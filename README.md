@@ -11,4 +11,6 @@ Jeu de course et de bataille en vue de dessus, jouable en ligne entre potes (jus
 - **Fin de course** : replay au ralenti, photo-finish, podium animé, finale du Grand Prix
 - Clavier ou manette, bots, chat, émotes
 
+Version actuelle : **1.1** — voir le [journal des versions](CHANGELOG.md).
+
 by Amiel and Claude

@@ -111,6 +111,40 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
 .seg button:last-child{border-right:0}
 .seg button.sel{background:var(--ink);color:var(--yellow)}
 .locked .trk,.locked .seg button,.locked .pills button{cursor:default;pointer-events:none}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.steps button{display:flex;align-items:center;gap:9px;border:3px solid var(--ink);border-radius:12px;background:#fff;padding:7px 10px;cursor:pointer;font:inherit;color:var(--ink);text-align:left;min-width:0}
+.steps button i{font-style:normal;flex:none;width:26px;height:26px;border-radius:50%;background:#efe6d2;display:flex;align-items:center;justify-content:center;font-family:Bungee,Impact,sans-serif;font-size:13px}
+.steps button span{display:flex;flex-direction:column;min-width:0}
+.steps button b{font-size:14.5px}
+.steps button small{font-size:11.5px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps button.on{background:var(--ink);color:var(--paper)}
+.steps button.on i{background:var(--yellow);color:var(--ink)}
+.steps button.on small{color:rgba(255,248,234,.7)}
+.step{display:none}.step.on{display:block}
+.lbl-note{text-transform:none;letter-spacing:0;font-weight:600}
+.modes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.mcard{border:3px solid var(--ink);border-radius:12px;background:#fff;padding:9px 11px;cursor:pointer;font:inherit;color:var(--ink);text-align:left;display:flex;flex-direction:column;gap:3px;transition:transform .08s}
+.mcard:hover{transform:translateY(-2px)}
+.mcard .ic{font-size:24px;line-height:1}
+.mcard b{font-size:15px}
+.mcard small{font-size:12px;color:var(--muted);font-weight:600;line-height:1.3}
+.mcard.sel{background:var(--yellow);box-shadow:4px 4px 0 var(--ink)}
+.mcard.sel small{color:var(--ink)}
+#trkTabs{margin-bottom:10px}
+.tracks.big{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.trk-info{margin-top:12px;border:3px solid var(--ink);border-radius:12px;background:#fff;padding:10px 12px;display:flex;gap:12px;align-items:flex-start}
+.trk-info .ti-main{flex:1;min-width:0}
+.trk-info b{font-size:17px}
+.trk-info p{margin:3px 0 0;font-size:13.5px;font-weight:600;color:var(--muted);line-height:1.4}
+.trk-info .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.trk-info .tags span{background:#efe6d2;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:700}
+.trk-info .med{flex:none;text-align:right;font-weight:700;font-size:13px}
+.trk-info .med div{font-size:26px}
+.optgrid{display:flex;flex-direction:column;gap:9px}
+.orow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-weight:700;font-size:14.5px;border-bottom:2px dashed var(--line2);padding-bottom:9px}
+.more{margin-top:12px;font:inherit;font-weight:700;font-size:14px;border:2px dashed var(--ink);border-radius:9px;background:transparent;padding:6px 12px;cursor:pointer;color:var(--ink)}
+#moreOpts{display:none}#moreOpts.on{display:block}
+.locked .mcard,.locked #trkTabs button{cursor:default;pointer-events:none}
 .lobby-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
 .hint{font-size:14px;color:var(--muted);font-weight:600}
 .res{list-style:none;margin:0 0 14px;padding:0}
@@ -163,6 +197,15 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
 .ctrl td{padding:5px 6px;border-top:2px dashed var(--line2);font-weight:600}
 .ctrl td:first-child{font-weight:700}
 #menu{padding-bottom:48px}
+.ver{position:fixed;left:14px;bottom:14px;background:rgba(22,24,29,.82);border:2px solid rgba(255,248,234,.25);border-radius:999px;padding:5px 14px;color:var(--yellow);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.ver:hover{border-color:var(--yellow)}
+.news-ver{border:3px solid var(--ink);border-radius:12px;background:#fff;padding:10px 14px;margin-bottom:10px}
+.news-ver.cur{background:#fff8dd}
+.news-ver h3{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:18px;margin:0}
+.news-ver h3 span{font-family:"Chakra Petch",sans-serif;font-size:11px;background:var(--ink);color:var(--yellow);border-radius:6px;padding:2px 7px;vertical-align:3px;margin-left:6px}
+.news-ver small{color:var(--muted);font-weight:700}
+.news-ver ul{margin:6px 0 0;padding-left:20px;font-weight:600;font-size:14.5px;line-height:1.45}
+@media(max-width:700px){.ver{bottom:56px}}
 .menu-sub.three{grid-template-columns:1fr 1fr 1fr}
 .prof-chip{display:flex;align-items:center;gap:12px;width:100%;border:3px solid var(--ink);border-radius:12px;background:#fff;padding:8px 12px;cursor:pointer;font:inherit;text-align:left;color:var(--ink);transition:transform .08s}
 .prof-chip:hover{transform:translateY(-2px);box-shadow:4px 4px 0 var(--ink)}
@@ -255,6 +298,7 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
     </div>
   </div>
   <div class="credit">by <b>Amiel</b> and <b>Claude</b></div>
+  <button class="ver" id="btnNews">v</button>
 </div>
 
 <!-- GARAGE -->
@@ -276,6 +320,15 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
       </div>
     </div>
     <div class="lobby-foot"><span class="hint">Tout est gardé pour les prochaines parties.</span><button class="btn" id="btnGarageOk">Terminé</button></div>
+  </div>
+</div>
+
+<!-- NOUVEAUTÉS -->
+<div class="screen" id="news">
+  <div class="card wide">
+    <h2>Nouveautés</h2>
+    <div id="newsList"></div>
+    <div class="lobby-foot"><span class="hint">Chaque mise à jour est listée ici.</span><button class="btn" id="btnNewsOk">Compris !</button></div>
   </div>
 </div>
 
@@ -362,21 +415,34 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
         </div>
       </div>
       <div id="settings">
-        <div class="lbl" style="margin-top:0">Mode</div><div class="pills" id="sMode"></div>
-        <p class="modeDesc" id="modeDesc"></p>
-        <div class="lbl" id="trkLbl">Circuit</div><div class="tracks" id="tracks"></div>
-        <div class="lbl" id="trkLbl2">Grandes villes <span style="text-transform:none;letter-spacing:0;font-weight:600">· plus grandes, une mécanique chacune</span></div><div class="tracks" id="tracks2"></div>
-        <div class="opts">
-          <div id="oLaps"><div class="lbl">Tours</div><div class="seg" id="sLaps"></div></div>
-          <div id="oGp"><div class="lbl">Manches</div><div class="seg" id="sGp"></div></div>
-          <div id="oItems"><div class="lbl">Objets</div><div class="seg" id="sItems"></div></div>
-          <div id="oTeams"><div class="lbl">Équipes</div><div class="seg" id="sTeams"></div></div>
+        <div class="steps" id="steps">
+          <button data-step="mode"><i>1</i><span><b>Mode</b><small id="stMode"></small></span></button>
+          <button data-step="track"><i>2</i><span><b id="stTrackLbl">Circuit</b><small id="stTrack"></small></span></button>
+          <button data-step="opts"><i>3</i><span><b>Réglages</b><small id="stOpts"></small></span></button>
         </div>
-        <div class="lbl">Météo</div><div class="pills" id="sWeather"></div>
-        <div class="lbl">Mutateurs <small style="text-transform:none;letter-spacing:0">(à combiner)</small></div><div class="pills" id="sMut"></div><p class="modeDesc" id="mutDesc"></p>
-        <div class="opts">
-          <div><div class="lbl">Bots pour compléter</div><div class="seg" id="sBots"></div></div>
-          <div><div class="lbl">Niveau des bots</div><div class="seg" id="sBotLv"></div></div>
+        <div class="step" id="stepMode">
+          <div class="lbl" style="margin-top:4px">Courses</div><div class="modes" id="modesRace"></div>
+          <div class="lbl">Jeux de fête <span class="lbl-note">· dans une arène</span></div><div class="modes" id="modesParty"></div>
+        </div>
+        <div class="step" id="stepTrack">
+          <div class="seg" id="trkTabs"></div>
+          <div class="tracks" id="tracks"></div>
+          <div class="trk-info" id="trkInfo"></div>
+        </div>
+        <div class="step" id="stepOpts">
+          <div class="optgrid">
+            <div class="orow" id="oLaps"><span>Tours</span><div class="seg" id="sLaps"></div></div>
+            <div class="orow" id="oGp"><span>Manches</span><div class="seg" id="sGp"></div></div>
+            <div class="orow" id="oItems"><span>Objets</span><div class="seg" id="sItems"></div></div>
+            <div class="orow" id="oTeams"><span>Équipes</span><div class="seg" id="sTeams"></div></div>
+            <div class="orow"><span>Bots pour compléter</span><div class="seg" id="sBots"></div></div>
+            <div class="orow" id="oBotLv"><span>Niveau des bots</span><div class="seg" id="sBotLv"></div></div>
+          </div>
+          <button class="more" id="btnMore"></button>
+          <div id="moreOpts">
+            <div class="lbl">Météo</div><div class="pills" id="sWeather"></div>
+            <div class="lbl">Mutateurs <span class="lbl-note">· à combiner</span></div><div class="pills" id="sMut"></div><p class="modeDesc" id="mutDesc"></p>
+          </div>
         </div>
       </div>
     </div>
@@ -2374,6 +2440,7 @@ function stepCar(c, inp, dt, tr, r){
   if(c.shrink>0) maxMul*=0.68;
   if(r.mut.vitesse) maxMul*=1.3; if(r.mut.glace) gripMul*=0.35; if(r.mut.turbo) c.nitro=Math.min(1,c.nitro+0.3*dt);
   if(r.mode==='patate' && r.mx.holder===c.id) maxMul*=1.1;
+  if(c.rb && c.ctl==='bot') maxMul*=1+c.rb;
   c.padCool-=dt;
   for(const p of tr.pads){ const dx=c.x-p.x, dy=c.y-p.y, al=dx*Math.cos(p.a)+dy*Math.sin(p.a), la=-dx*Math.sin(p.a)+dy*Math.cos(p.a);
     if(Math.abs(al)<38 && Math.abs(la)<30){ c.boostT=Math.max(c.boostT,1.0); if(c.padCool<=0){ c.padCool=0.6; if(c.ctl==='local'){ AudioSys.play('pad'); Pad.rumble(0.3,200); } if(vf>0) vf=Math.max(vf, K.max*1.05); } } }
@@ -2537,13 +2604,15 @@ const ITEMS = { turbo:'Turbo', oil:'Huile', shield:'Bouclier', missile:'Missile'
 const ITEM_IDS = Object.keys(ITEMS);
 function rollItem(c, r){
   let w;
-  if(isArenaMode(r.mode)) w = r.mut.folie ? {ball:15,triple:20,mine:12,bomb:20,missile:10,zap:8,phantom:5} : {ball:20,triple:11,mine:14,bomb:14,phantom:8,shield:9,oil:7,wall:5,turbo:6,zap:3,missile:3};
+  if(isArenaMode(r.mode)) w = r.mut.folie ? {ball:15,triple:20,mine:12,bomb:20,missile:10,zap:8,phantom:5} : {ball:22,triple:12,mine:14,bomb:8,phantom:9,shield:10,oil:8,wall:6,turbo:8,zap:2,missile:3};
   else if(r.mut.folie) w={missile:28,bomb:26,zap:14,oil:14,wall:10,shield:8};
   else { const n=r.list.filter(x=>!x.out&&!x.left).length, rk=rankOf(c,r);
-    if(n<2) w={turbo:5,oil:2,wall:2,shield:2,bomb:2};
-    else if(rk===1) w={oil:25,wall:25,shield:25,bomb:15,turbo:10};
-    else if(rk>=n) w={missile:30,turbo:25,zap:20,bomb:15,shield:10};
-    else w={missile:22,bomb:20,turbo:20,oil:10,wall:10,shield:12,zap:6}; }
+    if(n<2) w={turbo:5,oil:2,wall:2,shield:2,bomb:1};
+    else if(rk===1) w={oil:30,wall:28,shield:28,turbo:10,bomb:4};
+    else if(rk>=n) w={turbo:34,missile:28,shield:14,bomb:8,oil:6,zap:7};
+    else w={turbo:28,missile:20,oil:16,wall:12,shield:16,bomb:6,zap:2}; }
+  // l'éclair est rare : jamais deux à moins de 20 s d'écart
+  if(w.zap && performance.now()-(r.lastZap||-1e9)<20000) delete w.zap;
   let tot=0; for(const k in w) tot+=w[k]; let x=Math.random()*tot;
   for(const k in w){ x-=w[k]; if(x<=0) return k; } return 'turbo';
 }
@@ -2668,7 +2737,7 @@ function applyEvent(e){
     case 'mineboom': { const m=r.mines.find(q=>q.id===e.id); if(!m || m.dead) break; m.dead=true; explode(r,m.x,m.y);
       for(const c of r.list){ if(!c.sim || c.out || ownerMate(r,c,m.o)) continue; if(dist2(c,m)<110*110) spinOut(c,r,'mine',m.o); }
       break; }
-    case 'zap': { const o=C(e.o); r.flash=0.8; r.flashCol='255,240,120'; AudioSys.play('zap');
+    case 'zap': { const o=C(e.o); r.lastZap=now; r.flash=0.8; r.flashCol='255,240,120'; AudioSys.play('zap');
       if(o) feed(r, '⚡ '+o.name+" lance l'éclair", '#ffc531');
       for(const c of r.list){ if(!c.sim || c.out || c.id===(e.o|0) || ownerMate(r,c,e.o)) continue;
         if(c.shield>0){ if(c.ctl==='local') AudioSys.play('block'); continue; }
@@ -2750,11 +2819,16 @@ function botInput(c, r, now, lv, dt){
   const tr=r.tr, sp=Math.hypot(c.vx,c.vy), N=tr.N, i=c.idx, bl=botLine(tr), prof=botProf(tr,c.cls);
   // niveau : vitesse de passage en courbe et précision
   let skill=lv.speed;
-  if(lv!==AUTO && skill<0.99){ const hum=r.list.filter(o=>!o.bot && !o.left && !o.out);
+  // élastique : un bot distancé par le meilleur humain pousse plus fort (tous niveaux)
+  let behind=0;
+  if(lv!==AUTO){ const hum=r.list.filter(o=>!o.bot && !o.left && !o.out && !o.finished);
     if(hum.length){ const maxH=Math.max(...hum.map(o=>o.progress)), minH=Math.min(...hum.map(o=>o.progress));
-      if((maxH-c.progress)/N>0.2) skill*=1.06; else if((c.progress-minH)/N>0.35) skill*=0.95; } }
+      behind=(maxH-c.progress)/N;
+      c.rb = behind>0.06 ? Math.min(0.08,(behind-0.06)*0.3) : 0; if(c.rb) c.nitro=Math.min(1,c.nitro+0.1*dt);
+      if(behind>0.06) skill*=1+Math.min(0.13, (behind-0.06)*0.45);
+      else if(skill<0.99 && (c.progress-minH)/N>0.35) skill*=0.95; } }
   // le niveau joue surtout sur la vitesse de pointe : en virage, même les bots moyens restent proches de la limite
-  const cornerSkill=1-(1-skill)*0.45;
+  const cornerSkill=Math.min(1.03, 1-(1-skill)*0.45);
   let vt=Math.min(prof[(i+3)%N]*cornerSkill, CLASSES[c.cls].max*skill)*(1-0.12*r.rain);
   if(r.mut.glace) vt*=0.7; if(r.mut.vitesse && prof[(i+3)%N]>=CLASSES[c.cls].max*0.99) vt*=1.25;
   for(const hz of tr.hazards) if(hz.type==='ice' && Math.hypot(c.x-hz.x,c.y-hz.y)<hz.r+90) vt*=0.72;
@@ -2783,7 +2857,7 @@ function botInput(c, r, now, lv, dt){
   inp.down = sp>vt+30;
   if(Math.abs(d)>1.3 && sp>140){ inp.down=true; inp.thr=0; inp.up=false; }
   // nitro dans les longues lignes droites
-  if(lv.nitro && !c.finished && c.nitro>0.25 && Math.abs(d)<0.12 && sp<CLASSES[c.cls].max*1.2){ let m=1e9; for(let k=3;k<46;k+=3) m=Math.min(m,prof[(i+k)%N]); if(m>sp+120 && m>CLASSES[c.cls].max*0.92) inp.nitro=true; }
+  if(lv.nitro && !c.finished && c.nitro>0.25 && Math.abs(d)<0.12 && sp<CLASSES[c.cls].max*1.2){ let m=1e9; for(let k=3;k<46;k+=3) m=Math.min(m,prof[(i+k)%N]); if(m>sp+(behind>0.06?30:120) && m>CLASSES[c.cls].max*(behind>0.06?0.8:0.92)) inp.nitro=true; }
   // drift (Tokyo) : les bons bots tentent les zones de drift
   if(lv.drift && tr.mech==='drift' && c.dz!=null && c.dz>=0 && sp>220 && Math.abs(d)>0.18){ inp.hb=true; }
   // bloqué ou à l'envers : marche arrière puis replacement
@@ -3043,16 +3117,17 @@ function podiumEntries(res, r){
 function startCeremony(res){
   const r=G.race; if(!r) return;
   const gpFinal=!!(res.gp && res.gp.done), pod=podiumEntries(res, r);
-  if(pod.length<2){ showResults(res); return; }
-  const plan=replayPlan(r, res);
-  G.cer={ r, res, plan, gpFinal, pod, phase: plan?'replay':'podium', t:0, rt: plan?plan.t0:0, conf:[], fw:[], nextFw:0, flashes:[], snd:{}, dur: gpFinal?10500:7000 };
+  const plan=replayPlan(r, res), midGp = !!(res.gp && !res.gp.done);
+  // Grand Prix : pas de podium entre les manches, seulement le replay ; le podium arrive à la fin
+  if(pod.length<2 || (midGp && !plan)){ showResults(res); return; }
+  G.cer={ r, res, plan, gpFinal, pod, phase: plan?'replay':'podium', t:0, rt: plan?plan.t0:0, conf:[], fw:[], nextFw:0, flashes:[], snd:{}, dur: gpFinal?10500:7000, noPodium: midGp };
   G.state='ceremony'; showScreen('none'); closeRaceChat(); for(const k in keys) keys[k]=false;
   for(const c of r.list){ c.nitroOn=false; c.boostT=0; c.shield=0; c.phantom=0; c.inv=0; c.spin=0; c.emote=null; c.hornUntil=0; c.brake=false; }
   r.parts=[]; r.msg=null; r.shake=0;
   if(plan) AudioSys.play('rewind');
 }
 function skipCeremony(){ const C=G.cer; if(!C || G.state!=='ceremony') return;
-  if(C.phase==='replay'){ C.phase='podium'; C.t=0; AudioSys.play('click'); } else endCeremony(); }
+  if(C.phase==='replay' && !C.noPodium){ C.phase='podium'; C.t=0; AudioSys.play('click'); } else endCeremony(); }
 function endCeremony(){ const C=G.cer; G.cer=null; if(C && G.state==='ceremony' && G.race===C.r) showResults(C.res); }
 
 function applyReplayFrame(C, dt, rate){
@@ -3087,7 +3162,7 @@ function updateCeremony(dt, now){
     if(f){ const base=clamp(Math.min(W,H)/760,.58,1.3), tz=base*(near<700?1.45:1.15), k=1-Math.exp(-4*dt);
       if(C.t<30){ r.cam.x=f.x; r.cam.y=f.y; }
       r.cam.x+=(f.x-r.cam.x)*k; r.cam.y+=(f.y-r.cam.y)*k; r.cam.z+=(tz-r.cam.z)*(1-Math.exp(-2.5*dt)); }
-    if(C.rt>=P.t1){ C.phase='podium'; C.t=0; }
+    if(C.rt>=P.t1){ if(C.noPodium){ endCeremony(); return; } C.phase='podium'; C.t=0; }
     return;
   }
   // podium : les sons suivent la mise en scène
@@ -4004,7 +4079,7 @@ const Pad = {
     el=list[this.focus];
     if(this.take('a') && el){ if(el.tagName==='INPUT') el.focus(); else el.click(); AudioSys.play('click'); }
     if(this.take('start')){ const p = $('.screen.on #btnStart:not(:disabled)') || $('.screen.on #resActions .btn') || $('.screen.on #btnGarageOk') || $('.screen.on #btnPrefsOk') || $('.screen.on #btnSolo'); if(p) p.click(); }
-    if(this.take('b')){ if(G.state==='garage') $('#btnGarageOk').click(); else if(G.state==='prefs') $('#btnPrefsOk').click(); else if(G.state==='profile') $('#btnProfileOk').click(); }
+    if(this.take('b')){ if(G.state==='garage') $('#btnGarageOk').click(); else if(G.state==='prefs') $('#btnPrefsOk').click(); else if(G.state==='profile') $('#btnProfileOk').click(); else if(G.state==='news') $('#btnNewsOk').click(); }
   },
   mark(list){ document.querySelectorAll('.padfocus').forEach(x=>x.classList.remove('padfocus')); const el=list[this.focus]; if(el){ el.classList.add('padfocus'); el.scrollIntoView({block:'nearest'}); } }
 };
@@ -4177,35 +4252,7 @@ function renderLobby(){
   renderEvening();
   renderChat();
   $('#settings').classList.toggle('locked', guest);
-  pills('sMode', Object.fromEntries(Object.entries(MODES).map(([k,v])=>[k,v.name])), mode, v=>setSet('mode',v));
-  $('#modeDesc').textContent = MODES[mode].desc;
-  const box1=$('#tracks'), box2=$('#tracks2'); box1.innerHTML=''; box2.innerHTML='';
-  const list = arena ? [trackById(modeTrack(set))] : TRACKS;
-  $('#trkLbl').textContent = mode==='foot' ? 'Stade' : arena ? 'Arène' : mode==='gp' ? 'Premier circuit' : 'Circuits';
-  $('#trkLbl2').style.display = $('#tracks2').style.display = arena ? 'none' : '';
-  list.forEach(tr=>{ const box = tr.theme.city ? box2 : box1;
-    const b=document.createElement('button'); b.className='trk'+((arena || tr.id===set.track)?' sel':'');
-    b.appendChild(trackPreview(tr,240,150));
-    const t=document.createElement('b'); t.textContent=tr.name; b.appendChild(t);
-    const s=document.createElement('span'); s.textContent = tr.arena ? ({battle:'3 ballons · 3 min', patate:'Dernier survivant', roi:ROI_TARGET+' pts · 2 min 30', foot:FOOT_TARGET+' buts · 3 min'})[mode] : (tr.theme.city ? MECH_INFO[tr.theme.mech] : tr.theme.label)+' · '+Math.round(tr.L*0.32/3.6/10)*10+' m'; b.appendChild(s);
-    if(!tr.arena){ const r=document.createElement('span'); r.className='rec'; const md=P.medals[tr.id]||0; r.textContent=(md?MEDALS[md].ico+' ':'')+'Record : '+(records[tr.id]!=null?fmtTime(records[tr.id]):'—'); b.appendChild(r);
-      b.onclick=()=>setSet('track',tr.id); }
-    box.appendChild(b);
-  });
-  $('#oLaps').style.display = (mode==='race'||mode==='gp') ? '' : 'none';
-  $('#oGp').style.display = mode==='gp' ? '' : 'none';
-  $('#oItems').style.display = arena ? 'none' : '';
-  $('#oTeams').style.display = (mode==='elim'||mode==='patate'||mode==='foot') ? 'none' : '';
-  { const box=$('#sMut'); box.innerHTML=''; for(const k in MUTATORS){ const b=document.createElement('button'); b.textContent=MUTATORS[k]; b.title=MUT_DESC[k]; b.className=set.mut.includes(k)?'sel':'';
-      b.onclick=()=>{ const m=new Set(G.set.mut); if(m.has(k)) m.delete(k); else m.add(k); setSet('mut',[...m]); }; box.appendChild(b); }
-    $('#mutDesc').textContent = set.mut.length ? set.mut.map(k=>MUT_DESC[k]).join(' · ')+' — pas de record ni de médaille' : ''; }
-  buildSeg('sLaps', [[3,'3'],[5,'5'],[10,'10']], set.laps, v=>setSet('laps',v));
-  buildSeg('sGp', [[3,'3'],[4,'4'],[6,'6']], set.gpLen, v=>setSet('gpLen',v));
-  buildSeg('sItems', [[true,'Oui'],[false,'Non']], set.items, v=>setSet('items',v));
-  buildSeg('sTeams', [[false,'Non'],[true,'Rouge/Bleue']], set.teams, v=>setSet('teams',v));
-  pills('sWeather', WEATHER, set.weather, v=>setSet('weather',v));
-  buildSeg('sBots', [0,1,2,3,4].map(n=>[n,String(n)]), set.bots, v=>setSet('bots',v));
-  buildSeg('sBotLv', [[1,'Facile'],[2,'Moyen'],[3,'Difficile']], set.botLv, v=>setSet('botLv',v));
+  renderSettings(set, mode, arena);
   const btn=$('#btnStart');
   btn.style.display = guest ? 'none' : '';
   btn.textContent = mode==='gp' ? 'Lancer le Grand Prix' : mode==='battle' ? 'Lancer la bataille' : arena ? 'Lancer la partie' : 'Lancer la course';
@@ -4215,6 +4262,73 @@ function renderLobby(){
   else if(!canStart()) hint = mode==='foot' ? 'Il faut au moins un joueur dans chaque équipe : ajoute un bot' : 'Il faut au moins 2 participants : ajoute un bot ou un joueur';
   else if(host && humans===1) hint='Envoie le code à tes potes';
   $('#lobbyHint').textContent=hint;
+}
+const MODE_CARDS = { race:['🏁','Le premier à boucler les tours'], gp:['🏆','Plusieurs circuits, des points à chaque manche'], elim:['☠️','Le dernier est éliminé à chaque tour'],
+  battle:['🎈','3 ballons : crève ceux des autres'], patate:['💣','Refile la bombe avant qu\'elle explose'], roi:['👑','Reste seul dans la zone à couronne'], foot:['⚽','2 équipes, 1 ballon géant'] };
+const CITY_HELP = { cobble:'Des portions pavées font glisser : freine un peu plus tôt.', wind:'Des rafales de vent poussent les voitures sur le côté.', tram:'Des tramways traversent la piste : attends-les ou passe vite.', taxi:'Des taxis roulent sur le circuit : évite-les.', drift:'Drifte dans les zones roses pour remplir ton turbo.' };
+const THEME_HELP = { forest:'Une boucle rapide à travers la forêt.', autumn:'Des lacets serrés sous les feuilles mortes.', beach:'Au bord de la mer, gare au sable.', desert:'De grandes courbes au fond du canyon.', snow:'Col enneigé : les plaques de glace font glisser.', city:'Circuit urbain de nuit, aux angles droits.' };
+const HAZ_NAME = { ice:'plaques de glace', puddle:'flaques', sand:'bacs à sable', mud:'boue' };
+G.lobbyStep='mode'; G.trkTab=null; G.lobbyMore=false;
+function goStep(st){ G.lobbyStep=st; renderLobby(); AudioSys.play('click'); }
+for(const b of document.querySelectorAll('#steps button')) b.onclick=()=>goStep(b.dataset.step);
+$('#btnMore').onclick=()=>{ G.lobbyMore=!G.lobbyMore; renderLobby(); AudioSys.play('click'); };
+function renderSettings(set, mode, arena){
+  const st=G.lobbyStep;
+  for(const b of document.querySelectorAll('#steps button')) b.classList.toggle('on', b.dataset.step===st);
+  $('#stepMode').classList.toggle('on', st==='mode'); $('#stepTrack').classList.toggle('on', st==='track'); $('#stepOpts').classList.toggle('on', st==='opts');
+  const tr0 = trackById(modeTrack(set));
+  $('#stMode').textContent = MODES[mode].name;
+  $('#stTrackLbl').textContent = mode==='foot' ? 'Stade' : arena ? 'Arène' : 'Circuit';
+  $('#stTrack').textContent = tr0.name + (mode==='gp' ? ' + '+(set.gpLen-1)+' autres' : '');
+  const lvName=['','faciles','moyens','difficiles'][set.botLv];
+  const bits=[]; if(mode==='race'||mode==='gp') bits.push(set.laps+' tours'); if(mode==='gp') bits.push(set.gpLen+' manches');
+  bits.push(set.bots ? set.bots+' bot'+(set.bots>1?'s':'')+' '+lvName.replace(/s$/, set.bots>1?'s':'') : 'sans bots'); if(set.mut.length) bits.push(set.mut.length+' mutateur'+(set.mut.length>1?'s':''));
+  $('#stOpts').textContent = bits.join(' · ');
+  // 1. modes
+  const mk=(box,ids)=>{ box.innerHTML=''; for(const k of ids){ const b=document.createElement('button'); b.className='mcard'+(k===mode?' sel':'');
+      b.innerHTML='<span class="ic">'+MODE_CARDS[k][0]+'</span><b>'+esc(MODES[k].name)+'</b><small>'+esc(MODE_CARDS[k][1])+'</small>';
+      b.onclick=()=>{ G.lobbyStep = isArenaMode(k) ? 'opts' : 'track'; setSet('mode',k); }; box.appendChild(b); } };
+  mk($('#modesRace'), ['race','gp','elim']); mk($('#modesParty'), ['battle','patate','roi','foot']);
+  // 2. circuit
+  const tabs=$('#trkTabs'), box=$('#tracks'), info=$('#trkInfo'); box.innerHTML='';
+  box.classList.toggle('big', true);
+  if(arena){ tabs.style.display='none';
+    const b=document.createElement('button'); b.className='trk sel'; b.appendChild(trackPreview(tr0,240,150)); const t=document.createElement('b'); t.textContent=tr0.name; b.appendChild(t); box.appendChild(b);
+    info.innerHTML='<div class="ti-main"><b>'+esc(MODES[mode].name)+'</b><p>'+esc(MODES[mode].desc)+'</p></div>';
+  } else {
+    if(!G.trkTab) G.trkTab = TRACKS[set.track].theme.city ? 'city' : 'classic';
+    tabs.style.display=''; buildSeg('trkTabs', [['classic','Circuits classiques'],['city','Grandes villes']], G.trkTab, v=>{ G.trkTab=v; renderLobby(); AudioSys.play('click'); });
+    for(const tr of TRACKS){ if(!!tr.theme.city !== (G.trkTab==='city')) continue;
+      const b=document.createElement('button'); b.className='trk'+(tr.id===set.track?' sel':''); b.appendChild(trackPreview(tr,240,150));
+      const t=document.createElement('b'); const md=P.medals[tr.id]||0; t.textContent=tr.name+(md?' '+MEDALS[md].ico:''); b.appendChild(t);
+      b.onclick=()=>setSet('track',tr.id); box.appendChild(b); }
+    const tr=TRACKS[set.track], th=tr.theme, md=P.medals[tr.id]||0, mt=medalTimes(tr);
+    const tags=[Math.round(tr.L*0.32/3.6/10)*10+' m'];
+    if(tr.ramps && tr.ramps.some(q=>q.kind==='jump')) tags.push('Tremplins'); if(tr.ramps && tr.ramps.some(q=>q.kind==='short')) tags.push('Raccourci par les airs');
+    if(th.city) tags.push(MECH_INFO[th.mech]); else if(tr.hazards.length) tags.push(HAZ_NAME[tr.hazards[0].type]||'pièges');
+    const desc = th.city ? CITY_HELP[th.mech] : (THEME_HELP[th.deco]||th.label);
+    info.innerHTML='<div class="ti-main"><b>'+esc(tr.name)+(mode==='gp'?' <small style="font-size:12px;color:var(--muted)">(1re manche)</small>':'')+'</b><p>'+esc(desc)+'</p><div class="tags">'+tags.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div>'+
+      '<div class="med"><div>'+(md?MEDALS[md].ico:'·')+'</div>Record '+(records[tr.id]!=null?fmtTime(records[tr.id]):'—')+'<br><span style="color:var(--muted)">'+(md<4?'Objectif '+MEDALS[md+1].ico+' '+fmtTime(mt[md+1]):'Tout gagné !')+'</span></div>';
+  }
+  // 3. réglages
+  $('#oLaps').style.display = (mode==='race'||mode==='gp') ? '' : 'none';
+  $('#oGp').style.display = mode==='gp' ? '' : 'none';
+  $('#oItems').style.display = arena ? 'none' : '';
+  $('#oTeams').style.display = (mode==='elim'||mode==='patate'||mode==='foot') ? 'none' : '';
+  $('#oBotLv').style.display = set.bots ? '' : 'none';
+  buildSeg('sLaps', [[3,'3'],[5,'5'],[10,'10']], set.laps, v=>setSet('laps',v));
+  buildSeg('sGp', [[3,'3'],[4,'4'],[6,'6']], set.gpLen, v=>setSet('gpLen',v));
+  buildSeg('sItems', [[true,'Oui'],[false,'Non']], set.items, v=>setSet('items',v));
+  buildSeg('sTeams', [[false,'Non'],[true,'Rouge / Bleue']], set.teams, v=>setSet('teams',v));
+  buildSeg('sBots', [0,1,2,3,4].map(n=>[n,String(n)]), set.bots, v=>setSet('bots',v));
+  buildSeg('sBotLv', [[1,'Facile'],[2,'Moyen'],[3,'Difficile']], set.botLv, v=>setSet('botLv',v));
+  const extra = (set.weather!=='clear') || set.mut.length;
+  $('#btnMore').textContent = (G.lobbyMore ? '▴ Moins d\'options' : '▾ Plus d\'options : météo, mutateurs') + (!G.lobbyMore && extra ? ' ('+[set.weather!=='clear'?WEATHER[set.weather]:null, set.mut.length?set.mut.length+' mutateur'+(set.mut.length>1?'s':''):null].filter(Boolean).join(', ')+')' : '');
+  $('#moreOpts').classList.toggle('on', G.lobbyMore);
+  pills('sWeather', WEATHER, set.weather, v=>setSet('weather',v));
+  { const b2=$('#sMut'); b2.innerHTML=''; for(const k in MUTATORS){ const b=document.createElement('button'); b.textContent=MUTATORS[k]; b.title=MUT_DESC[k]; b.className=set.mut.includes(k)?'sel':'';
+      b.onclick=()=>{ const m=new Set(G.set.mut); if(m.has(k)) m.delete(k); else m.add(k); setSet('mut',[...m]); }; b2.appendChild(b); }
+    $('#mutDesc').textContent = set.mut.length ? set.mut.map(k=>MUT_DESC[k]).join(' · ')+' — pas de record ni de médaille' : ''; }
 }
 function showLobby(){ G.state='lobby'; G.race=null; showScreen('lobby'); renderLobby(); }
 $('#btnCopy').onclick = async ()=>{ try{ await navigator.clipboard.writeText(G.code); toast('Code copié : '+G.code,1600); } catch(e){ toast('Code : '+G.code,2500); } };
@@ -4352,6 +4466,38 @@ function renderEvening(){
 }
 
 /* =====================================================================
+   VERSION ET JOURNAL DES NOUVEAUTÉS
+   ===================================================================== */
+const VERSION = '1.1';
+const CHANGELOG = [
+  { v:'1.1', date:'18 octobre 2026', items:[
+    'Nouveau salon en 3 étapes : Mode, Circuit, Réglages. Les options rares sont rangées dans « Plus d\'options ».',
+    'Bots plus rapides dans les virages, et ils ne se laissent plus distancer par les humains.',
+    'Éclair et bombe beaucoup plus rares en course (et jamais deux éclairs à moins de 20 s).',
+    'Grand Prix : le podium n\'arrive qu\'à la fin de la dernière manche.',
+    'Numéro de version et journal des nouveautés.'
+  ]},
+  { v:'1.0', date:'18 octobre 2026', items:[
+    'Jeu en ligne à jusqu\'à 5 joueurs (peer-to-peer), bots, chat, émotes, manette.',
+    'Modes Course, Grand Prix, Élimination, Bataille, Patate chaude, Roi de la colline, Foot en voiture.',
+    '11 circuits dont 5 grandes villes (Paris, Nice, Milan, New York, Tokyo), tremplins et raccourcis.',
+    'Mutateurs : Nitro infini, Vitesse ×1,3, Patinoire, Objets en folie, Voitures fantômes.',
+    'Progression : niveaux, pièces, garage à débloquer, défis du jour, succès, médailles, fantômes, rivalités.',
+    'Replay au ralenti, photo-finish, podium animé et finale du Grand Prix.'
+  ]}
+];
+function renderNews(){
+  $('#newsList').innerHTML = CHANGELOG.map((c,i)=>'<div class="news-ver'+(i===0?' cur':'')+'"><h3>Version '+esc(c.v)+(i===0?' <span>actuelle</span>':'')+'</h3><small>'+esc(c.date)+'</small><ul>'+
+    c.items.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>').join('');
+}
+function openNews(){ G.state='news'; renderNews(); showScreen('news'); AudioSys.play('click'); }
+function closeNews(){ store.set('dd_seen_ver', VERSION); showMenu(); }
+$('#btnNews').textContent = 'v'+VERSION+' · Nouveautés';
+$('#btnNews').onclick = openNews;
+$('#btnNewsOk').onclick = closeNews;
+function maybeShowNews(){ if(store.get('dd_seen_ver',null)!==VERSION) openNews(); }
+
+/* =====================================================================
    BOUCLE PRINCIPALE
    ===================================================================== */
 function update(dt, now){
@@ -4403,7 +4549,7 @@ function frame(){ if(!isHidden()) step(true); requestAnimationFrame(frame); }
   }catch(e){ setInterval(tick,33); }
 })();
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ for(const k in keys) keys[k]=false; } });
-buildSwatches(); buildClasses(); buildVolumes(); padInfo(); renderMenuCar(); renderProfChip();
+buildSwatches(); buildClasses(); buildVolumes(); padInfo(); renderMenuCar(); renderProfChip(); maybeShowNews();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>renderMenuCar());
 requestAnimationFrame(frame);
 window.__dd = { BOT_TUNE, G, TRACKS, ARENA, keys, nearest, AudioSys, records, Pad, roster, P, medalTimes, levelInfo, saveProfile };
