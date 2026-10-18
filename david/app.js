@@ -14,7 +14,7 @@ function boot(info) {
   const me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name, color: meP ? meP.color : prof.color };
   const qs = new URLSearchParams(location.search);
   const settings = H.embedded ? info.settings || {} : {
-    mode: qs.get('mode') || 'classic', bots: 3,
+    mode: qs.get('mode') || 'classic', bots: 3, level: qs.get('level') || 'normal',
     jackpot: qs.get('jackpot'), doubleGo: qs.get('doubleGo'), auctions: qs.get('auctions') ?? 1, cash: qs.get('cash'),
   };
 

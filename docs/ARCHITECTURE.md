@@ -71,7 +71,7 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── rng.js                 aléa reproductible (graine) : dés, mélange des cartes
 │   │   ├── valuation.js           patrimoine net, monopoles, classement
 │   │   ├── markov.js              probabilités d'arrivée (chaîne de Markov), rendement des propriétés
-│   │   ├── bot.js                 joueur automatique
+│   │   ├── bot.js                 bots facile / expert (+ bot-normal.js)
 │   │   └── resume.js              reprise : renumérotation des joueurs, décalage du chrono
 │   ├── net/
 │   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
@@ -93,7 +93,8 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   └── assets/                    sons, textures
 ├── tools/
 │   ├── check-board.mjs            contrôle de fidélité du plateau (étape 1)
-│   └── test-rules.mjs             tests du moteur (étape 2)
+│   ├── test-rules.mjs             tests du moteur (étape 2)
+│   └── bot-arena.mjs              tournoi entre niveaux de bots
 └── docs/ARCHITECTURE.md
 ```
 

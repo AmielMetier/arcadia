@@ -23,9 +23,10 @@ Plateau 3D façon jeu de société, choix du pion parmi 10 figurines, statistiqu
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
-- `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator.
+- `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator ;
+  `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots.
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Version actuelle : **2.8** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.9** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

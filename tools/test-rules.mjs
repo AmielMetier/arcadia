@@ -339,6 +339,15 @@ test('échange : refus et annulation', () => {
   s = act(s, { type: 'CANCEL_TRADE', by: 0, trade: s.trades[0].id }).state; eq(s.trades, []);
 });
 
+test('échange devenu impossible : retiré automatiquement', () => {
+  let s = give(game(2), 0, 1); give(s, 0, 3); give(s, 1, 39);
+  s = act(s, { type: 'PROPOSE_TRADE', by: 0, to: 1, give: { cash: 1480 }, want: { props: [39] } }).state;
+  eq(s.trades.length, 1);
+  const r = act(s, { type: 'BUILD', by: 0, space: 1 }); // 0 dépense 50 € : il n'a plus 1 480 €
+  eq(r.state.trades, []);
+  ok(r.events.some((e) => e.k === 'TRADE_CANCELLED'), 'événement d\'annulation');
+});
+
 /* ----------------------------------------------------------- cartes */
 function withCard(s, deck, id) { const d = s.decks[deck]; d.pos = d.order.indexOf(id); return s; }
 

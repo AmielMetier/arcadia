@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.9 — 19 octobre 2026
+- Trois niveaux de bots, à choisir dans le salon :
+  - Facile : achète à moitié au hasard, construit peu, ne propose jamais d'échange ;
+  - Normal : le bot habituel ;
+  - Expert : juge la valeur stratégique des terrains (compléter ou bloquer un monopole), garde une réserve adaptée
+    aux loyers qui le menacent, construit là où le modèle de Markov promet le meilleur rendement, propose des échanges
+    (sans harceler : 3 essais au plus, espacés) et reste en prison quand le plateau devient dangereux.
+- Sur 180 parties de test, l'expert gagne environ deux parties sur trois face aux bots normaux.
+- Correctif : une proposition d'échange devenue impossible (argent dépensé, terrain bâti…) est retirée automatiquement ;
+  elle pouvait bloquer la partie.
+- Correctif : une proposition d'échange reçue ne se referme plus toute seule à l'action suivante.
+
 ## 2.8 — 19 octobre 2026
 - Si l'hôte quitte ou perd la connexion, le salon continue : le joueur suivant devient hôte en une seconde environ,
   sous un nouveau code, et les autres s'y reconnectent automatiquement en gardant leur place.

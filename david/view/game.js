@@ -462,7 +462,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
       const it = queue.shift();
       const backlog = queue.length;
       const speed = backlog >= 6 ? 8 : backlog >= 3 ? 3 : backlog >= 1 ? 1.7 : 1;
-      if (String(M.key).startsWith('buy') || String(M.key).startsWith('offer')) M.close(true);
+      if (String(M.key).startsWith('buy')) M.close(true); // une proposition d'échange reste ouverte tant qu'elle existe
       for (const e of it.events) {
         try { await play(e, speed, it.state); } catch (err) { console.error(err); }
       }

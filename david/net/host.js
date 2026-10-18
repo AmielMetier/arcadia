@@ -1,7 +1,7 @@
 // Hôte de DavidSimulator : détient l'état, applique le moteur, fait jouer les bots et gère les minuteurs.
 // Les invités n'envoient que des intentions ({ t:'act', a }) ; l'hôte renvoie l'état complet et les événements.
 import { createGame, reduce, actors } from '../engine/rules.js';
-import { botAction } from '../engine/bot.js';
+import { botAction, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { cleanHouse } from '../engine/modes.js';
 import { remapPlayers, resumeAt, proposeMapping } from '../engine/resume.js';
@@ -17,6 +17,8 @@ const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnect
 // initial : état d'une partie en cours, quand ce joueur reprend le rôle d'hôte après le départ du précédent
 export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, initial = null }) {
   let state = null;
+  const level = BOT_LEVELS.includes(settings.level) ? settings.level : 'normal';
+  const botMemory = {}; // échanges déjà proposés par les bots
   let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0;
   const humans = new Set();
 
@@ -65,7 +67,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     for (const id of ids) {
       const p = state.players.find((q) => q.id === id);
       if (!p || !p.bot || p.bankrupt) continue;
-      const a = botAction(state, board, id);
+      const a = botAction(state, board, id, { level, memory: botMemory });
       if (!a) continue;
       const delay = pace + (a.type === 'ROLL' ? 700 : a.type === 'END_TURN' ? 600 : a.type === 'BID' || a.type === 'PASS' ? 900 : 450);
       botTimer = setTimeout(() => {
@@ -104,7 +106,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
         seats: sv.state.players.map((p) => ({ name: p.name, token: p.token, color: p.color, bankrupt: p.bankrupt, cash: p.cash,
           to: map[p.id].bot ? null : (players.find((r) => r.id === map[p.id].id) || {}).name })) };
     }
-    return { players, picks: { ...picks }, mode, house, bots: botCount(players.filter((p) => p.ready).length), hostId: me.id, saves: list, resume };
+    return { players, picks: { ...picks }, mode, house, level, bots: botCount(players.filter((p) => p.ready).length), hostId: me.id, saves: list, resume };
   }
   function pushSetup() {
     if (state) return;

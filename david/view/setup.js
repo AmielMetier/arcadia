@@ -3,6 +3,12 @@ import { TOKENS, tokenSvg, tokenName } from './tokens.js';
 import { esc, el, store, save } from './util.js';
 import { sfx } from './sfx.js';
 
+const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['normal', 'normaux'], expert: ['expert', 'experts'] };
+export function botsLabel(n, level) {
+  const w = LEVEL_WORDS[level] || LEVEL_WORDS.normal;
+  return `${n} bot${n > 1 ? 's' : ''} ${n > 1 ? w[1] : w[0]}`;
+}
+
 export function houseChips(h) {
   if (!h) return '';
   const list = [`${h.cash.toLocaleString('fr-FR')} € au départ`];
@@ -39,7 +45,7 @@ export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave
     box.innerHTML = `
       <div class="setup-card">
         <div class="setup-head">
-          ${s.resume ? '<div><h1>Reprendre la partie</h1></div>' : `<div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</p>
+          ${s.resume ? '<div><h1>Reprendre la partie</h1></div>' : `<div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${botsLabel(s.bots, s.level)}` : ''}</p>
             ${houseChips(s.house)}</div>`}
           <button class="btn ghost small" id="suQuit">Quitter</button>
         </div>

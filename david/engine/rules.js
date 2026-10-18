@@ -109,6 +109,7 @@ export function reduce(state, action, board) {
   try {
     HANDLERS[action.type](ctx, action);
     settleDebts(ctx);
+    pruneTrades(ctx);
     settle(s);
     s.seq++;
     return { ok: true, state: s, events: ctx.ev };
@@ -461,6 +462,19 @@ function maybeCloseAuction(ctx) {
 }
 
 /* ------------------------------------------------------------------ échanges ------ */
+
+// Retire les propositions devenues impossibles (argent dépensé, terrain vendu, bâti ou hypothéqué entre-temps)
+function pruneTrades(ctx) {
+  const s = ctx.s;
+  if (!s.trades.length) return;
+  s.trades = s.trades.filter((t) => {
+    const from = P(s, t.from), to = P(s, t.to);
+    let ok = from && to && !from.bankrupt && !to.bankrupt;
+    if (ok) { try { checkSide(ctx, from, t.give, true); checkSide(ctx, to, t.want, false); } catch (e) { if (!(e instanceof RuleError)) throw e; ok = false; } }
+    if (!ok) ctx.ev.push({ k: 'TRADE_CANCELLED', trade: t.id, reason: 'invalid' });
+    return ok;
+  });
+}
 
 const emptySide = () => ({ cash: 0, props: [], cards: [] });
 
