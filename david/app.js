@@ -17,11 +17,13 @@ function boot(info) {
   const view = mountGame(root, board, {
     me,
     act: (a) => session.act(a),
+    pick: (token) => session.pick(token),
+    start: () => session.start(),
     exit: () => { if (H.embedded) H.exit(); else location.reload(); },
   });
   const handlers = {
     onState: (s, ev, offset) => view.update(s, ev, offset),
-    onWaiting: (ready, all) => view.waiting(ready, all, H.players),
+    onSetup: (s) => view.setup(s),
     onError: (msg) => view.toast(msg),
   };
   let session;

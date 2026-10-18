@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.3 — 18 octobre 2026
+- DavidSimulator prend le look d'un vrai jeu de société : plateau posé sur une table en bois, avec son épaisseur,
+  centre vert classique, logo en diagonale, paquets de cartes en pointillés, coins à 45°.
+- Choix du pion avant chaque partie : 10 pions façon figurines en métal (voiture, chapeau, chien, pointu, botte,
+  dé à coudre, chat, canard, chaise bleue, palmier). Un pion ne peut être pris qu'une fois ; ton favori est mémorisé.
+- Les pions tombent sur la case Départ au début de la partie.
+- Titres de propriété dans le style d'origine (loyers avec pointillés, prix des maisons, valeur hypothécaire).
+- Cartes Chance et Caisse de communauté redessinées.
+- Billets de couleur qui volent à chaque paiement ; le titre de propriété file vers l'acheteur.
+- Maisons et hôtels en volume.
+- Clic sur les cases fiable en vue 3D : la case visée est calculée à partir de la projection du plateau.
+
 ## 2.2 — 18 octobre 2026
 - Tableau de bord en direct : rang, liquide, valeur immobilière, monopoles, patrimoine net et mini-courbe pour chaque joueur.
 - Écran « Statistiques » (bouton 📊, en direct et en fin de partie) :

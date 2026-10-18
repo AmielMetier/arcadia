@@ -28,7 +28,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
   const s = {
     v: 1, board: board.id, mode, cfg, seed: seed >>> 0, seq: 0,
     players: players.map((p) => ({
-      id: p.id, name: p.name, color: p.color, bot: !!p.bot,
+      id: p.id, name: p.name, color: p.color, bot: !!p.bot, token: p.token || null,
       cash: cfg.startingCash, pos: 0, inJail: false, jailTries: 0, jailCards: [],
       bankrupt: false, bankruptAt: 0, left: false,
     })),

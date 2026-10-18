@@ -83,6 +83,8 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── fx.js                  pièces, montants flottants, bandeaux, tampons, cartes, confettis
 │   │   ├── modals.js              titre de propriété, achat, enchère, échange, mes biens, fin de partie
 │   │   ├── sfx.js                 sons synthétisés (WebAudio), sans fichier
+│   │   ├── tokens.js              10 pions en métal (SVG) avec socle à la couleur du joueur
+│   │   ├── setup.js               salle d'avant-partie : choix des pions, lancement par l'hôte
 │   │   ├── icons.js, util.js      icônes SVG et petits outils
 │   │   └── stats.js               statistiques : courbe, heatmap, classement, analyse financière (étape 4)
 │   └── assets/                    sons, textures
@@ -187,6 +189,16 @@ pour faire patienter les bots d'autant.
 
 Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
 tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
+
+## Avant-partie et clics (version 2.3)
+
+Avant `createGame`, l'hôte tient une petite salle d'avant-partie : les joueurs envoient `{ t:'pick', token }`,
+l'hôte vérifie qu'un pion n'est pris qu'une fois et diffuse `{ t:'setup', s }`. Au lancement, les bots et les
+retardataires reçoivent un pion libre au hasard ; le pion est stocké dans l'état (`player.token`).
+
+Le navigateur détecte mal les clics sur un plan incliné en CSS 3D (les cases et le plateau sont coplanaires).
+Les cases ne reçoivent donc plus la souris : le plateau repère ses 4 coins à l'écran, calcule l'homographie
+écran → plateau et en déduit la case visée. Les cases restent des boutons pour la navigation au clavier.
 
 ## Statistiques (étape 4)
 

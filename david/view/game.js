@@ -7,13 +7,14 @@ import { mountBoard } from './board.js';
 import { mountDice } from './dice.js';
 import { mountFx } from './fx.js';
 import { sfx } from './sfx.js';
-import { pawnSvg } from './icons.js';
+import { tokenSvg } from './tokens.js';
+import { mountSetup } from './setup.js';
 import { esc, money, el, wait } from './util.js';
 import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings } from '../engine/valuation.js';
 
-export function mountGame(root, board, { me, act, exit }) {
+export function mountGame(root, board, { me, act, pick, start, exit }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -44,6 +45,7 @@ export function mountGame(root, board, { me, act, exit }) {
   const F = mountFx(root);
   const M = mountModals(root);
   B.onStep = () => sfx.play('hop');
+  const SU = mountSetup(root, { me, pick, start, exit });
 
   let S = null, offset = 0, playing = false, first = true;
   const queue = [], seenAuto = new Set(), logLines = [];
@@ -137,7 +139,7 @@ export function mountGame(root, board, { me, act, exit }) {
     $('#roster').innerHTML = S.players.map((p) => {
       const w = netWorth(S, board, p.id);
       return `<div class="pcard-hud${p.id === cur ? ' cur' : ''}${p.bankrupt ? ' out' : ''}${p.id === me.id ? ' me' : ''}" data-pid="${p.id}" style="--pc:${p.color}">
-        <span class="mini">${pawnSvg(p.color, esc(p.name[0].toUpperCase()))}<i class="rk" title="Rang au patrimoine">${p.bankrupt ? '✕' : rank.get(p.id)}</i></span>
+        <span class="mini">${tokenSvg(p.token, p.color)}<i class="rk" title="Rang au patrimoine">${p.bankrupt ? '✕' : rank.get(p.id)}</i></span>
         <span class="who"><b>${esc(p.name)}</b><small>${p.id === me.id ? 'toi' : p.bot ? 'bot' : ''}${p.inJail ? ' · 🔒 prison' : ''}${p.jailCards.length ? ' · 🎟' : ''}</small></span>
         <span class="cash" title="Argent liquide">${money(cash[p.id] ?? p.cash)}</span>
         <span class="worth"><span title="Valeur immobilière">🏠 ${money(w.property + w.buildings)}</span><span title="Monopoles">♛ ${w.monopolies}</span><span class="net" title="Patrimoine net">Net ${money(w.total)}</span></span>
@@ -345,8 +347,8 @@ export function mountGame(root, board, { me, act, exit }) {
         if (quick) break;
         if (e.reason === 'go') { const c = B.cellScreen(0); F.float(c.x, c.y, '+' + money(e.amount), 'plus'); }
         sfx.play(e.to != null ? 'coin' : 'pay');
-        const big = e.reason === 'rent' || e.reason === 'go' || e.reason === 'card' || e.reason === 'trade';
-        if (big) await F.coins(a, b, Math.min(10, 3 + Math.round(e.amount / 60)), speed);
+        const big = e.reason === 'rent' || e.reason === 'go' || e.reason === 'card' || e.reason === 'trade' || e.reason === 'tax' || e.reason === 'buy' || e.reason === 'auction';
+        if (big) await F.bills(a, b, e.amount, speed);
         if (e.to != null && b) F.float(b.x, b.y, '+' + money(e.amount), 'plus');
         break;
       }
@@ -369,9 +371,9 @@ export function mountGame(root, board, { me, act, exit }) {
       case 'BUY': case 'GIFT': {
         const c = B.cells[e.space]; c.classList.add('owned'); c.style.setProperty('--own', col(e.player));
         if (quick) break;
-        const p = B.cellScreen(e.space);
+        const p = B.cellScreen(e.space), sp = board.spaces[e.space];
         sfx.play('buy'); F.burst(p.x, p.y, col(e.player)); F.stamp(p.x, p.y, e.k === 'GIFT' ? 'OFFERT' : 'VENDU', col(e.player));
-        await wait((e.k === 'GIFT' ? 350 : 750) / speed);
+        await F.deed(p, cardPoint(e.player), sp.color || '#2b2f3a', sp.name, e.k === 'GIFT' ? speed * 2 : speed);
         break;
       }
       case 'AUCTION_START':
@@ -461,8 +463,10 @@ export function mountGame(root, board, { me, act, exit }) {
       if (first || !events.length) {
         const wasFirst = first; first = false;
         if (!playing && !queue.length) {
+          SU.hide();
           apply(state);
           if (wasFirst) {
+            B.intro();
             for (const e of events) log(e);
             F.banner(state.mode === 'express' ? 'Partie Express' : 'Partie classique', 'Bonne chance à Nice !', '#e3262f', 1500);
             if (events.some((e) => e.k === 'GIFT')) toast('Mode Express : 3 propriétés offertes à chacun');
@@ -473,10 +477,7 @@ export function mountGame(root, board, { me, act, exit }) {
       queue.push({ state, events });
       run();
     },
-    waiting(ready, all, players) {
-      M.open('wait', `<h2>Installation du plateau…</h2><p>Joueurs prêts : <b>${ready.length}/${all.length}</b></p>
-        <p class="hint">${players.map((p) => esc(p.name) + (ready.includes(p.id) ? ' ✓' : ' …')).join(' · ')}</p>`, { closable: false });
-    },
+    setup(s) { if (!S) SU.render(s); },
     toast(msg) { sfx.play('error'); toast(msg); },
   };
 }

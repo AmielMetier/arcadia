@@ -56,9 +56,38 @@ export function buildSpots(i, count, hotel) {
   const by = s === 'bottom' ? r.y + band / 2 : s === 'top' ? r.y + r.h - band / 2 : r.y + r.h / 2;
   if (hotel) return [{ x: bx, y: by }];
   const pts = [];
+  const gap = along ? 15 : 16;
   for (let k = 0; k < count; k++) {
-    const off = (k - (count - 1) / 2) * 15;
+    const off = (k - (count - 1) / 2) * gap;
     pts.push(along ? { x: bx + off, y: by } : { x: bx, y: by + off });
   }
   return pts;
+}
+
+// Case qui contient le point (x, y) du plateau, ou -1
+export function cellAt(x, y) {
+  for (let i = 0; i < 40; i++) { const r = rect(i); if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i; }
+  return -1;
+}
+
+// Homographie : transforme les 4 points src en dst (résolution du système 8 × 8 par Gauss)
+export function homography(src, dst) {
+  const A = [], b = [];
+  for (let k = 0; k < 4; k++) {
+    const [x, y] = src[k], [u, v] = dst[k];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  for (let c = 0; c < 8; c++) {
+    let piv = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    [A[c], A[piv]] = [A[piv], A[c]]; [b[c], b[piv]] = [b[piv], b[c]];
+    for (let r = 0; r < 8; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c];
+      for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  const h = b.map((v, k) => v / A[k][k]);
+  return (x, y) => { const w = h[6] * x + h[7] * y + 1; return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w]; };
 }

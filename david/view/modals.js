@@ -1,27 +1,33 @@
 // Fenêtres d'interaction : titre de propriété, achat, enchère, échange, biens, fin de partie.
 import { esc, money, el, inkOn } from './util.js';
-import { spaceIcon, pawnSvg } from './icons.js';
+import { spaceIcon } from './icons.js';
+import { tokenSvg } from './tokens.js';
 import { ownsGroup, level, groupHasBuildings, ownedBy, standings, netWorth } from '../engine/valuation.js';
 
 /* ------------------------------------------------------------- titre de propriété */
 export function deedHtml(board, S, i, { compact = false } = {}) {
   const sp = board.spaces[i];
   const hph = S ? S.cfg.housesPerHotel : 4;
-  const head = sp.type === 'street'
-    ? `<header style="background:${sp.color};color:${inkOn(sp.color)}"><small>Titre de propriété · ${esc(board.groups[sp.group].name)}</small><b>${esc(sp.name)}</b></header>`
-    : `<header class="plain"><span class="ico">${spaceIcon(sp)}</span><b>${esc(sp.name)}</b></header>`;
-  let rows = '';
+  const line = (label, v) => `<li><span>${label}</span><i></i><b>${v}</b></li>`;
+  let body;
   if (sp.type === 'street') {
-    const lbl = ['Loyer terrain nu', 'Avec 1 maison', 'Avec 2 maisons', 'Avec 3 maisons', 'Avec 4 maisons', 'Avec hôtel'];
-    rows = sp.rent.map((r, k) => (k > hph && k < 5 ? '' : `<tr${k === 0 ? ' class="base"' : ''}><td>${lbl[k]}</td><td>${money(r)}</td></tr>`)).join('')
-      + `<tr class="note"><td colspan="2">Loyer doublé sur les terrains nus si tout le groupe est possédé</td></tr>`;
+    body = `<header style="background:${sp.color};color:${inkOn(sp.color)}"><small>TITRE DE PROPRIÉTÉ</small><b>${esc(sp.name)}</b></header>
+      <p class="rent0">LOYER <b>${money(sp.rent[0])}</b></p>
+      <ul>${[1, 2, 3, 4].filter((k) => k <= hph).map((k) => line(`Avec ${k} maison${k > 1 ? 's' : ''}`, money(sp.rent[k]))).join('')}${line('Avec HÔTEL', money(sp.rent[5]))}</ul>
+      <div class="sep"></div>
+      <p class="cost">Prix des maisons : <b>${money(sp.houseCost)}</b> chacune<br>Prix d'un hôtel : <b>${money(sp.houseCost)}</b> plus ${hph} maisons<br>Valeur hypothécaire : <b>${money(sp.mortgage)}</b></p>
+      <p class="fine">Si un joueur possède TOUS les terrains d'un groupe de couleur, le loyer est doublé sur les terrains nus de ce groupe.</p>`;
   } else if (sp.type === 'station') {
-    rows = sp.rent.map((r, k) => `<tr><td>${k + 1} pôle${k ? 's' : ''} possédé${k ? 's' : ''}</td><td>${money(r)}</td></tr>`).join('');
+    body = `<header class="plain"><span class="ico">${spaceIcon(sp)}</span><b>${esc(sp.name)}</b></header>
+      <ul>${line('Loyer', money(sp.rent[0]))}${line('Si 2 pôles sont possédés', money(sp.rent[1]))}${line('Si 3 pôles sont possédés', money(sp.rent[2]))}${line('Si 4 pôles sont possédés', money(sp.rent[3]))}</ul>
+      <div class="sep"></div><p class="cost">Valeur hypothécaire : <b>${money(sp.mortgage)}</b></p>`;
   } else {
-    rows = `<tr><td>1 compagnie possédée</td><td>4 × les dés</td></tr><tr><td>2 compagnies possédées</td><td>10 × les dés</td></tr>`;
+    body = `<header class="plain"><span class="ico">${spaceIcon(sp)}</span><b>${esc(sp.name)}</b></header>
+      <p class="util">Si l'on possède <b>UNE</b> compagnie, le loyer est <b>4 fois</b> le montant indiqué par les dés.</p>
+      <p class="util">Si l'on possède <b>LES DEUX</b> compagnies, le loyer est <b>10 fois</b> le montant indiqué par les dés.</p>
+      <div class="sep"></div><p class="cost">Valeur hypothécaire : <b>${money(sp.mortgage)}</b></p>`;
   }
-  const foot = `<footer><span>Prix <b>${money(sp.price)}</b></span><span>Hypothèque <b>${money(sp.mortgage)}</b></span>${sp.houseCost ? `<span>Maison <b>${money(sp.houseCost)}</b></span><span>Hôtel <b>${money(sp.houseCost)}</b> + ${hph} maisons</span>` : ''}</footer>`;
-  return `<div class="deed${compact ? ' compact' : ''}">${head}<table>${rows}</table>${foot}</div>`;
+  return `<div class="deed${compact ? ' compact' : ''}">${body}<p class="price">Prix d'achat ${money(sp.price)}</p></div>`;
 }
 
 /* ------------------------------------------------------------- gestionnaire */
@@ -172,7 +178,7 @@ export function overHtml(board, S, name) {
   const why = { bankruptcy: 'Première faillite : la partie Express s\'arrête au patrimoine.', time: 'Fin du chrono de 40 minutes : victoire au patrimoine.', lastStanding: 'Il ne reste qu\'un joueur solvable.' }[S.endReason] || '';
   const top = rows.slice(0, 3).map((r) => S.players.find((q) => q.id === r.id));
   const order = [top[1], top[0], top[2]];
-  const podium = order.map((p, k) => p ? `<div class="pod p${[2, 1, 3][k]}"><div class="pw">${pawnSvg(p.color, esc(p.name[0].toUpperCase()))}</div><b>${esc(p.name)}</b><div class="step">${[2, 1, 3][k]}</div></div>` : '<div class="pod empty"></div>').join('');
+  const podium = order.map((p, k) => p ? `<div class="pod p${[2, 1, 3][k]}"><div class="pw">${tokenSvg(p.token, p.color)}</div><b>${esc(p.name)}</b><div class="step">${[2, 1, 3][k]}</div></div>` : '<div class="pod empty"></div>').join('');
   return `<div class="over"><h2>${esc(name(S.winner))} l'emporte !</h2><p class="hint">${why}</p>
     <div class="podium">${podium}</div>
     <table class="rank"><tr><th>#</th><th>Joueur</th><th>Patrimoine</th><th>Loyers perçus</th><th>Loyers payés</th><th>Distance</th><th>Prison</th></tr>

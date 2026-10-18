@@ -1,7 +1,8 @@
 // Plateau en 3D (CSS) : cases, coins illustrés, centre niçois, pions, bâtiments, propriétaires, caméra.
 // Le plateau est un plan de 880 × 880 px incliné ; pions et bâtiments sont des « panneaux » toujours face à l'écran.
-import { SIZE, CORNER, rect, side, pawnSpot, buildSpots, center } from './geometry.js';
-import { ICONS, spaceIcon, pawnSvg } from './icons.js';
+import { SIZE, CORNER, rect, side, pawnSpot, buildSpots, center, cellAt, homography } from './geometry.js';
+import { ICONS, spaceIcon } from './icons.js';
+import { tokenSvg } from './tokens.js';
 import { esc, money, el, wait, store, save } from './util.js';
 
 const TILT_3D = 52;
@@ -10,52 +11,44 @@ const shortName = (n) => n.replace(/^Boulevard /, 'Bd ').replace(/^Avenue /, 'Av
 
 function centerArt() {
   const c = SIZE - 2 * CORNER; // 648
+  const deck = (cx, cy, face, back, label, icon) => `
+    <g transform="translate(${cx} ${cy}) rotate(-45)">
+      <rect x="-104" y="-66" width="208" height="132" rx="10" fill="none" stroke="#16181d" stroke-width="2.5" stroke-dasharray="8 6"/>
+      ${[6, 4, 2].map((o) => `<rect x="${-88 + o}" y="${-54 + o}" width="176" height="108" rx="9" fill="${back}" stroke="#16181d" stroke-width="2"/>`).join('')}
+      <rect x="-88" y="-54" width="176" height="108" rx="9" fill="${face}" stroke="#16181d" stroke-width="3"/>
+      <rect x="-80" y="-46" width="160" height="92" rx="6" fill="none" stroke="#fff8ea" stroke-width="2"/>
+      ${icon}
+      <text x="0" y="40" text-anchor="middle" class="deckl" textLength="150" lengthAdjust="spacingAndGlyphs">${label}</text>
+    </g>`;
   return `<svg class="center-art" viewBox="0 0 ${c} ${c}" aria-hidden="true">
     <defs>
-      <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9f0fa"/><stop offset=".55" stop-color="#9FD8F5"/><stop offset="1" stop-color="#5fb3e3"/></linearGradient>
-      <pattern id="waves" width="60" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><path d="M0 13 q15 -10 30 0 t30 0" fill="none" stroke="#ffffff" stroke-opacity=".45" stroke-width="2"/></pattern>
+      <radialGradient id="mint" cx=".5" cy=".45" r=".75"><stop offset="0" stop-color="#e4f2e5"/><stop offset="1" stop-color="#c3e0c8"/></radialGradient>
     </defs>
-    <rect width="${c}" height="${c}" fill="url(#sea)"/>
-    <rect width="${c}" height="${c}" fill="url(#waves)"/>
+    <rect width="${c}" height="${c}" fill="url(#mint)"/>
+    <rect x="10" y="10" width="${c - 20}" height="${c - 20}" fill="none" stroke="#16181d" stroke-opacity=".18" stroke-width="2"/>
+    <g opacity=".5" stroke="#1C5FB4" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      ${[0, 1, 2].map((k) => `<path transform="translate(${60 + k * 42} ${616 - k * 14})" d="M0 0 L0 -26 L19 -26 L19 0 M0 -12 L26 -12 L30 0"/>`).join('')}
+      ${[0, 1, 2].map((k) => `<path transform="translate(${470 + k * 42} ${70 - k * 14})" d="M0 0 L0 -26 L19 -26 L19 0 M0 -12 L26 -12 L30 0"/>`).join('')}
+    </g>
+    ${deck(160, 160, '#1C5FB4', '#123f78', 'CAISSE DE COMMUNAUTÉ',
+      '<g transform="translate(0 -10) scale(1.5)"><rect x="-17" y="-6" width="34" height="22" rx="3" fill="#ffc531" stroke="#16181d" stroke-width="2.2"/><path d="M-17 -6 Q0 -20 17 -6" fill="#ffdd75" stroke="#16181d" stroke-width="2.2"/><rect x="-4" y="-2" width="8" height="8" rx="1.5" fill="#16181d"/></g>')}
+    ${deck(c - 160, c - 160, '#F7941D', '#b45f0b', 'CHANCE',
+      '<text x="0" y="22" text-anchor="middle" class="deckq">?</text>')}
     <g transform="translate(${c / 2} ${c / 2}) rotate(-45)">
-      <rect x="-300" y="-54" width="600" height="108" rx="16" fill="#e3262f" stroke="#16181d" stroke-width="6"/>
-      <rect x="-300" y="-54" width="600" height="20" rx="10" fill="#ff6a50" opacity=".55"/>
-      <text x="0" y="16" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="60" fill="#fff8ea" stroke="#16181d" stroke-width="5" paint-order="stroke">DavidSimulator</text>
-      <text x="0" y="44" text-anchor="middle" font-family="'Chakra Petch',sans-serif" font-weight="700" font-size="17" letter-spacing="9" fill="#fff8ea">ÉDITION NICE</text>
-    </g>
-    <g transform="translate(150 150) rotate(-45)">
-      <rect x="-92" y="-56" width="184" height="112" rx="12" fill="#0f3f7a" transform="translate(7 7)"/>
-      <rect x="-92" y="-56" width="184" height="112" rx="12" fill="#1C5FB4" stroke="#16181d" stroke-width="5"/>
-      <rect x="-80" y="-44" width="160" height="88" rx="8" fill="none" stroke="#fff8ea" stroke-width="2.5" stroke-dasharray="6 5"/>
-      <text x="0" y="-6" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="20" fill="#fff8ea">CAISSE DE</text>
-      <text x="0" y="20" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="20" fill="#fff8ea">COMMUNAUTÉ</text>
-    </g>
-    <g transform="translate(${c - 150} ${c - 150}) rotate(-45)">
-      <rect x="-92" y="-56" width="184" height="112" rx="12" fill="#a8510a" transform="translate(7 7)"/>
-      <rect x="-92" y="-56" width="184" height="112" rx="12" fill="#F7941D" stroke="#16181d" stroke-width="5"/>
-      <text x="0" y="34" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="84" fill="#fff8ea" stroke="#16181d" stroke-width="4" paint-order="stroke">?</text>
-      <text x="0" y="-30" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="16" fill="#16181d">CHANCE</text>
-    </g>
-    <g transform="translate(560 96)">
-      <circle r="30" fill="#ffc531" stroke="#16181d" stroke-width="5"/>
-    </g>
-    <g transform="translate(64 498) scale(.82)" stroke="#16181d" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
-      <path d="M0 110 C 4 70 10 40 22 10" fill="none"/>
-      <path d="M22 10 C 0 0 -24 8 -34 22 M22 10 C 40 -6 64 0 72 14 M22 10 C 12 -14 28 -32 46 -32 M22 10 C 30 -10 6 -26 -14 -20" fill="none" stroke-width="5"/>
-      <path d="M22 10 C 0 0 -24 8 -34 22 M22 10 C 40 -6 64 0 72 14 M22 10 C 12 -14 28 -32 46 -32 M22 10 C 30 -10 6 -26 -14 -20" fill="none" stroke="#2fbf71" stroke-width="2.5"/>
-    </g>
-    <g transform="translate(120 616) scale(.8)" stroke="#16181d" stroke-width="4" stroke-linejoin="round">
-      ${[0, 1, 2].map((k) => `<g transform="translate(${k * 52} ${k * -18})"><path d="M0 0 L0 -30 L22 -30 L22 0 M0 -14 L30 -14 L34 0" fill="none" stroke="#2b8cff" stroke-width="7" stroke-linecap="round"/><path d="M0 0 L0 -30 L22 -30 L22 0 M0 -14 L30 -14 L34 0" fill="none" stroke-width="2"/></g>`).join('')}
+      <rect x="-312" y="-62" width="624" height="124" rx="6" fill="#16181d"/>
+      <rect x="-304" y="-54" width="608" height="108" rx="4" fill="#e3262f" stroke="#fff8ea" stroke-width="3"/>
+      <text x="0" y="20" text-anchor="middle" class="logo" textLength="540" lengthAdjust="spacingAndGlyphs">DAVIDSIMULATOR</text>
+      <text x="0" y="45" text-anchor="middle" class="logosub" textLength="330" lengthAdjust="spacingAndGlyphs">ÉDITION NICE · CÔTE D'AZUR</text>
     </g>
   </svg>`;
 }
 
 function cornerHtml(sp) {
   switch (sp.type) {
-    case 'go': return `<div class="corner go"><b>DÉPART</b><span class="ico big">${ICONS.go}</span><small>Recevez ${money(sp.salary)}<br>en passant</small></div>`;
-    case 'jail': return `<div class="corner jail"><div class="cellblock"><span class="ico">${ICONS.bars}</span><b>EN PRISON</b></div><small class="visit v1">SIMPLE</small><small class="visit v2">VISITE</small></div>`;
-    case 'parking': return `<div class="corner parking"><b>PARC GRATUIT</b><span class="ico big">${ICONS.hill}</span><small>Colline du Château</small></div>`;
-    case 'gotojail': return `<div class="corner gotojail"><b>ALLEZ EN<br>PRISON</b><span class="ico big">${ICONS.police}</span></div>`;
+    case 'go': return `<div class="corner go"><div class="rot"><small>Recevez ${money(sp.salary)}<br>de salaire en passant</small><b>DÉPART</b></div><span class="arrow">${ICONS.go}</span></div>`;
+    case 'jail': return `<div class="corner jail"><div class="cellblock"><span class="ico">${ICONS.bars}</span><b>EN<br>PRISON</b></div><small class="visit v1">SIMPLE</small><small class="visit v2">VISITE</small></div>`;
+    case 'parking': return `<div class="corner parking"><div class="rot"><b>PARC</b><span class="ico big">${ICONS.hill}</span><b>GRATUIT</b><small>Colline du Château</small></div></div>`;
+    case 'gotojail': return `<div class="corner gotojail"><div class="rot r2"><b>ALLEZ EN</b><span class="ico big">${ICONS.police}</span><b>PRISON</b></div></div>`;
     default: return '';
   }
 }
@@ -67,8 +60,9 @@ export function mountBoard(host, board, { onCell } = {}) {
   plane.style.width = plane.style.height = SIZE + 'px';
   cam.appendChild(plane); stage.appendChild(cam); host.appendChild(stage);
 
-  // socle et centre
+  // socle épais (faces visibles depuis la caméra) et centre
   plane.appendChild(el('div', 'plinth'));
+  for (const f of ['front', 'left', 'right']) plane.appendChild(el('div', 'slab ' + f));
   const mid = el('div', 'mid', centerArt());
   Object.assign(mid.style, { left: CORNER + 'px', top: CORNER + 'px', width: SIZE - 2 * CORNER + 'px', height: SIZE - 2 * CORNER + 'px' });
   plane.appendChild(mid);
@@ -89,13 +83,35 @@ export function mountBoard(host, board, { onCell } = {}) {
       c.innerHTML = `${band}<span class="body">${ic ? `<span class="ico">${ic}</span>` : ''}<span class="cname" lang="fr">${esc(shortName(sp.name))}</span>${price ? `<span class="cprice">${price}</span>` : ''}</span>
         <i class="own"></i><i class="stampm">HYPOTHÉQUÉE</i>`;
     }
-    c.onclick = () => onCell && onCell(sp.i);
+    c.onclick = (e) => { if (e.detail === 0 && onCell) onCell(sp.i); }; // clavier (Entrée / Espace)
     plane.appendChild(c);
     cells[sp.i] = c;
   }
 
   const layer = el('div', 'pieces');
   plane.appendChild(layer);
+
+  /* ---------------------------------------------------------- pointeur → case
+     Le navigateur détecte mal les clics sur un plan incliné en 3D : on repère les 4 coins
+     du plateau à l'écran et on inverse la projection (homographie) pour trouver la case visée. */
+  const marks = [[0, 0], [SIZE, 0], [SIZE, SIZE], [0, SIZE]].map(([x, y]) => {
+    const m = el('i', 'mk'); m.style.left = x + 'px'; m.style.top = y + 'px'; plane.appendChild(m); return m;
+  });
+  function pickCell(cx, cy) {
+    const scr = marks.map((m) => { const b = m.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; });
+    const [x, y] = homography(scr, [[0, 0], [SIZE, 0], [SIZE, SIZE], [0, SIZE]])(cx, cy);
+    return cellAt(x, y);
+  }
+  let hover = -1;
+  stage.addEventListener('pointermove', (e) => {
+    const i = pickCell(e.clientX, e.clientY);
+    if (i === hover) return;
+    if (hover >= 0) cells[hover].classList.remove('hov');
+    hover = i; if (i >= 0) cells[i].classList.add('hov');
+    stage.style.cursor = i >= 0 ? 'pointer' : '';
+  });
+  stage.addEventListener('pointerleave', () => { if (hover >= 0) cells[hover].classList.remove('hov'); hover = -1; });
+  stage.addEventListener('click', (e) => { const i = pickCell(e.clientX, e.clientY); if (i >= 0 && onCell) onCell(i); });
 
   /* ---------------------------------------------------------- caméra */
   const view = { tilt: store('david_view3d', true) ? TILT_3D : 0, fit: 1, focus: null, zoom: 1, follow: store('david_follow', true) };
@@ -128,7 +144,7 @@ export function mountBoard(host, board, { onCell } = {}) {
   function ensurePawn(p) {
     let o = pawns.get(p.id);
     if (!o) {
-      const e = el('div', 'pawn3d', `<i class="shadow"></i><div class="sprite">${pawnSvg(p.color, esc((p.name || '?')[0].toUpperCase()))}</div>`);
+      const e = el('div', 'pawn3d', `<i class="shadow"></i><div class="sprite">${tokenSvg(p.token, p.color)}</div>`);
       layer.appendChild(e);
       o = { el: e, pos: p.pos, inJail: p.inJail };
       pawns.set(p.id, o);
@@ -226,6 +242,7 @@ export function mountBoard(host, board, { onCell } = {}) {
     },
     relax() { if (view.focus) { view.focus = null; applyCam(); } },
     // Position à l'écran du centre d'une case (pour les effets)
+    pickCell,
     cellScreen(i) { const b = cells[i].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; },
     pawnScreen(pid) { const o = pawns.get(pid); if (!o) return null; const b = o.el.querySelector('.sprite').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; },
     // Heatmap posée sur les cases : [{ bg, ink, label } | null] × 40, ou null pour l'enlever
@@ -235,6 +252,17 @@ export function mountBoard(host, board, { onCell } = {}) {
         c.classList.toggle('heated', !!h);
         if (h) { c.style.setProperty('--heat', h.bg); c.style.setProperty('--heatInk', h.ink); c.dataset.heat = h.label; }
         else delete c.dataset.heat;
+      }
+    },
+    // Arrivée des pions sur Départ, l'un après l'autre
+    intro() {
+      let k = 0;
+      for (const o of pawns.values()) {
+        const sp = o.el.querySelector('.sprite');
+        sp.animate([{ translate: '0 0 260px', opacity: 0 }, { translate: '0 0 0', opacity: 1, offset: 0.7 }, { translate: '0 0 18px', offset: 0.85 }, { translate: '0 0 0', opacity: 1 }],
+          { duration: 700, delay: 300 + k * 260, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'backwards' });
+        setTimeout(() => api.onStep && api.onStep(0, 1), 300 + k * 260 + 480);
+        k++;
       }
     },
     is3d: () => view.tilt > 0,
