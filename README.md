@@ -1,8 +1,12 @@
-# Duo Drift
+# Game Hub — Duo Drift et DavidSimulator
 
-Jeu de course et de bataille en vue de dessus, jouable en ligne entre potes (jusqu'à 5, en peer-to-peer), directement dans le navigateur.
+Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
+on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
 
 **Jouer : https://amielmetier.github.io/duo-drift/**
+
+## Duo Drift
+Course et bataille en vue de dessus, jusqu'à 5 joueurs.
 
 - **Modes** : Course, Grand Prix, Élimination, Bataille, Patate chaude, Roi de la colline, Foot en voiture, équipes
 - **Mutateurs** : Nitro infini, Vitesse ×1,3, Patinoire, Objets en folie, Voitures fantômes
@@ -11,6 +15,16 @@ Jeu de course et de bataille en vue de dessus, jouable en ligne entre potes (jus
 - **Fin de course** : replay au ralenti, photo-finish, podium animé, finale du Grand Prix
 - Clavier ou manette, bots, chat, émotes
 
-Version actuelle : **1.1** — voir le [journal des versions](CHANGELOG.md).
+## DavidSimulator
+Le Monopoly classique transposé à Nice, de Saint-Roch à la Promenade des Anglais, jusqu'à 6 joueurs (bots possibles).
+Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Express** (40 minutes).
+
+## Pour les développeurs
+- Site statique (GitHub Pages), sans étape de build.
+- `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
+- `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator.
+- Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+Version : **2.0** (en préparation) — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

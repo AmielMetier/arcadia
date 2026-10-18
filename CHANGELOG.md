@@ -1,4 +1,14 @@
-# Journal des versions — Duo Drift
+# Journal des versions — Game Hub (Duo Drift, DavidSimulator)
+
+## 2.0 — en préparation (branche `hub`)
+- Nouveau **Game Hub** : un seul salon entre potes (jusqu'à 6), avec pseudo, couleur, chat et lien d'invitation, pour choisir le jeu.
+- Le salon reste ouvert d'un jeu à l'autre : pas besoin de se reconnecter pour changer de jeu.
+- Duo Drift déplacé dans `drift/`, inchangé en jeu ; « Quitter » ramène au salon du Hub.
+- **DavidSimulator** (Monopoly édition Nice) : moteur de règles complet — achats, enchères, échanges, maisons et hôtels,
+  hypothèques, prison, doublés, cartes Chance et Caisse de communauté, dettes et faillite.
+- Mode **Express** : 3 propriétés offertes, hôtel dès 3 maisons, prison limitée à 2 tours, chrono de 40 minutes.
+- Bots pour compléter la table ou jouer seul.
+- Interface provisoire jouable ; le plateau animé arrive à l'étape suivante.
 
 ## 1.1 — 18 octobre 2026
 - Nouveau salon en 3 étapes : Mode, Circuit, Réglages. Les options rares sont rangées dans « Plus d'options ».

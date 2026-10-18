@@ -57,23 +57,25 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   ├── net.js                     Net extrait de Duo Drift ; préfixe d'ID paramétrable
 │   ├── room.js                    salon générique : joueurs, pseudos, couleurs, chat, pings, hôte
 │   ├── bridge.js                  pont Hub ⇄ jeu (postMessage), même API que Net
-│   ├── profile.js                 pseudo, couleur, niveau (clés localStorage communes)
-│   └── store.js                   accès localStorage protégé (try/catch)
+│   └── profile.js                 pseudo et couleur (clés localStorage communes avec Duo Drift)
 ├── drift/
 │   └── index.html                 Duo Drift actuel déplacé ; Net → bridge s'il est dans le Hub
 ├── david/
 │   ├── index.html                 DavidSimulator
+│   ├── app.js                     démarrage : rôle (hôte, invité, solo), session, vue
 │   ├── data/
 │   │   └── board-nice.json        40 cases, groupes, règles, modes, 32 cartes   ← étape 1
 │   ├── engine/                    moteur pur, sans DOM, testable sous Node      ← étape 2
 │   │   ├── rules.js               reduce(state, action) → { state, events }
 │   │   ├── modes.js               Classique / Express
 │   │   ├── rng.js                 aléa reproductible (graine) : dés, mélange des cartes
-│   │   └── valuation.js           patrimoine net, monopoles, faillite
+│   │   ├── valuation.js           patrimoine net, monopoles, classement
+│   │   └── bot.js                 joueur automatique
 │   ├── net/
 │   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
 │   │   └── client.js              envoie les intentions, rejoue les événements
 │   ├── view/                                                                    ← étape 3
+│   │   ├── table.js               vue provisoire jouable (étape 2), remplacée à l'étape 3
 │   │   ├── board.js               plateau isométrique en CSS 3D, caméra qui suit le pion
 │   │   ├── dice.js                dés 3D avec simulation de rebonds
 │   │   ├── tokens.js              pions et déplacements case par case
@@ -108,12 +110,24 @@ et `?local` est transmis du Hub au jeu pour les tests entre onglets.
   (`ROLL`, `BUY`, `BID`, `PROPOSE_TRADE`, `BUILD`, `MORTGAGE`, `PAY_BAIL`, `END_TURN`…).
   L'hôte les valide, tire les dés et diffuse des **événements** (`DICE`, `MOVE`, `PAY`, `BUY`,
   `CARD`, `BUILD`, `JAIL`, `BANKRUPT`…) que chaque client anime dans l'ordre.
-- Le moteur est une **fonction pure** `reduce(state, action, rng)` : la même logique tourne chez
-  l'hôte, dans les tests et dans les bots.
-- L'état complet tient en quelques Ko : il est diffusé à chaque fin de tour. Si l'hôte quitte la partie,
-  le joueur suivant reprend le salon avec le dernier état connu (migration d'hôte), et l'état est
-  sauvegardé localement pour reprendre une partie interrompue.
-- Les événements alimentent directement les statistiques (cases visitées, loyers, prison, distance).
+- Le moteur est une **fonction pure** `reduce(state, action, board)` : la même logique tourne chez
+  l'hôte, dans les tests et dans les bots. L'aléa (dés, paquets de cartes) vient d'une graine stockée
+  dans l'état, si bien qu'une partie est rejouable à l'identique.
+- La phase de jeu (`roll`, `buy`, `auction`, `debt`, `end`, `over`) est recalculée à partir de l'état
+  après chaque action, plutôt que maintenue à la main.
+- Les paiements impossibles deviennent des **dettes** traitées dans l'ordre : le débiteur vend,
+  hypothèque ou échange, la dette se règle dès qu'il a la somme, sinon il déclare faillite.
+- L'état complet tient en quelques Ko : il est envoyé après chaque action, avec les événements.
+  Il est aussi sauvegardé chez l'hôte (`localStorage`), base de la future reprise de partie.
+- Les statistiques (cases visitées, loyers perçus et payés par case, distance, tours en prison,
+  patrimoine à chaque tour) sont tenues dans l'état par le moteur.
+
+### Limites connues (étape 2)
+- Si l'hôte quitte le salon, la partie s'arrête : la migration d'hôte reste à faire.
+- Un joueur qui revient au salon en cours de partie garde sa place et peut revenir ; s'il quitte le salon,
+  ses biens retournent à la banque.
+- Faillite envers la banque : les terrains redeviennent libres, sans enchère.
+- Vente d'un hôtel quand la banque manque de maisons : refusée (il faut d'abord hypothéquer ailleurs).
 
 ## Plateau de Nice — `david/data/board-nice.json`
 
