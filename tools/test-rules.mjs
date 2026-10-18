@@ -448,6 +448,42 @@ test('actions disponibles', () => {
   ok(!availableActions(s, B, 1).includes('ROLL'));
 });
 
+/* ----------------------------------------------------------- règles maison */
+function houseGame(house, n = 2) {
+  const { state } = createGame(B, { players: PLAYERS(n), mode: 'classic', seed: 7, now: 0, house });
+  state.players.sort((a, b) => a.id - b.id);
+  return state;
+}
+test('règles maison : par défaut, règles officielles', () => {
+  const s = game(2);
+  eq([s.cfg.freeParkingJackpot, s.cfg.doubleGoLanding, s.cfg.auctionWhenDeclined, s.cfg.startingCash], [false, false, true, 1500]);
+  let g = game(2); g = roll(g, 1, 3).state; eq(g.pot, 0, 'pas de cagnotte');
+});
+test('règle maison : argent de départ', () => {
+  ok(houseGame({ cash: 2000 }).players.every((p) => p.cash === 2000));
+  ok(houseGame({ cash: 777 }).players.every((p) => p.cash === 1500), 'valeur inconnue → 1500');
+});
+test('règle maison : cagnotte du Parc gratuit', () => {
+  let s = houseGame({ jackpot: true });
+  s = roll(s, 1, 3).state;               // impôts 200 → cagnotte
+  eq(s.pot, 200);
+  s = act(s, { type: 'END_TURN', by: 0 }).state;
+  pl(s, 1).pos = 15; s = roll(s, 2, 3, 1).state; // case 20
+  eq(s.pot, 0); eq(pl(s, 1).cash, 1700);
+});
+test('règle maison : double salaire en tombant pile sur Départ', () => {
+  let s = houseGame({ doubleGo: true }); pl(s, 0).pos = 35;
+  s = roll(s, 2, 3).state; eq(pl(s, 0).cash, 1900);
+  s = houseGame({ doubleGo: true }); pl(s, 0).pos = 36;
+  s = roll(s, 2, 3).state; eq(pl(s, 0).cash, 1700, 'en passant seulement : salaire normal');
+});
+test('règle maison : sans enchères, la propriété refusée reste à la banque', () => {
+  let s = houseGame({ auctions: false });
+  s = roll(s, 1, 2).state;
+  s = act(s, { type: 'DECLINE', by: 0 }).state;
+  eq(s.auction, null); eq(s.props[3].owner, null); eq(s.phase, 'end');
+});
+
 /* ----------------------------------------------------------- statistiques */
 test('Markov : distribution stationnaire cohérente', () => {
   const pi = landingProbabilities(B);

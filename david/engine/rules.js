@@ -20,8 +20,8 @@ export const ACTIONS = [
 /* ------------------------------------------------------------------ création ------ */
 
 // players : [{ id, name, color, bot }] ; now : horodatage (ms) fourni par l'hôte.
-export function createGame(board, { players, mode = 'classic', seed = 1, now = 0 }) {
-  const cfg = makeConfig(board, mode);
+export function createGame(board, { players, mode = 'classic', seed = 1, now = 0, house = null }) {
+  const cfg = makeConfig(board, mode, house);
   if (players.length < cfg.minPlayers || players.length > cfg.maxPlayers) {
     throw new Error(`Il faut entre ${cfg.minPlayers} et ${cfg.maxPlayers} joueurs.`);
   }
@@ -35,6 +35,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
     props: {},
     bank: { houses: cfg.bankHouses, hotels: cfg.bankHotels },
     decks: {}, heldCards: {},
+    pot: 0,
     turn: null, pendingBuy: null, auction: null, trades: [], debts: [], nextTradeId: 1,
     round: 1, turnCount: 0, over: false, winner: null, endReason: null, ranking: null,
     startedAt: now, endsAt: cfg.timeLimitMs ? now + cfg.timeLimitMs : null,
@@ -171,7 +172,10 @@ function transfer(ctx, from, to, amount, reason, space) {
     if (space != null) st.rentBySpace[space] += amount;
   }
   if (reason === 'tax') st.players[from.id].taxes += amount;
-  ctx.ev.push({ k: 'PAY', from: from.id, to: to ? to.id : null, amount, reason, space });
+  // règle maison : taxes, amendes et cartes payées à la banque vont dans la cagnotte du Parc gratuit
+  const pot = !to && ctx.s.cfg.freeParkingJackpot && (reason === 'tax' || reason === 'card' || reason === 'bail');
+  if (pot) ctx.s.pot = (ctx.s.pot || 0) + amount;
+  ctx.ev.push({ k: 'PAY', from: from.id, to: to ? to.id : null, amount, reason, space, pot: pot || undefined });
 }
 
 function collect(ctx, p, amount, reason) {
@@ -205,7 +209,8 @@ function settleDebts(ctx) {
 function move(ctx, p, steps, opts = {}) {
   const from = p.pos, to = (from + steps) % 40;
   if (from + steps >= 40) {
-    collect(ctx, p, ctx.s.cfg.goSalary, 'go');
+    // règle maison : salaire doublé quand on s'arrête pile sur Départ
+    collect(ctx, p, ctx.s.cfg.goSalary * (to === 0 && ctx.s.cfg.doubleGoLanding ? 2 : 1), 'go');
     ctx.s.stats.players[p.id].goPassed++;
   }
   p.pos = to;
@@ -233,6 +238,9 @@ function land(ctx, p, opts = {}) {
     case 'gotojail': sendToJail(ctx, p); break;
     case 'tax': charge(ctx, p, null, sp.amount, 'tax', i); break;
     case 'chance': case 'chest': drawCard(ctx, p, sp.type); break;
+    case 'parking':
+      if (s.cfg.freeParkingJackpot && s.pot > 0) { const won = s.pot; s.pot = 0; collect(ctx, p, won, 'jackpot'); }
+      break;
     case 'street': case 'station': case 'utility': {
       const pr = s.props[i];
       if (pr.owner == null) { s.pendingBuy = i; break; }

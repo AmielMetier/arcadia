@@ -191,6 +191,13 @@ pour faire patienter les bots d'autant.
 Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
 tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
 
+## Règles maison (version 2.6)
+
+`makeConfig(board, mode, house)` fusionne les règles du plateau, le mode et les règles maison
+(`cleanHouse` valide les valeurs reçues du salon). Elles sont toutes désactivées par défaut :
+sans réglage, la partie suit les règles officielles. La cagnotte vit dans `state.pot` ; les paiements
+qui l'alimentent portent `pot: true` dans leur événement, pour que la vue envoie les billets vers le Parc gratuit.
+
 ## Avant-partie et clics (version 2.3)
 
 Avant `createGame`, l'hôte tient une petite salle d'avant-partie : les joueurs envoient `{ t:'pick', token }`,

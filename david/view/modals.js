@@ -71,8 +71,9 @@ export function buyHtml(board, S, me) {
     <h3>À vendre !</h3><p>Tu es sur <b>${esc(sp.name)}</b>. Tu as <b>${money(p.cash)}</b>.</p>
     ${btn(`Acheter · ${money(sp.price)}`, { type: 'BUY' }, 'big block' + (ok ? '' : ' off'))}
     ${ok ? '' : '<p class="hint">Pas assez de liquide : hypothèque ou vends dans « Mes biens », ou laisse partir aux enchères.</p>'}
-    ${btn('Mettre aux enchères', { type: 'DECLINE' }, 'ghost block')}
-    <p class="hint">Si tu n'achètes pas, la propriété est mise aux enchères entre tous les joueurs.</p></div></div>`;
+    ${S.cfg.auctionWhenDeclined
+      ? `${btn('Mettre aux enchères', { type: 'DECLINE' }, 'ghost block')}<p class="hint">Si tu n'achètes pas, la propriété est mise aux enchères entre tous les joueurs.</p>`
+      : `${btn('Ne pas acheter', { type: 'DECLINE' }, 'ghost block')}<p class="hint">Règle maison : sans enchères, la propriété reste à la banque.</p>`}</div></div>`;
 }
 
 export function auctionHtml(board, S, me, name) {

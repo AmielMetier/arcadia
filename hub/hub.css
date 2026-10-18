@@ -91,7 +91,7 @@ input[type=text]:focus{box-shadow:0 0 0 3px var(--yellow)}
 .game .why{display:block;font-size:12px;color:#c62a12;margin-top:6px;font-weight:700}
 .launch{margin-top:20px}
 .setrow{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 16px}
-.seg{display:flex;border:3px solid var(--ink);border-radius:11px;overflow:hidden;background:#fff}
+.seg{display:inline-flex;border:3px solid var(--ink);border-radius:11px;overflow:hidden;background:#fff}
 .seg button{border:0;background:transparent;padding:8px 12px;font-weight:700;cursor:pointer;border-right:2px solid var(--ink)}
 .seg button:last-child{border-right:0}
 .seg button.sel{background:var(--yellow)}
@@ -112,3 +112,5 @@ input[type=text]:focus{box-shadow:0 0 0 3px var(--yellow)}
   .games{grid-template-columns:1fr}
   .logo{font-size:44px}
 }
+
+.setgroup{flex-basis:100%;font-family:Bungee,Impact,sans-serif;font-size:14px;margin:8px 0 -6px;padding-top:10px;border-top:2px dashed var(--line2)}

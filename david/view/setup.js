@@ -3,6 +3,16 @@ import { TOKENS, tokenSvg, tokenName } from './tokens.js';
 import { esc, el, store, save } from './util.js';
 import { sfx } from './sfx.js';
 
+export function houseChips(h) {
+  if (!h) return '';
+  const list = [`${h.cash.toLocaleString('fr-FR')} € au départ`];
+  if (h.jackpot) list.push('Cagnotte au Parc gratuit');
+  if (h.doubleGo) list.push('Salaire doublé pile sur Départ');
+  if (!h.auctions) list.push('Sans enchères');
+  const custom = h.jackpot || h.doubleGo || !h.auctions || h.cash !== 1500;
+  return `<div class="hrules">${custom ? '<b>Règles maison :</b>' : '<b>Règles officielles</b>'}${custom ? list.map((x) => `<span>${esc(x)}</span>`).join('') : ''}</div>`;
+}
+
 export function mountSetup(root, { me, pick, start, exit }) {
   const box = el('div', 'setup');
   root.appendChild(box);
@@ -22,7 +32,8 @@ export function mountSetup(root, { me, pick, start, exit }) {
     box.innerHTML = `
       <div class="setup-card">
         <div class="setup-head">
-          <div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</p></div>
+          <div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</p>
+            ${houseChips(s.house)}</div>
           <button class="btn ghost small" id="suQuit">Quitter</button>
         </div>
         <div class="setup-body">

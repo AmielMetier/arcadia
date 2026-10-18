@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.5';
+  const VERSION = '2.6';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -151,7 +151,7 @@
     const g = gameDef(pick.game), set = pick.settings[g.id], n = room.players.length;
     const segs = (g.settings || []).map((s) => {
       const opts = s.options.filter(([v]) => s.key !== 'bots' || n + Number(v) <= g.maxPlayers);
-      return `<div><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>
+      return `${s.group ? `<div class="setgroup">${esc(s.group)}</div>` : ''}<div><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>
         `<button data-k="${s.key}" data-v="${v}" class="${String(set[s.key]) === String(v) ? 'sel' : ''}">${esc(l)}</button>`).join('')}</div></div>`;
     }).join('');
     const ok = n <= g.maxPlayers;

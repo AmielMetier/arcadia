@@ -3,6 +3,7 @@
 import { createGame, reduce, actors } from '../engine/rules.js';
 import { botAction } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
+import { cleanHouse } from '../engine/modes.js';
 import { TOKEN_IDS } from '../view/tokens.js';
 
 const BOT_NAMES = ['Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius', 'Tata Nine'];
@@ -81,12 +82,13 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   /* ---------------------------------------------------------- avant-partie : choix des pions */
   const picks = {}; // id du joueur → pion
   const mode = settings.mode === 'express' ? 'express' : 'classic';
+  const house = cleanHouse({ jackpot: Number(settings.jackpot) === 1, doubleGo: Number(settings.doubleGo) === 1, auctions: settings.auctions == null || Number(settings.auctions) === 1, cash: settings.cash });
   const botCount = (n) => { let b = Math.max(0, Math.min(Number(settings.bots ?? (solo ? 3 : 0)), 6 - n)); if (n + b < 2) b = 2 - n; return b; };
   function setupState() {
     const room = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players;
     const players = room.map((p) => ({ id: p.id, name: p.name, color: p.color, ready: solo || p.id === me.id || bridge.readyMap[p.id] === 'david' }));
     for (const id of Object.keys(picks)) if (!players.some((p) => p.id === +id)) delete picks[id];
-    return { players, picks: { ...picks }, mode, bots: botCount(players.filter((p) => p.ready).length), hostId: me.id };
+    return { players, picks: { ...picks }, mode, house, bots: botCount(players.filter((p) => p.ready).length), hostId: me.id };
   }
   function pushSetup() {
     if (state) return;
@@ -118,7 +120,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     const free = TOKEN_IDS.filter((tk) => !players.some((p) => p.token === tk)).sort(() => Math.random() - 0.5);
     for (const p of players) if (!p.token) p.token = free.shift();
     try {
-      const g = createGame(board, { players, mode, seed: randomSeed(), now: Date.now() });
+      const g = createGame(board, { players, mode, seed: randomSeed(), now: Date.now(), house });
       state = g.state;
       broadcast(g.events);
       schedule();

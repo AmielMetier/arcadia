@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.6 — 18 octobre 2026
+- Règles maison pour DavidSimulator, à régler dans le salon avant de lancer :
+  argent de départ (1 000 à 2 500 €), cagnotte au Parc gratuit (taxes, amendes et cartes s'y accumulent),
+  salaire doublé en tombant pile sur Départ, enchères désactivables.
+- Les règles choisies s'affichent avant la partie ; la cagnotte est visible sur la case Parc gratuit.
+
 ## 2.5 — 18 octobre 2026
 - Trois ambiances musicales qui s'enchaînent selon la partie : calme ; tendue (dette, joueur presque à sec,
   dernières 5 minutes en Express) ; enchères, façon jeu télévisé. Les changements se font en fin de mesure.

@@ -26,6 +26,6 @@ Plateau 3D façon jeu de société, choix du pion parmi 10 figurines, statistiqu
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator.
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Version actuelle : **2.5** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.6** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

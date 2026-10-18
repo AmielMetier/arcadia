@@ -108,6 +108,7 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
       case 'PAY':
         if (e.reason === 'rent') return `${name(e.from)} paie ${money(e.amount)} de loyer à ${name(e.to)}`;
         if (e.reason === 'go') return `${name(e.to)} touche ${money(e.amount)} (Départ)`;
+        if (e.reason === 'jackpot') return `${name(e.to)} remporte la cagnotte : ${money(e.amount)} !`;
         if (e.reason === 'tax') return `${name(e.from)} paie ${money(e.amount)} de taxe`;
         if (e.reason === 'bail') return `${name(e.from)} paie la caution`;
         if (e.reason === 'card') return e.from == null ? `${name(e.to)} reçoit ${money(e.amount)}` : `${name(e.from)} paie ${money(e.amount)}${e.to != null ? ' à ' + name(e.to) : ''}`;
@@ -194,7 +195,7 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
         } else h = `<span class="status">${S.turn.rolls ? 'Double ! Rejoue' : 'À toi de jouer'}</span>${abtn('🎲 Lancer les dés', { type: 'ROLL' }, 'primary')}`;
       } else if (S.phase === 'buy') {
         const sp = board.spaces[S.pendingBuy];
-        h = `<span class="status">${esc(sp.name)} · ${money(sp.price)}</span>${abtn('Acheter', { type: 'BUY' }, 'primary' + (p.cash < sp.price ? ' off' : ''))}${abtn('Enchères', { type: 'DECLINE' }, 'ghost')}<button class="btn ghost" data-open="buy">Voir le titre</button>`;
+        h = `<span class="status">${esc(sp.name)} · ${money(sp.price)}</span>${abtn('Acheter', { type: 'BUY' }, 'primary' + (p.cash < sp.price ? ' off' : ''))}${abtn(S.cfg.auctionWhenDeclined ? 'Enchères' : 'Ne pas acheter', { type: 'DECLINE' }, 'ghost')}<button class="btn ghost" data-open="buy">Voir le titre</button>`;
       } else if (S.phase === 'end') {
         h = `<span class="status">Construis, échange… ou passe la main</span>${abtn('Fin du tour ➜', { type: 'END_TURN' }, 'primary')}`;
       }
@@ -360,14 +361,15 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
         break;
       case 'LAND': break;
       case 'PAY': {
-        const a = e.from != null ? cardPoint(e.from) : (e.reason === 'go' ? B.cellScreen(0) : bankPoint());
-        const b = e.to != null ? cardPoint(e.to) : bankPoint();
+        const a = e.from != null ? cardPoint(e.from) : (e.reason === 'go' ? B.cellScreen(0) : e.reason === 'jackpot' ? B.cellScreen(20) : bankPoint());
+        const b = e.to != null ? cardPoint(e.to) : (e.pot ? B.cellScreen(20) : bankPoint());
+        if (e.reason === 'jackpot' && !quick) await F.banner('Cagnotte !', `${nm(e.to)} empoche ${money(e.amount)}`, '#2fbf71', 1100 / speed);
         if (e.from != null) { setCash(e.from, (cash[e.from] ?? 0) - e.amount, !quick); if (!quick && a) F.float(a.x, a.y, '−' + money(e.amount), 'minus'); }
         if (e.to != null) { setCash(e.to, (cash[e.to] ?? 0) + e.amount, !quick); }
         if (quick) break;
         if (e.reason === 'go') { const c = B.cellScreen(0); F.float(c.x, c.y, '+' + money(e.amount), 'plus'); }
         sfx.play(e.to != null ? 'coin' : 'pay');
-        const big = e.reason === 'rent' || e.reason === 'go' || e.reason === 'card' || e.reason === 'trade' || e.reason === 'tax' || e.reason === 'buy' || e.reason === 'auction';
+        const big = ['rent', 'go', 'card', 'trade', 'tax', 'buy', 'auction', 'jackpot', 'bail'].includes(e.reason);
         if (big) await F.bills(a, b, e.amount, speed);
         if (e.to != null && b) F.float(b.x, b.y, '+' + money(e.amount), 'plus');
         break;

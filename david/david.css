@@ -547,3 +547,9 @@ input[type=number]:focus{outline:none;box-shadow:0 0 0 3px var(--yellow)}
 .musicctl input{position:absolute;top:46px;left:50%;transform:translateX(-50%);width:120px;accent-color:var(--red);opacity:0;pointer-events:none;
   background:var(--paper);border:3px solid var(--ink);border-radius:10px;padding:6px 8px;box-shadow:3px 3px 0 rgba(0,0,0,.4);transition:opacity .2s}
 .musicctl:hover input,.musicctl:focus-within input{opacity:1;pointer-events:auto}
+/* règles maison */
+.hrules{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px}
+.hrules b{font-weight:700;color:var(--muted)}
+.hrules span{border:2px solid var(--ink);border-radius:20px;padding:1px 9px;font-weight:700;background:#fff3c9}
+.corner .pot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg) translateY(38px);background:#2fbf71;color:#fff;border:2px solid var(--ink);
+  border-radius:10px;font-family:var(--spartan);font-weight:900;font-size:13px;padding:1px 8px;white-space:nowrap;box-shadow:2px 2px 0 rgba(0,0,0,.3)}

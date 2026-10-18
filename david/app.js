@@ -12,7 +12,11 @@ function boot(info) {
   const meP = H.players.find((p) => p.id === info.myId);
   const prof = (() => { try { return { name: JSON.parse(localStorage.getItem('dd_name')) || 'Moi', color: JSON.parse(localStorage.getItem('dd_color')) || '#ff4b2b' }; } catch (e) { return { name: 'Moi', color: '#ff4b2b' }; } })();
   const me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name, color: meP ? meP.color : prof.color };
-  const settings = H.embedded ? info.settings || {} : { mode: new URLSearchParams(location.search).get('mode') || 'classic', bots: 3 };
+  const qs = new URLSearchParams(location.search);
+  const settings = H.embedded ? info.settings || {} : {
+    mode: qs.get('mode') || 'classic', bots: 3,
+    jackpot: qs.get('jackpot'), doubleGo: qs.get('doubleGo'), auctions: qs.get('auctions') ?? 1, cash: qs.get('cash'),
+  };
 
   const view = mountGame(root, board, {
     me,

@@ -47,7 +47,7 @@ function cornerHtml(sp) {
   switch (sp.type) {
     case 'go': return `<div class="corner go"><div class="rot"><small>Recevez ${money(sp.salary)}<br>de salaire en passant</small><b>DÉPART</b></div><span class="arrow">${ICONS.go}</span></div>`;
     case 'jail': return `<div class="corner jail"><div class="cellblock"><span class="ico">${ICONS.bars}</span><b>EN<br>PRISON</b></div><small class="visit v1">SIMPLE</small><small class="visit v2">VISITE</small></div>`;
-    case 'parking': return `<div class="corner parking"><div class="rot"><b>PARC</b><span class="ico big">${ICONS.hill}</span><b>GRATUIT</b><small>Colline du Château</small></div></div>`;
+    case 'parking': return `<div class="corner parking"><div class="rot"><b>PARC</b><span class="ico big">${ICONS.hill}</span><b>GRATUIT</b><small>Colline du Château</small></div><span class="pot" hidden></span></div>`;
     case 'gotojail': return `<div class="corner gotojail"><div class="rot r2"><b>ALLEZ EN</b><span class="ico big">${ICONS.police}</span><b>PRISON</b></div></div>`;
     default: return '';
   }
@@ -195,6 +195,8 @@ export function mountBoard(host, board, { onCell } = {}) {
         o.el.classList.toggle('jailed', p.inJail);
       }
       layoutPawns(S.players);
+      const pot = cells[20].querySelector('.pot');
+      if (pot) { pot.hidden = !S.cfg.freeParkingJackpot; pot.textContent = money(S.pot || 0); }
       for (const sp of board.spaces) {
         const pr = S.props[sp.i]; if (!pr) continue;
         const c = cells[sp.i], owner = S.players.find((q) => q.id === pr.owner);
