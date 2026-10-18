@@ -1,5 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.5 — 18 octobre 2026
+- Trois ambiances musicales qui s'enchaînent selon la partie : calme ; tendue (dette, joueur presque à sec,
+  dernières 5 minutes en Express) ; enchères, façon jeu télévisé. Les changements se font en fin de mesure.
+- Petite fanfare de victoire en fin de partie.
+
 ## 2.4 — 18 octobre 2026
 - Musique d'ambiance « lo-fi » dans DavidSimulator, générée en direct (aucun fichier, libre de droits) :
   piano électrique, basse ronde, batterie feutrée, petites mélodies ; les accords changent toutes les 8 mesures.

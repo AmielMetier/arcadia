@@ -73,6 +73,15 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
   let statsCtl = null, heatMode = null;
   const HEAT_NAMES = { visits: 'Visites', rent: 'Loyers perçus', theory: 'Probabilité' };
   function openStatsWin() { if (!S) return; statsCtl = openStats(M, board, () => S, me, { onHeat: setHeat, heatMode: heatMode || 'visits' }); }
+  // Ambiance musicale : enchères, tension (dette, peu d'argent, fin de chrono, faillite proche), sinon calme
+  function moodOf(s) {
+    if (s.auction) return 'auction';
+    const p = s.players.find((q) => q.id === me.id);
+    const anyLow = s.players.some((q) => !q.bankrupt && q.cash < 150);
+    const late = s.endsAt && s.endsAt - (Date.now() + offset) < 5 * 60000;
+    if (s.debts.length || anyLow || late || (p && !p.bankrupt && p.cash < 300)) return 'tense';
+    return 'calm';
+  }
   function setHeat(mode) {
     heatMode = mode;
     $('#heatPill').hidden = !mode;
@@ -324,7 +333,8 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
     B.pulse(S.phase === 'buy' ? S.pendingBuy : -1);
     renderRoster(); renderActions(); autoModals(); tickTimer();
     if (heatMode) paintHeat();
-    music.duck(!!S.auction || S.over);
+    music.setMood(moodOf(S));
+    music.duck(S.over);
     if (statsCtl && M.key === 'stats') statsCtl.refresh();
   }
 
@@ -427,7 +437,8 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
         if (!quick) await F.banner(`${nm(e.player)} fait faillite`, '', '#16181d', 1200 / speed);
         break;
       case 'GAME_OVER':
-        sfx.play('win'); F.confetti();
+        if (music.on) music.win(); else sfx.play('win');
+        F.confetti();
         break;
       default: break;
     }
