@@ -23,6 +23,8 @@ function boot(info) {
     act: (a) => session.act(a),
     pick: (token) => session.pick(token),
     start: () => session.start(),
+    chooseSave: (id) => session.chooseSave(id),
+    deleteSave: (id) => session.deleteSave(id),
     exit: () => { if (H.embedded) H.exit(); else location.reload(); },
   });
   const handlers = {

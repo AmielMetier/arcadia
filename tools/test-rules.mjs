@@ -5,6 +5,7 @@ import { botAction } from '../david/engine/bot.js';
 import { nextRandom } from '../david/engine/rng.js';
 import { netWorth, level, groupSpaces } from '../david/engine/valuation.js';
 import { landingProbabilities, propertyAnalysis } from '../david/engine/markov.js';
+import { remapPlayers, resumeAt, proposeMapping } from '../david/engine/resume.js';
 
 const B = JSON.parse(readFileSync(new URL('../david/data/board-nice.json', import.meta.url), 'utf8'));
 let passed = 0, failed = 0;
@@ -482,6 +483,45 @@ test('règle maison : sans enchères, la propriété refusée reste à la banque
   s = roll(s, 1, 2).state;
   s = act(s, { type: 'DECLINE', by: 0 }).state;
   eq(s.auction, null); eq(s.props[3].owner, null); eq(s.phase, 'end');
+});
+
+/* ----------------------------------------------------------- reprise de partie */
+test('reprise : correspondance par nom, puis dans l\'ordre, sinon bot', () => {
+  const saved = [{ id: 0, name: 'Amiel' }, { id: 3, name: 'David' }, { id: 5, name: 'Léa' }, { id: 100, name: 'Mamé Rose', bot: true }];
+  const room = [{ id: 0, name: 'david', color: '#2b8cff' }, { id: 1, name: 'Amiel', color: '#ff4b2b' }];
+  const m = proposeMapping(saved, room);
+  eq(m[0].id, 1); eq(m[3].id, 0); eq(m[5].bot, true); eq(m[100].bot, true);
+  ok(m[5].id !== m[100].id && m[5].id >= 100, 'identifiants de bots distincts');
+});
+
+test('reprise : renumérotation cohérente de tout l\'état', () => {
+  let s = give(game(3), 1, 39, 37); give(s, 2, 1);
+  s.heldCards.ch09 = 1; pl(s, 1).jailCards = ['ch09'];
+  s = act(s, { type: 'PROPOSE_TRADE', by: 2, to: 1, give: { cash: 50 }, want: { props: [39] } }).state;
+  s.debts.push({ from: 2, to: 1, amount: 10, reason: 'rent', space: null });
+  s.auction = { space: 24, high: 40, bidder: 1, active: [0, 1, 2], passed: [2], bids: 1 };
+  const map = { 0: { id: 7 }, 1: { id: 4 }, 2: { id: 100, bot: true } };
+  const r = remapPlayers(s, map);
+  eq(r.players.map((p) => p.id).sort(), [100, 4, 7].sort());
+  eq([r.props[39].owner, r.props[1].owner, r.heldCards.ch09], [4, 100, 4]);
+  eq([r.trades[0].from, r.trades[0].to], [100, 4]);
+  eq([r.debts[0].from, r.debts[0].to], [100, 4]);
+  eq([r.auction.bidder, r.auction.active, r.auction.passed], [4, [7, 4, 100], [100]]);
+  eq(Object.keys(r.stats.players).map(Number).sort(), [100, 4, 7].sort());
+  ok(r.players.find((p) => p.id === 100).bot, 'devient un bot');
+  // la partie continue normalement après la reprise
+  r.auction = null; r.debts = [];
+  const cur = currentPlayer(r).id;
+  const after = reduce(forceDice(r, 1, 2), { type: 'ROLL', by: cur }, B);
+  ok(after.ok, after.error);
+  let bad = null; try { remapPlayers(s, { 0: { id: 1 }, 1: { id: 1 }, 2: { id: 5 } }); } catch (e) { bad = e; }
+  ok(bad, 'doublon refusé');
+});
+
+test('reprise : le chrono Express est décalé de la durée de la pause', () => {
+  const { state } = createGame(B, { players: PLAYERS(2), mode: 'express', seed: 3, now: 1000 });
+  const r = resumeAt(state, 1000 + 10 * 60000, 1000 + 70 * 60000); // sauvée à 10 min, reprise une heure plus tard
+  eq(r.endsAt - (1000 + 70 * 60000), 30 * 60000, 'il reste 30 minutes');
 });
 
 /* ----------------------------------------------------------- statistiques */

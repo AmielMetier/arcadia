@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.7 — 19 octobre 2026
+- Sauvegarde automatique des parties de DavidSimulator chez l'hôte, après chaque action (6 parties gardées).
+- Reprise depuis l'écran de choix des pions : l'hôte choisit une sauvegarde, chacun retrouve son pion, son argent
+  et ses propriétés. Les places sont attribuées par nom ; un joueur absent est joué par un bot.
+- Le chrono Express repart là où il s'était arrêté.
+
 ## 2.6 — 18 octobre 2026
 - Règles maison pour DavidSimulator, à régler dans le salon avant de lancer :
   argent de départ (1 000 à 2 500 €), cagnotte au Parc gratuit (taxes, amendes et cartes s'y accumulent),

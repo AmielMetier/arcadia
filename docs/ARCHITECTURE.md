@@ -71,10 +71,12 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── rng.js                 aléa reproductible (graine) : dés, mélange des cartes
 │   │   ├── valuation.js           patrimoine net, monopoles, classement
 │   │   ├── markov.js              probabilités d'arrivée (chaîne de Markov), rendement des propriétés
-│   │   └── bot.js                 joueur automatique
+│   │   ├── bot.js                 joueur automatique
+│   │   └── resume.js              reprise : renumérotation des joueurs, décalage du chrono
 │   ├── net/
 │   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
-│   │   └── client.js              envoie les intentions, rejoue les événements
+│   │   ├── client.js              envoie les intentions, rejoue les événements
+│   │   └── saves.js               sauvegardes locales chez l'hôte
 │   ├── view/                                                                    ← étape 3
 │   │   ├── game.js                interface de jeu + « réalisateur » qui met en scène les événements
 │   │   ├── board.js               plateau incliné en CSS 3D, pions, bâtiments, caméra qui suit le pion
@@ -127,7 +129,7 @@ et `?local` est transmis du Hub au jeu pour les tests entre onglets.
   patrimoine à chaque tour) sont tenues dans l'état par le moteur.
 
 ### Limites connues (étape 2)
-- Si l'hôte quitte le salon, la partie s'arrête : la migration d'hôte reste à faire.
+- Si l'hôte quitte le salon, la partie s'arrête ; elle reste sauvegardée chez lui et peut être reprise.
 - Un joueur qui revient au salon en cours de partie garde sa place et peut revenir ; s'il quitte le salon,
   ses biens retournent à la banque.
 - Faillite envers la banque : les terrains redeviennent libres, sans enchère.
@@ -190,6 +192,14 @@ pour faire patienter les bots d'autant.
 
 Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
 tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
+
+## Sauvegarde et reprise (version 2.7)
+
+L'hôte enregistre l'état après chaque action dans `localStorage` (`david_saves`, 6 parties au plus,
+identifiées par `state.gid`) et retire la sauvegarde en fin de partie. Pour reprendre, `proposeMapping`
+associe les joueurs de la sauvegarde à ceux du salon (par nom, puis dans l'ordre, sinon bot) et
+`remapPlayers` renumérote d'un coup tous les identifiants de l'état (propriétaires, cartes, échanges,
+dettes, enchère, statistiques). `resumeAt` décale le chrono Express de la durée de la pause.
 
 ## Règles maison (version 2.6)
 

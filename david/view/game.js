@@ -15,7 +15,7 @@ import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, t
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings } from '../engine/valuation.js';
 
-export function mountGame(root, board, { me, act, pick, start, exit }) {
+export function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -47,7 +47,7 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
   const F = mountFx(root);
   const M = mountModals(root);
   B.onStep = () => sfx.play('hop');
-  const SU = mountSetup(root, { me, pick, start, exit });
+  const SU = mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave });
 
   let S = null, offset = 0, playing = false, first = true;
   const queue = [], seenAuto = new Set(), logLines = [];
@@ -68,7 +68,7 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
   $('#t3d').onclick = () => { B.toggle3d(); syncTools(); };
   $('#tcam').onclick = () => { B.toggleFollow(); syncTools(); };
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
-  $('#tquit').onclick = () => { if (!S || S.over || confirm('Quitter la partie ?')) exit(); };
+  $('#tquit').onclick = () => { if (!S || S.over || confirm("Quitter la partie ?\nElle est sauvegardée : l'hôte pourra la reprendre depuis l'écran de choix des pions.")) exit(); };
   $('#bMine').onclick = () => openMine();
   let statsCtl = null, heatMode = null;
   const HEAT_NAMES = { visits: 'Visites', rent: 'Loyers perçus', theory: 'Probabilité' };
@@ -488,7 +488,11 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
         if (!playing && !queue.length) {
           SU.hide();
           apply(state);
-          if (wasFirst) {
+          const resumed = events.find((e) => e.k === 'RESUMED');
+          if (wasFirst && resumed) {
+            F.banner('Partie reprise', `Tour ${state.round} · bon retour à Nice !`, '#1C5FB4', 1600);
+            logLines.push({ t: `Partie reprise au tour ${state.round}`, turn: true });
+          } else if (wasFirst) {
             B.intro();
             for (const e of events) log(e);
             F.banner(state.mode === 'express' ? 'Partie Express' : 'Partie classique', 'Bonne chance à Nice !', '#e3262f', 1500);

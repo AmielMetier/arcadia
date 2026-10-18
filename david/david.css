@@ -553,3 +553,28 @@ input[type=number]:focus{outline:none;box-shadow:0 0 0 3px var(--yellow)}
 .hrules span{border:2px solid var(--ink);border-radius:20px;padding:1px 9px;font-weight:700;background:#fff3c9}
 .corner .pot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-45deg) translateY(38px);background:#2fbf71;color:#fff;border:2px solid var(--ink);
   border-radius:10px;font-family:var(--spartan);font-weight:900;font-size:13px;padding:1px 8px;white-space:nowrap;box-shadow:2px 2px 0 rgba(0,0,0,.3)}
+/* sauvegardes et reprise */
+.saves{border-top:3px dashed var(--line);padding-top:12px;margin-bottom:12px}
+.saves h3{font-family:var(--spartan);font-weight:900;text-transform:uppercase;font-size:16px}
+.savelist{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.save{position:relative}
+.saveb{width:100%;text-align:left;border:3px solid var(--ink);border-radius:12px;background:#fff;padding:8px 12px;cursor:pointer;box-shadow:3px 3px 0 var(--ink);
+  display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.saveb:hover{background:#fff3c9}
+.saveb b{font-family:var(--spartan);font-weight:800}
+.saveb small{color:var(--muted);font-weight:700;text-align:right}
+.saveb .minitoks{grid-column:1/3;display:flex;gap:2px}
+.saveb .names{grid-column:1/3;font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt svg{width:30px;height:33px;display:block}.mt.out{opacity:.35}
+.save .del{position:absolute;top:-9px;right:-9px;width:24px;height:24px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);cursor:pointer;font-weight:700;line-height:1}
+.resume{margin:14px 0}
+.resume h3{font-family:var(--spartan);font-weight:900;font-size:20px;text-transform:uppercase}
+.resume h3 small{font-family:'Chakra Petch',sans-serif;text-transform:none;font-size:13px;color:var(--muted);font-weight:700}
+.seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin:12px 0}
+.seat{display:grid;grid-template-columns:44px 1fr auto auto;gap:8px;align-items:center;border:2px solid var(--ink);border-radius:12px;background:#fff;padding:6px 10px}
+.seat.out{opacity:.5}
+.seat .tsv svg{width:40px;height:44px;display:block}
+.seat b{display:block;font-weight:700}.seat small{color:var(--muted);font-weight:700}
+.seat .arrow{font-weight:700;color:var(--muted)}
+.seat .to{border:2px solid var(--ink);border-radius:20px;padding:1px 10px;font-weight:700;background:#fff3c9}
+.seat .to.bot{background:var(--cream);color:var(--muted)}

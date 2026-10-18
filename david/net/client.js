@@ -15,6 +15,8 @@ export function startClient({ bridge, me, onState, onSetup, onError }) {
     act(a) { bridge.send('host', { t: 'act', a }); },
     pick(token) { bridge.send('host', { t: 'pick', token }); },
     start() {},
+    chooseSave() {},
+    deleteSave() {},
     get state() { return state; },
   };
 }

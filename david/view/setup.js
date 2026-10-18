@@ -13,7 +13,14 @@ export function houseChips(h) {
   return `<div class="hrules">${custom ? '<b>Règles maison :</b>' : '<b>Règles officielles</b>'}${custom ? list.map((x) => `<span>${esc(x)}</span>`).join('') : ''}</div>`;
 }
 
-export function mountSetup(root, { me, pick, start, exit }) {
+const ago = (at) => {
+  const m = Math.round((Date.now() - at) / 60000);
+  if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `il y a ${h} h`;
+  const d = Math.round(h / 24); return `il y a ${d} jour${d > 1 ? 's' : ''}`;
+};
+
+export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave }) {
   const box = el('div', 'setup');
   root.appendChild(box);
   let last = '', autoPicked = false, S = null;
@@ -32,11 +39,11 @@ export function mountSetup(root, { me, pick, start, exit }) {
     box.innerHTML = `
       <div class="setup-card">
         <div class="setup-head">
-          <div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</p>
-            ${houseChips(s.house)}</div>
+          ${s.resume ? '<div><h1>Reprendre la partie</h1></div>' : `<div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${s.bots} bot${s.bots > 1 ? 's' : ''}` : ''}</p>
+            ${houseChips(s.house)}</div>`}
           <button class="btn ghost small" id="suQuit">Quitter</button>
         </div>
-        <div class="setup-body">
+        ${s.resume ? resumeHtml(s.resume, isHost) : `<div class="setup-body">
           <div class="showcase">
             <div class="pedestal"><div class="spin">${tokenSvg(mine || TOKENS[0].id, meP.color)}</div></div>
             <b>${mine ? esc(tokenName(mine)) : 'À toi de choisir'}</b>
@@ -48,14 +55,17 @@ export function mountSetup(root, { me, pick, start, exit }) {
                 <span class="tsv">${tokenSvg(t.id, o ? o.color : '#c9c0ad')}</span><b>${esc(t.name)}</b>${o ? `<small style="--c:${o.color}">${o.id === me.id ? 'toi' : esc(o.name)}</small>` : ''}</button>`;
             }).join('')}
           </div>
-        </div>
+        </div>`}
+        ${isHost && !s.resume && s.saves && s.saves.length ? savesHtml(s.saves) : ''}
         <div class="setup-foot">
-          <div class="who">${s.players.map((p) => `<span class="${p.ready ? '' : 'wait'}"><i style="background:${p.color}"></i>${esc(p.name)}${p.id === me.id ? ' (toi)' : ''} · ${!p.ready ? 'charge le jeu…' : s.picks[p.id] ? esc(tokenName(s.picks[p.id])) : 'choisit…'}</span>`).join('')}</div>
+          <div class="who">${s.players.map((p) => `<span class="${p.ready ? '' : 'wait'}"><i style="background:${p.color}"></i>${esc(p.name)}${p.id === me.id ? ' (toi)' : ''} · ${!p.ready ? 'charge le jeu…' : s.resume ? 'prêt' : s.picks[p.id] ? esc(tokenName(s.picks[p.id])) : 'choisit…'}</span>`).join('')}</div>
           ${isHost
-            ? `<button class="btn big" id="suGo" ${mine ? '' : 'disabled'}>${mine ? 'Lancer la partie' : 'Choisis d\'abord ton pion'}</button>`
-            : `<span class="waithost"><i></i>L'hôte lance la partie…</span>`}
+            ? (s.resume
+              ? `<span class="row"><button class="btn ghost" id="suNew">Nouvelle partie</button><button class="btn big" id="suGo">Reprendre la partie</button></span>`
+              : `<button class="btn big" id="suGo" ${mine ? '' : 'disabled'}>${mine ? 'Lancer la partie' : 'Choisis d\'abord ton pion'}</button>`)
+            : `<span class="waithost"><i></i>${s.resume ? 'L\'hôte reprend une partie sauvegardée…' : 'L\'hôte lance la partie…'}</span>`}
         </div>
-        ${isHost && missing && mine ? `<p class="hint center">${missing} joueur${missing > 1 ? 's' : ''} n'${missing > 1 ? 'ont' : 'a'} pas encore choisi : un pion leur sera attribué au hasard.</p>` : ''}
+        ${isHost && missing && mine && !s.resume ? `<p class="hint center">${missing} joueur${missing > 1 ? 's' : ''} n'${missing > 1 ? 'ont' : 'a'} pas encore choisi : un pion leur sera attribué au hasard.</p>` : ''}
       </div>`;
     for (const b of box.querySelectorAll('[data-tok]')) b.onclick = () => {
       if (b.classList.contains('taken')) { sfx.play('error'); return; }
@@ -63,12 +73,32 @@ export function mountSetup(root, { me, pick, start, exit }) {
     };
     const go = box.querySelector('#suGo'); if (go) go.onclick = () => { sfx.play('turn'); start(); };
     box.querySelector('#suQuit').onclick = exit;
+    for (const b of box.querySelectorAll('[data-resume]')) b.onclick = () => { sfx.play('bid'); chooseSave(b.dataset.resume); };
+    for (const b of box.querySelectorAll('[data-delsave]')) b.onclick = (e) => { e.stopPropagation(); if (confirm('Supprimer cette sauvegarde ?')) deleteSave(b.dataset.delsave); };
+    const nw = box.querySelector('#suNew'); if (nw) nw.onclick = () => chooseSave(null);
     // pion favori choisi automatiquement s'il est libre
     if (!mine && !autoPicked) {
       autoPicked = true;
       const fav = store('david_token', null);
       if (fav && !owner(fav)) pick(fav);
     }
+  }
+
+  function savesHtml(list) {
+    return `<div class="saves"><h3>Reprendre une partie sauvegardée</h3><div class="savelist">${list.map((sv) => `
+      <div class="save"><button class="saveb" data-resume="${esc(sv.id)}">
+        <b>${sv.mode === 'express' ? 'Express' : 'Classique'} · tour ${sv.round}</b><small>${ago(sv.at)}</small>
+        <span class="minitoks">${sv.players.map((p) => `<span class="mt${p.bankrupt ? ' out' : ''}" title="${esc(p.name)}">${tokenSvg(p.token, p.color)}</span>`).join('')}</span>
+        <span class="names">${sv.players.map((p) => esc(p.name)).join(', ')}</span></button>
+        <button class="del" data-delsave="${esc(sv.id)}" aria-label="Supprimer la sauvegarde">×</button></div>`).join('')}</div></div>`;
+  }
+  function resumeHtml(r, isHost) {
+    return `<div class="resume"><h3>Partie ${r.mode === 'express' ? 'Express' : 'classique'} · tour ${r.round} <small>(sauvegardée ${ago(r.at)})</small></h3>
+      ${houseChips(r.house)}
+      <div class="seats">${r.seats.map((p) => `<div class="seat${p.bankrupt ? ' out' : ''}"><span class="tsv">${tokenSvg(p.token, p.color)}</span>
+        <div><b>${esc(p.name)}</b><small>${p.bankrupt ? 'en faillite' : (p.cash ?? 0).toLocaleString('fr-FR') + ' €'}</small></div>
+        <span class="arrow">→</span><span class="to${p.to ? '' : ' bot'}">${p.to ? esc(p.to) : 'bot'}</span></div>`).join('')}</div>
+      <p class="hint">${isHost ? 'Les places sont attribuées par nom, puis dans l\'ordre ; les joueurs absents sont joués par un bot.' : 'Chaque joueur retrouve son pion, son argent et ses propriétés.'}</p></div>`;
   }
 
   return {
