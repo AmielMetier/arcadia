@@ -2137,7 +2137,7 @@ const ACH = [
 const TITLES = ACH.filter(a=>a.title).map(a=>a.title);
 const MEDALS = [null, {n:'Bronze', ico:'🥉', f:1.4, rew:30}, {n:'Argent', ico:'🥈', f:1.22, rew:60}, {n:'Or', ico:'🥇', f:1.08, rew:120}, {n:'Légende', ico:'⚡', f:0.98, rew:250}];
 // meilleur tour mesuré des bots difficiles (sans objets) : la Légende les bat
-const BOT_BEST = [11.0,16.4,12.6,12.2,13.3,21.3,33.0,24.1,31.0,35.7,27.2];
+const BOT_BEST = [9.8,14.3,11.5,11.2,11.7,17.3,28.8,20.7,26.8,30.1,26.2];
 
 function newStats(){ return {races:0,wins:0,podiums:0,battles:0,bwins:0,funWins:0,goals:0,coins:0,jumps:0,flawless:0,hits:0,laps:0,drifts:0,dist:0,boxes:0,nitro:0,gpWins:0,multi:0,rainWins:0,cityRaces:0,cities:{},tracksWon:{}}; }
 function loadProfile(){
@@ -2737,10 +2737,11 @@ function botLine(tr){
   return tr.bline;
 }
 /* vitesse cible le long de la trajectoire, avec anticipation du freinage */
+const BOT_TUNE = { yaw:1.5, dec:950, hs:0 };
 function botProf(tr, cls){
   const bl=botLine(tr); if(bl.prof[cls]) return bl.prof[cls];
-  const K=CLASSES[cls], N=tr.N, v=new Float32Array(N), YAW=K.turn*0.86, DEC=760;
-  for(let i=0;i<N;i++) v[i]=Math.min(K.max, YAW/Math.max(1e-4,bl.k[i]));
+  const K=CLASSES[cls], N=tr.N, v=new Float32Array(N), DEC=BOT_TUNE.dec;
+  for(let i=0;i<N;i++){ let w=K.turn*BOT_TUNE.yaw*Math.min(1,K.grip/12.5)/Math.max(1e-4,bl.k[i]); if(w>380) w=380+(w-380)*(1-0.22*BOT_TUNE.hs); v[i]=Math.min(K.max, w); }
   for(let pass=0;pass<2;pass++) for(let i=N-1;i>=0;i--){ const j=(i+1)%N; v[i]=Math.min(v[i], Math.sqrt(v[j]*v[j]+2*DEC*bl.ds[i])); }
   bl.prof[cls]=v; return v;
 }
@@ -2752,7 +2753,9 @@ function botInput(c, r, now, lv, dt){
   if(lv!==AUTO && skill<0.99){ const hum=r.list.filter(o=>!o.bot && !o.left && !o.out);
     if(hum.length){ const maxH=Math.max(...hum.map(o=>o.progress)), minH=Math.min(...hum.map(o=>o.progress));
       if((maxH-c.progress)/N>0.2) skill*=1.06; else if((c.progress-minH)/N>0.35) skill*=0.95; } }
-  let vt=prof[(i+3)%N]*skill*(1-0.12*r.rain);
+  // le niveau joue surtout sur la vitesse de pointe : en virage, même les bots moyens restent proches de la limite
+  const cornerSkill=1-(1-skill)*0.45;
+  let vt=Math.min(prof[(i+3)%N]*cornerSkill, CLASSES[c.cls].max*skill)*(1-0.12*r.rain);
   if(r.mut.glace) vt*=0.7; if(r.mut.vitesse && prof[(i+3)%N]>=CLASSES[c.cls].max*0.99) vt*=1.25;
   for(const hz of tr.hazards) if(hz.type==='ice' && Math.hypot(c.x-hz.x,c.y-hz.y)<hz.r+90) vt*=0.72;
   if(c.shrink>0) vt*=0.85;
@@ -4403,7 +4406,7 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ for(co
 buildSwatches(); buildClasses(); buildVolumes(); padInfo(); renderMenuCar(); renderProfChip();
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>renderMenuCar());
 requestAnimationFrame(frame);
-window.__dd = { G, TRACKS, ARENA, keys, nearest, AudioSys, records, Pad, roster, P, medalTimes, levelInfo, saveProfile };
+window.__dd = { BOT_TUNE, G, TRACKS, ARENA, keys, nearest, AudioSys, records, Pad, roster, P, medalTimes, levelInfo, saveProfile };
 
 </script>
 </body>
