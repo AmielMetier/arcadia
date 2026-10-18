@@ -70,6 +70,7 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── modes.js               Classique / Express
 │   │   ├── rng.js                 aléa reproductible (graine) : dés, mélange des cartes
 │   │   ├── valuation.js           patrimoine net, monopoles, classement
+│   │   ├── markov.js              probabilités d'arrivée (chaîne de Markov), rendement des propriétés
 │   │   └── bot.js                 joueur automatique
 │   ├── net/
 │   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
@@ -83,9 +84,7 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── modals.js              titre de propriété, achat, enchère, échange, mes biens, fin de partie
 │   │   ├── sfx.js                 sons synthétisés (WebAudio), sans fichier
 │   │   ├── icons.js, util.js      icônes SVG et petits outils
-│   ├── stats/                                                                   ← étape 4
-│   │   ├── tracker.js             relevés par tour à partir des événements du moteur
-│   │   └── charts.js              courbe de patrimoine, heatmap, classement final
+│   │   └── stats.js               statistiques : courbe, heatmap, classement, analyse financière (étape 4)
 │   └── assets/                    sons, textures
 ├── tools/
 │   ├── check-board.mjs            contrôle de fidélité du plateau (étape 1)
@@ -188,6 +187,19 @@ pour faire patienter les bots d'autant.
 
 Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
 tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
+
+## Statistiques (étape 4)
+
+Le moteur tient les compteurs dans l'état (visites et loyers par case, distance, prison, doubles,
+achats, constructions) et un historique du patrimoine et du liquide à chaque fin de tour, plafonné
+à 400 points (un point sur deux est retiré au-delà, le dernier est toujours gardé).
+
+`markov.js` calcule la probabilité d'arrêt à long terme sur chaque case : matrice de transition
+40 × 40 (deux dés, cartes du paquet réel, « Allez en prison », trois doubles), distribution
+stationnaire par itération de puissance. On retrouve les résultats connus : prison ≈ 6,3 %,
+puis Cours Saleya (l'équivalent d'Illinois Avenue), Départ et le groupe orange. L'analyse financière
+en déduit, avec les loyers actuels, le revenu espéré par tour de table, le rendement et le gain
+marginal d'une maison de plus.
 
 ## Étapes suivantes
 

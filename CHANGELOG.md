@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.2 — 18 octobre 2026
+- Tableau de bord en direct : rang, liquide, valeur immobilière, monopoles, patrimoine net et mini-courbe pour chaque joueur.
+- Écran « Statistiques » (bouton 📊, en direct et en fin de partie) :
+  - courbe du patrimoine net ou du liquide tour par tour, avec infobulle au survol ;
+  - heatmap du plateau (visites, loyers perçus, probabilité théorique), affichable sur le plateau 3D ;
+  - classement détaillé et triable : loyers perçus et payés, distance, tours en prison, doubles, achats…
+  - analyse financière : probabilité d'arrivée (chaîne de Markov), revenu espéré, rendement, délai de rentabilité
+    et meilleur prochain investissement.
+- L'historique de partie reste léger même dans les très longues parties.
+
 ## 2.1 — 18 octobre 2026
 - DavidSimulator a son vrai plateau : vue 3D inclinée (ou vue de dessus), coins illustrés, centre aux couleurs de Nice.
 - Dés en 3D qui roulent et rebondissent, pions qui sautent de case en case, caméra qui suit le joueur.

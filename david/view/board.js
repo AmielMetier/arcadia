@@ -228,6 +228,15 @@ export function mountBoard(host, board, { onCell } = {}) {
     // Position à l'écran du centre d'une case (pour les effets)
     cellScreen(i) { const b = cells[i].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; },
     pawnScreen(pid) { const o = pawns.get(pid); if (!o) return null; const b = o.el.querySelector('.sprite').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; },
+    // Heatmap posée sur les cases : [{ bg, ink, label } | null] × 40, ou null pour l'enlever
+    heat(list) {
+      for (const c of cells) {
+        const h = list && list[+c.dataset.i];
+        c.classList.toggle('heated', !!h);
+        if (h) { c.style.setProperty('--heat', h.bg); c.style.setProperty('--heatInk', h.ink); c.dataset.heat = h.label; }
+        else delete c.dataset.heat;
+      }
+    },
     is3d: () => view.tilt > 0,
     toggle3d() { view.tilt = view.tilt ? 0 : TILT_3D; save('david_view3d', view.tilt > 0); fit(); },
     follow: () => view.follow,

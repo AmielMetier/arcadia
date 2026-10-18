@@ -18,6 +18,7 @@ Course et bataille en vue de dessus, jusqu'à 5 joueurs.
 ## DavidSimulator
 Le Monopoly classique transposé à Nice, de Saint-Roch à la Promenade des Anglais, jusqu'à 6 joueurs (bots possibles).
 Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Express** (40 minutes).
+Plateau 3D animé, statistiques en direct (courbe du patrimoine, heatmap, classement) et analyse financière des propriétés.
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
@@ -25,6 +26,6 @@ Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Expres
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator.
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Version actuelle : **2.0** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.2** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

@@ -4,6 +4,7 @@ import { createGame, reduce, actors, currentPlayer, availableActions } from '../
 import { botAction } from '../david/engine/bot.js';
 import { nextRandom } from '../david/engine/rng.js';
 import { netWorth, level, groupSpaces } from '../david/engine/valuation.js';
+import { landingProbabilities, propertyAnalysis } from '../david/engine/markov.js';
 
 const B = JSON.parse(readFileSync(new URL('../david/data/board-nice.json', import.meta.url), 'utf8'));
 let passed = 0, failed = 0;
@@ -445,6 +446,44 @@ test('actions disponibles', () => {
   const s = game(2);
   ok(availableActions(s, B, 0).includes('ROLL'));
   ok(!availableActions(s, B, 1).includes('ROLL'));
+});
+
+/* ----------------------------------------------------------- statistiques */
+test('Markov : distribution stationnaire cohérente', () => {
+  const pi = landingProbabilities(B);
+  ok(Math.abs(pi.reduce((a, b) => a + b, 0) - 1) < 1e-9, 'somme ≠ 1');
+  eq(pi[30], 0, 'on ne reste jamais sur « Allez en prison »');
+  const top = pi.map((p, i) => [i, p]).sort((a, b) => b[1] - a[1]);
+  eq(top[0][0], 10, 'la prison est la case la plus fréquentée');
+  ok(pi[24] > pi[21] && pi[24] > 0.03, 'Cours Saleya parmi les plus visitées');
+});
+
+test('analyse financière : revenu espéré et rendement', () => {
+  const s = give(game(3), 0, 37, 39); s.props[39].hotel = true;
+  const { rows, opponents } = propertyAnalysis(s, B, 0);
+  eq(opponents, 2);
+  const prom = rows.find((r) => r.i === 39);
+  eq(prom.rent, 2000); eq(prom.invested, 400 + 5 * 200);
+  ok(Math.abs(prom.ev - landingProbabilities(B)[39] * 2000 * 2) < 1e-9, 'espérance');
+  ok(prom.nextGain === null, 'pas de bâtiment après un hôtel');
+  ok(rows.find((r) => r.i === 37).nextGain > 0, 'gain marginal d\'une maison');
+});
+
+test('historique : liquide enregistré et taille plafonnée', () => {
+  let s = game(2);
+  ok(s.stats.history[0].cash[0] === 1500, 'liquide absent');
+  for (let k = 0; k < 450; k++) {
+    s = forceDice(s, 1, 2); s = act(s, { type: 'ROLL', by: currentPlayer(s).id }).state;
+    while (s.phase !== 'end') {
+      const id = actors(s)[0];
+      const a = s.phase === 'buy' ? { type: 'DECLINE', by: id } : s.auction ? { type: 'PASS', by: id } : s.debts.length ? { type: 'BANKRUPT', by: id } : { type: 'ROLL', by: id };
+      s = act(s, a).state; if (s.over) break;
+    }
+    if (s.over) break;
+    s = act(s, { type: 'END_TURN', by: currentPlayer(s).id }).state;
+  }
+  ok(s.stats.history.length <= 400, `historique trop long (${s.stats.history.length})`);
+  eq(s.stats.history[s.stats.history.length - 1].t, s.turnCount - 1, 'dernier point conservé (fin du tour précédent)');
 });
 
 /* ----------------------------------------------------------- simulation */

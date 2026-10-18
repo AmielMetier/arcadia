@@ -178,5 +178,5 @@ export function overHtml(board, S, name) {
     <table class="rank"><tr><th>#</th><th>Joueur</th><th>Patrimoine</th><th>Loyers perçus</th><th>Loyers payés</th><th>Distance</th><th>Prison</th></tr>
     ${rows.map((r, k) => { const p = S.players.find((q) => q.id === r.id), st = S.stats.players[p.id];
       return `<tr class="${p.bankrupt ? 'out' : ''}"><td>${k + 1}</td><td><i class="dot" style="background:${p.color}"></i>${esc(p.name)}</td><td>${p.bankrupt ? 'faillite' : money(r.total)}</td><td>${money(st.rentIn)}</td><td>${money(st.rentOut)}</td><td>${st.dist} cases</td><td>${st.jailTurns} tour${st.jailTurns > 1 ? 's' : ''}</td></tr>`; }).join('')}</table>
-    <div class="row end"><button class="btn big" id="backHub">Retour au salon</button></div></div>`;
+    <div class="row end"><button class="btn big yellow" id="overStats">📊 Statistiques détaillées</button><button class="btn big" id="backHub">Retour au salon</button></div></div>`;
 }

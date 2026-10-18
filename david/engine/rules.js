@@ -335,10 +335,19 @@ function nextTurn(ctx) {
   ctx.ev.push({ k: 'TURN', player: s.players[cur].id, round: s.round });
 }
 
+// Historique du patrimoine et du liquide, un point par fin de tour.
+// Au-delà de HISTORY_MAX points, on garde un point sur deux (le premier et le dernier restent) :
+// l'état reste léger même dans une très longue partie.
+const HISTORY_MAX = 400;
 function recordHistory(s, board) {
-  const worth = {};
-  for (const p of s.players) worth[p.id] = p.bankrupt ? 0 : netWorth(s, board, p.id).total;
-  s.stats.history.push({ t: s.turnCount, r: s.round, worth });
+  const worth = {}, cash = {};
+  for (const p of s.players) {
+    worth[p.id] = p.bankrupt ? 0 : netWorth(s, board, p.id).total;
+    cash[p.id] = p.bankrupt ? 0 : p.cash;
+  }
+  const h = s.stats.history;
+  h.push({ t: s.turnCount, r: s.round, worth, cash });
+  if (h.length > HISTORY_MAX) s.stats.history = h.filter((_, k) => k % 2 === 0 || k === h.length - 1);
 }
 
 function rollDice(ctx, p) {

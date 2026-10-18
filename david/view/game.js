@@ -10,6 +10,8 @@ import { sfx } from './sfx.js';
 import { pawnSvg } from './icons.js';
 import { esc, money, el, wait } from './util.js';
 import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
+import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
+import { standings } from '../engine/valuation.js';
 
 export function mountGame(root, board, { me, act, exit }) {
   root.className = 'game';
@@ -19,6 +21,8 @@ export function mountGame(root, board, { me, act, exit }) {
       <div class="info"><b id="mode">DavidSimulator</b><span id="round"></span></div>
       <div class="timer" id="timer" hidden></div>
       <div class="tools">
+        <button class="heatpill" id="heatPill" hidden title="Masquer la heatmap"></button>
+        <button class="tool" id="tstats" title="Statistiques">📊</button>
         <button class="tool" id="t3d" title="Vue 3D ou vue de dessus">3D</button>
         <button class="tool" id="tcam" title="Caméra qui suit le pion">🎥</button>
         <button class="tool" id="tsnd" title="Son">🔊</button>
@@ -55,6 +59,22 @@ export function mountGame(root, board, { me, act, exit }) {
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
   $('#tquit').onclick = () => { if (!S || S.over || confirm('Quitter la partie ?')) exit(); };
   $('#bMine').onclick = () => openMine();
+  let statsCtl = null, heatMode = null;
+  const HEAT_NAMES = { visits: 'Visites', rent: 'Loyers perçus', theory: 'Probabilité' };
+  function openStatsWin() { if (!S) return; statsCtl = openStats(M, board, () => S, me, { onHeat: setHeat, heatMode: heatMode || 'visits' }); }
+  function setHeat(mode) {
+    heatMode = mode;
+    $('#heatPill').hidden = !mode;
+    if (mode) $('#heatPill').textContent = `Heatmap : ${HEAT_NAMES[mode]} ✕`;
+    paintHeat();
+  }
+  function paintHeat() {
+    if (!S || !heatMode) { B.heat(null); return; }
+    const vals = heatValues(S, board, heatMode), max = Math.max(...vals);
+    B.heat(vals.map((v) => { const c = heatColor(v, max); return c ? { ...c, label: heatLabel(heatMode, v) } : null; }));
+  }
+  $('#tstats').onclick = () => openStatsWin();
+  $('#heatPill').onclick = () => setHeat(null);
   $('#bTrade').onclick = () => openTrade();
   $('#logbox').onclick = () => $('#logbox').classList.toggle('open');
   syncTools();
@@ -113,13 +133,15 @@ export function mountGame(root, board, { me, act, exit }) {
   }
   function renderRoster() {
     const cur = S.over ? null : currentPlayer(S).id;
+    const rank = new Map(standings(S, board).map((r, k) => [r.id, k + 1]));
     $('#roster').innerHTML = S.players.map((p) => {
       const w = netWorth(S, board, p.id);
       return `<div class="pcard-hud${p.id === cur ? ' cur' : ''}${p.bankrupt ? ' out' : ''}${p.id === me.id ? ' me' : ''}" data-pid="${p.id}" style="--pc:${p.color}">
-        <span class="mini">${pawnSvg(p.color, esc(p.name[0].toUpperCase()))}</span>
+        <span class="mini">${pawnSvg(p.color, esc(p.name[0].toUpperCase()))}<i class="rk" title="Rang au patrimoine">${p.bankrupt ? '✕' : rank.get(p.id)}</i></span>
         <span class="who"><b>${esc(p.name)}</b><small>${p.id === me.id ? 'toi' : p.bot ? 'bot' : ''}${p.inJail ? ' · 🔒 prison' : ''}${p.jailCards.length ? ' · 🎟' : ''}</small></span>
-        <span class="cash">${money(cash[p.id] ?? p.cash)}</span>
-        <span class="worth" title="Patrimoine net et monopoles">Patrimoine ${money(w.total)}${w.monopolies ? ` · ${'♛'.repeat(w.monopolies)}` : ''}</span>
+        <span class="cash" title="Argent liquide">${money(cash[p.id] ?? p.cash)}</span>
+        <span class="worth"><span title="Valeur immobilière">🏠 ${money(w.property + w.buildings)}</span><span title="Monopoles">♛ ${w.monopolies}</span><span class="net" title="Patrimoine net">Net ${money(w.total)}</span></span>
+        <span class="sp">${sparkline(S, p.id, p.color)}</span>
         ${p.id === cur ? '<i class="playing">joue</i>' : ''}
       </div>`;
     }).join('');
@@ -258,6 +280,7 @@ export function mountGame(root, board, { me, act, exit }) {
   function openOver() {
     const box = M.open('over', overHtml(board, S, name), { cls: 'wide', closable: true });
     box.querySelector('#backHub').onclick = exit;
+    box.querySelector('#overStats').onclick = () => openStatsWin();
   }
 
   // fenêtres qui s'ouvrent d'elles-mêmes selon la situation
@@ -289,6 +312,8 @@ export function mountGame(root, board, { me, act, exit }) {
     B.setCurrent(S.over ? null : currentPlayer(S).id);
     B.pulse(S.phase === 'buy' ? S.pendingBuy : -1);
     renderRoster(); renderActions(); autoModals(); tickTimer();
+    if (heatMode) paintHeat();
+    if (statsCtl && M.key === 'stats') statsCtl.refresh();
   }
 
   /* ---------------------------------------------------------- mise en scène */
