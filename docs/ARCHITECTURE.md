@@ -1,0 +1,170 @@
+# Game Hub — architecture (étape 1)
+
+Ce document décrit comment transformer Duo Drift en **Game Hub** accueillant deux jeux :
+**Duo Drift** (course) et **DavidSimulator** (Monopoly édition Nice).
+
+## Ce qui existe aujourd'hui
+
+- Un seul fichier `index.html` (≈ 438 Ko) : HTML, CSS, PeerJS 1.5.5 embarqué et tout le jeu.
+- Réseau **en étoile** : l'hôte crée un identifiant PeerJS `duodrift-v3-<CODE>` (code de 4 lettres),
+  les invités s'y connectent, l'hôte fait autorité et relaie les messages.
+- Objet `Net` avec une API simple : `host(cb)`, `join(code, cb)`, `toHost(m)`, `to(cid, m)`, `bcast(m)`, `close()`.
+  Mode `?local` qui remplace WebRTC par un `BroadcastChannel` pour tester entre onglets.
+- Protocole de salon : `hello` → `welcome` → `lobby` (liste des joueurs + réglages), `ev` (chat, émotes…), `ping/pong`, `bye`.
+- Profil en `localStorage` : pseudo, couleur, niveau, titre.
+- Site 100 % statique publié par GitHub Pages, sans étape de build.
+
+## Le choix structurant : un salon qui survit au changement de jeu
+
+Si chaque jeu est une page séparée, passer du Hub au jeu recharge la page et **coupe la connexion
+WebRTC** : tout le monde devrait se reconnecter. Deux solutions ont été comparées :
+
+| | Coquille + iframe (retenue) | Pages séparées + reconnexion auto |
+|---|---|---|
+| Connexion pendant le changement de jeu | conservée | coupée puis rétablie (1 à 3 s, échecs possibles) |
+| Modifs dans Duo Drift | remplacer `Net` par un pont de même API | réutiliser le même code de salon, gérer l'ID PeerJS encore occupé |
+| Isolation entre jeux | totale (chaque jeu dans son iframe) | totale |
+| Jeu jouable seul via son URL | oui | oui |
+
+**Solution retenue** : le Hub est une **coquille** qui détient la connexion et le salon. Le jeu choisi
+est chargé dans une **iframe plein écran** de la même origine et parle au Hub par `postMessage`
+au travers de `shared/bridge.js`, qui expose **exactement la même API que `Net`**. Duo Drift n'a donc
+presque rien à changer : s'il est lancé depuis le Hub il utilise le pont, sinon il garde `Net` en direct.
+
+```
+┌──────────────────────── index.html (Hub) ────────────────────────┐
+│ profil · salon commun · chat · choix du jeu                      │
+│ shared/net.js ⇄ PeerJS ⇄ amis                                    │
+│        ▲ postMessage                                             │
+│ ┌──────┴────────────── iframe ─────────────────────────────────┐ │
+│ │ drift/index.html   ou   david/index.html                     │ │
+│ │ shared/bridge.js  (même API que Net)                         │ │
+│ └──────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Arborescence cible
+
+```
+duo-drift/                         → https://amielmetier.github.io/duo-drift/
+├── index.html                     Hub : accueil, profil, salon, choix du jeu, iframe du jeu
+├── hub/
+│   ├── hub.css                    habillage du Hub (thème commun aux deux jeux)
+│   ├── hub.js                     écrans du Hub, lancement / retour de jeu
+│   └── games.js                   registre : id, titre, vignette, joueurs min/max, URL
+├── shared/
+│   ├── vendor/peerjs.min.js       PeerJS sorti d'index.html (une seule copie)
+│   ├── net.js                     Net extrait de Duo Drift ; préfixe d'ID paramétrable
+│   ├── room.js                    salon générique : joueurs, pseudos, couleurs, chat, pings, hôte
+│   ├── bridge.js                  pont Hub ⇄ jeu (postMessage), même API que Net
+│   ├── profile.js                 pseudo, couleur, niveau (clés localStorage communes)
+│   └── store.js                   accès localStorage protégé (try/catch)
+├── drift/
+│   └── index.html                 Duo Drift actuel déplacé ; Net → bridge s'il est dans le Hub
+├── david/
+│   ├── index.html                 DavidSimulator
+│   ├── data/
+│   │   └── board-nice.json        40 cases, groupes, règles, modes, 32 cartes   ← étape 1
+│   ├── engine/                    moteur pur, sans DOM, testable sous Node      ← étape 2
+│   │   ├── rules.js               reduce(state, action) → { state, events }
+│   │   ├── modes.js               Classique / Express
+│   │   ├── rng.js                 aléa reproductible (graine) : dés, mélange des cartes
+│   │   └── valuation.js           patrimoine net, monopoles, faillite
+│   ├── net/
+│   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
+│   │   └── client.js              envoie les intentions, rejoue les événements
+│   ├── view/                                                                    ← étape 3
+│   │   ├── board.js               plateau isométrique en CSS 3D, caméra qui suit le pion
+│   │   ├── dice.js                dés 3D avec simulation de rebonds
+│   │   ├── tokens.js              pions et déplacements case par case
+│   │   ├── fx.js                  achats, constructions, paiements (particules, billets)
+│   │   └── modals.js              achat, enchère, échange, hypothèque, prison, cartes
+│   ├── stats/                                                                   ← étape 4
+│   │   ├── tracker.js             relevés par tour à partir des événements du moteur
+│   │   └── charts.js              courbe de patrimoine, heatmap, classement final
+│   └── assets/                    sons, textures
+├── tools/
+│   ├── check-board.mjs            contrôle de fidélité du plateau (étape 1)
+│   └── test-rules.mjs             tests du moteur (étape 2)
+└── docs/ARCHITECTURE.md
+```
+
+URL : la racine devient le Hub. Duo Drift reste accessible directement via `/duo-drift/drift/`,
+et `?local` est transmis du Hub au jeu pour les tests entre onglets.
+
+## Salon commun
+
+- Capacité du salon : **6** joueurs. Duo Drift reste limité à 5 : le Hub grise son lancement au-delà.
+- Le salon (pseudos, couleurs, chat, pings) appartient au Hub. Les réglages propres à chaque jeu
+  (circuit, mode Express…) sont gérés par le jeu et envoyés dans le même canal.
+- Messages ajoutés au protocole existant :
+  - `launch` `{ game, settings }` : l'hôte lance un jeu, tous les Hub chargent l'iframe correspondante ;
+  - `back` : retour au salon pour tout le monde ;
+  - `g` `{ game, m }` : enveloppe des messages propres à un jeu (le Hub les transmet sans les lire).
+
+## DavidSimulator : principes du moteur
+
+- **L'hôte fait autorité** (comme dans Duo Drift). Les invités envoient des *intentions*
+  (`ROLL`, `BUY`, `BID`, `PROPOSE_TRADE`, `BUILD`, `MORTGAGE`, `PAY_BAIL`, `END_TURN`…).
+  L'hôte les valide, tire les dés et diffuse des **événements** (`DICE`, `MOVE`, `PAY`, `BUY`,
+  `CARD`, `BUILD`, `JAIL`, `BANKRUPT`…) que chaque client anime dans l'ordre.
+- Le moteur est une **fonction pure** `reduce(state, action, rng)` : la même logique tourne chez
+  l'hôte, dans les tests et dans les bots.
+- L'état complet tient en quelques Ko : il est diffusé à chaque fin de tour. Si l'hôte quitte la partie,
+  le joueur suivant reprend le salon avec le dernier état connu (migration d'hôte), et l'état est
+  sauvegardé localement pour reprendre une partie interrompue.
+- Les événements alimentent directement les statistiques (cases visitées, loyers, prison, distance).
+
+## Plateau de Nice — `david/data/board-nice.json`
+
+Les valeurs sont celles du Monopoly classique (édition en euros) : 40 cases, mêmes prix, loyers,
+coûts de construction, hypothèques, taxes et 16 + 16 cartes aux effets identiques. Seuls les noms et
+les textes sont niçois. `node tools/check-board.mjs` compare le fichier à la référence officielle.
+
+| Groupe | Quartier | Cases (prix) |
+|---|---|---|
+| Marron | Quartiers Nord & Saint-Roch | Boulevard de l'Ariane (60), Boulevard Pierre Sola (60) |
+| Bleu ciel | Libération & République | Avenue de la République (100), Avenue Malausséna (100), Place Charles de Gaulle (120) |
+| Rose | Les Musiciens | Boulevard Gambetta (140), Rue Rossini (140), Rue de la Buffa (160) |
+| Orange | Port Lympia | Quai Lunel (180), Quai Cassini (180), Place Île-de-Beauté (200) |
+| Rouge | Vieux-Nice | Rue Pairolière (220), Place Rossetti (220), Cours Saleya (240) |
+| Jaune | Centre-ville | Boulevard Victor Hugo (260), Avenue Jean Médecin (260), Place Masséna (280) |
+| Vert | Cimiez | Boulevard de Cimiez (300), Avenue des Arènes de Cimiez (300), Place du Monastère (320) |
+| Bleu foncé | Mont Boron & Promenade | Boulevard du Mont-Boron (350), Promenade des Anglais (400) |
+| Transports | — | Gare Riquier (5), Tramway Ligne 1 (15), Gare Thiers (25), Aéroport Nice Côte d'Azur (35) |
+| Compagnies | — | Eau d'Azur (12), Régie Lignes d'Azur (28) |
+
+L'aéroport est placé en case 35, juste avant la Promenade des Anglais, comme dans la réalité.
+
+### Format d'une case
+
+```json
+{ "i": 39, "type": "street", "name": "Promenade des Anglais", "district": "Baie des Anges",
+  "group": "darkblue", "color": "#1C5FB4", "price": 400, "mortgage": 200, "houseCost": 200,
+  "rent": [50, 200, 600, 1400, 1700, 2000] }
+```
+
+`rent` = [terrain nu, 1 maison, 2, 3, 4, hôtel]. Le loyer nu est doublé quand le groupe entier
+appartient au même joueur et qu'aucun terrain n'est hypothéqué. Un hôtel coûte `houseCost`
+(les maisons sont rendues à la banque). Gares : `rent` selon le nombre possédé (1 à 4).
+Compagnies : 4 × ou 10 × les dés selon qu'on en possède 1 ou 2.
+
+### Mode Express
+
+| Paramètre | Valeur |
+|---|---|
+| Propriétés offertes au départ | 3 par joueur, tirées au hasard, sans former de groupe complet |
+| Maisons pour un hôtel | 3 (on paie l'hôtel après 3 maisons ; le loyer « hôtel » s'applique) |
+| Prison | 2 tours maximum |
+| Fin | première faillite **ou** fin du chrono de 40 min |
+| Vainqueur | patrimoine le plus élevé : argent + prix des terrains (moitié si hypothéqués) + coût des bâtiments |
+
+Le calcul du patrimoine reprend celui de la variante « partie courte » des règles officielles.
+
+## Étapes suivantes
+
+2. Hub (coquille, salon, pont) + moteur de règles complet avec tests.
+3. Plateau isométrique, dés, pions, effets, fenêtres d'interaction.
+4. Tableau de bord temps réel, courbes, heatmap, classement final.
+
+La sortie du Hub sera publiée en **version 2.0** avec son entrée dans le journal des versions.
