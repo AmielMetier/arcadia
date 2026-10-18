@@ -14,6 +14,7 @@ function ac() {
   return ctx;
 }
 // Le navigateur exige un geste de l'utilisateur avant de jouer du son
+// (la musique, si elle est activée, démarre au même moment : voir game.js)
 for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (on) ac(); }, { once: true, capture: true });
 
 function tone(freq, t0, dur, { type = 'sine', vol = 0.5, slide = 0 } = {}) {
@@ -47,6 +48,7 @@ const SOUNDS = {
   bankrupt(c, t) { [392, 330, 262, 196].forEach((f, k) => tone(f, t + k * 0.15, 0.3, { type: 'sawtooth', vol: 0.12 })); },
 };
 
+export const audioContext = () => ac();
 export const sfx = {
   play(name) {
     if (!on || !SOUNDS[name]) return;

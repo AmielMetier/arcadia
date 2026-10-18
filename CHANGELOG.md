@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.4 — 18 octobre 2026
+- Musique d'ambiance « lo-fi » dans DavidSimulator, générée en direct (aucun fichier, libre de droits) :
+  piano électrique, basse ronde, batterie feutrée, petites mélodies ; les accords changent toutes les 8 mesures.
+- Bouton 🎵 pour la couper, curseur de volume au survol, réglages mémorisés.
+- La musique s'efface pendant les enchères et en fin de partie.
+
 ## 2.3 — 18 octobre 2026
 - DavidSimulator prend le look d'un vrai jeu de société : plateau posé sur une table en bois, avec son épaisseur,
   centre vert classique, logo en diagonale, paquets de cartes en pointillés, coins à 45°.

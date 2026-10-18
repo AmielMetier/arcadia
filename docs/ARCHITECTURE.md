@@ -83,6 +83,7 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── fx.js                  pièces, montants flottants, bandeaux, tampons, cartes, confettis
 │   │   ├── modals.js              titre de propriété, achat, enchère, échange, mes biens, fin de partie
 │   │   ├── sfx.js                 sons synthétisés (WebAudio), sans fichier
+│   │   ├── music.js               musique lo-fi générée (séquenceur WebAudio, rendu hors ligne pour les tests)
 │   │   ├── tokens.js              10 pions en métal (SVG) avec socle à la couleur du joueur
 │   │   ├── setup.js               salle d'avant-partie : choix des pions, lancement par l'hôte
 │   │   ├── icons.js, util.js      icônes SVG et petits outils

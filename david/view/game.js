@@ -6,7 +6,8 @@ import { netWorth } from '../engine/valuation.js';
 import { mountBoard } from './board.js';
 import { mountDice } from './dice.js';
 import { mountFx } from './fx.js';
-import { sfx } from './sfx.js';
+import { sfx, audioContext } from './sfx.js';
+import { createMusic } from './music.js';
 import { tokenSvg } from './tokens.js';
 import { mountSetup } from './setup.js';
 import { esc, money, el, wait } from './util.js';
@@ -26,7 +27,8 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
         <button class="tool" id="tstats" title="Statistiques">📊</button>
         <button class="tool" id="t3d" title="Vue 3D ou vue de dessus">3D</button>
         <button class="tool" id="tcam" title="Caméra qui suit le pion">🎥</button>
-        <button class="tool" id="tsnd" title="Son">🔊</button>
+        <span class="musicctl"><button class="tool" id="tmus" title="Musique d'ambiance">🎵</button><input type="range" id="mvol" min="0" max="1" step="0.05" aria-label="Volume de la musique"></span>
+        <button class="tool" id="tsnd" title="Bruitages">🔊</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
@@ -55,7 +57,14 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
   const meP = () => S && S.players.find((p) => p.id === me.id);
 
   /* ---------------------------------------------------------- barre d'outils */
-  const syncTools = () => { $('#t3d').textContent = B.is3d() ? '3D' : '2D'; $('#tcam').classList.toggle('off', !B.follow()); $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; };
+  const music = createMusic(audioContext);
+  // le navigateur n'autorise le son qu'après un geste : la musique démarre au premier clic ou touche
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (music.on) music.start(); }, { once: true, capture: true });
+  $('#mvol').value = music.volume;
+  $('#mvol').oninput = (e) => music.setVolume(+e.target.value);
+  $('#tmus').onclick = () => { music.toggle(); syncTools(); };
+  const syncTools = () => {
+    $('#tmus').classList.toggle('off', !music.on); $('#tmus').title = music.on ? 'Couper la musique' : 'Mettre la musique'; $('#t3d').textContent = B.is3d() ? '3D' : '2D'; $('#tcam').classList.toggle('off', !B.follow()); $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; };
   $('#t3d').onclick = () => { B.toggle3d(); syncTools(); };
   $('#tcam').onclick = () => { B.toggleFollow(); syncTools(); };
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
@@ -315,6 +324,7 @@ export function mountGame(root, board, { me, act, pick, start, exit }) {
     B.pulse(S.phase === 'buy' ? S.pendingBuy : -1);
     renderRoster(); renderActions(); autoModals(); tickTimer();
     if (heatMode) paintHeat();
+    music.duck(!!S.auction || S.over);
     if (statsCtl && M.key === 'stats') statsCtl.refresh();
   }
 
