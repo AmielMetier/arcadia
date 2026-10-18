@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.1 — 18 octobre 2026
+- DavidSimulator a son vrai plateau : vue 3D inclinée (ou vue de dessus), coins illustrés, centre aux couleurs de Nice.
+- Dés en 3D qui roulent et rebondissent, pions qui sautent de case en case, caméra qui suit le joueur.
+- Effets : pièces qui volent lors des paiements, tampons « VENDU » et « ADJUGÉ », maisons et hôtels qui tombent du ciel,
+  cartes Chance et Caisse de communauté qui se retournent, confettis et podium en fin de partie.
+- Titres de propriété complets, fenêtres d'achat, d'enchère (avec compte à rebours), d'échange et « Mes biens ».
+- Sons synthétisés (coupables), raccourci Espace pour lancer les dés ou finir son tour, affichage adapté au téléphone.
+- Les bots attendent la fin des animations avant de jouer.
+
 ## 2.0 — 18 octobre 2026
 - Nouveau **Game Hub** : un seul salon entre potes (jusqu'à 6), avec pseudo, couleur, chat et lien d'invitation, pour choisir le jeu.
 - Le salon reste ouvert d'un jeu à l'autre : pas besoin de se reconnecter pour changer de jeu.

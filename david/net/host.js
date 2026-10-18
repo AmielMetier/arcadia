@@ -14,7 +14,26 @@ export function startHost({ board, bridge, solo, settings, me, onState, onWaitin
   let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0;
   const humans = new Set();
 
+  // Durée approximative de la mise en scène chez les joueurs : les bots attendent la fin des animations.
+  let pace = 0;
+  function paceOf(events) {
+    let ms = 0;
+    for (const e of events) {
+      if (e.k === 'DICE') ms += 1300;
+      else if (e.k === 'MOVE') ms += Math.abs(e.steps) * 190 + 250;
+      else if (e.k === 'CARD') ms += 1700 + e.text.length * 22;
+      else if (e.k === 'TURN') ms += 950;
+      else if (e.k === 'JAIL') ms += 1600;
+      else if (e.k === 'BUY' || e.k === 'AUCTION_END') ms += 800;
+      else if (e.k === 'PAY') ms += e.reason === 'rent' || e.reason === 'go' || e.reason === 'card' ? 750 : 150;
+      else if (e.k === 'AUCTION_START' || e.k === 'TRADE_DONE' || e.k === 'BANKRUPT' || e.k === 'DEBT' || e.k === 'SPEEDING') ms += 1000;
+      else if (e.k === 'BUILD') ms += 500;
+    }
+    return ms;
+  }
+
   function broadcast(events) {
+    pace = paceOf(events);
     if (!solo) bridge.send('all', { t: 'st', s: state, ev: events, now: Date.now() });
     try { localStorage.setItem('david_save', JSON.stringify({ at: Date.now(), state })); } catch (e) {}
     onState(state, events, 0);
@@ -41,7 +60,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onWaitin
       if (!p || !p.bot || p.bankrupt) continue;
       const a = botAction(state, board, id);
       if (!a) continue;
-      const delay = a.type === 'ROLL' ? 900 : a.type === 'END_TURN' ? 700 : a.type === 'BID' || a.type === 'PASS' ? 650 : 500;
+      const delay = pace + (a.type === 'ROLL' ? 700 : a.type === 'END_TURN' ? 600 : a.type === 'BID' || a.type === 'PASS' ? 900 : 450);
       botTimer = setTimeout(() => {
         const r = apply({ ...a, by: id });
         if (!r.ok) console.warn('bot', id, a, r.error);
@@ -53,7 +72,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onWaitin
       const key = state.auction.space + ':' + state.auction.bids + ':' + state.auction.passed.length;
       if (key !== auctionKey) {
         auctionKey = key; clearTimeout(auctionTimer);
-        auctionTimer = setTimeout(() => apply({ type: 'AUCTION_TIMEOUT', by: 'host' }), AUCTION_IDLE_MS);
+        auctionTimer = setTimeout(() => apply({ type: 'AUCTION_TIMEOUT', by: 'host' }), AUCTION_IDLE_MS + pace);
       }
     } else { auctionKey = ''; clearTimeout(auctionTimer); }
   }
@@ -114,5 +133,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onWaitin
   return {
     act(a) { const r = apply({ ...a, by: me.id }); if (!r.ok) onError(r.error); },
     get state() { return state; },
+    // tests uniquement (?debug) : modifier l'état puis le rediffuser
+    debug(fn) { fn(state); broadcast([]); schedule(); },
   };
 }

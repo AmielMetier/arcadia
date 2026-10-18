@@ -1,7 +1,7 @@
 // Démarrage de DavidSimulator : rôle (hôte, invité, solo), session réseau et vue.
 import { startHost } from './net/host.js';
 import { startClient } from './net/client.js';
-import { mountTable } from './view/table.js';
+import { mountGame } from './view/game.js';
 
 const H = window.HubBridge;
 const board = await fetch('data/board-nice.json').then((r) => r.json());
@@ -14,11 +14,10 @@ function boot(info) {
   const me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name, color: meP ? meP.color : prof.color };
   const settings = H.embedded ? info.settings || {} : { mode: new URLSearchParams(location.search).get('mode') || 'classic', bots: 3 };
 
-  const view = mountTable(root, board, {
+  const view = mountGame(root, board, {
     me,
     act: (a) => session.act(a),
     exit: () => { if (H.embedded) H.exit(); else location.reload(); },
-    isHost: role !== 'guest',
   });
   const handlers = {
     onState: (s, ev, offset) => view.update(s, ev, offset),
@@ -29,6 +28,7 @@ function boot(info) {
   if (role === 'guest') session = startClient({ bridge: H, me, ...handlers });
   else session = startHost({ board, bridge: H, solo: role === 'solo', settings, me, ...handlers });
   H.signalReady();
+  if (new URLSearchParams(location.search).has('debug')) window.__david = { session, view, board };
 }
 
 if (H.embedded) H.on('init', boot);

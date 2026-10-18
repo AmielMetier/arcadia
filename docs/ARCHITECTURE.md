@@ -75,12 +75,14 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   ├── host.js                l'hôte valide les intentions, lance les dés, diffuse
 │   │   └── client.js              envoie les intentions, rejoue les événements
 │   ├── view/                                                                    ← étape 3
-│   │   ├── table.js               vue provisoire jouable (étape 2), remplacée à l'étape 3
-│   │   ├── board.js               plateau isométrique en CSS 3D, caméra qui suit le pion
-│   │   ├── dice.js                dés 3D avec simulation de rebonds
-│   │   ├── tokens.js              pions et déplacements case par case
-│   │   ├── fx.js                  achats, constructions, paiements (particules, billets)
-│   │   └── modals.js              achat, enchère, échange, hypothèque, prison, cartes
+│   │   ├── game.js                interface de jeu + « réalisateur » qui met en scène les événements
+│   │   ├── board.js               plateau incliné en CSS 3D, pions, bâtiments, caméra qui suit le pion
+│   │   ├── geometry.js            position des cases, des pions et des bâtiments (repère 880 × 880)
+│   │   ├── dice.js                dés 3D (la face finale correspond au tirage du moteur)
+│   │   ├── fx.js                  pièces, montants flottants, bandeaux, tampons, cartes, confettis
+│   │   ├── modals.js              titre de propriété, achat, enchère, échange, mes biens, fin de partie
+│   │   ├── sfx.js                 sons synthétisés (WebAudio), sans fichier
+│   │   ├── icons.js, util.js      icônes SVG et petits outils
 │   ├── stats/                                                                   ← étape 4
 │   │   ├── tracker.js             relevés par tour à partir des événements du moteur
 │   │   └── charts.js              courbe de patrimoine, heatmap, classement final
@@ -174,6 +176,18 @@ Compagnies : 4 × ou 10 × les dés selon qu'on en possède 1 ou 2.
 | Vainqueur | patrimoine le plus élevé : argent + prix des terrains (moitié si hypothéqués) + coût des bâtiments |
 
 Le calcul du patrimoine reprend celui de la variante « partie courte » des règles officielles.
+
+## Mise en scène (étape 3)
+
+Chaque mise à jour reçue de l'hôte contient l'état complet et la liste des événements qui y ont mené.
+La vue joue ces événements dans l'ordre (dés, déplacement case par case, paiement, achat, carte…)
+puis applique l'état final, qui fait foi. Si plusieurs mises à jour s'accumulent (bots rapides,
+reconnexion), la lecture accélère jusqu'à devenir instantanée. Pendant la lecture, les boutons
+d'action sont neutralisés, sauf ceux des enchères. L'hôte estime la durée de la mise en scène
+pour faire patienter les bots d'autant.
+
+Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
+tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
 
 ## Étapes suivantes
 
