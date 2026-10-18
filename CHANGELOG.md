@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.0 — en préparation (branche `hub`)
+## 2.0 — 18 octobre 2026
 - Nouveau **Game Hub** : un seul salon entre potes (jusqu'à 6), avec pseudo, couleur, chat et lien d'invitation, pour choisir le jeu.
 - Le salon reste ouvert d'un jeu à l'autre : pas besoin de se reconnecter pour changer de jeu.
 - Duo Drift déplacé dans `drift/`, inchangé en jeu ; « Quitter » ramène au salon du Hub.

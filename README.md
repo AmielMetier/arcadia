@@ -25,6 +25,6 @@ Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Expres
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator.
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Version : **2.0** (en préparation) — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.0** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude
