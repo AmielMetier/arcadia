@@ -14,7 +14,7 @@ export const ACTIONS = [
   'ROLL', 'PAY_BAIL', 'USE_JAIL_CARD', 'BUY', 'DECLINE', 'BID', 'PASS', 'END_TURN',
   'BUILD', 'SELL_BUILDING', 'MORTGAGE', 'UNMORTGAGE',
   'PROPOSE_TRADE', 'ACCEPT_TRADE', 'REJECT_TRADE', 'CANCEL_TRADE',
-  'BANKRUPT', 'AUCTION_TIMEOUT', 'TIME_UP', 'PLAYER_LEFT',
+  'BANKRUPT', 'AUCTION_TIMEOUT', 'TIME_UP', 'PLAYER_LEFT', 'SET_BOT',
 ];
 
 /* ------------------------------------------------------------------ création ------ */
@@ -28,7 +28,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
   const s = {
     v: 1, board: board.id, mode, cfg, seed: seed >>> 0, seq: 0,
     players: players.map((p) => ({
-      id: p.id, name: p.name, color: p.color, bot: !!p.bot, token: p.token || null,
+      id: p.id, name: p.name, color: p.color, bot: !!p.bot, human: !p.bot, token: p.token || null,
       cash: cfg.startingCash, pos: 0, inJail: false, jailTries: 0, jailCards: [],
       bankrupt: false, bankruptAt: 0, left: false,
     })),
@@ -723,6 +723,15 @@ const HANDLERS = {
     p.left = true;
     if (ctx.s.over) return;
     bankrupt(ctx, p, null);
+  },
+
+  // Un joueur déconnecté est joué par un bot ; il reprend la main à son retour.
+  SET_BOT(ctx, a) {
+    if (a.by !== 'host') fail('Réservé à l’hôte.');
+    const p = P(ctx.s, a.player);
+    if (!p || p.bankrupt || p.bot === !!a.bot) return;
+    p.bot = !!a.bot;
+    ctx.ev.push({ k: 'BOT', player: p.id, bot: p.bot });
   },
 
   TIME_UP(ctx, a) {

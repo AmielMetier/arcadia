@@ -35,6 +35,16 @@ function boot(info) {
   let session;
   if (role === 'guest') session = startClient({ bridge: H, me, ...handlers });
   else session = startHost({ board, bridge: H, solo: role === 'solo', settings, me, ...handlers });
+  // L'hôte est parti et ce joueur reprend le salon : il devient l'hôte de la partie, à partir du dernier état reçu
+  let current = role;
+  H.on('roster', () => {
+    if (current === 'guest' && H.info.role === 'host') {
+      current = 'host';
+      const last = session.state;
+      session = startHost({ board, bridge: H, solo: false, settings, me, ...handlers, initial: last });
+      view.toast(last ? 'Tu reprends la partie en tant qu\'hôte' : 'Tu es maintenant l\'hôte');
+    }
+  });
   H.signalReady();
   if (new URLSearchParams(location.search).has('debug')) window.__david = { session, view, board };
 }

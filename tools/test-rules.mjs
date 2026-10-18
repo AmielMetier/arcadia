@@ -485,6 +485,16 @@ test('règle maison : sans enchères, la propriété refusée reste à la banque
   eq(s.auction, null); eq(s.props[3].owner, null); eq(s.phase, 'end');
 });
 
+test('joueur déconnecté : un bot prend sa place, puis il reprend la main', () => {
+  let s = game(2);
+  ok(pl(s, 1).human && !pl(s, 1).bot);
+  refused(s, { type: 'SET_BOT', by: 0, player: 1, bot: true });
+  s = act(s, { type: 'SET_BOT', by: 'host', player: 1, bot: true }).state;
+  ok(pl(s, 1).bot && pl(s, 1).human, 'devenu bot, reste un humain');
+  s = act(s, { type: 'SET_BOT', by: 'host', player: 1, bot: false }).state;
+  ok(!pl(s, 1).bot);
+});
+
 /* ----------------------------------------------------------- reprise de partie */
 test('reprise : correspondance par nom, puis dans l\'ordre, sinon bot', () => {
   const saved = [{ id: 0, name: 'Amiel' }, { id: 3, name: 'David' }, { id: 5, name: 'Léa' }, { id: 100, name: 'Mamé Rose', bot: true }];

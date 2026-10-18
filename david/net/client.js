@@ -9,6 +9,9 @@ export function startClient({ bridge, me, onState, onSetup, onError }) {
     } else if (m.t === 'setup' && m.s && !state) onSetup(m.s);
     else if (m.t === 'err') onError(m.msg);
   });
+  // nouvel hôte (migration) : on lui redemande l'état complet
+  let hostSeen = bridge.info.hostId;
+  bridge.on('roster', () => { if (bridge.info.hostId !== hostSeen) { hostSeen = bridge.info.hostId; setTimeout(() => bridge.send('host', { t: 'sync' }), 300); } });
   // demande l'état tant qu'on ne l'a pas (arrivée en cours de partie, messages perdus au chargement)
   const ask = setInterval(() => { if (state) clearInterval(ask); else bridge.send('host', { t: 'sync' }); }, 1500);
   return {

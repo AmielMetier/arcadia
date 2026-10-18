@@ -53,12 +53,16 @@
           if (p) return;
           if (R.players.length >= MAX_PLAYERS) { net.to(cid, { t: 'full' }); net.drop(cid); return; }
           const used = new Set(R.players.map((q) => q.id)); let id = 0; while (used.has(id)) id++;
+          // après une migration d'hôte, chacun garde son numéro (le jeu en cours en dépend)
+          const prev = Number.isInteger(m.prevId) ? m.prevId : -1;
+          if (prev >= 0 && !used.has(prev)) id = prev;
           const usedC = new Set(R.players.map((q) => q.color));
           const color = PALETTE.includes(m.color) && !usedC.has(m.color) ? m.color : PALETTE.find((c) => !usedC.has(c));
           const np = { id, cid, name: cleanName(m.name), color, lvl: Math.max(1, Math.min(99, m.lvl | 0)) };
           R.players.push(np);
+          if (m.ready) R.ready[id] = m.ready;
           net.to(cid, { t: 'welcome', id, chat: R.chat.slice(-20) });
-          sys(np.name + ' a rejoint le salon'); changed();
+          sys(np.name + (prev >= 0 ? ' est reconnecté' : ' a rejoint le salon')); changed();
           break;
         }
         case 'me': if (p) { p.name = cleanName(m.name); p.lvl = Math.max(1, Math.min(99, m.lvl | 0)); changed(); } break;
@@ -94,8 +98,64 @@
         case 'ping': net.toHost({ t: 'pong', ts: m.ts }); break;
         case 'pong': R.pings[R.myId] = performance.now() - m.ts; break;
         case 'full': emit('error', 'Le salon est complet (6 joueurs max).'); break;
-        case 'bye': emit('closed', "L'hôte a fermé le salon."); break;
+        case 'bye': migrate("L'hôte a quitté le salon."); break;
       }
+    }
+
+    /* ---------- migration d'hôte ----------
+       Si l'hôte disparaît, le joueur restant au plus petit numéro devient hôte, sous un nouveau code
+       que tout le monde peut calculer ; les autres s'y reconnectent en gardant leur numéro. */
+    let myReady = null, migrating = false;
+    const CODE_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    function deriveCode(code, id) {
+      let h = 2166136261;
+      for (const ch of String(code) + ':' + id) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+      let out = ''; for (let k = 0; k < 4; k++) { out += CODE_ALPHA[h % CODE_ALPHA.length]; h = Math.floor(h / CODE_ALPHA.length) + 7919 * (k + 1); }
+      return out;
+    }
+    function migrate(reason) {
+      if (R.mode !== 'guest' || migrating) return;
+      const oldHost = R.hostId;
+      const cands = R.players.filter((p) => p.id !== oldHost).map((p) => p.id).sort((a, b) => a - b);
+      if (!cands.length || R.myId < 0) { emit('closed', reason); return; }
+      migrating = true;
+      const succ = cands[0], succName = (R.players.find((p) => p.id === succ) || {}).name || '?';
+      const code2 = deriveCode(R.code, succ);
+      const me = R.me || { name: 'Joueur', color: PALETTE[0], lvl: 1 };
+      emit('migrating', { to: succ, name: succName, me: succ === R.myId });
+      net.close();
+      setTimeout(() => {
+        if (succ === R.myId) becomeHost(code2, me);
+        else rejoin(code2, me, Date.now() + 20000);
+      }, 400);
+    }
+    function becomeHost(code, me) {
+      R.mode = 'host'; R.hostId = R.myId; R.lastRecvC = {}; R.pings = {};
+      R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1 }];
+      R.ready = myReady ? { [R.myId]: myReady } : {};
+      let tries = 0;
+      const go = () => net.host({
+        ready(c) { migrating = false; R.code = c; sys('Tu es maintenant l\'hôte du salon.'); emit('migrated', R); changed(); },
+        join(cid) { R.lastRecvC[cid] = performance.now(); },
+        msg: onHostMsg, leave: onHostLeave,
+        error(msg) { if (++tries < 6) setTimeout(go, 1500); else { migrating = false; emit('closed', msg); } },
+      }, code);
+      go();
+    }
+    function rejoin(code, me, deadline) {
+      R.mode = 'guest'; R.code = code;
+      net.join(code, {
+        open() {
+          migrating = false; R.lastRecv = performance.now();
+          net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, prevId: R.myId, ready: myReady });
+        },
+        msg: (m) => { onGuestMsg(m); if (m && m.t === 'welcome') emit('migrated', R); },
+        close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
+        error(msg) {
+          if (Date.now() < deadline) { R.mode = 'guest'; setTimeout(() => rejoin(code, me, deadline), 1500); }
+          else { migrating = false; R.mode = null; emit('closed', 'Impossible de joindre le nouvel hôte.'); }
+        },
+      }, 4000);
     }
 
     /* ---------- API ---------- */
@@ -115,7 +175,7 @@
         net.join(code, {
           open() { R.lastRecv = performance.now(); net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl }); },
           msg: onGuestMsg,
-          close() { if (R.mode === 'guest') emit('closed', "Connexion perdue avec l'hôte."); },
+          close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
           error(msg) { R.mode = null; emit('error', msg); },
         });
       },
@@ -124,7 +184,7 @@
         R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1 }];
         setTimeout(() => { emit('joined', R); emit('update', R); }, 0);
       },
-      leave() { net.close(); R.mode = null; R.players = []; R.game = null; R.ready = {}; R.code = null; },
+      leave() { migrating = false; myReady = null; net.close(); R.mode = null; R.players = []; R.game = null; R.ready = {}; R.code = null; },
       updateMe(me) {
         if (R.isHost) { const p = R.me; if (p) { p.name = cleanName(me.name); p.lvl = me.lvl | 0 || 1; changed(); } }
         else if (R.mode === 'guest') net.toHost({ t: 'me', name: me.name, lvl: me.lvl });
@@ -143,6 +203,7 @@
       },
       // Le jeu de ce joueur est prêt (ou fermé si game = null).
       setReady(game) {
+        myReady = game || null;
         if (R.isHost) { if (game) R.ready[R.myId] = game; else delete R.ready[R.myId]; changed(); }
         else net.toHost({ t: 'ready', game });
       },
@@ -158,7 +219,7 @@
           for (const p of R.players) if (p.cid && now - (R.lastRecvC[p.cid] || now) > 15000) net.drop(p.cid);
         } else if (R.mode === 'guest' && net.hostLink) {
           net.toHost({ t: 'ping', ts: now });
-          if (R.lastRecv && now - R.lastRecv > 15000) { R.lastRecv = 0; emit('closed', "Connexion perdue avec l'hôte."); }
+          if (R.lastRecv && now - R.lastRecv > 15000) { R.lastRecv = 0; migrate("Connexion perdue avec l'hôte."); }
         }
       },
     });

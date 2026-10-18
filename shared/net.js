@@ -20,8 +20,9 @@
   function create({ prefix, maxPeers = 5 }) {
     const net = {
       peer: null, bc: null, links: new Map(), hostLink: null, cb: null, cidc: 0, role: null, code: null,
-      host(cb) {
-        this.role = 'host'; this.cb = cb; this.links = new Map(); const code = genCode(); this.code = code;
+      // fixedCode : code imposé (migration d'hôte) ; sinon un code au hasard
+      host(cb, fixedCode) {
+        this.role = 'host'; this.cb = cb; this.links = new Map(); const code = fixedCode || genCode(); this.code = code;
         if (LOCAL_TEST) {
           const bc = new BroadcastChannel(prefix + code); this.bc = bc; setTimeout(() => cb.ready(code), 30);
           bc.onmessage = (e) => {
@@ -56,7 +57,7 @@
         peer.on('disconnected', () => { if (this.peer === peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} } });
         peer.on('error', (e) => {
           if (this.peer !== peer) return;
-          if (e.type === 'unavailable-id') { peer.destroy(); this.peer = null; this.host(cb); return; }
+          if (e.type === 'unavailable-id') { peer.destroy(); this.peer = null; if (fixedCode) cb.error('Code indisponible.'); else this.host(cb); return; }
           if (e.type === 'peer-unavailable') return;
           cb.error(peerErr(e));
         });
@@ -67,10 +68,10 @@
         try { L.send({ t: 'bye' }); } catch (e) {}
         setTimeout(() => { try { L.close(); } catch (e) {} }, 80); this._drop(cid);
       },
-      join(code, cb) {
+      join(code, cb, timeout = 15000) {
         this.role = 'guest'; this.cb = cb; this.code = code;
         let done = false; const fin = (fn, a) => { if (done) return; done = true; clearTimeout(to); fn(a); };
-        const to = setTimeout(() => fin(cb.error, "Pas de réponse. Vérifie le code et que ton pote a bien créé le salon."), 15000);
+        const to = setTimeout(() => fin(cb.error, "Pas de réponse. Vérifie le code et que ton pote a bien créé le salon."), timeout);
         if (LOCAL_TEST) {
           const cid = 'g' + Math.random().toString(36).slice(2, 9), bc = new BroadcastChannel(prefix + code); this.bc = bc; let closed = false;
           this.hostLink = { send: (x) => bc.postMessage({ k: 'd', to: 'host', from: cid, m: x }), close: () => bc.postMessage({ k: 'bye', to: 'host', from: cid }) };

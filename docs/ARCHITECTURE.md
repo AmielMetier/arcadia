@@ -129,7 +129,6 @@ et `?local` est transmis du Hub au jeu pour les tests entre onglets.
   patrimoine à chaque tour) sont tenues dans l'état par le moteur.
 
 ### Limites connues (étape 2)
-- Si l'hôte quitte le salon, la partie s'arrête ; elle reste sauvegardée chez lui et peut être reprise.
 - Un joueur qui revient au salon en cours de partie garde sa place et peut revenir ; s'il quitte le salon,
   ses biens retournent à la banque.
 - Faillite envers la banque : les terrains redeviennent libres, sans enchère.
@@ -192,6 +191,18 @@ pour faire patienter les bots d'autant.
 
 Le plateau est un plan de 880 × 880 px incliné en CSS 3D ; pions et bâtiments sont des panneaux
 tournés en sens inverse pour rester face à l'écran. `?debug` expose `window.__david` pour les tests.
+
+## Migration d'hôte (version 2.8)
+
+Tous les invités reçoivent la même liste de joueurs. Quand la liaison avec l'hôte se ferme (départ, onglet
+fermé, 15 s de silence), chacun désigne le même successeur : le joueur restant au plus petit numéro. Le nouveau
+code de salon est dérivé de l'ancien code et du numéro du successeur (hachage FNV), donc connu de tous sans
+échange. Le successeur ouvre ce code ; les autres s'y reconnectent (essais pendant 20 s) en envoyant `prevId`
+et leur état « prêt », pour garder leur numéro et éviter de recharger le jeu.
+
+Dans DavidSimulator, le client du successeur devient hôte avec le dernier état reçu (`startHost({ initial })`),
+les autres redemandent l'état complet au nouvel hôte. Un joueur absent depuis 20 s passe en bot
+(`SET_BOT`) et reprend la main à son retour. Duo Drift ne migre pas : la course se ferme et chacun revient au salon.
 
 ## Sauvegarde et reprise (version 2.7)
 

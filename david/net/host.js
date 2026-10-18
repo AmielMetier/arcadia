@@ -12,7 +12,10 @@ const BOT_NAMES = ['Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius',
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const AUCTION_IDLE_MS = 12000;
 
-export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError }) {
+const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnecté
+
+// initial : état d'une partie en cours, quand ce joueur reprend le rôle d'hôte après le départ du précédent
+export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, initial = null }) {
   let state = null;
   let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0;
   const humans = new Set();
@@ -157,18 +160,34 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     } catch (e) { onError(e.message); }
   }
 
-  setTimeout(pushSetup, 0);
+  if (initial) {
+    // reprise du rôle d'hôte : on repart du dernier état connu
+    state = initial;
+    for (const p of state.players) if (p.human ?? !p.bot) humans.add(p.id);
+    setTimeout(() => { broadcast([{ k: 'HOST_CHANGED', host: me.id }]); schedule(); }, 300);
+    if (state.endsAt) clock = setInterval(() => { if (state && !state.over && Date.now() >= state.endsAt) apply({ type: 'TIME_UP', by: 'host' }); }, 1000);
+  } else setTimeout(pushSetup, 0);
   if (!solo) {
-    bridge.on('roster', () => {
-      pushSetup();
-      if (!state) return;
-      // un joueur parti du salon (ou revenu au salon) quitte la partie
+    // présence des joueurs : un absent depuis ABSENT_MS est remplacé par un bot, et reprend la main à son retour
+    const absentSince = {};
+    const presence = () => {
+      if (!state || state.over) return;
+      const now = Date.now();
       for (const id of humans) {
         const inRoom = bridge.players.some((p) => p.id === id);
         const p = state.players.find((q) => q.id === id);
-        if (!inRoom && p && !p.bankrupt && !state.over) apply({ type: 'PLAYER_LEFT', by: 'host', player: id });
+        if (!p || p.bankrupt) continue;
+        if (inRoom) {
+          delete absentSince[id];
+          if (p.bot && id !== me.id) apply({ type: 'SET_BOT', by: 'host', player: id, bot: false });
+        } else {
+          absentSince[id] = absentSince[id] || now;
+          if (!p.bot && now - absentSince[id] >= ABSENT_MS) apply({ type: 'SET_BOT', by: 'host', player: id, bot: true });
+        }
       }
-    });
+    };
+    setInterval(presence, 2000);
+    bridge.on('roster', () => { pushSetup(); presence(); });
     bridge.on('msg', (from, m) => {
       if (!m || typeof m !== 'object') return;
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: state, ev: [], now: Date.now() }); else pushSetup(); }

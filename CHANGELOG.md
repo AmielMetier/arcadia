@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.8 — 19 octobre 2026
+- Si l'hôte quitte ou perd la connexion, le salon continue : le joueur suivant devient hôte en une seconde environ,
+  sous un nouveau code, et les autres s'y reconnectent automatiquement en gardant leur place.
+- DavidSimulator continue la partie en cours avec le nouvel hôte, sans rechargement.
+- Un joueur déconnecté depuis 20 secondes est remplacé par un bot ; il reprend la main s'il revient.
+- Duo Drift : une course ne peut pas changer d'hôte, tout le monde revient proprement au salon pour relancer.
+
 ## 2.7 — 19 octobre 2026
 - Sauvegarde automatique des parties de DavidSimulator chez l'hôte, après chaque action (6 parties gardées).
 - Reprise depuis l'écran de choix des pions : l'hôte choisit une sauvegarde, chacun retrouve son pion, son argent

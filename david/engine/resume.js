@@ -10,7 +10,7 @@ export function remapPlayers(state, map) {
   for (const p of s.players) {
     const t = map[p.id];
     p.id = t.id;
-    if (t.bot != null) p.bot = !!t.bot;
+    if (t.bot != null) { p.bot = !!t.bot; p.human = !t.bot; }
     if (t.name) p.name = t.name;
     if (t.color) p.color = t.color;
   }

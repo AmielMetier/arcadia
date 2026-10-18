@@ -124,6 +124,8 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
       case 'UNMORTGAGE': return `${name(e.player)} lève l'hypothèque de ${board.spaces[e.space].name}`;
       case 'TRADE_DONE': return `Échange conclu : ${name(e.trade.from)} ⇄ ${name(e.trade.to)}`;
       case 'BANKRUPT': return `${name(e.player)} fait faillite`;
+      case 'BOT': return e.bot ? `${name(e.player)} est déconnecté : un bot joue à sa place` : `${name(e.player)} est de retour`;
+      case 'HOST_CHANGED': return `${name(e.host)} est le nouvel hôte de la partie`;
       case 'GAME_OVER': return `${name(e.winner)} remporte la partie !`;
       default: return null;
     }
@@ -434,6 +436,10 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
       case 'DEBT':
         if (e.from === me.id && !quick) await F.banner('Il te manque de l\'argent', `Tu dois ${money(e.amount)}`, '#e3262f', 1000 / speed);
         break;
+      case 'BOT': case 'HOST_CHANGED': {
+        const t2 = describe(e); if (t2) toast(t2);
+        break;
+      }
       case 'BANKRUPT':
         sfx.play('bankrupt');
         if (!quick) await F.banner(`${nm(e.player)} fait faillite`, '', '#16181d', 1200 / speed);

@@ -39,6 +39,8 @@
       H.initDone = true; emit('init', H.info); emit('roster', H.players, H.readyMap);
     } else if (d.k === 'roster') {
       H.players = d.players || []; H.readyMap = d.ready || {}; H.info.hostId = d.hostId;
+      if (d.role) H.info.role = d.role;
+      if (d.code) H.info.code = d.code;
       emit('roster', H.players, H.readyMap);
     } else if (d.k === 'msg') emit('msg', d.from, d.m);
   });
@@ -47,7 +49,7 @@
   // Duo Drift parle à un objet Net (host/join/to/bcast…) : on le branche sur le salon du Hub.
   // Côté hôte, chaque joueur dont le jeu est prêt devient un « lien » 'p<id>'.
   H.patchNet = (Net) => {
-    let cb = null, role = null, opened = false;
+    let cb = null, role = null, opened = false, openedHost = null;
     const joined = new Set();
     const isReady = (id) => H.readyMap[id] === H.info.game;
     function sync() {
@@ -58,8 +60,10 @@
         for (const id of [...joined]) if (!ids.includes(id)) { joined.delete(id); if (cb.leave) cb.leave('p' + id); }
       } else if (role === 'guest') {
         const hostReady = isReady(H.info.hostId);
-        if (hostReady && !opened) { opened = true; Net.hostLink = { hub: true }; cb.open(); }
-        else if (!hostReady && opened) { opened = false; Net.hostLink = null; if (cb.close) cb.close(); }
+        // une course ne survit pas à un changement d'hôte : retour propre au salon
+        const hostChanged = opened && openedHost !== H.info.hostId;
+        if (hostReady && !opened) { opened = true; openedHost = H.info.hostId; Net.hostLink = { hub: true }; cb.open(); }
+        else if ((!hostReady || hostChanged) && opened) { opened = false; Net.hostLink = null; if (cb.close) cb.close(); }
       }
     }
     H.on('roster', sync);

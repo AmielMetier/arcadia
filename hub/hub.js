@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.7';
+  const VERSION = '2.8';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -74,6 +74,8 @@
       game(from, m) { if (frame && frame.loaded) frame.el.contentWindow.postMessage({ dd: 'hub', k: 'msg', from, m }, ORIGIN); },
       error(msg) { if ($('#home').classList.contains('on')) goHome(msg); else toast(msg, 4000); },
       closed(msg) { goHome(msg); },
+      migrating(info) { toast(info.me ? "L'hôte est parti : tu deviens l'hôte…" : `L'hôte est parti : ${info.name} reprend le salon…`, 5000); },
+      migrated() { toast('Salon rétabli, la partie continue', 3000); renderRoom(); syncFrame(); postRoster(); },
     });
   }
   setInterval(() => { if (room) { room.tick(performance.now()); renderPings(); } }, 2000);
@@ -198,7 +200,8 @@
 
   function postRoster() {
     if (!frame || !frame.loaded || !room) return;
-    frame.el.contentWindow.postMessage({ dd: 'hub', k: 'roster', players: room.players.map(({ cid, ...p }) => p), ready: room.ready, hostId: room.hostId }, ORIGIN);
+    frame.el.contentWindow.postMessage({ dd: 'hub', k: 'roster', players: room.players.map(({ cid, ...p }) => p), ready: room.ready, hostId: room.hostId,
+      role: room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest', code: room.code }, ORIGIN);
   }
 
   window.addEventListener('message', (e) => {
