@@ -270,7 +270,7 @@
     const q = new URLSearchParams({ hub: '1', role, game: g.id });
     if (room.code) q.set('code', room.code);
     const pass = new URLSearchParams(location.search);
-    for (const k of ['debug', 'peer', 'relay', 'turn']) if (pass.has(k)) q.set(k, pass.get(k));
+    for (const k of ['debug', 'ws']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
