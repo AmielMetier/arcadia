@@ -11,12 +11,20 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   const QS = new URLSearchParams(location.search);
   const LOCAL_TEST = QS.has('local');
   const getWsUrl = () => QS.get('ws') || WS_SERVER_URL;
+  const getHttpUrl = () => getWsUrl().replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:');
 
-  const BLOCKED = "Impossible de joindre le serveur relais WebSocket. Vérifie ta connexion internet ou que le serveur est bien démarré.";
+  // Réveil automatique du serveur Render dès l'ouverture de la page (évite l'attente de 50s à la création du salon)
+  function wakeServer() {
+    if (LOCAL_TEST) return;
+    try { fetch(getHttpUrl(), { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (e) {}
+  }
+  wakeServer();
+
+  const BLOCKED = "Impossible de joindre le serveur relais WebSocket. Vérifie ta connexion internet ou réessaie dans quelques secondes.";
 
   function create({ prefix, maxPeers = 5 }) {
     const net = {
-      ws: null, bc: null, links: new Map(), hostLink: null, cb: null, cidc: 0, role: null, code: null, roomId: null, pingIv: null,
+      ws: null, bc: null, links: new Map(), hostLink: null, cb: null, cidc: 0, role: null, code: null, roomId: null, pingIv: null, retryTo: null,
       // fixedCode : code imposé (migration d'hôte) ; sinon un code au hasard
       host(cb, fixedCode) {
         this.role = 'host'; this.cb = cb; this.links = new Map();
@@ -37,13 +45,27 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           };
           return;
         }
-        this._hostWs(cb, code, fixedCode, roomId);
+        this._hostWs(cb, code, fixedCode, roomId, Date.now() + 60000);
       },
-      _hostWs(cb, code, fixedCode, roomId) {
+      _hostWs(cb, code, fixedCode, roomId, deadline) {
+        wakeServer();
         let ws;
         try { ws = new WebSocket(getWsUrl()); } catch (e) { cb.error(BLOCKED); return; }
         this.ws = ws;
-        let ready = false;
+        let ready = false, retried = false;
+        const retryOrFail = () => {
+          if (retried || ready || this.cb !== cb) return;
+          retried = true;
+          this._stopKeepAlive();
+          try { ws.close(); } catch (e) {}
+          if (Date.now() < deadline) {
+            this.retryTo = setTimeout(() => {
+              if (this.cb === cb && this.role === 'host') this._hostWs(cb, code, fixedCode, roomId, deadline);
+            }, 2500);
+          } else {
+            cb.error(BLOCKED);
+          }
+        };
         const sendWs = (obj) => { if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} } };
         this._startKeepAlive(ws, roomId);
         ws.onopen = () => {
@@ -61,10 +83,12 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           }
           if (msg.type === 'error') {
             if (msg.reason === 'unavailable-id') {
+              retried = true;
               this._stopKeepAlive(); try { ws.close(); } catch (e) {} this.ws = null;
               if (fixedCode) cb.error('Code indisponible.'); else this.host(cb);
               return;
             }
+            retried = true;
             cb.error(msg.message || 'Erreur de connexion.');
             return;
           }
@@ -111,12 +135,12 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
         };
         ws.onerror = () => {
           if (this.ws !== ws) return;
-          if (!ready) cb.error(BLOCKED);
+          if (!ready) retryOrFail();
         };
         ws.onclose = () => {
           if (this.ws !== ws) return;
           this._stopKeepAlive();
-          if (!ready) cb.error(BLOCKED);
+          if (!ready) retryOrFail();
         };
       },
       _drop(cid) { if (!this.links.has(cid)) return; this.links.delete(cid); if (this.cb && this.cb.leave) this.cb.leave(cid); },
@@ -125,11 +149,12 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
         try { L.send({ t: 'bye' }); } catch (e) {}
         setTimeout(() => { try { L.close(); } catch (e) {} }, 80); this._drop(cid);
       },
-      join(code, cb, timeout = 15000) {
+      join(code, cb, timeout = 60000) {
         this.role = 'guest'; this.cb = cb; this.code = code;
         const roomId = prefix + code; this.roomId = roomId;
-        let done = false; const fin = (fn, a) => { if (done) return; done = true; clearTimeout(to); fn(a); };
+        let done = false; const fin = (fn, a) => { if (done) return; done = true; clearTimeout(to); clearTimeout(this.retryTo); fn(a); };
         let signaled = false;
+        const deadline = Date.now() + timeout;
         const to = setTimeout(() => fin(cb.error, signaled ? "Aucun salon avec ce code ou l'hôte ne répond pas." : BLOCKED), timeout);
         if (LOCAL_TEST) {
           const cid = 'g' + Math.random().toString(36).slice(2, 9), bc = new BroadcastChannel(roomId); this.bc = bc; let closed = false;
@@ -143,55 +168,73 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           };
           bc.postMessage({ k: 'hi', cid }); return;
         }
-        let ws;
-        try { ws = new WebSocket(getWsUrl()); } catch (e) { fin(cb.error, BLOCKED); return; }
-        this.ws = ws;
-        let closed = false;
-        const sendWs = (obj) => { if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} } };
-        this._startKeepAlive(ws, roomId);
-        const fireClose = () => { if (closed) return; closed = true; if (done && this.cb === cb) cb.close(); };
-        this.hostLink = {
-          send: (x) => sendWs({ type: 'relay', roomId, to: 'host', data: x }),
-          close: () => { sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
+        const connectGuest = () => {
+          if (done || this.cb !== cb) return;
+          wakeServer();
+          let ws;
+          try { ws = new WebSocket(getWsUrl()); } catch (e) { fin(cb.error, BLOCKED); return; }
+          this.ws = ws;
+          let closed = false, retried = false;
+          const sendWs = (obj) => { if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} } };
+          this._startKeepAlive(ws, roomId);
+          const fireClose = () => { if (closed) return; closed = true; if (done && this.cb === cb) cb.close(); };
+          const retryOrFail = () => {
+            if (retried || done || this.cb !== cb) return;
+            retried = true;
+            this._stopKeepAlive();
+            try { ws.close(); } catch (e) {}
+            if (Date.now() < deadline) {
+              this.retryTo = setTimeout(connectGuest, 2500);
+            } else {
+              fin(cb.error, BLOCKED);
+            }
+          };
+          this.hostLink = {
+            send: (x) => sendWs({ type: 'relay', roomId, to: 'host', data: x }),
+            close: () => { sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
+          };
+          ws.onopen = () => {
+            signaled = true;
+            sendWs({ type: 'join_room', roomId, role: 'guest' });
+          };
+          ws.onmessage = (ev) => {
+            if (this.ws !== ws) return;
+            let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+            if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'pong') return;
+            if (msg.type === 'ping') { sendWs({ type: 'pong', roomId }); return; }
+            if (msg.type === 'room_joined') {
+              sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'hi' } });
+              return;
+            }
+            if (msg.type === 'error') {
+              retried = true;
+              if (msg.reason === 'room-not-found') fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
+              else if (msg.reason === 'room-full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
+              else fin(cb.error, msg.message || "Erreur de connexion.");
+              return;
+            }
+            if (msg.type === 'host_left') {
+              retried = true;
+              if (!done) fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
+              else fireClose();
+              return;
+            }
+            if (msg.type === 'relay') {
+              const d = msg.data;
+              if (!d) return;
+              if (d._ctrl === 'ok') { fin(cb.open); return; }
+              if (d._ctrl === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
+              if (d._ctrl === 'bye') { fireClose(); return; }
+              if (!done) fin(cb.open);
+              if (d.t === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
+              cb.msg(d);
+            }
+          };
+          ws.onerror = () => { if (this.ws !== ws) return; if (!done) retryOrFail(); else fireClose(); };
+          ws.onclose = () => { if (this.ws !== ws) return; this._stopKeepAlive(); if (!done) retryOrFail(); else fireClose(); };
         };
-        ws.onopen = () => {
-          signaled = true;
-          sendWs({ type: 'join_room', roomId, role: 'guest' });
-        };
-        ws.onmessage = (ev) => {
-          if (this.ws !== ws) return;
-          let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-          if (!msg || typeof msg !== 'object') return;
-          if (msg.type === 'pong') return;
-          if (msg.type === 'ping') { sendWs({ type: 'pong', roomId }); return; }
-          if (msg.type === 'room_joined') {
-            sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'hi' } });
-            return;
-          }
-          if (msg.type === 'error') {
-            if (msg.reason === 'room-not-found') fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
-            else if (msg.reason === 'room-full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
-            else fin(cb.error, msg.message || "Erreur de connexion.");
-            return;
-          }
-          if (msg.type === 'host_left') {
-            if (!done) fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
-            else fireClose();
-            return;
-          }
-          if (msg.type === 'relay') {
-            const d = msg.data;
-            if (!d) return;
-            if (d._ctrl === 'ok') { fin(cb.open); return; }
-            if (d._ctrl === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
-            if (d._ctrl === 'bye') { fireClose(); return; }
-            if (!done) fin(cb.open);
-            if (d.t === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
-            cb.msg(d);
-          }
-        };
-        ws.onerror = () => { if (this.ws !== ws) return; if (!done) fin(cb.error, BLOCKED); else fireClose(); };
-        ws.onclose = () => { if (this.ws !== ws) return; this._stopKeepAlive(); if (!done) fin(cb.error, BLOCKED); else fireClose(); };
+        connectGuest();
       },
       _startKeepAlive(ws, roomId) {
         this._stopKeepAlive();
@@ -219,6 +262,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       },
       close() {
         this._stopKeepAlive();
+        clearTimeout(this.retryTo);
         const w = this.ws, b = this.bc, roomId = this.roomId;
         if (this.role === 'host') {
           if (LOCAL_TEST) {
@@ -244,6 +288,6 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   }
 
   window.WS_SERVER_URL = WS_SERVER_URL;
-  window.DDNet = { create, LOCAL_TEST, BLOCKED, getWsUrl, WS_SERVER_URL };
+  window.DDNet = { create, LOCAL_TEST, BLOCKED, getWsUrl, wakeServer, WS_SERVER_URL };
 })();
 
