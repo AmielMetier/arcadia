@@ -592,7 +592,8 @@ function buildTerrainCanvas() {
    ============================================================================ */
 const Sfx = (() => {
   let ctx = null, muted = false, musicOn = true, musicTimer = null;
-  let stepIdx = 0, nextNoteTime = 0, noiseBuf = null;
+  let stepIdx = 0, nextNoteTime = 0, noiseBuf = null, masterComp = null;
+  let lastMineSound = 0;
 
   function ensureContext() {
     if (!ctx) {
@@ -600,12 +601,31 @@ const Sfx = (() => {
       if (AC) ctx = new AC();
     }
     if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx && !masterComp) {
+      masterComp = ctx.createDynamicsCompressor();
+      masterComp.threshold.setValueAtTime(-12, ctx.currentTime);
+      masterComp.knee.setValueAtTime(12, ctx.currentTime);
+      masterComp.ratio.setValueAtTime(6, ctx.currentTime);
+      masterComp.attack.setValueAtTime(0.003, ctx.currentTime);
+      masterComp.release.setValueAtTime(0.14, ctx.currentTime);
+      masterComp.connect(ctx.destination);
+    }
     if (ctx && !noiseBuf) {
-      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+      const len = ctx.sampleRate * 1.0;
+      noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
       const data = noiseBuf.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      let lastOut = 0.0;
+      for (let i = 0; i < len; i++) {
+        const white = Math.random() * 2 - 1;
+        lastOut = (lastOut * 0.45) + (white * 0.55);
+        data[i] = lastOut;
+      }
     }
     return ctx;
+  }
+
+  function dest() {
+    return masterComp || (ctx ? ctx.destination : null);
   }
 
   function ensure() {
@@ -622,7 +642,7 @@ const Sfx = (() => {
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(c.destination);
+    o.connect(g); g.connect(dest());
     o.start(t); o.stop(t + dur);
   }
 
@@ -638,7 +658,7 @@ const Sfx = (() => {
     o.frequency.exponentialRampToValueAtTime(34, t + 0.19);
     g.gain.setValueAtTime(accent ? 0.22 : 0.16, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-    o.connect(g); g.connect(c.destination);
+    o.connect(g); g.connect(dest());
     o.start(t); o.stop(t + 0.23);
   }
 
@@ -652,7 +672,7 @@ const Sfx = (() => {
       const g = c.createGain();
       g.gain.setValueAtTime(vol, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-      src.connect(flt); flt.connect(g); g.connect(c.destination);
+      src.connect(flt); flt.connect(g); g.connect(dest());
       src.start(t); src.stop(t + 0.15);
     }
     const o = c.createOscillator(), og = c.createGain();
@@ -661,7 +681,7 @@ const Sfx = (() => {
     o.frequency.exponentialRampToValueAtTime(92, t + 0.09);
     og.gain.setValueAtTime(vol * 0.7, t);
     og.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-    o.connect(og); og.connect(c.destination);
+    o.connect(og); og.connect(dest());
     o.start(t); o.stop(t + 0.11);
   }
 
@@ -676,7 +696,7 @@ const Sfx = (() => {
     const dur = open ? 0.14 : 0.045;
     g.gain.setValueAtTime(open ? 0.045 : 0.026, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(flt); flt.connect(g); g.connect(c.destination);
+    src.connect(flt); flt.connect(g); g.connect(dest());
     src.start(t); src.stop(t + dur + 0.01);
   }
 
@@ -692,7 +712,7 @@ const Sfx = (() => {
     flt.frequency.exponentialRampToValueAtTime(190, t + dur);
     g.gain.setValueAtTime(0.085, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(c.destination);
+    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(dest());
     o1.start(t); o2.start(t);
     o1.stop(t + dur + 0.01); o2.stop(t + dur + 0.01);
   }
@@ -707,7 +727,7 @@ const Sfx = (() => {
     g.gain.linearRampToValueAtTime(0.048, t + 0.08);
     g.gain.setValueAtTime(0.042, t + dur * 0.7);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    flt.connect(g); g.connect(c.destination);
+    flt.connect(g); g.connect(dest());
 
     for (const m of midis) {
       for (const det of [-4.5, 4.5]) {
@@ -735,7 +755,7 @@ const Sfx = (() => {
     g.gain.setValueAtTime(0.002, t);
     g.gain.linearRampToValueAtTime(0.068, t + 0.025);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(c.destination);
+    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(dest());
     o1.start(t); o2.start(t);
     o1.stop(t + dur + 0.02); o2.stop(t + dur + 0.02);
   }
@@ -847,17 +867,303 @@ const Sfx = (() => {
       ensureContext();
       if (musicOn && !musicTimer) startMusic();
     },
-    build()   { tone(320, 0.1, 'square', 0.09, 160); setTimeout(() => tone(520, 0.12, 'triangle', 0.1, 100), 55); },
-    spawn()   { tone(280, 0.1, 'sawtooth', 0.08, 130); },
-    order()   { tone(520, 0.07, 'sine', 0.09, 110); },
-    attack()  { tone(380, 0.09, 'sawtooth', 0.1, -110); },
-    stim()    { tone(440, 0.12, 'sawtooth', 0.12, 340); },
-    siege()   { tone(180, 0.22, 'square', 0.12, -60); setTimeout(() => tone(290, 0.15, 'triangle', 0.1, 80), 120); },
-    scan()    { tone(680, 0.25, 'sine', 0.11, 260); },
-    shoot()   { tone(190 + Math.random() * 60, 0.05, 'sawtooth', 0.03, -85); },
-    plasma()  { tone(620, 0.13, 'sine', 0.06, -400); },
-    boom()    { tone(110, 0.3, 'sawtooth', 0.15, -75); },
-    error()   { tone(155, 0.15, 'sawtooth', 0.11, -35); },
+
+    // --- BRUITAGES SCI-FI RTS IMMERSIFS HAUTE FIDÉLITÉ ---
+    // Tir fusil d'assaut Gauss des Marines : détonation percutante + bruit de culasse métallique
+    shoot() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const pitchMod = 0.92 + Math.random() * 0.16;
+
+      // 1. Détonation supersonique (crack de bouche filtré)
+      if (noiseBuf) {
+        const src = c.createBufferSource();
+        src.buffer = noiseBuf;
+        const flt = c.createBiquadFilter();
+        flt.type = 'bandpass';
+        flt.frequency.setValueAtTime(2200 * pitchMod, t);
+        flt.Q.setValueAtTime(2.2, t);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.14, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.042);
+        src.connect(flt); flt.connect(g); g.connect(dest());
+        src.start(t); src.stop(t + 0.045);
+      }
+
+      // 2. Choc de culasse mécanique (corps percutant basse fréquence)
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(260 * pitchMod, t);
+      o.frequency.exponentialRampToValueAtTime(65 * pitchMod, t + 0.038);
+      g.gain.setValueAtTime(0.09, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      o.connect(g); g.connect(dest());
+      o.start(t); o.stop(t + 0.042);
+    },
+
+    // Tir Plasma / Roquette Maraudeur / Canons Thor : balayage résonant + onde de choc plasma
+    plasma() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+
+      // 1. Sifflement d'énergie concentrée
+      const o = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(1150, t);
+      o.frequency.exponentialRampToValueAtTime(175, t + 0.13);
+      flt.type = 'lowpass';
+      flt.frequency.setValueAtTime(2600, t);
+      flt.frequency.exponentialRampToValueAtTime(240, t + 0.13);
+      flt.Q.setValueAtTime(4.5, t);
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      o.connect(flt); flt.connect(g); g.connect(dest());
+      o.start(t); o.stop(t + 0.15);
+
+      // 2. Impact sub-basse
+      const sub = c.createOscillator(), subG = c.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(140, t);
+      sub.frequency.exponentialRampToValueAtTime(40, t + 0.16);
+      subG.gain.setValueAtTime(0.13, t);
+      subG.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+      sub.connect(subG); subG.connect(dest());
+      sub.start(t); sub.stop(t + 0.18);
+    },
+
+    // Explosion cinéma (unités et bâtiments) : sub-kick + grondement de flammes et débris
+    boom(big = false) {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const dur = big ? 0.65 : 0.32;
+
+      // 1. Onde de choc sub-graves (ressentie dans les oreilles)
+      const sub = c.createOscillator(), subG = c.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(big ? 105 : 145, t);
+      sub.frequency.exponentialRampToValueAtTime(26, t + dur * 0.85);
+      subG.gain.setValueAtTime(big ? 0.34 : 0.22, t);
+      subG.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      sub.connect(subG); subG.connect(dest());
+      sub.start(t); sub.stop(t + dur + 0.02);
+
+      // 2. Débris, flammes et souffle (filtre passe-bas descendant sur bruit rose)
+      if (noiseBuf) {
+        const src = c.createBufferSource();
+        src.buffer = noiseBuf;
+        const flt = c.createBiquadFilter(), g = c.createGain();
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(big ? 2800 : 1800, t);
+        flt.frequency.exponentialRampToValueAtTime(80, t + dur);
+        g.gain.setValueAtTime(big ? 0.28 : 0.16, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        src.connect(flt); flt.connect(g); g.connect(dest());
+        src.start(t); src.stop(t + dur + 0.02);
+      }
+
+      // 3. Déflagration métallique pour grandes explosions
+      if (big) {
+        const crunch = c.createOscillator(), crG = c.createGain();
+        crunch.type = 'sawtooth';
+        crunch.frequency.setValueAtTime(65, t);
+        crunch.frequency.exponentialRampToValueAtTime(22, t + 0.38);
+        crG.gain.setValueAtTime(0.18, t);
+        crG.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        crunch.connect(crG); crG.connect(dest());
+        crunch.start(t); crunch.stop(t + 0.42);
+      }
+    },
+
+    // Mode Siège du Char d'Assaut : servomoteur hydraulique + verrouillage de blindage lourd
+    siege() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+
+      // Servomoteur ascendant
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(210, t);
+      o.frequency.exponentialRampToValueAtTime(510, t + 0.18);
+      g.gain.setValueAtTime(0.085, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      o.connect(g); g.connect(dest());
+      o.start(t); o.stop(t + 0.21);
+
+      // Décharge pneumatique
+      if (noiseBuf) {
+        const src = c.createBufferSource();
+        src.buffer = noiseBuf;
+        const flt = c.createBiquadFilter(), ng = c.createGain();
+        flt.type = 'bandpass';
+        flt.frequency.setValueAtTime(2100, t + 0.08);
+        flt.frequency.exponentialRampToValueAtTime(650, t + 0.26);
+        ng.gain.setValueAtTime(0.001, t);
+        ng.gain.setValueAtTime(0.09, t + 0.08);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        src.connect(flt); flt.connect(ng); ng.connect(dest());
+        src.start(t + 0.08); src.stop(t + 0.29);
+      }
+
+      // Verrouillage mécanique métallique (clank)
+      setTimeout(() => tone(165, 0.14, 'square', 0.13, -45), 130);
+    },
+
+    // Stimpack des Marines : injection pneumatique sifflante + montée d'adrénaline
+    stim() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+
+      // Pschitt pneumatique haute pression
+      if (noiseBuf) {
+        const src = c.createBufferSource();
+        src.buffer = noiseBuf;
+        const flt = c.createBiquadFilter(), g = c.createGain();
+        flt.type = 'highpass';
+        flt.frequency.setValueAtTime(3600, t);
+        g.gain.setValueAtTime(0.13, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        src.connect(flt); flt.connect(g); g.connect(dest());
+        src.start(t); src.stop(t + 0.16);
+      }
+
+      // Fréquence ascendante d'adrénaline
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(280, t);
+      o.frequency.exponentialRampToValueAtTime(740, t + 0.22);
+      og.gain.setValueAtTime(0.11, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      o.connect(og); og.connect(dest());
+      o.start(t); o.stop(t + 0.25);
+    },
+
+    // Ordre de déplacement tactique : bip radio haute technologie double impulsion
+    order() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const o1 = c.createOscillator(), g1 = c.createGain();
+      o1.type = 'sine';
+      o1.frequency.setValueAtTime(784, t);
+      g1.gain.setValueAtTime(0.08, t);
+      g1.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
+      o1.connect(g1); g1.connect(dest());
+      o1.start(t); o1.stop(t + 0.035);
+
+      const o2 = c.createOscillator(), g2 = c.createGain();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(1046, t + 0.04);
+      g2.gain.setValueAtTime(0.09, t + 0.04);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      o2.connect(g2); g2.connect(dest());
+      o2.start(t + 0.04); o2.stop(t + 0.085);
+    },
+
+    // Ordre d'attaque : confirmation militaire agressive et tranchante
+    attack() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const o = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(988, t);
+      o.frequency.exponentialRampToValueAtTime(740, t + 0.065);
+      flt.type = 'lowpass';
+      flt.frequency.setValueAtTime(2600, t);
+      g.gain.setValueAtTime(0.1, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      o.connect(flt); flt.connect(g); g.connect(dest());
+      o.start(t); o.stop(t + 0.075);
+    },
+
+    // Déploiement de bâtiment : accord technologique ascendant + vérin pneumatique
+    build() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const notes = [622, 784, 932];
+      notes.forEach((f, idx) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f, t + idx * 0.045);
+        g.gain.setValueAtTime(0.075, t + idx * 0.045);
+        g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.045 + 0.085);
+        o.connect(g); g.connect(dest());
+        o.start(t + idx * 0.045); o.stop(t + idx * 0.045 + 0.09);
+      });
+    },
+
+    // Unité prête au combat / Hangar ouvert : carillon martial noble
+    spawn() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const notes = [587, 880, 1175];
+      notes.forEach((f, idx) => {
+        const o = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f, t + idx * 0.05);
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(2400, t + idx * 0.05);
+        g.gain.setValueAtTime(0.065, t + idx * 0.05);
+        g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.05 + 0.12);
+        o.connect(flt); flt.connect(g); g.connect(dest());
+        o.start(t + idx * 0.05); o.stop(t + idx * 0.05 + 0.13);
+      });
+    },
+
+    // Scanner Comsat : impulsion sonar holographique avec écho scintillant
+    scan() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      const o = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(460, t);
+      o.frequency.exponentialRampToValueAtTime(2400, t + 0.14);
+      o.frequency.exponentialRampToValueAtTime(700, t + 0.38);
+      flt.type = 'bandpass';
+      flt.frequency.setValueAtTime(1600, t);
+      flt.Q.setValueAtTime(3.5, t);
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+      o.connect(flt); flt.connect(g); g.connect(dest());
+      o.start(t); o.stop(t + 0.45);
+    },
+
+    // Récolte de minéraux / étincelle de soudure VCS : crépitement laser discret
+    mine() {
+      const now = performance.now();
+      if (now - lastMineSound < 130) return;
+      lastMineSound = now;
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      if (noiseBuf) {
+        const src = c.createBufferSource();
+        src.buffer = noiseBuf;
+        const flt = c.createBiquadFilter(), g = c.createGain();
+        flt.type = 'bandpass';
+        flt.frequency.setValueAtTime(2900 + Math.random() * 400, t);
+        flt.Q.setValueAtTime(3.0, t);
+        g.gain.setValueAtTime(0.045, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        src.connect(flt); flt.connect(g); g.connect(dest());
+        src.start(t); src.stop(t + 0.045);
+      }
+      tone(1350 + Math.random() * 150, 0.035, 'triangle', 0.03, -150);
+    },
+
+    // Action impossible / Ravitaillement bloqué : double buzzer grave feutré
+    error() {
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime;
+      [0, 0.09].forEach((offset) => {
+        const o = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain();
+        o.type = 'square';
+        o.frequency.setValueAtTime(135, t + offset);
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(460, t + offset);
+        g.gain.setValueAtTime(0.08, t + offset);
+        g.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.065);
+        o.connect(flt); flt.connect(g); g.connect(dest());
+        o.start(t + offset); o.stop(t + offset + 0.07);
+      });
+    },
   };
 })();
 
@@ -2063,7 +2369,20 @@ const fogCanvas = document.createElement('canvas');
 fogCanvas.width = FOG_RES;
 fogCanvas.height = FOG_RES;
 const fogCtx = fogCanvas.getContext('2d');
+const exploredCanvas = document.createElement('canvas');
+exploredCanvas.width = FOG_RES;
+exploredCanvas.height = FOG_RES;
+const exploredCtx = exploredCanvas.getContext('2d');
 const exploredGrid = new Uint8Array(FOG_RES * FOG_RES);
+
+function isExplored(wx, wy) {
+  if (!state) return true;
+  const me = state.players.find((p) => p.id === myId);
+  if (!me || me.dead) return true;
+  const gx = Math.floor(clamp(wx, 0, WORLD_SIZE - 1) * (FOG_RES / WORLD_SIZE));
+  const gy = Math.floor(clamp(wy, 0, WORLD_SIZE - 1) * (FOG_RES / WORLD_SIZE));
+  return exploredGrid[gy * FOG_RES + gx] === 1;
+}
 
 function isVisibleToMe(wx, wy) {
   if (!state) return true;
@@ -2093,7 +2412,11 @@ function updateFogCanvas(now = performance.now()) {
   if (now - lastFogUpdate < 80) return;
   lastFogUpdate = now;
   const me = state.players.find((p) => p.id === myId);
-  if (!me) return;
+  if (!me || me.dead) {
+    fogCtx.clearRect(0, 0, FOG_RES, FOG_RES);
+    if (fogTexture3D) fogTexture3D.needsUpdate = true;
+    return;
+  }
   const scale = FOG_RES / WORLD_SIZE;
 
   const markCircle = (wx, wy, r) => {
@@ -2105,13 +2428,25 @@ function updateFogCanvas(now = performance.now()) {
         if ((x - cx) ** 2 + (y - cy) ** 2 <= cr2) exploredGrid[y * FOG_RES + x] = 1;
       }
     }
+    exploredCtx.fillStyle = '#ffffff';
+    exploredCtx.beginPath();
+    exploredCtx.arc(cx, cy, cr, 0, TAU);
+    exploredCtx.fill();
   };
 
+  // 1. Fond noir profond pour les zones non explorées
   fogCtx.globalCompositeOperation = 'source-over';
-  fogCtx.fillStyle = 'rgba(8, 12, 16, 0.56)';
+  fogCtx.globalAlpha = 1.0;
+  fogCtx.fillStyle = '#060d0a';
   fogCtx.fillRect(0, 0, FOG_RES, FOG_RES);
 
+  // 2. Éclaircissement partiel des zones déjà explorées (brouillard de guerre semi-transparent)
   fogCtx.globalCompositeOperation = 'destination-out';
+  fogCtx.globalAlpha = 0.44;
+  fogCtx.drawImage(exploredCanvas, 0, 0);
+
+  // 3. Découpage complet à 100% de transparence pour la vision en direct de nos unités/bâtiments
+  fogCtx.globalAlpha = 1.0;
   for (const b of state.buildings) {
     if (b.team === me.team && b.hp > 0) {
       const s = BUILDINGS[b.kind]?.sight || 300;
@@ -2834,8 +3169,10 @@ function handleFxEvents(list) {
         x: e.x, y: e.y, vx: Math.cos(a) * 35, vy: Math.sin(a) * 35,
         r: 2.8, color: e.color || '#1fc7c1', life: 0.18,
       });
+      if (hypot(e.x, e.y, cam.x, cam.y) < 700) Sfx.mine();
     } else if (e.k === 'STIM') {
       shockwaves.push({ x: e.x, y: e.y, r: 4, maxR: 26, color: '#ff4b2b', life: 0.22, maxLife: 0.22 });
+      if (hypot(e.x, e.y, cam.x, cam.y) < 750) Sfx.stim();
     } else if (e.k === 'SIEGE') {
       shockwaves.push({ x: e.x, y: e.y, r: 6, maxR: 32, color: '#ffc531', life: 0.25, maxLife: 0.25 });
       if (hypot(e.x, e.y, cam.x, cam.y) < 800) Sfx.siege();
@@ -2849,7 +3186,10 @@ function handleFxEvents(list) {
       if (big) {
         craters.push({ x: e.x, y: e.y, r: e.r * 0.78 });
         if (craters.length > 45) craters.shift();
-        if (hypot(e.x, e.y, cam.x, cam.y) < 900) { cam.shake = Math.max(cam.shake, 10); Sfx.boom(); }
+      }
+      if (hypot(e.x, e.y, cam.x, cam.y) < 1100) {
+        if (big) cam.shake = Math.max(cam.shake, 12);
+        Sfx.boom(big);
       }
       for (let k = 0; k < cnt; k++) {
         const a = Math.random() * TAU, sp = (big ? 55 : 28) + Math.random() * (big ? 165 : 80);
@@ -2862,6 +3202,7 @@ function handleFxEvents(list) {
       }
     } else if (e.k === 'BUILD' || e.k === 'SPAWN' || e.k === 'COMPLETE') {
       shockwaves.push({ x: e.x, y: e.y, r: 10, maxR: 52, color: e.color || '#ffc531', life: 0.28, maxLife: 0.28 });
+      if (e.k === 'COMPLETE' && hypot(e.x, e.y, cam.x, cam.y) < 850) Sfx.spawn();
     } else if (e.k === 'ELIM') {
       toast(`💥 Le Centre de Commandement de ${e.name} a été détruit !`, 3500);
     } else if (e.k === 'PHASE') {
@@ -2905,6 +3246,7 @@ function sendCommand(cmd) {
     if (cmd.op === 'BUILD') Sfx.build();
     else if (cmd.op === 'TRAIN') Sfx.spawn();
     else if (cmd.op === 'STIM') Sfx.stim();
+    else if (cmd.op === 'SIEGE') Sfx.siege();
     else if (cmd.op === 'UNIT_ORDER') {
       if (cmd.mode === 'amove' || cmd.mode === 'focus') Sfx.attack();
       else Sfx.order();
@@ -3825,6 +4167,9 @@ function updateHudUI() {
    ============================================================================ */
 const bldMeshes3D = new Map();
 const unitMeshes3D = new Map();
+let treeMeshes3D = [];
+let rockMeshes3D = [];
+let centerMonumentGroup3D = null;
 const mineralMeshes3D = [];
 const geyserMeshes3D = [];
 let wallBeamsGroup3D = null;
@@ -3863,8 +4208,11 @@ function initThree3D() {
     threeRenderer.shadowMap.enabled = true;
     threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    const FOG_COLOR = 0x091410;
     threeScene = new THREE.Scene();
-    threeScene.background = new THREE.Color(0x0f1f14);
+    threeScene.background = new THREE.Color(FOG_COLOR);
+    // Brouillard atmosphérique au loin : dissimule le bord du monde et plonge le lointain dans la brume sci-fi
+    threeScene.fog = new THREE.Fog(FOG_COLOR, 1300, 3600);
 
     threeCam = new THREE.PerspectiveCamera(34, W / Math.max(1, H), 40, 9500);
     threeRaycaster = new THREE.Raycaster();
@@ -3901,10 +4249,10 @@ function initThree3D() {
     threeScene.add(rim);
     threeScene.add(rim.target);
 
-    // Sol étendu à l'horizon (empêche tout vide noir à angle bas prononcé)
+    // Sol étendu à l'horizon (empêche tout vide noir à angle bas prononcé et se fond dans le brouillard)
     const skirtGeo = new THREE.PlaneGeometry(WORLD_SIZE * 3.5, WORLD_SIZE * 3.5);
     const skirtMat = new THREE.MeshStandardMaterial({
-      color: 0x0a160e,
+      color: FOG_COLOR,
       roughness: 0.95,
       metalness: 0.08,
     });
@@ -3945,24 +4293,28 @@ function initThree3D() {
       threeScene.add(p2);
     });
 
+    // Monument Citadelle Centrale 3D
+    centerMonumentGroup3D = new THREE.Group();
     const c1 = new THREE.Mesh(new THREE.CylinderGeometry(336, 348, 6, 40), platMat1);
     c1.position.set(HALF_W, 3, HALF_W);
     c1.receiveShadow = true;
     c1.castShadow = true;
-    threeScene.add(c1);
+    centerMonumentGroup3D.add(c1);
     const c2 = new THREE.Mesh(new THREE.CylinderGeometry(272, 280, 4, 40), getMat3D('#454954', 0.5, 0.4));
     c2.position.set(HALF_W, 7, HALF_W);
     c2.receiveShadow = true;
-    threeScene.add(c2);
+    centerMonumentGroup3D.add(c2);
     const cRing = new THREE.Mesh(new THREE.TorusGeometry(115, 2.5, 8, 40), goldRingMat);
     cRing.rotation.x = Math.PI / 2;
     cRing.position.set(HALF_W, 9.5, HALF_W);
-    threeScene.add(cRing);
+    centerMonumentGroup3D.add(cRing);
+    threeScene.add(centerMonumentGroup3D);
 
     // Arbres de forêt 3D (tronc + 3 cônes de feuillage projetant de vraies ombres)
     const trunkGeo = new THREE.CylinderGeometry(2.4, 3.6, 12, 7);
     const cone1Geo = new THREE.ConeGeometry(1, 1, 8);
     const barkMat = getMat3D('#4b3624', 0.85, 0.05);
+    treeMeshes3D = [];
     for (const tr of TREES_3D) {
       const grp = new THREE.Group();
       grp.position.set(tr.x, 0, tr.y);
@@ -3985,11 +4337,13 @@ function initThree3D() {
         grp.add(cone);
       }
       threeScene.add(grp);
+      treeMeshes3D.push({ grp, x: tr.x, y: tr.y });
     }
 
     // Rochers 3D facettés
     const rockGeo = new THREE.DodecahedronGeometry(1, 0);
     const rockMat = getMat3D('#6e685f', 0.78, 0.12);
+    rockMeshes3D = [];
     for (const rk of ROCKS) {
       const m = new THREE.Mesh(rockGeo, rockMat);
       m.position.set(rk.x, rk.r * 0.42, rk.y);
@@ -3998,10 +4352,12 @@ function initThree3D() {
       m.castShadow = true;
       m.receiveShadow = true;
       threeScene.add(m);
+      rockMeshes3D.push({ mesh: m, x: rk.x, y: rk.y });
     }
 
     // Gisements de Minéraux 3D (Bouquets de cristaux lumineux)
     const crysGeo = new THREE.OctahedronGeometry(1, 0);
+    mineralMeshes3D.length = 0;
     for (const m of MINERAL_NODES) {
       const grp = new THREE.Group();
       grp.position.set(m.x, 4, m.y);
@@ -4025,12 +4381,13 @@ function initThree3D() {
         grp.add(c);
       }
       threeScene.add(grp);
-      mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01 });
+      mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y });
     }
 
     // Geysers de Gaz Plasma 3D
     const geyRimMat = getMat3D('#435449', 0.68, 0.22);
     const geyCoreMat = getMat3D('#2fbf71', 0.2, 0.1, 0x2fbf71, 0.75);
+    geyserMeshes3D.length = 0;
     for (const gey of GAS_GEYSERS) {
       const grp = new THREE.Group();
       grp.position.set(gey.x, 4, gey.y);
@@ -4047,7 +4404,7 @@ function initThree3D() {
       core.position.y = 13;
       grp.add(core);
       threeScene.add(grp);
-      geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01 });
+      geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01, x: gey.x, y: gey.y });
     }
 
     wallBeamsGroup3D = new THREE.Group();
@@ -4056,7 +4413,7 @@ function initThree3D() {
     fxGroup3D = new THREE.Group();
     threeScene.add(fxGroup3D);
 
-    // Brouillard de Guerre 3D flottant au-dessus du champ de bataille
+    // Brouillard de Guerre 3D dynamique : recouvre arbres, rochers, monuments et terrain
     fogTexture3D = new THREE.CanvasTexture(fogCanvas);
     fogTexture3D.minFilter = THREE.LinearFilter;
     fogTexture3D.magFilter = THREE.LinearFilter;
@@ -4065,12 +4422,14 @@ function initThree3D() {
       map: fogTexture3D,
       transparent: true,
       depthWrite: false,
-      opacity: 0.92,
+      depthTest: false,
+      opacity: 0.98,
+      fog: false,
     });
     const fogMesh = new THREE.Mesh(fogGeo, fogMat);
     fogMesh.rotation.x = -Math.PI / 2;
-    fogMesh.position.set(HALF_W, 4.0, HALF_W);
-    fogMesh.renderOrder = 20;
+    fogMesh.position.set(HALF_W, 0.5, HALF_W);
+    fogMesh.renderOrder = 999;
     threeScene.add(fogMesh);
 
     threeReady = true;
@@ -4576,13 +4935,42 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       sunLight3D.target.updateMatrixWorld();
     }
 
-    // Animation des cristaux de minéraux et geysers de gaz plasma
+    // Brouillard atmosphérique au loin adaptatif selon la distance caméra
+    if (threeScene.fog) {
+      threeScene.fog.near = Math.max(650, dist * 0.9);
+      threeScene.fog.far = Math.max(1800, dist * 2.85);
+    }
+
+    // Masquage tactique des arbres, rochers, monuments et ressources non encore explorés
+    if (centerMonumentGroup3D) {
+      centerMonumentGroup3D.visible = isExplored(HALF_W, HALF_W) ||
+        isExplored(HALF_W - 180, HALF_W) || isExplored(HALF_W + 180, HALF_W) ||
+        isExplored(HALF_W, HALF_W - 180) || isExplored(HALF_W, HALF_W + 180);
+    }
+    for (const t of treeMeshes3D) {
+      t.grp.visible = isExplored(t.x, t.y);
+    }
+    for (const r of rockMeshes3D) {
+      r.mesh.visible = isExplored(r.x, r.y);
+    }
     for (const m of mineralMeshes3D) {
-      m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
+      m.grp.visible = isExplored(m.x, m.y);
     }
     for (const g of geyserMeshes3D) {
-      const s = 0.88 + Math.sin(now * 0.006 + g.seed) * 0.18;
-      g.core.scale.set(s, s * 0.7, s);
+      g.grp.visible = isExplored(g.x, g.y);
+    }
+
+    // Animation des cristaux de minéraux et geysers de gaz plasma
+    for (const m of mineralMeshes3D) {
+      if (m.grp.visible) {
+        m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
+      }
+    }
+    for (const g of geyserMeshes3D) {
+      if (g.grp.visible) {
+        const s = 0.88 + Math.sin(now * 0.006 + g.seed) * 0.18;
+        g.core.scale.set(s, s * 0.7, s);
+      }
     }
 
     // Synchronisation des Bâtiments 3D
@@ -5478,6 +5866,7 @@ function startMatch(info) {
   buildMode = null;
   orderCursor = null;
   exploredGrid.fill(0);
+  if (exploredCtx) exploredCtx.clearRect(0, 0, FOG_RES, FOG_RES);
   lastFogUpdate = 0;
   pendingCmds.length = 0;
   netSyncTick = 0;
