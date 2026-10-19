@@ -56,7 +56,7 @@ canvas#world.cur-build{cursor:cell}
 .btn.small{font-size:11.5px;padding:5px 9px;box-shadow:3px 3px 0 var(--ink)}
 
 /* BARRE D'ACCÈS RAPIDE STARCRAFT II (F1 VCS INACTIF, F2 ARMÉE, GROUPES DE CONTRÔLE 1-5) */
-.quick-bar{position:fixed;bottom:184px;left:14px;z-index:22;display:flex;gap:6px;align-items:center;pointer-events:none;flex-wrap:wrap}
+.quick-bar{position:fixed;bottom:232px;left:14px;z-index:22;display:flex;gap:6px;align-items:center;pointer-events:none;flex-wrap:wrap}
 .quick-bar > *{pointer-events:auto}
 .qbtn{background:var(--ink);color:var(--paper);border:2.5px solid var(--paper);box-shadow:3px 3px 0 #000;border-radius:9px;
   padding:4px 9px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:transform .06s}
@@ -70,73 +70,80 @@ canvas#world.cur-build{cursor:cell}
 .cg-pill b{font-family:Bungee,sans-serif;font-size:11px}
 
 /* CONSOLE RTS INFÉRIEURE STYLE STARCRAFT (MINIMAP | SÉLECTION & PRODUCTION | GRILLE DE COMMANDES) */
-.rts-console{position:fixed;bottom:8px;left:10px;right:10px;height:168px;z-index:24;display:grid;
-  grid-template-columns:196px minmax(280px,1fr) 392px;gap:10px;pointer-events:none;max-width:1280px;margin:0 auto}
+.rts-console{position:fixed;bottom:8px;left:10px;right:10px;height:216px;z-index:24;display:grid;
+  grid-template-columns:196px minmax(310px,1fr) 488px;gap:12px;pointer-events:none;max-width:1360px;margin:0 auto}
 .rts-console > *{pointer-events:auto}
 
-.panel-box{background:var(--paper);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:16px;padding:8px 10px;display:flex;flex-direction:column;overflow:hidden;position:relative}
-.panel-hd{display:flex;justify-content:space-between;align-items:center;font-family:Bungee,Impact,sans-serif;font-size:10.5px;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;border-bottom:2px dashed var(--line2);padding-bottom:3px}
+.panel-box{background:var(--paper);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:16px;padding:9px 12px;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.panel-hd{display:flex;justify-content:space-between;align-items:center;font-family:Bungee,Impact,sans-serif;font-size:11px;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;border-bottom:2px dashed var(--line2);padding-bottom:4px;flex:none}
 
 /* 1. MINIMAP */
-.minimap-wrap{display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%}
-canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--ink);border-radius:9px;background:#102014;cursor:crosshair}
+.minimap-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:0}
+canvas#minimap{width:170px;height:164px;display:block;border:2.5px solid var(--ink);border-radius:9px;background:#102014;cursor:crosshair}
 
-/* 2. PANNEAU CENTRAL : PORTRAIT, STATS, FILE DE PRODUCTION OU GRILLE D'UNITÉS */
-.sel-body{display:flex;gap:12px;align-items:center;flex:1;min-height:0}
-.portrait-box{width:88px;height:88px;border:2.5px solid var(--ink);border-radius:12px;background:var(--cream);flex:none;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 12px rgba(0,0,0,.08)}
-.portrait-box canvas{width:80px;height:68px;display:block}
-.portrait-hp{width:76px;height:8px;background:#d9cdb3;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;margin-top:2px}
+/* 2. PANNEAU CENTRAL/GAUCHE : PORTRAIT ESPACÉ, NOM CLAIR, STATS, FILE DE PRODUCTION OU GRILLE D'UNITÉS */
+.sel-body{display:flex;gap:14px;align-items:stretch;flex:1;min-height:0;padding:2px 0}
+.portrait-box{width:118px;border:2.5px solid var(--ink);border-radius:12px;background:var(--cream);flex:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 6px 5px;position:relative;box-shadow:inset 0 0 12px rgba(0,0,0,.08)}
+.portrait-name{width:100%;background:var(--ink);color:var(--paper);font-family:Bungee,sans-serif;font-size:10px;text-align:center;
+  border-radius:5px;padding:2px 4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portrait-box canvas{width:98px;height:86px;display:block;margin:2px auto}
+.portrait-hp{width:100%;height:9px;background:#d9cdb3;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden}
 .portrait-hp i{display:block;height:100%;background:var(--green)}
 
-.sel-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
-.sel-title{font-family:Bungee,Impact,sans-serif;font-size:16px;line-height:1.1;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sel-sub{font-size:12px;font-weight:700;color:var(--muted)}
-.sel-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
-.st-chip{background:var(--cream);border:1.5px solid var(--ink);border-radius:6px;padding:2px 7px;font-size:11.5px;font-weight:700}
+.sel-info{flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:5px;min-width:0;overflow:hidden}
+.sel-title{font-family:Bungee,Impact,sans-serif;font-size:17px;line-height:1.15;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel-sub{font-size:12px;font-weight:700;color:var(--muted);line-height:1.25}
+.sel-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:1px}
+.st-chip{background:var(--cream);border:1.5px solid var(--ink);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700}
 
-/* File d'attente de production (5 slots style StarCraft) */
-.prod-queue{display:flex;flex-direction:column;gap:5px;min-width:195px}
-.q-bar-wrap{width:100%;height:10px;background:#d9cdb3;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+/* File d'attente de production (5 slots style StarCraft bien espacés avec nom visible) */
+.prod-queue{display:flex;flex-direction:column;gap:4px;margin-top:auto;padding-top:4px;border-top:1.5px dashed var(--line2)}
+.q-bar-wrap{width:100%;height:8px;background:#d9cdb3;border:1.5px solid var(--ink);border-radius:5px;overflow:hidden}
 .q-bar-wrap i{display:block;height:100%;background:var(--yellow);transition:width .08s}
-.q-slots{display:flex;gap:5px}
-.q-slot{width:34px;height:34px;border:2px solid var(--ink);border-radius:7px;background:var(--cream);display:flex;align-items:center;justify-content:center;
-  font-family:Bungee,sans-serif;font-size:10px;position:relative;cursor:pointer;overflow:hidden}
+.q-slots{display:flex;gap:6px}
+.q-slot{width:54px;height:36px;border:2px solid var(--ink);border-radius:8px;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:Bungee,sans-serif;font-size:9.5px;position:relative;cursor:pointer;overflow:hidden;padding-top:4px}
 .q-slot.filled{background:#fff;box-shadow:2px 2px 0 var(--ink)}
 .q-slot.filled:hover::after{content:'✕';position:absolute;inset:0;background:rgba(255,75,43,.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px}
-.q-slot .num{position:absolute;top:1px;left:3px;font-size:8.5px;color:var(--muted)}
+.q-slot .num{position:absolute;top:1px;left:4px;font-size:8px;color:var(--muted)}
+.q-slot .q-nm{font-weight:700;font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48px}
 
-/* Grille multi-unités sélectionnées */
-.multi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:5px;width:100%;max-height:118px;overflow-y:auto;padding:2px}
-.u-card{height:44px;border:2px solid var(--ink);border-radius:8px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
-  padding:2px 3px 3px;cursor:pointer;position:relative;box-shadow:1.5px 1.5px 0 var(--ink)}
+/* Grille multi-unités sélectionnées (cartes aérées avec icône 3D + nom complet visible) */
+.multi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;width:100%;max-height:162px;overflow-y:auto;padding:3px}
+.u-card{height:68px;border:2px solid var(--ink);border-radius:10px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+  padding:3px 4px 4px;cursor:pointer;position:relative;box-shadow:2px 2px 0 var(--ink)}
 .u-card:hover{background:var(--cream)}
 .u-card.stim{border-color:var(--red);background:#fff0ed}
 .u-card.siege{border-color:var(--purple);background:#f5ecff}
-.u-card .u-nm{font-size:9px;font-weight:700;line-height:1;margin-top:2px}
-.u-card .u-badge{font-family:Bungee,sans-serif;font-size:11px;color:var(--ink)}
+.u-card canvas.u-thumb{width:58px;height:34px;display:block;margin:0 auto}
+.u-card .u-nm{font-family:Bungee,sans-serif;font-size:9.5px;color:var(--ink);line-height:1.1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
 .u-card .u-hp{width:100%;height:5px;background:#e2d6bc;border:1px solid var(--ink);border-radius:3px;overflow:hidden}
 .u-card .u-hp i{display:block;height:100%;background:var(--green)}
 
-/* 3. GRILLE DE COMMANDES 4x3 (COMMAND CARD STARCRAFT STRICTE) */
-.cmd-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:5px;flex:1;min-height:0}
+/* 3. GRILLE DE COMMANDES 4x3 AÉRÉE (COMMAND CARD AVEC IMAGE BIEN DÉGAGÉE ET NOM EN BANDEAU) */
+.cmd-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:7px;flex:1;min-height:0}
 .cmd-empty{grid-column:1/-1;grid-row:1/-1;border:2px dashed var(--line2);border-radius:10px;background:var(--cream);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--muted);font-size:12px;font-weight:700;gap:4px}
-.cmd-empty b{font-family:Bungee,sans-serif;color:var(--ink);font-size:12.5px}
-.cbtn{border:2px solid var(--ink);border-radius:9px;background:#fff;padding:2px 3px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--muted);font-size:12px;font-weight:700;gap:5px}
+.cmd-empty b{font-family:Bungee,sans-serif;color:var(--ink);font-size:13px}
+.cbtn{border:2px solid var(--ink);border-radius:10px;background:#fff;padding:0;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;position:relative;
   transition:transform .06s,background .06s;font:inherit;color:var(--ink);box-shadow:2px 2px 0 var(--ink);overflow:hidden}
 .cbtn:hover:not(:disabled){transform:translateY(-2px);background:var(--cream)}
 .cbtn.sel{background:var(--yellow);box-shadow:0 0 0 2px var(--ink),2px 3px 0 var(--ink)}
 .cbtn:disabled{opacity:.42;cursor:not-allowed;background:#e9e1cf;box-shadow:none}
-.cbtn .key{position:absolute;top:2px;left:3px;font-size:9px;font-weight:700;background:var(--ink);color:var(--paper);
-  border-radius:3px;padding:0 3.5px;line-height:1.35;z-index:2}
-.cbtn .cost-tag{position:absolute;top:2px;right:3px;font-family:Bungee,sans-serif;font-size:8.5px;color:#0e6b68;background:#d8f8f6;
-  border:1px solid var(--ink);border-radius:3px;padding:0 3px;line-height:1.3;z-index:2}
+.cbtn-top{width:100%;display:flex;justify-content:space-between;align-items:center;padding:2px 4px 0;flex:none}
+.cbtn .key{font-size:9px;font-weight:700;background:var(--ink);color:var(--paper);
+  border-radius:3px;padding:0 4px;line-height:1.35}
+.cbtn .cost-tag{font-family:Bungee,sans-serif;font-size:8.5px;color:#0e6b68;background:#d8f8f6;
+  border:1px solid var(--ink);border-radius:3px;padding:0 3.5px;line-height:1.25}
 .cbtn.cant .cost-tag{color:#c4231a;background:#ffe3dc}
-.cbtn canvas.thumb{width:42px;height:26px;display:block;margin-top:8px}
-.cbtn .ico-txt{font-size:15px;margin-top:8px;line-height:1}
-.cbtn .lbl-b{font-weight:700;font-size:9.5px;line-height:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.cbtn-mid{flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0;padding:1px 2px}
+.cbtn canvas.thumb{width:68px;height:30px;display:block}
+.cbtn .ico-txt{font-size:17px;line-height:1}
+.cbtn .lbl-b{width:100%;background:var(--ink);color:var(--paper);font-weight:700;font-size:10.5px;line-height:1.25;
+  padding:2px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;letter-spacing:.2px}
+.cbtn.sel .lbl-b{background:#16181d;color:var(--yellow)}
 
 /* TOAST & MODAL */
 .toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--yellow);
@@ -152,9 +159,9 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
 .rank-list li .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink)}
 .rank-list li .sc{margin-left:auto;font-family:Bungee,Impact,sans-serif;font-size:14px;color:var(--muted)}
 
-@media(max-width:980px){
-  .rts-console{grid-template-columns:150px 1fr 310px;height:154px}
-  canvas#minimap{width:130px;height:110px}
+@media(max-width:1040px){
+  .rts-console{grid-template-columns:156px 1fr 380px;height:204px}
+  canvas#minimap{width:136px;height:148px}
 }
 </style>
 </head>
@@ -184,7 +191,8 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
   <div class="spacer"></div>
   <div class="roster-top" id="uiRoster"></div>
   <button class="btn small ghost" id="btnCenter" title="Recentrer sur ton QG (Espace)">🎯 QG</button>
-  <button class="btn small ghost" id="btnMute" title="Son">🔊</button>
+  <button class="btn small yellow" id="btnMusic" title="Activer / Couper la musique épique">🎵 Musique</button>
+  <button class="btn small ghost" id="btnMute" title="Effets sonores">🔊</button>
   <button class="btn small" id="btnExit">Quitter</button>
 </div>
 
@@ -205,7 +213,7 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
   <div class="panel-box">
     <div class="panel-hd"><span>Radar Tactique</span><span>Clic Droit = Ordre</span></div>
     <div class="minimap-wrap">
-      <canvas id="minimap" width="170" height="132"></canvas>
+      <canvas id="minimap" width="170" height="164"></canvas>
     </div>
   </div>
 
@@ -572,19 +580,31 @@ function buildTerrainCanvas() {
 }
 
 /* ============================================================================
-   AUDIO SYNTHÉTISÉ (WebAudio)
+   AUDIO SYNTHÉTISÉ + BANDE-SON ORCHESTRALE RTS ÉPIQUE (WebAudio)
    ============================================================================ */
 const Sfx = (() => {
-  let ctx = null, muted = false;
-  function ensure() {
-    if (muted) return null;
+  let ctx = null, muted = false, musicOn = true, musicTimer = null;
+  let stepIdx = 0, nextNoteTime = 0, noiseBuf = null;
+
+  function ensureContext() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (AC) ctx = new AC();
     }
     if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx && !noiseBuf) {
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
     return ctx;
   }
+
+  function ensure() {
+    if (muted) return null;
+    return ensureContext();
+  }
+
   function tone(freq, dur, type = 'triangle', vol = 0.11, slide = 0) {
     const c = ensure(); if (!c) return;
     const o = c.createOscillator(), g = c.createGain();
@@ -597,9 +617,228 @@ const Sfx = (() => {
     o.connect(g); g.connect(c.destination);
     o.start(t); o.stop(t + dur);
   }
+
+  // --- INSTRUMENTS DE LA MUSIQUE ÉPIQUE RTS (Ré mineur / 132 BPM) ---
+  function mtof(midi) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function playKick(c, t, accent = false) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(accent ? 145 : 120, t);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.19);
+    g.gain.setValueAtTime(accent ? 0.22 : 0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + 0.23);
+  }
+
+  function playSnare(c, t, vol = 0.09) {
+    if (noiseBuf) {
+      const src = c.createBufferSource();
+      src.buffer = noiseBuf;
+      const flt = c.createBiquadFilter();
+      flt.type = 'bandpass';
+      flt.frequency.setValueAtTime(1650, t);
+      const g = c.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      src.connect(flt); flt.connect(g); g.connect(c.destination);
+      src.start(t); src.stop(t + 0.15);
+    }
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(195, t);
+    o.frequency.exponentialRampToValueAtTime(92, t + 0.09);
+    og.gain.setValueAtTime(vol * 0.7, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(og); og.connect(c.destination);
+    o.start(t); o.stop(t + 0.11);
+  }
+
+  function playHat(c, t, open = false) {
+    if (!noiseBuf) return;
+    const src = c.createBufferSource();
+    src.buffer = noiseBuf;
+    const flt = c.createBiquadFilter();
+    flt.type = 'highpass';
+    flt.frequency.setValueAtTime(6500, t);
+    const g = c.createGain();
+    const dur = open ? 0.14 : 0.045;
+    g.gain.setValueAtTime(open ? 0.045 : 0.026, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(flt); flt.connect(g); g.connect(c.destination);
+    src.start(t); src.stop(t + dur + 0.01);
+  }
+
+  function playBass(c, t, midi, dur) {
+    const f = mtof(midi);
+    const o1 = c.createOscillator(), o2 = c.createOscillator();
+    const flt = c.createBiquadFilter(), g = c.createGain();
+    o1.type = 'sawtooth'; o2.type = 'square';
+    o1.frequency.setValueAtTime(f, t);
+    o2.frequency.setValueAtTime(f * 0.5, t);
+    flt.type = 'lowpass';
+    flt.frequency.setValueAtTime(680, t);
+    flt.frequency.exponentialRampToValueAtTime(190, t + dur);
+    g.gain.setValueAtTime(0.085, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(c.destination);
+    o1.start(t); o2.start(t);
+    o1.stop(t + dur + 0.01); o2.stop(t + dur + 0.01);
+  }
+
+  function playBrassChord(c, t, midis, dur) {
+    const flt = c.createBiquadFilter(), g = c.createGain();
+    flt.type = 'lowpass';
+    flt.frequency.setValueAtTime(420, t);
+    flt.frequency.linearRampToValueAtTime(1450, t + dur * 0.35);
+    flt.frequency.exponentialRampToValueAtTime(520, t + dur);
+    g.gain.setValueAtTime(0.002, t);
+    g.gain.linearRampToValueAtTime(0.048, t + 0.08);
+    g.gain.setValueAtTime(0.042, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    flt.connect(g); g.connect(c.destination);
+
+    for (const m of midis) {
+      for (const det of [-4.5, 4.5]) {
+        const o = c.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(mtof(m), t);
+        o.detune.setValueAtTime(det, t);
+        o.connect(flt);
+        o.start(t); o.stop(t + dur + 0.02);
+      }
+    }
+  }
+
+  function playHeroLead(c, t, midi, dur) {
+    const f = mtof(midi);
+    const o1 = c.createOscillator(), o2 = c.createOscillator();
+    const flt = c.createBiquadFilter(), g = c.createGain();
+    o1.type = 'sawtooth'; o2.type = 'triangle';
+    o1.frequency.setValueAtTime(f, t);
+    o2.frequency.setValueAtTime(f, t);
+    o1.detune.setValueAtTime(6, t);
+    o2.detune.setValueAtTime(-6, t);
+    flt.type = 'lowpass';
+    flt.frequency.setValueAtTime(2400, t);
+    g.gain.setValueAtTime(0.002, t);
+    g.gain.linearRampToValueAtTime(0.068, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o1.connect(flt); o2.connect(flt); flt.connect(g); g.connect(c.destination);
+    o1.start(t); o2.start(t);
+    o1.stop(t + dur + 0.02); o2.stop(t + dur + 0.02);
+  }
+
+  // Partition épique sur 64 pas (4 mesures en 4/4 à 132 BPM : Dm -> Bb -> Gm -> A7 / Dm -> F -> C -> A7)
+  const CHORDS_8BARS = [
+    [50, 57, 62, 65], // Dm
+    [46, 53, 58, 62], // Bb
+    [43, 50, 55, 58], // Gm
+    [45, 52, 57, 61], // A7
+    [50, 57, 62, 65], // Dm
+    [41, 48, 53, 57], // F
+    [48, 55, 60, 64], // C
+    [45, 52, 57, 61], // A7
+  ];
+  const BASS_ROOTS = [38, 34, 31, 33, 38, 41, 36, 33];
+
+  // Mélodie héroïque style Terran / Command & Conquer (par pas de 1/16e sur 128 pas = 8 mesures)
+  const LEAD_SEQ = {
+    0: [62, 3], 3: [65, 3], 6: [69, 6], 12: [67, 2], 14: [65, 2],
+    16: [64, 6], 22: [62, 4], 26: [58, 6],
+    32: [62, 3], 35: [65, 3], 38: [67, 6], 44: [70, 4],
+    48: [69, 10], 58: [64, 3], 61: [67, 3],
+    64: [69, 4], 68: [74, 6], 74: [72, 3], 77: [69, 3],
+    80: [65, 6], 86: [69, 4], 90: [72, 6],
+    96: [70, 4], 100: [67, 4], 104: [64, 4], 108: [67, 4],
+    112: [69, 12], 124: [61, 4],
+  };
+
+  function scheduleMusic() {
+    if (!musicOn) return;
+    const c = ensureContext();
+    if (!c || c.state !== 'running') return;
+
+    const stepDur = 60 / 132 / 4; // ~0.1136s par double-croche
+    if (nextNoteTime < c.currentTime) nextNoteTime = c.currentTime + 0.04;
+
+    while (nextNoteTime < c.currentTime + 0.22) {
+      const s = stepIdx % 128;
+      const bar = Math.floor(s / 16);
+      const inBar = s % 16;
+      const t = nextNoteTime;
+
+      // 1. Accords de cuivres orchestraux en début de mesure et relance au temps 3
+      if (inBar === 0) {
+        playBrassChord(c, t, CHORDS_8BARS[bar], stepDur * 15.5);
+      }
+
+      // 2. Basse ostinato galopante façon RTS
+      const root = BASS_ROOTS[bar];
+      if (inBar % 2 === 0 || inBar === 3 || inBar === 11 || inBar === 15) {
+        const pitch = (inBar === 6 || inBar === 14) ? root + 12 : (inBar === 15 ? root + 7 : root);
+        playBass(c, t, pitch, stepDur * 1.6);
+      }
+
+      // 3. Percussions de guerre (Taiko Kick + Caisse claire martiale + Charley)
+      if (inBar === 0 || inBar === 6 || inBar === 8 || inBar === 11) {
+        playKick(c, t, inBar === 0 || inBar === 8);
+      }
+      if (inBar === 4 || inBar === 12) {
+        playSnare(c, t, 0.095);
+      } else if (bar % 2 === 1 && (inBar === 14 || inBar === 15)) {
+        playSnare(c, t, 0.065); // Roulement militaire de fin de phrase
+      }
+      if (inBar % 2 === 0) {
+        playHat(c, t, inBar === 10);
+      }
+
+      // 4. Mélodie héroïque principale
+      const note = LEAD_SEQ[s];
+      if (note) {
+        playHeroLead(c, t, note[0], stepDur * note[1]);
+      }
+
+      nextNoteTime += stepDur;
+      stepIdx++;
+    }
+  }
+
+  function startMusic() {
+    musicOn = true;
+    const c = ensureContext();
+    if (c && nextNoteTime < c.currentTime) nextNoteTime = c.currentTime + 0.05;
+    if (!musicTimer) {
+      musicTimer = setInterval(scheduleMusic, 80);
+    }
+  }
+
+  function stopMusic() {
+    musicOn = false;
+    if (musicTimer) {
+      clearInterval(musicTimer);
+      musicTimer = null;
+    }
+  }
+
   return {
     get muted() { return muted; },
+    get musicPlaying() { return musicOn; },
     toggle() { muted = !muted; return muted; },
+    toggleMusic() {
+      if (musicOn) stopMusic();
+      else startMusic();
+      return musicOn;
+    },
+    startMusic,
+    stopMusic,
+    wake() {
+      ensureContext();
+      if (musicOn && !musicTimer) startMusic();
+    },
     build()   { tone(320, 0.1, 'square', 0.09, 160); setTimeout(() => tone(520, 0.12, 'triangle', 0.1, 100), 55); },
     spawn()   { tone(280, 0.1, 'sawtooth', 0.08, 130); },
     order()   { tone(520, 0.07, 'sine', 0.09, 110); },
@@ -2425,17 +2664,28 @@ function drawThumbIcon(canvasEl, kind, playerColor) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, w, h);
   g.save();
-  g.translate(w / 2, h / 2 + 5);
   if (BUILDINGS[kind]) {
     const def = BUILDINGS[kind];
-    const sc = Math.min(0.78, 20 / def.radius);
+    const r = def.radius;
+    const zMax = (def.height || 36) * 1.1;
+    const spanY = 2.05 * r + zMax * 0.48;
+    const spanX = 2.25 * r + zMax * 0.14;
+    const sc = Math.min((w * 0.76) / spanX, (h * 0.76) / spanY);
+    const midY = -zMax * 0.24;
+    g.translate(w / 2 + zMax * 0.06 * sc, h / 2 - midY * sc);
     g.scale(sc, sc);
-    drawBuilding(g, { kind, x: 0, y: 0, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: -0.4 }, playerColor, false, 0, true);
+    drawBuilding(g, { kind, x: 0, y: 0, radius: r, hp: def.hp, maxHp: def.hp, aimA: -0.4 }, playerColor, false, 0, true);
   } else if (UNITS[kind]) {
     const def = UNITS[kind];
-    const sc = Math.min(1.3, 17 / def.radius);
+    const r = def.radius;
+    const zMax = kind === 'titan' ? 40 : (kind === 'tank' || kind === 'siege') ? 24 : 18;
+    const spanY = 2.2 * r + zMax * 0.48;
+    const spanX = 2.5 * r + zMax * 0.14;
+    const sc = Math.min((w * 0.74) / spanX, (h * 0.74) / spanY);
+    const midY = -zMax * 0.24;
+    g.translate(w / 2 + zMax * 0.06 * sc, h / 2 - midY * sc);
     g.scale(sc, sc);
-    drawUnit(g, { kind, x: 0, y: 0, radius: def.radius, a: -0.35, hp: def.hp, maxHp: def.hp }, playerColor, false, 0, true);
+    drawUnit(g, { kind, x: 0, y: 0, radius: r, a: -0.35, hp: def.hp, maxHp: def.hp }, playerColor, false, 0, true);
   }
   g.restore();
 }
@@ -2891,11 +3141,22 @@ miniCvs.addEventListener('pointerdown', (e) => {
 miniCvs.addEventListener('contextmenu', (e) => e.preventDefault());
 
 $('#btnCenter').onclick = centerOnMyHq;
+$('#btnMusic').onclick = () => {
+  const on = Sfx.toggleMusic();
+  const btn = $('#btnMusic');
+  btn.textContent = on ? '🎵 Musique' : '🔇 Musique';
+  btn.classList.toggle('yellow', on);
+  btn.classList.toggle('ghost', !on);
+};
 $('#btnMute').onclick = () => {
   const m = Sfx.toggle();
   $('#btnMute').textContent = m ? '🔇' : '🔊';
 };
+window.addEventListener('pointerdown', () => Sfx.wake(), { passive: true });
+window.addEventListener('keydown', () => Sfx.wake(), { passive: true });
+
 const exitGame = () => {
+  Sfx.stopMusic();
   if (window.HubBridge && HubBridge.embedded) HubBridge.exit();
   else location.href = '../';
 };
@@ -2950,7 +3211,7 @@ function renderConsoleUI(force = false) {
   const selU = state.units.filter((u) => selectedUnits.has(u.id));
   const selB = state.buildings.filter((b) => selectedBlds.has(b.id));
 
-  // PANNEAU CENTRAL : SÉLECTION
+  // PANNEAU CENTRAL / GAUCHE : SÉLECTION AÉRÉE AVEC NOM ET APERÇU 3D CLAIR
   if (selB.length >= 1 && selU.length === 0) {
     const b = selB[0];
     const def = BUILDINGS[b.kind];
@@ -2961,15 +3222,16 @@ function renderConsoleUI(force = false) {
       const qKind = b.queue?.[idx];
       const uDef = qKind ? UNITS[qKind] : null;
       return `<div class="q-slot ${uDef ? 'filled' : ''}" data-cancel-bld="${b.id}" data-cancel-slot="${idx}" title="${uDef ? `Annuler ${uDef.name}` : 'Slot libre'}">
-        <span class="num">${idx + 1}</span>
-        ${uDef ? `<span>${uDef.short.slice(0, 3)}</span>` : ''}
+        <span class="num">#${idx + 1}</span>
+        ${uDef ? `<span class="q-nm">${uDef.short}</span>` : '<span style="color:#b7ac95">—</span>'}
       </div>`;
     }).join('');
     const qProg = b.qTotal > 0 ? Math.round((1 - b.qTimer / b.qTotal) * 100) : 0;
 
     selBody.innerHTML = `
       <div class="portrait-box">
-        <canvas width="80" height="68" id="portCvs"></canvas>
+        <div class="portrait-name">${def.short}</div>
+        <canvas width="98" height="86" id="portCvs"></canvas>
         <div class="portrait-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
       </div>
       <div class="sel-info">
@@ -2980,17 +3242,17 @@ function renderConsoleUI(force = false) {
           ${def.supply ? `<span class="st-chip">📦 Ravitaillement : +${def.supply}</span>` : ''}
           <span class="st-chip">${def.desc}</span>
         </div>
-      </div>
-      ${(def.trains && def.trains.length && !b.constructing) ? `
-        <div class="prod-queue">
-          <div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:700">
-            <span>File de production (${b.queue.length}/5)</span>
-            <span>${b.queue[0] ? UNITS[b.queue[0]].short : 'Prêt'}</span>
+        ${(def.trains && def.trains.length && !b.constructing) ? `
+          <div class="prod-queue">
+            <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700">
+              <span>File de production (${b.queue.length}/5)</span>
+              <span>${b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire'}</span>
+            </div>
+            <div class="q-bar-wrap"><i style="width:${qProg}%"></i></div>
+            <div class="q-slots">${qSlotsHtml}</div>
           </div>
-          <div class="q-bar-wrap"><i style="width:${qProg}%"></i></div>
-          <div class="q-slots">${qSlotsHtml}</div>
-        </div>
-      ` : ''}
+        ` : ''}
+      </div>
     `;
     drawThumbIcon($('#portCvs'), b.kind, me.color);
     for (const sl of selBody.querySelectorAll('.q-slot.filled')) {
@@ -3006,7 +3268,8 @@ function renderConsoleUI(force = false) {
     const pct = Math.round((u.hp / u.maxHp) * 100);
     selBody.innerHTML = `
       <div class="portrait-box">
-        <canvas width="80" height="68" id="portCvs"></canvas>
+        <div class="portrait-name">${def.short}</div>
+        <canvas width="98" height="86" id="portCvs"></canvas>
         <div class="portrait-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
       </div>
       <div class="sel-info">
@@ -3022,16 +3285,19 @@ function renderConsoleUI(force = false) {
     drawThumbIcon($('#portCvs'), u.kind, me.color);
   } else if (selU.length > 1) {
     $('#uiSelHeader').textContent = `Escouade sélectionnée (${selU.length} unités)`;
-    $('#uiSelSubHint').textContent = 'Clic = Isoler · A + Clic = Attaque-Déplacement · T = Stimpack · E = Siège';
+    $('#uiSelSubHint').textContent = 'Clic = Isoler · Ctrl+Clic = Même type · A + Clic = Attaque · T = Stimpack · E = Siège';
     selBody.innerHTML = `<div class="multi-grid">${selU.slice(0, 24).map((u) => {
       const def = UNITS[u.kind];
       const pct = Math.round((u.hp / u.maxHp) * 100);
-      return `<div class="u-card ${u.stimT > 0 ? 'stim' : ''} ${u.sieged ? 'siege' : ''}" data-pick-u="${u.id}">
+      return `<div class="u-card ${u.stimT > 0 ? 'stim' : ''} ${u.sieged ? 'siege' : ''}" data-pick-u="${u.id}" title="${def.name} (${Math.ceil(u.hp)}/${u.maxHp} PV)">
+        <canvas class="u-thumb" width="68" height="38" data-u-thumb="${u.kind}"></canvas>
         <span class="u-nm">${def.short}</span>
-        <span class="u-badge">${u.sieged ? '💥' : u.stimT > 0 ? '⚡' : '⚔️'}</span>
         <div class="u-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
       </div>`;
     }).join('')}</div>`;
+    for (const c of selBody.querySelectorAll('canvas[data-u-thumb]')) {
+      drawThumbIcon(c, c.dataset.uThumb, me.color);
+    }
     for (const card of selBody.querySelectorAll('[data-pick-u]')) {
       card.onclick = (ev) => {
         const id = Number(card.dataset.pickU);
@@ -3052,8 +3318,8 @@ function renderConsoleUI(force = false) {
         <div class="sel-title">Sélectionne une unité ou un bâtiment</div>
         <div class="sel-sub">Fonctionnement StarCraft :</div>
         <div class="sel-stats">
-          <span class="st-chip">👷 Clique sur un <b>VCS</b> pour construire un bâtiment</span>
-          <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un VCS</span>
+          <span class="st-chip">👷 Clique sur un <b>Ouvrier VCS</b> pour construire un bâtiment</span>
+          <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un Ouvrier VCS</span>
           <span class="st-chip">🏭 Clique sur la <b>Caserne / Usine</b> pour créer des troupes</span>
         </div>
       </div>
@@ -3088,40 +3354,56 @@ function renderConsoleUI(force = false) {
       const def = BUILDINGS[k];
       const cant = me.minerals < def.min || me.gas < def.gas || (def.req && !hasCompletedBuilding(state, myId, def.req));
       cards.push(`<button class="cbtn ${buildMode === k ? 'sel' : ''} ${cant ? 'cant' : ''}" data-cmd-build="${k}" title="${def.name} — ${def.desc}">
-        <span class="key">${key}</span>
-        <span class="cost-tag">${def.min}💎${def.gas ? ` ${def.gas}🧪` : ''}</span>
-        <canvas class="thumb" width="64" height="44" data-thumb="${k}"></canvas>
+        <div class="cbtn-top">
+          <span class="key">${key}</span>
+          <span class="cost-tag">${def.min}💎${def.gas ? ` ${def.gas}🧪` : ''}</span>
+        </div>
+        <div class="cbtn-mid">
+          <canvas class="thumb" width="76" height="40" data-thumb="${k}"></canvas>
+        </div>
         <span class="lbl-b">${def.short}</span>
       </button>`);
     }
     cards.push(`<button class="cbtn" data-cmd-act="harvest" title="Envoyer récolter les minéraux les plus proches (R)">
-      <span class="key">R</span><span class="ico-txt">💎</span><span class="lbl-b">Récolter</span>
+      <div class="cbtn-top"><span class="key">R</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">💎</span></div>
+      <span class="lbl-b">Récolter</span>
     </button>`);
     cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaquer (A)">
-      <span class="key">A</span><span class="ico-txt">🎯</span><span class="lbl-b">Attaquer</span>
+      <div class="cbtn-top"><span class="key">A</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">🎯</span></div>
+      <span class="lbl-b">Attaquer</span>
     </button>`);
     cards.push(`<button class="cbtn" data-cmd-act="stop" title="Stopper (S)">
-      <span class="key">S</span><span class="ico-txt">✋</span><span class="lbl-b">Stop</span>
+      <div class="cbtn-top"><span class="key">S</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">✋</span></div>
+      <span class="lbl-b">Stop</span>
     </button>`);
 
   } else if (modeKey.startsWith('BLD_') && modeKey !== 'BLD_CONSTRUCT') {
     const bDef = BUILDINGS[firstB.kind];
-    $('#uiCmdTitle').textContent = bDef.short;
+    $('#uiCmdTitle').textContent = `${bDef.name}`;
     $('#uiCmdHint').textContent = bDef.trains.length ? 'Touches Q / W / E' : 'Structure active';
     const keysMap = ['Q', 'W', 'E', 'R'];
     (bDef.trains || []).forEach((uKind, idx) => {
       const uDef = UNITS[uKind];
       const cant = me.minerals < uDef.min || me.gas < uDef.gas;
       cards.push(`<button class="cbtn ${cant ? 'cant' : ''}" data-cmd-train="${uKind}" title="Entraîner ${uDef.name} — ${uDef.desc}">
-        <span class="key">${keysMap[idx]}</span>
-        <span class="cost-tag">${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}</span>
-        <canvas class="thumb" width="64" height="44" data-thumb="${uKind}"></canvas>
+        <div class="cbtn-top">
+          <span class="key">${keysMap[idx]}</span>
+          <span class="cost-tag">${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}</span>
+        </div>
+        <div class="cbtn-mid">
+          <canvas class="thumb" width="76" height="40" data-thumb="${uKind}"></canvas>
+        </div>
         <span class="lbl-b">${uDef.short}</span>
       </button>`);
     });
     if (firstB.kind === 'hq') {
       cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎) : révèle le brouillard de guerre">
-        <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
+        <div class="cbtn-top"><span class="key">X</span><span class="cost-tag">50💎</span></div>
+        <div class="cbtn-mid"><span class="ico-txt">📡</span></div>
+        <span class="lbl-b">Scan Radar</span>
       </button>`);
     }
     if (!cards.length) {
@@ -3132,7 +3414,7 @@ function renderConsoleUI(force = false) {
   } else if (modeKey === 'BLD_CONSTRUCT') {
     $('#uiCmdTitle').textContent = 'Chantier en cours';
     $('#uiCmdHint').textContent = 'En construction';
-    grid.innerHTML = `<div class="cmd-empty"><b>Chantier en cours de soudure</b><span>Envoie un Ouvrier VCS dessus (Clic Droit) pour accélérer la construction.</span></div>`;
+    grid.innerHTML = `<div class="cmd-empty"><b>Chantier en cours de soudure</b><span>Ton Ouvrier VCS est sur l'emplacement en train de souder la structure.</span></div>`;
     return;
 
   } else if (modeKey === 'ARMY') {
@@ -3141,22 +3423,32 @@ function renderConsoleUI(force = false) {
     const canStim = selU.some((u) => UNITS[u.kind]?.canStim);
     const canSiege = selU.some((u) => UNITS[u.kind]?.canSiege);
     cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaque-Déplacement (A + Clic gauche)">
-      <span class="key">A</span><span class="ico-txt">⚔️</span><span class="lbl-b">A-Move</span>
+      <div class="cbtn-top"><span class="key">A</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">⚔️</span></div>
+      <span class="lbl-b">A-Move</span>
     </button>`);
     cards.push(`<button class="cbtn" data-cmd-act="stop" title="Stopper les unités (S)">
-      <span class="key">S</span><span class="ico-txt">✋</span><span class="lbl-b">Stop</span>
+      <div class="cbtn-top"><span class="key">S</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">✋</span></div>
+      <span class="lbl-b">Stop</span>
     </button>`);
     cards.push(`<button class="cbtn" data-cmd-act="hold" title="Tenir Position (H)">
-      <span class="key">H</span><span class="ico-txt">🛡️</span><span class="lbl-b">Tenir Pos.</span>
+      <div class="cbtn-top"><span class="key">H</span></div>
+      <div class="cbtn-mid"><span class="ico-txt">🛡️</span></div>
+      <span class="lbl-b">Tenir Pos.</span>
     </button>`);
     if (canStim) {
       cards.push(`<button class="cbtn" data-cmd-act="stim" title="Stimpack (T) : +50% vitesse d'attaque et de déplacement pendant 8s (-18 PV)">
-        <span class="key">T</span><span class="ico-txt">💉</span><span class="lbl-b">Stimpack</span>
+        <div class="cbtn-top"><span class="key">T</span></div>
+        <div class="cbtn-mid"><span class="ico-txt">💉</span></div>
+        <span class="lbl-b">Stimpack</span>
       </button>`);
     }
     if (canSiege) {
       cards.push(`<button class="cbtn" data-cmd-act="siege" title="Mode Siège / Mode Char (E) pour les Chars de Siège">
-        <span class="key">E</span><span class="ico-txt">💥</span><span class="lbl-b">Mode Siège</span>
+        <div class="cbtn-top"><span class="key">E</span></div>
+        <div class="cbtn-mid"><span class="ico-txt">💥</span></div>
+        <span class="lbl-b">Mode Siège</span>
       </button>`);
     }
 
@@ -3620,6 +3912,7 @@ function startMatch(info) {
 
   clearInterval(tickInterval);
   clearInterval(botInterval);
+  Sfx.wake();
 
   const H = window.HubBridge;
   role = H && H.embedded ? info.role : 'solo';
