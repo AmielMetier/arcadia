@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.11 — 19 octobre 2026
+- Musique lo-fi aussi dans l'accueil et le salon du Hub (bouton 🎵 et volume en bas à gauche, réglages partagés
+  avec DavidSimulator). Elle s'efface quand un jeu démarre, chaque jeu ayant sa propre musique.
+- Réactions dans DavidSimulator (bouton 😀 ou touche R) : 8 émotes et 8 phrases (« Nissa la bella ! », « T'es fada ! »…),
+  en bulle à côté du joueur et au-dessus de son pion. Les bots réagissent aussi de temps en temps.
+- Classement entre potes (🏆, accueil et salon) : victoires, parties, % de victoires, podiums, meilleur score,
+  par jeu ou tous jeux confondus, et dernières parties. Chaque joueur est reconnu par un identifiant permanent ;
+  les historiques sont fusionnés quand on se retrouve dans un salon, pour que tout le monde voie le même classement.
+
 ## 2.10 — 19 octobre 2026
 - Multijoueur sur les wifi publics (université, hôtel, gare) : quand la connexion directe est bloquée,
   le jeu passe automatiquement par un relais sur les ports 80 et 443 (TLS compris), comme une page web.

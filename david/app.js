@@ -21,6 +21,7 @@ function boot(info) {
   const view = mountGame(root, board, {
     me,
     act: (a) => session.act(a),
+    emote: (id) => session.emote(id),
     pick: (token) => session.pick(token),
     start: () => session.start(),
     chooseSave: (id) => session.chooseSave(id),
@@ -31,6 +32,7 @@ function boot(info) {
     onState: (s, ev, offset) => view.update(s, ev, offset),
     onSetup: (s) => view.setup(s),
     onError: (msg) => view.toast(msg),
+    onEmote: (from, id) => view.emote(from, id),
   };
   let session;
   if (role === 'guest') session = startClient({ bridge: H, me, ...handlers });

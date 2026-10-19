@@ -2942,6 +2942,10 @@ function endRace(){
   const r=G.race; if(!r || r.ending) return;
   const res=computeResults(r);
   if(G.mode==='host') Net.bcast({t:'end',res});
+  if(IN_HUB && HubBridge.report) try{
+    HubBridge.report({ id:'drift-'+Date.now()+'-'+res.track, mode:(MODES[res.mode]||{}).name||res.mode,
+      players: res.rows.filter(x=>!x.left).map(x=>({ id:null, name:x.name, color:x.color, bot:!!x.bot, rank:x.pos, score:x.pts })) });
+  }catch(e){ console.error(e); }
   finishRace(res);
 }
 function finishRace(res){

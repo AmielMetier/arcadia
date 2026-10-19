@@ -10,12 +10,13 @@ import { sfx, audioContext } from './sfx.js';
 import { createMusic } from './music.js';
 import { tokenSvg } from './tokens.js';
 import { mountSetup } from './setup.js';
+import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { esc, money, el, wait } from './util.js';
 import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings } from '../engine/valuation.js';
 
-export function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave }) {
+export function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {} }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -35,6 +36,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
     <aside class="roster" id="roster" aria-label="Joueurs"></aside>
     <div class="actionbar" id="actionbar" aria-live="polite"></div>
     <div class="dock">
+      <button class="btn ghost emobtn" id="bEmote" title="Réagir (touche R)" aria-expanded="false">😀</button>
       <button class="btn ghost" id="bMine">Mes biens</button>
       <button class="btn ghost" id="bTrade">Échanger<i class="badge" id="tradeBadge" hidden></i></button>
     </div>
@@ -96,6 +98,49 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
   $('#tstats').onclick = () => openStatsWin();
   $('#heatPill').onclick = () => setHeat(null);
   $('#bTrade').onclick = () => openTrade();
+
+  /* ---------------------------------------------------------- réactions */
+  const emoPanel = el('div', 'emopanel', `<div class="emogrid">${EMOTES.map((e) => `<button data-emo="${e.id}" aria-label="${e.id}">${e.glyph}</button>`).join('')}</div>
+    <div class="emophr">${PHRASES.map((p) => `<button data-emo="${p.id}">${esc(p.text)}</button>`).join('')}</div>`);
+  emoPanel.hidden = true; root.appendChild(emoPanel);
+  const toggleEmo = (v = emoPanel.hidden) => { emoPanel.hidden = !v; $('#bEmote').setAttribute('aria-expanded', String(v)); };
+  $('#bEmote').onclick = () => toggleEmo();
+  let emoLast = 0;
+  emoPanel.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-emo]'); if (!b) return;
+    if (Date.now() - emoLast < 1200) { sfx.play('error'); return; }
+    emoLast = Date.now(); emote(b.dataset.emo); toggleEmo(false);
+  });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !emoPanel.hidden) { toggleEmo(false); return; }
+    if ((e.key === 'r' || e.key === 'R') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && !M.key) toggleEmo();
+  });
+  addEventListener('pointerdown', (e) => { if (!emoPanel.hidden && !e.target.closest('.emopanel, #bEmote')) toggleEmo(false); });
+  function showEmote(from, id) {
+    const em = emoteOf(id); if (!em || !S) return;
+    const p = S.players.find((q) => q.id === from); if (!p) return;
+    sfx.play('bid');
+    const big = !!em.glyph;
+    // bulle à côté de la carte du joueur
+    const card = cardEl(from);
+    if (card) {
+      card.querySelector('.bubble')?.remove();
+      const bub = el('div', 'bubble' + (big ? ' big' : ''));
+      bub.textContent = em.glyph || em.text; card.appendChild(bub);
+      setTimeout(() => bub.classList.add('out'), 2600); setTimeout(() => bub.remove(), 3000);
+    }
+    // au-dessus du pion sur le plateau
+    const pt = B.pawnScreen && B.pawnScreen(from);
+    if (pt) {
+      const f = el('div', 'emofloat' + (big ? ' big' : ''));
+      f.textContent = em.glyph || em.text; f.style.left = pt.x + 'px'; f.style.top = (pt.y - 34) + 'px'; f.style.setProperty('--c', p.color);
+      root.appendChild(f);
+      f.animate([{ transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 }, { transform: 'translate(-50%,-90%) scale(1.15)', opacity: 1, offset: 0.15 },
+        { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.75 }, { transform: 'translate(-50%,-160%) scale(.9)', opacity: 0 }],
+      { duration: 2400, easing: 'ease-out' }).finished.then(() => f.remove());
+    }
+    log({ k: 'EMOTE', player: from, text: em.glyph || em.text });
+  }
   $('#logbox').onclick = () => $('#logbox').classList.toggle('open');
   syncTools();
 
@@ -103,6 +148,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
   function describe(e) {
     switch (e.k) {
       case 'TURN': return `Au tour de ${name(e.player)}`;
+      case 'EMOTE': return `${name(e.player)} : ${e.text}`;
       case 'DICE': return e.reason === 'utility' ? `${name(e.player)} relance : ${e.dice[0]} + ${e.dice[1]}` : `${name(e.player)} fait ${e.dice[0]} + ${e.dice[1]}${e.dice[0] === e.dice[1] ? ' (double)' : ''}`;
       case 'LAND': return `${name(e.player)} → ${board.spaces[e.space].name}`;
       case 'PAY':
@@ -512,5 +558,6 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
     },
     setup(s) { if (!S) SU.render(s); },
     toast(msg) { sfx.play('error'); toast(msg); },
+    emote(from, id) { showEmote(from, id); },
   };
 }

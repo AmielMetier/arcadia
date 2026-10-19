@@ -29,6 +29,8 @@
   H.signalReady = () => post({ k: 'ready' });
   H.send = (to, m) => post({ k: 'send', to, m });
   H.exit = () => post({ k: 'exit' });
+  // Fin de partie : le jeu de l'hôte transmet le classement au Hub (historique et classement entre potes)
+  H.report = (r) => post({ k: 'result', r });
   H.playerName = (id) => { const p = H.players.find((q) => q.id === id); return p ? p.name : '?'; };
 
   window.addEventListener('message', (e) => {

@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.10';
+  const VERSION = '2.11';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -18,7 +18,7 @@
     for (const s of g.settings || []) pick.settings[g.id][s.key] = DDProfile.get('hub_set_' + g.id + '_' + s.key, s.def);
   }
 
-  function showScreen(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); }
+  function showScreen(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); document.dispatchEvent(new CustomEvent('hub:screen', { detail: id })); }
   let toastT = 0;
   function toast(msg, ms = 2800) {
     let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
@@ -82,9 +82,57 @@
     go();
   }
   $('#btnNetTest').onclick = openNetTest;
+
+  /* ------------------------------------------------------------ classement entre potes */
+  // Le jeu de l'hôte (ou du joueur solo) signale la fin d'une partie ; on relie ses joueurs aux identifiants du salon.
+  function recordResult(game, r) {
+    if (!room || !r || !Array.isArray(r.players) || !(room.isHost || room.mode === 'solo')) return;
+    const byId = new Map(room.players.map((p) => [p.id, p])), byName = new Map(room.players.map((p) => [p.name, p]));
+    const players = r.players.map((p) => {
+      const hp = p.bot ? null : (Number.isInteger(p.id) && byId.get(p.id)) || byName.get(p.name);
+      return { key: p.bot ? 'bot:' + p.name : hp && hp.uid ? hp.uid : 'nom:' + p.name, name: hp ? hp.name : p.name, color: p.color || (hp && hp.color), bot: !!p.bot, rank: p.rank, score: p.score };
+    });
+    room.addResult({ id: String(r.id || game + '-' + Date.now()), game, mode: r.mode || '', at: Date.now(), players });
+  }
+  let lbOpen = false, lbGame = 'all', lbOnly = false, lbBots = true;
+  const GNAME = { all: 'Tous les jeux', david: 'DavidSimulator', drift: 'Duo Drift' };
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+  function renderBoard() {
+    const ov = document.querySelector('.lbov'); if (!ov) return;
+    const inRoom = room && room.mode !== 'solo' && room.players.length > 1;
+    const only = lbOnly && inRoom ? room.players.map((p) => p.uid) : null;
+    const rows = DDResults.table({ game: lbGame, only, bots: lbBots });
+    const myUid = me.uid;
+    const recent = DDResults.recent(40).filter((r) => lbGame === 'all' || r.game === lbGame).slice(0, 8);
+    const scoreLabel = lbGame === 'david' ? 'Meilleur patrimoine' : lbGame === 'drift' ? 'Meilleurs points' : '';
+    ov.querySelector('.lbbody').innerHTML = `
+      <div class="lbfilters"><div class="seg">${Object.entries(GNAME).map(([k, l]) => `<button data-g="${k}" class="${lbGame === k ? 'sel' : ''}">${l}</button>`).join('')}</div>
+        ${inRoom ? `<label class="ck"><input type="checkbox" id="lbOnly" ${lbOnly ? 'checked' : ''}> Joueurs du salon</label>` : ''}
+        <label class="ck"><input type="checkbox" id="lbBots" ${lbBots ? 'checked' : ''}> Bots</label></div>
+      ${rows.length ? `<table class="lbt"><thead><tr><th>#</th><th>Joueur</th><th>Victoires</th><th>Parties</th><th>% victoires</th><th>Podiums</th>${scoreLabel ? `<th>${scoreLabel}</th>` : ''}</tr></thead><tbody>
+        ${rows.map((x, k) => `<tr class="${x.key === myUid ? 'me' : ''}"><td>${k < 3 ? ['🥇', '🥈', '🥉'][k] : k + 1}</td><td><i class="dot" style="background:${esc(x.color)}"></i>${esc(x.name)}${x.bot ? ' <small>🤖</small>' : ''}${x.key === myUid ? ' <small>(toi)</small>' : ''}</td>
+          <td><b>${x.wins}</b></td><td>${x.games}</td><td>${Math.round((x.wins / x.games) * 100)} %</td><td>${x.podiums}</td>${scoreLabel ? `<td>${lbGame === 'david' ? x.best.toLocaleString('fr-FR') + ' €' : x.best}</td>` : ''}</tr>`).join('')}</tbody></table>`
+      : '<p class="lbempty">Pas encore de partie terminée. Le classement se remplit tout seul à la fin de chaque partie (DavidSimulator et Duo Drift).</p>'}
+      ${recent.length ? `<h3>Dernières parties</h3><ul class="lbrecent">${recent.map((r) => { const w = r.players.find((p) => p.rank === 1);
+        return `<li><span class="g">${r.game === 'david' ? '🎲' : '🏎️'}</span><span>${esc(GNAME[r.game])}${r.mode ? ' · ' + esc(r.mode) : ''}</span><b>${w ? '🏆 ' + esc(w.name) : ''}</b><small>${r.players.length} joueurs · ${ago(r.at)}</small></li>`; }).join('')}</ul>` : ''}
+      <p class="nthint">Historique partagé : quand vous vous retrouvez dans un salon, les parties de chacun sont mises en commun.</p>`;
+    for (const b of ov.querySelectorAll('[data-g]')) b.onclick = () => { lbGame = b.dataset.g; renderBoard(); };
+    const o = ov.querySelector('#lbOnly'); if (o) o.onchange = () => { lbOnly = o.checked; renderBoard(); };
+    ov.querySelector('#lbBots').onchange = (e) => { lbBots = e.target.checked; renderBoard(); };
+  }
+  function openBoard() {
+    const ov = document.createElement('div'); ov.className = 'ntov lbov';
+    ov.innerHTML = '<div class="nt card lb" role="dialog" aria-label="Classement"><button class="ntx" aria-label="Fermer">×</button><h2>🏆 Classement entre potes</h2><div class="lbbody"></div></div>';
+    document.body.appendChild(ov); lbOpen = true;
+    const close = () => { ov.remove(); lbOpen = false; };
+    ov.querySelector('.ntx').onclick = close;
+    ov.addEventListener('pointerdown', (e) => { if (e.target === ov) close(); });
+    renderBoard();
+  }
+  for (const id of ['#btnBoard', '#btnBoardRoom']) { const b = $(id); if (b) b.onclick = openBoard; }
   if (new URLSearchParams(location.search).has('nettest')) setTimeout(openNetTest, 300);
   const busy = (b) => { for (const id of ['#btnHost', '#btnJoin', '#btnSolo']) $(id).disabled = b; };
-  const profile = () => ({ name: DDRoom.cleanName(me.name), color: me.color, lvl: me.lvl });
+  const profile = () => ({ name: DDRoom.cleanName(me.name), color: me.color, lvl: me.lvl, uid: me.uid });
 
   $('#btnHost').onclick = () => { homeErr(''); busy(true); $('#btnHost').textContent = 'Création…'; newRoom(); room.host(profile()); };
   $('#btnJoin').onclick = () => {
@@ -113,6 +161,7 @@
       game(from, m) { if (frame && frame.loaded) frame.el.contentWindow.postMessage({ dd: 'hub', k: 'msg', from, m }, ORIGIN); },
       error(msg) { if ($('#home').classList.contains('on')) goHome(msg); else toast(msg, 4000); },
       closed(msg) { goHome(msg); },
+      results() { if (lbOpen) renderBoard(); },
       migrating(info) { toast(info.me ? "L'hôte est parti : tu deviens l'hôte…" : `L'hôte est parti : ${info.name} reprend le salon…`, 5000); },
       migrated() { toast('Salon rétabli, la partie continue', 3000); renderRoom(); syncFrame(); postRoster(); },
     });
@@ -220,6 +269,8 @@
     const role = room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest';
     const q = new URLSearchParams({ hub: '1', role, game: g.id });
     if (room.code) q.set('code', room.code);
+    const pass = new URLSearchParams(location.search);
+    for (const k of ['debug', 'peer', 'relay', 'turn']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
@@ -258,6 +309,7 @@
         break;
       case 'ready': room.setReady(frame.game); break;
       case 'send': room.sendGame(d.to, d.m); break;
+      case 'result': recordResult(frame.game, d.r); break;
       case 'exit':
         if (room.isHost) room.setGame(null);
         else { leftGame = frame.n; closeFrame(true); }

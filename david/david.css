@@ -578,3 +578,24 @@ input[type=number]:focus{outline:none;box-shadow:0 0 0 3px var(--yellow)}
 .seat .arrow{font-weight:700;color:var(--muted)}
 .seat .to{border:2px solid var(--ink);border-radius:20px;padding:1px 10px;font-weight:700;background:#fff3c9}
 .seat .to.bot{background:var(--cream);color:var(--muted)}
+
+/* réactions */
+.emobtn{font-size:20px;padding:6px 10px}
+.emopanel{position:absolute;right:14px;bottom:200px;z-index:35;width:300px;background:var(--paper);border:3px solid var(--ink);border-radius:16px;
+  box-shadow:6px 6px 0 rgba(0,0,0,.45);padding:10px}
+.emogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.emogrid button{font-size:26px;border:2px solid var(--ink);border-radius:10px;background:#fff;padding:4px 0;cursor:pointer;transition:transform .1s}
+.emogrid button:hover{transform:scale(1.12)}
+.emophr{display:flex;flex-wrap:wrap;gap:5px}
+.emophr button{border:2px solid var(--ink);border-radius:16px;background:#fff;padding:3px 9px;font-weight:700;font-size:12.5px;cursor:pointer}
+.emophr button:hover{background:#fff3c9}
+.pcard-hud .bubble{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:#fff;border:3px solid var(--ink);border-radius:14px;
+  padding:5px 11px;font-weight:800;font-size:14px;white-space:nowrap;box-shadow:3px 3px 0 rgba(0,0,0,.35);z-index:3;animation:bubin .25s cubic-bezier(.2,.9,.3,1.3);transition:opacity .4s}
+.pcard-hud .bubble::before{content:'';position:absolute;left:-11px;top:50%;margin-top:-7px;border:7px solid transparent;border-right:9px solid var(--ink)}
+.pcard-hud .bubble.big{font-size:28px;padding:1px 9px;line-height:1.2}
+.pcard-hud .bubble.out{opacity:0}
+@keyframes bubin{from{transform:translateY(-50%) scale(.4);opacity:0}}
+.emofloat{position:fixed;z-index:44;pointer-events:none;background:#fff;border:3px solid var(--c);border-radius:14px;padding:3px 9px;font-weight:800;font-size:13px;
+  white-space:nowrap;box-shadow:3px 3px 0 rgba(0,0,0,.35)}
+.emofloat.big{background:none;border:0;box-shadow:none;font-size:42px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.4))}
+@media (max-width:900px){ .emopanel{right:8px;bottom:150px;width:min(300px,calc(100vw - 16px))} .pcard-hud .bubble{left:auto;right:6px;top:-26px;transform:none} }

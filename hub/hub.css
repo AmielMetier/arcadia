@@ -130,3 +130,32 @@ input[type=text]:focus{box-shadow:0 0 0 3px var(--yellow)}
 .ntlist li.ok b{color:#1a7a43} .ntlist li.ko b{color:#c62a12}
 .ntverdict{margin-top:12px;border:3px solid var(--ink);border-radius:12px;padding:10px 12px;font-weight:700;line-height:1.35}
 .ntverdict.ok{background:#dff5e7} .ntverdict.ko{background:#ffe3dc}
+
+/* musique du Hub */
+.musicbar{position:fixed;left:16px;bottom:14px;z-index:40;display:flex;align-items:center;gap:8px;background:var(--paper);border:3px solid var(--ink);
+  border-radius:12px;padding:4px 10px 4px 4px;box-shadow:3px 3px 0 #000}
+.mtool{width:36px;height:32px;border:0;background:none;font-size:18px;cursor:pointer;border-radius:8px}
+.mtool.off{opacity:.4;text-decoration:line-through}
+.musicbar input{width:90px;accent-color:var(--red)}
+body:has(#play.on) .musicbar{display:none}
+
+/* classement */
+.links{display:flex;justify-content:center;gap:18px;flex-wrap:wrap}
+.links .linkbtn{margin:12px 0 0}
+.nt.lb{width:min(760px,100%);max-height:92vh;overflow:auto}
+.lbfilters{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.lbfilters .ck{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;cursor:pointer}
+.lbt{width:100%;border-collapse:collapse;font-size:14px}
+.lbt th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:left;padding:4px 6px}
+.lbt td{padding:7px 6px;border-top:2px solid var(--line2);font-weight:600}
+.lbt td:first-child{font-size:18px;width:34px}
+.lbt tr.me td{background:#fff3c9}
+.lbt .dot{display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);margin-right:7px;vertical-align:-1px}
+.lbt small{color:var(--muted)}
+.lbempty{padding:22px;text-align:center;font-weight:700;color:var(--muted)}
+.lb h3{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:16px;margin:16px 0 6px}
+.lbrecent{list-style:none;margin:0;padding:0}
+.lbrecent li{display:grid;grid-template-columns:26px 1fr auto;grid-template-rows:auto auto;column-gap:8px;padding:6px 0;border-bottom:1px solid var(--line2);font-weight:600;font-size:14px}
+.lbrecent .g{grid-row:1/3;font-size:20px}
+.lbrecent small{grid-column:2/4;color:var(--muted);font-size:12px}
+@media(max-width:600px){ .lbt th:nth-child(5),.lbt td:nth-child(5),.lbt th:nth-child(6),.lbt td:nth-child(6){display:none} }

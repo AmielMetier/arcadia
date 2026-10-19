@@ -4,9 +4,11 @@ import { createGame, reduce, actors } from '../engine/rules.js';
 import { botAction, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { cleanHouse } from '../engine/modes.js';
+import { standings, netWorth } from '../engine/valuation.js';
 import { remapPlayers, resumeAt, proposeMapping } from '../engine/resume.js';
 import { saves } from './saves.js';
 import { TOKEN_IDS } from '../view/tokens.js';
+import { isEmote, botReaction } from '../view/emotes.js';
 
 const BOT_NAMES = ['Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius', 'Tata Nine'];
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
@@ -15,8 +17,9 @@ const AUCTION_IDLE_MS = 12000;
 const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnecté
 
 // initial : état d'une partie en cours, quand ce joueur reprend le rôle d'hôte après le départ du précédent
-export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, initial = null }) {
+export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, onEmote = () => {}, initial = null }) {
   let state = null;
+  let reported = !!(initial && initial.over); // classement déjà transmis
   const level = BOT_LEVELS.includes(settings.level) ? settings.level : 'normal';
   const botMemory = {}; // échanges déjà proposés par les bots
   let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0;
@@ -46,6 +49,42 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     if (!solo) bridge.send('all', { t: 'st', s: state, ev: events, now: Date.now() });
     saves.put(state);
     onState(state, events, 0);
+    botsReact(events);
+    if (state && state.over && !reported) { reported = true; reportResult(); }
+  }
+
+  // Fin de partie : classement transmis au Hub (historique et classement entre potes)
+  function reportResult() {
+    if (!bridge.embedded || !bridge.report) return;
+    const order = state.ranking || standings(state, board).map((r) => r.id);
+    bridge.report({
+      id: `david-${state.startedAt}-${state.players.map((p) => p.id).join('.')}`,
+      mode: state.mode === 'express' ? 'Express' : 'Classique',
+      players: order.map((id, k) => {
+        const p = state.players.find((q) => q.id === id);
+        return { id: p.bot ? null : p.id, name: p.name, color: p.color, bot: !!p.bot, rank: k + 1, score: p.bankrupt ? 0 : netWorth(state, board, p.id).total };
+      }),
+    });
+  }
+
+  /* ---------------------------------------------------------- réactions (émotes) */
+  const lastEmote = {};
+  function emote(from, id) {
+    if (!isEmote(id)) return;
+    const now = Date.now();
+    if (now - (lastEmote[from] || 0) < 1200) return; // anti-spam
+    lastEmote[from] = now;
+    if (!solo) bridge.send('all', { t: 'emo', from, id });
+    onEmote(from, id);
+  }
+  function botsReact(events) {
+    if (!state) return;
+    const bots = state.players.filter((p) => p.bot && !p.bankrupt).map((p) => p.id);
+    if (!bots.length) return;
+    for (const e of events) {
+      const r = botReaction(e, bots);
+      if (r) { setTimeout(() => emote(r.from, r.id), pace * 0.6 + 400 + Math.random() * 700); break; }
+    }
   }
 
   function apply(action) {
@@ -193,6 +232,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     bridge.on('msg', (from, m) => {
       if (!m || typeof m !== 'object') return;
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: state, ev: [], now: Date.now() }); else pushSetup(); }
+      if (m.t === 'emote') emote(from, String(m.id));
       if (m.t === 'pick') { const err = pick(from, String(m.token)); if (err) bridge.send(from, { t: 'err', msg: err }); }
       if (m.t === 'act' && m.a && typeof m.a === 'object') {
         const r = apply({ ...m.a, by: from }); // l'identité vient du salon, jamais du message
@@ -203,6 +243,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
 
   return {
     act(a) { const r = apply({ ...a, by: me.id }); if (!r.ok) onError(r.error); },
+    emote(id) { emote(me.id, id); },
     pick(token) { const err = pick(me.id, token); if (err) onError(err); },
     start() { if (state) return; if (resumeId) resume(); else begin(setupState().players.filter((p) => p.ready).map((p) => p.id)); },
     chooseSave(id) { if (state) return; resumeId = id || null; pushSetup(); },

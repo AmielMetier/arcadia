@@ -7,7 +7,10 @@
     PALETTE, get, set,
     load() {
       const color = get('dd_color', PALETTE[0]);
-      return { name: String(get('dd_name', '') || '').slice(0, 12), color: PALETTE.includes(color) ? color : PALETTE[0], lvl: 1 };
+      // identifiant permanent du joueur (classement entre potes), créé au premier passage
+      let uid = get('dd_uid', null);
+      if (!/^[a-z0-9]{6,16}$/.test(String(uid))) { uid = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 12); set('dd_uid', uid); }
+      return { name: String(get('dd_name', '') || '').slice(0, 12), color: PALETTE.includes(color) ? color : PALETTE[0], lvl: 1, uid };
     },
     save(p) { set('dd_name', String(p.name || '').slice(0, 12)); if (PALETTE.includes(p.color)) set('dd_color', p.color); },
   };

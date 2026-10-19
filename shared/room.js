@@ -11,6 +11,8 @@
   const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
   const clean = (s, n) => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, n);
   const cleanName = (s) => clean(s, 12) || 'Joueur';
+  const cleanUid = (s) => (/^[a-z0-9]{6,16}$/.test(String(s)) ? String(s) : null);
+  const RES = () => window.DDResults;
 
   function createRoom(handlers) {
     const net = DDNet.create({ prefix: PREFIX, maxPeers: MAX_PLAYERS - 1 });
@@ -58,7 +60,7 @@
           if (prev >= 0 && !used.has(prev)) id = prev;
           const usedC = new Set(R.players.map((q) => q.color));
           const color = PALETTE.includes(m.color) && !usedC.has(m.color) ? m.color : PALETTE.find((c) => !usedC.has(c));
-          const np = { id, cid, name: cleanName(m.name), color, lvl: Math.max(1, Math.min(99, m.lvl | 0)) };
+          const np = { id, cid, name: cleanName(m.name), color, lvl: Math.max(1, Math.min(99, m.lvl | 0)), uid: cleanUid(m.uid) || 'g' + Math.random().toString(36).slice(2, 10) };
           R.players.push(np);
           if (m.ready) R.ready[id] = m.ready;
           net.to(cid, { t: 'welcome', id, chat: R.chat.slice(-20) });
@@ -66,6 +68,7 @@
           break;
         }
         case 'me': if (p) { p.name = cleanName(m.name); p.lvl = Math.max(1, Math.min(99, m.lvl | 0)); changed(); } break;
+        case 'res': if (p && Array.isArray(m.list) && RES()) { const added = RES().merge(m.list.slice(0, 150)); if (added) { net.bcast({ t: 'res', list: RES().all().slice(0, 150) }); emit('results'); } } break;
         case 'chat': if (p) { const txt = clean(m.txt, 140); if (txt) { const c = { id: p.id, name: p.name, color: p.color, txt }; pushChat(c); net.bcast({ t: 'chat', ...c }); } } break;
         case 'ready': if (p) { if (m.game) R.ready[p.id] = m.game; else delete R.ready[p.id]; changed(); } break;
         case 'g': if (p) deliverGame(p.id, m.to, m.m); break;
@@ -86,7 +89,10 @@
       if (!m || typeof m !== 'object') return;
       R.lastRecv = performance.now();
       switch (m.t) {
-        case 'welcome': R.myId = m.id | 0; R.chat = Array.isArray(m.chat) ? m.chat : []; emit('joined', R); break;
+        case 'welcome': R.myId = m.id | 0; R.chat = Array.isArray(m.chat) ? m.chat : []; emit('joined', R);
+          if (RES()) net.toHost({ t: 'res', list: RES().all().slice(0, 150) });
+          break;
+        case 'res': if (Array.isArray(m.list) && RES() && RES().merge(m.list.slice(0, 150))) emit('results'); break;
         case 'lobby': {
           const before = R.players;
           R.players = Array.isArray(m.players) ? m.players : []; R.game = m.game || null; R.ready = m.ready || {}; R.hostId = m.host | 0;
@@ -131,7 +137,7 @@
     }
     function becomeHost(code, me) {
       R.mode = 'host'; R.hostId = R.myId; R.lastRecvC = {}; R.pings = {};
-      R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1 }];
+      R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
       R.ready = myReady ? { [R.myId]: myReady } : {};
       let tries = 0;
       const go = () => net.host({
@@ -147,7 +153,7 @@
       net.join(code, {
         open() {
           migrating = false; R.lastRecv = performance.now();
-          net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, prevId: R.myId, ready: myReady });
+          net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, uid: me.uid, prevId: R.myId, ready: myReady });
         },
         msg: (m) => { onGuestMsg(m); if (m && m.t === 'welcome') emit('migrated', R); },
         close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
@@ -161,7 +167,7 @@
     /* ---------- API ---------- */
     Object.assign(R, {
       host(me) {
-        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1 }];
+        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
         R.chat = []; R.ready = {}; R.game = null;
         net.host({
           ready(code) { R.code = code; emit('joined', R); changed(); },
@@ -173,7 +179,7 @@
       join(code, me) {
         R.mode = 'guest'; R.players = []; R.chat = []; R.myId = -1; R.code = code;
         net.join(code, {
-          open() { R.lastRecv = performance.now(); net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl }); },
+          open() { R.lastRecv = performance.now(); net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, uid: me.uid }); },
           msg: onGuestMsg,
           close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
           error(msg) { R.mode = null; emit('error', msg); },
@@ -181,7 +187,7 @@
       },
       solo(me) {
         R.mode = 'solo'; R.myId = 0; R.hostId = 0; R.code = null; R.chat = []; R.ready = {}; R.game = null;
-        R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1 }];
+        R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
         setTimeout(() => { emit('joined', R); emit('update', R); }, 0);
       },
       leave() { migrating = false; myReady = null; net.close(); R.mode = null; R.players = []; R.game = null; R.ready = {}; R.code = null; },
@@ -206,6 +212,13 @@
         myReady = game || null;
         if (R.isHost) { if (game) R.ready[R.myId] = game; else delete R.ready[R.myId]; changed(); }
         else net.toHost({ t: 'ready', game });
+      },
+      // Résultat d'une partie (envoyé par le jeu de l'hôte) : enregistré et partagé avec tout le salon
+      addResult(rec) {
+        if (!RES() || !RES().merge([rec])) return;
+        if (R.mode === 'host') net.bcast({ t: 'res', list: [rec] });
+        else if (R.mode === 'guest') net.toHost({ t: 'res', list: [rec] });
+        emit('results');
       },
       sendGame(to, m) {
         if (R.isHost) deliverGame(R.myId, to, m);

@@ -13,6 +13,10 @@
 <body>
 
 <!-- ACCUEIL -->
+<div class="musicbar" aria-label="Musique">
+  <button class="mtool" id="hubMusic" aria-pressed="true">🎵</button>
+  <input type="range" id="hubVol" min="0" max="1" step="0.05" aria-label="Volume de la musique">
+</div>
 <section class="screen on" id="home">
   <div class="home">
     <div>
@@ -35,7 +39,7 @@
       </div>
       <div class="err" id="homeErr"></div>
       <button class="btn ghost block" id="btnSolo">Jouer seul</button>
-      <button class="linkbtn" id="btnNetTest">📶 Tester ma connexion</button>
+      <div class="links"><button class="linkbtn" id="btnBoard">🏆 Classement</button><button class="linkbtn" id="btnNetTest">📶 Tester ma connexion</button></div>
     </div>
   </div>
   <div class="credit">by <b>Amiel</b> and <b>Claude</b> · <span id="ver"></span></div>
@@ -48,6 +52,7 @@
     <div class="code" id="codeBox"><div><small>Code du salon</small><br><b id="code">----</b></div>
       <button class="btn small yellow" id="btnCopy">Copier le lien</button></div>
     <div class="spacer"></div>
+    <button class="btn small yellow" id="btnBoardRoom">🏆 Classement</button>
     <button class="btn small ghost" id="btnLeave">Quitter</button>
   </div>
   <div class="room">
@@ -75,8 +80,10 @@
 <script src="shared/net.js"></script>
 <script src="shared/room.js"></script>
 <script src="shared/profile.js"></script>
+<script src="shared/results.js"></script>
 <script src="hub/nettest.js"></script>
 <script src="hub/games.js"></script>
 <script src="hub/hub.js"></script>
+<script type="module" src="hub/music.js"></script>
 </body>
 </html>
