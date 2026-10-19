@@ -278,7 +278,7 @@ const TAU = Math.PI * 2;
 
 const WORLD_SIZE = 2400;
 const HALF_W = WORLD_SIZE / 2;
-const TICK_RATE = 20;
+const TICK_RATE = 30;
 const TICK_DT = 1 / TICK_RATE;
 const MAX_SUPPLY = 100;
 
@@ -2032,8 +2032,11 @@ function isVisibleToMe(wx, wy) {
   return false;
 }
 
-function updateFogCanvas() {
+let lastFogUpdate = 0;
+function updateFogCanvas(now = performance.now()) {
   if (!state) return;
+  if (now - lastFogUpdate < 80) return;
+  lastFogUpdate = now;
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
   const scale = FOG_RES / WORLD_SIZE;
@@ -2777,18 +2780,20 @@ function handleFxEvents(list) {
   }
 }
 
+let localCmdSeq = 0;
+const pendingCmds = [];
+const clientAckSeq = {};
+
 function sendCommand(cmd) {
   if (!state || state.over) return;
-  if (role === 'guest') {
-    HubBridge.send('host', { t: 'cmd', cmd });
-    return;
-  }
   const fx = [];
   const res = executeCommand(state, myId, cmd, fx);
   if (!res.ok && res.reason) {
     toast(res.reason, 2000);
     Sfx.error();
-  } else if (res.ok) {
+    return;
+  }
+  if (res.ok) {
     if (cmd.op === 'BUILD') Sfx.build();
     else if (cmd.op === 'TRAIN') Sfx.spawn();
     else if (cmd.op === 'STIM') Sfx.stim();
@@ -2797,6 +2802,17 @@ function sendCommand(cmd) {
       else Sfx.order();
     }
     handleFxEvents(fx);
+    renderConsoleUI(false);
+
+    if (window.HubBridge && HubBridge.embedded) {
+      if (role === 'guest') {
+        const seq = ++localCmdSeq;
+        pendingCmds.push({ seq, cmd, ts: performance.now() });
+        HubBridge.send('host', { t: 'cmd', cmd, seq });
+      } else if (role === 'host') {
+        HubBridge.send('all', { t: 'rcmd', p: myId, cmd });
+      }
+    }
   }
 }
 
@@ -3594,7 +3610,7 @@ function renderWorld(dt, now) {
     cam.shake *= Math.pow(0.04, dt);
   } else cam.shake = 0;
 
-  updateFogCanvas();
+  updateFogCanvas(now);
 
   ctx.save();
   ctx.translate(W / 2 + shX, H / 2 + shY);
@@ -3892,8 +3908,155 @@ function renderMinimap() {
 let lastBootInfo = null;
 let tickInterval = null;
 let botInterval = null;
+let netSyncTick = 0;
+let pendingNetFx = [];
 
 buildTerrainCanvas();
+
+function packState(s) {
+  const r1 = (v) => Math.round((Number(v) || 0) * 10) / 10;
+  const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+  return {
+    time: r2(s.time),
+    blitz: s.blitz,
+    mode: s.mode,
+    level: s.level,
+    phase: s.phase,
+    stormRadius: Math.round(s.stormRadius),
+    dmgMult: s.dmgMult,
+    nextId: s.nextId,
+    over: s.over,
+    winnerTeam: s.winnerTeam,
+    ranking: s.ranking,
+    ack: { ...clientAckSeq },
+    players: s.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      bot: p.bot,
+      team: p.team,
+      minerals: r1(p.minerals),
+      gas: r1(p.gas),
+      score: Math.round(p.score),
+      dead: p.dead,
+      spawnX: p.spawnX,
+      spawnY: p.spawnY,
+    })),
+    buildings: s.buildings.map((b) => ({
+      id: b.id,
+      kind: b.kind,
+      owner: b.owner,
+      team: b.team,
+      x: Math.round(b.x),
+      y: Math.round(b.y),
+      hp: Math.round(b.hp),
+      maxHp: b.maxHp,
+      radius: b.radius,
+      cd: r2(b.cd),
+      aimA: r2(b.aimA),
+      constructing: b.constructing,
+      buildStarted: b.buildStarted,
+      buildProg: r2(b.buildProg),
+      buildTime: b.buildTime,
+      queue: b.queue,
+      qTimer: r2(b.qTimer),
+      qTotal: r2(b.qTotal),
+      rallyX: Math.round(b.rallyX ?? b.x),
+      rallyY: Math.round(b.rallyY ?? b.y),
+      geyserId: b.geyserId,
+    })),
+    units: s.units.map((u) => ({
+      id: u.id,
+      kind: u.kind,
+      owner: u.owner,
+      team: u.team,
+      x: r1(u.x),
+      y: r1(u.y),
+      vx: r1(u.vx),
+      vy: r1(u.vy),
+      a: r2(u.a),
+      hp: Math.round(u.hp),
+      maxHp: u.maxHp,
+      radius: u.radius,
+      cd: r2(u.cd),
+      mode: u.mode,
+      orderX: u.orderX != null ? Math.round(u.orderX) : null,
+      orderY: u.orderY != null ? Math.round(u.orderY) : null,
+      targetEntId: u.targetEntId,
+      harvestId: u.harvestId,
+      gatherT: r2(u.gatherT),
+      carryType: u.carryType,
+      carryAmt: u.carryAmt,
+      buildTargetId: u.buildTargetId,
+      onSite: !!u.onSite,
+      weldTimer: r2(u.weldTimer),
+      weldX: u.weldX != null ? r1(u.weldX) : null,
+      weldY: u.weldY != null ? r1(u.weldY) : null,
+      stimT: r2(u.stimT),
+      sieged: !!u.sieged,
+    })),
+    scans: s.scans.map((sc) => ({
+      x: Math.round(sc.x),
+      y: Math.round(sc.y),
+      team: sc.team,
+      r: sc.r,
+      timer: r2(sc.timer),
+    })),
+  };
+}
+
+function reconcileGuestState(prev, incoming) {
+  if (!prev) return incoming;
+  const oldPos = new Map();
+  for (const u of prev.units) {
+    oldPos.set(u.id, { x: u.x, y: u.y });
+  }
+
+  const acked = (incoming.ack && incoming.ack[myId]) || 0;
+  const nowP = performance.now();
+  while (pendingCmds.length && (pendingCmds[0].seq <= acked || nowP - pendingCmds[0].ts > 1500)) {
+    pendingCmds.shift();
+  }
+
+  if (pendingCmds.length > 0) {
+    const dummyFx = [];
+    for (const pc of pendingCmds) {
+      executeCommand(incoming, myId, pc.cmd, dummyFx);
+    }
+  }
+
+  for (const u of incoming.units) {
+    const o = oldPos.get(u.id);
+    if (o) {
+      const err = hypot(o.x, o.y, u.x, u.y);
+      if (err > 0.3 && err < 95) {
+        u.x = lerp(o.x, u.x, 0.45);
+        u.y = lerp(o.y, u.y, 0.45);
+      }
+    }
+  }
+  return incoming;
+}
+
+function startTickLoop() {
+  clearInterval(tickInterval);
+  const H = window.HubBridge;
+  tickInterval = setInterval(() => {
+    if (!state || state.over) return;
+    const fx = [];
+    stepWorld(state, TICK_DT, fx);
+    handleFxEvents(fx);
+    if (role === 'host' && H && H.embedded) {
+      for (const e of fx) {
+        if (e.k === 'ELIM' || e.k === 'PHASE') pendingNetFx.push(e);
+      }
+      netSyncTick++;
+      if (netSyncTick % 5 === 0 || state.over) {
+        H.send('all', { t: 'st', s: packState(state), fx: pendingNetFx.splice(0) });
+      }
+    }
+  }, 1000 / TICK_RATE);
+}
 
 function startMatch(info) {
   lastBootInfo = info;
@@ -3903,6 +4066,10 @@ function startMatch(info) {
   buildMode = null;
   orderCursor = null;
   exploredGrid.fill(0);
+  lastFogUpdate = 0;
+  pendingCmds.length = 0;
+  netSyncTick = 0;
+  pendingNetFx = [];
   craters = [];
   particles = [];
   shockwaves = [];
@@ -3919,6 +4086,7 @@ function startMatch(info) {
   myId = H && H.embedded ? info.myId : 0;
 
   if (role === 'guest') {
+    startTickLoop();
     H.send('host', { t: 'sync' });
     return;
   }
@@ -3947,18 +4115,10 @@ function startMatch(info) {
   updateHudUI();
 
   if (role === 'host' && H && H.embedded) {
-    H.send('all', { t: 'st', s: state, fx: [] });
+    H.send('all', { t: 'st', s: packState(state), fx: [] });
   }
 
-  tickInterval = setInterval(() => {
-    if (!state || state.over) return;
-    const fx = [];
-    stepWorld(state, TICK_DT, fx);
-    handleFxEvents(fx);
-    if (role === 'host' && H && H.embedded) {
-      H.send('all', { t: 'st', s: state, fx });
-    }
-  }, 1000 / TICK_RATE);
+  startTickLoop();
 
   const botEvery = settings.level === 'expert' ? 850 : settings.level === 'facile' ? 2000 : 1250;
   botInterval = setInterval(() => {
@@ -3972,6 +4132,7 @@ function startMatch(info) {
 if (window.HubBridge && HubBridge.embedded) {
   let centeredOnce = false;
   HubBridge.on('init', (info) => {
+    centeredOnce = false;
     startMatch(info);
     HubBridge.signalReady();
   });
@@ -3979,21 +4140,34 @@ if (window.HubBridge && HubBridge.embedded) {
     if (!m || typeof m !== 'object') return;
     if (role === 'host') {
       if (m.t === 'sync' && state) {
-        HubBridge.send(from, { t: 'st', s: state, fx: [] });
-      } else if (m.t === 'cmd' && m.cmd) {
+        HubBridge.send(from, { t: 'st', s: packState(state), fx: [] });
+      } else if (m.t === 'cmd' && m.cmd && state) {
+        if (m.seq) clientAckSeq[from] = Math.max(clientAckSeq[from] || 0, m.seq);
         const fx = [];
-        executeCommand(state, from, m.cmd, fx);
-        handleFxEvents(fx);
+        const res = executeCommand(state, from, m.cmd, fx);
+        if (res.ok) {
+          handleFxEvents(fx);
+          HubBridge.send('all', { t: 'rcmd', p: from, cmd: m.cmd, seq: m.seq });
+        }
       }
     } else if (role === 'guest' && from === HubBridge.info.hostId) {
       if (m.t === 'st' && m.s) {
-        state = m.s;
+        state = reconcileGuestState(state, m.s);
         if (!centeredOnce) {
           centeredOnce = true;
           centerOnMyHq();
           renderConsoleUI(true);
         }
-        if (m.fx) handleFxEvents(m.fx);
+        if (m.fx && m.fx.length) handleFxEvents(m.fx);
+      } else if (m.t === 'rcmd' && m.cmd && state) {
+        if (m.p === myId && m.seq) {
+          clientAckSeq[myId] = Math.max(clientAckSeq[myId] || 0, m.seq);
+          while (pendingCmds.length && pendingCmds[0].seq <= m.seq) pendingCmds.shift();
+        } else if (m.p !== myId) {
+          const fx = [];
+          executeCommand(state, m.p, m.cmd, fx);
+          handleFxEvents(fx);
+        }
       }
     }
   });
