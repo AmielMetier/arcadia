@@ -196,6 +196,12 @@ canvas#minimap{width:170px;height:164px;display:block;border:2.5px solid var(--i
   <div class="phase-badge" id="uiPhase">
     <span id="uiClock">00:00</span> · <span id="uiPhaseName">Ouverture RTS</span>
   </div>
+  <button class="btn small ghost" id="btnMap" title="Changer de champ de bataille (Solo) : Vallée, Fissures de Magma, Glacier Boréal">
+    <span id="uiMapIcon">🌲</span> <span id="uiMapName">Vallée Tempérée</span>
+  </button>
+  <div class="res-pill" id="uiMapBadge" style="font-size:11px;padding:4px 9px;border-color:var(--ink);cursor:help" title="Spécificité du champ de bataille">
+    <span id="uiMapBadgeTxt">🌲 Abondance Centrale</span>
+  </div>
   <div class="spacer"></div>
   <div class="roster-top" id="uiRoster"></div>
   <button class="btn small ghost" id="btnCenter" title="Recentrer sur ton QG (Espace)">🎯 QG</button>
@@ -404,181 +410,633 @@ const SPAWN_CORNERS = [
   { x: 360, y: WORLD_SIZE - 360 },
 ];
 
+const MAP_DEFS = {
+  vallee: {
+    id: 'vallee',
+    name: 'Vallée Tempérée',
+    icon: '🌲',
+    theme: 'temperee',
+    desc: 'Bassin verdoyant équilibré avec une abondance de minéraux dorés au centre.',
+    badge: 'Abondance Centrale',
+    badgeDesc: '6 filons d\'or riches (12 min/trajet) au centre du champ de bataille.',
+    fogColor: 0x091410,
+    fogNear: 1300,
+    fogFar: 3600,
+    sunColor: 0xfff4d8,
+    hemiSky: 0xe4f5ff,
+    hemiGround: 0x1d3822,
+    rimColor: 0x6ecbff,
+    moveSpeedMult: 1.0,
+    mineHarvestTime: 1.55,
+    gasHarvestMult: 1.0,
+    splashMult: 1.0,
+    scanRadiusMult: 1.0,
+  },
+  magma: {
+    id: 'magma',
+    name: 'Fissures de Magma',
+    icon: '🌋',
+    theme: 'volcanique',
+    desc: 'Croûte basaltique déchirée par des rivières de lave. Fortes tensions géothermiques.',
+    badge: 'Surtension Géothermique & Chokepoints',
+    badgeDesc: '+50% Gaz récolté (9/trajet) · +20% Rayon de déflagration d\'artillerie · 2 Geysers de départ.',
+    fogColor: 0x180906,
+    fogNear: 1100,
+    fogFar: 3400,
+    sunColor: 0xffa048,
+    hemiSky: 0xffc89a,
+    hemiGround: 0x361008,
+    rimColor: 0xff5522,
+    moveSpeedMult: 1.0,
+    mineHarvestTime: 1.55,
+    gasHarvestMult: 1.5,
+    splashMult: 1.20,
+    scanRadiusMult: 1.0,
+  },
+  glace: {
+    id: 'glace',
+    name: 'Glacier Boréal',
+    icon: '❄️',
+    theme: 'cryo',
+    desc: 'Étendue polaire glaciaire aux crevasses luminescentes. Zéro friction et hyper-cristaux.',
+    badge: 'Supraconductivité Cryo & Hyper-Cristaux',
+    badgeDesc: '+20% Vitesse de déplacement · Forage de minerai 35% plus rapide · Portée radar Comsat étendue.',
+    fogColor: 0x06131c,
+    fogNear: 1250,
+    fogFar: 3600,
+    sunColor: 0xd6f0ff,
+    hemiSky: 0xbfeaff,
+    hemiGround: 0x0e2a3c,
+    rimColor: 0x38bdf8,
+    moveSpeedMult: 1.20,
+    mineHarvestTime: 1.00,
+    gasHarvestMult: 1.0,
+    splashMult: 1.0,
+    scanRadiusMult: 1.32,
+  },
+};
+
+let activeMapId = 'vallee';
 const MINERAL_NODES = [];
 const GAS_GEYSERS = [];
+const ROCKS = [];
 const TREES_3D = [];
 
-(function initMapResources() {
+function initMap(mapId = 'vallee') {
+  if (!MAP_DEFS[mapId]) mapId = 'vallee';
+  activeMapId = mapId;
+  const def = MAP_DEFS[mapId];
+
+  MINERAL_NODES.length = 0;
+  GAS_GEYSERS.length = 0;
+  ROCKS.length = 0;
+  TREES_3D.length = 0;
+
   let mId = 1, gId = 1;
-  SPAWN_CORNERS.forEach((sp, idx) => {
-    const awayA = Math.atan2(sp.y - HALF_W, sp.x - HALF_W);
-    for (let i = -2.5; i <= 2.5; i += 1) {
-      const a = awayA + i * 0.25;
-      MINERAL_NODES.push({
-        id: 'm' + (mId++),
-        x: Math.round(sp.x + Math.cos(a) * 142),
-        y: Math.round(sp.y + Math.sin(a) * 142),
-        rich: false,
+
+  if (mapId === 'magma') {
+    // 🌋 FISSURES DE MAGMA : 2 Geysers par base de départ, minéraux riches de lave, 4 super-geysers centraux
+    SPAWN_CORNERS.forEach((sp, idx) => {
+      const awayA = Math.atan2(sp.y - HALF_W, sp.x - HALF_W);
+      for (let i = -2; i <= 2; i += 1) {
+        const a = awayA + i * 0.28;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(sp.x + Math.cos(a) * 142),
+          y: Math.round(sp.y + Math.sin(a) * 142),
+          rich: Math.abs(i) === 2,
+        });
+      }
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(sp.x + Math.cos(awayA + 0.95) * 148),
+        y: Math.round(sp.y + Math.sin(awayA + 0.95) * 148),
+      });
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(sp.x + Math.cos(awayA - 0.95) * 148),
+        y: Math.round(sp.y + Math.sin(awayA - 0.95) * 148),
+      });
+    });
+
+    const naturals = [
+      { x: HALF_W, y: 260, a: -Math.PI / 2 },
+      { x: HALF_W, y: WORLD_SIZE - 260, a: Math.PI / 2 },
+      { x: 260, y: HALF_W, a: Math.PI },
+      { x: WORLD_SIZE - 260, y: HALF_W, a: 0 },
+    ];
+    for (const nat of naturals) {
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const a = nat.a + i * 0.28;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(nat.x + Math.cos(a) * 105),
+          y: Math.round(nat.y + Math.sin(a) * 105),
+          rich: false,
+        });
+      }
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(nat.x + Math.cos(nat.a + 0.85) * 115),
+        y: Math.round(nat.y + Math.sin(nat.a + 0.85) * 115),
       });
     }
-    const ga = awayA + (idx % 2 === 0 ? 0.95 : -0.95);
-    GAS_GEYSERS.push({
-      id: 'g' + (gId++),
-      x: Math.round(sp.x + Math.cos(ga) * 148),
-      y: Math.round(sp.y + Math.sin(ga) * 148),
-    });
-  });
 
-  const naturals = [
-    { x: HALF_W, y: 260, a: -Math.PI / 2 },
-    { x: HALF_W, y: WORLD_SIZE - 260, a: Math.PI / 2 },
-    { x: 260, y: HALF_W, a: Math.PI },
-    { x: WORLD_SIZE - 260, y: HALF_W, a: 0 },
-  ];
-  for (const nat of naturals) {
-    for (let i = -1.5; i <= 1.5; i += 1) {
-      const a = nat.a + i * 0.28;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * TAU + Math.PI / 4;
       MINERAL_NODES.push({
         id: 'm' + (mId++),
-        x: Math.round(nat.x + Math.cos(a) * 105),
-        y: Math.round(nat.y + Math.sin(a) * 105),
-        rich: false,
+        x: Math.round(HALF_W + Math.cos(a) * 165),
+        y: Math.round(HALF_W + Math.sin(a) * 165),
+        rich: true,
       });
     }
-    GAS_GEYSERS.push({
-      id: 'g' + (gId++),
-      x: Math.round(nat.x + Math.cos(nat.a + 0.85) * 115),
-      y: Math.round(nat.y + Math.sin(nat.a + 0.85) * 115),
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W - 220, y: HALF_W });
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W + 220, y: HALF_W });
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W, y: HALF_W - 220 });
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W, y: HALF_W + 220 });
+
+    ROCKS.push(
+      { x: 860, y: 860, r: 48, seed: 15, col: '#22181c' },
+      { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 48, seed: 26, col: '#22181c' },
+      { x: WORLD_SIZE - 860, y: 860, r: 48, seed: 37, col: '#22181c' },
+      { x: 860, y: WORLD_SIZE - 860, r: 48, seed: 48, col: '#22181c' },
+      { x: HALF_W, y: HALF_W, r: 35, seed: 55, col: '#2e1812' }
+    );
+
+  } else if (mapId === 'glace') {
+    // ❄️ GLACIER BORÉAL : 6 filons friables par base, 8 hyper-cristaux centraux
+    SPAWN_CORNERS.forEach((sp, idx) => {
+      const awayA = Math.atan2(sp.y - HALF_W, sp.x - HALF_W);
+      for (let i = -2.5; i <= 2.5; i += 1) {
+        const a = awayA + i * 0.25;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(sp.x + Math.cos(a) * 140),
+          y: Math.round(sp.y + Math.sin(a) * 140),
+          rich: Math.abs(i) === 2.5,
+        });
+      }
+      const ga = awayA + (idx % 2 === 0 ? 0.95 : -0.95);
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(sp.x + Math.cos(ga) * 148),
+        y: Math.round(sp.y + Math.sin(ga) * 148),
+      });
     });
+
+    const naturals = [
+      { x: HALF_W, y: 260, a: -Math.PI / 2 },
+      { x: HALF_W, y: WORLD_SIZE - 260, a: Math.PI / 2 },
+      { x: 260, y: HALF_W, a: Math.PI },
+      { x: WORLD_SIZE - 260, y: HALF_W, a: 0 },
+    ];
+    for (const nat of naturals) {
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const a = nat.a + i * 0.28;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(nat.x + Math.cos(a) * 105),
+          y: Math.round(nat.y + Math.sin(a) * 105),
+          rich: false,
+        });
+      }
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(nat.x + Math.cos(nat.a + 0.85) * 115),
+        y: Math.round(nat.y + Math.sin(nat.a + 0.85) * 115),
+      });
+    }
+
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU;
+      MINERAL_NODES.push({
+        id: 'm' + (mId++),
+        x: Math.round(HALF_W + Math.cos(a) * 165),
+        y: Math.round(HALF_W + Math.sin(a) * 165),
+        rich: true,
+      });
+    }
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W - 270, y: HALF_W });
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W + 270, y: HALF_W });
+
+    ROCKS.push(
+      { x: 860, y: 860, r: 45, seed: 18, col: '#294d69' },
+      { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 45, seed: 29, col: '#294d69' },
+      { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 45, seed: 40, col: '#294d69' },
+      { x: 860, y: WORLD_SIZE - 860, r: 45, seed: 51, col: '#294d69' }
+    );
+
+  } else {
+    // 🌲 VALLÉE TEMPÉRÉE (Classique)
+    SPAWN_CORNERS.forEach((sp, idx) => {
+      const awayA = Math.atan2(sp.y - HALF_W, sp.x - HALF_W);
+      for (let i = -2.5; i <= 2.5; i += 1) {
+        const a = awayA + i * 0.25;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(sp.x + Math.cos(a) * 142),
+          y: Math.round(sp.y + Math.sin(a) * 142),
+          rich: false,
+        });
+      }
+      const ga = awayA + (idx % 2 === 0 ? 0.95 : -0.95);
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(sp.x + Math.cos(ga) * 148),
+        y: Math.round(sp.y + Math.sin(ga) * 148),
+      });
+    });
+
+    const naturals = [
+      { x: HALF_W, y: 260, a: -Math.PI / 2 },
+      { x: HALF_W, y: WORLD_SIZE - 260, a: Math.PI / 2 },
+      { x: 260, y: HALF_W, a: Math.PI },
+      { x: WORLD_SIZE - 260, y: HALF_W, a: 0 },
+    ];
+    for (const nat of naturals) {
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const a = nat.a + i * 0.28;
+        MINERAL_NODES.push({
+          id: 'm' + (mId++),
+          x: Math.round(nat.x + Math.cos(a) * 105),
+          y: Math.round(nat.y + Math.sin(a) * 105),
+          rich: false,
+        });
+      }
+      GAS_GEYSERS.push({
+        id: 'g' + (gId++),
+        x: Math.round(nat.x + Math.cos(nat.a + 0.85) * 115),
+        y: Math.round(nat.y + Math.sin(nat.a + 0.85) * 115),
+      });
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU;
+      MINERAL_NODES.push({
+        id: 'm' + (mId++),
+        x: Math.round(HALF_W + Math.cos(a) * 155),
+        y: Math.round(HALF_W + Math.sin(a) * 155),
+        rich: true,
+      });
+    }
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W - 265, y: HALF_W });
+    GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W + 265, y: HALF_W });
+
+    ROCKS.push(
+      { x: 860, y: 860, r: 44, seed: 11, col: '#6e685f' },
+      { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 44, seed: 22, col: '#6e685f' },
+      { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 44, seed: 33, col: '#6e685f' },
+      { x: 860, y: WORLD_SIZE - 860, r: 44, seed: 44, col: '#6e685f' }
+    );
   }
 
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU;
-    MINERAL_NODES.push({
-      id: 'm' + (mId++),
-      x: Math.round(HALF_W + Math.cos(a) * 155),
-      y: Math.round(HALF_W + Math.sin(a) * 155),
-      rich: true,
-    });
+  buildTerrainCanvas(mapId);
+  updateMapUI();
+  if (typeof setupThreeMapScenery === 'function' && threeReady && threeScene) {
+    setupThreeMapScenery(mapId);
   }
-  GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W - 265, y: HALF_W });
-  GAS_GEYSERS.push({ id: 'g' + (gId++), x: HALF_W + 265, y: HALF_W });
-})();
+}
 
-const ROCKS = [
-  { x: 860, y: 860, r: 44, seed: 11 },
-  { x: WORLD_SIZE - 860, y: WORLD_SIZE - 860, r: 44, seed: 22 },
-  { x: WORLD_SIZE - 860, y: 860, r: 44, seed: 33 },
-  { x: 860, y: WORLD_SIZE - 860, r: 44, seed: 44 },
-];
+function updateMapUI() {
+  const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
+  const iconEl = $('#uiMapIcon'), nameEl = $('#uiMapName'), badgeEl = $('#uiMapBadgeTxt'), badgeWrap = $('#uiMapBadge');
+  if (iconEl) iconEl.textContent = def.icon;
+  if (nameEl) nameEl.textContent = def.name;
+  if (badgeEl) badgeEl.textContent = `${def.icon} ${def.badge}`;
+  if (badgeWrap) badgeWrap.title = `${def.name} : ${def.desc}\nSpécificité : ${def.badgeDesc}`;
+}
+
+function switchMap(newMapId) {
+  if (!MAP_DEFS[newMapId]) return;
+  initMap(newMapId);
+  if (state) {
+    state.map = newMapId;
+    toast(`🗺️ Champ de bataille : ${MAP_DEFS[newMapId].icon} ${MAP_DEFS[newMapId].name}\n⭐ ${MAP_DEFS[newMapId].badgeDesc}`, 4200);
+  }
+}
 
 /* ============================================================================
-   CARTE SOL PRÉ-RENDUE + LISTE DES ARBRES VOLUMÉTRIQUES 3D
+   CARTE SOL PRÉ-RENDUE + LISTE DES ÉLÉMENTS DE DÉCOR VOLUMÉTRIQUES 3D
    ============================================================================ */
 let terrainCanvas = null;
 
-function buildTerrainCanvas() {
+function buildTerrainCanvas(mapId = activeMapId) {
+  if (!MAP_DEFS[mapId]) mapId = 'vallee';
   const c = document.createElement('canvas');
   c.width = WORLD_SIZE;
   c.height = WORLD_SIZE;
   const g = c.getContext('2d');
-  const rnd = mulberry(20261019);
+  const rnd = mulberry(mapId === 'magma' ? 20261021 : mapId === 'glace' ? 20261022 : 20261019);
 
-  g.fillStyle = '#386f3e';
-  g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+  if (mapId === 'magma') {
+    // 🌋 BIOME BASALTE VOLCANIQUE & RIVIÈRES DE MAGMA INCANDESCENTES
+    g.fillStyle = '#160e12';
+    g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-  for (let k = 0; k < 65; k++) {
-    const bx = rnd() * WORLD_SIZE, by = rnd() * WORLD_SIZE, br = 90 + rnd() * 190;
-    g.fillStyle = rnd() < 0.5 ? 'rgba(38, 84, 44, 0.38)' : 'rgba(76, 138, 72, 0.26)';
-    g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill();
-  }
-  for (let k = 0; k < 10000; k++) {
-    g.fillStyle = rnd() < 0.5 ? 'rgba(22, 50, 28, 0.22)' : 'rgba(135, 190, 105, 0.18)';
-    g.fillRect(rnd() * WORLD_SIZE, rnd() * WORLD_SIZE, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
-  }
+    for (let k = 0; k < 75; k++) {
+      const bx = rnd() * WORLD_SIZE, by = rnd() * WORLD_SIZE, br = 90 + rnd() * 210;
+      g.fillStyle = rnd() < 0.5 ? 'rgba(28, 18, 24, 0.45)' : 'rgba(42, 22, 28, 0.32)';
+      g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill();
+    }
+    for (let k = 0; k < 12000; k++) {
+      g.fillStyle = rnd() < 0.6 ? 'rgba(255, 69, 0, 0.14)' : 'rgba(22, 10, 14, 0.28)';
+      g.fillRect(rnd() * WORLD_SIZE, rnd() * WORLD_SIZE, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
+    }
+    for (let k = 0; k < 25; k++) {
+      const fx = rnd() * WORLD_SIZE, fy = rnd() * WORLD_SIZE;
+      g.strokeStyle = 'rgba(255, 80, 0, 0.22)';
+      g.lineWidth = 4 + rnd() * 8;
+      g.beginPath();
+      g.moveTo(fx, fy);
+      g.lineTo(fx + (rnd() - 0.5) * 260, fy + (rnd() - 0.5) * 260);
+      g.stroke();
+    }
 
-  const riverPath = new Path2D();
-  riverPath.moveTo(0, HALF_W - 180);
-  riverPath.bezierCurveTo(WORLD_SIZE * 0.33, HALF_W + 220, WORLD_SIZE * 0.66, HALF_W - 220, WORLD_SIZE, HALF_W + 180);
-  g.lineCap = 'round';
-  g.strokeStyle = '#16181d'; g.lineWidth = 122; g.stroke(riverPath);
-  g.strokeStyle = '#c8ba9b'; g.lineWidth = 110; g.stroke(riverPath);
-  g.strokeStyle = '#246b96'; g.lineWidth = 84; g.stroke(riverPath);
-  g.strokeStyle = '#328bc2'; g.lineWidth = 60; g.stroke(riverPath);
+    const drawLavaRiver = (p0x, p0y, cp1x, cp1y, cp2x, cp2y, p1x, p1y) => {
+      const lp = new Path2D();
+      lp.moveTo(p0x, p0y);
+      lp.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p1x, p1y);
+      g.lineCap = 'round';
+      g.strokeStyle = '#2b0704'; g.lineWidth = 126; g.stroke(lp);
+      g.strokeStyle = '#7c1305'; g.lineWidth = 110; g.stroke(lp);
+      g.strokeStyle = '#d62c00'; g.lineWidth = 84; g.stroke(lp);
+      g.strokeStyle = '#ff6200'; g.lineWidth = 58; g.stroke(lp);
+      g.strokeStyle = '#ffea66'; g.lineWidth = 26; g.stroke(lp);
+    };
 
-  const drawRoad = (x1, y1, x2, y2, width = 72) => {
+    drawLavaRiver(0, HALF_W - 200, WORLD_SIZE * 0.35, HALF_W + 180, WORLD_SIZE * 0.65, HALF_W - 220, WORLD_SIZE, HALF_W + 180);
+    drawLavaRiver(HALF_W - 220, 0, HALF_W + 190, WORLD_SIZE * 0.35, HALF_W - 210, WORLD_SIZE * 0.65, HALF_W + 200, WORLD_SIZE);
+
+    const drawObsidianBridge = (x1, y1, x2, y2, width = 72) => {
+      g.save();
+      g.lineCap = 'butt';
+      g.strokeStyle = '#100a0d'; g.lineWidth = width + 18;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#ff7b00'; g.lineWidth = width + 12;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#2d2732'; g.lineWidth = width - 4;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = 'rgba(255, 140, 0, 0.65)'; g.lineWidth = 3.5;
+      g.setLineDash([18, 16]);
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.restore();
+    };
+
+    drawObsidianBridge(360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 70);
+    drawObsidianBridge(WORLD_SIZE - 360, 360, 360, WORLD_SIZE - 360, 70);
+    drawObsidianBridge(360, 360, WORLD_SIZE - 360, 360, 52);
+    drawObsidianBridge(360, WORLD_SIZE - 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 52);
+    drawObsidianBridge(360, 360, 360, WORLD_SIZE - 360, 52);
+    drawObsidianBridge(WORLD_SIZE - 360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 52);
+
+    SPAWN_CORNERS.forEach((sp) => {
+      g.save();
+      g.translate(sp.x, sp.y);
+      g.fillStyle = 'rgba(12, 8, 10, 0.45)';
+      g.beginPath(); g.arc(8, 10, 218, 0, TAU); g.fill();
+      g.fillStyle = '#2d252c';
+      g.strokeStyle = '#120a0e';
+      g.lineWidth = 5;
+      g.beginPath(); g.arc(0, 0, 215, 0, TAU); g.fill(); g.stroke();
+      g.fillStyle = '#3a2e38';
+      g.beginPath(); g.arc(0, 0, 175, 0, TAU); g.fill(); g.stroke();
+      g.strokeStyle = '#ff4500';
+      g.lineWidth = 4.5;
+      g.setLineDash([18, 14]);
+      g.beginPath(); g.arc(0, 0, 195, 0, TAU); g.stroke();
+      g.restore();
+    });
+
     g.save();
-    g.lineCap = 'round';
-    g.strokeStyle = '#16181d'; g.lineWidth = width + 16;
-    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-    g.strokeStyle = '#f3e9d2'; g.lineWidth = width + 8;
-    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-    g.strokeStyle = '#484b54'; g.lineWidth = width - 4;
-    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-    g.strokeStyle = 'rgba(255, 248, 234, 0.5)'; g.lineWidth = 3;
-    g.setLineDash([20, 20]);
-    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-    g.restore();
-  };
-
-  drawRoad(360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 72);
-  drawRoad(WORLD_SIZE - 360, 360, 360, WORLD_SIZE - 360, 72);
-  drawRoad(360, 360, WORLD_SIZE - 360, 360, 50);
-  drawRoad(360, WORLD_SIZE - 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
-  drawRoad(360, 360, 360, WORLD_SIZE - 360, 50);
-  drawRoad(WORLD_SIZE - 360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
-
-  // Plateformes de bases principales avec biseau 3D au sol
-  SPAWN_CORNERS.forEach((sp) => {
-    g.save();
-    g.translate(sp.x, sp.y);
-    g.fillStyle = 'rgba(16, 18, 24, 0.35)';
-    g.beginPath(); g.arc(8, 10, 218, 0, TAU); g.fill();
-    g.fillStyle = '#535763';
-    g.strokeStyle = '#16181d';
-    g.lineWidth = 5;
-    g.beginPath(); g.arc(0, 0, 215, 0, TAU); g.fill(); g.stroke();
-    g.fillStyle = '#626775';
-    g.beginPath(); g.arc(0, 0, 175, 0, TAU); g.fill(); g.stroke();
-    g.strokeStyle = '#ffc531';
+    g.translate(HALF_W, HALF_W);
+    g.fillStyle = 'rgba(12, 8, 10, 0.45)';
+    g.beginPath(); g.arc(8, 10, 344, 0, TAU); g.fill();
+    g.fillStyle = '#261a22';
+    g.strokeStyle = '#0e070a';
+    g.lineWidth = 6;
+    g.beginPath(); g.arc(0, 0, 340, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = '#3c242c';
+    g.beginPath(); g.arc(0, 0, 275, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = '#ff5500';
     g.lineWidth = 4.5;
-    g.setLineDash([18, 14]);
-    g.beginPath(); g.arc(0, 0, 195, 0, TAU); g.stroke();
+    g.setLineDash([22, 14]);
+    g.beginPath(); g.arc(0, 0, 115, 0, TAU); g.stroke();
     g.restore();
-  });
 
-  // Citadelle Centrale (Gold Base)
-  g.save();
-  g.translate(HALF_W, HALF_W);
-  g.fillStyle = 'rgba(16, 18, 24, 0.35)';
-  g.beginPath(); g.arc(8, 10, 344, 0, TAU); g.fill();
-  g.fillStyle = '#585c69';
-  g.strokeStyle = '#16181d';
-  g.lineWidth = 6;
-  g.beginPath(); g.arc(0, 0, 340, 0, TAU); g.fill(); g.stroke();
-  g.fillStyle = '#454954';
-  g.beginPath(); g.arc(0, 0, 275, 0, TAU); g.fill(); g.stroke();
-  g.strokeStyle = '#ffc531';
-  g.lineWidth = 4;
-  g.setLineDash([22, 14]);
-  g.beginPath(); g.arc(0, 0, 115, 0, TAU); g.stroke();
-  g.restore();
+    TREES_3D.length = 0;
+    const volColors = ['#2a1e20', '#362426', '#1e1618', '#422b28'];
+    for (let k = 0; k < 145; k++) {
+      const tx = 45 + rnd() * (WORLD_SIZE - 90);
+      const ty = 45 + rnd() * (WORLD_SIZE - 90);
+      const nearBase = SPAWN_CORNERS.some((s) => hypot(tx, ty, s.x, s.y) < 330);
+      const nearCenter = hypot(tx, ty, HALF_W, HALF_W) < 410;
+      const nearDiag1 = Math.abs(tx - ty) < 120;
+      const nearDiag2 = Math.abs(tx + ty - WORLD_SIZE) < 120;
+      const nearRes = MINERAL_NODES.some((m) => hypot(tx, ty, m.x, m.y) < 95) || GAS_GEYSERS.some((ge) => hypot(tx, ty, ge.x, ge.y) < 110);
+      if (nearBase || nearCenter || nearDiag1 || nearDiag2 || nearRes) continue;
+      const col = volColors[(rnd() * volColors.length) | 0];
+      const r = 16 + rnd() * 10;
+      TREES_3D.push({ x: tx, y: ty, r, col, h: 36 + rnd() * 26, type: 'volcano' });
+    }
 
-  // Génération des arbres 3D (rendus dynamiquement avec parallaxe 3D)
-  TREES_3D.length = 0;
-  const treeColors = ['#2d6632', '#39783c', '#245429', '#468a44'];
-  for (let k = 0; k < 155; k++) {
-    const tx = 45 + rnd() * (WORLD_SIZE - 90);
-    const ty = 45 + rnd() * (WORLD_SIZE - 90);
-    const nearBase = SPAWN_CORNERS.some((s) => hypot(tx, ty, s.x, s.y) < 330);
-    const nearCenter = hypot(tx, ty, HALF_W, HALF_W) < 410;
-    const nearDiag1 = Math.abs(tx - ty) < 120;
-    const nearDiag2 = Math.abs(tx + ty - WORLD_SIZE) < 120;
-    const nearRes = MINERAL_NODES.some((m) => hypot(tx, ty, m.x, m.y) < 95) || GAS_GEYSERS.some((ge) => hypot(tx, ty, ge.x, ge.y) < 110);
-    if (nearBase || nearCenter || nearDiag1 || nearDiag2 || nearRes) continue;
-    const col = treeColors[(rnd() * treeColors.length) | 0];
-    const r = 17 + rnd() * 12;
-    TREES_3D.push({ x: tx, y: ty, r, col, h: 32 + rnd() * 22 });
+  } else if (mapId === 'glace') {
+    // ❄️ BIOME GLACIER BORÉAL : GLACE TURQUOISE, CREVASSES ET NÉVÉS POLAIRES
+    g.fillStyle = '#0f2232';
+    g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+    for (let k = 0; k < 70; k++) {
+      const bx = rnd() * WORLD_SIZE, by = rnd() * WORLD_SIZE, br = 90 + rnd() * 200;
+      g.fillStyle = rnd() < 0.5 ? 'rgba(24, 60, 86, 0.42)' : 'rgba(16, 42, 60, 0.32)';
+      g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill();
+    }
+    for (let k = 0; k < 12000; k++) {
+      g.fillStyle = rnd() < 0.6 ? 'rgba(190, 240, 255, 0.22)' : 'rgba(8, 28, 44, 0.24)';
+      g.fillRect(rnd() * WORLD_SIZE, rnd() * WORLD_SIZE, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
+    }
+
+    const drawCryoCrevasse = (p0x, p0y, cp1x, cp1y, cp2x, cp2y, p1x, p1y) => {
+      const cp = new Path2D();
+      cp.moveTo(p0x, p0y);
+      cp.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p1x, p1y);
+      g.lineCap = 'round';
+      g.strokeStyle = '#051018'; g.lineWidth = 120; g.stroke(cp);
+      g.strokeStyle = '#0a3d54'; g.lineWidth = 100; g.stroke(cp);
+      g.strokeStyle = '#00c7db'; g.lineWidth = 72; g.stroke(cp);
+      g.strokeStyle = '#5eead4'; g.lineWidth = 48; g.stroke(cp);
+      g.strokeStyle = '#e0faff'; g.lineWidth = 22; g.stroke(cp);
+    };
+
+    drawCryoCrevasse(0, HALF_W - 170, WORLD_SIZE * 0.33, HALF_W + 190, WORLD_SIZE * 0.66, HALF_W - 200, WORLD_SIZE, HALF_W + 170);
+    drawCryoCrevasse(HALF_W + 170, 0, HALF_W - 190, WORLD_SIZE * 0.33, HALF_W + 180, WORLD_SIZE * 0.66, HALF_W - 170, WORLD_SIZE);
+
+    const drawFrostRoad = (x1, y1, x2, y2, width = 72) => {
+      g.save();
+      g.lineCap = 'round';
+      g.strokeStyle = '#0a1d2c'; g.lineWidth = width + 16;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#9be7ff'; g.lineWidth = width + 8;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#2b506b'; g.lineWidth = width - 4;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = 'rgba(255, 255, 255, 0.7)'; g.lineWidth = 3;
+      g.setLineDash([20, 20]);
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.restore();
+    };
+
+    drawFrostRoad(360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 72);
+    drawFrostRoad(WORLD_SIZE - 360, 360, 360, WORLD_SIZE - 360, 72);
+    drawFrostRoad(360, 360, WORLD_SIZE - 360, 360, 50);
+    drawFrostRoad(360, WORLD_SIZE - 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
+    drawFrostRoad(360, 360, 360, WORLD_SIZE - 360, 50);
+    drawFrostRoad(WORLD_SIZE - 360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
+
+    SPAWN_CORNERS.forEach((sp) => {
+      g.save();
+      g.translate(sp.x, sp.y);
+      g.fillStyle = 'rgba(8, 20, 32, 0.4)';
+      g.beginPath(); g.arc(8, 10, 218, 0, TAU); g.fill();
+      g.fillStyle = '#344e60';
+      g.strokeStyle = '#0c1a24';
+      g.lineWidth = 5;
+      g.beginPath(); g.arc(0, 0, 215, 0, TAU); g.fill(); g.stroke();
+      g.fillStyle = '#486880';
+      g.beginPath(); g.arc(0, 0, 175, 0, TAU); g.fill(); g.stroke();
+      g.strokeStyle = '#00f0ff';
+      g.lineWidth = 4.5;
+      g.setLineDash([18, 14]);
+      g.beginPath(); g.arc(0, 0, 195, 0, TAU); g.stroke();
+      g.restore();
+    });
+
+    g.save();
+    g.translate(HALF_W, HALF_W);
+    g.fillStyle = 'rgba(8, 20, 32, 0.4)';
+    g.beginPath(); g.arc(8, 10, 344, 0, TAU); g.fill();
+    g.fillStyle = '#27475d';
+    g.strokeStyle = '#0a1822';
+    g.lineWidth = 6;
+    g.beginPath(); g.arc(0, 0, 340, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = '#1e384b';
+    g.beginPath(); g.arc(0, 0, 275, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = '#1fc7c1';
+    g.lineWidth = 4;
+    g.setLineDash([22, 14]);
+    g.beginPath(); g.arc(0, 0, 115, 0, TAU); g.stroke();
+    g.restore();
+
+    TREES_3D.length = 0;
+    const iceColors = ['#1fc7c1', '#5cd5eb', '#89e5f5', '#38bdf8', '#a5f3fc'];
+    for (let k = 0; k < 145; k++) {
+      const tx = 45 + rnd() * (WORLD_SIZE - 90);
+      const ty = 45 + rnd() * (WORLD_SIZE - 90);
+      const nearBase = SPAWN_CORNERS.some((s) => hypot(tx, ty, s.x, s.y) < 330);
+      const nearCenter = hypot(tx, ty, HALF_W, HALF_W) < 410;
+      const nearDiag1 = Math.abs(tx - ty) < 120;
+      const nearDiag2 = Math.abs(tx + ty - WORLD_SIZE) < 120;
+      const nearRes = MINERAL_NODES.some((m) => hypot(tx, ty, m.x, m.y) < 95) || GAS_GEYSERS.some((ge) => hypot(tx, ty, ge.x, ge.y) < 110);
+      if (nearBase || nearCenter || nearDiag1 || nearDiag2 || nearRes) continue;
+      const col = iceColors[(rnd() * iceColors.length) | 0];
+      const r = 15 + rnd() * 11;
+      TREES_3D.push({ x: tx, y: ty, r, col, h: 38 + rnd() * 28, type: 'crystal' });
+    }
+
+  } else {
+    // 🌲 VALLÉE TEMPÉRÉE (Classique)
+    g.fillStyle = '#386f3e';
+    g.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+    for (let k = 0; k < 65; k++) {
+      const bx = rnd() * WORLD_SIZE, by = rnd() * WORLD_SIZE, br = 90 + rnd() * 190;
+      g.fillStyle = rnd() < 0.5 ? 'rgba(38, 84, 44, 0.38)' : 'rgba(76, 138, 72, 0.26)';
+      g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill();
+    }
+    for (let k = 0; k < 10000; k++) {
+      g.fillStyle = rnd() < 0.5 ? 'rgba(22, 50, 28, 0.22)' : 'rgba(135, 190, 105, 0.18)';
+      g.fillRect(rnd() * WORLD_SIZE, rnd() * WORLD_SIZE, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
+    }
+
+    const riverPath = new Path2D();
+    riverPath.moveTo(0, HALF_W - 180);
+    riverPath.bezierCurveTo(WORLD_SIZE * 0.33, HALF_W + 220, WORLD_SIZE * 0.66, HALF_W - 220, WORLD_SIZE, HALF_W + 180);
+    g.lineCap = 'round';
+    g.strokeStyle = '#16181d'; g.lineWidth = 122; g.stroke(riverPath);
+    g.strokeStyle = '#c8ba9b'; g.lineWidth = 110; g.stroke(riverPath);
+    g.strokeStyle = '#246b96'; g.lineWidth = 84; g.stroke(riverPath);
+    g.strokeStyle = '#328bc2'; g.lineWidth = 60; g.stroke(riverPath);
+
+    const drawRoad = (x1, y1, x2, y2, width = 72) => {
+      g.save();
+      g.lineCap = 'round';
+      g.strokeStyle = '#16181d'; g.lineWidth = width + 16;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#f3e9d2'; g.lineWidth = width + 8;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = '#484b54'; g.lineWidth = width - 4;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = 'rgba(255, 248, 234, 0.5)'; g.lineWidth = 3;
+      g.setLineDash([20, 20]);
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.restore();
+    };
+
+    drawRoad(360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 72);
+    drawRoad(WORLD_SIZE - 360, 360, 360, WORLD_SIZE - 360, 72);
+    drawRoad(360, 360, WORLD_SIZE - 360, 360, 50);
+    drawRoad(360, WORLD_SIZE - 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
+    drawRoad(360, 360, 360, WORLD_SIZE - 360, 50);
+    drawRoad(WORLD_SIZE - 360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
+
+    SPAWN_CORNERS.forEach((sp) => {
+      g.save();
+      g.translate(sp.x, sp.y);
+      g.fillStyle = 'rgba(16, 18, 24, 0.35)';
+      g.beginPath(); g.arc(8, 10, 218, 0, TAU); g.fill();
+      g.fillStyle = '#535763';
+      g.strokeStyle = '#16181d';
+      g.lineWidth = 5;
+      g.beginPath(); g.arc(0, 0, 215, 0, TAU); g.fill(); g.stroke();
+      g.fillStyle = '#626775';
+      g.beginPath(); g.arc(0, 0, 175, 0, TAU); g.fill(); g.stroke();
+      g.strokeStyle = '#ffc531';
+      g.lineWidth = 4.5;
+      g.setLineDash([18, 14]);
+      g.beginPath(); g.arc(0, 0, 195, 0, TAU); g.stroke();
+      g.restore();
+    });
+
+    g.save();
+    g.translate(HALF_W, HALF_W);
+    g.fillStyle = 'rgba(16, 18, 24, 0.35)';
+    g.beginPath(); g.arc(8, 10, 344, 0, TAU); g.fill();
+    g.fillStyle = '#585c69';
+    g.strokeStyle = '#16181d';
+    g.lineWidth = 6;
+    g.beginPath(); g.arc(0, 0, 340, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = '#454954';
+    g.beginPath(); g.arc(0, 0, 275, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = '#ffc531';
+    g.lineWidth = 4;
+    g.setLineDash([22, 14]);
+    g.beginPath(); g.arc(0, 0, 115, 0, TAU); g.stroke();
+    g.restore();
+
+    TREES_3D.length = 0;
+    const treeColors = ['#2d6632', '#39783c', '#245429', '#468a44'];
+    for (let k = 0; k < 155; k++) {
+      const tx = 45 + rnd() * (WORLD_SIZE - 90);
+      const ty = 45 + rnd() * (WORLD_SIZE - 90);
+      const nearBase = SPAWN_CORNERS.some((s) => hypot(tx, ty, s.x, s.y) < 330);
+      const nearCenter = hypot(tx, ty, HALF_W, HALF_W) < 410;
+      const nearDiag1 = Math.abs(tx - ty) < 120;
+      const nearDiag2 = Math.abs(tx + ty - WORLD_SIZE) < 120;
+      const nearRes = MINERAL_NODES.some((m) => hypot(tx, ty, m.x, m.y) < 95) || GAS_GEYSERS.some((ge) => hypot(tx, ty, ge.x, ge.y) < 110);
+      if (nearBase || nearCenter || nearDiag1 || nearDiag2 || nearRes) continue;
+      const col = treeColors[(rnd() * treeColors.length) | 0];
+      const r = 17 + rnd() * 12;
+      TREES_3D.push({ x: tx, y: ty, r, col, h: 32 + rnd() * 22, type: 'tree' });
+    }
   }
 
   g.strokeStyle = '#16181d';
@@ -586,6 +1044,8 @@ function buildTerrainCanvas() {
   g.strokeRect(9, 9, WORLD_SIZE - 18, WORLD_SIZE - 18);
   terrainCanvas = c;
 }
+
+initMap('vallee');
 
 /* ============================================================================
    AUDIO SYNTHÉTISÉ + BANDE-SON ORCHESTRALE RTS ÉPIQUE (WebAudio)
@@ -1277,7 +1737,11 @@ function nearestMyHq(state, ownerId, x, y) {
 /* ============================================================================
    CRÉATION DE L'ÉTAT INITIAL RTS (QG + 6 OUVRIERS VCS EN RÉCOLTE)
    ============================================================================ */
-function createInitialState(roster, settings) {
+function createInitialState(roster, settings = {}) {
+  const mapId = settings.map || activeMapId || 'vallee';
+  if (mapId !== activeMapId || MINERAL_NODES.length === 0) {
+    initMap(mapId);
+  }
   const is2v2 = settings.mode === '2v2' && roster.length >= 2;
   const blitz = settings.pace === 'blitz';
   const players = roster.map((p, idx) => {
@@ -1346,6 +1810,7 @@ function createInitialState(roster, settings) {
   return {
     time: 0,
     blitz,
+    map: mapId,
     mode: is2v2 ? '2v2' : 'ffa',
     level: settings.level || 'normal',
     phase: 1,
@@ -1671,8 +2136,10 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     p.minerals -= 50;
     const x = clamp(Math.round(Number(cmd.x) || HALF_W), 60, WORLD_SIZE - 60);
     const y = clamp(Math.round(Number(cmd.y) || HALF_W), 60, WORLD_SIZE - 60);
-    state.scans.push({ x, y, team: p.team, r: 380, timer: 10.0 });
-    fxEvents.push({ k: 'SCAN', x, y, color: '#1fc7c1' });
+    const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+    const scanR = Math.round(380 * (mapDef.scanRadiusMult || 1.0));
+    state.scans.push({ x, y, team: p.team, r: scanR, timer: 10.0 });
+    fxEvents.push({ k: 'SCAN', x, y, color: '#1fc7c1', r: scanR });
     return { ok: true };
   }
 
@@ -1799,7 +2266,9 @@ function stepWorld(state, dt, fxEvents) {
           const dmg = def.dmg * state.dmgMult;
           target.hp -= dmg;
           if (def.splash) {
-            const s2 = def.splash * def.splash;
+            const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+            const splashR = def.splash * (mapDef.splashMult || 1.0);
+            const s2 = splashR * splashR;
             for (const u2 of state.units) {
               if (u2 !== target && u2.team !== b.team && dist2(target.x, target.y, u2.x, u2.y) <= s2) {
                 u2.hp -= dmg * 0.6;
@@ -1854,9 +2323,11 @@ function stepWorld(state, dt, fxEvents) {
             const wx = u.weldX - u.x, wy = u.weldY - u.y;
             const wd = Math.hypot(wx, wy);
             if (wd > 3) {
-              const stepSpd = Math.min(wd, def.speed * 0.55 * dt);
-              u.vx = (wx / wd) * (def.speed * 0.55);
-              u.vy = (wy / wd) * (def.speed * 0.55);
+              const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+              const moveMult = mapDef.moveSpeedMult || 1.0;
+              const stepSpd = Math.min(wd, def.speed * moveMult * 0.55 * dt);
+              u.vx = (wx / wd) * (def.speed * moveMult * 0.55);
+              u.vy = (wy / wd) * (def.speed * moveMult * 0.55);
               u.x += (wx / wd) * stepSpd;
               u.y += (wy / wd) * stepSpd;
             } else {
@@ -1930,7 +2401,8 @@ function stepWorld(state, dt, fxEvents) {
               u.vx = 0; u.vy = 0;
               u.gatherT = (u.gatherT || 0) + dt;
               if (Math.random() < 0.25) fxEvents.push({ k: 'MINE', x: mNode.x, y: mNode.y, color: mNode.rich ? '#ffc531' : '#1fc7c1' });
-              if (u.gatherT >= 1.55) {
+              const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+              if (u.gatherT >= (mapDef.mineHarvestTime || 1.55)) {
                 u.gatherT = 0;
                 u.carryType = mNode.rich ? 'gold' : 'min';
                 u.carryAmt = mNode.rich ? 12 : 8;
@@ -1951,10 +2423,11 @@ function stepWorld(state, dt, fxEvents) {
               u.a = Math.atan2(ref.y - u.y, ref.x - u.x);
               u.vx = 0; u.vy = 0;
               u.gatherT = (u.gatherT || 0) + dt;
+              const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
               if (u.gatherT >= 1.7) {
                 u.gatherT = 0;
                 u.carryType = 'gas';
-                u.carryAmt = 6;
+                u.carryAmt = Math.round(6 * (mapDef.gasHarvestMult || 1.0));
               }
               continue;
             } else {
@@ -2021,7 +2494,8 @@ function stepWorld(state, dt, fxEvents) {
         else if (u.kind === 'rocket' && UNITS[tgt.kind]?.mech) dmg *= 1.5;
         tgt.hp -= dmg;
         if (def.splash || u.sieged) {
-          const splashR = def.splash || 58;
+          const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+          const splashR = (def.splash || 58) * (mapDef.splashMult || 1.0);
           const s2 = splashR * splashR;
           for (const e2 of state.units) {
             if (e2 !== tgt && e2.team !== u.team && dist2(tgt.x, tgt.y, e2.x, e2.y) <= s2) e2.hp -= dmg * 0.55;
@@ -2107,7 +2581,8 @@ function stepWorld(state, dt, fxEvents) {
     }
 
     const sLen = Math.hypot(steerX, steerY) || 1;
-    const spd = def.speed * stimMult;
+    const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
+    const spd = def.speed * stimMult * (mapDef.moveSpeedMult || 1.0);
     u.vx = (steerX / sLen) * spd;
     u.vy = (steerY / sLen) * spd;
     u.x = clamp(u.x + u.vx * dt, 24, WORLD_SIZE - 24);
@@ -2321,9 +2796,9 @@ const webglCvs = $('#webgl3d');
 const cvs = $('#world'), ctx = cvs.getContext('2d');
 const miniCvs = $('#minimap'), miniCtx = miniCvs.getContext('2d');
 let W = 0, H = 0, DPR = 1;
-let threeReady = false, threeRenderer = null, threeScene = null, threeCam = null, sunLight3D = null;
-let threeRaycaster = null, threeGroundPlane = null, threeNdc = null, threeHitPt = null, threeProjVec = null;
-let fogTexture3D = null;
+var threeReady = false, threeRenderer = null, threeScene = null, threeCam = null, sunLight3D = null;
+var threeRaycaster = null, threeGroundPlane = null, threeNdc = null, threeHitPt = null, threeProjVec = null;
+var fogTexture3D = null;
 
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -2840,29 +3315,78 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
 function drawTree3D(g, tr) {
   g.save();
   g.translate(tr.x, tr.y);
-  // Ombre au sol
-  g.fillStyle = 'rgba(12, 16, 20, 0.34)';
-  g.beginPath(); g.ellipse(8, 10, tr.r * 1.05, tr.r * 0.9, 0, 0, TAU); g.fill();
 
-  // Tronc 3D
-  const oTrunk = project3DOffset(tr.x, tr.y, tr.h * 0.32, false);
-  g.strokeStyle = '#16181d'; g.lineWidth = 9; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
-  g.strokeStyle = '#5c4028'; g.lineWidth = 5;
-  g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
+  if (tr.type === 'volcano') {
+    // Ombre au sol
+    g.fillStyle = 'rgba(12, 8, 10, 0.42)';
+    g.beginPath(); g.ellipse(6, 8, tr.r * 1.1, tr.r * 0.9, 0, 0, TAU); g.fill();
+    const oTop = project3DOffset(tr.x, tr.y, tr.h, false);
+    // Cône volcanique basaltique
+    g.fillStyle = tr.col || '#2a1e20';
+    g.strokeStyle = '#100a0d';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(-tr.r * 0.9, 0);
+    g.lineTo(oTop.ox - tr.r * 0.45, oTop.oy);
+    g.lineTo(oTop.ox + tr.r * 0.45, oTop.oy);
+    g.lineTo(tr.r * 0.9, 0);
+    g.closePath();
+    g.fill(); g.stroke();
+    // Cratère et magma incandescent au sommet
+    g.fillStyle = '#ff4500';
+    g.beginPath(); g.ellipse(oTop.ox, oTop.oy, tr.r * 0.42, tr.r * 0.28, 0, 0, TAU); g.fill();
+    g.fillStyle = '#ffd000';
+    g.beginPath(); g.ellipse(oTop.ox, oTop.oy, tr.r * 0.22, tr.r * 0.15, 0, 0, TAU); g.fill();
 
-  // 3 Étages de feuillage 3D superposés en élévation Z !
-  const tiers = [
-    { z: tr.h * 0.38, r: tr.r * 1.0, col: shade(tr.col, -0.16) },
-    { z: tr.h * 0.68, r: tr.r * 0.82, col: tr.col },
-    { z: tr.h * 0.98, r: tr.r * 0.56, col: shade(tr.col, 0.2) },
-  ];
-  g.strokeStyle = '#16181d';
-  g.lineWidth = 2.8;
-  for (const t of tiers) {
-    const o = project3DOffset(tr.x, tr.y, t.z, false);
-    g.fillStyle = t.col;
-    g.beginPath(); g.arc(o.ox, o.oy, t.r, 0, TAU); g.fill(); g.stroke();
+  } else if (tr.type === 'crystal') {
+    // Ombre au sol
+    g.fillStyle = 'rgba(6, 16, 24, 0.38)';
+    g.beginPath(); g.ellipse(5, 7, tr.r * 0.95, tr.r * 0.8, 0, 0, TAU); g.fill();
+    const oTop = project3DOffset(tr.x, tr.y, tr.h * 1.15, false);
+    // Spire cristalline à 2 facettes réfléchissantes
+    g.fillStyle = '#104b66';
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(-tr.r * 0.6, 0);
+    g.lineTo(oTop.ox, oTop.oy);
+    g.closePath();
+    g.fill();
+
+    g.fillStyle = tr.col || '#1fc7c1';
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(tr.r * 0.6, 0);
+    g.lineTo(oTop.ox, oTop.oy);
+    g.closePath();
+    g.fill();
+
+    g.strokeStyle = '#d6f0ff';
+    g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(oTop.ox, oTop.oy); g.stroke();
+
+  } else {
+    // Arbre standard (Vallée)
+    g.fillStyle = 'rgba(12, 16, 20, 0.34)';
+    g.beginPath(); g.ellipse(8, 10, tr.r * 1.05, tr.r * 0.9, 0, 0, TAU); g.fill();
+
+    const oTrunk = project3DOffset(tr.x, tr.y, tr.h * 0.32, false);
+    g.strokeStyle = '#16181d'; g.lineWidth = 9; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
+    g.strokeStyle = '#5c4028'; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
+
+    const tiers = [
+      { z: tr.h * 0.38, r: tr.r * 1.0, col: shade(tr.col, -0.16) },
+      { z: tr.h * 0.68, r: tr.r * 0.82, col: tr.col },
+      { z: tr.h * 0.98, r: tr.r * 0.56, col: shade(tr.col, 0.2) },
+    ];
+    g.strokeStyle = '#16181d';
+    g.lineWidth = 2.8;
+    for (const t of tiers) {
+      const o = project3DOffset(tr.x, tr.y, t.z, false);
+      g.fillStyle = t.col;
+      g.beginPath(); g.arc(o.ox, o.oy, t.r, 0, TAU); g.fill(); g.stroke();
+    }
   }
   g.restore();
 }
@@ -3177,7 +3701,7 @@ function handleFxEvents(list) {
       shockwaves.push({ x: e.x, y: e.y, r: 6, maxR: 32, color: '#ffc531', life: 0.25, maxLife: 0.25 });
       if (hypot(e.x, e.y, cam.x, cam.y) < 800) Sfx.siege();
     } else if (e.k === 'SCAN') {
-      shockwaves.push({ x: e.x, y: e.y, r: 20, maxR: 380, color: '#1fc7c1', life: 0.55, maxLife: 0.55 });
+      shockwaves.push({ x: e.x, y: e.y, r: 20, maxR: e.r || 380, color: '#1fc7c1', life: 0.55, maxLife: 0.55 });
       Sfx.scan();
     } else if (e.k === 'BOOM' || e.k === 'BOOM_BIG') {
       const big = e.k === 'BOOM_BIG';
@@ -3648,6 +4172,23 @@ miniCvs.addEventListener('pointerdown', (e) => {
 miniCvs.addEventListener('contextmenu', (e) => e.preventDefault());
 
 $('#btnCenter').onclick = centerOnMyHq;
+$('#btnMap').onclick = () => {
+  if (role === 'guest') {
+    toast(`Carte choisie par l'Hôte : ${MAP_DEFS[activeMapId]?.name || 'Vallée'}`, 2500);
+    return;
+  }
+  const mapIds = ['vallee', 'magma', 'glace'];
+  const nextIdx = (mapIds.indexOf(activeMapId) + 1) % mapIds.length;
+  const nextMap = mapIds[nextIdx];
+  switchMap(nextMap);
+  if (role === 'host' && window.HubBridge && HubBridge.embedded && state) {
+    HubBridge.send('all', { t: 'st', s: packState(state), fx: [] });
+  }
+};
+$('#uiMapBadge').onclick = () => {
+  const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
+  toast(`🗺️ ${def.icon} ${def.name}\n⭐ Spécificité : ${def.badgeDesc}`, 4000);
+};
 $('#btnMusic').onclick = () => {
   const on = Sfx.toggleMusic();
   const btn = $('#btnMusic');
@@ -4170,12 +4711,17 @@ const unitMeshes3D = new Map();
 let treeMeshes3D = [];
 let rockMeshes3D = [];
 let centerMonumentGroup3D = null;
-const mineralMeshes3D = [];
-const geyserMeshes3D = [];
+let basePlatformsGroup3D = null;
+let mineralMeshes3D = [];
+let geyserMeshes3D = [];
 let wallBeamsGroup3D = null;
 let fxGroup3D = null;
 let ghostGroup3D = null;
 let ghostKind3D = null;
+let hemiLight3D = null;
+let rimLight3D = null;
+let skirtMesh3D = null;
+let groundMesh3D = null;
 const matCache3D = new Map();
 const geoCache3D = {};
 
@@ -4208,11 +4754,12 @@ function initThree3D() {
     threeRenderer.shadowMap.enabled = true;
     threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    const FOG_COLOR = 0x091410;
+    const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
+    const FOG_COLOR = def.fogColor;
     threeScene = new THREE.Scene();
     threeScene.background = new THREE.Color(FOG_COLOR);
     // Brouillard atmosphérique au loin : dissimule le bord du monde et plonge le lointain dans la brume sci-fi
-    threeScene.fog = new THREE.Fog(FOG_COLOR, 1300, 3600);
+    threeScene.fog = new THREE.Fog(FOG_COLOR, def.fogNear, def.fogFar);
 
     threeCam = new THREE.PerspectiveCamera(34, W / Math.max(1, H), 40, 9500);
     threeRaycaster = new THREE.Raycaster();
@@ -4222,10 +4769,10 @@ function initThree3D() {
     threeProjVec = new THREE.Vector3();
 
     // Éclairage 3D directionnel + hémisphérique avec vraies ombres portées au sol
-    const hemi = new THREE.HemisphereLight(0xe4f5ff, 0x1d3822, 0.78);
-    threeScene.add(hemi);
+    hemiLight3D = new THREE.HemisphereLight(def.hemiSky, def.hemiGround, 0.78);
+    threeScene.add(hemiLight3D);
 
-    const sun = new THREE.DirectionalLight(0xfff4d8, 0.98);
+    const sun = new THREE.DirectionalLight(def.sunColor, 0.98);
     sun.position.set(WORLD_SIZE * 0.26, 1750, WORLD_SIZE * 0.82);
     sun.target.position.set(HALF_W, 0, HALF_W);
     sun.castShadow = true;
@@ -4243,11 +4790,11 @@ function initThree3D() {
     threeScene.add(sun.target);
     sunLight3D = sun;
 
-    const rim = new THREE.DirectionalLight(0x6ecbff, 0.32);
-    rim.position.set(WORLD_SIZE * 0.85, 950, WORLD_SIZE * 0.14);
-    rim.target.position.set(HALF_W, 0, HALF_W);
-    threeScene.add(rim);
-    threeScene.add(rim.target);
+    rimLight3D = new THREE.DirectionalLight(def.rimColor, 0.32);
+    rimLight3D.position.set(WORLD_SIZE * 0.85, 950, WORLD_SIZE * 0.14);
+    rimLight3D.target.position.set(HALF_W, 0, HALF_W);
+    threeScene.add(rimLight3D);
+    threeScene.add(rimLight3D.target);
 
     // Sol étendu à l'horizon (empêche tout vide noir à angle bas prononcé et se fond dans le brouillard)
     const skirtGeo = new THREE.PlaneGeometry(WORLD_SIZE * 3.5, WORLD_SIZE * 3.5);
@@ -4256,11 +4803,11 @@ function initThree3D() {
       roughness: 0.95,
       metalness: 0.08,
     });
-    const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
-    skirtMesh.rotation.x = -Math.PI / 2;
-    skirtMesh.position.set(HALF_W, -1.2, HALF_W);
-    skirtMesh.receiveShadow = true;
-    threeScene.add(skirtMesh);
+    skirtMesh3D = new THREE.Mesh(skirtGeo, skirtMat);
+    skirtMesh3D.rotation.x = -Math.PI / 2;
+    skirtMesh3D.position.set(HALF_W, -1.2, HALF_W);
+    skirtMesh3D.receiveShadow = true;
+    threeScene.add(skirtMesh3D);
 
     // Sol 3D texturé à partir de terrainCanvas
     const groundTex = new THREE.CanvasTexture(terrainCanvas);
@@ -4271,141 +4818,19 @@ function initThree3D() {
       roughness: 0.88,
       metalness: 0.06,
     });
-    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-    groundMesh.rotation.x = -Math.PI / 2;
-    groundMesh.position.set(HALF_W, 0, HALF_W);
-    groundMesh.receiveShadow = true;
-    threeScene.add(groundMesh);
+    groundMesh3D = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh3D.rotation.x = -Math.PI / 2;
+    groundMesh3D.position.set(HALF_W, 0, HALF_W);
+    groundMesh3D.receiveShadow = true;
+    threeScene.add(groundMesh3D);
 
-    // Plateformes de bases 3D en relief + Citadelle Centrale 3D
-    const platMat1 = getMat3D('#535763', 0.55, 0.35);
-    const platMat2 = getMat3D('#656a78', 0.48, 0.4);
-    const goldRingMat = getMat3D('#ffc531', 0.35, 0.5, 0xffc531, 0.2);
-    SPAWN_CORNERS.forEach((sp) => {
-      const p1 = new THREE.Mesh(new THREE.CylinderGeometry(212, 222, 5, 32), platMat1);
-      p1.position.set(sp.x, 2.5, sp.y);
-      p1.receiveShadow = true;
-      p1.castShadow = true;
-      threeScene.add(p1);
-      const p2 = new THREE.Mesh(new THREE.CylinderGeometry(172, 178, 3, 32), platMat2);
-      p2.position.set(sp.x, 6.0, sp.y);
-      p2.receiveShadow = true;
-      threeScene.add(p2);
-    });
+    basePlatformsGroup3D = new THREE.Group();
+    threeScene.add(basePlatformsGroup3D);
 
-    // Monument Citadelle Centrale 3D
     centerMonumentGroup3D = new THREE.Group();
-    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(336, 348, 6, 40), platMat1);
-    c1.position.set(HALF_W, 3, HALF_W);
-    c1.receiveShadow = true;
-    c1.castShadow = true;
-    centerMonumentGroup3D.add(c1);
-    const c2 = new THREE.Mesh(new THREE.CylinderGeometry(272, 280, 4, 40), getMat3D('#454954', 0.5, 0.4));
-    c2.position.set(HALF_W, 7, HALF_W);
-    c2.receiveShadow = true;
-    centerMonumentGroup3D.add(c2);
-    const cRing = new THREE.Mesh(new THREE.TorusGeometry(115, 2.5, 8, 40), goldRingMat);
-    cRing.rotation.x = Math.PI / 2;
-    cRing.position.set(HALF_W, 9.5, HALF_W);
-    centerMonumentGroup3D.add(cRing);
     threeScene.add(centerMonumentGroup3D);
 
-    // Arbres de forêt 3D (tronc + 3 cônes de feuillage projetant de vraies ombres)
-    const trunkGeo = new THREE.CylinderGeometry(2.4, 3.6, 12, 7);
-    const cone1Geo = new THREE.ConeGeometry(1, 1, 8);
-    const barkMat = getMat3D('#4b3624', 0.85, 0.05);
-    treeMeshes3D = [];
-    for (const tr of TREES_3D) {
-      const grp = new THREE.Group();
-      grp.position.set(tr.x, 0, tr.y);
-      const trunk = new THREE.Mesh(trunkGeo, barkMat);
-      trunk.position.y = 6;
-      trunk.castShadow = true;
-      grp.add(trunk);
-
-      const leafMat = getMat3D(tr.col, 0.72, 0.05);
-      const h = tr.h || 40;
-      const r = tr.r || 20;
-      for (let tier = 0; tier < 3; tier++) {
-        const cone = new THREE.Mesh(cone1Geo, leafMat);
-        const rad = r * (1.02 - tier * 0.24);
-        const ch = h * (0.48 - tier * 0.07);
-        cone.scale.set(rad, ch, rad);
-        cone.position.y = 10 + tier * (h * 0.24) + ch * 0.45;
-        cone.castShadow = true;
-        cone.receiveShadow = true;
-        grp.add(cone);
-      }
-      threeScene.add(grp);
-      treeMeshes3D.push({ grp, x: tr.x, y: tr.y });
-    }
-
-    // Rochers 3D facettés
-    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-    const rockMat = getMat3D('#6e685f', 0.78, 0.12);
-    rockMeshes3D = [];
-    for (const rk of ROCKS) {
-      const m = new THREE.Mesh(rockGeo, rockMat);
-      m.position.set(rk.x, rk.r * 0.42, rk.y);
-      m.scale.set(rk.r * 1.05, rk.r * 0.78, rk.r * 0.95);
-      m.rotation.set(rk.seed * 0.7, rk.seed * 1.3, rk.seed * 0.4);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      threeScene.add(m);
-      rockMeshes3D.push({ mesh: m, x: rk.x, y: rk.y });
-    }
-
-    // Gisements de Minéraux 3D (Bouquets de cristaux lumineux)
-    const crysGeo = new THREE.OctahedronGeometry(1, 0);
-    mineralMeshes3D.length = 0;
-    for (const m of MINERAL_NODES) {
-      const grp = new THREE.Group();
-      grp.position.set(m.x, 4, m.y);
-      const col = m.rich ? '#ffc531' : '#1fc7c1';
-      const em = m.rich ? 0xffa800 : 0x0ea5a0;
-      const mat = getMat3D(col, 0.2, 0.35, em, 0.45);
-      const r = m.rich ? 14 : 11.5;
-      const h = m.rich ? 34 : 28;
-      const angles = [
-        { ox: 0, oz: 0, sx: r * 0.72, sy: h, sz: r * 0.72, rx: 0.08, rz: -0.06 },
-        { ox: -r * 0.55, oz: r * 0.3, sx: r * 0.52, sy: h * 0.74, sz: r * 0.52, rx: -0.22, rz: 0.28 },
-        { ox: r * 0.55, oz: -r * 0.25, sx: r * 0.5, sy: h * 0.7, sz: r * 0.5, rx: 0.24, rz: -0.26 },
-        { ox: r * 0.15, oz: r * 0.58, sx: r * 0.44, sy: h * 0.62, sz: r * 0.44, rx: 0.3, rz: 0.15 },
-      ];
-      for (const a of angles) {
-        const c = new THREE.Mesh(crysGeo, mat);
-        c.position.set(a.ox, a.sy * 0.36, a.oz);
-        c.scale.set(a.sx, a.sy * 0.65, a.sz);
-        c.rotation.set(a.rx, a.ox, a.rz);
-        c.castShadow = true;
-        grp.add(c);
-      }
-      threeScene.add(grp);
-      mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y });
-    }
-
-    // Geysers de Gaz Plasma 3D
-    const geyRimMat = getMat3D('#435449', 0.68, 0.22);
-    const geyCoreMat = getMat3D('#2fbf71', 0.2, 0.1, 0x2fbf71, 0.75);
-    geyserMeshes3D.length = 0;
-    for (const gey of GAS_GEYSERS) {
-      const grp = new THREE.Group();
-      grp.position.set(gey.x, 4, gey.y);
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 29, 14, 12), geyRimMat);
-      base.position.y = 7;
-      base.castShadow = true;
-      base.receiveShadow = true;
-      grp.add(base);
-      const torus = new THREE.Mesh(new THREE.TorusGeometry(16, 4.5, 8, 16), geyRimMat);
-      torus.rotation.x = Math.PI / 2;
-      torus.position.y = 14;
-      grp.add(torus);
-      const core = new THREE.Mesh(new THREE.SphereGeometry(12, 14, 12), geyCoreMat);
-      core.position.y = 13;
-      grp.add(core);
-      threeScene.add(grp);
-      geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01, x: gey.x, y: gey.y });
-    }
+    setupThreeMapScenery(activeMapId);
 
     wallBeamsGroup3D = new THREE.Group();
     threeScene.add(wallBeamsGroup3D);
@@ -4438,6 +4863,247 @@ function initThree3D() {
     console.warn('Fallback 2D activé :', err);
     threeReady = false;
     return false;
+  }
+}
+
+function setupThreeMapScenery(mapId = activeMapId) {
+  if (!threeReady || !threeScene) return;
+  const def = MAP_DEFS[mapId] || MAP_DEFS.vallee;
+
+  // 1. Ambiance, Fog et Horizon
+  threeScene.background = new THREE.Color(def.fogColor);
+  if (threeScene.fog) {
+    threeScene.fog.color = new THREE.Color(def.fogColor);
+  }
+  if (skirtMesh3D && skirtMesh3D.material) {
+    skirtMesh3D.material.color = new THREE.Color(def.fogColor);
+  }
+
+  // 2. Éclairage
+  if (sunLight3D) sunLight3D.color = new THREE.Color(def.sunColor);
+  if (hemiLight3D) {
+    hemiLight3D.color = new THREE.Color(def.hemiSky);
+    hemiLight3D.groundColor = new THREE.Color(def.hemiGround);
+  }
+  if (rimLight3D) rimLight3D.color = new THREE.Color(def.rimColor);
+
+  // 3. Texture du sol
+  if (groundMesh3D && terrainCanvas) {
+    if (groundMesh3D.material.map && groundMesh3D.material.map.dispose) {
+      groundMesh3D.material.map.dispose();
+    }
+    const groundTex = new THREE.CanvasTexture(terrainCanvas);
+    groundTex.anisotropy = 4;
+    groundMesh3D.material.map = groundTex;
+    groundMesh3D.material.needsUpdate = true;
+  }
+
+  // 4. Plateformes des bases
+  if (basePlatformsGroup3D) {
+    while (basePlatformsGroup3D.children.length > 0) {
+      basePlatformsGroup3D.remove(basePlatformsGroup3D.children[0]);
+    }
+    const platMat1 = getMat3D(def.theme === 'volcanique' ? '#2d252c' : def.theme === 'cryo' ? '#344e60' : '#535763', 0.55, 0.35);
+    const platMat2 = getMat3D(def.theme === 'volcanique' ? '#3a2e38' : def.theme === 'cryo' ? '#486880' : '#656a78', 0.48, 0.4);
+    SPAWN_CORNERS.forEach((sp) => {
+      const p1 = new THREE.Mesh(new THREE.CylinderGeometry(212, 222, 5, 32), platMat1);
+      p1.position.set(sp.x, 2.5, sp.y);
+      p1.receiveShadow = true; p1.castShadow = true;
+      basePlatformsGroup3D.add(p1);
+      const p2 = new THREE.Mesh(new THREE.CylinderGeometry(172, 178, 3, 32), platMat2);
+      p2.position.set(sp.x, 6.0, sp.y);
+      p2.receiveShadow = true;
+      basePlatformsGroup3D.add(p2);
+    });
+  }
+
+  // 5. Monument Central
+  if (centerMonumentGroup3D) {
+    while (centerMonumentGroup3D.children.length > 0) {
+      centerMonumentGroup3D.remove(centerMonumentGroup3D.children[0]);
+    }
+    const platMat1 = getMat3D(def.theme === 'volcanique' ? '#261a22' : def.theme === 'cryo' ? '#27475d' : '#585c69', 0.55, 0.35);
+    const platMat2 = getMat3D(def.theme === 'volcanique' ? '#3c242c' : def.theme === 'cryo' ? '#1e384b' : '#454954', 0.5, 0.4);
+    const ringCol = def.theme === 'volcanique' ? '#ff5500' : def.theme === 'cryo' ? '#1fc7c1' : '#ffc531';
+    const ringMat = getMat3D(ringCol, 0.35, 0.5, ringCol === '#ff5500' ? 0xff3b00 : ringCol === '#1fc7c1' ? 0x00f0ff : 0xffc531, 0.35);
+
+    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(336, 348, 6, 40), platMat1);
+    c1.position.set(HALF_W, 3, HALF_W);
+    c1.receiveShadow = true; c1.castShadow = true;
+    centerMonumentGroup3D.add(c1);
+
+    const c2 = new THREE.Mesh(new THREE.CylinderGeometry(272, 280, 4, 40), platMat2);
+    c2.position.set(HALF_W, 7, HALF_W);
+    c2.receiveShadow = true;
+    centerMonumentGroup3D.add(c2);
+
+    const cRing = new THREE.Mesh(new THREE.TorusGeometry(115, 2.8, 8, 40), ringMat);
+    cRing.rotation.x = Math.PI / 2;
+    cRing.position.set(HALF_W, 9.5, HALF_W);
+    centerMonumentGroup3D.add(cRing);
+  }
+
+  // 6. Éléments de décor (Arbres / Cheminées / Spires de glace)
+  if (treeMeshes3D) {
+    for (const item of treeMeshes3D) {
+      if (item.grp) threeScene.remove(item.grp);
+    }
+  }
+  treeMeshes3D = [];
+
+  const trunkGeo = new THREE.CylinderGeometry(2.4, 3.6, 12, 7);
+  const cone1Geo = new THREE.ConeGeometry(1, 1, 8);
+  const barkMat = getMat3D('#4b3624', 0.85, 0.05);
+
+  const volcanoGeo = new THREE.CylinderGeometry(0.5, 1, 1, 10);
+  const lavaCoreGeo = new THREE.SphereGeometry(1, 8, 8);
+  const lavaMat = getMat3D('#ff4500', 0.2, 0.2, 0xff3300, 0.95);
+
+  const spireGeo = new THREE.ConeGeometry(1, 1, 6);
+  const crystalMat = getMat3D('#5cd5eb', 0.15, 0.45, 0x00e5ff, 0.55);
+
+  for (const tr of TREES_3D) {
+    const grp = new THREE.Group();
+    grp.position.set(tr.x, 0, tr.y);
+
+    if (tr.type === 'volcano') {
+      const basaltMat = getMat3D(tr.col || '#2a1e20', 0.78, 0.15);
+      const chim = new THREE.Mesh(volcanoGeo, basaltMat);
+      chim.scale.set(tr.r * 0.9, tr.h, tr.r * 0.9);
+      chim.position.y = tr.h * 0.5;
+      chim.castShadow = true; chim.receiveShadow = true;
+      grp.add(chim);
+
+      const core = new THREE.Mesh(lavaCoreGeo, lavaMat);
+      core.scale.set(tr.r * 0.35, tr.r * 0.25, tr.r * 0.35);
+      core.position.y = tr.h;
+      grp.add(core);
+
+    } else if (tr.type === 'crystal') {
+      const spire = new THREE.Mesh(spireGeo, crystalMat);
+      spire.scale.set(tr.r * 0.7, tr.h * 1.15, tr.r * 0.7);
+      spire.position.y = (tr.h * 1.15) * 0.5;
+      spire.castShadow = true; spire.receiveShadow = true;
+      grp.add(spire);
+
+    } else {
+      const trunk = new THREE.Mesh(trunkGeo, barkMat);
+      trunk.position.y = 6;
+      trunk.castShadow = true;
+      grp.add(trunk);
+
+      const leafMat = getMat3D(tr.col, 0.72, 0.05);
+      const h = tr.h || 40;
+      const r = tr.r || 20;
+      for (let tier = 0; tier < 3; tier++) {
+        const cone = new THREE.Mesh(cone1Geo, leafMat);
+        const rad = r * (1.02 - tier * 0.24);
+        const ch = h * (0.48 - tier * 0.07);
+        cone.scale.set(rad, ch, rad);
+        cone.position.y = 10 + tier * (h * 0.24) + ch * 0.45;
+        cone.castShadow = true; cone.receiveShadow = true;
+        grp.add(cone);
+      }
+    }
+
+    threeScene.add(grp);
+    treeMeshes3D.push({ grp, x: tr.x, y: tr.y });
+  }
+
+  // 7. Rochers 3D
+  if (rockMeshes3D) {
+    for (const item of rockMeshes3D) {
+      if (item.mesh) threeScene.remove(item.mesh);
+    }
+  }
+  rockMeshes3D = [];
+  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+  for (const rk of ROCKS) {
+    const rockMat = getMat3D(rk.col || (def.theme === 'volcanique' ? '#251c20' : def.theme === 'cryo' ? '#2b506b' : '#6e685f'), 0.8, 0.1);
+    const m = new THREE.Mesh(rockGeo, rockMat);
+    m.position.set(rk.x, rk.r * 0.42, rk.y);
+    m.scale.set(rk.r * 1.05, rk.r * 0.78, rk.r * 0.95);
+    m.rotation.set(rk.seed * 0.7, rk.seed * 1.3, rk.seed * 0.4);
+    m.castShadow = true; m.receiveShadow = true;
+    threeScene.add(m);
+    rockMeshes3D.push({ mesh: m, x: rk.x, y: rk.y });
+  }
+
+  // 8. Gisements de Minéraux 3D
+  if (mineralMeshes3D) {
+    for (const item of mineralMeshes3D) {
+      if (item.grp) threeScene.remove(item.grp);
+    }
+  }
+  mineralMeshes3D.length = 0;
+  const crysGeo = new THREE.OctahedronGeometry(1, 0);
+  for (const m of MINERAL_NODES) {
+    const grp = new THREE.Group();
+    grp.position.set(m.x, 4, m.y);
+    let col, em;
+    if (def.theme === 'volcanique') {
+      col = m.rich ? '#ffd700' : '#ff4b2b';
+      em = m.rich ? 0xffa000 : 0xd42b00;
+    } else if (def.theme === 'cryo') {
+      col = m.rich ? '#c084fc' : '#38bdf8';
+      em = m.rich ? 0x9333ea : 0x0284c7;
+    } else {
+      col = m.rich ? '#ffc531' : '#1fc7c1';
+      em = m.rich ? 0xffa800 : 0x0ea5a0;
+    }
+    const mat = getMat3D(col, 0.2, 0.35, em, 0.55);
+    const r = m.rich ? 14 : 11.5;
+    const h = m.rich ? 34 : 28;
+    const angles = [
+      { ox: 0, oz: 0, sx: r * 0.72, sy: h, sz: r * 0.72, rx: 0.08, rz: -0.06 },
+      { ox: -r * 0.55, oz: r * 0.3, sx: r * 0.52, sy: h * 0.74, sz: r * 0.52, rx: -0.22, rz: 0.28 },
+      { ox: r * 0.55, oz: -r * 0.25, sx: r * 0.5, sy: h * 0.7, sz: r * 0.5, rx: 0.24, rz: -0.26 },
+      { ox: r * 0.15, oz: r * 0.58, sx: r * 0.44, sy: h * 0.62, sz: r * 0.44, rx: 0.3, rz: 0.15 },
+    ];
+    for (const a of angles) {
+      const c = new THREE.Mesh(crysGeo, mat);
+      c.position.set(a.ox, a.sy * 0.36, a.oz);
+      c.scale.set(a.sx, a.sy * 0.65, a.sz);
+      c.rotation.set(a.rx, a.ox, a.rz);
+      c.castShadow = true;
+      grp.add(c);
+    }
+    threeScene.add(grp);
+    mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y });
+  }
+
+  // 9. Geysers de Gaz Plasma 3D
+  if (geyserMeshes3D) {
+    for (const item of geyserMeshes3D) {
+      if (item.grp) threeScene.remove(item.grp);
+    }
+  }
+  geyserMeshes3D = [];
+  const geyRimMat = getMat3D(def.theme === 'volcanique' ? '#332428' : def.theme === 'cryo' ? '#26485e' : '#435449', 0.68, 0.22);
+  let geyCol = '#2fbf71', geyEm = 0x2fbf71;
+  if (def.theme === 'volcanique') {
+    geyCol = '#ff5500'; geyEm = 0xff4500;
+  } else if (def.theme === 'cryo') {
+    geyCol = '#00f0ff'; geyEm = 0x00f0ff;
+  }
+  const geyCoreMat = getMat3D(geyCol, 0.2, 0.1, geyEm, 0.85);
+
+  for (const gey of GAS_GEYSERS) {
+    const grp = new THREE.Group();
+    grp.position.set(gey.x, 4, gey.y);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 29, 14, 12), geyRimMat);
+    base.position.y = 7;
+    base.castShadow = true; base.receiveShadow = true;
+    grp.add(base);
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(16, 4.5, 8, 16), geyRimMat);
+    torus.rotation.x = Math.PI / 2;
+    torus.position.y = 14;
+    grp.add(torus);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(12, 14, 12), geyCoreMat);
+    core.position.y = 13;
+    grp.add(core);
+    threeScene.add(grp);
+    geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01, x: gey.x, y: gey.y });
   }
 }
 
@@ -5376,12 +6042,13 @@ function renderWorld(dt, now) {
       ctx.restore();
     } else if (orderCursor === 'scan') {
       const pt = worldToScreen3D(mouse.wx, mouse.wy, 4);
+      const scanR = Math.round(380 * ((MAP_DEFS[activeMapId] || MAP_DEFS.vallee).scanRadiusMult || 1.0));
       ctx.save();
       ctx.strokeStyle = '#1fc7c1';
       ctx.fillStyle = 'rgba(31, 199, 193, 0.14)';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.ellipse(pt.x, pt.y, 380 * cam.z, 380 * cam.z * isoSin, 0, 0, TAU);
+      ctx.ellipse(pt.x, pt.y, scanR * cam.z, scanR * cam.z * isoSin, 0, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
@@ -5421,16 +6088,23 @@ function renderWorld(dt, now) {
     ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, TAU); ctx.fill();
   }
 
+  const curMapDef = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
+
   // Geysers de Gaz Plasma 3D
   for (const gey of GAS_GEYSERS) {
     ctx.save();
     ctx.translate(gey.x, gey.y);
-    drawPrism3D(ctx, gey.x, gey.y, makeNGon(26, 8), 0, 14, '#38463d', '#4d5e52', false, 0.78);
+    const rimCol = curMapDef.theme === 'volcanique' ? '#332428' : curMapDef.theme === 'cryo' ? '#26485e' : '#38463d';
+    const topCol = curMapDef.theme === 'volcanique' ? '#4d2d34' : curMapDef.theme === 'cryo' ? '#376885' : '#4d5e52';
+    drawPrism3D(ctx, gey.x, gey.y, makeNGon(26, 8), 0, 14, rimCol, topCol, false, 0.78);
     const oTop = project3DOffset(gey.x, gey.y, 14, false);
-    ctx.fillStyle = '#162b1d';
+    ctx.fillStyle = '#101518';
     ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, 13, 0, TAU); ctx.fill();
     const pulse = 9 + Math.sin(now * 0.006 + gey.x) * 3;
-    ctx.fillStyle = 'rgba(47, 191, 113, 0.65)';
+    let plasmaGlow = 'rgba(47, 191, 113, 0.75)';
+    if (curMapDef.theme === 'volcanique') plasmaGlow = 'rgba(255, 85, 0, 0.85)';
+    else if (curMapDef.theme === 'cryo') plasmaGlow = 'rgba(0, 240, 255, 0.85)';
+    ctx.fillStyle = plasmaGlow;
     ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, pulse, 0, TAU); ctx.fill();
     ctx.restore();
   }
@@ -5438,11 +6112,14 @@ function renderWorld(dt, now) {
   // Gisements de Minéraux 3D (Pyramides cristallines à facettes)
   for (const m of MINERAL_NODES) {
     const r = m.rich ? 21 : 17;
+    let col = m.rich ? '#ffc531' : '#1fc7c1';
+    if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff4b2b';
+    else if (curMapDef.theme === 'cryo') col = m.rich ? '#c084fc' : '#38bdf8';
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.fillStyle = m.rich ? 'rgba(255, 197, 49, 0.22)' : 'rgba(31, 199, 193, 0.22)';
     ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, TAU); ctx.fill();
-    drawPyramid3D(ctx, m.x, m.y, makeNGon(r, 6, 0.2), 0, m.rich ? 34 : 28, m.rich ? '#ffc531' : '#1fc7c1', false);
+    drawPyramid3D(ctx, m.x, m.y, makeNGon(r, 6, 0.2), 0, m.rich ? 34 : 28, col, false);
     ctx.restore();
   }
 
@@ -5450,7 +6127,8 @@ function renderWorld(dt, now) {
   for (const rk of ROCKS) {
     ctx.save();
     ctx.translate(rk.x, rk.y);
-    drawPrism3D(ctx, rk.x, rk.y, makeNGon(rk.r, 7, rk.seed), 0, 26, '#59544b', '#878073', false, 0.72);
+    const rkCol = rk.col || (curMapDef.theme === 'volcanique' ? '#251c20' : curMapDef.theme === 'cryo' ? '#2b506b' : '#59544b');
+    drawPrism3D(ctx, rk.x, rk.y, makeNGon(rk.r, 7, rk.seed), 0, 26, rkCol, shade(rkCol, 0.35), false, 0.72);
     ctx.restore();
   }
 
@@ -5642,9 +6320,10 @@ function renderWorld(dt, now) {
     ctx.beginPath(); ctx.arc(gx, gy, def.radius + 4, 0, TAU); ctx.stroke();
     ctx.restore();
   } else if (orderCursor === 'scan') {
+    const scanR = Math.round(380 * ((MAP_DEFS[activeMapId] || MAP_DEFS.vallee).scanRadiusMult || 1.0));
     ctx.save();
     ctx.strokeStyle = '#1fc7c1'; ctx.fillStyle = 'rgba(31, 199, 193, 0.15)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(mouse.wx, mouse.wy, 380, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mouse.wx, mouse.wy, scanR, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
@@ -5672,8 +6351,12 @@ function renderMinimap() {
   const sx = mw / WORLD_SIZE, sy = mh / WORLD_SIZE;
   if (terrainCanvas) miniCtx.drawImage(terrainCanvas, 0, 0, mw, mh);
 
+  const curMapDef = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   for (const m of MINERAL_NODES) {
-    miniCtx.fillStyle = m.rich ? '#ffc531' : '#1fc7c1';
+    let col = m.rich ? '#ffc531' : '#1fc7c1';
+    if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff5522';
+    else if (curMapDef.theme === 'cryo') col = m.rich ? '#c084fc' : '#38bdf8';
+    miniCtx.fillStyle = col;
     miniCtx.fillRect(m.x * sx - 1.5, m.y * sy - 1.5, 3, 3);
   }
   for (const b of state.buildings) {
@@ -5717,6 +6400,7 @@ function packState(s) {
   return {
     time: r2(s.time),
     blitz: s.blitz,
+    map: s.map || activeMapId || 'vallee',
     mode: s.mode,
     level: s.level,
     phase: s.phase,
@@ -5806,6 +6490,10 @@ function packState(s) {
 }
 
 function reconcileGuestState(prev, incoming) {
+  if (!incoming) return prev;
+  if (incoming.map && incoming.map !== activeMapId) {
+    initMap(incoming.map);
+  }
   if (!prev) return incoming;
   const oldPos = new Map();
   for (const u of prev.units) {

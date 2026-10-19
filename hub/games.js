@@ -68,6 +68,7 @@ window.HUB_GAMES = [
     minPlayers: 1, maxPlayers: 4,
     accent: '#2fbf71',
     settings: [
+      { key: 'map', label: 'Champ de bataille', options: [['vallee', '🌲 Vallée Tempérée (Classique)'], ['magma', '🌋 Fissures de Magma (+Gaz & Chokepoints)'], ['glace', '❄️ Glacier Boréal (+Vitesse & Forage Rapide)']], def: 'vallee' },
       { key: 'mode', label: 'Format', options: [['ffa', 'Chacun pour soi'], ['2v2', 'Équipes 2v2']], def: 'ffa' },
       { key: 'pace', label: 'Durée max', options: [['standard', 'Standard · 25 min'], ['blitz', 'Blitz · 12 min']], def: 'standard' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
