@@ -358,7 +358,7 @@ const BUILDINGS = {
 const UNITS = {
   scv: {
     name: 'Ouvrier VCS', short: 'VCS', min: 50, gas: 0, supply: 1, trainTime: 5.5,
-    hp: 90, radius: 10.5, speed: 96, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8,
+    hp: 90, radius: 6.0, speed: 98, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8,
     desc: 'Sélectionne ce VCS pour construire des bâtiments [1-8], récolter Minéraux/Gaz ou réparer.',
   },
   marine: {
@@ -921,7 +921,7 @@ function canPlaceBuilding(state, ownerId, kind, x, y) {
     return { ok: false, reason: 'Trop près du bord de la carte.' };
   }
 
-  const pad = kind === 'wall' ? 2 : 8;
+  const pad = kind === 'wall' ? 2 : 14;
   for (const b of state.buildings) {
     if (b.hp <= 0) continue;
     const minDist = def.radius + b.radius + pad;
@@ -1755,29 +1755,30 @@ function stepWorld(state, dt, fxEvents) {
     const distGoal = Math.hypot(dx, dy) || 1;
     let steerX = dx / distGoal, steerY = dy / distGoal;
 
-    const lookAhead = u.radius + 32;
+    const isScv = u.kind === 'scv';
+    const lookAhead = isScv ? 14 : (u.radius + 32);
     const sideSign = (u.id % 2 === 0) ? 1 : -1;
     for (const b of state.buildings) {
       if (b.hp <= 0 || b.id === u.buildTargetId || b.id === u.harvestId) continue;
       if (b.constructing && !b.buildStarted) continue;
-      if (u.kind === 'scv' && u.carryAmt > 0 && b.owner === u.owner && b.kind === 'hq') continue;
+      if (isScv && u.carryAmt > 0 && b.owner === u.owner && b.kind === 'hq') continue;
       const ox = b.x - u.x, oy = b.y - u.y;
       const d = Math.hypot(ox, oy) || 1;
-      const minClear = u.radius + b.radius + 10;
+      const minClear = u.radius + b.radius + (isScv ? 2 : 10);
       if (d < minClear + lookAhead) {
         const dot = (ox / d) * steerX + (oy / d) * steerY;
         if (dot > -0.2) {
           const tx = -oy / d * sideSign, ty = ox / d * sideSign;
-          const push = ((minClear + lookAhead - d) / lookAhead) * 1.8;
-          steerX += (tx - ox / d * 0.5) * push;
-          steerY += (ty - oy / d * 0.5) * push;
+          const push = ((minClear + lookAhead - d) / lookAhead) * (isScv ? 1.2 : 1.8);
+          steerX += (tx - ox / d * (isScv ? 0.2 : 0.5)) * push;
+          steerY += (ty - oy / d * (isScv ? 0.2 : 0.5)) * push;
         }
       }
     }
     for (const rk of ROCKS) {
       const ox = rk.x - u.x, oy = rk.y - u.y;
       const d = Math.hypot(ox, oy) || 1;
-      const minClear = u.radius + rk.r + 10;
+      const minClear = u.radius + rk.r + (isScv ? 2 : 10);
       if (d < minClear + lookAhead) {
         const tx = -oy / d * sideSign, ty = ox / d * sideSign;
         const push = ((minClear + lookAhead - d) / lookAhead) * 1.9;
@@ -1813,12 +1814,40 @@ function stepWorld(state, dt, fxEvents) {
       if (b.constructing && u.kind === 'scv' && u.buildTargetId === b.id) continue;
       if (b.constructing && !b.buildStarted) continue;
       const cx = u.x - b.x, cy = u.y - b.y;
-      const minD = u.radius + b.radius + 2;
+      const minD = u.radius + (isScv ? b.radius * 0.94 : b.radius) + (isScv ? 0.5 : 2);
       const d2 = cx * cx + cy * cy;
       if (d2 < minD * minD) {
         const d = Math.sqrt(d2) || 1;
-        u.x = b.x + (cx / d) * minD;
-        u.y = b.y + (cy / d) * minD;
+        const nx = cx / d, ny = cy / d;
+        u.x = b.x + nx * minD;
+        u.y = b.y + ny * minD;
+        // Glissement tangentiel le long de la façade
+        const vDot = u.vx * nx + u.vy * ny;
+        if (vDot < 0) {
+          u.vx -= vDot * nx;
+          u.vy -= vDot * ny;
+        }
+      }
+    }
+
+    // Système d'expulsion anti-coincement si un VCS est pris en étau entre 2+ bâtiments
+    if (isScv) {
+      let stuckCount = 0, escX = 0, escY = 0;
+      for (const b of state.buildings) {
+        if (b.hp <= 0 || (b.constructing && u.buildTargetId === b.id)) continue;
+        const cx = u.x - b.x, cy = u.y - b.y;
+        const minD = u.radius + b.radius * 0.95;
+        if (cx * cx + cy * cy < minD * minD) {
+          stuckCount++;
+          const d = Math.hypot(cx, cy) || 1;
+          escX += cx / d;
+          escY += cy / d;
+        }
+      }
+      if (stuckCount >= 2) {
+        const escLen = Math.hypot(escX, escY) || 1;
+        u.x += (escX / escLen) * 3.5;
+        u.y += (escY / escLen) * 3.5;
       }
     }
   }
@@ -2006,7 +2035,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-const cam = { x: HALF_W, y: HALF_W, z: 0.88, pitch: 36, shake: 0 };
+const cam = { x: HALF_W, y: HALF_W, z: 0.88, pitch: 70, shake: 0 };
 const keys = {};
 const mouse = { x: W / 2, y: H / 2, wx: HALF_W, wy: HALF_W, down: false, dragStart: null, panning: false, panStart: null };
 
@@ -2504,7 +2533,7 @@ function drawTree3D(g, tr) {
 }
 
 function drawUnit(g, u, color, selected, now, isIcon = false) {
-  const r = u.radius;
+  const r = u.kind === 'scv' ? 10.0 : u.radius;
   const wx = u.x || 0, wy = u.y || 0;
   const darkCol = shade(color, -0.35);
   const lightCol = shade(color, 0.25);
@@ -3035,7 +3064,7 @@ function updateCursorClass() {
 cvs.addEventListener('wheel', (e) => {
   e.preventDefault();
   if (e.shiftKey) {
-    cam.pitch = clamp((cam.pitch || 36) + (e.deltaY < 0 ? 2.5 : -2.5), 22, 62);
+    cam.pitch = clamp((cam.pitch || 70) + (e.deltaY < 0 ? 2.5 : -2.5), 25, 82);
   } else {
     cam.z = clamp(cam.z * (e.deltaY < 0 ? 1.1 : 0.9), 0.44, 1.35);
   }
@@ -3186,7 +3215,7 @@ window.addEventListener('pointermove', (e) => {
   mouse.wx = w.x; mouse.wy = w.y;
 
   if (mouse.panning && mouse.panStart) {
-    const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
+    const isoSin = Math.sin(((cam.pitch || 70) * Math.PI) / 180);
     cam.x = clamp(mouse.panStart.cx - (e.clientX - mouse.panStart.x) / cam.z, 0, WORLD_SIZE);
     cam.y = clamp(mouse.panStart.cy - (e.clientY - mouse.panStart.y) / (cam.z * isoSin), 0, WORLD_SIZE);
   }
@@ -4304,7 +4333,7 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
 function createUnitMesh3D(kind, color) {
   const grp = new THREE.Group();
   const def = UNITS[kind] || UNITS.marine;
-  const r = def.radius || 12;
+  const r = kind === 'scv' ? 10.2 : (def.radius || 12);
 
   const teamMat = getMat3D(color, 0.35, 0.35, color, 0.12);
   const darkTeamMat = getMat3D(shade(color, -0.35), 0.48, 0.42);
@@ -4527,10 +4556,10 @@ function createUnitMesh3D(kind, color) {
 function syncAndRenderThree3D(dt, now, shX, shY) {
   if (!threeReady && !initThree3D()) return false;
   try {
-    // Caméra 3D vue isométrique prononcée (par défaut 36° au-dessus du sol pour un vrai relief et volume 3D)
-    const pitchDeg = clamp(cam.pitch || 36, 22, 62);
+    // Caméra 3D vue tactique à ~70° au-dessus du sol (inclinaison douce de 20° depuis le dessus)
+    const pitchDeg = clamp(cam.pitch || 70, 25, 82);
     const pitchRad = (pitchDeg * Math.PI) / 180;
-    const fovRad = (34 * Math.PI) / 180;
+    const fovRad = (36 * Math.PI) / 180;
     const dist = (H / 2) / (cam.z * Math.tan(fovRad / 2));
     const camH = dist * Math.sin(pitchRad);
     const camZOffset = dist * Math.cos(pitchRad);
@@ -4787,8 +4816,8 @@ function renderWorld(dt, now) {
   if (keys['arrowdown']) cam.y += panSpd * dt;
   if (keys['arrowleft']) cam.x -= panSpd * dt;
   if (keys['arrowright']) cam.x += panSpd * dt;
-  if (keys['pageup']) cam.pitch = clamp((cam.pitch || 36) + 38 * dt, 22, 62);
-  if (keys['pagedown']) cam.pitch = clamp((cam.pitch || 36) - 38 * dt, 22, 62);
+  if (keys['pageup']) cam.pitch = clamp((cam.pitch || 70) + 38 * dt, 25, 82);
+  if (keys['pagedown']) cam.pitch = clamp((cam.pitch || 70) - 38 * dt, 25, 82);
   cam.x = clamp(cam.x, 0, WORLD_SIZE);
   cam.y = clamp(cam.y, 0, WORLD_SIZE);
 
@@ -4804,7 +4833,7 @@ function renderWorld(dt, now) {
   // 1. Rendu WebGL 3D (Three.js) vue isométrique + Surcouche tactique 2D projetée
   if (syncAndRenderThree3D(dt, now, shX, shY)) {
     ctx.clearRect(0, 0, W, H);
-    const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
+    const isoSin = Math.sin(((cam.pitch || 70) * Math.PI) / 180);
 
     // Points de Ralliement des bâtiments sélectionnés
     for (const b of state.buildings) {
@@ -5276,7 +5305,7 @@ function renderMinimap() {
   }
   miniCtx.drawImage(fogCanvas, 0, 0, mw, mh);
 
-  const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
+  const isoSin = Math.sin(((cam.pitch || 70) * Math.PI) / 180);
   const vw = (W / cam.z) * sx, vh = ((H / cam.z) / isoSin) * sy;
   miniCtx.strokeStyle = '#fff8ea';
   miniCtx.lineWidth = 1.6;
