@@ -188,6 +188,9 @@
     for (const el of document.querySelectorAll('[data-ping]')) {
       const v = room.pings[el.dataset.ping]; el.textContent = v != null ? Math.round(v) + ' ms' : '';
     }
+    if (frame && frame.loaded) {
+      frame.el.contentWindow.postMessage({ dd: 'hub', k: 'pings', pings: room.pings }, ORIGIN);
+    }
   }
 
   function renderRoom() {
@@ -290,7 +293,7 @@
 
   function postRoster() {
     if (!frame || !frame.loaded || !room) return;
-    frame.el.contentWindow.postMessage({ dd: 'hub', k: 'roster', players: room.players.map(({ cid, ...p }) => p), ready: room.ready, hostId: room.hostId,
+    frame.el.contentWindow.postMessage({ dd: 'hub', k: 'roster', players: room.players.map(({ cid, ...p }) => p), ready: room.ready, pings: room.pings, hostId: room.hostId,
       role: room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest', code: room.code }, ORIGIN);
   }
 
@@ -304,7 +307,7 @@
           role: room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest',
           myId: room.myId, hostId: room.hostId, code: room.code, game: frame.game,
           settings: room.game ? room.game.settings : {},
-          players: room.players.map(({ cid, ...p }) => p), ready: room.ready,
+          players: room.players.map(({ cid, ...p }) => p), ready: room.ready, pings: room.pings,
         } }, ORIGIN);
         break;
       case 'ready': room.setReady(frame.game); break;

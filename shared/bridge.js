@@ -17,7 +17,7 @@
   const H = {
     embedded,
     info: { role: qs.get('role') || 'solo', code: qs.get('code') || null, game: qs.get('game') || null, myId: 0, hostId: 0, settings: {} },
-    players: [], readyMap: {}, initDone: false, handlers: {},
+    players: [], readyMap: {}, pings: {}, initDone: false, handlers: {},
   };
   const emit = (k, ...a) => (H.handlers[k] || []).forEach((f) => { try { f(...a); } catch (e) { console.error(e); } });
   const post = (o) => { if (embedded) parent.postMessage({ dd: 'hub', ...o }, target); };
@@ -37,13 +37,17 @@
     if (e.source !== window.parent) return;
     const d = e.data; if (!d || d.dd !== 'hub') return;
     if (d.k === 'init') {
-      Object.assign(H.info, d.info); H.players = d.info.players || []; H.readyMap = d.info.ready || {};
+      Object.assign(H.info, d.info); H.players = d.info.players || []; H.readyMap = d.info.ready || {}; H.pings = d.info.pings || {};
       H.initDone = true; emit('init', H.info); emit('roster', H.players, H.readyMap);
     } else if (d.k === 'roster') {
       H.players = d.players || []; H.readyMap = d.ready || {}; H.info.hostId = d.hostId;
+      if (d.pings) Object.assign(H.pings, d.pings);
       if (d.role) H.info.role = d.role;
       if (d.code) H.info.code = d.code;
       emit('roster', H.players, H.readyMap);
+    } else if (d.k === 'pings') {
+      if (d.pings) Object.assign(H.pings, d.pings);
+      emit('pings', H.pings);
     } else if (d.k === 'msg') emit('msg', d.from, d.m);
   });
   if (embedded) post({ k: 'hello' });

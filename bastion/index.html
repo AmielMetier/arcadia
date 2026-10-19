@@ -39,10 +39,15 @@ canvas#world.cur-build{cursor:cell}
 @keyframes pulseSd{to{transform:scale(1.05)}}
 .spacer{flex:1}
 
-.roster-top{background:var(--paper);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:12px;padding:4px 9px;display:flex;gap:10px;align-items:center}
-.p-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700}
+.roster-top{background:var(--paper);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:12px;padding:4px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.p-chip{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;background:var(--cream);border:1.5px solid var(--ink);border-radius:8px;padding:2px 7px}
+.p-chip.me{background:#fff;box-shadow:2px 2px 0 var(--ink)}
 .p-chip.dead{opacity:.38;text-decoration:line-through}
-.p-chip .dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--ink);display:inline-block}
+.p-chip .dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--ink);display:inline-block;flex:none}
+.p-chip .ping-tag{font-family:Bungee,sans-serif;font-size:9.5px;padding:1px 5px;border-radius:5px;border:1px solid var(--ink);background:#d8f8e5;color:#0f6838;margin-left:2px;white-space:nowrap}
+.p-chip .ping-tag.warn{background:#fff3cd;color:#855700}
+.p-chip .ping-tag.bad{background:#ffe0db;color:#b51d14}
+.p-chip .ping-tag.bot{background:#e4dfd3;color:#524c42}
 
 .btn{font-family:Bungee,Impact,sans-serif;font-size:13px;letter-spacing:.4px;background:var(--red);color:#fff;
   border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:10px;padding:7px 12px;cursor:pointer;
@@ -978,6 +983,8 @@ function createInitialState(roster, settings) {
       gas: blitz ? 100 : 50,
       dead: false,
       score: 0,
+      nextUnitSeq: 20,
+      ping: p.bot ? 0 : 16,
     };
   });
 
@@ -1055,12 +1062,14 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
   const rx = bld.rallyX ?? (bld.x + Math.sign(HALF_W - bld.x) * 110);
   const ry = bld.rallyY ?? (bld.y + Math.sign(HALF_W - bld.y) * 110);
   const angle = Math.atan2(ry - bld.y, rx - bld.x);
-  const jitter = (Math.random() - 0.5) * 32;
+  const seq = (owner.nextUnitSeq = (owner.nextUnitSeq || 20) + 1);
+  const jitter = (((seq * 37) % 100) / 100 - 0.5) * 32;
   const ux = clamp(bld.x + Math.cos(angle) * (bld.radius + def.radius + 10) - Math.sin(angle) * jitter, 30, WORLD_SIZE - 30);
   const uy = clamp(bld.y + Math.sin(angle) * (bld.radius + def.radius + 10) + Math.cos(angle) * jitter, 30, WORLD_SIZE - 30);
+  const detId = (Number(owner.id) + 1) * 10000 + seq;
 
   const u = {
-    id: state.nextId++,
+    id: detId,
     kind,
     owner: owner.id,
     team: owner.team,
@@ -1074,8 +1083,8 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
     radius: def.radius,
     cd: 0,
     mode: 'amove',
-    orderX: rx + (Math.random() - 0.5) * 28,
-    orderY: ry + (Math.random() - 0.5) * 28,
+    orderX: rx + (((seq * 53) % 100) / 100 - 0.5) * 28,
+    orderY: ry + (((seq * 71) % 100) / 100 - 0.5) * 28,
     targetEntId: null,
     harvestId: null,
     gatherT: 0,
@@ -1101,11 +1110,14 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
 
 function executeCommand(state, playerId, cmd, fxEvents) {
   if (state.over || !cmd || typeof cmd !== 'object') return { ok: false };
-  const p = state.players.find((q) => q.id === playerId);
+  const p = state.players.find((q) => Number(q.id) === Number(playerId));
   if (!p || p.dead) return { ok: false };
 
   // 1. POSER UN CHANTIER DE CONSTRUCTION (exige un Ouvrier VCS qui se déplace sur place !)
   if (cmd.op === 'BUILD') {
+    if (cmd.bldId && state.buildings.some((b) => b.id === cmd.bldId)) {
+      return { ok: true, bldId: cmd.bldId };
+    }
     const kind = String(cmd.kind || '');
     const check = canPlaceBuilding(state, p.id, kind, Number(cmd.x) || 0, Number(cmd.y) || 0);
     if (!check.ok) return check;
@@ -1113,9 +1125,8 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     const bx = check.snapX, by = check.snapY;
     let builder = null;
     if (Array.isArray(cmd.unitIds) && cmd.unitIds.length) {
-      const candidates = state.units.filter((u) => u.owner === p.id && u.kind === 'scv' && u.hp > 0 && cmd.unitIds.includes(u.id));
+      const candidates = state.units.filter((u) => Number(u.owner) === Number(p.id) && u.kind === 'scv' && u.hp > 0 && cmd.unitIds.includes(u.id));
       if (candidates.length) {
-        // Choisit le VCS sélectionné le plus proche (en privilégiant ceux qui ne construisent pas déjà)
         candidates.sort((a, b) => {
           const pa = a.mode === 'build' ? 1e7 : 0;
           const pb = b.mode === 'build' ? 1e7 : 0;
@@ -1124,10 +1135,11 @@ function executeCommand(state, playerId, cmd, fxEvents) {
         builder = candidates[0];
       }
     }
-    if (!builder && p.bot) {
+    if (!builder) {
+      // Fallback sur le VCS libre le plus proche du joueur si l'ID de sélection a glissé
       let bestD2 = Infinity;
       for (const u of state.units) {
-        if (u.owner === p.id && u.kind === 'scv' && u.hp > 0 && u.mode !== 'build') {
+        if (Number(u.owner) === Number(p.id) && u.kind === 'scv' && u.hp > 0 && u.mode !== 'build') {
           const d2 = dist2(u.x, u.y, bx, by);
           if (d2 < bestD2) { bestD2 = d2; builder = u; }
         }
@@ -1141,7 +1153,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     p.minerals -= def.min;
     p.gas -= def.gas;
     const bld = {
-      id: state.nextId++,
+      id: Number(cmd.bldId) || state.nextId++,
       kind,
       owner: p.id,
       team: p.team,
@@ -1192,13 +1204,14 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 
     let producer = null;
     if (cmd.bldId) {
-      const b = state.buildings.find((x) => x.id === cmd.bldId && x.owner === p.id && x.hp > 0 && !x.constructing);
+      const b = state.buildings.find((x) => x.id === cmd.bldId && Number(x.owner) === Number(p.id) && x.hp > 0 && !x.constructing);
       if (b && (BUILDINGS[b.kind]?.trains || []).includes(uKind) && b.queue.length < 5) {
         producer = b;
       }
-    } else if (p.bot) {
+    }
+    if (!producer) {
       const candidates = state.buildings.filter((b) =>
-        b.owner === p.id && b.hp > 0 && !b.constructing && (BUILDINGS[b.kind]?.trains || []).includes(uKind) && b.queue.length < 5
+        Number(b.owner) === Number(p.id) && b.hp > 0 && !b.constructing && (BUILDINGS[b.kind]?.trains || []).includes(uKind) && b.queue.length < 5
       );
       candidates.sort((a, b) => a.queue.length - b.queue.length);
       producer = candidates[0] || null;
@@ -2422,6 +2435,25 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
     g.fillRect(roofOff.ox - bw / 2, roofOff.oy - r - 12.5, bw * pct, bh);
   }
+  if (!isIcon && b.kind === 'hq' && state) {
+    const ownerP = state.players.find((q) => Number(q.id) === Number(b.owner));
+    if (ownerP) {
+      const roofOff = project3DOffset(wx, wy, h3d, false);
+      const pingVal = ownerP.bot ? '🤖 IA' : `${getPlayerPing(ownerP)} ms`;
+      const lbl = `${ownerP.name} · ${pingVal}`;
+      g.font = '700 11px "Chakra Petch", sans-serif';
+      const tw = g.measureText(lbl).width + 16;
+      const bx = roofOff.ox - tw / 2, by = roofOff.oy - r - 34;
+      g.fillStyle = 'rgba(22, 24, 29, 0.88)';
+      g.strokeStyle = color;
+      g.lineWidth = 2;
+      g.beginPath(); g.roundRect(bx, by, tw, 18, 6); g.fill(); g.stroke();
+      g.fillStyle = '#fff8ea';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(lbl, roofOff.ox, by + 9);
+    }
+  }
   g.restore();
 }
 
@@ -2783,9 +2815,22 @@ function handleFxEvents(list) {
 let localCmdSeq = 0;
 const pendingCmds = [];
 const clientAckSeq = {};
+const playerPings = {};
+
+function getPlayerPing(p) {
+  if (!p || p.bot) return 0;
+  const fromLocal = playerPings[p.id];
+  const fromHub = window.HubBridge && HubBridge.pings ? HubBridge.pings[p.id] : null;
+  const val = fromLocal || fromHub || p.ping || (role === 'solo' ? 1 : 18);
+  return Math.max(1, Math.round(val));
+}
 
 function sendCommand(cmd) {
   if (!state || state.over) return;
+  const seq = ++localCmdSeq;
+  if (cmd.op === 'BUILD' && !cmd.bldId) {
+    cmd.bldId = (Number(myId) + 1) * 100000 + seq;
+  }
   const fx = [];
   const res = executeCommand(state, myId, cmd, fx);
   if (!res.ok && res.reason) {
@@ -2802,11 +2847,10 @@ function sendCommand(cmd) {
       else Sfx.order();
     }
     handleFxEvents(fx);
-    renderConsoleUI(false);
+    renderConsoleUI(true);
 
     if (window.HubBridge && HubBridge.embedded) {
       if (role === 'guest') {
-        const seq = ++localCmdSeq;
         pendingCmds.push({ seq, cmd, ts: performance.now() });
         HubBridge.send('host', { t: 'cmd', cmd, seq });
       } else if (role === 'host') {
@@ -2816,13 +2860,10 @@ function sendCommand(cmd) {
   }
 }
 
-/* ============================================================================
-   CONTRÔLES RTS STARCRAFT STRICTS (SÉLECTION OBLIGATOIRE POUR CONSTRUIRE/PRODUIRE)
-   ============================================================================ */
 function cleanSelection() {
   if (!state) return;
-  const validU = new Set(state.units.filter((u) => u.owner === myId && u.hp > 0).map((u) => u.id));
-  const validB = new Set(state.buildings.filter((b) => b.owner === myId && b.hp > 0).map((b) => b.id));
+  const validU = new Set(state.units.filter((u) => Number(u.owner) === Number(myId) && u.hp > 0).map((u) => u.id));
+  const validB = new Set(state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.hp > 0).map((b) => b.id));
   for (const id of [...selectedUnits]) if (!validU.has(id)) selectedUnits.delete(id);
   for (const id of [...selectedBlds]) if (!validB.has(id)) selectedBlds.delete(id);
 
@@ -3187,14 +3228,16 @@ $('#btnReplay').onclick = () => {
    CONSOLE RTS INFÉRIEURE STRICTE (AUCUNE ACTION SANS SÉLECTION D'UNITÉ/BÂTIMENT)
    ============================================================================ */
 let lastCmdSig = '';
+let lastSelSig = '';
+let lastRosterSig = '';
 
 function renderConsoleUI(force = false) {
   if (!state) return;
   cleanSelection();
-  const me = state.players.find((p) => p.id === myId);
+  const me = state.players.find((p) => Number(p.id) === Number(myId));
   if (!me) return;
 
-  const myUnits = state.units.filter((u) => u.owner === myId && u.hp > 0);
+  const myUnits = state.units.filter((u) => Number(u.owner) === Number(myId) && u.hp > 0);
   const scvs = myUnits.filter((u) => u.kind === 'scv');
   const armyCnt = myUnits.filter((u) => u.kind !== 'scv').length;
   $('#uiIdleCnt').textContent = scvs.length;
@@ -3212,7 +3255,9 @@ function renderConsoleUI(force = false) {
   if (cgBar.innerHTML !== cgHtml.join('')) {
     cgBar.innerHTML = cgHtml.join('');
     for (const btn of cgBar.querySelectorAll('[data-cg]')) {
-      btn.onclick = () => {
+      btn.onpointerdown = (ev) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
         const g = Number(btn.dataset.cg);
         const grp = controlGroups[g];
         selectedUnits = new Set(grp.units || []);
@@ -3227,122 +3272,169 @@ function renderConsoleUI(force = false) {
   const selU = state.units.filter((u) => selectedUnits.has(u.id));
   const selB = state.buildings.filter((b) => selectedBlds.has(b.id));
 
-  // PANNEAU CENTRAL / GAUCHE : SÉLECTION AÉRÉE AVEC NOM ET APERÇU 3D CLAIR
+  let selSig = 'NONE';
   if (selB.length >= 1 && selU.length === 0) {
-    const b = selB[0];
-    const def = BUILDINGS[b.kind];
-    $('#uiSelHeader').textContent = selB.length > 1 ? `${selB.length} × ${def.name}` : def.name;
-    $('#uiSelSubHint').textContent = b.constructing ? 'Chantier 3D en construction...' : 'Clic Droit sur la carte = Point de Ralliement';
-    const pct = Math.round((b.hp / b.maxHp) * 100);
-    const qSlotsHtml = [0, 1, 2, 3, 4].map((idx) => {
-      const qKind = b.queue?.[idx];
-      const uDef = qKind ? UNITS[qKind] : null;
-      return `<div class="q-slot ${uDef ? 'filled' : ''}" data-cancel-bld="${b.id}" data-cancel-slot="${idx}" title="${uDef ? `Annuler ${uDef.name}` : 'Slot libre'}">
-        <span class="num">#${idx + 1}</span>
-        ${uDef ? `<span class="q-nm">${uDef.short}</span>` : '<span style="color:#b7ac95">—</span>'}
-      </div>`;
-    }).join('');
-    const qProg = b.qTotal > 0 ? Math.round((1 - b.qTimer / b.qTotal) * 100) : 0;
-
-    selBody.innerHTML = `
-      <div class="portrait-box">
-        <div class="portrait-name">${def.short}</div>
-        <canvas width="98" height="86" id="portCvs"></canvas>
-        <div class="portrait-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
-      </div>
-      <div class="sel-info">
-        <div class="sel-title">${def.name}</div>
-        <div class="sel-sub">PV : ${Math.ceil(b.hp)} / ${b.maxHp} ${b.constructing ? `· Construction ${Math.round((b.buildProg || 0) * 100)}%` : ''}</div>
-        <div class="sel-stats">
-          ${def.dmg ? `<span class="st-chip">⚔️ Dégâts : ${def.dmg}</span>` : ''}
-          ${def.supply ? `<span class="st-chip">📦 Ravitaillement : +${def.supply}</span>` : ''}
-          <span class="st-chip">${def.desc}</span>
-        </div>
-        ${(def.trains && def.trains.length && !b.constructing) ? `
-          <div class="prod-queue">
-            <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700">
-              <span>File de production (${b.queue.length}/5)</span>
-              <span>${b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire'}</span>
-            </div>
-            <div class="q-bar-wrap"><i style="width:${qProg}%"></i></div>
-            <div class="q-slots">${qSlotsHtml}</div>
-          </div>
-        ` : ''}
-      </div>
-    `;
-    drawThumbIcon($('#portCvs'), b.kind, me.color);
-    for (const sl of selBody.querySelectorAll('.q-slot.filled')) {
-      sl.onclick = () => sendCommand({ op: 'CANCEL_QUEUE', bldId: Number(sl.dataset.cancelBld), slot: Number(sl.dataset.cancelSlot) });
-    }
+    const b0 = selB[0];
+    selSig = `B:${selB.map((b) => b.id).join(',')}:${b0.constructing ? 1 : 0}:${(b0.queue || []).join(',')}`;
   } else if (selU.length === 1) {
-    const u = selU[0];
-    const def = UNITS[u.kind];
-    $('#uiSelHeader').textContent = def.name;
-    $('#uiSelSubHint').textContent = u.kind === 'scv'
-      ? 'Ouvrier VCS : choisis un bâtiment à droite [1-8] ou Clic Droit sur un cristal'
-      : 'A + Clic = Attaque-Déplacement · Clic Droit = Ordre';
-    const pct = Math.round((u.hp / u.maxHp) * 100);
-    selBody.innerHTML = `
-      <div class="portrait-box">
-        <div class="portrait-name">${def.short}</div>
-        <canvas width="98" height="86" id="portCvs"></canvas>
-        <div class="portrait-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
-      </div>
-      <div class="sel-info">
-        <div class="sel-title">${def.name} ${u.sieged ? '· [MODE SIÈGE]' : ''} ${u.stimT > 0 ? '· [STIMPACK ⚡]' : ''}</div>
-        <div class="sel-sub">PV : ${Math.ceil(u.hp)} / ${u.maxHp} · ${def.desc}</div>
-        <div class="sel-stats">
-          <span class="st-chip">⚔️ Dégâts : ${u.sieged ? def.siegeDmg : def.dmg}</span>
-          <span class="st-chip">🎯 Portée : ${u.sieged ? def.siegeRange : def.range}</span>
-          <span class="st-chip">💨 Vitesse : ${u.sieged ? 0 : def.speed}</span>
-        </div>
-      </div>
-    `;
-    drawThumbIcon($('#portCvs'), u.kind, me.color);
+    const u0 = selU[0];
+    selSig = `U1:${u0.id}:${u0.kind}:${u0.sieged ? 1 : 0}:${u0.stimT > 0 ? 1 : 0}`;
   } else if (selU.length > 1) {
-    $('#uiSelHeader').textContent = `Escouade sélectionnée (${selU.length} unités)`;
-    $('#uiSelSubHint').textContent = 'Clic = Isoler · Ctrl+Clic = Même type · A + Clic = Attaque · T = Stimpack · E = Siège';
-    selBody.innerHTML = `<div class="multi-grid">${selU.slice(0, 24).map((u) => {
-      const def = UNITS[u.kind];
-      const pct = Math.round((u.hp / u.maxHp) * 100);
-      return `<div class="u-card ${u.stimT > 0 ? 'stim' : ''} ${u.sieged ? 'siege' : ''}" data-pick-u="${u.id}" title="${def.name} (${Math.ceil(u.hp)}/${u.maxHp} PV)">
-        <canvas class="u-thumb" width="68" height="38" data-u-thumb="${u.kind}"></canvas>
-        <span class="u-nm">${def.short}</span>
-        <div class="u-hp"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
-      </div>`;
-    }).join('')}</div>`;
-    for (const c of selBody.querySelectorAll('canvas[data-u-thumb]')) {
-      drawThumbIcon(c, c.dataset.uThumb, me.color);
-    }
-    for (const card of selBody.querySelectorAll('[data-pick-u]')) {
-      card.onclick = (ev) => {
-        const id = Number(card.dataset.pickU);
-        const targetU = state.units.find((x) => x.id === id);
-        if (ev.ctrlKey && targetU) {
-          selectedUnits = new Set(selU.filter((x) => x.kind === targetU.kind).map((x) => x.id));
-        } else {
-          selectedUnits = new Set([id]);
-        }
-        renderConsoleUI(true);
-      };
-    }
-  } else {
-    $('#uiSelHeader').textContent = 'Aucune sélection';
-    $('#uiSelSubHint').textContent = 'Clique sur un VCS ou un bâtiment sur la carte';
-    selBody.innerHTML = `
-      <div class="sel-info">
-        <div class="sel-title">Sélectionne une unité ou un bâtiment</div>
-        <div class="sel-sub">Fonctionnement StarCraft :</div>
-        <div class="sel-stats">
-          <span class="st-chip">👷 Clique sur un <b>Ouvrier VCS</b> pour construire un bâtiment</span>
-          <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un Ouvrier VCS</span>
-          <span class="st-chip">🏭 Clique sur la <b>Caserne / Usine</b> pour créer des troupes</span>
-        </div>
-      </div>
-    `;
+    selSig = `UM:${selU.map((u) => `${u.id}:${u.sieged ? 1 : 0}:${u.stimT > 0 ? 1 : 0}`).join(',')}`;
   }
 
-  // PANNEAU DE DROITE : COMMAND CARD 4x3 STRICTE (basée uniquement sur ce qui est sélectionné !)
+  // PANNEAU CENTRAL / GAUCHE : ne reconstruit le DOM que si la structure de sélection change !
+  if (!force && selSig === lastSelSig) {
+    if (selB.length >= 1 && selU.length === 0) {
+      const b = selB[0];
+      const pct = Math.round((b.hp / b.maxHp) * 100);
+      const qProg = b.qTotal > 0 ? Math.round((1 - b.qTimer / b.qTotal) * 100) : 0;
+      const hpBar = $('#selHpBar'), hpSub = $('#selHpSub'), qBar = $('#selQBar'), qTxt = $('#selQTxt');
+      if (hpBar) { hpBar.style.width = `${pct}%`; hpBar.style.background = pct > 45 ? '#2fbf71' : '#ff4b2b'; }
+      if (hpSub) hpSub.textContent = `PV : ${Math.ceil(b.hp)} / ${b.maxHp} ${b.constructing ? `· Construction ${Math.round((b.buildProg || 0) * 100)}%` : ''}`;
+      if (qBar) qBar.style.width = `${qProg}%`;
+      if (qTxt) qTxt.textContent = b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire';
+    } else if (selU.length === 1) {
+      const u = selU[0];
+      const def = UNITS[u.kind];
+      const pct = Math.round((u.hp / u.maxHp) * 100);
+      const hpBar = $('#selHpBar'), hpSub = $('#selHpSub');
+      if (hpBar) { hpBar.style.width = `${pct}%`; hpBar.style.background = pct > 45 ? '#2fbf71' : '#ff4b2b'; }
+      if (hpSub) hpSub.textContent = `PV : ${Math.ceil(u.hp)} / ${u.maxHp} · ${def.desc}`;
+    } else if (selU.length > 1) {
+      for (const u of selU.slice(0, 24)) {
+        const bar = selBody.querySelector(`[data-u-hp="${u.id}"]`);
+        if (bar) {
+          const pct = Math.round((u.hp / u.maxHp) * 100);
+          bar.style.width = `${pct}%`;
+          bar.style.background = pct > 45 ? '#2fbf71' : '#ff4b2b';
+        }
+      }
+    }
+  } else {
+    lastSelSig = selSig;
+    if (selB.length >= 1 && selU.length === 0) {
+      const b = selB[0];
+      const def = BUILDINGS[b.kind];
+      $('#uiSelHeader').textContent = selB.length > 1 ? `${selB.length} × ${def.name}` : def.name;
+      $('#uiSelSubHint').textContent = b.constructing ? 'Chantier 3D en construction...' : 'Clic Droit sur la carte = Point de Ralliement';
+      const pct = Math.round((b.hp / b.maxHp) * 100);
+      const qSlotsHtml = [0, 1, 2, 3, 4].map((idx) => {
+        const qKind = b.queue?.[idx];
+        const uDef = qKind ? UNITS[qKind] : null;
+        return `<div class="q-slot ${uDef ? 'filled' : ''}" data-cancel-bld="${b.id}" data-cancel-slot="${idx}" title="${uDef ? `Annuler ${uDef.name}` : 'Slot libre'}">
+          <span class="num">#${idx + 1}</span>
+          ${uDef ? `<span class="q-nm">${uDef.short}</span>` : '<span style="color:#b7ac95">—</span>'}
+        </div>`;
+      }).join('');
+      const qProg = b.qTotal > 0 ? Math.round((1 - b.qTimer / b.qTotal) * 100) : 0;
+
+      selBody.innerHTML = `
+        <div class="portrait-box">
+          <div class="portrait-name">${def.short}</div>
+          <canvas width="98" height="86" id="portCvs"></canvas>
+          <div class="portrait-hp"><i id="selHpBar" style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
+        </div>
+        <div class="sel-info">
+          <div class="sel-title">${def.name}</div>
+          <div class="sel-sub" id="selHpSub">PV : ${Math.ceil(b.hp)} / ${b.maxHp} ${b.constructing ? `· Construction ${Math.round((b.buildProg || 0) * 100)}%` : ''}</div>
+          <div class="sel-stats">
+            ${def.dmg ? `<span class="st-chip">⚔️ Dégâts : ${def.dmg}</span>` : ''}
+            ${def.supply ? `<span class="st-chip">📦 Ravitaillement : +${def.supply}</span>` : ''}
+            <span class="st-chip">${def.desc}</span>
+          </div>
+          ${(def.trains && def.trains.length && !b.constructing) ? `
+            <div class="prod-queue">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700">
+                <span>File de production (${b.queue.length}/5)</span>
+                <span id="selQTxt">${b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire'}</span>
+              </div>
+              <div class="q-bar-wrap"><i id="selQBar" style="width:${qProg}%"></i></div>
+              <div class="q-slots">${qSlotsHtml}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      drawThumbIcon($('#portCvs'), b.kind, me.color);
+      for (const sl of selBody.querySelectorAll('.q-slot.filled')) {
+        sl.onpointerdown = (ev) => {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          sendCommand({ op: 'CANCEL_QUEUE', bldId: Number(sl.dataset.cancelBld), slot: Number(sl.dataset.cancelSlot) });
+        };
+      }
+    } else if (selU.length === 1) {
+      const u = selU[0];
+      const def = UNITS[u.kind];
+      $('#uiSelHeader').textContent = def.name;
+      $('#uiSelSubHint').textContent = u.kind === 'scv'
+        ? 'Ouvrier VCS : choisis un bâtiment à droite [1-8] ou Clic Droit sur un cristal'
+        : 'A + Clic = Attaque-Déplacement · Clic Droit = Ordre';
+      const pct = Math.round((u.hp / u.maxHp) * 100);
+      selBody.innerHTML = `
+        <div class="portrait-box">
+          <div class="portrait-name">${def.short}</div>
+          <canvas width="98" height="86" id="portCvs"></canvas>
+          <div class="portrait-hp"><i id="selHpBar" style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
+        </div>
+        <div class="sel-info">
+          <div class="sel-title">${def.name} ${u.sieged ? '· [MODE SIÈGE]' : ''} ${u.stimT > 0 ? '· [STIMPACK ⚡]' : ''}</div>
+          <div class="sel-sub" id="selHpSub">PV : ${Math.ceil(u.hp)} / ${u.maxHp} · ${def.desc}</div>
+          <div class="sel-stats">
+            <span class="st-chip">⚔️ Dégâts : ${u.sieged ? def.siegeDmg : def.dmg}</span>
+            <span class="st-chip">🎯 Portée : ${u.sieged ? def.siegeRange : def.range}</span>
+            <span class="st-chip">💨 Vitesse : ${u.sieged ? 0 : def.speed}</span>
+          </div>
+        </div>
+      `;
+      drawThumbIcon($('#portCvs'), u.kind, me.color);
+    } else if (selU.length > 1) {
+      $('#uiSelHeader').textContent = `Escouade sélectionnée (${selU.length} unités)`;
+      $('#uiSelSubHint').textContent = 'Clic = Isoler · Ctrl+Clic = Même type · A + Clic = Attaque · T = Stimpack · E = Siège';
+      selBody.innerHTML = `<div class="multi-grid">${selU.slice(0, 24).map((u) => {
+        const def = UNITS[u.kind];
+        const pct = Math.round((u.hp / u.maxHp) * 100);
+        return `<div class="u-card ${u.stimT > 0 ? 'stim' : ''} ${u.sieged ? 'siege' : ''}" data-pick-u="${u.id}" title="${def.name} (${Math.ceil(u.hp)}/${u.maxHp} PV)">
+          <canvas class="u-thumb" width="68" height="38" data-u-thumb="${u.kind}"></canvas>
+          <span class="u-nm">${def.short}</span>
+          <div class="u-hp"><i data-u-hp="${u.id}" style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></div>
+        </div>`;
+      }).join('')}</div>`;
+      for (const c of selBody.querySelectorAll('canvas[data-u-thumb]')) {
+        drawThumbIcon(c, c.dataset.uThumb, me.color);
+      }
+      for (const card of selBody.querySelectorAll('[data-pick-u]')) {
+        card.onpointerdown = (ev) => {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          const id = Number(card.dataset.pickU);
+          const targetU = state.units.find((x) => x.id === id);
+          if (ev.ctrlKey && targetU) {
+            selectedUnits = new Set(selU.filter((x) => x.kind === targetU.kind).map((x) => x.id));
+          } else {
+            selectedUnits = new Set([id]);
+          }
+          renderConsoleUI(true);
+        };
+      }
+    } else {
+      $('#uiSelHeader').textContent = 'Aucune sélection';
+      $('#uiSelSubHint').textContent = 'Clique sur un VCS ou un bâtiment sur la carte';
+      selBody.innerHTML = `
+        <div class="sel-info">
+          <div class="sel-title">Sélectionne une unité ou un bâtiment</div>
+          <div class="sel-sub">Fonctionnement StarCraft :</div>
+          <div class="sel-stats">
+            <span class="st-chip">👷 Clique sur un <b>Ouvrier VCS</b> pour construire un bâtiment</span>
+            <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un Ouvrier VCS</span>
+            <span class="st-chip">🏭 Clique sur la <b>Caserne / Usine</b> pour créer des troupes</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // PANNEAU DE DROITE : COMMAND CARD 4x3 STRICTE (sans re-création DOM sur variation de ressources !)
   const hasScv = selU.some((u) => u.kind === 'scv');
   const firstB = selB[0] || null;
   let modeKey = 'NONE';
@@ -3352,11 +3444,24 @@ function renderConsoleUI(force = false) {
     modeKey = firstB.constructing ? 'BLD_CONSTRUCT' : `BLD_${firstB.kind}`;
   }
 
-  const sig = `${modeKey}|${buildMode}|${orderCursor}|${Math.floor(me.minerals / 5)}|${Math.floor(me.gas / 5)}|${me.color}`;
-  if (!force && sig === lastCmdSig) return;
+  const grid = $('#uiCmdGrid');
+  const sig = `${modeKey}|${buildMode}|${orderCursor}|${me.color}`;
+  if (!force && sig === lastCmdSig) {
+    // Mise à jour légère des classes .cant sans détruire les boutons en plein clic !
+    for (const b of grid.querySelectorAll('[data-cmd-build]')) {
+      const def = BUILDINGS[b.dataset.cmdBuild];
+      const cant = me.minerals < def.min || me.gas < def.gas || (def.req && !hasCompletedBuilding(state, myId, def.req));
+      b.classList.toggle('cant', !!cant);
+    }
+    for (const b of grid.querySelectorAll('[data-cmd-train]')) {
+      const uDef = UNITS[b.dataset.cmdTrain];
+      const cant = me.minerals < uDef.min || me.gas < uDef.gas;
+      b.classList.toggle('cant', !!cant);
+    }
+    return;
+  }
   lastCmdSig = sig;
 
-  const grid = $('#uiCmdGrid');
   const cards = [];
 
   if (modeKey === 'SCV') {
@@ -3469,7 +3574,6 @@ function renderConsoleUI(force = false) {
     }
 
   } else {
-    // RIEN N'EST SÉLECTIONNÉ : Panneau de droite vide (aucun bouton de construction/production global)
     $('#uiCmdTitle').textContent = 'Aucune sélection';
     $('#uiCmdHint').textContent = 'Sélection requise';
     grid.innerHTML = `<div class="cmd-empty">
@@ -3484,7 +3588,9 @@ function renderConsoleUI(force = false) {
     drawThumbIcon(c, c.dataset.thumb, me.color);
   }
   for (const b of grid.querySelectorAll('[data-cmd-build]')) {
-    b.onclick = () => {
+    b.onpointerdown = (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
       const k = b.dataset.cmdBuild;
       orderCursor = null;
       buildMode = buildMode === k ? null : k;
@@ -3493,7 +3599,9 @@ function renderConsoleUI(force = false) {
     };
   }
   for (const b of grid.querySelectorAll('[data-cmd-train]')) {
-    b.onclick = () => {
+    b.onpointerdown = (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
       const uKind = b.dataset.cmdTrain;
       for (const bId of selectedBlds) {
         sendCommand({ op: 'TRAIN', unit: uKind, bldId: bId });
@@ -3501,7 +3609,9 @@ function renderConsoleUI(force = false) {
     };
   }
   for (const b of grid.querySelectorAll('[data-cmd-act]')) {
-    b.onclick = () => {
+    b.onpointerdown = (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
       const act = b.dataset.cmdAct;
       if (act === 'amove') { buildMode = null; orderCursor = orderCursor === 'amove' ? null : 'amove'; updateCursorClass(); renderConsoleUI(true); }
       else if (act === 'scan') { buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan'; updateCursorClass(); renderConsoleUI(true); }
@@ -3516,12 +3626,12 @@ function renderConsoleUI(force = false) {
 
 function updateHudUI() {
   if (!state) return;
-  const me = state.players.find((p) => p.id === myId);
+  const me = state.players.find((p) => Number(p.id) === Number(myId));
   if (me) {
     $('#uiMin').textContent = Math.floor(me.minerals);
     $('#uiGas').textContent = Math.floor(me.gas);
-    const scvCnt = state.units.filter((u) => u.owner === myId && u.kind === 'scv' && u.hp > 0).length;
-    const refCnt = state.buildings.filter((b) => b.owner === myId && b.kind === 'extractor' && b.hp > 0 && !b.constructing).length;
+    const scvCnt = state.units.filter((u) => Number(u.owner) === Number(myId) && u.kind === 'scv' && u.hp > 0).length;
+    const refCnt = state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.kind === 'extractor' && b.hp > 0 && !b.constructing).length;
     $('#uiWorkers').textContent = `${scvCnt} VCS`;
     $('#uiRefineries').textContent = `${refCnt} Raff.`;
     const sup = computeSupply(state, myId);
@@ -3543,10 +3653,26 @@ function updateHudUI() {
   $('#uiPhaseName').textContent = phaseNames[state.phase] || '';
   $('#uiPhase').classList.toggle('sd', state.phase === 4);
 
-  $('#uiRoster').innerHTML = state.players.map((p) => `<div class="p-chip ${p.dead ? 'dead' : ''}">
-    <span class="dot" style="background:${p.color}"></span>
-    <span>${p.name}</span>
-  </div>`).join('');
+  const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.dead ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
+  if (rosterSig !== lastRosterSig) {
+    lastRosterSig = rosterSig;
+    $('#uiRoster').innerHTML = state.players.map((p) => {
+      const isMe = Number(p.id) === Number(myId);
+      let pingHtml = '';
+      if (p.bot) {
+        pingHtml = `<span class="ping-tag bot">🤖 IA</span>`;
+      } else {
+        const ms = getPlayerPing(p);
+        const cls = ms > 150 ? 'bad' : ms > 80 ? 'warn' : '';
+        pingHtml = `<span class="ping-tag ${cls}">📶 ${ms} ms</span>`;
+      }
+      return `<div class="p-chip ${p.dead ? 'dead' : ''} ${isMe ? 'me' : ''}">
+        <span class="dot" style="background:${p.color}"></span>
+        <span>${p.name}${isMe ? ' <small>(Toi)</small>' : ''}</span>
+        ${pingHtml}
+      </div>`;
+    }).join('');
+  }
 
   renderConsoleUI(false);
 
@@ -3941,6 +4067,8 @@ function packState(s) {
       dead: p.dead,
       spawnX: p.spawnX,
       spawnY: p.spawnY,
+      nextUnitSeq: p.nextUnitSeq || 20,
+      ping: p.bot ? 0 : getPlayerPing(p),
     })),
     buildings: s.buildings.map((b) => ({
       id: b.id,
@@ -4131,16 +4259,40 @@ function startMatch(info) {
 
 if (window.HubBridge && HubBridge.embedded) {
   let centeredOnce = false;
+  let lastStateAt = performance.now();
+
   HubBridge.on('init', (info) => {
     centeredOnce = false;
+    lastStateAt = performance.now();
+    if (info && info.pings) Object.assign(playerPings, info.pings);
     startMatch(info);
     HubBridge.signalReady();
   });
+
+  HubBridge.on('pings', (pMap) => {
+    if (pMap) Object.assign(playerPings, pMap);
+  });
+
+  setInterval(() => {
+    if (!window.HubBridge || !HubBridge.embedded) return;
+    if (HubBridge.pings) Object.assign(playerPings, HubBridge.pings);
+    if (role === 'guest') {
+      const now = performance.now();
+      HubBridge.send('host', { t: 'gping', ts: now, myPing: playerPings[myId] });
+      if (now - lastStateAt > 2500) {
+        HubBridge.send('host', { t: 'sync' });
+      }
+    }
+  }, 1800);
+
   HubBridge.on('msg', (from, m) => {
     if (!m || typeof m !== 'object') return;
     if (role === 'host') {
       if (m.t === 'sync' && state) {
         HubBridge.send(from, { t: 'st', s: packState(state), fx: [] });
+      } else if (m.t === 'gping') {
+        if (Number.isFinite(m.myPing)) playerPings[from] = Math.max(1, Math.round(m.myPing));
+        HubBridge.send(from, { t: 'gpong', ts: m.ts, pings: playerPings });
       } else if (m.t === 'cmd' && m.cmd && state) {
         if (m.seq) clientAckSeq[from] = Math.max(clientAckSeq[from] || 0, m.seq);
         const fx = [];
@@ -4148,10 +4300,19 @@ if (window.HubBridge && HubBridge.embedded) {
         if (res.ok) {
           handleFxEvents(fx);
           HubBridge.send('all', { t: 'rcmd', p: from, cmd: m.cmd, seq: m.seq });
+        } else if (m.seq) {
+          HubBridge.send(from, { t: 'rcmd', p: from, cmd: null, seq: m.seq });
         }
       }
-    } else if (role === 'guest' && from === HubBridge.info.hostId) {
-      if (m.t === 'st' && m.s) {
+    } else if (role === 'guest') {
+      if (m.t === 'gpong') {
+        if (m.pings) Object.assign(playerPings, m.pings);
+        if (m.ts) playerPings[myId] = Math.max(1, Math.round(performance.now() - m.ts));
+      } else if (m.t === 'st' && m.s) {
+        lastStateAt = performance.now();
+        for (const p of m.s.players || []) {
+          if (!p.bot && p.ping && Number(p.id) !== Number(myId)) playerPings[p.id] = p.ping;
+        }
         state = reconcileGuestState(state, m.s);
         if (!centeredOnce) {
           centeredOnce = true;
@@ -4159,11 +4320,12 @@ if (window.HubBridge && HubBridge.embedded) {
           renderConsoleUI(true);
         }
         if (m.fx && m.fx.length) handleFxEvents(m.fx);
-      } else if (m.t === 'rcmd' && m.cmd && state) {
-        if (m.p === myId && m.seq) {
+      } else if (m.t === 'rcmd' && state) {
+        lastStateAt = performance.now();
+        if (Number(m.p) === Number(myId) && m.seq) {
           clientAckSeq[myId] = Math.max(clientAckSeq[myId] || 0, m.seq);
           while (pendingCmds.length && pendingCmds[0].seq <= m.seq) pendingCmds.shift();
-        } else if (m.p !== myId) {
+        } else if (Number(m.p) !== Number(myId) && m.cmd) {
           const fx = [];
           executeCommand(state, m.p, m.cmd, fx);
           handleFxEvents(fx);

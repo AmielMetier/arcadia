@@ -75,8 +75,11 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (this.ws !== ws) return;
           let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
           if (!msg || typeof msg !== 'object') return;
-          if (msg.type === 'pong') return;
-          if (msg.type === 'ping') { sendWs({ type: 'pong', roomId }); return; }
+          if (msg.type === 'pong') {
+            if (msg.ts) this.rtt = Math.max(1, Math.round(performance.now() - msg.ts));
+            return;
+          }
+          if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
           if (msg.type === 'room_joined') {
             ready = true; cb.ready(code);
             return;
@@ -95,13 +98,13 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (msg.type === 'peer_joined') {
             const cid = msg.cid;
             if (!cid) return;
-            if (this.links.size >= maxPeers) {
+            if (this.links.size >= maxPeers && !this.links.has(cid)) {
               sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'full' } });
               return;
             }
             this.links.set(cid, {
-              send: (x) => sendWs({ type: 'relay', roomId, to: cid, data: x }),
-              close: () => sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
+              send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+              close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
             });
             sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
             cb.join(cid);
@@ -116,21 +119,27 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             const d = msg.data;
             if (!cid || !d) return;
             if (d._ctrl === 'hi') {
-              if (this.links.has(cid)) return;
-              if (this.links.size >= maxPeers) {
+              if (!this.links.has(cid) && this.links.size >= maxPeers) {
                 sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'full' } });
                 return;
               }
               this.links.set(cid, {
-                send: (x) => sendWs({ type: 'relay', roomId, to: cid, data: x }),
-                close: () => sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
+                send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+                close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
               });
               sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
               cb.join(cid);
               return;
             }
             if (d._ctrl === 'bye') { this._drop(cid); return; }
-            if (this.links.has(cid)) cb.msg(cid, d);
+            if (!this.links.has(cid)) {
+              this.links.set(cid, {
+                send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+                close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
+              });
+              cb.join(cid);
+            }
+            cb.msg(cid, d);
           }
         };
         ws.onerror = () => {
@@ -141,6 +150,11 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (this.ws !== ws) return;
           this._stopKeepAlive();
           if (!ready) retryOrFail();
+          else if (this.role === 'host' && this.cb === cb) {
+            this.retryTo = setTimeout(() => {
+              if (this.cb === cb && this.role === 'host') this._hostWs(cb, code, code, roomId, Date.now() + 60000);
+            }, 1200);
+          }
         };
       },
       _drop(cid) { if (!this.links.has(cid)) return; this.links.delete(cid); if (this.cb && this.cb.leave) this.cb.leave(cid); },
@@ -190,8 +204,8 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             }
           };
           this.hostLink = {
-            send: (x) => sendWs({ type: 'relay', roomId, to: 'host', data: x }),
-            close: () => { sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
+            send: (x) => this._sendWs({ type: 'relay', roomId, to: 'host', data: x }),
+            close: () => { this._sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
           };
           ws.onopen = () => {
             signaled = true;
@@ -201,16 +215,21 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             if (this.ws !== ws) return;
             let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
             if (!msg || typeof msg !== 'object') return;
-            if (msg.type === 'pong') return;
-            if (msg.type === 'ping') { sendWs({ type: 'pong', roomId }); return; }
+            if (msg.type === 'pong') {
+              if (msg.ts) this.rtt = Math.max(1, Math.round(performance.now() - msg.ts));
+              return;
+            }
+            if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
             if (msg.type === 'room_joined') {
               sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'hi' } });
               return;
             }
             if (msg.type === 'error') {
               retried = true;
-              if (msg.reason === 'room-not-found') fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
-              else if (msg.reason === 'room-full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
+              if (msg.reason === 'room-not-found') {
+                if (done) fireClose();
+                else fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
+              } else if (msg.reason === 'room-full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
               else fin(cb.error, msg.message || "Erreur de connexion.");
               return;
             }
@@ -231,18 +250,36 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
               cb.msg(d);
             }
           };
-          ws.onerror = () => { if (this.ws !== ws) return; if (!done) retryOrFail(); else fireClose(); };
-          ws.onclose = () => { if (this.ws !== ws) return; this._stopKeepAlive(); if (!done) retryOrFail(); else fireClose(); };
+          ws.onerror = () => { if (this.ws !== ws) return; if (!done) retryOrFail(); };
+          ws.onclose = () => {
+            if (this.ws !== ws) return;
+            this._stopKeepAlive();
+            if (!done) retryOrFail();
+            else if (this.role === 'guest' && this.cb === cb && !closed) {
+              // Reconnexion transparente au même salon si la WebSocket a eu une micro-coupure
+              this.retryTo = setTimeout(() => {
+                if (this.role === 'guest' && this.cb === cb && !closed) {
+                  done = false;
+                  connectGuest();
+                }
+              }, 1000);
+            }
+          };
         };
         connectGuest();
+      },
+      _sendWs(obj) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          try { this.ws.send(JSON.stringify(obj)); } catch (e) {}
+        }
       },
       _startKeepAlive(ws, roomId) {
         this._stopKeepAlive();
         this.pingIv = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            try { ws.send(JSON.stringify({ type: 'ping', roomId })); } catch (e) {}
+            try { ws.send(JSON.stringify({ type: 'ping', roomId, ts: performance.now() })); } catch (e) {}
           }
-        }, 25000);
+        }, 12000);
       },
       _stopKeepAlive() {
         if (this.pingIv) { clearInterval(this.pingIv); this.pingIv = null; }
