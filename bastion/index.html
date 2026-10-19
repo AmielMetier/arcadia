@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 :root{
   --ink:#16181d; --paper:#fff8ea; --cream:#f3e9d2; --muted:#6d675c; --line2:#d9cdb3;
@@ -16,7 +17,8 @@
 [hidden]{display:none!important}
 html,body{margin:0;height:100%;overflow:hidden;background:#142818;color:var(--ink);
   font-family:'Chakra Petch',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-canvas#world{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:default}
+canvas#webgl3d{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:1}
+canvas#world{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:default;z-index:2;background:transparent}
 canvas#world.cur-attack{cursor:crosshair}
 canvas#world.cur-build{cursor:cell}
 
@@ -172,6 +174,7 @@ canvas#minimap{width:170px;height:164px;display:block;border:2.5px solid var(--i
 </head>
 <body>
 
+<canvas id="webgl3d"></canvas>
 <canvas id="world"></canvas>
 
 <!-- HUD TOP : MINÉRAUX, GAZ PLASMA, RAVITAILLEMENT, PHASE & JOUEURS -->
@@ -1979,9 +1982,13 @@ function runBots(state, fxEvents) {
 /* ============================================================================
    MOTEUR 3D VUE DU DESSUS (TOP-DOWN 3D PERSPECTIVE & EXTRUSION VOLUMÉTRIQUE)
    ============================================================================ */
+const webglCvs = $('#webgl3d');
 const cvs = $('#world'), ctx = cvs.getContext('2d');
 const miniCvs = $('#minimap'), miniCtx = miniCvs.getContext('2d');
 let W = 0, H = 0, DPR = 1;
+let threeReady = false, threeRenderer = null, threeScene = null, threeCam = null;
+let threeRaycaster = null, threeGroundPlane = null, threeNdc = null, threeHitPt = null, threeProjVec = null;
+let fogTexture3D = null;
 
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -1989,6 +1996,12 @@ function resize() {
   H = window.innerHeight;
   cvs.width = Math.round(W * DPR);
   cvs.height = Math.round(H * DPR);
+  if (threeRenderer && threeCam) {
+    threeRenderer.setPixelRatio(Math.min(1.75, DPR));
+    threeRenderer.setSize(W, H, false);
+    threeCam.aspect = W / Math.max(1, H);
+    threeCam.updateProjectionMatrix();
+  }
 }
 window.addEventListener('resize', resize);
 resize();
@@ -2096,6 +2109,7 @@ function updateFogCanvas(now = performance.now()) {
       fogCtx.fill();
     }
   }
+  if (fogTexture3D) fogTexture3D.needsUpdate = true;
 }
 
 /* ============================================================================
@@ -2726,9 +2740,30 @@ function drawThumbIcon(canvasEl, kind, playerColor) {
 }
 
 function screenToWorld(sx, sy) {
+  if (threeReady && threeCam && threeRaycaster && threeGroundPlane) {
+    threeNdc.set((sx / Math.max(1, W)) * 2 - 1, -(sy / Math.max(1, H)) * 2 + 1);
+    threeRaycaster.setFromCamera(threeNdc, threeCam);
+    if (threeRaycaster.ray.intersectPlane(threeGroundPlane, threeHitPt)) {
+      return { x: threeHitPt.x, y: threeHitPt.z };
+    }
+  }
   return {
     x: cam.x + (sx - W / 2) / cam.z,
     y: cam.y + (sy - H / 2) / cam.z,
+  };
+}
+
+function worldToScreen3D(wx, wy, h = 0) {
+  if (threeReady && threeCam && threeProjVec) {
+    threeProjVec.set(wx, h, wy).project(threeCam);
+    return {
+      x: (threeProjVec.x * 0.5 + 0.5) * W,
+      y: (-threeProjVec.y * 0.5 + 0.5) * H,
+    };
+  }
+  return {
+    x: W / 2 + (wx - cam.x) * cam.z,
+    y: H / 2 + (wy - cam.y - h * 0.46) * cam.z,
   };
 }
 
@@ -3713,13 +3748,963 @@ function updateHudUI() {
 }
 
 /* ============================================================================
+   MOTEUR WEBGL 3D VRAIE 3D VUE DU DESSUS (THREE.JS + OMBRES TEMPS RÉEL)
+   ============================================================================ */
+const bldMeshes3D = new Map();
+const unitMeshes3D = new Map();
+const mineralMeshes3D = [];
+const geyserMeshes3D = [];
+let wallBeamsGroup3D = null;
+let fxGroup3D = null;
+let ghostGroup3D = null;
+let ghostKind3D = null;
+const matCache3D = new Map();
+const geoCache3D = {};
+
+function getMat3D(hexOrStr, rough = 0.45, metal = 0.25, emissiveHex = 0x000000, emissiveInt = 0, opacity = 1) {
+  const key = `${hexOrStr}|${rough}|${metal}|${emissiveHex}|${emissiveInt}|${opacity}`;
+  if (matCache3D.has(key)) return matCache3D.get(key);
+  const m = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(hexOrStr),
+    roughness: rough,
+    metalness: metal,
+    emissive: new THREE.Color(emissiveHex),
+    emissiveIntensity: emissiveInt,
+    transparent: opacity < 1,
+    opacity,
+  });
+  matCache3D.set(key, m);
+  return m;
+}
+
+function initThree3D() {
+  if (threeReady || !window.THREE || !webglCvs) return false;
+  try {
+    threeRenderer = new THREE.WebGLRenderer({
+      canvas: webglCvs,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    threeRenderer.setPixelRatio(Math.min(1.75, DPR));
+    threeRenderer.setSize(W, H, false);
+    threeRenderer.shadowMap.enabled = true;
+    threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    threeScene = new THREE.Scene();
+    threeScene.background = new THREE.Color(0x0f1f14);
+
+    threeCam = new THREE.PerspectiveCamera(36, W / Math.max(1, H), 40, 5200);
+    threeRaycaster = new THREE.Raycaster();
+    threeGroundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    threeNdc = new THREE.Vector2();
+    threeHitPt = new THREE.Vector3();
+    threeProjVec = new THREE.Vector3();
+
+    // Éclairage 3D directionnel + hémisphérique avec vraies ombres portées au sol
+    const hemi = new THREE.HemisphereLight(0xe4f5ff, 0x1d3822, 0.78);
+    threeScene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xfff4d8, 0.98);
+    sun.position.set(WORLD_SIZE * 0.26, 1750, WORLD_SIZE * 0.82);
+    sun.target.position.set(HALF_W, 0, HALF_W);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 250;
+    sun.shadow.camera.far = 3600;
+    const sc = 1380;
+    sun.shadow.camera.left = -sc;
+    sun.shadow.camera.right = sc;
+    sun.shadow.camera.top = sc;
+    sun.shadow.camera.bottom = -sc;
+    sun.shadow.bias = -0.0005;
+    threeScene.add(sun);
+    threeScene.add(sun.target);
+
+    const rim = new THREE.DirectionalLight(0x6ecbff, 0.32);
+    rim.position.set(WORLD_SIZE * 0.85, 950, WORLD_SIZE * 0.14);
+    rim.target.position.set(HALF_W, 0, HALF_W);
+    threeScene.add(rim);
+    threeScene.add(rim.target);
+
+    // Sol 3D texturé à partir de terrainCanvas
+    const groundTex = new THREE.CanvasTexture(terrainCanvas);
+    groundTex.anisotropy = 4;
+    const groundGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: groundTex,
+      roughness: 0.88,
+      metalness: 0.06,
+    });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.set(HALF_W, 0, HALF_W);
+    groundMesh.receiveShadow = true;
+    threeScene.add(groundMesh);
+
+    // Plateformes de bases 3D en relief + Citadelle Centrale 3D
+    const platMat1 = getMat3D('#535763', 0.55, 0.35);
+    const platMat2 = getMat3D('#656a78', 0.48, 0.4);
+    const goldRingMat = getMat3D('#ffc531', 0.35, 0.5, 0xffc531, 0.2);
+    SPAWN_CORNERS.forEach((sp) => {
+      const p1 = new THREE.Mesh(new THREE.CylinderGeometry(212, 222, 5, 32), platMat1);
+      p1.position.set(sp.x, 2.5, sp.y);
+      p1.receiveShadow = true;
+      p1.castShadow = true;
+      threeScene.add(p1);
+      const p2 = new THREE.Mesh(new THREE.CylinderGeometry(172, 178, 3, 32), platMat2);
+      p2.position.set(sp.x, 6.0, sp.y);
+      p2.receiveShadow = true;
+      threeScene.add(p2);
+    });
+
+    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(336, 348, 6, 40), platMat1);
+    c1.position.set(HALF_W, 3, HALF_W);
+    c1.receiveShadow = true;
+    c1.castShadow = true;
+    threeScene.add(c1);
+    const c2 = new THREE.Mesh(new THREE.CylinderGeometry(272, 280, 4, 40), getMat3D('#454954', 0.5, 0.4));
+    c2.position.set(HALF_W, 7, HALF_W);
+    c2.receiveShadow = true;
+    threeScene.add(c2);
+    const cRing = new THREE.Mesh(new THREE.TorusGeometry(115, 2.5, 8, 40), goldRingMat);
+    cRing.rotation.x = Math.PI / 2;
+    cRing.position.set(HALF_W, 9.5, HALF_W);
+    threeScene.add(cRing);
+
+    // Arbres de forêt 3D (tronc + 3 cônes de feuillage projetant de vraies ombres)
+    const trunkGeo = new THREE.CylinderGeometry(2.4, 3.6, 12, 7);
+    const cone1Geo = new THREE.ConeGeometry(1, 1, 8);
+    const barkMat = getMat3D('#4b3624', 0.85, 0.05);
+    for (const tr of TREES_3D) {
+      const grp = new THREE.Group();
+      grp.position.set(tr.x, 0, tr.y);
+      const trunk = new THREE.Mesh(trunkGeo, barkMat);
+      trunk.position.y = 6;
+      trunk.castShadow = true;
+      grp.add(trunk);
+
+      const leafMat = getMat3D(tr.col, 0.72, 0.05);
+      const h = tr.h || 40;
+      const r = tr.r || 20;
+      for (let tier = 0; tier < 3; tier++) {
+        const cone = new THREE.Mesh(cone1Geo, leafMat);
+        const rad = r * (1.02 - tier * 0.24);
+        const ch = h * (0.48 - tier * 0.07);
+        cone.scale.set(rad, ch, rad);
+        cone.position.y = 10 + tier * (h * 0.24) + ch * 0.45;
+        cone.castShadow = true;
+        cone.receiveShadow = true;
+        grp.add(cone);
+      }
+      threeScene.add(grp);
+    }
+
+    // Rochers 3D facettés
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const rockMat = getMat3D('#6e685f', 0.78, 0.12);
+    for (const rk of ROCKS) {
+      const m = new THREE.Mesh(rockGeo, rockMat);
+      m.position.set(rk.x, rk.r * 0.42, rk.y);
+      m.scale.set(rk.r * 1.05, rk.r * 0.78, rk.r * 0.95);
+      m.rotation.set(rk.seed * 0.7, rk.seed * 1.3, rk.seed * 0.4);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      threeScene.add(m);
+    }
+
+    // Gisements de Minéraux 3D (Bouquets de cristaux lumineux)
+    const crysGeo = new THREE.OctahedronGeometry(1, 0);
+    for (const m of MINERAL_NODES) {
+      const grp = new THREE.Group();
+      grp.position.set(m.x, 4, m.y);
+      const col = m.rich ? '#ffc531' : '#1fc7c1';
+      const em = m.rich ? 0xffa800 : 0x0ea5a0;
+      const mat = getMat3D(col, 0.2, 0.35, em, 0.45);
+      const r = m.rich ? 14 : 11.5;
+      const h = m.rich ? 34 : 28;
+      const angles = [
+        { ox: 0, oz: 0, sx: r * 0.72, sy: h, sz: r * 0.72, rx: 0.08, rz: -0.06 },
+        { ox: -r * 0.55, oz: r * 0.3, sx: r * 0.52, sy: h * 0.74, sz: r * 0.52, rx: -0.22, rz: 0.28 },
+        { ox: r * 0.55, oz: -r * 0.25, sx: r * 0.5, sy: h * 0.7, sz: r * 0.5, rx: 0.24, rz: -0.26 },
+        { ox: r * 0.15, oz: r * 0.58, sx: r * 0.44, sy: h * 0.62, sz: r * 0.44, rx: 0.3, rz: 0.15 },
+      ];
+      for (const a of angles) {
+        const c = new THREE.Mesh(crysGeo, mat);
+        c.position.set(a.ox, a.sy * 0.36, a.oz);
+        c.scale.set(a.sx, a.sy * 0.65, a.sz);
+        c.rotation.set(a.rx, a.ox, a.rz);
+        c.castShadow = true;
+        grp.add(c);
+      }
+      threeScene.add(grp);
+      mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01 });
+    }
+
+    // Geysers de Gaz Plasma 3D
+    const geyRimMat = getMat3D('#435449', 0.68, 0.22);
+    const geyCoreMat = getMat3D('#2fbf71', 0.2, 0.1, 0x2fbf71, 0.75);
+    for (const gey of GAS_GEYSERS) {
+      const grp = new THREE.Group();
+      grp.position.set(gey.x, 4, gey.y);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 29, 14, 12), geyRimMat);
+      base.position.y = 7;
+      base.castShadow = true;
+      base.receiveShadow = true;
+      grp.add(base);
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(16, 4.5, 8, 16), geyRimMat);
+      torus.rotation.x = Math.PI / 2;
+      torus.position.y = 14;
+      grp.add(torus);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(12, 14, 12), geyCoreMat);
+      core.position.y = 13;
+      grp.add(core);
+      threeScene.add(grp);
+      geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01 });
+    }
+
+    wallBeamsGroup3D = new THREE.Group();
+    threeScene.add(wallBeamsGroup3D);
+
+    fxGroup3D = new THREE.Group();
+    threeScene.add(fxGroup3D);
+
+    // Brouillard de Guerre 3D flottant au-dessus du champ de bataille
+    fogTexture3D = new THREE.CanvasTexture(fogCanvas);
+    fogTexture3D.minFilter = THREE.LinearFilter;
+    fogTexture3D.magFilter = THREE.LinearFilter;
+    const fogGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
+    const fogMat = new THREE.MeshBasicMaterial({
+      map: fogTexture3D,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.92,
+    });
+    const fogMesh = new THREE.Mesh(fogGeo, fogMat);
+    fogMesh.rotation.x = -Math.PI / 2;
+    fogMesh.position.set(HALF_W, 74, HALF_W);
+    fogMesh.renderOrder = 20;
+    threeScene.add(fogMesh);
+
+    threeReady = true;
+    return true;
+  } catch (err) {
+    console.warn('Fallback 2D activé :', err);
+    threeReady = false;
+    return false;
+  }
+}
+
+function createBuildingMesh3D(kind, color, isGhost = false) {
+  const grp = new THREE.Group();
+  const bodyGroup = new THREE.Group();
+  grp.add(bodyGroup);
+
+  const def = BUILDINGS[kind] || BUILDINGS.pylon;
+  const r = def.radius || 32;
+  const h = def.height || 36;
+  const op = isGhost ? 0.65 : 1;
+
+  const teamMat = getMat3D(color, 0.35, 0.35, color, isGhost ? 0.35 : 0.1, op);
+  const darkTeamMat = getMat3D(shadeHex(color, -36), 0.45, 0.4, 0x000000, 0, op);
+  const steelMat = getMat3D('#5a606e', 0.45, 0.55, 0x000000, 0, op);
+  const darkSteelMat = getMat3D('#2b2f38', 0.55, 0.6, 0x000000, 0, op);
+  const lightSteelMat = getMat3D('#929aa8', 0.35, 0.5, 0x000000, 0, op);
+  const cyanMat = getMat3D('#1fc7c1', 0.2, 0.2, 0x1fc7c1, 0.75, op);
+  const yellowMat = getMat3D('#ffc531', 0.3, 0.3, 0xffc531, 0.5, op);
+  const greenMat = getMat3D('#2fbf71', 0.2, 0.2, 0x2fbf71, 0.7, op);
+
+  // Socle blindé commun
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.02, r * 1.08, 6, 8), darkSteelMat);
+  plinth.position.y = 3;
+  plinth.castShadow = !isGhost;
+  plinth.receiveShadow = !isGhost;
+  bodyGroup.add(plinth);
+
+  if (kind === 'hq') {
+    // Forteresse octogonale Terran + 4 bastions d'angle + pont supérieur + radar Comsat rotatif 3D
+    const mainHull = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.96, h * 0.55, 8), steelMat);
+    mainHull.position.y = 6 + h * 0.275;
+    mainHull.castShadow = !isGhost;
+    mainHull.receiveShadow = !isGhost;
+    bodyGroup.add(mainHull);
+
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2 + Math.PI / 4;
+      const pod = new THREE.Mesh(new THREE.BoxGeometry(r * 0.46, h * 0.62, r * 0.46), darkTeamMat);
+      pod.position.set(Math.cos(a) * r * 0.64, 6 + h * 0.31, Math.sin(a) * r * 0.64);
+      pod.rotation.y = -a;
+      pod.castShadow = !isGhost;
+      bodyGroup.add(pod);
+    }
+
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.56, r * 0.66, h * 0.32, 8), teamMat);
+    deck.position.y = 6 + h * 0.68;
+    deck.castShadow = !isGhost;
+    bodyGroup.add(deck);
+
+    const heliRing = new THREE.Mesh(new THREE.TorusGeometry(r * 0.36, 2.2, 8, 24), yellowMat);
+    heliRing.rotation.x = Math.PI / 2;
+    heliRing.position.y = 6 + h * 0.85;
+    bodyGroup.add(heliRing);
+
+    const coreGlow = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.18, r * 0.18, 4, 16), cyanMat);
+    coreGlow.position.y = 6 + h * 0.85;
+    bodyGroup.add(coreGlow);
+
+    const radarGrp = new THREE.Group();
+    radarGrp.position.set(r * 0.34, 6 + h * 0.92, -r * 0.28);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3, 10, 8), darkSteelMat);
+    radarGrp.add(mast);
+    const dish = new THREE.Mesh(new THREE.CylinderGeometry(11, 4, 5, 12), lightSteelMat);
+    dish.position.y = 6;
+    dish.rotation.z = 0.55;
+    radarGrp.add(dish);
+    bodyGroup.add(radarGrp);
+    grp.userData.rotPart = radarGrp;
+
+  } else if (kind === 'pylon') {
+    // Dépôt de Ravitaillement 3D : 4 dômes pressurisés + cristal d'énergie central rotatif
+    const baseBox = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, h * 0.48, r * 1.45), steelMat);
+    baseBox.position.y = 6 + h * 0.24;
+    baseBox.castShadow = !isGhost;
+    bodyGroup.add(baseBox);
+
+    const offsets = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const [ox, oz] of offsets) {
+      const dome = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.32, r * 0.36, h * 0.65, 12), teamMat);
+      dome.position.set(ox * r * 0.42, 6 + h * 0.33, oz * r * 0.42);
+      dome.castShadow = !isGhost;
+      bodyGroup.add(dome);
+    }
+
+    const crys = new THREE.Mesh(new THREE.OctahedronGeometry(r * 0.34, 0), cyanMat);
+    crys.position.y = 6 + h * 0.85;
+    crys.scale.set(0.8, 1.45, 0.8);
+    bodyGroup.add(crys);
+    grp.userData.rotPart = crys;
+
+  } else if (kind === 'extractor') {
+    // Raffinerie de Gaz 3D : anneau industriel + cuves de stockage + colonne plasma verte
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.82, r * 0.95, h * 0.68, 10), steelMat);
+    body.position.y = 6 + h * 0.34;
+    body.castShadow = !isGhost;
+    bodyGroup.add(body);
+
+    const teamBand = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.86, h * 0.22, 10), teamMat);
+    teamBand.position.y = 6 + h * 0.48;
+    bodyGroup.add(teamBand);
+
+    for (let i = 0; i < 3; i++) {
+      const a = (i * TAU) / 3;
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, h * 0.78, 10), lightSteelMat);
+      tank.position.set(Math.cos(a) * r * 0.68, 6 + h * 0.39, Math.sin(a) * r * 0.68);
+      tank.castShadow = !isGhost;
+      bodyGroup.add(tank);
+    }
+
+    const piston = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.36, r * 0.36, h * 0.45, 14), greenMat);
+    piston.position.y = 6 + h * 0.78;
+    bodyGroup.add(piston);
+    grp.userData.piston = piston;
+
+  } else if (kind === 'barracks') {
+    // Caserne Militaire 3D : hangar blindé, toit biseauté couleur équipe, sas lumineux et antenne
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(r * 1.65, h * 0.62, r * 1.38), steelMat);
+    hull.position.y = 6 + h * 0.31;
+    hull.castShadow = !isGhost;
+    hull.receiveShadow = !isGhost;
+    bodyGroup.add(hull);
+
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(r * 1.42, h * 0.26, r * 1.12), teamMat);
+    roof.position.y = 6 + h * 0.72;
+    roof.castShadow = !isGhost;
+    bodyGroup.add(roof);
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(r * 0.75, h * 0.42, 6), darkSteelMat);
+    door.position.set(0, 6 + h * 0.21, r * 0.68);
+    bodyGroup.add(door);
+
+    const neon = new THREE.Mesh(new THREE.BoxGeometry(r * 0.85, 3.5, 4), yellowMat);
+    neon.position.set(0, 6 + h * 0.48, r * 0.69);
+    bodyGroup.add(neon);
+
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.5, 18, 6), lightSteelMat);
+    ant.position.set(-r * 0.5, 6 + h * 0.92, -r * 0.35);
+    bodyGroup.add(ant);
+
+  } else if (kind === 'factory') {
+    // Usine d'Armement 3D : double nef industrielle, cheminées, grue et cœur de fusion
+    const baseH = new THREE.Mesh(new THREE.BoxGeometry(r * 1.72, h * 0.58, r * 1.56), darkSteelMat);
+    baseH.position.y = 6 + h * 0.29;
+    baseH.castShadow = !isGhost;
+    baseH.receiveShadow = !isGhost;
+    bodyGroup.add(baseH);
+
+    for (const oz of [-r * 0.36, r * 0.36]) {
+      const bay = new THREE.Mesh(new THREE.BoxGeometry(r * 1.52, h * 0.32, r * 0.58), teamMat);
+      bay.position.set(0, 6 + h * 0.7, oz);
+      bay.castShadow = !isGhost;
+      bodyGroup.add(bay);
+    }
+
+    for (const ox of [-r * 0.55, r * 0.55]) {
+      const stack = new THREE.Mesh(new THREE.CylinderGeometry(6, 7.5, h * 0.55, 10), steelMat);
+      stack.position.set(ox, 6 + h * 0.82, -r * 0.45);
+      stack.castShadow = !isGhost;
+      bodyGroup.add(stack);
+      const glowTop = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 3, 10), yellowMat);
+      glowTop.position.set(ox, 6 + h * 1.1, -r * 0.45);
+      bodyGroup.add(glowTop);
+    }
+
+  } else if (kind === 'turret') {
+    // Tourelle Lance-Missiles 3D : bunker octogonal + tourelle rotative double-panier SAM
+    const bunker = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.76, r * 0.92, h * 0.48, 8), steelMat);
+    bunker.position.y = 6 + h * 0.24;
+    bunker.castShadow = !isGhost;
+    bodyGroup.add(bunker);
+
+    const turretGrp = new THREE.Group();
+    turretGrp.position.y = 6 + h * 0.56;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(16, 12, 16), teamMat);
+    head.castShadow = !isGhost;
+    turretGrp.add(head);
+
+    for (const oz of [-9.5, 9.5]) {
+      const pod = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 7), darkSteelMat);
+      pod.position.set(4, 2, oz);
+      pod.castShadow = !isGhost;
+      turretGrp.add(pod);
+      const tip = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 4, 8), getMat3D('#ff4b2b', 0.3, 0.2, 0xff4b2b, 0.5, op));
+      tip.rotation.z = Math.PI / 2;
+      tip.position.set(15, 2, oz);
+      turretGrp.add(tip);
+    }
+    bodyGroup.add(turretGrp);
+    grp.userData.turret = turretGrp;
+
+  } else if (kind === 'tesla') {
+    // Bobine Tesla 3D : socle blindé + 3 anneaux d'induction + sphère plasma en lévitation
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.85, h * 0.38, 8), darkSteelMat);
+    ped.position.y = 6 + h * 0.19;
+    ped.castShadow = !isGhost;
+    bodyGroup.add(ped);
+
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(4, 8, h * 0.72, 10), steelMat);
+    spire.position.y = 6 + h * 0.52;
+    spire.castShadow = !isGhost;
+    bodyGroup.add(spire);
+
+    for (let k = 0; k < 3; k++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r * (0.56 - k * 0.1), 2.2, 8, 20), cyanMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 6 + h * (0.42 + k * 0.18);
+      bodyGroup.add(ring);
+    }
+
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(9.5, 1), cyanMat);
+    orb.position.y = 6 + h * 0.96;
+    bodyGroup.add(orb);
+    grp.userData.rotPart = orb;
+
+  } else if (kind === 'wall') {
+    // Mur Bastion 3D
+    const blk = new THREE.Mesh(new THREE.BoxGeometry(r * 1.75, h * 0.85, r * 1.75), lightSteelMat);
+    blk.position.y = 6 + h * 0.42;
+    blk.castShadow = !isGhost;
+    blk.receiveShadow = !isGhost;
+    bodyGroup.add(blk);
+
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(r * 1.2, 5, r * 1.2), teamMat);
+    cap.position.y = 6 + h * 0.88;
+    bodyGroup.add(cap);
+  }
+
+  // Cage d'échafaudage 3D dorée visible pendant la construction par le VCS
+  if (!isGhost) {
+    const scaffGeo = new THREE.BoxGeometry(r * 1.75, h * 1.05, r * 1.75);
+    const scaffMat = new THREE.MeshBasicMaterial({
+      color: 0xffc531,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.75,
+    });
+    const scaffold = new THREE.Mesh(scaffGeo, scaffMat);
+    scaffold.position.y = (h * 1.05) / 2 + 2;
+    scaffold.visible = false;
+    grp.add(scaffold);
+    grp.userData.scaffold = scaffold;
+  }
+
+  grp.userData.bodyGroup = bodyGroup;
+  grp.userData.color = color;
+  grp.userData.kind = kind;
+  return grp;
+}
+
+function createUnitMesh3D(kind, color) {
+  const grp = new THREE.Group();
+  const def = UNITS[kind] || UNITS.marine;
+  const r = def.radius || 12;
+
+  const teamMat = getMat3D(color, 0.35, 0.35, color, 0.12);
+  const darkTeamMat = getMat3D(shadeHex(color, -35), 0.48, 0.42);
+  const steelMat = getMat3D('#5a606e', 0.45, 0.58);
+  const darkSteelMat = getMat3D('#232730', 0.6, 0.55);
+  const visorMat = getMat3D('#9be7ff', 0.15, 0.2, 0x3ecbff, 0.65);
+  const yellowMat = getMat3D('#ffc531', 0.35, 0.3, 0xffc531, 0.35);
+  const cyanMat = getMat3D('#1fc7c1', 0.2, 0.2, 0x1fc7c1, 0.8);
+  const greenMat = getMat3D('#2fbf71', 0.2, 0.2, 0x2fbf71, 0.8);
+  const redMat = getMat3D('#ff4b2b', 0.25, 0.2, 0xff4b2b, 0.75);
+
+  if (kind === 'scv') {
+    // Ouvrier VCS 3D : chenilles, châssis industriel jaune/équipe, arceau, pinces et cristal/gaz sur le dos
+    for (const oz of [-r * 0.68, r * 0.68]) {
+      const trk = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, 6, 4.5), darkSteelMat);
+      trk.position.set(0, 3, oz);
+      trk.castShadow = true;
+      grp.add(trk);
+    }
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, 11, r * 1.25), teamMat);
+    hull.position.y = 9.5;
+    hull.castShadow = true;
+    grp.add(hull);
+
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(r * 0.85, 8, r * 0.9), yellowMat);
+    cab.position.set(-1, 17, 0);
+    cab.castShadow = true;
+    grp.add(cab);
+
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(4, 5, r * 0.72), visorMat);
+    visor.position.set(r * 0.35, 17, 0);
+    grp.add(visor);
+
+    for (const oz of [-r * 0.48, r * 0.48]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(10, 3.5, 3), steelMat);
+      arm.position.set(r * 0.9, 8.5, oz);
+      grp.add(arm);
+    }
+
+    const cargoMin = new THREE.Mesh(new THREE.OctahedronGeometry(6.5, 0), cyanMat);
+    cargoMin.position.set(-r * 0.45, 22, 0);
+    cargoMin.visible = false;
+    grp.add(cargoMin);
+
+    const cargoGas = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 10, 10), greenMat);
+    cargoGas.position.set(-r * 0.45, 22, 0);
+    cargoGas.visible = false;
+    grp.add(cargoGas);
+
+    const weldGlow = new THREE.Mesh(new THREE.SphereGeometry(5.5, 10, 10), cyanMat);
+    weldGlow.position.set(r * 1.35, 9, 0);
+    weldGlow.visible = false;
+    grp.add(weldGlow);
+
+    grp.userData.cargoMin = cargoMin;
+    grp.userData.cargoGas = cargoGas;
+    grp.userData.weldGlow = weldGlow;
+
+  } else if (kind === 'tank' || kind === 'siege') {
+    // Char d'Assaut & Char de Siège 3D : doubles chenilles blindées, châssis incliné, stabilisateurs Siège & tourelle rotative
+    const isSiege = kind === 'siege';
+    for (const oz of [-r * 0.72, r * 0.72]) {
+      const trk = new THREE.Mesh(new THREE.BoxGeometry(r * 2.05, 8.5, 7), darkSteelMat);
+      trk.position.set(0, 4.25, oz);
+      trk.castShadow = true;
+      grp.add(trk);
+    }
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(r * 1.75, 11, r * 1.32), darkTeamMat);
+    hull.position.y = 10;
+    hull.castShadow = true;
+    grp.add(hull);
+
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(r * 1.35, 4, r * 1.08), teamMat);
+    deck.position.y = 16.5;
+    grp.add(deck);
+
+    if (isSiege) {
+      const stabs = new THREE.Group();
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2 + Math.PI / 4;
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(14, 5, 6), yellowMat);
+        leg.position.set(Math.cos(a) * (r + 5), 3, Math.sin(a) * (r + 5));
+        leg.rotation.y = -a;
+        stabs.add(leg);
+      }
+      stabs.visible = false;
+      grp.add(stabs);
+      grp.userData.stabilizers = stabs;
+    }
+
+    const turretGrp = new THREE.Group();
+    turretGrp.position.y = 20;
+    const tBox = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.56, r * 0.66, 9, 8), teamMat);
+    tBox.castShadow = true;
+    turretGrp.add(tBox);
+
+    if (isSiege) {
+      for (const oz of [-4.2, 4.2]) {
+        const brl = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.4, r * 1.95, 10), steelMat);
+        brl.rotation.z = -Math.PI / 2;
+        brl.position.set(r * 0.95, 1.5, oz);
+        brl.castShadow = true;
+        turretGrp.add(brl);
+      }
+    } else {
+      const brl = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, r * 1.75, 10), darkSteelMat);
+      brl.rotation.z = -Math.PI / 2;
+      brl.position.set(r * 0.88, 1, 0);
+      brl.castShadow = true;
+      turretGrp.add(brl);
+    }
+    grp.add(turretGrp);
+    grp.userData.turret = turretGrp;
+
+  } else if (kind === 'titan') {
+    // Titan Mécha Thor 3D : jambes articulées, torse blindé massif, pods lance-missiles d'épaule et doubles canons plasma
+    for (const oz of [-r * 0.46, r * 0.46]) {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 11), darkSteelMat);
+      foot.position.set(0, 3, oz);
+      foot.castShadow = true;
+      grp.add(foot);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5.5, 18, 8), steelMat);
+      leg.position.set(0, 14, oz);
+      leg.castShadow = true;
+      grp.add(leg);
+    }
+
+    const turretGrp = new THREE.Group();
+    turretGrp.position.y = 26;
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(r * 1.35, 18, r * 1.55), teamMat);
+    torso.castShadow = true;
+    turretGrp.add(torso);
+
+    const core = new THREE.Mesh(new THREE.SphereGeometry(6.5, 12, 12), cyanMat);
+    core.position.set(r * 0.55, 1, 0);
+    turretGrp.add(core);
+
+    for (const oz of [-r * 0.85, r * 0.85]) {
+      const shPod = new THREE.Mesh(new THREE.BoxGeometry(18, 12, 10), darkTeamMat);
+      shPod.position.set(-2, 10, oz);
+      shPod.castShadow = true;
+      turretGrp.add(shPod);
+
+      const armCannon = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 4.5, r * 1.7, 10), darkSteelMat);
+      armCannon.rotation.z = -Math.PI / 2;
+      armCannon.position.set(r * 0.85, -1, oz * 1.05);
+      armCannon.castShadow = true;
+      turretGrp.add(armCannon);
+
+      const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 4, 10), cyanMat);
+      muzzle.rotation.z = -Math.PI / 2;
+      muzzle.position.set(r * 1.68, -1, oz * 1.05);
+      turretGrp.add(muzzle);
+    }
+
+    grp.add(turretGrp);
+    grp.userData.turret = turretGrp;
+
+  } else {
+    // Infanterie 3D (Marine, Maraudeur, Démolisseur) : armure CMC, épaulières, casque à visière et arme 3D
+    const bodyGrp = new THREE.Group();
+    const torsoH = kind === 'rocket' ? 15 : 13;
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 0.52, torsoH, 10), teamMat);
+    torso.position.y = torsoH * 0.5 + 2;
+    torso.castShadow = true;
+    bodyGrp.add(torso);
+
+    // Épaulières blindées
+    for (const oz of [-r * 0.68, r * 0.68]) {
+      const pad = new THREE.Mesh(new THREE.SphereGeometry(r * (kind === 'rocket' ? 0.52 : 0.42), 8, 8), darkTeamMat);
+      pad.position.set(0, torsoH + 1, oz);
+      pad.castShadow = true;
+      bodyGrp.add(pad);
+    }
+
+    // Casque + visière lumineuse
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(r * 0.52, 10, 10), teamMat);
+    helm.position.set(0, torsoH + 5, 0);
+    helm.castShadow = true;
+    bodyGrp.add(helm);
+
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(r * 0.45, 3.8, r * 0.68), kind === 'sapper' ? yellowMat : visorMat);
+    visor.position.set(r * 0.35, torsoH + 5, 0);
+    bodyGrp.add(visor);
+
+    if (kind === 'rocket') {
+      for (const oz of [-r * 0.78, r * 0.78]) {
+        const launcher = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, r * 1.45, 8), darkSteelMat);
+        launcher.rotation.z = -Math.PI / 2;
+        launcher.position.set(r * 0.55, torsoH - 1, oz);
+        bodyGrp.add(launcher);
+      }
+    } else if (kind === 'sapper') {
+      const bomb = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 12, 10), redMat);
+      bomb.position.set(-r * 0.5, torsoH * 0.7, 0);
+      bodyGrp.add(bomb);
+    } else {
+      const rifle = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, 3.2, 2.8), darkSteelMat);
+      rifle.position.set(r * 0.65, torsoH * 0.72, r * 0.45);
+      bodyGrp.add(rifle);
+    }
+
+    const stimRing = new THREE.Mesh(new THREE.RingGeometry(r * 0.95, r * 1.3, 18), redMat);
+    stimRing.rotation.x = -Math.PI / 2;
+    stimRing.position.y = 1.5;
+    stimRing.visible = false;
+    grp.add(stimRing);
+    grp.userData.stimRing = stimRing;
+
+    grp.add(bodyGrp);
+    grp.userData.walkBody = bodyGrp;
+  }
+
+  grp.userData.color = color;
+  grp.userData.kind = kind;
+  return grp;
+}
+
+function syncAndRenderThree3D(dt, now, shX, shY) {
+  if (!threeReady && !initThree3D()) return false;
+
+  // Caméra 3D vue du dessus (inclinaison tactique de ~12° pour révéler les reliefs, façades, canons et ombres 3D)
+  const fovRad = (36 * Math.PI) / 180;
+  const dist = (H / 2) / (cam.z * Math.tan(fovRad / 2));
+  threeCam.position.set(cam.x + shX, dist, cam.y + dist * 0.22 + shY);
+  threeCam.up.set(0, 1, 0);
+  threeCam.lookAt(cam.x + shX, 0, cam.y + shY);
+  threeCam.updateMatrixWorld();
+
+  // Animation des cristaux de minéraux et geysers de gaz plasma
+  for (const m of mineralMeshes3D) {
+    m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
+  }
+  for (const g of geyserMeshes3D) {
+    const s = 0.88 + Math.sin(now * 0.006 + g.seed) * 0.18;
+    g.core.scale.set(s, s * 0.7, s);
+  }
+
+  // Synchronisation des Bâtiments 3D
+  const activeBldIds = new Set();
+  for (const b of state.buildings) {
+    if (b.hp <= 0) continue;
+    const vis = b.owner === myId || isVisibleToMe(b.x, b.y);
+    activeBldIds.add(b.id);
+    const owner = state.players.find((p) => p.id === b.owner);
+    const col = owner ? owner.color : '#888888';
+
+    let mesh = bldMeshes3D.get(b.id);
+    if (!mesh || mesh.userData.kind !== b.kind || mesh.userData.color !== col) {
+      if (mesh) threeScene.remove(mesh);
+      mesh = createBuildingMesh3D(b.kind, col, false);
+      threeScene.add(mesh);
+      bldMeshes3D.set(b.id, mesh);
+    }
+
+    mesh.visible = vis;
+    if (!vis) continue;
+    mesh.position.set(b.x, 0, b.y);
+
+    const prog = b.constructing ? clamp(b.buildProg || 0.06, 0.06, 1) : 1;
+    if (mesh.userData.bodyGroup) {
+      mesh.userData.bodyGroup.scale.set(1, b.constructing ? 0.15 + 0.85 * prog : 1, 1);
+    }
+    if (mesh.userData.scaffold) {
+      mesh.userData.scaffold.visible = !!b.constructing;
+      if (b.constructing) mesh.userData.scaffold.rotation.y = now * 0.0012;
+    }
+    if (mesh.userData.rotPart && !b.constructing) {
+      mesh.userData.rotPart.rotation.y = now * 0.0022;
+    }
+    if (mesh.userData.piston && !b.constructing) {
+      mesh.userData.piston.position.y = 26 + Math.sin(now * 0.006 + b.id) * 4;
+    }
+    if (mesh.userData.turret) {
+      mesh.userData.turret.rotation.y = -(b.aimA || 0);
+    }
+  }
+  for (const [id, mesh] of bldMeshes3D.entries()) {
+    if (!activeBldIds.has(id)) {
+      threeScene.remove(mesh);
+      bldMeshes3D.delete(id);
+    }
+  }
+
+  // Connexions 3D entre Murs voisins
+  while (wallBeamsGroup3D.children.length > 0) {
+    wallBeamsGroup3D.remove(wallBeamsGroup3D.children[0]);
+  }
+  const walls = state.buildings.filter((b) => b.kind === 'wall' && b.hp > 0 && (b.owner === myId || isVisibleToMe(b.x, b.y)));
+  if (walls.length > 1) {
+    if (!geoCache3D.wallBox) geoCache3D.wallBox = new THREE.BoxGeometry(1, 16, 10);
+    const wallBeamMat = getMat3D('#929aa8', 0.4, 0.5);
+    for (let i = 0; i < walls.length; i++) {
+      for (let j = i + 1; j < walls.length; j++) {
+        const w1 = walls[i], w2 = walls[j];
+        if (w1.team === w2.team) {
+          const d = hypot(w1.x, w1.y, w2.x, w2.y);
+          if (d > 8 && d <= 58) {
+            const beam = new THREE.Mesh(geoCache3D.wallBox, wallBeamMat);
+            beam.scale.set(d, 1, 1);
+            beam.position.set((w1.x + w2.x) * 0.5, 11, (w1.y + w2.y) * 0.5);
+            beam.rotation.y = -Math.atan2(w2.y - w1.y, w2.x - w1.x);
+            beam.castShadow = true;
+            wallBeamsGroup3D.add(beam);
+          }
+        }
+      }
+    }
+  }
+
+  // Synchronisation des Unités 3D
+  const activeUnitIds = new Set();
+  for (const u of state.units) {
+    if (u.hp <= 0) continue;
+    const vis = u.owner === myId || isVisibleToMe(u.x, u.y);
+    activeUnitIds.add(u.id);
+    const owner = state.players.find((p) => p.id === u.owner);
+    const col = owner ? owner.color : '#888888';
+
+    let mesh = unitMeshes3D.get(u.id);
+    if (!mesh || mesh.userData.kind !== u.kind || mesh.userData.color !== col) {
+      if (mesh) threeScene.remove(mesh);
+      mesh = createUnitMesh3D(u.kind, col);
+      threeScene.add(mesh);
+      unitMeshes3D.set(u.id, mesh);
+    }
+
+    mesh.visible = vis;
+    if (!vis) continue;
+    mesh.position.set(u.x, 0, u.y);
+
+    if (u.kind === 'tank' || u.kind === 'siege' || u.kind === 'titan') {
+      const moveA = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0) > 2) ? Math.atan2(u.vy, u.vx) : (u.a || 0);
+      mesh.rotation.y = -moveA;
+      if (mesh.userData.turret) {
+        mesh.userData.turret.rotation.y = -(u.a || 0) + moveA;
+      }
+      if (mesh.userData.stabilizers) {
+        mesh.userData.stabilizers.visible = !!u.sieged;
+      }
+    } else {
+      mesh.rotation.y = -(u.a || 0);
+      if (mesh.userData.walkBody) {
+        const moving = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0)) > 4;
+        mesh.userData.walkBody.position.y = moving ? Math.abs(Math.sin(now * 0.015 + u.id)) * 2.2 : 0;
+      }
+      if (mesh.userData.stimRing) {
+        mesh.userData.stimRing.visible = (u.stimT || 0) > 0;
+      }
+      if (u.kind === 'scv') {
+        if (mesh.userData.cargoMin) mesh.userData.cargoMin.visible = u.carryAmt > 0 && u.carryType === 'min';
+        if (mesh.userData.cargoGas) mesh.userData.cargoGas.visible = u.carryAmt > 0 && u.carryType === 'gas';
+        if (mesh.userData.weldGlow) {
+          const welding = !!(u.onSite && u.buildTargetId);
+          mesh.userData.weldGlow.visible = welding && ((Math.floor(now / 50) + u.id) % 2 === 0);
+        }
+      }
+    }
+  }
+  for (const [id, mesh] of unitMeshes3D.entries()) {
+    if (!activeUnitIds.has(id)) {
+      threeScene.remove(mesh);
+      unitMeshes3D.delete(id);
+    }
+  }
+
+  // Aperçu fantôme 3D du bâtiment à poser (uniquement quand un VCS est sélectionné)
+  if (buildMode) {
+    const def = BUILDINGS[buildMode];
+    const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
+    const gx = check.snapX ?? mouse.wx, gy = check.snapY ?? mouse.wy;
+    const ghostCol = check.ok ? '#2fbf71' : '#ff4b2b';
+    const ghostKey = `${buildMode}|${ghostCol}`;
+    if (!ghostGroup3D || ghostKind3D !== ghostKey) {
+      if (ghostGroup3D) threeScene.remove(ghostGroup3D);
+      ghostGroup3D = createBuildingMesh3D(buildMode, ghostCol, true);
+      threeScene.add(ghostGroup3D);
+      ghostKind3D = ghostKey;
+    }
+    ghostGroup3D.visible = true;
+    ghostGroup3D.position.set(gx, 0, gy);
+  } else if (ghostGroup3D) {
+    ghostGroup3D.visible = false;
+  }
+
+  // Projectiles, Rayons Tesla/Laser, Ondes de choc et Particules en 3D
+  while (fxGroup3D.children.length > 0) {
+    fxGroup3D.remove(fxGroup3D.children[0]);
+  }
+  if (!geoCache3D.proj) {
+    geoCache3D.proj = new THREE.SphereGeometry(1, 8, 8);
+    geoCache3D.ring = new THREE.RingGeometry(0.86, 1.0, 24);
+    geoCache3D.beamCyl = new THREE.CylinderGeometry(1, 1, 1, 6);
+  }
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const pr = projectiles[i];
+    pr.prog += pr.speed * dt;
+    if (pr.prog >= 1) { projectiles.splice(i, 1); continue; }
+    const px = lerp(pr.x, pr.tx, pr.prog), py = lerp(pr.y, pr.ty, pr.prog);
+    const arcH = 14 + Math.sin(pr.prog * Math.PI) * 16;
+    const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(pr.color, 0.1, 0.1, pr.color, 0.95));
+    pm.position.set(px, arcH, py);
+    pm.scale.setScalar(pr.r * 1.15);
+    fxGroup3D.add(pm);
+  }
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const sw = shockwaves[i];
+    sw.life -= dt;
+    if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+    const u = 1 - sw.life / sw.maxLife;
+    const rad = lerp(sw.r, sw.maxR, u);
+    const rm = new THREE.Mesh(geoCache3D.ring, getMat3D(sw.color, 0.2, 0.1, sw.color, 0.85, 1 - u));
+    rm.rotation.x = -Math.PI / 2;
+    rm.position.set(sw.x, 3.5, sw.y);
+    rm.scale.setScalar(rad);
+    fxGroup3D.add(rm);
+  }
+  for (let i = beams.length - 1; i >= 0; i--) {
+    const bm = beams[i];
+    bm.life -= dt;
+    if (bm.life <= 0) { beams.splice(i, 1); continue; }
+    const d = hypot(bm.x1, bm.y1, bm.x2, bm.y2);
+    const beamMesh = new THREE.Mesh(
+      geoCache3D.beamCyl,
+      getMat3D(bm.color, 0.1, 0.1, bm.color, 0.95, clamp(bm.life / bm.maxLife, 0, 1))
+    );
+    beamMesh.scale.set(bm.w * 0.35, d, bm.w * 0.35);
+    beamMesh.position.set((bm.x1 + bm.x2) * 0.5, 22, (bm.y1 + bm.y2) * 0.5);
+    beamMesh.rotation.z = Math.PI / 2;
+    beamMesh.rotation.y = -Math.atan2(bm.y2 - bm.y1, bm.x2 - bm.x1);
+    fxGroup3D.add(beamMesh);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(p.color, 0.2, 0.1, p.color, 0.8));
+    pm.position.set(p.x, 10 + p.life * 28, p.y);
+    pm.scale.setScalar(p.r * 0.85);
+    fxGroup3D.add(pm);
+  }
+
+  threeRenderer.render(threeScene, threeCam);
+  return true;
+}
+
+/* ============================================================================
    RENDU PRINCIPAL DU MONDE 3D VUE DU DESSUS & MINIMAP (60 FPS)
    ============================================================================ */
 function renderWorld(dt, now) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#142818';
-  ctx.fillRect(0, 0, W, H);
-  if (!state) return;
+  if (!state) {
+    ctx.fillStyle = '#142818';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
 
   const panSpd = 680 / cam.z;
   if (keys['arrowup']) cam.y -= panSpd * dt;
@@ -3737,6 +4722,196 @@ function renderWorld(dt, now) {
   } else cam.shake = 0;
 
   updateFogCanvas(now);
+
+  // 1. Rendu WebGL 3D (Three.js) vue du dessus + Surcouche tactique 2D projetée
+  if (syncAndRenderThree3D(dt, now, shX, shY)) {
+    ctx.clearRect(0, 0, W, H);
+
+    // Points de Ralliement des bâtiments sélectionnés
+    for (const b of state.buildings) {
+      if (selectedBlds.has(b.id) && b.rallyX != null && b.rallyY != null && (BUILDINGS[b.kind]?.trains || []).length > 0) {
+        const p1 = worldToScreen3D(b.x, b.y, 6);
+        const p2 = worldToScreen3D(b.rallyX, b.rallyY, 4);
+        ctx.save();
+        ctx.strokeStyle = '#ffc531';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ffc531';
+        ctx.strokeStyle = '#16181d';
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 6, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Surcouche tactique des Bâtiments 3D (Cercles de sélection, Barres de PV, % Chantier, Nom + Ping sur QG)
+    for (const b of state.buildings) {
+      if (b.hp <= 0) continue;
+      if (b.owner !== myId && !isVisibleToMe(b.x, b.y)) continue;
+      const def = BUILDINGS[b.kind] || BUILDINGS.pylon;
+      const selected = selectedBlds.has(b.id);
+      const basePt = worldToScreen3D(b.x, b.y, 2);
+      const topPt = worldToScreen3D(b.x, b.y, (def.height || 36) + 12);
+      const radPx = b.radius * cam.z;
+
+      if (selected) {
+        ctx.save();
+        ctx.strokeStyle = '#2fbf71';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.ellipse(basePt.x, basePt.y, radPx * 1.08, radPx * 0.96, 0, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (b.constructing) {
+        const pct = Math.floor((b.buildProg || 0) * 100);
+        const hasBuilder = state.units.some((u) => u.kind === 'scv' && u.buildTargetId === b.id && u.onSite && u.hp > 0);
+        ctx.save();
+        ctx.font = '700 11px Bungee, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#16181d';
+        ctx.fillRect(topPt.x - 36, topPt.y - 10, 72, 17);
+        ctx.fillStyle = hasBuilder ? '#ffc531' : '#ff4b2b';
+        ctx.fillText(hasBuilder ? `🔧 ${pct}%` : `⏸ ${pct}%`, topPt.x, topPt.y + 2);
+        ctx.restore();
+      }
+
+      if (b.hp < b.maxHp || selected || b.constructing) {
+        const bw = Math.max(40, radPx * 1.55);
+        const pct = clamp(b.hp / b.maxHp, 0, 1);
+        ctx.fillStyle = '#16181d';
+        ctx.fillRect(topPt.x - bw / 2 - 1, topPt.y - 22, bw + 2, 7);
+        ctx.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
+        ctx.fillRect(topPt.x - bw / 2, topPt.y - 21, bw * pct, 5);
+      }
+
+      if (b.kind === 'hq' && !b.constructing) {
+        const ownerPlayer = state.players.find((p) => Number(p.id) === Number(b.owner));
+        if (ownerPlayer) {
+          const pingTxt = ownerPlayer.bot ? 'IA' : `${getPlayerPing(ownerPlayer)}ms`;
+          const tag = `${ownerPlayer.name} · ${pingTxt}`;
+          ctx.save();
+          ctx.font = '700 11px "Chakra Petch", sans-serif';
+          const tw = ctx.measureText(tag).width + 14;
+          const bx = topPt.x - tw / 2, by = topPt.y - 42;
+          ctx.fillStyle = 'rgba(22, 24, 29, 0.88)';
+          ctx.strokeStyle = ownerPlayer.color || '#ffc531';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(bx, by, tw, 18, 6);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fff8ea';
+          ctx.textAlign = 'center';
+          ctx.fillText(tag, topPt.x, by + 13);
+          ctx.restore();
+        }
+      }
+    }
+
+    // Surcouche tactique des Unités 3D (Cercles de sélection & Barres de PV)
+    for (const u of state.units) {
+      if (u.hp <= 0) continue;
+      if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
+      const selected = selectedUnits.has(u.id);
+      const basePt = worldToScreen3D(u.x, u.y, 2);
+      const hUnit = u.kind === 'titan' ? 42 : (u.kind === 'tank' || u.kind === 'siege') ? 26 : 20;
+      const topPt = worldToScreen3D(u.x, u.y, hUnit);
+      const radPx = u.radius * cam.z;
+
+      if (selected) {
+        ctx.save();
+        ctx.strokeStyle = '#2fbf71';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.ellipse(basePt.x, basePt.y, radPx + 4, (radPx + 4) * 0.92, 0, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (u.hp < u.maxHp || selected) {
+        const bw = Math.max(24, radPx * 2.1);
+        const pct = clamp(u.hp / u.maxHp, 0, 1);
+        ctx.fillStyle = '#16181d';
+        ctx.fillRect(topPt.x - bw / 2 - 1, topPt.y - 10, bw + 2, 5);
+        ctx.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
+        ctx.fillRect(topPt.x - bw / 2, topPt.y - 9, bw * pct, 3);
+      }
+    }
+
+    // Marqueurs d'ordres au sol projetés en 3D
+    for (let i = orderMarkers.length - 1; i >= 0; i--) {
+      const om = orderMarkers[i];
+      om.life -= dt;
+      if (om.life <= 0) { orderMarkers.splice(i, 1); continue; }
+      const f = clamp(om.life / om.maxLife, 0, 1);
+      const r = (5 + f * 20) * cam.z;
+      const pt = worldToScreen3D(om.x, om.y, 3);
+      ctx.save();
+      ctx.translate(pt.x, pt.y);
+      ctx.strokeStyle = om.color;
+      ctx.lineWidth = 2.8;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Cercles de portée de construction / Scan Radar
+    if (buildMode) {
+      const def = BUILDINGS[buildMode];
+      const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
+      const gx = check.snapX ?? mouse.wx, gy = check.snapY ?? mouse.wy;
+      const pt = worldToScreen3D(gx, gy, 3);
+      ctx.save();
+      ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, (def.radius + 4) * cam.z, 0, TAU);
+      ctx.stroke();
+      if (def.range) {
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, def.range * cam.z, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (orderCursor === 'scan') {
+      const pt = worldToScreen3D(mouse.wx, mouse.wy, 4);
+      ctx.save();
+      ctx.strokeStyle = '#1fc7c1';
+      ctx.fillStyle = 'rgba(31, 199, 193, 0.14)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 380 * cam.z, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Rectangle de sélection (Box Selection StarCraft)
+    if (mouse.down && mouse.dragStart) {
+      ctx.save();
+      ctx.strokeStyle = '#2fbf71';
+      ctx.fillStyle = 'rgba(47, 191, 113, 0.16)';
+      ctx.lineWidth = 2;
+      const rx = Math.min(mouse.dragStart.sx, mouse.x);
+      const ry = Math.min(mouse.dragStart.sy, mouse.y);
+      const rw = Math.abs(mouse.x - mouse.dragStart.sx);
+      const rh = Math.abs(mouse.y - mouse.dragStart.sy);
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.restore();
+    }
+
+    renderMinimap();
+    return;
+  }
+
+  ctx.fillStyle = '#142818';
+  ctx.fillRect(0, 0, W, H);
 
   ctx.save();
   ctx.translate(W / 2 + shX, H / 2 + shY);
