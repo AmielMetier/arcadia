@@ -9,7 +9,7 @@ const TILT_3D = 52;
 // Nom affiché sur la case (le titre de propriété garde le nom complet)
 const shortName = (n) => n.replace(/^Boulevard /, 'Bd ').replace(/^Avenue /, 'Av. ').replace(/^Taxe de luxe — /, 'Taxe de luxe · ');
 
-function centerArt() {
+export function centerArt() {
   const c = SIZE - 2 * CORNER; // 648
   const deck = (cx, cy, face, back, label, icon) => `
     <g transform="translate(${cx} ${cy}) rotate(-45)">
@@ -207,6 +207,7 @@ export function mountBoard(host, board, { onCell } = {}) {
       }
     },
     setCurrent(id) { for (const [pid, o] of pawns) o.el.classList.toggle('cur', pid === id); },
+    markOwner(i, color) { const c = cells[i]; c.classList.toggle('owned', !!color); c.style.setProperty('--own', color || 'transparent'); },
     select(i) { for (const c of cells) c.classList.toggle('sel', +c.dataset.i === i); },
     pulse(i) { for (const c of cells) c.classList.toggle('pulse', +c.dataset.i === i); },
     // Déplacement case par case (steps négatif : recul)

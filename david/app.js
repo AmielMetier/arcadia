@@ -7,7 +7,7 @@ const H = window.HubBridge;
 const board = await fetch('data/board-nice.json').then((r) => r.json());
 const root = document.getElementById('app');
 
-function boot(info) {
+async function boot(info) {
   const role = H.embedded ? info.role : 'solo';
   const meP = H.players.find((p) => p.id === info.myId);
   const prof = (() => { try { return { name: JSON.parse(localStorage.getItem('dd_name')) || 'Moi', color: JSON.parse(localStorage.getItem('dd_color')) || '#ff4b2b' }; } catch (e) { return { name: 'Moi', color: '#ff4b2b' }; } })();
@@ -18,7 +18,7 @@ function boot(info) {
     jackpot: qs.get('jackpot'), doubleGo: qs.get('doubleGo'), auctions: qs.get('auctions') ?? 1, cash: qs.get('cash'),
   };
 
-  const view = mountGame(root, board, {
+  const view = await mountGame(root, board, {
     me,
     act: (a) => session.act(a),
     emote: (id) => session.emote(id),

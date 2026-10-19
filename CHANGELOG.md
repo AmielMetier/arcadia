@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.12 — 19 octobre 2026
+- DavidSimulator en vraie 3D (WebGL) : plateau en relief posé sur une table en bois, ombres, pions en métal modélisés
+  en volume, maisons et hôtels en 3D, dés physiques qui roulent et tombent sur la bonne face.
+- Caméra libre (clic-glisser pour tourner, molette pour zoomer, ⌖ pour recentrer) et caméra qui suit le pion :
+  elle se place du côté du plateau où il se trouve, pour lire les noms de rues à l'endroit, comme autour d'une vraie table.
+- Couleurs fidèles au plateau (rendu « neutre »), vue de dessus toujours disponible (bouton 3D/2D).
+- Le plateau classique reste disponible (bouton 🧊) et sert de secours si WebGL manque ; il est utilisé par défaut
+  sur les écrans tactiles, plus légers.
+
 ## 2.11 — 19 octobre 2026
 - Musique lo-fi aussi dans l'accueil et le salon du Hub (bouton 🎵 et volume en bas à gauche, réglages partagés
   avec DavidSimulator). Elle s'efface quand un jeu démarre, chaque jeu ayant sa propre musique.

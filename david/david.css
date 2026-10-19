@@ -1,3 +1,9 @@
+/* plateau en vraie 3D (WebGL) : le canevas occupe toute la fenêtre, l'interface flotte par-dessus */
+.game.webgl{background:#5b3820}
+.game.webgl .stagehost{inset:0}
+.stage3d{position:absolute;inset:0}
+.stage3d canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.stage3d canvas:active{cursor:grabbing}
 :root{
   --ink:#16181d; --paper:#fff8ea; --cream:#f3e9d2; --muted:#6d675c; --line:#d9cdb3;
   --red:#ff4b2b; --yellow:#ffc531; --green:#2fbf71; --sea:#1C5FB4; --sky:#9FD8F5;

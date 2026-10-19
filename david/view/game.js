@@ -4,6 +4,7 @@
 import { availableActions, currentPlayer } from '../engine/rules.js';
 import { netWorth } from '../engine/valuation.js';
 import { mountBoard } from './board.js';
+import { mountBoard3d } from './board3d.js';
 import { mountDice } from './dice.js';
 import { mountFx } from './fx.js';
 import { sfx, audioContext } from './sfx.js';
@@ -11,12 +12,12 @@ import { createMusic } from './music.js';
 import { tokenSvg } from './tokens.js';
 import { mountSetup } from './setup.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
-import { esc, money, el, wait } from './util.js';
+import { esc, money, el, wait, store, save } from './util.js';
 import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings } from '../engine/valuation.js';
 
-export function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {} }) {
+export async function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {} }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -26,7 +27,9 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
       <div class="tools">
         <button class="heatpill" id="heatPill" hidden title="Masquer la heatmap"></button>
         <button class="tool" id="tstats" title="Statistiques">📊</button>
+        <button class="tool" id="tcenter" title="Recentrer la caméra" hidden>⌖</button>
         <button class="tool" id="t3d" title="Vue 3D ou vue de dessus">3D</button>
+        <button class="tool" id="trend" title="Plateau en vraie 3D ou plateau classique">🧊</button>
         <button class="tool" id="tcam" title="Caméra qui suit le pion">🎥</button>
         <span class="musicctl"><button class="tool" id="tmus" title="Musique d'ambiance">🎵</button><input type="range" id="mvol" min="0" max="1" step="0.05" aria-label="Volume de la musique"></span>
         <button class="tool" id="tsnd" title="Bruitages">🔊</button>
@@ -44,7 +47,16 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
     <div class="toast" id="toast" hidden role="status"></div>`;
   const $ = (s) => root.querySelector(s);
 
-  const B = mountBoard($('#stagehost'), board, { onCell: (i) => openProperty(i) });
+  // plateau en vraie 3D (WebGL) ; plateau CSS classique si WebGL est indisponible ou si le joueur le préfère
+  let B = null;
+  // plateau en vraie 3D par défaut sur ordinateur ; plateau classique (plus léger) par défaut sur écran tactile
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  const wantCss = new URLSearchParams(location.search).has('css') || store('david_renderer', touch ? 'css' : '3d') === 'css';
+  if (!wantCss) {
+    try { B = await mountBoard3d($('#stagehost'), board, { onCell: (i) => openProperty(i) }); root.classList.add('webgl'); }
+    catch (e) { console.warn('Plateau 3D indisponible, plateau classique utilisé.', e); $('#stagehost').innerHTML = ''; B = null; }
+  }
+  if (!B) B = mountBoard($('#stagehost'), board, { onCell: (i) => openProperty(i) });
   const D = mountDice(root);
   const F = mountFx(root);
   const M = mountModals(root);
@@ -68,6 +80,13 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
   const syncTools = () => {
     $('#tmus').classList.toggle('off', !music.on); $('#tmus').title = music.on ? 'Couper la musique' : 'Mettre la musique'; $('#t3d').textContent = B.is3d() ? '3D' : '2D'; $('#tcam').classList.toggle('off', !B.follow()); $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; };
   $('#t3d').onclick = () => { B.toggle3d(); syncTools(); };
+  $('#tcenter').hidden = !B.recenter;
+  $('#tcenter').onclick = () => B.recenter && B.recenter();
+  $('#trend').onclick = () => {
+    const next = B.kind === '3d' ? 'css' : '3d';
+    save('david_renderer', next);
+    toast(next === 'css' ? 'Plateau classique à la prochaine partie' : 'Plateau en vraie 3D à la prochaine partie');
+  };
   $('#tcam').onclick = () => { B.toggleFollow(); syncTools(); };
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
   $('#tquit').onclick = () => { if (!S || S.over || confirm("Quitter la partie ?\nElle est sauvegardée : l'hôte pourra la reprendre depuis l'écran de choix des pions.")) exit(); };
@@ -401,7 +420,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
         break;
       case 'DICE':
         if (!quick) sfx.play('dice');
-        await D.roll(e.dice, speed);
+        await (B.rollDice ? B.rollDice(e.dice, speed) : D.roll(e.dice, speed));
         if (e.dice[0] === e.dice[1] && !e.reason && !quick) { const pt = B.pawnScreen(e.player); if (pt) F.float(pt.x, pt.y - 30, 'DOUBLE !', 'gold'); }
         break;
       case 'MOVE':
@@ -439,7 +458,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
         break;
       }
       case 'BUY': case 'GIFT': {
-        const c = B.cells[e.space]; c.classList.add('owned'); c.style.setProperty('--own', col(e.player));
+        B.markOwner(e.space, col(e.player));
         if (quick) break;
         const p = B.cellScreen(e.space), sp = board.spaces[e.space];
         sfx.play('buy'); F.burst(p.x, p.y, col(e.player)); F.stamp(p.x, p.y, e.k === 'GIFT' ? 'OFFERT' : 'VENDU', col(e.player));
@@ -452,7 +471,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
       case 'BID': if (!quick) sfx.play('bid'); break;
       case 'AUCTION_END': {
         if (e.winner == null || quick) break;
-        const c = B.cells[e.space]; c.classList.add('owned'); c.style.setProperty('--own', col(e.winner));
+        B.markOwner(e.space, col(e.winner));
         const p = B.cellScreen(e.space); sfx.play('buy'); F.stamp(p.x, p.y, 'ADJUGÉ', col(e.winner)); F.burst(p.x, p.y, col(e.winner));
         await wait(700 / speed);
         break;
@@ -558,6 +577,7 @@ export function mountGame(root, board, { me, act, pick, start, exit, chooseSave,
     },
     setup(s) { if (!S) SU.render(s); },
     toast(msg) { sfx.play('error'); toast(msg); },
+    board: B, // tests (?debug)
     emote(from, id) { showEmote(from, id); },
   };
 }

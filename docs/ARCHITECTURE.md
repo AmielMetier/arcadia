@@ -80,7 +80,9 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   │   └── saves.js               sauvegardes locales chez l'hôte
 │   ├── view/                                                                    ← étape 3
 │   │   ├── game.js                interface de jeu + « réalisateur » qui met en scène les événements
-│   │   ├── board.js               plateau incliné en CSS 3D, pions, bâtiments, caméra qui suit le pion
+│   │   ├── board3d.js             plateau en vraie 3D (Three.js) : texture dessinée en canevas, dés, caméra orbitale
+│   │   ├── tokens3d.js            pions en volume (tour, extrusion), normalisés sur un socle coloré
+│   │   ├── board.js               plateau classique en CSS 3D (secours sans WebGL, défaut sur écran tactile)
 │   │   ├── geometry.js            position des cases, des pions et des bâtiments (repère 880 × 880)
 │   │   ├── dice.js                dés 3D (la face finale correspond au tirage du moteur)
 │   │   ├── fx.js                  pièces, montants flottants, bandeaux, tampons, cartes, confettis
@@ -263,3 +265,11 @@ d'utilisateur avec le secret partagé que Metered publie). Un relais personnel p
 `hub/nettest.js` diagnostique le réseau (bouton « Tester ma connexion », ou `?nettest`).
 Paramètres de test : `?peer=127.0.0.1:9000` (serveur PeerJS local), `?relay` (relais obligatoire),
 `?turn=url,identifiant,motdepasse` (relais imposé).
+
+## Plateau en vraie 3D (version 2.12)
+
+`board3d.js` expose la même interface que `board.js` (sync, hop, slide, rollDice, heat, pickCell, cellScreen…),
+ce qui permet à `game.js` de choisir l'un ou l'autre. La texture du plateau est dessinée une fois dans un canevas
+(3072 px) à partir des mêmes données et icônes que le plateau classique. Rendu « NeutralToneMapping » pour garder
+les couleurs du plateau. La caméra de suivi se place du côté de la case visée (azimut par côté) et se déplace
+en arc autour de sa cible. Three.js r170 est embarqué dans `shared/vendor/three/` (licence MIT).

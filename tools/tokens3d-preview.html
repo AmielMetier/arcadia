@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Aperçu des pions 3D</title>
+<style>html,body{margin:0;background:#6f4224}canvas{display:block}</style>
+<script type="module">
+import * as THREE from '../shared/vendor/three/three.module.min.js';
+import { RoomEnvironment } from '../shared/vendor/three/RoomEnvironment.js';
+import { makeToken3d } from '../david/view/tokens3d.js';
+import { TOKENS } from '../david/view/tokens.js';
+const W = 1500, H = 640, r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W, H); document.body.appendChild(r.domElement);
+const tm = new URLSearchParams(location.search).get('tm') || 'neutral';
+r.toneMapping = { aces: THREE.ACESFilmicToneMapping, neutral: THREE.NeutralToneMapping, agx: THREE.AgXToneMapping, none: THREE.NoToneMapping }[tm];
+r.outputColorSpace = THREE.SRGBColorSpace;
+const s = new THREE.Scene(); s.background = new THREE.Color('#7d4b28');
+s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+s.add(new THREE.HemisphereLight(0xfff4e0, 0x3a2412, 0.9)); const sun = new THREE.DirectionalLight(0xfff1d6, 2.1); sun.position.set(30, 60, 40); s.add(sun);
+const cols = ['#ff4b2b','#2b8cff','#ffc531','#2fbf71','#b45cff'];
+TOKENS.forEach((t, k) => { const o = makeToken3d(t.id, cols[k % 5]); o.position.set((k % 5) * 9 - 18, 0, Math.floor(k / 5) * 9 - 4); o.rotation.y = -0.5; s.add(o); });
+const cam = new THREE.PerspectiveCamera(30, W / H, 1, 500); cam.position.set(0, 26, 46); cam.lookAt(0, 1.5, 0.5);
+r.render(s, cam); window.done = true;
+</script>
