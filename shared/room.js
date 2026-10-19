@@ -33,15 +33,15 @@
     const pushChat = (c) => { R.chat.push(c); R.chat = R.chat.slice(-40); emit('chat', c); };
     const sys = (txt) => { const c = { id: -1, txt, sys: true }; pushChat(c); if (R.mode === 'host') net.bcast({ t: 'chat', ...c }); };
 
-    function deliverGame(from, to, m, fromCid) {
+    function deliverGame(from, to, m) {
       // côté hôte : un message de jeu venant de `from` (id) vers `to`
-      if (to === 'host' || to === R.myId) { emit('game', from, m); return; }
+      if (to === 'host' || Number(to) === Number(R.myId)) { emit('game', from, m); return; }
       if (to === 'all') {
         emit('game', from, m);
-        net.bcast({ t: 'g', from, m }, fromCid);
+        for (const p of R.players) if (p.cid && Number(p.id) !== Number(from)) net.to(p.cid, { t: 'g', from, m });
         return;
       }
-      const p = R.players.find((q) => q.id === to);
+      const p = R.players.find((q) => Number(q.id) === Number(to));
       if (p && p.cid) net.to(p.cid, { t: 'g', from, m });
     }
 
@@ -57,8 +57,8 @@
       switch (m.t) {
         case 'hello': {
           const uid = cleanUid(m.uid);
-          const existing = p || (uid && R.players.find((q) => q.uid === uid && q.id !== R.hostId))
-            || (Number.isInteger(m.prevId) && m.prevId > 0 && R.players.find((q) => q.id === m.prevId));
+          const existing = p || (uid && R.players.find((q) => q.uid === uid && q.id !== R.hostId && !q.cid))
+            || (Number.isInteger(m.prevId) && m.prevId > 0 && R.players.find((q) => q.id === m.prevId && !q.cid));
           if (existing) {
             existing.cid = cid;
             existing.name = cleanName(m.name);

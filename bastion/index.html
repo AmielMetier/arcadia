@@ -2452,7 +2452,6 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
   if (!isIcon && b.kind === 'hq' && state) {
     const ownerP = state.players.find((q) => Number(q.id) === Number(b.owner));
     if (ownerP) {
-      const roofOff = project3DOffset(wx, wy, h3d, false);
       const pingVal = ownerP.bot ? '🤖 IA' : `${getPlayerPing(ownerP)} ms`;
       const lbl = `${ownerP.name} · ${pingVal}`;
       g.font = '700 11px "Chakra Petch", sans-serif';
@@ -4006,7 +4005,7 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
   const op = isGhost ? 0.65 : 1;
 
   const teamMat = getMat3D(color, 0.35, 0.35, color, isGhost ? 0.35 : 0.1, op);
-  const darkTeamMat = getMat3D(shadeHex(color, -36), 0.45, 0.4, 0x000000, 0, op);
+  const darkTeamMat = getMat3D(shade(color, -0.36), 0.45, 0.4, 0x000000, 0, op);
   const steelMat = getMat3D('#5a606e', 0.45, 0.55, 0x000000, 0, op);
   const darkSteelMat = getMat3D('#2b2f38', 0.55, 0.6, 0x000000, 0, op);
   const lightSteelMat = getMat3D('#929aa8', 0.35, 0.5, 0x000000, 0, op);
@@ -4249,7 +4248,7 @@ function createUnitMesh3D(kind, color) {
   const r = def.radius || 12;
 
   const teamMat = getMat3D(color, 0.35, 0.35, color, 0.12);
-  const darkTeamMat = getMat3D(shadeHex(color, -35), 0.48, 0.42);
+  const darkTeamMat = getMat3D(shade(color, -0.35), 0.48, 0.42);
   const steelMat = getMat3D('#5a606e', 0.45, 0.58);
   const darkSteelMat = getMat3D('#232730', 0.6, 0.55);
   const visorMat = getMat3D('#9be7ff', 0.15, 0.2, 0x3ecbff, 0.65);
@@ -4468,231 +4467,237 @@ function createUnitMesh3D(kind, color) {
 
 function syncAndRenderThree3D(dt, now, shX, shY) {
   if (!threeReady && !initThree3D()) return false;
+  try {
+    // Caméra 3D vue du dessus (inclinaison tactique de ~12° pour révéler les reliefs, façades, canons et ombres 3D)
+    const fovRad = (36 * Math.PI) / 180;
+    const dist = (H / 2) / (cam.z * Math.tan(fovRad / 2));
+    threeCam.position.set(cam.x + shX, dist, cam.y + dist * 0.22 + shY);
+    threeCam.up.set(0, 1, 0);
+    threeCam.lookAt(cam.x + shX, 0, cam.y + shY);
+    threeCam.updateMatrixWorld();
 
-  // Caméra 3D vue du dessus (inclinaison tactique de ~12° pour révéler les reliefs, façades, canons et ombres 3D)
-  const fovRad = (36 * Math.PI) / 180;
-  const dist = (H / 2) / (cam.z * Math.tan(fovRad / 2));
-  threeCam.position.set(cam.x + shX, dist, cam.y + dist * 0.22 + shY);
-  threeCam.up.set(0, 1, 0);
-  threeCam.lookAt(cam.x + shX, 0, cam.y + shY);
-  threeCam.updateMatrixWorld();
-
-  // Animation des cristaux de minéraux et geysers de gaz plasma
-  for (const m of mineralMeshes3D) {
-    m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
-  }
-  for (const g of geyserMeshes3D) {
-    const s = 0.88 + Math.sin(now * 0.006 + g.seed) * 0.18;
-    g.core.scale.set(s, s * 0.7, s);
-  }
-
-  // Synchronisation des Bâtiments 3D
-  const activeBldIds = new Set();
-  for (const b of state.buildings) {
-    if (b.hp <= 0) continue;
-    const vis = b.owner === myId || isVisibleToMe(b.x, b.y);
-    activeBldIds.add(b.id);
-    const owner = state.players.find((p) => p.id === b.owner);
-    const col = owner ? owner.color : '#888888';
-
-    let mesh = bldMeshes3D.get(b.id);
-    if (!mesh || mesh.userData.kind !== b.kind || mesh.userData.color !== col) {
-      if (mesh) threeScene.remove(mesh);
-      mesh = createBuildingMesh3D(b.kind, col, false);
-      threeScene.add(mesh);
-      bldMeshes3D.set(b.id, mesh);
+    // Animation des cristaux de minéraux et geysers de gaz plasma
+    for (const m of mineralMeshes3D) {
+      m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
+    }
+    for (const g of geyserMeshes3D) {
+      const s = 0.88 + Math.sin(now * 0.006 + g.seed) * 0.18;
+      g.core.scale.set(s, s * 0.7, s);
     }
 
-    mesh.visible = vis;
-    if (!vis) continue;
-    mesh.position.set(b.x, 0, b.y);
+    // Synchronisation des Bâtiments 3D
+    const activeBldIds = new Set();
+    for (const b of state.buildings) {
+      if (b.hp <= 0) continue;
+      const vis = b.owner === myId || isVisibleToMe(b.x, b.y);
+      activeBldIds.add(b.id);
+      const owner = state.players.find((p) => p.id === b.owner);
+      const col = owner ? owner.color : '#888888';
 
-    const prog = b.constructing ? clamp(b.buildProg || 0.06, 0.06, 1) : 1;
-    if (mesh.userData.bodyGroup) {
-      mesh.userData.bodyGroup.scale.set(1, b.constructing ? 0.15 + 0.85 * prog : 1, 1);
-    }
-    if (mesh.userData.scaffold) {
-      mesh.userData.scaffold.visible = !!b.constructing;
-      if (b.constructing) mesh.userData.scaffold.rotation.y = now * 0.0012;
-    }
-    if (mesh.userData.rotPart && !b.constructing) {
-      mesh.userData.rotPart.rotation.y = now * 0.0022;
-    }
-    if (mesh.userData.piston && !b.constructing) {
-      mesh.userData.piston.position.y = 26 + Math.sin(now * 0.006 + b.id) * 4;
-    }
-    if (mesh.userData.turret) {
-      mesh.userData.turret.rotation.y = -(b.aimA || 0);
-    }
-  }
-  for (const [id, mesh] of bldMeshes3D.entries()) {
-    if (!activeBldIds.has(id)) {
-      threeScene.remove(mesh);
-      bldMeshes3D.delete(id);
-    }
-  }
+      let mesh = bldMeshes3D.get(b.id);
+      if (!mesh || mesh.userData.kind !== b.kind || mesh.userData.color !== col) {
+        if (mesh) threeScene.remove(mesh);
+        mesh = createBuildingMesh3D(b.kind, col, false);
+        threeScene.add(mesh);
+        bldMeshes3D.set(b.id, mesh);
+      }
 
-  // Connexions 3D entre Murs voisins
-  while (wallBeamsGroup3D.children.length > 0) {
-    wallBeamsGroup3D.remove(wallBeamsGroup3D.children[0]);
-  }
-  const walls = state.buildings.filter((b) => b.kind === 'wall' && b.hp > 0 && (b.owner === myId || isVisibleToMe(b.x, b.y)));
-  if (walls.length > 1) {
-    if (!geoCache3D.wallBox) geoCache3D.wallBox = new THREE.BoxGeometry(1, 16, 10);
-    const wallBeamMat = getMat3D('#929aa8', 0.4, 0.5);
-    for (let i = 0; i < walls.length; i++) {
-      for (let j = i + 1; j < walls.length; j++) {
-        const w1 = walls[i], w2 = walls[j];
-        if (w1.team === w2.team) {
-          const d = hypot(w1.x, w1.y, w2.x, w2.y);
-          if (d > 8 && d <= 58) {
-            const beam = new THREE.Mesh(geoCache3D.wallBox, wallBeamMat);
-            beam.scale.set(d, 1, 1);
-            beam.position.set((w1.x + w2.x) * 0.5, 11, (w1.y + w2.y) * 0.5);
-            beam.rotation.y = -Math.atan2(w2.y - w1.y, w2.x - w1.x);
-            beam.castShadow = true;
-            wallBeamsGroup3D.add(beam);
+      mesh.visible = vis;
+      if (!vis) continue;
+      mesh.position.set(b.x, 0, b.y);
+
+      const prog = b.constructing ? clamp(b.buildProg || 0.06, 0.06, 1) : 1;
+      if (mesh.userData.bodyGroup) {
+        mesh.userData.bodyGroup.scale.set(1, b.constructing ? 0.15 + 0.85 * prog : 1, 1);
+      }
+      if (mesh.userData.scaffold) {
+        mesh.userData.scaffold.visible = !!b.constructing;
+        if (b.constructing) mesh.userData.scaffold.rotation.y = now * 0.0012;
+      }
+      if (mesh.userData.rotPart && !b.constructing) {
+        mesh.userData.rotPart.rotation.y = now * 0.0022;
+      }
+      if (mesh.userData.piston && !b.constructing) {
+        mesh.userData.piston.position.y = 26 + Math.sin(now * 0.006 + b.id) * 4;
+      }
+      if (mesh.userData.turret) {
+        mesh.userData.turret.rotation.y = -(b.aimA || 0);
+      }
+    }
+    for (const [id, mesh] of bldMeshes3D.entries()) {
+      if (!activeBldIds.has(id)) {
+        threeScene.remove(mesh);
+        bldMeshes3D.delete(id);
+      }
+    }
+
+    // Connexions 3D entre Murs voisins
+    while (wallBeamsGroup3D.children.length > 0) {
+      wallBeamsGroup3D.remove(wallBeamsGroup3D.children[0]);
+    }
+    const walls = state.buildings.filter((b) => b.kind === 'wall' && b.hp > 0 && (b.owner === myId || isVisibleToMe(b.x, b.y)));
+    if (walls.length > 1) {
+      if (!geoCache3D.wallBox) geoCache3D.wallBox = new THREE.BoxGeometry(1, 16, 10);
+      const wallBeamMat = getMat3D('#929aa8', 0.4, 0.5);
+      for (let i = 0; i < walls.length; i++) {
+        for (let j = i + 1; j < walls.length; j++) {
+          const w1 = walls[i], w2 = walls[j];
+          if (w1.team === w2.team) {
+            const d = hypot(w1.x, w1.y, w2.x, w2.y);
+            if (d > 8 && d <= 58) {
+              const beam = new THREE.Mesh(geoCache3D.wallBox, wallBeamMat);
+              beam.scale.set(d, 1, 1);
+              beam.position.set((w1.x + w2.x) * 0.5, 11, (w1.y + w2.y) * 0.5);
+              beam.rotation.y = -Math.atan2(w2.y - w1.y, w2.x - w1.x);
+              beam.castShadow = true;
+              wallBeamsGroup3D.add(beam);
+            }
           }
         }
       }
     }
-  }
 
-  // Synchronisation des Unités 3D
-  const activeUnitIds = new Set();
-  for (const u of state.units) {
-    if (u.hp <= 0) continue;
-    const vis = u.owner === myId || isVisibleToMe(u.x, u.y);
-    activeUnitIds.add(u.id);
-    const owner = state.players.find((p) => p.id === u.owner);
-    const col = owner ? owner.color : '#888888';
+    // Synchronisation des Unités 3D
+    const activeUnitIds = new Set();
+    for (const u of state.units) {
+      if (u.hp <= 0) continue;
+      const vis = u.owner === myId || isVisibleToMe(u.x, u.y);
+      activeUnitIds.add(u.id);
+      const owner = state.players.find((p) => p.id === u.owner);
+      const col = owner ? owner.color : '#888888';
 
-    let mesh = unitMeshes3D.get(u.id);
-    if (!mesh || mesh.userData.kind !== u.kind || mesh.userData.color !== col) {
-      if (mesh) threeScene.remove(mesh);
-      mesh = createUnitMesh3D(u.kind, col);
-      threeScene.add(mesh);
-      unitMeshes3D.set(u.id, mesh);
-    }
+      let mesh = unitMeshes3D.get(u.id);
+      if (!mesh || mesh.userData.kind !== u.kind || mesh.userData.color !== col) {
+        if (mesh) threeScene.remove(mesh);
+        mesh = createUnitMesh3D(u.kind, col);
+        threeScene.add(mesh);
+        unitMeshes3D.set(u.id, mesh);
+      }
 
-    mesh.visible = vis;
-    if (!vis) continue;
-    mesh.position.set(u.x, 0, u.y);
+      mesh.visible = vis;
+      if (!vis) continue;
+      mesh.position.set(u.x, 0, u.y);
 
-    if (u.kind === 'tank' || u.kind === 'siege' || u.kind === 'titan') {
-      const moveA = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0) > 2) ? Math.atan2(u.vy, u.vx) : (u.a || 0);
-      mesh.rotation.y = -moveA;
-      if (mesh.userData.turret) {
-        mesh.userData.turret.rotation.y = -(u.a || 0) + moveA;
-      }
-      if (mesh.userData.stabilizers) {
-        mesh.userData.stabilizers.visible = !!u.sieged;
-      }
-    } else {
-      mesh.rotation.y = -(u.a || 0);
-      if (mesh.userData.walkBody) {
-        const moving = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0)) > 4;
-        mesh.userData.walkBody.position.y = moving ? Math.abs(Math.sin(now * 0.015 + u.id)) * 2.2 : 0;
-      }
-      if (mesh.userData.stimRing) {
-        mesh.userData.stimRing.visible = (u.stimT || 0) > 0;
-      }
-      if (u.kind === 'scv') {
-        if (mesh.userData.cargoMin) mesh.userData.cargoMin.visible = u.carryAmt > 0 && u.carryType === 'min';
-        if (mesh.userData.cargoGas) mesh.userData.cargoGas.visible = u.carryAmt > 0 && u.carryType === 'gas';
-        if (mesh.userData.weldGlow) {
-          const welding = !!(u.onSite && u.buildTargetId);
-          mesh.userData.weldGlow.visible = welding && ((Math.floor(now / 50) + u.id) % 2 === 0);
+      if (u.kind === 'tank' || u.kind === 'siege' || u.kind === 'titan') {
+        const moveA = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0) > 2) ? Math.atan2(u.vy, u.vx) : (u.a || 0);
+        mesh.rotation.y = -moveA;
+        if (mesh.userData.turret) {
+          mesh.userData.turret.rotation.y = -(u.a || 0) + moveA;
+        }
+        if (mesh.userData.stabilizers) {
+          mesh.userData.stabilizers.visible = !!u.sieged;
+        }
+      } else {
+        mesh.rotation.y = -(u.a || 0);
+        if (mesh.userData.walkBody) {
+          const moving = (Math.abs(u.vx || 0) + Math.abs(u.vy || 0)) > 4;
+          mesh.userData.walkBody.position.y = moving ? Math.abs(Math.sin(now * 0.015 + u.id)) * 2.2 : 0;
+        }
+        if (mesh.userData.stimRing) {
+          mesh.userData.stimRing.visible = (u.stimT || 0) > 0;
+        }
+        if (u.kind === 'scv') {
+          if (mesh.userData.cargoMin) mesh.userData.cargoMin.visible = u.carryAmt > 0 && u.carryType === 'min';
+          if (mesh.userData.cargoGas) mesh.userData.cargoGas.visible = u.carryAmt > 0 && u.carryType === 'gas';
+          if (mesh.userData.weldGlow) {
+            const welding = !!(u.onSite && u.buildTargetId);
+            mesh.userData.weldGlow.visible = welding && ((Math.floor(now / 50) + u.id) % 2 === 0);
+          }
         }
       }
     }
-  }
-  for (const [id, mesh] of unitMeshes3D.entries()) {
-    if (!activeUnitIds.has(id)) {
-      threeScene.remove(mesh);
-      unitMeshes3D.delete(id);
+    for (const [id, mesh] of unitMeshes3D.entries()) {
+      if (!activeUnitIds.has(id)) {
+        threeScene.remove(mesh);
+        unitMeshes3D.delete(id);
+      }
     }
-  }
 
-  // Aperçu fantôme 3D du bâtiment à poser (uniquement quand un VCS est sélectionné)
-  if (buildMode) {
-    const def = BUILDINGS[buildMode];
-    const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
-    const gx = check.snapX ?? mouse.wx, gy = check.snapY ?? mouse.wy;
-    const ghostCol = check.ok ? '#2fbf71' : '#ff4b2b';
-    const ghostKey = `${buildMode}|${ghostCol}`;
-    if (!ghostGroup3D || ghostKind3D !== ghostKey) {
-      if (ghostGroup3D) threeScene.remove(ghostGroup3D);
-      ghostGroup3D = createBuildingMesh3D(buildMode, ghostCol, true);
-      threeScene.add(ghostGroup3D);
-      ghostKind3D = ghostKey;
+    // Aperçu fantôme 3D du bâtiment à poser (uniquement quand un VCS est sélectionné)
+    if (buildMode) {
+      const def = BUILDINGS[buildMode];
+      const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
+      const gx = check.snapX ?? mouse.wx, gy = check.snapY ?? mouse.wy;
+      const ghostCol = check.ok ? '#2fbf71' : '#ff4b2b';
+      const ghostKey = `${buildMode}|${ghostCol}`;
+      if (!ghostGroup3D || ghostKind3D !== ghostKey) {
+        if (ghostGroup3D) threeScene.remove(ghostGroup3D);
+        ghostGroup3D = createBuildingMesh3D(buildMode, ghostCol, true);
+        threeScene.add(ghostGroup3D);
+        ghostKind3D = ghostKey;
+      }
+      ghostGroup3D.visible = true;
+      ghostGroup3D.position.set(gx, 0, gy);
+    } else if (ghostGroup3D) {
+      ghostGroup3D.visible = false;
     }
-    ghostGroup3D.visible = true;
-    ghostGroup3D.position.set(gx, 0, gy);
-  } else if (ghostGroup3D) {
-    ghostGroup3D.visible = false;
-  }
 
-  // Projectiles, Rayons Tesla/Laser, Ondes de choc et Particules en 3D
-  while (fxGroup3D.children.length > 0) {
-    fxGroup3D.remove(fxGroup3D.children[0]);
-  }
-  if (!geoCache3D.proj) {
-    geoCache3D.proj = new THREE.SphereGeometry(1, 8, 8);
-    geoCache3D.ring = new THREE.RingGeometry(0.86, 1.0, 24);
-    geoCache3D.beamCyl = new THREE.CylinderGeometry(1, 1, 1, 6);
-  }
-  for (let i = projectiles.length - 1; i >= 0; i--) {
-    const pr = projectiles[i];
-    pr.prog += pr.speed * dt;
-    if (pr.prog >= 1) { projectiles.splice(i, 1); continue; }
-    const px = lerp(pr.x, pr.tx, pr.prog), py = lerp(pr.y, pr.ty, pr.prog);
-    const arcH = 14 + Math.sin(pr.prog * Math.PI) * 16;
-    const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(pr.color, 0.1, 0.1, pr.color, 0.95));
-    pm.position.set(px, arcH, py);
-    pm.scale.setScalar(pr.r * 1.15);
-    fxGroup3D.add(pm);
-  }
-  for (let i = shockwaves.length - 1; i >= 0; i--) {
-    const sw = shockwaves[i];
-    sw.life -= dt;
-    if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
-    const u = 1 - sw.life / sw.maxLife;
-    const rad = lerp(sw.r, sw.maxR, u);
-    const rm = new THREE.Mesh(geoCache3D.ring, getMat3D(sw.color, 0.2, 0.1, sw.color, 0.85, 1 - u));
-    rm.rotation.x = -Math.PI / 2;
-    rm.position.set(sw.x, 3.5, sw.y);
-    rm.scale.setScalar(rad);
-    fxGroup3D.add(rm);
-  }
-  for (let i = beams.length - 1; i >= 0; i--) {
-    const bm = beams[i];
-    bm.life -= dt;
-    if (bm.life <= 0) { beams.splice(i, 1); continue; }
-    const d = hypot(bm.x1, bm.y1, bm.x2, bm.y2);
-    const beamMesh = new THREE.Mesh(
-      geoCache3D.beamCyl,
-      getMat3D(bm.color, 0.1, 0.1, bm.color, 0.95, clamp(bm.life / bm.maxLife, 0, 1))
-    );
-    beamMesh.scale.set(bm.w * 0.35, d, bm.w * 0.35);
-    beamMesh.position.set((bm.x1 + bm.x2) * 0.5, 22, (bm.y1 + bm.y2) * 0.5);
-    beamMesh.rotation.z = Math.PI / 2;
-    beamMesh.rotation.y = -Math.atan2(bm.y2 - bm.y1, bm.x2 - bm.x1);
-    fxGroup3D.add(beamMesh);
-  }
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.life -= dt;
-    if (p.life <= 0) { particles.splice(i, 1); continue; }
-    p.x += p.vx * dt; p.y += p.vy * dt;
-    const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(p.color, 0.2, 0.1, p.color, 0.8));
-    pm.position.set(p.x, 10 + p.life * 28, p.y);
-    pm.scale.setScalar(p.r * 0.85);
-    fxGroup3D.add(pm);
-  }
+    // Projectiles, Rayons Tesla/Laser, Ondes de choc et Particules en 3D
+    while (fxGroup3D.children.length > 0) {
+      fxGroup3D.remove(fxGroup3D.children[0]);
+    }
+    if (!geoCache3D.proj) {
+      geoCache3D.proj = new THREE.SphereGeometry(1, 8, 8);
+      geoCache3D.ring = new THREE.RingGeometry(0.86, 1.0, 24);
+      geoCache3D.beamCyl = new THREE.CylinderGeometry(1, 1, 1, 6);
+    }
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const pr = projectiles[i];
+      pr.prog += pr.speed * dt;
+      if (pr.prog >= 1) { projectiles.splice(i, 1); continue; }
+      const px = lerp(pr.x, pr.tx, pr.prog), py = lerp(pr.y, pr.ty, pr.prog);
+      const arcH = 14 + Math.sin(pr.prog * Math.PI) * 16;
+      const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(pr.color, 0.1, 0.1, pr.color, 0.95));
+      pm.position.set(px, arcH, py);
+      pm.scale.setScalar(pr.r * 1.15);
+      fxGroup3D.add(pm);
+    }
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.life -= dt;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      const u = 1 - sw.life / sw.maxLife;
+      const rad = lerp(sw.r, sw.maxR, u);
+      const rm = new THREE.Mesh(geoCache3D.ring, getMat3D(sw.color, 0.2, 0.1, sw.color, 0.85, 1 - u));
+      rm.rotation.x = -Math.PI / 2;
+      rm.position.set(sw.x, 3.5, sw.y);
+      rm.scale.setScalar(rad);
+      fxGroup3D.add(rm);
+    }
+    for (let i = beams.length - 1; i >= 0; i--) {
+      const bm = beams[i];
+      bm.life -= dt;
+      if (bm.life <= 0) { beams.splice(i, 1); continue; }
+      const d = hypot(bm.x1, bm.y1, bm.x2, bm.y2);
+      const beamMesh = new THREE.Mesh(
+        geoCache3D.beamCyl,
+        getMat3D(bm.color, 0.1, 0.1, bm.color, 0.95, clamp(bm.life / bm.maxLife, 0, 1))
+      );
+      beamMesh.scale.set(bm.w * 0.35, d, bm.w * 0.35);
+      beamMesh.position.set((bm.x1 + bm.x2) * 0.5, 22, (bm.y1 + bm.y2) * 0.5);
+      beamMesh.rotation.z = Math.PI / 2;
+      beamMesh.rotation.y = -Math.atan2(bm.y2 - bm.y1, bm.x2 - bm.x1);
+      fxGroup3D.add(beamMesh);
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(p.color, 0.2, 0.1, p.color, 0.8));
+      pm.position.set(p.x, 10 + p.life * 28, p.y);
+      pm.scale.setScalar(p.r * 0.85);
+      fxGroup3D.add(pm);
+    }
 
-  threeRenderer.render(threeScene, threeCam);
-  return true;
+    threeRenderer.render(threeScene, threeCam);
+    return true;
+  } catch (err) {
+    console.error('3D render error, fallback to 2D:', err);
+    threeReady = false;
+    if (c3d) c3d.style.display = 'none';
+    return false;
+  }
 }
 
 /* ============================================================================
@@ -5514,11 +5519,15 @@ if (window.HubBridge && HubBridge.embedded) {
 
 let lastFrame = performance.now();
 function loop(now) {
+  requestAnimationFrame(loop);
   const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
   lastFrame = now;
-  renderWorld(dt, now);
-  updateHudUI();
-  requestAnimationFrame(loop);
+  try {
+    renderWorld(dt, now);
+    updateHudUI();
+  } catch (err) {
+    console.error('Frame error:', err);
+  }
 }
 requestAnimationFrame(loop);
 </script>
