@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Bastion Clash — RTS StarCraft Edition</title>
+<title>Bastion Clash — RTS 3D Top-Down (Édition StarCraft)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -55,15 +55,15 @@ canvas#world.cur-build{cursor:cell}
 .btn.ghost{background:var(--paper);color:var(--ink)}
 .btn.small{font-size:11.5px;padding:5px 9px;box-shadow:3px 3px 0 var(--ink)}
 
-/* BARRE D'ACCÈS RAPIDE (F1-F4 + GROUPES DE CONTRÔLE 1-5) */
-.quick-bar{position:fixed;bottom:184px;left:50%;transform:translateX(-50%);z-index:22;display:flex;gap:6px;align-items:center;pointer-events:none;flex-wrap:wrap;justify-content:center}
+/* BARRE D'ACCÈS RAPIDE STARCRAFT II (F1 VCS INACTIF, F2 ARMÉE, GROUPES DE CONTRÔLE 1-5) */
+.quick-bar{position:fixed;bottom:184px;left:14px;z-index:22;display:flex;gap:6px;align-items:center;pointer-events:none;flex-wrap:wrap}
 .quick-bar > *{pointer-events:auto}
 .qbtn{background:var(--ink);color:var(--paper);border:2.5px solid var(--paper);box-shadow:3px 3px 0 #000;border-radius:9px;
   padding:4px 9px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:transform .06s}
 .qbtn:hover{background:#282c36;transform:translateY(-2px)}
 .qbtn kbd{background:var(--yellow);color:var(--ink);border-radius:4px;padding:0 4px;font-family:Bungee,sans-serif;font-size:10px}
 .qbtn .cnt{background:var(--cyan);color:var(--ink);border-radius:5px;padding:0 5px;font-weight:700;font-size:11px}
-.cg-bar{display:flex;gap:4px;margin-left:6px}
+.cg-bar{display:flex;gap:4px;margin-left:4px}
 .cg-pill{background:var(--paper);color:var(--ink);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);border-radius:7px;
   padding:2px 7px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px}
 .cg-pill.active{background:var(--yellow)}
@@ -118,11 +118,11 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
 .u-card .u-hp{width:100%;height:5px;background:#e2d6bc;border:1px solid var(--ink);border-radius:3px;overflow:hidden}
 .u-card .u-hp i{display:block;height:100%;background:var(--green)}
 
-/* 3. GRILLE DE COMMANDES 4x3 (COMMAND CARD STARCRAFT) */
-.cmd-tabs{display:flex;gap:4px}
-.tab-btn{border:1.5px solid var(--ink);border-radius:5px;background:var(--cream);font:inherit;font-size:10px;font-weight:700;padding:1px 6px;cursor:pointer}
-.tab-btn.active{background:var(--yellow)}
+/* 3. GRILLE DE COMMANDES 4x3 (COMMAND CARD STARCRAFT STRICTE) */
 .cmd-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:5px;flex:1;min-height:0}
+.cmd-empty{grid-column:1/-1;grid-row:1/-1;border:2px dashed var(--line2);border-radius:10px;background:var(--cream);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--muted);font-size:12px;font-weight:700;gap:4px}
+.cmd-empty b{font-family:Bungee,sans-serif;color:var(--ink);font-size:12.5px}
 .cbtn{border:2px solid var(--ink);border-radius:9px;background:#fff;padding:2px 3px;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;position:relative;
   transition:transform .06s,background .06s;font:inherit;color:var(--ink);box-shadow:2px 2px 0 var(--ink);overflow:hidden}
@@ -133,7 +133,6 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
   border-radius:3px;padding:0 3.5px;line-height:1.35;z-index:2}
 .cbtn .cost-tag{position:absolute;top:2px;right:3px;font-family:Bungee,sans-serif;font-size:8.5px;color:#0e6b68;background:#d8f8f6;
   border:1px solid var(--ink);border-radius:3px;padding:0 3px;line-height:1.3;z-index:2}
-.cbtn .cost-tag.gas{color:#186b3a;background:#dcf7e6}
 .cbtn.cant .cost-tag{color:#c4231a;background:#ffe3dc}
 .cbtn canvas.thumb{width:42px;height:26px;display:block;margin-top:8px}
 .cbtn .ico-txt{font-size:15px;margin-top:8px;line-height:1}
@@ -170,12 +169,12 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
     <span class="res-val" id="uiMin">200</span>
     <span class="res-sub" id="uiWorkers">6 VCS</span>
   </div>
-  <div class="res-pill" title="Gaz Plasma récolté dans tes Raffineries (construit une Raffinerie sur un geyser vert)">
+  <div class="res-pill" title="Gaz Plasma récolté dans tes Raffineries (clique sur un VCS pour construire une Raffinerie sur un geyser vert)">
     <span class="res-ico gas">🧪</span>
     <span class="res-val" id="uiGas">50</span>
     <span class="res-sub" id="uiRefineries">0 Raff.</span>
   </div>
-  <div class="res-pill" title="Ravitaillement (Population) : construis des Dépôts Relais pour augmenter la limite">
+  <div class="res-pill" title="Ravitaillement (Population) : sélectionne un VCS et construis des Dépôts Relais pour augmenter la limite">
     <span class="res-ico sup">📦</span>
     <span class="res-val" id="uiSupply">6/15</span>
   </div>
@@ -189,24 +188,18 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
   <button class="btn small" id="btnExit">Quitter</button>
 </div>
 
-<!-- BARRE D'ACCÈS RAPIDE STYLE STARCRAFT II (F1, F2, F3, F4 + GROUPES DE CONTRÔLE 1-5) -->
+<!-- BARRE D'UNITÉS STARCRAFT II (F1 VCS, F2 ARMÉE + GROUPES DE CONTRÔLE 1-5) -->
 <div class="quick-bar">
-  <button class="qbtn" id="btnIdleScv" title="Sélectionner un Ouvrier VCS inactif (F1)">
-    <kbd>F1</kbd> VCS inactif <span class="cnt" id="uiIdleCnt">0</span>
+  <button class="qbtn" id="btnIdleScv" title="Sélectionner un Ouvrier VCS pour construire (F1)">
+    <kbd>F1</kbd> Sélectionner VCS <span class="cnt" id="uiIdleCnt">0</span>
   </button>
   <button class="qbtn" id="btnAllArmy" title="Sélectionner toute l'armée de combat (F2)">
     <kbd>F2</kbd> Toute l'armée <span class="cnt" id="uiArmyCnt">0</span>
   </button>
-  <button class="qbtn" id="btnAllRax" title="Sélectionner toutes tes Casernes pour produire vite (F3)">
-    <kbd>F3</kbd> Casernes
-  </button>
-  <button class="qbtn" id="btnAllFac" title="Sélectionner toutes tes Usines blindées (F4)">
-    <kbd>F4</kbd> Usines
-  </button>
-  <div class="cg-bar" id="uiCgBar" title="Groupes de contrôle (Ctrl+1..5 pour assigner, 1..5 pour rappeler)"></div>
+  <div class="cg-bar" id="uiCgBar" title="Groupes de contrôle (Ctrl+1..9 pour assigner un bâtiment ou une escouade, 1..9 pour rappeler)"></div>
 </div>
 
-<!-- CONSOLE RTS INFÉRIEURE (3 VOLETS : RADAR | SÉLECTION & PRODUCTION | ORDRES) -->
+<!-- CONSOLE RTS INFÉRIEURE (3 VOLETS : RADAR | SÉLECTION & PRODUCTION | ORDRES DE LA SÉLECTION) -->
 <div class="rts-console">
   <!-- 1. Minimap Radar -->
   <div class="panel-box">
@@ -220,19 +213,16 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
   <div class="panel-box">
     <div class="panel-hd">
       <span id="uiSelHeader">Sélection tactique</span>
-      <span id="uiSelSubHint">Glisser = Sélectionner · Clic Droit = Action</span>
+      <span id="uiSelSubHint">Clique sur un VCS ou un bâtiment</span>
     </div>
     <div class="sel-body" id="uiSelBody"></div>
   </div>
 
-  <!-- 3. Grille d'Ordres & Construction (Command Card 4x3) -->
+  <!-- 3. Grille d'Ordres liée strictement à l'unité ou au bâtiment sélectionné -->
   <div class="panel-box">
     <div class="panel-hd">
-      <span id="uiCmdTitle">Ordres & Production</span>
-      <div class="cmd-tabs">
-        <button class="tab-btn active" id="tabAuto">Contexte</button>
-        <button class="tab-btn" id="tabBuild">Construire (B)</button>
-      </div>
+      <span id="uiCmdTitle">Aucune sélection</span>
+      <span id="uiCmdHint" style="font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:10px">—</span>
     </div>
     <div class="cmd-grid" id="uiCmdGrid"></div>
   </div>
@@ -258,14 +248,16 @@ canvas#minimap{width:170px;height:132px;display:block;border:2.5px solid var(--i
 'use strict';
 
 /* ============================================================================
-   BASTION CLASH — ÉDITION RTS STARCRAFT (2.5D HAUTE DÉFINITION)
-   - Récolte physique par Ouvriers VCS (Minéraux 💎 & Gaz Plasma 🧪)
-   - Chantiers de construction progressifs & Réparation mécanique
-   - Files de production par bâtiment (5 slots) + Points de Ralliement
-   - Ravitaillement (Supply Cap) via Dépôts Relais
-   - Micro-gestion StarCraft : Box-Select, A-Move (Attaque-Déplacement),
-     Focus Fire, Stimpack (T), Mode Siège déployable (E), Scan Radar (X),
-     Groupes de contrôle (1-5) & Brouillard de Guerre dynamique.
+   BASTION CLASH — RTS 3D VUE DU DESSUS (ÉDITION STARCRAFT PURE)
+   - Sélection stricte à la StarCraft :
+     * Par défaut (rien sélectionné) : aucune construction ni production possible.
+     * Pour construire un bâtiment : il faut cliquer sur un Ouvrier VCS.
+     * Pour entraîner des Ouvriers VCS : il faut cliquer sur son QG.
+     * Pour entraîner l'infanterie : il faut cliquer sur une Caserne.
+     * Pour produire des blindés/mechas : il faut cliquer sur une Usine.
+   - Moteur de projection 3D Vue du Dessus (Top-Down 3D Perspective) :
+     * Extrusion volumétrique 3D réelle (prismes, cylindres, pyramides, octaèdres)
+       avec calcul d'éclairage directionnel par face et point de fuite caméra.
    ============================================================================ */
 
 const $ = (s) => document.querySelector(s);
@@ -307,43 +299,43 @@ function mulberry(a) {
 const BUILDINGS = {
   hq: {
     name: 'Centre de Commandement', short: 'QG', min: 350, gas: 0, buildTime: 18,
-    hp: 3200, radius: 48, height: 42, supply: 15, sight: 420, range: 255, dmg: 24, rate: 0.85,
-    trains: ['scv'], desc: 'Base principale : stocke les ressources récoltées, produit des VCS et lance des Scans Radar.',
+    hp: 3200, radius: 48, height: 54, supply: 15, sight: 420, range: 255, dmg: 24, rate: 0.85,
+    trains: ['scv'], desc: 'Clique sur le QG pour entraîner des Ouvriers VCS [Q] ou lancer un Scan Radar [X].',
   },
   pylon: {
     name: 'Dépôt Relais', short: 'Dépôt', min: 75, gas: 0, buildTime: 7,
-    hp: 520, radius: 22, height: 34, supply: 10, sight: 280, range: 175, dmg: 0, rate: 0, heal: 8,
-    trains: [], desc: '+10 Ravitaillement 📦 et régénère les unités alliées proches.',
+    hp: 520, radius: 22, height: 48, supply: 10, sight: 280, range: 175, dmg: 0, rate: 0, heal: 8,
+    trains: [], desc: 'Fournit +10 Ravitaillement 📦 et régénère les unités alliées proches.',
   },
   extractor: {
     name: 'Raffinerie de Gaz', short: 'Raffinerie', min: 75, gas: 0, buildTime: 8,
-    hp: 680, radius: 28, height: 26, supply: 0, sight: 240, range: 0, dmg: 0, rate: 0,
-    trains: [], onGeyser: true, desc: 'Se construit sur un Geyser de Gaz Plasma 🧪 pour permettre aux VCS de le récolter.',
+    hp: 680, radius: 28, height: 42, supply: 0, sight: 240, range: 0, dmg: 0, rate: 0,
+    trains: [], onGeyser: true, desc: 'Se construit sur un Geyser de Gaz Plasma 🧪 pour que tes VCS récoltent du Gaz.',
   },
   barracks: {
     name: 'Caserne Militaire', short: 'Caserne', min: 125, gas: 0, buildTime: 10,
-    hp: 1000, radius: 36, height: 28, supply: 0, sight: 300, range: 0, dmg: 0, rate: 0,
-    trains: ['marine', 'rocket', 'sapper'], desc: 'Entraîne l’infanterie : Marines, Maraudeurs et Faucheurs démolisseurs.',
+    hp: 1000, radius: 36, height: 40, supply: 0, sight: 300, range: 0, dmg: 0, rate: 0,
+    trains: ['marine', 'rocket', 'sapper'], desc: 'Clique sur la Caserne pour entraîner Marines [Q], Maraudeurs [W] et Faucheurs [E].',
   },
   factory: {
     name: 'Usine Blindée', short: 'Usine', min: 150, gas: 75, buildTime: 13,
-    hp: 1350, radius: 41, height: 32, supply: 0, sight: 310, range: 0, dmg: 0, rate: 0,
-    trains: ['tank', 'siege', 'titan'], req: 'barracks', desc: 'Produit les blindés : Chars Goliath, Chars de Siège et Mechas Thor.',
+    hp: 1350, radius: 41, height: 46, supply: 0, sight: 310, range: 0, dmg: 0, rate: 0,
+    trains: ['tank', 'siege', 'titan'], req: 'barracks', desc: 'Clique sur l’Usine pour produire Chars Goliath [Q], Chars de Siège [W] et Mechas Thor [E].',
   },
   turret: {
     name: 'Bunker Mitrailleur', short: 'Bunker', min: 100, gas: 0, buildTime: 8,
-    hp: 820, radius: 25, height: 25, supply: 0, sight: 310, range: 255, dmg: 22, rate: 0.35,
-    trains: [], desc: 'Tourelle défensive à double canon rotatif ultra rapide.',
+    hp: 820, radius: 25, height: 36, supply: 0, sight: 310, range: 255, dmg: 22, rate: 0.35,
+    trains: [], desc: 'Tourelle défensive 3D à double canon rotatif ultra rapide.',
   },
   tesla: {
     name: 'Bobine Tesla', short: 'Tesla', min: 125, gas: 50, buildTime: 10,
-    hp: 980, radius: 28, height: 38, supply: 0, sight: 340, range: 315, dmg: 62, rate: 1.25, splash: 58,
-    trains: [], req: 'barracks', desc: 'Défense haute tension : arcs électriques à dégâts de zone.',
+    hp: 980, radius: 28, height: 58, supply: 0, sight: 340, range: 315, dmg: 62, rate: 1.25, splash: 58,
+    trains: [], req: 'barracks', desc: 'Tour haute tension : projette des éclairs de plasma à dégâts de zone.',
   },
   wall: {
     name: 'Mur Blindé', short: 'Mur', min: 25, gas: 0, buildTime: 3.5,
-    hp: 1050, radius: 20, height: 18, supply: 0, sight: 160, range: 0, dmg: 0, rate: 0,
-    trains: [], desc: 'Barrière fortifiée pour bloquer les couloirs (se connecte aux murs voisins).',
+    hp: 1050, radius: 20, height: 28, supply: 0, sight: 160, range: 0, dmg: 0, rate: 0,
+    trains: [], desc: 'Rempart blindé 3D pour bloquer les couloirs (se connecte aux murs voisins).',
   },
 };
 
@@ -351,7 +343,7 @@ const UNITS = {
   scv: {
     name: 'Ouvrier VCS', short: 'VCS', min: 50, gas: 0, supply: 1, trainTime: 5.5,
     hp: 90, radius: 10.5, speed: 96, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8,
-    desc: 'Récolte les Minéraux 💎 et le Gaz 🧪, construit les bâtiments et répare.',
+    desc: 'Sélectionne ce VCS pour construire des bâtiments [1-8], récolter Minéraux/Gaz ou réparer.',
   },
   marine: {
     name: 'Marine Commando', short: 'Marine', min: 50, gas: 0, supply: 1, trainTime: 5.0,
@@ -382,7 +374,7 @@ const UNITS = {
   titan: {
     name: 'Mecha Thor', short: 'Thor', min: 250, gas: 150, supply: 6, trainTime: 15.0,
     hp: 1650, radius: 25, speed: 56, range: 225, dmg: 115, rate: 0.92, sight: 350, bldMult: 1.65, splash: 64,
-    mech: true, desc: 'Colosse mécanique bipède armé de canons plasma jumelés.',
+    mech: true, desc: 'Colosse mécanique bipède 3D armé de canons plasma jumelés.',
   },
 };
 
@@ -396,13 +388,12 @@ const SPAWN_CORNERS = [
   { x: 360, y: WORLD_SIZE - 360 },
 ];
 
-// Génération des lignes de Minéraux (façon StarCraft) autour de chaque base, des expansions et du centre
 const MINERAL_NODES = [];
 const GAS_GEYSERS = [];
+const TREES_3D = [];
 
 (function initMapResources() {
   let mId = 1, gId = 1;
-  // 1. Ligne de 6 minéraux + 1 geyser dans chaque base principale
   SPAWN_CORNERS.forEach((sp, idx) => {
     const awayA = Math.atan2(sp.y - HALF_W, sp.x - HALF_W);
     for (let i = -2.5; i <= 2.5; i += 1) {
@@ -422,7 +413,6 @@ const GAS_GEYSERS = [];
     });
   });
 
-  // 2. Expansions naturelles (4 expansions latérales)
   const naturals = [
     { x: HALF_W, y: 260, a: -Math.PI / 2 },
     { x: HALF_W, y: WORLD_SIZE - 260, a: Math.PI / 2 },
@@ -446,7 +436,6 @@ const GAS_GEYSERS = [];
     });
   }
 
-  // 3. Base Dorée Centrale (High-Yield Gold Minerals + 2 Geysers)
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU;
     MINERAL_NODES.push({
@@ -468,29 +457,9 @@ const ROCKS = [
 ];
 
 /* ============================================================================
-   CARTE PRÉ-RENDUE 2.5D HAUTE DÉFINITION
+   CARTE SOL PRÉ-RENDUE + LISTE DES ARBRES VOLUMÉTRIQUES 3D
    ============================================================================ */
 let terrainCanvas = null;
-
-function drawTree(g, x, y, r, cols, rnd) {
-  g.save();
-  g.fillStyle = 'rgba(16, 20, 24, 0.32)';
-  g.beginPath(); g.arc(x + 6, y + 7, r * 1.02, 0, TAU); g.fill();
-  const c0 = cols[(rnd() * cols.length) | 0];
-  g.fillStyle = c0;
-  g.strokeStyle = '#16181d';
-  g.lineWidth = 3;
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * TAU + rnd() * 0.3;
-    const lx = x + Math.cos(a) * r * 0.38;
-    const ly = y + Math.sin(a) * r * 0.38;
-    g.beginPath(); g.arc(lx, ly, r * 0.68, 0, TAU); g.fill(); g.stroke();
-  }
-  g.beginPath(); g.arc(x, y, r * 0.78, 0, TAU); g.fill(); g.stroke();
-  g.fillStyle = shade(c0, 0.22);
-  g.beginPath(); g.arc(x - r * 0.22, y - r * 0.22, r * 0.42, 0, TAU); g.fill();
-  g.restore();
-}
 
 function buildTerrainCanvas() {
   const c = document.createElement('canvas');
@@ -512,7 +481,6 @@ function buildTerrainCanvas() {
     g.fillRect(rnd() * WORLD_SIZE, rnd() * WORLD_SIZE, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
   }
 
-  // Rivière sinueuse
   const riverPath = new Path2D();
   riverPath.moveTo(0, HALF_W - 180);
   riverPath.bezierCurveTo(WORLD_SIZE * 0.33, HALF_W + 220, WORLD_SIZE * 0.66, HALF_W - 220, WORLD_SIZE, HALF_W + 180);
@@ -522,7 +490,6 @@ function buildTerrainCanvas() {
   g.strokeStyle = '#246b96'; g.lineWidth = 84; g.stroke(riverPath);
   g.strokeStyle = '#328bc2'; g.lineWidth = 60; g.stroke(riverPath);
 
-  // Routes tactiques asphaltées
   const drawRoad = (x1, y1, x2, y2, width = 72) => {
     g.save();
     g.lineCap = 'round';
@@ -545,10 +512,12 @@ function buildTerrainCanvas() {
   drawRoad(360, 360, 360, WORLD_SIZE - 360, 50);
   drawRoad(WORLD_SIZE - 360, 360, WORLD_SIZE - 360, WORLD_SIZE - 360, 50);
 
-  // Plateformes de bases principales
+  // Plateformes de bases principales avec biseau 3D au sol
   SPAWN_CORNERS.forEach((sp) => {
     g.save();
     g.translate(sp.x, sp.y);
+    g.fillStyle = 'rgba(16, 18, 24, 0.35)';
+    g.beginPath(); g.arc(8, 10, 218, 0, TAU); g.fill();
     g.fillStyle = '#535763';
     g.strokeStyle = '#16181d';
     g.lineWidth = 5;
@@ -565,6 +534,8 @@ function buildTerrainCanvas() {
   // Citadelle Centrale (Gold Base)
   g.save();
   g.translate(HALF_W, HALF_W);
+  g.fillStyle = 'rgba(16, 18, 24, 0.35)';
+  g.beginPath(); g.arc(8, 10, 344, 0, TAU); g.fill();
   g.fillStyle = '#585c69';
   g.strokeStyle = '#16181d';
   g.lineWidth = 6;
@@ -577,9 +548,10 @@ function buildTerrainCanvas() {
   g.beginPath(); g.arc(0, 0, 115, 0, TAU); g.stroke();
   g.restore();
 
-  // Arbres décoratifs hors zones de jeu
+  // Génération des arbres 3D (rendus dynamiquement avec parallaxe 3D)
+  TREES_3D.length = 0;
   const treeColors = ['#2d6632', '#39783c', '#245429', '#468a44'];
-  for (let k = 0; k < 180; k++) {
+  for (let k = 0; k < 155; k++) {
     const tx = 45 + rnd() * (WORLD_SIZE - 90);
     const ty = 45 + rnd() * (WORLD_SIZE - 90);
     const nearBase = SPAWN_CORNERS.some((s) => hypot(tx, ty, s.x, s.y) < 330);
@@ -588,7 +560,9 @@ function buildTerrainCanvas() {
     const nearDiag2 = Math.abs(tx + ty - WORLD_SIZE) < 120;
     const nearRes = MINERAL_NODES.some((m) => hypot(tx, ty, m.x, m.y) < 95) || GAS_GEYSERS.some((ge) => hypot(tx, ty, ge.x, ge.y) < 110);
     if (nearBase || nearCenter || nearDiag1 || nearDiag2 || nearRes) continue;
-    drawTree(g, tx, ty, 17 + rnd() * 13, treeColors, rnd);
+    const col = treeColors[(rnd() * treeColors.length) | 0];
+    const r = 17 + rnd() * 12;
+    TREES_3D.push({ x: tx, y: ty, r, col, h: 32 + rnd() * 22 });
   }
 
   g.strokeStyle = '#16181d';
@@ -687,7 +661,6 @@ function canPlaceBuilding(state, ownerId, kind, x, y) {
   if (player.minerals < def.min) return { ok: false, reason: `Pas assez de Minéraux (${def.min}💎 requis).` };
   if (player.gas < def.gas) return { ok: false, reason: `Pas assez de Gaz Plasma (${def.gas}🧪 requis).` };
 
-  // Cas particulier : Raffinerie doit être posée sur un Geyser de Gaz libre
   if (def.onGeyser) {
     const gey = findGeyserAt(x, y, 64);
     if (!gey) return { ok: false, reason: 'La Raffinerie doit être placée sur un Geyser de Gaz Plasma 🧪.' };
@@ -776,7 +749,6 @@ function createInitialState(roster, settings) {
   players.forEach((p, idx) => {
     const sp = SPAWN_CORNERS[idx % 4];
     const dirX = Math.sign(HALF_W - sp.x), dirY = Math.sign(HALF_W - sp.y);
-    // Centre de Commandement principal
     const hq = {
       id: nextId++, kind: 'hq', owner: p.id, team: p.team,
       x: sp.x, y: sp.y, hp: BUILDINGS.hq.hp, maxHp: BUILDINGS.hq.hp,
@@ -786,7 +758,6 @@ function createInitialState(roster, settings) {
     };
     buildings.push(hq);
 
-    // 6 Ouvriers VCS assignés aux minéraux de départ
     const baseMinerals = MINERAL_NODES.filter((m) => hypot(m.x, m.y, sp.x, sp.y) < 220);
     for (let k = 0; k < 6; k++) {
       const mNode = baseMinerals[k % baseMinerals.length];
@@ -805,7 +776,6 @@ function createInitialState(roster, settings) {
       });
     }
 
-    // 2 Marines d'escorte initiale
     for (let k = 0; k < 2; k++) {
       units.push({
         id: nextId++, kind: 'marine', owner: p.id, team: p.team,
@@ -877,7 +847,6 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
     sieged: false,
   };
 
-  // Si c'est un Ouvrier VCS produit par un QG, il part automatiquement miner le cristal le plus proche du point de ralliement !
   if (kind === 'scv') {
     const m = nearestMineral(rx, ry, 260) || nearestMineral(bld.x, bld.y, 350);
     if (m) {
@@ -896,15 +865,33 @@ function executeCommand(state, playerId, cmd, fxEvents) {
   const p = state.players.find((q) => q.id === playerId);
   if (!p || p.dead) return { ok: false };
 
-  // 1. POSER UN CHANTIER DE CONSTRUCTION (un VCS va le construire)
+  // 1. POSER UN CHANTIER DE CONSTRUCTION (exige un Ouvrier VCS !)
   if (cmd.op === 'BUILD') {
     const kind = String(cmd.kind || '');
     const check = canPlaceBuilding(state, p.id, kind, Number(cmd.x) || 0, Number(cmd.y) || 0);
     if (!check.ok) return check;
+
+    const bx = check.snapX, by = check.snapY;
+    let builder = null;
+    if (Array.isArray(cmd.unitIds) && cmd.unitIds.length) {
+      builder = state.units.find((u) => u.owner === p.id && u.kind === 'scv' && cmd.unitIds.includes(u.id));
+    }
+    if (!builder && p.bot) {
+      let bestD2 = Infinity;
+      for (const u of state.units) {
+        if (u.owner === p.id && u.kind === 'scv' && u.mode !== 'build') {
+          const d2 = dist2(u.x, u.y, bx, by);
+          if (d2 < bestD2) { bestD2 = d2; builder = u; }
+        }
+      }
+    }
+    if (!builder) {
+      return { ok: false, reason: 'Sélectionne d’abord un Ouvrier VCS pour construire !' };
+    }
+
     const def = BUILDINGS[kind];
     p.minerals -= def.min;
     p.gas -= def.gas;
-    const bx = check.snapX, by = check.snapY;
     const bld = {
       id: state.nextId++,
       kind,
@@ -930,56 +917,43 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     state.buildings.push(bld);
     p.score += Math.round((def.min + def.gas) * 0.35);
 
-    // Envoyer un Ouvrier VCS sélectionné ou le VCS le plus proche construire ce chantier
-    let builder = null;
-    if (Array.isArray(cmd.unitIds) && cmd.unitIds.length) {
-      builder = state.units.find((u) => u.owner === p.id && u.kind === 'scv' && cmd.unitIds.includes(u.id));
-    }
-    if (!builder) {
-      let bestD2 = Infinity;
-      for (const u of state.units) {
-        if (u.owner === p.id && u.kind === 'scv' && u.mode !== 'build') {
-          const d2 = dist2(u.x, u.y, bx, by);
-          if (d2 < bestD2) { bestD2 = d2; builder = u; }
-        }
-      }
-    }
-    if (builder) {
-      builder.mode = 'build';
-      builder.buildTargetId = bld.id;
-      builder.orderX = bx;
-      builder.orderY = by;
-    }
+    builder.mode = 'build';
+    builder.buildTargetId = bld.id;
+    builder.orderX = bx;
+    builder.orderY = by;
     fxEvents.push({ k: 'BUILD', x: bx, y: by, color: p.color, radius: def.radius });
     return { ok: true, bldId: bld.id };
   }
 
-  // 2. ENTRAÎNER UNE UNITÉ DANS LA FILE D'ATTENTE D'UN BÂTIMENT
+  // 2. ENTRAÎNER UNE UNITÉ DANS UN BÂTIMENT SÉLECTIONNÉ
   if (cmd.op === 'TRAIN') {
     const uKind = String(cmd.unit || '');
     const uDef = UNITS[uKind];
     if (!uDef) return { ok: false, reason: 'Unité inconnue.' };
     const sup = computeSupply(state, p.id);
     if (sup.used + uDef.supply > sup.max) {
-      return { ok: false, reason: 'Ravitaillement insuffisant 📦 ! Construis un Dépôt Relais.' };
+      return { ok: false, reason: 'Ravitaillement insuffisant 📦 ! Clique sur un VCS et construis un Dépôt Relais.' };
     }
     if (p.minerals < uDef.min) return { ok: false, reason: `Minéraux insuffisants (${uDef.min}💎).` };
     if (p.gas < uDef.gas) return { ok: false, reason: `Gaz Plasma insuffisant (${uDef.gas}🧪).` };
 
-    // Trouver le bâtiment producteur (spécifié ou le moins chargé du joueur)
-    let candidates = state.buildings.filter((b) =>
-      b.owner === p.id && b.hp > 0 && !b.constructing && (BUILDINGS[b.kind]?.trains || []).includes(uKind)
-    );
+    let producer = null;
     if (cmd.bldId) {
-      const specific = candidates.find((b) => b.id === cmd.bldId);
-      if (specific && specific.queue.length < 5) candidates = [specific];
+      const b = state.buildings.find((x) => x.id === cmd.bldId && x.owner === p.id && x.hp > 0 && !x.constructing);
+      if (b && (BUILDINGS[b.kind]?.trains || []).includes(uKind) && b.queue.length < 5) {
+        producer = b;
+      }
+    } else if (p.bot) {
+      const candidates = state.buildings.filter((b) =>
+        b.owner === p.id && b.hp > 0 && !b.constructing && (BUILDINGS[b.kind]?.trains || []).includes(uKind) && b.queue.length < 5
+      );
+      candidates.sort((a, b) => a.queue.length - b.queue.length);
+      producer = candidates[0] || null;
     }
-    candidates = candidates.filter((b) => b.queue.length < 5);
-    if (!candidates.length) {
-      return { ok: false, reason: 'Aucun bâtiment disponible ou file de production pleine (5/5).' };
+
+    if (!producer) {
+      return { ok: false, reason: 'Clique sur le bâtiment de production correspondant (ou file pleine 5/5).' };
     }
-    candidates.sort((a, b) => a.queue.length - b.queue.length);
-    const producer = candidates[0];
     p.minerals -= uDef.min;
     p.gas -= uDef.gas;
     producer.queue.push(uKind);
@@ -991,7 +965,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     return { ok: true };
   }
 
-  // 3. ANNULER UNE UNITÉ DE LA FILE DE PRODUCTION (Remboursement 100%)
+  // 3. ANNULER UNE UNITÉ DE LA FILE DE PRODUCTION
   if (cmd.op === 'CANCEL_QUEUE') {
     const bld = state.buildings.find((b) => b.owner === p.id && b.id === cmd.bldId);
     if (!bld || !Array.isArray(bld.queue) || !bld.queue.length) return { ok: false };
@@ -1022,7 +996,6 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     const y = clamp(Math.round(Number(cmd.y) || HALF_W), 35, WORLD_SIZE - 35);
     const ids = Array.isArray(cmd.unitIds) ? new Set(cmd.unitIds) : new Set();
 
-    // Si des bâtiments sont sélectionnés : définir leur Point de Ralliement
     if (Array.isArray(cmd.bldIds) && cmd.bldIds.length) {
       for (const b of state.buildings) {
         if (b.owner === p.id && cmd.bldIds.includes(b.id)) {
@@ -1038,17 +1011,11 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 
     mySelected.forEach((u, idx) => {
       if (mode === 'stop') {
-        u.mode = 'idle';
-        u.orderX = null;
-        u.orderY = null;
-        u.targetEntId = null;
+        u.mode = 'idle'; u.orderX = null; u.orderY = null; u.targetEntId = null;
         return;
       }
       if (mode === 'hold') {
-        u.mode = 'hold';
-        u.orderX = null;
-        u.orderY = null;
-        u.targetEntId = null;
+        u.mode = 'hold'; u.orderX = null; u.orderY = null; u.targetEntId = null;
         return;
       }
       if (mode === 'harvest_min' && u.kind === 'scv') {
@@ -1069,7 +1036,6 @@ function executeCommand(state, playerId, cmd, fxEvents) {
         return;
       }
 
-      // Formation en grille autour du point cible
       const row = Math.floor(idx / cols), col = idx % cols;
       const spacing = u.radius * 2.5 + 6;
       const fx = clamp(x + (col - (cols - 1) / 2) * spacing, 30, WORLD_SIZE - 30);
@@ -1077,20 +1043,11 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 
       u.buildTargetId = null;
       if (mode === 'focus' && cmd.targetId) {
-        u.mode = 'focus';
-        u.targetEntId = cmd.targetId;
-        u.orderX = x;
-        u.orderY = y;
+        u.mode = 'focus'; u.targetEntId = cmd.targetId; u.orderX = x; u.orderY = y;
       } else if (mode === 'move') {
-        u.mode = 'move';
-        u.targetEntId = null;
-        u.orderX = fx;
-        u.orderY = fy;
+        u.mode = 'move'; u.targetEntId = null; u.orderX = fx; u.orderY = fy;
       } else {
-        u.mode = 'amove';
-        u.targetEntId = null;
-        u.orderX = fx;
-        u.orderY = fy;
+        u.mode = 'amove'; u.targetEntId = null; u.orderX = fx; u.orderY = fy;
       }
     });
     return { ok: true };
@@ -1126,7 +1083,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     return count > 0 ? { ok: true } : { ok: false, reason: 'Sélectionne un Char de Siège.' };
   }
 
-  // 7. CAPACITÉ COMSAT : SCAN RADAR (X - 50 Minéraux)
+  // 7. CAPACITÉ COMSAT DU QG : SCAN RADAR (X - 50 Minéraux)
   if (cmd.op === 'SCAN') {
     if (p.minerals < 50) return { ok: false, reason: '50💎 requis pour lancer un Scan Radar.' };
     p.minerals -= 50;
@@ -1147,7 +1104,6 @@ function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
 
-  // Phases du match
   const t = state.time;
   const p2At = state.blitz ? 120 : 210;
   const p3At = state.blitz ? 360 : 720;
@@ -1163,13 +1119,11 @@ function stepWorld(state, dt, fxEvents) {
     state.stormRadius = Math.max(380, state.stormRadius - (state.blitz ? 16 : 9) * dt);
   }
 
-  // Scans radar actifs
   for (let i = state.scans.length - 1; i >= 0; i--) {
     state.scans[i].timer -= dt;
     if (state.scans[i].timer <= 0) state.scans.splice(i, 1);
   }
 
-  // Revenu de base léger + Raffineries complétées
   for (const p of state.players) {
     if (p.dead) continue;
     p.minerals = Math.min(9999, p.minerals + 2.5 * dt);
@@ -1177,7 +1131,6 @@ function stepWorld(state, dt, fxEvents) {
     if (myRefs > 0) p.gas = Math.min(9999, p.gas + myRefs * 2.2 * dt);
   }
 
-  // Mise à jour des Bâtiments (Chantiers, Files de production, Soin, Tourelles)
   for (const b of state.buildings) {
     if (b.hp <= 0) continue;
     const owner = state.players.find((p) => p.id === b.owner);
@@ -1188,9 +1141,8 @@ function stepWorld(state, dt, fxEvents) {
       b.hp -= 35 * dt;
     }
 
-    // Si en cours de construction : progression lente autonome + accélérée par un Ouvrier VCS sur place
     if (b.constructing) {
-      const rate = 0.25 / (b.buildTime || 8);
+      const rate = 0.22 / (b.buildTime || 8);
       b.buildProg += rate * dt;
       b.hp = Math.min(b.maxHp, b.hp + b.maxHp * rate * dt);
       if (b.buildProg >= 1) {
@@ -1198,7 +1150,6 @@ function stepWorld(state, dt, fxEvents) {
         b.buildProg = 1;
         b.hp = b.maxHp;
         fxEvents.push({ k: 'COMPLETE', x: b.x, y: b.y, color: owner.color, kind: b.kind });
-        // Si c'est une Raffinerie, assigner automatiquement le VCS qui la construisait à la récolte du gaz
         if (b.kind === 'extractor') {
           for (const u of state.units) {
             if (u.owner === owner.id && u.kind === 'scv' && u.buildTargetId === b.id) {
@@ -1212,7 +1163,6 @@ function stepWorld(state, dt, fxEvents) {
       continue;
     }
 
-    // Soin des Dépôts Relais
     if (def.heal) {
       const r2 = def.range * def.range;
       for (const u of state.units) {
@@ -1222,7 +1172,6 @@ function stepWorld(state, dt, fxEvents) {
       }
     }
 
-    // File d'attente de production (5 slots)
     if (Array.isArray(b.queue) && b.queue.length > 0) {
       b.qTimer -= dt;
       if (b.qTimer <= 0) {
@@ -1239,7 +1188,6 @@ function stepWorld(state, dt, fxEvents) {
       }
     }
 
-    // Tir défensif (QG, Bunker, Tesla)
     if (def.range > 0 && def.dmg > 0) {
       b.cd = Math.max(0, (b.cd || 0) - dt);
       if (b.cd <= 0) {
@@ -1265,14 +1213,13 @@ function stepWorld(state, dt, fxEvents) {
           }
           fxEvents.push({
             k: b.kind === 'tesla' ? 'TESLA' : 'SHOT',
-            x1: b.x, y1: b.y - 12, x2: target.x, y2: target.y, color: owner.color,
+            x1: b.x, y1: b.y - 16, x2: target.x, y2: target.y, color: owner.color,
           });
         }
       }
     }
   }
 
-  // Mise à jour des Unités (Ouvriers VCS + Unités de Combat)
   for (const u of state.units) {
     if (u.hp <= 0) continue;
     const def = UNITS[u.kind];
@@ -1283,9 +1230,7 @@ function stepWorld(state, dt, fxEvents) {
     const stimMult = u.stimT > 0 ? 1.48 : 1.0;
     u.cd = Math.max(0, u.cd - dt * stimMult);
 
-    // LOGIQUE SPÉCIFIQUE OUVRIER VCS : Construire / Réparer ou Récolter Minéraux & Gaz
     if (u.kind === 'scv') {
-      // A) Construire ou Réparer un bâtiment ciblé
       if (u.mode === 'build' && u.buildTargetId) {
         const bld = state.buildings.find((b) => b.id === u.buildTargetId && b.hp > 0);
         if (!bld) {
@@ -1320,11 +1265,9 @@ function stepWorld(state, dt, fxEvents) {
         }
       }
 
-      // B) Récolte de Minéraux ou de Gaz Plasma (Aller-Retour vers le QG)
       if (u.mode === 'harvest_min' || u.mode === 'harvest_gas') {
         const hq = nearestMyHq(state, u.owner, u.x, u.y);
         if (u.carryAmt > 0 && hq) {
-          // Rapporte les ressources au QG
           const dHq = hypot(u.x, u.y, hq.x, hq.y) - hq.radius - u.radius;
           if (dHq <= 18) {
             if (u.carryType === 'gas') owner.gas = Math.min(9999, owner.gas + u.carryAmt);
@@ -1385,7 +1328,6 @@ function stepWorld(state, dt, fxEvents) {
       }
     }
 
-    // RECHERCHE DE CIBLE POUR UNITÉS DE COMBAT (sauf si ordre 'move' pur)
     const effRange = u.sieged && def.siegeRange ? def.siegeRange : def.range;
     const effDmg = u.sieged && def.siegeDmg ? def.siegeDmg : def.dmg;
     const effRate = u.sieged && def.siegeRate ? def.siegeRate : def.rate;
@@ -1394,7 +1336,6 @@ function stepWorld(state, dt, fxEvents) {
     if (u.mode !== 'move' && u.mode !== 'harvest_min' && u.mode !== 'harvest_gas' && u.mode !== 'build') {
       const aggroR = u.sieged || u.mode === 'hold' ? effRange : Math.max(255, effRange + 65);
 
-      // Si focus fire explicite
       if (u.mode === 'focus' && u.targetEntId) {
         const fUnit = state.units.find((e) => e.id === u.targetEntId && e.hp > 0);
         const fBld = fUnit ? null : state.buildings.find((b) => b.id === u.targetEntId && b.hp > 0);
@@ -1428,7 +1369,6 @@ function stepWorld(state, dt, fxEvents) {
       }
     }
 
-    // Tir si cible à portée
     if (bestTarget && bestTarget.dist <= effRange) {
       const tgt = bestTarget.ent;
       u.a = Math.atan2(tgt.y - u.y, tgt.x - u.x);
@@ -1456,13 +1396,11 @@ function stepWorld(state, dt, fxEvents) {
       continue;
     }
 
-    // Un char en Mode Siège ou une unité en Hold Position ne se déplace pas
     if (u.sieged || u.mode === 'hold') {
       u.vx = 0; u.vy = 0;
       continue;
     }
 
-    // Détermination de la destination de déplacement
     let goalX = u.orderX, goalY = u.orderY;
     if (bestTarget && u.mode !== 'move') {
       goalX = bestTarget.ent.x;
@@ -1483,7 +1421,6 @@ function stepWorld(state, dt, fxEvents) {
     const distGoal = Math.hypot(dx, dy) || 1;
     let steerX = dx / distGoal, steerY = dy / distGoal;
 
-    // Évitement continu des bâtiments et rochers
     const lookAhead = u.radius + 32;
     const sideSign = (u.id % 2 === 0) ? 1 : -1;
     for (const b of state.buildings) {
@@ -1515,7 +1452,7 @@ function stepWorld(state, dt, fxEvents) {
     }
     for (const o of state.units) {
       if (o === u || o.hp <= 0) continue;
-      if (u.kind === 'scv' && o.kind === 'scv') continue; // Les VCS se traversent pendant la récolte (comme dans StarCraft !)
+      if (u.kind === 'scv' && o.kind === 'scv') continue;
       const sx = u.x - o.x, sy = u.y - o.y;
       const minSep = u.radius + o.radius + 4;
       const d2 = sx * sx + sy * sy;
@@ -1548,7 +1485,6 @@ function stepWorld(state, dt, fxEvents) {
     }
   }
 
-  // Destruction des unités et bâtiments tombés à 0 PV
   for (let i = state.units.length - 1; i >= 0; i--) {
     const u = state.units[i];
     if (u.hp <= 0) {
@@ -1562,7 +1498,6 @@ function stepWorld(state, dt, fxEvents) {
       fxEvents.push({ k: 'BOOM_BIG', x: b.x, y: b.y, r: b.radius * 1.8 });
       const ownerId = b.owner;
       state.buildings.splice(i, 1);
-      // Un joueur est éliminé s'il n'a plus aucun Centre de Commandement (QG)
       const hasAnyHq = state.buildings.some((ob) => ob.owner === ownerId && ob.kind === 'hq' && ob.hp > 0);
       if (!hasAnyHq) {
         const p = state.players.find((q) => q.id === ownerId);
@@ -1628,22 +1563,16 @@ function runBots(state, fxEvents) {
       return false;
     };
 
-    // 1. Construire un Dépôt Relais si proche de la limite de Ravitaillement
     if (sup.max - sup.used <= 3 && sup.max < MAX_SUPPLY && p.minerals >= 75) {
       if (tryBuildNear('pylon', hq.x + dirX * 90, hq.y + dirY * 90, 65, 195)) return;
     }
-
-    // 2. Produire des Ouvriers VCS jusqu'à 11
     if (scvs.length < 11 && hq.queue.length < 2 && p.minerals >= 50) {
       executeCommand(state, p.id, { op: 'TRAIN', unit: 'scv', bldId: hq.id }, fxEvents);
     }
-
-    // 3. Construire une Raffinerie sur le geyser de sa base
     if (refs < 1 && scvs.length >= 7 && p.minerals >= 75) {
       const gey = findGeyserAt(hq.x, hq.y, 260);
       if (gey) executeCommand(state, p.id, { op: 'BUILD', kind: 'extractor', x: gey.x, y: gey.y }, fxEvents);
     }
-    // Affecter 2 VCS au gaz si raffinerie prête
     const readyRef = myBlds.find((b) => b.kind === 'extractor' && !b.constructing);
     if (readyRef) {
       const gasScvs = scvs.filter((u) => u.mode === 'harvest_gas');
@@ -1653,7 +1582,6 @@ function runBots(state, fxEvents) {
       }
     }
 
-    // 4. Ordre de construction (Build Order StarCraft : Caserne -> Bunker -> Usine -> 2e Caserne)
     if (rax < 1 && p.minerals >= 125) {
       if (tryBuildNear('barracks', hq.x + dirX * 135, hq.y + dirY * 45, 50, 140)) return;
     }
@@ -1668,7 +1596,6 @@ function runBots(state, fxEvents) {
       if (tryBuildNear('barracks', hq.x + dirX * 140, hq.y - dirY * 50, 55, 160)) return;
     }
 
-    // 5. Production continue d'unités dans les Casernes et Usines
     if (fac >= 1 && p.minerals >= 250 && p.gas >= 150) {
       executeCommand(state, p.id, { op: 'TRAIN', unit: 'titan' }, fxEvents);
     } else if (fac >= 1 && p.minerals >= 150 && p.gas >= 100 && Math.random() < 0.55) {
@@ -1682,7 +1609,6 @@ function runBots(state, fxEvents) {
       executeCommand(state, p.id, { op: 'TRAIN', unit: 'marine' }, fxEvents);
     }
 
-    // 6. Vague d'assaut A-Move coordonnée dès que l'armée atteint 7+ unités
     const waveSize = state.level === 'expert' ? 6 : state.level === 'facile' ? 10 : 8;
     const idleArmy = army.filter((u) => u.mode === 'idle' || hypot(u.x, u.y, hq.x, hq.y) < 260);
     if (idleArmy.length >= waveSize) {
@@ -1702,7 +1628,7 @@ function runBots(state, fxEvents) {
 }
 
 /* ============================================================================
-   RENDU 2.5D HAUTE DÉFINITION + BROUILLARD DE GUERRE STARCRAFT
+   MOTEUR 3D VUE DU DESSUS (TOP-DOWN 3D PERSPECTIVE & EXTRUSION VOLUMÉTRIQUE)
    ============================================================================ */
 const cvs = $('#world'), ctx = cvs.getContext('2d');
 const miniCvs = $('#minimap'), miniCtx = miniCvs.getContext('2d');
@@ -1727,7 +1653,6 @@ let role = 'solo';
 let state = null;
 let buildMode = null;
 let orderCursor = null; // 'amove' | 'scan' | null
-let cmdTab = 'auto'; // 'auto' | 'build'
 let selectedUnits = new Set();
 let selectedBlds = new Set();
 const controlGroups = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [] };
@@ -1742,7 +1667,6 @@ let craters = [];
 let orderMarkers = [];
 let reportedResult = false;
 
-// Brouillard de guerre (grille explorée + canvas de masque)
 const FOG_RES = 200;
 const fogCanvas = document.createElement('canvas');
 fogCanvas.width = FOG_RES;
@@ -1778,7 +1702,6 @@ function updateFogCanvas() {
   if (!me) return;
   const scale = FOG_RES / WORLD_SIZE;
 
-  // Marquer les cellules explorées
   const markCircle = (wx, wy, r) => {
     const cx = Math.floor(wx * scale), cy = Math.floor(wy * scale);
     const cr = Math.ceil(r * scale);
@@ -1823,47 +1746,153 @@ function updateFogCanvas() {
   }
 }
 
-function roofOffset(wx, wy, height, isPreview = false) {
-  if (isPreview) return { ox: -3, oy: -height * 0.32 };
-  const dx = clamp((wx - cam.x) * 0.018, -14, 14);
-  const dy = clamp((wy - cam.y) * 0.018 - height * 0.34, -height * 0.55, -height * 0.16);
-  return { ox: dx, oy: dy };
+/* ============================================================================
+   PRIMITIVES DE PROJECTION 3D VUE DU DESSUS (PERSPECTIVE CAMÉRA + FACES OMBRÉES)
+   ============================================================================ */
+// Projette un point local (lx, ly, z) situé autour de l'ancre monde (wx, wy) en coordonnées 2D avec point de fuite caméra
+function project3DOffset(wx, wy, z, isIcon = false) {
+  if (isIcon) {
+    return { ox: -z * 0.14, oy: -z * 0.48 };
+  }
+  // Point de fuite radial depuis le centre de la caméra + inclinaison tactique vue du dessus
+  const perspX = clamp((wx - cam.x) * 0.00085, -0.34, 0.34) * z;
+  const perspY = clamp((wy - cam.y) * 0.00085, -0.34, 0.34) * z - z * 0.46;
+  return { ox: perspX - z * 0.08, oy: perspY };
 }
 
-function drawCylinder25D(g, r, ox, oy, sideCol, topCol) {
-  g.fillStyle = sideCol;
+// Génère un polygone régulier ou boîte biseautée
+function makeRectPoly(hw, hh, bevel = 5) {
+  const b = Math.min(bevel, hw * 0.4, hh * 0.4);
+  if (b <= 0.5) {
+    return [
+      { x: -hw, y: -hh }, { x: hw, y: -hh },
+      { x: hw, y: hh },   { x: -hw, y: hh },
+    ];
+  }
+  return [
+    { x: -hw + b, y: -hh }, { x: hw - b, y: -hh },
+    { x: hw, y: -hh + b },  { x: hw, y: hh - b },
+    { x: hw - b, y: hh },   { x: -hw + b, y: hh },
+    { x: -hw, y: hh - b },  { x: -hw, y: -hh + b },
+  ];
+}
+
+function makeNGon(r, n = 8, rot = Math.PI / 8) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = rot + (i / n) * TAU;
+    pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+  }
+  return pts;
+}
+
+// Extrude un prisme 3D entre la hauteur z0 et la hauteur z1 avec calcul d'illumination par face latérale
+function drawPrism3D(g, wx, wy, pts, z0, z1, baseColor, topColor, isIcon = false, topScale = 1.0) {
+  const o0 = project3DOffset(wx, wy, z0, isIcon);
+  const o1 = project3DOffset(wx, wy, z1, isIcon);
+  const p0 = pts.map((p) => ({ x: p.x + o0.ox, y: p.y + o0.oy }));
+  const p1 = pts.map((p) => ({ x: p.x * topScale + o1.ox, y: p.y * topScale + o1.oy }));
+
+  const n = pts.length;
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a0 = p0[i], b0 = p0[j], b1 = p1[j], a1 = p1[i];
+    // Produit vectoriel 2D (Back-face culling : ne dessine que les faces orientées vers la caméra)
+    const cross = (b0.x - a0.x) * (a1.y - a0.y) - (b0.y - a0.y) * (a1.x - a0.x);
+    if (cross < 0) {
+      const edgeDx = pts[j].x - pts[i].x, edgeDy = pts[j].y - pts[i].y;
+      const len = Math.hypot(edgeDx, edgeDy) || 1;
+      const nx = edgeDy / len, ny = -edgeDx / len;
+      // Soleil venant du haut-gauche (-0.6, -0.8) + rebond sur la face avant (sud)
+      const light = clamp(nx * -0.35 + ny * 0.25, -0.45, 0.25);
+      const depthY = (a0.y + b0.y + a1.y + b1.y) * 0.25;
+      faces.push({ a0, b0, b1, a1, col: shade(baseColor, light - 0.12), depthY });
+    }
+  }
+
+  faces.sort((a, b) => a.depthY - b.depthY);
   g.strokeStyle = '#16181d';
-  g.lineWidth = 3.5;
-  const ang = Math.atan2(oy, ox) + Math.PI / 2;
-  const cx = Math.cos(ang) * r, cy = Math.sin(ang) * r;
-  g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill(); g.stroke();
+  g.lineWidth = 2.6;
+  g.lineJoin = 'round';
+
+  for (const f of faces) {
+    g.fillStyle = f.col;
+    g.beginPath();
+    g.moveTo(f.a0.x, f.a0.y);
+    g.lineTo(f.b0.x, f.b0.y);
+    g.lineTo(f.b1.x, f.b1.y);
+    g.lineTo(f.a1.x, f.a1.y);
+    g.closePath();
+    g.fill();
+    g.stroke();
+  }
+
+  // Face supérieure (Toit 3D)
+  g.fillStyle = topColor || shade(baseColor, 0.12);
+  g.lineWidth = 3;
   g.beginPath();
-  g.moveTo(cx, cy); g.lineTo(ox + cx, oy + cy); g.lineTo(ox - cx, oy - cy); g.lineTo(-cx, -cy);
-  g.closePath(); g.fill(); g.stroke();
-  g.fillStyle = topCol;
-  g.beginPath(); g.arc(ox, oy, r, 0, TAU); g.fill(); g.stroke();
+  for (let i = 0; i < n; i++) {
+    if (i === 0) g.moveTo(p1[i].x, p1[i].y);
+    else g.lineTo(p1[i].x, p1[i].y);
+  }
+  g.closePath();
+  g.fill();
+  g.stroke();
+
+  return o1;
 }
 
-function drawBox25D(g, hw, hh, rad, ox, oy, sideCol, topCol) {
-  g.fillStyle = sideCol;
+// Dessine une Pyramide / Cristal 3D pointu avec facettes triangulaires ombrées
+function drawPyramid3D(g, wx, wy, pts, zBase, zApex, baseColor, isIcon = false) {
+  const o0 = project3DOffset(wx, wy, zBase, isIcon);
+  const oTop = project3DOffset(wx, wy, zApex, isIcon);
+  const p0 = pts.map((p) => ({ x: p.x + o0.ox, y: p.y + o0.oy }));
+  const apex = { x: oTop.ox, y: oTop.oy };
+
+  const n = pts.length;
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a = p0[i], b = p0[j];
+    const edgeDx = pts[j].x - pts[i].x, edgeDy = pts[j].y - pts[i].y;
+    const len = Math.hypot(edgeDx, edgeDy) || 1;
+    const nx = edgeDy / len, ny = -edgeDx / len;
+    const light = clamp(nx * -0.45 + ny * -0.25, -0.38, 0.38);
+    const depthY = (a.y + b.y + apex.y) / 3;
+    faces.push({ a, b, col: shade(baseColor, light), depthY });
+  }
+  faces.sort((f1, f2) => f1.depthY - f2.depthY);
+
   g.strokeStyle = '#16181d';
-  g.lineWidth = 3.5;
-  g.beginPath(); g.roundRect(-hw, -hh, hw * 2, hh * 2, rad); g.fill(); g.stroke();
-  g.beginPath(); g.roundRect(ox * 0.45 - hw, oy * 0.45 - hh, hw * 2, hh * 2, rad); g.fill(); g.stroke();
-  g.fillStyle = topCol;
-  g.beginPath(); g.roundRect(ox - hw, oy - hh, hw * 2, hh * 2, rad); g.fill(); g.stroke();
+  g.lineWidth = 2.4;
+  g.lineJoin = 'round';
+  for (const f of faces) {
+    g.fillStyle = f.col;
+    g.beginPath();
+    g.moveTo(f.a.x, f.a.y);
+    g.lineTo(f.b.x, f.b.y);
+    g.lineTo(apex.x, apex.y);
+    g.closePath();
+    g.fill();
+    g.stroke();
+  }
 }
 
+/* ============================================================================
+   RENDU 3D VOLUMÉTRIQUE DES BÂTIMENTS (MULTI-ÉTAGES & ÉCHAFAUDAGES 3D)
+   ============================================================================ */
 function drawBuilding(g, b, color, selected, now, isIcon = false) {
   const r = b.radius;
   const def = BUILDINGS[b.kind] || BUILDINGS.hq;
-  const hScale = b.constructing ? 0.35 + 0.65 * (b.buildProg || 0.2) : 1;
-  const { ox, oy } = roofOffset(b.x || 0, b.y || 0, (def.height || 26) * hScale, isIcon);
-  const darkCol = shade(color, -0.35);
-  const lightCol = shade(color, 0.25);
+  const wx = b.x || 0, wy = b.y || 0;
+  const prog = b.constructing && !isIcon ? clamp(b.buildProg || 0.15, 0.15, 1) : 1;
+  const H3D = (def.height || 36) * prog;
+  const darkCol = shade(color, -0.28);
+  const lightCol = shade(color, 0.22);
 
   g.save();
-  g.translate(b.x || 0, b.y || 0);
+  g.translate(wx, wy);
 
   if (selected) {
     g.strokeStyle = '#2fbf71';
@@ -1871,230 +1900,266 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.beginPath(); g.arc(0, 0, r + 9, 0, TAU); g.stroke();
   }
 
-  g.fillStyle = 'rgba(16, 18, 24, 0.38)';
-  g.beginPath(); g.ellipse(7, 9, r * 1.05, r * 0.92, 0, 0, TAU); g.fill();
-
-  if (b.constructing && !isIcon) {
-    g.globalAlpha = 0.78;
-  }
+  // Ombre portée 3D au sol
+  g.fillStyle = 'rgba(12, 16, 20, 0.42)';
+  g.beginPath(); g.ellipse(9, 11, r * 1.08, r * 0.95, 0, 0, TAU); g.fill();
 
   if (b.kind === 'hq') {
+    // 4 Tourelles de bastion d'angle en 3D
+    const cOff = r * 0.68;
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      g.fillStyle = '#383b44'; g.strokeStyle = '#16181d'; g.lineWidth = 3;
-      g.beginPath(); g.arc(sx * r * 0.72, sy * r * 0.72, r * 0.36, 0, TAU); g.fill(); g.stroke();
+      g.save();
+      g.translate(sx * cOff, sy * cOff);
+      drawPrism3D(g, wx + sx * cOff, wy + sy * cOff, makeNGon(r * 0.34, 6), 0, H3D * 0.62, '#3d414b', '#565b68', isIcon, 0.9);
+      g.restore();
     }
-    drawBox25D(g, r * 0.88, r * 0.88, 13, ox, oy, darkCol, color);
+    // Étage 1 : Forteresse blindée octogonale biseautée
+    drawPrism3D(g, wx, wy, makeRectPoly(r * 0.88, r * 0.88, 12), 0, H3D * 0.56, darkCol, color, isIcon, 0.92);
+    // Étage 2 : Pont de commandement en acier crème
+    const top2 = drawPrism3D(g, wx, wy, makeRectPoly(r * 0.62, r * 0.62, 7), H3D * 0.56, H3D * 0.86, '#cfc4ad', '#fff8ea', isIcon, 0.92);
+    // Étage 3 : Tourelle réacteur & double canon rotatif
+    const top3 = drawPrism3D(g, wx, wy, makeNGon(r * 0.34, 8), H3D * 0.86, H3D * 1.04, '#2a2d35', '#484c58', isIcon, 0.9);
+
     g.save();
-    g.translate(ox, oy);
-    g.fillStyle = '#fff8ea'; g.strokeStyle = '#16181d'; g.lineWidth = 3;
-    g.beginPath(); g.roundRect(-r * 0.62, -r * 0.62, r * 1.24, r * 1.24, 8); g.fill(); g.stroke();
-    g.strokeStyle = shade(color, -0.15); g.lineWidth = 3;
-    g.beginPath(); g.moveTo(-r * 0.5, 0); g.lineTo(r * 0.5, 0); g.moveTo(0, -r * 0.5); g.lineTo(0, r * 0.5); g.stroke();
-    g.fillStyle = '#16181d';
-    g.beginPath(); g.arc(0, 0, r * 0.36, 0, TAU); g.fill();
+    g.translate(top3.ox, top3.oy);
     g.save();
     g.rotate(b.aimA || 0);
-    g.fillStyle = '#484b54'; g.strokeStyle = '#16181d'; g.lineWidth = 2.5;
-    g.fillRect(4, -8, r * 0.58, 5); g.strokeRect(4, -8, r * 0.58, 5);
-    g.fillRect(4, 3, r * 0.58, 5);  g.strokeRect(4, 3, r * 0.58, 5);
+    g.fillStyle = '#383b44'; g.strokeStyle = '#16181d'; g.lineWidth = 2.4;
+    g.fillRect(4, -8, r * 0.56, 5); g.strokeRect(4, -8, r * 0.56, 5);
+    g.fillRect(4, 3, r * 0.56, 5);  g.strokeRect(4, 3, r * 0.56, 5);
     g.restore();
     g.fillStyle = '#ffc531'; g.strokeStyle = '#16181d'; g.lineWidth = 2.5;
-    g.beginPath(); g.arc(0, 0, 11, 0, TAU); g.fill(); g.stroke();
-    const ra = now * 0.0035;
+    g.beginPath(); g.arc(0, 0, 9.5, 0, TAU); g.fill(); g.stroke();
+    g.restore();
+
+    // Antenne radar Comsat rotative sur le toit 2
     g.save();
-    g.translate(-r * 0.42, -r * 0.42);
-    g.rotate(ra);
+    g.translate(top2.ox - r * 0.38, top2.oy - r * 0.38);
+    g.rotate(now * 0.0038);
     g.strokeStyle = '#16181d'; g.lineWidth = 3;
-    g.beginPath(); g.moveTo(-8, 0); g.lineTo(8, 0); g.stroke();
+    g.beginPath(); g.moveTo(-9, 0); g.lineTo(9, 0); g.stroke();
     g.fillStyle = '#1fc7c1';
     g.beginPath(); g.arc(0, 0, 4, 0, TAU); g.fill(); g.stroke();
     g.restore();
-    g.restore();
+
   } else if (b.kind === 'extractor') {
-    drawCylinder25D(g, r, ox, oy, '#38463d', '#e5f7ec');
+    // Raffinerie 3D avec cuves de Gaz Vespène
+    drawPrism3D(g, wx, wy, makeNGon(r, 8), 0, H3D * 0.65, '#3b4a40', '#d5f2df', isIcon, 0.9);
+    const top = drawPrism3D(g, wx, wy, makeNGon(r * 0.62, 8), H3D * 0.65, H3D, '#1f8a4f', '#2fbf71', isIcon, 0.88);
     g.save();
-    g.translate(ox, oy);
-    g.fillStyle = '#2fbf71'; g.strokeStyle = '#16181d'; g.lineWidth = 2.5;
-    g.beginPath(); g.arc(0, 0, r * 0.64, 0, TAU); g.fill(); g.stroke();
-    g.save();
+    g.translate(top.ox, top.oy);
     g.rotate(now * 0.005);
-    g.fillStyle = '#ffc531';
+    g.fillStyle = '#ffc531'; g.strokeStyle = '#16181d'; g.lineWidth = 2;
     for (let k = 0; k < 3; k++) {
       g.rotate(TAU / 3);
-      g.fillRect(-3, -r * 0.55, 6, r * 0.42);
-      g.strokeRect(-3, -r * 0.55, 6, r * 0.42);
+      g.fillRect(-3, -r * 0.48, 6, r * 0.38);
+      g.strokeRect(-3, -r * 0.48, 6, r * 0.38);
     }
     g.restore();
-    g.fillStyle = '#fff8ea';
-    g.beginPath(); g.arc(0, 0, 5.5, 0, TAU); g.fill(); g.stroke();
-    g.restore();
+
   } else if (b.kind === 'pylon') {
-    drawCylinder25D(g, r * 0.92, ox * 0.7, oy * 0.7, darkCol, color);
-    g.save();
-    g.translate(ox, oy);
-    const pulse = 1 + Math.sin(now * 0.006) * 0.12;
-    g.strokeStyle = '#ffc531'; g.lineWidth = 2.5;
-    g.beginPath(); g.arc(0, 0, r * 0.75 * pulse, 0, TAU); g.stroke();
-    g.fillStyle = '#1fc7c1'; g.strokeStyle = '#16181d'; g.lineWidth = 2.5;
-    g.beginPath(); g.moveTo(0, -13); g.lineTo(10, 0); g.lineTo(0, 13); g.lineTo(-10, 0); g.closePath();
-    g.fill(); g.stroke();
-    g.restore();
+    // Socle 3D hexagonal + Cristal Pyramidal 3D en lévitation rotative !
+    drawPrism3D(g, wx, wy, makeNGon(r * 0.92, 6, 0), 0, H3D * 0.42, darkCol, color, isIcon, 0.86);
+    const rot = now * 0.0025;
+    const crysPts = makeNGon(r * 0.56, 4, rot);
+    const bobZ = Math.sin(now * 0.006) * 4;
+    drawPrism3D(g, wx, wy, crysPts, H3D * 0.5 + bobZ, H3D * 0.78 + bobZ, '#129691', '#1fc7c1', isIcon, 1.0);
+    drawPyramid3D(g, wx, wy, crysPts, H3D * 0.78 + bobZ, H3D * 1.15 + bobZ, '#64f5ef', isIcon);
+
   } else if (b.kind === 'barracks') {
-    drawBox25D(g, r * 0.95, r * 0.78, 9, ox, oy, '#5c5549', '#f3e9d2');
+    // Bunker Caserne 3D à 2 niveaux + rampe blindée 3D
+    drawPrism3D(g, wx, wy, makeRectPoly(r * 0.95, r * 0.78, 8), 0, H3D * 0.68, '#665e52', '#f3e9d2', isIcon, 0.94);
+    const top2 = drawPrism3D(g, wx, wy, makeRectPoly(r * 0.68, r * 0.48, 5), H3D * 0.68, H3D, darkCol, color, isIcon, 0.92);
     g.save();
-    g.translate(ox, oy);
-    g.fillStyle = color; g.strokeStyle = '#16181d'; g.lineWidth = 2.8;
-    g.beginPath(); g.roundRect(-r * 0.7, -r * 0.5, r * 1.4, r * 0.72, 5); g.fill(); g.stroke();
-    g.fillStyle = '#ffc531';
-    g.beginPath(); g.arc(0, -r * 0.14, 7, 0, TAU); g.fill(); g.stroke();
-    g.fillStyle = '#16181d';
-    g.fillRect(-r * 0.45, r * 0.32, r * 0.9, 7);
-    g.fillStyle = '#ffc531';
-    for (let k = -2; k <= 2; k++) g.fillRect(k * 9 - 3, r * 0.32, 5, 7);
+    g.translate(top2.ox, top2.oy);
+    g.fillStyle = '#ffc531'; g.strokeStyle = '#16181d'; g.lineWidth = 2.2;
+    g.beginPath(); g.arc(0, 0, 6.5, 0, TAU); g.fill(); g.stroke();
     g.restore();
+
   } else if (b.kind === 'factory') {
-    drawBox25D(g, r * 0.96, r * 0.86, 10, ox, oy, '#2d3038', '#4a4e5a');
-    g.save();
-    g.translate(ox, oy);
-    g.fillStyle = color; g.strokeStyle = '#16181d'; g.lineWidth = 2.8;
-    g.beginPath(); g.roundRect(-r * 0.76, -r * 0.62, r * 1.52, r * 0.82, 6); g.fill(); g.stroke();
-    g.fillStyle = '#ffc531';
-    g.fillRect(-r * 0.55, -r * 0.38, r * 1.1, 8);
-    g.strokeRect(-r * 0.55, -r * 0.38, r * 1.1, 8);
-    for (const sx of [-r * 0.52, r * 0.52]) {
-      g.fillStyle = '#16181d'; g.beginPath(); g.arc(sx, r * 0.42, 8, 0, TAU); g.fill();
-      g.fillStyle = '#ff4b2b'; g.beginPath(); g.arc(sx, r * 0.42, 4, 0, TAU); g.fill();
+    // Usine lourde 3D avec 2 cheminées cylindriques 3D hautes
+    drawPrism3D(g, wx, wy, makeRectPoly(r * 0.96, r * 0.84, 9), 0, H3D * 0.65, '#353942', '#525766', isIcon, 0.94);
+    drawPrism3D(g, wx, wy, makeRectPoly(r * 0.72, r * 0.54, 6), H3D * 0.65, H3D * 0.9, darkCol, color, isIcon, 0.92);
+    for (const sx of [-r * 0.54, r * 0.54]) {
+      g.save();
+      g.translate(sx, r * 0.35);
+      drawPrism3D(g, wx + sx, wy + r * 0.35, makeNGon(8.5, 6), H3D * 0.4, H3D * 1.22, '#22252b', '#ff4b2b', isIcon, 0.85);
+      g.restore();
     }
-    g.restore();
+
   } else if (b.kind === 'turret') {
-    drawCylinder25D(g, r, ox * 0.7, oy * 0.7, '#6d675c', '#f3e9d2');
+    // Socle Bunker octogonal 3D + Tourelle rotative 3D
+    drawPrism3D(g, wx, wy, makeNGon(r, 8), 0, H3D * 0.58, '#6d675c', '#f3e9d2', isIcon, 0.88);
+    const top2 = drawPrism3D(g, wx, wy, makeNGon(r * 0.62, 8), H3D * 0.58, H3D, darkCol, color, isIcon, 0.88);
     g.save();
-    g.translate(ox * 0.85, oy * 0.85);
+    g.translate(top2.ox, top2.oy);
     g.rotate(b.aimA || 0);
     const rec = b.cd > 0.2 ? -4 : 0;
-    g.fillStyle = '#16181d'; g.strokeStyle = '#16181d'; g.lineWidth = 2.5;
-    g.fillRect(4 + rec, -7, r * 0.82, 5);
-    g.fillRect(4 + rec, 2, r * 0.82, 5);
-    g.fillStyle = color;
-    g.beginPath(); g.arc(0, 0, r * 0.62, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = '#16181d'; g.strokeStyle = '#16181d'; g.lineWidth = 2.4;
+    g.fillRect(4 + rec, -7, r * 0.85, 5);
+    g.fillRect(4 + rec, 2, r * 0.85, 5);
     g.fillStyle = lightCol;
-    g.beginPath(); g.arc(-3, -3, r * 0.25, 0, TAU); g.fill();
+    g.beginPath(); g.arc(0, 0, r * 0.28, 0, TAU); g.fill(); g.stroke();
     g.restore();
+
   } else if (b.kind === 'tesla') {
-    drawCylinder25D(g, r, ox * 0.65, oy * 0.65, '#2b303c', '#484e5e');
+    // Bobine Tesla 3D : socle + pylône pyramidal + 2 anneaux 3D + sphère de plasma au sommet
+    drawPrism3D(g, wx, wy, makeNGon(r, 8), 0, H3D * 0.38, '#2b303c', '#484e5e', isIcon, 0.88);
+    drawPrism3D(g, wx, wy, makeNGon(r * 0.48, 6), H3D * 0.38, H3D * 0.92, '#1c6b68', '#1fc7c1', isIcon, 0.55);
+    const topOrb = project3DOffset(wx, wy, H3D * 1.05, isIcon);
     g.save();
-    g.translate(ox, oy);
-    g.strokeStyle = '#1fc7c1'; g.lineWidth = 3;
-    g.beginPath(); g.arc(0, 0, r * 0.72, 0, TAU); g.stroke();
-    const pR = r * 0.46 + Math.sin(now * 0.012) * 2.5;
+    g.translate(topOrb.ox, topOrb.oy);
+    const pR = r * 0.42 + Math.sin(now * 0.012) * 2.5;
     g.fillStyle = '#1fc7c1'; g.strokeStyle = '#16181d'; g.lineWidth = 3;
     g.beginPath(); g.arc(0, 0, pR, 0, TAU); g.fill(); g.stroke();
     g.fillStyle = '#fff8ea';
-    g.beginPath(); g.arc(-3, -3, pR * 0.42, 0, TAU); g.fill();
+    g.beginPath(); g.arc(-3, -3, pR * 0.4, 0, TAU); g.fill();
     g.restore();
+
   } else if (b.kind === 'wall') {
-    drawBox25D(g, r * 0.92, r * 0.92, 6, ox * 0.5, oy * 0.5, '#6d675c', '#c8ba9b');
+    drawPrism3D(g, wx, wy, makeRectPoly(r * 0.9, r * 0.9, 5), 0, H3D, '#756e61', '#d6c8aa', isIcon, 0.9);
+    const topW = project3DOffset(wx, wy, H3D, isIcon);
     g.save();
-    g.translate(ox * 0.5, oy * 0.5);
+    g.translate(topW.ox, topW.oy);
     g.fillStyle = color; g.strokeStyle = '#16181d'; g.lineWidth = 2;
-    g.fillRect(-r * 0.58, -4, r * 1.16, 8);
-    g.strokeRect(-r * 0.58, -4, r * 1.16, 8);
+    g.fillRect(-r * 0.55, -4, r * 1.1, 8);
+    g.strokeRect(-r * 0.55, -4, r * 1.1, 8);
     g.restore();
   }
 
-  g.globalAlpha = 1;
-
-  // Grille d'échafaudage 2.5D si le bâtiment est en cours de construction
+  // Cage d'échafaudage holographique 3D pendant la construction
   if (!isIcon && b.constructing) {
+    const fullH = def.height || 36;
+    const oTop = project3DOffset(wx, wy, fullH, false);
     g.strokeStyle = '#ffc531';
-    g.lineWidth = 2.5;
-    g.setLineDash([6, 5]);
-    g.strokeRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+    g.lineWidth = 2;
+    g.setLineDash([5, 5]);
+    g.strokeRect(oTop.ox - r * 0.85, oTop.oy - r * 0.85, r * 1.7, r * 1.7);
     g.setLineDash([]);
     const bw = r * 1.9;
     g.fillStyle = '#16181d';
-    g.fillRect(-bw / 2 - 1, oy - r - 23, bw + 2, 7);
+    g.fillRect(oTop.ox - bw / 2 - 1, oTop.oy - r - 20, bw + 2, 7);
     g.fillStyle = '#ffc531';
-    g.fillRect(-bw / 2, oy - r - 22, bw * clamp(b.buildProg || 0, 0, 1), 5);
+    g.fillRect(oTop.ox - bw / 2, oTop.oy - r - 19, bw * clamp(b.buildProg || 0, 0, 1), 5);
   }
 
   // Anneau de progression de la file d'attente de production
+  const roofOff = project3DOffset(wx, wy, H3D, isIcon);
   if (!isIcon && !b.constructing && Array.isArray(b.queue) && b.queue.length > 0 && b.qTotal > 0) {
-    const prog = clamp(1 - b.qTimer / b.qTotal, 0, 1);
+    const qProg = clamp(1 - b.qTimer / b.qTotal, 0, 1);
     g.strokeStyle = '#ffc531';
     g.lineWidth = 4;
     g.beginPath();
-    g.arc(ox, oy, r + 6, -Math.PI / 2, -Math.PI / 2 + prog * TAU);
+    g.arc(roofOff.ox, roofOff.oy, r + 5, -Math.PI / 2, -Math.PI / 2 + qProg * TAU);
     g.stroke();
   }
 
-  // Barre de PV
+  // Barre de PV flottant au-dessus du toit 3D
   if (!isIcon && (b.hp < b.maxHp || b.kind === 'hq' || selected)) {
     const bw = r * 1.9, bh = 6;
     const pct = clamp(b.hp / b.maxHp, 0, 1);
     g.fillStyle = '#16181d';
-    g.beginPath(); g.roundRect(-bw / 2 - 1.5, oy - r - 14, bw + 3, bh + 3, 3); g.fill();
+    g.beginPath(); g.roundRect(roofOff.ox - bw / 2 - 1.5, roofOff.oy - r - 14, bw + 3, bh + 3, 3); g.fill();
     g.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
-    g.fillRect(-bw / 2, oy - r - 12.5, bw * pct, bh);
+    g.fillRect(roofOff.ox - bw / 2, roofOff.oy - r - 12.5, bw * pct, bh);
+  }
+  g.restore();
+}
+
+/* ============================================================================
+   RENDU 3D VOLUMÉTRIQUE DES UNITÉS, ARBRES, ROCHERS & CRISTAUX
+   ============================================================================ */
+function drawTree3D(g, tr) {
+  g.save();
+  g.translate(tr.x, tr.y);
+  // Ombre au sol
+  g.fillStyle = 'rgba(12, 16, 20, 0.34)';
+  g.beginPath(); g.ellipse(8, 10, tr.r * 1.05, tr.r * 0.9, 0, 0, TAU); g.fill();
+
+  // Tronc 3D
+  const oTrunk = project3DOffset(tr.x, tr.y, tr.h * 0.32, false);
+  g.strokeStyle = '#16181d'; g.lineWidth = 9; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
+  g.strokeStyle = '#5c4028'; g.lineWidth = 5;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(oTrunk.ox, oTrunk.oy); g.stroke();
+
+  // 3 Étages de feuillage 3D superposés en élévation Z !
+  const tiers = [
+    { z: tr.h * 0.38, r: tr.r * 1.0, col: shade(tr.col, -0.16) },
+    { z: tr.h * 0.68, r: tr.r * 0.82, col: tr.col },
+    { z: tr.h * 0.98, r: tr.r * 0.56, col: shade(tr.col, 0.2) },
+  ];
+  g.strokeStyle = '#16181d';
+  g.lineWidth = 2.8;
+  for (const t of tiers) {
+    const o = project3DOffset(tr.x, tr.y, t.z, false);
+    g.fillStyle = t.col;
+    g.beginPath(); g.arc(o.ox, o.oy, t.r, 0, TAU); g.fill(); g.stroke();
   }
   g.restore();
 }
 
 function drawUnit(g, u, color, selected, now, isIcon = false) {
   const r = u.radius;
+  const wx = u.x || 0, wy = u.y || 0;
   const darkCol = shade(color, -0.35);
   const lightCol = shade(color, 0.25);
 
   g.save();
-  g.translate(u.x || 0, u.y || 0);
+  g.translate(wx, wy);
 
-  // Halo Stimpack actif
   if (!isIcon && u.stimT > 0) {
     g.strokeStyle = '#ff4b2b';
     g.lineWidth = 2.5;
     g.beginPath(); g.arc(0, 0, r + 4 + Math.sin(now * 0.03) * 2, 0, TAU); g.stroke();
   }
 
-  // Cercle de sélection vert style StarCraft
   if (selected) {
     g.strokeStyle = '#2fbf71';
     g.lineWidth = 2.8;
     g.beginPath(); g.arc(0, 0, r + 6, 0, TAU); g.stroke();
   }
 
-  g.fillStyle = 'rgba(16, 18, 24, 0.35)';
-  g.beginPath(); g.ellipse(3.5, 4.5, r * 1.05, r * 0.9, 0, 0, TAU); g.fill();
+  g.fillStyle = 'rgba(12, 16, 20, 0.38)';
+  g.beginPath(); g.ellipse(4.5, 5.5, r * 1.08, r * 0.92, 0, 0, TAU); g.fill();
 
-  g.save();
-  g.rotate(u.a || 0);
+  // Décalage 3D du châssis et de la tourelle/tête selon l'élévation Z
+  const bodyOff = project3DOffset(wx, wy, u.kind === 'titan' ? 22 : u.kind === 'tank' || u.kind === 'siege' ? 12 : 9, isIcon);
+  const topOff = project3DOffset(wx, wy, u.kind === 'titan' ? 38 : u.kind === 'tank' || u.kind === 'siege' ? 22 : 16, isIcon);
+
   g.strokeStyle = '#16181d';
   g.lineWidth = 2.5;
 
   if (u.kind === 'scv') {
-    // OUVRIER VCS (Exosquelette de récolte avec pinces, phares et cristal transporté)
+    // Base chenilles au sol
+    g.save();
+    g.rotate(u.a || 0);
     g.fillStyle = '#383b44';
     g.fillRect(-r * 0.9, -r * 0.85, r * 1.4, 5); g.strokeRect(-r * 0.9, -r * 0.85, r * 1.4, 5);
     g.fillRect(-r * 0.9, r * 0.85 - 5, r * 1.4, 5); g.strokeRect(-r * 0.9, r * 0.85 - 5, r * 1.4, 5);
-    // Pinces avant
     g.fillStyle = '#ffc531';
     g.fillRect(r * 0.3, -r * 0.68, 8, 4); g.strokeRect(r * 0.3, -r * 0.68, 8, 4);
     g.fillRect(r * 0.3, r * 0.68 - 4, 8, 4); g.strokeRect(r * 0.3, r * 0.68 - 4, 8, 4);
-    // Ressource transportée entre les pinces !
     if (!isIcon && u.carryAmt > 0) {
       g.fillStyle = u.carryType === 'gas' ? '#2fbf71' : u.carryType === 'gold' ? '#ffc531' : '#1fc7c1';
       g.beginPath(); g.arc(r + 3, 0, 5.5, 0, TAU); g.fill(); g.stroke();
     }
-    // Cabine blindée
+    g.restore();
+    // Cabine 3D surélevée
+    g.save();
+    g.translate(bodyOff.ox, bodyOff.oy);
+    g.rotate(u.a || 0);
     g.fillStyle = color;
     g.beginPath(); g.roundRect(-r * 0.78, -r * 0.68, r * 1.45, r * 1.36, 4); g.fill(); g.stroke();
-    g.fillStyle = '#ffc531';
-    g.fillRect(-r * 0.55, -r * 0.45, 5, r * 0.9);
     g.fillStyle = '#a9d8ff';
     g.beginPath(); g.roundRect(0, -r * 0.42, r * 0.48, r * 0.84, 2); g.fill(); g.stroke();
+    g.restore();
 
   } else if (u.kind === 'tank' || u.kind === 'siege') {
     const L = r * 1.25, Wd = r * 0.95;
-    // Stabilisateurs hydrauliques déployés si Mode Siège actif !
+    // Niveau 0 : Chenilles et vérins de siège au sol
+    g.save();
+    g.rotate(u.a || 0);
     if (u.sieged) {
       g.fillStyle = '#ffc531';
       for (const [sx, sy] of [[-L * 0.85, -Wd * 1.15], [L * 0.85, -Wd * 1.15], [-L * 0.85, Wd * 1.15], [L * 0.85, Wd * 1.15]]) {
@@ -2107,44 +2172,83 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
     }
     g.fillStyle = darkCol;
     g.beginPath(); g.roundRect(-L * 0.9, -Wd * 0.78, L * 1.8, Wd * 1.56, 5); g.fill(); g.stroke();
+    g.restore();
+
+    // Niveau 1 (Z=12) : Châssis blindé 3D
+    g.save();
+    g.translate(bodyOff.ox, bodyOff.oy);
+    g.rotate(u.a || 0);
     g.fillStyle = color;
-    g.beginPath(); g.roundRect(-L * 0.75, -Wd * 0.65, L * 1.5, Wd * 1.3, 4); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(-L * 0.78, -Wd * 0.68, L * 1.56, Wd * 1.36, 4); g.fill(); g.stroke();
+    g.restore();
+
+    // Niveau 2 (Z=22) : Tourelle 3D et canon
+    g.save();
+    g.translate(topOff.ox, topOff.oy);
+    g.rotate(u.a || 0);
     g.fillStyle = '#16181d';
     if (u.kind === 'siege') {
-      const ext = u.sieged ? 20 : 13;
+      const ext = u.sieged ? 21 : 14;
       g.fillRect(0, -5, r + ext, 10);
       g.fillStyle = '#1fc7c1';
       g.fillRect(4, -2, r + ext - 5, 4);
     } else {
-      g.fillRect(2, -3.5, r + 10, 7);
+      g.fillRect(2, -3.5, r + 11, 7);
     }
     g.fillStyle = '#fff8ea';
-    g.beginPath(); g.arc(-2, 0, r * 0.48, 0, TAU); g.fill(); g.stroke();
+    g.beginPath(); g.arc(-2, 0, r * 0.5, 0, TAU); g.fill(); g.stroke();
     g.fillStyle = color;
-    g.beginPath(); g.arc(-2, 0, r * 0.24, 0, TAU); g.fill();
+    g.beginPath(); g.arc(-2, 0, r * 0.25, 0, TAU); g.fill();
+    g.restore();
 
   } else if (u.kind === 'titan') {
     const walk = isIcon ? 0 : Math.sin(now * 0.012 + (u.id || 0)) * 3;
+    // Niveau 0 : Pieds mécaniques au sol
+    g.save();
+    g.rotate(u.a || 0);
     g.fillStyle = '#383b44';
     g.beginPath(); g.roundRect(-8 + walk, -r * 0.85, 14, 8, 3); g.fill(); g.stroke();
     g.beginPath(); g.roundRect(-8 - walk, r * 0.85 - 8, 14, 8, 3); g.fill(); g.stroke();
+    g.restore();
+
+    // Niveau 1 (Z=22) : Torse & Canons plasma aux bras
+    g.save();
+    g.translate(bodyOff.ox, bodyOff.oy);
+    g.rotate(u.a || 0);
     g.fillStyle = '#16181d';
-    g.fillRect(2, -r * 0.88, r * 0.95, 7);
-    g.fillRect(2, r * 0.88 - 7, r * 0.95, 7);
+    g.fillRect(2, -r * 0.88, r * 0.98, 7);
+    g.fillRect(2, r * 0.88 - 7, r * 0.98, 7);
     g.fillStyle = '#1fc7c1';
     g.fillRect(r * 0.65, -r * 0.82, 6, 4);
     g.fillRect(r * 0.65, r * 0.82 - 4, 6, 4);
     g.fillStyle = color;
     g.beginPath(); g.roundRect(-r * 0.78, -r * 0.78, r * 1.56, r * 1.56, 8); g.fill(); g.stroke();
+    g.restore();
+
+    // Niveau 2 (Z=38) : Épaulières lourdes & Tête réacteur 3D
+    g.save();
+    g.translate(topOff.ox, topOff.oy);
+    g.rotate(u.a || 0);
     g.fillStyle = '#fff8ea';
-    g.beginPath(); g.roundRect(-r * 0.45, -r * 0.72, r * 0.9, r * 1.44, 5); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(-r * 0.48, -r * 0.72, r * 0.96, r * 1.44, 5); g.fill(); g.stroke();
     g.fillStyle = '#ffc531';
-    g.beginPath(); g.arc(0, 0, r * 0.34, 0, TAU); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, 0, r * 0.36, 0, TAU); g.fill(); g.stroke();
+    g.restore();
 
   } else {
-    const bob = isIcon ? 0 : Math.sin(now * 0.018 + (u.id || 0)) * 1.5;
+    // Infanterie 3D : corps à Z=9, casque et arme à Z=16
+    g.save();
+    g.translate(bodyOff.ox * 0.6, bodyOff.oy * 0.6);
+    g.rotate(u.a || 0);
     g.fillStyle = u.kind === 'sapper' ? '#ffc531' : darkCol;
     g.beginPath(); g.roundRect(-r * 0.95, -r * 0.55, r * 0.7, r * 1.1, 3); g.fill(); g.stroke();
+    g.fillStyle = darkCol;
+    g.beginPath(); g.arc(0, 0, r * 0.9, 0, TAU); g.fill(); g.stroke();
+    g.restore();
+
+    g.save();
+    g.translate(topOff.ox * 0.75, topOff.oy * 0.75);
+    g.rotate(u.a || 0);
     if (u.kind === 'rocket') {
       g.fillStyle = '#383b44';
       g.fillRect(-4, 3, r + 9, 6); g.strokeRect(-4, 3, r + 9, 6);
@@ -2158,20 +2262,20 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
       g.fillRect(2, 2, r + 6, 4.5);
     }
     g.fillStyle = color;
-    g.beginPath(); g.arc(bob * 0.3, 0, r * 0.88, 0, TAU); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, 0, r * 0.82, 0, TAU); g.fill(); g.stroke();
     g.fillStyle = '#a9d8ff';
-    g.beginPath(); g.roundRect(r * 0.15, -r * 0.48, r * 0.52, r * 0.96, 3); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(r * 0.12, -r * 0.45, r * 0.5, r * 0.9, 3); g.fill(); g.stroke();
     g.fillStyle = lightCol;
-    g.beginPath(); g.arc(-r * 0.25, -r * 0.25, r * 0.28, 0, TAU); g.fill();
+    g.beginPath(); g.arc(-r * 0.22, -r * 0.22, r * 0.25, 0, TAU); g.fill();
+    g.restore();
   }
-  g.restore();
 
   if (!isIcon && (u.hp < u.maxHp || selected)) {
     const bw = r * 2.1, pct = clamp(u.hp / u.maxHp, 0, 1);
     g.fillStyle = '#16181d';
-    g.fillRect(-bw / 2 - 1, -r - 10, bw + 2, 5);
+    g.fillRect(topOff.ox - bw / 2 - 1, topOff.oy - r - 10, bw + 2, 5);
     g.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
-    g.fillRect(-bw / 2, -r - 9, bw * pct, 3);
+    g.fillRect(topOff.ox - bw / 2, topOff.oy - r - 9, bw * pct, 3);
   }
   g.restore();
 }
@@ -2183,15 +2287,15 @@ function drawThumbIcon(canvasEl, kind, playerColor) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, w, h);
   g.save();
-  g.translate(w / 2, h / 2 + 2);
+  g.translate(w / 2, h / 2 + 5);
   if (BUILDINGS[kind]) {
     const def = BUILDINGS[kind];
-    const sc = Math.min(0.85, 22 / def.radius);
+    const sc = Math.min(0.78, 20 / def.radius);
     g.scale(sc, sc);
     drawBuilding(g, { kind, x: 0, y: 0, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: -0.4 }, playerColor, false, 0, true);
   } else if (UNITS[kind]) {
     const def = UNITS[kind];
-    const sc = Math.min(1.4, 18 / def.radius);
+    const sc = Math.min(1.3, 17 / def.radius);
     g.scale(sc, sc);
     drawUnit(g, { kind, x: 0, y: 0, radius: def.radius, a: -0.35, hp: def.hp, maxHp: def.hp }, playerColor, false, 0, true);
   }
@@ -2309,7 +2413,7 @@ function sendCommand(cmd) {
 }
 
 /* ============================================================================
-   CONTRÔLES RTS STARCRAFT (CLAVIER, GROUPES DE CONTRÔLE, SOURIS)
+   CONTRÔLES RTS STARCRAFT STRICTS (SÉLECTION OBLIGATOIRE POUR CONSTRUIRE/PRODUIRE)
    ============================================================================ */
 function cleanSelection() {
   if (!state) return;
@@ -2317,6 +2421,13 @@ function cleanSelection() {
   const validB = new Set(state.buildings.filter((b) => b.owner === myId && b.hp > 0).map((b) => b.id));
   for (const id of [...selectedUnits]) if (!validU.has(id)) selectedUnits.delete(id);
   for (const id of [...selectedBlds]) if (!validB.has(id)) selectedBlds.delete(id);
+
+  // Si on était en train de poser un bâtiment mais qu'aucun VCS n'est sélectionné, on annule buildMode
+  const hasScv = state.units.some((u) => selectedUnits.has(u.id) && u.kind === 'scv');
+  if (buildMode && !hasScv) {
+    buildMode = null;
+    updateCursorClass();
+  }
 }
 
 function selectIdleWorker() {
@@ -2328,35 +2439,23 @@ function selectIdleWorker() {
     selectedUnits.add(idle.id);
     cam.x = idle.x; cam.y = idle.y;
     Sfx.order();
+    renderConsoleUI(true);
   }
 }
 
 function selectAllArmy() {
   if (!state) return;
   selectedUnits.clear(); selectedBlds.clear();
+  buildMode = null; updateCursorClass();
   for (const u of state.units) {
     if (u.owner === myId && u.kind !== 'scv' && u.hp > 0) selectedUnits.add(u.id);
   }
-  if (selectedUnits.size > 0) Sfx.order();
+  if (selectedUnits.size > 0) { Sfx.order(); renderConsoleUI(true); }
   else toast('Aucune unité de combat déployée.');
-}
-
-function selectBuildingsByKind(kind) {
-  if (!state) return;
-  selectedUnits.clear(); selectedBlds.clear();
-  for (const b of state.buildings) {
-    if (b.owner === myId && b.kind === kind && b.hp > 0) selectedBlds.add(b.id);
-  }
-  if (selectedBlds.size > 0) { cmdTab = 'auto'; Sfx.order(); }
-  else toast(`Aucun bâtiment de type ${BUILDINGS[kind]?.name || kind}.`);
 }
 
 $('#btnIdleScv').onclick = selectIdleWorker;
 $('#btnAllArmy').onclick = selectAllArmy;
-$('#btnAllRax').onclick = () => selectBuildingsByKind('barracks');
-$('#btnAllFac').onclick = () => selectBuildingsByKind('factory');
-$('#tabAuto').onclick = () => { cmdTab = 'auto'; renderConsoleUI(true); };
-$('#tabBuild').onclick = () => { cmdTab = 'build'; renderConsoleUI(true); };
 
 window.addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
@@ -2365,20 +2464,20 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'F1') { e.preventDefault(); selectIdleWorker(); return; }
   if (e.key === 'F2') { e.preventDefault(); selectAllArmy(); return; }
-  if (e.key === 'F3') { e.preventDefault(); selectBuildingsByKind('barracks'); return; }
-  if (e.key === 'F4') { e.preventDefault(); selectBuildingsByKind('factory'); return; }
 
   if (k === 'escape') {
-    buildMode = null; orderCursor = null; cmdTab = 'auto';
+    buildMode = null; orderCursor = null;
     updateCursorClass(); renderConsoleUI(true);
     return;
   }
   if (k === ' ') { e.preventDefault(); centerOnMyHq(); return; }
 
-  // Si menu Construire actif (ou uniquement des Ouvriers VCS sélectionnés sans Ctrl) : 1..8 choisit un bâtiment
+  cleanSelection();
   const selUList = state ? state.units.filter((u) => selectedUnits.has(u.id)) : [];
-  const onlyScvSelected = selUList.length > 0 && selUList.every((u) => u.kind === 'scv');
-  if ((cmdTab === 'build' || onlyScvSelected) && !e.ctrlKey && !e.metaKey && /^[1-8]$/.test(k)) {
+  const hasScvSelected = selUList.some((u) => u.kind === 'scv');
+
+  // Si un Ouvrier VCS est sélectionné (sans Ctrl) : 1..8 choisit le bâtiment à construire !
+  if (hasScvSelected && !e.ctrlKey && !e.metaKey && /^[1-8]$/.test(k)) {
     const bMap = { '1': 'pylon', '2': 'extractor', '3': 'barracks', '4': 'factory', '5': 'turret', '6': 'tesla', '7': 'wall', '8': 'hq' };
     orderCursor = null;
     buildMode = buildMode === bMap[k] ? null : bMap[k];
@@ -2394,6 +2493,7 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
       controlGroups[g] = { units: [...selectedUnits], blds: [...selectedBlds] };
       toast(`Groupe de contrôle #${g} assigné`);
+      renderConsoleUI(true);
       return;
     }
     const grp = controlGroups[g];
@@ -2414,23 +2514,25 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Raccourcis RTS : A = Attack-Move, S = Stop, H = Hold, T = Stimpack, E = Siege/3e unité, B = Construire, X = Scan Radar
-  if (k === 'b') { cmdTab = cmdTab === 'build' ? 'auto' : 'build'; renderConsoleUI(true); return; }
-  if (k === 'x') { buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan'; updateCursorClass(); renderConsoleUI(true); return; }
-
-  if (selectedUnits.size > 0 && cmdTab !== 'build') {
+  // Raccourcis quand des UNITÉS sont sélectionnées : A = A-Move, S = Stop, H = Hold, R = Récolter (VCS), T = Stimpack, E = Siège
+  if (selectedUnits.size > 0) {
     if (k === 'a') { buildMode = null; orderCursor = 'amove'; updateCursorClass(); renderConsoleUI(true); return; }
     if (k === 's') { sendCommand({ op: 'UNIT_ORDER', mode: 'stop', unitIds: [...selectedUnits] }); return; }
     if (k === 'h') { sendCommand({ op: 'UNIT_ORDER', mode: 'hold', unitIds: [...selectedUnits] }); return; }
-    if (k === 'r' && onlyScvSelected) { sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_min', x: cam.x, y: cam.y, unitIds: [...selectedUnits] }); return; }
+    if (k === 'r' && hasScvSelected) { sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_min', x: cam.x, y: cam.y, unitIds: [...selectedUnits] }); return; }
     if (k === 't') { sendCommand({ op: 'STIM', unitIds: [...selectedUnits] }); return; }
     if (k === 'e') { sendCommand({ op: 'SIEGE', unitIds: [...selectedUnits] }); return; }
   }
 
-  // Si un bâtiment de production est sélectionné : Q / W / E entraînent les unités !
-  if (selectedBlds.size > 0 && cmdTab !== 'build') {
+  // Raccourcis quand un BÂTIMENT est sélectionné : Q / W / E entraînent les troupes de ce bâtiment, X = Scan Radar (si QG)
+  if (selectedBlds.size > 0) {
     const firstB = state?.buildings.find((b) => selectedBlds.has(b.id));
-    if (firstB) {
+    if (firstB && !firstB.constructing) {
+      if (firstB.kind === 'hq' && k === 'x') {
+        buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan';
+        updateCursorClass(); renderConsoleUI(true);
+        return;
+      }
       const trains = BUILDINGS[firstB.kind]?.trains || [];
       const keyIdx = { q: 0, w: 1, e: 2 }[k];
       if (keyIdx !== undefined && trains[keyIdx]) {
@@ -2439,16 +2541,6 @@ window.addEventListener('keydown', (e) => {
         }
         return;
       }
-    }
-  }
-
-  // Si aucune sélection (Mode Global Macro) : C/Q/W/E/R/T/Y produisent directement et A lance A-Move
-  if (selectedUnits.size === 0 && selectedBlds.size === 0 && cmdTab !== 'build') {
-    if (k === 'a') { buildMode = null; orderCursor = 'amove'; updateCursorClass(); renderConsoleUI(true); return; }
-    const macroMap = { c: 'scv', q: 'marine', w: 'rocket', e: 'sapper', r: 'tank', t: 'siege', y: 'titan' };
-    if (macroMap[k]) {
-      sendCommand({ op: 'TRAIN', unit: macroMap[k] });
-      return;
     }
   }
 });
@@ -2489,50 +2581,42 @@ function issueSmartRightClick(wx, wy) {
   const hit = findEntityAt(wx, wy);
   const me = state.players.find((p) => p.id === myId);
 
-  // Si on a sélectionné des bâtiments de production (et pas d'unités), le clic droit place le Point de Ralliement
+  // Si un bâtiment de production est sélectionné -> Clic droit définit son Point de Ralliement
   if (selectedUnits.size === 0 && selectedBlds.size > 0) {
     sendCommand({ op: 'UNIT_ORDER', mode: 'rally', x: wx, y: wy, bldIds: [...selectedBlds] });
     orderMarkers.push({ x: wx, y: wy, color: '#ffc531', life: 0.45, maxLife: 0.45 });
     return;
   }
 
-  // Par défaut, si aucune unité n'est sélectionnée, on commande toute l'armée de combat
-  let unitIds = [...selectedUnits];
-  if (!unitIds.length) {
-    unitIds = state.units.filter((u) => u.owner === myId && u.kind !== 'scv' && u.hp > 0).map((u) => u.id);
-  }
+  // Si aucune unité n'est sélectionnée, le clic droit ne fait rien (comme dans StarCraft !)
+  const unitIds = [...selectedUnits];
   if (!unitIds.length) return;
 
-  const onlyScvs = unitIds.every((id) => state.units.find((u) => u.id === id)?.kind === 'scv');
+  const hasScvs = unitIds.some((id) => state.units.find((u) => u.id === id)?.kind === 'scv');
 
   if (hit) {
-    // Clic droit sur un ennemi -> Focus Fire !
     if ((hit.type === 'unit' || hit.type === 'bld') && me && hit.ent.team !== me.team) {
       sendCommand({ op: 'UNIT_ORDER', mode: 'focus', targetId: hit.ent.id, x: hit.ent.x, y: hit.ent.y, unitIds });
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#ff4b2b', life: 0.45, maxLife: 0.45 });
       return;
     }
-    // Clic droit d'un Ouvrier sur un Minéral -> Récolter Minéraux
-    if (hit.type === 'min' && onlyScvs) {
+    if (hit.type === 'min' && hasScvs) {
       sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_min', resId: hit.ent.id, x: hit.ent.x, y: hit.ent.y, unitIds });
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#1fc7c1', life: 0.45, maxLife: 0.45 });
       return;
     }
-    // Clic droit d'un Ouvrier sur une Raffinerie alliée -> Récolter Gaz
-    if (hit.type === 'bld' && hit.ent.owner === myId && hit.ent.kind === 'extractor' && !hit.ent.constructing && onlyScvs) {
+    if (hit.type === 'bld' && hit.ent.owner === myId && hit.ent.kind === 'extractor' && !hit.ent.constructing && hasScvs) {
       sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_gas', resId: hit.ent.id, x: hit.ent.x, y: hit.ent.y, unitIds });
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#2fbf71', life: 0.45, maxLife: 0.45 });
       return;
     }
-    // Clic droit d'un Ouvrier sur un Chantier ou bâtiment allié endommagé -> Construire / Réparer
-    if (hit.type === 'bld' && hit.ent.owner === myId && (hit.ent.constructing || hit.ent.hp < hit.ent.maxHp) && onlyScvs) {
+    if (hit.type === 'bld' && hit.ent.owner === myId && (hit.ent.constructing || hit.ent.hp < hit.ent.maxHp) && hasScvs) {
       sendCommand({ op: 'UNIT_ORDER', mode: 'build', targetId: hit.ent.id, x: hit.ent.x, y: hit.ent.y, unitIds });
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#ffc531', life: 0.45, maxLife: 0.45 });
       return;
     }
   }
 
-  // Sinon : Déplacement standard (Move)
   sendCommand({ op: 'UNIT_ORDER', mode: 'move', x: wx, y: wy, unitIds });
   orderMarkers.push({ x: wx, y: wy, color: '#2fbf71', life: 0.42, maxLife: 0.42 });
 }
@@ -2550,7 +2634,6 @@ cvs.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  // CLIC DROIT : Annuler mode en cours ou Ordre contextuel StarCraft
   if (e.button === 2) {
     if (buildMode || orderCursor) {
       buildMode = null; orderCursor = null; updateCursorClass(); renderConsoleUI(true);
@@ -2560,28 +2643,25 @@ cvs.addEventListener('pointerdown', (e) => {
     return;
   }
 
-  // CLIC GAUCHE : Scan Radar, A-Move, Pose de bâtiment ou Sélection Box
   if (e.button === 0) {
     if (orderCursor === 'scan') {
       sendCommand({ op: 'SCAN', x: w.x, y: w.y });
-      orderCursor = null; updateCursorClass();
+      orderCursor = null; updateCursorClass(); renderConsoleUI(true);
       return;
     }
     if (orderCursor === 'amove') {
-      let unitIds = [...selectedUnits];
-      if (!unitIds.length && state) {
-        unitIds = state.units.filter((u) => u.owner === myId && u.kind !== 'scv' && u.hp > 0).map((u) => u.id);
+      const unitIds = [...selectedUnits];
+      if (unitIds.length) {
+        sendCommand({ op: 'UNIT_ORDER', mode: 'amove', x: w.x, y: w.y, unitIds });
+        orderMarkers.push({ x: w.x, y: w.y, color: '#ff4b2b', life: 0.45, maxLife: 0.45 });
       }
-      sendCommand({ op: 'UNIT_ORDER', mode: 'amove', x: w.x, y: w.y, unitIds });
-      orderMarkers.push({ x: w.x, y: w.y, color: '#ff4b2b', life: 0.45, maxLife: 0.45 });
-      orderCursor = null; updateCursorClass();
+      orderCursor = null; updateCursorClass(); renderConsoleUI(true);
       return;
     }
     if (buildMode) {
       sendCommand({ op: 'BUILD', kind: buildMode, x: w.x, y: w.y, unitIds: [...selectedUnits] });
       if (buildMode !== 'wall' && !e.shiftKey) {
         buildMode = null;
-        cmdTab = 'auto';
         updateCursorClass();
         renderConsoleUI(true);
       }
@@ -2619,7 +2699,6 @@ window.addEventListener('pointerup', () => {
   }
 
   if (dx > 12 || dy > 12) {
-    // Rectangle de sélection (Box Select) : priorise les unités de combat si présentes, sinon les Ouvriers
     const x1 = Math.min(mouse.dragStart.wx, mouse.wx), x2 = Math.max(mouse.dragStart.wx, mouse.wx);
     const y1 = Math.min(mouse.dragStart.wy, mouse.wy), y2 = Math.max(mouse.dragStart.wy, mouse.wy);
     const boxed = state.units.filter((u) => u.owner === myId && u.hp > 0 && u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2);
@@ -2634,8 +2713,7 @@ window.addEventListener('pointerup', () => {
       }
     }
   } else {
-    // Clic simple ou Double-Clic (sélectionne toutes les unités du même type à l'écran !)
-    const hitU = state.units.find((u) => u.owner === myId && u.hp > 0 && dist2(u.x, u.y, mouse.wx, mouse.wy) <= (u.radius + 12) ** 2);
+    const hitU = state.units.find((u) => u.owner === myId && u.hp > 0 && dist2(u.x, u.y, mouse.wx, mouse.wy) <= (u.radius + 14) ** 2);
     if (hitU) {
       const now = performance.now();
       if (mouse.dragStart.ctrl || (lastClickUnit.id === hitU.id && now - lastClickUnit.t < 360)) {
@@ -2649,14 +2727,14 @@ window.addEventListener('pointerup', () => {
       }
       lastClickUnit = { id: hitU.id, kind: hitU.kind, t: now };
     } else {
-      const hitB = state.buildings.find((b) => b.owner === myId && b.hp > 0 && dist2(b.x, b.y, mouse.wx, mouse.wy) <= (b.radius + 10) ** 2);
+      const hitB = state.buildings.find((b) => b.owner === myId && b.hp > 0 && dist2(b.x, b.y, mouse.wx, mouse.wy) <= (b.radius + 12) ** 2);
       if (hitB) {
         selectedBlds.add(hitB.id);
-        cmdTab = 'auto';
       }
     }
   }
   mouse.dragStart = null;
+  cleanSelection();
   renderConsoleUI(true);
 });
 
@@ -2664,13 +2742,9 @@ miniCvs.addEventListener('pointerdown', (e) => {
   const r = miniCvs.getBoundingClientRect();
   const wx = ((e.clientX - r.left) / r.width) * WORLD_SIZE;
   const wy = ((e.clientY - r.top) / r.height) * WORLD_SIZE;
-  if (e.button === 2 || orderCursor === 'amove') {
-    let unitIds = [...selectedUnits];
-    if (!unitIds.length && state) {
-      unitIds = state.units.filter((u) => u.owner === myId && u.kind !== 'scv' && u.hp > 0).map((u) => u.id);
-    }
-    sendCommand({ op: 'UNIT_ORDER', mode: 'amove', x: wx, y: wy, unitIds });
-    orderCursor = null; updateCursorClass();
+  if ((e.button === 2 || orderCursor === 'amove') && selectedUnits.size > 0) {
+    sendCommand({ op: 'UNIT_ORDER', mode: 'amove', x: wx, y: wy, unitIds: [...selectedUnits] });
+    orderCursor = null; updateCursorClass(); renderConsoleUI(true);
   } else {
     cam.x = clamp(wx, 0, WORLD_SIZE);
     cam.y = clamp(wy, 0, WORLD_SIZE);
@@ -2695,7 +2769,7 @@ $('#btnReplay').onclick = () => {
 };
 
 /* ============================================================================
-   MISE À JOUR DE LA CONSOLE RTS INFÉRIEURE (PORTRAIT, FILE & COMMAND CARD)
+   CONSOLE RTS INFÉRIEURE STRICTE (AUCUNE ACTION SANS SÉLECTION D'UNITÉ/BÂTIMENT)
    ============================================================================ */
 let lastCmdSig = '';
 
@@ -2705,16 +2779,12 @@ function renderConsoleUI(force = false) {
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
 
-  $('#tabAuto').classList.toggle('active', cmdTab === 'auto');
-  $('#tabBuild').classList.toggle('active', cmdTab === 'build');
-
   const myUnits = state.units.filter((u) => u.owner === myId && u.hp > 0);
-  const idleScvs = myUnits.filter((u) => u.kind === 'scv' && u.mode === 'idle').length;
+  const scvs = myUnits.filter((u) => u.kind === 'scv');
   const armyCnt = myUnits.filter((u) => u.kind !== 'scv').length;
-  $('#uiIdleCnt').textContent = idleScvs;
+  $('#uiIdleCnt').textContent = scvs.length;
   $('#uiArmyCnt').textContent = armyCnt;
 
-  // Groupes de contrôle actifs
   const cgHtml = [];
   for (let g = 1; g <= 5; g++) {
     const grp = controlGroups[g];
@@ -2738,16 +2808,16 @@ function renderConsoleUI(force = false) {
     }
   }
 
-  // PANNEAU CENTRAL : SÉLECTION
   const selBody = $('#uiSelBody');
   const selU = state.units.filter((u) => selectedUnits.has(u.id));
   const selB = state.buildings.filter((b) => selectedBlds.has(b.id));
 
+  // PANNEAU CENTRAL : SÉLECTION
   if (selB.length >= 1 && selU.length === 0) {
     const b = selB[0];
     const def = BUILDINGS[b.kind];
     $('#uiSelHeader').textContent = selB.length > 1 ? `${selB.length} × ${def.name}` : def.name;
-    $('#uiSelSubHint').textContent = b.constructing ? 'Chantier en construction...' : 'Clic Droit sur la carte = Point de Ralliement';
+    $('#uiSelSubHint').textContent = b.constructing ? 'Chantier 3D en construction...' : 'Clic Droit sur la carte = Point de Ralliement';
     const pct = Math.round((b.hp / b.maxHp) * 100);
     const qSlotsHtml = [0, 1, 2, 3, 4].map((idx) => {
       const qKind = b.queue?.[idx];
@@ -2792,7 +2862,9 @@ function renderConsoleUI(force = false) {
     const u = selU[0];
     const def = UNITS[u.kind];
     $('#uiSelHeader').textContent = def.name;
-    $('#uiSelSubHint').textContent = 'A + Clic = Attaque-Déplacement · Clic Droit = Ordre';
+    $('#uiSelSubHint').textContent = u.kind === 'scv'
+      ? 'Ouvrier VCS : choisis un bâtiment à droite [1-8] ou Clic Droit sur un cristal'
+      : 'A + Clic = Attaque-Déplacement · Clic Droit = Ordre';
     const pct = Math.round((u.hp / u.maxHp) * 100);
     selBody.innerHTML = `
       <div class="portrait-box">
@@ -2801,7 +2873,7 @@ function renderConsoleUI(force = false) {
       </div>
       <div class="sel-info">
         <div class="sel-title">${def.name} ${u.sieged ? '· [MODE SIÈGE]' : ''} ${u.stimT > 0 ? '· [STIMPACK ⚡]' : ''}</div>
-        <div class="sel-sub">PV : ${Math.ceil(u.hp)} / ${u.maxHp} · Coût : ${def.min}💎 ${def.gas ? `${def.gas}🧪` : ''} (${def.supply} 📦)</div>
+        <div class="sel-sub">PV : ${Math.ceil(u.hp)} / ${u.maxHp} · ${def.desc}</div>
         <div class="sel-stats">
           <span class="st-chip">⚔️ Dégâts : ${u.sieged ? def.siegeDmg : def.dmg}</span>
           <span class="st-chip">🎯 Portée : ${u.sieged ? def.siegeRange : def.range}</span>
@@ -2835,26 +2907,31 @@ function renderConsoleUI(force = false) {
       };
     }
   } else {
-    $('#uiSelHeader').textContent = 'Commandement Tactique';
-    $('#uiSelSubHint').textContent = 'Sélectionne tes unités ou bâtiments (ou utilise F1-F4)';
+    $('#uiSelHeader').textContent = 'Aucune sélection';
+    $('#uiSelSubHint').textContent = 'Clique sur un VCS ou un bâtiment sur la carte';
     selBody.innerHTML = `
       <div class="sel-info">
-        <div class="sel-title">Aucune sélection active</div>
-        <div class="sel-sub">Astuces StarCraft :</div>
+        <div class="sel-title">Sélectionne une unité ou un bâtiment</div>
+        <div class="sel-sub">Fonctionnement StarCraft :</div>
         <div class="sel-stats">
-          <span class="st-chip">🖱️ Glisser : Sélectionner tes unités</span>
-          <span class="st-chip">⌨️ A + Clic : Attaque-Déplacement (A-Move)</span>
-          <span class="st-chip">⌨️ F1 / F2 : VCS inactif / Toute l'armée</span>
-          <span class="st-chip">⌨️ B : Menu Construction</span>
+          <span class="st-chip">👷 Clique sur un <b>VCS</b> pour construire un bâtiment</span>
+          <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un VCS</span>
+          <span class="st-chip">🏭 Clique sur la <b>Caserne / Usine</b> pour créer des troupes</span>
         </div>
       </div>
     `;
   }
 
-  // PANNEAU DE DROITE : COMMAND CARD 4x3
+  // PANNEAU DE DROITE : COMMAND CARD 4x3 STRICTE (basée uniquement sur ce qui est sélectionné !)
   const hasScv = selU.some((u) => u.kind === 'scv');
   const firstB = selB[0] || null;
-  let modeKey = cmdTab === 'build' ? 'BUILD' : firstB ? `BLD_${firstB.kind}` : hasScv && selU.length === selectedUnits.size ? 'SCV' : selU.length > 0 ? 'ARMY' : 'GLOBAL';
+  let modeKey = 'NONE';
+  if (selU.length > 0) {
+    modeKey = hasScv ? 'SCV' : 'ARMY';
+  } else if (firstB) {
+    modeKey = firstB.constructing ? 'BLD_CONSTRUCT' : `BLD_${firstB.kind}`;
+  }
+
   const sig = `${modeKey}|${buildMode}|${orderCursor}|${Math.floor(me.minerals / 5)}|${Math.floor(me.gas / 5)}|${me.color}`;
   if (!force && sig === lastCmdSig) return;
   lastCmdSig = sig;
@@ -2862,8 +2939,9 @@ function renderConsoleUI(force = false) {
   const grid = $('#uiCmdGrid');
   const cards = [];
 
-  if (modeKey === 'BUILD' || modeKey === 'SCV') {
-    $('#uiCmdTitle').textContent = 'Construction (VCS)';
+  if (modeKey === 'SCV') {
+    $('#uiCmdTitle').textContent = 'Ouvrier VCS · Construction';
+    $('#uiCmdHint').textContent = 'Touches 1-8';
     const bList = [
       ['pylon', '1'], ['extractor', '2'], ['barracks', '3'], ['factory', '4'],
       ['turret', '5'], ['tesla', '6'], ['wall', '7'], ['hq', '8'],
@@ -2878,22 +2956,20 @@ function renderConsoleUI(force = false) {
         <span class="lbl-b">${def.short}</span>
       </button>`);
     }
-    cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaque-Déplacement (A)">
-      <span class="key">A</span><span class="ico-txt">🎯</span><span class="lbl-b">Attaquer</span>
-    </button>`);
-    cards.push(`<button class="cbtn" data-cmd-act="harvest" title="Envoyer récolter les minéraux les plus proches">
+    cards.push(`<button class="cbtn" data-cmd-act="harvest" title="Envoyer récolter les minéraux les plus proches (R)">
       <span class="key">R</span><span class="ico-txt">💎</span><span class="lbl-b">Récolter</span>
+    </button>`);
+    cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaquer (A)">
+      <span class="key">A</span><span class="ico-txt">🎯</span><span class="lbl-b">Attaquer</span>
     </button>`);
     cards.push(`<button class="cbtn" data-cmd-act="stop" title="Stopper (S)">
       <span class="key">S</span><span class="ico-txt">✋</span><span class="lbl-b">Stop</span>
     </button>`);
-    cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎) : révèle le brouillard de guerre">
-      <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
-    </button>`);
 
-  } else if (modeKey.startsWith('BLD_')) {
+  } else if (modeKey.startsWith('BLD_') && modeKey !== 'BLD_CONSTRUCT') {
     const bDef = BUILDINGS[firstB.kind];
-    $('#uiCmdTitle').textContent = `Production · ${bDef.short}`;
+    $('#uiCmdTitle').textContent = bDef.short;
+    $('#uiCmdHint').textContent = bDef.trains.length ? 'Touches Q / W / E' : 'Structure active';
     const keysMap = ['Q', 'W', 'E', 'R'];
     (bDef.trains || []).forEach((uKind, idx) => {
       const uDef = UNITS[uKind];
@@ -2905,15 +2981,27 @@ function renderConsoleUI(force = false) {
         <span class="lbl-b">${uDef.short}</span>
       </button>`);
     });
-    cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎)">
-      <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
-    </button>`);
-    cards.push(`<button class="cbtn" data-cmd-act="open_build" title="Ouvrir le menu de construction (B)">
-      <span class="key">B</span><span class="ico-txt">🏗️</span><span class="lbl-b">Construire</span>
-    </button>`);
+    if (firstB.kind === 'hq') {
+      cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎) : révèle le brouillard de guerre">
+        <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
+      </button>`);
+    }
+    if (!cards.length) {
+      grid.innerHTML = `<div class="cmd-empty"><b>${bDef.name}</b><span>Ce bâtiment fonctionne automatiquement (${bDef.desc})</span></div>`;
+      return;
+    }
+
+  } else if (modeKey === 'BLD_CONSTRUCT') {
+    $('#uiCmdTitle').textContent = 'Chantier en cours';
+    $('#uiCmdHint').textContent = 'En construction';
+    grid.innerHTML = `<div class="cmd-empty"><b>Chantier en cours de soudure</b><span>Envoie un Ouvrier VCS dessus (Clic Droit) pour accélérer la construction.</span></div>`;
+    return;
 
   } else if (modeKey === 'ARMY') {
-    $('#uiCmdTitle').textContent = 'Ordres Tactiques';
+    $('#uiCmdTitle').textContent = 'Ordres de Combat';
+    $('#uiCmdHint').textContent = 'Micro-gestion';
+    const canStim = selU.some((u) => UNITS[u.kind]?.canStim);
+    const canSiege = selU.some((u) => UNITS[u.kind]?.canSiege);
     cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaque-Déplacement (A + Clic gauche)">
       <span class="key">A</span><span class="ico-txt">⚔️</span><span class="lbl-b">A-Move</span>
     </button>`);
@@ -2923,42 +3011,26 @@ function renderConsoleUI(force = false) {
     cards.push(`<button class="cbtn" data-cmd-act="hold" title="Tenir Position (H)">
       <span class="key">H</span><span class="ico-txt">🛡️</span><span class="lbl-b">Tenir Pos.</span>
     </button>`);
-    cards.push(`<button class="cbtn" data-cmd-act="stim" title="Stimpack (T) : +50% vitesse d'attaque et de déplacement pendant 8s (-18 PV)">
-      <span class="key">T</span><span class="ico-txt">💉</span><span class="lbl-b">Stimpack</span>
-    </button>`);
-    cards.push(`<button class="cbtn" data-cmd-act="siege" title="Mode Siège / Mode Char (E) pour les Chars de Siège">
-      <span class="key">E</span><span class="ico-txt">💥</span><span class="lbl-b">Mode Siège</span>
-    </button>`);
-    cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎)">
-      <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
-    </button>`);
-    cards.push(`<button class="cbtn" data-cmd-act="open_build" title="Construire un bâtiment (B)">
-      <span class="key">B</span><span class="ico-txt">🏗️</span><span class="lbl-b">Construire</span>
-    </button>`);
-
-  } else {
-    // Mode Global (aucune sélection) : Raccourcis directs de production & construction
-    $('#uiCmdTitle').textContent = 'Macro-Commandes Rapides';
-    const quickTrain = [['scv', 'C'], ['marine', 'Q'], ['rocket', 'W'], ['sapper', 'E'], ['tank', 'R'], ['siege', 'T'], ['titan', 'Y']];
-    for (const [uKind, key] of quickTrain) {
-      const uDef = UNITS[uKind];
-      const cant = me.minerals < uDef.min || me.gas < uDef.gas;
-      cards.push(`<button class="cbtn ${cant ? 'cant' : ''}" data-cmd-train="${uKind}" title="Produire ${uDef.name} (${uDef.min}💎 ${uDef.gas ? `${uDef.gas}🧪` : ''})">
-        <span class="key">${key}</span>
-        <span class="cost-tag">${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}</span>
-        <canvas class="thumb" width="64" height="44" data-thumb="${uKind}"></canvas>
-        <span class="lbl-b">${uDef.short}</span>
+    if (canStim) {
+      cards.push(`<button class="cbtn" data-cmd-act="stim" title="Stimpack (T) : +50% vitesse d'attaque et de déplacement pendant 8s (-18 PV)">
+        <span class="key">T</span><span class="ico-txt">💉</span><span class="lbl-b">Stimpack</span>
       </button>`);
     }
-    cards.push(`<button class="cbtn" data-cmd-act="open_build" title="Ouvrir le menu de construction (B)">
-      <span class="key">B</span><span class="ico-txt">🏗️</span><span class="lbl-b">Construire</span>
-    </button>`);
-    cards.push(`<button class="cbtn ${orderCursor === 'amove' ? 'sel' : ''}" data-cmd-act="amove" title="Attaque-Déplacement avec toute l'armée (A)">
-      <span class="key">A</span><span class="ico-txt">⚔️</span><span class="lbl-b">A-Move</span>
-    </button>`);
-    cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎)">
-      <span class="key">X</span><span class="cost-tag">50💎</span><span class="ico-txt">📡</span><span class="lbl-b">Scan Radar</span>
-    </button>`);
+    if (canSiege) {
+      cards.push(`<button class="cbtn" data-cmd-act="siege" title="Mode Siège / Mode Char (E) pour les Chars de Siège">
+        <span class="key">E</span><span class="ico-txt">💥</span><span class="lbl-b">Mode Siège</span>
+      </button>`);
+    }
+
+  } else {
+    // RIEN N'EST SÉLECTIONNÉ : Panneau de droite vide (aucun bouton de construction/production global)
+    $('#uiCmdTitle').textContent = 'Aucune sélection';
+    $('#uiCmdHint').textContent = 'Sélection requise';
+    grid.innerHTML = `<div class="cmd-empty">
+      <b>Aucune unité ou structure sélectionnée</b>
+      <span>Clique sur un <b>Ouvrier VCS</b> (ou <kbd>F1</kbd>) pour construire, ou clique sur un <b>Bâtiment</b> (QG, Caserne, Usine) pour produire des troupes.</span>
+    </div>`;
+    return;
   }
 
   grid.innerHTML = cards.join('');
@@ -2977,18 +3049,15 @@ function renderConsoleUI(force = false) {
   for (const b of grid.querySelectorAll('[data-cmd-train]')) {
     b.onclick = () => {
       const uKind = b.dataset.cmdTrain;
-      if (selectedBlds.size > 0) {
-        for (const bId of selectedBlds) sendCommand({ op: 'TRAIN', unit: uKind, bldId: bId });
-      } else {
-        sendCommand({ op: 'TRAIN', unit: uKind });
+      for (const bId of selectedBlds) {
+        sendCommand({ op: 'TRAIN', unit: uKind, bldId: bId });
       }
     };
   }
   for (const b of grid.querySelectorAll('[data-cmd-act]')) {
     b.onclick = () => {
       const act = b.dataset.cmdAct;
-      if (act === 'open_build') { cmdTab = 'build'; renderConsoleUI(true); }
-      else if (act === 'amove') { buildMode = null; orderCursor = orderCursor === 'amove' ? null : 'amove'; updateCursorClass(); renderConsoleUI(true); }
+      if (act === 'amove') { buildMode = null; orderCursor = orderCursor === 'amove' ? null : 'amove'; updateCursorClass(); renderConsoleUI(true); }
       else if (act === 'scan') { buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan'; updateCursorClass(); renderConsoleUI(true); }
       else if (act === 'stop') sendCommand({ op: 'UNIT_ORDER', mode: 'stop', unitIds: [...selectedUnits] });
       else if (act === 'hold') sendCommand({ op: 'UNIT_ORDER', mode: 'hold', unitIds: [...selectedUnits] });
@@ -3072,7 +3141,7 @@ function updateHudUI() {
 }
 
 /* ============================================================================
-   RENDU PRINCIPAL DU MONDE 2.5D & MINIMAP (60 FPS)
+   RENDU PRINCIPAL DU MONDE 3D VUE DU DESSUS & MINIMAP (60 FPS)
    ============================================================================ */
 function renderWorld(dt, now) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -3080,7 +3149,6 @@ function renderWorld(dt, now) {
   ctx.fillRect(0, 0, W, H);
   if (!state) return;
 
-  // Déplacement caméra au clavier (Flèches ou ZQSD uniquement avec flèches pour laisser Q/W/E/S aux ordres RTS, ou bord d'écran)
   const panSpd = 680 / cam.z;
   if (keys['arrowup']) cam.y -= panSpd * dt;
   if (keys['arrowdown']) cam.y += panSpd * dt;
@@ -3110,67 +3178,48 @@ function renderWorld(dt, now) {
     ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, TAU); ctx.fill();
   }
 
-  // Gisements de Minéraux 2.5D (Bleus & Dorés)
-  for (const m of MINERAL_NODES) {
-    const r = m.rich ? 21 : 17;
-    const { ox, oy } = roofOffset(m.x, m.y, 24);
-    ctx.save();
-    ctx.translate(m.x, m.y);
-    ctx.fillStyle = m.rich ? 'rgba(255, 197, 49, 0.2)' : 'rgba(31, 199, 193, 0.2)';
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, TAU); ctx.fill();
-    ctx.fillStyle = m.rich ? '#d99b16' : '#128c88';
-    ctx.strokeStyle = '#16181d';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * TAU - Math.PI / 2;
-      const px = Math.cos(a) * r, py = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = m.rich ? '#ffc531' : '#1fc7c1';
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * TAU - Math.PI / 2;
-      const px = ox * 0.55 + Math.cos(a) * r * 0.65, py = oy * 0.55 + Math.sin(a) * r * 0.65;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.restore();
-  }
-
-  // Geysers de Gaz Plasma (Cratères fumants verts)
+  // Geysers de Gaz Plasma 3D
   for (const gey of GAS_GEYSERS) {
     ctx.save();
     ctx.translate(gey.x, gey.y);
-    ctx.fillStyle = '#38463d';
-    ctx.strokeStyle = '#16181d';
-    ctx.lineWidth = 3.5;
-    ctx.beginPath(); ctx.arc(0, 0, 26, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#193322';
-    ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill();
-    const pulse = 10 + Math.sin(now * 0.006 + gey.x) * 3;
-    ctx.fillStyle = 'rgba(47, 191, 113, 0.55)';
-    ctx.beginPath(); ctx.arc(0, 0, pulse, 0, TAU); ctx.fill();
+    drawPrism3D(ctx, gey.x, gey.y, makeNGon(26, 8), 0, 14, '#38463d', '#4d5e52', false, 0.78);
+    const oTop = project3DOffset(gey.x, gey.y, 14, false);
+    ctx.fillStyle = '#162b1d';
+    ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, 13, 0, TAU); ctx.fill();
+    const pulse = 9 + Math.sin(now * 0.006 + gey.x) * 3;
+    ctx.fillStyle = 'rgba(47, 191, 113, 0.65)';
+    ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, pulse, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
-  // Rochers 2.5D
+  // Gisements de Minéraux 3D (Pyramides cristallines à facettes)
+  for (const m of MINERAL_NODES) {
+    const r = m.rich ? 21 : 17;
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.fillStyle = m.rich ? 'rgba(255, 197, 49, 0.22)' : 'rgba(31, 199, 193, 0.22)';
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.4, 0, TAU); ctx.fill();
+    drawPyramid3D(ctx, m.x, m.y, makeNGon(r, 6, 0.2), 0, m.rich ? 34 : 28, m.rich ? '#ffc531' : '#1fc7c1', false);
+    ctx.restore();
+  }
+
+  // Rochers 3D
   for (const rk of ROCKS) {
-    const { ox, oy } = roofOffset(rk.x, rk.y, 26);
     ctx.save();
     ctx.translate(rk.x, rk.y);
-    drawCylinder25D(ctx, rk.r, ox * 0.55, oy * 0.55, '#59544b', '#7d776b');
+    drawPrism3D(ctx, rk.x, rk.y, makeNGon(rk.r, 7, rk.seed), 0, 26, '#59544b', '#878073', false, 0.72);
     ctx.restore();
   }
 
-  // Connexions des Murs
+  // Connexions 3D des Murs voisins
   const walls = state.buildings.filter((b) => b.kind === 'wall' && b.hp > 0 && isVisibleToMe(b.x, b.y));
   ctx.strokeStyle = '#16181d'; ctx.lineWidth = 22;
   for (let i = 0; i < walls.length; i++) {
     for (let j = i + 1; j < walls.length; j++) {
       if (walls[i].team === walls[j].team && dist2(walls[i].x, walls[i].y, walls[j].x, walls[j].y) <= 58 * 58) {
-        ctx.beginPath(); ctx.moveTo(walls[i].x, walls[i].y); ctx.lineTo(walls[j].x, walls[j].y); ctx.stroke();
+        const o1 = project3DOffset(walls[i].x, walls[i].y, 16, false);
+        const o2 = project3DOffset(walls[j].x, walls[j].y, 16, false);
+        ctx.beginPath(); ctx.moveTo(walls[i].x + o1.ox, walls[i].y + o1.oy); ctx.lineTo(walls[j].x + o2.ox, walls[j].y + o2.oy); ctx.stroke();
       }
     }
   }
@@ -3178,7 +3227,9 @@ function renderWorld(dt, now) {
   for (let i = 0; i < walls.length; i++) {
     for (let j = i + 1; j < walls.length; j++) {
       if (walls[i].team === walls[j].team && dist2(walls[i].x, walls[i].y, walls[j].x, walls[j].y) <= 58 * 58) {
-        ctx.beginPath(); ctx.moveTo(walls[i].x, walls[i].y); ctx.lineTo(walls[j].x, walls[j].y); ctx.stroke();
+        const o1 = project3DOffset(walls[i].x, walls[i].y, 16, false);
+        const o2 = project3DOffset(walls[j].x, walls[j].y, 16, false);
+        ctx.beginPath(); ctx.moveTo(walls[i].x + o1.ox, walls[i].y + o1.oy); ctx.lineTo(walls[j].x + o2.ox, walls[j].y + o2.oy); ctx.stroke();
       }
     }
   }
@@ -3199,22 +3250,38 @@ function renderWorld(dt, now) {
     }
   }
 
-  // Unités (visibles uniquement hors brouillard de guerre)
-  const sortedUnits = [...state.units].sort((a, b) => a.y - b.y);
-  for (const u of sortedUnits) {
+  // Tri de profondeur 3D (Painter's Algorithm : Arbres 3D, Unités 3D et Bâtiments 3D triés par Y et distance au centre caméra)
+  const renderList = [];
+  const viewW = (W / cam.z) * 0.65, viewH = (H / cam.z) * 0.65;
+  for (const tr of TREES_3D) {
+    if (Math.abs(tr.x - cam.x) <= viewW && Math.abs(tr.y - cam.y) <= viewH) {
+      renderList.push({ k: 'tree', y: tr.y, obj: tr });
+    }
+  }
+  for (const u of state.units) {
     if (u.hp <= 0) continue;
     if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
-    const owner = state.players.find((p) => p.id === u.owner);
-    drawUnit(ctx, u, owner ? owner.color : '#888', selectedUnits.has(u.id), now, false);
+    renderList.push({ k: 'unit', y: u.y, obj: u });
   }
-
-  // Bâtiments 2.5D
-  const sortedBlds = [...state.buildings].sort((a, b) => a.y - b.y);
-  for (const b of sortedBlds) {
+  for (const b of state.buildings) {
     if (b.hp <= 0) continue;
     if (b.owner !== myId && !isVisibleToMe(b.x, b.y)) continue;
-    const owner = state.players.find((p) => p.id === b.owner);
-    drawBuilding(ctx, b, owner ? owner.color : '#888', selectedBlds.has(b.id), now, false);
+    renderList.push({ k: 'bld', y: b.y, obj: b });
+  }
+  renderList.sort((a, b) => a.y - b.y);
+
+  for (const item of renderList) {
+    if (item.k === 'tree') {
+      drawTree3D(ctx, item.obj);
+    } else if (item.k === 'unit') {
+      const u = item.obj;
+      const owner = state.players.find((p) => p.id === u.owner);
+      drawUnit(ctx, u, owner ? owner.color : '#888', selectedUnits.has(u.id), now, false);
+    } else {
+      const b = item.obj;
+      const owner = state.players.find((p) => p.id === b.owner);
+      drawBuilding(ctx, b, owner ? owner.color : '#888', selectedBlds.has(b.id), now, false);
+    }
   }
 
   // Projectiles, Ondes de choc & Éclairs
@@ -3289,15 +3356,12 @@ function renderWorld(dt, now) {
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); ctx.stroke();
   }
 
-  // Brouillard de Guerre (Fog of War) dessiné par-dessus le champ de bataille
+  // Brouillard de Guerre (Fog of War)
   ctx.drawImage(fogCanvas, 0, 0, WORLD_SIZE, WORLD_SIZE);
 
-  // Anneau de Scan Radar Comsat actif
   for (const sc of state.scans) {
     ctx.save();
-    ctx.strokeStyle = '#1fc7c1';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([12, 8]);
+    ctx.strokeStyle = '#1fc7c1'; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
     ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r, 0, TAU); ctx.stroke();
     ctx.restore();
   }
@@ -3309,7 +3373,7 @@ function renderWorld(dt, now) {
     ctx.restore();
   }
 
-  // Aperçu fantôme 2.5D du bâtiment à poser
+  // Aperçu fantôme 3D du bâtiment à poser (uniquement quand un VCS est sélectionné)
   if (buildMode) {
     const def = BUILDINGS[buildMode];
     const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
@@ -3322,8 +3386,8 @@ function renderWorld(dt, now) {
       ctx.beginPath(); ctx.arc(gx, gy, def.range, 0, TAU); ctx.stroke();
       ctx.setLineDash([]);
     }
-    ctx.globalAlpha = 0.72;
-    drawBuilding(ctx, { kind: buildMode, x: gx, y: gy, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: 0 }, check.ok ? (me ? me.color : '#2fbf71') : '#ff4b2b', false, now, true);
+    ctx.globalAlpha = 0.74;
+    drawBuilding(ctx, { kind: buildMode, x: gx, y: gy, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: 0 }, check.ok ? (me ? me.color : '#2fbf71') : '#ff4b2b', false, now, false);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
     ctx.lineWidth = 3.5;
@@ -3336,7 +3400,6 @@ function renderWorld(dt, now) {
     ctx.restore();
   }
 
-  // Rectangle de sélection vert style StarCraft
   if (mouse.down && mouse.dragStart) {
     ctx.save();
     ctx.strokeStyle = '#2fbf71';
@@ -3404,7 +3467,6 @@ function startMatch(info) {
   selectedBlds.clear();
   buildMode = null;
   orderCursor = null;
-  cmdTab = 'auto';
   exploredGrid.fill(0);
   craters = [];
   particles = [];
