@@ -2006,7 +2006,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-const cam = { x: HALF_W, y: HALF_W, z: 0.88, shake: 0 };
+const cam = { x: HALF_W, y: HALF_W, z: 0.88, pitch: 36, shake: 0 };
 const keys = {};
 const mouse = { x: W / 2, y: H / 2, wx: HALF_W, wy: HALF_W, down: false, dragStart: null, panning: false, panStart: null };
 
@@ -3034,7 +3034,11 @@ function updateCursorClass() {
 
 cvs.addEventListener('wheel', (e) => {
   e.preventDefault();
-  cam.z = clamp(cam.z * (e.deltaY < 0 ? 1.1 : 0.9), 0.44, 1.35);
+  if (e.shiftKey) {
+    cam.pitch = clamp((cam.pitch || 36) + (e.deltaY < 0 ? 2.5 : -2.5), 22, 62);
+  } else {
+    cam.z = clamp(cam.z * (e.deltaY < 0 ? 1.1 : 0.9), 0.44, 1.35);
+  }
 }, { passive: false });
 
 function findEntityAt(wx, wy, sx = mouse.x, sy = mouse.y) {
@@ -3182,8 +3186,9 @@ window.addEventListener('pointermove', (e) => {
   mouse.wx = w.x; mouse.wy = w.y;
 
   if (mouse.panning && mouse.panStart) {
+    const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
     cam.x = clamp(mouse.panStart.cx - (e.clientX - mouse.panStart.x) / cam.z, 0, WORLD_SIZE);
-    cam.y = clamp(mouse.panStart.cy - (e.clientY - mouse.panStart.y) / (cam.z * 0.77), 0, WORLD_SIZE);
+    cam.y = clamp(mouse.panStart.cy - (e.clientY - mouse.panStart.y) / (cam.z * isoSin), 0, WORLD_SIZE);
   }
 });
 
@@ -3832,7 +3837,7 @@ function initThree3D() {
     threeScene = new THREE.Scene();
     threeScene.background = new THREE.Color(0x0f1f14);
 
-    threeCam = new THREE.PerspectiveCamera(36, W / Math.max(1, H), 40, 7500);
+    threeCam = new THREE.PerspectiveCamera(34, W / Math.max(1, H), 40, 9500);
     threeRaycaster = new THREE.Raycaster();
     threeGroundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     threeNdc = new THREE.Vector2();
@@ -3850,8 +3855,8 @@ function initThree3D() {
     sun.shadow.mapSize.width = 2048;
     sun.shadow.mapSize.height = 2048;
     sun.shadow.camera.near = 250;
-    sun.shadow.camera.far = 4200;
-    const sc = 1380;
+    sun.shadow.camera.far = 4800;
+    const sc = 1450;
     sun.shadow.camera.left = -sc;
     sun.shadow.camera.right = sc;
     sun.shadow.camera.top = sc;
@@ -3866,6 +3871,19 @@ function initThree3D() {
     rim.target.position.set(HALF_W, 0, HALF_W);
     threeScene.add(rim);
     threeScene.add(rim.target);
+
+    // Sol étendu à l'horizon (empêche tout vide noir à angle bas prononcé)
+    const skirtGeo = new THREE.PlaneGeometry(WORLD_SIZE * 3.5, WORLD_SIZE * 3.5);
+    const skirtMat = new THREE.MeshStandardMaterial({
+      color: 0x0a160e,
+      roughness: 0.95,
+      metalness: 0.08,
+    });
+    const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
+    skirtMesh.rotation.x = -Math.PI / 2;
+    skirtMesh.position.set(HALF_W, -1.2, HALF_W);
+    skirtMesh.receiveShadow = true;
+    threeScene.add(skirtMesh);
 
     // Sol 3D texturé à partir de terrainCanvas
     const groundTex = new THREE.CanvasTexture(terrainCanvas);
@@ -4022,7 +4040,7 @@ function initThree3D() {
     });
     const fogMesh = new THREE.Mesh(fogGeo, fogMat);
     fogMesh.rotation.x = -Math.PI / 2;
-    fogMesh.position.set(HALF_W, 7.5, HALF_W);
+    fogMesh.position.set(HALF_W, 4.0, HALF_W);
     fogMesh.renderOrder = 20;
     threeScene.add(fogMesh);
 
@@ -4509,10 +4527,10 @@ function createUnitMesh3D(kind, color) {
 function syncAndRenderThree3D(dt, now, shX, shY) {
   if (!threeReady && !initThree3D()) return false;
   try {
-    // Caméra 3D vue isométrique RTS (inclinaison à 50° au-dessus du sol pour révéler volumes, façades et reliefs)
-    const ISO_PITCH_DEG = 50;
-    const pitchRad = (ISO_PITCH_DEG * Math.PI) / 180;
-    const fovRad = (36 * Math.PI) / 180;
+    // Caméra 3D vue isométrique prononcée (par défaut 36° au-dessus du sol pour un vrai relief et volume 3D)
+    const pitchDeg = clamp(cam.pitch || 36, 22, 62);
+    const pitchRad = (pitchDeg * Math.PI) / 180;
+    const fovRad = (34 * Math.PI) / 180;
     const dist = (H / 2) / (cam.z * Math.tan(fovRad / 2));
     const camH = dist * Math.sin(pitchRad);
     const camZOffset = dist * Math.cos(pitchRad);
@@ -4522,9 +4540,9 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     threeCam.lookAt(cam.x + shX, 0, cam.y + shY);
     threeCam.updateMatrixWorld();
 
-    // Éclairage solaire dynamique aligné sur le centre de vision
+    // Éclairage solaire dynamique aligné sur le centre de vision pour des ombres portées prononcées
     if (sunLight3D) {
-      sunLight3D.position.set(cam.x - 550, 1650, cam.y + 750);
+      sunLight3D.position.set(cam.x - 650, 1800, cam.y + 800);
       sunLight3D.target.position.set(cam.x, 0, cam.y);
       sunLight3D.target.updateMatrixWorld();
     }
@@ -4769,6 +4787,8 @@ function renderWorld(dt, now) {
   if (keys['arrowdown']) cam.y += panSpd * dt;
   if (keys['arrowleft']) cam.x -= panSpd * dt;
   if (keys['arrowright']) cam.x += panSpd * dt;
+  if (keys['pageup']) cam.pitch = clamp((cam.pitch || 36) + 38 * dt, 22, 62);
+  if (keys['pagedown']) cam.pitch = clamp((cam.pitch || 36) - 38 * dt, 22, 62);
   cam.x = clamp(cam.x, 0, WORLD_SIZE);
   cam.y = clamp(cam.y, 0, WORLD_SIZE);
 
@@ -4781,9 +4801,10 @@ function renderWorld(dt, now) {
 
   updateFogCanvas(now);
 
-  // 1. Rendu WebGL 3D (Three.js) vue du dessus + Surcouche tactique 2D projetée
+  // 1. Rendu WebGL 3D (Three.js) vue isométrique + Surcouche tactique 2D projetée
   if (syncAndRenderThree3D(dt, now, shX, shY)) {
     ctx.clearRect(0, 0, W, H);
+    const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
 
     // Points de Ralliement des bâtiments sélectionnés
     for (const b of state.buildings) {
@@ -4819,7 +4840,7 @@ function renderWorld(dt, now) {
         ctx.lineWidth = 3;
         ctx.setLineDash([10, 6]);
         ctx.beginPath();
-        ctx.ellipse(basePt.x, basePt.y, radPx * 1.08, radPx * 1.08 * 0.77, 0, 0, TAU);
+        ctx.ellipse(basePt.x, basePt.y, radPx * 1.08, radPx * 1.08 * isoSin, 0, 0, TAU);
         ctx.stroke();
         ctx.restore();
       }
@@ -4885,7 +4906,7 @@ function renderWorld(dt, now) {
         ctx.strokeStyle = '#2fbf71';
         ctx.lineWidth = 2.4;
         ctx.beginPath();
-        ctx.ellipse(basePt.x, basePt.y, radPx + 4, (radPx + 4) * 0.77, 0, 0, TAU);
+        ctx.ellipse(basePt.x, basePt.y, radPx + 4, (radPx + 4) * isoSin, 0, 0, TAU);
         ctx.stroke();
         ctx.restore();
       }
@@ -4912,7 +4933,7 @@ function renderWorld(dt, now) {
       ctx.translate(pt.x, pt.y);
       ctx.strokeStyle = om.color;
       ctx.lineWidth = 2.8;
-      ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.77, 0, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r * isoSin, 0, 0, TAU); ctx.stroke();
       ctx.restore();
     }
 
@@ -4926,13 +4947,13 @@ function renderWorld(dt, now) {
       ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(pt.x, pt.y, (def.radius + 4) * cam.z, (def.radius + 4) * cam.z * 0.77, 0, 0, TAU);
+      ctx.ellipse(pt.x, pt.y, (def.radius + 4) * cam.z, (def.radius + 4) * cam.z * isoSin, 0, 0, TAU);
       ctx.stroke();
       if (def.range) {
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 6]);
         ctx.beginPath();
-        ctx.ellipse(pt.x, pt.y, def.range * cam.z, def.range * cam.z * 0.77, 0, 0, TAU);
+        ctx.ellipse(pt.x, pt.y, def.range * cam.z, def.range * cam.z * isoSin, 0, 0, TAU);
         ctx.stroke();
       }
       ctx.restore();
@@ -4943,7 +4964,7 @@ function renderWorld(dt, now) {
       ctx.fillStyle = 'rgba(31, 199, 193, 0.14)';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.ellipse(pt.x, pt.y, 380 * cam.z, 380 * cam.z * 0.77, 0, 0, TAU);
+      ctx.ellipse(pt.x, pt.y, 380 * cam.z, 380 * cam.z * isoSin, 0, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
@@ -5255,7 +5276,8 @@ function renderMinimap() {
   }
   miniCtx.drawImage(fogCanvas, 0, 0, mw, mh);
 
-  const vw = (W / cam.z) * sx, vh = ((H / cam.z) / 0.77) * sy;
+  const isoSin = Math.sin(((cam.pitch || 36) * Math.PI) / 180);
+  const vw = (W / cam.z) * sx, vh = ((H / cam.z) / isoSin) * sy;
   miniCtx.strokeStyle = '#fff8ea';
   miniCtx.lineWidth = 1.6;
   miniCtx.strokeRect(cam.x * sx - vw / 2, cam.y * sy - vh / 2, vw, vh);
