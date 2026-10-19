@@ -1,4 +1,4 @@
-const WS_SERVER_URL = "wss://TON-SERVEUR-RELAIS.onrender.com";
+const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
 
 /* Réseau en étoile entre amis, via serveur relais WebSocket.
    L'hôte ouvre un salon <préfixe><CODE> ; les invités s'y connectent ; le serveur relaie les paquets.
