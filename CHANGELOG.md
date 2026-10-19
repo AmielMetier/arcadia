@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.10 — 19 octobre 2026
+- Multijoueur sur les wifi publics (université, hôtel, gare) : quand la connexion directe est bloquée,
+  le jeu passe automatiquement par un relais sur les ports 80 et 443 (TLS compris), comme une page web.
+- Message clair quand le réseau bloque la connexion, au lieu de « Pas de réponse ».
+- Nouveau bouton « Tester ma connexion » sur l'accueil : il indique ce que le réseau laisse passer
+  (mise en relation, connexion directe, relais 3478, 80, 443, TLS) et fait un essai réel par le relais.
+- Duo Drift joué seul (hors Hub) profite des mêmes relais.
+
 ## 2.9 — 19 octobre 2026
 - Trois niveaux de bots, à choisir dans le salon :
   - Facile : achète à moitié au hasard, construit peu, ne propose jamais d'échange ;

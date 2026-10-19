@@ -5,7 +5,14 @@
 (function () {
   const CODE_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const genCode = () => Array.from({ length: 4 }, () => CODE_ALPHA[(Math.random() * CODE_ALPHA.length) | 0]).join('');
-  const LOCAL_TEST = new URLSearchParams(location.search).has('local');
+  const QS = new URLSearchParams(location.search);
+  const LOCAL_TEST = QS.has('local');
+
+  // Serveurs et options WebRTC : voir shared/ice.js (relais sur le port 443 pour les réseaux publics)
+  const peerOptions = () => (window.DDIce ? DDIce.peerOptions() : { debug: 1 });
+  const iceReady = () => (window.DDIce ? Promise.race([DDIce.ready, new Promise((r) => setTimeout(r, 1500))]) : Promise.resolve());
+  const BLOCKED = "Ton réseau bloque la connexion entre joueurs (fréquent sur les wifi publics ou d'université). "
+    + "Essaie le partage de connexion de ton téléphone, ou lance « Tester ma connexion » depuis l'accueil.";
 
   function peerErr(e) {
     const t = e && e.type;
@@ -39,7 +46,10 @@
           return;
         }
         if (typeof Peer === 'undefined') { cb.error("La bibliothèque réseau n'a pas pu se charger."); return; }
-        const peer = new Peer(prefix + code, { debug: 1 }); this.peer = peer;
+        iceReady().then(() => { if (this.cb === cb) this._hostPeer(cb, code, fixedCode); });
+      },
+      _hostPeer(cb, code, fixedCode) {
+        const peer = new Peer(prefix + code, peerOptions()); this.peer = peer;
         peer.on('open', () => cb.ready(code));
         peer.on('connection', (c) => {
           if (this.links.size >= maxPeers) {
@@ -71,7 +81,9 @@
       join(code, cb, timeout = 15000) {
         this.role = 'guest'; this.cb = cb; this.code = code;
         let done = false; const fin = (fn, a) => { if (done) return; done = true; clearTimeout(to); fn(a); };
-        const to = setTimeout(() => fin(cb.error, "Pas de réponse. Vérifie le code et que ton pote a bien créé le salon."), timeout);
+        let signaled = false;
+        const to = setTimeout(() => fin(cb.error, signaled ? BLOCKED : "Pas de réponse. Vérifie le code et que ton pote a bien créé le salon."), timeout);
+        this._signaled = () => { signaled = true; };
         if (LOCAL_TEST) {
           const cid = 'g' + Math.random().toString(36).slice(2, 9), bc = new BroadcastChannel(prefix + code); this.bc = bc; let closed = false;
           this.hostLink = { send: (x) => bc.postMessage({ k: 'd', to: 'host', from: cid, m: x }), close: () => bc.postMessage({ k: 'bye', to: 'host', from: cid }) };
@@ -85,14 +97,25 @@
           bc.postMessage({ k: 'hi', cid }); return;
         }
         if (typeof Peer === 'undefined') { fin(cb.error, "La bibliothèque réseau n'a pas pu se charger."); return; }
-        const peer = new Peer({ debug: 1 }); this.peer = peer;
+        iceReady().then(() => { if (!done && this.cb === cb) this._joinPeer(code, cb, fin, () => done); });
+      },
+      _joinPeer(code, cb, fin, isDone) {
+        const peer = new Peer(peerOptions()); this.peer = peer;
         peer.on('open', () => {
+          if (this._signaled) this._signaled();
           const c = peer.connect(prefix + code, { reliable: true, serialization: 'json' }); let closed = false;
-          const fire = () => { if (closed) return; closed = true; if (done && net.cb === cb) cb.close(); };
+          const done = isDone;
+          // le serveur de mise en relation répond, mais la connexion directe échoue : réseau bloquant
+          const watchIce = () => {
+            const pc = c.peerConnection; if (!pc) return setTimeout(watchIce, 200);
+            pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed' && !isDone()) fin(cb.error, BLOCKED); });
+          };
+          watchIce();
+          const fire = () => { if (closed) return; closed = true; if (done() && net.cb === cb) cb.close(); };
           this.hostLink = { send: (x) => { if (c.open) { try { c.send(x); } catch (e) {} } }, close: () => { try { c.close(); } catch (e) {} } };
           c.on('open', () => fin(cb.open)); c.on('data', (d) => cb.msg(d)); c.on('close', fire); c.on('error', fire);
         });
-        peer.on('error', (e) => { if (this.peer !== peer) return; if (!done) fin(cb.error, peerErr(e)); });
+        peer.on('error', (e) => { if (this.peer !== peer) return; if (!isDone()) fin(cb.error, peerErr(e)); });
       },
       toHost(m) { this.hostLink && this.hostLink.send(m); },
       to(cid, m) { const L = this.links.get(cid); L && L.send(m); },
@@ -110,5 +133,5 @@
     return net;
   }
 
-  window.DDNet = { create, LOCAL_TEST };
+  window.DDNet = { create, LOCAL_TEST, BLOCKED };
 })();

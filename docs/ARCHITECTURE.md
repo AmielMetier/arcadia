@@ -54,6 +54,7 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 │   └── games.js                   registre : id, titre, vignette, joueurs min/max, URL
 ├── shared/
 │   ├── vendor/peerjs.min.js       PeerJS sorti d'index.html (une seule copie)
+│   ├── ice.js                     serveurs STUN/TURN (relais 80/443 pour les réseaux publics), ?peer= ?relay ?turn=
 │   ├── net.js                     Net extrait de Duo Drift ; préfixe d'ID paramétrable
 │   ├── room.js                    salon générique : joueurs, pseudos, couleurs, chat, pings, hôte
 │   ├── bridge.js                  pont Hub ⇄ jeu (postMessage), même API que Net
@@ -250,3 +251,15 @@ marginal d'une maison de plus.
 4. Tableau de bord temps réel, courbes, heatmap, classement final.
 
 La sortie du Hub sera publiée en **version 2.0** avec son entrée dans le journal des versions.
+
+## Réseaux publics (version 2.10)
+
+WebRTC essaie d'abord la connexion directe (STUN Google), puis les relais TURN : celui de PeerJS (3478),
+puis Open Relay de Metered sur les ports 80 et 443, en TCP et en TLS. Les identifiants Open Relay sont
+temporaires (24 h) et calculés dans le navigateur selon le schéma « TURN REST » (HMAC-SHA1 du nom
+d'utilisateur avec le secret partagé que Metered publie). Un relais personnel peut être ajouté dans
+`shared/ice.js` (`CUSTOM_TURN`).
+
+`hub/nettest.js` diagnostique le réseau (bouton « Tester ma connexion », ou `?nettest`).
+Paramètres de test : `?peer=127.0.0.1:9000` (serveur PeerJS local), `?relay` (relais obligatoire),
+`?turn=url,identifiant,motdepasse` (relais imposé).

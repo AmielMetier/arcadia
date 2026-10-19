@@ -470,6 +470,7 @@ body.in-hub #menu .menu-actions{visibility:hidden}
 <div id="toast"></div>
 
 <script src="../shared/vendor/peerjs.min.js"></script>
+<script src="../shared/ice.js"></script>
 <script src="../shared/bridge.js"></script>
 <script>
 'use strict';
@@ -1935,7 +1936,7 @@ const Net = {
       return;
     }
     if(typeof Peer==='undefined'){ cb.error("La bibliothèque réseau n'a pas pu se charger."); return; }
-    const peer=new Peer(PREFIX+code,{debug:1}); this.peer=peer;
+    const peer=new Peer(PREFIX+code, window.DDIce ? DDIce.peerOptions() : {debug:1}); this.peer=peer;
     peer.on('open',()=>cb.ready(code));
     peer.on('connection',c=>{
       if(this.links.size>=MAX_PLAYERS-1){ c.on('open',()=>{ try{ c.send({t:'full'}); }catch(e){} setTimeout(()=>{ try{c.close();}catch(e){} },500); }); return; }
@@ -1967,7 +1968,7 @@ const Net = {
       bc.postMessage({k:'hi',cid}); return;
     }
     if(typeof Peer==='undefined'){ fin(cb.error,"La bibliothèque réseau n'a pas pu se charger."); return; }
-    const peer=new Peer({debug:1}); this.peer=peer;
+    const peer=new Peer(window.DDIce ? DDIce.peerOptions() : {debug:1}); this.peer=peer;
     peer.on('open',()=>{
       const c=peer.connect(PREFIX+code,{reliable:true,serialization:'json'}); let closed=false;
       const fire=()=>{ if(closed) return; closed=true; if(done && Net.cb===cb) cb.close(); };

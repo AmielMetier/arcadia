@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.9';
+  const VERSION = '2.10';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -44,6 +44,45 @@
   $('#joinCode').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
   $('#joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnJoin').click(); });
   const homeErr = (m) => { $('#homeErr').textContent = m || ''; };
+
+  /* ------------------------------------------------------------ test de connexion */
+  function openNetTest() {
+    const ov = document.createElement('div'); ov.className = 'ntov';
+    ov.innerHTML = `<div class="nt card" role="dialog" aria-label="Test de connexion"><button class="ntx" aria-label="Fermer">×</button>
+      <h2>Test de connexion</h2><p class="nthint">Une vingtaine de secondes. Lance-le sur le réseau où le multijoueur ne marche pas.</p>
+      <ul class="ntlist"></ul><div class="ntverdict" hidden></div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn small ghost" id="ntCopy" hidden>Copier le résultat</button><button class="btn small" id="ntAgain" hidden>Recommencer</button></div></div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('.ntx').onclick = close;
+    ov.addEventListener('pointerdown', (e) => { if (e.target === ov) close(); });
+    const list = ov.querySelector('.ntlist');
+    let lines = [];
+    const go = async () => {
+      list.innerHTML = ''; lines = [];
+      ov.querySelector('.ntverdict').hidden = true; ov.querySelector('#ntCopy').hidden = true; ov.querySelector('#ntAgain').hidden = true;
+      const R = await DDNetTest.run((key, label, v) => {
+        let li = list.querySelector(`[data-k="${key}"]`);
+        if (!li) { li = document.createElement('li'); li.dataset.k = key; list.appendChild(li); }
+        li.className = v === null ? 'wait' : v ? 'ok' : 'ko';
+        li.innerHTML = `<i></i><span></span><b>${v === null ? 'test…' : v ? 'OK' : 'bloqué'}</b>`;
+        li.querySelector('span').textContent = label;
+        if (v !== null) lines.push(`${label} : ${v ? 'OK' : 'bloqué'}`);
+      });
+      const vd = DDNetTest.verdict(R), box = ov.querySelector('.ntverdict');
+      box.hidden = false; box.className = 'ntverdict ' + (vd.ok ? 'ok' : 'ko'); box.textContent = vd.text;
+      lines.push('', vd.text, '', navigator.userAgent);
+      ov.querySelector('#ntCopy').hidden = false; ov.querySelector('#ntAgain').hidden = false;
+    };
+    ov.querySelector('#ntAgain').onclick = go;
+    ov.querySelector('#ntCopy').onclick = () => {
+      const txt = 'Test de connexion Game Hub\n' + lines.join('\n');
+      (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Résultat copié'), () => toast('Copie impossible : fais une capture d\'écran'));
+    };
+    go();
+  }
+  $('#btnNetTest').onclick = openNetTest;
+  if (new URLSearchParams(location.search).has('nettest')) setTimeout(openNetTest, 300);
   const busy = (b) => { for (const id of ['#btnHost', '#btnJoin', '#btnSolo']) $(id).disabled = b; };
   const profile = () => ({ name: DDRoom.cleanName(me.name), color: me.color, lvl: me.lvl });
 
