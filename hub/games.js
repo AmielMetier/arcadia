@@ -59,4 +59,53 @@ window.HUB_GAMES = [
       </g>
     </svg>`,
   },
+  {
+    id: 'bastion',
+    title: 'Bastion Clash',
+    tag: 'RTS & Arène tactique',
+    desc: 'Construis ta base librement sans grille, capture les cristaux, déploie tes escouades et détruis les QG ennemis.',
+    url: 'bastion/',
+    minPlayers: 1, maxPlayers: 4,
+    accent: '#2fbf71',
+    settings: [
+      { key: 'mode', label: 'Format', options: [['ffa', 'Chacun pour soi'], ['2v2', 'Équipes 2v2']], def: 'ffa' },
+      { key: 'pace', label: 'Durée max', options: [['standard', 'Standard · 25 min'], ['blitz', 'Blitz · 12 min']], def: 'standard' },
+      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
+    ],
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="320" height="180" fill="#2f5d3a"/>
+      <g fill="#254b2e"><circle cx="46" cy="146" r="24"/><circle cx="278" cy="36" r="28"/><circle cx="160" cy="90" r="54"/></g>
+      <circle cx="82" cy="112" r="58" fill="rgba(255,75,43,.14)" stroke="#ff4b2b" stroke-width="2.5" stroke-dasharray="8 6"/>
+      <circle cx="238" cy="68" r="58" fill="rgba(43,140,255,.14)" stroke="#2b8cff" stroke-width="2.5" stroke-dasharray="8 6"/>
+      <g transform="translate(160 90)">
+        <polygon points="0,-18 14,-6 9,14 -9,14 -14,-6" fill="#1fc7c1" stroke="#16181d" stroke-width="3"/>
+        <polygon points="0,-12 7,-3 4,8 -4,8 -7,-3" fill="#fff8ea" opacity=".65"/>
+      </g>
+      <g transform="translate(76 114)">
+        <rect x="-24" y="-24" width="48" height="48" rx="10" fill="#ff4b2b" stroke="#16181d" stroke-width="3.5"/>
+        <rect x="-13" y="-13" width="26" height="26" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="0" r="6" fill="#ffc531" stroke="#16181d" stroke-width="2"/>
+      </g>
+      <g transform="translate(118 96) rotate(-25)">
+        <circle cx="0" cy="0" r="13" fill="#f3e9d2" stroke="#16181d" stroke-width="3"/>
+        <rect x="0" y="-4" width="18" height="8" rx="3" fill="#16181d"/>
+        <circle cx="0" cy="0" r="6" fill="#ff4b2b" stroke="#16181d" stroke-width="2"/>
+      </g>
+      <g transform="translate(244 64)">
+        <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#2b8cff" stroke="#16181d" stroke-width="3.5"/>
+        <rect x="-12" y="-12" width="24" height="24" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="0" r="5.5" fill="#ffc531" stroke="#16181d" stroke-width="2"/>
+      </g>
+      <g transform="translate(138 126) rotate(-28)">
+        <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#ff4b2b" stroke="#16181d" stroke-width="2.5"/>
+        <rect x="2" y="-2.5" width="14" height="5" rx="2" fill="#16181d"/>
+      </g>
+      <g transform="translate(194 74) rotate(152)">
+        <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#2b8cff" stroke="#16181d" stroke-width="2.5"/>
+        <rect x="2" y="-2.5" width="14" height="5" rx="2" fill="#16181d"/>
+      </g>
+      <line x1="128" y1="90" x2="182" y2="68" stroke="#ffc531" stroke-width="3" stroke-dasharray="6 5"/>
+    </svg>`,
+  },
 ];

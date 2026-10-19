@@ -1,0 +1,2152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bastion Clash — RTS & Arène Tactique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16181d; --paper:#fff8ea; --cream:#f3e9d2; --muted:#6d675c; --line2:#d9cdb3;
+  --red:#ff4b2b; --yellow:#ffc531; --green:#2fbf71; --blue:#2b8cff; --purple:#b45cff; --cyan:#1fc7c1;
+}
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;background:#254b2e;color:var(--ink);
+  font-family:'Chakra Petch',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+canvas#world{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+
+/* HUD TOPBAR */
+.hud-top{position:fixed;top:12px;left:12px;right:12px;display:flex;align-items:center;gap:10px;pointer-events:none;z-index:20;flex-wrap:wrap}
+.hud-top > *{pointer-events:auto}
+.pill-box{background:var(--paper);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:12px;
+  padding:6px 12px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px}
+.res-val{font-family:Bungee,Impact,sans-serif;font-size:20px;color:var(--ink);display:flex;align-items:center;gap:5px}
+.res-rate{font-size:12px;color:#1a7a43;background:#dff5e7;border:2px solid var(--ink);border-radius:8px;padding:1px 6px}
+.phase-badge{background:var(--ink);color:var(--yellow);font-family:Bungee,Impact,sans-serif;font-size:13px;
+  border:3px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.45);border-radius:12px;padding:7px 13px;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.phase-badge.sd{background:var(--red);color:#fff;animation:pulseSd .7s infinite alternate}
+@keyframes pulseSd{to{transform:scale(1.05)}}
+.spacer{flex:1}
+.target-bar{background:var(--paper);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:12px;
+  padding:5px 8px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+.target-bar span{color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:1px;margin-right:2px}
+.tbtn{border:2px solid var(--ink);border-radius:8px;background:var(--cream);padding:4px 8px;font:inherit;font-weight:700;
+  font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:transform .06s}
+.tbtn.sel{background:var(--yellow);box-shadow:2px 2px 0 var(--ink)}
+.tbtn .dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ink);display:inline-block}
+
+.btn{font-family:Bungee,Impact,sans-serif;font-size:14px;letter-spacing:.4px;background:var(--red);color:#fff;
+  border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:10px;padding:8px 13px;cursor:pointer;
+  transition:transform .06s,box-shadow .06s;white-space:nowrap}
+.btn:hover{filter:brightness(1.06)}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.btn:disabled{background:#c9c0ad;color:#7b7466;cursor:not-allowed;transform:none}
+.btn.yellow{background:var(--yellow);color:var(--ink)}
+.btn.green{background:var(--green);color:#fff}
+.btn.ghost{background:var(--paper);color:var(--ink)}
+.btn.small{font-size:12px;padding:6px 10px;box-shadow:3px 3px 0 var(--ink)}
+
+/* MINIMAP & SCOREBOARD (LEFT / RIGHT PANELS) */
+.side-left{position:fixed;left:12px;bottom:126px;z-index:20;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.side-left > *{pointer-events:auto}
+.minimap-card{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);border-radius:14px;padding:8px;width:196px}
+.minimap-card .hd{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px}
+canvas#minimap{width:174px;height:174px;display:block;border:2px solid var(--ink);border-radius:8px;background:#23442a;cursor:pointer}
+
+.roster-card{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);border-radius:14px;padding:8px 10px;width:196px;display:grid;gap:5px}
+.p-row{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+.p-row.dead{opacity:.45;text-decoration:line-through}
+.p-row .dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);flex:none}
+.p-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-row .hpbar{width:48px;height:8px;background:#e3d8c1;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden}
+.p-row .hpbar i{display:block;height:100%;background:var(--green)}
+
+/* BOTTOM COMMAND DOCK */
+.dock{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:10px;align-items:flex-end;
+  max-width:calc(100vw - 20px);overflow-x:auto;padding:4px}
+.dock-group{background:var(--paper);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:15px;padding:8px 10px;display:flex;gap:6px;align-items:stretch}
+.dock-title{writing-mode:vertical-rl;transform:rotate(180deg);font-family:Bungee,Impact,sans-serif;font-size:10px;letter-spacing:1px;
+  color:var(--muted);text-align:center;padding-right:4px;border-left:2px dashed var(--line2)}
+.cbtn{width:76px;border:2.5px solid var(--ink);border-radius:10px;background:#fff;padding:5px 5px 6px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;position:relative;transition:transform .08s,background .08s;font:inherit;color:var(--ink)}
+.cbtn:hover:not(:disabled){transform:translateY(-3px);background:var(--cream)}
+.cbtn.sel{background:var(--yellow);box-shadow:0 0 0 2px var(--ink);transform:translateY(-4px)}
+.cbtn:disabled{opacity:.48;cursor:not-allowed;background:#e9e1cf}
+.cbtn .key{position:absolute;top:3px;left:4px;font-size:10px;font-weight:700;background:var(--ink);color:var(--paper);
+  border-radius:4px;padding:0 4px;line-height:1.35}
+.cbtn .tier{position:absolute;top:3px;right:4px;font-size:9.5px;font-weight:700;background:var(--purple);color:#fff;
+  border:1.5px solid var(--ink);border-radius:4px;padding:0 3px;line-height:1.25}
+.cbtn .ico{font-size:21px;line-height:1.1;margin-top:8px}
+.cbtn .lbl-b{font-weight:700;font-size:11px;line-height:1.1;text-align:center;margin:2px 0}
+.cbtn .cost{font-family:Bungee,Impact,sans-serif;font-size:11px;color:#1a7a43;background:#dff5e7;border:1.5px solid var(--ink);
+  border-radius:6px;padding:0 5px}
+.cbtn.cant .cost{color:#c4231a;background:#ffe3dc}
+.cbtn .cd-ov{position:absolute;inset:0;background:rgba(22,24,29,.65);color:#fff;font-family:Bungee,Impact,sans-serif;
+  font-size:16px;display:flex;align-items:center;justify-content:center;border-radius:8px}
+
+/* HELP / CONTROLS HINT BAR */
+.hint-bar{position:fixed;bottom:114px;left:50%;transform:translateX(-50%);z-index:18;background:rgba(22,24,29,.88);color:var(--paper);
+  border:2px solid var(--paper);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;pointer-events:none;white-space:nowrap;
+  box-shadow:3px 3px 0 #000}
+.hint-bar kbd{background:var(--yellow);color:var(--ink);border-radius:4px;padding:0 5px;font-weight:700;margin:0 2px}
+
+/* TOAST & OVERLAYS */
+.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--yellow);
+  font-family:Bungee,Impact,sans-serif;font-size:15px;border:3px solid var(--paper);border-radius:12px;padding:8px 16px;
+  box-shadow:5px 5px 0 #000;pointer-events:none;transition:opacity .2s}
+.modal-ov{position:fixed;inset:0;z-index:50;background:rgba(10,12,16,.65);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-card{background:var(--paper);border:3px solid var(--ink);box-shadow:8px 8px 0 var(--ink);border-radius:18px;padding:24px;width:min(540px,100%);text-align:center}
+.modal-card h1{font-family:Bungee,Impact,sans-serif;font-size:36px;margin:0 0 6px;line-height:1}
+.modal-card p{color:var(--muted);font-weight:600;margin:6px 0 16px}
+.rank-list{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:8px;text-align:left}
+.rank-list li{display:flex;align-items:center;gap:10px;background:#fff;border:2.5px solid var(--ink);border-radius:11px;padding:8px 12px;font-weight:700}
+.rank-list li .rk{font-family:Bungee,Impact,sans-serif;font-size:18px;width:28px}
+.rank-list li .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink)}
+.rank-list li .sc{margin-left:auto;font-family:Bungee,Impact,sans-serif;font-size:14px;color:var(--muted)}
+
+@media(max-width:900px){
+  .side-left{bottom:auto;top:64px;left:8px;transform:scale(.85);transform-origin:top left}
+  .hint-bar{display:none}
+  .cbtn{width:64px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="world"></canvas>
+
+<!-- HUD TOP -->
+<div class="hud-top">
+  <div class="pill-box" title="Énergie disponible et revenu par seconde">
+    <span>⚡</span>
+    <span class="res-val" id="uiEnergy">250</span>
+    <span class="res-rate" id="uiRate">+10/s</span>
+  </div>
+  <div class="pill-box" title="Niveau technologique du QG">
+    <span id="uiTierLbl">QG Niv. 1</span>
+    <button class="btn small yellow" id="btnUpHq">Passer Niv. 2 (220⚡)</button>
+  </div>
+  <div class="phase-badge" id="uiPhase">
+    <span id="uiClock">00:00</span> · <span id="uiPhaseName">Phase 1 : Ouverture</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="target-bar" id="targetBar">
+    <span>Cible assaut :</span>
+    <div id="targetBtns" style="display:flex;gap:5px"></div>
+  </div>
+  <button class="btn small ghost" id="btnCenter" title="Recentrer sur ton QG (Espace)">🎯 QG</button>
+  <button class="btn small ghost" id="btnMute" title="Couper/Activer le son">🔊</button>
+  <button class="btn small" id="btnExit">Quitter</button>
+</div>
+
+<!-- LEFT MINIMAP & ROSTER -->
+<div class="side-left">
+  <div class="minimap-card">
+    <div class="hd"><span>Radar tactique</span><span id="uiPop">0 unités</span></div>
+    <canvas id="minimap" width="174" height="174"></canvas>
+  </div>
+  <div class="roster-card" id="uiRoster"></div>
+</div>
+
+<!-- HINT BAR -->
+<div class="hint-bar" id="uiHint">
+  <kbd>1-7</kbd> Construire librement dans ta zone · <kbd>Clic gauche glisser</kbd> Sélectionner · <kbd>Clic droit</kbd> Ordre / Ralliement · <kbd>Échap</kbd> Annuler
+</div>
+
+<!-- BOTTOM DOCK -->
+<div class="dock">
+  <div class="dock-group">
+    <div class="dock-title">BASE</div>
+    <button class="cbtn" data-build="extractor" title="Extracteur d'énergie (+8⚡/s, ou +14⚡/s près d'un gisement de cristal)">
+      <span class="key">1</span><span class="ico">⛏️</span><span class="lbl-b">Extracteur</span><span class="cost">75⚡</span>
+    </button>
+    <button class="cbtn" data-build="pylon" title="Pylône relais : étend largement ta zone de construction libre et soigne tes troupes proches">
+      <span class="key">2</span><span class="ico">📡</span><span class="lbl-b">Relais</span><span class="cost">60⚡</span>
+    </button>
+    <button class="cbtn" data-build="barracks" title="Caserne : produit automatiquement des escouades d'infanterie toutes les 9s">
+      <span class="key">3</span><span class="ico">⛺</span><span class="lbl-b">Caserne</span><span class="cost">110⚡</span>
+    </button>
+    <button class="cbtn" data-build="factory" title="Usine blindée (Niv. 2) : produit automatiquement des chars lourds">
+      <span class="key">4</span><span class="tier">T2</span><span class="ico">🏭</span><span class="lbl-b">Usine</span><span class="cost">180⚡</span>
+    </button>
+    <button class="cbtn" data-build="turret" title="Tourelle mitrailleuse : défense rapide contre les assauts">
+      <span class="key">5</span><span class="ico">🗼</span><span class="lbl-b">Tourelle</span><span class="cost">95⚡</span>
+    </button>
+    <button class="cbtn" data-build="tesla" title="Canon Plasma & Tesla (Niv. 2) : longue portée et dégâts de zone">
+      <span class="key">6</span><span class="tier">T2</span><span class="ico">⚡</span><span class="lbl-b">Plasma</span><span class="cost">160⚡</span>
+    </button>
+    <button class="cbtn" data-build="wall" title="Mur blindé : bloque et dévie les unités ennemies (maintiens Maj pour en poser plusieurs)">
+      <span class="key">7</span><span class="ico">🧱</span><span class="lbl-b">Mur</span><span class="cost">30⚡</span>
+    </button>
+  </div>
+
+  <div class="dock-group">
+    <div class="dock-title">ASSAUT</div>
+    <button class="cbtn" data-squad="commando" title="Déploie immédiatement 4 Commandos d'assaut rapides">
+      <span class="key">Q</span><span class="ico">🪖</span><span class="lbl-b">Commandos</span><span class="cost">90⚡</span>
+    </button>
+    <button class="cbtn" data-squad="sappers" title="Déploie 3 Démolisseurs explosifs redoutables contre les bâtiments et murs">
+      <span class="key">W</span><span class="ico">💣</span><span class="lbl-b">Sapeurs</span><span class="cost">130⚡</span>
+    </button>
+    <button class="cbtn" data-squad="tanks" title="Déploie 2 Chars Goliath + 1 Artilleur (requiert QG Niv. 2)">
+      <span class="key">E</span><span class="tier">T2</span><span class="ico">🚜</span><span class="lbl-b">Blindés</span><span class="cost">210⚡</span>
+    </button>
+    <button class="cbtn" data-squad="titan" title="Déploie un Mecha Titan colossal (requiert QG Niv. 3)">
+      <span class="key">R</span><span class="tier">T3</span><span class="ico">🤖</span><span class="lbl-b">Titan</span><span class="cost">360⚡</span>
+    </button>
+    <button class="cbtn" data-strike="1" id="btnStrike" title="Frappe Orbitale : clic sur la carte pour bombarder une zone ennemie (40s de recharge)">
+      <span class="key">F</span><span class="ico">☄️</span><span class="lbl-b">Frappe</span><span class="cost">220⚡</span>
+      <div class="cd-ov" id="uiStrikeCd" hidden>40s</div>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="uiToast" hidden></div>
+
+<!-- ENDGAME MODAL -->
+<div class="modal-ov" id="endModal" hidden>
+  <div class="modal-card">
+    <h1 id="endTitle">Victoire !</h1>
+    <p id="endSub">Tous les bastions adverses ont été détruits.</p>
+    <ul class="rank-list" id="endRanks"></ul>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="btn yellow" id="btnReplay">Rejouer</button>
+      <button class="btn ghost" id="btnEndExit">Retour au salon</button>
+    </div>
+  </div>
+</div>
+
+<script src="../shared/bridge.js"></script>
+<script>
+'use strict';
+
+/* ============================================================================
+   BASTION CLASH — RTS & ARÈNE MULTIJOUER EN TEMPS RÉEL (SANS GRILLE)
+   Architecture : Hôte Autoritaire 20 Hz + Rendu Canvas Néo-Brutaliste 60 FPS
+   ============================================================================ */
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
+const hypot = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
+
+const WORLD_SIZE = 2400;
+const HALF_W = WORLD_SIZE / 2;
+const TICK_RATE = 20;
+const TICK_DT = 1 / TICK_RATE;
+
+// Définition des bâtiments (placement libre par cercle de collision + rayon d'influence)
+const BUILDINGS = {
+  hq:        { name: 'QG Bastion', cost: 0,   hp: 3200, radius: 46, influence: 350, range: 260, dmg: 26, rate: 0.9, income: 10, tier: 1 },
+  extractor: { name: 'Extracteur', cost: 75,  hp: 580,  radius: 26, influence: 95,  range: 0,   dmg: 0,  rate: 0,   income: 8,  tier: 1 },
+  pylon:     { name: 'Relais',     cost: 60,  hp: 480,  radius: 22, influence: 280, range: 170, dmg: 0,  rate: 0,   income: 0,  tier: 1, heal: 8 },
+  barracks:  { name: 'Caserne',    cost: 110, hp: 850,  radius: 34, influence: 130, range: 0,   dmg: 0,  rate: 0,   income: 0,  tier: 1, spawnEvery: 9.0 },
+  factory:   { name: 'Usine',      cost: 180, hp: 1150, radius: 38, influence: 140, range: 0,   dmg: 0,  rate: 0,   income: 0,  tier: 2, spawnEvery: 13.0 },
+  turret:    { name: 'Tourelle',   cost: 95,  hp: 720,  radius: 24, influence: 90,  range: 235, dmg: 19, rate: 0.38,income: 0,  tier: 1 },
+  tesla:     { name: 'Plasma',     cost: 160, hp: 920,  radius: 27, influence: 100, range: 310, dmg: 58, rate: 1.35,income: 0,  tier: 2, splash: 55 },
+  wall:      { name: 'Mur blindé', cost: 30,  hp: 950,  radius: 20, influence: 45,  range: 0,   dmg: 0,  rate: 0,   income: 0,  tier: 1 },
+};
+
+// Définition des unités
+const UNITS = {
+  marine:  { name: 'Commando',    hp: 140, radius: 10, speed: 92, range: 115, dmg: 14, rate: 0.55, bldMult: 1.0, score: 10 },
+  rocket:  { name: 'Roquette',    hp: 120, radius: 11, speed: 80, range: 165, dmg: 26, rate: 1.10, bldMult: 1.35,score: 15 },
+  sapper:  { name: 'Sapeur',      hp: 175, radius: 11, speed: 98, range: 52,  dmg: 48, rate: 0.85, bldMult: 2.5, score: 20 },
+  tank:    { name: 'Char Goliath',hp: 520, radius: 17, speed: 66, range: 175, dmg: 44, rate: 1.15, bldMult: 1.25,score: 40 },
+  siege:   { name: 'Artilleur',   hp: 340, radius: 16, speed: 58, range: 275, dmg: 65, rate: 1.85, bldMult: 1.75,score: 45, splash: 48 },
+  titan:   { name: 'Titan Mecha', hp: 1650,radius: 24, speed: 54, range: 210, dmg: 115,rate: 0.95, bldMult: 1.6, score: 120, splash: 60 },
+};
+
+// Escouades déployables à la demande
+const SQUADS = {
+  commando: { name: 'Commandos', cost: 90,  tier: 1, units: ['marine', 'marine', 'marine', 'rocket'] },
+  sappers:  { name: 'Sapeurs',   cost: 130, tier: 1, units: ['sapper', 'sapper', 'sapper'] },
+  tanks:    { name: 'Blindés',   cost: 210, tier: 2, units: ['tank', 'tank', 'siege'] },
+  titan:    { name: 'Titan',     cost: 360, tier: 3, units: ['titan', 'marine', 'rocket'] },
+};
+
+const UPGRADE_COSTS = { 2: 220, 3: 380 };
+const STRIKE_COST = 220;
+const STRIKE_CD = 40; // secondes
+
+const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2'];
+const BOT_NAMES = ['Général Fer', 'Commandant Nova', 'Maréchal Korb', 'Amiral Valk'];
+
+// Positions de départ des 4 bastions (coins de l'arène)
+const SPAWN_CORNERS = [
+  { x: 340, y: 340 },
+  { x: WORLD_SIZE - 340, y: WORLD_SIZE - 340 },
+  { x: WORLD_SIZE - 340, y: 340 },
+  { x: 340, y: WORLD_SIZE - 340 },
+];
+
+// Gisements de Cristal d'Énergie (4 naturels près des bases + 4 centraux riches + 1 Cœur Central)
+const CRYSTAL_NODES = [
+  // Expansion naturelle de chaque coin
+  { id: 'c0', x: 640, y: 310, rich: false },
+  { id: 'c1', x: WORLD_SIZE - 640, y: WORLD_SIZE - 310, rich: false },
+  { id: 'c2', x: WORLD_SIZE - 640, y: 310, rich: false },
+  { id: 'c3', x: 640, y: WORLD_SIZE - 310, rich: false },
+  // Anneau central contesté
+  { id: 'c4', x: HALF_W - 310, y: HALF_W, rich: true },
+  { id: 'c5', x: HALF_W + 310, y: HALF_W, rich: true },
+  { id: 'c6', x: HALF_W, y: HALF_W - 310, rich: true },
+  { id: 'c7', x: HALF_W, y: HALF_W + 310, rich: true },
+  // Cœur central
+  { id: 'c8', x: HALF_W, y: HALF_W, rich: true },
+];
+
+// Rochers décoratifs / obstacles naturels fixes
+const ROCKS = [
+  { x: 880, y: 880, r: 46 },
+  { x: WORLD_SIZE - 880, y: WORLD_SIZE - 880, r: 46 },
+  { x: WORLD_SIZE - 880, y: 880, r: 46 },
+  { x: 880, y: WORLD_SIZE - 880, r: 46 },
+  { x: HALF_W, y: 420, r: 52 },
+  { x: HALF_W, y: WORLD_SIZE - 420, r: 52 },
+  { x: 420, y: HALF_W, r: 52 },
+  { x: WORLD_SIZE - 420, y: HALF_W, r: 52 },
+];
+
+/* ============================================================================
+   AUDIO SYNTHÉTISÉ (WebAudio)
+   ============================================================================ */
+const Sfx = (() => {
+  let ctx = null, muted = false;
+  function ensure() {
+    if (muted) return null;
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) ctx = new AC();
+    }
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  function tone(freq, dur, type = 'triangle', vol = 0.12, slide = 0) {
+    const c = ensure(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    const t = c.currentTime;
+    o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur);
+  }
+  return {
+    get muted() { return muted; },
+    toggle() { muted = !muted; return muted; },
+    build()   { tone(320, 0.12, 'square', 0.1, 180); setTimeout(() => tone(520, 0.14, 'triangle', 0.12, 120), 60); },
+    spawn()   { tone(260, 0.11, 'sawtooth', 0.09, 140); },
+    order()   { tone(480, 0.08, 'sine', 0.1, 120); },
+    upgrade() { tone(330, 0.12, 'triangle', 0.13); setTimeout(() => tone(440, 0.12, 'triangle', 0.13), 90); setTimeout(() => tone(660, 0.22, 'triangle', 0.15), 180); },
+    shoot()   { tone(190 + Math.random() * 60, 0.06, 'sawtooth', 0.04, -90); },
+    plasma()  { tone(620, 0.14, 'sine', 0.07, -420); },
+    boom()    { tone(110, 0.32, 'sawtooth', 0.16, -75); },
+    strike()  { tone(740, 0.45, 'sawtooth', 0.14, -580); setTimeout(() => tone(85, 0.55, 'square', 0.2, -50), 380); },
+    error()   { tone(160, 0.16, 'sawtooth', 0.12, -40); },
+  };
+})();
+
+/* ============================================================================
+   VALIDATION DE PLACEMENT LIBRE & COLLISIONS (PARTAGÉ CLIENT / SERVEUR)
+   ============================================================================ */
+function canPlaceBuilding(state, ownerId, kind, x, y) {
+  const def = BUILDINGS[kind];
+  if (!def) return { ok: false, reason: 'Bâtiment inconnu.' };
+  const player = state.players.find((p) => p.id === ownerId);
+  if (!player || player.dead) return { ok: false, reason: 'Joueur éliminé.' };
+  if ((player.tier || 1) < (def.tier || 1)) return { ok: false, reason: `Requiert QG Niveau ${def.tier}.` };
+  if (player.energy < def.cost) return { ok: false, reason: 'Pas assez d’énergie ⚡.' };
+
+  const margin = def.radius + 30;
+  if (x < margin || y < margin || x > WORLD_SIZE - margin || y > WORLD_SIZE - margin) {
+    return { ok: false, reason: 'Trop près du bord de l’arène.' };
+  }
+
+  // 1. Vérifier que (x, y) est dans la Zone d'Influence d'au moins un bâtiment allié du joueur
+  let inInfluence = false;
+  for (const b of state.buildings) {
+    if (b.owner === ownerId && b.hp > 0) {
+      const bDef = BUILDINGS[b.kind];
+      const inf = (bDef && bDef.influence) || 120;
+      if (dist2(x, y, b.x, b.y) <= (inf - def.radius * 0.35) ** 2) {
+        inInfluence = true;
+        break;
+      }
+    }
+  }
+  if (!inInfluence) {
+    return { ok: false, reason: 'Hors de ta zone d’influence (pose un Relais 📡 pour l’étendre).' };
+  }
+
+  // 2. Détection de collision continue cercle-cercle avec tous les bâtiments existants
+  const pad = kind === 'wall' ? 2 : 8;
+  for (const b of state.buildings) {
+    if (b.hp <= 0) continue;
+    const minDist = def.radius + b.radius + pad;
+    if (dist2(x, y, b.x, b.y) < minDist * minDist) {
+      return { ok: false, reason: 'Collision avec un autre bâtiment.' };
+    }
+  }
+
+  // 3. Collision avec les rochers et le cœur des gisements de cristal
+  for (const rk of ROCKS) {
+    const minDist = def.radius + rk.r + 6;
+    if (dist2(x, y, rk.x, rk.y) < minDist * minDist) {
+      return { ok: false, reason: 'Obstacle naturel.' };
+    }
+  }
+  for (const cn of CRYSTAL_NODES) {
+    const minDist = def.radius + 20;
+    if (dist2(x, y, cn.x, cn.y) < minDist * minDist) {
+      return { ok: false, reason: 'Place l’extracteur juste à côté du cristal, pas dessus.' };
+    }
+  }
+
+  return { ok: true };
+}
+
+function nearestCrystal(x, y, maxDist = 145) {
+  let best = null, bestD2 = maxDist * maxDist;
+  for (const cn of CRYSTAL_NODES) {
+    const d2 = dist2(x, y, cn.x, cn.y);
+    if (d2 <= bestD2) { bestD2 = d2; best = cn; }
+  }
+  return best;
+}
+
+/* ============================================================================
+   MOTEUR DE SIMULATION TEMPS RÉEL (HÔTE AUTORITAIRE À 20 HZ)
+   ============================================================================ */
+function createInitialState(roster, settings) {
+  const is2v2 = settings.mode === '2v2' && roster.length >= 2;
+  const blitz = settings.pace === 'blitz';
+  const players = roster.map((p, idx) => {
+    const sp = SPAWN_CORNERS[idx % 4];
+    const team = is2v2 ? (idx % 2) : p.id;
+    return {
+      id: p.id,
+      name: p.name,
+      color: p.color || PALETTE[idx % PALETTE.length],
+      bot: !!p.bot,
+      team,
+      energy: blitz ? 320 : 250,
+      income: 10,
+      tier: 1,
+      dead: false,
+      score: 0,
+      targetId: -1, // -1 = ennemi le plus proche / centre
+      rallyX: sp.x + (HALF_W - sp.x) * 0.28,
+      rallyY: sp.y + (HALF_W - sp.y) * 0.28,
+      strikeCd: 0,
+    };
+  });
+
+  let nextId = 1;
+  const buildings = [];
+  const units = [];
+
+  // Création du QG + 1 Extracteur + 1 Tourelle de départ + 2 Commandos de reconnaissance par joueur
+  players.forEach((p, idx) => {
+    const sp = SPAWN_CORNERS[idx % 4];
+    const dirX = Math.sign(HALF_W - sp.x), dirY = Math.sign(HALF_W - sp.y);
+    buildings.push({
+      id: nextId++, kind: 'hq', owner: p.id, team: p.team,
+      x: sp.x, y: sp.y, hp: BUILDINGS.hq.hp, maxHp: BUILDINGS.hq.hp,
+      radius: BUILDINGS.hq.radius, cd: 0, spawnT: 0,
+    });
+    // Extracteur initial
+    buildings.push({
+      id: nextId++, kind: 'extractor', owner: p.id, team: p.team,
+      x: sp.x - dirX * 95, y: sp.y + dirY * 40,
+      hp: BUILDINGS.extractor.hp, maxHp: BUILDINGS.extractor.hp,
+      radius: BUILDINGS.extractor.radius, cd: 0, spawnT: 0, boost: false,
+    });
+    // Caserne initiale pour permettre l'ouverture agressive dès 0:00
+    buildings.push({
+      id: nextId++, kind: 'barracks', owner: p.id, team: p.team,
+      x: sp.x + dirX * 115, y: sp.y + dirY * 25,
+      hp: BUILDINGS.barracks.hp, maxHp: BUILDINGS.barracks.hp,
+      radius: BUILDINGS.barracks.radius, cd: 0, spawnT: 4.5,
+    });
+    // Patrouille initiale
+    for (let k = 0; k < 2; k++) {
+      units.push({
+        id: nextId++, kind: 'marine', owner: p.id, team: p.team,
+        x: sp.x + dirX * (150 + k * 24), y: sp.y + dirY * (85 - k * 20),
+        vx: 0, vy: 0, a: Math.atan2(dirY, dirX),
+        hp: UNITS.marine.hp, maxHp: UNITS.marine.hp, radius: UNITS.marine.radius,
+        cd: 0, orderX: null, orderY: null, targetEnt: null,
+      });
+    }
+  });
+
+  return {
+    time: 0,
+    blitz,
+    mode: is2v2 ? '2v2' : 'ffa',
+    level: settings.level || 'normal',
+    phase: 1,
+    stormRadius: HALF_W * 1.45,
+    dmgMult: 1.0,
+    nextId,
+    players,
+    buildings,
+    units,
+    strikes: [], // [{ x, y, owner, team, timer }]
+    over: false,
+    winnerTeam: null,
+    ranking: [],
+  };
+}
+
+function spawnUnit(state, owner, kind, x, y, targetX, targetY) {
+  const def = UNITS[kind];
+  if (!def) return;
+  const angle = Math.atan2((targetY ?? HALF_W) - y, (targetX ?? HALF_W) - x);
+  const jitter = (Math.random() - 0.5) * 28;
+  state.units.push({
+    id: state.nextId++,
+    kind,
+    owner: owner.id,
+    team: owner.team,
+    x: clamp(x + Math.cos(angle) * 42 - Math.sin(angle) * jitter, 30, WORLD_SIZE - 30),
+    y: clamp(y + Math.sin(angle) * 42 + Math.cos(angle) * jitter, 30, WORLD_SIZE - 30),
+    vx: 0,
+    vy: 0,
+    a: angle,
+    hp: def.hp,
+    maxHp: def.hp,
+    radius: def.radius,
+    cd: Math.random() * 0.3,
+    orderX: targetX ?? null,
+    orderY: targetY ?? null,
+    targetEnt: null,
+  });
+}
+
+// Exécution d'une commande joueur ou bot côté serveur/hôte
+function executeCommand(state, playerId, cmd, fxEvents) {
+  if (state.over || !cmd || typeof cmd !== 'object') return { ok: false };
+  const p = state.players.find((q) => q.id === playerId);
+  if (!p || p.dead) return { ok: false };
+
+  if (cmd.op === 'BUILD') {
+    const x = Math.round(Number(cmd.x) || 0), y = Math.round(Number(cmd.y) || 0);
+    const kind = String(cmd.kind || '');
+    const check = canPlaceBuilding(state, p.id, kind, x, y);
+    if (!check.ok) return check;
+    const def = BUILDINGS[kind];
+    p.energy -= def.cost;
+    const crys = kind === 'extractor' ? nearestCrystal(x, y) : null;
+    const b = {
+      id: state.nextId++,
+      kind,
+      owner: p.id,
+      team: p.team,
+      x,
+      y,
+      hp: def.hp,
+      maxHp: def.hp,
+      radius: def.radius,
+      cd: 0,
+      spawnT: def.spawnEvery ? def.spawnEvery * 0.65 : 0,
+      boost: !!crys,
+      crysId: crys ? crys.id : null,
+    };
+    state.buildings.push(b);
+    p.score += Math.round(def.cost * 0.5);
+    fxEvents.push({ k: 'BUILD', x, y, color: p.color, radius: def.radius });
+    return { ok: true };
+  }
+
+  if (cmd.op === 'SQUAD') {
+    const sq = SQUADS[cmd.squad];
+    if (!sq) return { ok: false, reason: 'Escouade inconnue.' };
+    if (p.tier < sq.tier) return { ok: false, reason: `Requiert QG Niv. ${sq.tier}.` };
+    if (p.energy < sq.cost) return { ok: false, reason: 'Pas assez d’énergie ⚡.' };
+    // Trouver le point de déploiement (caserne/usine la plus avancée vers le point de ralliement, sinon QG)
+    const spawners = state.buildings.filter((b) => b.owner === p.id && ['barracks', 'factory', 'hq'].includes(b.kind));
+    if (!spawners.length) return { ok: false, reason: 'Aucun bâtiment de déploiement.' };
+    spawners.sort((a, b) => dist2(a.x, a.y, p.rallyX, p.rallyY) - dist2(b.x, b.y, p.rallyX, p.rallyY));
+    const sp = spawners[0];
+    p.energy -= sq.cost;
+    p.score += Math.round(sq.cost * 0.4);
+    const goal = getOffensiveGoal(state, p);
+    for (const uKind of sq.units) {
+      spawnUnit(state, p, uKind, sp.x, sp.y, goal.x, goal.y);
+    }
+    fxEvents.push({ k: 'SPAWN', x: sp.x, y: sp.y, color: p.color });
+    return { ok: true };
+  }
+
+  if (cmd.op === 'UPGRADE_HQ') {
+    const nextTier = p.tier + 1;
+    const cost = UPGRADE_COSTS[nextTier];
+    if (!cost) return { ok: false, reason: 'QG déjà au niveau maximum.' };
+    if (p.energy < cost) return { ok: false, reason: `Il faut ${cost}⚡ pour passer Niv. ${nextTier}.` };
+    p.energy -= cost;
+    p.tier = nextTier;
+    p.score += 120 * nextTier;
+    const hq = state.buildings.find((b) => b.owner === p.id && b.kind === 'hq');
+    if (hq) {
+      hq.maxHp += 900;
+      hq.hp = Math.min(hq.maxHp, hq.hp + 900);
+      fxEvents.push({ k: 'UPGRADE', x: hq.x, y: hq.y, color: p.color, tier: nextTier });
+    }
+    return { ok: true };
+  }
+
+  if (cmd.op === 'STRIKE') {
+    const x = clamp(Math.round(Number(cmd.x) || HALF_W), 60, WORLD_SIZE - 60);
+    const y = clamp(Math.round(Number(cmd.y) || HALF_W), 60, WORLD_SIZE - 60);
+    if (p.strikeCd > 0) return { ok: false, reason: 'Frappe orbitale en recharge.' };
+    if (p.energy < STRIKE_COST) return { ok: false, reason: 'Pas assez d’énergie ⚡.' };
+    p.energy -= STRIKE_COST;
+    p.strikeCd = STRIKE_CD;
+    state.strikes.push({ x, y, owner: p.id, team: p.team, color: p.color, timer: 2.1 });
+    fxEvents.push({ k: 'STRIKE_WARN', x, y, color: p.color });
+    return { ok: true };
+  }
+
+  if (cmd.op === 'ORDER') {
+    const x = clamp(Math.round(Number(cmd.x) || HALF_W), 40, WORLD_SIZE - 40);
+    const y = clamp(Math.round(Number(cmd.y) || HALF_W), 40, WORLD_SIZE - 40);
+    p.rallyX = x;
+    p.rallyY = y;
+    const ids = Array.isArray(cmd.unitIds) ? new Set(cmd.unitIds) : null;
+    for (const u of state.units) {
+      if (u.owner === p.id && (!ids || !ids.size || ids.has(u.id))) {
+        u.orderX = x + (Math.random() - 0.5) * 34;
+        u.orderY = y + (Math.random() - 0.5) * 34;
+      }
+    }
+    return { ok: true };
+  }
+
+  if (cmd.op === 'TARGET') {
+    p.targetId = Number.isInteger(cmd.targetId) ? cmd.targetId : -1;
+    const goal = getOffensiveGoal(state, p);
+    for (const u of state.units) {
+      if (u.owner === p.id) {
+        u.orderX = goal.x + (Math.random() - 0.5) * 45;
+        u.orderY = goal.y + (Math.random() - 0.5) * 45;
+      }
+    }
+    return { ok: true };
+  }
+
+  return { ok: false };
+}
+
+function getOffensiveGoal(state, player) {
+  // Si le joueur a choisi un adversaire précis
+  if (player.targetId === -2) return { x: HALF_W, y: HALF_W }; // Contrôle du centre
+  if (player.targetId >= 0) {
+    const enemyHq = state.buildings.find((b) => b.owner === player.targetId && b.kind === 'hq' && b.hp > 0);
+    if (enemyHq) return { x: enemyHq.x, y: enemyHq.y };
+  }
+  // Sinon, le QG ennemi vivant le plus proche
+  const myHq = state.buildings.find((b) => b.owner === player.id && b.kind === 'hq') || { x: HALF_W, y: HALF_W };
+  let best = null, bestD2 = Infinity;
+  for (const b of state.buildings) {
+    if (b.team !== player.team && b.kind === 'hq' && b.hp > 0) {
+      const d2 = dist2(myHq.x, myHq.y, b.x, b.y);
+      if (d2 < bestD2) { bestD2 = d2; best = b; }
+    }
+  }
+  if (best) return { x: best.x, y: best.y };
+  // Sinon n'importe quel bâtiment ennemi
+  for (const b of state.buildings) {
+    if (b.team !== player.team && b.hp > 0) return { x: b.x, y: b.y };
+  }
+  return { x: HALF_W, y: HALF_W };
+}
+
+// Tick de simulation (50 ms / 20 Hz)
+function stepWorld(state, dt, fxEvents) {
+  if (state.over) return;
+  state.time += dt;
+
+  // Progression des phases (Standard 25-30 min vs Blitz 10-12 min)
+  const t = state.time;
+  const p2At = state.blitz ? 90 : 180;     // 1m30 ou 3m00
+  const p3At = state.blitz ? 360 : 900;    // 6m00 ou 15m00
+  const sdAt = state.blitz ? 540 : 1500;   // 9m00 ou 25m00
+  const newPhase = t >= sdAt ? 4 : t >= p3At ? 3 : t >= p2At ? 2 : 1;
+  if (newPhase !== state.phase) {
+    state.phase = newPhase;
+    fxEvents.push({ k: 'PHASE', phase: newPhase });
+  }
+  const crystalMult = state.phase >= 2 ? 1.35 : 1.0;
+  state.dmgMult = state.phase === 4 ? 2.0 : state.phase === 3 ? 1.2 : 1.0;
+
+  // Rétrécissement de la zone de tempête en Mort Subite (Phase 4)
+  if (state.phase === 4) {
+    const shrinkSpeed = state.blitz ? 18 : 9;
+    state.stormRadius = Math.max(360, state.stormRadius - shrinkSpeed * dt);
+  }
+
+  // 1. Économie et revenus par joueur
+  for (const p of state.players) {
+    if (p.dead) continue;
+    if (p.strikeCd > 0) p.strikeCd = Math.max(0, p.strikeCd - dt);
+    let inc = 8 + (p.tier - 1) * 4;
+    for (const b of state.buildings) {
+      if (b.owner === p.id && b.hp > 0 && b.kind === 'extractor') {
+        const base = b.boost ? 14 * crystalMult : 8;
+        inc += base;
+      }
+    }
+    p.income = Math.round(inc);
+    p.energy = Math.min(2500, p.energy + inc * dt);
+  }
+
+  // 2. Frappes orbitales en cours
+  for (let i = state.strikes.length - 1; i >= 0; i--) {
+    const s = state.strikes[i];
+    s.timer -= dt;
+    if (s.timer <= 0) {
+      state.strikes.splice(i, 1);
+      const R2 = 165 * 165;
+      for (const u of state.units) {
+        if (u.team !== s.team && dist2(s.x, s.y, u.x, u.y) <= R2) u.hp -= 340 * state.dmgMult;
+      }
+      for (const b of state.buildings) {
+        if (b.team !== s.team && dist2(s.x, s.y, b.x, b.y) <= R2) b.hp -= 520 * state.dmgMult;
+      }
+      fxEvents.push({ k: 'STRIKE_HIT', x: s.x, y: s.y, color: s.color });
+    }
+  }
+
+  // 3. Bâtiments : production automatique, soins des relais, tirs des tourelles/QG, dégâts de tempête
+  for (const b of state.buildings) {
+    if (b.hp <= 0) continue;
+    const owner = state.players.find((p) => p.id === b.owner);
+    if (!owner || owner.dead) { b.hp = 0; continue; }
+    const def = BUILDINGS[b.kind];
+
+    // Dégâts de tempête magnétique en Mort Subite hors du rayon sûr
+    if (state.phase === 4 && hypot(b.x, b.y, HALF_W, HALF_W) > state.stormRadius) {
+      b.hp -= 38 * dt;
+    }
+
+    // Relais : soin des unités alliées proches
+    if (def.heal) {
+      const r2 = def.range * def.range;
+      for (const u of state.units) {
+        if (u.team === b.team && u.hp < u.maxHp && dist2(b.x, b.y, u.x, u.y) <= r2) {
+          u.hp = Math.min(u.maxHp, u.hp + def.heal * dt);
+        }
+      }
+    }
+
+    // Production automatique (Casernes & Usines)
+    if (def.spawnEvery) {
+      b.spawnT -= dt;
+      if (b.spawnT <= 0) {
+        b.spawnT = def.spawnEvery;
+        const myUnitCount = state.units.filter((u) => u.owner === owner.id).length;
+        if (myUnitCount < 42) {
+          const goal = getOffensiveGoal(state, owner);
+          if (b.kind === 'barracks') {
+            spawnUnit(state, owner, 'marine', b.x, b.y, goal.x, goal.y);
+            spawnUnit(state, owner, 'marine', b.x, b.y, goal.x, goal.y);
+            if (owner.tier >= 2) spawnUnit(state, owner, 'rocket', b.x, b.y, goal.x, goal.y);
+          } else if (b.kind === 'factory') {
+            spawnUnit(state, owner, 'tank', b.x, b.y, goal.x, goal.y);
+            if (owner.tier >= 3) spawnUnit(state, owner, 'siege', b.x, b.y, goal.x, goal.y);
+          }
+        }
+      }
+    }
+
+    // Tir défensif (QG, Tourelle, Plasma/Tesla)
+    if (def.range > 0 && def.dmg > 0) {
+      b.cd = Math.max(0, (b.cd || 0) - dt);
+      if (b.cd <= 0) {
+        let target = null, bestD2 = def.range * def.range;
+        for (const u of state.units) {
+          if (u.team !== b.team && u.hp > 0) {
+            const d2 = dist2(b.x, b.y, u.x, u.y);
+            if (d2 <= bestD2) { bestD2 = d2; target = u; }
+          }
+        }
+        if (target) {
+          b.cd = def.rate;
+          const dmg = def.dmg * (b.kind === 'hq' ? 1 + (owner.tier - 1) * 0.35 : 1) * state.dmgMult;
+          target.hp -= dmg;
+          if (def.splash) {
+            const s2 = def.splash * def.splash;
+            for (const u2 of state.units) {
+              if (u2 !== target && u2.team !== b.team && dist2(target.x, target.y, u2.x, u2.y) <= s2) {
+                u2.hp -= dmg * 0.6;
+              }
+            }
+          }
+          fxEvents.push({
+            k: b.kind === 'tesla' ? 'TESLA' : 'SHOT',
+            x1: b.x, y1: b.y, x2: target.x, y2: target.y, color: owner.color,
+          });
+        }
+      }
+    }
+  }
+
+  // 4. Unités : Acquisition de cible, Pathfinding continu sans grille (Steering + Contournement tangentiel + Boids), Tir
+  for (const u of state.units) {
+    if (u.hp <= 0) continue;
+    const def = UNITS[u.kind];
+    const owner = state.players.find((p) => p.id === u.owner);
+    u.cd = Math.max(0, u.cd - dt);
+
+    // Recherche d'une cible ennemie à portée d'engagement (aggro = max(240, range + 50))
+    const aggroR = Math.max(245, def.range + 55);
+    let bestTarget = null, bestScore = Infinity;
+
+    for (const e of state.units) {
+      if (e.team === u.team || e.hp <= 0) continue;
+      const d = hypot(u.x, u.y, e.x, e.y) - e.radius;
+      if (d <= aggroR) {
+        const s = u.kind === 'sapper' ? d + 140 : d;
+        if (s < bestScore) { bestScore = s; bestTarget = { ent: e, isBld: false, dist: d }; }
+      }
+    }
+    for (const b of state.buildings) {
+      if (b.team === u.team || b.hp <= 0) continue;
+      const d = hypot(u.x, u.y, b.x, b.y) - b.radius;
+      if (d <= aggroR + 40) {
+        // Les sapeurs priorisent les bâtiments et murs ; les autres ciblent les tourelles/QG proches
+        const priority = b.kind === 'wall' ? (u.kind === 'sapper' ? -30 : 65) : (u.kind === 'sapper' ? -50 : 15);
+        const s = d + priority;
+        if (s < bestScore) { bestScore = s; bestTarget = { ent: b, isBld: true, dist: d }; }
+      }
+    }
+
+    // Si une cible est à portée de tir : tirer !
+    if (bestTarget && bestTarget.dist <= def.range) {
+      const tgt = bestTarget.ent;
+      u.a = Math.atan2(tgt.y - u.y, tgt.x - u.x);
+      u.vx *= 0.5;
+      u.vy *= 0.5;
+      if (u.cd <= 0) {
+        u.cd = def.rate;
+        let dmg = def.dmg * state.dmgMult;
+        if (bestTarget.isBld) dmg *= def.bldMult || 1;
+        tgt.hp -= dmg;
+        if (def.splash) {
+          const s2 = def.splash * def.splash;
+          for (const e2 of state.units) {
+            if (e2 !== tgt && e2.team !== u.team && dist2(tgt.x, tgt.y, e2.x, e2.y) <= s2) e2.hp -= dmg * 0.55;
+          }
+        }
+        if (owner) owner.score += Math.round(dmg * 0.12);
+        fxEvents.push({
+          k: u.kind === 'siege' || u.kind === 'titan' ? 'PLASMA' : 'SHOT',
+          x1: u.x, y1: u.y, x2: tgt.x, y2: tgt.y, color: owner ? owner.color : '#fff',
+        });
+      }
+      continue;
+    }
+
+    // Déterminer le point de destination (cible en vue > ordre direct > objectif offensif du joueur)
+    let goalX = u.orderX, goalY = u.orderY;
+    if (bestTarget) {
+      goalX = bestTarget.ent.x;
+      goalY = bestTarget.ent.y;
+    } else if (goalX == null || goalY == null || dist2(u.x, u.y, goalX, goalY) < 45 * 45) {
+      const g = owner ? getOffensiveGoal(state, owner) : { x: HALF_W, y: HALF_W };
+      goalX = g.x;
+      goalY = g.y;
+      u.orderX = goalX;
+      u.orderY = goalY;
+    }
+
+    // Vecteur de désir (Seek)
+    const dx = goalX - u.x, dy = goalY - u.y;
+    const distGoal = Math.hypot(dx, dy) || 1;
+    let steerX = dx / distGoal, steerY = dy / distGoal;
+
+    // Évitement tangentiel continu des obstacles (bâtiments alliés, rochers, cristaux)
+    const lookAhead = u.radius + 36;
+    const sideSign = (u.id % 2 === 0) ? 1 : -1;
+    for (const b of state.buildings) {
+      if (b.hp <= 0) continue;
+      // Si c'est un bâtiment ennemi et qu'on est tout près, on l'attaque au lieu de le contourner indéfiniment
+      if (b.team !== u.team && hypot(u.x, u.y, b.x, b.y) - b.radius <= def.range + 12) continue;
+      const ox = b.x - u.x, oy = b.y - u.y;
+      const d = Math.hypot(ox, oy) || 1;
+      const minClear = u.radius + b.radius + 14;
+      if (d < minClear + lookAhead) {
+        const dot = (ox / d) * steerX + (oy / d) * steerY;
+        if (dot > -0.2) {
+          // Vecteur tangentiel autour du cercle de l'obstacle
+          const tx = -oy / d * sideSign, ty = ox / d * sideSign;
+          const push = ((minClear + lookAhead - d) / lookAhead) * 1.85;
+          steerX += (tx - ox / d * 0.5) * push;
+          steerY += (ty - oy / d * 0.5) * push;
+        }
+      }
+    }
+    for (const rk of ROCKS) {
+      const ox = rk.x - u.x, oy = rk.y - u.y;
+      const d = Math.hypot(ox, oy) || 1;
+      const minClear = u.radius + rk.r + 12;
+      if (d < minClear + lookAhead) {
+        const tx = -oy / d * sideSign, ty = ox / d * sideSign;
+        const push = ((minClear + lookAhead - d) / lookAhead) * 2.0;
+        steerX += (tx - ox / d * 0.5) * push;
+        steerY += (ty - oy / d * 0.5) * push;
+      }
+    }
+
+    // Séparation Boids entre unités proches
+    for (const o of state.units) {
+      if (o === u || o.hp <= 0) continue;
+      const sx = u.x - o.x, sy = u.y - o.y;
+      const minSep = u.radius + o.radius + 5;
+      const d2 = sx * sx + sy * sy;
+      if (d2 > 0 && d2 < minSep * minSep) {
+        const d = Math.sqrt(d2);
+        const f = (minSep - d) / minSep;
+        steerX += (sx / d) * f * 1.4;
+        steerY += (sy / d) * f * 1.4;
+      }
+    }
+
+    const sLen = Math.hypot(steerX, steerY) || 1;
+    u.vx = (steerX / sLen) * def.speed;
+    u.vy = (steerY / sLen) * def.speed;
+    u.x = clamp(u.x + u.vx * dt, 24, WORLD_SIZE - 24);
+    u.y = clamp(u.y + u.vy * dt, 24, WORLD_SIZE - 24);
+    u.a = Math.atan2(u.vy, u.vx);
+
+    // Résolution dure de collision cercle-cercle contre les bâtiments et rochers
+    for (const b of state.buildings) {
+      if (b.hp <= 0) continue;
+      const cx = u.x - b.x, cy = u.y - b.y;
+      const minD = u.radius + b.radius + 2;
+      const d2 = cx * cx + cy * cy;
+      if (d2 < minD * minD) {
+        const d = Math.sqrt(d2) || 1;
+        u.x = b.x + (cx / d) * minD;
+        u.y = b.y + (cy / d) * minD;
+      }
+    }
+    for (const rk of ROCKS) {
+      const cx = u.x - rk.x, cy = u.y - rk.y;
+      const minD = u.radius + rk.r + 2;
+      const d2 = cx * cx + cy * cy;
+      if (d2 < minD * minD) {
+        const d = Math.sqrt(d2) || 1;
+        u.x = rk.x + (cx / d) * minD;
+        u.y = rk.y + (cy / d) * minD;
+      }
+    }
+  }
+
+  // 5. Nettoyage des entités détruites & vérification des QG
+  for (let i = state.units.length - 1; i >= 0; i--) {
+    const u = state.units[i];
+    if (u.hp <= 0) {
+      fxEvents.push({ k: 'BOOM', x: u.x, y: u.y, r: u.radius * 1.5 });
+      state.units.splice(i, 1);
+    }
+  }
+  for (let i = state.buildings.length - 1; i >= 0; i--) {
+    const b = state.buildings[i];
+    if (b.hp <= 0) {
+      fxEvents.push({ k: 'BOOM_BIG', x: b.x, y: b.y, r: b.radius * 1.8 });
+      const kind = b.kind, ownerId = b.owner;
+      state.buildings.splice(i, 1);
+      if (kind === 'hq') {
+        const p = state.players.find((q) => q.id === ownerId);
+        if (p && !p.dead) {
+          p.dead = true;
+          state.ranking.unshift(p.id); // éliminé : classé avant les précédents éliminés
+          // Détruire ses autres bâtiments et unités
+          for (const ob of state.buildings) if (ob.owner === ownerId) ob.hp = 0;
+          for (const ou of state.units) if (ou.owner === ownerId) ou.hp = 0;
+          fxEvents.push({ k: 'ELIM', name: p.name, color: p.color });
+        }
+      }
+    }
+  }
+
+  // 6. Vérification de fin de partie (1 seule équipe/joueur en vie)
+  const aliveTeams = new Set(state.players.filter((p) => !p.dead).map((p) => p.team));
+  if (aliveTeams.size <= 1) {
+    state.over = true;
+    state.winnerTeam = [...aliveTeams][0] ?? 0;
+    const winners = state.players.filter((p) => !p.dead).sort((a, b) => b.score - a.score);
+    for (const w of winners) {
+      w.score += 500;
+      if (!state.ranking.includes(w.id)) state.ranking.unshift(w.id);
+    }
+    for (const p of state.players) {
+      if (!state.ranking.includes(p.id)) state.ranking.push(p.id);
+    }
+  }
+}
+
+/* ============================================================================
+   INTELLIGENCE ARTIFICIELLE DES BOTS (FACILE / NORMAL / EXPERT)
+   ============================================================================ */
+function runBots(state, fxEvents) {
+  if (state.over) return;
+  for (const p of state.players) {
+    if (!p.bot || p.dead) continue;
+    const myBlds = state.buildings.filter((b) => b.owner === p.id && b.hp > 0);
+    const hq = myBlds.find((b) => b.kind === 'hq');
+    if (!hq) continue;
+
+    const extractors = myBlds.filter((b) => b.kind === 'extractor').length;
+    const barracks = myBlds.filter((b) => b.kind === 'barracks').length;
+    const factories = myBlds.filter((b) => b.kind === 'factory').length;
+    const turrets = myBlds.filter((b) => b.kind === 'turret' || b.kind === 'tesla').length;
+    const pylons = myBlds.filter((b) => b.kind === 'pylon').length;
+
+    const dirX = Math.sign(HALF_W - hq.x) || 1;
+    const dirY = Math.sign(HALF_W - hq.y) || 1;
+
+    // Helper pour trouver une position libre valide autour d'un point d'ancrage
+    const tryBuildNear = (kind, ax, ay, minR = 70, maxR = 240) => {
+      for (let k = 0; k < 14; k++) {
+        const ang = Math.random() * Math.PI * 2;
+        const r = minR + Math.random() * (maxR - minR);
+        const x = ax + Math.cos(ang) * r;
+        const y = ay + Math.sin(ang) * r;
+        if (canPlaceBuilding(state, p.id, kind, x, y).ok) {
+          return executeCommand(state, p.id, { op: 'BUILD', kind, x, y }, fxEvents).ok;
+        }
+      }
+      return false;
+    };
+
+    // 1. Construire des extracteurs près des cristaux accessibles
+    if (extractors < 2 + p.tier && p.energy >= 75) {
+      for (const cn of CRYSTAL_NODES) {
+        if (tryBuildNear('extractor', cn.x, cn.y, 46, 95)) return;
+      }
+      if (tryBuildNear('extractor', hq.x, hq.y, 85, 220)) return;
+    }
+
+    // 2. Étendre la zone d'influence vers les cristaux centraux avec un Relais
+    if (pylons < p.tier + 1 && p.energy >= 80) {
+      const anchor = myBlds[myBlds.length - 1] || hq;
+      const tx = anchor.x + Math.sign(HALF_W - anchor.x) * 175;
+      const ty = anchor.y + Math.sign(HALF_W - anchor.y) * 175;
+      if (tryBuildNear('pylon', tx, ty, 20, 90)) return;
+    }
+
+    // 3. Poser une tourelle de défense à l'avant de la base
+    if (turrets < 1 + p.tier && p.energy >= 100) {
+      const kind = p.tier >= 2 && p.energy >= 165 ? 'tesla' : 'turret';
+      if (tryBuildNear(kind, hq.x + dirX * 150, hq.y + dirY * 150, 30, 120)) return;
+    }
+
+    // 4. Monter en niveau de QG
+    if (p.tier === 1 && extractors >= 2 && p.energy >= 240) {
+      if (executeCommand(state, p.id, { op: 'UPGRADE_HQ' }, fxEvents).ok) return;
+    }
+    if (p.tier === 2 && factories >= 1 && p.energy >= 400) {
+      if (executeCommand(state, p.id, { op: 'UPGRADE_HQ' }, fxEvents).ok) return;
+    }
+
+    // 5. Construire Usine Blindée (Tier 2) ou seconde Caserne
+    if (p.tier >= 2 && factories < 1 && p.energy >= 180) {
+      if (tryBuildNear('factory', hq.x + dirX * 120, hq.y - dirY * 80, 40, 150)) return;
+    }
+    if (barracks < 2 && p.energy >= 150) {
+      if (tryBuildNear('barracks', hq.x + dirX * 130, hq.y + dirY * 90, 40, 150)) return;
+    }
+
+    // 6. Déployer des escouades d'assaut
+    if (p.tier >= 3 && p.energy >= 380) {
+      executeCommand(state, p.id, { op: 'SQUAD', squad: 'titan' }, fxEvents);
+    } else if (p.tier >= 2 && p.energy >= 240) {
+      executeCommand(state, p.id, { op: 'SQUAD', squad: Math.random() < 0.65 ? 'tanks' : 'sappers' }, fxEvents);
+    } else if (p.energy >= 150) {
+      executeCommand(state, p.id, { op: 'SQUAD', squad: Math.random() < 0.7 ? 'commando' : 'sappers' }, fxEvents);
+    }
+
+    // 7. Frappe orbitale (bots Normal / Expert)
+    if (state.level !== 'facile' && p.strikeCd <= 0 && p.energy >= 320) {
+      const enemyBld = state.buildings.find((b) => b.team !== p.team && (b.kind === 'turret' || b.kind === 'tesla' || b.kind === 'hq'));
+      if (enemyBld) executeCommand(state, p.id, { op: 'STRIKE', x: enemyBld.x, y: enemyBld.y }, fxEvents);
+    }
+  }
+}
+
+/* ============================================================================
+   CLIENT : CAMÉRA, CONTRÔLES, RENDU CANVAS NÉO-BRUTALISTE & PONT HUB
+   ============================================================================ */
+const cvs = $('#world'), ctx = cvs.getContext('2d');
+const miniCvs = $('#minimap'), miniCtx = miniCvs.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cvs.width = Math.round(W * DPR);
+  cvs.height = Math.round(H * DPR);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const cam = { x: HALF_W, y: HALF_W, z: 0.85, shake: 0 };
+const keys = {};
+const mouse = { x: W / 2, y: H / 2, wx: HALF_W, wy: HALF_W, down: false, dragStart: null, panning: false, panStart: null };
+
+let myId = 0;
+let role = 'solo'; // 'host' | 'guest' | 'solo'
+let state = null;
+let buildMode = null;   // kind de bâtiment sélectionné
+let strikeMode = false; // viseur de frappe orbitale
+let selectedUnits = new Set();
+let particles = [];
+let beams = [];
+let craters = [];
+let reportedResult = false;
+
+function screenToWorld(sx, sy) {
+  return {
+    x: cam.x + (sx - W / 2) / cam.z,
+    y: cam.y + (sy - H / 2) / cam.z,
+  };
+}
+
+function centerOnMyHq() {
+  if (!state) return;
+  const hq = state.buildings.find((b) => b.owner === myId && b.kind === 'hq');
+  if (hq) { cam.x = hq.x; cam.y = hq.y; }
+}
+
+let toastTimer = 0;
+function toast(msg, ms = 2400) {
+  const el = $('#uiToast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+// Effets visuels déclenchés par les événements du moteur
+function handleFxEvents(list) {
+  if (!Array.isArray(list)) return;
+  for (const e of list) {
+    if (e.k === 'SHOT') {
+      beams.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, color: e.color || '#ffc531', w: 2.5, life: 0.11, maxLife: 0.11 });
+      if (hypot(e.x1, e.y1, cam.x, cam.y) < 700) Sfx.shoot();
+    } else if (e.k === 'PLASMA' || e.k === 'TESLA') {
+      beams.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, color: '#1fc7c1', w: 4.5, life: 0.2, maxLife: 0.2, tesla: e.k === 'TESLA' });
+      for (let k = 0; k < 6; k++) {
+        const a = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 90;
+        particles.push({ x: e.x2, y: e.y2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 4, color: '#1fc7c1', life: 0.25 });
+      }
+      if (hypot(e.x2, e.y2, cam.x, cam.y) < 800) Sfx.plasma();
+    } else if (e.k === 'BOOM' || e.k === 'BOOM_BIG') {
+      const big = e.k === 'BOOM_BIG';
+      const cnt = big ? 20 : 9;
+      if (big) {
+        craters.push({ x: e.x, y: e.y, r: e.r * 0.75 });
+        if (craters.length > 45) craters.shift();
+        if (hypot(e.x, e.y, cam.x, cam.y) < 900) { cam.shake = Math.max(cam.shake, 10); Sfx.boom(); }
+      }
+      for (let k = 0; k < cnt; k++) {
+        const a = Math.random() * Math.PI * 2, sp = (big ? 50 : 25) + Math.random() * (big ? 150 : 75);
+        particles.push({
+          x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          r: (big ? 6 : 3.5) + Math.random() * 4,
+          color: k % 2 === 0 ? '#ff4b2b' : '#ffc531',
+          life: (big ? 0.45 : 0.28) + Math.random() * 0.15,
+        });
+      }
+    } else if (e.k === 'BUILD' || e.k === 'SPAWN' || e.k === 'UPGRADE') {
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        particles.push({
+          x: e.x + Math.cos(a) * 18, y: e.y + Math.sin(a) * 18,
+          vx: Math.cos(a) * 55, vy: Math.sin(a) * 55,
+          r: 4, color: e.color || '#ffc531', life: 0.32,
+        });
+      }
+      if (e.k === 'UPGRADE') { toast(`QG amélioré au Niveau ${e.tier} !`); Sfx.upgrade(); }
+    } else if (e.k === 'STRIKE_WARN') {
+      toast('⚠️ Alerte : Frappe Orbitale détectée !');
+      Sfx.strike();
+    } else if (e.k === 'STRIKE_HIT') {
+      cam.shake = 18;
+      craters.push({ x: e.x, y: e.y, r: 95 });
+      for (let k = 0; k < 34; k++) {
+        const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 240;
+        particles.push({
+          x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          r: 6 + Math.random() * 6, color: k % 3 === 0 ? '#fff8ea' : k % 2 === 0 ? '#ff4b2b' : '#ffc531',
+          life: 0.55 + Math.random() * 0.25,
+        });
+      }
+    } else if (e.k === 'ELIM') {
+      toast(`💥 Le bastion de ${e.name} est tombé !`, 3500);
+    } else if (e.k === 'PHASE') {
+      const labels = {
+        2: '⚡ Phase 2 : Surcharge des Cristaux Centraux (+35 %)',
+        3: '🤖 Phase 3 : Guerre Totale & Titans (Dégâts +20 %)',
+        4: '🔥 MORT SUBITE : Tempête Magnétique & Dégâts ×2 !',
+      };
+      if (labels[e.phase]) { toast(labels[e.phase], 4000); Sfx.upgrade(); }
+    }
+  }
+}
+
+// Envoi d'une commande (localement si hôte/solo, ou via HubBridge si invité)
+function sendCommand(cmd) {
+  if (!state || state.over) return;
+  if (role === 'guest') {
+    HubBridge.send('host', { t: 'cmd', cmd });
+    return;
+  }
+  const fx = [];
+  const res = executeCommand(state, myId, cmd, fx);
+  if (!res.ok && res.reason) {
+    toast(res.reason, 2000);
+    Sfx.error();
+  } else if (res.ok) {
+    if (cmd.op === 'BUILD') Sfx.build();
+    else if (cmd.op === 'SQUAD') Sfx.spawn();
+    else if (cmd.op === 'ORDER' || cmd.op === 'TARGET') Sfx.order();
+    handleFxEvents(fx);
+  }
+}
+
+/* ============================================================================
+   CONTRÔLES SOURIS, CLAVIER & BOUTONS HUD
+   ============================================================================ */
+window.addEventListener('keydown', (e) => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (k === 'escape') { buildMode = null; strikeMode = false; selectedUnits.clear(); updateDockUI(); }
+  if (k === ' ') { e.preventDefault(); centerOnMyHq(); }
+  const buildMap = { '1': 'extractor', '2': 'pylon', '3': 'barracks', '4': 'factory', '5': 'turret', '6': 'tesla', '7': 'wall' };
+  if (buildMap[k]) {
+    strikeMode = false;
+    buildMode = buildMode === buildMap[k] ? null : buildMap[k];
+    updateDockUI();
+  }
+  const squadMap = { 'q': 'commando', 'w': 'sappers', 'e': 'tanks', 'r': 'titan' };
+  if (squadMap[k]) sendCommand({ op: 'SQUAD', squad: squadMap[k] });
+  if (k === 'f') { buildMode = null; strikeMode = !strikeMode; updateDockUI(); }
+});
+
+window.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+cvs.addEventListener('contextmenu', (e) => e.preventDefault());
+
+cvs.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  cam.z = clamp(cam.z * factor, 0.42, 1.35);
+}, { passive: false });
+
+cvs.addEventListener('pointerdown', (e) => {
+  const rect = cvs.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+  const w = screenToWorld(mouse.x, mouse.y);
+  mouse.wx = w.x; mouse.wy = w.y;
+
+  // Bouton du milieu ou Alt+Clic : déplacer la caméra
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    mouse.panning = true;
+    mouse.panStart = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y };
+    return;
+  }
+
+  // Clic droit : annuler le mode construction OU donner un ordre de mouvement/attaque
+  if (e.button === 2) {
+    if (buildMode || strikeMode) {
+      buildMode = null; strikeMode = false; updateDockUI();
+      return;
+    }
+    sendCommand({ op: 'ORDER', x: w.x, y: w.y, unitIds: [...selectedUnits] });
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      particles.push({ x: w.x, y: w.y, vx: Math.cos(a) * 38, vy: Math.sin(a) * 38, r: 3.5, color: '#ffc531', life: 0.25 });
+    }
+    return;
+  }
+
+  // Clic gauche
+  if (e.button === 0) {
+    if (strikeMode) {
+      sendCommand({ op: 'STRIKE', x: w.x, y: w.y });
+      strikeMode = false;
+      updateDockUI();
+      return;
+    }
+    if (buildMode) {
+      sendCommand({ op: 'BUILD', kind: buildMode, x: w.x, y: w.y });
+      // Garder le mode actif si on pose des murs ou si Maj est maintenu
+      if (buildMode !== 'wall' && !e.shiftKey) {
+        buildMode = null;
+        updateDockUI();
+      }
+      return;
+    }
+    mouse.down = true;
+    mouse.dragStart = { sx: mouse.x, sy: mouse.y, wx: w.x, wy: w.y };
+  }
+});
+
+window.addEventListener('pointermove', (e) => {
+  const rect = cvs.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+  const w = screenToWorld(mouse.x, mouse.y);
+  mouse.wx = w.x; mouse.wy = w.y;
+
+  if (mouse.panning && mouse.panStart) {
+    cam.x = clamp(mouse.panStart.cx - (e.clientX - mouse.panStart.x) / cam.z, 0, WORLD_SIZE);
+    cam.y = clamp(mouse.panStart.cy - (e.clientY - mouse.panStart.y) / cam.z, 0, WORLD_SIZE);
+  }
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (mouse.panning) { mouse.panning = false; mouse.panStart = null; return; }
+  if (!mouse.down) return;
+  mouse.down = false;
+  if (!state || !mouse.dragStart) return;
+
+  const dx = Math.abs(mouse.x - mouse.dragStart.sx);
+  const dy = Math.abs(mouse.y - mouse.dragStart.sy);
+  selectedUnits.clear();
+
+  if (dx > 12 || dy > 12) {
+    // Rectangle de sélection (Box Selection)
+    const x1 = Math.min(mouse.dragStart.wx, mouse.wx), x2 = Math.max(mouse.dragStart.wx, mouse.wx);
+    const y1 = Math.min(mouse.dragStart.wy, mouse.wy), y2 = Math.max(mouse.dragStart.wy, mouse.wy);
+    for (const u of state.units) {
+      if (u.owner === myId && u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) {
+        selectedUnits.add(u.id);
+      }
+    }
+  } else {
+    // Clic simple sur une unité alliée
+    for (const u of state.units) {
+      if (u.owner === myId && dist2(u.x, u.y, mouse.wx, mouse.wy) <= (u.radius + 14) ** 2) {
+        selectedUnits.add(u.id);
+        break;
+      }
+    }
+  }
+  mouse.dragStart = null;
+});
+
+// Clic sur la minicarte : déplacer la caméra ou donner un ordre au clic droit
+miniCvs.addEventListener('pointerdown', (e) => {
+  const r = miniCvs.getBoundingClientRect();
+  const wx = ((e.clientX - r.left) / r.width) * WORLD_SIZE;
+  const wy = ((e.clientY - r.top) / r.height) * WORLD_SIZE;
+  if (e.button === 2) {
+    sendCommand({ op: 'ORDER', x: wx, y: wy, unitIds: [...selectedUnits] });
+  } else {
+    cam.x = clamp(wx, 0, WORLD_SIZE);
+    cam.y = clamp(wy, 0, WORLD_SIZE);
+  }
+});
+miniCvs.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Boutons du Dock
+for (const btn of $$('[data-build]')) {
+  btn.onclick = () => {
+    const k = btn.dataset.build;
+    strikeMode = false;
+    buildMode = buildMode === k ? null : k;
+    updateDockUI();
+  };
+}
+for (const btn of $$('[data-squad]')) {
+  btn.onclick = () => sendCommand({ op: 'SQUAD', squad: btn.dataset.squad });
+}
+$('#btnStrike').onclick = () => {
+  buildMode = null;
+  strikeMode = !strikeMode;
+  updateDockUI();
+};
+$('#btnUpHq').onclick = () => sendCommand({ op: 'UPGRADE_HQ' });
+$('#btnCenter').onclick = centerOnMyHq;
+$('#btnMute').onclick = () => {
+  const m = Sfx.toggle();
+  $('#btnMute').textContent = m ? '🔇' : '🔊';
+};
+const exitGame = () => {
+  if (window.HubBridge && HubBridge.embedded) HubBridge.exit();
+  else location.href = '../';
+};
+$('#btnExit').onclick = exitGame;
+$('#btnEndExit').onclick = exitGame;
+$('#btnReplay').onclick = () => {
+  if (role === 'guest') { toast('Seul l’hôte peut relancer une partie.'); return; }
+  startMatch(lastBootInfo);
+};
+
+function updateDockUI() {
+  if (!state) return;
+  const me = state.players.find((p) => p.id === myId);
+  if (!me) return;
+
+  for (const btn of $$('[data-build]')) {
+    const k = btn.dataset.build;
+    const def = BUILDINGS[k];
+    btn.classList.toggle('sel', buildMode === k);
+    btn.disabled = me.tier < (def.tier || 1);
+    btn.classList.toggle('cant', me.energy < def.cost);
+  }
+  for (const btn of $$('[data-squad]')) {
+    const k = btn.dataset.squad;
+    const sq = SQUADS[k];
+    btn.disabled = me.tier < sq.tier;
+    btn.classList.toggle('cant', me.energy < sq.cost);
+  }
+  const stBtn = $('#btnStrike');
+  stBtn.classList.toggle('sel', strikeMode);
+  stBtn.classList.toggle('cant', me.energy < STRIKE_COST || me.strikeCd > 0);
+  const cdOv = $('#uiStrikeCd');
+  if (me.strikeCd > 0) {
+    cdOv.hidden = false;
+    cdOv.textContent = Math.ceil(me.strikeCd) + 's';
+  } else {
+    cdOv.hidden = true;
+  }
+}
+
+function updateHudUI() {
+  if (!state) return;
+  const me = state.players.find((p) => p.id === myId);
+  if (me) {
+    $('#uiEnergy').textContent = Math.floor(me.energy);
+    $('#uiRate').textContent = `+${me.income}/s`;
+    $('#uiTierLbl').textContent = `QG Niv. ${me.tier}`;
+    const upBtn = $('#btnUpHq');
+    if (me.tier >= 3) {
+      upBtn.textContent = 'QG Niv. Max';
+      upBtn.disabled = true;
+    } else {
+      const next = me.tier + 1, cost = UPGRADE_COSTS[next];
+      upBtn.textContent = `Passer Niv. ${next} (${cost}⚡)`;
+      upBtn.disabled = me.energy < cost;
+    }
+  }
+
+  // Horloge & Phase
+  const sec = Math.floor(state.time);
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  $('#uiClock').textContent = `${mm}:${ss}`;
+  const phaseNames = {
+    1: 'Phase 1 · Ouverture agressive',
+    2: 'Phase 2 · Cristaux surchargés',
+    3: 'Phase 3 · Assauts lourds',
+    4: 'MORT SUBITE · Dégâts ×2',
+  };
+  $('#uiPhaseName').textContent = phaseNames[state.phase] || '';
+  $('#uiPhase').classList.toggle('sd', state.phase === 4);
+
+  // Cibles d'assaut
+  if (me) {
+    const box = $('#targetBtns');
+    const enemies = state.players.filter((p) => p.team !== me.team && !p.dead);
+    const items = [
+      { id: -1, label: 'Auto', color: null },
+      { id: -2, label: '💎 Centre', color: null },
+      ...enemies.map((e) => ({ id: e.id, label: e.name, color: e.color })),
+    ];
+    const sig = items.map((i) => `${i.id}:${me.targetId === i.id}`).join('|');
+    if (box.dataset.sig !== sig) {
+      box.dataset.sig = sig;
+      box.innerHTML = items.map((it) => `<button class="tbtn ${me.targetId === it.id ? 'sel' : ''}" data-t="${it.id}">
+        ${it.color ? `<i class="dot" style="background:${it.color}"></i>` : ''}${it.label}</button>`).join('');
+      for (const b of box.querySelectorAll('button')) {
+        b.onclick = () => sendCommand({ op: 'TARGET', targetId: Number(b.dataset.t) });
+      }
+    }
+  }
+
+  // Liste des joueurs et PV des QG
+  const rosterHtml = state.players.map((p) => {
+    const hq = state.buildings.find((b) => b.owner === p.id && b.kind === 'hq');
+    const pct = hq ? Math.max(0, Math.round((hq.hp / hq.maxHp) * 100)) : 0;
+    return `<div class="p-row ${p.dead ? 'dead' : ''}">
+      <span class="dot" style="background:${p.color}"></span>
+      <span class="nm">${p.name}${p.id === myId ? ' (toi)' : ''}</span>
+      <span class="hpbar"><i style="width:${pct}%;background:${pct > 45 ? '#2fbf71' : '#ff4b2b'}"></i></span>
+    </div>`;
+  }).join('');
+  $('#uiRoster').innerHTML = rosterHtml;
+
+  const myUnitsCount = state.units.filter((u) => u.owner === myId).length;
+  $('#uiPop').textContent = `${myUnitsCount}/42 unités`;
+
+  updateDockUI();
+
+  // Fin de partie
+  const modal = $('#endModal');
+  if (state.over && modal.hidden) {
+    modal.hidden = false;
+    const won = me && !me.dead && me.team === state.winnerTeam;
+    $('#endTitle').textContent = won ? '🏆 Victoire !' : '💥 Défaite';
+    $('#endSub').textContent = won
+      ? 'Ton bastion règne en maître sur l’arène !'
+      : 'Ton QG a été détruit dans la bataille.';
+    const ordered = state.ranking.map((id) => state.players.find((p) => p.id === id)).filter(Boolean);
+    $('#endRanks').innerHTML = ordered.map((p, idx) => `<li>
+      <span class="rk">${idx < 3 ? ['🥇', '🥈', '🥉'][idx] : idx + 1}</span>
+      <span class="dot" style="background:${p.color}"></span>
+      <span>${p.name}${p.bot ? ' 🤖' : ''}</span>
+      <span class="sc">${p.score} pts</span>
+    </li>`).join('');
+
+    if (!reportedResult && (role === 'host' || role === 'solo') && window.HubBridge && HubBridge.embedded) {
+      reportedResult = true;
+      HubBridge.report({
+        id: `bastion-${Date.now()}`,
+        mode: state.mode === '2v2' ? '2v2' : 'Arène',
+        players: ordered.map((p, idx) => ({
+          id: p.bot ? null : p.id,
+          name: p.name,
+          color: p.color,
+          bot: !!p.bot,
+          rank: idx + 1,
+          score: p.score,
+        })),
+      });
+    }
+  } else if (!state.over && !modal.hidden) {
+    modal.hidden = true;
+  }
+}
+
+/* ============================================================================
+   RENDU GRAPHIQUE NÉO-BRUTALISTE (60 FPS)
+   ============================================================================ */
+function renderWorld(dt) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#23442a';
+  ctx.fillRect(0, 0, W, H);
+  if (!state) return;
+
+  // Déplacement caméra au clavier (ZQSD / WASD / Flèches)
+  const panSpd = 640 / cam.z;
+  if (keys['z'] || keys['w'] || keys['arrowup']) cam.y -= panSpd * dt;
+  if (keys['s'] || keys['arrowdown']) cam.y += panSpd * dt;
+  if (keys['q'] || keys['a'] || keys['arrowleft']) cam.x -= panSpd * dt;
+  if (keys['d'] || keys['arrowright']) cam.x += panSpd * dt;
+  cam.x = clamp(cam.x, 0, WORLD_SIZE);
+  cam.y = clamp(cam.y, 0, WORLD_SIZE);
+
+  // Secousse d'écran (Screen Shake)
+  let shX = 0, shY = 0;
+  if (cam.shake > 0.2) {
+    shX = (Math.random() - 0.5) * cam.shake * 2;
+    shY = (Math.random() - 0.5) * cam.shake * 2;
+    cam.shake *= Math.pow(0.04, dt);
+  } else cam.shake = 0;
+
+  ctx.save();
+  ctx.translate(W / 2 + shX, H / 2 + shY);
+  ctx.scale(cam.z, cam.z);
+  ctx.translate(-cam.x, -cam.y);
+
+  // 1. Sol de l'arène & plateaux topographiques
+  ctx.fillStyle = '#3a7440';
+  ctx.strokeStyle = '#16181d';
+  ctx.lineWidth = 8;
+  ctx.fillRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+  ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+  // Plateaux d'herbe plus sombre et plateau central
+  ctx.fillStyle = '#316337';
+  for (const sp of SPAWN_CORNERS) {
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 330, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#487f47';
+  ctx.strokeStyle = '#28522d';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(HALF_W, HALF_W, 430, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Routes tactiques reliant les bases au centre
+  ctx.strokeStyle = '#c8ba9b';
+  ctx.lineWidth = 54;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(340, 340); ctx.lineTo(WORLD_SIZE - 340, WORLD_SIZE - 340);
+  ctx.moveTo(WORLD_SIZE - 340, 340); ctx.lineTo(340, WORLD_SIZE - 340);
+  ctx.stroke();
+  ctx.strokeStyle = '#dfd3b8';
+  ctx.lineWidth = 44;
+  ctx.stroke();
+
+  // Cratères d'explosion
+  for (const c of craters) {
+    ctx.fillStyle = 'rgba(22, 24, 29, 0.28)';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 2. Affichage des Zones d'Influence (toujours visible en léger, et mis en valeur en mode construction)
+  for (const b of state.buildings) {
+    if (b.hp <= 0) continue;
+    const def = BUILDINGS[b.kind];
+    if (!def || !def.influence) continue;
+    const isMine = b.owner === myId;
+    if (!isMine && !buildMode) continue;
+    const owner = state.players.find((p) => p.id === b.owner);
+    const col = owner ? owner.color : '#fff';
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = buildMode && isMine ? 3 : 1.5;
+    ctx.globalAlpha = buildMode && isMine ? 0.55 : 0.16;
+    ctx.setLineDash([12, 8]);
+    ctx.lineDashOffset = -performance.now() * 0.02;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, def.influence, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 3. Gisements de Cristal d'Énergie & Faisceaux de récolte
+  for (const b of state.buildings) {
+    if (b.kind === 'extractor' && b.boost && b.crysId) {
+      const cn = CRYSTAL_NODES.find((c) => c.id === b.crysId);
+      if (cn) {
+        ctx.strokeStyle = '#1fc7c1';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([6, 6]);
+        ctx.lineDashOffset = -performance.now() * 0.04;
+        ctx.beginPath();
+        ctx.moveTo(cn.x, cn.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+  for (const cn of CRYSTAL_NODES) {
+    const r = cn.rich ? 24 : 18;
+    const pulse = 1 + Math.sin(performance.now() * 0.004 + cn.x) * 0.06;
+    ctx.save();
+    ctx.translate(cn.x, cn.y);
+    ctx.scale(pulse, pulse);
+    // Ombre
+    ctx.fillStyle = 'rgba(22,24,29,0.35)';
+    ctx.beginPath(); ctx.arc(4, 5, r, 0, Math.PI * 2); ctx.fill();
+    // Cristal octogonal
+    ctx.fillStyle = cn.rich ? '#ffc531' : '#1fc7c1';
+    ctx.strokeStyle = '#16181d';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * r, py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff8ea';
+    ctx.beginPath();
+    ctx.arc(-r * 0.25, -r * 0.25, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 4. Rochers naturels
+  for (const rk of ROCKS) {
+    ctx.fillStyle = 'rgba(22,24,29,0.3)';
+    ctx.beginPath(); ctx.arc(rk.x + 6, rk.y + 7, rk.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6d675c';
+    ctx.strokeStyle = '#16181d';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(rk.x, rk.y, rk.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8b8477';
+    ctx.beginPath(); ctx.arc(rk.x - rk.r * 0.22, rk.y - rk.r * 0.22, rk.r * 0.55, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 5. Bâtiments
+  for (const b of state.buildings) {
+    if (b.hp <= 0) continue;
+    const owner = state.players.find((p) => p.id === b.owner);
+    const col = owner ? owner.color : '#888';
+    drawBuilding(ctx, b, col, owner ? owner.tier : 1);
+  }
+
+  // 6. Unités
+  for (const u of state.units) {
+    if (u.hp <= 0) continue;
+    const owner = state.players.find((p) => p.id === u.owner);
+    const col = owner ? owner.color : '#888';
+    drawUnit(ctx, u, col, selectedUnits.has(u.id));
+  }
+
+  // 7. Faisceaux de tir & Éclairs Tesla
+  for (let i = beams.length - 1; i >= 0; i--) {
+    const bm = beams[i];
+    bm.life -= dt;
+    if (bm.life <= 0) { beams.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = clamp(bm.life / bm.maxLife, 0, 1);
+    ctx.strokeStyle = bm.color;
+    ctx.lineWidth = bm.w;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bm.x1, bm.y1);
+    if (bm.tesla) {
+      const mx = (bm.x1 + bm.x2) / 2 + (Math.random() - 0.5) * 28;
+      const my = (bm.y1 + bm.y2) / 2 + (Math.random() - 0.5) * 28;
+      ctx.lineTo(mx, my);
+    }
+    ctx.lineTo(bm.x2, bm.y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 8. Alertes de Frappes Orbitales
+  for (const s of state.strikes) {
+    ctx.save();
+    ctx.strokeStyle = '#ff4b2b';
+    ctx.fillStyle = 'rgba(255, 75, 43, 0.18)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 165, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    const prog = clamp(1 - s.timer / 2.1, 0, 1);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 165 * (1 - prog), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 9. Particules
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    ctx.fillStyle = p.color;
+    ctx.strokeStyle = '#16181d';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 10. Anneau de Tempête Magnétique (Mort Subite)
+  if (state.phase === 4) {
+    ctx.save();
+    ctx.strokeStyle = '#ff4b2b';
+    ctx.lineWidth = 10;
+    ctx.setLineDash([24, 14]);
+    ctx.beginPath();
+    ctx.arc(HALF_W, HALF_W, state.stormRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 11. Aperçu fantôme du bâtiment sous le curseur (Placement libre sans grille)
+  if (buildMode) {
+    const def = BUILDINGS[buildMode];
+    const check = canPlaceBuilding(state, myId, buildMode, mouse.wx, mouse.wy);
+    ctx.save();
+    // Rayon de portée ou d'influence du futur bâtiment
+    const showR = def.range || def.influence;
+    if (showR) {
+      ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.arc(mouse.wx, mouse.wy, showR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Lien avec un cristal si c'est un extracteur
+    if (buildMode === 'extractor') {
+      const cn = nearestCrystal(mouse.wx, mouse.wy);
+      if (cn) {
+        ctx.strokeStyle = '#ffc531';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cn.x, cn.y);
+        ctx.lineTo(mouse.wx, mouse.wy);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = check.ok ? 'rgba(47, 191, 113, 0.38)' : 'rgba(255, 75, 43, 0.42)';
+    ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(mouse.wx, mouse.wy, def.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  } else if (strikeMode) {
+    ctx.save();
+    ctx.strokeStyle = '#ff4b2b';
+    ctx.fillStyle = 'rgba(255, 75, 43, 0.22)';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(mouse.wx, mouse.wy, 165, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 12. Rectangle de sélection à la souris
+  if (mouse.down && mouse.dragStart) {
+    ctx.save();
+    ctx.strokeStyle = '#ffc531';
+    ctx.fillStyle = 'rgba(255, 197, 49, 0.15)';
+    ctx.lineWidth = 2.5 / cam.z;
+    const rx = Math.min(mouse.dragStart.wx, mouse.wx);
+    const ry = Math.min(mouse.dragStart.wy, mouse.wy);
+    const rw = Math.abs(mouse.wx - mouse.dragStart.wx);
+    const rh = Math.abs(mouse.wy - mouse.dragStart.wy);
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.restore();
+  }
+
+  ctx.restore();
+  renderMinimap();
+}
+
+function drawBuilding(g, b, color, tier) {
+  const r = b.radius;
+  g.save();
+  g.translate(b.x, b.y);
+
+  // Ombre portée nette style BD
+  g.fillStyle = 'rgba(22,24,29,0.35)';
+  g.beginPath();
+  g.arc(5, 6, r, 0, Math.PI * 2);
+  g.fill();
+
+  g.strokeStyle = '#16181d';
+  g.lineWidth = 3.5;
+
+  if (b.kind === 'hq') {
+    // Bastion octogonal/carré arrondi massif
+    g.fillStyle = color;
+    g.beginPath();
+    g.roundRect(-r, -r, r * 2, r * 2, 12);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#fff8ea';
+    g.beginPath();
+    g.roundRect(-r * 0.56, -r * 0.56, r * 1.12, r * 1.12, 6);
+    g.fill();
+    g.stroke();
+    // Étoiles de niveau (Tier 1..3)
+    g.fillStyle = '#ffc531';
+    g.beginPath();
+    g.arc(0, 0, 8 + tier * 2.5, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+  } else if (b.kind === 'extractor') {
+    g.fillStyle = '#fff8ea';
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = b.boost ? '#1fc7c1' : color;
+    g.beginPath();
+    g.arc(0, 0, r * 0.58, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+  } else if (b.kind === 'pylon') {
+    g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(0, -r); g.lineTo(r, r * 0.75); g.lineTo(-r, r * 0.75);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#ffc531';
+    g.beginPath();
+    g.arc(0, 0, 6, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+  } else if (b.kind === 'barracks' || b.kind === 'factory') {
+    g.fillStyle = b.kind === 'factory' ? '#16181d' : '#f3e9d2';
+    g.beginPath();
+    g.roundRect(-r, -r * 0.82, r * 2, r * 1.64, 8);
+    g.fill();
+    g.stroke();
+    g.fillStyle = color;
+    g.beginPath();
+    g.roundRect(-r * 0.65, -r * 0.45, r * 1.3, r * 0.9, 4);
+    g.fill();
+    g.stroke();
+  } else if (b.kind === 'turret' || b.kind === 'tesla') {
+    g.fillStyle = '#f3e9d2';
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = b.kind === 'tesla' ? '#1fc7c1' : color;
+    g.beginPath();
+    g.arc(0, 0, r * 0.52, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+  } else if (b.kind === 'wall') {
+    g.fillStyle = '#c8ba9b';
+    g.beginPath();
+    g.roundRect(-r, -r, r * 2, r * 2, 6);
+    g.fill();
+    g.stroke();
+    g.fillStyle = color;
+    g.fillRect(-r * 0.5, -3, r, 6);
+  }
+
+  // Barre de vie si endommagé (ou toujours sur les QG)
+  if (b.hp < b.maxHp || b.kind === 'hq') {
+    const bw = r * 1.9, bh = 6;
+    const pct = clamp(b.hp / b.maxHp, 0, 1);
+    g.fillStyle = '#16181d';
+    g.fillRect(-bw / 2 - 1, -r - 13, bw + 2, bh + 2);
+    g.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
+    g.fillRect(-bw / 2, -r - 12, bw * pct, bh);
+  }
+  g.restore();
+}
+
+function drawUnit(g, u, color, selected) {
+  const r = u.radius;
+  g.save();
+  g.translate(u.x, u.y);
+
+  if (selected) {
+    g.strokeStyle = '#ffc531';
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.arc(0, 0, r + 6, 0, Math.PI * 2);
+    g.stroke();
+  }
+
+  // Ombre
+  g.fillStyle = 'rgba(22,24,29,0.3)';
+  g.beginPath();
+  g.arc(3, 4, r, 0, Math.PI * 2);
+  g.fill();
+
+  g.save();
+  g.rotate(u.a);
+  g.strokeStyle = '#16181d';
+  g.lineWidth = 2.5;
+
+  if (u.kind === 'tank' || u.kind === 'siege' || u.kind === 'titan') {
+    g.fillStyle = color;
+    g.beginPath();
+    g.roundRect(-r, -r * 0.78, r * 2, r * 1.56, 5);
+    g.fill();
+    g.stroke();
+    // Canon
+    g.fillStyle = '#16181d';
+    g.fillRect(0, -3.5, r + 8, 7);
+    g.fillStyle = '#fff8ea';
+    g.beginPath();
+    g.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+  } else {
+    g.fillStyle = color;
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    // Arme
+    g.fillStyle = u.kind === 'sapper' ? '#ffc531' : '#16181d';
+    g.fillRect(2, -2.5, r + 4, 5);
+  }
+  g.restore();
+
+  if (u.hp < u.maxHp) {
+    const bw = r * 2.1, pct = clamp(u.hp / u.maxHp, 0, 1);
+    g.fillStyle = '#16181d';
+    g.fillRect(-bw / 2 - 1, -r - 9, bw + 2, 5);
+    g.fillStyle = '#2fbf71';
+    g.fillRect(-bw / 2, -r - 8, bw * pct, 3);
+  }
+  g.restore();
+}
+
+function renderMinimap() {
+  if (!state) return;
+  const mw = miniCvs.width, mh = miniCvs.height;
+  const sc = mw / WORLD_SIZE;
+  miniCtx.fillStyle = '#23442a';
+  miniCtx.fillRect(0, 0, mw, mh);
+
+  // Cristaux
+  miniCtx.fillStyle = '#1fc7c1';
+  for (const cn of CRYSTAL_NODES) {
+    miniCtx.fillRect(cn.x * sc - 2, cn.y * sc - 2, 4, 4);
+  }
+  // Bâtiments
+  for (const b of state.buildings) {
+    const owner = state.players.find((p) => p.id === b.owner);
+    miniCtx.fillStyle = owner ? owner.color : '#fff';
+    const sz = b.kind === 'hq' ? 6 : 3.5;
+    miniCtx.fillRect(b.x * sc - sz / 2, b.y * sc - sz / 2, sz, sz);
+  }
+  // Unités
+  for (const u of state.units) {
+    const owner = state.players.find((p) => p.id === u.owner);
+    miniCtx.fillStyle = owner ? owner.color : '#fff';
+    miniCtx.fillRect(u.x * sc - 1.2, u.y * sc - 1.2, 2.4, 2.4);
+  }
+  // Cadre de la caméra
+  const vw = (W / cam.z) * sc, vh = (H / cam.z) * sc;
+  miniCtx.strokeStyle = '#fff8ea';
+  miniCtx.lineWidth = 1.5;
+  miniCtx.strokeRect(cam.x * sc - vw / 2, cam.y * sc - vh / 2, vw, vh);
+}
+
+/* ============================================================================
+   DÉMARRAGE DE PARTIE & SYNCHRONISATION RÉSEAU (HUB BRIDGE)
+   ============================================================================ */
+let lastBootInfo = null;
+let tickInterval = null;
+let botInterval = null;
+
+function startMatch(info) {
+  lastBootInfo = info;
+  reportedResult = false;
+  selectedUnits.clear();
+  buildMode = null;
+  strikeMode = false;
+  craters = [];
+  particles = [];
+  beams = [];
+
+  clearInterval(tickInterval);
+  clearInterval(botInterval);
+
+  const H = window.HubBridge;
+  role = H && H.embedded ? info.role : 'solo';
+  myId = H && H.embedded ? info.myId : 0;
+
+  if (role === 'guest') {
+    // L'invité demande l'état initial à l'hôte
+    H.send('host', { t: 'sync' });
+    return;
+  }
+
+  // Construction de la liste des joueurs (humains du salon + bots pour compléter jusqu'à 4)
+  const settings = (info && info.settings) || { mode: 'ffa', pace: 'standard', bots: 1, level: 'normal' };
+  const humans = H && H.embedded && Array.isArray(H.players) && H.players.length
+    ? H.players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: false }))
+    : [{ id: 0, name: 'Commandant', color: PALETTE[0], bot: false }];
+
+  const roster = [...humans];
+  const wantBots = role === 'solo'
+    ? Math.max(1, Math.min(3, Number(settings.bots ?? 1)))
+    : Math.max(0, Math.min(Number(settings.bots ?? 1), 4 - roster.length));
+  const finalBots = roster.length + wantBots < 2 ? 2 - roster.length : wantBots;
+  const usedColors = new Set(roster.map((p) => p.color));
+
+  for (let k = 0; k < finalBots && roster.length < 4; k++) {
+    const col = PALETTE.find((c) => !usedColors.has(c)) || PALETTE[(roster.length) % PALETTE.length];
+    usedColors.add(col);
+    roster.push({ id: 100 + k, name: BOT_NAMES[k], color: col, bot: true });
+  }
+
+  state = createInitialState(roster, settings);
+  centerOnMyHq();
+  updateHudUI();
+
+  if (role === 'host' && H && H.embedded) {
+    H.send('all', { t: 'st', s: state, fx: [] });
+  }
+
+  // Boucle de simulation autoritaire à 20 Hz (50 ms)
+  tickInterval = setInterval(() => {
+    if (!state || state.over) return;
+    const fx = [];
+    stepWorld(state, TICK_DT, fx);
+    handleFxEvents(fx);
+    if (role === 'host' && H && H.embedded) {
+      H.send('all', { t: 'st', s: state, fx });
+    }
+  }, 1000 / TICK_RATE);
+
+  // Boucle de décision des bots (toutes les 1.4 s)
+  const botEvery = settings.level === 'expert' ? 950 : settings.level === 'facile' ? 2200 : 1400;
+  botInterval = setInterval(() => {
+    if (!state || state.over) return;
+    const fx = [];
+    runBots(state, fx);
+    handleFxEvents(fx);
+  }, botEvery);
+}
+
+// Branchement sur HubBridge
+if (window.HubBridge && HubBridge.embedded) {
+  let centeredOnce = false;
+  HubBridge.on('init', (info) => {
+    startMatch(info);
+    HubBridge.signalReady();
+  });
+  HubBridge.on('msg', (from, m) => {
+    if (!m || typeof m !== 'object') return;
+    if (role === 'host') {
+      if (m.t === 'sync' && state) {
+        HubBridge.send(from, { t: 'st', s: state, fx: [] });
+      } else if (m.t === 'cmd' && m.cmd) {
+        const fx = [];
+        executeCommand(state, from, m.cmd, fx);
+        handleFxEvents(fx);
+      }
+    } else if (role === 'guest' && from === HubBridge.info.hostId) {
+      if (m.t === 'st' && m.s) {
+        state = m.s;
+        if (!centeredOnce) { centeredOnce = true; centerOnMyHq(); }
+        if (m.fx) handleFxEvents(m.fx);
+      }
+    }
+  });
+} else {
+  startMatch({ role: 'solo', myId: 0, settings: { mode: 'ffa', pace: 'standard', bots: 1, level: 'normal' } });
+}
+
+// Boucle de rendu 60 FPS
+let lastFrame = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
+  lastFrame = now;
+  renderWorld(dt);
+  updateHudUI();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
