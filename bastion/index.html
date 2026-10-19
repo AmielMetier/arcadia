@@ -865,7 +865,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
   const p = state.players.find((q) => q.id === playerId);
   if (!p || p.dead) return { ok: false };
 
-  // 1. POSER UN CHANTIER DE CONSTRUCTION (exige un Ouvrier VCS !)
+  // 1. POSER UN CHANTIER DE CONSTRUCTION (exige un Ouvrier VCS qui se déplace sur place !)
   if (cmd.op === 'BUILD') {
     const kind = String(cmd.kind || '');
     const check = canPlaceBuilding(state, p.id, kind, Number(cmd.x) || 0, Number(cmd.y) || 0);
@@ -874,12 +874,21 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     const bx = check.snapX, by = check.snapY;
     let builder = null;
     if (Array.isArray(cmd.unitIds) && cmd.unitIds.length) {
-      builder = state.units.find((u) => u.owner === p.id && u.kind === 'scv' && cmd.unitIds.includes(u.id));
+      const candidates = state.units.filter((u) => u.owner === p.id && u.kind === 'scv' && u.hp > 0 && cmd.unitIds.includes(u.id));
+      if (candidates.length) {
+        // Choisit le VCS sélectionné le plus proche (en privilégiant ceux qui ne construisent pas déjà)
+        candidates.sort((a, b) => {
+          const pa = a.mode === 'build' ? 1e7 : 0;
+          const pb = b.mode === 'build' ? 1e7 : 0;
+          return (dist2(a.x, a.y, bx, by) + pa) - (dist2(b.x, b.y, bx, by) + pb);
+        });
+        builder = candidates[0];
+      }
     }
     if (!builder && p.bot) {
       let bestD2 = Infinity;
       for (const u of state.units) {
-        if (u.owner === p.id && u.kind === 'scv' && u.mode !== 'build') {
+        if (u.owner === p.id && u.kind === 'scv' && u.hp > 0 && u.mode !== 'build') {
           const d2 = dist2(u.x, u.y, bx, by);
           if (d2 < bestD2) { bestD2 = d2; builder = u; }
         }
@@ -905,6 +914,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
       cd: 0,
       aimA: Math.atan2(HALF_W - by, HALF_W - bx),
       constructing: true,
+      buildStarted: false,
       buildProg: 0,
       buildTime: state.blitz ? def.buildTime * 0.65 : def.buildTime,
       queue: [],
@@ -919,6 +929,10 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 
     builder.mode = 'build';
     builder.buildTargetId = bld.id;
+    builder.onSite = false;
+    builder.weldTimer = 0;
+    builder.weldX = bx;
+    builder.weldY = by;
     builder.orderX = bx;
     builder.orderY = by;
     fxEvents.push({ k: 'BUILD', x: bx, y: by, color: p.color, radius: def.radius });
@@ -1011,28 +1025,34 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 
     mySelected.forEach((u, idx) => {
       if (mode === 'stop') {
-        u.mode = 'idle'; u.orderX = null; u.orderY = null; u.targetEntId = null;
+        u.mode = 'idle'; u.orderX = null; u.orderY = null; u.targetEntId = null; u.buildTargetId = null; u.onSite = false;
         return;
       }
       if (mode === 'hold') {
-        u.mode = 'hold'; u.orderX = null; u.orderY = null; u.targetEntId = null;
+        u.mode = 'hold'; u.orderX = null; u.orderY = null; u.targetEntId = null; u.buildTargetId = null; u.onSite = false;
         return;
       }
       if (mode === 'harvest_min' && u.kind === 'scv') {
         u.mode = 'harvest_min';
         u.harvestId = cmd.resId || (nearestMineral(x, y)?.id ?? null);
         u.buildTargetId = null;
+        u.onSite = false;
         return;
       }
       if (mode === 'harvest_gas' && u.kind === 'scv') {
         u.mode = 'harvest_gas';
         u.harvestId = cmd.resId || null;
         u.buildTargetId = null;
+        u.onSite = false;
         return;
       }
       if (mode === 'build' && u.kind === 'scv' && cmd.targetId) {
         u.mode = 'build';
         u.buildTargetId = cmd.targetId;
+        u.onSite = false;
+        u.weldTimer = 0;
+        const tb = state.buildings.find((b) => b.id === cmd.targetId);
+        if (tb) { u.orderX = tb.x; u.orderY = tb.y; u.weldX = tb.x; u.weldY = tb.y; }
         return;
       }
 
@@ -1042,6 +1062,7 @@ function executeCommand(state, playerId, cmd, fxEvents) {
       const fy = clamp(y + (row - (Math.ceil(count / cols) - 1) / 2) * spacing, 30, WORLD_SIZE - 30);
 
       u.buildTargetId = null;
+      u.onSite = false;
       if (mode === 'focus' && cmd.targetId) {
         u.mode = 'focus'; u.targetEntId = cmd.targetId; u.orderX = x; u.orderY = y;
       } else if (mode === 'move') {
@@ -1100,6 +1121,32 @@ function executeCommand(state, playerId, cmd, fxEvents) {
 /* ============================================================================
    SIMULATION DU MONDE TEMPS RÉEL (20 HZ)
    ============================================================================ */
+function finishBuildingConstruction(state, b, owner, fxEvents) {
+  b.constructing = false;
+  b.buildStarted = true;
+  b.buildProg = 1;
+  b.hp = b.maxHp;
+  fxEvents.push({ k: 'COMPLETE', x: b.x, y: b.y, color: owner ? owner.color : '#ffc531', kind: b.kind });
+  for (const u of state.units) {
+    if (u.kind === 'scv' && u.buildTargetId === b.id) {
+      // Le VCS sort proprement du périmètre du bâtiment achevé
+      const ang = Math.atan2(u.y - b.y, u.x - b.x) || 0.6;
+      const outDist = b.radius + u.radius + 6;
+      u.x = clamp(b.x + Math.cos(ang) * outDist, 26, WORLD_SIZE - 26);
+      u.y = clamp(b.y + Math.sin(ang) * outDist, 26, WORLD_SIZE - 26);
+      u.onSite = false;
+      u.buildTargetId = null;
+      if (b.kind === 'extractor') {
+        u.mode = 'harvest_gas';
+        u.harvestId = b.id;
+      } else {
+        u.mode = 'harvest_min';
+        u.harvestId = nearestMineral(u.x, u.y, 500)?.id ?? null;
+      }
+    }
+  }
+}
+
 function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
@@ -1141,24 +1188,11 @@ function stepWorld(state, dt, fxEvents) {
       b.hp -= 35 * dt;
     }
 
+    // Important : Un chantier en construction NE PROGRESSE PAS tout seul !
+    // Il exige qu'un Ouvrier VCS soit physiquement SUR l'emplacement de construction.
     if (b.constructing) {
-      const rate = 0.22 / (b.buildTime || 8);
-      b.buildProg += rate * dt;
-      b.hp = Math.min(b.maxHp, b.hp + b.maxHp * rate * dt);
       if (b.buildProg >= 1) {
-        b.constructing = false;
-        b.buildProg = 1;
-        b.hp = b.maxHp;
-        fxEvents.push({ k: 'COMPLETE', x: b.x, y: b.y, color: owner.color, kind: b.kind });
-        if (b.kind === 'extractor') {
-          for (const u of state.units) {
-            if (u.owner === owner.id && u.kind === 'scv' && u.buildTargetId === b.id) {
-              u.mode = 'harvest_gas';
-              u.harvestId = b.id;
-              u.buildTargetId = null;
-            }
-          }
-        }
+        finishBuildingConstruction(state, b, owner, fxEvents);
       }
       continue;
     }
@@ -1236,19 +1270,63 @@ function stepWorld(state, dt, fxEvents) {
         if (!bld) {
           u.mode = 'harvest_min';
           u.buildTargetId = null;
+          u.onSite = false;
           const m = nearestMineral(u.x, u.y, 400);
           u.harvestId = m ? m.id : null;
+        } else if (bld.constructing) {
+          // CONSTRUCTION FAÇON STARCRAFT : Le VCS doit être PHYSIQUEMENT SUR l'endroit de construction !
+          const distCenter = hypot(u.x, u.y, bld.x, bld.y);
+          const siteRadius = Math.max(16, bld.radius * 0.72);
+          if (distCenter <= siteRadius || u.onSite) {
+            u.onSite = true;
+            bld.buildStarted = true;
+
+            // Le VCS se déplace d'un point de soudure à l'autre SUR la dalle du chantier
+            u.weldTimer = (u.weldTimer || 0) - dt;
+            if (u.weldTimer <= 0 || u.weldX == null || u.weldY == null) {
+              u.weldTimer = 1.0 + Math.random() * 0.75;
+              const wAng = Math.random() * TAU;
+              const wR = bld.radius * (0.16 + Math.random() * 0.36);
+              u.weldX = bld.x + Math.cos(wAng) * wR;
+              u.weldY = bld.y + Math.sin(wAng) * wR;
+            }
+            const wx = u.weldX - u.x, wy = u.weldY - u.y;
+            const wd = Math.hypot(wx, wy);
+            if (wd > 3) {
+              const stepSpd = Math.min(wd, def.speed * 0.55 * dt);
+              u.vx = (wx / wd) * (def.speed * 0.55);
+              u.vy = (wy / wd) * (def.speed * 0.55);
+              u.x += (wx / wd) * stepSpd;
+              u.y += (wy / wd) * stepSpd;
+            } else {
+              u.vx = 0; u.vy = 0;
+            }
+            // Oriente le chalumeau du VCS vers le cœur de la structure sur le chantier
+            u.a = Math.atan2(bld.y - u.y, bld.x - u.x);
+
+            const step = (1.0 / (bld.buildTime || 8)) * dt;
+            bld.buildProg += step;
+            bld.hp = Math.min(bld.maxHp, bld.hp + bld.maxHp * 0.85 * step);
+            if (Math.random() < 0.48) {
+              fxEvents.push({ k: 'SPARK', x: u.x + Math.cos(u.a) * 14, y: u.y + Math.sin(u.a) * 14, color: '#ffc531' });
+            }
+            if (bld.buildProg >= 1) {
+              finishBuildingConstruction(state, bld, owner, fxEvents);
+            }
+            continue;
+          } else {
+            // En route vers le centre du chantier de construction
+            u.orderX = bld.x;
+            u.orderY = bld.y;
+          }
         } else {
+          // Réparation d'un bâtiment déjà construit
+          u.onSite = false;
           const d = hypot(u.x, u.y, bld.x, bld.y) - bld.radius - u.radius;
-          if (d <= 22) {
+          if (d <= 18) {
             u.a = Math.atan2(bld.y - u.y, bld.x - u.x);
             u.vx = 0; u.vy = 0;
-            if (bld.constructing) {
-              const step = (0.85 / (bld.buildTime || 8)) * dt;
-              bld.buildProg += step;
-              bld.hp = Math.min(bld.maxHp, bld.hp + bld.maxHp * step);
-              if (Math.random() < 0.35) fxEvents.push({ k: 'SPARK', x: u.x + Math.cos(u.a) * 14, y: u.y + Math.sin(u.a) * 14, color: '#ffc531' });
-            } else if (bld.hp < bld.maxHp && owner.minerals >= 1) {
+            if (bld.hp < bld.maxHp && owner.minerals >= 1) {
               bld.hp = Math.min(bld.maxHp, bld.hp + 45 * dt);
               owner.minerals = Math.max(0, owner.minerals - 3 * dt);
               if (Math.random() < 0.35) fxEvents.push({ k: 'SPARK', x: u.x + Math.cos(u.a) * 14, y: u.y + Math.sin(u.a) * 14, color: '#ffc531' });
@@ -1266,6 +1344,7 @@ function stepWorld(state, dt, fxEvents) {
       }
 
       if (u.mode === 'harvest_min' || u.mode === 'harvest_gas') {
+        u.onSite = false;
         const hq = nearestMyHq(state, u.owner, u.x, u.y);
         if (u.carryAmt > 0 && hq) {
           const dHq = hypot(u.x, u.y, hq.x, hq.y) - hq.radius - u.radius;
@@ -1407,7 +1486,7 @@ function stepWorld(state, dt, fxEvents) {
       goalY = bestTarget.ent.y;
     }
     if (goalX == null || goalY == null) continue;
-    if (dist2(u.x, u.y, goalX, goalY) <= 18 * 18) {
+    if (u.mode !== 'build' && dist2(u.x, u.y, goalX, goalY) <= 18 * 18) {
       if (u.mode === 'move' || u.mode === 'amove') {
         u.orderX = null;
         u.orderY = null;
@@ -1425,6 +1504,7 @@ function stepWorld(state, dt, fxEvents) {
     const sideSign = (u.id % 2 === 0) ? 1 : -1;
     for (const b of state.buildings) {
       if (b.hp <= 0 || b.id === u.buildTargetId || b.id === u.harvestId) continue;
+      if (b.constructing && !b.buildStarted) continue;
       if (u.kind === 'scv' && u.carryAmt > 0 && b.owner === u.owner && b.kind === 'hq') continue;
       const ox = b.x - u.x, oy = b.y - u.y;
       const d = Math.hypot(ox, oy) || 1;
@@ -1474,6 +1554,9 @@ function stepWorld(state, dt, fxEvents) {
 
     for (const b of state.buildings) {
       if (b.hp <= 0) continue;
+      // Le VCS qui construit ce chantier a le droit d'entrer SUR l'emplacement de construction !
+      if (b.constructing && u.kind === 'scv' && u.buildTargetId === b.id) continue;
+      if (b.constructing && !b.buildStarted) continue;
       const cx = u.x - b.x, cy = u.y - b.y;
       const minD = u.radius + b.radius + 2;
       const d2 = cx * cx + cy * cy;
@@ -1562,6 +1645,20 @@ function runBots(state, fxEvents) {
       }
       return false;
     };
+
+    // Si un chantier du bot n'a plus de VCS attitré, y envoyer un VCS libre
+    for (const cb of myBlds) {
+      if (cb.constructing && !scvs.some((u) => u.mode === 'build' && u.buildTargetId === cb.id)) {
+        const freeBuilder = scvs.find((u) => u.mode !== 'build');
+        if (freeBuilder) {
+          freeBuilder.mode = 'build';
+          freeBuilder.buildTargetId = cb.id;
+          freeBuilder.onSite = false;
+          freeBuilder.orderX = cb.x;
+          freeBuilder.orderY = cb.y;
+        }
+      }
+    }
 
     if (sup.max - sup.used <= 3 && sup.max < MAX_SUPPLY && p.minerals >= 75) {
       if (tryBuildNear('pylon', hq.x + dirX * 90, hq.y + dirY * 90, 65, 195)) return;
@@ -1886,7 +1983,8 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
   const r = b.radius;
   const def = BUILDINGS[b.kind] || BUILDINGS.hq;
   const wx = b.x || 0, wy = b.y || 0;
-  const prog = b.constructing && !isIcon ? clamp(b.buildProg || 0.15, 0.15, 1) : 1;
+  const waitingScv = !isIcon && b.constructing && !b.buildStarted && (b.buildProg || 0) <= 0.01;
+  const prog = b.constructing && !isIcon ? clamp(b.buildProg || 0.08, 0.12, 1) : 1;
   const H3D = (def.height || 36) * prog;
   const darkCol = shade(color, -0.28);
   const lightCol = shade(color, 0.22);
@@ -1898,6 +1996,25 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.strokeStyle = '#2fbf71';
     g.lineWidth = 3.5;
     g.beginPath(); g.arc(0, 0, r + 9, 0, TAU); g.stroke();
+  }
+
+  // Tant que le VCS n'est pas arrivé sur l'emplacement, on affiche le plan holographique au sol !
+  if (waitingScv) {
+    g.fillStyle = 'rgba(31, 199, 193, 0.16)';
+    g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+    g.strokeStyle = '#ffc531';
+    g.lineWidth = 2.8;
+    g.setLineDash([7, 5]);
+    g.beginPath(); g.arc(0, 0, r, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    // Balise centrale "VCS en approche"
+    const pulse = 5 + Math.sin(now * 0.01) * 2.5;
+    g.fillStyle = '#ffc531';
+    g.strokeStyle = '#16181d';
+    g.lineWidth = 2;
+    g.beginPath(); g.arc(0, 0, pulse, 0, TAU); g.fill(); g.stroke();
+    g.restore();
+    return;
   }
 
   // Ombre portée 3D au sol
@@ -2108,6 +2225,18 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
   g.save();
   g.translate(wx, wy);
 
+  // Si c'est un VCS posé SUR un chantier en cours de construction, on l'élève sur la dalle 3D du chantier !
+  let siteZ = 0;
+  if (!isIcon && u.kind === 'scv' && u.onSite && u.buildTargetId && state) {
+    const tb = state.buildings.find((b) => b.id === u.buildTargetId && b.constructing);
+    if (tb) {
+      const defB = BUILDINGS[tb.kind] || BUILDINGS.hq;
+      siteZ = (defB.height || 36) * clamp(tb.buildProg || 0.12, 0.12, 1) * 0.72;
+    }
+  }
+  const siteOff = siteZ > 0 ? project3DOffset(wx, wy, siteZ, false) : { ox: 0, oy: 0 };
+  g.translate(siteOff.ox, siteOff.oy);
+
   if (!isIcon && u.stimT > 0) {
     g.strokeStyle = '#ff4b2b';
     g.lineWidth = 2.5;
@@ -2143,6 +2272,15 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
     if (!isIcon && u.carryAmt > 0) {
       g.fillStyle = u.carryType === 'gas' ? '#2fbf71' : u.carryType === 'gold' ? '#ffc531' : '#1fc7c1';
       g.beginPath(); g.arc(r + 3, 0, 5.5, 0, TAU); g.fill(); g.stroke();
+    }
+    // Arc de soudure plasma actif quand le VCS construit sur le chantier
+    if (!isIcon && u.onSite && u.mode === 'build') {
+      const fR = 4.5 + Math.sin(now * 0.045) * 2.5;
+      g.strokeStyle = '#1fc7c1';
+      g.lineWidth = 3;
+      g.beginPath(); g.moveTo(r * 0.7, -3); g.lineTo(r + 12, 0); g.lineTo(r * 0.7, 3); g.stroke();
+      g.fillStyle = '#fff8ea';
+      g.beginPath(); g.arc(r + 12, 0, fR, 0, TAU); g.fill();
     }
     g.restore();
     // Cabine 3D surélevée
@@ -3261,7 +3399,12 @@ function renderWorld(dt, now) {
   for (const u of state.units) {
     if (u.hp <= 0) continue;
     if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
-    renderList.push({ k: 'unit', y: u.y, obj: u });
+    let sortY = u.y;
+    if (u.kind === 'scv' && u.onSite && u.buildTargetId) {
+      const tb = state.buildings.find((b) => b.id === u.buildTargetId && b.constructing);
+      if (tb) sortY = Math.max(u.y, tb.y + 1);
+    }
+    renderList.push({ k: 'unit', y: sortY, obj: u });
   }
   for (const b of state.buildings) {
     if (b.hp <= 0) continue;
