@@ -196,11 +196,8 @@ canvas#minimap{width:170px;height:164px;display:block;border:2.5px solid var(--i
   <div class="phase-badge" id="uiPhase">
     <span id="uiClock">00:00</span> · <span id="uiPhaseName">Ouverture RTS</span>
   </div>
-  <button class="btn small ghost" id="btnMap" title="Changer de champ de bataille (Solo) : Vallée, Fissures de Magma, Glacier Boréal">
-    <span id="uiMapIcon">🌲</span> <span id="uiMapName">Vallée Tempérée</span>
-  </button>
-  <div class="res-pill" id="uiMapBadge" style="font-size:11px;padding:4px 9px;border-color:var(--ink);cursor:help" title="Spécificité du champ de bataille">
-    <span id="uiMapBadgeTxt">🌲 Abondance Centrale</span>
+  <div class="res-pill" id="uiMapBadge" style="font-size:11px;padding:4px 9px;border-color:var(--ink);cursor:help" title="Champ de bataille et spécificité active">
+    <span id="uiMapBadgeTxt">🌲 Vallée Tempérée · Abondance Centrale</span>
   </div>
   <div class="spacer"></div>
   <div class="roster-top" id="uiRoster"></div>
@@ -704,7 +701,7 @@ function updateMapUI() {
   const iconEl = $('#uiMapIcon'), nameEl = $('#uiMapName'), badgeEl = $('#uiMapBadgeTxt'), badgeWrap = $('#uiMapBadge');
   if (iconEl) iconEl.textContent = def.icon;
   if (nameEl) nameEl.textContent = def.name;
-  if (badgeEl) badgeEl.textContent = `${def.icon} ${def.badge}`;
+  if (badgeEl) badgeEl.textContent = `${def.icon} ${def.name} · ${def.badge}`;
   if (badgeWrap) badgeWrap.title = `${def.name} : ${def.desc}\nSpécificité : ${def.badgeDesc}`;
 }
 
@@ -3176,7 +3173,10 @@ function isExplored(wx, wy) {
   if (!me || me.dead) return true;
   const gx = Math.floor(clamp(wx, 0, WORLD_SIZE - 1) * (FOG_RES / WORLD_SIZE));
   const gy = Math.floor(clamp(wy, 0, WORLD_SIZE - 1) * (FOG_RES / WORLD_SIZE));
-  return exploredGrid[gy * FOG_RES + gx] === 1;
+  if (exploredGrid[gy * FOG_RES + gx] === 1) return true;
+  const myHq = state.buildings.find((b) => b.owner === myId && b.kind === 'hq');
+  if (myHq && dist2(wx, wy, myHq.x, myHq.y) <= 280 * 280) return true;
+  return false;
 }
 
 function isVisibleToMe(wx, wy) {
@@ -4492,24 +4492,6 @@ miniCvs.addEventListener('pointerdown', (e) => {
 miniCvs.addEventListener('contextmenu', (e) => e.preventDefault());
 
 $('#btnCenter').onclick = centerOnMyHq;
-$('#btnMap').onclick = () => {
-  if (role === 'guest') {
-    toast(`Carte choisie par l'Hôte : ${MAP_DEFS[activeMapId]?.name || 'Vallée'}`, 2500);
-    return;
-  }
-  const mapIds = ['vallee', 'magma', 'glace'];
-  const nextIdx = (mapIds.indexOf(activeMapId) + 1) % mapIds.length;
-  const nextMap = mapIds[nextIdx];
-  const nextDef = MAP_DEFS[nextMap];
-  if (state && !state.over && state.time > 8) {
-    const ok = window.confirm(`Relancer une nouvelle partie sur ${nextDef.icon} ${nextDef.name} ?\n(La partie en cours sera réinitialisée)`);
-    if (!ok) return;
-  }
-  switchMap(nextMap);
-  if (role === 'host' && window.HubBridge && HubBridge.embedded && state) {
-    HubBridge.send('all', { t: 'st', s: packState(state), fx: [] });
-  }
-};
 $('#uiMapBadge').onclick = () => {
   const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   toast(`🗺️ ${def.icon} ${def.name}\n⭐ Spécificité : ${def.badgeDesc}`, 4000);
@@ -5155,8 +5137,6 @@ function initThree3D() {
     centerMonumentGroup3D = new THREE.Group();
     threeScene.add(centerMonumentGroup3D);
 
-    setupThreeMapScenery(activeMapId);
-
     wallBeamsGroup3D = new THREE.Group();
     threeScene.add(wallBeamsGroup3D);
 
@@ -5183,6 +5163,7 @@ function initThree3D() {
     threeScene.add(fogMesh);
 
     threeReady = true;
+    setupThreeMapScenery(activeMapId);
     return true;
   } catch (err) {
     console.warn('Fallback 2D activé :', err);
@@ -5192,7 +5173,7 @@ function initThree3D() {
 }
 
 function setupThreeMapScenery(mapId = activeMapId) {
-  if (!threeReady || !threeScene) return;
+  if (!threeScene) return;
   const def = MAP_DEFS[mapId] || MAP_DEFS.vallee;
 
   // 1. Ambiance, Fog et Horizon
@@ -5213,7 +5194,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   if (rimLight3D) rimLight3D.color = new THREE.Color(def.rimColor);
 
   // 3. Texture du sol
-  if (groundMesh3D && terrainCanvas) {
+  if (groundMesh3D && groundMesh3D.material && terrainCanvas) {
     if (groundMesh3D.material.map && groundMesh3D.material.map.dispose) {
       groundMesh3D.material.map.dispose();
     }
@@ -5363,8 +5344,10 @@ function setupThreeMapScenery(mapId = activeMapId) {
   mineralMeshes3D.length = 0;
   const crysGeo = new THREE.OctahedronGeometry(1, 0);
   for (const m of MINERAL_NODES) {
+    const isBasePlat = SPAWN_CORNERS.some((sp) => hypot(m.x, m.y, sp.x, sp.y) < 220);
+    const baseY = isBasePlat ? 7.2 : 3.5;
     const grp = new THREE.Group();
-    grp.position.set(m.x, 4, m.y);
+    grp.position.set(m.x, baseY, m.y);
     let col, em;
     if (def.theme === 'volcanique') {
       col = m.rich ? '#ffd700' : '#ff4b2b';
@@ -5394,7 +5377,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
       grp.add(c);
     }
     threeScene.add(grp);
-    mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y });
+    mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y, baseY });
   }
 
   // 9. Geysers de Gaz Plasma 3D
@@ -5414,8 +5397,10 @@ function setupThreeMapScenery(mapId = activeMapId) {
   const geyCoreMat = getMat3D(geyCol, 0.2, 0.1, geyEm, 0.85);
 
   for (const gey of GAS_GEYSERS) {
+    const isBasePlat = SPAWN_CORNERS.some((sp) => hypot(gey.x, gey.y, sp.x, sp.y) < 220);
+    const baseY = isBasePlat ? 7.2 : 3.5;
     const grp = new THREE.Group();
-    grp.position.set(gey.x, 4, gey.y);
+    grp.position.set(gey.x, baseY, gey.y);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(22, 29, 14, 12), geyRimMat);
     base.position.y = 7;
     base.castShadow = true; base.receiveShadow = true;
@@ -5428,7 +5413,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
     core.position.y = 13;
     grp.add(core);
     threeScene.add(grp);
-    geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01, x: gey.x, y: gey.y });
+    geyserMeshes3D.push({ grp, core, seed: gey.x * 0.01, x: gey.x, y: gey.y, baseY });
   }
 }
 
@@ -5954,7 +5939,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     // Animation des cristaux de minéraux et geysers de gaz plasma
     for (const m of mineralMeshes3D) {
       if (m.grp.visible) {
-        m.grp.position.y = 4 + Math.sin(now * 0.0035 + m.seed) * 1.8;
+        m.grp.position.y = (m.baseY || 4) + Math.sin(now * 0.0035 + m.seed) * 1.8;
       }
     }
     for (const g of geyserMeshes3D) {
@@ -6924,6 +6909,10 @@ function startMatch(info) {
   }
 
   state = createInitialState(roster, settings);
+  if (typeof setupThreeMapScenery === 'function' && threeScene) {
+    setupThreeMapScenery(state.map || activeMapId);
+  }
+  updateFogCanvas(performance.now() + 100);
   centerOnMyHq();
   renderConsoleUI(true);
   updateHudUI();
