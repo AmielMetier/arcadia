@@ -62,8 +62,8 @@ window.HUB_GAMES = [
   {
     id: 'bastion',
     title: 'Bastion Clash',
-    tag: 'RTS & Arène tactique',
-    desc: 'Construis ta base librement sans grille, capture les cristaux, déploie tes escouades et détruis les QG ennemis.',
+    tag: 'RTS StarCraft · Base & Micro',
+    desc: 'Récolte minéraux et gaz avec tes VCS, construis ta base librement, gère ton ravitaillement et micro-gère ton armée (A-Move, Stimpack, Mode Siège).',
     url: 'bastion/',
     minPlayers: 1, maxPlayers: 4,
     accent: '#2fbf71',
