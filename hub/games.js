@@ -74,38 +74,58 @@ window.HUB_GAMES = [
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#2f5d3a"/>
-      <g fill="#254b2e"><circle cx="46" cy="146" r="24"/><circle cx="278" cy="36" r="28"/><circle cx="160" cy="90" r="54"/></g>
-      <circle cx="82" cy="112" r="58" fill="rgba(255,75,43,.14)" stroke="#ff4b2b" stroke-width="2.5" stroke-dasharray="8 6"/>
-      <circle cx="238" cy="68" r="58" fill="rgba(43,140,255,.14)" stroke="#2b8cff" stroke-width="2.5" stroke-dasharray="8 6"/>
-      <g transform="translate(160 90)">
-        <polygon points="0,-18 14,-6 9,14 -9,14 -14,-6" fill="#1fc7c1" stroke="#16181d" stroke-width="3"/>
-        <polygon points="0,-12 7,-3 4,8 -4,8 -7,-3" fill="#fff8ea" opacity=".65"/>
+      <rect width="320" height="180" fill="#5aa846"/>
+      <ellipse cx="64" cy="40" rx="52" ry="30" fill="#4e963b"/>
+      <ellipse cx="260" cy="148" rx="60" ry="34" fill="#68b853"/>
+      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#f3e9d2" stroke-width="32" stroke-linecap="round"/>
+      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#16181d" stroke-width="34" stroke-linecap="round" opacity=".18"/>
+      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#3a3d46" stroke-width="24" stroke-linecap="round"/>
+      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#ffc531" stroke-width="2.5" stroke-dasharray="9 8" stroke-linecap="round"/>
+      <circle cx="160" cy="90" r="30" fill="#464b56" stroke="#16181d" stroke-width="3"/>
+      <circle cx="160" cy="90" r="22" fill="none" stroke="#ffc531" stroke-width="2" stroke-dasharray="6 5"/>
+      <circle cx="74" cy="122" r="58" fill="rgba(255,75,43,.12)" stroke="#ff4b2b" stroke-width="2.5" stroke-dasharray="8 6"/>
+      <circle cx="248" cy="56" r="58" fill="rgba(43,140,255,.12)" stroke="#2b8cff" stroke-width="2.5" stroke-dasharray="8 6"/>
+      <g transform="translate(160 88)">
+        <polygon points="-14,6 -6,-14 4,-10 2,10" fill="#0d9b96" stroke="#16181d" stroke-width="2.5"/>
+        <polygon points="4,8 10,-12 18,-4 12,12" fill="#1fc7c1" stroke="#16181d" stroke-width="2.5"/>
+        <polygon points="-4,12 0,-20 10,-12 6,12" fill="#7cf7f2" stroke="#16181d" stroke-width="2.5"/>
       </g>
-      <g transform="translate(76 114)">
-        <rect x="-24" y="-24" width="48" height="48" rx="10" fill="#ff4b2b" stroke="#16181d" stroke-width="3.5"/>
-        <rect x="-13" y="-13" width="26" height="26" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="0" r="6" fill="#ffc531" stroke="#16181d" stroke-width="2"/>
+      <g transform="translate(68 122)">
+        <rect x="-26" y="-18" width="52" height="44" rx="8" fill="#a82913" stroke="#16181d" stroke-width="3"/>
+        <rect x="-26" y="-26" width="52" height="44" rx="8" fill="#ff4b2b" stroke="#16181d" stroke-width="3"/>
+        <rect x="-15" y="-17" width="30" height="26" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="-4" r="7" fill="#ffc531" stroke="#16181d" stroke-width="2.5"/>
+        <line x1="0" y1="-4" x2="15" y2="-11" stroke="#16181d" stroke-width="4" stroke-linecap="round"/>
       </g>
-      <g transform="translate(118 96) rotate(-25)">
-        <circle cx="0" cy="0" r="13" fill="#f3e9d2" stroke="#16181d" stroke-width="3"/>
-        <rect x="0" y="-4" width="18" height="8" rx="3" fill="#16181d"/>
-        <circle cx="0" cy="0" r="6" fill="#ff4b2b" stroke="#16181d" stroke-width="2"/>
+      <g transform="translate(116 94)">
+        <circle cx="0" cy="4" r="14" fill="#9a9382" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="-2" r="12" fill="#f3e9d2" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="-6" r="6" fill="#7cf7f2" stroke="#16181d" stroke-width="2"/>
+        <polyline points="5,-6 22,-14 30,-8 46,-16" fill="none" stroke="#7cf7f2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </g>
-      <g transform="translate(244 64)">
-        <rect x="-22" y="-22" width="44" height="44" rx="10" fill="#2b8cff" stroke="#16181d" stroke-width="3.5"/>
-        <rect x="-12" y="-12" width="24" height="24" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="0" r="5.5" fill="#ffc531" stroke="#16181d" stroke-width="2"/>
+      <g transform="translate(250 54)">
+        <rect x="-24" y="-16" width="48" height="40" rx="8" fill="#165299" stroke="#16181d" stroke-width="3"/>
+        <rect x="-24" y="-24" width="48" height="40" rx="8" fill="#2b8cff" stroke="#16181d" stroke-width="3"/>
+        <rect x="-14" y="-16" width="28" height="24" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
+        <circle cx="0" cy="-4" r="6.5" fill="#ffc531" stroke="#16181d" stroke-width="2.5"/>
       </g>
-      <g transform="translate(138 126) rotate(-28)">
+      <g transform="translate(132 132) rotate(-25)">
+        <rect x="-15" y="-12" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
+        <rect x="-15" y="6" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
         <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#ff4b2b" stroke="#16181d" stroke-width="2.5"/>
-        <rect x="2" y="-2.5" width="14" height="5" rx="2" fill="#16181d"/>
+        <rect x="0" y="-3" width="18" height="6" rx="2" fill="#3a3d46" stroke="#16181d" stroke-width="2"/>
+        <circle cx="-1" cy="0" r="6" fill="#fff8ea" stroke="#16181d" stroke-width="2"/>
       </g>
-      <g transform="translate(194 74) rotate(152)">
+      <g transform="translate(202 74) rotate(155)">
+        <rect x="-15" y="-12" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
+        <rect x="-15" y="6" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
         <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#2b8cff" stroke="#16181d" stroke-width="2.5"/>
-        <rect x="2" y="-2.5" width="14" height="5" rx="2" fill="#16181d"/>
+        <rect x="0" y="-3" width="18" height="6" rx="2" fill="#3a3d46" stroke="#16181d" stroke-width="2"/>
+        <circle cx="-1" cy="0" r="6" fill="#fff8ea" stroke="#16181d" stroke-width="2"/>
       </g>
-      <line x1="128" y1="90" x2="182" y2="68" stroke="#ffc531" stroke-width="3" stroke-dasharray="6 5"/>
+      <g fill="#2e7028" stroke="#16181d" stroke-width="2.5">
+        <circle cx="32" cy="46" r="14"/><circle cx="50" cy="36" r="11"/><circle cx="286" cy="142" r="15"/><circle cx="264" cy="154" r="11"/>
+      </g>
     </svg>`,
   },
 ];
