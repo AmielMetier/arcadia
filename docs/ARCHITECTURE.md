@@ -272,4 +272,4 @@ Paramètres de test : `?peer=127.0.0.1:9000` (serveur PeerJS local), `?relay` (r
 ce qui permet à `game.js` de choisir l'un ou l'autre. La texture du plateau est dessinée une fois dans un canevas
 (3072 px) à partir des mêmes données et icônes que le plateau classique. Rendu « NeutralToneMapping » pour garder
 les couleurs du plateau. La caméra de suivi se place du côté de la case visée (azimut par côté) et se déplace
-en arc autour de sa cible. Three.js r170 est embarqué dans `shared/vendor/three/` (licence MIT).
+en arc autour de sa cible. Three.js r169 est embarqué dans `shared/vendor/three/` (licence MIT).
