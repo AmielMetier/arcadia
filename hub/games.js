@@ -69,7 +69,12 @@ window.HUB_GAMES = [
     accent: '#2fbf71',
     settings: [
       { key: 'map', label: 'Champ de bataille', options: [['vallee', '🌲 Vallée Tempérée (Classique)'], ['magma', '🌋 Fissures de Magma (+Gaz & Chokepoints)'], ['glace', '❄️ Glacier Boréal (+Vitesse & Forage Rapide)']], def: 'vallee' },
-      { key: 'mode', label: 'Format', options: [['ffa', 'Chacun pour soi'], ['2v2', 'Équipes 2v2']], def: 'ffa' },
+      { key: 'mode', label: 'Format & Équipes', options: [
+        ['ffa', 'Chacun pour soi (FFA)'],
+        ['2v2_coop', '2v2 Coop : Humains ensemble vs Bots'],
+        ['2v2_duel', '2v2 Duel : Humain + Bot vs Humain + Bot'],
+        ['2v2_pvp', '2v2 PvP : Joueurs 1 & 2 vs Joueurs 3 & 4'],
+      ], def: 'ffa' },
       { key: 'pace', label: 'Durée max', options: [['standard', 'Standard · 25 min'], ['blitz', 'Blitz · 12 min']], def: 'standard' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
@@ -129,4 +134,95 @@ window.HUB_GAMES = [
       </g>
     </svg>`,
   },
+  {
+    id: 'outbreak',
+    title: 'Outbreak : Secteur Zéro',
+    tag: 'Shooter Zombie Roguelite 2D',
+    desc: 'Shooter twin-stick cartoon et nerveux ! Éliminez les hordes mutantes salle par salle, déverrouillez l\'arsenal et terrassez le Spécimen Zéro en coop.',
+    url: 'outbreak/',
+    minPlayers: 1, maxPlayers: 5,
+    accent: '#f43f5e',
+    settings: [
+      { key: 'difficulty', label: 'Intensité épidémie', options: [['normal', 'Normale'], ['hardcore', 'Hardcore · Cauchemar'], ['arcade', 'Arcade · Action']], def: 'normal' },
+      { key: 'startingWeapon', label: 'Arme de départ', options: [['pistol', '🔫 Pistolet 9mm'], ['shotgun', '💥 Spas-12 Pompe'], ['smg', '⚡ Mitraillette MP5']], def: 'pistol' },
+    ],
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="outbreakBkg" cx="50%" cy="40%" r="75%">
+          <stop offset="0%" stop-color="#221215"/>
+          <stop offset="50%" stop-color="#140a0c"/>
+          <stop offset="100%" stop-color="#080405"/>
+        </radialGradient>
+        <linearGradient id="laserSight" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff3344" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#ff3344" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Bunker corridor -->
+      <rect width="320" height="180" fill="url(#outbreakBkg)"/>
+      <!-- Grid laboratory tiles -->
+      <g stroke="#2a1418" stroke-width="1" opacity="0.6">
+        <line x1="0" y1="50" x2="320" y2="50"/>
+        <line x1="0" y1="90" x2="320" y2="90"/>
+        <line x1="0" y1="130" x2="320" y2="130"/>
+        <line x1="60" y1="0" x2="60" y2="180"/>
+        <line x1="120" y1="0" x2="120" y2="180"/>
+        <line x1="180" y1="0" x2="180" y2="180"/>
+        <line x1="240" y1="0" x2="240" y2="180"/>
+      </g>
+      <!-- Blood splatters on floor -->
+      <path d="M70 120 Q85 105 100 122 Q115 135 95 140 Q80 145 70 120 Z" fill="#880814" opacity="0.85"/>
+      <circle cx="112" cy="115" r="3" fill="#880814"/>
+      <circle cx="62" cy="135" r="2.5" fill="#880814"/>
+      <path d="M230 140 Q250 130 265 145 Q260 160 240 155 Z" fill="#6d0610" opacity="0.8"/>
+      <!-- Biohazard warning door / airlock in background -->
+      <rect x="110" y="20" width="100" height="110" rx="6" fill="#181c22" stroke="#ff3344" stroke-width="2.5"/>
+      <rect x="120" y="35" width="80" height="25" fill="#0d0f12" stroke="#2a303a" stroke-width="1.5"/>
+      <circle cx="160" cy="47" r="6" fill="#ff3344"/>
+      <!-- Hazard stripes -->
+      <g stroke="#ffc531" stroke-width="3">
+        <line x1="112" y1="24" x2="124" y2="24"/>
+        <line x1="130" y1="24" x2="142" y2="24"/>
+        <line x1="148" y1="24" x2="160" y2="24"/>
+        <line x1="166" y1="24" x2="178" y2="24"/>
+        <line x1="184" y1="24" x2="196" y2="24"/>
+        <line x1="202" y1="24" x2="208" y2="24"/>
+      </g>
+      <!-- Swarming mutant zombie silhouettes -->
+      <g fill="#0e0708" stroke="#ff3344" stroke-width="0.5">
+        <!-- Zombie 1 (left charging) -->
+        <circle cx="45" cy="85" r="11"/>
+        <path d="M38 96 L45 135 L35 170 M45 135 L55 170 M38 105 L20 85 M48 105 L65 92" stroke="#0e0708" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="48" cy="84" r="2.5" fill="#ff3344"/>
+        <circle cx="42" cy="85" r="2.5" fill="#ff3344"/>
+        <!-- Zombie 2 (center crawler) -->
+        <circle cx="130" cy="120" r="10"/>
+        <path d="M125 125 L105 138 M135 125 L150 135" stroke="#0e0708" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="132" cy="119" r="2" fill="#2de8bd"/>
+        <!-- Zombie 3 (right titan) -->
+        <circle cx="275" cy="70" r="16"/>
+        <path d="M265 85 L275 135 L260 175 M275 135 L290 175 M265 95 L245 78 M285 95 L305 82" stroke="#0e0708" stroke-width="9" stroke-linecap="round"/>
+        <circle cx="270" cy="68" r="3" fill="#ff3344"/>
+      </g>
+      <!-- SWAT Survivor aiming shotgun/rifle with muzzle flash -->
+      <g transform="translate(160, 125)">
+        <circle cx="-15" cy="-25" r="12" fill="#2d3748" stroke="#16181d" stroke-width="2"/>
+        <!-- Helmet and visor -->
+        <rect x="-18" y="-28" width="16" height="6" rx="2" fill="#1fc7c1"/>
+        <!-- Torso & tactical vest -->
+        <rect x="-24" y="-12" width="22" height="26" rx="4" fill="#1a202c" stroke="#16181d" stroke-width="2"/>
+        <!-- Shotgun / Rifle -->
+        <rect x="-10" y="-8" width="46" height="7" rx="2" fill="#4a5568" stroke="#16181d" stroke-width="1.5"/>
+        <rect x="18" y="-7" width="18" height="4" fill="#2d3748"/>
+        <!-- Muzzle flash explosion -->
+        <polygon points="38,-5 58,-12 50,-5 62,-3 48,0 58,6 38,2" fill="#ffdc73"/>
+        <circle cx="42" cy="-2" r="5" fill="#ff8524"/>
+        <circle cx="40" cy="-2" r="2.5" fill="#ffffff"/>
+      </g>
+      <!-- Laser aim beam slicing the dark -->
+      <line x1="195" y1="120" x2="45" y2="85" stroke="#ff3344" stroke-width="1.8" opacity="0.85" stroke-dasharray="4 2"/>
+    </svg>`,
+  },
 ];
+
+

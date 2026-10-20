@@ -50,6 +50,9 @@ canvas#world.cur-build{cursor:cell}
 .p-chip .ping-tag.warn{background:#fff3cd;color:#855700}
 .p-chip .ping-tag.bad{background:#ffe0db;color:#b51d14}
 .p-chip .ping-tag.bot{background:#e4dfd3;color:#524c42}
+.p-chip .team-tag{font-family:Bungee,sans-serif;font-size:9.5px;padding:1px 5px;border-radius:5px;border:1px solid var(--ink);color:#fff;margin-left:3px;box-shadow:1px 1px 0 var(--ink)}
+.p-chip .team-tag.t0{background:#1f6feb}
+.p-chip .team-tag.t1{background:#da3633}
 
 .btn{font-family:Bungee,Impact,sans-serif;font-size:13px;letter-spacing:.4px;background:var(--red);color:#fff;
   border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:10px;padding:7px 12px;cursor:pointer;
@@ -151,6 +154,9 @@ canvas#minimap{width:170px;height:164px;display:block;border:2.5px solid var(--i
 .cbtn .lbl-b{width:100%;background:var(--ink);color:var(--paper);font-weight:700;font-size:10.5px;line-height:1.25;
   padding:2px 3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;letter-spacing:.2px}
 .cbtn.sel .lbl-b{background:#16181d;color:var(--yellow)}
+.cbtn.done{background:#e3f9eb!important;border-color:#1c7a45!important;cursor:default!important}
+.cbtn.done .cost-tag{color:#1c7a45;background:#c3efd3}
+.cbtn.done .lbl-b{background:#1c7a45;color:#fff}
 
 /* TOAST & MODAL */
 .toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--yellow);
@@ -356,13 +362,69 @@ const BUILDINGS = {
     hp: 1050, radius: 20, height: 28, supply: 0, sight: 160, range: 0, dmg: 0, rate: 0,
     trains: [], desc: 'Rempart blindé 3D pour bloquer les couloirs (se connecte aux murs voisins).',
   },
+  armory: {
+    name: 'Armurerie Tech', short: 'Armurerie', min: 125, gas: 50, buildTime: 11,
+    hp: 950, radius: 34, height: 42, supply: 0, sight: 280, range: 0, dmg: 0, rate: 0,
+    trains: [], req: 'barracks', desc: 'Débloque et recherche les améliorations d’armement, blindage et propulsion de tes troupes.',
+  },
+};
+
+const UPGRADES = {
+  infantry_weapons: {
+    id: 'infantry_weapons',
+    name: 'Balles Perforantes',
+    short: 'Armes Infanterie',
+    min: 100, gas: 50, time: 14,
+    icon: '⚔️',
+    desc: '+25% Dégâts pour Marines, Maraudeurs et Faucheurs.',
+    appliesTo: ['marine', 'rocket', 'sapper'],
+  },
+  infantry_armor: {
+    id: 'infantry_armor',
+    name: 'Blindage Renforcé',
+    short: 'Armure Infanterie',
+    min: 100, gas: 25, time: 14,
+    icon: '🛡️',
+    desc: '+25% PV Max pour Marines, Maraudeurs et Faucheurs.',
+    appliesTo: ['marine', 'rocket', 'sapper'],
+    hpMult: 1.25,
+  },
+  vehicle_weapons: {
+    id: 'vehicle_weapons',
+    name: 'Obus Haute Énergie',
+    short: 'Canons Blindés',
+    min: 125, gas: 75, time: 16,
+    icon: '💥',
+    desc: '+25% Dégâts pour Goliaths, Chars de Siège et Mechas Thor.',
+    appliesTo: ['tank', 'siege', 'titan'],
+  },
+  vehicle_armor: {
+    id: 'vehicle_armor',
+    name: 'Coques en Titane',
+    short: 'Blindage Blindés',
+    min: 125, gas: 50, time: 16,
+    icon: '🦾',
+    desc: '+25% PV Max pour Goliaths, Chars de Siège et Mechas Thor.',
+    appliesTo: ['tank', 'siege', 'titan'],
+    hpMult: 1.25,
+  },
+  advanced_thrusters: {
+    id: 'advanced_thrusters',
+    name: 'Propulseurs Surchargés',
+    short: 'Vitesse Armée',
+    min: 75, gas: 50, time: 12,
+    icon: '⚡',
+    desc: '+18% Vitesse de déplacement pour toutes les unités de combat.',
+    appliesTo: ['marine', 'rocket', 'sapper', 'tank', 'siege', 'titan'],
+    speedMult: 1.18,
+  },
 };
 
 const UNITS = {
   scv: {
     name: 'Ouvrier VCS', short: 'VCS', min: 50, gas: 0, supply: 1, trainTime: 5.5,
     hp: 90, radius: 6.0, speed: 98, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8,
-    desc: 'Sélectionne ce VCS pour construire des bâtiments [1-8], récolter Minéraux/Gaz ou réparer.',
+    desc: 'Sélectionne ce VCS pour construire des bâtiments [1-9], récolter Minéraux/Gaz ou réparer.',
   },
   marine: {
     name: 'Marine Commando', short: 'Marine', min: 50, gas: 0, supply: 1, trainTime: 5.0,
@@ -2002,16 +2064,42 @@ function createInitialState(roster, settings = {}) {
   if (mapId !== activeMapId || MINERAL_NODES.length === 0) {
     initMap(mapId);
   }
-  const is2v2 = settings.mode === '2v2' && roster.length >= 2;
+  const modeStr = String(settings.mode || '');
+  const is2v2 = modeStr.startsWith('2v2') && roster.length >= 2;
   const blitz = settings.pace === 'blitz';
+
+  const humans = roster.filter((p) => !p.bot);
+  const bots = roster.filter((p) => p.bot);
+
   const players = roster.map((p, idx) => {
-    const team = is2v2 ? (idx % 2) : p.id;
+    let team = p.id;
+    if (is2v2) {
+      if (modeStr === '2v2_duel') {
+        // Duel : Humain 1 + Bot 1 (Équipe A) vs Humain 2 + Bot 2 (Équipe B)
+        if (humans.length >= 2 && bots.length >= 2) {
+          team = (p.id === humans[0].id || p.id === bots[0].id) ? 0 : 1;
+        } else {
+          team = idx % 2;
+        }
+      } else if (modeStr === '2v2_pvp') {
+        // 2v2 Joueurs 1 & 2 vs Joueurs 3 & 4
+        team = idx < 2 ? 0 : 1;
+      } else {
+        // Mode 2v2 Coopératif (par défaut : 2v2_coop ou 2v2) : HUMAINS ENSEMBLE VS BOTS !
+        if (humans.length > 0 && bots.length > 0) {
+          team = p.bot ? 1 : 0;
+        } else {
+          team = idx < 2 ? 0 : 1;
+        }
+      }
+    }
     return {
       id: p.id,
       name: p.name,
       color: p.color || PALETTE[idx % PALETTE.length],
       bot: !!p.bot,
       team,
+      upgrades: {},
       minerals: blitz ? 300 : 200,
       gas: blitz ? 100 : 50,
       dead: false,
@@ -2101,6 +2189,12 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
   const ux = clamp(bld.x + Math.cos(angle) * (bld.radius + def.radius + 10) - Math.sin(angle) * jitter, 30, WORLD_SIZE - 30);
   const uy = clamp(bld.y + Math.sin(angle) * (bld.radius + def.radius + 10) + Math.cos(angle) * jitter, 30, WORLD_SIZE - 30);
   const detId = (Number(owner.id) + 1) * 10000 + seq;
+  let hpMult = 1.0;
+  if (owner.upgrades) {
+    if (['marine', 'rocket', 'sapper'].includes(kind) && owner.upgrades.infantry_armor) hpMult *= 1.25;
+    if (['tank', 'siege', 'titan'].includes(kind) && owner.upgrades.vehicle_armor) hpMult *= 1.25;
+  }
+  const finalHp = Math.round(def.hp * hpMult);
 
   const u = {
     id: detId,
@@ -2112,8 +2206,8 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
     vx: 0,
     vy: 0,
     a: angle,
-    hp: def.hp,
-    maxHp: def.hp,
+    hp: finalHp,
+    maxHp: finalHp,
     radius: def.radius,
     cd: 0,
     mode: 'amove',
@@ -2265,21 +2359,69 @@ function executeCommand(state, playerId, cmd, fxEvents) {
     return { ok: true };
   }
 
-  // 3. ANNULER UNE UNITÉ DE LA FILE DE PRODUCTION
+  // 3. RECHERCHER UNE AMÉLIORATION DANS L'ARMURERIE TECH
+  if (cmd.op === 'RESEARCH') {
+    const upgId = String(cmd.upgId || '');
+    const upgDef = UPGRADES[upgId];
+    if (!upgDef) return { ok: false, reason: 'Amélioration inconnue.' };
+    p.upgrades = p.upgrades || {};
+    if (p.upgrades[upgId]) return { ok: false, reason: 'Amélioration déjà acquise !' };
+    if (p.minerals < upgDef.min) return { ok: false, reason: `Minéraux insuffisants (${upgDef.min}💎 requis).` };
+    if (p.gas < upgDef.gas) return { ok: false, reason: `Gaz Plasma insuffisant (${upgDef.gas}🧪 requis).` };
+
+    let lab = null;
+    if (cmd.bldId) {
+      const b = state.buildings.find((x) => x.id === cmd.bldId && Number(x.owner) === Number(p.id) && x.hp > 0 && !x.constructing && x.kind === 'armory');
+      if (b && Array.isArray(b.queue) && b.queue.length < 5 && !b.queue.includes(upgId)) lab = b;
+    }
+    if (!lab) {
+      const labs = state.buildings.filter((b) => Number(b.owner) === Number(p.id) && b.hp > 0 && !b.constructing && b.kind === 'armory' && Array.isArray(b.queue) && b.queue.length < 5 && !b.queue.includes(upgId));
+      lab = labs[0] || null;
+    }
+    if (!lab) return { ok: false, reason: 'Construis d’abord une Armurerie Tech pour lancer cette amélioration.' };
+
+    p.minerals -= upgDef.min;
+    p.gas -= upgDef.gas;
+    lab.queue = lab.queue || [];
+    lab.queue.push(upgId);
+    if (lab.queue.length === 1) {
+      lab.qTotal = state.blitz ? upgDef.time * 0.65 : upgDef.time;
+      lab.qTimer = lab.qTotal;
+    }
+    p.score += Math.round((upgDef.min + upgDef.gas) * 0.35);
+    fxEvents.push({ k: 'RESEARCH_START', bldId: lab.id, x: lab.x, y: lab.y, color: p.color });
+    return { ok: true };
+  }
+
+  // 4. CHANGER D'ÉQUIPE (2v2)
+  if (cmd.op === 'TOGGLE_TEAM') {
+    if (state.time > 45) return { ok: false, reason: 'Changement d’équipe verrouillé après le début de la partie.' };
+    const target = state.players.find((q) => Number(q.id) === Number(cmd.targetId));
+    if (!target) return { ok: false };
+    if (role !== 'solo' && Number(p.id) !== Number(target.id) && role !== 'host') return { ok: false };
+    target.team = target.team === 0 ? 1 : 0;
+    for (const b of state.buildings) { if (b.owner === target.id) b.team = target.team; }
+    for (const u of state.units) { if (u.owner === target.id) u.team = target.team; }
+    fxEvents.push({ k: 'TEAM_CHANGE', playerId: target.id, team: target.team, name: target.name });
+    return { ok: true };
+  }
+
+  // 5. ANNULER UNE UNITÉ OU AMÉLIORATION DE LA FILE DE PRODUCTION
   if (cmd.op === 'CANCEL_QUEUE') {
     const bld = state.buildings.find((b) => b.owner === p.id && b.id === cmd.bldId);
     if (!bld || !Array.isArray(bld.queue) || !bld.queue.length) return { ok: false };
     const idx = clamp(Number(cmd.slot) || 0, 0, bld.queue.length - 1);
-    const uKind = bld.queue.splice(idx, 1)[0];
-    const uDef = UNITS[uKind];
-    if (uDef) {
-      p.minerals += uDef.min;
-      p.gas += uDef.gas;
+    const itemKey = bld.queue.splice(idx, 1)[0];
+    const itemDef = UNITS[itemKey] || UPGRADES[itemKey];
+    if (itemDef) {
+      p.minerals += itemDef.min;
+      p.gas += itemDef.gas;
     }
     if (idx === 0) {
       if (bld.queue.length > 0) {
-        const nextDef = UNITS[bld.queue[0]];
-        bld.qTotal = state.blitz ? nextDef.trainTime * 0.65 : nextDef.trainTime;
+        const nextDef = UNITS[bld.queue[0]] || UPGRADES[bld.queue[0]];
+        const nextTime = nextDef.trainTime ?? nextDef.time ?? 8;
+        bld.qTotal = state.blitz ? nextTime * 0.65 : nextTime;
         bld.qTimer = bld.qTotal;
       } else {
         bld.qTimer = 0;
@@ -2435,6 +2577,27 @@ function finishBuildingConstruction(state, b, owner, fxEvents) {
   }
 }
 
+function applyUpgrade(state, owner, upgId, fxEvents) {
+  const upgDef = UPGRADES[upgId];
+  if (!upgDef) return;
+  owner.upgrades = owner.upgrades || {};
+  owner.upgrades[upgId] = true;
+  fxEvents.push({ k: 'UPGRADE_DONE', ownerId: owner.id, upgId, name: upgDef.name });
+
+  if (upgDef.hpMult) {
+    const mult = upgDef.hpMult;
+    for (const u of state.units) {
+      if (u.owner === owner.id && upgDef.appliesTo.includes(u.kind)) {
+        const baseDef = UNITS[u.kind];
+        if (baseDef) {
+          u.maxHp = Math.round(baseDef.hp * mult);
+          u.hp = Math.min(u.maxHp, Math.round(u.hp * mult));
+        }
+      }
+    }
+  }
+}
+
 function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
@@ -2461,9 +2624,9 @@ function stepWorld(state, dt, fxEvents) {
 
   for (const p of state.players) {
     if (p.dead) continue;
-    p.minerals = Math.min(9999, p.minerals + 2.5 * dt);
+    p.minerals = Math.min(9999, p.minerals + 1.25 * dt); // Réduit de 50% (auparavant 2.5)
     const myRefs = state.buildings.filter((b) => b.owner === p.id && b.kind === 'extractor' && b.hp > 0 && !b.constructing).length;
-    if (myRefs > 0) p.gas = Math.min(9999, p.gas + myRefs * 2.2 * dt);
+    if (myRefs > 0) p.gas = Math.min(9999, p.gas + myRefs * 1.1 * dt); // Réduit de 50% (auparavant 2.2)
   }
 
   for (const b of state.buildings) {
@@ -2497,11 +2660,16 @@ function stepWorld(state, dt, fxEvents) {
     if (Array.isArray(b.queue) && b.queue.length > 0) {
       b.qTimer -= dt;
       if (b.qTimer <= 0) {
-        const uKind = b.queue.shift();
-        spawnTrainedUnit(state, owner, b, uKind, fxEvents);
+        const item = b.queue.shift();
+        if (UPGRADES[item]) {
+          applyUpgrade(state, owner, item, fxEvents);
+        } else {
+          spawnTrainedUnit(state, owner, b, item, fxEvents);
+        }
         if (b.queue.length > 0) {
-          const nextDef = UNITS[b.queue[0]];
-          b.qTotal = state.blitz ? nextDef.trainTime * 0.65 : nextDef.trainTime;
+          const nextDef = UNITS[b.queue[0]] || UPGRADES[b.queue[0]];
+          const nextTime = nextDef.trainTime ?? nextDef.time ?? 8;
+          b.qTotal = state.blitz ? nextTime * 0.65 : nextTime;
           b.qTimer = b.qTotal;
         } else {
           b.qTimer = 0;
@@ -2665,7 +2833,7 @@ function stepWorld(state, dt, fxEvents) {
               if (u.gatherT >= (mapDef.mineHarvestTime || 1.55)) {
                 u.gatherT = 0;
                 u.carryType = mNode.rich ? 'gold' : 'min';
-                u.carryAmt = mNode.rich ? 12 : 8;
+                u.carryAmt = mNode.rich ? 6 : 4; // Réduit de 50% (auparavant 12 / 8)
               }
               continue;
             } else {
@@ -2687,7 +2855,7 @@ function stepWorld(state, dt, fxEvents) {
               if (u.gatherT >= 1.7) {
                 u.gatherT = 0;
                 u.carryType = 'gas';
-                u.carryAmt = Math.round(6 * (mapDef.gasHarvestMult || 1.0));
+                u.carryAmt = Math.max(1, Math.round(3 * (mapDef.gasHarvestMult || 1.0))); // Réduit de 50% (auparavant 6)
               }
               continue;
             } else {
@@ -2750,6 +2918,10 @@ function stepWorld(state, dt, fxEvents) {
       if (u.cd <= 0) {
         u.cd = effRate;
         let dmg = effDmg * state.dmgMult;
+        if (owner?.upgrades) {
+          if (['marine', 'rocket', 'sapper'].includes(u.kind) && owner.upgrades.infantry_weapons) dmg *= 1.25;
+          if (['tank', 'siege', 'titan'].includes(u.kind) && owner.upgrades.vehicle_weapons) dmg *= 1.25;
+        }
         if (bestTarget.isBld) dmg *= def.bldMult || 1;
         else if (u.kind === 'rocket' && UNITS[tgt.kind]?.mech) dmg *= 1.5;
         tgt.hp -= dmg;
@@ -2846,7 +3018,9 @@ function stepWorld(state, dt, fxEvents) {
 
     const sLen = Math.hypot(steerX, steerY) || 1;
     const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
-    const spd = def.speed * stimMult * (mapDef.moveSpeedMult || 1.0);
+    let upgSpdMult = 1.0;
+    if (owner?.upgrades?.advanced_thrusters && u.kind !== 'scv') upgSpdMult = 1.18;
+    const spd = def.speed * stimMult * (mapDef.moveSpeedMult || 1.0) * upgSpdMult;
     u.vx = (steerX / sLen) * spd;
     u.vy = (steerY / sLen) * spd;
 
@@ -3054,6 +3228,24 @@ function runBots(state, fxEvents) {
       const tKind = (state.map === 'magma' || (p.gas >= 50 && Math.random() < 0.5)) ? 'tesla' : 'turret';
       if (tryBuildNear(tKind, hq.x + dirX * 165, hq.y + dirY * 165, 35, 110)) return;
     }
+    const arm = myBlds.filter((b) => b.kind === 'armory').length;
+    if (rax >= 1 && arm < 1 && p.minerals >= 125 && p.gas >= 50) {
+      if (tryBuildNear('armory', hq.x - dirX * 50, hq.y + dirY * 130, 45, 140)) return;
+    }
+    const readyArm = myBlds.find((b) => b.kind === 'armory' && !b.constructing && (!b.queue || b.queue.length === 0));
+    if (readyArm) {
+      p.upgrades = p.upgrades || {};
+      const upgOrder = ['infantry_weapons', 'infantry_armor', 'vehicle_weapons', 'vehicle_armor', 'advanced_thrusters'];
+      for (const uid of upgOrder) {
+        if (!p.upgrades[uid]) {
+          const uDef = UPGRADES[uid];
+          if (p.minerals >= uDef.min && p.gas >= uDef.gas) {
+            executeCommand(state, p.id, { op: 'RESEARCH', upgId: uid, bldId: readyArm.id }, fxEvents);
+            break;
+          }
+        }
+      }
+    }
     if (rax < 2 && fac >= 1 && p.minerals >= 180) {
       if (tryBuildNear('barracks', hq.x + dirX * 140, hq.y - dirY * 50, 55, 160)) return;
     }
@@ -3135,7 +3327,7 @@ resize();
 
 const cam = { x: HALF_W, y: HALF_W, z: 0.88, pitch: 70, shake: 0 };
 const keys = {};
-const mouse = { x: W / 2, y: H / 2, wx: HALF_W, wy: HALF_W, down: false, dragStart: null, panning: false, panStart: null };
+const mouse = { x: W / 2, y: H / 2, clientX: -999, clientY: -999, inside: false, wx: HALF_W, wy: HALF_W, down: false, dragStart: null, panning: false, panStart: null };
 
 let myId = 0;
 let role = 'solo';
@@ -3569,6 +3761,19 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.fillStyle = color; g.strokeStyle = '#16181d'; g.lineWidth = 2;
     g.fillRect(-r * 0.55, -4, r * 1.1, 8);
     g.strokeRect(-r * 0.55, -4, r * 1.1, 8);
+    g.restore();
+
+  } else if (b.kind === 'armory') {
+    // Armurerie Tech 2D : dôme hexagonal avec capteur holo rotatif
+    drawPrism3D(g, wx, wy, makeNGon(r * 0.95, 6, 0), 0, H3D * 0.58, '#323742', '#586072', isIcon, 0.92);
+    const topLab = drawPrism3D(g, wx, wy, makeNGon(r * 0.62, 6, 0), H3D * 0.58, H3D * 0.88, darkCol, color, isIcon, 0.9);
+    g.save();
+    g.translate(topLab.ox, topLab.oy);
+    g.rotate(now * 0.0035);
+    g.fillStyle = '#1fc7c1'; g.strokeStyle = '#16181d'; g.lineWidth = 2.4;
+    g.beginPath(); g.arc(0, 0, 7.5, 0, TAU); g.fill(); g.stroke();
+    g.strokeStyle = '#ffc531'; g.lineWidth = 1.8;
+    g.beginPath(); g.moveTo(-11, 0); g.lineTo(11, 0); g.moveTo(0, -11); g.lineTo(0, 11); g.stroke();
     g.restore();
   }
 
@@ -4049,6 +4254,8 @@ function handleFxEvents(list) {
       if (e.k === 'COMPLETE' && hypot(e.x, e.y, cam.x, cam.y) < 850) Sfx.spawn();
     } else if (e.k === 'ELIM') {
       toast(`💥 Le Centre de Commandement de ${e.name} a été détruit !`, 3500);
+    } else if (e.k === 'TEAM_CHANGE') {
+      toast(`🛡️ ${e.name} a rejoint l’Équipe ${e.team === 0 ? 'A' : 'B'} !`, 3000);
     } else if (e.k === 'PHASE') {
       const labels = {
         2: '💎 Phase 2 : Intensification des combats',
@@ -4170,9 +4377,9 @@ window.addEventListener('keydown', (e) => {
   const selUList = state ? state.units.filter((u) => selectedUnits.has(u.id)) : [];
   const hasScvSelected = selUList.some((u) => u.kind === 'scv');
 
-  // Si un Ouvrier VCS est sélectionné (sans Ctrl) : 1..8 choisit le bâtiment à construire !
-  if (hasScvSelected && !e.ctrlKey && !e.metaKey && /^[1-8]$/.test(k)) {
-    const bMap = { '1': 'pylon', '2': 'extractor', '3': 'barracks', '4': 'factory', '5': 'turret', '6': 'tesla', '7': 'wall', '8': 'hq' };
+  // Si un Ouvrier VCS est sélectionné (sans Ctrl) : 1..9 choisit le bâtiment à construire !
+  if (hasScvSelected && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(k)) {
+    const bMap = { '1': 'pylon', '2': 'extractor', '3': 'barracks', '4': 'factory', '5': 'turret', '6': 'tesla', '7': 'wall', '8': 'hq', '9': 'armory' };
     orderCursor = null;
     buildMode = buildMode === bMap[k] ? null : bMap[k];
     updateCursorClass();
@@ -4208,6 +4415,9 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Raccourcis avec touche maintenue : ne pas répéter les ordres si e.repeat
+  if (e.repeat) return;
+
   // Raccourcis quand des UNITÉS sont sélectionnées : A = A-Move, S = Stop, H = Hold, R = Récolter (VCS), T = Stimpack, E = Siège
   if (selectedUnits.size > 0) {
     if (k === 'a') { buildMode = null; orderCursor = 'amove'; updateCursorClass(); renderConsoleUI(true); return; }
@@ -4226,6 +4436,15 @@ window.addEventListener('keydown', (e) => {
         buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan';
         updateCursorClass(); renderConsoleUI(true);
         return;
+      }
+      if (firstB.kind === 'armory') {
+        const upgKeys = ['q', 'w', 'e', 'r', 't'];
+        const upgIds = Object.keys(UPGRADES);
+        const upgIdx = upgKeys.indexOf(k);
+        if (upgIdx >= 0 && upgIds[upgIdx]) {
+          sendCommand({ op: 'RESEARCH', upgId: upgIds[upgIdx], bldId: firstB.id });
+          return;
+        }
       }
       const trains = BUILDINGS[firstB.kind]?.trains || [];
       const keyIdx = { q: 0, w: 1, e: 2 }[k];
@@ -4393,7 +4612,13 @@ cvs.addEventListener('pointerdown', (e) => {
   }
 });
 
+window.addEventListener('pointerenter', () => { mouse.inside = true; });
+window.addEventListener('pointerleave', () => { mouse.inside = false; mouse.clientX = -999; mouse.clientY = -999; });
+
 window.addEventListener('pointermove', (e) => {
+  mouse.clientX = e.clientX;
+  mouse.clientY = e.clientY;
+  mouse.inside = true;
   const rect = cvs.getBoundingClientRect();
   mouse.x = e.clientX - rect.left;
   mouse.y = e.clientY - rect.top;
@@ -4591,7 +4816,11 @@ function renderConsoleUI(force = false) {
       if (hpBar) { hpBar.style.width = `${pct}%`; hpBar.style.background = pct > 45 ? '#2fbf71' : '#ff4b2b'; }
       if (hpSub) hpSub.textContent = `PV : ${Math.ceil(b.hp)} / ${b.maxHp} ${b.constructing ? `· Construction ${Math.round((b.buildProg || 0) * 100)}%` : ''}`;
       if (qBar) qBar.style.width = `${qProg}%`;
-      if (qTxt) qTxt.textContent = b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire';
+      if (qTxt) {
+        const qItem = b.queue[0];
+        const qDef = qItem ? (UNITS[qItem] || UPGRADES[qItem]) : null;
+        qTxt.textContent = qDef ? `En cours : ${qDef.name} (${qProg}%)` : (b.kind === 'armory' ? 'Prêt à rechercher' : 'Prêt à produire');
+      }
     } else if (selU.length === 1) {
       const u = selU[0];
       const def = UNITS[u.kind];
@@ -4619,13 +4848,15 @@ function renderConsoleUI(force = false) {
       const pct = Math.round((b.hp / b.maxHp) * 100);
       const qSlotsHtml = [0, 1, 2, 3, 4].map((idx) => {
         const qKind = b.queue?.[idx];
-        const uDef = qKind ? UNITS[qKind] : null;
+        const uDef = qKind ? (UNITS[qKind] || UPGRADES[qKind]) : null;
         return `<div class="q-slot ${uDef ? 'filled' : ''}" data-cancel-bld="${b.id}" data-cancel-slot="${idx}" title="${uDef ? `Annuler ${uDef.name}` : 'Slot libre'}">
           <span class="num">#${idx + 1}</span>
-          ${uDef ? `<span class="q-nm">${uDef.short}</span>` : '<span style="color:#b7ac95">—</span>'}
+          ${uDef ? `<span class="q-nm">${uDef.short || uDef.name}</span>` : '<span style="color:#b7ac95">—</span>'}
         </div>`;
       }).join('');
       const qProg = b.qTotal > 0 ? Math.round((1 - b.qTimer / b.qTotal) * 100) : 0;
+      const qItem0 = b.queue?.[0];
+      const qDef0 = qItem0 ? (UNITS[qItem0] || UPGRADES[qItem0]) : null;
 
       selBody.innerHTML = `
         <div class="portrait-box">
@@ -4641,11 +4872,11 @@ function renderConsoleUI(force = false) {
             ${def.supply ? `<span class="st-chip">📦 Ravitaillement : +${def.supply}</span>` : ''}
             <span class="st-chip">${def.desc}</span>
           </div>
-          ${(def.trains && def.trains.length && !b.constructing) ? `
+          ${(((def.trains && def.trains.length) || b.kind === 'armory') && !b.constructing) ? `
             <div class="prod-queue">
               <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700">
-                <span>File de production (${b.queue.length}/5)</span>
-                <span id="selQTxt">${b.queue[0] ? `En cours : ${UNITS[b.queue[0]].name} (${qProg}%)` : 'Prêt à produire'}</span>
+                <span>File ${b.kind === 'armory' ? 'de recherche' : 'de production'} (${b.queue.length}/5)</span>
+                <span id="selQTxt">${qDef0 ? `En cours : ${qDef0.name} (${qProg}%)` : (b.kind === 'armory' ? 'Prêt à rechercher' : 'Prêt à produire')}</span>
               </div>
               <div class="q-bar-wrap"><i id="selQBar" style="width:${qProg}%"></i></div>
               <div class="q-slots">${qSlotsHtml}</div>
@@ -4756,6 +4987,14 @@ function renderConsoleUI(force = false) {
       const cant = me.minerals < uDef.min || me.gas < uDef.gas;
       b.classList.toggle('cant', !!cant);
     }
+    for (const b of grid.querySelectorAll('[data-cmd-research]')) {
+      const uDef = UPGRADES[b.dataset.cmdResearch];
+      const isDone = !!(me.upgrades && me.upgrades[uDef?.id]);
+      const isQueued = (firstB?.queue || []).includes(uDef?.id);
+      const cant = isDone || isQueued || me.minerals < (uDef?.min || 0) || me.gas < (uDef?.gas || 0);
+      b.classList.toggle('cant', !!cant);
+      b.classList.toggle('done', !!isDone);
+    }
     return;
   }
   lastCmdSig = sig;
@@ -4764,10 +5003,10 @@ function renderConsoleUI(force = false) {
 
   if (modeKey === 'SCV') {
     $('#uiCmdTitle').textContent = 'Ouvrier VCS · Construction';
-    $('#uiCmdHint').textContent = 'Touches 1-8';
+    $('#uiCmdHint').textContent = 'Touches 1-9';
     const bList = [
       ['pylon', '1'], ['extractor', '2'], ['barracks', '3'], ['factory', '4'],
-      ['turret', '5'], ['tesla', '6'], ['wall', '7'], ['hq', '8'],
+      ['turret', '5'], ['tesla', '6'], ['wall', '7'], ['hq', '8'], ['armory', '9'],
     ];
     for (const [k, key] of bList) {
       const def = BUILDINGS[k];
@@ -4802,28 +5041,49 @@ function renderConsoleUI(force = false) {
   } else if (modeKey.startsWith('BLD_') && modeKey !== 'BLD_CONSTRUCT') {
     const bDef = BUILDINGS[firstB.kind];
     $('#uiCmdTitle').textContent = `${bDef.name}`;
-    $('#uiCmdHint').textContent = bDef.trains.length ? 'Touches Q / W / E' : 'Structure active';
-    const keysMap = ['Q', 'W', 'E', 'R'];
-    (bDef.trains || []).forEach((uKind, idx) => {
-      const uDef = UNITS[uKind];
-      const cant = me.minerals < uDef.min || me.gas < uDef.gas;
-      cards.push(`<button class="cbtn ${cant ? 'cant' : ''}" data-cmd-train="${uKind}" title="Entraîner ${uDef.name} — ${uDef.desc}">
-        <div class="cbtn-top">
-          <span class="key">${keysMap[idx]}</span>
-          <span class="cost-tag">${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}</span>
-        </div>
-        <div class="cbtn-mid">
-          <canvas class="thumb" width="76" height="40" data-thumb="${uKind}"></canvas>
-        </div>
-        <span class="lbl-b">${uDef.short}</span>
-      </button>`);
-    });
-    if (firstB.kind === 'hq') {
-      cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎) : révèle le brouillard de guerre">
-        <div class="cbtn-top"><span class="key">X</span><span class="cost-tag">50💎</span></div>
-        <div class="cbtn-mid"><span class="ico-txt">📡</span></div>
-        <span class="lbl-b">Scan Radar</span>
-      </button>`);
+    $('#uiCmdHint').textContent = firstB.kind === 'armory' ? 'Recherches Q / W / E / R / T' : bDef.trains.length ? 'Touches Q / W / E' : 'Structure active';
+    if (firstB.kind === 'armory') {
+      const upgKeys = ['Q', 'W', 'E', 'R', 'T'];
+      const upgList = Object.values(UPGRADES);
+      me.upgrades = me.upgrades || {};
+      upgList.forEach((uDef, idx) => {
+        const isDone = !!me.upgrades[uDef.id];
+        const isQueued = (firstB.queue || []).includes(uDef.id);
+        const cant = isDone || isQueued || me.minerals < uDef.min || me.gas < uDef.gas;
+        cards.push(`<button class="cbtn ${isDone ? 'done' : ''} ${cant ? 'cant' : ''}" data-cmd-research="${uDef.id}" title="${uDef.name} — ${uDef.desc}">
+          <div class="cbtn-top">
+            <span class="key">${upgKeys[idx] || ''}</span>
+            <span class="cost-tag">${isDone ? '✔️ Validé' : isQueued ? '⏳ En cours' : `${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}`}</span>
+          </div>
+          <div class="cbtn-mid">
+            <span class="ico-txt">${uDef.icon}</span>
+          </div>
+          <span class="lbl-b">${uDef.short}</span>
+        </button>`);
+      });
+    } else {
+      const keysMap = ['Q', 'W', 'E', 'R'];
+      (bDef.trains || []).forEach((uKind, idx) => {
+        const uDef = UNITS[uKind];
+        const cant = me.minerals < uDef.min || me.gas < uDef.gas;
+        cards.push(`<button class="cbtn ${cant ? 'cant' : ''}" data-cmd-train="${uKind}" title="Entraîner ${uDef.name} — ${uDef.desc}">
+          <div class="cbtn-top">
+            <span class="key">${keysMap[idx]}</span>
+            <span class="cost-tag">${uDef.min}💎${uDef.gas ? ` ${uDef.gas}🧪` : ''}</span>
+          </div>
+          <div class="cbtn-mid">
+            <canvas class="thumb" width="76" height="40" data-thumb="${uKind}"></canvas>
+          </div>
+          <span class="lbl-b">${uDef.short}</span>
+        </button>`);
+      });
+      if (firstB.kind === 'hq') {
+        cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''}" data-cmd-act="scan" title="Scan Radar Comsat (50💎) : révèle le brouillard de guerre">
+          <div class="cbtn-top"><span class="key">X</span><span class="cost-tag">50💎</span></div>
+          <div class="cbtn-mid"><span class="ico-txt">📡</span></div>
+          <span class="lbl-b">Scan Radar</span>
+        </button>`);
+      }
     }
     if (!cards.length) {
       grid.innerHTML = `<div class="cmd-empty"><b>${bDef.name}</b><span>Ce bâtiment fonctionne automatiquement (${bDef.desc})</span></div>`;
@@ -4906,6 +5166,16 @@ function renderConsoleUI(force = false) {
       }
     };
   }
+  for (const b of grid.querySelectorAll('[data-cmd-research]')) {
+    b.onpointerdown = (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      const upgId = b.dataset.cmdResearch;
+      if (firstB) {
+        sendCommand({ op: 'RESEARCH', upgId, bldId: firstB.id });
+      }
+    };
+  }
   for (const b of grid.querySelectorAll('[data-cmd-act]')) {
     b.onpointerdown = (ev) => {
       if (ev.button !== 0) return;
@@ -4951,7 +5221,7 @@ function updateHudUI() {
   $('#uiPhaseName').textContent = phaseNames[state.phase] || '';
   $('#uiPhase').classList.toggle('sd', state.phase === 4);
 
-  const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.dead ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
+  const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.team}:${p.dead ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
   if (rosterSig !== lastRosterSig) {
     lastRosterSig = rosterSig;
     $('#uiRoster').innerHTML = state.players.map((p) => {
@@ -4964,12 +5234,27 @@ function updateHudUI() {
         const cls = ms > 150 ? 'bad' : ms > 80 ? 'warn' : '';
         pingHtml = `<span class="ping-tag ${cls}">📶 ${ms} ms</span>`;
       }
+      let teamHtml = '';
+      if (state.is2v2) {
+        const tName = p.team === 0 ? 'Équipe A' : 'Équipe B';
+        const canSwitch = (state.time < 45 && (!p.bot || isMe || role === 'host'));
+        teamHtml = `<button class="team-tag t${p.team}" data-toggle-team="${p.id}" ${canSwitch ? 'title="Changer d’équipe"' : 'disabled'} style="border:none;cursor:${canSwitch ? 'pointer' : 'default'}">${tName}</button>`;
+      }
       return `<div class="p-chip ${p.dead ? 'dead' : ''} ${isMe ? 'me' : ''}">
         <span class="dot" style="background:${p.color}"></span>
         <span>${p.name}${isMe ? ' <small>(Toi)</small>' : ''}</span>
+        ${teamHtml}
         ${pingHtml}
       </div>`;
     }).join('');
+
+    for (const btn of $('#uiRoster').querySelectorAll('[data-toggle-team]')) {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const targetPid = Number(btn.dataset.toggleTeam);
+        sendCommand({ op: 'TOGGLE_TEAM', targetId: targetPid });
+      };
+    }
   }
 
   renderConsoleUI(false);
@@ -5641,6 +5926,36 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
     const cap = new THREE.Mesh(new THREE.BoxGeometry(r * 1.2, 5, r * 1.2), teamMat);
     cap.position.y = 6 + h * 0.88;
     bodyGroup.add(cap);
+
+  } else if (kind === 'armory') {
+    // Armurerie Tech 3D : dôme hexagonal blindé, consoles d'ingénierie, anneau holo et antenne radar rotative
+    const baseHex = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 1.05, h * 0.52, 6), darkSteelMat);
+    baseHex.position.y = 6 + h * 0.26;
+    baseHex.castShadow = !isGhost;
+    baseHex.receiveShadow = !isGhost;
+    bodyGroup.add(baseHex);
+
+    const midLab = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.68, r * 0.78, h * 0.36, 6), teamMat);
+    midLab.position.y = 6 + h * 0.62;
+    midLab.castShadow = !isGhost;
+    bodyGroup.add(midLab);
+
+    const ringHolo = new THREE.Mesh(new THREE.TorusGeometry(r * 0.52, 2.2, 8, 24), cyanMat);
+    ringHolo.rotation.x = Math.PI / 2;
+    ringHolo.position.y = 6 + h * 0.82;
+    bodyGroup.add(ringHolo);
+
+    const sensorGrp = new THREE.Group();
+    sensorGrp.position.set(0, 6 + h * 0.82, 0);
+    const dishPole = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 12, 8), lightSteelMat);
+    dishPole.position.y = 6;
+    sensorGrp.add(dishPole);
+    const techDish = new THREE.Mesh(new THREE.CylinderGeometry(10, 3, 4, 12), yellowMat);
+    techDish.position.y = 12;
+    techDish.rotation.z = 0.45;
+    sensorGrp.add(techDish);
+    bodyGroup.add(sensorGrp);
+    grp.userData.rotPart = sensorGrp;
   }
 
   // Cage d'échafaudage 3D dorée visible pendant la construction par le VCS
@@ -6175,11 +6490,28 @@ function renderWorld(dt, now) {
     return;
   }
 
-  const panSpd = 680 / cam.z;
-  if (keys['arrowup']) cam.y -= panSpd * dt;
-  if (keys['arrowdown']) cam.y += panSpd * dt;
-  if (keys['arrowleft']) cam.x -= panSpd * dt;
-  if (keys['arrowright']) cam.x += panSpd * dt;
+  const panSpd = 720 / cam.z;
+  let panX = 0, panY = 0;
+  if (keys['arrowup'] || keys['z'] || keys['w']) panY -= 1;
+  if (keys['arrowdown'] || keys['s']) panY += 1;
+  if (keys['arrowleft'] || keys['q'] || keys['a']) panX -= 1;
+  if (keys['arrowright'] || keys['d']) panX += 1;
+
+  // Déplacement au bord / coins de l'écran avec la souris (Edge Scrolling)
+  if (mouse.inside && !mouse.panning) {
+    const edgeMargin = 26;
+    const winW = window.innerWidth, winH = window.innerHeight;
+    if (mouse.clientX <= edgeMargin) panX -= 1;
+    if (mouse.clientX >= winW - edgeMargin) panX += 1;
+    if (mouse.clientY <= edgeMargin) panY -= 1;
+    if (mouse.clientY >= winH - edgeMargin) panY += 1;
+  }
+
+  if (panX !== 0 || panY !== 0) {
+    const pLen = Math.hypot(panX, panY) || 1;
+    cam.x += (panX / pLen) * panSpd * dt;
+    cam.y += (panY / pLen) * panSpd * dt;
+  }
   if (keys['pageup']) cam.pitch = clamp((cam.pitch || 70) + 38 * dt, 25, 82);
   if (keys['pagedown']) cam.pitch = clamp((cam.pitch || 70) - 38 * dt, 25, 82);
   cam.x = clamp(cam.x, 0, WORLD_SIZE);
@@ -6712,6 +7044,7 @@ function packState(s) {
     blitz: s.blitz,
     map: s.map || activeMapId || 'vallee',
     mode: s.mode,
+    is2v2: s.is2v2,
     level: s.level,
     phase: s.phase,
     stormRadius: Math.round(s.stormRadius),
@@ -6735,6 +7068,7 @@ function packState(s) {
       spawnY: p.spawnY,
       nextUnitSeq: p.nextUnitSeq || 20,
       ping: p.bot ? 0 : getPlayerPing(p),
+      upgrades: p.upgrades ? { ...p.upgrades } : {},
     })),
     buildings: s.buildings.map((b) => ({
       id: b.id,
