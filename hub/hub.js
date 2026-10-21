@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.12';
+  const VERSION = '2.13';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -82,6 +82,48 @@
     go();
   }
   $('#btnNetTest').onclick = openNetTest;
+
+  /* ------------------------------------------------------------ nouveautés (journal des versions) */
+  // Le journal est lu dans CHANGELOG.md : une seule source, toujours à jour.
+  function mdInline(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+  }
+  function parseChangelog(md) {
+    const out = []; let cur = null, item = null;
+    for (const line of md.split('\n')) {
+      const h = /^## (.+)$/.exec(line);
+      if (h) { cur = { title: h[1], items: [] }; out.push(cur); item = null; continue; }
+      if (!cur) continue;
+      const li = /^(\s*)- (.+)$/.exec(line);
+      if (li) { item = { text: li[2], sub: li[1].length >= 2 }; cur.items.push(item); continue; }
+      if (item && /^\s+\S/.test(line)) item.text += ' ' + line.trim();
+    }
+    return out;
+  }
+  async function openNews() {
+    const ov = document.createElement('div'); ov.className = 'ntov';
+    ov.innerHTML = '<div class="nt card news" role="dialog" aria-label="Nouveautés"><button class="ntx" aria-label="Fermer">×</button><h2>✨ Nouveautés</h2><div class="newsbody"><p class="nthint">Chargement…</p></div>'
+      + '<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="newsOk">Compris !</button></div></div>';
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); DDProfile.set('hub_seen_ver', VERSION); };
+    ov.querySelector('.ntx').onclick = close; ov.querySelector('#newsOk').onclick = close;
+    ov.addEventListener('pointerdown', (e) => { if (e.target === ov) close(); });
+    let vers = [];
+    try { vers = parseChangelog(await (await fetch('CHANGELOG.md', { cache: 'no-cache' })).text()); } catch (e) {}
+    const body = ov.querySelector('.newsbody');
+    if (!vers.length) { body.innerHTML = '<p class="nthint">Journal indisponible pour le moment.</p>'; return; }
+    const block = (v, open) => `<details class="ver" ${open ? 'open' : ''}><summary>${mdInline(v.title)}${v.title.startsWith(VERSION + ' ') ? ' <span class="pill">actuelle</span>' : ''}</summary>
+      <ul>${v.items.map((it) => `<li class="${it.sub ? 'sub' : ''}">${mdInline(it.text)}</li>`).join('')}</ul></details>`;
+    body.innerHTML = vers.map((v, k) => block(v, k < 2)).join('');
+  }
+  $('#btnNews').onclick = openNews;
+  $('#ver').onclick = openNews;
+  // à la première visite après une mise à jour (pas pour un tout nouveau joueur)
+  {
+    const seen = DDProfile.get('hub_seen_ver', null), veteran = seen || DDProfile.get('dd_seen_ver', null) || DDProfile.get('dd_name', null);
+    if (!seen && !veteran) DDProfile.set('hub_seen_ver', VERSION);
+    else if (seen !== VERSION && !new URLSearchParams(location.search).has('join')) setTimeout(openNews, 600);
+  }
 
   /* ------------------------------------------------------------ classement entre potes */
   // Le jeu de l'hôte (ou du joueur solo) signale la fin d'une partie ; on relie ses joueurs aux identifiants du salon.

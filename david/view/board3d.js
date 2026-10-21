@@ -185,7 +185,8 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   scene.background = new THREE.Color('#5b3820');
   scene.fog = new THREE.Fog('#5b3820', 180, 420);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = envTex; // reflets des pions en métal
 
   const camera = new THREE.PerspectiveCamera(36, 1, 1, 1000);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -195,8 +196,9 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   controls.screenSpacePanning = false;
 
   // lumières
-  scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a2412, 0.75));
-  const sun = new THREE.DirectionalLight(0xfff1d6, 1.8);
+  // éclairage réglé par mesure : les couleurs du plateau rendues ≈ 85-95 % de leur valeur d'origine, saturation conservée
+  scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a2412, 0.55));
+  const sun = new THREE.DirectionalLight(0xfff1d6, 1.3);
   sun.position.set(45, 110, 60); sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 10, far: 300 });
@@ -211,7 +213,8 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   const tex = new THREE.CanvasTexture(await drawBoardTexture(board));
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const sideMat = new THREE.MeshStandardMaterial({ color: 0x16120f, roughness: 0.6 });
-  const topMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0, envMapIntensity: 0.55 });
+  // le plateau reçoit peu de reflets d'environnement : sinon les couleurs sont délavées (surexposition mesurée à +70 %)
+  const topMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0, envMap: envTex, envMapIntensity: 0.3 });
   const boardMesh = new THREE.Mesh(new THREE.BoxGeometry(W, TOP, W), [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]);
   boardMesh.position.y = TOP / 2; boardMesh.receiveShadow = true; boardMesh.castShadow = true;
   scene.add(boardMesh);

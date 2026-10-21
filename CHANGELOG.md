@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.13 — 21 octobre 2026
+- Le journal des nouveautés est maintenant dans le Hub : bouton « ✨ Nouveautés » sur l'accueil (ou clic sur le numéro
+  de version). Il s'ouvre tout seul à la première visite après une mise à jour.
+- Duo Drift lancé depuis le Hub : garage, profil (succès, statistiques) et réglages accessibles depuis la salle d'attente.
+  Une nouvelle voiture, déco ou couleur choisie au garage est transmise aux autres joueurs.
+- Plateau 3D de DavidSimulator moins surexposé : éclairage réglé par mesure, les couleurs du plateau gardent leur saturation.
+
 ## 2.12 — 19 octobre 2026
 - DavidSimulator en vraie 3D (WebGL) : plateau en relief posé sur une table en bois, ombres, pions en métal modélisés
   en volume, maisons et hôtels en 3D, dés physiques qui roulent et tombent sur la bonne face.

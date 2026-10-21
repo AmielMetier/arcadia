@@ -258,6 +258,7 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
 .prof-sec{margin-top:16px}
 @media(max-width:860px){.prof-grid{grid-template-columns:1fr}}
 @media(max-width:860px){.lobby-grid,.menu-grid,.garage-grid,.res-grid{grid-template-columns:1fr}}
+.subnav{display:flex;gap:6px;flex-wrap:wrap}
 body.in-hub #menu .menu-actions{visibility:hidden}
 </style>
 </head>
@@ -449,6 +450,7 @@ body.in-hub #menu .menu-actions{visibility:hidden}
     </div>
     <div class="lobby-foot">
       <button class="btn ghost small" id="btnLeave">Quitter</button>
+      <span class="subnav"><button class="btn ghost small" id="lobGarage" title="Garage">🔧 Garage</button><button class="btn ghost small" id="lobProfile" title="Profil et succès">🏆 Profil</button><button class="btn ghost small" id="lobPrefs" title="Réglages">⚙️</button></span>
       <span class="hint" id="lobbyHint"></span>
       <button class="btn" id="btnStart">Lancer</button>
     </div>
@@ -2100,7 +2102,10 @@ function onHostMsg(cid, m){
       if(['chat','emote','horn','fin'].includes(e.k)) e.id=p.id;
       if(e.k==='chat'){ e.n=p.name; e.c=p.color; }
       applyEvent(e); Net.bcast({t:'ev',e},cid); } break;
-    case 'me': if(p){ p.lvl=clamp(m.lvl|0,1,50); p.title=TITLES.includes(m.title)?m.title:null; if(G.state==='lobby'){ sendLobby(); renderLobby(); } } break;
+    case 'me': if(p){ p.lvl=clamp(m.lvl|0,1,50); p.title=TITLES.includes(m.title)?m.title:null;
+      if(CLASSES[m.car]) p.car=m.car; if(m.deco) p.deco=cleanDeco(m.deco);
+      if(ALL_COLORS.includes(m.color) && !G.players.some(q=>q!==p && q.color===m.color)) p.color=m.color;
+      if(G.state==='lobby'){ sendLobby(); renderLobby(); } } break;
     case 'team': if(p && G.set.teams && G.state==='lobby'){ p.team=1-p.team; sendLobby(); renderLobby(); } break;
     case 'ping': Net.to(cid,{t:'pong',ts:m.ts}); break;
     case 'pong': if(p) G.pings[p.id]=performance.now()-m.ts; break;
@@ -4189,7 +4194,7 @@ function renderGarageUI(){
 $('#gNum').addEventListener('input', e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,2); G.me.deco.num=parseInt(e.target.value,10)||0; saveDeco(); });
 function openGarage(){ G.state='garage'; G.garage.parts=[]; buildClasses(); buildSwatches(); renderGarageUI(); showScreen('garage'); AudioSys.play('click'); }
 $('#btnGarage').onclick = openGarage; $('#menuCarBtn').onclick = openGarage;
-$('#btnGarageOk').onclick = ()=>{ saveDeco(); showMenu(); };
+$('#btnGarageOk').onclick = ()=>{ saveDeco(); backFromSub(); };
 /* ---------- paramètres ---------- */
 function renderPrefs(){
   buildSeg('pShake', [[true,'Oui'],[false,'Non']], G.prefs.shake, v=>setPref('shake',v));
@@ -4198,7 +4203,7 @@ function renderPrefs(){
   padInfo();
 }
 $('#btnPrefs').onclick = ()=>{ G.state='prefs'; buildVolumes(); renderPrefs(); showScreen('prefs'); AudioSys.play('click'); };
-$('#btnPrefsOk').onclick = ()=>showMenu();
+$('#btnPrefsOk').onclick = ()=>backFromSub();
 
 /* ---------- salon ---------- */
 function trackPreview(tr, w, h){
@@ -4435,7 +4440,20 @@ function renderProfile(){
 }
 function openProfile(){ G.state='profile'; checkAch(); renderProfile(); showScreen('profile'); AudioSys.play('click'); }
 $('#btnProfile').onclick=openProfile; $('#profChip').onclick=openProfile;
-$('#btnProfileOk').onclick=()=>showMenu();
+$('#btnProfileOk').onclick=()=>backFromSub();
+/* Garage, profil et réglages accessibles depuis la salle d'attente (indispensable dans le Hub, qui saute le menu) */
+function backFromSub(){ if(G.mode){ syncMyCar(); showLobby(); } else showMenu(); }
+function syncMyCar(){
+  const me=G.players.find(p=>p.id===G.myId); if(!me) return;
+  const free = c => !G.players.some(q=>q!==me && q.color===c);
+  me.car=G.me.car; me.deco=cleanDeco(G.me.deco); if(free(G.me.color)) me.color=G.me.color; else G.me.color=me.color;
+  me.lvl=levelInfo().lvl; me.title=P.title||null;
+  if(G.mode==='host') sendLobby();
+  else if(G.mode==='guest') Net.toHost({t:'me', lvl:me.lvl, title:me.title, car:G.me.car, deco:cleanDeco(G.me.deco), color:G.me.color});
+}
+$('#lobGarage').onclick=openGarage;
+$('#lobProfile').onclick=openProfile;
+$('#lobPrefs').onclick=()=>$('#btnPrefs').click();
 $('#btnGhostIn').onclick=()=>{ const g=importGhost($('#ghostIn').value);
   if(!g){ toast('Code de fantôme invalide',2200); return; }
   $('#ghostIn').value=''; toast('Fantôme de '+g.by+' importé sur '+TRACKS[g.tid].name+' ('+fmtTime(g.t)+'). Bats-le en solo !',3500); AudioSys.play('box'); renderProfile(); };
