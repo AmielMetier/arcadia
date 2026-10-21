@@ -30,7 +30,7 @@ window.HUB_GAMES = [
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['express', 'Express · 40 min']], def: 'classic' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
-      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'cash', label: 'Argent de départ', group: 'Règles maison', options: [[1000, '1 000 €'], [1500, '1 500 €'], [2000, '2 000 €'], [2500, '2 500 €']], def: 1500 },
       { key: 'jackpot', label: 'Cagnotte au Parc gratuit', options: [[0, 'Non'], [1, 'Oui']], def: 0 },
       { key: 'doubleGo', label: 'Salaire doublé pile sur Départ', options: [[0, 'Non'], [1, 'Oui']], def: 0 },
@@ -68,13 +68,13 @@ window.HUB_GAMES = [
     minPlayers: 1, maxPlayers: 6,
     accent: '#ff5fa2',
     settings: [
-      { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['chartier', '💼 The Candidate (Pierre Chartier)'], ['peril', 'Péril · erreurs pénalisées'], ['eclair', 'Éclair · seul le 1er marque']], def: 'classic' },
-      { key: 'theme', label: 'Questions', options: [['mix', 'Tout mélangé'], ['chartier', '💼 The Candidate (300 Questions Finance)'], ['base', 'Les 4 opérations'], ['malin', 'Astuces & nombres'], ['frac', 'Fractions & décimaux'], ['logique', 'Suites & logique'], ['flash', 'Vrai/faux & comparaisons'], ['algebre', 'Équations & devinettes'], ['geo', 'Géométrie & mesures'], ['vite', 'Vitesse & estimations'], ['compte', 'Compte est bon']], def: 'mix' },
-      { key: 'len', label: 'Longueur', options: [[10, '10 questions'], [15, '15'], [20, '20'], [30, '30 questions (Grand Entretien)']], def: 10 },
-      { key: 'diff', label: 'Difficulté', options: [['facile', 'Niveau 1 · Stagiaire / Analyste Junior'], ['normal', 'Niveau 2 · Associate / Quant'], ['expert', 'Niveau 3 · VP / Managing Director']], def: 'normal' },
+      { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['chartier', 'The Candidate'], ['peril', 'Péril'], ['eclair', 'Éclair']], def: 'classic' },
+      { key: 'theme', label: 'Questions', options: [['mix', 'Mélangé'], ['base', '4 opérations'], ['malin', 'Astuces'], ['frac', 'Fractions'], ['logique', 'Logique'], ['flash', 'Vrai/Faux'], ['algebre', 'Équations'], ['geo', 'Géométrie'], ['vite', 'Vitesse'], ['compte', 'Compte est bon']], def: 'mix' },
+      { key: 'len', label: 'Longueur', options: [[10, '10 questions'], [15, '15 questions'], [20, '20 questions'], [30, '30 questions']], def: 10 },
+      { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
-      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
-      { key: 'sabotage', label: 'Sabotage (pouvoirs à lancer sur les autres)', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
       { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -113,7 +113,7 @@ window.HUB_GAMES = [
       ], def: 'ffa' },
       { key: 'pace', label: 'Durée max', options: [['standard', 'Standard · 25 min'], ['blitz', 'Blitz · 12 min']], def: 'standard' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
-      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect width="320" height="180" fill="#5aa846"/>

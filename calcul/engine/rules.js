@@ -7,11 +7,12 @@ import { CATS, DIFFS, THEMES, planCats, makeQuestion, publicQuestion, fmt } from
 import { parseNumber, evalExpr, usesOnly } from './expr.js';
 
 export const MODES = {
-  classic: { label: 'Classique', desc: 'Tout le monde répond, les plus rapides marquent plus.' },
+  classic:  { label: 'Classique', desc: 'Tout le monde répond, les plus rapides marquent plus.' },
+  chartier: { label: 'The Candidate', desc: 'L\'épreuve impitoyable de Pierre Chartier : 300 questions de finance et hedge funds sous pression.' },
   peril:   { label: 'Péril', desc: 'Une erreur coûte des points : ne tente pas n\'importe quoi.' },
   eclair:  { label: 'Éclair', desc: 'Seul le premier qui trouve marque. Une erreur et tu es bloqué.' },
 };
-export const LENGTHS = [10, 15, 20];
+export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const REVEAL_MS = 5200;
 const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
@@ -33,9 +34,10 @@ const MAX_POWERS = 2;
 export function makeConfig(s = {}) {
   return {
     mode: MODES[s.mode] ? s.mode : 'classic',
+    theme: (s.mode === 'chartier' || !THEMES[s.theme]) ? (s.mode === 'chartier' ? 'chartier' : 'mix') : s.theme,
     len: LENGTHS.includes(Number(s.len)) ? Number(s.len) : 10,
     diff: DIFFS.includes(s.diff) ? s.diff : 'normal',
-    theme: THEMES[s.theme] ? s.theme : 'mix',
+
     finale: s.finale == null ? true : Number(s.finale) === 1,
     sabotage: s.sabotage == null ? true : Number(s.sabotage) === 1,
   };

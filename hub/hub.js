@@ -243,8 +243,9 @@
     if (!host) { box.innerHTML = '<span class="wait"><i></i>L\'hôte choisit le jeu…</span>'; return; }
     const g = gameDef(pick.game), set = pick.settings[g.id], n = room.players.length;
     const segs = (g.settings || []).map((s) => {
+      if (g.id === 'calcul' && set.mode === 'chartier' && s.key === 'theme') return '';
       const opts = s.options.filter(([v]) => s.key !== 'bots' || n + Number(v) <= g.maxPlayers);
-      return `${s.group ? `<div class="setgroup">${esc(s.group)}</div>` : ''}<div><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>
+      return `${s.group ? `<div class="setgroup">${esc(s.group)}</div>` : ''}<div class="setitem"><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>
         `<button data-k="${s.key}" data-v="${v}" class="${String(set[s.key]) === String(v) ? 'sel' : ''}">${esc(l)}</button>`).join('')}</div></div>`;
     }).join('');
     const ok = n <= g.maxPlayers;

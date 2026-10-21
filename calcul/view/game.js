@@ -8,14 +8,26 @@ import { sfx } from './sfx.js';
 import { wallStreetMusic } from './music.js';
 import { esc, el, prefersReducedMotion } from './util.js';
 
-const DIFF_LABEL = { facile: 'Facile', normal: 'Normal', expert: 'Expert' };
-const THEME_LABEL = { mix: 'Tout mélangé', chartier: 'The Candidate (300 Questions Finance)', base: 'Les 4 opérations', malin: 'Astuces & nombres', frac: 'Fractions & décimaux', logique: 'Suites & logique',
-  vite: 'Vitesse & estimations', flash: 'Vrai/faux & comparaisons', algebre: 'Équations & devinettes', geo: 'Géométrie & mesures', compte: 'Compte est bon' };
-const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['normal', 'normaux'], expert: ['expert', 'experts'] };
+const DIFF_LABEL = { facile: 'Facile', normal: 'Moyen', expert: 'Difficile' };
+const THEME_LABEL = {
+  mix: 'Mélangé',
+  chartier: 'The Candidate',
+  base: 'Les 4 opérations',
+  malin: 'Astuces & nombres',
+  frac: 'Fractions & décimaux',
+  logique: 'Suites & logique',
+  vite: 'Vitesse & estimations',
+  flash: 'Vrai/faux & comparaisons',
+  algebre: 'Équations & devinettes',
+  geo: 'Géométrie & mesures',
+  compte: 'Compte est bon'
+};
+const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['moyen', 'moyens'], expert: ['difficile', 'difficiles'] };
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
 const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir' };
 const motion = () => !prefersReducedMotion();
+
 const CHARTIER_QUOTES = {
   ok: [
     "C'est rapide, c'est précis. Tu as le calibre pour le desk de trading.",
@@ -63,7 +75,6 @@ const BLOOMBERG_TICKER = `
     </div>
   </div>`;
 
-
 export function mountGame(root, { me, answer, emote, sabotage = () => {}, start, exit }) {
   root.className = 'game';
   root.innerHTML = `
@@ -98,10 +109,20 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
   const myDeadline = () => S.endsAt - (myCurses().some((c) => c.power === 'time') ? STEAL_MS : 0);
 
   /* ---------------------------------------------------------- outils */
-  const syncTools = () => { $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; $('#tsnd').classList.toggle('off', !sfx.on); };
+  const syncTools = () => {
+    $('#tsnd').textContent = sfx.on ? '🔊' : '🔇';
+    $('#tsnd').classList.toggle('off', !sfx.on);
+    const tm = $('#tmus');
+    if (tm) {
+      tm.textContent = wallStreetMusic.on ? '🎵' : '🔇';
+      tm.classList.toggle('off', !wallStreetMusic.on);
+    }
+  };
   syncTools();
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
-  $('#tquit').onclick = () => exit();
+  const tm = $('#tmus');
+  if (tm) tm.onclick = () => { wallStreetMusic.toggle(); syncTools(); };
+  $('#tquit').onclick = () => { wallStreetMusic.stop(); exit(); };
   let toastT = 0;
   function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.hidden = false; t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, ms); }
 
@@ -221,43 +242,93 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
   function renderSetup(s) {
     setupS = s;
     const isHost = s.hostId === me.id, c = s.cfg, ready = s.players.filter((p) => p.ready);
+    const isChartier = c.mode === 'chartier';
+    root.classList.toggle('mode-chartier', isChartier);
     const w = LEVEL_WORDS[s.level] || LEVEL_WORDS.normal;
+
+    const bannerHtml = isChartier
+      ? `${BLOOMBERG_TICKER}
+         <div class="chartier-banner">💼 THE CANDIDATE · ÉVALUATION PIERRE CHARTIER</div>`
+      : '';
+
+    const briefingHtml = isChartier
+      ? `<div class="chartier-briefing">
+           <b>ENTRETIEN TECHNIQUE BANQUE D'AFFAIRES & HEDGE FUNDS</b>
+           <p class="chartier-howto">
+             300 questions de finance de marché, M&A, valorisation, probabilités et brainteasers quant.<br>
+             <b>Clique sur un choix</b> ou utilise les raccourcis <b>1, 2, 3, 4</b> (ou <b>A, B, C, D</b>) pour valider instantanément.<br>
+             Chaque seconde d'hésitation vous pénalise : sur les marchés, la vitesse et la précision font la différence.
+           </p>
+         </div>`
+      : `<p class="mdesc">${esc(MODES[c.mode].desc)}</p>
+         <div class="rules">
+           ${Object.entries(CATS).filter(([k]) => k !== 'chartier').map(([k, v], i) => `<div class="rule" style="--cc:${v.color};--k:${i}"><i>${v.icon}</i><b>${esc(v.label)}</b><small>${v.pts * 100} pts</small></div>`).join('')}
+         </div>
+         <ul class="howto">
+           <li>Une seule réponse par question : <b>Entrée</b> pour valider (ou <b>1</b> / <b>2</b> pour les choix).</li>
+           <li>Plus tu réponds vite, plus tu marques. Le premier juste gagne <b>+50</b>.</li>
+           <li>Trois bonnes réponses d'affilée : bonus de <b>série</b> 🔥${c.sabotage ? ' et un <b>pouvoir de sabotage</b> à lancer sur un adversaire entre deux questions' : ''}.</li>
+         </ul>`;
+
     stage.innerHTML = `
+      ${bannerHtml}
       <div class="card setup deal">
         <div class="setup-head">
-          <div class="logo-c"><span>Tête de</span><b>Calcul</b></div>
+          <div class="logo-c"><span>${isChartier ? 'Pierre Chartier' : 'Tête de'}</span><b>${isChartier ? 'The Candidate' : 'Calcul'}</b></div>
           <div class="chips">
             <span class="chip strong">${esc(MODES[c.mode].label)}</span><span class="chip">${c.len} questions</span>
-            <span class="chip">${esc(DIFF_LABEL[c.diff])}</span><span class="chip">${esc(THEME_LABEL[c.theme] || c.theme)}</span>
+            <span class="chip">${esc(DIFF_LABEL[c.diff])}</span>
+            ${!isChartier ? `<span class="chip">${esc(THEME_LABEL[c.theme] || c.theme)}</span>` : ''}
             ${c.finale ? '<span class="chip gold">Finale quitte ou double</span>' : ''}
             ${c.sabotage ? '<span class="chip sab">Sabotage 🌫️⏱️🙃</span>' : ''}
             ${s.bots ? `<span class="chip">${s.bots} bot${s.bots > 1 ? 's' : ''} ${s.bots > 1 ? w[1] : w[0]}</span>` : ''}
           </div>
         </div>
-        <p class="mdesc">${esc(MODES[c.mode].desc)}</p>
-        <div class="rules">
-          ${Object.entries(CATS).map(([k, v], i) => `<div class="rule" style="--cc:${v.color};--k:${i}"><i>${v.icon}</i><b>${esc(v.label)}</b><small>${v.pts * 100} pts</small></div>`).join('')}
-        </div>
-        <ul class="howto">
-          <li>Une seule réponse par question : <b>Entrée</b> pour valider (ou <b>1</b> / <b>2</b> pour les choix).</li>
-          <li>Plus tu réponds vite, plus tu marques. Le premier juste gagne <b>+50</b>.</li>
-          <li>Trois bonnes réponses d'affilée : bonus de <b>série</b> 🔥${c.sabotage ? ' et un <b>pouvoir de sabotage</b> à lancer sur un adversaire entre deux questions' : ''}.</li>
-        </ul>
+        ${briefingHtml}
         <div class="who">${s.players.map((p) => `<span class="pp${p.ready ? '' : ' off'}"><i style="background:${esc(p.color)}"></i>${esc(p.name)}${p.ready ? '' : ' · charge…'}</span>`).join('')}</div>
-        ${isHost ? `<button class="btn big block primary" id="bStart" ${ready.length ? '' : 'disabled'}>Lancer la partie</button>`
+        ${isHost ? `<button class="btn big block primary ${isChartier ? 'chartier-start-btn' : ''}" id="bStart" ${ready.length ? '' : 'disabled'}>${isChartier ? 'Entrer dans l\'Arène' : 'Lancer la partie'}</button>`
           : '<div class="waithost"><i></i>L\'hôte va lancer la partie…</div>'}
       </div>`;
-    const b = $('#bStart'); if (b) b.onclick = () => { sfx.play('go'); start(); };
+    const b = $('#bStart');
+    if (b) {
+      b.onclick = () => {
+        sfx.play('go');
+        if (isChartier) wallStreetMusic.start();
+        start();
+      };
+    }
   }
 
   /* ---------------------------------------------------------- question */
   function questionBody(q) {
     if (q.input === 'expr') return `<div class="target"><small>Cible</small><b>${q.target}</b></div>
       <div class="tiles">${q.nums.map((n, k) => `<button class="tile" data-n="${n}" data-k="${k}" style="--k:${k}">${n}</button>`).join('')}</div>`;
-    const cls = q.cat === 'devinette' ? 'riddle' : q.fig ? 'geo' : q.text.length > 16 ? 'long' : '';
+    const isCh = q.isChartier || q.input === 'chartier';
+    const cls = q.cat === 'devinette' ? 'riddle' : q.fig ? 'geo' : (isCh || q.text.length > 50) ? 'long' : q.text.length > 16 ? 'long' : '';
     return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>`;
   }
+
   function answerZone(q) {
+    if (q.isChartier || q.input === 'chartier') {
+      const letters = ['A', 'B', 'C', 'D'];
+      const choicesHtml = (q.choices && q.choices.length)
+        ? `<div class="chartier-choices">
+            ${q.choices.map((c, k) => `
+              <button type="button" class="btn-choice" data-choice="${esc(c)}" data-idx="${k}">
+                <span class="choice-badge">${letters[k] || (k + 1)}</span>
+                <span class="choice-text">${esc(c)}</span>
+                <span class="choice-key">${k + 1}</span>
+              </button>
+            `).join('')}
+          </div>`
+        : '';
+      return `
+        ${choicesHtml}
+        <form class="answer chartier-answer" id="aform" autocomplete="off">
+          <input id="ain" inputmode="text" placeholder="Clique sur un choix ou écris ta réponse…" maxlength="60" aria-label="Ta réponse" spellcheck="false">
+          <button class="btn yellow" id="asend">Valider</button>
+        </form>`;
+    }
     if (q.input === 'choice') {
       const vf = q.choices.length === 2 && q.choices[0] === 'Vrai';
       return `<div class="choices ${vf ? 'vf' : 'cmp'}">${q.choices.map((c, k) => `<button class="choice c${k}" data-c="${k}"><kbd>${vf ? (k ? 'F' : 'V') : k + 1}</kbd>${qText(c)}</button>`).join('')}</div>`;
@@ -269,11 +340,16 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
       </form>
       ${expr ? `<div class="ops">${['+', '−', '×', '÷', '(', ')'].map((o) => `<button type="button" data-op="${o}">${o}</button>`).join('')}<button type="button" data-op="back" aria-label="Effacer">⌫</button><button type="button" data-op="clear">C</button></div>` : ''}`;
   }
+
   function renderQuestion() {
     const q = S.q, cat = CATS[q.cat];
+    const isChartier = S.cfg.mode === 'chartier' || q.isChartier;
+    root.classList.toggle('mode-chartier', isChartier);
+    if (isChartier) wallStreetMusic.start();
     myAns = null; lastTick = -1;
     const curses = myCurses();
     stage.innerHTML = `
+      ${isChartier ? BLOOMBERG_TICKER : ''}
       <div class="card pupitre in-${q.input} deal" style="--cc:${cat.color}">
         ${curses.map((c) => `<div class="cursed c-${c.power}">${POWERS[c.power].icon} <b>${esc(name(c.from))}</b> t'a envoyé « ${esc(POWERS[c.power].label)} »${c.power === 'time' ? ' : −5 s' : ''}</div>`).join('')}
         <div class="qhead">
@@ -281,6 +357,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
           <span class="pts">${q.pts * 100} pts</span>
           ${q.final ? '<span class="final">Quitte ou double</span>' : ''}
           <span class="qnum">${q.n} / ${S.cfg.len}</span>
+          ${isChartier ? '<span class="chartier-live-pill"><span class="rec-dot"></span> EN DIRECT</span>' : ''}
         </div>
         <div class="timer" id="timer"><i id="tbar"></i><b id="tsec"></b></div>
         <div class="qzone ${curses.some((c) => c.power === 'fog') ? 'fog' : ''} ${curses.some((c) => c.power === 'flip') ? 'flip' : ''}" id="qzone">
@@ -291,17 +368,32 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
         <div class="sent" id="sent" hidden></div>
       </div>`;
     const fog = $('#qzone.fog'); if (fog) fog.style.setProperty('--fog', FOG_MS + 'ms');
+
     if (q.input === 'choice') {
       for (const b of root.querySelectorAll('[data-c]')) b.onclick = () => choose(Number(b.dataset.c));
     } else {
+      if (q.isChartier || q.input === 'chartier') {
+        for (const b of root.querySelectorAll('.btn-choice')) {
+          b.onclick = () => {
+            const v = b.dataset.choice;
+            if (!v || myAns != null) return;
+            myAns = v;
+            answer(v);
+            sfx.play('lock');
+            lockInput(v, false);
+          };
+        }
+      }
       const inp = $('#ain');
-      setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) {} }, 60);
-      $('#aform').onsubmit = (e) => {
-        e.preventDefault();
-        const v = inp.value.trim();
-        if (!v || myAns != null) return;
-        myAns = v; answer(v); sfx.play('lock'); lockInput(v, false);
-      };
+      if (inp) {
+        setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) {} }, 60);
+        $('#aform').onsubmit = (e) => {
+          e.preventDefault();
+          const v = inp.value.trim();
+          if (!v || myAns != null) return;
+          myAns = v; answer(v); sfx.play('lock'); lockInput(v, false);
+        };
+      }
       if (q.input === 'expr') {
         const insert = (t) => { if (myAns != null) return; inp.value += t; markTiles(); inp.focus({ preventScroll: true }); };
         for (const b of root.querySelectorAll('.tile')) b.onclick = () => { if (!b.classList.contains('used')) insert((/\d$/.test(inp.value) ? ' + ' : '') + b.dataset.n); };
@@ -316,12 +408,14 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     }
     sfx.play(curses.length ? 'sab' : 'question');
   }
+
   function choose(k) {
     if (!S || S.phase !== 'question' || myAns != null || !S.q.choices) return;
     myAns = String(k); answer(myAns); sfx.play('lock');
     for (const b of root.querySelectorAll('[data-c]')) { b.disabled = true; b.classList.toggle('picked', Number(b.dataset.c) === k); }
     const s = $('#sent'); s.hidden = false; s.className = 'sent'; s.innerHTML = `Réponse verrouillée : <b>${qText(S.q.choices[k])}</b> · on attend les autres…`;
   }
+
   // tuiles déjà employées dans l'expression
   function markTiles() {
     const left = ($('#ain').value.match(/\d+/g) || []).map(Number);
@@ -330,6 +424,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
       b.classList.toggle('used', i >= 0); if (i >= 0) left.splice(i, 1);
     }
   }
+
   function lockInput(v, locked) {
     const s = $('#sent'); if (!s) return;
     const inp = $('#ain');
@@ -344,6 +439,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     s.innerHTML = locked ? `🔒 Raté ! Tu es bloqué pour cette question.` : `Réponse verrouillée : <b>${esc(v)}</b> · on attend les autres…`;
     if (locked) shake();
   }
+
   function shake() { const c = root.querySelector('.card'); if (!c || !motion()) return; c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
   function burst(node) {
     if (!node || !motion()) return;
@@ -362,12 +458,38 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
 
   /* ---------------------------------------------------------- révélation */
   function renderReveal() {
+    const isChartier = S.cfg.mode === 'chartier' || (S.last && S.last.cat === 'chartier');
+    root.classList.toggle('mode-chartier', isChartier);
+    if (isChartier) wallStreetMusic.stop();
+
     const L = S.last, cat = CATS[L.cat], mine = L.results.find((r) => r.id === me.id);
     const h = S.history[S.history.length - 1], q = S.q || h;
     const res = [...L.results].sort((a, b) => b.pts - a.pts || (a.at ?? 1e9) - (b.at ?? 1e9));
     const fast = L.results.find((r) => r.tags.includes('eclair') || (S.cfg.mode === 'eclair' && r.pts > 0));
-    const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : q.input === 'choice' ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
+    const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : (q.input === 'choice' || isChartier) ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
+
+    let quoteHtml = '';
+    if (isChartier) {
+      const quoteType = !mine || mine.raw == null ? 'timeout' : (mine.ok ? 'ok' : 'ko');
+      const quotesList = CHARTIER_QUOTES[quoteType];
+      const quoteStr = quotesList[(S.idx || 0) % quotesList.length];
+      const statusLabel = quoteType === 'ok' ? 'VALIDÉ' : quoteType === 'ko' ? 'ÉLIMINÉ' : 'TROP LENT';
+      quoteHtml = `
+        <div class="chartier-quote quote-${quoteType}">
+          <div class="quote-header">
+            <div class="quote-avatar">👔</div>
+            <div class="quote-meta">
+              <b>Pierre Chartier</b>
+              <small>Associé-Gérant · The Candidate</small>
+            </div>
+            <span class="quote-status">${statusLabel}</span>
+          </div>
+          <p class="quote-text">« ${esc(quoteStr)} »</p>
+        </div>`;
+    }
+
     stage.innerHTML = `
+      ${isChartier ? BLOOMBERG_TICKER : ''}
       <div class="card reveal flipin" style="--cc:${cat.color}">
         ${fast ? `<div class="buzz">⚡ <b>${esc(name(fast.id))}</b> a dégainé le premier !</div>` : ''}
         <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.idx + 1} / ${S.cfg.len}</span></div>
@@ -397,7 +519,11 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
   /* ---------------------------------------------------------- compte à rebours */
   function renderIntro() {
     const c = S.cfg;
-    stage.innerHTML = `<div class="card intro deal"><div class="logo-c"><span>Tête de</span><b>Calcul</b></div>
+    const isChartier = c.mode === 'chartier';
+    root.classList.toggle('mode-chartier', isChartier);
+    stage.innerHTML = `
+      ${isChartier ? BLOOMBERG_TICKER : ''}
+      <div class="card intro deal"><div class="logo-c"><span>${isChartier ? 'Pierre Chartier' : 'Tête de'}</span><b>${isChartier ? 'The Candidate' : 'Calcul'}</b></div>
       <p>${esc(MODES[c.mode].label)} · ${c.len} questions · ${esc(DIFF_LABEL[c.diff])}${c.sabotage ? ' · Sabotage' : ''}</p><div class="count" id="count">3</div></div>`;
   }
 
@@ -409,13 +535,18 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     return `<details class="recap" ${miss.length <= 4 ? 'open' : ''}><summary><b>📒 Tes erreurs à revoir</b><span>${miss.length} question${miss.length > 1 ? 's' : ''}</span></summary>
       <ol>${miss.map(({ h, r }) => {
         const c = CATS[h.cat];
-        return `<li style="--cc:${c.color}">${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}<div class="rq"><span class="cat sm"><i>${c.icon}</i>${esc(c.label)}</span><b>${qText(h.text)}</b>${h.sub && h.input !== 'choice' ? `<small>${esc(h.sub)}</small>` : ''}</div>
+        return `<li style="--cc:${c.color}">${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}<div class="rq"><span class="cat sm"><i>${c.icon}</i>${esc(c.label)}</span><b>${qText(h.text)}</b>${h.sub && h.input !== 'choice' && !h.isChartier ? `<small>${esc(h.sub)}</small>` : ''}</div>
           <div class="ra"><span class="mine">${r.raw != null ? 'Ta réponse : <s>' + qText(describeAnswer(h, r.raw)) + '</s>' : 'Pas de réponse'}</span><span class="good">Bonne réponse : <b>${qText(h.show)}</b></span></div>
           <div class="rt">💡 ${qText(h.tip)}</div></li>`;
       }).join('')}</ol></details>`;
   }
+
   function renderOver() {
     closePick();
+    const isChartier = S.cfg.mode === 'chartier';
+    root.classList.toggle('mode-chartier', isChartier);
+    wallStreetMusic.stop();
+
     const rank = S.ranking.map((id) => S.players.find((p) => p.id === id)).filter(Boolean);
     const podium = [rank[1], rank[0], rank[2]];
     const meP = S.players.find((p) => p.id === me.id);
@@ -424,9 +555,46 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     const n = S.history.length || 1;
     const catStats = meP ? Object.entries(meP.byCat).map(([k, v]) => `<span class="chip" style="--cc:${CATS[k].color}"><i>${CATS[k].icon}</i> ${esc(CATS[k].label)} : ${v.ok}/${v.n}</span>`).join('') : '';
     const sab = S.cfg.sabotage;
+
+    let offerBanner = '';
+    if (isChartier && meP) {
+      const score = meP.score;
+      if (score >= 2000) {
+        offerBanner = `
+          <div class="verdict-banner offer-top">
+            <span class="offer-stamp">OFFRE RETENUE · PALIER SUPÉRIEURS</span>
+            <h3>Managing Director / Senior Portfolio Manager</h3>
+            <p>Score exceptionnel : ${fmt(score)} pts (${meP.right}/${n} justes). Pierre Chartier valide votre ticket d'entrée immédiat avec allocation de capital garantie.</p>
+          </div>`;
+      } else if (score >= 1200) {
+        offerBanner = `
+          <div class="verdict-banner offer-mid">
+            <span class="offer-stamp">OFFRE VALIDÉE</span>
+            <h3>Associate Quantitative Trader</h3>
+            <p>Solide performance sous pression : ${fmt(score)} pts (${meP.right}/${n} justes). Vous rejoignez le desk de pricing et d'arbitrage de volatilité.</p>
+          </div>`;
+      } else if (score >= 600) {
+        offerBanner = `
+          <div class="verdict-banner offer-low">
+            <span class="offer-stamp">OFFRE PROBATOIRE</span>
+            <h3>Analyste M&A Junior</h3>
+            <p>Score passable : ${fmt(score)} pts (${meP.right}/${n} justes). Le potentiel est là mais vos temps d'exécution doivent être divisés par deux.</p>
+          </div>`;
+      } else {
+        offerBanner = `
+          <div class="verdict-banner offer-rejected">
+            <span class="offer-stamp">CANDIDATURE REJETÉE</span>
+            <h3>Éliminé au premier tour</h3>
+            <p>${fmt(score)} pts (${meP.right}/${n} justes). En entretien, ce niveau de fébrilité ne pardonne pas. Pierre Chartier vous conseille de refaire vos gammes.</p>
+          </div>`;
+      }
+    }
+
     stage.innerHTML = `
+      ${isChartier ? BLOOMBERG_TICKER : ''}
       <div class="card over deal">
-        <h1>${myPlace === 0 ? '🏆 Champion du calcul !' : myPlace > 0 ? `Tu finis ${myPlace + 1}<sup>e</sup>` : 'Fin de partie'}</h1>
+        <h1>${isChartier ? (myPlace === 0 ? '🏆 Vainqueur de l\'Épreuve The Candidate !' : 'Verdict du Comité de Recrutement') : (myPlace === 0 ? '🏆 Champion du calcul !' : myPlace > 0 ? `Tu finis ${myPlace + 1}<sup>e</sup>` : 'Fin de partie')}</h1>
+        ${offerBanner}
         <div class="podium">${podium.map((p, k) => p ? `<div class="step s${[2, 1, 3][k]}" style="--pc:${esc(p.color)}">
           <div class="who"><i></i><b>${esc(p.name)}</b><span>${fmt(p.score)} pts</span></div><div class="block">${[2, 1, 3][k]}</div></div>` : '<div class="step empty"></div>').join('')}</div>
         <table class="stats"><thead><tr><th>#</th><th>Joueur</th><th>Score</th><th>Justes</th><th>Série max</th><th>Plus rapide</th><th>Temps moyen</th><th>⚡ Premier</th>${sab ? '<th>Sabotages</th>' : ''}</tr></thead>
@@ -439,10 +607,11 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
         <div class="row end">${isHost ? '<button class="btn yellow big" id="bAgain">Rejouer</button>' : '<span class="waithost"><i></i>L\'hôte peut relancer une partie</span>'}<button class="btn ghost big" id="bBack">Retour au salon</button></div>
       </div>`;
     const a = $('#bAgain'); if (a) a.onclick = () => start();
-    $('#bBack').onclick = () => exit();
+    $('#bBack').onclick = () => { wallStreetMusic.stop(); exit(); };
     sfx.play('win');
     confetti();
   }
+
   function confetti() {
     if (!motion()) return;
     const box = el('div', 'confetti');
@@ -470,9 +639,12 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
       const s = Math.max(0, Math.ceil(left / 1000));
       sec.textContent = s + ' s';
       if (myAns == null && s <= 3 && s > 0 && s !== lastTick) { lastTick = s; sfx.play('tick'); }
+      if (S.cfg.mode === 'chartier' || S.q.isChartier) {
+        wallStreetMusic.setTension(1 - k);
+      }
       if (left <= 0 && myAns == null && !root.querySelector('.sent:not([hidden])')) {
         const st = $('#sent'); if (st) { st.hidden = false; st.className = 'sent locked'; st.textContent = '⏰ Temps écoulé !'; }
-        for (const b of root.querySelectorAll('[data-c], #ain, #asend')) b.disabled = true;
+        for (const b of root.querySelectorAll('[data-c], #ain, #asend, .btn-choice')) b.disabled = true;
       }
     } else if (S.phase === 'intro') {
       const c = $('#count'); if (!c) return;
@@ -484,26 +656,50 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
   }
   requestAnimationFrame(frame);
 
-  // raccourcis : 1 / 2 (ou V / F) pour les choix, R pour réagir, Échap pour fermer
+  // raccourcis : 1 / 2 (ou V / F) pour les choix, 1-4 ou A-D pour The Candidate, R pour réagir, Échap pour fermer
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { toggleEmo(false); closePick(); }
     const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
     if (typing) return;
-    if (S && S.phase === 'question' && S.q && S.q.input === 'choice') {
-      const vf = S.q.choices[0] === 'Vrai';
-      const k = e.key === '1' || (vf && /^v$/i.test(e.key)) ? 0 : e.key === '2' || (vf && /^f$/i.test(e.key)) ? 1 : -1;
-      if (k >= 0) { choose(k); return; }
+    if (S && S.phase === 'question' && S.q) {
+      if (S.q.isChartier || S.q.input === 'chartier') {
+        if (myAns == null && S.q.choices) {
+          const kLower = e.key.toLowerCase();
+          let idx = -1;
+          if (kLower >= '1' && kLower <= '4') idx = parseInt(kLower, 10) - 1;
+          else if (['a', 'b', 'c', 'd'].includes(kLower)) idx = ['a', 'b', 'c', 'd'].indexOf(kLower);
+          if (idx >= 0 && idx < S.q.choices.length) {
+            const val = S.q.choices[idx];
+            myAns = val;
+            answer(val);
+            sfx.play('lock');
+            lockInput(val, false);
+            return;
+          }
+        }
+      } else if (S.q.input === 'choice') {
+        const vf = S.q.choices[0] === 'Vrai';
+        const k = e.key === '1' || (vf && /^v$/i.test(e.key)) ? 0 : e.key === '2' || (vf && /^f$/i.test(e.key)) ? 1 : -1;
+        if (k >= 0) { choose(k); return; }
+      }
     }
     if (e.key === 'r' || e.key === 'R') toggleEmo();
   });
 
   return {
-    setup(s) { if (S && S.phase !== 'over') return; if (!S) renderSetup(s); else setupS = s; },
+    setup(s) {
+      if (S && S.phase !== 'over') return;
+      if (!S) renderSetup(s);
+      else setupS = s;
+    },
     update(state, off) {
       offset = off || 0;
       const prev = S; S = state;
+      const isChartier = state.cfg.mode === 'chartier';
+      root.classList.toggle('mode-chartier', isChartier);
       const k = state.phase + ':' + state.idx;
-      const round = state.phase === 'over' ? 'Terminé' : state.idx >= 0 ? `Question ${state.idx + 1} / ${state.cfg.len} · ${MODES[state.cfg.mode].label}` : MODES[state.cfg.mode].label;
+      const modeLabel = MODES[state.cfg.mode] ? MODES[state.cfg.mode].label : state.cfg.mode;
+      const round = state.phase === 'over' ? 'Terminé' : state.idx >= 0 ? `Question ${state.idx + 1} / ${state.cfg.len} · ${modeLabel}` : modeLabel;
       $('#round').textContent = round;
       if (k !== key) {
         key = k;
@@ -525,7 +721,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
       if (soft && S && S.phase === 'question') {
         myAns = null;
         const i = $('#ain'); if (i) { i.disabled = false; $('#asend').disabled = false; $('#aform').classList.remove('locked'); $('#sent').hidden = true; i.focus(); }
-        for (const b of root.querySelectorAll('[data-c]')) { b.disabled = false; b.classList.remove('picked'); }
+        for (const b of root.querySelectorAll('[data-c], .btn-choice')) { b.disabled = false; b.classList.remove('picked', 'selected'); }
       }
       toast(msg);
     },

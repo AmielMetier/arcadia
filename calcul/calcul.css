@@ -367,6 +367,8 @@ button.power.ready:hover{filter:brightness(1.05)}
 .game.mode-chartier .results li{background:#171d2b;border-color:#2a364d;color:#e6edf7}
 .game.mode-chartier .results li.ok{background:#13281e;border-color:#235738}
 .game.mode-chartier .results li.ko{background:#2b1617;border-color:#612826}
+.game.mode-chartier .qtext{font-family:'Chakra Petch',sans-serif;font-size:clamp(18px,2.8vw,26px);font-weight:700;line-height:1.35;letter-spacing:0;color:#f3f7fc;margin:12px 0 6px}
+.game.mode-chartier .qsub{color:#ffd27a;font-family:var(--bung);font-size:12px;letter-spacing:1px}
 
 /* Ruban Ticker Marché Wall Street */
 .bloomberg-ticker{

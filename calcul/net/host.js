@@ -137,9 +137,10 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     const humans = setupState().players.filter((p) => p.ready);
     const players = humans.map((p) => ({ id: p.id, name: p.name, color: p.color }));
     const used = new Set(players.map((p) => p.color));
+    const botPool = cfg.mode === 'chartier' ? FINANCE_BOT_NAMES : BOT_NAMES;
     for (let k = 0; k < botCount(players.length); k++) {
       const color = COLORS.find((c) => !used.has(c)) || COLORS[k]; used.add(color);
-      players.push({ id: 100 + k, name: BOT_NAMES[k], color, bot: true });
+      players.push({ id: 100 + k, name: botPool[k % botPool.length], color, bot: true });
     }
     reported = false;
     try { state = createGame({ players, cfg, seed: randomSeed(), now: Date.now() }); }
