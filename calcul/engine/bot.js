@@ -1,0 +1,35 @@
+// Bots de Tête de Calcul : pour chaque question, un délai de réponse et une réponse (juste ou plausible).
+// Ils ne « calculent » pas : ils connaissent la réponse et se trompent selon leur niveau et la catégorie.
+export const BOT_LEVELS = ['facile', 'normal', 'expert'];
+const SKILL = {
+  facile: { acc: 0.55, speed: 0.62, skip: 0.15 },
+  normal: { acc: 0.75, speed: 0.45, skip: 0.07 },
+  expert: { acc: 0.9, speed: 0.3, skip: 0.02 },
+};
+const HARD = { base: 1, astuce: 0.85, theorie: 0.85, estim: 0.9, compte: 0.6 };
+
+// q : question complète (avec la réponse) ; renvoie { delay (ms), raw } ou null (le bot sèche)
+export function botAnswer(q, level, rnd = Math.random) {
+  const k = SKILL[level] || SKILL.normal;
+  const limit = q.time * 1000;
+  if (rnd() < k.skip * (q.cat === 'compte' ? 2.5 : 1)) return null;
+  // temps de réponse : autour de speed × limite, jamais avant 1,2 s
+  const spread = 0.55 + rnd() * 0.9;
+  const delay = Math.max(1200, Math.min(limit - 300, limit * k.speed * spread * (q.cat === 'base' ? 0.8 : 1)));
+  const right = rnd() < k.acc * (HARD[q.cat] || 1);
+  if (q.input === 'expr') {
+    if (right) return { delay, raw: q.sol };
+    const [a, b] = q.nums; // une tentative ratée, mais qui utilise bien les nombres
+    return { delay, raw: `${a} + ${b}` + (q.nums[2] ? ` × ${q.nums[2]}` : '') };
+  }
+  if (right) return { delay, raw: String(q.tol ? Math.round(q.answer * (1 + (rnd() - 0.5) * q.tol)) : q.answer) };
+  return { delay, raw: String(nearMiss(q.answer, rnd)) };
+}
+
+// Erreur crédible : une retenue oubliée, une dizaine de travers…
+function nearMiss(n, rnd) {
+  const mag = Math.abs(n) >= 1000 ? 100 : Math.abs(n) >= 100 ? 10 : 1;
+  let d = (1 + Math.floor(rnd() * 3)) * mag * (rnd() < 0.5 ? -1 : 1);
+  if (n + d < 0 || d === 0) d = mag;
+  return n + d;
+}

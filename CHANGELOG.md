@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.13 — 21 octobre 2026
+- Nouveau jeu : **Tête de Calcul**, duel de calcul mental jusqu'à 6 joueurs, avec bots (facile, normal, expert).
+- 5 catégories : les 4 opérations, astuces (nombres équidistants, carrés en 5, ×11, pourcentages inversés),
+  nombres (puissances, restes, racines), ordres de grandeur (km/h ↔ m/s, trajets, estimations) et Compte est bon.
+- 3 modes : Classique, Péril (erreurs pénalisées), Éclair (seul le premier juste marque). Bonus de rapidité,
+  de série et finale quitte ou double. L'astuce de chaque question s'affiche à la révélation.
+- Les réponses restent chez l'hôte jusqu'à la révélation ; les questions sont tirées d'une graine, ce qui permet
+  à un nouvel hôte de reprendre la partie après un départ.
+- Classement entre potes : Tête de Calcul y a sa colonne.
+
 ## 2.12 — 19 octobre 2026
 - DavidSimulator en vraie 3D (WebGL) : plateau en relief posé sur une table en bois, ombres, pions en métal modélisés
   en volume, maisons et hôtels en 3D, dés physiques qui roulent et tombent sur la bonne face.

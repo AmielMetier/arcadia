@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift et DavidSimulator
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash et Tête de Calcul
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -20,13 +20,24 @@ Le Monopoly classique transposé à Nice, de Saint-Roch à la Promenade des Angl
 Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Express** (40 minutes).
 Plateau 3D façon jeu de société, choix du pion parmi 10 figurines, statistiques en direct (courbe du patrimoine, heatmap, classement) et analyse financière des propriétés.
 
+## Tête de Calcul
+Duel de calcul mental jusqu'à 6 joueurs (bots possibles) : tout le monde voit la même question et répond en même temps.
+Les 4 opérations, les astuces qui font passer pour un génie (47 × 53, 75², 43 × 11, 16 % de 50), puissances, restes et racines,
+conversions et ordres de grandeur, et le **Compte est bon** (atteindre une cible avec 4 nombres).
+
+- **Modes** : Classique (le plus rapide marque plus), Péril (une erreur coûte des points), Éclair (seul le premier juste marque)
+- **Bonus** : premier juste +50, série de bonnes réponses 🔥, dernière question quitte ou double
+- Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium et statistiques (série, réponse la plus rapide, catégories)
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator ;
-  `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots.
+  `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
+  `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul.
+- Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Version actuelle : **2.9** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.13** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

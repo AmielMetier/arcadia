@@ -60,6 +60,41 @@ window.HUB_GAMES = [
     </svg>`,
   },
   {
+    id: 'calcul',
+    title: 'Tête de Calcul',
+    tag: 'Duel de calcul mental',
+    desc: 'Additions, astuces (47 × 53), puissances, modulos, conversions et Compte est bon : le plus rapide gagne. Avec bots.',
+    url: 'calcul/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#ff5fa2',
+    settings: [
+      { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['peril', 'Péril · erreurs pénalisées'], ['eclair', 'Éclair · seul le 1er marque']], def: 'classic' },
+      { key: 'theme', label: 'Questions', options: [['mix', 'Tout mélangé'], ['base', 'Les 4 opérations'], ['malin', 'Astuces & nombres'], ['vite', 'Vitesse & estimations'], ['compte', 'Compte est bon']], def: 'mix' },
+      { key: 'len', label: 'Longueur', options: [[10, '10 questions'], [15, '15'], [20, '20']], def: 10 },
+      { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
+      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
+      { key: 'finale', label: 'Dernière question quitte ou double', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+    ],
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="320" height="180" fill="#3f86d0"/>
+      <rect y="120" width="320" height="60" fill="#1C5FB4"/>
+      <circle cx="276" cy="34" r="20" fill="#FDE62F" stroke="#16181d" stroke-width="3"/>
+      <g font-family="Bungee,Impact,sans-serif" fill="#fff8ea" opacity=".22" font-size="40"><text x="14" y="52">+</text><text x="22" y="160">÷</text><text x="282" y="150">√</text><text x="230" y="98">%</text></g>
+      <g transform="translate(160 92) rotate(-4)">
+        <rect x="-96" y="-58" width="192" height="116" rx="14" fill="#16181d"/>
+        <rect x="-100" y="-62" width="192" height="116" rx="14" fill="#fff8ea" stroke="#16181d" stroke-width="4"/>
+        <rect x="-86" y="-50" width="66" height="18" rx="9" fill="#ff5fa2" stroke="#16181d" stroke-width="3"/>
+        <rect x="-86" y="-24" width="164" height="12" rx="6" fill="#f3e9d2" stroke="#16181d" stroke-width="3"/>
+        <rect x="-86" y="-24" width="104" height="12" rx="6" fill="#2fbf71" stroke="#16181d" stroke-width="3"/>
+        <text x="-4" y="30" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="38" fill="#16181d">47×53</text>
+      </g>
+      <g transform="translate(250 136) rotate(10)"><rect x="-26" y="-18" width="52" height="34" rx="8" fill="#ffc531" stroke="#16181d" stroke-width="3"/>
+        <text x="0" y="8" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="16" fill="#16181d">2491</text></g>
+      <g transform="translate(58 128)"><circle r="20" fill="#ff8a1f" stroke="#16181d" stroke-width="3"/><text y="7" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="18" fill="#fff">48</text></g>
+    </svg>`,
+  },
+  {
     id: 'bastion',
     title: 'Bastion Clash',
     tag: 'RTS StarCraft · Base & Micro',
