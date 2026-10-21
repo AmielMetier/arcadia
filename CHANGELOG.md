@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.14 — 21 octobre 2026
+- Le journal des nouveautés est maintenant dans le Hub : bouton « ✨ Nouveautés » sur l'accueil (ou clic sur le numéro
+  de version). Il s'ouvre tout seul à la première visite après une mise à jour.
+- Duo Drift lancé depuis le Hub : garage, profil (succès, statistiques) et réglages accessibles depuis la salle d'attente.
+  Une nouvelle voiture, déco ou couleur choisie au garage est transmise aux autres joueurs.
+- Duo Drift se lance de nouveau : l'adresse du serveur relais était déclarée deux fois, ce qui bloquait tout le jeu.
+- Plateau 3D de DavidSimulator moins surexposé : éclairage réglé par mesure, les couleurs du plateau gardent leur saturation.
+
 ## 2.13 — 21 octobre 2026
 - Nouveau jeu : **Tête de Calcul**, duel de calcul mental jusqu'à 6 joueurs, avec bots (facile, normal, expert).
 - 5 catégories : les 4 opérations, astuces (nombres équidistants, carrés en 5, ×11, pourcentages inversés),
