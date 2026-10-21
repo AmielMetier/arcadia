@@ -6,17 +6,18 @@ const SKILL = {
   normal: { acc: 0.75, speed: 0.45, skip: 0.07 },
   expert: { acc: 0.9, speed: 0.3, skip: 0.02 },
 };
-const HARD = { base: 1, astuce: 0.85, theorie: 0.85, estim: 0.9, compte: 0.6 };
+const HARD = { base: 1, astuce: 0.85, theorie: 0.85, fraction: 0.85, suite: 0.85, estim: 0.9, compte: 0.6, vf: 0.95, compare: 0.9, equation: 0.85, geo: 0.8, devinette: 0.7 };
 
 // q : question complète (avec la réponse) ; renvoie { delay (ms), raw } ou null (le bot sèche)
 export function botAnswer(q, level, rnd = Math.random) {
   const k = SKILL[level] || SKILL.normal;
   const limit = q.time * 1000;
-  if (rnd() < k.skip * (q.cat === 'compte' ? 2.5 : 1)) return null;
+  if (rnd() < k.skip * (q.cat === 'compte' ? 2.5 : q.cat === 'devinette' ? 1.5 : 1)) return null;
   // temps de réponse : autour de speed × limite, jamais avant 1,2 s
   const spread = 0.55 + rnd() * 0.9;
   const delay = Math.max(1200, Math.min(limit - 300, limit * k.speed * spread * (q.cat === 'base' ? 0.8 : 1)));
   const right = rnd() < k.acc * (HARD[q.cat] || 1);
+  if (q.input === 'choice') return { delay: delay * 0.7 + 600, raw: String(right ? q.answer : (q.answer + 1 + Math.floor(rnd() * (q.choices.length - 1))) % q.choices.length) };
   if (q.input === 'expr') {
     if (right) return { delay, raw: q.sol };
     const [a, b] = q.nums; // une tentative ratée, mais qui utilise bien les nombres
@@ -28,8 +29,20 @@ export function botAnswer(q, level, rnd = Math.random) {
 
 // Erreur crédible : une retenue oubliée, une dizaine de travers…
 function nearMiss(n, rnd) {
+  if (!Number.isInteger(n)) return Math.round((n + (rnd() < 0.5 ? 0.25 : 0.5)) * 100) / 100;
   const mag = Math.abs(n) >= 1000 ? 100 : Math.abs(n) >= 100 ? 10 : 1;
   let d = (1 + Math.floor(rnd() * 3)) * mag * (rnd() < 0.5 ? -1 : 1);
   if (n + d < 0 || d === 0) d = mag;
   return n + d;
+}
+
+// Sabotage : le bot vise le premier du classement (lui excepté), pas à chaque fois
+export function botSabotage(state, botId, rnd = Math.random) {
+  const me = state.players.find((p) => p.id === botId);
+  const attack = me && me.powers.find((pw) => pw !== 'shield');
+  if (!attack || rnd() < 0.35) return null;
+  const others = state.players.filter((p) => p.id !== botId && !(state.curses[p.id] || []).some((c) => c.power === attack));
+  if (!others.length) return null;
+  const target = others.sort((a, b) => b.score - a.score)[0];
+  return { power: attack, target: target.id };
 }

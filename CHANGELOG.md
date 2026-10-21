@@ -9,6 +9,23 @@
 - Les réponses restent chez l'hôte jusqu'à la révélation ; les questions sont tirées d'une graine, ce qui permet
   à un nouvel hôte de reprendre la partie après un départ.
 - Classement entre potes : Tête de Calcul y a sa colonne.
+- Banque de questions agrandie : 54 types de questions au lieu de 17, et jamais deux fois la même question dans une partie.
+  - Calcul : chaînes d'opérations, nombre manquant (? × 7 = 56), moitié / double / quart / triple, priorités opératoires.
+  - Astuces : × 5, × 25, × 9, × 99, × 1,5, carrés voisins d'un nombre rond (39²), compléments à 100 / 1 000, pourcentages par 10 %.
+  - Nombres : cubes, PGCD, PPCM, factorielles, binaire, nombre premier suivant, nombre de diviseurs.
+  - Nouvelle catégorie **Fractions** : fraction d'un nombre, décimaux connus (0,25 × 36), fraction → décimal, fraction → %, somme de fractions.
+  - Nouvelle catégorie **Suite logique** : arithmétiques, géométriques, carrés et cubes, Fibonacci, écarts croissants, alternances, nombres premiers.
+  - Ordres de grandeur : durées, unités (km, L, kg, m²…), soldes, règle de trois, moyennes, « +20 % puis −20 % ».
+- Deux nouveaux thèmes dans le salon : Fractions & décimaux, Suites & logique. Les réponses décimales acceptent la virgule.
+- **Sabotage** (règle maison, activée par défaut) : 3 bonnes réponses d'affilée rapportent un pouvoir à lancer sur un adversaire
+  entre deux questions — 🌫️ Brouillard (question floue 5 s), ⏱️ Chrono volé (5 s de moins), 🙃 Tête à l'envers — ou un 🛡️ Bouclier
+  qui bloque le prochain sabotage reçu. Les bots visent le meneur. La pause entre deux questions s'allonge quand quelqu'un peut saboter.
+- 5 nouvelles catégories : **Vrai ou faux** et **Le plus grand** (réponse en un clic, ou touches 1 / 2, V / F), **Équations** (3x + 7 = 22),
+  **Géométrie** avec une figure cotée (aires, périmètres, angles, Pythagore, volumes, polygones) et **Devinettes** (« Je suis pair, entre 40 et 50… »).
+  Trois nouveaux thèmes : Vrai/faux & comparaisons, Équations & devinettes, Géométrie & mesures. 80 types de questions en tout.
+- Animations : cartes qui tombent et se retournent, résultats en cascade, étincelles quand c'est juste, secousse quand c'est raté,
+  tampon « verrouillé », bandeau du plus rapide, classement qui se réordonne en glissant, podium qui monte, pouvoirs qui volent d'un joueur à l'autre.
+- Fin de partie : **récapitulatif des erreurs** (ta réponse, la bonne, et l'astuce), et colonne des sabotages envoyés et reçus.
 
 ## 2.12 — 19 octobre 2026
 - DavidSimulator en vraie 3D (WebGL) : plateau en relief posé sur une table en bois, ombres, pions en métal modélisés

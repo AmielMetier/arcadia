@@ -15,13 +15,14 @@ function boot(info) {
   // hors du Hub (calcul/?mode=eclair&len=15…) : réglages dans l'adresse, deux bots par défaut
   const settings = H.embedded ? info.settings || {} : {
     mode: qs.get('mode'), len: qs.get('len'), diff: qs.get('diff'), theme: qs.get('theme'),
-    finale: qs.get('finale'), bots: qs.get('bots') ?? 2, level: qs.get('level') || 'normal',
+    finale: qs.get('finale'), sabotage: qs.get('sabotage'), bots: qs.get('bots') ?? 2, level: qs.get('level') || 'normal',
   };
 
   const view = mountGame(root, {
     me,
     answer: (v) => session.answer(v),
     emote: (id) => session.emote(id),
+    sabotage: (power, target) => session.sabotage(power, target),
     start: () => session.start(),
     exit: () => { if (H.embedded) H.exit(); else location.reload(); },
   });

@@ -22,12 +22,14 @@ Plateau 3D façon jeu de société, choix du pion parmi 10 figurines, statistiqu
 
 ## Tête de Calcul
 Duel de calcul mental jusqu'à 6 joueurs (bots possibles) : tout le monde voit la même question et répond en même temps.
-Les 4 opérations, les astuces qui font passer pour un génie (47 × 53, 75², 43 × 11, 16 % de 50), puissances, restes et racines,
-conversions et ordres de grandeur, et le **Compte est bon** (atteindre une cible avec 4 nombres).
+12 catégories et 80 types de questions : les 4 opérations, les astuces qui font passer pour un génie (47 × 53, 75², 43 × 11, 16 % de 50),
+nombres (puissances, PGCD, binaire, premiers), fractions, suites logiques, vrai ou faux, le plus grand, équations, géométrie avec figure,
+devinettes, ordres de grandeur, et le **Compte est bon** (atteindre une cible avec 4 nombres).
 
 - **Modes** : Classique (le plus rapide marque plus), Péril (une erreur coûte des points), Éclair (seul le premier juste marque)
 - **Bonus** : premier juste +50, série de bonnes réponses 🔥, dernière question quitte ou double
-- Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium et statistiques (série, réponse la plus rapide, catégories)
+- **Sabotage** : une série de 3 rapporte un pouvoir (brouillard, chrono volé, tête à l'envers, bouclier) à lancer sur un adversaire
+- Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium, statistiques et récapitulatif de tes erreurs avec leurs astuces
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.

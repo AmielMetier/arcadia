@@ -16,6 +16,7 @@ export function startClient({ bridge, onState, onSetup, onError, onAck = () => {
   return {
     answer(raw) { if (state) bridge.send('host', { t: 'ans', i: state.idx, v: raw }); },
     emote(id) { bridge.send('host', { t: 'emote', id }); },
+    sabotage(power, target) { bridge.send('host', { t: 'sab', power, target }); },
     start() {},
     get state() { return state; },
   };
