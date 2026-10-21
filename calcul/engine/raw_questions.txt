@@ -1,0 +1,300 @@
+001 | Finance | 15s | Que signifie l'acronyme CAC dans CAC 40 ? | Cotation Assistée en Continu
+002 | Finance | 15s | Combien d'entreprises composent l'indice CAC 40 ? | 40
+003 | Finance | 15s | Si les taux d'intérêt augmentent, que fait le prix d'une obligation à taux fixe ? | Il baisse
+004 | Finance | 15s | Quel animal symbolise un marché boursier en hausse ? | Le Taureau (Bull)
+005 | Finance | 15s | Quel animal symbolise un marché boursier en baisse ? | L'Ours (Bear)
+006 | Finance | 15s | Quelle est la devise officielle du Japon ? | Le Yen (JPY)
+007 | Finance | 15s | Quelle est la devise officielle de la Suisse ? | Le Franc suisse (CHF)
+008 | Finance | 15s | Comment appelle-t-on la part du bénéfice distribuée aux actionnaires ? | Le dividende
+009 | Finance | 15s | Combien vaut 1 point de base (bps) en pourcentage ? | 0,01 %
+010 | Finance | 15s | Combien de points de base y a-t-il dans 1 % ? | 100 bps
+011 | Finance | 15s | Une action passe de 100 € à 120 €. Quel est son pourcentage de hausse ? | 20 %
+012 | Finance | 20s | Une action passe de 100 € à 50 €. De quel pourcentage doit-elle remonter pour revenir à 100 € ? | 100 %
+013 | Finance | 15s | Que signifie l'acronyme IPO ? | Initial Public Offering (Introduction en bourse)
+014 | Finance | 15s | Quel est le principal indice boursier allemand contenant 40 valeurs ? | Le DAX
+015 | Finance | 15s | Quel indice américain regroupe les 500 plus grandes entreprises cotées aux USA ? | Le S&P 500
+016 | Finance | 15s | Comment s'appelle la banque centrale des États-Unis ? | La Réserve Fédérale (Fed)
+017 | Finance | 15s | Dans quelle ville se trouve le siège de la Banque Centrale Européenne (BCE) ? | Francfort
+018 | Finance | 15s | Quel produit dérivé donne le droit (sans obligation) d'acheter un actif ? | Un Call (Option d'achat)
+019 | Finance | 15s | Quel produit dérivé donne le droit (sans obligation) de vendre un actif ? | Un Put (Option de vente)
+020 | Finance | 15s | Comment appelle-t-on le prix auquel une option peut être exercée ? | Le Strike (ou Prix d'exercice)
+021 | Finance | 20s | Une entreprise a 10 millions d'actions à 25 € chacune. Quelle est sa capitalisation boursière ? | 250 millions d'euros
+022 | Finance | 20s | Si le Chiffre d'Affaires est de 100 M€ et les charges de 85 M€, quel est le résultat ? | 15 M€
+023 | Finance | 15s | Dans un bilan comptable, comment s'appelle la colonne de gauche (ce que possède l'entreprise) ? | L'Actif
+024 | Finance | 15s | Dans un bilan comptable, comment s'appelle la colonne de droite (les ressources/dettes) ? | Le Passif
+025 | Finance | 15s | Que signifie l'acronyme M&A ? | Mergers and Acquisitions (Fusions et Acquisitions)
+026 | Finance | 15s | Quel terme désigne la vente d'un titre que l'on ne possède pas encore ? | La vente à découvert (Short selling)
+027 | Finance | 20s | Vous placez 1 000 € à 5 % d'intérêt simple par an. Combien avez-vous après 1 an ? | 1 050 €
+028 | Finance | 20s | Quel est le coupon annuel en euros d'une obligation de nominal 1 000 € à taux facial de 4 % ? | 40 €
+029 | Finance | 15s | Quel est l'actif considéré comme la valeur refuge historique par excellence en cas de crise ? | L'Or
+030 | Finance | 15s | Quel indice boursier américain est fortement concentré sur les valeurs technologiques ? | Le Nasdaq
+031 | Finance | 15s | Quel est l'indice boursier phare de la Bourse de Londres ? | Le FTSE 100 (Footsie)
+032 | Finance | 15s | Quel est l'indice boursier phare de la Bourse de Tokyo ? | Le Nikkei 225
+033 | Finance | 15s | Comment appelle-t-on l'écart entre le prix d'achat (Bid) et le prix de vente (Ask) ? | Le Spread
+034 | Finance | 15s | Si le Bid est à 99,50 € et l'Ask à 100,00 €, quel est le spread ? | 0,50 € (50 centimes)
+035 | Finance | 15s | Que signifie P&L en salle des marchés ? | Profit and Loss (Pertes et Profits)
+036 | Finance | 15s | Quelle agence de notation fait partie du "Big Three" avec Moody's et Fitch ? | Standard & Poor's (S&P)
+037 | Finance | 15s | Comment appelle-t-on une obligation émise par l'État français à long terme ? | Une OAT (Obligation Assimilable du Trésor)
+038 | Finance | 15s | Comment appelle-t-on une obligation à haut rendement mais à risque élevé de défaut ? | High Yield (ou Junk Bond / Obligation spéculative)
+039 | Finance | 20s | Si l'inflation est de 4 % et que votre salaire augmente de 4 %, comment évolue votre pouvoir d'achat ? | Il reste stable (0 %)
+040 | Finance | 15s | Quel terme désigne une baisse générale et durable des prix dans une économie ? | La déflation
+041 | Finance | 15s | Que signifie l'acronyme PIB ? | Produit Intérieur Brut
+042 | Finance | 15s | Combien de trimestres consécutifs de baisse du PIB définissent techniquement une récession ? | 2 trimestres
+043 | Finance | 20s | Une action cote 40 € et verse un dividende de 2 €. Quel est son rendement du dividende (Dividend Yield) ? | 5 % (2 / 40)
+044 | Finance | 15s | Que signifie l'acronyme ETF ? | Exchange Traded Fund (Fonds indiciel coté / Tracker)
+045 | Finance | 15s | Quel marché financier est le plus liquide au monde avec des milliers de milliards échangés par jour ? | Le Forex (Marché des changes)
+046 | Finance | 15s | Quelle matière première est cotée sous les références "Brent" et "WTI" ? | Le pétrole brut
+047 | Finance | 15s | Combien y a-t-il d'onces troy environ dans un lingot d'or de 1 kg (à l'unité près) ? | 32 onces (32,15)
+048 | Finance | 20s | Si EUR/USD = 1,10, combien de dollars obtenez-vous avec 100 euros ? | 110 dollars
+049 | Finance | 15s | Comment appelle-t-on un ordre de bourse qui s'exécute immédiatement au meilleur prix disponible ? | Un ordre au marché (Market order)
+050 | Finance | 15s | Comment appelle-t-on une entreprise non cotée valorisée à plus d'un milliard de dollars ? | Une Licorne
+051 | Calcul | 15s | Combien font 7 x 8 ? | 56
+052 | Calcul | 15s | Combien font 15 % de 200 ? | 30
+053 | Calcul | 15s | Quel est le quart de 120 ? | 30
+054 | Calcul | 15s | Combien font 140 + 270 ? | 410
+055 | Calcul | 15s | Résolvez : 100 - 37 | 63
+056 | Calcul | 15s | Quel est le carré de 12 ? | 144
+057 | Calcul | 15s | Quelle est la racine carrée de 81 ? | 9
+058 | Calcul | 15s | Combien de minutes y a-t-il dans 2 heures et demie ? | 150 minutes
+059 | Calcul | 15s | Si 4 cafés coûtent 8 €, combien coûtent 7 cafés ? | 14 €
+060 | Calcul | 15s | Résolvez : 5 + 5 x 5 | 30 (Priorité à la multiplication)
+061 | Calcul | 15s | Quel nombre divisé par 6 donne 7 ? | 42
+062 | Calcul | 15s | Combien font 25 % de 80 ? | 20
+063 | Calcul | 15s | Quelle est la moitié de 350 ? | 175
+064 | Calcul | 15s | Combien font 9 x 12 ? | 108
+065 | Calcul | 20s | Quelle est la moyenne de 10, 20 et 30 ? | 20
+066 | Logique | 15s | Complétez la suite : 2 - 4 - 6 - 8 - ? | 10
+067 | Logique | 15s | Complétez la suite : 5 - 10 - 20 - 40 - ? | 80
+068 | Logique | 15s | Complétez la suite : 100 - 90 - 80 - 70 - ? | 60
+069 | Logique | 15s | Complétez la suite : A - C - E - G - ? | I
+070 | Logique | 15s | Complétez la suite : L - M - M - J - V - S - ? | D (Dimanche)
+071 | Logique | 15s | Si vous dépassez le deuxième dans une course, à quelle place êtes-vous ? | Deuxième
+072 | Logique | 15s | Le père de Clara a 4 filles : Lala, Lélé, Lili. Comment s'appelle la quatrième ? | Clara
+073 | Logique | 15s | Combien de mois dans l'année ont 28 jours ? | 12 (Tous les mois en ont au moins 28)
+074 | Logique | 15s | Chassez l'intrus : Rouge - Bleu - Carré - Vert | Carré (C'est une forme, pas une couleur)
+075 | Logique | 15s | Chassez l'intrus : 2 - 4 - 8 - 9 - 10 | 9 (C'est le seul nombre impair)
+076 | Logique | 15s | Sur un dé standard à 6 faces, quel chiffre est sur la face opposée au 1 ? | 6 (La somme des faces opposées vaut 7)
+077 | Logique | 15s | Combien de côtés possède un octogone ? | 8
+078 | Logique | 15s | Un fermier a 15 vaches. Toutes meurent sauf 8. Combien lui en reste-t-il ? | 8
+079 | Attention | 15s | Les deux nombres suivants sont-ils identiques : 49281 et 49218 ? | Non
+080 | Attention | 15s | Combien y a-t-il de lettres dans le mot « BANQUE » ? | 6
+081 | Attention | 15s | Épelez le mot « EURO » à l'envers. | ORUE
+082 | Attention | 15s | Quelle est la troisième voyelle de l'alphabet ? | I (A, E, I)
+083 | Attention | 15s | Combien de fois apparaît le chiffre 3 dans : 39230313 ? | 4 fois
+084 | Calcul | 15s | Quel est le triple de 15 ? | 45
+085 | Calcul | 20s | Un train part à 08h50 et arrive à 09h25. Combien de minutes a duré le trajet ? | 35 minutes
+086 | Calcul | 15s | Combien de centimes y a-t-il dans 4,50 € ? | 450 centimes
+087 | Logique | 15s | Qui est le plus lourd : 1 kg de plumes ou 1 kg de plomb ? | Ils ont le même poids (1 kg)
+088 | Logique | 15s | Vous regardez vers le Sud et faites un demi-tour (180°). Vers où regardez-vous ? | Vers le Nord
+089 | Logique | 15s | Si hier était mardi, quel jour serons-nous demain ? | Jeudi
+090 | Calcul | 15s | Quelle est la probabilité de tirer « Pile » sur un lancer de pièce équilibrée ? | 1/2 (ou 50 %)
+091 | Calcul | 15s | Quelle est la probabilité de faire un 6 avec un dé équilibré à 6 faces ? | 1/6
+092 | Logique | 15s | Chassez l'intrus : Euro - Dollar - Yen - Bitcoin - Livre Sterling | Bitcoin (Cryptomonnaie, pas une devise étatique)
+093 | Attention | 15s | Si le mot « VERT » est écrit en rouge, quelle est la couleur de l'encre ? | Rouge
+094 | Calcul | 15s | Combien font 11 x 11 ? | 121
+095 | Calcul | 15s | Résolvez : 48 divisé par 6 | 8
+096 | Logique | 15s | Combien d'angles droits possède un rectangle ? | 4
+097 | Attention | 15s | Quel chiffre manque dans cette suite de 1 à 6 : 4 - 2 - 6 - 1 - 3 ? | 5
+098 | Calcul | 15s | Si x + 12 = 20, combien vaut x ? | 8
+099 | Logique | 15s | Dans quel sens tourne l'aiguille d'une montre si on la regarde dans un miroir ? | Sens inverse des aiguilles d'une montre (Sens anti-horaire)
+100 | Calcul | 15s | Combien font 10 puissance 3 ($10^3$) ? | 1 000
+101 | Finance | 25s | Une action a un cours de 75 € et un Bénéfice Par Action (BPA) de 5 €. Quel est son PER ? | 15
+102 | Finance | 25s | Une obligation de nominal 1 000 € verse un coupon de 40 € et cote 800 €. Quel est son Current Yield (rendement courant) ? | 5 % (40 / 800)
+103 | Finance | 25s | La capitalisation boursière d'une société est de 400 M€, sa dette de 120 M€ et sa trésorerie de 40 M€. Quelle est sa Valeur d'Entreprise (EV) ? | 480 M€ (400 + 120 - 40)
+104 | Finance | 20s | Que mesure le coefficient Bêta ($\beta$) d'une action ? | Sa sensibilité (ou volatilité relative) aux variations du marché
+105 | Finance | 20s | Si une action a un Bêta de 1,5 et que le marché monte de 2 %, de combien monte théoriquement l'action ? | +3 %
+106 | Finance | 30s | Taux sans risque = 2 %, Prime de risque du marché = 6 %, Bêta = 1,5. Quel est le coût des capitaux propres selon le MEDAF (CAPM) ? | 11 % (2 % + 1,5 x 6 %)
+107 | Finance | 25s | Un fonds a un rendement de 12 %, une volatilité de 10 % et le taux sans risque est de 2 %. Quel est son ratio de Sharpe ? | 1,0 ((12 - 2) / 10)
+108 | Finance | 25s | Le coût de la dette avant impôt est de 8 % et le taux d'IS est de 25 %. Quel est le coût de la dette après impôt ? | 6 % (8 % x (1 - 0,25))
+109 | Finance | 20s | Que signifie l'acronyme WACC en Corporate Finance ? | Weighted Average Cost of Capital (CMPC)
+110 | Finance | 20s | Que signifie l'acronyme EBITDA ? | Earnings Before Interest, Taxes, Depreciation, and Amortization
+111 | Finance | 25s | Quelle est la différence comptable entre l'EBITDA et l'EBIT ? | Les dotations aux amortissements et provisions (D&A)
+112 | Finance | 25s | Vous achetez un Call Strike 50 € pour une prime de 4 €. À l'échéance, l'action vaut 60 €. Quel est votre profit net ? | 6 € ((60 - 50) - 4)
+113 | Finance | 25s | Vous achetez un Put Strike 100 € pour une prime de 6 €. À l'échéance, l'action vaut 110 €. Quel est votre résultat net ? | -6 € (Perte de la prime, option non exercée)
+114 | Finance | 20s | À quel prix de l'action atteint-on le point mort (Break-even) sur l'achat d'un Call de Strike 80 € payé 5 € ? | 85 €
+115 | Finance | 20s | Quelle lettre grecque mesure la sensibilité du prix d'une option à une variation de 1 € du sous-jacent ? | Le Delta ($\Delta$)
+116 | Finance | 20s | Quelle lettre grecque mesure la perte de valeur d'une option liée à l'écoulement du temps (Time Decay) ? | Le Thêta ($\Theta$)
+117 | Finance | 20s | Quelle lettre grecque mesure la sensibilité d'une option à la volatilité implicite ? | Le Véga ($\nu$)
+118 | Finance | 20s | Quelle est la valeur approximative du Delta d'un Call à la monnaie (At-The-Money) ? | 0,5 (ou 50 %)
+119 | Finance | 25s | Quelle est la différence entre une option européenne et une option américaine ? | L'américaine est exerçable à tout moment, l'européenne uniquement à maturité
+120 | Finance | 25s | Comment appelle-t-on l'achat simultané d'un Call et d'un Put de même Strike et même maturité ? | Un Straddle (Long Straddle)
+121 | Finance | 25s | Selon la règle des 72, en combien d'années environ un capital placé à 6 % par an double-t-il ? | 12 ans (72 / 6)
+122 | Finance | 25s | Une action passe de 80 € à 100 €, puis baisse de 20 %. Quel est son cours final ? | 80 €
+123 | Finance | 20s | Lorsqu'une action de 100 € détache un dividende de 4 €, à quel cours théorique ouvre-t-elle ? | 96 €
+124 | Finance | 20s | Quel est le risque maximal pour un vendeur d'option Call nue (non couverte) ? | Illimité
+125 | Finance | 25s | Quelle est la formule du Besoin en Fonds de Roulement (BFR) opérationnel ? | Stocks + Créances Clients - Dettes Fournisseurs
+126 | Finance | 25s | Si le BFR d'une entreprise augmente de 10 M€ sur l'année, quel est l'impact sur son Free Cash Flow ? | Une baisse de 10 M€ (Consommation de cash)
+127 | Finance | 25s | Un projet coûte 200 € et rapporte 220 € dans un an. Si le taux d'actualisation est de 10 %, quelle est sa VAN (NPV) ? | 0 € (-200 + 220 / 1,10)
+128 | Finance | 20s | Comment s'appelle le taux d'actualisation pour lequel la VAN est égale à zéro ? | Le TRI (Taux de Rentabilité Interne / IRR)
+129 | Finance | 20s | Que mesure le ratio ROE (Return On Equity) ? | Résultat Net / Capitaux Propres (Rentabilité financière)
+130 | Finance | 25s | Une entreprise a un Résultat Net de 15 M€ et des Capitaux Propres de 100 M€. Quel est son ROE ? | 15 %
+131 | Finance | 20s | Comment appelle-t-on une opération de rachat d'entreprise financée majoritairement par de la dette ? | Un LBO (Leveraged Buy-Out)
+132 | Finance | 20s | Que signifie une courbe des taux inversée (taux courts > taux longs) pour les économistes ? | Un signal avancé de récession économique
+133 | Finance | 20s | Quel produit dérivé de crédit permet de s'assurer contre le défaut de paiement d'un émetteur obligataire ? | Un CDS (Credit Default Swap)
+134 | Finance | 20s | Quel est le nom de l'indice surnommé « l'indice de la peur » qui mesure la volatilité implicite du S&P 500 ? | Le VIX
+135 | Finance | 20s | Sur un contrat Future, comment appelle-t-on le dépôt de garantie initial exigé par la chambre de compensation ? | Le dépôt de garantie (Initial Margin)
+136 | Finance | 25s | Si le taux d'intérêt nominal est de 6 % et l'inflation de 2,5 %, quel est le taux d'intérêt réel approximatif ? | 3,5 %
+137 | Finance | 25s | Une obligation a une sensibilité (Duration modifiée) de 5. Si les taux montent de 1 %, de combien varie son prix ? | Il baisse d'environ 5 %
+138 | Finance | 20s | Quelle est la plus petite note de crédit appartenant encore à la catégorie « Investment Grade » chez S&P ? | BBB-
+139 | Finance | 20s | Comment appelle-t-on le rachat par une entreprise de ses propres actions en bourse ? | Le Share Buyback (Rachat d'actions)
+140 | Finance | 25s | Quel est l'effet mécanique d'un rachat d'actions (annulées ensuite) sur le Bénéfice Par Action (BPA) ? | Il augmente le BPA (Effet relutif)
+141 | Finance | 25s | Si USD/JPY passe de 140 à 150, le Yen s'est-il apprécié ou déprécié face au Dollar ? | Il s'est déprécié (Il faut plus de Yens pour 1 Dollar)
+142 | Finance | 20s | Dans quel type de contrat deux parties échangent-elles un flux d'intérêt à taux fixe contre un taux variable ? | Un Swap de taux (IRS - Interest Rate Swap)
+143 | Finance | 20s | Quel était le taux interbancaire de référence historique à Londres remplacé récemment par le SONIA / SOFR ? | Le LIBOR
+144 | Finance | 20s | Quel est le taux interbancaire de référence au jour le jour dans la zone euro (qui a remplacé l'EONIA) ? | L'€STR (Ester)
+145 | Finance | 25s | Une action subit un regroupement d'actions (Reverse Split) de 1 pour 5 alors qu'elle cotait 2 €. Quel est son nouveau prix ? | 10 €
+146 | Finance | 25s | Si la corrélation entre deux actifs est de -1, comment évoluent-ils l'un par rapport à l'autre ? | De manière parfaitement opposée
+147 | Finance | 20s | Quel économiste a théorisé la sélection de portefeuille moderne (Frontière efficiente) en 1952 ? | Harry Markowitz
+148 | Finance | 25s | Si le PER d'une action est de 20, quel est son Earnings Yield (rendement bénéficiaire : BPA / Cours) ? | 5 % (1 / 20)
+149 | Finance | 25s | Un zéro-coupon de nominal 110 € échoit dans 1 an. Les taux sont à 10 %. Quel est son prix ? | 100 € (110 / 1,10)
+150 | Finance | 20s | Comment appelle-t-on le risque qu'une contrepartie ne puisse pas honorer ses engagements sur un contrat de gré à gré (OTC) ? | Le risque de contrepartie (ou risque de crédit)
+151 | Calcul | 20s | Combien font 16 x 15 ? | 240
+152 | Calcul | 20s | Combien font 17 x 13 ? | 221 ((15+2)(15-2) = 225 - 4)
+153 | Calcul | 20s | Quel est le carré de 16 ? | 256
+154 | Calcul | 20s | Quel est le cube de 4 ($4^3$) ? | 64
+155 | Calcul | 20s | Combien font 12,5 % de 400 ? | 50 (1/8 de 400)
+156 | Calcul | 25s | Un article passe de 80 € à 60 €. Quel est le pourcentage de réduction ? | 25 %
+157 | Calcul | 25s | Un portefeuille perd 20 % puis gagne 25 %. Quel est son rendement total ? | 0 % (Il revient à sa valeur initiale : 0,8 x 1,25 = 1)
+158 | Calcul | 20s | Résolvez : 3/4 + 5/8 | 11/8 (ou 1,375)
+159 | Calcul | 20s | Si 4x - 7 = 21, combien vaut x ? | 7
+160 | Probabilités | 25s | Vous lancez deux dés à 6 faces. Quelle est la probabilité que la somme fasse 7 ? | 1/6 (6 combinaisons sur 36)
+161 | Probabilités | 25s | Vous lancez deux dés à 6 faces. Quelle est la probabilité de faire un double (ex: 1-1, 2-2...) ? | 1/6 (6 sur 36)
+162 | Probabilités | 25s | Vous lancez une pièce 3 fois. Quelle est la probabilité d'avoir 3 fois « Pile » ? | 1/8 (12,5 %)
+163 | Probabilités | 30s | Vous lancez une pièce 3 fois. Quelle est la probabilité d'avoir exactement 2 fois « Pile » ? | 3/8 (37,5 %)
+164 | Probabilités | 25s | Quelle est l'espérance mathématique d'un lancer de dé équilibré à 6 faces ? | 3,5
+165 | Probabilités | 25s | Dans un jeu de 52 cartes, quelle est la probabilité de tirer un As ? | 1/13 (4/52)
+166 | Logique | 30s | Une batte et une balle coûtent 1,10 €. La batte coûte 1,00 € de plus que la balle. Combien coûte la balle ? | 0,05 € (5 centimes)
+167 | Logique | 25s | 5 machines produisent 5 pièces en 5 minutes. En combien de temps 100 machines produisent-elles 100 pièces ? | 5 minutes
+168 | Logique | 25s | Un nénuphar double chaque jour et couvre un lac en 40 jours. En combien de jours couvre-t-il la moitié du lac ? | 39 jours
+169 | Logique | 30s | Il est 15h15. Quel est l'angle en degrés entre l'aiguille des heures et celle des minutes ? | 7,5°
+170 | Logique | 35s | Combien de fois utilise-t-on le chiffre 9 en écrivant tous les nombres de 1 à 100 ? | 20 fois
+171 | Logique | 25s | Complétez la suite : 1 - 1 - 2 - 3 - 5 - 8 - 13 - ? | 21 (Fibonacci)
+172 | Logique | 25s | Complétez la suite : 2 - 6 - 12 - 20 - 30 - ? | 42 (+4, +6, +8, +10, +12)
+173 | Logique | 25s | Complétez la suite : 1 - 4 - 9 - 16 - 25 - 36 - ? | 49 (Carrés parfaits)
+174 | Logique | 30s | Complétez la suite : 2 - 3 - 5 - 7 - 11 - 13 - 17 - ? | 19 (Nombres premiers)
+175 | Logique | 25s | Complétez la suite : U - D - T - Q - C - S - S - ? | H (Huit)
+176 | Logique | 25s | Complétez la suite : AZ - BY - CX - DW - ? | EV
+177 | Spatial | 25s | On peint un cube de 3x3x3. Combien de petits cubes n'ont AUCUNE face peinte ? | 1 (Celui au centre)
+178 | Spatial | 30s | On peint un cube de 3x3x3. Combien de petits cubes ont exactement 3 faces peintes ? | 8 (Les sommets)
+179 | Spatial | 30s | Vous pliez une feuille en deux 4 fois, puis vous percez un trou au milieu. Combien de trous en la dépliant ? | 16 ($2^4$)
+180 | Spatial | 35s | Combien de carrés au total (toutes tailles) y a-t-il dans une grille de 3x3 ? | 14 (9 petits + 4 moyens + 1 grand)
+181 | Logique | 30s | 8 personnes se serrent toutes la main une fois. Combien de poignées de main sont échangées ? | 28 ((8 x 7) / 2)
+182 | Logique | 25s | Dans un tiroir sombre, il y a 10 chaussettes rouges et 10 bleues. Combien en tirer au minimum pour avoir une paire identique ? | 3
+183 | Calcul | 25s | Quelle est la somme des entiers de 1 à 50 ? | 1 275 ((50 x 51) / 2)
+184 | Calcul | 25s | Vous roulez à 80 km/h pendant 45 minutes. Quelle distance avez-vous parcourue ? | 60 km
+185 | Attention | 25s | Combien y a-t-il de consonnes dans le mot « INVESTISSEMENT » ? | 9
+186 | Attention | 25s | Quelle est la somme des chiffres impairs dans : 4 - 7 - 2 - 9 - 6 - 3 - 8 - 5 ? | 24 (7 + 9 + 3 + 5)
+187 | Attention | 25s | Si A=1, B=2, C=3... que vaut la somme des lettres du mot « CASH » ? | 31 (3 + 1 + 19 + 8)
+188 | Logique | 30s | Un escargot dans un puits de 10m monte de 3m le jour et glisse de 2m la nuit. En combien de jours sort-il ? | 8 jours
+189 | Logique | 30s | Vous avez 9 billes dont 1 plus lourde. Combien de pesées minimum sur une balance à plateaux pour la trouver ? | 2 pesées
+190 | Logique | 25s | Si tous les A sont des B, et que certains B sont des C, tous les A sont-ils forcément des C ? | Non
+191 | Calcul | 20s | Quel est le reste de la division de 85 par 9 ? | 4 (9 x 9 = 81)
+192 | Calcul | 25s | Quel est le plus grand commun diviseur (PGCD) de 36 et 48 ? | 12
+193 | Calcul | 25s | Quel est le plus petit commun multiple (PPCM) de 6 et 8 ? | 24
+194 | Spatial | 25s | Combien d'arêtes possède un cube ? | 12
+195 | Logique | 25s | Trois médecins disent que Paul est leur frère. Paul dit qu'il n'a pas de frères. Qui ment ? | Personne (Les trois médecins sont ses sœurs)
+196 | Calcul | 25s | Si une pompe remplit un bassin en 3h et une autre en 6h, combien de temps mettent-elles ensemble ? | 2 heures (1/3 + 1/6 = 1/2 bassin par heure)
+197 | Attention | 20s | Inversez le deuxième et le quatrième chiffre de 83915. Quel nombre obtenez-vous ? | 81935
+198 | Logique | 25s | Complétez la suite : 3 - 6 - 18 - 72 - ? | 360 (x2, x3, x4, x5)
+199 | Calcul | 20s | Combien font 0,2 x 0,05 ? | 0,01
+200 | Spatial | 30s | En combien de coups de couteau droits au minimum peut-on couper un gâteau cylindrique en 8 parts égales ? | 3 coups
+201 | Finance | 35s | Un Call Strike 100 vaut 8 €, le Put de même Strike et maturité vaut 5 €. Le Strike actualisé vaut 97 €. Sans dividende, combien vaut l'action (Parité Call-Put) ? | 100 € ($S = C - P + K \cdot e^{-rT} = 8 - 5 + 97$)
+202 | Finance | 35s | La volatilité quotidienne d'une action est de 1 %. En supposant 256 jours de bourse par an, quelle est sa volatilité annualisée ? | 16 % ($1\% \times \sqrt{256}$)
+203 | Finance | 35s | La volatilité annuelle d'un indice est de 32 %. Quelle est sa volatilité journalière approximative (base 256 jours) ? | 2 % ($32\% / \sqrt{256}$)
+204 | Finance | 35s | Une entreprise a un Bêta des capitaux propres (Levered Beta) de 1,5, un ratio Dette/Fonds Propres (D/E) de 1, et un taux d'IS de 20 %. Quel est son Bêta désendetté (Unlevered Beta) ? | 0,83 (ou 5/6 : $\beta_U = 1,5 / (1 + (1 - 0,2) \times 1) = 1,5 / 1,8$)
+205 | Finance | 30s | Quel est le prix d'une rente perpétuelle versant 60 € par an si le taux d'actualisation est de 5 % ? | 1 200 € (60 / 0,05)
+206 | Finance | 35s | Selon la formule de Gordon-Shapiro, combien vaut une action qui versera un dividende de 4 € l'an prochain, croissant de 2 % par an à l'infini, avec un coût du capital de 10 % ? | 50 € ($4 / (0,10 - 0,02)$)
+207 | Finance | 35s | Une entreprise a 40 % de dette (coût après impôt de 5 %) et 60 % de fonds propres (coût de 10 %). Quel est son WACC ? | 8 % ($0,4 \times 5\% + 0,6 \times 10\%$)
+208 | Finance | 30s | Quelle lettre grecque représente la dérivée seconde du prix de l'option par rapport au sous-jacent (sensibilité du Delta) ? | Le Gamma ($\Gamma$)
+209 | Finance | 30s | Pour quelle position le Gamma d'une option vanille est-il maximal (en valeur absolue) ? | À la monnaie (At-The-Money) et proche de l'échéance
+210 | Finance | 30s | Si un trader est « Delta Neutre » et « Long Gamma », que souhaite-t-il qu'il arrive au marché ? | Une forte volatilité (de grands mouvements du sous-jacent dans n'importe quel sens)
+211 | Finance | 30s | Dans la formule de Black-Scholes, que représente le terme $N(d_2)$ pour une option Call ? | La probabilité (sous la mesure risque-neutre) que le Call finisse dans la monnaie (exercé)
+212 | Finance | 35s | Une obligation de Duration modifiée 6 et de Convexité 50 subit une hausse des taux de 2 % (+200 bps). Quelle est la variation de son prix au second ordre ? | -11 % ($-6 \times 2\% + 0,5 \times 50 \times (0,02)^2 = -12\% + 1\%$)
+213 | Finance | 35s | Si le taux spot à 1 an est de 4 % et le taux spot à 2 ans est de 5 %, quel est approximativement le taux Forward à 1 an dans 1 an ($f_{1,1}$) ? | 6 % ($2 \times 5\% - 4\%$)
+214 | Finance | 35s | Une société augmente ses dotations aux amortissements de 20 M€. Le taux d'impôt est de 25 %. Quel est l'impact sur son Free Cash Flow ? | +5 M€ (Bouclier fiscal : économie d'impôt de $20 \times 25\%$)
+215 | Finance | 35s | Un acquéreur au PER de 15 rachète 100 % en actions une cible au PER de 20. L'opération est-elle relutive ou dilutive pour les actionnaires de l'acquéreur ? | Dilutive (le rendement bénéficiaire de la cible est inférieur à celui de l'acquéreur)
+216 | Finance | 35s | Un acquéreur rachète une cible au PER de 20 entièrement par endettement à un coût de la dette avant impôt de 5 % et un taux d'IS de 20 %. Est-ce relutif ou dilutif ? | Relutif (Coût de la dette après impôt = 4 % < Earnings yield de la cible = 1/20 = 5 %)
+217 | Finance | 30s | Comment s'appelle la courbe qui montre que la volatilité implicite des options varie en fonction du Strike pour une même échéance ? | Le Smile de volatilité (ou Skew de volatilité)
+218 | Finance | 30s | Quelle équation différentielle aux dérivées partielles de la physique a inspiré la résolution de l'équation de Black-Scholes ? | L'équation de la chaleur (Diffusion thermique)
+219 | Finance | 30s | Quel lemme fondamental du calcul stochastique permet de différencier une fonction d'un mouvement brownien géométrique ? | Le lemme d'Itô
+220 | Finance | 35s | Deux actifs A et B ont chacun une volatilité de 20 % et une corrélation de 0. Quelle est la volatilité d'un portefeuille équipondéré (50 % A, 50 % B) ? | $10\sqrt{2}$ % soit environ 14,14 % ($\sqrt{0,5^2 \cdot 20^2 + 0,5^2 \cdot 20^2}$)
+221 | Finance | 30s | Que signifie une VaR (Value at Risk) 1 jour à 99 % de 5 millions d'euros ? | Il y a 1 % de chance de perdre plus de 5 M€ en une journée (dans des conditions normales de marché)
+222 | Finance | 30s | Quelle mesure de risque corrige le défaut de la VaR en calculant la perte moyenne au-delà du seuil de la VaR ? | L'Expected Shortfall (ou CVaR - Conditional VaR)
+223 | Finance | 35s | Comment appelle-t-on la stratégie d'options consistant à acheter un Call Strike K1, vendre 2 Calls Strike K2 et acheter un Call Strike K3 (avec K1 < K2 < K3 équidistants) ? | Un Butterfly (Papillon)
+224 | Finance | 35s | Vous achetez un Call Strike 100 à 6 € et vendez un Call Strike 110 à 2 € (Bull Call Spread). Quel est votre gain net maximal à l'échéance ? | 6 € (Écart de strikes de 10 € - coût net de 4 €)
+225 | Finance | 30s | Sur une option barrière, comment qualifie-t-on une option qui s'active uniquement si le sous-jacent franchit un certain seuil à la baisse ? | Down-and-In
+226 | Finance | 30s | Comment appelle-t-on une option dont le payoff dépend du prix moyen du sous-jacent sur toute la durée de vie du contrat ? | Une option Asiatique
+227 | Finance | 30s | Quel théorème de 1958 stipule que, dans un marché parfait sans impôts ni coûts de faillite, la valeur d'une entreprise est indépendante de sa structure de financement ? | Le théorème de Modigliani-Miller
+228 | Finance | 35s | Dans la décomposition de DuPont, le ROE est le produit de trois ratios : Marge nette x Rotation des actifs x ... Quel est le troisième terme ? | Le levier financier (Actif total / Capitaux propres)
+229 | Finance | 35s | Une banque affiche un ratio de levier de 20 (Actif / Fonds propres). Quelle baisse en pourcentage de la valeur de ses actifs suffit à anéantir 100 % de ses fonds propres ? | 5 % (1 / 20)
+230 | Finance | 35s | Quel est le prix Forward à 1 an d'une action cotant 100 €, ne versant pas de dividende, si le taux sans risque continu est de 5 % par an ? | Environ 105,13 € (ou 105 € en taux composé annuel : $100 \times 1,05$)
+231 | Finance | 35s | Si le prix du pétrole au comptant (Spot) est supérieur aux prix des contrats Futures à échéances lointaines, dans quelle configuration est la courbe ? | En Backwardation (Déport)
+232 | Finance | 30s | À l'inverse, comment s'appelle la situation où les prix Futures sont plus élevés que le prix Spot ? | Le Contango (Report)
+233 | Finance | 35s | Un CDS à 5 ans se négocie à un spread de 200 bps. Si le taux de recouvrement (Recovery Rate) est estimé à 60 %, quelle est la probabilité annuelle implicite de défaut ? | 5 % ($\text{Spread} / (1 - R) = 2\% / (1 - 0,60) = 0,02 / 0,40 = 5\%$)
+234 | Finance | 30s | Dans un LBO, comment appelle-t-on la dette subordonnée hybride située entre la dette senior et les capitaux propres (souvent assortie de BSA/Warrants) ? | La dette Mezzanine
+235 | Finance | 35s | Quel ratio mesure la capacité de remboursement d'une entreprise en divisant la Dette Nette par l'EBITDA ? | Le ratio de Levier (Net Debt / EBITDA)
+236 | Finance | 35s | Une entreprise a un EBIT de 50 M€, des D&A de 10 M€, des Capex de 15 M€, une hausse du BFR de 5 M€ et un taux d'IS de 20 %. Quel est son Free Cash Flow to Firm (FCFF) ? | 30 M€ ($\text{EBIT}(1-t) + \text{D\&A} - \text{Capex} - \Delta\text{BFR} = 40 + 10 - 15 - 5$)
+237 | Finance | 35s | Quelle propriété possède un processus stochastique dit « Martingale » ? | Son espérance conditionnelle future est égale à sa valeur présente ($E[X_{t+1} | \mathcal{F}_t] = X_t$)
+238 | Finance | 35s | Si le cours EUR/USD est à 1,1000, le taux d'intérêt US à 1 an est de 5 % et le taux Euro à 1 an est de 3 %, le Forward EUR/USD à 1 an cote-t-il au-dessus ou en dessous de 1,1000 ? | Au-dessus (Environ 1,1213 : la devise à taux faible cote en report)
+239 | Finance | 30s | Comment appelle-t-on l'écart de valeur constaté lors d'une acquisition entre le prix payé et la juste valeur des actifs nets identifiables ? | Le Goodwill (Écart d'acquisition / Survaleur)
+240 | Finance | 35s | Une obligation perpétuelle verse 50 € par an. Si les taux passent de 5 % à 4 %, quel est le gain en capital en euros ? | +250 € (Le prix passe de $50/0,05 = 1000$ € à $50/0,04 = 1250$ €)
+241 | Finance | 30s | Quelle lettre grecque mesure la sensibilité du prix d'une option au taux d'intérêt sans risque ? | Le Rhô ($\rho$)
+242 | Finance | 35s | Quel est le payoff d'une option « Digitale » (ou Binaire) Cash-or-Nothing Call à l'échéance si $S_T > K$ ? | Un montant fixe prédéterminé (ex: 1 € ou 100 €), peu importe de combien $S_T$ dépasse $K$
+243 | Finance | 35s | Quel est le signe du Gamma d'un portefeuille constitué uniquement d'actions et de contrats Futures ? | Nul (Gamma = 0, produits linéaires)
+244 | Finance | 35s | Si un fonds spéculatif (Hedge Fund) facture « 2 and 20 » (2 % de frais de gestion, 20 % de commission de performance) et réalise +22 % brut sur 100 M€, combien gagne le client en net ? | +16 % soit 16 M€ (22 % - 2 % frais fixes = 20 % ; moins 20 % de perf sur 20 % = 16 %)
+245 | Finance | 30s | Comment s'appelle la clause qui empêche un gérant de Hedge Fund de toucher des commissions de performance tant qu'il n'a pas effacé ses pertes passées ? | Le High-Water Mark
+246 | Finance | 35s | Quel est le Multiplicateur Monétaire théorique si le taux de réserves obligatoires des banques commerciales est de 5 % (et sans fuite en billets) ? | 20 (1 / 0,05)
+247 | Finance | 35s | Dans les accords bancaires de Bâle III, que signifie l'acronyme CET1 ? | Common Equity Tier 1 (Fonds propres de base de catégorie 1)
+248 | Finance | 35s | Si la covariance entre un titre A et le marché est de 0,06 et que la variance du marché est de 0,04, quel est le Bêta du titre A ? | 1,5 ($\text{Cov}(A, M) / \text{Var}(M) = 0,06 / 0,04$)
+249 | Finance | 35s | Quelle est la Duration de Macaulay d'une obligation Zéro-Coupon de maturité 8 ans ? | 8 ans (Égale à sa maturité)
+250 | Finance | 35s | Vous vendez à découvert 100 actions à 50 €. Le courtier exige une marge de 50 %. Combien devez-vous immobiliser en collatéral ? | 2 500 € (50 % de 5 000 €)
+251 | Probabilités | 40s | Dans le paradoxe de Monty Hall (3 portes, 1 voiture, 2 chèvres), l'animateur ouvre une porte avec une chèvre. Quelle est votre probabilité de gagner si vous changez de porte ? | 2/3 (66,7 %)
+252 | Probabilités | 40s | Vous lancez deux dés. Sachant qu'au moins l'un des deux dés montre un 6, quelle est la probabilité que la somme fasse 12 (double 6) ? | 1/11 (Il y a 11 combinaisons contenant au moins un 6, et 1 seule est 6-6)
+253 | Probabilités | 40s | Combien de personnes faut-il réunir au minimum dans une pièce pour que la probabilité que deux d'entre elles aient la même date d'anniversaire dépasse 50 % ? | 23 personnes (Paradoxe des anniversaires)
+254 | Probabilités | 40s | Une famille a deux enfants. Sachant qu'au moins l'un des deux est un garçon, quelle est la probabilité que les deux soient des garçons ? | 1/3 (Les cas équiprobables restants sont GG, GF, FG)
+255 | Probabilités | 45s | Vous jouez à la roulette russe avec un barillet à 6 chambres contenant 2 balles placées côte à côte. Votre adversaire tire à vide. Devez-vous tirer directement ou refaire tourner le barillet ? | Tirer directement (4 chances sur 4 emplacements vides que le suivant soit vide dans 3 cas sur 4 = 75 % de survie, contre 4/6 = 66,7 % en refaisant tourner)
+256 | Probabilités | 40s | En moyenne, combien de lancers d'une pièce équilibrée faut-il effectuer pour obtenir un « Pile » pour la première fois ? | 2 lancers (Loi géométrique de paramètre $p = 0,5 \Rightarrow E = 1/p = 2$)
+257 | Probabilités | 45s | En moyenne, combien de lancers d'une pièce équilibrée faut-il pour obtenir deux « Pile » consécutifs (PP) ? | 6 lancers ($E = 2 + 4 = 6$)
+258 | Probabilités | 40s | Une urne contient 4 boules rouges et 3 boules bleues. On en tire 2 sans remise. Quelle est la probabilité qu'elles soient de la même couleur ? | 3/7 (Rouge-Rouge = 12/42, Bleu-Bleu = 6/42 ; Total = 18/42 = 3/7)
+259 | Probabilités | 40s | On casse un bâton de 1 mètre au hasard en deux endroits. Quelle est la probabilité de pouvoir former un triangle avec les 3 morceaux ? | 1/4 (25 %)
+260 | Probabilités | 45s | Trois fourmis sont placées aux 3 sommets d'un triangle équilatéral. Chacune choisit au hasard une arête et avance. Quelle est la probabilité qu'aucune fourmi ne se croise ? | 1/4 (2 issues favorables : toutes sens horaire ou toutes anti-horaire sur $2^3 = 8$ issues, soit 2/8)
+261 | Calcul | 35s | Vous faites l'aller de A à B à 60 km/h et le retour de B à A à 40 km/h. Quelle est votre vitesse moyenne sur l'ensemble du trajet ? | 48 km/h (Moyenne harmonique : $\frac{2 \times 60 \times 40}{60 + 40}$)
+262 | Calcul | 35s | Combien y a-t-il de zéros à la fin de $100!$ (factorielle de 100) ? | 24 zéros ($100/5 + 100/25 = 20 + 4$)
+263 | Calcul | 30s | Combien font $99^2$ de tête ? | 9 801 ($(100 - 1)^2 = 10000 - 200 + 1$)
+264 | Calcul | 30s | Combien font $48 \times 52$ de tête ? | 2 496 ($(50 - 2)(50 + 2) = 2500 - 4$)
+265 | Calcul | 35s | Quelle est la somme de la série géométrique infinie : $1 + 1/2 + 1/4 + 1/8 + 1/16 + \dots$ ? | 2 ($1 / (1 - 0,5)$)
+266 | Calcul | 35s | Quel est le chiffre des unités de $7^{100}$ ? | 1 (Le cycle des unités des puissances de 7 est 7, 9, 3, 1 : 100 est un multiple de 4)
+267 | Spatial | 35s | On peint un grand cube de $4 \times 4 \times 4$. Combien de petits cubes n'ont AUCUNE face peinte ? | 8 (Le cube intérieur de $2 \times 2 \times 2$)
+268 | Spatial | 40s | On peint un grand cube de $10 \times 10 \times 10$. Combien de petits cubes ont au moins une face peinte (la coque extérieure) ? | 488 ($1000 - 8^3 = 1000 - 512$)
+269 | Spatial | 40s | Combien de carrés de toutes tailles y a-t-il sur un échiquier standard de $8 \times 8$ ? | 204 ($1^2 + 2^2 + 3^2 + \dots + 8^2 = \frac{8 \times 9 \times 17}{6}$)
+270 | Logique | 40s | Vous avez deux cordes qui mettent chacune exactement 1 heure à brûler (mais de façon irrégulière). Comment mesurer 45 minutes ? | Allumer la corde 1 aux deux bouts et la corde 2 à un bout ; quand la 1 finit (30 min), allumer le 2ème bout de la corde 2 (15 min restantes)
+271 | Logique | 40s | Vous avez un bidon de 5L et un de 3L. Comment obtenir exactement 4L ? (Indiquez le nombre d'étapes ou la logique) | Remplir le 5L, verser dans le 3L (reste 2L dans le 5L), vider le 3L, mettre les 2L dans le 3L, remplir le 5L et compléter le 3L (il reste 4L dans le 5L)
+272 | Logique | 45s | 25 chevaux courent sur des pistes de 5 couloirs (sans chronomètre). Quel est le nombre minimum de courses pour trouver les 3 chevaux les plus rapides ? | 7 courses (5 séries qualificatives + 1 course des 5 gagnants + 1 course finale des 5 prétendants aux places 2 et 3)
+273 | Logique | 40s | Une maladie touche 1 % de la population. Un test est fiable à 99 % (vrais positifs et vrais négatifs). Si vous êtes testé positif, quelle est la probabilité que vous soyez réellement malade ? | 50 % (Théorème de Bayes : sur 10 000 personnes, 99 vrais positifs et 99 faux positifs)
+274 | Logique | 40s | Complétez la suite de Conway : 1 - 11 - 21 - 1211 - 111221 - ? | 312211
+275 | Logique | 35s | Complétez la suite : 2 - 12 - 36 - 80 - 150 - ? | 252 ($n^2 + n^3$ : pour $n=6 \Rightarrow 36 + 216 = 252$)
+276 | Logique | 35s | Complétez la suite : O - T - T - F - F - S - S - E - ? | N (Nine : initiales des nombres en anglais)
+277 | Logique | 35s | Complétez la suite : U - D - T - C - S - ? (Indice : nombres premiers en français) | O (Onze : Deux, Trois, Cinq, Sept, Onze - avec Un en tête)
+278 | Calcul | 35s | À quelle heure exacte entre 12h00 et 13h00 les aiguilles d'une montre se superposent-elles ? | Aucune (Elles se superposent à 12h00 puis à 13h05 et 5/11 min, soit 12/11 d'heure)
+279 | Calcul | 35s | Combien de fois par jour (24h) les aiguilles des heures et des minutes d'une horloge se superposent-elles ? | 22 fois
+280 | Logique | 40s | Vous avez 10 sacs de pièces d'or (10g la pièce), mais un sac ne contient que des fausses pièces de 9g. Avec une balance électronique précise au gramme, combien de pesées minimum pour trouver le faux sac ? | 1 seule pesée (Prendre 1 pièce du sac 1, 2 du sac 2... 10 du sac 10 ; l'écart avec 550g donne le numéro du sac)
+281 | Logique | 45s | 5 pirates rationnels doivent partager 100 pièces d'or. Le plus âgé propose un partage ; si au moins 50 % votent oui, il est adopté, sinon il est jeté à l'eau. Combien le plus âgé garde-t-il pour lui ? | 98 pièces (Distribution : 98 - 0 - 1 - 0 - 1)
+282 | Probabilités | 40s | Deux joueurs A et B lancent chacun une pièce à tour de rôle. Le premier qui fait « Pile » gagne. A commence. Quelle est la probabilité que A gagne ? | 2/3 ($1/2 + 1/8 + 1/32 + \dots = \frac{1/2}{1 - 1/4} = 2/3$)
+283 | Calcul | 35s | Si $\log_{10}(2) \approx 0,301$, combien de chiffres comporte le nombre $2^{100}$ en base 10 ? | 31 chiffres ($\lfloor 100 \times 0,301 \rfloor + 1 = 30 + 1$)
+284 | Logique | 35s | Si hier était demain, aujourd'hui serait vendredi. Quel jour sommes-nous réellement ? | Mercredi (ou Dimanche selon l'interprétation grammaticale du subjonctif)
+285 | Calcul | 35s | Trois robinets A, B et C remplissent une piscine respectivement en 2h, 3h et 6h. En combien de temps la remplissent-ils ensemble ? | 1 heure ($1/2 + 1/3 + 1/6 = 1$ piscine par heure)
+286 | Probabilités | 40s | Vous tirez une variable aléatoire uniforme $X$ entre 0 et 1, puis $Y$ entre 0 et 1. Quelle est la probabilité que $X + Y \le 1$ ? | 1/2 (50 % : la moitié de l'aire du carré unité)
+287 | Calcul | 35s | Combien de diagonales possède un décagone (polygone à 10 côtés) ? | 35 ($\frac{n(n-3)}{2} = \frac{10 \times 7}{2}$)
+288 | Logique | 40s | 100 ampoules numérotées de 1 à 100 sont éteintes. Aux passages 1 à 100, on inverse l'état des multiples du numéro de passage. Combien d'ampoules restent allumées à la fin ? | 10 (Seuls les carrés parfaits ont un nombre impair de diviseurs : 1, 4, 9... 100)
+289 | Calcul | 35s | Quelle est la dérivée de la fonction $f(x) = x \cdot \ln(x) - x$ ? | $\ln(x)$
+290 | Calcul | 35s | Quelle est la valeur de l'intégrale de $2x$ entre $x = 0$ et $x = 5$ ? | 25 ($[x^2]_0^5 = 25$)
+291 | Probabilités | 40s | Vous avez un jeu de 52 cartes. Vous retournez les cartes deux par deux. Quelle est la probabilité que la toute dernière carte du paquet soit un As ? | 1/13 (4/52, par symétrie : chaque position a la même probabilité)
+292 | Logique | 35s | Un train de 1 km de long roule à 60 km/h. Il entre dans un tunnel de 1 km de long. Combien de temps s'écoule entre l'entrée de la locomotive et la sortie du dernier wagon ? | 2 minutes (Il doit parcourir 2 km au total à 1 km/min)
+293 | Calcul | 35s | Si un nénuphar triple de taille chaque jour et met 27 jours à couvrir un lac, combien de jours mettront 3 nénuphars identiques pour couvrir ce même lac ? | 26 jours (3 nénuphars équivalent au jour 2 d'un seul nénuphar)
+294 | Attention | 30s | Quel est le 50ème chiffre de la suite : 1234567891011121314... ? | 3 (Les 9 premiers chiffres = 1 à 9 ; il reste 41 chiffres soit 20 nombres à 2 chiffres + le 1er chiffre du 21ème nombre à 2 chiffres qui est 30, donc '3')
+295 | Calcul | 30s | Résolvez dans les réels : $2^{2x} = 64$. Combien vaut $x$ ? | 3 ($64 = 2^6 \Rightarrow 2x = 6 \Rightarrow x = 3$)
+296 | Probabilités | 40s | Vous lancez un dé équilibré. Vous pouvez garder votre score ou relancer une seule fois. Quelle est votre espérance de gain optimale si vous jouez parfaitement ? | 4,25 (On relance si on fait 1, 2 ou 3 : $\frac{1}{2} \times 3,5 + \frac{1}{6}(4 + 5 + 6) = 1,75 + 2,5 = 4,25$)
+297 | Logique | 40s | Deux pères et deux fils vont à la pêche. Chacun attrape un poisson. Au total, seulement 3 poissons ont été pêchés. Comment est-ce possible ? | Ils ne sont que 3 : le grand-père, le père et le petit-fils
+298 | Spatial | 35s | Vous êtes au Pôle Sud. Vous marchez 1 km au Nord, 1 km à l'Est, puis 1 km au Sud. À quelle distance êtes-vous de votre point de départ ? | 0 km (Vous êtes revenu exactement au Pôle Sud)
+299 | Calcul | 35s | Un marchand achète un objet 70 €, le vend 80 €, le rachète 90 € et le revend 100 €. Quel est son bénéfice total ? | 20 € (-70 + 80 - 90 + 100)
+300 | Logique | 40s | Sur une île, il y a 13 caméléons rouges, 15 verts et 17 bleus. Quand deux caméléons de couleurs différentes se rencontrent, ils prennent tous deux la 3ème couleur. Peuvent-ils tous devenir de la même couleur ? | Non (Les restes modulo 3 des populations sont 1, 0 et 2 ; cet invariant ne permet jamais d'égaliser deux populations pour les fusionner)

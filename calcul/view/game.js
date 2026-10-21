@@ -5,16 +5,64 @@ import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer } from '../engine/rules
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { figureSvg } from './figure.js';
 import { sfx } from './sfx.js';
+import { wallStreetMusic } from './music.js';
 import { esc, el, prefersReducedMotion } from './util.js';
 
 const DIFF_LABEL = { facile: 'Facile', normal: 'Normal', expert: 'Expert' };
-const THEME_LABEL = { mix: 'Tout mélangé', base: 'Les 4 opérations', malin: 'Astuces & nombres', frac: 'Fractions & décimaux', logique: 'Suites & logique',
+const THEME_LABEL = { mix: 'Tout mélangé', chartier: 'The Candidate (300 Questions Finance)', base: 'Les 4 opérations', malin: 'Astuces & nombres', frac: 'Fractions & décimaux', logique: 'Suites & logique',
   vite: 'Vitesse & estimations', flash: 'Vrai/faux & comparaisons', algebre: 'Équations & devinettes', geo: 'Géométrie & mesures', compte: 'Compte est bon' };
 const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['normal', 'normaux'], expert: ['expert', 'experts'] };
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
 const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir' };
 const motion = () => !prefersReducedMotion();
+const CHARTIER_QUOTES = {
+  ok: [
+    "C'est rapide, c'est précis. Tu as le calibre pour le desk de trading.",
+    "Bien vu. Mais ne prends pas la confiance, la prochaine question va trier les touristes.",
+    "Exact. Une fraction de seconde d'hésitation et le bid t'échappait.",
+    "Solide. C'est exactement ce que j'attends d'un analyste M&A au premier tour.",
+    "Propre et sans bavure. Passons à la vitesse supérieure.",
+    "Impeccable. Les marchés récompensent l'audace et la précision mathématique.",
+    "Excellente intuition. Tu calcules plus vite que le spread ne bouge."
+  ],
+  ko: [
+    "Non. En M&A chez Lazard avec une bourde pareille, tu ne passes même pas le premier tour.",
+    "C'est faux. À ce niveau d'approximation, va plutôt faire de la compta de PME.",
+    "Non non non ! Tu viens de vaporiser le capital du fonds en 15 secondes.",
+    "Raisonnement bâclé. On ne spécule pas au doigt mouillé dans The Candidate.",
+    "Une grossière erreur de débutant. Révise tes basiques avant de postuler.",
+    "Catastrophique. Les banques d'affaires n'ont pas de place pour les hésitants.",
+    "Erreur éliminatoire. Sur un desk de dérivés, un tel écart te coûte ta carrière."
+  ],
+  timeout: [
+    "Temps écoulé. Le marché n'attend personne. Zéro point.",
+    "Trois secondes de retard sur les marchés, c'est un compte liquidé. Trop lent.",
+    "Paralysé par le stress ? Ce n'est pas bon signe pour les entretiens finaux.",
+    "L'horloge a tourné. Si tu ne tranches pas en 20 secondes, quelqu'un prend ta place."
+  ]
+};
+
+const BLOOMBERG_TICKER = `
+  <div class="bloomberg-ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span class="ticker-badge">LIVE TERMINAL</span>
+      <span class="up">▲ CAC 40 <b>7 984.32</b> (+0.6%)</span>
+      <span class="down">▼ S&P 500 <b>5 864.67</b> (-0.4%)</span>
+      <span class="up">▲ NASDAQ <b>18 392.10</b> (+0.9%)</span>
+      <span class="up">▲ EUR/USD <b>1.0842</b></span>
+      <span class="up">▲ US 10Y <b>4.22%</b></span>
+      <span class="up">▲ GOLD <b>$2 720.50</b></span>
+      <span class="down">▼ BRENT <b>$74.20</b></span>
+      <span class="alert">⚡ THE CANDIDATE : ÉVALUATION PIERRE CHARTIER EN DIRECT</span>
+      <span class="ticker-badge">LIVE TERMINAL</span>
+      <span class="up">▲ CAC 40 <b>7 984.32</b> (+0.6%)</span>
+      <span class="down">▼ S&P 500 <b>5 864.67</b> (-0.4%)</span>
+      <span class="up">▲ NASDAQ <b>18 392.10</b> (+0.9%)</span>
+      <span class="up">▲ EUR/USD <b>1.0842</b></span>
+    </div>
+  </div>`;
+
 
 export function mountGame(root, { me, answer, emote, sabotage = () => {}, start, exit }) {
   root.className = 'game';
@@ -23,6 +71,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     <header class="topbar">
       <div class="info"><b>Tête de Calcul</b><span id="round"></span></div>
       <div class="tools">
+        <button class="tool" id="tmus" title="Musique de tension Wall Street">🎵</button>
         <button class="tool" id="tsnd" title="Bruitages">🔊</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
@@ -286,6 +335,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     const inp = $('#ain');
     if (inp) { inp.disabled = true; $('#asend').disabled = true; $('#aform').classList.add('locked'); }
     for (const b of root.querySelectorAll('[data-c]')) b.disabled = true;
+    for (const b of root.querySelectorAll('.btn-choice')) {
+      b.disabled = true;
+      if (b.dataset.choice === v) b.classList.add('selected');
+    }
     s.hidden = false;
     s.className = 'sent' + (locked ? ' locked' : '');
     s.innerHTML = locked ? `🔒 Raté ! Tu es bloqué pour cette question.` : `Réponse verrouillée : <b>${esc(v)}</b> · on attend les autres…`;
@@ -323,7 +376,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
         <div class="bigans">${qText(L.show)}</div>
         ${mine ? `<div class="verdict ${mine.ok ? 'ok' : mine.raw != null ? 'ko' : 'none'}" id="verdict">${mine.ok ? `Bravo ! +${fmt(mine.pts)}` : mine.raw != null ? (mine.pts < 0 ? `Raté… ${fmt(mine.pts)}` : 'Raté…') : 'Pas de réponse'}</div>` : ''}
         ${mine && mine.power ? `<div class="gotpower">🎁 Nouveau pouvoir : ${POWERS[mine.power].icon} <b>${esc(POWERS[mine.power].label)}</b>${mine.power === 'shield' ? ' (il te protège tout seul)' : ' : lance-le en bas à gauche !'}</div>` : ''}
-        <div class="tip"><b>💡 L'astuce</b>${qText(L.tip)}</div>
+        ${quoteHtml}
+        <div class="tip ${isChartier ? 'chartier-tip' : ''}"><b>${isChartier ? '📊 Analyse & Décryptage' : '💡 L\'astuce'}</b>${qText(L.tip)}</div>
         <ol class="results">${res.map((r, k) => {
           const p = S.players.find((x) => x.id === r.id); if (!p) return '';
           const tags = r.tags.map((t) => `<span class="tag t-${t}">${TAGS[t]}${t === 'serie' ? ' ×' + r.streak : ''}${t === 'power' ? ' ' + POWERS[r.power].icon : ''}</span>`).join('');

@@ -6,6 +6,14 @@ import { randomSeed } from '../engine/rng.js';
 import { isEmote, botReaction } from '../view/emotes.js';
 
 const BOT_NAMES = ['Prof Garibaldi', 'Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius'];
+const FINANCE_BOT_NAMES = [
+  'Julien (Ex-McKinsey)',
+  'Alexandre (M&A Lazard)',
+  'Clara (Quant Citadel)',
+  'Baptiste (PE KKR)',
+  'Maxime (Sales Goldman)',
+  'Sophie (Trader BNP)'
+];
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const ABSENT_MS = 15000; // un joueur parti du salon depuis 15 s quitte la partie
 
@@ -28,7 +36,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     if (!bridge.embedded || !bridge.report) return;
     bridge.report({
       id: `calcul-${state.startedAt}-${state.players.map((p) => p.id).join('.')}`,
-      mode: { classic: 'Classique', peril: 'Péril', eclair: 'Éclair' }[state.cfg.mode],
+      mode: { classic: 'Classique', chartier: 'The Candidate', peril: 'Péril', eclair: 'Éclair' }[state.cfg.mode] || state.cfg.mode,
       players: state.ranking.map((id, k) => {
         const p = state.players.find((q) => q.id === id);
         return { id: p.bot ? null : p.id, name: p.name, color: p.color, bot: p.bot, rank: k + 1, score: p.score };

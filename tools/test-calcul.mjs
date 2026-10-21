@@ -35,6 +35,11 @@ t('les questions sont reproductibles et justes', () => {
     const seed = 1000 + i * 7919;
     const q = makeQuestion(seed, i, cat, diff);
     assert.deepEqual(q, makeQuestion(seed, i, cat, diff));
+    if (cat === 'chartier') {
+      assert.ok(q.text && q.choices && q.choices.length === 4);
+      assert.ok(check(q, q.correctChoice).ok, `${cat} ${q.text} → ${q.correctChoice}`);
+      continue;
+    }
     assert.ok(Number.isFinite(q.answer), `${cat} ${q.text}`);
     assert.ok(q.time > 0 && q.text && q.tip);
     if (q.input === 'expr') {

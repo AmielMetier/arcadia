@@ -111,8 +111,75 @@ export function restartQuestion(state, now) {
   return s;
 }
 
+function normalize(str) {
+  return String(str ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function checkChartier(q, raw) {
+  const inputStr = String(raw ?? '').trim();
+  if (!inputStr) return { ok: false, error: 'Saisie vide' };
+
+  if (q.choices && q.choices.length) {
+    const exactChoice = q.choices.find((c) => c === inputStr);
+    if (exactChoice) {
+      return { ok: exactChoice === q.correctChoice, value: exactChoice };
+    }
+
+    if (/^[1-4]$/.test(inputStr)) {
+      const numIdx = parseInt(inputStr, 10);
+      if (numIdx >= 1 && numIdx <= q.choices.length) {
+        const selected = q.choices[numIdx - 1];
+        return { ok: selected === q.correctChoice, value: selected };
+      }
+    }
+
+    if (/^[a-d]$/i.test(inputStr)) {
+      const letterIdx = ['a', 'b', 'c', 'd'].indexOf(inputStr.toLowerCase());
+      if (letterIdx >= 0 && letterIdx < q.choices.length) {
+        const selected = q.choices[letterIdx];
+        return { ok: selected === q.correctChoice, value: selected };
+      }
+    }
+  }
+
+  const normInput = normalize(inputStr);
+  const normCorrect = normalize(q.correctChoice);
+  const normClean = normalize(q.answer);
+
+  if (normInput && (normInput === normCorrect || normInput === normClean)) {
+    return { ok: true, value: q.answer };
+  }
+
+  if (q.aliases && Array.isArray(q.aliases)) {
+    for (const a of q.aliases) {
+      const normA = normalize(a);
+      if (normInput === normA) return { ok: true, value: q.answer };
+      if (normA.length >= 5 && normInput.includes(normA)) {
+        return { ok: true, value: q.answer };
+      }
+    }
+  }
+
+  const nInp = parseNumber(inputStr);
+  const nAns = parseNumber(q.answer);
+  if (nInp != null && nAns != null) {
+    if (nInp === nAns) return { ok: true, value: nInp };
+  }
+
+  return { ok: false, value: inputStr };
+}
+
 // Justesse d'une saisie
 export function check(q, raw) {
+  if (q.isChartier || q.input === 'chartier') {
+    return checkChartier(q, raw);
+  }
   if (q.input === 'choice') {
     const k = /^\d$/.test(String(raw).trim()) ? Number(raw) : -1;
     if (k < 0 || k >= q.choices.length) return { ok: false, error: 'Choisis une des réponses' };
