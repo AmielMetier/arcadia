@@ -7,7 +7,7 @@ import { sfx } from './sfx.js';
 import { esc, el, prefersReducedMotion } from './util.js';
 
 const DIFF_LABEL = { facile: 'Facile', normal: 'Normal', expert: 'Expert' };
-const THEME_LABEL = { mix: 'Tout mélangé', base: 'Les 4 opérations', malin: 'Astuces & nombres', vite: 'Vitesse & estimations', compte: 'Compte est bon' };
+const THEME_LABEL = { mix: 'Tout mélangé', base: 'Les 4 opérations', malin: 'Astuces & nombres', frac: 'Fractions & décimaux', logique: 'Suites & logique', vite: 'Vitesse & estimations', compte: 'Compte est bon' };
 const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['normal', 'normaux'], expert: ['expert', 'experts'] };
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
@@ -144,10 +144,10 @@ export function mountGame(root, { me, answer, emote, start, exit }) {
         <div class="timer"><i id="tbar"></i><b id="tsec"></b></div>
         ${expr ? `<div class="target"><small>Cible</small><b>${q.target}</b></div>
           <div class="tiles">${q.nums.map((n, k) => `<button class="tile" data-n="${n}" data-k="${k}">${n}</button>`).join('')}</div>`
-          : `<div class="qtext">${qText(q.text)}<span class="eq"> = ?</span></div>`}
+          : `<div class="qtext ${q.text.length > 16 ? 'long' : ''}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>`}
         <p class="qsub">${esc(q.sub)}</p>
         <form class="answer" id="aform" autocomplete="off">
-          <input id="ain" ${expr ? 'inputmode="text" placeholder="ex. (8 + 4) × 5"' : 'inputmode="numeric" placeholder="Ta réponse"'} maxlength="${expr ? 40 : 12}" aria-label="Ta réponse" spellcheck="false">
+          <input id="ain" ${expr ? 'inputmode="text" placeholder="ex. (8 + 4) × 5"' : 'inputmode="decimal" placeholder="Ta réponse"'} maxlength="${expr ? 40 : 12}" aria-label="Ta réponse" spellcheck="false">
           <button class="btn yellow" id="asend">Valider</button>
         </form>
         ${expr ? `<div class="ops">${['+', '−', '×', '÷', '(', ')'].map((o) => `<button type="button" data-op="${o}">${o}</button>`).join('')}<button type="button" data-op="back" aria-label="Effacer">⌫</button><button type="button" data-op="clear">C</button></div>` : ''}
@@ -197,7 +197,7 @@ export function mountGame(root, { me, answer, emote, start, exit }) {
     stage.innerHTML = `
       <div class="card reveal" style="--cc:${cat.color}">
         <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}</div>
-        <div class="qrecall">${qText(S.history[S.history.length - 1].text)}${L.cat === 'compte' ? ' 🎯' : ' ='}</div>
+        <div class="qrecall">${(() => { const h = S.history[S.history.length - 1]; return qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (L.cat === 'compte' ? ' 🎯' : h.eq === false ? '' : ' ='); })()}</div>
         <div class="bigans">${esc(L.show)}</div>
         ${mine ? `<div class="verdict ${mine.ok ? 'ok' : mine.raw != null ? 'ko' : 'none'}">${mine.ok ? `Bravo ! +${fmt(mine.pts)}` : mine.raw != null ? (mine.pts < 0 ? `Raté… ${fmt(mine.pts)}` : 'Raté…') : 'Pas de réponse'}</div>` : ''}
         <div class="tip"><b>💡 L'astuce</b>${esc(L.tip)}</div>

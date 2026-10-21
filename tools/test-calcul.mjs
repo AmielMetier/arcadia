@@ -1,6 +1,6 @@
 // Tests du moteur de Tête de Calcul : node tools/test-calcul.mjs
 import assert from 'node:assert/strict';
-import { makeQuestion, planCats, CATS, DIFFS, THEMES } from '../calcul/engine/questions.js';
+import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS } from '../calcul/engine/questions.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion } from '../calcul/engine/rules.js';
 import { botAnswer } from '../calcul/engine/bot.js';
@@ -39,9 +39,28 @@ t('les questions sont reproductibles et justes', () => {
       assert.ok(c.ok, `${q.sol} = ${q.target} (${q.nums})`);
     } else {
       assert.ok(check(q, String(q.answer)).ok, `${cat} ${q.text} → ${q.answer}`);
-      assert.ok(Number.isInteger(q.answer), `${cat} ${q.text} → ${q.answer} entier`);
+      if (cat !== 'fraction' && !['x15', 'units', 'avg'].includes(q.kind)) assert.ok(Number.isInteger(q.answer), `${cat} ${q.text} → ${q.answer} entier`);
+      assert.ok(q.answer >= 0, `${cat} ${q.text} → ${q.answer} positif`);
+      assert.ok(check(q, String(q.answer).replace('.', ',')).ok, `${q.text} : virgule acceptée`);
+      assert.ok(!/NaN|undefined|Infinity/.test(q.text + q.tip + q.sub), `${cat} ${q.kind} : ${q.text} | ${q.tip}`);
     }
   }
+});
+
+t('banque de questions : tous les types sortent, et beaucoup de questions différentes', () => {
+  for (const cat of Object.keys(CATS)) {
+    const kinds = new Set(), texts = new Set();
+    for (const diff of DIFFS) for (let i = 0; i < 600; i++) { const q = makeQuestion(i * 104729 + 17, i, cat, diff); kinds.add(q.kind); texts.add(q.text); }
+    for (const k of KINDS[cat]) assert.ok(kinds.has(k), `${cat} : le type ${k} ne sort jamais`);
+    console.log(`  ${cat.padEnd(9)} ${String(KINDS[cat].length).padStart(2)} types · ${texts.size} questions différentes sur 1 800 tirages`);
+  }
+});
+
+t('pas deux fois la même question dans une partie', () => {
+  let s = createGame({ players: [{ id: 0, name: 'A' }], cfg: { len: 20, theme: 'base', diff: 'facile' }, seed: 77, now: 0 });
+  const seen = [];
+  for (let i = 0; i < 20; i++) { s = nextQuestion(s, i * 1e5); seen.push(fullQuestion(s).text); s = reveal(s, i * 1e5 + 1); }
+  assert.equal(new Set(seen).size, 20, seen.join(' | '));
 });
 
 t('quelques questions connues', () => {

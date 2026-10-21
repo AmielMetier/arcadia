@@ -41,7 +41,13 @@ export function createGame({ players, cfg, seed, now }) {
 
 const clone = (s) => JSON.parse(JSON.stringify(s));
 export const isFinal = (s, idx = s.idx) => s.cfg.finale && idx === s.cfg.len - 1;
-export const fullQuestion = (s, idx = s.idx) => makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff);
+// Question n° idx ; si son texte est déjà sorti dans la partie, on en tire une autre (toujours de façon reproductible)
+export function fullQuestion(s, idx = s.idx) {
+  const seen = new Set(s.history.filter((h) => h.idx < idx).map((h) => h.text));
+  let q;
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt); if (!seen.has(q.text)) break; }
+  return q;
+}
 
 // Question suivante (ou fin de partie)
 export function nextQuestion(state, now) {
@@ -134,7 +140,7 @@ export function reveal(state, now) {
     return r;
   });
   s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s) };
-  s.history.push({ idx: s.idx, cat: q.cat, kind: q.kind, text: q.text, show: q.show, results: results.map(({ id, ok, at, pts }) => ({ id, ok, at, pts })) });
+  s.history.push({ idx: s.idx, cat: q.cat, kind: q.kind, text: q.text, eq: q.eq, show: q.show, results: results.map(({ id, ok, at, pts }) => ({ id, ok, at, pts })) });
   s.phase = 'reveal'; s.endsAt = now + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0);
   // les réponses deviennent publiques
   return s;

@@ -9,6 +9,14 @@
 - Les réponses restent chez l'hôte jusqu'à la révélation ; les questions sont tirées d'une graine, ce qui permet
   à un nouvel hôte de reprendre la partie après un départ.
 - Classement entre potes : Tête de Calcul y a sa colonne.
+- Banque de questions agrandie : 54 types de questions au lieu de 17, et jamais deux fois la même question dans une partie.
+  - Calcul : chaînes d'opérations, nombre manquant (? × 7 = 56), moitié / double / quart / triple, priorités opératoires.
+  - Astuces : × 5, × 25, × 9, × 99, × 1,5, carrés voisins d'un nombre rond (39²), compléments à 100 / 1 000, pourcentages par 10 %.
+  - Nombres : cubes, PGCD, PPCM, factorielles, binaire, nombre premier suivant, nombre de diviseurs.
+  - Nouvelle catégorie **Fractions** : fraction d'un nombre, décimaux connus (0,25 × 36), fraction → décimal, fraction → %, somme de fractions.
+  - Nouvelle catégorie **Suite logique** : arithmétiques, géométriques, carrés et cubes, Fibonacci, écarts croissants, alternances, nombres premiers.
+  - Ordres de grandeur : durées, unités (km, L, kg, m²…), soldes, règle de trois, moyennes, « +20 % puis −20 % ».
+- Deux nouveaux thèmes dans le salon : Fractions & décimaux, Suites & logique. Les réponses décimales acceptent la virgule.
 
 ## 2.12 — 19 octobre 2026
 - DavidSimulator en vraie 3D (WebGL) : plateau en relief posé sur une table en bois, ombres, pions en métal modélisés

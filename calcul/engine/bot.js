@@ -6,7 +6,7 @@ const SKILL = {
   normal: { acc: 0.75, speed: 0.45, skip: 0.07 },
   expert: { acc: 0.9, speed: 0.3, skip: 0.02 },
 };
-const HARD = { base: 1, astuce: 0.85, theorie: 0.85, estim: 0.9, compte: 0.6 };
+const HARD = { base: 1, astuce: 0.85, theorie: 0.85, fraction: 0.85, suite: 0.85, estim: 0.9, compte: 0.6 };
 
 // q : question complète (avec la réponse) ; renvoie { delay (ms), raw } ou null (le bot sèche)
 export function botAnswer(q, level, rnd = Math.random) {
@@ -28,6 +28,7 @@ export function botAnswer(q, level, rnd = Math.random) {
 
 // Erreur crédible : une retenue oubliée, une dizaine de travers…
 function nearMiss(n, rnd) {
+  if (!Number.isInteger(n)) return Math.round((n + (rnd() < 0.5 ? 0.25 : 0.5)) * 100) / 100;
   const mag = Math.abs(n) >= 1000 ? 100 : Math.abs(n) >= 100 ? 10 : 1;
   let d = (1 + Math.floor(rnd() * 3)) * mag * (rnd() < 0.5 ? -1 : 1);
   if (n + d < 0 || d === 0) d = mag;

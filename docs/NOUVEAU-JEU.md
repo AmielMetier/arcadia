@@ -150,8 +150,9 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 
 ## 9. Étendre Tête de Calcul
 
-- **Nouvelle question** : ajouter une branche dans un générateur de `engine/questions.js` (ou une nouvelle catégorie dans
-  `CATS`, `TIME`, `GEN`, puis dans `THEMES`). Chaque question renvoie `text`, `answer`, `tip` et, si besoin, `sub`, `tol`
+- **Nouvelle question** : ajouter une branche dans un générateur de `engine/questions.js` et son nom dans `KINDS`
+  (ou une nouvelle catégorie dans `CATS`, `TIME`, `GEN`, `KINDS`, puis dans `THEMES` et `HARD` de `engine/bot.js`).
+  Les tests vérifient que chaque type déclaré sort bien. Chaque question renvoie `text`, `answer`, `tip` et, si besoin, `sub`, `tol`
   (tolérance relative), `input: 'expr'`. Les tests vérifient automatiquement que la réponse attendue est acceptée.
 - **Nouveau mode** : ajouter une entrée dans `MODES` (`engine/rules.js`), son calcul de points dans `reveal()`,
   son option dans `hub/games.js`.
