@@ -18,18 +18,26 @@ export const CATS = {
   fraction: { label: 'Fractions',         pts: 2, color: '#1fc7c1', icon: '½' },
   suite:    { label: 'Suite logique',     pts: 2, color: '#e3262f', icon: '…' },
   estim:    { label: 'Ordre de grandeur', pts: 2, color: '#2fbf71', icon: '≈' },
+  vf:        { label: 'Vrai ou faux',      pts: 1, color: '#f0a800', icon: '✓' },
+  compare:   { label: 'Le plus grand',     pts: 1, color: '#8a4b2a', icon: '>' },
+  equation:  { label: 'Équation',          pts: 2, color: '#3b4cc0', icon: 'x' },
+  geo:       { label: 'Géométrie',         pts: 2, color: '#0f8a6a', icon: '△' },
+  devinette: { label: 'Devinette',         pts: 2, color: '#c2185b', icon: '?' },
   compte:   { label: 'Compte est bon',    pts: 3, color: '#ff8a1f', icon: '🎯' },
 };
 export const DIFFS = ['facile', 'normal', 'expert'];
 
 // Thèmes proposés dans le salon : catégories tirées et leur poids
 export const THEMES = {
-  mix:     { base: 26, astuce: 17, theorie: 14, fraction: 11, suite: 12, estim: 12, compte: 8 },
+  mix:     { base: 18, astuce: 12, theorie: 10, fraction: 8, suite: 9, estim: 8, vf: 9, compare: 7, equation: 7, geo: 6, devinette: 4, compte: 6 },
   base:    { base: 100 },
   malin:   { astuce: 55, theorie: 45 },
   frac:    { fraction: 70, base: 30 },
   logique: { suite: 60, theorie: 40 },
   vite:    { base: 40, estim: 60 },
+  flash:   { vf: 55, compare: 45 },
+  algebre: { equation: 60, devinette: 40 },
+  geo:     { geo: 70, estim: 30 },
   compte:  { compte: 100 },
 };
 
@@ -67,7 +75,7 @@ const D = (diff) => Math.max(0, DIFFS.indexOf(diff)); // 0, 1, 2
 const between = (r, a, b) => a + r.int(b - a + 1);
 const pick = (r, list) => list[r.int(list.length)];
 const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
-const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45] };
+const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22] };
 
 /* ------------------------------------------------------------ les 4 opérations */
 function base(r, d) {
@@ -454,7 +462,174 @@ function compte(r, d) {
   return { kind: 'compte', text: '24', target: 24, nums: [2, 3, 4, 6], sub: 'Atteins la cible', input: 'expr', answer: 24, sol: '6 × 4', show: '6 × 4 = 24', tip: '6 × 4 = 24' };
 }
 
-const GEN = { base, astuce, theorie, fraction, suite, estim, compte };
+
+/* ------------------------------------------------------------ vrai ou faux */
+// Une affirmation juste une fois sur deux ; la fausse est une erreur crédible (retenue, chiffre voisin…)
+const VF = ['Vrai', 'Faux'];
+function wrongish(r, n) {
+  const mag = n >= 1000 ? pick(r, [10, 100]) : n >= 100 ? pick(r, [1, 10]) : 1;
+  return Math.max(0, n + pick(r, [-2, -1, 1, 2]) * mag) || n + 1;
+}
+function vf(r, d) {
+  const kind = pick(r, ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac', 'vf-mul']);
+  const truth = r.next() < 0.5;
+  const out = (text, tip, t = truth) => ({ kind, text, sub: 'Vrai ou faux ?', choices: VF, answer: t ? 0 : 1, tip });
+  if (kind === 'vf-mul') {
+    const a = between(r, [3, 6, 12][d], [12, 25, 49][d]), b = between(r, [3, 4, 6][d], [9, 12, 25][d]), c = a * b;
+    const shown = truth ? c : wrongish(r, c);
+    return out(`${a} × ${b} = ${fmt(shown)}`, `${a} × ${b} = ${fmt(c)}`);
+  }
+  if (kind === 'vf-add') {
+    const hi = [99, 999, 9999][d], a = between(r, 11, hi), b = between(r, 11, hi), c = a + b;
+    const shown = truth ? c : wrongish(r, c);
+    return out(`${fmt(a)} + ${fmt(b)} = ${fmt(shown)}`, `${fmt(a)} + ${fmt(b)} = ${fmt(c)}`);
+  }
+  if (kind === 'vf-div') {
+    const k = pick(r, d === 0 ? [2, 3, 5] : [3, 4, 6, 9]);
+    let n = k * between(r, [5, 12, 40][d], [30, 120, 1100][d]);
+    if (!truth) n += between(r, 1, k - 1);
+    const rule = { 2: 'il finit par un chiffre pair', 3: 'la somme de ses chiffres est un multiple de 3', 4: 'ses deux derniers chiffres forment un multiple de 4',
+      5: 'il finit par 0 ou 5', 6: 'il est pair et divisible par 3', 9: 'la somme de ses chiffres est un multiple de 9' }[k];
+    return out(`${fmt(n)} est divisible par ${k}`, `Divisible par ${k} quand ${rule} : ${fmt(n)} ${n % k ? 'ne l\'est pas' : 'l\'est'}`, n % k === 0);
+  }
+  if (kind === 'vf-prime') {
+    const hi = [50, 120, 400][d];
+    let n = between(r, 11, hi); if (n % 2 === 0) n++;
+    for (let k = 0; k < 40 && isPrime(n) !== truth; k++) n += 2;
+    const p = isPrime(n);
+    return out(`${n} est premier`, p ? `${n} n'a pas d'autre diviseur que 1 et lui-même` : `${n} = ${smallFactor(n)} × ${n / smallFactor(n)}`, p);
+  }
+  if (kind === 'vf-pct') {
+    const pc = pick(r, [10, 20, 25, 50, 75, 5, 15]), b = 20 * between(r, 1, [5, 10, 30][d]), c = (pc * b) / 100;
+    const shown = truth ? c : pick(r, [c * 2, c / 2, c + 10, Math.max(1, c - 5)]);
+    return out(`${pc} % de ${fmt(b)} = ${fmt(shown)}`, `${pc} % de ${fmt(b)} = ${fmt(c)}`, shown === c);
+  }
+  if (kind === 'vf-pow') {
+    const b = pick(r, [2, 3, 5]), e = between(r, 3, { 2: [8, 10, 12][d], 3: [4, 5, 6][d], 5: [3, 4, 5][d] }[b]), v = b ** e;
+    const shown = truth ? v : pick(r, [b * e, v + b, v - b, b ** (e - 1) * (b + 1)]);
+    return out(`${b}^${e} = ${fmt(shown)}`, `${b}^${e} = ${fmt(v)}${shown === b * e ? ` (et pas ${b} × ${e})` : ''}`, shown === v);
+  }
+  const den = pick(r, [2, 4, 5, 8, 10, 20]);
+  let num; do { num = between(r, 1, den - 1); } while (gcd(num, den) !== 1);
+  const v = round4(num / den), shown = truth ? v : pick(r, [round4(num / 10), round4(den / 100), round4(v + 0.1), round4(num / (den + 1))].filter((x) => x !== v && x > 0));
+  return out(`${num}/${den} = ${fmt(shown)}`, `${num} ÷ ${den} = ${fmt(v)}`, shown === v);
+}
+
+/* ------------------------------------------------------------ le plus grand / le plus petit */
+function compare(r, d) {
+  const kind = pick(r, ['cmp-frac', 'cmp-pow', 'cmp-pct', 'cmp-mul', 'cmp-sqrt', 'cmp-sqcube']);
+  let A, B;
+  if (kind === 'cmp-frac') {
+    const den = pick(r, [3, 6, 7, 8, 9, 11, 12]), num = between(r, 1, den - 1), v = num / den;
+    const near = round4(Math.round((v + pick(r, [-1, 1]) * (0.01 + r.next() * 0.05)) * 100) / 100);
+    A = { l: `${num}/${den}`, v }; B = { l: fmt(near), v: near };
+  } else if (kind === 'cmp-pow') {
+    const pairs = [[2, 10, 10, 3], [2, 5, 5, 2], [3, 4, 4, 3], [2, 6, 6, 2], [2, 7, 5, 3], [3, 5, 5, 3], [2, 9, 3, 6], [2, 8, 4, 4]];
+    let [a, x, b, y] = pick(r, pairs);
+    if (a ** x === b ** y) [a, x, b, y] = [2, 10, 10, 3];
+    A = { l: `${a}^${x}`, v: a ** x }; B = { l: `${b}^${y}`, v: b ** y };
+  } else if (kind === 'cmp-pct') {
+    const a = pick(r, [10, 20, 25, 30, 40, 50, 60, 75]), x = 20 * between(r, 1, 10), b = pick(r, [10, 20, 25, 30, 40, 50, 60, 75]), y = 20 * between(r, 1, 10);
+    A = { l: `${a} % de ${x}`, v: (a * x) / 100 }; B = { l: `${b} % de ${y}`, v: (b * y) / 100 };
+  } else if (kind === 'cmp-mul') {
+    // deux produits proches : (m − e)(m + e) contre m², ou deux découpages
+    const m = between(r, [6, 10, 20][d], [15, 40, 90][d]), e = between(r, 1, 5);
+    A = { l: `${m - e} × ${m + e}`, v: (m - e) * (m + e) }; B = { l: `${m}²`, v: m * m };
+  } else if (kind === 'cmp-sqrt') {
+    const k = between(r, [4, 6, 10][d], [9, 15, 30][d]), n = between(r, (k - 1) * (k - 1) + 1, (k + 1) * (k + 1) - 1);
+    if (n === k * k) return compare(r, d);
+    A = { l: `√${n}`, v: Math.sqrt(n) }; B = { l: `${k}`, v: k };
+  } else {
+    const a = between(r, 3, [8, 12, 20][d]), b = between(r, 2, [5, 6, 9][d]);
+    if (a * a === b ** 3) return compare(r, d);
+    A = { l: `${a}²`, v: a * a }; B = { l: `${b}^3`, v: b ** 3 };
+  }
+  if (A.v === B.v) return compare(r, d);
+  if (r.next() < 0.5) [A, B] = [B, A];
+  const small = r.next() < 0.3;
+  const win = (small ? A.v < B.v : A.v > B.v) ? 0 : 1;
+  const val = (x) => (x.l === fmt(x.v) ? '' : Number.isInteger(x.v) ? ` = ${fmt(x.v)}` : ` ≈ ${fmt(Math.round(x.v * 100) / 100)}`);
+  return { kind, text: `${A.l}  ou  ${B.l}`, sub: small ? 'Lequel est le plus PETIT ?' : 'Lequel est le plus GRAND ?', choices: [A.l, B.l], answer: win,
+    tip: `${A.l}${val(A)} et ${B.l}${val(B)}` };
+}
+
+/* ------------------------------------------------------------ équations */
+function equation(r, d) {
+  const x = between(r, [1, 2, 3][d], [10, 15, 25][d]);
+  const forms = d === 0 ? ['x+a', 'ax', 'x-a', 'ax+b'] : d === 1 ? ['ax+b', 'a(x+b)', 'x/a+b', 'ax-b'] : ['ax+b=cx+d', 'a(x-b)+c', 'x/a+b', 'ax+b'];
+  const f = pick(r, forms);
+  const a = between(r, 2, [5, 9, 12][d]), b = between(r, 1, [12, 20, 40][d]);
+  let text, tip, kind = d === 0 ? 'eq1' : d === 1 ? 'eq2' : 'eq3';
+  if (f === 'x+a') { text = `x + ${b} = ${x + b}`; tip = `x = ${x + b} − ${b} = ${x}`; kind = 'eq1'; }
+  else if (f === 'x-a') { text = `x − ${b} = ${x - b}`; tip = `x = ${x - b} + ${b} = ${x}`; kind = 'eq1'; if (x - b < 0) return equation(r, d); }
+  else if (f === 'ax') { text = `${a}x = ${a * x}`; tip = `x = ${a * x} ÷ ${a} = ${x}`; kind = 'eq1'; }
+  else if (f === 'ax+b') { text = `${a}x + ${b} = ${a * x + b}`; tip = `${a}x = ${a * x + b} − ${b} = ${a * x}, donc x = ${x}`; kind = d === 0 ? 'eq1' : 'eq2'; }
+  else if (f === 'ax-b') { if (a * x - b < 0) return equation(r, d); text = `${a}x − ${b} = ${a * x - b}`; tip = `${a}x = ${a * x - b} + ${b} = ${a * x}, donc x = ${x}`; kind = 'eq2'; }
+  else if (f === 'a(x+b)') { text = `${a}(x + ${b}) = ${a * (x + b)}`; tip = `x + ${b} = ${a * (x + b)} ÷ ${a} = ${x + b}, donc x = ${x}`; kind = 'eq2'; }
+  else if (f === 'x/a+b') { const X = a * x; text = `x ÷ ${a} + ${b} = ${x + b}`; tip = `x ÷ ${a} = ${x}, donc x = ${X}`; return { kind: 'eq2', text, sub: 'Trouve x', eq: false, answer: X, tip }; }
+  else if (f === 'a(x-b)+c') { const bb = between(r, 1, x - 1 || 1); if (x - bb <= 0) return equation(r, d); const c = between(r, 1, 20); text = `${a}(x − ${bb}) + ${c} = ${a * (x - bb) + c}`; tip = `${a}(x − ${bb}) = ${a * (x - bb)}, x − ${bb} = ${x - bb}, donc x = ${x}`; kind = 'eq3'; }
+  else { let c; do { c = between(r, 1, 9); } while (c === a); const bigA = Math.max(a, c), smallC = Math.min(a, c); const dd = (bigA - smallC) * x + b; text = `${bigA}x + ${b} = ${smallC}x + ${dd}`; tip = `${bigA - smallC}x = ${dd} − ${b} = ${dd - b}, donc x = ${x}`; kind = 'eq3'; }
+  return { kind, text, sub: 'Trouve x', eq: false, answer: x, tip };
+}
+
+/* ------------------------------------------------------------ géométrie de tête (avec une figure) */
+const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [6, 8, 10], [9, 12, 15]];
+function geo(r, d) {
+  const kind = pick(r, ['rect-area', 'rect-perim', 'square-side', 'tri-angle', 'pythag', 'cube-vol', 'tri-area', d > 0 ? 'polygon' : 'rect-area', 'rect-side']);
+  const w = between(r, [3, 6, 12][d], [12, 25, 60][d]), h = between(r, [2, 4, 8][d], [9, 18, 40][d]);
+  if (kind === 'rect-area') return { kind, text: `Aire du rectangle`, sub: 'En cm²', answer: w * h, fig: { t: 'rect', a: `${w} cm`, b: `${h} cm` }, tip: `Longueur × largeur = ${w} × ${h} = ${fmt(w * h)} cm²` };
+  if (kind === 'rect-perim') return { kind, text: `Périmètre du rectangle`, sub: 'En cm', answer: 2 * (w + h), fig: { t: 'rect', a: `${w} cm`, b: `${h} cm` }, tip: `2 × (${w} + ${h}) = ${2 * (w + h)} cm` };
+  if (kind === 'rect-side') { const P = 2 * (w + h); return { kind, text: `Côté manquant ?`, sub: `Périmètre ${P} cm`, answer: h, fig: { t: 'rect', a: `${w} cm`, b: '?' }, tip: `${P} ÷ 2 = ${w + h}, puis ${w + h} − ${w} = ${h} cm` }; }
+  if (kind === 'square-side') { const c = between(r, [3, 6, 11][d], [10, 15, 30][d]); return { kind, text: `Côté du carré ?`, sub: `Aire ${fmt(c * c)} cm²`, answer: c, fig: { t: 'square', a: '?' }, tip: `√${fmt(c * c)} = ${c} cm, car ${c}² = ${fmt(c * c)}` }; }
+  if (kind === 'tri-angle') {
+    const A = 5 * between(r, 4, 18), B = 5 * between(r, 4, Math.max(4, Math.min(20, (175 - A) / 5))); const C = 180 - A - B;
+    if (C <= 0) return geo(r, d);
+    return { kind, text: `Angle manquant`, sub: 'En degrés', answer: C, fig: { t: 'tri', a: `${A}°`, b: `${B}°`, c: '?' }, tip: `Les angles d'un triangle font 180° : 180 − ${A} − ${B} = ${C}°` };
+  }
+  if (kind === 'pythag') {
+    const [a, b, c] = pick(r, d === 0 ? TRIPLES.slice(0, 1).concat([[6, 8, 10]]) : TRIPLES), k = d === 2 ? between(r, 1, 4) : between(r, 1, 2);
+    return { kind, text: `Hypoténuse ?`, sub: 'Triangle rectangle, en cm', answer: c * k, fig: { t: 'right', a: `${a * k} cm`, b: `${b * k} cm`, c: '?' },
+      tip: `Pythagore : ${a * k}² + ${b * k}² = ${a * a * k * k} + ${b * b * k * k} = ${c * c * k * k} = ${c * k}²` };
+  }
+  if (kind === 'cube-vol') { const c = between(r, 2, [5, 9, 12][d]); return { kind, text: `Volume du cube`, sub: 'En cm³', answer: c ** 3, fig: { t: 'cube', a: `${c} cm` }, tip: `${c} × ${c} × ${c} = ${fmt(c ** 3)} cm³` }; }
+  if (kind === 'tri-area') { const B = 2 * between(r, 2, [6, 12, 30][d]), H = between(r, 2, [9, 15, 40][d]); return { kind, text: `Aire du triangle`, sub: 'En cm²', answer: (B * H) / 2, fig: { t: 'trih', a: `${B} cm`, b: `${H} cm` }, tip: `Base × hauteur ÷ 2 = ${B} × ${H} ÷ 2 = ${fmt((B * H) / 2)} cm²` }; }
+  const n = pick(r, [4, 5, 6, 8, 9, 10, 12]), ang = ((n - 2) * 180) / n;
+  const names = { 4: 'carré', 5: 'pentagone', 6: 'hexagone', 8: 'octogone', 9: 'ennéagone', 10: 'décagone', 12: 'dodécagone' };
+  return { kind: 'polygon', text: `Angle d'un ${names[n]} régulier`, sub: 'Un angle intérieur, en degrés', answer: ang, fig: { t: 'poly', n }, tip: `(${n} − 2) × 180 ÷ ${n} = ${(n - 2) * 180} ÷ ${n} = ${ang}°` };
+}
+
+/* ------------------------------------------------------------ devinettes de nombre */
+// On choisit le nombre, puis on ajoute des indices vrais jusqu'à ce qu'il soit le seul possible.
+const digitSum = (n) => String(n).split('').reduce((s, c) => s + Number(c), 0);
+function devinette(r, d) {
+  const max = [50, 100, 200][d];
+  for (let tries = 0; tries < 80; tries++) {
+    const n = between(r, 10, max);
+    const lo = Math.max(1, n - between(r, 5, 25)), hi = Math.min(max + 20, n + between(r, 5, 25));
+    const clues = [{ t: `Je suis entre ${lo} et ${hi}.`, f: (x) => x > lo && x < hi }];
+    const pool = [
+      { t: n % 2 ? 'Je suis impair.' : 'Je suis pair.', f: (x) => x % 2 === n % 2 },
+      ...[3, 4, 5, 6, 7, 8, 9, 11].filter((k) => n % k === 0).map((k) => ({ t: `Je suis un multiple de ${k}.`, f: (x) => x % k === 0 })),
+      ...[3, 4, 5, 7].filter((k) => n % k !== 0).map((k) => ({ t: `Je ne suis pas un multiple de ${k}.`, f: (x) => x % k !== 0 })),
+      { t: `La somme de mes chiffres fait ${digitSum(n)}.`, f: (x) => digitSum(x) === digitSum(n) },
+      { t: `Mon chiffre des unités est ${n % 10}.`, f: (x) => x % 10 === n % 10 },
+      ...(isPrime(n) ? [{ t: 'Je suis un nombre premier.', f: isPrime }] : []),
+      ...(Number.isInteger(Math.sqrt(n)) ? [{ t: 'Je suis un carré parfait.', f: (x) => Number.isInteger(Math.sqrt(x)) }] : []),
+    ];
+    r.shuffle(pool);
+    let cand = Array.from({ length: hi - lo - 1 }, (_, k) => lo + 1 + k);
+    for (const c of pool) {
+      if (cand.length === 1 || clues.length >= 4) break;
+      const next = cand.filter(c.f);
+      if (next.length < cand.length) { clues.push(c); cand = next; }
+    }
+    if (cand.length !== 1 || clues.length < 3) continue;
+    return { kind: 'riddle', text: clues.map((c) => c.t).join(' '), sub: 'Qui suis-je ?', eq: false, answer: n, tip: `${n} : ${clues.slice(1).map((c) => c.t.replace(/\.$/, '')).join(' · ')}` };
+  }
+  return { kind: 'riddle', text: 'Je suis entre 10 et 20. Je suis un multiple de 7.', sub: 'Qui suis-je ?', eq: false, answer: 14, tip: '14 = 2 × 7' };
+}
+
+const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette };
 export const KINDS = {
   base: ['add', 'sub', 'mul', 'div', 'chain', 'missing', 'half', 'prio'],
   astuce: ['equi', 'sq5', 'x11', 'pct', 'x5', 'x25', 'x9', 'x99', 'sqnear', 'compl', 'pct2', 'x15'],
@@ -463,6 +638,11 @@ export const KINDS = {
   suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes'],
   estim: ['kmh', 'ms', 'train', 'time', 'units', 'promo', 'rule3', 'avg', 'evol', 'famous', 'approx'],
   compte: ['compte'],
+  vf: ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac'],
+  compare: ['cmp-frac', 'cmp-pow', 'cmp-pct', 'cmp-mul', 'cmp-sqrt', 'cmp-sqcube'],
+  equation: ['eq1', 'eq2', 'eq3'],
+  geo: ['rect-area', 'rect-perim', 'square-side', 'tri-angle', 'pythag', 'cube-vol', 'tri-area', 'polygon', 'rect-side'],
+  devinette: ['riddle'],
 };
 
 export function makeQuestion(seed, i, cat, diff, salt = 0) {
@@ -470,11 +650,12 @@ export function makeQuestion(seed, i, cat, diff, salt = 0) {
   const d = D(diff);
   const q = GEN[cat](r, d);
   return {
-    cat, kind: q.kind, text: q.text, sub: q.sub || '', eq: q.eq !== false, input: q.input || 'num', time: TIME[cat][d],
-    answer: q.answer, tol: q.tol || 0, show: q.show || fmt(q.answer), tip: q.tip || '',
-    nums: q.nums || null, target: q.target ?? null, sol: q.sol || null,
+    cat, kind: q.kind, text: q.text, sub: q.sub || '', eq: q.eq !== false && !q.choices && !q.fig, input: q.choices ? 'choice' : q.input || 'num', time: TIME[cat][d],
+    answer: q.answer, tol: q.tol || 0, show: q.show || (q.choices ? q.choices[q.answer] : fmt(q.answer)), tip: q.tip || '',
+    nums: q.nums || null, target: q.target ?? null, sol: q.sol || null, choices: q.choices || null, fig: q.fig || null,
+    key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
 
 // Ce que voient les joueurs pendant la question (sans la réponse)
-export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol });
+export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, choices: q.choices, fig: q.fig });

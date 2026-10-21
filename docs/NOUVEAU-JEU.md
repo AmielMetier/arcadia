@@ -82,6 +82,7 @@ if (H.embedded) H.on('init', boot); else boot({ role: 'solo', myId: 0 });
 | De → vers | Message | Sens |
 |---|---|---|
 | invité → hôte | `{ t:'ans', i, v }` | réponse `v` à la question n° `i` |
+| invité → hôte | `{ t:'sab', power, target }` | lancer un pouvoir de sabotage (pendant la révélation) |
 | invité → hôte | `{ t:'emote', id }` | réaction |
 | invité → hôte | `{ t:'sync' }` | « renvoie-moi l'état » (arrivée en cours, nouvel hôte) |
 | hôte → tous | `{ t:'setup', s }` | salle d'avant-partie (joueurs prêts, réglages) |
@@ -153,7 +154,8 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 - **Nouvelle question** : ajouter une branche dans un générateur de `engine/questions.js` et son nom dans `KINDS`
   (ou une nouvelle catégorie dans `CATS`, `TIME`, `GEN`, `KINDS`, puis dans `THEMES` et `HARD` de `engine/bot.js`).
   Les tests vérifient que chaque type déclaré sort bien. Chaque question renvoie `text`, `answer`, `tip` et, si besoin, `sub`, `tol`
-  (tolérance relative), `input: 'expr'`. Les tests vérifient automatiquement que la réponse attendue est acceptée.
+  (tolérance relative), `input: 'expr'`, `choices` (réponse en un clic : `answer` est alors l'indice du bon choix)
+  ou `fig` (figure dessinée par `view/figure.js`). Les tests vérifient automatiquement que la réponse attendue est acceptée.
 - **Nouveau mode** : ajouter une entrée dans `MODES` (`engine/rules.js`), son calcul de points dans `reveal()`,
   son option dans `hub/games.js`.
 - **Bots** : niveaux et taux de réussite dans `SKILL` et `HARD` (`engine/bot.js`).

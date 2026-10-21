@@ -1,7 +1,7 @@
 // Hôte de Tête de Calcul : détient l'état, chronomètre les questions, juge les réponses et fait jouer les bots.
 // Les invités n'envoient que { t:'ans', i, v } ; l'hôte renvoie l'état public (sans les réponses pendant une question).
-import { createGame, nextQuestion, answer, reveal, publicState, fullQuestion, restartQuestion, removePlayer, makeConfig, standings } from '../engine/rules.js';
-import { botAnswer, BOT_LEVELS } from '../engine/bot.js';
+import { createGame, nextQuestion, answer, reveal, publicState, fullQuestion, restartQuestion, removePlayer, makeConfig, standings, sabotage } from '../engine/rules.js';
+import { botAnswer, botSabotage, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { isEmote, botReaction } from '../view/emotes.js';
 
@@ -49,6 +49,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     if (state.phase === 'question') { state = reveal(state, now); broadcast(); botsReact(); }
     else { state = nextQuestion(state, now); broadcast(); }
     schedule();
+    if (state.phase === 'reveal') botsSabotage(); // après schedule(), qui annule les minuteurs des bots
   }
   function planBots() {
     const q = fullQuestion(state), idx = state.idx;
@@ -75,6 +76,23 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     broadcast();
     return r;
   }
+  function sabo(by, power, target) {
+    if (!state) return { ok: false, error: 'La partie n’a pas commencé.' };
+    const r = sabotage(state, { by, power: String(power), target: Number(target) });
+    if (!r.ok) return r;
+    state = r.state; broadcast();
+    return r;
+  }
+  // les bots qui ont un pouvoir le lancent pendant la révélation, sur le meneur
+  function botsSabotage() {
+    if (!state.cfg.sabotage) return;
+    for (const p of state.players) {
+      if (!p.bot) continue;
+      const a = botSabotage(state, p.id);
+      if (a) botTimers.push(setTimeout(() => { if (state.phase === 'reveal') sabo(p.id, a.power, a.target); }, 1200 + Math.random() * 2200));
+    }
+  }
+
   // accusé de réception pour le joueur seul : en Éclair, il apprend tout de suite s'il est bloqué
   const ackOf = (r) => ({ t: 'ack', i: state.idx, locked: state.cfg.mode === 'eclair' && !r.right });
 
@@ -145,6 +163,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       if (!m || typeof m !== 'object') return;
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: publicState(state), now: Date.now() }); else pushSetup(); }
       if (m.t === 'emote') emote(from, String(m.id));
+      if (m.t === 'sab') { const r = sabo(from, m.power, m.target); if (!r.ok) bridge.send(from, { t: 'err', msg: r.error }); }
       if (m.t === 'ans') {
         const r = submit(from, String(m.v ?? '').slice(0, 60), Number(m.i)); // l'identité vient du salon, jamais du message
         bridge.send(from, r.ok ? ackOf(r) : { t: 'err', msg: r.error, soft: !!r.soft });
@@ -158,6 +177,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       if (!r.ok) onError(r.error, r.soft); else onAck(ackOf(r));
     },
     emote(id) { emote(me.id, id); },
+    sabotage(power, target) { const r = sabo(me.id, power, target); if (!r.ok) onError(r.error); },
     start() { if (!state || state.phase === 'over') begin(); },
     get state() { return state; },
     get standings() { return state ? standings(state) : []; },

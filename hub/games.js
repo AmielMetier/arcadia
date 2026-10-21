@@ -63,18 +63,19 @@ window.HUB_GAMES = [
     id: 'calcul',
     title: 'Tête de Calcul',
     tag: 'Duel de calcul mental',
-    desc: 'Calcul, astuces (47 × 53), puissances, fractions, suites logiques, conversions et Compte est bon : le plus rapide gagne. Avec bots.',
+    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, devinettes, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres !',
     url: 'calcul/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ff5fa2',
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['peril', 'Péril · erreurs pénalisées'], ['eclair', 'Éclair · seul le 1er marque']], def: 'classic' },
-      { key: 'theme', label: 'Questions', options: [['mix', 'Tout mélangé'], ['base', 'Les 4 opérations'], ['malin', 'Astuces & nombres'], ['frac', 'Fractions & décimaux'], ['logique', 'Suites & logique'], ['vite', 'Vitesse & estimations'], ['compte', 'Compte est bon']], def: 'mix' },
+      { key: 'theme', label: 'Questions', options: [['mix', 'Tout mélangé'], ['base', 'Les 4 opérations'], ['malin', 'Astuces & nombres'], ['frac', 'Fractions & décimaux'], ['logique', 'Suites & logique'], ['flash', 'Vrai/faux & comparaisons'], ['algebre', 'Équations & devinettes'], ['geo', 'Géométrie & mesures'], ['vite', 'Vitesse & estimations'], ['compte', 'Compte est bon']], def: 'mix' },
       { key: 'len', label: 'Longueur', options: [[10, '10 questions'], [15, '15'], [20, '20']], def: 10 },
       { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']], def: 'normal' },
-      { key: 'finale', label: 'Dernière question quitte ou double', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'sabotage', label: 'Sabotage (pouvoirs à lancer sur les autres)', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect width="320" height="180" fill="#3f86d0"/>

@@ -40,6 +40,7 @@ const SOUNDS = {
   ok(c, t) { [784, 988, 1319].forEach((f, k) => tone(f, t + k * 0.08, 0.22, { type: 'triangle', vol: 0.3 })); },
   ko(c, t) { tone(220, t, 0.35, { type: 'sawtooth', vol: 0.18, slide: 0.6 }); },
   streak(c, t) { [988, 1175, 1480, 1976].forEach((f, k) => tone(f, t + k * 0.06, 0.12, { type: 'square', vol: 0.1 })); },
+  sab(c, t) { tone(1200, t, 0.5, { type: 'sawtooth', vol: 0.12, slide: 0.25 }); noise(t + 0.05, 0.35, { vol: 0.3, freq: 700, q: 0.7 }); tone(180, t + 0.35, 0.25, { type: 'square', vol: 0.12 }); },
   pop(c, t) { tone(700, t, 0.08, { type: 'sine', vol: 0.3, slide: 1.8 }); },
   win(c, t) { [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, t + k * 0.13, 0.3, { type: 'triangle', vol: 0.3 })); noise(t + 0.7, 0.6, { vol: 0.2, freq: 4000, q: 0.5 }); },
 };

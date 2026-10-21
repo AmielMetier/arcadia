@@ -2,10 +2,13 @@
 import assert from 'node:assert/strict';
 import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS } from '../calcul/engine/questions.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
-import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion } from '../calcul/engine/rules.js';
-import { botAnswer } from '../calcul/engine/bot.js';
+import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer } from '../calcul/engine/rules.js';
+import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
 let n = 0;
+// bonne et mauvaise réponse pour n'importe quel type de question
+const good = (q) => (q.input === 'expr' ? q.sol : String(q.answer));
+const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
 
 t('lecture des nombres', () => {
@@ -50,7 +53,7 @@ t('les questions sont reproductibles et justes', () => {
 t('banque de questions : tous les types sortent, et beaucoup de questions différentes', () => {
   for (const cat of Object.keys(CATS)) {
     const kinds = new Set(), texts = new Set();
-    for (const diff of DIFFS) for (let i = 0; i < 600; i++) { const q = makeQuestion(i * 104729 + 17, i, cat, diff); kinds.add(q.kind); texts.add(q.text); }
+    for (const diff of DIFFS) for (let i = 0; i < 600; i++) { const q = makeQuestion(i * 104729 + 17, i, cat, diff); kinds.add(q.kind); texts.add(q.key); }
     for (const k of KINDS[cat]) assert.ok(kinds.has(k), `${cat} : le type ${k} ne sort jamais`);
     console.log(`  ${cat.padEnd(9)} ${String(KINDS[cat].length).padStart(2)} types · ${texts.size} questions différentes sur 1 800 tirages`);
   }
@@ -59,7 +62,7 @@ t('banque de questions : tous les types sortent, et beaucoup de questions diffé
 t('pas deux fois la même question dans une partie', () => {
   let s = createGame({ players: [{ id: 0, name: 'A' }], cfg: { len: 20, theme: 'base', diff: 'facile' }, seed: 77, now: 0 });
   const seen = [];
-  for (let i = 0; i < 20; i++) { s = nextQuestion(s, i * 1e5); seen.push(fullQuestion(s).text); s = reveal(s, i * 1e5 + 1); }
+  for (let i = 0; i < 20; i++) { s = nextQuestion(s, i * 1e5); seen.push(fullQuestion(s).key); s = reveal(s, i * 1e5 + 1); }
   assert.equal(new Set(seen).size, 20, seen.join(' | '));
 });
 
@@ -95,13 +98,12 @@ t('une partie complète', () => {
     const q = fullQuestion(s);
     const pub = publicState(s);
     assert.equal(pub.q.answer, undefined, 'la réponse ne part pas sur le réseau');
-    const good = q.input === 'expr' ? q.sol : String(q.answer);
-    let r = answer(s, { by: 0, raw: good, idx: s.idx, now: now + 1000 }); assert.ok(r.ok && r.right); s = r.state;
+    let r = answer(s, { by: 0, raw: good(q), idx: s.idx, now: now + 1000 }); assert.ok(r.ok && r.right); s = r.state;
     assert.equal(publicState(s).answers[0].ok, undefined, 'la justesse reste cachée');
-    assert.equal(answer(s, { by: 0, raw: good, now: now + 1100 }).ok, false, 'une seule réponse');
-    r = answer(s, { by: 1, raw: q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : String(q.answer * 3 + 7), now: now + 2000 }); assert.ok(r.ok); s = r.state;
+    assert.equal(answer(s, { by: 0, raw: good(q), now: now + 1100 }).ok, false, 'une seule réponse');
+    r = answer(s, { by: 1, raw: bad(q), now: now + 2000 }); assert.ok(r.ok, q.text + ' ' + r.error); s = r.state;
     assert.equal(r.done, false);
-    r = answer(s, { by: 100, raw: good, now: now + 3000 }); s = r.state; assert.equal(r.done, true);
+    r = answer(s, { by: 100, raw: good(q), now: now + 3000 }); s = r.state; assert.equal(r.done, true);
     s = reveal(s, now + 3100);
     assert.equal(s.phase, 'reveal');
     now += 10000;
@@ -162,6 +164,71 @@ t('bots plausibles', () => {
   }
   assert.ok(right / total > 0.8, `expert juste à ${Math.round((100 * right) / total)} %`);
   for (let i = 0; i < 100; i++) { const q = makeQuestion(i, i, 'compte', 'expert'); const a = botAnswer(q, 'expert'); if (a) assert.ok(!check(q, a.raw).error, a.raw); }
+});
+
+t('réponses à choix (vrai ou faux, le plus grand)', () => {
+  for (let i = 0; i < 300; i++) for (const cat of ['vf', 'compare']) {
+    const q = makeQuestion(i * 13 + 1, i, cat, 'normal');
+    assert.equal(q.input, 'choice'); assert.equal(q.choices.length, 2);
+    assert.ok(check(q, String(q.answer)).ok);
+    assert.ok(!check(q, String(1 - q.answer)).ok);
+    assert.ok(check(q, '7').error, 'choix hors liste');
+    assert.equal(describeAnswer(q, String(q.answer)), q.choices[q.answer]);
+  }
+  // les affirmations « vrai » le sont vraiment (multiplications et additions)
+  for (let i = 0; i < 500; i++) {
+    const q = makeQuestion(i * 17 + 3, i, 'vf', 'expert');
+    const m = q.text.replace(/\u00a0/g, '').match(/^(\d+) ([×+]) (\d+) = (\d+)$/);
+    if (m) { const v = m[2] === '×' ? m[1] * m[3] : +m[1] + +m[3]; assert.equal(q.answer === 0, v === +m[4], q.text); }
+  }
+});
+
+t('devinettes : toujours au moins 2 indices en plus de l\'intervalle', () => {
+  for (let i = 0; i < 300; i++) for (const diff of DIFFS) {
+    const q = makeQuestion(i * 31 + 7, i, 'devinette', diff);
+    assert.ok(q.text.split('. ').length >= 3, q.text);
+  }
+});
+
+t('sabotage : gagner, lancer, bloquer, subir', () => {
+  const players = [{ id: 0, name: 'A' }, { id: 1, name: 'B' }, { id: 2, name: 'C' }];
+  let s = createGame({ players, cfg: { len: 15, theme: 'base' }, seed: 21, now: 0 });
+  let t0 = 0;
+  const round = (who) => { s = nextQuestion(s, t0); const q = fullQuestion(s); for (const id of who) s = answer(s, { by: id, raw: good(q), now: t0 + 500 }).state; s = reveal(s, t0 + 1000); t0 += 1e5; };
+  assert.equal(sabotage(s, { by: 0, power: 'fog', target: 1 }).ok, false, 'pas pendant l\'intro');
+  round([0]); round([0]); round([0]);
+  const A = s.players[0];
+  assert.equal(A.powers.length, 1, '3 bonnes réponses d\'affilée = 1 pouvoir');
+  // on force les pouvoirs pour tester chaque cas
+  s.players[0].powers = ['time', 'fog']; s.players[2].powers = ['shield'];
+  assert.equal(sabotage(s, { by: 0, power: 'time', target: 0 }).ok, false, 'pas sur soi');
+  assert.equal(sabotage(s, { by: 0, power: 'flip', target: 1 }).ok, false, 'pouvoir non possédé');
+  let r = sabotage(s, { by: 0, power: 'time', target: 1 }); assert.ok(r.ok && !r.blocked); s = r.state;
+  r = sabotage(s, { by: 0, power: 'fog', target: 2 }); assert.ok(r.ok && r.blocked, 'le bouclier bloque'); s = r.state;
+  assert.deepEqual(s.players[2].powers, []); assert.deepEqual(s.players[0].powers, []);
+  assert.equal(s.sabs.length, 2);
+  s = nextQuestion(s, t0);
+  assert.equal(s.active[1][0].power, 'time');
+  assert.equal(deadlineOf(s, 1), s.endsAt - STEAL_MS);
+  assert.equal(deadlineOf(s, 0), s.endsAt);
+  const q = fullQuestion(s);
+  assert.equal(answer(s, { by: 1, raw: good(q), now: s.endsAt - 1000 }).ok, false, 'chrono volé : trop tard pour B');
+  assert.ok(answer(s, { by: 0, raw: good(q), now: s.endsAt - 1000 }).ok);
+  s = reveal(s, t0 + 1);
+  s = nextQuestion(s, t0 + 1e5);
+  assert.deepEqual(s.active, {}, 'un sabotage ne dure qu\'une question');
+  const off = createGame({ players, cfg: { sabotage: 0 }, seed: 1, now: 0 });
+  assert.equal(off.cfg.sabotage, false);
+});
+
+t('bots saboteurs : visent le meneur', () => {
+  const s = createGame({ players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }, { id: 100, name: 'Bot', bot: true }], cfg: {}, seed: 2, now: 0 });
+  s.players[0].score = 500; s.players[1].score = 100; s.players[2].powers = ['fog'];
+  let hit = 0;
+  for (let i = 0; i < 50; i++) { const a = botSabotage(s, 100); if (a) { hit++; assert.equal(a.target, 0); assert.equal(a.power, 'fog'); } }
+  assert.ok(hit > 10);
+  s.players[2].powers = ['shield'];
+  assert.equal(botSabotage(s, 100), null, 'le bouclier ne se lance pas');
 });
 
 console.log(`\n${n} tests réussis`);
