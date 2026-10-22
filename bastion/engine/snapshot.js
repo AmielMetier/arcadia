@@ -54,12 +54,12 @@ function packState(s, { viewer = null, ack = {}, pings = {} } = {}) {
   const visibleUnit = (u) => {
     if (viewer == null || u.team === viewer.team) return true;
     const at = u.boardedIn ? ships.get(u.boardedIn) || u : u;
-    return !u.cloaked && teamSees(viewer.team, at.x, at.y);
+    return (!u.cloaked || teamDetects(viewer.team, at.x, at.y)) && teamSees(viewer.team, at.x, at.y);
   };
   return {
     v: SNAP_VERSION,
     time: q2(s.time), blitz: s.blitz, map: s.map, mode: s.mode, is2v2: s.is2v2, coop: s.coop || null,
-    level: s.level, phase: s.phase, stormRadius: Math.round(s.stormRadius), dmgMult: s.dmgMult,
+    level: s.level, factionRule: s.factionRule, phase: s.phase, stormRadius: Math.round(s.stormRadius), dmgMult: s.dmgMult,
     nextId: s.nextId, over: s.over, winnerTeam: s.winnerTeam, ranking: s.ranking, ack,
     waves: s.waves || null,
     players: s.players.map((p) => {

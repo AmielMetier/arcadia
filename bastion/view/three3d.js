@@ -519,7 +519,9 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
   plinth.receiveShadow = !isGhost;
   bodyGroup.add(plinth);
 
-  if (kind === 'hq') {
+  if (def.faction === 'synth') {
+    buildSynthBuilding3D(kind, grp, bodyGroup, r, h, color, op, isGhost);
+  } else if (kind === 'hq') {
     // Forteresse octogonale Terran + 4 bastions d'angle + pont supérieur + radar Comsat rotatif 3D
     const mainHull = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.96, h * 0.55, 8), steelMat);
     mainHull.position.y = 6 + h * 0.275;
@@ -868,7 +870,7 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
 function createUnitMesh3D(kind, color) {
   const grp = new THREE.Group();
   const def = UNITS[kind] || UNITS.marine;
-  const r = kind === 'scv' ? 10.2 : (def.radius || 12);
+  const r = isWorker(kind) ? 10.2 : (def.radius || 12);
 
   const teamMat = getMat3D(color, 0.35, 0.35, color, 0.12);
   const darkTeamMat = getMat3D(shade(color, -0.35), 0.48, 0.42);
@@ -881,7 +883,9 @@ function createUnitMesh3D(kind, color) {
   const greenMat = getMat3D('#2fbf71', 0.2, 0.2, 0x2fbf71, 0.8);
   const redMat = getMat3D('#ff4b2b', 0.25, 0.2, 0xff4b2b, 0.75);
 
-  if (kind === 'scv') {
+  if (def.faction === 'synth') {
+    buildSynthUnit3D(kind, grp, r, color);
+  } else if (kind === 'scv') {
     // Ouvrier VCS 3D : chenilles, châssis industriel jaune/équipe, arceau, pinces et cristal/gaz sur le dos
     for (const oz of [-r * 0.68, r * 0.68]) {
       const trk = new THREE.Mesh(new THREE.BoxGeometry(r * 1.6, 6, 4.5), darkSteelMat);
@@ -1306,7 +1310,9 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     const healLinks = [];
     for (const u of state.units) {
       if (u.hp <= 0 || u.boardedIn) continue;
-      const vis = u.owner === myId || isVisibleToMe(u.x, u.y);
+      // Spectre camouflé : invisible pour l'adversaire tant que son équipe n'a pas de détection sur place
+      const myTeam3D = (state.players.find((p) => p.id === myId) || {}).team;
+      const vis = u.owner === myId || (isVisibleToMe(u.x, u.y) && (!u.cloaked || u.team === myTeam3D || teamDetects(myTeam3D, u.x, u.y)));
       activeUnitIds.add(u.id);
       const owner = state.players.find((p) => p.id === u.owner);
       const col = owner ? pc(owner) : '#888888';
@@ -1326,6 +1332,10 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       const hoverY = isFly ? (42 + Math.sin(now * 0.003 + u.id) * 3) : 0;
       mesh.position.set(u.x, heightAt(u.x, u.y) + hoverY, u.y);
       if (u.boss) mesh.scale.setScalar(1.4);
+      if (mesh.userData.cloakMats) {
+        const op = u.cloaked ? (u.team === myTeam3D ? 0.32 : 0.5) : 1;
+        for (const m of mesh.userData.cloakMats) m.opacity = op;
+      }
       if (mesh.userData.shadowDisc) {
         mesh.userData.shadowDisc.position.y = -hoverY + 0.5;
       }
@@ -1354,9 +1364,13 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
         if (mesh.userData.stimRing) {
           mesh.userData.stimRing.visible = (u.stimT || 0) > 0;
         }
-        if (u.kind === 'scv') {
-          if (mesh.userData.cargoMin) mesh.userData.cargoMin.visible = u.carryAmt > 0 && u.carryType === 'min';
-          if (mesh.userData.cargoGas) mesh.userData.cargoGas.visible = u.carryAmt > 0 && u.carryType === 'gas';
+        if (isWorker(u.kind)) {
+          if (mesh.userData.cargoMin === mesh.userData.cargoGas && mesh.userData.cargoMin) {
+            mesh.userData.cargoMin.visible = u.carryAmt > 0;
+          } else {
+            if (mesh.userData.cargoMin) mesh.userData.cargoMin.visible = u.carryAmt > 0 && u.carryType === 'min';
+            if (mesh.userData.cargoGas) mesh.userData.cargoGas.visible = u.carryAmt > 0 && u.carryType === 'gas';
+          }
           if (mesh.userData.weldGlow) {
             const welding = !!(u.onSite && u.buildTargetId);
             mesh.userData.weldGlow.visible = welding && ((Math.floor(now / 50) + u.id) % 2 === 0);

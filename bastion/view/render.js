@@ -107,7 +107,7 @@ function renderWorld(dt, now) {
 
       if (b.constructing) {
         const pct = Math.floor((b.buildProg || 0) * 100);
-        const hasBuilder = state.units.some((u) => u.kind === 'scv' && u.buildTargetId === b.id && u.onSite && u.hp > 0);
+        const hasBuilder = state.units.some((u) => isWorker(u.kind) && u.buildTargetId === b.id && u.onSite && u.hp > 0);
         ctx.save();
         ctx.font = '700 11px Bungee, sans-serif';
         ctx.textAlign = 'center';
@@ -127,7 +127,7 @@ function renderWorld(dt, now) {
         ctx.fillRect(topPt.x - bw / 2, topPt.y - 21, bw * pct, 5);
       }
 
-      if (b.kind === 'hq' && !b.constructing) {
+      if (isMainBase(b.kind) && !b.constructing) {
         const ownerPlayer = state.players.find((p) => Number(p.id) === Number(b.owner));
         if (ownerPlayer) {
           const pingTxt = ownerPlayer.bot ? 'IA' : `${getPlayerPing(ownerPlayer)}ms`;
@@ -154,7 +154,7 @@ function renderWorld(dt, now) {
     // Surcouche tactique des Unités 3D (Cercles de sélection & Barres de PV)
     for (const u of state.units) {
       if (u.hp <= 0 || u.boardedIn) continue;
-      if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
+      if (u.owner !== myId && (!isVisibleToMe(u.x, u.y) || !seenByMe(u))) continue;
       const selected = selectedUnits.has(u.id);
       const isFly = !!u.flying;
       const baseAlt = isFly ? 42 : 2;
@@ -392,9 +392,9 @@ function renderWorld(dt, now) {
   }
   for (const u of state.units) {
     if (u.hp <= 0 || u.boardedIn) continue;
-    if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
+    if (u.owner !== myId && (!isVisibleToMe(u.x, u.y) || !seenByMe(u))) continue;
     let sortY = u.y;
-    if (u.kind === 'scv' && u.onSite && u.buildTargetId) {
+    if (isWorker(u.kind) && u.onSite && u.buildTargetId) {
       const tb = state.buildings.find((b) => b.id === u.buildTargetId && b.constructing);
       if (tb) sortY = Math.max(u.y, tb.y + 1);
     }
@@ -594,7 +594,7 @@ function renderMinimap() {
   for (const b of state.buildings) {
     if (b.hp <= 0) continue;
     if (b.owner !== myId && !isVisibleToMe(b.x, b.y)) continue;
-    const sz = b.kind === 'hq' ? 13 : b.kind === 'wall' ? 5 : 8;
+    const sz = isMainBase(b.kind) ? 13 : b.kind === 'wall' ? 5 : 8;
     mc.fillStyle = '#05080b';
     mc.fillRect(b.x * sx - sz / 2 - 1.5, b.y * sy - sz / 2 - 1.5, sz + 3, sz + 3);
     mc.fillStyle = colorOf(b.owner);
@@ -602,8 +602,8 @@ function renderMinimap() {
   }
   for (const u of state.units) {
     if (u.hp <= 0 || u.boardedIn) continue;
-    if (u.owner !== myId && !isVisibleToMe(u.x, u.y)) continue;
-    const sz = u.kind === 'scv' ? 4 : 5.5;
+    if (u.owner !== myId && (!isVisibleToMe(u.x, u.y) || !seenByMe(u))) continue;
+    const sz = isWorker(u.kind) ? 4 : 5.5;
     mc.fillStyle = colorOf(u.owner);
     mc.fillRect(u.x * sx - sz / 2, u.y * sy - sz / 2, sz, sz);
     if (me && u.team !== me.team) {

@@ -4,7 +4,7 @@
 
 function centerOnMyHq() {
   if (!state) return;
-  const hq = state.buildings.find((b) => b.owner === myId && b.kind === 'hq');
+  const hq = state.buildings.find((b) => b.owner === myId && isMainBase(b.kind));
   if (hq) { cam.x = hq.x; cam.y = hq.y; }
 }
 
@@ -120,7 +120,7 @@ function handleFxEvents(list) {
     } else if (e.k === 'SATURATED') {
       if (Number(e.owner) === Number(myId) && performance.now() - lastSaturatedMsg > 7000) {
         lastSaturatedMsg = performance.now();
-        notify('⛏️ Gisements saturés : un VCS attend. Construis un nouveau QG près d’autres cristaux.', 'info');
+        notify(`⛏️ Gisements saturés : un ${workerName()} attend. Construis un nouveau ${mainName()} près d’autres cristaux.`, 'info');
       }
     } else if (e.k === 'WAVE') {
       notify(e.boss ? `☠️ Vague ${e.n}/${e.total} : un Colosse mène l’assaut !` : `🌊 Vague ${e.n}/${e.total} en approche !`, 'warn', 5200);
@@ -128,6 +128,10 @@ function handleFxEvents(list) {
       Sfx.alert();
     } else if (e.k === 'WAVE_CLEARED') {
       notify(e.n >= e.total ? '🏆 Dernière vague repoussée !' : `✅ Vague ${e.n} repoussée : prime de 150💎 et 60🧪 pour chacun.`, 'good', 4600);
+    } else if (e.k === 'FACTION') {
+      if (Number(e.playerId) !== Number(myId)) notify(`${FACTIONS[e.faction].icon} ${e.name} joue ${FACTIONS[e.faction].name}.`, 'info', 3200);
+      lastCmdSig = ''; lastRosterSig = '';
+      renderConsoleUI(true);
     } else if (e.k === 'AFK') {
       notify(`🔌 ${e.name} est parti : un bot garde sa base en attendant son retour.`, 'warn', 6000);
     } else if (e.k === 'BACK') {

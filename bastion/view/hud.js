@@ -18,8 +18,8 @@ function renderConsoleUI(force = false) {
   document.body.classList.remove('spectating');
 
   const myUnits = state.units.filter((u) => Number(u.owner) === Number(myId) && u.hp > 0);
-  const scvs = myUnits.filter((u) => u.kind === 'scv');
-  const armyCnt = myUnits.filter((u) => u.kind !== 'scv').length;
+  const scvs = myUnits.filter((u) => isWorker(u.kind));
+  const armyCnt = myUnits.filter((u) => !isWorker(u.kind)).length;
   $('#uiArmyCnt').textContent = armyCnt;
 
   const cgHtml = [];
@@ -75,7 +75,7 @@ function renderConsoleUI(force = false) {
       if (qTxt) {
         const qItem = b.queue[0];
         const qDef = qItem ? (UNITS[qItem] || UPGRADES[qItem]) : null;
-        qTxt.textContent = qDef ? `En cours : ${qDef.name} (${qProg}%)` : (b.kind === 'armory' ? 'Prêt à rechercher' : 'Prêt à produire');
+        qTxt.textContent = qDef ? `En cours : ${qDef.name} (${qProg}%)` : (isLab(b.kind) ? 'Prêt à rechercher' : 'Prêt à produire');
       }
     } else if (selU.length === 1) {
       const u = selU[0];
@@ -128,11 +128,11 @@ function renderConsoleUI(force = false) {
             ${def.supply ? `<span class="st-chip">📦 Ravitaillement : +${def.supply}</span>` : ''}
             <span class="st-chip wide">${def.desc}</span>
           </div>
-          ${(((def.trains && def.trains.length) || b.kind === 'armory') && !b.constructing) ? `
+          ${(((def.trains && def.trains.length) || isLab(b.kind)) && !b.constructing) ? `
             <div class="prod-queue">
               <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700">
-                <span>File ${b.kind === 'armory' ? 'de recherche' : 'de production'} (${b.queue.length}/5)</span>
-                <span id="selQTxt">${qDef0 ? `En cours : ${qDef0.name} (${qProg}%)` : (b.kind === 'armory' ? 'Prêt à rechercher' : 'Prêt à produire')}</span>
+                <span>File ${isLab(b.kind) ? 'de recherche' : 'de production'} (${b.queue.length}/5)</span>
+                <span id="selQTxt">${qDef0 ? `En cours : ${qDef0.name} (${qProg}%)` : (isLab(b.kind) ? 'Prêt à rechercher' : 'Prêt à produire')}</span>
               </div>
               <div class="q-bar-wrap"><i id="selQBar" style="width:${qProg}%"></i></div>
               <div class="q-slots">${qSlotsHtml}</div>
@@ -152,7 +152,7 @@ function renderConsoleUI(force = false) {
       const u = selU[0];
       const def = UNITS[u.kind];
       $('#uiSelHeader').textContent = def.name;
-      if (u.kind === 'scv') {
+      if (isWorker(u.kind)) {
         $('#uiSelSubHint').textContent = 'Clic droit sur un cristal ou une raffinerie pour récolter';
       } else if (u.kind === 'dropship') {
         $('#uiSelSubHint').textContent = 'Navette : Clic Droit sur troupes pour embarquer [max 4] · V = Débarquer';
@@ -226,14 +226,14 @@ function renderConsoleUI(force = false) {
       }
     } else {
       $('#uiSelHeader').textContent = 'Aucune sélection';
-      $('#uiSelSubHint').textContent = 'Clique sur un VCS ou un bâtiment sur la carte';
+      $('#uiSelSubHint').textContent = `Clique sur un ${workerName()} ou un bâtiment sur la carte`;
       selBody.innerHTML = `
         <div class="sel-info">
           <div class="sel-title">Sélectionne une unité ou un bâtiment</div>
           <div class="sel-sub">Fonctionnement StarCraft :</div>
           <div class="sel-stats">
-            <span class="st-chip">👷 Clique sur un <b>Ouvrier VCS</b> pour construire un bâtiment</span>
-            <span class="st-chip">🏰 Clique sur le <b>QG</b> pour créer un Ouvrier VCS</span>
+            <span class="st-chip">👷 Clique sur un <b>${workerName()}</b> pour construire un bâtiment</span>
+            <span class="st-chip">🏰 Clique sur le <b>${mainName()}</b> pour créer un ${workerName()}</span>
             <span class="st-chip">🏭 Clique sur la <b>Caserne / Usine</b> pour créer des troupes</span>
           </div>
         </div>
@@ -242,7 +242,7 @@ function renderConsoleUI(force = false) {
   }
 
   // PANNEAU DE DROITE : CARTE DE COMMANDE 4×3 (le DOM n'est reconstruit que si la sélection change)
-  const hasScv = selU.some((u) => u.kind === 'scv');
+  const hasScv = selU.some((u) => isWorker(u.kind));
   const firstB = selB[0] || null;
   let modeKey = 'NONE';
   if (selU.length > 0) {
@@ -251,11 +251,11 @@ function renderConsoleUI(force = false) {
     modeKey = firstB.constructing ? 'BLD_CONSTRUCT' : `BLD_${firstB.kind}`;
   }
   const armyAbil = modeKey === 'ARMY'
-    ? `${selU.some((u) => UNITS[u.kind]?.canStim) ? 1 : 0}${selU.some((u) => UNITS[u.kind]?.canSiege) ? 1 : 0}${selU.some((u) => u.kind === 'dropship') ? 1 : 0}`
+    ? `${selU.some((u) => UNITS[u.kind]?.canStim) ? 1 : 0}${selU.some((u) => UNITS[u.kind]?.canSiege) ? 1 : 0}${selU.some((u) => u.kind === 'dropship') ? 1 : 0}${selU.some((u) => UNITS[u.kind]?.canOvercharge) ? 1 : 0}`
     : '';
 
   const grid = $('#uiCmdGrid');
-  const sig = `${modeKey}|${armyAbil}|${buildMode}|${buildKeysArmed}|${orderCursor}|${pc(me)}|${BUILD_ORDER.map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}`;
+  const sig = `${modeKey}|${armyAbil}|${buildMode}|${buildKeysArmed}|${orderCursor}|${pc(me)}|${factionOf(me).id}|${buildOrder().map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}|${state.buildings.filter((b) => b.owner === me.id && !b.constructing).length}`;
   if (!force && sig === lastCmdSig) {
     refreshCmdAffordability(grid, me, firstB);
     return;
@@ -268,12 +268,12 @@ function renderConsoleUI(force = false) {
   if (modeKey === 'SCV') {
     $('#uiCmdTitle').textContent = 'Construction';
     $('#uiCmdHint').textContent = buildKeysArmed ? 'Choisis : 1-0 ou R · Échap pour annuler' : 'B puis 1-0 ou R · Échap pour annuler';
-    for (const k of BUILD_ORDER) {
+    for (const k of buildOrder()) {
       const def = BUILDINGS[k];
       const locked = isBuildLocked(me, k);
       const poor = me.minerals < def.min || me.gas < def.gas;
       cards.push(`<button class="cbtn ${buildMode === k ? 'sel' : ''} ${buildKeysArmed ? 'armed' : ''} ${locked ? 'locked' : poor ? 'cant' : ''}" data-cmd-build="${k}" data-tip-kind="bld" data-tip-id="${k}">
-        <span class="key">${BUILD_KEYS[k]}</span>
+        <span class="key">${buildKeyOf(k)}</span>
         <canvas class="thumb" width="120" height="60" data-thumb="${k}"></canvas>
         <span class="lbl-b">${def.short}</span>
         ${locked ? `<span class="req">🔒 ${BUILDINGS[def.req].short}</span>` : costHtml(def.min, def.gas)}
@@ -283,11 +283,11 @@ function renderConsoleUI(force = false) {
   } else if (modeKey.startsWith('BLD_') && modeKey !== 'BLD_CONSTRUCT') {
     const bDef = BUILDINGS[firstB.kind];
     $('#uiCmdTitle').textContent = bDef.name;
-    $('#uiCmdHint').textContent = firstB.kind === 'armory' ? 'Touches E R T Y U' : bDef.trains.length ? 'Touches E R T · Clic droit = ralliement' : 'Structure automatique';
-    if (firstB.kind === 'armory') {
+    $('#uiCmdHint').textContent = isLab(firstB.kind) ? 'Touches E R T Y U' : bDef.trains.length ? 'Touches E R T · Clic droit = ralliement' : 'Structure automatique';
+    if (isLab(firstB.kind)) {
       const upgKeys = ['E', 'R', 'T', 'Y', 'U'];
       me.upgrades = me.upgrades || {};
-      Object.values(UPGRADES).forEach((uDef, idx) => {
+      Object.values(UPGRADES).filter((d) => d.faction === BUILDINGS[firstB.kind].faction).forEach((uDef, idx) => {
         // Paliers : le bouton montre le niveau acquis et le coût du suivant
         const c = upgCost(me, uDef.id);
         const lvl = upgLevel(me, uDef.id), max = uDef.maxLevel || 1;
@@ -306,14 +306,16 @@ function renderConsoleUI(force = false) {
       (bDef.trains || []).forEach((uKind, idx) => {
         const uDef = UNITS[uKind];
         const poor = me.minerals < uDef.min || me.gas < uDef.gas;
-        cards.push(`<button class="cbtn ${poor ? 'cant' : ''}" data-cmd-train="${uKind}" data-tip-kind="unit" data-tip-id="${uKind}">
+        // Unité qui exige un autre bâtiment (le Spectre et les Archives)
+        const locked = uDef.req && !hasCompletedBuilding(state, me.id, uDef.req);
+        cards.push(`<button class="cbtn ${locked ? 'locked' : poor ? 'cant' : ''}" data-cmd-train="${uKind}" data-tip-kind="unit" data-tip-id="${uKind}">
           <span class="key">${keysMap[idx]}</span>
           <canvas class="thumb" width="120" height="60" data-thumb="${uKind}"></canvas>
           <span class="lbl-b">${uDef.short}</span>
-          ${costHtml(uDef.min, uDef.gas)}
+          ${locked ? `<span class="req">🔒 ${BUILDINGS[uDef.req].short}</span>` : costHtml(uDef.min, uDef.gas)}
         </button>`);
       });
-      if (firstB.kind === 'hq') {
+      if (isMainBase(firstB.kind)) {
         cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''} ${me.minerals < 50 ? 'cant' : ''}" data-cmd-act="scan" data-tip-kind="act" data-tip-id="scan">
           <span class="key">C</span>
           <span class="ico-txt">📡</span>
@@ -330,7 +332,9 @@ function renderConsoleUI(force = false) {
   } else if (modeKey === 'BLD_CONSTRUCT') {
     $('#uiCmdTitle').textContent = 'Chantier';
     $('#uiCmdHint').textContent = 'En construction';
-    grid.innerHTML = `<div class="cmd-empty"><b>Chantier en cours</b><span>Un VCS doit rester sur place pour terminer le bâtiment. Clic droit avec un VCS sur le chantier pour le reprendre.</span></div>`;
+    grid.innerHTML = BUILDINGS[firstB.kind]?.selfBuild
+      ? `<div class="cmd-empty"><b>Assemblage en cours</b><span>${firstB.buildStarted ? 'La structure s’assemble seule.' : 'Un Drone doit d’abord venir poser la structure.'}</span></div>`
+      : `<div class="cmd-empty"><b>Chantier en cours</b><span>Un VCS doit rester sur place pour terminer le bâtiment. Clic droit avec un VCS sur le chantier pour le reprendre.</span></div>`;
     return;
 
   } else if (modeKey === 'ARMY') {
@@ -342,6 +346,11 @@ function renderConsoleUI(force = false) {
     if (armyAbil[0] === '1') {
       cards.push(`<button class="cbtn" data-cmd-act="stim" data-tip-kind="act" data-tip-id="stim">
         <span class="key">T</span><span class="ico-txt">💉</span><span class="lbl-b">Stimpack</span><span class="cost"><i class="hp">−18 PV</i></span>
+      </button>`);
+    }
+    if (armyAbil[3] === '1') {
+      cards.push(`<button class="cbtn" data-cmd-act="overcharge" data-tip-kind="act" data-tip-id="overcharge">
+        <span class="key">T</span><span class="ico-txt">⚡</span><span class="lbl-b">Surcharge</span><span class="cost"><i class="hp">−${OVERCHARGE_COST} énergie</i></span>
       </button>`);
     }
     if (armyAbil[1] === '1') {
@@ -360,7 +369,7 @@ function renderConsoleUI(force = false) {
     $('#uiCmdHint').textContent = '';
     grid.innerHTML = `<div class="cmd-empty">
       <b>Rien de sélectionné</b>
-      <span><kbd>F1</kbd> un VCS pour construire · clique un <b>bâtiment</b> pour produire · <kbd>F2</kbd> toute l'armée</span>
+      <span><kbd>F1</kbd> un ${workerName()} pour construire · clique un <b>bâtiment</b> pour produire · <kbd>F2</kbd> toute l'armée</span>
     </div>`;
     return;
   }
@@ -405,6 +414,7 @@ function renderConsoleUI(force = false) {
       if (act === 'scan') { buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan'; updateCursorClass(); renderConsoleUI(true); }
       else if (act === 'hold') sendCommand({ op: 'UNIT_ORDER', mode: 'hold', unitIds: [...selectedUnits] });
       else if (act === 'stim') sendCommand({ op: 'STIM', unitIds: [...selectedUnits] });
+      else if (act === 'overcharge') sendCommand({ op: 'OVERCHARGE', unitIds: [...selectedUnits] });
       else if (act === 'siege') sendCommand({ op: 'SIEGE', unitIds: [...selectedUnits] });
       else if (act === 'unload') {
         for (const uId of selectedUnits) {
@@ -417,9 +427,13 @@ function renderConsoleUI(force = false) {
 }
 
 // ---- Carte de commande : ordre, raccourcis, verrous, coûts et infobulles ----
-const BUILD_ORDER = ['pylon', 'extractor', 'barracks', 'factory', 'starport', 'armory', 'turret', 'tesla', 'wall', 'hq', 'radar'];
-const BUILD_KEYS = { pylon: '1', extractor: '2', barracks: '3', factory: '4', starport: '5', armory: '6', turret: '7', tesla: '8', wall: '9', hq: '0', radar: 'R' };
-const KEY_TO_BUILD = Object.fromEntries(Object.entries(BUILD_KEYS).map(([k, v]) => [v.toLowerCase(), k]));
+// Cartes de construction et raccourcis : ceux de la faction du joueur
+const workerName = () => UNITS[myFaction().roles.worker].short;
+const mainName = () => BUILDINGS[myFaction().roles.main].short;
+const myFaction = () => factionOf(state && state.players.find((p) => Number(p.id) === Number(myId)));
+const buildOrder = () => myFaction().build;
+const buildKeyOf = (kind) => myFaction().keys[kind] || '';
+const keyToBuild = (k) => Object.entries(myFaction().keys).find(([, v]) => v.toLowerCase() === k)?.[0];
 
 function isBuildLocked(me, kind) {
   const def = BUILDINGS[kind];
@@ -481,6 +495,7 @@ const ACT_TIPS = {
   scan: ['Scan Radar', 'Révèle une zone (même sur les plateaux) pendant quelques secondes. Clique ensuite sur la carte ou la minimap.'],
   hold: ['Tenir position', 'Les unités restent sur place et ne tirent que sur ce qui entre à portée.'],
   stim: ['Stimpack', '+50 % de vitesse de tir et de déplacement pendant 8 s. Coûte 18 PV par unité.'],
+  overcharge: ['Surcharge', '+50 % de vitesse de tir et de déplacement pendant 6 s, sans perte de vie : coûte de l’énergie, qui remonte toute seule.'],
   siege: ['Mode Siège', 'Le Char de Siège se fixe au sol : portée et dégâts de zone énormes, mais immobile. Rappuie pour repartir.'],
   unload: ['Débarquer', 'La navette dépose toutes les troupes transportées.'],
 };
@@ -494,7 +509,7 @@ function showCmdTip(btn) {
   const costRow = (min, gas, extra = '') => `<div class="cost">${min ? `<span class="m">${min}</span>` : ''}${gas ? `<span class="g">${gas}</span>` : ''}${extra}</div>`;
   if (kind === 'bld') {
     const d = BUILDINGS[id];
-    html = `<b>${d.name} <kbd>${BUILD_KEYS[id]}</kbd></b>${d.desc}${costRow(d.min, d.gas, `<span class="t">⏱ ${d.buildTime}s</span>`)}`;
+    html = `<b>${d.name} <kbd>${buildKeyOf(id)}</kbd></b>${d.desc}${costRow(d.min, d.gas, `<span class="t">⏱ ${d.buildTime}s</span>`)}`;
     if (me && isBuildLocked(me, id)) html += `<div class="lockmsg">🔒 Requiert : ${BUILDINGS[d.req].name}</div>`;
   } else if (kind === 'unit') {
     const d = UNITS[id];
@@ -526,15 +541,15 @@ function getMyHarvestStats() {
   const minCnt = new Map(), gasCnt = new Map();
   let minWorkers = 0, gasWorkers = 0, idle = 0, total = 0;
   for (const u of state.units) {
-    if (Number(u.owner) !== Number(myId) || u.kind !== 'scv' || u.hp <= 0 || u.boardedIn) continue;
+    if (Number(u.owner) !== Number(myId) || !isWorker(u.kind) || u.hp <= 0 || u.boardedIn) continue;
     total++;
     if (u.mode === 'harvest_min' && u.harvestId) { minWorkers++; minCnt.set(u.harvestId, (minCnt.get(u.harvestId) || 0) + 1); }
     else if (u.mode === 'harvest_gas' && u.harvestId) { gasWorkers++; gasCnt.set(u.harvestId, (gasCnt.get(u.harvestId) || 0) + 1); }
     else if (u.mode === 'idle') idle++;
   }
-  const hqs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.kind === 'hq' && b.hp > 0 && !b.constructing);
+  const hqs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && isMainBase(b.kind) && b.hp > 0 && !b.constructing);
   const baseMins = MINERAL_NODES.filter((m) => mineralAlive(state, m) && hqs.some((h) => hypot(h.x, h.y, m.x, m.y) < 420));
-  const refs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.kind === 'extractor' && b.hp > 0 && !b.constructing);
+  const refs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && isRefinery(b.kind) && b.hp > 0 && !b.constructing);
   return {
     minCnt, gasCnt, baseMins, refs, idle, total,
     minWorkers, gasWorkers,
@@ -576,14 +591,15 @@ function updateHudUI() {
     // Limites de VCS affichées : ouvriers au travail / places disponibles (2 par cristal, 3 par Raffinerie)
     const hs = getMyHarvestStats();
     const wEl = $('#uiWorkers'), gEl = $('#uiRefineries');
-    wEl.innerHTML = `<b>${hs.minWorkers}</b>/${hs.minCap} VCS`;
+    wEl.innerHTML = `<b>${hs.minWorkers}</b>/${hs.minCap} ${workerName()}`;
     wEl.className = `res-sub cap ${hs.minCap && hs.minWorkers >= hs.minCap ? 'full' : ''}`;
-    gEl.innerHTML = hs.refs.length ? `<b>${hs.gasWorkers}</b>/${hs.gasCap} VCS` : 'aucune raff.';
+    gEl.innerHTML = hs.refs.length ? `<b>${hs.gasWorkers}</b>/${hs.gasCap} ${workerName()}` : 'aucune raff.';
     gEl.className = `res-sub cap ${hs.gasCap && hs.gasWorkers >= hs.gasCap ? 'full' : ''}`;
     $('#resMin').title = `Minéraux — ${hs.minWorkers} VCS sur les cristaux de tes bases, ${hs.minCap} places (2 VCS max par cristal). Au-delà, construis un QG près d'autres cristaux.`;
     $('#resGas').title = `Gaz Plasma — ${hs.gasWorkers} VCS sur ${hs.refs.length} Raffinerie(s), ${hs.gasCap} places (3 VCS max par Raffinerie).`;
     const idleBtn = $('#btnIdleScv');
     if (idleBtn) idleBtn.classList.toggle('idle-warn', hs.idle > 0);
+    $('#uiWorkerLbl').textContent = workerName();
     const idleCnt = $('#uiIdleCnt');
     if (idleCnt) idleCnt.textContent = hs.idle > 0 ? `${hs.idle} inactif${hs.idle > 1 ? 's' : ''}` : hs.total;
     const sup = computeSupply(state, myId);
@@ -655,6 +671,7 @@ function updateHudUI() {
   }
 
   renderConsoleUI(false);
+  renderFactionPick();
   checkDetectorAlerts();
 
   const modal = $('#endModal');

@@ -2,6 +2,12 @@
 
 ## 2.22 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Nouvelle faction jouable : **la Synthèse** 💠, des machines qui s'assemblent seules.
+  - le Drone pose la structure, qui se construit seule pendant qu'il repart récolter ;
+  - unités et bâtiments se réparent seuls hors combat ;
+  - Surcharge (T) : comme le Stimpack, mais payée en énergie au lieu de points de vie ;
+  - Lancier, Spectre (invisible tant qu'il n'attaque pas : la Tour de Détection, l'Oculus et le Scan le révèlent), Arpenteur à arc électrique, Monolithe qui protège ses voisins, Libellule volante ;
+  - en début de partie, chacun choisit sa faction (le choix est retenu pour la fois suivante) ; l'hôte peut aussi imposer une faction ou la tirer au sort.
 - **Bastion Clash** — Deux nouvelles cartes :
   - 🏜️ **Canyon de Cuivre** : grès rouge, mesas et oasis ; la chaleur réduit la vision de 15 % mais les minéraux se récoltent 20 % plus vite ;
   - 🌃 **Ruines Néon** : une ville abandonnée de nuit, coupée par des canaux toxiques ; les unités voient 20 % moins loin et toutes les bases avancées ont des cristaux dorés.

@@ -12,7 +12,7 @@ function finishBuildingConstruction(state, b, owner, fxEvents) {
   b.hp = b.maxHp;
   fxEvents.push({ k: 'COMPLETE', x: b.x, y: b.y, color: owner ? owner.color : '#ffc531', kind: b.kind, owner: b.owner });
   for (const u of state.units) {
-    if (u.kind === 'scv' && u.buildTargetId === b.id) {
+    if (isWorker(u.kind) && u.buildTargetId === b.id) {
       // Le VCS sort proprement du périmètre du bâtiment achevé
       const ang = Math.atan2(u.y - b.y, u.x - b.x) || 0.6;
       const outDist = b.radius + u.radius + 6;
@@ -20,7 +20,7 @@ function finishBuildingConstruction(state, b, owner, fxEvents) {
       u.y = clamp(b.y + Math.sin(ang) * outDist, 26, WORLD_SIZE - 26);
       u.onSite = false;
       u.buildTargetId = null;
-      if (b.kind === 'extractor') {
+      if (isRefinery(b.kind)) {
         u.mode = 'harvest_gas';
         u.harvestId = b.id;
       } else {
@@ -29,7 +29,7 @@ function finishBuildingConstruction(state, b, owner, fxEvents) {
       }
     }
   }
-  if (b.kind === 'extractor' && b.remaining == null) b.remaining = GAS_STOCK;
+  if (isRefinery(b.kind) && b.remaining == null) b.remaining = GAS_STOCK;
 }
 
 function applyUpgrade(state, owner, upgId, fxEvents) {
@@ -71,7 +71,7 @@ function enforceHarvestCaps(st, fxEvents) {
   const counts = new Map();
   const overflow = [];
   for (const u of st.units) {
-    if (u.kind !== 'scv' || u.hp <= 0 || u.boardedIn) continue;
+    if (!isWorker(u.kind) || u.hp <= 0 || u.boardedIn) continue;
     let key = null, cap = 0;
     if (u.mode === 'harvest_min' && u.harvestId) { key = u.owner + ':' + u.harvestId; cap = MAX_SCV_PER_MINERAL; }
     else if (u.mode === 'harvest_gas' && u.harvestId) { key = u.owner + ':' + u.harvestId; cap = MAX_SCV_PER_GAS; }
@@ -111,9 +111,47 @@ function enforceHarvestCaps(st, fxEvents) {
   st.harvestCounts = counts;
 }
 
+/* ---------- Dégâts, aura, rayons en chaîne, camouflage ---------- */
+// Applique des dégâts : l'aura d'un Monolithe allié tout proche en absorbe une partie, et la cible
+// note l'instant du coup (la régénération ne reprend qu'après 4 s sans en recevoir)
+function hurt(state, ent, dmg) {
+  if (!ent || ent.hp <= 0) return;
+  if (state._auras && state._auras.length && ent.kind in UNITS) {
+    for (const a of state._auras) {
+      if (a !== ent && a.team === ent.team && dist2(a.x, a.y, ent.x, ent.y) < 170 * 170) { dmg *= 1 - UNITS[a.kind].aura; break; }
+    }
+  }
+  ent.hp -= dmg;
+  ent.hitT = state.time;
+}
+// Une unité camouflée ne peut être visée que là où l'équipe de l'attaquant a de la détection
+function canTarget(team, e) {
+  return !e.cloaked || teamDetects(team, e.x, e.y);
+}
+// Rayon qui rebondit : jusqu'à n cibles de plus, chacune à moins de 140 de la précédente, 60 % des dégâts à chaque saut
+function chainArc(state, team, first, dmg, n, color, fxEvents) {
+  const hit = new Set([first]);
+  let from = first;
+  for (let k = 0; k < n; k++) {
+    let next = null, bd = 140 * 140;
+    for (const e of state.units) {
+      if (hit.has(e) || e.team === team || e.hp <= 0 || e.boardedIn || !canTarget(team, e)) continue;
+      const d = dist2(from.x, from.y, e.x, e.y);
+      if (d < bd) { bd = d; next = e; }
+    }
+    if (!next) break;
+    dmg *= 0.6;
+    hurt(state, next, dmg);
+    fxEvents.push({ k: 'TESLA', x1: from.x, y1: from.y, x2: next.x, y2: next.y, color });
+    hit.add(next);
+    from = next;
+  }
+}
+
 function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
+  state._auras = state.units.filter((u) => u.hp > 0 && UNITS[u.kind]?.aura);
   flowBuildsLeft = FLOW_BUILDS_PER_TICK;
   syncPathBuildings(state);
   refreshSimVision(state);
@@ -152,17 +190,25 @@ function stepWorld(state, dt, fxEvents) {
     const def = BUILDINGS[b.kind];
 
     if (state.phase === 4 && hypot(b.x, b.y, HALF_W, HALF_W) > state.stormRadius) {
-      b.hp -= 35 * dt;
+      hurt(state, b, 35 * dt);
     }
 
     // Important : Un chantier en construction NE PROGRESSE PAS tout seul !
     // Il exige qu'un Ouvrier VCS soit physiquement SUR l'emplacement de construction.
     if (b.constructing) {
+      // Synthèse : une fois posée par le Drone, la structure s'assemble seule
+      if (def.selfBuild && b.buildStarted) {
+        const step = (1.0 / (b.buildTime || 8)) * dt;
+        b.buildProg += step;
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.85 * step);
+      }
       if (b.buildProg >= 1) {
         finishBuildingConstruction(state, b, owner, fxEvents);
       }
       continue;
     }
+    // Nanoréparation des structures de la Synthèse, 4 s après le dernier coup reçu
+    if (def.regen && b.hp < b.maxHp && state.time - (b.hitT ?? -99) > 4) b.hp = Math.min(b.maxHp, b.hp + def.regen * dt);
 
     if (def.heal) {
       const r2 = def.range * def.range;
@@ -199,7 +245,7 @@ function stepWorld(state, dt, fxEvents) {
       if (b.cd <= 0) {
         let target = null, bestD2 = def.range * def.range;
         for (const u of state.units) {
-          if (u.team !== b.team && u.hp > 0 && !u.boardedIn && canStrike(b, u)) {
+          if (u.team !== b.team && u.hp > 0 && !u.boardedIn && canStrike(b, u) && canTarget(b.team, u)) {
             const d2 = dist2(b.x, b.y, u.x, u.y);
             if (d2 <= bestD2) { bestD2 = d2; target = u; }
           }
@@ -208,7 +254,8 @@ function stepWorld(state, dt, fxEvents) {
           b.cd = def.rate;
           b.aimA = Math.atan2(target.y - b.y, target.x - b.x);
           const dmg = def.dmg * state.dmgMult;
-          target.hp -= dmg;
+          hurt(state, target, dmg);
+          if (def.chain) chainArc(state, b.team, target, dmg, def.chain, owner.color, fxEvents);
           if (def.splash) {
             const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
             const splashR = def.splash * (mapDef.splashMult || 1.0);
@@ -216,12 +263,12 @@ function stepWorld(state, dt, fxEvents) {
             for (const u2 of state.units) {
               // Les passagers d'une navette sont à l'abri des éclaboussures
               if (u2 !== target && u2.team !== b.team && !u2.boardedIn && u2.hp > 0 && dist2(target.x, target.y, u2.x, u2.y) <= s2) {
-                u2.hp -= dmg * 0.6;
+                hurt(state, u2, dmg * 0.6);
               }
             }
           }
           fxEvents.push({
-            k: b.kind === 'tesla' ? 'TESLA' : 'SHOT',
+            k: b.kind === 'tesla' || def.chain ? 'TESLA' : 'SHOT',
             x1: b.x, y1: b.y - 16, x2: target.x, y2: target.y, color: owner.color,
           });
         }
@@ -304,11 +351,15 @@ function stepWorld(state, dt, fxEvents) {
       }
     }
 
+    // Synthèse : réparation hors combat, énergie qui remonte, camouflage du Spectre quand il ne tire pas
+    if (def.regen && u.hp < u.maxHp && state.time - (u.hitT ?? -99) > 4) u.hp = Math.min(u.maxHp, u.hp + def.regen * dt);
+    if (def.energyMax) u.energy = Math.min(def.energyMax, (u.energy || 0) + dt);
+    if (def.cloak) u.cloaked = !u.boardedIn && state.time - (u.shotT ?? -99) > 2.5;
     if (u.stimT > 0) u.stimT = Math.max(0, u.stimT - dt);
     const stimMult = u.stimT > 0 ? 1.48 : 1.0;
     u.cd = Math.max(0, u.cd - dt * stimMult);
 
-    if (u.kind === 'scv') {
+    if (isWorker(u.kind)) {
       if (u.mode === 'build' && u.buildTargetId) {
         const bld = state.buildings.find((b) => b.id === u.buildTargetId && b.hp > 0);
         if (!bld) {
@@ -321,6 +372,16 @@ function stepWorld(state, dt, fxEvents) {
           // CONSTRUCTION FAÇON STARCRAFT : Le VCS doit être PHYSIQUEMENT SUR l'endroit de construction !
           const distCenter = hypot(u.x, u.y, bld.x, bld.y);
           const siteRadius = Math.max(16, bld.radius * 0.72);
+          if (BUILDINGS[bld.kind].selfBuild && distCenter <= siteRadius + 30) {
+            // Le Drone pose la structure et repart aussitôt récolter
+            bld.buildStarted = true;
+            u.buildTargetId = null;
+            u.onSite = false;
+            u.mode = 'harvest_min';
+            u.harvestId = nearestMineral(u.x, u.y, 600, state)?.id ?? null;
+            fxEvents.push({ k: 'SPARK', x: bld.x, y: bld.y, color: '#3df2ff' });
+            continue;
+          }
           if (distCenter <= siteRadius || u.onSite) {
             u.onSite = true;
             bld.buildStarted = true;
@@ -377,8 +438,8 @@ function stepWorld(state, dt, fxEvents) {
               owner.minerals = Math.max(0, owner.minerals - 3 * dt);
               if (Math.random() < 0.35) fxEvents.push({ k: 'SPARK', x: u.x + Math.cos(u.a) * 14, y: u.y + Math.sin(u.a) * 14, color: '#ffc531' });
             } else {
-              u.mode = bld.kind === 'extractor' ? 'harvest_gas' : 'harvest_min';
-              u.harvestId = bld.kind === 'extractor' ? bld.id : (nearestMineral(u.x, u.y, 500, state)?.id ?? null);
+              u.mode = isRefinery(bld.kind) ? 'harvest_gas' : 'harvest_min';
+              u.harvestId = isRefinery(bld.kind) ? bld.id : (nearestMineral(u.x, u.y, 500, state)?.id ?? null);
               u.buildTargetId = null;
             }
             continue;
@@ -436,8 +497,8 @@ function stepWorld(state, dt, fxEvents) {
             }
           }
         } else if (u.mode === 'harvest_gas') {
-          const ref = state.buildings.find((b) => b.id === u.harvestId && b.owner === u.owner && b.kind === 'extractor' && b.hp > 0 && !b.constructing)
-            || state.buildings.find((b) => b.owner === u.owner && b.kind === 'extractor' && b.hp > 0 && !b.constructing);
+          const ref = state.buildings.find((b) => b.id === u.harvestId && b.owner === u.owner && isRefinery(b.kind) && b.hp > 0 && !b.constructing)
+            || state.buildings.find((b) => b.owner === u.owner && isRefinery(b.kind) && b.hp > 0 && !b.constructing);
           if (ref) {
             u.harvestId = ref.id;
             const dR = hypot(u.x, u.y, ref.x, ref.y) - ref.radius - u.radius;
@@ -482,7 +543,7 @@ function stepWorld(state, dt, fxEvents) {
         const fUnit = state.units.find((e) => e.id === u.targetEntId && e.hp > 0);
         const fBld = fUnit ? null : state.buildings.find((b) => b.id === u.targetEntId && b.hp > 0);
         const ent = fUnit || fBld;
-        if (ent && ent.team !== u.team) {
+        if (ent && ent.team !== u.team && canTarget(u.team, ent)) {
           const d = hypot(u.x, u.y, ent.x, ent.y) - ent.radius;
           bestTarget = { ent, isBld: !!fBld, dist: d, blind: !canStrike(u, ent) };
         } else {
@@ -493,11 +554,11 @@ function stepWorld(state, dt, fxEvents) {
 
       if (!bestTarget && def.dmg > 0) {
         for (const e of state.units) {
-          if (e.team === u.team || e.hp <= 0 || e.boardedIn) continue;
-          if (e.flying && (u.kind === 'scv' || u.kind === 'siege' || u.kind === 'sapper')) continue;
+          if (e.team === u.team || e.hp <= 0 || e.boardedIn || !canTarget(u.team, e)) continue;
+          if (e.flying && (isWorker(u.kind) || u.kind === 'siege' || u.kind === 'sapper')) continue;
           const d = hypot(u.x, u.y, e.x, e.y) - e.radius;
           if (d <= aggroR && canStrike(u, e)) {
-            const prio = e.kind === 'scv' ? 35 : 0;
+            const prio = isWorker(e.kind) ? 35 : 0;
             if (d + prio < bestScore) { bestScore = d + prio; bestTarget = { ent: e, isBld: false, dist: d }; }
           }
         }
@@ -525,7 +586,9 @@ function stepWorld(state, dt, fxEvents) {
         }
         if (bestTarget.isBld) dmg *= def.bldMult || 1;
         else if (u.kind === 'rocket' && UNITS[tgt.kind]?.mech) dmg *= 1.5;
-        tgt.hp -= dmg;
+        hurt(state, tgt, dmg);
+        u.shotT = state.time;
+        if (def.chain) chainArc(state, u.team, tgt, dmg, def.chain, owner.color, fxEvents);
         if (def.splash || u.sieged) {
           const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
           const splashR = (def.splash || 58) * (mapDef.splashMult || 1.0);
@@ -534,7 +597,7 @@ function stepWorld(state, dt, fxEvents) {
             if (e2 === tgt || e2.team === u.team || e2.boardedIn || e2.hp <= 0) continue;
             // Une arme sol-sol n'éclabousse pas les appareils en vol
             if (e2.flying && (u.kind === 'siege' || u.kind === 'sapper')) continue;
-            if (dist2(tgt.x, tgt.y, e2.x, e2.y) <= s2) e2.hp -= dmg * 0.55;
+            if (dist2(tgt.x, tgt.y, e2.x, e2.y) <= s2) hurt(state, e2, dmg * 0.55);
           }
         }
         owner.score += Math.round(dmg * 0.12);
@@ -610,13 +673,13 @@ function stepWorld(state, dt, fxEvents) {
     const distGoal = Math.hypot(dx, dy) || 1;
     let steerX = dx / distGoal, steerY = dy / distGoal;
 
-    const isScv = u.kind === 'scv';
+    const isScv = isWorker(u.kind);
     const lookAhead = isScv ? 14 : (u.radius + 32);
     const sideSign = (u.id % 2 === 0) ? 1 : -1;
     for (const b of state.buildings) {
       if (b.hp <= 0 || b.id === u.buildTargetId || b.id === u.harvestId) continue;
       if (b.constructing && !b.buildStarted) continue;
-      if (isScv && u.carryAmt > 0 && b.owner === u.owner && b.kind === 'hq') continue;
+      if (isScv && u.carryAmt > 0 && b.owner === u.owner && isMainBase(b.kind)) continue;
       const ox = b.x - u.x, oy = b.y - u.y;
       const d = Math.hypot(ox, oy) || 1;
       const minClear = u.radius + b.radius + (isScv ? 2 : 10);
@@ -646,7 +709,7 @@ function stepWorld(state, dt, fxEvents) {
     }
     for (const o of state.units) {
       if (o === u || o.hp <= 0) continue;
-      if (u.kind === 'scv' && o.kind === 'scv') continue;
+      if (isWorker(u.kind) && isWorker(o.kind)) continue;
       const sx = u.x - o.x, sy = u.y - o.y;
       const minSep = u.radius + o.radius + 4;
       const d2 = sx * sx + sy * sy;
@@ -701,7 +764,7 @@ function stepWorld(state, dt, fxEvents) {
     for (const b of state.buildings) {
       if (b.hp <= 0) continue;
       // Le VCS qui construit ce chantier a le droit d'entrer SUR l'emplacement de construction !
-      if (b.constructing && u.kind === 'scv' && u.buildTargetId === b.id) continue;
+      if (b.constructing && isWorker(u.kind) && u.buildTargetId === b.id) continue;
       if (b.constructing && !b.buildStarted) continue;
       const cx = u.x - b.x, cy = u.y - b.y;
       const minD = u.radius + (isScv ? b.radius * 0.94 : b.radius) + (isScv ? 0.5 : 2);
@@ -775,7 +838,7 @@ function stepWorld(state, dt, fxEvents) {
       const ownerId = b.owner;
       state.buildings.splice(i, 1);
       // Un invité ne voit qu'une partie des bâtiments : l'élimination est décidée par l'hôte seul
-      const hasAnyHq = state.partial || state.buildings.some((ob) => ob.owner === ownerId && ob.kind === 'hq' && ob.hp > 0);
+      const hasAnyHq = state.partial || state.buildings.some((ob) => ob.owner === ownerId && isMainBase(ob.kind) && ob.hp > 0);
       if (!hasAnyHq) {
         const p = state.players.find((q) => q.id === ownerId);
         if (p && !p.dead) {

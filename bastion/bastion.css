@@ -281,3 +281,15 @@ body::before{content:'';position:fixed;inset:0;z-index:3;pointer-events:none;
 .wave-box .foes{color:#ff8a7a;font-weight:700}
 .wave-box.boss{border-color:rgba(255,59,48,.7);box-shadow:0 0 0 1px rgba(255,59,48,.4),0 0 18px rgba(255,59,48,.35);animation:wavePulse 1s ease-in-out infinite}
 @keyframes wavePulse{50%{box-shadow:0 0 0 1px rgba(255,59,48,.7),0 0 26px rgba(255,59,48,.55)}}
+/* ---------- CHOIX DE FACTION ---------- */
+.faction-pick{position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:40;padding:12px 14px;border-radius:14px;width:min(560px,calc(100vw - 32px))}
+.faction-pick h3{margin:0 0 10px;font:700 13px/1.2 'Chakra Petch',sans-serif;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between}
+.faction-pick h3 span{color:var(--gold)}
+.fp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fp-card{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;
+  background:linear-gradient(180deg,#1b2530,#111820);border:1px solid var(--line);color:inherit;font:inherit}
+.fp-card:hover{border-color:var(--line2)}
+.fp-card.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(255,197,49,.3)}
+.fp-card .fp-ico{font-size:22px}
+.fp-card b{font-size:14px}
+.fp-card small{font-size:11.5px;line-height:1.35;opacity:.8}

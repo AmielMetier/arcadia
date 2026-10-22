@@ -55,7 +55,7 @@ const BUILDINGS = {
   hq: {
     name: 'Centre de Commandement', short: 'QG', min: 350, gas: 0, buildTime: 36,
     hp: 3400, radius: 48, height: 54, supply: 15, sight: 440, range: 255, dmg: 24, rate: 0.85,
-    trains: ['scv'], desc: 'Clique sur le QG pour entraîner des Ouvriers VCS [E] ou lancer un Scan Radar [C].',
+    trains: ['scv'], main: true, desc: 'Clique sur le QG pour entraîner des Ouvriers VCS [E] ou lancer un Scan Radar [C].',
   },
   pylon: {
     name: 'Dépôt Relais', short: 'Dépôt', min: 75, gas: 0, buildTime: 14,
@@ -100,13 +100,75 @@ const BUILDINGS = {
   armory: {
     name: 'Armurerie Tech', short: 'Armurerie', min: 125, gas: 50, buildTime: 24,
     hp: 1000, radius: 34, height: 42, supply: 0, sight: 280, range: 0, dmg: 0, rate: 0,
-    trains: [], req: 'barracks', desc: 'Débloque et recherche les améliorations d’armement, blindage et propulsion de tes troupes.',
+    trains: [], req: 'barracks', researches: true, desc: 'Débloque et recherche les améliorations d’armement, blindage et propulsion de tes troupes.',
   },
   radar: {
     name: 'Tour de Détection', short: 'Détection', min: 100, gas: 25, buildTime: 18,
     hp: 650, radius: 20, height: 72, supply: 0, sight: 660, range: 0, dmg: 0, rate: 0,
     detector: true, trains: [], req: 'barracks',
     desc: 'Tourelle de détection : immense rayon de vision, voit aussi sur les plateaux et donne l’alerte (son + minimap) dès qu’un ennemi entre dans sa zone.',
+  },
+
+  // ---------- LA SYNTHÈSE : structures qui s'assemblent seules et se réparent ----------
+  core: {
+    name: 'Noyau d’Assemblage', short: 'Noyau', min: 360, gas: 0, buildTime: 44, faction: 'synth',
+    hp: 3100, radius: 48, height: 60, supply: 15, sight: 440, range: 230, dmg: 18, rate: 0.75,
+    trains: ['drone'], main: true, selfBuild: true, regen: 5,
+    desc: 'Cœur de la Synthèse : assemble les Drones [E] et lance un Scan [C]. Se répare seul.',
+  },
+  condenser: {
+    name: 'Condensateur', short: 'Condens.', min: 85, gas: 0, buildTime: 18, faction: 'synth',
+    hp: 480, radius: 20, height: 46, supply: 10, sight: 260, range: 175, dmg: 0, rate: 0, heal: 6,
+    trains: [], selfBuild: true, regen: 3,
+    desc: 'Fournit +10 Ravitaillement 📦 et répare les unités alliées proches.',
+  },
+  siphon: {
+    name: 'Siphon de Gaz', short: 'Siphon', min: 85, gas: 0, buildTime: 21, faction: 'synth',
+    hp: 650, radius: 28, height: 40, supply: 0, sight: 240, range: 0, dmg: 0, rate: 0,
+    trains: [], onGeyser: true, selfBuild: true, regen: 3,
+    desc: 'Se pose sur un Geyser 🧪 pour que tes Drones récoltent du Gaz.',
+  },
+  forge: {
+    name: 'Forge Synthétique', short: 'Forge', min: 140, gas: 0, buildTime: 29, faction: 'synth',
+    hp: 1050, radius: 36, height: 42, supply: 0, sight: 300, range: 0, dmg: 0, rate: 0,
+    trains: ['lancer', 'spectre'], selfBuild: true, regen: 4,
+    desc: 'Assemble les Lanciers [E] et les Spectres [R] (Spectre : Archives requises).',
+  },
+  workshop: {
+    name: 'Atelier Lourd', short: 'Atelier', min: 170, gas: 75, buildTime: 34, faction: 'synth',
+    hp: 1400, radius: 41, height: 48, supply: 0, sight: 310, range: 0, dmg: 0, rate: 0,
+    trains: ['strider', 'monolith'], req: 'forge', selfBuild: true, regen: 4,
+    desc: 'Assemble les Arpenteurs [E] et les Monolithes [R].',
+  },
+  aerie: {
+    name: 'Nid Aérien', short: 'Nid', min: 170, gas: 100, buildTime: 36, faction: 'synth',
+    hp: 1200, radius: 40, height: 50, supply: 0, sight: 330, range: 0, dmg: 0, rate: 0,
+    trains: ['dragonfly'], req: 'workshop', selfBuild: true, regen: 4,
+    desc: 'Assemble les Libellules [E], chasseurs volants.',
+  },
+  prism: {
+    name: 'Prisme Défensif', short: 'Prisme', min: 125, gas: 25, buildTime: 23, faction: 'synth',
+    hp: 820, radius: 24, height: 52, supply: 0, sight: 320, range: 270, dmg: 20, rate: 0.7, chain: 1,
+    trains: [], req: 'forge', selfBuild: true, regen: 4,
+    desc: 'Tour défensive sol-air : son rayon rebondit sur un second ennemi.',
+  },
+  oculus: {
+    name: 'Oculus', short: 'Oculus', min: 110, gas: 25, buildTime: 23, faction: 'synth',
+    hp: 600, radius: 20, height: 70, supply: 0, sight: 640, range: 0, dmg: 0, rate: 0,
+    detector: true, trains: [], req: 'forge', selfBuild: true, regen: 3,
+    desc: 'Œil de détection : immense vision, révèle les unités camouflées et donne l’alerte.',
+  },
+  archive: {
+    name: 'Archives Quantiques', short: 'Archives', min: 140, gas: 50, buildTime: 31, faction: 'synth',
+    hp: 1000, radius: 34, height: 44, supply: 0, sight: 280, range: 0, dmg: 0, rate: 0,
+    trains: [], req: 'forge', researches: true, selfBuild: true, regen: 3,
+    desc: 'Recherche les améliorations de la Synthèse et débloque le Spectre.',
+  },
+  barrier: {
+    name: 'Barrière Cristalline', short: 'Barrière', min: 25, gas: 0, buildTime: 10, faction: 'synth',
+    hp: 1000, radius: 20, height: 28, supply: 0, sight: 160, range: 0, dmg: 0, rate: 0,
+    trains: [], selfBuild: true, regen: 5,
+    desc: 'Rempart de cristal pour fermer un passage (se relie aux barrières voisines).',
   },
 };
 
@@ -161,7 +223,43 @@ const UPGRADES = {
     appliesTo: ['marine', 'rocket', 'sapper', 'tank', 'siege', 'titan', 'dropship', 'medivac'],
     maxLevel: 1, speedPerLevel: 0.18,
   },
+  synth_weapons: {
+    id: 'synth_weapons', faction: 'synth',
+    name: 'Lentilles Focalisées',
+    short: 'Rayons',
+    min: 100, gas: 50, time: 26,
+    icon: '🔆',
+    desc: '+12% Dégâts par niveau (3 niveaux) pour toutes les unités de combat de la Synthèse.',
+    appliesTo: ['lancer', 'spectre', 'strider', 'monolith', 'dragonfly'],
+    maxLevel: 3, dmgPerLevel: 0.12,
+  },
+  synth_armor: {
+    id: 'synth_armor', faction: 'synth',
+    name: 'Coque Nanocristalline',
+    short: 'Coques',
+    min: 100, gas: 50, time: 26,
+    icon: '💠',
+    desc: '+10% PV Max par niveau (3 niveaux) pour toutes les unités de combat de la Synthèse.',
+    appliesTo: ['lancer', 'spectre', 'strider', 'monolith', 'dragonfly'],
+    maxLevel: 3, hpPerLevel: 0.10,
+  },
+  synth_drive: {
+    id: 'synth_drive', faction: 'synth',
+    name: 'Propulseurs Ioniques',
+    short: 'Vitesse',
+    min: 75, gas: 50, time: 22,
+    icon: '⚡',
+    desc: '+15% Vitesse de déplacement pour toutes les unités de combat de la Synthèse.',
+    appliesTo: ['lancer', 'spectre', 'strider', 'monolith', 'dragonfly'],
+    maxLevel: 1, speedPerLevel: 0.15,
+  },
 };
+
+// Rôles indépendants de la faction : base principale, ouvrier, raffinerie, laboratoire de recherche
+const isMainBase = (kind) => !!(BUILDINGS[kind] && BUILDINGS[kind].main);
+const isWorker = (kind) => !!(UNITS[kind] && UNITS[kind].worker);
+const isRefinery = (kind) => !!(BUILDINGS[kind] && BUILDINGS[kind].onGeyser);
+const isLab = (kind) => !!(BUILDINGS[kind] && BUILDINGS[kind].researches);
 
 // Améliorations par paliers : chaque niveau coûte 50 % de plus et prend 25 % de temps en plus
 function upgLevel(owner, id) {
@@ -188,7 +286,7 @@ const unitSpeedMult = (owner, kind) => upgMult(owner, kind, 'speedPerLevel');
 const UNITS = {
   scv: {
     name: 'Ouvrier VCS', short: 'VCS', min: 50, gas: 0, supply: 1, trainTime: 12,
-    hp: 90, radius: 6.0, speed: 98, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8,
+    hp: 90, radius: 6.0, speed: 98, range: 48, dmg: 7, rate: 0.65, sight: 250, bldMult: 1.0, score: 8, worker: true,
     desc: 'Construit les bâtiments (B puis 1-0 ou R), récolte minéraux et gaz, répare.',
   },
   marine: {
@@ -232,7 +330,75 @@ const UNITS = {
     hp: 250, radius: 14, speed: 104, range: 190, dmg: 0, rate: 0.5, sight: 340, bldMult: 1.0, score: 25,
     flying: true, healer: true, healRate: 24, desc: 'Vaisseau médical aérien volant. Projette en continu un rayon nanite soignant les unités alliées blessées.',
   },
+
+  // ---------- LA SYNTHÈSE : se répare hors combat, Surcharge à l'énergie, camouflage, rayons en chaîne ----------
+  drone: {
+    name: 'Drone d’Assemblage', short: 'Drone', min: 50, gas: 0, supply: 1, trainTime: 12, faction: 'synth',
+    hp: 80, radius: 6.0, speed: 104, range: 40, dmg: 6, rate: 0.7, sight: 250, bldMult: 1.0, score: 8, worker: true, regen: 1,
+    desc: 'Récolte et pose les structures, qui s’assemblent ensuite seules : le Drone repart aussitôt.',
+  },
+  lancer: {
+    name: 'Lancier', short: 'Lancier', min: 50, gas: 0, supply: 1, trainTime: 11, faction: 'synth',
+    hp: 120, radius: 10, speed: 100, range: 150, dmg: 11, rate: 0.5, sight: 270, bldMult: 1.0, score: 12,
+    regen: 1, energyMax: 100, canOvercharge: true,
+    desc: 'Fantassin synthétique à rayon sol-air. Surcharge (T) : vitesse et cadence accrues contre de l’énergie.',
+  },
+  spectre: {
+    name: 'Spectre', short: 'Spectre', min: 100, gas: 50, supply: 2, trainTime: 18, faction: 'synth', req: 'archive',
+    hp: 140, radius: 11, speed: 118, range: 60, dmg: 42, rate: 0.85, sight: 290, bldMult: 1.4, score: 24,
+    regen: 2, cloak: true, energyMax: 100, canOvercharge: true,
+    desc: 'Assassin camouflé tant qu’il n’attaque pas : seules la détection et les Scans le révèlent.',
+  },
+  strider: {
+    name: 'Arpenteur', short: 'Arpenteur', min: 150, gas: 100, supply: 3, trainTime: 25, faction: 'synth',
+    hp: 330, radius: 17, speed: 70, range: 260, dmg: 30, rate: 1.4, sight: 330, bldMult: 1.2, score: 40,
+    mech: true, regen: 3, chain: 1,
+    desc: 'Marcheur d’artillerie à longue portée : son arc d’énergie rebondit sur un second ennemi.',
+  },
+  monolith: {
+    name: 'Monolithe', short: 'Monolithe', min: 275, gas: 175, supply: 6, trainTime: 34, faction: 'synth',
+    hp: 1800, radius: 26, speed: 52, range: 150, dmg: 70, rate: 1.1, sight: 330, bldMult: 1.5, score: 70,
+    mech: true, regen: 8, aura: 0.15,
+    desc: 'Géant de cristal : les alliés autour de lui encaissent 15 % de dégâts en moins.',
+  },
+  dragonfly: {
+    name: 'Libellule', short: 'Libellule', min: 125, gas: 75, supply: 2, trainTime: 20, faction: 'synth',
+    hp: 220, radius: 14, speed: 122, range: 170, dmg: 14, rate: 0.6, sight: 340, bldMult: 1.0, score: 25,
+    flying: true, regen: 2,
+    desc: 'Chasseur volant rapide qui frappe au sol comme dans les airs.',
+  },
 };
+// Les définitions sans faction sont celles des Terriens
+for (const d of Object.values(BUILDINGS)) d.faction = d.faction || 'terran';
+for (const d of Object.values(UNITS)) d.faction = d.faction || 'terran';
+for (const d of Object.values(UPGRADES)) d.faction = d.faction || 'terran';
+
+/* ---------- FACTIONS ----------
+   roles : le bâtiment ou l'unité qui tient chaque rôle (les bots raisonnent par rôle, pas par nom)
+   build : l'ordre des cartes de construction, keys : leurs raccourcis (après B) */
+const FACTIONS = {
+  terran: {
+    id: 'terran', name: 'Terriens', icon: '🛡️',
+    desc: 'Ouvriers qui restent sur le chantier, Stimpack, Mode Siège, Navettes de soin et de transport.',
+    build: ['pylon', 'extractor', 'barracks', 'factory', 'starport', 'armory', 'turret', 'tesla', 'wall', 'hq', 'radar'],
+    keys: { pylon: '1', extractor: '2', barracks: '3', factory: '4', starport: '5', armory: '6', turret: '7', tesla: '8', wall: '9', hq: '0', radar: 'R' },
+    roles: { main: 'hq', worker: 'scv', supply: 'pylon', refinery: 'extractor', rax: 'barracks', fac: 'factory', port: 'starport',
+      lab: 'armory', tower: 'turret', tower2: 'tesla', detector: 'radar', wall: 'wall',
+      basic: 'marine', anti: 'rocket', raider: 'sapper', tank: 'tank', artillery: 'siege', heavy: 'titan', healer: 'medivac', transport: 'dropship', air: null },
+    upgrades: ['infantry_weapons', 'infantry_armor', 'vehicle_weapons', 'advanced_thrusters', 'vehicle_armor'],
+  },
+  synth: {
+    id: 'synth', name: 'Synthèse', icon: '💠',
+    desc: 'Structures qui s’assemblent seules, unités qui se réparent, Surcharge à l’énergie, Spectres camouflés.',
+    build: ['condenser', 'siphon', 'forge', 'workshop', 'aerie', 'archive', 'prism', 'oculus', 'barrier', 'core'],
+    keys: { condenser: '1', siphon: '2', forge: '3', workshop: '4', aerie: '5', archive: '6', prism: '7', oculus: '8', barrier: '9', core: '0' },
+    roles: { main: 'core', worker: 'drone', supply: 'condenser', refinery: 'siphon', rax: 'forge', fac: 'workshop', port: 'aerie',
+      lab: 'archive', tower: 'prism', tower2: 'prism', detector: 'oculus', wall: 'barrier',
+      basic: 'lancer', anti: 'lancer', raider: 'spectre', tank: 'strider', artillery: 'strider', heavy: 'monolith', healer: null, transport: null, air: 'dragonfly' },
+    upgrades: ['synth_weapons', 'synth_armor', 'synth_drive'],
+  },
+};
+const factionOf = (p) => FACTIONS[(p && p.faction) || 'terran'] || FACTIONS.terran;
 
 const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2'];
 const BOT_NAMES = ['Commandant Raynor', 'Général Mengsk', 'Amiral Horner', 'Maréchal Valerian'];

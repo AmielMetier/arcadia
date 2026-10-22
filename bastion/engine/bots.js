@@ -26,13 +26,14 @@ const BOT_LEVELS = {
   },
 };
 const UNIT_DPS = (k) => (UNITS[k] && UNITS[k].rate ? UNITS[k].dmg / UNITS[k].rate : 0);
-const COMBAT_KINDS = ['marine', 'rocket', 'sapper', 'tank', 'siege', 'titan'];
+// Unités de combat au sol ou en vol (ni ouvrier, ni soin, ni transport)
+const isCombatKind = (k) => !!UNITS[k] && !UNITS[k].worker && !UNITS[k].healer && !UNITS[k].maxCargo;
 
 // Cible d'un bot : il garde le même QG ennemi tant qu'il tient debout. Sinon il choisit le plus proche,
 // en évitant ceux que les autres bots attaquent déjà (avant, tous les bots visaient le premier QG de la liste :
 // celui de l'hôte).
 function pickBotTarget(state, p, hq) {
-  const hqs = state.buildings.filter((b) => b.team !== p.team && b.kind === 'hq' && b.hp > 0);
+  const hqs = state.buildings.filter((b) => b.team !== p.team && isMainBase(b.kind) && b.hp > 0);
   const kept = hqs.find((b) => b.id === p.botTargetId);
   if (kept) return kept;
   const takenBy = (owner) => state.players.filter((q) => q.bot && q.id !== p.id && !q.dead
@@ -63,12 +64,12 @@ function centroid(units) {
 // Emplacement d'expansion libre le plus proche : base avancée dont il reste des cristaux et où personne n'est installé
 function findExpansion(state, p, from) {
   const spots = (MAP_FEATURES?.expos || []).filter((e) =>
-    !state.buildings.some((b) => b.kind === 'hq' && b.hp > 0 && hypot(b.x, b.y, e.x, e.y) < 420)
+    !state.buildings.some((b) => isMainBase(b.kind) && b.hp > 0 && hypot(b.x, b.y, e.x, e.y) < 420)
     && MINERAL_NODES.some((m) => hypot(m.x, m.y, e.x, e.y) < 200 && mineralAlive(state, m)));
   spots.sort((a, b) => hypot(a.x, a.y, from.x, from.y) - hypot(b.x, b.y, from.x, from.y));
   for (const e of spots.slice(0, 3)) {
     for (const [ox, oy] of [[0, 0], [24, 0], [-24, 0], [0, 24], [0, -24], [40, 40], [-40, -40]]) {
-      if (canPlaceBuilding(state, p.id, 'hq', e.x + ox, e.y + oy, { ignoreCost: true }).ok) return { x: e.x + ox, y: e.y + oy };
+      if (canPlaceBuilding(state, p.id, factionOf(p).roles.main, e.x + ox, e.y + oy, { ignoreCost: true }).ok) return { x: e.x + ox, y: e.y + oy };
     }
   }
   return null;
@@ -87,20 +88,21 @@ function runBots(state, fxEvents) {
 function runOneBot(state, p, L, fxEvents) {
   const ai = p.ai || (p.ai = { attacking: false, regroupUntil: 0, scouted: false, dropState: null });
   const order = (cmd) => executeCommand(state, p.id, cmd, fxEvents, { authority: true });
+  const R = factionOf(p).roles;
   const myBlds = state.buildings.filter((b) => b.owner === p.id && b.hp > 0);
-  const hqs = myBlds.filter((b) => b.kind === 'hq');
+  const hqs = myBlds.filter((b) => isMainBase(b.kind));
   if (!hqs.length) return;
   // Base principale : celle du point de départ (sinon la première encore debout)
   const hq = hqs.find((b) => hypot(b.x, b.y, p.spawnX, p.spawnY) < 80) || hqs[0];
   const readyHqs = hqs.filter((b) => !b.constructing);
 
   const myUnits = state.units.filter((u) => u.owner === p.id && u.hp > 0);
-  const scvs = myUnits.filter((u) => u.kind === 'scv');
-  const army = myUnits.filter((u) => COMBAT_KINDS.includes(u.kind) && !u.boardedIn);
+  const scvs = myUnits.filter((u) => isWorker(u.kind));
+  const army = myUnits.filter((u) => isCombatKind(u.kind) && !u.boardedIn);
   const sup = computeSupply(state, p.id);
   const count = (kind) => myBlds.filter((b) => b.kind === kind).length;
-  const refs = count('extractor'), rax = count('barracks'), fac = count('factory'), port = count('starport');
-  const tur = count('turret') + count('tesla');
+  const refs = count(R.refinery), rax = count(R.rax), fac = count(R.fac), port = count(R.port);
+  const tur = count(R.tower) + (R.tower2 !== R.tower ? count(R.tower2) : 0);
 
   const dirX = Math.sign(HALF_W - hq.x) || 1;
   const dirY = Math.sign(HALF_W - hq.y) || 1;
@@ -110,9 +112,9 @@ function runOneBot(state, p, L, fxEvents) {
   const lanes = main ? main.ramps.map((a) => [hq.x, hq.y, main.x + Math.cos(a) * (main.r + RAMP_LEN * 0.6), main.y + Math.sin(a) * (main.r + RAMP_LEN * 0.6)]) : [];
   const leavesRoom = (kind, x, y, gap = 56) => {
     const r = BUILDINGS[kind].radius;
-    if (kind !== 'extractor' && lanes.some((l) => segDist(x, y, l[0], l[1], l[2], l[3]) < r + 70)) return false;
+    if (!isRefinery(kind) && lanes.some((l) => segDist(x, y, l[0], l[1], l[2], l[3]) < r + 70)) return false;
     // Un vrai passage entre deux bâtiments, assez large pour un Thor
-    return !myBlds.some((b) => b.kind !== 'extractor' && hypot(x, y, b.x, b.y) < r + b.radius + gap);
+    return !myBlds.some((b) => !isRefinery(b.kind) && hypot(x, y, b.x, b.y) < r + b.radius + gap);
   };
   // Cherche autour du point visé, puis autour des autres bases, en resserrant l'espacement si la base est pleine
   const tryBuildNear = (kind, ax, ay, minR = 75, maxR = 230) => {
@@ -158,13 +160,13 @@ function runOneBot(state, p, L, fxEvents) {
   }
 
   const production = rax + fac + port;
-  if (sup.max - sup.used <= 3 + production * 2 && sup.max < MAX_SUPPLY && p.minerals >= 75 && !myBlds.some((b) => b.kind === 'pylon' && b.constructing)) {
-    if (tryBuildNear('pylon', hq.x + dirX * 90, hq.y + dirY * 90, 65, 210)) return;
+  if (sup.max - sup.used <= 3 + production * 2 && sup.max < MAX_SUPPLY && p.minerals >= 75 && !myBlds.some((b) => b.kind === R.supply && b.constructing)) {
+    if (tryBuildNear(R.supply, hq.x + dirX * 90, hq.y + dirY * 90, 65, 210)) return;
   }
   const wantScv = Math.min(L.maxScv, L.scvPerBase * readyHqs.length + refs * 3);
   if (scvs.length < wantScv && p.minerals >= 50) {
     for (const b of readyHqs) {
-      if (b.queue.length < 2 && scvs.length < wantScv) order({ op: 'TRAIN', unit: 'scv', bldId: b.id });
+      if (b.queue.length < 2 && scvs.length < wantScv) order({ op: 'TRAIN', unit: R.worker, bldId: b.id });
     }
   }
   // Expansion : à l'heure prévue par le niveau, ou plus tôt si la base principale s'épuise
@@ -175,7 +177,7 @@ function runOneBot(state, p, L, fxEvents) {
     && ((L.expandAt && state.time > L.expandAt * hqs.length) || runningDry);
   if (expandDue) {
     const spot = findExpansion(state, p, hq);
-    if (spot && p.minerals >= 350 && order({ op: 'BUILD', kind: 'hq', x: spot.x, y: spot.y }).ok) return;
+    if (spot && p.minerals >= 350 && order({ op: 'BUILD', kind: R.main, x: spot.x, y: spot.y }).ok) return;
     // On met de côté pour le nouveau QG : pas d'autre dépense en minéraux tant qu'il n'est pas lancé
     if (spot && !(sup.max - sup.used <= 2)) return;
   }
@@ -184,10 +186,10 @@ function runOneBot(state, p, L, fxEvents) {
     for (const b of readyHqs) {
       const gey = GAS_GEYSERS.find((g) => hypot(g.x, g.y, b.x, b.y) < 260
         && !state.buildings.some((x) => x.hp > 0 && dist2(x.x, x.y, g.x, g.y) < 35 * 35));
-      if (gey) { order({ op: 'BUILD', kind: 'extractor', x: gey.x, y: gey.y }); break; }
+      if (gey) { order({ op: 'BUILD', kind: R.refinery, x: gey.x, y: gey.y }); break; }
     }
   }
-  for (const r of myBlds.filter((b) => b.kind === 'extractor' && !b.constructing && (b.remaining ?? 1) > 0)) {
+  for (const r of myBlds.filter((b) => isRefinery(b.kind) && !b.constructing && (b.remaining ?? 1) > 0)) {
     const onGas = scvs.filter((u) => u.mode === 'harvest_gas' && u.harvestId === r.id).length;
     if (onGas < 3) {
       const free = scvs.find((u) => u.mode === 'harvest_min' && hypot(u.x, u.y, r.x, r.y) < 500);
@@ -197,36 +199,36 @@ function runOneBot(state, p, L, fxEvents) {
 
   // ---------- Bâtiments ----------
   if (rax < 1 && p.minerals >= 125) {
-    if (tryBuildNear('barracks', hq.x + dirX * 135, hq.y + dirY * 45, 50, 160)) return;
+    if (tryBuildNear(R.rax, hq.x + dirX * 135, hq.y + dirY * 45, 50, 160)) return;
   }
   if (rax >= 1 && fac < Math.min(1, L.maxFac) && p.minerals >= 150 && p.gas >= 75) {
-    if (tryBuildNear('factory', hq.x + dirX * 60, hq.y + dirY * 140, 55, 170)) return;
+    if (tryBuildNear(R.fac, hq.x + dirX * 60, hq.y + dirY * 140, 55, 170)) return;
   }
   if (tur < L.defenses && rax >= 1 && p.minerals >= 125) {
-    const tKind = (state.map === 'magma' || (p.gas >= 50 && Math.random() < 0.5)) ? 'tesla' : 'turret';
+    const tKind = (state.map === 'magma' || (p.gas >= 50 && Math.random() < 0.5)) ? R.tower2 : R.tower;
     if (tryBuildNear(tKind, hq.x + dirX * 165, hq.y + dirY * 165, 35, 120)) return;
   }
-  if (L.upgradeLevel > 0 && rax >= 1 && count('armory') < 1 && p.minerals >= 125 && p.gas >= 50) {
-    if (tryBuildNear('armory', hq.x - dirX * 50, hq.y + dirY * 130, 45, 160)) return;
+  if (L.upgradeLevel > 0 && rax >= 1 && count(R.lab) < 1 && p.minerals >= 125 && p.gas >= 50) {
+    if (tryBuildNear(R.lab, hq.x - dirX * 50, hq.y + dirY * 130, 45, 160)) return;
   }
-  if (L.scout && rax >= 1 && count('radar') < 1 && state.time > 150 && p.minerals >= 140 && p.gas >= 25) {
-    if (tryBuildNear('radar', hq.x + dirX * 170, hq.y + dirY * 170, 20, 130)) return;
+  if (L.scout && rax >= 1 && count(R.detector) < 1 && state.time > 150 && p.minerals >= 140 && p.gas >= 25) {
+    if (tryBuildNear(R.detector, hq.x + dirX * 170, hq.y + dirY * 170, 20, 130)) return;
   }
   if (fac >= 1 && port < L.maxPort && p.minerals >= 150 && p.gas >= 100) {
-    if (tryBuildNear('starport', hq.x - dirX * 110, hq.y - dirY * 90, 50, 170)) return;
+    if (tryBuildNear(R.port, hq.x - dirX * 110, hq.y - dirY * 90, 50, 170)) return;
   }
   // Trop de minéraux en réserve : une Caserne de plus (au-delà du plan si le gaz manque)
   if ((rax < L.maxRax && fac >= 1 && p.minerals >= 180) || (rax < L.maxRax + 2 && p.minerals >= 700)) {
-    if (tryBuildNear('barracks', hq.x + dirX * 140, hq.y - dirY * 50, 55, 180)) return;
+    if (tryBuildNear(R.rax, hq.x + dirX * 140, hq.y - dirY * 50, 55, 180)) return;
   }
   if (fac < L.maxFac && rax >= 2 && p.minerals >= 200 && p.gas >= 100) {
-    if (tryBuildNear('factory', hq.x - dirX * 100, hq.y + dirY * 60, 55, 180)) return;
+    if (tryBuildNear(R.fac, hq.x - dirX * 100, hq.y + dirY * 60, 55, 180)) return;
   }
 
   // ---------- Améliorations (par paliers, jusqu'au niveau permis) ----------
-  const lab = myBlds.find((b) => b.kind === 'armory' && !b.constructing && (!b.queue || b.queue.length === 0));
+  const lab = myBlds.find((b) => isLab(b.kind) && !b.constructing && (!b.queue || b.queue.length === 0));
   if (lab && L.upgradeLevel > 0) {
-    const order0 = ['infantry_weapons', 'infantry_armor', 'vehicle_weapons', 'advanced_thrusters', 'vehicle_armor'];
+    const order0 = factionOf(p).upgrades;
     for (const uid of order0) {
       const c = upgCost(p, uid);
       if (c.maxed || c.level > L.upgradeLevel) continue;
@@ -237,26 +239,29 @@ function runOneBot(state, p, L, fxEvents) {
   // ---------- Production ----------
   const enemyMech = state.units.filter((u) => u.team !== p.team && UNITS[u.kind]?.mech && teamSees(p.team, u.x, u.y)).length;
   // Le gaz est mis de côté tant que la technologie prévue n'est pas lancée (sinon chaque Maraudeur le dépense)
-  const techPending = fac < L.maxFac || port < L.maxPort || (L.upgradeLevel > 0 && count('armory') < 1);
+  const techPending = fac < L.maxFac || port < L.maxPort || (L.upgradeLevel > 0 && count(R.lab) < 1);
   const gasReserve = techPending ? 100 : 0;
   for (const b of myBlds) {
     if (b.constructing || !Array.isArray(b.queue) || b.queue.length >= 2) continue;
-    if (b.kind === 'barracks') {
-      let kind = 'marine';
-      if (p.gas >= 25 + gasReserve && (enemyMech > 3 || Math.random() < (L === BOT_LEVELS.facile ? 0.25 : 0.45))) kind = 'rocket';
-      if (L !== BOT_LEVELS.facile && p.gas >= 50 + gasReserve && Math.random() < (state.map === 'magma' ? 0.4 : 0.18)) kind = 'sapper';
+    // Production par rôle : la même logique sert aux Terriens et à la Synthèse
+    const can = (k) => k && UNITS[k] && (BUILDINGS[b.kind].trains || []).includes(k) && (!UNITS[k].req || hasCompletedBuilding(state, p.id, UNITS[k].req));
+    if (b.kind === R.rax) {
+      let kind = R.basic;
+      if (can(R.anti) && R.anti !== R.basic && p.gas >= UNITS[R.anti].gas + gasReserve && (enemyMech > 3 || Math.random() < (L === BOT_LEVELS.facile ? 0.25 : 0.45))) kind = R.anti;
+      if (can(R.raider) && L !== BOT_LEVELS.facile && p.gas >= UNITS[R.raider].gas + gasReserve && Math.random() < (state.map === 'magma' ? 0.4 : 0.18)) kind = R.raider;
       order({ op: 'TRAIN', unit: kind, bldId: b.id });
-    } else if (b.kind === 'factory') {
+    } else if (b.kind === R.fac) {
       let kind = null;
-      if (p.minerals >= 250 && p.gas >= 150 && L !== BOT_LEVELS.facile) kind = 'titan';
-      else if (p.minerals >= 150 && p.gas >= 100 && Math.random() < 0.55) kind = 'siege';
-      else if (p.minerals >= 125 && p.gas >= 50) kind = 'tank';
+      if (can(R.heavy) && p.minerals >= UNITS[R.heavy].min && p.gas >= UNITS[R.heavy].gas && L !== BOT_LEVELS.facile) kind = R.heavy;
+      else if (can(R.artillery) && p.minerals >= UNITS[R.artillery].min && p.gas >= UNITS[R.artillery].gas && Math.random() < 0.55) kind = R.artillery;
+      else if (can(R.tank) && p.minerals >= UNITS[R.tank].min && p.gas >= UNITS[R.tank].gas) kind = R.tank;
       if (kind) order({ op: 'TRAIN', unit: kind, bldId: b.id });
-    } else if (b.kind === 'starport') {
-      const meds = myUnits.filter((u) => u.kind === 'medivac').length;
-      const ships = myUnits.filter((u) => u.kind === 'dropship').length;
-      if (meds < (L === BOT_LEVELS.expert ? 3 : 2)) order({ op: 'TRAIN', unit: 'medivac', bldId: b.id });
-      else if (L.drops && ships < 1) order({ op: 'TRAIN', unit: 'dropship', bldId: b.id });
+    } else if (b.kind === R.port) {
+      const meds = R.healer ? myUnits.filter((u) => u.kind === R.healer).length : 0;
+      const ships = R.transport ? myUnits.filter((u) => u.kind === R.transport).length : 0;
+      if (R.healer && meds < (L === BOT_LEVELS.expert ? 3 : 2)) order({ op: 'TRAIN', unit: R.healer, bldId: b.id });
+      else if (R.transport && L.drops && ships < 1) order({ op: 'TRAIN', unit: R.transport, bldId: b.id });
+      else if (R.air) order({ op: 'TRAIN', unit: R.air, bldId: b.id });
     }
   }
 
@@ -290,7 +295,7 @@ function runOneBot(state, p, L, fxEvents) {
       }
     }
     // Coop : suivre l'armée du coéquipier humain quand elle part à l'attaque
-    const allyArmy = state.units.filter((u) => allies.some((q) => q.id === u.owner) && COMBAT_KINDS.includes(u.kind));
+    const allyArmy = state.units.filter((u) => allies.some((q) => q.id === u.owner) && isCombatKind(u.kind));
     const allyPush = allyArmy.filter((u) => { const q = allies.find((a) => a.id === u.owner); return hypot(u.x, u.y, q.spawnX, q.spawnY) > 1400; });
     if (allyPush.length >= 6 && state.time > ai.regroupUntil) {
       const ac = centroid(allyPush);
@@ -311,15 +316,15 @@ function runOneBot(state, p, L, fxEvents) {
       if (armySupply < L.attackSupply * 0.3) ai.attacking = false;
     }
     // Les Navettes Médicales accompagnent l'armée
-    const meds = myUnits.filter((u) => u.kind === 'medivac');
+    const meds = R.healer ? myUnits.filter((u) => u.kind === R.healer) : [];
     if (meds.length) order({ op: 'UNIT_ORDER', mode: 'move', x: c.x - dirX * 40, y: c.y - dirY * 40, unitIds: meds.map((u) => u.id) });
   }
 
   // Micro : Stimpack à l'engagement, Mode Siège face à des ennemis au sol, puis on replie
   if (L.micro) {
-    const stim = army.filter((u) => UNITS[u.kind].canStim && !(u.stimT > 0) && u.hp > u.maxHp * 0.7
+    const stim = army.filter((u) => (UNITS[u.kind].canStim ? u.hp > u.maxHp * 0.7 : UNITS[u.kind].canOvercharge && (u.energy || 0) >= OVERCHARGE_COST) && !(u.stimT > 0)
       && visibleFoes.some((e) => hypot(e.x, e.y, u.x, u.y) < UNITS[u.kind].range + 60));
-    if (stim.length >= 3) order({ op: 'STIM', unitIds: stim.map((u) => u.id) });
+    if (stim.length >= 3) order({ op: factionOf(p).id === 'synth' ? 'OVERCHARGE' : 'STIM', unitIds: stim.map((u) => u.id) });
     for (const u of army.filter((x) => x.kind === 'siege')) {
       const close = visibleFoes.some((e) => !e.flying && hypot(e.x, e.y, u.x, u.y) < UNITS.siege.siegeRange * 0.9);
       if (close) u.foeSeenAt = state.time;
@@ -330,7 +335,7 @@ function runOneBot(state, p, L, fxEvents) {
 
   // Éclaireur : un Marine part voir la base adverse la plus lointaine
   if (L.scout && !ai.scouted && state.time > 100) {
-    const scout = army.find((u) => u.kind === 'marine' && u.mode === 'idle');
+    const scout = army.find((u) => u.kind === R.basic && u.mode === 'idle');
     const far = state.players.filter((q) => q.team !== p.team && !q.dead)
       .sort((a, b) => hypot(b.spawnX, b.spawnY, hq.x, hq.y) - hypot(a.spawnX, a.spawnY, hq.x, hq.y))[0];
     if (scout && far) {
@@ -340,7 +345,7 @@ function runOneBot(state, p, L, fxEvents) {
   }
 
   // Largage (Difficile) : 4 Marines dans une Navette, posés sur la ligne de minerai adverse
-  if (L.drops) runDrop(state, p, ai, hq, myUnits, order);
+  if (L.drops && R.transport) runDrop(state, p, ai, hq, myUnits, order);
 }
 
 function runDrop(state, p, ai, hq, myUnits, order) {

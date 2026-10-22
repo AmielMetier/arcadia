@@ -23,9 +23,9 @@ function specStats(p) {
   const blds = state.buildings.filter((b) => b.owner === p.id && b.hp > 0);
   const sup = computeSupply(state, p.id);
   return {
-    scv: units.filter((u) => u.kind === 'scv').length,
-    army: units.filter((u) => u.kind !== 'scv').reduce((a, u) => a + (UNITS[u.kind]?.supply || 1), 0),
-    bases: blds.filter((b) => b.kind === 'hq' && !b.constructing).length,
+    scv: units.filter((u) => isWorker(u.kind)).length,
+    army: units.filter((u) => !isWorker(u.kind)).reduce((a, u) => a + (UNITS[u.kind]?.supply || 1), 0),
+    bases: blds.filter((b) => isMainBase(b.kind) && !b.constructing).length,
     sup,
     upg: Object.values(p.upgrades || {}).reduce((a, v) => a + (v === true ? 1 : Number(v) || 0), 0),
   };
@@ -34,7 +34,7 @@ function specStats(p) {
 // Point le plus disputé : là où des unités d'équipes différentes sont au contact
 function hottestFight() {
   let best = null, bestN = 0;
-  const pts = state.units.filter((u) => u.hp > 0 && !u.boardedIn && u.kind !== 'scv');
+  const pts = state.units.filter((u) => u.hp > 0 && !u.boardedIn && !isWorker(u.kind));
   for (let i = 0; i < pts.length; i += 3) {
     const a = pts[i];
     let n = 0, foes = 0;
@@ -47,8 +47,8 @@ function hottestFight() {
 }
 
 function focusPlayer(p) {
-  const hq = state.buildings.find((b) => b.owner === p.id && b.kind === 'hq' && b.hp > 0);
-  const army = state.units.filter((u) => u.owner === p.id && u.kind !== 'scv' && u.hp > 0 && !u.boardedIn);
+  const hq = state.buildings.find((b) => b.owner === p.id && isMainBase(b.kind) && b.hp > 0);
+  const army = state.units.filter((u) => u.owner === p.id && !isWorker(u.kind) && u.hp > 0 && !u.boardedIn);
   const at = hq || army[0];
   if (at) { cam.x = at.x; cam.y = at.y; }
 }

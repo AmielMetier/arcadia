@@ -68,7 +68,20 @@ function computeTeamVision(st, team, grid, explored = null) {
 }
 
 // Vision par équipe utilisée par la simulation : on ne tire pas sur un plateau qu'on ne voit pas
-const simVision = { t: -1, st: null, grids: new Map() };
+const simVision = { t: -1, st: null, grids: new Map(), det: new Map() };
+// Détection : Tours de Détection, Oculus et Scans révèlent les unités camouflées
+function computeTeamDetection(st, team, grid) {
+  grid.fill(0);
+  for (const b of st.buildings) {
+    if (b.team !== team || b.hp <= 0 || b.constructing || !BUILDINGS[b.kind]?.detector) continue;
+    stampVision(grid, b.x, b.y, BUILDINGS[b.kind].sight, true, null);
+  }
+  for (const sc of st.scans || []) if (sc.team === team) stampVision(grid, sc.x, sc.y, sc.r, true, null);
+}
+function teamDetects(team, wx, wy) {
+  const g = simVision.det.get(team);
+  return !!g && g[fogCellOf(wx, wy)] === 1;
+}
 function refreshSimVision(st) {
   if (simVision.st === st && st.time - simVision.t < 0.25 && st.time >= simVision.t) return;
   simVision.st = st;
@@ -78,6 +91,9 @@ function refreshSimVision(st) {
     let g = simVision.grids.get(t);
     if (!g || g.length !== FOG_RES * FOG_RES) { g = new Uint8Array(FOG_RES * FOG_RES); simVision.grids.set(t, g); }
     computeTeamVision(st, t, g);
+    let dg = simVision.det.get(t);
+    if (!dg || dg.length !== FOG_RES * FOG_RES) { dg = new Uint8Array(FOG_RES * FOG_RES); simVision.det.set(t, dg); }
+    computeTeamDetection(st, t, dg);
   }
 }
 function teamSees(team, wx, wy) {

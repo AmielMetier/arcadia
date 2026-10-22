@@ -44,6 +44,7 @@ function canPlaceBuilding(state, ownerId, kind, x, y, opts = {}) {
   if (!def) return { ok: false, reason: 'Bâtiment inconnu.' };
   const player = state.players.find((p) => p.id === ownerId);
   if (!player || player.dead) return { ok: false, reason: 'Joueur éliminé.' };
+  if (def.faction !== factionOf(player).id) return { ok: false, reason: 'Ce bâtiment appartient à l’autre faction.' };
   if (def.req && !hasCompletedBuilding(state, ownerId, def.req)) {
     return { ok: false, reason: `Requiert d’abord : ${BUILDINGS[def.req].name}.` };
   }
@@ -85,7 +86,7 @@ function canPlaceBuilding(state, ownerId, kind, x, y, opts = {}) {
     }
   }
   for (const m of MINERAL_NODES) {
-    const minD = kind === 'hq' ? def.radius + 45 : def.radius + 22;
+    const minD = isMainBase(kind) ? def.radius + 45 : def.radius + 22;
     if (dist2(x, y, m.x, m.y) < minD * minD) {
       return { ok: false, reason: 'Trop près des gisements de minéraux.' };
     }
@@ -101,6 +102,8 @@ function canPlaceBuilding(state, ownerId, kind, x, y, opts = {}) {
 // Cristaux qui s'épuisent : le stock de chaque cristal vit dans l'état de la partie
 const MINERAL_STOCK = { main: 1200, expo: 1000, rich: 1500 };
 const SCAN_COOLDOWN = 45;
+const OVERCHARGE_COST = 50;
+const FACTION_PICK_TIME = 20;
 const GAS_STOCK = 2000;
 function mineralAlive(st, m) {
   return !st || !st.mineralLeft || (st.mineralLeft[m.id] ?? 1) > 0;
@@ -119,7 +122,7 @@ function nearestMineral(x, y, maxDist = 2000, st = null) {
 function nearestMyHq(state, ownerId, x, y) {
   let best = null, bestD2 = Infinity;
   for (const b of state.buildings) {
-    if (b.owner === ownerId && b.kind === 'hq' && b.hp > 0 && !b.constructing) {
+    if (b.owner === ownerId && isMainBase(b.kind) && b.hp > 0 && !b.constructing) {
       const d2 = dist2(x, y, b.x, b.y);
       if (d2 < bestD2) { bestD2 = d2; best = b; }
     }
@@ -130,6 +133,16 @@ function nearestMyHq(state, ownerId, x, y) {
 /* ============================================================================
    CRÉATION DE L'ÉTAT INITIAL RTS (QG + 6 OUVRIERS VCS EN RÉCOLTE)
    ============================================================================ */
+// Faction de départ : imposée par le réglage du salon, au hasard, ou choisie par chacun (Terriens par défaut,
+// les bots tirent au sort de façon reproductible)
+function pickFaction(p, rule, idx) {
+  if (p.faction && FACTIONS[p.faction]) return p.faction;
+  if (rule === 'terran' || rule === 'synth') return rule;
+  const coin = ((Number(p.id) * 2654435761) >>> 0) % 2 === 0 ? 'terran' : 'synth';
+  if (rule === 'random') return coin;
+  return p.bot ? coin : 'terran';
+}
+
 function createInitialState(roster, settings = {}) {
   const mapId = MAP_DEFS[settings.map] ? settings.map : (activeMapId || 'vallee');
   const modeStr = String(settings.mode || '');
@@ -180,6 +193,7 @@ function createInitialState(roster, settings = {}) {
       color: p.color || PALETTE[idx % PALETTE.length],
       bot: !!p.bot,
       botLevel: p.botLevel || null,
+      faction: pickFaction(p, settings.factions, idx),
       team,
       upgrades: {},
       minerals: blitz ? 300 : 200,
@@ -208,15 +222,16 @@ function createInitialState(roster, settings = {}) {
     }
   }
   players.forEach((p, idx) => {
+    const R = factionOf(p).roles;
     const sp = spawnOf.get(p.id) || SPAWN_CORNERS[idx % SPAWN_CORNERS.length];
     p.spawnX = sp.x; p.spawnY = sp.y;
     const dirX = Math.sign(HALF_W - sp.x) || 1, dirY = Math.sign(HALF_W - sp.y) || 1;
     const mainDef = (MAP_FEATURES?.mains || []).find((m) => m.x === sp.x && m.y === sp.y);
     const rampA = mainDef ? mainDef.ramps[0] : Math.atan2(dirY, dirX);
     const hq = {
-      id: nextId++, kind: 'hq', owner: p.id, team: p.team,
-      x: sp.x, y: sp.y, hp: BUILDINGS.hq.hp, maxHp: BUILDINGS.hq.hp,
-      radius: BUILDINGS.hq.radius, cd: 0, aimA: rampA,
+      id: nextId++, kind: R.main, owner: p.id, team: p.team,
+      x: sp.x, y: sp.y, hp: BUILDINGS[R.main].hp, maxHp: BUILDINGS[R.main].hp,
+      radius: BUILDINGS[R.main].radius, cd: 0, aimA: rampA,
       constructing: false, buildProg: 1, queue: [], qTimer: 0, qTotal: 0,
       rallyX: Math.round(sp.x + Math.cos(rampA) * 150), rallyY: Math.round(sp.y + Math.sin(rampA) * 150),
     };
@@ -227,11 +242,11 @@ function createInitialState(roster, settings = {}) {
       const mNode = baseMinerals[k % baseMinerals.length];
       const ang = Math.atan2((mNode ? mNode.y : sp.y) - sp.y, (mNode ? mNode.x : sp.x) - sp.x);
       units.push({
-        id: nextId++, kind: 'scv', owner: p.id, team: p.team,
+        id: nextId++, kind: R.worker, owner: p.id, team: p.team,
         x: Math.round(sp.x + Math.cos(ang) * 66 + (k - 2.5) * 14),
         y: Math.round(sp.y + Math.sin(ang) * 66 + (k - 2.5) * 14),
         vx: 0, vy: 0, a: ang,
-        hp: UNITS.scv.hp, maxHp: UNITS.scv.hp, radius: UNITS.scv.radius,
+        hp: UNITS[R.worker].hp, maxHp: UNITS[R.worker].hp, radius: UNITS[R.worker].radius,
         cd: 0, mode: 'harvest_min',
         harvestId: mNode ? mNode.id : null,
         gatherT: 0, carryType: null, carryAmt: 0,
@@ -243,10 +258,11 @@ function createInitialState(roster, settings = {}) {
 
     for (let k = 0; k < 2; k++) {
       units.push({
-        id: nextId++, kind: 'marine', owner: p.id, team: p.team,
+        id: nextId++, kind: R.basic, owner: p.id, team: p.team,
         x: sp.x + dirX * (95 + k * 22), y: sp.y + dirY * (75 - k * 20),
         vx: 0, vy: 0, a: Math.atan2(dirY, dirX),
-        hp: UNITS.marine.hp, maxHp: UNITS.marine.hp, radius: UNITS.marine.radius,
+        hp: UNITS[R.basic].hp, maxHp: UNITS[R.basic].hp, radius: UNITS[R.basic].radius,
+        energy: UNITS[R.basic].energyMax ? 50 : undefined,
         cd: 0, mode: 'idle', orderX: null, orderY: null, targetEntId: null,
         stimT: 0, sieged: false,
         flying: false, cargo: [], boardedIn: null, healingTargetId: null,
@@ -261,6 +277,7 @@ function createInitialState(roster, settings = {}) {
     mode: is2v2 ? '2v2' : is1v1 ? '1v1' : 'ffa',
     is2v2,
     level: settings.level || 'normal',
+    factionRule: settings.factions || 'libre',
     phase: 1,
     stormRadius: HALF_W * 1.45,
     dmgMult: 1.0,
@@ -334,9 +351,10 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
     cargo: [],
     boardedIn: null,
     healingTargetId: null,
+    energy: def.energyMax ? 50 : undefined,
   };
 
-  if (kind === 'scv') {
+  if (isWorker(kind)) {
     const m = nearestMineral(rx, ry, 260, state) || nearestMineral(bld.x, bld.y, 350, state);
     if (m) {
       u.mode = 'harvest_min';
@@ -417,7 +435,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     const bx = check.snapX, by = check.snapY;
     let builder = null;
     if (Array.isArray(cmd.unitIds) && cmd.unitIds.length) {
-      const candidates = state.units.filter((u) => Number(u.owner) === Number(p.id) && u.kind === 'scv' && u.hp > 0 && cmd.unitIds.includes(u.id));
+      const candidates = state.units.filter((u) => Number(u.owner) === Number(p.id) && isWorker(u.kind) && u.hp > 0 && cmd.unitIds.includes(u.id));
       if (candidates.length) {
         candidates.sort((a, b) => {
           const pa = a.mode === 'build' ? 1e7 : 0;
@@ -431,7 +449,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
       // Fallback sur le VCS libre le plus proche du joueur si l'ID de sélection a glissé
       let bestD2 = Infinity;
       for (const u of state.units) {
-        if (Number(u.owner) === Number(p.id) && u.kind === 'scv' && u.hp > 0 && u.mode !== 'build') {
+        if (Number(u.owner) === Number(p.id) && isWorker(u.kind) && u.hp > 0 && u.mode !== 'build') {
           const d2 = dist2(u.x, u.y, bx, by);
           if (d2 < bestD2) { bestD2 = d2; builder = u; }
         }
@@ -487,9 +505,11 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     const uKind = String(cmd.unit || '');
     const uDef = UNITS[uKind];
     if (!uDef) return { ok: false, reason: 'Unité inconnue.' };
+    if (uDef.req && !hasCompletedBuilding(state, p.id, uDef.req)) return { ok: false, reason: `Requiert d’abord : ${BUILDINGS[uDef.req].name}.` };
     const sup = computeSupply(state, p.id);
     if (sup.used + uDef.supply > sup.max) {
-      return { ok: false, reason: 'Ravitaillement insuffisant 📦 ! Clique sur un VCS et construis un Dépôt Relais.' };
+      const R = factionOf(p).roles;
+      return { ok: false, reason: `Ravitaillement insuffisant 📦 ! Construis un ${BUILDINGS[R.supply].name} avec un ${UNITS[R.worker].short}.` };
     }
     if (p.minerals < uDef.min) return { ok: false, reason: `Minéraux insuffisants (${uDef.min}💎).` };
     if (p.gas < uDef.gas) return { ok: false, reason: `Gaz Plasma insuffisant (${uDef.gas}🧪).` };
@@ -528,6 +548,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     const upgId = String(cmd.upgId || '');
     const upgDef = UPGRADES[upgId];
     if (!upgDef) return { ok: false, reason: 'Amélioration inconnue.' };
+    if (upgDef.faction !== factionOf(p).id) return { ok: false, reason: 'Amélioration de l’autre faction.' };
     p.upgrades = p.upgrades || {};
     const cost = upgCost(p, upgId);
     if (cost.maxed) return { ok: false, reason: 'Amélioration déjà au niveau maximum !' };
@@ -540,14 +561,14 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
 
     let lab = null;
     if (cmd.bldId) {
-      const b = state.buildings.find((x) => x.id === cmd.bldId && Number(x.owner) === Number(p.id) && x.hp > 0 && !x.constructing && x.kind === 'armory');
+      const b = state.buildings.find((x) => x.id === cmd.bldId && Number(x.owner) === Number(p.id) && x.hp > 0 && !x.constructing && isLab(x.kind));
       if (b && Array.isArray(b.queue) && b.queue.length < 5 && !b.queue.includes(upgId)) lab = b;
     }
     if (!lab) {
-      const labs = state.buildings.filter((b) => Number(b.owner) === Number(p.id) && b.hp > 0 && !b.constructing && b.kind === 'armory' && Array.isArray(b.queue) && b.queue.length < 5 && !b.queue.includes(upgId));
+      const labs = state.buildings.filter((b) => Number(b.owner) === Number(p.id) && b.hp > 0 && !b.constructing && isLab(b.kind) && Array.isArray(b.queue) && b.queue.length < 5 && !b.queue.includes(upgId));
       lab = labs[0] || null;
     }
-    if (!lab) return { ok: false, reason: 'Construis d’abord une Armurerie Tech pour lancer cette amélioration.' };
+    if (!lab) return { ok: false, reason: `Construis d’abord : ${BUILDINGS[factionOf(p).roles.lab].name}.` };
 
     p.minerals -= cost.min;
     p.gas -= cost.gas;
@@ -652,22 +673,22 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
         u.mode = 'hold'; u.orderX = null; u.orderY = null; u.targetEntId = null; u.buildTargetId = null; u.onSite = false;
         return;
       }
-      if (mode === 'harvest_min' && u.kind === 'scv') {
+      if (mode === 'harvest_min' && isWorker(u.kind)) {
         u.mode = 'harvest_min';
         u.harvestId = MINERAL_NODES.some((m) => m.id === cmd.resId && mineralAlive(state, m)) ? cmd.resId : (nearestMineral(x, y, 2000, state)?.id ?? null);
         u.buildTargetId = null;
         u.onSite = false;
         return;
       }
-      if (mode === 'harvest_gas' && u.kind === 'scv') {
+      if (mode === 'harvest_gas' && isWorker(u.kind)) {
         u.mode = 'harvest_gas';
         // Seulement sa propre Raffinerie (la simulation retombe sinon sur la plus proche)
-        u.harvestId = state.buildings.some((b) => b.id === cmd.resId && b.owner === p.id && b.kind === 'extractor') ? cmd.resId : null;
+        u.harvestId = state.buildings.some((b) => b.id === cmd.resId && b.owner === p.id && isRefinery(b.kind)) ? cmd.resId : null;
         u.buildTargetId = null;
         u.onSite = false;
         return;
       }
-      if (mode === 'build' && u.kind === 'scv' && cmd.targetId) {
+      if (mode === 'build' && isWorker(u.kind) && cmd.targetId) {
         // On ne construit et ne répare que ses bâtiments ou ceux d'un allié, jamais ceux de l'adversaire
         const tb0 = state.buildings.find((b) => b.id === cmd.targetId && b.hp > 0);
         if (!tb0 || tb0.team !== p.team) return;
@@ -699,6 +720,45 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
   }
 
   // 5. CAPACITÉ MICRO : STIMPACK (T)
+  // CAPACITÉ DE LA SYNTHÈSE : SURCHARGE (T) — même effet que le Stimpack, payé en énergie et non en vie
+  if (cmd.op === 'OVERCHARGE') {
+    const ids = new Set(Array.isArray(cmd.unitIds) ? cmd.unitIds : []);
+    let count = 0;
+    for (const u of state.units) {
+      if (u.owner === p.id && ids.has(u.id) && UNITS[u.kind]?.canOvercharge && (u.energy || 0) >= OVERCHARGE_COST) {
+        u.energy -= OVERCHARGE_COST;
+        u.stimT = 6.0;
+        count++;
+        fxEvents.push({ k: 'STIM', x: u.x, y: u.y, color: '#3df2ff' });
+      }
+    }
+    return count > 0 ? { ok: true } : { ok: false, reason: `Surcharge : ${OVERCHARGE_COST} d’énergie requis.` };
+  }
+
+  // CHOIX DE FACTION : pendant les 20 premières secondes, la base de départ change de camp
+  if (cmd.op === 'SET_FACTION') {
+    const f = FACTIONS[cmd.faction];
+    if (!f) return { ok: false };
+    if (state.time > FACTION_PICK_TIME) return { ok: false, reason: 'Le choix de faction est verrouillé.' };
+    if (factionOf(p).id === f.id) return { ok: true };
+    const from = factionOf(p).roles, to = f.roles;
+    const swap = { [from.main]: to.main, [from.worker]: to.worker, [from.basic]: to.basic };
+    if (state.buildings.some((b) => b.owner === p.id && !swap[b.kind]) || state.units.some((u) => u.owner === p.id && !swap[u.kind])) {
+      return { ok: false, reason: 'Trop tard : tu as déjà commencé à construire.' };
+    }
+    for (const b of state.buildings) if (b.owner === p.id) {
+      const d = BUILDINGS[swap[b.kind]];
+      b.kind = swap[b.kind]; b.maxHp = d.hp; b.hp = d.hp; b.radius = d.radius; b.queue = []; b.qTimer = 0; b.qTotal = 0;
+    }
+    for (const u of state.units) if (u.owner === p.id) {
+      const d = UNITS[swap[u.kind]];
+      u.kind = swap[u.kind]; u.maxHp = d.hp; u.hp = d.hp; u.radius = d.radius; u.energy = d.energyMax ? 50 : undefined;
+    }
+    p.faction = f.id;
+    fxEvents.push({ k: 'FACTION', playerId: p.id, name: p.name, faction: f.id });
+    return { ok: true };
+  }
+
   if (cmd.op === 'STIM') {
     const ids = new Set(Array.isArray(cmd.unitIds) ? cmd.unitIds : []);
     let count = 0;
@@ -730,7 +790,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
 
   // 7. CAPACITÉ COMSAT DU QG : SCAN RADAR (C - 50 Minéraux)
   if (cmd.op === 'SCAN') {
-    if (!state.buildings.some((b) => b.owner === p.id && b.kind === 'hq' && b.hp > 0 && !b.constructing)) {
+    if (!state.buildings.some((b) => b.owner === p.id && isMainBase(b.kind) && b.hp > 0 && !b.constructing)) {
       return { ok: false, reason: 'Le Scan Radar se lance depuis un Centre de Commandement.' };
     }
     if (p.scanCd > 0) return { ok: false, reason: `Scan Radar en recharge (${Math.ceil(p.scanCd)} s).` };

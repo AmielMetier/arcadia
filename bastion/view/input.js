@@ -82,7 +82,7 @@ function sendCommand(cmd) {
   if (res.ok) {
     if (cmd.op === 'BUILD') Sfx.build();
     else if (cmd.op === 'TRAIN') Sfx.spawn();
-    else if (cmd.op === 'STIM') Sfx.stim();
+    else if (cmd.op === 'STIM' || cmd.op === 'OVERCHARGE') Sfx.stim();
     else if (cmd.op === 'SIEGE') Sfx.siege();
     else if (cmd.op === 'UNIT_ORDER') {
       if (cmd.mode === 'amove' || cmd.mode === 'focus') Sfx.attack();
@@ -110,7 +110,7 @@ function cleanSelection() {
   for (const id of [...selectedBlds]) if (!validB.has(id)) selectedBlds.delete(id);
 
   // Si on était en train de poser un bâtiment mais qu'aucun VCS n'est sélectionné, on annule buildMode
-  const hasScv = state.units.some((u) => selectedUnits.has(u.id) && u.kind === 'scv');
+  const hasScv = state.units.some((u) => selectedUnits.has(u.id) && isWorker(u.kind));
   if (buildMode && !hasScv) {
     buildMode = null;
     updateCursorClass();
@@ -119,8 +119,8 @@ function cleanSelection() {
 
 function selectIdleWorker() {
   if (!state) return;
-  const idle = state.units.find((u) => u.owner === myId && u.kind === 'scv' && u.mode === 'idle')
-    || state.units.find((u) => u.owner === myId && u.kind === 'scv');
+  const idle = state.units.find((u) => u.owner === myId && isWorker(u.kind) && u.mode === 'idle')
+    || state.units.find((u) => u.owner === myId && isWorker(u.kind));
   if (idle) {
     selectedUnits.clear(); selectedBlds.clear();
     selectedUnits.add(idle.id);
@@ -135,7 +135,7 @@ function selectAllArmy() {
   selectedUnits.clear(); selectedBlds.clear();
   buildMode = null; updateCursorClass();
   for (const u of state.units) {
-    if (u.owner === myId && u.kind !== 'scv' && u.hp > 0 && !u.boardedIn) selectedUnits.add(u.id);
+    if (u.owner === myId && !isWorker(u.kind) && u.hp > 0 && !u.boardedIn) selectedUnits.add(u.id);
   }
   if (selectedUnits.size > 0) { Sfx.order(); renderConsoleUI(true); }
   else toast('Aucune unité de combat déployée.');
@@ -172,7 +172,7 @@ window.addEventListener('keydown', (e) => {
 
   cleanSelection();
   const selUList = state ? state.units.filter((u) => selectedUnits.has(u.id)) : [];
-  const hasScvSelected = selUList.some((u) => u.kind === 'scv');
+  const hasScvSelected = selUList.some((u) => isWorker(u.kind));
 
   // VCS sélectionné : B ouvre le menu de construction, puis 1..0 / R choisit le bâtiment.
   // Sans B, les chiffres restent les groupes de contrôle.
@@ -182,9 +182,9 @@ window.addEventListener('keydown', (e) => {
     renderConsoleUI(true);
     return;
   }
-  if (buildKeysArmed && !e.ctrlKey && !e.metaKey && KEY_TO_BUILD[k] && !e.repeat) {
+  if (buildKeysArmed && !e.ctrlKey && !e.metaKey && keyToBuild(k) && !e.repeat) {
     buildKeysArmed = false;
-    pickBuildMode(KEY_TO_BUILD[k]);
+    pickBuildMode(keyToBuild(k));
     return;
   }
 
@@ -230,7 +230,13 @@ window.addEventListener('keydown', (e) => {
       sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_min', x: hx, y: hy, unitIds: [...selectedUnits] });
       return;
     }
-    if (k === 't') { sendCommand({ op: 'STIM', unitIds: [...selectedUnits] }); return; }
+    if (k === 't') {
+      // Stimpack pour les Terriens, Surcharge pour la Synthèse
+      const ids = [...selectedUnits];
+      const synth = ids.some((id) => UNITS[state.units.find((u) => u.id === id)?.kind]?.canOvercharge);
+      sendCommand({ op: synth ? 'OVERCHARGE' : 'STIM', unitIds: ids });
+      return;
+    }
     if (k === 'g') { sendCommand({ op: 'SIEGE', unitIds: [...selectedUnits] }); return; }
     if (k === 'v') {
       for (const uId of selectedUnits) {
@@ -245,14 +251,14 @@ window.addEventListener('keydown', (e) => {
   if (selectedBlds.size > 0) {
     const firstB = state?.buildings.find((b) => selectedBlds.has(b.id));
     if (firstB && !firstB.constructing) {
-      if (firstB.kind === 'hq' && k === 'c') {
+      if (isMainBase(firstB.kind) && k === 'c') {
         buildMode = null; orderCursor = orderCursor === 'scan' ? null : 'scan';
         updateCursorClass(); renderConsoleUI(true);
         return;
       }
-      if (firstB.kind === 'armory') {
+      if (isLab(firstB.kind)) {
         const upgKeys = ['e', 'r', 't', 'y', 'u'];
-        const upgIds = Object.keys(UPGRADES);
+        const upgIds = Object.keys(UPGRADES).filter((id) => UPGRADES[id].faction === BUILDINGS[firstB.kind].faction);
         const upgIdx = upgKeys.indexOf(k);
         if (upgIdx >= 0 && upgIds[upgIdx]) {
           sendCommand({ op: 'RESEARCH', upgId: upgIds[upgIdx], bldId: firstB.id });
@@ -350,7 +356,7 @@ function issueSmartRightClick(wx, wy) {
   const unitIds = [...selectedUnits];
   if (!unitIds.length) return;
 
-  const hasScvs = unitIds.some((id) => state.units.find((u) => u.id === id)?.kind === 'scv');
+  const hasScvs = unitIds.some((id) => isWorker(state.units.find((u) => u.id === id)?.kind));
 
   if (hit) {
     if ((hit.type === 'unit' || hit.type === 'bld') && me && hit.ent.team !== me.team) {
@@ -375,7 +381,7 @@ function issueSmartRightClick(wx, wy) {
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#1fc7c1', life: 0.45, maxLife: 0.45 });
       return;
     }
-    if (hit.type === 'bld' && hit.ent.owner === myId && hit.ent.kind === 'extractor' && !hit.ent.constructing && hasScvs) {
+    if (hit.type === 'bld' && hit.ent.owner === myId && isRefinery(hit.ent.kind) && !hit.ent.constructing && hasScvs) {
       sendCommand({ op: 'UNIT_ORDER', mode: 'harvest_gas', resId: hit.ent.id, x: hit.ent.x, y: hit.ent.y, unitIds });
       orderMarkers.push({ x: hit.ent.x, y: hit.ent.y, color: '#2fbf71', life: 0.45, maxLife: 0.45 });
       return;
@@ -483,7 +489,7 @@ window.addEventListener('pointerup', () => {
     const sy1 = Math.min(mouse.dragStart.sy, mouse.y), sy2 = Math.max(mouse.dragStart.sy, mouse.y);
     const inBox = (wx, wy, h) => { const pt = worldToScreen3D(wx, wy, h); return pt.x >= sx1 && pt.x <= sx2 && pt.y >= sy1 && pt.y <= sy2; };
     const boxed = state.units.filter((u) => u.owner === myId && u.hp > 0 && !u.boardedIn && inBox(u.x, u.y, u.flying ? 42 : 8));
-    const combat = boxed.filter((u) => u.kind !== 'scv');
+    const combat = boxed.filter((u) => !isWorker(u.kind));
     const finalUnits = combat.length > 0 ? combat : boxed;
     for (const u of finalUnits) selectedUnits.add(u.id);
     if (selectedUnits.size === 0) {
@@ -558,8 +564,8 @@ function issueMinimapOrder(wx, wy, forceAttack = false) {
     return true;
   }
   if (!units.length) return false;
-  const fighters = units.filter((u) => u.kind !== 'scv').map((u) => u.id);
-  const workers = units.filter((u) => u.kind === 'scv').map((u) => u.id);
+  const fighters = units.filter((u) => !isWorker(u.kind)).map((u) => u.id);
+  const workers = units.filter((u) => isWorker(u.kind)).map((u) => u.id);
   // Les troupes avancent en attaquant tout ce qu'elles croisent ; les VCS se déplacent simplement
   void forceAttack;
   if (fighters.length) sendCommand({ op: 'UNIT_ORDER', mode: 'amove', x: wx, y: wy, unitIds: fighters });

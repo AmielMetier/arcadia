@@ -180,7 +180,18 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
   g.fillStyle = 'rgba(12, 16, 20, 0.42)';
   g.beginPath(); g.ellipse(9, 11, r * 1.08, r * 0.95, 0, 0, TAU); g.fill();
 
-  if (b.kind === 'hq') {
+  if (def.faction === 'synth') {
+    // Synthèse (vue 2D et vignettes) : gradins hexagonaux et pointe de cristal
+    g.strokeStyle = '#16181d';
+    g.lineWidth = 2.5;
+    drawPrism3D(g, wx, wy, makeNGon(r * 0.95, 6, 0), 0, H3D * 0.42, '#232833', '#3a4150', isIcon, 0.94);
+    drawPrism3D(g, wx, wy, makeNGon(r * 0.66, 6, 0), H3D * 0.42, H3D * 0.7, darkCol, color, isIcon, 0.9);
+    drawPyramid3D(g, wx, wy, makeNGon(r * 0.3, 4, 0), H3D * 0.7, H3D * 1.15, '#3df2ff', isIcon);
+    g.restore();
+    return;
+  }
+
+  if (isMainBase(b.kind)) {
     // 4 Tourelles de bastion d'angle en 3D
     const cOff = r * 0.68;
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
@@ -218,7 +229,7 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.beginPath(); g.arc(0, 0, 4, 0, TAU); g.fill(); g.stroke();
     g.restore();
 
-  } else if (b.kind === 'extractor') {
+  } else if (isRefinery(b.kind)) {
     // Raffinerie 3D avec cuves de Gaz Vespène
     drawPrism3D(g, wx, wy, makeNGon(r, 8), 0, H3D * 0.65, '#3b4a40', '#d5f2df', isIcon, 0.9);
     const top = drawPrism3D(g, wx, wy, makeNGon(r * 0.62, 8), H3D * 0.65, H3D, '#1f8a4f', '#2fbf71', isIcon, 0.88);
@@ -302,7 +313,7 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.strokeRect(-r * 0.55, -4, r * 1.1, 8);
     g.restore();
 
-  } else if (b.kind === 'armory') {
+  } else if (isLab(b.kind)) {
     // Armurerie Tech 2D : dôme hexagonal avec capteur holo rotatif
     drawPrism3D(g, wx, wy, makeNGon(r * 0.95, 6, 0), 0, H3D * 0.58, '#323742', '#586072', isIcon, 0.92);
     const topLab = drawPrism3D(g, wx, wy, makeNGon(r * 0.62, 6, 0), H3D * 0.58, H3D * 0.88, darkCol, color, isIcon, 0.9);
@@ -375,7 +386,7 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
   }
 
   // Barre de PV flottant au-dessus du toit 3D
-  if (!isIcon && (b.hp < b.maxHp || b.kind === 'hq' || selected)) {
+  if (!isIcon && (b.hp < b.maxHp || isMainBase(b.kind) || selected)) {
     const bw = r * 1.9, bh = 6;
     const pct = clamp(b.hp / b.maxHp, 0, 1);
     g.fillStyle = '#16181d';
@@ -383,7 +394,7 @@ function drawBuilding(g, b, color, selected, now, isIcon = false) {
     g.fillStyle = pct > 0.45 ? '#2fbf71' : '#ff4b2b';
     g.fillRect(roofOff.ox - bw / 2, roofOff.oy - r - 12.5, bw * pct, bh);
   }
-  if (!isIcon && b.kind === 'hq' && state) {
+  if (!isIcon && isMainBase(b.kind) && state) {
     const ownerP = state.players.find((q) => Number(q.id) === Number(b.owner));
     if (ownerP) {
       const pingVal = ownerP.bot ? '🤖 IA' : `${getPlayerPing(ownerP)} ms`;
@@ -494,7 +505,7 @@ function drawTree3D(g, tr) {
 }
 
 function drawUnit(g, u, color, selected, now, isIcon = false) {
-  const r = u.kind === 'scv' ? 10.0 : u.radius;
+  const r = isWorker(u.kind) ? 10.0 : u.radius;
   const wx = u.x || 0, wy = u.y || 0;
   const darkCol = shade(color, -0.35);
   const lightCol = shade(color, 0.25);
@@ -504,7 +515,7 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
 
   // Si c'est un VCS posé SUR un chantier en cours de construction, on l'élève sur la dalle 3D du chantier !
   let siteZ = 0;
-  if (!isIcon && u.kind === 'scv' && u.onSite && u.buildTargetId && state) {
+  if (!isIcon && isWorker(u.kind) && u.onSite && u.buildTargetId && state) {
     const tb = state.buildings.find((b) => b.id === u.buildTargetId && b.constructing);
     if (tb) {
       const defB = BUILDINGS[tb.kind] || BUILDINGS.hq;
@@ -536,7 +547,17 @@ function drawUnit(g, u, color, selected, now, isIcon = false) {
   g.strokeStyle = '#16181d';
   g.lineWidth = 2.5;
 
-  if (u.kind === 'scv') {
+  if (UNITS[u.kind]?.faction === 'synth') {
+    // Synthèse : coque hexagonale à la couleur de l'équipe, cristal au sommet
+    const lift = UNITS[u.kind].flying ? 28 : 0;
+    const top = drawPrism3D(g, wx, wy, makeNGon(r * 0.8, 6, u.a || 0), lift, lift + (u.kind === 'monolith' ? 26 : 9), darkCol, color, isIcon, 0.85);
+    void top;
+    drawPyramid3D(g, wx, wy, makeNGon(r * 0.38, 4, 0), lift + (u.kind === 'monolith' ? 26 : 9), lift + (u.kind === 'monolith' ? 46 : 18), '#3df2ff', isIcon);
+    g.restore();
+    return;
+  }
+
+  if (isWorker(u.kind)) {
     // Base chenilles au sol
     g.save();
     g.rotate(u.a || 0);

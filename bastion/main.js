@@ -149,6 +149,8 @@ function startMatch(info) {
   if (exploredCtx) exploredCtx.clearRect(0, 0, FOG_RES, FOG_RES);
   lastFogUpdate = 0;
   pendingCmds.length = 0;
+  factionAutoSent = false;
+  factionChosen = false;
   netSyncTick = 0;
   pendingNetFx = [];
   craters = [];

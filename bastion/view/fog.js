@@ -64,3 +64,11 @@ function smoothFog() {
   fogSmoothCtx.drawImage(fogCanvas, 0, 0, S, S);
   fogSmoothCtx.filter = 'none';
 }
+
+// Unité camouflée : visible seulement pour son équipe, ou si mon équipe a de la détection à cet endroit
+function seenByMe(u) {
+  if (!u.cloaked || !state) return true;
+  const me = state.players.find((p) => p.id === myId);
+  if (!me || me.dead) return true;
+  return u.team === me.team || teamDetects(me.team, u.x, u.y);
+}

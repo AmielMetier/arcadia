@@ -49,6 +49,18 @@ Survie zombie en coop, vue de dessus (twin-stick), jusqu'à 5 joueurs, avec équ
 - **Coop** : relever les alliés à terre, partage de l'écran de fin, classement entre potes
 - Clavier/souris, manette ou écran tactile
 
+## Bastion Clash
+Stratégie en temps réel en 3D (Three.js), seul contre des bots ou jusqu'à 4 joueurs.
+
+- **Deux factions** : les Terriens (ouvriers qui restent sur le chantier, Stimpack, Mode Siège, Navettes de soin et de transport)
+  et la Synthèse (structures qui s'assemblent seules, unités qui se réparent, Surcharge à l'énergie, Spectres camouflés, rayons en chaîne)
+- **Cinq cartes** : Vallée Tempérée, Fissures de Magma, Glacier Boréal, Canyon de Cuivre, Ruines Néon, chacune avec sa particularité
+- **Modes** : chacun pour soi, duel 1 contre 1 sur carte dédiée, 2 contre 2 (coop contre bots, mixte ou entre joueurs),
+  coop « Défense contre des vagues » (15 vagues, un boss toutes les 5)
+- **Économie** : cristaux et geysers qui s'épuisent, expansions, améliorations à trois paliers
+- **Bots** Facile / Moyen / Difficile qui jouent vraiment différemment ; un bot garde la base d'un joueur parti
+- Mode spectateur, reprise de la partie si l'hôte s'en va, réglages graphiques (qualité, mode daltonien)
+
 ## Cyber Kart GP
 Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par des IA jusqu'à 8 pilotes.
 
@@ -67,6 +79,7 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA.
+  `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée

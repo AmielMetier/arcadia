@@ -178,4 +178,64 @@ t('vagues : la Horde attaque, une vague repoussée paie une prime, la dernière 
   assert.equal(s.winnerTeam, 0, 'les défenseurs gagnent');
 });
 
+t('Synthèse : choix de faction au départ, puis verrouillé', () => {
+  const E = loadEngine();
+  const s = fresh(E, 'ffa', 2);
+  assert.equal(E.executeCommand(s, 0, { op: 'SET_FACTION', faction: 'synth' }, []).ok, true);
+  assert.equal(s.players[0].faction, 'synth');
+  assert.ok(s.buildings.some((b) => b.owner === 0 && b.kind === 'core'));
+  assert.ok(s.units.filter((u) => u.owner === 0).every((u) => u.kind === 'drone' || u.kind === 'lancer'));
+  assert.equal(E.canPlaceBuilding(s, 0, 'barracks', 900, 900, { ignoreCost: true }).ok, false, 'pas de bâtiment terrien');
+  step(E, s, 30 * 21);
+  assert.equal(E.executeCommand(s, 0, { op: 'SET_FACTION', faction: 'terran' }, []).ok, false, 'verrouillé après 20 s');
+});
+
+t('Synthèse : la structure s’assemble seule et le Drone repart', () => {
+  const E = loadEngine();
+  const s = E.createInitialState([{ id: 0, name: 'S', color: '#0ff', faction: 'synth' }, { id: 1, name: 'T', color: '#f00' }], { map: 'vallee', mode: 'ffa' });
+  const p = s.players[0];
+  p.minerals = 1000;
+  let placed = null;
+  for (let a = 0; a < 6.28 && !placed; a += 0.3) {
+    const x = p.spawnX + Math.cos(a) * 200, y = p.spawnY + Math.sin(a) * 200;
+    const r = E.executeCommand(s, 0, { op: 'BUILD', kind: 'condenser', x, y }, []);
+    if (r.ok) placed = r.bldId;
+  }
+  assert.ok(placed, 'condensateur posé');
+  step(E, s, 30 * 8);
+  const b = s.buildings.find((x) => x.id === placed);
+  assert.ok(b.buildStarted, 'posé par le Drone');
+  assert.ok(!s.units.some((u) => u.buildTargetId === placed), 'le Drone est reparti');
+  step(E, s, 30 * 22);
+  assert.equal(b.constructing, false, 'terminé sans ouvrier');
+});
+
+t('Synthèse : Spectre invisible sans détection, Surcharge payée en énergie, réparation hors combat', () => {
+  const E = loadEngine();
+  const s = E.createInitialState([{ id: 0, name: 'S', color: '#0ff', faction: 'synth' }, { id: 1, name: 'T', color: '#f00' }], { map: 'vallee', mode: 'ffa' });
+  const marine = s.units.find((u) => u.owner === 1 && u.kind === 'marine');
+  const lancer = s.units.find((u) => u.owner === 0 && u.kind === 'lancer');
+  // Loin des QG (leurs tourelles tireraient avant que le Spectre ne se camoufle)
+  marine.x = 1800; marine.y = 1500; marine.mode = 'idle';
+  const spectre = { ...lancer, id: 7001, kind: 'spectre', hp: 140, maxHp: 140, radius: 11, x: 1880, y: 1500, mode: 'hold', shotT: -99, cloaked: true };
+  s.units.push(spectre);
+  step(E, s, 30 * 2);
+  assert.equal(spectre.cloaked, true);
+  assert.equal(spectre.hp, 140, 'pas visé sans détection');
+  s.scans.push({ x: spectre.x, y: spectre.y, team: 1, r: 380, timer: 10 });
+  step(E, s, 30 * 2);
+  assert.ok(spectre.hp < 140, 'visé une fois détecté par un Scan');
+  // Surcharge : 50 d'énergie, refusée sans
+  lancer.energy = 60;
+  assert.equal(E.executeCommand(s, 0, { op: 'OVERCHARGE', unitIds: [lancer.id] }, []).ok, true);
+  assert.ok(lancer.energy < 20 && lancer.stimT > 0);
+  assert.equal(E.executeCommand(s, 0, { op: 'OVERCHARGE', unitIds: [lancer.id] }, []).ok, false);
+  // Réparation : rien pendant 4 s après un coup, puis la vie remonte
+  lancer.x = lancer.y = 1800; lancer.mode = 'hold'; lancer.hp = 60; lancer.hitT = s.time;
+  step(E, s, 30 * 3);
+  assert.equal(Math.round(lancer.hp), 60);
+  step(E, s, 30 * 4);
+  assert.ok(lancer.hp > 60);
+});
+
 console.log(`\n${n} tests réussis`);

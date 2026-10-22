@@ -75,7 +75,7 @@
 
 <!-- ACCÈS RAPIDE (F1 VCS, F2 ARMÉE, GROUPES) -->
 <div class="quick-bar">
-  <button class="qbtn" id="btnIdleScv" title="Sélectionner un VCS inactif, sinon un VCS (F1)"><kbd>F1</kbd> VCS <span class="cnt" id="uiIdleCnt">0</span></button>
+  <button class="qbtn" id="btnIdleScv" title="Sélectionner un VCS inactif, sinon un VCS (F1)"><kbd>F1</kbd> <span id="uiWorkerLbl">VCS</span> <span class="cnt" id="uiIdleCnt">0</span></button>
   <button class="qbtn" id="btnAllArmy" title="Sélectionner toute l'armée (F2)"><kbd>F2</kbd> Armée <span class="cnt" id="uiArmyCnt">0</span></button>
   <div class="cg-bar" id="uiCgBar" title="Groupes de contrôle : Ctrl+1..5 pour assigner, 1..5 pour rappeler"></div>
 </div>
@@ -105,6 +105,10 @@
   </div>
 </div>
 
+<div class="faction-pick glass" id="uiFactionPick" hidden>
+  <h3>Choisis ta faction <span id="uiFactionTimer"></span></h3>
+  <div class="fp-row" id="uiFactionCards"></div>
+</div>
 <div class="tip glass" id="uiTip" hidden></div>
 <div class="toast glass" id="uiToast" hidden></div>
 
@@ -140,7 +144,9 @@
 <script src="view/input.js"></script>
 <script src="view/hud.js"></script>
 <script src="view/spectator.js"></script>
+<script src="view/factionpick.js"></script>
 <script src="view/three3d.js"></script>
+<script src="view/synth3d.js"></script>
 <script src="view/render.js"></script>
 <script src="main.js"></script>
 </body>
