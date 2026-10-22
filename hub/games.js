@@ -304,6 +304,41 @@ window.HUB_GAMES = [
       <path d="M150 140 q 40 -30 70 -20" stroke="#d62828" stroke-width="5" fill="none" stroke-linecap="round"/>
     </svg>`,
   },
+  {
+    id: 'kart',
+    title: 'Kart Rush GP',
+    tag: 'Course de karts en 3D',
+    desc: 'Kart en 3D façon Mario Kart : 3 circuits (Grand Circuit, Whisky Peak, Route Arc-en-ciel), drift et mini-turbo, 16 objets, 8 pilotes et IA. Circuit et pilotes se choisissent dans le jeu.',
+    url: 'kart/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#ff4fd8',
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="kartSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#140a3a"/><stop offset="1" stop-color="#3a1470"/></linearGradient>
+        <linearGradient id="kartRoad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ff3b5c"/><stop offset=".17" stop-color="#ff9a2e"/><stop offset=".34" stop-color="#ffe23d"/>
+          <stop offset=".5" stop-color="#3ee07a"/><stop offset=".67" stop-color="#2fb8ff"/><stop offset=".84" stop-color="#5b6bff"/><stop offset="1" stop-color="#c25bff"/>
+        </linearGradient>
+      </defs>
+      <rect width="320" height="180" fill="url(#kartSky)"/>
+      <g fill="#fff"><circle cx="30" cy="22" r="1.6"/><circle cx="74" cy="48" r="1.2"/><circle cx="122" cy="16" r="1.8"/><circle cx="170" cy="40" r="1.1"/><circle cx="214" cy="12" r="1.5"/><circle cx="58" cy="78" r="1"/><circle cx="196" cy="70" r="1.3"/><circle cx="12" cy="56" r="1.2"/></g>
+      <circle cx="270" cy="40" r="26" fill="#2f7be0" stroke="#16181d" stroke-width="3"/>
+      <path d="M252 34c8-6 14 2 22-2s10 6 14 2M256 50c6 4 14-2 20 2" fill="none" stroke="#3ee07a" stroke-width="5" stroke-linecap="round"/>
+      <path d="M150 180 C 170 120, 240 110, 330 92 L 330 132 C 250 140, 214 150, 214 180 Z" fill="url(#kartRoad)" stroke="#16181d" stroke-width="3"/>
+      <path d="M-10 180 L 40 110 L 70 128 L 110 72 L 150 118 L 180 180 Z" fill="#e9f2fb" stroke="#16181d" stroke-width="3"/>
+      <path d="M110 72 L 124 92 L 112 88 L 100 100 L 96 92 Z" fill="#b8cde6"/>
+      <g transform="translate(210 112) rotate(-8)" stroke="#16181d" stroke-width="3">
+        <rect x="-34" y="-6" width="68" height="22" rx="9" fill="#e53935"/>
+        <rect x="-38" y="-14" width="22" height="7" rx="3" fill="#e53935"/>
+        <circle cx="-22" cy="20" r="11" fill="#22252d"/><circle cx="24" cy="20" r="11" fill="#22252d"/>
+        <circle cx="2" cy="-18" r="13" fill="#f2f2f2"/>
+        <path d="M-11-22 a13 13 0 0 1 26 0 z" fill="#e53935"/>
+        <ellipse cx="-3" cy="-17" rx="2.6" ry="3.4" fill="#16181d" stroke="none"/><ellipse cx="7" cy="-17" rx="2.6" ry="3.4" fill="#16181d" stroke="none"/>
+      </g>
+      <path d="M150 128 l-28 -4 M150 140 l-36 2 M156 116 l-22 -10" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <g stroke="#16181d" stroke-width="3"><path d="M44 30 l6 12 13 2 -10 9 3 13 -12 -7 -12 7 3 -13 -10 -9 13 -2 z" fill="#ffd53d"/></g>
+    </svg>`,
+  },
 ];
 
 

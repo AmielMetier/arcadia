@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.18 — 22 octobre 2026
+- **Kart Rush GP** — Nouveau jeu : course de karts en 3D, seul ou jusqu'à 6 joueurs, avec des IA pour compléter la grille (8 pilotes en piste).
+  - 3 circuits au choix de l'hôte : le Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée, boules de neige géantes, route gelée, télésiège et skieurs à éviter) et la Route Arc-en-ciel (dans l'espace, face à la Terre et la Lune).
+  - 8 pilotes et 4 karts, chacun avec ses statistiques ; un pilote par joueur.
+  - Drift avec la touche Maj : 1 seconde de drift donne un mini-turbo, deux fois plus vite en alternant gauche et droite.
+  - 16 objets dans les cubes irisés : champignons, bananes, carapaces verte, rouge et bleue, étoile, fleur de feu (rare), éclair, poulpe, fusée…
+  - Une musique par circuit, qui accélère un peu à chaque tour.
+
 ## 2.17 — 22 octobre 2026
 - **Outbreak : Secteur Zéro** — Le jeu de zombies est entièrement refait, graphismes et gameplay.
   - Vraie coop en ligne jusqu'à 5 : tout le monde voit les mêmes zombies, son propre survivant répond sans délai, et si l'hôte part, un autre joueur reprend la partie.
