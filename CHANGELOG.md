@@ -1,50 +1,16 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.24 — 22 octobre 2026
-- **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
-- **Bastion Clash** — Les grosses batailles restent fluides, même en 2 contre 2 avec plus de 200 unités.
-- **Bastion Clash** — Nouvelle faction jouable : **la Synthèse** 💠, des machines qui s'assemblent seules.
-  - le Drone pose la structure, qui se construit seule pendant qu'il repart récolter ;
-  - unités et bâtiments se réparent seuls hors combat ;
-  - Surcharge (T) : comme le Stimpack, mais payée en énergie au lieu de points de vie ;
-  - Lancier, Spectre (invisible tant qu'il n'attaque pas : la Tour de Détection, l'Oculus et le Scan le révèlent), Arpenteur à arc électrique, Monolithe qui protège ses voisins, Libellule volante ;
-  - en début de partie, chacun choisit sa faction (le choix est retenu pour la fois suivante) ; l'hôte peut aussi imposer une faction ou la tirer au sort.
-- **Bastion Clash** — Deux nouvelles cartes :
-  - 🏜️ **Canyon de Cuivre** : grès rouge, mesas et oasis ; la chaleur réduit la vision de 15 % mais les minéraux se récoltent 20 % plus vite ;
-  - 🌃 **Ruines Néon** : une ville abandonnée de nuit, coupée par des canaux toxiques ; les unités voient 20 % moins loin et toutes les bases avancées ont des cristaux dorés.
-- **Bastion Clash** — Nouveau format **Duel 1 contre 1**, sur une carte dédiée plus compacte (bases en diagonale, base naturelle, troisième base et deux coins disputés), sur les cinq champs de bataille.
-- **Bastion Clash** — Nouveau mode **Coop : Défense contre des vagues** : tous les joueurs du même côté face à la Horde, 15 vagues de plus en plus fortes (10 en Blitz), un Colosse toutes les cinq vagues, une prime de 150💎 et 60🧪 par vague repoussée.
-- **Bastion Clash** — Économie : les cristaux et les geysers s'épuisent, et il n'y a plus de revenu automatique. Tout vient de tes VCS : s'étendre vers d'autres bases devient indispensable.
-- **Bastion Clash** — Améliorations par paliers : armes et blindages montent jusqu'au niveau 3 (+12 % de dégâts ou +10 % de points de vie par niveau), chaque niveau coûtant un peu plus cher.
-- **Bastion Clash** — Le Scan Radar se lance depuis un Centre de Commandement et se recharge en 45 secondes.
-- **Bastion Clash** — Des bots vraiment différents selon le niveau :
-  - Facile reste sur une base et attaque en masse, sans finesse ;
-  - Moyen s'étend, monte ses améliorations, utilise Stimpack et Mode Siège, recule quand il perd et envoie un éclaireur ;
-  - Difficile s'étend tôt sur trois bases, produit davantage et fait des largages en Navette sur tes ouvriers ;
-  - en 2 contre 2 coop, ton bot allié vient défendre ta base et suit tes attaques.
-- **Bastion Clash** — Mode spectateur : une fois éliminé, ou si tu rejoins le salon en cours de partie, tu vois toute la carte, le tableau des joueurs (ressources, armée, bases, améliorations) et tu passes d'une base à l'autre avec Tab.
-- **Bastion Clash** — Graphismes :
-  - nouveau bouton ⚙️ : qualité Bas / Moyen / Haut / Ultra (Ultra ajoute des lueurs et des ombres plus fines), couleurs pour daltoniens, secousses de caméra, barres de vie toujours visibles ;
-  - sol plus détaillé (herbe, cendres, congères), ombre au pied des falaises et des bâtiments, éclairs lumineux des explosions.
-- **Bastion Clash** — Parties en ligne plus solides :
-  - si un joueur quitte ou perd la connexion, un bot garde sa base ; il la reprend dès qu'il revient dans le salon ;
-  - si l'hôte part, un autre joueur reprend la partie là où elle en était, sans retour au salon ;
-  - chacun ne reçoit plus que ce que son équipe voit (fini le brouillard de guerre contournable), et les échanges réseau sont environ huit fois plus légers ;
-  - l'hôte vérifie chaque ordre : pas de Scan sans Centre de Commandement, pas de réparation des bâtiments adverses.
-- **Bastion Clash** — Corrections :
-  - le classement de fin de partie met bien le meilleur score en tête chez les vainqueurs ;
-  - si les dernières bases tombent en même temps, la partie se termine sur une égalité ;
-  - les troupes embarquées dans une Navette ne prennent plus les dégâts de zone ;
-  - les équipes ne se changent qu'en 2 contre 2, et seul l'hôte peut déplacer un autre joueur ;
-  - le rayon de soin des Navettes Médicales est enfin visible ;
-  - la touche C envoie récolter près de la souris, la sélection au cadre suit exactement le cadre tracé, et la caméra ne défile plus toute seule après un changement de fenêtre.
-
-## 2.23 — 22 octobre 2026
-- **Bastion Clash** — Les longues parties ne ralentissent plus : à partir de 8-10 minutes, le jeu passait au ralenti pour tout le monde dès que les armées grossissaient.
-- **Bastion Clash** — Les unités contournent les bâtiments au lieu de se coincer contre eux, et les armées des bots sortent enfin de leur base.
-- **Bastion Clash** — En chacun pour soi, les bots ne s'acharnent plus tous sur l'hôte : chacun choisit un adversaire proche et ils se répartissent les cibles.
-- **Bastion Clash** — Les longues parties ne font plus grimper la mémoire de la carte graphique (explosions et unités détruites).
-- **Bastion Clash** — Si l'hôte passe sur un autre onglet, la partie continue à vitesse normale au lieu de presque s'arrêter.
+## 2.25 — 22 octobre 2026
+- **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.
+  - En drift, le kart glisse de travers mais suit la direction voulue : au neutre il tourne en douceur, en contre-braquant il file presque tout droit, en braquant il serre le virage.
+  - La carrosserie se met plus ou moins de travers selon le braquage, et le petit saut ne fait plus pivoter le kart d'un coup.
+  - Les chocs entre karts ne stoppent plus net comme un mur : on rebondit, on garde sa vitesse, et le kart touché est poussé sur le côté.
+  - Nouveau mode spectateur : depuis le classement, le bouton « Spectateur » suit n'importe quel pilote avec une caméra de face (← → pour changer).
+  - Château Hanté : plus de tas de roche qui traversent la route dans la lave ; le jardin hanté est plus long et la lave de fin plus courte.
+  - Plage des Falaises : deux fois moins de crabes, une plage plus longue et plus large, et un plateau vallonné avec pins et blocs de craie.
+  - Jungle Perdue : on entre dans la pyramide par le haut, après une ligne droite, puis on descend sa rampe en spirale sur deux étages jusqu'à la sortie en bas ; la forêt est bien plus dense.
+  - Touché par une carapace, le kart fait un tonneau complet et repart dans le bon sens (il finissait parfois à l'envers).
+  - Écran des résultats façon Mario Kart : le classement de la course se met à jour en direct pendant que les autres finissent, puis 5 secondes après l'arrivée du dernier, les points s'ajoutent de bas en haut et le classement général du Grand Prix s'affiche.
 
 ## 2.22 — 22 octobre 2026
 - **Tête de Calcul** — Tout tient à l'écran, sans faire défiler :
