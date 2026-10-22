@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.15 — 22 octobre 2026
+- Nouveau jeu : **Fil Rouge**, désamorçage à deux voix. Le démineur voit la bombe en 3D, l'expert a le manuel posé sur sa table.
+  Coopération (1 à 6 joueurs) ou **Duel** : deux équipes, la même bombe, la première qui la désamorce gagne.
+- Une vraie pièce en 3D : table en bois sous une suspension, ombres, fenêtre sur la Baie des Anges la nuit.
+  On tourne la bombe avec Z/S, Q/D, A/E (WASD/QE en QWERTY) ou à la souris, on clique un module pour s'en approcher.
+- Six modules : raccordements, coffre à symboles, leviers, carillon (mélodie à décrire), tuyauterie, manomètres.
+  Il faut aussi lire l'extérieur de la bombe : n° de lot, tampons de villes de la Côte, vis manquantes.
+- Le manuel est un livret 3D aux pages qui se tournent, avec des onglets par module. Ses règles changent à chaque partie
+  (numéro d'édition imprimé sous le chrono).
+- Fautes : le chrono accélère. 4 difficultés, de l'Initiation (2 modules) à Difficile (7 modules).
+- Duel : chat réservé à l'équipe, progression adverse en direct, sabotages (coupure de courant, fumigène, secousse, encre renversée).
+- Classement entre potes : Fil Rouge y a sa colonne.
+
 ## 2.14 — 21 octobre 2026
 - Le journal des nouveautés est maintenant dans le Hub : bouton « ✨ Nouveautés » sur l'accueil (ou clic sur le numéro
   de version). Il s'ouvre tout seul à la première visite après une mise à jour.
