@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.22 — 22 octobre 2026
+- **Tête de Calcul** — Tout tient à l'écran, sans faire défiler :
+  - La carte s'ajuste toute seule à la hauteur de la fenêtre (question, correction, accueil), même sur un petit écran d'ordinateur.
+  - En The Candidate, la correction passe sur deux colonnes : la question et les quatre réponses à gauche, le verdict de Pierre Chartier, le décryptage et les scores à droite.
+  - Le bandeau de cotations remonte dans la barre du haut pour laisser plus de place.
+  - Avant la partie, la carte d'accueil est bien centrée.
+
 ## 2.21 — 22 octobre 2026
 - **Tête de Calcul** — Le mode The Candidate est entièrement refait :
   - Plus de 300 questions réécrites (marchés, corporate finance, dérivés, taux, calcul mental, probabilités, brainteasers) : énoncés clairs, et trois mauvaises réponses crédibles, au même format que la bonne (fini le seul entier au milieu de trois nombres à virgule).

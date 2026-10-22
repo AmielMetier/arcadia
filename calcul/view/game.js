@@ -71,13 +71,13 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     <div class="deco" aria-hidden="true"><span>+</span><span>÷</span><span>×</span><span>−</span><span>√</span><span>%</span><span>π</span><span>=</span></div>
     <header class="topbar">
       <div class="info"><b id="ibrand">Tête de Calcul</b><span id="round"></span></div>
+      <div class="ticker" id="ticker" aria-hidden="true"><div class="ticker-track" id="ttrack"></div></div>
       <div class="tools">
         <button class="tool" id="tmus" title="Musique de salle de marché" hidden>🎵</button>
         <button class="tool" id="tsnd" title="Bruitages">🔊</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
-    <div class="ticker" id="ticker" aria-hidden="true"><div class="ticker-track" id="ttrack"></div></div>
     <aside class="roster" id="roster" aria-label="Joueurs"></aside>
     <main class="stage" id="stage"></main>
     <div class="dock">
@@ -92,6 +92,25 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     <div class="toast" id="toast" hidden role="status"></div>`;
   const $ = (s) => root.querySelector(s);
   const stage = $('#stage');
+
+  // La carte s'adapte à la hauteur de l'écran : jamais besoin de faire défiler (sauf écran vraiment minuscule)
+  let fitCard = null;
+  function fit() {
+    const c = stage.querySelector(':scope > .card'); if (!c) return;
+    c.style.zoom = '';
+    const avail = stage.clientHeight - 14, h = c.offsetHeight;
+    const min = innerWidth < 820 ? 0.72 : 0.5;
+    c.style.zoom = h > avail ? String(Math.max(min, Math.floor((avail / h) * 1000) / 1000)) : '';
+  }
+  const fitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => requestAnimationFrame(fit)) : null;
+  if (fitRO) fitRO.observe(stage);
+  new MutationObserver(() => {
+    const c = stage.querySelector(':scope > .card');
+    if (c !== fitCard && fitRO) { if (fitCard) fitRO.unobserve(fitCard); fitCard = c; if (c) fitRO.observe(c); }
+    requestAnimationFrame(fit);
+  }).observe(stage, { childList: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fit());
+  addEventListener('resize', () => requestAnimationFrame(fit));
 
   let S = null, offset = 0, key = '', myAns = null, shown = {}, lastTick = -1, setupS = null, sabSeen = -1, picking = null;
   const name = (id) => { const p = S && S.players.find((q) => q.id === id); return p ? p.name : '?'; };
@@ -260,6 +279,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
   /* ---------------------------------------------------------- avant-partie */
   function renderSetup(s) {
     setupS = s;
+    root.classList.add('noroster');
     const isHost = s.hostId === me.id, c = s.cfg, ready = s.players.filter((p) => p.ready);
     const isChartier = c.mode === 'chartier';
     root.classList.toggle('mode-chartier', isChartier);
@@ -477,10 +497,11 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
       <div class="card reveal${ch ? ' cand' : ''} flipin" style="--cc:${cat.color}">
         ${fast ? `<div class="buzz">⚡ <b>${esc(name(fast.id))}</b> a dégainé le premier !</div>` : ''}
         <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(ch ? h.rubric || cat.label : cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.idx + 1} / ${S.cfg.len}</span></div>
+        ${ch ? '<div class="rv-cols"><div class="rv-l">' : ''}
         ${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}
         <div class="qrecall">${recall}</div>
         ${ch ? candGrid(L) : `<div class="bigans">${qText(L.show)}</div>`}
-        ${ch ? '' : verdict}
+        ${ch ? '</div><div class="rv-r">' : verdict}
         ${mine && mine.power ? `<div class="gotpower">🎁 Nouveau pouvoir : ${POWERS[mine.power].icon} <b>${esc(POWERS[mine.power].label)}</b>${mine.power === 'shield' ? ' (il te protège tout seul)' : ' : lance-le en bas à gauche !'}</div>` : ''}
         ${ch && S.players.some((p) => p.id === me.id) ? chartierQuote(mine, L, (q.time || 20) * 1000) : ''}
         <div class="tip"><b>${ch ? '📊 Le décryptage' : '💡 L\'astuce'}</b>${qText(L.tip)}</div>
@@ -491,6 +512,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
           return `<li class="${r.ok ? 'ok' : r.raw != null ? 'ko' : 'none'}" style="--k:${k}"><i class="dot" style="background:${esc(p.color)}"></i><span class="nm">${esc(p.name)}</span>
             <span class="raw">${raw}</span><span class="tm">${r.at != null ? secs(r.at) : ''}</span>${tags}<b class="gain">${r.pts > 0 ? '+' : ''}${r.pts ? fmt(r.pts) : '0'}</b></li>`;
         }).join('')}</ol>
+        ${ch ? '</div></div>' : ''}
         ${S.cfg.sabotage && S.idx + 1 < S.cfg.len ? '<p class="sabhint">⚔️ C\'est le moment de saboter !</p>' : ''}
         <div class="nextbar"><i id="nbar"></i></div>
       </div>`;
@@ -640,6 +662,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, start,
     update(state, off) {
       offset = off || 0;
       const prev = S; S = state;
+      root.classList.remove('noroster');
       const isChartier = state.cfg.mode === 'chartier';
       root.classList.toggle('mode-chartier', isChartier);
       $('#tmus').hidden = !isChartier;

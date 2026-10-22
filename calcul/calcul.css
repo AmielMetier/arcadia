@@ -362,12 +362,14 @@ button.power.ready:hover{filter:brightness(1.05)}
 .game.mode-chartier .info b{color:var(--gold2)}
 .game.mode-chartier .tool{background:#161c28;color:#f0f4fa;border-color:#333e54}
 
-/* bandeau de cotations, fixe sous la barre du haut */
+/* bandeau de cotations, dans la barre du haut (entre le titre et les boutons) */
 .ticker{display:none}
-.game.mode-chartier .ticker{display:flex;position:absolute;left:270px;right:24px;top:64px;height:34px;z-index:20;align-items:center;overflow:hidden;
+.game.mode-chartier .ticker{display:flex;flex:1;min-width:0;height:38px;align-items:center;overflow:hidden;
   background:#05070b;border:2px solid var(--edge);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.5);
   font:700 13px/1 'Chakra Petch',monospace;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.game.mode-chartier .info{flex:none}
+.game.mode-chartier .tools{margin-left:0}
 .ticker-track{display:inline-flex;align-items:center;gap:26px;white-space:nowrap;padding-left:20px;animation:tick 48s linear infinite;will-change:transform}
 @keyframes tick{to{transform:translateX(-50%)}}
 .ticker-track span{display:inline-flex;align-items:center;gap:5px;color:var(--dim)}
@@ -376,8 +378,9 @@ button.power.ready:hover{filter:brightness(1.05)}
 .ticker-track .pl i{width:9px;height:9px;border-radius:50%;border:1.5px solid #000}
 .ticker-track .badge{background:var(--gold);color:#0c0e14;font-family:var(--bung);font-weight:400;font-size:11px;padding:3px 8px;border-radius:5px;letter-spacing:.5px}
 .ticker-track .sep{color:var(--gold)}
-.game.mode-chartier .roster{top:110px}
-.game.mode-chartier .stage{top:108px}
+.game.mode-chartier .stage{bottom:12px}
+/* avant la partie, pas de liste de joueurs à gauche : la carte se centre sur tout l'écran */
+.game.noroster .stage{left:24px}
 
 /* cartes, joueurs, textes */
 .game.mode-chartier .card{background:linear-gradient(180deg,#151b29,#10141f);color:var(--txt);border:3px solid var(--gold);
@@ -516,9 +519,11 @@ button.cchoice.picked .cl{background:var(--gold2)}
 .game.mode-chartier .recap.perfect{background:#0f2a1b}
 
 @media (max-width:820px){
-  .game.mode-chartier .ticker{left:8px;right:8px;top:134px;height:30px;font-size:12px}
-  .game.mode-chartier .roster{top:60px}
-  .game.mode-chartier .stage{top:170px}
+  .game.mode-chartier .ticker{position:absolute;left:8px;right:8px;top:134px;height:30px;font-size:12px}
+  .game.mode-chartier.noroster .ticker{top:62px}
+  .game.mode-chartier .tools{margin-left:auto}
+  .game.mode-chartier .stage{top:170px;bottom:70px}
+  .game.noroster .stage{left:8px;top:100px}
   .cand-choices{grid-template-columns:1fr;gap:8px;margin-top:12px}
   .cchoice{min-height:50px;font-size:15px;padding:8px 36px 8px 10px}
   .cchoice .cl{width:30px;height:30px;font-size:14px}
@@ -530,4 +535,26 @@ button.cchoice.picked .cl{background:var(--gold2)}
   .qtext.cand{font-size:19px;margin-top:10px}
   .chartier-quote{padding:10px}
   .quote-avatar{width:34px;height:34px;font-size:12px}
+}
+
+/* correction en deux colonnes quand la place le permet : la question et les réponses à gauche, le verdict à droite */
+.card.reveal.cand{width:min(1080px,100%);padding:18px 22px}
+.card.reveal.cand .buzz{margin:-4px -6px 10px;padding:6px 12px}
+.card.reveal.cand .qrecall{margin-top:8px}
+.card.reveal.cand .cand-choices.rev{margin:10px 0 0}
+.card.reveal.cand .chartier-quote{margin:0 0 10px}
+.card.reveal.cand .tip{margin-bottom:10px;padding:8px 12px}
+.card.reveal.cand .results li{padding:4px 10px}
+.card.reveal.cand .sabhint{margin-top:8px}
+.card.reveal.cand .nextbar{margin-top:10px}
+@media (min-width:900px){
+  .rv-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .rv-l .cand-choices.rev{grid-template-columns:1fr}
+  .rv-l .qrecall{text-align:left}
+  .rv-r .chartier-quote{margin-top:8px}
+}
+@media (min-width:900px){
+  .rv-r .results li{flex-wrap:nowrap}
+  .rv-r .results .nm{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rv-r .results .tag{white-space:nowrap}
 }
