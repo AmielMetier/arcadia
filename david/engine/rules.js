@@ -5,7 +5,7 @@ import { rngOf } from './rng.js';
 import { makeConfig } from './modes.js';
 import {
   isOwnable, groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, netWorth, standings,
-  sameTeam, teamStandings, teamOf, teammate,
+  sameTeam, teamStandings, teamOf, teammate, teamOwnsGroup,
 } from './valuation.js';
 
 export const PHASES = ['roll', 'buy', 'auction', 'debt', 'end', 'over'];
@@ -46,7 +46,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
     round: 1, turnCount: 0, over: false, winner: null, endReason: null, ranking: null,
     startedAt: now, endsAt: cfg.timeLimitMs ? now + cfg.timeLimitMs : null,
     stats: {
-      visits: Array(40).fill(0), rentBySpace: Array(40).fill(0), history: [],
+      visits: Array(40).fill(0), rentBySpace: Array(40).fill(0), history: [], dice: Array(13).fill(0), rolls: 0, doubles: 0,
       players: Object.fromEntries(players.map((p) => [p.id, {
         rentIn: 0, rentOut: 0, dist: 0, jailTurns: 0, goPassed: 0, bought: 0, built: 0, doubles: 0, taxes: 0,
       }])),
@@ -274,7 +274,7 @@ export function rentFor(ctx, i, opts = {}) {
   if (sp.type === 'street') {
     if (pr.hotel) return sp.rent[5];
     if (pr.houses > 0) return sp.rent[pr.houses];
-    const double = s.cfg.doubleRentOnUnimprovedMonopoly && ownsGroup(s, board, pr.owner, sp.group);
+    const double = s.cfg.doubleRentOnUnimprovedMonopoly && teamOwnsGroup(s, board, pr.owner, sp.group);
     return sp.rent[0] * (double ? 2 : 1);
   }
   const n = groupSpaces(board, sp.group).filter((j) => s.props[j].owner === pr.owner).length;
@@ -380,6 +380,10 @@ function rollDice(ctx, p) {
   const d = [ctx.rng.die(), ctx.rng.die()];
   ctx.s.turn.dice = d;
   ctx.s.turn.rolls++;
+  // historique des lancers de la partie (onglet « Dés » des statistiques)
+  const st = ctx.s.stats;
+  if (!st.dice) { st.dice = Array(13).fill(0); st.rolls = 0; st.doubles = 0; }
+  st.dice[d[0] + d[1]]++; st.rolls++; if (d[0] === d[1]) st.doubles++;
   ctx.ev.push({ k: 'DICE', player: p.id, dice: d });
   return d;
 }
@@ -431,6 +435,20 @@ function bankrupt(ctx, p, creditorId) {
   p.jailCards = [];
   p.cash = 0;
   p.bankrupt = true;
+  // 2 contre 2 : une couleur qui n'est plus complète pour l'équipe perd ses bâtiments (revendus à moitié prix)
+  if (s.cfg.teams) {
+    for (const g of Object.keys(board.groups)) {
+      for (const i of groupSpaces(board, g)) {
+        const pr = s.props[i], o = pr.owner != null ? P(s, pr.owner) : null;
+        if (!o || o.bankrupt || level(s, i) === 0 || teamOwnsGroup(s, board, o.id, g)) continue;
+        const sp = board.spaces[i], n = pr.hotel ? s.cfg.housesPerHotel + 1 : pr.houses;
+        if (pr.hotel) s.bank.hotels++; else s.bank.houses += pr.houses;
+        pr.hotel = false; pr.houses = 0;
+        collect(ctx, o, (sp.houseCost * n) / 2, 'sell');
+        ctx.ev.push({ k: 'SELL', player: o.id, space: i, houses: 0, hotel: false });
+      }
+    }
+  }
   p.inJail = false;
   p.bankruptAt = s.seq + 1;
   s.debts = s.debts.filter((d) => d.from !== p.id);
@@ -543,6 +561,8 @@ function giveSide(ctx, from, to, side) {
 const HANDLERS = {
   ROLL(ctx, a) {
     const p = onTurn(ctx, a, ['roll']), s = ctx.s, t = s.turn;
+    // aléa frais fourni par l'hôte (crypto.getRandomValues) mêlé à la graine : chaque lancer est indépendant
+    if (Number.isInteger(a.entropy)) s.seed = (s.seed ^ (a.entropy >>> 0)) >>> 0;
     const d = rollDice(ctx, p), doubles = d[0] === d[1], total = d[0] + d[1];
     if (doubles) s.stats.players[p.id].doubles++;
     if (p.inJail) {
@@ -647,7 +667,7 @@ const HANDLERS = {
     if (s.debts.length) fail("Réglez d'abord votre dette.");
     const sp = ownProperty(ctx, p, i);
     if (sp.type !== 'street') fail('On ne construit que sur les terrains.');
-    if (!ownsGroup(s, board, p.id, sp.group)) fail('Il faut posséder tout le groupe de couleur.');
+    if (!teamOwnsGroup(s, board, p.id, sp.group)) fail(s.cfg.teams ? 'Il faut que ton équipe possède tout le groupe de couleur.' : 'Il faut posséder tout le groupe de couleur.');
     const g = groupSpaces(board, sp.group), hph = s.cfg.housesPerHotel, pr = s.props[i];
     if (g.some((j) => s.props[j].mortgaged)) fail('Un terrain du groupe est hypothéqué.');
     if (pr.hotel) fail('Il y a déjà un hôtel.');
@@ -672,7 +692,9 @@ const HANDLERS = {
     const sp = ownProperty(ctx, p, i);
     if (sp.type !== 'street' || level(s, i) === 0) fail("Aucun bâtiment à vendre ici.");
     const g = groupSpaces(board, sp.group), hph = s.cfg.housesPerHotel, pr = s.props[i];
-    if (level(s, i) < Math.max(...g.map((j) => level(s, j)))) fail('Vendez de façon égale sur tout le groupe.');
+    // en 2 contre 2, on vend de façon égale sur ses propres terrains du groupe
+    const mineG = s.cfg.teams ? g.filter((j) => s.props[j].owner === p.id) : g;
+    if (level(s, i) < Math.max(...mineG.map((j) => level(s, j)))) fail('Vendez de façon égale sur tout le groupe.');
     const refund = Math.floor((sp.houseCost * s.cfg.buildingResaleRatio));
     if (pr.hotel) {
       if (s.bank.houses < hph) fail(`La banque n'a pas ${hph} maisons pour remplacer l'hôtel.`);
@@ -815,4 +837,4 @@ export function availableActions(s, board, pid) {
   return out;
 }
 
-export { netWorth, standings, ownedBy, ownsGroup, level, groupSpaces, isOwnable, emptySide, sameTeam, teamStandings, teamOf, teammate };
+export { netWorth, standings, ownedBy, ownsGroup, level, groupSpaces, isOwnable, emptySide, sameTeam, teamStandings, teamOf, teammate, teamOwnsGroup };

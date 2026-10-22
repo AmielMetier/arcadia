@@ -73,6 +73,12 @@ export const teammate = (state, pid) => {
 };
 export const TEAM_NAMES = ['Équipe A', 'Équipe B'];
 
+// Groupe de couleur complet pour construire : à soi seul, ou avec son coéquipier en 2 contre 2.
+export function teamOwnsGroup(state, board, pid, group) {
+  if (!state.cfg.teams) return ownsGroup(state, board, pid, group);
+  return groupSpaces(board, group).every((i) => state.props[i].owner === pid || sameTeam(state, state.props[i].owner, pid));
+}
+
 // Classement des équipes : équipes encore en lice d'abord (patrimoine cumulé), puis équipe éliminée.
 export function teamStandings(state, board) {
   if (!state.cfg.teams) return [];

@@ -13,7 +13,7 @@ import { isEmote, botReaction } from '../view/emotes.js';
 const BOT_NAMES = ['Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius', 'Tata Nine'];
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const AUCTION_IDLE_MS = 12000;
-const TRADE_WAIT_MS = 25000; // un bot qui attend la réponse d'un humain retire sa proposition au bout de ce délai
+const TRADE_WAIT_MS = 60000; // un bot qui attend la réponse d'un humain retire sa proposition au bout de ce délai (affiché aux joueurs)
 
 const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnecté
 
@@ -93,12 +93,26 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
 
   function apply(action) {
     if (!state) return { ok: false, error: 'La partie n’a pas commencé.' };
+    // chaque lancer reçoit un aléa frais du navigateur de l'hôte (générateur cryptographique)
+    if (action.type === 'ROLL') action = { ...action, entropy: crypto.getRandomValues(new Uint32Array(1))[0] };
     const r = reduce(state, action, board);
     if (!r.ok) return r;
     state = r.state;
+    stampTrades(r.events);
     broadcast(r.events);
     schedule();
     return r;
+  }
+
+  // Délai de réponse d'un humain à une proposition d'un bot : l'heure limite (horloge de l'hôte) voyage avec l'état
+  // pour que chacun voie le compte à rebours.
+  function stampTrades(events) {
+    const prev = state.tradeUntil || {}, until = {}, now = Date.now(), anim = paceOf(events);
+    for (const t of state.trades) {
+      const f = state.players.find((q) => q.id === t.from), to = state.players.find((q) => q.id === t.to);
+      if (f && f.bot && to && !to.bot) until[t.id] = prev[t.id] || now + anim + TRADE_WAIT_MS;
+    }
+    state.tradeUntil = until;
   }
 
   function schedule() {
@@ -123,7 +137,10 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     const wkey = waiting.map((t) => t.id).join(',');
     if (wkey !== tradeKey) {
       tradeKey = wkey; clearTimeout(tradeTimer);
-      if (waiting.length) tradeTimer = setTimeout(() => { for (const t of waiting) apply({ type: 'CANCEL_TRADE', by: t.from, trade: t.id }); }, TRADE_WAIT_MS + pace);
+      if (waiting.length) {
+        const until = Math.min(...waiting.map((t) => (state.tradeUntil || {})[t.id] || Date.now() + TRADE_WAIT_MS));
+        tradeTimer = setTimeout(() => { for (const t of waiting) if (state.trades.some((x) => x.id === t.id)) apply({ type: 'CANCEL_TRADE', by: t.from, trade: t.id }); }, Math.max(0, until - Date.now()));
+      }
     }
     // enchère : clôture après quelques secondes sans nouvelle offre
     if (state.auction) {

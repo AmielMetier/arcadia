@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.20 — 22 octobre 2026
+- **DavidSimulator** — Échanges :
+  - Quand un bot te fait une proposition, tu as maintenant 60 secondes pour répondre (au lieu de 25), avec un compte à rebours dans la fenêtre et dans la barre du bas (« Mamé Rose attend ta réponse · 42 s »). Si tu fermes la fenêtre, le bouton « Voir la proposition » la rouvre.
+  - L'argent d'un échange s'affiche en billet de banque avec la somme dessus, à la couleur de la plus grosse coupure ; le billet suit le montant pendant que tu composes ta proposition.
+  - Les bots proposent beaucoup moins d'échanges (au plus un tous les quatre tours de table, une seule fois la même affaire à un joueur humain) et des affaires simples : une somme ronde, ou un seul terrain, pour un seul terrain demandé.
+- **DavidSimulator** — 2 contre 2 : une couleur détenue à deux par les coéquipiers suffit pour construire. Chacun bâtit sur ses propres terrains, toujours de façon égale sur tout le groupe, et le loyer des terrains nus est doublé. Si un coéquipier fait faillite et que la couleur n'est plus complète, les bâtiments du groupe sont revendus à moitié prix.
+- **DavidSimulator** — Dés : chaque lancer reçoit un aléa neuf tiré par le générateur cryptographique du navigateur de l'hôte, et un nouvel onglet « Dés » dans les statistiques compare les lancers de la partie aux probabilités d'une vraie paire de dés. Il explique aussi pourquoi la prison et quelques cases reviennent plus souvent, même avec des dés parfaits.
+
 ## 2.19 — 22 octobre 2026
 - **Cyber Kart GP** — Kart Rush GP devient Cyber Kart GP, avec une vraie affiche dans le Hub.
   - Grand Prix : « Course suivante » enchaîne le circuit suivant au lieu de revenir au menu, et les points s'additionnent course après course (classement général à la fin des 6 circuits).

@@ -194,6 +194,39 @@ function analysis(S, board, pid) {
     Les compagnies sont estimées avec une somme moyenne de 7 aux dés. « +1 bâtiment » : revenu supplémentaire par tour rapporté au coût d'une maison.</p>`;
 }
 
+/* ------------------------------------------------------------- dés : lancers de la partie face à la théorie */
+const THEORY = [0, 0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1].map((k) => k / 36);
+function diceTab(S) {
+  const st = S.stats, n = st.rolls || 0, counts = st.dice || Array(13).fill(0);
+  if (!n) return '<p class="hint">Aucun lancer pour l\'instant.</p>';
+  const W = 640, H = 230, L = 40, Bt = 196, T = 14, bw = (W - L - 10) / 11;
+  const obs = counts.map((c) => c / n), max = Math.max(0.2, ...obs.slice(2));
+  const y = (v) => Bt - (v / max) * (Bt - T);
+  let chi = 0; for (let t = 2; t <= 12; t++) { const e = THEORY[t] * n; chi += (counts[t] - e) ** 2 / e; }
+  const verdict = n < 40 ? 'Encore trop peu de lancers pour juger : à ce stade, de gros écarts sont normaux.'
+    : chi < 18.3 ? 'Les écarts avec la théorie sont ceux qu\'on attend du hasard : les dés sont équilibrés.'
+    : 'Écart un peu inhabituel avec la théorie (cela arrive une partie sur vingt avec des dés parfaits).';
+  const bars = [];
+  for (let t = 2; t <= 12; t++) {
+    const x = L + (t - 2) * bw;
+    bars.push(`<rect x="${x + 6}" y="${y(obs[t])}" width="${bw - 12}" height="${Bt - y(obs[t])}" rx="3" fill="#1C5FB4"><title>${t} : ${counts[t]} lancer${counts[t] > 1 ? 's' : ''} (${pct(obs[t])}, théorie ${pct(THEORY[t])})</title></rect>
+      <line x1="${x + 2}" x2="${x + bw - 2}" y1="${y(THEORY[t])}" y2="${y(THEORY[t])}" stroke="#16181d" stroke-width="2.5" stroke-dasharray="5 3"/>
+      <text x="${x + bw / 2}" y="${Bt + 18}" text-anchor="middle" class="ax">${t}</text>`);
+  }
+  const ticks = Array.from({ length: Math.floor(max / 0.05 + 1e-9) + 1 }, (_, k) => k * 0.05).map((v) => `<line x1="${L}" x2="${W - 10}" y1="${y(v)}" y2="${y(v)}" stroke="#d9cdb3"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="ax">${Math.round(v * 100)} %</text>`).join('');
+  const top = counts.map((c, t) => [t, c]).slice(2).sort((a, b) => b[1] - a[1])[0];
+  return `<div class="kpis"><div><small>Lancers</small><b>${n}</b><span>depuis le début de la partie</span></div>
+      <div><small>Doubles</small><b>${pct((st.doubles || 0) / n)}</b><span>théorie 16,7 %</span></div>
+      <div><small>Somme la plus fréquente</small><b>${top[0]}</b><span>${top[1]} fois · théorie : 7</span></div></div>
+    <svg class="dicechart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Fréquence de chaque somme des dés, comparée à la théorie">${ticks}${bars.join('')}
+      <text x="${L + (W - L) / 2}" y="${H - 2}" text-anchor="middle" class="ax">somme des deux dés</text></svg>
+    <p class="legend2"><span><i class="sw obs"></i>cette partie</span><span><i class="sw th"></i>théorie (deux dés équilibrés)</span></p>
+    <p class="tipline">🎲 ${verdict}</p>
+    <p class="hint">Chaque lancer est tiré par l'hôte avec le générateur aléatoire cryptographique du navigateur. Même avec des dés parfaits,
+      certaines cases reviennent plus souvent : la prison (case « Allez en prison », cartes, trois doubles), puis les cases situées 6 à 8 cases après la prison
+      ou Départ, où l'on repart souvent. L'onglet Plateau compare les visites réelles à la probabilité théorique de chaque case.</p>`;
+}
+
 /* ------------------------------------------------------------- fenêtre */
 export function openStats(M, board, getState, me, { onHeat, heatMode }) {
   let tab = 'worth', measure = 'worth', mode = heatMode || 'visits', sort = null;
@@ -201,7 +234,7 @@ export function openStats(M, board, getState, me, { onHeat, heatMode }) {
   const draw = () => {
     const S = getState();
     if (!S.players.some((p) => p.id === who)) who = S.players[0].id;
-    const tabs = [['worth', 'Patrimoine'], ['heat', 'Plateau'], ['rank', 'Classement'], ['fin', 'Analyse financière']];
+    const tabs = [['worth', 'Patrimoine'], ['heat', 'Plateau'], ['dice', 'Dés'], ['rank', 'Classement'], ['fin', 'Analyse financière']];
     let body = '';
     if (tab === 'worth') {
       body = `<div class="filters"><div class="seg">${[['worth', 'Patrimoine net'], ['cash', 'Liquide']].map(([k, l]) => `<button data-m="${k}" class="${measure === k ? 'sel' : ''}">${l}</button>`).join('')}</div>
@@ -210,7 +243,8 @@ export function openStats(M, board, getState, me, { onHeat, heatMode }) {
     } else if (tab === 'heat') {
       body = `<div class="filters"><div class="seg">${[['visits', 'Visites'], ['rent', 'Loyers perçus'], ['theory', 'Probabilité théorique']].map(([k, l]) => `<button data-h="${k}" class="${mode === k ? 'sel' : ''}">${l}</button>`).join('')}</div>
         <button class="btn small yellow" id="heatOn">Afficher sur le plateau</button></div>${heatmap(S, board, mode)}`;
-    } else if (tab === 'rank') body = rankTable(S, board, sort);
+    } else if (tab === 'dice') body = diceTab(S);
+    else if (tab === 'rank') body = rankTable(S, board, sort);
     else {
       body = `<div class="filters"><div class="seg">${S.players.map((p) => `<button data-who="${p.id}" class="${who === p.id ? 'sel' : ''}"><i style="background:${p.color}"></i>${esc(p.name)}</button>`).join('')}</div></div>${analysis(S, board, who)}`;
     }

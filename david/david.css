@@ -685,3 +685,29 @@ input[type=number]:focus{outline:none;box-shadow:0 0 0 3px var(--yellow)}
   .teams2{grid-template-columns:1fr}.teams2 .vs{text-align:center}
   .diceread{bottom:140px}
 }
+
+/* ---------- 2.20 : billets, compte à rebours des échanges, onglet Dés ---------- */
+.banknote{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:128px;height:66px;border:2px solid var(--ink);border-radius:6px;
+  background:var(--bc,#a8d8a0);box-shadow:3px 3px 0 rgba(0,0,0,.35);overflow:hidden;flex:none;vertical-align:middle}
+.banknote::before{content:'';position:absolute;inset:5px;border:1.5px dashed rgba(22,24,29,.45);border-radius:4px;pointer-events:none}
+.banknote::after{content:'';position:absolute;width:44px;height:44px;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.35);pointer-events:none}
+.banknote b{position:relative;z-index:1;font-family:var(--bung);font-weight:400;font-size:19px;line-height:1;color:var(--ink)}
+.banknote small{position:relative;z-index:1;font-size:7.5px;font-weight:800;letter-spacing:1px;color:rgba(22,24,29,.7);margin-top:3px}
+.banknote .bc{position:absolute;left:8px;top:6px;font-style:normal;font-weight:900;font-size:11px;z-index:1}
+.banknote .bc.br{left:auto;top:auto;right:8px;bottom:5px}
+.banknote.b1{--bc:#f6f1e7}.banknote.b5{--bc:#f4b6c8}.banknote.b10{--bc:#9fd0f0}.banknote.b20{--bc:#a8d8a0}.banknote.b50{--bc:#c7a6e0}.banknote.b100{--bc:#f2dc9b}.banknote.b500{--bc:#f5a65b}
+.banknote.empty{opacity:.35;filter:grayscale(1)}
+.cashrow{display:flex;align-items:center;gap:10px}
+.cashrow input{width:110px}
+.cashrow .banknote{width:110px;height:56px}
+.cashrow .banknote b{font-size:16px}
+.ttimer{margin:0 0 10px;font-size:13px;font-weight:700}
+.ttimer .tbar{height:8px;border:2px solid var(--ink);border-radius:6px;background:#fffdf6;overflow:hidden;margin-top:4px}
+.ttimer .tbar i{display:block;height:100%;width:100%;background:var(--green);transition:width .25s linear}
+.ttimer.hot{color:#c62a12}.ttimer.hot .tbar i{background:#e3262f}
+[data-short].hot{color:#c62a12}
+.dicechart{width:100%;height:auto;max-height:280px;margin-top:6px}
+.dicechart .ax{font-size:12px;fill:var(--muted);font-weight:700}
+.legend2{display:flex;gap:16px;font-size:12px;font-weight:700;color:var(--muted);margin:2px 0 6px}
+.legend2 .sw{display:inline-block;width:16px;height:10px;margin-right:6px;vertical-align:-1px}
+.legend2 .sw.obs{background:#1C5FB4;border-radius:2px}.legend2 .sw.th{border-top:2.5px dashed #16181d;height:0;margin-bottom:3px}

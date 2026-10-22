@@ -13,7 +13,7 @@ import { tokenSvg } from './tokens.js';
 import { mountSetup } from './setup.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { esc, money, el, wait, store, save } from './util.js';
-import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
+import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml, billHtml } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
@@ -283,8 +283,11 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
           : `<span class="status">Construis, échange… ou passe la main</span>${abtn('Fin du tour ➜', { type: 'END_TURN' }, 'primary')}`;
       }
     } else {
-      const c = currentPlayer(S);
-      h = `<span class="status"><i class="dotc" style="background:${c.color}"></i>${esc(c.name)} joue…</span>`;
+      const c = currentPlayer(S), wait = S.trades.find((t) => t.from === c.id);
+      const left = wait && S.tradeUntil && S.tradeUntil[wait.id] ? ` · <b data-until="${S.tradeUntil[wait.id]}" data-short>…</b>` : '';
+      if (wait && wait.to === me.id) h = `<span class="status"><i class="dotc" style="background:${c.color}"></i>${esc(c.name)} attend ta réponse${left}</span><button class="btn yellow" data-open="offer">Voir la proposition</button>`;
+      else if (wait) h = `<span class="status"><i class="dotc" style="background:${c.color}"></i>${esc(c.name)} attend la réponse de ${esc(name(wait.to))}${left}</span>`;
+      else h = `<span class="status"><i class="dotc" style="background:${c.color}"></i>${esc(c.name)} joue…</span>`;
     }
     bar.innerHTML = h;
     const so = $('#showOver'); if (so) so.onclick = () => openOver();
@@ -311,7 +314,11 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       return;
     }
     const o = e.target.closest('[data-open]');
-    if (o) { const k = o.dataset.open; if (k === 'mine') openMine(); if (k === 'auction') openAuction(true); if (k === 'buy') openBuy(true); return; }
+    if (o) {
+      const k = o.dataset.open; if (k === 'mine') openMine(); if (k === 'auction') openAuction(true); if (k === 'buy') openBuy(true);
+      if (k === 'offer') { const t = S && S.trades.find((x) => x.to === me.id); if (t) { seenAuto.delete('offer:' + t.id); openOffer(t); } }
+      return;
+    }
     // carte d'un échange : la case clignote sur le plateau
     const pk = e.target.closest('[data-peek]');
     if (pk) { const i = +pk.dataset.peek; B.pulse(i); setTimeout(() => B.pulse(S && S.phase === 'buy' ? S.pendingBuy : -1), 1600); return; }
@@ -388,6 +395,12 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       B.tradeMarks(list);
     };
     box.addEventListener('change', marks); marks();
+    // l'argent proposé s'affiche en billet
+    box.addEventListener('input', (e) => {
+      if (!/^(g|w)Cash$/.test(e.target.id)) return;
+      const v = Math.max(0, Math.floor(Number(e.target.value) || 0)), old = e.target.parentElement.querySelector('[data-bill]');
+      if (old) old.outerHTML = billHtml(v, v ? '' : ' empty');
+    });
     box.querySelector('#tSend').onclick = () => {
       const pick = (k) => [...box.querySelectorAll(`[data-${k}]:checked`)].map((x) => +x.dataset[k]);
       const mine = meP(), them = S.players.find((p) => p.id === partner);
@@ -603,12 +616,23 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
 
   /* ---------------------------------------------------------- chrono */
   function tickTimer() {
+    // comptes à rebours des propositions d'échange
+    for (const e of root.querySelectorAll('[data-until]')) {
+      const left = Math.max(0, +e.dataset.until - (Date.now() + offset)), sec = Math.ceil(left / 1000);
+      const txt = sec >= 60 ? '1 min' : `${sec} s`;
+      if (e.hasAttribute('data-short')) e.textContent = txt;
+      else {
+        const l = e.querySelector('[data-left]'); if (l) l.textContent = txt;
+        const bar = e.querySelector('.tbar i'); if (bar) bar.style.width = (100 * left / (+e.dataset.total || 60000)) + '%';
+      }
+      e.classList.toggle('hot', left < 15000);
+    }
     if (!S || !S.endsAt) return;
     const left = Math.max(0, S.endsAt - (Date.now() + offset));
     const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
     const t = $('#timer'); t.textContent = `⏱ ${m}:${String(s).padStart(2, '0')}`; t.classList.toggle('hot', left < 5 * 60000);
   }
-  setInterval(tickTimer, 500);
+  setInterval(tickTimer, 250);
 
   // lecture des dés : la somme jouée reste affichée jusqu'au tour suivant (les dés 3D se lisent mal de biais)
   function diceRead(e, c) {

@@ -39,7 +39,7 @@ function teamsHtml(s, me) {
       ${canJoin ? `<button class="btn ghost small" data-team="${t}">Rejoindre</button>` : mine === t ? '<span class="tme">Ton équipe</span>' : ''}</div>`;
   };
   return `<div class="teams2">${col(0)}<div class="vs">VS</div>${col(1)}</div>
-    ${s.teams.tooMany ? '<p class="hint center warn">Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.</p>' : '<p class="hint center">Pas de loyer chez son coéquipier, échanges entre coéquipiers pour regrouper les couleurs. L\'équipe au plus gros patrimoine cumulé l\'emporte.</p>'}`;
+    ${s.teams.tooMany ? '<p class="hint center warn">Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.</p>' : '<p class="hint center">Pas de loyer chez son coéquipier, et une couleur détenue à deux suffit pour construire. L\'équipe au plus gros patrimoine cumulé l\'emporte.</p>'}`;
 }
 
 export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave, team = () => {} }) {

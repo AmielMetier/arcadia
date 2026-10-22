@@ -4,7 +4,7 @@
 //  - la prison est traitée comme une simple visite (on en sort au tour suivant) ;
 //  - les cartes Chance et Caisse de communauté déplacent le pion selon le paquet réel du plateau.
 // La distribution stationnaire est obtenue par itération de puissance.
-import { level, groupSpaces } from './valuation.js';
+import { level, groupSpaces, teamOwnsGroup } from './valuation.js';
 
 const N = 40;
 
@@ -95,7 +95,7 @@ export function currentRent(state, board, i) {
   if (sp.type === 'street') {
     if (pr.hotel) return sp.rent[5];
     if (pr.houses) return sp.rent[pr.houses];
-    return sp.rent[0] * (owned === groupSpaces(board, sp.group).length ? 2 : 1);
+    return sp.rent[0] * (teamOwnsGroup(state, board, pr.owner, sp.group) ? 2 : 1);
   }
   if (sp.type === 'station') return sp.rent[owned - 1];
   return 7 * sp.diceMultiplier[Math.min(owned, 2) - 1]; // espérance de la somme de deux dés = 7

@@ -7,7 +7,7 @@
 // botAction renvoie la prochaine action d'un bot, ou null. `memory` (objet modifiable) garde la trace
 // des échanges déjà proposés, pour ne pas harceler les autres joueurs.
 import { currentPlayer } from './rules.js';
-import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teammate } from './valuation.js';
+import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teammate, teamOwnsGroup } from './valuation.js';
 import { landingProbabilities } from './markov.js';
 import { normalBot } from './bot-normal.js';
 
@@ -72,7 +72,7 @@ function exposure(s, board, pid) {
     const pd = (6 - Math.abs(7 - d)) / 36, i = (me.pos + d) % 40, pr = s.props[i], sp = board.spaces[i];
     if (!pr || pr.owner == null || pr.owner === pid || pr.mortgaged || sameTeam(s, pr.owner, pid)) continue;
     let rent;
-    if (sp.type === 'street') rent = pr.hotel ? sp.rent[5] : pr.houses ? sp.rent[pr.houses] : sp.rent[0] * (ownsGroup(s, board, pr.owner, sp.group) ? 2 : 1);
+    if (sp.type === 'street') rent = pr.hotel ? sp.rent[5] : pr.houses ? sp.rent[pr.houses] : sp.rent[0] * (teamOwnsGroup(s, board, pr.owner, sp.group) ? 2 : 1);
     else if (sp.type === 'station') rent = sp.rent[groupSpaces(board, sp.group).filter((j) => s.props[j].owner === pr.owner).length - 1];
     else rent = 7 * sp.diceMultiplier[Math.min(2, groupSpaces(board, sp.group).filter((j) => s.props[j].owner === pr.owner).length) - 1];
     worst = Math.max(worst, rent); expected += pd * rent;
@@ -128,25 +128,12 @@ function teamPlay(s, board, pid, memory) {
   if (au && au.bidder === mate.id && au.active.includes(pid) && !au.passed.includes(pid)) return { type: 'PASS' };
   if (mate.bankrupt || s.debts.length || au || currentPlayer(s).id !== pid || s.phase !== 'end') return null;
   if (s.trades.some((t) => t.from === pid)) return null;
-  // regrouper un groupe de couleur détenu à deux : celui qui en a le plus le récupère (à égalité, le plus riche)
-  for (const g of Object.keys(board.groups)) {
-    if (g === 'station' || g === 'utility') continue;
-    const sp = groupSpaces(board, g);
-    if (sp.some((j) => s.props[j].owner !== pid && s.props[j].owner !== mate.id) || groupHasBuildings(s, board, g)) continue;
-    const mine = sp.filter((j) => s.props[j].owner === pid), theirs = sp.filter((j) => s.props[j].owner === mate.id);
-    if (!mine.length || !theirs.length) continue;
-    const key = `team:${g}:${s.turnCount >> 3}`;
-    if (memory[key]) continue;
-    memory[key] = true;
-    const iKeep = mine.length > theirs.length || (mine.length === theirs.length && me.cash >= mate.cash);
-    const none = { cash: 0, props: [], cards: [] };
-    return iKeep ? { type: 'PROPOSE_TRADE', to: mate.id, give: none, want: { ...none, props: theirs } }
-      : { type: 'PROPOSE_TRADE', to: mate.id, give: { ...none, props: mine }, want: none };
-  }
+  // (plus besoin de regrouper les couleurs : en 2 contre 2, une couleur détenue à deux suffit pour construire)
   // coup de pouce : un coéquipier presque à sec reçoit un peu d'argent
-  const key = `help:${s.turnCount}`;
-  if (mate.cash < 150 && me.cash > 700 && !memory[key]) {
-    memory[key] = true;
+  // au plus une fois tous les trois tours de table, pour ne pas assaillir un coéquipier humain de propositions
+  const key = `help:${mate.id}`, last = memory[key] ?? -99;
+  if (mate.cash < 150 && me.cash > 700 && s.turnCount - last >= 3 * s.players.length) {
+    memory[key] = s.turnCount;
     return { type: 'PROPOSE_TRADE', to: mate.id, give: { cash: Math.min(300, Math.floor((me.cash - 400) / 2 / 10) * 10), props: [], cards: [] }, want: { cash: 0, props: [], cards: [] } };
   }
   return null;
@@ -199,13 +186,13 @@ function expertBot(s, board, pid, memory) {
     const pi = landingProbabilities(board), opp = s.players.filter((q) => !q.bankrupt && q.id !== pid).length;
     let best = null;
     for (const g of Object.keys(board.groups)) {
-      if (g === 'station' || g === 'utility' || !ownsGroup(s, board, pid, g)) continue;
+      if (g === 'station' || g === 'utility' || !teamOwnsGroup(s, board, pid, g)) continue;
       const sp = groupSpaces(board, g);
       if (sp.some((j) => s.props[j].mortgaged)) continue;
       const minLv = Math.min(...sp.map((j) => level(s, j)));
       for (const j of sp) {
         const pr = s.props[j], spc = board.spaces[j];
-        if (pr.hotel || level(s, j) !== minLv) continue;
+        if (pr.owner !== pid || pr.hotel || level(s, j) !== minLv) continue;
         const toHotel = pr.houses === s.cfg.housesPerHotel;
         if (toHotel ? s.bank.hotels < 1 : s.bank.houses < 1) continue;
         const cur = pr.houses ? spc.rent[pr.houses] : spc.rent[0] * 2;
@@ -229,8 +216,12 @@ function expertBot(s, board, pid, memory) {
   return null;
 }
 
+// Échanges des bots : rares (au plus un tous les quatre tours de table), deux essais au plus par affaire
+// (un seul face à un humain), et simples : de l'argent rond, ou un seul terrain, jamais un panier compliqué.
 function tradeIdea(s, board, pid, reserve, memory) {
   const me = P(s, pid);
+  const lastKey = `last:${pid}`;
+  if (s.turnCount - (memory[lastKey] ?? -99) < 4 * s.players.length) return null;
   for (const g of Object.keys(board.groups)) {
     if (g === 'station' || g === 'utility') continue;
     const sp = groupSpaces(board, g), st = groupStatus(s, board, g, pid);
@@ -239,21 +230,28 @@ function tradeIdea(s, board, pid, reserve, memory) {
     if (owners.length !== 1) continue;                     // un seul adversaire détient le reste
     const other = owners[0], wanted = sp.filter((j) => s.props[j].owner === other);
     if (wanted.some((j) => level(s, j) > 0)) continue;
+    if (wanted.length > 1) continue;                       // on ne demande qu'un terrain à la fois
+    const human = !P(s, other).bot;
     const key = `${pid}>${other}:${wanted.join(',')}`;
     const mem = memory[key] || { tries: 0, at: -99 };
-    if (mem.tries >= 3 || s.turnCount - mem.at < 8) continue;
+    if (mem.tries >= (human ? 1 : 2) || s.turnCount - mem.at < 20) continue;
     const base = wanted.reduce((n, j) => n + board.spaces[j].price, 0);
-    let cash = Math.round(base * (1.35 + 0.3 * mem.tries) / 10) * 10;
-    // monnaie d'échange : un terrain qui intéresse l'autre sans lui donner de monopole
-    const mine = ownedBy(s, board, pid).filter((j) => !sp.includes(j) && !(isStreet(board, j) && groupHasBuildings(s, board, board.spaces[j].group)));
-    const sweet = mine.filter((j) => !givesMonopoly(s, board, [j], other) && !(isStreet(board, j) && groupStatus(s, board, board.spaces[j].group, pid).mine >= 2))
-      .sort((a, b) => stratValue(s, board, other, b) - stratValue(s, board, other, a))[0];
     const give = { cash: 0, props: [], cards: [] };
-    if (sweet != null) { give.props.push(sweet); cash = Math.max(0, cash - Math.round(board.spaces[sweet].price * 0.8 / 10) * 10); }
-    if (me.cash - cash < Math.min(reserve, 250)) cash = Math.max(0, me.cash - Math.min(reserve, 250));
-    give.cash = cash;
+    // 1) de l'argent, arrondi à 50 € : la proposition la plus lisible
+    const cash = Math.ceil(base * (1.5 + 0.25 * mem.tries) / 50) * 50;
+    if (me.cash - cash >= Math.min(reserve, 250)) give.cash = cash;
+    else {
+      // 2) sinon un seul terrain qui intéresse l'autre sans lui donner de monopole
+      const mine = ownedBy(s, board, pid).filter((j) => !sp.includes(j) && !s.props[j].mortgaged && !(isStreet(board, j) && groupHasBuildings(s, board, board.spaces[j].group)));
+      const sweet = mine.filter((j) => !givesMonopoly(s, board, [j], other) && !(isStreet(board, j) && groupStatus(s, board, board.spaces[j].group, pid).mine >= 2))
+        .filter((j) => stratValue(s, board, other, j) >= base * 1.15)
+        .sort((a, b) => board.spaces[a].price - board.spaces[b].price)[0];
+      if (sweet == null) continue;
+      give.props.push(sweet);
+    }
     if (sideValue(s, board, give, other) < base * 1.1) continue; // offre trop faible pour être honnête
     memory[key] = { tries: mem.tries + 1, at: s.turnCount };
+    memory[lastKey] = s.turnCount;
     return { type: 'PROPOSE_TRADE', to: other, give, want: { cash: 0, props: wanted, cards: [] } };
   }
   return null;
@@ -289,11 +287,12 @@ function easyBot(s, board, pid) {
   if (s.phase === 'end') {
     if (chance(s, pid, 2) < 0.35) {
       for (const g of Object.keys(board.groups)) {
-        if (g === 'station' || g === 'utility' || !ownsGroup(s, board, pid, g)) continue;
+        if (g === 'station' || g === 'utility' || !teamOwnsGroup(s, board, pid, g)) continue;
         const sp = groupSpaces(board, g);
         if (sp.some((j) => s.props[j].mortgaged)) continue;
-        const lowest = sp.reduce((a, b) => (level(s, b) < level(s, a) ? b : a));
-        if (s.props[lowest].hotel) continue;
+        const minLv = Math.min(...sp.map((j) => level(s, j)));
+        const lowest = sp.find((j) => level(s, j) === minLv && s.props[j].owner === pid);
+        if (lowest == null || s.props[lowest].hotel) continue;
         const toHotel = s.props[lowest].houses === s.cfg.housesPerHotel;
         if ((toHotel ? s.bank.hotels : s.bank.houses) < 1) continue;
         if (me.cash - board.spaces[lowest].houseCost >= 100) return { type: 'BUILD', space: lowest };

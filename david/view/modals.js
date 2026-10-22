@@ -2,7 +2,7 @@
 import { esc, money, el, inkOn } from './util.js';
 import { spaceIcon } from './icons.js';
 import { tokenSvg } from './tokens.js';
-import { ownsGroup, level, groupHasBuildings, ownedBy, standings, netWorth, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
+import { ownsGroup, teamOwnsGroup, level, groupHasBuildings, ownedBy, standings, netWorth, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
 /* ------------------------------------------------------------- titre de propriété */
 export function deedHtml(board, S, i, { compact = false } = {}) {
@@ -109,7 +109,7 @@ export function propertyHtml(board, S, me, i, name) {
     const row = [];
     const canManage = !S.auction && ((S.debts.length && S.debts[0].from === me.id) || (!S.debts.length && S.players[S.turn.cur].id === me.id));
     if (canManage) {
-      if (sp.type === 'street' && ownsGroup(S, board, me.id, sp.group) && !pr.hotel && !S.debts.length) {
+      if (sp.type === 'street' && teamOwnsGroup(S, board, me.id, sp.group) && !pr.hotel && !S.debts.length) {
         row.push(btn(pr.houses === S.cfg.housesPerHotel ? `Construire un hôtel · ${money(sp.houseCost)}` : `Construire une maison · ${money(sp.houseCost)}`, { type: 'BUILD', space: i }));
       }
       if (sp.type === 'street' && level(S, i) > 0) row.push(btn(`Vendre un bâtiment · +${money(sp.houseCost / 2)}`, { type: 'SELL_BUILDING', space: i }, 'ghost'));
@@ -132,7 +132,7 @@ export function mineHtml(board, S, me) {
   const w = netWorth(S, board, me.id);
   const rows = Object.keys(board.groups).filter((g) => groups[g]).map((g) => {
     const full = board.groups[g].spaces.length;
-    return `<div class="grp"><div class="gh"><i style="background:${board.groups[g].color}"></i>${esc(board.groups[g].name)} <small>${groups[g].length}/${full}${ownsGroup(S, board, me.id, g) && g !== 'station' && g !== 'utility' ? ' · monopole ♛' : ''}</small></div>
+    return `<div class="grp"><div class="gh"><i style="background:${board.groups[g].color}"></i>${esc(board.groups[g].name)} <small>${groups[g].length}/${full}${g !== 'station' && g !== 'utility' ? (ownsGroup(S, board, me.id, g) ? ' · monopole ♛' : teamOwnsGroup(S, board, me.id, g) ? ' · couleur d\'équipe ♛' : '') : ''}</small></div>
       <div class="gl">${groups[g].map((i) => { const sp = board.spaces[i], pr = S.props[i];
         return `<button class="pcard${pr.mortgaged ? ' mort' : ''}" data-prop="${i}"><b>${esc(sp.name)}</b><span>${pr.hotel ? '🏨 hôtel' : pr.houses ? '⌂'.repeat(pr.houses) : ''}${pr.mortgaged ? 'hypothéquée' : ''}</span></button>`; }).join('')}</div></div>`;
   }).join('');
@@ -150,6 +150,13 @@ const sideText = (board, sd) => {
   return parts.length ? parts.join(', ') : 'rien';
 };
 
+// Billet de banque à la couleur de la plus grosse coupure contenue (comme les billets du jeu original)
+const BILLS = [[500, 'b500'], [100, 'b100'], [50, 'b50'], [20, 'b20'], [10, 'b10'], [5, 'b5'], [0, 'b1']];
+export function billHtml(amount, extra = '') {
+  const v = Math.max(0, Math.floor(Number(amount) || 0)), cls = BILLS.find(([d]) => v >= d)[1];
+  return `<span class="banknote ${cls}${extra}" data-bill><i class="bc">€</i><i class="bc br">€</i><b>${money(v)}</b><small>BANQUE DE NICE</small></span>`;
+}
+
 // Petites cartes de titre (bande de couleur, nom, prix) : on voit d'un coup d'œil ce qui change de main
 export function miniDeeds(board, S, sd) {
   const cards = sd.props.map((i) => {
@@ -157,14 +164,22 @@ export function miniDeeds(board, S, sd) {
     const head = sp.type === 'street' ? `<i class="mband" style="background:${sp.color}"></i>` : `<i class="mico">${spaceIcon(sp)}</i>`;
     return `<button class="mdeed${pr && pr.mortgaged ? ' mort' : ''}" data-peek="${i}" title="Montrer sur le plateau">${head}<b>${esc(sp.name)}</b><small>${money(sp.price)}${pr && pr.mortgaged ? ' · hyp.' : ''}</small></button>`;
   });
-  if (sd.cash) cards.push(`<span class="mdeed cash"><i class="mband" style="background:#2fbf71"></i><b>${money(sd.cash)}</b><small>argent</small></span>`);
+  if (sd.cash) cards.push(billHtml(sd.cash));
   if (sd.cards.length) cards.push('<span class="mdeed card"><i class="mband" style="background:#F7941D"></i><b>Libéré de prison</b><small>carte</small></span>');
   return cards.length ? `<div class="mdeeds">${cards.join('')}</div>` : '<p class="hint">rien</p>';
+}
+
+// Compte à rebours d'une proposition (heure limite de l'hôte) ; mis à jour chaque demi-seconde par la vue
+export function tradeTimerHtml(S, t, name) {
+  const until = S.tradeUntil && S.tradeUntil[t.id];
+  if (until) return `<div class="ttimer" data-until="${until}" data-total="60000"><span>Temps pour répondre : <b data-left>…</b></span><div class="tbar"><i></i></div></div>`;
+  return `<p class="hint">Proposition valable jusqu'à la fin du tour de ${esc(name(t.from))}.</p>`;
 }
 
 export function offerHtml(board, S, t, name) {
   const mate = sameTeam(S, t.from, t.to);
   return `<h2>${mate ? 'Proposition de ton coéquipier' : 'Proposition d\'échange'}</h2>
+    ${tradeTimerHtml(S, t, name)}
     <div class="swap2"><div class="get"><small>Tu reçois de ${esc(name(t.from))}</small>${miniDeeds(board, S, t.give)}</div>
     <div class="arrow">⇄</div>
     <div class="give"><small>Tu donnes</small>${miniDeeds(board, S, t.want)}</div></div>
@@ -180,9 +195,9 @@ export function tradeComposeHtml(board, S, me, partner) {
   const out = S.trades.filter((t) => t.from === me.id);
   return `<h2>Proposer un échange</h2>
     <div class="seg">${others.map((p) => `<button data-partner="${p.id}" class="${p.id === partner ? 'sel' : ''}"><i style="background:${p.color}"></i>${esc(p.name)}${sameTeam(S, me.id, p.id) ? ' <small>coéquipier</small>' : ''}</button>`).join('')}</div>
-    <div class="cols"><div><h3>Tu donnes</h3>${col(me.id, 'g')}<label class="lbl">Argent (tu as ${money(mine.cash)})</label><input type="number" id="gCash" min="0" max="${mine.cash}" value="0">
+    <div class="cols"><div><h3>Tu donnes</h3>${col(me.id, 'g')}<label class="lbl">Argent (tu as ${money(mine.cash)})</label><div class="cashrow"><input type="number" id="gCash" min="0" max="${mine.cash}" step="10" value="0">${billHtml(0, ' empty')}</div>
       ${mine.jailCards.length ? '<label class="ck"><input type="checkbox" id="gCard"> Ta carte « Libéré de prison »</label>' : ''}</div>
-    <div><h3>Tu demandes</h3>${col(partner, 'w')}<label class="lbl">Argent</label><input type="number" id="wCash" min="0" value="0">
+    <div><h3>Tu demandes</h3>${col(partner, 'w')}<label class="lbl">Argent (${esc(them.name)} a ${money(them.cash)})</label><div class="cashrow"><input type="number" id="wCash" min="0" max="${them.cash}" step="10" value="0">${billHtml(0, ' empty')}</div>
       ${them.jailCards.length ? '<label class="ck"><input type="checkbox" id="wCard"> Sa carte « Libéré de prison »</label>' : ''}</div></div>
     ${out.length ? `<p class="hint">En attente : ${out.map((t) => `proposition à ${esc(S.players.find((q) => q.id === t.to).name)}${btn('Annuler', { type: 'CANCEL_TRADE', trade: t.id }, 'ghost tiny')}`).join(' · ')}</p>` : ''}
     <p class="hint">Les terrains cochés s'affichent sur le plateau. Les terrains d'un groupe bâti ne s'échangent pas : vends d'abord les bâtiments. Un terrain hypothéqué coûte 10 % d'intérêts à celui qui le reçoit. Une proposition sans réponse expire à la fin de ton tour.</p>

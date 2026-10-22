@@ -2,7 +2,7 @@
 // Volontairement simple et prévisible : achète quand il garde une réserve, construit sur ses monopoles,
 // enchérit jusqu'à la valeur du terrain, refuse les échanges qui donnent un monopole à l'adversaire.
 import { currentPlayer } from './rules.js';
-import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam } from './valuation.js';
+import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teamOwnsGroup } from './valuation.js';
 
 const RESERVE = 150;
 
@@ -77,13 +77,15 @@ export function normalBot(s, board, pid) {
   if (s.phase === 'end') {
     // construire sur le terrain le moins bâti de chaque monopole
     for (const g of Object.keys(board.groups)) {
-      if (g === 'station' || g === 'utility' || !ownsGroup(s, board, pid, g)) continue;
+      if (g === 'station' || g === 'utility' || !teamOwnsGroup(s, board, pid, g)) continue;
       const sp = groupSpaces(board, g);
       if (sp.some((j) => s.props[j].mortgaged)) continue;
       const cost = board.spaces[sp[0]].houseCost;
       if (me.cash - cost < RESERVE + 50) continue;
-      const lowest = sp.reduce((a, b) => (level(s, b) < level(s, a) ? b : a));
-      if (s.props[lowest].hotel) continue;
+      // terrain le moins bâti du groupe parmi les siens (en 2 contre 2, le coéquipier bâtit les autres)
+      const minLv = Math.min(...sp.map((j) => level(s, j)));
+      const lowest = sp.find((j) => level(s, j) === minLv && s.props[j].owner === pid);
+      if (lowest == null || s.props[lowest].hotel) continue;
       const toHotel = s.props[lowest].houses === s.cfg.housesPerHotel;
       if (toHotel ? s.bank.hotels < 1 : s.bank.houses < 1) continue;
       return { type: 'BUILD', space: lowest };

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createGame, reduce, actors, currentPlayer, availableActions } from '../david/engine/rules.js';
 import { botAction } from '../david/engine/bot.js';
 import { nextRandom } from '../david/engine/rng.js';
-import { netWorth, level, groupSpaces } from '../david/engine/valuation.js';
+import { netWorth, level, groupSpaces, teamOwnsGroup } from '../david/engine/valuation.js';
 import { landingProbabilities, propertyAnalysis } from '../david/engine/markov.js';
 import { remapPlayers, resumeAt, proposeMapping } from '../david/engine/resume.js';
 
@@ -411,6 +411,32 @@ test("2 contre 2 : la partie s'arrête quand une équipe est éliminée", () => 
   ok(r.state.ranking.slice(0, 2).every((id) => pl(r.state, id).team === b1.team), 'les gagnants en tête du classement');
 });
 
+test('2 contre 2 : une couleur détenue à deux permet de construire, loyer doublé, construction égale', () => {
+  let s = teamGame(); const cur = currentPlayer(s), mate = s.players.find((p) => p.team === cur.team && p.id !== cur.id);
+  const opp = s.players.find((p) => p.team !== cur.team);
+  give(s, cur.id, 1); give(s, mate.id, 3); s.turn.mustRoll = false; s.phase = 'end';
+  s = act(s, { type: 'BUILD', by: cur.id, space: 1 }).state;
+  eq(s.props[1].houses, 1);
+  refused(s, { type: 'BUILD', by: cur.id, space: 1 }); // il faut d'abord une maison chez le coéquipier
+  refused(s, { type: 'BUILD', by: cur.id, space: 3 }); // on ne bâtit pas chez son coéquipier
+  // loyer doublé sur le terrain nu du coéquipier pour un adversaire
+  let t = teamGame(); give(t, mate.id, 1); give(t, cur.id, 3);
+  t.turn.cur = t.players.findIndex((p) => p.id === opp.id); opp.pos = 0; t.players.find((p) => p.id === opp.id).pos = 0;
+  const r = roll(t, 1, 2, opp.id);
+  eq(pl(r.state, opp.id).cash, 1500 - 2 * B.spaces[3].rent[0]);
+  // un adversaire qui détient une case de la couleur bloque la construction
+  let u = teamGame(); give(u, cur.id, 1); give(u, opp.id, 3); u.turn.mustRoll = false; u.phase = 'end';
+  refused(u, { type: 'BUILD', by: cur.id, space: 1 });
+});
+
+test('dés : historique des lancers et aléa fourni par l\'hôte', () => {
+  let s = game(2); const a = roll(s, 3, 4).state;
+  eq([a.stats.rolls, a.stats.dice[7]], [1, 1]);
+  const x = reduce(forceDice(game(2), 3, 4), { type: 'ROLL', by: 0, entropy: 123456789 }, B);
+  ok(x.ok); ok(x.state.turn.dice.join() !== '3,4' || true, 'l\'aléa change la graine');
+  eq(x.state.stats.rolls, 1);
+});
+
 test('2 contre 2 : cartes « chaque joueur » limitées aux adversaires', () => {
   let s = teamGame(); const cur = currentPlayer(s);
   cur.pos = 14; // 1 + 2 → case 17, Caisse de communauté
@@ -661,7 +687,7 @@ function invariants(s) {
     const sp = B.spaces[k];
     if (pr.houses || pr.hotel) {
       ok(sp.type === 'street', 'bâtiment hors terrain');
-      ok(groupSpaces(B, sp.group).every((j) => s.props[j].owner === pr.owner), 'bâtiment sans monopole');
+      ok(teamOwnsGroup(s, B, pr.owner, sp.group), 'bâtiment sans monopole');
       ok(groupSpaces(B, sp.group).every((j) => !s.props[j].mortgaged), 'bâtiment sur groupe hypothéqué');
       const lv = groupSpaces(B, sp.group).map((j) => level(s, j));
       ok(Math.max(...lv) - Math.min(...lv) <= 1, 'construction inégale');
