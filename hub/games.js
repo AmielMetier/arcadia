@@ -260,6 +260,48 @@ window.HUB_GAMES = [
       <line x1="195" y1="120" x2="45" y2="85" stroke="#ff3344" stroke-width="1.8" opacity="0.85" stroke-dasharray="4 2"/>
     </svg>`,
   },
+  {
+    id: 'filrouge',
+    title: 'Fil Rouge',
+    tag: 'Désamorçage à deux voix',
+    desc: 'Un démineur voit la bombe en 3D, l\'expert a le manuel posé sur sa table. Parlez-vous, coupez le bon fil… ou affrontez une autre équipe sur la même bombe.',
+    url: 'filrouge/',
+    minPlayers: 2, maxPlayers: 6,
+    accent: '#c8102e',
+    settings: [
+      { key: 'mode', label: 'Mode', options: [['coop', '🤝 Coopération'], ['versus', '⚔️ Duel · 2 contre 2']], def: 'coop' },
+      { key: 'diff', label: 'Bombe', options: [['initiation', 'Initiation · 2 modules'], ['facile', 'Facile · 3'], ['normal', 'Moyen · 5'], ['expert', 'Difficile · 7']], def: 'facile' },
+      { key: 'strikes', label: 'Fautes permises', options: [[1, '1'], [3, '3'], [5, '5']], def: 3 },
+      { key: 'sabotage', label: 'Sabotages en duel', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+    ],
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="320" height="180" fill="#2a2016"/>
+      <rect y="118" width="320" height="62" fill="#7a4f2c"/>
+      <path d="M0 118 H320" stroke="#16181d" stroke-width="3"/>
+      <ellipse cx="160" cy="16" rx="120" ry="70" fill="#ffd27a" opacity=".18"/>
+      <g transform="translate(70 40)">
+        <rect x="0" y="0" width="128" height="90" rx="10" fill="#59654a" stroke="#16181d" stroke-width="4"/>
+        <rect x="10" y="10" width="50" height="34" rx="4" fill="#16181d"/>
+        <text x="35" y="34" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="16" fill="#ff3a3a">0:42</text>
+        <rect x="68" y="10" width="50" height="34" rx="4" fill="#e9e3d3" stroke="#16181d" stroke-width="2"/>
+        <path d="M72 18 C 88 18, 98 36, 114 36" stroke="#d62828" stroke-width="4" fill="none"/>
+        <path d="M72 36 C 88 36, 98 18, 114 18" stroke="#1d5fd1" stroke-width="4" fill="none"/>
+        <path d="M72 27 H 90 M 96 27 H 114" stroke="#f2c200" stroke-width="4"/>
+        <rect x="10" y="50" width="50" height="32" rx="4" fill="#2c3038"/>
+        <circle cx="35" cy="66" r="11" fill="#bbb" stroke="#16181d" stroke-width="2"/>
+        <rect x="68" y="50" width="50" height="32" rx="4" fill="#2c3038"/>
+        <g fill="#e23b3b"><rect x="72" y="62" width="9" height="16"/></g><g fill="#2f6fe0"><rect x="83" y="62" width="9" height="16"/></g><g fill="#f4c51d"><rect x="94" y="62" width="9" height="16"/></g><g fill="#2fb35c"><rect x="105" y="62" width="9" height="16"/></g>
+        <path d="M44 0 a20 14 0 0 1 40 0" fill="none" stroke="#16181d" stroke-width="6"/>
+      </g>
+      <g transform="translate(212 104) rotate(-8)">
+        <rect x="0" y="0" width="84" height="56" rx="4" fill="#7a1526" stroke="#16181d" stroke-width="3"/>
+        <rect x="4" y="3" width="37" height="49" fill="#f6efdc"/><rect x="43" y="3" width="37" height="49" fill="#f6efdc"/>
+        <g stroke="#b9ad92" stroke-width="2"><path d="M8 14h28M8 21h28M8 28h22M47 14h28M47 21h28M47 28h28M47 35h20"/></g>
+        <text x="22" y="46" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="9" fill="#b3122a">✂</text>
+      </g>
+      <path d="M150 140 q 40 -30 70 -20" stroke="#d62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </svg>`,
+  },
 ];
 
 

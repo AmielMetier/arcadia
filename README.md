@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash et Tête de Calcul
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul et Fil Rouge
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -31,18 +31,27 @@ devinettes, ordres de grandeur, et le **Compte est bon** (atteindre une cible av
 - **Sabotage** : une série de 3 rapporte un pouvoir (brouillard, chrono volé, tête à l'envers, bouclier) à lancer sur un adversaire
 - Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium, statistiques et récapitulatif de tes erreurs avec leurs astuces
 
+## Fil Rouge
+Désamorçage à deux voix, de 2 à 6 joueurs : le démineur voit la bombe en 3D et la tourne (Z/S, Q/D, A/E),
+l'expert a le manuel posé sur sa table, un livret 3D dont les règles changent à chaque partie. Parlez-vous !
+
+- **Modes** : Coopération (une personne à la bombe, une au manuel), ou Duel 2 contre 2 sur la même bombe (avec sabotages et chat d'équipe secret)
+- **6 modules** : raccordements, coffre à symboles, leviers, carillon, tuyauterie, manomètres ; l'extérieur de la bombe compte (lot, tampons, vis)
+- **4 difficultés**, de l'Initiation (2 modules) à Difficile (7 modules)
+- Conception et idées pour la suite : [docs/FIL-ROUGE.md](docs/FIL-ROUGE.md)
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator ;
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
-  `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul.
+  `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.13** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.16** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude
