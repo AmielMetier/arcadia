@@ -25,7 +25,11 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
-  '.ttf': 'font/ttf'
+  '.ttf': 'font/ttf',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.wav': 'audio/wav'
 };
 
 const server = http.createServer((req, res) => {
