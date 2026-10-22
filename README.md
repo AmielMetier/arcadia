@@ -75,4 +75,4 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 
 Version actuelle : **2.19** — voir le [journal des versions](CHANGELOG.md).
 
-by Amiel and Claude
+by Amiel, Nicolas, Gabriel and Claude
