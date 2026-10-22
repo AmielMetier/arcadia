@@ -31,7 +31,7 @@ export function makeConfig(s = {}) {
 export const timeLeft = (team, now) => Math.max(0, team.clock.left - Math.max(0, now - team.clock.at) * team.clock.rate);
 export const manualOf = (() => { let last = null; return (edition) => (last && last.edition === edition ? last : (last = makeManual(edition))); })();
 
-// Rôles : chaque équipe a un démineur ; un joueur seul dans son équipe fait les deux (il a aussi le manuel)
+// Rôles : chaque équipe a un seul démineur (la bombe, jamais le manuel) ; les autres sont experts (le manuel)
 export function fixRoles(players, mode) {
   const nTeams = mode === 'versus' ? 2 : 1;
   const out = players.map((p) => ({ ...p, team: Math.max(0, Math.min(nTeams - 1, p.team | 0)), role: p.role === 'defuser' ? 'defuser' : 'expert' }));
@@ -44,11 +44,11 @@ export function fixRoles(players, mode) {
   return out;
 }
 export function teamsReady(players, mode) {
-  if (!players.length) return 'Personne dans la partie.';
+  // le démineur n'a jamais le manuel : il faut au moins un expert à côté de lui
   if (mode === 'versus') {
-    if (players.length < 2) return 'Le duel se joue à 2 joueurs minimum.';
-    if (![0, 1].every((t) => players.some((p) => p.team === t))) return 'Chaque équipe doit avoir au moins un joueur.';
-  }
+    if (players.length < 4) return 'Le duel se joue à 4 minimum : 2 contre 2.';
+    if (![0, 1].every((t) => players.filter((p) => p.team === t).length >= 2)) return 'Chaque équipe a besoin de 2 joueurs : un démineur et un expert.';
+  } else if (players.length < 2) return 'Fil Rouge se joue à deux : une personne à la bombe, une personne au manuel.';
   return '';
 }
 
@@ -68,8 +68,7 @@ export function createGame({ players, cfg, seed, now }) {
   return { phase: 'play', cfg, seed, edition, players: ps, teams, startedAt: now, n: 0, winner: null, ranking: null };
 }
 
-const solo = (state, team) => state.players.filter((p) => p.team === team).length === 1;
-export const canSeeManual = (state, id) => { const p = state.players.find((q) => q.id === id); return !!p && (p.role === 'expert' || solo(state, p.team)); };
+export const canSeeManual = (state, id) => { const p = state.players.find((q) => q.id === id); return !!p && p.role === 'expert'; };
 
 function finishTeam(state, team, status, now, ev) {
   team.left = timeLeft(team, now);

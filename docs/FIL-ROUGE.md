@@ -3,11 +3,12 @@
 Un jeu de communication asymétrique : le **démineur** voit la bombe en 3D mais n'a pas le manuel,
 l'**expert** a le manuel posé devant lui sur la table mais ne voit pas la bombe. Ils doivent se parler.
 
-- **Coopération** (1 à 6 joueurs) : une équipe, un démineur, les autres lisent le manuel.
-- **Duel** (2 à 6 joueurs, typiquement 2 contre 2) : deux équipes reçoivent **la même bombe** (même graine).
+Le démineur n'a **jamais** le manuel : il faut toujours au moins une personne à la bombe et une personne au manuel.
+
+- **Coopération** (2 à 6 joueurs) : une équipe, un démineur, les autres lisent le manuel.
+- **Duel** (4 à 6 joueurs, 2 contre 2 ou 3 contre 3) : deux équipes reçoivent **la même bombe** (même graine).
   La première qui la désamorce gagne ; si une équipe saute, l'autre gagne. Chaque module désamorcé envoie
   un **sabotage** à l'équipe adverse. Le chat est réservé à l'équipe pendant la partie.
-- **Seul** : on fait les deux rôles, le manuel est posé à droite de la bombe (touche M).
 
 ## Ce qui est en jeu (version 2.15)
 
@@ -26,7 +27,6 @@ sa hauteur suit son point le plus bas quand on la tourne.
 | Clic | sur un module : s'en approcher ; sur une pièce : agir |
 | Glisser, molette | tourner, zoomer |
 | Échap, clic droit | reculer |
-| M | se pencher sur le manuel (seul) |
 | Icônes du bandeau | tourner la bombe et zoomer sur un module, même au dos |
 
 Les touches de rotation sont lues par **position** (`KeyboardEvent.code`) : ZQSD en AZERTY, WASD en QWERTY.
@@ -155,7 +155,7 @@ par un coéquipier ; une équipe vide abandonne.
 - **Chat vocal intégré** (WebRTC audio) par équipe. Il faut ajouter `microphone` à l'attribut `allow` de l'iframe dans le Hub,
   et passer les flux audio par la connexion PeerJS existante.
 - **Talkie-walkie** : appuyer sur Espace pour parler, avec un grésillement ; en duel, le sabotage « brouilleur » le coupe.
-- Réponses rapides contextuelles (« Le fil A va au 4, il est rouge ») générées en cliquant sur un fil quand on est seul.
+- Réponses rapides contextuelles (« Le fil A va au 4, il est rouge ») générées en cliquant sur un fil.
 
 ### Progression et rejouabilité
 - Statistiques : modules les plus ratés, temps moyen par module, meilleur duo démineur/expert.

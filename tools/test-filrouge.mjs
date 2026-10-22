@@ -1,5 +1,5 @@
 // Tests du moteur de Fil Rouge : node tools/test-filrouge.mjs
-import { createGame, act, tick, makeConfig, solutionOf, timeLeft, dropPlayer, fixRoles, INTRO_MS, manualOf } from '../filrouge/engine/rules.js';
+import { createGame, act, tick, makeConfig, solutionOf, timeLeft, dropPlayer, fixRoles, teamsReady, canSeeManual, INTRO_MS, manualOf } from '../filrouge/engine/rules.js';
 import { MODULES, pipeFlow } from '../filrouge/engine/modules.js';
 
 let fails = 0, checks = 0;
@@ -82,6 +82,18 @@ for (let seed = 1; seed <= 400; seed++) {
   const r = act(s, { by: 3, now: GO, ...solutionOf(s, 1).find((a) => a.op === 'cut' || a.op === 'submit' || a.op === 'open' || a.op === 'enter' || a.op === 'key') });
   ok(r.ok, 'action du démineur adverse acceptée');
   ok(fixRoles([{ id: 1, team: 0, role: 'defuser' }, { id: 2, team: 0, role: 'defuser' }], 'coop').filter((p) => p.role === 'defuser').length === 1, 'un seul démineur par équipe');
+}
+
+// 4 bis. Le démineur n'a jamais le manuel : au moins 2 par équipe
+{
+  ok(teamsReady([{ id: 1, team: 0, role: 'defuser' }], 'coop') !== '', 'seul : partie refusée');
+  ok(teamsReady(fixRoles(P2, 'coop'), 'coop') === '', 'à deux : partie acceptée');
+  ok(teamsReady(fixRoles(P4.slice(0, 3), 'versus'), 'versus') !== '', 'duel à 3 : refusé');
+  ok(teamsReady(fixRoles(P4, 'versus'), 'versus') === '', 'duel 2 contre 2 : accepté');
+  let threw = false; try { createGame({ players: P2.slice(0, 1), cfg: makeConfig({}), seed: 1, now: T0 }); } catch (e) { threw = true; }
+  ok(threw, 'createGame refuse un joueur seul');
+  const s = createGame({ players: P4, cfg: makeConfig({ mode: 'versus' }), seed: 3, now: T0 });
+  ok(s.players.every((p) => canSeeManual(s, p.id) === (p.role === 'expert')), 'seuls les experts ont le manuel');
 }
 
 // 5. Départ d'un joueur : un coéquipier reprend la bombe ; équipe vide = abandon

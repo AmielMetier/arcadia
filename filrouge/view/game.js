@@ -3,7 +3,7 @@
 import { createScene } from './scene.js';
 import { mountManual } from './manual.js';
 import { sfx } from './sfx.js';
-import { DIFFS, TEAMS, timeLeft, canSeeManual, manualOf } from '../engine/rules.js';
+import { DIFFS, TEAMS, timeLeft, manualOf } from '../engine/rules.js';
 import { makeBomb } from '../engine/modules.js';
 import { rngOf, randomSeed } from '../engine/rng.js';
 import { MODULE_INFO } from '../engine/manual.js';
@@ -26,7 +26,6 @@ export function mountGame(root, { me, session, exit }) {
       <div class="prog" id="hProg"></div>
       <div class="opp" id="hOpp" hidden></div>
       <div class="tools">
-        <button class="tool" id="tManual" title="Manuel (M)" hidden>📘</button>
         <button class="tool" id="tReset" title="Remettre la bombe de face (R)" hidden>⟲</button>
         <button class="tool" id="tFlip" title="Retourner la bombe (F)" hidden>⇋</button>
         <button class="tool" id="tSound" title="Son">🔊</button>
@@ -58,29 +57,26 @@ export function mountGame(root, { me, session, exit }) {
       <div><kbd>R</kbd> de face · <kbd>F</kbd> retourner · <kbd>Échap</kbd> reculer</div>
       <div>Clic sur un module : zoom · clic sur une pièce : agir</div>
       <div>Glisser : tourner · molette : zoom</div>`,
-    solo: '<div><kbd>M</kbd> ou clic sur le manuel posé à droite : le lire</div>',
     book: `<div>Clic page droite / gauche ou <kbd>←</kbd><kbd>→</kbd> : tourner les pages</div>
       <div>Onglets sur la tranche : aller au module</div>
       <div>Molette : zoom · glisser : déplacer</div>`,
-    bookSolo: '<div><kbd>M</kbd>, <kbd>Échap</kbd> ou clic à côté : retour à la bombe</div>',
   };
   // les touches de rotation sont lues par position : on affiche la lettre du clavier de chacun (AZERTY par défaut)
   let layout = null;
   try { if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then((m) => { layout = m; setHelp(); }).catch(() => {}); } catch (e) {}
   function setHelp() {
-    const book = scene && scene.bookOn;
-    $('#helpBody').innerHTML = role === 'expert' ? HELP.book : book ? HELP.book + HELP.bookSolo : HELP.bomb + (canManual ? HELP.solo : '');
+    $('#helpBody').innerHTML = role === 'expert' ? HELP.book : HELP.bomb;
     if (layout) for (const k of root.querySelectorAll('#helpBody kbd[data-code]')) { const l = layout.get(k.dataset.code); if (l) k.textContent = l.toUpperCase(); }
   }
   let previewEd = 0;
   let scene = null, manual = null, manualEd = 0, gameKey = '', state = null, offset = 0, setupS = null;
-  let myTeam = 0, role = 'expert', canManual = false, manualOpen = false, lastSolved = -1;
+  let myTeam = 0, role = 'expert', manualOpen = false, lastSolved = -1;
 
   /* ---------------------------------------------------------- scène 3D (créée une fois) */
   function ensureScene() {
     if (scene) return scene;
     try {
-      scene = createScene($('#stage'), { onPick: pick, onFocus: () => {}, onBook: (on) => { manualOpen = on; $('#tManual').classList.toggle('on', on); setHelp(); sfx.page(); } });
+      scene = createScene($('#stage'), { onPick: pick, onFocus: () => {}, onBook: () => sfx.page() });
       scene.onSecond((sec, rate) => { if (role === 'defuser') sfx.tick(sec <= 10 || rate > 1); });
     } catch (e) {
       console.error(e);
@@ -131,7 +127,6 @@ export function mountGame(root, { me, session, exit }) {
   $('#tQuit').onclick = exit;
   $('#tReset').onclick = () => scene && scene.reset();
   $('#tFlip').onclick = () => scene && scene.flip();
-  $('#tManual').onclick = () => setManualOpen(!manualOpen);
   $('#helpX').onclick = () => { $('#help').classList.toggle('mini'); };
   // l'aide se replie d'elle-même au bout de quelques secondes de jeu
   let helpTimer = 0;
@@ -146,14 +141,11 @@ export function mountGame(root, { me, session, exit }) {
   if (matchMedia('(pointer: coarse)').matches) root.querySelector('.fr').classList.add('touch');
   window.addEventListener('keydown', (e) => {
     if (/INPUT|TEXTAREA/.test(e.target.tagName)) return;
-    // M se lit par sa lettre (sur AZERTY, la touche M a le code « Semicolon »)
-    if ((e.key || '').toLowerCase() === 'm' && canManual && role === 'defuser' && state && state.phase === 'play') setManualOpen(!manualOpen);
     if (e.code === 'Enter' && !$('#chat').hidden) { e.preventDefault(); $('#chatIn').focus(); }
   });
 
+  // secours sans 3D : manuel HTML (experts seulement)
   function setManualOpen(v) {
-    if (scene) { scene.setBookView(v); return; }
-    // secours sans 3D : manuel HTML à côté
     manualOpen = v;
     root.querySelector('.fr').classList.toggle('split', role === 'defuser' && manualOpen);
     $('#manualBox').hidden = !(role === 'expert' || manualOpen);
@@ -177,7 +169,7 @@ export function mountGame(root, { me, session, exit }) {
     $('#manualBox').hidden = true; root.querySelector('.fr').classList.remove('split', 'expert');
     $('#stage').hidden = false;
     if (gameKey !== 'preview') { gameKey = ''; previewBomb(); }
-    if (scene) { scene.setBombVisible(true); scene.setBookView(false, false); scene.setManual(previewEd); }
+    if (scene) { scene.setBombVisible(true); scene.setBookView(false, false); scene.setManual(null); }
     const versus = s.cfg.mode === 'versus';
     const mine = s.players.find((p) => p.id === me.id);
     const host = session.isHost;
@@ -185,7 +177,7 @@ export function mountGame(root, { me, session, exit }) {
       const ps = s.players.filter((p) => p.team === t);
       return `<div class="tcol" style="--tc:${versus ? TEAMS[t].color : '#ffc531'}"><h3>${versus ? esc(TEAMS[t].name) : 'Ton équipe'}</h3>
         ${ps.map((p) => `<div class="prow${p.id === me.id ? ' me' : ''}${p.ready ? '' : ' wait'}"><i style="background:${esc(p.color)}"></i><span>${esc(p.name)}</span>
-          <em class="${p.role}">${p.role === 'defuser' ? '💣 Démineur' : '📘 Expert'}${ps.length === 1 ? ' + 📘' : ''}</em>${p.ready ? '' : '<small>charge…</small>'}</div>`).join('') || '<div class="prow empty">Personne</div>'}
+          <em class="${p.role}">${p.role === 'defuser' ? '💣 Démineur' : '📘 Expert'}</em>${p.ready ? '' : '<small>charge…</small>'}</div>`).join('') || '<div class="prow empty">Personne</div>'}
         ${mine && versus && mine.team !== t ? `<button class="btn small ghost" data-team="${t}">Rejoindre</button>` : ''}</div>`;
     };
     $('#setup').innerHTML = `<div class="card setupcard">
@@ -199,16 +191,17 @@ export function mountGame(root, { me, session, exit }) {
         <div><b>💣 Le démineur</b> voit la bombe en 3D, la tourne et la manipule… mais n'a pas le manuel.</div>
         <div><b>📘 L'expert</b> a le manuel… mais ne voit pas la bombe. Parlez-vous (vocal ou chat d'équipe) !</div>
         ${versus ? '<div><b>⚔️ Duel</b> : les deux équipes ont la même bombe. La première qui la désamorce gagne. Chaque module désamorcé envoie un sabotage à l\'autre équipe.</div>' : ''}
-        <div><b>Seul ?</b> Tu fais les deux : le manuel est posé sur la table, à côté de la bombe (touche M).</div>
+        <div><b>À deux minimum</b> : une personne à la bombe, une personne au manuel${versus ? ' — en duel, 2 par équipe' : ''}. Le démineur n'a jamais le manuel.</div>
       </div>
       ${s.error ? `<p class="err">${esc(s.error)}</p>` : ''}
-      <div class="row end">${host ? `${s.players.length > 1 ? '<button class="btn ghost" id="sShuffle">🎲 Au hasard</button>' : ''}<button class="btn big primary" id="sGo" ${s.error ? 'disabled' : ''}>Lancer la partie</button>` : '<span class="waiting">L\'hôte lance la partie…</span>'}</div>
+      <div class="row end">${host ? `${s.players.length > 1 ? '<button class="btn ghost" id="sShuffle">🎲 Au hasard</button>' : ''}<button class="btn big primary" id="sGo" ${s.error ? 'disabled' : ''}>Lancer la partie</button>` : '<span class="waiting">L\'hôte lance la partie…</span>'}<button class="btn ghost" id="sExit">Retour au salon</button></div>
     </div>`;
     $('#setup').hidden = false;
     for (const b of root.querySelectorAll('#setup [data-role]')) b.onclick = () => session.pick({ role: b.dataset.role });
     for (const b of root.querySelectorAll('#setup [data-team]')) b.onclick = () => session.pick({ team: Number(b.dataset.team) });
     if ($('#sShuffle')) $('#sShuffle').onclick = () => session.shuffle();
     if ($('#sGo')) $('#sGo').onclick = () => session.start();
+    $('#sExit').onclick = exit;
   }
 
   /* ---------------------------------------------------------- partie */
@@ -227,17 +220,15 @@ export function mountGame(root, { me, session, exit }) {
       if (ensureScene()) { scene.setBomb(team, { edition: s.edition, maxStrikes: s.cfg.strikes }); scene.setBookView(false, false); }
       if (now() < team.clock.at) countdown(team.clock.at);
       $('#help').classList.remove('mini'); foldHelp();
-      if (p && p.role === 'defuser' && canSeeManual(s, me.id)) setTimeout(() => toast('📘 Le manuel est posé à droite de la bombe : touche M pour le lire'), 3800);
     }
     role = newRole;
-    canManual = !p || canSeeManual(s, me.id);
     if (!p) role = 'expert'; // spectateur : il lit le manuel
     const fr = root.querySelector('.fr');
     if (scene) {
       // tout est dans la pièce : l'expert a le manuel devant lui, sans la bombe
       scene.setBombVisible(role === 'defuser');
-      scene.setManual(canManual ? s.edition : null);
-      scene.setBookView(role === 'expert' || (manualOpen && canManual), role === 'expert');
+      scene.setManual(role === 'expert' ? s.edition : null);
+      scene.setBookView(role === 'expert', role === 'expert');
       $('#manualBox').hidden = true;
     } else {
       ensureManual(s.edition);
@@ -248,7 +239,6 @@ export function mountGame(root, { me, session, exit }) {
     $('#help').hidden = s.phase !== 'play';
     $('#pad').hidden = role !== 'defuser' || s.phase !== 'play';
     $('#tReset').hidden = $('#tFlip').hidden = role !== 'defuser';
-    $('#tManual').hidden = !(role === 'defuser' && canManual);
     $('#hud').hidden = false; $('#chat').hidden = false;
     setHelp();
     if (scene) scene.setTeam(team, off);
@@ -256,7 +246,7 @@ export function mountGame(root, { me, session, exit }) {
 
     // en-tête
     const versus = s.cfg.mode === 'versus';
-    $('#hTeam').innerHTML = `<i style="background:${versus ? team.color : '#ffc531'}"></i>${versus ? esc(team.name) : 'Coopération'}<small>${p ? (p.role === 'defuser' ? (canManual ? '💣 Démineur + 📘' : '💣 Démineur') : '📘 Expert') : 'Spectateur'}</small>`;
+    $('#hTeam').innerHTML = `<i style="background:${versus ? team.color : '#ffc531'}"></i>${versus ? esc(team.name) : 'Coopération'}<small>${p ? (p.role === 'defuser' ? '💣 Démineur' : '📘 Expert') : 'Spectateur'}</small>`;
     $('#hProg').innerHTML = team.bomb.modules.map((m, k) => `<button data-m="${k}" class="${m.solved ? 'ok' : ''}" title="${MODULE_INFO[m.type].name}${m.slot >= 6 ? ' (au dos)' : ''}" ${role === 'defuser' ? '' : 'tabindex="-1"'}>${MODULE_INFO[m.type].icon}</button>`).join('');
     for (const b of root.querySelectorAll('#hProg button')) b.onclick = () => { if (scene && role === 'defuser') scene.focusModule(Number(b.dataset.m), true); };
     const opp = versus ? s.teams[1 - myTeam] : null;

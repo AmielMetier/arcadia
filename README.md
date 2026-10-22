@@ -32,10 +32,10 @@ devinettes, ordres de grandeur, et le **Compte est bon** (atteindre une cible av
 - Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium, statistiques et récapitulatif de tes erreurs avec leurs astuces
 
 ## Fil Rouge
-Désamorçage à deux voix, jusqu'à 6 joueurs : le démineur voit la bombe en 3D et la tourne (Z/S, Q/D, A/E),
+Désamorçage à deux voix, de 2 à 6 joueurs : le démineur voit la bombe en 3D et la tourne (Z/S, Q/D, A/E),
 l'expert a le manuel posé sur sa table, un livret 3D dont les règles changent à chaque partie. Parlez-vous !
 
-- **Modes** : Coopération, ou Duel à deux équipes sur la même bombe (avec sabotages et chat d'équipe secret)
+- **Modes** : Coopération (une personne à la bombe, une au manuel), ou Duel 2 contre 2 sur la même bombe (avec sabotages et chat d'équipe secret)
 - **6 modules** : raccordements, coffre à symboles, leviers, carillon, tuyauterie, manomètres ; l'extérieur de la bombe compte (lot, tampons, vis)
 - **4 difficultés**, de l'Initiation (2 modules) à Difficile (7 modules)
 - Conception et idées pour la suite : [docs/FIL-ROUGE.md](docs/FIL-ROUGE.md)

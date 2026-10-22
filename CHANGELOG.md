@@ -2,7 +2,8 @@
 
 ## 2.15 — 22 octobre 2026
 - Nouveau jeu : **Fil Rouge**, désamorçage à deux voix. Le démineur voit la bombe en 3D, l'expert a le manuel posé sur sa table.
-  Coopération (1 à 6 joueurs) ou **Duel** : deux équipes, la même bombe, la première qui la désamorce gagne.
+  Coopération (2 à 6 joueurs) ou **Duel** 2 contre 2 : deux équipes, la même bombe, la première qui la désamorce gagne.
+  Le démineur n'a jamais le manuel : une personne à la bombe, une personne au manuel.
 - Une vraie pièce en 3D : table en bois sous une suspension, ombres, fenêtre sur la Baie des Anges la nuit.
   On tourne la bombe avec Z/S, Q/D, A/E (WASD/QE en QWERTY) ou à la souris, on clique un module pour s'en approcher.
 - Six modules : raccordements, coffre à symboles, leviers, carillon (mélodie à décrire), tuyauterie, manomètres.

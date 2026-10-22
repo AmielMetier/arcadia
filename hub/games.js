@@ -265,10 +265,10 @@ window.HUB_GAMES = [
     tag: 'Désamorçage à deux voix',
     desc: 'Un démineur voit la bombe en 3D, l\'expert a le manuel posé sur sa table. Parlez-vous, coupez le bon fil… ou affrontez une autre équipe sur la même bombe.',
     url: 'filrouge/',
-    minPlayers: 1, maxPlayers: 6,
+    minPlayers: 2, maxPlayers: 6,
     accent: '#c8102e',
     settings: [
-      { key: 'mode', label: 'Mode', options: [['coop', '🤝 Coopération'], ['versus', '⚔️ Duel · 2 équipes']], def: 'coop' },
+      { key: 'mode', label: 'Mode', options: [['coop', '🤝 Coopération'], ['versus', '⚔️ Duel · 2 contre 2']], def: 'coop' },
       { key: 'diff', label: 'Bombe', options: [['initiation', 'Initiation · 2 modules'], ['facile', 'Facile · 3'], ['normal', 'Moyen · 5'], ['expert', 'Difficile · 7']], def: 'facile' },
       { key: 'strikes', label: 'Fautes permises', options: [[1, '1'], [3, '3'], [5, '5']], def: 3 },
       { key: 'sabotage', label: 'Sabotages en duel', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
