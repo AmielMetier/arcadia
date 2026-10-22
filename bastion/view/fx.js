@@ -122,6 +122,12 @@ function handleFxEvents(list) {
         lastSaturatedMsg = performance.now();
         notify('⛏️ Gisements saturés : un VCS attend. Construis un nouveau QG près d’autres cristaux.', 'info');
       }
+    } else if (e.k === 'WAVE') {
+      notify(e.boss ? `☠️ Vague ${e.n}/${e.total} : un Colosse mène l’assaut !` : `🌊 Vague ${e.n}/${e.total} en approche !`, 'warn', 5200);
+      for (const pt of e.points || []) addMiniPing(pt.x, pt.y, '#ff3b30', 3, true);
+      Sfx.alert();
+    } else if (e.k === 'WAVE_CLEARED') {
+      notify(e.n >= e.total ? '🏆 Dernière vague repoussée !' : `✅ Vague ${e.n} repoussée : prime de 150💎 et 60🧪 pour chacun.`, 'good', 4600);
     } else if (e.k === 'AFK') {
       notify(`🔌 ${e.name} est parti : un bot garde sa base en attendant son retour.`, 'warn', 6000);
     } else if (e.k === 'BACK') {

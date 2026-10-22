@@ -789,6 +789,8 @@ function stepWorld(state, dt, fxEvents) {
     }
   }
 
+  if (state.coop === 'waves' && !state.partial) stepWaves(state, dt, fxEvents);
+  if (state.over) return;
   const aliveTeams = new Set(state.players.filter((p) => !p.dead && !p.spectator).map((p) => p.team));
   if (aliveTeams.size <= 1 && !state.partial) {
     state.over = true;

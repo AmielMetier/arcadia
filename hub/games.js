@@ -105,9 +105,11 @@ window.HUB_GAMES = [
     minPlayers: 1, maxPlayers: 4,
     accent: '#2fbf71',
     settings: [
-      { key: 'map', label: 'Champ de bataille', options: [['vallee', '🌲 Vallée Tempérée (Classique)'], ['magma', '🌋 Fissures de Magma (+Gaz & Chokepoints)'], ['glace', '❄️ Glacier Boréal (+Vitesse & Forage Rapide)']], def: 'vallee' },
+      { key: 'map', label: 'Champ de bataille', options: [['vallee', '🌲 Vallée Tempérée (Classique)'], ['magma', '🌋 Fissures de Magma (+Gaz & Chokepoints)'], ['glace', '❄️ Glacier Boréal (+Vitesse & Forage Rapide)'], ['desert', '🏜️ Canyon de Cuivre (Oasis & Récolte Rapide)'], ['ruines', '🌃 Ruines Néon (Nuit & Avant-postes Riches)']], def: 'vallee' },
       { key: 'mode', label: 'Format & Équipes', options: [
         ['ffa', 'Chacun pour soi (FFA)'],
+        ['1v1', 'Duel 1 contre 1 (carte dédiée)'],
+        ['waves', 'Coop : Défense contre des vagues'],
         ['2v2_coop', '2v2 Coop : Humains ensemble vs Bots'],
         ['2v2_duel', '2v2 Duel : Humain + Bot vs Humain + Bot'],
         ['2v2_pvp', '2v2 PvP : Joueurs 1 & 2 vs Joueurs 3 & 4'],

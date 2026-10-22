@@ -2,6 +2,11 @@
 
 ## 2.22 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Deux nouvelles cartes :
+  - 🏜️ **Canyon de Cuivre** : grès rouge, mesas et oasis ; la chaleur réduit la vision de 15 % mais les minéraux se récoltent 20 % plus vite ;
+  - 🌃 **Ruines Néon** : une ville abandonnée de nuit, coupée par des canaux toxiques ; les unités voient 20 % moins loin et toutes les bases avancées ont des cristaux dorés.
+- **Bastion Clash** — Nouveau format **Duel 1 contre 1**, sur une carte dédiée plus compacte (bases en diagonale, base naturelle, troisième base et deux coins disputés), sur les cinq champs de bataille.
+- **Bastion Clash** — Nouveau mode **Coop : Défense contre des vagues** : tous les joueurs du même côté face à la Horde, 15 vagues de plus en plus fortes (10 en Blitz), un Colosse toutes les cinq vagues, une prime de 150💎 et 60🧪 par vague repoussée.
 - **Bastion Clash** — Économie : les cristaux et les geysers s'épuisent, et il n'y a plus de revenu automatique. Tout vient de tes VCS : s'étendre vers d'autres bases devient indispensable.
 - **Bastion Clash** — Améliorations par paliers : armes et blindages montent jusqu'au niveau 3 (+12 % de dégâts ou +10 % de points de vie par niveau), chaque niveau coûtant un peu plus cher.
 - **Bastion Clash** — Le Scan Radar se lance depuis un Centre de Commandement et se recharge en 45 secondes.

@@ -308,17 +308,15 @@ function renderWorld(dt, now) {
   for (const gey of GAS_GEYSERS) {
     ctx.save();
     ctx.translate(gey.x, gey.y);
-    const rimCol = curMapDef.theme === 'volcanique' ? '#332428' : curMapDef.theme === 'cryo' ? '#26485e' : '#38463d';
-    const topCol = curMapDef.theme === 'volcanique' ? '#4d2d34' : curMapDef.theme === 'cryo' ? '#376885' : '#4d5e52';
+    const rimCol = curMapDef.look.geyRim;
+    const topCol = shade(curMapDef.look.geyRim, 0.18);
     drawPrism3D(ctx, gey.x, gey.y, makeNGon(26, 8), 0, 14, rimCol, topCol, false, 0.78);
     const oTop = project3DOffset(gey.x, gey.y, 14, false);
     ctx.fillStyle = '#101518';
     ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, 13, 0, TAU); ctx.fill();
     const pulse = 9 + Math.sin(now * 0.006 + gey.x) * 3;
-    let plasmaGlow = 'rgba(47, 191, 113, 0.75)';
-    if (curMapDef.theme === 'volcanique') plasmaGlow = 'rgba(255, 85, 0, 0.85)';
-    else if (curMapDef.theme === 'cryo') plasmaGlow = 'rgba(0, 240, 255, 0.85)';
-    ctx.fillStyle = plasmaGlow;
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = curMapDef.look.gas;
     ctx.beginPath(); ctx.arc(oTop.ox, oTop.oy, pulse, 0, TAU); ctx.fill();
     ctx.restore();
   }
@@ -327,9 +325,7 @@ function renderWorld(dt, now) {
   for (const m of MINERAL_NODES) {
     if (!mineralAlive(state, m)) continue;
     const r = m.rich ? 21 : 17;
-    let col = m.rich ? '#ffc531' : '#1fc7c1';
-    if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff4b2b';
-    else if (curMapDef.theme === 'cryo') col = m.rich ? '#c084fc' : '#38bdf8';
+    const col = curMapDef.look.mineral[m.rich ? 1 : 0];
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.fillStyle = m.rich ? 'rgba(255, 197, 49, 0.22)' : 'rgba(31, 199, 193, 0.22)';
@@ -342,7 +338,7 @@ function renderWorld(dt, now) {
   for (const rk of ROCKS) {
     ctx.save();
     ctx.translate(rk.x, rk.y);
-    const rkCol = rk.col || (curMapDef.theme === 'volcanique' ? '#251c20' : curMapDef.theme === 'cryo' ? '#2b506b' : '#59544b');
+    const rkCol = rk.col || curMapDef.look.rock;
     drawPrism3D(ctx, rk.x, rk.y, makeNGon(rk.r, 7, rk.seed), 0, 26, rkCol, shade(rkCol, 0.35), false, 0.72);
     ctx.restore();
   }
@@ -582,10 +578,7 @@ function renderMinimap() {
   const curMapDef = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   for (const m of MINERAL_NODES) {
     if (!mineralAlive(state, m)) continue;
-    let col = m.rich ? '#ffc531' : '#1fc7c1';
-    if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff5522';
-    else if (curMapDef.theme === 'cryo') col = m.rich ? '#c084fc' : '#38bdf8';
-    mc.fillStyle = col;
+    mc.fillStyle = curMapDef.look.mineral[m.rich ? 1 : 0];
     mc.fillRect(m.x * sx - 2, m.y * sy - 2, 4, 4);
   }
   // Brouillard : le relief reste deviné sous les zones inexplorées

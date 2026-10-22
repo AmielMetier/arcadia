@@ -50,14 +50,17 @@ function stampVision(grid, wx, wy, r, ignoreHeight, explored) {
 
 function computeTeamVision(st, team, grid, explored = null) {
   grid.fill(0);
+  // Certaines cartes réduisent la vision (chaleur du Canyon, nuit des Ruines)
+  const mapDef = MAP_DEFS[st.map] || MAP_DEFS.vallee;
+  const uMult = mapDef.unitSightMult || 1, bMult = mapDef.bldSightMult || 1;
   for (const b of st.buildings) {
     if (b.team !== team || b.hp <= 0) continue;
     const def = BUILDINGS[b.kind] || {};
-    stampVision(grid, b.x, b.y, def.sight || 300, !!def.detector && !b.constructing, explored);
+    stampVision(grid, b.x, b.y, (def.sight || 300) * (def.detector ? 1 : bMult), !!def.detector && !b.constructing, explored);
   }
   for (const u of st.units) {
     if (u.team !== team || u.hp <= 0 || u.boardedIn) continue;
-    stampVision(grid, u.x, u.y, UNITS[u.kind]?.sight || 260, !!u.flying, explored);
+    stampVision(grid, u.x, u.y, (UNITS[u.kind]?.sight || 260) * uMult, !!u.flying, explored);
   }
   for (const sc of st.scans || []) {
     if (sc.team === team) stampVision(grid, sc.x, sc.y, sc.r, true, explored);

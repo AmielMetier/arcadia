@@ -603,12 +603,23 @@ function updateHudUI() {
     4: 'MORT SUBITE · Tempête & Dégâts ×1.85',
   };
   $('#uiPhaseName').textContent = phaseNames[state.phase] || '';
+  // Défense contre des vagues : numéro de vague, compte à rebours et ennemis restants
+  const waveEl = $('#uiWave');
+  if (state.waves) {
+    const w = state.waves;
+    const left = Math.max(0, Math.ceil(w.nextAt - state.time));
+    const enemies = state.units.filter((u) => u.owner === HORDE_ID && u.hp > 0).length;
+    waveEl.hidden = false;
+    waveEl.innerHTML = w.n >= w.total && enemies === 0 ? `🌊 Toutes les vagues repoussées`
+      : `🌊 Vague <b>${w.n}</b>/${w.total}${enemies ? ` · <span class="foes">${enemies} ennemi${enemies > 1 ? 's' : ''}</span>` : ''}${w.n < w.total ? ` · prochaine dans <b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b>` : ''}`;
+    waveEl.classList.toggle('boss', (w.n + 1) % 5 === 0 && left < 20);
+  } else waveEl.hidden = true;
   $('#uiPhase').classList.toggle('sd', state.phase === 4);
 
   const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.team}:${p.dead ? 1 : 0}:${p.afk ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
   if (rosterSig !== lastRosterSig) {
     lastRosterSig = rosterSig;
-    $('#uiRoster').innerHTML = state.players.map((p) => {
+    $('#uiRoster').innerHTML = state.players.filter((p) => !p.horde).map((p) => {
       const isMe = Number(p.id) === Number(myId);
       let pingHtml = '';
       if (p.bot) {
@@ -656,7 +667,11 @@ function updateHudUI() {
     $('#endSub').innerHTML = draw
       ? 'Les dernières bases sont tombées en même temps : personne ne l’emporte.'
       : !me ? `Victoire de ${winners}.` : won ? 'Tes forces ont conquis le secteur !' : `Tous tes Centres de Commandement ont été détruits. Victoire de ${winners}.`;
-    const ordered = state.ranking.map((id) => state.players.find((p) => p.id === id)).filter(Boolean);
+    if (state.waves) {
+      $('#endTitle').textContent = won ? '🏆 Bastion tenu !' : '💥 La Horde a gagné';
+      $('#endSub').innerHTML = won ? `Les ${state.waves.total} vagues ont été repoussées.` : `Vos bases sont tombées à la vague ${state.waves.n}/${state.waves.total}.`;
+    }
+    const ordered = state.ranking.map((id) => state.players.find((p) => p.id === id)).filter((p) => p && !p.horde);
     $('#endRanks').innerHTML = ordered.map((p, idx) => `<li>
       <span class="rk">${idx < 3 ? ['🥇', '🥈', '🥉'][idx] : idx + 1}</span>
       <span class="dot" style="background:${pc(p)}"></span>
@@ -668,7 +683,7 @@ function updateHudUI() {
       reportedResult = true;
       HubBridge.report({
         id: `bastion-${Date.now()}`,
-        mode: state.mode === '2v2' ? '2v2' : 'RTS',
+        mode: state.waves ? 'Vagues' : state.mode === '2v2' ? '2v2' : state.mode === '1v1' ? 'Duel' : 'RTS',
         players: ordered.map((p, idx) => ({
           id: p.bot ? null : p.id,
           name: p.name,

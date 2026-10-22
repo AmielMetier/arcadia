@@ -193,20 +193,21 @@ function buildTerrainMeshes3D(def) {
   threeScene.add(groundMesh3D);
 
   // Surface de l'eau / de la lave / de la glace
-  const theme = def.theme;
-  const lava = theme === 'volcanique', ice = theme === 'cryo';
+  const L = def.look.liquid;
+  const lava = L.solid;
   const liqMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(lava ? '#ff5a00' : ice ? '#8ee9ff' : '#2f86c0'),
-    roughness: ice ? 0.12 : 0.22, metalness: 0.25,
-    transparent: !lava, opacity: ice ? 0.8 : 0.74,
-    emissive: new THREE.Color(lava ? '#ff3000' : ice ? '#0a7fa0' : '#0b3a58'),
-    emissiveIntensity: lava ? 1.0 : 0.3,
+    color: new THREE.Color(L.color),
+    roughness: L.rough, metalness: 0.25,
+    transparent: !lava, opacity: L.opacity,
+    emissive: new THREE.Color(L.emissive),
+    emissiveIntensity: L.glow,
   });
   liquidMesh3D = new THREE.Mesh(new THREE.PlaneGeometry(W, W), liqMat);
   liquidMesh3D.rotation.x = -Math.PI / 2;
   liquidMesh3D.position.set(HALF_W, -5, HALF_W);
   liquidMesh3D.receiveShadow = !lava;
   liquidMesh3D.userData.lava = lava;
+  liquidMesh3D.userData.glow = L.glow;
   threeScene.add(liquidMesh3D);
 
   // Brouillard de guerre drapé sur le relief (au-dessus de l'eau)
@@ -253,7 +254,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
     while (basePlatformsGroup3D.children.length > 0) {
       basePlatformsGroup3D.remove(basePlatformsGroup3D.children[0]);
     }
-    const beaconCol = def.theme === 'volcanique' ? '#ff5500' : def.theme === 'cryo' ? '#00f0ff' : '#ffc531';
+    const beaconCol = def.look.accent;
     const beaconMat = getMat3D(beaconCol, 0.3, 0.2, beaconCol, 0.9);
     const postMat = getMat3D('#2b2f38', 0.6, 0.5);
     const postGeo = new THREE.CylinderGeometry(3, 4, 16, 6);
@@ -281,10 +282,10 @@ function setupThreeMapScenery(mapId = activeMapId) {
     while (centerMonumentGroup3D.children.length > 0) {
       centerMonumentGroup3D.remove(centerMonumentGroup3D.children[0]);
     }
-    const platMat1 = getMat3D(def.theme === 'volcanique' ? '#261a22' : def.theme === 'cryo' ? '#27475d' : '#585c69', 0.55, 0.35);
-    const platMat2 = getMat3D(def.theme === 'volcanique' ? '#3c242c' : def.theme === 'cryo' ? '#1e384b' : '#454954', 0.5, 0.4);
-    const ringCol = def.theme === 'volcanique' ? '#ff5500' : def.theme === 'cryo' ? '#1fc7c1' : '#ffc531';
-    const ringMat = getMat3D(ringCol, 0.35, 0.5, ringCol === '#ff5500' ? 0xff3b00 : ringCol === '#1fc7c1' ? 0x00f0ff : 0xffc531, 0.35);
+    const platMat1 = getMat3D(def.look.plat[0], 0.55, 0.35);
+    const platMat2 = getMat3D(def.look.plat[1], 0.5, 0.4);
+    const ringCol = def.look.accent;
+    const ringMat = getMat3D(ringCol, 0.35, 0.5, ringCol, 0.35);
 
     const cy0 = heightAt(HALF_W, HALF_W);
     const c2 = new THREE.Mesh(new THREE.CylinderGeometry(98, 104, 4, 40), platMat2);
@@ -323,6 +324,10 @@ function setupThreeMapScenery(mapId = activeMapId) {
   const lavaMat = getMat3D('#ff4500', 0.2, 0.2, 0xff3300, 0.95);
 
   const spireGeo = new THREE.ConeGeometry(1, 1, 6);
+  const cactusGeo = new THREE.CylinderGeometry(1, 1, 1, 8);
+  const pillarGeo = new THREE.BoxGeometry(1.4, 1, 1.4);
+  const neonGeo = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true);
+  const concreteMat = getMat3D('#4a4f63', 0.85, 0.1);
   const crystalMat = getMat3D('#5cd5eb', 0.15, 0.45, 0x00e5ff, 0.55);
 
   for (const tr of TREES_3D) {
@@ -342,6 +347,38 @@ function setupThreeMapScenery(mapId = activeMapId) {
       core.position.y = tr.h;
       grp.add(core);
 
+    } else if (tr.type === 'cactus') {
+      // Cactus candélabre : un tronc et deux bras relevés
+      const cMat = getMat3D(tr.col, 0.7, 0.05);
+      const h = tr.h * 0.95, r = Math.max(5, tr.r * 0.32);
+      const trunk = new THREE.Mesh(cactusGeo, cMat);
+      trunk.scale.set(r, h, r); trunk.position.y = h / 2; trunk.castShadow = true;
+      grp.add(trunk);
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Mesh(cactusGeo, cMat);
+        arm.scale.set(r * 0.7, h * 0.42, r * 0.7);
+        arm.position.set(side * r * 1.6, h * (0.45 + 0.12 * side), 0);
+        arm.castShadow = true;
+        grp.add(arm);
+        const elbow = new THREE.Mesh(cactusGeo, cMat);
+        elbow.scale.set(r * 1.6, r * 0.7, r * 0.7);
+        elbow.rotation.z = Math.PI / 2;
+        elbow.position.set(side * r * 0.8, h * (0.25 + 0.12 * side), 0);
+        grp.add(elbow);
+      }
+      grp.rotation.y = tr.x * 0.13;
+    } else if (tr.type === 'pillar') {
+      // Pilier de béton cassé, cerclé d'un néon qui grésille
+      const h = tr.h * (0.8 + (tr.x % 7) * 0.08), r = tr.r * 0.45;
+      const col = new THREE.Mesh(pillarGeo, concreteMat);
+      col.scale.set(r, h, r); col.position.y = h / 2;
+      col.rotation.z = ((tr.y % 11) - 5) * 0.02;
+      col.castShadow = true; col.receiveShadow = true;
+      grp.add(col);
+      const neon = new THREE.Mesh(neonGeo, getMat3D(tr.col, 0.2, 0.1, tr.col, 1.2));
+      neon.scale.set(r * 1.08, 2.2, r * 1.08);
+      neon.position.y = h * 0.62;
+      grp.add(neon);
     } else if (tr.type === 'crystal') {
       const spire = new THREE.Mesh(spireGeo, crystalMat);
       spire.scale.set(tr.r * 0.7, tr.h * 1.15, tr.r * 0.7);
@@ -382,7 +419,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   rockMeshes3D = [];
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   for (const rk of ROCKS) {
-    const rockMat = getMat3D(rk.col || (def.theme === 'volcanique' ? '#251c20' : def.theme === 'cryo' ? '#2b506b' : '#6e685f'), 0.8, 0.1);
+    const rockMat = getMat3D(rk.col || def.look.rock, 0.8, 0.1);
     const m = new THREE.Mesh(rockGeo, rockMat);
     m.position.set(rk.x, heightAt(rk.x, rk.y) + rk.r * 0.42, rk.y);
     m.scale.set(rk.r * 1.05, rk.r * 0.78, rk.r * 0.95);
@@ -404,17 +441,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
     const baseY = heightAt(m.x, m.y) + 2.5;
     const grp = new THREE.Group();
     grp.position.set(m.x, baseY, m.y);
-    let col, em;
-    if (def.theme === 'volcanique') {
-      col = m.rich ? '#ffd700' : '#ff4b2b';
-      em = m.rich ? 0xffa000 : 0xd42b00;
-    } else if (def.theme === 'cryo') {
-      col = m.rich ? '#c084fc' : '#38bdf8';
-      em = m.rich ? 0x9333ea : 0x0284c7;
-    } else {
-      col = m.rich ? '#ffc531' : '#1fc7c1';
-      em = m.rich ? 0xffa800 : 0x0ea5a0;
-    }
+    const col = def.look.mineral[m.rich ? 1 : 0], em = def.look.mineralEm[m.rich ? 1 : 0];
     const mat = getMat3D(col, 0.2, 0.35, em, 0.55);
     const r = m.rich ? 14 : 11.5;
     const h = m.rich ? 34 : 28;
@@ -443,14 +470,8 @@ function setupThreeMapScenery(mapId = activeMapId) {
     }
   }
   geyserMeshes3D = [];
-  const geyRimMat = getMat3D(def.theme === 'volcanique' ? '#332428' : def.theme === 'cryo' ? '#26485e' : '#435449', 0.68, 0.22);
-  let geyCol = '#2fbf71', geyEm = 0x2fbf71;
-  if (def.theme === 'volcanique') {
-    geyCol = '#ff5500'; geyEm = 0xff4500;
-  } else if (def.theme === 'cryo') {
-    geyCol = '#00f0ff'; geyEm = 0x00f0ff;
-  }
-  const geyCoreMat = getMat3D(geyCol, 0.2, 0.1, geyEm, 0.85);
+  const geyRimMat = getMat3D(def.look.geyRim, 0.68, 0.22);
+  const geyCoreMat = getMat3D(def.look.gas, 0.2, 0.1, def.look.gas, 0.85);
 
   for (const gey of GAS_GEYSERS) {
     const baseY = heightAt(gey.x, gey.y);
@@ -1191,7 +1212,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
 
     if (liquidMesh3D) {
       liquidMesh3D.position.y = -5 + Math.sin(now * 0.0012) * 0.7;
-      if (liquidMesh3D.userData.lava) liquidMesh3D.material.emissiveIntensity = 0.85 + Math.sin(now * 0.002) * 0.15;
+      if (liquidMesh3D.userData.glow > 0.5) liquidMesh3D.material.emissiveIntensity = liquidMesh3D.userData.glow * (0.85 + Math.sin(now * 0.002) * 0.15);
     }
 
     // Animation des cristaux de minéraux et geysers de gaz plasma
@@ -1304,6 +1325,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       const isFly = !!u.flying;
       const hoverY = isFly ? (42 + Math.sin(now * 0.003 + u.id) * 3) : 0;
       mesh.position.set(u.x, heightAt(u.x, u.y) + hoverY, u.y);
+      if (u.boss) mesh.scale.setScalar(1.4);
       if (mesh.userData.shadowDisc) {
         mesh.userData.shadowDisc.position.y = -hoverY + 0.5;
       }

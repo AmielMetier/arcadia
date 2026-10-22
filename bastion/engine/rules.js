@@ -134,7 +134,10 @@ function createInitialState(roster, settings = {}) {
   const mapId = MAP_DEFS[settings.map] ? settings.map : (activeMapId || 'vallee');
   const modeStr = String(settings.mode || '');
   const is2v2 = modeStr.startsWith('2v2') && roster.length >= 2;
-  const layout = is2v2 ? '2v2' : 'ffa';
+  // Duel : carte dédiée, deux joueurs seulement (les autres suivent en spectateurs)
+  const is1v1 = modeStr === '1v1';
+  if (is1v1) roster = roster.slice(0, 2);
+  const layout = is2v2 ? '2v2' : is1v1 ? '1v1' : 'ffa';
   if (mapId !== activeMapId || layout !== activeLayout || MINERAL_NODES.length === 0) {
     initMap(mapId, layout);
   }
@@ -143,8 +146,10 @@ function createInitialState(roster, settings = {}) {
   const humans = roster.filter((p) => !p.bot);
   const bots = roster.filter((p) => p.bot);
 
+  const isWaves = modeStr === 'waves';
   const players = roster.map((p, idx) => {
-    let team = p.id;
+    // Défense contre des vagues : tout le monde dans la même équipe face à la Horde
+    let team = isWaves ? 0 : p.id;
     if (is2v2) {
       if (modeStr === '2v2_duel') {
         // Duel : Humain 1 + Bot 1 (Équipe A) vs Humain 2 + Bot 2 (Équipe B)
@@ -249,11 +254,11 @@ function createInitialState(roster, settings = {}) {
     }
   });
 
-  return {
+  const st = {
     time: 0,
     blitz,
     map: mapId,
-    mode: is2v2 ? '2v2' : 'ffa',
+    mode: is2v2 ? '2v2' : is1v1 ? '1v1' : 'ffa',
     is2v2,
     level: settings.level || 'normal',
     phase: 1,
@@ -271,6 +276,8 @@ function createInitialState(roster, settings = {}) {
     winnerTeam: null,
     ranking: [],
   };
+  if (isWaves) setupWaves(st, blitz);
+  return st;
 }
 
 /* ============================================================================

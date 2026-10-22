@@ -275,3 +275,9 @@ body.spectating::after{content:'👁 MODE SPECTATEUR';position:fixed;top:64px;le
 /* Vignette douce : resserre le regard sur le centre de l'action */
 body::before{content:'';position:fixed;inset:0;z-index:3;pointer-events:none;
   background:radial-gradient(ellipse 75% 70% at 50% 46%,rgba(0,0,0,0) 58%,rgba(0,0,0,.34) 100%)}
+/* ---------- DÉFENSE CONTRE DES VAGUES ---------- */
+.wave-box{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:9px;font-size:12.5px;white-space:nowrap}
+.wave-box b{color:var(--gold)}
+.wave-box .foes{color:#ff8a7a;font-weight:700}
+.wave-box.boss{border-color:rgba(255,59,48,.7);box-shadow:0 0 0 1px rgba(255,59,48,.4),0 0 18px rgba(255,59,48,.35);animation:wavePulse 1s ease-in-out infinite}
+@keyframes wavePulse{50%{box-shadow:0 0 0 1px rgba(255,59,48,.7),0 0 26px rgba(255,59,48,.55)}}

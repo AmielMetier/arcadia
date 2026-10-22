@@ -140,4 +140,42 @@ t('commandes vérifiées par l’hôte : scan, réparation, raffinerie, numéro 
   if (r.ok) assert.ok(Math.floor(r.bldId / 100000) !== 2, 'le numéro d’un autre joueur est refusé');
 });
 
+t('cartes : chaque carte et chaque format se génèrent jouables', () => {
+  for (const map of ['vallee', 'magma', 'glace', 'desert', 'ruines']) {
+    for (const mode of ['ffa', '2v2_pvp', '1v1']) {
+      const E = loadEngine();
+      const s = E.createInitialState(humans(mode === '1v1' ? 3 : 4), { map, mode });
+      assert.equal(s.players.length, mode === '1v1' ? 2 : 4, `${map}/${mode} : joueurs`);
+      for (const p of s.players) {
+        assert.ok(!E.isBlockedAt(p.spawnX, p.spawnY), `${map}/${mode} : départ praticable`);
+        const hq = s.buildings.find((b) => b.owner === p.id && b.kind === 'hq');
+        assert.ok(E.MINERAL_NODES.filter((m) => Math.hypot(m.x - hq.x, m.y - hq.y) < 220).length >= 5, `${map}/${mode} : cristaux au départ`);
+        // Toutes les bases de départ sont reliées entre elles par le sol
+        const f = E.getFlowField(E.nearestFreeCell(E.pathCellOf(s.players[0].spawnX, s.players[0].spawnY)));
+        assert.ok(Number.isFinite(f[E.nearestFreeCell(E.pathCellOf(p.spawnX, p.spawnY))]), `${map}/${mode} : base ${p.id} accessible`);
+      }
+      if (mode === '1v1') assert.equal(E.WORLD_SIZE, 3000);
+    }
+  }
+});
+
+t('vagues : la Horde attaque, une vague repoussée paie une prime, la dernière donne la victoire', () => {
+  const E = loadEngine({ seed: 6 });
+  const s = E.createInitialState(humans(2), { map: 'vallee', mode: 'waves' });
+  assert.ok(s.players.slice(0, 2).every((p) => p.team === 0), 'joueurs dans la même équipe');
+  assert.ok(s.players.some((p) => p.horde));
+  while (s.waves.n === 0) step(E, s);
+  const foes = s.units.filter((u) => u.owner === E.HORDE_ID);
+  assert.ok(foes.length >= 3, 'une vague apparaît');
+  const before = s.players[0].minerals;
+  for (const u of foes) u.hp = 0;
+  step(E, s, 2);
+  assert.equal(s.waves.cleared, 1);
+  assert.ok(s.players[0].minerals >= before + 150, 'prime versée');
+  s.waves.n = s.waves.total; s.waves.cleared = s.waves.total - 1;
+  step(E, s, 2);
+  assert.equal(s.over, true);
+  assert.equal(s.winnerTeam, 0, 'les défenseurs gagnent');
+});
+
 console.log(`\n${n} tests réussis`);

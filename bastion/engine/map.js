@@ -37,7 +37,7 @@ let terType = new Uint8Array(1);
 let terH = new Float32Array(1);
 let terrainActive = true;
 
-const LIQUID_LABEL = { vallee: 'la rivière', magma: 'la lave', glace: 'la crevasse' };
+const LIQUID_LABEL = Object.fromEntries(Object.values(MAP_DEFS).map((d) => [d.id, d.look.liquidLabel]));
 
 // ---- Pathfinding par champs de flux (Dijkstra) mis en cache par cellule-objectif ----
 // La grille connaît le relief ET les bâtiments : sans eux, les unités fonçaient dans leurs propres
@@ -168,7 +168,48 @@ function buildLayout(mapId, layout) {
   SPAWN_CORNERS.length = 0;
   TEAM_SPAWNS = null;
 
-  if (layout === '2v2') {
+  if (layout === '1v1') {
+    // ---- DUEL : carte plus compacte (3000), bases en diagonale, symétrie centrale ----
+    const P = (x, y) => [W - x, W - y];
+    const A = { x: 470, y: 470 }, B = { x: W - 470, y: W - 470 };
+    SPAWN_CORNERS.push(A, B);
+    const natA = { x: 1090, y: 380, a: -Math.PI / 2 }, thirdA = { x: 380, y: 1090, a: Math.PI };
+    const natB = { x: W - natA.x, y: W - natA.y, a: Math.PI / 2 }, thirdB = { x: W - thirdA.x, y: W - thirdA.y, a: 0 };
+    // Coins disputés : loin des deux joueurs, à mi-chemin
+    const cornerTR = { x: W - 400, y: 400, a: -Math.PI / 4 }, cornerBL = { x: 400, y: W - 400, a: (3 * Math.PI) / 4 };
+    const rampA = Math.atan2(natA.y + 260 - A.y, natA.x - A.x);
+    F.mains.push({ ...A, r: MAIN_R - 26, away: Math.atan2(A.y - C, A.x - C), ramps: [rampA] });
+    F.mains.push({ ...B, r: MAIN_R - 26, away: Math.atan2(B.y - C, B.x - C), ramps: [rampA + Math.PI] });
+    F.expos.push(natA, thirdA, natB, thirdB, cornerTR, cornerBL);
+    F.center.r = CENTER_R - 30;
+    F.center.ramps = [Math.PI / 4, (3 * Math.PI) / 4, (-3 * Math.PI) / 4, -Math.PI / 4];
+    const crossA = { x: C + 560, y: C - 560, r: 210 }, crossB = { x: C - 560, y: C + 560, r: 210 };
+    F.crossings.push(crossA, crossB);
+    if (mapId === 'desert') {
+      F.liquidHalf = 42;
+      F.pools.push({ x: C + 520, y: C + 120, r: 110 }, { x: C - 520, y: C - 120, r: 110 });
+    } else if (mapId === 'ruines') {
+      F.liquidHalf = 38;
+      F.liquids.push([W, 0, W * 0.66, W * 0.34, W * 0.34, W * 0.66, 0, W]);
+    } else {
+      F.liquidHalf = mapId === 'magma' ? 44 : 42;
+      F.liquids.push([W, 0, C + 180, C - 620, C - 180, C + 620, 0, W]);
+      if (mapId === 'magma') F.pools.push({ x: C + 640, y: C + 180, r: 105 }, { x: C - 640, y: C - 180, r: 105 });
+    }
+    // Montagnes : protègent les troisièmes bases et dessinent deux couloirs vers le centre
+    for (const [pts, w] of [[[[760, 820], [900, 980], [980, 1150]], 74], [[[1240, 700], [1380, 760]], 64]]) {
+      addRidge(pts, w);
+      addRidge(pts.map(([x, y]) => P(x, y)), w);
+    }
+    for (const [m, nat, third] of [[F.mains[0], natA, thirdA], [F.mains[1], natB, thirdB]]) {
+      const f = rampFoot(m, m.ramps[0]);
+      F.roads.push([f.x, f.y, nat.x, nat.y + Math.sign(C - nat.y) * 120, 40]);
+      F.roads.push([f.x, f.y, third.x + Math.sign(C - third.x) * 140, third.y, 36]);
+      const ca = F.center.ramps.reduce((b, a) => (hypot(rampFoot(F.center, a).x, rampFoot(F.center, a).y, f.x, f.y) < hypot(rampFoot(F.center, b).x, rampFoot(F.center, b).y, f.x, f.y) ? a : b));
+      const cf = rampFoot(F.center, ca);
+      F.roads.push([f.x, f.y, cf.x, cf.y, 44]);
+    }
+  } else if (layout === '2v2') {
     // ---- 2 CONTRE 2 : alliés côte à côte sur le même flanc ----
     const ax = 560, dy = 720;
     const A1 = { x: ax, y: C - dy }, A2 = { x: ax, y: C + dy };
@@ -196,8 +237,16 @@ function buildLayout(mapId, layout) {
 
     F.crossings.push({ x: C, y: 470, r: 240 }, { x: C, y: W - 470, r: 240 });
     F.liquidHalf = mapId === 'magma' ? 50 : mapId === 'glace' ? 46 : 48;
-    F.liquids.push([C + 210, 0, C - 300, W * 0.33, C + 300, W * 0.66, C - 210, W]);
-    if (mapId !== 'vallee') {
+    if (mapId === 'desert') {
+      // Canyon : pas de rivière, des oasis au milieu de chaque flanc
+      F.pools.push({ x: C, y: C - 900, r: 150 }, { x: C, y: C + 900, r: 150 });
+    } else if (mapId === 'ruines') {
+      // Canal droit nord-sud, franchi par les ponts des avant-postes
+      F.liquids.push([C, 0, C, W * 0.33, C, W * 0.66, C, W]);
+    } else {
+      F.liquids.push([C + 210, 0, C - 300, W * 0.33, C + 300, W * 0.66, C - 210, W]);
+    }
+    if (mapId !== 'vallee' && mapId !== 'ruines') {
       F.pools.push({ x: 1650, y: 1250, r: 130 }, { x: W - 1650, y: W - 1250, r: 130 },
         { x: 1650, y: W - 1250, r: 130 }, { x: W - 1650, y: 1250, r: 130 });
     }
@@ -259,6 +308,16 @@ function buildLayout(mapId, layout) {
       F.liquidHalf = 46;
       F.liquids.push([0, C - 240, W * 0.35, C + 220, W * 0.65, C - 260, W, C + 220]);
       F.liquids.push([C - 260, 0, C + 240, W * 0.35, C - 250, W * 0.65, C + 240, W]);
+    } else if (mapId === 'desert') {
+      // Quatre oasis entre les bases et le centre, et des mesas en plus des montagnes
+      F.liquidHalf = 44;
+      for (const [x, y] of [[C, C - 760], [C, C + 760], [C - 760, C], [C + 760, C]]) F.pools.push({ x, y, r: 120 });
+      mirror4([[700, 1500], [860, 1640]], 92);
+    } else if (mapId === 'ruines') {
+      // Deux canaux droits en croix : la ville est coupée en quatre quartiers reliés par des ponts
+      F.liquidHalf = 40;
+      F.liquids.push([0, C, W * 0.33, C, W * 0.66, C, W, C]);
+      F.liquids.push([C, 0, C, W * 0.33, C, W * 0.66, C, W]);
     } else if (mapId === 'glace') {
       F.liquidHalf = 42;
       F.liquids.push([0, C - 210, W * 0.33, C + 240, W * 0.66, C - 250, W, C + 210]);
@@ -304,7 +363,8 @@ function placeResources(mapId, F) {
       const a = m.away + i * 0.25;
       MINERAL_NODES.push({ id: 'm' + (mId++), x: Math.round(m.x + Math.cos(a) * 142), y: Math.round(m.y + Math.sin(a) * 142), rich: mapId !== 'vallee' && Math.abs(i) === half });
     }
-    const gasAngles = mapId === 'magma' ? [0.95, -0.95] : [idx % 2 === 0 ? 0.95 : -0.95];
+    // (en duel, symétrie centrale : même décalage pour les deux bases)
+    const gasAngles = mapId === 'magma' ? [0.95, -0.95] : [F.layout === '1v1' || idx % 2 === 0 ? 0.95 : -0.95];
     for (const ga of gasAngles) {
       GAS_GEYSERS.push({ id: 'g' + (gId++), x: Math.round(m.x + Math.cos(m.away + ga) * 150), y: Math.round(m.y + Math.sin(m.away + ga) * 150) });
     }
@@ -312,7 +372,7 @@ function placeResources(mapId, F) {
   for (const n of F.expos) {
     for (let i = -1.5; i <= 1.5; i += 1) {
       const a = n.a + i * 0.28;
-      MINERAL_NODES.push({ id: 'm' + (mId++), x: Math.round(n.x + Math.cos(a) * 105), y: Math.round(n.y + Math.sin(a) * 105), rich: false });
+      MINERAL_NODES.push({ id: 'm' + (mId++), x: Math.round(n.x + Math.cos(a) * 105), y: Math.round(n.y + Math.sin(a) * 105), rich: !!MAP_DEFS[mapId]?.richExpos });
     }
     GAS_GEYSERS.push({ id: 'g' + (gId++), x: Math.round(n.x + Math.cos(n.a + 0.85) * 118), y: Math.round(n.y + Math.sin(n.a + 0.85) * 118) });
   }
@@ -321,7 +381,7 @@ function placeResources(mapId, F) {
     const a = (i / 8) * TAU + Math.PI / 8;
     MINERAL_NODES.push({ id: 'm' + (mId++), x: Math.round(C + Math.cos(a) * 168), y: Math.round(C + Math.sin(a) * 168), rich: true });
   }
-  const geyA = F.layout === '2v2'
+  const geyA = F.layout === '1v1' ? [Math.PI / 4, (-3 * Math.PI) / 4] : F.layout === '2v2'
     ? [Math.PI / 4, (-3 * Math.PI) / 4]
     : mapId === 'magma' ? [0, Math.PI / 2, Math.PI, -Math.PI / 2] : [0, Math.PI];
   for (const a of geyA) GAS_GEYSERS.push({ id: 'g' + (gId++), x: Math.round(C + Math.cos(a) * 258), y: Math.round(C + Math.sin(a) * 258) });
@@ -395,7 +455,7 @@ function rasterizeTerrain(mapId, F) {
     });
   }
 
-  const seed = mapId === 'magma' ? 3.1 : mapId === 'glace' ? 7.7 : 1.3;
+  const seed = { magma: 3.1, glace: 7.7, desert: 5.4, ruines: 9.2 }[mapId] || 1.3;
   for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
     const i = gy * N + gx;
     const cx = (gx + 0.5) * cs, cy = (gy + 0.5) * cs;
@@ -599,9 +659,10 @@ function routeWaypoint(u, gx, gy, fx = gx, fy = gy, now = 0) {
 /* ---------- Décor : arbres / cheminées / cristaux ---------- */
 function scatterDecor(mapId, F) {
   TREES_3D.length = 0;
-  const rnd = mulberry(mapId === 'magma' ? 20261021 : mapId === 'glace' ? 20261022 : 20261019);
+  const rnd = mulberry({ vallee: 20261019, magma: 20261021, glace: 20261022, desert: 20261023, ruines: 20261024 }[mapId] || 20261019);
   const W = WORLD_SIZE;
-  const count = Math.round((mapId === 'vallee' ? 230 : 170) * (W / BASE_WORLD) ** 2);
+  const look = (MAP_DEFS[mapId] || MAP_DEFS.vallee).look;
+  const count = Math.round(look.decorCount * (W / BASE_WORLD) ** 2);
   const roadNear = (x, y) => F.roads.some((r) => segDist(x, y, r[0], r[1], r[2], r[3]) < r[4] + 34);
   const resNear = (x, y) => MINERAL_NODES.some((m) => hypot(x, y, m.x, m.y) < 95) || GAS_GEYSERS.some((g) => hypot(x, y, g.x, g.y) < 110);
   const expoNear = (x, y) => F.expos.some((e) => hypot(x, y, e.x, e.y) < 190);
@@ -617,9 +678,11 @@ function scatterDecor(mapId, F) {
     // Les arbres poussent surtout au pied des montagnes et le long de l'eau
     const hNear = heightAt(tx, ty);
     if (hNear < 6 && rnd() < 0.55) continue;
-    const type = mapId === 'magma' ? 'volcano' : mapId === 'glace' ? 'crystal' : 'tree';
+    const type = look.decor;
     const pal = type === 'volcano' ? ['#2a1e20', '#362426', '#1e1618', '#422b28']
       : type === 'crystal' ? ['#1fc7c1', '#5cd5eb', '#89e5f5', '#38bdf8', '#a5f3fc']
+        : type === 'cactus' ? ['#3f7d3a', '#4f8f45', '#5d9b4f', '#356b31']
+          : type === 'pillar' ? ['#ff3df2', '#3df2ff', '#ffd23d', '#7cff4f']
         : ['#2d6632', '#39783c', '#245429', '#468a44', '#2f5f2a'];
     TREES_3D.push({ x: tx, y: ty, r: 15 + rnd() * 12, col: pal[(rnd() * pal.length) | 0], h: 32 + rnd() * 26, type });
   }
@@ -628,10 +691,10 @@ function scatterDecor(mapId, F) {
 
 function initMap(mapId = 'vallee', layout = 'ffa') {
   if (!MAP_DEFS[mapId]) mapId = 'vallee';
-  layout = layout === '2v2' ? '2v2' : 'ffa';
+  layout = layout === '2v2' || layout === '1v1' ? layout : 'ffa';
   activeMapId = mapId;
   activeLayout = layout;
-  setWorldSize(layout === '2v2' ? Math.round(BASE_WORLD * 1.4) : BASE_WORLD);
+  setWorldSize(layout === '2v2' ? Math.round(BASE_WORLD * 1.4) : layout === '1v1' ? 3000 : BASE_WORLD);
   const F = buildLayout(mapId, layout);
   MAP_FEATURES = F;
   placeResources(mapId, F);

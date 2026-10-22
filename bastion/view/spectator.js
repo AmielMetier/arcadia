@@ -68,7 +68,7 @@ function renderSpectatorPanel(force = false) {
   document.body.classList.add('spectating');
   $('#uiSelHeader').textContent = '👁 Vue spectateur';
   $('#uiSelSubHint').textContent = 'Tu vois toute la carte';
-  const rows = state.players.filter((p) => !p.spectator).map((p) => {
+  const rows = state.players.filter((p) => !p.spectator && !p.horde).map((p) => {
     const s = specStats(p);
     return `<tr class="${p.dead ? 'dead' : ''}" data-spec-player="${p.id}">
       <td><span class="dot" style="background:${pc(p)}"></span>${escHtml(p.name)}${p.bot ? ' 🤖' : ''}${p.dead ? ' 💀' : ''}</td>

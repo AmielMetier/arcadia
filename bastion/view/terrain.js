@@ -15,6 +15,14 @@ const THEMES = {
   glace: { ground: '#1a3446', blotA: 'rgba(24,60,86,0.42)', blotB: 'rgba(120,180,210,0.18)', speckA: 'rgba(8,28,44,0.24)', speckB: 'rgba(200,245,255,0.22)',
     plateau: '#3d6580', plateauB: '#4c7896', rock: [150, 186, 206], rock2: [74, 108, 130], snow: true, cliff: [52, 84, 104],
     road: ['#0a1d2c', '#9be7ff', '#2b506b'], roadDash: 'rgba(255,255,255,0.7)', pad: '#344e60', padRing: '#00f0ff' },
+  desert: { ground: '#c98a52', blotA: 'rgba(170,98,52,0.32)', blotB: 'rgba(236,184,120,0.3)', speckA: 'rgba(120,64,34,0.22)', speckB: 'rgba(255,226,170,0.24)',
+    plateau: '#b0703f', plateauB: '#c27d48', rock: [168, 92, 58], rock2: [126, 66, 42], snow: false, cliff: [104, 54, 36],
+    road: ['#3b2416', '#f2d6a2', '#6e4a30'], roadDash: 'rgba(255,240,210,0.55)', pad: '#7b5a44', padRing: '#ff9f1c',
+    liq: [['#6b3d22', 38], ['#e2c08a', 22], ['#167f8f', 0], ['#1fb3c4', -24], ['#7fe6ee', -56]] },
+  ruines: { ground: '#1b1d27', blotA: 'rgba(40,44,60,0.45)', blotB: 'rgba(12,14,22,0.5)', speckA: 'rgba(0,0,0,0.3)', speckB: 'rgba(120,130,170,0.12)',
+    plateau: '#262a38', plateauB: '#2e3344', rock: [64, 70, 92], rock2: [40, 44, 60], snow: false, cliff: [34, 36, 50],
+    road: ['#0b0c12', '#ff3df2', '#2a2d3d'], roadDash: 'rgba(61,242,255,0.6)', pad: '#2c3040', padRing: '#ff3df2',
+    liq: [['#06140c', 36], ['#3a3f52', 18], ['#0f8f47', 0], ['#2fff8a', -26], ['#c8ffd9', -60]] },
 };
 
 function buildTerrainCanvas(mapId = activeMapId) {
@@ -29,7 +37,7 @@ function buildTerrainCanvas(mapId = activeMapId) {
   c.height = texSize;
   const g = c.getContext('2d');
   g.scale(terrainTexScale, terrainTexScale);
-  const rnd = mulberry(mapId === 'magma' ? 9021 : mapId === 'glace' ? 9022 : 9019);
+  const rnd = mulberry({ magma: 9021, glace: 9022, desert: 9023, ruines: 9024 }[mapId] || 9019);
   const area = (W / BASE_WORLD) ** 2;
 
   g.fillStyle = T.ground;
@@ -80,6 +88,40 @@ function buildTerrainCanvas(mapId = activeMapId) {
       g.stroke();
     }
   }
+  if (mapId === 'desert') {
+    // Ondulations des dunes et cailloux
+    g.lineCap = 'round';
+    for (let k = 0; k < 900 * area; k++) {
+      const x = rnd() * W, y = rnd() * W, l = 30 + rnd() * 70;
+      g.strokeStyle = rnd() < 0.6 ? 'rgba(150,84,44,0.22)' : 'rgba(255,230,180,0.2)';
+      g.lineWidth = 2 + rnd() * 2.5;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l / 2, y - 8 - rnd() * 8, x + l, y); g.stroke();
+    }
+    for (let k = 0; k < 2600 * area; k++) {
+      g.fillStyle = rnd() < 0.5 ? 'rgba(110,62,38,0.45)' : 'rgba(80,46,30,0.4)';
+      g.beginPath(); g.arc(rnd() * W, rnd() * W, 1.5 + rnd() * 3, 0, TAU); g.fill();
+    }
+  } else if (mapId === 'ruines') {
+    // Dalles de béton fissurées, quadrillage de rues et flaques de néon
+    g.strokeStyle = 'rgba(80,88,120,0.18)'; g.lineWidth = 2;
+    for (let x = 0; x < W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, W); g.stroke(); }
+    for (let y = 0; y < W; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    g.strokeStyle = 'rgba(0,0,0,0.35)';
+    for (let k = 0; k < 220 * area; k++) {
+      let x = rnd() * W, y = rnd() * W;
+      g.lineWidth = 1 + rnd() * 2;
+      g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 4; s++) { x += (rnd() - 0.5) * 60; y += (rnd() - 0.5) * 60; g.lineTo(x, y); }
+      g.stroke();
+    }
+    for (let k = 0; k < 70 * area; k++) {
+      const x = rnd() * W, y = rnd() * W, r = 20 + rnd() * 50;
+      const col = ['255,61,242', '61,242,255', '255,210,61'][(rnd() * 3) | 0];
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, `rgba(${col},0.22)`); gr.addColorStop(1, `rgba(${col},0)`);
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+  }
   if (mapId === 'magma') {
     for (let k = 0; k < 30 * area; k++) {
       const fx = rnd() * W, fy = rnd() * W;
@@ -95,7 +137,8 @@ function buildTerrainCanvas(mapId = activeMapId) {
     ? [['#2b0704', half * 2 + 38], ['#7c1305', half * 2 + 18], ['#d62c00', half * 2 - 6], ['#ff6200', half * 2 - 32], ['#ffea66', half * 2 - 64]]
     : mapId === 'glace'
       ? [['#051018', half * 2 + 36], ['#0a3d54', half * 2 + 16], ['#00c7db', half * 2 - 12], ['#5eead4', half * 2 - 36], ['#e0faff', half * 2 - 62]]
-      : [['#2e3a2c', half * 2 + 38], ['#c8ba9b', half * 2 + 22], ['#1d5f88', half * 2], ['#2b7fb5', half * 2 - 24], ['#4aa3d6', half * 2 - 56]];
+      : T.liq ? T.liq.map(([col, d]) => [col, half * 2 + d])
+        : [['#2e3a2c', half * 2 + 38], ['#c8ba9b', half * 2 + 22], ['#1d5f88', half * 2], ['#2b7fb5', half * 2 - 24], ['#4aa3d6', half * 2 - 56]];
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for (const [col, w] of liqStyles) {
@@ -232,6 +275,6 @@ function onMapInitView(mapId) {
 function updateMapUI() {
   const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   const badgeEl = $('#uiMapBadgeTxt'), badgeWrap = $('#uiMapBadge');
-  if (badgeEl) badgeEl.innerHTML = `${def.icon} <span class="mtxt">${def.name}${activeLayout === '2v2' ? ' · 2v2 (carte XL)' : ''}</span>`;
+  if (badgeEl) badgeEl.innerHTML = `${def.icon} <span class="mtxt">${def.name}${activeLayout === '2v2' ? ' · 2v2 (carte XL)' : activeLayout === '1v1' ? ' · Duel' : ''}</span>`;
   if (badgeWrap) badgeWrap.title = `${def.name} : ${def.desc}\nSpécificité : ${def.badgeDesc}`;
 }

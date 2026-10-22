@@ -433,6 +433,13 @@ function drawTree3D(g, tr) {
     g.fillStyle = '#ffd000';
     g.beginPath(); g.ellipse(oTop.ox, oTop.oy, tr.r * 0.22, tr.r * 0.15, 0, 0, TAU); g.fill();
 
+  } else if (tr.type === 'cactus' || tr.type === 'pillar') {
+    // (repère déjà centré sur l'élément de décor)
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.beginPath(); g.ellipse(6, 5, tr.r * 0.6, tr.r * 0.35, 0, 0, TAU); g.fill();
+    g.fillStyle = tr.type === 'cactus' ? tr.col : '#4a4f63';
+    g.fillRect(-tr.r * 0.3, -tr.h * 0.7, tr.r * 0.6, tr.h * 0.7);
+    if (tr.type === 'pillar') { g.fillStyle = tr.col; g.fillRect(-tr.r * 0.34, -tr.h * 0.45, tr.r * 0.68, 3); }
   } else if (tr.type === 'crystal') {
     // Ombre au sol
     g.fillStyle = 'rgba(6, 16, 24, 0.38)';

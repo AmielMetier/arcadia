@@ -30,6 +30,7 @@ const UNIT_FIELDS = [
   ['sieged', qb, toBool], ['flying', qb, toBool], ['cargo', (v) => (Array.isArray(v) && v.length ? [...v] : 0), (v) => (Array.isArray(v) ? v : [])],
   ['boardedIn', raw, keep], ['healingTargetId', raw, keep],
   ['energy', q1, keep], ['shield', qi, keep], ['maxShield', raw, keep], ['cloaked', qb, toBool], ['faction', raw, keep],
+  ['boss', qb, toBool],
 ];
 const BLD_FIELDS = [
   ['id', raw, keep], ['kind', raw, keep], ['owner', raw, keep], ['team', raw, keep],
@@ -64,7 +65,7 @@ function packState(s, { viewer = null, ack = {}, pings = {} } = {}) {
     players: s.players.map((p) => {
       const mine = viewer == null || p.team === viewer.team;
       return {
-        id: p.id, name: p.name, color: p.color, bot: p.bot, afk: !!p.afk, team: p.team, faction: p.faction || 'terran',
+        id: p.id, name: p.name, color: p.color, bot: p.bot, afk: !!p.afk, horde: !!p.horde, team: p.team, faction: p.faction || 'terran',
         minerals: mine ? q1(p.minerals) : 0, gas: mine ? q1(p.gas) : 0, score: Math.round(p.score),
         dead: p.dead, spectator: !!p.spectator, spawnX: p.spawnX, spawnY: p.spawnY, nextUnitSeq: p.nextUnitSeq || 20,
         ping: p.bot ? 0 : (pings[p.id] || 0), upgrades: p.upgrades ? { ...p.upgrades } : {}, scanCd: q1(p.scanCd || 0),

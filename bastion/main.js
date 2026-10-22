@@ -41,7 +41,7 @@ function broadcastState(fx = []) {
 
 function reconcileGuestState(prev, incoming) {
   if (!incoming) return prev;
-  const inLayout = incoming.mode === '2v2' ? '2v2' : 'ffa';
+  const inLayout = incoming.mode === '2v2' || incoming.mode === '1v1' ? incoming.mode : 'ffa';
   if ((incoming.map && incoming.map !== activeMapId) || inLayout !== activeLayout) {
     initMap(incoming.map || activeMapId, inLayout);
     exploredGrid.fill(0);
@@ -176,8 +176,9 @@ function startMatch(info) {
     ? H.players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: false }))
     : [{ id: 0, name: 'Commandant', color: PALETTE[0], bot: false }];
 
-  const roster = [...humans];
-  const wantBots = role === 'solo'
+  // Duel : les deux premiers joueurs du salon s'affrontent (un bot si on est seul), les autres regardent
+  const roster = settings.mode === '1v1' ? humans.slice(0, 2) : [...humans];
+  const wantBots = settings.mode === '1v1' ? 2 - roster.length : role === 'solo'
     ? Math.max(1, Math.min(3, Number(settings.bots ?? 1)))
     : Math.max(0, Math.min(Number(settings.bots ?? 1), 4 - roster.length));
   const finalBots = roster.length + wantBots < 2 ? 2 - roster.length : wantBots;
@@ -219,7 +220,7 @@ function checkPresence() {
   const now = performance.now();
   const fx = [];
   for (const p of state.players) {
-    if (p.bot || p.dead || p.spectator || Number(p.id) === Number(myId)) continue;
+    if (p.bot || p.horde || p.dead || p.spectator || Number(p.id) === Number(myId)) continue;
     const inRoom = H.players.some((q) => Number(q.id) === Number(p.id));
     const inGame = !H.readyMap || H.readyMap[p.id] === H.info.game;
     const heard = lastHeard[p.id] != null && now - lastHeard[p.id] < PRESENCE_TIMEOUT;
