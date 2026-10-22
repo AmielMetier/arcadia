@@ -118,7 +118,7 @@ function renderWorld(dt, now) {
         ctx.restore();
       }
 
-      if (b.hp < b.maxHp || selected || b.constructing) {
+      if (b.hp < b.maxHp || selected || b.constructing || GFX.bars === 'always') {
         const bw = Math.max(40, radPx * 1.55);
         const pct = clamp(b.hp / b.maxHp, 0, 1);
         ctx.fillStyle = '#16181d';
@@ -137,7 +137,7 @@ function renderWorld(dt, now) {
           const tw = ctx.measureText(tag).width + 14;
           const bx = topPt.x - tw / 2, by = topPt.y - 42;
           ctx.fillStyle = 'rgba(22, 24, 29, 0.88)';
-          ctx.strokeStyle = ownerPlayer.color || '#ffc531';
+          ctx.strokeStyle = pc(ownerPlayer) || '#ffc531';
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.roundRect(bx, by, tw, 18, 6);
@@ -173,7 +173,7 @@ function renderWorld(dt, now) {
         ctx.restore();
       }
 
-      if (u.hp < u.maxHp || selected) {
+      if (u.hp < u.maxHp || selected || GFX.bars === 'always') {
         const bw = Math.max(24, radPx * 2.1);
         const pct = clamp(u.hp / u.maxHp, 0, 1);
         ctx.fillStyle = '#16181d';
@@ -325,6 +325,7 @@ function renderWorld(dt, now) {
 
   // Gisements de Minéraux 3D (Pyramides cristallines à facettes)
   for (const m of MINERAL_NODES) {
+    if (!mineralAlive(state, m)) continue;
     const r = m.rich ? 21 : 17;
     let col = m.rich ? '#ffc531' : '#1fc7c1';
     if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff4b2b';
@@ -416,11 +417,11 @@ function renderWorld(dt, now) {
     } else if (item.k === 'unit') {
       const u = item.obj;
       const owner = state.players.find((p) => p.id === u.owner);
-      drawUnit(ctx, u, owner ? owner.color : '#888', selectedUnits.has(u.id), now, false);
+      drawUnit(ctx, u, owner ? pc(owner) : '#888', selectedUnits.has(u.id), now, false);
     } else {
       const b = item.obj;
       const owner = state.players.find((p) => p.id === b.owner);
-      drawBuilding(ctx, b, owner ? owner.color : '#888', selectedBlds.has(b.id), now, false);
+      drawBuilding(ctx, b, owner ? pc(owner) : '#888', selectedBlds.has(b.id), now, false);
     }
   }
 
@@ -492,7 +493,7 @@ function renderWorld(dt, now) {
     p.life -= dt;
     if (p.life <= 0) { particles.splice(i, 1); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt;
-    ctx.fillStyle = p.color; ctx.strokeStyle = '#16181d'; ctx.lineWidth = 1.5;
+    ctx.fillStyle = pc(p); ctx.strokeStyle = '#16181d'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); ctx.stroke();
   }
 
@@ -527,7 +528,7 @@ function renderWorld(dt, now) {
       ctx.setLineDash([]);
     }
     ctx.globalAlpha = 0.74;
-    drawBuilding(ctx, { kind: buildMode, x: gx, y: gy, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: 0 }, check.ok ? (me ? me.color : '#2fbf71') : '#ff4b2b', false, now, false);
+    drawBuilding(ctx, { kind: buildMode, x: gx, y: gy, radius: def.radius, hp: def.hp, maxHp: def.hp, aimA: 0 }, check.ok ? (me ? pc(me) : '#2fbf71') : '#ff4b2b', false, now, false);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = check.ok ? '#2fbf71' : '#ff4b2b';
     ctx.lineWidth = 3.5;
@@ -580,6 +581,7 @@ function renderMinimap() {
 
   const curMapDef = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   for (const m of MINERAL_NODES) {
+    if (!mineralAlive(state, m)) continue;
     let col = m.rich ? '#ffc531' : '#1fc7c1';
     if (curMapDef.theme === 'volcanique') col = m.rich ? '#ffd700' : '#ff5522';
     else if (curMapDef.theme === 'cryo') col = m.rich ? '#c084fc' : '#38bdf8';
@@ -594,7 +596,7 @@ function renderMinimap() {
   const me = state.players.find((p) => Number(p.id) === Number(myId));
   const colorOf = (owner) => {
     const pl = state.players.find((p) => p.id === owner);
-    return pl ? pl.color : '#fff';
+    return pl ? pc(pl) : '#fff';
   };
   for (const b of state.buildings) {
     if (b.hp <= 0) continue;

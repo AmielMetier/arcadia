@@ -117,8 +117,9 @@ const UPGRADES = {
     short: 'Armes Infanterie',
     min: 100, gas: 50, time: 26,
     icon: '⚔️',
-    desc: '+25% Dégâts pour Marines, Maraudeurs et Faucheurs.',
+    desc: '+12% Dégâts par niveau (3 niveaux) pour Marines, Maraudeurs et Faucheurs.',
     appliesTo: ['marine', 'rocket', 'sapper'],
+    maxLevel: 3, dmgPerLevel: 0.12,
   },
   infantry_armor: {
     id: 'infantry_armor',
@@ -126,9 +127,9 @@ const UPGRADES = {
     short: 'Armure Infanterie',
     min: 100, gas: 25, time: 26,
     icon: '🛡️',
-    desc: '+25% PV Max pour Marines, Maraudeurs et Faucheurs.',
+    desc: '+10% PV Max par niveau (3 niveaux) pour Marines, Maraudeurs et Faucheurs.',
     appliesTo: ['marine', 'rocket', 'sapper'],
-    hpMult: 1.25,
+    maxLevel: 3, hpPerLevel: 0.10,
   },
   vehicle_weapons: {
     id: 'vehicle_weapons',
@@ -136,8 +137,9 @@ const UPGRADES = {
     short: 'Canons Blindés',
     min: 125, gas: 75, time: 30,
     icon: '💥',
-    desc: '+25% Dégâts pour Goliaths, Chars de Siège et Mechas Thor.',
+    desc: '+12% Dégâts par niveau (3 niveaux) pour Goliaths, Chars de Siège et Mechas Thor.',
     appliesTo: ['tank', 'siege', 'titan'],
+    maxLevel: 3, dmgPerLevel: 0.12,
   },
   vehicle_armor: {
     id: 'vehicle_armor',
@@ -145,9 +147,9 @@ const UPGRADES = {
     short: 'Blindage Blindés',
     min: 125, gas: 50, time: 30,
     icon: '🦾',
-    desc: '+25% PV Max pour Goliaths, Chars de Siège et Mechas Thor.',
+    desc: '+10% PV Max par niveau (3 niveaux) pour Goliaths, Chars de Siège et Mechas Thor.',
     appliesTo: ['tank', 'siege', 'titan'],
-    hpMult: 1.25,
+    maxLevel: 3, hpPerLevel: 0.10,
   },
   advanced_thrusters: {
     id: 'advanced_thrusters',
@@ -157,9 +159,31 @@ const UPGRADES = {
     icon: '⚡',
     desc: '+18% Vitesse de déplacement pour toutes les unités de combat (au sol et dans les airs).',
     appliesTo: ['marine', 'rocket', 'sapper', 'tank', 'siege', 'titan', 'dropship', 'medivac'],
-    speedMult: 1.18,
+    maxLevel: 1, speedPerLevel: 0.18,
   },
 };
+
+// Améliorations par paliers : chaque niveau coûte 50 % de plus et prend 25 % de temps en plus
+function upgLevel(owner, id) {
+  const v = owner && owner.upgrades ? owner.upgrades[id] : 0;
+  return v === true ? 1 : Number(v) || 0;
+}
+function upgCost(owner, id) {
+  const d = UPGRADES[id];
+  const level = upgLevel(owner, id) + 1;
+  const f = 1 + 0.5 * (level - 1);
+  return { level, maxed: level > (d.maxLevel || 1), min: Math.round(d.min * f), gas: Math.round(d.gas * f), time: Math.round(d.time * (1 + 0.25 * (level - 1))) };
+}
+function upgMult(owner, kind, field) {
+  let m = 1;
+  for (const d of Object.values(UPGRADES)) {
+    if (d[field] && d.appliesTo.includes(kind)) m *= 1 + d[field] * upgLevel(owner, d.id);
+  }
+  return m;
+}
+const unitDmgMult = (owner, kind) => upgMult(owner, kind, 'dmgPerLevel');
+const unitHpMult = (owner, kind) => upgMult(owner, kind, 'hpPerLevel');
+const unitSpeedMult = (owner, kind) => upgMult(owner, kind, 'speedPerLevel');
 
 const UNITS = {
   scv: {

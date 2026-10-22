@@ -38,7 +38,8 @@ function hasCompletedBuilding(state, ownerId, kind) {
   return state.buildings.some((b) => b.owner === ownerId && b.kind === kind && b.hp > 0 && !b.constructing);
 }
 
-function canPlaceBuilding(state, ownerId, kind, x, y) {
+// opts.ignoreCost : vérifier seulement l'emplacement (un bot repère où s'étendre avant d'avoir les minéraux)
+function canPlaceBuilding(state, ownerId, kind, x, y, opts = {}) {
   const def = BUILDINGS[kind];
   if (!def) return { ok: false, reason: 'Bâtiment inconnu.' };
   const player = state.players.find((p) => p.id === ownerId);
@@ -46,8 +47,8 @@ function canPlaceBuilding(state, ownerId, kind, x, y) {
   if (def.req && !hasCompletedBuilding(state, ownerId, def.req)) {
     return { ok: false, reason: `Requiert d’abord : ${BUILDINGS[def.req].name}.` };
   }
-  if (player.minerals < def.min) return { ok: false, reason: `Pas assez de Minéraux (${def.min}💎 requis).` };
-  if (player.gas < def.gas) return { ok: false, reason: `Pas assez de Gaz Plasma (${def.gas}🧪 requis).` };
+  if (!opts.ignoreCost && player.minerals < def.min) return { ok: false, reason: `Pas assez de Minéraux (${def.min}💎 requis).` };
+  if (!opts.ignoreCost && player.gas < def.gas) return { ok: false, reason: `Pas assez de Gaz Plasma (${def.gas}🧪 requis).` };
 
   if (def.onGeyser) {
     const gey = findGeyserAt(x, y, 64);
@@ -97,9 +98,18 @@ function canPlaceBuilding(state, ownerId, kind, x, y) {
   return { ok: true, snapX: Math.round(x), snapY: Math.round(y) };
 }
 
-function nearestMineral(x, y, maxDist = 2000) {
+// Cristaux qui s'épuisent : le stock de chaque cristal vit dans l'état de la partie
+const MINERAL_STOCK = { main: 1200, expo: 1000, rich: 1500 };
+const SCAN_COOLDOWN = 45;
+const GAS_STOCK = 2000;
+function mineralAlive(st, m) {
+  return !st || !st.mineralLeft || (st.mineralLeft[m.id] ?? 1) > 0;
+}
+
+function nearestMineral(x, y, maxDist = 2000, st = null) {
   let best = null, bestD2 = maxDist * maxDist;
   for (const m of MINERAL_NODES) {
+    if (!mineralAlive(st, m)) continue;
     const d2 = dist2(x, y, m.x, m.y);
     if (d2 < bestD2) { bestD2 = d2; best = m; }
   }
@@ -164,6 +174,7 @@ function createInitialState(roster, settings = {}) {
       name: p.name,
       color: p.color || PALETTE[idx % PALETTE.length],
       bot: !!p.bot,
+      botLevel: p.botLevel || null,
       team,
       upgrades: {},
       minerals: blitz ? 300 : 200,
@@ -253,6 +264,9 @@ function createInitialState(roster, settings = {}) {
     buildings,
     units,
     scans: [],
+    // Stock de chaque cristal : ceux des bases principales sont un peu plus riches
+    mineralLeft: Object.fromEntries(MINERAL_NODES.map((m) => [m.id,
+      m.rich ? MINERAL_STOCK.rich : (MAP_FEATURES?.mains || []).some((b) => hypot(b.x, b.y, m.x, m.y) < 220) ? MINERAL_STOCK.main : MINERAL_STOCK.expo])),
     over: false,
     winnerTeam: null,
     ranking: [],
@@ -280,12 +294,7 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
   const ux = clamp(bld.x + Math.cos(angle) * (bld.radius + def.radius + 10) - Math.sin(angle) * jitter, 30, WORLD_SIZE - 30);
   const uy = clamp(bld.y + Math.sin(angle) * (bld.radius + def.radius + 10) + Math.cos(angle) * jitter, 30, WORLD_SIZE - 30);
   const detId = (Number(owner.id) + 1) * 10000 + seq;
-  let hpMult = 1.0;
-  if (owner.upgrades) {
-    if (['marine', 'rocket', 'sapper'].includes(kind) && owner.upgrades.infantry_armor) hpMult *= 1.25;
-    if (['tank', 'siege', 'titan'].includes(kind) && owner.upgrades.vehicle_armor) hpMult *= 1.25;
-  }
-  const finalHp = Math.round(def.hp * hpMult);
+  const finalHp = Math.round(def.hp * unitHpMult(owner, kind));
 
   const u = {
     id: detId,
@@ -321,7 +330,7 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
   };
 
   if (kind === 'scv') {
-    const m = nearestMineral(rx, ry, 260) || nearestMineral(bld.x, bld.y, 350);
+    const m = nearestMineral(rx, ry, 260, state) || nearestMineral(bld.x, bld.y, 350, state);
     if (m) {
       u.mode = 'harvest_min';
       u.harvestId = m.id;
@@ -513,9 +522,14 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     const upgDef = UPGRADES[upgId];
     if (!upgDef) return { ok: false, reason: 'Amélioration inconnue.' };
     p.upgrades = p.upgrades || {};
-    if (p.upgrades[upgId]) return { ok: false, reason: 'Amélioration déjà acquise !' };
-    if (p.minerals < upgDef.min) return { ok: false, reason: `Minéraux insuffisants (${upgDef.min}💎 requis).` };
-    if (p.gas < upgDef.gas) return { ok: false, reason: `Gaz Plasma insuffisant (${upgDef.gas}🧪 requis).` };
+    const cost = upgCost(p, upgId);
+    if (cost.maxed) return { ok: false, reason: 'Amélioration déjà au niveau maximum !' };
+    // Un seul niveau à la fois, toutes Armureries confondues
+    if (state.buildings.some((b) => b.owner === p.id && Array.isArray(b.queue) && b.queue.includes(upgId))) {
+      return { ok: false, reason: 'Ce niveau est déjà en recherche.' };
+    }
+    if (p.minerals < cost.min) return { ok: false, reason: `Minéraux insuffisants (${cost.min}💎 requis).` };
+    if (p.gas < cost.gas) return { ok: false, reason: `Gaz Plasma insuffisant (${cost.gas}🧪 requis).` };
 
     let lab = null;
     if (cmd.bldId) {
@@ -528,15 +542,15 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     }
     if (!lab) return { ok: false, reason: 'Construis d’abord une Armurerie Tech pour lancer cette amélioration.' };
 
-    p.minerals -= upgDef.min;
-    p.gas -= upgDef.gas;
+    p.minerals -= cost.min;
+    p.gas -= cost.gas;
     lab.queue = lab.queue || [];
     lab.queue.push(upgId);
     if (lab.queue.length === 1) {
-      lab.qTotal = state.blitz ? upgDef.time * 0.65 : upgDef.time;
+      lab.qTotal = state.blitz ? cost.time * 0.65 : cost.time;
       lab.qTimer = lab.qTotal;
     }
-    p.score += Math.round((upgDef.min + upgDef.gas) * 0.35);
+    p.score += Math.round((cost.min + cost.gas) * 0.35);
     fxEvents.push({ k: 'RESEARCH_START', bldId: lab.id, x: lab.x, y: lab.y, color: p.color });
     return { ok: true };
   }
@@ -583,14 +597,14 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     if (!bld || !Array.isArray(bld.queue) || !bld.queue.length) return { ok: false };
     const idx = clamp(Number(cmd.slot) || 0, 0, bld.queue.length - 1);
     const itemKey = bld.queue.splice(idx, 1)[0];
-    const itemDef = UNITS[itemKey] || UPGRADES[itemKey];
+    const itemDef = UNITS[itemKey] || (UPGRADES[itemKey] && upgCost(p, itemKey));
     if (itemDef) {
       p.minerals += itemDef.min;
       p.gas += itemDef.gas;
     }
     if (idx === 0) {
       if (bld.queue.length > 0) {
-        const nextDef = UNITS[bld.queue[0]] || UPGRADES[bld.queue[0]];
+        const nextDef = UNITS[bld.queue[0]] || (UPGRADES[bld.queue[0]] && upgCost(p, bld.queue[0]));
         const nextTime = nextDef.trainTime ?? nextDef.time ?? 8;
         bld.qTotal = state.blitz ? nextTime * 0.65 : nextTime;
         bld.qTimer = bld.qTotal;
@@ -633,7 +647,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
       }
       if (mode === 'harvest_min' && u.kind === 'scv') {
         u.mode = 'harvest_min';
-        u.harvestId = MINERAL_NODES.some((m) => m.id === cmd.resId) ? cmd.resId : (nearestMineral(x, y)?.id ?? null);
+        u.harvestId = MINERAL_NODES.some((m) => m.id === cmd.resId && mineralAlive(state, m)) ? cmd.resId : (nearestMineral(x, y, 2000, state)?.id ?? null);
         u.buildTargetId = null;
         u.onSite = false;
         return;
@@ -712,8 +726,10 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     if (!state.buildings.some((b) => b.owner === p.id && b.kind === 'hq' && b.hp > 0 && !b.constructing)) {
       return { ok: false, reason: 'Le Scan Radar se lance depuis un Centre de Commandement.' };
     }
+    if (p.scanCd > 0) return { ok: false, reason: `Scan Radar en recharge (${Math.ceil(p.scanCd)} s).` };
     if (p.minerals < 50) return { ok: false, reason: '50💎 requis pour lancer un Scan Radar.' };
     p.minerals -= 50;
+    p.scanCd = SCAN_COOLDOWN;
     const x = clamp(Math.round(Number(cmd.x) || HALF_W), 60, WORLD_SIZE - 60);
     const y = clamp(Math.round(Number(cmd.y) || HALF_W), 60, WORLD_SIZE - 60);
     const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;

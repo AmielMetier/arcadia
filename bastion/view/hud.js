@@ -13,7 +13,9 @@ function renderConsoleUI(force = false) {
   if (!state) return;
   cleanSelection();
   const me = state.players.find((p) => Number(p.id) === Number(myId));
-  if (!me) return;
+  // Éliminé ou arrivé en cours de partie : tableau des joueurs et caméra libre
+  if (!me || me.dead || me.spectator) { renderSpectatorPanel(force); return; }
+  document.body.classList.remove('spectating');
 
   const myUnits = state.units.filter((u) => Number(u.owner) === Number(myId) && u.hp > 0);
   const scvs = myUnits.filter((u) => u.kind === 'scv');
@@ -138,7 +140,7 @@ function renderConsoleUI(force = false) {
           ` : ''}
         </div>
       `;
-      drawThumbIcon($('#portCvs'), b.kind, me.color);
+      drawThumbIcon($('#portCvs'), b.kind, pc(me));
       for (const sl of selBody.querySelectorAll('.q-slot.filled')) {
         sl.onpointerdown = (ev) => {
           if (ev.button !== 0) return;
@@ -192,7 +194,7 @@ function renderConsoleUI(force = false) {
           <div class="sel-stats">${statsHtml}</div>
         </div>
       `;
-      drawThumbIcon($('#portCvs'), u.kind, me.color);
+      drawThumbIcon($('#portCvs'), u.kind, pc(me));
     } else if (selU.length > 1) {
       $('#uiSelHeader').textContent = `Escouade sélectionnée (${selU.length} unités)`;
       $('#uiSelSubHint').textContent = 'Clic = isoler · Ctrl+clic = même type';
@@ -206,7 +208,7 @@ function renderConsoleUI(force = false) {
         </div>`;
       }).join('')}</div>`;
       for (const c of selBody.querySelectorAll('canvas[data-u-thumb]')) {
-        drawThumbIcon(c, c.dataset.uThumb, me.color);
+        drawThumbIcon(c, c.dataset.uThumb, pc(me));
       }
       for (const card of selBody.querySelectorAll('[data-pick-u]')) {
         card.onpointerdown = (ev) => {
@@ -253,7 +255,7 @@ function renderConsoleUI(force = false) {
     : '';
 
   const grid = $('#uiCmdGrid');
-  const sig = `${modeKey}|${armyAbil}|${buildMode}|${buildKeysArmed}|${orderCursor}|${me.color}|${BUILD_ORDER.map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}`;
+  const sig = `${modeKey}|${armyAbil}|${buildMode}|${buildKeysArmed}|${orderCursor}|${pc(me)}|${BUILD_ORDER.map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}`;
   if (!force && sig === lastCmdSig) {
     refreshCmdAffordability(grid, me, firstB);
     return;
@@ -286,14 +288,17 @@ function renderConsoleUI(force = false) {
       const upgKeys = ['E', 'R', 'T', 'Y', 'U'];
       me.upgrades = me.upgrades || {};
       Object.values(UPGRADES).forEach((uDef, idx) => {
-        const isDone = !!me.upgrades[uDef.id];
-        const isQueued = (firstB.queue || []).includes(uDef.id);
-        const poor = me.minerals < uDef.min || me.gas < uDef.gas;
+        // Paliers : le bouton montre le niveau acquis et le coût du suivant
+        const c = upgCost(me, uDef.id);
+        const lvl = upgLevel(me, uDef.id), max = uDef.maxLevel || 1;
+        const isDone = c.maxed;
+        const isQueued = state.buildings.some((b) => b.owner === me.id && (b.queue || []).includes(uDef.id));
+        const poor = me.minerals < c.min || me.gas < c.gas;
         cards.push(`<button class="cbtn ${isDone ? 'done' : isQueued ? 'queued' : poor ? 'cant' : ''}" data-cmd-research="${uDef.id}" data-tip-kind="upg" data-tip-id="${uDef.id}">
           <span class="key">${upgKeys[idx] || ''}</span>
           <span class="ico-txt">${uDef.icon}</span>
-          <span class="lbl-b">${uDef.short}</span>
-          ${isDone ? '<span class="req ok">✔ Acquis</span>' : isQueued ? '<span class="req q">⏳ En cours</span>' : costHtml(uDef.min, uDef.gas)}
+          <span class="lbl-b">${uDef.short}${max > 1 ? ` <small class="lvl">${lvl}/${max}</small>` : ''}</span>
+          ${isDone ? '<span class="req ok">✔ Maximum</span>' : isQueued ? `<span class="req q">⏳ Niv. ${c.level}</span>` : costHtml(c.min, c.gas)}
         </button>`);
       });
     } else {
@@ -312,7 +317,7 @@ function renderConsoleUI(force = false) {
         cards.push(`<button class="cbtn ${orderCursor === 'scan' ? 'sel' : ''} ${me.minerals < 50 ? 'cant' : ''}" data-cmd-act="scan" data-tip-kind="act" data-tip-id="scan">
           <span class="key">C</span>
           <span class="ico-txt">📡</span>
-          <span class="lbl-b">Scan</span>
+          <span class="lbl-b">Scan <small class="cd">${me.scanCd > 0 ? Math.ceil(me.scanCd) + ' s' : ''}</small></span>
           ${costHtml(50, 0)}
         </button>`);
       }
@@ -362,7 +367,7 @@ function renderConsoleUI(force = false) {
 
   grid.innerHTML = cards.join('');
   for (const c of grid.querySelectorAll('canvas[data-thumb]')) {
-    drawThumbIcon(c, c.dataset.thumb, me.color);
+    drawThumbIcon(c, c.dataset.thumb, pc(me));
   }
   for (const b of grid.querySelectorAll('[data-tip-kind]')) {
     b.onpointerenter = () => showCmdTip(b);
@@ -435,14 +440,22 @@ function refreshCmdAffordability(grid, me, firstB) {
     b.classList.toggle('cant', me.minerals < uDef.min || me.gas < uDef.gas);
   }
   for (const b of grid.querySelectorAll('[data-cmd-research]')) {
-    const uDef = UPGRADES[b.dataset.cmdResearch];
-    const isDone = !!(me.upgrades && me.upgrades[uDef?.id]);
-    const isQueued = (firstB?.queue || []).includes(uDef?.id);
-    if (isDone !== b.classList.contains('done') || isQueued !== b.classList.contains('queued')) { lastCmdSig = ''; return; }
-    b.classList.toggle('cant', !isDone && !isQueued && (me.minerals < (uDef?.min || 0) || me.gas < (uDef?.gas || 0)));
+    const id = b.dataset.cmdResearch;
+    if (!UPGRADES[id]) continue;
+    const c = upgCost(me, id);
+    const isQueued = state.buildings.some((x) => x.owner === me.id && (x.queue || []).includes(id));
+    const sig = `${upgLevel(me, id)}|${isQueued}`;
+    if (b.dataset.sig && b.dataset.sig !== sig) { lastCmdSig = ''; return; }
+    b.dataset.sig = sig;
+    b.classList.toggle('cant', !c.maxed && !isQueued && (me.minerals < c.min || me.gas < c.gas));
   }
   const scan = grid.querySelector('[data-cmd-act="scan"]');
-  if (scan) scan.classList.toggle('cant', me.minerals < 50);
+  if (scan) {
+    const cd = Math.ceil(me.scanCd || 0);
+    scan.classList.toggle('cant', me.minerals < 50 || cd > 0);
+    const lbl = scan.querySelector('.cd');
+    if (lbl) lbl.textContent = cd > 0 ? `${cd} s` : '';
+  }
 }
 
 // Choisit le bâtiment à poser (bouton ou raccourci) ; refuse proprement s'il n'est pas débloqué
@@ -488,9 +501,12 @@ function showCmdTip(btn) {
     html = `<b>${d.name}</b>${d.desc}${costRow(d.min, d.gas, `<span class="s">${d.supply}</span><span class="t">⏱ ${d.trainTime}s</span>`)}`;
   } else if (kind === 'upg') {
     const d = UPGRADES[id];
-    html = `<b>${d.name}</b>${d.desc}${costRow(d.min, d.gas, `<span class="t">⏱ ${d.time}s</span>`)}`;
+    const c = upgCost(me, id);
+    html = c.maxed
+      ? `<b>${d.name}</b>${d.desc}<div class="tip-note">Niveau maximum atteint.</div>`
+      : `<b>${d.name}${(d.maxLevel || 1) > 1 ? ` — niveau ${c.level}` : ''}</b>${d.desc}${costRow(c.min, c.gas, `<span class="t">⏱ ${c.time}s</span>`)}`;
   } else if (ACT_TIPS[id]) {
-    html = `<b>${ACT_TIPS[id][0]}</b>${ACT_TIPS[id][1]}${id === 'scan' ? costRow(50, 0) : ''}`;
+    html = `<b>${ACT_TIPS[id][0]}</b>${ACT_TIPS[id][1]}${id === 'scan' ? costRow(50, 0, `<span class="t">⏱ recharge ${SCAN_COOLDOWN}s</span>`) : ''}`;
   }
   if (!html) return;
   tip.innerHTML = html;
@@ -517,7 +533,7 @@ function getMyHarvestStats() {
     else if (u.mode === 'idle') idle++;
   }
   const hqs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.kind === 'hq' && b.hp > 0 && !b.constructing);
-  const baseMins = MINERAL_NODES.filter((m) => hqs.some((h) => hypot(h.x, h.y, m.x, m.y) < 420));
+  const baseMins = MINERAL_NODES.filter((m) => mineralAlive(state, m) && hqs.some((h) => hypot(h.x, h.y, m.x, m.y) < 420));
   const refs = state.buildings.filter((b) => Number(b.owner) === Number(myId) && b.kind === 'extractor' && b.hp > 0 && !b.constructing);
   return {
     minCnt, gasCnt, baseMins, refs, idle, total,
@@ -611,7 +627,7 @@ function updateHudUI() {
         teamHtml = `<button class="team-tag t${p.team}" data-toggle-team="${p.id}" ${canSwitch ? 'title="Changer d’équipe"' : 'disabled'} style="border:none;cursor:${canSwitch ? 'pointer' : 'default'}">${tName}</button>`;
       }
       return `<div class="p-chip ${p.dead ? 'dead' : ''} ${isMe ? 'me' : ''}">
-        <span class="dot" style="background:${p.color}"></span>
+        <span class="dot" style="background:${pc(p)}"></span>
         <span>${escHtml(p.name)}${isMe ? ' <small>(Toi)</small>' : ''}</span>
         ${teamHtml}
         ${pingHtml}
@@ -635,14 +651,15 @@ function updateHudUI() {
     modal.hidden = false;
     const draw = state.winnerTeam == null;
     const won = !draw && me && !me.dead && me.team === state.winnerTeam;
-    $('#endTitle').textContent = draw ? '🤝 Égalité' : won ? '🏆 Victoire !' : '💥 Défaite';
-    $('#endSub').textContent = draw
+    const winners = state.players.filter((p) => !draw && p.team === state.winnerTeam).map((p) => escHtml(p.name)).join(' et ');
+    $('#endTitle').textContent = draw ? '🤝 Égalité' : !me ? '🏁 Fin de partie' : won ? '🏆 Victoire !' : '💥 Défaite';
+    $('#endSub').innerHTML = draw
       ? 'Les dernières bases sont tombées en même temps : personne ne l’emporte.'
-      : won ? 'Tes forces ont conquis le secteur !' : 'Tous tes Centres de Commandement ont été détruits.';
+      : !me ? `Victoire de ${winners}.` : won ? 'Tes forces ont conquis le secteur !' : `Tous tes Centres de Commandement ont été détruits. Victoire de ${winners}.`;
     const ordered = state.ranking.map((id) => state.players.find((p) => p.id === id)).filter(Boolean);
     $('#endRanks').innerHTML = ordered.map((p, idx) => `<li>
       <span class="rk">${idx < 3 ? ['🥇', '🥈', '🥉'][idx] : idx + 1}</span>
-      <span class="dot" style="background:${p.color}"></span>
+      <span class="dot" style="background:${pc(p)}"></span>
       <span>${escHtml(p.name)}${p.bot ? ' 🤖' : ''}</span>
       <span class="sc">${p.score} pts</span>
     </li>`).join('');

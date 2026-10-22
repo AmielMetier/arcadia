@@ -75,7 +75,7 @@ function packState(s, { viewer = null, ack = {}, pings = {} } = {}) {
     U: s.units.filter(visibleUnit).map((u) => encodeRow(u, UNIT_FIELDS)),
     scans: s.scans.filter((sc) => viewer == null || sc.team === viewer.team)
       .map((sc) => ({ x: Math.round(sc.x), y: Math.round(sc.y), team: sc.team, r: sc.r, timer: q2(sc.timer) })),
-    minerals: (s.mineralLeft ? Object.fromEntries(Object.entries(s.mineralLeft).map(([k, v]) => [k, Math.round(v)])) : null),
+    mineralLeft: s.mineralLeft ? Object.fromEntries(Object.entries(s.mineralLeft).map(([k, v]) => [k, Math.max(0, Math.round(v))])) : null,
     fog: viewer != null,
   };
 }

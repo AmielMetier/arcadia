@@ -71,9 +71,9 @@ function initThree3D() {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    threeRenderer.setPixelRatio(Math.min(1.75, DPR));
+    threeRenderer.setPixelRatio(Math.min(gfxPreset().pixelRatio, DPR));
     threeRenderer.setSize(W, H, false);
-    threeRenderer.shadowMap.enabled = true;
+    threeRenderer.shadowMap.enabled = gfxPreset().shadows;
     threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
@@ -97,9 +97,9 @@ function initThree3D() {
     const sun = new THREE.DirectionalLight(def.sunColor, 0.98);
     sun.position.set(WORLD_SIZE * 0.26, 1750, WORLD_SIZE * 0.82);
     sun.target.position.set(HALF_W, 0, HALF_W);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    sun.castShadow = gfxPreset().shadows;
+    sun.shadow.mapSize.width = gfxPreset().shadowSize;
+    sun.shadow.mapSize.height = gfxPreset().shadowSize;
     sun.shadow.camera.near = 250;
     sun.shadow.camera.far = 4800;
     const sc = 1450;
@@ -433,7 +433,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
       grp.add(c);
     }
     threeScene.add(grp);
-    mineralMeshes3D.push({ grp, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y, baseY });
+    mineralMeshes3D.push({ grp, id: m.id, seed: m.x * 0.02 + m.y * 0.01, x: m.x, y: m.y, baseY });
   }
 
   // 9. Geysers de Gaz Plasma 3D
@@ -817,6 +817,27 @@ function createBuildingMesh3D(kind, color, isGhost = false) {
     grp.userData.scaffold = scaffold;
   }
 
+  // Ombre de contact : une auréole sombre et douce ancre le bâtiment dans le sol
+  if (!isGhost) {
+    if (!geoCache3D.contact) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      const cg = cv.getContext('2d');
+      const gr = cg.createRadialGradient(64, 64, 18, 64, 64, 64);
+      gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.32)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      cg.fillStyle = gr; cg.fillRect(0, 0, 128, 128);
+      geoCache3D.contact = new THREE.PlaneGeometry(1, 1);
+      geoCache3D.contactMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false });
+      geoCache3D.contactMat.userData.shared = true;
+    }
+    const disc = new THREE.Mesh(geoCache3D.contact, geoCache3D.contactMat);
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = 0.8;
+    disc.scale.setScalar(r * 2.9);
+    disc.renderOrder = -1;
+    grp.add(disc);
+  }
+
   grp.userData.bodyGroup = bodyGroup;
   grp.userData.color = color;
   grp.userData.kind = kind;
@@ -1156,8 +1177,13 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     for (const r of rockMeshes3D) {
       r.mesh.visible = isExplored(r.x, r.y);
     }
+    // Les cristaux rapetissent à mesure qu'on les exploite et disparaissent une fois épuisés
     for (const m of mineralMeshes3D) {
-      m.grp.visible = isExplored(m.x, m.y);
+      const left = state.mineralLeft ? state.mineralLeft[m.id] : null;
+      const frac = left == null ? 1 : clamp(left / 1200, 0, 1.25);
+      m.grp.visible = isExplored(m.x, m.y) && (left == null || left > 0);
+      const sc = 0.45 + 0.55 * Math.min(1, frac);
+      m.grp.scale.set(sc, sc, sc);
     }
     for (const g of geyserMeshes3D) {
       g.grp.visible = isExplored(g.x, g.y);
@@ -1188,7 +1214,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       const vis = b.owner === myId || isVisibleToMe(b.x, b.y);
       activeBldIds.add(b.id);
       const owner = state.players.find((p) => p.id === b.owner);
-      const col = owner ? owner.color : '#888888';
+      const col = owner ? pc(owner) : '#888888';
 
       let mesh = bldMeshes3D.get(b.id);
       if (!mesh || mesh.userData.kind !== b.kind || mesh.userData.color !== col) {
@@ -1262,7 +1288,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       const vis = u.owner === myId || isVisibleToMe(u.x, u.y);
       activeUnitIds.add(u.id);
       const owner = state.players.find((p) => p.id === u.owner);
-      const col = owner ? owner.color : '#888888';
+      const col = owner ? pc(owner) : '#888888';
 
       let mesh = unitMeshes3D.get(u.id);
       if (!mesh || mesh.userData.kind !== u.kind || mesh.userData.color !== col) {
@@ -1409,7 +1435,8 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       fxGroup3D.add(pm);
     }
 
-    threeRenderer.render(threeScene, threeCam);
+    updateFlashes3D(dt);
+    renderFrame3D();
     return true;
   } catch (err) {
     console.error('3D render error, fallback to 2D:', err);

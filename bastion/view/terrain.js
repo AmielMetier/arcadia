@@ -43,6 +43,43 @@ function buildTerrainCanvas(mapId = activeMapId) {
     g.fillStyle = rnd() < 0.55 ? T.speckA : T.speckB;
     g.fillRect(rnd() * W, rnd() * W, 2 + rnd() * 3.5, 2 + rnd() * 3.5);
   }
+  // Détail du sol : brins d'herbe (Vallée), cendres (Magma), congères et craquelures (Glacier)
+  if (mapId === 'vallee') {
+    // Surtout des brins plus sombres que le sol (relief et profondeur), quelques reflets clairs
+    const blades = ['rgba(22,62,28,0.30)', 'rgba(34,82,36,0.26)', 'rgba(18,52,24,0.22)', 'rgba(150,196,104,0.12)'];
+    g.lineCap = 'round';
+    for (let k = 0; k < 26000 * area; k++) {
+      const x = rnd() * W, y = rnd() * W, a = -Math.PI / 2 + (rnd() - 0.5) * 0.9, l = 3 + rnd() * 6;
+      g.strokeStyle = blades[(rnd() * blades.length) | 0]; g.lineWidth = 1 + rnd() * 1.3;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    // Petites touffes de fleurs
+    for (let k = 0; k < 420 * area; k++) {
+      const x = rnd() * W, y = rnd() * W;
+      g.fillStyle = ['#f4e3a1', '#e8b4d4', '#fff8ea'][(rnd() * 3) | 0];
+      for (let f = 0; f < 5; f++) g.fillRect(x + (rnd() - 0.5) * 18, y + (rnd() - 0.5) * 18, 2.2, 2.2);
+    }
+  } else if (mapId === 'magma') {
+    for (let k = 0; k < 9000 * area; k++) {
+      g.fillStyle = rnd() < 0.7 ? 'rgba(70,58,62,0.35)' : 'rgba(255,120,40,0.16)';
+      g.beginPath(); g.arc(rnd() * W, rnd() * W, 1 + rnd() * 2.5, 0, TAU); g.fill();
+    }
+  } else if (mapId === 'glace') {
+    for (let k = 0; k < 90 * area; k++) {
+      const x = rnd() * W, y = rnd() * W, r = 60 + rnd() * 150;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgba(235,248,255,0.22)'); gr.addColorStop(1, 'rgba(235,248,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+    g.strokeStyle = 'rgba(190,240,255,0.22)';
+    for (let k = 0; k < 160 * area; k++) {
+      let x = rnd() * W, y = rnd() * W;
+      g.lineWidth = 1 + rnd() * 1.5;
+      g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { x += (rnd() - 0.5) * 70; y += (rnd() - 0.5) * 70; g.lineTo(x, y); }
+      g.stroke();
+    }
+  }
   if (mapId === 'magma') {
     for (let k = 0; k < 30 * area; k++) {
       const fx = rnd() * W, fy = rnd() * W;
@@ -162,7 +199,13 @@ function buildTerrainCanvas(mapId = activeMapId) {
       if (mapId === 'magma' && t === T_MOUNT && hgt > 110) { const s = smooth01((hgt - 110) / 18); r = lerp(r, 255, s * 0.8); gg = lerp(gg, 90, s * 0.8); b = lerp(b, 10, s * 0.8); }
       d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
     } else {
-      const shade = clamp(0.62 - light, -0.4, 0.6);
+      // Occlusion ambiante : le sol s'assombrit au pied des falaises et des montagnes
+      let occ = 0;
+      for (let oy = -3; oy <= 3; oy++) for (let ox = -3; ox <= 3; ox++) {
+        const tt = terType[clamp(y + oy, 0, N - 1) * N + clamp(x + ox, 0, N - 1)];
+        if ((tt === T_CLIFF || tt === T_MOUNT) && (t === T_LOW || t === T_RAMP)) occ += 1 / (1 + ox * ox + oy * oy);
+      }
+      const shade = clamp(0.62 - light + Math.min(0.35, occ * 0.09), -0.4, 0.75);
       if (shade > 0) { d[o] = 0; d[o + 1] = 0; d[o + 2] = 0; d[o + 3] = Math.round(shade * 230); }
       else { d[o] = 255; d[o + 1] = 248; d[o + 2] = 220; d[o + 3] = Math.round(-shade * 70); }
     }

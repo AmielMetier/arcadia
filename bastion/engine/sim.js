@@ -25,27 +25,28 @@ function finishBuildingConstruction(state, b, owner, fxEvents) {
         u.harvestId = b.id;
       } else {
         u.mode = 'harvest_min';
-        u.harvestId = nearestMineral(u.x, u.y, 500)?.id ?? null;
+        u.harvestId = nearestMineral(u.x, u.y, 500, state)?.id ?? null;
       }
     }
   }
+  if (b.kind === 'extractor' && b.remaining == null) b.remaining = GAS_STOCK;
 }
 
 function applyUpgrade(state, owner, upgId, fxEvents) {
   const upgDef = UPGRADES[upgId];
   if (!upgDef) return;
   owner.upgrades = owner.upgrades || {};
-  owner.upgrades[upgId] = true;
-  fxEvents.push({ k: 'UPGRADE_DONE', ownerId: owner.id, upgId, name: upgDef.name });
+  owner.upgrades[upgId] = upgLevel(owner, upgId) + 1;
+  fxEvents.push({ k: 'UPGRADE_DONE', ownerId: owner.id, upgId, name: `${upgDef.name}${(upgDef.maxLevel || 1) > 1 ? ' niv. ' + owner.upgrades[upgId] : ''}` });
 
-  if (upgDef.hpMult) {
-    const mult = upgDef.hpMult;
+  if (upgDef.hpPerLevel) {
     for (const u of state.units) {
       if (u.owner === owner.id && upgDef.appliesTo.includes(u.kind)) {
         const baseDef = UNITS[u.kind];
         if (baseDef) {
-          u.maxHp = Math.round(baseDef.hp * mult);
-          u.hp = Math.min(u.maxHp, Math.round(u.hp * mult));
+          const newMax = Math.round(baseDef.hp * unitHpMult(owner, u.kind));
+          u.hp = Math.min(newMax, u.hp * (newMax / Math.max(1, u.maxHp)));
+          u.maxHp = newMax;
         }
       }
     }
@@ -56,10 +57,10 @@ function applyUpgrade(state, owner, upgId, fxEvents) {
 const MAX_SCV_PER_MINERAL = 2;
 const MAX_SCV_PER_GAS = 3;
 
-function nearestFreeMineral(owner, x, y, counts, maxDist = 560) {
+function nearestFreeMineral(owner, x, y, counts, maxDist = 560, st = null) {
   let best = null, bestD2 = maxDist * maxDist;
   for (const m of MINERAL_NODES) {
-    if ((counts.get(owner + ':' + m.id) || 0) >= MAX_SCV_PER_MINERAL) continue;
+    if ((counts.get(owner + ':' + m.id) || 0) >= MAX_SCV_PER_MINERAL || !mineralAlive(st, m)) continue;
     const d2 = dist2(x, y, m.x, m.y);
     if (d2 < bestD2) { bestD2 = d2; best = m; }
   }
@@ -84,7 +85,7 @@ function enforceHarvestCaps(st, fxEvents) {
     const from = u.mode === 'harvest_gas'
       ? st.buildings.find((b) => b.id === u.harvestId) || u
       : MINERAL_NODES.find((m) => m.id === u.harvestId) || u;
-    const m = nearestFreeMineral(u.owner, from.x, from.y, counts);
+    const m = nearestFreeMineral(u.owner, from.x, from.y, counts, 560, st);
     if (m) {
       u.mode = 'harvest_min';
       u.harvestId = m.id;
@@ -140,9 +141,8 @@ function stepWorld(state, dt, fxEvents) {
 
   for (const p of state.players) {
     if (p.dead) continue;
-    p.minerals = Math.min(9999, p.minerals + 1.25 * dt); // Réduit de 50% (auparavant 2.5)
-    const myRefs = state.buildings.filter((b) => b.owner === p.id && b.kind === 'extractor' && b.hp > 0 && !b.constructing).length;
-    if (myRefs > 0) p.gas = Math.min(9999, p.gas + myRefs * 1.1 * dt); // Réduit de 50% (auparavant 2.2)
+    // Plus de revenu passif : tout vient des VCS (cristaux et geysers qui s'épuisent)
+    if (p.scanCd > 0) p.scanCd = Math.max(0, p.scanCd - dt);
   }
 
   for (const b of state.buildings) {
@@ -183,7 +183,7 @@ function stepWorld(state, dt, fxEvents) {
           spawnTrainedUnit(state, owner, b, item, fxEvents);
         }
         if (b.queue.length > 0) {
-          const nextDef = UNITS[b.queue[0]] || UPGRADES[b.queue[0]];
+          const nextDef = UNITS[b.queue[0]] || (UPGRADES[b.queue[0]] && upgCost(owner, b.queue[0]));
           const nextTime = nextDef.trainTime ?? nextDef.time ?? 8;
           b.qTotal = state.blitz ? nextTime * 0.65 : nextTime;
           b.qTimer = b.qTotal;
@@ -315,7 +315,7 @@ function stepWorld(state, dt, fxEvents) {
           u.mode = 'harvest_min';
           u.buildTargetId = null;
           u.onSite = false;
-          const m = nearestMineral(u.x, u.y, 400);
+          const m = nearestMineral(u.x, u.y, 400, state);
           u.harvestId = m ? m.id : null;
         } else if (bld.constructing) {
           // CONSTRUCTION FAÇON STARCRAFT : Le VCS doit être PHYSIQUEMENT SUR l'endroit de construction !
@@ -378,7 +378,7 @@ function stepWorld(state, dt, fxEvents) {
               if (Math.random() < 0.35) fxEvents.push({ k: 'SPARK', x: u.x + Math.cos(u.a) * 14, y: u.y + Math.sin(u.a) * 14, color: '#ffc531' });
             } else {
               u.mode = bld.kind === 'extractor' ? 'harvest_gas' : 'harvest_min';
-              u.harvestId = bld.kind === 'extractor' ? bld.id : (nearestMineral(u.x, u.y, 500)?.id ?? null);
+              u.harvestId = bld.kind === 'extractor' ? bld.id : (nearestMineral(u.x, u.y, 500, state)?.id ?? null);
               u.buildTargetId = null;
             }
             continue;
@@ -406,7 +406,9 @@ function stepWorld(state, dt, fxEvents) {
             u.orderY = hq.y;
           }
         } else if (u.mode === 'harvest_min') {
-          let mNode = MINERAL_NODES.find((m) => m.id === u.harvestId) || nearestMineral(u.x, u.y);
+          let mNode = MINERAL_NODES.find((m) => m.id === u.harvestId && mineralAlive(state, m)) || nearestMineral(u.x, u.y, 1400, state);
+          // Plus aucun cristal à portée : le VCS se met au repos (à toi de l'envoyer vers une autre base)
+          if (!mNode) { u.mode = 'idle'; u.harvestId = null; u.orderX = null; u.orderY = null; }
           if (mNode) {
             u.harvestId = mNode.id;
             const dM = hypot(u.x, u.y, mNode.x, mNode.y) - 22 - u.radius;
@@ -418,8 +420,14 @@ function stepWorld(state, dt, fxEvents) {
               const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
               if (u.gatherT >= (mapDef.mineHarvestTime || 1.55)) {
                 u.gatherT = 0;
+                const left = state.mineralLeft ? state.mineralLeft[mNode.id] ?? Infinity : Infinity;
+                const amt = Math.min(left, mNode.rich ? 6 : 4);
                 u.carryType = mNode.rich ? 'gold' : 'min';
-                u.carryAmt = mNode.rich ? 6 : 4; // Réduit de 50% (auparavant 12 / 8)
+                u.carryAmt = amt;
+                if (state.mineralLeft && Number.isFinite(left)) {
+                  state.mineralLeft[mNode.id] = left - amt;
+                  if (left - amt <= 0) fxEvents.push({ k: 'DEPLETED', x: mNode.x, y: mNode.y, owner: u.owner });
+                }
               }
               continue;
             } else {
@@ -440,8 +448,15 @@ function stepWorld(state, dt, fxEvents) {
               const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
               if (u.gatherT >= 1.7) {
                 u.gatherT = 0;
+                // Geyser épuisé : il ne donne plus qu'1 unité par voyage
+                const left = ref.remaining ?? GAS_STOCK;
+                const amt = left > 0 ? Math.min(left, Math.max(1, Math.round(4 * (mapDef.gasHarvestMult || 1.0)))) : 1;
                 u.carryType = 'gas';
-                u.carryAmt = Math.max(1, Math.round(3 * (mapDef.gasHarvestMult || 1.0))); // Réduit de 50% (auparavant 6)
+                u.carryAmt = amt;
+                if (left > 0) {
+                  ref.remaining = left - amt;
+                  if (ref.remaining <= 0) fxEvents.push({ k: 'GAS_DEPLETED', x: ref.x, y: ref.y, owner: u.owner });
+                }
               }
               continue;
             } else {
@@ -506,8 +521,7 @@ function stepWorld(state, dt, fxEvents) {
         u.cd = effRate;
         let dmg = effDmg * state.dmgMult;
         if (owner?.upgrades) {
-          if (['marine', 'rocket', 'sapper'].includes(u.kind) && owner.upgrades.infantry_weapons) dmg *= 1.25;
-          if (['tank', 'siege', 'titan'].includes(u.kind) && owner.upgrades.vehicle_weapons) dmg *= 1.25;
+          dmg *= unitDmgMult(owner, u.kind);
         }
         if (bestTarget.isBld) dmg *= def.bldMult || 1;
         else if (u.kind === 'rocket' && UNITS[tgt.kind]?.mech) dmg *= 1.5;
@@ -544,7 +558,8 @@ function stepWorld(state, dt, fxEvents) {
     }
     if (goalX == null || goalY == null) continue;
     // Point d'arrivée sur un bâtiment (ralliement mal placé) : arrivé dès qu'on le touche, sinon l'unité pousse indéfiniment
-    const arriveR = pathBlocked[pathCellOf(goalX, goalY)] ? 18 + u.radius + 40 : 18;
+    // (seulement pour un déplacement : récolte et réparation ont leur propre distance d'arrivée)
+    const arriveR = (u.mode === 'move' || u.mode === 'amove') && pathBlocked[pathCellOf(goalX, goalY)] ? 18 + u.radius + 40 : 18;
     if (u.mode !== 'build' && dist2(u.x, u.y, goalX, goalY) <= arriveR * arriveR) {
       if (u.mode === 'move' || u.mode === 'amove') {
         u.orderX = null;
@@ -575,7 +590,7 @@ function stepWorld(state, dt, fxEvents) {
       const sLen = Math.hypot(steerX, steerY) || 1;
       const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
       let upgSpdMult = 1.0;
-      if (owner?.upgrades?.advanced_thrusters) upgSpdMult = 1.18;
+      upgSpdMult = unitSpeedMult(owner, u.kind);
       const spd = def.speed * (mapDef.moveSpeedMult || 1.0) * upgSpdMult;
       u.vx = (steerX / sLen) * spd;
       u.vy = (steerY / sLen) * spd;
@@ -646,7 +661,7 @@ function stepWorld(state, dt, fxEvents) {
     const sLen = Math.hypot(steerX, steerY) || 1;
     const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
     let upgSpdMult = 1.0;
-    if (owner?.upgrades?.advanced_thrusters && u.kind !== 'scv') upgSpdMult = 1.18;
+    upgSpdMult = unitSpeedMult(owner, u.kind);
     const spd = def.speed * stimMult * (mapDef.moveSpeedMult || 1.0) * upgSpdMult;
     u.vx = (steerX / sLen) * spd;
     u.vy = (steerY / sLen) * spd;
@@ -768,7 +783,7 @@ function stepWorld(state, dt, fxEvents) {
           state.ranking.unshift(p.id);
           for (const ob of state.buildings) if (ob.owner === ownerId) ob.hp = 0;
           for (const ou of state.units) if (ou.owner === ownerId) ou.hp = 0;
-          fxEvents.push({ k: 'ELIM', name: p.name, color: p.color });
+          fxEvents.push({ k: 'ELIM', name: p.name, color: p.color, playerId: p.id });
         }
       }
     }

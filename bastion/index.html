@@ -46,6 +46,7 @@
     <button class="ibtn" id="btnAudio" title="Couper / remettre le son (M)">🔊</button>
     <button class="ibtn caret" id="btnAudioMore" title="Réglages du son (musique, effets)">▾</button>
   </div>
+  <button class="ibtn" id="btnGfx" title="Réglages graphiques (qualité, mode daltonien…)">⚙️</button>
   <button class="ibtn danger" id="btnExit">Quitter</button>
 </div>
 
@@ -55,6 +56,17 @@
   <div class="a-row"><span>💥 Effets</span><input type="range" id="volSfx" min="0" max="100" value="80"><button class="tg on" id="tgSfx">ON</button></div>
   <div class="a-row"><span>🔇 Tout couper</span><span></span><button class="tg" id="tgAll">OFF</button></div>
   <div class="a-hint">Touche <b>M</b> ou clic sur 🔊 : couper / remettre tout le son.</div>
+</div>
+
+<div class="audio-pop gfx-pop glass" id="gfxPop" hidden>
+  <h4>GRAPHISMES</h4>
+  <div class="q-row">
+    <button class="tg" data-gfx-q="bas">Bas</button><button class="tg" data-gfx-q="moyen">Moyen</button><button class="tg" data-gfx-q="haut">Haut</button><button class="tg" data-gfx-q="ultra">Ultra</button>
+  </div>
+  <div class="a-row"><span>🎨 Couleurs pour daltoniens</span><span></span><button class="tg" id="tgCvd">OFF</button></div>
+  <div class="a-row"><span>📳 Secousses de caméra</span><span></span><button class="tg" id="tgShake">ON</button></div>
+  <div class="a-row"><span>❤️ Barres de vie</span><span></span><button class="tg" id="tgBars">BLESSÉS</button></div>
+  <div class="a-hint">Bas : sans ombres, pour les petites machines. Ultra : lueurs et ombres fines.</div>
 </div>
 
 <div class="roster-top" id="uiRoster"></div>
@@ -119,11 +131,13 @@
 <script src="view/audio.js"></script>
 <script src="view/terrain.js"></script>
 <script src="view/client.js"></script>
+<script src="view/settings.js"></script>
 <script src="view/fog.js"></script>
 <script src="view/draw2d.js"></script>
 <script src="view/fx.js"></script>
 <script src="view/input.js"></script>
 <script src="view/hud.js"></script>
+<script src="view/spectator.js"></script>
 <script src="view/three3d.js"></script>
 <script src="view/render.js"></script>
 <script src="main.js"></script>

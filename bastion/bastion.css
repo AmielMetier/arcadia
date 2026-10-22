@@ -252,3 +252,26 @@ canvas#minimap{width:202px;height:202px;display:block;border-radius:6px;backgrou
   .portrait-box{display:none}
   .res-sub{display:none}
 }
+.cbtn .lvl{color:var(--gold);font-weight:700;margin-left:2px}
+.cbtn .cd{color:#ffb4a8;font-weight:700}
+.tip-note{margin-top:6px;color:var(--gold)}
+/* ---------- MODE SPECTATEUR ---------- */
+body.spectating .quick-bar{display:none}
+body.spectating::after{content:'👁 MODE SPECTATEUR';position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:4px 14px;border-radius:999px;
+  background:rgba(12,16,22,.78);border:1px solid rgba(255,197,49,.45);color:var(--gold);font:700 11px/1.4 'Chakra Petch',sans-serif;letter-spacing:.12em;pointer-events:none;z-index:30}
+.spec-table{width:100%;border-collapse:collapse;font-size:12px}
+.spec-table th{font-weight:600;opacity:.7;text-align:right;padding:2px 4px}
+.spec-table th:first-child,.spec-table td:first-child{text-align:left}
+.spec-table td{text-align:right;padding:3px 4px;border-top:1px solid rgba(255,255,255,.06);font-variant-numeric:tabular-nums}
+.spec-table tr[data-spec-player]{cursor:pointer}
+.spec-table tr[data-spec-player]:hover td{background:rgba(255,255,255,.05)}
+.spec-table tr.dead td{opacity:.45}
+.spec-table .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.spec-table td.m{color:#7ff3ec}.spec-table td.g{color:#8ff0b5}
+/* ---------- RÉGLAGES GRAPHIQUES ---------- */
+.gfx-pop{right:58px}
+.gfx-pop .q-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 0 10px}
+.gfx-pop .q-row .tg{width:100%}
+/* Vignette douce : resserre le regard sur le centre de l'action */
+body::before{content:'';position:fixed;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse 75% 70% at 50% 46%,rgba(0,0,0,0) 58%,rgba(0,0,0,.34) 100%)}

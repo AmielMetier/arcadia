@@ -2,6 +2,18 @@
 
 ## 2.22 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Économie : les cristaux et les geysers s'épuisent, et il n'y a plus de revenu automatique. Tout vient de tes VCS : s'étendre vers d'autres bases devient indispensable.
+- **Bastion Clash** — Améliorations par paliers : armes et blindages montent jusqu'au niveau 3 (+12 % de dégâts ou +10 % de points de vie par niveau), chaque niveau coûtant un peu plus cher.
+- **Bastion Clash** — Le Scan Radar se lance depuis un Centre de Commandement et se recharge en 45 secondes.
+- **Bastion Clash** — Des bots vraiment différents selon le niveau :
+  - Facile reste sur une base et attaque en masse, sans finesse ;
+  - Moyen s'étend, monte ses améliorations, utilise Stimpack et Mode Siège, recule quand il perd et envoie un éclaireur ;
+  - Difficile s'étend tôt sur trois bases, produit davantage et fait des largages en Navette sur tes ouvriers ;
+  - en 2 contre 2 coop, ton bot allié vient défendre ta base et suit tes attaques.
+- **Bastion Clash** — Mode spectateur : une fois éliminé, ou si tu rejoins le salon en cours de partie, tu vois toute la carte, le tableau des joueurs (ressources, armée, bases, améliorations) et tu passes d'une base à l'autre avec Tab.
+- **Bastion Clash** — Graphismes :
+  - nouveau bouton ⚙️ : qualité Bas / Moyen / Haut / Ultra (Ultra ajoute des lueurs et des ombres plus fines), couleurs pour daltoniens, secousses de caméra, barres de vie toujours visibles ;
+  - sol plus détaillé (herbe, cendres, congères), ombre au pied des falaises et des bâtiments, éclairs lumineux des explosions.
 - **Bastion Clash** — Parties en ligne plus solides :
   - si un joueur quitte ou perd la connexion, un bot garde sa base ; il la reprend dès qu'il revient dans le salon ;
   - si l'hôte part, un autre joueur reprend la partie là où elle en était, sans retour au salon ;

@@ -158,6 +158,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (k === ' ') { e.preventDefault(); centerOnMyHq(); return; }
+  if (k === 'tab' && isSpectatorView()) { e.preventDefault(); cycleSpectatorFocus(); return; }
   if (k === 'm' && !e.ctrlKey && !e.metaKey) {
     const m = Sfx.toggleAll();
     syncAudioUI();
