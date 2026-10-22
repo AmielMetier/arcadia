@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.22 — 22 octobre 2026
+- **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Corrections :
+  - le classement de fin de partie met bien le meilleur score en tête chez les vainqueurs ;
+  - si les dernières bases tombent en même temps, la partie se termine sur une égalité ;
+  - les troupes embarquées dans une Navette ne prennent plus les dégâts de zone ;
+  - les équipes ne se changent qu'en 2 contre 2, et seul l'hôte peut déplacer un autre joueur ;
+  - le rayon de soin des Navettes Médicales est enfin visible ;
+  - la touche C envoie récolter près de la souris, la sélection au cadre suit exactement le cadre tracé, et la caméra ne défile plus toute seule après un changement de fenêtre.
+
 ## 2.21 — 22 octobre 2026
 - **Bastion Clash** — Les longues parties ne ralentissent plus : à partir de 8-10 minutes, le jeu passait au ralenti pour tout le monde dès que les armées grossissaient.
 - **Bastion Clash** — Les unités contournent les bâtiments au lieu de se coincer contre eux, et les armées des bots sortent enfin de leur base.
