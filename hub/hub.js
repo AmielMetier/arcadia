@@ -137,7 +137,7 @@
     room.addResult({ id: String(r.id || game + '-' + Date.now()), game, mode: r.mode || '', at: Date.now(), players });
   }
   let lbOpen = false, lbGame = 'all', lbOnly = false, lbBots = true;
-  const GNAME = { all: 'Tous les jeux', david: 'DavidSimulator', drift: 'Duo Drift', bastion: 'Bastion Clash', calcul: 'Tête de Calcul', outbreak: 'Outbreak : Secteur Zéro', filrouge: 'Fil Rouge', kart: 'Kart Rush GP' };
+  const GNAME = { all: 'Tous les jeux', david: 'DavidSimulator', drift: 'Duo Drift', bastion: 'Bastion Clash', calcul: 'Tête de Calcul', outbreak: 'Outbreak : Secteur Zéro', filrouge: 'Fil Rouge', kart: 'Cyber Kart GP' };
   const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
   function renderBoard() {
     const ov = document.querySelector('.lbov'); if (!ov) return;

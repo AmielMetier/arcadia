@@ -1,15 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.19 — 22 octobre 2026
-- **Bastion Clash** — Grosse mise à jour du jeu de stratégie : relief, 2v2 repensé, interface refaite.
-  - Clic droit sur la minimap pour envoyer les unités sélectionnées n'importe où : un trait en pointillés et une cible apparaissent sur la minimap pour confirmer l'ordre (avec un bâtiment sélectionné, ça place le point de ralliement).
-  - Relief sur toutes les cartes : chaque base principale est sur un plateau surélevé avec une ou deux rampes d'accès, un plateau central riche, des montagnes, et des rivières, coulées de lave ou crevasses infranchissables (les vaisseaux passent au-dessus). Depuis le bas d'une falaise, on ne voit pas ce qui se passe sur le plateau.
-  - En 2v2, la carte est deux fois plus grande et les deux alliés ont leurs bases côte à côte, sur le même flanc. Changer d'équipe en début de partie échange ta base avec celle d'un adversaire pour rester à côté de ton allié. Seul contre 3 bots, l'un d'eux devient ton allié.
-  - Nouvelle Tour de Détection (touche R avec un VCS, après la Caserne) : immense champ de vision qui voit aussi sur les plateaux, et une alerte avec son et signal sur la minimap dès qu'un ennemi entre dans sa zone.
-  - Les bâtiments pas encore débloqués sont grisés avec un cadenas et le bâtiment qu'il faut construire avant ; une infobulle détaille chaque bâtiment, unité et recherche (coût, durée, prérequis).
-  - Limite de VCS affichée : 2 crans au-dessus de chaque cristal de tes bases, un compteur « 2/3 » sur chaque Raffinerie, et le total (par exemple 10/12 VCS) dans la barre du haut.
-  - Musique qui passe d'une ambiance calme à un thème de bataille pendant les combats, et bruitages pour les tirs, explosions, constructions et alertes. Un clic sur 🔊 (ou la touche M) coupe vraiment tout le son ; la petite flèche à côté règle séparément musique et effets.
-  - Interface refaite : console de commandement sombre et lisible, cartes d'ordres avec raccourci, image et coût, sans les boutons Récolter, Attaquer et Stop (le clic droit et les touches F et X font la même chose), brouillard de guerre aux bords adoucis, compteur de VCS inactifs.
+- **Cyber Kart GP** — Kart Rush GP devient Cyber Kart GP, avec une vraie affiche dans le Hub.
+  - Grand Prix : « Course suivante » enchaîne le circuit suivant au lieu de revenir au menu, et les points s'additionnent course après course (classement général à la fin des 6 circuits).
+  - 3 nouveaux circuits : la Jungle Perdue (forêt luxuriante, grand virage serré au bord d'un précipice, temple inca et tunnel sous la pyramide), le Château Hanté (de nuit : lave et serpentins jusqu'à la grande porte, labyrinthe à angles droits sur tapis rouge éclairé aux torches, jardin hanté sous la lune) et la Plage des Falaises (plein soleil, crabes qui traversent la route, pontons au pied des falaises de craie et de leurs arches).
+  - Le choix du circuit montre une capture de chaque piste, et le décor derrière est bien plus visible.
+  - Drift revu : le kart garde sa trajectoire avec un léger décalage, du côté où l'on tourne, à gauche comme à droite ; sans tourner, la touche fait juste un saut.
+  - ↓ + E lance bien les objets vers l'arrière (bananes comprises), et la carapace bleue explose enfin sur le premier.
+  - Nouveaux sons : vitre qui éclate sur les cubes, roulette qui ralentit au tirage de l'objet, crissement et toupie quand on se fait toucher.
+  - Pilotes : Jordan retrouve le robot de course en tôle (Marine en version bleue), Cybertype a des yeux néon violets ; les karts ne sont plus rognés dans le menu.
 
 ## 2.18 — 22 octobre 2026
 - **Kart Rush GP** — Nouveau jeu : course de karts en 3D, seul ou jusqu'à 6 joueurs, avec des IA pour compléter la grille (8 pilotes en piste).

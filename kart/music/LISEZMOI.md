@@ -1,4 +1,4 @@
-# Musiques de Kart Rush GP
+# Musiques de Cyber Kart GP
 
 Déposez vos morceaux **dans ce dossier** (`kart/music/`), avec exactement ces noms :
 
@@ -8,6 +8,9 @@ Déposez vos morceaux **dans ce dossier** (`kart/music/`), avec exactement ces n
 | `grand-circuit.mp3` | course sur le Grand Circuit |
 | `whisky-peak.mp3` | course sur Whisky Peak |
 | `arc-en-ciel.mp3` | course sur la Route Arc-en-ciel |
+| `jungle.mp3` | course dans la Jungle Perdue (sinon : musique du Grand Circuit) |
+| `chateau-hante.mp3` | course au Château Hanté (sinon : musique de Whisky Peak) |
+| `plage.mp3` | course sur la Plage des Falaises (sinon : musique de l'Arc-en-ciel) |
 | `resultats.mp3` | écran de classement (facultatif : sinon la musique du circuit continue) |
 
 - Formats acceptés : `.mp3` (essayé en premier) ou `.ogg`. Un fichier absent donne simplement du silence, sans erreur.
