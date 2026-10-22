@@ -1,18 +1,30 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.16 — 22 octobre 2026
+- **Fil Rouge** — Nouveau jeu : désamorçage à deux voix, de 2 à 6 joueurs. Le démineur voit la bombe en 3D mais n'a pas le manuel ; l'expert a le manuel posé sur sa table mais ne voit pas la bombe. Il faut se parler !
+  - Coopération, ou Duel 2 contre 2 : les deux équipes ont la même bombe, la première qui la désamorce gagne.
+  - Une vraie pièce en 3D, la nuit, avec vue sur la Baie des Anges. On tourne la bombe avec Z/S, Q/D, A/E (W/S, A/D, Q/E en QWERTY) ou à la souris, et on clique un module pour s'en approcher.
+  - Six modules : raccordements, coffre à symboles, leviers, carillon (une mélodie à décrire), tuyauterie, manomètres. L'extérieur de la bombe compte aussi : n° de lot, tampons de villes de la Côte, vis manquantes.
+  - Le manuel est un livret 3D aux pages qui se tournent, avec un onglet par module. Ses règles changent à chaque partie.
+  - Chaque faute fait accélérer le chrono. Quatre difficultés, de l'Initiation (2 modules) à Difficile (7 modules).
+  - En duel : chat réservé à l'équipe, progression adverse en direct, et chaque module désamorcé envoie un sabotage à l'autre équipe (coupure de courant, fumigène, secousse, encre renversée).
+  - Fil Rouge a sa colonne dans le classement entre potes.
+
 ## 2.15 — 22 octobre 2026
-- Nouveau jeu : **Fil Rouge**, désamorçage à deux voix. Le démineur voit la bombe en 3D, l'expert a le manuel posé sur sa table.
-  Coopération (2 à 6 joueurs) ou **Duel** 2 contre 2 : deux équipes, la même bombe, la première qui la désamorce gagne.
-  Le démineur n'a jamais le manuel : une personne à la bombe, une personne au manuel.
-- Une vraie pièce en 3D : table en bois sous une suspension, ombres, fenêtre sur la Baie des Anges la nuit.
-  On tourne la bombe avec Z/S, Q/D, A/E (WASD/QE en QWERTY) ou à la souris, on clique un module pour s'en approcher.
-- Six modules : raccordements, coffre à symboles, leviers, carillon (mélodie à décrire), tuyauterie, manomètres.
-  Il faut aussi lire l'extérieur de la bombe : n° de lot, tampons de villes de la Côte, vis manquantes.
-- Le manuel est un livret 3D aux pages qui se tournent, avec des onglets par module. Ses règles changent à chaque partie
-  (numéro d'édition imprimé sous le chrono).
-- Fautes : le chrono accélère. 4 difficultés, de l'Initiation (2 modules) à Difficile (7 modules).
-- Duel : chat réservé à l'équipe, progression adverse en direct, sabotages (coupure de courant, fumigène, secousse, encre renversée).
-- Classement entre potes : Fil Rouge y a sa colonne.
+- **DavidSimulator** — Nouveau mode **2 contre 2** (réglage « Équipes » dans le salon) : deux équipes de deux, des bots complètent si vous êtes moins de 4.
+  - Pas de loyer chez son coéquipier ; les cartes « chaque joueur » ne concernent que les adversaires.
+  - Les coéquipiers s'échangent des terrains pour regrouper les couleurs (les bots le font d'eux-mêmes et dépannent un coéquipier à sec).
+  - L'équipe au plus gros patrimoine cumulé gagne ; en Classique, la partie s'arrête quand une équipe a tout perdu.
+  - Choix de l'équipe sur l'écran des pions, joueurs regroupés par équipe pendant la partie, écran de victoire d'équipe.
+- **DavidSimulator** — Échanges plus clairs :
+  - On ne propose un échange que pendant son tour (on peut répondre à tout moment) ; une proposition sans réponse expire à la fin du tour.
+  - Les terrains concernés s'affichent sur le plateau (vert : tu reçois, rouge : tu donnes) et la caméra prend de la hauteur pour les montrer.
+  - La proposition présente les titres en petites cartes et laisse le plateau visible à côté.
+  - Échange conclu : les terrains qui changent de main sont signalés à tous les joueurs.
+- **DavidSimulator** — La caméra qui suit ne se coupe plus : un simple clic sur le plateau ne la désactive plus, elle reste sur le pion jusqu'à la fin du tour, et si on a déplacé la vue, elle reprend au tour suivant.
+- **DavidSimulator** — Dés vérifiés sur 123 000 lancers simulés : ils suivent exactement les probabilités d'une vraie paire de dés. Pour lever les doutes, le résultat (« 5 + 2 = 7 ») reste affiché jusqu'au tour suivant, et les dés 3D tombent devant le pion qui joue, face à la caméra.
+- **DavidSimulator** — Pioches Chance et Caisse de communauté en vraies piles de cartes en 3D : la carte du dessus se soulève et se retourne quand on pioche.
+- **Hub** — Le journal des nouveautés se tient à jour tout seul : si quelqu'un (ou une IA) pousse une modification sans la noter, une entrée est rédigée à partir de ses messages de commit.
 
 ## 2.14 — 21 octobre 2026
 - Le journal des nouveautés est maintenant dans le Hub : bouton « ✨ Nouveautés » sur l'accueil (ou clic sur le numéro

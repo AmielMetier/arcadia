@@ -23,12 +23,13 @@ window.HUB_GAMES = [
     id: 'david',
     title: 'DavidSimulator',
     tag: 'Monopoly édition Nice',
-    desc: 'De Saint-Roch à la Promenade des Anglais : achète, construis, négocie. Classique ou Express (40 min).',
+    desc: 'De Saint-Roch à la Promenade des Anglais : achète, construis, négocie. Classique ou Express (40 min), seul ou en 2 contre 2.',
     url: 'david/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#1C5FB4',
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['express', 'Express · 40 min']], def: 'classic' },
+      { key: 'teams', label: 'Équipes', options: [['solo', 'Chacun pour soi'], ['2v2', '2 contre 2']], def: 'solo' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'cash', label: 'Argent de départ', group: 'Règles maison', options: [[1000, '1 000 €'], [1500, '1 500 €'], [2000, '2 000 €'], [2500, '2 500 €']], def: 1500 },
@@ -259,7 +260,7 @@ window.HUB_GAMES = [
       <line x1="195" y1="120" x2="45" y2="85" stroke="#ff3344" stroke-width="1.8" opacity="0.85" stroke-dasharray="4 2"/>
     </svg>`,
   },
-{
+  {
     id: 'filrouge',
     title: 'Fil Rouge',
     tag: 'Désamorçage à deux voix',

@@ -17,7 +17,7 @@ Course et bataille en vue de dessus, jusqu'à 5 joueurs.
 
 ## DavidSimulator
 Le Monopoly classique transposé à Nice, de Saint-Roch à la Promenade des Anglais, jusqu'à 6 joueurs (bots possibles).
-Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Express** (40 minutes).
+Mêmes prix, loyers et règles que l'original, en mode **Classique** ou **Express** (40 minutes), chacun pour soi ou en **2 contre 2**.
 Plateau 3D façon jeu de société, choix du pion parmi 10 figurines, statistiques en direct (courbe du patrimoine, heatmap, classement) et analyse financière des propriétés.
 
 ## Tête de Calcul
@@ -48,7 +48,10 @@ l'expert a le manuel posé sur sa table, un livret 3D dont les règles changent 
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
+  en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
+  l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.15** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.16** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

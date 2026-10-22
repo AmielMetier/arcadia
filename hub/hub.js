@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.15';
+  const VERSION = '2.16';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -286,12 +286,15 @@
     const g = gameDef(pick.game), set = pick.settings[g.id], n = room.players.length;
     const segs = (g.settings || []).map((s) => {
       if (g.id === 'calcul' && set.mode === 'chartier' && s.key === 'theme') return '';
+      if (g.id === 'david' && set.teams === '2v2' && s.key === 'bots') return `<div class="setitem"><div class="lbl">Bots</div><div class="sethint">${n < 4 ? `${4 - n} bot${4 - n > 1 ? 's' : ''} complète${4 - n > 1 ? 'nt' : ''} les équipes` : 'Équipes complètes'}</div></div>`;
       const opts = s.options.filter(([v]) => s.key !== 'bots' || n + Number(v) <= g.maxPlayers);
       return `${s.group ? `<div class="setgroup">${esc(s.group)}</div>` : ''}<div class="setitem"><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>
         `<button data-k="${s.key}" data-v="${v}" class="${String(set[s.key]) === String(v) ? 'sel' : ''}">${esc(l)}</button>`).join('')}</div></div>`;
     }).join('');
-    const ok = n <= g.maxPlayers;
+    const max = g.id === 'david' && set.teams === '2v2' ? 4 : g.maxPlayers;
+    const ok = n <= max;
     box.innerHTML = `<h2>${esc(g.title)}</h2>${segs ? `<div class="setrow">${segs}</div>` : ''}
+      ${ok ? '' : `<p class="sethint">Ce mode se joue à ${max} au plus.</p>`}
       <button class="btn big block ${g.id === 'david' ? 'blue' : ''}" id="btnLaunch" ${ok ? '' : 'disabled'}>Lancer ${esc(g.title)}</button>`;
     for (const b of box.querySelectorAll('.seg button')) b.onclick = () => {
       const v = isNaN(Number(b.dataset.v)) ? b.dataset.v : Number(b.dataset.v);

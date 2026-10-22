@@ -2,13 +2,14 @@
 // Volontairement simple et prévisible : achète quand il garde une réserve, construit sur ses monopoles,
 // enchérit jusqu'à la valeur du terrain, refuse les échanges qui donnent un monopole à l'adversaire.
 import { currentPlayer } from './rules.js';
-import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable } from './valuation.js';
+import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam } from './valuation.js';
 
 const RESERVE = 150;
 
 function completesGroup(s, board, pid, i) {
   const sp = board.spaces[i];
-  return groupSpaces(board, sp.group).every((j) => j === i || s.props[j].owner === pid);
+  // en 2 contre 2, un terrain du coéquipier compte comme le sien
+  return groupSpaces(board, sp.group).every((j) => j === i || s.props[j].owner === pid || sameTeam(s, s.props[j].owner, pid));
 }
 
 function propValue(s, board, pid, i) {
