@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak et Kart Rush GP
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak et Cyber Kart GP
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -49,13 +49,16 @@ Survie zombie en coop, vue de dessus (twin-stick), jusqu'à 5 joueurs, avec équ
 - **Coop** : relever les alliés à terre, partage de l'écran de fin, classement entre potes
 - Clavier/souris, manette ou écran tactile
 
-## Kart Rush GP
+## Cyber Kart GP
 Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par des IA jusqu'à 8 pilotes.
 
-- **3 circuits** : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée, boules de neige, télésiège), Route Arc-en-ciel (espace)
-- **Drift** à la touche Maj : 1 s = mini-turbo, deux fois plus rapide en alternant Q et D ; figures sur les tremplins
-- **16 objets** dans les cubes irisés, 8 pilotes originaux, 4 karts
-- L'hôte choisit le circuit dans le jeu, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`)
+- **Grand Prix de 6 circuits** aux points cumulés : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée,
+  boules de neige, télésiège), Route Arc-en-ciel (espace), Jungle Perdue (forêt, précipice, temple inca),
+  Château Hanté (de nuit : lave, labyrinthe aux torches, jardin hanté), Plage des Falaises (crabes, pontons, arches de craie)
+- **Drift** à la touche Maj en tournant (tout droit = un saut) : 1 s = mini-turbo, deux fois plus rapide en alternant Q et D ; figures sur les tremplins
+- **16 objets** dans les cubes irisés (↓ + E pour lancer vers l'arrière), 8 pilotes originaux, 4 karts
+- L'hôte choisit le premier circuit, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`),
+  captures des circuits et affiche dans `kart/img/`
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
@@ -70,6 +73,6 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.18** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.19** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude

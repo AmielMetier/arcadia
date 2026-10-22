@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.19 — 22 octobre 2026
+- **Cyber Kart GP** — Kart Rush GP devient Cyber Kart GP, avec une vraie affiche dans le Hub.
+  - Grand Prix : « Course suivante » enchaîne le circuit suivant au lieu de revenir au menu, et les points s'additionnent course après course (classement général à la fin des 6 circuits).
+  - 3 nouveaux circuits : la Jungle Perdue (forêt luxuriante, grand virage serré au bord d'un précipice, temple inca et tunnel sous la pyramide), le Château Hanté (de nuit : lave et serpentins jusqu'à la grande porte, labyrinthe à angles droits sur tapis rouge éclairé aux torches, jardin hanté sous la lune) et la Plage des Falaises (plein soleil, crabes qui traversent la route, pontons au pied des falaises de craie et de leurs arches).
+  - Le choix du circuit montre une capture de chaque piste, et le décor derrière est bien plus visible.
+  - Drift revu : le kart garde sa trajectoire avec un léger décalage, du côté où l'on tourne, à gauche comme à droite ; sans tourner, la touche fait juste un saut.
+  - ↓ + E lance bien les objets vers l'arrière (bananes comprises), et la carapace bleue explose enfin sur le premier.
+  - Nouveaux sons : vitre qui éclate sur les cubes, roulette qui ralentit au tirage de l'objet, crissement et toupie quand on se fait toucher.
+  - Pilotes : Jordan retrouve le robot de course en tôle (Marine en version bleue), Cybertype a des yeux néon violets ; les karts ne sont plus rognés dans le menu.
+
 ## 2.18 — 22 octobre 2026
 - **Kart Rush GP** — Nouveau jeu : course de karts en 3D, seul ou jusqu'à 6 joueurs, avec des IA pour compléter la grille (8 pilotes en piste).
   - 3 circuits au choix de l'hôte : le Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée, boules de neige géantes, route gelée, télésiège et skieurs à éviter) et la Route Arc-en-ciel (dans l'espace, face à la Terre et la Lune).
