@@ -52,7 +52,7 @@ const commits = raw.split(END).map((c) => c.trim()).filter(Boolean).map((c) => {
 
 const GAMES = {
   drift: 'Duo Drift', david: 'DavidSimulator', monopoly: 'DavidSimulator', calcul: 'Tête de Calcul',
-  bastion: 'Bastion Clash', outbreak: 'Outbreak', hub: 'Hub', shared: 'Hub', server: 'Serveur', relay: 'Serveur',
+  bastion: 'Bastion Clash', outbreak: 'Outbreak', kart: 'Kart Rush GP', hub: 'Hub', shared: 'Hub', server: 'Serveur', relay: 'Serveur',
 };
 const NOT_FOR_PLAYERS = /^(\.github\/|docs\/|tools\/|AGENTS\.md$|CLAUDE\.md$|GEMINI\.md$|README\.md$)/;
 const TYPES = { feat: 'nouveau', fix: 'correction', perf: 'plus rapide', revert: 'retour en arrière' };

@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash et Tête de Calcul
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul et Kart Rush GP
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -31,6 +31,14 @@ devinettes, ordres de grandeur, et le **Compte est bon** (atteindre une cible av
 - **Sabotage** : une série de 3 rapporte un pouvoir (brouillard, chrono volé, tête à l'envers, bouclier) à lancer sur un adversaire
 - Après chaque question, l'astuce qui permettait d'aller vite ; à la fin, podium, statistiques et récapitulatif de tes erreurs avec leurs astuces
 
+## Kart Rush GP
+Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par des IA jusqu'à 8 pilotes.
+
+- **3 circuits** : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée, boules de neige, télésiège), Route Arc-en-ciel (espace)
+- **Drift** à la touche Maj : 1 s = mini-turbo, deux fois plus rapide en alternant Q et D ; figures sur les tremplins
+- **16 objets** dans les cubes irisés, 8 pilotes originaux, 4 karts
+- L'hôte choisit le circuit dans le jeu, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`)
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -43,6 +51,6 @@ devinettes, ordres de grandeur, et le **Compte est bon** (atteindre une cible av
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.13** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.16** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude
