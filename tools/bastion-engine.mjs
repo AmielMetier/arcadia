@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ENGINE_FILES = ['core.js', 'map.js', 'vision.js', 'rules.js', 'sim.js', 'bots.js'];
+export const ENGINE_FILES = ['core.js', 'map.js', 'vision.js', 'rules.js', 'sim.js', 'bots.js', 'snapshot.js'];
 
 export function loadEngine({ seed = 1, dir = process.env.BASTION_ENGINE || fileURLToPath(new URL('../bastion/engine/', import.meta.url)) } = {}) {
   const ctx = vm.createContext({ console, performance });

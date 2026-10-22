@@ -759,7 +759,8 @@ function stepWorld(state, dt, fxEvents) {
       fxEvents.push({ k: 'BOOM_BIG', x: b.x, y: b.y, r: b.radius * 1.8 });
       const ownerId = b.owner;
       state.buildings.splice(i, 1);
-      const hasAnyHq = state.buildings.some((ob) => ob.owner === ownerId && ob.kind === 'hq' && ob.hp > 0);
+      // Un invité ne voit qu'une partie des bâtiments : l'élimination est décidée par l'hôte seul
+      const hasAnyHq = state.partial || state.buildings.some((ob) => ob.owner === ownerId && ob.kind === 'hq' && ob.hp > 0);
       if (!hasAnyHq) {
         const p = state.players.find((q) => q.id === ownerId);
         if (p && !p.dead) {
@@ -773,8 +774,8 @@ function stepWorld(state, dt, fxEvents) {
     }
   }
 
-  const aliveTeams = new Set(state.players.filter((p) => !p.dead).map((p) => p.team));
-  if (aliveTeams.size <= 1) {
+  const aliveTeams = new Set(state.players.filter((p) => !p.dead && !p.spectator).map((p) => p.team));
+  if (aliveTeams.size <= 1 && !state.partial) {
     state.over = true;
     // Plus personne debout (dernières bases tombées au même instant) : égalité, pas de vainqueur
     state.winnerTeam = aliveTeams.size ? [...aliveTeams][0] : null;

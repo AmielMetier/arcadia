@@ -111,6 +111,12 @@ function handleFxEvents(list) {
         lastSaturatedMsg = performance.now();
         notify('⛏️ Gisements saturés : un VCS attend. Construis un nouveau QG près d’autres cristaux.', 'info');
       }
+    } else if (e.k === 'AFK') {
+      notify(`🔌 ${e.name} est parti : un bot garde sa base en attendant son retour.`, 'warn', 6000);
+    } else if (e.k === 'BACK') {
+      notify(`✅ ${e.name} est de retour et reprend sa base.`, 'good', 4200);
+    } else if (e.k === 'HOST_CHANGE') {
+      notify(`🛰️ L’hôte est parti : ${e.name} reprend la partie.`, 'info', 5000);
     } else if (e.k === 'ELIM') {
       notify(`💥 ${e.name} est éliminé !`, 'warn');
       Sfx.alert();

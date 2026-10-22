@@ -90,4 +90,54 @@ t('partie de 4 bots : rapide, cibles réparties, armées qui sortent', () => {
   assert.ok(away.length > 0, 'des unités ont quitté leur base');
 });
 
+t('instantanés : compacts, filtrés par le brouillard, sans perte pour son équipe', () => {
+  const E = loadEngine({ seed: 3 });
+  const s = playBots(E, { minutes: 5 });
+  const legacy = JSON.stringify({ units: s.units, buildings: s.buildings }).length;
+  const full = E.packState(s, { viewer: null });
+  const fog = E.packState(s, { viewer: { team: s.players[0].team } });
+  const fullLen = JSON.stringify(full).length, fogLen = JSON.stringify(fog).length;
+  assert.ok(fullLen < legacy * 0.55, `format compact ${fullLen} o contre ${legacy} o`);
+  assert.ok(fogLen < fullLen, `brouillard ${fogLen} o < complet ${fullLen} o`);
+  const back = E.unpackState(JSON.parse(JSON.stringify(fog)));
+  const team = s.players[0].team;
+  // Rien d'ennemi hors de vue, et les ressources adverses ne sont pas transmises
+  for (const u of back.units) if (u.team !== team) assert.ok(E.teamSees(team, u.x, u.y), 'unité ennemie visible');
+  for (const p of back.players) if (p.team !== team) assert.equal(p.minerals, 0);
+  // Mes unités reviennent à l'identique (aux arrondis près)
+  for (const u of s.units.filter((x) => x.team === team)) {
+    const v = back.units.find((x) => x.id === u.id);
+    assert.ok(v && Math.abs(v.x - u.x) < 0.06 && v.kind === u.kind && v.mode === u.mode && v.hp === Math.round(u.hp), 'unité ' + u.id);
+  }
+  assert.equal(back.partial, true);
+});
+
+t('joueur parti : un bot garde sa base et la fait tourner', () => {
+  const E = loadEngine({ seed: 4 });
+  const s = fresh(E, 'ffa', 2);
+  s.players[1].afk = true;
+  const scv0 = s.units.filter((u) => u.owner === 1 && u.kind === 'scv').length;
+  for (let i = 0; i < 30 * 40; i++) { E.stepWorld(s, E.TICK_DT, []); if (i % 38 === 0) E.runBots(s, []); }
+  const scv1 = s.units.filter((u) => u.owner === 1 && u.kind === 'scv').length;
+  assert.ok(scv1 > scv0, `VCS ${scv0} -> ${scv1}`);
+  assert.ok(s.buildings.some((b) => b.owner === 1 && b.kind !== 'hq'), 'au moins une construction');
+});
+
+t('commandes vérifiées par l’hôte : scan, réparation, raffinerie, numéro de chantier', () => {
+  const E = loadEngine();
+  const s = fresh(E, 'ffa', 2);
+  const scv = s.units.find((u) => u.owner === 0 && u.kind === 'scv');
+  const enemyHq = s.buildings.find((b) => b.owner === 1 && b.kind === 'hq');
+  enemyHq.hp = 1000;
+  E.executeCommand(s, 0, { op: 'UNIT_ORDER', mode: 'build', targetId: enemyHq.id, unitIds: [scv.id] }, []);
+  assert.notEqual(scv.mode, 'build', 'pas de réparation chez l’adversaire');
+  s.players[0].minerals = 500;
+  const myHq = s.buildings.find((b) => b.owner === 0 && b.kind === 'hq');
+  myHq.hp = 0; s.buildings = s.buildings.filter((b) => b !== myHq);
+  assert.equal(E.executeCommand(s, 0, { op: 'SCAN', x: 900, y: 900 }, []).ok, false, 'pas de scan sans QG');
+  const s2 = fresh(E, 'ffa', 2);
+  const r = E.executeCommand(s2, 0, { op: 'BUILD', kind: 'pylon', x: s2.players[0].spawnX + 160, y: s2.players[0].spawnY + 40, bldId: 2 * 100000 + 5 }, []);
+  if (r.ok) assert.ok(Math.floor(r.bldId / 100000) !== 2, 'le numéro d’un autre joueur est refusé');
+});
+
 console.log(`\n${n} tests réussis`);

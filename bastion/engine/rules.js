@@ -388,9 +388,12 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
 
   // 1. POSER UN CHANTIER DE CONSTRUCTION (exige un Ouvrier VCS qui se déplace sur place !)
   if (cmd.op === 'BUILD') {
-    if (cmd.bldId && state.buildings.some((b) => b.id === cmd.bldId)) {
-      return { ok: true, bldId: cmd.bldId };
+    // Numéro choisi par le joueur pour prédire son chantier : il doit être dans sa propre tranche
+    const ownId = Number.isInteger(cmd.bldId) && Math.floor(cmd.bldId / 100000) === Number(p.id) + 1 ? cmd.bldId : null;
+    if (ownId && state.buildings.some((b) => b.id === ownId && b.owner === p.id)) {
+      return { ok: true, bldId: ownId };
     }
+    if (ownId && (state.buildings.some((b) => b.id === ownId) || state.units.some((u) => u.id === ownId))) return { ok: false };
     const kind = String(cmd.kind || '');
     const check = canPlaceBuilding(state, p.id, kind, Number(cmd.x) || 0, Number(cmd.y) || 0);
     if (!check.ok) return check;
@@ -426,7 +429,7 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
     p.minerals -= def.min;
     p.gas -= def.gas;
     const bld = {
-      id: Number(cmd.bldId) || state.nextId++,
+      id: ownId || state.nextId++,
       kind,
       owner: p.id,
       team: p.team,
@@ -630,19 +633,23 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
       }
       if (mode === 'harvest_min' && u.kind === 'scv') {
         u.mode = 'harvest_min';
-        u.harvestId = cmd.resId || (nearestMineral(x, y)?.id ?? null);
+        u.harvestId = MINERAL_NODES.some((m) => m.id === cmd.resId) ? cmd.resId : (nearestMineral(x, y)?.id ?? null);
         u.buildTargetId = null;
         u.onSite = false;
         return;
       }
       if (mode === 'harvest_gas' && u.kind === 'scv') {
         u.mode = 'harvest_gas';
-        u.harvestId = cmd.resId || null;
+        // Seulement sa propre Raffinerie (la simulation retombe sinon sur la plus proche)
+        u.harvestId = state.buildings.some((b) => b.id === cmd.resId && b.owner === p.id && b.kind === 'extractor') ? cmd.resId : null;
         u.buildTargetId = null;
         u.onSite = false;
         return;
       }
       if (mode === 'build' && u.kind === 'scv' && cmd.targetId) {
+        // On ne construit et ne répare que ses bâtiments ou ceux d'un allié, jamais ceux de l'adversaire
+        const tb0 = state.buildings.find((b) => b.id === cmd.targetId && b.hp > 0);
+        if (!tb0 || tb0.team !== p.team) return;
         u.mode = 'build';
         u.buildTargetId = cmd.targetId;
         u.onSite = false;
@@ -702,6 +709,9 @@ function executeCommand(state, playerId, cmd, fxEvents, opts = {}) {
 
   // 7. CAPACITÉ COMSAT DU QG : SCAN RADAR (C - 50 Minéraux)
   if (cmd.op === 'SCAN') {
+    if (!state.buildings.some((b) => b.owner === p.id && b.kind === 'hq' && b.hp > 0 && !b.constructing)) {
+      return { ok: false, reason: 'Le Scan Radar se lance depuis un Centre de Commandement.' };
+    }
     if (p.minerals < 50) return { ok: false, reason: '50💎 requis pour lancer un Scan Radar.' };
     p.minerals -= 50;
     const x = clamp(Math.round(Number(cmd.x) || HALF_W), 60, WORLD_SIZE - 60);

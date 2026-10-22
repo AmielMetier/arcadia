@@ -2,6 +2,11 @@
 
 ## 2.22 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Parties en ligne plus solides :
+  - si un joueur quitte ou perd la connexion, un bot garde sa base ; il la reprend dès qu'il revient dans le salon ;
+  - si l'hôte part, un autre joueur reprend la partie là où elle en était, sans retour au salon ;
+  - chacun ne reçoit plus que ce que son équipe voit (fini le brouillard de guerre contournable), et les échanges réseau sont environ huit fois plus légers ;
+  - l'hôte vérifie chaque ordre : pas de Scan sans Centre de Commandement, pas de réparation des bâtiments adverses.
 - **Bastion Clash** — Corrections :
   - le classement de fin de partie met bien le meilleur score en tête chez les vainqueurs ;
   - si les dernières bases tombent en même temps, la partie se termine sur une égalité ;

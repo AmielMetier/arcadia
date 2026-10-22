@@ -28,7 +28,8 @@ function pickBotTarget(state, p, hq) {
 function runBots(state, fxEvents) {
   if (state.over) return;
   for (const p of state.players) {
-    if (!p.bot || p.dead) continue;
+    // Les bots, et les joueurs partis ou déconnectés dont un bot garde la base
+    if ((!p.bot && !p.afk) || p.dead || p.spectator) continue;
     const myBlds = state.buildings.filter((b) => b.owner === p.id && b.hp > 0);
     const hq = myBlds.find((b) => b.kind === 'hq');
     if (!hq) continue;

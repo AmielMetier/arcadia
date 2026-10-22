@@ -589,7 +589,7 @@ function updateHudUI() {
   $('#uiPhaseName').textContent = phaseNames[state.phase] || '';
   $('#uiPhase').classList.toggle('sd', state.phase === 4);
 
-  const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.team}:${p.dead ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
+  const rosterSig = state.players.map((p) => `${p.id}:${p.name}:${p.team}:${p.dead ? 1 : 0}:${p.afk ? 1 : 0}:${p.bot ? 'bot' : getPlayerPing(p)}`).join('|');
   if (rosterSig !== lastRosterSig) {
     lastRosterSig = rosterSig;
     $('#uiRoster').innerHTML = state.players.map((p) => {
@@ -597,6 +597,8 @@ function updateHudUI() {
       let pingHtml = '';
       if (p.bot) {
         pingHtml = `<span class="ping-tag bot">🤖 IA</span>`;
+      } else if (p.afk) {
+        pingHtml = `<span class="ping-tag bad" title="Parti : un bot garde sa base jusqu’à son retour">🔌 bot</span>`;
       } else {
         const ms = getPlayerPing(p);
         const cls = ms > 150 ? 'bad' : ms > 80 ? 'warn' : '';

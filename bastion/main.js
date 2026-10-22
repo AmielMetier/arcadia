@@ -21,107 +21,22 @@ let netSyncTick = 0;
 let pendingNetFx = [];
 
 
-function packState(s) {
-  const r1 = (v) => Math.round((Number(v) || 0) * 10) / 10;
-  const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
-  return {
-    time: r2(s.time),
-    blitz: s.blitz,
-    map: s.map || activeMapId || 'vallee',
-    mode: s.mode,
-    is2v2: s.is2v2,
-    level: s.level,
-    phase: s.phase,
-    stormRadius: Math.round(s.stormRadius),
-    dmgMult: s.dmgMult,
-    nextId: s.nextId,
-    over: s.over,
-    winnerTeam: s.winnerTeam,
-    ranking: s.ranking,
-    ack: { ...clientAckSeq },
-    players: s.players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      bot: p.bot,
-      team: p.team,
-      minerals: r1(p.minerals),
-      gas: r1(p.gas),
-      score: Math.round(p.score),
-      dead: p.dead,
-      spawnX: p.spawnX,
-      spawnY: p.spawnY,
-      nextUnitSeq: p.nextUnitSeq || 20,
-      ping: p.bot ? 0 : getPlayerPing(p),
-      upgrades: p.upgrades ? { ...p.upgrades } : {},
-    })),
-    buildings: s.buildings.map((b) => ({
-      id: b.id,
-      kind: b.kind,
-      owner: b.owner,
-      team: b.team,
-      x: Math.round(b.x),
-      y: Math.round(b.y),
-      hp: Math.round(b.hp),
-      maxHp: b.maxHp,
-      radius: b.radius,
-      cd: r2(b.cd),
-      aimA: r2(b.aimA),
-      constructing: b.constructing,
-      buildStarted: b.buildStarted,
-      buildProg: r2(b.buildProg),
-      buildTime: b.buildTime,
-      queue: b.queue,
-      qTimer: r2(b.qTimer),
-      qTotal: r2(b.qTotal),
-      rallyX: Math.round(b.rallyX ?? b.x),
-      rallyY: Math.round(b.rallyY ?? b.y),
-      geyserId: b.geyserId,
-    })),
-    units: s.units.map((u) => ({
-      id: u.id,
-      kind: u.kind,
-      owner: u.owner,
-      team: u.team,
-      x: r1(u.x),
-      y: r1(u.y),
-      vx: r1(u.vx),
-      vy: r1(u.vy),
-      a: r2(u.a),
-      hp: Math.round(u.hp),
-      maxHp: u.maxHp,
-      radius: u.radius,
-      cd: r2(u.cd),
-      mode: u.mode,
-      orderX: u.orderX != null ? Math.round(u.orderX) : null,
-      orderY: u.orderY != null ? Math.round(u.orderY) : null,
-      pathX: u.pathX != null ? Math.round(u.pathX) : null,
-      pathY: u.pathY != null ? Math.round(u.pathY) : null,
-      targetEntId: u.targetEntId,
-      harvestId: u.harvestId,
-      gatherT: r2(u.gatherT),
-      carryType: u.carryType,
-      carryAmt: u.carryAmt,
-      buildTargetId: u.buildTargetId,
-      onSite: !!u.onSite,
-      weldTimer: r2(u.weldTimer),
-      weldX: u.weldX != null ? r1(u.weldX) : null,
-      weldY: u.weldY != null ? r1(u.weldY) : null,
-      stimT: r2(u.stimT),
-      sieged: !!u.sieged,
-      flying: !!u.flying,
-      cargo: Array.isArray(u.cargo) ? [...u.cargo] : [],
-      boardedIn: u.boardedIn || null,
-      healingTargetId: u.healingTargetId || null,
-    })),
-    scans: s.scans.map((sc) => ({
-      x: Math.round(sc.x),
-      y: Math.round(sc.y),
-      team: sc.team,
-      r: sc.r,
-      timer: r2(sc.timer),
-    })),
-  };
+// Ce que voit un joueur : son équipe s'il est en jeu, tout s'il est spectateur ou éliminé
+function viewerFor(id) {
+  const p = state && state.players.find((q) => Number(q.id) === Number(id));
+  return p && !p.dead && !p.spectator ? { team: p.team } : null;
+}
+function snapshotFor(id) {
+  return packState(state, { viewer: viewerFor(id), ack: { [id]: clientAckSeq[id] || 0 }, pings: Object.fromEntries(state.players.map((p) => [p.id, getPlayerPing(p)])) });
+}
+// L'hôte envoie à chaque joueur connecté (et aux spectateurs) l'état vu par son équipe
+function broadcastState(fx = []) {
+  const H = window.HubBridge;
+  if (!H || !H.embedded || role !== 'host' || !state) return;
+  for (const p of H.players) {
+    if (Number(p.id) === Number(myId)) continue;
+    H.send(p.id, { t: 'st', s: snapshotFor(p.id), fx });
+  }
 }
 
 function reconcileGuestState(prev, incoming) {
@@ -216,7 +131,8 @@ function startTickLoop(botEvery = 0) {
         if (e.k === 'ELIM' || e.k === 'PHASE') pendingNetFx.push(e);
       }
       if (sendNow || state.over) {
-        H.send('all', { t: 'st', s: packState(state), fx: pendingNetFx.splice(0) });
+        broadcastState(pendingNetFx.splice(0));
+        sendBackup();
       }
     }
   }, stepMs);
@@ -282,13 +198,87 @@ function startMatch(info) {
   renderConsoleUI(true);
   updateHudUI();
 
-  if (role === 'host' && H && H.embedded) {
-    H.send('all', { t: 'st', s: packState(state), fx: [] });
-  }
+  broadcastState();
 
   // Les bots réfléchissent au rythme du temps de jeu, dans la même boucle que la simulation
-  const botEvery = settings.level === 'expert' ? 0.85 : settings.level === 'facile' ? 2.0 : 1.25;
-  startTickLoop(botEvery);
+  const nowP = performance.now();
+  for (const p of state.players) lastHeard[p.id] = nowP;
+  startTickLoop(botEveryFor(settings.level));
+}
+
+/* ---------- Joueurs partis, déconnectés, de retour ; reprise par un nouvel hôte ----------
+   Un joueur dont le jeu ne répond plus (8 s sans message, onglet fermé, retour au salon) est remplacé
+   par un bot qui défend et développe sa base ; il reprend la main dès qu'il revient. */
+const lastHeard = {};
+const PRESENCE_TIMEOUT = 8000;
+function botEveryFor(level) { return level === 'expert' ? 0.85 : level === 'facile' ? 2.0 : 1.25; }
+
+function checkPresence() {
+  const H = window.HubBridge;
+  if (!H || !H.embedded || role !== 'host' || !state || state.over) return;
+  const now = performance.now();
+  const fx = [];
+  for (const p of state.players) {
+    if (p.bot || p.dead || p.spectator || Number(p.id) === Number(myId)) continue;
+    const inRoom = H.players.some((q) => Number(q.id) === Number(p.id));
+    const inGame = !H.readyMap || H.readyMap[p.id] === H.info.game;
+    const heard = lastHeard[p.id] != null && now - lastHeard[p.id] < PRESENCE_TIMEOUT;
+    const here = inRoom && inGame && heard;
+    if (!here && !p.afk) { p.afk = true; fx.push({ k: 'AFK', playerId: p.id, name: p.name }); }
+    else if (here && p.afk) { p.afk = false; fx.push({ k: 'BACK', playerId: p.id, name: p.name }); }
+  }
+  if (fx.length) { handleFxEvents(fx); pendingNetFx.push(...fx); }
+}
+
+// Sauvegarde complète envoyée toutes les 2 s au seul joueur qui reprendrait la partie si l'hôte partait
+// (le plus petit numéro parmi les autres, comme le choisit le salon). Elle n'est pas affichée.
+let backupState = null;
+let lastBackupAt = 0;
+function successorId() {
+  const H = window.HubBridge;
+  const ids = H.players.map((p) => Number(p.id)).filter((id) => id !== Number(myId)).sort((a, b) => a - b);
+  return ids.length ? ids[0] : null;
+}
+function sendBackup() {
+  const H = window.HubBridge;
+  if (!H || !H.embedded || role !== 'host' || !state || performance.now() - lastBackupAt < 2000) return;
+  lastBackupAt = performance.now();
+  const id = successorId();
+  if (id != null) H.send(id, { t: 'bk', s: packState(state, { viewer: null }) });
+}
+// État de reprise : l'état récent (vu par mon équipe) complété par la sauvegarde pour ce que je ne voyais pas
+function mergeBackup(fresh, backup) {
+  if (!backup) return fresh;
+  const myTeam = (fresh.players.find((p) => Number(p.id) === Number(myId)) || {}).team;
+  const merge = (now, old) => {
+    const ids = new Set(now.map((e) => e.id));
+    return [...now, ...old.filter((e) => !ids.has(e.id) && e.team !== myTeam)];
+  };
+  const players = fresh.players.map((p) => {
+    const b = backup.players.find((q) => q.id === p.id);
+    return b && p.team !== myTeam ? { ...p, minerals: b.minerals, gas: b.gas } : p;
+  });
+  return { ...fresh, players, units: merge(fresh.units, backup.units), buildings: merge(fresh.buildings, backup.buildings), scans: backup.scans || fresh.scans };
+}
+
+function becomeHost() {
+  role = 'host';
+  const H = window.HubBridge;
+  myId = H.info.myId;
+  pendingCmds.length = 0;
+  for (const k of Object.keys(clientAckSeq)) delete clientAckSeq[k];
+  const now = performance.now();
+  if (!state) { startMatch({ ...(lastBootInfo || {}), role: 'host', myId }); return; }
+  // On reprend depuis le dernier état reçu : il devient l'état complet de référence
+  state = mergeBackup(state, backupState);
+  state.partial = false;
+  backupState = null;
+  for (const p of state.players) lastHeard[p.id] = now;
+  const settings = (lastBootInfo && lastBootInfo.settings) || {};
+  startTickLoop(botEveryFor(settings.level || state.level));
+  checkPresence();
+  broadcastState([{ k: 'HOST_CHANGE', name: (state.players.find((p) => Number(p.id) === Number(myId)) || {}).name || '' }]);
+  toast('L’hôte est parti : tu reprends la partie, elle continue.', 3600);
 }
 
 if (window.HubBridge && HubBridge.embedded) {
@@ -307,6 +297,12 @@ if (window.HubBridge && HubBridge.embedded) {
     if (pMap) Object.assign(playerPings, pMap);
   });
 
+  // Le Hub a désigné ce joueur comme nouvel hôte (l'ancien est parti) : la partie reprend ici
+  HubBridge.on('roster', () => {
+    if (role === 'guest' && HubBridge.info.role === 'host') becomeHost();
+    if (role === 'host') checkPresence();
+  });
+
   setInterval(() => {
     if (!window.HubBridge || !HubBridge.embedded) return;
     if (HubBridge.pings) Object.assign(playerPings, HubBridge.pings);
@@ -316,14 +312,18 @@ if (window.HubBridge && HubBridge.embedded) {
       if (now - lastStateAt > 2500) {
         HubBridge.send('host', { t: 'sync' });
       }
+    } else if (role === 'host') {
+      checkPresence();
     }
   }, 1800);
 
   HubBridge.on('msg', (from, m) => {
     if (!m || typeof m !== 'object') return;
     if (role === 'host') {
+      lastHeard[from] = performance.now();
       if (m.t === 'sync' && state) {
-        HubBridge.send(from, { t: 'st', s: packState(state), fx: [] });
+        checkPresence();
+        HubBridge.send(from, { t: 'st', s: snapshotFor(from), fx: [] });
       } else if (m.t === 'gping') {
         if (Number.isFinite(m.myPing)) playerPings[from] = Math.max(1, Math.round(m.myPing));
         HubBridge.send(from, { t: 'gpong', ts: m.ts, pings: playerPings });
@@ -339,21 +339,27 @@ if (window.HubBridge && HubBridge.embedded) {
         }
       }
     } else if (role === 'guest') {
+      // Seul l'hôte fait autorité : un autre joueur ne peut pas imposer un état ni rejouer des commandes
+      if (Number(from) !== Number(HubBridge.info.hostId)) return;
       if (m.t === 'gpong') {
         if (m.pings) Object.assign(playerPings, m.pings);
         if (m.ts) playerPings[myId] = Math.max(1, Math.round(performance.now() - m.ts));
       } else if (m.t === 'st' && m.s) {
+        const incoming = unpackState(m.s);
+        if (!incoming) return;
         lastStateAt = performance.now();
-        for (const p of m.s.players || []) {
+        for (const p of incoming.players || []) {
           if (!p.bot && p.ping && Number(p.id) !== Number(myId)) playerPings[p.id] = p.ping;
         }
-        state = reconcileGuestState(state, m.s);
+        state = reconcileGuestState(state, incoming);
         if (!centeredOnce) {
           centeredOnce = true;
           centerOnMyHq();
           renderConsoleUI(true);
         }
         if (m.fx && m.fx.length) handleFxEvents(m.fx);
+      } else if (m.t === 'bk' && m.s) {
+        backupState = unpackState(m.s);
       } else if (m.t === 'rcmd' && state) {
         lastStateAt = performance.now();
         if (Number(m.p) === Number(myId) && m.seq) {
