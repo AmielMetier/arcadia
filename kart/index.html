@@ -176,6 +176,12 @@
   #results h1 { margin: 0 0 10px; text-align: center; font-weight: normal; font-size: 42px; color: var(--gold); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
   .rr { display: grid; grid-template-columns: 50px 30px 1fr auto auto 50px; align-items: center; gap: 10px; padding: 5px 12px; border-radius: 12px; font-size: 20px; }
   .rr:nth-child(odd) { background: rgba(255, 255, 255, .05); }
+  #resrows { position: relative; transition: height .3s; }
+  #resrows .rr { position: absolute; left: 0; right: 0; height: 36px; box-sizing: border-box; background: none; transition: top .7s cubic-bezier(.3, 1.25, .5, 1), background .3s; }
+  #resrows .rr.odd { background: rgba(255, 255, 255, .05); } #resrows .rr.me { background: rgba(47, 107, 255, .85); }
+  #resrows .rr.bump .tot { color: #ffe27a; transform: scale(1.25); } .rr .tot { transition: transform .15s; }
+  #resrows .rr.pod1 { background: linear-gradient(90deg, rgba(255,205,60,.55), rgba(255,205,60,.1)); } #resrows .rr.pod2 { background: linear-gradient(90deg, rgba(210,220,235,.45), rgba(210,220,235,.08)); } #resrows .rr.pod3 { background: linear-gradient(90deg, rgba(220,140,80,.45), rgba(220,140,80,.08)); }
+  .rr .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rr.me { background: rgba(47, 107, 255, .85); } .rr.hum:not(.me) { box-shadow: inset 0 0 0 2px rgba(255,213,61,.6); }
   .rr img { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; }
   .rr .t { font-variant-numeric: tabular-nums; opacity: .95; } .rr .pts { color: #ffe27a; min-width: 44px; text-align: right; font-size: 16px; }
@@ -185,6 +191,17 @@
   #results .sub { text-align: center; margin: -6px 0 10px; font-family: 'Nunito', sans-serif; font-weight: 900; color: #9fd8ff; }
   #results .info { text-align: center; margin-top: 10px; font-family: 'Nunito', sans-serif; font-weight: 700; color: #cfd8e6; }
   #results .btns { justify-content: center; margin-top: 14px; }
+  #results.spec { background: none; } #results.spec .panel { display: none; }
+  #spec { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+  #spec .sp-top { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-size: 30px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; white-space: nowrap; }
+  #spec .sp-top small { font-family: 'Nunito', sans-serif; font-size: 15px; -webkit-text-stroke: 0; opacity: .85; display: block; text-align: center; }
+  #spec .sp-bar .btn { white-space: nowrap; flex: none; }
+  #spec .sp-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 12px 18px; background: linear-gradient(0deg, rgba(8, 10, 26, .85), rgba(8, 10, 26, 0)); pointer-events: auto; overflow-x: auto; }
+  #speclist { display: flex; gap: 8px; }
+  #speclist button { font: inherit; display: flex; align-items: center; gap: 6px; color: #fff; background: rgba(14, 18, 40, .85); border: 3px solid rgba(255, 255, 255, .25); border-radius: 14px; padding: 4px 10px 4px 4px; cursor: pointer; white-space: nowrap; font-size: 15px; }
+  #speclist button img { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; }
+  #speclist button.sel { border-color: #ffd53d; background: rgba(47, 107, 255, .85); }
+  #speclist button i { font-style: normal; color: #ffe27a; font-size: 13px; }
   #escmenu { display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 24, .55); }
   #escmenu .panel { background: rgba(14, 18, 40, .95); border: 4px solid #fff; border-radius: 22px; padding: 22px 28px; display: flex; flex-direction: column; gap: 14px; align-items: center; }
   #escmenu h2 { margin: 0; font-weight: normal; font-size: 40px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
@@ -278,6 +295,7 @@
     <div class="btns" id="resbtns"></div>
   </div>
 </div>
+<div id="spec" class="hidden"><div class="sp-top ol" id="specname"></div><div class="sp-bar"><button class="btn alt" id="specback">◀ Classement</button><div id="speclist"></div></div></div>
 <div id="escmenu" class="screen hidden"><div class="panel"><h2 id="esctitle">PAUSE</h2><div class="btns" id="escbtns"></div></div></div>
 <div id="toast" style="opacity:0"></div>
 <div id="loading" class="ol">Construction du circuit…<small>génération des textures et du décor</small></div>
@@ -325,7 +343,8 @@ const CFG = {
   KART_R: 1.35,
   G: 34, G_RAMP: 19, G_SLOPE: 20, HOP_V: 5.4,
   TOP_SPEED: 33, BOOST_MUL: 1.32,
-  DRIFT_MIN: 0.4, DRIFT_MAX: 1.7,
+  // drift : vitesse de rotation (rad/s) en contre-braquant / au neutre / en braquant dans le virage
+  DRIFT_OUT: 0.12, DRIFT_MID: 0.45, DRIFT_IN: 1.5,
   GRIP: 8.5, DRIFT_GRIP: 7.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
   MT1: 1.0, MT2: 2.0,           // charge du mini-turbo (s) : bleu / orange ; deux fois plus vite en gigotant (Q-D-Q-D)
   WIGGLE_RATE: 2.0,
@@ -363,6 +382,9 @@ function tnoise(x, y, s) {
 function tfbm(x, y, s, oct = 4) { let a = 0.5, f = 1, sum = 0, n = 0; for (let o = 0; o < oct; o++) { sum += a * tnoise(x * f, y * f, s * f); n += a; a *= 0.5; f *= 2; } return sum / n; }
 const _v1 = new V3(), _v2 = new V3(), _v3 = new V3(), _m4 = new THREE.Matrix4();
 const UP = new V3(0, 1, 0);
+/** drift : tight 0 (contre-braquage) → 0,5 (neutre) → 1 (braquage) ⇒ vitesse de rotation ; et l'inverse pour l'IA */
+const driftRate = (t) => (t < 0.5 ? lerp(CFG.DRIFT_OUT, CFG.DRIFT_MID, t * 2) : lerp(CFG.DRIFT_MID, CFG.DRIFT_IN, (t - 0.5) * 2));
+const driftTight = (r) => (r < CFG.DRIFT_MID ? clamp((r - CFG.DRIFT_OUT) / (CFG.DRIFT_MID - CFG.DRIFT_OUT), 0, 1) * 0.5 : 0.5 + clamp((r - CFG.DRIFT_MID) / (CFG.DRIFT_IN - CFG.DRIFT_MID), 0, 1) * 0.5);
 const QS = new URLSearchParams(location.search);
 let VCLOCK = null;   // horloge virtuelle (tests automatisés pas à pas)
 const nowMs = () => VCLOCK ?? performance.now();
@@ -2498,13 +2520,14 @@ function shoulderRibbon(pred, mat, s, { lift = 0.25, vTile = 8 } = {}) {
    ============================================================================= */
 const JG = { FOREST: 0, CLIMB: 1, CLIFF: 2, COURT: 3, TEMPLE: 4 };
 const JUNGLE_PATH = turtlePath(['start', ['S', 375], 'forest', ['T', 40, 125], ['S', 100], ['T', -80, 81.25], ['S', 75], ['T', 70, 100], ['S', 125], ['T', 60, 112.5],
-  'climb', ['S', 275, 20], 'cliff', ['T', -40, 175, 4], ['S', 112.5, 2], 'hairpin', ['T', 170, 65], 'hairpinEnd', ['S', 175, -8], ['T', -40, 150, -4],
-  'descent', ['S', 258.2, -14], 'temple', ['S', 112.5], 'templeIn', ['S', 212.5], 'templeOut', ['S', 50], ['T', 60, 112.5], ['S', 100], ['T', -30, 125], ['T', 60, 100],
+  'climb', ['S', 275, 20], 'cliff', ['T', -40, 175, 4], ['S', 112.5, 2], 'hairpin', ['T', 170, 65], 'hairpinEnd', ['S', 175, -2], ['T', -40, 150, 0],
+  'descent', ['S', 315.7, -2], 'temple', ['S', 112.5], 'templeIn', ['S', 70], 'helix', ['T', 720, 34, -22], 'helixEnd', ['S', 95], 'templeOut', ['S', 40], ['T', 60, 112.5], ['S', 100], ['T', -30, 125], ['T', 60, 100],
   ['S', 225.2], ['T', 90, 112.5]]);
+const HELIX_R = 34;
 const JUNGLE_DEF = {
   id: 'jungle', name: 'Jungle Perdue', theme: 'jungle', music: 'jungle', seed: 5151, accent: '#3fbf4a',
-  desc: 'Forêt luxuriante, précipice et grand virage serré, puis le temple inca et son tunnel sous la pyramide.', tags: ['Forêt', 'Précipice', 'Temple inca', 'Tremplin'],
-  points: JUNGLE_PATH.points,
+  desc: 'Forêt luxuriante, précipice et grand virage serré, puis la pyramide inca : on y entre en haut et on descend sa rampe en spirale.', tags: ['Forêt', 'Précipice', 'Pyramide', 'Spirale'],
+  points: JUNGLE_PATH.points, marks: JUNGLE_PATH.marks,
   secs: [
     { id: 'forest', surf: 'trail', edge: 'grass', curbs: false, run: 5, bankK: 3.5, bankMax: 0.07 },
     { id: 'climb', surf: 'trail', edge: 'grass', curbs: false, run: 4, bankK: 3, bankMax: 0.05 },
@@ -2568,6 +2591,13 @@ function buildJungle() {
   const gz = (() => { let a = new Float32Array(N); for (let i = 0; i < N; i++) a[i] = S[i] === JG.CLIFF ? 1 : 0;
     for (let p = 0; p < 40; p++) { const o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = (a[(i - 1 + N) % N] + a[i] * 2 + a[(i + 1) % N]) / 4; a = o; } return a; })();
   const RIVER_Y = -44;
+  // pyramide : centre de la spirale, repère local (u = côté, v = avant)
+  const iHel = track.segF.findIndex((v) => v >= JUNGLE_PATH.marks.helix), iIn = track.segF.findIndex((v) => v >= JUNGLE_PATH.marks.templeIn + 1);
+  const PY = { fx: track.tx[iIn], fz: track.tz[iIn], rx: track.rx[iIn], rz: track.rz[iIn], y0: track.py[(iHel + Math.round(4 * Math.PI * HELIX_R / track.step)) % N] - 0.3, hs0: 90, step: 6.5, th: 9, tierH: 5, tiers: 10 };
+  PY.cx = track.px[iHel] + PY.rx * HELIX_R; PY.cz = track.pz[iHel] + PY.rz * HELIX_R; PY.top = track.py[iHel];
+  const pyrUV = (x, z) => [(x - PY.cx) * PY.rx + (z - PY.cz) * PY.rz, (x - PY.cx) * PY.fx + (z - PY.cz) * PY.fz];
+  const inPyr = (x, z, m = 0) => { const [u, v] = pyrUV(x, z); return Math.abs(u) < PY.hs0 + m && Math.abs(v) < PY.hs0 + m; };
+  for (let u = -PY.hs0; u <= PY.hs0; u += 20) for (let v = -PY.hs0; v <= PY.hs0; v += 20) exclusions.push({ x: PY.cx + PY.rx * u + PY.fx * v, z: PY.cz + PY.rz * u + PY.fz * v, r: 16 });
   const natural = (x, z) => 7 * noise2(x / 150 + 3, z / 150) + 3 * noise2(x / 45, z / 45 + 2) + 2 + Math.max(0, Math.hypot(x - 500, z - 380) - 950) * 0.4;
   const height = (x, z) => {
     const n = natural(x, z), near = nearestTrack(x, z); if (near.i < 0) return n;
@@ -2577,10 +2607,11 @@ function buildJungle() {
       const o = -near.lat - ww, deep = smooth(1.2, 7, o) * (1 - smooth(68, 92, o));
       h = lerp(h, RIVER_Y - 4 + noise2(x / 20, z / 20) * 2, deep * g);
     }
+    if (inPyr(x, z, 4)) h = Math.min(h, PY.y0 - 0.6);
     return h;
   };
   buildTerrainMesh({ cx: 520, cz: 380, size: 2600, seg: 340, height, base: TEX.grass, baseN: TEX.grassN, rock: TEX.rock, third: TEX.dirt, uvScale: 7, thirdTint: [1.1, 1.0, 0.85],
-    blend: (x, y, z, ny) => [clamp(smooth(0.78, 0.55, ny), 0, 1), smooth(RIVER_Y + 4, RIVER_Y + 1, y)], tint: (x, z) => 0.66 + noise2(x / 50, z / 50) * 0.1 });
+    blend: (x, y, z, ny) => [clamp(smooth(0.78, 0.55, ny), 0, 1), smooth(RIVER_Y + 4, RIVER_Y + 1, y)], tint: (x, z) => 0.5 + noise2(x / 50, z / 50) * 0.08 });
   // rivière au fond de la gorge
   for (const [a, b] of cliffRuns) addMesh(track.ribbon([{ l: -(track.ww[a] + 6), dy: 0, u: 0 }, { l: -(track.ww[a] + 85), dy: 0, u: 6 }], a - 30, b + 30, 12,
     { disp: (i, c, l, dy) => [l, RIVER_Y - track.py[((i % N) + N) % N]] }), std({ color: 0x2f7f86, roughness: 0.08, metalness: 0.1, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.4, 0.4), transparent: true, opacity: 0.9 }));
@@ -2603,7 +2634,7 @@ function buildJungle() {
 
   // --- Végétation : géants de la jungle, palmiers, fougères, buissons, lianes
   const giants = [], palms = [], ferns = [], bushes = [], rocks = [], tufts = [];
-  const free = (x, z, pad) => { const near = nearestTrack(x, z); if (near.i < 0) return { ok: true, d: 999 }; const ww = track.ww[near.i];
+  const free = (x, z, pad) => { if (inPyr(x, z, 8)) return { ok: false }; const near = nearestTrack(x, z); if (near.i < 0) return { ok: true, d: 999 }; const ww = track.ww[near.i];
     if (near.d < ww + pad) return { ok: false }; if (gz[near.i] > 0.2 && near.lat < 0 && -near.lat - ww < 95) return { ok: false }; return { ok: true, d: near.d - ww, i: near.i }; };
   const nearRoad = (minO, maxO, pow) => { const i = (rng() * N) | 0, s = rng() < 0.5 ? -1 : 1; if (S[i] === JG.TEMPLE) return null; if (s < 0 && gz[i] > 0.2) return null;
     const l = s * (track.ww[i] + minO + Math.pow(rng(), pow) * (maxO - minO)); return [track.px[i] + track.rx[i] * l, track.pz[i] + track.rz[i] * l]; };
@@ -2618,11 +2649,11 @@ function buildJungle() {
     const x = 520 + rnd(-1100, 1100), z = 380 + rnd(-1100, 1100), f = free(x, z, 3.5); if (!f.ok || !isFree(x, z)) continue;
     if (f.d > 90 && rng() > 0.3) continue; palms.push({ x, y: height(x, z) - 0.3, z, s: rnd(0.8, 1.25), r: rnd(0, 6.28) });
   }
-  for (let t = 0; t < 80000 && ferns.length < 5200; t++) {
+  for (let t = 0; t < 160000 && ferns.length < 10500; t++) {
     const i = (rng() * N) | 0, s = rng() < 0.5 ? -1 : 1; if (S[i] === JG.TEMPLE || S[i] === JG.COURT) continue; if (s < 0 && gz[i] > 0.2) continue;
-    const l = s * (track.ww[i] + 0.8 + Math.pow(rng(), 2) * 50), x = track.px[i] + track.rx[i] * l, z = track.pz[i] + track.rz[i] * l;
-    const f = free(x, z, 0.6); if (!f.ok) continue; ferns.push({ x, y: height(x, z) - 0.15, z, s: rnd(0.7, 1.6), r: rnd(0, 6.28) });
-    if (rng() < 0.45) bushes.push({ x: x + rnd(-3, 3), y: height(x, z) - 0.6, z: z + rnd(-3, 3), s: rnd(0.8, 1.6), sy: rnd(0.7, 1.1), r: rnd(0, 6) });
+    const l = s * (track.ww[i] + 0.8 + Math.pow(rng(), 1.6) * 60), x = track.px[i] + track.rx[i] * l, z = track.pz[i] + track.rz[i] * l;
+    const f = free(x, z, 0.6); if (!f.ok) continue; ferns.push({ x, y: height(x, z) - 0.15, z, s: rnd(1.0, 2.1), r: rnd(0, 6.28) });
+    if (rng() < 0.7) bushes.push({ x: x + rnd(-3, 3), y: height(x, z) - 0.6, z: z + rnd(-3, 3), s: rnd(1.1, 2.2), sy: rnd(0.8, 1.3), r: rnd(0, 6) });
     if (rng() < 0.05) rocks.push({ x: x + rnd(-4, 4), y: height(x, z) - 0.6, z: z + rnd(-4, 4), s: rnd(1, 2.6), sy: rnd(0.6, 1.1), r: rnd(0, 6) });
     if (rng() < 0.5) tufts.push({ x: x + rnd(-2, 2), y: height(x, z) - 0.05, z: z + rnd(-2, 2), s: rnd(0.8, 1.4), r: rnd(0, 6) });
   }
@@ -2669,29 +2700,43 @@ function buildJungle() {
     addMesh(track.ribbon(prof, a, b, 7), std({ map: ENV_TEX.stone, normalMap: ENV_TEX.stoneN, color: 0xb8ae9c, roughness: 0.9, side: THREE.DoubleSide }), { cast: true });
     for (const s of [-1, 1]) addMesh(track.sided([R_('w', 1, 0.15, 5.0, 0), R_('w', 1, 0.05, 5.6, 1)], s, a, b, 6), gold);
     for (let i = a + 3; i < b; i += 12) for (const s of [-1, 1]) { const ii = i % N; addTorch(track.pointAt(ii, s * (track.ww[ii] + 0.05), 3.2, new V3()), { wall: true, scale: 0.9, intensity: 70 }); }
-    // pyramide à degrés autour du tunnel (deux premiers gradins ouverts par le passage)
-    const mid = Math.round((a + b) / 2) % N, P = track.pointAt(mid, 0, 0, new V3()), yaw = Math.atan2(track.tx[mid], track.tz[mid]);
-    const pyr = new THREE.Group(); pyr.position.set(P.x, P.y - 0.3, P.z); pyr.rotation.y = yaw; WORLD.root.add(pyr);
-    const L0 = (b - a) * track.step + 16, gap = track.ww[mid] + 1.6;
-    for (let k = 0; k < 8; k++) {
-      const w = 120 - k * 13, l = Math.max(18, L0 - k * 13), y0 = k * 5;
-      if (y0 < H) for (const s of [-1, 1]) { const ww = (w / 2 - gap); addMesh(new THREE.BoxGeometry(ww, 5, l), MAT_ENV.stone, { cast: true, parent: pyr }).position.set(s * (gap + ww / 2), y0 + 2.5, 0); }
-      else addMesh(new THREE.BoxGeometry(w, 5, l), MAT_ENV.stone, { cast: true, parent: pyr }).position.y = y0 + 2.5;
-      if (y0 < H && y0 + 5 > H) addMesh(new THREE.BoxGeometry(gap * 2, y0 + 5 - H, l), MAT_ENV.stone, { parent: pyr }).position.y = (H + y0 + 5) / 2;
+    // marches de l'escalier en spirale (bandes sombres)
+    const stepTex = toTex(fillPixels(16, 64, (x, y, o) => { const e = y < 6 ? 1 : 0; o[0] = 20; o[1] = 16; o[2] = 12; o[3] = e ? 150 : y < 12 ? 40 : 0; }));
+    const hr = track.runs((i) => track.segF[i] >= JUNGLE_PATH.marks.helix && track.segF[i] < JUNGLE_PATH.marks.helixEnd)[0];
+    if (hr) addMesh(track.ribbon([R_('r', -1, 0, 0.03, 0), R_('r', 1, 0, 0.03, 1)], hr[0], hr[1], 2.4), new THREE.MeshStandardMaterial({ map: stepTex, transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    // pyramide à degrés, creuse (anneaux de gradins), percée en haut (entrée) et en bas (sortie)
+    const pyr = new THREE.Group(); pyr.position.set(PY.cx, PY.y0, PY.cz); pyr.rotation.y = Math.atan2(PY.fx, PY.fz); WORLD.root.add(pyr);
+    const gap = track.ww[iIn] + 1.8, uDoor = HELIX_R, yIn = PY.top - PY.y0, yOut = 0.3, doorH = H + 1.2;
+    const slab = (u0, u1, v0, v1, y0, y1) => { if (u1 - u0 < 0.05 || v1 - v0 < 0.05 || y1 - y0 < 0.05) return; const m = addMesh(new THREE.BoxGeometry(u1 - u0, y1 - y0, v1 - v0), MAT_ENV.stone, { cast: true, parent: pyr }); m.position.set((u0 + u1) / 2, (y0 + y1) / 2, (v0 + v1) / 2); };
+    // (dans le groupe : x = −u (le côté droit de la route est vers −x), z = v (avant))
+    const slabCut = (u0, u1, v0, v1, y0, y1, door) => {
+      if (!door || y1 <= door.y || y0 >= door.y + doorH) return slab(u0, u1, v0, v1, y0, y1);
+      slab(u0, uDoor - gap, v0, v1, y0, y1); slab(uDoor + gap, u1, v0, v1, y0, y1);
+      if (y0 < door.y) slab(uDoor - gap, uDoor + gap, v0, v1, y0, door.y);
+      if (y1 > door.y + doorH) slab(uDoor - gap, uDoor + gap, v0, v1, door.y + doorH, y1);
+    };
+    for (let k = 0; k < PY.tiers; k++) {
+      const hs = PY.hs0 - k * PY.step, y0 = k * PY.tierH, y1 = y0 + PY.tierH, T2 = PY.th;
+      if (k === PY.tiers - 1) { slab(-hs, hs, -hs, hs, y0, y1); continue; }
+      slabCut(-hs, hs, -hs, -hs + T2, y0, y1, { y: yIn });          // face d'entrée (haut)
+      slabCut(-hs, hs, hs - T2, hs, y0, y1, { y: yOut - 0.6 });     // face de sortie (bas)
+      slab(-hs, -hs + T2, -hs + T2, hs - T2, y0, y1); slab(hs - T2, hs, -hs + T2, hs - T2, y0, y1);
     }
-    // sanctuaire au sommet + soleil d'or au-dessus des entrées
-    addMesh(new THREE.BoxGeometry(18, 7, 14), MAT_ENV.stone, { cast: true, parent: pyr }).position.y = 43.5;
-    addMesh(new THREE.BoxGeometry(20, 1.2, 16), gold, { parent: pyr }).position.y = 47.6;
-    for (const dir of [-1, 1]) {
-      const sun = new THREE.Group(); sun.position.set(0, 14, dir * (L0 / 2 + 0.6)); sun.rotation.y = dir > 0 ? 0 : Math.PI; pyr.add(sun);
+    const yTop = PY.tiers * PY.tierH;
+    addMesh(new THREE.BoxGeometry(20, 8, 16), MAT_ENV.stone, { cast: true, parent: pyr }).position.y = yTop + 4;
+    addMesh(new THREE.BoxGeometry(22, 1.2, 18), gold, { parent: pyr }).position.y = yTop + 8.6;
+    // escalier central sur la face d'entrée (décor)
+    for (let k = 0; k < PY.tiers - 1; k++) { const hs = PY.hs0 - k * PY.step; slab(-26, -12, -hs - 1.5, -hs + 1, k * PY.tierH, (k + 1) * PY.tierH + 0.4); }
+    // soleils d'or et portes trapézoïdales aux deux ouvertures
+    for (const [vFace, yDoor, dir] of [[-(PY.hs0 - Math.floor(yIn / PY.tierH) * PY.step), yIn, -1], [PY.hs0, yOut - 0.3, 1]]) {
+      const sun = new THREE.Group(); sun.position.set(uDoor, yDoor + doorH + 4.5, vFace + dir * 0.8); sun.rotation.y = dir > 0 ? 0 : Math.PI; pyr.add(sun);
       addMesh(new THREE.CylinderGeometry(3.4, 3.4, 0.6, 32).rotateX(Math.PI / 2), gold, { parent: sun });
       for (let k = 0; k < 12; k++) { const r = addMesh(new THREE.ConeGeometry(0.7, 2.6, 4), gold, { parent: sun }); const a2 = (k / 12) * Math.PI * 2; r.position.set(Math.cos(a2) * 4.6, Math.sin(a2) * 4.6, 0); r.rotation.z = a2 - Math.PI / 2; }
-      // encadrement trapézoïdal (porte inca)
-      const shape = new THREE.Shape([new THREE.Vector2(-gap - 3, -0.3), new THREE.Vector2(gap + 3, -0.3), new THREE.Vector2(gap - 1, H + 2.5), new THREE.Vector2(-gap + 1, H + 2.5)]);
-      shape.holes.push(new THREE.Path([new THREE.Vector2(-gap + 0.2, -0.3), new THREE.Vector2(-gap + 2.2, H - 0.2), new THREE.Vector2(gap - 2.2, H - 0.2), new THREE.Vector2(gap - 0.2, -0.3)]));
-      const fr = addMesh(new THREE.ExtrudeGeometry(shape, { depth: 1.4, bevelEnabled: false }), MAT_ENV.stone, { cast: true, parent: pyr }); fr.position.z = dir * (L0 / 2) - (dir > 0 ? 0 : 1.4);
+      const shape = new THREE.Shape([new THREE.Vector2(-gap - 3, -0.3), new THREE.Vector2(gap + 3, -0.3), new THREE.Vector2(gap - 1, doorH + 2.5), new THREE.Vector2(-gap + 1, doorH + 2.5)]);
+      shape.holes.push(new THREE.Path([new THREE.Vector2(-gap + 0.2, -0.3), new THREE.Vector2(-gap + 2.2, doorH - 0.2), new THREE.Vector2(gap - 2.2, doorH - 0.2), new THREE.Vector2(gap - 0.2, -0.3)]));
+      const fr = addMesh(new THREE.ExtrudeGeometry(shape, { depth: 1.4, bevelEnabled: false }), MAT_ENV.stone, { cast: true, parent: pyr });
+      fr.position.set(uDoor, yDoor, vFace + (dir > 0 ? 0 : -1.4));
     }
-    for (let i = a - 10; i <= b + 10; i += 8) { const Q = track.pointAt(i, 0, 0, new V3()); exclusions.push({ x: Q.x, z: Q.z, r: 66 }); }
   }
   animateTorches();
   // --- Départ
@@ -2707,11 +2752,11 @@ function buildJungle() {
 const CH = { LAVA: 0, BRIDGE: 1, HALL: 2, GARDEN: 3 };
 const CASTLE_PATH = turtlePath(['start', ['S', 200], 'serp', ['T', -50, 55], ['S', 30], ['T', 100, 48], ['S', 30], ['T', -100, 48], ['S', 30], ['T', 50, 55], 'serpEnd', ['S', 80],
   ['T', -90, 70], 'moat', ['S', 70, 3], 'gate', ['S', 45], 'castleIn', ['S', 55], ['T', 90, 21], ['S', 55], ['T', -90, 21], ['S', 70], ['T', -90, 21], ['S', 95], ['T', 90, 21], ['S', 55], ['T', 90, 21], ['S', 75], ['T', -90, 21], ['S', 60], 'castleOut',
-  ['S', 50], 'garden', ['T', -60, 70], ['S', 70], ['T', 55, 60], ['S', 40], ['T', -85, 62], ['S', 60], ['T', 30, 80], ['T', -30, 80], ['S', 289.2], 'lavaWest', ['T', -90, 85], ['S', 110], ['T', 45, 80], ['S', 70], ['T', -45, 80], ['S', 480.9, -3], ['T', -90, 85]]);
+  ['S', 50], 'garden', ['T', -60, 70], ['S', 70], ['T', 55, 60], ['S', 40], ['T', -85, 62], ['S', 60], ['T', 30, 80], ['T', -30, 80], ['S', 289.2], ['T', -90, 85], ['S', 110], ['T', 45, 80], ['S', 70], ['T', -45, 80], ['S', 330, -2], 'lavaWest', ['S', 150.9, -1], ['T', -90, 85]]);
 const CASTLE_DEF = {
   id: 'castle', name: 'Château Hanté', theme: 'night', music: 'castle', seed: 6666, accent: '#ff5a2a',
   desc: 'De nuit : lave et serpentins jusqu\'à la grande porte, labyrinthe sur tapis rouge à la lueur des torches, puis le jardin hanté sous la lune.', tags: ['Lave', 'Labyrinthe', 'Torches', 'Jardin hanté'],
-  points: CASTLE_PATH.points,
+  points: CASTLE_PATH.points, marks: CASTLE_PATH.marks,
   secs: [
     { id: 'lava', surf: 'rock', edge: 'hard', curbs: false, run: 2.2, bankK: 5, bankMax: 0.1 },
     { id: 'bridge', surf: 'wood', edge: 'hard', curbs: false, run: 0.8, bankK: 0, bankMax: 0 },
@@ -2846,6 +2891,8 @@ function buildCastle() {
     const g = gz[near.i];
     if (g > 0.01) { const gh = track.pyBase[near.i] - 0.35 + noise2(x / 40, z / 40) * 2.5 * smooth(8, 40, near.d); h = lerp(h, gh, g * smooth(140, 60, near.d)); }
     if (S[near.i] === CH.GARDEN || g > 0.5) h = lerp(track.pyBase[near.i] - 0.35, h, smooth(track.ww[near.i] + 2, track.ww[near.i] + 30, near.d));
+    // pas de rocher qui dépasse au-dessus de la route ou juste à côté (ils n'ont pas de collision)
+    else { const top = track.pyBase[near.i] - 1.4 - Math.max(0, near.d - track.ww[near.i] - 6) * 0.35; h = Math.min(h, lerp(top, h, smooth(track.ww[near.i] + 30, track.ww[near.i] + 60, near.d))); }
     return h;
   };
   buildTerrainMesh({ cx: 330, cz: -440, size: 2200, seg: 300, height, base: T.rock, baseN: T.rockN, rock: TEX.rock, third: TEX.grass, uvScale: 9, thirdTint: [0.32, 0.45, 0.3], roughness: 0.92,
@@ -2979,13 +3026,14 @@ function buildCastle() {
        pontons en bois au pied des falaises de craie percées d'arches, retour par le plateau)
    ============================================================================= */
 const BC = { PROM: 0, SAND: 1, BOARD: 2, TOP: 3 };
-const BEACH_PATH = turtlePath(['start', ['S', 240], ['T', 25, 160], 'sand', ['S', 220], ['T', -25, 160], ['S', 50], 'board1', ['S', 140], 'arch1', ['S', 70], 'board2', ['S', 100], ['T', -35, 140], 'arch2', ['S', 60], 'board3', ['S', 110], ['T', 20, 140], ['S', 60], 'cove',
-  ['T', -85, 75, 4], 'climb', ['S', 150, 22], ['T', -80, 80, 6], 'top', ['S', 140, 2], ['T', 30, 110], ['S', 80], ['T', -30, 110], ['S', 411.4], 'jump', ['S', 120], ['T', 40, 90], ['S', 50], ['T', -80, 80], ['S', 50], ['T', 40, 90], ['S', 60], ['T', -60, 90, -2], ['T', -30, 90, -2], 'down', ['S', 224.7, -30], ['T', -90, 90, 0]]);
+const BEACH_PATH = turtlePath(['start', ['S', 240], ['T', 25, 160], 'sand', ['S', 340], ['T', -25, 160], ['S', 50], 'board1', ['S', 140], 'arch1', ['S', 70], 'board2', ['S', 100], ['T', -35, 140], 'arch2', ['S', 60], 'board3', ['S', 110], ['T', 20, 140], ['S', 60], 'cove',
+  ['T', -85, 75, 4], 'climb', ['S', 150, 22], ['T', -80, 80, 6], 'top', ['S', 140, 6], ['T', 30, 110, -3], ['S', 80, -5], ['T', -30, 110, 4], ['S', 140, 8], ['S', 249.1, -10], ['S', 131, 4], 'jump', ['S', 120, 3], ['T', 40, 90, -6], ['S', 50, -2], ['T', -80, 80, 5], ['S', 50], ['T', 40, 90, -4], ['S', 60, 2],
+  ['T', -60, 90, -6], ['T', -30, 90, -6], 'down', ['S', 174, -22], ['T', -90, 90, 0]]);
 const SEA_Y = -1.3;
 const BEACH_DEF = {
   id: 'beach', name: 'Plage des Falaises', theme: 'beach', music: 'beach', seed: 8181, accent: '#1fc8e8',
   desc: 'Plein soleil : sable et crabes, pontons au pied des falaises de craie et leurs arches, puis le plateau et son phare.', tags: ['Plage', 'Crabes', 'Arches', 'Phare'],
-  points: BEACH_PATH.points,
+  points: BEACH_PATH.points, marks: BEACH_PATH.marks,
   secs: [
     { id: 'prom', surf: 'asphalt', edge: 'sand', curbs: false, run: 4, bankK: 3, bankMax: 0.05 },
     { id: 'sand', surf: 'sandroad', edge: 'sand', curbs: false, run: 4, bankK: 3, bankMax: 0.05 },
@@ -3070,9 +3118,9 @@ function crabModel() {
 function buildCrabs() {
   const run = track.runs((i) => track.sec[i] === BC.SAND)[0]; if (!run) return;
   const [a, b] = run, crabs = [];
-  for (let k = 0; k < 9; k++) {
+  for (let k = 0; k < 4; k++) {
     const m = crabModel(); WORLD.root.add(m);
-    crabs.push({ m, d: (a + 6 + ((b - a - 12) * (k + 0.5)) / 9) * track.step, speed: 3.2 + (k % 3) * 0.9, phase: k * 1.7, x: 0, y: 0, z: 0, lat: 0 });
+    crabs.push({ m, d: (a + 6 + ((b - a - 12) * (k + 0.5)) / 4) * track.step, speed: 3.2 + (k % 3) * 0.9, phase: k * 1.7, x: 0, y: 0, z: 0, lat: 0 });
   }
   WORLD.hazards.push({
     type: 'crabs',
@@ -3125,12 +3173,13 @@ function buildBeach() {
   let cl = new Float32Array(N); for (let i = 0; i < N; i++) cl[i] = S[i] === BC.BOARD ? 1 : 0;
   for (let p = 0; p < 25; p++) { const o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = (cl[(i - 1 + N) % N] + cl[i] * 2 + cl[(i + 1) % N]) / 4; cl = o; }
   const PLATEAU = 30;
-  const macro = (x, z) => { const dz = z - coastZ(x); if (dz > 0) return lerp(-0.2, -14, smooth(0, 160, dz)) - dz * 0.01; return lerp(0.4, PLATEAU + noise2(x / 120, z / 120) * 4, smooth(30, 120, -dz)); };
+  const macro = (x, z) => { const dz = z - coastZ(x); if (dz > 0) return lerp(-0.2, -14, smooth(0, 160, dz)) - dz * 0.01; return lerp(0.4, PLATEAU + noise2(x / 120, z / 120) * 9 + noise2(x / 45 + 7, z / 45) * 4, smooth(45, 140, -dz)); };
   const height = (x, z) => {
     let h = macro(x, z); const near = nearestTrack(x, z); if (near.i < 0) return h;
     const i = near.i, ww = track.ww[i], sec = S[i], road = track.pyBase[i] + clamp(near.lat, -30, 30) * track.tanb[i];
-    if (sec === BC.TOP) return lerp(road - 0.4, Math.max(h, road - 0.4 + noise2(x / 40, z / 40) * 3), smooth(ww + 3, ww + 45, near.d));
-    if (near.lat > 0) { const o = near.lat - ww; const beach = road - 0.35 - Math.max(0, o) * lerp(0.05, 0.11, cl[i]); return Math.min(lerp(road - 0.4, beach, smooth(0, 3, o)), Math.max(h, beach - 4)); }
+    // plateau vallonné : collines et creux de part et d'autre de la route (pas de « terrain plat »)
+    if (sec === BC.TOP) { const hill = road - 0.4 + noise2(x / 70 + 3, z / 70) * 11 + noise2(x / 26, z / 26 + 5) * 3.5 + Math.max(0, noise2(x / 110, z / 110 - 4)) * 14; return lerp(road - 0.4, Math.max(hill, h - 8), smooth(ww + 3, ww + 38, near.d)); }
+    if (near.lat > 0) { const o = near.lat - ww; const beach = road - 0.35 - Math.max(0, o) * lerp(0.028, 0.11, cl[i]); return Math.min(lerp(road - 0.4, beach, smooth(0, 3, o)), Math.max(h, beach - 4)); }
     const o = -near.lat - ww, cliff = lerp(road - 0.3, PLATEAU + noise2(x / 30, z / 30) * 2, smooth(1, 10, o));
     const dune = lerp(road - 0.3, Math.max(h, road + 3 + noise2(x / 25, z / 25) * 2), smooth(4, 60, o));
     return lerp(dune, cliff, cl[i]);
@@ -3180,6 +3229,16 @@ function buildBeach() {
     if (s > 0 && S[i] !== BC.TOP && rng() < 0.35) umbrellas.push({ x: x + rnd(-6, 6), y: y - 0.1, z: z + rnd(4, 12), s: 1, r: rnd(0, 6) });
   }
   for (let t = 0; t < 4000; t++) { const i = (rng() * N) | 0; if (S[i] !== BC.TOP) continue; const s = rng() < 0.5 ? -1 : 1, l = s * (track.ww[i] + 1 + rng() * 60), x = track.px[i] + track.rx[i] * l, z = track.pz[i] + track.rz[i] * l; tufts.push({ x, y: height(x, z) - 0.05, z, s: rnd(0.8, 1.4), r: rnd(0, 6) }); }
+  // plateau : pins couchés par le vent, gros blocs de craie, buissons
+  const pines = [], blocks = [];
+  for (let t = 0; t < 9000 && pines.length < 380; t++) {
+    const i = (rng() * N) | 0; if (S[i] !== BC.TOP) continue; const s = rng() < 0.5 ? -1 : 1, l = s * (track.ww[i] + 5 + Math.pow(rng(), 1.3) * 110), x = track.px[i] + track.rx[i] * l, z = track.pz[i] + track.rz[i] * l;
+    const near = nearestTrack(x, z); if (near.i >= 0 && near.d < track.ww[near.i] + 4) continue; if (!isFree(x, z)) continue; const y = height(x, z); if (y < 8) continue;
+    if (rng() < 0.6) pines.push({ x, y: y - 0.4, z, s: rnd(0.7, 1.3), sy: rnd(0.7, 1.1), r: rnd(0, 6.28) }); else blocks.push({ x, y: y - 0.8, z, s: rnd(1.2, 3.8), sy: rnd(0.5, 1), r: rnd(0, 6) });
+    if (rng() < 0.5) bushes.push({ x: x + rnd(-5, 5), y: y - 0.5, z: z + rnd(-5, 5), s: rnd(0.8, 1.5), sy: rnd(0.6, 1), r: rnd(0, 6) });
+  }
+  scatterInstanced(trunkGeometry(3, 0.42, 0.3, 0, 6), MAT_TREE.bark, pines); scatterInstanced(pineGeometry(9), MAT_TREE.pine, pines);
+  scatterInstanced(rockGeometry(), chalk, blocks);
   scatterPalms(palms, 41);
   scatterInstanced(foliageGeometry(14, 2.6, 1.6, 2.6, 1.2, 2.6, 9), MAT_TREE.leaves, bushes);
   scatterInstanced(mergeGeometries([0, 1, 2].map((k) => new THREE.PlaneGeometry(1.4, 0.9).translate(0, 0.42, 0).rotateY((k * Math.PI) / 3))), MAT_TREE.tuft, tufts, { cast: false });
@@ -3767,7 +3826,7 @@ class Kart {
     Object.assign(this, { drifting: false, driftHeld: false, driftDir: 0, driftCharge: 0, driftLevel: 0, driftT: 0, hopWindow: 0, hop: false, airT: 0, wiggleT: 0, lastAxisSign: 0,
       boostT: 0, stallT: 0, starT: 0, goldT: 0, rocketT: 0, shrinkT: 0, inkT: 0, hitT: 0, hitDur: 1, hitType: '', immuneT: 0, aiScale: 1, launched: false, launchT: 0, rampJump: false, trick: false, trickT: 0,
       cannonU: -1, lap: 0, maxLap: 0, prevDist: this.q.dist, progress: this.q.dist - track.length, lapStart: 0, lapTimes: [], finished: false, finishTime: 0, rank: slot + 1,
-      surface: 0, exAcc: 0, sparkAcc: 0, dustAcc: 0, wrongT: 0, firstThrottle: -1, item: null, count: 0, itemActive: false, roulT: 0, flowerT: 0, shotCd: 0, itemHeld: false, mtCol: 0, netState: 0 });
+      surface: 0, pushX: 0, pushZ: 0, exAcc: 0, sparkAcc: 0, dustAcc: 0, wrongT: 0, firstThrottle: -1, item: null, count: 0, itemActive: false, roulT: 0, flowerT: 0, shotCd: 0, itemHeld: false, mtCol: 0, netState: 0 });
     this.fx = { lvl: 0, mt: 0, wall: 0, wallSide: 0, land: 0, hop: false, lap: false, dash: false, trick: false, trickLand: false, hit: '', star: false, box: false };
     this.vis = { lean: 0, drift: 0, squash: 0, steer: 0, wheel: 0, bob: rnd(0, 6), scale: 1 };
     for (const k of ['throttle', 'brake', 'steer', 'axis']) this.input[k] = 0; this.input.drift = this.input.back = this.input.wiggle = false;
@@ -3809,9 +3868,9 @@ class Kart {
 
     // --- Lacet
     const vF0 = this.speedF; let yawRate;
-    if (this.drifting) { const tight = (steer * this.driftDir + 1) * 0.5; yawRate = this.driftDir * lerp(CFG.DRIFT_MIN, CFG.DRIFT_MAX, tight) * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
+    if (this.drifting) { const tight = (steer * this.driftDir + 1) * 0.5; this.driftVis = this.driftDir * lerp(0.7, 1.25, tight); yawRate = this.driftDir * driftRate(tight) * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
     else { const sf = clamp(Math.abs(vF0) / 7, 0, 1) * (1 - 0.3 * clamp(Math.abs(vF0) / S.maxSpeed, 0, 1.3)); yawRate = steer * S.handling * sf * (vF0 < -0.5 ? -1 : 1); }
-    if (!this.grounded) yawRate *= this.hop ? 0.8 : 0.3;
+    if (!this.grounded) yawRate *= this.hop ? 0.5 : 0.3;
     this.yawRate = yawRate; this.yaw -= yawRate * dt;
 
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), rx = -fz, rz = fx;
@@ -3857,7 +3916,8 @@ class Kart {
       }
     } else this.wiggling = false;
     // --- Intégration + murs
-    this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
+    this.pos.x += (this.vel.x + this.pushX) * dt; this.pos.z += (this.vel.z + this.pushZ) * dt;
+    const pd = Math.exp(-3.5 * dt); this.pushX *= pd; this.pushZ *= pd;
     const q2 = this.q2; track.query(this.pos.x, this.pos.z, this.ti, q2); this.ti = q2.index;
     const lim = q2.ww - CFG.KART_R * (this.shrinkT > 0 ? 0.6 : 1);
     if (Math.abs(q2.lateral) > lim && !q2.S.cannon) {
@@ -4000,15 +4060,15 @@ class Kart {
     const v = this.vis, n = this.grounded ? _v1.set(this.q2.nx, this.q2.ny, this.q2.nz) : _v1.copy(UP);
     this.vNormal.lerp(n, 1 - Math.exp(-12 * dt)).normalize();
     const sr = clamp(Math.abs(this.speedF) / CFG.TOP_SPEED, 0, 1.4);
-    v.drift = damp(v.drift, this.drifting ? this.driftDir : 0, 9, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
+    v.drift = damp(v.drift, this.drifting ? (this.remote ? this.driftDir : this.driftVis || this.driftDir) : 0, 9, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
     let extraYaw = 0, pitch = 0, roll = 0;
     if (this.hitT > 0) {
       const p = 1 - this.hitT / this.hitDur, e = 1 - Math.pow(1 - clamp(p, 0, 1), 2.2);
-      if (this.hitType === 'flip') { pitch = e * Math.PI * 2; extraYaw = e * Math.PI; } else if (this.hitType !== 'squash') extraYaw = e * Math.PI * (this.hitType === 'fire' ? 2 : 4);
+      if (this.hitType === 'flip') { pitch = e * Math.PI * 2; extraYaw = e * Math.PI * 2; }   // tour complet : le kart finit bien dans son sens else if (this.hitType !== 'squash') extraYaw = e * Math.PI * (this.hitType === 'fire' ? 2 : 4);
     }
     if (this.trick) roll = smooth(0, 0.45, this.trickT) * Math.PI * 2 * (this.idx % 2 ? 1 : -1);
     if (this.cannonU >= 0) roll = (race.time * 5) % (Math.PI * 2);
-    const visYaw = this.ryaw - v.drift * 0.48 + extraYaw, nn = this.vNormal, f = this.fwd.set(Math.sin(visYaw), 0, Math.cos(visYaw));
+    const visYaw = this.ryaw - v.drift * 0.42 + extraYaw, nn = this.vNormal, f = this.fwd.set(Math.sin(visYaw), 0, Math.cos(visYaw));
     f.addScaledVector(nn, -f.dot(nn)).normalize(); this.left.crossVectors(nn, f);
     _m4.makeBasis(this.left, nn, f); this.group.quaternion.setFromRotationMatrix(_m4); this.group.position.copy(this.rpos);
     v.scale = damp(v.scale, this.shrinkT > 0 ? 0.55 : 1, 6, dt); this.group.scale.setScalar(v.scale);
@@ -4552,8 +4612,8 @@ class AIDriver {
         this.pressT += dt;
         if (!k.drifting) { steer = this.wantDir * 0.45; if (this.pressT > 0.6) this.release(); }
         else {
-          const tightNeed = clamp((need - CFG.DRIFT_MIN) / (CFG.DRIFT_MAX - CFG.DRIFT_MIN), 0, 1);
-          steer = clamp(k.driftDir * (2 * tightNeed - 1) * 0.5 - diff * 2.2, -1, 1);
+          const tightNeed = driftTight(need);
+          steer = clamp(k.driftDir * (2 * tightNeed - 1) * 0.85 - diff * 2.2, -1, 1);
           const inside = k.q2.lateral * k.driftDir, over = Math.sign(-diff) !== k.driftDir && Math.abs(diff) > 0.5, goal = this.skill >= 0.98 ? 2 : 1;
           if (need < 0.3 || over || inside > hw - 3.5 || inside < -(hw + 1.5) || k.driftT > 4.2 || (k.driftLevel >= goal && need < 0.5)) this.release();
         }
@@ -4782,10 +4842,10 @@ function hostStartRace(mode = 'new') {
   beginLoading(RACE);
 }
 /** Fin de course (hôte) : points de la course pour la coupe */
-function hostScoreCup() {
+function hostScoreCup(final = false) {
   if (!LOBBY.cup) return;
   const last = {}; ranked.forEach((k, i) => { last[kartKey(k)] = POINTS[i] ?? 0; });
-  LOBBY.cup.last = last; hostSetLobby({});
+  LOBBY.cup.last = last; if (final) LOBBY.cup.doneSeed = RACE.seed; hostSetLobby({});
 }
 function hostCheckLoaded() {
   if (!RACE || RACE.goAt || LOBBY.phase !== 'loading') return;
@@ -5035,7 +5095,7 @@ function clearNameTags() { for (const s of nameTags.values()) scene.remove(s); n
 const UI = {
   screen: 'none',
   show(name) {
-    UI.screen = name;
+    UI.screen = name; if (name !== 'results' && SPEC.on) specStop();
     for (const id of ['title', 'maps', 'chars', 'loadscr', 'results', 'escmenu']) $(id).classList.toggle('hidden', id !== ({ loading: 'loadscr' }[name] || name));
     $('hud').classList.toggle('hidden', !['race'].includes(name));
     if (name === 'maps' || name === 'chars' || name === 'title') music.play('menu');
@@ -5158,34 +5218,112 @@ function renderLoading() {
     return `<div class="pl ${ok ? 'ok' : ''}"><span>${esc(h.name)}</span><span class="st">${ok ? 'prêt ✓' : NET.isHost ? 'charge…' : ''}</span></div>`; }).join('') : '';
 }
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
-function fillResults() {
-  if (!karts.length) return;
-  const cup = LOBBY.cup, scored = cup && Object.keys(cup.last).length > 0, done = cup && cup.n >= cup.total && scored;
-  const def = MAPS.find((m) => m.id === (RACE ? RACE.map : LOBBY.map)) || MAPS[0];
-  $('restitle').textContent = done ? 'GRAND PRIX TERMINÉ !' : 'CLASSEMENT';
-  $('ressub').textContent = cup ? `Grand Prix · course ${cup.n}/${cup.total} · ${def.name}` : def.name;
-  const rows = done ? ranked.slice().sort((a, b) => cupTotal(kartKey(b)) - cupTotal(kartKey(a))) : ranked;
-  $('restable').innerHTML = `<div class="rr rh"><span></span><span></span><span></span><span class="t">${done ? 'Course' : 'Temps'}</span><span class="pts">Points</span><span class="tot">Total</span></div>` + rows.map((k, i) => {
-    const r = ranked.indexOf(k), pts = scored ? cup.last[kartKey(k)] ?? 0 : POINTS[r] ?? 0, tot = scored ? cupTotal(kartKey(k)) : (cup ? cup.base[kartKey(k)] || 0 : 0) + pts;
-    const place = done ? i : r;
-    return `<div class="rr ol ${k.isPlayer ? 'me' : ''} ${k.human ? 'hum' : ''} ${done && i < 3 ? 'pod' + (i + 1) : ''}"><span>${place + 1}${ordinal(place + 1)}</span><img src="${PORTRAITS[k.ch.id]}" alt=""><span>${esc(k.name)}</span><span class="t">${done ? `${r + 1}${ordinal(r + 1)} ici` : k.finished ? fmtTime(k.finishTime) : '— en course —'}</span><span class="pts">+${pts}</span><span class="tot">${tot}</span></div>`;
-  }).join('');
-  const best = player && player.lapTimes.length ? Math.min(...player.lapTimes) : 0;
-  const lead = cup && scored ? ranked.slice().sort((a, b) => cupTotal(kartKey(b)) - cupTotal(kartKey(a)))[0] : null;
-  $('resinfo').textContent = [best ? `Ton meilleur tour : ${fmtTime(best)}` : '', lead && !done ? `En tête du Grand Prix : ${lead.name} (${cupTotal(kartKey(lead))} pts)` : '', done && lead ? `🏆 ${lead.name} remporte le Grand Prix !` : ''].filter(Boolean).join(' · ');
-  const host = NET.isHost, btns = $('resbtns'), next = MAPS.find((m) => m.id === nextMapId(def.id));
-  const html = host ? `<button class="btn alt" id="rquit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button><button class="btn gold" id="ragain">Rejouer ce circuit</button>` +
-      (done ? `<button class="btn" id="rnew">Nouveau Grand Prix ▶</button>` : `<button class="btn" id="rnext">Course suivante : ${esc(next.name)} ▶</button>`)
-    : `<span class="banner"><i></i>En attente de l'hôte…</span><button class="btn alt" id="rquit">Quitter</button>`;
-  if (btns.dataset.h !== html) {
-    btns.innerHTML = html; btns.dataset.h = html;
-    $('rquit').onclick = () => quitGame();
-    if (host) {
-      $('ragain').onclick = () => { endRaceLocal(); hostStartRace('again'); };
-      if ($('rnext')) $('rnext').onclick = () => { endRaceLocal(); hostStartRace('next'); };
-      if ($('rnew')) $('rnew').onclick = () => { endRaceLocal(); LOBBY.cup = null; hostSetLobby({ phase: 'map', map: MAPS[0].id }); UI.show('maps'); };
+/* --- Écran des résultats : classement de la course en direct (les autres continuent de rouler),
+       puis 5 s après la fin de la course, le classement général du Grand Prix (points ajoutés de bas en haut). */
+const RES = { seed: null, phase: 'race', doneAt: 0, animT: 0, rows: new Map(), tick: 0 };
+const ROW_H = 40;
+function resetResults() {
+  RES.seed = RACE ? RACE.seed : null; RES.phase = 'race'; RES.doneAt = 0; RES.animT = 0; RES.rows.clear(); RES.tick = 0;
+  $('restable').innerHTML = `<div class="rr rh"><span></span><span></span><span></span><span class="t" id="rescol">Temps</span><span class="pts">Points</span><span class="tot">Total</span></div><div id="resrows"></div>`;
+}
+function resRow(k) {
+  let el = RES.rows.get(k.idx);
+  if (!el) {
+    el = document.createElement('div'); el.className = 'rr ol';
+    el.innerHTML = `<span class="ps"></span><img src="${PORTRAITS[k.ch.id]}" alt=""><span class="nm">${esc(k.name)}</span><span class="t"></span><span class="pts"></span><span class="tot"></span>`;
+    RES.rows.set(k.idx, el); $('resrows').appendChild(el);
+  }
+  el.classList.toggle('me', k.isPlayer); el.classList.toggle('hum', !!k.human); return el;
+}
+const setTxt = (el, sel, t) => { const e = el.querySelector(sel); if (e.textContent !== t) e.textContent = t; };
+function updateResults(dt) {
+  if (UI.screen !== 'results' || !karts.length || !RACE) return;
+  if (RES.seed !== RACE.seed) resetResults();
+  const cup = LOBBY.cup, final = !!cup && cup.doneSeed === RACE.seed, gpDone = final && cup.n >= cup.total, now = performance.now();
+  if (final && !RES.doneAt) RES.doneAt = now;
+  if (RES.phase === 'race' && RES.doneAt && now - RES.doneAt > 5000) { RES.phase = 'total'; RES.animT = 0; }
+  const base = (k) => (cup ? cup.base[kartKey(k)] || 0 : 0), gain = (k, i) => (final ? cup.last[kartKey(k)] ?? 0 : POINTS[i] ?? 0);
+  const def = MAPS.find((m) => m.id === RACE.map) || MAPS[0];
+  $('restitle').textContent = RES.phase === 'race' ? 'CLASSEMENT DE LA COURSE' : gpDone ? 'GRAND PRIX TERMINÉ !' : 'CLASSEMENT GÉNÉRAL';
+  $('ressub').textContent = (cup ? `Grand Prix · course ${cup.n}/${cup.total} · ` : '') + def.name + (RES.phase === 'race' && !final ? ' · course en cours…' : '');
+  $('resrows').style.height = ranked.length * ROW_H + 'px';
+  if (RES.phase === 'race') {
+    RES.tick -= dt; if (RES.tick > 0 && dt) return; RES.tick = 0.25;
+    $('rescol').textContent = 'Temps';
+    ranked.forEach((k, i) => {
+      const el = resRow(k); el.style.top = i * ROW_H + 'px'; el.classList.toggle('odd', i % 2 === 1); el.classList.remove('pod1', 'pod2', 'pod3');
+      setTxt(el, '.ps', `${i + 1}${ordinal(i + 1)}`); setTxt(el, '.t', k.finished ? fmtTime(k.finishTime) : '— en course —');
+      setTxt(el, '.pts', `+${gain(k, i)}`); setTxt(el, '.tot', String(base(k))); el.querySelector('.pts').style.opacity = 1;
+    });
+  } else {
+    // les points s'ajoutent du dernier au premier, puis les lignes se réordonnent selon le total
+    RES.animT += dt; const n = ranked.length, stag = 0.2, dur = 0.45;
+    let all = true;
+    ranked.forEach((k, i) => {
+      const el = resRow(k), p = clamp((RES.animT - (n - 1 - i) * stag) / dur, 0, 1); if (p < 1) all = false;
+      setTxt(el, '.tot', String(Math.round(base(k) + gain(k, i) * p))); el.querySelector('.pts').style.opacity = 1 - p * 0.65;
+      if (p > 0 && p < 1) el.classList.add('bump'); else el.classList.remove('bump');
+    });
+    if (all && RES.animT > (n - 1) * stag + dur + 0.5) {
+      $('rescol').textContent = 'Course';
+      const tot = ranked.slice().sort((a, b) => base(b) + gain(b, ranked.indexOf(b)) - (base(a) + gain(a, ranked.indexOf(a))));
+      tot.forEach((k, i) => { const el = resRow(k); el.style.top = i * ROW_H + 'px'; el.classList.toggle('odd', i % 2 === 1); setTxt(el, '.ps', `${i + 1}${ordinal(i + 1)}`);
+        const r = ranked.indexOf(k); setTxt(el, '.t', `${r + 1}${ordinal(r + 1)} ici`); for (let q = 1; q <= 3; q++) el.classList.toggle('pod' + q, gpDone && i === q - 1); });
     }
   }
+  const best = player && player.lapTimes.length ? Math.min(...player.lapTimes) : 0;
+  const lead = final ? ranked.slice().sort((a, b) => cupTotal(kartKey(b)) - cupTotal(kartKey(a)))[0] : null;
+  const info = [best ? `Ton meilleur tour : ${fmtTime(best)}` : '', !final ? 'Le classement général s\'affiche 5 s après l\'arrivée du dernier.' : lead && !gpDone ? `En tête du Grand Prix : ${lead.name} (${cupTotal(kartKey(lead))} pts)` : '', gpDone && lead && RES.phase === 'total' ? `🏆 ${lead.name} remporte le Grand Prix !` : ''].filter(Boolean).join(' · ');
+  if ($('resinfo').textContent !== info) $('resinfo').textContent = info;
+  resButtons(gpDone, def);
+}
+function resButtons(gpDone, def) {
+  const host = NET.isHost, btns = $('resbtns'), next = MAPS.find((m) => m.id === nextMapId(def.id));
+  const specBtn = `<button class="btn alt" id="rspec">👁 Spectateur</button>`;
+  const html = host ? specBtn + `<button class="btn alt" id="rquit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button><button class="btn gold" id="ragain">Rejouer ce circuit</button>` +
+      (gpDone ? `<button class="btn" id="rnew">Nouveau Grand Prix ▶</button>` : `<button class="btn" id="rnext">Course suivante : ${esc(next.name)} ▶</button>`)
+    : `<span class="banner"><i></i>En attente de l'hôte…</span>` + specBtn + `<button class="btn alt" id="rquit">Quitter</button>`;
+  if (btns.dataset.h === html) return;
+  btns.innerHTML = html; btns.dataset.h = html;
+  $('rquit').onclick = () => quitGame(); $('rspec').onclick = () => specStart();
+  if (host) {
+    $('ragain').onclick = () => { endRaceLocal(); hostStartRace('again'); };
+    if ($('rnext')) $('rnext').onclick = () => { endRaceLocal(); hostStartRace('next'); };
+    if ($('rnew')) $('rnew').onclick = () => { endRaceLocal(); LOBBY.cup = null; hostSetLobby({ phase: 'map', map: MAPS[0].id }); UI.show('maps'); };
+  }
+}
+function fillResults() { if (karts.length && RACE) { RES.tick = 0; updateResults(0); } }
+// --- mode spectateur (après la course) : caméra de face sur le pilote choisi
+const SPEC = { on: false, idx: 0, pos: new V3(), look: new V3(), ti: -1, q: null, t: 0 };
+function specStart() {
+  SPEC.on = true; SPEC.idx = (ranked[0] || player).idx; SPEC.ti = -1; SPEC.snap = true;
+  $('results').classList.add('spec'); $('spec').classList.remove('hidden'); specRender();
+}
+function specStop() { SPEC.on = false; $('results').classList.remove('spec'); $('spec').classList.add('hidden'); }
+function specSelect(i) { SPEC.idx = (i + karts.length) % karts.length; SPEC.snap = true; specRender(); }
+function specStep(d) { const L = ranked.length ? ranked : karts, i = L.findIndex((k) => k.idx === SPEC.idx); specSelect(L[(i + d + L.length) % L.length].idx); }
+function specRender() {
+  const list = ranked.length ? ranked : karts;
+  $('speclist').innerHTML = list.map((k) => `<button data-i="${k.idx}" class="${k.idx === SPEC.idx ? 'sel' : ''}"><img src="${PORTRAITS[k.ch.id]}" alt=""><span>${esc(k.name)}</span><i>${k.rank}${ordinal(k.rank)}</i></button>`).join('');
+  for (const b of $('speclist').querySelectorAll('button')) b.onclick = () => specSelect(Number(b.dataset.i));
+  const k = karts[SPEC.idx]; if (k) $('specname').innerHTML = `${esc(k.name)}<small>${k.finished ? 'arrivé · ' + fmtTime(k.finishTime) : `tour ${Math.max(1, k.lap)}/${race.laps}`} · ${k.rank}${ordinal(k.rank)} · ← → pour changer</small>`;
+}
+$('specback').onclick = () => specStop();
+function specCamera(dt) {
+  const k = karts[SPEC.idx]; if (!k) return;
+  if (!SPEC.q) SPEC.q = new TrackQuery();
+  const yaw = Math.atan2(k.vel.x, k.vel.z) || k.ryaw, sr = clamp(Math.abs(k.speedF) / CFG.TOP_SPEED, 0, 1.4);
+  const D = 21 + sr * 4;   // caméra de face, assez loin pour voir le kart et ce qui l'entoure
+  _v2.set(k.rpos.x + Math.sin(yaw) * D, k.rpos.y + 5.5, k.rpos.z + Math.cos(yaw) * D);
+  if (SPEC.snap) { SPEC.pos.copy(_v2); SPEC.snap = false; } else { SPEC.pos.x = damp(SPEC.pos.x, _v2.x, 6, dt); SPEC.pos.y = damp(SPEC.pos.y, _v2.y, 5, dt); SPEC.pos.z = damp(SPEC.pos.z, _v2.z, 6, dt); }
+  track.query(SPEC.pos.x, SPEC.pos.z, SPEC.ti, SPEC.q, SPEC.pos.y); SPEC.ti = SPEC.q.index;
+  const lim = SPEC.q.ww - 0.7, cl = SPEC.q.lateral;
+  if (!SPEC.q.S.cannon && k.cannonU < 0) {
+    if (Math.abs(cl) > lim && Math.abs(cl) < lim + 12) { const p = (Math.abs(cl) - lim) * Math.sign(cl); SPEC.pos.x -= SPEC.q.rx * p; SPEC.pos.z -= SPEC.q.rz * p; }
+    if (Math.abs(cl) < lim + 12) { SPEC.pos.y = Math.max(SPEC.pos.y, SPEC.q.height + 1.2); if (SPEC.q.S.tunnel) SPEC.pos.y = Math.min(SPEC.pos.y, SPEC.q.cy + 7.5); }
+  }
+  camera.position.copy(SPEC.pos); camera.lookAt(k.rpos.x, k.rpos.y + 1.4, k.rpos.z); setFov(60);
+  SPEC.t -= dt; if (SPEC.t <= 0) { SPEC.t = 0.5; specRender(); }
 }
 // --- menu Échap pendant la course
 function openEscMenu() {
@@ -5257,6 +5395,7 @@ function onKeyPress(code) {
     else if (code === 'Escape' || code === 'Backspace') $('charback').click();
     return;
   }
+  if (UI.screen === 'results' && SPEC.on) { if (code === 'ArrowLeft' || code === 'KeyA') specStep(-1); else if (code === 'ArrowRight' || code === 'KeyD') specStep(1); else if (code === 'Escape') specStop(); return; }
   if (UI.screen === 'results') { if (NET.isHost && (code === 'Enter' || code === 'NumpadEnter')) ($('rnext') || $('rnew'))?.click(); else if (code === 'Escape') $('rquit').click(); return; }
   if (code === 'KeyM') { sfx.setMuted(!sfx.muted); music.toggle(); toast(sfx.muted ? 'Son coupé' : 'Son activé'); }
   if (code === 'KeyP') togglePixelMode();
@@ -5390,7 +5529,7 @@ function setupRacers(R) {
 function resetRace() {
   karts.forEach((k) => k.reset(k.slot));
   ais.forEach((a) => { a.driftCool = 0; a.trickState = 0; a.rocket = rng() < 0.45; });
-  autoPilot = null; race.time = -5.4; race.t = 0; race.finishOrder = []; race.cdShown = -1; race.goDone = false; race.endSent = false; race.finishT = 0;
+  autoPilot = null; race.time = -5.4; race.t = 0; race.finishOrder = []; race.cdShown = -1; race.goDone = false; race.endSent = false; race.finishT = 0; race.cupFinal = false; race.resT = 0;
   sparks.clear(); smoke.clear(); skids.clear(); clearItems(); setStartLights(0, false);
   lastRank = 0; computeRanks(); cam.ti = -1; cam.shake = 0; music.setRate(1);
 }
@@ -5439,9 +5578,15 @@ function updateRace(dt) {
     // l'hôte termine la course quand tous les humains ont passé la ligne (ou 60 s après le premier)
     if (NET.isHost && !race.endSent) {
       const hs = karts.filter((k) => k.human), allDone = hs.every((k) => k.finished);
-      if ((allDone && race.finishT > 3.2) || race.finishT > 60) { race.endSent = true; NET.broadcast({ t: 'end', order: ranked.map((k) => k.idx) }); hostScoreCup(); showResultsScreen(); reportResult(); }
+      if ((allDone && race.finishT > 3.2) || race.finishT > 60) { race.endSent = true; NET.broadcast({ t: 'end', order: ranked.map((k) => k.idx) }); hostScoreCup(); showResultsScreen(); }
     }
   }
+}
+/** Hôte : la course est vraiment finie quand tout le monde a passé la ligne (ou 20 s après l'écran des résultats) → points définitifs */
+function hostFinalizeRace(dt) {
+  if (!NET.isHost || race.state !== 'results' || race.cupFinal) return;
+  race.resT += dt;
+  if (karts.every((k) => k.finished) || race.resT > 20) { race.cupFinal = true; computeRanks(); hostScoreCup(true); reportResult(); }
 }
 function showResultsScreen() { if (race.state === 'results') return; race.state = 'results'; UI.show('results'); music.play('results', true); }
 function reportResult() {
@@ -5480,10 +5625,16 @@ function simulate(h) {
     a.pos.x -= nx * ov * wa; a.pos.z -= nz * ov * wa; b.pos.x += nx * ov * wb; b.pos.z += nz * ov * wb;
     const rv = (b.vel.x - a.vel.x) * nx + (b.vel.z - a.vel.z) * nz;
     if (rv < 0) {
-      const J = (-(1.6) * rv) / (1 / ma + 1 / mb);
-      if (!a.remote) { a.vel.x -= (nx * J) / ma; a.vel.z -= (nz * J) / ma; }
-      if (!b.remote) { b.vel.x += (nx * J) / mb; b.vel.z += (nz * J) / mb; }
-      if ((a.isPlayer || b.isPlayer) && -rv > 2.5) { cam.shake = Math.max(cam.shake, 0.12); sfx.noise(0.12, 0.25, 900); }
+      // choc de kart : rebond doux (peu de vitesse perdue) + poussée sur le côté, pas un mur
+      const close = -rv, q = a.q2, tx = q.tx, tz = q.tz, rx = q.rx, rz = q.rz, nF = nx * tx + nz * tz, nL = nx * rx + nz * rz;
+      const J = (1.2 * close) / (1 / ma + 1 / mb), jF = J * nF * 0.5, jL = J * nL;
+      const ix = tx * jF + rx * jL, iz = tz * jF + rz * jL;
+      if (!a.remote) { a.vel.x -= ix / ma; a.vel.z -= iz / ma; }
+      if (!b.remote) { b.vel.x += ix / mb; b.vel.z += iz / mb; }
+      const side = Math.abs(nL) > 0.2 ? Math.sign(nL) : b.q2.lateral >= a.q2.lateral ? 1 : -1, kick = clamp(2.5 + close * 0.6, 2.5, 9);
+      if (!a.remote) { const k = kick * (mb / (ma + mb)); a.pushX -= rx * side * k; a.pushZ -= rz * side * k; a.yaw += side * 0.03; }
+      if (!b.remote) { const k = kick * (ma / (ma + mb)); b.pushX += rx * side * k; b.pushZ += rz * side * k; b.yaw -= side * 0.05; }
+      if ((a.isPlayer || b.isPlayer) && close > 2) { cam.shake = Math.max(cam.shake, 0.1); sfx.noise(0.1, 0.22, 1100); sfx.tone(180, 0.12, 'square', 0.08, 110); }
     }
   }
 }
@@ -5590,7 +5741,7 @@ function tick(dt, render) {
   if (race.paused) { if (render) composer.render(); return; }
   if (['intro', 'countdown', 'race'].includes(race.state) && !autoPilot) readPlayerInput(dt); else readPad();
   if (race.state === 'countdown' || race.state === 'intro') player.input.steer = 0;
-  updateRace(dt);
+  updateRace(dt); hostFinalizeRace(dt);
   for (const hz of WORLD.hazards) hz.update(hazardTime(), render ? dt : 0);
   acc += dt; let steps = 0;
   while (acc >= CFG.STEP && steps < 24) { simulate(CFG.STEP); acc -= CFG.STEP; steps++; }
@@ -5603,13 +5754,16 @@ function tick(dt, render) {
   player.wrongT = race.state === 'race' && player.speedF > 3 && (Math.sin(player.yaw) * pq.tx + Math.cos(player.yaw) * pq.tz) < -0.2 ? player.wrongT + dt : 0;
   if (race.state === 'intro') introCamera((race.time + 5.4) / 2.4);
   else if (window.__game?.debugCam) { const d = window.__game.debugCam; camera.position.set(d[0], d[1], d[2]); camera.lookAt(d[3], d[4], d[5]); setFov(d[6] || 65); }
+  else if (SPEC.on && race.state === 'results') specCamera(dt);
   else chaseCamera(dt, !!window.__game?.snap);
   sky.position.copy(camera.position);
-  _v2.set(Math.sin(cam.yaw) * 42, 0, Math.cos(cam.yaw) * 42); updateSun(player.rpos, _v2);
-  updateLamps(_v3.copy(player.rpos).addScaledVector(_v2, 0.25), time);
+  const focus = SPEC.on && race.state === 'results' && karts[SPEC.idx] ? karts[SPEC.idx] : player;
+  if (focus !== player) _v2.set(0, 0, 0); else _v2.set(Math.sin(cam.yaw) * 42, 0, Math.cos(cam.yaw) * 42);
+  updateSun(focus.rpos, _v2);
+  updateLamps(_v3.copy(focus.rpos).addScaledVector(_v2, 0.25), time);
   track.query(camera.position.x, camera.position.z, cam.ti, cam.q, camera.position.y); cam.light = damp(cam.light, WORLD.tunnelLight[cam.q.index], 3, dt); setLightLevel(cam.light);
   sparks.update(dt); smoke.update(dt); skids.flush(); waterfallFX(dt);
-  updateBoxes(dt, time); syncItems(dt, time); updateNameTags();
+  updateBoxes(dt, time); syncItems(dt, time); updateNameTags(); updateResults(dt);
   for (const f of WORLD.anims) f(dt, time);
   TEX.dash.offset.y = (TEX.dash.offset.y + dt * 1.6) % 1; TEX.ramp.offset.y = (TEX.ramp.offset.y + dt * 0.8) % 1;
   TEX.waterN.offset.set((time * 0.015) % 1, (time * 0.01) % 1);
@@ -5657,7 +5811,7 @@ bootNet(() => {
 });
 requestAnimationFrame((t) => { last = t; frame(t); });
 window.__game = { renderer, composer, sanitizePass, smoke, sparks, camera, race, LOBBY, NET, get RACE() { return RACE; }, get karts() { return karts; }, get player() { return player; }, get track() { return track; }, CFG, tick, ents, boxes, useItem,
-  loadMap, hostStartRace, hostSetLobby, setMyPick, UI, MAPS, WORLD,
+  loadMap, hostStartRace, hostSetLobby, setMyPick, UI, MAPS, WORLD, SPEC, specStart, specSelect,
   setAuto: (on) => { autoPilot = on ? new AIDriver(player, 1, 99) : null; }, manual: false };
 </script>
 </body>

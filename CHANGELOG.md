@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.23 — 22 octobre 2026
+- **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.
+  - En drift, le kart glisse de travers mais suit la direction voulue : au neutre il tourne en douceur, en contre-braquant il file presque tout droit, en braquant il serre le virage.
+  - La carrosserie se met plus ou moins de travers selon le braquage, et le petit saut ne fait plus pivoter le kart d'un coup.
+  - Les chocs entre karts ne stoppent plus net comme un mur : on rebondit, on garde sa vitesse, et le kart touché est poussé sur le côté.
+  - Nouveau mode spectateur : depuis le classement, le bouton « Spectateur » suit n'importe quel pilote avec une caméra de face (← → pour changer).
+  - Château Hanté : plus de tas de roche qui traversent la route dans la lave ; le jardin hanté est plus long et la lave de fin plus courte.
+  - Plage des Falaises : deux fois moins de crabes, une plage plus longue et plus large, et un plateau vallonné avec pins et blocs de craie.
+  - Jungle Perdue : on entre dans la pyramide par le haut, après une ligne droite, puis on descend sa rampe en spirale sur deux étages jusqu'à la sortie en bas ; la forêt est bien plus dense.
+  - Touché par une carapace, le kart fait un tonneau complet et repart dans le bon sens (il finissait parfois à l'envers).
+  - Écran des résultats façon Mario Kart : le classement de la course se met à jour en direct pendant que les autres finissent, puis 5 secondes après l'arrivée du dernier, les points s'ajoutent de bas en haut et le classement général du Grand Prix s'affiche.
+
 ## 2.22 — 22 octobre 2026
 - **Tête de Calcul** — Tout tient à l'écran, sans faire défiler :
   - La carte s'ajuste toute seule à la hauteur de la fenêtre (question, correction, accueil), même sur un petit écran d'ordinateur.
