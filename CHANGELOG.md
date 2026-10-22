@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.21 — 22 octobre 2026
+- **Tête de Calcul** — Le mode The Candidate est entièrement refait :
+  - Plus de 300 questions réécrites (marchés, corporate finance, dérivés, taux, calcul mental, probabilités, brainteasers) : énoncés clairs, et trois mauvaises réponses crédibles, au même format que la bonne (fini le seul entier au milieu de trois nombres à virgule).
+  - Les réponses sont mélangées à chaque partie, et chaque correction explique vraiment le raisonnement (« Le décryptage »).
+  - La difficulté monte comme dans l'émission : Premier tour (100 pts), Desk (200 pts), Comité final (300 pts) ; la finale quitte ou double tombe toujours au niveau le plus dur.
+  - Réponse en un clic ou au clavier avec 1 2 3 4 ou A B C D (les raccourcis ne marchaient pas avant).
+  - À la correction, on voit les quatre réponses, la bonne en vert, la sienne en rouge si elle est fausse, et qui a choisi quoi.
+  - Pierre Chartier réagit selon ta réponse et ta vitesse, et rend à la fin un verdict selon ta justesse : offre immédiate, offre validée, période d'essai ou candidature rejetée.
+  - Bandeau de cotations fixe en haut de l'écran, avec les joueurs cotés comme des actions qui montent ou chutent à chaque question.
+  - Nouvelle musique de salle de marché qui tourne toute la partie : cloche d'ouverture, le rythme s'emballe quand le chrono file, gros coups de cuivres sur la finale, et le son s'étouffe le temps de la correction. Bouton 🎵 pour la couper.
+  - Mise en page corrigée : textes lisibles partout sur le fond sombre, carte de question qui ne glisse plus sur le côté, affichage propre sur téléphone.
+
 ## 2.20 — 22 octobre 2026
 - **DavidSimulator** — Échanges :
   - Quand un bot te fait une proposition, tu as maintenant 60 secondes pour répondre (au lieu de 25), avec un compte à rebours dans la fenêtre et dans la barre du bas (« Mamé Rose attend ta réponse · 42 s »). Si tu fermes la fenêtre, le bouton « Voir la proposition » la rouvre.

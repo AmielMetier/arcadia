@@ -1,6 +1,7 @@
 // Tests du moteur de Tête de Calcul : node tools/test-calcul.mjs
 import assert from 'node:assert/strict';
-import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS } from '../calcul/engine/questions.js';
+import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS, chartierTier } from '../calcul/engine/questions.js';
+import { CHARTIER_QUESTIONS } from '../calcul/engine/chartier-data.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer } from '../calcul/engine/rules.js';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
@@ -36,8 +37,12 @@ t('les questions sont reproductibles et justes', () => {
     const q = makeQuestion(seed, i, cat, diff);
     assert.deepEqual(q, makeQuestion(seed, i, cat, diff));
     if (cat === 'chartier') {
-      assert.ok(q.text && q.choices && q.choices.length === 4);
-      assert.ok(check(q, q.correctChoice).ok, `${cat} ${q.text} → ${q.correctChoice}`);
+      assert.ok(q.text && q.tip && q.choices && q.choices.length === 4 && new Set(q.choices).size === 4, q.text);
+      assert.equal(q.input, 'choice');
+      assert.equal(q.choices[q.answer], q.show, q.text);
+      assert.ok(check(q, String(q.answer)).ok, `${cat} ${q.text} → ${q.show}`);
+      assert.ok(!check(q, String((q.answer + 1) % 4)).ok);
+      assert.ok(q.time >= 12 && q.time <= 40 && [1, 2, 3].includes(q.tier) && q.pts === q.tier, q.text);
       continue;
     }
     assert.ok(Number.isFinite(q.answer), `${cat} ${q.text}`);
@@ -234,6 +239,34 @@ t('bots saboteurs : visent le meneur', () => {
   assert.ok(hit > 10);
   s.players[2].powers = ['shield'];
   assert.equal(botSabotage(s, 100), null, 'le bouclier ne se lance pas');
+});
+
+t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur', () => {
+  const pos = [0, 0, 0, 0];
+  for (let i = 0; i < 4000; i++) pos[makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15).answer]++;
+  for (const n of pos) assert.ok(n > 800, `bonne réponse trop souvent au même endroit : ${pos}`);
+  assert.deepEqual([0, 5, 9, 13, 14].map((i) => chartierTier(1, i, 15)), [1, 2, 2, 3, 3]);
+  assert.equal(chartierTier(0, 9, 10), 2); assert.equal(chartierTier(0, 0, 10), 1);
+  assert.equal(chartierTier(2, 0, 10), 2); assert.equal(chartierTier(2, 9, 10), 3);
+  // banque : 4 choix distincts, explication, pas de choix vide
+  for (const q of CHARTIER_QUESTIONS) {
+    const all = [q.good, ...q.wrong];
+    assert.equal(new Set(all).size, 4, q.text); assert.ok(all.every(Boolean) && q.tip && q.tier, q.text);
+  }
+  let s = createGame({ players: [{ id: 0, name: 'A' }, { id: 1, name: 'B', bot: true }], cfg: { mode: 'chartier', len: 10, diff: 'normal' }, seed: 99, now: 0 });
+  assert.equal(s.cfg.theme, 'chartier');
+  const seen = new Set();
+  for (let i = 0; i < 10; i++) {
+    s = nextQuestion(s, i * 1e5);
+    const q = fullQuestion(s); seen.add(q.key);
+    assert.equal(s.q.pts, q.tier * (i === 9 ? 2 : 1));
+    assert.ok(!('answer' in publicState(s).q) || publicState(s).q.answer === undefined);
+    s = answer(s, { by: 0, raw: String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
+    s = reveal(s, i * 1e5 + 2000);
+    assert.equal(s.last.choices[s.last.answer], s.last.show);
+  }
+  assert.equal(seen.size, 10);
+  assert.ok(s.players[0].score > 0 && s.players[0].right === 10);
 });
 
 console.log(`\n${n} tests réussis`);
