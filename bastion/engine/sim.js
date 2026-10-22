@@ -111,6 +111,36 @@ function enforceHarvestCaps(st, fxEvents) {
   st.harvestCounts = counts;
 }
 
+/* ---------- Grille de voisinage ----------
+   Reconstruite à chaque pas : une unité ne compare sa position qu'aux unités des cases voisines
+   au lieu de toutes celles de la carte (le coût ne croît plus avec le carré du nombre d'unités). */
+const SPATIAL_CELL = 128;
+function buildSpatial(state) {
+  const g = new Map();
+  for (const u of state.units) {
+    if (u.hp <= 0 || u.boardedIn) continue;
+    const k = Math.floor(u.x / SPATIAL_CELL) * 8192 + Math.floor(u.y / SPATIAL_CELL);
+    let a = g.get(k);
+    if (!a) { a = []; g.set(k, a); }
+    a.push(u);
+  }
+  state._spatial = g;
+}
+function unitsNear(state, x, y, r) {
+  const g = state._spatial;
+  if (!g) return state.units;
+  const out = [];
+  const x0 = Math.floor((x - r) / SPATIAL_CELL), x1 = Math.floor((x + r) / SPATIAL_CELL);
+  const y0 = Math.floor((y - r) / SPATIAL_CELL), y1 = Math.floor((y + r) / SPATIAL_CELL);
+  for (let cx = x0; cx <= x1; cx++) {
+    for (let cy = y0; cy <= y1; cy++) {
+      const a = g.get(cx * 8192 + cy);
+      if (a) for (const o of a) out.push(o);
+    }
+  }
+  return out;
+}
+
 /* ---------- Dégâts, aura, rayons en chaîne, camouflage ---------- */
 // Applique des dégâts : l'aura d'un Monolithe allié tout proche en absorbe une partie, et la cible
 // note l'instant du coup (la régénération ne reprend qu'après 4 s sans en recevoir)
@@ -134,7 +164,7 @@ function chainArc(state, team, first, dmg, n, color, fxEvents) {
   let from = first;
   for (let k = 0; k < n; k++) {
     let next = null, bd = 140 * 140;
-    for (const e of state.units) {
+    for (const e of unitsNear(state, from.x, from.y, 150)) {
       if (hit.has(e) || e.team === team || e.hp <= 0 || e.boardedIn || !canTarget(team, e)) continue;
       const d = dist2(from.x, from.y, e.x, e.y);
       if (d < bd) { bd = d; next = e; }
@@ -152,7 +182,9 @@ function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
   state._auras = state.units.filter((u) => u.hp > 0 && UNITS[u.kind]?.aura);
-  flowBuildsLeft = FLOW_BUILDS_PER_TICK;
+  buildSpatial(state);
+  // Budget de calculs de chemin par pas, à la taille de la carte (grande carte 2v2 : un seul)
+  flowBuildsLeft = Math.max(1, Math.min(FLOW_BUILDS_PER_TICK, Math.floor(80000 / (PATH_N * PATH_N))));
   syncPathBuildings(state);
   refreshSimVision(state);
   enforceHarvestCaps(state, fxEvents);
@@ -212,7 +244,7 @@ function stepWorld(state, dt, fxEvents) {
 
     if (def.heal) {
       const r2 = def.range * def.range;
-      for (const u of state.units) {
+      for (const u of unitsNear(state, b.x, b.y, def.range)) {
         if (u.team === b.team && u.hp < u.maxHp && dist2(b.x, b.y, u.x, u.y) <= r2) {
           u.hp = Math.min(u.maxHp, u.hp + def.heal * dt);
         }
@@ -244,7 +276,7 @@ function stepWorld(state, dt, fxEvents) {
       b.cd = Math.max(0, (b.cd || 0) - dt);
       if (b.cd <= 0) {
         let target = null, bestD2 = def.range * def.range;
-        for (const u of state.units) {
+        for (const u of unitsNear(state, b.x, b.y, def.range)) {
           if (u.team !== b.team && u.hp > 0 && !u.boardedIn && canStrike(b, u) && canTarget(b.team, u)) {
             const d2 = dist2(b.x, b.y, u.x, u.y);
             if (d2 <= bestD2) { bestD2 = d2; target = u; }
@@ -260,7 +292,7 @@ function stepWorld(state, dt, fxEvents) {
             const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
             const splashR = def.splash * (mapDef.splashMult || 1.0);
             const s2 = splashR * splashR;
-            for (const u2 of state.units) {
+            for (const u2 of unitsNear(state, target.x, target.y, splashR)) {
               // Les passagers d'une navette sont à l'abri des éclaboussures
               if (u2 !== target && u2.team !== b.team && !u2.boardedIn && u2.hp > 0 && dist2(target.x, target.y, u2.x, u2.y) <= s2) {
                 hurt(state, u2, dmg * 0.6);
@@ -330,7 +362,7 @@ function stepWorld(state, dt, fxEvents) {
     // Navette Médicale : soin nanite automatique en continu des unités alliées au sol
     if (u.kind === 'medivac' && u.hp > 0) {
       let bestWounded = null, bestWoundDist = 190 * 190;
-      for (const ally of state.units) {
+      for (const ally of unitsNear(state, u.x, u.y, 190)) {
         if (ally.team === u.team && ally.hp > 0 && ally.hp < ally.maxHp && !ally.flying && !ally.boardedIn) {
           const d2 = dist2(u.x, u.y, ally.x, ally.y);
           if (d2 <= bestWoundDist) {
@@ -553,7 +585,7 @@ function stepWorld(state, dt, fxEvents) {
       }
 
       if (!bestTarget && def.dmg > 0) {
-        for (const e of state.units) {
+        for (const e of unitsNear(state, u.x, u.y, aggroR + 40)) {
           if (e.team === u.team || e.hp <= 0 || e.boardedIn || !canTarget(u.team, e)) continue;
           if (e.flying && (isWorker(u.kind) || u.kind === 'siege' || u.kind === 'sapper')) continue;
           const d = hypot(u.x, u.y, e.x, e.y) - e.radius;
@@ -593,7 +625,7 @@ function stepWorld(state, dt, fxEvents) {
           const mapDef = MAP_DEFS[state.map] || MAP_DEFS.vallee;
           const splashR = (def.splash || 58) * (mapDef.splashMult || 1.0);
           const s2 = splashR * splashR;
-          for (const e2 of state.units) {
+          for (const e2 of unitsNear(state, tgt.x, tgt.y, splashR)) {
             if (e2 === tgt || e2.team === u.team || e2.boardedIn || e2.hp <= 0) continue;
             // Une arme sol-sol n'éclabousse pas les appareils en vol
             if (e2.flying && (u.kind === 'siege' || u.kind === 'sapper')) continue;
@@ -638,7 +670,7 @@ function stepWorld(state, dt, fxEvents) {
       const dx = goalX - u.x, dy = goalY - u.y;
       const distGoal = Math.hypot(dx, dy) || 1;
       let steerX = dx / distGoal, steerY = dy / distGoal;
-      for (const o of state.units) {
+      for (const o of unitsNear(state, u.x, u.y, 70)) {
         if (o === u || o.hp <= 0 || !o.flying || o.boardedIn) continue;
         const sx = u.x - o.x, sy = u.y - o.y;
         const minSep = u.radius + o.radius + 6;
@@ -707,7 +739,7 @@ function stepWorld(state, dt, fxEvents) {
         steerY += (ty - oy / d * 0.5) * push;
       }
     }
-    for (const o of state.units) {
+    for (const o of unitsNear(state, u.x, u.y, 60)) {
       if (o === u || o.hp <= 0) continue;
       if (isWorker(u.kind) && isWorker(o.kind)) continue;
       const sx = u.x - o.x, sy = u.y - o.y;

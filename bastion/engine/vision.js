@@ -58,9 +58,15 @@ function computeTeamVision(st, team, grid, explored = null) {
     const def = BUILDINGS[b.kind] || {};
     stampVision(grid, b.x, b.y, (def.sight || 300) * (def.detector ? 1 : bMult), !!def.detector && !b.constructing, explored);
   }
+  // Plusieurs unités dans la même case avec la même portée éclairent la même zone : une seule fois suffit
+  const stamped = new Set();
   for (const u of st.units) {
     if (u.team !== team || u.hp <= 0 || u.boardedIn) continue;
-    stampVision(grid, u.x, u.y, (UNITS[u.kind]?.sight || 260) * uMult, !!u.flying, explored);
+    const sight = (UNITS[u.kind]?.sight || 260) * uMult;
+    const key = fogCellOf(u.x, u.y) * 512 + Math.round(sight / 10) * 2 + (u.flying ? 1 : 0);
+    if (stamped.has(key)) continue;
+    stamped.add(key);
+    stampVision(grid, u.x, u.y, sight, !!u.flying, explored);
   }
   for (const sc of st.scans || []) {
     if (sc.team === team) stampVision(grid, sc.x, sc.y, sc.r, true, explored);

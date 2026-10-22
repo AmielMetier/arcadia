@@ -2,6 +2,7 @@
 
 ## 2.22 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
+- **Bastion Clash** — Les grosses batailles restent fluides, même en 2 contre 2 avec plus de 200 unités.
 - **Bastion Clash** — Nouvelle faction jouable : **la Synthèse** 💠, des machines qui s'assemblent seules.
   - le Drone pose la structure, qui se construit seule pendant qu'il repart récolter ;
   - unités et bâtiments se réparent seuls hors combat ;
