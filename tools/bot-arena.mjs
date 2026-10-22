@@ -24,7 +24,7 @@ for (let g = 0; g < N; g++) {
   let steps = 0;
   while (!s.over && s.turnCount < MAX_TURNS && steps < 60000) {
     let moved = false;
-    const ids = new Set(actors(s)); for (const t of s.trades) ids.add(t.to);
+    const ids = new Set([...s.trades.map((t) => t.to), ...actors(s)]); // les destinataires d'une proposition répondent d'abord
     for (const id of ids) {
       const a = botAction(s, B, id, { level: level[id], memory });
       if (!a) continue;

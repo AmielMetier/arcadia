@@ -26,7 +26,23 @@ const ago = (at) => {
   const d = Math.round(h / 24); return `il y a ${d} jour${d > 1 ? 's' : ''}`;
 };
 
-export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave }) {
+const TEAM_NAMES = ['Équipe A', 'Équipe B'];
+function teamsHtml(s, me) {
+  const humans = s.players.filter((p) => p.ready);
+  const mine = s.teams.of[me.id];
+  const col = (t) => {
+    const mem = humans.filter((p) => s.teams.of[p.id] === t);
+    const slots = mem.map((p) => `<li style="--c:${p.color}"><span class="tsv">${s.picks[p.id] ? tokenSvg(s.picks[p.id], p.color) : ''}</span><b>${esc(p.name)}</b>${p.id === me.id ? '<small>toi</small>' : ''}</li>`);
+    while (slots.length < 2) slots.push('<li class="botslot"><span class="tsv">🤖</span><b>Bot</b><small>complète l\'équipe</small></li>');
+    const canJoin = mine !== t && mem.length < 2 && !s.teams.tooMany;
+    return `<div class="tcol t${t}${mine === t ? ' mine' : ''}"><h3>${TEAM_NAMES[t]}</h3><ul>${slots.join('')}</ul>
+      ${canJoin ? `<button class="btn ghost small" data-team="${t}">Rejoindre</button>` : mine === t ? '<span class="tme">Ton équipe</span>' : ''}</div>`;
+  };
+  return `<div class="teams2">${col(0)}<div class="vs">VS</div>${col(1)}</div>
+    ${s.teams.tooMany ? '<p class="hint center warn">Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.</p>' : '<p class="hint center">Pas de loyer chez son coéquipier, échanges entre coéquipiers pour regrouper les couleurs. L\'équipe au plus gros patrimoine cumulé l\'emporte.</p>'}`;
+}
+
+export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave, team = () => {} }) {
   const box = el('div', 'setup');
   root.appendChild(box);
   let last = '', autoPicked = false, S = null;
@@ -45,7 +61,7 @@ export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave
     box.innerHTML = `
       <div class="setup-card">
         <div class="setup-head">
-          ${s.resume ? '<div><h1>Reprendre la partie</h1></div>' : `<div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.bots ? ` · ${botsLabel(s.bots, s.level)}` : ''}</p>
+          ${s.resume ? '<div><h1>Reprendre la partie</h1></div>' : `<div><h1>Choisis ton pion</h1><p>${s.mode === 'express' ? 'Partie Express · 40 minutes' : 'Partie classique'}${s.teams ? ' · 2 contre 2' : ''}${s.bots ? ` · ${botsLabel(s.bots, s.level)}` : ''}</p>
             ${houseChips(s.house)}</div>`}
           <button class="btn ghost small" id="suQuit">Quitter</button>
         </div>
@@ -61,14 +77,14 @@ export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave
                 <span class="tsv">${tokenSvg(t.id, o ? o.color : '#c9c0ad')}</span><b>${esc(t.name)}</b>${o ? `<small style="--c:${o.color}">${o.id === me.id ? 'toi' : esc(o.name)}</small>` : ''}</button>`;
             }).join('')}
           </div>
-        </div>`}
+        </div>${s.teams ? teamsHtml(s, me) : ''}`}
         ${isHost && !s.resume && s.saves && s.saves.length ? savesHtml(s.saves) : ''}
         <div class="setup-foot">
           <div class="who">${s.players.map((p) => `<span class="${p.ready ? '' : 'wait'}"><i style="background:${p.color}"></i>${esc(p.name)}${p.id === me.id ? ' (toi)' : ''} · ${!p.ready ? 'charge le jeu…' : s.resume ? 'prêt' : s.picks[p.id] ? esc(tokenName(s.picks[p.id])) : 'choisit…'}</span>`).join('')}</div>
           ${isHost
             ? (s.resume
               ? `<span class="row"><button class="btn ghost" id="suNew">Nouvelle partie</button><button class="btn big" id="suGo">Reprendre la partie</button></span>`
-              : `<button class="btn big" id="suGo" ${mine ? '' : 'disabled'}>${mine ? 'Lancer la partie' : 'Choisis d\'abord ton pion'}</button>`)
+              : `<button class="btn big" id="suGo" ${mine && !(s.teams && s.teams.tooMany) ? '' : 'disabled'}>${mine ? 'Lancer la partie' : 'Choisis d\'abord ton pion'}</button>`)
             : `<span class="waithost"><i></i>${s.resume ? 'L\'hôte reprend une partie sauvegardée…' : 'L\'hôte lance la partie…'}</span>`}
         </div>
         ${isHost && missing && mine && !s.resume ? `<p class="hint center">${missing} joueur${missing > 1 ? 's' : ''} n'${missing > 1 ? 'ont' : 'a'} pas encore choisi : un pion leur sera attribué au hasard.</p>` : ''}
@@ -77,6 +93,7 @@ export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave
       if (b.classList.contains('taken')) { sfx.play('error'); return; }
       sfx.play('bid'); save('david_token', b.dataset.tok); pick(b.dataset.tok);
     };
+    for (const b of box.querySelectorAll('[data-team]')) b.onclick = () => { sfx.play('bid'); team(+b.dataset.team); };
     const go = box.querySelector('#suGo'); if (go) go.onclick = () => { sfx.play('turn'); start(); };
     box.querySelector('#suQuit').onclick = exit;
     for (const b of box.querySelectorAll('[data-resume]')) b.onclick = () => { sfx.play('bid'); chooseSave(b.dataset.resume); };

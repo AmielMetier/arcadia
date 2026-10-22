@@ -2,7 +2,7 @@
 import { esc, money, el, inkOn } from './util.js';
 import { spaceIcon } from './icons.js';
 import { tokenSvg } from './tokens.js';
-import { ownsGroup, level, groupHasBuildings, ownedBy, standings, netWorth } from '../engine/valuation.js';
+import { ownsGroup, level, groupHasBuildings, ownedBy, standings, netWorth, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
 /* ------------------------------------------------------------- titre de propriété */
 export function deedHtml(board, S, i, { compact = false } = {}) {
@@ -150,10 +150,25 @@ const sideText = (board, sd) => {
   return parts.length ? parts.join(', ') : 'rien';
 };
 
+// Petites cartes de titre (bande de couleur, nom, prix) : on voit d'un coup d'œil ce qui change de main
+export function miniDeeds(board, S, sd) {
+  const cards = sd.props.map((i) => {
+    const sp = board.spaces[i], pr = S.props[i];
+    const head = sp.type === 'street' ? `<i class="mband" style="background:${sp.color}"></i>` : `<i class="mico">${spaceIcon(sp)}</i>`;
+    return `<button class="mdeed${pr && pr.mortgaged ? ' mort' : ''}" data-peek="${i}" title="Montrer sur le plateau">${head}<b>${esc(sp.name)}</b><small>${money(sp.price)}${pr && pr.mortgaged ? ' · hyp.' : ''}</small></button>`;
+  });
+  if (sd.cash) cards.push(`<span class="mdeed cash"><i class="mband" style="background:#2fbf71"></i><b>${money(sd.cash)}</b><small>argent</small></span>`);
+  if (sd.cards.length) cards.push('<span class="mdeed card"><i class="mband" style="background:#F7941D"></i><b>Libéré de prison</b><small>carte</small></span>');
+  return cards.length ? `<div class="mdeeds">${cards.join('')}</div>` : '<p class="hint">rien</p>';
+}
+
 export function offerHtml(board, S, t, name) {
-  return `<h2>Proposition d'échange</h2>
-    <div class="swap"><div><small>${esc(name(t.from))} te donne</small><p>${sideText(board, t.give)}</p></div><div class="arrow">⇄</div>
-    <div><small>en échange de</small><p>${sideText(board, t.want)}</p></div></div>
+  const mate = sameTeam(S, t.from, t.to);
+  return `<h2>${mate ? 'Proposition de ton coéquipier' : 'Proposition d\'échange'}</h2>
+    <div class="swap2"><div class="get"><small>Tu reçois de ${esc(name(t.from))}</small>${miniDeeds(board, S, t.give)}</div>
+    <div class="arrow">⇄</div>
+    <div class="give"><small>Tu donnes</small>${miniDeeds(board, S, t.want)}</div></div>
+    <p class="hint">Les terrains concernés sont signalés sur le plateau : <b class="tg">vert</b> tu reçois, <b class="tr">rouge</b> tu donnes.</p>
     <div class="row end">${btn('Refuser', { type: 'REJECT_TRADE', trade: t.id }, 'ghost')}${btn('Accepter', { type: 'ACCEPT_TRADE', trade: t.id })}</div>`;
 }
 
@@ -164,24 +179,32 @@ export function tradeComposeHtml(board, S, me, partner) {
   const col = (pid, key) => tradable(pid).map((i) => `<label class="ck"><input type="checkbox" data-${key}="${i}"><i style="background:${board.spaces[i].color}"></i>${esc(board.spaces[i].name)}${S.props[i].mortgaged ? ' <small>(hyp.)</small>' : ''}</label>`).join('') || '<p class="hint">Rien d\'échangeable.</p>';
   const out = S.trades.filter((t) => t.from === me.id);
   return `<h2>Proposer un échange</h2>
-    <div class="seg">${others.map((p) => `<button data-partner="${p.id}" class="${p.id === partner ? 'sel' : ''}"><i style="background:${p.color}"></i>${esc(p.name)}</button>`).join('')}</div>
+    <div class="seg">${others.map((p) => `<button data-partner="${p.id}" class="${p.id === partner ? 'sel' : ''}"><i style="background:${p.color}"></i>${esc(p.name)}${sameTeam(S, me.id, p.id) ? ' <small>coéquipier</small>' : ''}</button>`).join('')}</div>
     <div class="cols"><div><h3>Tu donnes</h3>${col(me.id, 'g')}<label class="lbl">Argent (tu as ${money(mine.cash)})</label><input type="number" id="gCash" min="0" max="${mine.cash}" value="0">
       ${mine.jailCards.length ? '<label class="ck"><input type="checkbox" id="gCard"> Ta carte « Libéré de prison »</label>' : ''}</div>
     <div><h3>Tu demandes</h3>${col(partner, 'w')}<label class="lbl">Argent</label><input type="number" id="wCash" min="0" value="0">
       ${them.jailCards.length ? '<label class="ck"><input type="checkbox" id="wCard"> Sa carte « Libéré de prison »</label>' : ''}</div></div>
     ${out.length ? `<p class="hint">En attente : ${out.map((t) => `proposition à ${esc(S.players.find((q) => q.id === t.to).name)}${btn('Annuler', { type: 'CANCEL_TRADE', trade: t.id }, 'ghost tiny')}`).join(' · ')}</p>` : ''}
-    <p class="hint">Les terrains d'un groupe bâti ne s'échangent pas : vends d'abord les bâtiments. Un terrain hypothéqué coûte 10 % d'intérêts à celui qui le reçoit.</p>
+    <p class="hint">Les terrains cochés s'affichent sur le plateau. Les terrains d'un groupe bâti ne s'échangent pas : vends d'abord les bâtiments. Un terrain hypothéqué coûte 10 % d'intérêts à celui qui le reçoit. Une proposition sans réponse expire à la fin de ton tour.</p>
     <div class="row end"><button class="btn" id="tSend">Envoyer la proposition</button></div>`;
 }
 
 export function overHtml(board, S, name) {
   const rows = standings(S, board);
-  const why = { bankruptcy: 'Première faillite : la partie Express s\'arrête au patrimoine.', time: 'Fin du chrono de 40 minutes : victoire au patrimoine.', lastStanding: 'Il ne reste qu\'un joueur solvable.' }[S.endReason] || '';
+  const why = { bankruptcy: 'Première faillite : la partie Express s\'arrête au patrimoine.', time: 'Fin du chrono de 40 minutes : victoire au patrimoine.', lastStanding: 'Il ne reste qu\'un joueur solvable.', lastTeam: 'L\'équipe adverse a fait faillite.' }[S.endReason] || '';
+  if (S.cfg.teams) {
+    const ts = teamStandings(S, board);
+    const teamRows = ts.map((t, k) => `<div class="teamres${k === 0 ? ' win' : ''}"><b>${k === 0 ? '🏆 ' : ''}${esc(t.name)}</b><span>${t.members.map((id) => { const p = S.players.find((q) => q.id === id); return `<i class="dot" style="background:${p.color}"></i>${esc(p.name)}`; }).join(' · ')}</span><em>${t.alive ? money(t.total) : 'faillite'}</em></div>`).join('');
+    return overBody(board, S, name, rows, `${esc(TEAM_NAMES[S.winnerTeam ?? ts[0].team])} l'emporte !`, why + (S.endReason === 'lastTeam' ? '' : ' Patrimoine cumulé des deux coéquipiers.'), `<div class="teamsres">${teamRows}</div>`);
+  }
+  return overBody(board, S, name, rows, `${esc(name(S.winner))} l'emporte !`, why, '');
+}
+function overBody(board, S, name, rows, title, why, extra) {
   const top = rows.slice(0, 3).map((r) => S.players.find((q) => q.id === r.id));
   const order = [top[1], top[0], top[2]];
   const podium = order.map((p, k) => p ? `<div class="pod p${[2, 1, 3][k]}"><div class="pw">${tokenSvg(p.token, p.color)}</div><b>${esc(p.name)}</b><div class="step">${[2, 1, 3][k]}</div></div>` : '<div class="pod empty"></div>').join('');
-  return `<div class="over"><h2>${esc(name(S.winner))} l'emporte !</h2><p class="hint">${why}</p>
-    <div class="podium">${podium}</div>
+  return `<div class="over"><h2>${title}</h2><p class="hint">${why}</p>
+    ${extra || `<div class="podium">${podium}</div>`}
     <table class="rank"><tr><th>#</th><th>Joueur</th><th>Patrimoine</th><th>Loyers perçus</th><th>Loyers payés</th><th>Distance</th><th>Prison</th></tr>
     ${rows.map((r, k) => { const p = S.players.find((q) => q.id === r.id), st = S.stats.players[p.id];
       return `<tr class="${p.bankrupt ? 'out' : ''}"><td>${k + 1}</td><td><i class="dot" style="background:${p.color}"></i>${esc(p.name)}</td><td>${p.bankrupt ? 'faillite' : money(r.total)}</td><td>${money(st.rentIn)}</td><td>${money(st.rentOut)}</td><td>${st.dist} cases</td><td>${st.jailTurns} tour${st.jailTurns > 1 ? 's' : ''}</td></tr>`; }).join('')}</table>

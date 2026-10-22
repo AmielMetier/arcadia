@@ -14,7 +14,7 @@ async function boot(info) {
   const me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name, color: meP ? meP.color : prof.color };
   const qs = new URLSearchParams(location.search);
   const settings = H.embedded ? info.settings || {} : {
-    mode: qs.get('mode') || 'classic', bots: 3, level: qs.get('level') || 'normal',
+    mode: qs.get('mode') || 'classic', bots: 3, level: qs.get('level') || 'normal', teams: qs.get('teams') || 'solo',
     jackpot: qs.get('jackpot'), doubleGo: qs.get('doubleGo'), auctions: qs.get('auctions') ?? 1, cash: qs.get('cash'),
   };
 
@@ -23,6 +23,7 @@ async function boot(info) {
     act: (a) => session.act(a),
     emote: (id) => session.emote(id),
     pick: (token) => session.pick(token),
+    team: (t) => session.team && session.team(t),
     start: () => session.start(),
     chooseSave: (id) => session.chooseSave(id),
     deleteSave: (id) => session.deleteSave(id),

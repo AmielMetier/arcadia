@@ -1,0 +1,45 @@
+# Journal des versions automatique : si un push sur main n'a pas mis à jour CHANGELOG.md
+# (autre compte, autre IA, oubli), une entrée est rédigée à partir des messages de commit
+# et la version affichée par le Hub est montée (voir tools/changelog-auto.mjs).
+name: Journal des versions
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changelog
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rédiger l'entrée du journal si elle manque
+        run: node tools/changelog-auto.mjs "${{ github.event.before }}" "${{ github.sha }}"
+
+      - name: Publier
+        run: |
+          if git diff --quiet; then echo "Rien à publier."; exit 0; fi
+          VER=$(grep -oP "const VERSION = '\K[\d.]+" hub/hub.js)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md hub/hub.js
+          git commit -m "Changelog $VER (rédigé automatiquement) [skip changelog]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1

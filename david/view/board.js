@@ -9,16 +9,30 @@ const TILT_3D = 52;
 // Nom affiché sur la case (le titre de propriété garde le nom complet)
 const shortName = (n) => n.replace(/^Boulevard /, 'Bd ').replace(/^Avenue /, 'Av. ').replace(/^Taxe de luxe — /, 'Taxe de luxe · ');
 
-export function centerArt() {
+const DECKS = {
+  chest: { face: '#1C5FB4', back: '#123f78', label: 'CAISSE DE COMMUNAUTÉ',
+    icon: '<g transform="translate(0 -10) scale(1.5)"><rect x="-17" y="-6" width="34" height="22" rx="3" fill="#ffc531" stroke="#16181d" stroke-width="2.2"/><path d="M-17 -6 Q0 -20 17 -6" fill="#ffdd75" stroke="#16181d" stroke-width="2.2"/><rect x="-4" y="-2" width="8" height="8" rx="1.5" fill="#16181d"/></g>' },
+  chance: { face: '#F7941D', back: '#b45f0b', label: 'CHANCE', icon: '<text x="0" y="22" text-anchor="middle" class="deckq">?</text>' },
+};
+// Position (repère du plateau, px) et orientation des deux pioches au centre du plateau
+export const DECK_SPOTS = { chest: { x: CORNER + 160, y: CORNER + 160 }, chance: { x: SIZE - CORNER - 160, y: SIZE - CORNER - 160 }, w: 176, h: 108, rot: -45 };
+
+// Dos d'une carte (ce qu'on voit sur la pioche), 176 × 108, centré en (0, 0)
+const cardFace = (d) => `<rect x="-88" y="-54" width="176" height="108" rx="9" fill="${d.face}" stroke="#16181d" stroke-width="3"/>
+      <rect x="-80" y="-46" width="160" height="92" rx="6" fill="none" stroke="#fff8ea" stroke-width="2"/>
+      ${d.icon}
+      <text x="0" y="40" text-anchor="middle" class="deckl" textLength="150" lengthAdjust="spacingAndGlyphs">${d.label}</text>`;
+export function deckCardSvg(kind, css = '') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-90 -56 180 112" width="720" height="448">${css}${cardFace(DECKS[kind])}</svg>`;
+}
+
+// decks : false → seul l'emplacement en pointillés est dessiné (le plateau 3D pose de vraies piles de cartes)
+export function centerArt({ decks = true } = {}) {
   const c = SIZE - 2 * CORNER; // 648
-  const deck = (cx, cy, face, back, label, icon) => `
+  const deck = (cx, cy, d) => `
     <g transform="translate(${cx} ${cy}) rotate(-45)">
       <rect x="-104" y="-66" width="208" height="132" rx="10" fill="none" stroke="#16181d" stroke-width="2.5" stroke-dasharray="8 6"/>
-      ${[6, 4, 2].map((o) => `<rect x="${-88 + o}" y="${-54 + o}" width="176" height="108" rx="9" fill="${back}" stroke="#16181d" stroke-width="2"/>`).join('')}
-      <rect x="-88" y="-54" width="176" height="108" rx="9" fill="${face}" stroke="#16181d" stroke-width="3"/>
-      <rect x="-80" y="-46" width="160" height="92" rx="6" fill="none" stroke="#fff8ea" stroke-width="2"/>
-      ${icon}
-      <text x="0" y="40" text-anchor="middle" class="deckl" textLength="150" lengthAdjust="spacingAndGlyphs">${label}</text>
+      ${decks ? [6, 4, 2].map((o) => `<rect x="${-88 + o}" y="${-54 + o}" width="176" height="108" rx="9" fill="${d.back}" stroke="#16181d" stroke-width="2"/>`).join('') + cardFace(d) : ''}
     </g>`;
   return `<svg class="center-art" viewBox="0 0 ${c} ${c}" aria-hidden="true">
     <defs>
@@ -30,10 +44,8 @@ export function centerArt() {
       ${[0, 1, 2].map((k) => `<path transform="translate(${60 + k * 42} ${616 - k * 14})" d="M0 0 L0 -26 L19 -26 L19 0 M0 -12 L26 -12 L30 0"/>`).join('')}
       ${[0, 1, 2].map((k) => `<path transform="translate(${470 + k * 42} ${70 - k * 14})" d="M0 0 L0 -26 L19 -26 L19 0 M0 -12 L26 -12 L30 0"/>`).join('')}
     </g>
-    ${deck(160, 160, '#1C5FB4', '#123f78', 'CAISSE DE COMMUNAUTÉ',
-      '<g transform="translate(0 -10) scale(1.5)"><rect x="-17" y="-6" width="34" height="22" rx="3" fill="#ffc531" stroke="#16181d" stroke-width="2.2"/><path d="M-17 -6 Q0 -20 17 -6" fill="#ffdd75" stroke="#16181d" stroke-width="2.2"/><rect x="-4" y="-2" width="8" height="8" rx="1.5" fill="#16181d"/></g>')}
-    ${deck(c - 160, c - 160, '#F7941D', '#b45f0b', 'CHANCE',
-      '<text x="0" y="22" text-anchor="middle" class="deckq">?</text>')}
+    ${deck(160, 160, DECKS.chest)}
+    ${deck(c - 160, c - 160, DECKS.chance)}
     <g transform="translate(${c / 2} ${c / 2}) rotate(-45)">
       <rect x="-312" y="-62" width="624" height="124" rx="6" fill="#16181d"/>
       <rect x="-304" y="-54" width="608" height="108" rx="4" fill="#e3262f" stroke="#fff8ea" stroke-width="3"/>
@@ -117,8 +129,22 @@ export function mountBoard(host, board, { onCell } = {}) {
   const view = { tilt: store('david_view3d', true) ? TILT_3D : 0, fit: 1, focus: null, zoom: 1, follow: store('david_follow', true) };
   function applyCam(instant) {
     const f = view.focus;
-    const dx = f ? (SIZE / 2 - f.x) * 0.55 : 0, dy = f ? (SIZE / 2 - f.y) * 0.55 : 0;
-    const z = f ? view.zoom : 1;
+    let dx = f ? (SIZE / 2 - f.x) * 0.55 : 0, dy = f ? (SIZE / 2 - f.y) * 0.55 : 0;
+    let z = f ? view.zoom : 1;
+    // échange en cours (fenêtre ancrée à droite) : plateau entier, un peu réduit et décalé à gauche
+    if (view.trade === 'docked') {
+      const sb = stage.getBoundingClientRect(), m = document.querySelector('.modal.docked');
+      const L = Math.max(sb.left, 270), R = m ? m.getBoundingClientRect().left - 12 : innerWidth - 500;
+      z = Math.min(0.95, (R - L) / (view.fit * SIZE * 1.12));
+      dx = ((L + R) / 2 - (sb.left + sb.width / 2)) / (view.fit * z); dy = 0;
+    }
+    // petit écran : la fenêtre occupe le bas, le plateau remonte dans l'espace libre au-dessus
+    if (view.trade === 'sheet') {
+      const sb = stage.getBoundingClientRect(), m = document.querySelector('.modal.docked');
+      const T = 150, Bt = m ? m.getBoundingClientRect().top - 8 : innerHeight * 0.45, k = Math.cos(view.tilt * Math.PI / 180);
+      z = Math.min(1, (Bt - T) / (view.fit * SIZE * Math.max(0.35, k) * 1.08), (sb.width * 0.96) / (view.fit * SIZE));
+      dx = 0; dy = ((T + Bt) / 2 - (sb.top + sb.height / 2)) / (view.fit * z * Math.max(0.35, k));
+    }
     if (instant) cam.style.transition = 'none';
     cam.style.setProperty('--tilt', view.tilt + 'deg');
     plane.style.setProperty('--tilt', view.tilt + 'deg');
@@ -216,7 +242,7 @@ export function mountBoard(host, board, { onCell } = {}) {
       const dir = Math.sign(steps), n = Math.abs(steps);
       const dur = Math.max(70, 190 / speed);
       o.el.classList.add('moving'); o.inJail = false;
-      if (view.follow && speed <= 1.5) { view.focus = center(o.pos); view.zoom = stage.clientWidth < 700 ? 1.08 : 1.28; applyCam(); }
+      if (view.follow && speed <= 3) { view.focus = center(o.pos); view.zoom = stage.clientWidth < 700 ? 1.08 : 1.28; applyCam(); }
       for (let k = 0; k < n; k++) {
         o.pos = (o.pos + dir + 40) % 40;
         const s = pawnSpot(o.pos, 0, 1, false);
@@ -224,11 +250,11 @@ export function mountBoard(host, board, { onCell } = {}) {
         place(o, s.x, s.y);
         const sprite = o.el.querySelector('.sprite');
         sprite.animate([{ translate: '0 0' }, { translate: '0 -26px', offset: 0.45 }, { translate: '0 0' }], { duration: dur, easing: 'ease-out' });
-        if (view.follow && speed <= 1.5 && k % 3 === 2) { view.focus = center(o.pos); applyCam(); }
+        if (view.follow && speed <= 3 && k % 3 === 2) { view.focus = center(o.pos); applyCam(); }
         api.onStep && api.onStep(o.pos, speed);
         await wait(dur);
       }
-      if (view.follow && speed <= 1.5) { view.focus = center(o.pos); applyCam(); }
+      if (view.follow && speed <= 3) { view.focus = center(o.pos); applyCam(); }
       o.el.classList.remove('moving');
       o.el.style.transition = '';
     },
@@ -244,10 +270,25 @@ export function mountBoard(host, board, { onCell } = {}) {
       o.el.style.transition = '';
     },
     relax() { if (view.focus) { view.focus = null; applyCam(); } },
+    focusPawn(pid) { const o = pawns.get(pid); if (!o) return; view.focus = center(o.pos); view.zoom = stage.clientWidth < 700 ? 1.08 : 1.28; applyCam(); },
     // Position à l'écran du centre d'une case (pour les effets)
     pickCell,
     cellScreen(i) { const b = cells[i].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, h: b.height }; },
     pawnScreen(pid) { const o = pawns.get(pid); if (!o) return null; const b = o.el.querySelector('.sprite').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; },
+    // Terrains d'un échange signalés sur le plateau : [{ i, kind: 'get' | 'give' | 'done', label, color? }] ou null
+    tradeMarks(list) {
+      const on = !!(list && list.length);
+      if (on && !view.trade) { view.saved = view.focus; view.focus = null; }
+      if (on) view.trade = document.querySelector('.modal.docked') ? (innerWidth > 900 ? 'docked' : 'sheet') : 'full';
+      else if (view.trade) { view.trade = null; view.focus = view.follow ? view.saved : null; }
+      applyCam();
+      for (const c of cells) { c.classList.remove('tm', 'tm-get', 'tm-give', 'tm-done'); delete c.dataset.tm; c.style.removeProperty('--tm'); }
+      for (const m of list || []) {
+        const c = cells[m.i]; if (!c) continue;
+        c.classList.add('tm', 'tm-' + m.kind); c.dataset.tm = m.label || '';
+        if (m.color) c.style.setProperty('--tm', m.color);
+      }
+    },
     // Heatmap posée sur les cases : [{ bg, ink, label } | null] × 40, ou null pour l'enlever
     heat(list) {
       for (const c of cells) {

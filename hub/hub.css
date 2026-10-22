@@ -172,3 +172,5 @@ body:has(#play.on) .musicbar{display:none}
 .news li{margin:4px 0;font-weight:600;line-height:1.35;font-size:14.5px}
 .news li.sub{margin-left:18px;list-style:circle;font-weight:500}
 .news code{background:var(--cream);border-radius:4px;padding:0 4px;font-size:13px}
+
+.sethint{font-size:13px;color:var(--muted,#6d675c);padding:6px 2px}

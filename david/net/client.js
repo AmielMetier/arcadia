@@ -19,6 +19,7 @@ export function startClient({ bridge, me, onState, onSetup, onError, onEmote = (
     act(a) { bridge.send('host', { t: 'act', a }); },
     emote(id) { bridge.send('host', { t: 'emote', id }); },
     pick(token) { bridge.send('host', { t: 'pick', token }); },
+    team(t) { bridge.send('host', { t: 'team', team: t }); },
     start() {},
     chooseSave() {},
     deleteSave() {},

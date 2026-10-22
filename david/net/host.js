@@ -13,6 +13,7 @@ import { isEmote, botReaction } from '../view/emotes.js';
 const BOT_NAMES = ['Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius', 'Tata Nine'];
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const AUCTION_IDLE_MS = 12000;
+const TRADE_WAIT_MS = 25000; // un bot qui attend la réponse d'un humain retire sa proposition au bout de ce délai
 
 const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnecté
 
@@ -22,7 +23,8 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   let reported = !!(initial && initial.over); // classement déjà transmis
   const level = BOT_LEVELS.includes(settings.level) ? settings.level : 'normal';
   const botMemory = {}; // échanges déjà proposés par les bots
-  let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0;
+  let botTimer = 0, auctionTimer = 0, auctionKey = '', clock = 0, tradeTimer = 0, tradeKey = '';
+  const teams = settings.teams === '2v2';
   const humans = new Set();
 
   // Durée approximative de la mise en scène chez les joueurs : les bots attendent la fin des animations.
@@ -59,10 +61,12 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     const order = state.ranking || standings(state, board).map((r) => r.id);
     bridge.report({
       id: `david-${state.startedAt}-${state.players.map((p) => p.id).join('.')}`,
-      mode: state.mode === 'express' ? 'Express' : 'Classique',
+      mode: (state.mode === 'express' ? 'Express' : 'Classique') + (state.cfg.teams ? ' · 2 contre 2' : ''),
       players: order.map((id, k) => {
         const p = state.players.find((q) => q.id === id);
-        return { id: p.bot ? null : p.id, name: p.name, color: p.color, bot: !!p.bot, rank: k + 1, score: p.bankrupt ? 0 : netWorth(state, board, p.id).total };
+        // 2 contre 2 : les deux membres d'une équipe partagent son rang
+        const rank = state.cfg.teams ? (p.team === state.winnerTeam ? 1 : 2) : k + 1;
+        return { id: p.bot ? null : p.id, name: p.name, color: p.color, bot: !!p.bot, rank, score: p.bankrupt ? 0 : netWorth(state, board, p.id).total };
       }),
     });
   }
@@ -100,9 +104,8 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   function schedule() {
     clearTimeout(botTimer);
     if (!state || state.over) { clearInterval(clock); clearTimeout(auctionTimer); return; }
-    // bots qui doivent agir : acteurs du moment + destinataires d'une proposition d'échange
-    const ids = new Set(actors(state));
-    for (const t of state.trades) ids.add(t.to);
+    // bots qui doivent agir : destinataires d'une proposition d'échange d'abord (elle expire à la fin du tour), puis acteurs du moment
+    const ids = new Set([...state.trades.map((t) => t.to), ...actors(state)]);
     for (const id of ids) {
       const p = state.players.find((q) => q.id === id);
       if (!p || !p.bot || p.bankrupt) continue;
@@ -114,6 +117,13 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
         if (!r.ok) console.warn('bot', id, a, r.error);
       }, delay);
       break;
+    }
+    // un bot attend la réponse d'un humain à sa proposition, mais pas indéfiniment
+    const waiting = state.trades.filter((t) => { const f = state.players.find((q) => q.id === t.from); return f && f.bot; });
+    const wkey = waiting.map((t) => t.id).join(',');
+    if (wkey !== tradeKey) {
+      tradeKey = wkey; clearTimeout(tradeTimer);
+      if (waiting.length) tradeTimer = setTimeout(() => { for (const t of waiting) apply({ type: 'CANCEL_TRADE', by: t.from, trade: t.id }); }, TRADE_WAIT_MS + pace);
     }
     // enchère : clôture après quelques secondes sans nouvelle offre
     if (state.auction) {
@@ -130,7 +140,31 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   let resumeId = null; // partie sauvegardée choisie par l'hôte
   const mode = settings.mode === 'express' ? 'express' : 'classic';
   const house = cleanHouse({ jackpot: Number(settings.jackpot) === 1, doubleGo: Number(settings.doubleGo) === 1, auctions: settings.auctions == null || Number(settings.auctions) === 1, cash: settings.cash });
-  const botCount = (n) => { let b = Math.max(0, Math.min(Number(settings.bots ?? (solo ? 3 : 0)), 6 - n)); if (n + b < 2) b = 2 - n; return b; };
+  const botCount = (n) => {
+    if (teams) return Math.max(0, 4 - n); // 2 contre 2 : des bots complètent les équipes
+    let b = Math.max(0, Math.min(Number(settings.bots ?? (solo ? 3 : 0)), 6 - n)); if (n + b < 2) b = 2 - n; return b;
+  };
+  // 2 contre 2 : équipe choisie par chaque joueur (au plus deux humains par équipe), sinon en alternance
+  const teamPicks = {};
+  function teamsOf(humans) {
+    const out = {}, count = [0, 0];
+    for (const p of humans) if (teamPicks[p.id] != null && count[teamPicks[p.id]] < 2) { out[p.id] = teamPicks[p.id]; count[out[p.id]]++; }
+    for (const p of humans) if (out[p.id] == null) { const t = count[0] <= count[1] ? 0 : 1; out[p.id] = t; count[t]++; }
+    return out;
+  }
+  function pickTeam(id, t) {
+    if (state || !teams) return null;
+    t = Number(t) === 1 ? 1 : 0;
+    const humans = setupState().players.filter((p) => p.ready);
+    const cur = teamsOf(humans);
+    if (cur[id] === t) return null;
+    if (humans.filter((p) => p.id !== id && cur[p.id] === t).length >= 2) return 'Cette équipe est complète.';
+    teamPicks[id] = t;
+    // l'équipe quittée garde ses choix ; ceux qui n'avaient rien choisi peuvent changer de côté
+    for (const p of humans) if (p.id !== id && teamPicks[p.id] == null) teamPicks[p.id] = cur[p.id];
+    pushSetup();
+    return null;
+  }
   function setupState() {
     const room = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players;
     const players = room.map((p) => ({ id: p.id, name: p.name, color: p.color, ready: solo || p.id === me.id || bridge.readyMap[p.id] === 'david' }));
@@ -145,7 +179,9 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
         seats: sv.state.players.map((p) => ({ name: p.name, token: p.token, color: p.color, bankrupt: p.bankrupt, cash: p.cash,
           to: map[p.id].bot ? null : (players.find((r) => r.id === map[p.id].id) || {}).name })) };
     }
-    return { players, picks: { ...picks }, mode, house, level, bots: botCount(players.filter((p) => p.ready).length), hostId: me.id, saves: list, resume };
+    const ready = players.filter((p) => p.ready);
+    const teamInfo = teams ? { of: teamsOf(ready), tooMany: ready.length > 4 } : null;
+    return { players, picks: { ...picks }, mode, house, level, bots: botCount(ready.length), hostId: me.id, saves: list, resume, teams: teamInfo };
   }
   function pushSetup() {
     if (state) return;
@@ -180,19 +216,22 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   function begin(humanIds) {
     if (state) return;
     const roster = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players.filter((p) => humanIds.includes(p.id));
-    const players = roster.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: false, token: picks[p.id] }));
+    if (teams && roster.length > 4) { onError('Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.'); return; }
+    const tOf = teams ? teamsOf(roster) : {};
+    const players = roster.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: false, token: picks[p.id], team: tOf[p.id] }));
     for (const p of players) humans.add(p.id);
     const bots = botCount(players.length);
     const used = new Set(players.map((p) => p.color));
     for (let k = 0; k < bots; k++) {
       const color = COLORS.find((c) => !used.has(c)) || COLORS[k]; used.add(color);
-      players.push({ id: 100 + k, name: BOT_NAMES[k], color, bot: true });
+      const team = teams ? (players.filter((p) => p.team === 0).length < 2 ? 0 : 1) : undefined;
+      players.push({ id: 100 + k, name: BOT_NAMES[k], color, bot: true, team });
     }
     // pions restants : au hasard pour les bots et les retardataires
     const free = TOKEN_IDS.filter((tk) => !players.some((p) => p.token === tk)).sort(() => Math.random() - 0.5);
     for (const p of players) if (!p.token) p.token = free.shift();
     try {
-      const g = createGame(board, { players, mode, seed: randomSeed(), now: Date.now(), house });
+      const g = createGame(board, { players, mode, seed: randomSeed(), now: Date.now(), house, teams });
       state = g.state;
       state.gid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7); // identifiant de sauvegarde
       broadcast(g.events);
@@ -234,6 +273,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: state, ev: [], now: Date.now() }); else pushSetup(); }
       if (m.t === 'emote') emote(from, String(m.id));
       if (m.t === 'pick') { const err = pick(from, String(m.token)); if (err) bridge.send(from, { t: 'err', msg: err }); }
+      if (m.t === 'team') { const err = pickTeam(from, m.team); if (err) bridge.send(from, { t: 'err', msg: err }); }
       if (m.t === 'act' && m.a && typeof m.a === 'object') {
         const r = apply({ ...m.a, by: from }); // l'identité vient du salon, jamais du message
         if (!r.ok) bridge.send(from, { t: 'err', msg: r.error });
@@ -245,6 +285,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
     act(a) { const r = apply({ ...a, by: me.id }); if (!r.ok) onError(r.error); },
     emote(id) { emote(me.id, id); },
     pick(token) { const err = pick(me.id, token); if (err) onError(err); },
+    team(t) { const err = pickTeam(me.id, t); if (err) onError(err); },
     start() { if (state) return; if (resumeId) resume(); else begin(setupState().players.filter((p) => p.ready).map((p) => p.id)); },
     chooseSave(id) { if (state) return; resumeId = id || null; pushSetup(); },
     deleteSave(id) { saves.remove(id); if (resumeId === id) resumeId = null; pushSetup(); },

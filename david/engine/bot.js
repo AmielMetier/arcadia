@@ -7,13 +7,16 @@
 // botAction renvoie la prochaine action d'un bot, ou null. `memory` (objet modifiable) garde la trace
 // des échanges déjà proposés, pour ne pas harceler les autres joueurs.
 import { currentPlayer } from './rules.js';
-import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable } from './valuation.js';
+import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teammate } from './valuation.js';
 import { landingProbabilities } from './markov.js';
 import { normalBot } from './bot-normal.js';
 
 export const BOT_LEVELS = ['facile', 'normal', 'expert'];
 
 export function botAction(s, board, pid, { level: lvl = 'normal', memory = {} } = {}) {
+  // une proposition envoyée attend sa réponse avant la fin du tour (elle expirerait sinon)
+  if (!s.over && !s.debts.length && !s.auction && s.trades.some((t) => t.from === pid) && currentPlayer(s).id === pid && s.phase === 'end') return null;
+  if (s.cfg.teams) { const a = teamPlay(s, board, pid, memory); if (a) return a; }
   if (lvl === 'expert') return expertBot(s, board, pid, memory);
   if (lvl === 'facile') return easyBot(s, board, pid);
   return normalBot(s, board, pid);
@@ -30,8 +33,10 @@ function groupStatus(s, board, g, pid) {
   const mine = sp.filter((j) => s.props[j].owner === pid).length;
   const bank = sp.filter((j) => s.props[j].owner == null).length;
   const byOwner = {};
-  for (const j of sp) { const o = s.props[j].owner; if (o != null && o !== pid) byOwner[o] = (byOwner[o] || 0) + 1; }
-  return { total: sp.length, mine, bank, byOwner };
+  for (const j of sp) { const o = s.props[j].owner; if (o != null && o !== pid && !sameTeam(s, o, pid)) byOwner[o] = (byOwner[o] || 0) + 1; }
+  // en 2 contre 2, les terrains du coéquipier comptent comme les siens (l'équipe les regroupera)
+  const team = sp.filter((j) => sameTeam(s, s.props[j].owner, pid)).length;
+  return { total: sp.length, mine: mine + team, bank, byOwner };
 }
 
 // Valeur stratégique d'un terrain pour `pid` (s'il le recevait)
@@ -65,7 +70,7 @@ function exposure(s, board, pid) {
   let worst = 0, expected = 0;
   for (let d = 2; d <= 12; d++) {
     const pd = (6 - Math.abs(7 - d)) / 36, i = (me.pos + d) % 40, pr = s.props[i], sp = board.spaces[i];
-    if (!pr || pr.owner == null || pr.owner === pid || pr.mortgaged) continue;
+    if (!pr || pr.owner == null || pr.owner === pid || pr.mortgaged || sameTeam(s, pr.owner, pid)) continue;
     let rent;
     if (sp.type === 'street') rent = pr.hotel ? sp.rent[5] : pr.houses ? sp.rent[pr.houses] : sp.rent[0] * (ownsGroup(s, board, pr.owner, sp.group) ? 2 : 1);
     else if (sp.type === 'station') rent = sp.rent[groupSpaces(board, sp.group).filter((j) => s.props[j].owner === pr.owner).length - 1];
@@ -102,7 +107,49 @@ function sideValue(s, board, side, receiver) {
   return side.cash + side.props.reduce((n, i) => n + stratValue(s, board, receiver, i), 0) + side.cards.length * 40;
 }
 function givesMonopoly(s, board, props, to) {
-  return props.some((i) => isStreet(board, i) && groupSpaces(board, board.spaces[i].group).every((j) => j === i || props.includes(j) || s.props[j].owner === to));
+  return props.some((i) => isStreet(board, i) && groupSpaces(board, board.spaces[i].group).every((j) => j === i || props.includes(j) || s.props[j].owner === to || sameTeam(s, s.props[j].owner, to)));
+}
+
+/* ------------------------------------------------------------------ 2 contre 2 : jeu d'équipe (tous niveaux) */
+// Ne renvoie une action que pour ce qui concerne le coéquipier ; sinon le bot joue selon son niveau.
+function teamPlay(s, board, pid, memory) {
+  if (s.over) return null;
+  const me = P(s, pid), mate = teammate(s, pid);
+  if (!me || me.bankrupt || !mate) return null;
+  // proposition du coéquipier : acceptée sauf si elle casse un de mes monopoles ou me laisse sans le sou
+  const offer = s.trades.find((t) => t.to === pid && t.from === mate.id);
+  if (offer) {
+    const breaks = offer.want.props.some((i) => isStreet(board, i) && ownsGroup(s, board, pid, board.spaces[i].group) && !givesMonopoly(s, board, offer.want.props, mate.id));
+    const ok = !breaks && me.cash - offer.want.cash >= 50;
+    return { type: ok ? 'ACCEPT_TRADE' : 'REJECT_TRADE', trade: offer.id };
+  }
+  // enchère : on ne surenchérit pas sur son coéquipier
+  const au = s.auction;
+  if (au && au.bidder === mate.id && au.active.includes(pid) && !au.passed.includes(pid)) return { type: 'PASS' };
+  if (mate.bankrupt || s.debts.length || au || currentPlayer(s).id !== pid || s.phase !== 'end') return null;
+  if (s.trades.some((t) => t.from === pid)) return null;
+  // regrouper un groupe de couleur détenu à deux : celui qui en a le plus le récupère (à égalité, le plus riche)
+  for (const g of Object.keys(board.groups)) {
+    if (g === 'station' || g === 'utility') continue;
+    const sp = groupSpaces(board, g);
+    if (sp.some((j) => s.props[j].owner !== pid && s.props[j].owner !== mate.id) || groupHasBuildings(s, board, g)) continue;
+    const mine = sp.filter((j) => s.props[j].owner === pid), theirs = sp.filter((j) => s.props[j].owner === mate.id);
+    if (!mine.length || !theirs.length) continue;
+    const key = `team:${g}:${s.turnCount >> 3}`;
+    if (memory[key]) continue;
+    memory[key] = true;
+    const iKeep = mine.length > theirs.length || (mine.length === theirs.length && me.cash >= mate.cash);
+    const none = { cash: 0, props: [], cards: [] };
+    return iKeep ? { type: 'PROPOSE_TRADE', to: mate.id, give: none, want: { ...none, props: theirs } }
+      : { type: 'PROPOSE_TRADE', to: mate.id, give: { ...none, props: mine }, want: none };
+  }
+  // coup de pouce : un coéquipier presque à sec reçoit un peu d'argent
+  const key = `help:${s.turnCount}`;
+  if (mate.cash < 150 && me.cash > 700 && !memory[key]) {
+    memory[key] = true;
+    return { type: 'PROPOSE_TRADE', to: mate.id, give: { cash: Math.min(300, Math.floor((me.cash - 400) / 2 / 10) * 10), props: [], cards: [] }, want: { cash: 0, props: [], cards: [] } };
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ expert */

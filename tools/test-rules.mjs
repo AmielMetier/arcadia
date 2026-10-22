@@ -348,6 +348,77 @@ test('échange devenu impossible : retiré automatiquement', () => {
   ok(r.events.some((e) => e.k === 'TRADE_CANCELLED'), 'événement d\'annulation');
 });
 
+test("échange : on ne propose que pendant son tour, on répond à tout moment", () => {
+  let s = give(game(3), 0, 1); give(s, 1, 39);
+  const err = refused(s, { type: 'PROPOSE_TRADE', by: 1, to: 0, give: { props: [39] }, want: { cash: 10 } });
+  ok(/pendant son tour/.test(err), err);
+  ok(!availableActions(s, B, 1).includes('PROPOSE_TRADE'), 'pas proposé hors de son tour');
+  ok(availableActions(s, B, 0).includes('PROPOSE_TRADE'), 'proposé pendant son tour');
+  s = act(s, { type: 'PROPOSE_TRADE', by: 0, to: 1, give: { props: [1] }, want: { cash: 10 } }).state;
+  ok(availableActions(s, B, 1).includes('ACCEPT_TRADE'), 'le destinataire peut répondre');
+  s = act(s, { type: 'ACCEPT_TRADE', by: 1, trade: s.trades[0].id }).state;
+  eq(s.props[1].owner, 1);
+});
+
+test('échange : une proposition sans réponse expire à la fin du tour', () => {
+  let s = give(game(2), 0, 1);
+  s = act(s, { type: 'PROPOSE_TRADE', by: 0, to: 1, give: { props: [1] }, want: { cash: 10 } }).state;
+  s = roll(s, 1, 2).state; if (s.phase === 'buy') s = act(s, { type: 'BUY', by: 0 }).state;
+  const r = act(s, { type: 'END_TURN', by: 0 });
+  eq(r.state.trades, []);
+  ok(r.events.some((e) => e.k === 'TRADE_CANCELLED' && e.reason === 'turn'), 'événement d\'expiration');
+});
+
+test('échange : un joueur endetté peut proposer pour réunir la somme', () => {
+  let s = give(game(2), 1, 39); give(s, 0, 1);
+  s.debts.push({ from: 1, to: 0, amount: 2000, reason: 'rent', space: null }); s.phase = 'debt';
+  s = act(s, { type: 'PROPOSE_TRADE', by: 1, to: 0, give: { props: [39] }, want: { cash: 300 } }).state;
+  eq(s.trades.length, 1);
+  refused(s, { type: 'PROPOSE_TRADE', by: 0, to: 1, give: { props: [1] }, want: {} });
+});
+
+/* ----------------------------------------------------------- 2 contre 2 */
+const TEAMS4 = () => [{ id: 0, team: 0 }, { id: 1, team: 0 }, { id: 2, team: 1 }, { id: 3, team: 1 }].map((p) => ({ ...p, name: `J${p.id}`, color: '#000' }));
+function teamGame(mode = 'classic', seed = 7) { return createGame(B, { players: TEAMS4(), mode, seed, now: 0, teams: true }).state; }
+
+test('2 contre 2 : 4 joueurs, 2 par équipe, équipes en alternance', () => {
+  for (let seed = 1; seed < 40; seed++) {
+    const s = teamGame('classic', seed);
+    eq(s.players.map((p) => p.team % 2 === s.players[0].team % 2 ? 'x' : 'y').join(''), 'xyxy', `graine ${seed}`);
+  }
+  let err = null; try { createGame(B, { players: PLAYERS(3), teams: true }); } catch (e) { err = e; } ok(err, '3 joueurs refusés');
+  err = null; try { createGame(B, { players: TEAMS4().map((p) => ({ ...p, team: 0 })), teams: true }); } catch (e) { err = e; } ok(err, 'équipes déséquilibrées refusées');
+  ok(!game(4).cfg.teams, 'chacun pour soi par défaut');
+});
+
+test('2 contre 2 : pas de loyer chez son coéquipier, loyer normal chez un adversaire', () => {
+  let s = teamGame(); const cur = currentPlayer(s), mate = s.players.find((p) => p.team === cur.team && p.id !== cur.id);
+  const opp = s.players.find((p) => p.team !== cur.team);
+  give(s, mate.id, 3);
+  let r = roll(s, 1, 2); // case 3
+  eq(pl(r.state, cur.id).cash, 1500); ok(r.events.some((e) => e.k === 'NO_RENT'), 'événement NO_RENT');
+  s = teamGame(); give(s, opp.id, 3);
+  r = roll(s, 1, 2);
+  eq(pl(r.state, cur.id).cash, 1500 - B.spaces[3].rent[0]);
+});
+
+test("2 contre 2 : la partie s'arrête quand une équipe est éliminée", () => {
+  let s = teamGame(); const [a1, b1, a2] = s.players;
+  s = reduce(s, { type: 'PLAYER_LEFT', by: 'host', player: a1.id }, B).state;
+  ok(!s.over, 'un coéquipier reste en lice');
+  const r = reduce(s, { type: 'PLAYER_LEFT', by: 'host', player: a2.id }, B);
+  ok(r.state.over, 'équipe éliminée'); eq(r.state.endReason, 'lastTeam'); eq(r.state.winnerTeam, b1.team);
+  ok(r.state.ranking.slice(0, 2).every((id) => pl(r.state, id).team === b1.team), 'les gagnants en tête du classement');
+});
+
+test('2 contre 2 : cartes « chaque joueur » limitées aux adversaires', () => {
+  let s = teamGame(); const cur = currentPlayer(s);
+  cur.pos = 14; // 1 + 2 → case 17, Caisse de communauté
+  withCard(s, 'chest', B.cards.chest.find((c) => c.action.type === 'collectEach').id);
+  const r = roll(s, 1, 2), amt = B.cards.chest.find((c) => c.action.type === 'collectEach').action.amount;
+  eq(pl(r.state, cur.id).cash, 1500 + 2 * amt, 'payé par les 2 adversaires seulement');
+});
+
 /* ----------------------------------------------------------- cartes */
 function withCard(s, deck, id) { const d = s.decks[deck]; d.pos = d.order.indexOf(id); return s; }
 
@@ -516,6 +587,7 @@ test('reprise : correspondance par nom, puis dans l\'ordre, sinon bot', () => {
 test('reprise : renumérotation cohérente de tout l\'état', () => {
   let s = give(game(3), 1, 39, 37); give(s, 2, 1);
   s.heldCards.ch09 = 1; pl(s, 1).jailCards = ['ch09'];
+  s.turn.cur = 2; // on propose un échange pendant son tour
   s = act(s, { type: 'PROPOSE_TRADE', by: 2, to: 1, give: { cash: 50 }, want: { props: [39] } }).state;
   s.debts.push({ from: 2, to: 1, amount: 10, reason: 'rent', space: null });
   s.auction = { space: 24, high: 40, bidder: 1, active: [0, 1, 2], passed: [2], bids: 1 };
@@ -611,7 +683,7 @@ function simulate(n, mode, seed) {
   while (!s.over && steps < 40000) {
     if (mode === 'express' && s.turnCount >= maxTurns) { s = reduce(s, { type: 'TIME_UP', by: 'host' }, B).state; break; }
     if (s.turnCount >= maxTurns) break;
-    const who = actors(s);
+    const who = new Set([...s.trades.map((t) => t.to), ...actors(s)]); // les destinataires d'une proposition répondent d'abord
     let moved = false;
     for (const id of who) {
       const a = botAction(s, B, id);
@@ -629,6 +701,30 @@ function simulate(n, mode, seed) {
   }
   return s;
 }
+
+function simulateTeams(mode, seed) {
+  const memory = {};
+  let s = createGame(B, { players: TEAMS4().map((p) => ({ ...p, bot: true })), mode, seed, now: 0, teams: true }).state;
+  for (let steps = 0; !s.over && steps < 40000; steps++) {
+    if (s.turnCount >= (mode === 'express' ? 160 : 1500)) { if (mode === 'express') s = reduce(s, { type: 'TIME_UP', by: 'host' }, B).state; break; }
+    let moved = false;
+    const ids = new Set([...s.trades.map((t) => t.to), ...actors(s)]);
+    for (const id of ids) {
+      const a = botAction(s, B, id, { level: ['facile', 'normal', 'expert'][seed % 3], memory });
+      if (!a) continue;
+      const r = reduce(s, { ...a, by: id }, B);
+      if (!r.ok) throw new Error(`bot bloqué (2 contre 2) : ${a.type} → ${r.error}`);
+      s = r.state; moved = true; invariants(s); break;
+    }
+    if (!moved) { if (s.auction) s = reduce(s, { type: 'AUCTION_TIMEOUT', by: 'host' }, B).state; else throw new Error(`partie bloquée en phase ${s.phase}`); }
+  }
+  return s;
+}
+test('parties 2 contre 2 simulées entre bots', () => {
+  let over = 0;
+  for (let k = 0; k < 12; k++) { const s = simulateTeams(k % 2 ? 'express' : 'classic', 500 + k); if (s.over) over++; }
+  ok(over >= 6, `seulement ${over}/12 parties terminées`);
+});
 
 const N = Number(process.argv[2] || 60);
 const sim = { classic: { over: 0, turns: [] }, express: { over: 0, turns: [], time: 0, bankruptcy: 0 } };

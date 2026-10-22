@@ -5,6 +5,7 @@ import { rngOf } from './rng.js';
 import { makeConfig } from './modes.js';
 import {
   isOwnable, groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, netWorth, standings,
+  sameTeam, teamStandings, teamOf, teammate,
 } from './valuation.js';
 
 export const PHASES = ['roll', 'buy', 'auction', 'debt', 'end', 'over'];
@@ -19,11 +20,15 @@ export const ACTIONS = [
 
 /* ------------------------------------------------------------------ création ------ */
 
-// players : [{ id, name, color, bot }] ; now : horodatage (ms) fourni par l'hôte.
-export function createGame(board, { players, mode = 'classic', seed = 1, now = 0, house = null }) {
-  const cfg = makeConfig(board, mode, house);
+// players : [{ id, name, color, bot, team? }] ; now : horodatage (ms) fourni par l'hôte.
+// teams : 2 contre 2 (chaque joueur a team = 0 ou 1, deux joueurs par équipe).
+export function createGame(board, { players, mode = 'classic', seed = 1, now = 0, house = null, teams = false }) {
+  const cfg = makeConfig(board, mode, house, { teams });
   if (players.length < cfg.minPlayers || players.length > cfg.maxPlayers) {
-    throw new Error(`Il faut entre ${cfg.minPlayers} et ${cfg.maxPlayers} joueurs.`);
+    throw new Error(cfg.teams ? 'Le 2 contre 2 se joue à 4 joueurs.' : `Il faut entre ${cfg.minPlayers} et ${cfg.maxPlayers} joueurs.`);
+  }
+  if (cfg.teams && [0, 1].some((t) => players.filter((p) => p.team === t).length !== 2)) {
+    throw new Error('Il faut deux joueurs dans chaque équipe.');
   }
   const s = {
     v: 1, board: board.id, mode, cfg, seed: seed >>> 0, seq: 0,
@@ -31,6 +36,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
       id: p.id, name: p.name, color: p.color, bot: !!p.bot, human: !p.bot, token: p.token || null,
       cash: cfg.startingCash, pos: 0, inJail: false, jailTries: 0, jailCards: [],
       bankrupt: false, bankruptAt: 0, left: false,
+      ...(cfg.teams ? { team: p.team } : {}),
     })),
     props: {},
     bank: { houses: cfg.bankHouses, hotels: cfg.bankHotels },
@@ -53,6 +59,11 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
     s.decks[deck] = { order: rng.shuffle(board.cards[deck].map((c) => c.id)), pos: 0 };
   }
   rng.shuffle(s.players); // ordre de jeu tiré au sort
+  if (cfg.teams) {
+    // 2 contre 2 : les équipes jouent en alternance (A, B, A, B), l'équipe qui commence est tirée au sort
+    const first = rng.int(2), by = [first, 1 - first].map((t) => s.players.filter((p) => p.team === t));
+    s.players = [by[0][0], by[1][0], by[0][1], by[1][1]];
+  }
   const events = [];
   if (cfg.startingProperties) dealStartingProperties(s, board, rng, events);
   s.turn = freshTurn(0);
@@ -248,6 +259,8 @@ function land(ctx, p, opts = {}) {
       if (pr.owner === p.id || pr.mortgaged) break;
       const owner = P(s, pr.owner);
       if (owner.bankrupt) break;
+      // 2 contre 2 : pas de loyer chez son coéquipier
+      if (sameTeam(s, p.id, owner.id)) { ctx.ev.push({ k: 'NO_RENT', player: p.id, owner: owner.id, space: i }); break; }
       const rent = rentFor(ctx, i, opts);
       charge(ctx, p, owner, rent, 'rent', i);
       break;
@@ -316,8 +329,9 @@ function drawCard(ctx, p, deckName) {
       charge(ctx, p, null, houses * a.house + hotels * a.hotel, 'card');
       break;
     }
-    case 'payEach': for (const q of active(s)) if (q.id !== p.id) charge(ctx, p, q, a.amount, 'card'); break;
-    case 'collectEach': for (const q of active(s)) if (q.id !== p.id) charge(ctx, q, p, a.amount, 'card'); break;
+    // en 2 contre 2, seuls les adversaires paient ou sont payés
+    case 'payEach': for (const q of active(s)) if (q.id !== p.id && !sameTeam(s, p.id, q.id)) charge(ctx, p, q, a.amount, 'card'); break;
+    case 'collectEach': for (const q of active(s)) if (q.id !== p.id && !sameTeam(s, p.id, q.id)) charge(ctx, q, p, a.amount, 'card'); break;
     default: break;
   }
 }
@@ -341,6 +355,9 @@ function nextTurn(ctx) {
   }
   s.turn = freshTurn(cur);
   s.turnCount++;
+  // les échanges se négocient pendant le tour de celui qui propose : les propositions sans réponse expirent
+  for (const t of s.trades) ctx.ev.push({ k: 'TRADE_CANCELLED', trade: t.id, reason: 'turn' });
+  s.trades = [];
   ctx.ev.push({ k: 'TURN', player: s.players[cur].id, round: s.round });
 }
 
@@ -381,7 +398,8 @@ function endGame(ctx, reason) {
   s.trades = [];
   s.ranking = standings(s, ctx.board).map((r) => r.id);
   s.winner = s.ranking[0];
-  ctx.ev.push({ k: 'GAME_OVER', reason, winner: s.winner, ranking: s.ranking });
+  s.winnerTeam = s.cfg.teams ? teamStandings(s, ctx.board)[0].team : null;
+  ctx.ev.push({ k: 'GAME_OVER', reason, winner: s.winner, ranking: s.ranking, team: s.winnerTeam ?? undefined });
 }
 
 function bankrupt(ctx, p, creditorId) {
@@ -424,6 +442,7 @@ function bankrupt(ctx, p, creditorId) {
   ctx.ev.push({ k: 'BANKRUPT', player: p.id, creditor: creditor ? creditor.id : null });
 
   if (s.cfg.endOnFirstBankruptcy) { endGame(ctx, 'bankruptcy'); return; }
+  if (s.cfg.teams && new Set(active(s).map((q) => q.team)).size <= 1) { endGame(ctx, 'lastTeam'); return; }
   if (active(s).length <= 1) { endGame(ctx, 'lastStanding'); return; }
   if (s.auction) maybeCloseAuction(ctx);
   if (currentPlayer(s).id === p.id) { s.pendingBuy = null; s.auction = null; nextTurn(ctx); }
@@ -462,6 +481,15 @@ function maybeCloseAuction(ctx) {
 }
 
 /* ------------------------------------------------------------------ échanges ------ */
+
+// On propose un échange pendant son tour (ou pour réunir l'argent d'une dette) ; on peut répondre à tout moment.
+export function canPropose(s, pid) {
+  if (s.over || s.auction) return false;
+  const p = P(s, pid);
+  if (!p || p.bankrupt) return false;
+  if (s.debts.length) return s.debts[0].from === pid;
+  return currentPlayer(s).id === pid;
+}
 
 // Retire les propositions devenues impossibles (argent dépensé, terrain vendu, bâti ou hypothéqué entre-temps)
 function pruneTrades(ctx) {
@@ -679,6 +707,7 @@ const HANDLERS = {
   PROPOSE_TRADE(ctx, a) {
     const p = actor(ctx, a), s = ctx.s, to = P(s, a.to);
     if (s.auction) fail("Attendez la fin de l'enchère.");
+    if (!canPropose(s, p.id)) fail("Les échanges se proposent pendant son tour.");
     if (!to || to.bankrupt || to.id === p.id) fail('Partenaire invalide.');
     const give = cleanSide(a.give), want = cleanSide(a.want);
     if (!give.cash && !give.props.length && !give.cards.length && !want.cash && !want.props.length && !want.cards.length) {
@@ -779,11 +808,11 @@ export function availableActions(s, board, pid) {
     out.push('BUILD', 'SELL_BUILDING', 'MORTGAGE', 'UNMORTGAGE');
   }
   if (!s.auction) {
-    out.push('PROPOSE_TRADE');
+    if (canPropose(s, pid)) out.push('PROPOSE_TRADE');
     if (s.trades.some((t) => t.to === pid)) out.push('ACCEPT_TRADE', 'REJECT_TRADE');
     if (s.trades.some((t) => t.from === pid)) out.push('CANCEL_TRADE');
   }
   return out;
 }
 
-export { netWorth, standings, ownedBy, ownsGroup, level, groupSpaces, isOwnable, emptySide };
+export { netWorth, standings, ownedBy, ownsGroup, level, groupSpaces, isOwnable, emptySide, sameTeam, teamStandings, teamOf, teammate };

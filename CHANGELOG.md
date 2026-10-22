@@ -1,5 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.15 — 22 octobre 2026
+- **DavidSimulator** — Nouveau mode **2 contre 2** (réglage « Équipes » dans le salon) : deux équipes de deux, des bots complètent si vous êtes moins de 4.
+  - Pas de loyer chez son coéquipier ; les cartes « chaque joueur » ne concernent que les adversaires.
+  - Les coéquipiers s'échangent des terrains pour regrouper les couleurs (les bots le font d'eux-mêmes et dépannent un coéquipier à sec).
+  - L'équipe au plus gros patrimoine cumulé gagne ; en Classique, la partie s'arrête quand une équipe a tout perdu.
+  - Choix de l'équipe sur l'écran des pions, joueurs regroupés par équipe pendant la partie, écran de victoire d'équipe.
+- **DavidSimulator** — Échanges plus clairs :
+  - On ne propose un échange que pendant son tour (on peut répondre à tout moment) ; une proposition sans réponse expire à la fin du tour.
+  - Les terrains concernés s'affichent sur le plateau (vert : tu reçois, rouge : tu donnes) et la caméra prend de la hauteur pour les montrer.
+  - La proposition présente les titres en petites cartes et laisse le plateau visible à côté.
+  - Échange conclu : les terrains qui changent de main sont signalés à tous les joueurs.
+- **DavidSimulator** — La caméra qui suit ne se coupe plus : un simple clic sur le plateau ne la désactive plus, elle reste sur le pion jusqu'à la fin du tour, et si on a déplacé la vue, elle reprend au tour suivant.
+- **DavidSimulator** — Dés vérifiés sur 123 000 lancers simulés : ils suivent exactement les probabilités d'une vraie paire de dés. Pour lever les doutes, le résultat (« 5 + 2 = 7 ») reste affiché jusqu'au tour suivant, et les dés 3D tombent devant le pion qui joue, face à la caméra.
+- **DavidSimulator** — Pioches Chance et Caisse de communauté en vraies piles de cartes en 3D : la carte du dessus se soulève et se retourne quand on pioche.
+- **Hub** — Le journal des nouveautés se tient à jour tout seul : si quelqu'un (ou une IA) pousse une modification sans la noter, une entrée est rédigée à partir de ses messages de commit.
+
 ## 2.14 — 21 octobre 2026
 - Le journal des nouveautés est maintenant dans le Hub : bouton « ✨ Nouveautés » sur l'accueil (ou clic sur le numéro
   de version). Il s'ouvre tout seul à la première visite après une mise à jour.

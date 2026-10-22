@@ -1,7 +1,7 @@
 // Vue de DavidSimulator : plateau 3D, interface de jeu et « réalisateur » qui met en scène les événements.
 // Chaque mise à jour reçue (état + événements) est jouée dans l'ordre — dés, déplacements, paiements,
 // achats, cartes — puis l'état final est appliqué. Si les mises à jour s'accumulent, la lecture accélère.
-import { availableActions, currentPlayer } from '../engine/rules.js';
+import { availableActions, currentPlayer, canPropose } from '../engine/rules.js';
 import { netWorth } from '../engine/valuation.js';
 import { mountBoard } from './board.js';
 import { mountBoard3d } from './board3d.js';
@@ -15,9 +15,9 @@ import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { esc, money, el, wait, store, save } from './util.js';
 import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
-import { standings } from '../engine/valuation.js';
+import { standings, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
-export async function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {} }) {
+export async function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {}, team = () => {} }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -38,6 +38,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     </header>
     <aside class="roster" id="roster" aria-label="Joueurs"></aside>
     <div class="actionbar" id="actionbar" aria-live="polite"></div>
+    <div class="diceread" id="diceread" hidden aria-live="polite"></div>
     <div class="dock">
       <button class="btn ghost emobtn" id="bEmote" title="Réagir (touche R)" aria-expanded="false">😀</button>
       <button class="btn ghost" id="bMine">Mes biens</button>
@@ -61,7 +62,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
   const F = mountFx(root);
   const M = mountModals(root);
   B.onStep = () => sfx.play('hop');
-  const SU = mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave });
+  const SU = mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave, team });
 
   let S = null, offset = 0, playing = false, first = true;
   const queue = [], seenAuto = new Set(), logLines = [];
@@ -188,10 +189,12 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       case 'MORTGAGE': return `${name(e.player)} hypothèque ${board.spaces[e.space].name}`;
       case 'UNMORTGAGE': return `${name(e.player)} lève l'hypothèque de ${board.spaces[e.space].name}`;
       case 'TRADE_DONE': return `Échange conclu : ${name(e.trade.from)} ⇄ ${name(e.trade.to)}`;
+      case 'TRADE_CANCELLED': return e.reason === 'turn' ? 'Proposition d\'échange expirée (fin du tour)' : null;
+      case 'NO_RENT': return `${name(e.player)} est chez son coéquipier : pas de loyer`;
       case 'BANKRUPT': return `${name(e.player)} fait faillite`;
       case 'BOT': return e.bot ? `${name(e.player)} est déconnecté : un bot joue à sa place` : `${name(e.player)} est de retour`;
       case 'HOST_CHANGED': return `${name(e.host)} est le nouvel hôte de la partie`;
-      case 'GAME_OVER': return `${name(e.winner)} remporte la partie !`;
+      case 'GAME_OVER': return e.team != null ? `${TEAM_NAMES[e.team]} remporte la partie !` : `${name(e.winner)} remporte la partie !`;
       default: return null;
     }
   }
@@ -222,18 +225,28 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
   function renderRoster() {
     const cur = S.over ? null : currentPlayer(S).id;
     const rank = new Map(standings(S, board).map((r, k) => [r.id, k + 1]));
-    $('#roster').innerHTML = S.players.map((p) => {
+    const card = (p) => {
       const w = netWorth(S, board, p.id);
       return `<div class="pcard-hud${p.id === cur ? ' cur' : ''}${p.bankrupt ? ' out' : ''}${p.id === me.id ? ' me' : ''}" data-pid="${p.id}" style="--pc:${p.color}">
         <span class="mini">${tokenSvg(p.token, p.color)}<i class="rk" title="Rang au patrimoine">${p.bankrupt ? '✕' : rank.get(p.id)}</i></span>
-        <span class="who"><b>${esc(p.name)}</b><small>${p.id === me.id ? 'toi' : p.bot ? 'bot' : ''}${p.inJail ? ' · 🔒 prison' : ''}${p.jailCards.length ? ' · 🎟' : ''}</small></span>
+        <span class="who"><b>${esc(p.name)}</b><small>${p.id === me.id ? 'toi' : sameTeam(S, me.id, p.id) ? 'coéquipier' : p.bot ? 'bot' : ''}${p.inJail ? ' · 🔒 prison' : ''}${p.jailCards.length ? ' · 🎟' : ''}</small></span>
         <span class="cash" title="Argent liquide">${money(cash[p.id] ?? p.cash)}</span>
         <span class="worth"><span title="Valeur immobilière">🏠 ${money(w.property + w.buildings)}</span><span title="Monopoles">♛ ${w.monopolies}</span><span class="net" title="Patrimoine net">Net ${money(w.total)}</span></span>
         <span class="sp">${sparkline(S, p.id, p.color)}</span>
         ${p.id === cur ? '<i class="playing">joue</i>' : ''}
       </div>`;
-    }).join('');
-    const mode = S.mode === 'express' ? 'Partie Express' : 'Partie classique';
+    };
+    if (S.cfg.teams) {
+      // 2 contre 2 : une colonne par équipe, avec le patrimoine cumulé
+      const lead = teamStandings(S, board)[0];
+      $('#roster').innerHTML = [0, 1].map((t) => {
+        const ts = teamStandings(S, board).find((x) => x.team === t);
+        const mine = S.players.some((p) => p.id === me.id && p.team === t);
+        return `<div class="teamhead t${t}${mine ? ' mine' : ''}"><b>${TEAM_NAMES[t]}${mine ? ' · toi' : ''}</b><span>${ts.alive ? money(ts.total) : 'faillite'}${lead.team === t && ts.alive ? ' ♛' : ''}</span></div>`
+          + S.players.filter((p) => p.team === t).map(card).join('');
+      }).join('');
+    } else $('#roster').innerHTML = S.players.map(card).join('');
+    const mode = (S.mode === 'express' ? 'Partie Express' : 'Partie classique') + (S.cfg.teams ? ' · 2 contre 2' : '');
     $('#mode').textContent = mode; $('#round').textContent = `Tour ${S.round}`;
     $('#timer').hidden = !S.endsAt;
   }
@@ -264,7 +277,10 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         const sp = board.spaces[S.pendingBuy];
         h = `<span class="status">${esc(sp.name)} · ${money(sp.price)}</span>${abtn('Acheter', { type: 'BUY' }, 'primary' + (p.cash < sp.price ? ' off' : ''))}${abtn(S.cfg.auctionWhenDeclined ? 'Enchères' : 'Ne pas acheter', { type: 'DECLINE' }, 'ghost')}<button class="btn ghost" data-open="buy">Voir le titre</button>`;
       } else if (S.phase === 'end') {
-        h = `<span class="status">Construis, échange… ou passe la main</span>${abtn('Fin du tour ➜', { type: 'END_TURN' }, 'primary')}`;
+        const out = S.trades.find((t) => t.from === me.id);
+        h = out
+          ? `<span class="status">En attente de la réponse de ${esc(name(out.to))}…</span>${abtn('Annuler la proposition', { type: 'CANCEL_TRADE', trade: out.id }, 'ghost')}${abtn('Fin du tour ➜', { type: 'END_TURN' }, 'primary')}`
+          : `<span class="status">Construis, échange… ou passe la main</span>${abtn('Fin du tour ➜', { type: 'END_TURN' }, 'primary')}`;
       }
     } else {
       const c = currentPlayer(S);
@@ -275,6 +291,10 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     const inc = S.trades.filter((t) => t.to === me.id).length;
     $('#tradeBadge').hidden = !inc; $('#tradeBadge').textContent = inc;
     $('#bMine').disabled = $('#bTrade').disabled = !p || p.bankrupt || S.over;
+    // les échanges se proposent pendant son tour : en dehors, le bouton sert seulement à lire une proposition reçue
+    const can = p && canPropose(S, me.id);
+    $('#bTrade').classList.toggle('dim', !!p && !can && !inc);
+    $('#bTrade').title = can ? 'Proposer un échange' : inc ? 'Voir la proposition reçue' : 'Les échanges se proposent pendant ton tour';
   }
 
   // délégation : tout bouton data-act envoie l'action ; data-open ouvre une fenêtre
@@ -286,11 +306,15 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       if (b.classList.contains('off') || (root.classList.contains('busy') && !live)) { sfx.play('error'); return; }
       try { act(a); } catch (err) { console.error(err); }
       if (['BUY', 'DECLINE', 'ACCEPT_TRADE', 'REJECT_TRADE', 'BANKRUPT'].includes(a.type)) M.close(true);
+      if (a.type === 'ACCEPT_TRADE' || a.type === 'REJECT_TRADE') B.tradeMarks(null);
       if (a.type === 'BID' || a.type === 'PASS') sfx.play('bid');
       return;
     }
     const o = e.target.closest('[data-open]');
     if (o) { const k = o.dataset.open; if (k === 'mine') openMine(); if (k === 'auction') openAuction(true); if (k === 'buy') openBuy(true); return; }
+    // carte d'un échange : la case clignote sur le plateau
+    const pk = e.target.closest('[data-peek]');
+    if (pk) { const i = +pk.dataset.peek; B.pulse(i); setTimeout(() => B.pulse(S && S.phase === 'buy' ? S.pendingBuy : -1), 1600); return; }
     const pc = e.target.closest('[data-prop]');
     if (pc) openProperty(+pc.dataset.prop);
   });
@@ -347,23 +371,41 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     const others = S.players.filter((p) => !p.bankrupt && p.id !== me.id);
     if (!others.length) return;
     if (S.auction) { toast("Attends la fin de l'enchère."); return; }
-    partner = partner ?? others[0].id;
-    const box = M.open('trade', tradeComposeHtml(board, S, me, partner), { cls: 'wide' });
+    if (!canPropose(S, me.id)) {
+      const t = S.trades.find((x) => x.to === me.id);
+      if (t) { seenAuto.delete('offer:' + t.id); openOffer(t); return; }
+      toast('Les échanges se proposent pendant ton tour.'); sfx.play('error'); return;
+    }
+    // par défaut : le coéquipier en 2 contre 2, sinon le premier adversaire
+    partner = partner ?? (others.find((p) => sameTeam(S, me.id, p.id)) || others[0]).id;
+    const box = M.open('trade', tradeComposeHtml(board, S, me, partner), { cls: 'wide docked', onClose: () => B.tradeMarks(null) });
     for (const b of box.querySelectorAll('[data-partner]')) b.onclick = () => openTrade(+b.dataset.partner);
+    // les terrains cochés sont signalés sur le plateau
+    const marks = () => {
+      const list = [];
+      for (const x of box.querySelectorAll('[data-g]:checked')) list.push({ i: +x.dataset.g, kind: 'give', label: 'Tu donnes' });
+      for (const x of box.querySelectorAll('[data-w]:checked')) list.push({ i: +x.dataset.w, kind: 'get', label: 'Tu reçois' });
+      B.tradeMarks(list);
+    };
+    box.addEventListener('change', marks); marks();
     box.querySelector('#tSend').onclick = () => {
       const pick = (k) => [...box.querySelectorAll(`[data-${k}]:checked`)].map((x) => +x.dataset[k]);
       const mine = meP(), them = S.players.find((p) => p.id === partner);
       const g = { props: pick('g'), cash: Number(box.querySelector('#gCash').value) || 0, cards: box.querySelector('#gCard')?.checked ? [mine.jailCards[0]] : [] };
       const w = { props: pick('w'), cash: Number(box.querySelector('#wCash').value) || 0, cards: box.querySelector('#wCard')?.checked ? [them.jailCards[0]] : [] };
       act({ type: 'PROPOSE_TRADE', to: partner, give: g, want: w });
-      M.close(true);
+      M.close(true); B.tradeMarks(null);
       toast('Proposition envoyée à ' + them.name);
     };
+  }
+  function offerMarks(t) {
+    return [...t.give.props.map((i) => ({ i, kind: 'get', label: 'Tu reçois' })), ...t.want.props.map((i) => ({ i, kind: 'give', label: 'Tu donnes' }))];
   }
   function openOffer(t) {
     if (seenAuto.has('offer:' + t.id)) return;
     seenAuto.add('offer:' + t.id);
-    M.open('offer:' + t.id, offerHtml(board, S, t, name));
+    M.open('offer:' + t.id, offerHtml(board, S, t, name), { cls: 'wide docked', onClose: () => B.tradeMarks(null) });
+    B.tradeMarks(offerMarks(t));
   }
   function openOver() {
     const box = M.open('over', overHtml(board, S, name), { cls: 'wide', closable: true });
@@ -387,7 +429,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     const k = String(M.key || '');
     if (k.startsWith('prop:')) M.open(k, propertyHtml(board, S, me, +k.slice(5), name), { cls: 'wide', onClose: () => B.select(-1) });
     else if (k === 'mine') openMine();
-    else if (k.startsWith('offer:') && !S.trades.some((x) => 'offer:' + x.id === k)) M.close(true);
+    else if (k.startsWith('offer:') && !S.trades.some((x) => 'offer:' + x.id === k)) { M.close(true); B.tradeMarks(null); }
+    else if (k === 'trade' && !canPropose(S, me.id)) { M.close(true); B.tradeMarks(null); }
     else if (k.startsWith('buy') && S.phase !== 'buy') M.close(true);
   }
 
@@ -414,13 +457,16 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     const quick = speed > 3;
     switch (e.k) {
       case 'TURN':
-        B.setCurrent(e.player); B.relax();
+        // caméra qui suit : elle va directement sur le pion du joueur suivant ; sinon vue d'ensemble
+        B.setCurrent(e.player); if (B.follow()) B.focusPawn(e.player, speed); else B.relax();
+        $('#diceread').hidden = true;
         S && renderRosterCur(e.player);
         if (!quick) { sfx.play('turn'); await F.banner(e.player === me.id ? 'À toi de jouer !' : `Au tour de ${nm(e.player)}`, `Tour ${e.round}`, col(e.player), 900 / speed); }
         break;
       case 'DICE':
         if (!quick) sfx.play('dice');
-        await (B.rollDice ? B.rollDice(e.dice, speed) : D.roll(e.dice, speed));
+        await (B.rollDice ? B.rollDice(e.dice, speed, e.player) : D.roll(e.dice, speed));
+        diceRead(e, col(e.player));
         if (e.dice[0] === e.dice[1] && !e.reason && !quick) { const pt = B.pawnScreen(e.player); if (pt) F.float(pt.x, pt.y - 30, 'DOUBLE !', 'gold'); }
         break;
       case 'MOVE':
@@ -442,6 +488,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         break;
       }
       case 'CARD':
+        if (B.drawCard) B.drawCard(e.deck);
         if (!quick) { sfx.play('card'); await F.card(e.deck, e.text, speed); }
         break;
       case 'SPEEDING':
@@ -494,9 +541,24 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         break;
       }
       case 'TRADE_OFFER': if (e.trade.to === me.id) sfx.play('card'); break;
-      case 'TRADE_DONE':
-        if (!quick) { sfx.play('buy'); await F.banner('Échange conclu', `${nm(e.trade.from)} ⇄ ${nm(e.trade.to)}`, '#2fbf71', 900 / speed); }
+      case 'TRADE_DONE': {
+        if (quick) break;
+        sfx.play('buy');
+        // tout le monde voit sur le plateau ce qui a changé de main
+        const t = e.trade, moved = [...t.give.props.map((i) => ({ i, to: t.to })), ...t.want.props.map((i) => ({ i, to: t.from }))];
+        B.sync(next);
+        B.tradeMarks(moved.map((m) => ({ i: m.i, kind: 'done', label: '→ ' + nm(m.to), color: col(m.to) })));
+        for (const m of moved) { const c = B.cellScreen(m.i); F.stamp(c.x, c.y, 'ÉCHANGÉ', col(m.to)); }
+        await F.banner('Échange conclu', `${nm(t.from)} ⇄ ${nm(t.to)}`, '#2fbf71', 900 / speed);
+        setTimeout(() => { if (!String(M.key || '').match(/^(offer|trade)/)) B.tradeMarks(null); }, 2600);
         break;
+      }
+      case 'NO_RENT': {
+        if (quick) break;
+        const c = B.cellScreen(e.space); F.float(c.x, c.y - 10, 'Coéquipier : pas de loyer', 'gold');
+        await wait(500 / speed);
+        break;
+      }
       case 'TRADE_REJECTED': if (e.by !== me.id && next.players && !quick) toast(`${nm(e.by)} refuse l'échange`); break;
       case 'DEBT':
         if (e.from === me.id && !quick) await F.banner('Il te manque de l\'argent', `Tu dois ${money(e.amount)}`, '#e3262f', 1000 / speed);
@@ -510,6 +572,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         if (!quick) await F.banner(`${nm(e.player)} fait faillite`, '', '#16181d', 1200 / speed);
         break;
       case 'GAME_OVER':
+        if (e.team != null) F.banner(`${TEAM_NAMES[e.team]} l'emporte !`, '', '#2fbf71', 1600);
         if (music.on) music.win(); else sfx.play('win');
         F.confetti();
         break;
@@ -534,7 +597,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       apply(it.state);
     }
     playing = false; root.classList.remove('busy');
-    setTimeout(() => { if (!playing) B.relax(); }, 900);
+    // la caméra qui suit reste sur le pion jusqu'au tour suivant
+    setTimeout(() => { if (!playing && !B.follow()) B.relax(); }, 900);
   }
 
   /* ---------------------------------------------------------- chrono */
@@ -545,6 +609,13 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     const t = $('#timer'); t.textContent = `⏱ ${m}:${String(s).padStart(2, '0')}`; t.classList.toggle('hot', left < 5 * 60000);
   }
   setInterval(tickTimer, 500);
+
+  // lecture des dés : la somme jouée reste affichée jusqu'au tour suivant (les dés 3D se lisent mal de biais)
+  function diceRead(e, c) {
+    const box = $('#diceread'), d = e.dice, dbl = d[0] === d[1];
+    box.innerHTML = `<i class="dc" style="background:${c}"></i>${e.reason === 'utility' ? 'Relance compagnie : ' : ''}<b>${d[0]}</b> + <b>${d[1]}</b> = <strong>${d[0] + d[1]}</strong>${dbl && !e.reason ? '<em>double</em>' : ''}`;
+    box.hidden = false; box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+  }
 
   let toastT = 0;
   function toast(msg) {

@@ -15,7 +15,8 @@ export function cleanHouse(h) {
   };
 }
 
-export function makeConfig(board, mode = 'classic', house = null) {
+// teams : partie « 2 contre 2 » (4 joueurs, 2 équipes de 2), quel que soit le mode
+export function makeConfig(board, mode = 'classic', house = null, { teams = false } = {}) {
   if (!MODES.includes(mode)) throw new Error(`Mode inconnu : ${mode}`);
   const m = board.modes[mode] || {};
   const cfg = { ...board.rules, ...(m.overrides || {}), mode };
@@ -29,5 +30,7 @@ export function makeConfig(board, mode = 'classic', house = null) {
   cfg.doubleGoLanding = h.doubleGo;
   cfg.auctionWhenDeclined = h.auctions;
   cfg.startingCash = h.cash;
+  cfg.teams = !!teams;
+  if (cfg.teams) { cfg.minPlayers = 4; cfg.maxPlayers = 4; }
   return cfg;
 }
