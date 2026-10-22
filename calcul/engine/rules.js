@@ -8,7 +8,7 @@ import { parseNumber, evalExpr, usesOnly } from './expr.js';
 
 export const MODES = {
   classic:  { label: 'Classique', desc: 'Tout le monde répond, les plus rapides marquent plus.' },
-  chartier: { label: 'The Candidate', desc: 'L\'épreuve impitoyable de Pierre Chartier : 300 questions de finance et hedge funds sous pression.' },
+  chartier: { label: 'The Candidate', desc: 'L\'entretien impitoyable de Pierre Chartier : finance de marché, calcul mental et brainteasers, de plus en plus durs.' },
   peril:   { label: 'Péril', desc: 'Une erreur coûte des points : ne tente pas n\'importe quoi.' },
   eclair:  { label: 'Éclair', desc: 'Seul le premier qui trouve marque. Une erreur et tu es bloqué.' },
 };
@@ -63,7 +63,7 @@ export const isFinal = (s, idx = s.idx) => s.cfg.finale && idx === s.cfg.len - 1
 export function fullQuestion(s, idx = s.idx) {
   const seen = new Set(s.history.filter((h) => h.idx < idx).map((h) => h.key));
   let q;
-  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt); if (!seen.has(q.key)) break; }
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len); if (!seen.has(q.key)) break; }
   return q;
 }
 
@@ -73,7 +73,7 @@ export function nextQuestion(state, now) {
   if (s.idx + 1 >= s.cfg.len) return finish(s);
   s.idx++;
   const q = fullQuestion(s);
-  s.q = { ...publicQuestion(q), n: s.idx + 1, pts: CATS[q.cat].pts * (isFinal(s) ? 2 : 1), final: isFinal(s) };
+  s.q = { ...publicQuestion(q), n: s.idx + 1, pts: q.pts * (isFinal(s) ? 2 : 1), final: isFinal(s) };
   s.phase = 'question'; s.qAt = now; s.endsAt = now + q.time * 1000; s.answers = {}; s.last = null;
   // les sabotages lancés pendant la révélation s'appliquent maintenant
   s.active = s.curses || {}; s.curses = {};
@@ -113,75 +113,8 @@ export function restartQuestion(state, now) {
   return s;
 }
 
-function normalize(str) {
-  return String(str ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function checkChartier(q, raw) {
-  const inputStr = String(raw ?? '').trim();
-  if (!inputStr) return { ok: false, error: 'Saisie vide' };
-
-  if (q.choices && q.choices.length) {
-    const exactChoice = q.choices.find((c) => c === inputStr);
-    if (exactChoice) {
-      return { ok: exactChoice === q.correctChoice, value: exactChoice };
-    }
-
-    if (/^[1-4]$/.test(inputStr)) {
-      const numIdx = parseInt(inputStr, 10);
-      if (numIdx >= 1 && numIdx <= q.choices.length) {
-        const selected = q.choices[numIdx - 1];
-        return { ok: selected === q.correctChoice, value: selected };
-      }
-    }
-
-    if (/^[a-d]$/i.test(inputStr)) {
-      const letterIdx = ['a', 'b', 'c', 'd'].indexOf(inputStr.toLowerCase());
-      if (letterIdx >= 0 && letterIdx < q.choices.length) {
-        const selected = q.choices[letterIdx];
-        return { ok: selected === q.correctChoice, value: selected };
-      }
-    }
-  }
-
-  const normInput = normalize(inputStr);
-  const normCorrect = normalize(q.correctChoice);
-  const normClean = normalize(q.answer);
-
-  if (normInput && (normInput === normCorrect || normInput === normClean)) {
-    return { ok: true, value: q.answer };
-  }
-
-  if (q.aliases && Array.isArray(q.aliases)) {
-    for (const a of q.aliases) {
-      const normA = normalize(a);
-      if (normInput === normA) return { ok: true, value: q.answer };
-      if (normA.length >= 5 && normInput.includes(normA)) {
-        return { ok: true, value: q.answer };
-      }
-    }
-  }
-
-  const nInp = parseNumber(inputStr);
-  const nAns = parseNumber(q.answer);
-  if (nInp != null && nAns != null) {
-    if (nInp === nAns) return { ok: true, value: nInp };
-  }
-
-  return { ok: false, value: inputStr };
-}
-
 // Justesse d'une saisie
 export function check(q, raw) {
-  if (q.isChartier || q.input === 'chartier') {
-    return checkChartier(q, raw);
-  }
   if (q.input === 'choice') {
     const k = /^\d$/.test(String(raw).trim()) ? Number(raw) : -1;
     if (k < 0 || k >= q.choices.length) return { ok: false, error: 'Choisis une des réponses' };
@@ -226,7 +159,7 @@ export function reveal(state, now) {
   if (state.phase !== 'question') return state;
   const s = clone(state);
   const q = fullQuestion(s);
-  const base = CATS[q.cat].pts * 100 * (isFinal(s) ? 2 : 1);
+  const base = q.pts * 100 * (isFinal(s) ? 2 : 1);
   const correct = Object.entries(s.answers).filter(([, a]) => a.ok).sort((a, b) => a[1].at - b[1].at).map(([id]) => +id);
   const results = s.players.map((p) => {
     const a = s.answers[p.id];
@@ -261,12 +194,12 @@ export function reveal(state, now) {
     p.score += r.pts;
     return r;
   });
-  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s) };
-  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input,
+  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' ? q.answer : null, isChartier: q.isChartier, tier: q.tier };
+  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts,
     results: results.map(({ id, ok, at, pts, raw }) => ({ id, ok, at, pts, raw })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => p.powers.some((pw) => pw !== 'shield'));
-  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
+  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
   // les réponses deviennent publiques
   return s;

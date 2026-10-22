@@ -345,155 +345,216 @@ button.power.ready:hover{filter:brightness(1.05)}
 }
 
 /* ------------------------------------------------------------------ Mode The Candidate (Pierre Chartier) */
+/* Plateau de nuit façon salle de marché : bleu nuit, or, vert/rouge des cotations. */
 .game.mode-chartier{
-  background:radial-gradient(ellipse at 80% -10%,rgba(229,169,60,.22),transparent 45%),
-    radial-gradient(ellipse at 15% 105%,rgba(10,14,24,.85),transparent 55%),
-    linear-gradient(180deg,#131722 0%,#0d1017 40%,#08090d 100%)!important;
+  --gold:#e5a93c; --gold2:#ffd27a; --night:#0d111a; --panel:#131826; --edge:#2a3550; --txt:#e6ebf2; --dim:#8c9cb3;
+  --up:#2fbf71; --down:#ff5a3c;
+  color:var(--txt);
+  background:
+    radial-gradient(ellipse at 80% -10%,rgba(229,169,60,.25),transparent 45%),
+    radial-gradient(ellipse at 10% 110%,rgba(47,191,113,.10),transparent 50%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 34px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 34px),
+    linear-gradient(180deg,#141a28 0%,#0c1018 45%,#07090d 100%)!important;
 }
-.game.mode-chartier .deco span{color:rgba(229,169,60,.06)}
-.game.mode-chartier .info{background:#080a0f;border-color:#e5a93c;box-shadow:3px 3px 0 #000}
-.game.mode-chartier .info b{color:#ffd27a}
+.game.mode-chartier .deco span{color:rgba(229,169,60,.05)}
+.game.mode-chartier .info{background:#080a0f;border-color:var(--gold);box-shadow:3px 3px 0 #000}
+.game.mode-chartier .info b{color:var(--gold2)}
 .game.mode-chartier .tool{background:#161c28;color:#f0f4fa;border-color:#333e54}
-.game.mode-chartier .card{
-  background:#121622;color:#e6ebf2;border:3px solid #e5a93c;
-  box-shadow:8px 8px 0 rgba(0,0,0,.7),0 0 24px rgba(229,169,60,.12);
-}
+
+/* bandeau de cotations, dans la barre du haut (entre le titre et les boutons) */
+.ticker{display:none}
+.game.mode-chartier .ticker{display:flex;flex:1;min-width:0;height:38px;align-items:center;overflow:hidden;
+  background:#05070b;border:2px solid var(--edge);border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  font:700 13px/1 'Chakra Petch',monospace;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.game.mode-chartier .info{flex:none}
+.game.mode-chartier .tools{margin-left:0}
+.ticker-track{display:inline-flex;align-items:center;gap:26px;white-space:nowrap;padding-left:20px;animation:tick 48s linear infinite;will-change:transform}
+@keyframes tick{to{transform:translateX(-50%)}}
+.ticker-track span{display:inline-flex;align-items:center;gap:5px;color:var(--dim)}
+.ticker-track b{color:#f3f6fb}
+.ticker-track .up{color:var(--up)}.ticker-track .down{color:var(--down)}
+.ticker-track .pl i{width:9px;height:9px;border-radius:50%;border:1.5px solid #000}
+.ticker-track .badge{background:var(--gold);color:#0c0e14;font-family:var(--bung);font-weight:400;font-size:11px;padding:3px 8px;border-radius:5px;letter-spacing:.5px}
+.ticker-track .sep{color:var(--gold)}
+.game.mode-chartier .stage{bottom:12px}
+/* avant la partie, pas de liste de joueurs à gauche : la carte se centre sur tout l'écran */
+.game.noroster .stage{left:24px}
+
+/* cartes, joueurs, textes */
+.game.mode-chartier .card{background:linear-gradient(180deg,#151b29,#10141f);color:var(--txt);border:3px solid var(--gold);
+  box-shadow:8px 8px 0 rgba(0,0,0,.7),0 0 34px rgba(229,169,60,.14)}
+.game.mode-chartier .card.isfinal{border-color:var(--down);box-shadow:8px 8px 0 rgba(0,0,0,.7),0 0 40px rgba(255,90,60,.35);animation:deal .5s cubic-bezier(.2,1.3,.4,1),finalglow 1.2s ease-in-out infinite alternate}
+@keyframes finalglow{to{box-shadow:8px 8px 0 rgba(0,0,0,.7),0 0 60px rgba(255,90,60,.55)}}
 .game.mode-chartier .pcard{background:#151b27;color:#e8eef8;border-color:#2e3a50;box-shadow:4px 4px 0 rgba(0,0,0,.6)}
-.game.mode-chartier .pcard.me{box-shadow:4px 4px 0 rgba(0,0,0,.6),0 0 0 3px #e5a93c}
-.game.mode-chartier .pcard .nm{color:#f5f8fd}
-.game.mode-chartier .pcard .rank{color:#768499}
-.game.mode-chartier .pcard .think{color:#8c9cb3}
-.game.mode-chartier .pcard .done{background:#e5a93c;color:#0c0e14}
+.game.mode-chartier .pcard.me{box-shadow:4px 4px 0 rgba(0,0,0,.6),0 0 0 3px var(--gold)}
+.game.mode-chartier .pcard .band{border-right-color:#000}
+.game.mode-chartier .pcard .rank,.game.mode-chartier .pcard .think{color:var(--dim)}
+.game.mode-chartier .pcard .done{background:var(--gold);color:#0c0e14}
+.game.mode-chartier .pcard .good{background:#13361f;color:#7ff0ad}
+.game.mode-chartier .pcard .bad{background:#3a1712;color:#ffb3a5}
+.game.mode-chartier .pcard .flame{background:#3a2c0e;color:var(--gold2)}
+.game.mode-chartier .bubble{background:#1d2436;color:#fff;border-color:var(--gold)}
+.game.mode-chartier .logo-c span{color:var(--dim);font-size:16px;letter-spacing:1px}
+.game.mode-chartier .logo-c b{color:var(--gold2);-webkit-text-stroke:1.5px #000;text-shadow:3px 3px 0 #000,0 0 24px rgba(229,169,60,.45)}
+.game.mode-chartier .chip{background:#1b2232;color:var(--txt);border-color:#3a4766}
+.game.mode-chartier .chip.strong{background:var(--gold);color:#0c0e14;border-color:#000}
+.game.mode-chartier .chip.gold{background:#3a2c0e;color:var(--gold2);border-color:var(--gold)}
+.game.mode-chartier .mdesc,.game.mode-chartier .intro p{color:#b7c3d6}
+.game.mode-chartier .howto{color:#d2dbe8}
+.game.mode-chartier .howto b{color:var(--gold2)}
+.game.mode-chartier .rules.tiers{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.game.mode-chartier .rule{--cc:var(--gold);background:#0d111a;border-color:var(--edge);box-shadow:3px 3px 0 #000;color:var(--txt)}
+.game.mode-chartier .rule i{color:var(--gold2);-webkit-text-stroke:0;font-size:18px}
+.game.mode-chartier .rule small{color:var(--dim)}
+.game.mode-chartier .pp{background:#1b2232;color:var(--txt);border-color:#3a4766}
+.game.mode-chartier .pp i{border-color:#000}
+.game.mode-chartier .waithost{color:var(--dim)}
+.game.mode-chartier .btn.primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0c0e14;border-color:#000;box-shadow:3px 3px 0 #000}
+.game.mode-chartier .btn.ghost{background:#1b2232;color:var(--txt);border-color:#000}
+.game.mode-chartier .timer{background:#05070b;border-color:#000}
+.game.mode-chartier .timer i{background:linear-gradient(90deg,var(--up),#7ff0ad)}
+.game.mode-chartier .timer.hurry i{background:linear-gradient(90deg,var(--down),#ff9a7a)}
+.game.mode-chartier .timer b{color:#fff;text-shadow:1px 1px 0 #000}
+.game.mode-chartier .count{color:var(--gold2);-webkit-text-stroke:3px #000;text-shadow:6px 6px 0 #000,0 0 30px rgba(229,169,60,.5)}
+.game.mode-chartier h1{color:var(--gold2)}
+
+/* en-tête de question */
+.tierb{font-family:var(--bung);font-size:12px;border:2px solid #000;border-radius:20px;padding:3px 10px;background:#1b2232;color:var(--gold2)}
+.tierb.t2{background:#24324d;color:#a9c8ff}
+.tierb.t3{background:#3a1712;color:#ffb3a5}
+.live{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-family:var(--bung);font-size:11px;letter-spacing:.5px;color:#ff7a62;
+  border:1.5px solid var(--down);border-radius:20px;padding:2px 9px;background:rgba(255,90,60,.12)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--down);animation:blink 1s infinite}
+.game.mode-chartier .live + .qnum{margin-left:4px}
+.game.mode-chartier .qnum{color:var(--dim)}
+.game.mode-chartier .pts{background:var(--gold);border-color:#000;color:#0c0e14}
+.game.mode-chartier .cat{border-color:#000;color:#0c0e14;text-shadow:none}
+.game.mode-chartier .cat i{background:#0c0e14;color:var(--gold2);border-color:#000}
+.game.mode-chartier .final{border-color:#000}
+.qtext.cand{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:clamp(20px,2.9vw,30px);line-height:1.3;letter-spacing:0;text-align:center;color:#f5f8fc;margin:16px 0 4px}
+.game.mode-chartier .qtext.hurry{animation:none;color:#ffb3a5}
+
+/* les 4 réponses */
+.cand-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 4px}
+.cchoice{position:relative;display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 40px 10px 12px;text-align:left;
+  background:#0d111a;color:#eef3fa;border:2px solid var(--edge);border-radius:13px;box-shadow:4px 4px 0 #000;
+  font:700 17px/1.25 'Chakra Petch',sans-serif;cursor:pointer;transition:transform .08s,box-shadow .08s,border-color .15s,background .15s;
+  animation:pop .35s calc(var(--k,0) * 70ms + 120ms) cubic-bezier(.2,1.5,.4,1) both}
+button.cchoice:hover:not(:disabled){border-color:var(--gold);background:#161d2c;transform:translateY(-2px);box-shadow:4px 6px 0 #000}
+button.cchoice:active:not(:disabled){transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+.cchoice .cl{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--gold);color:#0c0e14;border:2px solid #000;font-family:var(--bung);font-weight:400;font-size:16px}
+.cchoice .ct{flex:1;word-break:break-word}
+.cchoice kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 11px monospace;color:var(--dim);background:#05070b;border:1px solid var(--edge);border-radius:5px;padding:2px 6px}
+button.cchoice:disabled{cursor:default;opacity:.45}
+button.cchoice.picked{opacity:1;border-color:var(--gold2);background:#2a2412;box-shadow:0 0 0 3px rgba(229,169,60,.55),4px 4px 0 #000;animation:stamp .35s cubic-bezier(.2,1.6,.4,1)}
+button.cchoice.picked .cl{background:var(--gold2)}
+/* à la révélation */
+.cand-choices.rev .cchoice{cursor:default;min-height:52px;padding-right:12px;font-size:15px}
+.cand-choices.rev .cchoice.good{border-color:var(--up);background:#0f2a1b;box-shadow:0 0 0 3px rgba(47,191,113,.35),4px 4px 0 #000}
+.cand-choices.rev .cchoice.good .cl{background:var(--up);color:#fff}
+.cand-choices.rev .cchoice.bad{border-color:var(--down);background:#2a1310}
+.cand-choices.rev .cchoice.bad .cl{background:var(--down);color:#fff}
+.cand-choices.rev .cchoice.dim{opacity:.5}
+.cand-choices.rev .who{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end;max-width:70px}
+.cand-choices.rev .who .dot{width:12px;height:12px;margin:0;border-color:#000}
+
+/* révélation */
+.game.mode-chartier .qrecall{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:17px;color:#b7c3d6;line-height:1.35;margin-top:12px}
+.game.mode-chartier .buzz{color:#0c0e14;border-color:#000;background:var(--gold2)}
+.game.mode-chartier .verdict{margin-top:14px}
+.game.mode-chartier .verdict.none{background:#1b2232;color:var(--dim);border-color:#000}
+.game.mode-chartier .verdict.ok,.game.mode-chartier .verdict.ko{border-color:#000}
+.game.mode-chartier .gotpower{color:#0c0e14;border-color:#000}
+.game.mode-chartier .tip{background:#0d111a;border:2px dashed var(--gold);color:#cbd8e8}
+.game.mode-chartier .tip b{color:var(--gold2)}
 .game.mode-chartier .results li{background:#171d2b;border-color:#2a364d;color:#e6edf7}
 .game.mode-chartier .results li.ok{background:#13281e;border-color:#235738}
 .game.mode-chartier .results li.ko{background:#2b1617;border-color:#612826}
-.game.mode-chartier .qtext{font-family:'Chakra Petch',sans-serif;font-size:clamp(18px,2.8vw,26px);font-weight:700;line-height:1.35;letter-spacing:0;color:#f3f7fc;margin:12px 0 6px}
-.game.mode-chartier .qsub{color:#ffd27a;font-family:var(--bung);font-size:12px;letter-spacing:1px}
+.game.mode-chartier .results .tm{color:var(--dim)}
+.game.mode-chartier .results .raw{color:var(--gold2)}
+.game.mode-chartier .tag{color:#0c0e14;border-color:#000}
+.game.mode-chartier .dot{border-color:#000}
+.game.mode-chartier .nextbar{background:#05070b}
+.game.mode-chartier .nextbar i{background:var(--gold)}
+.game.mode-chartier .sabhint{color:#ff9ad5}
+.game.mode-chartier .sent{background:#05070b;border:2px solid var(--edge);color:var(--txt)}
+.game.mode-chartier .sent b{color:var(--gold2)}
 
-/* Ruban Ticker Marché Wall Street */
-.bloomberg-ticker{
-  position:relative;width:100%;max-width:min(760px,100%);margin:0 auto 12px;
-  background:#090c12;border:2px solid #283347;border-radius:9px;overflow:hidden;height:32px;
-  display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.5);font-family:'Chakra Petch',monospace;
-  font-size:12px;font-weight:700;
-}
-.ticker-track{
-  display:inline-flex;align-items:center;gap:24px;white-space:nowrap;animation:tickerSlide 25s linear infinite;will-change:transform;
-}
-@keyframes tickerSlide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.ticker-badge{
-  background:#e5a93c;color:#0c0e14;font-family:var(--bung);font-size:11px;padding:2px 7px;border-radius:4px;letter-spacing:.5px;
-}
-.ticker-track .up{color:#2fbf71;display:inline-flex;gap:4px;align-items:baseline}
-.ticker-track .down{color:#ff4b2b;display:inline-flex;gap:4px;align-items:baseline}
-.ticker-track .alert{
-  color:#ffd27a;background:rgba(229,169,60,.18);padding:2px 8px;border-radius:4px;border:1px solid rgba(229,169,60,.35);
-}
+.chartier-quote{display:flex;gap:12px;align-items:flex-start;background:#05070b;border:2px solid var(--gold);border-radius:14px;padding:12px 14px;margin:12px 0;
+  box-shadow:4px 4px 0 #000;animation:deal .45s .15s cubic-bezier(.2,1.3,.4,1) both}
+.quote-avatar{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#2a3550,#141a28);
+  border:2px solid var(--gold);color:var(--gold2);font-family:var(--bung);font-size:14px}
+.quote-body{flex:1;min-width:0}
+.quote-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.quote-meta b{font-family:var(--bung);font-weight:400;font-size:14px;color:var(--gold2)}
+.quote-status{margin-left:auto;font-family:var(--bung);font-size:11px;padding:2px 9px;border-radius:7px;border:2px solid #000;color:#fff}
+.quote-ok .quote-status{background:var(--up)}.quote-ko .quote-status{background:var(--down)}.quote-timeout .quote-status{background:#6b778a}
+.quote-text{margin:4px 0 0;font-size:15px;font-style:italic;color:#e0e7f2;line-height:1.4}
 
-/* En-tête The Candidate & Briefing */
-.chartier-banner{
-  font-family:var(--bung);font-size:14px;letter-spacing:1px;background:linear-gradient(90deg,#e5a93c,#ffd27a);
-  color:#0c0e14;text-align:center;padding:6px 14px;border-radius:20px;border:2px solid #000;box-shadow:3px 3px 0 #000;margin-bottom:14px;
-}
-.chartier-briefing{
-  background:#090c12;border:2px solid #283347;border-radius:12px;padding:14px 16px;margin:12px 0 16px;color:#c4d0e3;
-}
-.chartier-briefing b{
-  color:#ffd27a;font-family:var(--bung);font-size:13px;letter-spacing:.5px;display:block;margin-bottom:8px;
-}
-.chartier-howto{margin:0;padding-left:20px;font-size:14px;line-height:1.6}
-.chartier-howto b{color:#fff;display:inline;font-family:inherit}
-.chartier-start-btn{
-  background:linear-gradient(135deg,#e5a93c,#ffd27a)!important;color:#0c0e14!important;border-color:#000!important;box-shadow:3px 3px 0 #000!important;
-}
-
-/* Pupitre de question */
-.chartier-live-pill{
-  display:inline-flex;align-items:center;gap:6px;background:rgba(255,75,43,.18);color:#ff6e52;border:1.5px solid #ff4b2b;
-  border-radius:20px;padding:2px 10px;font-family:var(--bung);font-size:11px;letter-spacing:.5px;margin-left:auto;
-}
-.rec-dot{
-  display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff4b2b;animation:recPulse 1s ease-in-out infinite;
-}
-@keyframes recPulse{50%{opacity:.25}}
-
-/* Cartes de choix QCM */
-.chartier-choices{
-  display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:16px 0;
-}
-.btn-choice{
-  position:relative;display:flex;align-items:center;gap:12px;background:#181d2a;color:#e3ebf7;
-  border:2px solid #2d384e;border-radius:12px;padding:12px 16px;font-family:'Chakra Petch',sans-serif;
-  font-size:15px;font-weight:600;text-align:left;cursor:pointer;
-  transition:transform .08s,box-shadow .08s,background .15s,border-color .15s;
-  box-shadow:4px 4px 0 rgba(0,0,0,.5);min-height:58px;
-}
-.btn-choice:hover:not(:disabled){
-  background:#22293b;border-color:#e5a93c;transform:translateY(-2px);box-shadow:4px 6px 0 rgba(229,169,60,.25);
-}
-.btn-choice:active:not(:disabled){
-  transform:translate(2px,2px);box-shadow:2px 2px 0 rgba(0,0,0,.5);
-}
-.btn-choice.selected{
-  background:#263045;border-color:#ffd27a;box-shadow:0 0 0 3px rgba(229,169,60,.5),4px 4px 0 rgba(0,0,0,.5);color:#ffd27a;
-}
-.btn-choice:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.btn-choice.selected:disabled{opacity:1}
-.choice-badge{
-  display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:#e5a93c;color:#0c0e14;
-  font-family:var(--bung);font-size:14px;font-weight:700;flex-shrink:0;border:1.5px solid #000;
-}
-.btn-choice.selected .choice-badge{background:#ffd27a;box-shadow:0 0 8px #ffd27a}
-.choice-text{flex:1;line-height:1.25;word-break:break-word}
-.choice-key{
-  display:inline-flex;align-items:center;justify-content:center;font-family:monospace;font-size:11px;font-weight:700;
-  color:#8c9cb3;background:#0d1017;padding:2px 6px;border-radius:4px;border:1px solid #283347;
-}
-
-.chartier-answer input{
-  background:#0d1017!important;color:#f5f8fc!important;border-color:#2e3a50!important;font-size:18px!important;
-  font-family:'Chakra Petch',sans-serif!important;font-weight:700;
-}
-.chartier-answer input:focus{box-shadow:0 0 0 3px rgba(229,169,60,.5)!important;border-color:#e5a93c!important}
-.chartier-answer .btn{background:#e5a93c!important;color:#0c0e14!important;border-color:#000!important}
-
-/* Verdict Pierre Chartier & Tip */
-.chartier-quote{
-  background:#090c12;border:2px solid #e5a93c;border-radius:14px;padding:14px 18px;margin:12px 0 16px;
-  box-shadow:4px 4px 0 rgba(0,0,0,.5);text-align:left;
-}
-.quote-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
-.quote-avatar{
-  font-size:26px;width:38px;height:38px;display:inline-grid;place-items:center;background:#181f2f;
-  border:2px solid #e5a93c;border-radius:50%;
-}
-.quote-meta b{display:block;font-family:var(--bung);font-size:15px;color:#ffd27a;font-weight:400}
-.quote-meta small{color:#8a9bb2;font-size:12px;font-weight:600}
-.quote-status{margin-left:auto;font-family:var(--bung);font-size:12px;padding:3px 10px;border-radius:8px;border:2px solid #000}
-.quote-ok .quote-status{background:#2fbf71;color:#fff}
-.quote-ko .quote-status{background:#ff4b2b;color:#fff}
-.quote-timeout .quote-status{background:#6b778a;color:#fff}
-.quote-text{font-size:15px;font-style:italic;color:#e0e7f2;line-height:1.45;margin:0;padding-left:50px}
-.chartier-tip{background:#0d111a!important;border-color:#e5a93c!important;color:#cbd8e8!important}
-.chartier-tip b{color:#ffd27a!important}
-
-/* Bannières d'offre finale */
-.verdict-banner{
-  border-radius:14px;padding:16px 20px;text-align:center;margin:12px auto 18px;border:3px solid #000;box-shadow:5px 5px 0 rgba(0,0,0,.5);
-}
-.verdict-banner h3{margin:4px 0 6px;font-family:var(--bung);font-size:20px;font-weight:400;letter-spacing:.5px}
-.verdict-banner p{margin:0;font-size:14px;font-weight:600;line-height:1.4}
-.offer-stamp{
-  display:inline-block;font-family:var(--bung);font-size:12px;letter-spacing:1.5px;padding:3px 12px;border-radius:20px;
-  background:rgba(0,0,0,.3);margin-bottom:6px;border:1px solid rgba(255,255,255,.2);
-}
-.offer-top{background:linear-gradient(135deg,#ffd700,#ffae19);color:#0c0e14;border-color:#634300}
-.offer-mid{background:linear-gradient(135deg,#e8f0fe,#a6c0e8);color:#0c0e14;border-color:#2b3d57}
-.offer-low{background:linear-gradient(135deg,#e09968,#ad5926);color:#fff;border-color:#4a2107}
-.offer-rejected{background:linear-gradient(135deg,#2b3140,#161922);color:#cfd8e5;border-color:#000}
+/* fin de partie */
+.verdict-banner{border-radius:14px;padding:16px 20px;text-align:center;margin:8px auto 18px;border:3px solid #000;box-shadow:5px 5px 0 rgba(0,0,0,.5);animation:stamp .55s .2s cubic-bezier(.2,1.5,.4,1) both}
+.verdict-banner h3{margin:6px 0;font-family:var(--bung);font-size:22px;font-weight:400}
+.verdict-banner p{margin:4px 0 0;font-size:14px;font-weight:600;line-height:1.4}
+.verdict-banner .offer-stats{opacity:.85;font-size:13px}
+.offer-stamp{display:inline-block;font-family:var(--bung);font-size:12px;letter-spacing:1.5px;padding:3px 12px;border-radius:20px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.25)}
+.offer-top{background:linear-gradient(135deg,#ffd700,#e5a93c);color:#0c0e14}
+.offer-mid{background:linear-gradient(135deg,#1f6f45,#2fbf71);color:#fff}
+.offer-low{background:linear-gradient(135deg,#7a4a1c,#c47a36);color:#fff}
+.offer-rejected{background:linear-gradient(135deg,#2b3140,#161922);color:#cfd8e5}
+.game.mode-chartier .step .who span{color:var(--dim)}
+.game.mode-chartier .step .who i,.game.mode-chartier .step .block{border-color:#000}
+.game.mode-chartier .stats th{color:var(--dim);border-bottom-color:var(--gold)}
+.game.mode-chartier .stats td{border-bottom-color:#232c40}
+.game.mode-chartier .stats tr.me td{background:#2a2412}
+.game.mode-chartier .strip i{border-color:#000}
+.game.mode-chartier .strip i.ko{background:var(--down)}
+.game.mode-chartier .recap{background:#0d111a;border-color:var(--edge)}
+.game.mode-chartier .recap summary span{color:var(--dim)}
+.game.mode-chartier .recap li{background:#151b29}
+.game.mode-chartier .recap .rq b{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px}
+.game.mode-chartier .recap .ra .mine{color:#ffb3a5}.game.mode-chartier .recap .ra .good{color:#7ff0ad}
+.game.mode-chartier .recap .rt{color:var(--dim)}
+.game.mode-chartier .recap.perfect{background:#0f2a1b}
 
 @media (max-width:820px){
-  .chartier-choices{grid-template-columns:1fr;gap:8px}
-  .btn-choice{min-height:48px;padding:8px 12px;font-size:14px}
-  .quote-text{padding-left:0}
+  .game.mode-chartier .ticker{position:absolute;left:8px;right:8px;top:134px;height:30px;font-size:12px}
+  .game.mode-chartier.noroster .ticker{top:62px}
+  .game.mode-chartier .tools{margin-left:auto}
+  .game.mode-chartier .stage{top:170px;bottom:70px}
+  .game.noroster .stage{left:8px;top:100px}
+  .cand-choices{grid-template-columns:1fr;gap:8px;margin-top:12px}
+  .cchoice{min-height:50px;font-size:15px;padding:8px 36px 8px 10px}
+  .cchoice .cl{width:30px;height:30px;font-size:14px}
+  .cand-choices.rev{grid-template-columns:1fr 1fr;gap:6px}
+  .cand-choices.rev .cchoice{min-height:44px;font-size:13px;padding:6px 8px;gap:8px}
+  .cand-choices.rev .cchoice .cl{width:24px;height:24px;font-size:12px}
+  .cand-choices.rev .who{display:none}
+  .live{display:none}
+  .qtext.cand{font-size:19px;margin-top:10px}
+  .chartier-quote{padding:10px}
+  .quote-avatar{width:34px;height:34px;font-size:12px}
+}
+
+/* correction en deux colonnes quand la place le permet : la question et les réponses à gauche, le verdict à droite */
+.card.reveal.cand{width:min(1080px,100%);padding:18px 22px}
+.card.reveal.cand .buzz{margin:-4px -6px 10px;padding:6px 12px}
+.card.reveal.cand .qrecall{margin-top:8px}
+.card.reveal.cand .cand-choices.rev{margin:10px 0 0}
+.card.reveal.cand .chartier-quote{margin:0 0 10px}
+.card.reveal.cand .tip{margin-bottom:10px;padding:8px 12px}
+.card.reveal.cand .results li{padding:4px 10px}
+.card.reveal.cand .sabhint{margin-top:8px}
+.card.reveal.cand .nextbar{margin-top:10px}
+@media (min-width:900px){
+  .rv-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .rv-l .cand-choices.rev{grid-template-columns:1fr}
+  .rv-l .qrecall{text-align:left}
+  .rv-r .chartier-quote{margin-top:8px}
+}
+@media (min-width:900px){
+  .rv-r .results li{flex-wrap:nowrap}
+  .rv-r .results .nm{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rv-r .results .tag{white-space:nowrap}
 }

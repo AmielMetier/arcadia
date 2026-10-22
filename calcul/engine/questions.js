@@ -1,4 +1,3 @@
-import { CHARTIER_QUESTIONS, getQuestionsByLevel } from './chartier-data.js';
 // Générateur de questions de Tête de Calcul. Pur et reproductible : la question n° i d'une partie ne dépend
 // que de la graine de la partie, de i et du réglage. N'importe quel joueur peut donc la recalculer
 // (reprise après migration d'hôte), et les tests tournent sous Node.
@@ -11,6 +10,7 @@ import { CHARTIER_QUESTIONS, getQuestionsByLevel } from './chartier-data.js';
 //   tip     l'astuce qui permettait d'aller vite
 import { rngOf } from './rng.js';
 import { evalExpr } from './expr.js';
+import { getQuestionsByLevel } from './chartier-data.js';
 
 export const CATS = {
   base:     { label: 'Calcul',            pts: 1, color: '#2b8cff', icon: '±' },
@@ -78,7 +78,7 @@ const D = (diff) => Math.max(0, DIFFS.indexOf(diff)); // 0, 1, 2
 const between = (r, a, b) => a + r.int(b - a + 1);
 const pick = (r, list) => list[r.int(list.length)];
 const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
-const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22], chartier: [20, 25, 35] };
+const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22] };
 
 /* ------------------------------------------------------------ les 4 opérations */
 function base(r, d) {
@@ -634,25 +634,28 @@ function devinette(r, d) {
 
 
 /* ------------------------------------------------------------ The Candidate (Pierre Chartier) */
-function chartier(r, d) {
-  const levelName = DIFFS[d] || 'normal';
-  const pool = getQuestionsByLevel(levelName);
-  const q = pick(r, pool);
-
+// Comme dans l'émission, ça monte en pression : premier tour, puis desk, puis comité final.
+// La finale (dernière question) est toujours tirée au niveau le plus dur du réglage.
+export const TIER_LABEL = { 1: 'Premier tour', 2: 'Desk', 3: 'Comité final' };
+export function chartierTier(d, i, len) {
+  const last = i >= len - 1, f = len > 1 ? i / (len - 1) : 1;
+  if (d === 0) return last || f >= 0.7 ? 2 : 1;
+  if (d === 1) return last || f >= 0.8 ? 3 : f < 0.3 ? 1 : 2;
+  return f < 0.25 && !last ? 2 : 3;
+}
+const CH_POOL = { 1: getQuestionsByLevel('facile'), 2: getQuestionsByLevel('normal'), 3: getQuestionsByLevel('expert') };
+const CH_TIME = { 1: 12, 2: 17, 3: 24 };
+function chartier(r, d, i = 0, len = 10) {
+  const tier = chartierTier(d, i, len);
+  const q = pick(r, CH_POOL[tier]);
+  // les choix sont mélangés à chaque tirage : la bonne réponse n'a pas de place fixe
+  const choices = r.shuffle([q.good, ...q.wrong]);
+  const longest = Math.max(...choices.map((c) => c.length));
   return {
-    kind: 'chartier',
-    text: q.text,
-    sub: `Niveau ${q.level.toUpperCase()} · ${q.cat}`,
-    input: 'chartier',
-    time: q.time || 20,
-    answer: q.cleanAns,
-    rawAns: q.rawAns,
-    show: q.show || q.rawAns,
-    tip: q.tip,
-    choices: q.choices,
-    correctChoice: q.correctChoice,
-    aliases: q.aliases,
-    isChartier: true,
+    kind: 'chartier', text: q.text, sub: `${q.cat} · ${TIER_LABEL[tier]}`,
+    time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0),
+    answer: choices.indexOf(q.good), choices, show: q.good, tip: q.tip,
+    isChartier: true, pts: tier, tier, rubric: q.cat,
   };
 }
 
@@ -673,21 +676,21 @@ export const KINDS = {
   chartier: ['chartier'],
 };
 
-export function makeQuestion(seed, i, cat, diff, salt = 0) {
+export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
   const r = rngOf({ seed: qSeed(seed, i, salt) });
   const d = D(diff);
-  const q = GEN[cat](r, d);
+  const q = GEN[cat](r, d, i, len);
   return {
     cat, kind: q.kind, text: q.text, sub: q.sub || '',
-    eq: q.isChartier ? false : (q.eq !== false && !q.choices && !q.fig),
-    input: q.isChartier ? 'chartier' : (q.choices ? 'choice' : q.input || 'num'),
+    eq: q.eq !== false && !q.choices && !q.fig,
+    input: q.choices ? 'choice' : q.input || 'num',
     time: q.time || (TIME[cat] ? TIME[cat][d] : 20),
     answer: q.answer, tol: q.tol || 0, show: q.show || (q.choices ? q.choices[q.answer] : fmt(q.answer)), tip: q.tip || '',
     nums: q.nums || null, target: q.target ?? null, sol: q.sol || null, choices: q.choices || null, fig: q.fig || null,
-    correctChoice: q.correctChoice || null, aliases: q.aliases || null, isChartier: !!q.isChartier,
+    pts: q.pts || CATS[cat].pts, isChartier: !!q.isChartier, tier: q.tier || 0, rubric: q.rubric || null,
     key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
 
 // Ce que voient les joueurs pendant la question (sans la réponse)
-export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier });
+export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric });

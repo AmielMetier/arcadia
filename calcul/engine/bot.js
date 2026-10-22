@@ -6,7 +6,7 @@ const SKILL = {
   normal: { acc: 0.75, speed: 0.45, skip: 0.07 },
   expert: { acc: 0.9, speed: 0.3, skip: 0.02 },
 };
-const HARD = { base: 1, astuce: 0.85, theorie: 0.85, fraction: 0.85, suite: 0.85, estim: 0.9, compte: 0.6, vf: 0.95, compare: 0.9, equation: 0.85, geo: 0.8, devinette: 0.7, chartier: 0.88 };
+const HARD = { base: 1, astuce: 0.85, theorie: 0.85, fraction: 0.85, suite: 0.85, estim: 0.9, compte: 0.6, vf: 0.95, compare: 0.9, equation: 0.85, geo: 0.8, devinette: 0.7 };
 
 // q : question complète (avec la réponse) ; renvoie { delay (ms), raw } ou null (le bot sèche)
 export function botAnswer(q, level, rnd = Math.random) {
@@ -16,16 +16,8 @@ export function botAnswer(q, level, rnd = Math.random) {
   // temps de réponse : autour de speed × limite, jamais avant 1,2 s
   const spread = 0.55 + rnd() * 0.9;
   const delay = Math.max(1200, Math.min(limit - 300, limit * k.speed * spread * (q.cat === 'base' ? 0.8 : 1)));
-  const right = rnd() < k.acc * (HARD[q.cat] || 1);
-  if (q.isChartier || q.input === 'chartier') {
-    if (right) return { delay, raw: q.correctChoice || q.answer };
-    if (q.choices && q.choices.length) {
-      const wrongs = q.choices.filter((c) => c !== q.correctChoice);
-      const picked = wrongs[Math.floor(rnd() * wrongs.length)] || wrongs[0];
-      return { delay, raw: picked };
-    }
-    return { delay, raw: '0' };
-  }
+  // The Candidate : plus le tour est avancé, plus les bots se trompent
+  const right = rnd() < k.acc * (q.isChartier ? [1, 0.97, 0.86, 0.72][q.tier || 2] : HARD[q.cat] || 1);
   if (q.input === 'choice') return { delay: delay * 0.7 + 600, raw: String(right ? q.answer : (q.answer + 1 + Math.floor(rnd() * (q.choices.length - 1))) % q.choices.length) };
   if (q.input === 'expr') {
     if (right) return { delay, raw: q.sol };

@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.22 — 22 octobre 2026
+## 2.24 — 22 octobre 2026
 - **Bastion Clash** — Construction au clavier : avec un VCS sélectionné, **B** ouvre le menu puis **1-0 / R** choisit le bâtiment. Les chiffres seuls rappellent toujours tes groupes de contrôle.
 - **Bastion Clash** — Les grosses batailles restent fluides, même en 2 contre 2 avec plus de 200 unités.
 - **Bastion Clash** — Nouvelle faction jouable : **la Synthèse** 💠, des machines qui s'assemblent seules.
@@ -39,12 +39,31 @@
   - le rayon de soin des Navettes Médicales est enfin visible ;
   - la touche C envoie récolter près de la souris, la sélection au cadre suit exactement le cadre tracé, et la caméra ne défile plus toute seule après un changement de fenêtre.
 
-## 2.21 — 22 octobre 2026
+## 2.23 — 22 octobre 2026
 - **Bastion Clash** — Les longues parties ne ralentissent plus : à partir de 8-10 minutes, le jeu passait au ralenti pour tout le monde dès que les armées grossissaient.
 - **Bastion Clash** — Les unités contournent les bâtiments au lieu de se coincer contre eux, et les armées des bots sortent enfin de leur base.
 - **Bastion Clash** — En chacun pour soi, les bots ne s'acharnent plus tous sur l'hôte : chacun choisit un adversaire proche et ils se répartissent les cibles.
 - **Bastion Clash** — Les longues parties ne font plus grimper la mémoire de la carte graphique (explosions et unités détruites).
 - **Bastion Clash** — Si l'hôte passe sur un autre onglet, la partie continue à vitesse normale au lieu de presque s'arrêter.
+
+## 2.22 — 22 octobre 2026
+- **Tête de Calcul** — Tout tient à l'écran, sans faire défiler :
+  - La carte s'ajuste toute seule à la hauteur de la fenêtre (question, correction, accueil), même sur un petit écran d'ordinateur.
+  - En The Candidate, la correction passe sur deux colonnes : la question et les quatre réponses à gauche, le verdict de Pierre Chartier, le décryptage et les scores à droite.
+  - Le bandeau de cotations remonte dans la barre du haut pour laisser plus de place.
+  - Avant la partie, la carte d'accueil est bien centrée.
+
+## 2.21 — 22 octobre 2026
+- **Tête de Calcul** — Le mode The Candidate est entièrement refait :
+  - Plus de 300 questions réécrites (marchés, corporate finance, dérivés, taux, calcul mental, probabilités, brainteasers) : énoncés clairs, et trois mauvaises réponses crédibles, au même format que la bonne (fini le seul entier au milieu de trois nombres à virgule).
+  - Les réponses sont mélangées à chaque partie, et chaque correction explique vraiment le raisonnement (« Le décryptage »).
+  - La difficulté monte comme dans l'émission : Premier tour (100 pts), Desk (200 pts), Comité final (300 pts) ; la finale quitte ou double tombe toujours au niveau le plus dur.
+  - Réponse en un clic ou au clavier avec 1 2 3 4 ou A B C D (les raccourcis ne marchaient pas avant).
+  - À la correction, on voit les quatre réponses, la bonne en vert, la sienne en rouge si elle est fausse, et qui a choisi quoi.
+  - Pierre Chartier réagit selon ta réponse et ta vitesse, et rend à la fin un verdict selon ta justesse : offre immédiate, offre validée, période d'essai ou candidature rejetée.
+  - Bandeau de cotations fixe en haut de l'écran, avec les joueurs cotés comme des actions qui montent ou chutent à chaque question.
+  - Nouvelle musique de salle de marché qui tourne toute la partie : cloche d'ouverture, le rythme s'emballe quand le chrono file, gros coups de cuivres sur la finale, et le son s'étouffe le temps de la correction. Bouton 🎵 pour la couper.
+  - Mise en page corrigée : textes lisibles partout sur le fond sombre, carte de question qui ne glisse plus sur le côté, affichage propre sur téléphone.
 
 ## 2.20 — 22 octobre 2026
 - **DavidSimulator** — Échanges :
