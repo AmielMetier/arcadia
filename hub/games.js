@@ -174,14 +174,16 @@ window.HUB_GAMES = [
   {
     id: 'outbreak',
     title: 'Outbreak : Secteur Zéro',
-    tag: 'Shooter Zombie Roguelite 2D',
-    desc: 'Shooter twin-stick cartoon et nerveux ! Éliminez les hordes mutantes salle par salle, déverrouillez l\'arsenal et terrassez le Spécimen Zéro en coop.',
+    tag: 'Survie zombie en coop',
+    desc: 'Twin-stick en équipe : traversez le labo salle par salle, choisissez votre chemin et vos améliorations, relevez vos alliés et abattez le Spécimen Zéro. Ou tenez en mode Survie.',
     url: 'outbreak/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#f43f5e',
     settings: [
-      { key: 'difficulty', label: 'Intensité épidémie', options: [['normal', 'Normale'], ['hardcore', 'Hardcore · Cauchemar'], ['arcade', 'Arcade · Action']], def: 'normal' },
-      { key: 'startingWeapon', label: 'Arme de départ', options: [['pistol', '🔫 Pistolet 9mm'], ['shotgun', '💥 Spas-12 Pompe'], ['smg', '⚡ Mitraillette MP5']], def: 'pistol' },
+      { key: 'mode', label: 'Mode', options: [['campaign', 'Campagne · 7 salles'], ['survival', 'Survie · vagues infinies']], def: 'campaign' },
+      { key: 'difficulty', label: 'Difficulté', options: [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], def: 'normal' },
+      { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
+      { key: 'startWeapon', label: 'Arme de départ', options: [['pistol', 'Pistolet'], ['shotgun', 'Fusil à pompe'], ['smg', 'Mitraillette']], def: 'pistol' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>

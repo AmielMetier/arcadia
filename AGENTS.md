@@ -38,6 +38,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
 - Registre des jeux et de leurs réglages : `hub/games.js`. Ajouter un jeu : `docs/NOUVEAU-JEU.md`.
-- Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul ou Fil Rouge :
-  `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`.
+- Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge ou Outbreak :
+  `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
+  `node tools/test-outbreak.mjs`.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

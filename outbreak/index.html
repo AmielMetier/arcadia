@@ -1,97 +1,45 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Outbreak : Secteur Zéro — Duo-Drift Hub</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Outbreak : Secteur Zéro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Canvas principal du jeu -->
-  <canvas id="game-canvas"></canvas>
+<canvas id="game"></canvas>
 
-  <!-- Navigation Hub -->
-  <a href="../" class="hub-back-btn" title="Retourner au menu du Hub Duo-Drift">
-    <span>←</span> Retour au Hub
-  </a>
-
-  <!-- Écran de briefing et commandes de mission -->
-  <div id="start-overlay">
-    <div class="briefing-box">
-      <h1 class="game-title">OUTBREAK : SECTEUR ZÉRO</h1>
-      <div class="game-subtitle">Survie Roguelite Coopérative (1 à 5 Joueurs)</div>
-
-      <div class="instructions-grid">
-        <div class="instr-card">
-          <span class="instr-key">ZQSD / WASD</span>
-          <span class="instr-desc">Déplacement tactique du garde</span>
-        </div>
-        <div class="instr-card">
-          <span class="instr-key">Souris + Clic Gauche</span>
-          <span class="instr-desc">Visée à 360° & Tir à l'arme à feu</span>
-        </div>
-        <div class="instr-card">
-          <span class="instr-key">Espace / Clic Droit</span>
-          <span class="instr-desc">Roulade d'esquive tactique (i-frames)</span>
-        </div>
-        <div class="instr-card">
-          <span class="instr-key">Touche [R]</span>
-          <span class="instr-desc">Rechargement manuel de l'arme</span>
-        </div>
-        <div class="instr-card">
-          <span class="instr-key">Touches [1] / [2] / [Q]</span>
-          <span class="instr-desc">Alterner entre arme primaire et secondaire</span>
-        </div>
-        <div class="instr-card">
-          <span class="instr-key">Touche [E]</span>
-          <span class="instr-desc">Maintenir pour réanimer un allié à terre</span>
-        </div>
-      </div>
-
-      <button id="start-btn" class="start-btn">DÉPLOYER L'ESCOUADE</button>
-    </div>
+<div id="hud" hidden>
+  <div class="hud-tl">
+    <div class="room card"><small id="roomN">SALLE 1/7</small><b id="roomName">Sas</b></div>
+    <div class="status card" id="status"></div>
   </div>
+  <div class="hud-tr">
+    <div class="card stats"><span title="Score de l'escouade">★ <b id="score">0</b></span><span title="Zombies éliminés">☠ <b id="kills">0</b></span><span title="Temps">⏱ <b id="clock">0:00</b></span></div>
+    <button class="icon card" id="btnMute" title="Son (M)">🔊</button>
+    <button class="icon card" id="btnMenu" title="Menu (Échap)">☰</button>
+  </div>
+  <div class="boss" id="boss" hidden><span>☣ SPÉCIMEN ZÉRO</span><div class="bar"><i id="bossBar"></i></div></div>
+  <div class="team" id="team"></div>
+  <div class="me card" id="mePanel">
+    <div class="row"><b id="meName">Moi</b><span class="dash" id="dash"></span><span class="nades" id="nades"></span></div>
+    <div class="bar hp"><i id="hpBar"></i><span id="hpTxt">100</span></div>
+    <div class="bar ar"><i id="arBar"></i><span id="arTxt">25</span></div>
+    <div class="perks" id="perks"></div>
+  </div>
+  <div class="weapons" id="weapons"></div>
+  <div class="prompt" id="prompt" hidden></div>
+  <div class="toast" id="toast"></div>
+  <div class="offers" id="offers" hidden></div>
+  <div class="tbtns" id="tbtns"><button data-a="use" title="Relever / prendre">✋</button><button data-a="sw" title="Changer d'arme">🔫</button><button data-a="reload" title="Recharger">🔄</button><button data-a="nade" title="Grenade">💣</button><button data-a="dash" title="Roulade">🌀</button></div>
+</div>
 
-  <!-- Scripts Hub et Moteur de Jeu -->
-  <script src="../shared/bridge.js"></script>
-  <script type="module">
-    import { OutbreakGame } from './main.js';
+<div id="screen" class="screen"></div>
 
-    window.addEventListener('DOMContentLoaded', () => {
-      const canvas = document.getElementById('game-canvas');
-      const startOverlay = document.getElementById('start-overlay');
-      const startBtn = document.getElementById('start-btn');
-
-      const game = new OutbreakGame(canvas);
-
-      function startGame() {
-        if (game.audio && game.audio.init) {
-          game.audio.init();
-        }
-        startOverlay.classList.add('hidden');
-        game.start();
-      }
-
-      startBtn.addEventListener('click', startGame);
-
-      // Si le joueur appuie sur Espace ou Entrée depuis l'écran d'accueil
-      window.addEventListener('keydown', (e) => {
-        if (!game.running && (e.key === ' ' || e.key === 'Enter')) {
-          startGame();
-        } else if (game.gameOver || game.gameWon) {
-          if (e.key === ' ' || e.key === 'Enter') {
-            window.location.reload();
-          }
-        }
-      });
-
-      // Relancer au clic en fin de partie
-      canvas.addEventListener('click', () => {
-        if (game.gameOver || game.gameWon) {
-          window.location.reload();
-        }
-      });
-    });
-  </script>
+<script src="../shared/bridge.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

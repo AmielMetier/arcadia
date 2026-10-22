@@ -146,8 +146,9 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 - **Horloges** : les machines ne sont pas à l'heure ; l'hôte envoie `now` et chaque invité calcule son décalage.
   La durée de réponse est mesurée à la réception chez l'hôte (la latence pèse un peu sur les invités).
 - **Sons** : le navigateur bloque l'audio avant un clic ; créer l'`AudioContext` au premier `pointerdown`.
-- **État du dépôt** : `hub/games.js` contenait déjà une entrée `outbreak` (« Outbreak : Secteur Zéro ») alors que le dossier
-  `outbreak/` n'existe pas : la carte s'affiche dans le salon mais le lancement ouvre une page 404.
+- **Temps réel** : pour un jeu d'action, voir Outbreak (`outbreak/app.js`) : l'hôte simule à 60 Hz et diffuse l'état à 20 Hz,
+  les invités envoient leurs commandes (compteurs pour les actions ponctuelles), prédisent leur propre déplacement et
+  affichent les autres avec ~110 ms de retard, interpolés entre deux états.
 
 ## 9. Étendre Tête de Calcul
 

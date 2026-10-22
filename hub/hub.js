@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.16';
+  const VERSION = '2.17';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -146,7 +146,7 @@
     const rows = DDResults.table({ game: lbGame, only, bots: lbBots });
     const myUid = me.uid;
     const recent = DDResults.recent(40).filter((r) => lbGame === 'all' || r.game === lbGame).slice(0, 8);
-    const scoreLabel = lbGame === 'david' ? 'Meilleur patrimoine' : lbGame === 'drift' ? 'Meilleurs points' : lbGame === 'bastion' || lbGame === 'calcul' ? 'Meilleur score' : lbGame === 'outbreak' ? 'Salles nettoyées / Score' : lbGame === 'filrouge' ? 'Secondes restantes' : '';
+    const scoreLabel = lbGame === 'david' ? 'Meilleur patrimoine' : lbGame === 'drift' ? 'Meilleurs points' : lbGame === 'bastion' || lbGame === 'calcul' || lbGame === 'outbreak' ? 'Meilleur score' : lbGame === 'filrouge' ? 'Secondes restantes' : '';
     ov.querySelector('.lbbody').innerHTML = `
       <div class="lbfilters"><div class="seg">${Object.entries(GNAME).map(([k, l]) => `<button data-g="${k}" class="${lbGame === k ? 'sel' : ''}">${l}</button>`).join('')}</div>
         ${inRoom ? `<label class="ck"><input type="checkbox" id="lbOnly" ${lbOnly ? 'checked' : ''}> Joueurs du salon</label>` : ''}
@@ -156,7 +156,7 @@
           <td><b>${x.wins}</b></td><td>${x.games}</td><td>${Math.round((x.wins / x.games) * 100)} %</td><td>${x.podiums}</td>${scoreLabel ? `<td>${lbGame === 'david' ? x.best.toLocaleString('fr-FR') + ' €' : x.best}</td>` : ''}</tr>`).join('')}</tbody></table>`
       : '<p class="lbempty">Pas encore de partie terminée. Le classement se remplit tout seul à la fin de chaque partie.</p>'}
       ${recent.length ? `<h3>Dernières parties</h3><ul class="lbrecent">${recent.map((r) => { const w = r.players.find((p) => p.rank === 1);
-        return `<li><span class="g">${r.game === 'david' ? '🎲' : r.game === 'bastion' ? '🏰' : r.game === 'calcul' ? '🧮' : r.game === 'filrouge' ? '💣' : '🏎️'}</span><span>${esc(GNAME[r.game])}${r.mode ? ' · ' + esc(r.mode) : ''}</span><b>${w ? '🏆 ' + esc(w.name) : ''}</b><small>${r.players.length} joueurs · ${ago(r.at)}</small></li>`; }).join('')}</ul>` : ''}
+        return `<li><span class="g">${r.game === 'david' ? '🎲' : r.game === 'bastion' ? '🏰' : r.game === 'calcul' ? '🧮' : r.game === 'filrouge' ? '💣' : r.game === 'outbreak' ? '🧟' : '🏎️'}</span><span>${esc(GNAME[r.game])}${r.mode ? ' · ' + esc(r.mode) : ''}</span><b>${w ? '🏆 ' + esc(w.name) : ''}</b><small>${r.players.length} joueurs · ${ago(r.at)}</small></li>`; }).join('')}</ul>` : ''}
       <p class="nthint">Historique partagé : quand vous vous retrouvez dans un salon, les parties de chacun sont mises en commun.</p>`;
     for (const b of ov.querySelectorAll('[data-g]')) b.onclick = () => { lbGame = b.dataset.g; renderBoard(); };
     const o = ov.querySelector('#lbOnly'); if (o) o.onchange = () => { lbOnly = o.checked; renderBoard(); };

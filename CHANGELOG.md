@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.17 — 22 octobre 2026
+- **Outbreak : Secteur Zéro** — Le jeu de zombies est entièrement refait, graphismes et gameplay.
+  - Vraie coop en ligne jusqu'à 5 : tout le monde voit les mêmes zombies, son propre survivant répond sans délai, et si l'hôte part, un autre joueur reprend la partie.
+  - Campagne de 7 salles : à chaque salle nettoyée, deux portes annoncent leur récompense (Armurerie, Infirmerie, Laboratoire, Entrepôt) et l'escouade choisit son chemin jusqu'au Noyau et au boss, le Spécimen Zéro (3 phases : charge, onde de choc, salves d'acide, renforts).
+  - Nouveau mode Survie : vagues sans fin dans un hangar, avec une brute toutes les 5 vagues et le boss toutes les 10.
+  - Améliorations façon roguelite entre les salles : 22 cartes (dégâts, cadence, vampirisme, ricochets, réaction en chaîne, second souffle…), communes, rares ou épiques.
+  - 8 armes (pistolet, mitraillette, pompe, fusil d'assaut, lance-flammes, lance-grenades, fusil à rail, minigun), grenades à lancer, roulade invulnérable.
+  - 7 sortes de zombies qui se reconnaissent au premier coup d'œil : rôdeurs, coureurs, rampants, cracheurs (flaques d'acide), gonflés qui explosent, hurleuses qui enragent la horde, brutes qui chargent. Les attaques dangereuses sont annoncées au sol.
+  - À terre, on peut encore ramper et tirer au pistolet pendant que les autres viennent vous relever (maintenir E) ; les K.O. reviennent à la salle suivante.
+  - Équipiers IA (réglage « Équipiers IA ») : ils suivent, tirent, relèvent, ramassent et franchissent les portes avec vous.
+  - Nouveau style dessiné à la main, dans l'esprit du Hub : lampes torches dans le noir, sang et cadavres qui restent au sol, explosions, barils, caisses à casser, sons et musique qui montent avec le combat.
+  - Manette et écran tactile pris en charge ; difficulté Arcade, Normale ou Cauchemar ; le score de chacun entre au classement entre potes.
+
 ## 2.16 — 22 octobre 2026
 - **Fil Rouge** — Nouveau jeu : désamorçage à deux voix, de 2 à 6 joueurs. Le démineur voit la bombe en 3D mais n'a pas le manuel ; l'expert a le manuel posé sur sa table mais ne voit pas la bombe. Il faut se parler !
   - Coopération, ou Duel 2 contre 2 : les deux équipes ont la même bombe, la première qui la désamorce gagne.

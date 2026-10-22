@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul et Fil Rouge
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge et Outbreak
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -40,18 +40,28 @@ l'expert a le manuel posé sur sa table, un livret 3D dont les règles changent 
 - **4 difficultés**, de l'Initiation (2 modules) à Difficile (7 modules)
 - Conception et idées pour la suite : [docs/FIL-ROUGE.md](docs/FIL-ROUGE.md)
 
+## Outbreak : Secteur Zéro
+Survie zombie en coop, vue de dessus (twin-stick), jusqu'à 5 joueurs, avec équipiers IA possibles.
+
+- **Campagne** : 7 salles, on choisit sa porte selon la récompense (armes, soins, améliorations, munitions), boss final en 3 phases
+- **Survie** : vagues sans fin, brutes et boss réguliers
+- **Roguelite** : 22 améliorations à cumuler, 8 armes, grenades, roulade
+- **Coop** : relever les alliés à terre, partage de l'écran de fin, classement entre potes
+- Clavier/souris, manette ou écran tactile
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator ;
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
-  `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge.
+  `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
+  `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.16** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.17** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel and Claude
