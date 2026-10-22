@@ -41,4 +41,6 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge ou Outbreak :
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
   `node tools/test-outbreak.mjs`.
+- Bastion Clash : `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
+  le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.
 - Commits : auteur et messages en français, un message qui décrit ce que le joueur gagne.

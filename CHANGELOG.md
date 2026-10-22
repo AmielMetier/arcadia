@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.21 — 22 octobre 2026
+- **Bastion Clash** — Les longues parties ne ralentissent plus : à partir de 8-10 minutes, le jeu passait au ralenti pour tout le monde dès que les armées grossissaient.
+- **Bastion Clash** — Les unités contournent les bâtiments au lieu de se coincer contre eux, et les armées des bots sortent enfin de leur base.
+- **Bastion Clash** — En chacun pour soi, les bots ne s'acharnent plus tous sur l'hôte : chacun choisit un adversaire proche et ils se répartissent les cibles.
+- **Bastion Clash** — Les longues parties ne font plus grimper la mémoire de la carte graphique (explosions et unités détruites).
+- **Bastion Clash** — Si l'hôte passe sur un autre onglet, la partie continue à vitesse normale au lieu de presque s'arrêter.
+
 ## 2.20 — 22 octobre 2026
 - **DavidSimulator** — Échanges :
   - Quand un bot te fait une proposition, tu as maintenant 60 secondes pour répondre (au lieu de 25), avec un compte à rebours dans la fenêtre et dans la barre du bas (« Mamé Rose attend ta réponse · 42 s »). Si tu fermes la fenêtre, le bouton « Voir la proposition » la rouvre.

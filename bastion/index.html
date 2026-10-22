@@ -680,10 +680,19 @@ let terrainActive = true;
 const LIQUID_LABEL = { vallee: 'la rivière', magma: 'la lave', glace: 'la crevasse' };
 
 // ---- Pathfinding par champs de flux (Dijkstra) mis en cache par cellule-objectif ----
+// La grille connaît le relief ET les bâtiments : sans eux, les unités fonçaient dans leurs propres
+// bâtiments et restaient coincées dans leur base.
 const PATH_CELL = 20;
 let PATH_N = 1;
-let pathBlocked = new Uint8Array(1);
+let pathTerrain = new Uint8Array(1);   // relief infranchissable
+let pathBld = new Uint8Array(1);       // emprise des bâtiments
+let pathBlocked = new Uint8Array(1);   // relief + bâtiments (ce que suit le Dijkstra)
+let pathBldSig = 0;
 const flowCache = new Map();
+const FLOW_CACHE_MAX = 64;
+const FLOW_BUILDS_PER_TICK = 4;        // champs neufs calculés au plus par pas de simulation
+let flowBuildsLeft = FLOW_BUILDS_PER_TICK;
+const WAYPOINT_TTL = 0.3;              // une unité garde son point de passage 0,3 s avant de le recalculer
 const NB8 = [[1, 0, 10], [-1, 0, 10], [0, 1, 10], [0, -1, 10], [1, 1, 14], [1, -1, 14], [-1, 1, 14], [-1, -1, 14]];
 
 function setWorldSize(size) {
@@ -693,7 +702,10 @@ function setWorldSize(size) {
   terType = new Uint8Array(TER_N * TER_N);
   terH = new Float32Array(TER_N * TER_N);
   PATH_N = Math.ceil(size / PATH_CELL);
+  pathTerrain = new Uint8Array(PATH_N * PATH_N);
+  pathBld = new Uint8Array(PATH_N * PATH_N);
   pathBlocked = new Uint8Array(PATH_N * PATH_N);
+  pathBldSig = 0;
   flowCache.clear();
 }
 
@@ -1065,51 +1077,112 @@ function buildPathGrid() {
       if (isBlockedAt(cx + 6, cy - 6)) n++;
       if (isBlockedAt(cx - 6, cy + 6)) n++;
       if (isBlockedAt(cx + 6, cy + 6)) n++;
-      pathBlocked[gy * PATH_N + gx] = (isBlockedAt(cx, cy) || n >= 2) ? 1 : 0;
+      pathTerrain[gy * PATH_N + gx] = (isBlockedAt(cx, cy) || n >= 2) ? 1 : 0;
     }
   }
+  pathBld.fill(0);
+  pathBlocked.set(pathTerrain);
+  pathBldSig = 0;
+}
+// Recopie l'emprise des bâtiments dans la grille quand ils changent (pose, destruction, déplacement)
+function syncPathBuildings(st) {
+  let sig = st.buildings.length;
+  for (const b of st.buildings) {
+    if (b.hp <= 0) continue;
+    sig = (Math.imul(sig, 31) + b.id * 7 + (b.x | 0) * 13 + (b.y | 0)) | 0;
+  }
+  if (sig === pathBldSig) return;
+  pathBldSig = sig;
+  pathBld.fill(0);
+  for (const b of st.buildings) {
+    if (b.hp <= 0) continue;
+    const r = b.radius + 4;
+    const gx0 = Math.max(0, Math.floor((b.x - r) / PATH_CELL)), gx1 = Math.min(PATH_N - 1, Math.floor((b.x + r) / PATH_CELL));
+    const gy0 = Math.max(0, Math.floor((b.y - r) / PATH_CELL)), gy1 = Math.min(PATH_N - 1, Math.floor((b.y + r) / PATH_CELL));
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        if (hypot((gx + 0.5) * PATH_CELL, (gy + 0.5) * PATH_CELL, b.x, b.y) <= r) pathBld[gy * PATH_N + gx] = 1;
+      }
+    }
+  }
+  for (let i = 0; i < pathBlocked.length; i++) pathBlocked[i] = pathTerrain[i] | pathBld[i];
+  flowCache.clear();
 }
 function pathCellOf(x, y) {
   const gx = clamp(Math.floor(x / PATH_CELL), 0, PATH_N - 1), gy = clamp(Math.floor(y / PATH_CELL), 0, PATH_N - 1);
   return gy * PATH_N + gx;
 }
+// Cellule libre la plus proche (anneaux successifs autour de la cellule de départ)
+function nearestFreeCell(idx) {
+  if (!pathBlocked[idx]) return idx;
+  const cx = idx % PATH_N, cy = (idx / PATH_N) | 0;
+  for (let r = 1; r <= 24; r++) {
+    let best = -1, bestD = Infinity;
+    for (let oy = -r; oy <= r; oy++) {
+      for (let ox = -r; ox <= r; ox++) {
+        if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+        const nx = cx + ox, ny = cy + oy;
+        if (nx < 0 || ny < 0 || nx >= PATH_N || ny >= PATH_N) continue;
+        const ni = ny * PATH_N + nx;
+        const d = ox * ox + oy * oy;
+        if (!pathBlocked[ni] && d < bestD) { bestD = d; best = ni; }
+      }
+    }
+    if (best >= 0) return best;
+  }
+  return idx;
+}
+// Ligne droite praticable : relief franchissable et aucun bâtiment en travers
+// (on tolère les bâtiments au départ et à l'arrivée : unité collée à un mur, cible qui est un bâtiment)
+function pathSegmentClear(x1, y1, x2, y2, endTol = 70) {
+  if (!segmentClear(x1, y1, x2, y2)) return false;
+  const d = Math.hypot(x2 - x1, y2 - y1);
+  const n = Math.ceil(d / 10);
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    if (d * t < 24 || d * (1 - t) < endTol) continue;
+    if (pathBld[pathCellOf(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)]) return false;
+  }
+  return true;
+}
+// Tas binaire réutilisé d'un calcul à l'autre (pas d'allocation par cellule)
+let heapIdx = new Int32Array(1), heapCost = new Float32Array(1);
 function getFlowField(goalIdx) {
   let f = flowCache.get(goalIdx);
   if (f) { flowCache.delete(goalIdx); flowCache.set(goalIdx, f); return f; }
-  f = new Float32Array(PATH_N * PATH_N).fill(Infinity);
-  const heapI = [], heapC = [];
+  // Budget par pas : au-delà, l'unité garde son ancien point de passage et réessaie au pas suivant
+  if (flowBuildsLeft <= 0) return null;
+  flowBuildsLeft--;
+  const N2 = PATH_N * PATH_N;
+  if (heapIdx.length < N2 * 8 + 8) { heapIdx = new Int32Array(N2 * 8 + 8); heapCost = new Float32Array(N2 * 8 + 8); }
+  f = new Float32Array(N2).fill(Infinity);
+  let size = 0;
   const push = (i, c) => {
-    heapI.push(i); heapC.push(c);
-    let k = heapI.length - 1;
+    let k = size++;
     while (k > 0) {
       const p = (k - 1) >> 1;
-      if (heapC[p] <= heapC[k]) break;
-      [heapI[p], heapI[k]] = [heapI[k], heapI[p]]; [heapC[p], heapC[k]] = [heapC[k], heapC[p]];
+      if (heapCost[p] <= c) break;
+      heapIdx[k] = heapIdx[p]; heapCost[k] = heapCost[p];
       k = p;
     }
-  };
-  const pop = () => {
-    const ti = heapI[0], tc = heapC[0];
-    const li = heapI.pop(), lc = heapC.pop();
-    if (heapI.length) {
-      heapI[0] = li; heapC[0] = lc;
-      let k = 0;
-      for (;;) {
-        const l = 2 * k + 1, r = l + 1;
-        let m = k;
-        if (l < heapI.length && heapC[l] < heapC[m]) m = l;
-        if (r < heapI.length && heapC[r] < heapC[m]) m = r;
-        if (m === k) break;
-        [heapI[m], heapI[k]] = [heapI[k], heapI[m]]; [heapC[m], heapC[k]] = [heapC[k], heapC[m]];
-        k = m;
-      }
-    }
-    return [ti, tc];
+    heapIdx[k] = i; heapCost[k] = c;
   };
   f[goalIdx] = 0;
   push(goalIdx, 0);
-  while (heapI.length) {
-    const [ci, cc] = pop();
+  while (size > 0) {
+    const ci = heapIdx[0], cc = heapCost[0];
+    // Retire la racine : le dernier élément redescend à sa place
+    const li = heapIdx[--size], lc = heapCost[size];
+    let k = 0;
+    for (;;) {
+      const l = 2 * k + 1;
+      if (l >= size) break;
+      const m = l + 1 < size && heapCost[l + 1] < heapCost[l] ? l + 1 : l;
+      if (heapCost[m] >= lc) break;
+      heapIdx[k] = heapIdx[m]; heapCost[k] = heapCost[m];
+      k = m;
+    }
+    heapIdx[k] = li; heapCost[k] = lc;
     if (cc > f[ci]) continue;
     const cx = ci % PATH_N, cy = (ci / PATH_N) | 0;
     for (const [ox, oy, cost] of NB8) {
@@ -1123,25 +1196,23 @@ function getFlowField(goalIdx) {
     }
   }
   flowCache.set(goalIdx, f);
-  if (flowCache.size > 64) flowCache.delete(flowCache.keys().next().value);
+  if (flowCache.size > FLOW_CACHE_MAX) flowCache.delete(flowCache.keys().next().value);
   return f;
 }
 
-// Renvoie un point de passage intermédiaire si la ligne droite vers l'objectif est bloquée par le relief
-function routeWaypoint(u, gx, gy) {
-  if (!terrainActive || segmentClear(u.x, u.y, gx, gy)) return null;
-  let goalIdx = pathCellOf(gx, gy);
-  if (pathBlocked[goalIdx]) {
-    const land = nearestLand(gx, gy);
-    goalIdx = pathCellOf(land.x, land.y);
-  }
+// Renvoie un point de passage intermédiaire si la ligne droite vers l'objectif est bloquée (relief ou bâtiments).
+// (fx, fy) : objectif commun de l'ordre (le point cliqué), qui sert de cible au champ de flux ; ainsi toutes
+// les unités d'un même ordre partagent un seul calcul au lieu d'un par place de formation.
+function routeWaypoint(u, gx, gy, fx = gx, fy = gy, now = 0) {
+  if (!terrainActive || pathSegmentClear(u.x, u.y, gx, gy)) { u.wp = null; return null; }
+  const goalIdx = nearestFreeCell(pathCellOf(fx, fy));
+  // Point de passage encore frais et toujours visible : inutile de recalculer
+  if (u.wp && u.wpGoal === goalIdx && now - u.wpT < WAYPOINT_TTL && now >= u.wpT) return u.wp;
   const f = getFlowField(goalIdx);
+  if (!f) return u.wp && u.wpGoal === goalIdx ? u.wp : null;
   let cur = pathCellOf(u.x, u.y);
-  if (!Number.isFinite(f[cur])) {
-    // Unité coincée sur une cellule isolée : on repart de la cellule libre la plus proche
-    const l = nearestLand(u.x, u.y);
-    cur = pathCellOf(l.x, l.y);
-  }
+  // Unité sur une cellule bloquée (collée à un bâtiment, au bord d'une falaise) : on part de la cellule libre la plus proche
+  if (!Number.isFinite(f[cur])) cur = nearestFreeCell(cur);
   let best = null, last = null;
   for (let step = 0; step < 14; step++) {
     const cx = cur % PATH_N, cy = (cur / PATH_N) | 0;
@@ -1156,10 +1227,13 @@ function routeWaypoint(u, gx, gy) {
     cur = nb;
     const px = ((cur % PATH_N) + 0.5) * PATH_CELL, py = (((cur / PATH_N) | 0) + 0.5) * PATH_CELL;
     last = { x: px, y: py };
-    if (segmentClear(u.x, u.y, px, py)) best = last;
+    if (pathSegmentClear(u.x, u.y, px, py, 0)) best = last;
     else if (best) break;
   }
-  return best || last;
+  u.wp = best || last;
+  u.wpGoal = goalIdx;
+  u.wpT = now;
+  return u.wp;
 }
 
 /* ---------- Décor : arbres / cheminées / cristaux ---------- */
@@ -2403,8 +2477,15 @@ function createInitialState(roster, settings = {}) {
 function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
   const def = UNITS[kind];
   if (!def) return;
-  const rx = bld.rallyX ?? (bld.x + Math.sign(HALF_W - bld.x) * 110);
-  const ry = bld.rallyY ?? (bld.y + Math.sign(HALF_W - bld.y) * 110);
+  let rx = bld.rallyX ?? (bld.x + Math.sign(HALF_W - bld.x) * 110);
+  let ry = bld.rallyY ?? (bld.y + Math.sign(HALF_W - bld.y) * 110);
+  // Point de ralliement tombé sur un bâtiment : on le décale sur la case libre la plus proche
+  const rCell = pathCellOf(rx, ry);
+  if (pathBlocked[rCell]) {
+    const free = nearestFreeCell(rCell);
+    rx = ((free % PATH_N) + 0.5) * PATH_CELL;
+    ry = (((free / PATH_N) | 0) + 0.5) * PATH_CELL;
+  }
   const angle = Math.atan2(ry - bld.y, rx - bld.x);
   const seq = (owner.nextUnitSeq = (owner.nextUnitSeq || 20) + 1);
   const jitter = (((seq * 37) % 100) / 100 - 0.5) * 32;
@@ -2435,6 +2516,8 @@ function spawnTrainedUnit(state, owner, bld, kind, fxEvents) {
     mode: 'amove',
     orderX: rx + (((seq * 53) % 100) / 100 - 0.5) * 28,
     orderY: ry + (((seq * 71) % 100) / 100 - 0.5) * 28,
+    pathX: Math.round(rx),
+    pathY: Math.round(ry),
     targetEntId: null,
     harvestId: null,
     gatherT: 0,
@@ -2788,9 +2871,9 @@ function executeCommand(state, playerId, cmd, fxEvents) {
       if (mode === 'focus' && cmd.targetId) {
         u.mode = 'focus'; u.targetEntId = cmd.targetId; u.orderX = x; u.orderY = y;
       } else if (mode === 'move') {
-        u.mode = 'move'; u.targetEntId = null; u.orderX = fx; u.orderY = fy;
+        u.mode = 'move'; u.targetEntId = null; u.orderX = fx; u.orderY = fy; u.pathX = x; u.pathY = y;
       } else {
-        u.mode = 'amove'; u.targetEntId = null; u.orderX = fx; u.orderY = fy;
+        u.mode = 'amove'; u.targetEntId = null; u.orderX = fx; u.orderY = fy; u.pathX = x; u.pathY = y;
       }
     });
     return { ok: true };
@@ -3005,6 +3088,8 @@ function enforceHarvestCaps(st, fxEvents) {
 function stepWorld(state, dt, fxEvents) {
   if (state.over) return;
   state.time += dt;
+  flowBuildsLeft = FLOW_BUILDS_PER_TICK;
+  syncPathBuildings(state);
   refreshSimVision(state);
   enforceHarvestCaps(state, fxEvents);
 
@@ -3429,7 +3514,9 @@ function stepWorld(state, dt, fxEvents) {
       goalY = bestTarget.ent.y;
     }
     if (goalX == null || goalY == null) continue;
-    if (u.mode !== 'build' && dist2(u.x, u.y, goalX, goalY) <= 18 * 18) {
+    // Point d'arrivée sur un bâtiment (ralliement mal placé) : arrivé dès qu'on le touche, sinon l'unité pousse indéfiniment
+    const arriveR = pathBlocked[pathCellOf(goalX, goalY)] ? 18 + u.radius + 40 : 18;
+    if (u.mode !== 'build' && dist2(u.x, u.y, goalX, goalY) <= arriveR * arriveR) {
       if (u.mode === 'move' || u.mode === 'amove') {
         u.orderX = null;
         u.orderY = null;
@@ -3469,7 +3556,9 @@ function stepWorld(state, dt, fxEvents) {
       continue;
     }
 
-    const wp = routeWaypoint(u, goalX, goalY);
+    // Le champ de flux vise le point cliqué commun à tout l'ordre, pas la place de chaque unité dans la formation
+    const shared = !bestTarget && (u.mode === 'move' || u.mode === 'amove') && u.pathX != null;
+    const wp = routeWaypoint(u, goalX, goalY, shared ? u.pathX : goalX, shared ? u.pathY : goalY, state.time);
     const steerTargetX = wp ? wp.x : goalX;
     const steerTargetY = wp ? wp.y : goalY;
 
@@ -3490,7 +3579,9 @@ function stepWorld(state, dt, fxEvents) {
       if (d < minClear + lookAhead) {
         const dot = (ox / d) * steerX + (oy / d) * steerY;
         if (dot > -0.2) {
-          const tx = -oy / d * sideSign, ty = ox / d * sideSign;
+          // Contourne par le côté qui mène à l'objectif (un côté fixe faisait tourner l'unité en rond)
+          const side = Math.sign(ox * steerY - oy * steerX) || sideSign;
+          const tx = -oy / d * side, ty = ox / d * side;
           const push = ((minClear + lookAhead - d) / lookAhead) * (isScv ? 1.2 : 1.8);
           steerX += (tx - ox / d * (isScv ? 0.2 : 0.5)) * push;
           steerY += (ty - oy / d * (isScv ? 0.2 : 0.5)) * push;
@@ -3502,7 +3593,8 @@ function stepWorld(state, dt, fxEvents) {
       const d = Math.hypot(ox, oy) || 1;
       const minClear = u.radius + rk.r + (isScv ? 2 : 10);
       if (d < minClear + lookAhead) {
-        const tx = -oy / d * sideSign, ty = ox / d * sideSign;
+        const side = Math.sign(ox * steerY - oy * steerX) || sideSign;
+        const tx = -oy / d * side, ty = ox / d * side;
         const push = ((minClear + lookAhead - d) / lookAhead) * 1.9;
         steerX += (tx - ox / d * 0.5) * push;
         steerY += (ty - oy / d * 0.5) * push;
@@ -3665,6 +3757,26 @@ function stepWorld(state, dt, fxEvents) {
 /* ============================================================================
    INTELLIGENCE ARTIFICIELLE DES BOTS (MACRO & MICRO STARCRAFT)
    ============================================================================ */
+// Cible d'un bot : il garde le même QG ennemi tant qu'il tient debout. Sinon il choisit le plus proche,
+// en évitant ceux que les autres bots attaquent déjà (avant, tous les bots visaient le premier QG de la liste :
+// celui de l'hôte).
+function pickBotTarget(state, p, hq) {
+  const hqs = state.buildings.filter((b) => b.team !== p.team && b.kind === 'hq' && b.hp > 0);
+  const kept = hqs.find((b) => b.id === p.botTargetId);
+  if (kept) return kept;
+  const takenBy = (owner) => state.players.filter((q) => q.bot && q.id !== p.id && !q.dead
+    && state.buildings.some((b) => b.id === q.botTargetId && b.owner === owner && b.hp > 0)).length;
+  let best = null, bestScore = Infinity;
+  for (const b of hqs) {
+    // Petit écart propre à chaque paire attaquant/cible pour départager les distances égales des cartes symétriques
+    const tie = ((p.id * 7919 + b.owner * 104729) % 97) * 3;
+    const score = hypot(hq.x, hq.y, b.x, b.y) + takenBy(b.owner) * 1600 + tie;
+    if (score < bestScore) { bestScore = score; best = b; }
+  }
+  p.botTargetId = best ? best.id : null;
+  return best || state.buildings.find((b) => b.team !== p.team && b.hp > 0) || null;
+}
+
 function runBots(state, fxEvents) {
   if (state.over) return;
   for (const p of state.players) {
@@ -3686,12 +3798,21 @@ function runBots(state, fxEvents) {
     const dirX = Math.sign(HALF_W - hq.x) || 1;
     const dirY = Math.sign(HALF_W - hq.y) || 1;
 
+    // Couloirs à garder libres : du QG vers chaque rampe de son plateau (sinon le bot s'emmure et son armée ne sort plus)
+    const main = (MAP_FEATURES?.mains || []).find((m) => hypot(m.x, m.y, hq.x, hq.y) < 60);
+    const lanes = main ? main.ramps.map((a) => [hq.x, hq.y, main.x + Math.cos(a) * (main.r + RAMP_LEN * 0.6), main.y + Math.sin(a) * (main.r + RAMP_LEN * 0.6)]) : [];
+    const leavesRoom = (kind, x, y) => {
+      const r = BUILDINGS[kind].radius;
+      if (kind !== 'extractor' && lanes.some((l) => segDist(x, y, l[0], l[1], l[2], l[3]) < r + 70)) return false;
+      // Un vrai passage entre deux bâtiments, assez large pour un Thor
+      return !myBlds.some((b) => b.kind !== 'extractor' && hypot(x, y, b.x, b.y) < r + b.radius + 56);
+    };
     const tryBuildNear = (kind, ax, ay, minR = 75, maxR = 230) => {
-      for (let k = 0; k < 16; k++) {
+      for (let k = 0; k < 30; k++) {
         const ang = Math.random() * TAU;
         const r = minR + Math.random() * (maxR - minR);
         const x = ax + Math.cos(ang) * r, y = ay + Math.sin(ang) * r;
-        if (canPlaceBuilding(state, p.id, kind, x, y).ok) {
+        if (leavesRoom(kind, x, y) && canPlaceBuilding(state, p.id, kind, x, y).ok) {
           return executeCommand(state, p.id, { op: 'BUILD', kind, x, y }, fxEvents).ok;
         }
       }
@@ -3713,7 +3834,7 @@ function runBots(state, fxEvents) {
     }
 
     if (sup.max - sup.used <= 3 && sup.max < MAX_SUPPLY && p.minerals >= 75) {
-      if (tryBuildNear('pylon', hq.x + dirX * 90, hq.y + dirY * 90, 65, 195)) return;
+      if (tryBuildNear('pylon', hq.x + dirX * 90, hq.y + dirY * 90, 65, 195)) continue;
     }
     if (scvs.length < 11 && hq.queue.length < 2 && p.minerals >= 50) {
       executeCommand(state, p.id, { op: 'TRAIN', unit: 'scv', bldId: hq.id }, fxEvents);
@@ -3739,26 +3860,26 @@ function runBots(state, fxEvents) {
     }
 
     if (rax < 1 && p.minerals >= 125) {
-      if (tryBuildNear('barracks', hq.x + dirX * 135, hq.y + dirY * 45, 50, 140)) return;
+      if (tryBuildNear('barracks', hq.x + dirX * 135, hq.y + dirY * 45, 50, 140)) continue;
     }
     if (rax >= 1 && fac < 1 && p.minerals >= 150 && p.gas >= 75) {
-      if (tryBuildNear('factory', hq.x + dirX * 60, hq.y + dirY * 140, 55, 150)) return;
+      if (tryBuildNear('factory', hq.x + dirX * 60, hq.y + dirY * 140, 55, 150)) continue;
     }
     if (tur < 2 && rax >= 1 && p.minerals >= 125) {
       const tKind = (state.map === 'magma' || (p.gas >= 50 && Math.random() < 0.5)) ? 'tesla' : 'turret';
-      if (tryBuildNear(tKind, hq.x + dirX * 165, hq.y + dirY * 165, 35, 110)) return;
+      if (tryBuildNear(tKind, hq.x + dirX * 165, hq.y + dirY * 165, 35, 110)) continue;
     }
     const arm = myBlds.filter((b) => b.kind === 'armory').length;
     if (rax >= 1 && arm < 1 && p.minerals >= 125 && p.gas >= 50) {
-      if (tryBuildNear('armory', hq.x - dirX * 50, hq.y + dirY * 130, 45, 140)) return;
+      if (tryBuildNear('armory', hq.x - dirX * 50, hq.y + dirY * 130, 45, 140)) continue;
     }
     const rad = myBlds.filter((b) => b.kind === 'radar').length;
     if (rax >= 1 && rad < 1 && state.time > 150 && p.minerals >= 140 && p.gas >= 25) {
-      if (tryBuildNear('radar', hq.x + dirX * 170, hq.y + dirY * 170, 20, 120)) return;
+      if (tryBuildNear('radar', hq.x + dirX * 170, hq.y + dirY * 170, 20, 120)) continue;
     }
     const spPort = myBlds.filter((b) => b.kind === 'starport').length;
     if (fac >= 1 && spPort < 1 && p.minerals >= 150 && p.gas >= 100) {
-      if (tryBuildNear('starport', hq.x - dirX * 110, hq.y - dirY * 90, 50, 160)) return;
+      if (tryBuildNear('starport', hq.x - dirX * 110, hq.y - dirY * 90, 50, 160)) continue;
     }
     const readyArm = myBlds.find((b) => b.kind === 'armory' && !b.constructing && (!b.queue || b.queue.length === 0));
     if (readyArm) {
@@ -3786,7 +3907,7 @@ function runBots(state, fxEvents) {
       }
     }
     if (rax < 2 && fac >= 1 && p.minerals >= 180) {
-      if (tryBuildNear('barracks', hq.x + dirX * 140, hq.y - dirY * 50, 55, 160)) return;
+      if (tryBuildNear('barracks', hq.x + dirX * 140, hq.y - dirY * 50, 55, 160)) continue;
     }
 
     if (state.map === 'magma') {
@@ -3820,10 +3941,10 @@ function runBots(state, fxEvents) {
     }
 
     const waveSize = state.level === 'expert' ? 6 : state.level === 'facile' ? 10 : 8;
-    const idleArmy = army.filter((u) => u.mode === 'idle' || hypot(u.x, u.y, hq.x, hq.y) < 260);
+    // Armée disponible : au repos, ou encore sur le plateau de sa base (ralliement compris)
+    const idleArmy = army.filter((u) => !u.boardedIn && (u.mode === 'idle' || hypot(u.x, u.y, hq.x, hq.y) < MAIN_R + 140));
     if (idleArmy.length >= waveSize) {
-      const enemyBld = state.buildings.find((b) => b.team !== p.team && b.kind === 'hq' && b.hp > 0)
-        || state.buildings.find((b) => b.team !== p.team && b.hp > 0);
+      const enemyBld = pickBotTarget(state, p, hq);
       if (enemyBld) {
         executeCommand(state, p.id, {
           op: 'UNIT_ORDER',
@@ -6280,6 +6401,9 @@ const matCache3D = new Map();
 const geoCache3D = {};
 
 function getMat3D(hexOrStr, rough = 0.45, metal = 0.25, emissiveHex = 0x000000, emissiveInt = 0, opacity = 1) {
+  // Opacité arrondie au 1/20 : les ondes de choc et rayons qui s'estompent réutilisent 20 matières
+  // au lieu d'en créer une nouvelle (jamais libérée) à chaque image
+  opacity = Math.round(clamp(opacity, 0, 1) * 20) / 20;
   const key = `${hexOrStr}|${rough}|${metal}|${emissiveHex}|${emissiveInt}|${opacity}`;
   if (matCache3D.has(key)) return matCache3D.get(key);
   const m = new THREE.MeshStandardMaterial({
@@ -6291,8 +6415,26 @@ function getMat3D(hexOrStr, rough = 0.45, metal = 0.25, emissiveHex = 0x000000, 
     transparent: opacity < 1,
     opacity,
   });
+  m.userData.shared = true;
   matCache3D.set(key, m);
   return m;
+}
+
+// Retire un objet 3D de la scène et libère ses géométries et matières propres (pas celles partagées par les caches) :
+// sans ça, chaque unité morte laissait ses géométries dans la mémoire de la carte graphique
+function disposeObject3D(obj) {
+  if (!obj) return;
+  if (obj.parent) obj.parent.remove(obj);
+  const sharedGeo = new Set(Object.values(geoCache3D));
+  obj.traverse((o) => {
+    if (o.geometry && !sharedGeo.has(o.geometry)) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) {
+      if (m.userData && m.userData.shared) continue;
+      if (m.map) m.map.dispose();
+      m.dispose();
+    }
+  });
 }
 
 function initThree3D() {
@@ -6541,7 +6683,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   // 6. Éléments de décor (Arbres / Cheminées / Spires de glace)
   if (treeMeshes3D) {
     for (const item of treeMeshes3D) {
-      if (item.grp) threeScene.remove(item.grp);
+      if (item.grp) disposeObject3D(item.grp);
     }
   }
   treeMeshes3D = [];
@@ -6608,7 +6750,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   // 7. Rochers 3D
   if (rockMeshes3D) {
     for (const item of rockMeshes3D) {
-      if (item.mesh) threeScene.remove(item.mesh);
+      if (item.mesh) disposeObject3D(item.mesh);
     }
   }
   rockMeshes3D = [];
@@ -6627,7 +6769,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   // 8. Gisements de Minéraux 3D
   if (mineralMeshes3D) {
     for (const item of mineralMeshes3D) {
-      if (item.grp) threeScene.remove(item.grp);
+      if (item.grp) disposeObject3D(item.grp);
     }
   }
   mineralMeshes3D.length = 0;
@@ -6671,7 +6813,7 @@ function setupThreeMapScenery(mapId = activeMapId) {
   // 9. Geysers de Gaz Plasma 3D
   if (geyserMeshes3D) {
     for (const item of geyserMeshes3D) {
-      if (item.grp) threeScene.remove(item.grp);
+      if (item.grp) disposeObject3D(item.grp);
     }
   }
   geyserMeshes3D = [];
@@ -7424,7 +7566,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
 
       let mesh = bldMeshes3D.get(b.id);
       if (!mesh || mesh.userData.kind !== b.kind || mesh.userData.color !== col) {
-        if (mesh) threeScene.remove(mesh);
+        disposeObject3D(mesh);
         mesh = createBuildingMesh3D(b.kind, col, false);
         threeScene.add(mesh);
         bldMeshes3D.set(b.id, mesh);
@@ -7455,7 +7597,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     }
     for (const [id, mesh] of bldMeshes3D.entries()) {
       if (!activeBldIds.has(id)) {
-        threeScene.remove(mesh);
+        disposeObject3D(mesh);
         bldMeshes3D.delete(id);
       }
     }
@@ -7497,7 +7639,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
 
       let mesh = unitMeshes3D.get(u.id);
       if (!mesh || mesh.userData.kind !== u.kind || mesh.userData.color !== col) {
-        if (mesh) threeScene.remove(mesh);
+        disposeObject3D(mesh);
         mesh = createUnitMesh3D(u.kind, col);
         threeScene.add(mesh);
         unitMeshes3D.set(u.id, mesh);
@@ -7556,7 +7698,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     }
     for (const [id, mesh] of unitMeshes3D.entries()) {
       if (!activeUnitIds.has(id)) {
-        threeScene.remove(mesh);
+        disposeObject3D(mesh);
         unitMeshes3D.delete(id);
       }
     }
@@ -7569,7 +7711,7 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       const ghostCol = check.ok ? '#2fbf71' : '#ff4b2b';
       const ghostKey = `${buildMode}|${ghostCol}`;
       if (!ghostGroup3D || ghostKind3D !== ghostKey) {
-        if (ghostGroup3D) threeScene.remove(ghostGroup3D);
+        disposeObject3D(ghostGroup3D);
         ghostGroup3D = createBuildingMesh3D(buildMode, ghostCol, true);
         threeScene.add(ghostGroup3D);
         ghostKind3D = ghostKey;
@@ -8324,8 +8466,6 @@ function renderMinimap() {
    DÉMARRAGE DE PARTIE & SYNCHRONISATION RÉSEAU (HUB BRIDGE)
    ============================================================================ */
 let lastBootInfo = null;
-let tickInterval = null;
-let botInterval = null;
 let netSyncTick = 0;
 let pendingNetFx = [];
 
@@ -8404,6 +8544,8 @@ function packState(s) {
       mode: u.mode,
       orderX: u.orderX != null ? Math.round(u.orderX) : null,
       orderY: u.orderY != null ? Math.round(u.orderY) : null,
+      pathX: u.pathX != null ? Math.round(u.pathX) : null,
+      pathY: u.pathY != null ? Math.round(u.pathY) : null,
       targetEntId: u.targetEntId,
       harvestId: u.harvestId,
       gatherT: r2(u.gatherT),
@@ -8470,24 +8612,63 @@ function reconcileGuestState(prev, incoming) {
   return incoming;
 }
 
-function startTickLoop() {
-  clearInterval(tickInterval);
+// Minuterie de la simulation. Elle tourne dans un Worker : les navigateurs brident à ~1 appel par seconde
+// (voire par minute) les minuteries d'un onglet caché, pas celles d'un Worker. Repli sur setInterval.
+function startTicker(fn, ms) {
+  try {
+    const src = 'let id=null;onmessage=(e)=>{clearInterval(id);if(e.data>0)id=setInterval(()=>postMessage(0),e.data);};';
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    const w = new Worker(url);
+    URL.revokeObjectURL(url);
+    w.onmessage = fn;
+    w.postMessage(ms);
+    return () => w.terminate();
+  } catch (err) {
+    const id = setInterval(fn, ms);
+    return () => clearInterval(id);
+  }
+}
+let stopTicker = null;
+const MAX_STEPS_PER_CALL = 60;       // 2 s de jeu rattrapées au plus d'un coup
+const STEP_BUDGET_MS = 250;          // au-delà, on abandonne le retard plutôt que de geler la page
+
+function startTickLoop(botEvery = 0) {
+  if (stopTicker) stopTicker();
   const H = window.HubBridge;
-  tickInterval = setInterval(() => {
-    if (!state || state.over) return;
+  const stepMs = 1000 / TICK_RATE;
+  let last = performance.now(), acc = 0, botAcc = 0;
+  stopTicker = startTicker(() => {
+    const now = performance.now();
+    acc = Math.min(acc + (now - last), MAX_STEPS_PER_CALL * stepMs);
+    last = now;
+    if (!state || state.over) { acc = 0; return; }
+    // La partie avance au rythme de l'horloge, même si les appels arrivent en retard (onglet caché, machine lente)
     const fx = [];
-    stepWorld(state, TICK_DT, fx);
+    let steps = 0, sendNow = false;
+    const t0 = now;
+    while (acc >= stepMs && !state.over) {
+      stepWorld(state, TICK_DT, fx);
+      acc -= stepMs;
+      steps++;
+      if (botEvery > 0) {
+        botAcc += TICK_DT;
+        if (botAcc >= botEvery) { botAcc = 0; runBots(state, fx); }
+      }
+      netSyncTick++;
+      if (netSyncTick % 5 === 0) sendNow = true;
+      if (performance.now() - t0 > STEP_BUDGET_MS) { acc = 0; break; }
+    }
+    if (!steps) return;
     handleFxEvents(fx);
     if (role === 'host' && H && H.embedded) {
       for (const e of fx) {
         if (e.k === 'ELIM' || e.k === 'PHASE') pendingNetFx.push(e);
       }
-      netSyncTick++;
-      if (netSyncTick % 5 === 0 || state.over) {
+      if (sendNow || state.over) {
         H.send('all', { t: 'st', s: packState(state), fx: pendingNetFx.splice(0) });
       }
     }
-  }, 1000 / TICK_RATE);
+  }, stepMs);
 }
 
 function startMatch(info) {
@@ -8510,8 +8691,7 @@ function startMatch(info) {
   beams = [];
   orderMarkers = [];
 
-  clearInterval(tickInterval);
-  clearInterval(botInterval);
+  if (stopTicker) { stopTicker(); stopTicker = null; }
   Sfx.wake();
 
   const H = window.HubBridge;
@@ -8555,15 +8735,9 @@ function startMatch(info) {
     H.send('all', { t: 'st', s: packState(state), fx: [] });
   }
 
-  startTickLoop();
-
-  const botEvery = settings.level === 'expert' ? 850 : settings.level === 'facile' ? 2000 : 1250;
-  botInterval = setInterval(() => {
-    if (!state || state.over) return;
-    const fx = [];
-    runBots(state, fx);
-    handleFxEvents(fx);
-  }, botEvery);
+  // Les bots réfléchissent au rythme du temps de jeu, dans la même boucle que la simulation
+  const botEvery = settings.level === 'expert' ? 0.85 : settings.level === 'facile' ? 2.0 : 1.25;
+  startTickLoop(botEvery);
 }
 
 if (window.HubBridge && HubBridge.embedded) {
