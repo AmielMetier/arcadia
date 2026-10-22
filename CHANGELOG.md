@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.23 — 22 octobre 2026
+## 2.25 — 22 octobre 2026
 - **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.
   - En drift, le kart glisse de travers mais suit la direction voulue : au neutre il tourne en douceur, en contre-braquant il file presque tout droit, en braquant il serre le virage.
   - La carrosserie se met plus ou moins de travers selon le braquage, et le petit saut ne fait plus pivoter le kart d'un coup.
