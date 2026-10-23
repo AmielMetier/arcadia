@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.26 — 23 octobre 2026
+- **Cyber Kart GP** — La musique marche aussi sur iPad, iPhone et Brave : elle démarre au premier toucher ou à la première touche (avant, seuls les bruitages s'entendaient).
+
 ## 2.25 — 22 octobre 2026
 - **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.
   - En drift, le kart glisse de travers mais suit la direction voulue : au neutre il tourne en douceur, en contre-braquant il file presque tout droit, en braquant il serre le virage.
