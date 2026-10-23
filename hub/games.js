@@ -64,7 +64,7 @@ window.HUB_GAMES = [
     id: 'calcul',
     title: 'Tête de Calcul',
     tag: 'Duel de calcul mental',
-    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, devinettes, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres !',
+    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, figures à compter, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres ! Mode The Candidate : un entretien éliminatoire, jusqu\'au code Python.',
     url: 'calcul/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ff5fa2',

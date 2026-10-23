@@ -23,6 +23,7 @@ function boot(info) {
     answer: (v) => session.answer(v),
     emote: (id) => session.emote(id),
     sabotage: (power, target) => session.sabotage(power, target),
+    joker: (kind) => session.joker(kind),
     start: () => session.start(),
     exit: () => { if (H.embedded) H.exit(); else location.reload(); },
   });
@@ -32,6 +33,7 @@ function boot(info) {
     onError: (msg, soft) => view.error(msg, soft),
     onAck: (m) => view.ack(m),
     onEmote: (from, id) => view.emote(from, id),
+    onNote: (m) => view.note(m),
   };
   let session;
   if (role === 'guest') session = startClient({ bridge: H, me, ...handlers });

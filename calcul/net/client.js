@@ -1,5 +1,5 @@
 // Invité de Tête de Calcul : envoie ses réponses à l'hôte et affiche l'état reçu.
-export function startClient({ bridge, onState, onSetup, onError, onAck = () => {}, onEmote = () => {} }) {
+export function startClient({ bridge, onState, onSetup, onError, onAck = () => {}, onEmote = () => {}, onNote = () => {} }) {
   let state = null;
   bridge.on('msg', (from, m) => {
     if (from !== bridge.info.hostId || !m || typeof m !== 'object') return;
@@ -8,6 +8,7 @@ export function startClient({ bridge, onState, onSetup, onError, onAck = () => {
     else if (m.t === 'err') onError(m.msg, m.soft);
     else if (m.t === 'ack') onAck(m);
     else if (m.t === 'emo') onEmote(m.from, m.id);
+    else if (m.t === 'jok' || m.t === 'graded') onNote(m); // réponses privées : joker, correction de mon code
   });
   // nouvel hôte (migration) : on lui redemande l'état complet
   let hostSeen = bridge.info.hostId;
@@ -17,6 +18,7 @@ export function startClient({ bridge, onState, onSetup, onError, onAck = () => {
     answer(raw) { if (state) bridge.send('host', { t: 'ans', i: state.idx, v: raw }); },
     emote(id) { bridge.send('host', { t: 'emote', id }); },
     sabotage(power, target) { bridge.send('host', { t: 'sab', power, target }); },
+    joker(kind) { bridge.send('host', { t: 'jok', kind }); },
     start() {},
     get state() { return state; },
   };

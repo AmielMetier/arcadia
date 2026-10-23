@@ -35,6 +35,48 @@ export function figureSvg(fig) {
       return `${(140 + 70 * Math.cos(a)).toFixed(1)},${(88 + 70 * Math.sin(a)).toFixed(1)}`;
     });
     body = `<polygon points="${pts.join(' ')}" fill="${FILL}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>${label(140, 96, '?', 'middle', true)}`;
+  } else if (fig.t === 'grid') {
+    // grille m × n de carrés unité
+    const c = Math.min(220 / fig.m, 150 / fig.n), w = c * fig.m, h = c * fig.n, x0 = 140 - w / 2, y0 = 90 - h / 2;
+    let lines = '';
+    for (let k = 1; k < fig.m; k++) lines += `<path d="M${(x0 + k * c).toFixed(1)} ${y0.toFixed(1)} V${(y0 + h).toFixed(1)}"/>`;
+    for (let k = 1; k < fig.n; k++) lines += `<path d="M${x0.toFixed(1)} ${(y0 + k * c).toFixed(1)} H${(x0 + w).toFixed(1)}"/>`;
+    body = `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${FILL}" stroke="${INK}" stroke-width="4"/>
+      <g stroke="${INK}" stroke-width="2.5">${lines}</g>`;
+  } else if (fig.t === 'trigrid') {
+    // triangle équilatéral découpé en n rangées de petits triangles
+    const n = fig.n, side = 190, H = side * Math.sqrt(3) / 2, A = [140, 90 - H / 2], B = [140 - side / 2, 90 + H / 2], C = [140 + side / 2, 90 + H / 2];
+    const at = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    const seg = (p, q) => `<path d="M${p[0].toFixed(1)} ${p[1].toFixed(1)} L${q[0].toFixed(1)} ${q[1].toFixed(1)}"/>`;
+    let lines = '';
+    for (let k = 1; k < n; k++) {
+      const t = k / n;
+      lines += seg(at(A, B, t), at(A, C, t)) + seg(at(B, A, t), at(B, C, t)) + seg(at(C, A, t), at(C, B, t));
+    }
+    body = `<path d="M${A.join(' ')} L${B.join(' ')} L${C.join(' ')} Z" fill="${FILL}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="${INK}" stroke-width="2.5">${lines}</g>`;
+  } else if (fig.t === 'pyramid') {
+    // pyramide de cubes en perspective isométrique : étage k (depuis le bas) = carré de n − k cubes, centré
+    const n = fig.n, cubes = [];
+    for (let z = 0; z < n; z++) for (let x = 0; x < n - z; x++) for (let y = 0; y < n - z; y++) cubes.push([x + z / 2, y + z / 2, z]);
+    cubes.sort((a, b) => a[2] - b[2] || (a[0] + a[1]) - (b[0] + b[1]));
+    const P = (X, Y, Z) => [(X - Y) * 0.866, (X + Y) * 0.5 - Z];
+    const all = cubes.flatMap(([x, y, z]) => [P(x, y + 1, z), P(x + 1, y, z), P(x + 1, y + 1, z), P(x, y, z + 1)]);
+    const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const sc = Math.min(240 / (maxX - minX), 160 / (maxY - minY));
+    const T = ([X, Y]) => `${(140 + (X - (minX + maxX) / 2) * sc).toFixed(1)},${(90 + (Y - (minY + maxY) / 2) * sc).toFixed(1)}`;
+    const face = (pts, fill) => `<polygon points="${pts.map(T).join(' ')}" fill="${fill}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+    body = cubes.map(([x, y, z]) =>
+      face([P(x, y, z + 1), P(x + 1, y, z + 1), P(x + 1, y + 1, z + 1), P(x, y + 1, z + 1)], '#d8f3ea')
+      + face([P(x + 1, y, z), P(x + 1, y + 1, z), P(x + 1, y + 1, z + 1), P(x + 1, y, z + 1)], '#8fd9c1')
+      + face([P(x, y + 1, z), P(x + 1, y + 1, z), P(x + 1, y + 1, z + 1), P(x, y + 1, z + 1)], '#b5e9d8')).join('');
+  } else if (fig.t === 'dots') {
+    const n = fig.n;
+    body = Array.from({ length: n }, (_, k) => {
+      const a = -Math.PI / 2 + (k * 2 * Math.PI) / n;
+      return `<circle cx="${(140 + 72 * Math.cos(a)).toFixed(1)}" cy="${(90 + 72 * Math.sin(a)).toFixed(1)}" r="8" fill="${ACC}" stroke="${INK}" stroke-width="3"/>`;
+    }).join('');
   }
   return `<svg class="fig" viewBox="0 0 280 180" role="img" aria-label="Figure">${body}</svg>`;
 }

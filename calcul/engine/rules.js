@@ -3,7 +3,7 @@
 //
 // Phases : 'intro' (compte à rebours) → 'question' → 'reveal' → 'question'… → 'over'
 // Pendant 'question', les réponses (valeur, juste ou non) restent chez l'hôte : publicState() les masque.
-import { CATS, DIFFS, THEMES, planCats, makeQuestion, publicQuestion, fmt } from './questions.js';
+import { CATS, DIFFS, THEMES, planCats, makeQuestion, publicQuestion, fmt, chartierTier } from './questions.js';
 import { parseNumber, evalExpr, usesOnly } from './expr.js';
 
 export const MODES = {
@@ -16,6 +16,17 @@ export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const REVEAL_MS = 5200;
 const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
+
+// The Candidate : 3 vies. Une mauvaise réponse en coûte une, la réponse piège deux, le silence une.
+// À la fin de chaque tour (premier tour → desk → comité final), le dernier du classement est éliminé
+// tant qu'il reste au moins trois candidats. La partie s'arrête quand il n'en reste qu'un.
+export const LIVES = 3;
+export const JOKERS = {
+  half:   { label: '50/50', icon: '✂️', desc: 'Retire deux mauvaises réponses' },
+  friend: { label: 'Appel à un ami', icon: '📞', desc: 'Un ami te souffle une réponse (il se trompe parfois)' },
+};
+const FRIEND_ACC = { 1: 0.85, 2: 0.75, 3: 0.62 };
+const MAX_RAW = 60, MAX_CODE = 6000;
 
 // Sabotage : une série de 3 bonnes réponses rapporte un pouvoir, à lancer sur un adversaire entre deux questions.
 // Il agit sur sa question suivante. Le bouclier, gardé en réserve, annule le prochain sabotage reçu.
@@ -40,6 +51,7 @@ export function makeConfig(s = {}) {
 
     finale: s.finale == null ? true : Number(s.finale) === 1,
     sabotage: s.sabotage == null ? true : Number(s.sabotage) === 1,
+    lives: s.mode === 'chartier' ? LIVES : 0,
   };
 }
 
@@ -51,7 +63,8 @@ export function createGame({ players, cfg, seed, now }) {
     cats: planCats(seed, c.len, c.theme),
     players: players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: !!p.bot,
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
-      powers: [], sabSent: 0, sabTaken: 0 })),
+      powers: [], sabSent: 0, sabTaken: 0,
+      lives: c.lives, out: false, outIdx: null, outWhy: null, traps: 0, jokers: c.lives ? Object.keys(JOKERS) : [] })),
     idx: -1, phase: 'intro', endsAt: now + INTRO_MS, q: null, qAt: 0, answers: {}, last: null, history: [], ranking: null,
     curses: {}, active: {}, sabs: [],
   };
@@ -70,7 +83,7 @@ export function fullQuestion(s, idx = s.idx) {
 // Question suivante (ou fin de partie)
 export function nextQuestion(state, now) {
   const s = clone(state);
-  if (s.idx + 1 >= s.cfg.len) return finish(s);
+  if (s.idx + 1 >= s.cfg.len || s.endEarly) return finish(s);
   s.idx++;
   const q = fullQuestion(s);
   s.q = { ...publicQuestion(q), n: s.idx + 1, pts: q.pts * (isFinal(s) ? 2 : 1), final: isFinal(s) };
@@ -128,11 +141,26 @@ export function check(q, raw) {
     if (!usesOnly(e.nums, q.nums)) return { ok: false, error: 'Utilise seulement les nombres proposés, une fois chacun' };
     return { ok: e.value.d === 1 && e.value.n === q.target, value: e.value.d === 1 ? e.value.n : e.value.n / e.value.d };
   }
+  if (q.input === 'code') {
+    if (!String(raw).trim()) return { ok: false, error: 'Écris ton code avant de l’envoyer' };
+    return { ok: false, pending: true };
+  }
   const n = parseNumber(raw);
   if (n == null) return { ok: false, error: 'Ce n\'est pas un nombre' };
-  const ok = q.tol ? Math.abs(n - q.answer) <= q.tol * Math.abs(q.answer) : n === q.answer;
+  const ok = q.tolMode === 'factor' && q.tol ? n > 0 && n >= q.answer / q.tol && n <= q.answer * q.tol
+    : q.tol ? Math.abs(n - q.answer) <= q.tol * Math.abs(q.answer) : n === q.answer;
   return { ok, value: n };
 }
+
+// La réponse choisie est-elle le piège prévu par l'examinateur ? (choix, ou valeur classique à saisir)
+export function isTrap(q, raw) {
+  if (q.input === 'choice') return q.trap >= 0 && Number(raw) === q.trap;
+  if (q.input !== 'num' || !q.traps || !q.traps.length) return false;
+  const n = parseNumber(raw);
+  return n != null && q.traps.some((t) => Math.abs(n - t) <= Math.max(1e-9, Math.abs(t) * 0.005));
+}
+
+const alive = (s) => s.players.filter((p) => !p.out);
 
 // Une réponse de joueur → { ok, state, done } ; done : la question peut être révélée tout de suite
 export function answer(state, { by, raw, idx, now }) {
@@ -140,18 +168,62 @@ export function answer(state, { by, raw, idx, now }) {
   if (idx != null && idx !== state.idx) return { ok: false, error: 'Trop tard, question suivante !' };
   const p = state.players.find((q) => q.id === by);
   if (!p) return { ok: false, error: 'Tu ne joues pas cette partie' };
+  if (p.out) return { ok: false, error: 'Tu es éliminé : tu regardes la suite' };
   if (state.answers[by]) return { ok: false, error: 'Tu as déjà répondu' };
   if (now > deadlineOf(state, by) + GRACE_MS) return { ok: false, error: 'Temps écoulé' };
   const q = fullQuestion(state);
-  const c = check(q, String(raw ?? '').slice(0, 60));
+  const text = String(raw ?? '').slice(0, q.input === 'code' ? MAX_CODE : MAX_RAW);
+  const c = check(q, text);
   // saisie illisible : on prévient le joueur sans lui compter de réponse (sauf en Éclair, où il faut assumer)
   if (c.error && state.cfg.mode !== 'eclair') return { ok: false, error: c.error, soft: true };
   const s = clone(state);
-  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: String(raw ?? '').slice(0, 40), ok: !!c.ok };
-  const active = s.players.map((x) => x.id);
-  const all = active.every((id) => s.answers[id]);
-  const done = all || (s.cfg.mode === 'eclair' && c.ok);
-  return { ok: true, state: s, done, right: !!c.ok };
+  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' ? text : text.slice(0, 40), ok: !!c.ok,
+    trap: !c.ok && isTrap(q, text), ...(c.pending ? { pending: true, passed: 0, total: q.tests.length } : {}) };
+  const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok);
+  return { ok: true, state: s, done, right: !!c.ok, pending: !!c.pending };
+}
+
+// Tous les candidats encore en lice ont répondu, et tous les codes envoyés ont été corrigés
+const allDone = (s) => alive(s).every((p) => s.answers[p.id] && !s.answers[p.id].pending);
+
+// Résultat de la correction d'un code par l'hôte (tests réussis sur le total)
+export function gradeCode(state, { by, idx, passed, total, detail = null }) {
+  if (state.phase !== 'question' || idx !== state.idx) return { ok: false, error: 'Question déjà close' };
+  const a = state.answers[by];
+  if (!a || !a.pending) return { ok: false, error: 'Rien à corriger' };
+  const s = clone(state);
+  const n = Math.max(0, Math.min(total, passed | 0));
+  s.answers[by] = { ...a, pending: false, passed: n, total, ok: n === total, detail };
+  return { ok: true, state: s, done: allDone(s) };
+}
+
+// Joker (une fois par partie chacun) → { ok, state, info } ; info n'est envoyée qu'au joueur qui l'a demandé
+export function useJoker(state, { by, kind }) {
+  if (!state.cfg.lives) return { ok: false, error: 'Pas de joker dans ce mode' };
+  if (state.phase !== 'question') return { ok: false, error: 'Pas de question en cours' };
+  const p = state.players.find((x) => x.id === by);
+  if (!p || p.out) return { ok: false, error: 'Tu ne joues plus cette partie' };
+  if (!JOKERS[kind] || !p.jokers.includes(kind)) return { ok: false, error: 'Joker déjà utilisé' };
+  if (state.answers[by]) return { ok: false, error: 'Tu as déjà répondu' };
+  const q = fullQuestion(state);
+  if (q.input !== 'choice') return { ok: false, error: 'Les jokers servent sur les questions à choix' };
+  const s = clone(state);
+  const me = s.players.find((x) => x.id === by);
+  me.jokers = me.jokers.filter((k) => k !== kind);
+  // tirage reproductible (graine de la partie, question, joueur)
+  const h = (s.seed ^ Math.imul(s.idx + 11, 2654435761) ^ Math.imul(by + 5, 40503) ^ (kind === 'half' ? 0x5bd1e995 : 0x1b873593)) >>> 0;
+  let info;
+  if (kind === 'half') {
+    // on retire deux mauvaises réponses qui ne sont pas le piège : il reste la bonne… et le piège
+    const others = q.choices.map((_, k) => k).filter((k) => k !== q.answer && k !== q.trap);
+    while (others.length > 2) others.splice(h % others.length, 1);
+    info = { kind, idx: s.idx, removed: others };
+  } else {
+    const right = (h % 1000) / 1000 < (FRIEND_ACC[q.tier] || 0.75);
+    info = { kind, idx: s.idx, suggest: right ? q.answer : (q.trap >= 0 ? q.trap : (q.answer + 1) % q.choices.length) };
+  }
+  (s.jokerLog = s.jokerLog || []).push({ idx: s.idx, by, kind });
+  return { ok: true, state: s, info };
 }
 
 // Calcul des points de la question et passage en révélation
@@ -160,19 +232,31 @@ export function reveal(state, now) {
   const s = clone(state);
   const q = fullQuestion(s);
   const base = q.pts * 100 * (isFinal(s) ? 2 : 1);
+  const isCode = q.input === 'code';
   const correct = Object.entries(s.answers).filter(([, a]) => a.ok).sort((a, b) => a[1].at - b[1].at).map(([id]) => +id);
+  const eliminated = [];
   const results = s.players.map((p) => {
+    if (p.out) return { id: p.id, raw: null, ok: false, at: null, pts: 0, tags: [], out: true };
     const a = s.answers[p.id];
-    const r = { id: p.id, raw: a ? a.raw : null, ok: !!(a && a.ok), at: a ? a.at : null, pts: 0, tags: [] };
+    // un code encore en correction à la fin du temps ne rapporte rien
+    const passed = isCode && a && !a.pending ? a.passed : 0, total = isCode ? q.tests.length : 0;
+    const r = { id: p.id, raw: a ? (isCode ? `${passed}/${total}` : a.raw) : null, ok: !!(a && a.ok), at: a ? a.at : null, pts: 0, tags: [],
+      ...(isCode ? { passed, total, detail: a && a.detail ? a.detail : null } : {}) };
     const cat = (p.byCat[q.cat] = p.byCat[q.cat] || { n: 0, ok: 0 });
     cat.n++;
-    if (r.ok) {
+    // code : des points pour chaque test réussi, même si tous ne passent pas
+    const partial = isCode && !r.ok && passed > 0 ? passed / total : 0;
+    if (r.ok || partial) {
       const rank = correct.indexOf(p.id);
+      const share = r.ok ? 1 : partial;
       if (s.cfg.mode === 'eclair') { r.pts = rank === 0 ? base : 0; }
       else {
-        r.pts = Math.round((base * (0.5 + 0.5 * Math.max(0, 1 - a.at / limitOf(s, q, p.id)))) / 10) * 10;
-        if (rank === 0 && correct.length > 1) { r.pts += 50; r.tags.push('eclair'); }
+        r.pts = Math.round((base * share * (0.5 + 0.5 * Math.max(0, 1 - a.at / limitOf(s, q, p.id)))) / 10) * 10;
+        if (r.ok && rank === 0 && correct.length > 1) { r.pts += 50; r.tags.push('eclair'); }
       }
+    }
+    if (r.ok) {
+      const rank = correct.indexOf(p.id);
       p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
       if (p.streak >= 3 && s.cfg.mode !== 'eclair') { const b = Math.min(100, 25 * (p.streak - 2)); r.pts += b; r.tags.push('serie'); r.streak = p.streak; }
       if (rank === 0) p.firsts++;
@@ -190,23 +274,52 @@ export function reveal(state, now) {
         p.wrong++;
         if (s.cfg.mode === 'peril') { r.pts = -Math.round(base / 2); r.tags.push('peril'); }
       } else p.silent++;
+      // The Candidate : vies perdues (piège : deux ; code avec au moins un test réussi : aucune)
+      if (s.cfg.lives && !partial) {
+        const lost = a && a.trap ? 2 : 1;
+        if (a && a.trap) { r.tags.push('trap'); p.traps++; }
+        r.lost = Math.min(lost, p.lives);
+        p.lives = Math.max(0, p.lives - lost);
+        if (!p.lives) { p.out = true; p.outIdx = s.idx; p.outWhy = 'vies'; eliminated.push({ id: p.id, why: 'vies' }); }
+      }
     }
     p.score += r.pts;
     return r;
   });
-  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' ? q.answer : null, isChartier: q.isChartier, tier: q.tier };
-  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts,
-    results: results.map(({ id, ok, at, pts, raw }) => ({ id, ok, at, pts, raw })) });
+  // fin d'un tour : le dernier du classement saute, s'il reste au moins trois candidats
+  const tierNow = s.cfg.lives ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx, s.cfg.len) : 0;
+  const tierNext = s.cfg.lives && s.idx + 1 < s.cfg.len ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx + 1, s.cfg.len) : tierNow;
+  let tierEnd = null;
+  if (s.cfg.lives && tierNext !== tierNow) {
+    tierEnd = tierNow;
+    const left = alive(s);
+    if (left.length >= 3) {
+      const last = [...left].sort((x, y) => x.score - y.score || x.right - y.right || y.totalMs - x.totalMs)[0];
+      last.out = true; last.outIdx = s.idx; last.outWhy = 'palier';
+      eliminated.push({ id: last.id, why: 'palier' });
+      const r = results.find((x) => x.id === last.id); if (r) r.tags.push('cut');
+    }
+  }
+  // dernier debout : entre joueurs, la partie s'arrête quand il n'en reste qu'un ; seul contre des bots,
+  // on finit l'entretien pour le score ; plus aucun humain en lice : terminé
+  const standing = alive(s).length, humans = s.players.filter((p) => !p.bot);
+  if (s.cfg.lives && (standing === 0 || !humans.some((p) => !p.out) || (humans.length > 1 && standing <= 1))) s.endEarly = true;
+  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
+    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, eliminated, tierEnd, endEarly: !!s.endEarly };
+  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit,
+    results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
-  const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => p.powers.some((pw) => pw !== 'shield'));
-  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (canSab ? SAB_EXTRA_MS : 0);
+  const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
+  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (eliminated.length ? 2500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
   // les réponses deviennent publiques
   return s;
 }
 
+// Classement : les candidats encore en lice d'abord, puis les éliminés (le dernier tombé devant)
 export function standings(s) {
-  return [...s.players].sort((a, b) => b.score - a.score || b.right - a.right || a.totalMs - b.totalMs).map((p) => p.id);
+  return [...s.players].sort((a, b) => (a.out - b.out) || (a.out && b.out ? b.outIdx - a.outIdx : 0)
+    || b.score - a.score || b.right - a.right || a.totalMs - b.totalMs).map((p) => p.id);
 }
 
 function finish(s) {
@@ -225,9 +338,9 @@ export function removePlayer(state, id) {
 
 // Ce que l'hôte envoie à tout le monde : pendant une question, seulement « a répondu » (et le blocage en Éclair)
 export function publicState(s) {
-  if (s.phase !== 'question') return s;
+  if (s.phase !== 'question') return { ...s, answers: {} };
   const answers = {};
-  for (const [id, a] of Object.entries(s.answers)) answers[id] = s.cfg.mode === 'eclair' && !a.ok ? { done: true, locked: true } : { done: true };
+  for (const [id, a] of Object.entries(s.answers)) answers[id] = s.cfg.mode === 'eclair' && !a.ok ? { done: true, locked: true } : a.pending ? { done: true, grading: true } : { done: true };
   return { ...s, answers };
 }
 
@@ -236,6 +349,7 @@ export function describeAnswer(q, raw) {
   if (raw == null) return '—';
   if (q && q.input === 'choice') return q.choices[Number(raw)] ?? String(raw);
   if (q && q.input === 'expr') return String(raw).replace(/\*/g, '×');
+  if (q && q.input === 'code') return String(raw);
   const n = parseNumber(raw);
   return n == null ? String(raw) : fmt(n);
 }

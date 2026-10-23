@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.32 — 23 octobre 2026
+- **Tête de Calcul** — The Candidate devient un vrai entretien éliminatoire.
+  - Trois vies par candidat : une erreur ou un silence en coûte une, tomber dans le piège (la réponse « évidente » mais fausse) en coûte deux.
+  - À la fin de chaque tour, le dernier du classement est coupé, tant qu'il reste trois candidats. Entre joueurs, le dernier debout décroche le poste.
+  - Deux jokers par partie, une fois chacun : 50/50 et Appel à un ami (qui a souvent raison… pas toujours).
+  - Une centaine de nouvelles questions d'entretien (marchés, probabilités, brainteasers, estimations), et des réponses à taper : les estimations sont acceptées dans une marge.
+  - Épreuve de code : une ou deux fonctions Python à écrire en 3 minutes, testées en direct sur des tests cachés. Des points pour chaque test réussi, et un bouton pour essayer les exemples avant d'envoyer.
+- **Tête de Calcul** — Nouvelles questions visuelles : carrés, rectangles et triangles à compter dans une grille, cubes d'une pyramide, segments entre des points.
+- **Tête de Calcul** — Nouvelles suites logiques : cubes, suites croisées, « ×2 + 2 », factorielles, et d'autres. Visuels et suites arrivent aussi dans les thèmes Logique et Mélangé.
+
 ## 2.31 — 23 octobre 2026
 - **Outbreak** — Nouveau mode **Défense** : tenez le fort Delta pendant 15 vagues.
   - Les zombies foncent sur le générateur au centre du fort : s'il tombe, c'est perdu.

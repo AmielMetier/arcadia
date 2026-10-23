@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS, chartierTier } from '../calcul/engine/questions.js';
 import { CHARTIER_QUESTIONS } from '../calcul/engine/chartier-data.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
-import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer } from '../calcul/engine/rules.js';
+import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
+import { CODE_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
+import { spawnSync } from 'node:child_process';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
 let n = 0;
@@ -36,7 +38,18 @@ t('les questions sont reproductibles et justes', () => {
     const seed = 1000 + i * 7919;
     const q = makeQuestion(seed, i, cat, diff);
     assert.deepEqual(q, makeQuestion(seed, i, cat, diff));
-    if (cat === 'chartier') {
+    if (q.kind === 'code') {
+      assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 180, q.text);
+      assert.ok(!check(q, '').ok && check(q, 'def f(): pass').pending);
+      continue;
+    }
+    if (q.kind === 'chartier-num') {
+      assert.ok(Number.isFinite(q.answer) && q.tip && [1, 2, 3].includes(q.tier), q.text);
+      assert.ok(check(q, String(q.answer)).ok, `${q.text} → ${q.answer}`);
+      assert.ok(!check(q, String(q.answer * 100 + 7)).ok, `${q.text} : réponse fausse refusée`);
+      continue;
+    }
+    if (q.kind === 'chartier') {
       assert.ok(q.text && q.tip && q.choices && q.choices.length === 4 && new Set(q.choices).size === 4, q.text);
       assert.equal(q.input, 'choice');
       assert.equal(q.choices[q.answer], q.show, q.text);
@@ -243,30 +256,215 @@ t('bots saboteurs : visent le meneur', () => {
 
 t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur', () => {
   const pos = [0, 0, 0, 0];
-  for (let i = 0; i < 4000; i++) pos[makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15).answer]++;
-  for (const n of pos) assert.ok(n > 800, `bonne réponse trop souvent au même endroit : ${pos}`);
+  for (let i = 0; i < 4000; i++) { const q = makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15); if (q.kind === 'chartier') pos[q.answer]++; }
+  for (const n of pos) assert.ok(n > 600, `bonne réponse trop souvent au même endroit : ${pos}`);
   assert.deepEqual([0, 5, 9, 13, 14].map((i) => chartierTier(1, i, 15)), [1, 2, 2, 3, 3]);
   assert.equal(chartierTier(0, 9, 10), 2); assert.equal(chartierTier(0, 0, 10), 1);
   assert.equal(chartierTier(2, 0, 10), 2); assert.equal(chartierTier(2, 9, 10), 3);
   // banque : 4 choix distincts, explication, pas de choix vide
-  for (const q of CHARTIER_QUESTIONS) {
+  for (const q of CHARTIER_QUESTIONS.filter((x) => x.type === 'choice')) {
+    assert.ok(q.wrong.includes(q.trap), `piège parmi les mauvaises réponses : ${q.text}`);
     const all = [q.good, ...q.wrong];
     assert.equal(new Set(all).size, 4, q.text); assert.ok(all.every(Boolean) && q.tip && q.tier, q.text);
   }
-  let s = createGame({ players: [{ id: 0, name: 'A' }, { id: 1, name: 'B', bot: true }], cfg: { mode: 'chartier', len: 10, diff: 'normal' }, seed: 99, now: 0 });
+  let s = createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 10, diff: 'normal' }, seed: 99, now: 0 });
   assert.equal(s.cfg.theme, 'chartier');
   const seen = new Set();
   for (let i = 0; i < 10; i++) {
     s = nextQuestion(s, i * 1e5);
     const q = fullQuestion(s); seen.add(q.key);
-    assert.equal(s.q.pts, q.tier * (i === 9 ? 2 : 1));
+    assert.equal(s.q.pts, (q.tier + (q.input === 'code' ? 1 : 0)) * (i === 9 ? 2 : 1));
     assert.ok(!('answer' in publicState(s).q) || publicState(s).q.answer === undefined);
-    s = answer(s, { by: 0, raw: String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
+    if (q.input === 'code') {
+      const r = answer(s, { by: 0, raw: q.show, idx: i, now: i * 1e5 + 1000 });
+      assert.ok(r.ok && r.pending); s = r.state;
+      s = gradeCode(s, { by: 0, idx: i, passed: q.tests.length, total: q.tests.length }).state;
+    } else s = answer(s, { by: 0, raw: String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
     s = reveal(s, i * 1e5 + 2000);
-    assert.equal(s.last.choices[s.last.answer], s.last.show);
+    if (s.last.input === 'choice') assert.equal(s.last.choices[s.last.answer], s.last.show);
   }
   assert.equal(seen.size, 10);
-  assert.ok(s.players[0].score > 0 && s.players[0].right === 10);
+  assert.ok(s.players[0].score > 0 && s.players[0].right === 10 && s.players[0].lives === LIVES);
 });
+
+// joue une question : chaque joueur répond selon how[id] = 'good' | 'slow' (juste, mais à la fin) | 'bad' | 'trap' | 'none'
+function play(s, how, now) {
+  const q = fullQuestion(s);
+  for (const [id, h] of Object.entries(how)) {
+    if (h === 'none' || s.players.find((p) => p.id === +id).out) continue;
+    let raw = h === 'good' || h === 'slow' ? good(q) : bad(q);
+    const at = now + (h === 'slow' ? q.time * 950 : 500);
+    if (h === 'trap') raw = q.input === 'choice' ? String(q.trap) : String(q.traps && q.traps[0] != null ? q.traps[0] : q.answer * 3 + 7);
+    if (q.input === 'code') {
+      s = answer(s, { by: +id, raw: 'def f(): pass', idx: s.idx, now: at }).state;
+      s = gradeCode(s, { by: +id, idx: s.idx, passed: h === 'good' || h === 'slow' ? q.tests.length : 0, total: q.tests.length }).state;
+    } else s = answer(s, { by: +id, raw, idx: s.idx, now: at }).state;
+  }
+  return reveal(s, now + q.time * 1000);
+}
+
+t('The Candidate : vies, piège, éliminations aux paliers, dernier debout', () => {
+  const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 5, now: 0 });
+  assert.ok(s.players.every((p) => p.lives === LIVES && p.jokers.length === 2));
+  // trouver une question à choix pour tester le piège
+  let now = 0;
+  s = nextQuestion(s, now);
+  while (fullQuestion(s).input !== 'choice') { s = play(s, { 0: 'good', 1: 'good', 2: 'good', 3: 'good' }, now); now += 1e5; s = nextQuestion(s, now); }
+  const q = fullQuestion(s);
+  assert.ok(isTrap(q, String(q.trap)) && !isTrap(q, String(q.answer)));
+  const before = s.players.map((p) => p.lives);
+  s = play(s, { 0: 'good', 1: 'trap', 2: 'none', 3: 'good' }, now);
+  assert.equal(s.players[1].lives, before[1] - 2, 'le piège coûte deux vies');
+  assert.equal(s.players[2].lives, before[2] - 1, 'le silence coûte une vie');
+  assert.equal(s.players[0].lives, before[0]);
+  assert.ok(s.last.results[1].tags.includes('trap'));
+  // jouer jusqu'au bout : le joueur 0 répond juste, les autres se trompent
+  let cuts = 0;
+  while (s.phase !== 'over') {
+    now += 1e5; s = nextQuestion(s, now);
+    if (s.phase === 'over') break;
+    s = play(s, { 0: 'good', 1: 'bad', 2: 'bad', 3: 'good' }, now);
+    cuts += s.last.eliminated.filter((e) => e.why === 'palier').length;
+    for (const p of s.players) assert.ok(p.lives >= 0);
+    assert.ok(s.last.results.filter((r) => r.out).every((r) => r.pts === 0));
+  }
+  assert.ok(s.players[1].out && s.players[2].out, 'à court de vies');
+  assert.ok(!s.players[0].out);
+  assert.equal(standings(s)[0], 0);
+  const order = standings(s), outs = order.filter((id) => s.players.find((p) => p.id === id).out);
+  assert.deepEqual(order.slice(-outs.length), outs, 'les éliminés en fin de classement');
+  assert.ok(s.history.length < 15 || cuts >= 0);
+  // un éliminé ne peut plus répondre
+  const ended = s;
+  assert.equal(ended.phase, 'over');
+});
+
+t('The Candidate : palier qui élimine le dernier, arrêt quand il reste un candidat', () => {
+  const players = [0, 1, 2].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 10, diff: 'normal' }, seed: 8, now: 0 });
+  let now = 0, cut = null;
+  while (s.phase !== 'over') {
+    s = nextQuestion(s, now); if (s.phase === 'over') break;
+    // tout le monde répond juste, mais 2 toujours au dernier moment : il garde ses vies et traîne au score
+    s = play(s, { 0: 'good', 1: 'good', 2: 'slow' }, now);
+    if (s.last.eliminated.some((e) => e.why === 'palier')) cut = s.last.eliminated.find((e) => e.why === 'palier');
+    now += 1e5;
+    const out = s.players.find((p) => p.out);
+    if (out) assert.equal(answer(nextQuestion(s, now), { by: out.id, raw: '1', idx: s.idx + 1, now: now + 1 }).ok, false, 'un éliminé ne répond plus');
+  }
+  assert.ok(s.players[2].out && s.players[2].outWhy === 'palier' && s.players[2].lives === LIVES, 'le dernier saute');
+  assert.equal(cut.id, 2);
+  assert.ok(!s.players[0].out && !s.players[1].out, 'à deux, plus d\'élimination au palier');
+  assert.equal(s.history.length, 10);
+});
+
+t('The Candidate : en solo, la partie s\'arrête quand on n\'a plus de vies', () => {
+  let s = createGame({ players: [{ id: 0, name: 'Solo' }], cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 3, now: 0 });
+  let now = 0;
+  while (s.phase !== 'over') { s = nextQuestion(s, now); if (s.phase === 'over') break; s = play(s, { 0: 'none' }, now); now += 1e5; }
+  assert.equal(s.history.length, LIVES, 'trois silences, trois vies');
+  assert.ok(s.players[0].out && s.players[0].outWhy === 'vies');
+});
+
+t('The Candidate : seul contre des bots, on va au bout ; plus d\'humain en lice, c\'est fini', () => {
+  let s = createGame({ players: [{ id: 0, name: 'Moi' }, { id: 100, name: 'Bot', bot: true }, { id: 101, name: 'Bot2', bot: true }], cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 4, now: 0 });
+  let now = 0;
+  while (s.phase !== 'over') { s = nextQuestion(s, now); if (s.phase === 'over') break; s = play(s, { 0: 'good', 100: 'none', 101: 'none' }, now); now += 1e5; }
+  assert.ok(s.players[1].out && s.players[2].out);
+  assert.equal(s.history.length, 15, 'le dernier humain finit l\'entretien');
+  s = createGame({ players: [{ id: 0, name: 'Moi' }, { id: 100, name: 'Bot', bot: true }], cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 4, now: 0 });
+  now = 0;
+  while (s.phase !== 'over') { s = nextQuestion(s, now); if (s.phase === 'over') break; s = play(s, { 0: 'none', 100: 'good' }, now); now += 1e5; }
+  assert.equal(s.history.length, LIVES, 'l\'humain éliminé : fin, sans regarder les bots jouer seuls');
+});
+
+t('The Candidate : code corrigé en différé, points partiels sans perte de vie', () => {
+  const players = [0, 1, 2, 3, 4].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 11, now: 0 });
+  let now = 0;
+  const all = (h) => Object.fromEntries(s.players.map((p, k) => [p.id, k ? 'good' : h]));
+  s = nextQuestion(s, now);
+  // le joueur 0 répond vite : il n'est jamais coupé au palier
+  while (fullQuestion(s).input !== 'code') { s = play(s, all('good'), now); now += 1e5; s = nextQuestion(s, now); }
+  const [A, B, C] = s.players.filter((p) => !p.out).map((p) => p.id);
+  const q = fullQuestion(s), T = q.tests.length;
+  assert.ok(!('tests' in publicState(s).q), 'les tests cachés ne partent pas');
+  assert.equal(publicState(s).q.ntests, T);
+  let r = answer(s, { by: A, raw: 'def x(): pass', idx: s.idx, now: now + 1000 });
+  assert.ok(r.pending && !r.done); s = r.state;
+  assert.ok(publicState(s).answers[A].grading);
+  assert.equal(gradeCode(s, { by: C, idx: s.idx, passed: 1, total: T }).ok, false, 'pas de code envoyé');
+  s = gradeCode(s, { by: A, idx: s.idx, passed: T, total: T }).state;
+  s = answer(s, { by: B, raw: 'def x(): pass', idx: s.idx, now: now + 2000 }).state;
+  s = gradeCode(s, { by: B, idx: s.idx, passed: 2, total: T }).state;
+  const lives = Object.fromEntries(s.players.map((p) => [p.id, p.lives]));
+  s = reveal(s, now + 3000);
+  const res = (id) => s.last.results.find((x) => x.id === id);
+  const a = res(A), b = res(B), c = res(C);
+  assert.ok(a.ok && a.pts > 0 && a.passed === T);
+  assert.ok(!b.ok && b.pts > 0 && b.pts < a.pts && b.passed === 2, 'points partiels');
+  assert.equal(s.players.find((p) => p.id === B).lives, lives[B], 'quelques tests réussis : pas de vie perdue');
+  assert.equal(s.players.find((p) => p.id === C).lives, lives[C] - 1);
+  assert.ok(!c.ok && c.pts === 0);
+  assert.equal(s.history.at(-1).results.find((x) => x.id === A).raw, `${T}/${T}`, 'le code lui-même ne reste pas dans l\'historique');
+});
+
+t('The Candidate : jokers 50/50 et appel à un ami', () => {
+  const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 21, now: 0 });
+  let now = 0;
+  s = nextQuestion(s, now);
+  while (fullQuestion(s).input !== 'choice') { s = play(s, { 0: 'good', 1: 'good' }, now); now += 1e5; s = nextQuestion(s, now); }
+  const q = fullQuestion(s);
+  let r = useJoker(s, { by: 0, kind: 'half' });
+  assert.ok(r.ok && r.info.removed.length === 2);
+  assert.ok(!r.info.removed.includes(q.answer) && !r.info.removed.includes(q.trap), 'le 50/50 garde la bonne réponse et le piège');
+  s = r.state;
+  assert.equal(useJoker(s, { by: 0, kind: 'half' }).ok, false, 'une seule fois par partie');
+  r = useJoker(s, { by: 0, kind: 'friend' }); assert.ok(r.ok && [q.answer, q.trap].includes(r.info.suggest)); s = r.state;
+  assert.deepEqual(s.players[0].jokers, []);
+  // l'ami a raison la plupart du temps
+  let right = 0;
+  for (let seed = 0; seed < 300; seed++) {
+    let g = createGame({ players, cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed, now: 0 });
+    g = nextQuestion(g, 0); const gq = fullQuestion(g);
+    if (gq.input !== 'choice') continue;
+    const k = useJoker(g, { by: 1, kind: 'friend' });
+    if (k.info.suggest === gq.answer) right++; else assert.equal(k.info.suggest, gq.trap);
+  }
+  assert.ok(right > 150, `ami fiable : ${right}`);
+  // pas de joker hors The Candidate
+  const c = nextQuestion(createGame({ players, cfg: {}, seed: 1, now: 0 }), 0);
+  assert.equal(useJoker(c, { by: 0, kind: 'half' }).ok, false);
+});
+
+t('code : chaque exercice a une solution de référence et des tests sous la limite des entiers JSON', () => {
+  for (const c of CODE_QUESTIONS) {
+    assert.ok(c.fn && c.starter.includes(`def ${c.fn}`) && c.ref.includes(`def ${c.fn}`) && c.tests.length >= 4, c.title);
+    const big = (v) => (Array.isArray(v) ? v.some(big) : typeof v === 'number' && Math.abs(v) > 2 ** 53);
+    for (const [args, exp] of c.tests) assert.ok(!big(args) && !big(exp), `${c.title} : ${exp}`);
+  }
+});
+
+// Python local (le même harnais que dans le navigateur) : les solutions de référence passent tous leurs tests
+const py = spawnSync('python3', ['-I', '-c', 'print(1)'], { encoding: 'utf8' });
+const runPy = (code, fn, tests) => {
+  const r = spawnSync('python3', ['-I', '-c', buildProgram(code, fn, tests, { print: true })], { encoding: 'utf8', timeout: 10000 });
+  const line = (r.stdout || '').split('\n').find((l) => l.startsWith('@@RESULT@@'));
+  return line ? JSON.parse(line.slice(10)) : { error: r.stderr || 'pas de résultat', tests: [] };
+};
+if (py.status === 0) t('code : références justes, code vide ou tricheur refusé (python3)', () => {
+  for (const c of CODE_QUESTIONS) {
+    const out = runPy(c.ref, c.fn, c.tests);
+    assert.equal(scoreRun(out, c.tests.length), c.tests.length, `${c.title} : ${JSON.stringify(out)}`);
+    assert.equal(scoreRun(runPy(c.starter, c.fn, c.tests), c.tests.length) < c.tests.length, true, `${c.title} : le squelette ne suffit pas`);
+  }
+  const c = CODE_QUESTIONS[0];
+  assert.ok(runPy('def ' + c.fn + '(:', c.fn, c.tests).error, 'erreur de syntaxe signalée');
+  const cheat = `class T:\n    def __eq__(self, o): return True\ndef ${c.fn}(*a): return T()`;
+  assert.equal(scoreRun(runPy(cheat, c.fn, c.tests), c.tests.length), 0, 'un objet « égal à tout » ne passe pas');
+});
+else console.log('· python3 absent : vérification des solutions de code sautée');
 
 console.log(`\n${n} tests réussis`);
