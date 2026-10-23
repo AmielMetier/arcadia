@@ -265,6 +265,8 @@ export function reveal(state, now) {
       p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
       if (p.streak >= 3 && s.cfg.mode !== 'eclair') { const b = Math.min(100, 25 * (p.streak - 2)); r.pts += b; r.tags.push('serie'); r.streak = p.streak; }
       if (rank === 0) p.firsts++;
+      // The Candidate : trois bonnes réponses d'affilée rendent un cœur (sans dépasser le nombre de départ)
+      if (s.cfg.lives && p.streak % 3 === 0 && p.lives < s.cfg.lives) { p.lives++; r.tags.push('life'); r.gained = 1; }
       // sabotage : un pouvoir toutes les 3 bonnes réponses d'affilée (tiré de la graine, donc reproductible)
       if (s.cfg.sabotage && p.streak % 3 === 0 && p.powers.length < MAX_POWERS && s.idx + 1 < s.cfg.len) {
         const list = Object.keys(POWERS), h = (s.seed ^ Math.imul(s.idx + 7, 2654435761) ^ Math.imul(p.id + 3, 40503)) >>> 0;

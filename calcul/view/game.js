@@ -1,6 +1,6 @@
 // Vue de Tête de Calcul : salle d'avant-partie, pupitre de question, révélation et podium final.
 // La vue n'invente rien : elle affiche l'état reçu de l'hôte et envoie la saisie du joueur.
-import { CATS, TIER_LABEL, fmt } from '../engine/questions.js';
+import { CATS, TIER_LABEL, DIFFS, chartierTier, fmt } from '../engine/questions.js';
 import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer, JOKERS, LIVES } from '../engine/rules.js';
 import { buildProgram } from '../engine/code-data.js';
 import { runPython, preloadPython } from './py.js';
@@ -28,7 +28,7 @@ const THEME_LABEL = {
 const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['moyen', 'moyens'], expert: ['difficile', 'difficiles'] };
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
-const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir', trap: '🪤 Piège', cut: '✂️ Coupé' };
+const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir', trap: '🪤 Piège', cut: '✂️ Coupé', life: '♥ +1 vie' };
 const hearts = (n, max = LIVES) => `${'♥'.repeat(Math.max(0, n))}<s>${'♥'.repeat(Math.max(0, max - n))}</s>`;
 // valeurs des tests (JSON) écrites comme en Python
 const pyRepr = (v) => (v === true ? 'True' : v === false ? 'False' : v == null ? 'None' : Array.isArray(v) ? `[${v.map(pyRepr).join(', ')}]` : typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
@@ -112,18 +112,22 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       </div>
       <div class="sabpick" id="sabpick" hidden></div>
     </div>
-    <div class="toast" id="toast" hidden role="status"></div>`;
+    <div class="toast" id="toast" hidden role="status"></div>
+    <div class="inter" id="inter" aria-hidden="true"><div class="inter-band"><small id="ikick"></small><b id="ititle"></b><span id="isub"></span></div></div>`;
   const $ = (s) => root.querySelector(s);
   const stage = $('#stage');
 
-  // La carte s'adapte à la hauteur de l'écran : jamais besoin de faire défiler (sauf écran vraiment minuscule)
+  // La carte s'adapte à l'écran : réduite si elle déborde (jamais besoin de faire défiler, sauf écran minuscule),
+  // agrandie sur les grands écrans pour occuper la place (jusqu'à ×1,5)
   let fitCard = null;
   function fit() {
     const c = stage.querySelector(':scope > .card'); if (!c) return;
     c.style.zoom = '';
-    const avail = stage.clientHeight - 14, h = c.offsetHeight;
-    const min = innerWidth < 820 ? 0.72 : 0.5;
-    c.style.zoom = h > avail ? String(Math.max(min, Math.floor((avail / h) * 1000) / 1000)) : '';
+    const availH = stage.clientHeight - 14, availW = stage.clientWidth - 14, h = c.offsetHeight, w = c.offsetWidth;
+    if (!h || !w) return;
+    const min = innerWidth < 820 ? 0.72 : 0.5, max = innerWidth < 820 ? 1 : 1.5;
+    const k = Math.max(min, Math.min(max, availH / h, availW / w));
+    c.style.zoom = Math.abs(k - 1) < 0.02 ? '' : String(Math.floor(k * 1000) / 1000);
   }
   const fitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => requestAnimationFrame(fit)) : null;
   if (fitRO) fitRO.observe(stage);
@@ -136,7 +140,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   addEventListener('resize', () => requestAnimationFrame(fit));
 
   let S = null, offset = 0, key = '', myAns = null, shown = {}, lastTick = -1, setupS = null, sabSeen = -1, picking = null;
-  let jokInfo = null, draft = { idx: -1, code: '' }, pyAsked = false;
+  let jokInfo = null, draft = { idx: -1, code: '' }, pyAsked = false, interFor = -2, interT = 0;
   const meP = () => S && S.players.find((p) => p.id === me.id);
   const iAmOut = () => !!(meP() && meP().out);
   const name = (id) => { const p = S && S.players.find((q) => q.id === id); return p ? p.name : '?'; };
@@ -235,6 +239,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     // The Candidate : les éliminés descendent en bas, grisés
     const order = [...S.players].sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || b.score - a.score);
     const box = $('#roster');
+    // à 7 ou 8 autour de la table, cartes plus compactes pour que tout le monde tienne
+    box.classList.toggle('many', S.players.length > 6);
     for (const c of [...box.children]) if (!S.players.some((p) => String(p.id) === c.dataset.id)) c.remove();
     // animation FLIP : on note la place de chaque carte avant de les réordonner
     const before = new Map([...box.children].map((c) => [c.dataset.id, c.getBoundingClientRect()]));
@@ -255,7 +261,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       else if (S.phase === 'question') st = a ? (a.locked ? '<em class="locked">🔒 bloqué</em>' : a.grading ? '<em class="done">⚙️ code en test…</em>' : '<em class="done">✔ a répondu</em>') : '<em class="think">réfléchit…</em>';
       else if (S.phase === 'reveal' && S.last) { const r = S.last.results.find((x) => x.id === p.id); st = r ? (r.ok ? '<em class="good">juste</em>' : r.raw != null ? '<em class="bad">raté</em>' : '<em class="think">pas de réponse</em>') : ''; }
       if (p.streak >= 2 && S.phase !== 'over' && !p.out) st += `<em class="flame">🔥 ${p.streak}</em>`;
-      if (S.cfg.lives && !p.out) st = `<em class="lives" title="${p.lives} vie${p.lives > 1 ? 's' : ''}">${hearts(p.lives, S.cfg.lives)}</em>` + st;
+      const regained = S.phase === 'reveal' && S.last && S.last.results.some((x) => x.id === p.id && x.tags.includes('life'));
+      if (S.cfg.lives && !p.out) st = `<em class="lives${regained ? ' up' : ''}" title="${p.lives} vie${p.lives > 1 ? 's' : ''}">${hearts(p.lives, S.cfg.lives)}</em>` + st;
       const curses = S.phase === 'question' ? (S.active && S.active[p.id]) || [] : (S.curses && S.curses[p.id]) || [];
       if (curses.length) st += `<em class="curse" title="Saboté">${curses.map((c) => POWERS[c.power].icon).join('')}</em>`;
       if (S.cfg.sabotage && p.powers && p.powers.length && p.id !== me.id) st += `<em class="pw" title="Pouvoirs en réserve">${p.powers.map((pw) => POWERS[pw].icon).join('')}</em>`;
@@ -328,7 +335,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
          </div>
          <ul class="howto">
            <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${c.code && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code Python</b>' : 'une <b>épreuve de code Python</b>'} de 3 minutes` : ''}.</li>
-           <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une, <b>le piège en coûte deux</b> 🪤.</li>
+           <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une, <b>le piège en coûte deux</b> 🪤. Trois bonnes réponses d'affilée en rendent une.</li>
            ${c.cut ? '<li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu\'il reste trois candidats).</li>' : ''}
            ${c.jokers ? '<li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>' : ''}
            ${c.sabotage ? '<li>Sabotage activé : trois bonnes réponses d\'affilée donnent un pouvoir à lancer sur un adversaire.</li>' : ''}
@@ -653,6 +660,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <div class="qrecall">${recall}</div>
         ${answerHtml}
         ${ch ? '</div><div class="rv-r">' : verdict}
+        ${mine && mine.gained ? '<div class="gotlife"><b>♥</b> Trois d\'affilée : tu récupères une vie !</div>' : ''}
         ${mine && mine.power ? `<div class="gotpower">🎁 Nouveau pouvoir : ${POWERS[mine.power].icon} <b>${esc(POWERS[mine.power].label)}</b>${mine.power === 'shield' ? ' (il te protège tout seul)' : ' : lance-le en bas à gauche !'}</div>` : ''}
         ${ch && mine && !mine.out ? chartierQuote(mine, L, (q.time || 20) * 1000) : ''}
         <div class="tip"><b>${ch ? '📊 Le décryptage' : '💡 L\'astuce'}</b>${qText(L.tip)}</div>
@@ -674,6 +682,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       sfx.play(mine.ok ? (mine.tags.includes('serie') ? 'streak' : 'ok') : mine.tags.includes('trap') ? 'trap' : mine.raw != null ? 'ko' : 'lock');
       if (mine.ok) setTimeout(() => burst($('#verdict')), 250); else if (mine.raw != null) setTimeout(shake, 200);
       if (mine.power) setTimeout(() => sfx.play('streak'), 700);
+      if (mine.gained) setTimeout(() => sfx.play('life'), 500);
     }
   }
 
@@ -766,6 +775,27 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     root.appendChild(box); setTimeout(() => box.remove(), 5000);
   }
 
+  /* ---------------------------------------------------------- transitions entre deux étapes */
+  // Jouées pendant la dernière seconde de la correction : la question suivante démarre à l'heure, sans temps perdu
+  function showInter(kick, title, sub, tone) {
+    const o = $('#inter'); if (!o || !motion()) return;
+    $('#ikick').textContent = kick; $('#ititle').textContent = title; $('#isub').textContent = sub || '';
+    o.className = 'inter ' + (tone || ''); void o.offsetWidth; o.classList.add('show');
+    sfx.play(tone === 'tier' || tone === 'final' ? 'sab' : 'pop');
+  }
+  function nextInter() {
+    const n = S.idx + 1, ch = S.cfg.mode === 'chartier';
+    if (n >= S.cfg.len || (S.last && S.last.endEarly)) return showInter(ch ? 'Fin de l\'entretien' : 'Fin de la partie', ch ? 'Le verdict' : 'Les résultats', '', 'end');
+    const cat = CATS[S.cats && S.cats[n]] || null, final = S.cfg.finale && n === S.cfg.len - 1;
+    const d = Math.max(0, DIFFS.indexOf(S.cfg.diff)), tier = ch ? chartierTier(d, n, S.cfg.len) : 0;
+    const newTier = ch && n > 0 && tier !== chartierTier(d, n - 1, S.cfg.len);
+    if (final) return showInter(`Question ${n + 1} / ${S.cfg.len}`, 'Quitte ou double', 'Les points comptent double', 'final');
+    if (newTier) return showInter(`${'★'.repeat(tier)} Nouveau tour`, TIER_LABEL[tier], `Question ${n + 1} / ${S.cfg.len}`, 'tier');
+    // The Candidate : on annonce le tour (ou l'épreuve de code) ; ailleurs, la catégorie de la question
+    if (ch) return showInter(`Question ${n + 1} / ${S.cfg.len}`, S.cats[n] === 'code' ? '⌨ Épreuve de code' : TIER_LABEL[tier], S.cats[n] === 'code' ? '3 minutes, en Python' : '★'.repeat(tier), S.cats[n] === 'code' ? 'tier' : '');
+    showInter(`Question ${n + 1} / ${S.cfg.len}`, cat ? `${cat.icon} ${cat.label}` : 'Question suivante', '', '');
+  }
+
   /* ---------------------------------------------------------- horloge : barre de temps, compte à rebours */
   function frame() {
     requestAnimationFrame(frame);
@@ -838,9 +868,14 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       $('#round').textContent = round;
       if (k !== key) {
         key = k;
-        if (state.phase === 'intro') { shown = {}; sabSeen = -1; $('#roster').innerHTML = ''; renderIntro(); }
+        if (state.phase === 'intro') { shown = {}; sabSeen = -1; interFor = -2; $('#roster').innerHTML = ''; renderIntro(); }
         else if (state.phase === 'question') renderQuestion();
-        else if (state.phase === 'reveal') renderReveal();
+        else if (state.phase === 'reveal') {
+          renderReveal();
+          // la transition démarre une seconde avant la question suivante (minuteur : elle part même onglet en arrière-plan)
+          clearTimeout(interT);
+          interT = setTimeout(() => { if (S && S.phase === 'reveal' && interFor !== S.idx) { interFor = S.idx; nextInter(); } }, Math.max(0, state.endsAt - now() - 1150));
+        }
         else if (state.phase === 'over') renderOver();
       } else if (state.phase === 'question' && prev && prev.qAt !== state.qAt) renderQuestion(); // question relancée (nouvel hôte)
       renderRoster();

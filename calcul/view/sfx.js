@@ -46,6 +46,7 @@ const SOUNDS = {
   trap(c, t) { tone(520, t, 0.18, { type: 'square', vol: 0.14, slide: 0.5 }); noise(t + 0.16, 0.08, { vol: 0.5, freq: 3200, q: 2 }); tone(140, t + 0.2, 0.4, { type: 'sawtooth', vol: 0.16, slide: 0.7 }); },
   elim(c, t) { [392, 370, 349, 262].forEach((f, k) => tone(f, t + k * 0.28, k === 3 ? 0.7 : 0.26, { type: 'sawtooth', vol: 0.12, slide: k === 3 ? 0.8 : 0.97 })); noise(t + 1.15, 0.25, { vol: 0.5, freq: 200, q: 0.6 }); },
   cut(c, t) { noise(t, 0.05, { vol: 0.5, freq: 5000, q: 3 }); noise(t + 0.12, 0.05, { vol: 0.5, freq: 4200, q: 3 }); tone(196, t + 0.25, 0.3, { type: 'triangle', vol: 0.2, slide: 0.7 }); },
+  life(c, t) { [659, 880, 1319].forEach((f, k) => tone(f, t + k * 0.09, 0.3, { type: 'sine', vol: 0.28 })); tone(1760, t + 0.3, 0.4, { type: 'triangle', vol: 0.12 }); },
   snip(c, t) { noise(t, 0.04, { vol: 0.45, freq: 5200, q: 3 }); noise(t + 0.09, 0.04, { vol: 0.45, freq: 4600, q: 3 }); },
   ring(c, t) { for (let k = 0; k < 6; k++) { tone(1400, t + k * 0.05, 0.04, { type: 'square', vol: 0.07 }); tone(1750, t + k * 0.05 + 0.025, 0.04, { type: 'square', vol: 0.07 }); } },
   win(c, t) { [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, t + k * 0.13, 0.3, { type: 'triangle', vol: 0.3 })); noise(t + 0.7, 0.6, { vol: 0.2, freq: 4000, q: 0.5 }); },

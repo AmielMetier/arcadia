@@ -94,6 +94,13 @@ export function figureSvg(fig) {
       <circle cx="${x0.toFixed(1)}" cy="${(y0 + h).toFixed(1)}" r="9" fill="${ACC}" stroke="${INK}" stroke-width="3"/>
       <circle cx="${(x0 + w).toFixed(1)}" cy="${y0.toFixed(1)}" r="9" fill="#ffc531" stroke="${INK}" stroke-width="3"/>
       ${label(x0 - 14, y0 + h + 6, 'A', 'end')}${label(x0 + w + 14, y0 + 6, 'B', 'start')}`;
+  } else if (fig.t === 'fan') {
+    // triangle, et k traits du sommet vers la base (bases réparties au hasard mais fixes)
+    const A = [140, 22], B = [40, 150], C = [240, 150];
+    let lines = '';
+    for (let j = 1; j <= fig.k; j++) { const x = 40 + (200 * j) / (fig.k + 1) + (j % 2 ? 6 : -6); lines += `<path d="M${A[0]} ${A[1]} L${x.toFixed(1)} 150"/>`; }
+    body = `<path d="M${A.join(' ')} L${B.join(' ')} L${C.join(' ')} Z" fill="${FILL}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="${INK}" stroke-width="2.5">${lines}</g>`;
   } else if (fig.t === 'polyd') {
     // polygon à n sommets, avec une diagonale en exemple
     const n = fig.n, pts = Array.from({ length: n }, (_, k) => {

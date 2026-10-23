@@ -8,16 +8,19 @@ import { botAnswer, botSabotage, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { isEmote, botReaction } from '../view/emotes.js';
 
-const BOT_NAMES = ['Prof Garibaldi', 'Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius'];
+const BOT_NAMES = ['Prof Garibaldi', 'Mamé Rose', 'Tonton Jojo', 'Lou Pitchoun', 'Cousin Marius', 'Tata Mireille', 'Papé Fernand'];
 const FINANCE_BOT_NAMES = [
   'Julien (Ex-McKinsey)',
   'Alexandre (M&A Lazard)',
   'Clara (Quant Citadel)',
   'Baptiste (PE KKR)',
   'Maxime (Sales Goldman)',
-  'Sophie (Trader BNP)'
+  'Sophie (Trader BNP)',
+  'Inès (Structuration SocGen)',
+  'Hugo (Hedge fund Londres)'
 ];
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
+export const MAX_TABLE = 8; // humains + bots autour de la table (jusqu'à 6 bots)
 const ABSENT_MS = 15000; // un joueur parti du salon depuis 15 s quitte la partie
 
 export function startHost({ bridge, solo, settings, me, onState, onSetup, onError, onAck = () => {}, onEmote = () => {}, onNote = () => {}, initial = null }) {
@@ -25,7 +28,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
   const botTimers = [];
   const cfg = makeConfig(settings);
   const level = BOT_LEVELS.includes(settings.level) ? settings.level : 'normal';
-  const botCount = (n) => Math.max(solo ? 1 : 0, Math.min(Number(settings.bots ?? (solo ? 2 : 0)), 6 - n));
+  const botCount = (n) => Math.max(solo ? 1 : 0, Math.min(Number(settings.bots ?? (solo ? 2 : 0)), 6, MAX_TABLE - n));
 
   function broadcast() {
     const pub = publicState(state);
@@ -177,7 +180,9 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     const players = humans.map((p) => ({ id: p.id, name: p.name, color: p.color }));
     const used = new Set(players.map((p) => p.color));
     const botPool = cfg.mode === 'chartier' ? FINANCE_BOT_NAMES : BOT_NAMES;
-    for (let k = 0; k < botCount(players.length); k++) {
+    // le nombre de bots se calcule une fois, d'après les seuls humains (sinon la table qui se remplit le réduit)
+    const nBots = botCount(players.length);
+    for (let k = 0; k < nBots; k++) {
       const color = COLORS.find((c) => !used.has(c)) || COLORS[k]; used.add(color);
       players.push({ id: 100 + k, name: botPool[k % botPool.length], color, bot: true });
     }
