@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.34 — 23 octobre 2026
+- **Cyber Kart GP** — Correction : la musique marche sur iPad, iPhone et Brave (Claude)
+
 ## 2.33 — 23 octobre 2026
 - **Outbreak** — Nouvelle intro cinématique avant chaque partie : transmission radio, carte de la Côte d'Azur qui se fait infecter, survol de la ville en feu en hélico, puis chaque joueur descend en rappel avec sa fiche (nom, classe, capacité) avant le titre et le compte à rebours.
 - **Outbreak** — L'écran de préparation tient entièrement à l'écran : plus besoin de faire défiler pour lancer la partie, il s'adapte à la taille de la fenêtre.
