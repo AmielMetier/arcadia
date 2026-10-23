@@ -17,7 +17,7 @@ import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, t
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
-export async function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {}, team = () => {} }) {
+export async function mountGame(root, board, { me, act, pick, start, exit, chooseSave, deleteSave, emote = () => {}, team = () => {}, chat = () => {} }) {
   root.className = 'game';
   root.innerHTML = `
     <div class="stagehost" id="stagehost"></div>
@@ -43,6 +43,13 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       <button class="btn ghost emobtn" id="bEmote" title="Réagir (touche R)" aria-expanded="false">😀</button>
       <button class="btn ghost" id="bMine">Mes biens</button>
       <button class="btn ghost" id="bTrade">Échanger<i class="badge" id="tradeBadge" hidden></i></button>
+      <button class="btn ghost" id="bChat" hidden title="Chat d'équipe (touche T)">💬 Équipe<i class="badge" id="chatBadge" hidden></i></button>
+    </div>
+    <div class="tchat" id="tchat" hidden role="dialog" aria-label="Chat d'équipe">
+      <div class="tch"><b>Chat d'équipe</b><small>🔒 seul ton coéquipier le lit</small><button class="tchx" id="tchatX" aria-label="Fermer">✕</button></div>
+      <ol class="tchlog" id="tchatLog"><li class="tchempty">Coordonnez-vous ici : l'équipe adverse ne voit rien.</li></ol>
+      <div class="tchquick">${['Je bâtis chez toi ?', 'Garde du cash !', 'Achète-la !', 'J\'ai besoin d\'argent', 'On échange ?', 'Bien joué 👏'].map((q) => `<button type="button" data-q="${q}">${q}</button>`).join('')}</div>
+      <form class="tchform" id="tchatF" autocomplete="off"><input id="tchatIn" maxlength="200" placeholder="Message à ton coéquipier…" aria-label="Message"><button class="btn small">Envoyer</button></form>
     </div>
     <div class="logbox" id="logbox"><ol id="log"></ol></div>
     <div class="toast" id="toast" hidden role="status"></div>`;
@@ -136,6 +143,45 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     if ((e.key === 'r' || e.key === 'R') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && !M.key) toggleEmo();
   });
   addEventListener('pointerdown', (e) => { if (!emoPanel.hidden && !e.target.closest('.emopanel, #bEmote')) toggleEmo(false); });
+  /* ---------------------------------------------------------- 2 contre 2 : chat d'équipe */
+  let unread = 0;
+  const chatBox = $('#tchat'), chatLog = $('#tchatLog');
+  function toggleChat(v) {
+    chatBox.hidden = v == null ? !chatBox.hidden : !v;
+    if (!chatBox.hidden) { unread = 0; $('#chatBadge').hidden = true; chatLog.scrollTop = chatLog.scrollHeight; setTimeout(() => $('#tchatIn').focus(), 30); }
+  }
+  $('#bChat').onclick = () => toggleChat();
+  $('#tchatX').onclick = () => toggleChat(false);
+  $('#tchatF').onsubmit = (e) => { e.preventDefault(); const i = $('#tchatIn'), v = i.value.trim(); if (!v) return; chat(v); i.value = ''; };
+  for (const b of chatBox.querySelectorAll('[data-q]')) b.onclick = () => chat(b.dataset.q);
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !chatBox.hidden) { toggleChat(false); return; }
+    if ((e.key === 't' || e.key === 'T') && S && S.cfg.teams && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && !M.key) { e.preventDefault(); toggleChat(true); }
+  });
+  function showChat(m) {
+    chatLog.querySelector('.tchempty')?.remove();
+    const mine = m.from === me.id;
+    const li = el('li', mine ? 'me' : '');
+    li.style.setProperty('--c', m.color || '#16181d');
+    li.innerHTML = `<b>${esc(mine ? 'Toi' : m.name)}</b><span></span>`;
+    li.querySelector('span').textContent = m.text;
+    chatLog.appendChild(li);
+    while (chatLog.children.length > 80) chatLog.firstChild.remove();
+    chatLog.scrollTop = chatLog.scrollHeight;
+    if (mine) return;
+    sfx.play('bid');
+    if (chatBox.hidden) {
+      unread++; const b = $('#chatBadge'); b.textContent = unread; b.hidden = false;
+      // aperçu dans une bulle à côté de la carte du coéquipier
+      const card = cardEl(m.from);
+      if (card) {
+        card.querySelector('.bubble')?.remove();
+        const bub = el('div', 'bubble chatbub'); bub.textContent = '💬 ' + (m.text.length > 60 ? m.text.slice(0, 57) + '…' : m.text);
+        card.appendChild(bub); setTimeout(() => bub.classList.add('out'), 3600); setTimeout(() => bub.remove(), 4000);
+      }
+    }
+  }
+
   function showEmote(from, id) {
     const em = emoteOf(id); if (!em || !S) return;
     const p = S.players.find((q) => q.id === from); if (!p) return;
@@ -177,6 +223,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         if (e.reason === 'jackpot') return `${name(e.to)} remporte la cagnotte : ${money(e.amount)} !`;
         if (e.reason === 'tax') return `${name(e.from)} paie ${money(e.amount)} de taxe`;
         if (e.reason === 'bail') return `${name(e.from)} paie la caution`;
+        if (e.reason === 'bankrupt') return `${name(e.from)} solde ${money(e.amount)} ${e.to != null ? 'à ' + name(e.to) : 'à la banque'} avant de sortir`;
+        if (e.reason === 'inherit') return `${name(e.to)} récupère ${money(e.amount)} de son coéquipier`;
         if (e.reason === 'card') return e.from == null ? `${name(e.to)} reçoit ${money(e.amount)}` : `${name(e.from)} paie ${money(e.amount)}${e.to != null ? ' à ' + name(e.to) : ''}`;
         return null;
       case 'CARD': return `${e.deck === 'chance' ? 'Chance' : 'Caisse'} : ${e.text}`;
@@ -191,7 +239,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       case 'TRADE_DONE': return `Échange conclu : ${name(e.trade.from)} ⇄ ${name(e.trade.to)}`;
       case 'TRADE_CANCELLED': return e.reason === 'turn' ? 'Proposition d\'échange expirée (fin du tour)' : null;
       case 'NO_RENT': return `${name(e.player)} est chez son coéquipier : pas de loyer`;
-      case 'BANKRUPT': return `${name(e.player)} fait faillite`;
+      case 'BANKRUPT': return e.heir != null ? `${name(e.player)} fait faillite : son coéquipier ${name(e.heir)} reprend ses biens` : `${name(e.player)} fait faillite`;
       case 'BOT': return e.bot ? `${name(e.player)} est déconnecté : un bot joue à sa place` : `${name(e.player)} est de retour`;
       case 'HOST_CHANGED': return `${name(e.host)} est le nouvel hôte de la partie`;
       case 'GAME_OVER': return e.team != null ? `${TEAM_NAMES[e.team]} remporte la partie !` : `${name(e.winner)} remporte la partie !`;
@@ -450,6 +498,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
   /* ---------------------------------------------------------- application d'un état */
   function apply(state) {
     S = state;
+    $('#bChat').hidden = !(S.cfg && S.cfg.teams);
+    if (!(S.cfg && S.cfg.teams)) chatBox.hidden = true;
     if (M.key === 'wait') M.close(true);
     for (const p of S.players) cash[p.id] = p.cash;
     B.sync(S);
@@ -674,5 +724,6 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     toast(msg) { sfx.play('error'); toast(msg); },
     board: B, // tests (?debug)
     emote(from, id) { showEmote(from, id); },
+    chat(m) { showChat(m); },
   };
 }

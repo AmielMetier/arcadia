@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.26 — 23 octobre 2026
+- **DavidSimulator** — Dés plus lisibles : en 3D, les dés se posent de trois quarts pour que la face du dessus (celle qui compte) se lise d'un coup d'œil ; sur le plateau classique, ils se voient de face. Dans les deux cas, une pastille au-dessus de chaque dé rappelle sa valeur, la même que celle affichée en bas.
+- **DavidSimulator** — 2 contre 2 :
+  - On peut construire sur les terrains de son coéquipier quand l'équipe possède la couleur (on paie la maison, le loyer revient au propriétaire). La construction et la vente restent égales sur tout le groupe, chez l'un comme chez l'autre.
+  - Nouvelle règle de faillite : le créancier n'est payé qu'à hauteur de la dette avec l'argent qui reste ; le coéquipier reprend tout le reste (terrains, hypothèques comprises, argent restant, cartes « Sortie de prison »). L'adversaire ne rafle plus tout le patrimoine d'un coup.
+  - Chat privé d'équipe : bouton « 💬 Équipe » (ou touche T), messages rapides, et les messages n'arrivent qu'au coéquipier. Un message reçu s'affiche en bulle à côté de sa carte.
+  - Les deux coéquipiers ont la couleur de leur équipe en deux nuances : bleu foncé et bleu clair pour l'équipe A, rouge foncé et rouge clair pour l'équipe B.
+
 ## 2.25 — 22 octobre 2026
 - **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.
   - En drift, le kart glisse de travers mais suit la direction voulue : au neutre il tourne en douceur, en contre-braquant il file presque tout droit, en braquant il serre le virage.

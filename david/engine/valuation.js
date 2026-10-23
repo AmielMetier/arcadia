@@ -72,6 +72,8 @@ export const teammate = (state, pid) => {
   return state.players.find((q) => q.id !== pid && q.team === t) || null;
 };
 export const TEAM_NAMES = ['Équipe A', 'Équipe B'];
+// 2 contre 2 : une couleur par équipe, en deux nuances (foncée, claire) pour les deux coéquipiers
+export const TEAM_SHADES = [['#1C5FB4', '#5DADFF'], ['#C62A12', '#FF8A66']];
 
 // Groupe de couleur complet pour construire : à soi seul, ou avec son coéquipier en 2 contre 2.
 export function teamOwnsGroup(state, board, pid, group) {

@@ -3,6 +3,8 @@
 // enchérit jusqu'à la valeur du terrain, refuse les échanges qui donnent un monopole à l'adversaire.
 import { currentPlayer } from './rules.js';
 import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teamOwnsGroup } from './valuation.js';
+// terrain de soi ou (en 2 contre 2) de son coéquipier : on peut y bâtir
+const ours = (s, owner, pid) => owner === pid || (s.cfg.teams && owner != null && sameTeam(s, owner, pid));
 
 const RESERVE = 150;
 
@@ -26,7 +28,7 @@ export function normalBot(s, board, pid) {
   if (s.debts.length) {
     if (s.debts[0].from !== pid) return null;
     const mine = ownedBy(s, board, pid);
-    const sellable = mine.filter((i) => board.spaces[i].type === 'street' && level(s, i) > 0)
+    const sellable = (s.cfg.teams ? Object.keys(s.props).map(Number).filter((i) => ours(s, s.props[i].owner, pid)) : mine).filter((i) => board.spaces[i].type === 'street' && level(s, i) > 0)
       .filter((i) => level(s, i) === Math.max(...groupSpaces(board, board.spaces[i].group).map((j) => level(s, j))))
       .filter((i) => !s.props[i].hotel || s.bank.houses >= s.cfg.housesPerHotel);
     if (sellable.length) return { type: 'SELL_BUILDING', space: sellable[0] };
@@ -84,7 +86,7 @@ export function normalBot(s, board, pid) {
       if (me.cash - cost < RESERVE + 50) continue;
       // terrain le moins bâti du groupe parmi les siens (en 2 contre 2, le coéquipier bâtit les autres)
       const minLv = Math.min(...sp.map((j) => level(s, j)));
-      const lowest = sp.find((j) => level(s, j) === minLv && s.props[j].owner === pid);
+      const lowest = sp.find((j) => level(s, j) === minLv && ours(s, s.props[j].owner, pid));
       if (lowest == null || s.props[lowest].hotel) continue;
       const toHotel = s.props[lowest].houses === s.cfg.housesPerHotel;
       if (toHotel ? s.bank.hotels < 1 : s.bank.houses < 1) continue;

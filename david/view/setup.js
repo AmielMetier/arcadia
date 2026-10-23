@@ -26,20 +26,20 @@ const ago = (at) => {
   const d = Math.round(h / 24); return `il y a ${d} jour${d > 1 ? 's' : ''}`;
 };
 
-const TEAM_NAMES = ['Équipe A', 'Équipe B'];
+import { TEAM_NAMES, TEAM_SHADES } from '../engine/valuation.js';
 function teamsHtml(s, me) {
   const humans = s.players.filter((p) => p.ready);
   const mine = s.teams.of[me.id];
   const col = (t) => {
     const mem = humans.filter((p) => s.teams.of[p.id] === t);
-    const slots = mem.map((p) => `<li style="--c:${p.color}"><span class="tsv">${s.picks[p.id] ? tokenSvg(s.picks[p.id], p.color) : ''}</span><b>${esc(p.name)}</b>${p.id === me.id ? '<small>toi</small>' : ''}</li>`);
-    while (slots.length < 2) slots.push('<li class="botslot"><span class="tsv">🤖</span><b>Bot</b><small>complète l\'équipe</small></li>');
+    const slots = mem.map((p, k) => `<li style="--c:${TEAM_SHADES[t][k]}"><span class="tsv">${s.picks[p.id] ? tokenSvg(s.picks[p.id], TEAM_SHADES[t][k]) : ''}</span><b>${esc(p.name)}</b>${p.id === me.id ? '<small>toi</small>' : ''}</li>`);
+    while (slots.length < 2) slots.push(`<li class="botslot" style="--c:${TEAM_SHADES[t][slots.length]}"><span class="tsv">🤖</span><b>Bot</b><small>complète l'équipe</small></li>`);
     const canJoin = mine !== t && mem.length < 2 && !s.teams.tooMany;
     return `<div class="tcol t${t}${mine === t ? ' mine' : ''}"><h3>${TEAM_NAMES[t]}</h3><ul>${slots.join('')}</ul>
       ${canJoin ? `<button class="btn ghost small" data-team="${t}">Rejoindre</button>` : mine === t ? '<span class="tme">Ton équipe</span>' : ''}</div>`;
   };
   return `<div class="teams2">${col(0)}<div class="vs">VS</div>${col(1)}</div>
-    ${s.teams.tooMany ? '<p class="hint center warn">Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.</p>' : '<p class="hint center">Pas de loyer chez son coéquipier, et une couleur détenue à deux suffit pour construire. L\'équipe au plus gros patrimoine cumulé l\'emporte.</p>'}`;
+    ${s.teams.tooMany ? '<p class="hint center warn">Le 2 contre 2 se joue à 4 : il y a trop de joueurs dans le salon.</p>' : '<p class="hint center">Pas de loyer chez son coéquipier ; une couleur détenue à deux suffit pour construire, chez soi comme chez lui. En cas de faillite, le coéquipier reprend les biens. Chat privé d\'équipe pendant la partie. L\'équipe au plus gros patrimoine cumulé l\'emporte.</p>'}`;
 }
 
 export function mountSetup(root, { me, pick, start, exit, chooseSave, deleteSave, team = () => {} }) {

@@ -164,6 +164,13 @@ function manager(ctx, a) {
   return p;
 }
 
+function teamProperty(ctx, p, i) {
+  const sp = ctx.board.spaces[i], o = ctx.s.props[i] && ctx.s.props[i].owner;
+  if (!sp || !isOwnable(sp)) fail('Case invalide.');
+  if (o !== p.id && !(ctx.s.cfg.teams && o != null && sameTeam(ctx.s, o, p.id))) fail(ctx.s.cfg.teams ? 'Ce terrain n\'appartient pas à ton équipe.' : 'Cette propriété ne vous appartient pas.');
+  return sp;
+}
+
 function ownProperty(ctx, p, i) {
   const sp = ctx.board.spaces[i];
   if (!sp || !isOwnable(sp)) fail('Case invalide.');
@@ -406,9 +413,11 @@ function endGame(ctx, reason) {
   ctx.ev.push({ k: 'GAME_OVER', reason, winner: s.winner, ranking: s.ranking, team: s.winnerTeam ?? undefined });
 }
 
-function bankrupt(ctx, p, creditorId) {
+function bankrupt(ctx, p, creditorId, owed = Infinity) {
   const { s, board } = ctx;
   const creditor = creditorId != null ? P(s, creditorId) : null;
+  // 2 contre 2 : le coéquipier encore en jeu hérite des biens (voir plus bas)
+  const heir = s.cfg.teams ? s.players.find((q) => q.id !== p.id && !q.bankrupt && sameTeam(s, q.id, p.id)) : null;
   // 1) bâtiments revendus à la banque à moitié prix
   for (const i of ownedBy(s, board, p.id)) {
     const pr = s.props[i], sp = board.spaces[i];
@@ -416,7 +425,16 @@ function bankrupt(ctx, p, creditorId) {
     if (pr.houses) { p.cash += (sp.houseCost * pr.houses) / 2; s.bank.houses += pr.houses; pr.houses = 0; }
   }
   const props = ownedBy(s, board, p.id);
-  if (creditor && !creditor.bankrupt) {
+  if (heir) {
+    // 2a') 2 contre 2 : le créancier n'est payé qu'à hauteur de la dette, avec l'argent qui reste ;
+    //      le reste de l'argent, les terrains (hypothèques comprises) et les cartes passent au coéquipier
+    const toCreditor = creditor && !creditor.bankrupt && !sameTeam(s, creditor.id, p.id) ? Math.min(p.cash, owed) : 0;
+    if (toCreditor > 0) transfer(ctx, p, creditor, toCreditor, 'bankrupt');
+    else if (!creditor && owed !== Infinity && p.cash > 0) transfer(ctx, p, null, Math.min(p.cash, owed), 'bankrupt');
+    if (p.cash > 0) transfer(ctx, p, heir, p.cash, 'inherit');
+    for (const i of props) s.props[i].owner = heir.id;
+    for (const c of p.jailCards) { s.heldCards[c] = heir.id; heir.jailCards.push(c); }
+  } else if (creditor && !creditor.bankrupt) {
     // 2a) tout revient au créancier ; il paie 10 % sur les terrains hypothéqués reçus
     if (p.cash > 0) transfer(ctx, p, creditor, p.cash, 'bankrupt');
     for (const i of props) {
@@ -457,7 +475,7 @@ function bankrupt(ctx, p, creditorId) {
     s.auction.passed.push(p.id);
     if (s.auction.bidder === p.id) { s.auction.bidder = null; s.auction.high = 0; }
   }
-  ctx.ev.push({ k: 'BANKRUPT', player: p.id, creditor: creditor ? creditor.id : null });
+  ctx.ev.push({ k: 'BANKRUPT', player: p.id, creditor: creditor ? creditor.id : null, ...(heir ? { heir: heir.id, props: props.length } : {}) });
 
   if (s.cfg.endOnFirstBankruptcy) { endGame(ctx, 'bankruptcy'); return; }
   if (s.cfg.teams && new Set(active(s).map((q) => q.team)).size <= 1) { endGame(ctx, 'lastTeam'); return; }
@@ -665,7 +683,8 @@ const HANDLERS = {
   BUILD(ctx, a) {
     const p = manager(ctx, a), { s, board } = ctx, i = Number(a.space);
     if (s.debts.length) fail("Réglez d'abord votre dette.");
-    const sp = ownProperty(ctx, p, i);
+    // en 2 contre 2, on peut aussi bâtir (à ses frais) sur les terrains de son coéquipier
+    const sp = teamProperty(ctx, p, i);
     if (sp.type !== 'street') fail('On ne construit que sur les terrains.');
     if (!teamOwnsGroup(s, board, p.id, sp.group)) fail(s.cfg.teams ? 'Il faut que ton équipe possède tout le groupe de couleur.' : 'Il faut posséder tout le groupe de couleur.');
     const g = groupSpaces(board, sp.group), hph = s.cfg.housesPerHotel, pr = s.props[i];
@@ -689,12 +708,11 @@ const HANDLERS = {
 
   SELL_BUILDING(ctx, a) {
     const p = manager(ctx, a), { s, board } = ctx, i = Number(a.space);
-    const sp = ownProperty(ctx, p, i);
+    // en 2 contre 2, les bâtiments d'une couleur d'équipe se vendent aussi chez le coéquipier (toujours de façon égale)
+    const sp = teamProperty(ctx, p, i);
     if (sp.type !== 'street' || level(s, i) === 0) fail("Aucun bâtiment à vendre ici.");
     const g = groupSpaces(board, sp.group), hph = s.cfg.housesPerHotel, pr = s.props[i];
-    // en 2 contre 2, on vend de façon égale sur ses propres terrains du groupe
-    const mineG = s.cfg.teams ? g.filter((j) => s.props[j].owner === p.id) : g;
-    if (level(s, i) < Math.max(...mineG.map((j) => level(s, j)))) fail('Vendez de façon égale sur tout le groupe.');
+    if (level(s, i) < Math.max(...g.map((j) => level(s, j)))) fail('Vendez de façon égale sur tout le groupe.');
     const refund = Math.floor((sp.houseCost * s.cfg.buildingResaleRatio));
     if (pr.hotel) {
       if (s.bank.houses < hph) fail(`La banque n'a pas ${hph} maisons pour remplacer l'hôtel.`);
@@ -777,7 +795,8 @@ const HANDLERS = {
   BANKRUPT(ctx, a) {
     const p = actor(ctx, a), s = ctx.s;
     if (!s.debts.length || s.debts[0].from !== p.id) fail("Vous n'avez pas de dette à régler.");
-    bankrupt(ctx, p, s.debts[0].to);
+    const owed = s.debts.filter((d) => d.from === p.id && d.to === s.debts[0].to).reduce((t, d) => t + d.amount, 0);
+    bankrupt(ctx, p, s.debts[0].to, owed);
   },
 
   // Un joueur quitte la partie : ses biens reviennent à la banque.

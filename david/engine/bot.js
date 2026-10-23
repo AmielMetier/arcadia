@@ -10,6 +10,8 @@ import { currentPlayer } from './rules.js';
 import { groupSpaces, ownsGroup, level, groupHasBuildings, ownedBy, isOwnable, sameTeam, teammate, teamOwnsGroup } from './valuation.js';
 import { landingProbabilities } from './markov.js';
 import { normalBot } from './bot-normal.js';
+// terrain de soi ou (en 2 contre 2) de son coéquipier : on peut y bâtir
+const ours = (s, owner, pid) => owner === pid || (s.cfg.teams && owner != null && sameTeam(s, owner, pid));
 
 export const BOT_LEVELS = ['facile', 'normal', 'expert'];
 
@@ -90,7 +92,7 @@ function reserveFor(s, board, pid) {
 function debtAction(s, board, pid, smart) {
   const mine = ownedBy(s, board, pid);
   const pi = landingProbabilities(board);
-  const sellable = mine.filter((i) => isStreet(board, i) && level(s, i) > 0)
+  const sellable = (s.cfg.teams ? Object.keys(s.props).map(Number).filter((i) => ours(s, s.props[i].owner, pid)) : mine).filter((i) => isStreet(board, i) && level(s, i) > 0)
     .filter((i) => level(s, i) === Math.max(...groupSpaces(board, board.spaces[i].group).map((j) => level(s, j))))
     .filter((i) => !s.props[i].hotel || s.bank.houses >= s.cfg.housesPerHotel);
   // l'expert hypothèque d'abord ce qui rapporte le moins, et ne vend ses maisons qu'en dernier recours
@@ -192,7 +194,7 @@ function expertBot(s, board, pid, memory) {
       const minLv = Math.min(...sp.map((j) => level(s, j)));
       for (const j of sp) {
         const pr = s.props[j], spc = board.spaces[j];
-        if (pr.owner !== pid || pr.hotel || level(s, j) !== minLv) continue;
+        if (!ours(s, pr.owner, pid) || pr.hotel || level(s, j) !== minLv) continue;
         const toHotel = pr.houses === s.cfg.housesPerHotel;
         if (toHotel ? s.bank.hotels < 1 : s.bank.houses < 1) continue;
         const cur = pr.houses ? spc.rent[pr.houses] : spc.rent[0] * 2;
@@ -291,7 +293,7 @@ function easyBot(s, board, pid) {
         const sp = groupSpaces(board, g);
         if (sp.some((j) => s.props[j].mortgaged)) continue;
         const minLv = Math.min(...sp.map((j) => level(s, j)));
-        const lowest = sp.find((j) => level(s, j) === minLv && s.props[j].owner === pid);
+        const lowest = sp.find((j) => level(s, j) === minLv && ours(s, s.props[j].owner, pid));
         if (lowest == null || s.props[lowest].hotel) continue;
         const toHotel = s.props[lowest].houses === s.cfg.housesPerHotel;
         if ((toHotel ? s.bank.hotels : s.bank.houses) < 1) continue;

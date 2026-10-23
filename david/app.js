@@ -22,6 +22,7 @@ async function boot(info) {
     me,
     act: (a) => session.act(a),
     emote: (id) => session.emote(id),
+    chat: (text) => session.chat && session.chat(text),
     pick: (token) => session.pick(token),
     team: (t) => session.team && session.team(t),
     start: () => session.start(),
@@ -34,6 +35,7 @@ async function boot(info) {
     onSetup: (s) => view.setup(s),
     onError: (msg) => view.toast(msg),
     onEmote: (from, id) => view.emote(from, id),
+    onChat: (m) => view.chat(m),
   };
   let session;
   if (role === 'guest') session = startClient({ bridge: H, me, ...handlers });

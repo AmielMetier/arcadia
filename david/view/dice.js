@@ -13,20 +13,22 @@ function dieHtml() {
 
 export function mountDice(host) {
   const tray = el('div', 'dicetray');
-  const dice = [0, 1].map(() => { const d = el('div', 'die', dieHtml()); d.appendChild(el('i', 'dshadow')); tray.appendChild(d); return d; });
+  const dice = [0, 1].map(() => { const d = el('div', 'die', dieHtml()); d.appendChild(el('i', 'dshadow')); d.appendChild(el('b', 'dval')); tray.appendChild(d); return d; });
   host.appendChild(tray);
   let hideT = 0;
 
   return {
     async roll(values, speed = 1) {
       clearTimeout(hideT);
-      tray.classList.add('on');
+      tray.classList.add('on'); tray.classList.remove('landed');
       const dur = Math.max(260, 1100 / speed);
       const runs = values.map((v, k) => {
         const cube = dice[k].querySelector('.cube');
         const [sx, sy] = SHOW[v];
         const spins = 2 + k;
-        const tilt = k ? "rotateX(-16deg) rotateY(-22deg)" : "rotateX(-16deg) rotateY(18deg)";
+        // vue presque de face : la face qui compte (devant) domine, le dessus se voit à peine
+        const tilt = k ? 'rotateX(-7deg) rotateY(-12deg)' : 'rotateX(-7deg) rotateY(10deg)';
+        dice[k].querySelector('.dval').textContent = v;
         const end = `${tilt} rotateX(${sx + 360 * spins}deg) rotateY(${sy + 360 * (spins + 1)}deg)`;
         const start = `rotateX(${Math.random() * 360}deg) rotateY(${Math.random() * 360}deg)`;
         cube.animate([{ transform: start }, { transform: end }], { duration: dur, easing: 'cubic-bezier(.15,.6,.25,1)', fill: 'forwards' });
@@ -41,9 +43,10 @@ export function mountDice(host) {
       });
       await Promise.all(runs);
       tray.classList.toggle('double', values[0] === values[1]);
+      tray.classList.add('landed');
       await wait(180 / speed);
-      hideT = setTimeout(() => tray.classList.remove('on', 'double'), 2600);
+      hideT = setTimeout(() => tray.classList.remove('on', 'double', 'landed'), 2600);
     },
-    hide() { tray.classList.remove('on', 'double'); },
+    hide() { tray.classList.remove('on', 'double', 'landed'); },
   };
 }

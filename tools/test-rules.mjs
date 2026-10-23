@@ -418,7 +418,20 @@ test('2 contre 2 : une couleur détenue à deux permet de construire, loyer doub
   s = act(s, { type: 'BUILD', by: cur.id, space: 1 }).state;
   eq(s.props[1].houses, 1);
   refused(s, { type: 'BUILD', by: cur.id, space: 1 }); // il faut d'abord une maison chez le coéquipier
-  refused(s, { type: 'BUILD', by: cur.id, space: 3 }); // on ne bâtit pas chez son coéquipier
+  // on peut bâtir chez son coéquipier, à ses frais
+  const before = pl(s, cur.id).cash, mateCash = pl(s, mate.id).cash;
+  s = act(s, { type: 'BUILD', by: cur.id, space: 3 }).state;
+  eq(s.props[3].houses, 1); eq(s.props[3].owner, mate.id);
+  eq(pl(s, cur.id).cash, before - B.spaces[3].houseCost); eq(pl(s, mate.id).cash, mateCash);
+  // vente égale sur tout le groupe, y compris chez le coéquipier
+  s = act(s, { type: 'BUILD', by: cur.id, space: 1 }).state;
+  refused(s, { type: 'SELL_BUILDING', by: cur.id, space: 3 });
+  s = act(s, { type: 'SELL_BUILDING', by: cur.id, space: 1 }).state;
+  s = act(s, { type: 'SELL_BUILDING', by: cur.id, space: 3 }).state;
+  eq([s.props[1].houses, s.props[3].houses], [1, 0]);
+  // un adversaire ne peut rien bâtir chez nous
+  const oppId = s.players.find((p) => p.team !== cur.team).id;
+  refused(s, { type: 'BUILD', by: oppId, space: 3 });
   // loyer doublé sur le terrain nu du coéquipier pour un adversaire
   let t = teamGame(); give(t, mate.id, 1); give(t, cur.id, 3);
   t.turn.cur = t.players.findIndex((p) => p.id === opp.id); opp.pos = 0; t.players.find((p) => p.id === opp.id).pos = 0;
@@ -427,6 +440,24 @@ test('2 contre 2 : une couleur détenue à deux permet de construire, loyer doub
   // un adversaire qui détient une case de la couleur bloque la construction
   let u = teamGame(); give(u, cur.id, 1); give(u, opp.id, 3); u.turn.mustRoll = false; u.phase = 'end';
   refused(u, { type: 'BUILD', by: cur.id, space: 1 });
+});
+
+test('2 contre 2 : en faillite, le créancier n\'est payé qu\'à hauteur de la dette ; le coéquipier hérite du reste', () => {
+  let s = teamGame(); const cur = currentPlayer(s), mate = s.players.find((p) => p.team === cur.team && p.id !== cur.id);
+  const opp = s.players.find((p) => p.team !== cur.team);
+  give(s, cur.id, 1); give(s, cur.id, 5); give(s, cur.id, 39); s.props[39].mortgaged = true;
+  pl(s, cur.id).cash = 30; pl(s, cur.id).jailCards = [];
+  s.debts = [{ from: cur.id, to: opp.id, amount: 400, reason: 'rent', space: null }]; s.phase = 'debt'; s.turn.mustRoll = false;
+  const oppCash = pl(s, opp.id).cash, mateCash = pl(s, mate.id).cash;
+  const r = act(s, { type: 'BANKRUPT', by: cur.id });
+  const t = r.state;
+  ok(pl(t, cur.id).bankrupt);
+  eq(pl(t, opp.id).cash, oppCash + 30, 'le créancier touche ce qui reste en caisse');
+  eq(pl(t, mate.id).cash, mateCash);
+  eq([t.props[1].owner, t.props[5].owner, t.props[39].owner], [mate.id, mate.id, mate.id], 'terrains au coéquipier');
+  ok(t.props[39].mortgaged, 'les hypothèques suivent');
+  ok(r.events.some((e) => e.k === 'BANKRUPT' && e.heir === mate.id));
+  ok(!t.over, 'le coéquipier continue');
 });
 
 test('dés : historique des lancers et aléa fourni par l\'hôte', () => {
