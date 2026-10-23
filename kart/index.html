@@ -4729,23 +4729,34 @@ class Sound {
   setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.3; }
 }
 const sfx = new Sound();
-/** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle. Réglages partagés avec le Hub (marche/arrêt, volume). */
+/** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle. Réglages partagés avec le Hub (marche/arrêt, volume).
+    Un seul lecteur audio pour toute la partie : une fois débloqué par un geste (clic, toucher, touche),
+    il le reste, même en changeant de morceau (iPad / Safari, Brave et leurs règles de lecture automatique). */
 class Music {
   constructor() {
-    this.el = null; this.key = null; this.found = new Map(); this.rate = 1;
+    this.el = null; this.key = null; this.url = null; this.found = new Map(); this.rate = 1; this.pending = false;
     const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
     this.on = get('david_music', true); this.vol = get('david_music_vol', 0.55);
   }
   save() { try { localStorage.setItem('david_music', JSON.stringify(this.on)); } catch (e) {} }
+  /** existence du fichier : simple requête réseau (ne dépend pas du préchargement audio, bloqué sur iPad et Brave) */
   async resolve(name) {
     if (this.found.has(name)) return this.found.get(name);
     for (const ext of MUSIC.ext) {
       const url = `${MUSIC.folder}${name}.${ext}`;
-      const ok = await new Promise((res) => { const a = new Audio(); a.preload = 'metadata'; a.oncanplay = a.onloadedmetadata = () => res(true); a.onerror = () => res(false); a.src = url; setTimeout(() => res(false), 4000); });
+      let ok = false;
+      try { const r = await fetch(url, { method: 'HEAD', cache: 'no-cache' }); ok = r.ok; } catch (e) { ok = false; }
+      if (!ok) try { const r = await fetch(url, { headers: { Range: 'bytes=0-1' } }); ok = r.ok || r.status === 206; } catch (e) { ok = false; }
+      if (ok && ext === 'ogg' && !new Audio().canPlayType('audio/ogg')) ok = false;
       if (ok) { this.found.set(name, url); return url; }
     }
     this.found.set(name, null); return null;
   }
+  player() {
+    if (!this.el) { const a = new Audio(); a.loop = true; a.preload = 'auto'; a.setAttribute('playsinline', ''); this.el = a; }
+    return this.el;
+  }
+  applyVol() { if (!this.el) return; this.el.muted = !this.on; try { this.el.volume = this.vol * MUSIC.volume; } catch (e) {} }
   /** keepIfMissing : si le morceau n'existe pas, la musique en cours continue (écran de résultats) */
   async play(key, keepIfMissing = false) {
     if (this.key === key) return; const prevKey = this.key; this.key = key;
@@ -4753,19 +4764,21 @@ class Music {
     if (!url && MUSIC.fallback && MUSIC.fallback[key]) url = await this.resolve(MUSIC.tracks[MUSIC.fallback[key]] || MUSIC.fallback[key]);
     if (this.key !== key) return;
     if (!url && keepIfMissing) { this.key = prevKey; return; }
-    if (this.el) { this.el.pause(); this.el = null; }
-    if (!url) return;
-    const a = new Audio(url); a.loop = true; a.volume = this.on ? this.vol * MUSIC.volume : 0;
-    a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = MUSIC.preservePitch; a.playbackRate = this.rate;
-    this.el = a; a.play().catch(() => { this.pending = true; });
+    const a = this.player();
+    if (!url) { a.pause(); this.url = null; this.pending = false; return; }
+    if (this.url !== url) { this.url = url; a.src = url; }
+    a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = MUSIC.preservePitch;
+    this.applyVol(); a.playbackRate = this.rate; this.start();
   }
-  unlock() { if (this.el && this.pending) { this.pending = false; this.el.play().catch(() => {}); } }
+  start() { const a = this.el; if (!a || !this.url) return; const p = a.play(); this.pending = true; if (p && p.then) p.then(() => { this.pending = false; a.playbackRate = this.rate; }).catch(() => { this.pending = true; }); }
+  /** appelé à chaque geste : relance la lecture si le navigateur l'avait bloquée */
+  unlock() { if (this.el && this.url && (this.pending || this.el.paused)) this.start(); }
   setRate(r) { this.rate = r; if (this.el) this.el.playbackRate = r; }
-  stop() { this.key = null; if (this.el) { this.el.pause(); this.el = null; } }
-  toggle() { this.on = !this.on; this.save(); if (this.el) this.el.volume = this.on ? this.vol * MUSIC.volume : 0; }
+  stop() { this.key = null; this.url = null; this.pending = false; if (this.el) this.el.pause(); }
+  toggle() { this.on = !this.on; this.save(); this.applyVol(); }
 }
 const music = new Music();
-for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { sfx.init(); music.unlock(); }, { capture: true });
+for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => { sfx.init(); music.unlock(); }, { capture: true });
 
 /* =============================================================================
    18. RÉSEAU (via le Hub) : salon d'avant-course, horloge commune, états des karts, instantanés
@@ -5811,7 +5824,7 @@ bootNet(() => {
 });
 requestAnimationFrame((t) => { last = t; frame(t); });
 window.__game = { renderer, composer, sanitizePass, smoke, sparks, camera, race, LOBBY, NET, get RACE() { return RACE; }, get karts() { return karts; }, get player() { return player; }, get track() { return track; }, CFG, tick, ents, boxes, useItem,
-  loadMap, hostStartRace, hostSetLobby, setMyPick, UI, MAPS, WORLD, SPEC, specStart, specSelect,
+  loadMap, hostStartRace, hostSetLobby, setMyPick, UI, MAPS, WORLD, SPEC, specStart, specSelect, music,
   setAuto: (on) => { autoPilot = on ? new AIDriver(player, 1, 99) : null; }, manual: false };
 </script>
 </body>
