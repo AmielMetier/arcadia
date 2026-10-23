@@ -4,6 +4,7 @@
 - **Tête de Calcul** — The Candidate : trois bonnes réponses d'affilée rendent une vie, sans dépasser le nombre de départ.
 - **Tête de Calcul** — Plus de 300 nouvelles questions dans The Candidate, dans toutes les rubriques : probabilités, logique, macroéconomie, finance d'entreprise, taux, marchés, dérivés, calcul mental et estimations à taper. Chaque rubrique a maintenant au moins 15 questions par tour.
 - **Tête de Calcul** — Les figures s'affichent en blanc sur le fond sombre de The Candidate, avec deux nouveaux types (rectangles dans une bande, triangles en éventail) et des tailles plus variées.
+- **Tête de Calcul** — The Candidate : le passage d'un tour à l'autre devient une vraie scène. Les lumières baissent sous un roulement de tambour, les survivants défilent et le coupé tombe, Pierre Chartier ouvre le tour suivant, puis son nom s'affiche en grand dans un flash, avec un gong.
 - **Tête de Calcul** — Une transition entre chaque étape : numéro de la question qui arrive, grand bandeau à chaque nouveau tour, avant l'épreuve de code, la question quitte ou double et le verdict.
 - **Tête de Calcul** — La carte de jeu s'adapte à l'écran : plus grande sur un grand écran, plus petite sur un petit, sans jamais avoir à faire défiler.
 - **Tête de Calcul** — Jusqu'à 6 bots par partie, et 8 joueurs autour de la table ; la liste des joueurs se resserre pour que tout le monde tienne.

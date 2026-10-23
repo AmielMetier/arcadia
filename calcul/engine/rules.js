@@ -15,6 +15,7 @@ export const MODES = {
 export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const REVEAL_MS = 5200;
+export const TIER_SHOW_MS = 5200; // passage d'un tour à l'autre en The Candidate
 const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
 
 // The Candidate : 3 vies. Une mauvaise réponse en coûte une, la réponse piège deux, le silence une.
@@ -297,10 +298,10 @@ export function reveal(state, now) {
   const tierNow = s.cfg.lives ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx, s.cfg.len) : 0;
   const tierNext = s.cfg.lives && s.idx + 1 < s.cfg.len ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx + 1, s.cfg.len) : tierNow;
   let tierEnd = null;
-  if (s.cfg.lives && s.cfg.cut && tierNext !== tierNow) {
+  if (s.cfg.lives && tierNext !== tierNow) {
     tierEnd = tierNow;
     const left = alive(s);
-    if (left.length >= 3) {
+    if (s.cfg.cut && left.length >= 3) {
       const last = [...left].sort((x, y) => x.score - y.score || x.right - y.right || y.totalMs - x.totalMs)[0];
       last.out = true; last.outIdx = s.idx; last.outWhy = 'palier';
       eliminated.push({ id: last.id, why: 'palier' });
@@ -317,7 +318,9 @@ export function reveal(state, now) {
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
-  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (eliminated.length ? 2500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
+  // fin d'un tour : la mise en scène du passage au tour suivant s'ajoute à la correction
+  const interlude = tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : 0;
+  s.revealMs = interlude + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (eliminated.length ? 2500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
   // les réponses deviennent publiques
   return s;

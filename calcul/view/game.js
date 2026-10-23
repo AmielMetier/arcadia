@@ -81,6 +81,20 @@ const CHARTIER_QUOTES = {
   finalKo: ["Tout se jouait là. Et tu as craqué.", "La finale, c'est là qu'on voit les vrais. Pas aujourd'hui."],
 };
 
+// Ce que dit Pierre Chartier en ouvrant chaque tour
+const TIER_QUOTES = {
+  2: [
+    "Le premier tour, c'était l'échauffement. Bienvenue au desk.",
+    "Ici, une erreur coûte de l'argent. Le vôtre.",
+    "Vous avez survécu aux questions faciles. Voyons maintenant qui sait trader.",
+  ],
+  3: [
+    "Le comité vous attend. Il ne laisse rien passer.",
+    "Ceux qui sont encore là m'intéressent. Prouvez-le.",
+    "Dernière ligne droite. Un seul poste, et je n'ai pas de temps à perdre.",
+  ],
+};
+
 // Le bandeau de cotations (indices fictifs qui bougent, puis les joueurs cotés comme des actions)
 const TICKER_IDX = [['CAC 40', 7984.3], ['S&P 500', 5864.7], ['NASDAQ', 18392.1], ['EUR/USD', 1.0842], ['DAX', 19210.5], ['OR', 2720.5], ['BRENT', 74.2], ['US 10A', 4.22], ['VIX', 16.4]];
 // Portrait de Pierre Chartier (ses initiales restent dessous si l'image ne charge pas)
@@ -113,6 +127,14 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <div class="sabpick" id="sabpick" hidden></div>
     </div>
     <div class="toast" id="toast" hidden role="status"></div>
+    <div class="curtain" id="curtain" aria-hidden="true">
+      <div class="cu-spot"></div>
+      <div class="cu-end" id="cuend"></div>
+      <div class="cu-ppl" id="cuppl"></div>
+      <div class="cu-pc">${pcFace('pc-face big')}<p id="cuquote"></p></div>
+      <div class="cu-title"><small id="custars"></small><b id="cutitle"></b><span id="cusub"></span></div>
+      <div class="cu-flash"></div>
+    </div>
     <div class="inter" id="inter" aria-hidden="true"><div class="inter-band"><small id="ikick"></small><b id="ititle"></b><span id="isub"></span></div></div>`;
   const $ = (s) => root.querySelector(s);
   const stage = $('#stage');
@@ -783,6 +805,25 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     o.className = 'inter ' + (tone || ''); void o.offsetWidth; o.classList.add('show');
     sfx.play(tone === 'tier' || tone === 'final' ? 'sab' : 'pop');
   }
+  // The Candidate, entre deux tours : lumières qui baissent, projecteur, les survivants, Pierre Chartier, puis le nom du tour
+  function tierScene() {
+    const o = $('#curtain'), L = S.last;
+    if (!o || !motion() || !L) return nextInter();
+    const d = Math.max(0, DIFFS.indexOf(S.cfg.diff)), tier = chartierTier(d, S.idx + 1, S.cfg.len);
+    const gone = new Set((L.eliminated || []).map((e) => e.id));
+    const ppl = S.players.filter((p) => !p.out || gone.has(p.id)).sort((a, b) => (gone.has(a.id) - gone.has(b.id)) || b.score - a.score);
+    $('#cuend').textContent = `Fin du ${(TIER_LABEL[L.tierEnd] || 'tour').toLowerCase()}`;
+    $('#cuppl').innerHTML = ppl.map((p, k) => `<span class="cu-p${gone.has(p.id) ? ' gone' : ''}${p.id === me.id ? ' me' : ''}" style="--k:${k};--pc:${esc(p.color)}"><i></i>${esc(p.name)}<b>${gone.has(p.id) ? '✂️' : fmt(p.score)}</b></span>`).join('');
+    const quotes = TIER_QUOTES[tier] || TIER_QUOTES[3];
+    $('#cuquote').textContent = `« ${quotes[(S.seed + S.idx) % quotes.length]} »`;
+    $('#custars').textContent = '★'.repeat(tier);
+    $('#cutitle').textContent = TIER_LABEL[tier];
+    const alive = S.players.filter((p) => !p.out).length;
+    $('#cusub').textContent = `${alive} candidat${alive > 1 ? 's' : ''} encore en lice · ${tier * 100} pts la question`;
+    o.classList.remove('play'); void o.offsetWidth; o.classList.add('play');
+    sfx.play('drum');
+    setTimeout(() => { sfx.play('gong'); wallStreetMusic.sting(); }, 3700);
+  }
   function nextInter() {
     const n = S.idx + 1, ch = S.cfg.mode === 'chartier';
     if (n >= S.cfg.len || (S.last && S.last.endEarly)) return showInter(ch ? 'Fin de l\'entretien' : 'Fin de la partie', ch ? 'Le verdict' : 'Les résultats', '', 'end');
@@ -874,7 +915,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
           renderReveal();
           // la transition démarre une seconde avant la question suivante (minuteur : elle part même onglet en arrière-plan)
           clearTimeout(interT);
-          interT = setTimeout(() => { if (S && S.phase === 'reveal' && interFor !== S.idx) { interFor = S.idx; nextInter(); } }, Math.max(0, state.endsAt - now() - 1150));
+          // fin d'un tour de The Candidate : la grande mise en scène, sinon le bandeau habituel
+          const L = state.last, scene = state.cfg.mode === 'chartier' && L && L.tierEnd && !L.endEarly && state.idx + 1 < state.cfg.len;
+          interT = setTimeout(() => { if (S && S.phase === 'reveal' && interFor !== S.idx) { interFor = S.idx; if (scene) tierScene(); else nextInter(); } },
+            Math.max(0, state.endsAt - now() - (scene ? 5200 : 1150)));
         }
         else if (state.phase === 'over') renderOver();
       } else if (state.phase === 'question' && prev && prev.qAt !== state.qAt) renderQuestion(); // question relancée (nouvel hôte)

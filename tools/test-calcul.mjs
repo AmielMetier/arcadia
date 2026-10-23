@@ -359,6 +359,19 @@ t('The Candidate : palier qui élimine le dernier, arrêt quand il reste un cand
   assert.equal(s.history.length, 10);
 });
 
+t('The Candidate : la fin d\'un tour laisse le temps de la mise en scène, même sans coupe', () => {
+  const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 9, now: 0 });
+  let now = 0, ends = 0, plain = 0;
+  while (s.phase !== 'over') {
+    s = nextQuestion(s, now); if (s.phase === 'over') break;
+    s = play(s, { 0: 'good', 1: 'good' }, now); now += 1e5;
+    if (s.last.tierEnd) { ends++; assert.ok(s.revealMs >= 5200 + 5200, `pause allongée : ${s.revealMs}`); } else plain = Math.max(plain, s.revealMs);
+  }
+  assert.equal(ends, 2, 'deux passages : premier tour → desk → comité');
+  assert.ok(plain < 5200 + 5200);
+});
+
 t('The Candidate : en solo, la partie s\'arrête quand on n\'a plus de vies', () => {
   let s = createGame({ players: [{ id: 0, name: 'Solo' }], cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 3, now: 0 });
   let now = 0;
