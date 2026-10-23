@@ -114,6 +114,27 @@ export class Audio {
       case 'boss': this.tone(o, t, 2.2, { type: 'sawtooth', f0: 55, f1: 41, a: 0.2, v: 0.4, vib: 3 }); this.tone(o, t, 2.2, { type: 'sawtooth', f0: 82, f1: 61, a: 0.2, v: 0.3 }); break;
       case 'won': [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(o, t + i * 0.14, 0.7, { type: 'triangle', f0: f, v: 0.25 })); break;
       case 'over': [392, 330, 262, 196].forEach((f, i) => this.tone(o, t + i * 0.22, 0.6, { type: 'triangle', f0: f, v: 0.25 })); break;
+      case 'slash': this.noise(o, t, 0.16, { type: 'bandpass', f0: 1800, f1: 5000, q: 1.2, v: 0.45 }); break;
+      case 'crossbow': this.noise(o, t, 0.08, { type: 'bandpass', f0: 900, f1: 300, q: 2, v: 0.6 }); this.tone(o, t, 0.18, { type: 'triangle', f0: 180, f1: 90, v: 0.4 }); break;
+      case 'tesla': this.tone(o, t, 0.2, { type: 'sawtooth', f0: 90, f1: 60, v: 0.25 }); this.noise(o, t, 0.22, { type: 'highpass', f0: 3500, f1: 7000, v: 0.4 }); this.tone(o, t, 0.15, { type: 'square', f0: 1200, f1: 400, v: 0.08 }); break;
+      case 'clank': this.tone(o, t, 0.25, { type: 'triangle', f0: 1650, f1: 1500, v: 0.18 }); this.tone(o, t, 0.2, { type: 'triangle', f0: 2470, f1: 2300, v: 0.1 }); this.noise(o, t, 0.05, { type: 'highpass', f0: 3000, v: 0.3 }); break;
+      case 'ability': [392, 523, 659, 784].forEach((f, i) => this.tone(o, t + i * 0.04, 0.3, { type: 'square', f0: f, v: 0.07 })); this.noise(o, t, 0.3, { type: 'bandpass', f0: 600, f1: 2400, v: 0.3 }); break;
+      case 'ready': this.tone(o, t, 0.12, { type: 'triangle', f0: 1046, v: 0.15 }); this.tone(o, t + 0.08, 0.2, { type: 'triangle', f0: 1568, v: 0.15 }); break;
+      case 'pounce': this.tone(o, t, 0.4, { type: 'sawtooth', f0: 500, f1: 1100, a: 0.02, v: 0.22, vib: 25 }); this.noise(o, t, 0.3, { type: 'bandpass', f0: 1500, q: 2, v: 0.25 }); break;
+      case 'buy': [784, 1046, 1318].forEach((f, i) => this.tone(o, t + i * 0.05, 0.2, { type: 'square', f0: f, v: 0.08 })); this.noise(o, t, 0.12, { type: 'highpass', f0: 5000, v: 0.3 }); break;
+      case 'powerdown': this.tone(o, t, 1.2, { type: 'sawtooth', f0: 220, f1: 30, a: 0.01, v: 0.25 }); this.noise(o, t, 0.2, { type: 'bandpass', f0: 2000, v: 0.3 }); break;
+      case 'powerup': this.tone(o, t, 0.8, { type: 'sawtooth', f0: 40, f1: 220, a: 0.05, v: 0.2 }); break;
+      case 'plane': this.tone(o, t, 2.5, { type: 'sawtooth', f0: 70, f1: 60, a: 0.6, v: 0.12, vib: 12 }); this.noise(o, t, 2.5, { f0: 300, f1: 200, a: 0.8, v: 0.2 }); break;
+      case 'horn': for (let k = 0; k < 2; k++) { this.tone(o, t + k * 0.55, 0.45, { type: 'sawtooth', f0: 311, v: 0.18 }); this.tone(o, t + k * 0.55, 0.45, { type: 'sawtooth', f0: 392, v: 0.14 }); } break;
+      case 'trainPass': this.noise(o, t, 1.4, { f0: 600, f1: 120, a: 0.1, v: 0.9 }); this.tone(o, t, 1.3, { type: 'sawtooth', f0: 70, f1: 50, a: 0.1, v: 0.35 }); for (let k = 0; k < 8; k++) this.noise(o, t + k * 0.14, 0.05, { type: 'highpass', f0: 2500, v: 0.4 }); break;
+      case 'carAlarm': for (let k = 0; k < 8; k++) this.tone(o, t + k * 0.25, 0.22, { type: 'square', f0: k % 2 ? 880 : 1175, v: 0.09 }); break;
+      case 'radio': this.noise(o, t, 0.12, { type: 'bandpass', f0: 2200, q: 3, v: 0.25 }); this.tone(o, t + 0.1, 0.06, { type: 'square', f0: 1400, v: 0.05 }); break;
+      case 'note': [523, 784, 659].forEach((f, i) => this.tone(o, t + i * 0.09, 0.3, { type: 'triangle', f0: f, v: 0.16 })); this.noise(o, t, 0.15, { type: 'highpass', f0: 3000, v: 0.2 }); break;
+      case 'heli': this.noise(o, t, 2.6, { type: 'lowpass', f0: 500, f1: 300, a: 0.4, v: 0.35 }); for (let k = 0; k < 20; k++) this.noise(o, t + k * 0.12, 0.06, { type: 'lowpass', f0: 300, v: 0.4 }); break;
+      case 'static': this.noise(o, t, 1.6, { type: 'bandpass', f0: 3000, q: 0.5, a: 0.05, v: 0.25 }); break;
+      case 'build': this.noise(o, t, 0.08, { type: 'bandpass', f0: 900, v: 0.5 }); this.noise(o, t + 0.12, 0.08, { type: 'bandpass', f0: 1200, v: 0.5 }); this.tone(o, t + 0.2, 0.25, { type: 'triangle', f0: 880, v: 0.15 }); break;
+      case 'hammer': this.noise(o, t, 0.05, { type: 'bandpass', f0: 1600, q: 3, v: 0.4 }); this.tone(o, t, 0.06, { type: 'triangle', f0: 600, v: 0.1 }); break;
+      case 'wood': this.noise(o, t, 0.12, { type: 'bandpass', f0: 400, f1: 250, q: 1.5, v: 0.5 }); break;
       case 'click': this.tone(o, t, 0.05, { type: 'triangle', f0: 1200, v: 0.15 }); break;
     }
   }

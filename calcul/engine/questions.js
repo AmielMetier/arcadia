@@ -11,6 +11,7 @@
 import { rngOf } from './rng.js';
 import { evalExpr } from './expr.js';
 import { getQuestionsByLevel } from './chartier-data.js';
+import { CODE_QUESTIONS } from './code-data.js';
 
 export const CATS = {
   base:     { label: 'Calcul',            pts: 1, color: '#2b8cff', icon: '±' },
@@ -25,18 +26,20 @@ export const CATS = {
   geo:       { label: 'Géométrie',         pts: 2, color: '#0f8a6a', icon: '△' },
   devinette: { label: 'Devinette',         pts: 2, color: '#c2185b', icon: '?' },
   compte:   { label: 'Compte est bon',    pts: 3, color: '#ff8a1f', icon: '🎯' },
+  visuel:   { label: 'Figures à compter', pts: 2, color: '#0b7285', icon: '▦' },
   chartier: { label: 'The Candidate',     pts: 2, color: '#e5a93c', icon: '💼' },
+  code:     { label: 'Code',              pts: 3, color: '#3b82f6', icon: '⌨' },
 };
 export const DIFFS = ['facile', 'normal', 'expert'];
 
 // Thèmes proposés dans le salon : catégories tirées et leur poids
 export const THEMES = {
-  mix:      { base: 18, astuce: 12, theorie: 10, fraction: 8, suite: 9, estim: 8, vf: 9, compare: 7, equation: 7, geo: 6, devinette: 4, compte: 6 },
+  mix:      { base: 18, astuce: 12, theorie: 10, fraction: 8, suite: 9, estim: 8, vf: 9, compare: 7, equation: 7, geo: 6, devinette: 4, compte: 6, visuel: 6 },
   chartier: { chartier: 100 },
   base:    { base: 100 },
   malin:   { astuce: 55, theorie: 45 },
   frac:    { fraction: 70, base: 30 },
-  logique: { suite: 60, theorie: 40 },
+  logique: { suite: 45, visuel: 30, theorie: 25 },
   vite:    { base: 40, estim: 60 },
   flash:   { vf: 55, compare: 45 },
   algebre: { equation: 60, devinette: 40 },
@@ -55,7 +58,7 @@ function qSeed(seed, i, salt = 0) {
 }
 
 // Liste des catégories de la partie : tirée une fois, d'après les poids du thème, sans trois fois la même d'affilée
-export function planCats(seed, len, theme) {
+export function planCats(seed, len, theme, { code = true } = {}) {
   const w = THEMES[theme] || THEMES.mix;
   const r = rngOf({ seed: qSeed(seed, 9999) });
   const keys = Object.keys(w), total = keys.reduce((s, k) => s + w[k], 0);
@@ -71,14 +74,17 @@ export function planCats(seed, len, theme) {
   }
   // le « Compte est bon » est plus long : jamais en première question d'un mélange
   if (keys.length > 1 && out[0] === 'compte') { const j = out.findIndex((c) => c !== 'compte'); if (j > 0) [out[0], out[j]] = [out[j], out[0]]; }
+  // The Candidate : une épreuve de code au desk, et une seconde au comité final dans les parties longues
+  if (theme === 'chartier' && code) for (const k of codeSlots(len)) out[k] = 'code';
   return out;
 }
 
+export const codeSlots = (len) => (len >= 15 ? [Math.round(len * 0.45), Math.round(len * 0.75)] : len >= 8 ? [Math.round(len * 0.55)] : []).filter((k) => k > 0 && k < len - 1);
 const D = (diff) => Math.max(0, DIFFS.indexOf(diff)); // 0, 1, 2
 const between = (r, a, b) => a + r.int(b - a + 1);
 const pick = (r, list) => list[r.int(list.length)];
 const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
-const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22] };
+const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22], visuel: [28, 24, 22], code: [180, 180, 180] };
 
 /* ------------------------------------------------------------ les 4 opérations */
 function base(r, d) {
@@ -315,7 +321,7 @@ function fraction(r, d) {
 
 /* ------------------------------------------------------------ suites logiques */
 function suite(r, d) {
-  const kind = pick(r, ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'arith', 'geom']);
+  const kind = pick(r, ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'arith', 'geom', 'cubes', 'cross', 'affine', 'tri', 'pow2m1', 'sqplus', d > 0 ? 'fact' : 'cross']);
   let terms, ans, tip;
   if (kind === 'arith') {
     const s = between(r, [2, 3, 6][d], [9, 15, 40][d]) * (d > 0 && r.next() < 0.35 ? -1 : 1);
@@ -346,6 +352,45 @@ function suite(r, d) {
     terms = [x]; for (let k = 0; k < 4; k++) terms.push(k % 2 ? terms[k] * b : terms[k] + a);
     ans = terms[4] + a;
     tip = `En alternance : + ${a}, × ${b}, + ${a}, × ${b}… donc ${terms[4]} + ${a} = ${ans}`;
+  } else if (kind === 'cubes') {
+    const k = between(r, 1, [3, 5, 8][d]);
+    terms = Array.from({ length: 4 }, (_, j) => (k + j) ** 3); ans = (k + 4) ** 3;
+    tip = `Les cubes : ${k}³, ${k + 1}³, ${k + 2}³, ${k + 3}³… puis ${k + 4}³ = ${fmt(ans)}`;
+  } else if (kind === 'cross') {
+    // deux suites entrelacées : une qui avance, une qui reste fixe (ou avance aussi au-delà du facile)
+    const a = between(r, 1, [5, 10, 20][d]), s1 = between(r, 2, [4, 6, 9][d]);
+    const b = between(r, 2, [9, 20, 40][d]), s2 = d === 0 ? 0 : between(r, 0, [0, 3, 7][d]) * (r.next() < 0.5 ? 1 : -1);
+    const A = (k) => a + k * s1, B = (k) => b + k * s2;
+    terms = [A(0), B(0), A(1), B(1), A(2), B(2)]; ans = A(3);
+    if (B(2) < 0) return suite(r, d);
+    const shown = [...terms];
+    return { kind, text: `${shown.map(fmt).join(', ')}, ?`, eq: false, sub: 'Quel est le nombre suivant ?', answer: ans,
+      tip: `Deux suites entrelacées : ${A(0)}, ${A(1)}, ${A(2)}… (+${s1}) et ${B(0)}, ${B(1)}, ${B(2)}… ${s2 ? `(${s2 > 0 ? '+' : ''}${s2})` : '(fixe)'}. La suivante est ${ans}.` };
+  } else if (kind === 'affine') {
+    // x → k·x + c : 2, 6, 14, 30… (× 2 + 2)
+    const k = d === 0 ? 2 : between(r, 2, 3), c = pick(r, d === 0 ? [1, 2] : [1, 2, 3, -1]), x = between(r, 1, [3, 4, 5][d]);
+    terms = [x]; for (let j = 0; j < 3; j++) terms.push(terms[j] * k + c);
+    ans = terms[3] * k + c;
+    if (terms.some((t) => t <= 0)) return suite(r, d);
+    tip = `On multiplie par ${k} puis on ${c > 0 ? 'ajoute' : 'enlève'} ${Math.abs(c)} : ${fmt(terms[3])} × ${k} ${c > 0 ? '+' : '−'} ${Math.abs(c)} = ${fmt(ans)}`;
+  } else if (kind === 'tri') {
+    const T = (n) => (n * (n + 1)) / 2, k = between(r, 1, [3, 6, 12][d]);
+    terms = Array.from({ length: 5 }, (_, j) => T(k + j)); ans = T(k + 5);
+    tip = `Les nombres triangulaires : on ajoute ${k + 1}, ${k + 2}, ${k + 3}… puis ${k + 5} : ${fmt(terms[4])} + ${k + 5} = ${fmt(ans)}`;
+  } else if (kind === 'pow2m1') {
+    const m = d === 2 ? pick(r, [2, 3]) : 2, k = between(r, 1, [2, 3, 3][d]);
+    terms = Array.from({ length: 5 }, (_, j) => m ** (k + j) - 1); ans = m ** (k + 5) - 1;
+    tip = `${m === 2 ? 'Puissances de 2' : 'Puissances de 3'} moins 1 : chaque terme vaut ${m} × le précédent + ${m - 1} → ${fmt(ans)}`;
+  } else if (kind === 'sqplus') {
+    const k = between(r, 1, [5, 8, 12][d]), c = pick(r, [1, 1, 2, -1]);
+    terms = Array.from({ length: 4 }, (_, j) => (k + j) ** 2 + c); ans = (k + 4) ** 2 + c;
+    if (terms[0] < 0) return suite(r, d);
+    tip = `Les carrés ${c > 0 ? 'plus' : 'moins'} ${Math.abs(c)} : ${k + 4}² ${c > 0 ? '+' : '−'} ${Math.abs(c)} = ${fmt(ans)}`;
+  } else if (kind === 'fact') {
+    const k = between(r, 1, d === 2 ? 3 : 1);
+    const F = (n) => { let x = 1; for (let j = 2; j <= n; j++) x *= j; return x; };
+    terms = Array.from({ length: 4 }, (_, j) => F(k + j)); ans = F(k + 4);
+    tip = `Les factorielles : on multiplie par ${k + 1}, ${k + 2}, ${k + 3}… puis par ${k + 4} : ${fmt(terms[3])} × ${k + 4} = ${fmt(ans)}`;
   } else {
     const P = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
     const s = between(r, 0, [2, 8, 18][d]);
@@ -633,6 +678,78 @@ function devinette(r, d) {
 }
 
 
+/* ------------------------------------------------------------ figures à compter */
+// Le dessin est dans la question (fig) ; on compte toutes les figures, petites et grandes, cachées comprises.
+const C2 = (n) => (n * (n - 1)) / 2;
+function visuel(r, d) {
+  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths']
+    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag']);
+  if (kind === 'box') {
+    const a = between(r, 2, [3, 4, 4][d]), b = between(r, 2, [3, 3, 4][d]), c = between(r, 2, [2, 3, 4][d]);
+    return { kind, text: `Combien de petits cubes forment ce pavé ?`, sub: `Un bloc plein, y compris les cubes cachés`, answer: a * b * c, fig: { t: 'box', a, b, c },
+      tip: `Longueur × largeur × hauteur : ${a} × ${b} × ${c} = ${a * b * c}. Compter les cubes visibles un par un fait oublier ceux du milieu.` };
+  }
+  if (kind === 'painted') {
+    const n = between(r, 3, [4, 4, 5][d]), m = n - 2;
+    const asks = [[3, 8, 'les 8 coins'], [2, 12 * m, `${m} par arête, sur 12 arêtes`], [1, 6 * m * m, `${m}² = ${m * m} par face, sur 6 faces`], [0, m ** 3, `le cœur de ${m} × ${m} × ${m}`]];
+    const [f, ans, why] = d === 0 ? asks[between(r, 0, 1)] : pick(r, asks);
+    return { kind, text: `Combien de petits cubes ont ${f ? `exactement ${f} face${f > 1 ? 's' : ''} peinte${f > 1 ? 's' : ''}` : 'aucune face peinte'} ?`,
+      sub: `Un cube de ${n} × ${n} × ${n} peint en rouge, puis découpé`, answer: ans, fig: { t: 'box', a: n, b: n, c: n, paint: true },
+      tip: `${f === 3 ? '3 faces peintes' : f === 2 ? '2 faces' : f === 1 ? '1 face' : '0 face'} : ${why}, soit ${ans}. Vérification : 8 + 12×${m} + 6×${m * m} + ${m ** 3} = ${n ** 3} = ${n}³.` };
+  }
+  if (kind === 'stair') {
+    const n = between(r, [3, 3, 4][d], [4, 5, 6][d]), w = between(r, 1, [2, 3, 3][d]), t = (n * (n + 1)) / 2;
+    return { kind, text: `Combien de cubes dans cet escalier ?`, sub: `${n} marches pleines, ${w} cube${w > 1 ? 's' : ''} de large`, answer: t * w, fig: { t: 'stair', n, w },
+      tip: `Les marches font 1, 2, …, ${n} cubes de haut : ${n} × ${n + 1} / 2 = ${t}${w > 1 ? `, fois ${w} de large = ${t * w}` : ''}.` };
+  }
+  if (kind === 'paths') {
+    const m = between(r, 2, [3, 4, 5][d]), n = between(r, 2, [2, 3, 4][d]);
+    let ans = 1; for (let k = 1; k <= n; k++) ans = (ans * (m + k)) / k;
+    return { kind, text: `Combien de chemins de A à B, en allant seulement à droite ou vers le haut ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'paths', m, n },
+      tip: `Tout chemin fait ${m} pas à droite et ${n} vers le haut : on choisit où placer les ${n} montées parmi ${m + n} pas, C(${m + n}, ${n}) = ${ans}.` };
+  }
+  if (kind === 'diag') {
+    const n = between(r, [5, 5, 6][d], [6, 8, 10][d]);
+    return { kind, text: `Combien de diagonales a ce polygone ?`, sub: `${n} sommets (une diagonale en pointillés)`, answer: (n * (n - 3)) / 2, fig: { t: 'polyd', n },
+      tip: `Chaque sommet se relie à ${n - 3} autres (pas à lui-même ni à ses 2 voisins), et chaque diagonale est comptée deux fois : ${n} × ${n - 3} / 2 = ${(n * (n - 3)) / 2}.` };
+  }
+  if (kind === 'grid-sq') {
+    const n = between(r, [2, 3, 4][d], [3, 4, 5][d]);
+    let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
+    return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${n} × ${n} : les petits, les moyens, le grand…`, answer: ans, fig: { t: 'grid', n, m: n },
+      tip: `On compte par taille : ${Array.from({ length: n }, (_, k) => `${(n - k) ** 2} de ${k + 1}×${k + 1}`).join(', ')}. Total : ${Array.from({ length: n }, (_, k) => `${n - k}²`).join(' + ')} = ${ans}.` };
+  }
+  if (kind === 'grid-sq-rect') {
+    const n = between(r, 2, [3, 3, 4][d]), m = n + between(r, 1, 2);
+    let ans = 0; const parts = [];
+    for (let k = 1; k <= n; k++) { const c = (n - k + 1) * (m - k + 1); ans += c; parts.push(`${c} de ${k}×${k}`); }
+    return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
+      tip: `Un carré k×k peut se placer de (${m} − k + 1) × (${n} − k + 1) façons : ${parts.join(', ')}. Total : ${ans}.` };
+  }
+  if (kind === 'grid-rect') {
+    const n = between(r, 2, 3), m = between(r, n, [3, 4, 5][d]);
+    const ans = C2(n + 1) * C2(m + 1);
+    return { kind, text: `Combien de rectangles en tout (les carrés comptent) ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
+      tip: `Un rectangle, c'est 2 lignes verticales parmi ${m + 1} et 2 horizontales parmi ${n + 1} : ${C2(m + 1)} × ${C2(n + 1)} = ${ans}.` };
+  }
+  if (kind === 'tri') {
+    const n = between(r, [2, 2, 3][d], [2, 3, 4][d]);
+    const ans = Math.floor((n * (n + 2) * (2 * n + 1)) / 8);
+    let up = 0; for (let k = 1; k <= n; k++) up += ((n - k + 1) * (n - k + 2)) / 2;
+    return { kind, text: `Combien de triangles en tout ?`, sub: `Un triangle découpé en ${n} rangées`, answer: ans, fig: { t: 'trigrid', n },
+      tip: `${up} triangles pointe en haut (de toutes tailles) et ${ans - up} pointe en bas : ${ans} en tout. Formule : ⌊n(n + 2)(2n + 1)/8⌋.` };
+  }
+  if (kind === 'pyramid') {
+    const n = between(r, [2, 3, 3][d], [3, 4, 5][d]);
+    let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
+    return { kind, text: `Combien de cubes dans cette pyramide ?`, sub: `${n} étages pleins, y compris les cubes cachés`, answer: ans, fig: { t: 'pyramid', n },
+      tip: `Chaque étage est un carré : ${Array.from({ length: n }, (_, k) => `${k + 1}²`).join(' + ')} = ${ans}.` };
+  }
+  const n = between(r, [4, 5, 7][d], [5, 7, 10][d]);
+  return { kind: 'dots', text: `Combien de segments pour relier chaque point à tous les autres ?`, sub: `${n} points`, answer: C2(n), fig: { t: 'dots', n },
+    tip: `Chaque point se relie aux ${n - 1} autres, et chaque segment est compté deux fois : ${n} × ${n - 1} / 2 = ${C2(n)}.` };
+}
+
 /* ------------------------------------------------------------ The Candidate (Pierre Chartier) */
 // Comme dans l'émission, ça monte en pression : premier tour, puis desk, puis comité final.
 // La finale (dernière question) est toujours tirée au niveau le plus dur du réglage.
@@ -645,27 +762,55 @@ export function chartierTier(d, i, len) {
 }
 const CH_POOL = { 1: getQuestionsByLevel('facile'), 2: getQuestionsByLevel('normal'), 3: getQuestionsByLevel('expert') };
 const CH_TIME = { 1: 12, 2: 17, 3: 24 };
+const UNIT_TIME = 10; // une réponse à taper prend plus de temps qu'un clic
 function chartier(r, d, i = 0, len = 10) {
   const tier = chartierTier(d, i, len);
+  const head = (rubric) => ({ isChartier: true, pts: tier, tier, rubric, sub: `${rubric} · ${TIER_LABEL[tier]}` });
+  // une question sur sept environ : une suite logique ou une figure à compter, comme les brainteasers de l'émission
+  if (r.next() < 0.15) {
+    const g = r.next() < 0.5 ? suite : visuel;
+    const q = g(r, Math.min(2, tier - 1));
+    return { ...q, ...head(g === suite ? 'Suite logique' : 'Figures'), sub: q.sub ? `${q.sub} · ${TIER_LABEL[tier]}` : TIER_LABEL[tier], time: CH_TIME[tier] + UNIT_TIME + (q.fig ? 6 : 0) };
+  }
   const q = pick(r, CH_POOL[tier]);
+  if (q.type === 'num') {
+    return {
+      kind: 'chartier-num', text: q.text, ...head(q.cat), sub: `${q.cat} · ${TIER_LABEL[tier]}${q.unit ? ' · réponse en ' + q.unit : ''}`,
+      time: CH_TIME[tier] + UNIT_TIME + Math.min(10, Math.floor(q.text.length / 22)), eq: false,
+      answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps, unit: q.unit,
+      show: fmt(q.answer) + (q.unit ? ' ' + q.unit : ''), tip: q.tip,
+    };
+  }
   // les choix sont mélangés à chaque tirage : la bonne réponse n'a pas de place fixe
   const choices = r.shuffle([q.good, ...q.wrong]);
   const longest = Math.max(...choices.map((c) => c.length));
   return {
-    kind: 'chartier', text: q.text, sub: `${q.cat} · ${TIER_LABEL[tier]}`,
+    kind: 'chartier', text: q.text, ...head(q.cat),
     time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0),
-    answer: choices.indexOf(q.good), choices, show: q.good, tip: q.tip,
-    isChartier: true, pts: tier, tier, rubric: q.cat,
+    answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip,
   };
 }
 
-const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, chartier };
+// L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
+function code(r, d, i = 0, len = 10) {
+  const tier = chartierTier(d, i, len);
+  const pool = CODE_QUESTIONS.filter((q) => q.level === tier);
+  const q = pick(r, pool);
+  return {
+    kind: 'code', input: 'code', text: q.title, sub: `Code · ${TIER_LABEL[tier]}`, eq: false,
+    prompt: q.prompt, starter: q.starter, fn: q.fn, tests: q.tests, examples: q.tests.slice(0, 2), codeId: q.id,
+    time: 180, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: 'Code',
+  };
+}
+
+const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code };
 export const KINDS = {
   base: ['add', 'sub', 'mul', 'div', 'chain', 'missing', 'half', 'prio'],
   astuce: ['equi', 'sq5', 'x11', 'pct', 'x5', 'x25', 'x9', 'x99', 'sqnear', 'compl', 'pct2', 'x15'],
   theorie: ['pow', 'mod', 'sqrt', 'cube', 'pgcd', 'ppcm', 'fact', 'binary', 'prime', 'divs'],
   fraction: ['fracof', 'dec', 'fracdec', 'fracpct', 'fracadd'],
-  suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes'],
+  suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'cubes', 'cross', 'affine', 'tri', 'pow2m1', 'sqplus', 'fact'],
+  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag'],
   estim: ['kmh', 'ms', 'train', 'time', 'units', 'promo', 'rule3', 'avg', 'evol', 'famous', 'approx'],
   compte: ['compte'],
   vf: ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac'],
@@ -673,7 +818,8 @@ export const KINDS = {
   equation: ['eq1', 'eq2', 'eq3'],
   geo: ['rect-area', 'rect-perim', 'square-side', 'tri-angle', 'pythag', 'cube-vol', 'tri-area', 'polygon', 'rect-side'],
   devinette: ['riddle'],
-  chartier: ['chartier'],
+  chartier: ['chartier', 'chartier-num'],
+  code: ['code'],
 };
 
 export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
@@ -688,9 +834,14 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
     answer: q.answer, tol: q.tol || 0, show: q.show || (q.choices ? q.choices[q.answer] : fmt(q.answer)), tip: q.tip || '',
     nums: q.nums || null, target: q.target ?? null, sol: q.sol || null, choices: q.choices || null, fig: q.fig || null,
     pts: q.pts || CATS[cat].pts, isChartier: !!q.isChartier, tier: q.tier || 0, rubric: q.rubric || null,
+    // piège (index du choix, ou valeurs à saisir), ordre de grandeur, unité, et l'épreuve de code
+    trap: q.trap ?? -1, traps: q.traps || [], tolMode: q.tolMode || 'rel', unit: q.unit || '',
+    prompt: q.prompt || null, starter: q.starter || null, fn: q.fn || null, tests: q.tests || null, examples: q.examples || null, codeId: q.codeId || null,
     key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
 
 // Ce que voient les joueurs pendant la question (sans la réponse)
-export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric });
+// (ni la bonne réponse, ni le piège, ni les tests cachés du code)
+export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, tolMode: q.tolMode, unit: q.unit, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric,
+  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0 });

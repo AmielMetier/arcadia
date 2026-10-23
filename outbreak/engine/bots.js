@@ -1,11 +1,11 @@
 // Équipiers IA : suivent l'escouade, tirent, relèvent les blessés, ramassent, franchissent les portes.
 // Ils produisent des entrées comme un joueur humain (même chemin que le clavier).
-import { WEAPONS, GRENADE } from './data.js';
+import { WEAPONS, GRENADE, CLASSES } from './data.js';
 import { distanceField, flowDir, WALL_TOP } from './level.js';
 import { raycastSolids, angDiff } from './geom.js';
 
 export function botThink(sim, p, dt) {
-  const B = p.brain || (p.brain = { fieldT: 0, field: null, goalKey: '', strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, inp: { mx: 0, my: 0, a: p.aim, fire: false, dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, td: 300, use: false, pk: 0, pi: -1, q: 0 }, nadeCd: 3, useT: 0, think: 0, aimErr: 0 });
+  const B = p.brain || (p.brain = { fieldT: 0, field: null, goalKey: '', strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, inp: { mx: 0, my: 0, a: p.aim, fire: false, dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, td: 300, use: false, pk: 0, pi: -1, q: 0, ab: 0 }, nadeCd: 3, useT: 0, think: 0, aimErr: 0 });
   const inp = B.inp;
   inp.use = false;
   if (p.state === 'dead') { inp.mx = inp.my = 0; inp.fire = false; p.input = inp; return; }
@@ -23,7 +23,9 @@ export function botThink(sim, p, dt) {
     const d = Math.hypot(z.x - p.x, z.y - p.y);
     if (d < nd) { nd = d; near = z; }
     // priorité : cracheurs, hurleuses et gonflés proches
-    const prio = d * (z.ty === 'screamer' || z.ty === 'spitter' ? 0.7 : z.ty === 'bloater' && d < 220 ? 0.5 : 1);
+    let prio = d * (z.ty === 'screamer' || z.ty === 'spitter' ? 0.7 : z.ty === 'bloater' && d < 220 ? 0.5 : 1);
+    if (z.state === 'pin') prio *= 0.2; // libérer un allié plaqué au sol
+    if (z.ty === 'armored' && Math.abs(((Math.atan2(p.y - z.y, p.x - z.x) - z.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.9) prio *= 1.6;
     if (prio < td && d < W.range * 0.95 && !raycastSolids(blockers, p.x, p.y, z.x, z.y)) { td = prio; tgt = z; }
   }
 
@@ -50,6 +52,19 @@ export function botThink(sim, p, dt) {
       if (want) { pd = d; pick = k; }
     }
     if (pick) { goal = pick; goalTight = 10; if (pick.k === 'weapon' && pd < 40) { B.useT += dt; if (B.useT > 0.15) { inp.use = true; B.useT = 0; } } }
+  }
+  if (!goal && p.state === 'ok' && sim.evt && sim.evt.k === 'drop' && sim.evt.st === 'land' && nd > 90) { goal = { x: sim.evt.x, y: sim.evt.y }; goalTight = 70; stopAtGoal = true; }
+  // Défense : réparer les barricades abîmées quand ça se calme, sinon rester près du fort
+  if (!goal && p.state === 'ok' && sim.base) {
+    const quiet = sim.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) < 350).length === 0;
+    let bar = null, worst = 0.85;
+    for (const b of sim.base.bars) { const f = b.hp / b.max; if (f < worst) { worst = f; bar = b; } }
+    if (bar && quiet) {
+      const g = sim.base.gen, bx = bar.x + bar.w / 2, by = bar.y + bar.h / 2;
+      const ix = bx + Math.sign(g.x - bx) * (Math.abs(g.x - bx) > 5 ? 45 : 0), iy = by + Math.sign(g.y - by) * (Math.abs(g.y - by) > 5 ? 45 : 0);
+      goal = { x: ix, y: iy }; goalTight = 20; stopAtGoal = true;
+      if (Math.hypot(bx - p.x, by - p.y) < 70) inp.use = true;
+    } else if (!humans.length && Math.hypot(sim.base.gen.x - p.x, sim.base.gen.y - p.y) > 230) { goal = { x: sim.base.gen.x + (p.id % 3) * 60 - 60, y: sim.base.gen.y + 120 }; goalTight = 60; }
   }
   if (!goal && sim.doorsOpen && p.state === 'ok' && !sim.zombies.length) {
     const doors = sim.lv.doors.filter((d) => d.kind === 'exit');
@@ -93,7 +108,7 @@ export function botThink(sim, p, dt) {
   }
   // garder ses distances avec les zombies (sauf pendant une réanimation)
   if (near && !inp.use) {
-    const kite = near.ty === 'brute' || near.ty === 'boss' ? 260 : near.ty === 'bloater' ? 200 : 140;
+    const kite = near.ty === 'brute' || near.r > 30 ? 260 : near.ty === 'bloater' ? 200 : 140;
     if (nd < kite) {
       const ax = (p.x - near.x) / nd, ay = (p.y - near.y) / nd;
       const w = 1.4 * (1 - nd / kite) + 0.6;
@@ -101,13 +116,18 @@ export function botThink(sim, p, dt) {
       // un peu de côté pour ne pas reculer dans un mur
       mx += -ay * B.strafe * 0.5; my += ax * B.strafe * 0.5;
       B.strafeT -= dt; if (B.strafeT <= 0) { B.strafe = -B.strafe; B.strafeT = 1.5 + Math.random() * 2; }
-      if (nd < near.r + 40 && p.dashCharges > 0 && (p.hp < p.maxHp * 0.7 || near.ty === 'brute' || near.ty === 'boss') && Math.random() < 0.08) inp.dash++;
+      if (nd < near.r + 40 && p.dashCharges > 0 && (p.hp < p.maxHp * 0.7 || near.ty === 'brute' || near.r > 30) && Math.random() < 0.08) inp.dash++;
     }
   }
   // éviter les flaques d'acide
   for (const h of sim.hazards) {
     const d = Math.hypot(p.x - h.x, p.y - h.y);
     if (d < h.r + 30 && d > 1) { mx += ((p.x - h.x) / d) * 1.5; my += ((p.y - h.y) / d) * 1.5; }
+  }
+  // métro : quitter les voies quand la rame arrive
+  if (sim.train && sim.train.st !== 'idle' || (sim.train && sim.train.t < 3)) {
+    const tz = sim.lv.zones.find((z) => z.k === 'track');
+    if (tz && p.y > tz.y - 30 && p.y < tz.y + tz.h + 30) { mx *= 0.3; my = p.y < tz.y + tz.h / 2 ? -1.5 : 1.5; }
   }
   // charge d'une brute : s'écarter de la ligne
   for (const z of sim.zombies) {
@@ -142,8 +162,20 @@ export function botThink(sim, p, dt) {
   if (p.state === 'ok' && p.reloadT <= 0) {
     // meilleure arme encore chargée
     let best = 0, bt = -1;
-    p.weapons.forEach((x, i) => { const X = WEAPONS[x.id]; const ok = x.mag > 0 || x.res > 0; const sc = ok ? X.tier * 10 + (X.id === 'shotgun' && nd < 260 ? 15 : 0) + (X.explosive && nd < 200 ? -30 : 0) : -100; if (sc > bt) { bt = sc; best = i; } });
+    p.weapons.forEach((x, i) => { const X = WEAPONS[x.id]; const ok = x.mag > 0 || x.res > 0; const sc = ok ? X.tier * 10 + (X.id === 'shotgun' && nd < 260 ? 15 : 0) + (X.explosive && nd < 200 ? -30 : 0) + (X.melee ? (nd < 110 ? 20 : -25) : 0) : -100; if (sc > bt) { bt = sc; best = i; } });
     if (best !== p.slot && Math.random() < dt * 3) { inp.sw++; inp.sl = best; }
+  }
+  if (p.pinnedBy != null && Math.random() < dt * 6) inp.dash++; // se débattre
+  // capacité de classe
+  if (p.state === 'ok' && p.abCd <= 0 && p.pinnedBy == null) {
+    const close = (r) => sim.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) < r).length;
+    let go = false;
+    if (p.cls === 'soldier') go = close(420) >= 6;
+    else if (p.cls === 'medic') go = players.some((o) => o.state === 'down' && Math.hypot(o.x - p.x, o.y - p.y) < 150) || players.filter((o) => o.state === 'ok' && o.hp < o.maxHp * 0.55 && Math.hypot(o.x - p.x, o.y - p.y) < 160).length >= 2 || p.hp < p.maxHp * 0.35;
+    else if (p.cls === 'engineer') go = close(500) >= 4;
+    else if (p.cls === 'tank') go = close(260) >= 4 || players.some((o) => o.state === 'down' && Math.hypot(o.x - p.x, o.y - p.y) < 200);
+    else if (p.cls === 'scout') go = p.hp < p.maxHp * 0.4 && close(200) >= 2;
+    if (go) inp.ab++;
   }
   B.nadeCd -= dt;
   if (p.state === 'ok' && p.grenades > 0 && B.nadeCd <= 0) {

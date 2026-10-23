@@ -64,7 +64,7 @@ window.HUB_GAMES = [
     id: 'calcul',
     title: 'Tête de Calcul',
     tag: 'Duel de calcul mental',
-    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, devinettes, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres !',
+    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, figures à compter, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres ! Mode The Candidate : un entretien éliminatoire, jusqu\'au code Python.',
     url: 'calcul/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ff5fa2',
@@ -75,8 +75,14 @@ window.HUB_GAMES = [
       { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
-      { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1, notMode: 'chartier' },
       { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      // règles de The Candidate (affichées seulement dans ce mode)
+      { key: 'lives', label: 'Vies par candidat', group: 'The Candidate', options: [[2, '2'], [3, '3'], [5, '5']], def: 3, onlyMode: 'chartier' },
+      { key: 'jokers', label: 'Jokers (50/50, ami)', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'code', label: 'Épreuve de code Python', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'cut', label: 'Le dernier coupé à chaque tour', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'chsab', label: 'Sabotage', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect width="320" height="180" fill="#3f86d0"/>
@@ -178,15 +184,16 @@ window.HUB_GAMES = [
     id: 'outbreak',
     title: 'Outbreak : Secteur Zéro',
     tag: 'Survie zombie en coop',
-    desc: 'Twin-stick en équipe : traversez le labo salle par salle, choisissez votre chemin et vos améliorations, relevez vos alliés et abattez le Spécimen Zéro. Ou tenez en mode Survie.',
+    desc: 'Twin-stick en équipe : 5 classes, 5 secteurs (dont les rues de Nice), boss, marchand, histoire. Campagne à embranchements, Survie ou Défense du fort.',
     url: 'outbreak/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#f43f5e',
     settings: [
-      { key: 'mode', label: 'Mode', options: [['campaign', 'Campagne · 7 salles'], ['survival', 'Survie · vagues infinies']], def: 'campaign' },
+      { key: 'mode', label: 'Mode', options: [['campaign', 'Campagne · 7 salles'], ['survival', 'Survie · vagues infinies'], ['defense', 'Défense · tenir le fort']], def: 'campaign' },
       { key: 'difficulty', label: 'Difficulté', options: [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], def: 'normal' },
       { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'startWeapon', label: 'Arme de départ', options: [['pistol', 'Pistolet'], ['shotgun', 'Fusil à pompe'], ['smg', 'Mitraillette']], def: 'pistol' },
+      { key: 'sector', label: 'Secteur', options: [['random', '🎲 Au hasard'], ['lab', '🧪 Labo'], ['sewers', '🐀 Égouts'], ['hospital', '🏥 Hôpital'], ['metro', '🚇 Métro'], ['nice', '🌴 Rues de Nice']], def: 'random' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>

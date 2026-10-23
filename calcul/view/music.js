@@ -8,6 +8,8 @@
 //            fait rouler la basse et finit par une alarme
 //   final    la question quitte ou double : tempo 126, clap permanent, gros « braam » toutes les deux mesures
 //   reveal   le morceau passe « derrière la vitre » (filtre fermé, demi-temps) le temps de la correction
+//   over     « Closing Bell », un autre morceau pour l'écran des scores : cloche de clôture, 98 BPM, piano,
+//            mélodie et claps. En majeur (Fa) pour qui gagne, en mineur (Rém, plus doux-amer) sinon
 import { store, save } from './util.js';
 
 const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -17,6 +19,20 @@ const PAD = [[50, 53, 57, 62], [50, 53, 58, 62], [50, 55, 58, 62], [49, 52, 57, 
 const ARP = [[62, 65, 69, 74], [62, 65, 70, 74], [62, 67, 70, 74], [61, 64, 69, 73]];
 const ARP_STEPS = [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1, 3, 1, 2, 3, 2];
 const BLIPS = [86, 89, 91, 93, 96, 98];
+// Closing Bell : une grille de 4 mesures et une mélodie (pas de double croche → note), par version
+const OVER = {
+  win: {
+    bass: [41, 36, 38, 34], // Fa – Do – Rém – Si♭
+    chords: [[53, 57, 60, 65], [52, 55, 60, 64], [50, 53, 57, 62], [50, 53, 58, 62]],
+    mel: [{ 0: 72, 4: 77, 6: 76, 8: 74, 12: 72 }, { 0: 72, 4: 76, 8: 79, 12: 76 }, { 0: 74, 4: 77, 8: 81, 12: 79 }, { 0: 77, 6: 74, 8: 72, 12: 70, 14: 72 }],
+  },
+  lose: {
+    bass: [38, 34, 41, 36], // Rém – Si♭ – Fa – Do
+    chords: [[50, 53, 57, 62], [50, 53, 58, 62], [53, 57, 60, 65], [52, 55, 60, 64]],
+    mel: [{ 0: 74, 4: 77, 8: 76, 12: 74 }, { 0: 74, 4: 72, 8: 70, 12: 69 }, { 0: 72, 4: 69, 8: 65, 12: 67 }, { 0: 67, 4: 72, 8: 70, 12: 69 }],
+  },
+};
+let overSide = 'win';
 
 let enabled = store('calcul_music', true);
 let ctx = null, out = null, filt = null, comp = null, duck = null, verb = null, echo = null, noiseBuf = null;
@@ -54,7 +70,7 @@ function build() {
 function unlock() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, unlock, { capture: true });
 
-const bpm = () => (mode === 'final' ? 126 : 120);
+const bpm = () => (mode === 'final' ? 126 : mode === 'over' ? 98 : 120);
 const sixteenth = () => 60 / bpm() / 4;
 
 function env(g, t, peak, attack, decay) {
@@ -162,7 +178,46 @@ function bellAt(t) {
   }
 }
 
+// piano électrique : triangle + harmonique, attaque franche, longue queue dans la réverbe
+function keys(t, notes, vol, dur) {
+  for (const n of notes) {
+    const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = mtof(n); o2.type = 'sine'; o2.frequency.value = mtof(n) * 2;
+    env(g, t, vol, 0.004, dur); env(g2, t, vol * 0.35, 0.002, dur * 0.4);
+    o.connect(g); o2.connect(g2); g.connect(duck); g2.connect(duck); g.connect(verb);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
+  }
+}
+// voix de la mélodie : sinus légèrement vibré, en écho
+function lead(t, note, dur) {
+  const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+  o.type = 'triangle'; o.frequency.value = mtof(note);
+  lfo.frequency.value = 5.2; lg.gain.value = 4; lfo.connect(lg); lg.connect(o.detune);
+  f.type = 'lowpass'; f.frequency.value = 3200;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(duck); g.connect(echo); g.connect(verb);
+  o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+}
+// Closing Bell : ça démarre piano seul, la rythmique entre à la 3e mesure, la mélodie à la 5e
+function scheduleOver(s, t) {
+  if (s < 0) return; // la cloche sonne seule
+  const st = s % 16, bar = Math.floor(s / 16) % 4, k = OVER[overSide], X = sixteenth();
+  const drums = s >= 32, tune = s >= 64;
+  if (drums && (st === 0 || st === 8)) kick(t, 0.6);
+  if (drums && (st === 4 || st === 12)) clap(t, 0.2);
+  if (drums && st % 4 === 2) hat(t, st === 14, 0.05);
+  if (st === 0) { keys(t, k.chords[bar], 0.07, X * 14); pad(t, k.chords[bar], X * 16, 1300); }
+  if (st === 6 || st === 10) keys(t, k.chords[bar].slice(1), 0.045, X * 3);
+  if (drums && (st === 0 || st === 7 || st === 10)) bass(t, k.bass[bar] + (st === 10 ? 7 : 0), 0.24, 0.2);
+  const m = k.mel[bar][st];
+  // au deuxième passage, la version gagnante monte d'une octave sur la 3e mesure
+  const up = overSide === 'win' && bar === 2 && Math.floor(s / 64) % 2 ? 12 : 0;
+  if (tune && m) lead(t, m + up, X * 3.6);
+  if (Math.random() < 0.05) blip(t + X * 0.5);
+}
+
 function schedule(s, t) {
+  if (mode === 'over') return scheduleOver(s, t);
   const st = s % 16, bar = Math.floor(s / 16) % 4, beat = st % 4 === 0;
   const tt = smooth, lobby = mode === 'lobby', reveal = mode === 'reveal', final = mode === 'final', intro = mode === 'intro';
   const groove = mode === 'question' || final;
@@ -227,7 +282,7 @@ function setFilter(freq, time = 0.4) {
   const t = ctx.currentTime;
   filt.frequency.cancelScheduledValues(t); filt.frequency.setValueAtTime(filt.frequency.value, t); filt.frequency.exponentialRampToValueAtTime(freq, t + time);
 }
-const FILTER = { lobby: 2400, intro: 6000, question: 16000, final: 18000, reveal: 750 };
+const FILTER = { lobby: 2400, intro: 6000, question: 16000, final: 18000, reveal: 750, over: 9000 };
 
 export const wallStreetMusic = {
   get on() { return enabled; },
@@ -249,10 +304,13 @@ export const wallStreetMusic = {
     tick();
   },
   stop(fade = 0.6) { wanted = false; halt(fade); },
-  // phase du jeu : lobby, intro, question, final, reveal
-  setMode(m) {
+  // phase du jeu : lobby, intro, question, final, reveal, over ({ win } : version gagnante ou doux-amère)
+  setMode(m, { win = true } = {}) {
+    if (m === 'over') overSide = win ? 'win' : 'lose';
     if (m === mode) return;
     const prev = mode; mode = m;
+    // Closing Bell repart du début de sa grille, après la cloche de clôture
+    if (m === 'over' && ctx && playing) { step = -16; bellAt(ctx.currentTime + 0.05); }
     if (m === 'question' || m === 'final') { tension = 0; smooth = 0; riserArmed = true; }
     if (!ctx || !playing) return;
     setFilter(FILTER[m] || 2400, m === 'reveal' ? 0.35 : 0.6);

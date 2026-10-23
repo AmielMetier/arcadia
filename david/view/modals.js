@@ -103,12 +103,18 @@ export function propertyHtml(board, S, me, i, name) {
   const sp = board.spaces[i], pr = S.props[i];
   if (!pr) return `<h3>${esc(sp.name)}</h3><p class="hint">Case spéciale.</p>`;
   const mine = pr.owner === me.id;
+  // 2 contre 2 : on peut bâtir (à ses frais) sur les terrains de son coéquipier
+  const mate = !mine && S.cfg.teams && pr.owner != null && S.players.some((q) => q.id === pr.owner && q.team === (S.players.find((x) => x.id === me.id) || {}).team);
   const lv = pr.hotel ? 'Un hôtel' : pr.houses ? `${pr.houses} maison${pr.houses > 1 ? 's' : ''}` : 'Aucun bâtiment';
   let actions = '';
-  if (mine && !S.over) {
+  if ((mine || mate) && !S.over) {
     const row = [];
     const canManage = !S.auction && ((S.debts.length && S.debts[0].from === me.id) || (!S.debts.length && S.players[S.turn.cur].id === me.id));
-    if (canManage) {
+    if (canManage && mate) {
+      if (sp.type === 'street' && teamOwnsGroup(S, board, me.id, sp.group) && !pr.hotel && !S.debts.length) {
+        row.push(btn(pr.houses === S.cfg.housesPerHotel ? `Construire un hôtel ici · ${money(sp.houseCost)}` : `Construire une maison ici · ${money(sp.houseCost)}`, { type: 'BUILD', space: i }));
+      }
+    } else if (canManage) {
       if (sp.type === 'street' && teamOwnsGroup(S, board, me.id, sp.group) && !pr.hotel && !S.debts.length) {
         row.push(btn(pr.houses === S.cfg.housesPerHotel ? `Construire un hôtel · ${money(sp.houseCost)}` : `Construire une maison · ${money(sp.houseCost)}`, { type: 'BUILD', space: i }));
       }
@@ -116,7 +122,8 @@ export function propertyHtml(board, S, me, i, name) {
       if (!pr.mortgaged) row.push(btn(`Hypothéquer · +${money(sp.mortgage)}`, { type: 'MORTGAGE', space: i }, 'ghost'));
       else if (!S.debts.length) row.push(btn(`Lever l'hypothèque · ${money(sp.mortgage + Math.ceil(sp.mortgage * S.cfg.mortgageInterest))}`, { type: 'UNMORTGAGE', space: i }, 'ghost'));
     }
-    actions = row.length ? `<div class="stack">${row.join('')}</div>` : '<p class="hint">Tu peux gérer tes biens pendant ton tour, ou pour régler une dette.</p>';
+    actions = row.length ? `<div class="stack">${row.join('')}${mate ? '<p class="hint">Terrain de ton coéquipier : tu paies la construction, le loyer lui revient.</p>' : ''}</div>`
+      : mate ? (canManage ? '' : '<p class="hint">Pendant ton tour, tu peux bâtir ici : ton équipe possède la couleur.</p>') : '<p class="hint">Tu peux gérer tes biens pendant ton tour, ou pour régler une dette.</p>';
   }
   return `<div class="split">${deedHtml(board, S, i)}<div class="side">
     <h3>${pr.owner == null ? 'À la banque' : (mine ? 'À toi' : 'À ' + esc(name(pr.owner)))}</h3>

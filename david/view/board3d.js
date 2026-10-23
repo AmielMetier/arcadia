@@ -416,6 +416,13 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.2, 3.2, 1, 1, 1), diceMats);
     m.castShadow = true; m.visible = false; scene.add(m); return m;
   });
+  // pastille avec la valeur, au-dessus de chaque dé une fois posé : la lecture ne dépend plus de l'angle de vue
+  const diceTags = [0, 1].map(() => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+    sp.scale.set(2.6, 2.6, 1); sp.renderOrder = 10; sp.visible = false; scene.add(sp); return sp;
+  });
+  const tagTex = {};
+  const tagOf = (v) => tagTex[v] || (tagTex[v] = labelTexture(String(v), { bg: '#16181d', fg: '#fff', w: 96, h: 96, size: 62 }));
 
   /* ---------------------------------------------------------- caméra */
   const view = { top: !store('david_view3d', true), follow: store('david_follow', true), offsetPx: 0, az: 0 };
@@ -603,7 +610,9 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
       // les dés sont lancés depuis le côté du joueur et tombent devant son pion, là où la caméra regarde
       const o = pid != null ? pawns.get(pid) : null;
       let ends = [new THREE.Vector3(-3, TOP + 1.6, 4), new THREE.Vector3(3.5, TOP + 1.6, 1)], from = new THREE.Vector3(26, 14, 30);
-      const yawBase = o ? AZ[sideOf(o.pos)] : 0; // les points du dessus sont alignés face au joueur
+      // dés posés de trois quarts (une arête vers la caméra) : la face du dessus, celle qui compte, est la plus visible
+      const yawBase = (o ? AZ[sideOf(o.pos)] : 0) + Math.PI / 4;
+      for (const t of diceTags) t.visible = false;
       if (o) {
         const out = dir(AZ[sideOf(o.pos)]), tan = new THREE.Vector3(out.z, 0, -out.x);
         const c = center(o.pos), w = pxToWorld(c.x, c.y, 0);
@@ -623,7 +632,7 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
         const m = dice[k]; m.visible = true;
         const end = ends[k], start = from.clone().add(new THREE.Vector3(k * 3, 0, -k * 2));
         const q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
-        const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawBase + (Math.random() - 0.5) * 0.5);
+        const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawBase + (Math.random() - 0.5) * 0.2);
         const q1 = yaw.multiply(faceUp(v));
         const spin = new THREE.Vector3(Math.random() - 0.5, 0.3, Math.random() - 0.5).normalize();
         return T.run(dur, (t) => {
@@ -638,8 +647,13 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
         });
       });
       await Promise.all(runs);
+      values.forEach((v, k) => {
+        const t = diceTags[k]; t.material.map = tagOf(v); t.material.needsUpdate = true;
+        t.position.copy(dice[k].position).add(new THREE.Vector3(0, 3.6, 0)); t.visible = true;
+        T.run(260, (x) => { const sc = 2.6 * (0.4 + 0.6 * (1 - Math.pow(1 - x, 3))); t.scale.set(sc, sc, 1); });
+      });
       clearTimeout(api._diceT);
-      api._diceT = setTimeout(() => { for (const m of dice) m.visible = false; }, 2600);
+      api._diceT = setTimeout(() => { for (const m of dice) m.visible = false; for (const t of diceTags) t.visible = false; }, 2600);
     },
     // valeur lue sur le dessus des dés (tests)
     diceTop() {

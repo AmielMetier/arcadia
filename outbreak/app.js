@@ -4,13 +4,15 @@
 import { Sim, DT, lvl } from './engine/sim.js';
 import { botThink } from './engine/bots.js';
 import { generateRoom } from './engine/level.js';
-import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS } from './engine/data.js';
+import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS, CLASSES, CLASS_IDS, SHOP_ITEMS, isBig } from './engine/data.js';
 import { pushOutRect, clamp, angDiff } from './engine/geom.js';
 import { Audio } from './audio.js';
 import { FX } from './render/fx.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { HUD, briefingHtml, menuHtml, endHtml } from './ui/hud.js';
+import { drawIntro, drawOutro } from './render/cinema.js';
+import { radioFor, SPEAKERS, NOTES, MISSIONS, ENDINGS, noteKey, TOTAL_NOTES } from './engine/story.js';
 
 const H = window.HubBridge;
 const QS = new URLSearchParams(location.search);
@@ -30,7 +32,9 @@ const S = {
   role: 'solo', myId: 0, cfg: null, sim: null, runId: 0, lobby: true, menu: false,
   lvKey: '', lv: null, snaps: [], evq: [], last: null, off: null, endShown: false, reported: false,
   netEv: [], tick: 0, acc: 0, inp: null, sentSeq: 0, hist: [], shots: [], pred: null, gcd: 0, spin: 0, gotHost: false, hiT: 0,
+  classes: {}, myClass: 'soldier', abReady: true,
 };
+try { const c = localStorage.getItem('outbreak_class'); if (CLASSES[c]) S.myClass = c; } catch (e) {}
 
 // ------------------------------------------------------------------ réglages et identité
 function readCfg(settings = {}) {
@@ -38,10 +42,11 @@ function readCfg(settings = {}) {
   try { saved = JSON.parse(localStorage.getItem('outbreak_cfg') || '{}'); } catch (e) {}
   const src = H.embedded ? settings : { ...saved, ...Object.fromEntries(QS) };
   return {
-    mode: src.mode === 'survival' ? 'survival' : 'campaign',
+    mode: ['survival', 'defense'].includes(src.mode) ? src.mode : 'campaign',
     difficulty: DIFFICULTY[src.difficulty] ? src.difficulty : 'normal',
     startWeapon: ['pistol', 'shotgun', 'smg'].includes(src.startWeapon) ? src.startWeapon : 'pistol',
     bots: clamp(Number(src.bots ?? (H.embedded ? 0 : 2)) | 0, 0, 3),
+    sector: ['lab', 'sewers', 'hospital', 'metro', 'nice', 'random'].includes(src.sector) ? src.sector : 'random',
   };
 }
 function localProfile() {
@@ -59,11 +64,12 @@ function boot(info) {
   S.role = H.embedded ? info.role : 'solo';
   S.myId = H.embedded ? info.myId : 0;
   S.cfg = readCfg(info.settings || {});
+  S.classes[S.myId] = S.myClass;
   H.on('msg', onMsg);
   H.on('roster', onRoster);
   if (H.embedded) H.signalReady();
   showBriefing();
-  if (S.role === 'guest') H.send('host', { t: 'hi' });
+  if (S.role === 'guest') H.send('host', { t: 'hi', c: S.myClass });
   requestAnimationFrame(loop);
   if (QS.has('debug')) window.__outbreak = { S, fx, renderer, input };
   if (QS.has('autostart') && S.role !== 'guest') setTimeout(startRun, 300);
@@ -71,17 +77,31 @@ function boot(info) {
 if (H.embedded) H.on('init', boot); else boot({});
 
 function squad() {
-  const hs = humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id) }));
+  const hs = humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id), cls: p.id === S.myId ? S.myClass : CLASSES[S.classes[p.id]] ? S.classes[p.id] : 'soldier' }));
   const nb = Math.min(S.cfg.bots, Math.max(0, 5 - hs.length));
-  const bots = BOT_NAMES.slice(0, nb).map(([name, color]) => ({ name, color, bot: true }));
+  // les équipiers IA prennent les classes encore libres (soigneur et colosse d'abord)
+  const order = ['medic', 'tank', 'engineer', 'scout', 'soldier'];
+  const free = order.filter((c) => !hs.some((h) => h.cls === c)).concat(order);
+  const bots = BOT_NAMES.slice(0, nb).map(([name, color], i) => ({ name, color, bot: true, cls: free[i] }));
   return hs.concat(bots);
+}
+
+function chooseClass(c) {
+  if (!CLASSES[c]) return;
+  S.myClass = c; S.classes[S.myId] = c;
+  try { localStorage.setItem('outbreak_class', c); } catch (e) {}
+  if (S.role === 'guest') H.send('host', { t: 'cls', c });
+  else broadcastLobby();
+  audio.unlock(); audio.play('click');
+  showBriefing();
 }
 
 function showBriefing() {
   if (!S.lobby) return;
   const canStart = S.role !== 'guest';
   screenEl.className = 'screen'; screenEl.hidden = false;
-  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart });
+  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart, myClass: S.myClass, notes: foundNotes().size, totalNotes: TOTAL_NOTES });
+  for (const b of screenEl.querySelectorAll('.cls')) b.onclick = () => chooseClass(b.dataset.c);
   hud.show(false);
   const go = $('#btnGo'); if (go) go.onclick = () => { audio.unlock(); startRun(); };
   const ex = $('#btnExit'); if (ex) ex.onclick = () => H.exit();
@@ -98,11 +118,13 @@ function showBriefing() {
 function startRun() {
   if (S.role === 'guest') return;
   const seed = (Math.random() * 2 ** 31) | 0;
-  const sim = new Sim({ mode: S.cfg.mode, difficulty: S.cfg.difficulty, startWeapon: S.cfg.startWeapon, seed });
-  for (const p of humanPlayers()) if (isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
-  squad().filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true }));
+  const sim = new Sim({ mode: S.cfg.mode, difficulty: S.cfg.difficulty, startWeapon: S.cfg.startWeapon, seed, sector: S.cfg.sector === 'random' ? null : S.cfg.sector });
+  const sq = squad();
+  for (const p of sq) if (!p.bot && isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
+  sq.filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true, cls: b.cls }));
   sim.startRoom(sim.room.type, sim.room.index); // replace tout le monde à l'entrée
-  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0;
+  sim.beginIntro(9);
+  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; radio.q = []; radio.cur = null;
   hideScreen();
   if (H.embedded) H.send('all', { t: 'go', run: S.runId });
 }
@@ -131,8 +153,8 @@ function hostFrame(dt) {
   }
   S.last = snap;
   const view = buildView(snap, snap, 0, dt);
-  for (const e of frameEv) fx.handle(e, view, S.myId);
-  if (sim.phase !== 'play' && sim.endT > 2.4) { report(snap); showEnd(snap); }
+  for (const e of frameEv) { fx.handle(e, view, S.myId); story(e, snap); }
+  if (sim.phase !== 'play') report(snap);
   return view;
 }
 
@@ -143,10 +165,10 @@ function onRoster() {
   const sim = S.sim; if (!sim) return;
   const ids = new Set(H.players.map((p) => p.id));
   for (const p of [...sim.players.values()]) if (!p.bot && !ids.has(p.id)) sim.removePlayer(p.id);
-  for (const p of humanPlayers()) if (isReady(p.id) && !sim.players.has(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
+  for (const p of squad()) if (!p.bot && isReady(p.id) && !sim.players.has(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
 }
 
-function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg }); }
+function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg, classes: S.classes }); }
 
 // Le Hub a désigné ce joueur comme nouvel hôte : la partie reprend depuis le dernier état reçu
 function becomeHost() {
@@ -170,7 +192,7 @@ function report(snap) {
   S.reported = true;
   const ranked = snap.P.slice().sort((a, b) => b.st[1] - a.st[1]);
   const camp = snap.rm.mode !== 'survival';
-  const mode = camp ? (snap.ph === 'won' ? 'Campagne · victoire' : `Campagne · salle ${snap.rm.i}`) : `Survie · vague ${snap.wv.n}`;
+  const mode = snap.rm.mode === 'defense' ? (snap.ph === 'won' ? 'Défense · fort tenu' : `Défense · vague ${snap.wv.n}`) : camp ? (snap.ph === 'won' ? 'Campagne · victoire' : `Campagne · salle ${snap.rm.i}`) : `Survie · vague ${snap.wv.n}`;
   H.report({
     id: `outbreak-${S.runId}-${ranked.map((p) => p.i).join('.')}`, mode,
     players: ranked.map((p, k) => ({ id: p.b ? null : p.i, name: p.n, color: p.c, bot: !!p.b, rank: k + 1, score: p.st[1] })),
@@ -181,14 +203,21 @@ function report(snap) {
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
   if (S.role === 'host' || S.role === 'solo') {
-    if (m.t === 'hi') { if (S.lobby) H.send(from, { t: 'lobby', cfg: S.cfg }); }
+    if (m.t === 'hi' || m.t === 'cls') {
+      if (CLASSES[m.c]) S.classes[from] = m.c;
+      if (S.lobby) { showBriefing(); if (m.t === 'cls') broadcastLobby(); else H.send(from, { t: 'lobby', cfg: S.cfg, classes: S.classes }); }
+    }
     else if (m.t === 'i' && S.sim) S.sim.setInput(from, cleanInput(m));
     return;
   }
   // invité : seul l'hôte fait foi
   if (from !== H.info.hostId) return;
   S.gotHost = true;
-  if (m.t === 'lobby') { if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg }; if (S.lobby) showBriefing(); }
+  if (m.t === 'lobby') {
+    if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg };
+    if (m.classes && typeof m.classes === 'object') { S.classes = { ...m.classes }; S.classes[S.myId] = S.myClass; }
+    if (S.lobby) showBriefing();
+  }
   else if (m.t === 'go') { S.lobby = false; S.endShown = false; hideScreen(); }
   else if (m.t === 's' && m.s) receiveSnap(m.s, m.e || []);
 }
@@ -197,7 +226,7 @@ function cleanInput(m) {
   const n = (v, a, b, d = 0) => (Number.isFinite(+v) ? clamp(+v, a, b) : d);
   return {
     mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), a: n(m.a, -10, 10), fire: !!m.fire, use: !!m.use, td: n(m.td, 0, 2000, 300),
-    dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
+    ab: m.ab | 0, sk: m.sk | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 3, -1) | 0, q: m.q | 0,
   };
 }
 
@@ -225,9 +254,7 @@ function guestFrame(dt) {
   const view = buildView(a, b, f, dt);
   // événements à l'heure de l'image affichée
   const due = []; S.evq = S.evq.filter((x) => (x.t <= rt + 0.001 ? (due.push(x.e), false) : true));
-  for (const e of due) fx.handle(e, view, S.myId);
-  const last = S.last;
-  if (last.ph !== 'play' && !S.endShown) { S.endT = (S.endT || 0) + dt; if (S.endT > 2.4) showEnd(last); } else if (last.ph === 'play') S.endT = 0;
+  for (const e of due) { fx.handle(e, view, S.myId); story(e, S.last); }
   // demander l'état tant que l'hôte n'a rien envoyé
   return view;
 }
@@ -247,8 +274,12 @@ function stepBody(P, h, dt, me, snap, solids) {
   if (me.pk?.rage && me.h < me.H * 0.35) sp *= 1.4;
   const W = WEAPONS[WEAPON_IDS[(me.w[me.sl] || me.w[0])[0]]];
   if (W.slow && h.fire) sp *= W.slow;
+  const cls = CLASS_IDS[me.cl];
+  if (cls === 'tank') sp *= 0.92;
+  if (cls === 'scout') sp *= me.ab && me.ab[1] > 0 ? 1.4 * 1.08 : 1.08;
+  for (const z of S.lv.zones || []) if (z.k === 'water' && P.x > z.x && P.x < z.x + z.w && P.y > z.y && P.y < z.y + z.h) { sp *= 0.62; break; }
   if (me.state === 1) sp = 52;
-  if (me.state === 2) sp = 0;
+  if (me.state === 2 || me.pn) sp = 0;
   if (h.revive) sp = 0;
   if (h.dashDir != null) { P.dashT = 0.2; P.dashDir = h.dashDir; }
   if (P.dashT > 0) {
@@ -295,7 +326,7 @@ function predictLocal(dt) {
   if (S.lastDash == null) S.lastDash = inp.dash;
   if (inp.dash !== S.lastDash) {
     S.lastDash = inp.dash;
-    if (me.state === 0 && me.dc > 0 && S.pred.dashT <= 0) h.dashDir = Math.hypot(inp.mx, inp.my) > 0.2 ? Math.atan2(inp.my, inp.mx) : inp.a;
+    if (me.state === 0 && !me.pn && me.dc > 0 && S.pred.dashT <= 0) h.dashDir = Math.hypot(inp.mx, inp.my) > 0.2 ? Math.atan2(inp.my, inp.mx) : inp.a;
   }
   // réanimation : le joueur s'arrête
   if (inp.use && me.state === 0) h.revive = s.P.some((o) => o.i !== me.i && o.s === 1 && Math.hypot(o.x - S.pred.x, o.y - S.pred.y) < 82);
@@ -308,9 +339,10 @@ function predictLocal(dt) {
   const w = me.w[slot] || me.w[0];
   const W = WEAPONS[WEAPON_IDS[w[0]]];
   S.spin = inp.fire ? S.spin + dt : 0;
-  const mag = w[1] - S.shots.length;
-  if (inp.fire && me.state !== 2 && !h.revive && S.pred.dashT <= 0 && me.rl === 0 && S.gcd <= 0 && mag > 0 && (!W.spinUp || S.spin >= W.spinUp)) {
-    S.gcd = 1 / (W.rate * (1 + 0.15 * (me.pk?.rate || 0)));
+  const barrage = CLASS_IDS[me.cl] === 'soldier' && me.ab && me.ab[1] > 0;
+  const mag = barrage ? 99 : w[1] - S.shots.length;
+  if (!W.melee && !W.tesla && inp.fire && me.state !== 2 && !me.pn && !h.revive && S.pred.dashT <= 0 && me.rl === 0 && S.gcd <= 0 && mag > 0 && (!W.spinUp || S.spin >= W.spinUp)) {
+    S.gcd = 1 / (W.rate * (1 + 0.15 * (me.pk?.rate || 0)) * (barrage ? 1.5 : 1));
     const a = inp.a;
     const angs = [];
     for (let i = 0; i < W.pellets; i++) angs.push(a + (W.pellets > 1 ? ((i + Math.random()) / W.pellets * 2 - 1) : (Math.random() * 2 - 1)) * W.spread);
@@ -324,10 +356,10 @@ function predictLocal(dt) {
 // ------------------------------------------------------------------ vue commune (hôte et invités)
 const anim = new Map();
 function ensureLevel(s) {
-  const key = `${s.run}:${s.rm.mode}:${s.rm.i}:${s.rm.ty}:${s.rm.sd}`;
+  const key = `${s.run}:${s.rm.mode}:${s.rm.i}:${s.rm.ty}:${s.rm.sd}:${s.rm.sec}`;
   if (key === S.lvKey) return false;
   S.lvKey = key;
-  S.lv = generateRoom({ mode: s.rm.mode, index: s.rm.i, type: s.rm.ty, seed: s.rm.sd, exits: s.rm.ex });
+  S.lv = generateRoom({ mode: s.rm.mode, index: s.rm.i, type: s.rm.ty, seed: s.rm.sd, exits: s.rm.ex, sector: s.rm.sec });
   renderer.setLevel(S.lv, key); renderer.camInit = false;
   return true;
 }
@@ -354,6 +386,8 @@ function buildView(a, b, f, dt) {
       id: q.i, name: q.n, color: q.c, bot: !!q.b, x, y, a: ang, vx, vy, state: q.s, weapon: WEAPON_IDS[wi], h: q.h, H: q.H, r: q.r, R: q.R,
       bl: q.bl, rv: q.rv, dash: q.d, rl: q.rl, walk: an.walk, move: an.move, speed: Math.min(1, sp / 230),
       hurt: fx.pflash.has(q.i), recoil: (fx.recoil.get(q.i) || 0) * 7,
+      cls: CLASS_IDS[q.cl], clsColor: CLASSES[CLASS_IDS[q.cl]]?.color, pinned: !!q.pn,
+      shield: CLASS_IDS[q.cl] === 'tank' && q.ab && q.ab[1] > 0, barrage: CLASS_IDS[q.cl] === 'soldier' && q.ab && q.ab[1] > 0, shadow: CLASS_IDS[q.cl] === 'scout' && q.ab && q.ab[1] > 0,
     };
   });
   const za = new Map(a.Z.map((z) => [z[0], z]));
@@ -362,7 +396,7 @@ function buildView(a, b, f, dt) {
     const ty = ZOMBIE_IDS[z[1]];
     const an = anim.get(z[0]) || { walk: Math.random() * 6 };
     const sp = Math.hypot(z[9], z[10]);
-    an.walk += sp * dt / (ty === 'boss' ? 16 : 9); anim.set(z[0], an);
+    an.walk += sp * dt / (isBig(ty) ? 16 : 9); anim.set(z[0], an);
     let flags = z[6] & ~128; if (fx.zflash.has(z[0])) flags |= 128;
     return { id: z[0], ty, x: lerp(o[2], z[2]), y: lerp(o[3], z[3]), a: lerpA(o[4], z[4]), hp: z[5] / 1000, flags, lockA: z[7], phase: z[8], vx: z[9], vy: z[10], walk: an.walk, r: ZOMBIES[ty].r * (flags & 8 ? 1.18 : 1) };
   });
@@ -379,7 +413,7 @@ function buildView(a, b, f, dt) {
   const view = {
     lv, t, players, zombies, eprojs, mode: b.rm.mode,
     pickups: b.K.map((k) => ({ id: k[0], k: k[1], x: k[2], y: k[3], w: k[4] })),
-    hazards: b.A, barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
+    hazards: b.A, turrets: b.T || [], base: b.bs2, myPad: meSnap ? meSnap.bd : 0, shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, train: b.tr, alarms: b.ca || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
     doorsOpen: !!b.op, cleared: !!b.cl, rally: b.rl, meId: S.myId, me: meSnap ? { ...meSnap, state: meSnap.s } : null,
     snap: b, waveLeft: b.wv.left, focus, bleedMax: DIFFICULTY[b.cfg.d]?.bleed || 28, predictFire: S.role === 'guest',
     clock: b.t,
@@ -395,9 +429,24 @@ function promptFor(view) {
   if (!me || !ms || view.snap.ph !== 'play') return '';
   const camp = view.mode !== 'survival';
   if (me.state === 2) return camp ? '☠ K.O. — tu reviens à la prochaine salle' : '☠ K.O. — tu reviens à la fin de la vague';
+  if (me.pinned) return '⚠ Plaqué au sol ! Martèle <kbd>Espace</kbd> pour te débattre';
   if (me.state === 1) return `✚ À terre ! Tu peux ramper et tirer au pistolet · ${Math.ceil(me.bl)} s`;
   const downed = view.players.find((o) => o.id !== me.id && o.state === 1 && Math.hypot(o.x - me.x, o.y - me.y) < 82);
   if (downed) return downed.rv > 0 ? `Réanimation de ${esc(downed.name)}… ${Math.round(downed.rv * 100)} %` : `Maintiens <kbd>E</kbd> pour relever ${esc(downed.name)}`;
+  const it = view.shop.find((q) => !q[6] && Math.hypot(q[2] - me.x, q[3] - me.y) < 50);
+  if (it) {
+    const name = it[1] === 'weapon' ? WEAPONS[it[4]].name : SHOP_ITEMS[it[1]].name;
+    return view.scrap >= it[5] ? `<kbd>E</kbd> Acheter ${esc(name)} · ⚙ ${it[5]}` : `${esc(name)} · ⚙ ${it[5]} — pas assez de ferraille (${view.scrap})`;
+  }
+  if (view.base) {
+    const pad = view.base.p.find((q) => !q[3] && Math.hypot(q[1] - me.x, q[2] - me.y) < 48);
+    if (pad && !ms.bd) return `<kbd>E</kbd> Poser un piège ici · ⚙ ${view.scrap}`;
+    const geo = view.lv.base.bars;
+    for (const b of view.base.b) { const g = geo.find((x) => x.id === b[0]); if (g && b[1] < b[2] && Math.hypot(g.x + g.w / 2 - me.x, g.y + g.h / 2 - me.y) < 75) return `Maintiens <kbd>E</kbd> pour réparer la barricade · ${Math.round((b[1] / b[2]) * 100)} %`; }
+  }
+  if (view.vault && view.vault[2] === 'closed' && Math.hypot(view.vault[0] - me.x, view.vault[1] - me.y) < 95)
+    return view.vault[3] > 0 ? `Ouverture du coffre… ${Math.round(view.vault[3] * 100)} % (ça va sonner !)` : 'Maintiens <kbd>E</kbd> pour forcer le coffre — une alarme attirera une horde';
+  if (view.drop && view.drop[0] === 'land' && Math.hypot(view.drop[1] - me.x, view.drop[2] - me.y) < 120) return `Sécurisation du largage… ${Math.round(view.drop[3] * 100)} %`;
   const wp = view.pickups.find((k) => k.k === 'weapon' && Math.hypot(k.x - me.x, k.y - me.y) < 60);
   if (wp) {
     const W = WEAPONS[wp.w];
@@ -416,6 +465,42 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 // ------------------------------------------------------------------ écrans
 function hideScreen() { screenEl.hidden = true; screenEl.innerHTML = ''; S.menu = false; hud.show(true); }
+
+// ------------------------------------------------------------------ histoire : radio et dossiers
+const radio = { q: [], cur: null, t: 0, shown: 0 };
+let radioN = 0;
+function story(e, snap) {
+  if (!snap) return;
+  if (e.e === 'note') { showNote(e.sec, e.n); return; }
+  const lines = radioFor(e, { sector: snap.rm.sec, mode: snap.rm.mode, seed: (snap.rm.sd >>> 0) + (radioN++ & 0) });
+  if (lines) for (const l of lines) if (radio.q.length < 4) radio.q.push(l);
+}
+function sayEnding(won, sector) { const E = won ? ENDINGS.won(sector) : ENDINGS.over(); radio.q = E.lines.slice(); radio.cur = null; }
+function stepRadio(dt) {
+  const el = $('#radio');
+  if (!radio.cur && radio.q.length) {
+    radio.cur = radio.q.shift(); radio.t = 0; radio.shown = -1;
+    const Sp = SPEAKERS[radio.cur[0]] || SPEAKERS.inconnu;
+    el.style.setProperty('--c', Sp.color);
+    el.innerHTML = `<span class="who">${Sp.icon}</span><div><b>${Sp.name.toUpperCase()}</b><span id="radioTxt"></span></div>`;
+    el.hidden = false; audio.play('radio');
+  }
+  if (!radio.cur) { el.hidden = true; return; }
+  radio.t += dt;
+  const txt = radio.cur[1], n = Math.min(txt.length, Math.floor(radio.t * 55));
+  if (n !== radio.shown) { radio.shown = n; const tEl = $('#radioTxt'); if (tEl) tEl.textContent = txt.slice(0, n); }
+  if (radio.t > 1.6 + txt.length * 0.045) radio.cur = null;
+}
+let noteT = 0;
+function foundNotes() { try { return new Set(JSON.parse(localStorage.getItem('outbreak_notes') || '[]')); } catch (e) { return new Set(); } }
+function showNote(sector, n) {
+  const N = (NOTES[sector] || [])[n]; if (!N) return;
+  const set = foundNotes(); set.add(noteKey(sector, n));
+  try { localStorage.setItem('outbreak_notes', JSON.stringify([...set])); } catch (e) {}
+  const el = $('#note');
+  el.innerHTML = `<small>📁 DOSSIER TROUVÉ · ${set.size}/${TOTAL_NOTES}</small><b>${esc(N[0])}</b><p>« ${esc(N[1])} »</p>`;
+  el.hidden = false; noteT = 9 + N[1].length * 0.02; audio.play('note');
+}
 
 function showEnd(snap) {
   if (S.endShown) return;
@@ -460,7 +545,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   const origin = S.view && S.view.me ? renderer.toScreen(S.view.players.find((p) => p.id === S.myId)?.x ?? 0, S.view.players.find((p) => p.id === S.myId)?.y ?? 0) : null;
-  input.offerOpen = !!(S.view && S.view.me && S.view.me.of);
+  input.offerOpen = !!(S.view && S.view.me && (S.view.me.of || S.view.me.bd));
   const blocked = S.lobby || S.endShown || S.menu;
   const raw = input.sample(origin, renderer.cam.zoom);
   S.inp = blocked ? { ...raw, mx: 0, my: 0, fire: false, use: false } : raw;
@@ -493,12 +578,47 @@ function loop(now) {
   // intensité musicale : zombies proches
   const near = meP ? view.zombies.filter((z) => Math.hypot(z.x - meP.x, z.y - meP.y) < 700).length : 0;
   audio.intensity += ((view.snap.ph === 'play' && !view.cleared ? Math.min(1, near / 14 + (view.zombies.length ? 0.2 : 0)) : 0) - audio.intensity) * Math.min(1, dt * 1.5);
-  if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && z.ty !== 'boss') audio.play('groan', z.x, z.y, 0.6); }
+  if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && !isBig(z.ty)) audio.play('groan', z.x, z.y, 0.6); }
+  // ---- cinématique d'intro (la partie attend)
+  const snapNow = view.snap;
+  if (snapNow.in > 0 && !S.lobby) {
+    const p = 9 - snapNow.in;
+    const now2 = performance.now() / 1000;
+    if (S.introRun !== snapNow.run || S.introClock == null || Math.abs((now2 - S.introClock) - p) > 0.5) { S.introRun = snapNow.run; S.introClock = now2 - p; if (p < 0.5) audio.play('heli'); }
+    const ip = now2 - S.introClock;
+    const c = canvas.getContext('2d'); renderer.resize();
+    c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
+    const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], bot: !!q.b, me: q.i === S.myId, weapon: WEAPON_IDS[(q.w[q.sl] || q.w[0])[0]] }));
+    drawIntro(c, renderer.W, renderer.H, ip, { sector: snapNow.rm.sec, squad, mission: snapNow.rm.mode === 'survival' ? MISSIONS.survival : snapNow.rm.mode === 'defense' ? MISSIONS.defense : MISSIONS[snapNow.rm.sec], votes: (snapNow.sv || []).length, total: snapNow.P.filter((q) => !q.b).length });
+    hud.show(false);
+    S.introShown = true;
+    return;
+  }
+  if (S.introShown) { S.introShown = false; if (!S.endShown && !S.menu) hud.show(true); }
   fx.update(dt, view);
   view.prompt = promptFor(view);
+  if (view.me && view.me.ab) { const ready = view.me.ab[0] <= 0; if (ready && !S.abReady && view.snap.ph === 'play') audio.play('ready'); S.abReady = ready; }
   view.sfx = (n) => audio.play(n);
   renderer.frame(view, dt);
   if (!S.lobby) hud.update(view, now);
+  stepRadio(dt);
+  if (noteT > 0) { noteT -= dt; if (noteT <= 0) $('#note').hidden = true; }
+  // ---- fin : cinématique puis écran de résultats
+  if (snapNow.ph !== 'play' && !S.lobby) {
+    if (S.outroRun !== snapNow.run) { S.outroRun = snapNow.run; S.outroT = 0; sayEnding(snapNow.ph === 'won', snapNow.rm.sec); audio.play(snapNow.ph === 'won' ? 'heli' : 'static'); }
+    S.outroT += dt;
+    const dur = snapNow.ph === 'won' ? 7.4 : 5.8;
+    if (S.outroT > 1.0 && !S.endShown) {
+      const c = canvas.getContext('2d');
+      c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
+      const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], state: q.s }));
+      c.globalAlpha = Math.min(1, (S.outroT - 1.0) / 0.5);
+      drawOutro(c, renderer.W, renderer.H, S.outroT - 1.0, { won: snapNow.ph === 'won', squad, sector: snapNow.rm.sec });
+      c.globalAlpha = 1;
+      hud.show(false);
+    }
+    if (S.outroT > dur) showEnd(snapNow);
+  }
 }
 
 // écran d'attente : petit fond animé derrière le briefing

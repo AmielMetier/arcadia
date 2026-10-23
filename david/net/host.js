@@ -4,7 +4,7 @@ import { createGame, reduce, actors } from '../engine/rules.js';
 import { botAction, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { cleanHouse } from '../engine/modes.js';
-import { standings, netWorth } from '../engine/valuation.js';
+import { standings, netWorth, TEAM_SHADES } from '../engine/valuation.js';
 import { remapPlayers, resumeAt, proposeMapping } from '../engine/resume.js';
 import { saves } from './saves.js';
 import { TOKEN_IDS } from '../view/tokens.js';
@@ -18,7 +18,7 @@ const TRADE_WAIT_MS = 60000; // un bot qui attend la réponse d'un humain retire
 const ABSENT_MS = 20000; // délai avant qu'un bot remplace un joueur déconnecté
 
 // initial : état d'une partie en cours, quand ce joueur reprend le rôle d'hôte après le départ du précédent
-export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, onEmote = () => {}, initial = null }) {
+export function startHost({ board, bridge, solo, settings, me, onState, onSetup, onError, onEmote = () => {}, onChat = () => {}, initial = null }) {
   let state = null;
   let reported = !!(initial && initial.over); // classement déjà transmis
   const level = BOT_LEVELS.includes(settings.level) ? settings.level : 'normal';
@@ -69,6 +69,26 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
         return { id: p.bot ? null : p.id, name: p.name, color: p.color, bot: !!p.bot, rank, score: p.bankrupt ? 0 : netWorth(state, board, p.id).total };
       }),
     });
+  }
+
+  /* ---------------------------------------------------------- 2 contre 2 : chat d'équipe */
+  // Les messages ne partent qu'aux coéquipiers (l'équipe adverse ne les reçoit jamais).
+  const lastChat = {};
+  function teamChat(from, raw) {
+    if (!state || !state.cfg.teams) return 'Le chat d\'équipe n\'existe qu\'en 2 contre 2.';
+    const p = state.players.find((q) => q.id === from);
+    if (!p) return 'Tu ne joues pas cette partie.';
+    const text = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!text) return null;
+    const now = Date.now();
+    if (now - (lastChat[from] || 0) < 600) return 'Doucement !';
+    lastChat[from] = now;
+    const msg = { t: 'tchat', from, name: p.name, color: p.color, team: p.team, text, at: now };
+    for (const q of state.players) {
+      if (q.team !== p.team || q.bot) continue;
+      if (q.id === me.id) onChat(msg); else if (!solo) bridge.send(q.id, msg);
+    }
+    return null;
   }
 
   /* ---------------------------------------------------------- réactions (émotes) */
@@ -244,6 +264,8 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
       const team = teams ? (players.filter((p) => p.team === 0).length < 2 ? 0 : 1) : undefined;
       players.push({ id: 100 + k, name: BOT_NAMES[k], color, bot: true, team });
     }
+    // 2 contre 2 : les coéquipiers prennent la couleur de leur équipe, en deux nuances
+    if (teams) for (const t of [0, 1]) players.filter((p) => p.team === t).forEach((p, k) => { p.color = TEAM_SHADES[t][k]; });
     // pions restants : au hasard pour les bots et les retardataires
     const free = TOKEN_IDS.filter((tk) => !players.some((p) => p.token === tk)).sort(() => Math.random() - 0.5);
     for (const p of players) if (!p.token) p.token = free.shift();
@@ -289,6 +311,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
       if (!m || typeof m !== 'object') return;
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: state, ev: [], now: Date.now() }); else pushSetup(); }
       if (m.t === 'emote') emote(from, String(m.id));
+      if (m.t === 'tchat') { const err = teamChat(from, m.text); if (err) bridge.send(from, { t: 'err', msg: err }); }
       if (m.t === 'pick') { const err = pick(from, String(m.token)); if (err) bridge.send(from, { t: 'err', msg: err }); }
       if (m.t === 'team') { const err = pickTeam(from, m.team); if (err) bridge.send(from, { t: 'err', msg: err }); }
       if (m.t === 'act' && m.a && typeof m.a === 'object') {
@@ -301,6 +324,7 @@ export function startHost({ board, bridge, solo, settings, me, onState, onSetup,
   return {
     act(a) { const r = apply({ ...a, by: me.id }); if (!r.ok) onError(r.error); },
     emote(id) { emote(me.id, id); },
+    chat(text) { const err = teamChat(me.id, text); if (err) onError(err); },
     pick(token) { const err = pick(me.id, token); if (err) onError(err); },
     team(t) { const err = pickTeam(me.id, t); if (err) onError(err); },
     start() { if (state) return; if (resumeId) resume(); else begin(setupState().players.filter((p) => p.ready).map((p) => p.id)); },

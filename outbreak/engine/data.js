@@ -19,6 +19,13 @@ export const WEAPONS = {
     speed: 4200, range: 1700, pellets: 1, spread: 0.004, pen: 12, knock: 240, shake: 6, kick: 90, sound: 'rail', color: '#7ff0ff', rail: true },
   minigun: { id: 'minigun', name: 'Minigun Broyeur', short: 'MINI', tier: 3, dmg: 15, rate: 21, mag: 150, res: 300, resMax: 600, reload: 3.0,
     speed: 1900, range: 900, pellets: 1, spread: 0.13, pen: 1, knock: 40, shake: 1.5, kick: 6, sound: 'minigun', color: '#ffe066', spinUp: 0.55, slow: 0.72 },
+  // mêlée : pas de munitions, frappe en arc devant soi
+  katana: { id: 'katana', name: 'Katana Ronin', short: 'KATANA', tier: 1, dmg: 62, rate: 2.6, mag: 1, res: Infinity, resMax: Infinity, reload: 0,
+    speed: 0, range: 92, pellets: 1, spread: 0, pen: 99, knock: 160, shake: 3, kick: -90, sound: 'slash', color: '#e8f4ff', melee: true, arc: 1.15 },
+  crossbow: { id: 'crossbow', name: 'Arbalète Chasseresse', short: 'ARBA', tier: 2, dmg: 140, rate: 1.25, mag: 1, res: 30, resMax: 50, reload: 0.75,
+    speed: 1500, range: 1300, pellets: 1, spread: 0.008, pen: 5, knock: 200, shake: 2.5, kick: 30, sound: 'crossbow', color: '#d9c39a', bolt: true },
+  tesla: { id: 'tesla', name: 'Canon Tesla', short: 'TESLA', tier: 3, dmg: 34, rate: 3.2, mag: 20, res: 60, resMax: 120, reload: 2.0,
+    speed: 0, range: 520, pellets: 1, spread: 0, pen: 1, knock: 50, shake: 2.2, kick: 20, sound: 'tesla', color: '#9fd8ff', tesla: 5 },
 };
 export const WEAPON_IDS = Object.keys(WEAPONS);
 export const GRENADE = { dmg: 170, radius: 145, fuse: 1.3, maxThrow: 440, max: 3 };
@@ -32,9 +39,20 @@ export const ZOMBIES = {
   bloater: { id: 'bloater', name: 'Gonflé', hp: 170, speed: 54, dmg: 34, cd: 1, r: 24, score: 300, drop: 0.35, blast: 115 },
   brute: { id: 'brute', name: 'Brute', hp: 680, speed: 70, dmg: 30, cd: 1.3, r: 29, score: 800, drop: 1, charge: 520 },
   screamer: { id: 'screamer', name: 'Hurleuse', hp: 120, speed: 96, dmg: 8, cd: 1, r: 15, score: 400, drop: 0.6 },
+  armored: { id: 'armored', name: 'Blindé', hp: 260, speed: 66, dmg: 18, cd: 1.1, r: 21, score: 450, drop: 0.5 },
+  stalker: { id: 'stalker', name: 'Traqueur', hp: 140, speed: 150, dmg: 10, cd: 0.5, r: 15, score: 500, drop: 0.5, pounce: 640 },
+  larva: { id: 'larva', name: 'Larve', hp: 16, speed: 175, dmg: 4, cd: 0.45, r: 9, score: 25, drop: 0.02 },
+  abomination: { id: 'abomination', name: "L'Abomination", hp: 2600, speed: 84, dmg: 28, cd: 1.2, r: 40, score: 2500, drop: 0 },
+  mother: { id: 'mother', name: 'La Mère des Cracheurs', hp: 1800, speed: 50, dmg: 20, cd: 1.2, r: 36, score: 2500, drop: 0 },
+  colossus: { id: 'colossus', name: 'Le Colosse', hp: 8600, speed: 80, dmg: 40, cd: 1.2, r: 54, score: 6000, drop: 0 },
+  queen: { id: 'queen', name: 'La Reine', hp: 5200, speed: 150, dmg: 24, cd: 0.7, r: 34, score: 6000, drop: 0, pounce: 720 },
   boss: { id: 'boss', name: 'Spécimen Zéro', hp: 7200, speed: 92, dmg: 38, cd: 1.1, r: 50, score: 5000, drop: 0 },
 };
 export const ZOMBIE_IDS = Object.keys(ZOMBIES);
+export const FINAL_BOSSES = ['boss', 'colossus', 'queen'];
+export const MINI_BOSSES = ['abomination', 'mother'];
+const BIG = new Set([...FINAL_BOSSES, ...MINI_BOSSES]);
+export const isBig = (ty) => BIG.has(ty);
 
 // ---------------------------------------------------------------- améliorations (cartes entre les salles)
 // rar : 0 commun, 1 rare, 2 épique · max : niveaux cumulables
@@ -74,6 +92,21 @@ export const ROOM_TYPES = {
   storage: { name: 'Entrepôt', theme: 'storage', reward: 'Munitions et grenades', icon: '📦' },
   core: { name: 'Noyau — Spécimen Zéro', theme: 'core', reward: 'Victoire', icon: '☣️' },
   arena: { name: 'Hangar de quarantaine', theme: 'arena', reward: null },
+  base: { name: 'Fort Delta', theme: 'arena', reward: null },
+  shop: { name: 'Chez Dédé, ferrailleur', theme: 'shop', reward: 'Marchand · pas de combat', icon: '🛒' },
+  vault: { name: 'Coffre-fort', theme: 'vault', reward: 'Trésor piégé', icon: '💰' },
+  dark: { name: 'Salle obscure', theme: 'dark', reward: 'Ferraille ×2', icon: '🌑' },
+  gas: { name: 'Salle contaminée', theme: 'gas', reward: 'Améliorations rares', icon: '☣️' },
+};
+export const SPECIAL_TYPES = ['vault', 'dark', 'gas'];
+// Marchand : prix en ferraille (les consommables renchérissent à chaque achat)
+export const SHOP_ITEMS = {
+  med: { name: 'Trousse de soin', icon: '➕', price: 10 },
+  armor: { name: 'Plaque d\'armure', icon: '🛡️', price: 10 },
+  nade: { name: 'Grenade', icon: '💣', price: 9 },
+  ammo: { name: 'Munitions', icon: '📦', price: 8 },
+  perk: { name: 'Amélioration au choix', icon: '⭐', price: 28 },
+  weapon: { name: 'Arme', icon: '🔫', price: 24 },
 };
 export const BRANCH_TYPES = ['armory', 'medbay', 'lab', 'storage'];
 export const CAMPAIGN_ROOMS = 7; // 6 salles puis le Noyau
@@ -83,6 +116,53 @@ export const DIFFICULTY = {
   normal: { name: 'Normale', zHp: 1, zDmg: 1, budget: 1, drops: 1, bleed: 28, adrenaline: 1 },
   hardcore: { name: 'Cauchemar', zHp: 1.2, zDmg: 1.3, budget: 1.15, drops: 0.75, bleed: 16, adrenaline: 0 },
 };
+
+// ---------------------------------------------------------------- secteurs
+// rooms : noms qui remplacent ceux du labo · zw : bonus de probabilité des zombies · pal : tenues des zombies
+export const SECTORS = {
+  lab: { name: 'Laboratoire Alpha', short: 'Labo', icon: '🧪', desc: 'Le complexe souterrain où tout a commencé.',
+    rooms: {}, zw: {}, pal: null },
+  sewers: { name: 'Égouts de Nice', short: 'Égouts', icon: '🐀', desc: "Canaux qui ralentissent, larves et rampants dans l'eau.",
+    rooms: { start: "Bouche d'égout", core: 'Collecteur principal', arena: 'Grand bassin' }, zw: { crawler: 2, larva: 2.2, spitter: 1.4 },
+    pal: ['#5a5446', '#6b6250', '#4f5a4a', '#5d4f45'] },
+  hospital: { name: 'Hôpital Pasteur', short: 'Hôpital', icon: '🏥', desc: 'Néons qui clignotent, patients enragés, hurleuses.',
+    rooms: { start: 'Hall des urgences', core: 'Bloc opératoire', arena: 'Grand hall' }, zw: { runner: 1.6, screamer: 2.2, stalker: 1.6 },
+    pal: ['#b9d6e8', '#d7e6ef', '#9cc3d8', '#e8eef2', '#7fb0a5'] },
+  metro: { name: 'Tramway souterrain', short: 'Métro', icon: '🚇', desc: 'Les rames passent toujours : ne restez pas sur les voies.',
+    rooms: { start: 'Quai Garibaldi', core: 'Terminus', arena: 'Grande station' }, zw: { walker: 1.3, armored: 1.8, brute: 1.5 },
+    pal: ['#3e4a5c', '#5b6270', '#2f3a48', '#7a6a55'] },
+  nice: { name: 'Rues de Nice', short: 'Nice', icon: '🌴', desc: 'Voitures à alarme, terrasses, palmiers. Ne tirez pas dans les voitures.',
+    rooms: { start: 'Place Masséna', core: 'Promenade des Anglais', arena: 'Cours Saleya' }, zw: { runner: 1.8, walker: 1.2 },
+    pal: ['#ff6f91', '#ffc75f', '#4fc3f7', '#f9f871', '#ff9671', '#00c9a7', '#fff8ea'] },
+};
+export const SECTOR_LIST = Object.keys(SECTORS);
+export const roomName = (type, sector) => (SECTORS[sector] && SECTORS[sector].rooms[type]) || ROOM_TYPES[type].name;
+
+// ---------------------------------------------------------------- mode Défense : pièges à poser
+export const TRAPS = {
+  wire: { name: 'Barbelés', icon: '🕸️', price: 10, desc: 'Ralentit fortement et blesse les zombies qui le traversent' },
+  mine: { name: 'Mines', icon: '💥', price: 8, desc: 'Trois mines qui explosent au passage des zombies' },
+  turret: { name: 'Tourelle', icon: '🔫', price: 26, desc: 'Tourelle automatique pendant trois vagues' },
+  flame: { name: 'Grille brûlante', icon: '🔥', price: 18, desc: 'Enflamme les zombies qui marchent dessus' },
+};
+export const TRAP_IDS = Object.keys(TRAPS);
+export const DEFENSE_WAVES = 15;
+
+// ---------------------------------------------------------------- classes de survivants
+// cd : recharge de la capacité (s) · dur : durée de l'effet
+export const CLASSES = {
+  soldier: { id: 'soldier', name: 'Soldat', icon: '🎖️', color: '#ffc531', cd: 28, dur: 7,
+    passive: '+10 % de dégâts, une grenade de plus', active: 'Barrage', activeDesc: 'Munitions infinies et cadence +50 % pendant 7 s' },
+  medic: { id: 'medic', name: 'Médecin', icon: '⚕️', color: '#2fbf71', cd: 26, dur: 5,
+    passive: 'Relève 2× plus vite, les soins ramassés soignent aussi les alliés proches', active: 'Station de soin', activeDesc: 'Zone qui soigne et relève tout le monde pendant 5 s' },
+  engineer: { id: 'engineer', name: 'Ingénieur', icon: '🔧', color: '#ff8a1f', cd: 30, dur: 22,
+    passive: 'Les caisses donnent plus, munitions +25 %', active: 'Tourelle', activeDesc: 'Pose une tourelle automatique pendant 22 s' },
+  tank: { id: 'tank', name: 'Colosse', icon: '🛡️', color: '#2b8cff', cd: 24, dur: 5,
+    passive: '+50 PV max, +25 armure max, un peu plus lent', active: 'Provocation', activeDesc: 'Attire les zombies proches et réduit les dégâts reçus de 75 % pendant 5 s' },
+  scout: { id: 'scout', name: 'Éclaireur', icon: '🦅', color: '#b45cff', cd: 20, dur: 5,
+    passive: 'Deux roulades, +8 % de vitesse, critiques plus fréquents', active: 'Ombre', activeDesc: 'Les zombies le perdent de vue, +40 % de vitesse et de dégâts pendant 5 s' },
+};
+export const CLASS_IDS = Object.keys(CLASSES);
 
 // Couleurs des équipiers IA
 export const BOT_NAMES = [['Vega', '#ff9f1c'], ['Rook', '#2fbf71'], ['Moss', '#b45cff'], ['Kilo', '#ff5fa2']];

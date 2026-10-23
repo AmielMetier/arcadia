@@ -1,7 +1,78 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.32 — 23 octobre 2026
+- **Tête de Calcul** — The Candidate devient un vrai entretien éliminatoire.
+  - Trois vies par candidat : une erreur ou un silence en coûte une, tomber dans le piège (la réponse « évidente » mais fausse) en coûte deux.
+  - À la fin de chaque tour, le dernier du classement est coupé, tant qu'il reste trois candidats. Entre joueurs, le dernier debout décroche le poste.
+  - Deux jokers par partie, une fois chacun : 50/50 et Appel à un ami (qui a souvent raison… pas toujours).
+  - Une centaine de nouvelles questions d'entretien (marchés, probabilités, brainteasers, estimations), et des réponses à taper : les estimations sont acceptées dans une marge.
+  - Épreuve de code : une ou deux fonctions Python à écrire en 3 minutes, testées en direct sur des tests cachés. Des points pour chaque test réussi, et un bouton pour essayer les exemples avant d'envoyer.
+    - 37 exercices, du plus simple (FizzBuzz, moyenne) au comité final (meilleur trade, crible, mensualité d'un prêt).
+    - Un éditeur en couleurs, avec numéros de ligne et indentation automatique.
+  - Nouvelles questions de dérivés et de taux : couverture à l'échéance (cash ou livraison physique), gamma et thêta, caps et floors, date de constatation d'un taux variable, FRA.
+  - Règles maison dans le salon : nombre de vies (2, 3 ou 5), jokers, épreuve de code et coupe à chaque tour, chacun activable. Le sabotage est coupé par défaut dans ce mode.
+  - Le 50/50 efface les deux réponses en trop, un éliminé tombe de la liste des joueurs, et le piège, la coupe et l'élimination ont leur propre son.
+  - Nouvelle musique pour l'écran des scores : « Closing Bell », en majeur pour le gagnant, plus douce-amère pour les autres.
+- **Tête de Calcul** — Pierre Chartier a enfin un visage : sa photo accompagne ses verdicts, l'accueil et le verdict final.
+- **Tête de Calcul** — Nouvelles questions visuelles : carrés, rectangles et triangles à compter dans une grille, cubes d'une pyramide ou d'un escalier, pavés, cube peint puis découpé, chemins dans une grille, diagonales d'un polygone, segments entre des points.
+- **Tête de Calcul** — Nouvelles suites logiques : cubes, suites croisées, « ×2 + 2 », factorielles, et d'autres. Visuels et suites arrivent aussi dans les thèmes Logique et Mélangé.
+
+## 2.31 — 23 octobre 2026
+- **Outbreak** — Nouveau mode **Défense** : tenez le fort Delta pendant 15 vagues.
+  - Les zombies foncent sur le générateur au centre du fort : s'il tombe, c'est perdu.
+  - Quatre barricades ferment les brèches ; les zombies les défoncent, vous les réparez en maintenant E (l'Ingénieur répare plus vite).
+  - Entre les vagues, 20 secondes de préparation pour poser des pièges avec la ferraille sur les emplacements marqués : barbelés, mines, tourelle, grille brûlante.
+  - Mini-boss aux vagues 5 et 10, boss final à la 15e ; le marchand passe toutes les 3 vagues.
+- **Outbreak** — La radio s'affiche en haut de l'écran pour ne plus cacher l'action.
+
+## 2.30 — 23 octobre 2026
+- **Outbreak** — Une histoire : la souche VIREO s'est échappée du Laboratoire Alpha et l'Escouade Delta doit remonter jusqu'à la source pour que le Dr Lenoir fabrique l'antidote.
+  - Cinématique d'intro : l'hélico arrive sur le secteur, puis chaque joueur est présenté avec son nom et sa classe, avant la mission. Espace ou clic pour passer (quand tout le monde a passé, la partie démarre).
+  - Fin animée : extraction en hélico au lever du soleil si vous gagnez, « fin de transmission » si l'escouade tombe.
+  - Messages radio du Commandant Moreau, du Dr Lenoir, du pilote et de Dédé, différents selon le secteur, la salle, le boss et les évènements.
+  - 20 dossiers à trouver dans les salles de la campagne (4 par secteur) pour comprendre ce qui s'est passé ; le compteur est sur l'écran de briefing.
+
+## 2.29 — 23 octobre 2026
+- **Outbreak** — Cinq secteurs, à choisir au lancement (ou au hasard), chacun avec son décor, ses zombies et son piège :
+  - Labo : le complexe d'origine.
+  - Égouts de Nice : des canaux qui ralentissent, des ponts pour traverser, des larves et des rampants partout.
+  - Hôpital Pasteur : lits, rideaux et néons qui clignotent ; des patients qui courent et des hurleuses.
+  - Tramway souterrain : une rame traverse régulièrement la salle, et tout ce qui est sur les voies (zombies compris) est fauché. L'alarme sonne avant.
+  - Rues de Nice : voitures, palmiers, terrasses et kiosque à socca. Une balle dans une voiture déclenche son alarme… et attire une horde.
+- **Outbreak** — Les salles de départ et du boss prennent un nom propre au secteur (Place Masséna, Bloc opératoire, Terminus…) et les zombies s'habillent selon l'endroit.
+
+## 2.28 — 23 octobre 2026
+- **Outbreak** — Nouveaux boss :
+  - Un mini-boss garde la salle 4 : l'Abomination (charge, onde de choc, lancer de rochers) ou la Mère des Cracheurs (pond des larves, pluie d'acide).
+  - Le boss final change d'une partie à l'autre : Spécimen Zéro, le Colosse (blindé devant, point faible lumineux dans le dos, charges en série) ou la Reine (disparaît, réapparaît avec sa nuée et plaque au sol).
+  - En mode Survie : un mini-boss toutes les 5 vagues, un boss final toutes les 10.
+- **Outbreak** — Salles spéciales à choisir aux portes :
+  - Chez Dédé, le ferrailleur : pas de zombies, on dépense la ferraille ramassée (armes, améliorations, soins, munitions). Proposé avant les salles 3 et 5, et de passage en Survie toutes les 3 vagues.
+  - Coffre-fort : on peut le forcer (maintenir E)… l'alarme attire une horde, mais le trésor vaut le coup.
+  - Salle obscure : les lumières sont coupées et les traqueurs y rôdent ; double ferraille.
+  - Salle contaminée : des nuages toxiques dérivent dans la pièce ; améliorations plus rares à la sortie.
+- **Outbreak** — Événements surprises en pleine salle : coupure de courant, horde en approche, largage de ravitaillement à sécuriser en restant à côté.
+- **Outbreak** — La ferraille (⚙) tombe des zombies et des caisses, et elle est commune à toute l'escouade.
+- **Outbreak** — Plaqué au sol par un traqueur, on peut maintenant se débattre en martelant la roulade.
+
+## 2.27 — 23 octobre 2026
+- **Outbreak** — Cinq classes de survivants, chacune avec sa capacité (touche A, ou Q en QWERTY ; Y à la manette) :
+  - Soldat : Barrage, munitions infinies et cadence +50 % pendant 7 s.
+  - Médecin : Station de soin, une zone qui soigne et relève tout le monde ; il relève aussi 2× plus vite.
+  - Ingénieur : pose une tourelle automatique ; les caisses lui donnent plus.
+  - Colosse : Provocation, il attire les zombies et encaisse 75 % de dégâts en moins ; +50 PV.
+  - Éclaireur : Ombre, les zombies le perdent de vue et il frappe plus fort ; deux roulades.
+  - On choisit sa classe sur l'écran de briefing, et les équipiers IA prennent les classes libres.
+- **Outbreak** — Trois nouvelles armes : le Katana (mêlée, sans munitions), l'Arbalète (carreaux qui transpercent) et le Canon Tesla (un éclair qui saute de zombie en zombie).
+- **Outbreak** — Trois nouveaux zombies : le Blindé (bouclier devant, à prendre de côté ou de dos), le Traqueur (presque invisible, il bondit et plaque un survivant au sol jusqu'à ce que ses alliés le libèrent) et les Larves (en nuée).
+
 ## 2.26 — 23 octobre 2026
-- **Cyber Kart GP** — La musique marche aussi sur iPad, iPhone et Brave : elle démarre au premier toucher ou à la première touche (avant, seuls les bruitages s'entendaient).
+- **DavidSimulator** — Dés plus lisibles : en 3D, les dés se posent de trois quarts pour que la face du dessus (celle qui compte) se lise d'un coup d'œil ; sur le plateau classique, ils se voient de face. Dans les deux cas, une pastille au-dessus de chaque dé rappelle sa valeur, la même que celle affichée en bas.
+- **DavidSimulator** — 2 contre 2 :
+  - On peut construire sur les terrains de son coéquipier quand l'équipe possède la couleur (on paie la maison, le loyer revient au propriétaire). La construction et la vente restent égales sur tout le groupe, chez l'un comme chez l'autre.
+  - Nouvelle règle de faillite : le créancier n'est payé qu'à hauteur de la dette avec l'argent qui reste ; le coéquipier reprend tout le reste (terrains, hypothèques comprises, argent restant, cartes « Sortie de prison »). L'adversaire ne rafle plus tout le patrimoine d'un coup.
+  - Chat privé d'équipe : bouton « 💬 Équipe » (ou touche T), messages rapides, et les messages n'arrivent qu'au coéquipier. Un message reçu s'affiche en bulle à côté de sa carte.
+  - Les deux coéquipiers ont la couleur de leur équipe en deux nuances : bleu foncé et bleu clair pour l'équipe A, rouge foncé et rouge clair pour l'équipe B.
 
 ## 2.25 — 22 octobre 2026
 - **Cyber Kart GP** — Le drift tient enfin la trajectoire, façon Mario Kart.

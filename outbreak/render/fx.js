@@ -2,7 +2,7 @@
 // Tout est cosmétique : les dégâts sont décidés par la simulation de l'hôte.
 import { drawZombie, shade, INK, ell, circ, MUZZLE } from './sprites.js';
 import { segCircle, raycastSolids } from '../engine/geom.js';
-import { WEAPONS, ZOMBIE_IDS } from '../engine/data.js';
+import { WEAPONS, ZOMBIE_IDS, isBig } from '../engine/data.js';
 
 const BLOOD = ['#7a0f12', '#8f1418', '#a3191d', '#6a0c0f'];
 const GOO = ['#5f8f2a', '#78a832', '#9be15d'];
@@ -10,9 +10,9 @@ const GOO = ['#5f8f2a', '#78a832', '#9be15d'];
 export class FX {
   constructor(audio) {
     this.audio = audio;
-    this.parts = []; this.bullets = []; this.beams = []; this.lights = []; this.texts = []; this.rings = [];
+    this.parts = []; this.bullets = []; this.beams = []; this.lights = []; this.texts = []; this.rings = []; this.arcs = []; this.zaps = [];
     this.decal = null; this.dctx = null; this.shake = 0; this.flash = 0; this.hurtFlash = 0;
-    this.recoil = new Map(); this.muzzle = new Map(); this.ventGlow = new Map(); this.zflash = new Map(); this.pflash = new Map();
+    this.recoil = new Map(); this.muzzle = new Map(); this.ventGlow = new Map(); this.zflash = new Map(); this.pflash = new Map(); this.genFlash = 0;
     this.showDamage = true;
   }
 
@@ -20,7 +20,7 @@ export class FX {
     this.lv = lv;
     this.decal = document.createElement('canvas'); this.decal.width = lv.w; this.decal.height = lv.h;
     this.dctx = this.decal.getContext('2d');
-    this.parts = []; this.bullets = []; this.beams = []; this.lights = []; this.texts = []; this.rings = [];
+    this.parts = []; this.bullets = []; this.beams = []; this.lights = []; this.texts = []; this.rings = []; this.arcs = []; this.zaps = [];
   }
 
   // ------------------------------------------------------------------ événements de la simulation
@@ -58,8 +58,8 @@ export class FX {
       case 'respawn': case 'adren': { const p = P(e.p); A.play('revive', p && p.x, p && p.y); if (p) this.ring(p.x, p.y, 80, '#1fc7c1', 0.6); break; }
       case 'pk': {
         A.play(e.k === 'med' ? 'heal' : 'pickup', e.x, e.y, e.p === me ? 1 : 0.5);
-        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE' }[e.k];
-        if (label && e.p === me) this.text(e.x, e.y - 24, label, e.k === 'med' ? '#2fbf71' : e.k === 'armor' ? '#2b8cff' : '#ffc531', 14);
+        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE', scrap: '+' + (e.v || 1) + ' ⚙' }[e.k];
+        if (label && (e.p === me || e.k === 'scrap')) this.text(e.x, e.y - 24, label, e.k === 'med' ? '#2fbf71' : e.k === 'armor' ? '#2b8cff' : '#ffc531', 14);
         for (let i = 0; i < 8; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.5) * 200, life: 0.4, max: 0.4, c: '#fff8ea', r: 2 });
         break;
       }
@@ -87,6 +87,57 @@ export class FX {
       case 'fuse': A.play('fuse', e.x, e.y); break;
       case 'crate': A.play('crate', e.x, e.y); for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, s = 80 + Math.random() * 200; this.parts.push({ k: 'chunk', x: e.x, y: e.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.7, max: 0.7, c: i % 2 ? '#b0793f' : '#7a4f24', r: 4, rot: Math.random() * 6, decal: true }); } break;
       case 'zs': break;
+      case 'slash': {
+        this.arcs.push({ x: e.x, y: e.y, a: e.a, life: 0.18, max: 0.18 });
+        A.play('slash', e.x, e.y, e.p === me ? 1 : 0.5);
+        if (e.h) { A.play('hit', e.x, e.y); if (e.p === me) this.addShake(3); }
+        break;
+      }
+      case 'zap': {
+        this.zaps.push({ pts: e.pts, life: 0.16, max: 0.16, seed: Math.random() * 100 });
+        const last = e.pts[e.pts.length - 1];
+        this.lights.push({ x: last[0], y: last[1], r: 220, a: 0.9, life: 0.12, max: 0.12, c: '#9fd8ff' });
+        for (const q of e.pts.slice(1)) this.sparks(q[0], q[1], Math.random() * 6.28, 5);
+        A.play('tesla', e.pts[0][0], e.pts[0][1], e.p === me ? 1 : 0.6);
+        if (e.p === me) this.addShake(2);
+        break;
+      }
+      case 'clank': this.sparks(e.x, e.y, e.a, 7); A.play('clank', e.x, e.y, 0.8); if (Math.random() < 0.3) this.text(e.x, e.y - 20, 'BLINDÉ', '#8d96a3', 12); break;
+      case 'ab': {
+        const C = { soldier: ['#ffc531', 'BARRAGE !'], medic: ['#2fbf71', 'SOINS !'], engineer: ['#ff8a1f', 'TOURELLE !'], tank: ['#2b8cff', 'PROVOCATION !'], scout: ['#b45cff', 'OMBRE !'] }[e.c] || ['#fff', ''];
+        this.ring(e.x, e.y, e.c === 'tank' ? 430 : 120, C[0], 0.6, 7);
+        this.text(e.x, e.y - 44, C[1], C[0], 18, true);
+        A.play('ability', e.x, e.y, e.p === me ? 1 : 0.6);
+        if (e.c === 'tank') A.play('roar', e.x, e.y, 0.5);
+        break;
+      }
+      case 'pounce': A.play('pounce', e.x, e.y); break;
+      case 'pin': { const p = P(e.p); if (p) { this.text(p.x, p.y - 42, 'PLAQUÉ !', '#ff4b2b', 18, true); this.spray(p.x, p.y, Math.random() * 6.28, BLOOD, 10, 160); } if (e.p === me) { this.hurtFlash = 1; this.addShake(10); } A.play('down', p && p.x, p && p.y); break; }
+      case 'unpin': { const p = P(e.p); if (p) this.ring(p.x, p.y, 60, '#fff8ea', 0.35, 4); break; }
+      case 'buy': A.play('buy', e.x, e.y); this.text(e.x, e.y - 40, 'ACHETÉ !', '#ffc531', 16, true); for (let i = 0; i < 10; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, life: 0.5, max: 0.5, c: '#ffc531', r: 2 }); break;
+      case 'poor': if (e.p === me) A.play('dry'); break;
+      case 'vaultAlarm': A.play('alarm'); A.play('alarm', null, null, 0.8); this.addShake(6); break;
+      case 'blackout': A.play('powerdown'); break;
+      case 'lightsOn': A.play('powerup'); break;
+      case 'horde': A.play('roar'); A.play('scream', null, null, 0.4); this.addShake(4); break;
+      case 'dropIn': A.play('plane'); break;
+      case 'dropLand': A.play('slam', e.x, e.y); this.dust(e.x, e.y, 16); this.addShake(5, e.x, e.y, view); break;
+      case 'dropOk': A.play('clear'); this.ring(e.x, e.y, 140, '#2fbf71', 0.6, 6); break;
+      case 'birth': A.play('splash', e.x, e.y); this.spray(e.x, e.y, Math.random() * 6.28, ['#8fbf4a', '#e8d79c'], 16, 180); break;
+      case 'vanish': A.play('scream', e.x, e.y, 0.6); this.ring(e.x, e.y, 80, '#c77dff', 0.5, 6); this.dust(e.x, e.y, 10); break;
+      case 'screech': A.play('scream', e.x, e.y); this.ring(e.x, e.y, 200, '#c77dff', 0.6, 8); this.addShake(6, e.x, e.y, view); break;
+      case 'throwRock': A.play('roar', e.x, e.y, 0.5); break;
+      case 'struggle': { const p = P(e.p); if (p) this.parts.push({ k: 'smoke', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, life: 0.4, max: 0.4, c: '#a8a296', r: 8 }); if (e.p === me) A.play('dash'); break; }
+      case 'trainWarn': A.play('horn'); break;
+      case 'train': A.play('trainPass'); this.addShake(9); break;
+      case 'carAlarm': A.play('carAlarm', e.x, e.y); this.text(e.x, e.y - 40, 'ALARME !', '#ffc531', 18, true); break;
+      case 'build': A.play('build', e.x, e.y); this.dust(e.x, e.y, 10); this.ring(e.x, e.y, 60, '#ffc531', 0.4, 5); break;
+      case 'repair': A.play('hammer', e.x, e.y, 0.6); for (let i = 0; i < 3; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 160, vy: -Math.random() * 160, life: 0.25, max: 0.25, c: '#ffe27a', r: 2 }); break;
+      case 'barHit': A.play('wood', e.x, e.y, 0.6); for (let i = 0; i < 3; i++) this.parts.push({ k: 'chunk', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.5) * 200, life: 0.4, max: 0.4, c: '#b0793f', r: 3, rot: Math.random() * 6 }); break;
+      case 'barBreak': A.play('crate', e.x, e.y); this.dust(e.x, e.y, 14); this.text(e.x, e.y - 30, 'BRÈCHE !', '#ff4b2b', 18, true); break;
+      case 'genHit': this.genFlash = 0.08; if (Math.random() < 0.3) { A.play('clank', e.x, e.y, 0.6); this.sparks(e.x, e.y, Math.random() * 6.28, 5); } break;
+      case 'genDown': this.explosion(e.x || 0, e.y || 0, 200, 'barrel'); break;
+      case 'tEnd': this.dust(e.x, e.y, 8); A.play('switch', e.x, e.y); break;
       case 'dash': { const p = P(e.p); if (p) { this.dust(p.x, p.y, 6); if (e.p === me) A.play('dash'); } break; }
       case 'throw': A.play('throw', null, null, e.p === me ? 1 : 0.4); break;
       case 'rl': if (e.p === me) A.play('reload'); break;
@@ -99,6 +150,7 @@ export class FX {
       case 'room': A.play('alarm'); break;
       case 'door': A.play('door'); break;
       case 'boss': A.play('boss'); this.addShake(8); break;
+      case 'pk2': break;
       case 'phase': A.play('roar'); this.addShake(10); break;
       case 'won': A.play('won'); break;
       case 'over': A.play('over'); break;
@@ -183,7 +235,7 @@ export class FX {
     // flaque + cadavre peints sur le sol
     const c = this.dctx;
     if (c) {
-      this.stain(e.x + Math.cos(e.a) * 14, e.y + Math.sin(e.a) * 14, pal, ty === 'boss' ? 70 : ty === 'brute' ? 34 : 20, 0.8);
+      this.stain(e.x + Math.cos(e.a) * 14, e.y + Math.sin(e.a) * 14, pal, isBig(ty) ? 70 : ty === 'brute' ? 34 : 20, 0.8);
       if (ty !== 'bloater') {
         c.save(); c.translate(e.x + Math.cos(e.a) * 8, e.y + Math.sin(e.a) * 8); c.rotate(e.a + Math.PI + (Math.random() - 0.5) * 0.8);
         c.globalAlpha = 0.85;
@@ -194,13 +246,13 @@ export class FX {
       }
     }
     // gerbe de sang et morceaux
-    const n = ty === 'boss' ? 60 : ty === 'brute' ? 26 : ty === 'bloater' ? 30 : 14;
+    const n = isBig(ty) ? 60 : ty === 'brute' ? 26 : ty === 'bloater' ? 30 : 14;
     this.spray(e.x, e.y, e.a, pal, n, ty === 'bloater' ? 320 : 230);
-    for (let i = 0; i < (ty === 'boss' ? 16 : 4); i++) {
+    for (let i = 0; i < (isBig(ty) ? 16 : 4); i++) {
       const a = e.a + (Math.random() - 0.5) * 2, s = 120 + Math.random() * 220;
       this.parts.push({ k: 'chunk', x: e.x, y: e.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, max: 0.6, c: goo ? '#6f8f3a' : '#7a2a2a', r: 3 + Math.random() * 3, rot: Math.random() * 6, decal: true });
     }
-    if (ty === 'boss') { this.explosion(e.x, e.y, 200, 'toxic'); this.addShake(20); }
+    if (isBig(ty)) { this.explosion(e.x, e.y, 200, 'toxic'); this.addShake(20); }
   }
 
   explosion(x, y, r, kind) {
@@ -223,6 +275,7 @@ export class FX {
   update(dt, view) {
     this.shake *= Math.pow(0.0015, dt); if (this.shake < 0.05) this.shake = 0;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.6);
+    this.genFlash = Math.max(0, this.genFlash - dt);
     for (const [k, v] of this.recoil) { const n = v - dt * 9; if (n <= 0) this.recoil.delete(k); else this.recoil.set(k, n); }
     for (const [k, v] of this.muzzle) { const n = v - dt; if (n <= 0) this.muzzle.delete(k); else this.muzzle.set(k, n); }
     for (const M of [this.zflash, this.pflash]) for (const [k, v] of M) { const n = v - dt; if (n <= 0) M.delete(k); else M.set(k, n); }
@@ -247,6 +300,10 @@ export class FX {
       b.x += dx; b.y += dy; keep.push(b);
     }
     this.bullets = keep;
+    for (const b of this.arcs) b.life -= dt;
+    this.arcs = this.arcs.filter((b) => b.life > 0);
+    for (const b of this.zaps) b.life -= dt;
+    this.zaps = this.zaps.filter((b) => b.life > 0);
     for (const b of this.beams) b.life -= dt;
     this.beams = this.beams.filter((b) => b.life > 0);
     for (const l of this.lights) l.life -= dt;
@@ -295,6 +352,13 @@ export class FX {
     c.lineCap = 'round';
     for (const b of this.bullets) {
       const sp = Math.hypot(b.vx, b.vy), ux = b.vx / sp, uy = b.vy / sp;
+      if (b.w === 'crossbow') {
+        c.save(); c.translate(b.x, b.y); c.rotate(Math.atan2(b.vy, b.vx));
+        c.fillStyle = INK; c.fillRect(-26, -2.2, 26, 4.4); c.fillStyle = '#d9c39a'; c.fillRect(-25, -1.2, 24, 2.4);
+        c.fillStyle = '#e3262f'; c.beginPath(); c.moveTo(-26, 0); c.lineTo(-32, -5); c.lineTo(-22, 0); c.lineTo(-32, 5); c.fill();
+        c.fillStyle = '#c9ced6'; c.beginPath(); c.moveTo(0, -3); c.lineTo(7, 0); c.lineTo(0, 3); c.fill();
+        c.restore(); continue;
+      }
       if (b.shell) { c.fillStyle = '#3d4a2a'; c.beginPath(); c.arc(b.x, b.y, 5, 0, Math.PI * 2); c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke(); continue; }
       const L = b.dead ? 6 : b.len;
       c.strokeStyle = 'rgba(255,240,180,.35)'; c.lineWidth = 5; c.beginPath(); c.moveTo(b.x - ux * L, b.y - uy * L); c.lineTo(b.x, b.y); c.stroke();
@@ -313,6 +377,31 @@ export class FX {
         else { g.addColorStop(0, `rgba(255,240,180,${f})`); g.addColorStop(0.4, `rgba(255,140,40,${f * 0.8})`); g.addColorStop(1, 'rgba(200,40,10,0)'); }
         c.fillStyle = g; c.fillRect(p.x - r, p.y - r, r * 2, r * 2);
       } else if (p.k === 'spark') { c.fillStyle = `rgba(255,230,140,${f})`; c.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    }
+    // coups de katana : arc lumineux
+    for (const b of this.arcs) {
+      const f = b.life / b.max;
+      c.strokeStyle = `rgba(232,244,255,${f})`; c.lineWidth = 10 * f + 2; c.lineCap = 'round';
+      c.beginPath(); c.arc(b.x, b.y, 70, b.a - 1.1 + (1 - f) * 0.6, b.a + 1.1 - (1 - f) * 0.2); c.stroke();
+      c.strokeStyle = `rgba(160,220,255,${f * 0.4})`; c.lineWidth = 22 * f; c.stroke();
+    }
+    // éclairs Tesla : lignes brisées
+    for (const z of this.zaps) {
+      const f = z.life / z.max;
+      for (const [col, w] of [[`rgba(120,200,255,${f * 0.4})`, 9], [`rgba(235,250,255,${f})`, 2.5]]) {
+        c.strokeStyle = col; c.lineWidth = w; c.lineJoin = 'round'; c.beginPath();
+        for (let i = 0; i < z.pts.length - 1; i++) {
+          const [x0, y0] = z.pts[i], [x1, y1] = z.pts[i + 1];
+          if (i === 0) c.moveTo(x0, y0);
+          const n = 6;
+          for (let k = 1; k <= n; k++) {
+            const tt = k / n, jit = k === n ? 0 : (Math.sin(z.seed + i * 7 + k * 3 + (1 - f) * 40) * 14);
+            const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny) || 1;
+            c.lineTo(x0 + (x1 - x0) * tt + (nx / nl) * jit, y0 + (y1 - y0) * tt + (ny / nl) * jit);
+          }
+        }
+        c.stroke();
+      }
     }
     for (const b of this.beams) {
       const f = b.life / b.max;

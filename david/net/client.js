@@ -1,5 +1,5 @@
 // Invité de DavidSimulator : envoie ses intentions à l'hôte et affiche l'état reçu.
-export function startClient({ bridge, me, onState, onSetup, onError, onEmote = () => {} }) {
+export function startClient({ bridge, me, onState, onSetup, onError, onEmote = () => {}, onChat = () => {} }) {
   let state = null;
   bridge.on('msg', (from, m) => {
     if (from !== bridge.info.hostId || !m || typeof m !== 'object') return;
@@ -9,6 +9,7 @@ export function startClient({ bridge, me, onState, onSetup, onError, onEmote = (
     } else if (m.t === 'setup' && m.s && !state) onSetup(m.s);
     else if (m.t === 'err') onError(m.msg);
     else if (m.t === 'emo') onEmote(m.from, m.id);
+    else if (m.t === 'tchat' && typeof m.text === 'string') onChat(m);
   });
   // nouvel hôte (migration) : on lui redemande l'état complet
   let hostSeen = bridge.info.hostId;
@@ -18,6 +19,7 @@ export function startClient({ bridge, me, onState, onSetup, onError, onEmote = (
   return {
     act(a) { bridge.send('host', { t: 'act', a }); },
     emote(id) { bridge.send('host', { t: 'emote', id }); },
+    chat(text) { bridge.send('host', { t: 'tchat', text }); },
     pick(token) { bridge.send('host', { t: 'pick', token }); },
     team(t) { bridge.send('host', { t: 'team', team: t }); },
     start() {},
