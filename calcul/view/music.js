@@ -317,6 +317,8 @@ export const wallStreetMusic = {
     if (m === 'intro') { bellAt(ctx.currentTime + 0.05); riser(ctx.currentTime + 0.4, 3); }
     if (m === 'final' && prev !== 'final') braam(ctx.currentTime + 0.02, BASS[0]);
   },
+  // la musique se fait discrète pendant que Pierre Chartier parle, puis revient
+  duck(ms) { if (!playing || !ctx) return; setMaster(0.12, 0.3); setTimeout(() => { if (playing) setMaster(0.6, 0.8); }, ms); },
   // un « braam » de cinéma, pour l'annonce d'un nouveau tour
   sting() { if (playing && ctx) braam(ctx.currentTime + 0.02, BASS[0]); },
   // 0 : tout le temps devant soi → 1 : dernières secondes

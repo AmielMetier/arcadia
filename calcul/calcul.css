@@ -774,7 +774,8 @@ button.cchoice.gone{display:none}
 .trapline{margin:6px 0 0;font-size:13px;color:#ff9a7a}
 @media (max-width:700px){ .tipfig{float:none;width:100%;margin:6px 0} }
 
-/* ------------------------------------------------------------------ The Candidate : scène d'ouverture (9,5 s) */
+/* ------------------------------------------------------------------ The Candidate : scène d'ouverture (12 s) */
+/* 0 s ascenseur · 2,6 s portes · 3,3 s Pierre en grand, sa voix (4,7 s) · 8,6 s candidats et règles · 9 s compte à rebours */
 .opening{position:fixed;inset:0;z-index:62;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2232,#07090d 70%);overflow:hidden;color:#f5f8fc}
 .opening > *{grid-area:1/1}
 .op-lift{position:relative;width:min(360px,80vw);height:min(460px,70vh);border:4px solid #3a4766;border-radius:10px;background:#d9c27a;overflow:hidden;animation:op-out .5s 3.2s ease-in forwards}
@@ -788,13 +789,18 @@ button.cchoice.gone{display:none}
 @keyframes op-l{to{transform:translateX(-100%)}}
 @keyframes op-r{to{transform:translateX(100%)}}
 @keyframes op-out{to{opacity:0;transform:scale(1.3)}}
-.op-pierre{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:min(640px,calc(100vw - 32px));text-align:center;opacity:0;animation:cu-show 3s 3.4s both}
+.op-pierre{display:flex;flex-direction:column;align-items:center;gap:18px;max-width:min(680px,calc(100vw - 32px));text-align:center;opacity:0;animation:op-pierre 5.3s 3.3s both}
+@keyframes op-pierre{0%{opacity:0;transform:scale(.8)}8%,92%{opacity:1;transform:none}100%{opacity:0;transform:scale(1.04)}}
+/* la photo en grand pendant qu'il parle, avec un halo qui bat au rythme de la voix */
+.pc-face.huge{width:min(240px,46vw);height:min(240px,46vw);font-size:40px;border-width:5px}
+.pc-face.speaking{animation:pc-speak .9s ease-in-out infinite}
+@keyframes pc-speak{0%,100%{box-shadow:3px 3px 0 #000,0 0 22px rgba(229,169,60,.35)}50%{box-shadow:3px 3px 0 #000,0 0 46px rgba(229,169,60,.85);transform:scale(1.02)}}
 .op-say{margin:0;font:italic 600 clamp(17px,2.4vw,24px)/1.4 'Chakra Petch',sans-serif}
-.op-cands{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 32px));text-align:center;opacity:0;animation:op-cands 3.1s 6.4s both}
+.op-cands{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 32px));text-align:center;opacity:0;animation:op-cands 3.4s 8.6s both}
 @keyframes op-cands{0%{opacity:0;transform:translateY(20px)}15%,100%{opacity:1;transform:none}}
 .op-cands small{font:700 14px 'Chakra Petch',sans-serif;color:var(--gold2);letter-spacing:2px;text-transform:uppercase}
 .op-list{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
-.op-list .cu-p{animation:pop .4s calc(6.6s + var(--k) * 120ms) cubic-bezier(.2,1.5,.4,1) both}
+.op-list .cu-p{animation:pop .4s calc(8.8s + var(--k) * 120ms) cubic-bezier(.2,1.5,.4,1) both}
 .op-rules{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 .op-rules span{padding:6px 12px;border-radius:18px;background:#151b27;border:1px solid var(--edge);font:700 13px 'Chakra Petch',sans-serif}
 .op-rules s{text-decoration:none;opacity:.3}
@@ -874,3 +880,12 @@ button.cchoice.gone{display:none}
 /* face-à-face */
 .cu-vs{font-size:34px;align-self:center}
 .duelb{background:var(--down)!important;color:#fff!important}
+
+/* ------------------------------------------------------------------ écran des scores en deux colonnes */
+.card.over.two{width:min(1200px,100%)}
+.over-cols{display:block}
+.card.over.two .over-cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start}
+.over-side .recap{margin-top:0;max-height:min(68vh,720px);overflow:auto}
+.over-side .recap summary{position:sticky;top:-10px;z-index:1;padding:6px 0;background:inherit}
+.card.over.two .stats{font-size:13px}
+@media (max-width:900px){ .card.over.two .over-cols{display:block} .over-side .recap{max-height:none;margin-top:16px} }

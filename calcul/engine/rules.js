@@ -14,7 +14,7 @@ export const MODES = {
 };
 export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
-export const INTRO_CH_MS = 9500; // The Candidate : la scène d'ouverture (ascenseur, accueil de Pierre Chartier)
+export const INTRO_CH_MS = 12000; // The Candidate : la scène d'ouverture (ascenseur, accueil de Pierre Chartier avec sa voix enregistrée)
 export const DUEL_SHOW_MS = 9200; // annonce du face-à-face final (même mise en scène qu'un changement de tour)
 export const DUEL_MAX = 5; // questions de mort subite au plus, puis le score départage
 export const REVEAL_MS = 5200;

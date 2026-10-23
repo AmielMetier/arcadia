@@ -40,8 +40,8 @@ t('les questions sont reproductibles et justes', () => {
     const q = makeQuestion(seed, i, cat, diff);
     assert.deepEqual(q, makeQuestion(seed, i, cat, diff));
     if (q.kind === 'code') {
-      if (q.lang === 'sql') assert.ok(q.input === 'code' && !q.fn && q.starter && q.tests.length === 3 && q.examples.length === 1 && q.time === 180, q.text);
-      else assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 180, q.text);
+      if (q.lang === 'sql') assert.ok(q.input === 'code' && !q.fn && q.starter && q.tests.length === 3 && q.examples.length === 1 && q.time === 120, q.text);
+      else assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 120, q.text);
       assert.ok(!check(q, '').ok && check(q, 'def f(): pass').pending);
       continue;
     }

@@ -2,7 +2,7 @@
 
 ## 2.36 — 23 octobre 2026
 - **Tête de Calcul** — The Candidate passe en grand format.
-  - Une scène d'ouverture : l'ascenseur monte au 40e, les portes s'ouvrent, et Pierre Chartier accueille chaque joueur par son nom.
+  - Une scène d'ouverture : l'ascenseur monte au 40e, les portes s'ouvrent, et Pierre Chartier accueille chaque joueur par son nom, avec sa vraie voix et sa photo en grand.
   - Pierre réagit pendant les questions : une phrase pour lancer la question, une relance quand on tarde, un mot quand un adversaire a déjà répondu.
   - Le décor change à chaque tour : open space, salle de marché, puis salle du conseil.
   - Le verdict est mis en scène : classement dévoilé de la dernière à la première place, « Le poste est pour… », puis la lettre d'offre.
@@ -10,8 +10,9 @@
 - **Tête de Calcul** — Nouvelles questions dans The Candidate.
   - Lecture de graphiques : courbe des taux, profil de gain d'une option, cours d'une action, carnet d'ordres, chiffre d'affaires.
   - « Que va afficher ce programme ? » : lire un petit code Python et deviner ce qu'il affiche.
-  - L'épreuve de code peut aussi être une requête SQL à écrire sur une vraie base, ou un bug à corriger.
+  - L'épreuve de code peut aussi être une requête SQL à écrire sur une vraie base, ou un bug à corriger. Elle dure maintenant 2 minutes.
   - Après chaque réponse, un mini-schéma accompagne l'explication quand il aide (profil d'option, courbe des taux, cloche, frise d'un taux variable…), et le piège est nommé.
+- **Tête de Calcul** — L'écran des scores passe en deux colonnes : les scores d'un côté, tes erreurs à revoir de l'autre.
 - **Tête de Calcul** — Le poste à pourvoir se choisit dans le salon : généraliste, trading, M&A, quant ou risques. Les questions suivent le métier.
 - **Tête de Calcul** — Face-à-face final : les deux meilleurs encore en lice s'affrontent en mort subite. La première bonne réponse gagne, la première erreur perd.
 - **Tête de Calcul** — Pièges plus fins : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte pas de vie.

@@ -86,7 +86,7 @@ const D = (diff) => Math.max(0, DIFFS.indexOf(diff)); // 0, 1, 2
 const between = (r, a, b) => a + r.int(b - a + 1);
 const pick = (r, list) => list[r.int(list.length)];
 const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
-const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22], visuel: [28, 24, 22], code: [180, 180, 180] };
+const TIME = { base: [15, 12, 10], astuce: [20, 18, 15], theorie: [20, 18, 15], fraction: [22, 18, 15], suite: [22, 20, 16], estim: [22, 20, 16], compte: [60, 50, 45], vf: [9, 8, 7], compare: [10, 9, 8], equation: [20, 18, 16], geo: [22, 20, 18], devinette: [30, 26, 22], visuel: [28, 24, 22], code: [120, 120, 120] };
 
 /* ------------------------------------------------------------ les 4 opérations */
 function base(r, d) {
@@ -834,6 +834,7 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
 // L'épreuve de code : écrire une fonction Python, corriger un bug, ou écrire une requête SQL (plus souvent hors quant)
 const SQL_P = { gen: 0.3, trading: 0.35, ma: 0.4, risk: 0.4, quant: 0.2 };
+export const CODE_TIME = 120; // deux minutes pour l'épreuve de code
 function code(r, d, i = 0, len = 10, module = 'gen') {
   const tier = chartierTier(d, i, len), roll = r.next();
   const lvl = (l) => l.filter((q) => q.level === tier);
@@ -844,7 +845,7 @@ function code(r, d, i = 0, len = 10, module = 'gen') {
     kind: 'code', input: 'code', text: q.title, sub: `${sql ? 'SQL' : q.bug ? 'Corrige le bug' : 'Code'} · ${TIER_LABEL[tier]}`, eq: false,
     prompt: q.prompt, starter: q.starter, fn: q.fn || null, tests: q.tests, examples: q.tests.slice(0, sql ? 1 : 2), codeId: q.id,
     lang: q.lang || 'python', ordered: q.ordered !== false, bug: !!q.bug,
-    time: 180, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: sql ? 'SQL' : 'Code',
+    time: CODE_TIME, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: sql ? 'SQL' : 'Code',
   };
 }
 
