@@ -775,7 +775,7 @@ button.cchoice.gone{display:none}
 @media (max-width:700px){ .tipfig{float:none;width:100%;margin:6px 0} }
 
 /* ------------------------------------------------------------------ The Candidate : scène d'ouverture (12 s) */
-/* 0 s ascenseur · 2,6 s portes · 3,3 s Pierre en grand, sa voix (4,7 s) · 8,6 s candidats et règles · 9 s compte à rebours */
+/* 0 s ascenseur · 2,6 s portes · 3,3 s Pierre en grand, sa voix (4,4 s) · 8,6 s candidats et règles · 9 s compte à rebours */
 .opening{position:fixed;inset:0;z-index:62;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2232,#07090d 70%);overflow:hidden;color:#f5f8fc}
 .opening > *{grid-area:1/1}
 .op-lift{position:relative;width:min(360px,80vw);height:min(460px,70vh);border:4px solid #3a4766;border-radius:10px;background:#d9c27a;overflow:hidden;animation:op-out .5s 3.2s ease-in forwards}
