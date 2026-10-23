@@ -4,6 +4,7 @@ import { CATS, TIER_LABEL, fmt } from '../engine/questions.js';
 import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer, JOKERS, LIVES } from '../engine/rules.js';
 import { buildProgram } from '../engine/code-data.js';
 import { runPython, preloadPython } from './py.js';
+import { highlightPy } from './pyhl.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { figureSvg } from './figure.js';
 import { sfx } from './sfx.js';
@@ -28,9 +29,10 @@ const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['moyen', 'moyens']
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
 const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir', trap: '🪤 Piège', cut: '✂️ Coupé' };
-const hearts = (n) => `${'♥'.repeat(Math.max(0, n))}<s>${'♥'.repeat(Math.max(0, LIVES - n))}</s>`;
+const hearts = (n, max = LIVES) => `${'♥'.repeat(Math.max(0, n))}<s>${'♥'.repeat(Math.max(0, max - n))}</s>`;
 // valeurs des tests (JSON) écrites comme en Python
-const pyRepr = (v) => (v === true ? 'True' : v === false ? 'False' : v == null ? 'None' : Array.isArray(v) ? `[${v.map(pyRepr).join(', ')}]` : typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : String(v));
+const pyRepr = (v) => (v === true ? 'True' : v === false ? 'False' : v == null ? 'None' : Array.isArray(v) ? `[${v.map(pyRepr).join(', ')}]` : typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  : typeof v === 'object' ? `{${Object.entries(v).map(([k, x]) => `${pyRepr(k)}: ${pyRepr(x)}`).join(', ')}}` : String(v));
 const motion = () => !prefersReducedMotion();
 
 // Les verdicts de Pierre Chartier, selon la réponse et la vitesse
@@ -242,6 +244,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       c.style.setProperty('--pc', p.color); c.style.order = k;
       c.classList.toggle('me', p.id === me.id);
       c.classList.toggle('lead', k === 0 && p.score > 0 && !p.out);
+      // éliminé à l'instant : la carte vacille et tombe avant de passer en gris
+      if (p.out && !c.classList.contains('out') && motion()) { c.classList.remove('falling'); void c.offsetWidth; c.classList.add('falling'); }
       c.classList.toggle('out', !!p.out);
       c.querySelector('.rank').textContent = k === 0 && p.score > 0 ? '👑' : k + 1;
       c.querySelector('.nm').textContent = p.name + (p.bot ? ' 🤖' : '') + (p.id === me.id ? ' (toi)' : '');
@@ -251,7 +255,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       else if (S.phase === 'question') st = a ? (a.locked ? '<em class="locked">🔒 bloqué</em>' : a.grading ? '<em class="done">⚙️ code en test…</em>' : '<em class="done">✔ a répondu</em>') : '<em class="think">réfléchit…</em>';
       else if (S.phase === 'reveal' && S.last) { const r = S.last.results.find((x) => x.id === p.id); st = r ? (r.ok ? '<em class="good">juste</em>' : r.raw != null ? '<em class="bad">raté</em>' : '<em class="think">pas de réponse</em>') : ''; }
       if (p.streak >= 2 && S.phase !== 'over' && !p.out) st += `<em class="flame">🔥 ${p.streak}</em>`;
-      if (S.cfg.lives && !p.out) st = `<em class="lives" title="${p.lives} vie${p.lives > 1 ? 's' : ''}">${hearts(p.lives)}</em>` + st;
+      if (S.cfg.lives && !p.out) st = `<em class="lives" title="${p.lives} vie${p.lives > 1 ? 's' : ''}">${hearts(p.lives, S.cfg.lives)}</em>` + st;
       const curses = S.phase === 'question' ? (S.active && S.active[p.id]) || [] : (S.curses && S.curses[p.id]) || [];
       if (curses.length) st += `<em class="curse" title="Saboté">${curses.map((c) => POWERS[c.power].icon).join('')}</em>`;
       if (S.cfg.sabotage && p.powers && p.powers.length && p.id !== me.id) st += `<em class="pw" title="Pouvoirs en réserve">${p.powers.map((pw) => POWERS[pw].icon).join('')}</em>`;
@@ -323,10 +327,11 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
            ${c.finale ? '<div class="rule" style="--k:3"><i>×2</i><b>Finale</b><small>quitte ou double</small></div>' : ''}
          </div>
          <ul class="howto">
-           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${c.len >= 8 ? ', et une <b>épreuve de code Python</b> de 3 minutes' : ''}.</li>
-           <li><b>${hearts(LIVES)}</b> trois vies : une erreur ou un silence en coûte une, <b>le piège en coûte deux</b> 🪤.</li>
-           <li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu'il reste trois candidats).</li>
-           <li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>
+           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${c.code && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code Python</b>' : 'une <b>épreuve de code Python</b>'} de 3 minutes` : ''}.</li>
+           <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une, <b>le piège en coûte deux</b> 🪤.</li>
+           ${c.cut ? '<li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu\'il reste trois candidats).</li>' : ''}
+           ${c.jokers ? '<li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>' : ''}
+           ${c.sabotage ? '<li>Sabotage activé : trois bonnes réponses d\'affilée donnent un pouvoir à lancer sur un adversaire.</li>' : ''}
            <li>Le dernier debout décroche le poste ; sinon, le meilleur score.</li>
          </ul>`
       : `<p class="mdesc">${esc(MODES[c.mode].desc)}</p>
@@ -380,7 +385,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (q.input === 'code') {
       const code = draft.idx === S.idx && draft.code ? draft.code : q.starter || '';
       return `<div class="code-zone">
-          <textarea id="code" class="code-ed" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Ton code Python">${esc(code)}</textarea>
+          <div class="code-wrap"><pre class="code-gut" id="cgut" aria-hidden="true"></pre><div class="code-box">
+            <pre class="code-hl" aria-hidden="true"><code id="chl"></code></pre>
+            <textarea id="code" class="code-ed" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Ton code Python">${esc(code)}</textarea>
+          </div></div>
           <div class="code-bar"><button type="button" class="btn ghost" id="ctest">▶ Tester les exemples</button><small>Tab : indenter · Ctrl+Entrée : envoyer</small><button type="button" class="btn yellow" id="csend">Envoyer mon code</button></div>
           <pre class="code-out" id="cout" hidden></pre>
         </div>`;
@@ -415,7 +423,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
          <span class="pts">${q.pts * 100} pts</span>
          ${q.final ? '<span class="final">Quitte ou double</span>' : ''}
          <span class="live"><i></i>EN DIRECT</span>
-         ${S.cfg.lives && meP() && !meP().out ? `<span class="mylives" title="Tes vies">${hearts(meP().lives)}</span>` : ''}
+         ${S.cfg.lives && meP() && !meP().out ? `<span class="mylives" title="Tes vies">${hearts(meP().lives, S.cfg.lives)}</span>` : ''}
          <span class="qnum">${q.n} / ${S.cfg.len}</span>`
       : `<span class="cat"><i>${cat.icon}</i>${esc(cat.label)}</span>
          <span class="pts">${q.pts * 100} pts</span>
@@ -478,12 +486,18 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       const has = p.jokers.includes(k);
       return `<button type="button" class="joker${has ? '' : ' used'}" data-jok="${k}" ${has && usable ? '' : 'disabled'} title="${esc(j.desc || j.label)}">${j.icon} ${esc(j.label)}</button>`;
     }).join('') + (jokInfo && jokInfo.kind === 'friend' && S.q.choices ? `<span class="friendsays">📞 Ton ami : « Je dirais <b>${LETTERS[jokInfo.suggest]}</b>, ${esc(S.q.choices[jokInfo.suggest])}… je crois. »</span>` : '');
-    for (const b of box.querySelectorAll('[data-jok]')) b.onclick = () => { b.disabled = true; joker(b.dataset.jok); sfx.play('pop'); };
+    for (const b of box.querySelectorAll('[data-jok]')) b.onclick = () => { b.disabled = true; joker(b.dataset.jok); };
   }
   function applyJoker(m) {
     if (!S || S.phase !== 'question' || m.idx !== S.idx) return;
     jokInfo = m;
-    if (m.kind === 'half') for (const k of m.removed) { const b = root.querySelector(`[data-c="${k}"]`); if (b) { b.disabled = true; b.classList.add('gone'); } }
+    // 50/50 : les deux réponses retirées s'effacent, les deux restantes se rapprochent
+    if (m.kind === 'half') for (const k of m.removed) {
+      const b = root.querySelector(`[data-c="${k}"]`); if (!b) continue;
+      b.disabled = true; b.classList.add('going');
+      setTimeout(() => { b.classList.add('gone'); requestAnimationFrame(fit); }, motion() ? 380 : 0);
+    }
+    sfx.play(m.kind === 'half' ? 'snip' : 'ring');
     renderJokers();
   }
 
@@ -492,15 +506,25 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const ed = $('#code'), out = $('#cout');
     if (!ed) return;
     setTimeout(() => { try { ed.focus({ preventScroll: true }); ed.setSelectionRange(ed.value.length, ed.value.length); } catch (e) {} }, 60);
-    ed.addEventListener('input', () => { draft = { idx: S.idx, code: ed.value }; });
+    // couleurs et numéros de ligne : une couche dessinée sous la zone de saisie (transparente), qui suit le défilement
+    const hl = $('#chl'), gut = $('#cgut');
+    const paint = () => {
+      hl.innerHTML = highlightPy(ed.value) + '\n';
+      gut.textContent = Array.from({ length: ed.value.split('\n').length }, (_, k) => k + 1).join('\n');
+      draft = { idx: S.idx, code: ed.value };
+    };
+    const follow = () => { hl.parentNode.scrollTop = ed.scrollTop; hl.parentNode.scrollLeft = ed.scrollLeft; gut.scrollTop = ed.scrollTop; };
+    paint();
+    ed.addEventListener('input', () => { paint(); follow(); });
+    ed.addEventListener('scroll', follow);
     ed.addEventListener('keydown', (e) => {
       // Tab indente (4 espaces), Entrée garde l'indentation, Ctrl/Cmd+Entrée envoie
-      if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); ed.setRangeText('    ', ed.selectionStart, ed.selectionEnd, 'end'); draft = { idx: S.idx, code: ed.value }; }
+      if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); ed.setRangeText('    ', ed.selectionStart, ed.selectionEnd, 'end'); paint(); }
       else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
       else if (e.key === 'Enter') {
         const line = ed.value.slice(0, ed.selectionStart).split('\n').pop();
         const ind = (line.match(/^\s*/) || [''])[0] + (/:\s*$/.test(line) ? '    ' : '');
-        if (ind) { e.preventDefault(); ed.setRangeText('\n' + ind, ed.selectionStart, ed.selectionEnd, 'end'); draft = { idx: S.idx, code: ed.value }; }
+        if (ind) { e.preventDefault(); ed.setRangeText('\n' + ind, ed.selectionStart, ed.selectionEnd, 'end'); paint(); follow(); }
       }
     });
     const show = (html, cls = '') => { out.hidden = false; out.className = 'code-out ' + cls; out.innerHTML = html; requestAnimationFrame(fit); };
@@ -613,7 +637,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const res = L.results.filter((r) => !r.out).sort((a, b) => b.pts - a.pts || (a.at ?? 1e9) - (b.at ?? 1e9));
     const elim = (L.eliminated || []).map((e) => `<div class="elim"><b>${esc(name(e.id))}</b> ${e.why === 'palier' ? `est coupé : dernier à la fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())}` : 'n\'a plus de vies'} ${e.why === 'palier' ? '✂️' : '🚪'}</div>`).join('')
       + (L.tierEnd && !(L.eliminated || []).some((e) => e.why === 'palier') && !L.endEarly && L.idx + 1 < S.cfg.len ? `<div class="elim soft">Fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())} : tout le monde passe</div>` : '');
-    const answerHtml = L.input === 'code' ? `<div class="code-ref"><small>Une solution</small><pre>${esc(L.show)}</pre></div>`
+    const answerHtml = L.input === 'code' ? `<div class="code-ref"><small>Une solution</small><pre>${highlightPy(L.show)}</pre></div>`
       : ch && L.input === 'choice' ? candGrid(L) : `<div class="bigans">${qText(L.show)}</div>`;
     const fast = L.results.find((r) => r.tags.includes('eclair') || (S.cfg.mode === 'eclair' && r.pts > 0));
     const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : q.input === 'choice' ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
@@ -644,8 +668,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         ${S.cfg.sabotage && S.idx + 1 < S.cfg.len ? '<p class="sabhint">⚔️ C\'est le moment de saboter !</p>' : ''}
         <div class="nextbar"><i id="nbar"></i></div>
       </div>`;
+    const gone = L.eliminated || [];
+    if (gone.length) setTimeout(() => sfx.play(gone.some((e) => e.id === me.id) ? 'elim' : gone.some((e) => e.why === 'palier') ? 'cut' : 'elim'), 900);
     if (mine && !mine.out) {
-      sfx.play(mine.ok ? (mine.tags.includes('serie') ? 'streak' : 'ok') : mine.raw != null ? 'ko' : 'lock');
+      sfx.play(mine.ok ? (mine.tags.includes('serie') ? 'streak' : 'ok') : mine.tags.includes('trap') ? 'trap' : mine.raw != null ? 'ko' : 'lock');
       if (mine.ok) setTimeout(() => burst($('#verdict')), 250); else if (mine.raw != null) setTimeout(shake, 200);
       if (mine.power) setTimeout(() => sfx.play('streak'), 700);
     }
@@ -670,7 +696,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <ol>${miss.map(({ h, r }) => {
         const c = CATS[h.cat];
         return `<li style="--cc:${c.color}">${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}<div class="rq"><span class="cat sm"><i>${c.icon}</i>${esc(h.isChartier ? h.rubric || c.label : c.label)}</span><b>${qText(h.text)}</b>${h.sub && h.input !== 'choice' ? `<small>${esc(h.sub)}</small>` : ''}</div>
-          <div class="ra"><span class="mine">${r.raw != null ? 'Ta réponse : <s>' + qText(describeAnswer(h, r.raw)) + '</s>' : 'Pas de réponse'}</span><span class="good">${h.input === 'code' ? `Une solution : <pre>${esc(h.show)}</pre>` : `Bonne réponse : <b>${qText(h.show)}</b>`}</span></div>
+          <div class="ra"><span class="mine">${r.raw != null ? 'Ta réponse : <s>' + qText(describeAnswer(h, r.raw)) + '</s>' : 'Pas de réponse'}</span><span class="good">${h.input === 'code' ? `Une solution : <pre>${highlightPy(h.show)}</pre>` : `Bonne réponse : <b>${qText(h.show)}</b>`}</span></div>
           <div class="rt">💡 ${qText(h.tip)}</div></li>`;
       }).join('')}</ol></details>`;
   }
@@ -687,13 +713,14 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       : acc >= 0.5 ? ['low', 'PÉRIODE D\'ESSAI', 'Analyste M&A junior', 'Le potentiel est là, mais trop d\'hésitations. Six mois pour faire tes preuves.']
       : ['rejected', 'CANDIDATURE REJETÉE', 'Éliminé au premier tour', 'Pas cette fois. Révise tes gammes et reviens tenter ta chance.'];
     return `<div class="verdict-banner offer-${O[0]}">${pcFace('pc-face')}<span class="offer-stamp">${O[1]}</span><h3>${O[2]}</h3>
-      <p>${O[3]}</p><p class="offer-stats">${S.cfg.lives && !meP.out ? hearts(meP.lives) + ' · ' : ''}${meP.right}/${n} justes · ${fmt(meP.score)} pts${meP.right ? ' · ' + secs(meP.totalMs / meP.right) + ' par bonne réponse' : ''}</p></div>`;
+      <p>${O[3]}</p><p class="offer-stats">${S.cfg.lives && !meP.out ? hearts(meP.lives, S.cfg.lives) + ' · ' : ''}${meP.right}/${n} justes · ${fmt(meP.score)} pts${meP.right ? ' · ' + secs(meP.totalMs / meP.right) + ' par bonne réponse' : ''}</p></div>`;
   }
 
   function renderOver() {
     closePick();
     const ch = S.cfg.mode === 'chartier';
-    if (ch) wallStreetMusic.setMode('lobby');
+    // musique des scores : version gagnante pour le premier (et pour les spectateurs), doux-amère sinon
+    if (ch) { wallStreetMusic.setMode('over', { win: S.ranking[0] === me.id || !S.players.some((p) => p.id === me.id) }); wallStreetMusic.start(); }
 
     const rank = S.ranking.map((id) => S.players.find((p) => p.id === id)).filter(Boolean);
     const podium = [rank[1], rank[0], rank[2]];

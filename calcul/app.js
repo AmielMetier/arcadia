@@ -16,6 +16,7 @@ function boot(info) {
   const settings = H.embedded ? info.settings || {} : {
     mode: qs.get('mode'), len: qs.get('len'), diff: qs.get('diff'), theme: qs.get('theme'),
     finale: qs.get('finale'), sabotage: qs.get('sabotage'), bots: qs.get('bots') ?? 2, level: qs.get('level') || 'normal',
+    lives: qs.get('lives'), jokers: qs.get('jokers'), code: qs.get('code'), cut: qs.get('cut'), chsab: qs.get('chsab'),
   };
 
   const view = mountGame(root, {

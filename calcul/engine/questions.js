@@ -58,7 +58,7 @@ function qSeed(seed, i, salt = 0) {
 }
 
 // Liste des catégories de la partie : tirée une fois, d'après les poids du thème, sans trois fois la même d'affilée
-export function planCats(seed, len, theme) {
+export function planCats(seed, len, theme, { code = true } = {}) {
   const w = THEMES[theme] || THEMES.mix;
   const r = rngOf({ seed: qSeed(seed, 9999) });
   const keys = Object.keys(w), total = keys.reduce((s, k) => s + w[k], 0);
@@ -75,7 +75,7 @@ export function planCats(seed, len, theme) {
   // le « Compte est bon » est plus long : jamais en première question d'un mélange
   if (keys.length > 1 && out[0] === 'compte') { const j = out.findIndex((c) => c !== 'compte'); if (j > 0) [out[0], out[j]] = [out[j], out[0]]; }
   // The Candidate : une épreuve de code au desk, et une seconde au comité final dans les parties longues
-  if (theme === 'chartier') for (const k of codeSlots(len)) out[k] = 'code';
+  if (theme === 'chartier' && code) for (const k of codeSlots(len)) out[k] = 'code';
   return out;
 }
 
@@ -682,7 +682,37 @@ function devinette(r, d) {
 // Le dessin est dans la question (fig) ; on compte toutes les figures, petites et grandes, cachées comprises.
 const C2 = (n) => (n * (n - 1)) / 2;
 function visuel(r, d) {
-  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'grid-sq'] : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots']);
+  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths']
+    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag']);
+  if (kind === 'box') {
+    const a = between(r, 2, [3, 4, 4][d]), b = between(r, 2, [3, 3, 4][d]), c = between(r, 2, [2, 3, 4][d]);
+    return { kind, text: `Combien de petits cubes forment ce pavé ?`, sub: `Un bloc plein, y compris les cubes cachés`, answer: a * b * c, fig: { t: 'box', a, b, c },
+      tip: `Longueur × largeur × hauteur : ${a} × ${b} × ${c} = ${a * b * c}. Compter les cubes visibles un par un fait oublier ceux du milieu.` };
+  }
+  if (kind === 'painted') {
+    const n = between(r, 3, [4, 4, 5][d]), m = n - 2;
+    const asks = [[3, 8, 'les 8 coins'], [2, 12 * m, `${m} par arête, sur 12 arêtes`], [1, 6 * m * m, `${m}² = ${m * m} par face, sur 6 faces`], [0, m ** 3, `le cœur de ${m} × ${m} × ${m}`]];
+    const [f, ans, why] = d === 0 ? asks[between(r, 0, 1)] : pick(r, asks);
+    return { kind, text: `Combien de petits cubes ont ${f ? `exactement ${f} face${f > 1 ? 's' : ''} peinte${f > 1 ? 's' : ''}` : 'aucune face peinte'} ?`,
+      sub: `Un cube de ${n} × ${n} × ${n} peint en rouge, puis découpé`, answer: ans, fig: { t: 'box', a: n, b: n, c: n, paint: true },
+      tip: `${f === 3 ? '3 faces peintes' : f === 2 ? '2 faces' : f === 1 ? '1 face' : '0 face'} : ${why}, soit ${ans}. Vérification : 8 + 12×${m} + 6×${m * m} + ${m ** 3} = ${n ** 3} = ${n}³.` };
+  }
+  if (kind === 'stair') {
+    const n = between(r, [3, 3, 4][d], [4, 5, 6][d]), w = between(r, 1, [2, 3, 3][d]), t = (n * (n + 1)) / 2;
+    return { kind, text: `Combien de cubes dans cet escalier ?`, sub: `${n} marches pleines, ${w} cube${w > 1 ? 's' : ''} de large`, answer: t * w, fig: { t: 'stair', n, w },
+      tip: `Les marches font 1, 2, …, ${n} cubes de haut : ${n} × ${n + 1} / 2 = ${t}${w > 1 ? `, fois ${w} de large = ${t * w}` : ''}.` };
+  }
+  if (kind === 'paths') {
+    const m = between(r, 2, [3, 4, 5][d]), n = between(r, 2, [2, 3, 4][d]);
+    let ans = 1; for (let k = 1; k <= n; k++) ans = (ans * (m + k)) / k;
+    return { kind, text: `Combien de chemins de A à B, en allant seulement à droite ou vers le haut ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'paths', m, n },
+      tip: `Tout chemin fait ${m} pas à droite et ${n} vers le haut : on choisit où placer les ${n} montées parmi ${m + n} pas, C(${m + n}, ${n}) = ${ans}.` };
+  }
+  if (kind === 'diag') {
+    const n = between(r, [5, 5, 6][d], [6, 8, 10][d]);
+    return { kind, text: `Combien de diagonales a ce polygone ?`, sub: `${n} sommets (une diagonale en pointillés)`, answer: (n * (n - 3)) / 2, fig: { t: 'polyd', n },
+      tip: `Chaque sommet se relie à ${n - 3} autres (pas à lui-même ni à ses 2 voisins), et chaque diagonale est comptée deux fois : ${n} × ${n - 3} / 2 = ${(n * (n - 3)) / 2}.` };
+  }
   if (kind === 'grid-sq') {
     const n = between(r, [2, 3, 4][d], [3, 4, 5][d]);
     let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
@@ -764,7 +794,7 @@ function chartier(r, d, i = 0, len = 10) {
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
 function code(r, d, i = 0, len = 10) {
   const tier = chartierTier(d, i, len);
-  const pool = CODE_QUESTIONS.filter((q) => q.level === (tier >= 3 ? 3 : 2));
+  const pool = CODE_QUESTIONS.filter((q) => q.level === tier);
   const q = pick(r, pool);
   return {
     kind: 'code', input: 'code', text: q.title, sub: `Code · ${TIER_LABEL[tier]}`, eq: false,
@@ -780,7 +810,7 @@ export const KINDS = {
   theorie: ['pow', 'mod', 'sqrt', 'cube', 'pgcd', 'ppcm', 'fact', 'binary', 'prime', 'divs'],
   fraction: ['fracof', 'dec', 'fracdec', 'fracpct', 'fracadd'],
   suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'cubes', 'cross', 'affine', 'tri', 'pow2m1', 'sqplus', 'fact'],
-  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots'],
+  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag'],
   estim: ['kmh', 'ms', 'train', 'time', 'units', 'promo', 'rule3', 'avg', 'evol', 'famous', 'approx'],
   compte: ['compte'],
   vf: ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac'],

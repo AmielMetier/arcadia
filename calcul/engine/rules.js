@@ -21,6 +21,7 @@ const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
 // À la fin de chaque tour (premier tour → desk → comité final), le dernier du classement est éliminé
 // tant qu'il reste au moins trois candidats. La partie s'arrête quand il n'en reste qu'un.
 export const LIVES = 3;
+export const LIVES_CHOICES = [2, 3, 5];
 export const JOKERS = {
   half:   { label: '50/50', icon: '✂️', desc: 'Retire deux mauvaises réponses' },
   friend: { label: 'Appel à un ami', icon: '📞', desc: 'Un ami te souffle une réponse (il se trompe parfois)' },
@@ -50,8 +51,12 @@ export function makeConfig(s = {}) {
     diff: DIFFS.includes(s.diff) ? s.diff : 'normal',
 
     finale: s.finale == null ? true : Number(s.finale) === 1,
-    sabotage: s.sabotage == null ? true : Number(s.sabotage) === 1,
-    lives: s.mode === 'chartier' ? LIVES : 0,
+    // The Candidate a ses propres règles maison : sabotage coupé par défaut (il se marie mal avec les vies)
+    sabotage: s.mode === 'chartier' ? Number(s.chsab) === 1 : s.sabotage == null ? true : Number(s.sabotage) === 1,
+    lives: s.mode === 'chartier' ? (LIVES_CHOICES.includes(Number(s.lives)) ? Number(s.lives) : LIVES) : 0,
+    jokers: s.mode === 'chartier' && (s.jokers == null || Number(s.jokers) === 1),
+    code: s.mode === 'chartier' && (s.code == null || Number(s.code) === 1),
+    cut: s.mode === 'chartier' && (s.cut == null || Number(s.cut) === 1),
   };
 }
 
@@ -60,11 +65,11 @@ export function createGame({ players, cfg, seed, now }) {
   const c = makeConfig(cfg);
   return {
     v: 1, seed, cfg: c, startedAt: now,
-    cats: planCats(seed, c.len, c.theme),
+    cats: planCats(seed, c.len, c.theme, { code: c.code }),
     players: players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: !!p.bot,
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
       powers: [], sabSent: 0, sabTaken: 0,
-      lives: c.lives, out: false, outIdx: null, outWhy: null, traps: 0, jokers: c.lives ? Object.keys(JOKERS) : [] })),
+      lives: c.lives, out: false, outIdx: null, outWhy: null, traps: 0, jokers: c.lives && c.jokers ? Object.keys(JOKERS) : [] })),
     idx: -1, phase: 'intro', endsAt: now + INTRO_MS, q: null, qAt: 0, answers: {}, last: null, history: [], ranking: null,
     curses: {}, active: {}, sabs: [],
   };
@@ -199,7 +204,7 @@ export function gradeCode(state, { by, idx, passed, total, detail = null }) {
 
 // Joker (une fois par partie chacun) → { ok, state, info } ; info n'est envoyée qu'au joueur qui l'a demandé
 export function useJoker(state, { by, kind }) {
-  if (!state.cfg.lives) return { ok: false, error: 'Pas de joker dans ce mode' };
+  if (!state.cfg.lives || !state.cfg.jokers) return { ok: false, error: 'Pas de joker dans cette partie' };
   if (state.phase !== 'question') return { ok: false, error: 'Pas de question en cours' };
   const p = state.players.find((x) => x.id === by);
   if (!p || p.out) return { ok: false, error: 'Tu ne joues plus cette partie' };
@@ -290,7 +295,7 @@ export function reveal(state, now) {
   const tierNow = s.cfg.lives ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx, s.cfg.len) : 0;
   const tierNext = s.cfg.lives && s.idx + 1 < s.cfg.len ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx + 1, s.cfg.len) : tierNow;
   let tierEnd = null;
-  if (s.cfg.lives && tierNext !== tierNow) {
+  if (s.cfg.lives && s.cfg.cut && tierNext !== tierNow) {
     tierEnd = tierNow;
     const left = alive(s);
     if (left.length >= 3) {

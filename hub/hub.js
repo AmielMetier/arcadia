@@ -286,6 +286,8 @@
     const g = gameDef(pick.game), set = pick.settings[g.id], n = room.players.length;
     const segs = (g.settings || []).map((s) => {
       if (g.id === 'calcul' && set.mode === 'chartier' && s.key === 'theme') return '';
+      // réglages propres à un mode (ou masqués dans un mode)
+      if ((s.onlyMode && set.mode !== s.onlyMode) || (s.notMode && set.mode === s.notMode)) return '';
       if (g.id === 'david' && set.teams === '2v2' && s.key === 'bots') return `<div class="setitem"><div class="lbl">Bots</div><div class="sethint">${n < 4 ? `${4 - n} bot${4 - n > 1 ? 's' : ''} complète${4 - n > 1 ? 'nt' : ''} les équipes` : 'Équipes complètes'}</div></div>`;
       const opts = s.options.filter(([v]) => s.key !== 'bots' || n + Number(v) <= g.maxPlayers);
       return `${s.group ? `<div class="setgroup">${esc(s.group)}</div>` : ''}<div class="setitem"><div class="lbl">${esc(s.label)}</div><div class="seg" role="group" aria-label="${esc(s.label)}">${opts.map(([v, l]) =>

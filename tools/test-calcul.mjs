@@ -439,12 +439,54 @@ t('The Candidate : jokers 50/50 et appel à un ami', () => {
   assert.equal(useJoker(c, { by: 0, kind: 'half' }).ok, false);
 });
 
+t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
+  const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
+  const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
+  assert.ok(def.cfg.jokers && def.cfg.code && def.cfg.cut && def.cfg.lives === 3 && !def.cfg.sabotage, 'par défaut : tout, sauf le sabotage');
+  assert.ok(def.cats.includes('code'));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, lives: 5, jokers: 0, code: 0, cut: 0, chsab: 1 }, seed: 1, now: 0 });
+  assert.equal(s.cfg.lives, 5); assert.ok(s.players.every((p) => p.lives === 5 && !p.jokers.length));
+  assert.ok(!s.cats.includes('code'), 'pas d\'épreuve de code');
+  assert.ok(s.cfg.sabotage);
+  assert.equal(createGame({ players, cfg: { mode: 'chartier', lives: 4 }, seed: 1, now: 0 }).cfg.lives, 3, 'valeur inconnue : 3 vies');
+  s = nextQuestion(s, 0);
+  assert.equal(useJoker(s, { by: 0, kind: 'half' }).ok, false, 'jokers coupés');
+  // sans coupe : personne ne saute au palier
+  let now = 0;
+  while (s.phase !== 'over') { s = play(s, { 0: 'good', 1: 'good', 2: 'good', 3: 'slow' }, now); now += 1e5; s = nextQuestion(s, now); }
+  assert.ok(s.players.every((p) => !p.out) && s.history.length === 15);
+  // la sabotage classique ne déborde pas sur The Candidate
+  assert.equal(createGame({ players, cfg: { mode: 'chartier', sabotage: 1 }, seed: 1, now: 0 }).cfg.sabotage, false);
+});
+
 t('code : chaque exercice a une solution de référence et des tests sous la limite des entiers JSON', () => {
   for (const c of CODE_QUESTIONS) {
     assert.ok(c.fn && c.starter.includes(`def ${c.fn}`) && c.ref.includes(`def ${c.fn}`) && c.tests.length >= 4, c.title);
     const big = (v) => (Array.isArray(v) ? v.some(big) : typeof v === 'number' && Math.abs(v) > 2 ** 53);
     for (const [args, exp] of c.tests) assert.ok(!big(args) && !big(exp), `${c.title} : ${exp}`);
   }
+});
+
+t('figures à compter : chaque réponse recomptée par force brute', () => {
+  const seen = new Set();
+  for (const diff of DIFFS) for (let i = 0; i < 1500; i++) {
+    const q = makeQuestion(i * 104729 + 17, i, 'visuel', diff);
+    seen.add(q.kind); const f = q.fig;
+    let n = null;
+    if (q.kind === 'box') n = f.a * f.b * f.c;
+    if (q.kind === 'painted') {
+      const want = /aucune/.test(q.text) ? 0 : Number(q.text.match(/exactement (\d)/)[1]); n = 0;
+      for (let x = 0; x < f.a; x++) for (let y = 0; y < f.a; y++) for (let z = 0; z < f.a; z++) n += [x, y, z].filter((v) => v === 0 || v === f.a - 1).length === want;
+    }
+    if (q.kind === 'stair') { n = 0; for (let k = 0; k < f.n; k++) n += (k + 1) * f.w; }
+    if (q.kind === 'paths') { const W = Array.from({ length: f.n + 1 }, () => Array(f.m + 1).fill(1)); for (let y = 1; y <= f.n; y++) for (let x = 1; x <= f.m; x++) W[y][x] = W[y - 1][x] + W[y][x - 1]; n = W[f.n][f.m]; }
+    if (q.kind === 'diag') { n = 0; for (let a = 0; a < f.n; a++) for (let b = a + 2; b < f.n; b++) if (!(a === 0 && b === f.n - 1)) n++; }
+    if (q.kind === 'grid-sq' || q.kind === 'grid-sq-rect') { n = 0; for (let k = 1; k <= Math.min(f.n, f.m); k++) n += (f.m - k + 1) * (f.n - k + 1); }
+    if (q.kind === 'grid-rect') { n = 0; for (let x1 = 0; x1 <= f.m; x1++) for (let x2 = x1 + 1; x2 <= f.m; x2++) for (let y1 = 0; y1 <= f.n; y1++) for (let y2 = y1 + 1; y2 <= f.n; y2++) n++; }
+    if (n != null) assert.equal(q.answer, n, `${q.kind} ${q.text} ${JSON.stringify(f)}`);
+    assert.ok(Number.isInteger(q.answer) && q.answer > 0 && q.tip && !/NaN|undefined/.test(q.text + q.tip + q.sub), `${q.kind} ${q.tip}`);
+  }
+  for (const k of KINDS.visuel) assert.ok(seen.has(k), `figure ${k} jamais tirée`);
 });
 
 // Python local (le même harnais que dans le navigateur) : les solutions de référence passent tous leurs tests
@@ -467,4 +509,37 @@ if (py.status === 0) t('code : références justes, code vide ou tricheur refus�
 });
 else console.log('· python3 absent : vérification des solutions de code sautée');
 
+// Réseau simulé : l'hôte ne répond au joker qu'au joueur qui l'a demandé, et l'état diffusé ne révèle rien
+{
+  const { startHost } = await import('../calcul/net/host.js');
+  const { INTRO_MS } = await import('../calcul/engine/rules.js');
+  const games = Array.from({ length: 8 }, () => {
+    const sent = [], on = {};
+    const bridge = { embedded: false, players: [0, 1, 2].map((id) => ({ id, name: 'P' + id, color: '#fff' })), readyMap: { 1: 'calcul', 2: 'calcul' },
+      send: (to, m) => sent.push([to, JSON.parse(JSON.stringify(m))]), on: (ev, fn) => { on[ev] = fn; } };
+    const host = startHost({ bridge, solo: false, settings: { mode: 'chartier', len: 10, bots: 0, code: 0 }, me: { id: 0, name: 'P0' }, onState() {}, onSetup() {}, onError() {} });
+    return { host, sent, on };
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  for (const g of games) g.host.start();
+  await new Promise((r) => setTimeout(r, INTRO_MS + 300));
+  const g = games.find((x) => x.host.state.phase === 'question' && fullQuestion(x.host.state).input === 'choice');
+  assert.ok(g, 'une première question à choix');
+  const q = fullQuestion(g.host.state);
+  g.sent.length = 0;
+  g.on.msg(1, { t: 'jok', kind: 'friend' });
+  const jok = g.sent.filter(([, m]) => m.t === 'jok');
+  assert.equal(jok.length, 1); assert.equal(jok[0][0], 1, 'la réponse du joker part au seul demandeur');
+  assert.ok([q.answer, q.trap].includes(jok[0][1].suggest));
+  for (const [to, m] of g.sent.filter(([, m]) => m.t === 'st')) {
+    assert.equal(to, 'all');
+    const txt = JSON.stringify(m.s);
+    assert.ok(!/suggest|removed/.test(txt) && !('answer' in m.s.q) && !('trap' in m.s.q) && !('tests' in m.s.q), 'rien de secret dans l\'état diffusé');
+  }
+  g.on.msg(1, { t: 'jok', kind: 'friend' });
+  assert.equal(g.sent.at(-1)[0], 1); assert.equal(g.sent.at(-1)[1].t, 'err', 'deuxième appel refusé, au seul demandeur');
+  n++; console.log('✓ réseau : joker privé, rien de secret diffusé');
+}
+
 console.log(`\n${n} tests réussis`);
+process.exit(0); // l'hôte garde des minuteurs (surveillance des absents)

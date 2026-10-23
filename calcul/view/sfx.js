@@ -42,6 +42,12 @@ const SOUNDS = {
   streak(c, t) { [988, 1175, 1480, 1976].forEach((f, k) => tone(f, t + k * 0.06, 0.12, { type: 'square', vol: 0.1 })); },
   sab(c, t) { tone(1200, t, 0.5, { type: 'sawtooth', vol: 0.12, slide: 0.25 }); noise(t + 0.05, 0.35, { vol: 0.3, freq: 700, q: 0.7 }); tone(180, t + 0.35, 0.25, { type: 'square', vol: 0.12 }); },
   pop(c, t) { tone(700, t, 0.08, { type: 'sine', vol: 0.3, slide: 1.8 }); },
+  // The Candidate : le piège qui se referme, la porte qui claque, les ciseaux du palier, les jokers
+  trap(c, t) { tone(520, t, 0.18, { type: 'square', vol: 0.14, slide: 0.5 }); noise(t + 0.16, 0.08, { vol: 0.5, freq: 3200, q: 2 }); tone(140, t + 0.2, 0.4, { type: 'sawtooth', vol: 0.16, slide: 0.7 }); },
+  elim(c, t) { [392, 370, 349, 262].forEach((f, k) => tone(f, t + k * 0.28, k === 3 ? 0.7 : 0.26, { type: 'sawtooth', vol: 0.12, slide: k === 3 ? 0.8 : 0.97 })); noise(t + 1.15, 0.25, { vol: 0.5, freq: 200, q: 0.6 }); },
+  cut(c, t) { noise(t, 0.05, { vol: 0.5, freq: 5000, q: 3 }); noise(t + 0.12, 0.05, { vol: 0.5, freq: 4200, q: 3 }); tone(196, t + 0.25, 0.3, { type: 'triangle', vol: 0.2, slide: 0.7 }); },
+  snip(c, t) { noise(t, 0.04, { vol: 0.45, freq: 5200, q: 3 }); noise(t + 0.09, 0.04, { vol: 0.45, freq: 4600, q: 3 }); },
+  ring(c, t) { for (let k = 0; k < 6; k++) { tone(1400, t + k * 0.05, 0.04, { type: 'square', vol: 0.07 }); tone(1750, t + k * 0.05 + 0.025, 0.04, { type: 'square', vol: 0.07 }); } },
   win(c, t) { [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, t + k * 0.13, 0.3, { type: 'triangle', vol: 0.3 })); noise(t + 0.7, 0.6, { vol: 0.2, freq: 4000, q: 0.5 }); },
 };
 

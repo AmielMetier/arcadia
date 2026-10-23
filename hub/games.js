@@ -75,8 +75,14 @@ window.HUB_GAMES = [
       { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
-      { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1, notMode: 'chartier' },
       { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      // règles de The Candidate (affichées seulement dans ce mode)
+      { key: 'lives', label: 'Vies par candidat', group: 'The Candidate', options: [[2, '2'], [3, '3'], [5, '5']], def: 3, onlyMode: 'chartier' },
+      { key: 'jokers', label: 'Jokers (50/50, ami)', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'code', label: 'Épreuve de code Python', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'cut', label: 'Le dernier coupé à chaque tour', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'chsab', label: 'Sabotage', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect width="320" height="180" fill="#3f86d0"/>
