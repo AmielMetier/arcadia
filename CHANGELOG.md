@@ -7,6 +7,7 @@
   - Deux jokers par partie, une fois chacun : 50/50 et Appel à un ami (qui a souvent raison… pas toujours).
   - Une centaine de nouvelles questions d'entretien (marchés, probabilités, brainteasers, estimations), et des réponses à taper : les estimations sont acceptées dans une marge.
   - Épreuve de code : une ou deux fonctions Python à écrire en 3 minutes, testées en direct sur des tests cachés. Des points pour chaque test réussi, et un bouton pour essayer les exemples avant d'envoyer.
+- **Tête de Calcul** — Pierre Chartier a enfin un visage : sa photo accompagne ses verdicts, l'accueil et le verdict final.
 - **Tête de Calcul** — Nouvelles questions visuelles : carrés, rectangles et triangles à compter dans une grille, cubes d'une pyramide, segments entre des points.
 - **Tête de Calcul** — Nouvelles suites logiques : cubes, suites croisées, « ×2 + 2 », factorielles, et d'autres. Visuels et suites arrivent aussi dans les thèmes Logique et Mélangé.
 

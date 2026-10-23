@@ -81,6 +81,9 @@ const CHARTIER_QUOTES = {
 
 // Le bandeau de cotations (indices fictifs qui bougent, puis les joueurs cotés comme des actions)
 const TICKER_IDX = [['CAC 40', 7984.3], ['S&P 500', 5864.7], ['NASDAQ', 18392.1], ['EUR/USD', 1.0842], ['DAX', 19210.5], ['OR', 2720.5], ['BRENT', 74.2], ['US 10A', 4.22], ['VIX', 16.4]];
+// Portrait de Pierre Chartier (ses initiales restent dessous si l'image ne charge pas)
+const PC_IMG = 'img/chartier.jpg';
+const pcFace = (cls) => `<div class="${cls}" aria-hidden="true"><span>PC</span><img src="${PC_IMG}" alt="" onerror="this.remove()"></div>`;
 const symbolOf = (nm) => (String(nm).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase() + 'XXXX').slice(0, 4);
 
 export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker = () => {}, start, exit }) {
@@ -339,7 +342,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     stage.innerHTML = `
       <div class="card setup deal">
         <div class="setup-head">
-          <div class="logo-c"><span>${isChartier ? 'Pierre Chartier présente' : 'Tête de'}</span><b>${isChartier ? 'The Candidate' : 'Calcul'}</b></div>
+          ${isChartier ? pcFace('pc-face big') : ''}<div class="logo-c"><span>${isChartier ? 'Pierre Chartier présente' : 'Tête de'}</span><b>${isChartier ? 'The Candidate' : 'Calcul'}</b></div>
           <div class="chips">
             <span class="chip strong">${esc(MODES[c.mode].label)}</span><span class="chip">${c.len} questions</span>
             <span class="chip">${esc(DIFF_LABEL[c.diff])}</span>
@@ -588,7 +591,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       + (mine && mine.pts ? ` · ${mine.pts > 0 ? '+' : ''}${fmt(mine.pts)}` : '') + (mine && mine.lost ? ` · −${'♥'.repeat(mine.lost)}` : '');
     const tone = { fast: 'ok', ok: 'ok', finalOk: 'ok', partial: 'timeout', ko: 'ko', trap: 'ko', out: 'ko', finalKo: 'ko', timeout: 'timeout' }[type];
     return `<div class="chartier-quote quote-${tone}" id="verdict">
-        <div class="quote-avatar" aria-hidden="true">PC</div>
+        ${pcFace('quote-avatar')}
         <div class="quote-body"><div class="quote-meta"><b>Pierre Chartier</b><span class="quote-status">${label}</span></div>
         <p class="quote-text">« ${esc(text)} »</p></div>
       </div>`;
@@ -654,7 +657,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const ch = c.mode === 'chartier';
     if (ch) { wallStreetMusic.start(); wallStreetMusic.setMode('intro'); }
     stage.innerHTML = `
-      <div class="card intro deal"><div class="logo-c"><span>${ch ? 'Pierre Chartier présente' : 'Tête de'}</span><b>${ch ? 'The Candidate' : 'Calcul'}</b></div>
+      <div class="card intro deal">${ch ? pcFace('pc-face big') : ''}<div class="logo-c"><span>${ch ? 'Pierre Chartier présente' : 'Tête de'}</span><b>${ch ? 'The Candidate' : 'Calcul'}</b></div>
       <p>${ch ? 'Ouverture des marchés' : esc(MODES[c.mode].label)} · ${c.len} questions · ${esc(DIFF_LABEL[c.diff])}${c.sabotage ? ' · Sabotage' : ''}</p><div class="count" id="count">3</div></div>`;
   }
 
@@ -683,7 +686,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       : acc >= 0.7 ? ['mid', 'OFFRE VALIDÉE', 'Associate, trading quantitatif', 'Solide sous la pression. Encore un peu de vitesse et tu passes au niveau supérieur.']
       : acc >= 0.5 ? ['low', 'PÉRIODE D\'ESSAI', 'Analyste M&A junior', 'Le potentiel est là, mais trop d\'hésitations. Six mois pour faire tes preuves.']
       : ['rejected', 'CANDIDATURE REJETÉE', 'Éliminé au premier tour', 'Pas cette fois. Révise tes gammes et reviens tenter ta chance.'];
-    return `<div class="verdict-banner offer-${O[0]}"><span class="offer-stamp">${O[1]}</span><h3>${O[2]}</h3>
+    return `<div class="verdict-banner offer-${O[0]}">${pcFace('pc-face')}<span class="offer-stamp">${O[1]}</span><h3>${O[2]}</h3>
       <p>${O[3]}</p><p class="offer-stats">${S.cfg.lives && !meP.out ? hearts(meP.lives) + ' · ' : ''}${meP.right}/${n} justes · ${fmt(meP.score)} pts${meP.right ? ' · ' + secs(meP.totalMs / meP.right) + ' par bonne réponse' : ''}</p></div>`;
   }
 
