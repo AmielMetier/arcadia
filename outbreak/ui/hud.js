@@ -117,7 +117,7 @@ export function classPickerHtml(myClass) {
     <span class="ci">${C.icon}</span><b>${esc(C.name)}</b><span class="ca">⭐ ${esc(C.active)}</span><small>${esc(C.activeDesc)}</small><small class="cp">${esc(C.passive)}</small></button>`; }).join('')}</div>`;
 }
 
-export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myClass }) {
+export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myClass, notes = 0, totalNotes = 0 }) {
   const D = DIFFICULTY[cfg.difficulty] || DIFFICULTY.normal;
   const opt = (key, label, options, val) => `<div class="opt"><div class="lbl">${label}</div><div class="seg">${options.map(([v, l]) => `<button data-k="${key}" data-v="${v}" class="${String(val) === String(v) ? 'sel' : ''}">${l}</button>`).join('')}</div></div>`;
   const settings = !embedded ? `<h2>Réglages</h2><div class="opts">
@@ -137,6 +137,7 @@ export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myCla
     <h2>Escouade</h2>
     <div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><i></i>${CLASSES[p.cls]?.icon || ''} ${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'toi' : p.ready ? 'prêt' : 'connexion…'}</small></div>`).join('')}</div>
     <h2>Commandes</h2>${keysHtml()}
+    ${totalNotes ? `<p class="notes-found">📁 Dossiers trouvés : ${notes} / ${totalNotes} — fouillez les salles de la campagne pour découvrir ce qui s'est passé.</p>` : ''}
     ${canStart ? `<div class="btnrow"><button class="btn" id="btnGo">Déployer l'escouade</button>${embedded ? '<button class="btn alt" id="btnExit">Retour au salon</button>' : ''}</div>`
       : `<div class="wait"><i></i>${role === 'guest' ? "En attente de l'hôte…" : 'Préparation…'}</div>${embedded ? '<div class="btnrow"><button class="btn alt" id="btnExit">Retour au salon</button></div>' : ''}`}
   </div>`;

@@ -128,6 +128,10 @@ export class Audio {
       case 'horn': for (let k = 0; k < 2; k++) { this.tone(o, t + k * 0.55, 0.45, { type: 'sawtooth', f0: 311, v: 0.18 }); this.tone(o, t + k * 0.55, 0.45, { type: 'sawtooth', f0: 392, v: 0.14 }); } break;
       case 'trainPass': this.noise(o, t, 1.4, { f0: 600, f1: 120, a: 0.1, v: 0.9 }); this.tone(o, t, 1.3, { type: 'sawtooth', f0: 70, f1: 50, a: 0.1, v: 0.35 }); for (let k = 0; k < 8; k++) this.noise(o, t + k * 0.14, 0.05, { type: 'highpass', f0: 2500, v: 0.4 }); break;
       case 'carAlarm': for (let k = 0; k < 8; k++) this.tone(o, t + k * 0.25, 0.22, { type: 'square', f0: k % 2 ? 880 : 1175, v: 0.09 }); break;
+      case 'radio': this.noise(o, t, 0.12, { type: 'bandpass', f0: 2200, q: 3, v: 0.25 }); this.tone(o, t + 0.1, 0.06, { type: 'square', f0: 1400, v: 0.05 }); break;
+      case 'note': [523, 784, 659].forEach((f, i) => this.tone(o, t + i * 0.09, 0.3, { type: 'triangle', f0: f, v: 0.16 })); this.noise(o, t, 0.15, { type: 'highpass', f0: 3000, v: 0.2 }); break;
+      case 'heli': this.noise(o, t, 2.6, { type: 'lowpass', f0: 500, f1: 300, a: 0.4, v: 0.35 }); for (let k = 0; k < 20; k++) this.noise(o, t + k * 0.12, 0.06, { type: 'lowpass', f0: 300, v: 0.4 }); break;
+      case 'static': this.noise(o, t, 1.6, { type: 'bandpass', f0: 3000, q: 0.5, a: 0.05, v: 0.25 }); break;
       case 'click': this.tone(o, t, 0.05, { type: 'triangle', f0: 1200, v: 0.15 }); break;
     }
   }

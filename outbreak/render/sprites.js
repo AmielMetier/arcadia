@@ -473,6 +473,15 @@ export function drawPickup(c, k, t) {
       circ(c, 0, 2, 9); fs(c, '#4a5d32'); rr(c, -4, -11, 8, 6, 1.5); fs(c, '#8d96a3', 2);
       c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(6, -9, 4, Math.PI, Math.PI * 2.2); c.stroke();
       break;
+    case 'note': {
+      const glow = 0.5 + 0.5 * Math.sin(t * 4);
+      c.globalAlpha = 0.3 + 0.3 * glow; circ(c, 0, 0, 22); c.fillStyle = '#fff1c1'; c.fill(); c.globalAlpha = 1;
+      c.rotate(-0.2);
+      rr(c, -11, -14, 22, 28, 2); fs(c, '#fff8ea', 2.2);
+      c.strokeStyle = '#8a8478'; c.lineWidth = 1.5; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-7, -7 + i * 5); c.lineTo(7, -7 + i * 5); c.stroke(); }
+      c.fillStyle = '#e3262f'; c.fillRect(-11, -14, 22, 5); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(-11, -14, 22, 5);
+      break;
+    }
     case 'scrap':
       c.rotate(k.id);
       c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, r = i % 2 ? 6 : 10; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); fs(c, '#a7b0bd', 2.2);

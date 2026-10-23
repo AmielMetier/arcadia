@@ -11,6 +11,8 @@ import { FX } from './render/fx.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { HUD, briefingHtml, menuHtml, endHtml } from './ui/hud.js';
+import { drawIntro, drawOutro } from './render/cinema.js';
+import { radioFor, SPEAKERS, NOTES, MISSIONS, ENDINGS, noteKey, TOTAL_NOTES } from './engine/story.js';
 
 const H = window.HubBridge;
 const QS = new URLSearchParams(location.search);
@@ -98,7 +100,7 @@ function showBriefing() {
   if (!S.lobby) return;
   const canStart = S.role !== 'guest';
   screenEl.className = 'screen'; screenEl.hidden = false;
-  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart, myClass: S.myClass });
+  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart, myClass: S.myClass, notes: foundNotes().size, totalNotes: TOTAL_NOTES });
   for (const b of screenEl.querySelectorAll('.cls')) b.onclick = () => chooseClass(b.dataset.c);
   hud.show(false);
   const go = $('#btnGo'); if (go) go.onclick = () => { audio.unlock(); startRun(); };
@@ -121,7 +123,8 @@ function startRun() {
   for (const p of sq) if (!p.bot && isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
   sq.filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true, cls: b.cls }));
   sim.startRoom(sim.room.type, sim.room.index); // replace tout le monde à l'entrée
-  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0;
+  sim.beginIntro(9);
+  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; radio.q = []; radio.cur = null;
   hideScreen();
   if (H.embedded) H.send('all', { t: 'go', run: S.runId });
 }
@@ -150,8 +153,8 @@ function hostFrame(dt) {
   }
   S.last = snap;
   const view = buildView(snap, snap, 0, dt);
-  for (const e of frameEv) fx.handle(e, view, S.myId);
-  if (sim.phase !== 'play' && sim.endT > 2.4) { report(snap); showEnd(snap); }
+  for (const e of frameEv) { fx.handle(e, view, S.myId); story(e, snap); }
+  if (sim.phase !== 'play') report(snap);
   return view;
 }
 
@@ -223,7 +226,7 @@ function cleanInput(m) {
   const n = (v, a, b, d = 0) => (Number.isFinite(+v) ? clamp(+v, a, b) : d);
   return {
     mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), a: n(m.a, -10, 10), fire: !!m.fire, use: !!m.use, td: n(m.td, 0, 2000, 300),
-    ab: m.ab | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
+    ab: m.ab | 0, sk: m.sk | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
   };
 }
 
@@ -251,9 +254,7 @@ function guestFrame(dt) {
   const view = buildView(a, b, f, dt);
   // événements à l'heure de l'image affichée
   const due = []; S.evq = S.evq.filter((x) => (x.t <= rt + 0.001 ? (due.push(x.e), false) : true));
-  for (const e of due) fx.handle(e, view, S.myId);
-  const last = S.last;
-  if (last.ph !== 'play' && !S.endShown) { S.endT = (S.endT || 0) + dt; if (S.endT > 2.4) showEnd(last); } else if (last.ph === 'play') S.endT = 0;
+  for (const e of due) { fx.handle(e, view, S.myId); story(e, S.last); }
   // demander l'état tant que l'hôte n'a rien envoyé
   return view;
 }
@@ -459,6 +460,42 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 // ------------------------------------------------------------------ écrans
 function hideScreen() { screenEl.hidden = true; screenEl.innerHTML = ''; S.menu = false; hud.show(true); }
 
+// ------------------------------------------------------------------ histoire : radio et dossiers
+const radio = { q: [], cur: null, t: 0, shown: 0 };
+let radioN = 0;
+function story(e, snap) {
+  if (!snap) return;
+  if (e.e === 'note') { showNote(e.sec, e.n); return; }
+  const lines = radioFor(e, { sector: snap.rm.sec, mode: snap.rm.mode, seed: (snap.rm.sd >>> 0) + (radioN++ & 0) });
+  if (lines) for (const l of lines) if (radio.q.length < 4) radio.q.push(l);
+}
+function sayEnding(won, sector) { const E = won ? ENDINGS.won(sector) : ENDINGS.over(); radio.q = E.lines.slice(); radio.cur = null; }
+function stepRadio(dt) {
+  const el = $('#radio');
+  if (!radio.cur && radio.q.length) {
+    radio.cur = radio.q.shift(); radio.t = 0; radio.shown = -1;
+    const Sp = SPEAKERS[radio.cur[0]] || SPEAKERS.inconnu;
+    el.style.setProperty('--c', Sp.color);
+    el.innerHTML = `<span class="who">${Sp.icon}</span><div><b>${Sp.name.toUpperCase()}</b><span id="radioTxt"></span></div>`;
+    el.hidden = false; audio.play('radio');
+  }
+  if (!radio.cur) { el.hidden = true; return; }
+  radio.t += dt;
+  const txt = radio.cur[1], n = Math.min(txt.length, Math.floor(radio.t * 55));
+  if (n !== radio.shown) { radio.shown = n; const tEl = $('#radioTxt'); if (tEl) tEl.textContent = txt.slice(0, n); }
+  if (radio.t > 1.6 + txt.length * 0.045) radio.cur = null;
+}
+let noteT = 0;
+function foundNotes() { try { return new Set(JSON.parse(localStorage.getItem('outbreak_notes') || '[]')); } catch (e) { return new Set(); } }
+function showNote(sector, n) {
+  const N = (NOTES[sector] || [])[n]; if (!N) return;
+  const set = foundNotes(); set.add(noteKey(sector, n));
+  try { localStorage.setItem('outbreak_notes', JSON.stringify([...set])); } catch (e) {}
+  const el = $('#note');
+  el.innerHTML = `<small>📁 DOSSIER TROUVÉ · ${set.size}/${TOTAL_NOTES}</small><b>${esc(N[0])}</b><p>« ${esc(N[1])} »</p>`;
+  el.hidden = false; noteT = 9 + N[1].length * 0.02; audio.play('note');
+}
+
 function showEnd(snap) {
   if (S.endShown) return;
   S.endShown = true;
@@ -536,12 +573,46 @@ function loop(now) {
   const near = meP ? view.zombies.filter((z) => Math.hypot(z.x - meP.x, z.y - meP.y) < 700).length : 0;
   audio.intensity += ((view.snap.ph === 'play' && !view.cleared ? Math.min(1, near / 14 + (view.zombies.length ? 0.2 : 0)) : 0) - audio.intensity) * Math.min(1, dt * 1.5);
   if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && !isBig(z.ty)) audio.play('groan', z.x, z.y, 0.6); }
+  // ---- cinématique d'intro (la partie attend)
+  const snapNow = view.snap;
+  if (snapNow.in > 0 && !S.lobby) {
+    const p = 9 - snapNow.in;
+    const now2 = performance.now() / 1000;
+    if (S.introRun !== snapNow.run || S.introClock == null || Math.abs((now2 - S.introClock) - p) > 0.5) { S.introRun = snapNow.run; S.introClock = now2 - p; if (p < 0.5) audio.play('heli'); }
+    const ip = now2 - S.introClock;
+    const c = canvas.getContext('2d'); renderer.resize();
+    c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
+    const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], bot: !!q.b, me: q.i === S.myId, weapon: WEAPON_IDS[(q.w[q.sl] || q.w[0])[0]] }));
+    drawIntro(c, renderer.W, renderer.H, ip, { sector: snapNow.rm.sec, squad, mission: snapNow.rm.mode === 'survival' ? MISSIONS.survival : MISSIONS[snapNow.rm.sec], votes: (snapNow.sv || []).length, total: snapNow.P.filter((q) => !q.b).length });
+    hud.show(false);
+    S.introShown = true;
+    return;
+  }
+  if (S.introShown) { S.introShown = false; if (!S.endShown && !S.menu) hud.show(true); }
   fx.update(dt, view);
   view.prompt = promptFor(view);
   if (view.me && view.me.ab) { const ready = view.me.ab[0] <= 0; if (ready && !S.abReady && view.snap.ph === 'play') audio.play('ready'); S.abReady = ready; }
   view.sfx = (n) => audio.play(n);
   renderer.frame(view, dt);
   if (!S.lobby) hud.update(view, now);
+  stepRadio(dt);
+  if (noteT > 0) { noteT -= dt; if (noteT <= 0) $('#note').hidden = true; }
+  // ---- fin : cinématique puis écran de résultats
+  if (snapNow.ph !== 'play' && !S.lobby) {
+    if (S.outroRun !== snapNow.run) { S.outroRun = snapNow.run; S.outroT = 0; sayEnding(snapNow.ph === 'won', snapNow.rm.sec); audio.play(snapNow.ph === 'won' ? 'heli' : 'static'); }
+    S.outroT += dt;
+    const dur = snapNow.ph === 'won' ? 7.4 : 5.8;
+    if (S.outroT > 1.0 && !S.endShown) {
+      const c = canvas.getContext('2d');
+      c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
+      const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], state: q.s }));
+      c.globalAlpha = Math.min(1, (S.outroT - 1.0) / 0.5);
+      drawOutro(c, renderer.W, renderer.H, S.outroT - 1.0, { won: snapNow.ph === 'won', squad, sector: snapNow.rm.sec });
+      c.globalAlpha = 1;
+      hud.show(false);
+    }
+    if (S.outroT > dur) showEnd(snapNow);
+  }
 }
 
 // écran d'attente : petit fond animé derrière le briefing

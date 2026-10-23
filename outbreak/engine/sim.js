@@ -4,6 +4,7 @@ import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_R
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
+import { NOTES } from './story.js';
 
 export const DT = 1 / 60;
 const PLAYER_R = 17;
@@ -37,6 +38,7 @@ export class Sim {
     this.bossKind = FINAL_BOSSES[((this.cfg.seed >>> 3) % FINAL_BOSSES.length + FINAL_BOSSES.length) % FINAL_BOSSES.length];
     this.miniKind = MINI_BOSSES[((this.cfg.seed >>> 5) % 2 + 2) % 2];
     this.shop = []; this.vault = null; this.evt = null; this.evtAt = -1; this.dark = false;
+    this.intro = 0; this.notesFound = [];
     this.endT = 0;
     this.rally = null;
     this.field = null; this.fieldT = 0;
@@ -150,6 +152,18 @@ export class Sim {
         const h = this.hazards[this.hazards.length - 1], a = r.range(0, Math.PI * 2); h.vx = Math.cos(a) * 45; h.vy = Math.sin(a) * 45;
       }
     }
+    // dossier à trouver (campagne, une salle sur deux environ)
+    const notes = NOTES[this.cfg.sector] || [];
+    const ni = { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3 }[index];
+    if (this.cfg.mode === 'campaign' && ni != null && !this.notesFound.includes(ni) && type !== 'shop' && makeRng(seed ^ 0x707e).chance(index === 1 ? 1 : 0.6)) {
+      const r = makeRng(seed ^ 0x9071);
+      for (let a = 0; a < 30; a++) {
+        const x = r.range(I.x0 + 120, I.x1 - 120), y = r.range(I.y0 + 140, I.y1 - 220);
+        if (this.lv.solids.some((q) => x > q.x - 40 && x < q.x + q.w + 40 && y > q.y - 40 && y < q.y + q.h + 40)) continue;
+        if (this.lv.zones.some((q) => x > q.x - 20 && x < q.x + q.w + 20 && y > q.y - 30 && y < q.y + q.h + 30)) continue;
+        this.spawnPickup('note', x, y, { n: ni }); break;
+      }
+    }
     // événement aléatoire en cours de salle
     this.evtAt = -1;
     if (this.cfg.mode === 'campaign' && index >= 2 && !['shop', 'vault', 'core', 'start'].includes(type) && this.rng.chance(0.55)) this.evtAt = this.rng.range(14, 32);
@@ -197,8 +211,22 @@ export class Sim {
 
   setToast(text, dur = 2.5, kind = '') { this.toast = { text, until: this.t + dur, kind, n: (this.toast ? this.toast.n : 0) + 1 }; }
 
+  // Cinématique d'intro : la simulation attend ; elle se termine au bout du temps ou quand tous les humains passent
+  beginIntro(sec = 9) { this.intro = sec; for (const p of this.players.values()) p.skip = false; }
+
   // ------------------------------------------------------------------ boucle
   step(dt = DT) {
+    if (this.intro > 0) {
+      this.intro -= dt; this.t += dt; this.tick++;
+      for (const p of this.players.values()) {
+        if ((p.input.sk | 0) !== (p.last.sk | 0)) p.skip = true;
+        this.consumeEdges(p); p.last.sk = p.input.sk | 0;
+      }
+      const humans = [...this.players.values()].filter((p) => !p.bot);
+      if (humans.length && humans.every((p) => p.skip)) this.intro = 0;
+      if (this.intro <= 0) { this.intro = 0; this.ev({ e: 'introEnd' }); this.roomT = 0; }
+      return;
+    }
     this.t += dt; this.tick++;
     this.roomT += dt;
     if (this.phase !== 'play') { this.endT += dt; this.stepParticlesOnly(dt); return; }
@@ -826,13 +854,13 @@ export class Sim {
           if (d < 30 && this.take(p, pk)) { taken = true; break; }
         }
       }
-      if (!taken && (pk.t < 60 || pk.k === 'weapon')) keep.push(pk);
+      if (!taken && (pk.t < 60 || pk.k === 'weapon' || pk.k === 'note')) keep.push(pk);
     }
     this.pickups = keep;
   }
 
   wants(p, k) {
-    if (k === 'scrap') return true;
+    if (k === 'scrap' || k === 'note') return true;
     if (k === 'med') return p.hp < p.maxHp - 1;
     if (k === 'armor') return p.armor < p.maxArmor - 1;
     if (k === 'nade') return p.grenades < nadeMax(p);
@@ -842,6 +870,7 @@ export class Sim {
 
   take(p, pk) {
     if (!this.wants(p, pk.k)) return false;
+    if (pk.k === 'note') { this.notesFound.push(pk.n); this.ev({ e: 'note', p: p.id, n: pk.n, sec: this.cfg.sector, x: Math.round(pk.x), y: Math.round(pk.y) }); return true; }
     if (pk.k === 'scrap') { this.scrap += pk.v || 1; this.ev({ e: 'pk', p: p.id, k: 'scrap', v: pk.v || 1, x: Math.round(pk.x), y: Math.round(pk.y) }); return true; }
     if (pk.k === 'med') {
       p.hp = Math.min(p.maxHp, p.hp + 40);
@@ -1670,7 +1699,7 @@ export class Sim {
       return [z.id, ZOMBIE_IDS.indexOf(z.ty), r1(z.x), r1(z.y), r2(z.ang), Math.max(0, Math.round((z.hp / z.maxHp) * 1000)), fl, r2(z.lockA), z.phase, r1(z.vx), r1(z.vy)];
     });
     const O = this.eprojs.map((e) => [e.id, e.k === 'acid' ? 0 : e.k === 'rock' ? 2 : 1, r1(e.x), r1(e.y), r1(e.h || 0), e.big ? 1 : 0, r1(e.tx ?? e.x), r1(e.ty ?? e.y), r2(e.k === 'nade' ? e.t / e.fuse : e.t / e.dur)]);
-    const K = this.pickups.map((k) => [k.id, k.k, r1(k.x), r1(k.y), k.w || 0]);
+    const K = this.pickups.map((k) => [k.id, k.k, r1(k.x), r1(k.y), k.k === 'note' ? k.n : k.w || 0]);
     const T = this.turrets.map((t) => [t.id, r1(t.x), r1(t.y), r2(t.a), r2(t.t / t.dur), t.color]);
     const A = this.hazards.map((h) => [h.id, h.k, r1(h.x), r1(h.y), r1(h.r), r2(h.t / h.dur)]);
     const W = this.wave;
@@ -1682,6 +1711,7 @@ export class Sim {
       wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
       sc: this.score, k: this.kills, rc: this.roomsCleared, ts: this.toast && this.toast.until > this.t ? this.toast : null,
       bs: boss ? Math.round((boss.hp / boss.maxHp) * 1000) : -1, bn: boss ? ZOMBIES[boss.ty].name : '',
+      in: Math.round(this.intro * 100) / 100, sv: [...this.players.values()].filter((p) => p.skip && !p.bot).map((p) => p.id),
       scr: this.scrap, tr: this.train ? [this.train.st, Math.round(this.train.x), this.train.dir, Math.round(this.train.t * 10) / 10] : null, ca: [...this.cars], dk: this.dark || (this.evt && this.evt.k === 'blackout') ? 1 : 0,
       sh: this.shop.map((it) => [it.id, it.k, Math.round(it.x), Math.round(it.y), it.w || 0, it.price, it.sold ? 1 : 0]),
       vt: this.vault ? [Math.round(this.vault.x), Math.round(this.vault.y), this.vault.st, Math.round(this.vault.prog * 100) / 100] : null,

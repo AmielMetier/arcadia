@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.30 — 23 octobre 2026
+- **Outbreak** — Une histoire : la souche VIREO s'est échappée du Laboratoire Alpha et l'Escouade Delta doit remonter jusqu'à la source pour que le Dr Lenoir fabrique l'antidote.
+  - Cinématique d'intro : l'hélico arrive sur le secteur, puis chaque joueur est présenté avec son nom et sa classe, avant la mission. Espace ou clic pour passer (quand tout le monde a passé, la partie démarre).
+  - Fin animée : extraction en hélico au lever du soleil si vous gagnez, « fin de transmission » si l'escouade tombe.
+  - Messages radio du Commandant Moreau, du Dr Lenoir, du pilote et de Dédé, différents selon le secteur, la salle, le boss et les évènements.
+  - 20 dossiers à trouver dans les salles de la campagne (4 par secteur) pour comprendre ce qui s'est passé ; le compteur est sur l'écran de briefing.
+
 ## 2.29 — 23 octobre 2026
 - **Outbreak** — Cinq secteurs, à choisir au lancement (ou au hasard), chacun avec son décor, ses zombies et son piège :
   - Labo : le complexe d'origine.

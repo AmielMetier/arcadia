@@ -3,7 +3,7 @@ export class Input {
   constructor(canvas, hooks = {}) {
     this.keys = new Set();
     this.mouse = { x: innerWidth / 2, y: innerHeight / 2, down: false, inside: false };
-    this.c = { dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, pk: 0, pi: -1, ab: 0 };
+    this.c = { dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, pk: 0, pi: -1, ab: 0, sk: 0 };
     this.useHeld = false; this.mode = 'mouse'; this.aim = -Math.PI / 2; this.padAim = null; this.padPrev = [];
     this.hooks = hooks; this.enabled = true; this.offerOpen = false;
     const kd = (e) => {
@@ -12,6 +12,7 @@ export class Input {
       if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(k); this.mode = 'mouse';
+      if (k === 'Space' || k === 'Enter' || k === 'Escape') this.c.sk++;
       if (k === 'Space' || k === 'ShiftLeft' || k === 'ShiftRight') this.c.dash++;
       else if (k === 'KeyR') this.c.reload++;
       else if (k === 'KeyG') this.c.nade++;
@@ -42,6 +43,7 @@ export class Input {
     addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') tEnd(e); });
     canvas.addEventListener('pointerdown', (e) => {
       hooks.unlock && hooks.unlock();
+      this.c.sk++;
       if (e.pointerType === 'touch') {
         this.mode = 'touch'; document.body.classList.add('touch');
         const side = e.clientX < innerWidth * 0.45 ? 'move' : 'aim';
@@ -73,7 +75,7 @@ export class Input {
     const lx = dz(gp.axes[0] || 0), ly = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
     const any = lx || ly || rx || ry || gp.buttons.some((x) => x.pressed);
     if (any) this.mode = 'pad';
-    if (edge(0) || edge(6)) this.c.dash++;
+    if (edge(0) || edge(6)) { this.c.dash++; this.c.sk++; }
     if (edge(2)) this.c.reload++;
     if (edge(5)) { this.c.sw++; this.c.sl = -1; }
     if (edge(3)) this.c.ab++;
@@ -111,7 +113,7 @@ export class Input {
       td = Math.hypot(this.mouse.x - origin.x, this.mouse.y - origin.y) / (zoom || 1);
     }
     const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
-    return { mx, my, a: this.aim, fire, use, td, dash: this.c.dash, reload: this.c.reload, sw: this.c.sw, sl: this.c.sl, nade: this.c.nade, pk: this.c.pk, pi: this.c.pi, ab: this.c.ab };
+    return { mx, my, a: this.aim, fire, use, td, dash: this.c.dash, reload: this.c.reload, sw: this.c.sw, sl: this.c.sl, nade: this.c.nade, pk: this.c.pk, pi: this.c.pi, ab: this.c.ab, sk: this.c.sk };
   }
 
   crosshair(origin) {
