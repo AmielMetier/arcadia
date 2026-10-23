@@ -162,6 +162,27 @@ t('salles spéciales, ferraille et événements', () => {
   const snap = JSON.stringify(sim.snapshot()); assert.ok(snap.length < 40000);
 });
 
+t('secteurs : campagne jouable dans chaque secteur', () => {
+  for (const sector of ['lab', 'sewers', 'hospital', 'metro', 'nice']) {
+    const sim = new Sim({ mode: 'campaign', difficulty: 'arcade', seed: 77, sector });
+    for (let i = 0; i < 4; i++) sim.addPlayer({ id: i, name: 'B' + i, bot: true, cls: ['tank', 'medic', 'soldier', 'engineer'][i] });
+    const seen = new Set();
+    for (let s = 0; s < 60 * 60 * 6 && sim.phase === 'play'; s++) {
+      for (const p of sim.players.values()) botThink(sim, p, DT); sim.step(DT);
+      for (const e of sim.drainEvents()) if (['train', 'carAlarm'].includes(e.e)) seen.add(e.e);
+    }
+    console.log(`   ${sector}: salle ${sim.room.index} (${sim.phase}) ${[...seen].join(', ')}`);
+    assert.equal(sim.cfg.sector, sector);
+    assert.ok(sim.roomsCleared >= 2, sector + ' : au moins deux salles');
+    if (sector === 'metro') assert.ok(seen.has('train'), 'la rame passe');
+  }
+  for (const sector of ['sewers', 'hospital', 'metro', 'nice']) for (const type of ['start', 'armory', 'medbay', 'lab', 'storage', 'dark', 'gas', 'arena', 'core', 'shop', 'vault']) for (let seed = 1; seed < 12; seed++) {
+    const lv = generateRoom({ type, index: 3, seed, sector, exits: type === 'core' || type === 'arena' ? [] : ['lab', 'armory'], mode: type === 'arena' ? 'survival' : 'campaign' });
+    const f = distanceField(lv, [lv.spawn]);
+    for (const v of lv.vents) assert.ok(isFinite(f[cellIndex(lv, v.sx, v.sy)]), `bouche accessible (${sector}/${type}/${seed})`);
+  }
+});
+
 t('améliorations : toutes applicables', () => {
   const sim = new Sim({ seed: 1 });
   const p = sim.addPlayer({ id: 0, name: 'A' });

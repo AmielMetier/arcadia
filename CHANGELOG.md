@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.29 — 23 octobre 2026
+- **Outbreak** — Cinq secteurs, à choisir au lancement (ou au hasard), chacun avec son décor, ses zombies et son piège :
+  - Labo : le complexe d'origine.
+  - Égouts de Nice : des canaux qui ralentissent, des ponts pour traverser, des larves et des rampants partout.
+  - Hôpital Pasteur : lits, rideaux et néons qui clignotent ; des patients qui courent et des hurleuses.
+  - Tramway souterrain : une rame traverse régulièrement la salle, et tout ce qui est sur les voies (zombies compris) est fauché. L'alarme sonne avant.
+  - Rues de Nice : voitures, palmiers, terrasses et kiosque à socca. Une balle dans une voiture déclenche son alarme… et attire une horde.
+- **Outbreak** — Les salles de départ et du boss prennent un nom propre au secteur (Place Masséna, Bloc opératoire, Terminus…) et les zombies s'habillent selon l'endroit.
+
 ## 2.28 — 23 octobre 2026
 - **Outbreak** — Nouveaux boss :
   - Un mini-boss garde la salle 4 : l'Abomination (charge, onde de choc, lancer de rochers) ou la Mère des Cracheurs (pond des larves, pluie d'acide).

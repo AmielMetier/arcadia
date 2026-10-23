@@ -44,6 +44,7 @@ function readCfg(settings = {}) {
     difficulty: DIFFICULTY[src.difficulty] ? src.difficulty : 'normal',
     startWeapon: ['pistol', 'shotgun', 'smg'].includes(src.startWeapon) ? src.startWeapon : 'pistol',
     bots: clamp(Number(src.bots ?? (H.embedded ? 0 : 2)) | 0, 0, 3),
+    sector: ['lab', 'sewers', 'hospital', 'metro', 'nice', 'random'].includes(src.sector) ? src.sector : 'random',
   };
 }
 function localProfile() {
@@ -115,7 +116,7 @@ function showBriefing() {
 function startRun() {
   if (S.role === 'guest') return;
   const seed = (Math.random() * 2 ** 31) | 0;
-  const sim = new Sim({ mode: S.cfg.mode, difficulty: S.cfg.difficulty, startWeapon: S.cfg.startWeapon, seed });
+  const sim = new Sim({ mode: S.cfg.mode, difficulty: S.cfg.difficulty, startWeapon: S.cfg.startWeapon, seed, sector: S.cfg.sector === 'random' ? null : S.cfg.sector });
   const sq = squad();
   for (const p of sq) if (!p.bot && isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
   sq.filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true, cls: b.cls }));
@@ -275,6 +276,7 @@ function stepBody(P, h, dt, me, snap, solids) {
   const cls = CLASS_IDS[me.cl];
   if (cls === 'tank') sp *= 0.92;
   if (cls === 'scout') sp *= me.ab && me.ab[1] > 0 ? 1.4 * 1.08 : 1.08;
+  for (const z of S.lv.zones || []) if (z.k === 'water' && P.x > z.x && P.x < z.x + z.w && P.y > z.y && P.y < z.y + z.h) { sp *= 0.62; break; }
   if (me.state === 1) sp = 52;
   if (me.state === 2 || me.pn) sp = 0;
   if (h.revive) sp = 0;
@@ -353,10 +355,10 @@ function predictLocal(dt) {
 // ------------------------------------------------------------------ vue commune (hôte et invités)
 const anim = new Map();
 function ensureLevel(s) {
-  const key = `${s.run}:${s.rm.mode}:${s.rm.i}:${s.rm.ty}:${s.rm.sd}`;
+  const key = `${s.run}:${s.rm.mode}:${s.rm.i}:${s.rm.ty}:${s.rm.sd}:${s.rm.sec}`;
   if (key === S.lvKey) return false;
   S.lvKey = key;
-  S.lv = generateRoom({ mode: s.rm.mode, index: s.rm.i, type: s.rm.ty, seed: s.rm.sd, exits: s.rm.ex });
+  S.lv = generateRoom({ mode: s.rm.mode, index: s.rm.i, type: s.rm.ty, seed: s.rm.sd, exits: s.rm.ex, sector: s.rm.sec });
   renderer.setLevel(S.lv, key); renderer.camInit = false;
   return true;
 }
@@ -410,7 +412,7 @@ function buildView(a, b, f, dt) {
   const view = {
     lv, t, players, zombies, eprojs, mode: b.rm.mode,
     pickups: b.K.map((k) => ({ id: k[0], k: k[1], x: k[2], y: k[3], w: k[4] })),
-    hazards: b.A, turrets: b.T || [], shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
+    hazards: b.A, turrets: b.T || [], shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, train: b.tr, alarms: b.ca || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
     doorsOpen: !!b.op, cleared: !!b.cl, rally: b.rl, meId: S.myId, me: meSnap ? { ...meSnap, state: meSnap.s } : null,
     snap: b, waveLeft: b.wv.left, focus, bleedMax: DIFFICULTY[b.cfg.d]?.bleed || 28, predictFire: S.role === 'guest',
     clock: b.t,

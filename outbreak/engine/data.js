@@ -116,6 +116,27 @@ export const DIFFICULTY = {
   hardcore: { name: 'Cauchemar', zHp: 1.2, zDmg: 1.3, budget: 1.15, drops: 0.75, bleed: 16, adrenaline: 0 },
 };
 
+// ---------------------------------------------------------------- secteurs
+// rooms : noms qui remplacent ceux du labo · zw : bonus de probabilité des zombies · pal : tenues des zombies
+export const SECTORS = {
+  lab: { name: 'Laboratoire Alpha', short: 'Labo', icon: '🧪', desc: 'Le complexe souterrain où tout a commencé.',
+    rooms: {}, zw: {}, pal: null },
+  sewers: { name: 'Égouts de Nice', short: 'Égouts', icon: '🐀', desc: "Canaux qui ralentissent, larves et rampants dans l'eau.",
+    rooms: { start: "Bouche d'égout", core: 'Collecteur principal', arena: 'Grand bassin' }, zw: { crawler: 2, larva: 2.2, spitter: 1.4 },
+    pal: ['#5a5446', '#6b6250', '#4f5a4a', '#5d4f45'] },
+  hospital: { name: 'Hôpital Pasteur', short: 'Hôpital', icon: '🏥', desc: 'Néons qui clignotent, patients enragés, hurleuses.',
+    rooms: { start: 'Hall des urgences', core: 'Bloc opératoire', arena: 'Grand hall' }, zw: { runner: 1.6, screamer: 2.2, stalker: 1.6 },
+    pal: ['#b9d6e8', '#d7e6ef', '#9cc3d8', '#e8eef2', '#7fb0a5'] },
+  metro: { name: 'Tramway souterrain', short: 'Métro', icon: '🚇', desc: 'Les rames passent toujours : ne restez pas sur les voies.',
+    rooms: { start: 'Quai Garibaldi', core: 'Terminus', arena: 'Grande station' }, zw: { walker: 1.3, armored: 1.8, brute: 1.5 },
+    pal: ['#3e4a5c', '#5b6270', '#2f3a48', '#7a6a55'] },
+  nice: { name: 'Rues de Nice', short: 'Nice', icon: '🌴', desc: 'Voitures à alarme, terrasses, palmiers. Ne tirez pas dans les voitures.',
+    rooms: { start: 'Place Masséna', core: 'Promenade des Anglais', arena: 'Cours Saleya' }, zw: { runner: 1.8, walker: 1.2 },
+    pal: ['#ff6f91', '#ffc75f', '#4fc3f7', '#f9f871', '#ff9671', '#00c9a7', '#fff8ea'] },
+};
+export const SECTOR_LIST = Object.keys(SECTORS);
+export const roomName = (type, sector) => (SECTORS[sector] && SECTORS[sector].rooms[type]) || ROOM_TYPES[type].name;
+
 // ---------------------------------------------------------------- classes de survivants
 // cd : recharge de la capacité (s) · dur : durée de l'effet
 export const CLASSES = {

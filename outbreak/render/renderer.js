@@ -1,8 +1,8 @@
 // Rendu d'une image : salle, entités, effets, éclairage dynamique (lampes torches, flashs, explosions), indicateurs.
-import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, drawShopItem, drawVaultDoor, drawDropCrate, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
+import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, drawShopItem, drawVaultDoor, drawDropCrate, setZombiePalette, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
 import { paintLevel, THEMES } from './level-art.js';
 import { WALL_TOP } from '../engine/level.js';
-import { ROOM_TYPES, SHOP_ITEMS } from '../engine/data.js';
+import { ROOM_TYPES, SHOP_ITEMS, SECTORS } from '../engine/data.js';
 
 const LS = 0.5; // résolution de la carte de lumière
 
@@ -29,6 +29,7 @@ export class Renderer {
   setLevel(lv, key) {
     if (this.lvKey === key) return false;
     this.lvKey = key; this.lv = lv;
+    setZombiePalette(SECTORS[lv.sector] && SECTORS[lv.sector].pal);
     this.art = paintLevel(lv);
     this.theme = THEMES[lv.theme] || THEMES.sas;
     this.doorAnim.clear();
@@ -70,6 +71,13 @@ export class Renderer {
     c.drawImage(this.art, 0, 0);
     if (fx.decal) c.drawImage(fx.decal, 0, 0);
 
+    // ---- eau qui ondule
+    for (const z of lv.zones) if (z.k === 'water') {
+      c.save(); c.beginPath(); c.rect(z.x, z.y + 8, z.w, z.h - 16); c.clip();
+      c.strokeStyle = 'rgba(160,220,190,.35)'; c.lineWidth = 2;
+      for (let k = 0; k < z.w; k += 70) { const ox = (t * 30 + k) % z.w; c.beginPath(); c.moveTo(z.x + ox, z.y + 20 + (k % 3) * 14); c.quadraticCurveTo(z.x + ox + 15, z.y + 14 + (k % 3) * 14, z.x + ox + 30, z.y + 20 + (k % 3) * 14); c.stroke(); }
+      c.restore();
+    }
     // ---- flaques
     for (const h of v.hazards) this.drawHazard(c, h, t);
     // ---- bouches d'aération actives
@@ -136,6 +144,14 @@ export class Renderer {
       c.restore();
     }
 
+    // ---- rame de métro
+    if (v.train) this.drawTrain(c, v.train, t, false);
+    // ---- voitures dont l'alarme sonne
+    for (const id of v.alarms || []) {
+      const car = lv.solids.find((q) => q.id === id); if (!car || Math.sin(t * 12) < 0) continue;
+      c.fillStyle = 'rgba(255,200,60,.85)';
+      for (const [px, py] of [[car.x + 6, car.y + 6], [car.x + car.w - 6, car.y + 6], [car.x + 6, car.y + car.h - 6], [car.x + car.w - 6, car.y + car.h - 6]]) { circ(c, px, py, 6); c.fill(); }
+    }
     // ---- projectiles ennemis et grenades
     for (const o of v.eprojs) {
       const [, k, x, y, h, big] = o;
@@ -158,6 +174,7 @@ export class Renderer {
     // ---- par-dessus l'obscurité : yeux, lueurs, avertissements, étiquettes
     for (const z of v.zombies) zombieEyes(c, z);
     fx.drawGlow(c);
+    if (v.train) this.drawTrain(c, v.train, t, true);
     this.telegraphs(c, v, t);
     this.labels(c, v, t);
     fx.drawTexts(c);
@@ -242,6 +259,28 @@ export class Renderer {
     if (R.reward) { c.font = '600 12px "Chakra Petch", sans-serif'; c.lineWidth = 3; c.strokeStyle = INK; c.strokeText(R.reward, d.x + d.w / 2, ly + 26); c.fillStyle = '#ffc531'; c.fillText(R.reward, d.x + d.w / 2, ly + 26); }
   }
 
+  drawTrain(c, tr, t, warnLayer) {
+    const [st, x, dir, tt] = tr;
+    const tz = this.lv.zones.find((z) => z.k === 'track'); if (!tz) return;
+    if (warnLayer) {
+      if (!(st === 'warn' || (st === 'idle' && tt < 1))) return;
+      const on = Math.sin(t * 14) > 0;
+      c.fillStyle = on ? 'rgba(255,60,40,.35)' : 'rgba(255,60,40,.15)'; c.fillRect(tz.x, tz.y, tz.w, tz.h);
+      c.font = '700 22px Bungee, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let xx = tz.x + 200; xx < tz.x + tz.w; xx += 500) { c.lineWidth = 5; c.strokeStyle = INK; c.strokeText('⚠ RAME', xx, tz.y + tz.h / 2); c.fillStyle = '#ffc531'; c.fillText('⚠ RAME', xx, tz.y + tz.h / 2); }
+      return;
+    }
+    if (st !== 'pass') return;
+    const x0 = dir > 0 ? x - 900 : x, L = 900, y = tz.y + 8, h = tz.h - 16;
+    for (let k = 0; k < 3; k++) {
+      const cx = x0 + k * 300 + 6;
+      rr(c, cx, y, 288, h, 14); fs(c, '#e8e2d4', 3.5);
+      c.fillStyle = '#3a5a8c'; c.fillRect(cx + 6, y + h / 2 - 7, 276, 14);
+      for (let wx = cx + 20; wx < cx + 270; wx += 46) { rr(c, wx, y + 8, 30, 16, 3); c.fillStyle = '#9fd8ff'; c.fill(); rr(c, wx, y + h - 24, 30, 16, 3); c.fill(); }
+    }
+    c.fillStyle = 'rgba(255,240,180,.5)'; const fx0 = dir > 0 ? x : x0; c.beginPath(); c.moveTo(fx0, y + 10); c.lineTo(fx0 + dir * 260, y - 30); c.lineTo(fx0 + dir * 260, y + h + 30); c.lineTo(fx0, y + h - 10); c.fill();
+  }
+
   muzzleFlash(c, p) {
     c.save(); c.rotate(p.a);
     const L = (MUZZLE[p.weapon] || 20) + 10 - (p.recoil || 0);
@@ -257,7 +296,8 @@ export class Renderer {
     const lc = this.lc, th = this.theme;
     lc.setTransform(1, 0, 0, 1, 0, 0);
     lc.globalCompositeOperation = 'source-over';
-    const dark = v.dark ? 0.965 : th.dark;
+    let dark = v.dark ? 0.965 : th.dark;
+    if (this.lv.sector === 'hospital' && !v.dark) { const f = Math.sin(t * 23) * Math.sin(t * 7.3); if (f > 0.75) dark = Math.min(0.97, dark + 0.18); }
     lc.clearRect(0, 0, this.light.width, this.light.height);
     lc.fillStyle = `rgba(3,5,12,${dark})`; lc.fillRect(0, 0, this.light.width, this.light.height);
     lc.globalCompositeOperation = 'destination-out';
@@ -287,6 +327,7 @@ export class Renderer {
     for (const p of this.fx.parts) if ((p.k === 'flame' || p.k === 'fire') && (n++ % 3 === 0)) blob(p.x, p.y, 90, 0.5 * (p.life / p.max));
     for (const h of v.hazards) blob(h[2], h[3], h[4] * 1.4, h[1] === 'acid' ? 0.4 : h[1] === 'heal' ? 0.55 : 0.2);
     for (const tt of v.turrets || []) blob(tt[1], tt[2], 120, 0.5);
+    if (v.train && v.train[0] === 'pass') { const tz = this.lv.zones.find((z) => z.k === 'track'); if (tz) blob(v.train[2] > 0 ? v.train[1] : v.train[1], tz.y + tz.h / 2, 420, 0.8); }
     for (const k of v.pickups) blob(k.x, k.y, k.k === 'weapon' ? 110 : 70, 0.4);
     for (const d of this.lv.doors) if (d.kind === 'exit') blob(d.x + d.w / 2, WALL_TOP, 200, v.doorsOpen ? 0.7 : 0.35);
     for (const z of v.zombies) { if (z.flags & 2) blob(z.x, z.y, 90, 0.6); if (z.r > 30 && !(z.flags & 8192)) blob(z.x, z.y, 240, 0.45); }

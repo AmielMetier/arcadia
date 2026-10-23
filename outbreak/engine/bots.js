@@ -112,6 +112,11 @@ export function botThink(sim, p, dt) {
     const d = Math.hypot(p.x - h.x, p.y - h.y);
     if (d < h.r + 30 && d > 1) { mx += ((p.x - h.x) / d) * 1.5; my += ((p.y - h.y) / d) * 1.5; }
   }
+  // métro : quitter les voies quand la rame arrive
+  if (sim.train && sim.train.st !== 'idle' || (sim.train && sim.train.t < 3)) {
+    const tz = sim.lv.zones.find((z) => z.k === 'track');
+    if (tz && p.y > tz.y - 30 && p.y < tz.y + tz.h + 30) { mx *= 0.3; my = p.y < tz.y + tz.h / 2 ? -1.5 : 1.5; }
+  }
   // charge d'une brute : s'écarter de la ligne
   for (const z of sim.zombies) {
     if ((z.state === 'tele' || z.state === 'charge') && Math.hypot(z.x - p.x, z.y - p.y) < 600) {

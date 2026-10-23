@@ -1,6 +1,6 @@
 // Simulation d'Outbreak. Tourne chez l'hôte (ou en solo) à pas fixe ; les invités ne font qu'afficher ce qu'elle diffuse.
 // Aucun DOM, aucun réseau : testable sous Node (tools/test-outbreak.mjs).
-import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS, FINAL_BOSSES, MINI_BOSSES, isBig, SPECIAL_TYPES, SHOP_ITEMS } from './data.js';
+import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS, FINAL_BOSSES, MINI_BOSSES, isBig, SPECIAL_TYPES, SHOP_ITEMS, SECTORS, SECTOR_LIST, roomName } from './data.js';
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
@@ -21,7 +21,9 @@ export class Sim {
       difficulty: DIFFICULTY[cfg.difficulty] ? cfg.difficulty : 'normal',
       startWeapon: WEAPONS[cfg.startWeapon] ? cfg.startWeapon : 'pistol',
       seed: cfg.seed || ((Math.random() * 2 ** 31) | 0),
+      sector: cfg.sector,
     };
+    if (!SECTORS[this.cfg.sector]) this.cfg.sector = SECTOR_LIST[((this.cfg.seed >>> 7) % SECTOR_LIST.length + SECTOR_LIST.length) % SECTOR_LIST.length];
     this.diff = DIFFICULTY[this.cfg.difficulty];
     this.rng = makeRng(this.cfg.seed ^ 0x5eed);
     this.t = 0; this.tick = 0;
@@ -84,6 +86,8 @@ export class Sim {
     if (Number.isFinite(inp.q)) p.seq = inp.q;
   }
 
+  inZone(e, k) { for (const z of this.lv.zones) if (z.k === k && e.x > z.x && e.x < z.x + z.w && e.y > z.y && e.y < z.y + z.h) return z; return null; }
+
   standing() { return [...this.players.values()].filter((p) => p.state === 'ok'); }
 
   // ------------------------------------------------------------------ salles
@@ -96,7 +100,8 @@ export class Sim {
       else exits = this.pickExits(index + 1, makeRng(seed ^ 0xd00d));
     }
     this.room = { type, index, seed, exits };
-    this.lv = generateRoom({ mode: this.cfg.mode, index, type, seed, exits });
+    this.lv = generateRoom({ mode: this.cfg.mode, index, type, seed, exits, sector: this.cfg.sector });
+    this.cars = new Set(); this.train = this.lv.zones.some((z) => z.k === 'track') ? { t: 12 + this.rng.range(0, 6), st: 'idle', x: 0, dir: this.rng.chance(0.5) ? 1 : -1 } : null;
     this.zombies = []; this.projs = []; this.eprojs = []; this.hazards = []; this.pending = []; this.turrets = [];
     this.pickups = this.pickups.filter(() => false);
     this.destroyed = new Set();
@@ -150,7 +155,7 @@ export class Sim {
     if (this.cfg.mode === 'campaign' && index >= 2 && !['shop', 'vault', 'core', 'start'].includes(type) && this.rng.chance(0.55)) this.evtAt = this.rng.range(14, 32);
     this.ev({ e: 'room', i: index, ty: type });
     const bossName = ZOMBIES[this.bossKind].name;
-    this.setToast(this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? `${bossName} se réveille…` : ROOM_TYPES[type].name, 2.6);
+    this.setToast(this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? `${bossName} se réveille…` : roomName(type, this.cfg.sector), 2.6);
   }
 
   // Deux portes vers la salle suivante. Le marchand est proposé avant les salles 3 et 5 ; la 4 est celle du mini-boss.
@@ -206,6 +211,7 @@ export class Sim {
     this.updateField(dt);
     this.stepWaves(dt);
     this.stepEvents(dt);
+    if (this.train) this.stepTrain(dt);
     this.stepZombies(dt);
     this.stepTurrets(dt);
     this.stepProjectiles(dt);
@@ -347,6 +353,7 @@ export class Sim {
     if (lvl(p, 'rage') && p.hp < p.maxHp * 0.35) sp *= 1.4;
     if (CW.slow && p.spin > 0) sp *= CW.slow;
     sp *= classSpeed(p);
+    if (this.lv.zones.length && this.inZone(p, 'water')) sp *= 0.62;
     if (p.state === 'down') sp = 52;
     if (reviving || pinned) sp = 0;
     let mx = clamp(Number(inp.mx) || 0, -1, 1), my = clamp(Number(inp.my) || 0, -1, 1);
@@ -608,6 +615,7 @@ export class Sim {
       }
       if (alive && wall) {
         const hx = pr.x + dx * wall.t, hy = pr.y + dy * wall.t;
+        if (wall.solid && wall.solid.kind === 'car' && !this.cars.has(wall.solid.id)) this.carAlarm(wall.solid);
         if (pr.explosive) { this.explode(hx - (wall.nx || 0) * 6, hy - (wall.ny || 0) * 6, pr.explosive * (1 + 0.3 * lvl(owner, 'nade')), pr.dmg, 0, owner, 'shell'); alive = false; }
         else if (pr.bounce > 0 && !wall.inside) {
           pr.bounce--; pr.x = hx + wall.nx * 2; pr.y = hy + wall.ny * 2;
@@ -993,7 +1001,7 @@ export class Sim {
       ['armored', i >= 3 ? 1.3 : 0],
       ['stalker', (i >= 4 ? 0.7 : i >= 3 ? 0.3 : 0) + (ty === 'dark' ? 1.2 : 0)],
       ['larva', (i >= 2 ? 1.4 : 0) * (ty === 'lab' ? 1.8 : 1)],
-    ].filter((x) => x[1] > 0);
+    ].map(([k, v]) => [k, v * (SECTORS[this.cfg.sector].zw[k] || 1)]).filter((x) => x[1] > 0);
     if (this.room.type === 'core') return this.rng.weighted([['runner', 4], ['walker', 4], ['crawler', 3], ['spitter', 1]]);
     return this.rng.weighted(w);
   }
@@ -1035,6 +1043,37 @@ export class Sim {
     this.wave = { n: 0, total: 2, budget: 0, timer: 1.2, spawnT: 0, endless: false, mult: 1.5 };
     this.ev({ e: 'vaultAlarm', x: Math.round(V.x), y: Math.round(V.y) });
     this.setToast('Alarme ! Tenez jusqu\'à l\'ouverture du coffre', 3, 'bad');
+  }
+
+  // Métro : une rame traverse régulièrement la salle ; tout ce qui est sur les voies est fauché
+  carAlarm(car) {
+    this.cars.add(car.id);
+    const cx = car.x + car.w / 2, cy = car.y + car.h / 2;
+    this.ev({ e: 'carAlarm', x: Math.round(cx), y: Math.round(cy), id: car.id });
+    this.setToast('Alarme de voiture ! Ils arrivent…', 2.2, 'bad');
+    for (let i = 0; i < 8 + this.players.size * 2; i++) { const v = this.rng.pick(this.lv.vents); this.pending.push({ ty: i % 3 ? 'runner' : 'walker', x: v.sx, y: v.sy, t: 0.6 + i * 0.15 }); }
+    for (const z of this.zombies) if (!isBig(z.ty) && Math.hypot(z.x - cx, z.y - cy) < 700) z.buffT = 4;
+  }
+
+  stepTrain(dt) {
+    const T = this.train, tz = this.lv.zones.find((z) => z.k === 'track');
+    T.t -= dt;
+    if (T.st === 'idle' && T.t <= 0) { T.st = 'warn'; T.t = 2.6; this.ev({ e: 'trainWarn' }); }
+    else if (T.st === 'warn' && T.t <= 0) { T.st = 'pass'; T.t = 1.3; T.x = T.dir > 0 ? -900 : this.lv.w + 900; this.ev({ e: 'train', d: T.dir }); }
+    else if (T.st === 'pass') {
+      T.x += T.dir * 2600 * dt;
+      const x0 = T.dir > 0 ? T.x - 900 : T.x, x1 = T.dir > 0 ? T.x : T.x + 900;
+      for (const p of this.players.values()) {
+        if (p.state === 'dead' || p.y < tz.y - 4 || p.y > tz.y + tz.h + 4 || p.x < x0 || p.x > x1) continue;
+        if (p.state === 'down') { p.bleed = Math.min(p.bleed, 0.01); continue; }
+        if (!p.trainHit) { p.trainHit = true; p.hurtT = 0; p.dashT = 0; this.hurtPlayer(p, 70, p.x, p.y - T.dir * 0.01, 0); p.ky += (p.y < tz.y + tz.h / 2 ? -1 : 1) * 900; p.kx += T.dir * 300; }
+      }
+      for (const z of this.zombies) {
+        if (z.hp <= 0 || isBig(z.ty) || z.y < tz.y - z.r || z.y > tz.y + tz.h + z.r || z.x < x0 || z.x > x1) continue;
+        this.damageZombie(z, 9999, T.dir > 0 ? 0 : Math.PI, 600, null, false, true);
+      }
+      if (T.t <= 0 || (T.dir > 0 ? T.x - 900 > this.lv.w : T.x + 900 < 0)) { T.st = 'idle'; T.t = 18 + this.rng.range(0, 10); for (const p of this.players.values()) p.trainHit = false; }
+    }
   }
 
   // ------------------------------------------------------------------ événements aléatoires
@@ -1214,6 +1253,7 @@ export class Sim {
 
       let speed = z.spd * (z.buffT > 0 ? 1.45 : 1);
       if (z.slowT > 0) { z.slowT -= dt; speed *= 0.35; }
+      if (this.lv.zones.length && !isBig(z.ty) && this.inZone(z, 'water')) speed *= 0.6;
       let want = null; // direction souhaitée {x,y}
       // coincé contre un coin : on contourne
       z.stuckT = (z.stuckT || 0) + dt;
@@ -1636,13 +1676,13 @@ export class Sim {
     const W = this.wave;
     const boss = this.zombies.find((z) => isBig(z.ty));
     return {
-      ph: this.phase, t: r2(this.t), rm: { i: this.room.index, ty: this.room.type, sd: this.room.seed, ex: this.room.exits, mode: this.cfg.mode },
+      ph: this.phase, t: r2(this.t), rm: { i: this.room.index, ty: this.room.type, sd: this.room.seed, ex: this.room.exits, mode: this.cfg.mode, sec: this.cfg.sector },
       P, Z, O, K, A, T, D: [...this.destroyed], op: this.doorsOpen ? 1 : 0, cl: this.cleared ? 1 : 0,
       rl: this.rally ? { d: this.rally.door, t: r2(this.rally.t), a: this.rally.all ? 1 : 0 } : null,
       wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
       sc: this.score, k: this.kills, rc: this.roomsCleared, ts: this.toast && this.toast.until > this.t ? this.toast : null,
       bs: boss ? Math.round((boss.hp / boss.maxHp) * 1000) : -1, bn: boss ? ZOMBIES[boss.ty].name : '',
-      scr: this.scrap, dk: this.dark || (this.evt && this.evt.k === 'blackout') ? 1 : 0,
+      scr: this.scrap, tr: this.train ? [this.train.st, Math.round(this.train.x), this.train.dir, Math.round(this.train.t * 10) / 10] : null, ca: [...this.cars], dk: this.dark || (this.evt && this.evt.k === 'blackout') ? 1 : 0,
       sh: this.shop.map((it) => [it.id, it.k, Math.round(it.x), Math.round(it.y), it.w || 0, it.price, it.sold ? 1 : 0]),
       vt: this.vault ? [Math.round(this.vault.x), Math.round(this.vault.y), this.vault.st, Math.round(this.vault.prog * 100) / 100] : null,
       ev: this.evt && this.evt.k === 'drop' ? [this.evt.st, this.evt.x, this.evt.y, Math.round(this.evt.prog * 100) / 100, Math.round(this.evt.t * 10) / 10] : null, cfg: { d: this.cfg.difficulty, sw: this.cfg.startWeapon, seed: this.cfg.seed },
@@ -1651,7 +1691,7 @@ export class Sim {
 
   // Nouvel hôte : reprendre la partie à partir du dernier état reçu (la salle en cours redémarre proprement)
   static restore(snap, cfg) {
-    const sim = new Sim({ mode: snap.rm.mode, difficulty: snap.cfg.d, startWeapon: snap.cfg.sw, seed: snap.cfg.seed, ...cfg });
+    const sim = new Sim({ mode: snap.rm.mode, difficulty: snap.cfg.d, startWeapon: snap.cfg.sw, seed: snap.cfg.seed, sector: snap.rm.sec, ...cfg });
     sim.score = snap.sc; sim.kills = snap.k; sim.roomsCleared = snap.rc; sim.scrap = snap.scr || 0;
     for (const q of snap.P) {
       const p = sim.addPlayer({ id: q.i, name: q.n, color: q.c, bot: !!q.b, cls: CLASS_IDS[q.cl] || 'soldier' });

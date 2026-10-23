@@ -1,5 +1,5 @@
 // Interface (DOM) : HUD en jeu, choix d'améliorations, écrans de briefing, de menu et de fin.
-import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS } from '../engine/data.js';
+import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS, SECTORS, roomName } from '../engine/data.js';
 import { weaponIcon } from '../render/sprites.js';
 
 const $ = (s) => document.querySelector(s);
@@ -23,8 +23,8 @@ export class HUD {
     // salle et statut
     const rm = s.rm;
     const camp = rm.mode !== 'survival';
-    this.set('roomN', camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : 'MODE SURVIE');
-    this.set('roomName', esc(camp ? ROOM_TYPES[rm.ty].name.split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
+    this.set('roomN', (SECTORS[rm.sec] ? SECTORS[rm.sec].short.toUpperCase() + ' · ' : '') + (camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : 'SURVIE'));
+    this.set('roomName', esc(camp ? roomName(rm.ty, rm.sec).split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
     let st = '', sc = 'status card';
     if (s.ph === 'won') { st = '✔ Mission accomplie'; sc += ' clear'; }
     else if (s.ph === 'over') { st = '✖ Escouade décimée'; sc += ' lock'; }
@@ -125,7 +125,8 @@ export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myCla
       ${opt('difficulty', 'Difficulté', [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], cfg.difficulty)}
       ${opt('bots', 'Équipiers IA', [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], cfg.bots)}
       ${opt('startWeapon', 'Arme de départ', [['pistol', 'Pistolet'], ['shotgun', 'Pompe'], ['smg', 'Mitraillette']], cfg.startWeapon)}
-    </div>` : `<div class="chips"><span class="chip">${cfg.mode === 'survival' ? '♾ Survie' : '🗺 Campagne · 7 salles'}</span><span class="chip">☣ ${D.name}</span><span class="chip">🔫 Départ : ${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>${cfg.bots ? `<span class="chip">🤖 ${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}</div>`;
+      ${opt('sector', 'Secteur', [['random', '🎲 Au hasard'], ...Object.entries(SECTORS).map(([k, S2]) => [k, S2.icon + ' ' + S2.short])], cfg.sector)}
+    </div>` : `<div class="chips"><span class="chip">${cfg.mode === 'survival' ? '♾ Survie' : '🗺 Campagne · 7 salles'}</span><span class="chip">☣ ${D.name}</span><span class="chip">${cfg.sector === 'random' || !SECTORS[cfg.sector] ? '🎲 Secteur au hasard' : SECTORS[cfg.sector].icon + ' ' + SECTORS[cfg.sector].name}</span><span class="chip">🔫 Départ : ${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>${cfg.bots ? `<span class="chip">🤖 ${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}</div>`;
   return `<div class="card panel">
     <h1 class="logo">OUTBREAK<small>SECTEUR ZÉRO</small></h1>
     <p class="tagline">${cfg.mode === 'survival'

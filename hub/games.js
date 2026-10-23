@@ -187,6 +187,7 @@ window.HUB_GAMES = [
       { key: 'difficulty', label: 'Difficulté', options: [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], def: 'normal' },
       { key: 'bots', label: 'Équipiers IA', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'startWeapon', label: 'Arme de départ', options: [['pistol', 'Pistolet'], ['shotgun', 'Fusil à pompe'], ['smg', 'Mitraillette']], def: 'pistol' },
+      { key: 'sector', label: 'Secteur', options: [['random', '🎲 Au hasard'], ['lab', '🧪 Labo'], ['sewers', '🐀 Égouts'], ['hospital', '🏥 Hôpital'], ['metro', '🚇 Métro'], ['nice', '🌴 Rues de Nice']], def: 'random' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>

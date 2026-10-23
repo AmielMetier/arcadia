@@ -118,7 +118,9 @@ function drawDowned(c, p, t, col, dark, skin) {
 }
 
 // ------------------------------------------------------------------ zombies
-const SHIRTS = ['#6b7a8f', '#8a6d4b', '#5b6e4a', '#7a4b5a', '#4f5d75', '#9b8a6a', '#a35c3d', '#3e6b6b'];
+const BASE_SHIRTS = ['#6b7a8f', '#8a6d4b', '#5b6e4a', '#7a4b5a', '#4f5d75', '#9b8a6a', '#a35c3d', '#3e6b6b'];
+let SHIRTS = BASE_SHIRTS;
+export function setZombiePalette(pal) { SHIRTS = pal && pal.length ? pal : BASE_SHIRTS; }
 const SKINS = ['#9cb48a', '#8aa37a', '#a7b58f', '#b5b08a', '#8fa59a'];
 
 // z : { id, ty, a (orientation), walk, flags, hp (0..1), t, inflate }

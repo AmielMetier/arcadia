@@ -128,6 +128,9 @@ export class FX {
       case 'screech': A.play('scream', e.x, e.y); this.ring(e.x, e.y, 200, '#c77dff', 0.6, 8); this.addShake(6, e.x, e.y, view); break;
       case 'throwRock': A.play('roar', e.x, e.y, 0.5); break;
       case 'struggle': { const p = P(e.p); if (p) this.parts.push({ k: 'smoke', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, life: 0.4, max: 0.4, c: '#a8a296', r: 8 }); if (e.p === me) A.play('dash'); break; }
+      case 'trainWarn': A.play('horn'); break;
+      case 'train': A.play('trainPass'); this.addShake(9); break;
+      case 'carAlarm': A.play('carAlarm', e.x, e.y); this.text(e.x, e.y - 40, 'ALARME !', '#ffc531', 18, true); break;
       case 'tEnd': this.dust(e.x, e.y, 8); A.play('switch', e.x, e.y); break;
       case 'dash': { const p = P(e.p); if (p) { this.dust(p.x, p.y, 6); if (e.p === me) A.play('dash'); } break; }
       case 'throw': A.play('throw', null, null, e.p === me ? 1 : 0.4); break;
