@@ -773,3 +773,104 @@ button.cchoice.gone{display:none}
 .tip::after{content:'';display:block;clear:both}
 .trapline{margin:6px 0 0;font-size:13px;color:#ff9a7a}
 @media (max-width:700px){ .tipfig{float:none;width:100%;margin:6px 0} }
+
+/* ------------------------------------------------------------------ The Candidate : scène d'ouverture (9,5 s) */
+.opening{position:fixed;inset:0;z-index:62;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2232,#07090d 70%);overflow:hidden;color:#f5f8fc}
+.opening > *{grid-area:1/1}
+.op-lift{position:relative;width:min(360px,80vw);height:min(460px,70vh);border:4px solid #3a4766;border-radius:10px;background:#d9c27a;overflow:hidden;animation:op-out .5s 3.2s ease-in forwards}
+.op-panel{position:absolute;left:50%;top:-56px;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;padding:4px 18px;border-radius:8px;background:#05070b;border:2px solid var(--gold)}
+.op-lift{margin-top:60px;overflow:visible}
+.op-panel small{font:700 11px 'Chakra Petch',sans-serif;color:var(--dim);letter-spacing:2px;text-transform:uppercase}
+.op-panel b{font-family:var(--bung);font-weight:400;font-size:34px;color:#ff5a3c;text-shadow:0 0 12px rgba(255,90,60,.6)}
+.op-door{position:absolute;top:0;bottom:0;width:50%;background:linear-gradient(90deg,#9aa6ba,#d7dde7 45%,#8b96aa);border:1px solid #5b667c}
+.op-door.l{left:0;animation:op-l .8s 2.6s cubic-bezier(.6,0,.3,1) forwards}
+.op-door.r{right:0;animation:op-r .8s 2.6s cubic-bezier(.6,0,.3,1) forwards}
+@keyframes op-l{to{transform:translateX(-100%)}}
+@keyframes op-r{to{transform:translateX(100%)}}
+@keyframes op-out{to{opacity:0;transform:scale(1.3)}}
+.op-pierre{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:min(640px,calc(100vw - 32px));text-align:center;opacity:0;animation:cu-show 3s 3.4s both}
+.op-say{margin:0;font:italic 600 clamp(17px,2.4vw,24px)/1.4 'Chakra Petch',sans-serif}
+.op-cands{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 32px));text-align:center;opacity:0;animation:op-cands 3.1s 6.4s both}
+@keyframes op-cands{0%{opacity:0;transform:translateY(20px)}15%,100%{opacity:1;transform:none}}
+.op-cands small{font:700 14px 'Chakra Petch',sans-serif;color:var(--gold2);letter-spacing:2px;text-transform:uppercase}
+.op-list{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.op-list .cu-p{animation:pop .4s calc(6.6s + var(--k) * 120ms) cubic-bezier(.2,1.5,.4,1) both}
+.op-rules{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.op-rules span{padding:6px 12px;border-radius:18px;background:#151b27;border:1px solid var(--edge);font:700 13px 'Chakra Petch',sans-serif}
+.op-rules s{text-decoration:none;opacity:.3}
+.opening .count{align-self:end;margin-bottom:6vh}
+
+/* ------------------------------------------------------------------ Pierre Chartier en direct pendant la question */
+/* dans la carte, sur sa propre ligne sous le chrono : rien ne déborde ni n'est coupé */
+.pc-live{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;min-height:48px;margin:8px 0 0;pointer-events:none}
+.pc-live .pc-face{flex:none;width:46px;height:46px;margin:0}
+.pc-bubble{position:relative;max-width:min(420px,calc(100% - 60px));padding:7px 12px;border-radius:14px;background:#f5f8fc;color:#0c0e14;font:700 13px/1.3 'Chakra Petch',sans-serif;box-shadow:3px 3px 0 #000;opacity:0;transform:translateX(8px);transition:opacity .25s,transform .25s}
+.pc-bubble::after{content:'';position:absolute;right:-7px;top:50%;margin-top:-6px;border:6px solid transparent;border-left-color:#f5f8fc;border-right:0}
+.pc-live.talk .pc-bubble{opacity:1;transform:none}
+.pc-live.nod .pc-face{animation:pc-nod .7s ease-in-out 2}
+.pc-live.tap .pc-face{animation:pc-tap .35s ease-in-out 4}
+.pc-live.frown .pc-face{animation:pc-frown .5s ease-in-out 3;border-color:var(--down)}
+@keyframes pc-nod{50%{transform:translateY(5px) rotate(-3deg)}}
+@keyframes pc-tap{50%{transform:rotate(-8deg)}}
+@keyframes pc-frown{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@media (max-width:700px){ .pc-live{min-height:40px} .pc-live .pc-face{width:38px;height:38px} .pc-bubble{font-size:12px} }
+
+/* ------------------------------------------------------------------ décors de The Candidate selon le tour */
+/* premier tour : open space, grandes baies vitrées sur la ville */
+.game.mode-chartier.scene-1{background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 220' preserveAspectRatio='none'%3E%3Cpath d='M0 220V150h60v-40h50v60h40V90h70v80h30v-50h60v100h40V70h60v100h50v-60h40v110h70V100h50v70h40v-40h60v90h50V60h70v110h40v-50h60v100h50v-80h60v80h40v-30h60v80z' fill='%23070a10'/%3E%3C/svg%3E") bottom/100% 32% no-repeat,
+  repeating-linear-gradient(90deg,rgba(170,195,235,.07) 0 3px,transparent 3px 160px),
+  linear-gradient(180deg,transparent 0 30%,rgba(170,195,235,.07) 30% calc(30% + 3px),transparent calc(30% + 3px)),
+  radial-gradient(ellipse at 50% 0%,rgba(150,185,235,.28),transparent 60%),
+  linear-gradient(180deg,#1b2a44 0%,#101a2c 55%,#080c14 100%)!important}
+/* desk : salle de marché, murs d'écrans verts et rouges */
+.game.mode-chartier.scene-2{background:
+  radial-gradient(circle at 12% 30%,rgba(47,191,113,.18),transparent 14%),radial-gradient(circle at 82% 22%,rgba(255,90,60,.16),transparent 12%),
+  radial-gradient(circle at 60% 70%,rgba(47,191,113,.12),transparent 16%),
+  repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 2px,transparent 2px 92px),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 2px,transparent 2px 58px),
+  repeating-linear-gradient(90deg,rgba(47,191,113,.05) 0 40px,rgba(255,90,60,.04) 40px 80px),
+  linear-gradient(180deg,#0d1418 0%,#090d10 60%,#050708 100%)!important}
+/* comité final : salle du conseil, bois sombre, longue table, un projecteur */
+.game.mode-chartier.scene-3{background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200' preserveAspectRatio='none'%3E%3Cellipse cx='600' cy='170' rx='560' ry='60' fill='%23120806'/%3E%3Cellipse cx='600' cy='160' rx='520' ry='44' fill='%232a160e'/%3E%3C/svg%3E") bottom/100% 26% no-repeat,
+  radial-gradient(ellipse at 50% -10%,rgba(255,226,160,.30),transparent 55%),
+  repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 2px,transparent 2px 7px,rgba(255,255,255,.02) 7px 9px,transparent 9px 23px),
+  linear-gradient(180deg,#3a2216 0%,#221209 55%,#120805 100%)!important}
+.game.mode-chartier.scene-1 .deco span,.game.mode-chartier.scene-2 .deco span,.game.mode-chartier.scene-3 .deco span{opacity:.5}
+
+/* ------------------------------------------------------------------ verdict mis en scène */
+.verdict-show{position:fixed;inset:0;z-index:68;display:grid;place-items:center;background:rgba(3,4,8,.94);color:#f5f8fc;cursor:pointer;animation:fadein .5s both;overflow:auto;padding:16px}
+.verdict-show.gone{animation:fadeout .4s forwards}
+@keyframes fadein{from{opacity:0}}
+@keyframes fadeout{to{opacity:0}}
+.vs-in{display:grid;place-items:center;width:min(620px,100%)}
+.vs-title{margin:0 0 14px;font-family:var(--bung);font-weight:400;font-size:clamp(32px,6vw,56px);color:var(--gold2);text-shadow:3px 3px 0 #000;animation:vs-row .6s .1s both,vs-hide .5s var(--hide) forwards}
+.vs-rank{list-style:none;margin:0;padding:0;width:100%;display:flex;flex-direction:column-reverse;gap:8px;animation:vs-hide .5s var(--hide) forwards}
+.vs-rank li{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;background:#151b27;border:2px solid var(--edge);font:700 16px 'Chakra Petch',sans-serif;animation:vs-row .5s var(--d) cubic-bezier(.2,1.4,.4,1) both}
+.vs-rank li b{font-family:var(--bung);font-weight:400;font-size:22px;color:var(--gold2);min-width:44px}
+.vs-rank li i{width:12px;height:12px;border-radius:50%;border:2px solid #000}
+.vs-rank li span{flex:1}
+.vs-rank li em{font-style:normal;color:var(--dim)}
+.vs-rank li.me{border-color:var(--gold2)}
+.vs-rank li.out span,.vs-rank li.out b{opacity:.55}
+@keyframes vs-row{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@keyframes vs-hide{to{opacity:0;transform:translateY(-30px);visibility:hidden}}
+/* le classement et l'embauche occupent la même place : le premier s'efface quand le second arrive */
+.vs-in > .vs-top{grid-area:1/1;display:flex;flex-direction:column;align-items:center;width:100%}
+.vs-hire{grid-area:1/1;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;animation:fadein .5s var(--d) both}
+.vs-for{margin:0;font:italic 600 clamp(18px,2.6vw,26px) 'Chakra Petch',sans-serif}
+.vs-name{font-family:var(--bung);font-weight:400;font-size:clamp(40px,8vw,84px);color:var(--pc,var(--gold2));-webkit-text-stroke:1.5px #000;text-shadow:5px 5px 0 #000;animation:vs-name .9s calc(var(--d) + 1.3s) cubic-bezier(.2,1.2,.3,1) both}
+@keyframes vs-name{from{opacity:0;transform:scale(2.6);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
+.vs-stamp{font-family:var(--bung);font-size:24px;padding:4px 18px;border:4px solid var(--up);color:var(--up);border-radius:8px;transform:rotate(-6deg);animation:vs-stamp .45s calc(var(--d) + 2.2s) cubic-bezier(.2,1.6,.4,1) both}
+@keyframes vs-stamp{from{opacity:0;transform:scale(2.4) rotate(-6deg)}to{opacity:1;transform:rotate(-6deg)}}
+.vs-letter{max-width:460px;padding:14px 18px;border-radius:6px;background:#fff8ea;color:#16181d;text-align:left;font:15px/1.45 Georgia,'Times New Roman',serif;box-shadow:6px 6px 0 rgba(0,0,0,.5);animation:vs-letter .7s calc(var(--d) + 3s) cubic-bezier(.2,1.1,.3,1) both}
+.vs-letter p{margin:6px 0}
+.vs-letter small{color:#6d675c}
+.vs-letter .sig{text-align:right;font-style:italic;font-size:18px}
+@keyframes vs-letter{from{opacity:0;transform:translateY(40px) rotate(2deg)}to{opacity:1;transform:rotate(-1deg)}}
+.vs-skip{position:fixed;right:16px;bottom:16px}
+
+/* face-à-face */
+.cu-vs{font-size:34px;align-self:center}
+.duelb{background:var(--down)!important;color:#fff!important}
