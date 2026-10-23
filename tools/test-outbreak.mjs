@@ -121,6 +121,47 @@ t('zombies : blindé, traqueur, larves', () => {
   assert.equal(p.pinnedBy, null, 'les dégâts le font lâcher prise');
 });
 
+t('boss : les cinq boss se battent et meurent', () => {
+  for (const kind of ['boss', 'colossus', 'queen', 'abomination', 'mother']) {
+    const sim = new Sim({ mode: 'campaign', difficulty: 'arcade', seed: 3 });
+    for (let i = 0; i < 4; i++) {
+      const p = sim.addPlayer({ id: i, name: 'B' + i, bot: true, cls: ['tank', 'medic', 'soldier', 'engineer'][i] });
+      p.weapons.push({ id: 'rifle', mag: 30, res: 240 }, { id: 'launcher', mag: 6, res: 36 });
+      p.perks = { dmg: 3, hp: 2 }; p.maxHp = 150; p.hp = 150;
+    }
+    sim.startRoom('core', 7); sim.wave.total = 0;
+    const z = sim.spawnBoss(1, kind);
+    const seen = new Set();
+    for (let s = 0; s < 60 * 60 * 8 && sim.phase === 'play' && z.hp > 0; s++) {
+      for (const p of sim.players.values()) botThink(sim, p, DT); sim.step(DT);
+      for (const e of sim.drainEvents()) if (['phase', 'pin', 'birth', 'vanish', 'throwRock', 'charge', 'slam'].includes(e.e)) seen.add(e.e);
+      seen.add(z.state);
+    }
+    console.log(`   ${kind}: ${z.hp <= 0 ? 'vaincu' : sim.phase} en ${(sim.t / 60).toFixed(1)} min — ${[...seen].join(', ')}`);
+    assert.ok(z.hp <= 0 || sim.phase === 'over', kind + ' : combat qui se termine');
+  }
+});
+
+t('salles spéciales, ferraille et événements', () => {
+  const sim = new Sim({ seed: 21, difficulty: 'arcade' });
+  for (let i = 0; i < 3; i++) sim.addPlayer({ id: i, name: 'B' + i, bot: true, cls: 'soldier' });
+  sim.startRoom('shop', 3);
+  assert.ok(sim.doorsOpen && sim.shop.length >= 6, 'marchand : portes ouvertes et étals');
+  const p = sim.players.get(0); sim.scrap = 100; const it = sim.shop.find((q) => q.k === 'weapon'); p.x = it.x; p.y = it.y;
+  const n0 = p.weapons.length; assert.ok(sim.tryBuy(p)); assert.ok(p.weapons.length > n0 && sim.scrap < 100, 'achat d\'arme');
+  sim.startRoom('vault', 5);
+  assert.ok(sim.doorsOpen && sim.vault.st === 'closed');
+  sim.openVault(); assert.equal(sim.doorsOpen, false);
+  for (let s = 0; s < 60 * 60 * 6 && !sim.cleared && sim.phase === 'play'; s++) { for (const q of sim.players.values()) botThink(sim, q, DT); sim.step(DT); sim.drainEvents(); }
+  assert.equal(sim.vault.st, 'open', 'coffre ouvert après l\'alarme');
+  sim.startRoom('gas', 4); assert.ok(sim.hazards.some((h) => h.k === 'gas'));
+  for (const k of ['blackout', 'horde', 'drop']) { sim.startEvent(k); assert.equal(sim.evt.k, k); }
+  sim.startRoom('dark', 4); sim.startEvent('drop');
+  for (let s = 0; s < 60 * 40 && sim.evt && sim.evt.st !== 'done'; s++) { for (const q of sim.players.values()) botThink(sim, q, DT); sim.step(DT); sim.drainEvents(); }
+  assert.ok(!sim.evt || sim.evt.st === 'done', 'largage sécurisé par les bots');
+  const snap = JSON.stringify(sim.snapshot()); assert.ok(snap.length < 40000);
+});
+
 t('améliorations : toutes applicables', () => {
   const sim = new Sim({ seed: 1 });
   const p = sim.addPlayer({ id: 0, name: 'A' });

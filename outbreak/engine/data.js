@@ -42,9 +42,17 @@ export const ZOMBIES = {
   armored: { id: 'armored', name: 'Blindé', hp: 260, speed: 66, dmg: 18, cd: 1.1, r: 21, score: 450, drop: 0.5 },
   stalker: { id: 'stalker', name: 'Traqueur', hp: 140, speed: 150, dmg: 10, cd: 0.5, r: 15, score: 500, drop: 0.5, pounce: 640 },
   larva: { id: 'larva', name: 'Larve', hp: 16, speed: 175, dmg: 4, cd: 0.45, r: 9, score: 25, drop: 0.02 },
+  abomination: { id: 'abomination', name: "L'Abomination", hp: 2600, speed: 84, dmg: 28, cd: 1.2, r: 40, score: 2500, drop: 0 },
+  mother: { id: 'mother', name: 'La Mère des Cracheurs', hp: 1800, speed: 50, dmg: 20, cd: 1.2, r: 36, score: 2500, drop: 0 },
+  colossus: { id: 'colossus', name: 'Le Colosse', hp: 8600, speed: 80, dmg: 40, cd: 1.2, r: 54, score: 6000, drop: 0 },
+  queen: { id: 'queen', name: 'La Reine', hp: 5200, speed: 150, dmg: 24, cd: 0.7, r: 34, score: 6000, drop: 0, pounce: 720 },
   boss: { id: 'boss', name: 'Spécimen Zéro', hp: 7200, speed: 92, dmg: 38, cd: 1.1, r: 50, score: 5000, drop: 0 },
 };
 export const ZOMBIE_IDS = Object.keys(ZOMBIES);
+export const FINAL_BOSSES = ['boss', 'colossus', 'queen'];
+export const MINI_BOSSES = ['abomination', 'mother'];
+const BIG = new Set([...FINAL_BOSSES, ...MINI_BOSSES]);
+export const isBig = (ty) => BIG.has(ty);
 
 // ---------------------------------------------------------------- améliorations (cartes entre les salles)
 // rar : 0 commun, 1 rare, 2 épique · max : niveaux cumulables
@@ -84,6 +92,20 @@ export const ROOM_TYPES = {
   storage: { name: 'Entrepôt', theme: 'storage', reward: 'Munitions et grenades', icon: '📦' },
   core: { name: 'Noyau — Spécimen Zéro', theme: 'core', reward: 'Victoire', icon: '☣️' },
   arena: { name: 'Hangar de quarantaine', theme: 'arena', reward: null },
+  shop: { name: 'Chez Dédé, ferrailleur', theme: 'shop', reward: 'Marchand · pas de combat', icon: '🛒' },
+  vault: { name: 'Coffre-fort', theme: 'vault', reward: 'Trésor piégé', icon: '💰' },
+  dark: { name: 'Salle obscure', theme: 'dark', reward: 'Ferraille ×2', icon: '🌑' },
+  gas: { name: 'Salle contaminée', theme: 'gas', reward: 'Améliorations rares', icon: '☣️' },
+};
+export const SPECIAL_TYPES = ['vault', 'dark', 'gas'];
+// Marchand : prix en ferraille (les consommables renchérissent à chaque achat)
+export const SHOP_ITEMS = {
+  med: { name: 'Trousse de soin', icon: '➕', price: 10 },
+  armor: { name: 'Plaque d\'armure', icon: '🛡️', price: 10 },
+  nade: { name: 'Grenade', icon: '💣', price: 9 },
+  ammo: { name: 'Munitions', icon: '📦', price: 8 },
+  perk: { name: 'Amélioration au choix', icon: '⭐', price: 28 },
+  weapon: { name: 'Arme', icon: '🔫', price: 24 },
 };
 export const BRANCH_TYPES = ['armory', 'medbay', 'lab', 'storage'];
 export const CAMPAIGN_ROOMS = 7; // 6 salles puis le Noyau

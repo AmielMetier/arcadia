@@ -11,6 +11,10 @@ export const THEMES = {
   storage: { floor: '#8f8a80', tile: 0, grout: '#77726a', wall: '#45403a', cap: '#635d55', accent: '#ffc531', dark: 0.8, lamp: '#ffd9a0', concrete: true },
   core:    { floor: '#3b3446', tile: 60, grout: '#2a2433', wall: '#231d2b', cap: '#3a3046', accent: '#c77dff', dark: 0.84, lamp: '#e6b8ff' },
   arena:   { floor: '#7f8378', tile: 0, grout: '#676b62', wall: '#3a3d38', cap: '#5a5e57', accent: '#ffc531', dark: 0.76, lamp: '#fff0c8', concrete: true },
+  shop:    { floor: '#8a6f55', tile: 0, grout: '#6e5641', wall: '#4a3a2c', cap: '#6b5440', accent: '#ffc531', dark: 0.55, lamp: '#ffd59a', wood: true },
+  vault:   { floor: '#6b6f78', tile: 56, grout: '#555962', wall: '#2c3038', cap: '#4a4f59', accent: '#ffc531', dark: 0.8, lamp: '#ffe8b0', plate: true },
+  dark:    { floor: '#4c5058', tile: 64, grout: '#3a3d44', wall: '#23262c', cap: '#34373f', accent: '#ff4b2b', dark: 0.95, lamp: '#ff9a7a' },
+  gas:     { floor: '#8e9a80', tile: 48, grout: '#727e66', wall: '#3d4a38', cap: '#5a6a52', accent: '#9be15d', dark: 0.76, lamp: '#e6ffc2' },
 };
 
 export function paintLevel(lv) {
@@ -23,7 +27,12 @@ export function paintLevel(lv) {
 
   // ---------- sol
   c.fillStyle = th.floor; c.fillRect(0, 0, lv.w, lv.h);
-  if (th.concrete) {
+  if (th.wood) {
+    for (let y = I.y0; y < I.y1; y += 30) {
+      let x = I.x0 - rng.range(0, 120);
+      while (x < I.x1) { const L = rng.range(90, 200); c.fillStyle = shade(th.floor, rng.range(-0.08, 0.06)); c.fillRect(x, y, L, 30); c.strokeStyle = th.grout; c.lineWidth = 2; c.strokeRect(x, y, L, 30); x += L; }
+    }
+  } else if (th.concrete) {
     for (let k = 0; k < (lv.w * lv.h) / 9000; k++) {
       c.fillStyle = `rgba(${rng.chance(0.5) ? '0,0,0' : '255,255,255'},${rng.range(0.02, 0.06)})`;
       circ(c, rng.range(0, lv.w), rng.range(0, lv.h), rng.range(10, 60)); c.fill();
@@ -211,6 +220,27 @@ function paintObstacle(c, s, th, rng) {
       circ(c, cx, cy, 14); c.fillStyle = '#f3d9ff'; c.fill();
       break;
     }
+    case 'stall': {
+      // comptoir de Dédé : bâche rayée + étagères
+      rr(c, x, y, w, h, 6); fs(c, '#7a5230', 3);
+      c.save(); c.beginPath(); c.roundRect(x - 10, y - 46, w + 20, 34, 6); c.clip();
+      for (let k = 0; k < w + 20; k += 34) { c.fillStyle = (k / 34) % 2 ? '#fff8ea' : '#e3262f'; c.fillRect(x - 10 + k, y - 46, 34, 34); }
+      c.restore(); rr(c, x - 10, y - 46, w + 20, 34, 6); c.strokeStyle = INK; c.lineWidth = 3; c.stroke();
+      c.fillStyle = INK; c.font = '22px Bungee, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = '#fff8ea'; c.strokeStyle = INK; c.lineWidth = 5; c.strokeText('CHEZ DÉDÉ', x + w / 2, y - 29); c.fillText('CHEZ DÉDÉ', x + w / 2, y - 29);
+      for (let k = 0; k < 6; k++) { rr(c, x + 20 + k * (w - 40) / 6, y + 10, 30, 22, 3); fs(c, ['#5c6b3a', '#d64545', '#2b8cff', '#ffc531', '#b0793f', '#8d96a3'][k], 2); }
+      break;
+    }
+    case 'vault': {
+      rr(c, x, y, w, h, 8); fs(c, '#3a3f4b', 3.5);
+      c.strokeStyle = '#ffc531'; c.lineWidth = 6; c.setLineDash([16, 12]); c.strokeRect(x + 8, y + 8, w - 16, h - 16); c.setLineDash([]);
+      break;
+    }
+    case 'pipe':
+      rr(c, x, y, w, h, h / 2); fs(c, '#6f8492', 3);
+      c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 2; for (let k = 20; k < w; k += 40) { c.beginPath(); c.moveTo(x + k, y + 3); c.lineTo(x + k, y + h - 3); c.stroke(); }
+      circ(c, x + w / 2, y + h / 2, 10); fs(c, '#d64545', 2.5);
+      break;
     default:
       block3d(c, s, th.cap, th.wall, 14);
   }

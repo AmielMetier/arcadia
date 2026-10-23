@@ -1,8 +1,8 @@
 // Rendu d'une image : salle, entités, effets, éclairage dynamique (lampes torches, flashs, explosions), indicateurs.
-import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
+import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, drawShopItem, drawVaultDoor, drawDropCrate, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
 import { paintLevel, THEMES } from './level-art.js';
 import { WALL_TOP } from '../engine/level.js';
-import { ROOM_TYPES } from '../engine/data.js';
+import { ROOM_TYPES, SHOP_ITEMS } from '../engine/data.js';
 
 const LS = 0.5; // résolution de la carte de lumière
 
@@ -83,6 +83,17 @@ export class Renderer {
     fx.drawUnder(c);
     for (const k of v.pickups) { c.save(); c.translate(k.x, k.y); ell(c, 0, 12, 14, 5); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawPickup(c, k, t); c.restore(); }
     for (const b of v.barrels) { c.save(); c.translate(b.x, b.y); ell(c, 4, 6, b.r, b.r * 0.8); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawBarrel(c, b, t); c.restore(); }
+    if (v.vault) { c.save(); c.translate(v.vault[0], v.vault[1] - 80); drawVaultDoor(c, v.vault[2], v.vault[3], t); c.restore(); }
+    for (const it of v.shop || []) { c.save(); c.translate(it[2], it[3]); drawShopItem(c, it, t, SHOP_ITEMS[it[1]].icon, '', v.scrap >= it[5]); c.restore(); }
+    if (v.drop && v.drop[0] !== 'done') {
+      const [st, dx, dy, prog, tt2] = v.drop;
+      c.save(); c.translate(dx, dy);
+      if (st === 'fall') { ell(c, 0, 10, 30 * (1 - tt2 / 3) + 10, 10); c.fillStyle = 'rgba(0,0,0,.35)'; c.fill(); }
+      else { circ(c, 0, 0, 120); c.fillStyle = 'rgba(47,191,113,.08)'; c.fill(); c.strokeStyle = 'rgba(47,191,113,.7)'; c.lineWidth = 3; c.setLineDash([12, 10]); c.lineDashOffset = -t * 20; c.stroke(); c.setLineDash([]);
+        c.lineWidth = 8; c.strokeStyle = 'rgba(0,0,0,.5)'; circ(c, 0, 0, 44); c.stroke(); c.strokeStyle = '#2fbf71'; c.beginPath(); c.arc(0, 0, 44, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog); c.stroke(); }
+      drawDropCrate(c, st, st === 'fall' ? tt2 / 3 : 0, t);
+      c.restore();
+    }
     for (const tt of v.turrets || []) { c.save(); c.translate(tt[1], tt[2]); drawTurret(c, tt, t); c.restore(); }
     for (const k of v.crates) { c.save(); c.translate(k.x, k.y); rr(c, 6, 8, k.w, k.h, 3); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawCrate(c, k.w, k.h); c.restore(); }
 
@@ -100,7 +111,8 @@ export class Renderer {
       c.save(); c.translate(e.x, e.y);
       if (k === 0) {
         // traqueur : presque invisible sauf de près, quand il bondit, plaque ou se fait toucher
-        if (e.ty === 'stalker') {
+        if (e.flags & 8192) { e.alpha = 0.06; c.globalAlpha = 0.06; }
+        else if (e.ty === 'stalker') {
           const near = v.players.some((p) => p.state !== 2 && Math.hypot(p.x - e.x, p.y - e.y) < 190);
           e.alpha = e.flags & (2048 | 4096 | 128 | 32) || near ? 1 : 0.13;
           c.globalAlpha = e.alpha;
@@ -128,7 +140,8 @@ export class Renderer {
     for (const o of v.eprojs) {
       const [, k, x, y, h, big] = o;
       ell(c, x, y + 4, big ? 12 : 8, big ? 6 : 4); c.fillStyle = 'rgba(0,0,0,.35)'; c.fill();
-      if (k === 0) { circ(c, x, y - h, big ? 11 : 7); fs(c, '#9be15d', 2.5); circ(c, x - 2, y - h - 2, big ? 4 : 2.5); c.fillStyle = '#e6ffc2'; c.fill(); }
+      if (k === 2) { circ(c, x, y - h, 14); fs(c, '#8a7e6a', 3); circ(c, x - 4, y - h - 4, 4); c.fillStyle = '#a89a82'; c.fill(); }
+      else if (k === 0) { circ(c, x, y - h, big ? 11 : 7); fs(c, '#9be15d', 2.5); circ(c, x - 2, y - h - 2, big ? 4 : 2.5); c.fillStyle = '#e6ffc2'; c.fill(); }
       else { circ(c, x, y - h, 7); fs(c, '#4a5d32', 2.5); if (Math.sin(t * 30) > 0) { circ(c, x + 3, y - h - 5, 2.5); c.fillStyle = '#ff4b2b'; c.fill(); } }
     }
 
@@ -157,6 +170,16 @@ export class Renderer {
   drawHazard(c, h, t) {
     const [id, k, x, y, r, f] = h;
     const a = Math.min(1, f * 3);
+    if (k === 'gas') {
+      for (let i = 0; i < 6; i++) {
+        const ang = t * 0.3 + i * 1.05 + id;
+        c.globalAlpha = 0.28 * a; c.fillStyle = i % 2 ? '#9fcf5a' : '#c6e88a';
+        circ(c, x + Math.cos(ang) * r * 0.45, y + Math.sin(ang * 1.3) * r * 0.35, r * (0.55 + 0.1 * Math.sin(t + i))); c.fill();
+      }
+      c.globalAlpha = 1;
+      if (Math.sin(t * 2 + id) > 0.6) { c.font = '18px sans-serif'; c.textAlign = 'center'; c.globalAlpha = 0.6 * a; c.fillText('☣', x, y); c.globalAlpha = 1; }
+      return;
+    }
     if (k === 'heal') {
       circ(c, x, y, r); c.fillStyle = `rgba(47,191,113,${0.14 * a})`; c.fill();
       c.strokeStyle = `rgba(127,240,176,${0.8 * a})`; c.lineWidth = 3; c.setLineDash([14, 10]); c.lineDashOffset = -t * 30; c.stroke(); c.setLineDash([]);
@@ -234,7 +257,7 @@ export class Renderer {
     const lc = this.lc, th = this.theme;
     lc.setTransform(1, 0, 0, 1, 0, 0);
     lc.globalCompositeOperation = 'source-over';
-    const dark = v.dark ?? th.dark;
+    const dark = v.dark ? 0.965 : th.dark;
     lc.clearRect(0, 0, this.light.width, this.light.height);
     lc.fillStyle = `rgba(3,5,12,${dark})`; lc.fillRect(0, 0, this.light.width, this.light.height);
     lc.globalCompositeOperation = 'destination-out';
@@ -249,7 +272,10 @@ export class Renderer {
       g.addColorStop(0, `rgba(0,0,0,${alpha})`); g.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.7})`); g.addColorStop(1, 'rgba(0,0,0,0)');
       lc.fillStyle = g; lc.beginPath(); lc.moveTo(x, y); lc.arc(x, y, L, a - half, a + half); lc.closePath(); lc.fill();
     };
-    for (const l of this.lv.lamps) blob(l.x, l.y + 40, 280, 0.42);
+    if (!v.dark) for (const l of this.lv.lamps) blob(l.x, l.y + 40, 280, 0.42);
+    if (v.drop && v.drop[0] === 'land') blob(v.drop[1], v.drop[2], 180, 0.6);
+    for (const it of v.shop || []) blob(it[2], it[3], 90, 0.5);
+    if (v.vault) blob(v.vault[0], v.vault[1] - 60, 200, 0.5);
     for (const p of v.players) {
       if (p.state === 2) continue;
       const mine = p.id === v.meId;
@@ -263,7 +289,7 @@ export class Renderer {
     for (const tt of v.turrets || []) blob(tt[1], tt[2], 120, 0.5);
     for (const k of v.pickups) blob(k.x, k.y, k.k === 'weapon' ? 110 : 70, 0.4);
     for (const d of this.lv.doors) if (d.kind === 'exit') blob(d.x + d.w / 2, WALL_TOP, 200, v.doorsOpen ? 0.7 : 0.35);
-    for (const z of v.zombies) { if (z.flags & 2) blob(z.x, z.y, 90, 0.6); if (z.ty === 'boss') blob(z.x, z.y, 240, 0.45); }
+    for (const z of v.zombies) { if (z.flags & 2) blob(z.x, z.y, 90, 0.6); if (z.r > 30 && !(z.flags & 8192)) blob(z.x, z.y, 240, 0.45); }
     for (const o of v.eprojs) blob(o[2], o[3], 60, 0.4);
     lc.globalCompositeOperation = 'source-over';
   }
@@ -277,7 +303,7 @@ export class Renderer {
     };
     const lock = !v.cleared && v.mode !== 'survival';
     const pulse = 0.5 + 0.5 * Math.sin(t * 4);
-    for (const l of this.lv.lamps) {
+    if (!v.dark) for (const l of this.lv.lamps) {
       if (lock) glow(l.x, l.y + 10, 220, 'rgba(255,40,30,A)', 0.1 + 0.12 * pulse);
       else glow(l.x, l.y + 10, 200, 'rgba(255,220,160,A)', 0.08);
     }
@@ -287,6 +313,8 @@ export class Renderer {
     for (const d of this.lv.doors) if (d.kind === 'exit') glow(d.x + d.w / 2, WALL_TOP + 10, 160, v.doorsOpen ? 'rgba(47,191,113,A)' : 'rgba(255,60,40,A)', 0.18);
     for (const z of v.zombies) {
       if (z.ty === 'boss') glow(z.x, z.y, 160, 'rgba(199,125,255,A)', 0.25);
+      if (z.ty === 'colossus') glow(z.x - Math.cos(z.a) * 44, z.y - Math.sin(z.a) * 44, 60, 'rgba(255,170,40,A)', 0.4);
+      if (z.ty === 'mother') glow(z.x, z.y, 120, 'rgba(155,225,93,A)', 0.2);
       if (z.ty === 'spitter') glow(z.x, z.y, 50, 'rgba(155,225,93,A)', z.flags & 4 ? 0.45 : 0.15);
       if (z.flags & 2) glow(z.x, z.y, 60, 'rgba(255,130,40,A)', 0.35);
     }
@@ -324,7 +352,8 @@ export class Renderer {
     }
     for (const o of v.eprojs) {
       const [, k, x, y, h, big, tx2, ty2, f] = o;
-      if (k === 0) { const r = big ? 70 : 50; circ(c, tx2, ty2, r * (0.4 + 0.6 * f)); c.strokeStyle = 'rgba(155,225,93,.85)'; c.lineWidth = 2.5; c.setLineDash([8, 6]); c.stroke(); c.setLineDash([]); c.fillStyle = `rgba(155,225,93,${0.12 + 0.15 * f})`; c.fill(); }
+      if (k === 2) { circ(c, tx2, ty2, 70 * (0.4 + 0.6 * f)); c.strokeStyle = 'rgba(255,120,60,.85)'; c.lineWidth = 2.5; c.setLineDash([8, 6]); c.stroke(); c.setLineDash([]); c.fillStyle = `rgba(255,120,60,${0.1 + 0.15 * f})`; c.fill(); }
+      else if (k === 0) { const r = big ? 70 : 50; circ(c, tx2, ty2, r * (0.4 + 0.6 * f)); c.strokeStyle = 'rgba(155,225,93,.85)'; c.lineWidth = 2.5; c.setLineDash([8, 6]); c.stroke(); c.setLineDash([]); c.fillStyle = `rgba(155,225,93,${0.12 + 0.15 * f})`; c.fill(); }
       else if (f > 0.55) { circ(c, x, y, 145); c.strokeStyle = `rgba(255,80,60,${(f - 0.55) * 1.6})`; c.lineWidth = 2; c.setLineDash([8, 8]); c.stroke(); c.setLineDash([]); }
     }
   }

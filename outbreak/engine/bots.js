@@ -53,6 +53,7 @@ export function botThink(sim, p, dt) {
     }
     if (pick) { goal = pick; goalTight = 10; if (pick.k === 'weapon' && pd < 40) { B.useT += dt; if (B.useT > 0.15) { inp.use = true; B.useT = 0; } } }
   }
+  if (!goal && p.state === 'ok' && sim.evt && sim.evt.k === 'drop' && sim.evt.st === 'land' && nd > 90) { goal = { x: sim.evt.x, y: sim.evt.y }; goalTight = 70; stopAtGoal = true; }
   if (!goal && sim.doorsOpen && p.state === 'ok' && !sim.zombies.length) {
     const doors = sim.lv.doors.filter((d) => d.kind === 'exit');
     let door = sim.rally ? doors.find((d) => d.id === sim.rally.door) : null;
@@ -95,7 +96,7 @@ export function botThink(sim, p, dt) {
   }
   // garder ses distances avec les zombies (sauf pendant une réanimation)
   if (near && !inp.use) {
-    const kite = near.ty === 'brute' || near.ty === 'boss' ? 260 : near.ty === 'bloater' ? 200 : 140;
+    const kite = near.ty === 'brute' || near.r > 30 ? 260 : near.ty === 'bloater' ? 200 : 140;
     if (nd < kite) {
       const ax = (p.x - near.x) / nd, ay = (p.y - near.y) / nd;
       const w = 1.4 * (1 - nd / kite) + 0.6;
@@ -103,7 +104,7 @@ export function botThink(sim, p, dt) {
       // un peu de côté pour ne pas reculer dans un mur
       mx += -ay * B.strafe * 0.5; my += ax * B.strafe * 0.5;
       B.strafeT -= dt; if (B.strafeT <= 0) { B.strafe = -B.strafe; B.strafeT = 1.5 + Math.random() * 2; }
-      if (nd < near.r + 40 && p.dashCharges > 0 && (p.hp < p.maxHp * 0.7 || near.ty === 'brute' || near.ty === 'boss') && Math.random() < 0.08) inp.dash++;
+      if (nd < near.r + 40 && p.dashCharges > 0 && (p.hp < p.maxHp * 0.7 || near.ty === 'brute' || near.r > 30) && Math.random() < 0.08) inp.dash++;
     }
   }
   // éviter les flaques d'acide
@@ -147,6 +148,7 @@ export function botThink(sim, p, dt) {
     p.weapons.forEach((x, i) => { const X = WEAPONS[x.id]; const ok = x.mag > 0 || x.res > 0; const sc = ok ? X.tier * 10 + (X.id === 'shotgun' && nd < 260 ? 15 : 0) + (X.explosive && nd < 200 ? -30 : 0) + (X.melee ? (nd < 110 ? 20 : -25) : 0) : -100; if (sc > bt) { bt = sc; best = i; } });
     if (best !== p.slot && Math.random() < dt * 3) { inp.sw++; inp.sl = best; }
   }
+  if (p.pinnedBy != null && Math.random() < dt * 6) inp.dash++; // se débattre
   // capacité de classe
   if (p.state === 'ok' && p.abCd <= 0 && p.pinnedBy == null) {
     const close = (r) => sim.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) < r).length;

@@ -1,6 +1,6 @@
 // Simulation d'Outbreak. Tourne chez l'hôte (ou en solo) à pas fixe ; les invités ne font qu'afficher ce qu'elle diffuse.
 // Aucun DOM, aucun réseau : testable sous Node (tools/test-outbreak.mjs).
-import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS } from './data.js';
+import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS, FINAL_BOSSES, MINI_BOSSES, isBig, SPECIAL_TYPES, SHOP_ITEMS } from './data.js';
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
@@ -11,6 +11,7 @@ const BASE_SPEED = 232;
 const REVIVE_TIME = 3;
 const DASH_SPEED = 680, DASH_TIME = 0.2, DASH_CD = 1.5;
 
+const BIGW = 1;
 const COST = { walker: 1, crawler: 0.7, runner: 1.4, spitter: 2.6, bloater: 3, screamer: 4.5, brute: 10, armored: 4, stalker: 6, larva: 2.4 };
 
 export class Sim {
@@ -30,7 +31,10 @@ export class Sim {
     this.destroyed = new Set();
     this.events = [];
     this.nid = 1;
-    this.score = 0; this.kills = 0; this.roomsCleared = 0;
+    this.score = 0; this.kills = 0; this.roomsCleared = 0; this.scrap = 0;
+    this.bossKind = FINAL_BOSSES[((this.cfg.seed >>> 3) % FINAL_BOSSES.length + FINAL_BOSSES.length) % FINAL_BOSSES.length];
+    this.miniKind = MINI_BOSSES[((this.cfg.seed >>> 5) % 2 + 2) % 2];
+    this.shop = []; this.vault = null; this.evt = null; this.evtAt = -1; this.dark = false;
     this.endT = 0;
     this.rally = null;
     this.field = null; this.fieldT = 0;
@@ -89,7 +93,7 @@ export class Sim {
     if (this.cfg.mode === 'campaign') {
       if (index >= CAMPAIGN_ROOMS) exits = [];
       else if (index === CAMPAIGN_ROOMS - 1) exits = ['core'];
-      else { const r = makeRng(seed ^ 0xd00d); exits = r.shuffle(BRANCH_TYPES.slice()).slice(0, 2); }
+      else exits = this.pickExits(index + 1, makeRng(seed ^ 0xd00d));
     }
     this.room = { type, index, seed, exits };
     this.lv = generateRoom({ mode: this.cfg.mode, index, type, seed, exits });
@@ -123,8 +127,67 @@ export class Sim {
       this.spawnPickup('ammo', this.lv.spawn.x - 120, this.lv.spawn.y - 140);
       this.spawnPickup('nade', this.lv.spawn.x + 120, this.lv.spawn.y - 140);
     }
+    // salles spéciales
+    this.shop = []; this.vault = null; this.evt = null; this.dark = type === 'dark';
+    const I = this.lv.inner, cx = this.lv.w / 2;
+    if (type === 'shop') {
+      this.cleared = true; this.doorsOpen = true; this.wave.total = 0;
+      const st = this.lv.solids.find((q) => q.kind === 'stall');
+      this.openShop(cx, st ? st.y + st.h + 46 : I.y0 + 260, makeRng(seed ^ 0x5409));
+    } else if (type === 'vault') {
+      this.cleared = true; this.doorsOpen = true; this.wave.total = 0;
+      const vd = this.lv.solids.find((q) => q.kind === 'vault');
+      this.vault = { x: cx, y: vd ? vd.y + vd.h + 30 : I.y0 + 170, st: 'closed', prog: 0 };
+    } else if (type === 'gas') {
+      const r = makeRng(seed ^ 0x6a5);
+      for (let k = 0; k < 2 + Math.min(3, Math.floor(index / 2)); k++) {
+        this.addHazard('gas', r.range(I.x0 + 200, I.x1 - 200), r.range(I.y0 + 150, I.y1 - 320), r.range(110, 150), 9999);
+        const h = this.hazards[this.hazards.length - 1], a = r.range(0, Math.PI * 2); h.vx = Math.cos(a) * 45; h.vy = Math.sin(a) * 45;
+      }
+    }
+    // événement aléatoire en cours de salle
+    this.evtAt = -1;
+    if (this.cfg.mode === 'campaign' && index >= 2 && !['shop', 'vault', 'core', 'start'].includes(type) && this.rng.chance(0.55)) this.evtAt = this.rng.range(14, 32);
     this.ev({ e: 'room', i: index, ty: type });
-    this.setToast(this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? 'Le Spécimen Zéro se réveille…' : ROOM_TYPES[type].name, 2.6);
+    const bossName = ZOMBIES[this.bossKind].name;
+    this.setToast(this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? `${bossName} se réveille…` : ROOM_TYPES[type].name, 2.6);
+  }
+
+  // Deux portes vers la salle suivante. Le marchand est proposé avant les salles 3 et 5 ; la 4 est celle du mini-boss.
+  pickExits(next, r) {
+    const base = r.shuffle(BRANCH_TYPES.slice());
+    const special = r.shuffle(SPECIAL_TYPES.slice());
+    if (next === 3 || next === 5) return [ 'shop', r.chance(0.4) ? special[0] : base[0] ];
+    if (next === 4) return [base[0], r.chance(0.35) ? special.find((t) => t !== 'vault') : base[1]];
+    return r.chance(0.45) ? [base[0], special[0]] : [base[0], base[1]];
+  }
+
+  openShop(cx, y, r) {
+    const kinds = ['weapon', 'weapon', 'perk', 'med', 'armor', 'ammo', 'nade'];
+    const n = kinds.length, gap = 74;
+    this.shop = kinds.map((k, i) => {
+      const it = { id: 'sh' + i, k, x: cx + (i - (n - 1) / 2) * gap, y, price: SHOP_ITEMS[k].price, sold: false };
+      if (k === 'weapon') { const pool = WEAPON_IDS.filter((w) => WEAPONS[w].tier === (i === 0 ? 2 : 3)); it.w = r.pick(pool); it.price = i === 0 ? 22 : 34; }
+      return it;
+    });
+  }
+
+  tryBuy(p) {
+    let best = null, bd = 50 * 50;
+    for (const it of this.shop) { if (it.sold) continue; const d = (it.x - p.x) ** 2 + (it.y - p.y) ** 2; if (d < bd) { bd = d; best = it; } }
+    if (!best) return false;
+    if (this.scrap < best.price) { this.ev({ e: 'poor', p: p.id }); return true; }
+    this.scrap -= best.price;
+    switch (best.k) {
+      case 'med': p.hp = Math.min(p.maxHp, p.hp + 50); best.price += 4; break;
+      case 'armor': p.armor = p.maxArmor; best.price += 4; break;
+      case 'nade': p.grenades = Math.min(nadeMax(p) + 1, p.grenades + 2); best.price += 3; break;
+      case 'ammo': for (const w of p.weapons) if (w.res !== Infinity) w.res = resMax(p, WEAPONS[w.id]); best.price += 3; break;
+      case 'perk': best.sold = true; this.offerPerks(p, 2); break;
+      case 'weapon': best.sold = true; { const pk = this.spawnPickup('weapon', p.x, p.y, { w: best.w }); this.tryPickWeapon(p, pk); } break;
+    }
+    this.ev({ e: 'buy', p: p.id, k: best.k, x: Math.round(best.x), y: Math.round(best.y) });
+    return true;
   }
 
   setToast(text, dur = 2.5, kind = '') { this.toast = { text, until: this.t + dur, kind, n: (this.toast ? this.toast.n : 0) + 1 }; }
@@ -142,6 +205,7 @@ export class Sim {
     for (const p of this.players.values()) this.stepPlayer(p, dt);
     this.updateField(dt);
     this.stepWaves(dt);
+    this.stepEvents(dt);
     this.stepZombies(dt);
     this.stepTurrets(dt);
     this.stepProjectiles(dt);
@@ -192,6 +256,11 @@ export class Sim {
     // capacité de classe
     if ((inp.ab | 0) !== (L.ab | 0)) { L.ab = inp.ab | 0; if (p.state === 'ok' && p.abCd <= 0 && p.pinnedBy == null) this.useAbility(p); }
     const pinned = p.pinnedBy != null;
+    // se débattre : chaque appui sur roulade aide à se libérer
+    if (pinned && (inp.dash | 0) !== (L.dash | 0)) {
+      const z = this.zombies.find((q) => q.id === p.pinnedBy);
+      if (z) { z.pinDmg = (z.pinDmg || 0) + (z.ty === 'queen' ? 18 : 12); this.ev({ e: 'struggle', p: p.id }); if (z.pinDmg > (z.ty === 'queen' ? 160 : 55)) this.releasePin(z, true); }
+    }
 
     // armes
     const w = p.weapons[p.slot], W = WEAPONS[w.id];
@@ -264,9 +333,14 @@ export class Sim {
           p.stats.revives++; p.stats.score += 250;
           this.ev({ e: 'rev', p: best.id, by: p.id });
         }
-      } else if (useEdge) this.tryPickWeapon(p);
+      } else if (this.vault && this.vault.st === 'closed' && Math.hypot(this.vault.x - p.x, this.vault.y - p.y) < 95) {
+        p.reviving = 'vault';
+        this.vault.prog += dt / 3;
+        if (this.vault.prog >= 1) this.openVault();
+      } else if (useEdge) { if (!this.tryBuy(p)) this.tryPickWeapon(p); }
     }
     for (const o of this.players.values()) if (o.state === 'down' && o.reviveBy === p.id && p.reviving !== o.id) { o.reviveBy = null; }
+    if (this.vault && this.vault.st === 'closed' && ![...this.players.values()].some((q) => q.reviving === 'vault')) this.vault.prog = Math.max(0, this.vault.prog - dt * 0.5);
 
     // déplacement
     let sp = BASE_SPEED * (1 + 0.1 * lvl(p, 'speed'));
@@ -303,7 +377,7 @@ export class Sim {
       this.turrets.push({ id: this.nid++, owner: p.id, x: c.x, y: c.y, a: p.aim, t: C.dur, dur: C.dur, cd: 0.5, color: p.color });
       p.abT = 0;
     } else if (p.cls === 'tank') {
-      for (const z of this.zombies) if (z.ty !== 'boss' && Math.hypot(z.x - p.x, z.y - p.y) < 430) { z.tgt = p.id; z.tgtLock = C.dur; }
+      for (const z of this.zombies) if (!isBig(z.ty) && Math.hypot(z.x - p.x, z.y - p.y) < 430) { z.tgt = p.id; z.tgtLock = C.dur; }
     } else if (p.cls === 'scout') {
       for (const z of this.zombies) if (z.tgt === p.id) { z.tgt = null; z.tgtLock = 0; z.retarget = 0; }
     }
@@ -315,7 +389,7 @@ export class Sim {
       t.t -= dt; t.cd -= dt;
       let best = null, bd = 470;
       for (const z of this.zombies) {
-        if (z.hp <= 0 || (z.ty === 'stalker' && z.state === 'hide')) continue;
+        if (z.hp <= 0 || z.state === 'vanish') continue;
         const d = Math.hypot(z.x - t.x, z.y - t.y);
         if (d < bd && !raycastSolids(this.blockers, t.x, t.y, z.x, z.y)) { bd = d; best = z; }
       }
@@ -343,6 +417,7 @@ export class Sim {
     const solids = this.solidsNow || this.lv.solids;
     for (let it = 0; it < 2; it++) {
       for (const s of solids) {
+        if (s.low && e.r >= 34) continue; // les géants enjambent tables, sacs de sable et réacteur
         if (e.x + e.r < s.x || e.x - e.r > s.x + s.w || e.y + e.r < s.y || e.y - e.r > s.y + s.h) continue;
         pushOutRect(e, s);
       }
@@ -498,7 +573,7 @@ export class Sim {
       // zombies sur le trajet
       const hits = [];
       for (const z of this.zombies) {
-        if (z.hp <= 0 || (pr.hit && pr.hit.has(z.id))) continue;
+        if (z.hp <= 0 || z.state === 'vanish' || (pr.hit && pr.hit.has(z.id))) continue;
         if (Math.abs(z.x - pr.x) > Math.abs(dx) + z.r + 40 || Math.abs(z.y - pr.y) > Math.abs(dy) + z.r + 40) continue;
         const t = segCircle(pr.x, pr.y, dx, dy, z.x, z.y, z.r + (pr.flame ? 8 : 2));
         if (t >= 0 && t <= tWall) hits.push([t, z]);
@@ -552,18 +627,24 @@ export class Sim {
     if (by && !flame && Math.random() < 0.12 * lvl(by, 'crit') + (by.cls === 'scout' ? 0.1 : 0)) { dmg *= 2.5; crit = true; }
     // blindé : la plaque avant encaisse, il faut le prendre de côté ou de dos
     if (z.ty === 'armored' && !flame && !pierceArmor && Math.abs(angDiff(z.ang, ang + Math.PI)) < 1.0) { dmg *= 0.2; clank = true; crit = false; knock *= 0.3; }
-    if (z.ty === 'stalker' && z.state === 'pin') { z.pinDmg = (z.pinDmg || 0) + dmg; if (z.pinDmg > 55) this.releasePin(z, true); }
+    if (z.state === 'pin') { z.pinDmg = (z.pinDmg || 0) + dmg; if (z.pinDmg > (z.ty === 'queen' ? 160 : 55)) this.releasePin(z, true); }
+    // Colosse : carapace devant, point faible dans le dos
+    if (z.ty === 'colossus') {
+      const front = Math.abs(angDiff(z.ang, ang + Math.PI)) < 1.25, back = Math.abs(angDiff(z.ang, ang)) < 0.8;
+      if (front && !flame) { dmg *= pierceArmor ? 0.5 : 0.15; clank = !pierceArmor; }
+      else if (back) { dmg *= 1.6; crit = true; }
+    }
     if (z.state === 'stun') dmg *= 1.5;
     if (flame || (by && lvl(by, 'fire') && Math.random() < 0.2 * lvl(by, 'fire'))) { z.burnT = 3; z.burnBy = by ? by.id : null; }
     dmg = Math.max(1, dmg);
     z.hp -= dmg; z.flash = 0.07;
     if (by) by.stats.dmg += Math.min(dmg, z.hp + dmg);
     const mass = z.r / 16;
-    const kb = (z.ty === 'boss' ? 0.05 : z.ty === 'brute' ? 0.15 : 1) * knock / mass;
+    const kb = (isBig(z.ty) ? 0.05 : z.ty === 'brute' ? 0.15 : 1) * knock / mass;
     z.kx += Math.cos(ang) * kb; z.ky += Math.sin(ang) * kb;
     if (clank && Math.random() < 0.6) this.ev({ e: 'clank', x: Math.round(z.x + Math.cos(z.ang) * z.r), y: Math.round(z.y + Math.sin(z.ang) * z.r), a: Math.round(z.ang * 100) / 100 });
     else if (!flame || Math.random() < 0.15) this.ev({ e: 'h', i: z.id, x: Math.round(z.x), y: Math.round(z.y), a: Math.round(ang * 100) / 100, d: Math.round(dmg), c: crit ? 1 : 0, g: z.ty === 'spitter' || z.ty === 'bloater' ? 1 : 0 });
-    if (z.ty !== 'boss' && z.tgtLock <= 0 && by) { z.tgt = by.id; z.tgtLock = 1.2; }
+    if (!isBig(z.ty) && z.tgtLock <= 0 && by) { z.tgt = by.id; z.tgtLock = 1.2; }
     if (z.hp <= 0) this.killZombie(z, ang, by);
   }
 
@@ -581,7 +662,13 @@ export class Sim {
     this.ev({ e: 'zd', x: Math.round(z.x), y: Math.round(z.y), t: ZOMBIE_IDS.indexOf(z.ty), a: Math.round(ang * 100) / 100, i: z.id, s: z.elite ? 1 : 0, pts });
     if (z.ty === 'bloater') this.explode(z.x, z.y, Z.blast, 120, Z.dmg * this.diff.zDmg, null, 'toxic');
     else if (by && lvl(by, 'chain') && Math.random() < 0.15) this.explode(z.x, z.y, 110, 90, 0, by, 'chain');
-    if (z.ty === 'boss') { this.bossDead = true; this.setToast('Spécimen Zéro neutralisé !', 3, 'good'); }
+    if (isBig(z.ty)) { if (FINAL_BOSSES.includes(z.ty)) this.bossDead = true; this.setToast(`${Z.name} neutralisé${z.ty === 'queen' || z.ty === 'mother' || z.ty === 'abomination' ? 'e' : ''} !`, 3, 'good'); }
+    // ferraille (monnaie du marchand, commune à l'escouade)
+    const scrapP = isBig(z.ty) ? 1 : z.ty === 'brute' || z.elite ? 1 : 0.1 * (this.dark ? 2 : 1);
+    if (Math.random() < scrapP) {
+      const v = isBig(z.ty) ? 6 : z.ty === 'brute' ? 3 : z.elite ? 2 : 1;
+      for (let k = 0; k < (isBig(z.ty) ? 4 : 1); k++) this.spawnPickup('scrap', z.x + (Math.random() - 0.5) * 40, z.y + (Math.random() - 0.5) * 40, { v });
+    }
     // butin
     const dropP = Z.drop * this.diff.drops * (z.elite ? 3 : 1) * (this.cfg.mode === 'survival' ? 0.8 : 1);
     if (Math.random() < dropP) {
@@ -655,6 +742,7 @@ export class Sim {
       const roll = this.rng.next();
       const eng = [...this.players.values()].some((p) => p.cls === 'engineer' && p.state !== 'dead');
       if (eng) this.spawnPickup(this.rng.pick(['ammo', 'nade', 'armor']), cx - 16, cy - 12);
+      this.spawnPickup('scrap', cx + 14, cy + 14, { v: 2 });
       if (roll < 0.12) this.spawnWeaponDrop(cx, cy, 1);
       else { this.spawnPickup(this.rng.weighted([['ammo', 45], ['med', 25], ['armor', 15], ['nade', 15]]), cx, cy); if (this.rng.chance(0.35)) this.spawnPickup('ammo', cx + 18, cy + 10); }
     }
@@ -675,7 +763,13 @@ export class Sim {
         }
         continue;
       }
-      const dps = h.k === 'acid' ? 16 : h.k === 'toxic' ? 9 : 0;
+      if (h.k === 'gas') {
+        h.x += h.vx * dt; h.y += h.vy * dt;
+        const I = this.lv.inner;
+        if (h.x < I.x0 + h.r * 0.6 || h.x > I.x1 - h.r * 0.6) h.vx = -h.vx;
+        if (h.y < I.y0 + h.r * 0.6 || h.y > I.y1 - h.r * 0.6) h.vy = -h.vy;
+      }
+      const dps = h.k === 'acid' ? 16 : h.k === 'toxic' ? 9 : h.k === 'gas' ? 9 : 0;
       for (const p of this.players.values()) {
         if (p.state !== 'ok' || p.dashT > 0) continue;
         if ((p.x - h.x) ** 2 + (p.y - h.y) ** 2 < h.r * h.r) {
@@ -730,6 +824,7 @@ export class Sim {
   }
 
   wants(p, k) {
+    if (k === 'scrap') return true;
     if (k === 'med') return p.hp < p.maxHp - 1;
     if (k === 'armor') return p.armor < p.maxArmor - 1;
     if (k === 'nade') return p.grenades < nadeMax(p);
@@ -739,6 +834,7 @@ export class Sim {
 
   take(p, pk) {
     if (!this.wants(p, pk.k)) return false;
+    if (pk.k === 'scrap') { this.scrap += pk.v || 1; this.ev({ e: 'pk', p: p.id, k: 'scrap', v: pk.v || 1, x: Math.round(pk.x), y: Math.round(pk.y) }); return true; }
     if (pk.k === 'med') {
       p.hp = Math.min(p.maxHp, p.hp + 40);
       if (p.cls === 'medic') for (const o of this.players.values()) if (o !== p && o.state === 'ok' && Math.hypot(o.x - p.x, o.y - p.y) < 220) o.hp = Math.min(o.maxHp, o.hp + 25);
@@ -750,9 +846,9 @@ export class Sim {
     return true;
   }
 
-  tryPickWeapon(p) {
-    let best = null, bd = 60 * 60;
-    for (const pk of this.pickups) {
+  tryPickWeapon(p, forced = null) {
+    let best = forced, bd = 60 * 60;
+    if (!best) for (const pk of this.pickups) {
       if (pk.k !== 'weapon') continue;
       const d = (pk.x - p.x) ** 2 + (pk.y - p.y) ** 2;
       if (d < bd) { bd = d; best = pk; }
@@ -859,14 +955,18 @@ export class Sim {
     if (this.cfg.mode === 'survival') {
       W.budget = (12 + 6 * W.n) * pf * this.diff.budget;
       if (W.n % 5 === 0) for (let k = 0; k < Math.floor(W.n / 5); k++) this.queueSpecial('brute');
-      if (W.n % 10 === 0) this.spawnBoss(0.45 + 0.15 * (W.n / 10 - 1));
+      if (W.n % 10 === 0) this.spawnBoss(0.45 + 0.15 * (W.n / 10 - 1), FINAL_BOSSES[(W.n / 10 - 1) % FINAL_BOSSES.length]);
+      else if (W.n % 5 === 0) this.spawnBoss(0.6 + 0.1 * Math.floor(W.n / 10), MINI_BOSSES[Math.floor(W.n / 5) % 2]);
+      this.shop = [];
+      if (W.n > 1 && W.n % 3 === 1 && this.rng.chance(0.6)) this.evtAt = this.rng.range(10, 20);
       this.setToast(`Vague ${W.n}`, 2, 'wave');
     } else if (isBoss) {
-      this.spawnBoss(1);
+      this.spawnBoss(1, this.bossKind);
       W.budget = 8 * pf * this.diff.budget;
     } else {
-      W.budget = (9 + 5 * i) * (0.8 + 0.25 * W.n) * pf * this.diff.budget;
-      if (W.n === W.total && i >= 3) for (let k = 0; k < (i >= 6 && nPlayers(this) >= 3 ? 2 : 1); k++) this.queueSpecial('brute');
+      W.budget = (9 + 5 * i) * (0.8 + 0.25 * W.n) * pf * this.diff.budget * (W.mult || 1);
+      if (W.n === W.total && i === 4) { this.spawnBoss(0.8, this.miniKind); W.budget *= 0.25; }
+      else if (W.n === W.total && i >= 3) for (let k = 0; k < (i >= 6 && nPlayers(this) >= 3 ? 2 : 1); k++) this.queueSpecial('brute');
       if (this.room.type === 'armory' && W.n === W.total && i < 3) this.queueSpecial('brute');
       this.setToast(W.total > 1 ? `Vague ${W.n} / ${W.total}` : 'Contact !', 2, 'wave');
     }
@@ -885,13 +985,13 @@ export class Sim {
     const w = [
       ['walker', 10],
       ['crawler', (ty === 'storage' ? 8 : 4)],
-      ['runner', (i >= 2 ? 5 : 1.2) * (ty === 'medbay' ? 1.7 : 1)],
+      ['runner', (i >= 2 ? 5 : 1.2) * (ty === 'medbay' ? 1.7 : ty === 'dark' ? 1.5 : 1)],
       ['spitter', (i >= 2 ? 2.5 : 0) * (ty === 'lab' ? 2.2 : 1)],
       ['bloater', (i >= 3 ? 1.6 : 0) * (ty === 'storage' ? 1.6 : 1)],
       ['screamer', i >= 4 ? 0.8 : 0],
       ['brute', i >= 6 ? 0.25 : 0],
       ['armored', i >= 3 ? 1.3 : 0],
-      ['stalker', i >= 4 ? 0.7 : i >= 3 ? 0.3 : 0],
+      ['stalker', (i >= 4 ? 0.7 : i >= 3 ? 0.3 : 0) + (ty === 'dark' ? 1.2 : 0)],
       ['larva', (i >= 2 ? 1.4 : 0) * (ty === 'lab' ? 1.8 : 1)],
     ].filter((x) => x[1] > 0);
     if (this.room.type === 'core') return this.rng.weighted([['runner', 4], ['walker', 4], ['crawler', 3], ['spitter', 1]]);
@@ -919,10 +1019,67 @@ export class Sim {
     return z;
   }
 
-  spawnBoss(scale) {
-    const z = this.spawnZombie('boss', this.lv.w / 2, this.lv.inner.y0 + 160);
-    z.hp *= scale; z.maxHp = z.hp; z.cdA = 4; z.cdB = 6; z.cdC = 9;
-    this.ev({ e: 'boss' });
+  spawnBoss(scale, kind = 'boss') {
+    const z = this.spawnZombie(kind, this.lv.w / 2, this.lv.inner.y0 + 160);
+    z.hp *= scale * (1 + 0.3 * (this.players.size - 1)) / (1 + 0.12 * (this.players.size - 1)); z.maxHp = z.hp;
+    z.cdA = 4; z.cdB = 6; z.cdC = kind === 'mother' ? 3 : 9;
+    this.ev({ e: 'boss', k: kind });
+    if (MINI_BOSSES.includes(kind)) this.setToast(`Mini-boss : ${ZOMBIES[kind].name} !`, 2.6, 'bad');
+    return z;
+  }
+
+  openVault() {
+    const V = this.vault;
+    V.st = 'alarm'; V.prog = 1;
+    this.cleared = false; this.doorsOpen = false; this.rally = null;
+    this.wave = { n: 0, total: 2, budget: 0, timer: 1.2, spawnT: 0, endless: false, mult: 1.5 };
+    this.ev({ e: 'vaultAlarm', x: Math.round(V.x), y: Math.round(V.y) });
+    this.setToast('Alarme ! Tenez jusqu\'à l\'ouverture du coffre', 3, 'bad');
+  }
+
+  // ------------------------------------------------------------------ événements aléatoires
+  stepEvents(dt) {
+    const E = this.evt;
+    if (this.evtAt > 0 && !this.cleared && this.wave.n > 0) {
+      this.evtAt -= dt;
+      if (this.evtAt <= 0) this.startEvent(this.rng.weighted([['blackout', 3], ['horde', 3], ['drop', 4]]));
+    }
+    if (!E) return;
+    E.t -= dt;
+    if (E.k === 'drop') {
+      if (E.st === 'fall') { if (E.t <= 0) { E.st = 'land'; E.t = 0; this.ev({ e: 'dropLand', x: E.x, y: E.y }); this.wave.budget += 10; } }
+      else if (E.st === 'land') {
+        const near = this.standing().filter((p) => Math.hypot(p.x - E.x, p.y - E.y) < 120).length;
+        E.prog += dt * (near ? 1 + 0.35 * (near - 1) : 0) / E.need;
+        if (E.prog >= 1) {
+          E.st = 'done'; E.t = 2;
+          this.spawnWeaponDrop(E.x - 30, E.y, 3); this.spawnPickup('ammo', E.x + 30, E.y); this.spawnPickup('med', E.x, E.y + 30);
+          for (let k = 0; k < 4; k++) this.spawnPickup('scrap', E.x + (k - 1.5) * 20, E.y - 30, { v: 3 });
+          this.ev({ e: 'dropOk', x: E.x, y: E.y }); this.setToast('Ravitaillement sécurisé !', 2.2, 'good');
+        }
+      } else if (E.t <= 0) this.evt = null;
+    } else if (E.t <= 0) { if (E.k === 'blackout') this.ev({ e: 'lightsOn' }); this.evt = null; }
+  }
+
+  startEvent(k) {
+    if (k === 'blackout') { this.evt = { k, t: 13 }; this.ev({ e: 'blackout' }); this.setToast('Coupure de courant !', 2.4, 'bad'); }
+    else if (k === 'horde') {
+      this.evt = { k, t: 3 };
+      for (let i = 0; i < 12; i++) { const v = this.rng.pick(this.lv.vents); this.pending.push({ ty: i % 3 ? 'runner' : 'walker', x: v.sx + (Math.random() - 0.5) * 30, y: v.sy + (Math.random() - 0.5) * 30, t: 0.8 + i * 0.12 }); }
+      this.ev({ e: 'horde' }); this.setToast('Horde en approche !', 2.4, 'bad');
+    } else if (k === 'drop') {
+      const I = this.lv.inner;
+      let x = this.lv.w / 2, y = (I.y0 + I.y1) / 2;
+      for (let a = 0; a < 40; a++) {
+        const cx = this.rng.range(I.x0 + 150, I.x1 - 150), cy = this.rng.range(I.y0 + 150, I.y1 - 200);
+        const c = { x: cx, y: cy, r: 40 };
+        if (this.lv.solids.some((q) => cx > q.x - 60 && cx < q.x + q.w + 60 && cy > q.y - 60 && cy < q.y + q.h + 60)) continue;
+        if (this.standing().some((p) => Math.hypot(p.x - cx, p.y - cy) < 260)) continue;
+        x = c.x; y = c.y; break;
+      }
+      this.evt = { k, t: 3, st: 'fall', x: Math.round(x), y: Math.round(y), prog: 0, need: 8 };
+      this.ev({ e: 'dropIn', x: Math.round(x), y: Math.round(y) }); this.setToast('Largage de ravitaillement : sécurisez-le !', 2.6, 'good');
+    }
   }
 
   roomCleared() {
@@ -939,7 +1096,7 @@ export class Sim {
     const cx = this.lv.w / 2, cy = (this.lv.inner.y0 + this.lv.inner.y1) / 2;
     for (const p of this.players.values()) {
       if (p.state === 'down') { /* on peut encore le relever ; sinon il se relève à la salle suivante */ }
-      this.offerPerks(p, ty === 'lab' ? 1 : 0);
+      this.offerPerks(p, ty === 'lab' ? 1 : ty === 'gas' ? 2 : ty === 'vault' ? 3 : 0);
       if (ty === 'lab') p.picksQueued++;
       if (ty === 'medbay' && p.state === 'ok') { p.hp = Math.min(p.maxHp, p.hp + 50); p.armor = Math.min(p.maxArmor, p.armor + 40); }
       if (ty === 'storage') p.grenades = nadeMax(p);
@@ -948,6 +1105,16 @@ export class Sim {
     else if (ty === 'medbay') { this.spawnPickup('med', cx - 40, cy); this.spawnPickup('med', cx + 40, cy); this.spawnPickup('armor', cx, cy + 40); }
     else if (ty === 'storage') { for (let k = 0; k < 3; k++) this.spawnPickup('ammo', cx - 60 + k * 60, cy); this.spawnPickup('armor', cx, cy + 50); }
     else this.spawnPickup('ammo', cx, cy);
+    const scrapN = ty === 'dark' ? 8 : 3;
+    for (let k = 0; k < scrapN; k++) this.spawnPickup('scrap', cx + (k - (scrapN - 1) / 2) * 26, cy + 60, { v: 2 });
+    if (ty === 'gas') for (const h of this.hazards) if (h.k === 'gas') { h.t = Math.min(h.t, 2); h.dur = 2; }
+    if (ty === 'vault' && this.vault) {
+      this.vault.st = 'open';
+      this.spawnWeaponDrop(this.vault.x - 50, this.vault.y + 20, 3); this.spawnWeaponDrop(this.vault.x + 50, this.vault.y + 20, 3);
+      for (let k = 0; k < 8; k++) this.spawnPickup('scrap', this.vault.x + (k - 3.5) * 22, this.vault.y + 70, { v: 3 });
+      this.setToast('Le coffre est ouvert !', 3, 'good');
+    }
+    if (this.evt && this.evt.k === 'blackout') { this.evt = null; this.ev({ e: 'lightsOn' }); }
   }
 
   // mode Survie : fin de vague = petite pause, objets, et améliorations une vague sur deux
@@ -959,6 +1126,8 @@ export class Sim {
     const cx = this.lv.w / 2, cy = (this.lv.inner.y0 + this.lv.inner.y1) / 2;
     this.spawnPickup('ammo', cx - 40, cy); this.spawnPickup(this.rng.pick(['med', 'armor', 'nade']), cx + 40, cy);
     if (W.n % 3 === 0) this.spawnWeaponDrop(cx, cy - 60, W.n >= 6 ? 2 : 1);
+    if (W.n % 3 === 0) { this.openShop(cx, cy + 120, this.rng); this.setToast('Dédé le ferrailleur passe : achetez vite !', 2.6, 'good'); }
+    for (let k = 0; k < 3; k++) this.spawnPickup('scrap', cx + (k - 1) * 26, cy + 40, { v: 2 });
     for (const p of this.players.values()) {
       if (p.state === 'dead') { p.state = 'ok'; p.hp = Math.round(p.maxHp * 0.5); p.x = this.lv.spawn.x; p.y = this.lv.spawn.y; this.ev({ e: 'respawn', p: p.id }); }
       if (W.n % 2 === 0) this.offerPerks(p);
@@ -1021,7 +1190,7 @@ export class Sim {
       z.flash = Math.max(0, z.flash - dt);
       if (z.burnT > 0) {
         z.burnT -= dt;
-        z.hp -= 13 * dt * (z.ty === 'boss' ? 0.5 : 1);
+        z.hp -= 13 * dt * (isBig(z.ty) ? 0.5 : 1);
         if (z.hp <= 0) { this.killZombie(z, 0, this.players.get(z.burnBy)); continue; }
       }
       if (z.buffT > 0) z.buffT -= dt;
@@ -1041,13 +1210,18 @@ export class Sim {
       }
       const dx = T ? T.x - z.x : 0, dy = T ? T.y - z.y : 0, dist = Math.hypot(dx, dy) || 1;
       z.losT -= dt;
-      if (z.losT <= 0 && T) { z.losT = 0.25; z.los = !raycastSolids(this.blockers, z.x, z.y, T.x, T.y); z.walkLos = z.los && !this.solidsNow.some((s) => s.low && segRect(z.x, z.y, dx, dy, s, z.r * 0.8)); }
+      if (z.losT <= 0 && T) { z.losT = 0.25; z.los = !raycastSolids(this.blockers, z.x, z.y, T.x, T.y); z.walkLos = z.los && (z.r >= 34 || !this.solidsNow.some((s) => s.low && segRect(z.x, z.y, dx, dy, s, z.r * 0.8))); }
 
       let speed = z.spd * (z.buffT > 0 ? 1.45 : 1);
       if (z.slowT > 0) { z.slowT -= dt; speed *= 0.35; }
       let want = null; // direction souhaitée {x,y}
+      // coincé contre un coin : on contourne
+      z.stuckT = (z.stuckT || 0) + dt;
+      if (z.stuckT > 1.2) { const moved = Math.hypot(z.x - (z.sx0 ?? z.x), z.y - (z.sy0 ?? z.y)); z.unstick = moved < 18 && z.state === 'walk' ? 0.8 : 0; z.sx0 = z.x; z.sy0 = z.y; z.stuckT = 0; }
+      if (z.unstick > 0) z.unstick -= dt;
       const chase = () => {
         if (!T) return null;
+        if (z.unstick > 0) { const s2 = z.id % 2 ? 1 : -1; return { x: (-dy / dist) * s2 * 0.8 + (dx / dist) * 0.6, y: (dx / dist) * s2 * 0.8 + (dy / dist) * 0.6 }; }
         if (z.walkLos && dist < 520) return { x: dx / dist, y: dy / dist };
         const f = this.field && flowDir(this.lv, this.field, z.x, z.y);
         return f || { x: dx / dist, y: dy / dist };
@@ -1082,9 +1256,17 @@ export class Sim {
           break;
         case 'brute':
         case 'boss':
+        case 'colossus':
+        case 'abomination':
           if (this.bigAI(z, T, dt, dist, dx, dy)) { speed = z.curSpeed; want = z.curWant; }
           else want = chase();
-          if (z.ty === 'boss') speed *= z.phase === 3 ? 1.3 : 1;
+          if (z.ty !== 'brute') speed *= z.phase === 3 ? 1.3 : 1;
+          break;
+        case 'mother':
+          if (this.motherAI(z, T, dt, dist, dx, dy)) { speed = z.curSpeed; want = z.curWant; } else want = chase();
+          break;
+        case 'queen':
+          if (this.queenAI(z, T, dt, dist, dx, dy)) { speed = z.curSpeed; want = z.curWant; } else want = chase();
           break;
         case 'runner':
           want = chase(); if (T && dist < 160) speed *= 1.35;
@@ -1106,15 +1288,15 @@ export class Sim {
 
       // attaque au contact
       if (T && z.state === 'walk' && z.ty !== 'bloater' && z.ty !== 'stalker') {
-        const reach = z.r + T.r + (z.ty === 'boss' ? 30 : 8);
+        const reach = z.r + T.r + (isBig(z.ty) ? 30 : 8);
         if (z.atkT > 0) {
           z.atkT -= dt; speed *= 0.35;
           if (z.atkT <= 0) {
             z.atkCd = Z.cd;
-            if (dist < reach + 16) this.hurtPlayer(T, Z.dmg * this.diff.zDmg * (z.elite ? 1.4 : 1), z.x, z.y, z.ty === 'boss' ? 420 : z.ty === 'brute' ? 300 : 90);
+            if (dist < reach + 16) this.hurtPlayer(T, Z.dmg * this.diff.zDmg * (z.elite ? 1.4 : 1), z.x, z.y, isBig(z.ty) ? 420 : z.ty === 'brute' ? 300 : 90);
             this.ev({ e: 'zs', z: z.id });
           }
-        } else if (dist < reach && z.atkCd <= 0) { z.atkT = z.ty === 'boss' ? 0.45 : 0.28; }
+        } else if (dist < reach && z.atkCd <= 0) { z.atkT = isBig(z.ty) ? 0.45 : 0.28; }
       }
 
       // mouvement
@@ -1152,7 +1334,7 @@ export class Sim {
         const ox = p.x - z.x, oy = p.y - z.y, m = z.r + p.r - 4, d2 = ox * ox + oy * oy;
         if (d2 < m * m && d2 > 0.01) {
           const d = Math.sqrt(d2), over = m - d;
-          const heavy = z.ty === 'brute' || z.ty === 'boss';
+          const heavy = z.ty === 'brute' || isBig(z.ty);
           const pz = heavy ? 0.1 : p.dashT > 0 ? 0.9 : 0.72;
           z.x -= (ox / d) * over * pz; z.y -= (oy / d) * over * pz;
           if (p.dashT <= 0) { p.x += (ox / d) * over * (1 - pz); p.y += (oy / d) * over * (1 - pz); }
@@ -1166,7 +1348,7 @@ export class Sim {
 
   // Traqueur : rôde à distance, presque invisible, bondit et plaque un survivant au sol
   stalkerAI(z, T, dt, dist, dx, dy) {
-    const Z = ZOMBIES.stalker;
+    const Z = ZOMBIES[z.ty].pounce ? ZOMBIES[z.ty] : ZOMBIES.stalker;
     switch (z.state) {
       case 'crouch':
         z.stT -= dt; z.curSpeed = 0; z.curWant = null;
@@ -1181,7 +1363,7 @@ export class Sim {
           if (p.state !== 'ok' || p.dashT > 0 || p.pinnedBy != null) continue;
           if (Math.hypot(p.x - z.x, p.y - z.y) < z.r + p.r + 8) {
             if (p.cls === 'tank' && p.abT > 0) { z.state = 'stun'; z.stT = 1.2; this.ev({ e: 'clank', x: Math.round(p.x), y: Math.round(p.y), a: 0 }); return true; }
-            z.state = 'pin'; z.pinId = p.id; z.pinDmg = 0; z.stT = 5; p.pinnedBy = z.id; p.vx = p.vy = 0;
+            z.state = 'pin'; z.pinId = p.id; z.pinDmg = 0; z.stT = z.ty === 'queen' ? 2.6 : 4; p.pinnedBy = z.id; p.vx = p.vy = 0;
             this.ev({ e: 'pin', p: p.id }); this.setToast(`${p.name} est plaqué au sol !`, 2, 'bad');
             return true;
           }
@@ -1195,7 +1377,7 @@ export class Sim {
         if (!p || p.state !== 'ok') { this.releasePin(z, false); return true; }
         z.x += (p.x - z.x) * Math.min(1, dt * 10); z.y += (p.y - z.y) * Math.min(1, dt * 10);
         z.ang = Math.atan2(p.y - z.y, p.x - z.x) || z.ang;
-        let d = 12 * this.diff.zDmg * dt;
+        let d = (z.ty === 'queen' ? 15 : 12) * this.diff.zDmg * dt;
         if (p.armor > 0) { const a = Math.min(p.armor, d * 0.5); p.armor -= a; d -= a; }
         p.hp -= d;
         if (p.hp <= 0) { p.hp = 0.01; p.hurtT = 0; this.hurtPlayer(p, 5, z.x, z.y); }
@@ -1226,12 +1408,8 @@ export class Sim {
 
   // Brute et boss : charge, onde de choc, salves d'acide, invocation. Renvoie true si l'IA contrôle le mouvement.
   bigAI(z, T, dt, dist, dx, dy) {
-    const boss = z.ty === 'boss';
-    if (boss) {
-      const f = z.hp / z.maxHp;
-      const ph = f > 0.66 ? 1 : f > 0.33 ? 2 : 3;
-      if (ph !== z.phase) { z.phase = ph; this.ev({ e: 'phase', n: ph }); this.setToast(ph === 2 ? 'Le Spécimen mute !' : 'Le Spécimen est enragé !', 2.2, 'bad'); z.cdC = 1; }
-    }
+    const boss = z.ty !== 'brute';
+    this.bossPhase(z);
     const cdm = boss && z.phase === 3 ? 0.65 : 1;
     switch (z.state) {
       case 'tele': // préparation de charge (ligne rouge)
@@ -1253,7 +1431,11 @@ export class Sim {
         const I = this.lv.inner;
         const wallHit = ahead.x < I.x0 || ahead.x > I.x1 || ahead.y < I.y0 || ahead.y > I.y1 || this.blockers.some((s) => ahead.x > s.x && ahead.x < s.x + s.w && ahead.y > s.y && ahead.y < s.y + s.h);
         if (wallHit) { z.state = 'stun'; z.stT = boss ? 1.1 : 1.6; z.vx = z.vy = 0; this.ev({ e: 'slam', x: Math.round(z.x), y: Math.round(z.y), r: 60 }); return true; }
-        if (z.stT <= 0) { z.state = 'walk'; z.cdA = (boss ? 5 : 5.5) * cdm; }
+        if (z.stT <= 0) {
+          // Colosse enragé : enchaîne une deuxième charge
+          if (z.ty === 'colossus' && z.phase >= 2 && !z.chained) { z.chained = true; z.state = 'tele'; z.stT = 0.45; if (T) z.lockA = Math.atan2(T.y - z.y, T.x - z.x); return true; }
+          z.chained = false; z.state = 'walk'; z.cdA = (z.ty === 'colossus' ? 3.6 : boss ? 5 : 5.5) * cdm;
+        }
         return true;
       }
       case 'stun':
@@ -1273,8 +1455,18 @@ export class Sim {
     }
     if (!T) return false;
     // déclencheurs
-    if (z.cdA <= 0 && z.los && dist > 170 && dist < 560 && (!boss || z.phase >= 2)) { z.state = 'tele'; z.stT = boss ? 0.75 : 0.85; z.lockA = Math.atan2(dy, dx); this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
+    if (z.cdA <= 0 && z.los && dist > 170 && dist < 560 && (z.ty !== 'boss' || z.phase >= 2)) { z.state = 'tele'; z.stT = boss ? 0.75 : 0.85; z.lockA = Math.atan2(dy, dx); this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
     if (boss) {
+      if (z.ty === 'colossus') {
+        if (z.cdB <= 0 && dist < 240) { z.state = 'slamwind'; z.stT = 0.85; this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
+        if (z.cdC <= 0 && z.phase >= 2) { z.cdC = 10 * cdm; for (let k = 0; k < z.phase; k++) this.queueSpecial('armored'); this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); }
+        return false;
+      }
+      if (z.ty === 'abomination') {
+        if (z.cdB <= 0 && dist < 220) { z.state = 'slamwind'; z.stT = 0.8; this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
+        if (z.cdC <= 0) { z.cdC = 5 * cdm; const st = this.standing(); if (st.length) this.throwRock(z, this.rng.pick(st), z.phase >= 2 ? 3 : 2); }
+        return false;
+      }
       if (z.cdB <= 0 && dist < 260) { z.state = 'slamwind'; z.stT = 0.95; this.ev({ e: 'roar', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
       if (z.cdC <= 0) {
         z.cdC = (z.phase === 1 ? 7 : 8) * cdm;
@@ -1286,13 +1478,76 @@ export class Sim {
     return false;
   }
 
+  bossPhase(z) {
+    if (!isBig(z.ty)) return;
+    const f = z.hp / z.maxHp;
+    const ph = f > 0.66 ? 1 : f > 0.33 ? 2 : 3;
+    if (ph !== z.phase && ph > z.phase) {
+      z.phase = ph; z.cdC = 1; this.ev({ e: 'phase', n: ph, k: z.ty });
+      const nm = ZOMBIES[z.ty].name;
+      this.setToast(ph === 2 ? `${nm} mute !` : `${nm} : enragé${z.ty === 'queen' || z.ty === 'mother' || z.ty === 'abomination' ? 'e' : ''} !`, 2.2, 'bad');
+    }
+  }
+
+  // Mère des Cracheurs : garde ses distances, pond des larves et fait pleuvoir l'acide
+  motherAI(z, T, dt, dist, dx, dy) {
+    this.bossPhase(z);
+    const fast = z.phase >= 2 ? 0.65 : 1;
+    if (z.cdA <= 0) {
+      z.cdA = 7.5 * fast;
+      const n = this.zombies.length > 22 ? 0 : 1 + z.phase;
+      for (let k = 0; k < n; k++) this.pending.push({ ty: 'larva', x: z.x + Math.cos(k * 1.7) * 40, y: z.y + Math.sin(k * 1.7) * 40, t: 0.35 + k * 0.08 });
+      if (z.phase === 3) this.pending.push({ ty: 'spitter', x: z.x, y: z.y + 30, t: 0.6 });
+      this.ev({ e: 'birth', x: Math.round(z.x), y: Math.round(z.y) });
+    }
+    if (z.cdC <= 0) { z.cdC = 5.5 * fast; const st = this.standing(); if (st.length) this.spit(z, this.rng.pick(st), z.phase === 3 ? 3 : 2); }
+    if (Math.random() < dt * 0.2) this.addHazard('acid', z.x, z.y, 45, 3.5);
+    if (!T) return false;
+    z.curSpeed = z.spd;
+    if (dist < 280) { z.curWant = { x: -dx / dist, y: -dy / dist }; return true; }
+    if (dist < 460 && z.los) { const s2 = z.id % 2 ? 1 : -1; z.curWant = { x: (-dy / dist) * s2, y: (dx / dist) * s2 }; z.curSpeed = z.spd * 0.7; return true; }
+    return false;
+  }
+
+  // Reine : rapide, disparaît et réapparaît ailleurs avec sa nuée, plaque au sol à partir de la phase 2
+  queenAI(z, T, dt, dist, dx, dy) {
+    this.bossPhase(z);
+    if (['crouch', 'leap', 'pin', 'stun'].includes(z.state)) return this.stalkerAI(z, T, dt, dist, dx, dy);
+    if (z.state === 'vanish') {
+      z.stT -= dt; z.curSpeed = 0; z.curWant = null; z.vx = z.vy = 0;
+      if (z.stT <= 0) {
+        const far = this.lv.vents.filter((v) => !this.standing().some((p) => Math.hypot(p.x - v.sx, p.y - v.sy) < 300));
+        const v = this.rng.pick(far.length ? far : this.lv.vents);
+        z.x = v.sx; z.y = v.sy; z.state = 'walk'; z.cdA = (z.phase === 3 ? 7 : 10);
+        for (let k = 0; k < 3 + z.phase; k++) this.pending.push({ ty: k < z.phase ? 'runner' : 'larva', x: v.sx + (Math.random() - 0.5) * 50, y: v.sy + (Math.random() - 0.5) * 50, t: 0.2 + k * 0.06 });
+        this.ev({ e: 'screech', x: Math.round(z.x), y: Math.round(z.y) });
+      }
+      return true;
+    }
+    if (z.cdA <= 0) { z.state = 'vanish'; z.stT = 2; this.ev({ e: 'vanish', x: Math.round(z.x), y: Math.round(z.y) }); return true; }
+    if (!T) return false;
+    if (z.cdC <= 0) { z.cdC = 3.2; this.spit(z, T, z.phase); }
+    if (z.phase >= 2 && z.cdB <= 0 && z.los && dist < 460 && dist > 120) { z.cdB = z.phase === 3 ? 6.5 : 8.5; z.state = 'crouch'; z.stT = 0.55; z.lockA = Math.atan2(dy, dx); return true; }
+    if (z.los && dist < 320) { const s2 = z.id % 2 ? 1 : -1; z.curWant = { x: (-dy / dist) * s2 + (dx / dist) * 0.2, y: (dx / dist) * s2 + (dy / dist) * 0.2 }; z.curSpeed = z.spd; return true; }
+    return false;
+  }
+
+  throwRock(z, T, n) {
+    for (let k = 0; k < n; k++) {
+      const tx = T.x + T.vx * 0.6 + (Math.random() - 0.5) * 140, ty = T.y + T.vy * 0.6 + (Math.random() - 0.5) * 140;
+      const d = Math.hypot(tx - z.x, ty - z.y), dur = clamp(d / 380, 0.6, 1.4);
+      this.eprojs.push({ id: this.nid++, k: 'rock', x: z.x, y: z.y, sx: z.x, sy: z.y, tx, ty, t: 0, dur, big: true });
+    }
+    this.ev({ e: 'throwRock', x: Math.round(z.x), y: Math.round(z.y) });
+  }
+
   spit(z, T, n) {
     for (let k = 0; k < n; k++) {
       const lead = 0.5;
       const tx = T.x + T.vx * lead + (n > 1 ? (k - (n - 1) / 2) * 70 : 0) + (Math.random() - 0.5) * 30;
       const ty = T.y + T.vy * lead + (Math.random() - 0.5) * 30;
       const d = Math.hypot(tx - z.x, ty - z.y), dur = clamp(d / 420, 0.45, 1.3);
-      this.eprojs.push({ id: this.nid++, k: 'acid', x: z.x, y: z.y, sx: z.x, sy: z.y, tx, ty, t: 0, dur, big: z.ty === 'boss' });
+      this.eprojs.push({ id: this.nid++, k: 'acid', x: z.x, y: z.y, sx: z.x, sy: z.y, tx, ty, t: 0, dur, big: isBig(z.ty) });
     }
     this.ev({ e: 'spit', x: Math.round(z.x), y: Math.round(z.y) });
   }
@@ -1308,7 +1563,15 @@ export class Sim {
     const keep = [];
     for (const e of this.eprojs) {
       e.t += dt;
-      if (e.k === 'acid') {
+      if (e.k === 'rock') {
+        const f = Math.min(1, e.t / e.dur);
+        e.x = e.sx + (e.tx - e.sx) * f; e.y = e.sy + (e.ty - e.sy) * f; e.h = Math.sin(f * Math.PI) * 140;
+        if (f >= 1) {
+          for (const p of this.players.values()) if (p.state === 'ok' && Math.hypot(p.x - e.tx, p.y - e.ty) < 70) this.hurtPlayer(p, 24 * this.diff.zDmg, e.tx, e.ty, 300);
+          this.ev({ e: 'slam', x: Math.round(e.tx), y: Math.round(e.ty), r: 70 });
+          continue;
+        }
+      } else if (e.k === 'acid') {
         const f = Math.min(1, e.t / e.dur);
         e.x = e.sx + (e.tx - e.sx) * f; e.y = e.sy + (e.ty - e.sy) * f; e.h = Math.sin(f * Math.PI) * 90;
         if (f >= 1) {
@@ -1362,29 +1625,34 @@ export class Sim {
       if (z.state === 'tele') fl |= 256; if (z.state === 'slamwind') fl |= 512; if (z.state === 'fuse') fl |= 1024;
       if (z.elite) fl |= 8; if (z.buffT > 0) fl |= 16; if (z.state === 'stun') fl |= 32; if (z.state === 'charge') fl |= 64;
       if (z.flash > 0) fl |= 128;
+      if (z.state === 'vanish') fl |= 8192;
       if (z.state === 'pin') fl |= 2048; if (z.state === 'crouch' || z.state === 'leap') fl |= 4096;
       return [z.id, ZOMBIE_IDS.indexOf(z.ty), r1(z.x), r1(z.y), r2(z.ang), Math.max(0, Math.round((z.hp / z.maxHp) * 1000)), fl, r2(z.lockA), z.phase, r1(z.vx), r1(z.vy)];
     });
-    const O = this.eprojs.map((e) => [e.id, e.k === 'acid' ? 0 : 1, r1(e.x), r1(e.y), r1(e.h || 0), e.big ? 1 : 0, r1(e.tx ?? e.x), r1(e.ty ?? e.y), r2(e.k === 'acid' ? e.t / e.dur : e.t / e.fuse)]);
+    const O = this.eprojs.map((e) => [e.id, e.k === 'acid' ? 0 : e.k === 'rock' ? 2 : 1, r1(e.x), r1(e.y), r1(e.h || 0), e.big ? 1 : 0, r1(e.tx ?? e.x), r1(e.ty ?? e.y), r2(e.k === 'nade' ? e.t / e.fuse : e.t / e.dur)]);
     const K = this.pickups.map((k) => [k.id, k.k, r1(k.x), r1(k.y), k.w || 0]);
     const T = this.turrets.map((t) => [t.id, r1(t.x), r1(t.y), r2(t.a), r2(t.t / t.dur), t.color]);
     const A = this.hazards.map((h) => [h.id, h.k, r1(h.x), r1(h.y), r1(h.r), r2(h.t / h.dur)]);
     const W = this.wave;
-    const boss = this.zombies.find((z) => z.ty === 'boss');
+    const boss = this.zombies.find((z) => isBig(z.ty));
     return {
       ph: this.phase, t: r2(this.t), rm: { i: this.room.index, ty: this.room.type, sd: this.room.seed, ex: this.room.exits, mode: this.cfg.mode },
       P, Z, O, K, A, T, D: [...this.destroyed], op: this.doorsOpen ? 1 : 0, cl: this.cleared ? 1 : 0,
       rl: this.rally ? { d: this.rally.door, t: r2(this.rally.t), a: this.rally.all ? 1 : 0 } : null,
       wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
       sc: this.score, k: this.kills, rc: this.roomsCleared, ts: this.toast && this.toast.until > this.t ? this.toast : null,
-      bs: boss ? Math.round((boss.hp / boss.maxHp) * 1000) : -1, cfg: { d: this.cfg.difficulty, sw: this.cfg.startWeapon, seed: this.cfg.seed },
+      bs: boss ? Math.round((boss.hp / boss.maxHp) * 1000) : -1, bn: boss ? ZOMBIES[boss.ty].name : '',
+      scr: this.scrap, dk: this.dark || (this.evt && this.evt.k === 'blackout') ? 1 : 0,
+      sh: this.shop.map((it) => [it.id, it.k, Math.round(it.x), Math.round(it.y), it.w || 0, it.price, it.sold ? 1 : 0]),
+      vt: this.vault ? [Math.round(this.vault.x), Math.round(this.vault.y), this.vault.st, Math.round(this.vault.prog * 100) / 100] : null,
+      ev: this.evt && this.evt.k === 'drop' ? [this.evt.st, this.evt.x, this.evt.y, Math.round(this.evt.prog * 100) / 100, Math.round(this.evt.t * 10) / 10] : null, cfg: { d: this.cfg.difficulty, sw: this.cfg.startWeapon, seed: this.cfg.seed },
     };
   }
 
   // Nouvel hôte : reprendre la partie à partir du dernier état reçu (la salle en cours redémarre proprement)
   static restore(snap, cfg) {
     const sim = new Sim({ mode: snap.rm.mode, difficulty: snap.cfg.d, startWeapon: snap.cfg.sw, seed: snap.cfg.seed, ...cfg });
-    sim.score = snap.sc; sim.kills = snap.k; sim.roomsCleared = snap.rc;
+    sim.score = snap.sc; sim.kills = snap.k; sim.roomsCleared = snap.rc; sim.scrap = snap.scr || 0;
     for (const q of snap.P) {
       const p = sim.addPlayer({ id: q.i, name: q.n, color: q.c, bot: !!q.b, cls: CLASS_IDS[q.cl] || 'soldier' });
       p.maxHp = q.H; p.hp = Math.max(1, q.h); p.maxArmor = q.R; p.armor = q.r; p.state = q.s === 0 ? 'ok' : q.s === 1 ? 'down' : 'dead';

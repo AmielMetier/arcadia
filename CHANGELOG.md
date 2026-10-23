@@ -1,5 +1,19 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.28 — 23 octobre 2026
+- **Outbreak** — Nouveaux boss :
+  - Un mini-boss garde la salle 4 : l'Abomination (charge, onde de choc, lancer de rochers) ou la Mère des Cracheurs (pond des larves, pluie d'acide).
+  - Le boss final change d'une partie à l'autre : Spécimen Zéro, le Colosse (blindé devant, point faible lumineux dans le dos, charges en série) ou la Reine (disparaît, réapparaît avec sa nuée et plaque au sol).
+  - En mode Survie : un mini-boss toutes les 5 vagues, un boss final toutes les 10.
+- **Outbreak** — Salles spéciales à choisir aux portes :
+  - Chez Dédé, le ferrailleur : pas de zombies, on dépense la ferraille ramassée (armes, améliorations, soins, munitions). Proposé avant les salles 3 et 5, et de passage en Survie toutes les 3 vagues.
+  - Coffre-fort : on peut le forcer (maintenir E)… l'alarme attire une horde, mais le trésor vaut le coup.
+  - Salle obscure : les lumières sont coupées et les traqueurs y rôdent ; double ferraille.
+  - Salle contaminée : des nuages toxiques dérivent dans la pièce ; améliorations plus rares à la sortie.
+- **Outbreak** — Événements surprises en pleine salle : coupure de courant, horde en approche, largage de ravitaillement à sécuriser en restant à côté.
+- **Outbreak** — La ferraille (⚙) tombe des zombies et des caisses, et elle est commune à toute l'escouade.
+- **Outbreak** — Plaqué au sol par un traqueur, on peut maintenant se débattre en martelant la roulade.
+
 ## 2.27 — 23 octobre 2026
 - **Outbreak** — Cinq classes de survivants, chacune avec sa capacité (touche A, ou Q en QWERTY ; Y à la manette) :
   - Soldat : Barrage, munitions infinies et cadence +50 % pendant 7 s.

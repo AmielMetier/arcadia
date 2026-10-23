@@ -2,7 +2,7 @@
 // Tout est cosmétique : les dégâts sont décidés par la simulation de l'hôte.
 import { drawZombie, shade, INK, ell, circ, MUZZLE } from './sprites.js';
 import { segCircle, raycastSolids } from '../engine/geom.js';
-import { WEAPONS, ZOMBIE_IDS } from '../engine/data.js';
+import { WEAPONS, ZOMBIE_IDS, isBig } from '../engine/data.js';
 
 const BLOOD = ['#7a0f12', '#8f1418', '#a3191d', '#6a0c0f'];
 const GOO = ['#5f8f2a', '#78a832', '#9be15d'];
@@ -58,8 +58,8 @@ export class FX {
       case 'respawn': case 'adren': { const p = P(e.p); A.play('revive', p && p.x, p && p.y); if (p) this.ring(p.x, p.y, 80, '#1fc7c1', 0.6); break; }
       case 'pk': {
         A.play(e.k === 'med' ? 'heal' : 'pickup', e.x, e.y, e.p === me ? 1 : 0.5);
-        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE' }[e.k];
-        if (label && e.p === me) this.text(e.x, e.y - 24, label, e.k === 'med' ? '#2fbf71' : e.k === 'armor' ? '#2b8cff' : '#ffc531', 14);
+        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE', scrap: '+' + (e.v || 1) + ' ⚙' }[e.k];
+        if (label && (e.p === me || e.k === 'scrap')) this.text(e.x, e.y - 24, label, e.k === 'med' ? '#2fbf71' : e.k === 'armor' ? '#2b8cff' : '#ffc531', 14);
         for (let i = 0; i < 8; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.5) * 200, life: 0.4, max: 0.4, c: '#fff8ea', r: 2 });
         break;
       }
@@ -114,6 +114,20 @@ export class FX {
       case 'pounce': A.play('pounce', e.x, e.y); break;
       case 'pin': { const p = P(e.p); if (p) { this.text(p.x, p.y - 42, 'PLAQUÉ !', '#ff4b2b', 18, true); this.spray(p.x, p.y, Math.random() * 6.28, BLOOD, 10, 160); } if (e.p === me) { this.hurtFlash = 1; this.addShake(10); } A.play('down', p && p.x, p && p.y); break; }
       case 'unpin': { const p = P(e.p); if (p) this.ring(p.x, p.y, 60, '#fff8ea', 0.35, 4); break; }
+      case 'buy': A.play('buy', e.x, e.y); this.text(e.x, e.y - 40, 'ACHETÉ !', '#ffc531', 16, true); for (let i = 0; i < 10; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 260, vy: -Math.random() * 260, life: 0.5, max: 0.5, c: '#ffc531', r: 2 }); break;
+      case 'poor': if (e.p === me) A.play('dry'); break;
+      case 'vaultAlarm': A.play('alarm'); A.play('alarm', null, null, 0.8); this.addShake(6); break;
+      case 'blackout': A.play('powerdown'); break;
+      case 'lightsOn': A.play('powerup'); break;
+      case 'horde': A.play('roar'); A.play('scream', null, null, 0.4); this.addShake(4); break;
+      case 'dropIn': A.play('plane'); break;
+      case 'dropLand': A.play('slam', e.x, e.y); this.dust(e.x, e.y, 16); this.addShake(5, e.x, e.y, view); break;
+      case 'dropOk': A.play('clear'); this.ring(e.x, e.y, 140, '#2fbf71', 0.6, 6); break;
+      case 'birth': A.play('splash', e.x, e.y); this.spray(e.x, e.y, Math.random() * 6.28, ['#8fbf4a', '#e8d79c'], 16, 180); break;
+      case 'vanish': A.play('scream', e.x, e.y, 0.6); this.ring(e.x, e.y, 80, '#c77dff', 0.5, 6); this.dust(e.x, e.y, 10); break;
+      case 'screech': A.play('scream', e.x, e.y); this.ring(e.x, e.y, 200, '#c77dff', 0.6, 8); this.addShake(6, e.x, e.y, view); break;
+      case 'throwRock': A.play('roar', e.x, e.y, 0.5); break;
+      case 'struggle': { const p = P(e.p); if (p) this.parts.push({ k: 'smoke', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, life: 0.4, max: 0.4, c: '#a8a296', r: 8 }); if (e.p === me) A.play('dash'); break; }
       case 'tEnd': this.dust(e.x, e.y, 8); A.play('switch', e.x, e.y); break;
       case 'dash': { const p = P(e.p); if (p) { this.dust(p.x, p.y, 6); if (e.p === me) A.play('dash'); } break; }
       case 'throw': A.play('throw', null, null, e.p === me ? 1 : 0.4); break;
@@ -127,6 +141,7 @@ export class FX {
       case 'room': A.play('alarm'); break;
       case 'door': A.play('door'); break;
       case 'boss': A.play('boss'); this.addShake(8); break;
+      case 'pk2': break;
       case 'phase': A.play('roar'); this.addShake(10); break;
       case 'won': A.play('won'); break;
       case 'over': A.play('over'); break;
@@ -211,7 +226,7 @@ export class FX {
     // flaque + cadavre peints sur le sol
     const c = this.dctx;
     if (c) {
-      this.stain(e.x + Math.cos(e.a) * 14, e.y + Math.sin(e.a) * 14, pal, ty === 'boss' ? 70 : ty === 'brute' ? 34 : 20, 0.8);
+      this.stain(e.x + Math.cos(e.a) * 14, e.y + Math.sin(e.a) * 14, pal, isBig(ty) ? 70 : ty === 'brute' ? 34 : 20, 0.8);
       if (ty !== 'bloater') {
         c.save(); c.translate(e.x + Math.cos(e.a) * 8, e.y + Math.sin(e.a) * 8); c.rotate(e.a + Math.PI + (Math.random() - 0.5) * 0.8);
         c.globalAlpha = 0.85;
@@ -222,13 +237,13 @@ export class FX {
       }
     }
     // gerbe de sang et morceaux
-    const n = ty === 'boss' ? 60 : ty === 'brute' ? 26 : ty === 'bloater' ? 30 : 14;
+    const n = isBig(ty) ? 60 : ty === 'brute' ? 26 : ty === 'bloater' ? 30 : 14;
     this.spray(e.x, e.y, e.a, pal, n, ty === 'bloater' ? 320 : 230);
-    for (let i = 0; i < (ty === 'boss' ? 16 : 4); i++) {
+    for (let i = 0; i < (isBig(ty) ? 16 : 4); i++) {
       const a = e.a + (Math.random() - 0.5) * 2, s = 120 + Math.random() * 220;
       this.parts.push({ k: 'chunk', x: e.x, y: e.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6, max: 0.6, c: goo ? '#6f8f3a' : '#7a2a2a', r: 3 + Math.random() * 3, rot: Math.random() * 6, decal: true });
     }
-    if (ty === 'boss') { this.explosion(e.x, e.y, 200, 'toxic'); this.addShake(20); }
+    if (isBig(ty)) { this.explosion(e.x, e.y, 200, 'toxic'); this.addShake(20); }
   }
 
   explosion(x, y, r, kind) {

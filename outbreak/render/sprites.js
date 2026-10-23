@@ -241,6 +241,10 @@ export function drawZombie(c, z, t) {
       break;
     }
     case 'boss': drawBoss(c, z, t, v, flash); break;
+    case 'abomination': drawAbomination(c, z, t, v, flash); break;
+    case 'mother': drawMother(c, z, t, v, flash); break;
+    case 'colossus': drawColossus(c, z, t, v, flash); break;
+    case 'queen': c.scale(1.45, 1.45); drawQueen(c, z, t, v, flash); break;
   }
   c.restore();
 }
@@ -259,6 +263,77 @@ function face(c, x, flash, angry) {
   c.fillStyle = flash ? '#fff' : '#1b1414';
   circ(c, x + 4.5, -3.5, 2.1); c.fill(); circ(c, x + 4.5, 3.5, 2.1); c.fill();
   if (angry) { c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x + 2, -6); c.lineTo(x + 6, -2.5); c.moveTo(x + 2, 6); c.lineTo(x + 6, 2.5); c.stroke(); }
+}
+
+// L'Abomination : un amas de chair recousue à trois bras
+function drawAbomination(c, z, t, v, flash) {
+  const atk = (z.flags & 1) || (z.flags & 64);
+  const sw = Math.sin(z.walk) * 6, reach = atk ? 16 : 0;
+  feet(c, z, 18, flash);
+  limb(c, 0, 30, 34 + sw + reach, 28, 13, F(flash, '#d9a3a3'));
+  limb(c, 0, -30, 34 - sw + reach, -28, 13, F(flash, '#d9a3a3'));
+  limb(c, -6, 0, 30 + reach, 6, 11, F(flash, '#c98b8b'));
+  for (const [x, y] of [[36 + sw + reach, 28], [36 - sw + reach, -28], [32 + reach, 6]]) { circ(c, x, y, 10); fs(c, F(flash, '#e8b8b8'), 2.4); }
+  ell(c, -6, 0, 32, 38); fs(c, F(flash, '#b97a7a'), 3.2);
+  c.strokeStyle = INK; c.lineWidth = 2;
+  for (const [x0, y0, x1, y1] of [[-24, -20, 6, -6], [-20, 18, 8, 26], [-30, 0, -8, 4]]) {
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    for (let k = 0; k <= 4; k++) { const x = x0 + (x1 - x0) * k / 4, y = y0 + (y1 - y0) * k / 4; c.beginPath(); c.moveTo(x - 3, y - 4); c.lineTo(x + 3, y + 4); c.stroke(); }
+  }
+  circ(c, 16, -8, 11); fs(c, F(flash, '#d9a3a3')); circ(c, 18, 12, 8); fs(c, F(flash, '#c98b8b'));
+  c.fillStyle = flash ? '#fff' : '#1b1414'; circ(c, 23, -11, 2.4); c.fill(); circ(c, 23, -4, 2.4); c.fill(); circ(c, 23, 12, 2); c.fill();
+}
+
+// La Mère des Cracheurs : un sac d'œufs sur pattes
+function drawMother(c, z, t, v, flash) {
+  const pulse = 1 + Math.sin(t * 3) * 0.04;
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.5, st = Math.sin(z.walk + k) * 5;
+    limb(c, Math.cos(a) * 20, Math.sin(a) * 20, Math.cos(a) * 46 + st, Math.sin(a) * 46, 5, F(flash, '#6f8f3a'));
+  }
+  ell(c, -10, 0, 34 * pulse, 30 * pulse); fs(c, F(flash, '#8fbf4a'), 3.2);
+  for (let k = 0; k < 9; k++) { const a = k * 2.4, r = 8 + (k % 3) * 7; circ(c, -10 + Math.cos(a) * r, Math.sin(a) * r * 0.85, 5 + (k % 2)); fs(c, F(flash, '#e8d79c'), 1.8); }
+  ell(c, 20, 0, 13, 14); fs(c, F(flash, '#55704a'), 2.6);
+  ell(c, 30, 0, 7, 9); c.fillStyle = flash ? '#fff' : '#9be15d'; c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
+}
+
+// Le Colosse : un géant blindé, la plaque devant, un cœur lumineux dans le dos
+function drawColossus(c, z, t, v, flash) {
+  const atk = (z.flags & 1) || (z.flags & 64);
+  const sw = Math.sin(z.walk) * 5;
+  feet(c, z, 22, flash);
+  // point faible dans le dos
+  const g = 0.6 + 0.4 * Math.sin(t * 6);
+  circ(c, -44, 0, 15); fs(c, F(flash, `rgba(255,${140 + 60 * g | 0},40,1)`), 3);
+  limb(c, -6, 40, 26 + sw + (atk ? 12 : 0), 40, 16, F(flash, '#6b6f78'));
+  limb(c, -6, -40, 26 - sw + (atk ? 12 : 0), -40, 16, F(flash, '#6b6f78'));
+  ell(c, -10, 0, 34, 46); fs(c, F(flash, '#4f5560'), 3.4);
+  for (const y of [-26, 0, 26]) { rr(c, -36, y - 9, 30, 18, 4); fs(c, F(flash, '#8d96a3'), 2.4); }
+  // grande plaque frontale
+  c.save(); c.translate(32, 0);
+  c.beginPath(); c.moveTo(-6, -52); c.quadraticCurveTo(14, 0, -6, 52); c.lineTo(-16, 52); c.quadraticCurveTo(2, 0, -16, -52); c.closePath(); fs(c, F(flash, '#a7b0bd'), 3.4);
+  for (const y of [-34, -12, 12, 34]) { circ(c, -6, y, 3); c.fillStyle = INK; c.fill(); }
+  c.restore();
+  circ(c, 14, 0, 13); fs(c, F(flash, '#3b4250'), 3);
+  rr(c, 20, -7, 6, 14, 2); c.fillStyle = flash ? '#fff' : '#ff6a4a'; c.fill();
+}
+
+// La Reine : insecte élancé, couronne d'épines, longues pattes
+function drawQueen(c, z, t, v, flash) {
+  const leg = Math.sin(z.walk * 1.4);
+  for (let k = 0; k < 3; k++) for (const s of [-1, 1]) {
+    const x0 = 10 - k * 14, st = leg * (k % 2 ? 1 : -1) * 8 * s;
+    c.lineCap = 'round';
+    const mx = x0 + 6 + st, my = s * 30, ex = x0 + 18 + st, ey = s * 46;
+    c.strokeStyle = INK; c.lineWidth = 7; c.beginPath(); c.moveTo(x0, s * 8); c.lineTo(mx, my); c.lineTo(ex, ey); c.stroke();
+    c.strokeStyle = F(flash, '#3b2a4a'); c.lineWidth = 4; c.stroke();
+  }
+  ell(c, -30, 0, 22, 14); fs(c, F(flash, '#2b2033'), 3);
+  for (let k = 0; k < 3; k++) { c.strokeStyle = F(flash, '#c77dff'); c.lineWidth = 2; c.beginPath(); c.moveTo(-44 + k * 9, -11); c.lineTo(-44 + k * 9, 11); c.stroke(); }
+  ell(c, 0, 0, 16, 12); fs(c, F(flash, '#4b3560'), 3);
+  ell(c, 22, 0, 12, 10); fs(c, F(flash, '#5e4378'), 3);
+  for (let k = -2; k <= 2; k++) { c.save(); c.translate(18, 0); c.rotate(Math.PI + k * 0.35); c.beginPath(); c.moveTo(8, -3); c.lineTo(24, 0); c.lineTo(8, 3); fs(c, F(flash, '#e6b8ff'), 1.8); c.restore(); }
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(30, s * 4); c.quadraticCurveTo(42, s * 10, 40, s * 2); c.strokeStyle = INK; c.lineWidth = 3; c.stroke(); }
 }
 
 function drawBoss(c, z, t, v, flash) {
@@ -300,14 +375,16 @@ function drawBoss(c, z, t, v, flash) {
 // Yeux lumineux, dessinés après l'obscurité pour percer le noir
 export function zombieEyes(c, z) {
   if (z.ty === 'stalker' && z.alpha != null && z.alpha < 0.5) return;
-  const off = { walker: 3, runner: 4, crawler: 7, spitter: 1, bloater: 14, brute: 8, screamer: 2, armored: 4, stalker: 8, larva: 4, boss: 40 }[z.ty] ?? 3;
-  const col = z.flags & 16 ? '#ff4b2b' : z.ty === 'boss' ? '#ffef5a' : z.flags & 8 ? '#ffb03a' : '#ff6a4a';
+  if (z.flags & 8192) return;
+  const off = { walker: 3, runner: 4, crawler: 7, spitter: 1, bloater: 14, brute: 8, screamer: 2, armored: 4, stalker: 8, larva: 4, boss: 40, abomination: 18, mother: 26, colossus: 14, queen: 24 }[z.ty] ?? 3;
+  const bigE = z.ty === 'boss' || z.ty === 'colossus' || z.ty === 'queen' || z.ty === 'abomination' || z.ty === 'mother';
+  const col = z.flags & 16 ? '#ff4b2b' : bigE ? (z.ty === 'queen' ? '#e6b8ff' : '#ffef5a') : z.flags & 8 ? '#ffb03a' : '#ff6a4a';
   const ca = Math.cos(z.a), sa = Math.sin(z.a);
-  const pts = z.ty === 'boss' ? [[off, -9], [off + 3, 0], [off, 9]] : [[off + 4.5, -3.5], [off + 4.5, 3.5]];
+  const pts = z.ty === 'boss' ? [[off, -9], [off + 3, 0], [off, 9]] : bigE ? [[off, -5], [off, 5]] : [[off + 4.5, -3.5], [off + 4.5, 3.5]];
   c.fillStyle = col;
   for (const [lx, ly] of pts) {
     const x = z.x + lx * ca - ly * sa, y = z.y + lx * sa + ly * ca;
-    c.beginPath(); c.arc(x, y, z.ty === 'boss' ? 3.4 : 1.9, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(x, y, bigE ? 3.4 : 1.9, 0, Math.PI * 2); c.fill();
   }
 }
 
@@ -325,6 +402,52 @@ export function drawTurret(c, t, time) {
   // jauge de durée
   c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, 22, 0, Math.PI * 2); c.stroke();
   c.strokeStyle = color || '#ff8a1f'; c.beginPath(); c.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); c.stroke();
+}
+
+// ------------------------------------------------------------------ marchand, coffre, largage
+export function drawShopItem(c, it, t, icon, label, afford) {
+  const [, k, , , w, price, sold] = it;
+  rr(c, -24, -8, 48, 30, 5); fs(c, sold ? '#59616d' : '#d9cdb3', 2.6);
+  if (!sold) {
+    c.save(); c.translate(0, -16 + Math.sin(t * 3 + price) * 2);
+    if (k === 'weapon') { c.rotate(-0.3); c.translate(-16, 0); drawWeapon(c, w, false, 0.9); }
+    else { c.font = '22px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(icon, 0, 0); }
+    c.restore();
+  }
+  rr(c, -20, 24, 40, 18, 5); fs(c, sold ? '#59616d' : afford ? '#ffc531' : '#ff8a7a', 2.2);
+  c.fillStyle = INK; c.font = '700 12px "Chakra Petch", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(sold ? 'VENDU' : '⚙ ' + price, 0, 33);
+}
+
+export function drawVaultDoor(c, st, prog, t) {
+  const open = st === 'open', alarm = st === 'alarm';
+  const R0 = 52;
+  c.save();
+  if (open) c.translate(-40, 0);
+  circ(c, 0, 0, R0); fs(c, '#a7b0bd', 4);
+  circ(c, 0, 0, R0 - 10); fs(c, '#8d96a3', 2.5);
+  c.save(); c.rotate(open ? 2 : prog * Math.PI * 2 + (alarm ? t * 3 : 0));
+  for (let k = 0; k < 3; k++) { c.rotate((Math.PI * 2) / 3); rr(c, -4, 0, 8, R0 - 14, 3); fs(c, '#59616d', 2); }
+  circ(c, 0, 0, 12); fs(c, '#ffc531', 2.5);
+  c.restore();
+  c.restore();
+  if (alarm) { c.fillStyle = `rgba(255,60,40,${0.5 + 0.5 * Math.sin(t * 10)})`; circ(c, -R0 - 14, -R0 + 10, 7); c.fill(); circ(c, R0 + 14, -R0 + 10, 7); c.fill(); }
+}
+
+export function drawDropCrate(c, st, f, t) {
+  if (st === 'fall') {
+    const h = 60 + f * 500;
+    c.save(); c.translate(0, -h);
+    c.beginPath(); c.arc(0, -46, 40, Math.PI, 0); fs(c, '#fff8ea', 2.6);
+    for (let k = -1; k <= 1; k++) { c.beginPath(); c.moveTo(k * 28, -46); c.lineTo(k * 10, -14); c.strokeStyle = INK; c.lineWidth = 1.5; c.stroke(); }
+    c.restore();
+    c.save(); c.translate(0, -h); rr(c, -20, -16, 40, 32, 4); fs(c, '#5c6b3a', 2.6); c.restore();
+    return;
+  }
+  rr(c, -26, -20, 52, 40, 5); fs(c, '#5c6b3a', 3);
+  rr(c, -26, -4, 52, 8, 2); fs(c, '#ffc531', 2);
+  // balise
+  c.fillStyle = Math.sin(t * 8) > 0 ? '#2fbf71' : '#1a6b40'; circ(c, 20, -26, 6); c.fill(); c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
 }
 
 // ------------------------------------------------------------------ objets au sol
@@ -347,6 +470,11 @@ export function drawPickup(c, k, t) {
     case 'nade':
       circ(c, 0, 2, 9); fs(c, '#4a5d32'); rr(c, -4, -11, 8, 6, 1.5); fs(c, '#8d96a3', 2);
       c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(6, -9, 4, Math.PI, Math.PI * 2.2); c.stroke();
+      break;
+    case 'scrap':
+      c.rotate(k.id);
+      c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, r = i % 2 ? 6 : 10; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); fs(c, '#a7b0bd', 2.2);
+      circ(c, 0, 0, 3); c.fillStyle = INK; c.fill();
       break;
     case 'weapon': {
       const glow = 0.5 + 0.5 * Math.sin(t * 4);

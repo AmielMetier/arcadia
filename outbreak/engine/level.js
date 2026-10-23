@@ -10,7 +10,7 @@ export const CELL = 32;
 
 const SIZES = {
   start: [1500, 1050], armory: [1900, 1250], medbay: [1800, 1250], lab: [2000, 1300], storage: [1950, 1300],
-  core: [2100, 1550], arena: [2300, 1650],
+  core: [2100, 1550], arena: [2300, 1650], shop: [1500, 1050], vault: [1800, 1300], dark: [1900, 1300], gas: [1950, 1300],
 };
 
 export function generateRoom({ mode = 'campaign', index = 1, type = 'start', seed = 1, exits = [] }) {
@@ -69,7 +69,8 @@ function build({ mode, index, type, seed, exits }, bare) {
     vents.push({ x: I.x1, y: I.y0 + (I.y1 - I.y0) * f, nx: -1, ny: 0, side: 'right' });
   }
   const topSlots = [0.12, 0.5, 0.88].map((f) => I.x0 + (I.x1 - I.x0) * f)
-    .filter((vx) => !lv.doors.some((d) => d.side === 'top' && vx > d.x - 90 && vx < d.x + d.w + 90));
+    .filter((vx) => !lv.doors.some((d) => d.side === 'top' && vx > d.x - 90 && vx < d.x + d.w + 90))
+    .filter((vx) => !(type === 'vault' && Math.abs(vx - cx) < 260));
   for (const vx of topSlots) vents.push({ x: vx, y: I.y0, nx: 0, ny: 1, side: 'top' });
   if (type === 'arena' || type === 'core') {
     vents.push({ x: I.x0 + 160, y: I.y1, nx: 0, ny: -1, side: 'bottom' }, { x: I.x1 - 160, y: I.y1, nx: 0, ny: -1, side: 'bottom' });
@@ -184,6 +185,24 @@ function layout(type, lv, rng, add) {
       add({ x: X(0.25), y: Y(0.5), w: 160, h: 50, kind: 'pallet', low: true });
       break;
     }
+    case 'shop':
+      add({ x: X(0.5) - 260, y: Y(0.2), w: 520, h: 50, kind: 'stall', low: true }, false);
+      add({ x: X(0.14), y: Y(0.55), w: 90, h: 70, kind: 'stack' });
+      break;
+    case 'vault':
+      add({ x: X(0.5) - 110, y: I.y0 + 8, w: 220, h: 120, kind: 'vault' }, false);
+      add({ x: X(0.16), y: Y(0.3), w: 44, h: 170, kind: 'rack' });
+      add({ x: X(0.22), y: Y(0.72), w: 150, h: 40, kind: 'sandbags', low: true });
+      break;
+    case 'dark':
+      for (let k = 0; k < 2; k++) add({ x: X(0.15 + k * 0.17), y: Y(0.25 + k * 0.3), w: 60, h: 60, kind: 'pillar' });
+      add({ x: X(0.3), y: Y(0.62), w: 80, h: 80, kind: 'stack' });
+      break;
+    case 'gas':
+      add({ x: X(0.12), y: Y(0.35), w: 220, h: 34, kind: 'pipe', low: true });
+      add({ x: X(0.32), y: Y(0.6), w: 60, h: 60, kind: 'tank' });
+      add({ x: X(0.18), y: Y(0.72), w: 70, h: 70, kind: 'locker' });
+      break;
     case 'core':
       add({ x: X(0.5) - 90, y: Y(0.42) - 90, w: 180, h: 180, kind: 'reactor', low: true }, false);
       add({ x: X(0.2), y: Y(0.22), w: 70, h: 70, kind: 'pillar' });

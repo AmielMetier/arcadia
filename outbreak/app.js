@@ -4,7 +4,7 @@
 import { Sim, DT, lvl } from './engine/sim.js';
 import { botThink } from './engine/bots.js';
 import { generateRoom } from './engine/level.js';
-import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS, CLASSES, CLASS_IDS } from './engine/data.js';
+import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS, CLASSES, CLASS_IDS, SHOP_ITEMS, isBig } from './engine/data.js';
 import { pushOutRect, clamp, angDiff } from './engine/geom.js';
 import { Audio } from './audio.js';
 import { FX } from './render/fx.js';
@@ -393,7 +393,7 @@ function buildView(a, b, f, dt) {
     const ty = ZOMBIE_IDS[z[1]];
     const an = anim.get(z[0]) || { walk: Math.random() * 6 };
     const sp = Math.hypot(z[9], z[10]);
-    an.walk += sp * dt / (ty === 'boss' ? 16 : 9); anim.set(z[0], an);
+    an.walk += sp * dt / (isBig(ty) ? 16 : 9); anim.set(z[0], an);
     let flags = z[6] & ~128; if (fx.zflash.has(z[0])) flags |= 128;
     return { id: z[0], ty, x: lerp(o[2], z[2]), y: lerp(o[3], z[3]), a: lerpA(o[4], z[4]), hp: z[5] / 1000, flags, lockA: z[7], phase: z[8], vx: z[9], vy: z[10], walk: an.walk, r: ZOMBIES[ty].r * (flags & 8 ? 1.18 : 1) };
   });
@@ -410,7 +410,7 @@ function buildView(a, b, f, dt) {
   const view = {
     lv, t, players, zombies, eprojs, mode: b.rm.mode,
     pickups: b.K.map((k) => ({ id: k[0], k: k[1], x: k[2], y: k[3], w: k[4] })),
-    hazards: b.A, turrets: b.T || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
+    hazards: b.A, turrets: b.T || [], shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
     doorsOpen: !!b.op, cleared: !!b.cl, rally: b.rl, meId: S.myId, me: meSnap ? { ...meSnap, state: meSnap.s } : null,
     snap: b, waveLeft: b.wv.left, focus, bleedMax: DIFFICULTY[b.cfg.d]?.bleed || 28, predictFire: S.role === 'guest',
     clock: b.t,
@@ -426,10 +426,18 @@ function promptFor(view) {
   if (!me || !ms || view.snap.ph !== 'play') return '';
   const camp = view.mode !== 'survival';
   if (me.state === 2) return camp ? '☠ K.O. — tu reviens à la prochaine salle' : '☠ K.O. — tu reviens à la fin de la vague';
-  if (me.pinned) return '⚠ Plaqué au sol ! Tes alliés doivent tirer sur le traqueur';
+  if (me.pinned) return '⚠ Plaqué au sol ! Martèle <kbd>Espace</kbd> pour te débattre';
   if (me.state === 1) return `✚ À terre ! Tu peux ramper et tirer au pistolet · ${Math.ceil(me.bl)} s`;
   const downed = view.players.find((o) => o.id !== me.id && o.state === 1 && Math.hypot(o.x - me.x, o.y - me.y) < 82);
   if (downed) return downed.rv > 0 ? `Réanimation de ${esc(downed.name)}… ${Math.round(downed.rv * 100)} %` : `Maintiens <kbd>E</kbd> pour relever ${esc(downed.name)}`;
+  const it = view.shop.find((q) => !q[6] && Math.hypot(q[2] - me.x, q[3] - me.y) < 50);
+  if (it) {
+    const name = it[1] === 'weapon' ? WEAPONS[it[4]].name : SHOP_ITEMS[it[1]].name;
+    return view.scrap >= it[5] ? `<kbd>E</kbd> Acheter ${esc(name)} · ⚙ ${it[5]}` : `${esc(name)} · ⚙ ${it[5]} — pas assez de ferraille (${view.scrap})`;
+  }
+  if (view.vault && view.vault[2] === 'closed' && Math.hypot(view.vault[0] - me.x, view.vault[1] - me.y) < 95)
+    return view.vault[3] > 0 ? `Ouverture du coffre… ${Math.round(view.vault[3] * 100)} % (ça va sonner !)` : 'Maintiens <kbd>E</kbd> pour forcer le coffre — une alarme attirera une horde';
+  if (view.drop && view.drop[0] === 'land' && Math.hypot(view.drop[1] - me.x, view.drop[2] - me.y) < 120) return `Sécurisation du largage… ${Math.round(view.drop[3] * 100)} %`;
   const wp = view.pickups.find((k) => k.k === 'weapon' && Math.hypot(k.x - me.x, k.y - me.y) < 60);
   if (wp) {
     const W = WEAPONS[wp.w];
@@ -525,7 +533,7 @@ function loop(now) {
   // intensité musicale : zombies proches
   const near = meP ? view.zombies.filter((z) => Math.hypot(z.x - meP.x, z.y - meP.y) < 700).length : 0;
   audio.intensity += ((view.snap.ph === 'play' && !view.cleared ? Math.min(1, near / 14 + (view.zombies.length ? 0.2 : 0)) : 0) - audio.intensity) * Math.min(1, dt * 1.5);
-  if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && z.ty !== 'boss') audio.play('groan', z.x, z.y, 0.6); }
+  if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && !isBig(z.ty)) audio.play('groan', z.x, z.y, 0.6); }
   fx.update(dt, view);
   view.prompt = promptFor(view);
   if (view.me && view.me.ab) { const ready = view.me.ab[0] <= 0; if (ready && !S.abReady && view.snap.ph === 'play') audio.play('ready'); S.abReady = ready; }

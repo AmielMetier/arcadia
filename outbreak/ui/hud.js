@@ -24,19 +24,22 @@ export class HUD {
     const rm = s.rm;
     const camp = rm.mode !== 'survival';
     this.set('roomN', camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : 'MODE SURVIE');
-    this.set('roomName', esc(camp ? ROOM_TYPES[rm.ty].name.split(' — ')[0] : `Vague ${Math.max(1, s.wv.n)}`));
+    this.set('roomName', esc(camp ? ROOM_TYPES[rm.ty].name.split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
     let st = '', sc = 'status card';
     if (s.ph === 'won') { st = '✔ Mission accomplie'; sc += ' clear'; }
     else if (s.ph === 'over') { st = '✖ Escouade décimée'; sc += ' lock'; }
     else if (s.rl) { st = `🚪 Départ dans <span class="pill">${Math.ceil(s.rl.t / (s.rl.a ? 5 : 1))}</span>${s.rl.a ? '' : ' · rejoignez la porte'}`; sc += ' rally'; }
+    else if (rm.ty === 'shop' && !s.rl) { st = '🛒 Pas de zombies ici · dépensez votre ferraille'; sc += ' clear'; }
+    else if (!s.rl && rm.ty === 'vault' && s.vt && s.vt[2] === 'closed') { st = '💰 Forcez le coffre… ou passez votre chemin'; sc += ' rally'; }
     else if (s.cl || (!camp && s.wv.left === 0 && s.wv.n > 0)) { st = camp ? '✔ Zone sécurisée · choisissez une porte' : '✔ Vague repoussée · préparez-vous'; sc += ' clear'; }
     else if (s.wv.n === 0) { st = camp ? '☣ Confinement · ils arrivent…' : '☣ Préparez-vous…'; sc += ' lock'; }
     else { st = `☣ ${camp ? 'Confinement' : 'Horde'}${s.wv.tot > 1 ? ` · vague ${s.wv.n}/${s.wv.tot}` : ''} · <span class="pill">${s.wv.left}</span> restants`; sc += ' lock'; }
     this.set('status', st); this.cls('status', sc);
+    this.set('scrap', String(s.scr || 0));
     this.set('score', s.sc.toLocaleString('fr-FR')); this.set('kills', String(s.k)); this.set('clock', fmtTime(v.clock || 0));
     // boss
     const boss = $('#boss');
-    if (s.bs >= 0) { boss.hidden = false; $('#bossBar').style.width = s.bs / 10 + '%'; } else boss.hidden = true;
+    if (s.bs >= 0) { boss.hidden = false; $('#bossBar').style.width = s.bs / 10 + '%'; this.set('bossName', '☣ ' + esc((s.bn || '').toUpperCase())); } else boss.hidden = true;
     // toast
     if (s.ts && s.ts.n !== this.toastN) {
       this.toastN = s.ts.n;

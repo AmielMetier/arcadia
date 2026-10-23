@@ -121,6 +121,10 @@ export class Audio {
       case 'ability': [392, 523, 659, 784].forEach((f, i) => this.tone(o, t + i * 0.04, 0.3, { type: 'square', f0: f, v: 0.07 })); this.noise(o, t, 0.3, { type: 'bandpass', f0: 600, f1: 2400, v: 0.3 }); break;
       case 'ready': this.tone(o, t, 0.12, { type: 'triangle', f0: 1046, v: 0.15 }); this.tone(o, t + 0.08, 0.2, { type: 'triangle', f0: 1568, v: 0.15 }); break;
       case 'pounce': this.tone(o, t, 0.4, { type: 'sawtooth', f0: 500, f1: 1100, a: 0.02, v: 0.22, vib: 25 }); this.noise(o, t, 0.3, { type: 'bandpass', f0: 1500, q: 2, v: 0.25 }); break;
+      case 'buy': [784, 1046, 1318].forEach((f, i) => this.tone(o, t + i * 0.05, 0.2, { type: 'square', f0: f, v: 0.08 })); this.noise(o, t, 0.12, { type: 'highpass', f0: 5000, v: 0.3 }); break;
+      case 'powerdown': this.tone(o, t, 1.2, { type: 'sawtooth', f0: 220, f1: 30, a: 0.01, v: 0.25 }); this.noise(o, t, 0.2, { type: 'bandpass', f0: 2000, v: 0.3 }); break;
+      case 'powerup': this.tone(o, t, 0.8, { type: 'sawtooth', f0: 40, f1: 220, a: 0.05, v: 0.2 }); break;
+      case 'plane': this.tone(o, t, 2.5, { type: 'sawtooth', f0: 70, f1: 60, a: 0.6, v: 0.12, vib: 12 }); this.noise(o, t, 2.5, { f0: 300, f1: 200, a: 0.8, v: 0.2 }); break;
       case 'click': this.tone(o, t, 0.05, { type: 'triangle', f0: 1200, v: 0.15 }); break;
     }
   }
