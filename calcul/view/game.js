@@ -1,7 +1,7 @@
 // Vue de Tête de Calcul : salle d'avant-partie, pupitre de question, révélation et podium final.
 // La vue n'invente rien : elle affiche l'état reçu de l'hôte et envoie la saisie du joueur.
 import { CATS, TIER_LABEL, DIFFS, chartierTier, fmt } from '../engine/questions.js';
-import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer, JOKERS, LIVES } from '../engine/rules.js';
+import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer, JOKERS, LIVES, TIER_SHOW_MS, INTER_MS, ANNOUNCE_MS } from '../engine/rules.js';
 import { buildProgram } from '../engine/code-data.js';
 import { runPython, preloadPython } from './py.js';
 import { highlightPy } from './pyhl.js';
@@ -135,6 +135,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <div class="cu-title"><small id="custars"></small><b id="cutitle"></b><span id="cusub"></span></div>
       <div class="cu-flash"></div>
     </div>
+    <div class="announce" id="announce" role="status"><div class="an-card"><i id="anicon"></i><b id="antitle"></b><span id="ansub"></span></div></div>
     <div class="inter" id="inter" aria-hidden="true"><div class="inter-band"><small id="ikick"></small><b id="ititle"></b><span id="isub"></span></div></div>`;
   const $ = (s) => root.querySelector(s);
   const stage = $('#stage');
@@ -162,7 +163,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   addEventListener('resize', () => requestAnimationFrame(fit));
 
   let S = null, offset = 0, key = '', myAns = null, shown = {}, lastTick = -1, setupS = null, sabSeen = -1, picking = null;
-  let jokInfo = null, draft = { idx: -1, code: '' }, pyAsked = false, interFor = -2, interT = 0;
+  let jokInfo = null, draft = { idx: -1, code: '' }, pyAsked = false, interFor = -2, interT = 0, annT = [];
   const meP = () => S && S.players.find((p) => p.id === me.id);
   const iAmOut = () => !!(meP() && meP().out);
   const name = (id) => { const p = S && S.players.find((q) => q.id === id); return p ? p.name : '?'; };
@@ -524,7 +525,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (m.kind === 'half') for (const k of m.removed) {
       const b = root.querySelector(`[data-c="${k}"]`); if (!b) continue;
       b.disabled = true; b.classList.add('going');
-      setTimeout(() => { b.classList.add('gone'); requestAnimationFrame(fit); }, motion() ? 380 : 0);
+      setTimeout(() => { b.classList.add('gone'); requestAnimationFrame(fit); }, motion() ? 700 : 0);
     }
     sfx.play(m.kind === 'half' ? 'snip' : 'ring');
     renderJokers();
@@ -698,13 +699,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         ${S.cfg.sabotage && S.idx + 1 < S.cfg.len ? '<p class="sabhint">⚔️ C\'est le moment de saboter !</p>' : ''}
         <div class="nextbar"><i id="nbar"></i></div>
       </div>`;
-    const gone = L.eliminated || [];
-    if (gone.length) setTimeout(() => sfx.play(gone.some((e) => e.id === me.id) ? 'elim' : gone.some((e) => e.why === 'palier') ? 'cut' : 'elim'), 900);
     if (mine && !mine.out) {
       sfx.play(mine.ok ? (mine.tags.includes('serie') ? 'streak' : 'ok') : mine.tags.includes('trap') ? 'trap' : mine.raw != null ? 'ko' : 'lock');
       if (mine.ok) setTimeout(() => burst($('#verdict')), 250); else if (mine.raw != null) setTimeout(shake, 200);
       if (mine.power) setTimeout(() => sfx.play('streak'), 700);
-      if (mine.gained) setTimeout(() => sfx.play('life'), 500);
     }
   }
 
@@ -799,10 +797,12 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
 
   /* ---------------------------------------------------------- transitions entre deux étapes */
   // Jouées pendant la dernière seconde de la correction : la question suivante démarre à l'heure, sans temps perdu
+  // une fois son animation finie, l'élément redevient invisible (sinon son flou d'arrière-plan resterait à l'écran)
+  const endAfter = (o, cls, ms) => { clearTimeout(o._end); o._end = setTimeout(() => o.classList.remove(cls), ms + 100); };
   function showInter(kick, title, sub, tone) {
     const o = $('#inter'); if (!o || !motion()) return;
     $('#ikick').textContent = kick; $('#ititle').textContent = title; $('#isub').textContent = sub || '';
-    o.className = 'inter ' + (tone || ''); void o.offsetWidth; o.classList.add('show');
+    o.className = 'inter ' + (tone || ''); void o.offsetWidth; o.classList.add('show'); endAfter(o, 'show', INTER_MS);
     sfx.play(tone === 'tier' || tone === 'final' ? 'sab' : 'pop');
   }
   // The Candidate, entre deux tours : lumières qui baissent, projecteur, les survivants, Pierre Chartier, puis le nom du tour
@@ -820,9 +820,28 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     $('#cutitle').textContent = TIER_LABEL[tier];
     const alive = S.players.filter((p) => !p.out).length;
     $('#cusub').textContent = `${alive} candidat${alive > 1 ? 's' : ''} encore en lice · ${tier * 100} pts la question`;
-    o.classList.remove('play'); void o.offsetWidth; o.classList.add('play');
-    sfx.play('drum');
-    setTimeout(() => { sfx.play('gong'); wallStreetMusic.sting(); }, 3700);
+    o.classList.remove('play'); void o.offsetWidth; o.classList.add('play'); endAfter(o, 'play', TIER_SHOW_MS);
+    // le roulement monte pendant que Pierre Chartier parle, le gong tombe avec le nom du tour
+    setTimeout(() => sfx.play('drum'), 4000);
+    setTimeout(() => { sfx.play('gong'); wallStreetMusic.sting(); }, 6900);
+  }
+  // Annonces au centre de l'écran, chacune son tour : les éliminations, puis la vie regagnée (le temps est prévu par l'hôte)
+  function announce(icon, title, sub, tone, sound) {
+    const o = $('#announce'); if (!o) return;
+    $('#anicon').textContent = icon; $('#antitle').textContent = title; $('#ansub').textContent = sub;
+    o.className = 'announce ' + tone; void o.offsetWidth; o.classList.add('show'); endAfter(o, 'show', ANNOUNCE_MS);
+    if (sound) sfx.play(sound);
+  }
+  function planAnnounces(state) {
+    for (const t of annT.splice(0)) clearTimeout(t);
+    const L = state.last; if (!L) return;
+    const list = (L.eliminated || []).map((e) => e.id === me.id
+      ? [e.why === 'palier' ? '✂️' : '🚪', 'Ton entretien s\'arrête là', e.why === 'palier' ? `Dernier du classement à la fin du ${(TIER_LABEL[L.tierEnd] || 'tour').toLowerCase()}` : 'Plus aucune vie', 'bad', 'elim']
+      : [e.why === 'palier' ? '✂️' : '🚪', `${name(e.id)} quitte l'entretien`, e.why === 'palier' ? `Dernier du classement à la fin du ${(TIER_LABEL[L.tierEnd] || 'tour').toLowerCase()}` : 'Plus aucune vie', 'out', e.why === 'palier' ? 'cut' : 'elim']);
+    const mine = L.results.find((r) => r.id === me.id);
+    if (mine && mine.gained) list.push(['♥', 'Une vie de plus !', 'Trois bonnes réponses d\'affilée', 'life', 'life']);
+    // la correction s'affiche d'abord, puis les annonces défilent, une par une
+    list.forEach((a, k) => annT.push(setTimeout(() => { if (S && S.phase === 'reveal') announce(...a); }, 1600 + k * ANNOUNCE_MS)));
   }
   function nextInter() {
     const n = S.idx + 1, ch = S.cfg.mode === 'chartier';
@@ -918,7 +937,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
           // fin d'un tour de The Candidate : la grande mise en scène, sinon le bandeau habituel
           const L = state.last, scene = state.cfg.mode === 'chartier' && L && L.tierEnd && !L.endEarly && state.idx + 1 < state.cfg.len;
           interT = setTimeout(() => { if (S && S.phase === 'reveal' && interFor !== S.idx) { interFor = S.idx; if (scene) tierScene(); else nextInter(); } },
-            Math.max(0, state.endsAt - now() - (scene ? 5200 : 1150)));
+            Math.max(0, state.endsAt - now() - (scene ? TIER_SHOW_MS : INTER_MS)));
+          planAnnounces(state);
         }
         else if (state.phase === 'over') renderOver();
       } else if (state.phase === 'question' && prev && prev.qAt !== state.qAt) renderQuestion(); // question relancée (nouvel hôte)

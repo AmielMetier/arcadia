@@ -366,10 +366,10 @@ t('The Candidate : la fin d\'un tour laisse le temps de la mise en scène, même
   while (s.phase !== 'over') {
     s = nextQuestion(s, now); if (s.phase === 'over') break;
     s = play(s, { 0: 'good', 1: 'good' }, now); now += 1e5;
-    if (s.last.tierEnd) { ends++; assert.ok(s.revealMs >= 5200 + 5200, `pause allongée : ${s.revealMs}`); } else plain = Math.max(plain, s.revealMs);
+    if (s.last.tierEnd) { ends++; assert.ok(s.revealMs >= 5200 + 9200, `pause allongée : ${s.revealMs}`); } else plain = Math.max(plain, s.revealMs);
   }
   assert.equal(ends, 2, 'deux passages : premier tour → desk → comité');
-  assert.ok(plain < 5200 + 5200);
+  assert.ok(plain < 5200 + 9200 && plain >= 5200 + 2400, `bandeau de transition compris : ${plain}`);
 });
 
 t('The Candidate : en solo, la partie s\'arrête quand on n\'a plus de vies', () => {

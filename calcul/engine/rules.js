@@ -15,7 +15,9 @@ export const MODES = {
 export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const REVEAL_MS = 5200;
-export const TIER_SHOW_MS = 5200; // passage d'un tour à l'autre en The Candidate
+export const TIER_SHOW_MS = 9200; // passage d'un tour à l'autre en The Candidate (la grande scène)
+export const INTER_MS = 2400; // bandeau de transition avant la question suivante (ou le verdict)
+export const ANNOUNCE_MS = 2600; // annonce au centre de l'écran : éliminé, coupé, vie regagnée
 const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
 
 // The Candidate : 3 vies. Une mauvaise réponse en coûte une, la réponse piège deux, le silence une.
@@ -319,8 +321,10 @@ export function reveal(state, now) {
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
   // fin d'un tour : la mise en scène du passage au tour suivant s'ajoute à la correction
-  const interlude = tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : 0;
-  s.revealMs = interlude + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (eliminated.length ? 2500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
+  // chaque animation a son propre temps : la correction reste lisible, et le chrono de la question suivante est intact
+  const interlude = tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : INTER_MS;
+  const announces = eliminated.length + (results.some((r) => r.tags.includes('life')) ? 1 : 0);
+  s.revealMs = interlude + announces * ANNOUNCE_MS + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
   // les réponses deviennent publiques
   return s;
