@@ -66,7 +66,9 @@ for (const k in want) if (R[k] !== want[k]) fail(`règle ${k} = ${R[k]} au lieu 
 const ACTIONS = ['advance', 'advanceNearest', 'collect', 'pay', 'jailFree', 'back', 'goToJail', 'repairs', 'payEach', 'collectEach'];
 for (const deck of ['chance', 'chest']) {
   const cards = B.cards[deck];
-  if (cards.length !== 16) fail(`paquet ${deck} : ${cards.length} cartes au lieu de 16`);
+  // 16 cartes officielles ; Chance a en plus une carte maison (Sylvain Durif)
+  const want = deck === 'chance' ? 17 : 16;
+  if (cards.length !== want) fail(`paquet ${deck} : ${cards.length} cartes au lieu de ${want}`);
   for (const c of cards) {
     if (!ACTIONS.includes(c.action.type)) fail(`carte ${c.id} : action ${c.action.type} inconnue`);
     if (c.action.type === 'advance' && !(c.action.to >= 0 && c.action.to < 40)) fail(`carte ${c.id} : destination invalide`);

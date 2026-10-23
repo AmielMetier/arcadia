@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.37 — 23 octobre 2026
+- **DavidSimulator** — Nouvelle carte Chance : apparition de Sylvain Durif ! Elle rapporte 100 €, et son buste en 3D se dresse au milieu du plateau, avec un halo doré, pendant 3 tours de table complets. Il se tourne vers la caméra quand on fait pivoter la vue, et s'efface tout seul ensuite. Visible aussi sur le plateau classique.
+
 ## 2.36 — 23 octobre 2026
 - **Tête de Calcul** — The Candidate passe en grand format.
   - Une scène d'ouverture : l'ascenseur monte au 40e, les portes s'ouvrent, et Pierre Chartier accueille chaque joueur par son nom, avec sa vraie voix et sa photo en grand.

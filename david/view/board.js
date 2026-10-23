@@ -167,6 +167,20 @@ export function mountBoard(host, board, { onCell } = {}) {
 
   /* ---------------------------------------------------------- pions */
   const pawns = new Map(); // id → { el, pos, inJail }
+  // apparition (carte Sylvain Durif) : le buste au centre du plateau, debout face à la caméra
+  const bust = el('div', 'bust3d', `<i class="halo"></i><div class="sprite"><img src="${new URL('../models/durif.webp', import.meta.url).href}" alt="Buste de Sylvain Durif"></div>`);
+  bust.style.transform = `translate3d(${SIZE / 2}px, ${SIZE / 2 + 40}px, 0)`;
+  layer.appendChild(bust);
+  let bustOn = false;
+  function apparition(on, animate = false) {
+    if (on === bustOn) return;
+    bustOn = on;
+    bust.classList.remove('rise', 'sink');
+    if (animate) { void bust.offsetWidth; bust.classList.add(on ? 'rise' : 'sink'); }
+    bust.classList.toggle('on', on || animate);
+    if (!on && animate) setTimeout(() => { if (!bustOn) bust.classList.remove('on', 'sink'); }, 900);
+  }
+
   function ensurePawn(p) {
     let o = pawns.get(p.id);
     if (!o) {
@@ -213,7 +227,9 @@ export function mountBoard(host, board, { onCell } = {}) {
   const api = {
     stage, cells,
     // Synchronisation sans animation (ou presque) avec un état
+    apparition,
     sync(S, { animateBuild = false } = {}) {
+      apparition(!!S.apparition, false);
       for (const p of S.players) {
         const o = ensurePawn(p);
         o.pos = p.pos; o.inJail = p.inJail;

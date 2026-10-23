@@ -460,6 +460,25 @@ test('2 contre 2 : en faillite, le créancier n\'est payé qu\'à hauteur de la 
   ok(!t.over, 'le coéquipier continue');
 });
 
+test('carte Sylvain Durif : 100 €, puis le buste reste 3 tours de table complets', () => {
+  let s = game(2); const me = currentPlayer(s);
+  const d = s.decks.chance; d.order[d.pos] = 'ch17';
+  const r = roll(s, 3, 4); // Départ → case 7 (Chance)
+  s = r.state;
+  eq(pl(s, me.id).cash, 1600); ok(r.events.some((e) => e.k === 'APPARITION' && e.id === 'durif'));
+  const until = s.apparition.until; eq(until, s.round + 4);
+  // on fait tourner les tours jusqu'à la disparition
+  let rounds = 0, gone = null;
+  for (let k = 0; k < 40 && s.apparition; k++) {
+    const cur = currentPlayer(s), before = s.round;
+    s.turn.mustRoll = false; s.debts = []; s.pendingBuy = null; s.auction = null; s.phase = 'end';
+    const x = act(s, { type: 'END_TURN', by: cur.id }); s = x.state;
+    if (s.round > before) rounds++;
+    if (!s.apparition) gone = x.events.find((e) => e.k === 'APPARITION_END');
+  }
+  ok(gone, 'le buste disparaît'); eq(rounds, 4);
+});
+
 test('dés : historique des lancers et aléa fourni par l\'hôte', () => {
   let s = game(2); const a = roll(s, 3, 4).state;
   eq([a.stats.rolls, a.stats.dice[7]], [1, 1]);

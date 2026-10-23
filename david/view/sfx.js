@@ -46,6 +46,8 @@ const SOUNDS = {
   error(c, t) { tone(220, t, 0.18, { type: 'square', vol: 0.12 }); },
   win(c, t) { [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, t + k * 0.12, 0.25, { type: 'square', vol: 0.13 })); },
   bankrupt(c, t) { [392, 330, 262, 196].forEach((f, k) => tone(f, t + k * 0.15, 0.3, { type: 'sawtooth', vol: 0.12 })); },
+  // apparition : accord céleste qui monte, avec un scintillement
+  apparition(c, t) { [523, 659, 784, 1047].forEach((f, k) => { tone(f, t + k * 0.09, 1.4, { type: 'sine', vol: 0.14 }); tone(f * 1.005, t + k * 0.09, 1.4, { type: 'triangle', vol: 0.06 }); }); for (let k = 0; k < 8; k++) tone(2093 + k * 180, t + 0.4 + k * 0.07, 0.12, { type: 'sine', vol: 0.05 }); },
 };
 
 export const audioContext = () => ac();

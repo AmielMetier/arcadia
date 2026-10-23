@@ -43,7 +43,7 @@ export function createGame(board, { players, mode = 'classic', seed = 1, now = 0
     decks: {}, heldCards: {},
     pot: 0,
     turn: null, pendingBuy: null, auction: null, trades: [], debts: [], nextTradeId: 1,
-    round: 1, turnCount: 0, over: false, winner: null, endReason: null, ranking: null,
+    round: 1, turnCount: 0, apparition: null, over: false, winner: null, endReason: null, ranking: null,
     startedAt: now, endsAt: cfg.timeLimitMs ? now + cfg.timeLimitMs : null,
     stats: {
       visits: Array(40).fill(0), rentBySpace: Array(40).fill(0), history: [], dice: Array(13).fill(0), rolls: 0, doubles: 0,
@@ -318,7 +318,14 @@ function drawCard(ctx, p, deckName) {
       moveTo(ctx, p, j, { rentMultiplier: a.rentMultiplier, diceMultiplier: a.diceMultiplier });
       break;
     }
-    case 'collect': collect(ctx, p, a.amount, 'card'); break;
+    case 'collect':
+      collect(ctx, p, a.amount, 'card');
+      // carte spéciale : une apparition (le buste de Sylvain Durif) au centre du plateau pendant quelques tours de table
+      if (a.apparition) {
+        s.apparition = { id: a.apparition, by: p.id, until: s.round + (a.rounds || 3) + 1 }; // le reste de ce tour de table, puis 3 tours complets
+        ctx.ev.push({ k: 'APPARITION', id: a.apparition, player: p.id, until: s.apparition.until });
+      }
+      break;
     case 'pay': charge(ctx, p, null, a.amount, 'card'); break;
     case 'jailFree': s.heldCards[id] = p.id; p.jailCards.push(id); break;
     case 'back': {
@@ -357,7 +364,10 @@ function nextTurn(ctx) {
   let cur = s.turn.cur;
   for (let k = 0; k < s.players.length; k++) {
     cur = (cur + 1) % s.players.length;
-    if (cur === 0) s.round++;
+    if (cur === 0) {
+      s.round++;
+      if (s.apparition && s.round >= s.apparition.until) { ctx.ev.push({ k: 'APPARITION_END', id: s.apparition.id }); s.apparition = null; }
+    }
     if (!s.players[cur].bankrupt) break;
   }
   s.turn = freshTurn(cur);

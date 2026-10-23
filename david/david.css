@@ -741,3 +741,15 @@ input[type=number]:focus{outline:none;box-shadow:0 0 0 3px var(--yellow)}
 @media (max-width:820px){
   .tchat{right:8px;left:8px;width:auto;bottom:140px;max-height:min(360px,calc(100vh - 260px))}
 }
+
+/* ------------------------------------------------------------------ apparition : buste de Sylvain Durif (plateau classique) */
+.bust3d{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;display:none;pointer-events:none}
+.bust3d.on{display:block}
+.bust3d .halo{position:absolute;left:-80px;top:-32px;width:160px;height:64px;border-radius:50%;background:radial-gradient(rgba(255,197,49,.8),rgba(255,197,49,0) 70%);animation:halo 1.4s ease-in-out infinite}
+.bust3d .sprite{position:absolute;left:-70px;bottom:0;width:140px;transform-origin:50% 100%;transform:rotateX(calc(var(--tilt) * -1));filter:drop-shadow(0 8px 10px rgba(0,0,0,.35)) drop-shadow(0 0 18px rgba(255,214,90,.55))}
+.bust3d .sprite img{width:100%;display:block;animation:bustsway 5s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes bustsway{50%{transform:rotate(1.5deg) translateY(-3px)}}
+.bust3d.rise .sprite img{animation:bustrise 1.4s cubic-bezier(.2,1.2,.4,1) both,bustsway 5s 1.4s ease-in-out infinite}
+@keyframes bustrise{from{transform:scale(.05) rotate(-25deg);opacity:0;filter:brightness(3)}60%{opacity:1;filter:brightness(1.6)}to{transform:none;filter:none}}
+.bust3d.sink .sprite img{animation:bustsink .85s ease-in both}
+@keyframes bustsink{to{transform:scale(.1) translateY(40px);opacity:0;filter:brightness(2.5)}}
