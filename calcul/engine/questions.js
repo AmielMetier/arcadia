@@ -11,7 +11,9 @@
 import { rngOf } from './rng.js';
 import { evalExpr } from './expr.js';
 import { getQuestionsByLevel } from './chartier-data.js';
-import { CODE_QUESTIONS } from './code-data.js';
+import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS } from './code-data.js';
+import { chartQuestion, CHART_P } from './charts.js';
+import { schemaFor } from './schemas.js';
 
 export const CATS = {
   base:     { label: 'Calcul',            pts: 1, color: '#2b8cff', icon: '±' },
@@ -764,6 +766,14 @@ function visuel(r, d) {
 // Comme dans l'émission, ça monte en pression : premier tour, puis desk, puis comité final.
 // La finale (dernière question) est toujours tirée au niveau le plus dur du réglage.
 export const TIER_LABEL = { 1: 'Premier tour', 2: 'Desk', 3: 'Comité final' };
+// Modules par métier : ils orientent les rubriques tirées (poids par rubrique) et le poste annoncé par Pierre Chartier
+export const MODULES = {
+  gen: { label: 'Généraliste', job: 'Analyste', post: 'un poste d\'analyste', weights: null },
+  trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10 } },
+  ma: { label: 'M&A / Corporate', job: 'Analyste M&A', post: 'un poste en fusions-acquisitions', weights: { Corporate: 45, Taux: 15, Calcul: 20, Marchés: 10, Macro: 10 } },
+  quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 35, Logique: 20, Calcul: 20, Dérivés: 15, Estimation: 10 } },
+  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Taux: 25, Marchés: 25, Probas: 20, Dérivés: 15, Macro: 15 } },
+};
 export function chartierTier(d, i, len) {
   const last = i >= len - 1, f = len > 1 ? i / (len - 1) : 1;
   if (d === 0) return last || f >= 0.7 ? 2 : 1;
@@ -771,21 +781,41 @@ export function chartierTier(d, i, len) {
   return f < 0.25 && !last ? 2 : 3;
 }
 const CH_POOL = { 1: getQuestionsByLevel('facile'), 2: getQuestionsByLevel('normal'), 3: getQuestionsByLevel('expert') };
+// les mêmes, rangées par rubrique (pour les modules par métier)
+const CH_BY_CAT = Object.fromEntries(Object.entries(CH_POOL).map(([t, l]) => [t, l.reduce((m, q) => ((m[q.cat] = m[q.cat] || []).push(q), m), {})]));
+// tirage d'une question de la banque, orienté par les poids du module
+function bankPick(r, tier, M) {
+  if (!M.weights) return pick(r, CH_POOL[tier]);
+  const by = CH_BY_CAT[tier], cats = Object.keys(M.weights).filter((c) => by[c] && by[c].length);
+  let x = r.next() * cats.reduce((t, c) => t + M.weights[c], 0);
+  for (const c of cats) { x -= M.weights[c]; if (x < 0) return pick(r, by[c]); }
+  return pick(r, by[cats[cats.length - 1]]);
+}
 const CH_TIME = { 1: 12, 2: 17, 3: 24 };
 const UNIT_TIME = 10; // une réponse à taper prend plus de temps qu'un clic
-function chartier(r, d, i = 0, len = 10) {
-  const tier = chartierTier(d, i, len);
+function chartier(r, d, i = 0, len = 10, module = 'gen') {
+  const tier = chartierTier(d, i, len), M = MODULES[module] || MODULES.gen;
   const head = (rubric) => ({ isChartier: true, pts: tier, tier, rubric, sub: `${rubric} · ${TIER_LABEL[tier]}` });
   // une question sur sept environ : une suite logique ou une figure à compter, comme les brainteasers de l'émission
-  if (r.next() < 0.15) {
+  // (davantage en quant)
+  if (r.next() < (module === 'quant' ? 0.24 : 0.15)) {
     const g = r.next() < 0.5 ? suite : visuel;
     const q = g(r, Math.min(2, tier - 1));
     return { ...q, ...head(g === suite ? 'Suite logique' : 'Figures'), sub: q.sub ? `${q.sub} · ${TIER_LABEL[tier]}` : TIER_LABEL[tier], time: CH_TIME[tier] + UNIT_TIME + (q.fig ? 6 : 0) };
   }
-  const q = pick(r, CH_POOL[tier]);
+  if (r.next() < (module === 'quant' ? 0.14 : 0.06)) {
+    const c = readCode(r, tier);
+    return { ...c, ...head('Code'), sub: `Lire du code · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 14 };
+  }
+  // une lecture de graphique (plus souvent en trading, M&A et risques)
+  if (r.next() < (CHART_P[module] ?? CHART_P.gen)) {
+    const c = chartQuestion(r, tier, module);
+    if (c) return { ...c, ...head(c.rubric), sub: `Lecture de graphique · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 12 };
+  }
+  const q = bankPick(r, tier, M);
   if (q.type === 'num') {
     return {
-      kind: 'chartier-num', text: q.text, ...head(q.cat), sub: `${q.cat} · ${TIER_LABEL[tier]}${q.unit ? ' · réponse en ' + q.unit : ''}`,
+      kind: 'chartier-num', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip), sub: `${q.cat} · ${TIER_LABEL[tier]}${q.unit ? ' · réponse en ' + q.unit : ''}`,
       time: CH_TIME[tier] + UNIT_TIME + Math.min(10, Math.floor(q.text.length / 22)), eq: false,
       answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps, unit: q.unit,
       show: fmt(q.answer) + (q.unit ? ' ' + q.unit : ''), tip: q.tip,
@@ -795,22 +825,35 @@ function chartier(r, d, i = 0, len = 10) {
   const choices = r.shuffle([q.good, ...q.wrong]);
   const longest = Math.max(...choices.map((c) => c.length));
   return {
-    kind: 'chartier', text: q.text, ...head(q.cat),
+    kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip),
     time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0),
     answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip,
   };
 }
 
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
-function code(r, d, i = 0, len = 10) {
-  const tier = chartierTier(d, i, len);
-  const pool = CODE_QUESTIONS.filter((q) => q.level === tier);
-  const q = pick(r, pool);
+// L'épreuve de code : écrire une fonction Python, corriger un bug, ou écrire une requête SQL (plus souvent hors quant)
+const SQL_P = { gen: 0.3, trading: 0.35, ma: 0.4, risk: 0.4, quant: 0.2 };
+function code(r, d, i = 0, len = 10, module = 'gen') {
+  const tier = chartierTier(d, i, len), roll = r.next();
+  const lvl = (l) => l.filter((q) => q.level === tier);
+  const pool = roll < (SQL_P[module] ?? 0.3) && lvl(SQL_QUESTIONS).length ? lvl(SQL_QUESTIONS)
+    : roll < (SQL_P[module] ?? 0.3) + 0.25 && lvl(FIX_QUESTIONS).length ? lvl(FIX_QUESTIONS) : lvl(CODE_QUESTIONS);
+  const q = pick(r, pool), sql = q.lang === 'sql';
   return {
-    kind: 'code', input: 'code', text: q.title, sub: `Code · ${TIER_LABEL[tier]}`, eq: false,
-    prompt: q.prompt, starter: q.starter, fn: q.fn, tests: q.tests, examples: q.tests.slice(0, 2), codeId: q.id,
-    time: 180, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: 'Code',
+    kind: 'code', input: 'code', text: q.title, sub: `${sql ? 'SQL' : q.bug ? 'Corrige le bug' : 'Code'} · ${TIER_LABEL[tier]}`, eq: false,
+    prompt: q.prompt, starter: q.starter, fn: q.fn || null, tests: q.tests, examples: q.tests.slice(0, sql ? 1 : 2), codeId: q.id,
+    lang: q.lang || 'python', ordered: q.ordered !== false, bug: !!q.bug,
+    time: 180, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: sql ? 'SQL' : 'Code',
   };
+}
+
+// « Que va afficher ce programme ? » : une question à choix, glissée dans l'entretien (plus souvent en quant)
+function readCode(r, tier) {
+  const pool = READ_QUESTIONS.filter((q) => q.level === tier);
+  const q = pick(r, pool.length ? pool : READ_QUESTIONS);
+  const choices = r.shuffle([q.good, ...q.wrong]);
+  return { kind: 'code-read', text: 'Que va afficher ce programme ?', snippet: q.code, choices, answer: choices.indexOf(q.good), trap: choices.indexOf(q.wrong[0]), show: q.good, tip: q.tip };
 }
 
 const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code };
@@ -832,10 +875,10 @@ export const KINDS = {
   code: ['code'],
 };
 
-export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
+export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'gen') {
   const r = rngOf({ seed: qSeed(seed, i, salt) });
   const d = D(diff);
-  const q = GEN[cat](r, d, i, len);
+  const q = GEN[cat](r, d, i, len, module);
   return {
     cat, kind: q.kind, text: q.text, sub: q.sub || '',
     eq: q.eq !== false && !q.choices && !q.fig,
@@ -847,6 +890,7 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
     // piège (index du choix, ou valeurs à saisir), ordre de grandeur, unité, et l'épreuve de code
     trap: q.trap ?? -1, traps: q.traps || [], tolMode: q.tolMode || 'rel', unit: q.unit || '',
     prompt: q.prompt || null, starter: q.starter || null, fn: q.fn || null, tests: q.tests || null, examples: q.examples || null, codeId: q.codeId || null,
+    lang: q.lang || null, ordered: q.ordered !== false, bug: !!q.bug, snippet: q.snippet || null, schema: q.schema || null,
     key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
@@ -854,4 +898,4 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10) {
 // Ce que voient les joueurs pendant la question (sans la réponse)
 // (ni la bonne réponse, ni le piège, ni les tests cachés du code)
 export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, tolMode: q.tolMode, unit: q.unit, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric,
-  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0 });
+  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet });

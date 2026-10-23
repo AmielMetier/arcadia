@@ -4,7 +4,7 @@ import { CATS, TIER_LABEL, DIFFS, chartierTier, fmt } from '../engine/questions.
 import { MODES, POWERS, STEAL_MS, FOG_MS, describeAnswer, JOKERS, LIVES, TIER_SHOW_MS, INTER_MS, ANNOUNCE_MS } from '../engine/rules.js';
 import { buildProgram } from '../engine/code-data.js';
 import { runPython, preloadPython } from './py.js';
-import { highlightPy } from './pyhl.js';
+import { highlightPy, highlightCode } from './pyhl.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { figureSvg } from './figure.js';
 import { sfx } from './sfx.js';
@@ -398,15 +398,23 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
 
   /* ---------------------------------------------------------- question */
   function questionBody(q) {
+    if (q.input === 'code' && q.lang === 'sql') {
+      // les tables de la base d'exemple, et ce que la requête doit renvoyer dessus
+      const [[tables], exp] = q.examples[0];
+      const table = (cols, rows, title) => `<table class="sqltab"><caption>${esc(title)}</caption><tr>${cols.map((c) => `<th>${esc(c.split(' ')[0])}</th>`).join('')}</tr>${rows.slice(0, 8).map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}${rows.length > 8 ? `<tr><td colspan="${cols.length}">… ${rows.length - 8} de plus</td></tr>` : ''}</table>`;
+      return `<div class="qtext cand code-title">🗄 ${qText(q.text)}</div><p class="code-brief">${qText(q.prompt || '')}</p>
+        <div class="sqlbox">${tables.map((t) => table(t.cols, t.rows, t.name)).join('')}${table(exp[0] ? exp[0].map((_, k) => `col${k + 1}`) : ['—'], exp, 'résultat attendu')}</div>
+        <div class="code-ex"><small>+ 2 bases cachées${q.ordered ? ', l\'ordre des lignes compte' : ''}</small></div>`;
+    }
     if (q.input === 'code') {
       const ex = (q.examples || []).map(([args, exp]) => `<code>${esc(q.fn)}(${esc(args.map(pyRepr).join(', '))}) → ${esc(pyRepr(exp))}</code>`).join('');
-      return `<div class="qtext cand code-title">⌨ ${qText(q.text)}</div><p class="code-brief">${qText(q.prompt || '')}</p>
+      return `<div class="qtext cand code-title">${q.bug ? '🐞' : '⌨'} ${qText(q.text)}</div><p class="code-brief">${qText(q.prompt || '')}</p>
         <div class="code-ex"><b>Exemples</b>${ex}<small>+ ${Math.max(0, (q.ntests || 0) - (q.examples || []).length)} tests cachés</small></div>`;
     }
     if (q.input === 'expr') return `<div class="target"><small>Cible</small><b>${q.target}</b></div>
       <div class="tiles">${q.nums.map((n, k) => `<button class="tile" data-n="${n}" data-k="${k}" style="--k:${k}">${n}</button>`).join('')}</div>`;
     const cls = q.isChartier ? 'cand' : q.cat === 'devinette' ? 'riddle' : q.fig ? 'geo' : q.text.length > 16 ? 'long' : '';
-    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>`;
+    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>${q.snippet ? `<pre class="code-snip">${highlightPy(q.snippet)}</pre>` : ''}`;
   }
 
   const LETTERS = ['A', 'B', 'C', 'D'];
@@ -539,7 +547,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     // couleurs et numéros de ligne : une couche dessinée sous la zone de saisie (transparente), qui suit le défilement
     const hl = $('#chl'), gut = $('#cgut');
     const paint = () => {
-      hl.innerHTML = highlightPy(ed.value) + '\n';
+      hl.innerHTML = highlightCode(ed.value, q.lang) + '\n';
       gut.textContent = Array.from({ length: ed.value.split('\n').length }, (_, k) => k + 1).join('\n');
       draft = { idx: S.idx, code: ed.value };
     };
@@ -562,10 +570,11 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       const b = $('#ctest'); b.disabled = true; b.textContent = '⏳ Python…';
       show('Exécution des exemples…');
       const ex = q.examples || [];
-      const r = await runPython(buildProgram(ed.value, q.fn, ex));
+      const r = await runPython(buildProgram(ed.value, q.fn, ex, { lang: q.lang, ordered: q.ordered }));
       b.disabled = myAns != null; b.textContent = '▶ Tester les exemples';
       if (!S || S.phase !== 'question' || !out.isConnected) return;
       const lines = r.error ? [`<span class="ko">✗ ${esc(r.error)}</span>`]
+        : q.lang === 'sql' ? r.tests.map((t) => `<span class="${t.ok ? 'ok' : 'ko'}">${t.ok ? '✓ Résultat conforme sur la base d\'exemple' : '✗ ' + esc(t.err || 'Résultat obtenu : ' + t.got)}</span>`)
         : r.tests.map((t, k) => `<span class="${t.ok ? 'ok' : 'ko'}">${t.ok ? '✓' : '✗'} ${esc(q.fn)}(${esc(ex[k][0].map(pyRepr).join(', '))}) → ${esc(t.err || t.got || '')}${t.ok ? '' : ` (attendu ${esc(pyRepr(ex[k][1]))})`}</span>`);
       show(lines.join('\n') + (r.stdout ? `\n<span class="pr">${esc(r.stdout)}</span>` : ''), r.error || r.tests.some((t) => !t.ok) ? 'bad' : 'good');
     };
@@ -667,7 +676,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const res = L.results.filter((r) => !r.out).sort((a, b) => b.pts - a.pts || (a.at ?? 1e9) - (b.at ?? 1e9));
     const elim = (L.eliminated || []).map((e) => `<div class="elim"><b>${esc(name(e.id))}</b> ${e.why === 'palier' ? `est coupé : dernier à la fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())}` : 'n\'a plus de vies'} ${e.why === 'palier' ? '✂️' : '🚪'}</div>`).join('')
       + (L.tierEnd && !(L.eliminated || []).some((e) => e.why === 'palier') && !L.endEarly && L.idx + 1 < S.cfg.len ? `<div class="elim soft">Fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())} : tout le monde passe</div>` : '');
-    const answerHtml = L.input === 'code' ? `<div class="code-ref"><small>Une solution</small><pre>${highlightPy(L.show)}</pre></div>`
+    const answerHtml = L.input === 'code' ? `<div class="code-ref"><small>Une solution</small><pre>${highlightCode(L.show, L.lang)}</pre></div>`
       : ch && L.input === 'choice' ? candGrid(L) : `<div class="bigans">${qText(L.show)}</div>`;
     const fast = L.results.find((r) => r.tags.includes('eclair') || (S.cfg.mode === 'eclair' && r.pts > 0));
     const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : q.input === 'choice' ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
@@ -680,13 +689,14 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(ch ? h.rubric || cat.label : cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.idx + 1} / ${S.cfg.len}</span></div>
         ${ch ? '<div class="rv-cols"><div class="rv-l">' : ''}
         ${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}
-        <div class="qrecall">${recall}</div>
+        <div class="qrecall">${recall}</div>${L.snippet ? `<pre class="code-snip mini">${highlightPy(L.snippet)}</pre>` : ''}
         ${answerHtml}
         ${ch ? '</div><div class="rv-r">' : verdict}
         ${mine && mine.gained ? '<div class="gotlife"><b>♥</b> Trois d\'affilée : tu récupères une vie !</div>' : ''}
         ${mine && mine.power ? `<div class="gotpower">🎁 Nouveau pouvoir : ${POWERS[mine.power].icon} <b>${esc(POWERS[mine.power].label)}</b>${mine.power === 'shield' ? ' (il te protège tout seul)' : ' : lance-le en bas à gauche !'}</div>` : ''}
         ${ch && mine && !mine.out ? chartierQuote(mine, L, (q.time || 20) * 1000) : ''}
-        <div class="tip"><b>${ch ? '📊 Le décryptage' : '💡 L\'astuce'}</b>${qText(L.tip)}</div>
+        <div class="tip"><b>${ch ? '📊 Le décryptage' : '💡 L\'astuce'}</b>${L.schema ? `<div class="tipfig">${figureSvg(L.schema)}</div>` : ''}${qText(L.tip)}
+          ${ch && L.input === 'choice' && L.trap >= 0 && L.trap !== L.answer && L.choices ? `<p class="trapline">🪤 Le piège : « ${qText(L.choices[L.trap])} »</p>` : ''}</div>
         <ol class="results">${res.map((r, k) => {
           const p = S.players.find((x) => x.id === r.id); if (!p) return '';
           const tags = r.tags.map((t) => `<span class="tag t-${t}">${TAGS[t]}${t === 'serie' ? ' ×' + r.streak : ''}${t === 'power' ? ' ' + POWERS[r.power].icon : ''}</span>`).join('')
@@ -725,8 +735,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <ol>${miss.map(({ h, r }) => {
         const c = CATS[h.cat];
         return `<li style="--cc:${c.color}">${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}<div class="rq"><span class="cat sm"><i>${c.icon}</i>${esc(h.isChartier ? h.rubric || c.label : c.label)}</span><b>${qText(h.text)}</b>${h.sub && h.input !== 'choice' ? `<small>${esc(h.sub)}</small>` : ''}</div>
-          <div class="ra"><span class="mine">${r.raw != null ? 'Ta réponse : <s>' + qText(describeAnswer(h, r.raw)) + '</s>' : 'Pas de réponse'}</span><span class="good">${h.input === 'code' ? `Une solution : <pre>${highlightPy(h.show)}</pre>` : `Bonne réponse : <b>${qText(h.show)}</b>`}</span></div>
-          <div class="rt">💡 ${qText(h.tip)}</div></li>`;
+          <div class="ra"><span class="mine">${r.raw != null ? 'Ta réponse : <s>' + qText(describeAnswer(h, r.raw)) + '</s>' : 'Pas de réponse'}</span><span class="good">${h.input === 'code' ? `Une solution : <pre>${highlightCode(h.show, h.lang)}</pre>` : `Bonne réponse : <b>${qText(h.show)}</b>`}</span></div>
+          <div class="rt">${h.schema ? `<div class="tipfig sm">${figureSvg(h.schema)}</div>` : ''}💡 ${qText(h.tip)}</div></li>`;
       }).join('')}</ol></details>`;
   }
 

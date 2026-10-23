@@ -3,7 +3,7 @@
 //
 // Phases : 'intro' (compte à rebours) → 'question' → 'reveal' → 'question'… → 'over'
 // Pendant 'question', les réponses (valeur, juste ou non) restent chez l'hôte : publicState() les masque.
-import { CATS, DIFFS, THEMES, planCats, makeQuestion, publicQuestion, fmt, chartierTier } from './questions.js';
+import { CATS, DIFFS, THEMES, MODULES, planCats, makeQuestion, publicQuestion, fmt, chartierTier } from './questions.js';
 import { parseNumber, evalExpr, usesOnly } from './expr.js';
 
 export const MODES = {
@@ -14,6 +14,9 @@ export const MODES = {
 };
 export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
+export const INTRO_CH_MS = 9500; // The Candidate : la scène d'ouverture (ascenseur, accueil de Pierre Chartier)
+export const DUEL_SHOW_MS = 7000; // annonce du face-à-face final
+export const DUEL_MAX = 5; // questions de mort subite au plus, puis le score départage
 export const REVEAL_MS = 5200;
 export const TIER_SHOW_MS = 9200; // passage d'un tour à l'autre en The Candidate (la grande scène)
 export const INTER_MS = 2400; // bandeau de transition avant la question suivante (ou le verdict)
@@ -60,6 +63,8 @@ export function makeConfig(s = {}) {
     jokers: s.mode === 'chartier' && (s.jokers == null || Number(s.jokers) === 1),
     code: s.mode === 'chartier' && (s.code == null || Number(s.code) === 1),
     cut: s.mode === 'chartier' && (s.cut == null || Number(s.cut) === 1),
+    duel: s.mode === 'chartier' && (s.duel == null || Number(s.duel) === 1),
+    module: s.mode === 'chartier' && MODULES[s.module] ? s.module : 'gen',
   };
 }
 
@@ -73,7 +78,7 @@ export function createGame({ players, cfg, seed, now }) {
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
       powers: [], sabSent: 0, sabTaken: 0,
       lives: c.lives, out: false, outIdx: null, outWhy: null, traps: 0, jokers: c.lives && c.jokers ? Object.keys(JOKERS) : [] })),
-    idx: -1, phase: 'intro', endsAt: now + INTRO_MS, q: null, qAt: 0, answers: {}, last: null, history: [], ranking: null,
+    idx: -1, phase: 'intro', endsAt: now + (c.mode === 'chartier' ? INTRO_CH_MS : INTRO_MS), q: null, qAt: 0, answers: {}, last: null, history: [], ranking: null,
     curses: {}, active: {}, sabs: [],
   };
 }
@@ -84,14 +89,22 @@ export const isFinal = (s, idx = s.idx) => s.cfg.finale && idx === s.cfg.len - 1
 export function fullQuestion(s, idx = s.idx) {
   const seen = new Set(s.history.filter((h) => h.idx < idx).map((h) => h.key));
   let q;
-  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len); if (!seen.has(q.key)) break; }
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len, s.cfg.module); if (!seen.has(q.key)) break; }
   return q;
 }
+
+// Face-à-face final : les deux meilleurs encore en lice, à la fin de l'entretien
+const duelists = (s) => [...alive(s)].sort((a, b) => b.score - a.score || b.right - a.right || a.totalMs - b.totalMs).slice(0, 2).map((p) => p.id);
+const duelAhead = (s) => s.cfg.duel && s.cfg.lives && !s.duel && !s.endEarly && s.idx + 1 >= s.cfg.len && alive(s).length >= 2;
+export const inDuel = (s) => !!(s.duel && s.duel.winner == null);
 
 // Question suivante (ou fin de partie)
 export function nextQuestion(state, now) {
   const s = clone(state);
-  if (s.idx + 1 >= s.cfg.len || s.endEarly) return finish(s);
+  if (inDuel(s)) s.duel.k++;
+  else if (duelAhead(s)) s.duel = { ids: duelists(s), k: 1, winner: null, why: null };
+  else if (s.idx + 1 >= s.cfg.len || s.endEarly) return finish(s);
+  if (inDuel(s)) s.cats.push('chartier'); // une question de plus, au niveau du comité
   s.idx++;
   const q = fullQuestion(s);
   s.q = { ...publicQuestion(q), n: s.idx + 1, pts: q.pts * (isFinal(s) ? 2 : 1), final: isFinal(s) };
@@ -157,8 +170,17 @@ export function check(q, raw) {
   if (n == null) return { ok: false, error: 'Ce n\'est pas un nombre' };
   const ok = q.tolMode === 'factor' && q.tol ? n > 0 && n >= q.answer / q.tol && n <= q.answer * q.tol
     : q.tol ? Math.abs(n - q.answer) <= q.tol * Math.abs(q.answer) : n === q.answer;
-  return { ok, value: n };
+  return { ok, value: n, near: !ok && isNear(q, n) };
 }
+
+// Estimation « presque juste » : hors de la marge, mais pas de beaucoup (deux fois la marge) — pas de vie perdue
+export function isNear(q, n) {
+  if (!q.tol || !q.isChartier || q.input !== 'num') return false;
+  return q.tolMode === 'factor' ? n > 0 && n >= q.answer / q.tol ** 2 && n <= q.answer * q.tol ** 2
+    : Math.abs(n - q.answer) <= 2 * q.tol * Math.abs(q.answer);
+}
+// Coût du piège selon le tour : 1 vie au premier tour (comme une erreur), 2 au desk, 2 et des points au comité
+export const TRAP_COST = { 1: { lives: 1, pts: 0 }, 2: { lives: 2, pts: 0 }, 3: { lives: 2, pts: 0.5 } };
 
 // La réponse choisie est-elle le piège prévu par l'examinateur ? (choix, ou valeur classique à saisir)
 export function isTrap(q, raw) {
@@ -177,6 +199,7 @@ export function answer(state, { by, raw, idx, now }) {
   const p = state.players.find((q) => q.id === by);
   if (!p) return { ok: false, error: 'Tu ne joues pas cette partie' };
   if (p.out) return { ok: false, error: 'Tu es éliminé : tu regardes la suite' };
+  if (inDuel(state) && !state.duel.ids.includes(by)) return { ok: false, error: 'Face-à-face : tu regardes les deux finalistes' };
   if (state.answers[by]) return { ok: false, error: 'Tu as déjà répondu' };
   if (now > deadlineOf(state, by) + GRACE_MS) return { ok: false, error: 'Temps écoulé' };
   const q = fullQuestion(state);
@@ -186,8 +209,9 @@ export function answer(state, { by, raw, idx, now }) {
   if (c.error && state.cfg.mode !== 'eclair') return { ok: false, error: c.error, soft: true };
   const s = clone(state);
   s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' ? text : text.slice(0, 40), ok: !!c.ok,
-    trap: !c.ok && isTrap(q, text), ...(c.pending ? { pending: true, passed: 0, total: q.tests.length } : {}) };
-  const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok);
+    trap: !c.ok && isTrap(q, text), near: !!c.near, ...(c.pending ? { pending: true, passed: 0, total: q.tests.length } : {}) };
+  // face-à-face : la première réponse décide (juste, elle gagne ; fausse, elle perd)
+  const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok) || inDuel(s);
   return { ok: true, state: s, done, right: !!c.ok, pending: !!c.pending };
 }
 
@@ -208,6 +232,7 @@ export function gradeCode(state, { by, idx, passed, total, detail = null }) {
 // Joker (une fois par partie chacun) → { ok, state, info } ; info n'est envoyée qu'au joueur qui l'a demandé
 export function useJoker(state, { by, kind }) {
   if (!state.cfg.lives || !state.cfg.jokers) return { ok: false, error: 'Pas de joker dans cette partie' };
+  if (inDuel(state)) return { ok: false, error: 'Pas de joker en face-à-face' };
   if (state.phase !== 'question') return { ok: false, error: 'Pas de question en cours' };
   const p = state.players.find((x) => x.id === by);
   if (!p || p.out) return { ok: false, error: 'Tu ne joues plus cette partie' };
@@ -237,6 +262,7 @@ export function useJoker(state, { by, kind }) {
 // Calcul des points de la question et passage en révélation
 export function reveal(state, now) {
   if (state.phase !== 'question') return state;
+  if (inDuel(state)) return revealDuel(state, now);
   const s = clone(state);
   const q = fullQuestion(s);
   const base = q.pts * 100 * (isFinal(s) ? 2 : 1);
@@ -284,10 +310,17 @@ export function reveal(state, now) {
         p.wrong++;
         if (s.cfg.mode === 'peril') { r.pts = -Math.round(base / 2); r.tags.push('peril'); }
       } else p.silent++;
-      // The Candidate : vies perdues (piège : deux ; code avec au moins un test réussi : aucune)
-      if (s.cfg.lives && !partial) {
-        const lost = a && a.trap ? 2 : 1;
-        if (a && a.trap) { r.tags.push('trap'); p.traps++; }
+      // The Candidate : vies perdues (le piège coûte plus cher à chaque tour ; code avec au moins un test réussi
+      // ou estimation presque juste : aucune)
+      const near = a && a.near && !a.trap;
+      if (near) r.tags.push('near');
+      if (s.cfg.lives && !partial && !near) {
+        const cost = TRAP_COST[q.tier] || TRAP_COST[2];
+        const lost = a && a.trap ? cost.lives : 1;
+        if (a && a.trap) {
+          r.tags.push('trap'); p.traps++;
+          if (cost.pts) { const pen = Math.round((base * cost.pts) / 10) * 10; r.pts -= pen; r.trapPts = pen; }
+        }
         r.lost = Math.min(lost, p.lives);
         p.lives = Math.max(0, p.lives - lost);
         if (!p.lives) { p.out = true; p.outIdx = s.idx; p.outWhy = 'vies'; eliminated.push({ id: p.id, why: 'vies' }); }
@@ -315,14 +348,16 @@ export function reveal(state, now) {
   const standing = alive(s).length, humans = s.players.filter((p) => !p.bot);
   if (s.cfg.lives && (standing === 0 || !humans.some((p) => !p.out) || (humans.length > 1 && standing <= 1))) s.endEarly = true;
   s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
-    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, eliminated, tierEnd, endEarly: !!s.endEarly };
-  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit,
+    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, eliminated, tierEnd, endEarly: !!s.endEarly };
+  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema,
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
   // fin d'un tour : la mise en scène du passage au tour suivant s'ajoute à la correction
   // chaque animation a son propre temps : la correction reste lisible, et le chrono de la question suivante est intact
-  const interlude = tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : INTER_MS;
+  const duelNext = duelAhead(s);
+  if (duelNext) s.last.duelNext = duelists(s);
+  const interlude = duelNext ? DUEL_SHOW_MS : tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : INTER_MS;
   const announces = eliminated.length + (results.some((r) => r.tags.includes('life')) ? 1 : 0);
   s.revealMs = interlude + announces * ANNOUNCE_MS + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
@@ -331,9 +366,33 @@ export function reveal(state, now) {
 }
 
 // Classement : les candidats encore en lice d'abord, puis les éliminés (le dernier tombé devant)
+// (après un face-à-face : le vainqueur, puis le finaliste, puis les autres)
 export function standings(s) {
-  return [...s.players].sort((a, b) => (a.out - b.out) || (a.out && b.out ? b.outIdx - a.outIdx : 0)
+  const d = s.duel && s.duel.winner != null ? s.duel : null;
+  const dr = (p) => (!d ? 0 : p.id === d.winner ? -2 : d.ids.includes(p.id) ? -1 : 0);
+  return [...s.players].sort((a, b) => (dr(a) - dr(b)) || (a.out - b.out) || (a.out && b.out ? b.outIdx - a.outIdx : 0)
     || b.score - a.score || b.right - a.right || a.totalMs - b.totalMs).map((p) => p.id);
+}
+
+// Révélation d'une question du face-à-face : pas de points ni de vies, seulement un vainqueur (ou une question de plus)
+function revealDuel(state, now) {
+  const s = clone(state);
+  const q = fullQuestion(s), d = s.duel;
+  const first = d.ids.map((id) => [id, s.answers[id]]).filter(([, a]) => a).sort((a, b) => a[1].at - b[1].at)[0];
+  if (first) { d.winner = first[1].ok ? first[0] : d.ids.find((id) => id !== first[0]); d.why = first[1].ok ? 'juste' : 'faux'; d.by = first[0]; }
+  else if (d.k >= DUEL_MAX) { d.winner = duelists(s)[0]; d.why = 'score'; }
+  if (d.winner != null) s.endEarly = true;
+  const results = s.players.map((p) => {
+    const a = s.answers[p.id], duelist = d.ids.includes(p.id);
+    return { id: p.id, raw: a ? a.raw : null, ok: !!(a && a.ok), at: a ? a.at : null, pts: 0, tags: duelist && p.id === d.winner ? ['duel'] : [], out: !duelist };
+  });
+  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: false, choices: q.choices, answer: q.input === 'choice' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
+    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, eliminated: [], tierEnd: null, endEarly: d.winner != null, duel: { ...d } };
+  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: 0, unit: q.unit, duel: true,
+    results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
+  s.revealMs = REVEAL_MS + (d.winner != null ? ANNOUNCE_MS + INTER_MS : INTER_MS);
+  s.phase = 'reveal'; s.endsAt = now + s.revealMs;
+  return s;
 }
 
 function finish(s) {

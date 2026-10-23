@@ -751,3 +751,25 @@ button.cchoice.gone{display:none}
 .game.mode-chartier .announce.out .an-card,.game.mode-chartier .announce.bad .an-card{border-color:var(--down);box-shadow:8px 8px 0 #000,0 0 40px rgba(255,90,60,.35)}
 .game.mode-chartier .announce.life .an-card i{color:var(--down)}
 .announce.bad .an-card b{color:var(--down)}
+
+/* textes des graphiques */
+.fig text.sm{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:11px}
+
+/* lire du code, SQL */
+.code-snip{margin:10px auto 0;max-width:560px;padding:12px 16px;border-radius:12px;background:#05070b;border:2px solid var(--edge);color:#e6ebf2;
+  font:14px/1.5 ui-monospace,'SF Mono',Menlo,Consolas,monospace;white-space:pre;overflow:auto;text-align:left}
+.code-snip.mini{font-size:12px;padding:8px 12px;max-height:150px}
+.sqlbox{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:6px 0}
+.sqltab{border-collapse:collapse;font:12px ui-monospace,'SF Mono',Menlo,Consolas,monospace;background:#05070b;border:1px solid var(--edge);border-radius:8px;overflow:hidden}
+.sqltab caption{font:700 12px 'Chakra Petch',sans-serif;color:var(--gold2);padding:2px 0 4px;text-align:left}
+.sqltab th{color:var(--gold2);background:#151b27;padding:3px 8px;text-align:left}
+.sqltab td{color:#d2dbe8;padding:2px 8px;border-top:1px solid #1d2638}
+.sqltab:last-child caption{color:#7ff0ad}
+
+/* mini-schéma et piège dans l'explication */
+.tipfig{float:right;width:min(46%,230px);margin:0 0 6px 10px}
+.tipfig .fig{width:100%;margin:0}
+.tipfig.sm{width:150px}
+.tip::after{content:'';display:block;clear:both}
+.trapline{margin:6px 0 0;font-size:13px;color:#ff9a7a}
+@media (max-width:700px){ .tipfig{float:none;width:100%;margin:6px 0} }
