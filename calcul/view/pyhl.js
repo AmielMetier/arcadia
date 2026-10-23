@@ -24,3 +24,19 @@ export function highlightPy(code) {
   }
   return out + esc(code.slice(last));
 }
+
+// SQL : mots-clés, chaînes, nombres, commentaires
+const SQLKW = new Set('select from where and or not in is null as join left right inner outer on group by order having limit distinct count sum avg min max round case when then else end desc asc union all like between exists insert into values update set delete create table'.split(' '));
+const SQLTOK = /(--[^\n]*)|('(?:''|[^'])*'?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+export function highlightSql(code) {
+  let out = '', last = 0, m;
+  SQLTOK.lastIndex = 0;
+  while ((m = SQLTOK.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const [t, com, str, num, word] = m;
+    out += com ? `<i class="hc">${esc(t)}</i>` : str ? `<i class="hs">${esc(t)}</i>` : num ? `<i class="hn">${esc(t)}</i>` : word && SQLKW.has(word.toLowerCase()) ? `<i class="hk">${esc(t)}</i>` : esc(t);
+    last = m.index + t.length;
+  }
+  return out + esc(code.slice(last));
+}
+export const highlightCode = (code, lang) => (lang === 'sql' ? highlightSql(code) : highlightPy(code));

@@ -46,6 +46,8 @@ const SOUNDS = {
   trap(c, t) { tone(520, t, 0.18, { type: 'square', vol: 0.14, slide: 0.5 }); noise(t + 0.16, 0.08, { vol: 0.5, freq: 3200, q: 2 }); tone(140, t + 0.2, 0.4, { type: 'sawtooth', vol: 0.16, slide: 0.7 }); },
   elim(c, t) { [392, 370, 349, 262].forEach((f, k) => tone(f, t + k * 0.28, k === 3 ? 0.7 : 0.26, { type: 'sawtooth', vol: 0.12, slide: k === 3 ? 0.8 : 0.97 })); noise(t + 1.15, 0.25, { vol: 0.5, freq: 200, q: 0.6 }); },
   cut(c, t) { noise(t, 0.05, { vol: 0.5, freq: 5000, q: 3 }); noise(t + 0.12, 0.05, { vol: 0.5, freq: 4200, q: 3 }); tone(196, t + 0.25, 0.3, { type: 'triangle', vol: 0.2, slide: 0.7 }); },
+  // ascenseur qui arrive, portes qui s'ouvrent
+  ding(c, t) { tone(1318, t, 0.9, { type: 'sine', vol: 0.3 }); tone(1046, t + 0.32, 1.2, { type: 'sine', vol: 0.3 }); noise(t + 0.5, 0.7, { vol: 0.12, freq: 600, q: 0.4 }); },
   // roulement de tambour qui accélère et enfle, puis gong grave
   drum(c, t) {
     let at = t, gap = 0.12;

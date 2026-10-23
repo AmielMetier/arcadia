@@ -14,6 +14,8 @@ self.onmessage = async (e) => {
     try {
       importScripts(${JSON.stringify(BASE)} + 'pyodide.js');
       py = await loadPyodide({ indexURL: ${JSON.stringify(BASE)}, stdout: (s) => { if (out.length < 80) out.push(s); }, stderr: (s) => { if (out.length < 80) out.push(s); } });
+      // SQLite pour les épreuves SQL (chargé avant de couper le réseau)
+      try { await py.loadPackage('sqlite3'); } catch (err) { /* sans lui, seules les épreuves SQL échouent */ }
       // plus de réseau pour le code des joueurs
       for (const k of ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts', 'loadPyodide']) {
         try { Object.defineProperty(self, k, { value: undefined, writable: false, configurable: false }); } catch (err) {}

@@ -4,7 +4,8 @@ import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS, chartierTier } from
 import { CHARTIER_QUESTIONS } from '../calcul/engine/chartier-data.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
-import { CODE_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
+import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
+import { STRATS, payoffAt } from '../calcul/engine/charts.js';
 import { spawnSync } from 'node:child_process';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
@@ -39,7 +40,8 @@ t('les questions sont reproductibles et justes', () => {
     const q = makeQuestion(seed, i, cat, diff);
     assert.deepEqual(q, makeQuestion(seed, i, cat, diff));
     if (q.kind === 'code') {
-      assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 180, q.text);
+      if (q.lang === 'sql') assert.ok(q.input === 'code' && !q.fn && q.starter && q.tests.length === 3 && q.examples.length === 1 && q.time === 120, q.text);
+      else assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 120, q.text);
       assert.ok(!check(q, '').ok && check(q, 'def f(): pass').pending);
       continue;
     }
@@ -298,7 +300,7 @@ function play(s, how, now) {
     if (q.input === 'code') {
       s = answer(s, { by: +id, raw: 'def f(): pass', idx: s.idx, now: at }).state;
       s = gradeCode(s, { by: +id, idx: s.idx, passed: h === 'good' || h === 'slow' ? q.tests.length : 0, total: q.tests.length }).state;
-    } else s = answer(s, { by: +id, raw, idx: s.idx, now: at }).state;
+    } else { const r = answer(s, { by: +id, raw, idx: s.idx, now: at }); if (r.ok) s = r.state; } // refusé : spectateur du face-à-face
   }
   return reveal(s, now + q.time * 1000);
 }
@@ -315,7 +317,7 @@ t('The Candidate : vies, piège, éliminations aux paliers, dernier debout', () 
   assert.ok(isTrap(q, String(q.trap)) && !isTrap(q, String(q.answer)));
   const before = s.players.map((p) => p.lives);
   s = play(s, { 0: 'good', 1: 'trap', 2: 'none', 3: 'good' }, now);
-  assert.equal(s.players[1].lives, before[1] - 2, 'le piège coûte deux vies');
+  assert.equal(s.players[1].lives, before[1] - [0, 1, 2, 2][q.tier], 'le piège coûte selon le tour');
   assert.equal(s.players[2].lives, before[2] - 1, 'le silence coûte une vie');
   assert.equal(s.players[0].lives, before[0]);
   assert.ok(s.last.results[1].tags.includes('trap'));
@@ -356,12 +358,12 @@ t('The Candidate : palier qui élimine le dernier, arrêt quand il reste un cand
   assert.ok(s.players[2].out && s.players[2].outWhy === 'palier' && s.players[2].lives === LIVES, 'le dernier saute');
   assert.equal(cut.id, 2);
   assert.ok(!s.players[0].out && !s.players[1].out, 'à deux, plus d\'élimination au palier');
-  assert.equal(s.history.length, 10);
+  assert.equal(s.history.filter((h) => !h.duel).length, 10);
 });
 
 t('The Candidate : la fin d\'un tour laisse le temps de la mise en scène, même sans coupe', () => {
   const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
-  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 9, now: 0 });
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0, duel: 0 }, seed: 9, now: 0 });
   let now = 0, ends = 0, plain = 0;
   while (s.phase !== 'over') {
     s = nextQuestion(s, now); if (s.phase === 'over') break;
@@ -470,6 +472,80 @@ t('The Candidate : trois bonnes réponses d\'affilée rendent un cœur, sans dé
   assert.equal(s.players[0].lives, 3, 'jamais plus que le nombre de départ');
 });
 
+t('The Candidate : piège plus cher à chaque tour, estimation presque juste sans perte de vie', () => {
+  const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
+  // une question à choix de chaque tour, avec piège
+  for (const tier of [1, 2, 3]) {
+    let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 40 + tier, now: 0 });
+    let now = 0, done = false;
+    while (!done && s.phase !== 'over') {
+      s = nextQuestion(s, now); if (s.phase === 'over') break;
+      const q = fullQuestion(s);
+      if (q.input === 'choice' && q.tier === tier && q.trap >= 0 && s.players[0].lives === 3) {
+        s = play(s, { 0: 'trap', 1: 'good' }, now);
+        const r = s.last.results[0];
+        assert.equal(r.lost, [0, 1, 2, 2][tier], `tour ${tier} : vies perdues`);
+        assert.equal(r.pts < 0, tier === 3, `tour ${tier} : points retirés seulement au comité`);
+        done = true;
+      } else s = play(s, { 0: 'good', 1: 'good' }, now);
+      now += 1e5;
+    }
+    assert.ok(done, `piège trouvé au tour ${tier}`);
+  }
+  // presque juste : marge ±10 %, réponse à +15 %
+  const q = { input: 'num', isChartier: true, answer: 100, tol: 0.1, tolMode: 'rel' };
+  assert.ok(!check(q, '115').ok && check(q, '115').near && !check(q, '125').near);
+  const f = { input: 'num', isChartier: true, answer: 1000, tol: 2, tolMode: 'factor' };
+  assert.ok(check(f, '3000').near && !check(f, '5000').near && check(f, '1500').ok);
+});
+
+t('The Candidate : face-à-face final en mort subite entre les deux premiers', () => {
+  const players = [0, 1, 2].map((id) => ({ id, name: 'P' + id }));
+  const run = (duelHow) => {
+    let s = createGame({ players, cfg: { mode: 'chartier', len: 10, cut: 0, code: 0 }, seed: 12, now: 0 });
+    let now = 0;
+    // 0 répond vite, 1 lentement, 2 se trompe : 0 et 1 finissent premiers
+    while (!s.duel && s.phase !== 'over') { s = nextQuestion(s, now); if (s.duel || s.phase === 'over') break; s = play(s, { 0: 'good', 1: 'slow', 2: s.idx % 4 ? 'good' : 'bad' }, now); now += 1e5; }
+    return { s, now };
+  };
+  let { s, now } = run();
+  assert.ok(s.duel && s.phase === 'question' && s.idx === 10, 'le face-à-face commence après la dernière question');
+  assert.deepEqual(s.duel.ids, [0, 1]);
+  assert.equal(answer(s, { by: 2, raw: '0', idx: s.idx, now: now + 100 }).ok, false, 'le troisième regarde');
+  assert.equal(useJoker(s, { by: 1, kind: 'half' }).ok, false, 'pas de joker');
+  // le second (moins de points) répond juste le premier : il gagne et passe devant
+  const q = fullQuestion(s);
+  const r = answer(s, { by: 1, raw: good(q), idx: s.idx, now: now + 500 });
+  assert.ok(r.ok && r.done, 'la première réponse décide');
+  s = reveal(r.state, now + 600);
+  assert.equal(s.duel.winner, 1);
+  s = nextQuestion(s, now + 1e5);
+  assert.equal(s.phase, 'over'); assert.deepEqual(s.ranking.slice(0, 2), [1, 0]);
+  // une réponse fausse fait perdre, même la première
+  ({ s, now } = run());
+  s = reveal(answer(s, { by: 0, raw: bad(fullQuestion(s)), idx: s.idx, now: now + 500 }).state, now + 600);
+  assert.equal(s.duel.winner, 1, 'le premier qui se trompe perd');
+  // personne ne répond : on enchaîne, puis le score départage
+  ({ s, now } = run());
+  for (let k = 0; k < 5 && s.phase !== 'over'; k++) { s = reveal(s, now + 1); now += 1e5; s = nextQuestion(s, now); }
+  assert.equal(s.phase, 'over'); assert.equal(s.ranking[0], 0, 'après 5 silences, le meilleur score gagne');
+  // désactivé : pas de face-à-face
+  let g = createGame({ players, cfg: { mode: 'chartier', len: 10, cut: 0, code: 0, duel: 0 }, seed: 12, now: 0 });
+  now = 0;
+  while (g.phase !== 'over') { g = nextQuestion(g, now); if (g.phase === 'over') break; g = play(g, { 0: 'good', 1: 'good', 2: 'good' }, now); now += 1e5; }
+  assert.ok(!g.duel && g.history.length === 10);
+});
+
+t('The Candidate : modules par métier, rubriques orientées', () => {
+  const count = (module) => { const c = {}; for (let i = 0; i < 3000; i++) { const q = makeQuestion(i * 7919 + 5, i % 15, 'chartier', 'normal', 0, 15, module); if (q.rubric) c[q.rubric] = (c[q.rubric] || 0) + 1; } return c; };
+  const gen = count('gen'), trading = count('trading'), ma = count('ma'), quant = count('quant');
+  assert.ok(trading['Dérivés'] > gen['Dérivés'] * 1.3 && (trading['Corporate'] || 0) === 0, 'trading : dérivés et marchés');
+  assert.ok(ma['Corporate'] > gen['Corporate'] * 2.5, 'M&A : finance d\'entreprise');
+  assert.ok(quant['Probas'] > gen['Probas'] * 2, 'quant : probabilités');
+  assert.equal(createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', module: 'nimporte' }, seed: 1, now: 0 }).cfg.module, 'gen');
+  assert.equal(createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'classic', module: 'quant' }, seed: 1, now: 0 }).cfg.module, 'gen');
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
@@ -485,7 +561,7 @@ t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => 
   // sans coupe : personne ne saute au palier
   let now = 0;
   while (s.phase !== 'over') { s = play(s, { 0: 'good', 1: 'good', 2: 'good', 3: 'slow' }, now); now += 1e5; s = nextQuestion(s, now); }
-  assert.ok(s.players.every((p) => !p.out) && s.history.length === 15);
+  assert.ok(s.players.every((p) => !p.out) && s.history.filter((h) => !h.duel).length === 15);
   // la sabotage classique ne déborde pas sur The Candidate
   assert.equal(createGame({ players, cfg: { mode: 'chartier', sabotage: 1 }, seed: 1, now: 0 }).cfg.sabotage, false);
 });
@@ -522,6 +598,45 @@ t('figures à compter : chaque réponse recomptée par force brute', () => {
   for (const k of KINDS.visuel) assert.ok(seen.has(k), `figure ${k} jamais tirée`);
 });
 
+t('graphiques : chaque réponse recalculée à partir des données dessinées', () => {
+  const num = (t) => Number(String(t).replace('−', '-').replace(/\s/g, '').replace(',', '.').replace(/[^\d.\-+]/g, ''));
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const seen = new Set();
+  for (let i = 0; i < 9000; i++) {
+    const q = makeQuestion(i * 104729 + 3, i % 15, 'chartier', ['facile', 'normal', 'expert'][i % 3], 0, 15, ['gen', 'trading', 'ma', 'risk', 'quant'][i % 5]);
+    if (q.kind !== 'chart') continue;
+    const f = q.fig, good = q.choices[q.answer]; seen.add(f.c);
+    assert.ok(q.trap >= 0 && q.trap !== q.answer && new Set(q.choices).size === 4, q.text);
+    if (f.c === 'yc' && /décrire/.test(q.text)) {
+      const up = f.y.every((v, k) => !k || v > f.y[k - 1]), down = f.y.every((v, k) => !k || v < f.y[k - 1]);
+      const flat = Math.max(...f.y) - Math.min(...f.y) < 0.1, hump = [1, 2, 3].includes(f.y.indexOf(Math.max(...f.y))) && !up && !down;
+      assert.ok({ 'Normale, pentue': up, Inversée: down, Plate: flat, 'En bosse': hump }[good], `${good} ${f.y}`);
+    } else if (f.c === 'yc') assert.equal(num(good), Math.round((f.y[3] - f.y[1]) * 100), `${good} ${f.y}`);
+    if (f.c === 'payoff') {
+      const curve = (legs) => Array.from({ length: 41 }, (_, k) => payoffAt(legs, 50 + k * 2.5)).join();
+      assert.equal(curve(STRATS[good].legs), curve(f.legs));
+      for (const c of q.choices) if (c !== good) assert.notEqual(curve(STRATS[c].legs), curve(f.legs), `${c} se confond avec ${good}`);
+    }
+    if (f.c === 'line' && /Performance/.test(q.text)) assert.ok(near(num(good), ((f.y[6] - f.y[0]) / f.y[0]) * 100, 0.06), `${good} ${f.y}`);
+    if (f.c === 'line' && /drawdown/.test(q.text)) {
+      let peak = f.y[0], dd = 0; for (const x of f.y) { peak = Math.max(peak, x); dd = Math.max(dd, (peak - x) / peak); }
+      assert.ok(near(-num(good), dd * 100, 0.06), `${good} ${f.y}`);
+    }
+    if (f.c === 'book' && /tout de suite/.test(q.text)) assert.ok(near(num(good), f.ask[0], 0.006));
+    if (f.c === 'book' && /Prix moyen/.test(q.text)) {
+      let left = f.buy, cost = 0; for (let k = 0; k < 4 && left > 0; k++) { const take = Math.min(left, f.aq[k]); cost += take * f.ask[k]; left -= take; }
+      assert.equal(left, 0); assert.ok(near(num(good), cost / f.buy, 0.006), `${good} vs ${cost / f.buy}`);
+    }
+    if (f.c === 'book' && /points de base/.test(q.text)) assert.ok(near(num(good), ((f.ask[0] - f.bid[0]) / ((f.ask[0] + f.bid[0]) / 2)) * 1e4, 0.06));
+    if (f.c === 'bars' && /Quelle année/.test(q.text)) {
+      const g = f.y.slice(1).map((x, k) => (x - f.y[k]) / f.y[k]);
+      assert.equal(good, `An ${g.indexOf(Math.max(...g)) + 2}`);
+    }
+    if (f.c === 'bars' && /TCAM/.test(q.text)) assert.ok(near(num(good), ((f.y[4] / f.y[0]) ** 0.25 - 1) * 100, 0.06));
+  }
+  assert.deepEqual([...seen].sort(), ['bars', 'book', 'line', 'payoff', 'yc']);
+});
+
 // Python local (le même harnais que dans le navigateur) : les solutions de référence passent tous leurs tests
 const py = spawnSync('python3', ['-I', '-c', 'print(1)'], { encoding: 'utf8' });
 const runPy = (code, fn, tests) => {
@@ -542,10 +657,37 @@ if (py.status === 0) t('code : références justes, code vide ou tricheur refus�
 });
 else console.log('· python3 absent : vérification des solutions de code sautée');
 
+if (py.status === 0) t('code : lire du code, corriger un bug, SQL (python3)', () => {
+  for (const q of READ_QUESTIONS) {
+    const r = spawnSync('python3', ['-I', '-c', q.code], { encoding: 'utf8' });
+    assert.equal(r.stdout.trim(), q.good, `sortie réelle de : ${q.code}`);
+    assert.ok(!q.wrong.includes(q.good) && new Set(q.wrong).size === 3);
+  }
+  for (const q of FIX_QUESTIONS) {
+    const T = q.tests.length;
+    assert.equal(scoreRun(runPy(q.ref, q.fn, q.tests), T), T, `${q.title} : correction`);
+    assert.ok(scoreRun(runPy(q.starter, q.fn, q.tests), T) < T, `${q.title} : le code de départ a bien un bug`);
+  }
+  const runSql = (code, q) => {
+    const r = spawnSync('python3', ['-I', '-c', buildProgram(code, null, q.tests, { print: true, lang: 'sql', ordered: q.ordered })], { encoding: 'utf8', timeout: 10000 });
+    const line = (r.stdout || '').split('\n').find((l) => l.startsWith('@@RESULT@@'));
+    return line ? JSON.parse(line.slice(10)) : { error: r.stderr, tests: [] };
+  };
+  for (const q of SQL_QUESTIONS) {
+    assert.equal(scoreRun(runSql(q.ref, q), 3), 3, `${q.title} : requête de référence`);
+    assert.equal(scoreRun(runSql('SELECT 1', q), 3), 0, `${q.title} : une requête quelconque échoue`);
+    assert.ok(runSql('SELEC nimporte', q).error, 'erreur de syntaxe signalée');
+    assert.ok(q.tests.every(([, exp]) => exp.length > 0));
+  }
+  // l'ordre ne compte que si l'énoncé le demande
+  const cnt = SQL_QUESTIONS.find((q) => q.id === 'sql_count');
+  assert.equal(scoreRun(runSql("SELECT COUNT(*) FROM trades WHERE side='BUY'", cnt), 3), 3);
+});
+
 // Réseau simulé : l'hôte ne répond au joker qu'au joueur qui l'a demandé, et l'état diffusé ne révèle rien
 {
   const { startHost } = await import('../calcul/net/host.js');
-  const { INTRO_MS } = await import('../calcul/engine/rules.js');
+  const { INTRO_CH_MS } = await import('../calcul/engine/rules.js');
   const games = Array.from({ length: 8 }, () => {
     const sent = [], on = {};
     const bridge = { embedded: false, players: [0, 1, 2].map((id) => ({ id, name: 'P' + id, color: '#fff' })), readyMap: { 1: 'calcul', 2: 'calcul' },
@@ -555,7 +697,7 @@ else console.log('· python3 absent : vérification des solutions de code sauté
   });
   await new Promise((r) => setTimeout(r, 50));
   for (const g of games) g.host.start();
-  await new Promise((r) => setTimeout(r, INTRO_MS + 300));
+  await new Promise((r) => setTimeout(r, INTRO_CH_MS + 300));
   const g = games.find((x) => x.host.state.phase === 'question' && fullQuestion(x.host.state).input === 'choice');
   assert.ok(g, 'une première question à choix');
   const q = fullQuestion(g.host.state);

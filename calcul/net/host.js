@@ -69,6 +69,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     const q = fullQuestion(state), idx = state.idx;
     for (const p of state.players) {
       if (!p.bot || p.out || state.answers[p.id]) continue;
+      if (state.duel && state.duel.winner == null && !state.duel.ids.includes(p.id)) continue; // face-à-face : seuls les deux finalistes
       const a = botAnswer(q, level);
       if (!a) continue;
       const due = state.qAt + a.delay - Date.now();
@@ -99,7 +100,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
   }
   async function runCode(by, idx, code) {
     const q = fullQuestion(state);
-    const out = await runPython(buildProgram(code, q.fn, q.tests));
+    const out = await runPython(buildProgram(code, q.fn, q.tests, { lang: q.lang, ordered: q.ordered }));
     const total = q.tests.length, passed = scoreRun(out, total);
     if (!state || state.idx !== idx) return;
     // le détail des tests (sans les valeurs attendues) ne va qu'à l'auteur du code

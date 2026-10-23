@@ -1,5 +1,6 @@
 // Figures des questions de géométrie : petits dessins SVG cotés, dans le style du jeu (encre épaisse, aplats).
 import { esc } from './util.js';
+import { payoffAt } from '../engine/charts.js';
 
 const INK = '#16181d', FILL = '#d8f3ea', ACC = '#0f8a6a';
 // Empilement de cubes en perspective isométrique, mis à l'échelle de la vignette (peint : faces visibles en couleur)
@@ -94,6 +95,10 @@ export function figureSvg(fig) {
       <circle cx="${x0.toFixed(1)}" cy="${(y0 + h).toFixed(1)}" r="9" fill="${ACC}" stroke="${INK}" stroke-width="3"/>
       <circle cx="${(x0 + w).toFixed(1)}" cy="${y0.toFixed(1)}" r="9" fill="#ffc531" stroke="${INK}" stroke-width="3"/>
       ${label(x0 - 14, y0 + h + 6, 'A', 'end')}${label(x0 + w + 14, y0 + 6, 'B', 'start')}`;
+  } else if (fig.t === 'chart') {
+    body = chartSvg(fig) + (fig.label ? sm(152, 10, fig.label) : '');
+  } else if (SCHEMA[fig.t]) {
+    body = SCHEMA[fig.t](fig);
   } else if (fig.t === 'fan') {
     // triangle, et k traits du sommet vers la base (bases réparties au hasard mais fixes)
     const A = [140, 22], B = [40, 150], C = [240, 150];
@@ -120,3 +125,104 @@ export function figureSvg(fig) {
   }
   return `<svg class="fig" viewBox="0 0 280 180" role="img" aria-label="Figure">${body}</svg>`;
 }
+
+/* ------------------------------------------------------------------ graphiques (questions « lecture de graphique ») */
+const UP = '#2fbf71', DOWN = '#ff5a3c';
+const n1 = (x) => (Math.round(x * 10) / 10).toString().replace('.', ',');
+const n2 = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('.', ',');
+const sm = (x, y, t, anchor = 'middle', extra = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" class="sm" ${extra}>${esc(t)}</text>`;
+// zone de tracé : x de 36 à 268, y de 16 à 148
+function frame(lo, hi) {
+  const Y = (v) => 148 - ((v - lo) / (hi - lo || 1)) * 132;
+  const axes = `<path d="M36 16 V148 H268" fill="none" stroke="${INK}" stroke-width="2"/>`;
+  return { Y, axes };
+}
+function chartSvg(f) {
+  if (f.c === 'yc' || f.c === 'line') {
+    const lo = Math.min(...f.y), hi = Math.max(...f.y), pad = (hi - lo) * 0.25 || 0.5;
+    const { Y, axes } = frame(lo - pad, hi + pad), n = f.y.length;
+    const X = (k) => 50 + (k * 206) / (n - 1);
+    const pts = f.y.map((v, k) => `${X(k).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    const yc = f.c === 'yc';
+    const ticks = [lo, (lo + hi) / 2, hi].map((v) => sm(32, Y(v) + 4, yc ? `${n2(v)} %` : n1(v), 'end')).join('');
+    const xl = (f.x || f.y.map((_, k) => `J${k + 1}`)).map((t, k) => sm(X(k), 164, t)).join('');
+    const vals = (!yc || f.labels) ? f.y.map((v, k) => sm(X(k), Y(v) - 9, yc ? `${n2(v)}` : String(v))).join('') : '';
+    return `${axes}<polyline points="${pts}" fill="none" stroke="${ACC}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${f.y.map((v, k) => `<circle cx="${X(k).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${ACC}" stroke="${INK}" stroke-width="1.5"/>`).join('')}
+      ${yc ? '' : ticks}${yc && !f.labels ? ticks : ''}${xl}${vals}`;
+  }
+  if (f.c === 'payoff') {
+    const S = Array.from({ length: 41 }, (_, k) => 50 + k * 2.5), v = S.map((x) => payoffAt(f.legs, x));
+    const lo = Math.min(0, ...v), hi = Math.max(0, ...v), pad = (hi - lo) * 0.12 || 5;
+    const { Y } = frame(lo - pad, hi + pad), X = (x) => 36 + ((x - 50) / 100) * 232;
+    const pts = S.map((x, k) => `${X(x).toFixed(1)},${Y(v[k]).toFixed(1)}`).join(' ');
+    return `<path d="M36 16 V148" stroke="${INK}" stroke-width="2"/><path d="M36 ${Y(0).toFixed(1)} H268" stroke="${INK}" stroke-width="2"/>
+      ${sm(270, Y(0) - 6, 'cours', 'end')}${sm(40, 26, 'gain', 'start')}${sm(40, 144, 'perte', 'start')}
+      ${f.K.map((K) => `<path d="M${X(K).toFixed(1)} ${(Y(0) - 4).toFixed(1)} v8" stroke="${INK}" stroke-width="2"/>${sm(X(K), Y(0) + 18, String(K))}`).join('')}
+      <polyline points="${pts}" fill="none" stroke="${ACC}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  if (f.c === 'book') {
+    const mx = Math.max(...f.bq, ...f.aq), W = (q) => (q / mx) * 90;
+    const row = (k, side) => {
+      const y = side === 'a' ? 20 + (3 - k) * 17 : 96 + k * 17, px = side === 'a' ? f.ask[k] : f.bid[k], q = side === 'a' ? f.aq[k] : f.bq[k];
+      const bar = side === 'a' ? `<rect x="166" y="${y}" width="${W(q).toFixed(1)}" height="13" rx="3" fill="${DOWN}"/>${sm(170 + W(q), y + 11, String(q), 'start')}`
+        : `<rect x="${(114 - W(q)).toFixed(1)}" y="${y}" width="${W(q).toFixed(1)}" height="13" rx="3" fill="${UP}"/>${sm(110 - W(q), y + 11, String(q), 'end')}`;
+      return `${bar}${sm(140, y + 11, n2(px))}`;
+    };
+    return `${[0, 1, 2, 3].map((k) => row(k, 'a')).join('')}${[0, 1, 2, 3].map((k) => row(k, 'b')).join('')}
+      <path d="M40 91 H240" stroke="${INK}" stroke-width="1.5" stroke-dasharray="4 4"/>
+      ${sm(268, 14, 'vendeurs (ask)', 'end')}${sm(12, 174, 'acheteurs (bid)', 'start')}`;
+  }
+  if (f.c === 'bars') {
+    const hi = Math.max(...f.y) * 1.15, { Y, axes } = frame(0, hi), n = f.y.length, w = 200 / n;
+    return `${axes}${f.y.map((v, k) => { const x = 46 + k * (222 / n); return `<rect x="${x.toFixed(1)}" y="${Y(v).toFixed(1)}" width="${(w - 8).toFixed(1)}" height="${(148 - Y(v)).toFixed(1)}" rx="3" fill="${ACC}" stroke="${INK}" stroke-width="1.5"/>
+      ${sm(x + (w - 8) / 2, Y(v) - 6, String(v))}${sm(x + (w - 8) / 2, 164, f.x[k])}`; }).join('')}${sm(40, 12, 'CA (M€)', 'start')}`;
+  }
+  return '';
+}
+
+/* ------------------------------------------------------------------ mini-schémas des explications */
+const poly = (pts, color = ACC, w = 3.5, extra = '') => `<polyline points="${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const axes2 = (xl, yl) => `<path d="M36 16 V148 H268" fill="none" stroke="${INK}" stroke-width="2"/>${sm(268, 164, xl, 'end')}${sm(40, 12, yl, 'start')}`;
+const curve = (f, a = 50, b = 150) => Array.from({ length: 61 }, (_, k) => { const x = a + ((b - a) * k) / 60; return [36 + ((x - a) / (b - a)) * 232, f(x)]; });
+const N = (z) => 1 / (1 + Math.exp(-1.702 * z)); // approximation de la loi normale cumulée
+const SCHEMA = {
+  smile: () => `${axes2('strike', 'volatilité implicite')}${poly(curve((x) => 148 - 40 - 0.012 * (x - 112) ** 2 * (x < 112 ? 1.4 : 0.6)))}
+    <path d="M152 148 v-6" stroke="${INK}" stroke-width="2"/>${sm(152, 162, 'à la monnaie')}${sm(70, 40, 'puts chers', 'middle')}`,
+  greek: (f) => {
+    const g = { delta: [(x) => 140 - 120 * N((x - 100) / 15), 'delta d\'un call : de 0 à 1'], gamma: [(x) => 145 - 120 * Math.exp(-(((x - 100) / 14) ** 2)), 'gamma : maximal à la monnaie'],
+      vega: [(x) => 145 - 110 * Math.exp(-(((x - 100) / 24) ** 2)), 'vega : en cloche autour de la monnaie'] }[f.g];
+    if (f.g === 'theta') {
+      return `${axes2('temps qui passe →', 'valeur temps')}${poly(curve((x) => 148 - 125 * Math.sqrt(Math.max(0, (150 - x) / 100)), 50, 150))}${sm(150, 30, 'elle fond de plus en plus vite vers l\'échéance')}`;
+    }
+    return `${axes2('cours', f.g)}${poly(curve(g[0]))}<path d="M152 148 v-6" stroke="${INK}" stroke-width="2"/>${sm(152, 162, 'strike')}${sm(150, 30, g[1])}`;
+  },
+  timeline: () => {
+    const pt = (x, top, bottom, color = ACC) => `<circle cx="${x}" cy="90" r="7" fill="${color}" stroke="${INK}" stroke-width="2"/>${sm(x, 66, top)}${sm(x, 118, bottom)}`;
+    return `<path d="M20 90 H262" stroke="${INK}" stroke-width="3"/><path d="M262 90 l-10 -6 v12 z" fill="${INK}"/>
+      <path d="M90 90 H230" stroke="${ACC}" stroke-width="8" stroke-opacity=".35"/>
+      ${pt(50, 'constatation', 'on lit l\'Euribor', '#ffc531')}${pt(90, 'début', 'des intérêts')}${pt(230, 'paiement', 'du coupon')}
+      ${sm(160, 82, 'période d\'intérêts')}${sm(70, 150, '≈ 2 jours ouvrés')}`;
+  },
+  convex: () => {
+    const P = (y) => 100 / (1 + y / 100) ** 10, Y = (p) => 148 - ((p - 40) / 90) * 130, X = (y) => 36 + (y / 10) * 232;
+    const pts = Array.from({ length: 51 }, (_, k) => { const y = (k / 50) * 10; return [X(y), Y(P(y))]; });
+    const y0 = 4, d = (P(y0 + 0.01) - P(y0 - 0.01)) / 0.02, tan = [0, 10].map((y) => [X(y), Y(P(y0) + d * (y - y0))]);
+    return `${axes2('taux', 'prix')}${poly(tan, INK, 2, 'stroke-dasharray="6 5"')}${poly(pts)}<circle cx="${X(y0)}" cy="${Y(P(y0))}" r="5" fill="#ffc531" stroke="${INK}" stroke-width="2"/>
+      ${sm(200, 40, 'les taux montent : le prix baisse')}${sm(200, 140, 'pointillés : la duration seule')}`;
+  },
+  bell: () => {
+    const X = (z) => 152 + z * 36, Y = (z) => 148 - 120 * Math.exp(-(z * z) / 2);
+    const area = (a, b, op) => `<path d="M${X(a)} 148 ${Array.from({ length: 21 }, (_, k) => { const z = a + ((b - a) * k) / 20; return `L${X(z).toFixed(1)} ${Y(z).toFixed(1)}`; }).join(' ')} L${X(b)} 148 Z" fill="${ACC}" fill-opacity="${op}"/>`;
+    return `${area(-2, 2, 0.25)}${area(-1, 1, 0.45)}${poly(Array.from({ length: 61 }, (_, k) => { const z = -3 + k / 10; return [X(z), Y(z)]; }))}
+      <path d="M30 148 H274" stroke="${INK}" stroke-width="2"/>${sm(152, 110, '68 %')}${sm(X(-1.5), 140, '95 %')}${sm(X(1.5), 140, '95 %')}
+      ${[-2, -1, 0, 1, 2].map((z) => sm(X(z), 164, z ? `${z > 0 ? '+' : '−'}${Math.abs(z)}σ` : 'moyenne')).join('')}`;
+  },
+  evbridge: () => {
+    const bar = (x, y, h, label, value, color) => `<rect x="${x}" y="${y}" width="58" height="${h}" rx="4" fill="${color}" stroke="${INK}" stroke-width="2"/>${sm(x + 29, y + h / 2 + 4, value)}${sm(x + 29, 164, label)}`;
+    return `${bar(30, 58, 90, 'capitalisation', '600', ACC)}${sm(108, 104, '+')}${bar(120, 88, 60, 'dette nette', '400', '#e2553b')}${sm(198, 104, '=')}${bar(212, 18, 130, 'valeur d\'entreprise', '1 000', '#ffc531')}`;
+  },
+  balance: () => `<rect x="40" y="20" width="96" height="128" rx="6" fill="${ACC}" stroke="${INK}" stroke-width="2"/>${sm(88, 88, 'actif')}${sm(88, 104, 'ce que l\'on possède')}
+    <rect x="148" y="20" width="96" height="70" rx="6" fill="#ffc531" stroke="${INK}" stroke-width="2"/>${sm(196, 58, 'fonds propres')}
+    <rect x="148" y="92" width="96" height="56" rx="6" fill="#e2553b" stroke="${INK}" stroke-width="2"/>${sm(196, 124, 'dettes')}${sm(142, 166, 'actif = passif')}`,
+};
