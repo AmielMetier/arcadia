@@ -225,7 +225,7 @@ export class Sim {
   setToast(text, dur = 2.5, kind = '') { this.toast = { text, until: this.t + dur, kind, n: (this.toast ? this.toast.n : 0) + 1 }; }
 
   // Cinématique d'intro : la simulation attend ; elle se termine au bout du temps ou quand tous les humains passent
-  beginIntro(sec = 9) { this.intro = sec; for (const p of this.players.values()) p.skip = false; }
+  beginIntro(sec = 12.5) { this.intro = sec; for (const p of this.players.values()) p.skip = false; }
 
   // ------------------------------------------------------------------ boucle
   step(dt = DT) {

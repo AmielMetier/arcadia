@@ -1,6 +1,7 @@
 // Dessins vectoriels « cartoon » (contour encre, couleurs franches) : survivants, zombies, armes, objets.
 // Toutes les fonctions dessinent centré sur (0,0), l'avant vers +x ; l'appelant gère translate/rotate.
 import { hash } from '../engine/rng.js';
+import { drawIcon } from '../ui/icons.js';
 
 export const INK = '#16181d';
 const WHITE = { flash: true };
@@ -460,12 +461,13 @@ export function drawShopItem(c, it, t, icon, label, afford) {
   if (!sold) {
     c.save(); c.translate(0, -16 + Math.sin(t * 3 + price) * 2);
     if (k === 'weapon') { c.rotate(-0.3); c.translate(-16, 0); drawWeapon(c, w, false, 0.9); }
-    else { c.font = '22px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(icon, 0, 0); }
+    else drawIcon(c, icon, 0, 0, 28, '#fff8ea');
     c.restore();
   }
   rr(c, -20, 24, 40, 18, 5); fs(c, sold ? '#59616d' : afford ? '#ffc531' : '#ff8a7a', 2.2);
   c.fillStyle = INK; c.font = '700 12px "Chakra Petch", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(sold ? 'VENDU' : '⚙ ' + price, 0, 33);
+  if (sold) c.fillText('VENDU', 0, 33);
+  else { c.fillText(String(price), 6, 33); hexNut(c, -10, 33, 5); }
 }
 
 export function drawVaultDoor(c, st, prog, t) {
@@ -529,11 +531,17 @@ export function drawPickup(c, k, t) {
       c.fillStyle = '#e3262f'; c.fillRect(-11, -14, 22, 5); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(-11, -14, 22, 5);
       break;
     }
-    case 'scrap':
-      c.rotate(k.id);
-      c.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, r = i % 2 ? 6 : 10; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); fs(c, '#a7b0bd', 2.2);
-      circ(c, 0, 0, 3); c.fillStyle = INK; c.fill();
+    case 'scrap': {
+      // écrou hexagonal en acier, avec un reflet et un trou taraudé
+      c.rotate(k.id * 0.7 + t * 0.6);
+      const hex = (r) => { c.beginPath(); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); };
+      hex(10.5); fs(c, '#8d96a3', 2.4);
+      hex(7.6); c.fillStyle = '#b7bfca'; c.fill();
+      c.beginPath(); c.moveTo(-9, -5.2); c.lineTo(0, -10.5); c.lineTo(9, -5.2); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1.6; c.stroke();
+      circ(c, 0, 0, 4); fs(c, '#2a2d36', 1.8);
+      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 2.6, 0.5, 2.4); c.stroke();
       break;
+    }
     case 'weapon': {
       const glow = 0.5 + 0.5 * Math.sin(t * 4);
       c.globalAlpha = 0.35 + 0.25 * glow; ell(c, 0, 4, 30, 12); c.fillStyle = '#ffc531'; c.fill(); c.globalAlpha = 1;
@@ -551,7 +559,7 @@ export function drawBarrel(c, b, t) {
   circ(c, 0, 0, b.r); fs(c, toxic ? '#4f9d3a' : '#d64545', 3);
   circ(c, 0, 0, b.r - 6); c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 2; c.stroke();
   c.fillStyle = toxic ? '#c6f36a' : '#ffc531';
-  if (toxic) { c.font = 'bold 15px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('☣', 0, 1); }
+  if (toxic) drawIcon(c, 'bio', 0, 0, 20, '#c6f36a', 2.6, null);
   else { c.beginPath(); c.moveTo(0, -8); c.lineTo(7, 6); c.lineTo(-7, 6); c.closePath(); c.fill(); c.fillStyle = INK; c.fillRect(-1, -3, 2, 5); c.fillRect(-1, 3, 2, 2); }
 }
 
@@ -561,6 +569,13 @@ export function drawCrate(c, w, h) {
   c.beginPath(); c.moveTo(5, 5); c.lineTo(w - 5, h - 5); c.moveTo(w - 5, 5); c.lineTo(5, h - 5); c.stroke();
   rr(c, 3, 3, w - 6, h - 6, 2); c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.stroke();
   c.fillStyle = '#fff8ea'; rr(c, w / 2 - 6, h / 2 - 6, 12, 12, 2); c.fill(); c.fillStyle = '#e3262f'; c.fillRect(w / 2 - 1.5, h / 2 - 4, 3, 8); c.fillRect(w / 2 - 4, h / 2 - 1.5, 8, 3);
+}
+
+// petit écrou (prix, compteurs dessinés)
+export function hexNut(c, x, y, r) {
+  c.beginPath(); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.closePath();
+  c.fillStyle = '#8d96a3'; c.fill(); c.strokeStyle = INK; c.lineWidth = 1.4; c.stroke();
+  c.beginPath(); c.arc(x, y, r * 0.38, 0, Math.PI * 2); c.fillStyle = INK; c.fill();
 }
 
 // Icône d'arme sur un petit canvas (HUD)

@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.33 — 23 octobre 2026
+- **Outbreak** — Nouvelle intro cinématique avant chaque partie : transmission radio, carte de la Côte d'Azur qui se fait infecter, survol de la ville en feu en hélico, puis chaque joueur descend en rappel avec sa fiche (nom, classe, capacité) avant le titre et le compte à rebours.
+- **Outbreak** — L'écran de préparation tient entièrement à l'écran : plus besoin de faire défiler pour lancer la partie, il s'adapte à la taille de la fenêtre.
+- **Outbreak** — Interface refaite façon terminal militaire : panneaux en acier brossé rivetés, bandes de danger, dossiers et améliorations sur papier vieilli.
+- **Outbreak** — Les émojis sont remplacés par de vraies icônes dessinées, dans le menu comme en jeu.
+- **Outbreak** — La ferraille lâchée par les zombies est maintenant un écrou qui tourne, pour qu'on comprenne tout de suite ce que c'est.
+
 ## 2.32 — 23 octobre 2026
 - **Tête de Calcul** — The Candidate devient un vrai entretien éliminatoire.
   - Trois vies par candidat : une erreur ou un silence en coûte une, tomber dans le piège (la réponse « évidente » mais fausse) en coûte deux.

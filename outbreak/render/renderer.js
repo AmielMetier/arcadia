@@ -3,6 +3,7 @@ import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate
 import { paintLevel, THEMES } from './level-art.js';
 import { WALL_TOP } from '../engine/level.js';
 import { ROOM_TYPES, SHOP_ITEMS, SECTORS } from '../engine/data.js';
+import { drawIcon } from '../ui/icons.js';
 
 const LS = 0.5; // résolution de la carte de lumière
 
@@ -199,7 +200,7 @@ export class Renderer {
         circ(c, x + Math.cos(ang) * r * 0.45, y + Math.sin(ang * 1.3) * r * 0.35, r * (0.55 + 0.1 * Math.sin(t + i))); c.fill();
       }
       c.globalAlpha = 1;
-      if (Math.sin(t * 2 + id) > 0.6) { c.font = '18px sans-serif'; c.textAlign = 'center'; c.globalAlpha = 0.6 * a; c.fillText('☣', x, y); c.globalAlpha = 1; }
+      if (Math.sin(t * 2 + id) > 0.6) { c.globalAlpha = 0.6 * a; drawIcon(c, 'bio', x, y, 24, '#c6e88a', 2.4, null); c.globalAlpha = 1; }
       return;
     }
     if (k === 'heal') {
@@ -254,13 +255,15 @@ export class Renderer {
     const lit = open ? '#2fbf71' : '#ff4b2b';
     circ(c, d.x - 14, 14, 6); fs(c, lit, 2); circ(c, d.x + d.w + 14, 14, 6); fs(c, lit, 2);
     const R = ROOM_TYPES[d.to];
-    const label = (R.icon ? R.icon + ' ' : '') + R.name.split(' — ')[0].toUpperCase();
+    const label = R.name.split(' — ')[0].toUpperCase();
     c.font = '700 15px "Chakra Petch", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    const tw = c.measureText(label).width + 20;
-    const ly = WALL_TOP + 40;
+    const tw = c.measureText(label).width + (R.icon ? 44 : 20);
+    const ly = WALL_TOP + 40, mx = d.x + d.w / 2;
     const rally = v.rally && v.rally.d === d.id;
-    rr(c, d.x + d.w / 2 - tw / 2, ly - 13, tw, 26, 7); fs(c, rally ? '#2fbf71' : open ? '#fff8ea' : 'rgba(255,248,234,.75)', 2.5);
-    c.fillStyle = INK; c.fillText(label, d.x + d.w / 2, ly + 1);
+    rr(c, mx - tw / 2, ly - 14, tw, 28, 4); fs(c, rally ? '#2fbf71' : open ? '#2a2e36' : 'rgba(42,46,54,.85)', 2.5);
+    c.fillStyle = '#f2b51d'; c.fillRect(mx - tw / 2 + 2, ly - 12, 4, 24);
+    if (R.icon) drawIcon(c, R.icon, mx - tw / 2 + 22, ly, 18, '#f2b51d', 2.4, null);
+    c.fillStyle = '#eef0f2'; c.fillText(label, mx + (R.icon ? 12 : 0), ly + 1);
     if (R.reward) { c.font = '600 12px "Chakra Petch", sans-serif'; c.lineWidth = 3; c.strokeStyle = INK; c.strokeText(R.reward, d.x + d.w / 2, ly + 26); c.fillStyle = '#ffc531'; c.fillText(R.reward, d.x + d.w / 2, ly + 26); }
   }
 
@@ -272,7 +275,7 @@ export class Renderer {
       const on = Math.sin(t * 14) > 0;
       c.fillStyle = on ? 'rgba(255,60,40,.35)' : 'rgba(255,60,40,.15)'; c.fillRect(tz.x, tz.y, tz.w, tz.h);
       c.font = '700 22px Bungee, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      for (let xx = tz.x + 200; xx < tz.x + tz.w; xx += 500) { c.lineWidth = 5; c.strokeStyle = INK; c.strokeText('⚠ RAME', xx, tz.y + tz.h / 2); c.fillStyle = '#ffc531'; c.fillText('⚠ RAME', xx, tz.y + tz.h / 2); }
+      for (let xx = tz.x + 200; xx < tz.x + tz.w; xx += 500) { c.lineWidth = 5; c.strokeStyle = INK; c.strokeText('RAME', xx + 16, tz.y + tz.h / 2); c.fillStyle = '#ffc531'; c.fillText('RAME', xx + 16, tz.y + tz.h / 2); drawIcon(c, 'warn', xx - 44, tz.y + tz.h / 2, 30, '#ffc531'); }
       return;
     }
     if (st !== 'pass') return;
@@ -388,7 +391,7 @@ export class Renderer {
         c.strokeStyle = `rgba(200,140,255,${0.5 + 0.4 * pulse})`; c.lineWidth = 3; c.setLineDash([10, 8]);
         c.beginPath(); c.moveTo(16, 0); c.lineTo(330, 0); c.stroke(); c.setLineDash([]); c.restore();
       }
-      if (z.flags & 2048) { c.font = '16px sans-serif'; c.textAlign = 'center'; c.fillText('⚠', z.x, z.y - 30); }
+      if (z.flags & 2048) drawIcon(c, 'warn', z.x, z.y - 32, 22, '#ff4b2b');
       if (z.flags & 1024) { circ(c, z.x, z.y, 115); c.fillStyle = `rgba(200,255,90,${0.1 + 0.12 * pulse})`; c.fill(); c.strokeStyle = 'rgba(200,255,90,.8)'; c.lineWidth = 2.5; c.setLineDash([10, 8]); c.stroke(); c.setLineDash([]); }
       // barres de vie des gros et des élites
       if ((z.ty === 'brute' || z.flags & 8) && z.hp < 1) {
@@ -433,7 +436,7 @@ export class Renderer {
         c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.6)'; circ(c, p.x, p.y, 30); c.stroke();
         c.strokeStyle = '#ff4b2b'; c.beginPath(); c.arc(p.x, p.y, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); c.stroke();
         if (p.rv > 0) { c.strokeStyle = '#2fbf71'; c.lineWidth = 7; c.beginPath(); c.arc(p.x, p.y, 38, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.rv); c.stroke(); }
-        if (Math.sin(t * 6) > -0.3) { c.font = '18px sans-serif'; c.fillText('✚', p.x, p.y - 52); }
+        if (Math.sin(t * 6) > -0.3) drawIcon(c, 'medic', p.x, p.y - 54, 24, '#ff4b2b');
       }
       if (mine && p.rl > 0) {
         c.lineWidth = 4; c.strokeStyle = 'rgba(0,0,0,.5)'; circ(c, p.x, p.y, 27); c.stroke();
@@ -456,9 +459,9 @@ export class Renderer {
       c.restore();
       if (label) { c.font = '700 12px "Chakra Petch", sans-serif'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = INK; c.strokeText(label, x - Math.cos(a) * 24, y - Math.sin(a) * 22); c.fillStyle = col; c.fillText(label, x - Math.cos(a) * 24, y - Math.sin(a) * 22); }
     };
-    for (const p of v.players) if (p.id !== v.meId && p.state !== 2) edge(p.x, p.y, p.state === 1 ? '#ff4b2b' : p.color, p.state === 1 ? '✚ ' + p.name : p.name);
+    for (const p of v.players) if (p.id !== v.meId && p.state !== 2) edge(p.x, p.y, p.state === 1 ? '#ff4b2b' : p.color, p.state === 1 ? 'À TERRE · ' + p.name : p.name);
     if (!v.cleared && v.zombies.length && v.zombies.length <= 4 && v.waveLeft <= 4) for (const z of v.zombies) edge(z.x, z.y, '#ff6a4a');
-    if (v.base && v.base.g[0] < v.base.g[1] * 0.6) edge(this.lv.base.gen.x, this.lv.base.gen.y, '#2fbf71', '⚡ Générateur');
+    if (v.base && v.base.g[0] < v.base.g[1] * 0.6) edge(this.lv.base.gen.x, this.lv.base.gen.y, '#2fbf71', 'Générateur');
     if (v.doorsOpen) for (const d of this.lv.doors) if (d.kind === 'exit') edge(d.x + d.w / 2, WALL_TOP + 20, '#2fbf71');
 
     // vignette + dégâts

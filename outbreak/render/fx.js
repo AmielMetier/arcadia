@@ -58,7 +58,7 @@ export class FX {
       case 'respawn': case 'adren': { const p = P(e.p); A.play('revive', p && p.x, p && p.y); if (p) this.ring(p.x, p.y, 80, '#1fc7c1', 0.6); break; }
       case 'pk': {
         A.play(e.k === 'med' ? 'heal' : 'pickup', e.x, e.y, e.p === me ? 1 : 0.5);
-        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE', scrap: '+' + (e.v || 1) + ' ⚙' }[e.k];
+        const label = { med: '+40 PV', armor: '+35 ARMURE', ammo: 'MUNITIONS', nade: '+1 GRENADE', scrap: '+' + (e.v || 1) + ' ferraille' }[e.k];
         if (label && (e.p === me || e.k === 'scrap')) this.text(e.x, e.y - 24, label, e.k === 'med' ? '#2fbf71' : e.k === 'armor' ? '#2b8cff' : '#ffc531', 14);
         for (let i = 0; i < 8; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.5) * 200, life: 0.4, max: 0.4, c: '#fff8ea', r: 2 });
         break;

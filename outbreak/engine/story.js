@@ -4,11 +4,11 @@
 // puisse synthétiser un antidote, puis être extraite par l'hélico du Commandant Moreau.
 
 export const SPEAKERS = {
-  moreau: { name: 'Cdt Moreau', icon: '🎖️', color: '#ffc531' },
-  lenoir: { name: 'Dr Lenoir', icon: '🧪', color: '#1fc7c1' },
-  dede: { name: 'Dédé', icon: '🛒', color: '#ff8a1f' },
-  pilote: { name: 'Pilote Sacha', icon: '🚁', color: '#2b8cff' },
-  inconnu: { name: '???', icon: '📻', color: '#ff4b2b' },
+  moreau: { name: 'Cdt Moreau', icon: 'medal', color: '#ffc531' },
+  lenoir: { name: 'Dr Lenoir', icon: 'flask', color: '#1fc7c1' },
+  dede: { name: 'Dédé', icon: 'cart', color: '#ff8a1f' },
+  pilote: { name: 'Pilote Sacha', icon: 'heli', color: '#2b8cff' },
+  inconnu: { name: '???', icon: 'radio', color: '#ff4b2b' },
 };
 
 // Mission annoncée dans la cinématique d'intro

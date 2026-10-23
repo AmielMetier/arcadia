@@ -14,18 +14,18 @@
 
 <div id="hud" hidden>
   <div class="hud-tl">
-    <div class="room card"><small id="roomN">SALLE 1/7</small><b id="roomName">Sas</b></div>
+    <div class="room card rivets"><small id="roomN">SALLE 1/7</small><b id="roomName">Sas</b></div>
     <div class="status card" id="status"></div>
   </div>
   <div class="hud-tr">
-    <div class="card stats"><span title="Score de l'escouade">★ <b id="score">0</b></span><span title="Zombies éliminés">☠ <b id="kills">0</b></span><span title="Ferraille de l'escouade (pour le marchand)">⚙ <b id="scrap">0</b></span><span title="Temps">⏱ <b id="clock">0:00</b></span></div>
-    <button class="icon card" id="btnMute" title="Son (M)">🔊</button>
-    <button class="icon card" id="btnMenu" title="Menu (Échap)">☰</button>
+    <div class="card stats"><span title="Score de l'escouade" data-i="star"><b id="score">0</b></span><span title="Zombies éliminés" data-i="skull"><b id="kills">0</b></span><span class="scrap" title="Ferraille de l'escouade (marchand, pièges)" data-i="nut"><b id="scrap">0</b></span><span title="Temps" data-i="clock"><b id="clock">0:00</b></span></div>
+    <button class="icon card" id="btnMute" title="Son (M)"></button>
+    <button class="icon card" id="btnMenu" title="Menu (Échap)" data-i="menu"></button>
   </div>
-  <div class="boss gen" id="gen" hidden><span>⚡ GÉNÉRATEUR</span><div class="bar"><i id="genBar"></i></div></div>
-  <div class="boss" id="boss" hidden><span id="bossName">☣ SPÉCIMEN ZÉRO</span><div class="bar"><i id="bossBar"></i></div></div>
+  <div class="boss gen" id="gen" hidden><span data-i="bolt">GÉNÉRATEUR</span><div class="bar"><i id="genBar"></i></div></div>
+  <div class="boss" id="boss" hidden><span id="bossName">SPÉCIMEN ZÉRO</span><div class="bar"><i id="bossBar"></i></div></div>
   <div class="team" id="team"></div>
-  <div class="me card" id="mePanel">
+  <div class="me card rivets" id="mePanel">
     <div class="row"><b id="meName">Moi</b><span class="dash" id="dash"></span><span class="nades" id="nades"></span></div>
     <div class="bar hp"><i id="hpBar"></i><span id="hpTxt">100</span></div>
     <div class="bar ar"><i id="arBar"></i><span id="arTxt">25</span></div>
@@ -38,7 +38,7 @@
   <div class="note card" id="note" hidden></div>
   <div class="offers" id="offers" hidden></div>
   <div class="offers build" id="build" hidden></div>
-  <div class="tbtns" id="tbtns"><button data-a="use" title="Relever / prendre">✋</button><button data-a="sw" title="Changer d'arme">🔫</button><button data-a="reload" title="Recharger">🔄</button><button data-a="nade" title="Grenade">💣</button><button data-a="dash" title="Roulade">🌀</button><button data-a="ab" title="Capacité">⭐</button></div>
+  <div class="tbtns" id="tbtns"><button data-a="use" title="Relever / prendre" data-i="hand"></button><button data-a="sw" title="Changer d'arme" data-i="pistol"></button><button data-a="reload" title="Recharger" data-i="reload"></button><button data-a="nade" title="Grenade" data-i="bomb"></button><button data-a="dash" title="Roulade" data-i="dash"></button><button data-a="ab" title="Capacité" data-i="bolt"></button></div>
 </div>
 
 <div class="radio" id="radio" hidden></div>

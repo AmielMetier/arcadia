@@ -11,7 +11,10 @@ import { FX } from './render/fx.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
 import { HUD, briefingHtml, menuHtml, endHtml } from './ui/hud.js';
-import { drawIntro, drawOutro } from './render/cinema.js';
+import { drawIntro, drawOutro, INTRO_LEN, introCues, introShake } from './render/cinema.js';
+import { svg } from './ui/icons.js';
+import { installTextures } from './ui/textures.js';
+import { fitPanel } from './ui/hud.js';
 import { radioFor, SPEAKERS, NOTES, MISSIONS, ENDINGS, noteKey, TOTAL_NOTES } from './engine/story.js';
 
 const H = window.HubBridge;
@@ -20,6 +23,10 @@ const $ = (s) => document.querySelector(s);
 const canvas = $('#game'), screenEl = $('#screen');
 const INTERP = 0.11; // retard d'affichage des invités (s)
 
+installTextures();
+addEventListener('resize', () => { fitPanel(document.getElementById('briefPanel')); fitPanel(document.getElementById('endPanel')); });
+// icônes déclarées dans le HTML (data-i) : insérées au chargement
+for (const el of document.querySelectorAll('[data-i]')) el.insertAdjacentHTML('afterbegin', svg(el.dataset.i));
 const audio = new Audio();
 const fx = new FX(audio);
 const renderer = new Renderer(canvas, fx);
@@ -102,6 +109,7 @@ function showBriefing() {
   screenEl.className = 'screen'; screenEl.hidden = false;
   screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart, myClass: S.myClass, notes: foundNotes().size, totalNotes: TOTAL_NOTES });
   for (const b of screenEl.querySelectorAll('.cls')) b.onclick = () => chooseClass(b.dataset.c);
+  fitPanel($('#briefPanel'));
   hud.show(false);
   const go = $('#btnGo'); if (go) go.onclick = () => { audio.unlock(); startRun(); };
   const ex = $('#btnExit'); if (ex) ex.onclick = () => H.exit();
@@ -123,7 +131,7 @@ function startRun() {
   for (const p of sq) if (!p.bot && isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
   sq.filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true, cls: b.cls }));
   sim.startRoom(sim.room.type, sim.room.index); // replace tout le monde à l'entrée
-  sim.beginIntro(9);
+  sim.beginIntro(INTRO_LEN);
   S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; radio.q = []; radio.cur = null;
   hideScreen();
   if (H.embedded) H.send('all', { t: 'go', run: S.runId });
@@ -428,19 +436,19 @@ function promptFor(view) {
   const me = view.players.find((p) => p.id === S.myId); const ms = view.me;
   if (!me || !ms || view.snap.ph !== 'play') return '';
   const camp = view.mode !== 'survival';
-  if (me.state === 2) return camp ? '☠ K.O. — tu reviens à la prochaine salle' : '☠ K.O. — tu reviens à la fin de la vague';
-  if (me.pinned) return '⚠ Plaqué au sol ! Martèle <kbd>Espace</kbd> pour te débattre';
-  if (me.state === 1) return `✚ À terre ! Tu peux ramper et tirer au pistolet · ${Math.ceil(me.bl)} s`;
+  if (me.state === 2) return svg('skull') + (camp ? ' K.O. — tu reviens à la prochaine salle' : ' K.O. — tu reviens à la fin de la vague');
+  if (me.pinned) return svg('warn') + ' Plaqué au sol ! Martèle <kbd>Espace</kbd> pour te débattre';
+  if (me.state === 1) return `${svg('medic')} À terre ! Tu peux ramper et tirer au pistolet · ${Math.ceil(me.bl)} s`;
   const downed = view.players.find((o) => o.id !== me.id && o.state === 1 && Math.hypot(o.x - me.x, o.y - me.y) < 82);
   if (downed) return downed.rv > 0 ? `Réanimation de ${esc(downed.name)}… ${Math.round(downed.rv * 100)} %` : `Maintiens <kbd>E</kbd> pour relever ${esc(downed.name)}`;
   const it = view.shop.find((q) => !q[6] && Math.hypot(q[2] - me.x, q[3] - me.y) < 50);
   if (it) {
     const name = it[1] === 'weapon' ? WEAPONS[it[4]].name : SHOP_ITEMS[it[1]].name;
-    return view.scrap >= it[5] ? `<kbd>E</kbd> Acheter ${esc(name)} · ⚙ ${it[5]}` : `${esc(name)} · ⚙ ${it[5]} — pas assez de ferraille (${view.scrap})`;
+    return view.scrap >= it[5] ? `<kbd>E</kbd> Acheter ${esc(name)} · ${svg('nut')} ${it[5]}` : `${esc(name)} · ${svg('nut')} ${it[5]} — pas assez de ferraille (${view.scrap})`;
   }
   if (view.base) {
     const pad = view.base.p.find((q) => !q[3] && Math.hypot(q[1] - me.x, q[2] - me.y) < 48);
-    if (pad && !ms.bd) return `<kbd>E</kbd> Poser un piège ici · ⚙ ${view.scrap}`;
+    if (pad && !ms.bd) return `<kbd>E</kbd> Poser un piège ici · ${svg('nut')} ${view.scrap}`;
     const geo = view.lv.base.bars;
     for (const b of view.base.b) { const g = geo.find((x) => x.id === b[0]); if (g && b[1] < b[2] && Math.hypot(g.x + g.w / 2 - me.x, g.y + g.h / 2 - me.y) < 75) return `Maintiens <kbd>E</kbd> pour réparer la barricade · ${Math.round((b[1] / b[2]) * 100)} %`; }
   }
@@ -482,7 +490,7 @@ function stepRadio(dt) {
     radio.cur = radio.q.shift(); radio.t = 0; radio.shown = -1;
     const Sp = SPEAKERS[radio.cur[0]] || SPEAKERS.inconnu;
     el.style.setProperty('--c', Sp.color);
-    el.innerHTML = `<span class="who">${Sp.icon}</span><div><b>${Sp.name.toUpperCase()}</b><span id="radioTxt"></span></div>`;
+    el.innerHTML = `<span class="who">${svg(Sp.icon)}</span><div><b>${Sp.name.toUpperCase()}<span class="wave">${'<i></i>'.repeat(6).replace(/<i><\/i>/g, (m, k) => `<i style="animation-delay:${(Math.random() * 0.4).toFixed(2)}s"></i>`)}</span></b><span id="radioTxt"></span></div>`;
     el.hidden = false; audio.play('radio');
   }
   if (!radio.cur) { el.hidden = true; return; }
@@ -498,7 +506,7 @@ function showNote(sector, n) {
   const set = foundNotes(); set.add(noteKey(sector, n));
   try { localStorage.setItem('outbreak_notes', JSON.stringify([...set])); } catch (e) {}
   const el = $('#note');
-  el.innerHTML = `<small>📁 DOSSIER TROUVÉ · ${set.size}/${TOTAL_NOTES}</small><b>${esc(N[0])}</b><p>« ${esc(N[1])} »</p>`;
+  el.innerHTML = `<small>${svg('folder')} DOSSIER TROUVÉ · ${set.size}/${TOTAL_NOTES}</small><b>${esc(N[0])}</b><p>« ${esc(N[1])} »</p>`;
   el.hidden = false; noteT = 9 + N[1].length * 0.02; audio.play('note');
 }
 
@@ -507,6 +515,7 @@ function showEnd(snap) {
   S.endShown = true;
   screenEl.className = 'screen dim'; screenEl.hidden = false;
   screenEl.innerHTML = endHtml({ won: snap.ph === 'won', snap, clock: snap.t, canReplay: S.role !== 'guest', embedded: H.embedded });
+  fitPanel($('#endPanel'));
   const again = $('#btnAgain'); if (again) again.onclick = () => startRun();
   const ex = $('#btnExit'); if (ex) ex.onclick = () => H.exit();
 }
@@ -521,7 +530,7 @@ function toggleMenu() {
   $('#btnSound').onclick = () => { toggleMute(); toggleMenu(); toggleMenu(); };
   const q = $('#btnQuit'); if (q) q.onclick = () => { if (H.embedded) H.exit(); else location.reload(); };
 }
-function toggleMute() { audio.unlock(); const m = audio.toggleMute(); $('#btnMute').textContent = m ? '🔇' : '🔊'; }
+function toggleMute() { audio.unlock(); const m = audio.toggleMute(); $('#btnMute').innerHTML = svg(m ? 'mute' : 'sound'); }
 $('#btnMute').onclick = () => toggleMute();
 for (const b of document.querySelectorAll('#tbtns button')) {
   b.addEventListener('pointerdown', (e) => {
@@ -537,7 +546,7 @@ for (const b of document.querySelectorAll('#tbtns button')) {
 // en solo, la partie se met en pause quand l'onglet passe en arrière-plan
 document.addEventListener('visibilitychange', () => { if (document.hidden && S.role === 'solo' && S.sim && !S.menu && !S.endShown && !S.lobby) toggleMenu(); });
 $('#btnMenu').onclick = () => toggleMenu();
-$('#btnMute').textContent = audio.muted ? '🔇' : '🔊';
+$('#btnMute').innerHTML = svg(audio.muted ? 'mute' : 'sound');
 
 // ------------------------------------------------------------------ boucle
 let lastT = performance.now();
@@ -582,12 +591,16 @@ function loop(now) {
   // ---- cinématique d'intro (la partie attend)
   const snapNow = view.snap;
   if (snapNow.in > 0 && !S.lobby) {
-    const p = 9 - snapNow.in;
+    const p = INTRO_LEN - snapNow.in;
     const now2 = performance.now() / 1000;
-    if (S.introRun !== snapNow.run || S.introClock == null || Math.abs((now2 - S.introClock) - p) > 0.5) { S.introRun = snapNow.run; S.introClock = now2 - p; if (p < 0.5) audio.play('heli'); }
+    if (S.introRun !== snapNow.run || S.introClock == null || Math.abs((now2 - S.introClock) - p) > 0.5) { S.introRun = snapNow.run; S.introClock = now2 - p; S.introPrev = p - 0.001; }
     const ip = now2 - S.introClock;
+    // sons calés sur la séquence
+    for (const [at, snd] of introCues(snapNow.P.length)) if (at > S.introPrev && at <= ip) audio.play(snd);
+    S.introPrev = ip;
     const c = canvas.getContext('2d'); renderer.resize();
-    c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
+    const sh = introShake(ip, snapNow.P.length);
+    c.setTransform(renderer.dpr, 0, 0, renderer.dpr, (Math.random() - 0.5) * sh * renderer.dpr, (Math.random() - 0.5) * sh * renderer.dpr);
     const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], bot: !!q.b, me: q.i === S.myId, weapon: WEAPON_IDS[(q.w[q.sl] || q.w[0])[0]] }));
     drawIntro(c, renderer.W, renderer.H, ip, { sector: snapNow.rm.sec, squad, mission: snapNow.rm.mode === 'survival' ? MISSIONS.survival : snapNow.rm.mode === 'defense' ? MISSIONS.defense : MISSIONS[snapNow.rm.sec], votes: (snapNow.sv || []).length, total: snapNow.P.filter((q) => !q.b).length });
     hud.show(false);

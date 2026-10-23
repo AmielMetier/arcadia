@@ -1,6 +1,7 @@
 // Interface (DOM) : HUD en jeu, choix d'améliorations, écrans de briefing, de menu et de fin.
 import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS, SECTORS, roomName, TRAPS, TRAP_IDS } from '../engine/data.js';
 import { weaponIcon } from '../render/sprites.js';
+import { svg } from './icons.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -28,21 +29,21 @@ export class HUD {
     this.set('roomN', (SECTORS[rm.sec] ? SECTORS[rm.sec].short.toUpperCase() + ' · ' : '') + (camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : def ? 'DÉFENSE' : 'SURVIE'));
     this.set('roomName', def ? esc(`Vague ${Math.max(1, s.wv.n)} / ${s.wv.tot}`) : esc(camp ? roomName(rm.ty, rm.sec).split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
     let st = '', sc = 'status card';
-    if (s.ph === 'won') { st = '✔ Mission accomplie'; sc += ' clear'; }
-    else if (s.ph === 'over') { st = '✖ Escouade décimée'; sc += ' lock'; }
-    else if (s.rl) { st = `🚪 Départ dans <span class="pill">${Math.ceil(s.rl.t / (s.rl.a ? 5 : 1))}</span>${s.rl.a ? '' : ' · rejoignez la porte'}`; sc += ' rally'; }
-    else if (rm.ty === 'shop' && !s.rl) { st = '🛒 Pas de zombies ici · dépensez votre ferraille'; sc += ' clear'; }
-    else if (!s.rl && rm.ty === 'vault' && s.vt && s.vt[2] === 'closed') { st = '💰 Forcez le coffre… ou passez votre chemin'; sc += ' rally'; }
-    else if (s.cl || (!camp && s.wv.left === 0 && s.wv.n > 0)) { st = camp ? '✔ Zone sécurisée · choisissez une porte' : '✔ Vague repoussée · préparez-vous'; sc += ' clear'; }
-    else if (def && s.wv.bt > 0) { st = `🛠 Préparation · <span class="pill">${s.wv.bt}</span> s · réparez, posez des pièges`; sc += ' rally'; }
-    else if (s.wv.n === 0) { st = camp ? '☣ Confinement · ils arrivent…' : '☣ Préparez-vous…'; sc += ' lock'; }
-    else { st = `☣ ${camp ? 'Confinement' : 'Horde'}${s.wv.tot > 1 ? ` · vague ${s.wv.n}/${s.wv.tot}` : ''} · <span class="pill">${s.wv.left}</span> restants`; sc += ' lock'; }
+    if (s.ph === 'won') { st = svg('check') + ' Mission accomplie'; sc += ' clear'; }
+    else if (s.ph === 'over') { st = svg('x') + ' Escouade décimée'; sc += ' lock'; }
+    else if (s.rl) { st = `${svg('door')} Départ dans <span class="pill">${Math.ceil(s.rl.t / (s.rl.a ? 5 : 1))}</span>${s.rl.a ? '' : ' · rejoignez la porte'}`; sc += ' rally'; }
+    else if (rm.ty === 'shop' && !s.rl) { st = svg('cart') + ' Pas de zombies ici · dépensez votre ferraille'; sc += ' clear'; }
+    else if (!s.rl && rm.ty === 'vault' && s.vt && s.vt[2] === 'closed') { st = svg('vault') + ' Forcez le coffre… ou passez votre chemin'; sc += ' rally'; }
+    else if (s.cl || (!camp && s.wv.left === 0 && s.wv.n > 0)) { st = svg('check') + (camp ? ' Zone sécurisée · choisissez une porte' : ' Vague repoussée · préparez-vous'); sc += ' clear'; }
+    else if (def && s.wv.bt > 0) { st = `${svg('hammer')} Préparation · <span class="pill">${s.wv.bt}</span> s · réparez, posez des pièges`; sc += ' rally'; }
+    else if (s.wv.n === 0) { st = svg('siren') + (camp ? ' Confinement · ils arrivent…' : ' Préparez-vous…'); sc += ' lock'; }
+    else { st = `${svg('bio')} ${camp ? 'Confinement' : 'Horde'}${s.wv.tot > 1 ? ` · vague ${s.wv.n}/${s.wv.tot}` : ''} · <span class="pill">${s.wv.left}</span> restants`; sc += ' lock'; }
     this.set('status', st); this.cls('status', sc);
     this.set('scrap', String(s.scr || 0));
     this.set('score', s.sc.toLocaleString('fr-FR')); this.set('kills', String(s.k)); this.set('clock', fmtTime(v.clock || 0));
     // boss
     const boss = $('#boss');
-    if (s.bs >= 0) { boss.hidden = false; $('#bossBar').style.width = s.bs / 10 + '%'; this.set('bossName', '☣ ' + esc((s.bn || '').toUpperCase())); } else boss.hidden = true;
+    if (s.bs >= 0) { boss.hidden = false; $('#bossBar').style.width = s.bs / 10 + '%'; this.set('bossName', svg('bio') + ' ' + esc((s.bn || '').toUpperCase())); } else boss.hidden = true;
     // toast
     if (s.ts && s.ts.n !== this.toastN) {
       this.toastN = s.ts.n;
@@ -52,8 +53,8 @@ export class HUD {
     const mates = v.players.filter((p) => p.id !== v.meId);
     this.set('team', mates.map((p) => {
       const st2 = p.state === 1 ? 'down' : p.state === 2 ? 'dead' : '';
-      const info = p.state === 1 ? `✚ ${Math.ceil(p.bl)} s` : p.state === 2 ? '☠' : WEAPONS[p.weapon]?.short || '';
-      return `<div class="mate ${st2}" style="--c:${p.color}"><div class="n"><span>${CLASSES[p.cls]?.icon || ''} ${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><em>${info}</em></div><div class="hb"><i style="width:${Math.max(0, (p.h / p.H) * 100)}%"></i></div></div>`;
+      const info = p.state === 1 ? `${svg('medic')} ${Math.ceil(p.bl)} s` : p.state === 2 ? svg('skull') : WEAPONS[p.weapon]?.short || '';
+      return `<div class="mate ${st2}" style="--c:${p.color}"><div class="n"><span>${svg(CLASSES[p.cls]?.icon || 'helmet')} ${esc(p.name)}${p.bot ? ' <i class="tag">IA</i>' : ''}</span><em>${info}</em></div><div class="hb"><i style="width:${Math.max(0, (p.h / p.H) * 100)}%"></i></div></div>`;
     }).join(''));
     if (!me) return;
     // moi
@@ -62,7 +63,7 @@ export class HUD {
     if (C) {
       const ready = me.ab[0] <= 0, active = me.ab[1] > 0;
       const pct = active ? 100 : Math.round((1 - me.ab[0]) * 100);
-      this.set('abil', `<span class="ico">${C.icon}</span><span class="nm"><b>${esc(C.active)}</b><small>${active ? 'actif · ' + Math.ceil(me.ab[1]) + ' s' : ready ? 'prête' : Math.ceil(me.ab[0] * C.cd) + ' s'}</small></span><kbd>${ready ? 'A' : ''}</kbd><i style="width:${pct}%"></i>`);
+      this.set('abil', `<span class="ab-ico">${svg(C.icon)}</span><span class="nm"><b>${esc(C.active)}</b><small>${active ? 'actif · ' + Math.ceil(me.ab[1]) + ' s' : ready ? 'prête' : Math.ceil(me.ab[0] * C.cd) + ' s'}</small></span><kbd>${ready ? 'A' : ''}</kbd><i style="width:${pct}%"></i>`);
       this.cls('abil', 'abil' + (ready ? ' ready' : '') + (active ? ' on' : ''));
     }
     $('#hpBar').style.width = Math.max(0, (me.h / me.H) * 100) + '%';
@@ -71,8 +72,8 @@ export class HUD {
     $('#arBar').style.width = Math.max(0, (me.r / me.R) * 100) + '%';
     this.set('arTxt', `${me.r} / ${me.R}`);
     this.set('dash', Array.from({ length: me.dm }, (_, i) => `<i class="${i < me.dc ? '' : 'off'}"></i>`).join(''));
-    this.set('nades', '💣'.repeat(me.g) + `<span style="opacity:.25">${'💣'.repeat(Math.max(0, me.gm - me.g))}</span>`);
-    this.set('perks', Object.entries(me.pk || {}).map(([id, l]) => PERKS[id] ? `<span class="perk" data-r="${PERKS[id].rar}" title="${esc(PERKS[id].name + ' — ' + PERKS[id].desc)}">${PERKS[id].icon}${l > 1 ? `<sup>${l}</sup>` : ''}</span>` : '').join(''));
+    this.set('nades', svg('bomb').repeat(me.g) + `<span class="off">${svg('bomb').repeat(Math.max(0, me.gm - me.g))}</span>`);
+    this.set('perks', Object.entries(me.pk || {}).map(([id, l]) => PERKS[id] ? `<span class="perk" data-r="${PERKS[id].rar}" title="${esc(PERKS[id].name + ' — ' + PERKS[id].desc)}">${svg(PERKS[id].icon)}${l > 1 ? `<sup>${l}</sup>` : ''}</span>` : '').join(''));
     // armes
     const ws = me.w.map(([wi, mag, res], i) => {
       const id = WEAPON_IDS[wi], W = WEAPONS[id];
@@ -85,7 +86,7 @@ export class HUD {
     this.set('weapons', `<div class="wslots">${ws}</div><div class="card ammo"><small>${esc(W.name)}</small>${W.melee ? '<b>∞</b><span>mêlée</span>' : `<b class="${low ? 'low' : ''}">${cur[1]}</b><span>/ ${cur[2] < 0 ? '∞' : cur[2]}</span>`}</div>${me.rl > 0 ? `<div class="reload"><i style="width:${me.rl * 100}%"></i></div>` : ''}`);
     // générateur (mode Défense)
     const gen = $('#gen');
-    if (s.bs2) { gen.hidden = false; const f = s.bs2.g[0] / s.bs2.g[1]; $('#genBar').style.width = f * 100 + '%'; $('#genBar').style.background = f < 0.3 ? 'var(--red)' : 'var(--green)'; } else gen.hidden = true;
+    if (s.bs2) { gen.hidden = false; const f = s.bs2.g[0] / s.bs2.g[1]; $('#genBar').style.width = f * 100 + '%'; $('#genBar').style.backgroundColor = f < 0.3 ? 'var(--red)' : 'var(--green)'; } else gen.hidden = true;
     // menu de construction
     const bkey = me.bd ? me.bd + ':' + (s.scr || 0) : '';
     if (bkey !== this.buildKey) {
@@ -94,8 +95,8 @@ export class HUD {
       if (!me.bd) { el.hidden = true; el.innerHTML = ''; }
       else {
         el.hidden = false;
-        el.innerHTML = `<h3>Construire · ⚙ ${s.scr || 0}</h3><div class="cards">${TRAP_IDS.map((id, i) => { const T = TRAPS[id]; const ok = (s.scr || 0) >= T.price;
-          return `<button class="card offer ${ok ? '' : 'poor'}" data-i="${i}"><kbd>${i + 1}</kbd><div class="ic">${T.icon}</div><b>${esc(T.name)}</b><p>${esc(T.desc)}</p><span class="lv">⚙ ${T.price}</span></button>`; }).join('')}</div>`;
+        el.innerHTML = `<h3>Construire · ${svg('nut')} ${s.scr || 0}</h3><div class="cards">${TRAP_IDS.map((id, i) => { const T = TRAPS[id]; const ok = (s.scr || 0) >= T.price;
+          return `<button class="offer ${ok ? '' : 'poor'}" data-i="${i}"><kbd>${i + 1}</kbd><div class="ic">${svg(T.icon)}</div><b>${esc(T.name)}</b><p>${esc(T.desc)}</p><span class="lv">${svg('nut')} ${T.price}</span></button>`; }).join('')}</div>`;
       }
     }
     // améliorations proposées
@@ -108,7 +109,7 @@ export class HUD {
         el.hidden = false;
         el.innerHTML = `<h3>Choisis une amélioration</h3><div class="cards">${me.of.map((id, i) => {
           const P = PERKS[id], l = (me.pk && me.pk[id]) || 0;
-          return `<button class="card offer" data-i="${i}" data-r="${P.rar}"><kbd>${i + 1}</kbd><div class="ic">${P.icon}</div><b>${esc(P.name)}</b><p>${esc(P.desc)}</p>${P.max > 1 ? `<span class="lv">Niv. ${l + 1}/${P.max}</span>` : ''}</button>`;
+          return `<button class="offer" data-i="${i}" data-r="${P.rar}"><kbd>${i + 1}</kbd><div class="ic">${svg(P.icon)}</div><b>${esc(P.name)}</b><p>${esc(P.desc)}</p>${P.max > 1 ? `<span class="lv">Niv. ${l + 1}/${P.max}</span>` : ''}</button>`;
         }).join('')}</div>`;
         v.sfx && v.sfx('offer');
       }
@@ -121,52 +122,77 @@ export class HUD {
 
 // ------------------------------------------------------------------ écrans
 const KEYS = [
-  ['ZQSD / WASD', 'Se déplacer'], ['Souris', 'Viser · clic gauche : tirer'], ['Espace / Maj', 'Roulade (invulnérable)'], ['Clic droit / G', 'Lancer une grenade'],
-  ['A · Q', 'Capacité de classe (A en AZERTY, Q en QWERTY)'], ['R', 'Recharger'], ['1 2 3 · molette', 'Changer d\'arme'], ['E', 'Maintenir : relever un allié · prendre une arme'], ['Échap · M', 'Menu · son'],
+  ['ZQSD', 'bouger'], ['Souris', 'viser · tirer'], ['Espace', 'roulade'], ['G · clic droit', 'grenade'], ['A', 'capacité'],
+  ['R', 'recharger'], ['1 2 3', 'armes'], ['E', 'relever · prendre'], ['Échap', 'menu'],
 ];
-const PAD = 'Manette : stick gauche bouger, stick droit viser, RT tirer, A roulade, LB grenade, X recharger, B relever, Y capacité, RB arme.';
+const KEYS_FULL = [
+  ['ZQSD / WASD', 'Se déplacer'], ['Souris', 'Viser · clic gauche : tirer'], ['Espace / Maj', 'Roulade (invulnérable)'], ['Clic droit / G', 'Lancer une grenade'],
+  ['A (Q en QWERTY)', 'Capacité de classe'], ['R', 'Recharger'], ['1 2 3 · molette', "Changer d'arme"], ['E (maintenir)', 'Relever un allié · prendre · réparer'], ['Échap · M', 'Menu · son'],
+  ['Manette', 'RT tirer, A roulade, LB grenade, Y capacité'],
+];
 
 export function keysHtml() {
-  return `<div class="keys">${KEYS.map(([k, d]) => `<div><kbd>${k}</kbd>${d}</div>`).join('')}</div><p class="tagline" style="font-size:13px">${PAD}</p>`;
+  return `<div class="menu-keys">${KEYS_FULL.map(([k, d]) => `<div><kbd>${k}</kbd>${d}</div>`).join('')}</div>`;
 }
 
 export function classPickerHtml(myClass) {
   return `<div class="classes">${CLASS_IDS.map((id) => { const C = CLASSES[id]; return `<button class="cls ${id === myClass ? 'sel' : ''}" data-c="${id}" style="--c:${C.color}">
-    <span class="ci">${C.icon}</span><b>${esc(C.name)}</b><span class="ca">⭐ ${esc(C.active)}</span><small>${esc(C.activeDesc)}</small><small class="cp">${esc(C.passive)}</small></button>`; }).join('')}</div>`;
+    <span class="ci">${svg(C.icon)}</span><span class="top"><b>${esc(C.name)}</b><span class="ca">${svg('bolt')} ${esc(C.active)}</span></span>
+    <small>${esc(C.activeDesc)}. <span class="p">${esc(C.passive)}.</span></small></button>`; }).join('')}</div>`;
 }
+
+const MODES = { campaign: ['map', 'Campagne · 7 salles'], survival: ['infinity', 'Survie · vagues infinies'], defense: ['castle', 'Défense · 15 vagues'] };
 
 export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myClass, notes = 0, totalNotes = 0 }) {
   const D = DIFFICULTY[cfg.difficulty] || DIFFICULTY.normal;
-  const opt = (key, label, options, val) => `<div class="opt"><div class="lbl">${label}</div><div class="seg">${options.map(([v, l]) => `<button data-k="${key}" data-v="${v}" class="${String(val) === String(v) ? 'sel' : ''}">${l}</button>`).join('')}</div></div>`;
-  const settings = !embedded ? `<h2>Réglages</h2><div class="opts">
-      ${opt('mode', 'Mode', [['campaign', 'Campagne'], ['survival', 'Survie'], ['defense', 'Défense']], cfg.mode)}
+  const opt = (key, label, options, val) => `<div class="opt-l">${label}</div><div class="seg">${options.map(([v, l, ic]) => `<button data-k="${key}" data-v="${v}" class="${String(val) === String(v) ? 'sel' : ''}">${ic ? svg(ic) : ''}${l}</button>`).join('')}</div>`;
+  const sec = cfg.sector === 'random' || !SECTORS[cfg.sector] ? null : SECTORS[cfg.sector];
+  const settings = !embedded ? `<div class="opts">
+      ${opt('mode', 'Mode', [['campaign', 'Campagne', 'map'], ['survival', 'Survie', 'infinity'], ['defense', 'Défense', 'castle']], cfg.mode)}
       ${opt('difficulty', 'Difficulté', [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], cfg.difficulty)}
+      ${opt('sector', 'Secteur', [['random', 'Hasard', 'dice'], ...Object.entries(SECTORS).map(([k, S2]) => [k, S2.short, S2.icon])], cfg.sector)}
       ${opt('bots', 'Équipiers IA', [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], cfg.bots)}
-      ${opt('startWeapon', 'Arme de départ', [['pistol', 'Pistolet'], ['shotgun', 'Pompe'], ['smg', 'Mitraillette']], cfg.startWeapon)}
-      ${opt('sector', 'Secteur', [['random', '🎲 Au hasard'], ...Object.entries(SECTORS).map(([k, S2]) => [k, S2.icon + ' ' + S2.short])], cfg.sector)}
-    </div>` : `<div class="chips"><span class="chip">${cfg.mode === 'survival' ? '♾ Survie' : cfg.mode === 'defense' ? '🏰 Défense · 15 vagues' : '🗺 Campagne · 7 salles'}</span><span class="chip">☣ ${D.name}</span><span class="chip">${cfg.sector === 'random' || !SECTORS[cfg.sector] ? '🎲 Secteur au hasard' : SECTORS[cfg.sector].icon + ' ' + SECTORS[cfg.sector].name}</span><span class="chip">🔫 Départ : ${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>${cfg.bots ? `<span class="chip">🤖 ${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}</div>`;
-  return `<div class="card panel">
-    <h1 class="logo">OUTBREAK<small>SECTEUR ZÉRO</small></h1>
-    <p class="tagline">${cfg.mode === 'defense' ? 'Fort Delta : protégez le générateur pendant 15 vagues. Entre les vagues, réparez les barricades et posez des pièges avec la ferraille.' : cfg.mode === 'survival'
-      ? 'Hangar de quarantaine. Les vagues ne s\'arrêtent jamais : tenez le plus longtemps possible, ensemble.'
-      : 'Le laboratoire est tombé. Traversez 6 salles en choisissant votre chemin, puis neutralisez le Spécimen Zéro au cœur du complexe.'}</p>
-    ${settings}
-    <h2>Ta classe</h2>${classPickerHtml(myClass)}
-    <h2>Escouade</h2>
-    <div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><i></i>${CLASSES[p.cls]?.icon || ''} ${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'toi' : p.ready ? 'prêt' : 'connexion…'}</small></div>`).join('')}</div>
-    <h2>Commandes</h2>${keysHtml()}
-    ${totalNotes ? `<p class="notes-found">📁 Dossiers trouvés : ${notes} / ${totalNotes} — fouillez les salles de la campagne pour découvrir ce qui s'est passé.</p>` : ''}
-    ${canStart ? `<div class="btnrow"><button class="btn" id="btnGo">Déployer l'escouade</button>${embedded ? '<button class="btn alt" id="btnExit">Retour au salon</button>' : ''}</div>`
-      : `<div class="wait"><i></i>${role === 'guest' ? "En attente de l'hôte…" : 'Préparation…'}</div>${embedded ? '<div class="btnrow"><button class="btn alt" id="btnExit">Retour au salon</button></div>' : ''}`}
+      ${opt('startWeapon', 'Arme', [['pistol', 'Pistolet'], ['shotgun', 'Pompe'], ['smg', 'Mitraillette']], cfg.startWeapon)}
+    </div>` : `<div class="chips">
+      <span class="chip">${svg(MODES[cfg.mode]?.[0] || 'map')}${MODES[cfg.mode]?.[1] || ''}</span>
+      <span class="chip">${svg('bio')}${D.name}</span>
+      <span class="chip">${svg(sec ? sec.icon : 'dice')}${sec ? sec.name : 'Secteur au hasard'}</span>
+      <span class="chip">${svg('pistol')}${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>
+      ${cfg.bots ? `<span class="chip">${svg('bot')}${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}
+    </div>`;
+  const tag = cfg.mode === 'defense' ? 'Fort Delta : protégez le générateur pendant 15 vagues. Entre les vagues, réparez les barricades et posez des pièges.'
+    : cfg.mode === 'survival' ? "Hangar de quarantaine. Les vagues ne s'arrêtent jamais : tenez le plus longtemps possible, ensemble."
+    : 'La souche VIREO a tout contaminé. Traversez 6 salles en choisissant votre chemin, puis abattez la source au cœur du secteur.';
+  return `<div class="panel hazard-top brief" id="briefPanel">
+    <div class="head"><h1 class="logo">OUTBREAK<small>SECTEUR ZÉRO</small></h1><p class="tagline">${tag}</p></div>
+    <div class="opts-wrap"><h2>${embedded ? 'Mission' : 'Réglages'}</h2>${settings}</div>
+    <div class="classes-wrap"><h2>Ta classe</h2>${classPickerHtml(myClass)}
+      ${totalNotes ? `<div class="notes-found">${svg('folder')} Dossiers trouvés : ${notes} / ${totalNotes}</div>` : ''}</div>
+    <div class="squad-wrap"><h2>Escouade</h2><div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><span class="dot"></span>${svg(CLASSES[p.cls]?.icon || 'helmet')}${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'TOI' : p.ready ? 'PRÊT' : '…'}</small></div>`).join('')}</div></div>
+    <div class="foot">
+      <div class="keys">${KEYS.map(([k, d]) => `<span><kbd>${k}</kbd>${d}</span>`).join('')}</div>
+      ${canStart ? `<div class="btnrow">${embedded ? '<button class="btn alt" id="btnExit">Salon</button>' : ''}<button class="btn" id="btnGo">${svg('heli')} Déployer</button></div>`
+        : `<div class="wait"><i></i>${role === 'guest' ? "En attente de l'hôte…" : 'Préparation…'}</div>${embedded ? '<div class="btnrow"><button class="btn alt" id="btnExit">Salon</button></div>' : ''}`}
+    </div>
   </div>`;
 }
 
+// Fait tenir un panneau dans la fenêtre : on réduit l'échelle plutôt que de faire défiler
+export function fitPanel(el) {
+  if (!el) return;
+  el.style.transform = '';
+  const pad = 20;
+  const sx = (innerWidth - pad) / el.offsetWidth, sy = (innerHeight - pad) / el.offsetHeight;
+  const k = Math.min(1, sx, sy);
+  if (k < 1) el.style.transform = `scale(${Math.max(0.45, k)})`;
+}
+
 export function menuHtml({ muted, canQuit, solo }) {
-  return `<div class="card panel" style="width:min(560px,100%)">
-    <h2 style="margin-top:6px">${solo ? 'Pause' : 'Menu'}</h2>
+  return `<div class="panel hazard-top" style="width:min(640px,100%)">
+    <h2>${solo ? 'Pause' : 'Menu'}</h2>
     ${keysHtml()}
-    <div class="btnrow"><button class="btn" id="btnResume">Reprendre</button><button class="btn alt" id="btnSound">${muted ? '🔇 Son coupé' : '🔊 Son activé'}</button></div>
-    ${canQuit ? '<div class="btnrow"><button class="btn alt" id="btnQuit">Quitter la partie</button></div>' : ''}
+    <div class="btnrow"><button class="btn" id="btnResume">Reprendre</button><button class="btn alt" id="btnSound">${svg(muted ? 'mute' : 'sound')} ${muted ? 'Son coupé' : 'Son activé'}</button>
+    ${canQuit ? '<button class="btn alt" id="btnQuit">Quitter</button>' : ''}</div>
   </div>`;
 }
 
@@ -175,10 +201,10 @@ export function endHtml({ won, snap, clock, canReplay, embedded }) {
   const camp = snap.rm.mode === 'campaign', def = snap.rm.mode === 'defense';
   const genDown = def && snap.bs2 && snap.bs2.g[0] <= 0;
   const title = won ? (def ? 'FORT TENU' : 'MISSION ACCOMPLIE') : genDown ? 'GÉNÉRATEUR DÉTRUIT' : 'ESCOUADE DÉCIMÉE';
-  const sub = won ? (def ? 'Quinze vagues repoussées. Le fort Delta tient toujours.' : 'La source est neutralisée. Le secteur est sauvé… pour l\'instant.')
+  const sub = won ? (def ? 'Quinze vagues repoussées. Le fort Delta tient toujours.' : "La source est neutralisée. Le secteur est sauvé… pour l'instant.")
     : def ? `Le fort est tombé à la vague ${snap.wv.n} sur ${snap.wv.tot}.`
     : camp ? `Tombés dans la salle ${snap.rm.i} (${ROOM_TYPES[snap.rm.ty].name.split(' — ')[0]}).` : `Vous avez tenu jusqu'à la vague ${snap.wv.n}.`;
-  return `<div class="card panel">
+  return `<div class="panel hazard-top" id="endPanel" style="width:min(760px,100%)">
     <div class="res-title ${won ? 'win' : 'lose'}">${title}</div>
     <p class="tagline">${esc(sub)}</p>
     <div class="big3">
@@ -188,9 +214,9 @@ export function endHtml({ won, snap, clock, canReplay, embedded }) {
       <div><small>Temps</small><b>${fmtTime(clock)}</b></div>
     </div>
     <table class="res"><thead><tr><th>Survivant</th><th>Score</th><th>Éliminés</th><th>Dégâts</th><th>Relevés</th><th>À terre</th></tr></thead><tbody>
-    ${rows.map((p, i) => `<tr class="${i === 0 ? 'mvp' : ''}"><td><span class="dot" style="--c:${p.c}"></span>${esc(p.n)}${p.b ? ' 🤖' : ''}${i === 0 ? ' ⭐' : ''}</td><td>${p.st[1].toLocaleString('fr-FR')}</td><td>${p.st[0]}</td><td>${p.st[4].toLocaleString('fr-FR')}</td><td>${p.st[2]}</td><td>${p.st[3]}</td></tr>`).join('')}
+    ${rows.map((p, i) => `<tr class="${i === 0 ? 'mvp' : ''}"><td><span class="dot" style="--c:${p.c}"></span>${esc(p.n)}${p.b ? ' <small>IA</small>' : ''}${i === 0 ? ` <span class="mvp-ico">${svg('crown')}</span>` : ''}</td><td>${p.st[1].toLocaleString('fr-FR')}</td><td>${p.st[0]}</td><td>${p.st[4].toLocaleString('fr-FR')}</td><td>${p.st[2]}</td><td>${p.st[3]}</td></tr>`).join('')}
     </tbody></table>
-    <div class="btnrow">${canReplay ? '<button class="btn" id="btnAgain">Rejouer</button>' : '<div class="wait" style="margin:0"><i></i>L\'hôte peut relancer une partie</div>'}
+    <div class="btnrow">${canReplay ? '<button class="btn" id="btnAgain">Rejouer</button>' : '<div class="wait"><i></i>L\'hôte peut relancer une partie</div>'}
     ${embedded ? '<button class="btn alt" id="btnExit">Retour au salon</button>' : ''}</div>
   </div>`;
 }

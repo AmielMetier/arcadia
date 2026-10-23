@@ -57,28 +57,28 @@ export const isBig = (ty) => BIG.has(ty);
 // ---------------------------------------------------------------- améliorations (cartes entre les salles)
 // rar : 0 commun, 1 rare, 2 épique · max : niveaux cumulables
 export const PERKS = {
-  dmg: { name: 'Calibre lourd', desc: '+20 % de dégâts', icon: '💥', rar: 0, max: 5 },
-  rate: { name: 'Gâchette facile', desc: '+15 % de cadence de tir', icon: '⚡', rar: 0, max: 4 },
-  mag: { name: 'Chargeurs étendus', desc: '+35 % de balles par chargeur', icon: '📦', rar: 0, max: 3 },
-  reload: { name: 'Mains rapides', desc: 'Rechargement 25 % plus rapide', icon: '🔄', rar: 0, max: 3 },
-  speed: { name: 'Semelles de course', desc: '+10 % de vitesse de déplacement', icon: '👟', rar: 0, max: 3 },
-  hp: { name: 'Peau épaisse', desc: '+25 PV max (et soigne 25)', icon: '❤️', rar: 0, max: 4 },
-  armor: { name: 'Plaques céramique', desc: '+25 armure max, armure remplie', icon: '🛡️', rar: 0, max: 3 },
-  ammo: { name: 'Poches profondes', desc: '+50 % de munitions en réserve, réserves remplies', icon: '🎒', rar: 0, max: 2 },
-  medic: { name: 'Infirmier de terrain', desc: 'Relève 2× plus vite ; les alliés relevés ont +30 PV', icon: '🩹', rar: 0, max: 2 },
-  dash: { name: 'Réflexes', desc: 'Roulade rechargée 35 % plus vite, +1 roulade', icon: '🌀', rar: 1, max: 2 },
-  pierce: { name: 'Balles perforantes', desc: 'Chaque balle traverse un zombie de plus', icon: '🎯', rar: 1, max: 3 },
-  crit: { name: 'Œil de lynx', desc: '+12 % de chances de coup critique (×2,5)', icon: '👁️', rar: 1, max: 3 },
-  vamp: { name: 'Sang froid', desc: 'Chaque zombie éliminé rend 2 PV', icon: '🩸', rar: 1, max: 3 },
-  fire: { name: 'Balles incendiaires', desc: '20 % de chances d’enflammer la cible', icon: '🔥', rar: 1, max: 2 },
-  nade: { name: 'Grenadier', desc: '+1 grenade max, explosions +30 % plus larges', icon: '💣', rar: 1, max: 2 },
-  magnet: { name: 'Aimant', desc: 'Ramasse les objets de loin', icon: '🧲', rar: 0, max: 1 },
-  team: { name: "Esprit d'équipe", desc: 'Les alliés proches font +15 % de dégâts', icon: '🤝', rar: 1, max: 2 },
-  rage: { name: 'Dernier rempart', desc: 'Sous 35 % de PV : +40 % de dégâts et de vitesse', icon: '😤', rar: 1, max: 1 },
-  second: { name: 'Second souffle', desc: 'Se relève seul une fois par salle', icon: '💉', rar: 2, max: 1 },
-  ricochet: { name: 'Ricochets', desc: 'Les balles rebondissent sur les murs', icon: '↩️', rar: 2, max: 1 },
-  chain: { name: 'Réaction en chaîne', desc: 'Les zombies éliminés ont 15 % de chances d’exploser', icon: '☢️', rar: 2, max: 1 },
-  regen: { name: 'Nanites', desc: 'Régénère 1,5 PV par seconde', icon: '🧬', rar: 2, max: 2 },
+  dmg: { name: 'Calibre lourd', desc: '+20 % de dégâts', icon: 'target', rar: 0, max: 5 },
+  rate: { name: 'Gâchette facile', desc: '+15 % de cadence de tir', icon: 'bolt', rar: 0, max: 4 },
+  mag: { name: 'Chargeurs étendus', desc: '+35 % de balles par chargeur', icon: 'package', rar: 0, max: 3 },
+  reload: { name: 'Mains rapides', desc: 'Rechargement 25 % plus rapide', icon: 'reload', rar: 0, max: 3 },
+  speed: { name: 'Semelles de course', desc: '+10 % de vitesse de déplacement', icon: 'boot', rar: 0, max: 3 },
+  hp: { name: 'Peau épaisse', desc: '+25 PV max (et soigne 25)', icon: 'heart', rar: 0, max: 4 },
+  armor: { name: 'Plaques céramique', desc: '+25 armure max, armure remplie', icon: 'shield', rar: 0, max: 3 },
+  ammo: { name: 'Poches profondes', desc: '+50 % de munitions en réserve, réserves remplies', icon: 'backpack', rar: 0, max: 2 },
+  medic: { name: 'Infirmier de terrain', desc: 'Relève 2× plus vite ; les alliés relevés ont +30 PV', icon: 'bandage', rar: 0, max: 2 },
+  dash: { name: 'Réflexes', desc: 'Roulade rechargée 35 % plus vite, +1 roulade', icon: 'dash', rar: 1, max: 2 },
+  pierce: { name: 'Balles perforantes', desc: 'Chaque balle traverse un zombie de plus', icon: 'crosshair', rar: 1, max: 3 },
+  crit: { name: 'Œil de lynx', desc: '+12 % de chances de coup critique (×2,5)', icon: 'eye', rar: 1, max: 3 },
+  vamp: { name: 'Sang froid', desc: 'Chaque zombie éliminé rend 2 PV', icon: 'droplet', rar: 1, max: 3 },
+  fire: { name: 'Balles incendiaires', desc: '20 % de chances d’enflammer la cible', icon: 'flame', rar: 1, max: 2 },
+  nade: { name: 'Grenadier', desc: '+1 grenade max, explosions +30 % plus larges', icon: 'bomb', rar: 1, max: 2 },
+  magnet: { name: 'Aimant', desc: 'Ramasse les objets de loin', icon: 'magnet', rar: 0, max: 1 },
+  team: { name: "Esprit d'équipe", desc: 'Les alliés proches font +15 % de dégâts', icon: 'team', rar: 1, max: 2 },
+  rage: { name: 'Dernier rempart', desc: 'Sous 35 % de PV : +40 % de dégâts et de vitesse', icon: 'angry', rar: 1, max: 1 },
+  second: { name: 'Second souffle', desc: 'Se relève seul une fois par salle', icon: 'syringe', rar: 2, max: 1 },
+  ricochet: { name: 'Ricochets', desc: 'Les balles rebondissent sur les murs', icon: 'ricochet', rar: 2, max: 1 },
+  chain: { name: 'Réaction en chaîne', desc: 'Les zombies éliminés ont 15 % de chances d’exploser', icon: 'rad', rar: 2, max: 1 },
+  regen: { name: 'Nanites', desc: 'Régénère 1,5 PV par seconde', icon: 'dna', rar: 2, max: 2 },
 };
 export const PERK_IDS = Object.keys(PERKS);
 
@@ -86,27 +86,27 @@ export const PERK_IDS = Object.keys(PERKS);
 // reward : ce que l'équipe gagne en nettoyant la salle (annoncé sur la porte)
 export const ROOM_TYPES = {
   start: { name: 'Sas de décontamination', theme: 'sas', reward: null },
-  armory: { name: 'Armurerie', theme: 'armory', reward: 'Armes lourdes', icon: '🔫' },
-  medbay: { name: 'Infirmerie', theme: 'medbay', reward: 'Soins et armure', icon: '➕' },
-  lab: { name: 'Laboratoire', theme: 'lab', reward: 'Double amélioration', icon: '🧪' },
-  storage: { name: 'Entrepôt', theme: 'storage', reward: 'Munitions et grenades', icon: '📦' },
-  core: { name: 'Noyau — Spécimen Zéro', theme: 'core', reward: 'Victoire', icon: '☣️' },
+  armory: { name: 'Armurerie', theme: 'armory', reward: 'Armes lourdes', icon: 'pistol' },
+  medbay: { name: 'Infirmerie', theme: 'medbay', reward: 'Soins et armure', icon: 'medic' },
+  lab: { name: 'Laboratoire', theme: 'lab', reward: 'Double amélioration', icon: 'flask' },
+  storage: { name: 'Entrepôt', theme: 'storage', reward: 'Munitions et grenades', icon: 'package' },
+  core: { name: 'Noyau — Spécimen Zéro', theme: 'core', reward: 'Victoire', icon: 'bio' },
   arena: { name: 'Hangar de quarantaine', theme: 'arena', reward: null },
   base: { name: 'Fort Delta', theme: 'arena', reward: null },
-  shop: { name: 'Chez Dédé, ferrailleur', theme: 'shop', reward: 'Marchand · pas de combat', icon: '🛒' },
-  vault: { name: 'Coffre-fort', theme: 'vault', reward: 'Trésor piégé', icon: '💰' },
-  dark: { name: 'Salle obscure', theme: 'dark', reward: 'Ferraille ×2', icon: '🌑' },
-  gas: { name: 'Salle contaminée', theme: 'gas', reward: 'Améliorations rares', icon: '☣️' },
+  shop: { name: 'Chez Dédé, ferrailleur', theme: 'shop', reward: 'Marchand · pas de combat', icon: 'cart' },
+  vault: { name: 'Coffre-fort', theme: 'vault', reward: 'Trésor piégé', icon: 'vault' },
+  dark: { name: 'Salle obscure', theme: 'dark', reward: 'Ferraille ×2', icon: 'moon' },
+  gas: { name: 'Salle contaminée', theme: 'gas', reward: 'Améliorations rares', icon: 'bio' },
 };
 export const SPECIAL_TYPES = ['vault', 'dark', 'gas'];
 // Marchand : prix en ferraille (les consommables renchérissent à chaque achat)
 export const SHOP_ITEMS = {
-  med: { name: 'Trousse de soin', icon: '➕', price: 10 },
-  armor: { name: 'Plaque d\'armure', icon: '🛡️', price: 10 },
-  nade: { name: 'Grenade', icon: '💣', price: 9 },
-  ammo: { name: 'Munitions', icon: '📦', price: 8 },
-  perk: { name: 'Amélioration au choix', icon: '⭐', price: 28 },
-  weapon: { name: 'Arme', icon: '🔫', price: 24 },
+  med: { name: 'Trousse de soin', icon: 'medic', price: 10 },
+  armor: { name: 'Plaque d\'armure', icon: 'shield', price: 10 },
+  nade: { name: 'Grenade', icon: 'bomb', price: 9 },
+  ammo: { name: 'Munitions', icon: 'package', price: 8 },
+  perk: { name: 'Amélioration au choix', icon: 'sparkles', price: 28 },
+  weapon: { name: 'Arme', icon: 'pistol', price: 24 },
 };
 export const BRANCH_TYPES = ['armory', 'medbay', 'lab', 'storage'];
 export const CAMPAIGN_ROOMS = 7; // 6 salles puis le Noyau
@@ -120,18 +120,18 @@ export const DIFFICULTY = {
 // ---------------------------------------------------------------- secteurs
 // rooms : noms qui remplacent ceux du labo · zw : bonus de probabilité des zombies · pal : tenues des zombies
 export const SECTORS = {
-  lab: { name: 'Laboratoire Alpha', short: 'Labo', icon: '🧪', desc: 'Le complexe souterrain où tout a commencé.',
+  lab: { name: 'Laboratoire Alpha', short: 'Labo', icon: 'flask', desc: 'Le complexe souterrain où tout a commencé.',
     rooms: {}, zw: {}, pal: null },
-  sewers: { name: 'Égouts de Nice', short: 'Égouts', icon: '🐀', desc: "Canaux qui ralentissent, larves et rampants dans l'eau.",
+  sewers: { name: 'Égouts de Nice', short: 'Égouts', icon: 'rat', desc: "Canaux qui ralentissent, larves et rampants dans l'eau.",
     rooms: { start: "Bouche d'égout", core: 'Collecteur principal', arena: 'Grand bassin' }, zw: { crawler: 2, larva: 2.2, spitter: 1.4 },
     pal: ['#5a5446', '#6b6250', '#4f5a4a', '#5d4f45'] },
-  hospital: { name: 'Hôpital Pasteur', short: 'Hôpital', icon: '🏥', desc: 'Néons qui clignotent, patients enragés, hurleuses.',
+  hospital: { name: 'Hôpital Pasteur', short: 'Hôpital', icon: 'hospital', desc: 'Néons qui clignotent, patients enragés, hurleuses.',
     rooms: { start: 'Hall des urgences', core: 'Bloc opératoire', arena: 'Grand hall' }, zw: { runner: 1.6, screamer: 2.2, stalker: 1.6 },
     pal: ['#b9d6e8', '#d7e6ef', '#9cc3d8', '#e8eef2', '#7fb0a5'] },
-  metro: { name: 'Tramway souterrain', short: 'Métro', icon: '🚇', desc: 'Les rames passent toujours : ne restez pas sur les voies.',
+  metro: { name: 'Tramway souterrain', short: 'Métro', icon: 'train', desc: 'Les rames passent toujours : ne restez pas sur les voies.',
     rooms: { start: 'Quai Garibaldi', core: 'Terminus', arena: 'Grande station' }, zw: { walker: 1.3, armored: 1.8, brute: 1.5 },
     pal: ['#3e4a5c', '#5b6270', '#2f3a48', '#7a6a55'] },
-  nice: { name: 'Rues de Nice', short: 'Nice', icon: '🌴', desc: 'Voitures à alarme, terrasses, palmiers. Ne tirez pas dans les voitures.',
+  nice: { name: 'Rues de Nice', short: 'Nice', icon: 'palm', desc: 'Voitures à alarme, terrasses, palmiers. Ne tirez pas dans les voitures.',
     rooms: { start: 'Place Masséna', core: 'Promenade des Anglais', arena: 'Cours Saleya' }, zw: { runner: 1.8, walker: 1.2 },
     pal: ['#ff6f91', '#ffc75f', '#4fc3f7', '#f9f871', '#ff9671', '#00c9a7', '#fff8ea'] },
 };
@@ -140,10 +140,10 @@ export const roomName = (type, sector) => (SECTORS[sector] && SECTORS[sector].ro
 
 // ---------------------------------------------------------------- mode Défense : pièges à poser
 export const TRAPS = {
-  wire: { name: 'Barbelés', icon: '🕸️', price: 10, desc: 'Ralentit fortement et blesse les zombies qui le traversent' },
-  mine: { name: 'Mines', icon: '💥', price: 8, desc: 'Trois mines qui explosent au passage des zombies' },
-  turret: { name: 'Tourelle', icon: '🔫', price: 26, desc: 'Tourelle automatique pendant trois vagues' },
-  flame: { name: 'Grille brûlante', icon: '🔥', price: 18, desc: 'Enflamme les zombies qui marchent dessus' },
+  wire: { name: 'Barbelés', icon: 'fence', price: 10, desc: 'Ralentit fortement et blesse les zombies qui le traversent' },
+  mine: { name: 'Mines', icon: 'mine', price: 8, desc: 'Trois mines qui explosent au passage des zombies' },
+  turret: { name: 'Tourelle', icon: 'crosshair', price: 26, desc: 'Tourelle automatique pendant trois vagues' },
+  flame: { name: 'Grille brûlante', icon: 'flame', price: 18, desc: 'Enflamme les zombies qui marchent dessus' },
 };
 export const TRAP_IDS = Object.keys(TRAPS);
 export const DEFENSE_WAVES = 15;
@@ -151,15 +151,15 @@ export const DEFENSE_WAVES = 15;
 // ---------------------------------------------------------------- classes de survivants
 // cd : recharge de la capacité (s) · dur : durée de l'effet
 export const CLASSES = {
-  soldier: { id: 'soldier', name: 'Soldat', icon: '🎖️', color: '#ffc531', cd: 28, dur: 7,
+  soldier: { id: 'soldier', name: 'Soldat', icon: 'medal', color: '#ffc531', cd: 28, dur: 7,
     passive: '+10 % de dégâts, une grenade de plus', active: 'Barrage', activeDesc: 'Munitions infinies et cadence +50 % pendant 7 s' },
-  medic: { id: 'medic', name: 'Médecin', icon: '⚕️', color: '#2fbf71', cd: 26, dur: 5,
+  medic: { id: 'medic', name: 'Médecin', icon: 'medic', color: '#2fbf71', cd: 26, dur: 5,
     passive: 'Relève 2× plus vite, les soins ramassés soignent aussi les alliés proches', active: 'Station de soin', activeDesc: 'Zone qui soigne et relève tout le monde pendant 5 s' },
-  engineer: { id: 'engineer', name: 'Ingénieur', icon: '🔧', color: '#ff8a1f', cd: 30, dur: 22,
+  engineer: { id: 'engineer', name: 'Ingénieur', icon: 'wrench', color: '#ff8a1f', cd: 30, dur: 22,
     passive: 'Les caisses donnent plus, munitions +25 %', active: 'Tourelle', activeDesc: 'Pose une tourelle automatique pendant 22 s' },
-  tank: { id: 'tank', name: 'Colosse', icon: '🛡️', color: '#2b8cff', cd: 24, dur: 5,
+  tank: { id: 'tank', name: 'Colosse', icon: 'shield', color: '#2b8cff', cd: 24, dur: 5,
     passive: '+50 PV max, +25 armure max, un peu plus lent', active: 'Provocation', activeDesc: 'Attire les zombies proches et réduit les dégâts reçus de 75 % pendant 5 s' },
-  scout: { id: 'scout', name: 'Éclaireur', icon: '🦅', color: '#b45cff', cd: 20, dur: 5,
+  scout: { id: 'scout', name: 'Éclaireur', icon: 'bird', color: '#b45cff', cd: 20, dur: 5,
     passive: 'Deux roulades, +8 % de vitesse, critiques plus fréquents', active: 'Ombre', activeDesc: 'Les zombies le perdent de vue, +40 % de vitesse et de dégâts pendant 5 s' },
 };
 export const CLASS_IDS = Object.keys(CLASSES);
