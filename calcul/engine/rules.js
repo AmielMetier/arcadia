@@ -15,6 +15,9 @@ export const MODES = {
 export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const REVEAL_MS = 5200;
+export const TIER_SHOW_MS = 9200; // passage d'un tour à l'autre en The Candidate (la grande scène)
+export const INTER_MS = 2400; // bandeau de transition avant la question suivante (ou le verdict)
+export const ANNOUNCE_MS = 2600; // annonce au centre de l'écran : éliminé, coupé, vie regagnée
 const GRACE_MS = 400; // réponse arrivée juste après la fin (latence réseau)
 
 // The Candidate : 3 vies. Une mauvaise réponse en coûte une, la réponse piège deux, le silence une.
@@ -265,6 +268,8 @@ export function reveal(state, now) {
       p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
       if (p.streak >= 3 && s.cfg.mode !== 'eclair') { const b = Math.min(100, 25 * (p.streak - 2)); r.pts += b; r.tags.push('serie'); r.streak = p.streak; }
       if (rank === 0) p.firsts++;
+      // The Candidate : trois bonnes réponses d'affilée rendent un cœur (sans dépasser le nombre de départ)
+      if (s.cfg.lives && p.streak % 3 === 0 && p.lives < s.cfg.lives) { p.lives++; r.tags.push('life'); r.gained = 1; }
       // sabotage : un pouvoir toutes les 3 bonnes réponses d'affilée (tiré de la graine, donc reproductible)
       if (s.cfg.sabotage && p.streak % 3 === 0 && p.powers.length < MAX_POWERS && s.idx + 1 < s.cfg.len) {
         const list = Object.keys(POWERS), h = (s.seed ^ Math.imul(s.idx + 7, 2654435761) ^ Math.imul(p.id + 3, 40503)) >>> 0;
@@ -295,10 +300,10 @@ export function reveal(state, now) {
   const tierNow = s.cfg.lives ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx, s.cfg.len) : 0;
   const tierNext = s.cfg.lives && s.idx + 1 < s.cfg.len ? chartierTier(Math.max(0, DIFFS.indexOf(s.cfg.diff)), s.idx + 1, s.cfg.len) : tierNow;
   let tierEnd = null;
-  if (s.cfg.lives && s.cfg.cut && tierNext !== tierNow) {
+  if (s.cfg.lives && tierNext !== tierNow) {
     tierEnd = tierNow;
     const left = alive(s);
-    if (left.length >= 3) {
+    if (s.cfg.cut && left.length >= 3) {
       const last = [...left].sort((x, y) => x.score - y.score || x.right - y.right || y.totalMs - x.totalMs)[0];
       last.out = true; last.outIdx = s.idx; last.outWhy = 'palier';
       eliminated.push({ id: last.id, why: 'palier' });
@@ -315,7 +320,11 @@ export function reveal(state, now) {
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
-  s.revealMs = REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (eliminated.length ? 2500 : 0) + (canSab ? SAB_EXTRA_MS : 0);
+  // fin d'un tour : la mise en scène du passage au tour suivant s'ajoute à la correction
+  // chaque animation a son propre temps : la correction reste lisible, et le chrono de la question suivante est intact
+  const interlude = tierEnd && !s.endEarly && s.idx + 1 < s.cfg.len ? TIER_SHOW_MS : INTER_MS;
+  const announces = eliminated.length + (results.some((r) => r.tags.includes('life')) ? 1 : 0);
+  s.revealMs = interlude + announces * ANNOUNCE_MS + REVEAL_MS + (q.cat === 'compte' ? 1500 : 0) + (q.isChartier ? 2300 : 0) + (isCode ? 4000 : 0) + (canSab ? SAB_EXTRA_MS : 0);
   s.phase = 'reveal'; s.endsAt = now + s.revealMs;
   // les réponses deviennent publiques
   return s;

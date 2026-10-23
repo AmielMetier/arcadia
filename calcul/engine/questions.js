@@ -682,15 +682,25 @@ function devinette(r, d) {
 // Le dessin est dans la question (fig) ; on compte toutes les figures, petites et grandes, cachées comprises.
 const C2 = (n) => (n * (n - 1)) / 2;
 function visuel(r, d) {
-  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths']
-    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag']);
+  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths', 'strip', 'fan']
+    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan']);
+  if (kind === 'strip') {
+    const n = between(r, [3, 4, 5][d], [5, 7, 9][d]);
+    return { kind, text: `Combien de rectangles dans cette bande ?`, sub: `${n} cases alignées (une case seule compte)`, answer: (n * (n + 1)) / 2, fig: { t: 'grid', n: 1, m: n },
+      tip: `Un rectangle, c'est un bord gauche et un bord droit parmi ${n + 1} traits : ${n + 1} × ${n} / 2 = ${(n * (n + 1)) / 2}.` };
+  }
+  if (kind === 'fan') {
+    const k = between(r, [1, 2, 3][d], [3, 4, 6][d]), ans = ((k + 2) * (k + 1)) / 2;
+    return { kind, text: `Combien de triangles en tout ?`, sub: `${k} trait${k > 1 ? 's' : ''} parte${k > 1 ? 'nt' : ''} du sommet vers la base`, answer: ans, fig: { t: 'fan', k },
+      tip: `Chaque triangle a deux côtés parmi les ${k + 2} traits issus du sommet : ${k + 2} × ${k + 1} / 2 = ${ans}.` };
+  }
   if (kind === 'box') {
-    const a = between(r, 2, [3, 4, 4][d]), b = between(r, 2, [3, 3, 4][d]), c = between(r, 2, [2, 3, 4][d]);
+    const a = between(r, 2, [3, 4, 5][d]), b = between(r, 2, [3, 4, 4][d]), c = between(r, [1, 2, 2][d], [3, 3, 4][d]);
     return { kind, text: `Combien de petits cubes forment ce pavé ?`, sub: `Un bloc plein, y compris les cubes cachés`, answer: a * b * c, fig: { t: 'box', a, b, c },
       tip: `Longueur × largeur × hauteur : ${a} × ${b} × ${c} = ${a * b * c}. Compter les cubes visibles un par un fait oublier ceux du milieu.` };
   }
   if (kind === 'painted') {
-    const n = between(r, 3, [4, 4, 5][d]), m = n - 2;
+    const n = between(r, 3, [4, 5, 6][d]), m = n - 2;
     const asks = [[3, 8, 'les 8 coins'], [2, 12 * m, `${m} par arête, sur 12 arêtes`], [1, 6 * m * m, `${m}² = ${m * m} par face, sur 6 faces`], [0, m ** 3, `le cœur de ${m} × ${m} × ${m}`]];
     const [f, ans, why] = d === 0 ? asks[between(r, 0, 1)] : pick(r, asks);
     return { kind, text: `Combien de petits cubes ont ${f ? `exactement ${f} face${f > 1 ? 's' : ''} peinte${f > 1 ? 's' : ''}` : 'aucune face peinte'} ?`,
@@ -703,37 +713,37 @@ function visuel(r, d) {
       tip: `Les marches font 1, 2, …, ${n} cubes de haut : ${n} × ${n + 1} / 2 = ${t}${w > 1 ? `, fois ${w} de large = ${t * w}` : ''}.` };
   }
   if (kind === 'paths') {
-    const m = between(r, 2, [3, 4, 5][d]), n = between(r, 2, [2, 3, 4][d]);
+    const m = between(r, 2, [4, 5, 6][d]), n = between(r, 2, [3, 4, 4][d]);
     let ans = 1; for (let k = 1; k <= n; k++) ans = (ans * (m + k)) / k;
     return { kind, text: `Combien de chemins de A à B, en allant seulement à droite ou vers le haut ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'paths', m, n },
       tip: `Tout chemin fait ${m} pas à droite et ${n} vers le haut : on choisit où placer les ${n} montées parmi ${m + n} pas, C(${m + n}, ${n}) = ${ans}.` };
   }
   if (kind === 'diag') {
-    const n = between(r, [5, 5, 6][d], [6, 8, 10][d]);
+    const n = between(r, [5, 5, 6][d], [7, 9, 12][d]);
     return { kind, text: `Combien de diagonales a ce polygone ?`, sub: `${n} sommets (une diagonale en pointillés)`, answer: (n * (n - 3)) / 2, fig: { t: 'polyd', n },
       tip: `Chaque sommet se relie à ${n - 3} autres (pas à lui-même ni à ses 2 voisins), et chaque diagonale est comptée deux fois : ${n} × ${n - 3} / 2 = ${(n * (n - 3)) / 2}.` };
   }
   if (kind === 'grid-sq') {
-    const n = between(r, [2, 3, 4][d], [3, 4, 5][d]);
+    const n = between(r, [2, 3, 4][d], [4, 5, 6][d]);
     let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
     return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${n} × ${n} : les petits, les moyens, le grand…`, answer: ans, fig: { t: 'grid', n, m: n },
       tip: `On compte par taille : ${Array.from({ length: n }, (_, k) => `${(n - k) ** 2} de ${k + 1}×${k + 1}`).join(', ')}. Total : ${Array.from({ length: n }, (_, k) => `${n - k}²`).join(' + ')} = ${ans}.` };
   }
   if (kind === 'grid-sq-rect') {
-    const n = between(r, 2, [3, 3, 4][d]), m = n + between(r, 1, 2);
+    const n = between(r, 2, [3, 4, 5][d]), m = n + between(r, 1, [2, 2, 3][d]);
     let ans = 0; const parts = [];
     for (let k = 1; k <= n; k++) { const c = (n - k + 1) * (m - k + 1); ans += c; parts.push(`${c} de ${k}×${k}`); }
     return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
       tip: `Un carré k×k peut se placer de (${m} − k + 1) × (${n} − k + 1) façons : ${parts.join(', ')}. Total : ${ans}.` };
   }
   if (kind === 'grid-rect') {
-    const n = between(r, 2, 3), m = between(r, n, [3, 4, 5][d]);
+    const n = between(r, 2, [3, 3, 4][d]), m = between(r, n, [4, 5, 6][d]);
     const ans = C2(n + 1) * C2(m + 1);
     return { kind, text: `Combien de rectangles en tout (les carrés comptent) ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
       tip: `Un rectangle, c'est 2 lignes verticales parmi ${m + 1} et 2 horizontales parmi ${n + 1} : ${C2(m + 1)} × ${C2(n + 1)} = ${ans}.` };
   }
   if (kind === 'tri') {
-    const n = between(r, [2, 2, 3][d], [2, 3, 4][d]);
+    const n = between(r, [2, 2, 3][d], [3, 4, 5][d]);
     const ans = Math.floor((n * (n + 2) * (2 * n + 1)) / 8);
     let up = 0; for (let k = 1; k <= n; k++) up += ((n - k + 1) * (n - k + 2)) / 2;
     return { kind, text: `Combien de triangles en tout ?`, sub: `Un triangle découpé en ${n} rangées`, answer: ans, fig: { t: 'trigrid', n },
@@ -745,7 +755,7 @@ function visuel(r, d) {
     return { kind, text: `Combien de cubes dans cette pyramide ?`, sub: `${n} étages pleins, y compris les cubes cachés`, answer: ans, fig: { t: 'pyramid', n },
       tip: `Chaque étage est un carré : ${Array.from({ length: n }, (_, k) => `${k + 1}²`).join(' + ')} = ${ans}.` };
   }
-  const n = between(r, [4, 5, 7][d], [5, 7, 10][d]);
+  const n = between(r, [4, 5, 7][d], [6, 9, 12][d]);
   return { kind: 'dots', text: `Combien de segments pour relier chaque point à tous les autres ?`, sub: `${n} points`, answer: C2(n), fig: { t: 'dots', n },
     tip: `Chaque point se relie aux ${n - 1} autres, et chaque segment est compté deux fois : ${n} × ${n - 1} / 2 = ${C2(n)}.` };
 }
@@ -810,7 +820,7 @@ export const KINDS = {
   theorie: ['pow', 'mod', 'sqrt', 'cube', 'pgcd', 'ppcm', 'fact', 'binary', 'prime', 'divs'],
   fraction: ['fracof', 'dec', 'fracdec', 'fracpct', 'fracadd'],
   suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'cubes', 'cross', 'affine', 'tri', 'pow2m1', 'sqplus', 'fact'],
-  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag'],
+  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan'],
   estim: ['kmh', 'ms', 'train', 'time', 'units', 'promo', 'rule3', 'avg', 'evol', 'famous', 'approx'],
   compte: ['compte'],
   vf: ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac'],

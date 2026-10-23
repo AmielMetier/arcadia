@@ -66,14 +66,14 @@ window.HUB_GAMES = [
     tag: 'Duel de calcul mental',
     desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, figures à compter, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres ! Mode The Candidate : un entretien éliminatoire, jusqu\'au code Python.',
     url: 'calcul/',
-    minPlayers: 1, maxPlayers: 6,
+    minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 avec les bots
     accent: '#ff5fa2',
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['chartier', 'The Candidate'], ['peril', 'Péril'], ['eclair', 'Éclair']], def: 'classic' },
       { key: 'theme', label: 'Questions', options: [['mix', 'Mélangé'], ['base', '4 opérations'], ['malin', 'Astuces'], ['frac', 'Fractions'], ['logique', 'Logique'], ['flash', 'Vrai/Faux'], ['algebre', 'Équations'], ['geo', 'Géométrie'], ['vite', 'Vitesse'], ['compte', 'Compte est bon']], def: 'mix' },
       { key: 'len', label: 'Longueur', options: [[10, '10 questions'], [15, '15 questions'], [20, '20 questions'], [30, '30 questions']], def: 10 },
       { key: 'diff', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
-      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
+      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'sabotage', label: 'Sabotage', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1, notMode: 'chartier' },
       { key: 'finale', label: 'Dernière question quitte ou double', options: [[1, 'Oui'], [0, 'Non']], def: 1 },

@@ -577,11 +577,11 @@ button.cchoice.picked .cl{background:var(--gold2)}
 .joker.used{opacity:.25;text-decoration:line-through;border-color:var(--edge);color:var(--dim)}
 .friendsays{flex-basis:100%;font:600 14px/1.35 'Chakra Petch',sans-serif;color:#d2dbe8;background:#0d111a;border:1px dashed var(--gold);border-radius:10px;padding:8px 12px;animation:pop .3s cubic-bezier(.2,1.5,.4,1) both}
 .friendsays b{color:var(--gold2)}
-button.cchoice.going{animation:vanish .38s ease-in forwards}
+button.cchoice.going{animation:vanish .7s ease-in forwards}
 button.cchoice.gone{display:none}
 @keyframes vanish{to{opacity:0;transform:scale(.85) rotate(-3deg);filter:blur(2px)}}
 /* éliminé : la carte vacille, tombe, puis revient grisée */
-.pcard.falling{animation:fall 1.1s cubic-bezier(.5,0,.6,1) both}
+.pcard.falling{animation:fall 1.8s cubic-bezier(.5,0,.6,1) both}
 @keyframes fall{0%{transform:none}12%{transform:rotate(-4deg)}24%{transform:rotate(4deg)}36%{transform:rotate(-3deg)}
   60%{transform:translateY(26px) rotate(8deg);opacity:.4}61%{transform:translateY(-10px);opacity:0}100%{transform:none;opacity:.45}}
 .pcard.out .outtag{animation:stamp .4s 1s cubic-bezier(.2,1.6,.4,1) both}
@@ -650,3 +650,104 @@ button.cchoice.gone{display:none}
 .verdict-banner .pc-face{border-color:#000}
 @media (max-width:700px){ .pc-face.big{width:76px;height:76px} .chartier-quote .quote-avatar{width:42px;height:42px} }
 .setup-head .pc-face{margin:0}
+
+/* cœur regagné après trois bonnes réponses d'affilée */
+.gotlife{margin:8px 0;padding:8px 12px;border-radius:11px;border:2px solid var(--down);background:rgba(255,90,60,.12);color:#ffd2c8;font:700 14px 'Chakra Petch',sans-serif;text-align:center;animation:stamp .45s .3s cubic-bezier(.2,1.6,.4,1) both}
+.gotlife b{display:inline-block;color:var(--down);font-size:20px;animation:beat .8s .6s ease-in-out 2}
+@keyframes beat{30%{transform:scale(1.5)}60%{transform:scale(.9)}}
+.tag.t-life{background:#3a1712;color:#ff9a8a}
+.pcard .lives.up{animation:beat .8s ease-in-out 2}
+
+/* The Candidate : figures au trait blanc sur le fond sombre (les attributs du SVG sont remplacés par le CSS) */
+.game.mode-chartier .fig [stroke="#16181d"]{stroke:#f5f8fc}
+.game.mode-chartier .fig [fill="#16181d"]{fill:#f5f8fc}
+.game.mode-chartier .fig [fill="#d8f3ea"]{fill:#2c3954}
+.game.mode-chartier .fig [fill="#b5e9d8"]{fill:#1d2638}
+.game.mode-chartier .fig [fill="#8fd9c1"]{fill:#131a28}
+.game.mode-chartier .fig [fill="#0f8a6a"]{fill:var(--gold2)}
+.game.mode-chartier .fig [stroke="#0f8a6a"]{stroke:var(--gold2)}
+.game.mode-chartier .fig text{fill:#f5f8fc}
+.game.mode-chartier .fig text.unk{fill:var(--gold2)}
+.game.mode-chartier .fig{width:min(380px,86%)}
+.game.mode-chartier .figmini .fig{width:170px}
+
+/* 7 ou 8 joueurs : liste resserrée */
+.roster.many{gap:6px}
+.roster.many .pcard{padding-top:5px;padding-bottom:5px}
+.roster.many .pcard .rank{font-size:15px}
+.roster.many .pcard .sc{font-size:16px}
+.roster.many .pcard .st{min-height:15px}
+@media (max-height:760px) and (min-width:821px){ .roster.many .pcard{padding-top:3px;padding-bottom:3px} .roster.many .pcard .nm{font-size:13px} }
+
+/* ------------------------------------------------------------------ transitions entre deux étapes */
+.inter{position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;visibility:hidden}
+.inter.show{visibility:visible;animation:inter-bg 2.4s ease both}
+.inter-band{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:22px 16px;text-align:center;
+  background:var(--yellow);color:var(--ink);border-block:4px solid var(--ink);box-shadow:0 10px 0 rgba(0,0,0,.25)}
+.inter.show .inter-band{animation:inter-wipe 2.4s cubic-bezier(.6,0,.3,1) both}
+.inter-band small{font:700 14px 'Chakra Petch',sans-serif;letter-spacing:2px;text-transform:uppercase}
+.inter-band b{font-family:var(--bung);font-weight:400;font-size:clamp(34px,6vw,64px);line-height:1}
+.inter-band span{font:700 15px 'Chakra Petch',sans-serif;opacity:.8}
+.inter.final .inter-band,.inter.end .inter-band{background:var(--red);color:#fff}
+@keyframes inter-bg{0%,100%{background:transparent}14%,86%{background:rgba(0,0,0,.5)}}
+@keyframes inter-wipe{0%{transform:translateX(-110%)}14%,86%{transform:none}100%{transform:translateX(110%)}}
+.game.mode-chartier .inter-band{background:linear-gradient(90deg,#0d111a,#1b2232 50%,#0d111a);color:var(--gold2);border-color:var(--gold);box-shadow:0 0 40px rgba(229,169,60,.35)}
+.game.mode-chartier .inter-band small{color:var(--dim)}
+.game.mode-chartier .inter.tier .inter-band b{font-size:clamp(44px,8vw,86px);-webkit-text-stroke:1.5px #000;text-shadow:3px 3px 0 #000,0 0 24px rgba(229,169,60,.5)}
+.game.mode-chartier .inter.final .inter-band,.game.mode-chartier .inter.end .inter-band{background:linear-gradient(90deg,#2a1310,#3a1712 50%,#2a1310);color:#ffd2c8;border-color:var(--down)}
+
+/* ------------------------------------------------------------------ The Candidate : passage d'un tour à l'autre */
+/* 9,2 s : 0,5 s « Fin du tour » · 2,5 s les survivants (le coupé tombe à 3,6 s) · 4,9 s Pierre Chartier · 6,9 s le nom du tour, flash et gong */
+.curtain{position:fixed;inset:0;z-index:66;display:grid;place-items:center;pointer-events:none;visibility:hidden;overflow:hidden;color:#f5f8fc}
+.curtain > *{grid-area:1/1}
+.curtain > .cu-end,.curtain > .cu-ppl,.curtain > .cu-pc,.curtain > .cu-title{max-width:calc(100vw - 32px)}
+.curtain.play{visibility:visible;animation:cu-bg 9.2s linear both}
+@keyframes cu-bg{0%{background:rgba(3,4,8,0)}6%,95%{background:rgba(3,4,8,.95)}100%{background:rgba(3,4,8,0)}}
+/* le projecteur sort de la grille : plus grand que l'écran, il décalerait le centre de la scène vers le bas */
+.cu-spot{position:absolute;left:calc(50% - 40vmax);top:calc(50% - 40vmax);width:80vmax;height:80vmax;border-radius:50%;opacity:0;background:radial-gradient(circle,rgba(255,226,160,.30),rgba(255,226,160,.08) 32%,transparent 58%)}
+.play .cu-spot{animation:cu-spot 9.2s ease-in-out both}
+@keyframes cu-spot{0%{opacity:0;transform:translate(-45vw,-10vh)}6%{opacity:1}18%{transform:translate(25vw,5vh)}30%,94%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+.cu-end,.cu-ppl,.cu-pc,.cu-title{opacity:0;text-align:center;padding:0 16px}
+.cu-end{font-family:var(--bung);font-size:clamp(30px,6vw,64px);color:var(--gold2);-webkit-text-stroke:1.5px #000;text-shadow:4px 4px 0 #000;text-transform:uppercase}
+.play .cu-end{animation:cu-stamp 2s .5s both}
+@keyframes cu-stamp{0%{opacity:0;transform:scale(2.4)}14%{opacity:1;transform:scale(1)}85%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-30px)}}
+.cu-ppl{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:860px}
+.play .cu-ppl{animation:cu-show 2.4s 2.5s both}
+@keyframes cu-show{0%{opacity:0}12%,85%{opacity:1}100%{opacity:0}}
+.cu-p{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:22px;background:#151b27;border:2px solid var(--gold);font:700 16px 'Chakra Petch',sans-serif;box-shadow:3px 3px 0 #000}
+.cu-p i{width:12px;height:12px;border-radius:50%;background:var(--pc);border:2px solid #000}
+.cu-p b{color:var(--gold2);font-family:var(--bung);font-weight:400}
+.cu-p.me{box-shadow:3px 3px 0 #000,0 0 0 3px var(--gold2)}
+.play .cu-p{animation:pop .4s calc(2.6s + var(--k) * 120ms) cubic-bezier(.2,1.5,.4,1) both}
+.play .cu-p.gone{border-color:var(--down);animation:pop .4s calc(2.6s + var(--k) * 120ms) cubic-bezier(.2,1.5,.4,1) both,cu-fall 1s 3.6s ease-in forwards}
+@keyframes cu-fall{0%{transform:none}25%{transform:rotate(-6deg)}100%{transform:translateY(120px) rotate(14deg);opacity:0;text-decoration:line-through}}
+.cu-pc{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:640px}
+.cu-pc p{margin:0;font:italic 600 clamp(17px,2.4vw,24px)/1.35 'Chakra Petch',sans-serif;color:#e6ebf2}
+.play .cu-pc{animation:cu-show 2s 4.9s both}
+.play .cu-pc .pc-face{animation:pop .45s 4.9s cubic-bezier(.2,1.5,.4,1) both}
+.cu-title{display:flex;flex-direction:column;align-items:center;gap:6px}
+.cu-title small{font-size:clamp(22px,4vw,40px);color:var(--gold2);letter-spacing:6px}
+.cu-title b{font-family:var(--bung);font-weight:400;font-size:clamp(56px,12vw,150px);line-height:.9;color:var(--gold2);-webkit-text-stroke:2px #000;text-shadow:6px 6px 0 #000,0 0 50px rgba(229,169,60,.6)}
+.cu-title span{font:700 clamp(14px,1.8vw,18px) 'Chakra Petch',sans-serif;color:#b7c3d6}
+.play .cu-title{animation:cu-title 2s 6.9s cubic-bezier(.2,1.1,.3,1) both}
+@keyframes cu-title{0%{opacity:0;transform:scale(3);filter:blur(12px)}16%{opacity:1;transform:scale(1);filter:none}85%{opacity:1;transform:scale(1.04)}100%{opacity:0;transform:scale(1.08)}}
+.cu-flash{position:absolute;inset:0;background:#fff;opacity:0}
+.play .cu-flash{animation:cu-flash .7s 6.9s ease-out both}
+@keyframes cu-flash{0%{opacity:0}12%{opacity:.75}100%{opacity:0}}
+
+/* ------------------------------------------------------------------ annonces au centre (2,6 s chacune) */
+.announce{position:fixed;inset:0;z-index:64;display:grid;place-items:center;pointer-events:none;visibility:hidden}
+.announce.show{visibility:visible;animation:an-bg 2.6s ease both}
+@keyframes an-bg{0%,100%{background:transparent}12%,85%{background:rgba(0,0,0,.45)}}
+.an-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 34px;max-width:min(560px,calc(100% - 32px));text-align:center;
+  background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;box-shadow:8px 8px 0 rgba(0,0,0,.45);opacity:0}
+.announce.show .an-card{animation:an-card 2.6s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes an-card{0%{opacity:0;transform:scale(.6)}12%{opacity:1;transform:scale(1)}85%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.9) translateY(20px)}}
+.an-card i{font-style:normal;font-size:64px;line-height:1}
+.announce.show .an-card i{animation:beat 1s .35s ease-in-out}
+.an-card b{font-family:var(--bung);font-weight:400;font-size:clamp(24px,4vw,38px);line-height:1.05}
+.an-card span{font:700 15px 'Chakra Petch',sans-serif;opacity:.75}
+.game.mode-chartier .an-card{background:linear-gradient(180deg,#151b29,#10141f);color:#f5f8fc;border-color:var(--gold);box-shadow:8px 8px 0 #000,0 0 40px rgba(229,169,60,.3)}
+.game.mode-chartier .announce.out .an-card,.game.mode-chartier .announce.bad .an-card{border-color:var(--down);box-shadow:8px 8px 0 #000,0 0 40px rgba(255,90,60,.35)}
+.game.mode-chartier .announce.life .an-card i{color:var(--down)}
+.announce.bad .an-card b{color:var(--down)}

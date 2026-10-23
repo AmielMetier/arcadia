@@ -317,6 +317,8 @@ export const wallStreetMusic = {
     if (m === 'intro') { bellAt(ctx.currentTime + 0.05); riser(ctx.currentTime + 0.4, 3); }
     if (m === 'final' && prev !== 'final') braam(ctx.currentTime + 0.02, BASS[0]);
   },
+  // un « braam » de cinéma, pour l'annonce d'un nouveau tour
+  sting() { if (playing && ctx) braam(ctx.currentTime + 0.02, BASS[0]); },
   // 0 : tout le temps devant soi → 1 : dernières secondes
   setTension(v) {
     tension = Math.max(0, Math.min(1, v));

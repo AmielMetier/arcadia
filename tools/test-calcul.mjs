@@ -359,6 +359,19 @@ t('The Candidate : palier qui élimine le dernier, arrêt quand il reste un cand
   assert.equal(s.history.length, 10);
 });
 
+t('The Candidate : la fin d\'un tour laisse le temps de la mise en scène, même sans coupe', () => {
+  const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 9, now: 0 });
+  let now = 0, ends = 0, plain = 0;
+  while (s.phase !== 'over') {
+    s = nextQuestion(s, now); if (s.phase === 'over') break;
+    s = play(s, { 0: 'good', 1: 'good' }, now); now += 1e5;
+    if (s.last.tierEnd) { ends++; assert.ok(s.revealMs >= 5200 + 9200, `pause allongée : ${s.revealMs}`); } else plain = Math.max(plain, s.revealMs);
+  }
+  assert.equal(ends, 2, 'deux passages : premier tour → desk → comité');
+  assert.ok(plain < 5200 + 9200 && plain >= 5200 + 2400, `bandeau de transition compris : ${plain}`);
+});
+
 t('The Candidate : en solo, la partie s\'arrête quand on n\'a plus de vies', () => {
   let s = createGame({ players: [{ id: 0, name: 'Solo' }], cfg: { mode: 'chartier', len: 15, diff: 'normal' }, seed: 3, now: 0 });
   let now = 0;
@@ -439,6 +452,24 @@ t('The Candidate : jokers 50/50 et appel à un ami', () => {
   assert.equal(useJoker(c, { by: 0, kind: 'half' }).ok, false);
 });
 
+t('The Candidate : trois bonnes réponses d\'affilée rendent un cœur, sans dépasser le départ', () => {
+  const players = [0, 1, 2].map((id) => ({ id, name: 'P' + id }));
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, code: 0, cut: 0 }, seed: 6, now: 0 });
+  let now = 0;
+  const step = (how) => { s = nextQuestion(s, now); s = play(s, how, now); now += 1e5; };
+  step({ 0: 'bad', 1: 'good', 2: 'good' });
+  assert.equal(s.players[0].lives, 2);
+  step({ 0: 'good', 1: 'good', 2: 'good' }); step({ 0: 'good', 1: 'good', 2: 'good' });
+  assert.equal(s.players[0].lives, 2, 'deux bonnes : pas encore');
+  assert.equal(s.players[1].lives, 3, 'P1 au maximum : rien de plus');
+  assert.ok(!s.last.results[1].tags.includes('life'));
+  step({ 0: 'good', 1: 'good', 2: 'good' });
+  assert.equal(s.players[0].lives, 3, 'trois d\'affilée : +1');
+  assert.ok(s.last.results[0].tags.includes('life') && s.last.results[0].gained === 1);
+  step({ 0: 'good', 1: 'good', 2: 'good' }); step({ 0: 'good', 1: 'good', 2: 'good' }); step({ 0: 'good', 1: 'good', 2: 'good' });
+  assert.equal(s.players[0].lives, 3, 'jamais plus que le nombre de départ');
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
@@ -482,6 +513,8 @@ t('figures à compter : chaque réponse recomptée par force brute', () => {
     if (q.kind === 'paths') { const W = Array.from({ length: f.n + 1 }, () => Array(f.m + 1).fill(1)); for (let y = 1; y <= f.n; y++) for (let x = 1; x <= f.m; x++) W[y][x] = W[y - 1][x] + W[y][x - 1]; n = W[f.n][f.m]; }
     if (q.kind === 'diag') { n = 0; for (let a = 0; a < f.n; a++) for (let b = a + 2; b < f.n; b++) if (!(a === 0 && b === f.n - 1)) n++; }
     if (q.kind === 'grid-sq' || q.kind === 'grid-sq-rect') { n = 0; for (let k = 1; k <= Math.min(f.n, f.m); k++) n += (f.m - k + 1) * (f.n - k + 1); }
+    if (q.kind === 'strip') { n = 0; for (let a = 0; a <= f.m; a++) for (let b = a + 1; b <= f.m; b++) n++; }
+    if (q.kind === 'fan') { n = 0; for (let a = 0; a < f.k + 2; a++) for (let b = a + 1; b < f.k + 2; b++) n++; }
     if (q.kind === 'grid-rect') { n = 0; for (let x1 = 0; x1 <= f.m; x1++) for (let x2 = x1 + 1; x2 <= f.m; x2++) for (let y1 = 0; y1 <= f.n; y1++) for (let y2 = y1 + 1; y2 <= f.n; y2++) n++; }
     if (n != null) assert.equal(q.answer, n, `${q.kind} ${q.text} ${JSON.stringify(f)}`);
     assert.ok(Number.isInteger(q.answer) && q.answer > 0 && q.tip && !/NaN|undefined/.test(q.text + q.tip + q.sub), `${q.kind} ${q.tip}`);
