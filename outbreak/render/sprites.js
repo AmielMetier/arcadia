@@ -43,13 +43,29 @@ export function drawWeapon(c, id, flash = false, scale = 1) {
       rr(c, -8, -6, 38, 12, 5); fs(c, F(flash, '#5f7d3a'), lw); rr(c, 4, 5, 6, 7, 1.5); fs(c, d, lw); circ(c, 30, 0, 5); fs(c, d, lw); break;
     case 'rail':
       rr(c, -10, -4, 48, 8, 2); fs(c, d, lw); for (let k = 0; k < 3; k++) { rr(c, 6 + k * 9, -6, 5, 12, 2); fs(c, F(flash, '#7ff0ff'), 1.6); } rr(c, 38, -2, 8, 4, 1); fs(c, m, lw); break;
+    case 'katana':
+      rr(c, -6, -2.5, 12, 5, 2); fs(c, F(flash, '#2a2d36'), lw); rr(c, 5, -5, 3, 10, 1); fs(c, F(flash, '#c9a227'), 1.8);
+      c.beginPath(); c.moveTo(8, -2); c.lineTo(50, -1.5); c.quadraticCurveTo(56, 0, 50, 2); c.lineTo(8, 2); c.closePath(); fs(c, F(flash, '#e8f4ff'), 1.8);
+      c.strokeStyle = 'rgba(120,150,180,.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(10, 0.5); c.lineTo(48, 0.5); c.stroke();
+      break;
+    case 'crossbow':
+      rr(c, -8, -3, 34, 6, 2); fs(c, F(flash, '#7a5230'), lw);
+      c.beginPath(); c.moveTo(20, -16); c.quadraticCurveTo(30, 0, 20, 16); c.strokeStyle = INK; c.lineWidth = 5; c.stroke(); c.strokeStyle = F(flash, '#4a5d32'); c.lineWidth = 3; c.stroke();
+      c.strokeStyle = '#d9d2c3'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(20, -16); c.lineTo(8, 0); c.lineTo(20, 16); c.stroke();
+      rr(c, 6, -1.2, 26, 2.4, 1); c.fillStyle = '#d9c39a'; c.fill();
+      break;
+    case 'tesla':
+      rr(c, -8, -7, 22, 14, 4); fs(c, F(flash, '#3a3f4b'), lw);
+      for (let k = 0; k < 3; k++) { circ(c, 16 + k * 7, 0, 5 - k); fs(c, F(flash, '#b87333'), 1.8); }
+      circ(c, 36, 0, 4.5); fs(c, F(flash, '#9fd8ff'), 2);
+      break;
     case 'minigun':
       rr(c, -8, -9, 18, 18, 4); fs(c, F(flash, '#c9a227'), lw); for (const y of [-4, 0, 4]) { rr(c, 8, y - 1.6, 30, 3.2, 1); fs(c, m, 1.6); } rr(c, 32, -6, 5, 12, 1.5); fs(c, d, lw); break;
   }
   c.restore();
 }
 // longueur jusqu'au bout du canon (pour le flash de tir)
-export const MUZZLE = { pistol: 16, smg: 27, shotgun: 36, rifle: 32, flamer: 36, launcher: 34, rail: 46, minigun: 38 };
+export const MUZZLE = { pistol: 16, smg: 27, shotgun: 36, rifle: 32, flamer: 36, launcher: 34, rail: 46, minigun: 38, katana: 0, crossbow: 30, tesla: 40 };
 
 // ------------------------------------------------------------------ survivant
 // p : { x, y, a (visée), color, walk (phase), move (angle de marche), speed (0..1), state, hurt, weapon, dash, reload }
@@ -69,6 +85,7 @@ export function drawSurvivor(c, p, t) {
   c.rotate(p.a);
   // sac à dos
   rr(c, -17, -9, 10, 18, 4); fs(c, dark);
+  if (p.clsColor) { circ(c, -12, 0, 3.6); fs(c, F(flash, p.clsColor), 1.6); }
   // corps
   ell(c, -2, 0, 11, 15.5); fs(c, col);
   c.beginPath(); c.moveTo(-6, -12); c.lineTo(4, -2); c.lineTo(4, 2); c.lineTo(-6, 12); c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 2; c.stroke();
@@ -192,6 +209,37 @@ export function drawZombie(c, z, t) {
       ell(c, 8, 0, 2.2, open); c.fillStyle = INK; c.fill();
       break;
     }
+    case 'armored': {
+      feet(c, z, 9, flash);
+      limb(c, -2, 15, 16 + sway * 3 + reach, 13, 6.5, skin); limb(c, -2, -15, 16 - sway * 3 + reach, -13, 6.5, skin);
+      ell(c, -4, 0, 14, 19); fs(c, F(flash, '#4f5560'));
+      // gros bouclier anti-émeute devant
+      c.save(); c.translate(17, 0);
+      rr(c, -4, -21, 9, 42, 4); fs(c, F(flash, '#8d96a3'), 3);
+      c.fillStyle = flash ? '#fff' : 'rgba(30,40,55,.55)'; rr(c, -1, -14, 4, 10, 1.5); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-1, -17); c.lineTo(-1, 17); c.stroke();
+      c.restore();
+      circ(c, 2, 0, 9); fs(c, F(flash, '#3b4250'));
+      rr(c, 6, -5, 5, 10, 2); c.fillStyle = flash ? '#fff' : '#ff6a4a'; c.fill();
+      break;
+    }
+    case 'stalker': {
+      const crouch = (z.flags & 4096) !== 0, pin = (z.flags & 2048) !== 0;
+      const ext = pin ? 10 : crouch ? -4 : Math.sin(z.walk) * 4;
+      limb(c, 0, 10, 16 + ext, 14, 3.5, F(flash, '#4b3e5a')); limb(c, 0, -10, 16 - ext, -14, 3.5, F(flash, '#4b3e5a'));
+      limb(c, -8, 8, -20, 14, 3.5, F(flash, '#4b3e5a')); limb(c, -8, -8, -20, -14, 3.5, F(flash, '#4b3e5a'));
+      ell(c, -3, 0, 13, 8); fs(c, F(flash, '#2f2838'));
+      circ(c, 8, 0, 7); fs(c, F(flash, '#5a4a6a'));
+      for (const s of [-1, 1]) { c.beginPath(); c.moveTo(18 + ext, s * 14); c.lineTo(26 + ext, s * 12); c.lineTo(18 + ext, s * 10); fs(c, F(flash, '#e8e2d4'), 1.4); }
+      break;
+    }
+    case 'larva': {
+      const w2 = Math.sin(z.walk * 2) * 3;
+      c.beginPath(); c.moveTo(-14, w2); c.quadraticCurveTo(-6, -w2 * 1.5, 0, 0); c.strokeStyle = INK; c.lineWidth = 9; c.lineCap = 'round'; c.stroke(); c.strokeStyle = F(flash, '#d6c38a'); c.lineWidth = 6; c.stroke();
+      ell(c, 2, 0, 8, 6.5); fs(c, F(flash, '#e8d79c'), 2);
+      c.fillStyle = flash ? '#fff' : '#7a1d1d'; ell(c, 8, 0, 2.5, 3.5); c.fill();
+      break;
+    }
     case 'boss': drawBoss(c, z, t, v, flash); break;
   }
   c.restore();
@@ -251,7 +299,8 @@ function drawBoss(c, z, t, v, flash) {
 
 // Yeux lumineux, dessinés après l'obscurité pour percer le noir
 export function zombieEyes(c, z) {
-  const off = { walker: 3, runner: 4, crawler: 7, spitter: 1, bloater: 14, brute: 8, screamer: 2, boss: 40 }[z.ty] ?? 3;
+  if (z.ty === 'stalker' && z.alpha != null && z.alpha < 0.5) return;
+  const off = { walker: 3, runner: 4, crawler: 7, spitter: 1, bloater: 14, brute: 8, screamer: 2, armored: 4, stalker: 8, larva: 4, boss: 40 }[z.ty] ?? 3;
   const col = z.flags & 16 ? '#ff4b2b' : z.ty === 'boss' ? '#ffef5a' : z.flags & 8 ? '#ffb03a' : '#ff6a4a';
   const ca = Math.cos(z.a), sa = Math.sin(z.a);
   const pts = z.ty === 'boss' ? [[off, -9], [off + 3, 0], [off, 9]] : [[off + 4.5, -3.5], [off + 4.5, 3.5]];
@@ -260,6 +309,22 @@ export function zombieEyes(c, z) {
     const x = z.x + lx * ca - ly * sa, y = z.y + lx * sa + ly * ca;
     c.beginPath(); c.arc(x, y, z.ty === 'boss' ? 3.4 : 1.9, 0, Math.PI * 2); c.fill();
   }
+}
+
+// ------------------------------------------------------------------ tourelle de l'ingénieur
+export function drawTurret(c, t, time) {
+  const [, , , a, f, color] = t;
+  ell(c, 3, 5, 20, 16); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill();
+  for (let k = 0; k < 3; k++) { const aa = (k / 3) * Math.PI * 2 + Math.PI / 2; limb(c, 0, 0, Math.cos(aa) * 18, Math.sin(aa) * 18, 3, '#59616d'); }
+  circ(c, 0, 0, 13); fs(c, '#3a3f4b', 2.6);
+  c.save(); c.rotate(a);
+  rr(c, -9, -8, 18, 16, 4); fs(c, color || '#ff8a1f', 2.6);
+  rr(c, 6, -5, 22, 3.6, 1); fs(c, '#262932', 1.6); rr(c, 6, 1.4, 22, 3.6, 1); fs(c, '#262932', 1.6);
+  circ(c, -2, 0, 3); c.fillStyle = f < 0.25 && Math.sin(time * 14) > 0 ? '#ff4b2b' : '#2fbf71'; c.fill();
+  c.restore();
+  // jauge de durée
+  c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, 22, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = color || '#ff8a1f'; c.beginPath(); c.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); c.stroke();
 }
 
 // ------------------------------------------------------------------ objets au sol

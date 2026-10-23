@@ -1,5 +1,5 @@
 // Interface (DOM) : HUD en jeu, choix d'améliorations, écrans de briefing, de menu et de fin.
-import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS } from '../engine/data.js';
+import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS } from '../engine/data.js';
 import { weaponIcon } from '../render/sprites.js';
 
 const $ = (s) => document.querySelector(s);
@@ -47,11 +47,18 @@ export class HUD {
     this.set('team', mates.map((p) => {
       const st2 = p.state === 1 ? 'down' : p.state === 2 ? 'dead' : '';
       const info = p.state === 1 ? `✚ ${Math.ceil(p.bl)} s` : p.state === 2 ? '☠' : WEAPONS[p.weapon]?.short || '';
-      return `<div class="mate ${st2}" style="--c:${p.color}"><div class="n"><span>${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><em>${info}</em></div><div class="hb"><i style="width:${Math.max(0, (p.h / p.H) * 100)}%"></i></div></div>`;
+      return `<div class="mate ${st2}" style="--c:${p.color}"><div class="n"><span>${CLASSES[p.cls]?.icon || ''} ${esc(p.name)}${p.bot ? ' 🤖' : ''}</span><em>${info}</em></div><div class="hb"><i style="width:${Math.max(0, (p.h / p.H) * 100)}%"></i></div></div>`;
     }).join(''));
     if (!me) return;
     // moi
     this.set('meName', esc(me.name));
+    const C = CLASSES[CLASS_IDS[me.cl]];
+    if (C) {
+      const ready = me.ab[0] <= 0, active = me.ab[1] > 0;
+      const pct = active ? 100 : Math.round((1 - me.ab[0]) * 100);
+      this.set('abil', `<span class="ico">${C.icon}</span><span class="nm"><b>${esc(C.active)}</b><small>${active ? 'actif · ' + Math.ceil(me.ab[1]) + ' s' : ready ? 'prête' : Math.ceil(me.ab[0] * C.cd) + ' s'}</small></span><kbd>${ready ? 'A' : ''}</kbd><i style="width:${pct}%"></i>`);
+      this.cls('abil', 'abil' + (ready ? ' ready' : '') + (active ? ' on' : ''));
+    }
     $('#hpBar').style.width = Math.max(0, (me.h / me.H) * 100) + '%';
     this.set('hpTxt', me.state === 1 ? `À TERRE · ${Math.ceil(me.bl)} s` : me.state === 2 ? 'K.O.' : `${Math.max(0, me.h)} / ${me.H}`);
     $('#hpBar').parentElement.className = 'bar hp' + (me.h < me.H * 0.3 || me.state ? ' low' : '');
@@ -68,8 +75,8 @@ export class HUD {
     }).join('');
     const cur = me.w[me.sl] || me.w[0];
     const W = WEAPONS[WEAPON_IDS[cur[0]]];
-    const low = cur[1] <= Math.ceil(W.mag * 0.25);
-    this.set('weapons', `<div class="wslots">${ws}</div><div class="card ammo"><small>${esc(W.name)}</small><b class="${low ? 'low' : ''}">${cur[1]}</b><span>/ ${cur[2] < 0 ? '∞' : cur[2]}</span></div>${me.rl > 0 ? `<div class="reload"><i style="width:${me.rl * 100}%"></i></div>` : ''}`);
+    const low = !W.melee && cur[1] <= Math.ceil(W.mag * 0.25);
+    this.set('weapons', `<div class="wslots">${ws}</div><div class="card ammo"><small>${esc(W.name)}</small>${W.melee ? '<b>∞</b><span>mêlée</span>' : `<b class="${low ? 'low' : ''}">${cur[1]}</b><span>/ ${cur[2] < 0 ? '∞' : cur[2]}</span>`}</div>${me.rl > 0 ? `<div class="reload"><i style="width:${me.rl * 100}%"></i></div>` : ''}`);
     // améliorations proposées
     const key = me.of ? me.on + ':' + me.of.join(',') : '';
     if (key !== this.offerKey) {
@@ -94,15 +101,20 @@ export class HUD {
 // ------------------------------------------------------------------ écrans
 const KEYS = [
   ['ZQSD / WASD', 'Se déplacer'], ['Souris', 'Viser · clic gauche : tirer'], ['Espace / Maj', 'Roulade (invulnérable)'], ['Clic droit / G', 'Lancer une grenade'],
-  ['R', 'Recharger'], ['1 2 3 · molette', 'Changer d\'arme'], ['E', 'Maintenir : relever un allié · prendre une arme'], ['Échap · M', 'Menu · son'],
+  ['A · Q', 'Capacité de classe (A en AZERTY, Q en QWERTY)'], ['R', 'Recharger'], ['1 2 3 · molette', 'Changer d\'arme'], ['E', 'Maintenir : relever un allié · prendre une arme'], ['Échap · M', 'Menu · son'],
 ];
-const PAD = 'Manette : stick gauche bouger, stick droit viser, RT tirer, A roulade, LB grenade, X recharger, B relever, Y arme.';
+const PAD = 'Manette : stick gauche bouger, stick droit viser, RT tirer, A roulade, LB grenade, X recharger, B relever, Y capacité, RB arme.';
 
 export function keysHtml() {
   return `<div class="keys">${KEYS.map(([k, d]) => `<div><kbd>${k}</kbd>${d}</div>`).join('')}</div><p class="tagline" style="font-size:13px">${PAD}</p>`;
 }
 
-export function briefingHtml({ role, squad, cfg, embedded, canStart, solo }) {
+export function classPickerHtml(myClass) {
+  return `<div class="classes">${CLASS_IDS.map((id) => { const C = CLASSES[id]; return `<button class="cls ${id === myClass ? 'sel' : ''}" data-c="${id}" style="--c:${C.color}">
+    <span class="ci">${C.icon}</span><b>${esc(C.name)}</b><span class="ca">⭐ ${esc(C.active)}</span><small>${esc(C.activeDesc)}</small><small class="cp">${esc(C.passive)}</small></button>`; }).join('')}</div>`;
+}
+
+export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myClass }) {
   const D = DIFFICULTY[cfg.difficulty] || DIFFICULTY.normal;
   const opt = (key, label, options, val) => `<div class="opt"><div class="lbl">${label}</div><div class="seg">${options.map(([v, l]) => `<button data-k="${key}" data-v="${v}" class="${String(val) === String(v) ? 'sel' : ''}">${l}</button>`).join('')}</div></div>`;
   const settings = !embedded ? `<h2>Réglages</h2><div class="opts">
@@ -117,8 +129,9 @@ export function briefingHtml({ role, squad, cfg, embedded, canStart, solo }) {
       ? 'Hangar de quarantaine. Les vagues ne s\'arrêtent jamais : tenez le plus longtemps possible, ensemble.'
       : 'Le laboratoire est tombé. Traversez 6 salles en choisissant votre chemin, puis neutralisez le Spécimen Zéro au cœur du complexe.'}</p>
     ${settings}
+    <h2>Ta classe</h2>${classPickerHtml(myClass)}
     <h2>Escouade</h2>
-    <div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><i></i>${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'toi' : p.ready ? 'prêt' : 'connexion…'}</small></div>`).join('')}</div>
+    <div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><i></i>${CLASSES[p.cls]?.icon || ''} ${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'toi' : p.ready ? 'prêt' : 'connexion…'}</small></div>`).join('')}</div>
     <h2>Commandes</h2>${keysHtml()}
     ${canStart ? `<div class="btnrow"><button class="btn" id="btnGo">Déployer l'escouade</button>${embedded ? '<button class="btn alt" id="btnExit">Retour au salon</button>' : ''}</div>`
       : `<div class="wait"><i></i>${role === 'guest' ? "En attente de l'hôte…" : 'Préparation…'}</div>${embedded ? '<div class="btnrow"><button class="btn alt" id="btnExit">Retour au salon</button></div>' : ''}`}

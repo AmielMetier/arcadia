@@ -1,6 +1,6 @@
 // Simulation d'Outbreak. Tourne chez l'hôte (ou en solo) à pas fixe ; les invités ne font qu'afficher ce qu'elle diffuse.
 // Aucun DOM, aucun réseau : testable sous Node (tools/test-outbreak.mjs).
-import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS } from './data.js';
+import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS } from './data.js';
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
@@ -11,7 +11,7 @@ const BASE_SPEED = 232;
 const REVIVE_TIME = 3;
 const DASH_SPEED = 680, DASH_TIME = 0.2, DASH_CD = 1.5;
 
-const COST = { walker: 1, crawler: 0.7, runner: 1.4, spitter: 2.6, bloater: 3, screamer: 4.5, brute: 10 };
+const COST = { walker: 1, crawler: 0.7, runner: 1.4, spitter: 2.6, bloater: 3, screamer: 4.5, brute: 10, armored: 4, stalker: 6, larva: 2.4 };
 
 export class Sim {
   constructor(cfg = {}) {
@@ -26,7 +26,7 @@ export class Sim {
     this.t = 0; this.tick = 0;
     this.phase = 'play'; // 'play' | 'over' | 'won'
     this.players = new Map();
-    this.zombies = []; this.projs = []; this.eprojs = []; this.pickups = []; this.hazards = []; this.pending = [];
+    this.zombies = []; this.projs = []; this.eprojs = []; this.pickups = []; this.hazards = []; this.pending = []; this.turrets = [];
     this.destroyed = new Set();
     this.events = [];
     this.nid = 1;
@@ -40,8 +40,9 @@ export class Sim {
   }
 
   // ------------------------------------------------------------------ joueurs
-  addPlayer({ id, name, color, bot = false }) {
+  addPlayer({ id, name, color, bot = false, cls = 'soldier' }) {
     if (this.players.has(id)) return this.players.get(id);
+    if (!CLASSES[cls]) cls = 'soldier';
     const w0 = this.cfg.startWeapon;
     const weapons = [mkWeapon('pistol')];
     if (w0 !== 'pistol') weapons.push(mkWeapon(w0));
@@ -56,10 +57,14 @@ export class Sim {
       weapons, slot: weapons.length - 1, reloadT: 0, fireCd: 0, spin: 0,
       grenades: 2, perks: {}, offers: null, picksQueued: 0, offerT: 0,
       hurtT: 0, adrenaline: this.diff.adrenaline, secondUsed: false,
-      input: blankInput(), last: { dash: 0, reload: 0, sw: 0, nade: 0, pk: 0, use: false },
+      input: blankInput(), last: { dash: 0, reload: 0, sw: 0, nade: 0, pk: 0, use: false, ab: 0 },
       stats: { kills: 0, score: 0, revives: 0, downs: 0, dmg: 0 },
       seq: 0, emote: null,
+      cls, abCd: 4, abT: 0, pinnedBy: null,
     };
+    if (cls === 'tank') { p.maxHp = p.hp = 150; p.maxArmor = 75; p.armor = 40; }
+    if (cls === 'scout') p.dashCharges = 2;
+    if (cls === 'soldier') p.grenades = 3;
     this.players.set(id, p);
     this.collideBody(p);
     return p;
@@ -70,7 +75,7 @@ export class Sim {
   setInput(id, inp) {
     const p = this.players.get(id); if (!p || !inp) return;
     // première commande reçue : caler les compteurs (une nouvelle partie ne doit pas rejouer d'anciennes actions)
-    if (!p.inputSynced) { p.inputSynced = true; p.last = { dash: inp.dash, reload: inp.reload, sw: inp.sw, nade: inp.nade, pk: inp.pk, use: !!inp.use }; }
+    if (!p.inputSynced) { p.inputSynced = true; p.last = { dash: inp.dash, reload: inp.reload, sw: inp.sw, nade: inp.nade, pk: inp.pk, use: !!inp.use, ab: inp.ab | 0 }; }
     p.input = inp;
     if (Number.isFinite(inp.q)) p.seq = inp.q;
   }
@@ -88,7 +93,7 @@ export class Sim {
     }
     this.room = { type, index, seed, exits };
     this.lv = generateRoom({ mode: this.cfg.mode, index, type, seed, exits });
-    this.zombies = []; this.projs = []; this.eprojs = []; this.hazards = []; this.pending = [];
+    this.zombies = []; this.projs = []; this.eprojs = []; this.hazards = []; this.pending = []; this.turrets = [];
     this.pickups = this.pickups.filter(() => false);
     this.destroyed = new Set();
     this.barrels = this.lv.barrels.map((b) => ({ ...b, hp: 30, fuse: -1 }));
@@ -138,6 +143,7 @@ export class Sim {
     this.updateField(dt);
     this.stepWaves(dt);
     this.stepZombies(dt);
+    this.stepTurrets(dt);
     this.stepProjectiles(dt);
     this.stepEnemyProjectiles(dt);
     this.stepHazards(dt);
@@ -158,7 +164,13 @@ export class Sim {
     p.aim = Number.isFinite(inp.a) ? inp.a : p.aim;
     if (p.hurtT > 0) p.hurtT -= dt;
     if (p.fireCd > 0) p.fireCd -= dt;
-    const dashMax = 1 + lvl(p, 'dash');
+    const dashMax = dashMaxOf(p);
+    if (p.abCd > 0) p.abCd -= dt;
+    if (p.abT > 0) { p.abT -= dt; if (p.abT <= 0) { p.abT = 0; this.ev({ e: 'abEnd', p: p.id }); } }
+    if (p.pinnedBy != null) {
+      const z = this.zombies.find((q) => q.id === p.pinnedBy && q.hp > 0 && q.state === 'pin');
+      if (!z || p.state !== 'ok') p.pinnedBy = null;
+    }
     if (p.dashCharges < dashMax) { p.dashCd -= dt * (1 + 0.55 * lvl(p, 'dash')); if (p.dashCd <= 0) { p.dashCharges++; p.dashCd = DASH_CD; } }
     if (lvl(p, 'regen') && p.state === 'ok' && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1.5 * lvl(p, 'regen') * dt);
     if (p.offers && p.bot) { p.offerT -= dt; if (p.offerT <= 0) this.pickPerk(p, botPerkChoice(p)); }
@@ -176,6 +188,10 @@ export class Sim {
         p.adrenaline--; this.raise(p, 55); this.ev({ e: 'adren', p: p.id }); this.setToast('Adrénaline ! ' + p.name + ' se relève', 2.2, 'good');
       }
     }
+
+    // capacité de classe
+    if ((inp.ab | 0) !== (L.ab | 0)) { L.ab = inp.ab | 0; if (p.state === 'ok' && p.abCd <= 0 && p.pinnedBy == null) this.useAbility(p); }
+    const pinned = p.pinnedBy != null;
 
     // armes
     const w = p.weapons[p.slot], W = WEAPONS[w.id];
@@ -198,7 +214,7 @@ export class Sim {
     }
     if (CW.spinUp) p.spin = inp.fire && p.state !== 'dead' ? Math.min(CW.spinUp + 0.2, p.spin + dt) : Math.max(0, p.spin - dt * 2);
     const reviving = p.reviving != null;
-    if (inp.fire && !reviving && p.dashT <= 0 && p.reloadT <= 0 && p.fireCd <= 0 && (!CW.spinUp || p.spin >= CW.spinUp)) {
+    if (inp.fire && !reviving && !pinned && p.dashT <= 0 && p.reloadT <= 0 && p.fireCd <= 0 && (!CW.spinUp || p.spin >= CW.spinUp)) {
       if (cw.mag > 0) this.fire(p, cw, CW);
       else if (cw.res > 0) this.startReload(p);
       else if (p.state === 'ok') { p.fireCd = 0.3; this.ev({ e: 'dry', p: p.id }); }
@@ -220,7 +236,7 @@ export class Sim {
     // roulade
     if (inp.dash !== L.dash) {
       L.dash = inp.dash;
-      if (p.state === 'ok' && p.dashCharges > 0 && p.dashT <= 0) {
+      if (p.state === 'ok' && !pinned && p.dashCharges > 0 && p.dashT <= 0) {
         p.dashCharges--; if (p.dashCd <= 0) p.dashCd = DASH_CD;
         p.dashT = DASH_TIME;
         const mx = inp.mx || 0, my = inp.my || 0;
@@ -242,7 +258,7 @@ export class Sim {
       }
       if (best) {
         p.reviving = best.id; best.reviveBy = p.id;
-        best.reviveP += (dt / REVIVE_TIME) * (1 + lvl(p, 'medic'));
+        best.reviveP += (dt / REVIVE_TIME) * (1 + lvl(p, 'medic')) * (p.cls === 'medic' ? 2 : 1);
         if (best.reviveP >= 1) {
           this.raise(best, 30 + 30 * lvl(p, 'medic'));
           p.stats.revives++; p.stats.score += 250;
@@ -256,8 +272,9 @@ export class Sim {
     let sp = BASE_SPEED * (1 + 0.1 * lvl(p, 'speed'));
     if (lvl(p, 'rage') && p.hp < p.maxHp * 0.35) sp *= 1.4;
     if (CW.slow && p.spin > 0) sp *= CW.slow;
+    sp *= classSpeed(p);
     if (p.state === 'down') sp = 52;
-    if (reviving) sp = 0;
+    if (reviving || pinned) sp = 0;
     let mx = clamp(Number(inp.mx) || 0, -1, 1), my = clamp(Number(inp.my) || 0, -1, 1);
     const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
     if (p.dashT > 0) {
@@ -274,9 +291,52 @@ export class Sim {
     this.consumeEdges(p);
   }
 
+  // ------------------------------------------------------------------ capacités de classe
+  useAbility(p) {
+    const C = CLASSES[p.cls];
+    p.abCd = C.cd; p.abT = C.dur;
+    if (p.cls === 'medic') { this.addHazard('heal', p.x, p.y, 170, C.dur); this.hazards[this.hazards.length - 1].owner = p.id; p.abT = 0; }
+    else if (p.cls === 'engineer') {
+      this.turrets = this.turrets.filter((t) => t.owner !== p.id);
+      let tx = p.x + Math.cos(p.aim) * 44, ty = p.y + Math.sin(p.aim) * 44;
+      const c = { x: tx, y: ty, r: 16 }; this.collideBody(c);
+      this.turrets.push({ id: this.nid++, owner: p.id, x: c.x, y: c.y, a: p.aim, t: C.dur, dur: C.dur, cd: 0.5, color: p.color });
+      p.abT = 0;
+    } else if (p.cls === 'tank') {
+      for (const z of this.zombies) if (z.ty !== 'boss' && Math.hypot(z.x - p.x, z.y - p.y) < 430) { z.tgt = p.id; z.tgtLock = C.dur; }
+    } else if (p.cls === 'scout') {
+      for (const z of this.zombies) if (z.tgt === p.id) { z.tgt = null; z.tgtLock = 0; z.retarget = 0; }
+    }
+    this.ev({ e: 'ab', p: p.id, c: p.cls, x: Math.round(p.x), y: Math.round(p.y) });
+  }
+
+  stepTurrets(dt) {
+    for (const t of this.turrets) {
+      t.t -= dt; t.cd -= dt;
+      let best = null, bd = 470;
+      for (const z of this.zombies) {
+        if (z.hp <= 0 || (z.ty === 'stalker' && z.state === 'hide')) continue;
+        const d = Math.hypot(z.x - t.x, z.y - t.y);
+        if (d < bd && !raycastSolids(this.blockers, t.x, t.y, z.x, z.y)) { bd = d; best = z; }
+      }
+      if (best) {
+        const want = Math.atan2(best.y - t.y, best.x - t.x);
+        t.a += angDiff(t.a, want) * Math.min(1, dt * 12);
+        if (t.cd <= 0 && Math.abs(angDiff(t.a, want)) < 0.25) {
+          t.cd = 0.15;
+          const owner = this.players.get(t.owner);
+          const a = t.a + (Math.random() - 0.5) * 0.08, sx = t.x + Math.cos(a) * 22, sy = t.y + Math.sin(a) * 22;
+          this.projs.push({ x: sx, y: sy, vx: Math.cos(a) * 1700, vy: Math.sin(a) * 1700, life: 0.5, dmg: 14 * (owner ? 1 + 0.2 * lvl(owner, 'dmg') : 1), pen: 1, knock: 30, owner: t.owner, w: 'smg', hit: null, drag: 0 });
+          this.ev({ e: 'f', p: 't' + t.id, w: 'smg', x: Math.round(sx), y: Math.round(sy), a: [Math.round(a * 1000) / 1000] });
+        }
+      }
+    }
+    if (this.turrets.some((t) => t.t <= 0)) { for (const t of this.turrets) if (t.t <= 0) this.ev({ e: 'tEnd', x: Math.round(t.x), y: Math.round(t.y) }); this.turrets = this.turrets.filter((t) => t.t > 0); }
+  }
+
   consumeEdges(p) {
     const inp = p.input, L = p.last;
-    L.dash = inp.dash; L.reload = inp.reload; L.sw = inp.sw; L.nade = inp.nade; L.pk = inp.pk; L.use = !!inp.use;
+    L.dash = inp.dash; L.reload = inp.reload; L.sw = inp.sw; L.nade = inp.nade; L.pk = inp.pk; L.use = !!inp.use; L.ab = inp.ab | 0;
   }
 
   collideBody(e) {
@@ -312,6 +372,8 @@ export class Sim {
   // ------------------------------------------------------------------ tir
   dmgMult(p) {
     let m = 1 + 0.2 * lvl(p, 'dmg');
+    if (p.cls === 'soldier') m *= 1.1;
+    if (p.cls === 'scout' && p.abT > 0) m *= 1.4;
     if (lvl(p, 'rage') && p.hp < p.maxHp * 0.35) m *= 1.4;
     for (const o of this.players.values()) {
       if (o !== p && o.state === 'ok' && lvl(o, 'team') && (o.x - p.x) ** 2 + (o.y - p.y) ** 2 < 300 * 300) { m *= 1 + 0.15 * lvl(o, 'team'); break; }
@@ -321,8 +383,11 @@ export class Sim {
   }
 
   fire(p, w, W) {
-    w.mag--;
-    p.fireCd = 1 / (W.rate * (1 + 0.15 * lvl(p, 'rate')));
+    const barrage = p.cls === 'soldier' && p.abT > 0;
+    if (!W.melee && !barrage) w.mag--;
+    p.fireCd = 1 / (W.rate * (1 + 0.15 * lvl(p, 'rate')) * (barrage ? 1.5 : 1));
+    if (W.melee) { this.slash(p, W); return; }
+    if (W.tesla) { this.zap(p, W); return; }
     p.stats.shots = (p.stats.shots || 0) + 1;
     const mult = this.dmgMult(p);
     const ox = p.x + Math.cos(p.aim) * 26, oy = p.y + Math.sin(p.aim) * 26;
@@ -340,11 +405,60 @@ export class Sim {
         x: sx, y: sy, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: W.range / spd,
         dmg: W.dmg * mult, pen: W.pen + lvl(p, 'pierce') * (W.flame ? 0 : 1), knock: W.knock, owner: p.id, w: W.id,
         flame: !!W.flame, explosive: W.explosive || 0, bounce: lvl(p, 'ricochet') && !W.flame && !W.explosive ? 1 : 0, hit: null,
-        drag: W.flame ? 2.2 : 0,
+        drag: W.flame ? 2.2 : 0, bolt: !!W.bolt,
       });
     }
     p.kx -= Math.cos(p.aim) * W.kick; p.ky -= Math.sin(p.aim) * W.kick;
     this.ev({ e: 'f', p: p.id, w: W.id, x: Math.round(sx), y: Math.round(sy), a: angs });
+  }
+
+  slash(p, W) {
+    const mult = this.dmgMult(p), reach = W.range;
+    let hits = 0;
+    for (const z of this.zombies) {
+      if (z.hp <= 0) continue;
+      const d = Math.hypot(z.x - p.x, z.y - p.y);
+      if (d > reach + z.r) continue;
+      const a = Math.atan2(z.y - p.y, z.x - p.x);
+      if (Math.abs(angDiff(p.aim, a)) > W.arc && d > z.r + p.r) continue;
+      this.damageZombie(z, W.dmg * mult, a, W.knock, p, false, true); hits++;
+    }
+    for (const b of this.barrels) if (b.hp > 0 && Math.hypot(b.x - p.x, b.y - p.y) < reach + b.r && Math.abs(angDiff(p.aim, Math.atan2(b.y - p.y, b.x - p.x))) < W.arc) this.damageBarrel(b, W.dmg);
+    for (const c of this.crates) if (c.hp > 0 && Math.hypot(c.x + c.w / 2 - p.x, c.y + c.h / 2 - p.y) < reach + 22 && Math.abs(angDiff(p.aim, Math.atan2(c.y + c.h / 2 - p.y, c.x + c.w / 2 - p.x))) < W.arc) this.damageCrate(c, W.dmg);
+    p.kx += Math.cos(p.aim) * 90; p.ky += Math.sin(p.aim) * 90;
+    this.ev({ e: 'slash', p: p.id, a: Math.round(p.aim * 100) / 100, x: Math.round(p.x), y: Math.round(p.y), h: hits });
+  }
+
+  // éclair qui saute de zombie en zombie
+  zap(p, W) {
+    const mult = this.dmgMult(p);
+    const pts = [[Math.round(p.x + Math.cos(p.aim) * 26), Math.round(p.y + Math.sin(p.aim) * 26)]];
+    const hit = new Set();
+    let first = null, bd = Infinity;
+    for (const z of this.zombies) {
+      if (z.hp <= 0) continue;
+      const d = Math.hypot(z.x - p.x, z.y - p.y);
+      if (d > W.range || Math.abs(angDiff(p.aim, Math.atan2(z.y - p.y, z.x - p.x))) > 0.45) continue;
+      const score = d + Math.abs(angDiff(p.aim, Math.atan2(z.y - p.y, z.x - p.x))) * 300;
+      if (score < bd && !raycastSolids(this.blockers, p.x, p.y, z.x, z.y)) { bd = score; first = z; }
+    }
+    let cur = first, dmg = W.dmg * mult;
+    const jumps = W.tesla + lvl(p, 'pierce');
+    while (cur && hit.size < jumps) {
+      hit.add(cur.id); pts.push([Math.round(cur.x), Math.round(cur.y)]);
+      cur.slowT = 0.6;
+      this.damageZombie(cur, dmg, Math.atan2(cur.y - pts[pts.length - 2][1], cur.x - pts[pts.length - 2][0]), W.knock, p, false, true);
+      dmg *= 0.85;
+      let nx = null, nd = 190;
+      for (const z of this.zombies) {
+        if (z.hp <= 0 || hit.has(z.id)) continue;
+        const d = Math.hypot(z.x - cur.x, z.y - cur.y);
+        if (d < nd) { nd = d; nx = z; }
+      }
+      cur = nx;
+    }
+    if (!first) { const a = p.aim + (Math.random() - 0.5) * 0.5; pts.push([Math.round(p.x + Math.cos(a) * 150), Math.round(p.y + Math.sin(a) * 150)]); }
+    this.ev({ e: 'zap', p: p.id, pts });
   }
 
   railShot(p, x, y, a, W, mult) {
@@ -360,7 +474,7 @@ export class Sim {
     }
     hits.sort((u, v) => u[0] - v[0]);
     let n = W.pen + lvl(p, 'pierce');
-    for (const [, z] of hits) { if (n-- <= 0) break; this.damageZombie(z, W.dmg * mult, a, W.knock, p); }
+    for (const [, z] of hits) { if (n-- <= 0) break; this.damageZombie(z, W.dmg * mult, a, W.knock, p, false, true); }
     this.hitBarrelsOnSegment(x, y, dx * tEnd, dy * tEnd, W.dmg);
   }
 
@@ -398,7 +512,7 @@ export class Sim {
           this.explode(pr.x + dx * t, pr.y + dy * t, pr.explosive * (1 + 0.3 * lvl(owner, 'nade')), pr.dmg, 0, owner, 'shell');
           alive = false; break;
         }
-        this.damageZombie(z, pr.dmg, a, pr.knock, owner, pr.flame);
+        this.damageZombie(z, pr.dmg, a, pr.knock, owner, pr.flame, pr.bolt);
         if (pr.flame) (pr.hit = pr.hit || new Set()).add(z.id);
         else { (pr.hit = pr.hit || new Set()).add(z.id); if (--pr.pen <= 0) { alive = false; this.ev({ e: 'stop', x: Math.round(pr.x + dx * t), y: Math.round(pr.y + dy * t) }); } }
       }
@@ -432,10 +546,13 @@ export class Sim {
   }
 
   // ------------------------------------------------------------------ dégâts
-  damageZombie(z, dmg, ang, knock, by, flame = false) {
+  damageZombie(z, dmg, ang, knock, by, flame = false, pierceArmor = false) {
     if (z.hp <= 0) return;
-    let crit = false;
-    if (by && !flame && Math.random() < 0.12 * lvl(by, 'crit')) { dmg *= 2.5; crit = true; }
+    let crit = false, clank = false;
+    if (by && !flame && Math.random() < 0.12 * lvl(by, 'crit') + (by.cls === 'scout' ? 0.1 : 0)) { dmg *= 2.5; crit = true; }
+    // blindé : la plaque avant encaisse, il faut le prendre de côté ou de dos
+    if (z.ty === 'armored' && !flame && !pierceArmor && Math.abs(angDiff(z.ang, ang + Math.PI)) < 1.0) { dmg *= 0.2; clank = true; crit = false; knock *= 0.3; }
+    if (z.ty === 'stalker' && z.state === 'pin') { z.pinDmg = (z.pinDmg || 0) + dmg; if (z.pinDmg > 55) this.releasePin(z, true); }
     if (z.state === 'stun') dmg *= 1.5;
     if (flame || (by && lvl(by, 'fire') && Math.random() < 0.2 * lvl(by, 'fire'))) { z.burnT = 3; z.burnBy = by ? by.id : null; }
     dmg = Math.max(1, dmg);
@@ -444,13 +561,15 @@ export class Sim {
     const mass = z.r / 16;
     const kb = (z.ty === 'boss' ? 0.05 : z.ty === 'brute' ? 0.15 : 1) * knock / mass;
     z.kx += Math.cos(ang) * kb; z.ky += Math.sin(ang) * kb;
-    if (!flame || Math.random() < 0.15) this.ev({ e: 'h', i: z.id, x: Math.round(z.x), y: Math.round(z.y), a: Math.round(ang * 100) / 100, d: Math.round(dmg), c: crit ? 1 : 0, g: z.ty === 'spitter' || z.ty === 'bloater' ? 1 : 0 });
+    if (clank && Math.random() < 0.6) this.ev({ e: 'clank', x: Math.round(z.x + Math.cos(z.ang) * z.r), y: Math.round(z.y + Math.sin(z.ang) * z.r), a: Math.round(z.ang * 100) / 100 });
+    else if (!flame || Math.random() < 0.15) this.ev({ e: 'h', i: z.id, x: Math.round(z.x), y: Math.round(z.y), a: Math.round(ang * 100) / 100, d: Math.round(dmg), c: crit ? 1 : 0, g: z.ty === 'spitter' || z.ty === 'bloater' ? 1 : 0 });
     if (z.ty !== 'boss' && z.tgtLock <= 0 && by) { z.tgt = by.id; z.tgtLock = 1.2; }
     if (z.hp <= 0) this.killZombie(z, ang, by);
   }
 
   killZombie(z, ang, by) {
     z.hp = 0;
+    if (z.state === 'pin') this.releasePin(z, false);
     const Z = ZOMBIES[z.ty];
     this.kills++;
     const pts = Math.round(Z.score * (z.elite ? 2 : 1));
@@ -473,13 +592,14 @@ export class Sim {
 
   hurtPlayer(p, dmg, sx, sy, knock = 0) {
     if (p.state !== 'ok' || p.dashT > 0 || p.hurtT > 0.55 || this.phase !== 'play') return false;
-    dmg *= 1;
+    if (p.cls === 'tank' && p.abT > 0) { dmg *= 0.25; knock *= 0.2; }
     if (p.armor > 0) { const a = Math.min(p.armor, dmg * 0.6); p.armor -= a; dmg -= a; }
     p.hp -= dmg; p.hurtT = 0.6;
     if (knock && sx != null) { const a = Math.atan2(p.y - sy, p.x - sx); p.kx += Math.cos(a) * knock; p.ky += Math.sin(a) * knock; }
     this.ev({ e: 'hurt', p: p.id, d: Math.round(dmg), x: Math.round(sx ?? p.x), y: Math.round(sy ?? p.y) });
     if (p.hp <= 0) {
       if (lvl(p, 'second') && !p.secondUsed) { p.secondUsed = true; p.hp = 45; p.hurtT = 1.5; this.ev({ e: 'adren', p: p.id }); this.setToast(`Second souffle pour ${p.name} !`, 2, 'good'); return true; }
+      p.pinnedBy = null;
       p.hp = 0; p.state = 'down'; p.bleed = this.diff.bleed; p.reviveP = 0; p.downAt = this.t; p.stats.downs++;
       p.slot = 0; p.reloadT = 0; p.spin = 0;
       this.ev({ e: 'down', p: p.id });
@@ -495,7 +615,7 @@ export class Sim {
       const d = Math.hypot(z.x - x, z.y - y);
       if (d < r + z.r) {
         const f = 1 - 0.6 * Math.min(1, d / r);
-        this.damageZombie(z, dmgZ * f, Math.atan2(z.y - y, z.x - x), 380 * f, by);
+        this.damageZombie(z, dmgZ * f, Math.atan2(z.y - y, z.x - x), 380 * f, by, false, true);
       }
     }
     if (dmgP > 0) for (const p of this.players.values()) {
@@ -533,6 +653,8 @@ export class Sim {
       this.ev({ e: 'crate', x: Math.round(c.x + c.w / 2), y: Math.round(c.y + c.h / 2) });
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
       const roll = this.rng.next();
+      const eng = [...this.players.values()].some((p) => p.cls === 'engineer' && p.state !== 'dead');
+      if (eng) this.spawnPickup(this.rng.pick(['ammo', 'nade', 'armor']), cx - 16, cy - 12);
       if (roll < 0.12) this.spawnWeaponDrop(cx, cy, 1);
       else { this.spawnPickup(this.rng.weighted([['ammo', 45], ['med', 25], ['armor', 15], ['nade', 15]]), cx, cy); if (this.rng.chance(0.35)) this.spawnPickup('ammo', cx + 18, cy + 10); }
     }
@@ -545,6 +667,14 @@ export class Sim {
   stepHazards(dt) {
     for (const h of this.hazards) {
       h.t -= dt;
+      if (h.k === 'heal') {
+        for (const p of this.players.values()) {
+          if ((p.x - h.x) ** 2 + (p.y - h.y) ** 2 > h.r * h.r) continue;
+          if (p.state === 'ok') { p.hp = Math.min(p.maxHp, p.hp + 16 * dt); p.armor = Math.min(p.maxArmor, p.armor + 4 * dt); }
+          else if (p.state === 'down') { p.reviveP += dt / 1.6; if (p.reviveP >= 1) { this.raise(p, 50); const m = this.players.get(h.owner); if (m) { m.stats.revives++; m.stats.score += 250; } this.ev({ e: 'rev', p: p.id, by: h.owner }); } }
+        }
+        continue;
+      }
       const dps = h.k === 'acid' ? 16 : h.k === 'toxic' ? 9 : 0;
       for (const p of this.players.values()) {
         if (p.state !== 'ok' || p.dashT > 0) continue;
@@ -602,14 +732,17 @@ export class Sim {
   wants(p, k) {
     if (k === 'med') return p.hp < p.maxHp - 1;
     if (k === 'armor') return p.armor < p.maxArmor - 1;
-    if (k === 'nade') return p.grenades < GRENADE.max + lvl(p, 'nade');
+    if (k === 'nade') return p.grenades < nadeMax(p);
     if (k === 'ammo') return p.weapons.some((w) => w.res !== Infinity && w.res < resMax(p, WEAPONS[w.id]));
     return false;
   }
 
   take(p, pk) {
     if (!this.wants(p, pk.k)) return false;
-    if (pk.k === 'med') p.hp = Math.min(p.maxHp, p.hp + 40);
+    if (pk.k === 'med') {
+      p.hp = Math.min(p.maxHp, p.hp + 40);
+      if (p.cls === 'medic') for (const o of this.players.values()) if (o !== p && o.state === 'ok' && Math.hypot(o.x - p.x, o.y - p.y) < 220) o.hp = Math.min(o.maxHp, o.hp + 25);
+    }
     else if (pk.k === 'armor') p.armor = Math.min(p.maxArmor, p.armor + 35);
     else if (pk.k === 'nade') p.grenades++;
     else if (pk.k === 'ammo') for (const w of p.weapons) { const W = WEAPONS[w.id]; if (w.res !== Infinity) w.res = Math.min(resMax(p, W), w.res + Math.ceil(resMax(p, W) * 0.4)); }
@@ -673,8 +806,8 @@ export class Sim {
     if (id === 'hp') { p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + 25); }
     if (id === 'armor') { p.maxArmor += 25; p.armor = p.maxArmor; }
     if (id === 'ammo') for (const w of p.weapons) if (w.res !== Infinity) w.res = resMax(p, WEAPONS[w.id]);
-    if (id === 'nade') p.grenades = Math.min(GRENADE.max + lvl(p, 'nade'), p.grenades + 1);
-    if (id === 'dash') p.dashCharges = 1 + lvl(p, 'dash');
+    if (id === 'nade') p.grenades = Math.min(nadeMax(p), p.grenades + 1);
+    if (id === 'dash') p.dashCharges = dashMaxOf(p);
   }
 
   // ------------------------------------------------------------------ vagues
@@ -698,9 +831,9 @@ export class Sim {
         W.budget -= cost;
         const v = this.pickVent();
         if (v) {
-          const count = ty === 'crawler' ? 2 : 1;
+          const count = ty === 'crawler' ? 2 : ty === 'larva' ? 6 : 1;
           const elite = this.room.index >= 3 && ['walker', 'runner', 'spitter'].includes(ty) && this.rng.chance(0.06);
-          for (let k = 0; k < count; k++) this.pending.push({ ty, x: v.sx + (k ? 16 : 0), y: v.sy + (k ? 10 : 0), t: 0.75 + k * 0.25, elite });
+          for (let k = 0; k < count; k++) this.pending.push({ ty, x: v.sx + (k ? (k % 3 - 1) * 16 : 0), y: v.sy + (k ? ((k / 3) | 0) * 14 : 0), t: 0.75 + k * (ty === 'larva' ? 0.08 : 0.25), elite });
           this.ev({ e: 'vent', v: v.id });
         }
         W.spawnT = Math.max(0.28, (0.95 - this.room.index * 0.06) / Math.sqrt(pf)) * (0.6 + this.rng.next() * 0.8);
@@ -757,6 +890,9 @@ export class Sim {
       ['bloater', (i >= 3 ? 1.6 : 0) * (ty === 'storage' ? 1.6 : 1)],
       ['screamer', i >= 4 ? 0.8 : 0],
       ['brute', i >= 6 ? 0.25 : 0],
+      ['armored', i >= 3 ? 1.3 : 0],
+      ['stalker', i >= 4 ? 0.7 : i >= 3 ? 0.3 : 0],
+      ['larva', (i >= 2 ? 1.4 : 0) * (ty === 'lab' ? 1.8 : 1)],
     ].filter((x) => x[1] > 0);
     if (this.room.type === 'core') return this.rng.weighted([['runner', 4], ['walker', 4], ['crawler', 3], ['spitter', 1]]);
     return this.rng.weighted(w);
@@ -806,7 +942,7 @@ export class Sim {
       this.offerPerks(p, ty === 'lab' ? 1 : 0);
       if (ty === 'lab') p.picksQueued++;
       if (ty === 'medbay' && p.state === 'ok') { p.hp = Math.min(p.maxHp, p.hp + 50); p.armor = Math.min(p.maxArmor, p.armor + 40); }
-      if (ty === 'storage') p.grenades = GRENADE.max + lvl(p, 'nade');
+      if (ty === 'storage') p.grenades = nadeMax(p);
     }
     if (ty === 'armory') { this.spawnWeaponDrop(cx - 60, cy, 2); this.spawnWeaponDrop(cx + 60, cy, 2); this.spawnPickup('ammo', cx, cy + 50); }
     else if (ty === 'medbay') { this.spawnPickup('med', cx - 40, cy); this.spawnPickup('med', cx + 40, cy); this.spawnPickup('armor', cx, cy + 40); }
@@ -874,7 +1010,7 @@ export class Sim {
   stepZombies(dt) {
     const Zs = this.zombies;
     const plist = [...this.players.values()];
-    const targets = plist.filter((p) => p.state === 'ok');
+    const targets = plist.filter((p) => p.state === 'ok' && !(p.cls === 'scout' && p.abT > 0));
     // grille spatiale pour la séparation
     const G = 56, grid = new Map();
     for (const z of Zs) { const k = ((z.x / G) | 0) * 4096 + ((z.y / G) | 0); let a = grid.get(k); if (!a) grid.set(k, (a = [])); a.push(z); }
@@ -895,7 +1031,9 @@ export class Sim {
       // cible
       z.retarget -= dt;
       let T = this.players.get(z.tgt);
-      if (!T || T.state !== 'ok' || (z.retarget <= 0 && z.tgtLock <= 0)) {
+      if (T && T.cls === 'scout' && T.abT > 0) T = null;
+      if (z.state === 'pin') T = this.players.get(z.pinId) || null;
+      else if (!T || T.state !== 'ok' || (z.retarget <= 0 && z.tgtLock <= 0)) {
         z.retarget = 0.6 + Math.random() * 0.3;
         let best = null, bd = Infinity;
         for (const p of targets) { const d = (p.x - z.x) ** 2 + (p.y - z.y) ** 2; if (d < bd) { bd = d; best = p; } }
@@ -906,6 +1044,7 @@ export class Sim {
       if (z.losT <= 0 && T) { z.losT = 0.25; z.los = !raycastSolids(this.blockers, z.x, z.y, T.x, T.y); z.walkLos = z.los && !this.solidsNow.some((s) => s.low && segRect(z.x, z.y, dx, dy, s, z.r * 0.8)); }
 
       let speed = z.spd * (z.buffT > 0 ? 1.45 : 1);
+      if (z.slowT > 0) { z.slowT -= dt; speed *= 0.35; }
       let want = null; // direction souhaitée {x,y}
       const chase = () => {
         if (!T) return null;
@@ -950,12 +1089,23 @@ export class Sim {
         case 'runner':
           want = chase(); if (T && dist < 160) speed *= 1.35;
           break;
+        case 'stalker':
+          if (this.stalkerAI(z, T, dt, dist, dx, dy)) { speed = z.curSpeed; want = z.curWant; } else want = chase();
+          break;
+        case 'larva': {
+          want = chase();
+          if (want) { const wig = Math.sin(this.t * 9 + z.wob) * 0.7; const c = Math.cos(wig), sn = Math.sin(wig); want = { x: want.x * c - want.y * sn, y: want.x * sn + want.y * c }; }
+          break;
+        }
+        case 'armored':
+          want = chase(); if (T && dist < 140) speed *= 1.2;
+          break;
         default:
           want = chase();
       }
 
       // attaque au contact
-      if (T && z.state === 'walk' && (z.ty !== 'bloater')) {
+      if (T && z.state === 'walk' && z.ty !== 'bloater' && z.ty !== 'stalker') {
         const reach = z.r + T.r + (z.ty === 'boss' ? 30 : 8);
         if (z.atkT > 0) {
           z.atkT -= dt; speed *= 0.35;
@@ -1012,6 +1162,66 @@ export class Sim {
       if (z.state === 'charge' && z.hitWall) { z.hitWall = false; }
     }
     this.zombies = Zs.filter((z) => z.hp > 0);
+  }
+
+  // Traqueur : rôde à distance, presque invisible, bondit et plaque un survivant au sol
+  stalkerAI(z, T, dt, dist, dx, dy) {
+    const Z = ZOMBIES.stalker;
+    switch (z.state) {
+      case 'crouch':
+        z.stT -= dt; z.curSpeed = 0; z.curWant = null;
+        if (T) z.lockA = Math.atan2(dy, dx);
+        if (z.stT <= 0) { z.state = 'leap'; z.stT = 0.55; this.ev({ e: 'pounce', x: Math.round(z.x), y: Math.round(z.y) }); }
+        return true;
+      case 'leap': {
+        z.stT -= dt;
+        z.curSpeed = Z.pounce; z.curWant = { x: Math.cos(z.lockA), y: Math.sin(z.lockA) };
+        z.vx = Math.cos(z.lockA) * Z.pounce; z.vy = Math.sin(z.lockA) * Z.pounce;
+        for (const p of this.players.values()) {
+          if (p.state !== 'ok' || p.dashT > 0 || p.pinnedBy != null) continue;
+          if (Math.hypot(p.x - z.x, p.y - z.y) < z.r + p.r + 8) {
+            if (p.cls === 'tank' && p.abT > 0) { z.state = 'stun'; z.stT = 1.2; this.ev({ e: 'clank', x: Math.round(p.x), y: Math.round(p.y), a: 0 }); return true; }
+            z.state = 'pin'; z.pinId = p.id; z.pinDmg = 0; z.stT = 5; p.pinnedBy = z.id; p.vx = p.vy = 0;
+            this.ev({ e: 'pin', p: p.id }); this.setToast(`${p.name} est plaqué au sol !`, 2, 'bad');
+            return true;
+          }
+        }
+        if (z.stT <= 0) { z.state = 'walk'; z.cdA = 3.5; }
+        return true;
+      }
+      case 'pin': {
+        const p = this.players.get(z.pinId);
+        z.curSpeed = 0; z.curWant = null; z.vx = z.vy = 0;
+        if (!p || p.state !== 'ok') { this.releasePin(z, false); return true; }
+        z.x += (p.x - z.x) * Math.min(1, dt * 10); z.y += (p.y - z.y) * Math.min(1, dt * 10);
+        z.ang = Math.atan2(p.y - z.y, p.x - z.x) || z.ang;
+        let d = 12 * this.diff.zDmg * dt;
+        if (p.armor > 0) { const a = Math.min(p.armor, d * 0.5); p.armor -= a; d -= a; }
+        p.hp -= d;
+        if (p.hp <= 0) { p.hp = 0.01; p.hurtT = 0; this.hurtPlayer(p, 5, z.x, z.y); }
+        z.stT -= dt; if (z.stT <= 0) this.releasePin(z, true);
+        return true;
+      }
+      case 'stun':
+        z.stT -= dt; z.curSpeed = 0; z.curWant = null; if (z.stT <= 0) { z.state = 'walk'; z.cdA = 2; }
+        return true;
+    }
+    if (!T) return false;
+    if (z.cdA <= 0 && z.los && dist < 430 && dist > 120) { z.state = 'crouch'; z.stT = 0.6; z.lockA = Math.atan2(dy, dx); return true; }
+    // tourne autour de sa proie à distance en attendant
+    if (z.los && dist < 300) { const s = (z.id % 2 ? 1 : -1); z.curWant = { x: (-dy / dist) * s - (dx / dist) * 0.3, y: (dx / dist) * s - (dy / dist) * 0.3 }; z.curSpeed = z.spd * 0.8; return true; }
+    return false;
+  }
+
+  releasePin(z, jumpAway) {
+    const p = this.players.get(z.pinId);
+    if (p && p.pinnedBy === z.id) { p.pinnedBy = null; p.hurtT = 0.8; }
+    z.pinId = null;
+    if (z.hp > 0) {
+      z.state = 'stun'; z.stT = jumpAway ? 0.9 : 0.4; z.cdA = 5;
+      if (p && jumpAway) { const a = Math.atan2(z.y - p.y, z.x - p.x); z.kx += Math.cos(a) * 520; z.ky += Math.sin(a) * 520; }
+    }
+    this.ev({ e: 'unpin', p: p ? p.id : null });
   }
 
   // Brute et boss : charge, onde de choc, salves d'acide, invocation. Renvoie true si l'IA contrôle le mouvement.
@@ -1137,9 +1347,10 @@ export class Sim {
       P.push({
         i: p.id, n: p.name, c: p.color, b: p.bot ? 1 : 0, x: r1(p.x), y: r1(p.y), vx: r1(p.vx), vy: r1(p.vy), a: r2(p.aim),
         h: Math.ceil(p.hp), H: p.maxHp, r: Math.ceil(p.armor), R: p.maxArmor, s: p.state === 'ok' ? 0 : p.state === 'down' ? 1 : 2,
-        bl: r1(p.bleed), rv: r2(p.reviveP), rg: p.reviving, d: p.dashT > 0 ? 1 : 0, dc: p.dashCharges, dm: 1 + lvl(p, 'dash'), dcd: r2(p.dashCd),
+        bl: r1(p.bleed), rv: r2(p.reviveP), rg: p.reviving, d: p.dashT > 0 ? 1 : 0, dc: p.dashCharges, dm: dashMaxOf(p), dcd: r2(p.dashCd),
         w: p.weapons.map((w) => [WEAPON_IDS.indexOf(w.id), w.mag, w.res === Infinity ? -1 : w.res]), sl: p.slot,
-        rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadDur || 1)) : 0, sp: r2(p.spin), g: p.grenades, gm: GRENADE.max + lvl(p, 'nade'),
+        rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadDur || 1)) : 0, sp: r2(p.spin), g: p.grenades, gm: nadeMax(p),
+        cl: CLASS_IDS.indexOf(p.cls), ab: [r2(Math.max(0, p.abCd) / CLASSES[p.cls].cd), r2(p.abT)], pn: p.pinnedBy != null ? 1 : 0,
         pk: p.perks, of: p.offers, on: p.offerN || 0, ht: p.hurtT > 0 ? 1 : 0, q: p.seq, ad: p.adrenaline,
         st: [p.stats.kills, p.stats.score, p.stats.revives, p.stats.downs, r1(p.stats.dmg)],
       });
@@ -1151,16 +1362,18 @@ export class Sim {
       if (z.state === 'tele') fl |= 256; if (z.state === 'slamwind') fl |= 512; if (z.state === 'fuse') fl |= 1024;
       if (z.elite) fl |= 8; if (z.buffT > 0) fl |= 16; if (z.state === 'stun') fl |= 32; if (z.state === 'charge') fl |= 64;
       if (z.flash > 0) fl |= 128;
+      if (z.state === 'pin') fl |= 2048; if (z.state === 'crouch' || z.state === 'leap') fl |= 4096;
       return [z.id, ZOMBIE_IDS.indexOf(z.ty), r1(z.x), r1(z.y), r2(z.ang), Math.max(0, Math.round((z.hp / z.maxHp) * 1000)), fl, r2(z.lockA), z.phase, r1(z.vx), r1(z.vy)];
     });
     const O = this.eprojs.map((e) => [e.id, e.k === 'acid' ? 0 : 1, r1(e.x), r1(e.y), r1(e.h || 0), e.big ? 1 : 0, r1(e.tx ?? e.x), r1(e.ty ?? e.y), r2(e.k === 'acid' ? e.t / e.dur : e.t / e.fuse)]);
     const K = this.pickups.map((k) => [k.id, k.k, r1(k.x), r1(k.y), k.w || 0]);
+    const T = this.turrets.map((t) => [t.id, r1(t.x), r1(t.y), r2(t.a), r2(t.t / t.dur), t.color]);
     const A = this.hazards.map((h) => [h.id, h.k, r1(h.x), r1(h.y), r1(h.r), r2(h.t / h.dur)]);
     const W = this.wave;
     const boss = this.zombies.find((z) => z.ty === 'boss');
     return {
       ph: this.phase, t: r2(this.t), rm: { i: this.room.index, ty: this.room.type, sd: this.room.seed, ex: this.room.exits, mode: this.cfg.mode },
-      P, Z, O, K, A, D: [...this.destroyed], op: this.doorsOpen ? 1 : 0, cl: this.cleared ? 1 : 0,
+      P, Z, O, K, A, T, D: [...this.destroyed], op: this.doorsOpen ? 1 : 0, cl: this.cleared ? 1 : 0,
       rl: this.rally ? { d: this.rally.door, t: r2(this.rally.t), a: this.rally.all ? 1 : 0 } : null,
       wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
       sc: this.score, k: this.kills, rc: this.roomsCleared, ts: this.toast && this.toast.until > this.t ? this.toast : null,
@@ -1173,7 +1386,7 @@ export class Sim {
     const sim = new Sim({ mode: snap.rm.mode, difficulty: snap.cfg.d, startWeapon: snap.cfg.sw, seed: snap.cfg.seed, ...cfg });
     sim.score = snap.sc; sim.kills = snap.k; sim.roomsCleared = snap.rc;
     for (const q of snap.P) {
-      const p = sim.addPlayer({ id: q.i, name: q.n, color: q.c, bot: !!q.b });
+      const p = sim.addPlayer({ id: q.i, name: q.n, color: q.c, bot: !!q.b, cls: CLASS_IDS[q.cl] || 'soldier' });
       p.maxHp = q.H; p.hp = Math.max(1, q.h); p.maxArmor = q.R; p.armor = q.r; p.state = q.s === 0 ? 'ok' : q.s === 1 ? 'down' : 'dead';
       if (p.state === 'down') { p.state = 'ok'; p.hp = 30; }
       p.weapons = q.w.map(([wi, mag, res]) => ({ id: WEAPON_IDS[wi], mag, res: res < 0 ? Infinity : res }));
@@ -1191,7 +1404,10 @@ export class Sim {
 function blankInput() { return { mx: 0, my: 0, a: -Math.PI / 2, fire: false, dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, td: 300, use: false, pk: 0, pi: -1, q: 0 }; }
 export function lvl(p, id) { return (p && p.perks && p.perks[id]) || 0; }
 export function magSize(p, W) { return Math.round(W.mag * (1 + 0.35 * lvl(p, 'mag'))); }
-export function resMax(p, W) { return W.resMax === Infinity ? Infinity : Math.round(W.resMax * (1 + 0.5 * lvl(p, 'ammo'))); }
+export function resMax(p, W) { return W.resMax === Infinity ? Infinity : Math.round(W.resMax * (1 + 0.5 * lvl(p, 'ammo')) * (p && p.cls === 'engineer' ? 1.25 : 1)); }
+export function nadeMax(p) { return GRENADE.max + lvl(p, 'nade') + (p && p.cls === 'soldier' ? 1 : 0); }
+export function dashMaxOf(p) { return 1 + lvl(p, 'dash') + (p && p.cls === 'scout' ? 1 : 0); }
+export function classSpeed(p) { return p.cls === 'tank' ? 0.92 : p.cls === 'scout' ? (p.abT > 0 ? 1.4 * 1.08 : 1.08) : 1; }
 function mkWeapon(id, p) { const W = WEAPONS[id]; return { id, mag: p ? magSize(p, W) : W.mag, res: W.res }; }
 function nPlayers(sim) { return sim.players.size; }
 function botPerkChoice(p) {

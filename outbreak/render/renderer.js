@@ -1,5 +1,5 @@
 // Rendu d'une image : salle, entités, effets, éclairage dynamique (lampes torches, flashs, explosions), indicateurs.
-import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
+import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
 import { paintLevel, THEMES } from './level-art.js';
 import { WALL_TOP } from '../engine/level.js';
 import { ROOM_TYPES } from '../engine/data.js';
@@ -83,6 +83,7 @@ export class Renderer {
     fx.drawUnder(c);
     for (const k of v.pickups) { c.save(); c.translate(k.x, k.y); ell(c, 0, 12, 14, 5); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawPickup(c, k, t); c.restore(); }
     for (const b of v.barrels) { c.save(); c.translate(b.x, b.y); ell(c, 4, 6, b.r, b.r * 0.8); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawBarrel(c, b, t); c.restore(); }
+    for (const tt of v.turrets || []) { c.save(); c.translate(tt[1], tt[2]); drawTurret(c, tt, t); c.restore(); }
     for (const k of v.crates) { c.save(); c.translate(k.x, k.y); rr(c, 6, 8, k.w, k.h, 3); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawCrate(c, k.w, k.h); c.restore(); }
 
     // ---- ombres
@@ -98,13 +99,27 @@ export class Renderer {
     for (const [, k, e] of ents) {
       c.save(); c.translate(e.x, e.y);
       if (k === 0) {
+        // traqueur : presque invisible sauf de près, quand il bondit, plaque ou se fait toucher
+        if (e.ty === 'stalker') {
+          const near = v.players.some((p) => p.state !== 2 && Math.hypot(p.x - e.x, p.y - e.y) < 190);
+          e.alpha = e.flags & (2048 | 4096 | 128 | 32) || near ? 1 : 0.13;
+          c.globalAlpha = e.alpha;
+        }
         if (e.flags & 8) { c.globalAlpha = 0.5 + 0.3 * Math.sin(t * 6); circ(c, 0, 0, e.r + 7); c.fillStyle = '#ffb03a'; c.fill(); c.globalAlpha = 1; }
         if (e.flags & 16) { circ(c, 0, 0, e.r + 4); c.strokeStyle = '#ff4b2b'; c.lineWidth = 2; c.stroke(); }
         drawZombie(c, e, t);
+        c.globalAlpha = 1;
       } else {
+        if (e.shadow) c.globalAlpha = e.id === v.meId ? 0.55 : 0.35;
+        if (e.shield) {
+          circ(c, 0, 0, 30 + Math.sin(t * 8) * 1.5); c.fillStyle = 'rgba(43,140,255,.18)'; c.fill();
+          c.strokeStyle = 'rgba(140,200,255,.85)'; c.lineWidth = 3; c.stroke();
+        }
+        if (e.barrage) { circ(c, 0, 0, 26); c.strokeStyle = `rgba(255,197,49,${0.5 + 0.3 * Math.sin(t * 20)})`; c.lineWidth = 3; c.stroke(); }
         if (e.dash) { c.globalAlpha = 0.3; c.save(); c.translate(-e.vx * 0.05, -e.vy * 0.05); drawSurvivor(c, e, t); c.restore(); c.globalAlpha = 1; }
         drawSurvivor(c, e, t);
         if (fx.muzzle.has(e.id) && e.state !== 1) this.muzzleFlash(c, e);
+        c.globalAlpha = 1;
       }
       c.restore();
     }
@@ -142,6 +157,14 @@ export class Renderer {
   drawHazard(c, h, t) {
     const [id, k, x, y, r, f] = h;
     const a = Math.min(1, f * 3);
+    if (k === 'heal') {
+      circ(c, x, y, r); c.fillStyle = `rgba(47,191,113,${0.14 * a})`; c.fill();
+      c.strokeStyle = `rgba(127,240,176,${0.8 * a})`; c.lineWidth = 3; c.setLineDash([14, 10]); c.lineDashOffset = -t * 30; c.stroke(); c.setLineDash([]);
+      c.strokeStyle = `rgba(47,191,113,${0.5 * a})`; c.lineWidth = 2; circ(c, x, y, r * (1 - ((t * 0.8) % 1))); c.stroke();
+      c.fillStyle = `rgba(255,255,255,${0.75 * a})`; c.fillRect(x - 6, y - 18, 12, 36); c.fillRect(x - 18, y - 6, 36, 12);
+      c.fillStyle = `rgba(47,191,113,${0.9 * a})`; c.fillRect(x - 3.5, y - 15, 7, 30); c.fillRect(x - 15, y - 3.5, 30, 7);
+      return;
+    }
     if (k === 'acid') {
       c.globalAlpha = 0.75 * a;
       c.fillStyle = '#5a9a1f'; ell(c, x, y, r, r * 0.8, id); c.fill();
@@ -236,7 +259,8 @@ export class Renderer {
     for (const l of this.fx.lights) blob(l.x, l.y, l.r, l.a * (l.life / l.max));
     let n = 0;
     for (const p of this.fx.parts) if ((p.k === 'flame' || p.k === 'fire') && (n++ % 3 === 0)) blob(p.x, p.y, 90, 0.5 * (p.life / p.max));
-    for (const h of v.hazards) blob(h[2], h[3], h[4] * 1.4, h[1] === 'acid' ? 0.4 : 0.2);
+    for (const h of v.hazards) blob(h[2], h[3], h[4] * 1.4, h[1] === 'acid' ? 0.4 : h[1] === 'heal' ? 0.55 : 0.2);
+    for (const tt of v.turrets || []) blob(tt[1], tt[2], 120, 0.5);
     for (const k of v.pickups) blob(k.x, k.y, k.k === 'weapon' ? 110 : 70, 0.4);
     for (const d of this.lv.doors) if (d.kind === 'exit') blob(d.x + d.w / 2, WALL_TOP, 200, v.doorsOpen ? 0.7 : 0.35);
     for (const z of v.zombies) { if (z.flags & 2) blob(z.x, z.y, 90, 0.6); if (z.ty === 'boss') blob(z.x, z.y, 240, 0.45); }
@@ -258,7 +282,8 @@ export class Renderer {
       else glow(l.x, l.y + 10, 200, 'rgba(255,220,160,A)', 0.08);
     }
     for (const l of this.fx.lights) { const f = l.life / l.max; const rgb = hexToRgb(l.c); glow(l.x, l.y, l.r * 0.6, `rgba(${rgb},A)`, 0.35 * f); }
-    for (const h of v.hazards) glow(h[2], h[3], h[4] * 1.2, 'rgba(120,220,60,A)', h[1] === 'acid' ? 0.18 : 0.08);
+    for (const h of v.hazards) glow(h[2], h[3], h[4] * 1.2, h[1] === 'heal' ? 'rgba(60,230,140,A)' : 'rgba(120,220,60,A)', h[1] === 'acid' ? 0.18 : h[1] === 'heal' ? 0.22 : 0.08);
+    for (const p of v.players) if (p.shield) glow(p.x, p.y, 90, 'rgba(60,140,255,A)', 0.25);
     for (const d of this.lv.doors) if (d.kind === 'exit') glow(d.x + d.w / 2, WALL_TOP + 10, 160, v.doorsOpen ? 'rgba(47,191,113,A)' : 'rgba(255,60,40,A)', 0.18);
     for (const z of v.zombies) {
       if (z.ty === 'boss') glow(z.x, z.y, 160, 'rgba(199,125,255,A)', 0.25);
@@ -283,6 +308,12 @@ export class Renderer {
         c.restore();
       }
       if (z.flags & 512) { circ(c, z.x, z.y, 230); c.fillStyle = `rgba(255,60,40,${0.12 + 0.1 * pulse})`; c.fill(); c.strokeStyle = `rgba(255,90,60,${0.7})`; c.lineWidth = 3; c.stroke(); }
+      if (z.ty === 'stalker' && z.flags & 4096 && !(z.flags & 64)) {
+        c.save(); c.translate(z.x, z.y); c.rotate(z.lockA);
+        c.strokeStyle = `rgba(200,140,255,${0.5 + 0.4 * pulse})`; c.lineWidth = 3; c.setLineDash([10, 8]);
+        c.beginPath(); c.moveTo(16, 0); c.lineTo(330, 0); c.stroke(); c.setLineDash([]); c.restore();
+      }
+      if (z.flags & 2048) { c.font = '16px sans-serif'; c.textAlign = 'center'; c.fillText('⚠', z.x, z.y - 30); }
       if (z.flags & 1024) { circ(c, z.x, z.y, 115); c.fillStyle = `rgba(200,255,90,${0.1 + 0.12 * pulse})`; c.fill(); c.strokeStyle = 'rgba(200,255,90,.8)'; c.lineWidth = 2.5; c.setLineDash([10, 8]); c.stroke(); c.setLineDash([]); }
       // barres de vie des gros et des élites
       if ((z.ty === 'brute' || z.flags & 8) && z.hp < 1) {
@@ -309,6 +340,7 @@ export class Renderer {
         rr(c, p.x - 20, p.y - 29, 40, 6, 3); c.fillStyle = 'rgba(0,0,0,.65)'; c.fill();
         rr(c, p.x - 20, p.y - 29, 40 * Math.max(0, p.h / p.H), 6, 3); c.fillStyle = p.h / p.H < 0.35 ? '#ff4b2b' : '#2fbf71'; c.fill();
       }
+      if (p.pinned && Math.sin(t * 10) > -0.2) { c.font = 'bold 13px "Chakra Petch", sans-serif'; c.lineWidth = 4; c.strokeStyle = INK; c.strokeText('AIDEZ-MOI !', p.x, p.y + 36); c.fillStyle = '#ff4b2b'; c.fillText('AIDEZ-MOI !', p.x, p.y + 36); }
       if (p.state === 1) { // à terre : compte à rebours et progression de réanimation
         const f = Math.max(0, p.bl / (v.bleedMax || 28));
         c.lineWidth = 5; c.strokeStyle = 'rgba(0,0,0,.6)'; circ(c, p.x, p.y, 30); c.stroke();

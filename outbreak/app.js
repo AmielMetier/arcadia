@@ -4,7 +4,7 @@
 import { Sim, DT, lvl } from './engine/sim.js';
 import { botThink } from './engine/bots.js';
 import { generateRoom } from './engine/level.js';
-import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS } from './engine/data.js';
+import { WEAPONS, WEAPON_IDS, ZOMBIE_IDS, ZOMBIES, BOT_NAMES, PLAYER_COLORS, DIFFICULTY, CAMPAIGN_ROOMS, CLASSES, CLASS_IDS } from './engine/data.js';
 import { pushOutRect, clamp, angDiff } from './engine/geom.js';
 import { Audio } from './audio.js';
 import { FX } from './render/fx.js';
@@ -30,7 +30,9 @@ const S = {
   role: 'solo', myId: 0, cfg: null, sim: null, runId: 0, lobby: true, menu: false,
   lvKey: '', lv: null, snaps: [], evq: [], last: null, off: null, endShown: false, reported: false,
   netEv: [], tick: 0, acc: 0, inp: null, sentSeq: 0, hist: [], shots: [], pred: null, gcd: 0, spin: 0, gotHost: false, hiT: 0,
+  classes: {}, myClass: 'soldier', abReady: true,
 };
+try { const c = localStorage.getItem('outbreak_class'); if (CLASSES[c]) S.myClass = c; } catch (e) {}
 
 // ------------------------------------------------------------------ réglages et identité
 function readCfg(settings = {}) {
@@ -59,11 +61,12 @@ function boot(info) {
   S.role = H.embedded ? info.role : 'solo';
   S.myId = H.embedded ? info.myId : 0;
   S.cfg = readCfg(info.settings || {});
+  S.classes[S.myId] = S.myClass;
   H.on('msg', onMsg);
   H.on('roster', onRoster);
   if (H.embedded) H.signalReady();
   showBriefing();
-  if (S.role === 'guest') H.send('host', { t: 'hi' });
+  if (S.role === 'guest') H.send('host', { t: 'hi', c: S.myClass });
   requestAnimationFrame(loop);
   if (QS.has('debug')) window.__outbreak = { S, fx, renderer, input };
   if (QS.has('autostart') && S.role !== 'guest') setTimeout(startRun, 300);
@@ -71,17 +74,31 @@ function boot(info) {
 if (H.embedded) H.on('init', boot); else boot({});
 
 function squad() {
-  const hs = humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id) }));
+  const hs = humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id), cls: p.id === S.myId ? S.myClass : CLASSES[S.classes[p.id]] ? S.classes[p.id] : 'soldier' }));
   const nb = Math.min(S.cfg.bots, Math.max(0, 5 - hs.length));
-  const bots = BOT_NAMES.slice(0, nb).map(([name, color]) => ({ name, color, bot: true }));
+  // les équipiers IA prennent les classes encore libres (soigneur et colosse d'abord)
+  const order = ['medic', 'tank', 'engineer', 'scout', 'soldier'];
+  const free = order.filter((c) => !hs.some((h) => h.cls === c)).concat(order);
+  const bots = BOT_NAMES.slice(0, nb).map(([name, color], i) => ({ name, color, bot: true, cls: free[i] }));
   return hs.concat(bots);
+}
+
+function chooseClass(c) {
+  if (!CLASSES[c]) return;
+  S.myClass = c; S.classes[S.myId] = c;
+  try { localStorage.setItem('outbreak_class', c); } catch (e) {}
+  if (S.role === 'guest') H.send('host', { t: 'cls', c });
+  else broadcastLobby();
+  audio.unlock(); audio.play('click');
+  showBriefing();
 }
 
 function showBriefing() {
   if (!S.lobby) return;
   const canStart = S.role !== 'guest';
   screenEl.className = 'screen'; screenEl.hidden = false;
-  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart });
+  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, canStart, myClass: S.myClass });
+  for (const b of screenEl.querySelectorAll('.cls')) b.onclick = () => chooseClass(b.dataset.c);
   hud.show(false);
   const go = $('#btnGo'); if (go) go.onclick = () => { audio.unlock(); startRun(); };
   const ex = $('#btnExit'); if (ex) ex.onclick = () => H.exit();
@@ -99,8 +116,9 @@ function startRun() {
   if (S.role === 'guest') return;
   const seed = (Math.random() * 2 ** 31) | 0;
   const sim = new Sim({ mode: S.cfg.mode, difficulty: S.cfg.difficulty, startWeapon: S.cfg.startWeapon, seed });
-  for (const p of humanPlayers()) if (isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
-  squad().filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true }));
+  const sq = squad();
+  for (const p of sq) if (!p.bot && isReady(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
+  sq.filter((p) => p.bot).forEach((b, i) => sim.addPlayer({ id: -1 - i, name: b.name, color: b.color, bot: true, cls: b.cls }));
   sim.startRoom(sim.room.type, sim.room.index); // replace tout le monde à l'entrée
   S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0;
   hideScreen();
@@ -143,10 +161,10 @@ function onRoster() {
   const sim = S.sim; if (!sim) return;
   const ids = new Set(H.players.map((p) => p.id));
   for (const p of [...sim.players.values()]) if (!p.bot && !ids.has(p.id)) sim.removePlayer(p.id);
-  for (const p of humanPlayers()) if (isReady(p.id) && !sim.players.has(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
+  for (const p of squad()) if (!p.bot && isReady(p.id) && !sim.players.has(p.id)) sim.addPlayer({ id: p.id, name: p.name, color: p.color, cls: p.cls });
 }
 
-function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg }); }
+function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg, classes: S.classes }); }
 
 // Le Hub a désigné ce joueur comme nouvel hôte : la partie reprend depuis le dernier état reçu
 function becomeHost() {
@@ -181,14 +199,21 @@ function report(snap) {
 function onMsg(from, m) {
   if (!m || typeof m !== 'object') return;
   if (S.role === 'host' || S.role === 'solo') {
-    if (m.t === 'hi') { if (S.lobby) H.send(from, { t: 'lobby', cfg: S.cfg }); }
+    if (m.t === 'hi' || m.t === 'cls') {
+      if (CLASSES[m.c]) S.classes[from] = m.c;
+      if (S.lobby) { showBriefing(); if (m.t === 'cls') broadcastLobby(); else H.send(from, { t: 'lobby', cfg: S.cfg, classes: S.classes }); }
+    }
     else if (m.t === 'i' && S.sim) S.sim.setInput(from, cleanInput(m));
     return;
   }
   // invité : seul l'hôte fait foi
   if (from !== H.info.hostId) return;
   S.gotHost = true;
-  if (m.t === 'lobby') { if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg }; if (S.lobby) showBriefing(); }
+  if (m.t === 'lobby') {
+    if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg };
+    if (m.classes && typeof m.classes === 'object') { S.classes = { ...m.classes }; S.classes[S.myId] = S.myClass; }
+    if (S.lobby) showBriefing();
+  }
   else if (m.t === 'go') { S.lobby = false; S.endShown = false; hideScreen(); }
   else if (m.t === 's' && m.s) receiveSnap(m.s, m.e || []);
 }
@@ -197,7 +222,7 @@ function cleanInput(m) {
   const n = (v, a, b, d = 0) => (Number.isFinite(+v) ? clamp(+v, a, b) : d);
   return {
     mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), a: n(m.a, -10, 10), fire: !!m.fire, use: !!m.use, td: n(m.td, 0, 2000, 300),
-    dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
+    ab: m.ab | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
   };
 }
 
@@ -247,8 +272,11 @@ function stepBody(P, h, dt, me, snap, solids) {
   if (me.pk?.rage && me.h < me.H * 0.35) sp *= 1.4;
   const W = WEAPONS[WEAPON_IDS[(me.w[me.sl] || me.w[0])[0]]];
   if (W.slow && h.fire) sp *= W.slow;
+  const cls = CLASS_IDS[me.cl];
+  if (cls === 'tank') sp *= 0.92;
+  if (cls === 'scout') sp *= me.ab && me.ab[1] > 0 ? 1.4 * 1.08 : 1.08;
   if (me.state === 1) sp = 52;
-  if (me.state === 2) sp = 0;
+  if (me.state === 2 || me.pn) sp = 0;
   if (h.revive) sp = 0;
   if (h.dashDir != null) { P.dashT = 0.2; P.dashDir = h.dashDir; }
   if (P.dashT > 0) {
@@ -295,7 +323,7 @@ function predictLocal(dt) {
   if (S.lastDash == null) S.lastDash = inp.dash;
   if (inp.dash !== S.lastDash) {
     S.lastDash = inp.dash;
-    if (me.state === 0 && me.dc > 0 && S.pred.dashT <= 0) h.dashDir = Math.hypot(inp.mx, inp.my) > 0.2 ? Math.atan2(inp.my, inp.mx) : inp.a;
+    if (me.state === 0 && !me.pn && me.dc > 0 && S.pred.dashT <= 0) h.dashDir = Math.hypot(inp.mx, inp.my) > 0.2 ? Math.atan2(inp.my, inp.mx) : inp.a;
   }
   // réanimation : le joueur s'arrête
   if (inp.use && me.state === 0) h.revive = s.P.some((o) => o.i !== me.i && o.s === 1 && Math.hypot(o.x - S.pred.x, o.y - S.pred.y) < 82);
@@ -308,9 +336,10 @@ function predictLocal(dt) {
   const w = me.w[slot] || me.w[0];
   const W = WEAPONS[WEAPON_IDS[w[0]]];
   S.spin = inp.fire ? S.spin + dt : 0;
-  const mag = w[1] - S.shots.length;
-  if (inp.fire && me.state !== 2 && !h.revive && S.pred.dashT <= 0 && me.rl === 0 && S.gcd <= 0 && mag > 0 && (!W.spinUp || S.spin >= W.spinUp)) {
-    S.gcd = 1 / (W.rate * (1 + 0.15 * (me.pk?.rate || 0)));
+  const barrage = CLASS_IDS[me.cl] === 'soldier' && me.ab && me.ab[1] > 0;
+  const mag = barrage ? 99 : w[1] - S.shots.length;
+  if (!W.melee && !W.tesla && inp.fire && me.state !== 2 && !me.pn && !h.revive && S.pred.dashT <= 0 && me.rl === 0 && S.gcd <= 0 && mag > 0 && (!W.spinUp || S.spin >= W.spinUp)) {
+    S.gcd = 1 / (W.rate * (1 + 0.15 * (me.pk?.rate || 0)) * (barrage ? 1.5 : 1));
     const a = inp.a;
     const angs = [];
     for (let i = 0; i < W.pellets; i++) angs.push(a + (W.pellets > 1 ? ((i + Math.random()) / W.pellets * 2 - 1) : (Math.random() * 2 - 1)) * W.spread);
@@ -354,6 +383,8 @@ function buildView(a, b, f, dt) {
       id: q.i, name: q.n, color: q.c, bot: !!q.b, x, y, a: ang, vx, vy, state: q.s, weapon: WEAPON_IDS[wi], h: q.h, H: q.H, r: q.r, R: q.R,
       bl: q.bl, rv: q.rv, dash: q.d, rl: q.rl, walk: an.walk, move: an.move, speed: Math.min(1, sp / 230),
       hurt: fx.pflash.has(q.i), recoil: (fx.recoil.get(q.i) || 0) * 7,
+      cls: CLASS_IDS[q.cl], clsColor: CLASSES[CLASS_IDS[q.cl]]?.color, pinned: !!q.pn,
+      shield: CLASS_IDS[q.cl] === 'tank' && q.ab && q.ab[1] > 0, barrage: CLASS_IDS[q.cl] === 'soldier' && q.ab && q.ab[1] > 0, shadow: CLASS_IDS[q.cl] === 'scout' && q.ab && q.ab[1] > 0,
     };
   });
   const za = new Map(a.Z.map((z) => [z[0], z]));
@@ -379,7 +410,7 @@ function buildView(a, b, f, dt) {
   const view = {
     lv, t, players, zombies, eprojs, mode: b.rm.mode,
     pickups: b.K.map((k) => ({ id: k[0], k: k[1], x: k[2], y: k[3], w: k[4] })),
-    hazards: b.A, barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
+    hazards: b.A, turrets: b.T || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
     doorsOpen: !!b.op, cleared: !!b.cl, rally: b.rl, meId: S.myId, me: meSnap ? { ...meSnap, state: meSnap.s } : null,
     snap: b, waveLeft: b.wv.left, focus, bleedMax: DIFFICULTY[b.cfg.d]?.bleed || 28, predictFire: S.role === 'guest',
     clock: b.t,
@@ -395,6 +426,7 @@ function promptFor(view) {
   if (!me || !ms || view.snap.ph !== 'play') return '';
   const camp = view.mode !== 'survival';
   if (me.state === 2) return camp ? '☠ K.O. — tu reviens à la prochaine salle' : '☠ K.O. — tu reviens à la fin de la vague';
+  if (me.pinned) return '⚠ Plaqué au sol ! Tes alliés doivent tirer sur le traqueur';
   if (me.state === 1) return `✚ À terre ! Tu peux ramper et tirer au pistolet · ${Math.ceil(me.bl)} s`;
   const downed = view.players.find((o) => o.id !== me.id && o.state === 1 && Math.hypot(o.x - me.x, o.y - me.y) < 82);
   if (downed) return downed.rv > 0 ? `Réanimation de ${esc(downed.name)}… ${Math.round(downed.rv * 100)} %` : `Maintiens <kbd>E</kbd> pour relever ${esc(downed.name)}`;
@@ -496,6 +528,7 @@ function loop(now) {
   if (Math.random() < dt * Math.min(3, view.zombies.length * 0.12)) { const z = view.zombies[(Math.random() * view.zombies.length) | 0]; if (z && z.ty !== 'boss') audio.play('groan', z.x, z.y, 0.6); }
   fx.update(dt, view);
   view.prompt = promptFor(view);
+  if (view.me && view.me.ab) { const ready = view.me.ab[0] <= 0; if (ready && !S.abReady && view.snap.ph === 'play') audio.play('ready'); S.abReady = ready; }
   view.sfx = (n) => audio.play(n);
   renderer.frame(view, dt);
   if (!S.lobby) hud.update(view, now);

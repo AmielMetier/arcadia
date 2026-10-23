@@ -3,7 +3,7 @@ export class Input {
   constructor(canvas, hooks = {}) {
     this.keys = new Set();
     this.mouse = { x: innerWidth / 2, y: innerHeight / 2, down: false, inside: false };
-    this.c = { dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, pk: 0, pi: -1 };
+    this.c = { dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, pk: 0, pi: -1, ab: 0 };
     this.useHeld = false; this.mode = 'mouse'; this.aim = -Math.PI / 2; this.padAim = null; this.padPrev = [];
     this.hooks = hooks; this.enabled = true; this.offerOpen = false;
     const kd = (e) => {
@@ -15,6 +15,7 @@ export class Input {
       if (k === 'Space' || k === 'ShiftLeft' || k === 'ShiftRight') this.c.dash++;
       else if (k === 'KeyR') this.c.reload++;
       else if (k === 'KeyG') this.c.nade++;
+      else if (k === 'KeyQ' || k === 'KeyC') this.c.ab++;
       else if (/^Digit[1-3]$/.test(k) || /^Numpad[1-3]$/.test(k)) {
         const i = +k.slice(-1) - 1;
         if (this.offerOpen) { this.c.pk++; this.c.pi = i; } else { this.c.sw++; this.c.sl = i; }
@@ -74,7 +75,8 @@ export class Input {
     if (any) this.mode = 'pad';
     if (edge(0) || edge(6)) this.c.dash++;
     if (edge(2)) this.c.reload++;
-    if (edge(3) || edge(5)) { this.c.sw++; this.c.sl = -1; }
+    if (edge(5)) { this.c.sw++; this.c.sl = -1; }
+    if (edge(3)) this.c.ab++;
     if (edge(4)) this.c.nade++;
     if (edge(9)) this.hooks.menu && this.hooks.menu();
     if (this.offerOpen) { if (edge(14)) { this.c.pk++; this.c.pi = 0; } if (edge(12)) { this.c.pk++; this.c.pi = 1; } if (edge(15)) { this.c.pk++; this.c.pi = 2; } }
@@ -109,7 +111,7 @@ export class Input {
       td = Math.hypot(this.mouse.x - origin.x, this.mouse.y - origin.y) / (zoom || 1);
     }
     const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
-    return { mx, my, a: this.aim, fire, use, td, dash: this.c.dash, reload: this.c.reload, sw: this.c.sw, sl: this.c.sl, nade: this.c.nade, pk: this.c.pk, pi: this.c.pi };
+    return { mx, my, a: this.aim, fire, use, td, dash: this.c.dash, reload: this.c.reload, sw: this.c.sw, sl: this.c.sl, nade: this.c.nade, pk: this.c.pk, pi: this.c.pi, ab: this.c.ab };
   }
 
   crosshair(origin) {

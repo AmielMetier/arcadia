@@ -1,5 +1,16 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.27 — 23 octobre 2026
+- **Outbreak** — Cinq classes de survivants, chacune avec sa capacité (touche A, ou Q en QWERTY ; Y à la manette) :
+  - Soldat : Barrage, munitions infinies et cadence +50 % pendant 7 s.
+  - Médecin : Station de soin, une zone qui soigne et relève tout le monde ; il relève aussi 2× plus vite.
+  - Ingénieur : pose une tourelle automatique ; les caisses lui donnent plus.
+  - Colosse : Provocation, il attire les zombies et encaisse 75 % de dégâts en moins ; +50 PV.
+  - Éclaireur : Ombre, les zombies le perdent de vue et il frappe plus fort ; deux roulades.
+  - On choisit sa classe sur l'écran de briefing, et les équipiers IA prennent les classes libres.
+- **Outbreak** — Trois nouvelles armes : le Katana (mêlée, sans munitions), l'Arbalète (carreaux qui transpercent) et le Canon Tesla (un éclair qui saute de zombie en zombie).
+- **Outbreak** — Trois nouveaux zombies : le Blindé (bouclier devant, à prendre de côté ou de dos), le Traqueur (presque invisible, il bondit et plaque un survivant au sol jusqu'à ce que ses alliés le libèrent) et les Larves (en nuée).
+
 ## 2.26 — 23 octobre 2026
 - **DavidSimulator** — Dés plus lisibles : en 3D, les dés se posent de trois quarts pour que la face du dessus (celle qui compte) se lise d'un coup d'œil ; sur le plateau classique, ils se voient de face. Dans les deux cas, une pastille au-dessus de chaque dé rappelle sa valeur, la même que celle affichée en bas.
 - **DavidSimulator** — 2 contre 2 :

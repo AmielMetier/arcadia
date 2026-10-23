@@ -109,6 +109,30 @@ button { font: inherit; cursor: pointer; }
 .offer[data-r="1"]::after { content: 'RARE'; position: absolute; left: 12px; top: -10px; background: var(--blue); color: #fff; font-family: Bungee, Impact, sans-serif; font-size: 10px; padding: 1px 6px; border-radius: 6px; border: 2px solid var(--ink); }
 @keyframes drop { from { opacity: 0; transform: translateY(30px) rotate(-3deg); } }
 
+/* capacité de classe */
+.abil { position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px; margin-top: 6px; border: 2.5px solid var(--ink); border-radius: 9px; padding: 3px 8px; background: #3a3d46; color: #fff; }
+.abil > i { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,.14); z-index: 0; transition: width .2s; }
+.abil > * { position: relative; z-index: 1; }
+.abil .ico { font-size: 18px; }
+.abil .nm { flex: 1; display: flex; flex-direction: column; line-height: 1.05; }
+.abil b { font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 12px; }
+.abil small { font-size: 11px; font-weight: 700; opacity: .8; }
+.abil kbd { font-family: Bungee, Impact, sans-serif; font-size: 12px; border: 2px solid currentColor; border-radius: 6px; padding: 0 6px; }
+.abil kbd:empty { display: none; }
+.abil.ready { background: var(--ink); color: var(--yellow); animation: abready 1s ease-in-out infinite alternate; }
+.abil.on { background: var(--green); color: #fff; }
+@keyframes abready { to { box-shadow: 0 0 0 3px rgba(255,197,49,.45); } }
+.classes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.cls { border: 2.5px solid var(--ink); border-radius: 10px; padding: 8px 8px 9px; background: var(--cream); text-align: left; display: flex; flex-direction: column; gap: 2px; color: var(--ink); border-top: 7px solid var(--c); }
+.cls:hover { transform: translateY(-2px); }
+.cls.sel { background: var(--paper); box-shadow: 4px 4px 0 var(--ink); outline: 3px solid var(--c); outline-offset: -1px; }
+.cls .ci { font-size: 22px; }
+.cls b { font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 14px; }
+.cls .ca { font-weight: 700; font-size: 12px; }
+.cls small { font-size: 11px; font-weight: 600; color: #4a473f; line-height: 1.2; }
+.cls small.cp { color: var(--muted); font-style: italic; }
+@media (max-width: 760px) { .classes { grid-template-columns: repeat(2, 1fr); } }
+
 /* tactile */
 .tbtns { display: none; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); flex-direction: column; gap: 10px; pointer-events: auto; }
 body.touch .tbtns { display: flex; }

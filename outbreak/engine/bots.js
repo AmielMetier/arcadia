@@ -1,11 +1,11 @@
 // Équipiers IA : suivent l'escouade, tirent, relèvent les blessés, ramassent, franchissent les portes.
 // Ils produisent des entrées comme un joueur humain (même chemin que le clavier).
-import { WEAPONS, GRENADE } from './data.js';
+import { WEAPONS, GRENADE, CLASSES } from './data.js';
 import { distanceField, flowDir, WALL_TOP } from './level.js';
 import { raycastSolids, angDiff } from './geom.js';
 
 export function botThink(sim, p, dt) {
-  const B = p.brain || (p.brain = { fieldT: 0, field: null, goalKey: '', strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, inp: { mx: 0, my: 0, a: p.aim, fire: false, dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, td: 300, use: false, pk: 0, pi: -1, q: 0 }, nadeCd: 3, useT: 0, think: 0, aimErr: 0 });
+  const B = p.brain || (p.brain = { fieldT: 0, field: null, goalKey: '', strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, inp: { mx: 0, my: 0, a: p.aim, fire: false, dash: 0, reload: 0, sw: 0, sl: 0, nade: 0, td: 300, use: false, pk: 0, pi: -1, q: 0, ab: 0 }, nadeCd: 3, useT: 0, think: 0, aimErr: 0 });
   const inp = B.inp;
   inp.use = false;
   if (p.state === 'dead') { inp.mx = inp.my = 0; inp.fire = false; p.input = inp; return; }
@@ -23,7 +23,9 @@ export function botThink(sim, p, dt) {
     const d = Math.hypot(z.x - p.x, z.y - p.y);
     if (d < nd) { nd = d; near = z; }
     // priorité : cracheurs, hurleuses et gonflés proches
-    const prio = d * (z.ty === 'screamer' || z.ty === 'spitter' ? 0.7 : z.ty === 'bloater' && d < 220 ? 0.5 : 1);
+    let prio = d * (z.ty === 'screamer' || z.ty === 'spitter' ? 0.7 : z.ty === 'bloater' && d < 220 ? 0.5 : 1);
+    if (z.state === 'pin') prio *= 0.2; // libérer un allié plaqué au sol
+    if (z.ty === 'armored' && Math.abs(((Math.atan2(p.y - z.y, p.x - z.x) - z.ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.9) prio *= 1.6;
     if (prio < td && d < W.range * 0.95 && !raycastSolids(blockers, p.x, p.y, z.x, z.y)) { td = prio; tgt = z; }
   }
 
@@ -142,8 +144,19 @@ export function botThink(sim, p, dt) {
   if (p.state === 'ok' && p.reloadT <= 0) {
     // meilleure arme encore chargée
     let best = 0, bt = -1;
-    p.weapons.forEach((x, i) => { const X = WEAPONS[x.id]; const ok = x.mag > 0 || x.res > 0; const sc = ok ? X.tier * 10 + (X.id === 'shotgun' && nd < 260 ? 15 : 0) + (X.explosive && nd < 200 ? -30 : 0) : -100; if (sc > bt) { bt = sc; best = i; } });
+    p.weapons.forEach((x, i) => { const X = WEAPONS[x.id]; const ok = x.mag > 0 || x.res > 0; const sc = ok ? X.tier * 10 + (X.id === 'shotgun' && nd < 260 ? 15 : 0) + (X.explosive && nd < 200 ? -30 : 0) + (X.melee ? (nd < 110 ? 20 : -25) : 0) : -100; if (sc > bt) { bt = sc; best = i; } });
     if (best !== p.slot && Math.random() < dt * 3) { inp.sw++; inp.sl = best; }
+  }
+  // capacité de classe
+  if (p.state === 'ok' && p.abCd <= 0 && p.pinnedBy == null) {
+    const close = (r) => sim.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) < r).length;
+    let go = false;
+    if (p.cls === 'soldier') go = close(420) >= 6;
+    else if (p.cls === 'medic') go = players.some((o) => o.state === 'down' && Math.hypot(o.x - p.x, o.y - p.y) < 150) || players.filter((o) => o.state === 'ok' && o.hp < o.maxHp * 0.55 && Math.hypot(o.x - p.x, o.y - p.y) < 160).length >= 2 || p.hp < p.maxHp * 0.35;
+    else if (p.cls === 'engineer') go = close(500) >= 4;
+    else if (p.cls === 'tank') go = close(260) >= 4 || players.some((o) => o.state === 'down' && Math.hypot(o.x - p.x, o.y - p.y) < 200);
+    else if (p.cls === 'scout') go = p.hp < p.maxHp * 0.4 && close(200) >= 2;
+    if (go) inp.ab++;
   }
   B.nadeCd -= dt;
   if (p.state === 'ok' && p.grenades > 0 && B.nadeCd <= 0) {

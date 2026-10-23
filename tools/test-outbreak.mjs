@@ -25,7 +25,8 @@ t('salles : générées, accessibles, déterministes', () => {
 
 function play({ mode = 'campaign', difficulty = 'normal', bots = 4, maxMin = 25, seed = 1 }) {
   const sim = new Sim({ mode, difficulty, seed });
-  for (let i = 0; i < bots; i++) sim.addPlayer({ id: i, name: 'B' + i, color: '#ff0000', bot: true });
+  const CL = ['soldier', 'medic', 'engineer', 'tank', 'scout'];
+  for (let i = 0; i < bots; i++) sim.addPlayer({ id: i, name: 'B' + i, color: '#ff0000', bot: true, cls: CL[(i + seed) % 5] });
   const steps = maxMin * 60 * 60;
   let snaps = 0, maxZ = 0;
   for (let s = 0; s < steps && sim.phase === 'play'; s++) {
@@ -86,6 +87,38 @@ t('reprise par un nouvel hôte', () => {
   assert.equal(sim2.room.index, sim.room.index);
   assert.equal(sim2.players.size, sim.players.size);
   for (const p of sim2.players.values()) assert.ok(p.weapons.length >= 1 && WEAPONS[p.weapons[0].id]);
+});
+
+t('classes : capacités et nouvelles armes', () => {
+  const sim = new Sim({ seed: 4, difficulty: 'arcade' });
+  const CL = ['soldier', 'medic', 'engineer', 'tank', 'scout'];
+  CL.forEach((c, i) => { const p = sim.addPlayer({ id: i, name: c, bot: true, cls: c }); p.weapons.push({ id: ['katana', 'crossbow', 'tesla', 'katana', 'tesla'][i], mag: 20, res: 60 }); });
+  const used = new Set();
+  for (let s = 0; s < 60 * 60 * 3 && sim.phase === 'play'; s++) {
+    for (const p of sim.players.values()) botThink(sim, p, DT);
+    sim.step(DT);
+    for (const e of sim.drainEvents()) if (e.e === 'ab') used.add(e.c); else if (e.e === 'slash' || e.e === 'zap') used.add(e.e);
+  }
+  console.log('   utilisés :', [...used].join(', '));
+  assert.ok(used.size >= 3, 'les bots utilisent leurs capacités');
+  const p = sim.players.get(3); assert.equal(p.maxHp >= 150, true, 'Colosse : +50 PV');
+});
+
+t('zombies : blindé, traqueur, larves', () => {
+  const sim = new Sim({ seed: 8, difficulty: 'normal' });
+  const p = sim.addPlayer({ id: 0, name: 'A' });
+  sim.step(DT);
+  const a = sim.spawnZombie('armored', p.x, p.y - 200); a.ang = Math.PI / 2; // regarde vers le joueur
+  const hp0 = a.hp; sim.damageZombie(a, 100, -Math.PI / 2, 0, p);
+  assert.ok(hp0 - a.hp < 30, 'la plaque avant encaisse');
+  const hp1 = a.hp; sim.damageZombie(a, 100, Math.PI / 2, 0, p);
+  assert.ok(hp1 - a.hp >= 90, 'dans le dos, plein dégâts');
+  const s2 = sim.spawnZombie('stalker', p.x, p.y - 250);
+  let pinned = false;
+  for (let k = 0; k < 60 * 8 && !pinned; k++) { p.input = { ...p.input, mx: 0, my: 0 }; sim.step(DT); if (p.pinnedBy != null) pinned = true; }
+  assert.ok(pinned, 'le traqueur plaque le joueur');
+  sim.damageZombie(s2, 70, 0, 0, null);
+  assert.equal(p.pinnedBy, null, 'les dégâts le font lâcher prise');
 });
 
 t('améliorations : toutes applicables', () => {
