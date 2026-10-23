@@ -1,6 +1,9 @@
 // Hôte de Tête de Calcul : détient l'état, chronomètre les questions, juge les réponses et fait jouer les bots.
 // Les invités n'envoient que { t:'ans', i, v } ; l'hôte renvoie l'état public (sans les réponses pendant une question).
-import { createGame, nextQuestion, answer, reveal, publicState, fullQuestion, restartQuestion, removePlayer, makeConfig, standings, sabotage } from '../engine/rules.js';
+// The Candidate : l'hôte fait tourner le code Python de chacun (tests cachés) et répond en privé aux jokers.
+import { createGame, nextQuestion, answer, reveal, publicState, fullQuestion, restartQuestion, removePlayer, makeConfig, standings, sabotage, gradeCode, useJoker } from '../engine/rules.js';
+import { buildProgram, scoreRun } from '../engine/code-data.js';
+import { runPython, preloadPython } from '../view/py.js';
 import { botAnswer, botSabotage, BOT_LEVELS } from '../engine/bot.js';
 import { randomSeed } from '../engine/rng.js';
 import { isEmote, botReaction } from '../view/emotes.js';
@@ -17,7 +20,7 @@ const FINANCE_BOT_NAMES = [
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const ABSENT_MS = 15000; // un joueur parti du salon depuis 15 s quitte la partie
 
-export function startHost({ bridge, solo, settings, me, onState, onSetup, onError, onAck = () => {}, onEmote = () => {}, initial = null }) {
+export function startHost({ bridge, solo, settings, me, onState, onSetup, onError, onAck = () => {}, onEmote = () => {}, onNote = () => {}, initial = null }) {
   let state = null, timer = 0, reported = false;
   const botTimers = [];
   const cfg = makeConfig(settings);
@@ -62,26 +65,62 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
   function planBots() {
     const q = fullQuestion(state), idx = state.idx;
     for (const p of state.players) {
-      if (!p.bot || state.answers[p.id]) continue;
+      if (!p.bot || p.out || state.answers[p.id]) continue;
       const a = botAnswer(q, level);
       if (!a) continue;
       const due = state.qAt + a.delay - Date.now();
-      botTimers.push(setTimeout(() => submit(p.id, a.raw, idx), Math.max(200, due)));
+      botTimers.push(setTimeout(() => submit(p.id, a.raw, idx, a.passed), Math.max(200, due)));
     }
   }
 
-  function submit(by, raw, idx) {
+  // tout le monde a répondu (ou un premier juste en Éclair) : petite pause, puis révélation
+  function closeSoon() {
+    clearTimeout(timer);
+    state.endsAt = Math.min(state.endsAt, Date.now() + 700);
+    timer = setTimeout(step, 700);
+  }
+
+  function submit(by, raw, idx, botPassed) {
     if (!state) return { ok: false, error: 'La partie n’a pas commencé.' };
     const r = answer(state, { by, raw, idx, now: Date.now() });
     if (!r.ok) return r;
     state = r.state;
-    if (r.done) {
-      // tout le monde a répondu (ou un premier juste en Éclair) : petite pause, puis révélation
-      clearTimeout(timer);
-      state.endsAt = Math.min(state.endsAt, Date.now() + 700);
-      timer = setTimeout(step, 700);
+    if (r.pending) {
+      // un bot connaît son score ; le code d'un joueur passe par Python
+      if (botPassed != null) grade(by, idx, botPassed, fullQuestion(state).tests.length, null);
+      else runCode(by, idx, String(raw));
     }
+    if (r.done) closeSoon();
     broadcast();
+    return r;
+  }
+  async function runCode(by, idx, code) {
+    const q = fullQuestion(state);
+    const out = await runPython(buildProgram(code, q.fn, q.tests));
+    const total = q.tests.length, passed = scoreRun(out, total);
+    if (!state || state.idx !== idx) return;
+    // le détail des tests (sans les valeurs attendues) ne va qu'à l'auteur du code
+    note(by, { t: 'graded', i: idx, passed, total, error: out.error, offline: !!out.offline, tests: out.tests.map((t) => t.ok) });
+    grade(by, idx, passed, total, out.tests.map((t) => (t.ok ? 1 : 0)));
+  }
+  function grade(by, idx, passed, total, detail) {
+    const r = gradeCode(state, { by, idx, passed, total, detail });
+    if (!r.ok) return;
+    state = r.state;
+    if (r.done) closeSoon();
+    broadcast();
+  }
+  // message réservé à un joueur (moi : directement à la vue)
+  function note(to, m) {
+    if (to === me.id) onNote(m);
+    else if (!solo && !state.players.find((p) => p.id === to)?.bot) bridge.send(to, m);
+  }
+  function joker(by, kind) {
+    if (!state) return { ok: false, error: 'La partie n’a pas commencé.' };
+    const r = useJoker(state, { by, kind: String(kind) });
+    if (!r.ok) return r;
+    state = r.state; broadcast();
+    note(by, { t: 'jok', ...r.info });
     return r;
   }
   function sabo(by, power, target) {
@@ -95,7 +134,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
   function botsSabotage() {
     if (!state.cfg.sabotage) return;
     for (const p of state.players) {
-      if (!p.bot) continue;
+      if (!p.bot || p.out) continue;
       const a = botSabotage(state, p.id);
       if (a) botTimers.push(setTimeout(() => { if (state.phase === 'reveal') sabo(p.id, a.power, a.target); }, 1200 + Math.random() * 2200));
     }
@@ -115,7 +154,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     onEmote(from, id);
   }
   function botsReact() {
-    const bots = state.players.filter((p) => p.bot).map((p) => p.id);
+    const bots = state.players.filter((p) => p.bot && !p.out).map((p) => p.id);
     const r = bots.length && botReaction(state.last, bots);
     if (r) setTimeout(() => emote(r.from, r.id), 900 + Math.random() * 1200);
   }
@@ -145,6 +184,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     reported = false;
     try { state = createGame({ players, cfg, seed: randomSeed(), now: Date.now() }); }
     catch (e) { onError(e.message); return; }
+    if (state.cats.includes('code')) preloadPython();
     broadcast(); schedule();
   }
 
@@ -173,8 +213,9 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       if (m.t === 'sync') { if (state) bridge.send(from, { t: 'st', s: publicState(state), now: Date.now() }); else pushSetup(); }
       if (m.t === 'emote') emote(from, String(m.id));
       if (m.t === 'sab') { const r = sabo(from, m.power, m.target); if (!r.ok) bridge.send(from, { t: 'err', msg: r.error }); }
+      if (m.t === 'jok') { const r = joker(from, m.kind); if (!r.ok) bridge.send(from, { t: 'err', msg: r.error }); }
       if (m.t === 'ans') {
-        const r = submit(from, String(m.v ?? '').slice(0, 60), Number(m.i)); // l'identité vient du salon, jamais du message
+        const r = submit(from, String(m.v ?? '').slice(0, 6000), Number(m.i)); // l'identité vient du salon, jamais du message
         bridge.send(from, r.ok ? ackOf(r) : { t: 'err', msg: r.error, soft: !!r.soft });
       }
     });
@@ -187,6 +228,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     },
     emote(id) { emote(me.id, id); },
     sabotage(power, target) { const r = sabo(me.id, power, target); if (!r.ok) onError(r.error); },
+    joker(kind) { const r = joker(me.id, kind); if (!r.ok) onError(r.error); },
     start() { if (!state || state.phase === 'over') begin(); },
     get state() { return state; },
     get standings() { return state ? standings(state) : []; },
