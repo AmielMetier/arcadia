@@ -87,7 +87,7 @@ button { font: inherit; cursor: pointer; }
 .prompt { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); background: rgba(22,24,29,.88); border: 2.5px solid var(--ink); border-radius: 10px; padding: 7px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
 .prompt kbd { display: inline-block; min-width: 24px; padding: 1px 6px; margin: 0 3px; border: 2px solid var(--paper); border-radius: 6px; font-family: Bungee, Impact, sans-serif; font-size: 12px; color: var(--yellow); }
 
-.toast { position: absolute; left: 50%; top: 28%; transform: translate(-50%, -50%); font-family: Bungee, Impact, sans-serif; font-size: clamp(22px, 4vw, 44px); color: var(--paper);
+.toast { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%); font-family: Bungee, Impact, sans-serif; font-size: clamp(22px, 4vw, 44px); color: var(--paper);
   text-shadow: 3px 3px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink); text-align: center; opacity: 0; white-space: nowrap; letter-spacing: 1px; }
 .toast.show { animation: toast 2.6s ease forwards; }
 .toast.bad { color: #ff7a5c; } .toast.good { color: #7ff0b0; } .toast.wave { color: var(--yellow); }
@@ -109,14 +109,23 @@ button { font: inherit; cursor: pointer; }
 .offer[data-r="1"]::after { content: 'RARE'; position: absolute; left: 12px; top: -10px; background: var(--blue); color: #fff; font-family: Bungee, Impact, sans-serif; font-size: 10px; padding: 1px 6px; border-radius: 6px; border: 2px solid var(--ink); }
 @keyframes drop { from { opacity: 0; transform: translateY(30px) rotate(-3deg); } }
 
+/* mode Défense */
+.boss.gen { top: 70px; } .boss.gen span { color: #7ff0b0; }
+#gen:not([hidden]) ~ .boss#boss { top: 118px; }
+#hud .build, #hud .build * { pointer-events: auto; }
+.offer.poor { opacity: .55; }
+.offers.build .cards { flex-wrap: wrap; justify-content: center; }
+.offers.build .offer { width: 170px; }
+.offers { width: max-content; max-width: 96vw; }
+
 /* radio et dossiers */
-.radio { position: fixed; z-index: 8; left: 50%; bottom: 160px; transform: translateX(-50%); max-width: min(640px, 80vw); display: flex; gap: 10px; align-items: flex-start;
+.radio { position: fixed; z-index: 8; left: 50%; top: 152px; transform: translateX(-50%); max-width: min(640px, 80vw); display: flex; gap: 10px; align-items: flex-start;
   background: rgba(14,16,22,.9); border: 2.5px solid var(--ink); border-left: 7px solid var(--c, var(--yellow)); border-radius: 10px; padding: 8px 14px; animation: radioIn .25s ease; }
 .radio .who { font-size: 22px; line-height: 1; }
 .radio b { display: block; font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 12px; color: var(--c, var(--yellow)); letter-spacing: .5px; }
 .radio span { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
-@keyframes radioIn { from { opacity: 0; transform: translate(-50%, 10px); } }
-.note { position: absolute; right: 12px; top: 70px; width: 300px; padding: 10px 12px 12px; transform: rotate(1deg); animation: noteIn .4s cubic-bezier(.3,1.5,.5,1); pointer-events: none; }
+@keyframes radioIn { from { opacity: 0; transform: translate(-50%, -10px); } }
+.note { position: absolute; right: 12px; top: 250px; width: 300px; padding: 10px 12px 12px; transform: rotate(1deg); animation: noteIn .4s cubic-bezier(.3,1.5,.5,1); pointer-events: none; }
 .note small { font-family: Bungee, Impact, sans-serif; font-size: 11px; color: var(--red); }
 .note b { display: block; font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 15px; margin: 2px 0 6px; }
 .note p { margin: 0; font-size: 13.5px; font-weight: 600; line-height: 1.35; color: #3c3a35; font-style: italic; }

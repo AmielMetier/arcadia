@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.31 — 23 octobre 2026
+- **Outbreak** — Nouveau mode **Défense** : tenez le fort Delta pendant 15 vagues.
+  - Les zombies foncent sur le générateur au centre du fort : s'il tombe, c'est perdu.
+  - Quatre barricades ferment les brèches ; les zombies les défoncent, vous les réparez en maintenant E (l'Ingénieur répare plus vite).
+  - Entre les vagues, 20 secondes de préparation pour poser des pièges avec la ferraille sur les emplacements marqués : barbelés, mines, tourelle, grille brûlante.
+  - Mini-boss aux vagues 5 et 10, boss final à la 15e ; le marchand passe toutes les 3 vagues.
+- **Outbreak** — La radio s'affiche en haut de l'écran pour ne plus cacher l'action.
+
 ## 2.30 — 23 octobre 2026
 - **Outbreak** — Une histoire : la souche VIREO s'est échappée du Laboratoire Alpha et l'Escouade Delta doit remonter jusqu'à la source pour que le Dr Lenoir fabrique l'antidote.
   - Cinématique d'intro : l'hélico arrive sur le secteur, puis chaque joueur est présenté avec son nom et sa classe, avant la mission. Espace ou clic pour passer (quand tout le monde a passé, la partie démarre).

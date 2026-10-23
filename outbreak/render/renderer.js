@@ -1,5 +1,5 @@
 // Rendu d'une image : salle, entités, effets, éclairage dynamique (lampes torches, flashs, explosions), indicateurs.
-import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, drawShopItem, drawVaultDoor, drawDropCrate, setZombiePalette, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
+import { drawSurvivor, drawZombie, zombieEyes, drawPickup, drawBarrel, drawCrate, drawTurret, drawShopItem, drawVaultDoor, drawDropCrate, setZombiePalette, drawGenerator, drawBarricade, drawPad, INK, shade, circ, ell, rr, fs, MUZZLE } from './sprites.js';
 import { paintLevel, THEMES } from './level-art.js';
 import { WALL_TOP } from '../engine/level.js';
 import { ROOM_TYPES, SHOP_ITEMS, SECTORS } from '../engine/data.js';
@@ -91,6 +91,11 @@ export class Renderer {
     fx.drawUnder(c);
     for (const k of v.pickups) { c.save(); c.translate(k.x, k.y); ell(c, 0, 12, 14, 5); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawPickup(c, k, t); c.restore(); }
     for (const b of v.barrels) { c.save(); c.translate(b.x, b.y); ell(c, 4, 6, b.r, b.r * 0.8); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill(); drawBarrel(c, b, t); c.restore(); }
+    if (v.base) {
+      for (const q of v.base.p) { c.save(); c.translate(q[1], q[2]); drawPad(c, q[3], q[4], t, v.myPad === q[0]); c.restore(); }
+      for (const b of v.base.b) { const geo = lv.base.bars.find((x) => x.id === b[0]); if (geo) drawBarricade(c, geo, b[1], b[2], t); }
+      c.save(); c.translate(lv.base.gen.x, lv.base.gen.y); drawGenerator(c, v.base.g[0] / v.base.g[1], t, this.fx.genFlash > 0); c.restore();
+    }
     if (v.vault) { c.save(); c.translate(v.vault[0], v.vault[1] - 80); drawVaultDoor(c, v.vault[2], v.vault[3], t); c.restore(); }
     for (const it of v.shop || []) { c.save(); c.translate(it[2], it[3]); drawShopItem(c, it, t, SHOP_ITEMS[it[1]].icon, '', v.scrap >= it[5]); c.restore(); }
     if (v.drop && v.drop[0] !== 'done') {
@@ -327,6 +332,7 @@ export class Renderer {
     for (const p of this.fx.parts) if ((p.k === 'flame' || p.k === 'fire') && (n++ % 3 === 0)) blob(p.x, p.y, 90, 0.5 * (p.life / p.max));
     for (const h of v.hazards) blob(h[2], h[3], h[4] * 1.4, h[1] === 'acid' ? 0.4 : h[1] === 'heal' ? 0.55 : 0.2);
     for (const tt of v.turrets || []) blob(tt[1], tt[2], 120, 0.5);
+    if (v.base) { blob(this.lv.base.gen.x, this.lv.base.gen.y, 330, 0.55); for (const q of v.base.p) if (q[3] === 'flame') blob(q[1], q[2], 90, 0.5); }
     if (v.train && v.train[0] === 'pass') { const tz = this.lv.zones.find((z) => z.k === 'track'); if (tz) blob(v.train[2] > 0 ? v.train[1] : v.train[1], tz.y + tz.h / 2, 420, 0.8); }
     for (const k of v.pickups) blob(k.x, k.y, k.k === 'weapon' ? 110 : 70, 0.4);
     for (const d of this.lv.doors) if (d.kind === 'exit') blob(d.x + d.w / 2, WALL_TOP, 200, v.doorsOpen ? 0.7 : 0.35);
@@ -401,6 +407,17 @@ export class Renderer {
 
   labels(c, v, t) {
     c.textAlign = 'center'; c.textBaseline = 'middle';
+    if (v.base) {
+      for (const b of v.base.b) {
+        const geo = this.lv.base.bars.find((x) => x.id === b[0]); if (!geo || b[1] >= b[2]) continue;
+        const cx = geo.x + geo.w / 2, cy = geo.y + geo.h / 2 - 26, f = b[1] / b[2];
+        rr(c, cx - 30, cy, 60, 7, 3); c.fillStyle = 'rgba(0,0,0,.6)'; c.fill();
+        rr(c, cx - 30, cy, 60 * f, 7, 3); c.fillStyle = f < 0.3 ? '#ff4b2b' : '#ffc531'; c.fill();
+      }
+      const g = this.lv.base.gen, f = v.base.g[0] / v.base.g[1];
+      rr(c, g.x - 50, g.y - 64, 100, 9, 4); c.fillStyle = 'rgba(0,0,0,.65)'; c.fill();
+      rr(c, g.x - 50, g.y - 64, 100 * f, 9, 4); c.fillStyle = f < 0.3 ? '#ff4b2b' : '#2fbf71'; c.fill();
+    }
     for (const p of v.players) {
       if (p.state === 2) continue;
       const mine = p.id === v.meId;
@@ -441,6 +458,7 @@ export class Renderer {
     };
     for (const p of v.players) if (p.id !== v.meId && p.state !== 2) edge(p.x, p.y, p.state === 1 ? '#ff4b2b' : p.color, p.state === 1 ? '✚ ' + p.name : p.name);
     if (!v.cleared && v.zombies.length && v.zombies.length <= 4 && v.waveLeft <= 4) for (const z of v.zombies) edge(z.x, z.y, '#ff6a4a');
+    if (v.base && v.base.g[0] < v.base.g[1] * 0.6) edge(this.lv.base.gen.x, this.lv.base.gen.y, '#2fbf71', '⚡ Générateur');
     if (v.doorsOpen) for (const d of this.lv.doors) if (d.kind === 'exit') edge(d.x + d.w / 2, WALL_TOP + 20, '#2fbf71');
 
     // vignette + dégâts

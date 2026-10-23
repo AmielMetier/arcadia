@@ -1,5 +1,5 @@
 // Interface (DOM) : HUD en jeu, choix d'améliorations, écrans de briefing, de menu et de fin.
-import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS, SECTORS, roomName } from '../engine/data.js';
+import { WEAPONS, PERKS, ROOM_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, WEAPON_IDS, CLASSES, CLASS_IDS, SECTORS, roomName, TRAPS, TRAP_IDS } from '../engine/data.js';
 import { weaponIcon } from '../render/sprites.js';
 
 const $ = (s) => document.querySelector(s);
@@ -12,6 +12,7 @@ export class HUD {
     this.cache = {};
     this.toastN = -1; this.offerKey = '';
     $('#offers').addEventListener('click', (e) => { const b = e.target.closest('.offer'); if (b) onPick(+b.dataset.i); });
+    $('#build').addEventListener('click', (e) => { const b = e.target.closest('.offer'); if (b) onPick(+b.dataset.i); });
   }
   show(on) { this.root.hidden = !on; }
   set(id, html) { if (this.cache[id] !== html) { this.cache[id] = html; $('#' + id).innerHTML = html; } }
@@ -22,9 +23,10 @@ export class HUD {
     if (!s) return;
     // salle et statut
     const rm = s.rm;
-    const camp = rm.mode !== 'survival';
-    this.set('roomN', (SECTORS[rm.sec] ? SECTORS[rm.sec].short.toUpperCase() + ' · ' : '') + (camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : 'SURVIE'));
-    this.set('roomName', esc(camp ? roomName(rm.ty, rm.sec).split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
+    const camp = rm.mode === 'campaign';
+    const def = rm.mode === 'defense';
+    this.set('roomN', (SECTORS[rm.sec] ? SECTORS[rm.sec].short.toUpperCase() + ' · ' : '') + (camp ? `SALLE ${rm.i}/${CAMPAIGN_ROOMS}` : def ? 'DÉFENSE' : 'SURVIE'));
+    this.set('roomName', def ? esc(`Vague ${Math.max(1, s.wv.n)} / ${s.wv.tot}`) : esc(camp ? roomName(rm.ty, rm.sec).split(' — ')[0].replace('Chez Dédé, ferrailleur', 'Marchand') : `Vague ${Math.max(1, s.wv.n)}`));
     let st = '', sc = 'status card';
     if (s.ph === 'won') { st = '✔ Mission accomplie'; sc += ' clear'; }
     else if (s.ph === 'over') { st = '✖ Escouade décimée'; sc += ' lock'; }
@@ -32,6 +34,7 @@ export class HUD {
     else if (rm.ty === 'shop' && !s.rl) { st = '🛒 Pas de zombies ici · dépensez votre ferraille'; sc += ' clear'; }
     else if (!s.rl && rm.ty === 'vault' && s.vt && s.vt[2] === 'closed') { st = '💰 Forcez le coffre… ou passez votre chemin'; sc += ' rally'; }
     else if (s.cl || (!camp && s.wv.left === 0 && s.wv.n > 0)) { st = camp ? '✔ Zone sécurisée · choisissez une porte' : '✔ Vague repoussée · préparez-vous'; sc += ' clear'; }
+    else if (def && s.wv.bt > 0) { st = `🛠 Préparation · <span class="pill">${s.wv.bt}</span> s · réparez, posez des pièges`; sc += ' rally'; }
     else if (s.wv.n === 0) { st = camp ? '☣ Confinement · ils arrivent…' : '☣ Préparez-vous…'; sc += ' lock'; }
     else { st = `☣ ${camp ? 'Confinement' : 'Horde'}${s.wv.tot > 1 ? ` · vague ${s.wv.n}/${s.wv.tot}` : ''} · <span class="pill">${s.wv.left}</span> restants`; sc += ' lock'; }
     this.set('status', st); this.cls('status', sc);
@@ -80,6 +83,21 @@ export class HUD {
     const W = WEAPONS[WEAPON_IDS[cur[0]]];
     const low = !W.melee && cur[1] <= Math.ceil(W.mag * 0.25);
     this.set('weapons', `<div class="wslots">${ws}</div><div class="card ammo"><small>${esc(W.name)}</small>${W.melee ? '<b>∞</b><span>mêlée</span>' : `<b class="${low ? 'low' : ''}">${cur[1]}</b><span>/ ${cur[2] < 0 ? '∞' : cur[2]}</span>`}</div>${me.rl > 0 ? `<div class="reload"><i style="width:${me.rl * 100}%"></i></div>` : ''}`);
+    // générateur (mode Défense)
+    const gen = $('#gen');
+    if (s.bs2) { gen.hidden = false; const f = s.bs2.g[0] / s.bs2.g[1]; $('#genBar').style.width = f * 100 + '%'; $('#genBar').style.background = f < 0.3 ? 'var(--red)' : 'var(--green)'; } else gen.hidden = true;
+    // menu de construction
+    const bkey = me.bd ? me.bd + ':' + (s.scr || 0) : '';
+    if (bkey !== this.buildKey) {
+      this.buildKey = bkey;
+      const el = $('#build');
+      if (!me.bd) { el.hidden = true; el.innerHTML = ''; }
+      else {
+        el.hidden = false;
+        el.innerHTML = `<h3>Construire · ⚙ ${s.scr || 0}</h3><div class="cards">${TRAP_IDS.map((id, i) => { const T = TRAPS[id]; const ok = (s.scr || 0) >= T.price;
+          return `<button class="card offer ${ok ? '' : 'poor'}" data-i="${i}"><kbd>${i + 1}</kbd><div class="ic">${T.icon}</div><b>${esc(T.name)}</b><p>${esc(T.desc)}</p><span class="lv">⚙ ${T.price}</span></button>`; }).join('')}</div>`;
+      }
+    }
     // améliorations proposées
     const key = me.of ? me.on + ':' + me.of.join(',') : '';
     if (key !== this.offerKey) {
@@ -121,15 +139,15 @@ export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myCla
   const D = DIFFICULTY[cfg.difficulty] || DIFFICULTY.normal;
   const opt = (key, label, options, val) => `<div class="opt"><div class="lbl">${label}</div><div class="seg">${options.map(([v, l]) => `<button data-k="${key}" data-v="${v}" class="${String(val) === String(v) ? 'sel' : ''}">${l}</button>`).join('')}</div></div>`;
   const settings = !embedded ? `<h2>Réglages</h2><div class="opts">
-      ${opt('mode', 'Mode', [['campaign', 'Campagne'], ['survival', 'Survie']], cfg.mode)}
+      ${opt('mode', 'Mode', [['campaign', 'Campagne'], ['survival', 'Survie'], ['defense', 'Défense']], cfg.mode)}
       ${opt('difficulty', 'Difficulté', [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], cfg.difficulty)}
       ${opt('bots', 'Équipiers IA', [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], cfg.bots)}
       ${opt('startWeapon', 'Arme de départ', [['pistol', 'Pistolet'], ['shotgun', 'Pompe'], ['smg', 'Mitraillette']], cfg.startWeapon)}
       ${opt('sector', 'Secteur', [['random', '🎲 Au hasard'], ...Object.entries(SECTORS).map(([k, S2]) => [k, S2.icon + ' ' + S2.short])], cfg.sector)}
-    </div>` : `<div class="chips"><span class="chip">${cfg.mode === 'survival' ? '♾ Survie' : '🗺 Campagne · 7 salles'}</span><span class="chip">☣ ${D.name}</span><span class="chip">${cfg.sector === 'random' || !SECTORS[cfg.sector] ? '🎲 Secteur au hasard' : SECTORS[cfg.sector].icon + ' ' + SECTORS[cfg.sector].name}</span><span class="chip">🔫 Départ : ${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>${cfg.bots ? `<span class="chip">🤖 ${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}</div>`;
+    </div>` : `<div class="chips"><span class="chip">${cfg.mode === 'survival' ? '♾ Survie' : cfg.mode === 'defense' ? '🏰 Défense · 15 vagues' : '🗺 Campagne · 7 salles'}</span><span class="chip">☣ ${D.name}</span><span class="chip">${cfg.sector === 'random' || !SECTORS[cfg.sector] ? '🎲 Secteur au hasard' : SECTORS[cfg.sector].icon + ' ' + SECTORS[cfg.sector].name}</span><span class="chip">🔫 Départ : ${WEAPONS[cfg.startWeapon]?.name || 'Pistolet'}</span>${cfg.bots ? `<span class="chip">🤖 ${cfg.bots} équipier${cfg.bots > 1 ? 's' : ''} IA</span>` : ''}</div>`;
   return `<div class="card panel">
     <h1 class="logo">OUTBREAK<small>SECTEUR ZÉRO</small></h1>
-    <p class="tagline">${cfg.mode === 'survival'
+    <p class="tagline">${cfg.mode === 'defense' ? 'Fort Delta : protégez le générateur pendant 15 vagues. Entre les vagues, réparez les barricades et posez des pièges avec la ferraille.' : cfg.mode === 'survival'
       ? 'Hangar de quarantaine. Les vagues ne s\'arrêtent jamais : tenez le plus longtemps possible, ensemble.'
       : 'Le laboratoire est tombé. Traversez 6 salles en choisissant votre chemin, puis neutralisez le Spécimen Zéro au cœur du complexe.'}</p>
     ${settings}
@@ -154,9 +172,11 @@ export function menuHtml({ muted, canQuit, solo }) {
 
 export function endHtml({ won, snap, clock, canReplay, embedded }) {
   const rows = snap.P.slice().sort((a, b) => b.st[1] - a.st[1]);
-  const camp = snap.rm.mode !== 'survival';
-  const title = won ? 'MISSION ACCOMPLIE' : 'ESCOUADE DÉCIMÉE';
-  const sub = won ? 'Le Spécimen Zéro est neutralisé. Le secteur est sauvé… pour l\'instant.'
+  const camp = snap.rm.mode === 'campaign', def = snap.rm.mode === 'defense';
+  const genDown = def && snap.bs2 && snap.bs2.g[0] <= 0;
+  const title = won ? (def ? 'FORT TENU' : 'MISSION ACCOMPLIE') : genDown ? 'GÉNÉRATEUR DÉTRUIT' : 'ESCOUADE DÉCIMÉE';
+  const sub = won ? (def ? 'Quinze vagues repoussées. Le fort Delta tient toujours.' : 'La source est neutralisée. Le secteur est sauvé… pour l\'instant.')
+    : def ? `Le fort est tombé à la vague ${snap.wv.n} sur ${snap.wv.tot}.`
     : camp ? `Tombés dans la salle ${snap.rm.i} (${ROOM_TYPES[snap.rm.ty].name.split(' — ')[0]}).` : `Vous avez tenu jusqu'à la vague ${snap.wv.n}.`;
   return `<div class="card panel">
     <div class="res-title ${won ? 'win' : 'lose'}">${title}</div>

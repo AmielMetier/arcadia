@@ -132,6 +132,9 @@ export class Audio {
       case 'note': [523, 784, 659].forEach((f, i) => this.tone(o, t + i * 0.09, 0.3, { type: 'triangle', f0: f, v: 0.16 })); this.noise(o, t, 0.15, { type: 'highpass', f0: 3000, v: 0.2 }); break;
       case 'heli': this.noise(o, t, 2.6, { type: 'lowpass', f0: 500, f1: 300, a: 0.4, v: 0.35 }); for (let k = 0; k < 20; k++) this.noise(o, t + k * 0.12, 0.06, { type: 'lowpass', f0: 300, v: 0.4 }); break;
       case 'static': this.noise(o, t, 1.6, { type: 'bandpass', f0: 3000, q: 0.5, a: 0.05, v: 0.25 }); break;
+      case 'build': this.noise(o, t, 0.08, { type: 'bandpass', f0: 900, v: 0.5 }); this.noise(o, t + 0.12, 0.08, { type: 'bandpass', f0: 1200, v: 0.5 }); this.tone(o, t + 0.2, 0.25, { type: 'triangle', f0: 880, v: 0.15 }); break;
+      case 'hammer': this.noise(o, t, 0.05, { type: 'bandpass', f0: 1600, q: 3, v: 0.4 }); this.tone(o, t, 0.06, { type: 'triangle', f0: 600, v: 0.1 }); break;
+      case 'wood': this.noise(o, t, 0.12, { type: 'bandpass', f0: 400, f1: 250, q: 1.5, v: 0.5 }); break;
       case 'click': this.tone(o, t, 0.05, { type: 'triangle', f0: 1200, v: 0.15 }); break;
     }
   }

@@ -54,6 +54,18 @@ export function botThink(sim, p, dt) {
     if (pick) { goal = pick; goalTight = 10; if (pick.k === 'weapon' && pd < 40) { B.useT += dt; if (B.useT > 0.15) { inp.use = true; B.useT = 0; } } }
   }
   if (!goal && p.state === 'ok' && sim.evt && sim.evt.k === 'drop' && sim.evt.st === 'land' && nd > 90) { goal = { x: sim.evt.x, y: sim.evt.y }; goalTight = 70; stopAtGoal = true; }
+  // Défense : réparer les barricades abîmées quand ça se calme, sinon rester près du fort
+  if (!goal && p.state === 'ok' && sim.base) {
+    const quiet = sim.zombies.filter((z) => Math.hypot(z.x - p.x, z.y - p.y) < 350).length === 0;
+    let bar = null, worst = 0.85;
+    for (const b of sim.base.bars) { const f = b.hp / b.max; if (f < worst) { worst = f; bar = b; } }
+    if (bar && quiet) {
+      const g = sim.base.gen, bx = bar.x + bar.w / 2, by = bar.y + bar.h / 2;
+      const ix = bx + Math.sign(g.x - bx) * (Math.abs(g.x - bx) > 5 ? 45 : 0), iy = by + Math.sign(g.y - by) * (Math.abs(g.y - by) > 5 ? 45 : 0);
+      goal = { x: ix, y: iy }; goalTight = 20; stopAtGoal = true;
+      if (Math.hypot(bx - p.x, by - p.y) < 70) inp.use = true;
+    } else if (!humans.length && Math.hypot(sim.base.gen.x - p.x, sim.base.gen.y - p.y) > 230) { goal = { x: sim.base.gen.x + (p.id % 3) * 60 - 60, y: sim.base.gen.y + 120 }; goalTight = 60; }
+  }
   if (!goal && sim.doorsOpen && p.state === 'ok' && !sim.zombies.length) {
     const doors = sim.lv.doors.filter((d) => d.kind === 'exit');
     let door = sim.rally ? doors.find((d) => d.id === sim.rally.door) : null;

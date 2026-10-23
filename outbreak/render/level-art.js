@@ -267,6 +267,16 @@ function paintObstacle(c, s, th, rng) {
       circ(c, cx, cy, 14); c.fillStyle = '#f3d9ff'; c.fill();
       break;
     }
+    case 'fortwall': {
+      rr(c, x, y, w, h, 4); fs(c, '#8d96a3', 3);
+      c.save(); c.beginPath(); c.rect(x + 3, y + 3, w - 6, h - 6); c.clip();
+      c.fillStyle = '#ffc531'; for (let k = -40; k < w + h; k += 26) { c.beginPath(); c.moveTo(x + k, y + h); c.lineTo(x + k + 12, y + h); c.lineTo(x + k + 12 + h, y); c.lineTo(x + k + h, y); c.fill(); }
+      c.restore(); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(x + 3, y + 3, w - 6, h - 6);
+      break;
+    }
+    case 'generator':
+      rr(c, x - 6, y - 6, w + 12, h + 12, 10); fs(c, '#3a3f4b', 3);
+      break;
     case 'car': {
       const cols = ['#e3262f', '#2b8cff', '#ffc531', '#fff8ea', '#2fbf71', '#59616d'];
       const body = cols[s.hue % cols.length];

@@ -406,6 +406,53 @@ export function drawTurret(c, t, time) {
   c.strokeStyle = color || '#ff8a1f'; c.beginPath(); c.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); c.stroke();
 }
 
+// ------------------------------------------------------------------ mode Défense
+export function drawGenerator(c, f, t, hit) {
+  rr(c, -34, -34, 68, 68, 8); fs(c, hit ? '#fff' : '#59616d', 3);
+  for (let k = 0; k < 3; k++) { rr(c, -26, -24 + k * 16, 30, 10, 3); fs(c, '#2a2d36', 2); }
+  const on = f > 0.25 || Math.sin(t * 12) > 0;
+  circ(c, 18, -14, 9); fs(c, on ? (f > 0.5 ? '#2fbf71' : f > 0.25 ? '#ffc531' : '#ff4b2b') : '#3a1a10', 2.5);
+  c.save(); c.translate(18, 14); c.rotate(t * 4); for (let k = 0; k < 4; k++) { c.rotate(Math.PI / 2); rr(c, -2, 0, 4, 9, 2); c.fillStyle = '#ffc531'; c.fill(); } c.restore();
+  circ(c, 18, 14, 3); c.fillStyle = INK; c.fill();
+}
+
+export function drawBarricade(c, b, hp, max, t) {
+  const f = Math.max(0, hp / max), horiz = b.w > b.h;
+  const n = Math.ceil(f * 4);
+  c.save(); c.translate(b.x + b.w / 2, b.y + b.h / 2); if (!horiz) c.rotate(Math.PI / 2);
+  const L = Math.max(b.w, b.h);
+  if (hp <= 0) { c.globalAlpha = 0.5; c.setLineDash([8, 6]); rr(c, -L / 2, -8, L, 16, 4); c.strokeStyle = '#ff4b2b'; c.lineWidth = 2.5; c.stroke(); c.setLineDash([]); c.globalAlpha = 1; c.restore(); return; }
+  for (let k = 0; k < n; k++) {
+    c.save(); c.rotate((k % 2 ? -1 : 1) * 0.12); c.translate(0, (k - 1.5) * 7);
+    rr(c, -L / 2 - 6, -5, L + 12, 10, 3); fs(c, ['#b0793f', '#9c6a35', '#c48a4a', '#a8713c'][k], 2.2);
+    circ(c, -L / 2 + 2, 0, 1.8); c.fillStyle = INK; c.fill(); circ(c, L / 2 - 2, 0, 1.8); c.fill();
+    c.restore();
+  }
+  c.restore();
+}
+
+export function drawPad(c, k, n, t, active) {
+  if (!k) {
+    c.globalAlpha = active ? 0.9 : 0.55;
+    circ(c, 0, 0, 30); c.strokeStyle = '#ffc531'; c.lineWidth = 3; c.setLineDash([8, 6]); c.lineDashOffset = -t * 15; c.stroke(); c.setLineDash([]);
+    c.font = '700 20px "Chakra Petch", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#ffc531'; c.fillText('+', 0, 1);
+    c.globalAlpha = 1; return;
+  }
+  if (k === 'wire') {
+    c.strokeStyle = '#8d96a3'; c.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { c.beginPath(); for (let a = 0; a <= 24; a++) { const x = -60 + a * 5, y = -24 + i * 16 + Math.sin(a * 1.7 + i) * 4; a ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+    c.fillStyle = '#5a5e57'; for (const x of [-60, 0, 60]) { rr(c, x - 4, -32, 8, 64, 2); c.fill(); }
+  } else if (k === 'mine') {
+    for (let i = 0; i < n; i++) { const a = (i / 3) * Math.PI * 2; circ(c, Math.cos(a) * 16, Math.sin(a) * 16, 8); fs(c, '#4a5d32', 2); circ(c, Math.cos(a) * 16, Math.sin(a) * 16, 2.5); c.fillStyle = Math.sin(t * 6 + i) > 0 ? '#ff4b2b' : '#5a1a10'; c.fill(); }
+  } else if (k === 'flame') {
+    rr(c, -42, -42, 84, 84, 6); fs(c, '#3a3f4b', 2.5);
+    c.strokeStyle = '#59616d'; c.lineWidth = 3; for (let i = -30; i <= 30; i += 15) { c.beginPath(); c.moveTo(i, -38); c.lineTo(i, 38); c.stroke(); }
+    c.fillStyle = `rgba(255,${120 + 60 * Math.sin(t * 9) | 0},40,.55)`; rr(c, -38, -38, 76, 76, 4); c.fill();
+  } else if (k === 'turret') {
+    circ(c, 0, 0, 30); c.strokeStyle = 'rgba(255,138,31,.6)'; c.lineWidth = 2; c.stroke();
+  }
+}
+
 // ------------------------------------------------------------------ marchand, coffre, largage
 export function drawShopItem(c, it, t, icon, label, afford) {
   const [, k, , , w, price, sold] = it;

@@ -92,6 +92,7 @@ export const ROOM_TYPES = {
   storage: { name: 'Entrepôt', theme: 'storage', reward: 'Munitions et grenades', icon: '📦' },
   core: { name: 'Noyau — Spécimen Zéro', theme: 'core', reward: 'Victoire', icon: '☣️' },
   arena: { name: 'Hangar de quarantaine', theme: 'arena', reward: null },
+  base: { name: 'Fort Delta', theme: 'arena', reward: null },
   shop: { name: 'Chez Dédé, ferrailleur', theme: 'shop', reward: 'Marchand · pas de combat', icon: '🛒' },
   vault: { name: 'Coffre-fort', theme: 'vault', reward: 'Trésor piégé', icon: '💰' },
   dark: { name: 'Salle obscure', theme: 'dark', reward: 'Ferraille ×2', icon: '🌑' },
@@ -136,6 +137,16 @@ export const SECTORS = {
 };
 export const SECTOR_LIST = Object.keys(SECTORS);
 export const roomName = (type, sector) => (SECTORS[sector] && SECTORS[sector].rooms[type]) || ROOM_TYPES[type].name;
+
+// ---------------------------------------------------------------- mode Défense : pièges à poser
+export const TRAPS = {
+  wire: { name: 'Barbelés', icon: '🕸️', price: 10, desc: 'Ralentit fortement et blesse les zombies qui le traversent' },
+  mine: { name: 'Mines', icon: '💥', price: 8, desc: 'Trois mines qui explosent au passage des zombies' },
+  turret: { name: 'Tourelle', icon: '🔫', price: 26, desc: 'Tourelle automatique pendant trois vagues' },
+  flame: { name: 'Grille brûlante', icon: '🔥', price: 18, desc: 'Enflamme les zombies qui marchent dessus' },
+};
+export const TRAP_IDS = Object.keys(TRAPS);
+export const DEFENSE_WAVES = 15;
 
 // ---------------------------------------------------------------- classes de survivants
 // cd : recharge de la capacité (s) · dur : durée de l'effet

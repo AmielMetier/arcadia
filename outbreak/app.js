@@ -42,7 +42,7 @@ function readCfg(settings = {}) {
   try { saved = JSON.parse(localStorage.getItem('outbreak_cfg') || '{}'); } catch (e) {}
   const src = H.embedded ? settings : { ...saved, ...Object.fromEntries(QS) };
   return {
-    mode: src.mode === 'survival' ? 'survival' : 'campaign',
+    mode: ['survival', 'defense'].includes(src.mode) ? src.mode : 'campaign',
     difficulty: DIFFICULTY[src.difficulty] ? src.difficulty : 'normal',
     startWeapon: ['pistol', 'shotgun', 'smg'].includes(src.startWeapon) ? src.startWeapon : 'pistol',
     bots: clamp(Number(src.bots ?? (H.embedded ? 0 : 2)) | 0, 0, 3),
@@ -192,7 +192,7 @@ function report(snap) {
   S.reported = true;
   const ranked = snap.P.slice().sort((a, b) => b.st[1] - a.st[1]);
   const camp = snap.rm.mode !== 'survival';
-  const mode = camp ? (snap.ph === 'won' ? 'Campagne · victoire' : `Campagne · salle ${snap.rm.i}`) : `Survie · vague ${snap.wv.n}`;
+  const mode = snap.rm.mode === 'defense' ? (snap.ph === 'won' ? 'Défense · fort tenu' : `Défense · vague ${snap.wv.n}`) : camp ? (snap.ph === 'won' ? 'Campagne · victoire' : `Campagne · salle ${snap.rm.i}`) : `Survie · vague ${snap.wv.n}`;
   H.report({
     id: `outbreak-${S.runId}-${ranked.map((p) => p.i).join('.')}`, mode,
     players: ranked.map((p, k) => ({ id: p.b ? null : p.i, name: p.n, color: p.c, bot: !!p.b, rank: k + 1, score: p.st[1] })),
@@ -226,7 +226,7 @@ function cleanInput(m) {
   const n = (v, a, b, d = 0) => (Number.isFinite(+v) ? clamp(+v, a, b) : d);
   return {
     mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), a: n(m.a, -10, 10), fire: !!m.fire, use: !!m.use, td: n(m.td, 0, 2000, 300),
-    ab: m.ab | 0, sk: m.sk | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 2, -1) | 0, q: m.q | 0,
+    ab: m.ab | 0, sk: m.sk | 0, dash: m.dash | 0, reload: m.reload | 0, sw: m.sw | 0, sl: n(m.sl, -2, 2) | 0, nade: m.nade | 0, pk: m.pk | 0, pi: n(m.pi, -1, 3, -1) | 0, q: m.q | 0,
   };
 }
 
@@ -413,7 +413,7 @@ function buildView(a, b, f, dt) {
   const view = {
     lv, t, players, zombies, eprojs, mode: b.rm.mode,
     pickups: b.K.map((k) => ({ id: k[0], k: k[1], x: k[2], y: k[3], w: k[4] })),
-    hazards: b.A, turrets: b.T || [], shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, train: b.tr, alarms: b.ca || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
+    hazards: b.A, turrets: b.T || [], base: b.bs2, myPad: meSnap ? meSnap.bd : 0, shop: b.sh || [], vault: b.vt, drop: b.ev, scrap: b.scr || 0, dark: !!b.dk, train: b.tr, alarms: b.ca || [], barrels: lv.barrels.filter((x) => !dead.has(x.id)), crates: lv.crates.filter((x) => !dead.has(x.id)),
     doorsOpen: !!b.op, cleared: !!b.cl, rally: b.rl, meId: S.myId, me: meSnap ? { ...meSnap, state: meSnap.s } : null,
     snap: b, waveLeft: b.wv.left, focus, bleedMax: DIFFICULTY[b.cfg.d]?.bleed || 28, predictFire: S.role === 'guest',
     clock: b.t,
@@ -437,6 +437,12 @@ function promptFor(view) {
   if (it) {
     const name = it[1] === 'weapon' ? WEAPONS[it[4]].name : SHOP_ITEMS[it[1]].name;
     return view.scrap >= it[5] ? `<kbd>E</kbd> Acheter ${esc(name)} · ⚙ ${it[5]}` : `${esc(name)} · ⚙ ${it[5]} — pas assez de ferraille (${view.scrap})`;
+  }
+  if (view.base) {
+    const pad = view.base.p.find((q) => !q[3] && Math.hypot(q[1] - me.x, q[2] - me.y) < 48);
+    if (pad && !ms.bd) return `<kbd>E</kbd> Poser un piège ici · ⚙ ${view.scrap}`;
+    const geo = view.lv.base.bars;
+    for (const b of view.base.b) { const g = geo.find((x) => x.id === b[0]); if (g && b[1] < b[2] && Math.hypot(g.x + g.w / 2 - me.x, g.y + g.h / 2 - me.y) < 75) return `Maintiens <kbd>E</kbd> pour réparer la barricade · ${Math.round((b[1] / b[2]) * 100)} %`; }
   }
   if (view.vault && view.vault[2] === 'closed' && Math.hypot(view.vault[0] - me.x, view.vault[1] - me.y) < 95)
     return view.vault[3] > 0 ? `Ouverture du coffre… ${Math.round(view.vault[3] * 100)} % (ça va sonner !)` : 'Maintiens <kbd>E</kbd> pour forcer le coffre — une alarme attirera une horde';
@@ -539,7 +545,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   const origin = S.view && S.view.me ? renderer.toScreen(S.view.players.find((p) => p.id === S.myId)?.x ?? 0, S.view.players.find((p) => p.id === S.myId)?.y ?? 0) : null;
-  input.offerOpen = !!(S.view && S.view.me && S.view.me.of);
+  input.offerOpen = !!(S.view && S.view.me && (S.view.me.of || S.view.me.bd));
   const blocked = S.lobby || S.endShown || S.menu;
   const raw = input.sample(origin, renderer.cam.zoom);
   S.inp = blocked ? { ...raw, mx: 0, my: 0, fire: false, use: false } : raw;
@@ -583,7 +589,7 @@ function loop(now) {
     const c = canvas.getContext('2d'); renderer.resize();
     c.setTransform(renderer.dpr, 0, 0, renderer.dpr, 0, 0);
     const squad = snapNow.P.map((q) => ({ name: q.n, color: q.c, cls: CLASS_IDS[q.cl], bot: !!q.b, me: q.i === S.myId, weapon: WEAPON_IDS[(q.w[q.sl] || q.w[0])[0]] }));
-    drawIntro(c, renderer.W, renderer.H, ip, { sector: snapNow.rm.sec, squad, mission: snapNow.rm.mode === 'survival' ? MISSIONS.survival : MISSIONS[snapNow.rm.sec], votes: (snapNow.sv || []).length, total: snapNow.P.filter((q) => !q.b).length });
+    drawIntro(c, renderer.W, renderer.H, ip, { sector: snapNow.rm.sec, squad, mission: snapNow.rm.mode === 'survival' ? MISSIONS.survival : snapNow.rm.mode === 'defense' ? MISSIONS.defense : MISSIONS[snapNow.rm.sec], votes: (snapNow.sv || []).length, total: snapNow.P.filter((q) => !q.b).length });
     hud.show(false);
     S.introShown = true;
     return;

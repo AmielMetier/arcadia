@@ -10,7 +10,7 @@ export const CELL = 32;
 
 const SIZES = {
   start: [1500, 1050], armory: [1900, 1250], medbay: [1800, 1250], lab: [2000, 1300], storage: [1950, 1300],
-  core: [2100, 1550], arena: [2300, 1650], shop: [1500, 1050], vault: [1800, 1300], dark: [1900, 1300], gas: [1950, 1300],
+  core: [2100, 1550], arena: [2300, 1650], base: [2400, 1800], shop: [1500, 1050], vault: [1800, 1300], dark: [1900, 1300], gas: [1950, 1300],
 };
 
 export const SECTOR_IDS = ['lab', 'sewers', 'hospital', 'metro', 'nice'];
@@ -29,7 +29,7 @@ function build({ mode, index, type, seed, exits, sector }, bare) {
   const def = ROOM_TYPES[type] || ROOM_TYPES.start;
   let [w, h] = SIZES[type] || SIZES.storage;
   // un peu de variété de taille d'une partie à l'autre
-  if (type !== 'core' && type !== 'arena') { w += rng.int(-2, 2) * 50; h += rng.int(-1, 1) * 50; }
+  if (type !== 'core' && type !== 'arena' && type !== 'base') { w += rng.int(-2, 2) * 50; h += rng.int(-1, 1) * 50; }
   const lv = {
     mode, index, type, theme: sector === 'lab' || type === 'shop' || type === 'vault' ? def.theme : sector, name: def.name, w, h, seed,
     sector, tint: type === 'gas' ? 'gas' : type === 'dark' ? 'dark' : null, zones: [],
@@ -76,14 +76,48 @@ function build({ mode, index, type, seed, exits, sector }, bare) {
     .filter((vx) => !lv.doors.some((d) => d.side === 'top' && vx > d.x - 90 && vx < d.x + d.w + 90))
     .filter((vx) => !(type === 'vault' && Math.abs(vx - cx) < 260));
   for (const vx of topSlots) vents.push({ x: vx, y: I.y0, nx: 0, ny: 1, side: 'top' });
-  if (type === 'arena' || type === 'core') {
+  if (type === 'arena' || type === 'core' || type === 'base') {
     vents.push({ x: I.x0 + 160, y: I.y1, nx: 0, ny: -1, side: 'bottom' }, { x: I.x1 - 160, y: I.y1, nx: 0, ny: -1, side: 'bottom' });
   }
   lv.vents = vents.map((v, k) => ({ ...v, id: k, sx: v.x + v.nx * 34, sy: v.y + v.ny * 34 }));
   for (const v of lv.vents) keepOut.push({ x: v.sx - 60, y: v.sy - 60, w: 120, h: 120 });
 
+  // ---- mode Défense : un fort au centre, quatre brèches à barricader, un générateur, des emplacements de pièges
+  if (type === 'base') {
+    const fx = cx, fy = (I.y0 + I.y1) / 2 + 20, half = 270, th = 30, gap = 130;
+    const seg = (x, y, w2, h2) => lv.solids.push({ x, y, w: w2, h: h2, kind: 'fortwall', id: 'f' + x + '_' + y });
+    const L = fx - half, Rr = fx + half, T = fy - half, B = fy + half, g2 = gap / 2;
+    seg(L, T, half - g2, th); seg(fx + g2, T, half - g2, th);            // haut
+    seg(L, B - th, half - g2, th); seg(fx + g2, B - th, half - g2, th);  // bas
+    seg(L, T + th, th, half - g2 - th); seg(L, fy + g2, th, half - g2 - th); // gauche
+    seg(Rr - th, T + th, th, half - g2 - th); seg(Rr - th, fy + g2, th, half - g2 - th); // droite
+    lv.solids.push({ x: fx - 40, y: fy - 40, w: 80, h: 80, kind: 'generator', id: 'gen' });
+    lv.base = {
+      gen: { x: fx, y: fy, r: 48 },
+      fort: { x: L, y: T, w: half * 2, h: half * 2 },
+      bars: [
+        { id: 'bN', x: fx - g2, y: T, w: gap, h: th }, { id: 'bS', x: fx - g2, y: B - th, w: gap, h: th },
+        { id: 'bW', x: L, y: fy - g2, w: th, h: gap }, { id: 'bE', x: Rr - th, y: fy - g2, w: th, h: gap },
+      ],
+      pads: [],
+    };
+    // emplacements de pièges : devant chaque brèche (dehors) et sur un anneau autour du fort
+    const ring = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    let pid = 0;
+    for (const [dx, dy] of ring) {
+      for (const k of [-1, 1]) {
+        const ox = dx ? dx * (half + 120) : k * 120, oy = dy ? dy * (half + 120) : k * 120;
+        lv.base.pads.push({ id: 'p' + pid++, x: fx + ox, y: fy + oy });
+      }
+    }
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) lv.base.pads.push({ id: 'p' + pid++, x: fx + dx * (half + 150), y: fy + dy * (half + 130) });
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) lv.base.pads.push({ id: 'p' + pid++, x: fx + dx * 140, y: fy + dy * 140 });
+    lv.spawn = { x: fx, y: fy + 140 };
+    keepOut.push({ x: L - 220, y: T - 220, w: half * 2 + 440, h: half * 2 + 440 });
+  }
+
   // ---- zones au sol propres au secteur (eau des égouts, voies du métro)
-  const special = type === 'shop' || type === 'vault' || type === 'core';
+  const special = type === 'shop' || type === 'vault' || type === 'core' || type === 'base';
   if (!special) {
     const Hh = I.y1 - I.y0;
     if (sector === 'metro') {
@@ -111,7 +145,8 @@ function build({ mode, index, type, seed, exits, sector }, bare) {
       }
       for (const p of list) lv.solids.push({ ...p, id: 'o' + nid++ });
     };
-    if (sector !== 'lab' && !special) sectorLayout(sector, type, lv, rng, add);
+    if (type === 'base') sectorLayout(sector === 'lab' ? 'lab-base' : sector, 'base', lv, rng, add);
+    else if (sector !== 'lab' && !special) sectorLayout(sector, type, lv, rng, add);
     else layout(type, lv, rng, add);
   }
 
@@ -173,6 +208,11 @@ function sectorLayout(sector, type, lv, rng, add) {
   const I = lv.inner, W = I.x1 - I.x0, H = I.y1 - I.y0;
   const X = (f) => I.x0 + W * f, Y = (f) => I.y0 + H * f;
   switch (sector) {
+    case 'lab-base':
+      add({ x: X(0.08), y: Y(0.12), w: 70, h: 70, kind: 'pillar' });
+      add({ x: X(0.08), y: Y(0.78), w: 70, h: 70, kind: 'pillar' });
+      add({ x: X(0.12), y: Y(0.45), w: 140, h: 40, kind: 'barrier', low: true });
+      break;
     case 'nice': {
       // une rue : voitures garées, palmiers, terrasses, bancs de la Promenade
       const cars = rng.int(2, 3);
@@ -200,7 +240,7 @@ function sectorLayout(sector, type, lv, rng, add) {
     }
     case 'metro': {
       // quais de part et d'autre des voies : piliers carrelés et bancs
-      const tz = lv.zones.find((z) => z.k === 'track');
+      const tz = lv.zones.find((z) => z.k === 'track') || { y: Y(0.12) + 150, h: Y(0.55) - Y(0.12) };
       for (const f of [0.12, 0.3]) {
         add({ x: X(f), y: tz.y - 150, w: 54, h: 54, kind: 'mpillar' });
         add({ x: X(f), y: tz.y + tz.h + 96, w: 54, h: 54, kind: 'mpillar' });

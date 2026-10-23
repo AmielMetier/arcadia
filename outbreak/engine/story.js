@@ -19,6 +19,7 @@ export const MISSIONS = {
   metro: 'Remontez la ligne du tram souterrain jusqu\'au terminus. Attention aux rames automatiques.',
   nice: 'De la place Masséna à la Promenade : nettoyez la route jusqu\'au point d\'extraction.',
   survival: 'Tenez le hangar de quarantaine aussi longtemps que possible. Aucun renfort prévu.',
+  defense: 'Protégez le générateur du fort Delta pendant 15 vagues : sans lui, plus de radio, plus d\'extraction.',
 };
 
 // Radio par secteur : clé = numéro de salle (campagne)
@@ -96,6 +97,7 @@ export function radioFor(ev, ctx) {
   const { sector = 'lab', mode = 'campaign', seed = 0 } = ctx || {};
   const pick = (arr) => (arr && arr.length ? [arr[Math.abs(seed) % arr.length]] : null);
   if (ev.e === 'room') {
+    if (mode === 'defense') return [['moreau', 'Fort Delta. Le générateur alimente la radio et la balise d\'extraction : il ne doit pas tomber.'], ['lenoir', 'Entre les vagues, réparez les barricades et posez des pièges avec la ferraille.']];
     if (mode === 'survival') return SURVIVAL_LINES[1];
     if (ROOM_LINES[ev.ty]) return pick(ROOM_LINES[ev.ty]);
     if (ev.ty === 'core') return null; // la ligne arrive avec le boss
@@ -103,6 +105,8 @@ export function radioFor(ev, ctx) {
   }
   if (ev.e === 'boss') return BOSS_LINES[ev.k] || null;
   if (ev.e === 'wave' && mode === 'survival') return SURVIVAL_LINES[ev.n] || null;
+  if (ev.e === 'barBreak' && seed % 2 === 0) return [['moreau', 'Une barricade a cédé ! Bouchez cette brèche !']];
+  if (ev.e === 'wave' && mode === 'defense' && ev.n === 15) return [['moreau', 'Dernière vague, Delta. Tout ce qu\'il reste de la horde arrive.']];
   if (ev.e === 'blackout') return EVENT_LINES.blackout;
   if (ev.e === 'horde') return EVENT_LINES.horde;
   if (ev.e === 'dropIn') return EVENT_LINES.drop;

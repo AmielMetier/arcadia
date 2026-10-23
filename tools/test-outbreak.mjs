@@ -183,6 +183,27 @@ t('secteurs : campagne jouable dans chaque secteur', () => {
   }
 });
 
+t('défense : le fort tient, les pièges et barricades fonctionnent', () => {
+  const res = [];
+  for (const [seed, n] of [[31, 4], [32, 2]]) {
+    const sim = new Sim({ mode: 'defense', difficulty: 'normal', seed, sector: 'lab' });
+    for (let i = 0; i < n; i++) sim.addPlayer({ id: i, name: 'B' + i, bot: true, cls: ['engineer', 'medic', 'tank', 'soldier'][i] });
+    assert.ok(sim.base && sim.base.bars.length === 4 && sim.base.pads.length >= 12);
+    // un humain pose des pièges sur trois emplacements
+    const p = sim.players.get(0); sim.scrap = 200;
+    for (const [k, i] of [['turret', 0], ['wire', 2], ['mine', 4]]) { const q = sim.base.pads[i]; p.x = q.x; p.y = q.y; assert.ok(sim.tryPad(p)); sim.buildTrap(p, k); assert.equal(q.trap.k, k); }
+    const seen = new Set();
+    for (let s = 0; s < 60 * 60 * 18 && sim.phase === 'play'; s++) {
+      for (const q of sim.players.values()) botThink(sim, q, DT); sim.step(DT);
+      for (const e of sim.drainEvents()) if (['barHit', 'barBreak', 'genHit', 'repair', 'boss'].includes(e.e)) seen.add(e.e);
+    }
+    res.push(`${n} bots : ${sim.phase} vague ${sim.wave.n}/${sim.wave.total}, générateur ${Math.round(sim.base.gen.hp)} — ${[...seen].join(', ')}`);
+    assert.ok(sim.wave.n >= 5, 'au moins cinq vagues');
+    assert.ok(seen.has('barHit') && seen.has('repair'), 'barricades attaquées et réparées');
+  }
+  console.log('   ' + res.join('\n   '));
+});
+
 t('améliorations : toutes applicables', () => {
   const sim = new Sim({ seed: 1 });
   const p = sim.addPlayer({ id: 0, name: 'A' });

@@ -17,7 +17,7 @@ export class Input {
       else if (k === 'KeyR') this.c.reload++;
       else if (k === 'KeyG') this.c.nade++;
       else if (k === 'KeyQ' || k === 'KeyC') this.c.ab++;
-      else if (/^Digit[1-3]$/.test(k) || /^Numpad[1-3]$/.test(k)) {
+      else if (/^Digit[1-4]$/.test(k) || /^Numpad[1-4]$/.test(k)) {
         const i = +k.slice(-1) - 1;
         if (this.offerOpen) { this.c.pk++; this.c.pi = i; } else { this.c.sw++; this.c.sl = i; }
       }

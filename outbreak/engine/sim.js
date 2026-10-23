@@ -1,6 +1,6 @@
 // Simulation d'Outbreak. Tourne chez l'hôte (ou en solo) à pas fixe ; les invités ne font qu'afficher ce qu'elle diffuse.
 // Aucun DOM, aucun réseau : testable sous Node (tools/test-outbreak.mjs).
-import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS, FINAL_BOSSES, MINI_BOSSES, isBig, SPECIAL_TYPES, SHOP_ITEMS, SECTORS, SECTOR_LIST, roomName } from './data.js';
+import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_ROOMS, DIFFICULTY, GRENADE, WEAPON_IDS, ZOMBIE_IDS, CLASSES, CLASS_IDS, FINAL_BOSSES, MINI_BOSSES, isBig, SPECIAL_TYPES, SHOP_ITEMS, SECTORS, SECTOR_LIST, roomName, TRAPS, TRAP_IDS, DEFENSE_WAVES } from './data.js';
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
@@ -18,7 +18,7 @@ const COST = { walker: 1, crawler: 0.7, runner: 1.4, spitter: 2.6, bloater: 3, s
 export class Sim {
   constructor(cfg = {}) {
     this.cfg = {
-      mode: cfg.mode === 'survival' ? 'survival' : 'campaign',
+      mode: cfg.mode === 'survival' || cfg.mode === 'defense' ? cfg.mode : 'campaign',
       difficulty: DIFFICULTY[cfg.difficulty] ? cfg.difficulty : 'normal',
       startWeapon: WEAPONS[cfg.startWeapon] ? cfg.startWeapon : 'pistol',
       seed: cfg.seed || ((Math.random() * 2 ** 31) | 0),
@@ -44,6 +44,7 @@ export class Sim {
     this.field = null; this.fieldT = 0;
     this.toast = null;
     if (this.cfg.mode === 'survival') this.startRoom('arena', 1);
+    else if (this.cfg.mode === 'defense') this.startRoom('base', 1);
     else this.startRoom('start', 1);
   }
 
@@ -127,8 +128,20 @@ export class Sim {
     // vagues
     const isBoss = type === 'core';
     const n = this.cfg.mode === 'survival' ? 0 : isBoss ? 1 : index <= 2 ? 2 : 3;
-    this.wave = { n: 0, total: n, budget: 0, timer: 2.2, spawnT: 0, breather: 0, endless: this.cfg.mode === 'survival' };
+    this.wave = { n: 0, total: n, budget: 0, timer: 2.2, spawnT: 0, breather: 0, endless: this.cfg.mode !== 'campaign' };
     if (this.cfg.mode === 'survival') { this.wave.total = Infinity; this.wave.timer = 3; }
+    this.base = null;
+    if (this.cfg.mode === 'defense') {
+      this.wave.total = DEFENSE_WAVES; this.wave.timer = 30;
+      const B = this.lv.base, g = B.gen;
+      this.base = {
+        gen: { x: g.x, y: g.y, r: g.r, hp: 2000, max: 2000, isGen: true, id: 'gen', state: 'ok', vx: 0, vy: 0 },
+        bars: B.bars.map((b) => ({ ...b, hp: 450, max: 450 })),
+        pads: B.pads.map((q) => ({ ...q, trap: null })),
+        field: distanceField(this.lv, [{ x: g.x, y: g.y - 80 }, { x: g.x, y: g.y + 80 }, { x: g.x - 80, y: g.y }, { x: g.x + 80, y: g.y }]),
+      };
+      this.scrap += 20;
+    }
     // butin de départ
     if (type === 'start') {
       this.spawnPickup('ammo', this.lv.spawn.x - 120, this.lv.spawn.y - 140);
@@ -169,7 +182,7 @@ export class Sim {
     if (this.cfg.mode === 'campaign' && index >= 2 && !['shop', 'vault', 'core', 'start'].includes(type) && this.rng.chance(0.55)) this.evtAt = this.rng.range(14, 32);
     this.ev({ e: 'room', i: index, ty: type });
     const bossName = ZOMBIES[this.bossKind].name;
-    this.setToast(this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? `${bossName} se réveille…` : roomName(type, this.cfg.sector), 2.6);
+    this.setToast(this.cfg.mode === 'defense' ? 'Préparez le fort : réparez, posez des pièges' : this.cfg.mode === 'survival' ? 'Survivez aux vagues' : isBoss ? `${bossName} se réveille…` : roomName(type, this.cfg.sector), 2.6);
   }
 
   // Deux portes vers la salle suivante. Le marchand est proposé avant les salles 3 et 5 ; la 4 est celle du mini-boss.
@@ -242,6 +255,7 @@ export class Sim {
     if (this.train) this.stepTrain(dt);
     this.stepZombies(dt);
     this.stepTurrets(dt);
+    if (this.base) this.stepTraps(dt);
     this.stepProjectiles(dt);
     this.stepEnemyProjectiles(dt);
     this.stepHazards(dt);
@@ -274,7 +288,12 @@ export class Sim {
     if (p.offers && p.bot) { p.offerT -= dt; if (p.offerT <= 0) this.pickPerk(p, botPerkChoice(p)); }
 
     // choix d'amélioration (compteur pk, index pi)
-    if (inp.pk !== L.pk) { L.pk = inp.pk; if (p.offers && inp.pi >= 0 && inp.pi < p.offers.length) this.pickPerk(p, p.offers[inp.pi]); }
+    if (inp.pk !== L.pk) {
+      L.pk = inp.pk;
+      if (p.offers && inp.pi >= 0 && inp.pi < p.offers.length) this.pickPerk(p, p.offers[inp.pi]);
+      else if (p.build && inp.pi >= 0 && inp.pi < TRAP_IDS.length) this.buildTrap(p, TRAP_IDS[inp.pi]);
+    }
+    if (p.build) { const q = this.base && this.base.pads.find((x) => x.id === p.build); if (!q || q.trap || Math.hypot(q.x - p.x, q.y - p.y) > 90) p.build = null; }
 
     if (p.state === 'dead') { p.vx = p.vy = 0; this.consumeEdges(p); return; }
 
@@ -371,7 +390,11 @@ export class Sim {
         p.reviving = 'vault';
         this.vault.prog += dt / 3;
         if (this.vault.prog >= 1) this.openVault();
-      } else if (useEdge) { if (!this.tryBuy(p)) this.tryPickWeapon(p); }
+      } else if (this.base && this.nearBar(p, true)) {
+        const b = this.nearBar(p, true);
+        p.reviving = 'bar'; b.hp = Math.min(b.max, b.hp + 110 * dt * (p.cls === 'engineer' ? 1.6 : 1));
+        if (Math.random() < dt * 3) this.ev({ e: 'repair', x: Math.round(b.x + b.w / 2), y: Math.round(b.y + b.h / 2) });
+      } else if (useEdge) { if (!this.tryBuy(p) && !this.tryPad(p)) this.tryPickWeapon(p); }
     }
     for (const o of this.players.values()) if (o.state === 'down' && o.reviveBy === p.id && p.reviving !== o.id) { o.reviveBy = null; }
     if (this.vault && this.vault.st === 'closed' && ![...this.players.values()].some((q) => q.reviving === 'vault')) this.vault.prog = Math.max(0, this.vault.prog - dt * 0.5);
@@ -989,7 +1012,16 @@ export class Sim {
     W.n++;
     const i = this.room.index;
     const isBoss = this.room.type === 'core';
-    if (this.cfg.mode === 'survival') {
+    if (this.cfg.mode === 'defense') {
+      W.budget = (12 + 6.5 * W.n) * pf * this.diff.budget;
+      if (W.n >= 4) for (let k = 0; k < Math.floor(W.n / 4); k++) this.queueSpecial('brute');
+      if (W.n === W.total) this.spawnBoss(0.8, this.bossKind);
+      else if (W.n % 5 === 0) this.spawnBoss(0.7, MINI_BOSSES[(W.n / 5) % 2]);
+      this.shop = [];
+      if (W.n > 2 && W.n % 3 === 0 && this.rng.chance(0.6)) this.evtAt = this.rng.range(10, 20);
+      this.setToast(W.n === W.total ? 'Dernière vague !' : `Vague ${W.n} / ${W.total}`, 2, 'wave');
+      for (const p of this.players.values()) p.build = null;
+    } else if (this.cfg.mode === 'survival') {
       W.budget = (12 + 6 * W.n) * pf * this.diff.budget;
       if (W.n % 5 === 0) for (let k = 0; k < Math.floor(W.n / 5); k++) this.queueSpecial('brute');
       if (W.n % 10 === 0) this.spawnBoss(0.45 + 0.15 * (W.n / 10 - 1), FINAL_BOSSES[(W.n / 10 - 1) % FINAL_BOSSES.length]);
@@ -1007,7 +1039,7 @@ export class Sim {
       if (this.room.type === 'armory' && W.n === W.total && i < 3) this.queueSpecial('brute');
       this.setToast(W.total > 1 ? `Vague ${W.n} / ${W.total}` : 'Contact !', 2, 'wave');
     }
-    W.spawnT = 0.4; W.timer = this.cfg.mode === 'survival' ? 6 : 3.5;
+    W.spawnT = 0.4; W.timer = this.cfg.mode === 'survival' ? 6 : this.cfg.mode === 'defense' ? 22 : 3.5;
     this.ev({ e: 'wave', n: W.n });
   }
 
@@ -1017,7 +1049,7 @@ export class Sim {
   }
 
   pickZombieType(n) {
-    const i = this.cfg.mode === 'survival' ? 1 + Math.min(8, Math.floor(this.wave.n / 2)) : this.room.index;
+    const i = this.cfg.mode !== 'campaign' ? 1 + Math.min(8, Math.floor(this.wave.n / 2)) : this.room.index;
     const ty = this.room.type;
     const w = [
       ['walker', 10],
@@ -1044,7 +1076,7 @@ export class Sim {
   spawnZombie(ty, x, y, elite = false) {
     const Z = ZOMBIES[ty];
     const nP = Math.max(1, this.players.size);
-    const roomScale = this.cfg.mode === 'survival' ? 1 + this.wave.n * 0.045 : 1 + (this.room.index - 1) * 0.1;
+    const roomScale = this.cfg.mode !== 'campaign' ? 1 + this.wave.n * 0.045 : 1 + (this.room.index - 1) * 0.1;
     const hp = Z.hp * this.diff.zHp * roomScale * (1 + 0.12 * (nP - 1)) * (elite ? 2.6 : 1);
     const z = {
       id: this.nid++, ty, x, y, vx: 0, vy: 0, kx: 0, ky: 0, r: Z.r * (elite ? 1.18 : 1), hp, maxHp: hp,
@@ -1063,6 +1095,76 @@ export class Sim {
     this.ev({ e: 'boss', k: kind });
     if (MINI_BOSSES.includes(kind)) this.setToast(`Mini-boss : ${ZOMBIES[kind].name} !`, 2.6, 'bad');
     return z;
+  }
+
+  // ------------------------------------------------------------------ mode Défense
+  nearBar(p, damagedOnly) {
+    let best = null, bd = 75;
+    for (const b of this.base.bars) {
+      if (damagedOnly && b.hp >= b.max) continue;
+      const d = Math.hypot(b.x + b.w / 2 - p.x, b.y + b.h / 2 - p.y);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+
+  tryPad(p) {
+    if (!this.base) return false;
+    const q = this.base.pads.find((x) => !x.trap && Math.hypot(x.x - p.x, x.y - p.y) < 48);
+    if (!q) return false;
+    p.build = p.build === q.id ? null : q.id;
+    return true;
+  }
+
+  buildTrap(p, k) {
+    const q = this.base.pads.find((x) => x.id === p.build); const T = TRAPS[k];
+    if (!q || q.trap || !T) return;
+    if (this.scrap < T.price) { this.ev({ e: 'poor', p: p.id }); return; }
+    this.scrap -= T.price;
+    q.trap = { k, n: k === 'mine' ? 3 : 0, cd: 0, waves: 3 };
+    if (k === 'turret') this.turrets.push({ id: this.nid++, owner: p.id, pad: q.id, x: q.x, y: q.y, a: -Math.PI / 2, t: 9999, dur: 9999, cd: 0.5, color: p.color });
+    p.build = null;
+    this.ev({ e: 'build', p: p.id, k, x: Math.round(q.x), y: Math.round(q.y) });
+  }
+
+  stepTraps(dt) {
+    for (const q of this.base.pads) {
+      const tr = q.trap; if (!tr) continue;
+      if (tr.cd > 0) tr.cd -= dt;
+      for (const z of this.zombies) {
+        if (z.hp <= 0) continue;
+        const d = Math.hypot(z.x - q.x, z.y - q.y);
+        if (tr.k === 'wire' && d < 62 + z.r * 0.5) { z.slowT = Math.max(z.slowT || 0, 0.2); z.hp -= 9 * dt; if (z.hp <= 0) this.killZombie(z, 0, null); }
+        else if (tr.k === 'flame' && d < 56) { if (!(z.burnT > 0)) z.burnT = 2.5; }
+        else if (tr.k === 'mine' && d < 36 && tr.cd <= 0 && tr.n > 0) {
+          tr.n--; tr.cd = 0.6; this.explode(q.x, q.y, 120, 170, 0, null, 'nade');
+          if (tr.n <= 0) { q.trap = null; break; }
+        }
+      }
+    }
+  }
+
+  barricadeContact(z, Z) {
+    for (const b of this.base.bars) {
+      if (b.hp <= 0) continue;
+      const c = { x: z.x, y: z.y, r: z.r };
+      if (!pushOutRect(c, b)) continue;
+      z.x = c.x; z.y = c.y;
+      if (z.atkCd <= 0 && z.state === 'walk') {
+        z.atkCd = Z.cd; z.atkT = 0;
+        b.hp -= Z.dmg * this.diff.zDmg * (isBig(z.ty) ? 4 : 1) * (z.ty === 'brute' ? 2.5 : 1);
+        this.ev({ e: 'barHit', x: Math.round(b.x + b.w / 2), y: Math.round(b.y + b.h / 2) });
+        if (b.hp <= 0) { b.hp = 0; this.ev({ e: 'barBreak', id: b.id, x: Math.round(b.x + b.w / 2), y: Math.round(b.y + b.h / 2) }); this.setToast('Une barricade a cédé !', 2, 'bad'); }
+      }
+      z.ang = Math.atan2(b.y + b.h / 2 - z.y, b.x + b.w / 2 - z.x);
+    }
+  }
+
+  hitGen(dmg, z) {
+    const G = this.base.gen;
+    G.hp -= dmg;
+    this.ev({ e: 'genHit', x: Math.round(G.x), y: Math.round(G.y) });
+    if (G.hp <= 0 && this.phase === 'play') { G.hp = 0; this.phase = 'over'; this.endT = 0; this.ev({ e: 'genDown', x: Math.round(G.x), y: Math.round(G.y) }); this.ev({ e: 'over' }); this.setToast('Le générateur est détruit…', 4, 'bad'); }
   }
 
   openVault() {
@@ -1155,7 +1257,7 @@ export class Sim {
     const bonus = 400 * this.room.index;
     this.score += bonus;
     const ty = this.room.type;
-    if (this.cfg.mode === 'campaign' && (ty === 'core' || this.room.index >= CAMPAIGN_ROOMS)) {
+    if ((this.cfg.mode === 'campaign' && (ty === 'core' || this.room.index >= CAMPAIGN_ROOMS)) || this.cfg.mode === 'defense') {
       this.phase = 'won'; this.endT = 0; this.ev({ e: 'won' }); return;
     }
     this.doorsOpen = this.lv.doors.some((d) => d.kind === 'exit');
@@ -1191,6 +1293,10 @@ export class Sim {
     if (W.budget > 0 || this.zombies.length + this.pending.length > 0 || W.n === 0 || W.rewarded === W.n) return;
     W.rewarded = W.n;
     this.roomsCleared = W.n;
+    if (this.base) {
+      this.scrap += 8 + W.n;
+      for (const q of this.base.pads) if (q.trap && q.trap.k === 'turret' && --q.trap.waves <= 0) { this.turrets = this.turrets.filter((t) => t.pad !== q.id); q.trap = null; }
+    }
     const cx = this.lv.w / 2, cy = (this.lv.inner.y0 + this.lv.inner.y1) / 2;
     this.spawnPickup('ammo', cx - 40, cy); this.spawnPickup(this.rng.pick(['med', 'armor', 'nade']), cx + 40, cy);
     if (W.n % 3 === 0) this.spawnWeaponDrop(cx, cy - 60, W.n >= 6 ? 2 : 1);
@@ -1206,7 +1312,7 @@ export class Sim {
 
   // ------------------------------------------------------------------ portes
   stepRally(dt) {
-    if (this.cfg.mode === 'survival') { this.survivalBreak(); return; }
+    if (this.cfg.mode !== 'campaign') { this.survivalBreak(); return; }
     if (!this.doorsOpen) return;
     const st = this.standing();
     if (!st.length) return;
@@ -1276,6 +1382,8 @@ export class Sim {
         for (const p of targets) { const d = (p.x - z.x) ** 2 + (p.y - z.y) ** 2; if (d < bd) { bd = d; best = p; } }
         z.tgt = best ? best.id : null; T = best;
       }
+      // Défense : les zombies foncent vers le générateur, sauf si un survivant est tout près
+      if (this.base && z.state !== 'pin' && (!T || Math.hypot(T.x - z.x, T.y - z.y) > (isBig(z.ty) ? 420 : 280))) T = this.base.gen;
       const dx = T ? T.x - z.x : 0, dy = T ? T.y - z.y : 0, dist = Math.hypot(dx, dy) || 1;
       z.losT -= dt;
       if (z.losT <= 0 && T) { z.losT = 0.25; z.los = !raycastSolids(this.blockers, z.x, z.y, T.x, T.y); z.walkLos = z.los && (z.r >= 34 || !this.solidsNow.some((s) => s.low && segRect(z.x, z.y, dx, dy, s, z.r * 0.8))); }
@@ -1292,7 +1400,8 @@ export class Sim {
         if (!T) return null;
         if (z.unstick > 0) { const s2 = z.id % 2 ? 1 : -1; return { x: (-dy / dist) * s2 * 0.8 + (dx / dist) * 0.6, y: (dx / dist) * s2 * 0.8 + (dy / dist) * 0.6 }; }
         if (z.walkLos && dist < 520) return { x: dx / dist, y: dy / dist };
-        const f = this.field && flowDir(this.lv, this.field, z.x, z.y);
+        const fld = T.isGen ? this.base.field : this.field;
+        const f = fld && flowDir(this.lv, fld, z.x, z.y);
         return f || { x: dx / dist, y: dy / dist };
       };
 
@@ -1362,7 +1471,8 @@ export class Sim {
           z.atkT -= dt; speed *= 0.35;
           if (z.atkT <= 0) {
             z.atkCd = Z.cd;
-            if (dist < reach + 16) this.hurtPlayer(T, Z.dmg * this.diff.zDmg * (z.elite ? 1.4 : 1), z.x, z.y, isBig(z.ty) ? 420 : z.ty === 'brute' ? 300 : 90);
+            if (dist < reach + 16 && T.isGen) this.hitGen(Z.dmg * this.diff.zDmg * (isBig(z.ty) ? 3 : 1), z);
+            else if (dist < reach + 16) this.hurtPlayer(T, Z.dmg * this.diff.zDmg * (z.elite ? 1.4 : 1), z.x, z.y, isBig(z.ty) ? 420 : z.ty === 'brute' ? 300 : 90);
             this.ev({ e: 'zs', z: z.id });
           }
         } else if (dist < reach && z.atkCd <= 0) { z.atkT = isBig(z.ty) ? 0.45 : 0.28; }
@@ -1410,6 +1520,7 @@ export class Sim {
         }
       }
       this.collideBody(z);
+      if (this.base) this.barricadeContact(z, Z);
       if (z.state === 'charge' && z.hitWall) { z.hitWall = false; }
     }
     this.zombies = Zs.filter((z) => z.hp > 0);
@@ -1682,7 +1793,7 @@ export class Sim {
         bl: r1(p.bleed), rv: r2(p.reviveP), rg: p.reviving, d: p.dashT > 0 ? 1 : 0, dc: p.dashCharges, dm: dashMaxOf(p), dcd: r2(p.dashCd),
         w: p.weapons.map((w) => [WEAPON_IDS.indexOf(w.id), w.mag, w.res === Infinity ? -1 : w.res]), sl: p.slot,
         rl: p.reloadT > 0 ? r2(1 - p.reloadT / (p.reloadDur || 1)) : 0, sp: r2(p.spin), g: p.grenades, gm: nadeMax(p),
-        cl: CLASS_IDS.indexOf(p.cls), ab: [r2(Math.max(0, p.abCd) / CLASSES[p.cls].cd), r2(p.abT)], pn: p.pinnedBy != null ? 1 : 0,
+        bd: p.build || 0, cl: CLASS_IDS.indexOf(p.cls), ab: [r2(Math.max(0, p.abCd) / CLASSES[p.cls].cd), r2(p.abT)], pn: p.pinnedBy != null ? 1 : 0,
         pk: p.perks, of: p.offers, on: p.offerN || 0, ht: p.hurtT > 0 ? 1 : 0, q: p.seq, ad: p.adrenaline,
         st: [p.stats.kills, p.stats.score, p.stats.revives, p.stats.downs, r1(p.stats.dmg)],
       });
@@ -1708,10 +1819,11 @@ export class Sim {
       ph: this.phase, t: r2(this.t), rm: { i: this.room.index, ty: this.room.type, sd: this.room.seed, ex: this.room.exits, mode: this.cfg.mode, sec: this.cfg.sector },
       P, Z, O, K, A, T, D: [...this.destroyed], op: this.doorsOpen ? 1 : 0, cl: this.cleared ? 1 : 0,
       rl: this.rally ? { d: this.rally.door, t: r2(this.rally.t), a: this.rally.all ? 1 : 0 } : null,
-      wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
+      wv: { n: W.n, tot: W.total === Infinity ? -1 : W.total, bt: W.budget <= 0 && !this.zombies.length && !this.pending.length && W.n < W.total ? Math.ceil(W.timer) : 0, left: this.zombies.length + this.pending.length + Math.ceil(Math.max(0, W.budget)) },
       sc: this.score, k: this.kills, rc: this.roomsCleared, ts: this.toast && this.toast.until > this.t ? this.toast : null,
       bs: boss ? Math.round((boss.hp / boss.maxHp) * 1000) : -1, bn: boss ? ZOMBIES[boss.ty].name : '',
       in: Math.round(this.intro * 100) / 100, sv: [...this.players.values()].filter((p) => p.skip && !p.bot).map((p) => p.id),
+      bs2: this.base ? { g: [Math.ceil(this.base.gen.hp), this.base.gen.max], b: this.base.bars.map((b) => [b.id, Math.ceil(b.hp), b.max]), p: this.base.pads.map((q) => [q.id, Math.round(q.x), Math.round(q.y), q.trap ? q.trap.k : 0, q.trap ? q.trap.n || q.trap.waves : 0]) } : null,
       scr: this.scrap, tr: this.train ? [this.train.st, Math.round(this.train.x), this.train.dir, Math.round(this.train.t * 10) / 10] : null, ca: [...this.cars], dk: this.dark || (this.evt && this.evt.k === 'blackout') ? 1 : 0,
       sh: this.shop.map((it) => [it.id, it.k, Math.round(it.x), Math.round(it.y), it.w || 0, it.price, it.sold ? 1 : 0]),
       vt: this.vault ? [Math.round(this.vault.x), Math.round(this.vault.y), this.vault.st, Math.round(this.vault.prog * 100) / 100] : null,
@@ -1733,7 +1845,8 @@ export class Sim {
       p.adrenaline = q.ad ?? p.adrenaline;
     }
     sim.startRoom(snap.rm.ty, snap.rm.i);
-    if (snap.rm.mode === 'survival') { sim.wave.n = Math.max(0, snap.wv.n - 1); sim.wave.rewarded = sim.wave.n; }
+    if (snap.rm.mode !== 'campaign') { sim.wave.n = Math.max(0, snap.wv.n - 1); sim.wave.rewarded = sim.wave.n; sim.wave.timer = 5; }
+    if (sim.base && snap.bs2) { sim.base.gen.hp = Math.max(1, snap.bs2.g[0]); for (const [id, hp] of snap.bs2.b) { const b = sim.base.bars.find((x) => x.id === id); if (b) b.hp = hp; } }
     return sim;
   }
 }

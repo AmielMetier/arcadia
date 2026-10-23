@@ -12,7 +12,7 @@ export class FX {
     this.audio = audio;
     this.parts = []; this.bullets = []; this.beams = []; this.lights = []; this.texts = []; this.rings = []; this.arcs = []; this.zaps = [];
     this.decal = null; this.dctx = null; this.shake = 0; this.flash = 0; this.hurtFlash = 0;
-    this.recoil = new Map(); this.muzzle = new Map(); this.ventGlow = new Map(); this.zflash = new Map(); this.pflash = new Map();
+    this.recoil = new Map(); this.muzzle = new Map(); this.ventGlow = new Map(); this.zflash = new Map(); this.pflash = new Map(); this.genFlash = 0;
     this.showDamage = true;
   }
 
@@ -131,6 +131,12 @@ export class FX {
       case 'trainWarn': A.play('horn'); break;
       case 'train': A.play('trainPass'); this.addShake(9); break;
       case 'carAlarm': A.play('carAlarm', e.x, e.y); this.text(e.x, e.y - 40, 'ALARME !', '#ffc531', 18, true); break;
+      case 'build': A.play('build', e.x, e.y); this.dust(e.x, e.y, 10); this.ring(e.x, e.y, 60, '#ffc531', 0.4, 5); break;
+      case 'repair': A.play('hammer', e.x, e.y, 0.6); for (let i = 0; i < 3; i++) this.parts.push({ k: 'spark', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 160, vy: -Math.random() * 160, life: 0.25, max: 0.25, c: '#ffe27a', r: 2 }); break;
+      case 'barHit': A.play('wood', e.x, e.y, 0.6); for (let i = 0; i < 3; i++) this.parts.push({ k: 'chunk', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.5) * 200, life: 0.4, max: 0.4, c: '#b0793f', r: 3, rot: Math.random() * 6 }); break;
+      case 'barBreak': A.play('crate', e.x, e.y); this.dust(e.x, e.y, 14); this.text(e.x, e.y - 30, 'BRÈCHE !', '#ff4b2b', 18, true); break;
+      case 'genHit': this.genFlash = 0.08; if (Math.random() < 0.3) { A.play('clank', e.x, e.y, 0.6); this.sparks(e.x, e.y, Math.random() * 6.28, 5); } break;
+      case 'genDown': this.explosion(e.x || 0, e.y || 0, 200, 'barrel'); break;
       case 'tEnd': this.dust(e.x, e.y, 8); A.play('switch', e.x, e.y); break;
       case 'dash': { const p = P(e.p); if (p) { this.dust(p.x, p.y, 6); if (e.p === me) A.play('dash'); } break; }
       case 'throw': A.play('throw', null, null, e.p === me ? 1 : 0.4); break;
@@ -269,6 +275,7 @@ export class FX {
   update(dt, view) {
     this.shake *= Math.pow(0.0015, dt); if (this.shake < 0.05) this.shake = 0;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 1.6);
+    this.genFlash = Math.max(0, this.genFlash - dt);
     for (const [k, v] of this.recoil) { const n = v - dt * 9; if (n <= 0) this.recoil.delete(k); else this.recoil.set(k, n); }
     for (const [k, v] of this.muzzle) { const n = v - dt; if (n <= 0) this.muzzle.delete(k); else this.muzzle.set(k, n); }
     for (const M of [this.zflash, this.pflash]) for (const [k, v] of M) { const n = v - dt; if (n <= 0) M.delete(k); else M.set(k, n); }

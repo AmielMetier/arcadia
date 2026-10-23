@@ -43,10 +43,11 @@ l'expert a le manuel posé sur sa table, un livret 3D dont les règles changent 
 ## Outbreak : Secteur Zéro
 Survie zombie en coop, vue de dessus (twin-stick), jusqu'à 5 joueurs, avec équipiers IA possibles.
 
-- **Campagne** : 7 salles, on choisit sa porte selon la récompense (armes, soins, améliorations, munitions), boss final en 3 phases
-- **Survie** : vagues sans fin, brutes et boss réguliers
-- **Roguelite** : 22 améliorations à cumuler, 8 armes, grenades, roulade
-- **Coop** : relever les alliés à terre, partage de l'écran de fin, classement entre potes
+- **3 modes** : Campagne (7 salles à embranchements, mini-boss et boss final), Survie (vagues infinies), Défense (tenir le fort 15 vagues : barricades à réparer, pièges à poser)
+- **5 classes** avec capacité : Soldat, Médecin, Ingénieur (tourelle), Colosse (provocation), Éclaireur (ombre)
+- **5 secteurs** : Labo, Égouts, Hôpital, Métro (rames qui fauchent tout), Rues de Nice (alarmes de voiture)
+- **11 armes**, 10 types de zombies, 5 boss, 22 améliorations, marchand et ferraille, coffre-fort, salles obscure et contaminée, événements surprises
+- **Histoire** : intro animée avec les noms des joueurs, radio, 20 dossiers à trouver, fin en hélico
 - Clavier/souris, manette ou écran tactile
 
 ## Bastion Clash
