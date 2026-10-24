@@ -319,6 +319,29 @@ const RAW = `
 3 | Marchés | Un market maker cote 99/101 et achète au bid. Le prix juste est 100. Gain attendu par titre ? | 1 € | 2 € | 0,50 € | 0 € | Il achète 1 € sous le prix juste : c'est la moitié du spread.
 3 | Probas | Jeu : on lance un dé et vous touchez le carré du résultat en euros. Prix juste ? | 15,17 € | 12,25 € | 18 € | 21 € | E[X²] = (1 + 4 + 9 + 16 + 25 + 36) / 6 = 91/6 ≈ 15,17 €. Le 12,25 € est (E[X])².
 3 | Probas | Variance d'un lancer de dé à 6 faces ? | ≈ 2,92 | 3,5 | ≈ 1,71 | 6 | E[X²] − E[X]² = 91/6 − 12,25 ≈ 2,92. L'écart-type vaut ≈ 1,71.
+# lot 9 : gestion des risques (VaR, crédit, contrepartie, réglementation)
+1 | Risques | Que mesure une VaR à 99 % sur 1 jour ? | La perte dépassée 1 jour sur 100 | !La perte maximale possible en un jour | La perte moyenne d'une journée | Le gain dépassé 1 jour sur 100 | La VaR est un seuil : 1 jour sur 100, on perd plus. Elle ne dit rien de l'ampleur des pertes au-delà, ce n'est pas la perte maximale.
+1 | Risques | Le risque qu'une contrepartie ne paie pas ce qu'elle doit s'appelle… | le risque de crédit | !le risque de marché | le risque de liquidité | le risque opérationnel | Risque de marché : les prix bougent. Liquidité : impossible de vendre sans décote. Opérationnel : erreurs, fraudes, pannes.
+1 | Risques | Une erreur de saisie (fat finger) relève du risque… | opérationnel | !de marché | de crédit | de modèle | Le risque opérationnel couvre les erreurs humaines, les fraudes et les pannes de systèmes.
+1 | Risques | Quel quantile z pour une VaR normale à 95 % (unilatérale) ? | 1,65 | !1,96 | 2,33 | 1,28 | 1,96 correspond à 95 % bilatéral (2,5 % de chaque côté) ; 2,33 à 99 % unilatéral ; 1,28 à 90 %.
+1 | Risques | Quel quantile z pour une VaR normale à 99 % (unilatérale) ? | 2,33 | !2,58 | 1,65 | 3,00 | 2,58 est le quantile bilatéral à 99 % (0,5 % de chaque côté).
+1 | Risques | La limite de perte d'un trader (stop loss), c'est… | un seuil qui force à couper | !un ordre pour racheter plus bas | une prime versée à la clôture | une couverture par options | Une fois la limite atteinte, le trader doit réduire ou fermer sa position, sans discuter.
+1 | Risques | Que signifie CDS ? | Credit Default Swap | !Currency Derivative Swap | Collateral Debt Security | Credit Duration Spread | Le CDS assure contre le défaut d'un émetteur : on paie une prime, on est indemnisé en cas de défaut.
+2 | Risques | Pourquoi l'expected shortfall complète-t-il la VaR ? | Il mesure la perte moyenne au-delà de la VaR | !Il est toujours plus petit que la VaR | Il ignore les queues de distribution | Il ne s'applique qu'aux obligations | L'ES est la moyenne des pertes pires que la VaR : il voit la queue de distribution, la VaR non. Il est toujours au moins égal à la VaR.
+2 | Risques | La VaR n'est pas sous-additive. Cela veut dire que… | la VaR de deux books réunis peut dépasser la somme | !la VaR d'un book ne peut jamais baisser | les VaR s'additionnent toujours exactement | la VaR ignore les corrélations positives | Diversifier devrait réduire le risque, mais avec des pertes rares et concentrées, VaR(A + B) peut dépasser VaR(A) + VaR(B). L'expected shortfall, lui, est sous-additif.
+2 | Risques | Deux actifs de même volatilité : quelle corrélation diversifie le mieux ? | −1 | !0 | 0,5 | 1 | À −1, les deux se compensent exactement et le risque peut s'annuler. À 0, on ne fait que diviser la variance.
+2 | Risques | Que mesure le DV01 d'une obligation ? | Sa variation de prix pour 1 bp de taux | !Sa variation de prix pour 1 % de taux | Son coupon annuel en euros | Sa durée de vie restante en années | DV01 : dollar value of one basis point, la variation de valeur quand les taux bougent de 0,01 %.
+2 | Risques | Backtest d'une VaR à 99 % sur 250 jours : combien de dépassements attend-on ? | 2 à 3 | !0 | 25 | 10 | 1 % × 250 = 2,5. Zéro dépassement trahit souvent un modèle trop prudent ; 10 ou plus, un modèle qui sous-estime le risque.
+2 | Risques | Le « wrong-way risk », c'est quand… | l'exposition grandit quand la contrepartie se dégrade | !le marché va contre la position du trader | le hedge est passé dans le mauvais sens | la banque prête à un client mal noté | Exemple : acheter un CDS sur une banque à une autre banque très liée à elle. Quand la première fait défaut, la seconde vacille au pire moment.
+2 | Risques | À quoi sert le collatéral (appel de marge) sur un dérivé ? | À réduire le risque de contrepartie | !À augmenter l'effet de levier | À payer la prime de l'option | À fixer le prix du sous-jacent | Chaque jour, celui qui perd verse des garanties : si la contrepartie fait défaut, la perte est déjà couverte.
+2 | Risques | Un stress test historique, c'est… | rejouer un choc passé sur le portefeuille | !calculer la VaR sur un an de données | simuler des milliers de scénarios au hasard | tester la panne des serveurs de la banque | On applique au portefeuille d'aujourd'hui les mouvements de 2008, de mars 2020 ou de 1987 pour voir ce qu'il perdrait.
+2 | Risques | Que représente la CVA ? | Le coût du risque de défaut de la contrepartie | !La volatilité implicite d'un CDS | Le capital minimum exigé par Bâle | La valeur d'un swap à sa signature | Credit Valuation Adjustment : la valeur d'un dérivé moins la perte attendue si la contrepartie fait défaut.
+2 | Risques | Bâle III : ratio minimal de fonds propres durs (CET1), hors coussins ? | 4,5 % | !8 % | 10,5 % | 3 % | 4,5 % de CET1 au minimum ; 8 % pour le total des fonds propres ; 10,5 % avec le coussin de conservation ; 3 %, c'est le ratio de levier.
+3 | Risques | VaR historique à 99 % sur 250 jours : où se lit-elle ? | Entre la 2e et la 3e pire perte | !Sur la pire perte de l'année | Sur la 25e pire perte | Sur la perte moyenne | 1 % de 250 jours = 2,5 jours : la VaR se situe entre la 2e et la 3e pire perte observée.
+3 | Risques | Pourquoi la règle « VaR × √10 » est-elle fragile ? | Elle suppose des rendements indépendants | !Elle surestime toujours le risque | Elle ne vaut que pour les actions | Elle oublie les dividendes | La racine du temps suppose des rendements indépendants et de volatilité stable. Avec des tendances ou des crises qui s'enchaînent, elle sous-estime le risque.
+3 | Risques | Le ratio de liquidité LCR compare les actifs très liquides… | aux sorties de trésorerie sur 30 jours | !aux fonds propres de la banque | au total du bilan | aux crédits accordés sur un an | La banque doit pouvoir tenir 30 jours de crise de liquidité avec ses seuls actifs liquides de haute qualité.
+3 | Risques | Exposition future potentielle d'un swap de taux : quand est-elle maximale ? | Vers le tiers de sa vie | !À la signature | À l'échéance | Elle reste constante | Au début, les taux ont peu bougé ; à la fin, il reste peu de flux. Entre les deux, l'incertitude est maximale.
+3 | Risques | La VaR delta-normale d'un book d'options sous-estime souvent le risque, car… | elle ignore la convexité (gamma) | !elle surestime le delta | elle compte deux fois le vega | elle ne lit que les prix de clôture | Une approximation linéaire (delta) rate les gros mouvements : un book court gamma perd bien plus que prévu.
 `;
 
 // Questions posées aux candidats de l'émission (les relances « et pourquoi ? » sont fusionnées dans la question
@@ -989,6 +1012,49 @@ const RAW_NUM = `
 3 | Dérivés | Delta neutre, taux nuls : Γ = 0,04, S = 100, σ = 20 %. Thêta par an, en € (Θ ≈ −½ σ² S² Γ) ? | -8 | 0 | € | 8;-0,8 | −½ × 0,04 × 10 000 × 0,04 = −8 € par an, soit environ −3 centimes par jour.
 2 | Dérivés | Volatilité annuelle de 20 %. Volatilité sur un mois de bourse (21 jours), en % ? | 5,8 | ±5% | % | 1,7;20 | 20 % × √(21 / 252) ≈ 20 % × 0,29 ≈ 5,8 %.
 
+# lot 9 : risques, en chiffres
+1 | Risques | Volatilité annuelle de 16 % : volatilité quotidienne approximative (252 jours) ? | 1 | ±5% | % | 16;0,0635 | 16 % / √252 ≈ 16 % / 15,9 ≈ 1 %.
+2 | Risques | Portefeuille de 10 M€, volatilité quotidienne 2 %. VaR 1 jour à 95 % (z = 1,65) ? | 0,33 | ±3% | M€ | 0,466 | 10 × 2 % × 1,65 = 0,33 M€. Avec 2,33, on aurait la VaR à 99 %.
+2 | Risques | VaR à 1 jour de 1 M€. VaR à 25 jours, par la racine du temps ? | 5 | ±1% | M€ | 25 | × √25 = × 5. Pas × 25 : ce sont les variances qui s'additionnent.
+2 | Risques | Exposition 10 M€, probabilité de défaut 2 %, recouvrement 40 %. Perte attendue ? | 120 | ±2% | k€ | 200;80 | Perte attendue = exposition × probabilité de défaut × perte en cas de défaut = 10 M€ × 2 % × 60 % = 120 k€.
+3 | Risques | Deux positions de VaR 3 M€ et 4 M€, corrélation nulle. VaR de l'ensemble ? | 5 | ±2% | M€ | 7 | √(3² + 4²) = √25 = 5 M€. On ne retrouve 7 qu'avec une corrélation de 1.
+3 | Risques | Spread de CDS à 300 bp, recouvrement 40 %. Probabilité de défaut annuelle implicite ? | 5 | ±5% | % | 3;7,5 | Probabilité ≈ spread / (1 − recouvrement) = 3 % / 0,6 = 5 %.
+3 | Risques | DV01 de 4 500 € pour 10 M€ de nominal. Duration modifiée ? | 4,5 | ±2% | ans | 45 | DV01 = nominal × duration × 0,01 % : 4 500 = 10 M€ × D × 0,0001, donc D = 4,5.
+# lot 9 : estimations
+1 | Estimation | Population de la France (2025) ? | 68,6 | ±5% | millions | - | ≈ 68,6 millions d'habitants au 1er janvier 2025 (Insee, outre-mer compris).
+1 | Estimation | Habitants de Paris intra-muros ? | 2,1 | ±10% | millions | 12 | ≈ 2,1 millions. Les 12 millions, c'est l'Île-de-France.
+1 | Estimation | Distance Paris–Marseille à vol d'oiseau ? | 660 | ±10% | km | - | ≈ 660 km à vol d'oiseau, environ 775 km par l'autoroute.
+1 | Estimation | Combien de jours de bourse dans une année ? | 252 | ±3% | jours | 365 | 365 jours − 104 jours de week-end − une dizaine de jours fériés ≈ 252.
+1 | Estimation | Hauteur de la tour Eiffel, antenne comprise ? | 330 | ±10% | m | - | 330 m depuis la nouvelle antenne de 2022 ; 300 m pour la structure seule.
+1 | Estimation | Vitesse du son dans l'air ? | 1225 | ±10% | km/h | 340 | ≈ 340 m/s, soit 340 × 3,6 ≈ 1 225 km/h.
+1 | Estimation | Circonférence de la Terre à l'équateur ? | 40075 | ±5% | km | - | ≈ 40 000 km : le mètre fut défini comme le dix-millionième du quart de méridien.
+1 | Estimation | Combien de communes en France ? | 34900 | ×1,5 | communes | - | ≈ 34 900 communes en 2024, un record en Europe.
+1 | Estimation | Longueur de la Seine ? | 777 | ±10% | km | - | 777 km, du plateau de Langres jusqu'à la Manche.
+2 | Estimation | Combien de baguettes vendues chaque jour en France ? | 16000000 | ×3 | baguettes | - | On cite souvent 6 milliards par an, soit ≈ 16 millions par jour : environ une baguette pour quatre habitants.
+2 | Estimation | Combien de taxis à Paris ? | 18000 | ×2 | taxis | - | ≈ 18 000 licences de taxi parisiens, sans compter les VTC.
+2 | Estimation | Voyages par jour dans le métro parisien (2019) ? | 4000000 | ×2 | voyages | - | ≈ 1,5 milliard de voyages par an, soit ≈ 4 millions par jour.
+2 | Estimation | Combien de stations-service en France ? | 11000 | ×2 | stations | - | ≈ 11 000, contre plus de 40 000 en 1980.
+2 | Estimation | Heures de vidéo mises en ligne sur YouTube chaque minute ? | 500 | ×2 | heures | - | ≈ 500 heures par minute, chiffre avancé par YouTube depuis 2019.
+2 | Estimation | Vols commerciaux par jour dans le monde (2019) ? | 100000 | ×2 | vols | - | ≈ 38 millions de vols en 2019 selon l'OACI, soit ≈ 100 000 par jour.
+2 | Estimation | Smartphones vendus dans le monde par an ? | 1200000000 | ×1,5 | téléphones | - | ≈ 1,2 milliard par an (IDC, 2023-2024).
+2 | Estimation | Balles de tennis utilisées sur un Roland-Garros ? | 60000 | ×2 | balles | - | ≈ 60 000 : on les change tous les 7 à 9 jeux, sur plusieurs centaines de matchs.
+2 | Estimation | Masse d'un litre d'air au niveau de la mer ? | 1,2 | ±15% | g | 1000 | ≈ 1,2 g par litre, soit 1,2 kg par mètre cube.
+2 | Estimation | Capitalisation boursière d'Apple (2025) ? | 3500 | ×1,5 | Md$ | - | Autour de 3 500 milliards de dollars en 2025, au coude à coude avec Microsoft et Nvidia.
+2 | Estimation | PIB de la France (2024) ? | 2900 | ±10% | Md€ | - | ≈ 2 900 milliards d'euros (Insee).
+2 | Estimation | Dette publique de la France (fin 2024) ? | 3300 | ±10% | Md€ | - | ≈ 3 300 milliards d'euros, environ 113 % du PIB.
+2 | Estimation | Combien de boulangeries en France ? | 33000 | ×1,5 | boulangeries | - | ≈ 33 000 boulangeries-pâtisseries artisanales, environ une pour 2 000 habitants.
+2 | Estimation | Voitures neuves immatriculées en France par an (2024) ? | 1700000 | ×1,5 | voitures | - | ≈ 1,7 million en 2024, contre 2,2 millions avant 2020.
+3 | Estimation | Volume d'eau dans le corps d'un adulte de 70 kg ? | 42 | ±20% | litres | - | L'eau fait environ 60 % de la masse : ≈ 42 litres.
+3 | Estimation | Combien d'arbres sur Terre ? | 3000000000000 | ×3 | arbres | - | ≈ 3 000 milliards (étude publiée dans Nature en 2015), environ 400 par habitant.
+3 | Estimation | Paiements par carte bancaire en France par an ? | 17000000000 | ×2 | paiements | - | ≈ 17 milliards de paiements par carte par an, soit plus de 250 par habitant.
+3 | Estimation | Volume quotidien du marché des changes mondial ? | 7500 | ±20% | Md$ | - | ≈ 7 500 milliards de dollars par jour (BRI, 2022) : de loin le plus gros marché du monde.
+3 | Estimation | Combien de salons de coiffure en France ? | 85000 | ×2 | salons | - | ≈ 85 000 salons, environ un pour 800 habitants.
+3 | Estimation | Combien d'avions en vol au-dessus de la Terre à un instant donné ? | 10000 | ×2 | avions | - | ≈ 10 000 en moyenne, avec des pics vers 20 000 selon Flightradar24.
+3 | Estimation | Consommation d'électricité de la France par an ? | 450 | ±15% | TWh | - | ≈ 440 à 460 TWh par an (RTE).
+3 | Estimation | Ventes de logements anciens en France (2024) ? | 800000 | ×1,5 | ventes | - | ≈ 800 000 en 2024, après un record à plus d'un million en 2021.
+3 | Estimation | Combien de distributeurs de billets en France ? | 45000 | ×2 | distributeurs | - | ≈ 45 000, un nombre qui baisse chaque année depuis 2015.
+3 | Estimation | Emails envoyés dans le monde chaque jour ? | 350000000000 | ×2 | emails | - | ≈ 350 milliards par jour (2024), spam compris.
+3 | Estimation | Encours notionnel des dérivés de gré à gré dans le monde ? | 700000 | ×1,5 | Md$ | - | ≈ 700 000 milliards de dollars de notionnel (BRI, 2024), mais leur valeur de marché brute n'est que d'environ 20 000 milliards.
 `;
 
 const LEVEL_NAME = { 1: 'facile', 2: 'normal', 3: 'expert' };

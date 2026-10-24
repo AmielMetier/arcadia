@@ -1,6 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.40 — 24 octobre 2026
+- **Tête de Calcul** — Trois nouvelles épreuves dans The Candidate.
+  - Un cas pratique par partie : trois questions liées sur un même dossier (mini-LBO, book d'options à couvrir, VaR d'un portefeuille, couverture d'une obligation). Chaque étape rappelle le résultat de la précédente.
+  - Pierre relance : après une question, « et si… ? » sur la même situation. Bonus plein si ta première réponse était juste, moitié sinon, et aucune vie en jeu.
+  - Market making : fais un prix acheteur et vendeur sur la somme de trois dés, dévoilés un par un, face à un client. Tes points suivent ton P&L.
+- **Tête de Calcul** — À la fin de l'entretien, le bilan de Pierre Chartier : tes points forts et faibles rubrique par rubrique, et les notions à revoir.
+- **Tête de Calcul** — Plus de contenu dans The Candidate.
+  - Une nouvelle rubrique Risques (VaR, expected shortfall, crédit, contrepartie, Bâle III, liquidité), qui pèse lourd dans le poste Risques.
+  - Deux fois plus d'estimations, trois fois plus d'épreuves SQL et de bugs à corriger.
 - **Tête de Calcul** — The Candidate monte en pression.
   - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.
   - Fat finger : les espaces et les majuscules comptent, au caractère près.

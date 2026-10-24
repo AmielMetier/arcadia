@@ -12,8 +12,13 @@ import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
 let n = 0;
 // bonne et mauvaise réponse pour n'importe quel type de question
-const good = (q) => (q.input === 'expr' ? q.sol : String(q.answer));
-const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
+// (market making : coter juste à côté du client, du bon côté de la valeur finale ; ou trois fourchettes trop larges)
+const mmGood = (q) => {
+  const V = q.mm.dice.reduce((x, y) => x + y, 0);
+  return [0, 1, 2].map((k) => { const c = q.mm.dice.slice(0, k).reduce((x, y) => x + y, 0) + 3.5 * (3 - k) + q.mm.noise[k]; const m = (c + V) / 2; return c > V ? `${m - 1}/${m}` : `${m}/${m + 1}`; }).join(';');
+};
+const good = (q) => (q.input === 'expr' ? q.sol : q.input === 'mm' ? mmGood(q) : String(q.answer));
+const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'mm' ? '0/30;0/30;0/30' : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
 
 t('lecture des nombres', () => {
@@ -33,6 +38,35 @@ t('expressions exactes, sans eval', () => {
   assert.equal(evalExpr('(1+2').ok, false);
   assert.ok(usesOnly([2, 2], [2, 2, 5]));
   assert.ok(!usesOnly([2, 2], [2, 5]));
+});
+
+t('cas pratique, relance et market making : placés dans la partie et notés comme prévu', async () => {
+  const { runMarket, mmFair, parseQuotes, CASE_KEYS } = await import('../calcul/engine/cases.js');
+  // au plus un cas pratique (trois questions d'affilée), une relance, un market making ; jamais sur le code ni la dernière
+  for (const len of [10, 15, 20, 30]) for (const diff of DIFFS) for (let seed = 1; seed < 40; seed++) {
+    const cats = planCats(seed, len, 'chartier', { d: DIFFS.indexOf(diff) });
+    const n = (c) => cats.filter((x) => x === c).length;
+    assert.ok(n('case') === 3 && n('relance') === 2 && n('mm') === 1, `${len} ${diff} ${cats}`);
+    const k = cats.indexOf('case');
+    assert.ok(cats[k + 1] === 'case' && cats[k + 2] === 'case' && k + 2 < len - 1, cats.join(','));
+    assert.ok(new Set([k, k + 1, k + 2].map((i) => chartierTier(DIFFS.indexOf(diff), i, len))).size === 1, 'le cas tient dans un tour');
+    assert.ok(cats[len - 1] === 'chartier', 'la dernière reste une question normale');
+  }
+  // les trois étapes d'un cas parlent du même dossier
+  const s = createGame({ players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], cfg: { mode: 'chartier', len: 15, module: 'ma' }, seed: 3, now: 0 });
+  const k = s.cats.indexOf('case'), steps = [0, 1, 2].map((j) => fullQuestion(s, k + j));
+  assert.ok(steps.every((q, j) => q.caseStep === j && q.sub.includes(steps[0].sub.split(' · ')[1])), steps.map((q) => q.sub).join(' / '));
+  assert.ok(steps[0].text.split('.')[0] === steps[2].text.split('.')[0], 'même énoncé');
+  assert.ok(CASE_KEYS.length >= 4);
+  // market making : coter serré autour du juste milieu gagne le plus souvent ; trop large est pénalisé
+  let win = 0;
+  for (let i = 0; i < 400; i++) {
+    const m = { dice: [1 + (i % 6), 1 + ((i * 7) % 6), 1 + ((i * 13) % 6)], noise: [(i % 7) - 3, ((i * 3) % 7) - 3, ((i * 5) % 7) - 3] };
+    if (runMarket(m, [0, 1, 2].map((j) => [mmFair(m, j) - [2, 1.5, 1][j], mmFair(m, j) + [2, 1.5, 1][j]])).pnl > 0) win++;
+    assert.equal(runMarket(m, [[0, 30], [0, 30], [0, 30]]).pnl, -6, 'trois fourchettes trop larges : − 6');
+  }
+  assert.ok(win > 200, `coter serré gagne souvent (${win}/400)`);
+  assert.deepEqual(parseQuotes('9,5/11.5;10/12;x'), [[9.5, 11.5], [10, 12]]);
 });
 
 t('les questions sont reproductibles et justes', () => {
@@ -58,6 +92,19 @@ t('les questions sont reproductibles et justes', () => {
       assert.ok(q.input === 'multi' && q.answer.length >= 1 && q.answer.length < q.choices.length, q.text);
       assert.ok(check(q, q.answer.join(',')).ok && check(q, [...q.answer].reverse().join(',')).ok, 'ordre indifférent');
       assert.ok(!check(q, q.answer.slice(1).join(',') || '99').ok, 'il en manque une');
+      continue;
+    }
+    if (q.kind === 'case' || q.kind === 'relance') {
+      assert.ok(Number.isFinite(q.answer) && q.tip && q.input === 'num' && [1, 2, 3].includes(q.tier), q.text);
+      assert.ok(check(q, String(q.answer)).ok && check(q, String(q.answer).replace('.', ',')).ok, `${q.text} → ${q.answer}`);
+      assert.ok(!check(q, String(q.answer * 3 + 7)).ok, `${q.text} : réponse fausse refusée`);
+      assert.ok(!/NaN|undefined|Infinity/.test(q.text + q.tip + q.sub + q.show), `${q.text} | ${q.tip}`);
+      for (const t of q.traps) assert.ok(!check(q, String(t)).ok, `${q.text} : le piège ${t} est refusé`);
+      continue;
+    }
+    if (q.kind === 'mm') {
+      assert.ok(q.input === 'mm' && q.mm.dice.length === 3 && q.mm.dice.every((x) => x >= 1 && x <= 6) && q.time > 30, q.text);
+      assert.ok(check(q, '').error && !check(q, '1/50').ok, 'sans cotation, ou trop large');
       continue;
     }
     if (q.kind === 'chartier-num') {
@@ -290,13 +337,13 @@ t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur',
   for (let i = 0; i < 10; i++) {
     s = nextQuestion(s, i * 1e5);
     const q = fullQuestion(s); seen.add(q.key);
-    assert.equal(s.q.pts, (q.tier + (q.input === 'code' ? 1 : 0)) * (i === 9 ? 2 : 1));
+    assert.equal(s.q.pts, (q.tier + (q.input === 'code' || q.input === 'mm' ? 1 : 0)) * (i === 9 ? 2 : 1));
     assert.ok(!('answer' in publicState(s).q) || publicState(s).q.answer === undefined);
     if (q.input === 'code') {
       const r = answer(s, { by: 0, raw: q.show, idx: i, now: i * 1e5 + 1000 });
       assert.ok(r.ok && r.pending); s = r.state;
       s = gradeCode(s, { by: 0, idx: i, passed: q.tests.length, total: q.tests.length }).state;
-    } else s = answer(s, { by: 0, raw: String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
+    } else s = answer(s, { by: 0, raw: q.input === 'mm' ? '9/12;9/12;9/12' : String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
     s = reveal(s, i * 1e5 + 2000);
     if (s.last.input === 'choice') assert.equal(s.last.choices[s.last.answer], s.last.show);
   }

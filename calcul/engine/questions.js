@@ -15,6 +15,7 @@ import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ
 import { chartQuestion, CHART_P } from './charts.js';
 import { schemaFor } from './schemas.js';
 import { PHONES, FAT_FINGER } from './drills.js';
+import { caseStep, relanceStep, makeMarket, runMarket, mmFair, MM_TIME } from './cases.js';
 
 export const CATS = {
   base:     { label: 'Calcul',            pts: 1, color: '#2b8cff', icon: '±' },
@@ -32,6 +33,9 @@ export const CATS = {
   visuel:   { label: 'Figures à compter', pts: 2, color: '#0b7285', icon: '▦' },
   chartier: { label: 'The Candidate',     pts: 2, color: '#e5a93c', icon: '💼' },
   code:     { label: 'Code',              pts: 3, color: '#3b82f6', icon: '⌨' },
+  case:     { label: 'Cas pratique',      pts: 2, color: '#d97706', icon: '📁' },
+  relance:  { label: 'Relance',           pts: 2, color: '#ef4444', icon: '↻' },
+  mm:       { label: 'Market making',     pts: 3, color: '#10b981', icon: '⇅' },
 };
 export const DIFFS = ['facile', 'normal', 'expert'];
 
@@ -61,7 +65,7 @@ function qSeed(seed, i, salt = 0) {
 }
 
 // Liste des catégories de la partie : tirée une fois, d'après les poids du thème, sans trois fois la même d'affilée
-export function planCats(seed, len, theme, { code = true } = {}) {
+export function planCats(seed, len, theme, { code = true, d = 1 } = {}) {
   const w = THEMES[theme] || THEMES.mix;
   const r = rngOf({ seed: qSeed(seed, 9999) });
   const keys = Object.keys(w), total = keys.reduce((s, k) => s + w[k], 0);
@@ -79,6 +83,26 @@ export function planCats(seed, len, theme, { code = true } = {}) {
   if (keys.length > 1 && out[0] === 'compte') { const j = out.findIndex((c) => c !== 'compte'); if (j > 0) [out[0], out[j]] = [out[j], out[0]]; }
   // The Candidate : une épreuve de code au desk, et une seconde au comité final dans les parties longues
   if (theme === 'chartier' && code) for (const k of codeSlots(len)) out[k] = 'code';
+  if (theme === 'chartier') for (const [cat, k] of Object.entries(blockSlots(len, out, d))) for (let j = 0; j < BLOCK[cat]; j++) out[k + j] = cat;
+  return out;
+}
+
+// Les épreuves sur plusieurs questions de The Candidate (voir cases.js) : nombre de questions de chacune,
+// et où elles tombent (jamais sur l'épreuve de code ni sur la dernière question, toujours dans un même tour) :
+// une relance au premier tour, le market making au desk, un cas pratique au plus, au desk ou au comité
+export const BLOCK = { relance: 2, case: 3, mm: 1 };
+function blockSlots(len, cats, d) {
+  const used = new Set(cats.map((c, k) => (c === 'code' ? k : -1)).filter((k) => k >= 0)), out = {};
+  const want = [['case', 0.5, 10], ['relance', 0.12, 8], ['mm', 0.4, 10]]; // le cas pratique d'abord : c'est le plus long à caser
+  for (const [cat, at, min] of want) {
+    if (len < min) continue;
+    const n = BLOCK[cat], fits = (k) => k >= 1 && k + n <= len - 1 && [...Array(n).keys()].every((j) => !used.has(k + j) && chartierTier(d, k + j, len) === chartierTier(d, k, len));
+    const start = Math.round(len * at), order = [...Array(len).keys()].sort((a, b) => Math.abs(a - start) - Math.abs(b - start) || a - b);
+    const k = order.find(fits);
+    if (k == null) continue;
+    out[cat] = k;
+    for (let j = 0; j < n; j++) used.add(k + j);
+  }
   return out;
 }
 
@@ -773,7 +797,7 @@ export const MODULES = {
   trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10 } },
   ma: { label: 'M&A / Corporate', job: 'Analyste M&A', post: 'un poste en fusions-acquisitions', weights: { Corporate: 45, Taux: 15, Calcul: 20, Marchés: 10, Macro: 10 } },
   quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 35, Logique: 20, Calcul: 20, Dérivés: 15, Estimation: 10 } },
-  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Taux: 25, Marchés: 25, Probas: 20, Dérivés: 15, Macro: 15 } },
+  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Risques: 35, Taux: 20, Marchés: 15, Probas: 15, Dérivés: 10, Macro: 5 } },
 };
 export function chartierTier(d, i, len) {
   const last = i >= len - 1, f = len > 1 ? i / (len - 1) : 1;
@@ -899,7 +923,31 @@ function readCode(r, tier) {
   return { kind: 'code-read', text: q.lang === 'java' ? 'Que va afficher ce programme Java ?' : 'Que va afficher ce programme ?', snippet: q.code, lang: q.lang || 'python', choices, answer: choices.indexOf(q.good), trap: choices.indexOf(q.wrong[0]), show: q.good, tip: q.tip };
 }
 
-const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code };
+// Cas pratique : trois questions liées sur un même dossier ; rb est le tirage du dossier (le même aux trois étapes)
+const showNum = (n, unit) => fmt(Number(Number(n).toPrecision(4))) + (unit ? ' ' + unit : '');
+function caseQ(r, d, i = 0, len = 10, module = 'gen', { step = 0, rb = r } = {}) {
+  const tier = chartierTier(d, i, len), c = caseStep(rb, step, module);
+  return { kind: 'case', text: c.text, isChartier: true, pts: tier, tier, rubric: c.rubric, caseStep: step, caseTitle: c.title,
+    sub: `Cas pratique · ${c.title} · étape ${step + 1}/3`, eq: false, answer: c.answer, tol: c.tol, traps: c.traps, unit: c.unit,
+    show: showNum(c.answer, c.unit), tip: c.tip, time: CH_TIME[tier] + UNIT_TIME + 10 + Math.min(10, Math.floor(c.text.length / 25)) };
+}
+// Relance de Pierre : une question, puis « et si… ? » (bonus, sans vie en jeu)
+function relance(r, d, i = 0, len = 10, module = 'gen', { step = 0, rb = r } = {}) {
+  const tier = chartierTier(d, i, len), c = relanceStep(rb, step);
+  return { kind: 'relance', text: c.text, isChartier: true, pts: tier, tier, rubric: c.rubric, bonus: step === 1,
+    sub: step ? 'Relance de Pierre · bonus' : `${c.rubric} · ${TIER_LABEL[tier]}`, eq: false, answer: c.answer, tol: c.tol, unit: c.unit,
+    show: showNum(c.answer, c.unit), tip: c.tip, time: CH_TIME[tier] + UNIT_TIME + (step ? 6 : 0) };
+}
+// Market making : fais un prix sur la somme de trois dés
+function mm(r, d, i = 0, len = 10) {
+  const tier = chartierTier(d, i, len), m = makeMarket(r), V = m.dice.reduce((a, b) => a + b, 0);
+  const ideal = runMarket(m, [0, 1, 2].map((k) => [mmFair(m, k) - 1, mmFair(m, k) + 1]));
+  return { kind: 'mm', input: 'mm', text: 'Fais-moi un marché sur la somme de trois dés.', isChartier: true, pts: tier + 1, tier, rubric: 'Trading', mm: m,
+    sub: `Market making · ${TIER_LABEL[tier]}`, eq: false, answer: V, show: `Somme des dés : ${m.dice.join(' + ')} = ${V}`, time: MM_TIME,
+    tip: `Avant le premier dé, l'espérance vaut 3 × 3,5 = 10,5 ; après chaque dé, on remplace un 3,5 par la valeur sortie. Coter serré autour de ce juste milieu fait gagner la fourchette à chaque deal (cotations à ±1 ici : P&L de ${ideal.pnl >= 0 ? '+' : ''}${fmt(ideal.pnl)}). Après un deal, décale ton prix pour ne pas accumuler la position.` };
+}
+
+const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code, case: caseQ, relance, mm };
 export const KINDS = {
   base: ['add', 'sub', 'mul', 'div', 'chain', 'missing', 'half', 'prio'],
   astuce: ['equi', 'sq5', 'x11', 'pct', 'x5', 'x25', 'x9', 'x99', 'sqnear', 'compl', 'pct2', 'x15'],
@@ -916,12 +964,17 @@ export const KINDS = {
   devinette: ['riddle'],
   chartier: ['chartier', 'chartier-num'],
   code: ['code'],
+  case: ['case'],
+  relance: ['relance'],
+  mm: ['mm'],
 };
 
 export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'gen', opts = {}) {
   const r = rngOf({ seed: qSeed(seed, i, salt) });
   const d = D(diff);
-  const q = GEN[cat](r, d, i, len, module, opts);
+  // les épreuves sur plusieurs questions partagent un tirage, celui de leur première question
+  const rb = opts.start != null ? rngOf({ seed: qSeed(seed, opts.start, 4242) }) : r;
+  const q = GEN[cat](r, d, i, len, module, { ...opts, rb });
   return {
     cat, kind: q.kind, text: q.text, sub: q.sub || '',
     eq: q.eq !== false && !q.choices && !q.fig,
@@ -934,6 +987,7 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
     trap: q.trap ?? -1, traps: q.traps || [], tolMode: q.tolMode || 'rel', unit: q.unit || '',
     prompt: q.prompt || null, starter: q.starter || null, fn: q.fn || null, tests: q.tests || null, examples: q.examples || null, codeId: q.codeId || null,
     lang: q.lang || null, ordered: q.ordered !== false, bug: !!q.bug, snippet: q.snippet || null, schema: q.schema || null, copy: q.copy || null,
+    bonus: !!q.bonus, mm: q.mm || null, caseStep: q.caseStep ?? null,
     key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
@@ -941,4 +995,4 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
 // Ce que voient les joueurs pendant la question (sans la réponse)
 // (ni la bonne réponse, ni le piège, ni les tests cachés du code)
 export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, tolMode: q.tolMode, unit: q.unit, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric,
-  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet, copy: q.copy });
+  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet, copy: q.copy, bonus: q.bonus, mm: q.mm, caseStep: q.caseStep });

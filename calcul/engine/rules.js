@@ -3,7 +3,8 @@
 //
 // Phases : 'intro' (compte à rebours) → 'question' → 'reveal' → 'question'… → 'over'
 // Pendant 'question', les réponses (valeur, juste ou non) restent chez l'hôte : publicState() les masque.
-import { CATS, DIFFS, THEMES, MODULES, planCats, makeQuestion, publicQuestion, fmt, chartierTier } from './questions.js';
+import { CATS, DIFFS, THEMES, MODULES, BLOCK, planCats, makeQuestion, publicQuestion, fmt, chartierTier } from './questions.js';
+import { parseQuotes, runMarket } from './cases.js';
 import { parseNumber, evalExpr, usesOnly } from './expr.js';
 
 export const MODES = {
@@ -75,7 +76,7 @@ export function createGame({ players, cfg, seed, now }) {
   const c = makeConfig(cfg);
   return {
     v: 1, seed, cfg: c, startedAt: now,
-    cats: planCats(seed, c.len, c.theme, { code: c.code || c.sql }),
+    cats: planCats(seed, c.len, c.theme, { code: c.code || c.sql, d: Math.max(0, DIFFS.indexOf(c.diff)) }),
     players: players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: !!p.bot,
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
       powers: [], sabSent: 0, sabTaken: 0,
@@ -90,8 +91,13 @@ export const isFinal = (s, idx = s.idx) => s.cfg.finale && idx === s.cfg.len - 1
 // Question n° idx ; si son texte est déjà sorti dans la partie, on en tire une autre (toujours de façon reproductible)
 export function fullQuestion(s, idx = s.idx) {
   const seen = new Set(s.history.filter((h) => h.idx < idx).map((h) => h.key));
+  // cas pratique, relance : l'étape dans l'épreuve, et sa première question (qui fixe le dossier)
+  const cat = s.cats[idx];
+  let start = idx;
+  if (BLOCK[cat] > 1) while (start > 0 && idx - start < BLOCK[cat] - 1 && s.cats[start - 1] === cat) start--;
+  const block = BLOCK[cat] > 1 ? { step: idx - start, start } : {};
   let q;
-  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len, s.cfg.module, { python: s.cfg.code !== false, sql: s.cfg.sql !== false }); if (!seen.has(q.key)) break; }
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, cat, s.cfg.diff, salt, s.cfg.len, s.cfg.module, { python: s.cfg.code !== false, sql: s.cfg.sql !== false, ...block }); if (!seen.has(q.key)) break; }
   return q;
 }
 
@@ -180,6 +186,13 @@ export function check(q, raw) {
     if (!String(raw).trim()) return { ok: false, error: 'Écris ton code avant de l’envoyer' };
     return { ok: false, pending: true };
   }
+  if (q.input === 'mm') {
+    // market making : juste si le P&L est positif ; à zéro, pas de vie perdue
+    const quotes = parseQuotes(raw);
+    if (!quotes.length) return { ok: false, error: 'Cote au moins une fois' };
+    const { pnl } = runMarket(q.mm, quotes);
+    return { ok: pnl > 0, value: pnl, near: pnl === 0, pnl };
+  }
   const n = parseNumber(raw);
   if (n == null) return { ok: false, error: 'Ce n\'est pas un nombre' };
   const ok = q.tolMode === 'factor' && q.tol ? n > 0 && n >= q.answer / q.tol && n <= q.answer * q.tol
@@ -222,7 +235,7 @@ export function answer(state, { by, raw, idx, now }) {
   // saisie illisible : on prévient le joueur sans lui compter de réponse (sauf en Éclair, où il faut assumer)
   if (c.error && state.cfg.mode !== 'eclair') return { ok: false, error: c.error, soft: true };
   const s = clone(state);
-  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' ? text : text.slice(0, 40), ok: !!c.ok,
+  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' || q.input === 'mm' ? text : text.slice(0, 40), ok: !!c.ok, ...(c.pnl != null ? { pnl: c.pnl } : {}),
     trap: !c.ok && isTrap(q, text), near: !!c.near, ...(c.pending ? { pending: true, passed: 0, total: q.tests.length } : {}) };
   // face-à-face : la première réponse décide (juste, elle gagne ; fausse, elle perd)
   const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok) || inDuel(s);
@@ -281,6 +294,9 @@ export function reveal(state, now) {
   const q = fullQuestion(s);
   const base = q.pts * 100 * (isFinal(s) ? 2 : 1);
   const isCode = q.input === 'code';
+  // relance de Pierre : bonus plein si la question d'avant était juste, moitié sinon ; pas de vie en jeu
+  const prev = q.bonus ? s.history[s.history.length - 1] : null;
+  const prevOk = (id) => !!(prev && prev.results.some((x) => x.id === id && x.ok));
   const correct = Object.entries(s.answers).filter(([, a]) => a.ok).sort((a, b) => a[1].at - b[1].at).map(([id]) => +id);
   const eliminated = [];
   const results = s.players.map((p) => {
@@ -298,7 +314,12 @@ export function reveal(state, now) {
       const rank = correct.indexOf(p.id);
       const share = r.ok ? 1 : partial;
       if (s.cfg.mode === 'eclair') { r.pts = rank === 0 ? base : 0; }
-      else {
+      else if (q.input === 'mm') {
+        // market making : les points suivent le P&L (8 de P&L = les points de la question, plafonné à une fois et demie)
+        r.pts = Math.round((base * Math.min(1.5, a.pnl / 8)) / 10) * 10; r.pnl = a.pnl;
+      } else if (q.bonus) {
+        r.pts = Math.round((base * (prevOk(p.id) ? 1.5 : 0.5) * (0.5 + 0.5 * Math.max(0, 1 - a.at / limitOf(s, q, p.id)))) / 10) * 10; r.tags.push('relance');
+      } else {
         r.pts = Math.round((base * share * (0.5 + 0.5 * Math.max(0, 1 - a.at / limitOf(s, q, p.id)))) / 10) * 10;
         if (r.ok && rank === 0 && correct.length > 1) { r.pts += 50; r.tags.push('eclair'); }
       }
@@ -319,7 +340,8 @@ export function reveal(state, now) {
       p.right++; cat.ok++; p.totalMs += a.at;
       p.fastest = p.fastest == null ? a.at : Math.min(p.fastest, a.at);
     } else {
-      p.streak = 0;
+      if (a && a.pnl != null) r.pnl = a.pnl;
+      if (!q.bonus) p.streak = 0;
       if (a) {
         p.wrong++;
         if (s.cfg.mode === 'peril') { r.pts = -Math.round(base / 2); r.tags.push('peril'); }
@@ -328,7 +350,7 @@ export function reveal(state, now) {
       // ou estimation presque juste : aucune)
       const near = a && a.near && !a.trap;
       if (near) r.tags.push('near');
-      if (s.cfg.lives && !partial && !near) {
+      if (s.cfg.lives && !partial && !near && !q.bonus) {
         const cost = TRAP_COST[q.tier] || TRAP_COST[2];
         const lost = a && a.trap ? cost.lives : 1;
         if (a && a.trap) {
@@ -362,8 +384,8 @@ export function reveal(state, now) {
   const standing = alive(s).length, humans = s.players.filter((p) => !p.bot);
   if (s.cfg.lives && (standing === 0 || !humans.some((p) => !p.out) || (humans.length > 1 && standing <= 1))) s.endEarly = true;
   s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' || q.input === 'multi' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
-    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, eliminated, tierEnd, endEarly: !!s.endEarly };
-  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema,
+    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, mm: q.mm, bonus: q.bonus, sub: q.sub, eliminated, tierEnd, endEarly: !!s.endEarly };
+  s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, mm: q.mm, bonus: q.bonus,
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
   const canSab = s.cfg.sabotage && s.idx + 1 < s.cfg.len && s.players.some((p) => !p.out && p.powers.some((pw) => pw !== 'shield'));
@@ -439,6 +461,7 @@ export function describeAnswer(q, raw) {
   if (q && q.input === 'code') return String(raw);
   if (q && q.input === 'multi') return String(raw).split(',').map((k) => 'ABCDEFGHIJ'[Number(k)] || '?').join(', ');
   if (q && q.input === 'text') return String(raw);
+  if (q && q.input === 'mm') { if (!q.mm) return String(raw); const { pnl } = runMarket(q.mm, parseQuotes(raw)); return `P&L ${pnl > 0 ? '+' : ''}${fmt(pnl)}`; }
   const n = parseNumber(raw);
   return n == null ? String(raw) : fmt(n);
 }
