@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.38 — 24 octobre 2026
+- **Convoy Storm** — Nouveau jeu en coopération, seul ou jusqu'à 6 : un convoi blindé traverse une plaine gelée sans fin, en pleine tempête de neige, en 3D.
+  - La chaudière au centre du convoi brûle du fioul sans arrêt. Chaque caisse jetée dedans rend 25 %. À 0 %, le convoi s'arrête : c'est la panne sèche.
+  - Sautez du train pour fouiller les ruines (repérez les lanternes jaunes) et rapporter les caisses.
+  - Une caisse se lance : sur le wagon, à un équipier, ou en plein dans le foyer si vous visez bien.
+  - Dans la neige on avance moins vite et le convoi s'éloigne : il faut rattraper l'échelle de queue pour remonter. Trop loin, on se perd dans la tempête.
+  - Le convoi ralentit quand le réservoir baisse, et la tempête creuse la consommation au fil des minutes. Trois difficultés : Facile, Normale, Blizzard.
+  - Le classement retient la distance parcourue ; le bilan de fin montre qui a apporté le plus de fioul.
+  - Si l'hôte part en pleine route, un autre joueur reprend le convoi là où il en était.
+
 ## 2.37 — 23 octobre 2026
 - **DavidSimulator** — Nouvelle carte Chance : apparition de Sylvain Durif ! Elle rapporte 100 €, et son buste en 3D se dresse au milieu du plateau, avec un halo doré, pendant 3 tours de table complets. Il se tourne vers la caméra quand on fait pivoter la vue, et s'efface tout seul ensuite. Visible aussi sur le plateau classique.
 

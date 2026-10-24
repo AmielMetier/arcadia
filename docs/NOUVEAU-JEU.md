@@ -113,7 +113,7 @@ reprend le dernier état reçu et relance la question en cours (`restartQuestion
      `group` ajoute un intertitre (ex. « Règles maison »).
    - `maxPlayers` ≤ 6 (capacité du salon, `DDRoom.MAX_PLAYERS`).
    - `cover` : SVG 320 × 180, même style (contours `#16181d` de 3 px, couleurs franches).
-2. **`shared/results.js`** : ajouter l'id du jeu à la liste `['david', 'drift', 'bastion', 'calcul']`,
+2. **`shared/results.js`** : ajouter l'id du jeu à la liste des jeux acceptés (`['david', 'drift', …, 'convoy']`),
    sinon les résultats sont **rejetés** par la validation et n'apparaissent pas au classement.
 3. **`hub/hub.js`** : nom du jeu dans `GNAME`, icône dans la liste des dernières parties, libellé de `scoreLabel`.
    (Bonus : `VERSION`, `README.md`, `CHANGELOG.md`.)
@@ -148,7 +148,9 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 - **Sons** : le navigateur bloque l'audio avant un clic ; créer l'`AudioContext` au premier `pointerdown`.
 - **Temps réel** : pour un jeu d'action, voir Outbreak (`outbreak/app.js`) : l'hôte simule à 60 Hz et diffuse l'état à 20 Hz,
   les invités envoient leurs commandes (compteurs pour les actions ponctuelles), prédisent leur propre déplacement et
-  affichent les autres avec ~110 ms de retard, interpolés entre deux états.
+  affichent les autres avec ~110 ms de retard, interpolés entre deux états. Convoy Storm (`convoy/`) suit le même schéma
+  en 3D : la fonction de déplacement `stepPlayer` est partagée entre la simulation de l'hôte et la prédiction des invités,
+  et `teardown()` libère le contexte WebGL, l'audio et tous les écouteurs avant `H.exit()`.
 
 ## 9. Étendre Tête de Calcul
 

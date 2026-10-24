@@ -1,7 +1,7 @@
 # Consignes pour les assistants de code (Claude, Codex, Copilot, Cursor, Gemini…) et les contributeurs
 
 Ce dépôt est le **Game Hub** d'Amiel : un site statique (GitHub Pages, sans étape de build) qui réunit plusieurs
-jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP.
+jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm.
 
 ## À chaque modification poussée sur `main` : journal + version
 
@@ -28,19 +28,19 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
 - Registre des jeux et de leurs réglages : `hub/games.js`. Ajouter un jeu : `docs/NOUVEAU-JEU.md`.
-- Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge ou Outbreak :
+- Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge, Outbreak ou Convoy Storm :
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
-  `node tools/test-outbreak.mjs`.
+  `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.
