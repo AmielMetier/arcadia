@@ -797,6 +797,9 @@ const UNIT_TIME = 10; // une réponse à taper prend plus de temps qu'un clic
 function chartier(r, d, i = 0, len = 10, module = 'gen') {
   const tier = chartierTier(d, i, len), M = MODULES[module] || MODULES.gen;
   const head = (rubric) => ({ isChartier: true, pts: tier, tier, rubric, sub: `${rubric} · ${TIER_LABEL[tier]}` });
+  // page d'aperçu (calcul/apercu.html) : seulement les questions listées, plus les fat finger et les numéros de téléphone
+  const demo = typeof globalThis !== 'undefined' && globalThis.__candidateDemo;
+  if (demo) return demoPick(r, tier, head);
   // une question sur sept environ : une suite logique ou une figure à compter, comme les brainteasers de l'émission
   // (davantage en quant)
   if (r.next() < (module === 'quant' ? 0.24 : 0.15)) {
@@ -854,6 +857,19 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
 }
 
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
+function demoPick(r, tier, head) {
+  const roll = r.next();
+  if (roll < 0.1) { const f = pick(r, FAT_FINGER.filter((x) => x.tier === tier)); return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, answer: f.text, show: f.text, ...head('Fat finger'), sub: `Fat finger · ${f.label}`, time: 8 + Math.ceil(f.text.length / 2.2), eq: false, tip: 'Les espaces et les majuscules ne comptent pas.' }; }
+  if (roll < 0.16) { const ph = pick(r, PHONES), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0); return { kind: 'phone', text: 'Somme des chiffres de ce numéro ?', copy: ph, answer: sum, ...head('Calcul'), eq: false, time: CH_TIME[tier] + 6, tip: `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}.` }; }
+  const set = new Set(globalThis.__candidateDemo), all = Object.values(CH_POOL).flat().filter((q) => set.has(q.text));
+  const pool = all.filter((q) => q.tier === tier).length ? all.filter((q) => q.tier === tier) : all;
+  const q = pick(r, pool);
+  if (q.type === 'multi') { const choices = r.shuffle([...q.good, ...q.wrong]); return { kind: 'chartier-multi', input: 'multi', text: q.text, ...head(q.cat), choices, answer: q.good.map((g) => choices.indexOf(g)).sort((a, b) => a - b), show: q.good.join(' · '), tip: q.tip, schema: schemaFor(q.text), time: CH_TIME[tier] + 8 + choices.length * 2 }; }
+  if (q.type === 'num') return { kind: 'chartier-num', text: q.text, ...head(q.cat), schema: schemaFor(q.text), time: CH_TIME[tier] + UNIT_TIME + 6, eq: false, answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps, unit: q.unit, show: fmt(q.answer) + (q.unit ? ' ' + q.unit : ''), tip: q.tip };
+  const choices = r.shuffle([q.good, ...q.wrong]);
+  return { kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text), time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + 4, answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip };
+}
+
 // L'épreuve de code : écrire une fonction Python, corriger un bug, ou écrire une requête SQL (plus souvent hors quant)
 const SQL_P = { gen: 0.3, trading: 0.35, ma: 0.4, risk: 0.4, quant: 0.2 };
 export const CODE_TIME = 120; // deux minutes pour l'épreuve de code
