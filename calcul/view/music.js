@@ -253,10 +253,11 @@ function schedule(s, t) {
   if (st === 0) pad(t, PAD[bar], sixteenth() * 16, lobby || reveal ? 900 : 1100 + tt * 900);
   // finale : braam toutes les deux mesures (chaque mesure en face-à-face)
   if (final && st === 0 && (duel || bar % 2 === 0)) braam(t, BASS[bar]);
-  // desk : une ligne qui grimpe d'une octave sur quatre mesures, et un souffle qui monte en boucle
+  // desk : une ligne qui grimpe sur les notes de l'accord en cours (jamais à côté), et un souffle qui monte en boucle
   if ((desk || final) && st % 2 === 0) {
     const climb = Math.floor((s % 64) / 8); // 0 → 7
-    pluck(t, ARP[bar][(st / 2) % 4] + 12 + [0, 2, 3, 5, 7, 8, 10, 12][climb], 0.035, 2400 + climb * 500, st % 4 ? 0.6 : -0.6);
+    const k = climb + (st / 2) % 4;
+    pluck(t, ARP[bar][k % 4] + 12 * Math.floor(k / 4), 0.035, 2400 + climb * 500, st % 4 ? 0.6 : -0.6);
   }
   if ((desk || final) && st === 0 && bar === 0) riser(t, sixteenth() * 60);
   // face-à-face : cœur qui bat, roulement de caisse claire en fin de mesure, sirène à chaque mesure
