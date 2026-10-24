@@ -1,5 +1,20 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.40 — 24 octobre 2026
+- **Tête de Calcul** — The Candidate monte en pression.
+  - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.
+  - Fat finger : les espaces et les majuscules comptent, au caractère près.
+  - Les épreuves Python et SQL se désactivent séparément dans les réglages.
+  - Nouvelles questions de programmation objet en Java : classes, constructeurs, getters, setters, toString…
+- **Tête de Calcul** — Encore plus de questions dans The Candidate.
+  - Une quarantaine de questions tirées de vrais entretiens (pétrole négatif en 2020, straddle sur un jour, carry du yen, Monte-Carlo, deux boîtes…).
+  - Questions à cocher : il faut cocher toutes les bonnes réponses, et aucune mauvaise.
+  - Fat finger : recopier sans erreur un code, un IBAN, un ordre ou une liste de montants (80 exercices).
+  - Somme des chiffres d'un numéro de téléphone affiché (et, au comité, fois 53).
+  - Une centaine de questions de dérivés en plus : grecques de second ordre (vanna, volga, charm), Black-Scholes, skew et structure par terme, exotiques, variance et volatility swaps, VIX, P&L par les grecques, caps et swaptions, options de change, développement delta-gamma, mouvement brownien et processus stochastiques.
+  - Dans les QCM, la bonne réponse ne se repère plus à sa longueur : les choix ont été réécrits pour être de taille comparable.
+  - Trois manches de calcul mental rapide : tables, pourcentages, points de base, enchaînements de variations.
+
 ## 2.39 — 24 octobre 2026
 - **Convoy Storm** — Grosse mise à jour : le blizzard devient une vraie expédition.
   - Deux modes : **Expédition** (rallier Fort-Givre au bout de la ligne, trois gares en chemin) et **Sans fin** (une gare tous les 550 m, aller le plus loin possible).
@@ -26,11 +41,6 @@
 - **DavidSimulator** — Nouvelle carte Chance : apparition de Sylvain Durif ! Elle rapporte 100 €, et son buste en 3D se dresse au milieu du plateau, avec un halo doré, pendant 3 tours de table complets. Il se tourne vers la caméra quand on fait pivoter la vue, et s'efface tout seul ensuite. Visible aussi sur le plateau classique.
 
 ## 2.36 — 23 octobre 2026
-- **Tête de Calcul** — The Candidate monte en pression.
-  - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.
-  - Fat finger : les espaces et les majuscules comptent, au caractère près.
-  - Les épreuves Python et SQL se désactivent séparément dans les réglages.
-  - Nouvelles questions de programmation objet en Java : classes, constructeurs, getters, setters, toString…
 - **Tête de Calcul** — The Candidate passe en grand format.
   - Une scène d'ouverture : l'ascenseur monte au 40e, les portes s'ouvrent, et Pierre Chartier accueille chaque joueur par son nom, avec sa vraie voix et sa photo en grand.
   - Pierre réagit pendant les questions : une phrase pour lancer la question, une relance quand on tarde, un mot quand un adversaire a déjà répondu.
@@ -43,14 +53,6 @@
   - L'épreuve de code peut aussi être une requête SQL à écrire sur une vraie base, ou un bug à corriger. Elle dure maintenant 2 minutes.
   - Après chaque réponse, un mini-schéma accompagne l'explication quand il aide (profil d'option, courbe des taux, cloche, frise d'un taux variable…), et le piège est nommé.
 - **Tête de Calcul** — L'écran des scores passe en deux colonnes : les scores d'un côté, tes erreurs à revoir de l'autre.
-- **Tête de Calcul** — Encore plus de questions dans The Candidate.
-  - Une quarantaine de questions tirées de vrais entretiens (pétrole négatif en 2020, straddle sur un jour, carry du yen, Monte-Carlo, deux boîtes…).
-  - Questions à cocher : il faut cocher toutes les bonnes réponses, et aucune mauvaise.
-  - Fat finger : recopier sans erreur un code, un IBAN, un ordre ou une liste de montants (80 exercices).
-  - Somme des chiffres d'un numéro de téléphone affiché (et, au comité, fois 53).
-  - Une centaine de questions de dérivés en plus : grecques de second ordre (vanna, volga, charm), Black-Scholes, skew et structure par terme, exotiques, variance et volatility swaps, VIX, P&L par les grecques, caps et swaptions, options de change, développement delta-gamma, mouvement brownien et processus stochastiques.
-  - Dans les QCM, la bonne réponse ne se repère plus à sa longueur : les choix ont été réécrits pour être de taille comparable.
-  - Trois manches de calcul mental rapide : tables, pourcentages, points de base, enchaînements de variations.
 - **Tête de Calcul** — Le poste à pourvoir se choisit dans le salon : généraliste, trading, M&A, quant ou risques. Les questions suivent le métier.
 - **Tête de Calcul** — Face-à-face final : les deux meilleurs encore en lice s'affrontent en mort subite. La première bonne réponse gagne, la première erreur perd.
 - **Tête de Calcul** — Pièges plus fins : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte pas de vie.
