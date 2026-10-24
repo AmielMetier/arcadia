@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Convoy Storm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="convoy.css">
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="hud" hidden>
+  <div class="frost" id="frost"></div>
+  <div class="flash" id="flash"></div>
+  <div class="topc">
+    <div class="fuel card" id="fuelBox">
+      <div class="fl"><b>CHAUDIÈRE</b><span id="fuelTxt">100 %</span></div>
+      <div class="bar"><i id="fuelBar"></i></div>
+      <div class="fl sm"><span id="burnTxt">−0,8 %/s</span><span id="speedTxt">9 km/h</span></div>
+    </div>
+    <div class="route card" id="route">
+      <div class="rt"><i id="routeFill"></i><span id="routeTicks"></span><u id="routeTrain">🚂</u></div>
+      <div class="rl" id="routeTxt"></div>
+    </div>
+  </div>
+  <div class="stats card"><span title="Distance parcourue"><small>DISTANCE</small><b id="distTxt">0 m</b></span><span title="Temps"><small>TEMPS</small><b id="clockTxt">0:00</b></span><span title="Caisses brûlées"><small>FIOUL</small><b id="crateTxt">0</b></span><span title="Ferraille commune (améliorations en gare)"><small>FERRAILLE</small><b id="scrapTxt">0</b></span></div>
+  <div class="tr"><button class="icon card" id="btnMute" title="Son (M)">🔊</button><button class="icon card" id="btnMenu" title="Menu (Échap)">☰</button></div>
+  <div class="team" id="team"></div>
+  <div class="vitals card" id="vitals"><span class="hl">🌡️</span><div class="hb"><i id="heatBar"></i></div><b id="heatTxt">100 %</b><span class="fx" title="Fusées éclairantes (G)">🎆 <b id="flareTxt">×2</b></span></div>
+  <div class="station card" id="station" hidden></div>
+  <div class="prompt" id="prompt" hidden></div>
+  <div class="tracker" id="tracker" hidden><i>▲</i><span></span></div>
+  <div class="pops" id="pops"></div>
+  <div class="toast" id="toast" hidden></div>
+  <div class="help card" id="help"><b>ZQSD</b> bouger · <b>Espace</b> sauter · <b>E</b> fouiller / prendre / chaudière / pelle · <b>F</b> lancer · <b>G</b> fusée · <b>1-5</b> / <b>V</b> en gare</div>
+  <div class="tbtns" id="tbtns"><button data-a="fl">🎆<small>Fusée</small></button><button data-a="jump">⤒<small>Sauter</small></button><button data-a="use">✋<small>Agir</small></button><button data-a="thr">➶<small>Lancer</small></button></div>
+</div>
+
+<div id="screen" class="screen"></div>
+
+<script src="../shared/bridge.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

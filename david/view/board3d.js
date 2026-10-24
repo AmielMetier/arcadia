@@ -8,6 +8,7 @@ import { SIZE, CORNER, CELL, rect, side, pawnSpot, buildSpots, center, cellAt } 
 import { ICONS, spaceIcon } from './icons.js';
 import { centerArt, deckCardSvg, DECK_SPOTS } from './board.js';
 import { makeToken3d } from './tokens3d.js';
+import { loadBust } from './bust.js';
 import { money, el, wait, store, save } from './util.js';
 
 const U = 10;                    // 1 unité 3D = 10 px du plateau
@@ -508,6 +509,42 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   });
   renderer.domElement.addEventListener('pointerleave', () => { hover = -1; hov.visible = false; });
 
+  /* ---------------------------------------------------------- apparition (carte Sylvain Durif) */
+  // Le buste se dresse au centre du plateau, tourné vers la caméra, avec un halo doré.
+  const BUST_H = 24;
+  const bustGroup = new THREE.Group(); bustGroup.visible = false; scene.add(bustGroup);
+  const bustLight = new THREE.PointLight(0xffe2a0, 0, 60, 1.6); bustLight.position.set(0, TOP + BUST_H + 6, 10); scene.add(bustLight);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(10, 14, 48), new THREE.MeshBasicMaterial({ color: 0xffc531, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = TOP + 0.05; bustGroup.add(halo);
+  let bustMesh = null, bustOn = false, bustAnim = false;
+  async function apparition(on, animate = false) {
+    if (on === bustOn) return;
+    bustOn = on;
+    if (on) {
+      if (!bustMesh) {
+        try { bustMesh = await loadBust(THREE, new URL('../models/durif.bin', import.meta.url).href); } catch (e) { console.warn(e); bustOn = false; return; }
+        bustMesh.position.y = TOP; bustMesh.rotation.order = "YXZ"; bustGroup.add(bustMesh);
+      }
+      if (!bustOn) return;
+      bustGroup.visible = true; bustGroup.rotation.y = view.az;
+      if (!animate) { bustMesh.scale.setScalar(BUST_H); bustLight.intensity = 260; return; }
+      bustAnim = true;
+      await T.run(1500, (t) => {
+        const e = 1 - Math.pow(1 - t, 3);
+        bustMesh.scale.setScalar(BUST_H * Math.max(0.001, e)); bustMesh.position.y = TOP - 4 * (1 - e);
+        bustMesh.rotation.y = (1 - e) * Math.PI * 4; bustLight.intensity = 260 * e + Math.sin(t * Math.PI) * 400;
+        halo.scale.setScalar(0.3 + 0.7 * e);
+      });
+      bustAnim = false;
+    } else if (bustMesh) {
+      if (!animate) { bustGroup.visible = false; bustLight.intensity = 0; return; }
+      bustAnim = true;
+      await T.run(900, (t) => { bustMesh.scale.setScalar(BUST_H * Math.max(0.001, 1 - t)); bustMesh.rotation.y = t * Math.PI * 3; bustLight.intensity = 260 * (1 - t); halo.scale.setScalar(1 - t * 0.7); });
+      bustAnim = false;
+      if (!bustOn) bustGroup.visible = false;
+    }
+  }
+
   /* ---------------------------------------------------------- boucle de rendu */
   let pulseOn = false;
   renderer.setAnimationLoop((now) => {
@@ -519,6 +556,13 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
       ring.position.set(o.obj.position.x, o.obj.position.y + 0.08, o.obj.position.z);
       const s = 1 + Math.sin(now / 260) * 0.08; ring.scale.set(s, s, s);
     } else ring.visible = false;
+    if (bustGroup.visible && !bustAnim) {
+      // le buste se tourne doucement vers la caméra et ondule un peu
+      const want = Math.atan2(camera.position.x, camera.position.z) + Math.sin(now / 2600) * 0.35;
+      let d = want - bustGroup.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
+      bustGroup.rotation.y += d * 0.04; bustMesh.rotation.y = 0; bustMesh.rotation.x = -0.22; // légèrement penché en arrière, vers la caméra
+      halo.material.opacity = 0.3 + 0.2 * Math.sin(now / 400);
+    }
     if (pulseOn) pulseM.material.opacity = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(now / 220));
     for (const m of marks) {
       m.fill.material.opacity = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now / 240 + m.ph));
@@ -535,7 +579,9 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   /* ---------------------------------------------------------- API (identique au plateau CSS) */
   const api = {
     stage, renderer, scene, camera, kind: '3d',
+    apparition,
     sync(S, { animateBuild = false } = {}) {
+      apparition(!!S.apparition, false);
       for (const p of S.players) {
         const o = ensurePawn(p);
         if (!o.moving) { o.pos = p.pos; o.inJail = p.inJail; }

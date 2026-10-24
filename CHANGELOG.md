@@ -1,5 +1,30 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.39 — 24 octobre 2026
+- **Convoy Storm** — Grosse mise à jour : le blizzard devient une vraie expédition.
+  - Deux modes : **Expédition** (rallier Fort-Givre au bout de la ligne, trois gares en chemin) et **Sans fin** (une gare tous les 550 m, aller le plus loin possible).
+  - **Le froid** : dehors, ta chaleur baisse (plus vite pendant les bourrasques). À zéro, tu t'effondres et on te ramène à bord. On se réchauffe près de la chaudière.
+  - **Les loups** rôdent autour des ruines et traquent les joueurs isolés. Touche **G** : une fusée éclairante les fait fuir. Mieux vaut rester groupés.
+  - **Événements sur la voie** : congères qui bloquent le convoi (à déblayer à la pelle, à plusieurs ça va plus vite), avalanches signalées en rouge, bourrasques qui poussent de côté.
+  - **Gares** : fioul sur le quai, chaleur, fusées rechargées. La ferraille trouvée dans les ruines achète des améliorations communes (chaudière, réservoir, parkas, détecteur de fioul, fusées), touches **1** à **5**. Le convoi repart quand tout le monde est prêt (**V**).
+  - Nouveaux graphismes : maisons, garages, camions, sapins et colonnes givrés (modèles Kenney), survivants en parka avec capuche et lampe, loups animés, gares éclairées et la ville de Fort-Givre.
+  - Nouvelle interface : barre d'itinéraire avec les gares, jauge de chaleur, givre sur l'écran quand on gèle, alerte rouge quand un loup te traque, panneau de gare.
+  - Musique générée en direct : tendue sur la voie (elle s'emballe quand le fioul baisse ou que les loups chassent), plus douce en gare, fanfare à l'arrivée. Hurlements, cloche de gare, sifflet, avalanche…
+- **Hub** — L'accueil crédite maintenant Amiel, Nicolas, Gabriel et Claude.
+
+## 2.38 — 24 octobre 2026
+- **Convoy Storm** — Nouveau jeu en coopération, seul ou jusqu'à 6 : un convoi blindé traverse une plaine gelée sans fin, en pleine tempête de neige, en 3D.
+  - La chaudière au centre du convoi brûle du fioul sans arrêt. Chaque caisse jetée dedans rend 25 %. À 0 %, le convoi s'arrête : c'est la panne sèche.
+  - Sautez du train pour fouiller les ruines (repérez les lanternes jaunes) et rapporter les caisses.
+  - Une caisse se lance : sur le wagon, à un équipier, ou en plein dans le foyer si vous visez bien.
+  - Dans la neige on avance moins vite et le convoi s'éloigne : il faut rattraper l'échelle de queue pour remonter. Trop loin, on se perd dans la tempête.
+  - Le convoi ralentit quand le réservoir baisse, et la tempête creuse la consommation au fil des minutes. Trois difficultés : Facile, Normale, Blizzard.
+  - Le classement retient la distance parcourue ; le bilan de fin montre qui a apporté le plus de fioul.
+  - Si l'hôte part en pleine route, un autre joueur reprend le convoi là où il en était.
+
+## 2.37 — 23 octobre 2026
+- **DavidSimulator** — Nouvelle carte Chance : apparition de Sylvain Durif ! Elle rapporte 100 €, et son buste en 3D se dresse au milieu du plateau, avec un halo doré, pendant 3 tours de table complets. Il se tourne vers la caméra quand on fait pivoter la vue, et s'efface tout seul ensuite. Visible aussi sur le plateau classique.
+
 ## 2.36 — 23 octobre 2026
 - **Tête de Calcul** — The Candidate monte en pression.
   - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.

@@ -121,7 +121,8 @@
       { "id": "ch13", "text": "Excès de vitesse sur la voie Mathis : amende de 15 €.", "action": { "type": "pay", "amount": 15 } },
       { "id": "ch14", "text": "Prenez le train à la Gare Riquier. Si vous passez par Départ, recevez 200 €.", "action": { "type": "advance", "to": 5 } },
       { "id": "ch15", "text": "Vous présidez le comité du Carnaval : versez 50 € à chaque joueur.", "action": { "type": "payEach", "amount": 50 } },
-      { "id": "ch16", "text": "Votre prêt immobilier arrive à échéance : recevez 150 €.", "action": { "type": "collect", "amount": 150 } }
+      { "id": "ch16", "text": "Votre prêt immobilier arrive à échéance : recevez 150 €.", "action": { "type": "collect", "amount": 150 } },
+      { "id": "ch17", "text": "Apparition de Sylvain Durif en plein cœur de Nice ! Recevez 100 €. Son buste trône au milieu du plateau pendant 3 tours.", "action": { "type": "collect", "amount": 100, "apparition": "durif", "rounds": 3 } }
     ],
     "chest": [
       { "id": "cc01", "text": "Avancez jusqu'à la case Départ. Recevez 200 €.", "action": { "type": "advance", "to": 0 } },

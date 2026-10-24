@@ -228,6 +228,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         if (e.reason === 'card') return e.from == null ? `${name(e.to)} reçoit ${money(e.amount)}` : `${name(e.from)} paie ${money(e.amount)}${e.to != null ? ' à ' + name(e.to) : ''}`;
         return null;
       case 'CARD': return `${e.deck === 'chance' ? 'Chance' : 'Caisse'} : ${e.text}`;
+      case 'APPARITION': return `✨ Sylvain Durif apparaît au milieu du plateau pour 3 tours`;
+      case 'APPARITION_END': return `Le buste de Sylvain Durif s'efface du plateau`;
       case 'JAIL': return `${name(e.player)} va en prison`;
       case 'JAIL_OUT': return `${name(e.player)} sort de prison`;
       case 'BUY': return `${name(e.player)} achète ${board.spaces[e.space].name}`;
@@ -553,6 +555,13 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       case 'CARD':
         if (B.drawCard) B.drawCard(e.deck);
         if (!quick) { sfx.play('card'); await F.card(e.deck, e.text, speed); }
+        break;
+      case 'APPARITION':
+        if (!quick) { sfx.play('apparition'); F.banner('Apparition !', 'Sylvain Durif trône au milieu du plateau', '#b45cff', 1500 / speed); }
+        if (B.apparition) await B.apparition(true, !quick);
+        break;
+      case 'APPARITION_END':
+        if (B.apparition) await B.apparition(false, !quick);
         break;
       case 'SPEEDING':
         if (!quick) await F.banner('Trois doubles !', 'Excès de vitesse sur la voie Mathis', '#e3262f', 1000 / speed);

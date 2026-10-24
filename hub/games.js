@@ -331,6 +331,36 @@ window.HUB_GAMES = [
       <image href="kart/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
+  {
+    id: 'convoy',
+    title: 'Convoy Storm',
+    tag: 'Survie en coop dans le blizzard',
+    desc: 'Un convoi blindé traverse une plaine gelée. Sautez du train, fouillez les ruines, repoussez les loups et gardez la chaudière en vie jusqu\'à Fort-Givre — ou aussi loin que possible.',
+    url: 'convoy/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#9fd3ff',
+    settings: [
+      { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition'], ['endless', 'Sans fin']], def: 'expedition' },
+      { key: 'difficulty', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normale'], ['blizzard', 'Blizzard']], def: 'normal' },
+    ],
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="320" height="180" fill="#c3ced9"/>
+      <path d="M0 118 Q 90 104 170 116 T 320 110 V180 H0Z" fill="#f4f7fb"/>
+      <g fill="#8d8a86" stroke="#16181d" stroke-width="3"><path d="M22 116 v-34 h18 v12 h10 v22z"/><path d="M262 112 v-46 h14 v46z"/></g>
+      <g stroke="#16181d" stroke-width="3">
+        <path d="M40 150 L280 150" stroke="#4b525c" stroke-width="5"/>
+        <rect x="64" y="112" width="58" height="30" rx="3" fill="#4b525c"/>
+        <rect x="128" y="112" width="70" height="30" rx="3" fill="#4b525c"/>
+        <rect x="204" y="104" width="68" height="38" rx="3" fill="#ff4b2b"/>
+        <path d="M272 112 L292 142 L272 142Z" fill="#4b525c"/>
+        <rect x="150" y="84" width="26" height="28" rx="4" fill="#6d7480"/>
+        <rect x="216" y="112" width="18" height="12" fill="#ffe2a0"/>
+      </g>
+      <ellipse cx="163" cy="84" rx="11" ry="4" fill="#ff8a2a" stroke="#16181d" stroke-width="2"/>
+      <g fill="#16181d"><circle cx="80" cy="146" r="6"/><circle cx="106" cy="146" r="6"/><circle cx="146" cy="146" r="6"/><circle cx="182" cy="146" r="6"/><circle cx="222" cy="146" r="6"/><circle cx="256" cy="146" r="6"/></g>
+      <g stroke="#16181d" stroke-width="2"><rect x="88" y="98" width="12" height="14" fill="#2b8cff"/><circle cx="94" cy="93" r="5" fill="#e6b796"/><rect x="190" y="98" width="12" height="14" fill="#ffc531"/><circle cx="196" cy="93" r="5" fill="#e6b796"/><rect x="40" y="126" width="12" height="14" fill="#2fbf71"/><circle cx="46" cy="121" r="5" fill="#e6b796"/><rect x="38" y="104" width="16" height="12" fill="#c0821f"/></g>
+      <path d="M150 60 q 18 -12 40 -6 q 20 -14 44 0" fill="none" stroke="#5a5d63" stroke-width="7" stroke-linecap="round" opacity=".6"/>
+      <g fill="#fff"><circle cx="30" cy="30" r="2"/><circle cx="90" cy="20" r="2.4"/><circle cx="140" cy="44" r="1.8"/><circle cx="200" cy="24" r="2.2"/><circle cx="250" cy="40" r="2"/><circle cx="300" cy="18" r="2.4"/><circle cx="60" cy="70" r="1.8"/><circle cx="290" cy="80" r="2"/><circle cx="120" cy="80" r="1.6"/><circle cx="230" cy="70" r="1.8"/></g>
+    </svg>`,
+  },
 ];
-
-

@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak et Cyber Kart GP
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP et Convoy Storm
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -73,13 +73,23 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 - L'hôte choisit le premier circuit, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`),
   captures des circuits et affiche dans `kart/img/` ; mode spectateur depuis l'écran des résultats
 
+## Convoy Storm
+Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un blizzard.
+- Le convoi avance tant que la chaudière a du fioul : une caisse = +25 %, à 0 % c'est la panne sèche
+- Sauter du train, fouiller les ruines, ramasser et lancer les caisses ; dans la neige, rattraper l'échelle de queue
+- Le froid (chaleur de chaque joueur), les loups (fusées éclairantes), les congères, avalanches et bourrasques
+- Gares : ravitaillement et améliorations achetées avec la ferraille ; deux modes : Expédition (rallier Fort-Givre) et Sans fin
+- Trois difficultés : Facile, Normale, Blizzard ; musique et sons générés en direct (WebAudio)
+- Décor : modèles 3D de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/`
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
 - `node tools/check-board.mjs` vérifie le plateau ; `node tools/test-rules.mjs` teste le moteur de DavidSimulator ;
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
-  `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA.
+  `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
+  `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, froid, loups, gares, reprise) et le fait jouer par un pilote automatique.
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -87,6 +97,6 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.26** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.39** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude
