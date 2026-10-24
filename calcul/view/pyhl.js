@@ -39,4 +39,18 @@ export function highlightSql(code) {
   }
   return out + esc(code.slice(last));
 }
-export const highlightCode = (code, lang) => (lang === 'sql' ? highlightSql(code) : highlightPy(code));
+// Java : mots-clés, chaînes, nombres, commentaires
+const JKW = new Set('abstract boolean break case catch char class double else extends final for if implements import instanceof int interface long new null private protected public return static String super this throw throws try void while true false'.split(' '));
+const JTOK = /(\/\/[^\n]*)|("(?:\\.|[^"\\\n])*"?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+export function highlightJava(code) {
+  let out = '', last = 0, m;
+  JTOK.lastIndex = 0;
+  while ((m = JTOK.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const [t, com, str, num, word] = m;
+    out += com ? `<i class="hc">${esc(t)}</i>` : str ? `<i class="hs">${esc(t)}</i>` : num ? `<i class="hn">${esc(t)}</i>` : word && JKW.has(word) ? `<i class="hk">${esc(t)}</i>` : word && /^[A-Z]/.test(word) ? `<i class="hb">${esc(t)}</i>` : esc(t);
+    last = m.index + t.length;
+  }
+  return out + esc(code.slice(last));
+}
+export const highlightCode = (code, lang) => (lang === 'sql' ? highlightSql(code) : lang === 'java' ? highlightJava(code) : highlightPy(code));

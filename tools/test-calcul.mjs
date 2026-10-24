@@ -4,15 +4,21 @@ import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS, chartierTier } from
 import { CHARTIER_QUESTIONS } from '../calcul/engine/chartier-data.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
-import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
+import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
 import { STRATS, payoffAt } from '../calcul/engine/charts.js';
+import { PHONES, FAT_FINGER } from '../calcul/engine/drills.js';
 import { spawnSync } from 'node:child_process';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
 let n = 0;
 // bonne et mauvaise réponse pour n'importe quel type de question
-const good = (q) => (q.input === 'expr' ? q.sol : String(q.answer));
-const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
+// (market making : coter juste à côté du client, du bon côté de la valeur finale ; ou trois fourchettes trop larges)
+const mmGood = (q) => {
+  const V = q.mm.dice.reduce((x, y) => x + y, 0);
+  return [0, 1, 2].map((k) => { const c = q.mm.dice.slice(0, k).reduce((x, y) => x + y, 0) + 3.5 * (3 - k) + q.mm.noise[k]; const m = (c + V) / 2; return c > V ? `${m - 1}/${m}` : `${m}/${m + 1}`; }).join(';');
+};
+const good = (q) => (q.input === 'expr' ? q.sol : q.input === 'mm' ? mmGood(q) : String(q.answer));
+const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'mm' ? '0/30;0/30;0/30' : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
 
 t('lecture des nombres', () => {
@@ -34,6 +40,35 @@ t('expressions exactes, sans eval', () => {
   assert.ok(!usesOnly([2, 2], [2, 5]));
 });
 
+t('cas pratique, relance et market making : placés dans la partie et notés comme prévu', async () => {
+  const { runMarket, mmFair, parseQuotes, CASE_KEYS } = await import('../calcul/engine/cases.js');
+  // au plus un cas pratique (trois questions d'affilée), une relance, un market making ; jamais sur le code ni la dernière
+  for (const len of [10, 15, 20, 30]) for (const diff of DIFFS) for (let seed = 1; seed < 40; seed++) {
+    const cats = planCats(seed, len, 'chartier', { d: DIFFS.indexOf(diff) });
+    const n = (c) => cats.filter((x) => x === c).length;
+    assert.ok(n('case') === 3 && n('relance') === 2 && n('mm') === 1, `${len} ${diff} ${cats}`);
+    const k = cats.indexOf('case');
+    assert.ok(cats[k + 1] === 'case' && cats[k + 2] === 'case' && k + 2 < len - 1, cats.join(','));
+    assert.ok(new Set([k, k + 1, k + 2].map((i) => chartierTier(DIFFS.indexOf(diff), i, len))).size === 1, 'le cas tient dans un tour');
+    assert.ok(cats[len - 1] === 'chartier', 'la dernière reste une question normale');
+  }
+  // les trois étapes d'un cas parlent du même dossier
+  const s = createGame({ players: [{ id: 0, name: 'A' }, { id: 1, name: 'B' }], cfg: { mode: 'chartier', len: 15, module: 'ma' }, seed: 3, now: 0 });
+  const k = s.cats.indexOf('case'), steps = [0, 1, 2].map((j) => fullQuestion(s, k + j));
+  assert.ok(steps.every((q, j) => q.caseStep === j && q.sub.includes(steps[0].sub.split(' · ')[1])), steps.map((q) => q.sub).join(' / '));
+  assert.ok(steps[0].text.split('.')[0] === steps[2].text.split('.')[0], 'même énoncé');
+  assert.ok(CASE_KEYS.length >= 4);
+  // market making : coter serré autour du juste milieu gagne le plus souvent ; trop large est pénalisé
+  let win = 0;
+  for (let i = 0; i < 400; i++) {
+    const m = { dice: [1 + (i % 6), 1 + ((i * 7) % 6), 1 + ((i * 13) % 6)], noise: [(i % 7) - 3, ((i * 3) % 7) - 3, ((i * 5) % 7) - 3] };
+    if (runMarket(m, [0, 1, 2].map((j) => [mmFair(m, j) - [2, 1.5, 1][j], mmFair(m, j) + [2, 1.5, 1][j]])).pnl > 0) win++;
+    assert.equal(runMarket(m, [[0, 30], [0, 30], [0, 30]]).pnl, -6, 'trois fourchettes trop larges : − 6');
+  }
+  assert.ok(win > 200, `coter serré gagne souvent (${win}/400)`);
+  assert.deepEqual(parseQuotes('9,5/11.5;10/12;x'), [[9.5, 11.5], [10, 12]]);
+});
+
 t('les questions sont reproductibles et justes', () => {
   for (const diff of DIFFS) for (const cat of Object.keys(CATS)) for (let i = 0; i < 300; i++) {
     const seed = 1000 + i * 7919;
@@ -43,6 +78,33 @@ t('les questions sont reproductibles et justes', () => {
       if (q.lang === 'sql') assert.ok(q.input === 'code' && !q.fn && q.starter && q.tests.length === 3 && q.examples.length === 1 && q.time === 120, q.text);
       else assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 120, q.text);
       assert.ok(!check(q, '').ok && check(q, 'def f(): pass').pending);
+      continue;
+    }
+    if (q.kind === 'fatfinger') {
+      assert.ok(q.input === 'text' && q.copy && q.answer === q.copy && check(q, q.copy).ok, q.copy);
+      assert.ok(check(q, '  ' + q.copy + ' ').ok, 'espaces au bord ignorés');
+      if (/\s/.test(q.copy)) assert.ok(!check(q, q.copy.replace(/\s/g, '')).ok, 'les espaces comptent');
+      if (/[A-Z]/.test(q.copy)) assert.ok(!check(q, q.copy.toLowerCase()).ok, 'les majuscules comptent');
+      assert.ok(!check(q, q.copy.slice(0, -1)).ok, 'il manque un caractère');
+      continue;
+    }
+    if (q.kind === 'chartier-multi') {
+      assert.ok(q.input === 'multi' && q.answer.length >= 1 && q.answer.length < q.choices.length, q.text);
+      assert.ok(check(q, q.answer.join(',')).ok && check(q, [...q.answer].reverse().join(',')).ok, 'ordre indifférent');
+      assert.ok(!check(q, q.answer.slice(1).join(',') || '99').ok, 'il en manque une');
+      continue;
+    }
+    if (q.kind === 'case' || q.kind === 'relance') {
+      assert.ok(Number.isFinite(q.answer) && q.tip && q.input === 'num' && [1, 2, 3].includes(q.tier), q.text);
+      assert.ok(check(q, String(q.answer)).ok && check(q, String(q.answer).replace('.', ',')).ok, `${q.text} → ${q.answer}`);
+      assert.ok(!check(q, String(q.answer * 3 + 7)).ok, `${q.text} : réponse fausse refusée`);
+      assert.ok(!/NaN|undefined|Infinity/.test(q.text + q.tip + q.sub + q.show), `${q.text} | ${q.tip}`);
+      for (const t of q.traps) assert.ok(!check(q, String(t)).ok, `${q.text} : le piège ${t} est refusé`);
+      continue;
+    }
+    if (q.kind === 'mm') {
+      assert.ok(q.input === 'mm' && q.mm.dice.length === 3 && q.mm.dice.every((x) => x >= 1 && x <= 6) && q.time > 30, q.text);
+      assert.ok(check(q, '').error && !check(q, '1/50').ok, 'sans cotation, ou trop large');
       continue;
     }
     if (q.kind === 'chartier-num') {
@@ -259,7 +321,7 @@ t('bots saboteurs : visent le meneur', () => {
 t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur', () => {
   const pos = [0, 0, 0, 0];
   for (let i = 0; i < 4000; i++) { const q = makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15); if (q.kind === 'chartier') pos[q.answer]++; }
-  for (const n of pos) assert.ok(n > 600, `bonne réponse trop souvent au même endroit : ${pos}`);
+  for (const n of pos) assert.ok(n > 0.2 * pos.reduce((x, y) => x + y, 0), `bonne réponse trop souvent au même endroit : ${pos}`);
   assert.deepEqual([0, 5, 9, 13, 14].map((i) => chartierTier(1, i, 15)), [1, 2, 2, 3, 3]);
   assert.equal(chartierTier(0, 9, 10), 2); assert.equal(chartierTier(0, 0, 10), 1);
   assert.equal(chartierTier(2, 0, 10), 2); assert.equal(chartierTier(2, 9, 10), 3);
@@ -275,13 +337,13 @@ t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur',
   for (let i = 0; i < 10; i++) {
     s = nextQuestion(s, i * 1e5);
     const q = fullQuestion(s); seen.add(q.key);
-    assert.equal(s.q.pts, (q.tier + (q.input === 'code' ? 1 : 0)) * (i === 9 ? 2 : 1));
+    assert.equal(s.q.pts, (q.tier + (q.input === 'code' || q.input === 'mm' ? 1 : 0)) * (i === 9 ? 2 : 1));
     assert.ok(!('answer' in publicState(s).q) || publicState(s).q.answer === undefined);
     if (q.input === 'code') {
       const r = answer(s, { by: 0, raw: q.show, idx: i, now: i * 1e5 + 1000 });
       assert.ok(r.ok && r.pending); s = r.state;
       s = gradeCode(s, { by: 0, idx: i, passed: q.tests.length, total: q.tests.length }).state;
-    } else s = answer(s, { by: 0, raw: String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
+    } else s = answer(s, { by: 0, raw: q.input === 'mm' ? '9/12;9/12;9/12' : String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
     s = reveal(s, i * 1e5 + 2000);
     if (s.last.input === 'choice') assert.equal(s.last.choices[s.last.answer], s.last.show);
   }
@@ -475,9 +537,9 @@ t('The Candidate : trois bonnes réponses d\'affilée rendent un cœur, sans dé
 t('The Candidate : piège plus cher à chaque tour, estimation presque juste sans perte de vie', () => {
   const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
   // une question à choix de chaque tour, avec piège
-  for (const tier of [1, 2, 3]) {
-    let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 40 + tier, now: 0 });
-    let now = 0, done = false;
+  for (const tier of [1, 2, 3]) for (let seed = 40 + tier, done = false; !done && seed < 140; seed += 7) {
+    let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0, duel: 0 }, seed, now: 0 });
+    let now = 0;
     while (!done && s.phase !== 'over') {
       s = nextQuestion(s, now); if (s.phase === 'over') break;
       const q = fullQuestion(s);
@@ -490,7 +552,7 @@ t('The Candidate : piège plus cher à chaque tour, estimation presque juste san
       } else s = play(s, { 0: 'good', 1: 'good' }, now);
       now += 1e5;
     }
-    assert.ok(done, `piège trouvé au tour ${tier}`);
+    if (seed + 7 >= 140) assert.ok(done, `piège trouvé au tour ${tier}`);
   }
   // presque juste : marge ±10 %, réponse à +15 %
   const q = { input: 'num', isChartier: true, answer: 100, tol: 0.1, tolMode: 'rel' };
@@ -546,12 +608,68 @@ t('The Candidate : modules par métier, rubriques orientées', () => {
   assert.equal(createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'classic', module: 'quant' }, seed: 1, now: 0 }).cfg.module, 'gen');
 });
 
+t('The Candidate : fat finger, numéro de téléphone, réponses multiples', () => {
+  const kinds = {};
+  for (let i = 0; i < 6000; i++) { const q = makeQuestion(i * 7919 + 13, i % 15, 'chartier', 'normal', 0, 15); kinds[q.kind] = (kinds[q.kind] || 0) + 1;
+    if (q.kind === 'phone') {
+      const digits = [...q.copy.replace(/\D/g, '')].map(Number), sum = digits.reduce((a, b) => a + b, 0);
+      assert.ok(/^0[67]( \d\d){4}$/.test(q.copy), q.copy);
+      assert.equal(q.answer, /53/.test(q.text) ? sum * 53 : sum);
+    }
+  }
+  assert.ok(kinds.fatfinger > 150 && kinds.phone > 60 && kinds['chartier-multi'] > 20, JSON.stringify(kinds));
+  assert.equal(FAT_FINGER.length, 80); assert.equal(new Set(FAT_FINGER.map((f) => f.text)).size, 80);
+  assert.equal(PHONES.length, 50); assert.equal(new Set(PHONES).size, 50);
+  // une partie : la question à cocher compte juste, la mauvaise sélection coûte une vie
+  const g = (cfg) => createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, ...cfg }, seed: 3, now: 0 });
+  let s = g({}), now = 0, seen = 0;
+  while (s.phase !== 'over' && seen < 2) {
+    s = nextQuestion(s, now); if (s.phase === 'over') break;
+    const q = fullQuestion(s);
+    if (q.input === 'multi' || q.input === 'text') {
+      seen++;
+      const lives = s.players[0].lives, raw = q.input === 'multi' ? q.answer.slice(1).join(',') || String(q.choices.length - 1) : q.answer + 'X';
+      s = reveal(answer(s, { by: 0, raw, idx: s.idx, now: now + 500 }).state, now + 1000);
+      assert.equal(s.players[0].lives, lives - 1, `${q.kind} raté : une vie`);
+    } else s = play(s, { 0: 'good' }, now);
+    now += 1e5;
+  }
+  // un bot qui se trompe ne tombe pas juste par hasard
+  const mq = { input: 'multi', choices: ['a', 'b', 'c', 'd'], answer: [0, 2], time: 20, isChartier: true, tier: 2 };
+  for (let k = 0; k < 50; k++) { const b = botAnswer(mq, 'facile'); if (b && b.raw !== '0,2') assert.ok(!check(mq, b.raw).ok); }
+});
+
+t('QCM : la bonne réponse ne se repère pas à sa longueur', () => {
+  const Q = CHARTIER_QUESTIONS.filter((q) => q.type === 'choice'), L = (q) => Math.max(...q.wrong.map((w) => w.length));
+  const tell = Q.filter((q) => q.good.length >= 20 && q.good.length > 1.5 * L(q));
+  assert.deepEqual(tell.map((q) => q.text), [], 'bonne réponse bien plus longue que toutes les autres');
+  const longest = Q.filter((q) => q.good.length > L(q)).length / Q.length;
+  assert.ok(longest < 0.32, `la bonne réponse est la plus longue dans ${Math.round(longest * 100)} % des QCM`);
+});
+
+t('The Candidate : épreuves Python et SQL réglables séparément', () => {
+  const langs = (cfg) => { const l = new Set(); for (let seed = 1; seed < 160; seed++) { const g = createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, ...cfg }, seed, now: 0 }); g.cats.forEach((c, i) => { if (c === 'code') l.add(fullQuestion(g, i).lang); }); } return [...l].sort(); };
+  assert.deepEqual(langs({}), ['python', 'sql']);
+  assert.deepEqual(langs({ sql: 0 }), ['python']);
+  assert.deepEqual(langs({ code: 0 }), ['sql']);
+  assert.ok(!createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, sql: 0 }, seed: 1, now: 0 }).cats.includes('code'), 'ni Python ni SQL : pas d\'épreuve');
+});
+
+t('Java : lire du code, choix distincts, et des questions qui sortent en partie', () => {
+  assert.equal(JAVA_READ.length, 20);
+  for (const q of JAVA_READ) assert.ok(q.lang === 'java' && !q.wrong.includes(q.good) && new Set(q.wrong).size === 3, q.code);
+  let java = 0, concepts = 0;
+  for (let i = 0; i < 8000; i++) { const q = makeQuestion(i * 7919 + 29, i % 15, 'chartier', 'normal', 0, 15, 'quant'); if (q.lang === 'java') java++; if (q.rubric === 'Java') concepts++; }
+  assert.ok(java > 50, `programmes Java tirés : ${java}`);
+  assert.equal(CHARTIER_QUESTIONS.filter((q) => q.cat === 'Java').length, 12);
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
   assert.ok(def.cfg.jokers && def.cfg.code && def.cfg.cut && def.cfg.lives === 3 && !def.cfg.sabotage, 'par défaut : tout, sauf le sabotage');
   assert.ok(def.cats.includes('code'));
-  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, lives: 5, jokers: 0, code: 0, cut: 0, chsab: 1 }, seed: 1, now: 0 });
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, lives: 5, jokers: 0, code: 0, sql: 0, cut: 0, chsab: 1 }, seed: 1, now: 0 });
   assert.equal(s.cfg.lives, 5); assert.ok(s.players.every((p) => p.lives === 5 && !p.jokers.length));
   assert.ok(!s.cats.includes('code'), 'pas d\'épreuve de code');
   assert.ok(s.cfg.sabotage);
@@ -692,7 +810,7 @@ if (py.status === 0) t('code : lire du code, corriger un bug, SQL (python3)', ()
     const sent = [], on = {};
     const bridge = { embedded: false, players: [0, 1, 2].map((id) => ({ id, name: 'P' + id, color: '#fff' })), readyMap: { 1: 'calcul', 2: 'calcul' },
       send: (to, m) => sent.push([to, JSON.parse(JSON.stringify(m))]), on: (ev, fn) => { on[ev] = fn; } };
-    const host = startHost({ bridge, solo: false, settings: { mode: 'chartier', len: 10, bots: 0, code: 0 }, me: { id: 0, name: 'P0' }, onState() {}, onSetup() {}, onError() {} });
+    const host = startHost({ bridge, solo: false, settings: { mode: 'chartier', len: 10, bots: 0, code: 0, sql: 0 }, me: { id: 0, name: 'P0' }, onState() {}, onSetup() {}, onError() {} });
     return { host, sent, on };
   });
   await new Promise((r) => setTimeout(r, 50));

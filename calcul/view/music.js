@@ -70,7 +70,8 @@ function build() {
 function unlock() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, unlock, { capture: true });
 
-const bpm = () => (mode === 'final' ? 126 : mode === 'over' ? 98 : 120);
+// le tempo monte avec l'enjeu : premier tour, desk, comité, puis le face-à-face
+const bpm = () => ({ desk: 122, final: 126, duel: 134, over: 98 }[mode] || 120);
 const sixteenth = () => 60 / bpm() / 4;
 
 function env(g, t, peak, attack, decay) {
@@ -219,8 +220,11 @@ function scheduleOver(s, t) {
 function schedule(s, t) {
   if (mode === 'over') return scheduleOver(s, t);
   const st = s % 16, bar = Math.floor(s / 16) % 4, beat = st % 4 === 0;
-  const tt = smooth, lobby = mode === 'lobby', reveal = mode === 'reveal', final = mode === 'final', intro = mode === 'intro';
-  const groove = mode === 'question' || final;
+  const lobby = mode === 'lobby', reveal = mode === 'reveal', intro = mode === 'intro';
+  // desk : un élément qui monte en plus ; comité : la musique des dernières questions ; face-à-face : tout au maximum
+  const desk = mode === 'desk', duel = mode === 'duel', final = mode === 'final' || duel;
+  const tt = duel ? Math.max(0.85, smooth) : smooth;
+  const groove = mode === 'question' || desk || final;
   // grosse caisse
   if (groove && beat) kick(t);
   else if ((reveal || intro) && st === 0) kick(t, 0.8);
@@ -247,8 +251,22 @@ function schedule(s, t) {
   }
   // nappes à chaque mesure
   if (st === 0) pad(t, PAD[bar], sixteenth() * 16, lobby || reveal ? 900 : 1100 + tt * 900);
-  // finale : braam toutes les deux mesures
-  if (final && st === 0 && bar % 2 === 0) braam(t, BASS[bar]);
+  // finale : braam toutes les deux mesures (chaque mesure en face-à-face)
+  if (final && st === 0 && (duel || bar % 2 === 0)) braam(t, BASS[bar]);
+  // desk : une ligne qui grimpe sur les notes de l'accord en cours (jamais à côté), et un souffle qui monte en boucle
+  if ((desk || final) && st % 2 === 0) {
+    const climb = Math.floor((s % 64) / 8); // 0 → 7
+    const k = climb + (st / 2) % 4;
+    pluck(t, ARP[bar][k % 4] + 12 * Math.floor(k / 4), 0.035, 2400 + climb * 500, st % 4 ? 0.6 : -0.6);
+  }
+  if ((desk || final) && st === 0 && bar === 0) riser(t, sixteenth() * 60);
+  // face-à-face : cœur qui bat, roulement de caisse claire en fin de mesure, sirène à chaque mesure
+  if (duel) {
+    if (st === 0 || st === 3) kick(t, st === 0 ? 1 : 0.55);
+    if (st >= 12) clap(t, 0.08 + (st - 12) * 0.05);
+    if (st % 2 === 1) bass(t, BASS[bar] + 12, 0.14, 1);
+    if (st === 0) alarm(t);
+  }
   // bips de terminal
   if (Math.random() < (groove ? 0.1 + tt * 0.22 : 0.07)) blip(t + sixteenth() * 0.5);
   // alarme dans les dernières secondes
@@ -282,7 +300,7 @@ function setFilter(freq, time = 0.4) {
   const t = ctx.currentTime;
   filt.frequency.cancelScheduledValues(t); filt.frequency.setValueAtTime(filt.frequency.value, t); filt.frequency.exponentialRampToValueAtTime(freq, t + time);
 }
-const FILTER = { lobby: 2400, intro: 6000, question: 16000, final: 18000, reveal: 750, over: 9000 };
+const FILTER = { lobby: 2400, intro: 6000, question: 16000, desk: 17000, final: 18000, duel: 20000, reveal: 750, over: 9000 };
 
 export const wallStreetMusic = {
   get on() { return enabled; },
@@ -311,11 +329,11 @@ export const wallStreetMusic = {
     const prev = mode; mode = m;
     // Closing Bell repart du début de sa grille, après la cloche de clôture
     if (m === 'over' && ctx && playing) { step = -16; bellAt(ctx.currentTime + 0.05); }
-    if (m === 'question' || m === 'final') { tension = 0; smooth = 0; riserArmed = true; }
+    if (['question', 'desk', 'final', 'duel'].includes(m)) { tension = 0; smooth = 0; riserArmed = true; }
     if (!ctx || !playing) return;
     setFilter(FILTER[m] || 2400, m === 'reveal' ? 0.35 : 0.6);
     if (m === 'intro') { bellAt(ctx.currentTime + 0.05); riser(ctx.currentTime + 0.4, 3); }
-    if (m === 'final' && prev !== 'final') braam(ctx.currentTime + 0.02, BASS[0]);
+    if ((m === 'final' || m === 'duel') && prev !== m) braam(ctx.currentTime + 0.02, BASS[0]);
   },
   // la musique se fait discrète pendant que Pierre Chartier parle, puis revient
   duck(ms) { if (!playing || !ctx) return; setMaster(0.12, 0.3); setTimeout(() => { if (playing) setMaster(0.6, 0.8); }, ms); },
@@ -324,7 +342,7 @@ export const wallStreetMusic = {
   // 0 : tout le temps devant soi → 1 : dernières secondes
   setTension(v) {
     tension = Math.max(0, Math.min(1, v));
-    if (playing && ctx && riserArmed && tension > 0.72 && (mode === 'question' || mode === 'final')) {
+    if (playing && ctx && riserArmed && tension > 0.72 && ['question', 'desk', 'final', 'duel'].includes(mode)) {
       riserArmed = false; riser(ctx.currentTime + 0.02, 2.6);
     }
   },

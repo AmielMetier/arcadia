@@ -1,5 +1,7 @@
 // Bots de Tête de Calcul : pour chaque question, un délai de réponse et une réponse (juste ou plausible).
 // Ils ne « calculent » pas : ils connaissent la réponse et se trompent selon leur niveau et la catégorie.
+import { mmFair } from './cases.js';
+
 export const BOT_LEVELS = ['facile', 'normal', 'expert'];
 const SKILL = {
   facile: { acc: 0.55, speed: 0.62, skip: 0.15 },
@@ -25,8 +27,27 @@ export function botAnswer(q, level, rnd = Math.random) {
     const passed = right ? T : rnd() < 0.6 ? Math.floor(rnd() * T) : 0;
     return { delay: Math.min(limit - 5000, limit * (0.15 + k.speed * 0.5) * (0.7 + rnd() * 0.6)), raw: '# bot', passed };
   }
+  if (q.input === 'mm') {
+    // market making : un bon bot cote serré autour du juste milieu ; un moins bon se décale d'un ou deux points
+    const off = right ? 0 : (rnd() < 0.5 ? -1 : 1) * (1 + Math.floor(rnd() * 2));
+    const raw = [0, 1, 2].map((k) => { const w = [1.5, 1, 0.75][k], m = mmFair(q.mm, k) + off; return `${m - w}/${m + w}`; }).join(';');
+    return { delay: Math.min(limit - 3000, limit * (0.35 + k.speed * 0.5)), raw };
+  }
   // une mauvaise réponse tombe souvent dans le piège, comme un vrai candidat
   const trapped = !right && rnd() < 0.35;
+  if (q.input === 'multi') {
+    // un bot qui se trompe oublie une bonne réponse, ou en coche une de trop
+    if (right) return { delay: delay * 0.8 + 900, raw: q.answer.join(',') };
+    const extra = q.choices.map((_, k) => k).find((k) => !q.answer.includes(k));
+    return { delay: delay * 0.8 + 900, raw: (rnd() < 0.5 && q.answer.length > 1 ? q.answer.slice(1) : [...q.answer, extra]).join(',') };
+  }
+  if (q.input === 'text') {
+    // fat finger raté : deux caractères inversés
+    const t = String(q.answer);
+    if (right || t.length < 3) return { delay, raw: t };
+    const k = 1 + Math.floor(rnd() * (t.length - 2));
+    return { delay, raw: t.slice(0, k) + t[k + 1] + t[k] + t.slice(k + 2) };
+  }
   if (q.input === 'choice') {
     if (trapped && q.trap >= 0) return { delay: delay * 0.7 + 600, raw: String(q.trap) };
     return { delay: delay * 0.7 + 600, raw: String(right ? q.answer : (q.answer + 1 + Math.floor(rnd() * (q.choices.length - 1))) % q.choices.length) };

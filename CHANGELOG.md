@@ -1,5 +1,28 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.40 — 24 octobre 2026
+- **Tête de Calcul** — Trois nouvelles épreuves dans The Candidate.
+  - Un cas pratique par partie : trois questions liées sur un même dossier (mini-LBO, book d'options à couvrir, VaR d'un portefeuille, couverture d'une obligation). Chaque étape rappelle le résultat de la précédente.
+  - Pierre relance : après une question, « et si… ? » sur la même situation. Bonus plein si ta première réponse était juste, moitié sinon, et aucune vie en jeu.
+  - Market making : fais un prix acheteur et vendeur sur la somme de trois dés, dévoilés un par un, face à un client. Tes points suivent ton P&L.
+- **Tête de Calcul** — À la fin de l'entretien, le bilan de Pierre Chartier : tes points forts et faibles rubrique par rubrique, et les notions à revoir.
+- **Tête de Calcul** — Plus de contenu dans The Candidate.
+  - Une nouvelle rubrique Risques (VaR, expected shortfall, crédit, contrepartie, Bâle III, liquidité), qui pèse lourd dans le poste Risques.
+  - Deux fois plus d'estimations, trois fois plus d'épreuves SQL et de bugs à corriger.
+- **Tête de Calcul** — The Candidate monte en pression.
+  - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.
+  - Fat finger : les espaces et les majuscules comptent, au caractère près.
+  - Les épreuves Python et SQL se désactivent séparément dans les réglages.
+  - Nouvelles questions de programmation objet en Java : classes, constructeurs, getters, setters, toString…
+- **Tête de Calcul** — Encore plus de questions dans The Candidate.
+  - Une quarantaine de questions tirées de vrais entretiens (pétrole négatif en 2020, straddle sur un jour, carry du yen, Monte-Carlo, deux boîtes…).
+  - Questions à cocher : il faut cocher toutes les bonnes réponses, et aucune mauvaise.
+  - Fat finger : recopier sans erreur un code, un IBAN, un ordre ou une liste de montants (80 exercices).
+  - Somme des chiffres d'un numéro de téléphone affiché (et, au comité, fois 53).
+  - Une centaine de questions de dérivés en plus : grecques de second ordre (vanna, volga, charm), Black-Scholes, skew et structure par terme, exotiques, variance et volatility swaps, VIX, P&L par les grecques, caps et swaptions, options de change, développement delta-gamma, mouvement brownien et processus stochastiques.
+  - Dans les QCM, la bonne réponse ne se repère plus à sa longueur : les choix ont été réécrits pour être de taille comparable.
+  - Trois manches de calcul mental rapide : tables, pourcentages, points de base, enchaînements de variations.
+
 ## 2.39 — 24 octobre 2026
 - **Convoy Storm** — Grosse mise à jour : le blizzard devient une vraie expédition.
   - Deux modes : **Expédition** (rallier Fort-Givre au bout de la ligne, trois gares en chemin) et **Sans fin** (une gare tous les 550 m, aller le plus loin possible).
