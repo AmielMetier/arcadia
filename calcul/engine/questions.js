@@ -821,7 +821,7 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
     const pool = FAT_FINGER.filter((f) => f.tier === tier), f = pick(r, pool);
     return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, sub: `Fat finger · ${f.label} · ${TIER_LABEL[tier]}`,
       answer: f.text, show: f.text, ...head('Fat finger'), time: 8 + Math.ceil(f.text.length / 2.2), eq: false,
-      tip: 'Sur un desk, une faute de frappe dans un montant ou un code coûte cher : on relit avant de valider. Les espaces ne comptent pas.' };
+      tip: 'Sur un desk, une faute de frappe dans un montant ou un code coûte cher : on relit avant de valider. Chaque caractère compte, espaces et majuscules compris.' };
   }
   // la somme des chiffres d'un numéro de téléphone (et, au comité, fois 53)
   if (r.next() < 0.03) {
@@ -859,7 +859,7 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
 function demoPick(r, tier, head) {
   const roll = r.next();
-  if (roll < 0.1) { const f = pick(r, FAT_FINGER.filter((x) => x.tier === tier)); return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, answer: f.text, show: f.text, ...head('Fat finger'), sub: `Fat finger · ${f.label}`, time: 8 + Math.ceil(f.text.length / 2.2), eq: false, tip: 'Les espaces et les majuscules ne comptent pas.' }; }
+  if (roll < 0.1) { const f = pick(r, FAT_FINGER.filter((x) => x.tier === tier)); return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, answer: f.text, show: f.text, ...head('Fat finger'), sub: `Fat finger · ${f.label}`, time: 8 + Math.ceil(f.text.length / 2.2), eq: false, tip: 'Chaque caractère compte, espaces et majuscules compris.' }; }
   if (roll < 0.16) { const ph = pick(r, PHONES), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0); return { kind: 'phone', text: 'Somme des chiffres de ce numéro ?', copy: ph, answer: sum, ...head('Calcul'), eq: false, time: CH_TIME[tier] + 6, tip: `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}.` }; }
   const set = new Set(globalThis.__candidateDemo), all = Object.values(CH_POOL).flat().filter((q) => set.has(q.text));
   const pool = all.filter((q) => q.tier === tier).length ? all.filter((q) => q.tier === tier) : all;
@@ -873,17 +873,19 @@ function demoPick(r, tier, head) {
 // L'épreuve de code : écrire une fonction Python, corriger un bug, ou écrire une requête SQL (plus souvent hors quant)
 const SQL_P = { gen: 0.3, trading: 0.35, ma: 0.4, risk: 0.4, quant: 0.2 };
 export const CODE_TIME = 120; // deux minutes pour l'épreuve de code
-function code(r, d, i = 0, len = 10, module = 'gen') {
+function code(r, d, i = 0, len = 10, module = 'gen', { python = true, sql: sqlOn = true } = {}) {
   const tier = chartierTier(d, i, len), roll = r.next();
   const lvl = (l) => l.filter((q) => q.level === tier);
-  const pool = roll < (SQL_P[module] ?? 0.3) && lvl(SQL_QUESTIONS).length ? lvl(SQL_QUESTIONS)
-    : roll < (SQL_P[module] ?? 0.3) + 0.25 && lvl(FIX_QUESTIONS).length ? lvl(FIX_QUESTIONS) : lvl(CODE_QUESTIONS);
-  const q = pick(r, pool), sql = q.lang === 'sql';
+  // SQL seul, Python seul (fonction ou bug à corriger), ou les deux selon le module
+  const sqlP = !python ? 1 : !sqlOn ? 0 : SQL_P[module] ?? 0.3;
+  const pool = roll < sqlP && lvl(SQL_QUESTIONS).length ? lvl(SQL_QUESTIONS)
+    : roll < sqlP + (1 - sqlP) * 0.3 && lvl(FIX_QUESTIONS).length ? lvl(FIX_QUESTIONS) : lvl(CODE_QUESTIONS);
+  const q = pick(r, pool), isSql = q.lang === 'sql';
   return {
-    kind: 'code', input: 'code', text: q.title, sub: `${sql ? 'SQL' : q.bug ? 'Corrige le bug' : 'Code'} · ${TIER_LABEL[tier]}`, eq: false,
-    prompt: q.prompt, starter: q.starter, fn: q.fn || null, tests: q.tests, examples: q.tests.slice(0, sql ? 1 : 2), codeId: q.id,
+    kind: 'code', input: 'code', text: q.title, sub: `${isSql ? 'SQL' : q.bug ? 'Corrige le bug' : 'Code'} · ${TIER_LABEL[tier]}`, eq: false,
+    prompt: q.prompt, starter: q.starter, fn: q.fn || null, tests: q.tests, examples: q.tests.slice(0, isSql ? 1 : 2), codeId: q.id,
     lang: q.lang || 'python', ordered: q.ordered !== false, bug: !!q.bug,
-    time: CODE_TIME, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: sql ? 'SQL' : 'Code',
+    time: CODE_TIME, answer: null, show: q.ref, tip: q.tip, isChartier: true, pts: tier + 1, tier, rubric: isSql ? 'SQL' : 'Code',
   };
 }
 
@@ -914,10 +916,10 @@ export const KINDS = {
   code: ['code'],
 };
 
-export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'gen') {
+export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'gen', opts = {}) {
   const r = rngOf({ seed: qSeed(seed, i, salt) });
   const d = D(diff);
-  const q = GEN[cat](r, d, i, len, module);
+  const q = GEN[cat](r, d, i, len, module, opts);
   return {
     cat, kind: q.kind, text: q.text, sub: q.sub || '',
     eq: q.eq !== false && !q.choices && !q.fig,

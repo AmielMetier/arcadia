@@ -48,7 +48,9 @@ t('les questions sont reproductibles et justes', () => {
     }
     if (q.kind === 'fatfinger') {
       assert.ok(q.input === 'text' && q.copy && q.answer === q.copy && check(q, q.copy).ok, q.copy);
-      assert.ok(check(q, q.copy.toLowerCase().replace(/\s/g, '')).ok, 'espaces et majuscules ignorés');
+      assert.ok(check(q, '  ' + q.copy + ' ').ok, 'espaces au bord ignorés');
+      if (/\s/.test(q.copy)) assert.ok(!check(q, q.copy.replace(/\s/g, '')).ok, 'les espaces comptent');
+      if (/[A-Z]/.test(q.copy)) assert.ok(!check(q, q.copy.toLowerCase()).ok, 'les majuscules comptent');
       assert.ok(!check(q, q.copy.slice(0, -1)).ok, 'il manque un caractère');
       continue;
     }
@@ -598,12 +600,20 @@ t('QCM : la bonne réponse ne se repère pas à sa longueur', () => {
   assert.ok(longest < 0.32, `la bonne réponse est la plus longue dans ${Math.round(longest * 100)} % des QCM`);
 });
 
+t('The Candidate : épreuves Python et SQL réglables séparément', () => {
+  const langs = (cfg) => { const l = new Set(); for (let seed = 1; seed < 160; seed++) { const g = createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, ...cfg }, seed, now: 0 }); g.cats.forEach((c, i) => { if (c === 'code') l.add(fullQuestion(g, i).lang); }); } return [...l].sort(); };
+  assert.deepEqual(langs({}), ['python', 'sql']);
+  assert.deepEqual(langs({ sql: 0 }), ['python']);
+  assert.deepEqual(langs({ code: 0 }), ['sql']);
+  assert.ok(!createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, sql: 0 }, seed: 1, now: 0 }).cats.includes('code'), 'ni Python ni SQL : pas d\'épreuve');
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
   assert.ok(def.cfg.jokers && def.cfg.code && def.cfg.cut && def.cfg.lives === 3 && !def.cfg.sabotage, 'par défaut : tout, sauf le sabotage');
   assert.ok(def.cats.includes('code'));
-  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, lives: 5, jokers: 0, code: 0, cut: 0, chsab: 1 }, seed: 1, now: 0 });
+  let s = createGame({ players, cfg: { mode: 'chartier', len: 15, lives: 5, jokers: 0, code: 0, sql: 0, cut: 0, chsab: 1 }, seed: 1, now: 0 });
   assert.equal(s.cfg.lives, 5); assert.ok(s.players.every((p) => p.lives === 5 && !p.jokers.length));
   assert.ok(!s.cats.includes('code'), 'pas d\'épreuve de code');
   assert.ok(s.cfg.sabotage);
@@ -744,7 +754,7 @@ if (py.status === 0) t('code : lire du code, corriger un bug, SQL (python3)', ()
     const sent = [], on = {};
     const bridge = { embedded: false, players: [0, 1, 2].map((id) => ({ id, name: 'P' + id, color: '#fff' })), readyMap: { 1: 'calcul', 2: 'calcul' },
       send: (to, m) => sent.push([to, JSON.parse(JSON.stringify(m))]), on: (ev, fn) => { on[ev] = fn; } };
-    const host = startHost({ bridge, solo: false, settings: { mode: 'chartier', len: 10, bots: 0, code: 0 }, me: { id: 0, name: 'P0' }, onState() {}, onSetup() {}, onError() {} });
+    const host = startHost({ bridge, solo: false, settings: { mode: 'chartier', len: 10, bots: 0, code: 0, sql: 0 }, me: { id: 0, name: 'P0' }, onState() {}, onSetup() {}, onError() {} });
     return { host, sent, on };
   });
   await new Promise((r) => setTimeout(r, 50));

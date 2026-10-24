@@ -379,7 +379,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
            ${c.finale ? '<div class="rule" style="--k:3"><i>×2</i><b>Finale</b><small>quitte ou double</small></div>' : ''}
          </div>
          <ul class="howto">
-           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${c.code && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code Python</b>' : 'une <b>épreuve de code Python</b>'} de 2 minutes` : ''}.</li>
+           <li>QCM (<b>1 2 3 4</b> ou <b>A B C D</b>), calculs et estimations à taper, suites logiques, figures à compter${(c.code || c.sql) && c.len >= 8 ? `, et ${c.len >= 15 ? 'deux <b>épreuves de code</b>' : 'une <b>épreuve de code</b>'} de 2 minutes (${c.code && c.sql ? 'Python ou SQL' : c.sql ? 'SQL' : 'Python'})` : ''}.</li>
            <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une. <b>Le piège</b> 🪤 coûte de plus en plus cher : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte rien, et trois bonnes réponses d'affilée rendent une vie.</li>
            ${c.cut ? '<li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu\'il reste trois candidats).</li>' : ''}
            ${c.jokers ? '<li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>' : ''}
@@ -462,9 +462,9 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     }
     if (q.input === 'text') {
       return `<form class="answer fat" id="aform" autocomplete="off">
-          <input id="ain" inputmode="text" placeholder="Recopie ici" maxlength="64" aria-label="Recopie le texte affiché" spellcheck="false" autocapitalize="characters" autocorrect="off">
+          <input id="ain" inputmode="text" placeholder="Recopie ici" maxlength="64" aria-label="Recopie le texte affiché" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off">
           <button class="btn yellow" id="asend">Valider</button>
-        </form><p class="tolhint">Les espaces et les majuscules ne comptent pas, le reste doit être exact. Copier-coller interdit.</p>`;
+        </form><p class="tolhint">Tout compte : chaque caractère, les espaces et les majuscules. Copier-coller interdit.</p>`;
     }
     if (q.isChartier && q.input === 'choice') {
       return `<div class="cand-choices">${q.choices.map((c, k) => `<button type="button" class="cchoice" data-c="${k}" style="--k:${k}">
@@ -1028,7 +1028,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (final) return showInter(`Question ${n + 1} / ${S.cfg.len}`, 'Quitte ou double', 'Les points comptent double', 'final');
     if (newTier) return showInter(`${'★'.repeat(tier)} Nouveau tour`, TIER_LABEL[tier], `Question ${n + 1} / ${S.cfg.len}`, 'tier');
     // The Candidate : on annonce le tour (ou l'épreuve de code) ; ailleurs, la catégorie de la question
-    if (ch) return showInter(`Question ${n + 1} / ${S.cfg.len}`, S.cats[n] === 'code' ? '⌨ Épreuve de code' : TIER_LABEL[tier], S.cats[n] === 'code' ? '2 minutes, en Python ou en SQL' : '★'.repeat(tier), S.cats[n] === 'code' ? 'tier' : '');
+    if (ch) return showInter(`Question ${n + 1} / ${S.cfg.len}`, S.cats[n] === 'code' ? '⌨ Épreuve de code' : TIER_LABEL[tier], S.cats[n] === 'code' ? `2 minutes, en ${S.cfg.code !== false && S.cfg.sql !== false ? 'Python ou en SQL' : S.cfg.sql !== false ? 'SQL' : 'Python'}` : '★'.repeat(tier), S.cats[n] === 'code' ? 'tier' : '');
     showInter(`Question ${n + 1} / ${S.cfg.len}`, cat ? `${cat.icon} ${cat.label}` : 'Question suivante', '', '');
   }
 

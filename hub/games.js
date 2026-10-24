@@ -82,6 +82,7 @@ window.HUB_GAMES = [
       { key: 'lives', label: 'Vies par candidat', options: [[2, '2'], [3, '3'], [5, '5']], def: 3, onlyMode: 'chartier' },
       { key: 'jokers', label: 'Jokers (50/50, ami)', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'code', label: 'Épreuve de code Python', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
+      { key: 'sql', label: 'Épreuve SQL', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'cut', label: 'Le dernier coupé à chaque tour', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'duel', label: 'Face-à-face final', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'chsab', label: 'Sabotage', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },

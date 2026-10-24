@@ -61,7 +61,9 @@ export function makeConfig(s = {}) {
     sabotage: s.mode === 'chartier' ? Number(s.chsab) === 1 : s.sabotage == null ? true : Number(s.sabotage) === 1,
     lives: s.mode === 'chartier' ? (LIVES_CHOICES.includes(Number(s.lives)) ? Number(s.lives) : LIVES) : 0,
     jokers: s.mode === 'chartier' && (s.jokers == null || Number(s.jokers) === 1),
+    // épreuve de code : Python (fonctions et bugs) et SQL se règlent séparément
     code: s.mode === 'chartier' && (s.code == null || Number(s.code) === 1),
+    sql: s.mode === 'chartier' && (s.sql == null || Number(s.sql) === 1),
     cut: s.mode === 'chartier' && (s.cut == null || Number(s.cut) === 1),
     duel: s.mode === 'chartier' && (s.duel == null || Number(s.duel) === 1),
     module: s.mode === 'chartier' && MODULES[s.module] ? s.module : 'gen',
@@ -73,7 +75,7 @@ export function createGame({ players, cfg, seed, now }) {
   const c = makeConfig(cfg);
   return {
     v: 1, seed, cfg: c, startedAt: now,
-    cats: planCats(seed, c.len, c.theme, { code: c.code }),
+    cats: planCats(seed, c.len, c.theme, { code: c.code || c.sql }),
     players: players.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: !!p.bot,
       score: 0, streak: 0, bestStreak: 0, right: 0, wrong: 0, silent: 0, fastest: null, totalMs: 0, firsts: 0, byCat: {},
       powers: [], sabSent: 0, sabTaken: 0,
@@ -89,7 +91,7 @@ export const isFinal = (s, idx = s.idx) => s.cfg.finale && idx === s.cfg.len - 1
 export function fullQuestion(s, idx = s.idx) {
   const seen = new Set(s.history.filter((h) => h.idx < idx).map((h) => h.key));
   let q;
-  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len, s.cfg.module); if (!seen.has(q.key)) break; }
+  for (let salt = 0; salt < 8; salt++) { q = makeQuestion(s.seed, idx, s.cats[idx], s.cfg.diff, salt, s.cfg.len, s.cfg.module, { python: s.cfg.code !== false, sql: s.cfg.sql !== false }); if (!seen.has(q.key)) break; }
   return q;
 }
 
@@ -169,10 +171,10 @@ export function check(q, raw) {
     return { ok: picked.join(',') === q.answer.join(','), value: picked };
   }
   if (q.input === 'text') {
-    // fat finger : à la lettre près, sans compter les espaces ni les majuscules
-    const norm = (t) => String(t).replace(/\s+/g, '').toUpperCase();
-    if (!norm(raw)) return { ok: false, error: 'Recopie ce qui est affiché' };
-    return { ok: norm(raw) === norm(q.answer), value: String(raw) };
+    // fat finger : à la lettre près, espaces et majuscules compris (seuls les espaces au début et à la fin sont ignorés)
+    const t = String(raw).trim();
+    if (!t) return { ok: false, error: 'Recopie ce qui est affiché' };
+    return { ok: t === String(q.answer), value: t };
   }
   if (q.input === 'code') {
     if (!String(raw).trim()) return { ok: false, error: 'Écris ton code avant de l’envoyer' };
