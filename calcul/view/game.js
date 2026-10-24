@@ -438,7 +438,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (q.input === 'expr') return `<div class="target"><small>Cible</small><b>${q.target}</b></div>
       <div class="tiles">${q.nums.map((n, k) => `<button class="tile" data-n="${n}" data-k="${k}" style="--k:${k}">${n}</button>`).join('')}</div>`;
     const cls = q.isChartier ? 'cand' : q.cat === 'devinette' ? 'riddle' : q.fig ? 'geo' : q.text.length > 16 ? 'long' : '';
-    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>${q.snippet ? `<pre class="code-snip">${highlightPy(q.snippet)}</pre>` : ''}`;
+    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>${q.snippet ? `<pre class="code-snip">${highlightPy(q.snippet)}</pre>` : ''}${q.copy ? `<div class="copybox${q.kind === 'phone' ? ' phone' : ''}" aria-label="À lire">${esc(q.copy)}</div>` : ''}`;
   }
 
   const LETTERS = ['A', 'B', 'C', 'D'];
@@ -455,6 +455,16 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
           <div class="code-bar"><button type="button" class="btn ghost" id="ctest">▶ Tester les exemples</button><small>Tab : indenter · Ctrl+Entrée : envoyer</small><button type="button" class="btn yellow" id="csend">Envoyer mon code</button></div>
           <pre class="code-out" id="cout" hidden></pre>
         </div>`;
+    }
+    if (q.input === 'multi') {
+      return `<div class="multi-choices">${q.choices.map((c, k) => `<button type="button" class="mchoice" data-m="${k}" aria-pressed="false" style="--k:${k}"><span class="mbox"></span><span class="ct">${qText(c)}</span></button>`).join('')}</div>
+        <div class="multi-bar"><small>Coche toutes les bonnes réponses, puis valide</small><button type="button" class="btn yellow" id="msend">Valider</button></div>`;
+    }
+    if (q.input === 'text') {
+      return `<form class="answer fat" id="aform" autocomplete="off">
+          <input id="ain" inputmode="text" placeholder="Recopie ici" maxlength="64" aria-label="Recopie le texte affiché" spellcheck="false" autocapitalize="characters" autocorrect="off">
+          <button class="btn yellow" id="asend">Valider</button>
+        </form><p class="tolhint">Les espaces et les majuscules ne comptent pas, le reste doit être exact. Copier-coller interdit.</p>`;
     }
     if (q.isChartier && q.input === 'choice') {
       return `<div class="cand-choices">${q.choices.map((c, k) => `<button type="button" class="cchoice" data-c="${k}" style="--k:${k}">
@@ -513,10 +523,22 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const fog = $('#qzone.fog'); if (fog) fog.style.setProperty('--fog', FOG_MS + 'ms');
 
     if (q.input === 'code') wireCode(q);
+    else if (q.input === 'multi') {
+      for (const b of root.querySelectorAll('[data-m]')) b.onclick = () => { if (myAns != null) return; const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); sfx.play('pop'); };
+      $('#msend').onclick = () => {
+        const picked = [...root.querySelectorAll('[data-m].on')].map((b) => b.dataset.m);
+        if (!picked.length || myAns != null) return toast('Coche au moins une réponse');
+        myAns = picked.join(','); answer(myAns); sfx.play('lock'); pcAnswered();
+        for (const b of root.querySelectorAll('[data-m], #msend')) b.disabled = true;
+        const s2 = $('#sent'); s2.hidden = false; s2.className = 'sent'; s2.innerHTML = `Réponse verrouillée : <b>${picked.map((k) => 'ABCDEFGHIJ'[k]).join(', ')}</b> · on attend les autres…`;
+      };
+    }
     else if (q.input === 'choice') {
       for (const b of root.querySelectorAll('[data-c]')) b.onclick = () => choose(Number(b.dataset.c));
     } else {
       const inp = $('#ain');
+      // fat finger : pas de copier-coller ni de glisser-déposer
+      if (inp && q.input === 'text') for (const ev of ['paste', 'drop']) inp.addEventListener(ev, (e) => { e.preventDefault(); toast('Copier-coller interdit : recopie à la main'); });
       if (inp) {
         setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) {} }, 60);
         $('#aform').onsubmit = (e) => {
@@ -716,6 +738,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <span class="cl">${k === L.answer ? '✓' : k === mk ? '✗' : LETTERS[k]}</span><span class="ct">${qText(c)}${k === L.trap ? '<em class="trapmark">🪤 le piège</em>' : ''}</span><span class="who">${who(k)}</span></div>`).join('')}</div>`;
   }
 
+  // ce que j'avais coché (question à réponses multiples)
+  const myPick = (k) => { const r = S.last && S.last.results.find((x) => x.id === me.id); return !!(r && r.raw != null && String(r.raw).split(',').map(Number).includes(k)); };
   function renderReveal() {
     const L = S.last, cat = CATS[L.cat], mine = L.results.find((r) => r.id === me.id);
     const h = S.history[S.history.length - 1], q = S.q || h;
@@ -725,7 +749,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const elim = (L.eliminated || []).map((e) => `<div class="elim"><b>${esc(name(e.id))}</b> ${e.why === 'palier' ? `est coupé : dernier à la fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())}` : 'n\'a plus de vies'} ${e.why === 'palier' ? '✂️' : '🚪'}</div>`).join('')
       + (L.tierEnd && !(L.eliminated || []).some((e) => e.why === 'palier') && !L.endEarly && L.idx + 1 < S.cfg.len ? `<div class="elim soft">Fin du ${esc((TIER_LABEL[L.tierEnd] || 'tour').toLowerCase())} : tout le monde passe</div>` : '');
     const answerHtml = L.input === 'code' ? `<div class="code-ref"><small>Une solution</small><pre>${highlightCode(L.show, L.lang)}</pre></div>`
-      : ch && L.input === 'choice' ? candGrid(L) : `<div class="bigans">${qText(L.show)}</div>`;
+      : ch && L.input === 'choice' ? candGrid(L)
+      : L.input === 'multi' ? `<div class="multi-choices rev">${L.choices.map((c, k) => { const good = L.answer.includes(k), mine = myPick(k); return `<div class="mchoice ${good ? 'good' : mine ? 'bad' : 'dim'}"><span class="mbox">${good ? '✓' : mine ? '✗' : ''}</span><span class="ct">${qText(c)}</span></div>`; }).join('')}</div>`
+      : L.input === 'text' ? `<div class="copybox">${esc(L.show)}</div>`
+      : `<div class="bigans">${qText(L.show)}</div>`;
     const fast = L.results.find((r) => r.tags.includes('eclair') || (S.cfg.mode === 'eclair' && r.pts > 0));
     const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : q.input === 'choice' ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
     const verdict = mine ? `<div class="verdict ${mine.ok ? 'ok' : mine.raw != null ? 'ko' : 'none'}" id="verdict">${mine.ok ? `Bravo ! +${fmt(mine.pts)}` : mine.raw != null ? (mine.pts < 0 ? `Raté… ${fmt(mine.pts)}` : 'Raté…') : 'Pas de réponse'}</div>` : '';

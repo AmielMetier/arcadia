@@ -13,6 +13,12 @@
   - L'épreuve de code peut aussi être une requête SQL à écrire sur une vraie base, ou un bug à corriger. Elle dure maintenant 2 minutes.
   - Après chaque réponse, un mini-schéma accompagne l'explication quand il aide (profil d'option, courbe des taux, cloche, frise d'un taux variable…), et le piège est nommé.
 - **Tête de Calcul** — L'écran des scores passe en deux colonnes : les scores d'un côté, tes erreurs à revoir de l'autre.
+- **Tête de Calcul** — Encore plus de questions dans The Candidate.
+  - Une quarantaine de questions tirées de vrais entretiens (pétrole négatif en 2020, straddle sur un jour, carry du yen, Monte-Carlo, deux boîtes…).
+  - Questions à cocher : il faut cocher toutes les bonnes réponses, et aucune mauvaise.
+  - Fat finger : recopier sans erreur un code, un IBAN, un ordre ou une liste de montants (80 exercices).
+  - Somme des chiffres d'un numéro de téléphone affiché (et, au comité, fois 53).
+  - Trois manches de calcul mental rapide : tables, pourcentages, points de base, enchaînements de variations.
 - **Tête de Calcul** — Le poste à pourvoir se choisit dans le salon : généraliste, trading, M&A, quant ou risques. Les questions suivent le métier.
 - **Tête de Calcul** — Face-à-face final : les deux meilleurs encore en lice s'affrontent en mort subite. La première bonne réponse gagne, la première erreur perd.
 - **Tête de Calcul** — Pièges plus fins : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte pas de vie.

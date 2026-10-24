@@ -733,6 +733,53 @@ const RAW_ENTRETIENS = `
 3 | Calcul | √2 × √8 ? | 4 | !√10 | 8 | 2√2 | √(2 × 8) = √16.
 3 | Calcul | 3/7 de 84 ? | 36 | !28 | 12 | 42 | 84 / 7 = 12, × 3.
 3 | Calcul | e⁰ + ln(1) ? | 1 | !0 | 2 | e | e⁰ = 1 et ln(1) = 0.
+# ---- Questions des entretiens filmés (lot 5)
+1 | Macro | Capitale du Burkina Faso ? | Ouagadougou | !Bobo-Dioulasso | Bamako | Niamey | Ouagadougou ; Bobo-Dioulasso est la deuxième ville. Bamako est la capitale du Mali, Niamey celle du Niger.
+2 | Marchés | En avril 2020, pourquoi le future sur le pétrole WTI est-il passé sous zéro ? | Plus de place pour stocker le pétrole livré : les porteurs ont payé pour se débarrasser de leurs contrats | !L'OPEP a donné son pétrole gratuitement | Une erreur de cotation de la Bourse | Le dollar s'est effondré | Le future se livre physiquement à Cushing : sans cuve disponible, recevoir du pétrole devenait un coût. Le prix est tombé vers −37 $.
+2 | Macro | Pourquoi est-il important qu'une banque centrale soit indépendante ? | Pour viser la stabilité des prix sans pression électorale, et garder sa crédibilité | !Pour pouvoir financer directement le déficit de l'État | Pour fixer les impôts | Pour garantir une forte croissance chaque année | Un gouvernement aurait la tentation de baisser les taux avant une élection : l'indépendance ancre les anticipations d'inflation.
+1 | Dérivés | « Je veux être long Brent » : quel dérivé acheter ? | Un future sur le Brent | !Un put sur le Brent | Un swap de change | Une obligation d'une compagnie pétrolière | Le future gagne quand le Brent monte, un pour un. Le put, lui, gagne à la baisse.
+3 | Taux | Taux à 6 mois 5 %, taux à 1 an 5 %. Le taux 6 mois dans 6 mois (forward) est a priori… | un peu plus bas, environ 4,9 % | !plus haut, environ 5,1 % | exactement 5 % | environ 2,5 % | En taux simples : 1 + 5 % = (1 + 2,5 %) × (1 + f/2), soit f ≈ 4,88 %. Les intérêts des 6 premiers mois rapportent déjà des intérêts.
+2 | Taux | Prêter au jour le jour à 5 % (renouvelé chaque jour) ou à 5 % pour 6 mois ? | Au jour le jour, si le taux reste à 5 % : les intérêts se capitalisent chaque jour | !Pareil : c'est le même taux | Le 6 mois, parce qu'on prête plus longtemps | Le 6 mois, toujours | À taux égal, capitaliser plus souvent rapporte plus. Le vrai risque du jour le jour : que le taux baisse en route.
+2 | Dérivés | Quel est le rôle des données dans le pricing d'une option ? | Estimer ce qui ne s'observe pas, surtout la volatilité, et calibrer le modèle sur les prix du marché | !Elles donnent directement le prix futur de l'action | Aucun : la formule de Black-Scholes suffit | Elles fixent le strike | Le spot, les taux et la maturité se lisent ; la volatilité (et le smile) se déduit des prix cotés et de l'historique.
+2 | Probas | Pourquoi les crises arrivent-elles plus souvent que ne le prévoient beaucoup de modèles ? | Les rendements ont des queues épaisses : les gros mouvements sont bien plus fréquents qu'avec une loi normale | !Parce que les modèles sont piratés | Parce que la volatilité est constante | Elles n'arrivent pas plus souvent | Avec une loi normale, une baisse de 20 % en un jour serait quasi impossible ; elle est pourtant arrivée en 1987.
+1 | Marchés | Volatilité implicite « normale » d'un grand indice comme le S&P 500 ou l'EuroStoxx 50 ? | Autour de 15 à 20 % | !Autour de 2 % | Autour de 60 % | Autour de 100 % | En période calme, 12 à 20 % ; elle a dépassé 80 % en mars 2020.
+2 | Marchés | La crise des subprimes de 2008, en une phrase ? | Des crédits immobiliers risqués, titrisés et revendus partout, qui ont fait défaut quand les prix des maisons ont baissé | !La crise de la dette grecque | L'éclatement de la bulle internet | La faillite de la BCE | La titrisation a dispersé le risque dans tout le système ; Lehman Brothers a fait faillite en septembre 2008.
+2 | Marchés | Pourquoi a-t-on cru que les maisons qui garantissaient les subprimes ne perdraient pas de valeur ? | Les prix immobiliers américains n'avaient jamais baissé ensemble au niveau national : les modèles reposaient sur cet historique | !L'État garantissait toutes les maisons | Les maisons étaient assurées contre la baisse | Les agences de notation interdisaient la baisse | Les modèles supposaient des défauts peu corrélés entre régions ; la baisse a été simultanée.
+2 | Taux | Un taux d'intérêt peut-il être négatif ? | Oui, quand la banque centrale fait payer les dépôts et que les investisseurs paient pour la sécurité | !Non, jamais | Seulement pour les particuliers | Seulement en temps de guerre | La BCE a eu un taux de dépôt à −0,5 % ; des emprunts d'État allemands ont longtemps rapporté moins que zéro.
+2 | Probas | Comment estimer π par Monte-Carlo ? | Tirer des points au hasard dans un carré et compter la part qui tombe dans le quart de disque : elle tend vers π/4 | !Mesurer un cercle avec une règle, plusieurs fois | Multiplier par 3,14 un nombre tiré au hasard | Compter les décimales d'un nombre au hasard | Aire du quart de disque / aire du carré = π/4. Avec un million de points, on obtient π à environ 0,001 près.
+2 | Dérivés | Pourquoi utiliser Monte-Carlo pour pricer une option ? | On simule des milliers de trajectoires du sous-jacent et on moyenne les gains actualisés, quand aucune formule n'existe | !Pour ne pas avoir besoin de la volatilité | Pour fixer la prime à zéro | Pour remplacer le sous-jacent | Indispensable pour les options qui dépendent du chemin (barrières, autocalls, asiatiques).
+2 | Dérivés | Action à 100 €, call 1 an de strike 100, volatilité 50 %, taux nuls. Prime, environ ? | 20 € | !50 € | 2 € | 100 € | À la monnaie, C ≈ 0,4 × S × σ × √T = 0,4 × 100 × 0,5 = 20 €.
+1 | Dérivés | Un événement arrive sur Total, mais tu ne sais pas dans quel sens l'action va bouger. Stratégie ? | Acheter un straddle | !Acheter un call | Vendre un straddle | Vendre un put | Le straddle (call + put à la monnaie) gagne si l'action bouge fort, dans un sens ou dans l'autre.
+3 | Dérivés | Straddle 1 jour sur Total, action à 100 €, volatilité 20 %. Prix, environ ? | 1 € | !20 € | 8 € | 0,10 € | Straddle ≈ 0,8 × S × σ × √T = 0,8 × 100 × 0,2 × √(1/252) ≈ 1 €.
+3 | Dérivés | Straddle 1 jour sur une action pharmaceutique à 100 €, volatilité 55 %. Prix, environ ? | 2,8 € | !44 € | 0,30 € | 10 € | 0,8 × 100 × 0,55 × √(1/252) ≈ 2,8 €. Le marché attend un mouvement d'environ ± 2,8 € demain.
+2 | Dérivés | Un produit à « vol target », c'est… | une stratégie qui ajuste son exposition pour garder une volatilité constante | !un produit qui garantit une volatilité nulle | une option sur la volatilité d'un indice | un fonds qui achète la volatilité au plus bas | Quand le marché s'agite, on réduit l'exposition ; quand il se calme, on l'augmente.
+3 | Dérivés | Pourquoi pricer un autocall avec un modèle de volatilité locale ou stochastique ? | Son prix dépend du smile et de l'évolution de la volatilité (barrières, rappels) : une volatilité constante le valorise mal | !Parce qu'il n'a pas de sous-jacent | Pour ne pas avoir à modéliser les taux | Il n'en a pas besoin | La barrière basse du put vendu est très sensible au skew ; les rappels, à la dynamique de la vol.
+3 | Dérivés | La façon de modéliser les dividendes futurs change-t-elle le prix d'un autocall ? | Oui : les dividendes font baisser le forward, donc les chances de rappel et la valeur du put vendu | !Non, jamais | Seulement si l'action ne verse rien | Seulement pour un autocall en dollars | Dividendes fixes, proportionnels ou aléatoires : sur 5 à 10 ans, l'écart de prix peut être important.
+2 | Logique | Premier tour de stade à 5 km/h. Il faut 10 km/h de moyenne sur les deux tours. Allure du second tour ? | Impossible : le temps permis est déjà écoulé | !15 km/h | 20 km/h | 30 km/h | Deux tours à 10 km/h prennent le même temps qu'un seul tour à 5 km/h : il faudrait faire le second en zéro seconde.
+2 | Dérivés | Pourquoi existe-t-il encore des forwards, alors qu'on a les futures ? | Ils sont sur mesure (montant, date, sous-jacent) et sans appels de marge quotidiens | !Ils sont toujours moins chers | Les futures sont interdits en Europe | Ils n'ont aucun risque de contrepartie | Une entreprise qui couvre une facture en dollars pour le 17 mars veut cette date exacte.
+2 | Dérivés | Prix forward d'une action sans dividende ? | S × e^(rT) : le coût de porter l'action jusqu'à l'échéance | !S × e^(−rT) | Le prix que le marché attend dans un an | S plus la volatilité | Acheter l'action en empruntant S coûte S × e^(rT) à l'échéance : sinon, il y aurait un arbitrage.
+1 | Dérivés | Combien payes-tu pour entrer dans un forward au prix forward ? | Rien : il vaut zéro au départ | !Le prix de l'action | Le prix forward | La moitié du prix de l'action | Le prix forward est choisi pour que le contrat ne vaille rien à l'origine ; ensuite, il prend ou perd de la valeur.
+2 | Dérivés | Pourquoi un call à la monnaie sur le Bitcoin coûte-t-il bien plus cher que sur LVMH (en % du prix) ? | Le Bitcoin est beaucoup plus volatil | !Le Bitcoin vaut plus cher | Le Bitcoin ne verse pas de dividende | Le Bitcoin cote 24 h sur 24 | La prime grandit avec la volatilité : 60 à 80 % pour le Bitcoin, 25 à 30 % pour LVMH.
+1 | Logique | Combien de fois écrit-on le chiffre 9 entre 1 et 1 000 ? | 300 | !100 | 271 | 111 | De 000 à 999, chaque position (unités, dizaines, centaines) porte un 9 cent fois. 271, c'est le nombre de nombres qui contiennent au moins un 9.
+2 | Dérivés | Tu as un call sur Apple (à 100). Apple annonce un dividende de 10 dans 6 mois. Content ? | Non : l'action baissera du dividende, le call perd de la valeur | !Oui : un dividende est toujours une bonne nouvelle | Ça ne change rien | Oui : le porteur du call touche le dividende | Le forward baisse d'environ 10 : un call vaut moins. Un put, lui, en profite.
+2 | Dérivés | Call acheté et put vendu à la monnaie (même strike, même échéance) : sensibilité à la volatilité ? | Nulle : c'est un forward synthétique | !Le double du vega d'un call | Négative | Égale au vega d'un call | Les deux vegas s'annulent. C'est la parité call-put : C − P = S − K e^(−rT).
+2 | Marchés | Une action bouge de 1 % par jour. Volatilité annualisée ? | Environ 16 % | !365 % | 1 % | 252 % | On multiplie par la racine du nombre de jours de bourse : 1 % × √252 ≈ 16 %.
+3 | Dérivés | Sur la période, la vol réalisée dépasse la vol implicite payée. Le P&L d'un long gamma couvert est-il forcément positif ? | Pas forcément : tout dépend du moment des mouvements et du gamma détenu à ce moment-là | !Oui, toujours | Jamais | Seulement si le marché monte | Un gros mouvement quand l'option est loin de la monnaie (peu de gamma) rapporte peu : le P&L dépend du chemin.
+2 | Logique | Une balle tombe de 100 m et remonte à chaque rebond à la moitié de la hauteur précédente. Distance totale parcourue ? | 300 m | !200 m | 150 m | Infinie | 100 m de chute, puis 2 × (50 + 25 + 12,5 + …) = 2 × 100 : au total 300 m.
+3 | Dérivés | Même volatilité, taux nuls : prix d'un call à la monnaie 1 an divisé par celui d'un call à la monnaie 3 mois ? | Environ 2 | !4 | 1 | 1,5 | Le prix croît comme la racine du temps : √(1 / 0,25) = 2.
+2 | Logique | Train A : départ 10 h, 100 km/h, arrivée en 6 h. Train B : départ 11 h, 125 km/h, même destination. À quelle distance de l'arrivée B dépasse-t-il A ? | 100 km | !Il ne le dépasse pas | 50 km | 125 km | Le trajet fait 600 km. 100 t = 125 (t − 1) donne t = 5 h : à 500 km du départ, donc 100 km avant l'arrivée.
+2 | Dérivés | Tu achètes jeudi un call à la monnaie (action à 100) qui expire vendredi. Vendredi, l'action ouvre à −10 %. Gagné ou perdu ? | Perdu : le call finit hors de la monnaie et ne vaut presque plus rien | !Gagné : la volatilité a monté | Rien : un call ne perd pas | Gagné : son delta est positif | À un jour de l'échéance, il ne reste quasiment que la valeur intrinsèque : zéro à 90 pour un strike 100.
+2 | Dérivés | Corrélation spot-vol sur les actions : quand le spot monte, la volatilité implicite… | baisse en général | !monte | ne bouge jamais | devient nulle | Les marchés montent par l'escalier et descendent par l'ascenseur : la vol monte surtout dans les baisses.
+2 | Dérivés | Future pétrole 3 mois à 80, spot à 78, taux et stockage négligeables. Y a-t-il un arbitrage ? | Oui : acheter le pétrole à 78, vendre le future à 80 et livrer à l'échéance | !Non, jamais | Oui : acheter le future et vendre le pétrole | Non : c'est le prix du risque | Sans coût de portage, le future devrait valoir le spot : 2 de gain sans risque. Dans la réalité, le stockage n'est pas gratuit.
+3 | Probas | Deux boîtes : l'une contient le double de l'autre. Tu ouvres la première : 100 000 €. Changer ? | Ça ne change rien en espérance : le calcul « 125 000 € en moyenne » est un paradoxe | !Toujours changer : l'espérance est de 125 000 € | Toujours garder | Changer, puis revenir à la première | Le raisonnement suppose que 50 000 € et 200 000 € sont aussi probables quoi qu'on ait vu : c'est faux pour toute loi a priori raisonnable.
+2 | Dérivés | Protective put sur le S&P 500 : strike 90 ou strike 80, lequel coûte le moins cher ? | Le strike 80 | !Le strike 90 | Le même prix | Ça dépend du jour | Plus le strike est bas, plus le put est loin de la monnaie : il protège moins et coûte moins.
+2 | Dérivés | Action achetée 100, put de strike 100 acheté 5. Jusqu'où l'action doit-elle monter pour que l'ensemble soit rentable ? | 105 | !100 | 95 | 110 | Il faut d'abord regagner la prime payée : 100 + 5.
+3 | Marchés | Un investisseur japonais détient des actifs étrangers sans couverture de change. Côté devise, il est… | short yen, long des devises étrangères | !long yen | neutre | long or | Si le yen monte, ses actifs étrangers valent moins en yens : il perd quand le yen s'apprécie.
+1 | Marchés | Le yen : une devise à taux d'intérêt plutôt élevé ou faible ? | Faible | !Élevé | Toujours égal à celui du dollar | Indexé sur l'euro | Le Japon a gardé des taux proches de zéro (parfois négatifs) pendant des décennies : c'est la devise de financement du carry trade.
+3 | Marchés | Emprunter en yens pour placer en dollars : le carry est… | positif | !négatif | nul | il n'y a pas de carry sur les devises | On paie un taux faible et on touche un taux plus élevé ; le risque, c'est un brusque rebond du yen.
+2 | Dérivés | Long de tous les indices et, en plus, vendeur de puts : quel risque ? | On double l'exposition à la baisse : les puts vendus perdent quand les indices baissent | !On est parfaitement couvert | On devient neutre | On ne risque que la prime | Vendre des puts, c'est aussi une vue haussière : on cumule le risque au lieu de le couvrir.
+2 | Dérivés | Tu veux une exposition à la volatilité elle-même. Quel produit ? | Un variance swap (ou un future sur le VIX) | !Un future sur l'indice | Une obligation d'État | Un ETF actions | Le variance swap paie la variance réalisée contre un niveau fixé : pas besoin de couvrir le delta d'une option.
+
 `;
 
 // Questions à saisir au clavier : niveau | rubrique | question | réponse | marge | unité | pièges (séparés par « ; ») | explication
@@ -787,6 +834,67 @@ const RAW_NUM = `
 2 | Estimation | À 3 % d'inflation par an, combien d'années pour que les prix doublent ? | 24 | ±10% | ans | 33;10 | Règle de 72 : 72 / 3 = 24 ans (ln 2 / ln 1,03 ≈ 23,4).
 3 | Estimation | Combien de secondes en 100 ans ? | 3150000000 | ×1.3 | s | 31536000;315000000 | 100 × 3,15 × 10⁷ ≈ 3,15 milliards.
 3 | Estimation | 1 000 € placés à 7 % pendant 30 ans : valeur finale, environ ? | 7600 | ×1.3 | € | 3100;2100 | Le capital double tous les 10 ans environ (règle de 72) : 1 000 × 2³ ≈ 8 000 ; exactement 7 612 €. 3 100 € oublie les intérêts composés.
+# ---- Manches de calcul mental chronométré
+1 | Calcul | 25 × 8 ? | 200 | 0 | - | 180;208 | 25 × 4 = 100, donc 25 × 8 = 200.
+1 | Calcul | 10 % de 450 ? | 45 | 0 | - | 4,5;450 | Diviser par 10.
+1 | Calcul | 7 × 60 ? | 420 | 0 | - | 360;4200 | 7 × 6 = 42, puis un zéro.
+1 | Calcul | 1 000 − 387 ? | 613 | 0 | - | 713;623 | 387 + 613 = 1 000 : on complète à 400 (13), puis à 1 000 (600).
+1 | Calcul | 99 + 99 ? | 198 | 0 | - | 188;200 | 100 + 100 − 2.
+1 | Calcul | Double de 2 250 ? | 4500 | 0 | - | 4250;1125 | 2 000 × 2 + 250 × 2.
+1 | Calcul | 5 % de 1 200 ? | 60 | 0 | - | 600;120 | 10 % = 120, la moitié.
+1 | Calcul | 9 × 7 ? | 63 | 0 | - | 56;72 | 9 × 7 = 63.
+1 | Calcul | 50 × 14 ? | 700 | 0 | - | 650;7000 | 14 × 100 / 2.
+1 | Calcul | 20 % de 350 ? | 70 | 0 | - | 35;175 | 10 % = 35, fois 2.
+1 | Calcul | 8 × 8 ? | 64 | 0 | - | 56;16 | 8 × 8 = 64.
+1 | Calcul | Moitié de 1 850 ? | 925 | 0 | - | 950;825 | 1 800 / 2 + 50 / 2.
+1 | Calcul | 3 × 250 ? | 750 | 0 | - | 500;7500 | 250 + 250 + 250.
+1 | Calcul | 10 % de 7 300 ? | 730 | 0 | - | 73;7300 | Diviser par 10.
+1 | Calcul | 6 × 9 ? | 54 | 0 | - | 56;45 | 6 × 9 = 54.
+1 | Calcul | 400 + 380 + 220 ? | 1000 | 0 | - | 900;1100 | 380 + 220 = 600.
+1 | Calcul | 15 × 4 ? | 60 | 0 | - | 45;75 | 15 × 4 = 60.
+1 | Calcul | 1 % de 8 000 ? | 80 | 0 | - | 800;8 | Diviser par 100.
+1 | Calcul | 30 × 30 ? | 900 | 0 | - | 600;9000 | 3 × 3, puis deux zéros.
+1 | Calcul | Double de 460 ? | 920 | 0 | - | 820;230 | 400 × 2 + 60 × 2.
+1 | Calcul | 90 / 6 ? | 15 | 0 | - | 16;14 | 6 × 15 = 90.
+1 | Calcul | 25 % de 800 ? | 200 | 0 | - | 250;400 | Un quart.
+1 | Calcul | 7 + 8 + 9 + 6 ? | 30 | 0 | - | 29;31 | (7 + 8) + (9 + 6) = 15 + 15.
+1 | Calcul | 5 × 24 ? | 120 | 0 | - | 100;240 | 24 × 10 / 2.
+1 | Calcul | 100 − 37 − 13 ? | 50 | 0 | - | 63;76 | 37 + 13 = 50, et 100 − 50.
+2 | Calcul | 18 × 25 ? | 450 | 0 | - | 425;360 | 18 × 100 / 4.
+2 | Calcul | 850 augmenté de 12 % ? | 952 | 0 | - | 102;862 | 850 × 0,12 = 102, puis 850 + 102.
+2 | Calcul | 1 440 / 12 ? | 120 | 0 | - | 12;144 | 12 × 120 = 1 440.
+2 | Calcul | 35 × 35 ? | 1225 | 0 | - | 1205;1050 | Les carrés en 5 : 3 × 4 = 12, puis 25.
+2 | Calcul | 45 × 45 ? | 2025 | 0 | - | 2005;1825 | 4 × 5 = 20, puis 25.
+2 | Calcul | 7 % de 3 000 ? | 210 | 0 | - | 21;2100 | 1 % = 30, fois 7.
+2 | Calcul | Un prix passe de 80 à 100. Variation en % ? | 25 | 0 | % | 20;-20 | (100 − 80) / 80. 20 %, c'est en divisant par le prix d'arrivée.
+2 | Calcul | Un prix passe de 120 à 90. Variation en % ? | -25 | 0 | % | -30;-33,3 | (90 − 120) / 120 = −25 %.
+2 | Calcul | Un prix passe de 90 à 120. Variation en % ? | 33,3 | ±1% | % | 25;30 | 30 / 90 = un tiers.
+2 | Calcul | 250 × 16 ? | 4000 | 0 | - | 3000;4500 | 250 × 4 = 1 000, fois 4.
+2 | Calcul | 250 × 24 ? | 6000 | 0 | - | 5000;4800 | 1 000 × 6.
+2 | Calcul | 1/6 en pourcentage ? | 16,67 | ±1% | % | 6;15 | 100 / 6 ≈ 16,67 %.
+2 | Calcul | 144 × 11 ? | 1584 | 0 | - | 1444;1554 | 1 440 + 144.
+2 | Calcul | 153 × 11 ? | 1683 | 0 | - | 1663;1530 | 1 530 + 153.
+2 | Calcul | 1 200 diminué de 15 % ? | 1020 | 0 | - | 180;1185 | 15 % de 1 200 = 180.
+2 | Calcul | 45 × 12 ? | 540 | 0 | - | 450;560 | 45 × 10 + 45 × 2.
+2 | Calcul | 16 × 75 ? | 1200 | 0 | - | 1120;1050 | 16 × 3/4 de 100.
+2 | Calcul | 1 500 augmenté de 8 % ? | 1620 | 0 | - | 120;1508 | 8 % de 1 500 = 120.
+2 | Calcul | 2 700 / 15 ? | 180 | 0 | - | 1800;170 | 2 700 / 15 = 900 / 5.
+3 | Calcul | 3 points de base de 240 000 ? | 72 | 0 | - | 7200;720 | 1 bp = 0,01 % : 240 000 × 0,0003 = 72.
+3 | Calcul | 6 points de base de 630 000 ? | 378 | 0 | - | 3780;37,8 | 630 000 × 0,0006 = 378.
+3 | Calcul | +50 %, puis −50 %, puis +50 %. Variation totale en % ? | 12,5 | 0 | % | 50;0 | 1,5 × 0,5 × 1,5 = 1,125.
+3 | Calcul | +40 %, puis −40 %, puis +50 %. Variation totale en % ? | 26 | 0 | % | 50;-16 | 1,4 × 0,6 × 1,5 = 1,26.
+3 | Calcul | 17 × 18 ? | 306 | 0 | - | 296;316 | 17 × 18 = 17² + 17 = 289 + 17.
+3 | Calcul | 2 puissance 9 ? | 512 | 0 | - | 256;1024 | 2¹⁰ / 2.
+3 | Calcul | 4 × 256 ? | 1024 | 0 | - | 1000;1012 | 2² × 2⁸ = 2¹⁰.
+3 | Calcul | 7 854 + 997 ? | 8851 | 0 | - | 8841;8751 | 7 854 + 1 000 − 3.
+3 | Calcul | 6 754 + 9 680 ? | 16434 | 0 | - | 15434;16334 | 6 754 + 9 680 = 16 434.
+3 | Calcul | 875 / 25 ? | 35 | 0 | - | 3,5;350 | 875 × 4 / 100.
+3 | Calcul | 925 / 25 ? | 37 | 0 | - | 36;3,7 | 925 × 4 / 100.
+3 | Calcul | 13 × 13 × 4 ? | 676 | 0 | - | 576;169 | 169 × 4.
+3 | Calcul | 14 × 12 × 4 ? | 672 | 0 | - | 668;576 | 14 × 48.
+3 | Calcul | 1 % de 1 % de 3 millions ? | 300 | 0 | - | 30000;3000 | 1 % de 1 % = 0,01 %.
+3 | Calcul | 2 % de 2 % de 5 millions ? | 2000 | 0 | - | 200000;20000 | 2 % × 2 % = 0,04 %.
+
 `;
 
 const LEVEL_NAME = { 1: 'facile', 2: 'normal', 3: 'expert' };
@@ -803,6 +911,28 @@ function parseChoice(line, k) {
 
 // Réponse à saisir : « ±2% » (écart relatif), « ×3 » (ordre de grandeur : entre la valeur / 3 et × 3) ou « 0 » (exacte)
 const num = (t) => Number(String(t).replace(/\s/g, '').replace(',', '.'));
+// Questions « coche toutes les bonnes réponses » : niveau | rubrique | question | bonnes (;) | mauvaises (;) | explication
+const RAW_MULTI = `
+2 | Dérivés | Coche tous les paramètres qui jouent sur le prix d'une option. | Le cours du sous-jacent;Le strike;La volatilité;La maturité;Les taux d'intérêt;Les dividendes;Le taux de repo | Le volume échangé la veille;La capitalisation de l'entreprise | Sept paramètres : spot, strike, vol, maturité, taux, dividendes et repo (le coût d'emprunt du titre). Le volume et la taille de l'entreprise n'entrent pas dans le prix.
+2 | Probas | Coche les domaines des mathématiques utiles en finance de marché. | Probabilités;Statistiques;Calcul stochastique;Optimisation;Algèbre linéaire;Analyse numérique | Géométrie projective;Théorie des nœuds | Pricer, c'est des probabilités et du calcul stochastique ; gérer un portefeuille, de l'optimisation et de l'algèbre linéaire ; calculer, de l'analyse numérique.
+2 | Dérivés | Coche les positions dont le vega est positif. | Call acheté;Put acheté;Straddle acheté;Calendar spread acheté | Call vendu;Straddle vendu;Future sur indice;Action seule | Toute option achetée est longue de vega. Un future et une action n'ont pas de vega.
+2 | Dérivés | Coche ce qui fait monter le prix d'un call. | Hausse du sous-jacent;Hausse de la volatilité;Hausse des taux;Maturité plus longue | Dividende plus élevé;Strike plus haut;Baisse de la volatilité | Le dividende fait baisser le forward, un strike plus haut rend le call moins intéressant.
+2 | Dérivés | Coche ce qui fait monter le prix d'un put. | Baisse du sous-jacent;Hausse de la volatilité;Dividende plus élevé;Strike plus haut | Hausse des taux;Hausse du sous-jacent;Baisse de la volatilité | Les taux font monter le forward : le put y perd.
+2 | Dérivés | Future et forward : coche les affirmations vraies. | Le future est coté et standardisé;Le future a des appels de marge quotidiens;Le forward se négocie de gré à gré;Le forward porte un risque de contrepartie | Le forward est toujours moins cher;Le future donne un droit, sans obligation | Les deux engagent ferme. Le future passe par une chambre de compensation, le forward non.
+3 | Dérivés | Coche ce que contient un autocall classique. | Un coupon conditionnel;Un remboursement anticipé si l'indice est au-dessus d'un seuil;Un put vendu à barrière | Un call acheté sans limite;Une garantie du capital en toutes circonstances | Le client touche un coupon élevé parce qu'il vend un put à barrière : sous la barrière à l'échéance, il perd en capital.
+2 | Macro | Coche les missions de la BCE. | La stabilité des prix;Fixer les taux directeurs;Superviser les grandes banques de la zone euro | Fixer les impôts;Voter le budget des États;Fixer le SMIC | La stabilité des prix (inflation proche de 2 %) est son mandat principal ; la supervision bancaire date de 2014.
+2 | Marchés | Coche les causes de la crise de 2008. | Les crédits subprimes;Une titrisation opaque;Un levier excessif des banques;Des notations trop optimistes | La bulle internet;Le choc pétrolier de 1973 | La bulle internet, c'est 2000 ; le choc pétrolier, 1973.
+1 | Dérivés | Coche les produits dérivés. | Une option;Un future;Un swap;Un forward | Une action;Une obligation d'État;Un livret A | Un dérivé tire sa valeur d'un autre actif (le sous-jacent).
+3 | Taux | Coche ce qui fait baisser le prix d'une obligation à taux fixe. | Une hausse des taux;Une dégradation de la note de l'émetteur;Une hausse de l'inflation anticipée | Une baisse des taux;Une amélioration de la note | Le prix baisse quand le rendement exigé monte, que ce soit par les taux, le crédit ou l'inflation.
+2 | Dérivés | Coche les grecques d'une option. | Delta;Gamma;Vega;Thêta;Rhô | Sigma;Zêta | Sigma désigne la volatilité elle-même ; vega n'est pas une lettre grecque, mais c'est bien le nom de la sensibilité à la vol.
+1 | Corporate | Coche ce qui figure au passif du bilan. | Les capitaux propres;Les dettes financières;Les dettes fournisseurs | Les stocks;La trésorerie;Les créances clients | Le passif, c'est d'où vient l'argent ; l'actif, ce qu'on en a fait.
+3 | Dérivés | Coche ce qui rend un call américain plus cher qu'un call européen (mêmes caractéristiques). | Un dividende important avant l'échéance | Des taux nuls et aucun dividende;Une volatilité élevée seule | Sans dividende, on n'exerce jamais un call américain avant l'échéance : il vaut le même prix que l'européen.
+`;
+function parseMulti(line, k) {
+  const [lvl, cat, text, good, wrong, tip] = line.split(' | ').map((x) => x.trim());
+  return { id: 2000 + k, type: 'multi', level: LEVEL_NAME[lvl], tier: Number(lvl), cat, text, good: good.split(';'), wrong: wrong.split(';'), tip };
+}
+
 function parseNum(line, k) {
   const [lvl, cat, text, ans, margin, unit, traps, tip] = line.split(' | ').map((x) => x.trim());
   const m = margin.match(/^([±×])\s*([\d,.]+)\s*(%?)$/);
@@ -818,6 +948,7 @@ const lines = (raw) => raw.trim().split('\n').filter((l) => l.trim() && !l.start
 export const CHARTIER_QUESTIONS = [
   ...lines(RAW + '\n' + RAW_ENTRETIENS).map(parseChoice),
   ...lines(RAW_NUM).map(parseNum),
+  ...lines(RAW_MULTI).map(parseMulti),
 ];
 
 export function getQuestionsByLevel(level) {

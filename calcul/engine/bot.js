@@ -27,6 +27,19 @@ export function botAnswer(q, level, rnd = Math.random) {
   }
   // une mauvaise réponse tombe souvent dans le piège, comme un vrai candidat
   const trapped = !right && rnd() < 0.35;
+  if (q.input === 'multi') {
+    // un bot qui se trompe oublie une bonne réponse, ou en coche une de trop
+    if (right) return { delay: delay * 0.8 + 900, raw: q.answer.join(',') };
+    const extra = q.choices.map((_, k) => k).find((k) => !q.answer.includes(k));
+    return { delay: delay * 0.8 + 900, raw: (rnd() < 0.5 && q.answer.length > 1 ? q.answer.slice(1) : [...q.answer, extra]).join(',') };
+  }
+  if (q.input === 'text') {
+    // fat finger raté : deux caractères inversés
+    const t = String(q.answer);
+    if (right || t.length < 3) return { delay, raw: t };
+    const k = 1 + Math.floor(rnd() * (t.length - 2));
+    return { delay, raw: t.slice(0, k) + t[k + 1] + t[k] + t.slice(k + 2) };
+  }
   if (q.input === 'choice') {
     if (trapped && q.trap >= 0) return { delay: delay * 0.7 + 600, raw: String(q.trap) };
     return { delay: delay * 0.7 + 600, raw: String(right ? q.answer : (q.answer + 1 + Math.floor(rnd() * (q.choices.length - 1))) % q.choices.length) };

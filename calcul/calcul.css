@@ -889,3 +889,24 @@ button.cchoice.gone{display:none}
 .over-side .recap summary{position:sticky;top:-10px;z-index:1;padding:6px 0;background:inherit}
 .card.over.two .stats{font-size:13px}
 @media (max-width:900px){ .card.over.two .over-cols{display:block} .over-side .recap{max-height:none;margin-top:16px} }
+
+/* ------------------------------------------------------------------ fat finger, numéro affiché, réponses multiples */
+.copybox{margin:12px auto 4px;max-width:640px;padding:14px 18px;border-radius:12px;background:#05070b;border:2px dashed var(--gold);color:#f5f8fc;
+  font:700 clamp(18px,2.6vw,26px)/1.35 ui-monospace,'SF Mono',Menlo,Consolas,monospace;letter-spacing:1px;text-align:center;word-break:break-all;user-select:none;-webkit-user-select:none}
+.copybox.phone{font-size:clamp(26px,4vw,38px);letter-spacing:3px}
+.answer.fat input{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:20px;letter-spacing:1px;text-transform:uppercase}
+.multi-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 4px}
+.mchoice{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 12px;border-radius:12px;background:#0d111a;color:#eef3fa;border:2px solid var(--edge);
+  box-shadow:3px 3px 0 #000;font:700 15px/1.25 'Chakra Petch',sans-serif;text-align:left;cursor:pointer;animation:pop .35s calc(var(--k,0) * 50ms + 100ms) cubic-bezier(.2,1.5,.4,1) both}
+.mchoice .mbox{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:6px;border:2px solid var(--gold);color:#0c0e14;font-weight:900}
+button.mchoice.on{border-color:var(--gold2);background:#2a2412}
+button.mchoice.on .mbox{background:var(--gold2)}
+button.mchoice.on .mbox::after{content:'✓'}
+button.mchoice:disabled{cursor:default;opacity:.7}
+.multi-choices.rev .mchoice{cursor:default;animation:none}
+.multi-choices.rev .mchoice.good{border-color:var(--up);background:#0f2a1b}.multi-choices.rev .mchoice.good .mbox{background:var(--up);border-color:var(--up);color:#fff}
+.multi-choices.rev .mchoice.bad{border-color:var(--down);background:#2a1310}.multi-choices.rev .mchoice.bad .mbox{background:var(--down);border-color:var(--down);color:#fff}
+.multi-choices.rev .mchoice.dim{opacity:.45}
+.multi-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
+.multi-bar small{color:var(--dim)}
+@media (max-width:700px){ .multi-choices{grid-template-columns:1fr} }

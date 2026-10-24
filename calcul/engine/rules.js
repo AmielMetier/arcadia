@@ -162,6 +162,18 @@ export function check(q, raw) {
     if (!usesOnly(e.nums, q.nums)) return { ok: false, error: 'Utilise seulement les nombres proposés, une fois chacun' };
     return { ok: e.value.d === 1 && e.value.n === q.target, value: e.value.d === 1 ? e.value.n : e.value.n / e.value.d };
   }
+  if (q.input === 'multi') {
+    // indices cochés, séparés par des virgules : juste seulement si toutes les bonnes sont cochées, et rien d'autre
+    const picked = [...new Set(String(raw).split(',').map((x) => x.trim()).filter((x) => /^\d+$/.test(x)).map(Number))].filter((k) => k < q.choices.length).sort((a, b) => a - b);
+    if (!picked.length) return { ok: false, error: 'Coche au moins une réponse' };
+    return { ok: picked.join(',') === q.answer.join(','), value: picked };
+  }
+  if (q.input === 'text') {
+    // fat finger : à la lettre près, sans compter les espaces ni les majuscules
+    const norm = (t) => String(t).replace(/\s+/g, '').toUpperCase();
+    if (!norm(raw)) return { ok: false, error: 'Recopie ce qui est affiché' };
+    return { ok: norm(raw) === norm(q.answer), value: String(raw) };
+  }
   if (q.input === 'code') {
     if (!String(raw).trim()) return { ok: false, error: 'Écris ton code avant de l’envoyer' };
     return { ok: false, pending: true };
@@ -347,7 +359,7 @@ export function reveal(state, now) {
   // on finit l'entretien pour le score ; plus aucun humain en lice : terminé
   const standing = alive(s).length, humans = s.players.filter((p) => !p.bot);
   if (s.cfg.lives && (standing === 0 || !humans.some((p) => !p.out) || (humans.length > 1 && standing <= 1))) s.endEarly = true;
-  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
+  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' || q.input === 'multi' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
     isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, eliminated, tierEnd, endEarly: !!s.endEarly };
   s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema,
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
@@ -386,7 +398,7 @@ function revealDuel(state, now) {
     const a = s.answers[p.id], duelist = d.ids.includes(p.id);
     return { id: p.id, raw: a ? a.raw : null, ok: !!(a && a.ok), at: a ? a.at : null, pts: 0, tags: duelist && p.id === d.winner ? ['duel'] : [], out: !duelist };
   });
-  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: false, choices: q.choices, answer: q.input === 'choice' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
+  s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: false, choices: q.choices, answer: q.input === 'choice' || q.input === 'multi' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
     isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, eliminated: [], tierEnd: null, endEarly: d.winner != null, duel: { ...d } };
   s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: 0, unit: q.unit, duel: true,
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
@@ -423,6 +435,8 @@ export function describeAnswer(q, raw) {
   if (q && q.input === 'choice') return q.choices[Number(raw)] ?? String(raw);
   if (q && q.input === 'expr') return String(raw).replace(/\*/g, '×');
   if (q && q.input === 'code') return String(raw);
+  if (q && q.input === 'multi') return String(raw).split(',').map((k) => 'ABCDEFGHIJ'[Number(k)] || '?').join(', ');
+  if (q && q.input === 'text') return String(raw);
   const n = parseNumber(raw);
   return n == null ? String(raw) : fmt(n);
 }

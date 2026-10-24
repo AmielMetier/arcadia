@@ -6,6 +6,7 @@ import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
 import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
 import { STRATS, payoffAt } from '../calcul/engine/charts.js';
+import { PHONES, FAT_FINGER } from '../calcul/engine/drills.js';
 import { spawnSync } from 'node:child_process';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
@@ -43,6 +44,18 @@ t('les questions sont reproductibles et justes', () => {
       if (q.lang === 'sql') assert.ok(q.input === 'code' && !q.fn && q.starter && q.tests.length === 3 && q.examples.length === 1 && q.time === 120, q.text);
       else assert.ok(q.input === 'code' && q.fn && q.starter && q.tests.length >= 4 && q.examples.length === 2 && q.time === 120, q.text);
       assert.ok(!check(q, '').ok && check(q, 'def f(): pass').pending);
+      continue;
+    }
+    if (q.kind === 'fatfinger') {
+      assert.ok(q.input === 'text' && q.copy && q.answer === q.copy && check(q, q.copy).ok, q.copy);
+      assert.ok(check(q, q.copy.toLowerCase().replace(/\s/g, '')).ok, 'espaces et majuscules ignorés');
+      assert.ok(!check(q, q.copy.slice(0, -1)).ok, 'il manque un caractère');
+      continue;
+    }
+    if (q.kind === 'chartier-multi') {
+      assert.ok(q.input === 'multi' && q.answer.length >= 1 && q.answer.length < q.choices.length, q.text);
+      assert.ok(check(q, q.answer.join(',')).ok && check(q, [...q.answer].reverse().join(',')).ok, 'ordre indifférent');
+      assert.ok(!check(q, q.answer.slice(1).join(',') || '99').ok, 'il en manque une');
       continue;
     }
     if (q.kind === 'chartier-num') {
@@ -259,7 +272,7 @@ t('bots saboteurs : visent le meneur', () => {
 t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur', () => {
   const pos = [0, 0, 0, 0];
   for (let i = 0; i < 4000; i++) { const q = makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15); if (q.kind === 'chartier') pos[q.answer]++; }
-  for (const n of pos) assert.ok(n > 600, `bonne réponse trop souvent au même endroit : ${pos}`);
+  for (const n of pos) assert.ok(n > 0.2 * pos.reduce((x, y) => x + y, 0), `bonne réponse trop souvent au même endroit : ${pos}`);
   assert.deepEqual([0, 5, 9, 13, 14].map((i) => chartierTier(1, i, 15)), [1, 2, 2, 3, 3]);
   assert.equal(chartierTier(0, 9, 10), 2); assert.equal(chartierTier(0, 0, 10), 1);
   assert.equal(chartierTier(2, 0, 10), 2); assert.equal(chartierTier(2, 9, 10), 3);
@@ -475,9 +488,9 @@ t('The Candidate : trois bonnes réponses d\'affilée rendent un cœur, sans dé
 t('The Candidate : piège plus cher à chaque tour, estimation presque juste sans perte de vie', () => {
   const players = [0, 1].map((id) => ({ id, name: 'P' + id }));
   // une question à choix de chaque tour, avec piège
-  for (const tier of [1, 2, 3]) {
-    let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0 }, seed: 40 + tier, now: 0 });
-    let now = 0, done = false;
+  for (const tier of [1, 2, 3]) for (let seed = 40 + tier, done = false; !done && seed < 140; seed += 7) {
+    let s = createGame({ players, cfg: { mode: 'chartier', len: 15, cut: 0, code: 0, duel: 0 }, seed, now: 0 });
+    let now = 0;
     while (!done && s.phase !== 'over') {
       s = nextQuestion(s, now); if (s.phase === 'over') break;
       const q = fullQuestion(s);
@@ -490,7 +503,7 @@ t('The Candidate : piège plus cher à chaque tour, estimation presque juste san
       } else s = play(s, { 0: 'good', 1: 'good' }, now);
       now += 1e5;
     }
-    assert.ok(done, `piège trouvé au tour ${tier}`);
+    if (seed + 7 >= 140) assert.ok(done, `piège trouvé au tour ${tier}`);
   }
   // presque juste : marge ±10 %, réponse à +15 %
   const q = { input: 'num', isChartier: true, answer: 100, tol: 0.1, tolMode: 'rel' };
@@ -544,6 +557,37 @@ t('The Candidate : modules par métier, rubriques orientées', () => {
   assert.ok(quant['Probas'] > gen['Probas'] * 2, 'quant : probabilités');
   assert.equal(createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', module: 'nimporte' }, seed: 1, now: 0 }).cfg.module, 'gen');
   assert.equal(createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'classic', module: 'quant' }, seed: 1, now: 0 }).cfg.module, 'gen');
+});
+
+t('The Candidate : fat finger, numéro de téléphone, réponses multiples', () => {
+  const kinds = {};
+  for (let i = 0; i < 6000; i++) { const q = makeQuestion(i * 7919 + 13, i % 15, 'chartier', 'normal', 0, 15); kinds[q.kind] = (kinds[q.kind] || 0) + 1;
+    if (q.kind === 'phone') {
+      const digits = [...q.copy.replace(/\D/g, '')].map(Number), sum = digits.reduce((a, b) => a + b, 0);
+      assert.ok(/^0[67]( \d\d){4}$/.test(q.copy), q.copy);
+      assert.equal(q.answer, /53/.test(q.text) ? sum * 53 : sum);
+    }
+  }
+  assert.ok(kinds.fatfinger > 150 && kinds.phone > 60 && kinds['chartier-multi'] > 20, JSON.stringify(kinds));
+  assert.equal(FAT_FINGER.length, 80); assert.equal(new Set(FAT_FINGER.map((f) => f.text)).size, 80);
+  assert.equal(PHONES.length, 50); assert.equal(new Set(PHONES).size, 50);
+  // une partie : la question à cocher compte juste, la mauvaise sélection coûte une vie
+  const g = (cfg) => createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, ...cfg }, seed: 3, now: 0 });
+  let s = g({}), now = 0, seen = 0;
+  while (s.phase !== 'over' && seen < 2) {
+    s = nextQuestion(s, now); if (s.phase === 'over') break;
+    const q = fullQuestion(s);
+    if (q.input === 'multi' || q.input === 'text') {
+      seen++;
+      const lives = s.players[0].lives, raw = q.input === 'multi' ? q.answer.slice(1).join(',') || String(q.choices.length - 1) : q.answer + 'X';
+      s = reveal(answer(s, { by: 0, raw, idx: s.idx, now: now + 500 }).state, now + 1000);
+      assert.equal(s.players[0].lives, lives - 1, `${q.kind} raté : une vie`);
+    } else s = play(s, { 0: 'good' }, now);
+    now += 1e5;
+  }
+  // un bot qui se trompe ne tombe pas juste par hasard
+  const mq = { input: 'multi', choices: ['a', 'b', 'c', 'd'], answer: [0, 2], time: 20, isChartier: true, tier: 2 };
+  for (let k = 0; k < 50; k++) { const b = botAnswer(mq, 'facile'); if (b && b.raw !== '0,2') assert.ok(!check(mq, b.raw).ok); }
 });
 
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {

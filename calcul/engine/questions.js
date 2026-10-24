@@ -14,6 +14,7 @@ import { getQuestionsByLevel } from './chartier-data.js';
 import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS } from './code-data.js';
 import { chartQuestion, CHART_P } from './charts.js';
 import { schemaFor } from './schemas.js';
+import { PHONES, FAT_FINGER } from './drills.js';
 
 export const CATS = {
   base:     { label: 'Calcul',            pts: 1, color: '#2b8cff', icon: '±' },
@@ -812,7 +813,28 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
     const c = chartQuestion(r, tier, module);
     if (c) return { ...c, ...head(c.rubric), sub: `Lecture de graphique · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 12 };
   }
+  // fat finger : recopier exactement un code, un IBAN, un montant (environ une question sur seize)
+  if (r.next() < 0.06) {
+    const pool = FAT_FINGER.filter((f) => f.tier === tier), f = pick(r, pool);
+    return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, sub: `Fat finger · ${f.label} · ${TIER_LABEL[tier]}`,
+      answer: f.text, show: f.text, ...head('Fat finger'), time: 8 + Math.ceil(f.text.length / 2.2), eq: false,
+      tip: 'Sur un desk, une faute de frappe dans un montant ou un code coûte cher : on relit avant de valider. Les espaces ne comptent pas.' };
+  }
+  // la somme des chiffres d'un numéro de téléphone (et, au comité, fois 53)
+  if (r.next() < 0.03) {
+    const ph = pick(r, PHONES), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0), x53 = tier === 3;
+    return { kind: 'phone', text: x53 ? 'Somme des chiffres de ce numéro, multipliée par 53 ?' : 'Somme des chiffres de ce numéro ?', copy: ph, ...head('Calcul'), eq: false,
+      answer: x53 ? sum * 53 : sum, time: x53 ? CH_TIME[tier] + 14 : CH_TIME[tier] + 6,
+      tip: x53 ? `Somme : ${sum}. Puis ${sum} × 53 = ${sum} × 50 + ${sum} × 3 = ${sum * 50} + ${sum * 3} = ${sum * 53}.` : `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}. On regroupe par paires pour aller plus vite.` };
+  }
   const q = bankPick(r, tier, M);
+  if (q.type === 'multi') {
+    // « coche toutes les bonnes réponses » : il faut toutes les bonnes, et aucune mauvaise
+    const choices = r.shuffle([...q.good, ...q.wrong]);
+    return { kind: 'chartier-multi', input: 'multi', text: q.text, ...head(q.cat), sub: `${q.cat} · ${TIER_LABEL[tier]} · plusieurs réponses`,
+      choices, answer: q.good.map((g) => choices.indexOf(g)).sort((a, b) => a - b), show: q.good.join(' · '), tip: q.tip, schema: schemaFor(q.text),
+      time: CH_TIME[tier] + 8 + choices.length * 2 };
+  }
   if (q.type === 'num') {
     return {
       kind: 'chartier-num', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip), sub: `${q.cat} · ${TIER_LABEL[tier]}${q.unit ? ' · réponse en ' + q.unit : ''}`,
@@ -883,7 +905,7 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
   return {
     cat, kind: q.kind, text: q.text, sub: q.sub || '',
     eq: q.eq !== false && !q.choices && !q.fig,
-    input: q.choices ? 'choice' : q.input || 'num',
+    input: q.input || (q.choices ? 'choice' : 'num'),
     time: q.time || (TIME[cat] ? TIME[cat][d] : 20),
     answer: q.answer, tol: q.tol || 0, show: q.show || (q.choices ? q.choices[q.answer] : fmt(q.answer)), tip: q.tip || '',
     nums: q.nums || null, target: q.target ?? null, sol: q.sol || null, choices: q.choices || null, fig: q.fig || null,
@@ -891,7 +913,7 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
     // piège (index du choix, ou valeurs à saisir), ordre de grandeur, unité, et l'épreuve de code
     trap: q.trap ?? -1, traps: q.traps || [], tolMode: q.tolMode || 'rel', unit: q.unit || '',
     prompt: q.prompt || null, starter: q.starter || null, fn: q.fn || null, tests: q.tests || null, examples: q.examples || null, codeId: q.codeId || null,
-    lang: q.lang || null, ordered: q.ordered !== false, bug: !!q.bug, snippet: q.snippet || null, schema: q.schema || null,
+    lang: q.lang || null, ordered: q.ordered !== false, bug: !!q.bug, snippet: q.snippet || null, schema: q.schema || null, copy: q.copy || null,
     key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
   };
 }
@@ -899,4 +921,4 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
 // Ce que voient les joueurs pendant la question (sans la réponse)
 // (ni la bonne réponse, ni le piège, ni les tests cachés du code)
 export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, tolMode: q.tolMode, unit: q.unit, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric,
-  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet });
+  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet, copy: q.copy });
