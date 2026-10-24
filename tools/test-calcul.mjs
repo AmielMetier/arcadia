@@ -4,7 +4,7 @@ import { makeQuestion, planCats, CATS, DIFFS, THEMES, KINDS, chartierTier } from
 import { CHARTIER_QUESTIONS } from '../calcul/engine/chartier-data.js';
 import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
-import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
+import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
 import { STRATS, payoffAt } from '../calcul/engine/charts.js';
 import { PHONES, FAT_FINGER } from '../calcul/engine/drills.js';
 import { spawnSync } from 'node:child_process';
@@ -606,6 +606,15 @@ t('The Candidate : épreuves Python et SQL réglables séparément', () => {
   assert.deepEqual(langs({ sql: 0 }), ['python']);
   assert.deepEqual(langs({ code: 0 }), ['sql']);
   assert.ok(!createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, sql: 0 }, seed: 1, now: 0 }).cats.includes('code'), 'ni Python ni SQL : pas d\'épreuve');
+});
+
+t('Java : lire du code, choix distincts, et des questions qui sortent en partie', () => {
+  assert.equal(JAVA_READ.length, 20);
+  for (const q of JAVA_READ) assert.ok(q.lang === 'java' && !q.wrong.includes(q.good) && new Set(q.wrong).size === 3, q.code);
+  let java = 0, concepts = 0;
+  for (let i = 0; i < 8000; i++) { const q = makeQuestion(i * 7919 + 29, i % 15, 'chartier', 'normal', 0, 15, 'quant'); if (q.lang === 'java') java++; if (q.rubric === 'Java') concepts++; }
+  assert.ok(java > 50, `programmes Java tirés : ${java}`);
+  assert.equal(CHARTIER_QUESTIONS.filter((q) => q.cat === 'Java').length, 12);
 });
 
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {

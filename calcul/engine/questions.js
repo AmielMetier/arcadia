@@ -11,7 +11,7 @@
 import { rngOf } from './rng.js';
 import { evalExpr } from './expr.js';
 import { getQuestionsByLevel } from './chartier-data.js';
-import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS } from './code-data.js';
+import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ } from './code-data.js';
 import { chartQuestion, CHART_P } from './charts.js';
 import { schemaFor } from './schemas.js';
 import { PHONES, FAT_FINGER } from './drills.js';
@@ -891,10 +891,12 @@ function code(r, d, i = 0, len = 10, module = 'gen', { python = true, sql: sqlOn
 
 // « Que va afficher ce programme ? » : une question à choix, glissée dans l'entretien (plus souvent en quant)
 function readCode(r, tier) {
-  const pool = READ_QUESTIONS.filter((q) => q.level === tier);
-  const q = pick(r, pool.length ? pool : READ_QUESTIONS);
+  // Python ou Java, à peu près autant l'un que l'autre
+  const bank = r.next() < 0.45 ? JAVA_READ : READ_QUESTIONS;
+  const pool = bank.filter((q) => q.level === tier);
+  const q = pick(r, pool.length ? pool : bank);
   const choices = r.shuffle([q.good, ...q.wrong]);
-  return { kind: 'code-read', text: 'Que va afficher ce programme ?', snippet: q.code, choices, answer: choices.indexOf(q.good), trap: choices.indexOf(q.wrong[0]), show: q.good, tip: q.tip };
+  return { kind: 'code-read', text: q.lang === 'java' ? 'Que va afficher ce programme Java ?' : 'Que va afficher ce programme ?', snippet: q.code, lang: q.lang || 'python', choices, answer: choices.indexOf(q.good), trap: choices.indexOf(q.wrong[0]), show: q.good, tip: q.tip };
 }
 
 const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code };

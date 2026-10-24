@@ -438,7 +438,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     if (q.input === 'expr') return `<div class="target"><small>Cible</small><b>${q.target}</b></div>
       <div class="tiles">${q.nums.map((n, k) => `<button class="tile" data-n="${n}" data-k="${k}" style="--k:${k}">${n}</button>`).join('')}</div>`;
     const cls = q.isChartier ? 'cand' : q.cat === 'devinette' ? 'riddle' : q.fig ? 'geo' : q.text.length > 16 ? 'long' : '';
-    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>${q.snippet ? `<pre class="code-snip">${highlightPy(q.snippet)}</pre>` : ''}${q.copy ? `<div class="copybox${q.kind === 'phone' ? ' phone' : ''}" aria-label="À lire">${esc(q.copy)}</div>` : ''}`;
+    return `${q.fig ? figureSvg(q.fig) : ''}<div class="qtext ${cls}">${qText(q.text)}${q.eq !== false ? '<span class="eq"> = ?</span>' : ''}</div>${q.snippet ? `<pre class="code-snip">${highlightCode(q.snippet, q.lang)}</pre>` : ''}${q.copy ? `<div class="copybox${q.kind === 'phone' ? ' phone' : ''}" aria-label="À lire">${esc(q.copy)}</div>` : ''}`;
   }
 
   const LETTERS = ['A', 'B', 'C', 'D'];
@@ -487,7 +487,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   function renderQuestion() {
     const q = S.q, cat = CATS[q.cat];
     const ch = !!q.isChartier;
-    if (ch) { wallStreetMusic.setMode(q.final ? 'final' : 'question'); wallStreetMusic.start(); }
+    // la musique monte d'un cran à chaque tour : premier tour, desk, comité final, et le face-à-face au sommet
+    if (ch) { wallStreetMusic.setMode(duelOn() ? 'duel' : q.final || q.tier === 3 ? 'final' : q.tier === 2 ? 'desk' : 'question'); wallStreetMusic.start(); }
     myAns = null; lastTick = -1;
     const curses = myCurses();
     const head = ch
@@ -764,7 +765,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(ch ? h.rubric || cat.label : cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.idx + 1} / ${S.cfg.len}</span></div>
         ${ch ? '<div class="rv-cols"><div class="rv-l">' : ''}
         ${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}
-        <div class="qrecall">${recall}</div>${L.snippet ? `<pre class="code-snip mini">${highlightPy(L.snippet)}</pre>` : ''}
+        <div class="qrecall">${recall}</div>${L.snippet ? `<pre class="code-snip mini">${highlightCode(L.snippet, L.lang)}</pre>` : ''}
         ${answerHtml}
         ${ch ? '</div><div class="rv-r">' : verdict}
         ${mine && mine.gained ? '<div class="gotlife"><b>♥</b> Trois d\'affilée : tu récupères une vie !</div>' : ''}

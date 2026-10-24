@@ -1,6 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.36 — 23 octobre 2026
+- **Tête de Calcul** — The Candidate monte en pression.
+  - La musique s'intensifie à chaque tour : classique au premier tour, une ligne qui monte au desk, plus tendue au comité final, et au sommet de l'adrénaline pendant le face-à-face.
+  - Fat finger : les espaces et les majuscules comptent, au caractère près.
+  - Les épreuves Python et SQL se désactivent séparément dans les réglages.
+  - Nouvelles questions de programmation objet en Java : classes, constructeurs, getters, setters, toString…
 - **Tête de Calcul** — The Candidate passe en grand format.
   - Une scène d'ouverture : l'ascenseur monte au 40e, les portes s'ouvrent, et Pierre Chartier accueille chaque joueur par son nom, avec sa vraie voix et sa photo en grand.
   - Pierre réagit pendant les questions : une phrase pour lancer la question, une relance quand on tarde, un mot quand un adversaire a déjà répondu.
