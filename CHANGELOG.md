@@ -18,6 +18,8 @@
   - Questions à cocher : il faut cocher toutes les bonnes réponses, et aucune mauvaise.
   - Fat finger : recopier sans erreur un code, un IBAN, un ordre ou une liste de montants (80 exercices).
   - Somme des chiffres d'un numéro de téléphone affiché (et, au comité, fois 53).
+  - Une centaine de questions de dérivés en plus : grecques de second ordre (vanna, volga, charm), Black-Scholes, skew et structure par terme, exotiques, variance et volatility swaps, VIX, P&L par les grecques, caps et swaptions, options de change, développement delta-gamma, mouvement brownien et processus stochastiques.
+  - Dans les QCM, la bonne réponse ne se repère plus à sa longueur : les choix ont été réécrits pour être de taille comparable.
   - Trois manches de calcul mental rapide : tables, pourcentages, points de base, enchaînements de variations.
 - **Tête de Calcul** — Le poste à pourvoir se choisit dans le salon : généraliste, trading, M&A, quant ou risques. Les questions suivent le métier.
 - **Tête de Calcul** — Face-à-face final : les deux meilleurs encore en lice s'affrontent en mort subite. La première bonne réponse gagne, la première erreur perd.

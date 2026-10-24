@@ -590,6 +590,14 @@ t('The Candidate : fat finger, numéro de téléphone, réponses multiples', () 
   for (let k = 0; k < 50; k++) { const b = botAnswer(mq, 'facile'); if (b && b.raw !== '0,2') assert.ok(!check(mq, b.raw).ok); }
 });
 
+t('QCM : la bonne réponse ne se repère pas à sa longueur', () => {
+  const Q = CHARTIER_QUESTIONS.filter((q) => q.type === 'choice'), L = (q) => Math.max(...q.wrong.map((w) => w.length));
+  const tell = Q.filter((q) => q.good.length >= 20 && q.good.length > 1.5 * L(q));
+  assert.deepEqual(tell.map((q) => q.text), [], 'bonne réponse bien plus longue que toutes les autres');
+  const longest = Q.filter((q) => q.good.length > L(q)).length / Q.length;
+  assert.ok(longest < 0.32, `la bonne réponse est la plus longue dans ${Math.round(longest * 100)} % des QCM`);
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });
