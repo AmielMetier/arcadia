@@ -174,3 +174,4 @@ body:has(#play.on) .musicbar{display:none}
 .news code{background:var(--cream);border-radius:4px;padding:0 4px;font-size:13px}
 
 .sethint{font-size:13px;color:var(--muted,#6d675c);padding:6px 2px}
+[data-ping].slow{color:#c62a12;font-weight:700;cursor:help}

@@ -7,7 +7,8 @@
      HubBridge.players / readyMap       joueurs du salon / { id: jeu prêt }
      HubBridge.on('init'|'roster'|'msg', fn)
      HubBridge.signalReady()            ce jeu écoute : les autres peuvent lui parler
-     HubBridge.send(to, m)              to = id de joueur, 'host' ou 'all'
+     HubBridge.send(to, m, opts)        to = id de joueur, 'host' ou 'all' ; opts.volatile : instantané d'état continu
+                                        (sauté si la connexion sature, seul le plus récent est livré)
      HubBridge.exit()                   retour au salon
      HubBridge.patchNet(Net)            remplace un objet Net façon Duo Drift par le canal du Hub */
 (function () {
@@ -27,7 +28,7 @@
     if (k === 'init' && H.initDone) setTimeout(() => fn(H.info), 0);
   };
   H.signalReady = () => post({ k: 'ready' });
-  H.send = (to, m) => post({ k: 'send', to, m });
+  H.send = (to, m, opts) => post(opts && opts.volatile ? { k: 'send', to, m, v: 1 } : { k: 'send', to, m });
   H.exit = () => post({ k: 'exit' });
   // Fin de partie : le jeu de l'hôte transmet le classement au Hub (historique et classement entre potes)
   H.report = (r) => post({ k: 'result', r });
@@ -89,9 +90,9 @@
         H.signalReady();
         H.on('init', sync);
       },
-      toHost(m) { H.send('host', m); },
-      to(cid, m) { H.send(Number(String(cid).slice(1)), m); },
-      bcast(m, except) { for (const id of joined) if ('p' + id !== except) H.send(id, m); },
+      toHost(m, vol) { H.send('host', m, { volatile: !!vol }); },
+      to(cid, m, vol) { H.send(Number(String(cid).slice(1)), m, { volatile: !!vol }); },
+      bcast(m, except, vol) { for (const id of joined) if ('p' + id !== except) H.send(id, m, { volatile: !!vol }); },
       drop(cid) { const id = Number(String(cid).slice(1)); H.send(id, { t: 'bye' }); Net._drop(cid); },
       _drop(cid) { const id = Number(String(cid).slice(1)); if (joined.delete(id) && cb && cb.leave) cb.leave(cid); },
       close() { cb = null; Net.cb = null; Net.hostLink = null; Net.role = null; joined.clear(); opened = false; },

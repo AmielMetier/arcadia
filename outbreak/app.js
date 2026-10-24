@@ -157,7 +157,8 @@ function hostFrame(dt) {
   const snap = sim.snapshot(); snap.run = S.runId;
   if (H.embedded && H.players.length > 1 && S.tick - (S.lastSend || 0) >= 3) {
     S.lastSend = S.tick;
-    H.send('all', { t: 's', s: snap, e: S.netEv }); S.netEv = [];
+    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature, seul le plus récent est livré
+    H.send('all', { t: 's', s: snap, e: S.netEv }, { volatile: !S.netEv.length }); S.netEv = [];
   }
   S.last = snap;
   const view = buildView(snap, snap, 0, dt);

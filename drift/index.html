@@ -2986,9 +2986,9 @@ function updateRace(dt, now){
   r.feed=r.feed.filter(f=>now-f.t<9000);
   // réseau (25 Hz)
   if(now-r.lastSend>40){ r.lastSend=now;
-    if(G.mode==='guest' && me && !me.out) Net.toHost({t:'s', d:packState(me)});
+    if(G.mode==='guest' && me && !me.out) Net.toHost({t:'s', d:packState(me)}, true); // volatil : seul le dernier compte
     else if(G.mode==='host'){ const msg={t:'S', c:r.list.filter(c=>!c.left && !c.out && (c.sim||c.raw)).map(c=>c.sim?packState(c):c.raw)};
-      if(r.ball) msg.b=[r1(r.ball.x),r1(r.ball.y),r1(r.ball.vx),r1(r.ball.vy)]; Net.bcast(msg); }
+      if(r.ball) msg.b=[r1(r.ball.x),r1(r.ball.y),r1(r.ball.vx),r1(r.ball.vy)]; Net.bcast(msg, undefined, true); }
   }
   if(isHost() && go && !r.ending) hostLogic(r,now);
   const thr = me && !me.finished && !me.out ? Math.max(myIn.up?1:0, myIn.thr||0) : 0.15;

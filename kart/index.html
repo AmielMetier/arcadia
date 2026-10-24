@@ -4792,8 +4792,8 @@ const H = window.HubBridge || { embedded: false, info: { role: 'solo', myId: 0, 
 const NET = {
   role: 'solo', myId: 0, hostId: 0, online: false, offset: 0, rtt: 999, players: [],
   get isHost() { return this.role !== 'guest'; },
-  toHost(m) { if (this.role === 'guest') H.send('host', m); },
-  broadcast(m) { if (this.role === 'host') H.send('all', m); },
+  toHost(m, vol) { if (this.role === 'guest') H.send('host', m, { volatile: !!vol }); },
+  broadcast(m, vol) { if (this.role === 'host') H.send('all', m, { volatile: !!vol }); },
   sendTo(id, m) { if (this.role === 'host') H.send(id, m); },
   hostNow() { return nowMs() + (this.role === 'guest' ? this.offset : 0); },
   sendHit(k, type) { if (k.ownerId != null) this.sendTo(k.ownerId, { t: 'hit', type }); },
@@ -4935,10 +4935,10 @@ function netTick(dt) {
   }
   if (!NET.online || !karts.length || !['intro', 'countdown', 'race', 'finished', 'results'].includes(race.state)) return;
   netAcc += dt; if (netAcc < 1 / CFG.NET_HZ) return; netAcc = 0;
-  if (NET.role === 'guest') { if (player) { const s = player.netPack(); s.push(trailCodeOf(player)); NET.toHost({ t: 'k', T: race.time, s }); } return; }
+  if (NET.role === 'guest') { if (player) { const s = player.netPack(); s.push(trailCodeOf(player)); NET.toHost({ t: 'k', T: race.time, s }, true); } return; }
   const rows = karts.map((k) => { const s = k.remote ? (k.netBuf.length ? k.netBuf[k.netBuf.length - 1].s.slice(0, 16) : k.netPack()) : k.netPack(); return [k.idx, ...s, k.remote ? k.trailCode | 0 : trailCodeOf(k)]; });
   const bx = []; boxes.forEach((b, i) => { if (!b.alive) bx.push(i); });
-  NET.broadcast({ t: 'snap', T: race.time, k: rows, e: packEnts(), bx });
+  NET.broadcast({ t: 'snap', T: race.time, k: rows, e: packEnts(), bx }, true); // instantané : seul le plus récent compte
 }
 const trailCodeOf = (k) => (k.item === 'banana3' ? 1 : k.item === 'shell3' ? 2 : 0);
 

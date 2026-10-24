@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.42 — 24 octobre 2026
+- **Tous les jeux** — Fini les joueurs coincés à 1 500 ms de ping avec une bonne connexion :
+  - Quand la connexion d'un joueur ne suit plus le flux de la partie (wifi chargé, débit un peu juste, micro-coupure), les images de la partie s'empilaient dans une file d'attente qui ne se vidait jamais : il jouait avec plusieurs secondes de retard. Le serveur mesure maintenant le retard de chaque joueur quatre fois par seconde et, s'il prend du retard, lui saute les images périmées pour ne garder que la plus récente. En test, un joueur dont la connexion ne suivait pas passait de 3 secondes de retard (et ça montait) à environ 0,2 seconde.
+  - L'hôte envoie chaque image une seule fois pour tout le salon au lieu d'une fois par joueur : beaucoup moins de débit montant chez l'hôte, et moins de travail pour le serveur.
+  - Un ordinateur qui rame ne rattrape plus une file d'images en retard : il passe directement à la plus récente.
+  - Dans le salon, un gros ping indique sa cause au survol : « PC saturé » (l'ordinateur n'arrive pas à suivre), « onglet caché » (le jeu n'est pas au premier plan) ou « réseau ».
+
 ## 2.41 — 24 octobre 2026
 - **Outbreak** — Mode Défense rééquilibré : les tourelles ne font plus tout le travail.
   - Les tourelles posées dans le fort tirent moins vite, moins fort et moins loin, coûtent 34 de ferraille, durent deux vagues, et on ne peut en avoir que deux à la fois.

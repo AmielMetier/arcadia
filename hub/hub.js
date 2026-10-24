@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.41';
+  const VERSION = '2.42';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -207,6 +207,7 @@
       migrating(info) { toast(info.me ? "L'hôte est parti : tu deviens l'hôte…" : `L'hôte est parti : ${info.name} reprend le salon…`, 5000); },
       migrated() { toast('Salon rétabli, la partie continue', 3000); renderRoom(); syncFrame(); postRoster(); },
     });
+    if (new URLSearchParams(location.search).has('debug')) window.__room = room; // tests
   }
   setInterval(() => { if (room) { room.tick(performance.now()); renderPings(); } }, 2000);
 
@@ -225,13 +226,23 @@
   };
   $('#btnRejoin').onclick = () => { leftGame = null; syncFrame(); };
 
+  // Pourquoi un joueur a un gros ping : son ordinateur rame, son onglet est en arrière-plan, ou sa connexion
+  function pingCause(v, d) {
+    if (v == null || v < 250 || !d) return null;
+    if (d.hid) return { short: 'onglet caché', long: "Le jeu n'est pas au premier plan chez ce joueur : le navigateur le ralentit volontairement." };
+    if (d.lag > 60) return { short: 'PC saturé', long: `L'ordinateur de ce joueur n'arrive pas à suivre (${d.lag} ms de retard à chaque image) : fermer d'autres onglets ou applications, brancher le portable sur secteur, ou passer en plateau classique quand le jeu le propose.` };
+    return { short: 'réseau', long: `La connexion de ce joueur au serveur est lente (${d.net || '?'} ms aller-retour) : wifi chargé ou éloigné, partage de connexion…` };
+  }
   function renderPings() {
     if (!room) return;
     for (const el of document.querySelectorAll('[data-ping]')) {
-      const v = room.pings[el.dataset.ping]; el.textContent = v != null ? Math.round(v) + ' ms' : '';
+      const id = el.dataset.ping, v = room.pings[id], c = pingCause(v, room.diag[id]);
+      el.textContent = v != null ? Math.round(v) + ' ms' + (c ? ' · ' + c.short : '') : '';
+      el.title = c ? c.long : '';
+      el.classList.toggle('slow', !!c);
     }
     if (frame && frame.loaded) {
-      frame.el.contentWindow.postMessage({ dd: 'hub', k: 'pings', pings: room.pings }, ORIGIN);
+      frame.el.contentWindow.postMessage({ dd: 'hub', k: 'pings', pings: room.pings, diag: room.diag }, ORIGIN);
     }
   }
 
@@ -359,7 +370,7 @@
         } }, ORIGIN);
         break;
       case 'ready': room.setReady(frame.game); break;
-      case 'send': room.sendGame(d.to, d.m); break;
+      case 'send': room.sendGame(d.to, d.m, !!d.v); break;
       case 'result': recordResult(frame.game, d.r); break;
       case 'exit':
         if (room.isHost) room.setGame(null);

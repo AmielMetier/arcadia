@@ -146,7 +146,8 @@ function hostFrame(dt) {
   // 20 Hz ; l'état final part tout de suite pour que tout le monde voie la fin en même temps
   if (H.embedded && H.players.length > 1 && (S.tick - S.lastSend >= 3 || (snap.ph !== 'play' && !S.sentOver))) {
     S.lastSend = S.tick; if (snap.ph !== 'play') S.sentOver = true;
-    H.send('all', { t: 's', s: snap, e: S.netEv }); S.netEv = [];
+    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature, seul le plus récent est livré
+    H.send('all', { t: 's', s: snap, e: S.netEv }, { volatile: !S.netEv.length }); S.netEv = [];
   }
   if (snap.ph === 'play') S.sentOver = false;
   S.last = snap;
