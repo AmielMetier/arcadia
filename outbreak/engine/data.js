@@ -142,7 +142,7 @@ export const roomName = (type, sector) => (SECTORS[sector] && SECTORS[sector].ro
 export const TRAPS = {
   wire: { name: 'Barbelés', icon: 'fence', price: 10, desc: 'Ralentit fortement et blesse les zombies qui le traversent' },
   mine: { name: 'Mines', icon: 'mine', price: 8, desc: 'Trois mines qui explosent au passage des zombies' },
-  turret: { name: 'Tourelle', icon: 'crosshair', price: 26, desc: 'Tourelle automatique pendant trois vagues' },
+  turret: { name: 'Tourelle', icon: 'crosshair', price: 34, desc: 'Tourelle automatique pendant deux vagues (2 maximum)' },
   flame: { name: 'Grille brûlante', icon: 'flame', price: 18, desc: 'Enflamme les zombies qui marchent dessus' },
 };
 export const TRAP_IDS = Object.keys(TRAPS);

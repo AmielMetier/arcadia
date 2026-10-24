@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.41 — 24 octobre 2026
+- **Outbreak** — Mode Défense rééquilibré : les tourelles ne font plus tout le travail.
+  - Les tourelles posées dans le fort tirent moins vite, moins fort et moins loin, coûtent 34 de ferraille, durent deux vagues, et on ne peut en avoir que deux à la fois.
+  - La tourelle de l'Ingénieur est aussi moins puissante (dans tous les modes).
+  - Beaucoup moins d'objets lâchés par les zombies en Défense (munitions, soins, ferraille, armes), et ceux qui traînent disparaissent plus vite.
+
 ## 2.40 — 24 octobre 2026
 - **Tête de Calcul** — Trois nouvelles épreuves dans The Candidate.
   - Un cas pratique par partie : trois questions liées sur un même dossier (mini-LBO, book d'options à couvrir, VaR d'un portefeuille, couverture d'une obligation). Chaque étape rappelle le résultat de la précédente.

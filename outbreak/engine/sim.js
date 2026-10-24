@@ -4,6 +4,8 @@ import { WEAPONS, ZOMBIES, PERKS, PERK_IDS, ROOM_TYPES, BRANCH_TYPES, CAMPAIGN_R
 import { generateRoom, distanceField, flowDir, WALL_TOP, DOOR_W } from './level.js';
 import { pushOutRect, segRect, segCircle, raycastSolids, clamp, angDiff } from './geom.js';
 import { makeRng } from './rng.js';
+
+const MAX_PAD_TURRETS = 2;
 import { NOTES } from './story.js';
 
 export const DT = 1 / 60;
@@ -445,7 +447,9 @@ export class Sim {
   stepTurrets(dt) {
     for (const t of this.turrets) {
       t.t -= dt; t.cd -= dt;
-      let best = null, bd = 470;
+      // tourelle de piège (mode Défense) plus faible et plus courte que celle de l'Ingénieur
+      const pad = t.pad != null, range = pad ? 330 : 400;
+      let best = null, bd = range;
       for (const z of this.zombies) {
         if (z.hp <= 0 || z.state === 'vanish') continue;
         const d = Math.hypot(z.x - t.x, z.y - t.y);
@@ -455,10 +459,9 @@ export class Sim {
         const want = Math.atan2(best.y - t.y, best.x - t.x);
         t.a += angDiff(t.a, want) * Math.min(1, dt * 12);
         if (t.cd <= 0 && Math.abs(angDiff(t.a, want)) < 0.25) {
-          t.cd = 0.15;
-          const owner = this.players.get(t.owner);
-          const a = t.a + (Math.random() - 0.5) * 0.08, sx = t.x + Math.cos(a) * 22, sy = t.y + Math.sin(a) * 22;
-          this.projs.push({ x: sx, y: sy, vx: Math.cos(a) * 1700, vy: Math.sin(a) * 1700, life: 0.5, dmg: 14 * (owner ? 1 + 0.2 * lvl(owner, 'dmg') : 1), pen: 1, knock: 30, owner: t.owner, w: 'smg', hit: null, drag: 0 });
+          t.cd = pad ? 0.32 : 0.24;
+          const a = t.a + (Math.random() - 0.5) * 0.16, sx = t.x + Math.cos(a) * 22, sy = t.y + Math.sin(a) * 22;
+          this.projs.push({ x: sx, y: sy, vx: Math.cos(a) * 1700, vy: Math.sin(a) * 1700, life: range / 1700 + 0.02, dmg: pad ? 8 : 10, pen: 1, knock: 14, owner: t.owner, w: 'smg', hit: null, drag: 0 });
           this.ev({ e: 'f', p: 't' + t.id, w: 'smg', x: Math.round(sx), y: Math.round(sy), a: [Math.round(a * 1000) / 1000] });
         }
       }
@@ -723,15 +726,16 @@ export class Sim {
     else if (by && lvl(by, 'chain') && Math.random() < 0.15) this.explode(z.x, z.y, 110, 90, 0, by, 'chain');
     if (isBig(z.ty)) { if (FINAL_BOSSES.includes(z.ty)) this.bossDead = true; this.setToast(`${Z.name} neutralisé${z.ty === 'queen' || z.ty === 'mother' || z.ty === 'abomination' ? 'e' : ''} !`, 3, 'good'); }
     // ferraille (monnaie du marchand, commune à l'escouade)
-    const scrapP = isBig(z.ty) ? 1 : z.ty === 'brute' || z.elite ? 1 : 0.1 * (this.dark ? 2 : 1);
+    const def = this.cfg.mode === 'defense';
+    const scrapP = isBig(z.ty) ? 1 : z.ty === 'brute' || z.elite ? (def ? 0.5 : 1) : (def ? 0.04 : 0.1) * (this.dark ? 2 : 1);
     if (Math.random() < scrapP) {
       const v = isBig(z.ty) ? 6 : z.ty === 'brute' ? 3 : z.elite ? 2 : 1;
       for (let k = 0; k < (isBig(z.ty) ? 4 : 1); k++) this.spawnPickup('scrap', z.x + (Math.random() - 0.5) * 40, z.y + (Math.random() - 0.5) * 40, { v });
     }
     // butin
-    const dropP = Z.drop * this.diff.drops * (z.elite ? 3 : 1) * (this.cfg.mode === 'survival' ? 0.8 : 1);
+    const dropP = Z.drop * this.diff.drops * (z.elite ? 3 : 1) * (this.cfg.mode === 'survival' ? 0.8 : def ? 0.35 : 1);
     if (Math.random() < dropP) {
-      if ((z.ty === 'brute' || z.elite) && Math.random() < 0.45) this.spawnWeaponDrop(z.x, z.y, 2);
+      if ((z.ty === 'brute' || z.elite) && Math.random() < (def ? 0.2 : 0.45)) this.spawnWeaponDrop(z.x, z.y, 2);
       else this.spawnPickup(this.rng.weighted([['ammo', 46], ['med', 26], ['armor', 14], ['nade', 14]]), z.x, z.y);
     }
   }
@@ -877,7 +881,7 @@ export class Sim {
           if (d < 30 && this.take(p, pk)) { taken = true; break; }
         }
       }
-      if (!taken && (pk.t < 60 || pk.k === 'weapon' || pk.k === 'note')) keep.push(pk);
+      if (!taken && (pk.t < (this.cfg.mode === 'defense' ? 25 : 60) || pk.k === 'weapon' || pk.k === 'note')) keep.push(pk);
     }
     this.pickups = keep;
   }
@@ -1119,9 +1123,10 @@ export class Sim {
   buildTrap(p, k) {
     const q = this.base.pads.find((x) => x.id === p.build); const T = TRAPS[k];
     if (!q || q.trap || !T) return;
+    if (k === 'turret' && this.base.pads.filter((x) => x.trap && x.trap.k === 'turret').length >= MAX_PAD_TURRETS) { this.setToast(`${MAX_PAD_TURRETS} tourelles maximum dans le fort`, 2, 'bad'); return; }
     if (this.scrap < T.price) { this.ev({ e: 'poor', p: p.id }); return; }
     this.scrap -= T.price;
-    q.trap = { k, n: k === 'mine' ? 3 : 0, cd: 0, waves: 3 };
+    q.trap = { k, n: k === 'mine' ? 3 : 0, cd: 0, waves: k === 'turret' ? 2 : 3 };
     if (k === 'turret') this.turrets.push({ id: this.nid++, owner: p.id, pad: q.id, x: q.x, y: q.y, a: -Math.PI / 2, t: 9999, dur: 9999, cd: 0.5, color: p.color });
     p.build = null;
     this.ev({ e: 'build', p: p.id, k, x: Math.round(q.x), y: Math.round(q.y) });
