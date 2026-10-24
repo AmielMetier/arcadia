@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.39 — 24 octobre 2026
+- **Convoy Storm** — Grosse mise à jour : le blizzard devient une vraie expédition.
+  - Deux modes : **Expédition** (rallier Fort-Givre au bout de la ligne, trois gares en chemin) et **Sans fin** (une gare tous les 550 m, aller le plus loin possible).
+  - **Le froid** : dehors, ta chaleur baisse (plus vite pendant les bourrasques). À zéro, tu t'effondres et on te ramène à bord. On se réchauffe près de la chaudière.
+  - **Les loups** rôdent autour des ruines et traquent les joueurs isolés. Touche **G** : une fusée éclairante les fait fuir. Mieux vaut rester groupés.
+  - **Événements sur la voie** : congères qui bloquent le convoi (à déblayer à la pelle, à plusieurs ça va plus vite), avalanches signalées en rouge, bourrasques qui poussent de côté.
+  - **Gares** : fioul sur le quai, chaleur, fusées rechargées. La ferraille trouvée dans les ruines achète des améliorations communes (chaudière, réservoir, parkas, détecteur de fioul, fusées), touches **1** à **5**. Le convoi repart quand tout le monde est prêt (**V**).
+  - Nouveaux graphismes : maisons, garages, camions, sapins et colonnes givrés (modèles Kenney), survivants en parka avec capuche et lampe, loups animés, gares éclairées et la ville de Fort-Givre.
+  - Nouvelle interface : barre d'itinéraire avec les gares, jauge de chaleur, givre sur l'écran quand on gèle, alerte rouge quand un loup te traque, panneau de gare.
+  - Musique générée en direct : tendue sur la voie (elle s'emballe quand le fioul baisse ou que les loups chassent), plus douce en gare, fanfare à l'arrivée. Hurlements, cloche de gare, sifflet, avalanche…
+- **Hub** — L'accueil crédite maintenant Amiel, Nicolas, Gabriel et Claude.
+
 ## 2.38 — 24 octobre 2026
 - **Convoy Storm** — Nouveau jeu en coopération, seul ou jusqu'à 6 : un convoi blindé traverse une plaine gelée sans fin, en pleine tempête de neige, en 3D.
   - La chaudière au centre du convoi brûle du fioul sans arrêt. Chaque caisse jetée dedans rend 25 %. À 0 %, le convoi s'arrête : c'est la panne sèche.

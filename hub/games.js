@@ -334,11 +334,12 @@ window.HUB_GAMES = [
     id: 'convoy',
     title: 'Convoy Storm',
     tag: 'Survie en coop dans le blizzard',
-    desc: 'Un convoi blindé traverse une plaine gelée sans fin. Sautez du train, fouillez les ruines et gardez la chaudière en vie. Jusqu\'où irez-vous ?',
+    desc: 'Un convoi blindé traverse une plaine gelée. Sautez du train, fouillez les ruines, repoussez les loups et gardez la chaudière en vie jusqu\'à Fort-Givre — ou aussi loin que possible.',
     url: 'convoy/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#9fd3ff',
     settings: [
+      { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition'], ['endless', 'Sans fin']], def: 'expedition' },
       { key: 'difficulty', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normale'], ['blizzard', 'Blizzard']], def: 'normal' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
