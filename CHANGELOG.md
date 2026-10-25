@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.48 — 25 octobre 2026
+- Améliorations techniques sous le capot (1 modification).
+
 ## 2.47 — 25 octobre 2026
 - Nouveau : refonte visuelle de l'arene, agrandissement des sprites sans coupure, badges officiels Gen 8 et boutons d'attaque tactiles (Amiel)
 
