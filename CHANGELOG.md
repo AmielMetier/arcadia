@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.55 — 25 octobre 2026
+- Correction : fix multiplayer room player detection, eliminate unwanted bots for 2+ human players, add dynamic roster updates (Amiel)
+
 ## 2.54 — 25 octobre 2026
 - **Convoy Storm** — Grosse mise à jour : chaque expédition est différente.
   - **Le Front ralentit en gare** : on peut enfin faire ses achats sans perdre toute son avance.
