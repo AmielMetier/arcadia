@@ -4,6 +4,10 @@
 export const MOVES = {
   // --- NORMAL ---
   tackle: { name: 'Charge', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
+  scratch: { name: 'Griffe', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
+  splash: { name: 'Trempette', type: 'normal', cat: 'status', power: 0, acc: 100, pp: 40 },
+  growl: { name: 'Rugissement', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'opponent', stat: 'atk', val: -1 }, pp: 40 },
+  tail_whip: { name: 'Mimi-Queue', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'opponent', stat: 'def', val: -1 }, pp: 30 },
   body_slam: { name: 'Plaquage', type: 'normal', cat: 'physical', power: 85, acc: 100, pp: 15, effect: { type: 'status', status: 'paralysis', chance: 30 } },
   hyper_beam: { name: 'Ultralaser', type: 'normal', cat: 'special', power: 150, acc: 90, pp: 5 },
   quick_attack: { name: 'Vive-Attaque', type: 'normal', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
@@ -12,6 +16,7 @@ export const MOVES = {
   recover: { name: 'Soin', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'heal', val: 0.5 }, pp: 10 },
 
   // --- FEU ---
+  ember: { name: 'Flammèche', type: 'fire', cat: 'special', power: 40, acc: 100, pp: 25, effect: { type: 'status', status: 'burn', chance: 10 } },
   flamethrower: { name: 'Lance-Flammes', type: 'fire', cat: 'special', power: 90, acc: 100, pp: 15, effect: { type: 'status', status: 'burn', chance: 10 } },
   fire_blast: { name: 'Déflagration', type: 'fire', cat: 'special', power: 110, acc: 85, pp: 5, effect: { type: 'status', status: 'burn', chance: 20 } },
   flare_blitz: { name: 'Boutefeu', type: 'fire', cat: 'physical', power: 120, acc: 100, pp: 15, recoil: 0.33, effect: { type: 'status', status: 'burn', chance: 10 } },
@@ -19,6 +24,8 @@ export const MOVES = {
   will_o_wisp: { name: 'Feu Follet', type: 'fire', cat: 'status', power: 0, acc: 85, effect: { type: 'status', status: 'burn', chance: 100 }, pp: 15 },
 
   // --- EAU ---
+  water_gun: { name: 'Pistolet à O', type: 'water', cat: 'special', power: 40, acc: 100, pp: 25 },
+  bubble: { name: 'Écume', type: 'water', cat: 'special', power: 40, acc: 100, pp: 30, effect: { type: 'stat', target: 'opponent', stat: 'spe', val: -1, chance: 10 } },
   surf: { name: 'Surf', type: 'water', cat: 'special', power: 90, acc: 100, pp: 15 },
   hydro_pump: { name: 'Hydrocanon', type: 'water', cat: 'special', power: 110, acc: 80, pp: 5 },
   waterfall: { name: 'Cascade', type: 'water', cat: 'physical', power: 80, acc: 100, pp: 15 },
@@ -26,6 +33,7 @@ export const MOVES = {
   scald: { name: 'Ébullition', type: 'water', cat: 'special', power: 80, acc: 100, pp: 15, effect: { type: 'status', status: 'burn', chance: 30 } },
 
   // --- PLANTE ---
+  vine_whip: { name: 'Fouet Lianes', type: 'grass', cat: 'physical', power: 45, acc: 100, pp: 25 },
   energy_ball: { name: 'Éco-Sphère', type: 'grass', cat: 'special', power: 90, acc: 100, pp: 10 },
   solar_beam: { name: 'Lance-Soleil', type: 'grass', cat: 'special', power: 120, acc: 100, pp: 10 },
   giga_drain: { name: 'Giga-Sangsue', type: 'grass', cat: 'special', power: 75, acc: 100, pp: 10, drain: 0.5 },
@@ -34,6 +42,7 @@ export const MOVES = {
   spore: { name: 'Spore', type: 'grass', cat: 'status', power: 0, acc: 100, effect: { type: 'status', status: 'sleep', chance: 100 }, pp: 15 },
 
   // --- ÉLECTRIK ---
+  thundershock: { name: 'Éclair', type: 'electric', cat: 'special', power: 40, acc: 100, pp: 30, effect: { type: 'status', status: 'paralysis', chance: 10 } },
   thunderbolt: { name: 'Tonnerre', type: 'electric', cat: 'special', power: 90, acc: 100, pp: 15, effect: { type: 'status', status: 'paralysis', chance: 10 } },
   thunder: { name: 'Fatal-Foudre', type: 'electric', cat: 'special', power: 110, acc: 70, pp: 10, effect: { type: 'status', status: 'paralysis', chance: 30 } },
   wild_charge: { name: 'Éclair Fou', type: 'electric', cat: 'physical', power: 90, acc: 100, recoil: 0.25, pp: 15 },
@@ -59,6 +68,8 @@ export const MOVES = {
   bulldoze: { name: 'Piétinement', type: 'ground', cat: 'physical', power: 60, acc: 100, pp: 20 },
 
   // --- VOL ---
+  peck: { name: 'Picpic', type: 'flying', cat: 'physical', power: 35, acc: 100, pp: 35 },
+  gust: { name: 'Tornade', type: 'flying', cat: 'special', power: 40, acc: 100, pp: 35 },
   brave_bird: { name: 'Rapace', type: 'flying', cat: 'physical', power: 120, acc: 100, recoil: 0.33, pp: 15 },
   air_slash: { name: 'Lame d\'Air', type: 'flying', cat: 'special', power: 75, acc: 95, pp: 15, flinch: 30 },
   hurricane: { name: 'Vent Violent', type: 'flying', cat: 'special', power: 110, acc: 70, pp: 10 },
@@ -69,6 +80,7 @@ export const MOVES = {
   psyshock: { name: 'Choc Psy', type: 'psychic', cat: 'special', power: 80, acc: 100, pp: 10 },
   zen_headbutt: { name: 'Psykoud\'Boul', type: 'psychic', cat: 'physical', power: 80, acc: 90, pp: 15, flinch: 20 },
   calm_mind: { name: 'Plénitude', type: 'psychic', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 1 }, pp: 20 },
+  hypnosis: { name: 'Hypnose', type: 'psychic', cat: 'status', power: 0, acc: 60, effect: { type: 'status', status: 'sleep', chance: 100 }, pp: 20 },
 
   // --- ROCHE ---
   stone_edge: { name: 'Lame de Roc', type: 'rock', cat: 'physical', power: 100, acc: 80, crit: 2, pp: 5 },
@@ -88,6 +100,7 @@ export const MOVES = {
   dragon_dance: { name: 'Danse Draco', type: 'dragon', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1 }, pp: 20 },
 
   // --- TÉNÈBRES ---
+  bite: { name: 'Morsure', type: 'dark', cat: 'physical', power: 60, acc: 100, pp: 25 },
   dark_pulse: { name: 'Vibrobscur', type: 'dark', cat: 'special', power: 80, acc: 100, flinch: 20, pp: 15 },
   crunch: { name: 'Mâchouille', type: 'dark', cat: 'physical', power: 80, acc: 100, pp: 15 },
   sucker_punch: { name: 'Coup Bas', type: 'dark', cat: 'physical', power: 70, acc: 100, priority: 1, pp: 5 },
@@ -99,6 +112,7 @@ export const MOVES = {
   meteor_mash: { name: 'Poing Météore', type: 'steel', cat: 'physical', power: 90, acc: 90, pp: 10 },
 
   // --- INSECTE ---
+  bug_bite: { name: 'Piqûre', type: 'bug', cat: 'physical', power: 60, acc: 100, pp: 20 },
   x_scissor: { name: 'Plaie-Croix', type: 'bug', cat: 'physical', power: 80, acc: 100, pp: 15 },
   bug_buzz: { name: 'Bourdon', type: 'bug', cat: 'special', power: 90, acc: 100, pp: 10 },
   u_turn: { name: 'Demi-Tour', type: 'bug', cat: 'physical', power: 70, acc: 100, pp: 20 },
@@ -109,6 +123,7 @@ export const MOVES = {
   toxic: { name: 'Toxik', type: 'poison', cat: 'status', power: 0, acc: 90, effect: { type: 'status', status: 'toxic', chance: 100 }, pp: 10 },
 
   // --- FÉE ---
+  fairy_wind: { name: 'Vent Féérique', type: 'fairy', cat: 'special', power: 40, acc: 100, pp: 30 },
   moonblast: { name: 'Pouvoir Lunaire', type: 'fairy', cat: 'special', power: 95, acc: 100, pp: 15 },
   play_rough: { name: 'Câlinerie', type: 'fairy', cat: 'physical', power: 90, acc: 90, pp: 10 },
   dazzling_gleam: { name: 'Éclat Magique', type: 'fairy', cat: 'special', power: 80, acc: 100, pp: 20 },

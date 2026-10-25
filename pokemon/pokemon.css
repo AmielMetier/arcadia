@@ -1493,3 +1493,737 @@ b.hp-red { color: #ef4444; background: none !important; }
   color: #8ca3c3;
   font-weight: 500;
 }
+
+/* ==========================================================================
+   MODE AVENTURE KALOS-SUD (MENTON) & COMBATS SAUVAGES
+   ========================================================================== */
+
+.adv-container {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0f172a;
+  user-select: none;
+  font-family: var(--chakra);
+}
+
+.adv-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Boutons d'action rapides (haut droite) */
+.adv-top-actions {
+  position: absolute;
+  top: 16px;
+  right: 250px;
+  display: flex;
+  gap: 10px;
+  z-index: 25;
+}
+
+.adv-top-btn {
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid #ffcb05;
+  color: #fff;
+  border-radius: 8px;
+  font-family: var(--chakra);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transition: all 0.15s ease;
+}
+
+.adv-top-btn:hover {
+  background: #ffcb05;
+  color: #0f172a;
+  transform: translateY(-2px);
+}
+
+/* Contrôles tactiles (mobile) */
+.adv-touch-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@media (min-width: 900px) {
+  .adv-touch-controls { display: none; }
+}
+
+.adv-dpad {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.adv-dpad-mid {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.adv-dpad-center {
+  width: 44px;
+  height: 44px;
+  background: rgba(30, 41, 59, 0.7);
+  border-radius: 6px;
+}
+
+.adv-dpad-btn {
+  width: 44px;
+  height: 44px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 18px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.adv-dpad-btn:active {
+  background: #ffcb05;
+  color: #000;
+}
+
+.adv-action-btns {
+  pointer-events: auto;
+  display: flex;
+  gap: 14px;
+}
+
+.adv-btn-circle {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.adv-btn-circle.btn-a {
+  background: #22c55e;
+  color: #fff;
+}
+
+.adv-btn-circle.btn-b {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Couche de combat d'aventure */
+.adv-battle-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: #090e18;
+}
+
+.adv-battle-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: url('assets/arena_stadium.jpg') center/cover no-repeat;
+}
+
+.adv-battle-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.85));
+  pointer-events: none;
+}
+
+.adv-battle-arena {
+  flex: 1;
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.adv-side {
+  position: absolute;
+}
+
+.adv-side.top {
+  top: 30px;
+  right: 5%;
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.adv-side.bottom {
+  bottom: 20px;
+  left: 5%;
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.adv-platform-opp {
+  position: relative;
+  width: 320px;
+  height: 140px;
+  background: url('assets/platform_opponent.png') center/contain no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adv-platform-player {
+  position: relative;
+  width: 340px;
+  height: 150px;
+  background: url('assets/platform_player.png') center/contain no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adv-poke-sprite {
+  position: absolute;
+  bottom: 30px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6));
+  transition: transform 0.2s ease;
+}
+
+.adv-poke-sprite.front {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+}
+
+.adv-poke-sprite.back {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+/* Lancer de Poké Ball animé */
+.adv-pokeball-throw {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  display: none;
+  z-index: 10;
+}
+
+.adv-pokeball-throw.anim-ball-arc {
+  display: block;
+  animation: pokeballArc 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.adv-pokeball-throw.landed {
+  display: block;
+  left: 140px;
+  bottom: 35px;
+}
+
+@keyframes pokeballArc {
+  0% { transform: translate(-300px, 180px) rotate(0deg) scale(1.4); }
+  50% { transform: translate(-100px, -60px) rotate(360deg) scale(1.1); }
+  100% { transform: translate(0, 0) rotate(720deg) scale(0.9); }
+}
+
+.adv-pokeball-throw.wobble {
+  animation: ballWobble 0.3s ease-in-out infinite;
+}
+
+@keyframes ballWobble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-25deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(25deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.adv-poke-sprite.anim-caught-shrink {
+  animation: pokeCaughtShrink 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes pokeCaughtShrink {
+  0% { transform: scale(1); filter: drop-shadow(0 0 20px #ef4444) brightness(1.5); }
+  100% { transform: scale(0.05) translate(0, 80px); opacity: 0; }
+}
+
+.adv-poke-sprite.anim-break-free {
+  animation: pokeBreakFree 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes pokeBreakFree {
+  0% { transform: scale(0.2); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Cartes HUD de combat */
+.adv-hud {
+  width: 290px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid rgba(255, 203, 5, 0.5);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+  margin-bottom: 8px;
+}
+
+.adv-hud-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.adv-hud-name .poke-name {
+  color: #fff;
+}
+
+.adv-hud-name .poke-level {
+  color: #ffcb05;
+  font-size: 13px;
+}
+
+.adv-hp-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: #1e293b;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 4px;
+}
+
+.adv-hp-fill {
+  height: 100%;
+  background: #22c55e;
+  border-radius: 4px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.adv-hp-fill.warn { background: #eab308; }
+.adv-hp-fill.danger { background: #ef4444; }
+
+.adv-hp-text {
+  font-size: 12px;
+  color: #cbd5e1;
+  text-align: right;
+  font-family: monospace;
+}
+
+.adv-exp-bar-wrap {
+  width: 100%;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.adv-exp-fill {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* Panneau inférieur de combat */
+.adv-battle-bottom {
+  height: 140px;
+  background: rgba(11, 17, 28, 0.98);
+  border-top: 3px solid #ffcb05;
+  display: flex;
+  z-index: 5;
+}
+
+.adv-battle-dialogue {
+  flex: 1.2;
+  padding: 20px 28px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: #fff;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  border-right: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.adv-battle-menu {
+  flex: 1;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.adv-menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.adv-btn {
+  padding: 12px 16px;
+  font-family: var(--bung);
+  font-size: 14px;
+  letter-spacing: 1px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.adv-btn.attack-btn { background: #dc2626; border-color: #ef4444; }
+.adv-btn.bag-btn { background: #ca8a04; border-color: #eab308; }
+.adv-btn.poke-btn { background: #16a34a; border-color: #22c55e; }
+.adv-btn.run-btn { background: #2563eb; border-color: #3b82f6; }
+
+.adv-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.2);
+}
+
+.adv-moves-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.adv-move-card {
+  padding: 8px 12px;
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 8px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.15s ease;
+}
+
+.adv-move-card:hover {
+  border-color: #ffcb05;
+  transform: translateY(-2px);
+}
+
+.adv-move-card .m-name {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.adv-move-card .m-info {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.adv-move-back {
+  grid-column: span 2;
+  padding: 6px;
+  background: #334155;
+  border: 1px solid #475569;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.adv-bag-list, .adv-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 115px;
+  overflow-y: auto;
+}
+
+.adv-item-row, .adv-party-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.adv-item-row:hover, .adv-party-row:hover:not(:disabled) {
+  border-color: #ffcb05;
+  background: #273549;
+}
+
+.adv-party-row.fainted {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modales d'aventure (Starters, Sac, PC) */
+.adv-modal-layer {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.adv-modal-box {
+  background: #0f172a;
+  border: 2px solid #ffcb05;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.adv-modal-header h2 {
+  font-family: var(--bung);
+  color: #ffcb05;
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.adv-modal-header p {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.adv-starters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.adv-starter-card {
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.adv-starter-card:hover {
+  border-color: #ffcb05;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(255, 203, 5, 0.15);
+}
+
+.adv-starter-card .st-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.adv-starter-card .st-name {
+  font-family: var(--bung);
+  font-size: 16px;
+  color: #fff;
+}
+
+.adv-starter-card .st-type {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: #fff;
+}
+
+.adv-starter-card .st-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.4;
+  min-height: 48px;
+}
+
+.adv-starter-card .st-choose-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: #eab308;
+  color: #000;
+  font-weight: 800;
+}
+
+.adv-bag-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 700px) {
+  .adv-bag-sections { grid-template-columns: 1fr; }
+}
+
+.adv-section-col h3 {
+  font-family: var(--bung);
+  color: #38bdf8;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.adv-party-cards, .adv-inventory-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adv-poke-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.adv-poke-card .poke-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.adv-poke-card .poke-info {
+  flex: 1;
+}
+
+.adv-poke-card .pi-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.adv-poke-card .pi-lv {
+  color: #ffcb05;
+  font-size: 12px;
+}
+
+.adv-poke-card .pi-hp-bar {
+  width: 100%;
+  height: 6px;
+  background: #0f172a;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.adv-poke-card .pi-hp-fill {
+  height: 100%;
+  background: #22c55e;
+}
+
+.adv-poke-card .pi-hp-val {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.adv-item-row-card {
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.adv-item-row-card .it-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffcb05;
+}
+
+.adv-item-row-card .it-qty {
+  color: #fff;
+  font-size: 12px;
+}
+
+.adv-item-row-card .it-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.adv-pc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  min-height: 160px;
+}
+
+.adv-pc-slot {
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.adv-pc-slot img {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+}
+
+.adv-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.adv-btn.btn-secondary {
+  background: #334155;
+  border-color: #475569;
+}

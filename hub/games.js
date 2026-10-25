@@ -176,16 +176,17 @@ window.HUB_GAMES = [
   {
     id: 'pokemon',
     title: 'Poké Duel',
-    tag: 'Combat & Tournoi 3v3',
-    desc: 'Batailles stratégiques 3v3 en tournoi : équipes aléatoires, faiblesses de types, switchs tactiques et attaques cultes.',
+    tag: 'Aventure & Tournoi 3v3',
+    desc: 'Aventure multijoueur à Menton (Kalos-Sud) : capture de Pokémon sauvages, citrons de Menton, et tournoi 3v3 en arène.',
     url: 'pokemon/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ffcb05',
     settings: [
-      { key: 'timer', label: 'Chrono par tour', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
-      { key: 'gen', label: 'Génération', options: [['all', 'Gens 1 à 3 (Iconiques)'], ['kanto', 'Gen 1 (Kanto 151)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)']], def: 'all' },
-      { key: 'bots', label: 'Bots si salon incomplet', options: [[1, 'Oui (remplir le tournoi)'], [0, 'Non']], def: 1 },
-      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'mode', label: 'Mode de jeu', options: [['adventure', 'Aventure Kalos-Sud (Menton)'], ['tournament', 'Tournoi 3v3 (Arène)']], def: 'adventure' },
+      { key: 'timer', label: 'Chrono par tour', onlyMode: 'tournament', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
+      { key: 'gen', label: 'Génération', onlyMode: 'tournament', options: [['all', 'Gens 1 à 3 (Iconiques)'], ['kanto', 'Gen 1 (Kanto 151)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)']], def: 'all' },
+      { key: 'bots', label: 'Bots si salon incomplet', onlyMode: 'tournament', options: [[1, 'Oui (remplir le tournoi)'], [0, 'Non']], def: 1 },
+      { key: 'level', label: 'Niveau des bots', onlyMode: 'tournament', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>

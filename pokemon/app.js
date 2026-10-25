@@ -1,9 +1,11 @@
 // pokemon/app.js
-// Point d'entrée de Poké Duel : écoute le HubBridge, lance le rôle (hôte/invité/solo) et monte la vue.
+// Point d'entrée de Poké Duel : écoute le HubBridge, lance soit l'Aventure Kalos-Sud (Menton),
+// soit le Tournoi 3v3 en Arène selon le mode choisi dans le Hub.
 
 import { startHost } from './net/host.js';
 import { startClient } from './net/client.js';
 import { mountGame } from './view/game.js';
+import { mountAdventure } from './adventure/adventure.js';
 
 const H = window.HubBridge;
 const root = document.getElementById('app');
@@ -30,12 +32,31 @@ function boot(info) {
 
   const qs = new URLSearchParams(location.search);
   const settings = H.embedded ? (info.settings || {}) : {
+    mode: qs.get('mode') || 'adventure',
     timer: qs.get('timer') || 25,
     gen: qs.get('gen') || 'all',
     bots: qs.get('bots') ?? 1,
     level: qs.get('level') || 'normal'
   };
 
+  const mode = settings.mode || 'adventure';
+
+  // --- MODE AVENTURE MULTIJOUEUR À MENTON ---
+  if (mode === 'adventure') {
+    mountAdventure(root, {
+      me,
+      bridge: H,
+      settings,
+      exit: () => {
+        if (H.embedded) H.exit();
+        else location.reload();
+      }
+    });
+    H.signalReady();
+    return;
+  }
+
+  // --- MODE TOURNOI 3V3 ARÈNE ---
   let session;
 
   const view = mountGame(root, {
