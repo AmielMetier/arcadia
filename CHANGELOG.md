@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.49 — 25 octobre 2026
+- Nouveau : replace procedural AI visuals with authentic Showdown & PokeRogue assets, remove all emojis, pro moves interface (Amiel)
+
 ## 2.48 — 25 octobre 2026
 - Améliorations techniques sous le capot (1 modification).
 
