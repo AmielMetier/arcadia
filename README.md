@@ -77,6 +77,7 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un blizzard.
 - Le convoi avance tant que la chaudière a du fioul : une caisse = +25 %, à 0 % c'est la panne sèche
 - Sauter du train, fouiller les ruines, ramasser et lancer les caisses ; dans la neige, rattraper l'échelle de queue
+- Un front de tempête poursuit le convoi ; manette de vitesse, pression de la chaudière, pannes à bord, pillards en motoneige
 - Le froid (chaleur de chaque joueur), les loups (fusées éclairantes), les congères, avalanches et bourrasques
 - Gares : ravitaillement et améliorations achetées avec la ferraille ; deux modes : Expédition (rallier Fort-Givre) et Sans fin
 - Trois difficultés : Facile, Normale, Blizzard ; musique et sons générés en direct (WebAudio)
@@ -97,6 +98,6 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.39** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.43** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

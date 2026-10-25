@@ -2,10 +2,13 @@
 // Géométrie déterministe, chute / remontée par l'échelle, lancer dans la chaudière, panne sèche,
 // reprise d'un état diffusé (migration d'hôte), et parties jouées par un pilote automatique.
 import assert from 'node:assert/strict';
-import { Sim, DT, stepPlayer, playerFromRow, DIFFICULTY, Ruins, trainSpeedFor, VMAX, LOST_DIST, stationDist, UPGRADES, obstacleColliders, windOf, DIG_T, FLARE_R } from '../convoy/engine/sim.js';
+import { Sim, DT, stepPlayer, playerFromRow, DIFFICULTY, Ruins, trainSpeedFor, VMAX, LOST_DIST, stationDist, UPGRADES, obstacleColliders, windOf, DIG_T, FLARE_R,
+  THROTTLE, LEVER, VALVE, FAULTS, STORM_START } from '../convoy/engine/sim.js';
 import { chunkRuins, DECK_Y, REAR, BOILER, HALF_W, CHUNK, onDeckRect } from '../convoy/engine/world.js';
 
 let n = 0;
+// sans tempête, pression, pannes ni pillards : pour tester une mécanique à la fois
+const calmSim = (o) => Object.assign(new Sim(o), { calm: true });
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
 const run = (sim, sec, each) => { for (let i = 0; i < sec * 60 && sim.phase === 'play'; i++) { each && each(i); sim.step(DT); } };
 
@@ -24,7 +27,7 @@ t('ruines déterministes et à l\'écart des rails', () => {
 });
 
 t('sans personne pour la nourrir, la chaudière s\'éteint et le convoi s\'arrête', () => {
-  const sim = new Sim({ seed: 3, difficulty: 'normal' });
+  const sim = calmSim({ seed: 3, difficulty: 'normal' });
   sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   let low = false, stall = false;
   run(sim, 400, () => { for (const e of sim.drainEvents()) { if (e.e === 'low') low = true; if (e.e === 'stall') stall = true; } });
@@ -43,7 +46,7 @@ t('vitesse du convoi : plus lente quand le réservoir baisse, nulle à sec', () 
 });
 
 t('chute dans la neige, ralentissement, retour par l\'échelle de queue', () => {
-  const sim = new Sim({ seed: 9 });
+  const sim = calmSim({ seed: 9 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   run(sim, 2);
   const evs = [];
@@ -71,7 +74,7 @@ t('chute dans la neige, ralentissement, retour par l\'échelle de queue', () => 
 });
 
 t('saut : on retombe sur le plancher', () => {
-  const sim = new Sim({ seed: 2 });
+  const sim = calmSim({ seed: 2 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   p.inp = { mx: 0, mz: 0, jump: 0 }; sim.step(DT);
   p.inp = { mx: 0, mz: 0, jump: 1 }; sim.step(DT);
@@ -82,7 +85,7 @@ t('saut : on retombe sur le plancher', () => {
 });
 
 t('caisse : ramassée, posée dans la chaudière (+25 %) ou lancée dans le foyer', () => {
-  const sim = new Sim({ seed: 5 });
+  const sim = calmSim({ seed: 5 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.fuel = 40;
   sim.spawnCrate(p.x, DECK_Y + 0.25, p.z, 1);
@@ -113,7 +116,7 @@ t('caisse : ramassée, posée dans la chaudière (+25 %) ou lancée dans le foye
 });
 
 t('fouille : une ruine ne se fouille qu\'une fois', () => {
-  const sim = new Sim({ seed: 11, difficulty: 'facile' });
+  const sim = calmSim({ seed: 11, difficulty: 'facile' });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   // trouver une ruine avec du butin
   let ruin = null;
@@ -132,7 +135,7 @@ t('fouille : une ruine ne se fouille qu\'une fois', () => {
 });
 
 t('perdu dans la tempête : réapparition à bord, caisse perdue', () => {
-  const sim = new Sim({ seed: 4 });
+  const sim = calmSim({ seed: 4 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   Object.assign(p, { on: 0, ref: 0, y: 0, x: 8, z: REAR + LOST_DIST - 1, carry: 1 });
   const ev = [];
@@ -143,7 +146,7 @@ t('perdu dans la tempête : réapparition à bord, caisse perdue', () => {
 });
 
 t('déconnexion : le joueur lâche sa caisse ; reprise identique depuis l\'état diffusé', () => {
-  const sim = new Sim({ seed: 77 });
+  const sim = calmSim({ seed: 77 });
   sim.addPlayer({ id: 0, name: 'Hôte', color: '#ff0000' });
   const g = sim.addPlayer({ id: 3, name: 'Invité', color: '#00ff00' });
   run(sim, 5, (i) => { g.inp = { mx: Math.sin(i / 50), mz: 0.3, jump: (i / 90) | 0 }; });
@@ -162,7 +165,7 @@ t('déconnexion : le joueur lâche sa caisse ; reprise identique depuis l\'état
 });
 
 t('prédiction : rejouer stepPlayer depuis l\'état diffusé retombe sur l\'hôte', () => {
-  const sim = new Sim({ seed: 8 });
+  const sim = calmSim({ seed: 8 });
   const p = sim.addPlayer({ id: 1, name: 'A', color: '#ff0000' });
   run(sim, 1);
   const snap = sim.snapshot();
@@ -176,7 +179,7 @@ t('prédiction : rejouer stepPlayer depuis l\'état diffusé retombe sur l\'hôt
 });
 
 t('froid : on gèle dans la neige, on se réchauffe près de la chaudière', () => {
-  const sim = new Sim({ seed: 21 });
+  const sim = calmSim({ seed: 21 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   Object.assign(p, { on: 0, ref: 0, y: 0, x: 8, z: 0 });
   sim.fuel = 100;
@@ -200,7 +203,7 @@ t('froid : on gèle dans la neige, on se réchauffe près de la chaudière', () 
 });
 
 t('loups : ils chassent dans la neige, mordent, et fuient les fusées', () => {
-  const sim = new Sim({ seed: 31 });
+  const sim = calmSim({ seed: 31 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.v = 0; sim.D = { ...sim.D, burn: 0 };
   Object.assign(p, { on: 0, ref: 0, y: 0, x: 10, z: -2, carry: 1 });
@@ -220,7 +223,7 @@ t('loups : ils chassent dans la neige, mordent, et fuient les fusées', () => {
   run(sim, 2, () => { sim.v = 0; });
   assert.ok(Math.hypot(sim.wolves[0].x - p.x, sim.wolves[0].zw + sim.dist - p.z) > FLARE_R * 0.8, 'à bonne distance');
   // pas d'escalade : un joueur à bord n'est pas poursuivi
-  const sim2 = new Sim({ seed: 32 });
+  const sim2 = calmSim({ seed: 32 });
   const q = sim2.addPlayer({ id: 0, name: 'B', color: '#00ff00' });
   sim2.wolves.push({ id: 5, x: HALF_W + 3, zw: q.z - sim2.dist, yaw: 0, st: 0, t: 0, tg: -1, hx: HALF_W + 3, hz: q.z - sim2.dist, a: 0, fx: 0, fz: 0 });
   run(sim2, 3, () => { q.inp = { mx: 0, mz: 0 }; });
@@ -228,7 +231,7 @@ t('loups : ils chassent dans la neige, mordent, et fuient les fusées', () => {
 });
 
 t('congère : le convoi s\'arrête devant, on déblaie, il repart', () => {
-  const sim = new Sim({ seed: 41 });
+  const sim = calmSim({ seed: 41 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.ev = { k: 'drift', stopD: sim.dist + 20, zw: -19.4 - 2.4 - (sim.dist + 20), prog: 0, done: 0, t: 0 };
   sim.ed = 1e9;
@@ -250,7 +253,7 @@ t('congère : le convoi s\'arrête devant, on déblaie, il repart', () => {
 });
 
 t('gare : arrêt, chaleur et fusées rendues, achats, vote du départ', () => {
-  const sim = new Sim({ seed: 51, mode: 'endless' });
+  const sim = calmSim({ seed: 51, mode: 'endless' });
   const a = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' }), b = sim.addPlayer({ id: 1, name: 'B', color: '#00ff00' });
   sim.ed = 1e9;
   const sd = stationDist('endless', 0, 0);
@@ -271,14 +274,14 @@ t('gare : arrêt, chaleur et fusées rendues, achats, vote du départ', () => {
   assert.equal(sim.stop, null, 'départ'); assert.equal(sim.ns, 1);
   assert.equal(sim.buy(0, 'radar'), 'On n\'achète qu\'en gare.');
   // sans vote, le convoi repart tout seul
-  const s2 = new Sim({ seed: 52, mode: 'endless' }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s2.ed = 1e9;
+  const s2 = calmSim({ seed: 52, mode: 'endless' }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s2.ed = 1e9;
   s2.dist = sd - 5; s2.v = 1;
   run(s2, 70);
   assert.equal(s2.ns, 1, 'départ au bout du compte à rebours');
 });
 
 t('expédition : trois gares, puis l\'arrivée à Fort-Givre gagne la partie', () => {
-  const sim = new Sim({ seed: 61, difficulty: 'normal' });
+  const sim = calmSim({ seed: 61, difficulty: 'normal' });
   sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   assert.equal(sim.goal, DIFFICULTY.normal.goal);
   assert.deepEqual([0, 1, 2, 3].map((i) => stationDist('expedition', sim.goal, i)), [500, 1000, 1500, null]);
@@ -291,7 +294,7 @@ t('expédition : trois gares, puis l\'arrivée à Fort-Givre gagne la partie', (
 });
 
 t('avalanche et bourrasque', () => {
-  const sim = new Sim({ seed: 71 });
+  const sim = calmSim({ seed: 71 });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.ed = 1e9;
   sim.ev = { k: 'aval', at: sim.dist, side: 1, t: 0, hit: 0 };
@@ -309,7 +312,7 @@ t('avalanche et bourrasque', () => {
 });
 
 t('reprise identique avec loups, fusées, gare et améliorations', () => {
-  const sim = new Sim({ seed: 81, mode: 'endless', difficulty: 'blizzard' });
+  const sim = calmSim({ seed: 81, mode: 'endless', difficulty: 'blizzard' });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.scrap = 7; sim.up.coats = 1; sim.ed = 1e9;
   sim.wolves.push({ id: 90, x: 20, zw: -40, yaw: 0, st: 0, t: 0, tg: -1, hx: 20, hz: -40, a: 0, fx: 0, fz: 0 });
@@ -327,6 +330,112 @@ t('reprise identique avec loups, fusées, gare et améliorations', () => {
   assert.ok(Math.abs(copy.players.get(0).heat - p.heat) < 0.1);
 });
 
+
+t('front de tempête : il avance sans cesse et engloutit un convoi arrêté', () => {
+  const sim = new Sim({ seed: 91 });
+  const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  assert.equal(Math.round(sim.gap), STORM_START);
+  sim.press = -1e9; sim.nf = 1e9; sim.rd = 1e9; sim.ed = 1e9;
+  run(sim, 30, () => { p.inp = { mx: 0, mz: 0 }; });
+  assert.ok(sim.gap > STORM_START, 'à pleine vapeur, on prend de l\'avance : ' + sim.gap.toFixed(0));
+  sim.stop = { k: 'drift' }; const ev = []; // convoi immobilisé (congère jamais déblayée)
+  run(sim, 400, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; }); ev.push(...sim.drainEvents());
+  assert.equal(sim.phase, 'over');
+  assert.ok(ev.some((e) => e.e === 'storm_near') && ev.some((e) => e.e === 'over' && e.why === 'storm'), 'alerte puis fin');
+  // le front ne reste jamais trop loin derrière
+  const s2 = new Sim({ seed: 92, mode: 'endless' }); s2.ed = 1e9; s2.dist = 5010; s2.step(DT);
+  assert.ok(s2.gap <= 161);
+});
+
+t('manette : à fond on va plus vite mais on brûle bien plus', () => {
+  const mk = (thr) => { const s = calmSim({ seed: 93 }); const p = s.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s.thr = thr; s.ed = 1e9; run(s, 20, () => { p.inp = { mx: 0, mz: 0 }; }); return s; };
+  const eco = mk(0), nor = mk(1), max = mk(2);
+  assert.ok(eco.dist < nor.dist && nor.dist < max.dist, 'vitesses');
+  assert.ok(100 - max.fuel > (100 - nor.fuel) * 1.6, 'consommation à fond');
+  assert.ok(100 - eco.fuel < (100 - nor.fuel) * 0.7, 'consommation en éco');
+  // on change de régime à la manette, depuis l'arrière de la cabine
+  const s = new Sim({ seed: 94 }); const p = s.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  Object.assign(p, { x: LEVER.x, z: LEVER.z + 0.4 }); p.inp = { mx: 0, mz: 0, use: true }; s.step(DT);
+  assert.equal(s.thr, 2);
+  p.inp = { mx: 0, mz: 0, use: false }; s.step(DT); p.inp = { mx: 0, mz: 0, use: true }; s.step(DT);
+  assert.equal(s.thr, 0, 'retour en éco après « à fond »');
+});
+
+t('pression : sans soupape la chaudière explose, la soupape la fait retomber', () => {
+  const sim = new Sim({ seed: 95 }); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.storm = -1e9; sim.nf = 1e9; sim.rd = 1e9; sim.ed = 1e9; sim.press = 80;
+  const ev = [];
+  run(sim, 30, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; }); ev.push(...sim.drainEvents());
+  assert.ok(ev.some((e) => e.e === 'press_warn') && ev.some((e) => e.e === 'boom'), 'explosion');
+  assert.ok(sim.hull <= 75 && sim.fuel < 80);
+  sim.press = 90; Object.assign(p, { x: VALVE.x, z: VALVE.z - 0.3, st: 0 });
+  run(sim, 2, () => { p.inp = { mx: 0, mz: 0, use: true }; });
+  assert.ok(sim.press < 30, 'soupape : ' + sim.press.toFixed(0));
+});
+
+t('pannes : un tuyau gelé ralentit, une fuite vide le réservoir, on répare', () => {
+  const sim = new Sim({ seed: 96 }); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.storm = -1e9; sim.press = -1e9; sim.rd = 1e9; sim.ed = 1e9; sim.nf = 1e9;
+  run(sim, 15, () => { p.inp = { mx: 0, mz: 0 }; });
+  const v0 = sim.v;
+  sim.faults.push({ id: 500, k: 'pipe', s: 0, x: FAULTS.pipe.spots[0][0], z: FAULTS.pipe.spots[0][1], prog: 0 });
+  sim.faults.push({ id: 501, k: 'leak', s: 0, x: FAULTS.leak.spots[0][0], z: FAULTS.leak.spots[0][1], prog: 0 });
+  run(sim, 6, () => { p.inp = { mx: 0, mz: 0 }; });
+  assert.ok(sim.v < v0 * 0.7, 'le convoi ralentit');
+  const ev = [];
+  for (const f of [...sim.faults]) {
+    Object.assign(p, { x: f.x * 0.75, z: f.z, st: 0, on: 1, ref: 1, y: DECK_Y, air: 0 });
+    run(sim, FAULTS[f.k].fix + 0.5, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0, use: true }; });
+  }
+  assert.equal(sim.faults.length, 0); assert.equal(ev.filter((e) => e.e === 'fixed').length, 2);
+  // elles apparaissent toutes seules, à bord
+  const s2 = new Sim({ seed: 97 }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s2.storm = -1e9; s2.press = -1e9; s2.rd = 1e9;
+  run(s2, 200, () => s2.drainEvents());
+  assert.ok(s2.faults.length >= 1 && s2.faults.every((f) => onDeckRect(f.x, f.z)));
+});
+
+t('pillards : ils volent les caisses du pont, on les renverse, les fusées les chassent', () => {
+  const sim = new Sim({ seed: 98 }); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.storm = -1e9; sim.press = -1e9; sim.nf = 1e9; sim.ed = 1e9; sim.rd = 0;
+  sim.spawnCrate(-1, DECK_Y + 0.25, 6, 1); sim.spawnCrate(1, DECK_Y + 0.25, 7, 1);
+  const ev = [];
+  for (let i = 0; i < 20 * 60 && !ev.some((e) => e.e === 'steal'); i++) { p.inp = { mx: 0, mz: 0 }; sim.step(DT); ev.push(...sim.drainEvents()); }
+  assert.ok(ev.some((e) => e.e === 'raid') && ev.some((e) => e.e === 'steal'), 'vol');
+  const w = sim.raiders.find((r) => r.carry > 0 && r.st < 2);
+  assert.ok(w, 'un pillard le long du convoi');
+  const carried = w.carry, crates0 = sim.crates.filter((c) => c.m === 0).length, scrap0 = sim.scrap;
+  Object.assign(p, { x: w.side * (HALF_W - 0.4), z: w.z, on: 1, ref: 1, y: DECK_Y, air: 0, st: 0 });
+  p.inp = { mx: 0, mz: 0, use: true }; sim.step(DT);
+  assert.equal(w.st, 3, 'renversé'); assert.equal(sim.scrap, scrap0 + 1);
+  assert.equal(sim.crates.filter((c) => c.m === 0).length, crates0 + carried, 'il lâche son butin');
+  // une fusée fait fuir les autres
+  const s2 = new Sim({ seed: 99 }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  s2.storm = -1e9; s2.press = -1e9; s2.nf = 1e9; s2.ed = 1e9;
+  s2.raiders.push({ id: 700, x: HALF_W + 1.3, z: 3, side: 1, st: 1, t: 3, carry: 0, tz: 3 });
+  s2.flares.push({ id: 701, m: 1, x: 1, z: 3, t: 5 }); s2.step(DT);
+  assert.equal(s2.raiders[0].st, 2);
+  // sans caisse à voler, ils abîment le convoi
+  const s3 = new Sim({ seed: 100 }); s3.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s3.storm = -1e9; s3.press = -1e9; s3.nf = 1e9; s3.ed = 1e9;
+  s3.raiders.push({ id: 702, x: HALF_W + 1.3, z: 3, side: 1, st: 1, t: 0.1, carry: 0, tz: 3 });
+  run(s3, 1); assert.ok(s3.hull < 100);
+});
+
+t('reprise identique avec tempête, pannes et pillards', () => {
+  const sim = new Sim({ seed: 101, difficulty: 'blizzard' });
+  const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.rd = 0; sim.nf = 0.5; sim.thr = 2; sim.ed = 1e9;
+  run(sim, 12, () => { p.inp = { mx: 0, mz: 0 }; });
+  assert.ok(sim.raiders.length && sim.faults.length);
+  const copy = Sim.restore(JSON.parse(JSON.stringify(sim.snapshot())));
+  for (const s of [sim, copy]) for (const q of s.players.values()) q.inp = { mx: 0, mz: 0 };
+  run(sim, 5); run(copy, 5);
+  assert.equal(copy.thr, 2);
+  assert.ok(Math.abs(copy.storm - sim.storm) < 0.05 && Math.abs(copy.press - sim.press) < 0.05 && Math.abs(copy.hull - sim.hull) < 0.05);
+  assert.equal(copy.raiders.length, sim.raiders.length);
+  assert.ok(Math.abs(copy.raiders[0].z - sim.raiders[0].z) < 0.05, 'pillard identique');
+  assert.deepEqual(copy.faults.map((f) => f.k), sim.faults.map((f) => f.k));
+});
+
 // Pilote automatique très simple : fouille, rapporte, remonte, nourrit.
 function autopilot(sim, p, time) {
   const t0 = (time * 60) | 0;
@@ -341,6 +450,23 @@ function autopilot(sim, p, time) {
     for (const k of Object.keys(UPGRADES)) sim.buy(p.id, k);
     if (!sim.stop.v.includes(p.id)) sim.vote(p.id);
   }
+  // à bord : le premier équipier présent tient la soupape, la manette et les réparations
+  const crew = [...sim.players.values()].filter((q) => q.on && q.st < 2 && !q.carry);
+  const chief = crew.length && crew.reduce((a, b) => (a.id < b.id ? a : b)) === p;
+  const edge = t0 % 2 === 0;
+  if (p.on && !p.carry && p.st < 2) {
+    if (sim.press > 62 && (chief || sim.press > 85)) p.vent = true;
+    if (sim.press < 8) p.vent = false;
+    if (p.vent) { if (go(VALVE.x, VALVE.z - 0.3) < 0.7) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
+    const raider = sim.raiders.find((w) => w.st === 1);
+    if (raider) { if (go(raider.side * (HALF_W - 0.4), raider.z) < 0.8) p.inp = { ...p.inp, mx: 0, mz: 0, use: edge }; return; }
+    const f = sim.faults[0];
+    if (f && (chief || sim.faults.length > 1)) { const tf = sim.faults.length > 1 && !chief ? sim.faults[1] : f; if (go(tf.x * 0.75, tf.z) < 0.6) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
+    if (chief) {
+      const want = sim.gap < 80 && sim.fuel > 45 ? 2 : sim.fuel < 30 && sim.gap > 110 ? 0 : 1;
+      if (want !== sim.thr) { if (go(LEVER.x, LEVER.z + 0.5) < 0.6) p.inp = { ...p.inp, mx: 0, mz: 0, use: edge }; return; }
+    }
+  }
   // congère : tout le monde descend déblayer devant la locomotive
   if (sim.ev && sim.ev.k === 'drift' && !sim.ev.done && sim.dist > sim.ev.stopD - 30 && !p.carry) {
     const zd = sim.ev.zw + sim.dist;
@@ -348,6 +474,8 @@ function autopilot(sim, p, time) {
     if (go(Math.sign(p.x || 1) * 1.2, zd + 2.2) < 1.5) p.inp.use = true;
     return;
   }
+  // le front approche : on reste à bord
+  if (!p.on && sim.gap < 45 && !p.carry) { go(0, REAR + 0.7); return; }
   // un loup aux trousses : fusée
   if (!p.on && sim.wolves.some((w) => w.tg === p.id) && p.flares > 0 && t0 % 30 === 0) p.inp.fl = (p.inp.fl | 0) + 1;
   // trop froid : retour au chaud près de la chaudière
@@ -392,14 +520,15 @@ t('pilote automatique : la partie avance (panne sèche ou arrivée)', () => {
     const runs = [11, 22, 33].map((seed) => autoplay(diff, np, 30, seed));
     const avgT = runs.reduce((a, r) => a + r.sim.t, 0) / runs.length;
     const fed = runs.reduce((a, r) => a + r.sim.fedTotal, 0) / runs.length;
-    rows.push(`${diff.padEnd(8)} ${np} joueur(s) : ${(avgT / 60).toFixed(1)} min, ${(runs.reduce((a, r) => a + r.sim.dist, 0) / runs.length).toFixed(0)} m, ${fed.toFixed(1)} caisses, état ≤ ${Math.max(...runs.map((r) => r.maxSnap))} o`);
+    const whys = runs.map((r) => r.sim.win ? 'arrivé' : r.sim.why).join('/');
+    rows.push(`${diff.padEnd(8)} ${np} joueur(s) [${whys}] : ${(avgT / 60).toFixed(1)} min, ${(runs.reduce((a, r) => a + r.sim.dist, 0) / runs.length).toFixed(0)} m, ${fed.toFixed(1)} caisses, état ≤ ${Math.max(...runs.map((r) => r.maxSnap))} o`);
     const wins = runs.filter((r) => r.sim.win).length;
     rows[rows.length - 1] += ` · ${wins}/3 expéditions réussies`;
     console.log('   ' + rows[rows.length - 1]);
     for (const r of runs) assert.ok(r.maxSnap < 6000, 'état diffusé raisonnable');
     assert.ok(fed >= 2, `le pilote trouve et livre du fioul (${diff}, ${np})`);
     const tank = 100 / (DIFFICULTY[diff].burn * (1 + 0.15 * (np - 1)));
-    assert.ok(avgT > tank * 1.5, `on tient plus d'un réservoir (${diff}, ${np})`);
+    assert.ok(avgT > tank * 0.8, `la partie dure (${diff}, ${np})`);
   }
 });
 

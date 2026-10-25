@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.43 — 25 octobre 2026
+- **Convoy Storm** — Fini la balade : il y a maintenant de vrais enjeux à chaque instant.
+  - **Le Front** : un mur de tempête poursuit le convoi et ne s'arrête jamais, pas même en gare. S'il vous rattrape, c'est perdu. Une jauge montre l'avance qui reste, et l'écran s'assombrit quand il approche.
+  - **La manette de vitesse**, à l'arrière de la cabine : Éco (lent, économe), Normal ou À fond (on file, mais la chaudière dévore le fioul et la pression grimpe).
+  - **La pression** de la chaudière monte en permanence : quelqu'un doit lâcher la vapeur à la soupape (maintenir E devant la chaudière). Sinon elle explose : fioul perdu, convoi abîmé, équipiers projetés.
+  - **Des pannes à bord** : tuyaux gelés qui ralentissent le convoi, fuites qui vident le réservoir. Il faut aller réparer (maintenir E).
+  - **Des pillards en motoneige** longent le convoi, volent les caisses posées sur le pont et sabotent les wagons. Renversez-les depuis le bord du wagon (E), lancez-leur une caisse dessus ou chassez-les avec une fusée : ils lâchent leur butin et un peu de ferraille.
+  - **La solidité du convoi** baisse avec les explosions, les avalanches et les sabotages ; les gares en réparent une partie. À zéro, c'est fini.
+  - Une petite **cinématique d'ouverture** raconte l'histoire pendant que la caméra longe le convoi jusqu'au Front (bouton Passer, ou Entrée / Échap).
+  - Partie plus serrée : moins de fioul dans les ruines en Normale et en Blizzard. À plusieurs, il y a plus de travail à bord ; seul, la chaudière est un peu plus clémente.
+>>>>>>> 406e036 (feat(convoy): front de tempête, manette de vitesse, pression, pannes à bord, pillards et cinématique d'ouverture (v2.40))
+
 ## 2.42 — 24 octobre 2026
 - **Tous les jeux** — Fini les joueurs coincés à 1 500 ms de ping avec une bonne connexion :
   - Quand la connexion d'un joueur ne suit plus le flux de la partie (wifi chargé, débit un peu juste, micro-coupure), les images de la partie s'empilaient dans une file d'attente qui ne se vidait jamais : il jouait avec plusieurs secondes de retard. Le serveur mesure maintenant le retard de chaque joueur quatre fois par seconde et, s'il prend du retard, lui saute les images périmées pour ne garder que la plus récente. En test, un joueur dont la connexion ne suivait pas passait de 3 secondes de retard (et ça montait) à environ 0,2 seconde.
