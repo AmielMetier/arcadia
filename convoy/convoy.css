@@ -185,3 +185,34 @@ table.res td i{display:inline-block;width:12px;height:12px;border-radius:50%;bor
 .intro .skip:hover{background:rgba(255,255,255,.25)}
 .stormfx{position:absolute;inset:0;opacity:0;transition:opacity .5s;background:linear-gradient(0deg,rgba(58,64,78,.92) 0%,rgba(90,98,114,.55) 22%,transparent 50%);animation:sfx 3s ease-in-out infinite alternate}
 @keyframes sfx{from{background-position:0 0}to{background-position:0 12px}}
+
+/* ------------------------------------------------------------------ ambiances, nuit, Brise-Glace, cartes, aiguillage */
+.night{position:absolute;inset:0;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at 50% 55%,rgba(10,16,40,.15) 30%,rgba(6,10,28,.85) 100%)}
+.route .bio{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:700;margin-top:3px;border-top:1px dashed #d9d0bb;padding-top:3px}
+.route .bio .day{color:var(--muted);white-space:nowrap}
+.route .bio em{font-style:normal;color:var(--red);margin-left:6px}
+.boss{padding:5px 12px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;background:#ffe2d9;animation:low .6s infinite alternate}
+.boss b{font-family:var(--bung);font-weight:400;font-size:13px;white-space:nowrap}
+.boss .bb{flex:1;height:10px;border:2px solid var(--ink);border-radius:5px;background:#2a2622;overflow:hidden}
+.boss .bb i{display:block;height:100%;background:linear-gradient(90deg,#b3362a,#ff4b2b);transition:width .3s}
+.boss span{white-space:nowrap}
+.banner{position:absolute;top:28%;left:50%;transform:translateX(-50%);text-align:center;color:var(--paper);pointer-events:none;width:min(720px,calc(100vw - 30px))}
+.banner b{display:block;font-family:var(--bung);font-weight:400;font-size:clamp(24px,5vw,46px);-webkit-text-stroke:1.5px var(--ink);text-shadow:4px 4px 0 var(--ink)}
+.banner span{display:inline-block;margin-top:8px;background:rgba(22,24,29,.82);border-radius:10px;padding:5px 14px;font-weight:700;font-size:clamp(13px,2vw,17px)}
+.banner.in{animation:ban 3.2s ease-out forwards}
+@keyframes ban{0%{opacity:0;transform:translate(-50%,14px) scale(.96)}12%{opacity:1;transform:translateX(-50%)}82%{opacity:1}100%{opacity:0}}
+.station .ups button.free{background:#fff4cf;border-color:#b07a00}
+.station .ups button.free .co{color:#b07a00}
+.station .gift{color:#b07a00;font-weight:700}
+.station .fk{margin-top:10px;border-top:2px dashed #d9d0bb;padding-top:6px}
+.station .fk h3{font-family:var(--bung);font-weight:400;font-size:13px;margin:0 0 6px}
+.station .fk button{width:100%;display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:7px;text-align:left;background:#eef6ff;border:2px solid var(--ink);border-radius:9px;padding:5px 7px;margin-bottom:5px;cursor:pointer}
+.station .fk button:hover{background:#dcecff}
+.station .fk button.sel{background:#9fd3ff;box-shadow:inset 0 0 0 2px #1c5fb4}
+.station .fk .ic{font-size:20px}
+.station .fk .tx b{display:block;font-size:12.5px;line-height:1.1}
+.station .fk .tx small{display:block;font-size:10.5px;color:var(--muted);line-height:1.15}
+.station .fk .tx small.mo{color:#b3362a;font-weight:700;margin-top:1px}
+.station .fk em{font-style:normal;color:#1c5fb4;font-size:13px;letter-spacing:-2px}
+.station .wk{font-size:12.5px;margin:6px 0 0;line-height:1.35}
+.panel .legs{font-weight:700;font-size:13px;color:var(--muted)}

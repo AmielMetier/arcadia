@@ -76,11 +76,13 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 
 ## Convoy Storm
 Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un blizzard.
-- Le convoi avance tant que la chaudière a du fioul : une caisse = +25 %, à 0 % c'est la panne sèche
+- Le convoi avance tant que la chaudière a du fioul ; caisses de fioul, de charbon, de fioul gelé (à dégeler) et de pièces détachées
 - Sauter du train, fouiller les ruines, ramasser et lancer les caisses ; dans la neige, rattraper l'échelle de queue
-- Un front de tempête poursuit le convoi ; manette de vitesse, pression de la chaudière, pannes à bord, pillards en motoneige
-- Le froid (chaleur de chaque joueur), les loups (fusées éclairantes), les congères, avalanches et bourrasques
-- Gares : ravitaillement et améliorations achetées avec la ferraille ; deux modes : Expédition (rallier Fort-Givre) et Sans fin
+- Un front de tempête poursuit le convoi (il ralentit en gare) ; manette de vitesse, pression de la chaudière, pannes à bord, pillards en motoneige
+- Le froid (chaleur de chaque joueur), les loups (fusées éclairantes), les congères, avalanches et bourrasques, le jour et la nuit
+- Un paysage par tronçon (plaine, forêt, ville, lac gelé, col), choisi à l'aiguillage, et un moment fort (Brise-Glace, Pont de la Gorge, convoi abandonné, rugissement du Front)
+- Gares : ravitaillement, trois cartes d'amélioration tirées au hasard (la première offerte) ; rôles Mécano, Éclaireur, Chauffeur, Vigie
+- Deux modes : Expédition (rallier Fort-Givre) et Sans fin
 - Trois difficultés : Facile, Normale, Blizzard ; musique et sons générés en direct (WebAudio)
 - Décor : modèles 3D de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/`
 
@@ -91,7 +93,7 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
-  `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, froid, loups, gares, reprise) et le fait jouer par un pilote automatique.
+  `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillage, paysages, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

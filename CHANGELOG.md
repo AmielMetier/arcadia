@@ -1,5 +1,16 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.54 — 25 octobre 2026
+- **Convoy Storm** — Grosse mise à jour : chaque expédition est différente.
+  - **Le Front ralentit en gare** : on peut enfin faire ses achats sans perdre toute son avance.
+  - **Quatre sortes de caisses** : fioul (+25 %), charbon (+45 %, mais lourd et il se lance moins loin), fioul gelé (à garder près de la chaudière le temps qu'il dégèle, sinon il ne rend presque rien) et pièces détachées (rangées dans la chaudière, elles donnent de la ferraille).
+  - **Des paysages qui changent les règles** entre deux gares : Plaine gelée, Forêt noire (abritée du vent mais pleine de loups), Ville en ruine (des ruines partout et des pillards), Lac gelé (ça glisse, et la glace cède si l'on reste planté), Col des Glaces (grand froid et avalanches).
+  - **L'aiguillage** : en gare, votez la voie du tronçon suivant (touches 4 et 5). Chaque voie annonce son paysage et son moment fort.
+  - **Le jour et la nuit** : la nuit tombe toutes les six minutes. Les loups sortent en nombre et voient plus loin, le froid mord, mais les pillards se terrent.
+  - **Des cartes d'amélioration** : à chaque gare, trois cartes tirées au hasard parmi dix-huit (filet de récupération, échelle rallongée, crampons, blindage, brise-tempête, pistons neufs…). La première est offerte, les autres coûtent de la ferraille (touches 1 à 3).
+  - **Un moment fort par tronçon** : le Brise-Glace (un camion blindé de pillards qui harponne le convoi : coupez les grappins et lancez-lui des caisses), le Pont de la Gorge (passez-le en Éco, et que personne ne descende), un Convoi abandonné plein de caisses (mais le Front ne s'arrête pas), ou le Front qui rugit pendant 40 secondes.
+  - **Des rôles** à choisir avant le départ : Mécano (répare et coupe les grappins deux fois plus vite), Éclaireur (plus rapide dans la neige, fouille deux fois plus vite), Chauffeur (+6 % par caisse jetée au feu, craint moins le froid), Vigie (deux fusées de plus, lance plus loin, frappe fort le Brise-Glace). Sans choix, on prend le rôle qui manque à l'équipage.
+
 ## 2.53 — 25 octobre 2026
 - **Cyber Kart GP** — La musique passe par le même moteur audio que les bruitages : si on entend les bruitages, on entend la musique (iPad, iPhone, Brave). Elle démarre au premier toucher ou à la première touche, avec un petit fondu entre les morceaux.
 - **Cyber Kart GP** — Physique façon Mario Kart 8 :

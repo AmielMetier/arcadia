@@ -2,9 +2,10 @@
 // Géométrie déterministe, chute / remontée par l'échelle, lancer dans la chaudière, panne sèche,
 // reprise d'un état diffusé (migration d'hôte), et parties jouées par un pilote automatique.
 import assert from 'node:assert/strict';
-import { Sim, DT, stepPlayer, playerFromRow, DIFFICULTY, Ruins, trainSpeedFor, VMAX, LOST_DIST, stationDist, UPGRADES, obstacleColliders, windOf, DIG_T, FLARE_R,
-  THROTTLE, LEVER, VALVE, FAULTS, STORM_START } from '../convoy/engine/sim.js';
-import { chunkRuins, DECK_Y, REAR, BOILER, HALF_W, CHUNK, onDeckRect } from '../convoy/engine/world.js';
+import { Sim, DT, stepPlayer, playerFromRow, DIFFICULTY, Ruins, trainSpeedFor, VMAX, LOST_DIST, stationDist, CARDS, cardCost, obstacleColliders, windOf, DIG_T, FLARE_R,
+  THROTTLE, LEVER, VALVE, FAULTS, STORM_START, STORM_STATION_K, ROLES, THAW_T, nightK, dayInfo, DAY_LEN, legAt, momentPos, momentOf, momentKind, chunkEnv,
+  BRIDGE_LEN, HOOK_SPOTS, moveCtx, momentColliders, LEG_SHIFT } from '../convoy/engine/sim.js';
+import { chunkRuins, DECK_Y, REAR, BOILER, HALF_W, CHUNK, onDeckRect, BIOMES } from '../convoy/engine/world.js';
 
 let n = 0;
 // sans tempête, pression, pannes ni pillards : pour tester une mécanique à la fois
@@ -252,7 +253,7 @@ t('congère : le convoi s\'arrête devant, on déblaie, il repart', () => {
   assert.ok(sim.v > 0.5, 'le convoi repart');
 });
 
-t('gare : arrêt, chaleur et fusées rendues, achats, vote du départ', () => {
+t('gare : arrêt, chaleur et fusées rendues, cartes, aiguillage, vote du départ', () => {
   const sim = calmSim({ seed: 51, mode: 'endless' });
   const a = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' }), b = sim.addPlayer({ id: 1, name: 'B', color: '#00ff00' });
   sim.ed = 1e9;
@@ -266,18 +267,33 @@ t('gare : arrêt, chaleur et fusées rendues, achats, vote du départ', () => {
   assert.equal(a.heat, 100); assert.ok(a.flares >= 2);
   assert.ok(ev.some((e) => e.e === 'station'));
   const f0 = sim.fuel; run(sim, 5); assert.equal(sim.fuel, f0, 'rien ne brûle en gare');
-  assert.equal(sim.buy(0, 'boiler'), null); assert.equal(sim.up.boiler, 1); assert.equal(sim.scrap, 6);
-  assert.equal(sim.buy(1, 'coats'), null); assert.equal(sim.scrap, 3);
-  assert.ok(sim.buy(0, 'tank'), 'pas assez de ferraille');
+  // trois cartes différentes ; la première est offerte, les suivantes coûtent de la ferraille
+  const [c0, c1, c2] = sim.stop.c;
+  assert.equal(new Set(sim.stop.c).size, 3);
+  assert.equal(sim.buy(0, c0), null); assert.equal(sim.up[c0], 1); assert.equal(sim.scrap, 10, 'carte offerte');
+  assert.equal(sim.buy(1, c0), 'Déjà prise.');
+  const cost = cardCost(c1, sim.up[c1]);
+  assert.equal(sim.buy(1, c1), null); assert.equal(sim.scrap, 10 - cost);
+  sim.scrap = 0; assert.ok(sim.buy(0, c2), 'pas assez de ferraille');
+  assert.ok(sim.buy(0, Object.keys(CARDS).find((k) => !sim.stop.c.includes(k))), 'carte non proposée');
+  // aiguillage : deux voies, la majorité l'emporte
+  assert.equal(sim.stop.fk.length, 2); assert.notEqual(sim.stop.fk[0], sim.stop.fk[1]);
+  const pick = sim.stop.fk[1];
+  sim.route(0, 1); sim.route(1, 1); sim.route(1, 0); sim.route(1, 1);
   sim.vote(0); run(sim, 1); assert.ok(sim.stop, 'il manque un vote');
   sim.vote(1); run(sim, 1);
   assert.equal(sim.stop, null, 'départ'); assert.equal(sim.ns, 1);
-  assert.equal(sim.buy(0, 'radar'), 'On n\'achète qu\'en gare.');
+  assert.equal(sim.legs[1], pick, 'tronçon suivant : ' + pick);
+  assert.equal(sim.buy(0, c2), 'On n\'achète qu\'en gare.');
+  // le paysage change un peu après la gare
+  assert.equal(legAt('endless', 0, sd + LEG_SHIFT - 1), 0); assert.equal(legAt('endless', 0, sd + LEG_SHIFT + 1), 1);
+  assert.equal(chunkEnv(51, 'endless', 0, sim.legs, Math.ceil((sd + LEG_SHIFT) / CHUNK) + 1).bio, pick);
   // sans vote, le convoi repart tout seul
   const s2 = calmSim({ seed: 52, mode: 'endless' }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s2.ed = 1e9;
   s2.dist = sd - 5; s2.v = 1;
   run(s2, 70);
   assert.equal(s2.ns, 1, 'départ au bout du compte à rebours');
+  assert.ok(s2.legs[1], 'une voie choisie par défaut');
 });
 
 t('expédition : trois gares, puis l\'arrivée à Fort-Givre gagne la partie', () => {
@@ -436,6 +452,207 @@ t('reprise identique avec tempête, pannes et pillards', () => {
   assert.deepEqual(copy.faults.map((f) => f.k), sim.faults.map((f) => f.k));
 });
 
+t('front en gare : il ralentit nettement', () => {
+  const sim = new Sim({ seed: 120, mode: 'endless' }); sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  const v0 = sim.stormSpeed();
+  sim.stop = { k: 'station', i: 0, t: 50, v: [], c: [], b: [0, 0, 0], f: 1, fk: null, rv: [] };
+  assert.ok(Math.abs(sim.stormSpeed() - v0 * STORM_STATION_K) < 1e-9);
+  sim.press = -1e9; sim.nf = 1e9; sim.rd = 1e9; sim.ed = 1e9;
+  const g0 = sim.gap; run(sim, 40, () => sim.drainEvents());
+  assert.ok(g0 - sim.gap < v0 * 40 * 0.35, 'avance perdue en 40 s de gare : ' + (g0 - sim.gap).toFixed(0) + ' m');
+});
+
+t('caisses : fioul, charbon, fioul gelé (dégel près du feu), pièces détachées', () => {
+  const sim = calmSim({ seed: 121 }); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000', role: 0 });
+  sim.fuel = 20;
+  sim.feed(0, 2); assert.ok(Math.abs(sim.fuel - 65) < 1e-6, 'charbon +45');
+  sim.feed(0, 3); assert.ok(Math.abs(sim.fuel - 73) < 1e-6, 'gelé : presque rien');
+  const sc = sim.scrap; sim.feed(0, 4); assert.equal(sim.scrap, sc + 3, 'pièces : ferraille'); assert.ok(Math.abs(sim.fuel - 73) < 1e-6);
+  // une caisse gelée posée près de la chaudière devient du fioul
+  const c = sim.spawnCrate(0.4, DECK_Y + 0.25, 2.2, 1, null, 3);
+  run(sim, THAW_T + 0.5, () => { p.inp = { mx: 0, mz: 0 }; });
+  assert.equal(c.t, 1, 'dégelée');
+  // portée près du feu, elle dégèle aussi
+  Object.assign(p, { x: 0.2, z: 2.2, carry: 3, cth: 0 });
+  run(sim, THAW_T + 0.5, () => { p.inp = { mx: 0, mz: 0 }; });
+  assert.equal(p.carry, 1);
+  // le charbon est lourd
+  const a = { ...p, carry: 2, on: 0, ref: 0, y: 0, vx: 0, vz: 0, st: 0 }, b = { ...p, carry: 1, on: 0, ref: 0, y: 0, vx: 0, vz: 0, st: 0 };
+  for (let i = 0; i < 40; i++) { stepPlayer(a, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); stepPlayer(b, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); }
+  assert.ok(a.vx < b.vx * 0.8, 'porter du charbon ralentit');
+  // l'état diffusé garde le type des caisses
+  const copy = Sim.restore(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.deepEqual(copy.crates.map((q) => q.t), sim.crates.map((q) => q.t));
+});
+
+t('ambiances : la ville regorge de ruines, la forêt d\'arbres, le pont reste dégagé', () => {
+  const count = (bio, f) => { let n = 0; for (let k = 2; k < 120; k++) n += f(chunkRuins(7, k, 0.6, { bio })); return n; };
+  assert.ok(count('ville', (c) => c.ruins.length) > count('foret', (c) => c.ruins.length) * 2, 'ville > forêt en ruines');
+  assert.ok(count('foret', (c) => c.trees.length) > count('plaine', (c) => c.trees.length) * 2, 'forêt > plaine en sapins');
+  for (let k = 0; k < 40; k++) {
+    const c = chunkRuins(9, k, 0.9, { bio: 'ville', clear: [400, 450] });
+    for (const r of c.ruins) assert.ok(-r.zw < 390 - 3 || -r.zw > 460 + 3, 'aucune ruine sur le pont');
+    for (const tr of c.trees) assert.ok(-tr.zw < 390 || -tr.zw > 460, 'aucun sapin sur le pont');
+  }
+  for (const b of Object.values(BIOMES)) for (const m of Object.keys(b.moments)) assert.ok(['boss', 'bridge', 'wreck', 'roar'].includes(m));
+  // lac gelé : on glisse, et la glace cède si l'on reste planté
+  const sim = calmSim({ seed: 122, mode: 'endless' }); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.legs = ['lac']; sim.ruins.setLegs(sim.legs); sim.ed = 1e9;
+  Object.assign(p, { on: 0, ref: 0, y: 0, x: 9, z: 0, carry: 1 });
+  const ev = []; run(sim, 4, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; sim.v = 0; });
+  assert.ok(ev.some((e) => e.e === 'ice_warn') && ev.some((e) => e.e === 'crack' && e.p === 0), 'la glace cède');
+  assert.equal(p.carry, 0); assert.ok(p.heat < 70);
+  const ice = { x: 0, z: 0, y: 0, vx: 0, vz: 0, on: 0, ref: 0, air: 0, st: 0 }, snow = { ...ice };
+  for (let i = 0; i < 20; i++) { stepPlayer(ice, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {}, ice: true }, [])); stepPlayer(snow, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); }
+  assert.ok(ice.vx < snow.vx * 0.6, 'ça glisse : on démarre lentement');
+});
+
+t('jour et nuit : la nuit tombe, les loups sont plus nombreux, pas de pillards', () => {
+  assert.equal(nightK(0), 0);
+  let tn = 0; while (!dayInfo(tn).night) tn += 1;
+  assert.ok(tn > 120 && tn < DAY_LEN, 'première nuit après ' + tn + ' s');
+  assert.ok(nightK(tn + 20) > 0.9);
+  let td = tn; while (dayInfo(td).night) td += 1;
+  assert.ok(td - tn > 60 && td - tn < DAY_LEN / 2, 'la nuit dure ' + (td - tn) + ' s');
+  const sim = new Sim({ seed: 123 }); sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.t = tn + 20; sim.dist = 1000; sim.rd = 0; sim.storm = -1e9; sim.press = -1e9; sim.nf = 1e9; sim.ed = 1e9;
+  const ev = []; run(sim, 2, () => ev.push(...sim.drainEvents()));
+  assert.ok(ev.some((e) => e.e === 'night'), 'annonce de la nuit');
+  assert.equal(sim.raiders.length, 0, 'pas de raid la nuit');
+});
+
+t('moments forts : placés au milieu des tronçons, selon l\'ambiance choisie', () => {
+  for (const mode of ['expedition', 'endless']) for (const seed of [1, 2, 3]) {
+    const goal = mode === 'expedition' ? 2000 : 0;
+    for (let L = 1; L < 4; L++) {
+      const d = momentPos(seed, mode, goal, L); assert.ok(d != null);
+      assert.equal(legAt(mode, goal, d), L, 'dans son tronçon');
+      assert.ok(d + BRIDGE_LEN < (stationDist(mode, goal, L) ?? goal) - 100, 'loin de la gare suivante');
+    }
+  }
+  assert.equal(momentOf(5, 'expedition', 2000, ['plaine'], 1), null, 'pas avant l\'aiguillage');
+  const m = momentOf(5, 'expedition', 2000, ['plaine', 'lac'], 1);
+  assert.ok(['bridge', 'boss'].includes(m.k) && m.k === momentKind(5, 1, 'lac'));
+  // aucun événement de voie sur un moment fort
+  const sim = new Sim({ seed: 5 });
+  for (let i = 1; i < 12; i++) { sim.ed = sim.eventDist(i); for (let L = 1; L < 4; L++) { const d = momentPos(5, 'expedition', sim.goal, L); assert.ok(sim.ed < d - 100 || sim.ed > d + BRIDGE_LEN + 100); } }
+});
+
+// un convoi bien réglé arrivant sur le moment fort du tronçon 1 de l'ambiance donnée
+function momentSim(kind, seedFrom = 200) {
+  for (let seed = seedFrom; seed < seedFrom + 400; seed++) for (const bio of BIOME_LIST) {
+    if (momentKind(seed, 1, bio) !== kind) continue;
+    const sim = new Sim({ seed, mode: 'endless' });
+    sim.legs = ['plaine', bio]; sim.ruins.setLegs(sim.legs);
+    sim.press = -1e9; sim.nf = 1e9; sim.rd = 1e9; sim.ed = 1e9; sim.storm = -1e9;
+    const d = momentPos(seed, 'endless', 0, 1);
+    sim.ns = 1; sim.cl = 1; sim.dist = d - 240; sim.v = 2; sim.ks = Math.floor((sim.dist + 85) / CHUNK);
+    return { sim, d };
+  }
+  throw new Error('pas de graine pour ' + kind);
+}
+const BIOME_LIST = Object.keys(BIOMES);
+
+t('pont de la gorge : trop vite il se fissure, en Éco ça passe ; dehors, la chute', () => {
+  const { sim, d } = momentSim('bridge'); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  const ev = []; run(sim, 200, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; });
+  assert.ok(ev.some((e) => e.e === 'moment' && e.k === 'bridge'));
+  assert.ok(ev.some((e) => e.e === 'bridge_crack'), 'à pleine vitesse le pont cède'); assert.ok(sim.hull < 80);
+  const e2 = momentSim('bridge'); const q = e2.sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); e2.sim.thr = 0;
+  const ev2 = []; run(e2.sim, 200, () => { ev2.push(...e2.sim.drainEvents()); q.inp = { mx: 0, mz: 0 }; e2.sim.fuel = 100; });
+  assert.ok(ev2.some((e) => e.e === 'bridge_done') && !ev2.some((e) => e.e === 'bridge_crack'), 'en Éco, pas de casse');
+  // un joueur resté dehors au-dessus de la gorge
+  const e3 = momentSim('bridge'); const r = e3.sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  e3.sim.dist = e3.d - 150; e3.sim.step(DT); e3.sim.drainEvents();
+  e3.sim.dist = e3.d + 30; e3.sim.v = 0;
+  Object.assign(r, { on: 0, ref: 0, y: 0, x: 6, z: 2 });
+  const ev3 = []; run(e3.sim, 0.5, () => { ev3.push(...e3.sim.drainEvents()); r.inp = { mx: 0, mz: 0 }; });
+  assert.ok(ev3.some((e) => e.e === 'gorge'), 'tombé dans la gorge');
+  assert.ok(momentColliders(null, 0).length === 0);
+});
+
+t('convoi abandonné : arrêt, caisses le long du vieux train, départ au vote', () => {
+  const { sim, d } = momentSim('wreck'); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  const ev = []; run(sim, 200, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; if (sim.stop && sim.stop.k === 'wreck') sim.v = 0; return; });
+  // il s'arrête, puis repart tout seul au bout du compte à rebours
+  assert.ok(ev.some((e) => e.e === 'wreck'), 'arrêt au convoi abandonné');
+  assert.ok(sim.dist > d + 5, 'reparti');
+  const w = momentSim('wreck'); const q = w.sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  for (let i = 0; i < 200 * 60 && !(w.sim.stop && w.sim.stop.k === 'wreck'); i++) { q.inp = { mx: 0, mz: 0 }; w.sim.fuel = 100; w.sim.step(DT); }
+  assert.ok(w.sim.stop && Math.abs(w.sim.dist - w.d) < 0.3);
+  assert.ok(w.sim.crates.filter((c) => c.m === 0).length >= 5, 'des caisses à ramasser');
+  assert.equal(momentColliders(w.sim.mm, w.sim.dist).length, 3, 'les vieux wagons sont solides');
+  const copy = Sim.restore(JSON.parse(JSON.stringify(w.sim.snapshot())));
+  assert.equal(copy.stop.k, 'wreck'); assert.equal(copy.mm.k, 'wreck');
+  w.sim.vote(0); run(w.sim, 0.5);
+  assert.equal(w.sim.stop, null, 'départ au vote');
+});
+
+t('le Brise-Glace : grappins qui freinent, coupés au couteau, abattu à coups de caisses', () => {
+  const { sim, d } = momentSim('boss'); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000', role: 3 });
+  const m = sim.addPlayer({ id: 1, name: 'M', color: '#00ff00', role: 0 });
+  const ev = [];
+  for (let i = 0; i < 200 * 60 && !sim.hooks.length; i++) { p.inp = m.inp = { mx: 0, mz: 0 }; sim.fuel = 100; sim.step(DT); ev.push(...sim.drainEvents()); }
+  assert.ok(sim.boss && ev.some((e) => e.e === 'moment' && e.k === 'boss') && ev.some((e) => e.e === 'hook'), 'grappin lancé');
+  assert.ok(sim.speedK() < 0.8, 'le grappin freine');
+  const h = sim.hooks[0];
+  Object.assign(m, { x: h.x * 0.85, z: h.z, on: 1, ref: 1, y: DECK_Y, air: 0, st: 0 });
+  run(sim, 1.2, () => { m.inp = { mx: 0, mz: 0, use: true }; p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; ev.push(...sim.drainEvents()); });
+  assert.ok(ev.some((e) => e.e === 'cut'), 'le mécano coupe vite');
+  // la vigie lance des caisses sur le camion (2 dégâts par coup)
+  const b = sim.boss; const hp0 = b.hp, sc0 = sim.scrap;
+  for (let k = 0; k < 3 && sim.boss && sim.boss.st < 3; k++) {
+    const c = sim.spawnCrate(b.x, 2.5, b.z, 2, { vx: 0, vy: 0, vz: 0 }); c.by = 0; sim.step(DT); ev.push(...sim.drainEvents());
+  }
+  assert.ok(ev.some((e) => e.e === 'boss_hit' && e.hp === Math.max(0, hp0 - 2)), 'touché');
+  assert.ok(ev.some((e) => e.e === 'boss_down'), 'abattu'); assert.equal(sim.hooks.length, 0);
+  assert.ok(sim.scrap >= sc0 + 4, 'butin');
+  const copy = Sim.restore(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.equal(copy.boss.st, 3);
+});
+
+t('rugissement du Front : il fonce, puis s\'essouffle', () => {
+  const { sim, d } = momentSim('roar'); sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  sim.storm = sim.dist - 150;
+  const v0 = sim.stormSpeed();
+  sim.dist = d; sim.step(DT); sim.drainEvents();
+  assert.equal(sim.mm.k, 'roar'); assert.ok(sim.stormSpeed() > v0 * 1.6);
+  sim.mm.t = 41; assert.ok(sim.stormSpeed() < v0 * 0.7);
+});
+
+t('rôles : chacun son talent', () => {
+  const sim = calmSim({ seed: 124 });
+  const ps = [0, 1, 2, 3].map((i) => sim.addPlayer({ id: i, name: 'P' + i, color: '#ff0000' }));
+  assert.deepEqual(ps.map((p) => p.role).sort(), [0, 1, 2, 3], 'rôles répartis automatiquement');
+  assert.equal(ROLES.length, 4);
+  const guard = ps.find((p) => p.role === 3), other = ps.find((p) => p.role === 1);
+  assert.equal(guard.flares, other.flares + 2, 'la vigie a deux fusées de plus');
+  const stoker = ps.find((p) => p.role === 2);
+  sim.fuel = 10; sim.feed(stoker.id, 1); assert.ok(Math.abs(sim.fuel - 41) < 1e-6, 'le chauffeur tire plus du fioul');
+  const scout = { ...other, on: 0, ref: 0, y: 0, vx: 0, vz: 0, st: 0, carry: 0 }, meca = { ...scout, role: 0 };
+  for (let i = 0; i < 60; i++) { stepPlayer(scout, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); stepPlayer(meca, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); }
+  assert.ok(scout.vx > meca.vx * 1.1, 'l\'éclaireur court plus vite dans la neige');
+  // le rôle voyage dans l'état diffusé
+  assert.equal(playerFromRow(sim.snapshot().P.find((a) => a[0] === stoker.id)).role, 2);
+});
+
+t('cartes : leurs effets', () => {
+  const sim = new Sim({ seed: 125 }); sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
+  const b0 = sim.burnRate(), k0 = sim.speedK(), s0 = sim.stormSpeed();
+  Object.assign(sim.up, { boiler: 1, pistons: 1, breaker: 1 });
+  assert.ok(sim.burnRate() < b0 && sim.speedK() > k0 && sim.stormSpeed() < s0);
+  // filet : une caisse qui rate le wagon de peu est rattrapée
+  sim.up.net = 1; sim.calm = true;
+  const c = sim.spawnCrate(HALF_W + 1.5, 2, 3, 2, { vx: 0, vy: 0, vz: 0 }); run(sim, 1);
+  assert.equal(c.m, 1, 'rattrapée à bord');
+  // échelle rallongée
+  const p = { x: 1.8, z: REAR + 2.6, y: 0, vx: 0, vz: 0, on: 0, ref: 1, air: 0, st: 0 };
+  stepPlayer(p, { mx: 0, mz: 0 }, DT, moveCtx({ v: 0, up: { ladder: 1 } }, []));
+  assert.equal(p.st, 2, 'on attrape l\'échelle de plus loin');
+  // pas deux fois la même carte au maximum
+  sim.up.radar = 1; for (let i = 0; i < 20; i++) assert.ok(!sim.cardsFor(i).includes('radar'));
+});
+
 // Pilote automatique très simple : fouille, rapporte, remonte, nourrit.
 function autopilot(sim, p, time) {
   const t0 = (time * 60) | 0;
@@ -447,9 +664,12 @@ function autopilot(sim, p, time) {
   if (p.st >= 2) return;
   // en gare : on vote le départ (après avoir dépensé la ferraille)
   if (sim.stop && sim.stop.k === 'station') {
-    for (const k of Object.keys(UPGRADES)) sim.buy(p.id, k);
+    for (const k of sim.stop.c) sim.buy(p.id, k);
+    if (sim.stop.fk && !sim.stop.rv.some((x) => x[0] === p.id)) sim.route(p.id, (p.id + sim.ns) % 2);
     if (!sim.stop.v.includes(p.id)) sim.vote(p.id);
   }
+  // convoi abandonné : on ramasse ce qu'on peut, puis on repart
+  if (sim.stop && sim.stop.k === 'wreck' && sim.stop.t < 20 && !sim.stop.v.includes(p.id) && (p.on || sim.stop.t < 8)) sim.vote(p.id);
   // à bord : le premier équipier présent tient la soupape, la manette et les réparations
   const crew = [...sim.players.values()].filter((q) => q.on && q.st < 2 && !q.carry);
   const chief = crew.length && crew.reduce((a, b) => (a.id < b.id ? a : b)) === p;
@@ -458,12 +678,15 @@ function autopilot(sim, p, time) {
     if (sim.press > 62 && (chief || sim.press > 85)) p.vent = true;
     if (sim.press < 8) p.vent = false;
     if (p.vent) { if (go(VALVE.x, VALVE.z - 0.3) < 0.7) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
+    const hook = sim.hooks[p.id % Math.max(1, sim.hooks.length)];
+    if (hook) { if (go(hook.x * 0.85, hook.z) < 0.6) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
     const raider = sim.raiders.find((w) => w.st === 1);
     if (raider) { if (go(raider.side * (HALF_W - 0.4), raider.z) < 0.8) p.inp = { ...p.inp, mx: 0, mz: 0, use: edge }; return; }
     const f = sim.faults[0];
     if (f && (chief || sim.faults.length > 1)) { const tf = sim.faults.length > 1 && !chief ? sim.faults[1] : f; if (go(tf.x * 0.75, tf.z) < 0.6) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
     if (chief) {
-      const want = sim.gap < 80 && sim.fuel > 45 ? 2 : sim.fuel < 30 && sim.gap > 110 ? 0 : 1;
+      const M = sim.mm, bridge = M && M.k === 'bridge' && sim.dist > M.d - 90;
+      const want = bridge ? 0 : sim.gap < 80 && sim.fuel > 45 ? 2 : sim.fuel < 30 && sim.gap > 110 ? 0 : 1;
       if (want !== sim.thr) { if (go(LEVER.x, LEVER.z + 0.5) < 0.6) p.inp = { ...p.inp, mx: 0, mz: 0, use: edge }; return; }
     }
   }
@@ -474,15 +697,24 @@ function autopilot(sim, p, time) {
     if (go(Math.sign(p.x || 1) * 1.2, zd + 2.2) < 1.5) p.inp.use = true;
     return;
   }
-  // le front approche : on reste à bord
-  if (!p.on && sim.gap < 45 && !p.carry) { go(0, REAR + 0.7); return; }
+  // le front approche, ou le pont : on reste à bord
+  const onBridge = sim.mm && sim.mm.k === 'bridge' && sim.dist > sim.mm.d - 70;
+  if (!p.on && (sim.gap < 45 || onBridge) && !p.carry) { go(0, REAR + 0.7); return; }
+  if (p.on && onBridge && !p.carry) { go(0, 4); return; }
+  // le Brise-Glace : on lui lance des caisses depuis le bord du wagon
+  const B = sim.boss;
+  if (B && B.st === 1 && p.carry && p.on && sim.fuel > 35) {
+    if (go(B.side * (HALF_W - 0.4), B.z) < 0.6) { p.yaw = B.side > 0 ? Math.PI / 2 : -Math.PI / 2; p.inp = { ...p.inp, mx: 0, mz: 0, thr: (p.inp.thr | 0) + (t0 % 20 === 0 ? 1 : 0) }; }
+    return;
+  }
   // un loup aux trousses : fusée
   if (!p.on && sim.wolves.some((w) => w.tg === p.id) && p.flares > 0 && t0 % 30 === 0) p.inp.fl = (p.inp.fl | 0) + 1;
   // trop froid : retour au chaud près de la chaudière
   if ((p.heat ?? 100) < 30 && !p.carry) { if (p.on) go(0.2, 2.2); else go(0, REAR + 0.7); return; }
   const near = (c) => ({ x: c.x, z: c.m === 0 ? c.z + sim.dist : c.z });
   if (p.carry) {
-    if (p.on) { if (go(0.2, 1.9) < 0.5) p.inp = { mx: 0, mz: 0, use: t0 % 2 === 0 }; }
+    // une caisse gelée : on attend qu'elle dégèle près du feu
+    if (p.on) { if (go(0.2, 1.9) < 0.5) p.inp = { mx: 0, mz: 0, use: p.carry !== 3 && t0 % 2 === 0 }; }
     else if (p.z < REAR + 0.3 && Math.abs(p.x) < HALF_W + 1) go(Math.sign(p.x || 1) * (HALF_W + 1.4), REAR + 1);
     else go(0, REAR + 0.7);
     return;
