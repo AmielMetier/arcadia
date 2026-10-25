@@ -65,7 +65,7 @@ button{font:inherit;color:inherit}
 .pop{position:absolute;transform:translate(-50%,-50%);font-family:var(--bung);font-size:20px;color:#fff;-webkit-text-stroke:1px var(--ink);text-shadow:2px 2px 0 var(--ink);animation:pop 1.5s ease-out forwards;white-space:nowrap}
 .pop.fire{color:var(--fire)}.pop.gold{color:var(--yellow)}.pop.cold{color:var(--ice)}
 @keyframes pop{0%{opacity:0;margin-top:10px}15%{opacity:1}100%{opacity:0;margin-top:-60px}}
-.toast{position:absolute;top:150px;left:50%;transform:translateX(-50%);font-family:var(--bung);font-size:clamp(16px,3vw,24px);color:var(--paper);-webkit-text-stroke:1px var(--ink);text-shadow:3px 3px 0 var(--ink);text-align:center;white-space:nowrap}
+.toast{position:absolute;top:196px;left:50%;transform:translateX(-50%);font-family:var(--bung);font-size:clamp(16px,3vw,24px);color:var(--paper);-webkit-text-stroke:1px var(--ink);text-shadow:3px 3px 0 var(--ink);text-align:center;white-space:nowrap}
 .help{position:absolute;right:12px;bottom:12px;padding:6px 10px;font-size:12px;font-weight:600;max-width:360px}
 .vitals{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:5px 12px;font-weight:700}
 .vitals .hb{width:150px;height:12px;border:2px solid var(--ink);border-radius:6px;background:#2a3540;overflow:hidden}
@@ -147,3 +147,41 @@ table.res td i{display:inline-block;width:12px;height:12px;border-radius:50%;bor
 .nogl{color:var(--paper);font-size:18px;text-align:center;max-width:520px}
 @media (max-width:900px){.topc{width:calc(100vw - 130px);left:12px;transform:none;min-width:0}.stats{top:auto;bottom:12px;left:12px}.team{top:auto;bottom:70px}.help{display:none}.station{top:auto;bottom:100px}}
 @media (max-width:640px){.mate{width:150px}.stats{gap:9px}.stats b{font-size:14px}.vitals .hb{width:90px}}
+
+/* ------------------------------------------------------------------ pression, manette, front, solidité */
+.fuel .sm2{font-size:12px;margin-top:3px;border-top:1px dashed #d9d0bb;padding-top:3px}
+.fuel .sm2 .pr{display:flex;align-items:center;gap:5px}
+.fuel .sm2 .pb{display:inline-block;width:90px;height:8px;border:2px solid var(--ink);border-radius:4px;background:#2a2622;overflow:hidden}
+.fuel .sm2 .pb i{display:block;height:100%;background:linear-gradient(90deg,#9fd3ff,#ffc531 60%,#ff4b2b);transition:width .2s}
+.fuel .sm2 b{font-family:var(--bung);font-weight:400;font-size:12px}
+.fuel .sm2.hot .pr{color:var(--red);animation:low .3s infinite alternate}
+.fuel .sm2[data-thr="2"] .th b{color:var(--red)}
+.fuel .sm2[data-thr="0"] .th b{color:#1c8a50}
+.route .storm{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;font-weight:700}
+.route .storm span{white-space:nowrap}
+.route .storm .sb{flex:1;height:7px;border:2px solid var(--ink);border-radius:4px;background:#e7e1d3;overflow:hidden;transform:scaleX(-1)}
+.route .storm .sb i{display:block;height:100%;background:#7f8da0;transition:width .3s}
+.route .storm b{font-family:var(--bung);font-weight:400;font-size:12px;min-width:44px;text-align:right}
+.route .storm.near .sb i{background:#ff8a2a}
+.route .storm.close{color:var(--red);animation:low .3s infinite alternate}
+.route .storm.close .sb i{background:var(--red)}
+#hullBox.low b{color:var(--red)}
+.prompt .pg.hot i{background:var(--red)}
+
+/* ------------------------------------------------------------------ intro */
+.intro{position:fixed;inset:0;z-index:12;pointer-events:none}
+.intro .bars{position:absolute;inset:0;background:linear-gradient(#000 0 11vh,transparent 11vh calc(100% - 11vh),#000 calc(100% - 11vh));animation:bars 1s ease-out}
+@keyframes bars{from{background:linear-gradient(#000 0 50vh,transparent 50vh calc(100% - 50vh),#000 calc(100% - 50vh))}}
+.intro .txt{position:absolute;left:0;right:0;bottom:15vh;text-align:center;color:#fff;padding:0 20px;opacity:0;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.intro .txt.in{animation:itx 2.6s ease-out forwards}
+@keyframes itx{0%{opacity:0;transform:translateY(12px)}18%{opacity:1;transform:none}85%{opacity:1}100%{opacity:.0}}
+.intro .txt b{display:block;font-family:var(--bung);font-weight:400;font-size:clamp(22px,4.2vw,42px);letter-spacing:1px}
+.intro .txt span{display:block;font-size:clamp(14px,2vw,19px);font-weight:600;margin-top:6px;opacity:.9}
+.intro .txt h1{font-family:var(--bung);font-weight:400;font-size:clamp(34px,8vw,80px);margin:14px 0 0;color:var(--paper);-webkit-text-stroke:2px var(--ink)}
+.intro .txt h1 em{font-style:normal;color:#9fd3ff}
+.intro .txt.in:has(h1){animation:itx2 3s ease-out forwards}
+@keyframes itx2{0%{opacity:0;transform:scale(.95)}20%{opacity:1;transform:none}100%{opacity:1}}
+.intro .skip{pointer-events:auto;position:absolute;right:18px;bottom:calc(11vh + 12px);background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 14px;font-weight:700;cursor:pointer}
+.intro .skip:hover{background:rgba(255,255,255,.25)}
+.stormfx{position:absolute;inset:0;opacity:0;transition:opacity .5s;background:linear-gradient(0deg,rgba(58,64,78,.92) 0%,rgba(90,98,114,.55) 22%,transparent 50%);animation:sfx 3s ease-in-out infinite alternate}
+@keyframes sfx{from{background-position:0 0}to{background-position:0 12px}}

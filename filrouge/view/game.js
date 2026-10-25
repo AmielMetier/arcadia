@@ -88,8 +88,9 @@ export function mountGame(root, { me, session, exit }) {
   // décor de l'avant-partie : une bombe d'exemple sur la table
   function previewBomb() {
     if (!ensureScene() || gameKey) return;
-    const ed = previewEd = 1000 + Math.floor(Math.random() * 9000);
-    const team = { bomb: makeBomb(rngOf({ seed: randomSeed() }), manualOf(ed), 2), strikes: 0, status: 'live', clock: { left: 300000, at: Date.now() + 1e9, rate: 1 } };
+    const Q = new URLSearchParams(location.search);
+    const ed = previewEd = +Q.get('ed') || 1000 + Math.floor(Math.random() * 9000);
+    const team = { bomb: makeBomb(rngOf({ seed: +Q.get('seed') || randomSeed() }), manualOf(ed), +Q.get('d') || 2), strikes: 0, status: 'live', clock: { left: 300000, at: Date.now() + 1e9, rate: 1 } };
     scene.setBomb(team, { edition: ed, maxStrikes: 3 });
     scene.setTeam(team, 0);
     gameKey = 'preview';

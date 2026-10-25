@@ -4,7 +4,9 @@
    Protocole (champ t) :
      invité → hôte : hello {name,color,lvl} · me {name,color,lvl} · chat {txt} · ready {game} · g {to,m} · ping · bye
      hôte → invité : welcome {id} · lobby {players,game,ready,code,host} · chat {...} · g {from,m} · pong · full · bye
-   `g` transporte les messages d'un jeu ; le Hub ne les lit pas. `to` vaut un id de joueur, 'host' ou 'all'. */
+   `g` transporte les messages d'un jeu ; le Hub ne les lit pas. `to` vaut un id de joueur, 'host' ou 'all'.
+   `v` (volatil) : instantané d'état continu ; sauté si la connexion sature, et à l'arrivée seul le plus récent
+   de chaque expéditeur est transmis au jeu (un ordinateur lent ne prend pas de retard en rattrapant une file). */
 (function () {
   const MAX_PLAYERS = 6;
   const PREFIX = 'ddhub-v1-';
@@ -13,6 +15,11 @@
   const cleanName = (s) => clean(s, 12) || 'Joueur';
   const cleanUid = (s) => (/^[a-z0-9]{6,16}$/.test(String(s)) ? String(s) : null);
   const RES = () => window.DDResults;
+
+  // Charge de l'ordinateur : retard moyen de la boucle d'événements (un PC qui rame répond tard à tout, ping compris)
+  let loopLag = 0;
+  (function () { let last = performance.now(); setInterval(() => { const now = performance.now(); loopLag = loopLag * 0.75 + Math.max(0, now - last - 250) * 0.25; last = now; }, 250); })();
+  const myDiag = (net) => ({ lag: Math.round(loopLag), net: net.rtt || 0, hid: document.hidden ? 1 : 0 });
 
   function createRoom(handlers) {
     const net = DDNet.create({ prefix: PREFIX, maxPeers: MAX_PLAYERS - 1 });
@@ -24,6 +31,7 @@
       ready: {},                // { playerId: gameId }
       chat: [],
       pings: {}, lastRecv: 0, lastRecvC: {},
+      diag: {},                 // { playerId: { lag, net, hid } } : d'où vient un gros ping (ordinateur, onglet caché, réseau)
       get isHost() { return this.mode === 'host' || this.mode === 'solo'; },
       get me() { return this.players.find((p) => p.id === this.myId); },
     };
@@ -33,16 +41,33 @@
     const pushChat = (c) => { R.chat.push(c); R.chat = R.chat.slice(-40); emit('chat', c); };
     const sys = (txt) => { const c = { id: -1, txt, sys: true }; pushChat(c); if (R.mode === 'host') net.bcast({ t: 'chat', ...c }); };
 
-    function deliverGame(from, to, m) {
+    // Messages volatils reçus : on ne garde que le dernier de chaque expéditeur et de chaque sorte, transmis au jeu
+    // au prochain tour de boucle ; un message normal fait d'abord passer ceux en attente (l'ordre est respecté).
+    const pendingVol = new Map(); let volT = 0;
+    const flushVol = () => { clearTimeout(volT); volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
+    function gameIn(from, m, v) {
+      if (v && m && typeof m === 'object') {
+        pendingVol.set(from + ':' + m.t, [from, m]);
+        if (!volT) volT = setTimeout(flushVol, 0);
+        return;
+      }
+      if (pendingVol.size) flushVol();
+      emit('game', from, m);
+    }
+
+    function deliverGame(from, to, m, v) {
       // côté hôte : un message de jeu venant de `from` (id) vers `to`
-      if (to === 'host' || Number(to) === Number(R.myId)) { emit('game', from, m); return; }
+      v = v ? 1 : undefined;
+      if (to === 'host' || Number(to) === Number(R.myId)) { gameIn(from, m, v); return; }
       if (to === 'all') {
-        emit('game', from, m);
-        for (const p of R.players) if (p.cid && Number(p.id) !== Number(from)) net.to(p.cid, { t: 'g', from, m });
+        gameIn(from, m, v);
+        // un seul envoi pour tout le salon (le relais le distribue), sans renvoyer à l'expéditeur
+        const src = R.players.find((q) => Number(q.id) === Number(from));
+        net.bcast({ t: 'g', from, m, v }, src && src.cid ? src.cid : undefined, v);
         return;
       }
       const p = R.players.find((q) => Number(q.id) === Number(to));
-      if (p && p.cid) net.to(p.cid, { t: 'g', from, m });
+      if (p && p.cid) net.to(p.cid, { t: 'g', from, m, v }, v);
     }
 
     /* ---------- hôte ---------- */
@@ -85,11 +110,13 @@
         case 'res': if (p && Array.isArray(m.list) && RES()) { const added = RES().merge(m.list.slice(0, 150)); if (added) { net.bcast({ t: 'res', list: RES().all().slice(0, 150) }); emit('results'); } } break;
         case 'chat': if (p) { const txt = clean(m.txt, 140); if (txt) { const c = { id: p.id, name: p.name, color: p.color, txt }; pushChat(c); net.bcast({ t: 'chat', ...c }); } } break;
         case 'ready': if (p) { if (m.game) R.ready[p.id] = m.game; else delete R.ready[p.id]; changed(); } break;
-        case 'g': if (p) deliverGame(p.id, m.to, m.m, cid); break;
+        case 'g': if (p) deliverGame(p.id, m.to, m.m, m.v); break;
         case 'ping':
           if (p && Number.isFinite(m.myPing)) R.pings[p.id] = Math.round(m.myPing);
+          if (p && m.d && typeof m.d === 'object') R.diag[p.id] = { lag: m.d.lag | 0, net: m.d.net | 0, hid: m.d.hid ? 1 : 0 };
           if (net.rtt) R.pings[R.hostId] = net.rtt;
-          net.to(cid, { t: 'pong', ts: m.ts, pings: R.pings });
+          R.diag[R.hostId] = myDiag(net);
+          net.to(cid, { t: 'pong', ts: m.ts, pings: R.pings, diag: R.diag });
           break;
         case 'pong':
           if (p) R.pings[p.id] = Math.max(1, Math.round(performance.now() - m.ts));
@@ -127,13 +154,15 @@
           emit('update', R); break;
         }
         case 'chat': pushChat(m); break;
-        case 'g': emit('game', m.from, m.m); break;
+        case 'g': gameIn(m.from, m.m, m.v); break;
         case 'ping':
           if (m.pings) Object.assign(R.pings, m.pings);
+          if (m.diag) Object.assign(R.diag, m.diag);
           net.toHost({ t: 'pong', ts: m.ts, fromId: R.myId });
           break;
         case 'pong':
           if (m.pings) Object.assign(R.pings, m.pings);
+          if (m.diag) Object.assign(R.diag, m.diag);
           R.pings[R.myId] = Math.max(1, Math.round(performance.now() - m.ts));
           break;
         case 'full': emit('error', 'Le salon est complet (6 joueurs max).'); break;
@@ -253,18 +282,21 @@
         else if (R.mode === 'guest') net.toHost({ t: 'res', list: [rec] });
         emit('results');
       },
-      sendGame(to, m) {
-        if (R.isHost) deliverGame(R.myId, to, m);
-        else net.toHost({ t: 'g', fromId: R.myId, to, m });
+      sendGame(to, m, vol) {
+        if (R.isHost) deliverGame(R.myId, to, m, vol);
+        else net.toHost({ t: 'g', fromId: R.myId, to, m, v: vol ? 1 : undefined }, vol);
       },
+      netStats() { return { ...net.stats, buffered: net.buffered, proto: net.proto }; },
       kick(id) { const p = R.players.find((q) => q.id === id); if (R.mode === 'host' && p && p.cid) net.drop(p.cid); },
       // à appeler régulièrement : pings temps réel sans déconnecter les joueurs en arrière-plan
       tick(now) {
         if (R.mode === 'host') {
           if (net.rtt) R.pings[R.hostId] = net.rtt;
-          net.bcast({ t: 'ping', ts: now, pings: R.pings });
+          R.diag[R.hostId] = myDiag(net);
+          net.bcast({ t: 'ping', ts: now, pings: R.pings, diag: R.diag });
         } else if (R.mode === 'guest' && net.hostLink) {
-          net.toHost({ t: 'ping', ts: now, fromId: R.myId, myPing: R.pings[R.myId] });
+          R.diag[R.myId] = myDiag(net);
+          net.toHost({ t: 'ping', ts: now, fromId: R.myId, myPing: R.pings[R.myId], d: R.diag[R.myId] });
         }
       },
     });

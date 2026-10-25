@@ -185,6 +185,13 @@ export class Sfx {
       case 'whistle': this.tone(523, 0.9, 0.06, 'square', 520); this.tone(659, 0.9, 0.05, 'square', 655); this.burst(0.9, 1800, 0.08, 'bandpass', 2); break;
       case 'buy': this.tone(1175, 0.1, 0.07, 'triangle'); this.tone(1568, 0.25, 0.07, 'triangle', null, 0.08); this.burst(0.1, 5000, 0.05, 'highpass'); break;
       case 'arrive': this.play('whistle'); break;
+      // chaudière, manette, pannes, pillards
+      case 'lever': this.tone(180, 0.08, 0.12, 'square', 120); this.burst(0.08, 2500, 0.1, 'bandpass', 4); break;
+      case 'steam': { const f = this.burst(0.9, 4000, 0.22, 'highpass', 0.7); if (f) f.frequency.exponentialRampToValueAtTime(2000, this.ctx.currentTime + 0.9); break; }
+      case 'boom': this.burst(1.8, 160, 0.9, 'lowpass', 0.5); this.burst(0.5, 900, 0.6, 'lowpass'); this.tone(70, 1.2, 0.3, 'sawtooth', 30); this.burst(1.6, 3500, 0.15, 'highpass', 0.6, 0.2); break;
+      case 'clank': this.tone(240, 0.12, 0.1, 'square', 160); this.burst(0.12, 3000, 0.12, 'bandpass', 6); this.tone(520, 0.2, 0.05, 'triangle', null, 0.06); break;
+      case 'engine': { const o = this.tone(70, 2.4, 0.07, 'sawtooth', 110); if (o) { const l = this.ctx.createOscillator(), lg = this.ctx.createGain(); l.frequency.value = 31; lg.gain.value = 12; l.connect(lg).connect(o.frequency); l.start(); l.stop(this.ctx.currentTime + 2.5); } break; }
+      case 'crash': this.burst(0.5, 700, 0.5, 'lowpass'); this.burst(0.3, 2600, 0.2, 'bandpass', 3, 0.05); this.tone(300, 0.3, 0.06, 'square', 90, 0.05); break;
     }
   }
   dispose() {

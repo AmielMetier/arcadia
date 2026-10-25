@@ -14,9 +14,11 @@ import {
 export const DT = 1 / 60;
 export const FUEL_PER_CRATE = 25;
 export const DIFFICULTY = {
-  facile: { burn: 0.6, ramp: 0.10, loot: 0.8, cold: 0.7, wolves: 0.08, wolfV: 4.6, goal: 1600, label: 'Facile' },
-  normal: { burn: 0.8, ramp: 0.15, loot: 0.65, cold: 1.0, wolves: 0.16, wolfV: 5.0, goal: 2000, label: 'Normale' },
-  blizzard: { burn: 1.0, ramp: 0.22, loot: 0.5, cold: 1.3, wolves: 0.25, wolfV: 5.4, goal: 2400, label: 'Blizzard' },
+  // storm : vitesse du front de tempête (m/s) ; press : montée de la pression (%/s) ; faultT : s entre deux pannes ;
+  // raid0 / raidGap : distance du premier raid de pillards, puis écart entre deux raids
+  facile: { burn: 0.6, ramp: 0.10, loot: 0.8, cold: 0.7, wolves: 0.08, wolfV: 4.6, goal: 1600, storm: 1.55, press: 1.0, faultT: 90, raid0: 750, raidGap: [520, 720], label: 'Facile' },
+  normal: { burn: 0.8, ramp: 0.15, loot: 0.58, cold: 1.0, wolves: 0.16, wolfV: 5.0, goal: 2000, storm: 1.9, press: 1.5, faultT: 60, raid0: 420, raidGap: [380, 560], label: 'Normale' },
+  blizzard: { burn: 1.0, ramp: 0.22, loot: 0.48, cold: 1.3, wolves: 0.25, wolfV: 5.4, goal: 2400, storm: 2.1, press: 2.0, faultT: 45, raid0: 320, raidGap: [300, 450], label: 'Blizzard' },
 };
 export const MODES = {
   expedition: { label: 'Expédition', desc: 'Rallier Fort-Givre, au bout de la ligne, en passant par trois gares.' },
@@ -46,6 +48,23 @@ export const WARM_R = 3.2;            // près de la chaudière, on se réchauff
 const FREEZE_T = 6;                   // secondes à 0 de chaleur avant de s'effondrer
 export const DIG_T = 10;              // une congère : 10 s de pelle pour un joueur seul
 export const FLARE_R = 9, FLARE_T = 9;
+// Manette de vitesse (cabine) : vitesse, consommation et montée de pression selon le régime
+export const THROTTLE = [
+  { label: 'Éco', v: 0.72, burn: 0.6, press: 0.55 },
+  { label: 'Normal', v: 1, burn: 1, press: 1 },
+  { label: 'À fond', v: 1.35, burn: 1.85, press: 1.9 },
+];
+export const LEVER = { x: 0, z: -9.25, r: 1.3 };     // manette, à l'arrière de la cabine
+export const VALVE = { x: 0, z: -1.75, r: 1.3 };     // soupape de la chaudière, côté avant
+export const STORM_START = 90, STORM_MAX = 160;      // avance initiale et avance maximale sur le front de tempête
+// Pannes à bord : tuyaux gelés (le convoi ralentit) et fuites de fioul ; emplacements sur le plancher
+export const FAULTS = {
+  pipe: { label: 'Tuyau gelé', fix: 4, spots: [[-1.35, -8], [1.35, 2.6], [-1.35, 7.4], [1.35, 14]] },
+  leak: { label: 'Fuite de fioul', fix: 3, spots: [[1.35, -7.5], [-1.35, -3.6], [1.35, 8.2], [-1.35, 14.6]] },
+};
+const PIPE_K = 0.6, LEAK_RATE = 0.35, VENT_RATE = 50, FIX_R = 1.25;
+// Pillards en motoneige
+const RAID_V = 6.5, RAID_STEAL_T = 4.5, RAID_REACH = 1.9;
 const WOLF_SIGHT = 13, WOLF_GIVEUP = 24, WOLF_BITE = 0.95, MAX_WOLVES = 8;
 const SPAWNS = [[-0.9, -6], [0.9, -6], [-0.9, 6.5], [0.9, 6.5], [-0.9, 14], [0.9, 14]];
 
@@ -199,7 +218,16 @@ export class Sim {
     this.ev = null; this.en = 0; this.ed = 0; this.ed = this.eventDist(0); // événement de voie en cours, n° et distance du suivant
     this.gust = 0;                          // bourrasque : temps restant
     this.wolves = []; this.flares = [];
+    this.thr = 1; this.press = 20; this.pw = false; this.hull = 100; this.why = '';
+    this.storm = -STORM_START; this.sw = 0;   // position du front de tempête (repère du sol), alertes
+    this.faults = []; this.nf = this.D.faultT * 0.8; this.fn = 0;
+    this.raiders = []; this.rd = this.D.raid0; this.rn = 0;
+    this.calm = false;                       // tests : pas de tempête, de pression, de pannes ni de pillards
   }
+  get gap() { return this.dist - this.storm; }
+  // plus l'équipage est nombreux, plus il y a de travail à bord (seul, la chaudière est plus clémente)
+  crewK() { return Math.min(1.3, 0.7 + 0.15 * Math.max(1, this.players.size)); }
+  stormSpeed() { return this.D.storm + Math.min(0.4, this.t / 60 * 0.04); }
 
   get fmax() { return 100 + 25 * this.up.tank; }
 
@@ -241,7 +269,7 @@ export class Sim {
   humans() { return this.players.size; }
   burnRate() {
     const n = Math.max(1, this.players.size);
-    return this.D.burn * Math.min(2.6, 1 + this.D.ramp * this.t / 60) * (1 + 0.15 * (n - 1)) * (1 - 0.12 * this.up.boiler);
+    return this.D.burn * Math.min(2.6, 1 + this.D.ramp * this.t / 60) * (1 + 0.15 * (n - 1)) * (1 - 0.12 * this.up.boiler) * THROTTLE[this.thr].burn;
   }
 
   /* -------------------------------------------------------------- événements de voie (déterministes) */
@@ -277,12 +305,12 @@ export class Sim {
     const st = this.stop;
     // chaudière : rien ne brûle en gare ; au ralenti devant une congère
     const burnK = st ? (st.k === 'station' ? 0 : 0.5) : 1;
-    if (this.fuel > 0) this.fuel = Math.max(0, this.fuel - this.burnRate() * burnK * dt);
+    if (this.fuel > 0) this.fuel = Math.max(0, this.fuel - (this.burnRate() * burnK + this.leaks() * LEAK_RATE) * dt);
     if (this.fuel < 25 && !this.lowWarned) { this.lowWarned = true; this.events.push({ e: 'low' }); }
     if (this.fuel > 35) this.lowWarned = false;
 
     // vitesse : on freine à temps pour s'arrêter pile à la gare, devant la congère ou au terminus
-    let target = st ? 0 : trainSpeedFor(this.fuel), decel = st ? BRAKE : 0.45;
+    let target = st ? 0 : trainSpeedFor(this.fuel) * THROTTLE[this.thr].v * PIPE_K ** this.pipes(), decel = st ? BRAKE : 0.45;
     const stopAt = st ? null : this.nextStopDist();
     if (stopAt != null) {
       const rem = stopAt - this.dist;
@@ -301,7 +329,7 @@ export class Sim {
     if (this.fuel <= 0 && this.v < 0.05 && !(this.stop && this.stop.k === 'station')) {
       if (this.stallT === 0) this.events.push({ e: 'stall' });
       this.stallT += dt;
-      if (this.stallT > 3) { this.phase = 'over'; this.events.push({ e: 'over', dist: Math.round(this.dist) }); return; }
+      if (this.stallT > 3) { this.lose('fuel'); return; }
     } else this.stallT = 0;
 
     // arrêt en gare : compte à rebours, puis départ
@@ -320,6 +348,12 @@ export class Sim {
       this.maybeWolves(this.ks, ch);
     }
     this.stepTrackEvent(dt);
+    if (!this.calm) {
+      this.stepStorm(dt); if (this.phase !== 'play') return;
+      this.stepPressure(dt); if (this.phase !== 'play') return;
+      this.stepFaults(dt);
+      this.maybeRaid();
+    }
 
     // joueurs
     const ctx = { v: this.v, wind: windOf({ gu: this.gust, ev: this.ev }), colliders: this.ruins.colliders(this.dist).concat(obstacleColliders(this.ev, this.dist)) };
@@ -332,6 +366,8 @@ export class Sim {
     this.stepCrates(dt);
     this.stepWolves(dt, ctx.colliders);
     this.stepFlares(dt);
+    this.stepRaiders(dt);
+    if (this.hull <= 0) { this.lose('hull'); return; }
     // oubli des ruines fouillées loin derrière
     const kMin = Math.floor((this.dist - 120) / CHUNK) * 8;
     if (this.looted.size > 40) for (const id of this.looted) if (id < kMin) this.looted.delete(id);
@@ -353,6 +389,7 @@ export class Sim {
     if (sd == null || Math.abs(at - sd) > 0.5) return;
     this.stop = { k: 'station', i: this.ns, t: STATION_T, v: [] };
     for (const p of this.players.values()) { p.heat = 100; p.frz = 0; p.flares = Math.max(p.flares, 2 + this.up.flares); }
+    this.hull = Math.min(100, this.hull + 50); this.faults = []; this.press = Math.min(this.press, 30);
     // deux caisses de fioul attendent sur le quai (côté gauche)
     this.spawnCrate(-(HALF_W + 2.6), CRATE_H, -2, 0);
     this.spawnCrate(-(HALF_W + 2.6), CRATE_H, 3, 0);
@@ -428,6 +465,7 @@ export class Sim {
         }
         // la coulée découvre parfois une caisse
         if (makeRng(hash(this.seed + this.en * 53)).chance(0.6)) this.spawnCrate(E.side * 9, CRATE_H, -4, 0);
+        if (!this.calm) this.hull -= 10;
         this.events.push({ e: 'aval', side: E.side });
       }
       if (E.t > 9) this.ev = null;
@@ -439,6 +477,117 @@ export class Sim {
   }
   // zone de l'avalanche, en repère du train (elle reste attachée au convoi le temps de tomber)
   inAval(x, z, E) { return x * E.side > HALF_W + 1 && x * E.side < 28 && z > BODY_FRONT - 8 && z < REAR + 12; }
+
+  /* -------------------------------------------------------------- fin de partie */
+  lose(why) {
+    if (this.phase !== 'play') return;
+    this.phase = 'over'; this.why = why;
+    this.events.push({ e: 'over', why, dist: Math.round(this.dist) });
+  }
+
+  /* -------------------------------------------------------------- front de tempête */
+  // Un mur de neige avance derrière le convoi à vitesse constante (qui augmente doucement). S'il rattrape le convoi,
+  // c'est fini. Il ne s'arrête jamais : chaque arrêt en gare ou devant une congère se paie en avance perdue.
+  stepStorm(dt) {
+    this.storm = Math.max(this.storm + this.stormSpeed() * dt, this.dist - STORM_MAX);
+    const g = this.gap;
+    if (g < 60 && this.sw < 1) { this.sw = 1; this.events.push({ e: 'storm_near' }); }
+    if (g < 25 && this.sw < 2) { this.sw = 2; this.events.push({ e: 'storm_close' }); }
+    if (g > 90) this.sw = 0;
+    // un joueur resté dehors, dans le front : le froid le saisit aussitôt
+    for (const p of this.players.values()) if (!p.on && p.st < 2 && p.z > g - 2) p.heat = Math.max(0, (p.heat ?? 100) - 30 * dt);
+    if (g <= 0) this.lose('storm');
+  }
+
+  /* -------------------------------------------------------------- pression de la chaudière */
+  stepPressure(dt) {
+    if (this.fuel > 0 && !(this.stop && this.stop.k === 'station')) this.press += this.D.press * THROTTLE[this.thr].press * this.crewK() * dt;
+    if (this.press > 75 && !this.pw) { this.pw = true; this.events.push({ e: 'press_warn' }); }
+    if (this.press < 60) this.pw = false;
+    if (this.press >= 100) {
+      // explosion : le foyer crache, le convoi encaisse, ceux qui sont tout près sont projetés
+      this.press = 15; this.pw = false;
+      this.fuel = Math.max(0, this.fuel - 20); this.hull -= 25;
+      for (const p of this.players.values()) if (p.on && p.st < 2 && Math.hypot(p.x - BOILER.x, p.z - BOILER.z) < 3.2) {
+        p.st = 1; p.tm = 1.2; p.heat = Math.max(0, (p.heat ?? 100) - 10);
+        if (p.carry) { p.carry = 0; this.spawnCrate(p.x, DECK_Y + CRATE_H, p.z, 1); }
+      }
+      this.events.push({ e: 'boom' });
+    }
+  }
+
+  /* -------------------------------------------------------------- pannes à bord */
+  pipes() { let n = 0; for (const f of this.faults) if (f.k === 'pipe') n++; return n; }
+  leaks() { let n = 0; for (const f of this.faults) if (f.k === 'leak') n++; return n; }
+  stepFaults(dt) {
+    if (this.stop && this.stop.k === 'station') return;
+    this.nf -= dt;
+    if (this.nf > 0) return;
+    const r = makeRng(hash(this.seed * 17 + this.fn * 613 + 3)); this.fn++;
+    this.nf = this.D.faultT * r.range(0.7, 1.3) / this.crewK();
+    if (this.faults.length >= 2) return;
+    const k = r.chance(0.5) ? 'pipe' : 'leak';
+    const used = new Set(this.faults.map((f) => f.k + f.s));
+    const free = FAULTS[k].spots.map((_, i) => i).filter((i) => !used.has(k + i)); if (!free.length) return;
+    const i = r.pick(free), [x, z] = FAULTS[k].spots[i];
+    this.faults.push({ id: this.nid++, k, s: i, x, z, prog: 0 });
+    this.events.push({ e: 'fault', k, x, z });
+  }
+
+  /* -------------------------------------------------------------- pillards */
+  maybeRaid() {
+    if (this.dist < this.rd || (this.stop && this.stop.k === 'station')) return;
+    const r = makeRng(hash(this.seed * 29 + this.rn * 389 + 7)); this.rn++;
+    this.rd = this.dist + r.range(...this.D.raidGap);
+    const n = Math.min(3, 1 + (this.dist > 900 ? 1 : 0) + (this.diff === 'blizzard' && this.dist > 1500 ? 1 : 0));
+    const side = r.chance(0.5) ? -1 : 1;
+    for (let i = 0; i < n; i++) {
+      const sd = i % 2 ? -side : side;
+      this.raiders.push({ id: this.nid++, x: sd * (HALF_W + 5), z: REAR + 22 + i * 7, side: sd, st: 0, t: 0, carry: 0, tz: r2(r.range(-7, 13)) });
+    }
+    this.events.push({ e: 'raid', n, side });
+  }
+  crashRaider(w, by) {
+    w.st = 3; w.t = 0;
+    for (let i = 0; i < w.carry; i++) this.spawnCrate(w.x + w.side * 0.8, CRATE_H, w.z + i * 0.7, 0);
+    w.carry = 0; this.scrap++;
+    this.events.push({ e: 'repel', p: by, x: w.x, z: w.z });
+  }
+  stepRaiders(dt) {
+    for (let i = this.raiders.length - 1; i >= 0; i--) {
+      const w = this.raiders[i];
+      if (w.st === 3) { w.z += this.v * dt; if (w.z > REAR + 70) this.raiders.splice(i, 1); continue; } // renversé : reste au sol
+      // une fusée tout près : ils décrochent (avec leur butin)
+      if (w.st < 2) for (const f of this.flares) {
+        const fz = f.m === 0 ? f.z + this.dist : f.z;
+        if (Math.hypot(f.x - w.x, fz - w.z) < FLARE_R) { w.st = 2; this.events.push({ e: 'flee', x: w.x, z: w.z }); break; }
+      }
+      // touchés par une caisse lancée : renversés
+      for (const c of this.crates) if (c.m === 2 && c.y < 2.2 && Math.hypot(c.x - w.x, c.z - w.z) < 1.2 && w.st < 3) { this.crashRaider(w, c.by); break; }
+      if (w.st === 3) continue;
+      if (w.st === 2) { // fuite vers l'arrière
+        w.x += w.side * 2 * dt; w.z += RAID_V * dt;
+        if (w.z > REAR + 60) { this.raiders.splice(i, 1); if (w.carry) this.events.push({ e: 'stolen', n: w.carry }); }
+        continue;
+      }
+      const tx = w.side * (HALF_W + 1.3), dx = tx - w.x, dz = w.tz - w.z, d = Math.hypot(dx, dz);
+      if (d > 0.05) { const k = Math.min(1, RAID_V * dt / d); w.x += dx * k; w.z += dz * k; }
+      if (w.st === 0 && d < 0.6) { w.st = 1; w.t = RAID_STEAL_T; this.events.push({ e: 'board_raid', x: w.x, z: w.z }); }
+      if (w.st === 1) {
+        w.t -= dt;
+        if (w.t <= 0) {
+          w.t = RAID_STEAL_T;
+          let best = null, bd = 1e9;
+          for (const c of this.crates) if (c.m === 1) { const dd = Math.hypot(c.x - w.x, c.z - w.z); if (dd < bd) { bd = dd; best = c; } }
+          if (best) { this.crates.splice(this.crates.indexOf(best), 1); w.carry++; this.events.push({ e: 'steal', x: w.x, z: w.z }); }
+          else { this.hull -= 6; this.events.push({ e: 'sabotage', x: w.x, z: w.z }); }
+          w.tz = r2(clamp(w.tz + (w.carry ? 6 : -5), -8, 14));
+          w.n = (w.n | 0) + 1;
+          if (w.carry >= 2 || w.n >= 3) w.st = 2; // butin suffisant (ou trois coups) : ils décrochent
+        }
+      }
+    }
+  }
 
   /* -------------------------------------------------------------- froid */
   coldStep(p, dt) {
@@ -548,6 +697,7 @@ export class Sim {
     const thrEdge = (inp.thr | 0) !== p.pt; p.pt = inp.thr | 0;
     if (p.pf == null) p.pf = inp.fl | 0;
     const flEdge = (inp.fl | 0) !== p.pf; p.pf = inp.fl | 0;
+    p.wk = 0;
     if (p.st >= 2) { p.sp = 0; return; }
     const onDeck = p.on && !p.air;
     // fusée éclairante : posée là où l'on est, elle fait fuir les loups
@@ -569,6 +719,36 @@ export class Sim {
     }
     // nourrir la chaudière
     if (useEdge && p.carry && onDeck && Math.hypot(p.x - BOILER.x, p.z - BOILER.z) < FEED_R) { this.feed(p.id); p.carry = 0; return; }
+    // à bord : manette, soupape, réparations
+    if (onDeck && !p.carry && !this.calm) {
+      if (useEdge && Math.hypot(p.x - LEVER.x, p.z - LEVER.z) < LEVER.r) {
+        this.thr = (this.thr + 1) % THROTTLE.length;
+        this.events.push({ e: 'throttle', p: p.id, l: this.thr });
+        return;
+      }
+      if (use && Math.hypot(p.x - VALVE.x, p.z - VALVE.z) < VALVE.r) {
+        if (useEdge) this.events.push({ e: 'vent', p: p.id });
+        this.press = Math.max(0, this.press - VENT_RATE * dt); p.wk = 1;
+        return;
+      }
+      if (use) {
+        let f = null, fd = FIX_R;
+        for (const q of this.faults) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < fd) { fd = d; f = q; } }
+        if (f) {
+          f.prog += dt / FAULTS[f.k].fix; p.wk = 1;
+          if (f.prog >= 1) { this.faults.splice(this.faults.indexOf(f), 1); this.events.push({ e: 'fixed', p: p.id, k: f.k, x: f.x, z: f.z }); }
+          return;
+        }
+      }
+    }
+    // repousser un pillard (depuis le bord du wagon ou dans la neige)
+    if (useEdge && !p.carry && !p.air) {
+      for (const w of this.raiders) {
+        if (w.st > 1) continue;
+        const reach = p.on ? Math.abs(p.x) > HALF_W - 0.7 && Math.sign(p.x) === w.side && Math.abs(p.z - w.z) < RAID_REACH : Math.hypot(p.x - w.x, p.z - w.z) < 1.4;
+        if (reach) { this.crashRaider(w, p.id); return; }
+      }
+    }
     // ramasser
     if (useEdge && !p.carry && !p.air) {
       let best = null, bd = USE_R;
@@ -656,11 +836,15 @@ export class Sim {
       ev: E ? { ...E, ...(E.prog != null ? { prog: r2(E.prog) } : {}), t: r2(E.t || 0) } : null,
       P: [...this.players.values()].map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z), r2(p.vx), r2(p.vy), r2(p.vz), r2(p.yaw),
         p.on, p.air, p.ref, p.st, r2(p.tm), p.carry, r2(p.sp), p.q, p.pj ?? 0, p.fed, p.found, p.falls, p.slot,
-        r2(p.heat ?? 100), r2(p.frz || 0), p.flares | 0, p.dig ? 1 : 0, p.bites | 0, p.cw | 0]),
+        r2(p.heat ?? 100), r2(p.frz || 0), p.flares | 0, p.dig || p.wk ? 1 : 0, p.bites | 0, p.cw | 0]),
       N: [...this.players.values()].map((p) => [p.id, p.name, p.color]),
       C: this.crates.map((c) => [c.id, c.m, r2(c.x), r2(c.y), r2(c.z), r2(c.vx), r2(c.vy), r2(c.vz), c.by]),
       W: this.wolves.map((w) => [w.id, r2(w.x), r2(w.zw), r2(w.yaw), w.st, r2(w.t), w.tg, r2(w.hx), r2(w.hz), r2(w.a), r2(w.fx), r2(w.fz), r2(w.sk || 0), w.sd || 1]),
       F: this.flares.map((f) => [f.id, f.m, r2(f.x), r2(f.z), r2(f.t)]),
+      th: this.thr, pr: r2(this.press), pw: this.pw ? 1 : 0, hu: r2(this.hull), sto: r2(this.storm), sw: this.sw, wy: this.why, ca: this.calm ? 1 : 0,
+      nf: r2(this.nf), fn: this.fn, rd: r2(this.rd), rn: this.rn,
+      FA: this.faults.map((f) => [f.id, f.k, f.s, f.x, f.z, r2(f.prog)]),
+      R: this.raiders.map((w) => [w.id, r2(w.x), r2(w.z), w.side, w.st, r2(w.t), w.carry, w.tz, w.n | 0]),
       L: [...this.looted],
     };
   }
@@ -684,6 +868,9 @@ export class Sim {
     sim.crates = s.C.map((c) => ({ id: c[0], m: c[1], x: c[2], y: c[3], z: c[4], vx: c[5], vy: c[6], vz: c[7], by: c[8] }));
     sim.wolves = (s.W || []).map((w) => ({ id: w[0], x: w[1], zw: w[2], yaw: w[3], st: w[4], t: w[5], tg: w[6], hx: w[7], hz: w[8], a: w[9], fx: w[10], fz: w[11], sk: w[12] || 0, sd: w[13] || 1 }));
     sim.flares = (s.F || []).map((f) => ({ id: f[0], m: f[1], x: f[2], z: f[3], t: f[4] }));
+    if (s.th != null) Object.assign(sim, { thr: s.th, press: s.pr, pw: !!s.pw, hull: s.hu, storm: s.sto, sw: s.sw | 0, why: s.wy || '', calm: !!s.ca, nf: s.nf, fn: s.fn | 0, rd: s.rd, rn: s.rn | 0 });
+    sim.faults = (s.FA || []).map((f) => ({ id: f[0], k: f[1], s: f[2], x: f[3], z: f[4], prog: f[5] }));
+    sim.raiders = (s.R || []).map((w) => ({ id: w[0], x: w[1], z: w[2], side: w[3], st: w[4], t: w[5], carry: w[6], tz: w[7], n: w[8] | 0 }));
     sim.looted = new Set(s.L);
     return sim;
   }

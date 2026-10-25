@@ -35,7 +35,7 @@ function broadcastState(fx = []) {
   if (!H || !H.embedded || role !== 'host' || !state) return;
   for (const p of H.players) {
     if (Number(p.id) === Number(myId)) continue;
-    H.send(p.id, { t: 'st', s: snapshotFor(p.id), fx });
+    H.send(p.id, { t: 'st', s: snapshotFor(p.id), fx }, { volatile: !fx.length }); // instantané : seul le plus récent compte
   }
 }
 

@@ -4,7 +4,12 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
    L'hôte ouvre un salon <préfixe><CODE> ; les invités s'y connectent ; le serveur relaie les paquets.
    ?local dans l'adresse : remplace WebSocket par un BroadcastChannel pour tester entre onglets.
    ?ws=wss://... : surcharge l'URL du serveur relais.
-   Usage : const net = DDNet.create({ prefix: 'ddhub-v1-', maxPeers: 5 }); net.host(cb) / net.join(code, cb). */
+   Usage : const net = DDNet.create({ prefix: 'ddhub-v1-', maxPeers: 5 }); net.host(cb) / net.join(code, cb).
+
+   Messages « volatils » (to / toHost / bcast avec vol = true) : instantanés d'état envoyés en continu, dont seul le plus
+   récent compte. Quand la connexion sature (tampon d'envoi plein), on les saute au lieu de les empiler : sinon la file
+   d'attente grossit et le joueur se retrouve avec des secondes de retard (ping à 1 500 ms) alors que sa connexion est bonne.
+   Le serveur relais fait de même pour chaque destinataire. */
 (function () {
   const CODE_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const genCode = () => Array.from({ length: 4 }, () => CODE_ALPHA[(Math.random() * CODE_ALPHA.length) | 0]).join('');
@@ -21,10 +26,13 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   wakeServer();
 
   const BLOCKED = "Impossible de joindre le serveur relais WebSocket. Vérifie ta connexion internet ou réessaie dans quelques secondes.";
+  const SEND_BUFFER_MAX = 48 * 1024; // au-delà, la connexion n'arrive plus à suivre : les messages volatils attendront le suivant
+  const isVol = (o) => o === true || !!(o && o.volatile);
 
   function create({ prefix, maxPeers = 5 }) {
     const net = {
       ws: null, bc: null, links: new Map(), hostLink: null, cb: null, cidc: 0, role: null, code: null, roomId: null, pingIv: null, retryTo: null,
+      proto: 1, stats: { sent: 0, dropped: 0 },
       // fixedCode : code imposé (migration d'hôte) ; sinon un code au hasard
       host(cb, fixedCode) {
         this.role = 'host'; this.cb = cb; this.links = new Map();
@@ -75,12 +83,10 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (this.ws !== ws) return;
           let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
           if (!msg || typeof msg !== 'object') return;
-          if (msg.type === 'pong') {
-            if (msg.ts) this.rtt = Math.max(1, Math.round(performance.now() - msg.ts));
-            return;
-          }
+          if (msg.type === 'pong') { this._pong(msg.ts); return; }
           if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
           if (msg.type === 'room_joined') {
+            this.proto = msg.proto || 1; // 2 : le serveur relaie sans relire les données et protège les connexions lentes
             ready = true; cb.ready(code);
             return;
           }
@@ -103,7 +109,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
               return;
             }
             this.links.set(cid, {
-              send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+              send: (x, v) => this._relay(cid, x, v),
               close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
             });
             sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
@@ -124,7 +130,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
                 return;
               }
               this.links.set(cid, {
-                send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+                send: (x, v) => this._relay(cid, x, v),
                 close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
               });
               sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
@@ -134,7 +140,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             if (d._ctrl === 'bye') { this._drop(cid); return; }
             if (!this.links.has(cid)) {
               this.links.set(cid, {
-                send: (x) => this._sendWs({ type: 'relay', roomId, to: cid, data: x }),
+                send: (x, v) => this._relay(cid, x, v),
                 close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
               });
               cb.join(cid);
@@ -204,7 +210,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             }
           };
           this.hostLink = {
-            send: (x) => this._sendWs({ type: 'relay', roomId, to: 'host', data: x }),
+            send: (x, v) => this._relay('host', x, v),
             close: () => { this._sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
           };
           ws.onopen = () => {
@@ -215,12 +221,10 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
             if (this.ws !== ws) return;
             let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
             if (!msg || typeof msg !== 'object') return;
-            if (msg.type === 'pong') {
-              if (msg.ts) this.rtt = Math.max(1, Math.round(performance.now() - msg.ts));
-              return;
-            }
+            if (msg.type === 'pong') { this._pong(msg.ts); return; }
             if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
             if (msg.type === 'room_joined') {
+              this.proto = msg.proto || 1;
               sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'hi' } });
               return;
             }
@@ -273,30 +277,59 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           try { this.ws.send(JSON.stringify(obj)); } catch (e) {}
         }
       },
+      // Paquet de jeu vers 'host', un invité (cid) ou 'all' (except : cid exclu)
+      _relay(to, data, vol, except) {
+        const ws = this.ws;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const v = isVol(vol);
+        if (v && (ws.bufferedAmount > SEND_BUFFER_MAX || this._lagging())) { this.stats.dropped++; return; }
+        this.stats.sent++;
+        try {
+          if (this.proto >= 2) {
+            // trame compacte : en-tête court + données brutes, que le serveur retransmet sans les relire
+            const h = { to }; if (except) h.x = except; if (v) h.v = 1;
+            ws.send('#' + JSON.stringify(h) + '\n' + JSON.stringify(data));
+          } else ws.send(JSON.stringify({ type: 'relay', roomId: this.roomId, to: to === 'all' ? undefined : to, except: except || undefined, v: v ? 1 : undefined, data }));
+        } catch (e) {}
+      },
+      // Sonde vers le relais toutes les 250 ms (garde aussi la connexion ouverte). Si la réponse tarde nettement plus
+      // que d'habitude, nos envois s'empilent : on saute les instantanés d'état le temps que la file se vide.
       _startKeepAlive(ws, roomId) {
         this._stopKeepAlive();
+        this.probeAt = 0; this.lats = [];
         this.pingIv = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            try { ws.send(JSON.stringify({ type: 'ping', roomId, ts: performance.now() })); } catch (e) {}
-          }
-        }, 12000);
+          if (ws.readyState !== WebSocket.OPEN || this.probeAt) return;
+          this.probeAt = performance.now();
+          try { ws.send(JSON.stringify({ type: 'ping', roomId, ts: this.probeAt })); } catch (e) {}
+        }, 250);
+      },
+      _pong(ts) {
+        if (!ts) return;
+        const lat = Math.max(1, Math.round(performance.now() - ts));
+        this.rtt = lat;
+        if (ts === this.probeAt) this.probeAt = 0;
+        this.lats.push(lat); if (this.lats.length > 40) this.lats.shift();
+        this.baseLat = Math.min(...this.lats);
+      },
+      _lagging() {
+        const base = this.baseLat == null ? 150 : this.baseLat;
+        if (this.probeAt && performance.now() - this.probeAt > base + 150) return true;
+        return this.rtt != null && this.rtt > base + 150;
       },
       _stopKeepAlive() {
         if (this.pingIv) { clearInterval(this.pingIv); this.pingIv = null; }
       },
-      toHost(m) { this.hostLink && this.hostLink.send(m); },
-      to(cid, m) { const L = this.links.get(cid); L && L.send(m); },
-      bcast(m, except) {
+      toHost(m, vol) { this.hostLink && this.hostLink.send(m, vol); },
+      to(cid, m, vol) { const L = this.links.get(cid); L && L.send(m, vol); },
+      bcast(m, except, vol) {
         if (LOCAL_TEST) {
           for (const [cid, L] of this.links) if (cid !== except) L.send(m);
           return;
         }
-        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.links.size > 0) {
-          try {
-            this.ws.send(JSON.stringify({ type: 'relay', roomId: this.roomId, except: except || undefined, data: m }));
-          } catch (e) {}
-        }
+        if (this.links.size > 0) this._relay('all', m, vol, except);
       },
+      // taille du tampon d'envoi (diagnostic)
+      get buffered() { return this.ws ? this.ws.bufferedAmount : 0; },
       close() {
         this._stopKeepAlive();
         clearTimeout(this.retryTo);

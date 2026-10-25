@@ -5,6 +5,14 @@ const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 8080;
 const PING_INTERVAL_MS = 30000;
+// Protocole 2 : trames compactes « #{en-tête}\n<données> » retransmises sans relire les données,
+// et messages volatils (instantanés d'état) sautés pour un destinataire dont la connexion n'arrive plus à suivre.
+const PROTO = 2;
+const SLOW_CLIENT_BYTES = 96 * 1024; // tampon d'envoi au-delà duquel un destinataire ne reçoit plus les messages volatils
+// Sonde de retard : un ping WebSocket toutes les 250 ms à chaque joueur. Le pong revient après tout ce qui le précède
+// dans la file : s'il tarde nettement plus que d'habitude pour ce joueur, ses données s'empilent (connexion trop juste
+// pour le flux, coupure wifi…) et on lui saute les instantanés d'état le temps que la file se vide.
+const PROBE_MS = 250, LAG_MARGIN_MS = 150, PROBE_WINDOW = 40;
 
 // Serveur HTTP minimal (utile pour les healthchecks Render / Railway / Fly.io)
 const server = http.createServer((req, res) => {
@@ -24,6 +32,19 @@ const wss = new WebSocketServer({ server });
  * }>
  */
 const rooms = new Map();
+
+// Envoi d'une chaîne déjà sérialisée (une seule sérialisation pour tous les destinataires).
+// volatile : on saute le message si ce destinataire a déjà du retard, au lieu d'allonger sa file d'attente.
+function lagging(ws) {
+  const base = ws.baseLat == null ? 150 : ws.baseLat;
+  if (ws.probeAt && Date.now() - ws.probeAt > base + LAG_MARGIN_MS) return true; // sonde en attente depuis trop longtemps
+  return ws.lastLat != null && ws.lastLat > base + LAG_MARGIN_MS;
+}
+function sendRaw(ws, str, volatile) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (volatile && (ws.bufferedAmount > SLOW_CLIENT_BYTES || lagging(ws))) { ws.dropped = (ws.dropped || 0) + 1; return; }
+  try { ws.send(str); } catch (e) {}
+}
 
 function sendJson(ws, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -81,6 +102,28 @@ function leaveCurrentRoom(ws) {
   }
 }
 
+// Relais d'un paquet de jeu : vers l'hôte, vers un invité (cid) ou à toute la salle (sauf l'expéditeur et `except`).
+// `data` est le JSON des données, déjà sérialisé : le paquet sortant est construit une seule fois.
+function relay(ws, roomId, to, except, volatile, data) {
+  if (!roomId) return;
+  const room = rooms.get(roomId);
+  if (!room || !room.clients.has(ws)) return;
+  const from = ws.cid || (ws === room.host ? 'host' : null);
+  const out = '{"type":"relay","roomId":' + JSON.stringify(roomId) + ',"from":' + JSON.stringify(from) + ',"data":' + data + '}';
+  if (to === 'host') {
+    if (room.host && room.host !== ws) sendRaw(room.host, out, volatile);
+    return;
+  }
+  if (typeof to === 'string' && to !== 'all') {
+    const target = room.guests.get(to);
+    if (target && target !== ws) sendRaw(target, out, volatile);
+    return;
+  }
+  for (const client of room.clients) {
+    if (client !== ws && (!except || client.cid !== except)) sendRaw(client, out, volatile);
+  }
+}
+
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.roomId = null;
@@ -89,13 +132,30 @@ wss.on('connection', (ws) => {
 
   ws.on('pong', () => {
     ws.isAlive = true;
+    if (ws.probeAt) {
+      // retard de ce joueur ; sa base est le plus petit retard des 10 dernières secondes
+      ws.lastLat = Date.now() - ws.probeAt; ws.probeAt = 0;
+      (ws.lats = ws.lats || []).push(ws.lastLat); if (ws.lats.length > PROBE_WINDOW) ws.lats.shift();
+      ws.baseLat = Math.min(...ws.lats);
+    }
   });
 
   ws.on('message', (raw) => {
     ws.isAlive = true;
+    const text = typeof raw === 'string' ? raw : raw.toString();
+    // trame compacte de relais : seul l'en-tête est lu, les données repartent telles quelles
+    if (text.charCodeAt(0) === 35 /* # */) {
+      const nl = text.indexOf('\n');
+      if (nl < 0) return;
+      let h;
+      try { h = JSON.parse(text.slice(1, nl)); } catch (e) { return; }
+      if (!h || typeof h !== 'object') return;
+      relay(ws, ws.roomId, h.to, typeof h.x === 'string' ? h.x : null, !!h.v, text.slice(nl + 1));
+      return;
+    }
     let msg;
     try {
-      msg = JSON.parse(raw);
+      msg = JSON.parse(text);
     } catch (e) {
       return;
     }
@@ -147,7 +207,7 @@ wss.on('connection', (ws) => {
         ws.roomId = roomId;
         ws.role = 'host';
         ws.cid = 'host';
-        sendJson(ws, { type: 'room_joined', roomId, role: 'host', cid: 'host' });
+        sendJson(ws, { type: 'room_joined', roomId, role: 'host', cid: 'host', proto: PROTO });
         return;
       }
 
@@ -169,45 +229,14 @@ wss.on('connection', (ws) => {
       room.guests.set(cid, ws);
       room.clients.add(ws);
 
-      sendJson(ws, { type: 'room_joined', roomId, role: 'guest', cid });
+      sendJson(ws, { type: 'room_joined', roomId, role: 'guest', cid, proto: PROTO });
       return;
     }
 
-    // Relais des paquets de jeu (mouvements, tirs, états, chat, événements)
+    // Relais des paquets de jeu (ancien format JSON, gardé pour les pages restées en cache)
     if (action === 'relay') {
-      if (!roomId) return;
-      const room = rooms.get(roomId);
-      if (!room || !room.clients.has(ws)) return;
-
-      const packet = {
-        type: 'relay',
-        roomId,
-        from: ws.cid || (ws === room.host ? 'host' : null),
-        data: msg.data,
-      };
-
-      // Cible spécifique : vers l'hôte ou vers un invité précis (cid)
-      if (msg.to === 'host') {
-        if (room.host && room.host !== ws) {
-          sendJson(room.host, packet);
-        }
-        return;
-      }
-      if (typeof msg.to === 'string' && msg.to !== 'all') {
-        const target = room.guests.get(msg.to);
-        if (target && target !== ws) {
-          sendJson(target, packet);
-        }
-        return;
-      }
-
-      // Rediffusion générale à tous les autres joueurs présents dans la même salle
-      const exceptCid = typeof msg.except === 'string' ? msg.except : null;
-      for (const client of room.clients) {
-        if (client !== ws && (!exceptCid || client.cid !== exceptCid)) {
-          sendJson(client, packet);
-        }
-      }
+      if (msg.data === undefined) return;
+      relay(ws, roomId, msg.to, typeof msg.except === 'string' ? msg.except : null, !!msg.v, JSON.stringify(msg.data));
     }
   });
 
@@ -237,8 +266,18 @@ const keepAliveInterval = setInterval(() => {
   }
 }, PING_INTERVAL_MS);
 
+const probeInterval = setInterval(() => {
+  const now = Date.now();
+  for (const ws of wss.clients) {
+    if (!ws.roomId || ws.probeAt || ws.readyState !== WebSocket.OPEN) continue;
+    ws.probeAt = now;
+    try { ws.ping(); } catch (e) {}
+  }
+}, PROBE_MS);
+
 wss.on('close', () => {
   clearInterval(keepAliveInterval);
+  clearInterval(probeInterval);
 });
 
 server.listen(PORT, () => {

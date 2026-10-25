@@ -1,6 +1,6 @@
 // Convoy Storm — HUD (DOM) et écrans : briefing, menu, fin de partie, connexion perdue.
 // Les écrans sont reconstruits par innerHTML : leurs boutons disparaissent avec eux, aucun écouteur ne traîne.
-import { REAR, DECK_Y, LOST_DIST, DIFFICULTY, MODES, UPGRADES, UPG_KEYS, STATION_NAMES, stationDist, personalScore } from '../engine/sim.js';
+import { REAR, DECK_Y, LOST_DIST, DIFFICULTY, MODES, UPGRADES, UPG_KEYS, STATION_NAMES, THROTTLE, STORM_MAX, stationDist, personalScore } from '../engine/sim.js';
 
 const $ = (s) => document.querySelector(s);
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -12,7 +12,7 @@ export class HUD {
   constructor() {
     this.root = $('#hud'); this.el = {};
     for (const id of ['fuelBox', 'fuelBar', 'fuelTxt', 'burnTxt', 'speedTxt', 'distTxt', 'clockTxt', 'crateTxt', 'scrapTxt', 'team', 'prompt', 'tracker', 'pops', 'toast',
-      'routeFill', 'routeTicks', 'routeTrain', 'routeTxt', 'vitals', 'heatBar', 'heatTxt', 'flareTxt', 'station', 'frost', 'flash'])
+      'routeFill', 'routeTicks', 'routeTrain', 'routeTxt', 'mechBox', 'pressBar', 'pressTxt', 'thrTxt', 'stormBox', 'stormBar', 'stormTxt', 'hullBox', 'hullTxt', 'stormfx', 'vitals', 'heatBar', 'heatTxt', 'flareTxt', 'station', 'frost', 'flash'])
       this.el[id] = document.getElementById(id);
     this.teamKey = ''; this.toastT = 0; this.last = {}; this.flashT = 0;
     this.onBuy = null; this.onVote = null;
@@ -37,6 +37,19 @@ export class HUD {
     set(E.distTxt, fmtM(v.dist)); set(E.clockTxt, fmtT(v.t)); set(E.crateTxt, String(v.fedTotal)); set(E.scrapTxt, String(v.scrap | 0));
 
     this.route(v);
+
+    // pression, manette, front de tempête, solidité du convoi
+    E.mechBox.hidden = E.stormBox.hidden = E.hullBox.hidden = !!v.calm;
+    const prs = Math.max(0, Math.min(100, v.press || 0));
+    E.pressBar.style.width = prs.toFixed(0) + '%'; set(E.pressTxt, Math.round(prs) + ' %');
+    E.mechBox.classList.toggle('hot', prs > 75);
+    set(E.thrTxt, THROTTLE[v.thr]?.label || '');
+    E.mechBox.dataset.thr = v.thr;
+    const g = Math.max(0, v.gap);
+    E.stormBar.style.width = Math.min(100, g / STORM_MAX * 100).toFixed(1) + '%'; set(E.stormTxt, Math.round(g) + ' m');
+    E.stormfx.style.opacity = v.calm ? '0' : Math.max(0, Math.min(1, (70 - g) / 55)).toFixed(2);
+    E.stormBox.classList.toggle('near', g < 60); E.stormBox.classList.toggle('close', g < 25);
+    set(E.hullTxt, Math.max(0, Math.round(v.hull)) + ' %'); E.hullBox.classList.toggle('low', v.hull < 40);
 
     // équipe (chaleur de chacun)
     const rows = v.players.map((p) => {
@@ -161,6 +174,10 @@ export function briefingHtml({ role, squad, cfg, embedded }) {
       <div><b class="t">📦 Caisses</b><kbd>E</kbd> prendre, <kbd>F</kbd> lancer : sur le wagon, à un équipier ou dans le foyer.</div>
       <div><b class="t">🥶 Froid</b>Dehors, ta chaleur baisse. À zéro tu t'effondres : reviens près du feu à temps.</div>
       <div><b class="t">🐺 Loups</b>Ils traquent les isolés. <kbd>G</kbd> plante une fusée éclairante qui les fait fuir.</div>
+      <div><b class="t">🌪️ Le Front</b>Un mur de tempête vous suit et ne s'arrête jamais. S'il rattrape le convoi, c'est fini : gardez de l'avance.</div>
+      <div><b class="t">🕹️ Cabine</b>La manette règle la vitesse : Éco, Normal ou À fond (plus vite, mais ça brûle et la pression grimpe).</div>
+      <div><b class="t">♨️ À bord</b>Lâchez la vapeur à la soupape avant l'explosion, dégelez les tuyaux, colmatez les fuites (<kbd>E</kbd> maintenu).</div>
+      <div><b class="t">🏴 Pillards</b>En motoneige, ils volent les caisses du pont et sabotent le convoi. Renversez-les (<kbd>E</kbd> au bord) ou visez-les.</div>
       <div><b class="t">⛔ Voie</b>Congères à déblayer (<kbd>E</kbd> devant la loco), avalanches, bourrasques…</div>
       <div><b class="t">🚉 Gares</b>Fioul, chaleur, fusées. La ferraille achète des améliorations (<kbd>1</kbd>–<kbd>5</kbd>), <kbd>V</kbd> pour repartir.</div>
     </div>
@@ -190,11 +207,13 @@ export function endHtml({ snap, canReplay, embedded, reason }) {
   const names = new Map(snap.N.map(([id, n, c]) => [id, { n, c }]));
   ps.sort((a, b) => personalScore(b) - personalScore(a));
   const win = !!snap.wn && reason !== 'host';
-  const title = reason === 'host' ? 'LIAISON PERDUE' : win ? 'FORT-GIVRE !' : 'PANNE SÈCHE';
+  const why = snap.wy || 'fuel';
+  const title = reason === 'host' ? 'LIAISON PERDUE' : win ? 'FORT-GIVRE !' : { storm: 'ENGLOUTIS', hull: 'CONVOI DÉTRUIT' }[why] || 'PANNE SÈCHE';
   const exp = (snap.mo || 'expedition') === 'expedition';
   const sub = reason === 'host' ? 'L\'hôte a quitté la partie et personne n\'a pu reprendre le convoi.'
     : win ? 'Le convoi passe les portes de la ville. Tout l\'équipage est sauf — bravo !'
-      : exp ? `La chaudière s'est éteinte à ${fmtM(Math.max(0, (snap.gl || 0) - snap.d))} de Fort-Givre.` : 'La chaudière s\'est éteinte. Le convoi s\'immobilise dans la tempête.';
+      : (why === 'storm' ? 'Le front de tempête a rattrapé le convoi.' : why === 'hull' ? 'Explosions, avalanches et pillards : le convoi n\'a pas tenu.' : 'La chaudière s\'est éteinte.')
+        + (exp ? ` À ${fmtM(Math.max(0, (snap.gl || 0) - snap.d))} de Fort-Givre.` : '');
   return `<div class="panel card ${win ? 'win' : ''}" id="endPanel">
     <h1>${title}</h1><p>${sub}</p>
     <div class="big-num">${win ? fmtT(snap.t) : fmtM(snap.d)}</div>

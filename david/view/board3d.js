@@ -446,7 +446,11 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
     return { az, target, pos: target.clone().add(new THREE.Vector3(d.x * 46, 56, d.z * 46)) };
   }
   // Déplacement de caméra en arc autour de la cible (pas de traversée du plateau quand on change de côté)
+  // Un seul mouvement de caméra à la fois, et le joueur reprend toujours la main : dès qu'il touche la vue
+  // (glisser, molette, pincement), le mouvement automatique en cours s'arrête net.
+  let camTok = 0;
   async function flyTo(pos, target, dur = 700) {
+    const tok = ++camTok;
     const t0 = controls.target.clone();
     const s0 = new THREE.Spherical().setFromVector3(camera.position.clone().sub(t0));
     const s1 = new THREE.Spherical().setFromVector3(pos.clone().sub(target));
@@ -455,21 +459,23 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
     while (dTheta < -Math.PI) dTheta += 2 * Math.PI;
     const sp = new THREE.Spherical();
     await T.run(dur, (k) => {
+      if (tok !== camTok) return;
       const e = ease(k);
       controls.target.lerpVectors(t0, target, e);
       sp.set(s0.radius + (s1.radius - s0.radius) * e, s0.phi + (s1.phi - s0.phi) * e, s0.theta + dTheta * e);
       camera.position.setFromSpherical(sp).add(controls.target);
     });
   }
-  // La caméra qui suit s'efface seulement si le joueur déplace vraiment la vue (un simple clic sur une case ne compte pas),
-  // et reprend la main au tour suivant.
+  // La caméra qui suit s'efface si le joueur déplace vraiment la vue (un simple clic sur une case ne compte pas) ;
+  // elle reprend au début de son propre tour, ou avec le bouton ⌖. Avant, elle revenait à chaque tour des autres
+  // joueurs : avec des bots qui jouent vite, impossible de regarder le plateau tranquillement.
   let userMoved = false, grab = null;
-  controls.addEventListener('start', () => { grab = { pos: camera.position.clone(), target: controls.target.clone() }; });
+  controls.addEventListener('start', () => { camTok++; grab = { pos: camera.position.clone(), target: controls.target.clone() }; });
   controls.addEventListener('end', () => {
     if (grab && (grab.pos.distanceTo(camera.position) > 1.2 || grab.target.distanceTo(controls.target) > 0.8)) userMoved = true;
     grab = null;
   });
-  renderer.domElement.addEventListener('wheel', () => { userMoved = true; }, { passive: true });
+  renderer.domElement.addEventListener('wheel', () => { camTok++; userMoved = true; }, { passive: true });
   function fit(instant = true) {
     const w = stage.clientWidth, h = stage.clientHeight;
     if (!w || !h) return;
@@ -610,7 +616,8 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
       const m = owners[i]; if (!m) return;
       m.visible = !!color; if (color) m.material.color.set(color);
     },
-    setCurrent(id) { if (id !== curId) userMoved = false; curId = id; },
+    setCurrent(id) { curId = id; },
+    resumeFollow() { userMoved = false; },
     tradeMarks(list) {
       clearMarks();
       for (const m of list || []) addMark(m);
