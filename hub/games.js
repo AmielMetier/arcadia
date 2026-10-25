@@ -8,15 +8,10 @@ window.HUB_GAMES = [
     url: 'drift/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#ff4b2b',
+    // affiche : rendu du jeu (drift/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#3a7440"/>
-      <g fill="#2f6136"><circle cx="40" cy="30" r="16"/><circle cx="285" cy="150" r="20"/><circle cx="290" cy="28" r="12"/></g>
-      <path d="M-20 140 C 60 140, 80 40, 160 40 S 260 140, 340 120" fill="none" stroke="#16181d" stroke-width="54"/>
-      <path d="M-20 140 C 60 140, 80 40, 160 40 S 260 140, 340 120" fill="none" stroke="#4a4d55" stroke-width="44"/>
-      <path d="M-20 140 C 60 140, 80 40, 160 40 S 260 140, 340 120" fill="none" stroke="#fff8ea" stroke-width="3" stroke-dasharray="12 12"/>
-      <g transform="translate(118 58) rotate(-28)"><rect x="-17" y="-9" width="34" height="18" rx="5" fill="#ff4b2b" stroke="#16181d" stroke-width="3"/><rect x="2" y="-6" width="9" height="12" rx="2" fill="#16181d"/></g>
-      <g transform="translate(206 86) rotate(32)"><rect x="-17" y="-9" width="34" height="18" rx="5" fill="#2b8cff" stroke="#16181d" stroke-width="3"/><rect x="2" y="-6" width="9" height="12" rx="2" fill="#16181d"/></g>
-      <g transform="translate(64 116)"><path d="M0 0 h26 v16 h-26z" fill="#fff8ea" stroke="#16181d" stroke-width="2"/><path d="M0 0h6.5v4h-6.5zM13 0h6.5v4H13zM6.5 4H13v4H6.5zM19.5 4H26v4h-6.5zM0 8h6.5v4H0zM13 8h6.5v4H13zM6.5 12H13v4H6.5zM19.5 12H26v4h-6.5z" fill="#16181d"/></g>
+      <rect width="320" height="180" fill="#2b1a0e"/>
+      <image href="drift/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -37,27 +32,10 @@ window.HUB_GAMES = [
       { key: 'doubleGo', label: 'Salaire doublé pile sur Départ', options: [[0, 'Non'], [1, 'Oui']], def: 0 },
       { key: 'auctions', label: 'Enchères', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
+    // affiche : rendu du jeu (david/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#9FD8F5"/>
-      <rect y="110" width="320" height="70" fill="#1C5FB4"/>
-      <path d="M0 110 Q 80 100 160 112 T 320 106 V118 H0Z" fill="#f3e9d2"/>
-      <circle cx="270" cy="40" r="18" fill="#FDE62F" stroke="#16181d" stroke-width="3"/>
-      <g transform="translate(160 92)">
-        <path d="M0 -62 L110 0 L0 62 L-110 0Z" fill="#fff8ea" stroke="#16181d" stroke-width="4"/>
-        <path d="M0 -40 L72 0 L0 40 L-72 0Z" fill="#18A557" opacity=".22"/>
-        <g stroke="#16181d" stroke-width="2">
-          <path d="M-110 0 L-82 -16 L-72 -10 L-100 6Z" fill="#8A4B2A"/>
-          <path d="M-82 -16 L-55 -31 L-45 -25 L-72 -10Z" fill="#9FD8F5"/>
-          <path d="M-55 -31 L-27 -47 L-17 -41 L-45 -25Z" fill="#E0479E"/>
-          <path d="M-27 -47 L0 -62 L10 -56 L-17 -41Z" fill="#F7941D"/>
-          <path d="M0 -62 L28 -46 L18 -40 L-10 -56Z" fill="#E3262F"/>
-          <path d="M28 -46 L55 -31 L45 -25 L18 -40Z" fill="#FDE62F"/>
-          <path d="M55 -31 L83 -15 L73 -9 L45 -25Z" fill="#18A557"/>
-          <path d="M83 -15 L110 0 L100 6 L73 -9Z" fill="#1C5FB4"/>
-        </g>
-        <g stroke="#16181d" stroke-width="2"><path d="M-14 -8 l14 -8 l14 8 v12 l-14 8 l-14 -8z" fill="#E3262F"/><path d="M-14 -8 l14 8 l14 -8" fill="none"/><path d="M0 0 v12"/></g>
-        <g stroke="#16181d" stroke-width="2"><path d="M24 6 l9 -5 l9 5 v8 l-9 5 l-9 -5z" fill="#18A557"/></g>
-      </g>
+      <rect width="320" height="180" fill="#3a2010"/>
+      <image href="david/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -87,22 +65,10 @@ window.HUB_GAMES = [
       { key: 'duel', label: 'Face-à-face final', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'chsab', label: 'Sabotage', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },
     ],
+    // affiche : rendu du jeu (calcul/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#3f86d0"/>
-      <rect y="120" width="320" height="60" fill="#1C5FB4"/>
-      <circle cx="276" cy="34" r="20" fill="#FDE62F" stroke="#16181d" stroke-width="3"/>
-      <g font-family="Bungee,Impact,sans-serif" fill="#fff8ea" opacity=".22" font-size="40"><text x="14" y="52">+</text><text x="22" y="160">÷</text><text x="282" y="150">√</text><text x="230" y="98">%</text></g>
-      <g transform="translate(160 92) rotate(-4)">
-        <rect x="-96" y="-58" width="192" height="116" rx="14" fill="#16181d"/>
-        <rect x="-100" y="-62" width="192" height="116" rx="14" fill="#fff8ea" stroke="#16181d" stroke-width="4"/>
-        <rect x="-86" y="-50" width="66" height="18" rx="9" fill="#ff5fa2" stroke="#16181d" stroke-width="3"/>
-        <rect x="-86" y="-24" width="164" height="12" rx="6" fill="#f3e9d2" stroke="#16181d" stroke-width="3"/>
-        <rect x="-86" y="-24" width="104" height="12" rx="6" fill="#2fbf71" stroke="#16181d" stroke-width="3"/>
-        <text x="-4" y="30" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="38" fill="#16181d">47×53</text>
-      </g>
-      <g transform="translate(250 136) rotate(10)"><rect x="-26" y="-18" width="52" height="34" rx="8" fill="#ffc531" stroke="#16181d" stroke-width="3"/>
-        <text x="0" y="8" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="16" fill="#16181d">2491</text></g>
-      <g transform="translate(58 128)"><circle r="20" fill="#ff8a1f" stroke="#16181d" stroke-width="3"/><text y="7" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="18" fill="#fff">48</text></g>
+      <rect width="320" height="180" fill="#0b0d1a"/>
+      <image href="calcul/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -128,59 +94,10 @@ window.HUB_GAMES = [
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
+    // affiche : rendu du jeu (bastion/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#5aa846"/>
-      <ellipse cx="64" cy="40" rx="52" ry="30" fill="#4e963b"/>
-      <ellipse cx="260" cy="148" rx="60" ry="34" fill="#68b853"/>
-      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#f3e9d2" stroke-width="32" stroke-linecap="round"/>
-      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#16181d" stroke-width="34" stroke-linecap="round" opacity=".18"/>
-      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#3a3d46" stroke-width="24" stroke-linecap="round"/>
-      <path d="M -10 150 Q 95 120 160 90 T 330 28" fill="none" stroke="#ffc531" stroke-width="2.5" stroke-dasharray="9 8" stroke-linecap="round"/>
-      <circle cx="160" cy="90" r="30" fill="#464b56" stroke="#16181d" stroke-width="3"/>
-      <circle cx="160" cy="90" r="22" fill="none" stroke="#ffc531" stroke-width="2" stroke-dasharray="6 5"/>
-      <circle cx="74" cy="122" r="58" fill="rgba(255,75,43,.12)" stroke="#ff4b2b" stroke-width="2.5" stroke-dasharray="8 6"/>
-      <circle cx="248" cy="56" r="58" fill="rgba(43,140,255,.12)" stroke="#2b8cff" stroke-width="2.5" stroke-dasharray="8 6"/>
-      <g transform="translate(160 88)">
-        <polygon points="-14,6 -6,-14 4,-10 2,10" fill="#0d9b96" stroke="#16181d" stroke-width="2.5"/>
-        <polygon points="4,8 10,-12 18,-4 12,12" fill="#1fc7c1" stroke="#16181d" stroke-width="2.5"/>
-        <polygon points="-4,12 0,-20 10,-12 6,12" fill="#7cf7f2" stroke="#16181d" stroke-width="2.5"/>
-      </g>
-      <g transform="translate(68 122)">
-        <rect x="-26" y="-18" width="52" height="44" rx="8" fill="#a82913" stroke="#16181d" stroke-width="3"/>
-        <rect x="-26" y="-26" width="52" height="44" rx="8" fill="#ff4b2b" stroke="#16181d" stroke-width="3"/>
-        <rect x="-15" y="-17" width="30" height="26" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="-4" r="7" fill="#ffc531" stroke="#16181d" stroke-width="2.5"/>
-        <line x1="0" y1="-4" x2="15" y2="-11" stroke="#16181d" stroke-width="4" stroke-linecap="round"/>
-      </g>
-      <g transform="translate(116 94)">
-        <circle cx="0" cy="4" r="14" fill="#9a9382" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="-2" r="12" fill="#f3e9d2" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="-6" r="6" fill="#7cf7f2" stroke="#16181d" stroke-width="2"/>
-        <polyline points="5,-6 22,-14 30,-8 46,-16" fill="none" stroke="#7cf7f2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </g>
-      <g transform="translate(250 54)">
-        <rect x="-24" y="-16" width="48" height="40" rx="8" fill="#165299" stroke="#16181d" stroke-width="3"/>
-        <rect x="-24" y="-24" width="48" height="40" rx="8" fill="#2b8cff" stroke="#16181d" stroke-width="3"/>
-        <rect x="-14" y="-16" width="28" height="24" rx="5" fill="#fff8ea" stroke="#16181d" stroke-width="2.5"/>
-        <circle cx="0" cy="-4" r="6.5" fill="#ffc531" stroke="#16181d" stroke-width="2.5"/>
-      </g>
-      <g transform="translate(132 132) rotate(-25)">
-        <rect x="-15" y="-12" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
-        <rect x="-15" y="6" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
-        <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#ff4b2b" stroke="#16181d" stroke-width="2.5"/>
-        <rect x="0" y="-3" width="18" height="6" rx="2" fill="#3a3d46" stroke="#16181d" stroke-width="2"/>
-        <circle cx="-1" cy="0" r="6" fill="#fff8ea" stroke="#16181d" stroke-width="2"/>
-      </g>
-      <g transform="translate(202 74) rotate(155)">
-        <rect x="-15" y="-12" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
-        <rect x="-15" y="6" width="30" height="6" rx="2" fill="#262932" stroke="#16181d" stroke-width="2"/>
-        <rect x="-12" y="-8" width="24" height="16" rx="4" fill="#2b8cff" stroke="#16181d" stroke-width="2.5"/>
-        <rect x="0" y="-3" width="18" height="6" rx="2" fill="#3a3d46" stroke="#16181d" stroke-width="2"/>
-        <circle cx="-1" cy="0" r="6" fill="#fff8ea" stroke="#16181d" stroke-width="2"/>
-      </g>
-      <g fill="#2e7028" stroke="#16181d" stroke-width="2.5">
-        <circle cx="32" cy="46" r="14"/><circle cx="50" cy="36" r="11"/><circle cx="286" cy="142" r="15"/><circle cx="264" cy="154" r="11"/>
-      </g>
+      <rect width="320" height="180" fill="#0e1a12"/>
+      <image href="bastion/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -198,81 +115,10 @@ window.HUB_GAMES = [
       { key: 'startWeapon', label: 'Arme de départ', options: [['pistol', 'Pistolet'], ['shotgun', 'Fusil à pompe'], ['smg', 'Mitraillette']], def: 'pistol' },
       { key: 'sector', label: 'Secteur', options: [['random', 'Au hasard'], ['lab', 'Labo'], ['sewers', 'Égouts'], ['hospital', 'Hôpital'], ['metro', 'Métro'], ['nice', 'Rues de Nice']], def: 'random' },
     ],
+    // affiche : rendu du jeu (outbreak/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <radialGradient id="outbreakBkg" cx="50%" cy="40%" r="75%">
-          <stop offset="0%" stop-color="#221215"/>
-          <stop offset="50%" stop-color="#140a0c"/>
-          <stop offset="100%" stop-color="#080405"/>
-        </radialGradient>
-        <linearGradient id="laserSight" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#ff3344" stop-opacity="0.9"/>
-          <stop offset="100%" stop-color="#ff3344" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <!-- Bunker corridor -->
-      <rect width="320" height="180" fill="url(#outbreakBkg)"/>
-      <!-- Grid laboratory tiles -->
-      <g stroke="#2a1418" stroke-width="1" opacity="0.6">
-        <line x1="0" y1="50" x2="320" y2="50"/>
-        <line x1="0" y1="90" x2="320" y2="90"/>
-        <line x1="0" y1="130" x2="320" y2="130"/>
-        <line x1="60" y1="0" x2="60" y2="180"/>
-        <line x1="120" y1="0" x2="120" y2="180"/>
-        <line x1="180" y1="0" x2="180" y2="180"/>
-        <line x1="240" y1="0" x2="240" y2="180"/>
-      </g>
-      <!-- Blood splatters on floor -->
-      <path d="M70 120 Q85 105 100 122 Q115 135 95 140 Q80 145 70 120 Z" fill="#880814" opacity="0.85"/>
-      <circle cx="112" cy="115" r="3" fill="#880814"/>
-      <circle cx="62" cy="135" r="2.5" fill="#880814"/>
-      <path d="M230 140 Q250 130 265 145 Q260 160 240 155 Z" fill="#6d0610" opacity="0.8"/>
-      <!-- Biohazard warning door / airlock in background -->
-      <rect x="110" y="20" width="100" height="110" rx="6" fill="#181c22" stroke="#ff3344" stroke-width="2.5"/>
-      <rect x="120" y="35" width="80" height="25" fill="#0d0f12" stroke="#2a303a" stroke-width="1.5"/>
-      <circle cx="160" cy="47" r="6" fill="#ff3344"/>
-      <!-- Hazard stripes -->
-      <g stroke="#ffc531" stroke-width="3">
-        <line x1="112" y1="24" x2="124" y2="24"/>
-        <line x1="130" y1="24" x2="142" y2="24"/>
-        <line x1="148" y1="24" x2="160" y2="24"/>
-        <line x1="166" y1="24" x2="178" y2="24"/>
-        <line x1="184" y1="24" x2="196" y2="24"/>
-        <line x1="202" y1="24" x2="208" y2="24"/>
-      </g>
-      <!-- Swarming mutant zombie silhouettes -->
-      <g fill="#0e0708" stroke="#ff3344" stroke-width="0.5">
-        <!-- Zombie 1 (left charging) -->
-        <circle cx="45" cy="85" r="11"/>
-        <path d="M38 96 L45 135 L35 170 M45 135 L55 170 M38 105 L20 85 M48 105 L65 92" stroke="#0e0708" stroke-width="6" stroke-linecap="round"/>
-        <circle cx="48" cy="84" r="2.5" fill="#ff3344"/>
-        <circle cx="42" cy="85" r="2.5" fill="#ff3344"/>
-        <!-- Zombie 2 (center crawler) -->
-        <circle cx="130" cy="120" r="10"/>
-        <path d="M125 125 L105 138 M135 125 L150 135" stroke="#0e0708" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="132" cy="119" r="2" fill="#2de8bd"/>
-        <!-- Zombie 3 (right titan) -->
-        <circle cx="275" cy="70" r="16"/>
-        <path d="M265 85 L275 135 L260 175 M275 135 L290 175 M265 95 L245 78 M285 95 L305 82" stroke="#0e0708" stroke-width="9" stroke-linecap="round"/>
-        <circle cx="270" cy="68" r="3" fill="#ff3344"/>
-      </g>
-      <!-- SWAT Survivor aiming shotgun/rifle with muzzle flash -->
-      <g transform="translate(160, 125)">
-        <circle cx="-15" cy="-25" r="12" fill="#2d3748" stroke="#16181d" stroke-width="2"/>
-        <!-- Helmet and visor -->
-        <rect x="-18" y="-28" width="16" height="6" rx="2" fill="#1fc7c1"/>
-        <!-- Torso & tactical vest -->
-        <rect x="-24" y="-12" width="22" height="26" rx="4" fill="#1a202c" stroke="#16181d" stroke-width="2"/>
-        <!-- Shotgun / Rifle -->
-        <rect x="-10" y="-8" width="46" height="7" rx="2" fill="#4a5568" stroke="#16181d" stroke-width="1.5"/>
-        <rect x="18" y="-7" width="18" height="4" fill="#2d3748"/>
-        <!-- Muzzle flash explosion -->
-        <polygon points="38,-5 58,-12 50,-5 62,-3 48,0 58,6 38,2" fill="#ffdc73"/>
-        <circle cx="42" cy="-2" r="5" fill="#ff8524"/>
-        <circle cx="40" cy="-2" r="2.5" fill="#ffffff"/>
-      </g>
-      <!-- Laser aim beam slicing the dark -->
-      <line x1="195" y1="120" x2="45" y2="85" stroke="#ff3344" stroke-width="1.8" opacity="0.85" stroke-dasharray="4 2"/>
+      <rect width="320" height="180" fill="#0a0b10"/>
+      <image href="outbreak/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -289,32 +135,10 @@ window.HUB_GAMES = [
       { key: 'strikes', label: 'Fautes permises', options: [[1, '1'], [3, '3'], [5, '5']], def: 3 },
       { key: 'sabotage', label: 'Sabotages en duel', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
+    // affiche : rendu du jeu (filrouge/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#2a2016"/>
-      <rect y="118" width="320" height="62" fill="#7a4f2c"/>
-      <path d="M0 118 H320" stroke="#16181d" stroke-width="3"/>
-      <ellipse cx="160" cy="16" rx="120" ry="70" fill="#ffd27a" opacity=".18"/>
-      <g transform="translate(70 40)">
-        <rect x="0" y="0" width="128" height="90" rx="10" fill="#59654a" stroke="#16181d" stroke-width="4"/>
-        <rect x="10" y="10" width="50" height="34" rx="4" fill="#16181d"/>
-        <text x="35" y="34" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="16" fill="#ff3a3a">0:42</text>
-        <rect x="68" y="10" width="50" height="34" rx="4" fill="#e9e3d3" stroke="#16181d" stroke-width="2"/>
-        <path d="M72 18 C 88 18, 98 36, 114 36" stroke="#d62828" stroke-width="4" fill="none"/>
-        <path d="M72 36 C 88 36, 98 18, 114 18" stroke="#1d5fd1" stroke-width="4" fill="none"/>
-        <path d="M72 27 H 90 M 96 27 H 114" stroke="#f2c200" stroke-width="4"/>
-        <rect x="10" y="50" width="50" height="32" rx="4" fill="#2c3038"/>
-        <circle cx="35" cy="66" r="11" fill="#bbb" stroke="#16181d" stroke-width="2"/>
-        <rect x="68" y="50" width="50" height="32" rx="4" fill="#2c3038"/>
-        <g fill="#e23b3b"><rect x="72" y="62" width="9" height="16"/></g><g fill="#2f6fe0"><rect x="83" y="62" width="9" height="16"/></g><g fill="#f4c51d"><rect x="94" y="62" width="9" height="16"/></g><g fill="#2fb35c"><rect x="105" y="62" width="9" height="16"/></g>
-        <path d="M44 0 a20 14 0 0 1 40 0" fill="none" stroke="#16181d" stroke-width="6"/>
-      </g>
-      <g transform="translate(212 104) rotate(-8)">
-        <rect x="0" y="0" width="84" height="56" rx="4" fill="#7a1526" stroke="#16181d" stroke-width="3"/>
-        <rect x="4" y="3" width="37" height="49" fill="#f6efdc"/><rect x="43" y="3" width="37" height="49" fill="#f6efdc"/>
-        <g stroke="#b9ad92" stroke-width="2"><path d="M8 14h28M8 21h28M8 28h22M47 14h28M47 21h28M47 28h28M47 35h20"/></g>
-        <text x="22" y="46" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="9" fill="#b3122a">✂</text>
-      </g>
-      <path d="M150 140 q 40 -30 70 -20" stroke="#d62828" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <rect width="320" height="180" fill="#140608"/>
+      <image href="filrouge/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
   {
@@ -343,24 +167,10 @@ window.HUB_GAMES = [
       { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition'], ['endless', 'Sans fin']], def: 'expedition' },
       { key: 'difficulty', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normale'], ['blizzard', 'Blizzard']], def: 'normal' },
     ],
+    // affiche : rendu du jeu (convoy/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect width="320" height="180" fill="#c3ced9"/>
-      <path d="M0 118 Q 90 104 170 116 T 320 110 V180 H0Z" fill="#f4f7fb"/>
-      <g fill="#8d8a86" stroke="#16181d" stroke-width="3"><path d="M22 116 v-34 h18 v12 h10 v22z"/><path d="M262 112 v-46 h14 v46z"/></g>
-      <g stroke="#16181d" stroke-width="3">
-        <path d="M40 150 L280 150" stroke="#4b525c" stroke-width="5"/>
-        <rect x="64" y="112" width="58" height="30" rx="3" fill="#4b525c"/>
-        <rect x="128" y="112" width="70" height="30" rx="3" fill="#4b525c"/>
-        <rect x="204" y="104" width="68" height="38" rx="3" fill="#ff4b2b"/>
-        <path d="M272 112 L292 142 L272 142Z" fill="#4b525c"/>
-        <rect x="150" y="84" width="26" height="28" rx="4" fill="#6d7480"/>
-        <rect x="216" y="112" width="18" height="12" fill="#ffe2a0"/>
-      </g>
-      <ellipse cx="163" cy="84" rx="11" ry="4" fill="#ff8a2a" stroke="#16181d" stroke-width="2"/>
-      <g fill="#16181d"><circle cx="80" cy="146" r="6"/><circle cx="106" cy="146" r="6"/><circle cx="146" cy="146" r="6"/><circle cx="182" cy="146" r="6"/><circle cx="222" cy="146" r="6"/><circle cx="256" cy="146" r="6"/></g>
-      <g stroke="#16181d" stroke-width="2"><rect x="88" y="98" width="12" height="14" fill="#2b8cff"/><circle cx="94" cy="93" r="5" fill="#e6b796"/><rect x="190" y="98" width="12" height="14" fill="#ffc531"/><circle cx="196" cy="93" r="5" fill="#e6b796"/><rect x="40" y="126" width="12" height="14" fill="#2fbf71"/><circle cx="46" cy="121" r="5" fill="#e6b796"/><rect x="38" y="104" width="16" height="12" fill="#c0821f"/></g>
-      <path d="M150 60 q 18 -12 40 -6 q 20 -14 44 0" fill="none" stroke="#5a5d63" stroke-width="7" stroke-linecap="round" opacity=".6"/>
-      <g fill="#fff"><circle cx="30" cy="30" r="2"/><circle cx="90" cy="20" r="2.4"/><circle cx="140" cy="44" r="1.8"/><circle cx="200" cy="24" r="2.2"/><circle cx="250" cy="40" r="2"/><circle cx="300" cy="18" r="2.4"/><circle cx="60" cy="70" r="1.8"/><circle cx="290" cy="80" r="2"/><circle cx="120" cy="80" r="1.6"/><circle cx="230" cy="70" r="1.8"/></g>
+      <image href="convoy/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
     </svg>`,
   },
 ];

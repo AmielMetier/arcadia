@@ -1,5 +1,9 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.45 — 25 octobre 2026
+- **Hub** — Nouvelles affiches pour tous les jeux, dans le style de celle de Cyber Kart GP : une vraie image du jeu, un grand titre en deux couleurs et un bandeau. Duo Drift dans le canyon, le plateau 3D de DavidSimulator couvert de maisons, une bataille de Bastion Clash, une horde d'Outbreak sur la Prom', la bombe de Fil Rouge, l'équipage de Convoy Storm face aux pillards… et Pierre Chartier en personne sur l'affiche de Tête de Calcul.
+- **Convoy Storm** — Le mur du Front de tempête couvre maintenant tout l'horizon.
+
 ## 2.44 — 25 octobre 2026
 - **DavidSimulator** — On peut de nouveau bouger la vue quand on veut :
   - La caméra qui suit revenait de force sur le pion à chaque tour des autres joueurs ; avec des bots qui jouent vite, impossible de regarder le plateau. Maintenant, si tu déplaces la vue, elle reste où tu l'as mise jusqu'au début de ton propre tour (ou jusqu'au bouton ⌖).

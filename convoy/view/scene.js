@@ -379,8 +379,8 @@ export function createScene(host, { onLost } = {}) {
     const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; owned.tex.add(t); return t;
   })();
   const stormG = new THREE.Group(); scene.add(stormG);
-  const stormMats = [0, 1, 2].map((i) => { const m = new THREE.MeshBasicMaterial({ map: stormTex.clone(), transparent: true, opacity: 0.92 - i * 0.12, depthWrite: false, fog: false, side: THREE.DoubleSide }); m.map.wrapS = THREE.RepeatWrapping; m.map.repeat.set(2 + i, 1); owned.tex.add(m.map); owned.mat.add(m); return m; });
-  stormMats.forEach((m, i) => { const pl = mesh(GEO.plane, m, false, false); pl.scale.set(260, 46 + i * 8, 1); pl.position.set(0, 18 + i * 3, i * 5); stormG.add(pl); });
+  const stormMats = [0, 1, 2].map((i) => { const m = new THREE.MeshBasicMaterial({ map: stormTex.clone(), transparent: true, opacity: 0.92 - i * 0.12, depthWrite: false, fog: false, side: THREE.DoubleSide }); m.map.wrapS = THREE.RepeatWrapping; m.map.repeat.set(5 + i * 2, 1); owned.tex.add(m.map); owned.mat.add(m); return m; });
+  stormMats.forEach((m, i) => { const pl = mesh(GEO.plane, m, false, false); pl.scale.set(700, 46 + i * 8, 1); pl.position.set(0, 18 + i * 3, i * 5); stormG.add(pl); });
   // ombre du front au sol (visible d'en haut) : un voile sombre qui commence pile au front
   const shadeTex = (() => {
     const c = document.createElement('canvas'); c.width = 8; c.height = 128; const x = c.getContext('2d');
