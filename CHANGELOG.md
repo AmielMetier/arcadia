@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.58 — 26 octobre 2026
+- **Hub** — Nouveau : ajouter le mode aventure MMO multijoueur a Menton (Kalos-Sud) (Amiel)
+
 ## 2.57 — 25 octobre 2026
 - Améliorations techniques sous le capot (1 modification).
 
