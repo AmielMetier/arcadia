@@ -54,6 +54,7 @@
   #mtbar i { background: #9aa6b8; }
   #mtbar.l1 i { background: linear-gradient(90deg, #3cb4ff, #a8e4ff); box-shadow: 0 0 14px #3cb4ff; }
   #mtbar.l2 i { background: linear-gradient(90deg, #ff8a1a, #ffe066); box-shadow: 0 0 14px #ff8a1a; }
+  #mtbar.l3 i { background: linear-gradient(90deg, #b44dff, #ff8af0); box-shadow: 0 0 16px #b44dff; }
   #mtlabel { font-size: 16px; margin-top: 5px; color: #cfd8e6; -webkit-text-stroke: 2px var(--ink); }
 
   #ranking { position: absolute; left: 18px; top: 50%; transform: translateY(-46%); width: 190px; height: 256px; }
@@ -119,10 +120,10 @@
   .mapcard:hover { transform: translateY(-3px); }
   .mapcard.sel { border-color: #fff; box-shadow: 0 0 0 4px var(--ink), 0 0 30px rgba(255, 220, 80, .55); transform: scale(1.02); }
   .mapcard[disabled] { cursor: default; } .mapcard[disabled]:not(.sel) { opacity: .55; }
-  .opts { display: flex; flex-wrap: wrap; gap: 14px 26px; background: var(--panel); border: 3px solid rgba(255, 255, 255, .18); border-radius: 18px; padding: 12px 18px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 16px; background: var(--panel); border: 3px solid rgba(255, 255, 255, .18); border-radius: 18px; padding: 8px 14px; }
   .opt .lbl { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 13px; opacity: .8; margin-bottom: 4px; }
   .seg { display: inline-flex; gap: 4px; background: rgba(0, 0, 0, .3); border-radius: 12px; padding: 4px; }
-  .seg button { font: inherit; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; color: #dfe6f5; background: transparent; border: 0; border-radius: 9px; padding: 6px 11px; cursor: pointer; }
+  .seg button { font: inherit; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 13px; color: #dfe6f5; background: transparent; border: 0; border-radius: 9px; padding: 5px 8px; cursor: pointer; }
   .seg button.sel { background: #ffd53d; color: var(--ink); }
   .seg button:disabled { cursor: default; }
   .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -137,6 +138,7 @@
   #kgrid { margin-top: 14px; padding-top: 12px; border-top: 2px dashed rgba(255, 255, 255, .22); position: relative; }
   #kgrid::before { content: 'TON KART'; position: absolute; top: -11px; left: 14px; padding: 0 8px; font-size: 15px; color: #9fd8ff; background: rgba(12, 16, 40, .9); border-radius: 8px; -webkit-text-stroke: 0; }
   #kgrid .card { aspect-ratio: 1.35 / 1; }
+  #assist { font-size: 15px; padding: 5px 14px; } #assist.on { background: #4dff7a; }
   #kgrid .card img { object-fit: contain; inset: 4% 4% 24% 4%; width: 92%; height: 72%; }
   .card img { position: absolute; inset: 0 0 20% 0; width: 100%; height: 80%; object-fit: cover; }
   .card .nm { position: relative; font-size: 17px; padding: 4px 0 7px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
@@ -279,6 +281,7 @@
     <div id="grid"></div>
     <div id="kgrid"></div>
     <div id="info"><div class="who" id="selname">—</div><div class="desc" id="seldesc"></div><div id="selstats"></div></div>
+    <div class="row"><button class="btn alt" id="assist" title="Le kart se redresse tout seul avant de toucher les murs">Conduite assistée : non</button></div>
     <div class="plist" id="plist"></div>
     <div class="btns"><button class="btn alt" id="charback">Retour</button><button class="btn" id="charok">Course ! 🏁</button></div>
     <div class="keys"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> pilote · <kbd>Tab</kbd> kart suivant · <kbd>Entrée</kbd> valider · <kbd>Échap</kbd> retour</div>
@@ -322,7 +325,7 @@ const MUSIC = {
   tracks: { menu: 'menu', gc: 'grand-circuit', whisky: 'whisky-peak', rainbow: 'arc-en-ciel', jungle: 'jungle', castle: 'chateau-hante', beach: 'plage', results: 'resultats' },
   fallback: { jungle: 'gc', castle: 'whisky', beach: 'rainbow' },   // morceau joué si le fichier du circuit n'existe pas encore
   lapRate: [1.0, 1.04, 1.09, 1.13, 1.17],   // vitesse de lecture au tour 1, 2, 3… (dernier tour : valeur du rang « tours »)
-  preservePitch: true,                      // false = le morceau monte aussi dans les aigus en accélérant
+  preservePitch: false,                     // (la musique passe par Web Audio : en accélérant, elle monte aussi un peu dans les aigus)
   volume: 0.7,
   ext: ['mp3', 'ogg'],                     // formats essayés, dans l'ordre
 };
@@ -346,7 +349,11 @@ const CFG = {
   // drift : vitesse de rotation (rad/s) en contre-braquant / au neutre / en braquant dans le virage
   DRIFT_OUT: 0.12, DRIFT_MID: 0.45, DRIFT_IN: 1.5,
   GRIP: 8.5, DRIFT_GRIP: 7.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
-  MT1: 1.0, MT2: 2.0,           // charge du mini-turbo (s) : bleu / orange ; deux fois plus vite en gigotant (Q-D-Q-D)
+  MT1: 1.0, MT2: 2.0, MT3: 3.0, // charge du mini-turbo (s) : bleu / orange / violet ; deux fois plus vite en gigotant (Q-D-Q-D)
+  MT_BOOST: [0, 0.7, 1.25, 1.9], // durée du turbo selon le niveau
+  DRAFT_TIME: 1.3, DRAFT_DIST: 22, DRAFT_W: 3.4,   // aspiration : temps dans le sillage, portée (m), demi-largeur du sillage (m)
+  CC: { 50: 0.84, 100: 1, 150: 1.16 },            // cylindrées : multiplicateur de vitesse
+  RESCUE_T: 1.1,                                  // drone de dépannage : durée de la remise en piste (s)
   WIGGLE_RATE: 2.0,
   STAR_TIME: 5, FLOWER_TIME: 8, GOLD_TIME: 7, ROCKET_TIME: 6, SHOCK_TIME: 4, INK_TIME: 4.5, BOX_RESPAWN: 2.2,
   NET_HZ: 20, INTERP: 0.11,
@@ -964,6 +971,7 @@ class Track {
       this.ramp[(iTop + 1) % N] = 2;
     }
     this.rampTop = this.rampTops[0] ?? 0;
+    this.glideTops = (def.ramps || []).map((r, k) => (r.glide ? this.rampTops[k] : -1)).filter((i) => i >= 0);
     // bosses (sections tout-terrain)
     let ds = -1;
     for (let i = 0; i < N; i++) {
@@ -1049,6 +1057,8 @@ class Track {
     if (opts.color) o.color = (i, c, l, dy) => opts.color(i, n - 1 - c, l, dy);
     return this.ribbon(mirrorProfile(profile), i0, i1, vTile, o);
   }
+  /** vrai si un tremplin à planeur est juste derrière l'indice i */
+  glideNear(i) { return this.glideTops.some((t) => { const d = (i - t + this.N) % this.N; return d <= 8; }); }
   runs(pred) {
     const N = this.N; let s = -1; for (let k = 0; k < N; k++) if (!pred(k)) { s = k; break; }
     if (s < 0) return [[0, N]];
@@ -1916,7 +1926,7 @@ const WHISKY_DEF = {
     return WK.CURVE;
   },
   width(s, sec) { return [13.5, 22, 15, 11.5, 17, 15.5][sec] + (sec === WK.WINDING && s > 28.5 ? 1.5 : 0); },
-  ramps: [{ seg: 35.6, h: 2.6 }],
+  ramps: [{ seg: 35.6, h: 2.6, glide: true }],
   dash: [[0.255, -0.3], [0.262, 0.3], [0.56, 0], [0.74, 0], [0.97, 0.35]],
   boxes: { rows: [0.06, 0.2, 0.33, 0.47, 0.6, 0.71, 0.86, 0.94], lanes: [-0.7, -0.42, -0.14, 0.14, 0.42, 0.7] },
   minimapColors: { road: '#dfeaf6', special: [[WK.ICE, '#7fd4ff']] },
@@ -2544,7 +2554,7 @@ const JUNGLE_DEF = {
     return JG.FOREST;
   },
   width(s, sec) { return [12.5, 12, 11.5, 13, 11][sec]; },
-  ramps: [{ seg: JUNGLE_PATH.marks.descent + 5.2, h: 2.8 }],
+  ramps: [{ seg: JUNGLE_PATH.marks.descent + 5.2, h: 2.8, glide: true }],
   dash: [[0.06, -0.35], [0.06, 0.35], [0.3, 0], [0.47, 0.35], [0.66, -0.3], [0.66, 0.3], [0.9, 0]],
   boxes: { rows: [0.04, 0.17, 0.29, 0.39, 0.52, 0.62, 0.75, 0.87], lanes: [-0.7, -0.42, -0.14, 0.14, 0.42, 0.7] },
   minimapColors: { road: '#d9b46a', special: [[JG.TEMPLE, '#8a8478'], [JG.COURT, '#b5ab98']] },
@@ -3048,7 +3058,7 @@ const BEACH_DEF = {
     return BC.PROM;
   },
   width(s, sec) { return [13, 13, 10.5, 12][sec]; },
-  ramps: [{ seg: BEACH_PATH.marks.jump + 4.6, h: 3 }],
+  ramps: [{ seg: BEACH_PATH.marks.jump + 4.6, h: 3, glide: true }],
   dash: [[0.04, -0.3], [0.04, 0.3], [0.16, 0], [0.3, 0], [0.42, -0.3], [0.58, 0.3], [0.74, 0], [0.9, 0]],
   boxes: { rows: [0.05, 0.13, 0.23, 0.33, 0.45, 0.6, 0.7, 0.83, 0.95], lanes: [-0.7, -0.42, -0.14, 0.14, 0.42, 0.7] },
   minimapColors: { road: '#f2dca0', special: [[BC.BOARD, '#b07a45'], [BC.TOP, '#9fb0bf']] },
@@ -3339,8 +3349,8 @@ function updateParticleScale() {
   sparks.mat.uniforms.uMaxSize.value = smoke.mat.uniforms.uMaxSize.value = renderer.domElement.height * 0.18;
 }
 const COL = {
-  spark0: [[2.2, 2.0, 1.4], [1.6, 0.9, 0.3]], spark1: [[0.6, 1.4, 3.2], [0.2, 0.55, 2.4]], spark2: [[3.2, 1.6, 0.35], [2.4, 0.5, 0.08]],
-  flame: [[3.0, 2.2, 0.9], [2.0, 0.45, 0.05]], flameBlue: [[1.2, 2.0, 3.4], [0.3, 0.6, 2.6]], flameOrange: [[3.4, 1.5, 0.3], [2.2, 0.35, 0.05]],
+  spark0: [[2.2, 2.0, 1.4], [1.6, 0.9, 0.3]], spark1: [[0.6, 1.4, 3.2], [0.2, 0.55, 2.4]], spark2: [[3.2, 1.6, 0.35], [2.4, 0.5, 0.08]], spark3: [[2.6, 0.9, 3.4], [1.4, 0.3, 2.6]],
+  flame: [[3.0, 2.2, 0.9], [2.0, 0.45, 0.05]], flameBlue: [[1.2, 2.0, 3.4], [0.3, 0.6, 2.6]], flameOrange: [[3.4, 1.5, 0.3], [2.2, 0.35, 0.05]], flamePurple: [[2.6, 1.0, 3.6], [1.2, 0.2, 2.4]], draft: [[1.6, 1.8, 2.2], [1.0, 1.1, 1.4]],
   exhaust: [[0.55, 0.56, 0.6], [0.8, 0.8, 0.84]], tyre: [[0.85, 0.85, 0.88], [0.75, 0.76, 0.8]],
   dust: [[0.55, 0.42, 0.27], [0.66, 0.56, 0.4]], grass: [[0.25, 0.5, 0.15], [0.45, 0.62, 0.3]], wall: [[3, 2.6, 1.6], [2, 0.8, 0.2]],
   mist: [[0.9, 0.95, 1.0], [0.95, 0.98, 1.0]], snow: [[0.95, 0.97, 1.0], [0.9, 0.94, 1.0]], ice: [[1.6, 2.4, 3.0], [0.8, 1.6, 2.6]],
@@ -3393,7 +3403,7 @@ const FLAME_GEO = new THREE.ConeGeometry(0.22, 1.4, 12, 1, true).rotateX(-Math.P
 /* =============================================================================
    13. PERSONNAGES ORIGINAUX & KARTS (modèles procéduraux lisses)
    ============================================================================= */
-const CLASS_STATS = { 1: { speed: 2, accel: 4, handling: 4, weight: 1, offroad: 3 }, 2: { speed: 3, accel: 3, handling: 3, weight: 3, offroad: 3 }, 3: { speed: 4, accel: 2, handling: 2, weight: 5, offroad: 3 } };
+const CLASS_STATS = { 1: { speed: 2, accel: 4, handling: 4, weight: 1, offroad: 3, traction: 2, mturbo: 4 }, 2: { speed: 3, accel: 3, handling: 3, weight: 3, offroad: 3, traction: 3, mturbo: 3 }, 3: { speed: 4, accel: 2, handling: 2, weight: 5, offroad: 3, traction: 4, mturbo: 2 } };
 const CLASS_NAME = { 1: 'Léger', 2: 'Moyen', 3: 'Lourd' };
 const CHARACTERS = [
   { id: 'jordan', name: 'Jordan', color: '#e53935', cls: 2, desc: 'Robot de course en tôle rouge, yeux néon et antenne qui clignote. Polyvalent.' },
@@ -3406,16 +3416,18 @@ const CHARACTERS = [
   { id: 'draftpunk', name: 'Draft Punk', color: '#8e44ff', cls: 3, desc: 'Chevalier en armure violette, panache doré. Un vrai tank.' },
 ];
 const KARTS = [
-  { id: 'comete', name: 'Comète', mod: { speed: 0, accel: 0, handling: 0, weight: 0, offroad: 0 }, desc: 'Le kart équilibré par excellence.' },
-  { id: 'fleche', name: 'Flèche', mod: { speed: 1, accel: -1, handling: 0, weight: -1, offroad: -1 }, desc: 'Nez effilé, aileron géant : la vitesse pure.' },
-  { id: 'buggy', name: 'Buggy', mod: { speed: -1, accel: 1, handling: 1, weight: 0, offroad: 2 }, desc: 'Arceau, gros crampons : roi du tout-terrain.' },
-  { id: 'mastodonte', name: 'Mastodonte', mod: { speed: 1, accel: -1, handling: -1, weight: 1, offroad: 0 }, desc: 'Calandre chromée et cheminées : il pousse tout.' },
+  { id: 'comete', name: 'Comète', mod: { speed: 0, accel: 0, handling: 0, weight: 0, offroad: 0, traction: 0, mturbo: 0 }, desc: 'Le kart équilibré par excellence.' },
+  { id: 'fleche', name: 'Flèche', mod: { speed: 1, accel: -1, handling: 0, weight: -1, offroad: -1, traction: -1, mturbo: 1 }, desc: 'Nez effilé, aileron géant : la vitesse pure.' },
+  { id: 'buggy', name: 'Buggy', mod: { speed: -1, accel: 1, handling: 1, weight: 0, offroad: 2, traction: 1, mturbo: 0 }, desc: 'Arceau, gros crampons : roi du tout-terrain.' },
+  { id: 'mastodonte', name: 'Mastodonte', mod: { speed: 1, accel: -1, handling: -1, weight: 1, offroad: 0, traction: 1, mturbo: -1 }, desc: 'Calandre chromée et cheminées : il pousse tout.' },
 ];
-const STAT_LABELS = [['speed', 'Vitesse'], ['accel', 'Accélération'], ['handling', 'Maniabilité'], ['weight', 'Poids'], ['offroad', 'Tout-terrain']];
+const STAT_LABELS = [['speed', 'Vitesse'], ['accel', 'Accélération'], ['handling', 'Maniabilité'], ['weight', 'Poids'], ['offroad', 'Tout-terrain'], ['traction', 'Adhérence'], ['mturbo', 'Mini-turbo']];
 function comboStats(ch, kt) { const b = CLASS_STATS[ch.cls], o = {}; for (const [k] of STAT_LABELS) o[k] = clamp(b[k] + kt.mod[k], 1, 5); return o; }
 function physicsFromStats(s) {
   return { maxSpeed: 30.8 + s.speed * 0.75, accel: 14 + s.accel * 1.8, handling: 1.82 + s.handling * 0.08, mass: 0.72 + s.weight * 0.11,
-    offroad: 0.36 + s.offroad * 0.05, dirt: 0.9 + s.offroad * 0.02 };
+    offroad: 0.36 + s.offroad * 0.05, dirt: 0.9 + s.offroad * 0.02,
+    traction: 0.88 + s.traction * 0.05,   // adhérence sur glace, neige, terre, hors-piste
+    mtRate: 0.86 + s.mturbo * 0.07 };      // vitesse de charge du mini-turbo
 }
 
 // --- Aides de modélisation
@@ -3826,7 +3838,7 @@ class Kart {
     Object.assign(this, { drifting: false, driftHeld: false, driftDir: 0, driftCharge: 0, driftLevel: 0, driftT: 0, hopWindow: 0, hop: false, airT: 0, wiggleT: 0, lastAxisSign: 0,
       boostT: 0, stallT: 0, starT: 0, goldT: 0, rocketT: 0, shrinkT: 0, inkT: 0, hitT: 0, hitDur: 1, hitType: '', immuneT: 0, aiScale: 1, launched: false, launchT: 0, rampJump: false, trick: false, trickT: 0,
       cannonU: -1, lap: 0, maxLap: 0, prevDist: this.q.dist, progress: this.q.dist - track.length, lapStart: 0, lapTimes: [], finished: false, finishTime: 0, rank: slot + 1,
-      surface: 0, pushX: 0, pushZ: 0, exAcc: 0, sparkAcc: 0, dustAcc: 0, wrongT: 0, firstThrottle: -1, item: null, count: 0, itemActive: false, roulT: 0, flowerT: 0, shotCd: 0, itemHeld: false, mtCol: 0, netState: 0 });
+      surface: 0, pushX: 0, pushZ: 0, gliding: false, rescueT: 0, draftT: 0, exAcc: 0, sparkAcc: 0, dustAcc: 0, wrongT: 0, firstThrottle: -1, item: null, count: 0, itemActive: false, roulT: 0, flowerT: 0, shotCd: 0, itemHeld: false, mtCol: 0, netState: 0 });
     this.fx = { lvl: 0, mt: 0, wall: 0, wallSide: 0, land: 0, hop: false, lap: false, dash: false, trick: false, trickLand: false, hit: '', star: false, box: false };
     this.vis = { lean: 0, drift: 0, squash: 0, steer: 0, wheel: 0, bob: rnd(0, 6), scale: 1 };
     for (const k of ['throttle', 'brake', 'steer', 'axis']) this.input[k] = 0; this.input.drift = this.input.back = this.input.wiggle = false;
@@ -3844,6 +3856,12 @@ class Kart {
     if (this.flowerT <= 0 && this.item === 'flower' && this.itemActive) { this.item = null; this.itemActive = false; }
     if (this.goldT <= 0 && this.item === 'gold' && this.itemActive) { this.item = null; this.itemActive = false; }
     if (this.cannonU >= 0 || (q.S.cannon && race.state !== 'intro')) { this.stepCannon(dt); return; }
+    // drone de dépannage : le kart reste suspendu au-dessus de la piste, puis il est relâché avec un peu d'élan
+    if (this.rescueT > 0) {
+      this.rescueT -= dt; this.vel.set(0, 0, 0); this.vy = 0; this.grounded = false; this.speedF = 0;
+      if (this.rescueT <= 0) { const sp = Math.min(14, this.stats.maxSpeed * 0.45); this.vel.set(Math.sin(this.yaw) * sp, 0, Math.cos(this.yaw) * sp); this.speedF = sp; this.vy = -2; this.immuneT = Math.max(this.immuneT, 0.8); }
+      return;
+    }
     // surface sous le kart
     const al = Math.abs(q.lateral), Sx = q.S;
     if (al <= q.hw) this.surface = { dirt: SURF.DIRT, ice: SURF.ICE, snow: SURF.SNOW }[Sx.surf] ?? SURF.ROAD;
@@ -3870,14 +3888,15 @@ class Kart {
     const vF0 = this.speedF; let yawRate;
     if (this.drifting) { const tight = (steer * this.driftDir + 1) * 0.5; this.driftVis = this.driftDir * lerp(0.7, 1.25, tight); yawRate = this.driftDir * driftRate(tight) * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
     else { const sf = clamp(Math.abs(vF0) / 7, 0, 1) * (1 - 0.3 * clamp(Math.abs(vF0) / S.maxSpeed, 0, 1.3)); yawRate = steer * S.handling * sf * (vF0 < -0.5 ? -1 : 1); }
-    if (!this.grounded) yawRate *= this.hop ? 0.5 : 0.3;
+    if (!this.grounded) yawRate *= this.hop ? 0.5 : this.gliding ? 0.85 : 0.3;
     this.yawRate = yawRate; this.yaw -= yawRate * dt;
 
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), rx = -fz, rz = fx;
     let vF = this.vel.x * fx + this.vel.z * fz, vL = this.vel.x * rx + this.vel.z * rz;
     if (this.grounded) {
       const ice = this.surface === SURF.ICE;
-      const grip = this.drifting ? (ice ? 2.2 : CFG.DRIFT_GRIP) : offroad ? CFG.OFFROAD_GRIP : [CFG.GRIP, CFG.GRIP, CFG.OFFROAD_GRIP, CFG.DIRT_GRIP, CFG.ICE_GRIP, CFG.SNOW_GRIP][this.surface];
+      const slippery = this.surface !== SURF.ROAD && this.surface !== SURF.HARD;
+      const grip = (this.drifting ? (ice ? 2.2 : CFG.DRIFT_GRIP) : offroad ? CFG.OFFROAD_GRIP : [CFG.GRIP, CFG.GRIP, CFG.OFFROAD_GRIP, CFG.DIRT_GRIP, CFG.ICE_GRIP, CFG.SNOW_GRIP][this.surface]) * (slippery ? S.traction : 1);
       const before = Math.hypot(vF, vL), nvL = vL * Math.exp(-grip * dt), lost = Math.abs(vL - nvL); vL = nvL;
       // en drift, la trajectoire suit le cap (léger décalage) : la vitesse latérale perdue est presque entièrement rendue vers l'avant
       if (this.drifting) { if (vF > 0) vF = Math.sqrt(Math.max(0, before * before * (1 - 0.04 * dt) - vL * vL)); }
@@ -3910,8 +3929,8 @@ class Kart {
       this.wiggling = this.wiggleT > 0.2 || inp.wiggle;
       if (vF < 7) this.endDrift(false);
       else if (this.grounded) {
-        this.driftCharge += dt * (this.wiggling ? CFG.WIGGLE_RATE : 1);
-        const lvl = this.driftCharge >= CFG.MT2 ? 2 : this.driftCharge >= CFG.MT1 ? 1 : 0;
+        this.driftCharge += dt * (this.wiggling ? CFG.WIGGLE_RATE : 1) * S.mtRate;
+        const lvl = this.driftCharge >= CFG.MT3 ? 3 : this.driftCharge >= CFG.MT2 ? 2 : this.driftCharge >= CFG.MT1 ? 1 : 0;
         if (lvl > this.driftLevel) { this.driftLevel = lvl; this.fx.lvl = lvl; }
       }
     } else this.wiggling = false;
@@ -3925,8 +3944,10 @@ class Kart {
       this.pos.x -= q2.rx * side * push; this.pos.z -= q2.rz * side * push;
       const vn = (this.vel.x * q2.rx + this.vel.z * q2.rz) * side;
       if (vn > 0) {
-        this.vel.x -= q2.rx * side * vn * 1.45; this.vel.z -= q2.rz * side * vn * 1.45;
-        const loss = clamp(vn / 50, 0.01, 0.3); this.vel.x *= 1 - loss; this.vel.z *= 1 - loss;
+        // touchette (moins de 15°) : on glisse le long du mur presque sans perte ; choc franc : rebond et ralentissement
+        const spd = Math.hypot(this.vel.x, this.vel.z), glance = vn < spd * 0.26;
+        const rb = glance ? 1.05 : 1.45; this.vel.x -= q2.rx * side * vn * rb; this.vel.z -= q2.rz * side * vn * rb;
+        const loss = glance ? 0.004 : clamp(vn / 50, 0.01, 0.3); this.vel.x *= 1 - loss; this.vel.z *= 1 - loss;
         const ty = Math.atan2(q2.tx, q2.tz) + (fx * q2.tx + fz * q2.tz >= 0 ? 0 : Math.PI);
         if (ctrl) this.yaw += wrapAngle(ty - this.yaw) * clamp(vn * 0.02, 0, 0.25);
         if (vn > 5) { this.fx.wall = Math.max(this.fx.wall, vn); this.fx.wallSide = side; }
@@ -3936,10 +3957,12 @@ class Kart {
     }
     // --- Gravité / contact sol ; tremplin = gravité réduite
     const h = q2.height, wasGrounded = this.grounded;
-    this.vy -= (this.rampJump ? CFG.G_RAMP : CFG.G) * dt; this.pos.y += this.vy * dt;
+    if (this.gliding) { this.vy -= CFG.G * (this.vy > 0 ? 0.6 : 0.3) * dt; this.vy = Math.max(this.vy, -6.5); }
+    else this.vy -= (this.rampJump ? CFG.G_RAMP : CFG.G) * dt;
+    this.pos.y += this.vy * dt;
     if (this.pos.y <= h) { if (!this.grounded) this.land(); this.pos.y = h; this.grounded = true; this.vy = clamp((h - this.groundH) / dt, -30, 30); }
     else if (this.grounded && this.pos.y - h < 0.06) { this.pos.y = h; this.vy = clamp((h - this.groundH) / dt, -30, 30); }
-    else { this.grounded = false; this.airT += dt; if (wasGrounded && !this.hop) { this.launched = true; this.launchT = 0; this.rampJump = q.ramp > 0 || q2.ramp > 0; } }
+    else { this.grounded = false; this.airT += dt; if (wasGrounded && !this.hop) { this.launched = true; this.launchT = 0; this.rampJump = q.ramp > 0 || q2.ramp > 0; if (this.rampJump && track.glideNear(q2.index)) { this.gliding = true; this.fx.glide = true; } } }
     if (this.launched) this.launchT += dt;
     if (this.trick) this.trickT += dt;
     this.groundH = h;
@@ -3978,11 +4001,11 @@ class Kart {
     if (this.airT > 0.12) { this.fx.land = Math.min(1, this.airT); this.vis.squash = Math.min(0.28, 0.06 + Math.max(0, -this.vy) * 0.012); }
     if (this.hop) { this.hop = false; this.hopWindow = 0.4; }
     if (this.trick) { this.boost(this.rampJump ? 1.1 : 0.8); this.fx.trickLand = true; this.mtCol = 2; }
-    this.trick = false; this.launched = false; this.rampJump = false; this.airT = 0;
+    this.trick = false; this.launched = false; this.rampJump = false; this.gliding = false; this.airT = 0;
   }
   boost(t) { if (this.boostT <= 0.05) { this.vel.x += Math.sin(this.yaw) * 5; this.vel.z += Math.cos(this.yaw) * 5; } this.boostT = Math.max(this.boostT, t); }
   endDrift(release) {
-    if (release && this.driftLevel > 0) { this.boost(this.driftLevel === 2 ? 1.25 : 0.7); this.fx.mt = this.driftLevel; this.mtCol = this.driftLevel; }
+    if (release && this.driftLevel > 0) { this.boost(CFG.MT_BOOST[this.driftLevel]); this.fx.mt = this.driftLevel; this.mtCol = this.driftLevel; }
     this.drifting = false; this.driftCharge = 0; this.driftLevel = 0; this.wiggling = false;
   }
   /** Touché : toupie / tonneau / brûlure / écrasé. Pour un kart distant, l'hôte transmet le coup à son propriétaire. */
@@ -4008,9 +4031,9 @@ class Kart {
   }
   respawn() {
     const i = (this.q2.index - 4 + N) % N;
-    this.yaw = track.frameAt(i * track.step, 0, this.pos); this.pos.y += 2.5;
-    this.vel.set(0, 0, 0); this.vy = 0; this.grounded = false; this.drifting = false; this.ti = i; this.groundH = this.pos.y - 2.5; this.immuneT = 1.5;
-    this.prev.copy(this.pos); this.prevYaw = this.yaw;
+    this.yaw = track.frameAt(i * track.step, 0, this.pos); this.pos.y += 2.2;
+    this.vel.set(0, 0, 0); this.vy = 0; this.grounded = false; this.drifting = false; this.gliding = false; this.ti = i; this.groundH = this.pos.y - 2.2; this.immuneT = 1.5;
+    this.rescueT = CFG.RESCUE_T; this.fx.rescue = true; this.prev.copy(this.pos); this.prevYaw = this.yaw;
   }
 
   /* ---------- réseau : état compact (envoyé ~20 fois/s) ---------- */
@@ -4019,7 +4042,7 @@ class Kart {
     let f = 0;
     if (this.drifting) f |= 1; if (this.driftDir > 0) f |= 2; f |= (this.driftLevel & 3) << 2; if (this.boostT > 0) f |= 16; if (this.starT > 0) f |= 32; if (this.trick) f |= 64;
     if (this.grounded) f |= 128; f |= ({ spin: 1, flip: 2, fire: 3, squash: 1 }[this.hitType] || 0) << 8; if (this.rocketT > 0) f |= 1024; if (this.shrinkT > 0) f |= 2048;
-    if (this.finished) f |= 4096; f |= (this.mtCol & 3) << 13; f |= (this.surface & 7) << 15; if (this.cannonU >= 0) f |= 1 << 18; if (this.goldT > 0) f |= 1 << 19;
+    if (this.finished) f |= 4096; f |= (this.mtCol & 3) << 13; f |= (this.surface & 7) << 15; if (this.cannonU >= 0) f |= 1 << 18; if (this.goldT > 0) f |= 1 << 19; if (this.gliding) f |= 1 << 20; if (this.rescueT > 0) f |= 1 << 21;
     return [r(this.pos.x), r(this.pos.y), r(this.pos.z), r(this.yaw, 1000), r(this.speedF), r(this.vel.x), r(this.vel.z), f, r(Math.max(0, this.hitT)), r(this.input.steer), this.count | 0,
       this.lap, r(this.progress, 10), r(this.finishTime, 1000), r(this.trickT), this.ti];
   }
@@ -4032,7 +4055,7 @@ class Kart {
     this.boostT = f & 16 ? 0.2 : 0; this.starT = f & 32 ? 0.2 : 0; this.trick = !!(f & 64); this.grounded = !!(f & 128);
     const ht = (f >> 8) & 3; this.hitType = ['', 'spin', 'flip', 'fire'][ht]; if (s[8] > 0 && this.hitT <= 0) this.hitDur = this.hitType === 'flip' ? 1.5 : this.hitType === 'fire' ? 0.9 : 1.25; this.hitT = s[8];
     this.rocketT = f & 1024 ? 0.2 : 0; this.shrinkT = f & 2048 ? 0.2 : 0; this.finished = !!(f & 4096); this.mtCol = (f >> 13) & 3; this.surface = (f >> 15) & 7;
-    this.cannonU = f & (1 << 18) ? 0.5 : -1; this.goldT = f & (1 << 19) ? 0.2 : 0;
+    this.cannonU = f & (1 << 18) ? 0.5 : -1; this.goldT = f & (1 << 19) ? 0.2 : 0; this.gliding = !!(f & (1 << 20)); this.rescueT = f & (1 << 21) ? 0.2 : 0;
     this.input.steer = s[9]; this.count = s[10]; this.lap = s[11]; this.progress = s[12]; if (this.finished && !this.finishTime) this.finishTime = s[13]; this.trickT = s[14];
     if (this.drifting && this.driftLevel > wasLevel) this.fx.lvl = this.driftLevel;
     if (wasDrift && !this.drifting && wasLevel > 0) this.fx.mt = wasLevel;
@@ -4085,15 +4108,41 @@ class Kart {
       else if (this.goldT > 0) { this.paint.emissive.set(0xffb020); this.paint.emissiveIntensity = 0.5 + Math.sin(race.time * 12) * 0.2; }
       else this.paint.emissiveIntensity = 0;
     }
-    this.group.visible = !(this.immuneT > 0 && this.hitT <= 0 && this.starT <= 0 && Math.floor(race.time * 16) % 2 === 0);
+    this.group.visible = !(this.immuneT > 0 && this.hitT <= 0 && this.starT <= 0 && this.rescueT <= 0 && Math.floor(race.time * 16) % 2 === 0);
+    // planeur et drone de dépannage (créés à la première utilisation)
+    if (this.gliding && !this.gliderMesh) this.gliderMesh = buildGlider(this.group);
+    if (this.gliderMesh) { v.glide = damp(v.glide || 0, this.gliding ? 1 : 0, 14, dt); this.gliderMesh.visible = v.glide > 0.02; this.gliderMesh.scale.set(v.glide, 1, v.glide); }
+    if (this.rescueT > 0 && !this.droneMesh) this.droneMesh = buildDrone(this.group);
+    if (this.droneMesh) { this.droneMesh.visible = this.rescueT > 0; if (this.droneMesh.visible) { this.droneMesh.position.y = 2.7 + Math.sin(race.time * 6) * 0.08; for (const r of this.droneMesh.userData.rotors) r.rotation.y += dt * 40; } }
     const fl = this.boostT > 0 || this.starT > 0 || this.rocketT > 0;
     for (const fm of this.flames) {
       fm.visible = fl; if (!fl) continue;
-      const c = this.mtCol === 1 ? COL.flameBlue[0] : this.mtCol === 2 ? COL.flameOrange[0] : COL.flame[0];
+      const c = this.mtCol === 1 ? COL.flameBlue[0] : this.mtCol === 2 ? COL.flameOrange[0] : this.mtCol === 3 ? COL.flamePurple[0] : COL.flame[0];
       fm.material.uniforms.color.value.set(c[0], c[1], c[2]); fm.material.uniforms.time.value = race.time + this.idx;
       fm.scale.set(1, 1, (0.8 + Math.random() * 0.5) * (this.boostT > 0.3 || this.rocketT > 0 ? 1.4 : 1));
     }
   }
+}
+
+/** Aile de planeur (au-dessus du pilote) */
+function buildGlider(parent) {
+  const g = new THREE.Group(), cloth = new THREE.MeshStandardMaterial({ color: 0x5ff3ff, emissive: 0x2fb8ff, emissiveIntensity: 0.9, side: THREE.DoubleSide, roughness: 0.5, transparent: true, opacity: 0.92 }), bar = CM(0x2a2f3a, { metalness: 0.7, roughness: 0.3 });
+  const shape = new THREE.Shape([new THREE.Vector2(-3.4, -0.2), new THREE.Vector2(-1.2, 1.0), new THREE.Vector2(0, 1.5), new THREE.Vector2(1.2, 1.0), new THREE.Vector2(3.4, -0.2), new THREE.Vector2(0, -0.6)]);
+  const wing = new THREE.Mesh(new THREE.ShapeGeometry(shape), cloth); wing.rotation.x = -Math.PI / 2 + 0.45; wing.position.set(0, 2.5, -0.2); g.add(wing);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 2.6, 3) })); edge.position.set(0, 2.42, -0.25); g.add(edge);
+  for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 5), bar); m.position.set(s * 0.45, 1.6, -0.1); m.rotation.z = -s * 0.35; g.add(m); }
+  g.visible = false; parent.add(g); return g;
+}
+/** Drone de dépannage avec son câble */
+function buildDrone(parent) {
+  const g = new THREE.Group(), body = CM(0x22262f, { metalness: 0.6, roughness: 0.35 }), neon = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 2.4, 3) });
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.3, 16), body));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 6, 24), neon); ring.rotation.x = Math.PI / 2; g.add(ring);
+  const rotors = [];
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4, arm = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.1), body); arm.rotation.y = a; g.add(arm);
+    const r = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.1), CM(0xdfe6f5)); r.position.set(Math.cos(a) * 0.65, 0.12, -Math.sin(a) * 0.65); g.add(r); rotors.push(r); }
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.6, 4), CM(0x111111)); cable.position.y = -0.95; g.add(cable);
+  g.userData.rotors = rotors; g.visible = false; parent.add(g); return g;
 }
 
 /* =============================================================================
@@ -4678,7 +4727,7 @@ class Sound {
     this.o1.frequency.setTargetAtTime(f, t, 0.06); this.o2.frequency.setTargetAtTime(f * 0.5, t, 0.06);
     this.ef.frequency.setTargetAtTime(450 + sr * 1500 + (boost ? 700 : 0), t, 0.1);
     this.eg.gain.setTargetAtTime(on ? 0.09 + thr * 0.07 : 0, t, 0.12);
-    this.dg.gain.setTargetAtTime(on && drift ? 0.08 : 0, t, 0.05); this.df.frequency.setTargetAtTime(level === 2 ? 3000 : level === 1 ? 2400 : 1700, t, 0.05);
+    this.dg.gain.setTargetAtTime(on && drift ? 0.08 : 0, t, 0.05); this.df.frequency.setTargetAtTime(level === 3 ? 3600 : level === 2 ? 3000 : level === 1 ? 2400 : 1700, t, 0.05);
     if (star && on) { this.starT -= dt; if (this.starT <= 0) { this.starT = 0.11; const seq = [523, 659, 784, 1047, 784, 659]; this.tone(seq[Math.floor(t * 9) % seq.length], 0.1, 'square', 0.07); } }
   }
   tone(freq, dur, type = 'square', vol = 0.2, slide = 0, delay = 0) {
@@ -4729,52 +4778,58 @@ class Sound {
   setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.3; }
 }
 const sfx = new Sound();
-/** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle. Réglages partagés avec le Hub (marche/arrêt, volume).
-    Un seul lecteur audio pour toute la partie : une fois débloqué par un geste (clic, toucher, touche),
-    il le reste, même en changeant de morceau (iPad / Safari, Brave et leurs règles de lecture automatique). */
+/** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle, par le même moteur audio que les bruitages (Web Audio) :
+    s'ils s'entendent, la musique aussi (iPad / iPhone, Brave, Safari…). Réglages partagés avec le Hub (marche/arrêt, volume). */
 class Music {
   constructor() {
-    this.el = null; this.key = null; this.url = null; this.found = new Map(); this.rate = 1; this.pending = false;
+    this.key = null; this.url = null; this.cache = new Map(); this.src = null; this.srcGain = null; this.out = null; this.rate = 1;
     const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
     this.on = get('david_music', true); this.vol = get('david_music_vol', 0.55);
   }
   save() { try { localStorage.setItem('david_music', JSON.stringify(this.on)); } catch (e) {} }
-  /** existence du fichier : simple requête réseau (ne dépend pas du préchargement audio, bloqué sur iPad et Brave) */
-  async resolve(name) {
-    if (this.found.has(name)) return this.found.get(name);
+  ctx() { sfx.init(); const c = sfx.ctx; if (c && !this.out) { this.out = c.createGain(); this.out.connect(c.destination); this.applyVol(); } return c; }
+  applyVol() { if (this.out) this.out.gain.value = this.on ? this.vol * MUSIC.volume : 0; }
+  /** télécharge et décode le morceau (mp3, sinon ogg) ; null s'il n'existe pas */
+  async load(name) {
+    if (this.cache.has(name)) return this.cache.get(name);
+    const c = this.ctx(); if (!c) return null;
+    let buf = null;
     for (const ext of MUSIC.ext) {
-      const url = `${MUSIC.folder}${name}.${ext}`;
-      let ok = false;
-      try { const r = await fetch(url, { method: 'HEAD', cache: 'no-cache' }); ok = r.ok; } catch (e) { ok = false; }
-      if (!ok) try { const r = await fetch(url, { headers: { Range: 'bytes=0-1' } }); ok = r.ok || r.status === 206; } catch (e) { ok = false; }
-      if (ok && ext === 'ogg' && !new Audio().canPlayType('audio/ogg')) ok = false;
-      if (ok) { this.found.set(name, url); return url; }
+      try {
+        const r = await fetch(`${MUSIC.folder}${name}.${ext}`); if (!r.ok) continue;
+        const ab = await r.arrayBuffer();
+        buf = await new Promise((res, rej) => { const p = c.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+        if (buf) break;
+      } catch (e) { buf = null; }
     }
-    this.found.set(name, null); return null;
+    this.cache.set(name, buf);
+    // un morceau décodé pèse ~80 Mo : on n'en garde que 2 en mémoire (celui qui joue et le précédent), pour l'iPad
+    if (this.cache.size > 2) for (const k of this.cache.keys()) { if (k !== name && k !== this.url && this.cache.size > 2) this.cache.delete(k); }
+    return buf;
   }
-  player() {
-    if (!this.el) { const a = new Audio(); a.loop = true; a.preload = 'auto'; a.setAttribute('playsinline', ''); this.el = a; }
-    return this.el;
-  }
-  applyVol() { if (!this.el) return; this.el.muted = !this.on; try { this.el.volume = this.vol * MUSIC.volume; } catch (e) {} }
   /** keepIfMissing : si le morceau n'existe pas, la musique en cours continue (écran de résultats) */
   async play(key, keepIfMissing = false) {
     if (this.key === key) return; const prevKey = this.key; this.key = key;
-    const name = MUSIC.tracks[key] || key; let url = await this.resolve(name);
-    if (!url && MUSIC.fallback && MUSIC.fallback[key]) url = await this.resolve(MUSIC.tracks[MUSIC.fallback[key]] || MUSIC.fallback[key]);
+    let name = MUSIC.tracks[key] || key, buf = await this.load(name);
+    if (!buf && MUSIC.fallback && MUSIC.fallback[key]) { name = MUSIC.tracks[MUSIC.fallback[key]] || MUSIC.fallback[key]; buf = await this.load(name); }
     if (this.key !== key) return;
-    if (!url && keepIfMissing) { this.key = prevKey; return; }
-    const a = this.player();
-    if (!url) { a.pause(); this.url = null; this.pending = false; return; }
-    if (this.url !== url) { this.url = url; a.src = url; }
-    a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = MUSIC.preservePitch;
-    this.applyVol(); a.playbackRate = this.rate; this.start();
+    if (!buf && keepIfMissing) { this.key = prevKey; return; }
+    this.fadeOut();
+    if (!buf) { this.url = null; return; }
+    const c = this.ctx(), s = c.createBufferSource(), g = c.createGain(), t = c.currentTime;
+    s.buffer = buf; s.loop = true; s.playbackRate.value = this.rate;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.35);
+    s.connect(g); g.connect(this.out); s.start();
+    this.src = s; this.srcGain = g; this.url = name;
   }
-  start() { const a = this.el; if (!a || !this.url) return; const p = a.play(); this.pending = true; if (p && p.then) p.then(() => { this.pending = false; a.playbackRate = this.rate; }).catch(() => { this.pending = true; }); }
-  /** appelé à chaque geste : relance la lecture si le navigateur l'avait bloquée */
-  unlock() { if (this.el && this.url && (this.pending || this.el.paused)) this.start(); }
-  setRate(r) { this.rate = r; if (this.el) this.el.playbackRate = r; }
-  stop() { this.key = null; this.url = null; this.pending = false; if (this.el) this.el.pause(); }
+  fadeOut() {
+    if (!this.src) return; const c = sfx.ctx, s = this.src, g = this.srcGain, t = c.currentTime;
+    try { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); s.stop(t + 0.32); } catch (e) {}
+    this.src = null; this.srcGain = null;
+  }
+  unlock() { if (sfx.ctx && sfx.ctx.state !== 'running') sfx.ctx.resume(); }
+  setRate(r) { this.rate = r; if (this.src) this.src.playbackRate.setTargetAtTime(r, sfx.ctx.currentTime, 0.25); }
+  stop() { this.key = null; this.url = null; this.fadeOut(); }
   toggle() { this.on = !this.on; this.save(); this.applyVol(); }
 }
 const music = new Music();
@@ -4798,10 +4853,10 @@ const NET = {
   hostNow() { return nowMs() + (this.role === 'guest' ? this.offset : 0); },
   sendHit(k, type) { if (k.ownerId != null) this.sendTo(k.ownerId, { t: 'hit', type }); },
 };
-const LOBBY = { phase: 'map', map: 'gc', laps: 3, cpu: 7, level: 'normal', items: 'normal', picks: {}, n: 0, cup: null };
+const LOBBY = { phase: 'map', map: 'gc', laps: 3, cpu: 7, level: 'normal', items: 'normal', cc: 100, picks: {}, n: 0, cup: null };
 const PREFS = (() => { try { return JSON.parse(localStorage.getItem('kart_prefs')) || {}; } catch (e) { return {}; } })();
 const savePrefs = () => { try { localStorage.setItem('kart_prefs', JSON.stringify(PREFS)); } catch (e) {} };
-for (const k of ['map', 'laps', 'cpu', 'level', 'items']) if (PREFS[k] !== undefined) LOBBY[k] = PREFS[k];
+for (const k of ['map', 'laps', 'cpu', 'level', 'items', 'cc']) if (PREFS[k] !== undefined) LOBBY[k] = PREFS[k];
 let RACE = null;     // { map, laps, seed, racers: [{ ch, kt, owner, name }], goAt }
 const loadedSet = new Set();
 
@@ -4813,7 +4868,7 @@ function takenBy(chIdx) { for (const [id, p] of Object.entries(LOBBY.picks)) if 
 /* --- hôte : salon --- */
 function hostSetLobby(patch) {
   Object.assign(LOBBY, patch); LOBBY.n++;
-  for (const k of ['map', 'laps', 'cpu', 'level', 'items']) PREFS[k] = LOBBY[k]; savePrefs();
+  for (const k of ['map', 'laps', 'cpu', 'level', 'items', 'cc']) PREFS[k] = LOBBY[k]; savePrefs();
   NET.broadcast({ t: 'lobby', s: LOBBY }); UI.refresh();
 }
 function setMyPick(ch, kt, ready) {
@@ -4849,7 +4904,7 @@ function hostStartRace(mode = 'new') {
   // grille : au départ d'une coupe, au hasard ; ensuite, dans l'ordre du classement général (le leader en pole)
   let order = racers.map((r, i) => i).sort(() => Math.random() - 0.5);
   if (cup.n > 1) order.sort((a, b) => (cup.base[racerKey(racers[b].owner, racers[b].ch)] || 0) - (cup.base[racerKey(racers[a].owner, racers[a].ch)] || 0));
-  RACE = { map: LOBBY.map, laps: LOBBY.laps, seed: (Math.random() * 1e9) | 0, items: LOBBY.items, level: LOBBY.level, racers: order.map((i) => racers[i]) };
+  RACE = { map: LOBBY.map, laps: LOBBY.laps, seed: (Math.random() * 1e9) | 0, items: LOBBY.items, level: LOBBY.level, cc: LOBBY.cc || 100, racers: order.map((i) => racers[i]) };
   loadedSet.clear(); LOBBY.phase = 'loading'; LOBBY.n++;
   NET.broadcast({ t: 'lobby', s: LOBBY }); NET.broadcast({ t: 'start', r: RACE });
   beginLoading(RACE);
@@ -5063,8 +5118,8 @@ function updateHUD(dt) {
   const k = player; if (!k) return;
   const sr = clamp(Math.abs(k.speedF) / (k.stats.maxSpeed * CFG.BOOST_MUL), 0, 1);
   hud.spd.textContent = Math.round(Math.abs(k.speedF) * 3.6); hud.spdbar.style.width = (sr * 100).toFixed(1) + '%';
-  hud.mtfill.style.width = ((k.drifting ? clamp(k.driftCharge / CFG.MT2, 0, 1) : 0) * 100).toFixed(1) + '%';
-  hud.mtbar.className = 'bar' + (k.driftLevel === 2 ? ' l2' : k.driftLevel === 1 ? ' l1' : '');
+  hud.mtfill.style.width = ((k.drifting ? clamp(k.driftCharge / CFG.MT3, 0, 1) : 0) * 100).toFixed(1) + '%';
+  hud.mtbar.className = 'bar' + (k.driftLevel ? ' l' + k.driftLevel : '');
   $('mtlabel').textContent = k.wiggling ? 'MINI-TURBO ×2' : 'MINI-TURBO';
   hud.lapn.textContent = clamp(k.lap, 1, race.laps); hud.lapt.textContent = race.laps;
   hud.time.textContent = fmtTime(k.finished ? k.finishTime : ['race', 'finished', 'results'].includes(race.state) ? race.time : 0);
@@ -5171,6 +5226,7 @@ function renderMaps() {
     ['cpu', 'Pilotes IA', [0, 1, 2, 3, 4, 5, 6, 7].filter((n) => n <= maxCpu).map((n) => [n, String(n)])],
     ['level', 'Niveau IA', [['easy', 'Facile'], ['normal', 'Normal'], ['hard', 'Difficile']]],
     ['items', 'Objets', [['normal', 'Normaux'], ['frequent', 'Fréquents'], ['none', 'Aucun']]],
+    ['cc', 'Cylindrée', [[50, '50cc'], [100, '100cc'], [150, '150cc']]],
   ];
   $('mapopts').innerHTML = opts.map(([k, lab, list]) => `<div class="opt"><div class="lbl">${lab}</div><div class="seg">${list.map(([v, l]) =>
     `<button data-k="${k}" data-v="${v}" class="${String(Math.min(LOBBY[k], k === 'cpu' ? maxCpu : 99)) === String(v) || (k !== 'cpu' && String(LOBBY[k]) === String(v)) ? 'sel' : ''}" ${host ? '' : 'disabled'}>${l}</button>`).join('')}</div></div>`).join('');
@@ -5187,7 +5243,7 @@ function renderChars() {
   const mine = myPick(); sel.ch = mine.ch; sel.kt = mine.kt;
   const grid = $('grid'), kgrid = $('kgrid'), host = NET.isHost, online = NET.online || NET.role === 'host' && humans().length > 1;
   const def = MAPS.find((m) => m.id === LOBBY.map) || MAPS[0];
-  $('charmap').textContent = `${def.name} · ${LOBBY.laps} tour${LOBBY.laps > 1 ? 's' : ''} · ${LOBBY.cpu} IA · objets ${({ normal: 'normaux', frequent: 'fréquents', none: 'désactivés' })[LOBBY.items]}`;
+  $('charmap').textContent = `${def.name} · ${LOBBY.cc || 100}cc · ${LOBBY.laps} tour${LOBBY.laps > 1 ? 's' : ''} · ${LOBBY.cpu} IA · objets ${({ normal: 'normaux', frequent: 'fréquents', none: 'désactivés' })[LOBBY.items]}`;
   if (grid.children.length !== CHARACTERS.length) {
     grid.innerHTML = ''; kgrid.innerHTML = '';
     CHARACTERS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'card'; b.style.background = `linear-gradient(180deg, ${c.color}55, rgba(14,18,40,.9))`;
@@ -5204,6 +5260,7 @@ function renderChars() {
   $('seldesc').textContent = `${ch.desc} ${kt.desc}`;
   $('selstats').innerHTML = STAT_LABELS.map(([k, lab]) => `<div class="stat"><span>${lab}</span><span class="pips">${[1, 2, 3, 4, 5].map((n) => `<i class="${n <= st[k] ? 'on' : ''}"></i>`).join('')}</span></div>`).join('');
   showModel(ch, kt);
+  $('assist').textContent = `Conduite assistée : ${PREFS.assist ? 'oui' : 'non'}`; $('assist').classList.toggle('on', !!PREFS.assist);
   // joueurs et état « prêt »
   const hs = humans();
   $('plist').innerHTML = online ? hs.map((h) => { const p = LOBBY.picks[h.id], c = p ? CHARACTERS[p.ch] : null, ok = h.id === NET.hostId || (p && p.ready);
@@ -5212,6 +5269,7 @@ function renderChars() {
   if (host) { $('charok').textContent = online ? (allReady ? 'Lancer la course 🏁' : 'En attente des joueurs…') : 'Course ! 🏁'; $('charok').disabled = online && !allReady; $('charback').textContent = 'Retour'; }
   else { $('charok').textContent = mine.ready ? 'Pas prêt' : 'Prêt ✓'; $('charok').disabled = false; $('charback').textContent = 'Quitter'; }
 }
+$('assist').onclick = () => { PREFS.assist = !PREFS.assist; savePrefs(); renderChars(); };
 $('charok').onclick = () => {
   sfx.tone(880, 0.12, 'square', 0.15);
   if (NET.isHost) { const m = myPick(); LOBBY.picks[NET.myId] = { ...m, ready: true }; hostStartRace('new'); }
@@ -5383,6 +5441,12 @@ function readPlayerInput(dt) {
   let axis = (right ? 1 : 0) - (left ? 1 : 0);
   if (pad) { up = up || pad.up; down = down || pad.down; drift = drift || pad.drift; item = item || pad.item; if (pad.axis) axis = pad.axis; }
   inp.throttle = up ? 1 : 0; inp.brake = down ? 1 : 0; inp.drift = !!drift; inp.back = !!down; inp.axis = axis;
+  // conduite assistée (option du joueur) : redresse doucement le kart avant qu'il ne touche le mur
+  if (PREFS.assist && race.state === 'race') {
+    const q = k.q2, out = Math.sign(q.lateral), lim = q.hw - 3, over = Math.abs(q.lateral) - lim;
+    const headingOut = (Math.sin(k.yaw) * q.rx + Math.cos(k.yaw) * q.rz) * out;
+    if (over > 0 && headingOut > -0.08) axis = clamp(axis - out * clamp(over / 3, 0, 1) * 0.9, -1, 1);
+  }
   inp.steer = damp(inp.steer, axis, 16, dt);
   if (race.state === 'race' && (itemQueued || (item && !k.itemHeld) || (item && k.item === 'flower' && k.itemActive))) useItem(k);
   itemQueued = false; k.itemHeld = !!item;
@@ -5431,6 +5495,7 @@ function chaseCamera(dt, snap = false) {
   let target = k.ryaw;
   if (hv > 4 && k.speedF > 0) target = k.ryaw + wrapAngle(Math.atan2(k.vel.x, k.vel.z) - k.ryaw) * 0.65;
   if (k.hitT > 0 && hv > 2) target = Math.atan2(k.vel.x, k.vel.z);
+  cam.drift = damp(cam.drift || 0, k.drifting ? k.driftDir : 0, 2.5, dt); target -= cam.drift * 0.14;   // en drift, la caméra se décale vers l'extérieur du virage
   cam.yaw += wrapAngle(target - cam.yaw) * (snap ? 1 : 1 - Math.exp(-5 * dt));
   const back = rearView ? -1 : 1, dist = 6.8 + sr * 1.6, height = 2.7 + sr * 0.35 + (k.airT > 0.3 ? 0.8 : 0) + (k.cannonU >= 0 ? 3 : 0);
   _v2.set(P.x - Math.sin(cam.yaw) * dist * back, P.y + height, P.z - Math.cos(cam.yaw) * dist * back);
@@ -5513,7 +5578,7 @@ function beginLoading(R) {
   endRaceLocal(true);
   UI.show('loading'); race.state = 'loading';
   RACE = R; RACE.startedAt = performance.now();
-  RULES.items = R.items; RULES.level = R.level; RULES.laps = R.laps; race.laps = R.laps;
+  RULES.items = R.items; RULES.level = R.level; RULES.laps = R.laps; RULES.cc = R.cc || 100; race.laps = R.laps;
   setTimeout(() => {   // laisse l'écran de chargement s'afficher
     if (RACE !== R) return;
     if (loadedMap !== R.map) { loadMap(R.map); loadedMap = R.map; } else { placeBoxes(typeof MAP.boxes === 'function' ? MAP.boxes() : MAP.boxes); }
@@ -5531,6 +5596,7 @@ function setupRacers(R) {
     const mine = r.owner === NET.myId && r.owner != null;
     const k = new Kart(i, CHARACTERS[r.ch], KARTS[r.kt], { isPlayer: mine, remote: r.owner != null && !mine && !(NET.isHost && false), human: r.owner != null, ownerId: r.owner, name: (r.owner != null && humans().length > 1 ? r.name : null) || CHARACTERS[r.ch].name, tag: r.color });
     if (!NET.isHost && r.owner == null) k.remote = true;     // les IA sont simulées par l'hôte
+    { const m = CFG.CC[RULES.cc] || 1; k.stats.maxSpeed *= m; k.stats.accel *= Math.pow(m, 0.7); k.stats.handling *= 1 + (m - 1) * 0.45; }   // cylindrée
     k.slot = i; karts.push(k);
   });
   player = karts.find((k) => k.isPlayer) || karts[0];
@@ -5625,6 +5691,17 @@ function simulate(h) {
   else player.rocketAI = null;
   for (const k of karts) if (!k.remote) k.step(h);
   stepItems(h);
+  // aspiration : rester dans le sillage d'un kart (devant, à moins de 20 m, bien aligné) charge un petit turbo
+  for (const k of karts) {
+    if (k.remote || !k.grounded || k.speedF < 18 || k.hitT > 0) { k.draftT = Math.max(0, k.draftT - h * 2); continue; }
+    const hv = Math.hypot(k.vel.x, k.vel.z) || 1, fx = k.vel.x / hv, fz = k.vel.z / hv; let inWake = false;
+    for (const o of karts) {
+      if (o === k || o.speedF < 15) continue; const dx = o.pos.x - k.pos.x, dz = o.pos.z - k.pos.z, along = dx * fx + dz * fz, side = Math.abs(dx * fz - dz * fx);
+      if (along > 3 && along < CFG.DRAFT_DIST && side < CFG.DRAFT_W + along * 0.04 && Math.abs(o.pos.y - k.pos.y) < 2) { inWake = true; break; }
+    }
+    if (inWake) { k.draftT += h; if (k.draftT >= CFG.DRAFT_TIME) { k.draftT = 0; k.boost(1.0); k.fx.draft = true; } }
+    else k.draftT = Math.max(0, k.draftT - h);
+  }
   // contacts entre karts : chaque machine ne déplace que ses karts locaux
   for (let i = 0; i < karts.length; i++) for (let j = i + 1; j < karts.length; j++) {
     const a = karts[i], b = karts[j]; if (a.remote && b.remote) continue;
@@ -5645,8 +5722,9 @@ function simulate(h) {
       if (!a.remote) { a.vel.x -= ix / ma; a.vel.z -= iz / ma; }
       if (!b.remote) { b.vel.x += ix / mb; b.vel.z += iz / mb; }
       const side = Math.abs(nL) > 0.2 ? Math.sign(nL) : b.q2.lateral >= a.q2.lateral ? 1 : -1, kick = clamp(2.5 + close * 0.6, 2.5, 9);
-      if (!a.remote) { const k = kick * (mb / (ma + mb)); a.pushX -= rx * side * k; a.pushZ -= rz * side * k; a.yaw += side * 0.03; }
-      if (!b.remote) { const k = kick * (ma / (ma + mb)); b.pushX += rx * side * k; b.pushZ += rz * side * k; b.yaw -= side * 0.05; }
+      const a2 = ma * ma, b2 = mb * mb;   // le plus lourd pousse nettement plus le plus léger
+      if (!a.remote) { const k = kick * (b2 / (a2 + b2)); a.pushX -= rx * side * k; a.pushZ -= rz * side * k; a.yaw += side * 0.03; }
+      if (!b.remote) { const k = kick * (a2 / (a2 + b2)); b.pushX += rx * side * k; b.pushZ += rz * side * k; b.yaw -= side * 0.05; }
       if ((a.isPlayer || b.isPlayer) && close > 2) { cam.shake = Math.max(cam.shake, 0.1); sfx.noise(0.1, 0.22, 1100); sfx.tone(180, 0.12, 'square', 0.08, 110); }
     }
   }
@@ -5669,7 +5747,7 @@ function kartFX(k, dt) {
   }
   if (k.drifting && k.grounded) {
     k.sparkAcc = Math.min(k.sparkAcc + dt, 0.2);
-    const sRate = k.driftLevel === 0 ? 1 / 30 : 1 / 110, cols = k.driftLevel === 2 ? COL.spark2 : k.driftLevel === 1 ? COL.spark1 : COL.spark0;
+    const sRate = k.driftLevel === 0 ? 1 / 30 : 1 / 110, cols = k.driftLevel === 3 ? COL.spark3 : k.driftLevel === 2 ? COL.spark2 : k.driftLevel === 1 ? COL.spark1 : COL.spark0;
     SIDE.setFromMatrixColumn(mw, 0);
     while (k.sparkAcc > sRate) { k.sparkAcc -= sRate; if (!near) continue;
       for (const w of k.rearWheels) { P.set(w.x, 0.08, w.z).applyMatrix4(mw); const out = -k.driftDir;
@@ -5696,16 +5774,21 @@ function kartFX(k, dt) {
   if (F.wall) { P.set(k.rpos.x + k.q2.rx * F.wallSide * 1.2, k.rpos.y + 0.5, k.rpos.z + k.q2.rz * F.wallSide * 1.2);
     for (let n = 0; n < Math.min(26, F.wall * 1.4); n++) sparks.emit(P.x, P.y, P.z, k.vel.x * 0.5 + fxr(-4, 4), fxr(1, 6), k.vel.z * 0.5 + fxr(-4, 4), fxr(0.2, 0.4), 0.24, 0.05, COL.wall[0], COL.wall[1], 1, 20, 0.5);
     if (me) { cam.shake = Math.max(cam.shake, Math.min(0.3, F.wall * 0.02)); sfx.noise(0.18, Math.min(0.45, F.wall * 0.03), 1200); } F.wall = 0; }
-  if (F.lvl) { const c = F.lvl === 2 ? COL.spark2 : COL.spark1;
+  if (F.lvl) { const c = F.lvl === 3 ? COL.spark3 : F.lvl === 2 ? COL.spark2 : COL.spark1;
     for (let n = 0; n < 16; n++) { P.set(fxr(-1, 1), 0.3, -0.9).applyMatrix4(mw); sparks.emit(P.x, P.y, P.z, fxr(-5, 5) + k.vel.x * 0.7, fxr(2, 7), fxr(-5, 5) + k.vel.z * 0.7, 0.35, 0.32, 0.05, c[0], c[1], 1, 18, 1); }
-    if (me) sfx.tone(F.lvl === 2 ? 1320 : 990, 0.12, 'triangle', 0.18); F.lvl = 0; }
-  if (F.mt) { const c = F.mt === 2 ? COL.spark2 : COL.spark1;
+    if (me) sfx.tone([0, 990, 1320, 1760][F.lvl], 0.12, 'triangle', 0.18); F.lvl = 0; }
+  if (F.mt) { const c = F.mt === 3 ? COL.spark3 : F.mt === 2 ? COL.spark2 : COL.spark1;
     for (const e of k.exhausts) { e.getWorldPosition(P); for (let n = 0; n < 14; n++) sparks.emit(P.x, P.y, P.z, -fx * fxr(3, 9) + fxr(-3, 3) + k.vel.x * 0.7, fxr(0, 4), -fz * fxr(3, 9) + fxr(-3, 3) + k.vel.z * 0.7, 0.3, 0.5, 0.05, c[0], c[1], 1, 6, 1.5); }
-    if (me) { showPop(F.mt === 2 ? 'SUPER MINI-TURBO !' : 'MINI-TURBO !', F.mt === 2 ? 'c2' : 'c1'); sfx.tone(220, 0.45, 'sawtooth', 0.16, 900); sfx.noise(0.4, 0.2, 2500); cam.shake = Math.max(cam.shake, 0.06); }
+    if (me) { showPop(['', 'MINI-TURBO !', 'SUPER MINI-TURBO !', 'ULTRA MINI-TURBO !'][F.mt], ['', 'c1', 'c2', 'c4'][F.mt]); sfx.tone(220, 0.45, 'sawtooth', 0.16, 900); sfx.noise(0.4, 0.2, 2500); cam.shake = Math.max(cam.shake, 0.06); }
     F.mt = 0; }
   if (F.dash) { k.mtCol = 0; if (me) { showPop('BOOST !', 'c2'); sfx.tone(330, 0.4, 'sawtooth', 0.16, 1300); } F.dash = false; }
   if (F.trick) { for (let n = 0; n < 20; n++) { const c = RAINBOW[n % 6]; sparks.emit(k.rpos.x, k.rpos.y + 1, k.rpos.z, fxr(-5, 5), fxr(-2, 5), fxr(-5, 5), 0.45, 0.4, 0.05, c, c, 1, 4, 2); }
     if (me) { showPop('FIGURE !', 'c4'); sfx.tone(700, 0.25, 'triangle', 0.15, 1400); } F.trick = false; }
+  if (F.draft) { if (me) { showPop('ASPIRATION !', 'c1'); sfx.noise(0.5, 0.18, 3200); sfx.tone(300, 0.35, 'sawtooth', 0.12, 900); } F.draft = false; }
+  if (k.draftT > 0.25 && near && Math.random() < dt * 30) { const a = fxr(0, Math.PI * 2), r = fxr(0.9, 1.5); P.set(Math.cos(a) * r, 0.9 + Math.sin(a) * r * 0.6, fxr(0, 2.5)).applyMatrix4(mw);
+    const c = COL.draft; sparks.emit(P.x, P.y, P.z, -fx * 26 + k.vel.x, 0, -fz * 26 + k.vel.z, 0.18, 0.12, 0.04, c[0], c[1], 1, 0, 0.6); }
+  if (F.glide) { if (me) { showPop('PLANEUR !', 'c3'); sfx.tone(440, 0.5, 'triangle', 0.14, 880); } F.glide = false; }
+  if (F.rescue) { if (me) sfx.tone(660, 0.3, 'square', 0.1, 330); F.rescue = false; }
   if (F.trickLand) { if (me) { showPop('BOOST FIGURE !', 'c3'); sfx.tone(260, 0.4, 'sawtooth', 0.16, 1100); } F.trickLand = false; }
   if (F.hit) { for (let n = 0; n < 18; n++) { const c = F.hit === 'fire' ? COL.fire[0] : [3, 3, 1.4]; sparks.emit(k.rpos.x, k.rpos.y + 1.3, k.rpos.z, fxr(-4, 4), fxr(1, 6), fxr(-4, 4), 0.5, 0.45, 0.05, c, c, 1, 12, 1); }
     if (me) { cam.shake = 0.25; sfx.spinOut(F.hit); } else if (k.rpos.distanceToSquared(camera.position) < 600) sfx.spinOut(F.hit); F.hit = ''; }
