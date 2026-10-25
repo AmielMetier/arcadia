@@ -2,7 +2,8 @@
 // Même schéma qu'Outbreak : l'hôte fait tourner la simulation à 60 Hz et diffuse l'état 20 fois par seconde ;
 // les invités envoient leurs commandes (30 Hz), prédisent leur propre déplacement et voient les autres ~110 ms
 // en retard, interpolés entre deux états. Le jeu ne parle jamais au réseau directement : tout passe par HubBridge.
-import { Sim, DT, stepPlayer, playerFromRow, Ruins, DIFFICULTY, MODES, UPGRADES, UPG_KEYS, personalScore, BOILER, WARM_R, windOf, obstacleColliders, stationDist, THROTTLE, LEVER, VALVE, FAULTS, HALF_W } from './engine/sim.js';
+import { Sim, DT, stepPlayer, playerFromRow, Ruins, DIFFICULTY, MODES, CARDS, UPG_KEYS, personalScore, BOILER, windOf, obstacleColliders, stationDist, THROTTLE, LEVER, VALVE, FAULTS, HALF_W,
+  ROLES, BIOMES, MOMENTS, CRATES, BRIDGE_LEN, REAR, moveCtx, momentColliders, momentOf, bioAt, snapUp, warmR, flareR, dayInfo } from './engine/sim.js';
 import { createScene } from './view/scene.js';
 import { Input } from './input.js';
 import { Sfx } from './view/sfx.js';
@@ -21,7 +22,9 @@ const S = {
   role: 'solo', myId: 0, cfg: null, sim: null, runId: 0, lobby: true, menu: false, alive: true,
   snaps: [], evq: [], last: null, off: null, endShown: false, endAt: 0, reported: false, netEv: [], tick: 0, lastSend: 0,
   acc: 0, inp: null, sentSeq: 0, sendT: 0, hist: [], pred: null, gotHost: false, hiT: 0, snapAt: 0, ruins: null, ruinsKey: '', view: null,
+  myRole: readRole(), roles: new Map(), // rôle choisi par chaque joueur (id → n°), connu de l'hôte et diffusé au salon
 };
+function readRole() { try { const v = localStorage.getItem('convoy_role'), r = v == null ? -1 : +v; return Number.isInteger(r) && r >= 0 && r < 4 ? r : -1; } catch (e) { return -1; } }
 
 // ------------------------------------------------------------------ montage (une fois par page)
 const hud = new HUD();
@@ -30,7 +33,7 @@ let scene = null;
 try { scene = createScene($('#stage'), { onLost: () => { hud.toast('Affichage 3D interrompu : recharge la page', 6); } }); }
 catch (e) { console.error(e); }
 const input = new Input(document.body, { menu: () => toggleMenu(), mute: () => toggleMute(), unlock: () => sfx.unlock(), key: (k) => onKey(k) });
-hud.onBuy = (k) => doBuy(k); hud.onVote = () => doVote();
+hud.onBuy = (k) => doBuy(k); hud.onVote = () => doVote(); hud.onRoute = (c) => doRoute(c);
 input.bindTouchButtons($('#tbtns'));
 input.listen($('#btnMute'), 'click', () => toggleMute());
 input.listen($('#btnMenu'), 'click', () => toggleMenu());
@@ -74,22 +77,23 @@ function humanPlayers() {
   return H.players.map((p, i) => ({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
 }
 const isReady = (id) => id === S.myId || !H.embedded || H.readyMap[id] === 'convoy';
-const squad = () => humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id) }));
+const squad = () => humanPlayers().map((p) => ({ ...p, me: p.id === S.myId, ready: isReady(p.id), role: p.id === S.myId ? S.myRole : S.roles.get(p.id) ?? -1 }));
 
 // ------------------------------------------------------------------ démarrage
 function boot(info) {
   S.role = H.embedded ? info.role : 'solo';
   S.myId = H.embedded ? info.myId : 0;
   S.cfg = readCfg(info.settings || {});
+  S.roles.set(S.myId, S.myRole);
   H.on('msg', onMsg);
   H.on('roster', onRoster);
   if (H.embedded) H.signalReady();       // après on('msg') : sinon les premiers messages de l'hôte se perdent
   if (!scene) { showNoGL(); return; }
   // décor d'attente derrière le briefing : le convoi à l'arrêt dans la tempête
   S.idleView = { seed: 20261023, diff: S.cfg.difficulty, dist: 0, speed: 0, fuel: 70, burn: 0, t: 0, fedTotal: 0, phase: 'play', players: [], crates: [], wolves: [], flares: [],
-    looted: new Set(), me: null, focus: { x: 0, z: 2 }, ev: null, gust: 0, ns: 0, mode: 'endless', goal: 0, radar: false };
+    looted: new Set(), me: null, focus: { x: 0, z: 2 }, ev: null, gust: 0, ns: 0, mode: 'endless', goal: 0, radar: false, legs: ['plaine'], up: {}, night: 0, hooks: [], boss: null, mm: null };
   showBriefing();
-  if (S.role === 'guest') H.send('host', { t: 'hi' });
+  if (S.role === 'guest') { H.send('host', { t: 'hi' }); H.send('host', { t: 'role', r: S.myRole }); }
   raf = requestAnimationFrame(loop);
   if (QS.has('debug')) window.__convoy = { S, scene, input, hud, sfx, teardown };
   if (QS.has('autostart') && S.role !== 'guest') setTimeout(startRun, 300);
@@ -105,15 +109,24 @@ function showNoGL() {
 function showBriefing() {
   if (!S.lobby) return;
   screenEl.className = 'screen'; screenEl.hidden = false;
-  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded });
+  screenEl.innerHTML = briefingHtml({ role: S.role, squad: squad(), cfg: S.cfg, embedded: H.embedded, myRole: S.myRole });
   hud.show(false);
   const go = $('#btnGo'); if (go) go.onclick = () => { sfx.unlock(); startRun(); };
   const ex = $('#btnExit'); if (ex) ex.onclick = exitToLobby;
   for (const b of screenEl.querySelectorAll('.seg button')) b.onclick = () => {
+    if (b.dataset.k === 'role') { setMyRole(+b.dataset.v); return; }
     S.cfg[b.dataset.k] = b.dataset.v;
     try { localStorage.setItem('convoy_cfg', JSON.stringify(S.cfg)); } catch (e) {}
     sfx.unlock(); sfx.play('click'); showBriefing();
   };
+}
+// rôle choisi au briefing : gardé pour les prochaines parties, transmis à l'hôte
+function setMyRole(r) {
+  S.myRole = r; S.roles.set(S.myId, r);
+  try { localStorage.setItem('convoy_role', String(r)); } catch (e) {}
+  sfx.unlock(); sfx.play('click');
+  if (S.role === 'guest') H.send('host', { t: 'role', r }); else broadcastLobby();
+  showBriefing();
 }
 function hideScreen() { screenEl.hidden = true; screenEl.innerHTML = ''; S.menu = false; hud.show(true); }
 
@@ -121,7 +134,7 @@ function hideScreen() { screenEl.hidden = true; screenEl.innerHTML = ''; S.menu 
 function startRun() {
   if (S.role === 'guest') return;
   const sim = new Sim({ seed: (Math.random() * 2 ** 31) | 0, difficulty: S.cfg.difficulty, mode: S.cfg.mode });
-  for (const p of squad()) if (p.ready) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
+  for (const p of squad()) if (p.ready) sim.addPlayer({ id: p.id, name: p.name, color: p.color, role: p.role });
   S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; S.tick = 0;
   hideScreen();
   startIntro();
@@ -168,9 +181,9 @@ function onRoster() {
   const ids = new Set(H.players.map((p) => p.id));
   for (const p of [...sim.players.values()]) if (p.id !== S.myId && (!ids.has(p.id) || !isReady(p.id))) sim.removePlayer(p.id);
   // arrivée en cours de route (ou retour d'un joueur) : il monte à bord
-  for (const p of squad()) if (p.ready && !sim.players.has(p.id)) { sim.addPlayer({ id: p.id, name: p.name, color: p.color }); H.send(p.id, { t: 'go', run: S.runId }); }
+  for (const p of squad()) if (p.ready && !sim.players.has(p.id)) { sim.addPlayer({ id: p.id, name: p.name, color: p.color, role: p.role }); H.send(p.id, { t: 'go', run: S.runId }); }
 }
-function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg }); }
+function broadcastLobby() { if (H.embedded && S.role === 'host') H.send('all', { t: 'lobby', cfg: S.cfg, roles: [...S.roles] }); }
 
 // Le Hub a désigné ce joueur comme nouvel hôte : le convoi repart du dernier état reçu
 function becomeHost() {
@@ -207,7 +220,9 @@ function report(snap) {
 function onMsg(from, m) {
   if (!S.alive || !m || typeof m !== 'object') return;
   if (S.role === 'host' || S.role === 'solo') {
-    if (m.t === 'hi') { H.send(from, { t: 'lobby', cfg: S.cfg }); if (!S.lobby && S.sim) H.send(from, { t: 'go', run: S.runId }); }
+    if (m.t === 'hi') { H.send(from, { t: 'lobby', cfg: S.cfg, roles: [...S.roles] }); if (!S.lobby && S.sim) H.send(from, { t: 'go', run: S.runId }); }
+    else if (m.t === 'role' && Number.isInteger(m.r) && m.r >= -1 && m.r < ROLES.length) { S.roles.set(from, m.r); if (S.lobby) { showBriefing(); broadcastLobby(); } }
+    else if (m.t === 'route' && S.sim && (m.c === 0 || m.c === 1)) S.sim.route(from, m.c);
     else if (m.t === 'i' && S.sim) S.sim.setInput(from, cleanInput(m)); // `from` vient du Hub : seule identité fiable
     else if (m.t === 'buy' && S.sim && typeof m.k === 'string') { const err = S.sim.buy(from, m.k); if (err) H.send(from, { t: 'err', m: err }); }
     else if (m.t === 'vote' && S.sim) S.sim.vote(from);
@@ -215,7 +230,11 @@ function onMsg(from, m) {
   }
   if (from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   S.gotHost = true; S.snapAt = performance.now();
-  if (m.t === 'lobby') { if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg }; if (S.lobby) showBriefing(); }
+  if (m.t === 'lobby') {
+    if (m.cfg) S.cfg = { ...S.cfg, ...m.cfg };
+    if (Array.isArray(m.roles)) for (const [id, r] of m.roles) if (id !== S.myId && Number.isInteger(r)) S.roles.set(id, r);
+    if (S.lobby) showBriefing();
+  }
   else if (m.t === 'go') { const fresh = S.lobby || S.endShown; S.goRun = m.run; S.lobby = false; S.endShown = false; hideScreen(); if (fresh) startIntro(); }
   else if (m.t === 's' && m.s) receiveSnap(m.s, m.e || []);
   else if (m.t === 'err' && typeof m.m === 'string') { hud.toast(m.m.slice(0, 60), 2); sfx.play('nope'); }
@@ -241,8 +260,9 @@ function receiveSnap(s, events) {
 }
 
 function ruinsFor(s) {
-  const key = s.sd + ':' + s.df;
-  if (key !== S.ruinsKey) { S.ruinsKey = key; S.ruins = new Ruins(s.sd, DIFFICULTY[s.df].loot); }
+  const key = s.sd + ':' + s.df + ':' + s.mo + ':' + s.gl;
+  if (key !== S.ruinsKey) { S.ruinsKey = key; S.ruins = new Ruins(s.sd, DIFFICULTY[s.df].loot, s.mo || 'expedition', s.gl || 0); }
+  S.ruins.setLegs(s.lg || ['plaine']);
   return S.ruins;
 }
 
@@ -261,7 +281,8 @@ function reconcile(s) {
   S.pred = np;
 }
 
-const ctxFor = (s, ruins, d) => ({ v: s.sp, wind: windOf(s), colliders: ruins.colliders(d).concat(obstacleColliders(s.ev, d)) });
+const ctxFor = (s, ruins, d) => moveCtx({ v: s.sp, gust: s.gu, ev: s.ev, up: snapUp(s), ice: BIOMES[bioAt(s.mo, s.gl, s.lg || ['plaine'], d)]?.ice },
+  ruins.colliders(d).concat(obstacleColliders(s.ev, d), momentColliders(s.mm, d)));
 
 function predictLocal(dt) {
   const s = S.last; if (!s || !S.pred || !S.inp || s.ph !== 'play') return;
@@ -302,13 +323,13 @@ function buildView(a, b, f, dt) {
     let st = q.st, on = q.on, air = q.air;
     const me = q.id === S.myId;
     if (me && S.role === 'guest' && S.pred) { const P = S.pred; x = P.x + P.ox; y = P.y; z = P.z + P.oz; yaw = P.yaw; vx = P.vx; vz = P.vz; st = P.st; on = P.on; air = P.air; }
-    return { id: q.id, name, color, x, y, z, yaw, vx, vz, st, on, air, carry: q.carry, sp: q.sp, me, fed: q.fed, heat: q.heat, frz: q.frz, flares: q.flares, dig: q.dig, tm: q.tm };
+    return { id: q.id, name, color, x, y, z, yaw, vx, vz, st, on, air, carry: q.carry, sp: q.sp, me, fed: q.fed, heat: q.heat, frz: q.frz, flares: q.flares, dig: q.dig, tm: q.tm, role: q.role, ic: q.ic, cth: q.cth };
   });
   const ca = new Map(a.C.map((c) => [c[0], c]));
   const crates = b.C.map((c) => {
     const o = ca.get(c[0]);
     const same = o && o[1] === c[1];
-    return { id: c[0], m: c[1], x: same ? lerp(o[2], c[2]) : c[2], y: same ? lerp(o[3], c[3]) : c[3], z: same ? lerp(o[4], c[4]) : c[4] };
+    return { id: c[0], m: c[1], x: same ? lerp(o[2], c[2]) : c[2], y: same ? lerp(o[3], c[3]) : c[3], z: same ? lerp(o[4], c[4]) : c[4], t: c[9] || 1, th: c[10] || 0 };
   });
   const wa = new Map((a.W || []).map((w) => [w[0], w]));
   const wolves = (b.W || []).map((w) => {
@@ -319,16 +340,20 @@ function buildView(a, b, f, dt) {
   const me = players.find((p) => p.me) || null;
   const focus = me ? { x: me.x * 0.85, z: me.z } : { x: 0, z: 2 };
   if (me) focus.z = me.on ? me.z * 0.6 : me.z; // à bord, la caméra garde tout le convoi dans le cadre
-  const up = {}; UPG_KEYS.forEach((k, i) => { up[k] = (b.up && b.up[i]) | 0; });
+  const up = snapUp(b), legs = b.lg || ['plaine'], dist = lerp(a.d, b.d), bo = b.bo, ao = a.bo || bo;
   const view = {
-    seed: b.sd, diff: b.df, dist: lerp(a.d, b.d), speed: b.sp, fuel: lerp(a.fu, b.fu), burn: b.br, t: b.t, fedTotal: b.ft, phase: b.ph,
+    seed: b.sd, diff: b.df, dist, speed: b.sp, fuel: lerp(a.fu, b.fu), burn: b.br, t: b.t, fedTotal: b.ft, phase: b.ph,
     players, crates, wolves, flares, looted: new Set(b.L), me, focus, meId: S.myId,
     mode: b.mo || 'expedition', goal: b.gl || 0, fmax: b.fm || 100, scrap: b.sc | 0, up, radar: up.radar > 0, ns: b.ns | 0,
     stop: b.so || null, ev: b.ev || null, gust: b.gu || 0, win: b.wn | 0,
     thr: b.th ?? 1, press: lerp(a.pr ?? 0, b.pr ?? 0), hull: b.hu ?? 100, gap: b.sto != null ? lerp(a.d - (a.sto ?? b.sto), b.d - b.sto) : 999, calm: !!b.ca, why: b.wy || '',
     faults: (b.FA || []).map((f) => ({ id: f[0], k: f[1], x: f[3], z: f[4], prog: f[5] })),
     raiders: raidersView(a, b, lerp),
+    legs, bio: bioAt(b.mo || 'expedition', b.gl || 0, legs, dist), mi: b.mi ?? 1, mm: b.mm || null, night: dayInfo(b.t).k, day: dayInfo(b.t),
+    boss: bo ? { x: lerp(ao[0], bo[0]), z: lerp(ao[1], bo[1]), hp: bo[2], hm: bo[3], side: bo[4], st: bo[5], t: bo[6] } : null,
+    hooks: (b.HK || []).map((h) => ({ id: h[0], x: h[1], z: h[2], prog: h[3] })), warmR: warmR(up), flareR: flareR(up),
   };
+  view.moment = nextMoment(view);
   view.next = nextInfo(view);
   view.prompt = promptFor(view, b);
   return view;
@@ -337,6 +362,13 @@ function buildView(a, b, f, dt) {
 function raidersView(a, b, lerp) {
   const ra = new Map((a.R || []).map((w) => [w[0], w]));
   return (b.R || []).map((w) => { const o = ra.get(w[0]) || w; return { id: w[0], x: lerp(o[1], w[1]), z: lerp(o[2], w[2]), side: w[3], st: w[4], carry: w[6] }; });
+}
+
+// moment fort en cours ou à venir sur le tronçon : { k, d, on }
+function nextMoment(v) {
+  if (v.mm) return { k: v.mm.k, d: v.mm.d, on: true, t: v.mm.t };
+  const m = momentOf(v.seed, v.mode, v.goal, v.legs, v.mi);
+  return m && m.d > v.dist - 5 ? { k: m.k, d: m.d, on: false } : null;
 }
 
 // prochaine étape (gare ou terminus) pour la barre d'objectif
@@ -358,24 +390,32 @@ function promptFor(v, snap) {
   const E = v.ev;
   // dangers d'abord
   if (E && E.k === 'aval' && E.t > 0 && !E.hit && !me.on && me.x * E.side > 2.75) return `⚠️ AVALANCHE ! Remonte à bord ou file de l'autre côté de la voie !`;
+  const M = v.moment, bridge = M && M.k === 'bridge' && M.on && v.dist > M.d - 120 && v.dist - REAR < M.d + BRIDGE_LEN;
+  if (bridge && !me.on && v.dist > M.d - 60) return '🌉 Le pont ! Remonte vite à bord : dehors, c\'est la chute !';
+  if ((me.ic || 0) > 1.4 && !me.on) return '🧊 La glace craque sous tes pieds : bouge !';
   const hunter = v.wolves.find((w) => w.st === 1 && w.tg === me.id);
   if (hunter) return me.flares > 0 ? `🐺 Un loup te traque ! ${kbd('G')} fusée éclairante (${me.flares})` : `🐺 Un loup te traque ! Cours vers la chaudière ou un équipier`;
   const hd = Math.hypot(me.x - BOILER.x, me.z - BOILER.z);
   if (!v.calm && me.on && !me.air && !me.carry) {
     if (Math.hypot(me.x - LEVER.x, me.z - LEVER.z) < LEVER.r) return `${kbd('E')} Manette : ${THROTTLE.map((t, i) => (i === v.thr ? `<b>${t.label}</b>` : t.label)).join(' · ')}`;
     if (Math.hypot(me.x - VALVE.x, me.z - VALVE.z) < VALVE.r) return `Maintiens ${kbd('E')} pour lâcher la vapeur · pression ${Math.round(v.press)} % <span class="pg ${v.press > 75 ? 'hot' : ''}"><i style="width:${Math.round(v.press)}%"></i></span>`;
+    const h = v.hooks.find((q) => Math.hypot(q.x - me.x, q.z - me.z) < 1.25);
+    if (h) return `Maintiens ${kbd('E')} : couper le grappin <span class="pg hot"><i style="width:${Math.round(h.prog * 100)}%"></i></span>`;
     const f = v.faults.find((q) => Math.hypot(q.x - me.x, q.z - me.z) < 1.25);
     if (f) return `Maintiens ${kbd('E')} : ${f.k === 'pipe' ? 'dégeler le tuyau' : 'colmater la fuite'} <span class="pg"><i style="width:${Math.round(f.prog * 100)}%"></i></span>`;
   }
   const raider = !me.carry && v.raiders.find((w) => w.st < 2 && (me.on ? Math.abs(me.x) > HALF_W - 0.7 && Math.sign(me.x) === w.side && Math.abs(me.z - w.z) < 1.9 : Math.hypot(me.x - w.x, me.z - w.z) < 1.4));
   if (raider) return `${kbd('E')} Renverser le pillard !`;
   if (me.carry) {
-    if (me.on && hd < 2.4) return `${kbd('E')} Jeter le fioul dans la chaudière (+25 %)`;
-    if (me.on) return `Porte la caisse à la chaudière · ${kbd('F')} pour la lancer`;
-    return `Rattrape le convoi · ${kbd('F')} lance la caisse sur le wagon ou dans le foyer`;
+    const C = CRATES[me.carry] || CRATES[1], boss = v.boss && v.boss.st < 2;
+    if (boss && me.on) return `🚛 Lance-lui la caisse ! Au bord du wagon, face au camion, ${kbd('F')}`;
+    if (me.on && me.carry === 3 && hd < v.warmR) return `🧊 Ça dégèle près du feu… <span class="pg"><i style="width:${Math.round((me.cth || 0) * 100)}%"></i></span> · ${kbd('E')} tout de suite : +${C.fuel} % seulement`;
+    if (me.on && hd < 2.4) return C.scrap ? `${kbd('E')} Ranger les pièces (+${C.scrap + (v.up.salvage | 0)} ferraille)` : `${kbd('E')} ${C.label} dans la chaudière (+${C.fuel + (me.role === 2 && me.carry !== 3 ? 6 : 0)} %)`;
+    if (me.on) return me.carry === 3 ? `🧊 Fioul gelé : garde-le près de la chaudière pour le dégeler` : `Porte ${me.carry === 2 ? 'le charbon (lourd !)' : me.carry === 4 ? 'les pièces' : 'la caisse'} à la chaudière · ${kbd('F')} pour la lancer`;
+    return `Rattrape le convoi · ${kbd('F')} lance ${me.carry === 2 ? 'le charbon (lourd, ça porte moins loin)' : 'la caisse'} sur le wagon ou dans le foyer`;
   }
-  const near = v.crates.some((c) => c.m !== 2 && (c.m === 1) === !!me.on && Math.hypot(c.x - me.x, (c.m === 0 ? c.z + v.dist : c.z) - me.z) < 1.5);
-  if (near && !me.air) return `${kbd('E')} Prendre la caisse`;
+  const nearC = v.crates.find((c) => c.m !== 2 && (c.m === 1) === !!me.on && Math.hypot(c.x - me.x, (c.m === 0 ? c.z + v.dist : c.z) - me.z) < 1.5);
+  if (nearC && !me.air) return `${kbd('E')} Prendre ${{ 1: 'le fioul', 2: 'le charbon (+45 %, lourd)', 3: 'le fioul gelé (à dégeler près du feu)', 4: 'les pièces (ferraille)' }[nearC.t] || 'la caisse'}`;
   // congère sur la voie
   if (E && E.k === 'drift' && !E.done) {
     const zd = E.zw + v.dist;
@@ -383,7 +423,12 @@ function promptFor(v, snap) {
     if (!me.on && Math.abs(me.x) < 4.6 && Math.abs(me.z - zd) < 2.9) return me.dig ? `Pelletée après pelletée… ${pg}` : `Maintiens ${kbd('E')} pour déblayer la congère ${pg}`;
     if (v.stop && v.stop.k === 'drift') return `⛔ Congère sur la voie ! Descends devant la locomotive et déblaie-la ${pg}`;
   }
-  if (v.stop && v.stop.k === 'station') return `🚉 En gare : fioul sur le quai, chaleur et améliorations · ${kbd('V')} prêt à partir`;
+  if (v.stop && v.stop.k === 'station') return `🚉 En gare : fioul sur le quai, chaleur, cartes ${kbd('1')}–${kbd('3')} et aiguillage ${kbd('4')} ${kbd('5')} · ${kbd('V')} prêt à partir`;
+  if (v.stop && v.stop.k === 'wreck') return `🚃 Convoi abandonné : ramassez les caisses le long du vieux train, le Front avance ! · ${kbd('V')} repartir`;
+  if (bridge && me.on && v.thr !== 0) return `🌉 Pont fragile : passe la manette en <b>Éco</b> (${kbd('E')} à l'arrière de la cabine) !`;
+  if (bridge && me.on) return v.dist + 19.4 < M.d ? '🌉 Pont droit devant, en Éco : parfait. Personne ne descend !' : '🌉 Sur le pont… doucement, et personne ne descend.';
+  if (v.boss && v.boss.st < 2 && me.on) return `🚛 Le Brise-Glace ! Coupez les grappins (${kbd('E')}) et lancez-lui des caisses (${kbd('F')})`;
+  if (M && M.k === 'roar' && M.on && (M.t || 0) < 40) return '🌪️ Le Front rugit : plein gaz, nourrissez la chaudière !';
   if (!me.on) {
     const ruins = ruinsFor(snap);
     for (const [, c] of ruins.around(v.dist, 40, 70)) for (const r of c.ruins) {
@@ -393,11 +438,12 @@ function promptFor(v, snap) {
       }
     }
     if (me.st === 1) return '❄️ Tu t\'enfonces dans la neige !';
+    if (v.bio === 'lac' && !(v.up.crampons | 0)) return '🧊 Lac gelé : ça glisse, et ne reste pas planté sur la glace';
   }
   if (!v.calm && v.press > 80) return `♨️ La chaudière va exploser ! Soupape : maintiens ${kbd('E')} devant la chaudière`;
   if (!v.calm && v.gap < 30 && !me.on) return '🌪️ Le front de tempête arrive : remonte à bord !';
   if (v.raiders.some((w) => w.st === 1) && me.on && !me.carry) return '🏴 Pillards le long du convoi ! Va au bord du wagon et renverse-les (E), ou lance-leur une caisse';
-  if (me.heat < 30) return me.on && hd < WARM_R ? '🔥 Tu te réchauffes…' : '🥶 Tu gèles ! Va te réchauffer près de la chaudière';
+  if (me.heat < 30) return me.on && hd < v.warmR ? '🔥 Tu te réchauffes…' : '🥶 Tu gèles ! Va te réchauffer près de la chaudière';
   if (v.fuel <= 0) return '🔥 La chaudière est éteinte : une caisse, vite !';
   if (me.on && v.fuel < 25) return 'Réservoir bas ! Saute du train et fouille les ruines (lanternes jaunes)';
   return '';
@@ -406,20 +452,27 @@ function promptFor(v, snap) {
 // ------------------------------------------------------------------ gare : achats et départ
 function atStation() { const v = S.view; return !!(v && v.stop && v.stop.k === 'station' && v.phase === 'play' && !S.menu && !S.endShown); }
 function doBuy(k) {
-  if (!atStation() || !UPGRADES[k]) return;
+  if (!atStation() || !CARDS[k]) return;
   sfx.unlock();
   if (S.role === 'guest') { H.send('host', { t: 'buy', k }); return; }
   const err = S.sim && S.sim.buy(S.myId, k);
   if (err) { hud.toast(err, 2); sfx.play('nope'); }
 }
 function doVote() {
-  if (!atStation()) return;
+  const v = S.view;
+  if (!atStation() && !(v && v.stop && v.stop.k === 'wreck' && v.phase === 'play' && !S.menu && !S.endShown)) return;
   if (S.role === 'guest') H.send('host', { t: 'vote' }); else S.sim && S.sim.vote(S.myId);
+}
+function doRoute(c) {
+  if (!atStation() || !S.view.stop.fk) return;
+  sfx.unlock();
+  if (S.role === 'guest') H.send('host', { t: 'route', c }); else S.sim && S.sim.route(S.myId, c);
 }
 function onKey(k) {
   if (S.intro && (k === 'Enter' || k === 'KeyE' || k === 'NumpadEnter')) { endIntro(); return; }
   const m = /^(?:Digit|Numpad)([1-5])$/.exec(k);
-  if (m) doBuy(UPG_KEYS[+m[1] - 1]);
+  if (m && +m[1] <= 3) { const c = S.view?.stop?.c; if (c) doBuy(c[+m[1] - 1]); }
+  else if (m) doRoute(+m[1] - 4);
   else if (k === 'KeyV') doVote();
 }
 
@@ -430,7 +483,10 @@ function fxEvent(e, view) {
   const mine = e.p === S.myId;
   const nm = (id) => who(id)?.name || 'Quelqu\'un';
   switch (e.e) {
-    case 'feed': sfx.play('feed'); at(BOILER.x, BOILER.top + 1, BOILER.z, '+25 %', 'fire'); if (e.rescue) hud.toast('La chaudière repart !', 2.5); break;
+    case 'feed': sfx.play(e.t === 3 ? 'sizzle' : 'feed'); at(BOILER.x, BOILER.top + 1, BOILER.z, `+${e.a ?? 25} %${e.t === 3 ? ' (gelé…)' : ''}`, e.t === 3 ? 'cold' : 'fire'); if (e.rescue) hud.toast('La chaudière repart !', 2.5); break;
+    case 'stash': sfx.play('buy'); at(BOILER.x, BOILER.top + 1, BOILER.z, `+${e.s} ferraille`, 'gold'); break;
+    case 'thawed': sfx.play('sizzle'); at(e.x, 2.4, e.z, 'Dégelée !', 'fire'); break;
+    case 'netted': sfx.play('thud'); at(e.x, 2.4, e.z, 'Rattrapée !', 'gold'); break;
     case 'found': at(e.x, 1.5, e.z, [e.n ? `+${e.n} caisse${e.n > 1 ? 's' : ''}` : '', e.s ? `+${e.s} ferraille` : ''].filter(Boolean).join(' · '), 'gold'); if (mine) sfx.play('found'); break;
     case 'empty': at(e.x, 1.5, e.z, 'Rien…', 'cold'); if (mine) sfx.play('empty'); break;
     case 'fall': if (mine) { sfx.play('fall'); scene && scene.kick(0.4); } at(e.x, 1.2, e.z, 'Plouf !', 'cold'); scene && scene.burst(e.x, 0.3, e.z, 10, 1.5, 2); break;
@@ -469,7 +525,7 @@ function fxEvent(e, view) {
     case 'station': sfx.play('bell'); hud.toast(`🚉 ${e.n}`, 3); break;
     case 'depart': sfx.play('whistle'); hud.toast('En voiture ! Le convoi repart', 2.5); break;
     case 'vote': sfx.play('click'); break;
-    case 'buy': sfx.play('buy'); hud.toast(`${nm(e.p)} : ${UPGRADES[e.k]?.label || ''} (niv. ${e.l})`, 2.5); break;
+    case 'buy': sfx.play('buy'); hud.toast(`${nm(e.p)} : ${CARDS[e.k]?.icon || ''} ${CARDS[e.k]?.label || ''}${e.free ? ' (offerte)' : ''}`, 2.5); break;
     case 'arrive': sfx.play('arrive'); hud.toast('FORT-GIVRE ! Le convoi est arrivé', 4); break;
     // front de tempête, chaudière, pannes, pillards
     case 'storm_near': sfx.play('rumble'); hud.toast('Le front de tempête se rapproche…', 3); break;
@@ -488,7 +544,36 @@ function fxEvent(e, view) {
     case 'board_raid': sfx.play('clank'); break;
     case 'steal': sfx.play('nope'); at(e.x, 2, e.z, 'Caisse volée !', 'fire'); break;
     case 'sabotage': sfx.play('thud'); at(e.x, 2, e.z, 'Sabotage !', 'fire'); scene && scene.kick(0.2); break;
-    case 'repel': sfx.play('crash'); at(e.x, 1.8, e.z, 'Renversé ! +1 ferraille', 'gold'); scene && scene.burst(e.x, 0.5, e.z, 18, 2, 3); break;
+    case 'repel': sfx.play('crash'); at(e.x, 1.8, e.z, `Renversé ! +${e.s || 1} ferraille`, 'gold'); scene && scene.burst(e.x, 0.5, e.z, 18, 2, 3); break;
+    // ambiances, jour et nuit, aiguillage
+    case 'leg': { const B = BIOMES[e.b] || BIOMES.plaine; sfx.play('leg'); hud.banner(`${B.icon} ${B.label}`, B.desc); break; }
+    case 'night': sfx.play('howl'); hud.toast('🌙 La nuit tombe : les loups sortent, les pillards se terrent', 3.5); break;
+    case 'day': sfx.play('bell'); hud.toast('☀️ Le jour se lève', 2.5); break;
+    case 'route': { const B = BIOMES[e.b]; hud.toast(`Aiguillage : ${B.icon} ${B.label}`, 2.5); sfx.play('lever'); break; }
+    case 'route_vote': sfx.play('click'); break;
+    // moments forts
+    case 'moment': {
+      const T = { boss: ['🚛 LE BRISE-GLACE !', 'Coupez ses grappins et lancez-lui des caisses'], bridge: ['🌉 PONT DE LA GORGE', 'Passez en Éco et que personne ne descende'],
+        wreck: ['🚃 CONVOI ABANDONNÉ', 'Le convoi va s\'arrêter : ramassez tout ce que vous pouvez'], roar: ['🌪️ LE FRONT RUGIT !', 'Plein gaz pendant 40 secondes'] }[e.k];
+      if (T) hud.banner(T[0], T[1]);
+      sfx.play(e.k === 'boss' ? 'horn' : e.k === 'roar' ? 'roar' : 'warn'); if (e.k === 'roar') scene && scene.kick(0.5);
+      break;
+    }
+    case 'wreck': sfx.play('brake'); hud.toast(`${e.n} caisses le long du vieux train !`, 3); break;
+    case 'roar_end': sfx.play('gust'); hud.toast('Le Front s\'essouffle… profitez-en', 3); break;
+    case 'creak': sfx.play('creak'); scene && scene.kick(0.12); break;
+    case 'bridge_crack': sfx.play('boom'); scene && scene.kick(0.9); hud.flash(); hud.toast('💥 Le pont se fissure sous le convoi !', 3); break;
+    case 'bridge_done': sfx.play('cleared'); hud.toast('Pont franchi !', 2); break;
+    case 'gorge': if (mine) { sfx.play('lost'); hud.toast('Tu tombes dans la gorge…', 3); } else hud.toast(`${nm(e.p)} est tombé dans la gorge`, 2.5); break;
+    case 'hook': sfx.play('grapple'); at(e.x, 2.4, e.z, 'Grappin !', 'fire'); scene && scene.kick(0.2); break;
+    case 'cut': sfx.play('cut'); at(e.x, 2.4, e.z, 'Coupé !', 'gold'); break;
+    case 'boss_hit': sfx.play('crash'); at(e.x, 3, e.z, e.hp > 0 ? `Touché ! (${e.hp})` : 'À terre !', 'gold'); scene && scene.burst(e.x, 1.5, e.z, 14, 2, 3); break;
+    case 'boss_down':
+      sfx.play('boom'); scene && scene.kick(0.6); if (scene) scene.burst(e.x, 1, e.z, 40, 4, 6);
+      hud.toast(`🚛 LE BRISE-GLACE EST À TERRE ! +${e.s} ferraille`, 3.5); break;
+    case 'boss_gone': hud.toast('Le Brise-Glace décroche…', 2.5); break;
+    case 'ice_warn': if (mine) { sfx.play('creak'); at(e.x, 1.4, e.z, 'Craaac…', 'cold'); } break;
+    case 'crack': sfx.play('splash'); at(e.x, 1.4, e.z, 'Plouf !', 'cold'); if (scene) scene.burst(e.x, 0.3, e.z, 16, 1.5, 3); if (mine) { hud.toast('La glace cède !', 2.5); scene && scene.kick(0.4); } break;
     case 'flee': at(e.x, 1.8, e.z, 'Ils décrochent', 'cold'); break;
     case 'stolen': hud.toast(`Les pillards ont filé avec ${e.n} caisse${e.n > 1 ? 's' : ''}`, 2.5); break;
   }
@@ -568,8 +653,8 @@ function toggleMute() { sfx.unlock(); sfx.setMuted(!sfx.muted); $('#btnMute').te
 function musicState(v) {
   if (v.phase !== 'play') return { mode: v.win ? 'win' : 'off' };
   if (v.stop && v.stop.k === 'station') return { mode: 'station' };
-  const chase = v.wolves.some((w) => w.st === 1);
-  const danger = Math.max(v.fuel < 25 ? 1 - v.fuel / 25 : 0, v.gap < 60 ? 1 - v.gap / 60 : 0, v.press > 75 ? 0.7 : 0, v.raiders.some((w) => w.st === 1) ? 0.6 : 0, chase ? 0.8 : 0, v.me && v.me.heat < 30 ? 0.6 : 0, v.ev && v.ev.k === 'aval' && !v.ev.hit && v.ev.t > 0 ? 1 : 0);
+  const chase = v.wolves.some((w) => w.st === 1), M = v.moment;
+  const danger = Math.max(v.boss && v.boss.st < 2 ? 0.9 : 0, M && M.on && M.k === 'roar' && (M.t || 0) < 40 ? 1 : 0, M && M.on && M.k === 'bridge' && v.dist > M.d - 60 ? 0.6 : 0, v.night * 0.25,v.fuel < 25 ? 1 - v.fuel / 25 : 0, v.gap < 60 ? 1 - v.gap / 60 : 0, v.press > 75 ? 0.7 : 0, v.raiders.some((w) => w.st === 1) ? 0.6 : 0, chase ? 0.8 : 0, v.me && v.me.heat < 30 ? 0.6 : 0, v.ev && v.ev.k === 'aval' && !v.ev.hit && v.ev.t > 0 ? 1 : 0);
   return { mode: 'run', danger };
 }
 

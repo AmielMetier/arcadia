@@ -192,6 +192,15 @@ export class Sfx {
       case 'clank': this.tone(240, 0.12, 0.1, 'square', 160); this.burst(0.12, 3000, 0.12, 'bandpass', 6); this.tone(520, 0.2, 0.05, 'triangle', null, 0.06); break;
       case 'engine': { const o = this.tone(70, 2.4, 0.07, 'sawtooth', 110); if (o) { const l = this.ctx.createOscillator(), lg = this.ctx.createGain(); l.frequency.value = 31; lg.gain.value = 12; l.connect(lg).connect(o.frequency); l.start(); l.stop(this.ctx.currentTime + 2.5); } break; }
       case 'crash': this.burst(0.5, 700, 0.5, 'lowpass'); this.burst(0.3, 2600, 0.2, 'bandpass', 3, 0.05); this.tone(300, 0.3, 0.06, 'square', 90, 0.05); break;
+      // caisses, ambiances, moments forts
+      case 'sizzle': { const f = this.burst(0.9, 5000, 0.14, 'highpass', 0.6); if (f) f.frequency.exponentialRampToValueAtTime(2500, this.ctx.currentTime + 0.9); this.tone(180, 0.4, 0.05, 'triangle', 120); break; }
+      case 'leg': [392, 523, 659].forEach((f, i) => { this.tone(f, 0.7, 0.05, 'triangle', null, i * 0.12, this.verb); this.tone(f, 0.5, 0.04, 'sine', null, i * 0.12); }); break;
+      case 'horn': for (const [f, d] of [[110, 0], [104, 0.55]]) { this.tone(f, 0.5, 0.16, 'sawtooth', f * 0.98, d); this.tone(f * 1.5, 0.5, 0.08, 'square', f * 1.47, d); } break;
+      case 'roar': { const f = this.burst(3.2, 90, 0.8, 'lowpass', 0.8); if (f) f.frequency.exponentialRampToValueAtTime(700, this.ctx.currentTime + 2.2); this.tone(55, 2.6, 0.2, 'sawtooth', 42); this.burst(2.4, 1800, 0.18, 'bandpass', 0.7, 0.4); break; }
+      case 'creak': { const o = this.tone(140 + Math.random() * 60, 0.45, 0.07, 'sawtooth', 90); this.burst(0.3, 900, 0.1, 'bandpass', 6); if (o) { const l = this.ctx.createOscillator(), lg = this.ctx.createGain(); l.frequency.value = 37; lg.gain.value = 25; l.connect(lg).connect(o.frequency); l.start(); l.stop(this.ctx.currentTime + 0.5); } break; }
+      case 'grapple': this.burst(0.25, 2400, 0.12, 'bandpass', 2); this.tone(900, 0.15, 0.05, 'square', 300, 0.18); this.burst(0.2, 400, 0.4, 'lowpass', 1, 0.32); this.tone(200, 0.2, 0.1, 'square', 140, 0.32); break;
+      case 'cut': this.burst(0.08, 6000, 0.2, 'highpass'); this.tone(1400, 0.12, 0.06, 'triangle', 2200); this.burst(0.3, 800, 0.12, 'lowpass', 1, 0.08); break;
+      case 'splash': this.burst(0.15, 2400, 0.3, 'bandpass', 1); this.burst(0.7, 500, 0.4, 'lowpass', 0.7, 0.05); this.tone(320, 0.4, 0.05, 'sine', 90); break;
     }
   }
   dispose() {

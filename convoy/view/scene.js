@@ -3,7 +3,7 @@
 // createScene() monte le canevas ; dispose() libère tout (géométries, matériaux, textures, contexte WebGL, écouteurs).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { DECK_Y, HALF_W, REAR, BODY_FRONT, BOILER, DECK_BOXES, WAGONS, CHUNK, piecePos } from '../engine/world.js';
-import { Ruins, DIFFICULTY, stationDist, STATION_NAMES, WARM_R, FLARE_R, LEVER, VALVE } from '../engine/sim.js';
+import { Ruins, DIFFICULTY, stationDist, STATION_NAMES, WARM_R, FLARE_R, LEVER, VALVE, momentOf, BRIDGE_LEN } from '../engine/sim.js';
 import { hash, makeRng } from '../engine/rng.js';
 import { loadKit, frost } from './models.js';
 import { makeActors } from './actors.js';
@@ -11,7 +11,15 @@ import { makeActors } from './actors.js';
 // Caméra isométrique : décalage fixe par rapport au point suivi. CAM_DIR sert à l'entrée (haut de l'écran = CAM_DIR).
 const CAM_OFF = new THREE.Vector3(11, 17, 15);
 export const CAM_DIR = (() => { const l = Math.hypot(CAM_OFF.x, CAM_OFF.z); return { x: -CAM_OFF.x / l, z: -CAM_OFF.z / l }; })();
-const FOG = 0xc3ced9, FOG_GUST = 0xdfe5ec;
+const FOG = 0xc3ced9, FOG_GUST = 0xdfe5ec, FOG_NIGHT = 0x131a29;
+// teinte du sol et du brouillard selon le paysage du tronçon
+const BIO_LOOK = {
+  plaine: { ground: 0xffffff, fog: 0xc3ced9, rough: 1 },
+  foret: { ground: 0xd9e3e0, fog: 0xa7b6b0, rough: 1 },
+  ville: { ground: 0xdedcd8, fog: 0xbcbcc0, rough: 1 },
+  lac: { ground: 0xb8d9ef, fog: 0xcce0ee, rough: 0.3 },
+  col: { ground: 0xeaf0fb, fog: 0xd4dce8, rough: 1 },
+};
 
 export function createScene(host, { onLost } = {}) {
   const canvas = document.createElement('canvas');
@@ -59,8 +67,9 @@ export function createScene(host, { onLost } = {}) {
   const box = (w, h, d, mat, cast = true) => { const m = mesh(GEO.box, mat, cast); m.scale.set(w, h, d); return m; };
 
   // ---------------------------------------------------------------- lumières
-  scene.add(new THREE.HemisphereLight(0xe2ebf5, 0x5f6b78, 1.05));
+  const hemi = new THREE.HemisphereLight(0xe2ebf5, 0x5f6b78, 1.05); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff4e6, 1.35);
+  const hemiDay = new THREE.Color(0xe2ebf5), hemiNight = new THREE.Color(0x5d74a8), sunDay = new THREE.Color(0xfff4e6), sunNight = new THREE.Color(0x9fb4e0);
   sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 80 });
   sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
@@ -75,7 +84,8 @@ export function createScene(host, { onLost } = {}) {
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(36, 36); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
     owned.tex.add(t); return t;
   })();
-  const ground = mesh(G(new THREE.PlaneGeometry(360, 360)), M(0xffffff, { map: snowTex, roughness: 1, flatShading: false }), false, true);
+  const groundMat = M(0xffffff, { map: snowTex, roughness: 1, flatShading: false });
+  const ground = mesh(G(new THREE.PlaneGeometry(360, 360)), groundMat, false, true);
   ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
   // voie : ballast, rails, traverses (instanciées, recyclées en boucle)
@@ -228,21 +238,36 @@ export function createScene(host, { onLost } = {}) {
     const post = box(0.08, 1.2, 0.08, MAT.dark); post.position.set(r.spot.x, 0.6, r.spot.zw); g.add(post);
     const lan = mesh(GEO.ball, MAT.loot, false); lan.scale.setScalar(0.7); lan.position.set(r.spot.x, 1.3, r.spot.zw); g.add(lan);
     if (r.kind === 'camp' && kit) { const fl = kit.make('arena/banner', 0.9, 1.8, 0.4); if (fl) { fl.position.set(r.spot.x - r.side * 0.6, 0, r.spot.zw - 0.8); g.add(fl); } }
-    g.userData = { lan, loot: (r.loot || 0) + (r.scrap || 0) };
+    g.userData = { lan, loot: (r.loot || 0) + (r.scrap || 0), src: r };
     return g;
   }
   // monticules de neige, poteaux et sapins par tronçon
   const moundGroups = new Map();
   const pineMat = F(M(0x2f5d4a), 1), trunkMat = MAT.wood;
+  const iceSlab = M(0xd4ecfa, { roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 }), crackMat = M(0x5d86a8, { roughness: 0.4 });
+  const rockMat = F(M(0x6b6f78), 1);
   function buildMounds(seed, k, chunk) {
     const g = new THREE.Group(); const rr = makeRng(hash(seed * 31 + k));
+    const bio = (chunk && chunk.bio) || 'plaine', clear = chunk && chunk.clear;
+    const free = (zw) => !clear || -zw < clear[0] - 4 || -zw > clear[1] + 4;
     for (let i = 0; i < 7; i++) {
-      const m = mesh(GEO.mound, MAT.snow, false); const side = rr.chance(0.5) ? -1 : 1;
-      m.scale.set(rr.range(1, 4), rr.range(0.25, 0.9), rr.range(1, 3.5)); m.rotation.y = rr.range(0, 3);
-      m.position.set(side * rr.range(3.5, 34), -0.05, -k * CHUNK - rr.range(0, CHUNK)); g.add(m);
+      const side = rr.chance(0.5) ? -1 : 1, sx = rr.range(1, 4), sy = rr.range(0.25, 0.9), sz = rr.range(1, 3.5), ry = rr.range(0, 3), x = side * rr.range(3.5, 34), zw = -k * CHUNK - rr.range(0, CHUNK);
+      if (!free(zw)) continue;
+      if (bio === 'lac') { // plaques de glace et fissures
+        const m = mesh(GEO.mound, iceSlab, false, true); m.scale.set(sx * 1.2, 0.06, sz * 1.2); m.rotation.y = ry; m.position.set(x, 0.01, zw); g.add(m);
+        const c = box(0.08, 0.02, sz * 2.4, crackMat, false); c.position.set(x + 1, 0.03, zw); c.rotation.y = ry + 0.7; g.add(c);
+        continue;
+      }
+      const m = mesh(GEO.mound, MAT.snow, false); m.scale.set(sx, sy, sz); m.rotation.y = ry; m.position.set(x, -0.05, zw); g.add(m);
+    }
+    if (bio === 'col') for (let i = 0; i < 3; i++) { // aiguilles rocheuses, au loin
+      const side = rr.chance(0.5) ? -1 : 1, x = side * rr.range(26, 42), zw = -k * CHUNK - rr.range(0, CHUNK), h = rr.range(4, 9);
+      if (!free(zw)) continue;
+      const r = mesh(GEO.cone, rockMat); r.scale.set(rr.range(2, 3.5), h, rr.range(2, 3.5)); r.position.set(x, h / 2 - 0.2, zw); r.rotation.y = rr.range(0, 3); g.add(r);
     }
     if (rr.chance(0.5)) { // poteau télégraphique penché
-      const p = box(0.18, 4.5, 0.18, FM.wood); p.position.set((rr.chance(0.5) ? -1 : 1) * 4.2, 2.1, -k * CHUNK - rr.range(0, CHUNK)); p.rotation.z = rr.range(-0.25, 0.25); g.add(p);
+      const zw = -k * CHUNK - rr.range(0, CHUNK);
+      if (free(zw)) { const p = box(0.18, 4.5, 0.18, FM.wood); p.position.set((rr.chance(0.5) ? -1 : 1) * 4.2, 2.1, zw); p.rotation.z = rr.range(-0.25, 0.25); g.add(p); }
     }
     for (const t of (chunk && chunk.trees) || []) {
       const h = 5.6 * t.s;
@@ -254,6 +279,7 @@ export function createScene(host, { onLost } = {}) {
       }
       tr.position.set(t.x, 0, t.zw); tr.rotation.y = t.r; g.add(tr);
     }
+    g.userData.src = chunk;
     return g;
   }
 
@@ -421,6 +447,81 @@ export function createScene(host, { onLost } = {}) {
     return { g, sled, rider, crate, cloth };
   }
 
+  // ---------------------------------------------------------------- le Brise-Glace : camion blindé des pillards, et ses grappins
+  const BM = { hull: F(M(0x5a1f1a), 0.35), plate: F(M(0x3b3f46, { metalness: 0.5, roughness: 0.5 }), 0.4), spike: M(0xb8bec7, { metalness: 0.7, roughness: 0.3 }) };
+  function buildBoss() {
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    const ch = box(2.6, 0.7, 6.4, MAT.dark); ch.position.y = 0.75; body.add(ch);
+    const bed = box(2.7, 1.5, 3.8, BM.hull); bed.position.set(0, 1.85, 1.1); body.add(bed);
+    const cab = box(2.5, 1.6, 2.0, BM.hull); cab.position.set(0, 1.9, -1.9); body.add(cab);
+    const win = box(2.2, 0.5, 0.05, RM.glass, false); win.position.set(0, 2.3, -2.92); body.add(win);
+    for (const sx of [-1, 1]) {
+      const pl = box(0.12, 1.2, 5.6, BM.plate); pl.position.set(sx * 1.42, 1.5, 0.2); body.add(pl);
+      for (let k = 0; k < 3; k++) { const w = mesh(GEO.wheel, MAT.dark); w.scale.setScalar(1.6); w.position.set(sx * 1.25, 0.65, -2.2 + k * 2.1); body.add(w); }
+    }
+    // éperon à l'avant, piques, phares, cheminée, drapeau
+    for (const sx of [-1, 1]) { const pw = box(1.9, 1.3, 0.2, BM.plate); pw.position.set(sx * 0.7, 0.8, -3.45); pw.rotation.y = sx * 0.55; body.add(pw); }
+    for (let k = 0; k < 5; k++) { const sp = mesh(GEO.cone, BM.spike, false); sp.scale.set(0.12, 0.6, 0.12); sp.rotation.x = -Math.PI / 2; sp.position.set(-1 + k * 0.5, 0.95, -3.75); body.add(sp); }
+    for (const sx of [-0.8, 0.8]) { const l = mesh(GEO.ball, MAT.lamp, false); l.scale.setScalar(0.6); l.position.set(sx, 1.5, -2.95); body.add(l); }
+    const st = mesh(GEO.cyl10, MAT.dark); st.scale.set(0.18, 1.6, 0.18); st.position.set(1.0, 3.2, -1.2); body.add(st);
+    const pole = box(0.06, 2.4, 0.06, MAT.dark, false); pole.position.set(-1.1, 3.6, 2.6); body.add(pole);
+    const flag = box(0.03, 0.7, 1.1, RM.scarf, false); flag.position.set(-1.1, 4.4, 3.1); body.add(flag);
+    const winch = mesh(GEO.cyl10, MAT.brass); winch.scale.set(0.35, 0.5, 0.35); winch.rotation.z = Math.PI / 2; winch.position.set(0, 2.8, 0.6); body.add(winch);
+    return { g, body, flag };
+  }
+  let boss = null;
+  const hooksM = new Map();
+  const cableMat = M(0x2b2b2e, { metalness: 0.6 });
+  const clawGeo = G(new THREE.TorusGeometry(0.22, 0.06, 5, 10, Math.PI * 1.3));
+  function buildHook() {
+    const g = new THREE.Group();
+    const claw = mesh(clawGeo, MAT.brass, false); claw.rotation.y = Math.PI / 2; g.add(claw);
+    const cable = mesh(GEO.box, cableMat, false, false); scene.add(cable);
+    const ring = mesh(GEO.ring, markMat, false, false); ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(0.95); ring.position.y = -0.7; g.add(ring);
+    return { g, cable };
+  }
+
+  // ---------------------------------------------------------------- pont de la gorge (repère du sol)
+  const chasmTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 256; const x = c.getContext('2d');
+    const gr = x.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, '#e9f0f7'); gr.addColorStop(0.08, '#7d8ea3'); gr.addColorStop(0.22, '#24303f'); gr.addColorStop(0.5, '#0b1018'); gr.addColorStop(0.78, '#24303f'); gr.addColorStop(0.92, '#7d8ea3'); gr.addColorStop(1, '#e9f0f7');
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 256);
+    const r = makeRng(17); for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(200,215,230,${r.range(0.04, 0.16)})`; x.fillRect(r.range(0, 64), r.range(40, 216), r.range(2, 10), r.range(1, 3)); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(30, 1); t.colorSpace = THREE.SRGBColorSpace; owned.tex.add(t); return t;
+  })();
+  const gorge = new THREE.Group(); gorge.visible = false; scene.add(gorge);
+  {
+    const cm = new THREE.MeshBasicMaterial({ map: chasmTex, fog: true }); owned.mat.add(cm);
+    const ch = mesh(GEO.plane, cm, false, false); ch.rotation.x = -Math.PI / 2; ch.scale.set(220, BRIDGE_LEN + 4, 1); ch.position.y = 0.03; gorge.add(ch);
+    // tablier en bois sous les rails, croisillons du pont, garde-corps
+    const deck = box(4.8, 0.1, BRIDGE_LEN + 4, FM.wood, false); deck.position.y = 0.05; gorge.add(deck);
+    for (let z = -BRIDGE_LEN / 2; z < BRIDGE_LEN / 2; z += 4) for (const sgn of [-1, 1]) {
+      const x = box(0.22, 0.04, 5.6, MAT.wood, false); x.position.set(sgn * 3.4, 0.045, z + 2); x.rotation.y = sgn * 0.7; gorge.add(x);
+    }
+    for (let z = -BRIDGE_LEN / 2; z <= BRIDGE_LEN / 2; z += 2.5) for (const sx of [-2.35, 2.35]) { const pst = box(0.1, 0.9, 0.1, FM.wood); pst.position.set(sx, 0.45, z); gorge.add(pst); }
+    for (const sx of [-2.35, 2.35]) { const rl = box(0.08, 0.08, BRIDGE_LEN + 4, FM.wood, false); rl.position.set(sx, 0.9, 0); gorge.add(rl); }
+    for (const sz of [-1, 1]) { const lip = box(220, 0.3, 1.4, MAT.snow, false); lip.position.set(0, 0.05, sz * (BRIDGE_LEN / 2 + 2.2)); gorge.add(lip); }
+  }
+
+  // ---------------------------------------------------------------- convoi abandonné sur sa voie de garage (repère du sol)
+  let wreck = null;
+  function buildWreck() {
+    const g = new THREE.Group(), x0 = -(HALF_W + 7.2);
+    const ballast = box(4, 0.1, 40, M(0x6f6a66), false); ballast.position.set(x0, 0.05, 0); g.add(ballast);
+    for (const sx of [-0.75, 0.75]) { const r = box(0.12, 0.14, 40, FM.rust, false); r.position.set(x0 + sx, 0.17, 0); g.add(r); }
+    [-11, 0, 11].forEach((o, i) => {
+      const w = new THREE.Group(); w.position.set(x0, 0, o); w.rotation.y = -(i - 1) * 0.06; w.rotation.z = (i - 1) * 0.05; g.add(w);
+      const chs = box(2.6, 0.5, 9.2, FM.dark); chs.position.y = 0.75; w.add(chs);
+      const bodyW = box(2.8, 2.1, 9.5, FM.rust); bodyW.position.y = 2.0; w.add(bodyW);
+      const roof = box(3.0, 0.2, 9.8, MAT.snow, false); roof.position.y = 3.15; w.add(roof);
+      for (let k = 0; k < 4; k++) { const wn = box(0.05, 0.6, 1.1, MAT.dark, false); wn.position.set(1.42, 2.3, -3.3 + k * 2.2); w.add(wn); }
+      for (const z of [-3.4, 3.4]) for (const sx of [-1.15, 1.15]) { const wh = mesh(GEO.wheel, MAT.dark); wh.position.set(sx, 0.45, z); w.add(wh); }
+      const drift = mesh(GEO.mound, MAT.snow, false); drift.scale.set(2.2, 0.8, 4); drift.position.set(1.6, 0, i * 2 - 2); w.add(drift);
+    });
+    return g;
+  }
+
   // ---------------------------------------------------------------- joueurs, loups et caisses
   const players = new Map();
   function labelTex(name, color) {
@@ -432,21 +533,37 @@ export function createScene(host, { onLost } = {}) {
     x.fillStyle = '#fff'; x.fillText(name, 136, 33);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   }
-  function makeCrate() {
+  // caisses : 1 fioul (orange), 2 charbon (noire, morceaux sur le dessus), 3 fioul pris dans la glace, 4 pièces détachées (métal, engrenage)
+  const coalBox = M(0x2c2d31, { roughness: 0.95 }), partsBox = M(0x7d848e, { metalness: 0.5, roughness: 0.45 });
+  const shellMat = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, emissive: 0x2a6fa8, emissiveIntensity: 0.35, roughness: 0.15, transparent: true, opacity: 0.55, flatShading: true }); owned.mat.add(shellMat);
+  const gearGeo = G(new THREE.TorusGeometry(0.13, 0.05, 5, 8));
+  function makeCrate(t = 1) {
     const g = new THREE.Group();
-    g.add(mesh(GEO.crate, MAT.crate));
-    const s = mesh(GEO.crate, MAT.stripe, false); s.scale.set(1.02, 0.18, 1.02); g.add(s);
-    const s2 = mesh(GEO.crate, MAT.stripe, false); s2.scale.set(0.18, 1.02, 1.03); g.add(s2);
+    if (t === 2) {
+      g.add(mesh(GEO.crate, coalBox));
+      for (let i = 0; i < 5; i++) { const l = mesh(GEO.ball, MAT.coal, false); l.scale.setScalar(0.45 + (i % 2) * 0.2); l.position.set(-0.14 + (i % 3) * 0.14, 0.27, -0.12 + (i >> 1) * 0.12); g.add(l); }
+      const s = mesh(GEO.crate, MAT.rust, false); s.scale.set(1.03, 0.14, 1.03); s.position.y = -0.1; g.add(s);
+    } else if (t === 4) {
+      g.add(mesh(GEO.crate, partsBox));
+      const s = mesh(GEO.crate, MAT.brass, false); s.scale.set(1.03, 0.14, 1.03); g.add(s);
+      const gear = mesh(gearGeo, MAT.brass, false); gear.position.set(0, 0.27, 0); gear.rotation.x = Math.PI / 2; g.add(gear);
+    } else {
+      g.add(mesh(GEO.crate, MAT.crate));
+      const s = mesh(GEO.crate, MAT.stripe, false); s.scale.set(1.02, 0.18, 1.02); g.add(s);
+      const s2 = mesh(GEO.crate, MAT.stripe, false); s2.scale.set(0.18, 1.02, 1.03); g.add(s2);
+      if (t === 3) { const sh = mesh(GEO.crate, shellMat, false, false); sh.scale.setScalar(1.35); g.add(sh); g.userData.shell = sh; }
+    }
+    g.userData.t = t;
     return g;
   }
   function buildPlayer(p) {
     const o = actors.survivor(p.color);
-    const crate = makeCrate(); crate.position.set(0, 2.15, 0.05); crate.visible = false; o.root.add(crate);
+    const held = [null, 1, 2, 3, 4].map((t) => { if (!t) return null; const c = makeCrate(t); c.position.set(0, 2.15, 0.05); c.visible = false; o.root.add(c); return c; });
     const tex = labelTex(p.name, p.color);
     const labMat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
     const label = new THREE.Sprite(labMat); label.scale.set(2.4, 0.6, 1); label.position.y = 2.85; label.renderOrder = 10; o.g.add(label);
     scene.add(o.g);
-    o.crate = crate; o.label = label; o.own.push(tex, labMat); o.name = p.name; o.color = p.color;
+    o.held = held; o.label = label; o.own.push(tex, labMat); o.name = p.name; o.color = p.color;
     return o;
   }
   const crates = new Map();
@@ -469,7 +586,7 @@ export function createScene(host, { onLost } = {}) {
   const focus = new THREE.Vector3(0, 0, 0);
   let camInit = false, wheelA = 0, lastSeed = null, lastDiff = null, shake = 0, gustK = 0, lastDrift = null;
   const v3 = new THREE.Vector3();
-  const fogC = new THREE.Color(FOG), fogG = new THREE.Color(FOG_GUST), fogS = new THREE.Color(0x8e99a8);
+  const fogC = new THREE.Color(FOG), fogG = new THREE.Color(FOG_GUST), fogS = new THREE.Color(0x8e99a8), fogN = new THREE.Color(FOG_NIGHT), bioFog = new THREE.Color(FOG), tmpC = new THREE.Color();
   const camLook = new THREE.Vector3(), cp = new THREE.Vector3(), cl = new THREE.Vector3();
   // intro : travelling le long du convoi, vers le front de tempête, puis retour à la vue de jeu
   function cinematic(k, gap) {
@@ -491,17 +608,28 @@ export function createScene(host, { onLost } = {}) {
   }
 
   function frame(view, dt) {
-    if (view.seed !== lastSeed || view.diff !== lastDiff) {
-      reset(); lastSeed = view.seed; lastDiff = view.diff;
-      ruins = new Ruins(view.seed, DIFFICULTY[view.diff]?.loot ?? 0.6);
+    const runKey = view.diff + ':' + view.mode + ':' + view.goal;
+    if (view.seed !== lastSeed || runKey !== lastDiff) {
+      reset(); lastSeed = view.seed; lastDiff = runKey;
+      ruins = new Ruins(view.seed, DIFFICULTY[view.diff]?.loot ?? 0.6, view.mode || 'endless', view.goal || 0);
     }
+    const legs = view.legs || ['plaine'];
+    ruins.setLegs(legs);
     const bl = view.diff === 'blizzard';
     const dist = view.dist;
     // bourrasque : brouillard plus épais et plus clair, flocons plus gros et plus rapides
     gustK += ((view.gust > 0 ? 1 : 0) - gustK) * Math.min(1, dt * 1.5);
     scene.fog.near = (bl ? 9 : 14) - gustK * 6; scene.fog.far = (bl ? 42 : 56) - gustK * 22;
-    scene.fog.color.copy(fogC).lerp(fogG, gustK); scene.background.copy(scene.fog.color);
+    // paysage du tronçon : teinte du sol et du brouillard, qui changent en douceur ; puis la nuit par-dessus
+    const look = BIO_LOOK[view.bio] || BIO_LOOK.plaine, kb = Math.min(1, dt * 0.8);
+    bioFog.lerp(tmpC.set(look.fog), kb); groundMat.color.lerp(tmpC.set(look.ground), kb); groundMat.roughness += (look.rough - groundMat.roughness) * kb;
+    const nk = view.night || 0;
+    scene.fog.color.copy(bioFog).lerp(fogG, gustK).lerp(fogN, nk * 0.88); scene.background.copy(scene.fog.color);
+    scene.fog.far -= nk * 8;
+    hemi.intensity = 1.05 * (1 - 0.7 * nk); hemi.color.copy(hemiDay).lerp(hemiNight, nk);
+    sun.intensity = 1.35 * (1 - 0.82 * nk); sun.color.copy(sunDay).lerp(sunNight, nk);
     snow.mat.size = (bl ? 0.26 : 0.2) + gustK * 0.14;
+    snow.mat.color.setRGB(1 - nk * 0.4, 1 - nk * 0.33, 1 - nk * 0.2);
     // caméra : suit le joueur local (ou le convoi)
     const fx = view.focus.x, fz = view.focus.z;
     if (!camInit) { focus.set(fx, 0, fz); camInit = true; }
@@ -533,8 +661,9 @@ export function createScene(host, { onLost } = {}) {
     fireMat.emissiveIntensity = (0.3 + 2.6 * f) * flick;
     fireLight.intensity = (4 + 34 * f) * flick;
     fire.scale.setScalar(0.4 + 0.6 * Math.min(1, f * 1.6));
-    beam.intensity = view.speed > 0.05 ? 45 : 18; coneMat.opacity = view.speed > 0.05 ? 0.1 : 0.05;
+    beam.intensity = (view.speed > 0.05 ? 45 : 18) * (1 + 0.8 * nk); coneMat.opacity = (view.speed > 0.05 ? 0.1 : 0.05) + 0.1 * nk;
     warmMat.opacity = view.fuel > 0 ? 0.1 + 0.07 * Math.sin(view.t * 3) : 0;
+    warmRing.scale.setScalar(view.warmR || WARM_R);
     // pression : la chaudière rougit, l'aiguille monte, la vapeur fuit ; manette selon le régime
     const pr = Math.max(0, Math.min(100, view.press || 0)) / 100;
     boilerMat.emissiveIntensity = pr > 0.6 ? (pr - 0.6) * 2.2 * (0.7 + 0.3 * Math.sin(view.t * (8 + pr * 14))) : 0;
@@ -587,10 +716,13 @@ export function createScene(host, { onLost } = {}) {
     const live = new Set(), liveK = new Set();
     for (const [k, c] of ruins.around(dist)) {
       liveK.add(k);
+      const mg = moundGroups.get(k);
+      if (mg && mg.userData.src !== c) { ruinsGroup.remove(mg); moundGroups.delete(k); }
       if (!moundGroups.has(k)) { const g = buildMounds(view.seed, k, c); moundGroups.set(k, g); ruinsGroup.add(g); }
       for (const r of c.ruins) {
         live.add(r.id);
         let g = ruinMeshes.get(r.id);
+        if (g && g.userData.src !== r) { ruinsGroup.remove(g); g = null; } // tronçon reconstruit (aiguillage)
         if (!g) { g = buildRuin(r); ruinMeshes.set(r.id, g); ruinsGroup.add(g); }
         const looted = view.looted.has(r.id);
         // détecteur (amélioration « radar ») : les ruines vides n'ont plus de lanterne
@@ -638,7 +770,7 @@ export function createScene(host, { onLost } = {}) {
       let m = flareMeshes.get(fl.id);
       if (!m) {
         m = new THREE.Group(); const stick = box(0.09, 0.5, 0.09, MAT.flare, false); stick.position.y = 0.3; stick.rotation.z = 0.3; m.add(stick);
-        const ring = mesh(GEO.ring, flareRingMat, false, false); ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(FLARE_R); ring.position.y = 0.06; m.add(ring);
+        const ring = mesh(GEO.ring, flareRingMat, false, false); ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(view.flareR || FLARE_R); ring.position.y = 0.06; m.add(ring);
         flareMeshes.set(fl.id, m); scene.add(m);
         burst(fl.x, fl.m === 1 ? DECK_Y + 0.5 : 0.5, fl.m === 0 ? fl.z + dist : fl.z, 8, 0.6, 4);
       }
@@ -653,8 +785,10 @@ export function createScene(host, { onLost } = {}) {
     for (const c of view.crates) {
       seen.add(c.id);
       let m = crates.get(c.id);
-      if (!m) { m = makeCrate(); crates.set(c.id, m); scene.add(m); }
+      if (m && m.userData.t !== (c.t || 1)) { scene.remove(m); m = null; } // dégelée : elle change d'aspect
+      if (!m) { m = makeCrate(c.t || 1); crates.set(c.id, m); scene.add(m); }
       m.position.set(c.x, c.y, c.m === 0 ? c.z + dist : c.z);
+      if (m.userData.shell) m.userData.shell.scale.setScalar(1.35 - (c.th || 0) * 0.3);
       m.rotation.y = (c.id * 0.7) % 3; if (c.m === 2) m.rotation.x += dt * 8;
     }
     for (const [id, m] of crates) if (!seen.has(id)) { scene.remove(m); crates.delete(id); }
@@ -665,10 +799,12 @@ export function createScene(host, { onLost } = {}) {
     if (stormG.visible) {
       stormG.position.set(focus.x, 0, gap);
       stormMats.forEach((m, i) => { m.map.offset.x = (view.t * (0.02 + i * 0.015) * (i % 2 ? -1 : 1)) % 1; });
-      flashT -= dt; if (flashT <= 0) { flashT = 2 + Math.random() * 5; stormLight.intensity = 260; } stormLight.intensity *= Math.exp(-dt * 9);
+      // le Front rugit : éclairs à répétition, ciel plus sombre
+      const roar = view.mm && view.mm.k === 'roar' && view.mm.t < 40 ? 1 : 0;
+      flashT -= dt; if (flashT <= 0) { flashT = roar ? 0.3 + Math.random() * 1.1 : 2 + Math.random() * 5; stormLight.intensity = 260; } stormLight.intensity *= Math.exp(-dt * 9);
       // plus il est proche, plus la lumière tombe et la neige s'épaissit
       const near = Math.max(0, Math.min(1, (70 - gap) / 60));
-      scene.fog.color.lerp(fogS, near * 0.6); scene.background.copy(scene.fog.color);
+      scene.fog.color.lerp(fogS, near * 0.6 + roar * 0.3); scene.background.copy(scene.fog.color);
       scene.fog.far -= near * 14; snow.mat.size += near * 0.1;
       if (near > 0.5) shake = Math.max(shake, (near - 0.5) * 0.15);
     }
@@ -699,6 +835,44 @@ export function createScene(host, { onLost } = {}) {
     }
     for (const [id, o] of raiders) if (!seenR.has(id)) { scene.remove(o.g); raiders.delete(id); }
 
+    // Brise-Glace et grappins
+    const bv = view.boss;
+    if (bv && !boss) { boss = buildBoss(); scene.add(boss.g); }
+    if (!bv && boss) { scene.remove(boss.g); boss = null; }
+    if (boss) {
+      boss.g.position.set(bv.x, 0, bv.z);
+      boss.flag.rotation.y = Math.sin(view.t * 8) * 0.3;
+      if (bv.st === 3) { boss.body.rotation.z += (0.5 * bv.side - boss.body.rotation.z) * Math.min(1, dt * 4); if (Math.random() < 0.3) burst(bv.x, 2.5, bv.z, 1, 1.5, 2); }
+      else { boss.body.rotation.z = Math.sin(view.t * 5) * 0.02; boss.body.position.y = Math.abs(Math.sin(view.t * 9)) * 0.05; if (Math.random() < 0.4) burst(bv.x - bv.side * 0.4, 0.4, bv.z + 3.2, 1, 1, 1.2); }
+    }
+    const seenH = new Set();
+    for (const h of view.hooks || []) {
+      seenH.add(h.id);
+      let o = hooksM.get(h.id);
+      if (!o) { o = buildHook(); hooksM.set(h.id, o); train.add(o.g); burst(h.x, DECK_Y + 0.8, h.z, 6, 0.5, 2); }
+      o.g.position.set(h.x, DECK_Y + 0.75, h.z);
+      o.g.rotation.z = Math.sin(view.t * 12 + h.id) * 0.08 * (1 - (h.prog || 0));
+      if (boss) {
+        const a = v3.set(bv.x - bv.side * 0.2, 2.9, bv.z + 0.6), b = new THREE.Vector3(h.x, DECK_Y + 0.75, h.z), len = a.distanceTo(b);
+        o.cable.visible = true; o.cable.position.copy(a).add(b).multiplyScalar(0.5); o.cable.lookAt(b); o.cable.scale.set(0.05, 0.05, len);
+      } else o.cable.visible = false;
+    }
+    for (const [id, o] of hooksM) if (!seenH.has(id)) { train.remove(o.g); scene.remove(o.cable); hooksM.delete(id); }
+
+    // pont de la gorge et convoi abandonné, à leur place sur la ligne
+    const mi = view.mi ?? 1;
+    let br = null, wk = null;
+    for (const L of [mi - 1, mi, mi + 1]) {
+      const m = momentOf(view.seed, view.mode, view.goal, legs, L); if (!m) continue;
+      if (m.k === 'bridge' && dist - m.d > -230 && dist - m.d - BRIDGE_LEN < 160) br = m;
+      if (m.k === 'wreck' && Math.abs(dist - m.d) < 190) wk = m;
+    }
+    gorge.visible = !!br;
+    if (br) gorge.position.z = dist - br.d - BRIDGE_LEN / 2;
+    if (wk && (!wreck || wreck.d !== wk.d)) { if (wreck) scene.remove(wreck.g); wreck = { d: wk.d, g: buildWreck() }; scene.add(wreck.g); }
+    if (!wk && wreck) { scene.remove(wreck.g); wreck = null; }
+    if (wreck) wreck.g.position.z = dist - wreck.d;
+
     // loups (positions du sol → repère du train)
     const seenW = new Set();
     for (const w of view.wolves) {
@@ -724,7 +898,8 @@ export function createScene(host, { onLost } = {}) {
       o.g.position.set(p.x, p.y, p.z);
       o.g.rotation.y = p.st === 2 ? Math.PI : p.yaw; // dos à la caméra sur l'échelle
       actors.poseSurvivor(o, p, view.t, dt);
-      o.crate.visible = !!p.carry;
+      for (let t = 1; t <= 4; t++) o.held[t].visible = p.carry === t;
+      if (p.carry === 3) o.held[3].userData.shell.scale.setScalar(1.35 - (p.cth || 0) * 0.3);
       o.label.material.opacity = p.me ? 0.75 : 1;
     }
     for (const id of [...players.keys()]) if (!seenP.has(id)) dropPlayer(id);
@@ -752,6 +927,10 @@ export function createScene(host, { onLost } = {}) {
     for (const m of flareMeshes.values()) scene.remove(m); flareMeshes.clear();
     for (const o of raiders.values()) scene.remove(o.g); raiders.clear();
     for (const g of faultMeshes.values()) train.remove(g); faultMeshes.clear();
+    for (const o of hooksM.values()) { train.remove(o.g); scene.remove(o.cable); } hooksM.clear();
+    if (boss) { scene.remove(boss.g); boss = null; }
+    if (wreck) { scene.remove(wreck.g); wreck = null; }
+    gorge.visible = false;
     for (const id of [...players.keys()]) dropPlayer(id);
     driftG.visible = false; lastDrift = null; camInit = false;
   }

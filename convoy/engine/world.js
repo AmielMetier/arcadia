@@ -25,21 +25,47 @@ export const DECK_BOXES = [
 
 export const CHUNK = 36;            // longueur d'un tronçon de plaine (m)
 
+// Ambiances : chaque tronçon entre deux gares traverse un paysage qui change les règles du jeu.
+// ruins / trees : nombre de ruines et de sapins par tronçon ; wolves, raid (écart entre deux raids), cold : multiplicateurs ;
+// ev : poids des événements de voie ; loot : poids des types de caisses ; moments : poids des moments forts ;
+// kinds : poids des types de ruines (null = ceux de la plaine) ; ice : sol glissant qui craque.
+export const BIOMES = {
+  plaine: { icon: '❄️', label: 'Plaine gelée', desc: 'Ruines éparses, un peu de tout.', ruins: [1, 3], trees: [2, 6], wolves: 1, raid: 1, cold: 1,
+    ev: { drift: 45, aval: 30, gust: 25 }, loot: { fuel: 62, coal: 18, ice: 14, parts: 6 }, moments: { wreck: 40, boss: 35, roar: 25 }, kinds: null },
+  foret: { icon: '🌲', label: 'Forêt noire', desc: 'À l\'abri du vent, du charbon de bois… et des loups partout.', ruins: [0, 2], trees: [9, 15], wolves: 2.2, raid: 1.4, cold: 0.8,
+    ev: { drift: 60, aval: 10, gust: 30 }, loot: { coal: 48, fuel: 38, ice: 6, parts: 8 }, moments: { roar: 50, wreck: 50 },
+    kinds: [['house', 30], ['hulk', 35], ['depot', 15], ['pylon', 10], ['platform', 10]] },
+  ville: { icon: '🏚️', label: 'Ville en ruine', desc: 'Des ruines à perte de vue, des pièces détachées… et les pillards.', ruins: [2, 4], trees: [0, 3], wolves: 0.6, raid: 0.55, cold: 1,
+    ev: { drift: 40, aval: 20, gust: 40 }, loot: { fuel: 52, parts: 20, coal: 14, ice: 14 }, moments: { boss: 70, wreck: 30 },
+    kinds: [['house', 40], ['depot', 25], ['platform', 15], ['hulk', 12], ['silo', 8]] },
+  lac: { icon: '🧊', label: 'Lac gelé', desc: 'Ça glisse, et la glace craque si l\'on reste planté. Beaucoup de caisses gelées.', ruins: [0, 2], trees: [0, 2], wolves: 0.8, raid: 1, cold: 1.2, ice: true,
+    ev: { drift: 20, aval: 0, gust: 80 }, loot: { ice: 50, fuel: 36, coal: 8, parts: 6 }, moments: { bridge: 60, boss: 40 },
+    kinds: [['hulk', 55], ['platform', 20], ['pylon', 25]] },
+  col: { icon: '⛰️', label: 'Col des Glaces', desc: 'Grand froid et avalanches, mais du charbon dans les vieilles mines.', ruins: [1, 3], trees: [1, 4], wolves: 1, raid: 1.5, cold: 1.3,
+    ev: { drift: 30, aval: 55, gust: 15 }, loot: { coal: 45, fuel: 35, ice: 14, parts: 6 }, moments: { bridge: 55, roar: 45 },
+    kinds: [['temple', 30], ['pylon', 25], ['silo', 25], ['hulk', 20]] },
+};
+export const BIOME_KEYS = Object.keys(BIOMES);
+
 // Ruines d'un tronçon k (zw dans [-(k+1)·CHUNK, -k·CHUNK]). Déterministe : même graine → mêmes ruines partout.
 // Chaque ruine : morceaux solides (boîtes de collision), butin (caisses), ferraille, point de fouille côté voie.
 // Un morceau dont la matière commence par « model: » est dessiné avec un modèle 3D (Kenney, CC0) ajusté à sa boîte.
+// env : { bio, clear: [d0, d1] } — l'ambiance du tronçon, et une portion de voie à laisser vide (pont, convoi abandonné).
 const KINDS = [['house', 30], ['depot', 12], ['hulk', 18], ['temple', 11], ['pylon', 9], ['silo', 8], ['platform', 10]];
-export function chunkRuins(seed, k, lootRate) {
+export function chunkRuins(seed, k, lootRate, env = {}) {
+  const B = BIOMES[env.bio] || BIOMES.plaine;
+  const clear = env.clear || null;
+  const cleared = (zw, m = 10) => clear && -zw > clear[0] - m && -zw < clear[1] + m;
   const rng = makeRng(hash(seed ^ Math.imul(k + 1, 0x9e3779b1)));
   const out = [];
-  const n = k < 0 ? 0 : rng.int(1, 3);
+  const n = k < 0 ? 0 : rng.int(B.ruins[0], B.ruins[1]);
   for (let j = 0; j < n; j++) {
     const side = rng.chance(0.5) ? -1 : 1;
     const x = side * rng.range(10.5, 24);
     const zw = -k * CHUNK - rng.range(5, CHUNK - 5);
     // camp de ravitaillement abandonné : rare, mais plein (3 caisses et de la ferraille)
     const camp = k > 2 && j === 0 && rng.chance(0.07);
-    const kind = camp ? 'camp' : rng.weighted(KINDS);
+    const kind = camp ? 'camp' : rng.weighted(B.kinds || KINDS);
     const rot = rng.range(-0.5, 0.5);
     const id = k * 8 + j;
     // une ruine trop proche d'une autre dans le même tronçon est sautée
@@ -47,19 +73,22 @@ export function chunkRuins(seed, k, lootRate) {
     const pieces = buildPieces(kind, rng);
     const loot = camp ? 3 : rng.chance(lootRate) ? (rng.chance(0.25) ? 2 : 1) : 0;
     const scrap = camp ? 3 : (kind === 'depot' || kind === 'hulk' ? 1 : 0) + (rng.chance(0.45) ? 1 : 0);
+    if (cleared(zw, 14)) continue;
     // point de fouille : côté voie, hors des murs (les caisses trouvées y tombent, accessibles)
     out.push({ id, k, kind, x, zw, rot, pieces, loot, scrap, side, spot: { x: x - side * 5.2, zw }, seed: hash(id + seed) });
   }
   // caisse tombée d'un convoi précédent, parfois, au bord des rails
-  const loose = rng.chance(lootRate * 0.45) ? { x: (rng.chance(0.5) ? -1 : 1) * rng.range(3.4, 12), zw: -k * CHUNK - rng.range(3, CHUNK - 3) } : null;
+  let loose = rng.chance(lootRate * 0.45) ? { x: (rng.chance(0.5) ? -1 : 1) * rng.range(3.4, 12), zw: -k * CHUNK - rng.range(3, CHUNK - 3) } : null;
+  if (loose && cleared(loose.zw)) loose = null;
   // sapins enneigés (solides : on les contourne), jamais sur la voie ni sur une ruine
   const trees = [];
-  if (k >= -2) for (let i = rng.int(2, 6); i > 0; i--) {
+  if (k >= -2) for (let i = rng.int(B.trees[0], B.trees[1]); i > 0; i--) {
     const tx = (rng.chance(0.5) ? -1 : 1) * rng.range(5.5, 34), tz = -k * CHUNK - rng.range(0, CHUNK);
-    if (out.some((r) => Math.hypot(r.x - tx, r.zw - tz) < 8 || Math.hypot(r.spot.x - tx, r.spot.zw - tz) < 3)) continue;
-    trees.push({ x: tx, zw: tz, s: rng.range(0.8, 1.5), r: rng.range(0, 6.28) });
+    const s = rng.range(0.8, 1.5), r = rng.range(0, 6.28);
+    if (cleared(tz) || out.some((q) => Math.hypot(q.x - tx, q.zw - tz) < 8 || Math.hypot(q.spot.x - tx, q.spot.zw - tz) < 3)) continue;
+    trees.push({ x: tx, zw: tz, s, r });
   }
-  return { ruins: out, loose, trees };
+  return { ruins: out, loose, trees, bio: env.bio || 'plaine', clear };
 }
 
 // Morceaux d'une ruine dans son repère local (dx, dz, largeur w, profondeur d, hauteur h, rotation r, matière m).

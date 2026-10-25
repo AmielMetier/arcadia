@@ -15,6 +15,7 @@
 <div id="hud" hidden>
   <div class="frost" id="frost"></div>
   <div class="flash" id="flash"></div>
+  <div class="night" id="night"></div>
   <div class="stormfx" id="stormfx"></div>
   <div class="topc">
     <div class="fuel card" id="fuelBox">
@@ -27,7 +28,9 @@
       <div class="rt"><i id="routeFill"></i><span id="routeTicks"></span><u id="routeTrain">🚂</u></div>
       <div class="rl" id="routeTxt"></div>
       <div class="storm" id="stormBox" title="Avance sur le front de tempête"><span>🌪️ FRONT</span><div class="sb"><i id="stormBar"></i></div><b id="stormTxt">90 m</b></div>
+      <div class="bio"><span id="bioTxt" title="Paysage du tronçon et moment fort à venir"></span><span class="day" id="dayTxt" title="Jour et nuit : temps avant le prochain changement"></span></div>
     </div>
+    <div class="boss card" id="bossBox" hidden><b>🚛 LE BRISE-GLACE</b><div class="bb"><i id="bossBar"></i></div><span id="bossTxt"></span></div>
   </div>
   <div class="stats card"><span title="Distance parcourue"><small>DISTANCE</small><b id="distTxt">0 m</b></span><span title="Temps"><small>TEMPS</small><b id="clockTxt">0:00</b></span><span title="Caisses brûlées"><small>FIOUL</small><b id="crateTxt">0</b></span><span title="Ferraille commune (améliorations en gare)"><small>FERRAILLE</small><b id="scrapTxt">0</b></span><span title="Solidité du convoi (réparé en gare)" id="hullBox"><small>CONVOI</small><b id="hullTxt">100 %</b></span></div>
   <div class="tr"><button class="icon card" id="btnMute" title="Son (M)">🔊</button><button class="icon card" id="btnMenu" title="Menu (Échap)">☰</button></div>
@@ -38,7 +41,8 @@
   <div class="tracker" id="tracker" hidden><i>▲</i><span></span></div>
   <div class="pops" id="pops"></div>
   <div class="toast" id="toast" hidden></div>
-  <div class="help card" id="help"><b>ZQSD</b> bouger · <b>Espace</b> sauter · <b>E</b> fouiller / prendre / chaudière / pelle · <b>F</b> lancer · <b>G</b> fusée · <b>1-5</b> / <b>V</b> en gare<br>À bord : <b>E</b> manette (cabine), soupape (devant la chaudière), réparations</div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="help card" id="help"><b>ZQSD</b> bouger · <b>Espace</b> sauter · <b>E</b> fouiller / prendre / chaudière / pelle · <b>F</b> lancer · <b>G</b> fusée · en gare : <b>1-3</b> cartes, <b>4-5</b> aiguillage, <b>V</b> départ<br>À bord : <b>E</b> manette (cabine), soupape (devant la chaudière), réparations, grappins</div>
   <div class="tbtns" id="tbtns"><button data-a="fl">🎆<small>Fusée</small></button><button data-a="jump">⤒<small>Sauter</small></button><button data-a="use">✋<small>Agir</small></button><button data-a="thr">➶<small>Lancer</small></button></div>
 </div>
 

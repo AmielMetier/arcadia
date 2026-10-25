@@ -1,6 +1,7 @@
 // Convoy Storm — HUD (DOM) et écrans : briefing, menu, fin de partie, connexion perdue.
 // Les écrans sont reconstruits par innerHTML : leurs boutons disparaissent avec eux, aucun écouteur ne traîne.
-import { REAR, DECK_Y, LOST_DIST, DIFFICULTY, MODES, UPGRADES, UPG_KEYS, STATION_NAMES, THROTTLE, STORM_MAX, stationDist, personalScore } from '../engine/sim.js';
+import { REAR, DECK_Y, LOST_DIST, DIFFICULTY, MODES, CARDS, STATION_NAMES, THROTTLE, STORM_MAX, stationDist, personalScore, cardCost,
+  ROLES, BIOMES, MOMENTS, momentKind, BRIDGE_LEN } from '../engine/sim.js';
 
 const $ = (s) => document.querySelector(s);
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -12,15 +13,18 @@ export class HUD {
   constructor() {
     this.root = $('#hud'); this.el = {};
     for (const id of ['fuelBox', 'fuelBar', 'fuelTxt', 'burnTxt', 'speedTxt', 'distTxt', 'clockTxt', 'crateTxt', 'scrapTxt', 'team', 'prompt', 'tracker', 'pops', 'toast',
-      'routeFill', 'routeTicks', 'routeTrain', 'routeTxt', 'mechBox', 'pressBar', 'pressTxt', 'thrTxt', 'stormBox', 'stormBar', 'stormTxt', 'hullBox', 'hullTxt', 'stormfx', 'vitals', 'heatBar', 'heatTxt', 'flareTxt', 'station', 'frost', 'flash'])
+      'routeFill', 'routeTicks', 'routeTrain', 'routeTxt', 'mechBox', 'pressBar', 'pressTxt', 'thrTxt', 'stormBox', 'stormBar', 'stormTxt', 'hullBox', 'hullTxt', 'stormfx', 'vitals', 'heatBar', 'heatTxt', 'flareTxt', 'station', 'frost', 'flash',
+      'dayTxt', 'bioTxt', 'bossBox', 'bossBar', 'bossTxt', 'banner', 'night'])
       this.el[id] = document.getElementById(id);
-    this.teamKey = ''; this.toastT = 0; this.last = {}; this.flashT = 0;
-    this.onBuy = null; this.onVote = null;
+    this.teamKey = ''; this.toastT = 0; this.last = {}; this.flashT = 0; this.bannerT = 0;
+    this.onBuy = null; this.onVote = null; this.onRoute = null;
     // boutons du panneau de gare (délégation : le contenu est reconstruit, l'écouteur reste)
     this.el.station.addEventListener('pointerdown', (e) => {
       const b = e.target.closest('button'); if (!b) return;
       e.preventDefault(); e.stopPropagation();
-      if (b.dataset.k) this.onBuy && this.onBuy(b.dataset.k); else if (b.dataset.vote != null) this.onVote && this.onVote();
+      if (b.dataset.k) this.onBuy && this.onBuy(b.dataset.k);
+      else if (b.dataset.r != null) this.onRoute && this.onRoute(+b.dataset.r);
+      else if (b.dataset.vote != null) this.onVote && this.onVote();
     });
   }
   show(on) { this.root.hidden = !on; }
@@ -51,11 +55,32 @@ export class HUD {
     E.stormBox.classList.toggle('near', g < 60); E.stormBox.classList.toggle('close', g < 25);
     set(E.hullTxt, Math.max(0, Math.round(v.hull)) + ' %'); E.hullBox.classList.toggle('low', v.hull < 40);
 
+    // jour et nuit, ambiance du tronçon et moment fort qui approche, Brise-Glace
+    const D = v.day || { night: false, left: 0 };
+    set(E.dayTxt, `${D.night ? '🌙 nuit' : '☀️ jour'} ${fmtT(Math.max(0, D.left))}`);
+    E.night.style.opacity = ((v.night || 0) * 0.42).toFixed(2);
+    const B = BIOMES[v.bio] || BIOMES.plaine, M = v.moment;
+    let mt = '';
+    if (M && !v.calm) {
+      const I = MOMENTS[M.k], d = M.d - v.dist;
+      if (M.on && M.k === 'roar') mt = (M.t || 0) < 40 ? `${I.icon} Le Front rugit !` : `${I.icon} Le Front s'essouffle`;
+      else if (M.on && M.k === 'boss') mt = `${I.icon} ${I.label} !`;
+      else if (M.on && M.k === 'bridge' && d < 0) mt = `${I.icon} Sur le pont`;
+      else if (d < 450 && d > 0) mt = `${I.icon} ${I.label} · ${fmtM(d)}`;
+    }
+    const bt = `${B.icon} ${B.label}${mt ? ` <em>${mt}</em>` : ''}`;
+    if (bt !== this.last.bio) { this.last.bio = bt; E.bioTxt.innerHTML = bt; }
+    const bo = v.boss && v.boss.st < 3 ? v.boss : null;
+    E.bossBox.hidden = !bo;
+    if (bo) { E.bossBar.style.width = (Math.max(0, bo.hp) / bo.hm * 100).toFixed(0) + '%'; set(E.bossTxt, `${'■'.repeat(Math.max(0, bo.hp))}${'□'.repeat(Math.max(0, bo.hm - bo.hp))} · ${v.hooks.length} grappin${v.hooks.length > 1 ? 's' : ''}`); }
+    if (this.bannerT > 0) { this.bannerT -= dt; if (this.bannerT <= 0) E.banner.hidden = true; }
+
     // équipe (chaleur de chacun)
     const rows = v.players.map((p) => {
       const tag = p.st === 3 ? ['lost', p.heat <= 0.5 ? 'gelé…' : 'perdu…'] : p.st === 2 ? ['', 'remonte'] : !p.on ? ['off', p.z > REAR ? `${Math.round(p.z - REAR)} m derrière` : 'dans la neige'] : ['', p.carry ? '📦 à bord' : 'à bord'];
       const h = Math.round(Math.max(0, Math.min(100, p.heat ?? 100)) / 10) * 10;
-      return `<div class="mate ${tag[0]} ${h < 30 ? 'cold' : ''}" style="--c:${esc(p.color)};--h:${h}%"><span class="nm">${esc(p.name)}${p.me ? ' (toi)' : ''}</span><em>${p.carry && tag[1] !== '📦 à bord' ? '📦 ' : ''}${tag[1]}</em><s></s></div>`;
+      const R = ROLES[p.role] || ROLES[0];
+      return `<div class="mate ${tag[0]} ${h < 30 ? 'cold' : ''}" style="--c:${esc(p.color)};--h:${h}%"><span class="nm" title="${esc(R.label)}">${R.icon} ${esc(p.name)}${p.me ? ' (toi)' : ''}</span><em>${p.carry && tag[1] !== '📦 à bord' ? '📦 ' : ''}${tag[1]}</em><s></s></div>`;
     }).join('');
     if (rows !== this.teamKey) { this.teamKey = rows; E.team.innerHTML = rows; }
 
@@ -126,26 +151,49 @@ export class HUD {
     set(E.routeTxt, txt);
   }
 
-  // panneau de gare : améliorations (achetées avec la ferraille commune) et départ à l'unanimité
+  // panneau de gare : trois cartes (la première offerte), l'aiguillage, le départ à l'unanimité ; au convoi abandonné, le départ seul
   stationPanel(v) {
     const E = this.el, s = v.stop;
-    if (!s || s.k !== 'station' || v.phase !== 'play') { E.station.hidden = true; this.last.st = ''; return; }
+    if (!s || (s.k !== 'station' && s.k !== 'wreck') || v.phase !== 'play') { E.station.hidden = true; this.last.st = ''; return; }
     E.station.hidden = false;
     const n = v.players.length, votes = (s.v || []).length, mine = (s.v || []).includes(v.meId);
-    const rows = UPG_KEYS.map((k, i) => {
-      const U = UPGRADES[k], l = v.up[k] | 0, max = U.cost.length, c = U.cost[l];
-      const pips = Array.from({ length: max }, (_, j) => `<i class="${j < l ? 'on' : ''}"></i>`).join('');
-      return `<button data-k="${k}" class="${l >= max ? 'max' : v.scrap >= c ? '' : 'poor'}" ${l >= max ? 'disabled' : ''} title="${esc(U.desc)}">`
+    const go = `<button class="go ${mine ? 'on' : ''}" data-vote>${mine ? '✔ Prêt' : s.k === 'wreck' ? 'Repartir' : 'Prêt à partir'} <kbd>V</kbd> <em>${votes}/${n}</em></button>`;
+    if (s.k === 'wreck') {
+      const html = `<div class="sh"><b>🚃 Convoi abandonné</b><span>départ dans ${Math.max(0, Math.ceil(s.t))} s</span></div>`
+        + `<p class="wk">Des caisses attendent le long du vieux train, côté gauche. Le Front, lui, ne s'arrête pas.</p>` + go;
+      if (html !== this.last.st) { this.last.st = html; E.station.innerHTML = html; }
+      return;
+    }
+    const cards = (s.c || []).map((k, i) => {
+      const U = CARDS[k], l = v.up[k] | 0, taken = s.b && s.b[i], c = s.f ? 0 : cardCost(k, l);
+      const pips = U.max > 1 ? `<span class="lv">${Array.from({ length: U.max }, (_, j) => `<i class="${j < l ? 'on' : ''}"></i>`).join('')}</span>` : '<span></span>';
+      const cls = taken ? 'max' : v.scrap >= c ? (s.f ? 'free' : '') : 'poor';
+      return `<button data-k="${k}" class="${cls}" ${taken ? 'disabled' : ''} title="${esc(U.desc)}">`
         + `<kbd>${i + 1}</kbd><span class="ic">${U.icon}</span><span class="tx"><b>${esc(U.label)}</b><small>${esc(U.desc)}</small></span>`
-        + `<span class="lv">${pips}</span><span class="co">${l >= max ? 'MAX' : `⚙️ ${c}`}</span></button>`;
+        + `${pips}<span class="co">${taken ? 'PRISE' : s.f ? 'OFFERTE' : `⚙️ ${c}`}</span></button>`;
     }).join('');
+    let fork = '';
+    if (s.fk) {
+      const rv = s.rv || [], my = rv.find((x) => x[0] === v.meId);
+      fork = `<div class="fk"><h3>🔀 Aiguillage · prochain tronçon</h3>` + s.fk.map((b, i) => {
+        const B = BIOMES[b], M = MOMENTS[momentKind(v.seed, s.i + 1, b)], nv = rv.filter((x) => x[1] === i).length;
+        return `<button data-r="${i}" class="${my && my[1] === i ? 'sel' : ''}"><kbd>${i + 4}</kbd><span class="ic">${B.icon}</span>`
+          + `<span class="tx"><b>${esc(B.label)}</b><small>${esc(B.desc)}</small><small class="mo">${M.icon} ${esc(M.label)}</small></span><em>${nv ? '●'.repeat(nv) : ''}</em></button>`;
+      }).join('') + '</div>';
+    }
     const html = `<div class="sh"><b>🚉 ${esc(stName(s.i))}</b><span>départ dans ${Math.max(0, Math.ceil(s.t))} s</span></div>`
-      + `<div class="sc">Ferraille commune : <b>⚙️ ${v.scrap | 0}</b></div>`
-      + `<div class="ups">${rows}</div>`
-      + `<button class="go ${mine ? 'on' : ''}" data-vote>${mine ? '✔ Prêt' : 'Prêt à partir'} <kbd>V</kbd> <em>${votes}/${n}</em></button>`;
+      + `<div class="sc">Ferraille commune : <b>⚙️ ${v.scrap | 0}</b>${s.f ? ' · <span class="gift">🎁 une carte offerte</span>' : ''}</div>`
+      + `<div class="ups">${cards}</div>` + fork + go;
     if (html !== this.last.st) { this.last.st = html; E.station.innerHTML = html; }
   }
 
+  // grand titre au centre de l'écran (nouveau paysage, moment fort)
+  banner(title, sub, sec = 3.2) {
+    const E = this.el;
+    E.banner.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+    E.banner.hidden = false; E.banner.classList.remove('in'); void E.banner.offsetWidth; E.banner.classList.add('in');
+    this.bannerT = sec;
+  }
   flash() { this.flashT = 0.35; }
   toast(txt, sec = 2.5) { this.el.toast.textContent = txt; this.el.toast.hidden = false; this.toastT = sec; }
   pop(txt, sx, sy, cls = '') {
@@ -160,7 +208,7 @@ const set = (el, t) => { if (el.textContent !== t) el.textContent = t; };
 // ------------------------------------------------------------------ écrans
 const seg = (key, entries, cur) => `<div class="seg">${entries.map(([k, label]) => `<button data-k="${key}" data-v="${k}" class="${cur === k ? 'sel' : ''}">${esc(label)}</button>`).join('')}</div>`;
 
-export function briefingHtml({ role, squad, cfg, embedded }) {
+export function briefingHtml({ role, squad, cfg, embedded, myRole = -1 }) {
   const host = role !== 'guest', edit = host && !embedded;
   const diffSeg = edit ? seg('difficulty', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.label]), cfg.difficulty) : `<b class="val">${esc(DIFFICULTY[cfg.difficulty].label)}</b>`;
   const modeSeg = edit ? seg('mode', Object.entries(MODES).map(([k, m]) => [k, m.label]), cfg.mode) : `<b class="val">${esc(MODES[cfg.mode].label)}</b>`;
@@ -169,7 +217,7 @@ export function briefingHtml({ role, squad, cfg, embedded }) {
     <h1>CONVOY <span>STORM</span></h1>
     <p class="lead">Le blizzard ne s'arrête jamais. Le convoi non plus — tant que la chaudière a du fioul et que l'équipage tient le froid.</p>
     <div class="rules">
-      <div><b class="t">🔥 Chaudière</b>Une caisse de fioul = +25 %. À 0 %, le convoi s'arrête pour de bon. Sa chaleur te réchauffe.</div>
+      <div><b class="t">🔥 Chaudière</b>Fioul +25 %, charbon +45 % (lourd), fioul gelé à dégeler près du feu, pièces = ferraille. À 0 %, c'est la panne.</div>
       <div><b class="t">🏚️ Ruines</b>Saute du train, cours aux lanternes, maintiens <kbd>E</kbd> : fioul et ferraille.</div>
       <div><b class="t">📦 Caisses</b><kbd>E</kbd> prendre, <kbd>F</kbd> lancer : sur le wagon, à un équipier ou dans le foyer.</div>
       <div><b class="t">🥶 Froid</b>Dehors, ta chaleur baisse. À zéro tu t'effondres : reviens près du feu à temps.</div>
@@ -179,14 +227,19 @@ export function briefingHtml({ role, squad, cfg, embedded }) {
       <div><b class="t">♨️ À bord</b>Lâchez la vapeur à la soupape avant l'explosion, dégelez les tuyaux, colmatez les fuites (<kbd>E</kbd> maintenu).</div>
       <div><b class="t">🏴 Pillards</b>En motoneige, ils volent les caisses du pont et sabotent le convoi. Renversez-les (<kbd>E</kbd> au bord) ou visez-les.</div>
       <div><b class="t">⛔ Voie</b>Congères à déblayer (<kbd>E</kbd> devant la loco), avalanches, bourrasques…</div>
-      <div><b class="t">🚉 Gares</b>Fioul, chaleur, fusées. La ferraille achète des améliorations (<kbd>1</kbd>–<kbd>5</kbd>), <kbd>V</kbd> pour repartir.</div>
+      <div><b class="t">🚉 Gares</b>Le Front y ralentit. Trois cartes d'amélioration (<kbd>1</kbd>–<kbd>3</kbd>, la première offerte), <kbd>V</kbd> pour repartir.</div>
+      <div><b class="t">🔀 Aiguillage</b>En gare, votez la voie suivante (<kbd>4</kbd> <kbd>5</kbd>) : forêt, ville, lac gelé, col… chacune a ses règles.</div>
+      <div><b class="t">🌙 Nuit</b>Les loups sont plus nombreux et voient plus loin, le froid mord ; les pillards, eux, se terrent.</div>
+      <div><b class="t">⚡ Moments forts</b>Le Brise-Glace, un pont fragile (en Éco !), un convoi abandonné, le Front qui rugit…</div>
     </div>
     <div class="opts">
       <div><h2>Mode</h2>${modeSeg}<p class="hint">${cfg.mode === 'expedition' ? `Rallier Fort-Givre à ${fmtM(goal)}, trois gares en chemin.` : esc(MODES.endless.desc)}</p></div>
       <div><h2>Difficulté</h2>${diffSeg}</div>
     </div>
+    <h2>Ton rôle</h2>${seg('role', ROLES.map((r, i) => [String(i), `${r.icon} ${r.label}`]), String(myRole))}
+    <p class="hint">${myRole >= 0 ? esc(ROLES[myRole].desc) : 'Choisis un talent ; sinon tu prendras celui qui manque à l\'équipage.'}</p>
     <h2>Équipage</h2>
-    <div class="squad">${squad.map((p) => `<span class="${p.ready ? '' : 'wait'}" style="--c:${esc(p.color)}"><i></i>${esc(p.name)}${p.me ? ' (toi)' : ''}</span>`).join('')}</div>
+    <div class="squad">${squad.map((p) => `<span class="${p.ready ? '' : 'wait'}" style="--c:${esc(p.color)}"><i></i>${p.role >= 0 ? ROLES[p.role].icon + ' ' : ''}${esc(p.name)}${p.me ? ' (toi)' : ''}</span>`).join('')}</div>
     <div class="row end">
       <small class="cred">Modèles 3D : Kenney (CC0)</small>
       ${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}
@@ -203,7 +256,7 @@ export function menuHtml({ muted, solo }) {
 }
 
 export function endHtml({ snap, canReplay, embedded, reason }) {
-  const ps = snap.P.map((a) => ({ id: a[0], fed: a[17], found: a[18], falls: a[19], bites: a[25] | 0 }));
+  const ps = snap.P.map((a) => ({ id: a[0], fed: a[17], found: a[18], falls: a[19], bites: a[25] | 0, role: a[27] | 0 }));
   const names = new Map(snap.N.map(([id, n, c]) => [id, { n, c }]));
   ps.sort((a, b) => personalScore(b) - personalScore(a));
   const win = !!snap.wn && reason !== 'host';
@@ -218,8 +271,9 @@ export function endHtml({ snap, canReplay, embedded, reason }) {
     <h1>${title}</h1><p>${sub}</p>
     <div class="big-num">${win ? fmtT(snap.t) : fmtM(snap.d)}</div>
     <p>${win ? `<b>${fmtM(snap.d)}</b>` : `<b>${fmtT(snap.t)}</b> de route`} · <b>${snap.ft}</b> caisse${snap.ft > 1 ? 's' : ''} brûlée${snap.ft > 1 ? 's' : ''} · ${snap.ns | 0} gare${(snap.ns | 0) > 1 ? 's' : ''} · ${esc(MODES[snap.mo]?.label || '')} <b>${esc(DIFFICULTY[snap.df]?.label || '')}</b></p>
+    <p class="legs">${(snap.lg || ['plaine']).map((b) => `${BIOMES[b]?.icon || ''} ${esc(BIOMES[b]?.label || '')}`).join(' → ')}</p>
     ${ps.length ? `<table class="res"><thead><tr><th>#</th><th>CHAUFFEUR</th><th>BRÛLÉES</th><th>TROUVÉES</th><th>CHUTES</th><th>MORSURES</th></tr></thead><tbody>
-      ${ps.map((p, k) => { const nm = names.get(p.id) || { n: '?', c: '#888' }; return `<tr><td>${k + 1}</td><td><i style="background:${esc(nm.c)}"></i>${esc(nm.n)}</td><td>${p.fed}</td><td>${p.found}</td><td>${p.falls}</td><td>${p.bites}</td></tr>`; }).join('')}
+      ${ps.map((p, k) => { const nm = names.get(p.id) || { n: '?', c: '#888' }; return `<tr><td>${k + 1}</td><td><i style="background:${esc(nm.c)}"></i>${ROLES[p.role]?.icon || ''} ${esc(nm.n)}</td><td>${p.fed}</td><td>${p.found}</td><td>${p.falls}</td><td>${p.bites}</td></tr>`; }).join('')}
     </tbody></table>` : ''}
     <div class="row end">
       ${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}
