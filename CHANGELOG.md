@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.57 — 25 octobre 2026
+- Améliorations techniques sous le capot (1 modification).
+
 ## 2.56 — 25 octobre 2026
 - Nouveau : sequential turn-by-turn combat cinematic with authentic move dialogues, damage drain and animations (Amiel)
 
