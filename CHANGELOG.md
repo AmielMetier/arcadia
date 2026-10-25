@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.47 — 25 octobre 2026
+- Nouveau : refonte visuelle de l'arene, agrandissement des sprites sans coupure, badges officiels Gen 8 et boutons d'attaque tactiles (Amiel)
+
 ## 2.46 — 25 octobre 2026
 - **Hub** — Nouveau : ajouter Poké Duel (batailles 3v3 en tournoi, sprites Showdown, cris et tableau des types) (Amiel)
 
