@@ -1,11 +1,20 @@
 // pokemon/view/game.js
 // Interface visuelle de Poké Duel : Arbre de tournoi, arène de combat Showdown, barres de PV, attaques et switchs.
 
-import { spriteUrls } from '../engine/data.js';
+import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
-import { TYPES, getEffectiveness } from '../engine/types.js';
+import { TYPES, getEffectiveness, getTypeBadgeUrl } from '../engine/types.js';
 import { sfx } from './sfx.js';
 import { battleMusic } from './music.js';
+
+const STATUS_LABELS = {
+  burn: 'BRÛLURE',
+  paralysis: 'PARALYSIE',
+  poison: 'POISON',
+  toxic: 'TOXIK',
+  freeze: 'GEL',
+  sleep: 'SOMMEIL'
+};
 
 export function mountGame(root, { me, startMatch, restart, submitAction, exit }) {
   root.className = 'poke-root';
@@ -31,8 +40,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
   let localActionSent = false;
-  let lastPhase = '';
-  let lastEventsLogged = new Set();
+  let timerTicker = null;
 
   // --- Sons & Outils ---
   const syncTools = () => {
@@ -61,7 +69,6 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     battleMusic.stop();
     const round = s.rounds[s.currentRoundIdx];
     const match = round ? round[s.currentMatchIdx] : null;
-    const isHost = me.id === 0 || me.id === 1 || me.id === s.participants[0].id; // hôte
     const roundTitle = match ? match.roundName : 'Arbre du Tournoi';
     $('#pokeRoundTitle').textContent = roundTitle;
 
@@ -80,6 +87,9 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                 <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
                   <small>${p.name}</small>
+                  <div class="preview-types">
+                    ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -98,6 +108,9 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                 <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
                   <small>${p.name}</small>
+                  <div class="preview-types">
+                    ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -158,7 +171,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     const mySide = b.trainerA.id === me.id ? 'A' : b.trainerB.id === me.id ? 'B' : null;
     const isSpectator = !mySide;
 
-    // Déterminer qui est en bas (allié/vue arrière) et qui est en haut (adversaire/vue avant)
+    // Déterminer qui est en bas (joueur local / allié) et en haut (adversaire)
     const bottomSide = mySide === 'B' ? 'B' : 'A';
     const topSide = bottomSide === 'A' ? 'B' : 'A';
 
@@ -180,13 +193,24 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                           (mySide === 'B' && b.phase === 'switch_forced_B') ||
                           b.phase === 'switch_forced_both';
 
-    // Rendu des badges d'équipe (3 petites pokéballs par dresseur)
+    // Rendu des 3 Pokéballs d'équipe (PokeAPI item PNG)
     const ballsHtml = (team) => `
-      <div class="team-balls">
-        ${team.map(p => `<span class="ball-dot ${p.fainted ? 'fainted' : 'alive'}" title="${p.name} (${p.hp}/${p.maxHp})"></span>`).join('')}
+      <div class="team-pokeballs">
+        ${team.map(p => `
+          <div class="ball-slot ${p.fainted ? 'fainted' : 'alive'}" title="${p.name} (${p.hp}/${p.maxHp} PV)">
+            <img src="${POKEBALL_SPRITE}" alt="ball" class="ball-img">
+          </div>
+        `).join('')}
       </div>`;
 
-    // Rendu du message de journal / log
+    // Rendu des types avec images officielles Gen 8
+    const typeBadgesHtml = (types) => types.map(t => `
+      <span class="type-pill" title="${TYPES[t].name}">
+        <img class="type-pill-img" src="${getTypeBadgeUrl(t)}" alt="${TYPES[t].name}" loading="lazy">
+      </span>
+    `).join('');
+
+    // Message d'annonce
     let announcement = '';
     if (b.log && b.log.length) {
       const last = b.log[b.log.length - 1];
@@ -203,70 +227,128 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     stage.innerHTML = `
       <div class="arena-card deal">
         <div class="battlefield">
-          <!-- Zone Adversaire (Haut-Droit) -->
-          <div class="side top-side">
-            <div class="status-box">
-              <div class="sb-header">
-                <b>${pTop.name}</b>
-                <span class="sb-lvl">N.50</span>
-                ${pTop.types.map(t => `<span class="type-pill" style="background:${TYPES[t].color}">${TYPES[t].name}</span>`).join('')}
-                ${pTop.status ? `<span class="status-badge ${pTop.status}">${pTop.status.toUpperCase()}</span>` : ''}
+          <!-- Ciel & Éclairage de stade -->
+          <div class="stadium-sky">
+            <div class="floodlight left-light"></div>
+            <div class="floodlight right-light"></div>
+            <div class="stadium-stands"></div>
+          </div>
+
+          <!-- Pelouse & Marquages officiels de Stade Pokémon -->
+          <div class="stadium-turf">
+            <div class="turf-ring-outer"></div>
+            <div class="turf-pokeball-center"></div>
+          </div>
+
+          <!-- HUD Adversaire (Haut-Gauche) -->
+          <div class="hud-zone hud-top">
+            <div class="status-card opponent-card">
+              <div class="sc-head">
+                <div class="sc-name-row">
+                  <b class="sc-name">${pTop.name}</b>
+                  <span class="sc-lvl">Nv. 50</span>
+                </div>
+                <div class="sc-types">${typeBadgesHtml(pTop.types)}</div>
+                ${pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : ''}
               </div>
-              <div class="hp-bar-track">
-                <div class="hp-bar-fill" style="width:${hpPctTop}%;background:${hpColorTop}"></div>
+
+              <div class="hp-gauge-row">
+                <span class="hp-tag">PV</span>
+                <div class="hp-track">
+                  <div class="hp-fill ${hpPctTop <= 20 ? 'critical' : ''}" style="width:${hpPctTop}%;background:${hpColorTop}"></div>
+                  <div class="hp-gloss"></div>
+                </div>
               </div>
-              <div class="sb-sub">
-                <span class="trainer-tag" style="--tc:${tTop.color}">Dresseur : ${tTop.name}</span>
+
+              <div class="sc-foot">
+                <span class="trainer-badge" style="--tc:${tTop.color}">
+                  <i class="trainer-dot"></i>${tTop.name}
+                </span>
                 ${ballsHtml(teamTop)}
               </div>
             </div>
-            <div class="platform top-plat">
-              <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
+          </div>
+
+          <!-- Zone Combat Adversaire (Haut-Droite) : Plateforme 3D & Sprite avant sans coupure -->
+          <div class="fighter-zone fighter-top">
+            <div class="platform platform-top">
+              <div class="plat-shadow"></div>
+              <div class="plat-base"></div>
+              <div class="plat-turf"></div>
+              <div class="plat-ring"></div>
+              <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
+              <div class="damage-popup-anchor" id="popupAnchorTop"></div>
             </div>
           </div>
 
-          <!-- Zone Joueur / Allié (Bas-Gauche) -->
-          <div class="side bottom-side">
-            <div class="platform bottom-plat">
-              <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
+          <!-- Zone Combat Joueur (Bas-Gauche) : Plateforme 3D & Sprite arrière -->
+          <div class="fighter-zone fighter-bottom">
+            <div class="platform platform-bottom">
+              <div class="plat-shadow"></div>
+              <div class="plat-base"></div>
+              <div class="plat-turf"></div>
+              <div class="plat-ring"></div>
+              <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
+              <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
             </div>
-            <div class="status-box">
-              <div class="sb-header">
-                <b>${pBottom.name}</b>
-                <span class="sb-lvl">N.50</span>
-                ${pBottom.types.map(t => `<span class="type-pill" style="background:${TYPES[t].color}">${TYPES[t].name}</span>`).join('')}
-                ${pBottom.status ? `<span class="status-badge ${pBottom.status}">${pBottom.status.toUpperCase()}</span>` : ''}
+          </div>
+
+          <!-- HUD Joueur (Bas-Droite) -->
+          <div class="hud-zone hud-bottom">
+            <div class="status-card player-card">
+              <div class="sc-head">
+                <div class="sc-name-row">
+                  <b class="sc-name">${pBottom.name}</b>
+                  <span class="sc-lvl">Nv. 50</span>
+                </div>
+                <div class="sc-types">${typeBadgesHtml(pBottom.types)}</div>
+                ${pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : ''}
               </div>
-              <div class="hp-bar-track">
-                <div class="hp-bar-fill" style="width:${hpPctBottom}%;background:${hpColorBottom}"></div>
+
+              <div class="hp-gauge-row">
+                <span class="hp-tag">PV</span>
+                <div class="hp-track">
+                  <div class="hp-fill ${hpPctBottom <= 20 ? 'critical' : ''}" style="width:${hpPctBottom}%;background:${hpColorBottom}"></div>
+                  <div class="hp-gloss"></div>
+                </div>
               </div>
-              <div class="sb-sub">
-                <span class="hp-text">${pBottom.hp} / ${pBottom.maxHp} PV</span>
+
+              <div class="sc-foot">
+                <span class="hp-fraction"><b style="color:${hpColorBottom}">${pBottom.hp}</b> / ${pBottom.maxHp} PV</span>
                 ${ballsHtml(teamBottom)}
               </div>
             </div>
           </div>
-
-          <!-- Bandeau de combat au centre -->
-          <div class="announcement-bar">${announcement}</div>
         </div>
 
-        <!-- Pupitre de Commandes (Bas) -->
+        <!-- Bandeau de Dialogue Showdown -->
+        <div class="battle-dialogue-bar">
+          <span class="dialogue-icon">💬</span>
+          <span class="dialogue-text">${announcement}</span>
+        </div>
+
+        <!-- Pupitre de Commandes Tactiles -->
         <div class="dashboard">
           ${isSpectator ? `
             <div class="spectator-bar">
-              <span>👁️ Mode Spectateur en Direct : <b>${tBottom.name}</b> contre <b>${tTop.name}</b></span>
+              <span>👁️ Match en Direct : <b>${tBottom.name}</b> affronte <b>${tTop.name}</b></span>
             </div>
           ` : `
-            <div class="dash-timer">
-              <div class="dt-fill" style="width:${timerWidth}%"></div>
-              <span class="dt-text">${leftSec} s</span>
+            <div class="dash-top-row">
+              <div class="dash-timer">
+                <div class="dt-fill" id="timerFill" style="width:${timerWidth}%"></div>
+                <span class="dt-text" id="timerText">${leftSec} s</span>
+              </div>
+              ${isSubmitted ? '<span class="action-locked">✔ Ordre validé · Attente de l\'adversaire…</span>' : ''}
             </div>
 
             <div class="dash-tabs">
-              <button class="dash-tab ${activeTab === 'moves' ? 'active' : ''}" id="tabMoves" ${isForcedSwitch ? 'disabled' : ''}>Attaquer</button>
-              <button class="dash-tab ${activeTab === 'switch' ? 'active' : ''}" id="tabSwitch">Changer de Pokémon (${teamBottom.filter(p => !p.fainted).length})</button>
-              ${isSubmitted ? '<span class="action-locked">✔ Ordre validé · En attente de l\'adversaire…</span>' : ''}
+              <button class="dash-tab ${activeTab === 'moves' ? 'active' : ''}" id="tabMoves" ${isForcedSwitch ? 'disabled' : ''}>
+                ⚔️ Attaquer
+              </button>
+              <button class="dash-tab ${activeTab === 'switch' ? 'active' : ''}" id="tabSwitch">
+                🔄 Changer de Pokémon (${teamBottom.filter(p => !p.fainted).length})
+              </button>
             </div>
 
             ${activeTab === 'moves' && !isForcedSwitch ? `
@@ -275,19 +357,41 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   const m = MOVES[moveId];
                   if (!m) return '';
                   const eff = getEffectiveness(m.type, pTop.types);
-                  const effLabel = eff >= 2 ? 'Super efficace !' : eff <= 0.5 && eff > 0 ? 'Peu efficace' : eff === 0 ? 'Aucun effet' : '';
+                  let effTagHtml = '';
+                  if (m.power > 0) {
+                    if (eff >= 2) {
+                      effTagHtml = `<div class="bm-eff-tag eff-super">💥 Super efficace (x${eff})</div>`;
+                    } else if (eff <= 0.5 && eff > 0) {
+                      effTagHtml = `<div class="bm-eff-tag eff-low">🛡️ Peu efficace (x${eff})</div>`;
+                    } else if (eff === 0) {
+                      effTagHtml = `<div class="bm-eff-tag eff-zero">🚫 Sans effet (x0)</div>`;
+                    } else {
+                      effTagHtml = `<div class="bm-eff-tag eff-normal">Efficace (x1)</div>`;
+                    }
+                  } else {
+                    effTagHtml = `<div class="bm-eff-tag eff-status">Capacité Statut</div>`;
+                  }
+
                   return `
                     <button class="btn-move" data-move="${moveId}" style="--mc:${TYPES[m.type].color}" ${isSubmitted ? 'disabled' : ''}>
-                      <div class="bm-head">
-                        <kbd>${mIdx + 1}</kbd>
-                        <b>${m.name}</b>
-                        <span class="bm-cat">${m.cat === 'physical' ? '⚔️' : m.cat === 'special' ? '🔮' : '✨'}</span>
+                      <div class="bm-header">
+                        <kbd class="bm-key">${mIdx + 1}</kbd>
+                        <span class="bm-name">${m.name}</span>
+                        <span class="bm-category ${m.cat}">
+                          ${m.cat === 'physical' ? '⚔️ Phys' : m.cat === 'special' ? '🌀 Spé' : '✨ Stat'}
+                        </span>
                       </div>
-                      <div class="bm-sub">
-                        <span class="bm-type" style="background:${TYPES[m.type].color}">${TYPES[m.type].name}</span>
-                        <span class="bm-pow">${m.power ? `Puiss. ${m.power}` : 'Statut'}</span>
-                        ${effLabel ? `<span class="bm-eff ${eff >= 2 ? 'eff-super' : 'eff-low'}">${effLabel}</span>` : ''}
+                      <div class="bm-body">
+                        <div class="bm-type-badge">
+                          <img src="${getTypeBadgeUrl(m.type)}" alt="${TYPES[m.type].name}" class="bm-type-icon" loading="lazy">
+                        </div>
+                        <div class="bm-stats">
+                          <span class="bm-stat"><b>${m.power ? m.power : '—'}</b> Puiss</span>
+                          <span class="bm-stat"><b>${m.acc}%</b> Préc</span>
+                          <span class="bm-stat"><b>${m.pp}</b> PP</span>
+                        </div>
                       </div>
+                      ${effTagHtml}
                     </button>`;
                 }).join('')}
               </div>
@@ -295,13 +399,27 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
               <div class="switch-grid">
                 ${teamBottom.map((p, pIdx) => {
                   const isCurrent = pIdx === (bottomSide === 'A' ? b.activeA : b.activeB);
+                  const hpPct = Math.max(0, Math.min(100, Math.round((p.hp / p.maxHp) * 100)));
+                  const hpCol = hpPct > 50 ? '#2fbf71' : hpPct > 20 ? '#ffc531' : '#ff4b2b';
                   return `
                     <button class="btn-switch ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted ? 'disabled' : ''}>
-                      <img src="${spriteUrls(p.id).icon}" alt="${p.name}">
-                      <div class="bs-info">
-                        <b>${p.name} ${isCurrent ? '(Actif)' : ''}</b>
-                        <div class="bs-types">${p.types.map(t => `<span class="type-pill" style="background:${TYPES[t].color}">${TYPES[t].name}</span>`).join('')}</div>
-                        <span class="bs-hp">${p.fainted ? 'K.O.' : `${p.hp} / ${p.maxHp} PV`}</span>
+                      <div class="bs-avatar">
+                        <img src="${spriteUrls(p.id).icon}" alt="${p.name}" class="bs-icon">
+                        ${isCurrent ? '<span class="bs-active-tag">Actif</span>' : ''}
+                        ${p.fainted ? '<span class="bs-ko-tag">K.O.</span>' : ''}
+                      </div>
+                      <div class="bs-details">
+                        <div class="bs-title-row">
+                          <b>${p.name}</b>
+                          <span class="bs-lvl">Nv. 50</span>
+                        </div>
+                        <div class="bs-types">
+                          ${p.types.map(t => `<img src="${getTypeBadgeUrl(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
+                        </div>
+                        <div class="bs-hp-track">
+                          <div class="bs-hp-fill" style="width:${hpPct}%;background:${hpCol}"></div>
+                        </div>
+                        <div class="bs-hp-num">${p.fainted ? 'K.O.' : `${p.hp} / ${p.maxHp} PV`}</div>
                       </div>
                     </button>`;
                 }).join('')}
@@ -311,10 +429,12 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         </div>
       </div>`;
 
-    // Événements d'attaques
+    // Gestion des événements d'attaques et de switch
     if (!isSpectator && !isSubmitted) {
-      $('#tabMoves').onclick = () => { activeTab = 'moves'; renderBattle(state); };
-      $('#tabSwitch').onclick = () => { activeTab = 'switch'; renderBattle(state); };
+      const bMoves = $('#tabMoves');
+      const bSwitch = $('#tabSwitch');
+      if (bMoves) bMoves.onclick = () => { activeTab = 'moves'; renderBattle(state); };
+      if (bSwitch) bSwitch.onclick = () => { activeTab = 'switch'; renderBattle(state); };
 
       for (const btn of root.querySelectorAll('[data-move]')) {
         btn.onclick = () => {
@@ -336,12 +456,55 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     }
   }
 
+  // --- Animation visuelle d'un événement ---
+  function triggerEventAnimation(ev, b) {
+    if (!b) return;
+    const mySide = b.trainerA.id === me.id ? 'A' : b.trainerB.id === me.id ? 'B' : null;
+    const bottomSide = mySide === 'B' ? 'B' : 'A';
+
+    if (ev.type === 'move') {
+      const isBottom = (ev.side === bottomSide);
+      const sprite = $(isBottom ? '#spriteBottom' : '#spriteTop');
+      if (sprite) {
+        const animClass = isBottom ? 'anim-lunge-player' : 'anim-lunge-opponent';
+        sprite.classList.remove(animClass);
+        void sprite.offsetWidth;
+        sprite.classList.add(animClass);
+      }
+    } else if (ev.type === 'damage') {
+      const targetIsBottom = (ev.side === bottomSide);
+      const sprite = $(targetIsBottom ? '#spriteBottom' : '#spriteTop');
+      if (sprite) {
+        sprite.classList.remove('anim-hit');
+        void sprite.offsetWidth;
+        sprite.classList.add('anim-hit');
+      }
+
+      // Popup flottant de dégâts
+      const anchor = $(targetIsBottom ? '#popupAnchorBottom' : '#popupAnchorTop');
+      if (anchor && ev.dmg > 0) {
+        const pop = document.createElement('div');
+        pop.className = `damage-popup ${ev.crit ? 'crit' : ''}`;
+        pop.textContent = `-${ev.dmg} PV${ev.crit ? ' !' : ''}`;
+        anchor.appendChild(pop);
+        setTimeout(() => pop.remove(), 1000);
+      }
+    } else if (ev.type === 'switch') {
+      const isBottom = (ev.side === bottomSide);
+      const sprite = $(isBottom ? '#spriteBottom' : '#spriteTop');
+      if (sprite) {
+        sprite.classList.remove('anim-enter');
+        void sprite.offsetWidth;
+        sprite.classList.add('anim-enter');
+      }
+    }
+  }
+
   // --- Rendu du Podium Final ---
   function renderPodium(s) {
     battleMusic.stop();
     sfx.play('victory');
     const champ = s.champion;
-    const podium = s.podium || [];
 
     stage.innerHTML = `
       <div class="podium-screen deal">
@@ -349,13 +512,15 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         <div class="champ-banner" style="--cc:${champ.color}">
           <div class="champ-crown">👑</div>
           <h2>${champ.name}</h2>
-          <p>Maître de la Ligue Pokémon !</p>
+          <p>Nouveau Maître de la Ligue Pokémon !</p>
           <div class="champ-team">
             ${champ.team.map(p => `
               <div class="champ-poke-card">
                 <img src="${spriteUrls(p.id).artwork}" alt="${p.name}">
                 <b>${p.name}</b>
-                <div class="champ-types">${p.types.map(t => `<span class="type-pill" style="background:${TYPES[t].color}">${TYPES[t].name}</span>`).join('')}</div>
+                <div class="champ-types">
+                  ${p.types.map(t => `<img class="champ-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                </div>
               </div>
             `).join('')}
           </div>
@@ -363,7 +528,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
         <div class="podium-actions">
           <button class="btn big yellow" id="btnPlayAgain">Nouveau Tournoi 🔄</button>
-          <button class="btn big ghost" id="btnBackLobby">Retour au salon</button>
+          <button class="btn big ghost" id="btnBackLobby">Retour au Salon</button>
         </div>
       </div>`;
 
@@ -371,7 +536,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     $('#btnBackLobby').onclick = () => exit();
   }
 
-  // Gestion des raccourcis clavier (1, 2, 3, 4 pour attaques)
+  // Raccourcis clavier (1, 2, 3, 4 pour attaques)
   addEventListener('keydown', (e) => {
     if (!state || state.phase !== 'battle' || !state.battle) return;
     const b = state.battle;
@@ -394,25 +559,28 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   return {
     update(s, off) {
       state = s;
-      // Jouer les sons d'événements nouveaux
-      if (s.events && s.events.length) {
-        s.events.forEach(ev => {
-          if (ev.type === 'damage' && ev.mult >= 2) sfx.play('supereffective');
-          else if (ev.type === 'damage') sfx.play('hit');
-          else if (ev.type === 'faint') sfx.play('faint');
-          else if (ev.type === 'switch') {
-            sfx.play('switch');
-            if (ev.pokemonId) sfx.playCry(ev.pokemonId);
-          }
-          else if (ev.type === 'stat_change') sfx.play('stat');
-          else if (ev.type === 'victory') sfx.play('victory');
-        });
-      }
 
+      // Déclencher le rendu de phase
       if (s.phase === 'bracket_preview') {
         renderBracket(s);
       } else if (s.phase === 'battle') {
         renderBattle(s);
+
+        // Déclencher les animations et effets audio des événements récents
+        if (s.events && s.events.length) {
+          s.events.forEach(ev => {
+            triggerEventAnimation(ev, s.battle);
+            if (ev.type === 'damage' && ev.mult >= 2) sfx.play('supereffective');
+            else if (ev.type === 'damage') sfx.play('hit');
+            else if (ev.type === 'faint') sfx.play('faint');
+            else if (ev.type === 'switch') {
+              sfx.play('switch');
+              if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+            }
+            else if (ev.type === 'stat_change') sfx.play('stat');
+            else if (ev.type === 'victory') sfx.play('victory');
+          });
+        }
       } else if (s.phase === 'podium') {
         renderPodium(s);
       }
