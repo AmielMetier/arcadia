@@ -453,4 +453,4 @@ export function spriteUrls(pokemonId) {
   };
 }
 
-export const POKEBALL_SPRITE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
+export const POKEBALL_SPRITE = 'assets/poke-ball.png';
