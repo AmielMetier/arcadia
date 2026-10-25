@@ -10,7 +10,6 @@
   - **La solidité du convoi** baisse avec les explosions, les avalanches et les sabotages ; les gares en réparent une partie. À zéro, c'est fini.
   - Une petite **cinématique d'ouverture** raconte l'histoire pendant que la caméra longe le convoi jusqu'au Front (bouton Passer, ou Entrée / Échap).
   - Partie plus serrée : moins de fioul dans les ruines en Normale et en Blizzard. À plusieurs, il y a plus de travail à bord ; seul, la chaudière est un peu plus clémente.
->>>>>>> 406e036 (feat(convoy): front de tempête, manette de vitesse, pression, pannes à bord, pillards et cinématique d'ouverture (v2.40))
 
 ## 2.42 — 24 octobre 2026
 - **Tous les jeux** — Fini les joueurs coincés à 1 500 ms de ping avec une bonne connexion :
