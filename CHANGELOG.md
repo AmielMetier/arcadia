@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.46 — 25 octobre 2026
+## 2.54 — 25 octobre 2026
 - **Convoy Storm** — Grosse mise à jour : chaque expédition est différente.
   - **Le Front ralentit en gare** : on peut enfin faire ses achats sans perdre toute son avance.
   - **Quatre sortes de caisses** : fioul (+25 %), charbon (+45 %, mais lourd et il se lance moins loin), fioul gelé (à garder près de la chaudière le temps qu'il dégèle, sinon il ne rend presque rien) et pièces détachées (rangées dans la chaudière, elles donnent de la ferraille).
@@ -10,6 +10,29 @@
   - **Des cartes d'amélioration** : à chaque gare, trois cartes tirées au hasard parmi dix-huit (filet de récupération, échelle rallongée, crampons, blindage, brise-tempête, pistons neufs…). La première est offerte, les autres coûtent de la ferraille (touches 1 à 3).
   - **Un moment fort par tronçon** : le Brise-Glace (un camion blindé de pillards qui harponne le convoi : coupez les grappins et lancez-lui des caisses), le Pont de la Gorge (passez-le en Éco, et que personne ne descende), un Convoi abandonné plein de caisses (mais le Front ne s'arrête pas), ou le Front qui rugit pendant 40 secondes.
   - **Des rôles** à choisir avant le départ : Mécano (répare et coupe les grappins deux fois plus vite), Éclaireur (plus rapide dans la neige, fouille deux fois plus vite), Chauffeur (+6 % par caisse jetée au feu, craint moins le froid), Vigie (deux fusées de plus, lance plus loin, frappe fort le Brise-Glace). Sans choix, on prend le rôle qui manque à l'équipage.
+
+## 2.53 — 25 octobre 2026
+- **Cyber Kart GP** — La musique passe par le même moteur audio que les bruitages : si on entend les bruitages, on entend la musique (iPad, iPhone, Brave). Elle démarre au premier toucher ou à la première touche, avec un petit fondu entre les morceaux.
+- **Cyber Kart GP** — Physique façon Mario Kart 8 :
+  - Aspiration : rester dans le sillage d'un kart pendant un peu plus d'une seconde donne un petit turbo (traînée d'air visible).
+  - Troisième niveau de mini-turbo : après 3 secondes de drift, les étincelles passent au violet et le turbo dure plus longtemps.
+  - Trois cylindrées au choix de l'hôte : 50cc, 100cc et 150cc.
+  - Deux nouvelles caractéristiques par pilote et par kart : l'adhérence (glace, neige, terre, hors-piste) et le mini-turbo (vitesse de charge).
+  - Les karts lourds poussent nettement plus les légers dans les chocs.
+  - Planeur : sur les grands tremplins de Whisky Peak, de la Jungle Perdue et de la Plage, une aile se déploie et on se dirige en vol.
+  - On glisse le long des murs sur une simple touchette, sans perdre de vitesse ; seuls les chocs francs ralentissent.
+  - Option « Conduite assistée » dans le choix du pilote : le kart se redresse tout seul avant de toucher un mur.
+  - En drift, la caméra se décale doucement vers l'extérieur du virage.
+  - Sortie de piste : un drone vient rechercher le kart et le repose avec de l'élan, en à peine plus d'une seconde.
+
+## 2.48 — 25 octobre 2026
+- Améliorations techniques sous le capot (1 modification).
+
+## 2.47 — 25 octobre 2026
+- Nouveau : refonte visuelle de l'arene, agrandissement des sprites sans coupure, badges officiels Gen 8 et boutons d'attaque tactiles (Amiel)
+
+## 2.46 — 25 octobre 2026
+- **Hub** — Nouveau : ajouter Poké Duel (batailles 3v3 en tournoi, sprites Showdown, cris et tableau des types) (Amiel)
 
 ## 2.45 — 25 octobre 2026
 - **Hub** — Nouvelles affiches pour tous les jeux, dans le style de celle de Cyber Kart GP : une vraie image du jeu, un grand titre en deux couleurs et un bandeau. Duo Drift dans le canyon, le plateau 3D de DavidSimulator couvert de maisons, une bataille de Bastion Clash, une horde d'Outbreak sur la Prom', la bombe de Fil Rouge, l'équipage de Convoy Storm face aux pillards… et Pierre Chartier en personne sur l'affiche de Tête de Calcul.

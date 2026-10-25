@@ -17,11 +17,10 @@ Déposez vos morceaux **dans ce dossier** (`kart/music/`), avec exactement ces n
 - Chaque morceau est **lu en boucle**. Pour une boucle sans « trou », exportez un fichier qui commence et finit sur le temps
   (pas de silence au début ni à la fin).
 - **Accélération à chaque tour** : la vitesse de lecture passe à ×1,04 au tour 2, ×1,09 au tour 3, puis ×1,13 et ×1,17.
-  Par défaut la hauteur des notes ne change pas (seul le tempo accélère).
+  Le morceau monte aussi un peu dans les aigus en accélérant (la musique passe par le moteur audio des bruitages).
 - Réglages modifiables en haut du code de `kart/index.html`, objet `MUSIC` :
   - `tracks` : les noms de fichiers ci-dessus ;
   - `lapRate` : la vitesse de lecture tour par tour ;
-  - `preservePitch: false` pour que le morceau monte aussi dans les aigus en accélérant (effet « dernier tour » plus marqué) ;
   - `volume` : volume relatif de la musique (le volume général se règle dans le Hub, 🎵).
 - La touche **M** coupe ou remet le son en course ; le réglage est partagé avec le Hub.
 - Taille conseillée : 2 à 5 Mo par morceau (mp3 128 à 192 kb/s), pour que le chargement reste rapide sur GitHub Pages.

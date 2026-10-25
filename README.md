@@ -68,7 +68,8 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 - **Grand Prix de 6 circuits** aux points cumulés : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée,
   boules de neige, télésiège), Route Arc-en-ciel (espace), Jungle Perdue (forêt, précipice, pyramide inca en spirale),
   Château Hanté (de nuit : lave, labyrinthe aux torches, jardin hanté), Plage des Falaises (crabes, pontons, arches de craie)
-- **Drift** à la touche Maj en tournant (tout droit = un saut) : on contre-braque pour filer droit, on braque pour serrer : 1 s = mini-turbo, deux fois plus rapide en alternant Q et D ; figures sur les tremplins
+- **Drift** à la touche Maj en tournant (tout droit = un saut) : on contre-braque pour filer droit, on braque pour serrer ; mini-turbo bleu, orange puis violet, deux fois plus rapide en alternant Q et D ; figures sur les sauts
+- **Physique façon MK8** : aspiration, planeur sur les grands tremplins, 50/100/150cc, adhérence et mini-turbo par pilote, conduite assistée en option
 - **16 objets** dans les cubes irisés (↓ + E pour lancer vers l'arrière), 8 pilotes originaux, 4 karts
 - L'hôte choisit le premier circuit, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`),
   captures des circuits et affiche dans `kart/img/` ; mode spectateur depuis l'écran des résultats
@@ -100,6 +101,6 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.45** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.49** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude
