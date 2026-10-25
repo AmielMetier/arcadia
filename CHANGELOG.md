@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.56 — 25 octobre 2026
+- Nouveau : sequential turn-by-turn combat cinematic with authentic move dialogues, damage drain and animations (Amiel)
+
 ## 2.55 — 25 octobre 2026
 - Correction : fix multiplayer room player detection, eliminate unwanted bots for 2+ human players, add dynamic roster updates (Amiel)
 
