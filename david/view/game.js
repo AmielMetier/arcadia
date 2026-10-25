@@ -13,7 +13,7 @@ import { tokenSvg } from './tokens.js';
 import { mountSetup } from './setup.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
 import { esc, money, el, wait, store, save } from './util.js';
-import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml, billHtml } from './modals.js';
+import { mountModals, buyHtml, auctionHtml, propertyHtml, mineHtml, offerHtml, tradeComposeHtml, overHtml, billHtml, watchHtml, tradeChips } from './modals.js';
 import { openStats, sparkline, heatValues, heatColor, heatLabel } from './stats.js';
 import { standings, teamStandings, sameTeam, TEAM_NAMES } from '../engine/valuation.js';
 
@@ -39,6 +39,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     <aside class="roster" id="roster" aria-label="Joueurs"></aside>
     <div class="actionbar" id="actionbar" aria-live="polite"></div>
     <div class="diceread" id="diceread" hidden aria-live="polite"></div>
+    <div class="tradefeed" id="tradeFeed" aria-live="polite" aria-label="Échanges en direct entre les autres joueurs"></div>
     <div class="dock">
       <button class="btn ghost emobtn" id="bEmote" title="Réagir (touche R)" aria-expanded="false">😀</button>
       <button class="btn ghost" id="bMine">Mes biens</button>
@@ -54,6 +55,9 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     <div class="logbox" id="logbox"><ol id="log"></ol></div>
     <div class="toast" id="toast" hidden role="status"></div>`;
   const $ = (s) => root.querySelector(s);
+  // pincement du pavé tactile / Ctrl + molette : on zoome le plateau, jamais la page entière (Chrome zoomait toute la page
+  // dès que le pointeur passait sur un panneau au lieu du plateau)
+  addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
 
   // plateau en vraie 3D (WebGL) ; plateau CSS classique si WebGL est indisponible ou si le joueur le préfère
   let B = null;
@@ -240,6 +244,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
       case 'UNMORTGAGE': return `${name(e.player)} lève l'hypothèque de ${board.spaces[e.space].name}`;
       case 'TRADE_DONE': return `Échange conclu : ${name(e.trade.from)} ⇄ ${name(e.trade.to)}`;
       case 'TRADE_CANCELLED': return e.reason === 'turn' ? 'Proposition d\'échange expirée (fin du tour)' : null;
+      case 'TRADE_OFFER': return `${name(e.trade.from)} propose un échange à ${name(e.trade.to)}`;
+      case 'TRADE_REJECTED': { const t = tradeById(e.trade); return t ? `${name(e.by)} refuse l'échange de ${name(t.from)}` : `${name(e.by)} refuse un échange`; }
       case 'NO_RENT': return `${name(e.player)} est chez son coéquipier : pas de loyer`;
       case 'BANKRUPT': return e.heir != null ? `${name(e.player)} fait faillite : son coéquipier ${name(e.heir)} reprend ses biens` : `${name(e.player)} fait faillite`;
       case 'BOT': return e.bot ? `${name(e.player)} est déconnecté : un bot joue à sa place` : `${name(e.player)} est de retour`;
@@ -493,9 +499,54 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     if (k.startsWith('prop:')) M.open(k, propertyHtml(board, S, me, +k.slice(5), name), { cls: 'wide', onClose: () => B.select(-1) });
     else if (k === 'mine') openMine();
     else if (k.startsWith('offer:') && !S.trades.some((x) => 'offer:' + x.id === k)) { M.close(true); B.tradeMarks(null); }
+    else if (k.startsWith('watch:') && !S.trades.some((x) => 'watch:' + x.id === k) && !ended.has(+k.slice(6))) { M.close(true); B.tradeMarks(null); }
     else if (k === 'trade' && !canPropose(S, me.id)) { M.close(true); B.tradeMarks(null); }
     else if (k.startsWith('buy') && S.phase !== 'buy') M.close(true);
   }
+
+  /* ---------------------------------------------------------- échanges des autres, en direct */
+  // Chaque proposition entre deux autres joueurs apparaît dans un fil à droite, avec son contenu et son compte à rebours ;
+  // un clic l'ouvre en lecture seule avec les terrains signalés sur le plateau. Le résultat reste affiché quelques secondes.
+  const ended = new Map(); // id → { t, result, until }
+  let feedFlash = null;
+  const tradeById = (id) => (S && S.trades.find((x) => x.id === id)) || null;
+  function endTrade(t, result) {
+    if (!t || t.from === me.id || t.to === me.id) return;
+    ended.set(t.id, { t, result, until: Date.now() + 4000 });
+    if (String(M.key) === 'watch:' + t.id) {
+      const msg = { done: 'Échange accepté ✓', rejected: 'Échange refusé', expired: 'Proposition expirée', cancelled: 'Proposition retirée' }[result];
+      const h = root.querySelector('.modal h2'); if (h) h.textContent = msg;
+      setTimeout(() => { if (String(M.key) === 'watch:' + t.id) { M.close(true); B.tradeMarks(null); } }, 1600);
+    }
+    setTimeout(renderFeed, 4100);
+  }
+  function renderFeed() {
+    if (!S) return;
+    const now = Date.now();
+    for (const [id, x] of ended) if (x.until < now) ended.delete(id);
+    const live = S.over ? [] : S.trades.filter((t) => t.from !== me.id && t.to !== me.id).map((t) => ({ t, result: null }));
+    const done = [...ended.values()].filter((x) => !live.some((l) => l.t.id === x.t.id));
+    const list = [...live, ...done].slice(0, 3);
+    const RES = { done: ['ok', 'accepté ✓'], rejected: ['ko', 'refusé ✗'], expired: ['ko', 'expiré'], cancelled: ['ko', 'retiré'] };
+    $('#tradeFeed').innerHTML = list.map(({ t, result }) => {
+      const r = result && RES[result];
+      const until = !result && S.tradeUntil && S.tradeUntil[t.id];
+      return `<button class="tfcard${r ? ' ' + r[0] : ''}${feedFlash === t.id ? ' new' : ''}" data-watch="${t.id}" ${r ? 'disabled' : ''} title="${r ? '' : 'Regarder cet échange'}">
+        <span class="tfh"><i class="dotc" style="background:${color(t.from)}"></i><b>${esc(name(t.from))}</b><span class="arr">→</span><i class="dotc" style="background:${color(t.to)}"></i><b>${esc(name(t.to))}</b>
+          <em>${r ? r[1] : until ? `<span data-until="${until}" data-short>…</span>` : 'en attente'}</em></span>
+        <span class="tfrow"><small>donne</small>${tradeChips(board, t.give)}</span>
+        <span class="tfrow"><small>contre</small>${tradeChips(board, t.want)}</span></button>`;
+    }).join('');
+    feedFlash = null;
+  }
+  function openWatch(id) {
+    const t = tradeById(id); if (!t) return;
+    M.open('watch:' + id, watchHtml(board, S, t, name), { cls: 'wide docked', onClose: () => B.tradeMarks(null) });
+    B.tradeMarks([...t.give.props.map((i) => ({ i, kind: 'done', label: '→ ' + name(t.to), color: color(t.to) })),
+      ...t.want.props.map((i) => ({ i, kind: 'done', label: '→ ' + name(t.from), color: color(t.from) }))]);
+    tickTimer();
+  }
+  $('#tradeFeed').addEventListener('click', (e) => { const b = e.target.closest('[data-watch]'); if (b && !b.disabled) openWatch(+b.dataset.watch); });
 
   /* ---------------------------------------------------------- application d'un état */
   function apply(state) {
@@ -507,7 +558,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     B.sync(S);
     B.setCurrent(S.over ? null : currentPlayer(S).id);
     B.pulse(S.phase === 'buy' ? S.pendingBuy : -1);
-    renderRoster(); renderActions(); autoModals(); tickTimer();
+    renderRoster(); renderActions(); autoModals(); renderFeed(); tickTimer();
     if (heatMode) paintHeat();
     music.setMood(moodOf(S));
     music.duck(S.over);
@@ -523,6 +574,8 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
     switch (e.k) {
       case 'TURN':
         // caméra qui suit : elle va directement sur le pion du joueur suivant ; sinon vue d'ensemble
+        // au début de son propre tour, la caméra qui suit reprend même si on avait déplacé la vue
+        if (e.player === me.id && B.resumeFollow) B.resumeFollow();
         B.setCurrent(e.player); if (B.follow()) B.focusPawn(e.player, speed); else B.relax();
         $('#diceread').hidden = true;
         S && renderRosterCur(e.player);
@@ -612,8 +665,12 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         await wait(350 / speed);
         break;
       }
-      case 'TRADE_OFFER': if (e.trade.to === me.id) sfx.play('card'); break;
+      case 'TRADE_OFFER':
+        if (e.trade.to === me.id) sfx.play('card');
+        else if (e.trade.from !== me.id && !quick) { sfx.play('bid'); feedFlash = e.trade.id; }
+        break;
       case 'TRADE_DONE': {
+        endTrade(e.trade, 'done');
         if (quick) break;
         sfx.play('buy');
         // tout le monde voit sur le plateau ce qui a changé de main
@@ -631,7 +688,12 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         await wait(500 / speed);
         break;
       }
-      case 'TRADE_REJECTED': if (e.by !== me.id && next.players && !quick) toast(`${nm(e.by)} refuse l'échange`); break;
+      case 'TRADE_REJECTED': {
+        const t = tradeById(e.trade); if (t) endTrade(t, 'rejected');
+        if (t && t.from === me.id && !quick) toast(`${nm(e.by)} refuse ton échange`);
+        break;
+      }
+      case 'TRADE_CANCELLED': { const t = tradeById(e.trade); if (t) endTrade(t, e.reason === 'turn' ? 'expired' : 'cancelled'); break; }
       case 'DEBT':
         if (e.from === me.id && !quick) await F.banner('Il te manque de l\'argent', `Tu dois ${money(e.amount)}`, '#e3262f', 1000 / speed);
         break;

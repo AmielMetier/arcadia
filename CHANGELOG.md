@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.44 — 25 octobre 2026
+- **DavidSimulator** — On peut de nouveau bouger la vue quand on veut :
+  - La caméra qui suit revenait de force sur le pion à chaque tour des autres joueurs ; avec des bots qui jouent vite, impossible de regarder le plateau. Maintenant, si tu déplaces la vue, elle reste où tu l'as mise jusqu'au début de ton propre tour (ou jusqu'au bouton ⌖).
+  - Dès que tu touches la vue (glisser, molette, pincement), le mouvement automatique en cours s'arrête au lieu de te reprendre la caméra.
+  - Pendant un échange, le plateau reste manipulable à côté de la fenêtre.
+  - Pincer le pavé tactile ou faire Ctrl + molette zoome le plateau, et plus toute la page dans Chrome.
+- **DavidSimulator** — Les échanges des autres joueurs en direct : chaque proposition entre deux autres joueurs apparaît en haut à droite (qui propose quoi à qui, compte à rebours), puis son résultat (accepté, refusé, expiré). Un clic l'ouvre en lecture seule, avec les terrains concernés signalés sur le plateau. Les propositions et les refus apparaissent aussi dans le journal.
+
 ## 2.43 — 25 octobre 2026
 - **Convoy Storm** — Fini la balade : il y a maintenant de vrais enjeux à chaque instant.
   - **Le Front** : un mur de tempête poursuit le convoi et ne s'arrête jamais, pas même en gare. S'il vous rattrape, c'est perdu. Une jauge montre l'avance qui reste, et l'écran s'assombrit quand il approche.

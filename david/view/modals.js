@@ -183,6 +183,26 @@ export function tradeTimerHtml(S, t, name) {
   return `<p class="hint">Proposition valable jusqu'à la fin du tour de ${esc(name(t.from))}.</p>`;
 }
 
+// Échange entre deux autres joueurs, vu en spectateur (lecture seule)
+export function watchHtml(board, S, t, name) {
+  const dot = (id) => { const p = S.players.find((q) => q.id === id); return `<i class="dot" style="background:${p ? p.color : '#888'}"></i>`; };
+  return `<h2>Échange en cours</h2>
+    <p class="watchwho">${dot(t.from)}<b>${esc(name(t.from))}</b> propose à ${dot(t.to)}<b>${esc(name(t.to))}</b></p>
+    ${tradeTimerHtml(S, t, name)}
+    <div class="swap2"><div class="side1"><small>${esc(name(t.from))} donne</small>${miniDeeds(board, S, t.give)}</div>
+    <div class="arrow">⇄</div>
+    <div class="side2"><small>${esc(name(t.to))} donne</small>${miniDeeds(board, S, t.want)}</div></div>
+    <p class="hint">Tu regardes en direct : la fenêtre se ferme quand ${esc(name(t.to))} a répondu. Les terrains sont signalés sur le plateau.</p>`;
+}
+
+// Petit résumé d'un côté d'un échange (fil des échanges en direct)
+export function tradeChips(board, sd) {
+  const out = sd.props.map((i) => { const sp = board.spaces[i]; return `<span class="tchip"><i style="background:${sp.color || '#9aa'}"></i>${esc(sp.name.replace(/^Boulevard /, 'Bd ').replace(/^Avenue /, 'Av. '))}</span>`; });
+  if (sd.cash) { const cls = BILLS.find(([d]) => sd.cash >= d)[1]; out.push(`<span class="tchip cash ${cls}">${money(sd.cash)}</span>`); }
+  if (sd.cards.length) out.push('<span class="tchip">🎟 Libéré de prison</span>');
+  return out.join('') || '<span class="tchip none">rien</span>';
+}
+
 export function offerHtml(board, S, t, name) {
   const mate = sameTeam(S, t.from, t.to);
   return `<h2>${mate ? 'Proposition de ton coéquipier' : 'Proposition d\'échange'}</h2>
