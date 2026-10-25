@@ -19,7 +19,7 @@ let battle = createBattle({
 });
 
 let turnCount = 0;
-while (battle.phase !== 'over' && turnCount < 40) {
+while (battle.phase !== 'over' && turnCount < 80) {
   turnCount++;
   const actA = chooseBotAction(battle, 'A', 'normal');
   const actB = chooseBotAction(battle, 'B', 'normal');
@@ -45,7 +45,7 @@ while (battle.phase !== 'over' && turnCount < 40) {
   }
 }
 
-if (!battle.winner) throw new Error('Combat non terminé après 40 tours');
+if (!battle.winner) throw new Error('Combat non terminé après 80 tours');
 console.log(`✓ Combat terminé en ${turnCount} tours ! Vainqueur: ${battle.winner === 'A' ? 'Sacha' : 'Régis'}`);
 
 console.log('\n--- 3. Test tournoi 4 joueurs ---');

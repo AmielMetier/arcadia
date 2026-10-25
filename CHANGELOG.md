@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.49 — 25 octobre 2026
+## 2.53 — 25 octobre 2026
 - **Cyber Kart GP** — La musique passe par le même moteur audio que les bruitages : si on entend les bruitages, on entend la musique (iPad, iPhone, Brave). Elle démarre au premier toucher ou à la première touche, avec un petit fondu entre les morceaux.
 - **Cyber Kart GP** — Physique façon Mario Kart 8 :
   - Aspiration : rester dans le sillage d'un kart pendant un peu plus d'une seconde donne un petit turbo (traînée d'air visible).
