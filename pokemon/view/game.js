@@ -540,7 +540,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <!-- Zone Combat Adversaire (Haut-Droite) : Socle officiel plains_b & Sprite Gen 5 animé -->
             <div class="fighter-zone fighter-top">
               <div class="platform platform-top">
-                <img src="assets/plains_b.png" class="plat-img" alt="platform">
+                <img src="assets/platform_opponent.png" class="plat-img" alt="platform">
                 <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
                 <div class="damage-popup-anchor" id="popupAnchorTop"></div>
               </div>
@@ -549,7 +549,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <!-- Zone Combat Joueur (Bas-Gauche) : Socle officiel plains_a & Sprite arrière Gen 5 animé -->
             <div class="fighter-zone fighter-bottom">
               <div class="platform platform-bottom">
-                <img src="assets/plains_a.png" class="plat-img" alt="platform">
+                <img src="assets/platform_player.png" class="plat-img" alt="platform">
                 <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
                 <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
               </div>
