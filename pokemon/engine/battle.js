@@ -415,3 +415,25 @@ export function forceSwitch(state, side, targetIdx) {
   state.log = [event];
   return event;
 }
+
+
+/**
+ * Calcule la duree totale en millisecondes pour jouer l'animation sequentielle du tour
+ */
+export function estimateTurnDuration(events) {
+  if (!events || !events.length) return 0;
+  let total = 0;
+  for (const ev of events) {
+    if (ev.type === 'switch') total += 1100;
+    else if (ev.type === 'attack_start') total += 850;
+    else if (ev.type === 'damage') total += 1150;
+    else if (ev.type === 'heal' || ev.type === 'recoil') total += 900;
+    else if (ev.type === 'stat_change' || ev.type === 'status_applied') total += 900;
+    else if (ev.type === 'faint') total += 1200;
+    else if (ev.type === 'status_damage') total += 1000;
+    else if (ev.type === 'msg') total += 850;
+    else if (ev.type === 'victory') total += 1200;
+    else total += 600;
+  }
+  return total;
+}

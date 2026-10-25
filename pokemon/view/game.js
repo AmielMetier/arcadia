@@ -1,5 +1,5 @@
 // pokemon/view/game.js
-// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels Gen 5 animés, barres de PV progressives, sons officiels et musique Sandstorm.
+// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels Gen 5 animés, barres de PV progressives, sons officiels, musique Sandstorm et déroulement séquentiel des tours.
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
@@ -15,6 +15,8 @@ const STATUS_LABELS = {
   freeze: 'GEL',
   sleep: 'SOMMEIL'
 };
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export function mountGame(root, { me, startMatch, restart, submitAction, exit }) {
   root.className = 'poke-root';
@@ -41,6 +43,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   let activeTab = 'moves'; // 'moves' | 'switch'
   let displayedHp = { bottom: null, top: null };
   let hpAnimRaf = { bottom: null, top: null };
+  let isResolvingTurn = false;
+  let queuedState = null;
 
   // --- Outils & Audio ---
   const syncTools = () => {
@@ -72,6 +76,35 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     t._timer = setTimeout(() => { t.hidden = true; }, ms);
   }
 
+  // --- Rendu des Popups de dégâts flottants ---
+  function showDamagePopup(side, damage, isCrit) {
+    const anchor = $(side === 'bottom' ? '#popupAnchorBottom' : '#popupAnchorTop');
+    if (!anchor || !damage) return;
+    const pop = document.createElement('div');
+    pop.className = `damage-popup ${isCrit ? 'crit' : ''}`;
+    pop.textContent = isCrit ? `-${damage} CRITIQUE !` : `-${damage}`;
+    anchor.appendChild(pop);
+    setTimeout(() => pop.remove(), 1050);
+  }
+
+  // --- Rendu des 3 Pokéballs d'équipe ---
+  const ballsHtml = (team) => `
+    <div class="team-pokeballs">
+      ${team.map(p => `
+        <div class="ball-slot ${p.fainted ? 'fainted' : 'alive'}" title="${p.name} (${p.hp}/${p.maxHp} PV)">
+          <img src="${POKEBALL_SPRITE}" alt="ball" class="ball-img">
+        </div>
+      `).join('')}
+    </div>`;
+
+  // --- Rendu des badges de types officiels Showdown ---
+  const typeBadgesHtml = (types) => types.map(t => `
+    <span class="type-pill" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
+      <img class="type-pill-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
+      <span class="type-pill-text">${TYPES[t].name.toUpperCase()}</span>
+    </span>
+  `).join('');
+
   // --- Rendu du Bracket / Aperçu du Tournoi ---
   function renderBracket(s) {
     battleMusic.stop();
@@ -89,7 +122,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <div class="trainer-header">
               <i class="dot"></i>
               <b>${match.playerA.name.toUpperCase()}</b>
-              ${match.playerA.bot ? '<span class="tag-bot">BOT</span>' : ''}
+              ${match.playerA.bot ? '<span class="tag-bot">BOT</span>' : '<span class="tag-human">JOUEUR</span>'}
             </div>
             <div class="team-preview">
               ${match.playerA.team.map(p => `
@@ -115,7 +148,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <div class="trainer-header">
               <i class="dot"></i>
               <b>${match.playerB.name.toUpperCase()}</b>
-              ${match.playerB.bot ? '<span class="tag-bot">BOT</span>' : ''}
+              ${match.playerB.bot ? '<span class="tag-bot">BOT</span>' : '<span class="tag-human">JOUEUR</span>'}
             </div>
             <div class="team-preview">
               ${match.playerB.team.map(p => `
@@ -202,13 +235,12 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
       return;
     }
 
-    const duration = Math.min(1200, Math.max(600, Math.abs(diff) * 12));
+    const duration = Math.min(1100, Math.max(500, Math.abs(diff) * 10));
     const startTime = performance.now();
 
     function step(now) {
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / duration);
-      // Easing quadratique doux
       const eased = 1 - Math.pow(1 - progress, 2);
       const currHp = Math.round(fromHp + diff * eased);
       const pct = Math.max(0, Math.min(100, Math.round((currHp / maxHp) * 100)));
@@ -236,10 +268,182 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     hpAnimRaf[side] = requestAnimationFrame(step);
   }
 
+  // --- Déroulement séquentiel et authentique d'un tour de combat ---
+  async function playSequentialTurn(s) {
+    isResolvingTurn = true;
+    const b = s.battle;
+    if (!b) {
+      isResolvingTurn = false;
+      return;
+    }
+
+    // S'assurer que le plateau est affiché
+    if (!$('#arenaCard')) {
+      renderBattle(s);
+    }
+
+    const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
+    const bottomSide = mySide === 'B' ? 'B' : 'A';
+    const topSide = bottomSide === 'A' ? 'B' : 'A';
+
+    const setDialogue = (txt) => {
+      const dt = $('#dialogueText');
+      if (dt) dt.textContent = txt;
+    };
+
+    // Afficher le bandeau de résolution dans le dashboard pendant les animations
+    const dash = $('#dashContainer');
+    if (dash) {
+      dash.innerHTML = `
+        <div class="dash-resolving-view">
+          <div class="dash-resolving-title">
+            <span class="live-pill">COMBAT</span>
+            <span>RÉSOLUTION DU TOUR EN COURS...</span>
+          </div>
+          <div class="dash-resolving-desc">Observez les capacités et les dégâts s'exécuter tour par tour !</div>
+        </div>`;
+    }
+
+    // Dérouler chaque événement un par un de manière fluide et lisible
+    for (const ev of s.events) {
+      if (ev.type === 'switch') {
+        const isBottom = (ev.side === bottomSide);
+        setDialogue(ev.msg || `${ev.trainer} envoie ${ev.name} !`);
+        sfx.play('switch');
+        if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+
+        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
+        if (spriteEl) {
+          spriteEl.src = isBottom ? spriteUrls(ev.pokemonId).back : spriteUrls(ev.pokemonId).front;
+          spriteEl.className = `poke-sprite ${isBottom ? 'back' : 'front'} anim-enter`;
+        }
+        const nameEl = $(isBottom ? '#nameBottom' : '#nameTop');
+        if (nameEl) nameEl.textContent = ev.name.toUpperCase();
+        await sleep(1100);
+
+      } else if (ev.type === 'attack_start') {
+        const isBottom = (ev.side === bottomSide);
+        setDialogue(ev.msg || `${ev.moveName} !`);
+
+        // Bruitage d'attaque
+        const move = Object.values(MOVES).find(m => m.name === ev.moveName);
+        if (move && move.cat === 'special') sfx.play('beam');
+        else sfx.play('hit');
+
+        // Animation de charge/fente de l'attaquant
+        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
+        if (spriteEl) {
+          const animClass = isBottom ? 'anim-lunge-player' : 'anim-lunge-opponent';
+          spriteEl.classList.remove(animClass);
+          void spriteEl.offsetWidth;
+          spriteEl.classList.add(animClass);
+        }
+        await sleep(850);
+
+      } else if (ev.type === 'damage') {
+        const targetIsBottom = (ev.defSide === bottomSide);
+        const spriteEl = $(targetIsBottom ? '#spriteBottom' : '#spriteTop');
+        if (spriteEl) {
+          spriteEl.classList.remove('anim-hit');
+          void spriteEl.offsetWidth;
+          spriteEl.classList.add('anim-hit');
+        }
+
+        sfx.playHit(ev.mult || 1);
+        showDamagePopup(targetIsBottom ? 'bottom' : 'top', ev.damage, ev.crit);
+
+        if (ev.msg) {
+          setDialogue(ev.msg);
+        } else if (ev.crit && ev.mult > 1) {
+          setDialogue("Coup critique ! C'est super efficace !");
+        } else if (ev.crit) {
+          setDialogue("Coup critique !");
+        } else if (ev.mult > 1) {
+          setDialogue("C'est super efficace !");
+        } else if (ev.mult > 0 && ev.mult < 1) {
+          setDialogue("Ce n'est pas très efficace...");
+        }
+
+        // Animation de la barre de PV
+        const sideKey = targetIsBottom ? 'bottom' : 'top';
+        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.defHp + ev.damage);
+        animateHp(sideKey, oldHp, ev.defHp, ev.defMaxHp);
+        displayedHp[sideKey] = ev.defHp;
+
+        await sleep(1150);
+
+      } else if (ev.type === 'faint') {
+        const isBottom = (ev.side === bottomSide);
+        setDialogue(ev.msg || `${ev.name} est K.O. !`);
+        sfx.play('faint');
+
+        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
+        if (spriteEl) {
+          spriteEl.classList.remove('anim-hit', 'anim-lunge-player', 'anim-lunge-opponent');
+          spriteEl.classList.add('anim-faint');
+        }
+
+        // Mettre à jour l'indicateur de balles
+        const ballsEl = $(isBottom ? '#ballsBottom' : '#ballsTop');
+        const team = isBottom ? (bottomSide === 'A' ? b.teamA : b.teamB) : (topSide === 'A' ? b.teamA : b.teamB);
+        if (ballsEl) ballsEl.innerHTML = ballsHtml(team);
+
+        await sleep(1200);
+
+      } else if (ev.type === 'status_damage') {
+        const isBottom = (ev.side === bottomSide);
+        setDialogue(ev.msg);
+        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
+        if (spriteEl) {
+          spriteEl.classList.remove('anim-hit');
+          void spriteEl.offsetWidth;
+          spriteEl.classList.add('anim-hit');
+        }
+        const sideKey = isBottom ? 'bottom' : 'top';
+        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.hp + ev.damage);
+        animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
+        displayedHp[sideKey] = ev.hp;
+        await sleep(1000);
+
+      } else if (ev.type === 'heal' || ev.type === 'recoil') {
+        const isBottom = (ev.side === bottomSide);
+        setDialogue(ev.msg);
+        const sideKey = isBottom ? 'bottom' : 'top';
+        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : ev.hp;
+        animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
+        displayedHp[sideKey] = ev.hp;
+        await sleep(900);
+
+      } else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'msg') {
+        setDialogue(ev.msg || ev.text);
+        if (ev.type === 'status_applied') {
+          const isBottom = (ev.side === bottomSide);
+          const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
+          if (stEl) {
+            stEl.innerHTML = `<span class="status-badge status-${ev.status}">${STATUS_LABELS[ev.status] || ev.status.toUpperCase()}</span>`;
+          }
+        }
+        await sleep(950);
+
+      } else if (ev.type === 'victory') {
+        setDialogue(ev.msg);
+        sfx.play('victory');
+        await sleep(1400);
+      }
+    }
+
+    isResolvingTurn = false;
+    const targetState = queuedState || s;
+    queuedState = null;
+    renderBattle(targetState);
+  }
+
   // --- Rendu du Combat (Arène Showdown avec Assets Authentiques) ---
   function renderBattle(s) {
     const b = s.battle;
     if (!b) return;
+
+    if (isResolvingTurn) return;
 
     // Lancer la musique officielle du combat (Sandstorm pour matchs classiques, Cynthia pour la Finale)
     const isFinalRound = s.rounds && s.currentRoundIdx === s.rounds.length - 1;
@@ -274,29 +478,18 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                           (mySide === 'B' && b.phase === 'switch_forced_B') ||
                           b.phase === 'switch_forced_both';
 
-    // Rendu des 3 Pokéballs d'équipe (PokeAPI item PNG local)
-    const ballsHtml = (team) => `
-      <div class="team-pokeballs">
-        ${team.map(p => `
-          <div class="ball-slot ${p.fainted ? 'fainted' : 'alive'}" title="${p.name} (${p.hp}/${p.maxHp} PV)">
-            <img src="${POKEBALL_SPRITE}" alt="ball" class="ball-img">
-          </div>
-        `).join('')}
-      </div>`;
+    if (isForcedSwitch) {
+      activeTab = 'switch';
+    }
 
-    // Rendu des badges de types officiels Showdown avec couleur
-    const typeBadgesHtml = (types) => types.map(t => `
-      <span class="type-pill" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
-        <img class="type-pill-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
-        <span class="type-pill-text">${TYPES[t].name.toUpperCase()}</span>
-      </span>
-    `).join('');
-
-    // Message d'annonce
+    // Message d'annonce contextuel
     let announcement = '';
-    if (b.log && b.log.length) {
-      const last = b.log[b.log.length - 1];
-      announcement = last.msg || '';
+    if (isForcedSwitch) {
+      announcement = 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
+    } else if (b.phase === 'switch_forced_A' || b.phase === 'switch_forced_B') {
+      announcement = "En attente du Pokémon de l'adversaire...";
+    } else if (isSubmitted) {
+      announcement = "Attaque enregistrée ! En attente de l'adversaire...";
     } else {
       announcement = `Que doit faire ${pBottom.name} ?`;
     }
@@ -584,50 +777,6 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     }
   }
 
-  // --- Animation visuelle d'un événement ---
-  function triggerEventAnimation(ev, b) {
-    if (!b) return;
-    const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
-    const bottomSide = mySide === 'B' ? 'B' : 'A';
-
-    if (ev.type === 'move') {
-      const isBottom = (ev.side === bottomSide);
-      const sprite = $(isBottom ? '#spriteBottom' : '#spriteTop');
-      if (sprite) {
-        const animClass = isBottom ? 'anim-lunge-player' : 'anim-lunge-opponent';
-        sprite.classList.remove(animClass);
-        void sprite.offsetWidth;
-        sprite.classList.add(animClass);
-      }
-    } else if (ev.type === 'damage') {
-      const targetIsBottom = (ev.side === bottomSide);
-      const sprite = $(targetIsBottom ? '#spriteBottom' : '#spriteTop');
-      if (sprite) {
-        sprite.classList.remove('anim-hit');
-        void sprite.offsetWidth;
-        sprite.classList.add('anim-hit');
-      }
-
-      // Popup flottant de dégâts
-      const anchor = $(targetIsBottom ? '#popupAnchorBottom' : '#popupAnchorTop');
-      if (anchor && ev.dmg > 0) {
-        const pop = document.createElement('div');
-        pop.className = `damage-popup ${ev.crit ? 'crit' : ''}`;
-        pop.textContent = `-${ev.dmg} PV${ev.crit ? ' !' : ''}`;
-        anchor.appendChild(pop);
-        setTimeout(() => pop.remove(), 1000);
-      }
-    } else if (ev.type === 'switch') {
-      const isBottom = (ev.side === bottomSide);
-      const sprite = $(isBottom ? '#spriteBottom' : '#spriteTop');
-      if (sprite) {
-        sprite.classList.remove('anim-enter');
-        void sprite.offsetWidth;
-        sprite.classList.add('anim-enter');
-      }
-    }
-  }
-
   // --- Rendu du Podium Final ---
   function renderPodium(s) {
     battleMusic.stop();
@@ -671,6 +820,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
   // Raccourcis clavier (1, 2, 3, 4 pour attaques)
   addEventListener('keydown', (e) => {
+    if (isResolvingTurn) return;
     if (!state || state.phase !== 'battle' || !state.battle) return;
     const b = state.battle;
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
@@ -697,30 +847,18 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
       // Déclencher le rendu de phase
       if (s.phase === 'bracket_preview') {
+        isResolvingTurn = false;
         renderBracket(s);
       } else if (s.phase === 'battle') {
-        renderBattle(s);
-
-        // Déclencher les animations et effets audio des événements récents
-        if (s.events && s.events.length) {
-          s.events.forEach(ev => {
-            triggerEventAnimation(ev, s.battle);
-            if (ev.type === 'damage') {
-              sfx.playHit(ev.mult || 1);
-            } else if (ev.type === 'faint') {
-              sfx.play('faint');
-            } else if (ev.type === 'switch') {
-              sfx.play('switch');
-              if (ev.pokemonId) sfx.playCry(ev.pokemonId);
-            } else if (ev.type === 'move') {
-              const move = MOVES[ev.moveId];
-              if (move && move.cat === 'special') sfx.play('beam');
-            } else if (ev.type === 'victory') {
-              sfx.play('victory');
-            }
-          });
+        if (s.events && s.events.length > 0 && !isResolvingTurn) {
+          playSequentialTurn(s);
+        } else if (isResolvingTurn) {
+          queuedState = s;
+        } else {
+          renderBattle(s);
         }
       } else if (s.phase === 'podium') {
+        isResolvingTurn = false;
         renderPodium(s);
       }
     },

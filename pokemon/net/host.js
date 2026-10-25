@@ -2,7 +2,7 @@
 // Hôte autoritaire de Poké Duel : gère le tournoi, chronomètre les tours, fait jouer les bots et synchronise tous les joueurs.
 
 import { createTournament, startCurrentMatch, finishCurrentMatch } from '../engine/tournament.js';
-import { resolveTurn, forceSwitch } from '../engine/battle.js';
+import { resolveTurn, forceSwitch, estimateTurnDuration } from '../engine/battle.js';
 import { chooseBotAction } from '../engine/bot.js';
 
 export function startHost({ bridge, solo, settings, me, onState, onSetup, onError }) {
@@ -84,20 +84,20 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     const b = tournament.activeBattle;
     if (!b) return;
 
-    // Si l'un des dresseurs est un bot, planifier sa réponse
+    // Si l'un des dresseurs est un bot, planifier sa réponse avec un temps de réflexion réaliste
     if (b.trainerA.bot) {
       setTimeout(() => {
         if (tournament && tournament.activeBattle === b && !pendingActions.A) {
           submitAction('A', chooseBotAction(b, 'A', difficulty));
         }
-      }, 700 + Math.random() * 800);
+      }, 900 + Math.random() * 900);
     }
     if (b.trainerB.bot) {
       setTimeout(() => {
         if (tournament && tournament.activeBattle === b && !pendingActions.B) {
           submitAction('B', chooseBotAction(b, 'B', difficulty));
         }
-      }, 900 + Math.random() * 800);
+      }, 1100 + Math.random() * 900);
     }
 
     timerInterval = setInterval(() => {
@@ -179,32 +179,40 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
 
     broadcast(events);
 
+    // Calcul du temps nécessaire pour dérouler toutes les animations du tour
+    const animDuration = estimateTurnDuration(events);
+
     if (state.phase === 'over') {
-      // Fin du combat !
+      // Fin du combat : laisser le temps de voir la victoire avant l'arbre
       setTimeout(() => {
         finishCurrentMatch(tournament, state.winner);
         broadcast();
-      }, 3500);
+      }, animDuration + 2500);
     } else if (state.phase.startsWith('switch_forced')) {
-      // Si un bot doit forcer son switch
-      if ((state.phase === 'switch_forced_A' || state.phase === 'switch_forced_both') && state.trainerA.bot) {
-        setTimeout(() => {
-          const sw = chooseBotAction(state, 'A', difficulty);
-          if (sw && sw.type === 'switch') forceSwitch(state, 'A', sw.targetIndex);
-          broadcast();
-          if (state.phase === 'choose') startTurnTimer();
-        }, 1200);
-      }
-      if ((state.phase === 'switch_forced_B' || state.phase === 'switch_forced_both') && state.trainerB.bot) {
-        setTimeout(() => {
-          const sw = chooseBotAction(state, 'B', difficulty);
-          if (sw && sw.type === 'switch') forceSwitch(state, 'B', sw.targetIndex);
-          broadcast();
-          if (state.phase === 'choose') startTurnTimer();
-        }, 1400);
-      }
+      // Attendre la fin complète des animations du tour avant que les bots ne choisissent leur remplaçant
+      setTimeout(() => {
+        if ((state.phase === 'switch_forced_A' || state.phase === 'switch_forced_both') && state.trainerA.bot) {
+          setTimeout(() => {
+            const sw = chooseBotAction(state, 'A', difficulty);
+            if (sw && sw.type === 'switch') forceSwitch(state, 'A', sw.targetIndex);
+            broadcast();
+            if (state.phase === 'choose') startTurnTimer();
+          }, 800);
+        }
+        if ((state.phase === 'switch_forced_B' || state.phase === 'switch_forced_both') && state.trainerB.bot) {
+          setTimeout(() => {
+            const sw = chooseBotAction(state, 'B', difficulty);
+            if (sw && sw.type === 'switch') forceSwitch(state, 'B', sw.targetIndex);
+            broadcast();
+            if (state.phase === 'choose') startTurnTimer();
+          }, 1000);
+        }
+      }, animDuration);
     } else {
-      startTurnTimer();
+      // Démarrer le chronomètre du prochain tour UNIQUEMENT après la fin des animations
+      setTimeout(() => {
+        startTurnTimer();
+      }, animDuration);
     }
   }
 
