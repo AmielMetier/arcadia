@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.51 — 25 octobre 2026
+- Correction : resolve type badge overflow, ground sprites on pedestals with Gen 5 animated pixel art, smooth progressive HP drain, authentic attack SFX and Sandstorm BGM (Amiel)
+
 ## 2.50 — 24 octobre 2026
 - **Tête de Calcul** — Le market making de The Candidate est plus clair : un guide « Comment ça marche ? » sous les cotations, les dés déjà vus rappelés avant chaque prix, ce que chaque deal veut dire, et le détail de ton P&L à la correction.
 
