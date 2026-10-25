@@ -1,9 +1,9 @@
 // pokemon/view/game.js
-// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown, barres de PV, attaques professionnelles et switchs.
+// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels, barres de PV, attaques professionnelles et switchs.
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
-import { TYPES, getEffectiveness, getTypeBadgeUrl } from '../engine/types.js';
+import { TYPES, getEffectiveness, getTypeBadgeUrl, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
 import { sfx } from './sfx.js';
 import { battleMusic } from './music.js';
 
@@ -95,7 +95,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
                   <small>${p.name.toUpperCase()}</small>
                   <div class="preview-types">
-                    ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                    ${p.types.map(t => `<img class="preview-type-img" src="${getShowdownTypeIcon(t)}" alt="${t}">`).join('')}
                   </div>
                 </div>
               `).join('')}
@@ -116,7 +116,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
                   <small>${p.name.toUpperCase()}</small>
                   <div class="preview-types">
-                    ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                    ${p.types.map(t => `<img class="preview-type-img" src="${getShowdownTypeIcon(t)}" alt="${t}">`).join('')}
                   </div>
                 </div>
               `).join('')}
@@ -165,7 +165,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     }
   }
 
-  // --- Rendu du Combat (Arène Showdown) ---
+  // --- Rendu du Combat (Arène Showdown avec Assets Authentiques) ---
   function renderBattle(s) {
     const b = s.battle;
     if (!b) return;
@@ -192,15 +192,15 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     const hpPctBottom = Math.max(0, Math.min(100, Math.round((pBottom.hp / pBottom.maxHp) * 100)));
     const hpPctTop = Math.max(0, Math.min(100, Math.round((pTop.hp / pTop.maxHp) * 100)));
 
-    const hpColorBottom = hpPctBottom > 50 ? '#2fbf71' : hpPctBottom > 20 ? '#ffc531' : '#ff4b2b';
-    const hpColorTop = hpPctTop > 50 ? '#2fbf71' : hpPctTop > 20 ? '#ffc531' : '#ff4b2b';
+    const hpClassBottom = hpPctBottom > 50 ? 'hp-green' : hpPctBottom > 20 ? 'hp-yellow' : 'hp-red';
+    const hpClassTop = hpPctTop > 50 ? 'hp-green' : hpPctTop > 20 ? 'hp-yellow' : 'hp-red';
 
     const isSubmitted = mySide === 'A' ? s.submittedA : mySide === 'B' ? s.submittedB : false;
     const isForcedSwitch = (mySide === 'A' && b.phase === 'switch_forced_A') ||
                           (mySide === 'B' && b.phase === 'switch_forced_B') ||
                           b.phase === 'switch_forced_both';
 
-    // Rendu des 3 Pokéballs d'équipe (PokeAPI item PNG)
+    // Rendu des 3 Pokéballs d'équipe (PokeAPI item PNG local)
     const ballsHtml = (team) => `
       <div class="team-pokeballs">
         ${team.map(p => `
@@ -210,10 +210,10 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         `).join('')}
       </div>`;
 
-    // Rendu des types avec images officielles Gen 8
+    // Rendu des badges de types officiels Showdown
     const typeBadgesHtml = (types) => types.map(t => `
       <span class="type-pill" title="${TYPES[t].name}">
-        <img class="type-pill-img" src="${getTypeBadgeUrl(t)}" alt="${TYPES[t].name}" loading="lazy">
+        <img class="type-pill-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
       </span>
     `).join('');
 
@@ -234,20 +234,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     stage.innerHTML = `
       <div class="arena-card deal">
         <div class="battlefield">
-          <!-- Ciel & Éclairage de stade -->
-          <div class="stadium-sky">
-            <div class="floodlight left-light"></div>
-            <div class="floodlight right-light"></div>
-            <div class="stadium-stands"></div>
-          </div>
-
-          <!-- Pelouse & Marquages officiels de Stade Pokémon -->
-          <div class="stadium-turf">
-            <div class="turf-ring-outer"></div>
-            <div class="turf-pokeball-center"></div>
-          </div>
-
-          <!-- HUD Adversaire (Haut-Gauche) -->
+          <!-- HUD Adversaire (Haut-Gauche) avec Plaque Authentique -->
           <div class="hud-zone hud-top">
             <div class="status-card opponent-card">
               <div class="sc-head">
@@ -262,7 +249,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
               <div class="hp-gauge-row">
                 <span class="hp-tag">PV</span>
                 <div class="hp-track">
-                  <div class="hp-fill ${hpPctTop <= 20 ? 'critical' : ''}" style="width:${hpPctTop}%;background:${hpColorTop}"></div>
+                  <div class="hp-fill ${hpClassTop} ${hpPctTop <= 20 ? 'critical' : ''}" style="width:${hpPctTop}%"></div>
                   <div class="hp-gloss"></div>
                 </div>
               </div>
@@ -276,31 +263,25 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             </div>
           </div>
 
-          <!-- Zone Combat Adversaire (Haut-Droite) : Plateforme 3D & Sprite avant sans coupure -->
+          <!-- Zone Combat Adversaire (Haut-Droite) : Socle officiel plains_b & Sprite avant sans coupure -->
           <div class="fighter-zone fighter-top">
             <div class="platform platform-top">
-              <div class="plat-shadow"></div>
-              <div class="plat-base"></div>
-              <div class="plat-turf"></div>
-              <div class="plat-ring"></div>
+              <img src="assets/plains_b.png" class="plat-img" alt="platform">
               <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
               <div class="damage-popup-anchor" id="popupAnchorTop"></div>
             </div>
           </div>
 
-          <!-- Zone Combat Joueur (Bas-Gauche) : Plateforme 3D & Sprite arrière -->
+          <!-- Zone Combat Joueur (Bas-Gauche) : Socle officiel plains_a & Sprite arrière -->
           <div class="fighter-zone fighter-bottom">
             <div class="platform platform-bottom">
-              <div class="plat-shadow"></div>
-              <div class="plat-base"></div>
-              <div class="plat-turf"></div>
-              <div class="plat-ring"></div>
+              <img src="assets/plains_a.png" class="plat-img" alt="platform">
               <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
               <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
             </div>
           </div>
 
-          <!-- HUD Joueur (Bas-Droite) -->
+          <!-- HUD Joueur (Bas-Droite) avec Plaque Authentique -->
           <div class="hud-zone hud-bottom">
             <div class="status-card player-card">
               <div class="sc-head">
@@ -315,20 +296,20 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
               <div class="hp-gauge-row">
                 <span class="hp-tag">PV</span>
                 <div class="hp-track">
-                  <div class="hp-fill ${hpPctBottom <= 20 ? 'critical' : ''}" style="width:${hpPctBottom}%;background:${hpColorBottom}"></div>
+                  <div class="hp-fill ${hpClassBottom} ${hpPctBottom <= 20 ? 'critical' : ''}" style="width:${hpPctBottom}%"></div>
                   <div class="hp-gloss"></div>
                 </div>
               </div>
 
               <div class="sc-foot">
-                <span class="hp-fraction"><b style="color:${hpColorBottom}">${pBottom.hp}</b> / ${pBottom.maxHp} PV</span>
+                <span class="hp-fraction"><b class="${hpClassBottom}">${pBottom.hp}</b> / ${pBottom.maxHp} PV</span>
                 ${ballsHtml(teamBottom)}
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Bandeau de Dialogue Showdown Pro -->
+        <!-- Bandeau de Dialogue Showdown avec texture overlay_message -->
         <div class="battle-dialogue-bar">
           <span class="dialogue-tag">DIRECT</span>
           <span class="dialogue-text">${announcement}</span>
@@ -393,17 +374,15 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                     multiplierLabel = 'TACTIQUE';
                   }
 
-                  const catLabel = m.cat === 'physical' ? 'PHYSIQUE' : m.cat === 'special' ? 'SPÉCIAL' : 'STATUT';
-
                   return `
                     <button class="pro-move-card" data-move="${moveId}" style="--mc:${TYPES[m.type].color};--mc-bg:${TYPES[m.type].bg}" ${isSubmitted ? 'disabled' : ''}>
                       <div class="pm-top">
                         <span class="pm-key">${mIdx + 1}</span>
                         <span class="pm-name">${m.name}</span>
-                        <span class="pm-cat cat-${m.cat}">${catLabel}</span>
+                        <img src="${getCategoryIcon(m.cat)}" class="pm-cat-img" alt="${m.cat}" title="${m.cat.toUpperCase()}">
                       </div>
                       <div class="pm-mid">
-                        <img class="pm-type-img" src="${getTypeBadgeUrl(m.type)}" alt="${TYPES[m.type].name}" loading="lazy">
+                        <img class="pm-type-img" src="${getShowdownTypeIcon(m.type)}" alt="${TYPES[m.type].name}">
                         <div class="pm-stats-group">
                           <div class="pm-stat-chip">
                             <span class="pm-stat-label">PUISS</span>
@@ -445,7 +424,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                           <span class="bs-lvl">NV. 50</span>
                         </div>
                         <div class="bs-types">
-                          ${p.types.map(t => `<img src="${getTypeBadgeUrl(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
+                          ${p.types.map(t => `<img src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
                         </div>
                         <div class="bs-hp-track">
                           <div class="bs-hp-fill" style="width:${hpPct}%;background:${hpCol}"></div>
@@ -550,7 +529,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                 <img src="${spriteUrls(p.id).artwork}" alt="${p.name}">
                 <b>${p.name.toUpperCase()}</b>
                 <div class="champ-types">
-                  ${p.types.map(t => `<img class="champ-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
+                  ${p.types.map(t => `<img class="champ-type-img" src="${getShowdownTypeIcon(t)}" alt="${t}">`).join('')}
                 </div>
               </div>
             `).join('')}

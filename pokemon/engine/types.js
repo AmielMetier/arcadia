@@ -22,6 +22,38 @@ export const TYPE_IDS = {
   fairy: 18,
 };
 
+export const TYPE_SHOWDOWN_NAMES = {
+  normal: 'Normal',
+  fire: 'Fire',
+  water: 'Water',
+  grass: 'Grass',
+  electric: 'Electric',
+  ice: 'Ice',
+  fighting: 'Fighting',
+  poison: 'Poison',
+  ground: 'Ground',
+  flying: 'Flying',
+  psychic: 'Psychic',
+  bug: 'Bug',
+  rock: 'Rock',
+  ghost: 'Ghost',
+  dragon: 'Dragon',
+  steel: 'Steel',
+  dark: 'Dark',
+  fairy: 'Fairy',
+};
+
+export function getShowdownTypeIcon(typeKey) {
+  const name = TYPE_SHOWDOWN_NAMES[typeKey] || 'Normal';
+  return `assets/types/${name}.png`;
+}
+
+export function getCategoryIcon(cat) {
+  if (cat === 'physical') return 'assets/Physical.png';
+  if (cat === 'special') return 'assets/Special.png';
+  return 'assets/Status.png';
+}
+
 export function getTypeBadgeUrl(typeKey) {
   const id = TYPE_IDS[typeKey] || 1;
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/types/generation-viii/sword-shield/${id}.png`;
