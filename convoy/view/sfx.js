@@ -7,6 +7,16 @@ const RUN = [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]];       // D
 const RUN_DARK = [[50, 53, 57], [51, 55, 58], [50, 53, 56], [49, 53, 56]];  // Dm Eb Ddim C#… plus inquiétant
 const CALM = [[50, 54, 57], [55, 59, 62], [47, 50, 54], [45, 49, 52]];      // D G Bm A
 const PENTA = [62, 64, 66, 69, 71, 74, 76, 78];
+// chaque paysage a sa couleur : forêt sombre et lente, ville tendue, lac aérien, col héroïque, raffinerie martelée, toundra dépouillée
+const BIO_PROG = {
+  foret: [[45, 48, 52], [41, 45, 48], [43, 47, 50], [40, 43, 47]],     // Am F G Em
+  ville: [[50, 53, 57], [49, 52, 56], [48, 51, 55], [46, 50, 53]],     // Dm C#dim Cm Bb
+  lac: [[52, 56, 59], [57, 61, 64], [54, 57, 61], [50, 54, 57]],       // E A F#m D
+  col: [[48, 52, 55], [43, 47, 50], [45, 48, 52], [41, 45, 48]],       // C G Am F
+  usine: [[47, 50, 54], [47, 50, 53], [45, 48, 52], [46, 49, 52]],     // Bm Bdim Am Bb
+  toundra: [[50, 55, 57], [48, 53, 55], [46, 51, 53], [48, 53, 55]],   // Dsus4 Csus4 Bbsus4 Csus4
+};
+const BIO_BPM = { foret: -8, ville: 6, lac: -4, col: 4, usine: 10, toundra: -10 };
 
 export class Sfx {
   constructor() {
@@ -62,15 +72,16 @@ export class Sfx {
     if (state.mode !== 'win') M.won = false;
     if (state.mode !== M.mode) { M.mode = state.mode; M.step = 0; M.next = Math.max(M.next, t + 0.05); }
     M.danger += ((state.danger || 0) - M.danger) * 0.02;
+    M.bio = state.bio || M.bio; M.tunnel = !!state.tunnel;
     if (M.mode === 'off') { M.next = t + 0.1; return; }
     const calm = M.mode === 'station' || M.mode === 'win';
-    const bpm = calm ? 72 : 84 + M.danger * 26, sx = 60 / bpm / 4; // une double croche
+    const bpm = calm ? 72 : 84 + (BIO_BPM[M.bio] || 0) + M.danger * 26, sx = 60 / bpm / 4; // une double croche
     if (M.next < t - 0.5) M.next = t + 0.05;  // l'onglet a dormi : on repart proprement
     while (M.next < t + 0.15) { this.beat(M.step, M.next, sx, calm); M.step = (M.step + 1) % 64; M.next += sx; }
   }
   beat(s, at, sx, calm) {
     const M = this.m, bar = Math.floor(s / 16), i = s % 16;
-    const prog = calm ? CALM : M.danger > 0.55 ? RUN_DARK : RUN, ch = prog[bar];
+    const prog = calm ? CALM : M.danger > 0.55 ? RUN_DARK : BIO_PROG[M.bio] || RUN, ch = prog[bar];
     if (i === 0) for (const n of ch) this.pad(N(n), sx * 16, at, calm ? 0.05 : 0.045, calm ? 'triangle' : 'sawtooth');
     if (i === 0) this.pad(N(ch[0] - 12), sx * 16, at, 0.07, 'sine');
     if (calm) {
@@ -80,8 +91,9 @@ export class Sfx {
     }
     // arpège ostinato, qui monte avec le danger
     if (i % 2 === 0) { const n = ch[(i / 2) % 3] + 12 + (i >= 8 && M.danger > 0.3 ? 12 : 0); this.pluck(N(n), at, 0.035 + M.danger * 0.02, 'triangle'); }
-    // pulsation de basse et tic-tac (danger)
-    if (i % 4 === 0) this.bass(N(ch[0] - 24), at, 0.06 + M.danger * 0.12);
+    // pulsation de basse et tic-tac (danger) ; à la raffinerie, une enclume ; sous la montagne, un écho grave
+    if (i % 4 === 0) this.bass(N(ch[0] - 24), at, 0.06 + M.danger * 0.12 + (M.tunnel ? 0.05 : 0));
+    if (M.bio === 'usine' && i % 8 === 4) this.hat(at, 0.05);
     if (M.danger > 0.25 && i % 2 === 1) this.hat(at, 0.025 + M.danger * 0.04);
     if (M.danger > 0.6 && i === 12) this.pluck(N(ch[0] + 18), at, 0.04, 'square'); // triton qui grince
   }
@@ -201,6 +213,14 @@ export class Sfx {
       case 'grapple': this.burst(0.25, 2400, 0.12, 'bandpass', 2); this.tone(900, 0.15, 0.05, 'square', 300, 0.18); this.burst(0.2, 400, 0.4, 'lowpass', 1, 0.32); this.tone(200, 0.2, 0.1, 'square', 140, 0.32); break;
       case 'cut': this.burst(0.08, 6000, 0.2, 'highpass'); this.tone(1400, 0.12, 0.06, 'triangle', 2200); this.burst(0.3, 800, 0.12, 'lowpass', 1, 0.08); break;
       case 'splash': this.burst(0.15, 2400, 0.3, 'bandpass', 1); this.burst(0.7, 500, 0.4, 'lowpass', 0.7, 0.05); this.tone(320, 0.4, 0.05, 'sine', 90); break;
+      case 'chop': this.burst(0.06, 1800, 0.25, 'bandpass', 3); this.tone(220, 0.08, 0.08, 'square', 140); break;
+      case 'timber': { for (let i = 0; i < 5; i++) this.burst(0.08, 900 + i * 120, 0.12, 'bandpass', 4, i * 0.09); const f = this.burst(1.4, 140, 0.6, 'lowpass', 0.8, 0.55); if (f) f.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 2); break; }
+      case 'pump': for (let i = 0; i < 3; i++) { this.burst(0.25, 300, 0.2, 'lowpass', 1, i * 0.3); this.tone(90, 0.2, 0.06, 'sine', 70, i * 0.3); } break;
+      case 'beep': this.tone(1760, 0.08, 0.05, 'square'); this.tone(1760, 0.08, 0.05, 'square', null, 0.16); break;
+      case 'shot': this.burst(0.05, 4000, 0.5, 'highpass'); this.burst(0.5, 600, 0.35, 'lowpass', 0.8, 0.02); this.tone(140, 0.25, 0.08, 'square', 60); break;
+      case 'harpoon': this.burst(0.08, 3000, 0.25, 'bandpass', 2); this.tone(600, 0.3, 0.06, 'sawtooth', 120); this.burst(0.2, 400, 0.2, 'lowpass', 1, 0.25); break;
+      case 'hooves': for (let i = 0; i < 10; i++) this.burst(0.05, 700 + (i % 3) * 200, 0.1, 'bandpass', 3, i * 0.08); break;
+      case 'fire': { const f = this.burst(1.4, 800, 0.25, 'bandpass', 0.6); if (f) f.frequency.exponentialRampToValueAtTime(2400, this.ctx.currentTime + 1.2); for (let i = 0; i < 6; i++) this.burst(0.03, 3000, 0.08, 'highpass', 1, i * 0.13); break; }
     }
   }
   dispose() {

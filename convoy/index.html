@@ -17,32 +17,44 @@
   <div class="flash" id="flash"></div>
   <div class="night" id="night"></div>
   <div class="stormfx" id="stormfx"></div>
-  <div class="topc">
-    <div class="fuel card" id="fuelBox">
-      <div class="fl"><b>CHAUDIÈRE</b><span id="fuelTxt">100 %</span></div>
-      <div class="bar"><i id="fuelBar"></i></div>
-      <div class="fl sm"><span id="burnTxt">−0,8 %/s</span><span id="speedTxt">9 km/h</span></div>
-      <div class="fl sm2" id="mechBox"><span class="pr" title="Pression de la chaudière (soupape : E devant la chaudière)">♨️ <i class="pb"><i id="pressBar"></i></i><b id="pressTxt">0 %</b></span><span class="th" title="Manette de vitesse (E à l'arrière de la cabine)">🕹️ <b id="thrTxt">Normal</b></span></div>
-    </div>
-    <div class="route card" id="route">
-      <div class="rt"><i id="routeFill"></i><span id="routeTicks"></span><u id="routeTrain">🚂</u></div>
-      <div class="rl" id="routeTxt"></div>
-      <div class="storm" id="stormBox" title="Avance sur le front de tempête"><span>🌪️ FRONT</span><div class="sb"><i id="stormBar"></i></div><b id="stormTxt">90 m</b></div>
-      <div class="bio"><span id="bioTxt" title="Paysage du tronçon et moment fort à venir"></span><span class="day" id="dayTxt" title="Jour et nuit : temps avant le prochain changement"></span></div>
-    </div>
-    <div class="boss card" id="bossBox" hidden><b>🚛 LE BRISE-GLACE</b><div class="bb"><i id="bossBar"></i></div><span id="bossTxt"></span></div>
+  <div class="markers" id="markers"></div>
+
+  <!-- la ligne à venir : le Front, le convoi, les aiguillages, les tunnels, la gare suivante -->
+  <div class="strip panel-d" id="strip">
+    <div class="sl"><span class="chip" id="bioChip"></span><span class="next" id="nextTxt"></span><span class="chip" id="dayChip"></span></div>
+    <svg id="stripSvg" viewBox="0 0 560 52" preserveAspectRatio="none"></svg>
   </div>
-  <div class="stats card"><span title="Distance parcourue"><small>DISTANCE</small><b id="distTxt">0 m</b></span><span title="Temps"><small>TEMPS</small><b id="clockTxt">0:00</b></span><span title="Caisses brûlées"><small>FIOUL</small><b id="crateTxt">0</b></span><span title="Ferraille commune (améliorations en gare)"><small>FERRAILLE</small><b id="scrapTxt">0</b></span><span title="Solidité du convoi (réparé en gare)" id="hullBox"><small>CONVOI</small><b id="hullTxt">100 %</b></span></div>
-  <div class="tr"><button class="icon card" id="btnMute" title="Son (M)">🔊</button><button class="icon card" id="btnMenu" title="Menu (Échap)">☰</button></div>
+  <div class="boss panel-d" id="bossBox" hidden><b>LE BRISE-GLACE</b><div class="bb"><i id="bossBar"></i></div><span id="bossTxt"></span></div>
+
+  <!-- distance et temps -->
+  <div class="clock panel-d"><span><small>DISTANCE</small><b id="distTxt">0 m</b></span><span><small>TEMPS</small><b id="clockTxt">0:00</b></span></div>
+
+  <!-- tableau de bord de la locomotive -->
+  <div class="dash panel-d" id="dash">
+    <div class="gauges"><div class="gg" id="gFuel"></div><div class="gg" id="gPress"></div><div class="gg" id="gSpeed"></div></div>
+    <div class="drow"><div class="thr" id="thr"></div><span class="grade" id="grade"></span></div>
+    <div class="drow sm"><span id="burnTxt"></span></div>
+    <div class="bars">
+      <div class="bar hb" title="Solidité du convoi (réparée en gare)"><img class="ic" src="img/icons/shield.png" alt=""><span class="bt"><i id="hullBar"></i></span><b id="hullTxt">100%</b></div>
+      <div class="bar tb" title="Ta chaleur : près de la chaudière, on se réchauffe"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M10 3a2 2 0 0 1 4 0v10.3a4.5 4.5 0 1 1-4 0z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="17" r="2.6"/><rect x="11" y="8" width="2" height="8"/></svg><span class="bt"><i id="heatBar"></i></span><b id="heatTxt">100%</b></div>
+    </div>
+    <div class="drow tags">
+      <span title="Fusées éclairantes (G)"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 4.6L18 5l-2.4 4L20 11l-4.6 1.4L17 17l-4-2.6L12 19l-1-4.6L7 17l1.6-4.6L4 11l4.4-2L6 5l4.4 1.6z"/></svg><b id="flareTxt">×2</b></span>
+      <span title="Ferraille commune (cartes en gare)"><img class="ic" src="img/icons/resource_iron.png" alt=""><b id="scrapTxt">0</b></span>
+      <span title="Survivants à bord"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="3"/><path d="M8 9h8l1 7h-2.5l-.5 6h-4l-.5-6H7z"/></svg><b id="survTxt">0</b></span>
+    </div>
+  </div>
+
+  <div class="tr"><button class="icon" id="btnMap" title="Carte du trajet (Tab)"><svg class="ic" viewBox="0 0 24 24"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 3v16M15 5v16" fill="none" stroke="currentColor" stroke-width="2"/></svg></button><button class="icon" id="btnMute" title="Son (M)"><img class="ic" src="img/icons/audioOn.png" alt="Son"></button><button class="icon" id="btnMenu" title="Menu (Échap)"><img class="ic" src="img/icons/menuGrid.png" alt="Menu"></button></div>
   <div class="team" id="team"></div>
-  <div class="vitals card" id="vitals"><span class="hl">🌡️</span><div class="hb"><i id="heatBar"></i></div><b id="heatTxt">100 %</b><span class="fx" title="Fusées éclairantes (G)">🎆 <b id="flareTxt">×2</b></span></div>
-  <div class="station card" id="station" hidden></div>
+  <div class="tuto panel-d" id="tuto" hidden></div>
+  <div class="station panel-d" id="station" hidden></div>
   <div class="prompt" id="prompt" hidden></div>
   <div class="tracker" id="tracker" hidden><i>▲</i><span></span></div>
   <div class="pops" id="pops"></div>
   <div class="toast" id="toast" hidden></div>
   <div class="banner" id="banner" hidden></div>
-  <div class="help card" id="help"><b>ZQSD</b> bouger · <b>Espace</b> sauter · <b>E</b> fouiller / prendre / chaudière / pelle · <b>F</b> lancer · <b>G</b> fusée · en gare : <b>1-3</b> cartes, <b>4-5</b> aiguillage, <b>V</b> départ<br>À bord : <b>E</b> manette (cabine), soupape (devant la chaudière), réparations, grappins</div>
+  <div class="mapview" id="mapView" hidden><div class="mh"><b>Carte du trajet</b><span>La voie parcourue, les aiguillages à venir et leurs deux voies · <img class="key" src="img/icons/keys/tab.png" alt="Tab"> pour fermer</span></div><canvas id="mapCanvas"></canvas></div>
   <div class="tbtns" id="tbtns"><button data-a="fl">🎆<small>Fusée</small></button><button data-a="jump">⤒<small>Sauter</small></button><button data-a="use">✋<small>Agir</small></button><button data-a="thr">➶<small>Lancer</small></button></div>
 </div>
 

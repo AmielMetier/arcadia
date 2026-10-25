@@ -83,7 +83,11 @@ export function makeActors() {
     const shovel = new THREE.Group(); const sh1 = mesh(GEO.shaft, SH.wood); sh1.position.y = -0.2; shovel.add(sh1);
     const sb = mesh(GEO.blade, SH.steel); sb.position.y = -0.66; shovel.add(sb);
     shovel.position.set(0, 1.0, 0.35); shovel.visible = false; root.add(shovel);
-    return { g, root, legs, arms, head, tail, shovel, body, trim, own, base: new THREE.Color(color) };
+    // hache (abattre les arbres), tenue à deux mains
+    const axe = new THREE.Group(); const ah = mesh(GEO.shaft, SH.wood); ah.position.y = -0.2; axe.add(ah);
+    const ab = mesh(GEO.blade, SH.steel); ab.scale.set(1.1, 1.4, 0.6); ab.position.set(0.1, -0.62, 0); axe.add(ab);
+    axe.position.set(0, 1.25, 0.32); axe.visible = false; root.add(axe);
+    return { g, root, legs, arms, head, tail, shovel, axe, body, trim, own, base: new THREE.Color(color) };
   }
 
   const ICE = new THREE.Color(0xbfe4ff);
@@ -94,7 +98,15 @@ export function makeActors() {
     const sw = p.air ? 0.5 : Math.sin(o.walk) * Math.min(1, sp / 3) * 0.75;
     o.legs[0].rotation.x = sw; o.legs[1].rotation.x = -sw;
     let up0, up1;
+    const act = p.act | 0;
+    if (p.seat) { // assis (survivant à bord)
+      o.legs[0].rotation.x = o.legs[1].rotation.x = -1.35; o.root.position.y = -0.42;
+      o.arms[0].rotation.x = o.arms[1].rotation.x = -0.5; o.root.rotation.z = Math.sin(t * 1.1 + (p.id | 0)) * 0.03;
+      o.shovel.visible = o.axe.visible = false; return;
+    }
     if (p.carry) up0 = up1 = -2.9;
+    else if (act === 1) { up0 = up1 = -2.4 + Math.max(0, Math.sin(t * 7)) * 1.9; }
+    else if (act === 2) { up0 = up1 = -1.45 + Math.sin(t * 5) * 0.08; }
     else if (p.st === 2) { up0 = -2.6 + Math.sin(t * 14) * 0.4; up1 = -2.6 - Math.sin(t * 14) * 0.4; }
     else if (p.dig) { up0 = up1 = -1.1 + Math.sin(t * 9) * 0.6; }
     else if (p.sp > 0) { up0 = -1.2 + Math.sin(t * 16) * 0.5; up1 = -1.2 - Math.sin(t * 16) * 0.5; }
@@ -103,6 +115,8 @@ export function makeActors() {
     o.arms[0].rotation.z = p.carry ? 0.15 : 0; o.arms[1].rotation.z = p.carry ? -0.15 : 0;
     o.shovel.visible = !!p.dig;
     if (p.dig) { o.shovel.rotation.x = -0.9 + Math.sin(t * 9) * 0.6; }
+    o.axe.visible = act === 1;
+    if (act === 1) o.axe.rotation.x = -2.2 + Math.max(0, Math.sin(t * 7)) * 1.9;
     o.root.position.y = p.air ? 0 : Math.abs(Math.sin(o.walk)) * 0.05 * Math.min(1, sp / 3);
     o.tail.rotation.x = 0.3 + Math.sin(t * 6 + o.walk) * 0.25 * Math.min(1, sp / 2 + 0.3);
     // froid : la parka se couvre de givre, on grelotte sous 15 %
@@ -110,27 +124,30 @@ export function makeActors() {
     o.body.color.copy(o.base).lerp(ICE, ice * 0.65);
     const shiver = heat < 15 ? Math.sin(t * 60) * 0.03 : 0;
     o.root.rotation.z = shiver;
-    o.root.rotation.x = p.st === 1 ? 0.35 : p.dig ? 0.25 : 0;
+    o.root.rotation.x = p.st === 1 ? 0.35 : p.dig ? 0.25 : act === 2 ? 0.4 : 0;
   }
 
   // ------------------------------------------------------------------ loup
-  function wolf() {
+  const SHA = { wolf: M(0x2d2f35), wolfD: M(0x17181c) };
+  // alpha : plus grand, plus sombre, yeux toujours rouges
+  function wolf(alpha = false) {
     const g = new THREE.Group();
-    const body = mesh(GEO.wBody, SH.wolf); body.position.y = 0.62; g.add(body);
+    const W = alpha ? SHA : SH;
+    const body = mesh(GEO.wBody, W.wolf); body.position.y = 0.62; g.add(body);
     const chest = mesh(GEO.wChest, SH.wolfL); chest.position.set(0, 0.66, 0.34); chest.scale.set(0.9, 0.95, 0.9); g.add(chest);
     const neck = new THREE.Group(); neck.position.set(0, 0.82, 0.5); g.add(neck);
-    const head = mesh(GEO.wHead, SH.wolf); neck.add(head);
+    const head = mesh(GEO.wHead, W.wolf); neck.add(head);
     const snout = mesh(GEO.wSnout, SH.wolfL); snout.position.set(0, -0.04, 0.22); neck.add(snout);
     const nose = mesh(GEO.wEye, SH.wolfD, false); nose.position.set(0, 0.0, 0.34); nose.scale.set(1.2, 1.5, 1); neck.add(nose);
     for (const s of [-0.08, 0.08]) { const e = mesh(GEO.wEar, SH.wolfD); e.position.set(s, 0.17, -0.03); neck.add(e); }
     const eyes = [-0.075, 0.075].map((s) => { const e = mesh(GEO.wEye, SH.eye, false); e.position.set(s, 0.05, 0.145); neck.add(e); return e; });
     const legs = [[-0.13, 0.36], [0.13, 0.36], [-0.13, -0.32], [0.13, -0.32]].map(([x, z]) => {
       const piv = new THREE.Group(); piv.position.set(x, 0.55, z); g.add(piv);
-      const l = mesh(GEO.wLeg, SH.wolfD); l.position.y = -0.24; piv.add(l); return piv;
+      const l = mesh(GEO.wLeg, W.wolfD); l.position.y = -0.24; piv.add(l); return piv;
     });
-    const tail = mesh(GEO.wTail, SH.wolf); tail.position.set(0, 0.7, -0.62); g.add(tail);
-    g.scale.setScalar(1.3);
-    return { g, neck, legs, tail, eyes, run: 0 };
+    const tail = mesh(GEO.wTail, W.wolf); tail.position.set(0, 0.7, -0.62); g.add(tail);
+    g.scale.setScalar(alpha ? 2.0 : 1.3);
+    return { g, neck, legs, tail, eyes, run: 0, alpha };
   }
   function poseWolf(o, w, t, dt, sp) {
     o.run += dt * (2 + sp * 2.2);
@@ -140,7 +157,7 @@ export function makeActors() {
     o.g.children[0].position.y = 0.62 + Math.abs(Math.sin(o.run)) * 0.06 * a;
     o.neck.rotation.x = w.st === 1 ? 0.25 : -0.1 + Math.sin(t * 1.3 + w.id) * 0.1;
     o.tail.rotation.x = w.st === 2 ? 0.6 : Math.sin(t * 3 + w.id) * 0.2;
-    const red = w.st === 1;
+    const red = w.st === 1 || o.alpha;
     for (const e of o.eyes) e.material = red ? SH.eyeRed : SH.eye;
   }
 
