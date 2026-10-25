@@ -1,5 +1,5 @@
 // pokemon/view/game.js
-// Interface visuelle de Poké Duel : Arbre de tournoi, arène de combat Showdown, barres de PV, attaques et switchs.
+// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown, barres de PV, attaques professionnelles et switchs.
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
@@ -26,9 +26,9 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         <span id="pokeRoundTitle">Tournoi</span>
       </div>
       <div class="poke-tools">
-        <button class="poke-tool" id="btnMus" title="Musique de combat">🎵</button>
-        <button class="poke-tool" id="btnSnd" title="Bruitages">🔊</button>
-        <button class="poke-tool quit" id="btnQuit">Quitter</button>
+        <button class="poke-tool" id="btnMus">MUSIQUE : <b id="lblMus">ON</b></button>
+        <button class="poke-tool" id="btnSnd">AUDIO : <b id="lblSnd">ON</b></button>
+        <button class="poke-tool quit" id="btnQuit">QUITTER</button>
       </div>
     </header>
     <main class="poke-stage" id="pokeStage"></main>
@@ -40,14 +40,21 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
   let localActionSent = false;
-  let timerTicker = null;
 
-  // --- Sons & Outils ---
+  // --- Outils & Audio ---
   const syncTools = () => {
-    $('#btnSnd').textContent = sfx.enabled ? '🔊' : '🔇';
-    $('#btnSnd').classList.toggle('off', !sfx.enabled);
-    $('#btnMus').textContent = battleMusic.on ? '🎵' : '🔇';
-    $('#btnMus').classList.toggle('off', !battleMusic.on);
+    const lblS = $('#lblSnd');
+    const btnS = $('#btnSnd');
+    if (lblS && btnS) {
+      lblS.textContent = sfx.enabled ? 'ACTIF' : 'MUET';
+      btnS.classList.toggle('off', !sfx.enabled);
+    }
+    const lblM = $('#lblMus');
+    const btnM = $('#btnMus');
+    if (lblM && btnM) {
+      lblM.textContent = battleMusic.on ? 'ACTIVE' : 'MUETTE';
+      btnM.classList.toggle('off', !battleMusic.on);
+    }
   };
   syncTools();
 
@@ -74,19 +81,19 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
     const matchCardHtml = match ? `
       <div class="match-card deal">
-        <div class="match-badge">${match.roundName} · Match ${s.currentMatchIdx + 1}/${round.length}</div>
+        <div class="match-badge">${match.roundName.toUpperCase()} · MATCH ${s.currentMatchIdx + 1}/${round.length}</div>
         <div class="versus-row">
           <div class="fighter-card ${match.playerA.id === me.id ? 'me' : ''}" style="--c:${match.playerA.color}">
             <div class="trainer-header">
               <i class="dot"></i>
-              <b>${match.playerA.name}</b>
+              <b>${match.playerA.name.toUpperCase()}</b>
               ${match.playerA.bot ? '<span class="tag-bot">BOT</span>' : ''}
             </div>
             <div class="team-preview">
               ${match.playerA.team.map(p => `
                 <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
-                  <small>${p.name}</small>
+                  <small>${p.name.toUpperCase()}</small>
                   <div class="preview-types">
                     ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
                   </div>
@@ -100,14 +107,14 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           <div class="fighter-card ${match.playerB.id === me.id ? 'me' : ''}" style="--c:${match.playerB.color}">
             <div class="trainer-header">
               <i class="dot"></i>
-              <b>${match.playerB.name}</b>
+              <b>${match.playerB.name.toUpperCase()}</b>
               ${match.playerB.bot ? '<span class="tag-bot">BOT</span>' : ''}
             </div>
             <div class="team-preview">
               ${match.playerB.team.map(p => `
                 <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
-                  <small>${p.name}</small>
+                  <small>${p.name.toUpperCase()}</small>
                   <div class="preview-types">
                     ${p.types.map(t => `<img class="preview-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
                   </div>
@@ -118,27 +125,27 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         </div>
 
         <div class="match-action-row">
-          <button class="btn big yellow btn-start-match" id="btnStartFight">Entrer dans l'Arène ⚔️</button>
+          <button class="btn big yellow btn-start-match" id="btnStartFight">LANCER LE COMBAT</button>
         </div>
       </div>` : '';
 
     stage.innerHTML = `
       <div class="bracket-screen">
-        <h2 class="bracket-title">🏆 GRAND TOURNOI POKÉMON</h2>
+        <h2 class="bracket-title">CHAMPIONNAT POKÉMON · TOURNOI 3v3</h2>
         <div class="bracket-tree">
           ${s.rounds.map((r, rIdx) => `
             <div class="bracket-round">
-              <div class="round-header">${r[0] ? r[0].roundName : `Tour ${rIdx + 1}`}</div>
+              <div class="round-header">${r[0] ? r[0].roundName.toUpperCase() : `TOUR ${rIdx + 1}`}</div>
               <div class="round-matches">
                 ${r.map((m, mIdx) => {
                   const isCurrent = rIdx === s.currentRoundIdx && mIdx === s.currentMatchIdx;
                   return `
                     <div class="tree-match ${isCurrent ? 'current' : ''} ${m.status}">
                       <div class="tree-trainer ${m.winner && m.playerA && m.winner.id === m.playerA.id ? 'win' : ''}">
-                        <span class="tree-name">${m.playerA ? m.playerA.name : '—'}</span>
+                        <span class="tree-name">${m.playerA ? m.playerA.name.toUpperCase() : '—'}</span>
                       </div>
                       <div class="tree-trainer ${m.winner && m.playerB && m.winner.id === m.playerB.id ? 'win' : ''}">
-                        <span class="tree-name">${m.playerB ? m.playerB.name : '—'}</span>
+                        <span class="tree-name">${m.playerB ? m.playerB.name.toUpperCase() : '—'}</span>
                       </div>
                     </div>`;
                 }).join('')}
@@ -245,8 +252,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <div class="status-card opponent-card">
               <div class="sc-head">
                 <div class="sc-name-row">
-                  <b class="sc-name">${pTop.name}</b>
-                  <span class="sc-lvl">Nv. 50</span>
+                  <b class="sc-name">${pTop.name.toUpperCase()}</b>
+                  <span class="sc-lvl">NV. 50</span>
                 </div>
                 <div class="sc-types">${typeBadgesHtml(pTop.types)}</div>
                 ${pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : ''}
@@ -262,7 +269,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
               <div class="sc-foot">
                 <span class="trainer-badge" style="--tc:${tTop.color}">
-                  <i class="trainer-dot"></i>${tTop.name}
+                  <i class="trainer-dot"></i>${tTop.name.toUpperCase()}
                 </span>
                 ${ballsHtml(teamTop)}
               </div>
@@ -298,8 +305,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             <div class="status-card player-card">
               <div class="sc-head">
                 <div class="sc-name-row">
-                  <b class="sc-name">${pBottom.name}</b>
-                  <span class="sc-lvl">Nv. 50</span>
+                  <b class="sc-name">${pBottom.name.toUpperCase()}</b>
+                  <span class="sc-lvl">NV. 50</span>
                 </div>
                 <div class="sc-types">${typeBadgesHtml(pBottom.types)}</div>
                 ${pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : ''}
@@ -321,17 +328,18 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           </div>
         </div>
 
-        <!-- Bandeau de Dialogue Showdown -->
+        <!-- Bandeau de Dialogue Showdown Pro -->
         <div class="battle-dialogue-bar">
-          <span class="dialogue-icon">💬</span>
+          <span class="dialogue-tag">DIRECT</span>
           <span class="dialogue-text">${announcement}</span>
         </div>
 
-        <!-- Pupitre de Commandes Tactiles -->
+        <!-- Pupitre de Commandes Tactiles Professionnel -->
         <div class="dashboard">
           ${isSpectator ? `
             <div class="spectator-bar">
-              <span>👁️ Match en Direct : <b>${tBottom.name}</b> affronte <b>${tTop.name}</b></span>
+              <span class="live-pill">DIRECT</span>
+              <span>MATCH EN COURS : <b>${tBottom.name.toUpperCase()}</b> CONTRE <b>${tTop.name.toUpperCase()}</b></span>
             </div>
           ` : `
             <div class="dash-top-row">
@@ -339,15 +347,15 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                 <div class="dt-fill" id="timerFill" style="width:${timerWidth}%"></div>
                 <span class="dt-text" id="timerText">${leftSec} s</span>
               </div>
-              ${isSubmitted ? '<span class="action-locked">✔ Ordre validé · Attente de l\'adversaire…</span>' : ''}
+              ${isSubmitted ? '<span class="action-locked"><span class="lock-indicator"></span> ORDRE ENREGISTRÉ · EN ATTENTE</span>' : ''}
             </div>
 
             <div class="dash-tabs">
               <button class="dash-tab ${activeTab === 'moves' ? 'active' : ''}" id="tabMoves" ${isForcedSwitch ? 'disabled' : ''}>
-                ⚔️ Attaquer
+                ATTAQUE
               </button>
               <button class="dash-tab ${activeTab === 'switch' ? 'active' : ''}" id="tabSwitch">
-                🔄 Changer de Pokémon (${teamBottom.filter(p => !p.fainted).length})
+                ÉQUIPE (${teamBottom.filter(p => !p.fainted).length}/3)
               </button>
             </div>
 
@@ -357,41 +365,64 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   const m = MOVES[moveId];
                   if (!m) return '';
                   const eff = getEffectiveness(m.type, pTop.types);
-                  let effTagHtml = '';
+                  let matchupClass = '';
+                  let matchupLabel = '';
+                  let multiplierLabel = '';
+
                   if (m.power > 0) {
                     if (eff >= 2) {
-                      effTagHtml = `<div class="bm-eff-tag eff-super">💥 Super efficace (x${eff})</div>`;
+                      matchupClass = 'eff-super';
+                      matchupLabel = 'SUPER EFFICACE';
+                      multiplierLabel = `×${eff}`;
                     } else if (eff <= 0.5 && eff > 0) {
-                      effTagHtml = `<div class="bm-eff-tag eff-low">🛡️ Peu efficace (x${eff})</div>`;
+                      matchupClass = 'eff-low';
+                      matchupLabel = 'PEU EFFICACE';
+                      multiplierLabel = `×${eff}`;
                     } else if (eff === 0) {
-                      effTagHtml = `<div class="bm-eff-tag eff-zero">🚫 Sans effet (x0)</div>`;
+                      matchupClass = 'eff-zero';
+                      matchupLabel = 'AUCUN EFFET';
+                      multiplierLabel = '×0';
                     } else {
-                      effTagHtml = `<div class="bm-eff-tag eff-normal">Efficace (x1)</div>`;
+                      matchupClass = 'eff-normal';
+                      matchupLabel = 'EFFICACITÉ STANDARD';
+                      multiplierLabel = '×1';
                     }
                   } else {
-                    effTagHtml = `<div class="bm-eff-tag eff-status">Capacité Statut</div>`;
+                    matchupClass = 'eff-status';
+                    matchupLabel = 'CAPACITÉ DE STATUT';
+                    multiplierLabel = 'TACTIQUE';
                   }
 
+                  const catLabel = m.cat === 'physical' ? 'PHYSIQUE' : m.cat === 'special' ? 'SPÉCIAL' : 'STATUT';
+
                   return `
-                    <button class="btn-move" data-move="${moveId}" style="--mc:${TYPES[m.type].color}" ${isSubmitted ? 'disabled' : ''}>
-                      <div class="bm-header">
-                        <kbd class="bm-key">${mIdx + 1}</kbd>
-                        <span class="bm-name">${m.name}</span>
-                        <span class="bm-category ${m.cat}">
-                          ${m.cat === 'physical' ? '⚔️ Phys' : m.cat === 'special' ? '🌀 Spé' : '✨ Stat'}
-                        </span>
+                    <button class="pro-move-card" data-move="${moveId}" style="--mc:${TYPES[m.type].color};--mc-bg:${TYPES[m.type].bg}" ${isSubmitted ? 'disabled' : ''}>
+                      <div class="pm-top">
+                        <span class="pm-key">${mIdx + 1}</span>
+                        <span class="pm-name">${m.name}</span>
+                        <span class="pm-cat cat-${m.cat}">${catLabel}</span>
                       </div>
-                      <div class="bm-body">
-                        <div class="bm-type-badge">
-                          <img src="${getTypeBadgeUrl(m.type)}" alt="${TYPES[m.type].name}" class="bm-type-icon" loading="lazy">
-                        </div>
-                        <div class="bm-stats">
-                          <span class="bm-stat"><b>${m.power ? m.power : '—'}</b> Puiss</span>
-                          <span class="bm-stat"><b>${m.acc}%</b> Préc</span>
-                          <span class="bm-stat"><b>${m.pp}</b> PP</span>
+                      <div class="pm-mid">
+                        <img class="pm-type-img" src="${getTypeBadgeUrl(m.type)}" alt="${TYPES[m.type].name}" loading="lazy">
+                        <div class="pm-stats-group">
+                          <div class="pm-stat-chip">
+                            <span class="pm-stat-label">PUISS</span>
+                            <span class="pm-stat-val">${m.power ? m.power : '—'}</span>
+                          </div>
+                          <div class="pm-stat-chip">
+                            <span class="pm-stat-label">PRÉC</span>
+                            <span class="pm-stat-val">${m.acc}%</span>
+                          </div>
+                          <div class="pm-stat-chip">
+                            <span class="pm-stat-label">PP</span>
+                            <span class="pm-stat-val">${m.pp || 15} / ${m.pp || 15}</span>
+                          </div>
                         </div>
                       </div>
-                      ${effTagHtml}
+                      <div class="pm-matchup ${matchupClass}">
+                        <span class="pm-matchup-label">${matchupLabel}</span>
+                        <span class="pm-matchup-factor">${multiplierLabel}</span>
+                      </div>
                     </button>`;
                 }).join('')}
               </div>
@@ -405,13 +436,13 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                     <button class="btn-switch ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted ? 'disabled' : ''}>
                       <div class="bs-avatar">
                         <img src="${spriteUrls(p.id).icon}" alt="${p.name}" class="bs-icon">
-                        ${isCurrent ? '<span class="bs-active-tag">Actif</span>' : ''}
-                        ${p.fainted ? '<span class="bs-ko-tag">K.O.</span>' : ''}
+                        ${isCurrent ? '<span class="bs-tag-current">ACTIF</span>' : ''}
+                        ${p.fainted ? '<span class="bs-tag-ko">K.O.</span>' : ''}
                       </div>
                       <div class="bs-details">
                         <div class="bs-title-row">
-                          <b>${p.name}</b>
-                          <span class="bs-lvl">Nv. 50</span>
+                          <b>${p.name.toUpperCase()}</b>
+                          <span class="bs-lvl">NV. 50</span>
                         </div>
                         <div class="bs-types">
                           ${p.types.map(t => `<img src="${getTypeBadgeUrl(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
@@ -419,7 +450,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                         <div class="bs-hp-track">
                           <div class="bs-hp-fill" style="width:${hpPct}%;background:${hpCol}"></div>
                         </div>
-                        <div class="bs-hp-num">${p.fainted ? 'K.O.' : `${p.hp} / ${p.maxHp} PV`}</div>
+                        <div class="bs-hp-num">${p.fainted ? 'HORS COMBAT' : `${p.hp} / ${p.maxHp} PV`}</div>
                       </div>
                     </button>`;
                 }).join('')}
@@ -429,7 +460,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         </div>
       </div>`;
 
-    // Gestion des événements d'attaques et de switch
+    // Gestion des clics d'attaques et de switch
     if (!isSpectator && !isSubmitted) {
       const bMoves = $('#tabMoves');
       const bSwitch = $('#tabSwitch');
@@ -508,16 +539,16 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
     stage.innerHTML = `
       <div class="podium-screen deal">
-        <h1 class="podium-title">🏆 VAINQUEUR DU TOURNOI POKÉMON</h1>
+        <h1 class="podium-title">VAINQUEUR DE LA LIGUE POKÉMON</h1>
         <div class="champ-banner" style="--cc:${champ.color}">
-          <div class="champ-crown">👑</div>
-          <h2>${champ.name}</h2>
-          <p>Nouveau Maître de la Ligue Pokémon !</p>
+          <div class="champ-crown-tag">MAÎTRE DU TOURNOI</div>
+          <h2>${champ.name.toUpperCase()}</h2>
+          <p>Champion Officiel de la Ligue Pokémon 3v3</p>
           <div class="champ-team">
             ${champ.team.map(p => `
               <div class="champ-poke-card">
                 <img src="${spriteUrls(p.id).artwork}" alt="${p.name}">
-                <b>${p.name}</b>
+                <b>${p.name.toUpperCase()}</b>
                 <div class="champ-types">
                   ${p.types.map(t => `<img class="champ-type-img" src="${getTypeBadgeUrl(t)}" alt="${t}">`).join('')}
                 </div>
@@ -527,8 +558,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         </div>
 
         <div class="podium-actions">
-          <button class="btn big yellow" id="btnPlayAgain">Nouveau Tournoi 🔄</button>
-          <button class="btn big ghost" id="btnBackLobby">Retour au Salon</button>
+          <button class="btn big yellow" id="btnPlayAgain">NOUVEAU TOURNOI</button>
+          <button class="btn big ghost" id="btnBackLobby">RETOUR AU SALON</button>
         </div>
       </div>`;
 

@@ -214,9 +214,9 @@ window.HUB_GAMES = [
       <path d="M70 40 L90 55 L82 62 L105 78 L85 70 L92 64 Z" fill="#ffcb05" stroke="#16181d" stroke-width="2"/>
       <path d="M250 35 L230 52 L238 58 L215 76 L235 68 L228 62 Z" fill="#ffcb05" stroke="#16181d" stroke-width="2"/>
       <circle cx="50" cy="120" r="18" fill="#e62829" stroke="#16181d" stroke-width="3"/>
-      <text x="50" y="126" text-anchor="middle" font-size="18">🔥</text>
+      <text x="50" y="125" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="11" fill="#ffffff">FEU</text>
       <circle cx="270" cy="120" r="18" fill="#2980ef" stroke="#16181d" stroke-width="3"/>
-      <text x="270" y="126" text-anchor="middle" font-size="18">💧</text>
+      <text x="270" y="125" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="11" fill="#ffffff">EAU</text>
       <rect x="95" y="142" width="130" height="26" rx="8" fill="#ffcb05" stroke="#16181d" stroke-width="3"/>
       <text x="160" y="160" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="14" fill="#16181d">3v3 SHOWDOWN</text>
     </svg>`,
