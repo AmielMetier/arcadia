@@ -174,6 +174,26 @@ window.HUB_GAMES = [
     </svg>`,
   },
   {
+    id: 'golf',
+    title: 'Birdie Party',
+    tag: 'Golf 3D entre potes',
+    desc: 'Dix-huit trous en campagne, au bord de la mer et en montagne. Un geste pour armer, un geste pour frapper : gare au vent, aux bunkers et à l\'eau. Chacun son tour, avec des bots.',
+    url: 'golf/',
+    minPlayers: 1, maxPlayers: 4,
+    accent: '#5cc425',
+    settings: [
+      { key: 'course', label: 'Parcours', options: [['campagne', 'Campagne · 6 trous'], ['mer', 'Bord de mer · 6 trous'], ['montagne', 'Montagne · 6 trous'], ['aller', 'Aller · 9 trous'], ['retour', 'Retour · 9 trous'], ['complet', 'Grand tour · 18 trous']], def: 'campagne' },
+      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'wind', label: 'Vent', options: [['calme', 'Calme'], ['normal', 'Normal'], ['fort', 'Fort']], def: 'normal' },
+    ],
+    // affiche : rendu du jeu (golf/img/affiche.jpg)
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="320" height="180" fill="#5cc425"/>
+      <image href="golf/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
+    </svg>`,
+  },
+  {
     id: 'pokemon',
     title: 'Poké Duel',
     tag: 'Aventure & Tournoi 3v3',

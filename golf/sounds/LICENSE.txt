@@ -1,0 +1,23 @@
+Sons de Birdie Party — tous dans le domaine public (Creative Commons Zero, CC0 1.0) :
+https://creativecommons.org/publicdomain/zero/1.0/
+Découpés, normalisés et convertis en MP3 mono. Crédits (non obligatoires, mais mérités) :
+
+Kenney (www.kenney.nl)
+  - Impact Sounds : bounce-grass1, bounce-grass2, bounce-sand, tree, trunk, cup
+  - Music Jingles : jingle-*
+  - Interface Sounds : ui-*
+
+Freesound (freesound.org), auteurs :
+  - craigsmith — « R19-34-Golf Crowd Applauds » : applause-big, applause-big2
+  - mattheos — « golfclap.aif » : clap
+  - qubodup — « Short Crowd Cheer », « Pleased Crowd » : cheer, pleased
+  - HowardV — « small crowd gasp shock surprise » : gasp
+  - noah0189 — « Crowd Ooohs and Ahhhs in Excitement » : ooh1, ooh2, ooh3
+  - phmiller42 — « aww.wav » : aww ; WhisperPotato — « awwwww.mp3 » : aww2
+  - pfranzen — « Minigolf putt, right into the hole! » : cup-rattle ; Scottrex05 — « Golf ball in hole.wav » : cup-drop
+  - zolopher — « Golf 1 / 3 / 15 » : hit-chip, hit-iron, hit-drive ; lmbubec — « Golf Ball Putt.wav » : hit-putt
+  - 16FPanskaSimonMartin — « Ball in water - high » : splash ; AardsReal — « Landing in Water » : splash-small
+  - aidansamuel — « Golf Swing Swoosh.wav » : swoosh
+  - Mafon2 — « Park ambience - mostly birds » : amb-campagne
+  - jackmichaelking — « Gentle ocean waves birdsong and gull » : amb-mer
+  - Tonmeister88 — « Mountain Meadow Switzerland Birds Insects distant cowbells » : amb-montagne

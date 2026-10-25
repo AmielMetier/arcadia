@@ -1,0 +1,185 @@
+/* Birdie Party — interface légère par-dessus le jeu : texte blanc détouré, bandeaux cyan, jauge fine, mini-carte du trou. */
+:root{
+  --ink:#1d2b44; --soft:#5d6f8f; --cyan:#1ec8e6; --cyan2:#0b9fd0; --lime:#7ed321; --sun:#ffd23f; --red:#ff3b30;
+  --panel:rgba(255,255,255,.92); --line:#d7e9fb; --shadow:0 6px 18px rgba(20,50,90,.22);
+  --round:'Nunito',system-ui,sans-serif;
+  --stroke:#17243a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#a9cbe9;color:var(--ink);font-family:var(--round);font-weight:900;-webkit-font-smoothing:antialiased;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage{position:fixed;inset:0}
+#stage canvas.gl{display:block;width:100%;height:100%}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 60%,rgba(10,30,60,.22) 100%)}
+button{font-family:var(--round);font-weight:900;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.panel{background:var(--panel);border:3px solid #fff;border-radius:20px;box-shadow:var(--shadow),inset 0 -3px 0 var(--line)}
+
+/* texte détouré, lisible sur l'herbe comme sur le ciel */
+.ol,#hud .htitle,#hud .hsub,#hud .dist,#hud .lie,#hud .wband b,#hud .club b,#hud .club span,#hud .gauge span,.banner,.pintag b,#hud .pl b,#hud .pl span,#hud .turn{
+  color:#fff;-webkit-text-stroke:5px var(--stroke);paint-order:stroke fill;text-shadow:0 3px 0 rgba(10,20,40,.35)}
+#hud{position:fixed;inset:0;pointer-events:none}
+#hud button,#hud canvas{pointer-events:auto}
+
+/* trou en cours (haut gauche) */
+.holeinfo{position:absolute;left:0;top:14px;padding:6px 40px 8px 22px;isolation:isolate}
+.holeinfo .band,.clubbox .band{position:absolute;inset:0;background:linear-gradient(90deg,rgba(30,200,230,.85),rgba(30,200,230,.55) 60%,rgba(30,200,230,0));border-top:2px solid rgba(255,255,255,.7);border-bottom:2px solid rgba(255,255,255,.7);z-index:-1}
+.htitle{font-size:30px;line-height:1.1;letter-spacing:.5px}
+.htitle b{font-size:36px;color:#fff6c2}
+.hsub{font-size:16px;letter-spacing:.3px}
+.hsub b{color:#fff6c2}
+
+/* distance restante et position (haut droite) */
+.distbox{position:absolute;right:20px;top:12px;display:flex;flex-direction:column;align-items:flex-end;min-width:260px}
+.dist{font-size:20px;letter-spacing:.5px}
+.dist b{font-size:38px;letter-spacing:1px}
+.distbox .line{width:100%;height:4px;margin-top:2px;border-radius:2px;background:linear-gradient(90deg,rgba(30,200,230,0),var(--cyan) 30%,var(--cyan));box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.lie{font-size:17px;margin-top:4px}
+
+/* vent : bandeau oblique + tuile verte avec la flèche */
+.windbox{position:absolute;right:0;top:112px;display:flex;align-items:center;filter:drop-shadow(0 4px 6px rgba(0,30,60,.25))}
+.wband{height:46px;padding:0 34px 0 46px;display:flex;align-items:center;background:linear-gradient(90deg,var(--cyan2),var(--cyan));clip-path:polygon(22px 0,100% 0,100% 100%,0 100%);margin-right:-18px}
+.wband b{font-size:24px}
+.wtile{position:relative;width:86px;height:86px;margin-right:18px;border-radius:14px;background:linear-gradient(160deg,#9ff04a,#46b51a 55%,#2f8f12);border:3px solid #fff;box-shadow:inset 0 -6px 0 rgba(0,60,0,.25);display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.wtile::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 12px,rgba(255,255,255,0) 12px 24px)}
+.wtile span{position:relative;width:100%;text-align:center;font-size:15px;color:#fff;background:#6b4a2b;padding:1px 0 3px;border-top:2px solid rgba(255,255,255,.5)}
+.arrow{position:absolute;left:0;right:0;top:4px;height:58px;transition:transform .5s cubic-bezier(.3,1.4,.5,1)}
+.arrow i{position:absolute;left:50%;top:6px;width:16px;height:44px;margin-left:-8px}
+.arrow i::before{content:'';position:absolute;left:50%;top:0;margin-left:-13px;border-left:13px solid transparent;border-right:13px solid transparent;border-bottom:20px solid #fff;filter:drop-shadow(0 2px 0 rgba(0,40,0,.4))}
+.arrow i::after{content:'';position:absolute;left:50%;top:18px;margin-left:-5px;width:10px;height:24px;border-radius:5px;background:#fff;box-shadow:0 2px 0 rgba(0,40,0,.4)}
+.tbtns{position:absolute;right:16px;top:212px;display:flex;gap:8px}
+.round{width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);backdrop-filter:blur(4px);box-shadow:0 4px 10px rgba(0,30,60,.2);font-size:19px;display:flex;align-items:center;justify-content:center;padding:0}
+.round:active{transform:scale(.94)}
+.round.big{width:56px;height:56px;font-size:26px;color:var(--ink)}
+
+/* club (bas gauche) */
+.clubbox{position:absolute;left:0;bottom:18px;display:flex;align-items:center;gap:6px;padding:6px 46px 6px 12px;isolation:isolate}
+.clubbox .band{background:linear-gradient(90deg,rgba(30,200,230,.85),rgba(30,200,230,.5) 70%,rgba(30,200,230,0))}
+.cicon{width:64px;height:64px;margin:-14px 0 -10px}
+.cicon svg{width:100%;height:100%;filter:drop-shadow(0 3px 2px rgba(0,0,0,.35))}
+.club{display:flex;flex-direction:column;line-height:1.05;min-width:150px}
+.club b{font-size:30px;color:#fff6c2;letter-spacing:.5px;white-space:nowrap}
+.club span{font-size:16px}
+.club span i{font-style:normal;color:#bff3ff}
+.club span em{font-style:normal}
+.arrowbtn{width:34px;height:34px;border-radius:50%;border:3px solid #fff;background:rgba(255,255,255,.35);font-size:13px;color:#fff;-webkit-text-stroke:0;display:flex;align-items:center;justify-content:center;padding:0;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.arrowbtn:active{transform:scale(.92)}
+
+/* jauge de puissance : tube fin, trois repères, losange à 100 % */
+.gauge{position:absolute;left:max(18px,calc(50% - 250px));top:50%;transform:translateY(-55%);display:flex;flex-direction:column;align-items:center}
+.tube{position:relative;width:30px;height:min(290px,40vh);border-radius:6px;border:3px solid #ffd23f;background:rgba(10,20,10,.62);box-shadow:0 0 0 2px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.3);overflow:hidden}
+.tube .fill{position:absolute;left:3px;right:3px;bottom:3px;height:0;border-radius:3px;background:linear-gradient(0deg,#ff2d1a,#ff6a3a);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+.tube .fill.hot{background:linear-gradient(0deg,#ff2d1a,#ff6a3a 70%,#fff27a)}
+.tube .dot{position:absolute;left:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#cfd6e0);box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.tube .d1{top:71.8%}.tube .d2{top:43.6%}.tube .d3{top:15.3%;width:12px;height:12px;margin:-6px 0 0 -6px}
+.tube .full{position:absolute;left:0;right:0;top:0;height:15.3%;background:repeating-linear-gradient(-45deg,rgba(255,60,40,.25) 0 5px,rgba(255,60,40,.08) 5px 10px)}
+.gauge .diamond{position:absolute;left:-26px;top:calc(15.3% - 9px);width:16px;height:16px;background:linear-gradient(135deg,#fff7b0,#ffd23f 50%,#e0a800);transform:rotate(45deg);border:2px solid #fff;box-shadow:0 2px 3px rgba(0,0,0,.4)}
+.gauge span{font-size:18px;margin-top:6px}
+
+/* mini-carte (bas droite) */
+.mapframe{position:absolute;right:16px;bottom:16px;padding:6px;border-radius:12px;background:rgba(255,255,255,.28);border:3px solid rgba(255,255,255,.9);box-shadow:0 6px 16px rgba(0,30,60,.25);backdrop-filter:blur(2px)}
+.minimap{display:block;height:min(500px,calc(100vh - 300px));aspect-ratio:17/25;width:auto}
+.pintag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center}
+.pintag b{font-size:20px;-webkit-text-stroke-width:4px}
+.pintag i{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:10px solid #fff;filter:drop-shadow(0 2px 0 rgba(0,0,0,.4))}
+
+.aimpad{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:14px}
+.hint{color:#fff;font-size:14px;padding:6px 14px;max-width:40vw;text-align:center;line-height:1.3;background:rgba(15,30,55,.45);border-radius:999px;font-weight:700}
+
+/* annonces au centre : gros texte détouré, sous-titre sous un filet blanc */
+.banner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;font-size:clamp(34px,6.5vw,64px);letter-spacing:1.5px;white-space:nowrap;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.banner small{font-size:.5em;letter-spacing:.5px;padding-top:6px;margin-top:6px;border-top:3px solid rgba(255,255,255,.9);-webkit-text-stroke-width:4px}
+.banner.good{color:#e9ffb0}
+.banner.gold{color:#ffe14d;font-size:clamp(44px,9vw,92px)}
+.banner.bad{color:#fff}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.toast{position:absolute;left:50%;top:44%;transform:translateX(-50%);color:#fff;font-size:18px;-webkit-text-stroke:4px var(--stroke);paint-order:stroke fill}
+
+.fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .35s}
+.fade.on{opacity:1}
+
+/* écrans : titre, chargement, carte de score */
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.screen > *{pointer-events:auto}
+.title{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(ellipse 140% 60% at 50% 125%,#4cc21c 0 45%,transparent 46%),linear-gradient(#2a6ad6,#b2d6f6 75%)}
+.logo{font-size:clamp(48px,11vw,110px);color:#fff;-webkit-text-stroke:6px #17407e;paint-order:stroke fill;text-shadow:0 9px 0 #17407e,0 18px 30px rgba(0,40,100,.3);line-height:1;text-align:center}
+.logo span{color:var(--sun);-webkit-text-stroke-color:#9a5a00;text-shadow:0 9px 0 #9a5a00,0 18px 30px rgba(0,40,100,.3)}
+.sub{font-size:18px;color:#fff;-webkit-text-stroke:4px #17407e;paint-order:stroke fill}
+.bigbtn{font-size:24px;border:4px solid #fff;border-radius:999px;padding:14px 46px;background:linear-gradient(#9cf05d,#4cb81a);color:#fff;text-shadow:0 2px 0 rgba(0,70,0,.35);box-shadow:0 8px 0 #2f7d0d,0 14px 24px rgba(0,50,0,.3)}
+.bigbtn:active{transform:translateY(5px);box-shadow:0 3px 0 #2f7d0d,0 6px 14px rgba(0,50,0,.3)}
+.bigbtn.blue{background:linear-gradient(#5fdcf5,#0b9fd0);box-shadow:0 8px 0 #07709a,0 14px 24px rgba(0,30,90,.3)}
+.loading{font-size:22px;color:#fff;-webkit-text-stroke:4px #17407e;paint-order:stroke fill}
+.dots::after{content:'';animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+
+.card{padding:22px 26px;min-width:min(420px,92vw);display:flex;flex-direction:column;align-items:center;gap:14px;animation:pop2 .45s cubic-bezier(.2,1.5,.4,1)}
+@keyframes pop2{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+.card h2{margin:0;font-size:28px}
+.score{width:100%;border-collapse:separate;border-spacing:0;font-size:17px;text-align:center;border-radius:14px;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line)}
+.score th{background:var(--cyan2);color:#fff;padding:7px 10px;font-size:14px}
+.score td{padding:8px 10px;border-top:2px solid var(--line)}
+.score td.t{font-weight:800}
+.score .birdie{color:#1f8a00}.score .bogey{color:#d4462a}.score .eagle{color:#d18a00}
+.row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+
+/* joueurs (sous la carte du trou) et annonce du tour */
+.players{position:absolute;left:14px;top:106px;display:flex;flex-direction:column;gap:3px}
+.pl{display:flex;align-items:center;gap:8px;font-size:16px;opacity:.82;transition:transform .25s,opacity .25s}
+.pl i{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pl b{min-width:70px}
+.pl span{color:#fff6c2}
+.pl em{font-style:normal;color:#b6ff7a;font-size:14px}
+.pl.cur{opacity:1;transform:translateX(6px) scale(1.08)}
+.pl.cur b{color:#fff6c2}
+.pl.done{opacity:.55}
+.turn{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-size:clamp(24px,4vw,40px);white-space:nowrap;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.turn i{display:inline-block;width:.7em;height:.7em;border-radius:50%;border:3px solid #fff;margin-right:10px;vertical-align:-2px;box-shadow:0 2px 4px rgba(0,0,0,.4)}
+
+/* écran titre : réglages de la partie */
+.setup{padding:14px 18px;display:flex;flex-direction:column;gap:10px;max-width:min(720px,94vw)}
+.setup h3{margin:0;font-size:16px;color:var(--soft);letter-spacing:.5px}
+.courses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.course{border:3px solid #fff;border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.3);box-shadow:0 4px 0 rgba(0,0,0,.15)}
+.course b{font-size:17px}.course small{font-size:13px;opacity:.9}
+.course.campagne{background:linear-gradient(160deg,#7fd24a,#2f8f12)}
+.course.mer{background:linear-gradient(160deg,#5fe0d4,#1a8fd0)}
+.course.montagne{background:linear-gradient(160deg,#a9b8d0,#4f6a8f)}
+.course.aller{background:linear-gradient(160deg,#ffd76a,#e88a1a)}
+.course.retour{background:linear-gradient(160deg,#ff9fb0,#c94f86)}
+.course.complet{background:linear-gradient(160deg,#c9a2ff,#6a3fd0)}
+.course.on{outline:4px solid var(--sun);transform:translateY(-2px)}
+.opts{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center}
+.opts label{font-size:15px;color:var(--soft)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{border:2px solid var(--line);background:#fff;border-radius:999px;padding:5px 14px;font-size:14px}
+.seg button.on{background:var(--cyan2);border-color:var(--cyan2);color:#fff}
+.howto{font-size:14px;font-weight:700;color:#fff;-webkit-text-stroke:3px #17407e;paint-order:stroke fill;text-align:center;max-width:94vw}
+.howto b{color:#fff6c2}
+
+/* carte de score */
+.scorecard{max-width:min(980px,96vw);max-height:92vh;overflow:auto}
+.scorecard .score{font-size:15px}
+.scorecard .score th,.scorecard .score td{padding:5px 6px;min-width:28px}
+.scorecard .nm{text-align:left;white-space:nowrap;min-width:110px}
+.scorecard .nm i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.scorecard .tot{font-weight:900;background:#eef6ff}
+.scorecard .parrow td{color:var(--soft);font-size:13px}
+.score span{display:inline-block;min-width:24px;line-height:24px;border-radius:50%}
+.score .eagle{background:#ffd23f;color:#5a3a00}.score .birdie{border:2px solid #1f8a00;color:#1f8a00}.score .bogey{outline:2px solid #d4462a;border-radius:3px;color:#d4462a}.score .worse{background:#d4462a;color:#fff;border-radius:3px}
+.podium{display:flex;flex-direction:column;gap:6px;width:100%}
+.rk{display:flex;align-items:center;gap:10px;font-size:18px;padding:6px 12px;border-radius:12px;background:#f3f8ff}
+.rk.r1{background:linear-gradient(90deg,#fff3b0,#fff);font-size:22px}
+.rk b{width:42px;text-align:center}.rk i{width:16px;height:16px;border-radius:50%}
+.rk span{flex:1}.rk em{font-style:normal;color:var(--soft);font-size:15px}
+
+@media (max-width:720px){
+  .players{top:66px;left:8px}.pl{font-size:12px}.pl b{min-width:48px}
+  .holeinfo{top:8px;padding:4px 26px 6px 12px}.htitle{font-size:22px}.htitle b{font-size:26px}.hsub{font-size:12px}
+  .distbox{right:10px;top:72px;min-width:170px}.dist{font-size:15px}.dist b{font-size:28px}.lie{font-size:14px}
+  .windbox{top:8px}.wband{height:36px;padding:0 26px 0 34px}.wband b{font-size:18px}.wtile{width:62px;height:62px;margin-right:10px}.arrow{height:40px;transform-origin:50% 50%}.arrow i{transform:scale(.7);transform-origin:50% 0;top:2px}
+  .tbtns{top:180px;right:10px}
+  .clubbox{bottom:8px;padding:4px 30px 4px 8px}.cicon{width:46px;height:46px}.club{min-width:100px}.club b{font-size:20px}.club span{font-size:13px}
+  .minimap{height:min(210px,30vh)}.mapframe{right:8px;bottom:8px;padding:4px}
+  .aimpad{bottom:150px;gap:8px}.hint{display:none}
+  .gauge{left:10px}
+}
