@@ -1,20 +1,34 @@
 // pokemon/view/sfx.js
-// Bruitages synthétiques rétro & chargement des cris Pokémon officiels via Web Audio
+// Bruitages officiels Pokémon (PokéRogue & PokeAPI Cries) avec préchargement audio
+
+const SFX_FILES = {
+  hit: 'assets/sfx_hit.wav',
+  hit_strong: 'assets/sfx_hit_strong.wav',
+  hit_weak: 'assets/sfx_hit_weak.wav',
+  faint: 'assets/sfx_faint.wav',
+  low_hp: 'assets/sfx_low_hp.wav',
+  switch: 'assets/sfx_switch.wav',
+  beam: 'assets/sfx_beam.wav',
+  victory: 'assets/sfx_victory.wav'
+};
 
 class SoundManager {
   constructor() {
-    this.ctx = null;
     this.enabled = true;
+    this.audioPool = new Map();
     this.cryCache = new Map();
+    this.preload();
   }
 
-  init() {
-    if (this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume();
-      return;
+  preload() {
+    if (typeof window === 'undefined') return;
+    for (const [key, path] of Object.entries(SFX_FILES)) {
+      try {
+        const audio = new Audio(path);
+        audio.preload = 'auto';
+        this.audioPool.set(key, audio);
+      } catch (e) {}
     }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) this.ctx = new AC();
   }
 
   playCry(pokemonId) {
@@ -23,7 +37,7 @@ class SoundManager {
       let audio = this.cryCache.get(pokemonId);
       if (!audio) {
         audio = new Audio(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${pokemonId}.ogg`);
-        audio.volume = 0.5;
+        audio.volume = 0.55;
         this.cryCache.set(pokemonId, audio);
       }
       audio.currentTime = 0;
@@ -31,116 +45,58 @@ class SoundManager {
     } catch (e) {}
   }
 
+  playAudioFile(key, volume = 0.6) {
+    if (!this.enabled) return;
+    try {
+      const src = SFX_FILES[key];
+      if (!src) return;
+      // Cloner pour permettre plusieurs sons simultanés sans coupure
+      const sound = new Audio(src);
+      sound.volume = volume;
+      sound.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  playHit(effectiveness = 1) {
+    if (effectiveness > 1) {
+      this.playAudioFile('hit_strong', 0.75);
+    } else if (effectiveness > 0 && effectiveness < 1) {
+      this.playAudioFile('hit_weak', 0.55);
+    } else {
+      this.playAudioFile('hit', 0.65);
+    }
+  }
+
+  playBeam() {
+    this.playAudioFile('beam', 0.6);
+  }
+
   play(type) {
     if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-
     switch (type) {
-      case 'hit': {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.12);
+      case 'hit':
+        this.playAudioFile('hit', 0.65);
         break;
-      }
-
-      case 'supereffective': {
-        // Double boom percutant
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(280, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.25);
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.25);
+      case 'supereffective':
+        this.playAudioFile('hit_strong', 0.75);
         break;
-      }
-
-      case 'faint': {
-        // Descente triste de K.O.
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(110, now + 0.45);
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.45);
+      case 'faint':
+        this.playAudioFile('faint', 0.7);
         break;
-      }
-
-      case 'switch': {
-        // Whoosh de la Pokéball
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.18);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.18);
+      case 'switch':
+        this.playAudioFile('switch', 0.6);
         break;
-      }
-
-      case 'stat': {
-        // Tintement carillon
-        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + i * 0.05);
-          gain.gain.setValueAtTime(0.15, now + i * 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.12);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(now + i * 0.05);
-          osc.stop(now + i * 0.05 + 0.12);
-        });
+      case 'low_hp':
+        this.playAudioFile('low_hp', 0.5);
         break;
-      }
-
-      case 'victory': {
-        // Fanfare Pokémon légendaire !
-        const notes = [
-          { f: 523.25, d: 0.12 }, { f: 523.25, d: 0.12 }, { f: 523.25, d: 0.12 },
-          { f: 523.25, d: 0.35 }, { f: 415.30, d: 0.35 }, { f: 466.16, d: 0.35 },
-          { f: 523.25, d: 0.25 }, { f: 466.16, d: 0.12 }, { f: 523.25, d: 0.6 }
-        ];
-        let t = now;
-        notes.forEach(({ f, d }) => {
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, t);
-          gain.gain.setValueAtTime(0.25, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + d * 0.95);
-          osc.connect(gain);
-          gain.connect(this.ctx.destination);
-          osc.start(t);
-          osc.stop(t + d);
-          t += d;
-        });
+      case 'beam':
+        this.playAudioFile('beam', 0.6);
         break;
-      }
+      case 'victory':
+        this.playAudioFile('victory', 0.75);
+        break;
+      default:
+        this.playAudioFile('hit', 0.5);
     }
   }
 
