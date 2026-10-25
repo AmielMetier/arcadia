@@ -1,46 +1,7 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.49 — 25 octobre 2026
-- Nouveau : replace procedural AI visuals with authentic Showdown & PokeRogue assets, remove all emojis, pro moves interface (Amiel)
-
-## 2.48 — 25 octobre 2026
-- Améliorations techniques sous le capot (1 modification).
-
-## 2.47 — 25 octobre 2026
-- Nouveau : refonte visuelle de l'arene, agrandissement des sprites sans coupure, badges officiels Gen 8 et boutons d'attaque tactiles (Amiel)
-
-## 2.46 — 25 octobre 2026
-- **Hub** — Nouveau : ajouter Poké Duel (batailles 3v3 en tournoi, sprites Showdown, cris et tableau des types) (Amiel)
-
-## 2.45 — 25 octobre 2026
-- **Hub** — Nouvelles affiches pour tous les jeux, dans le style de celle de Cyber Kart GP : une vraie image du jeu, un grand titre en deux couleurs et un bandeau. Duo Drift dans le canyon, le plateau 3D de DavidSimulator couvert de maisons, une bataille de Bastion Clash, une horde d'Outbreak sur la Prom', la bombe de Fil Rouge, l'équipage de Convoy Storm face aux pillards… et Pierre Chartier en personne sur l'affiche de Tête de Calcul.
-- **Convoy Storm** — Le mur du Front de tempête couvre maintenant tout l'horizon.
-
-## 2.44 — 25 octobre 2026
-- **DavidSimulator** — On peut de nouveau bouger la vue quand on veut :
-  - La caméra qui suit revenait de force sur le pion à chaque tour des autres joueurs ; avec des bots qui jouent vite, impossible de regarder le plateau. Maintenant, si tu déplaces la vue, elle reste où tu l'as mise jusqu'au début de ton propre tour (ou jusqu'au bouton ⌖).
-  - Dès que tu touches la vue (glisser, molette, pincement), le mouvement automatique en cours s'arrête au lieu de te reprendre la caméra.
-  - Pendant un échange, le plateau reste manipulable à côté de la fenêtre.
-  - Pincer le pavé tactile ou faire Ctrl + molette zoome le plateau, et plus toute la page dans Chrome.
-- **DavidSimulator** — Les échanges des autres joueurs en direct : chaque proposition entre deux autres joueurs apparaît en haut à droite (qui propose quoi à qui, compte à rebours), puis son résultat (accepté, refusé, expiré). Un clic l'ouvre en lecture seule, avec les terrains concernés signalés sur le plateau. Les propositions et les refus apparaissent aussi dans le journal.
-
-## 2.43 — 25 octobre 2026
-- **Convoy Storm** — Fini la balade : il y a maintenant de vrais enjeux à chaque instant.
-  - **Le Front** : un mur de tempête poursuit le convoi et ne s'arrête jamais, pas même en gare. S'il vous rattrape, c'est perdu. Une jauge montre l'avance qui reste, et l'écran s'assombrit quand il approche.
-  - **La manette de vitesse**, à l'arrière de la cabine : Éco (lent, économe), Normal ou À fond (on file, mais la chaudière dévore le fioul et la pression grimpe).
-  - **La pression** de la chaudière monte en permanence : quelqu'un doit lâcher la vapeur à la soupape (maintenir E devant la chaudière). Sinon elle explose : fioul perdu, convoi abîmé, équipiers projetés.
-  - **Des pannes à bord** : tuyaux gelés qui ralentissent le convoi, fuites qui vident le réservoir. Il faut aller réparer (maintenir E).
-  - **Des pillards en motoneige** longent le convoi, volent les caisses posées sur le pont et sabotent les wagons. Renversez-les depuis le bord du wagon (E), lancez-leur une caisse dessus ou chassez-les avec une fusée : ils lâchent leur butin et un peu de ferraille.
-  - **La solidité du convoi** baisse avec les explosions, les avalanches et les sabotages ; les gares en réparent une partie. À zéro, c'est fini.
-  - Une petite **cinématique d'ouverture** raconte l'histoire pendant que la caméra longe le convoi jusqu'au Front (bouton Passer, ou Entrée / Échap).
-  - Partie plus serrée : moins de fioul dans les ruines en Normale et en Blizzard. À plusieurs, il y a plus de travail à bord ; seul, la chaudière est un peu plus clémente.
-
-## 2.42 — 24 octobre 2026
-- **Tous les jeux** — Fini les joueurs coincés à 1 500 ms de ping avec une bonne connexion :
-  - Quand la connexion d'un joueur ne suit plus le flux de la partie (wifi chargé, débit un peu juste, micro-coupure), les images de la partie s'empilaient dans une file d'attente qui ne se vidait jamais : il jouait avec plusieurs secondes de retard. Le serveur mesure maintenant le retard de chaque joueur quatre fois par seconde et, s'il prend du retard, lui saute les images périmées pour ne garder que la plus récente. En test, un joueur dont la connexion ne suivait pas passait de 3 secondes de retard (et ça montait) à environ 0,2 seconde.
-  - L'hôte envoie chaque image une seule fois pour tout le salon au lieu d'une fois par joueur : beaucoup moins de débit montant chez l'hôte, et moins de travail pour le serveur.
-  - Un ordinateur qui rame ne rattrape plus une file d'images en retard : il passe directement à la plus récente.
-  - Dans le salon, un gros ping indique sa cause au survol : « PC saturé » (l'ordinateur n'arrive pas à suivre), « onglet caché » (le jeu n'est pas au premier plan) ou « réseau ».
+## 2.50 — 24 octobre 2026
+- **Tête de Calcul** — Le market making de The Candidate est plus clair : un guide « Comment ça marche ? » sous les cotations, les dés déjà vus rappelés avant chaque prix, ce que chaque deal veut dire, et le détail de ton P&L à la correction.
 
 ## 2.41 — 24 octobre 2026
 - **Outbreak** — Mode Défense rééquilibré : les tourelles ne font plus tout le travail.
