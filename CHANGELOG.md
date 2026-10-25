@@ -1,5 +1,19 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.49 — 25 octobre 2026
+- **Cyber Kart GP** — La musique passe par le même moteur audio que les bruitages : si on entend les bruitages, on entend la musique (iPad, iPhone, Brave). Elle démarre au premier toucher ou à la première touche, avec un petit fondu entre les morceaux.
+- **Cyber Kart GP** — Physique façon Mario Kart 8 :
+  - Aspiration : rester dans le sillage d'un kart pendant un peu plus d'une seconde donne un petit turbo (traînée d'air visible).
+  - Troisième niveau de mini-turbo : après 3 secondes de drift, les étincelles passent au violet et le turbo dure plus longtemps.
+  - Trois cylindrées au choix de l'hôte : 50cc, 100cc et 150cc.
+  - Deux nouvelles caractéristiques par pilote et par kart : l'adhérence (glace, neige, terre, hors-piste) et le mini-turbo (vitesse de charge).
+  - Les karts lourds poussent nettement plus les légers dans les chocs.
+  - Planeur : sur les grands tremplins de Whisky Peak, de la Jungle Perdue et de la Plage, une aile se déploie et on se dirige en vol.
+  - On glisse le long des murs sur une simple touchette, sans perdre de vitesse ; seuls les chocs francs ralentissent.
+  - Option « Conduite assistée » dans le choix du pilote : le kart se redresse tout seul avant de toucher un mur.
+  - En drift, la caméra se décale doucement vers l'extérieur du virage.
+  - Sortie de piste : un drone vient rechercher le kart et le repose avec de l'élan, en à peine plus d'une seconde.
+
 ## 2.48 — 25 octobre 2026
 - Améliorations techniques sous le capot (1 modification).
 
