@@ -85,7 +85,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
       <div class="match-card deal">
         <div class="match-badge">${match.roundName.toUpperCase()} · MATCH ${s.currentMatchIdx + 1}/${round.length}</div>
         <div class="versus-row">
-          <div class="fighter-card ${match.playerA.id === me.id ? 'me' : ''}" style="--c:${match.playerA.color}">
+          <div class="fighter-card ${String(match.playerA.id) === String(me.id) ? 'me' : ''}" style="--c:${match.playerA.color}">
             <div class="trainer-header">
               <i class="dot"></i>
               <b>${match.playerA.name.toUpperCase()}</b>
@@ -111,7 +111,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
           <div class="versus-sep">VS</div>
 
-          <div class="fighter-card ${match.playerB.id === me.id ? 'me' : ''}" style="--c:${match.playerB.color}">
+          <div class="fighter-card ${String(match.playerB.id) === String(me.id) ? 'me' : ''}" style="--c:${match.playerB.color}">
             <div class="trainer-header">
               <i class="dot"></i>
               <b>${match.playerB.name.toUpperCase()}</b>
@@ -153,10 +153,10 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   const isCurrent = rIdx === s.currentRoundIdx && mIdx === s.currentMatchIdx;
                   return `
                     <div class="tree-match ${isCurrent ? 'current' : ''} ${m.status}">
-                      <div class="tree-trainer ${m.winner && m.playerA && m.winner.id === m.playerA.id ? 'win' : ''}">
+                      <div class="tree-trainer ${m.winner && m.playerA && String(m.winner.id) === String(m.playerA.id) ? 'win' : ''}">
                         <span class="tree-name">${m.playerA ? m.playerA.name.toUpperCase() : '—'}</span>
                       </div>
-                      <div class="tree-trainer ${m.winner && m.playerB && m.winner.id === m.playerB.id ? 'win' : ''}">
+                      <div class="tree-trainer ${m.winner && m.playerB && String(m.winner.id) === String(m.playerB.id) ? 'win' : ''}">
                         <span class="tree-name">${m.playerB ? m.playerB.name.toUpperCase() : '—'}</span>
                       </div>
                     </div>`;
@@ -249,7 +249,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     }
 
     // Déterminer si le joueur local est un combattant
-    const mySide = b.trainerA.id === me.id ? 'A' : b.trainerB.id === me.id ? 'B' : null;
+    const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const isSpectator = !mySide;
 
     // Déterminer qui est en bas (joueur local / allié) et en haut (adversaire)
@@ -587,7 +587,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   // --- Animation visuelle d'un événement ---
   function triggerEventAnimation(ev, b) {
     if (!b) return;
-    const mySide = b.trainerA.id === me.id ? 'A' : b.trainerB.id === me.id ? 'B' : null;
+    const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const bottomSide = mySide === 'B' ? 'B' : 'A';
 
     if (ev.type === 'move') {
@@ -673,7 +673,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
   addEventListener('keydown', (e) => {
     if (!state || state.phase !== 'battle' || !state.battle) return;
     const b = state.battle;
-    const mySide = b.trainerA.id === me.id ? 'A' : b.trainerB.id === me.id ? 'B' : null;
+    const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     if (!mySide) return;
 
     const isSubmitted = mySide === 'A' ? state.submittedA : state.submittedB;

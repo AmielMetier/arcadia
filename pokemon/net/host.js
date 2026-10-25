@@ -18,8 +18,19 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
 
   function getHumanPlayers() {
     if (solo) return [{ id: me.id, name: me.name, color: me.color }];
-    const list = bridge.players.filter(p => p.id === me.id || bridge.readyMap[p.id] === 'pokemon');
-    return list.length ? list : [{ id: me.id, name: me.name, color: me.color }];
+    if (bridge && Array.isArray(bridge.players) && bridge.players.length > 0) {
+      const list = bridge.players.map(p => ({
+        id: p.id,
+        name: p.name || 'Dresseur',
+        color: p.color || '#ff4b2b'
+      }));
+      // S'assurer que le joueur local est toujours dans la liste
+      if (!list.some(p => String(p.id) === String(me.id))) {
+        list.unshift({ id: me.id, name: me.name, color: me.color });
+      }
+      return list;
+    }
+    return [{ id: me.id, name: me.name, color: me.color }];
   }
 
   function broadcast(extraEvents = []) {
@@ -40,7 +51,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       submittedB: !!pendingActions.B
     };
 
-    if (!solo) bridge.send('all', { t: 'st', s: pub, now: Date.now() });
+    if (!solo && bridge) bridge.send('all', { t: 'st', s: pub, now: Date.now() });
     onState(pub, 0);
 
     if (tournament.phase === 'podium' && !reported) {
@@ -50,7 +61,7 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
   }
 
   function reportResults() {
-    if (!bridge.embedded || !bridge.report || !tournament || !tournament.champion) return;
+    if (!bridge || !bridge.embedded || !bridge.report || !tournament || !tournament.champion) return;
     bridge.report({
       id: `pokemon-${Date.now()}`,
       mode: 'Tournoi 3v3',
@@ -59,8 +70,8 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
         name: p.name,
         color: p.color,
         bot: p.bot,
-        rank: p.id === tournament.champion.id ? 1 : idx + 2,
-        score: p.id === tournament.champion.id ? 300 : 100
+        rank: String(p.id) === String(tournament.champion.id) ? 1 : idx + 2,
+        score: String(p.id) === String(tournament.champion.id) ? 300 : 100
       }))
     });
   }
@@ -215,19 +226,44 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     broadcast();
   }
 
-  // Écoute des messages réseau envoyés par les invités
-  bridge.on('msg', (from, m) => {
-    if (!m || typeof m !== 'object') return;
-    if (m.t === 'action' && tournament && tournament.activeBattle) {
-      const b = tournament.activeBattle;
-      if (b.trainerA.id === from) submitAction('A', m.action);
-      else if (b.trainerB.id === from) submitAction('B', m.action);
-    } else if (m.t === 'start_match' && from === me.id) {
-      startMatch();
-    } else if (m.t === 'restart' && from === me.id) {
-      startNewTournament();
-    }
-  });
+  if (!solo && bridge) {
+    // Mettre à jour l'arbre de tournoi dynamiquement si des joueurs rejoignent avant le match 1
+    bridge.on('roster', () => {
+      if (!tournament) return;
+      if (tournament.phase === 'bracket_preview' && tournament.currentRoundIdx === 0 && tournament.currentMatchIdx === 0) {
+        const currentHumanIds = tournament.participants
+          .filter(p => !p.bot)
+          .map(p => String(p.id))
+          .sort()
+          .join(',');
+        const newHumans = getHumanPlayers();
+        const newHumanIds = newHumans
+          .map(p => String(p.id))
+          .sort()
+          .join(',');
+
+        if (currentHumanIds !== newHumanIds) {
+          startNewTournament();
+        }
+      }
+    });
+
+    // Écoute des messages réseau envoyés par les invités
+    bridge.on('msg', (from, m) => {
+      if (!m || typeof m !== 'object') return;
+      if (m.t === 'action' && tournament && tournament.activeBattle) {
+        const b = tournament.activeBattle;
+        if (String(b.trainerA.id) === String(from)) submitAction('A', m.action);
+        else if (String(b.trainerB.id) === String(from)) submitAction('B', m.action);
+      } else if (m.t === 'start_match') {
+        startMatch();
+      } else if (m.t === 'restart') {
+        startNewTournament();
+      } else if (m.t === 'sync') {
+        broadcast();
+      }
+    });
+  }
 
   // Initialisation du tournoi
   startNewTournament();
@@ -238,8 +274,8 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
     submitAction(action) {
       if (!tournament || !tournament.activeBattle) return;
       const b = tournament.activeBattle;
-      if (b.trainerA.id === me.id) submitAction('A', action);
-      else if (b.trainerB.id === me.id) submitAction('B', action);
+      if (String(b.trainerA.id) === String(me.id)) submitAction('A', action);
+      else if (String(b.trainerB.id) === String(me.id)) submitAction('B', action);
     }
   };
 }
