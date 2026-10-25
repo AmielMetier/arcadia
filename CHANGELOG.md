@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.46 — 25 octobre 2026
+- **Hub** — Nouveau : ajouter Poké Duel (batailles 3v3 en tournoi, sprites Showdown, cris et tableau des types) (Amiel)
+
 ## 2.45 — 25 octobre 2026
 - **Hub** — Nouvelles affiches pour tous les jeux, dans le style de celle de Cyber Kart GP : une vraie image du jeu, un grand titre en deux couleurs et un bandeau. Duo Drift dans le canyon, le plateau 3D de DavidSimulator couvert de maisons, une bataille de Bastion Clash, une horde d'Outbreak sur la Prom', la bombe de Fil Rouge, l'équipage de Convoy Storm face aux pillards… et Pierre Chartier en personne sur l'affiche de Tête de Calcul.
 - **Convoy Storm** — Le mur du Front de tempête couvre maintenant tout l'horizon.
