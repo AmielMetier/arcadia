@@ -1,5 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.80 — 26 octobre 2026
+- **Cyber Kart GP** — Dérapage plus doux, plus proche de Mario Kart.
+  - Passer du virage serré au virage large (ou l'inverse) se fait en souplesse : le kart ne part plus brusquement sur le côté.
+  - Le kart glisse moins vers l'extérieur et suit mieux sa trajectoire ; le virage le plus serré est un peu moins violent, le plus large un peu moins mou.
+
 ## 2.79 — 26 octobre 2026
 - **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
   - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.
