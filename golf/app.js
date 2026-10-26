@@ -158,8 +158,23 @@ function startSession(role) {
   if (role === 'guest') V.session = startClient({ bridge: H, me: V.me, emit: onEvent });
   else {
     V.session = startHost({ bridge: H, solo: role === 'solo', settings: V.settings, me: V.me, emit: onEvent });
-    // laisse aux invités le temps d'ouvrir le jeu avant le survol du premier trou
-    setTimeout(() => V.session && V.session.begin(), role === 'solo' ? 50 : 1500);
+    if (role === 'solo') {
+      setTimeout(() => V.session && V.session.begin(), 50);
+    } else {
+      let started = false;
+      const tryBegin = () => {
+        if (started) return;
+        started = true;
+        if (V.session) V.session.begin();
+      };
+      // Démarre dès que les joueurs sont prêts dans le Hub, avec un filet de sécurité à 2500ms
+      const checkReady = () => {
+        const others = H.players.filter((p) => p.id !== H.info.myId);
+        if (others.length && others.every((p) => H.readyMap[p.id] === 'golf')) tryBegin();
+      };
+      H.on('roster', checkReady);
+      setTimeout(tryBegin, 2500);
+    }
   }
 }
 // raccourci de test : ?play lance directement une partie solo (?course=mer&bots=2)
@@ -246,8 +261,12 @@ async function loadHole(R) {
   await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time });
   scene.setWind(wind);
   // mini-carte : photo aérienne du trou, prise une fois le décor posé
-  const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
-  hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
+  try {
+    const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
+    hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
+  } catch (e) {
+    console.warn('Mini-carte non initialisée :', e);
+  }
   sfx.ambience(hole.theme);
   // l'écran de chargement s'efface sur le survol qui commence
   const scr = $('#screen'), ld = scr.firstElementChild;
@@ -261,7 +280,10 @@ async function loadHole(R) {
   hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, INTRO - 0.6);
   sfx.holeStart();
   introCamera(0, true);
-  await new Promise((r) => { V.introDone = r; });
+  await new Promise((r) => {
+    V.introDone = r;
+    setTimeout(() => { if (V.phase === 'intro') endIntro(); }, (INTRO + 1) * 1000);
+  });
 }
 function endIntro() {
   if (V.phase !== 'intro') return;
