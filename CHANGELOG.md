@@ -1,5 +1,23 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.71 — 26 octobre 2026
+- **Hub** — Nouvelle vitrine : les jeux s'affichent sur quatre colonnes, à l'accueil comme dans le salon.
+  - Chaque jeu a la même vignette : une vraie image du jeu avec son titre en grand et son sous-titre, une phrase pour le présenter, le nombre de joueurs et les bots.
+  - Nouvelles affiches tirées du vrai jeu pour Bastion Clash (un assaut sur une base, en 3D), Birdie Party (le trou des Îles, au bord du lac), Poké Duel (Pikachu face à Dracaufeu) et Mini-Golf Party (le Double Looping de la Forge Infernale).
+- **Hub** — Ton compte : à la première visite, tu choisis ton pseudo et ta couleur, et le navigateur s'en souvient.
+  - « Modifier » change ton pseudo ou ta couleur à tout moment.
+  - « 📲 Mon compte sur un autre appareil » donne un code à coller sur ton téléphone ou un autre ordinateur pour y retrouver ton compte et tes amis.
+- **Hub** — Les amis : rejoins tes potes sans copier de code.
+  - Chacun a un code ami ; ajoute un pote avec son code, ou d'un clic sur « ＋ Ami » à côté de son nom dans le salon. Il doit accepter.
+  - Ta liste d'amis montre qui est en ligne, à quoi il joue et dans quel salon : « Rejoindre » t'y emmène directement.
+  - Dans un salon, « Inviter » envoie une invitation à un ami en ligne ; il la reçoit même en pleine partie et la rejoint d'un clic.
+- **Tous les jeux** — Une connexion bien plus solide :
+  - Une coupure de quelques secondes (wifi qui saute, téléphone qui change de réseau, onglet mis de côté) ne fait plus quitter la partie : le jeu se reconnecte tout seul et récupère tout ce qui s'est passé entre-temps.
+  - Pendant la coupure, un bandeau « reconnexion… » s'affiche, et les autres voient « reconnexion… » à côté de ton nom au lieu de te voir partir.
+  - Si c'est l'hôte qui coupe, le salon l'attend au lieu de changer d'hôte, et personne ne perd la partie.
+  - Après une longue coupure, on retrouve sa place et son numéro dans le salon, sans apparaître en double.
+  - Même si le serveur redémarre, tout le monde se retrouve dans le même salon, avec le même code.
+
 ## 2.70 — 26 octobre 2026
 - **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
   - Tous les trous sont redessinés, chacun avec sa forme : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Le terrain est bordé d'arbres, puis de forêt ou d'eau.
