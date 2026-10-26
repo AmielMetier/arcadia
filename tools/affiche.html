@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Affiche d'un jeu</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800;1,900&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#16181d;color:#fff8ea;font:600 14px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;gap:12px;padding:16px;box-sizing:border-box}
+  canvas{max-width:100%;height:auto;border:3px solid #fff8ea;border-radius:12px}
+  a{color:#ffc531}
+</style>
+</head>
+<body>
+<!-- Affiche 960 × 540 d'un jeu pour le Hub, dans le style commun : vraie image du jeu, grand titre en deux couleurs, bandeau.
+     Paramètres : img (capture du jeu, même origine), t1 / t2 (les deux mots du titre), c1 / c2 (leurs couleurs),
+     sub (bandeau), pill (couleur du bandeau), y (cadrage vertical de l'image, 0 à 1), size (taille du titre).
+     Exemple : tools/affiche.html?img=../golf/img/fond.png&t1=BIRDIE&t2=PARTY&c2=%237fdc3a&sub=Golf%203D%20entre%20potes&pill=%23338f1d
+     Enregistrer : clic droit sur l'image, ou le lien sous l'image (JPEG), à placer dans <jeu>/img/affiche.jpg. -->
+<canvas id="cv" width="960" height="540"></canvas>
+<a id="dl" download="affiche.jpg" href="#">Télécharger l'affiche (JPEG)</a>
+<script>
+(async function () {
+  const Q = new URLSearchParams(location.search);
+  const W = 960, H = 540, INK = '#16181d';
+  const t1 = (Q.get('t1') || 'MON').toUpperCase(), t2 = (Q.get('t2') || 'JEU').toUpperCase();
+  const c1 = Q.get('c1') || '#ffffff', c2 = Q.get('c2') || '#ffc531';
+  const sub = (Q.get('sub') || '').toUpperCase(), pill = Q.get('pill') || '#ff4b2b';
+  const cv = document.getElementById('cv'), g = cv.getContext('2d');
+  await document.fonts.load('italic 900 96px Poppins'); await document.fonts.load('italic 800 31px Poppins');
+  // image du jeu, recadrée pour remplir l'affiche
+  const img = new Image();
+  await new Promise((r) => { img.onload = img.onerror = r; img.src = Q.get('img') || ''; });
+  if (img.naturalWidth) {
+    const s = Math.max(W / img.naturalWidth, H / img.naturalHeight), w = img.naturalWidth * s, h = img.naturalHeight * s;
+    g.drawImage(img, (W - w) / 2, (H - h) * Math.min(1, Math.max(0, +(Q.get('y') ?? 0.5))), w, h);
+  } else { g.fillStyle = '#2b2f3a'; g.fillRect(0, 0, W, H); }
+  // léger voile en haut, pour que le titre se lise sur toutes les images
+  const grad = g.createLinearGradient(0, 0, 0, 220); grad.addColorStop(0, 'rgba(10,12,20,.32)'); grad.addColorStop(1, 'rgba(10,12,20,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, W, 220);
+  // titre : deux mots, contour sombre et ombre portée
+  let size = +(Q.get('size') || 118);
+  const font = () => `italic 900 ${size}px Poppins`;
+  g.font = font();
+  const space = size * 0.28;
+  let w1 = g.measureText(t1).width, w2 = t2 ? g.measureText(t2).width : 0;
+  while (w1 + w2 + space > W - 70) { size -= 2; g.font = font(); w1 = g.measureText(t1).width; w2 = t2 ? g.measureText(t2).width : 0; }
+  const x0 = (W - (w1 + (t2 ? space + w2 : 0))) / 2, base = 30 + size * 0.86;
+  g.lineJoin = 'round'; g.textBaseline = 'alphabetic';
+  const word = (txt, x, color) => {
+    g.lineWidth = size * 0.16;
+    g.strokeStyle = 'rgba(10,12,20,.55)'; g.strokeText(txt, x, base + size * 0.07);
+    g.fillStyle = 'rgba(10,12,20,.55)'; g.fillText(txt, x, base + size * 0.07);
+    g.strokeStyle = INK; g.strokeText(txt, x, base);
+    g.fillStyle = color; g.fillText(txt, x, base);
+  };
+  word(t1, x0, c1);
+  if (t2) word(t2, x0 + w1 + space, c2);
+  // bandeau
+  if (sub) {
+    g.font = 'italic 800 31px Poppins';
+    const tw = g.measureText(sub).width, pw = tw + 56, ph = 58, px = (W - pw) / 2, py = base + size * 0.2;
+    const rr = (dx, dy) => { g.beginPath(); g.roundRect(px + dx, py + dy, pw, ph, 13); };
+    g.fillStyle = 'rgba(10,12,20,.55)'; rr(0, 5); g.fill();
+    g.fillStyle = pill; rr(0, 0); g.fill();
+    g.lineWidth = 4; g.strokeStyle = INK; rr(0, 0); g.stroke();
+    g.textAlign = 'center'; g.fillStyle = 'rgba(10,12,20,.45)'; g.fillText(sub, W / 2, py + 40 + 2);
+    g.fillStyle = '#ffffff'; g.fillText(sub, W / 2, py + 40);
+  }
+  document.getElementById('dl').href = cv.toDataURL('image/jpeg', 0.9);
+  window.affiche = cv; // pour les captures automatiques
+})();
+</script>
+</body>
+</html>

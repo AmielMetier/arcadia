@@ -51,12 +51,13 @@ duo-drift/                         → https://amielmetier.github.io/duo-drift/
 ├── hub/
 │   ├── hub.css                    habillage du Hub (thème commun aux deux jeux)
 │   ├── hub.js                     écrans du Hub, lancement / retour de jeu
-│   └── games.js                   registre : id, titre, vignette, joueurs min/max, URL
+│   ├── games.js                   registre : id, titre, sous-titre, phrase, affiche, joueurs min/max, URL
+│   └── friends.js                 amis : code ami, présence, salon de chacun, invitations
 ├── shared/
 │   ├── vendor/peerjs.min.js       PeerJS sorti d'index.html (une seule copie)
 │   ├── ice.js                     serveurs STUN/TURN (relais 80/443 pour les réseaux publics), ?peer= ?relay ?turn=
-│   ├── net.js                     Net extrait de Duo Drift ; préfixe d'ID paramétrable
-│   ├── room.js                    salon générique : joueurs, pseudos, couleurs, chat, pings, hôte
+│   ├── net.js                     connexion au relais WebSocket ; reprise de la place après une coupure
+│   ├── room.js                    salon générique : joueurs, pseudos, couleurs, chat, pings, hôte, reconnexions
 │   ├── bridge.js                  pont Hub ⇄ jeu (postMessage), même API que Net
 │   └── profile.js                 pseudo et couleur (clés localStorage communes avec Duo Drift)
 ├── drift/
@@ -273,3 +274,21 @@ ce qui permet à `game.js` de choisir l'un ou l'autre. La texture du plateau est
 (3072 px) à partir des mêmes données et icônes que le plateau classique. Rendu « NeutralToneMapping » pour garder
 les couleurs du plateau. La caméra de suivi se place du côté de la case visée (azimut par côté) et se déplace
 en arc autour de sa cible. Three.js r169 est embarqué dans `shared/vendor/three/` (licence MIT).
+
+## Coupures et amis (version 2.71)
+
+Le serveur relais (`server/server.js`, protocole 3) garde la place d'un joueur 20 s après une coupure. Chaque message
+non volatil est numéroté et reste gardé jusqu'à l'accusé de réception (porté par la sonde envoyée toutes les 250 ms).
+`shared/net.js` repère une connexion morte en 5 s (ou tout de suite au retour du réseau ou de l'onglet), en ouvre une
+autre et reprend la place : le serveur renvoie ce qui a été manqué, le navigateur renvoie ce que le serveur n'a pas
+reçu, les doublons sont écartés. Les autres joueurs voient seulement « reconnexion… ». Si la place est perdue
+(serveur redémarré, coupure trop longue), l'invité revient dans le salon avec son numéro (`prevId`) et l'identifiant
+de sa page, l'hôte rouvre le même code, et un ancien hôte dont les invités ont déjà migré les rejoint.
+Tests : `node tools/test-relay.mjs` (serveur) et `node tools/test-net.mjs` (net.js et room.js de bout en bout, à travers
+des mandataires qui coupent, figent ou bloquent les connexions, redémarrage du serveur compris).
+
+Amis (`hub/friends.js`, messages `p_*` sur une connexion à part) : la clé secrète du joueur reste dans son navigateur,
+le serveur en tire un code ami public de 8 caractères. Une demande doit être acceptée ; ensuite chacun voit l'autre
+en ligne, son jeu et son salon, peut le rejoindre d'un clic ou l'inviter. Le compte (pseudo, couleur, clé, amis) vit
+dans le navigateur ; un code de transfert l'emporte sur un autre appareil. `?as=<nom>` donne une identité séparée
+pour tester à plusieurs dans le même navigateur, avec `?ws=ws://localhost:8091` et `node server/server.js`.
