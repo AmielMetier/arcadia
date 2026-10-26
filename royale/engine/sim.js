@@ -12,7 +12,7 @@ import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, weapo
 export const DT = 1 / 60;
 export const HP = 100, SHIELD = 100;
 export const SLOTS = 5;
-const SHOULDER = 0.62;            // décalage de l'épaule (le rayon de tir part de là, comme celui de la caméra)
+export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon de tir part de là, comme celui de la caméra)
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
 const STORM_START = 30;           // s après le départ de la montgolfière
@@ -20,7 +20,7 @@ const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
-const emptyInput = () => ({ mx: 0, mz: 0, yaw: 0, pitch: 0, fire: false, aim: false, sprint: false, crouch: false, jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, sel: 1, build: null, place: 0, rotate: 0, edit: 0 });
+const emptyInput = () => ({ mx: 0, mz: 0, yaw: 0, pitch: 0, fire: false, aim: false, sprint: false, crouch: false, jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, sel: 1, build: null, place: 0, rotate: 0, edit: 0, mv: null });
 
 export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', start = null } = {}) {
   const rng = makeRng(hash(seed * 31 + 7));
@@ -53,7 +53,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, bot: !!r.bot, level: r.level || 'normal',
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
-      inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0 }, hitBy: null, swing: 0 };
+      inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };
     S.players.set(P.id, P);
     return P;
   }
@@ -138,6 +138,19 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!it) return;
     P.inv[P.sel - 1] = null; P.rl = 0; P.use = null;
     spawnItem(it, P.x + Math.sin(P.yaw) * 1.2, P.y + 0.4, P.z + Math.cos(P.yaw) * 1.2);
+  }
+  function moveSlot(P, a, b) {
+    if (!(a >= 0 && a < SLOTS) || a === b) return;
+    if (b === -1) {
+      const it = P.inv[a];
+      if (!it) return;
+      P.inv[a] = null;
+      spawnItem(it, P.x + Math.sin(P.yaw) * 1.2, P.y + 0.4, P.z + Math.cos(P.yaw) * 1.2);
+    } else if (b >= 0 && b < SLOTS) [P.inv[a], P.inv[b]] = [P.inv[b], P.inv[a]];
+    else return;
+    // l'objet en main a changé : on ne finit pas un rechargement ou un soin commencé avec l'autre
+    if (P.sel - 1 === a || P.sel - 1 === b) { P.rl = 0; P.use = null; P.cd = Math.max(P.cd, 0.25); }
+    ev({ e: 'range', p: P.id });
   }
   function openChest(P, c) {
     c.open = true;
@@ -364,6 +377,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     // changement de case (0 : outil de récolte)
     const want = clamp(P.inp.sel | 0, 0, SLOTS);
     if (want !== P.sel) { P.sel = want; P.rl = 0; P.use = null; P.cd = Math.max(P.cd, 0.25); ev({ e: 'arme', p: P.id, sel: want }); }
+    // rangement du sac (menu d'inventaire) : [compteur, case, case de destination ou −1 pour lâcher]
+    const mv = P.inp.mv;
+    if (mv && mv[0] !== P.last.mv) { P.last.mv = mv[0]; moveSlot(P, mv[1], mv[2]); }
     if (fired(P, 'use')) interact(P);
     if (fired(P, 'drop')) dropHeld(P);
     // ramassage automatique des munitions et matériaux

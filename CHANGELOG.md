@@ -21,6 +21,12 @@
   - Les sons : une détonation par arme (étouffée au loin), impacts, explosions, portes, coffres, rechargement, soins, pioche, constructions, tes pas et ceux des joueurs qui approchent, vent en chute libre, grondement de la tempête, et l'ambiance de la campagne, du bord de mer ou de la montagne.
   - Après une élimination, on regarde celui qui t'a eu, ou un autre joueur avec Espace. Le bilan de fin donne le classement, les éliminations et les dégâts de chacun ; l'hôte peut relancer une partie.
   - Sensibilité de la souris et volume réglables à l'écran de départ et en pause.
+  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
+  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
+  - Les ombres ne scintillent plus quand on tourne la caméra.
+  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
+  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
+  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
 
 ## 2.74 — 26 octobre 2026
 - **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
