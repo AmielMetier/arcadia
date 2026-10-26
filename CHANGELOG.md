@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.63 — 26 octobre 2026
+- **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 4 joueurs chacun son tour, avec des bots.
+  - 18 trous dans trois décors : la campagne, le bord de mer (plages, baies, palmiers) et la montagne (falaises, torrents, sommets enneigés).
+  - Partie de 6 trous (un décor), de 9 trous (l'aller ou le retour) ou les 18 trous d'un coup, avec la carte de score entre chaque trou et le podium à la fin.
+  - Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer, et on relâche pour frapper. Tirer de travers fait tourner la balle, et trop armer la fait partir en hook. Au clavier : maintenir Espace.
+  - Huit clubs, du vent à chaque trou, des bunkers, la plage, l'eau et le hors-limites (un coup de pénalité), des arbres qui arrêtent la balle.
+  - Une cible montre où tombe un coup plein sans le vent, et sur le green une grille animée montre la pente. La mini-carte est une vue aérienne du trou.
+  - Un rendu soigné : herbe haute en 3D qui ondule au vent, arbres et sapins touffus, reflets du décor dans l'eau, ombres douces, falaises et sommets enneigés.
+  - On voit le swing des autres en direct. Le plus loin du drapeau joue en premier, et l'honneur revient au meilleur score du trou précédent.
+  - Ambiance de nature, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
+  - Bots en trois niveaux : facile, moyen et difficile.
+
 ## 2.62 — 26 octobre 2026
 - Fix 3v3 battle platform alignment, sequential turn narration, and MMO pixel-art tileset + enterable buildings (Amiel)
 

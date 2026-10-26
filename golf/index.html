@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Birdie Party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="golf.css">
+</head>
+<body>
+<div id="stage"></div>
+<div class="vignette"></div>
+
+<div id="hud" hidden>
+  <div class="holeinfo" id="holeCard">
+    <div class="band"></div>
+    <div class="htitle">Trou <b id="hNum">1</b></div>
+    <div class="hsub"><span id="hPar">Par 4</span> · <span id="hLen">339 m</span> · Coup <b id="hStroke">1</b></div>
+  </div>
+  <div class="players" id="players"></div>
+  <div class="turn" id="turn" hidden></div>
+  <div class="distbox">
+    <div class="dist"><b id="distTxt">— m</b> <span>restants</span></div>
+    <div class="line"></div>
+    <div class="lie" id="lieTxt">Départ</div>
+  </div>
+  <div class="windbox" id="windBox" title="Vent : la flèche montre où il pousse la balle (vers le haut = dans le dos)">
+    <div class="wband"><b id="windTxt">0 m/s</b></div>
+    <div class="wtile"><div class="arrow" id="windArrow"><i></i></div><span>Vent</span></div>
+  </div>
+  <div class="tbtns"><button class="round" id="btnView" title="Vue d'ensemble (V)">🗺️</button><button class="round" id="btnMute" title="Son (M)">🔊</button><button class="round" id="btnLeave" title="Quitter la partie">✕</button></div>
+
+  <div class="clubbox" id="clubBox">
+    <div class="band"></div>
+    <button class="arrowbtn" id="clubPrev" title="Club plus long (↑)">◀</button>
+    <div class="cicon" id="clubIcon"></div>
+    <div class="club"><b id="clubName">Driver</b><span><i id="clubShort">1W</i> <em id="clubDist">230 m</em></span></div>
+    <button class="arrowbtn" id="clubNext" title="Club plus court (↓)">▶</button>
+  </div>
+
+  <div class="gauge" id="gauge" hidden><div class="tube"><i class="fill" id="gaugeFill"></i><i class="dot d1"></i><i class="dot d2"></i><i class="full"></i></div><b class="diamond"></b><span id="gaugeTxt">0 %</span></div>
+  <div class="mapframe"><canvas class="minimap" id="minimap" width="170" height="250"></canvas></div>
+  <div class="pintag" id="pinTag" hidden><b id="pinTxt">0 m</b><i></i></div>
+  <div class="aimpad" id="aimPad"><button class="round big" id="aimL" title="Viser à gauche (←)">⟲</button><div class="hint" id="hint">Tire vers le bas pour armer, relâche pour frapper</div><button class="round big" id="aimR" title="Viser à droite (→)">⟳</button></div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<div id="fade" class="fade"></div>
+<div id="screen" class="screen"></div>
+
+<script src="../shared/bridge.js"></script>
+<script src="../shared/profile.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

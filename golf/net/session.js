@@ -1,0 +1,189 @@
+// Birdie Party — la partie en réseau. L'hôte fait autorité : il tient l'état (règles), calcule chaque coup
+// (le moteur est déterministe, mais c'est le résultat de l'hôte qui compte), fait jouer les bots et diffuse.
+// Les invités envoient leur coup quand c'est leur tour, et leur posture (visée, club, armé) pour que les autres
+// voient le swing en direct. Le jeu ne parle jamais au réseau directement : tout passe par HubBridge.
+//
+// Protocole :
+//   invité → hôte : { t:'shot', no, club, aim, power, curve }   coup du joueur dont c'est le tour (no = numéro du coup)
+//                   { t:'pose', aim, club, back }               posture (volatile, ~10 fois par seconde)
+//                   { t:'sync' }                                « renvoie-moi l'état »
+//   hôte → tous :   { t:'st', R }                               état de la partie (après chaque coup animé)
+//                   { t:'shot', ev }                            un coup vient d'être joué (paramètres + résultat)
+//                   { t:'pose', id, aim, club, back }           posture du joueur qui joue
+import { HOLES, buildHole, windFor, COURSES } from '../engine/course.js';
+import { simulate } from '../engine/physics.js';
+import { newRound, startHole, applyShot, holeOver, finishHole, leave, ranking, MAX_STROKES } from '../engine/rules.js';
+import { botShot, BOT_NAMES } from '../engine/bot.js';
+import { putterRange, PUTTER } from '../engine/clubs.js';
+
+const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
+const holeCache = new Map();
+export function holeByNumber(n) {
+  if (!holeCache.has(n)) holeCache.set(n, buildHole(HOLES.find((h) => h.n === n)));
+  return holeCache.get(n);
+}
+export const currentHole = (R) => (R && R.hi < R.holes.length ? holeByNumber(R.holes[R.hi]) : null);
+export const windOf = (R) => { const h = currentHole(R); return h ? windFor(h, R.seed, R.wind) : { speed: 0, dir: 0, x: 0, z: 0 }; };
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const WIND = { calme: 0, normal: 1, fort: 1.6 };
+
+// balle d'entrée de la simulation (posée sur son tee au départ)
+export function simBall(hole, b) { return { x: b.x, z: b.z, lie: b.lie, y: hole.heightAt(b.x, b.z) + (b.lie === 'tee' ? 0.04 : 0.021) }; }
+
+// ------------------------------------------------------------------ hôte (et partie solo)
+// speed : accélère les délais (tests hors navigateur)
+export function startHost({ bridge, solo, settings = {}, me, emit, initial = null, speed = 1 }) {
+  let R = initial ? clone(initial) : null, busy = false, reported = false, ended = false;
+  const timers = new Set();
+  const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms / speed); timers.add(t); return t; };
+  const send = (m, vol) => { if (!solo) bridge.send('all', m, vol ? { volatile: true } : undefined); };
+  const publish = () => { const s = clone(R); emit({ type: 'state', R: s }); send({ t: 'st', R: s }); };
+
+  function begin() {
+    const course = COURSES[settings.course] || COURSES.campagne;
+    // test : ?hole=N démarre la partie à ce trou du parcours
+    const holes = settings.startHole ? course.holes.filter((n) => n >= settings.startHole) : course.holes;
+    const humans = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players.map((p) => ({ id: p.id, name: p.name, color: p.color }));
+    const nb = Math.max(0, Math.min(4 - humans.length, +(settings.bots ?? (solo ? 1 : 0)) || 0));
+    const used = new Set(humans.map((p) => p.color));
+    const free = COLORS.filter((c) => !used.has(c));
+    const bots = Array.from({ length: nb }, (_, k) => ({ id: 'b' + k, name: BOT_NAMES[k], color: free[k % free.length], bot: true, level: settings.level || 'normal' }));
+    const seed = (Date.now() & 0x7fffffff) || 1;
+    R = newRound({ holes: holes.length ? holes : course.holes, players: [...humans, ...bots], seed, wind: WIND[settings.wind] ?? 1 });
+    R.course = settings.course || 'campagne';
+    R.started = Date.now();
+    startHole(R, currentHole(R));
+    publish();
+    scheduleBot();
+  }
+
+  // un coup demandé par le joueur `pid` (humain ou bot)
+  function shot(pid, p) {
+    if (!R || R.phase !== 'play' || busy) return;
+    const i = R.turn, P = R.players[i];
+    if (!P || P.id !== pid || (p.no != null && p.no !== R.shotNo)) return;
+    const hole = currentHole(R), wind = windOf(R);
+    const from = { ...P.ball }, ball = simBall(hole, from);
+    const club = Math.max(0, Math.min(PUTTER, p.club | 0));
+    const params = {
+      club, traj: 'mid', aim: +p.aim || 0, power: Math.max(0, Math.min(1.25, +p.power || 0)), curve: Math.max(-1.6, Math.min(1.6, +p.curve || 0)),
+      seed: (R.seed * 31 + R.shotNo * 977 + i * 13) >>> 0,
+    };
+    const putt = putterRange(Math.hypot(hole.pin.x - from.x, hole.pin.z - from.z));
+    const res = simulate(hole, ball, params, wind, { putt });
+    const before = P.strokes;
+    const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf }, (x, z) => hole.surfaceAt(x, z));
+    const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
+    busy = true;
+    emit({ type: 'shot', ev });
+    send({ t: 'shot', ev });
+    // filet de sécurité : si l'animation de l'hôte ne rend pas la main (onglet caché), on avance quand même
+    later(() => done(ev.no), (res.n / 60 + 6) * 1000);
+  }
+
+  // l'animation du coup est finie chez l'hôte : trou suivant, joueur suivant ou fin de partie
+  function done(no) {
+    if (!busy || !R || no !== R.shotNo - 1) return;
+    busy = false;
+    if (holeOver(R)) {
+      finishHole(R);
+      if (R.phase === 'over') { publish(); finish(); return; }
+      startHole(R, currentHole(R));
+    }
+    publish();
+    scheduleBot();
+  }
+
+  function scheduleBot() {
+    if (!R || R.phase !== 'play') return;
+    const P = R.players[R.turn];
+    if (!P || !P.bot) return;
+    const no = R.shotNo, hi = R.hi;
+    // le temps de voir arriver le bot (plus long au départ d'un trou : il y a le survol)
+    const wait = (P.strokes === 0 && R.players.every((q) => q.strokes === 0) ? 7500 : 2600) + Math.random() * 600;
+    later(() => {
+      if (!R || R.shotNo !== no || R.hi !== hi) return;
+      const hole = currentHole(R);
+      const s = botShot(hole, simBall(hole, P.ball), windOf(R), P.level, (R.seed + no * 7) >>> 0);
+      // le bot arme son swing sous les yeux de tous, puis frappe
+      const pose = { t: 'pose', id: P.id, aim: s.aim, club: s.club, back: 0 };
+      let k = 0;
+      const arm = () => {
+        if (!R || R.shotNo !== no) return;
+        k++; pose.back = Math.min(s.power, k / 14) ; emit({ type: 'pose', ...pose }); send(pose, true);
+        if (k < 14 * Math.min(1, s.power) + 2) later(arm, 45); else shot(P.id, { ...s, no });
+      };
+      emit({ type: 'pose', ...pose }); send(pose, true);
+      later(arm, 700);
+    }, wait);
+  }
+
+  function finish() {
+    if (ended) return; ended = true;
+    if (reported || !bridge.embedded) return;
+    reported = true;
+    const pars = R.holes.map((n) => holeByNumber(n).par);
+    const rk = ranking(R, pars);
+    try {
+      bridge.report({
+        id: `golf-${R.started}-${R.players.map((p) => p.id).join('.')}`,
+        mode: (COURSES[R.course] || COURSES.campagne).label.split(' · ')[0],
+        players: rk.map((x) => ({ id: typeof x.id === 'number' ? x.id : null, name: x.name, color: x.color, bot: x.bot, rank: x.rank, score: x.stableford })),
+      });
+    } catch (e) { console.warn(e); }
+  }
+
+  // messages des invités
+  const onMsg = (from, m) => {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'sync') { if (R) bridge.send(from, { t: 'st', R: clone(R) }); }
+    else if (m.t === 'shot') shot(from, m);
+    else if (m.t === 'pose' && R && R.players[R.turn]?.id === from) {
+      const pose = { t: 'pose', id: from, aim: +m.aim || 0, club: m.club | 0, back: +m.back || 0 };
+      emit({ type: 'pose', ...pose }); send(pose, true);
+    }
+  };
+  if (!solo) bridge.on('msg', onMsg);
+  // un joueur quitte le salon : il ne joue plus
+  if (!solo) bridge.on('roster', () => {
+    if (!R || R.phase === 'over') return;
+    let changed = false;
+    for (const p of R.players) if (!p.bot && !p.left && !bridge.players.some((q) => q.id === p.id)) { leave(R, currentHole(R), p.id); changed = true; }
+    if (changed && !busy) { if (holeOver(R)) done(R.shotNo - 1); else { publish(); scheduleBot(); } }
+  });
+
+  if (R) { busy = false; publish(); scheduleBot(); }
+  return {
+    get state() { return R; }, isHost: true,
+    begin,
+    // le joueur local joue son coup
+    shot: (p) => shot(me.id, { ...p, no: R ? R.shotNo : 0 }),
+    pose: (p) => { if (R && R.players[R.turn]?.id === me.id) { const pose = { t: 'pose', id: me.id, ...p }; send(pose, true); } },
+    done,
+    stop() { for (const t of timers) clearTimeout(t); timers.clear(); R = null; },
+  };
+}
+
+// ------------------------------------------------------------------ invité
+export function startClient({ bridge, me, emit }) {
+  let R = null, gotState = false;
+  const ask = setInterval(() => { if (!gotState) bridge.send('host', { t: 'sync' }); }, 1500);
+  bridge.send('host', { t: 'sync' });
+  bridge.on('msg', (from, m) => {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'st' && m.R) { gotState = true; R = m.R; emit({ type: 'state', R: m.R }); }
+    else if (m.t === 'shot' && m.ev) emit({ type: 'shot', ev: m.ev });
+    else if (m.t === 'pose' && m.id !== me.id) emit({ type: 'pose', ...m });
+  });
+  let lastPose = 0;
+  return {
+    get state() { return R; }, isHost: false,
+    begin() {},
+    shot: (p) => bridge.send('host', { t: 'shot', no: R ? R.shotNo : 0, ...p }),
+    pose: (p) => { const now = performance.now(); if (now - lastPose < 90) return; lastPose = now; bridge.send('host', { t: 'pose', ...p }, { volatile: true }); },
+    done() {},
+    stop() { clearInterval(ask); },
+  };
+}
+
+export { MAX_STROKES };

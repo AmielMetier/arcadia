@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP et Convoy Storm
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm et Birdie Party
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -89,6 +89,18 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
 - Rendu : post-traitement (ombre aux contacts, halo des lumières, étalonnage selon la nuit, les tunnels et le Front), sapins enneigés générés à la volée (comme ceux de Birdie Party), neige qui scintille ; les effets se coupent d'eux-mêmes si la machine peine
 - Décor et icônes : modèles 3D et pictogrammes de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/` et `convoy/img/icons/`
 
+## Birdie Party
+Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots (facile, moyen, difficile).
+- 18 trous originaux dans trois décors : campagne (étangs, ruisseau, chênes), bord de mer (plages, baies, palmiers) et montagne (falaises, torrents au fond des ravins, sommets enneigés)
+- Parties de 6 trous (un décor), 9 trous (aller ou retour) ou 18 trous ; carte de score entre les trous, podium à la fin
+- Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer et on relâche pour frapper ; tirer de travers fait un hook ou un slice, trop armer fait tourner la balle. Au clavier : Espace
+- Huit clubs (driver depuis le départ seulement), vent par trou, rough, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
+- Cible du coup plein sans le vent et grille animée de la pente sur le green, mini-carte en vue aérienne (rendue depuis la scène 3D)
+- Rendu : herbe en 3D autour de la caméra, reflets dans l'eau, occlusion ambiante, halo et étalonnage ; si la machine peine, la résolution puis les effets baissent tout seuls
+- On voit le swing des autres en direct ; le plus loin du drapeau joue en premier, l'honneur au meilleur du trou précédent
+- Ambiance nature, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
+- Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, terrain, eau et ciel générés dans le code
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -97,6 +109,7 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
   `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
+  `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
