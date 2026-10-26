@@ -199,7 +199,7 @@
     }
 
     // Envoi asynchrone au serveur local (tools/serve.mjs) ou relais (server/server.js) pour écriture dans logs/crash/
-    if (!isEmbedded && typeof fetch === 'function' && location.protocol.startsWith('http')) {
+    if (typeof fetch === 'function' && typeof location !== 'undefined' && location.protocol && location.protocol.startsWith('http')) {
       try {
         fetch('/api/log', {
           method: 'POST',
