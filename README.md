@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm et Birdie Party
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party et Mini-Golf Party
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -101,6 +101,14 @@ Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots
 - Ambiance nature, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
 - Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, terrain, eau et ciel générés dans le code
 
+## Mini-Golf Party
+Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 joueurs (bots facile, normal, expert).
+
+- **4 parcours de 6 trous** : Green Park (classique), Île aux Pirates et Jardin Zen (décorés), Forge Infernale (difficile : lave, pistons, tapis roulants, loopings, marteaux)
+- **Physique maison** : la balle roule sur les vrais triangles du décor (pentes, dévers, loopings, tremplins), vrai trou dans lequel elle peut tomber ou dont elle peut ressortir, obstacles mobiles, sable, accélérateurs, eau et lave
+- **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance) ou trackpad ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
+- Le joueur qui tire simule son coup chez lui et diffuse la trajectoire ; l'hôte tient les tours et les scores
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -109,6 +117,7 @@ Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
   `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
+  `node tools/test-minigolf.mjs` construit les 24 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
@@ -117,6 +126,6 @@ Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.59** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.67** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude
