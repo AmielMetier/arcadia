@@ -7,8 +7,8 @@
 import { generateMap, ILE } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
-import { createSim, DT } from './engine/sim.js';
-import { WEAPONS, ITEMS, itemLabel, MATERIALS } from './engine/items.js';
+import { createSim, DT, SHOULDER } from './engine/sim.js';
+import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from './engine/net.js';
@@ -38,7 +38,7 @@ const MATS = ['bois', 'pierre', 'metal'];
 
 const S = {
   role: 'solo', me: 'moi', settings: {}, map: null, world: null, sim: null, scene: null, actors: null, fx: null, hud: null, input: null, sfx: null,
-  yaw: 0, pitch: -0.1, camD: 3.8, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, prev: new Map(),
+  yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
@@ -88,6 +88,7 @@ async function boot(info) {
   S.sfx.island(S.map.center, S.map.islandR);
   S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel });
   loadOpts();
+  try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
   S.loaded = true;
   if (H.embedded) H.signalReady();
@@ -164,9 +165,11 @@ function me() { return S.sim ? S.sim.player(S.me) : null; }
 function onKey(code, key) {
   if (!S.sim) return;
   const P = me();
-  if (key === 'm' || code === 'KeyM') { S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
+  if (code === 'Tab') { toggleBag(); return; }
+  if (code === 'Escape' && S.hud.bagOpen) { toggleBag(false); showScreen('pause'); return; }
+  if (key === 'm' || code === 'KeyM') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
   if (code === 'Escape' && S.hud.mapOpen) { S.hud.toggleMap(false); return; }
-  if (key === 'h') { $('#hints').classList.toggle('off'); return; }
+  if (key === 'h') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
   if (!S.input.playing) return;
   if ((!P || !P.alive) && code === 'Space') { nextSpectate(); return; }
   if (key === 'e') S.cnt.use++;
@@ -178,13 +181,28 @@ function onKey(code, key) {
   else if (/^Digit[1-5]$/.test(code)) { S.sel = +code.slice(5); S.build = null; buildBar(); }
   else if (code === 'Digit0' || code === 'Backquote' || key === 'x' || key === '²') { S.sel = 0; S.build = null; buildBar(); }
 }
+// le sac : la souris est libérée pour glisser les objets ; Tab pour revenir au jeu
+function toggleBag(open = !S.hud.bagOpen) {
+  const P = me();
+  if (open && (!P || !P.alive)) return;
+  if (open) {
+    S.bagLock = true;
+    S.input.unlock();
+    S.hud.openBag(P, (a, b) => { S.mv = [S.mv[0] + 1, a, b]; S.sfx.play('clic'); });
+    S.sfx.play('clic');
+  } else {
+    S.hud.closeBag();
+    S.bagLock = false;
+    if (!S.ended) S.input.lock();
+  }
+}
 function buildBar() {
   const el = $('#buildbar');
   el.hidden = !S.build;
   if (!S.build) return;
   const P = me();
   el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}"><kbd>${{ mur: 'F', sol: 'V', escalier: 'C' }[k]}</kbd>${l}</span>`).join('')
-    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}"><kbd>T</kbd>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
+    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}"><kbd>T</kbd><i></i>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
 }
 function onWheel(dir) {
   const P = me();
@@ -196,13 +214,19 @@ function onWheel(dir) {
   S.sel = occupied[(i + dir + occupied.length) % occupied.length];
 }
 function onLock(locked, free) {
-  if (locked) { showScreen(null); S.hud.toggleMap(false); S.sfx.unlock(); if (free) toast('Souris non capturée : maintiens le clic pour regarder', 4); return; }
-  if (!S.hud.mapOpen && !S.ended && S.sim) showScreen('pause');
+  if (locked) {
+    showScreen(null); S.hud.toggleMap(false); S.sfx.unlock();
+    if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
+    if (free && !S.freeTold) { S.freeTold = true; toast('Bouge la souris pour regarder ; contre un bord de l\'écran, la vue continue de tourner', 5); }
+    return;
+  }
+  if (S.bagLock || S.hud.mapOpen || S.ended || !S.sim) return;
+  showScreen('pause');
 }
 function myInput(on, ax) {
   const inp = S.input;
   return { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, fire: !!(on && inp.fire), aim: !!(on && inp.aim), sprint: !!(on && inp.sprint), crouch: !!(on && inp.crouch),
-    jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel, build: on ? S.build : null, mat: S.mat };
+    jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel, build: on ? S.build : null, mat: S.mat, mv: S.mv };
 }
 
 // ------------------------------------------------------------------ boucle
@@ -215,11 +239,11 @@ function loop(now) {
   if (S.role === 'guest') guestNet(dt);
   if (!S.sim) { idleFrame(dt); return; }
   const inp = S.input, P = me();
-  const [mx, my] = inp.takeMouse();
+  const [mx, my] = inp.takeMouse(dt);
   const scoped = isScoped(P);
   const sens = scoped ? 0.25 : inp.aim ? 0.6 : 1;
   S.yaw -= mx * sens; S.pitch = clamp(S.pitch - my * sens, -1.35, 1.25);
-  const on = !!(inp.playing && !S.hud.mapOpen && P && P.alive);
+  const on = !!(inp.playing && !S.hud.mapOpen && !S.hud.bagOpen && P && P.alive);
   if (on && inp.takeJump()) S.cnt.jump++;
   const ax = on ? inp.axes() : { mx: 0, mz: 0 };
   const events = S.role === 'guest' ? guestSteps(dt, on, ax) : hostSteps(dt, on, ax);
@@ -250,7 +274,7 @@ function loop(now) {
   if (focusP) {
     const fp = disp(focusP);
     S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms);
-    S.hud.player(focusP, { alive: S.sim.alive().length });
+    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat });
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
@@ -258,6 +282,7 @@ function loop(now) {
   S.hud.crosshair(P ? spreadOf(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
+  if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
   S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP) });
   // qualité automatique : si l'image prend plus de 24 ms pendant 3 s, on allège
   if (S.ms > 24 && S.t > 6) { S.slow += dt; if (S.slow > 3) { S.slow = 0; const w = S.scene.lowerQuality(); if (w && DEBUG) toast('Qualité baissée : ' + w, 2); } }
@@ -366,7 +391,7 @@ function cameraFor(P, disp, dt) {
   const yaw = target === P ? S.yaw : d.yaw, pitch = target === P ? S.pitch : clamp(target.pitch || 0, -0.6, 0.6);
   const cp = Math.cos(pitch), fx = Math.sin(yaw) * cp, fy = Math.sin(pitch), fz = Math.cos(yaw) * cp;
   const rx = -Math.cos(yaw), rz = Math.sin(yaw);
-  let dist = S.camD, sh = 0.62, headY;
+  let dist = S.camD, sh = SHOULDER, headY;
   if (target.mode === 'ballon') {
     // autour de la montgolfière, à la souris, en regardant l'île
     const b = S.sim.balloonPos(), pp = Math.min(S.pitch, -0.15), cy2 = Math.cos(pp), D = 42;
@@ -376,21 +401,32 @@ function cameraFor(P, disp, dt) {
   if (target.mode === 'chute' || target.mode === 'planeur') { dist = 7.5; sh = 0; headY = d.y + 1.6; }
   else headY = target.swim ? d.y + MOVE.swimDepth + 0.6 : d.y + (target.crouch ? MOVE.hc : MOVE.h) - 0.25;
   if (target === P && S.input.aim && heldWeapon(P)) dist = 2.1;
-  if (isScoped(P) && target === P) { dist = 0; }
-  // l'épaule ne doit pas entrer dans un mur
-  const side = sh ? W.ray(d.x, headY, d.z, rx, 0, rz, sh, 0.12) : 0;
-  const px = d.x + rx * side, pz = d.z + rz * side, py = headY;
-  const free = dist ? W.ray(px, py, pz, -fx, -fy, -fz, dist, 0.15) : 0;
-  const dd = dist ? Math.max(0.45, free - 0.1) : 0;
-  let cx = px - fx * dd, cy = py - fy * dd, cz = pz - fz * dd;
+  if (isScoped(P) && target === P) dist = 0;
+  // distance fixe : elle ne change que pour viser (ou en l'air), jamais à cause d'un mur
+  S.camDist = dist === 0 ? 0 : S.camDist + (dist - S.camDist) * (1 - Math.exp(-12 * dt));
+  // épaule droite (même axe que les tirs) ; un mur collé à droite la fait glisser doucement vers le centre
+  const wantSide = sh ? Math.max(0, W.ray(d.x, headY, d.z, rx, 0, rz, sh, 0.2)) : 0;
+  S.camSide += (wantSide - S.camSide) * (1 - Math.exp(-8 * dt));
+  const D = S.camDist, px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide, py = headY;
+  let cx = px - fx * D, cy = py - fy * D, cz = pz - fz * D;
   const wl = W.waterLevel(cx, cz);
   if (cy < wl + 0.35) cy = wl + 0.35;
+  const gh = S.map.heightAt(cx, cz);
+  if (cy < gh + 0.3) cy = gh + 0.3;
+  // ce qui se trouve entre la caméra et le joueur (mur, porte, arbre) est découpé par le plan proche : la caméra
+  // reste où elle est, on voit le joueur à travers
+  let near = 0.15;
+  if (D > 0.3) {
+    const vx = cx - d.x, vy = cy - py, vz = cz - d.z, L = Math.hypot(vx, vy, vz);
+    const free = W.ray(d.x, py, d.z, vx / L, vy / L, vz / L, L, 0.05);
+    if (free < L - 0.05) near = clamp(L - free + 0.25, 0.15, Math.max(0.15, D - 0.75));
+  }
   // secousse des explosions proches
   if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); cx += (Math.random() - 0.5) * S.shake * 0.4; cy += (Math.random() - 0.5) * S.shake * 0.4; cz += (Math.random() - 0.5) * S.shake * 0.4; }
-  return look(cx, cy, cz, fx, fy, fz, d);
-  function look(x, y, z, a, b, c, focus) {
+  return look(cx, cy, cz, fx, fy, fz, d, near);
+  function look(x, y, z, a, b, c, focus, nearP = 0.15) {
     S.cam = { x, y, z };
-    return { pos: { x, y, z }, look: { x: x + a * 30, y: y + b * 30, z: z + c * 30 }, focus: { x: focus.x, y: focus.y, z: focus.z } };
+    return { pos: { x, y, z }, look: { x: x + a * 30, y: y + b * 30, z: z + c * 30 }, focus: { x: focus.x, y: focus.y, z: focus.z }, near: nearP };
   }
 }
 function pickSpectate() {
@@ -549,7 +585,8 @@ function handleEvents(list) {
           S.sfx.play(e.head ? 'tete' : e.sh ? 'bouclier' : 'touche');
         }
         if (e.to === S.me) {
-          if (e.by != null) { const A = S.sim.player(e.by); if (A && P) { const ang = Math.atan2(A.x - P.x, A.z - P.z) - S.yaw; S.hud.hurtFrom(-ang); } }
+          const A = e.by != null ? S.sim.player(e.by) : null;
+          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null);
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
         }
         break;
@@ -557,7 +594,7 @@ function handleEvents(list) {
       case 'elim': {
         const killer = e.by != null ? `<b>${esc(nameOf(e.by))}</b>` : '';
         const icon = (id) => (S.sim.player(id) && S.sim.player(id).bot ? ' 🤖' : '');
-        S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`);
+        S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`, e.by === S.me || e.to === S.me);
         if (e.to === S.me) {
           S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur</small>`, 5);
           S.spect = e.by != null && S.sim.player(e.by) && S.sim.player(e.by).alive ? e.by : pickSpectate();
@@ -648,55 +685,70 @@ function showPrompt() {
   if (!tg) { S.hud.prompt(''); return; }
   if (tg.kind === 'porte') S.hud.prompt((tg.o.open ? 'Fermer' : 'Ouvrir') + (tg.o.kind === 'portail' ? ' le portail' : ' la porte'));
   else if (tg.kind === 'coffre') S.hud.prompt(tg.o.kind === 'coffre' ? 'Ouvrir le coffre' : 'Ouvrir la caisse de munitions');
-  else S.hud.prompt('Ramasser : ' + itemLabel(tg.o.it));
+  else {
+    const it = tg.o.it, full = P.inv.every(Boolean) && !(it.t === 'objet' && P.inv.some((q) => q && q.t === 'objet' && q.c === it.c));
+    S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
+  }
 }
 
 // ------------------------------------------------------------------ écrans
+const icon = (n) => `<img class="ic" src="img/icons/${n}.png" alt="">`;
 function lobbyList() {
-  if (!H.embedded) return '';
   const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, 30) - hs.length);
-  const rows = hs.map((p) => `<li><i style="background:${esc(p.color)}"></i>${esc(p.name)}${p.id === S.me ? ' (toi)' : ''}<em>${H.readyMap[p.id] === 'royale' ? 'prêt' : 'charge…'}</em></li>`).join('');
-  return `<ul class="lobby">${rows}${S.settings.mode !== 'exploration' && bots ? `<li class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</li>` : ''}</ul>`;
+  const rows = hs.map((p) => {
+    const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
+    return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
+  }).join('');
+  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
 }
+const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
+  <span><kbd>Espace</kbd> sauter, ouvrir le planeur</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
+  <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
+  <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
   if (!kind) return;
   const expl = S.settings.mode === 'exploration';
-  const play = (label) => `<button class="btn" id="go">${label}</button>`;
+  const play = (label) => `<button class="btn big" id="go">${label}</button>`;
   const back = `<button class="btn ghost" id="quit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button>`;
-  const keys = `<ul class="keys"><li><kbd>Z Q S D</kbd> ou <kbd>W A S D</kbd> se déplacer</li><li><kbd>Souris</kbd> regarder, <kbd>clic</kbd> tirer</li>
-    <li><kbd>Clic droit</kbd> viser</li><li><kbd>1</kbd> à <kbd>5</kbd>, molette : objets ; <kbd>X</kbd> outil</li>
-    <li><kbd>Espace</kbd> sauter, planer</li><li><kbd>Maj</kbd> sprinter, <kbd>Ctrl</kbd> s'accroupir</li>
-    <li><kbd>E</kbd> ouvrir, ramasser</li><li><kbd>R</kbd> recharger, <kbd>G</kbd> lâcher</li>
-    <li><kbd>X</kbd> pioche : casse et récolte</li><li><kbd>F</kbd> mur, <kbd>V</kbd> sol, <kbd>C</kbd> escalier, <kbd>T</kbd> matériau</li><li><kbd>M</kbd> carte</li><li><kbd>Échap</kbd> pause</li></ul>`;
-  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lede"><b>Pour l\'instant, Island Rush se joue au clavier et à la souris.</b></p>' : '';
+  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris.</p>' : '';
   const opts = `<div class="opts"><label>Sensibilité <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="${(S.input.sens / 0.0024).toFixed(1)}"></label>
     <label>Volume <input type="range" id="vol" min="0" max="1" step="0.05" value="${S.sfx.volume}"></label></div>`;
-  let html;
+  const title = '<h1>Island <span>Rush</span></h1>';
   const n = clamp(S.settings.places, 2, 30);
+  const rules = expl
+    ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
+    : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
+      ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
+      ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+  const rulesHtml = `<div class="rules">${rules.map(([i, b, t]) => `<div>${icon(i)}<span><b>${b}</b>${t}</span></div>`).join('')}</div>`;
+  let html;
   if (kind === 'start') {
-    const lead = expl ? 'Promène-toi sans combat : entre dans les bâtiments, ouvre les portes, monte sur les toits. Clic sur la carte (M) pour t\'y rendre.'
-      : `${n} joueurs montent dans la montgolfière. Saute quand tu veux (Espace), plane jusqu'au sol, fouille les coffres et les maisons, et reste dans le cercle : la tempête se referme. Le dernier en vie gagne.`;
-    html = `<p class="eyebrow">Island Rush · ${expl ? 'exploration' : 'battle royale'}</p><h1>${expl ? 'L\'île' : 'Dernier debout'}</h1><p class="lede">${lead}</p>${lobbyList()}${touch}${keys}${opts}
-      <div class="row">${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter dans la montgolfière')}${back}</div>`;
+    html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
+      ${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Island Rush</p><h1>En attente</h1><p class="lede">L'hôte va lancer la partie.</p>${lobbyList()}${touch}${keys}${opts}<div class="row">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
-    html = `<p class="eyebrow">Island Rush</p><h1>C'est parti</h1><p class="lede">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p>${keys}${opts}<div class="row">${play('Jouer')}${back}</div>`;
+    html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
-    html = `<p class="eyebrow">Island Rush</p><h1>Partie en cours</h1><p class="lede">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (<kbd>Espace</kbd> pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row">${play('Regarder')}${back}</div>`;
+    html = `<p class="eyebrow">Partie en cours</p>${title}<p class="lead">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (<kbd>Espace</kbd> pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row end">${back}${play('Regarder')}</div>`;
   } else if (kind === 'perdu') {
-    html = `<p class="eyebrow">Island Rush</p><h1>Liaison perdue</h1><p class="lede">L'hôte ne répond plus.</p><div class="row">${back}</div>`;
-  } else if (kind === 'pause') html = `<h1>Pause</h1><p class="lede">La partie continue pendant la pause.</p>${opts}<div class="row">${play('Reprendre')}${back}</div>`;
-  else {
+    html = `<p class="eyebrow">Liaison perdue</p>${title}<p class="lead">L'hôte ne répond plus.</p><div class="row end">${back}</div>`;
+  } else if (kind === 'pause') {
+    html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
+  } else {
     const { res, mine, winner } = data;
-    const rows = res.slice(0, 10).map((r) => `<li class="${r.id === S.me ? 'me' : ''}"><span>${r.place}</span><b>${esc(r.name)}${r.bot ? ' 🤖' : ''}</b><em>${r.kills} élim. · ${r.dealt} dégâts</em></li>`).join('');
-    const title = !mine ? (winner != null ? `${esc(nameOf(winner))} gagne` : 'Fin de partie') : winner === S.me ? 'Dernier debout !' : `${mine.place}${mine.place === 1 ? 'er' : 'e'} sur ${res.length}`;
-    const wait = S.role === 'guest' ? '<p class="lede">L\'hôte peut relancer une partie.</p>' : '';
-    html = `<p class="eyebrow">Island Rush · fin de partie</p><h1>${title}</h1>
-      ${mine ? `<p class="lede">${mine.kills} élimination${mine.kills > 1 ? 's' : ''} · ${mine.dealt} dégâts infligés · ${fmtTime((Date.now() - S.startedAt) / 1000)} de partie</p>` : ''}<ol class="ranking">${rows}</ol>${wait}
-      <div class="row">${S.role !== 'guest' ? '<button class="btn" id="again">Rejouer</button>' : ''}${back}</div>`;
+    const won = winner === S.me;
+    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : ''}"><td>${r.place}</td><td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
+    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${res.length}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
+    const tags = mine ? `<div class="tags"><span>${icon('skull')}<b>${mine.kills}</b> élimination${mine.kills > 1 ? 's' : ''}</span><span>${icon('target')}<b>${mine.dealt}</b> dégâts</span><span>${icon('hourglass')}<b>${fmtTime((Date.now() - S.startedAt) / 1000)}</b></span></div>` : '';
+    const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
+    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? 'Dernier <span>debout</span> !' : 'Island <span>Rush</span>'}</h1>${head}${tags}
+      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th><th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
+      <div class="row end">${back}${S.role !== 'guest' ? '<button class="btn big" id="again">Rejouer</button>' : ''}</div>`;
+    el.querySelector('.panel').classList.toggle('win', won);
   }
   el.querySelector('.panel').innerHTML = html;
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
@@ -706,7 +758,7 @@ function showScreen(kind, data) {
   const sens = $('#sens'); if (sens) sens.oninput = () => { S.input.sens = 0.0024 * +sens.value; saveOpts(); };
   const vol = $('#vol'); if (vol) vol.oninput = () => { S.sfx.setVolume(+vol.value); saveOpts(); };
 }
-const fmtTime = (s) => `${Math.floor(s / 60)} min ${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens, vol: S.sfx.volume })); } catch (e) { /* pas de stockage */ } }
 function loadOpts() {
   try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) S.sfx.setVolume(clamp(+o.vol, 0, 1)); } catch (e) { /* pas de stockage */ }

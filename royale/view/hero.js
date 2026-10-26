@@ -44,8 +44,8 @@ export function buildHero({ shirt = 0xff4b2b, pants = 0x2f3646, skin = 0, hair =
   const hairM = mesh(GEO.hair, mHair); hairM.rotation.x = -0.35; head.add(hairM);
   for (const sx of [-1, 1]) { const e = mesh(GEO.eye, mEye); e.scale.set(0.8, 1.45, 0.5); e.position.set(0.085 * sx, 0.0, 0.255); head.add(e); }
   const hands = [-1, 1].map((sx) => { const h = mesh(GEO.hand, mSkin); h.position.set(0.34 * sx, 0.3, 0.06); chest.add(h); return h; });
-  // ce qu'on tient : accroché entre les deux mains, devant le buste
-  const hold = new THREE.Group(); hold.position.set(0.26, 0.42, 0.3); chest.add(hold);
+  // ce qu'on tient : à droite (le côté droit du personnage est son x local négatif), devant l'épaule
+  const hold = new THREE.Group(); hold.position.set(-0.24, 0.42, 0.3); chest.add(hold);
   let held = null;
   // planeur : une aile au-dessus de la tête, à la couleur du joueur
   const glider = new THREE.Group(); glider.visible = false; root.add(glider);
@@ -90,10 +90,10 @@ export function buildHero({ shirt = 0xff4b2b, pants = 0x2f3646, skin = 0, hair =
     // arme en main : les deux mains se rejoignent sur l'arme, qui suit le regard ; léger recul au tir
     if (aim > 0.01) {
       const p = clamp(st.pitch || 0, -1.1, 1.1);
-      // l'arme à l'épaule droite (visible de la caméra, placée derrière l'épaule droite)
-      hold.rotation.x = -p * 0.85; hold.position.set(0.26, 0.42 + p * 0.12, 0.3 - kick * 0.08);
-      hands[1].position.lerp(new THREE.Vector3(0.3, 0.4 + p * 0.1, 0.28), aim);
-      hands[0].position.lerp(new THREE.Vector3(0.18, 0.42 + p * 0.16, 0.5), aim);
+      // l'arme à l'épaule droite : main droite sur la poignée, main gauche qui vient tenir le canon
+      hold.rotation.x = -p * 0.85; hold.position.set(-0.24, 0.42 + p * 0.12, 0.3 - kick * 0.08);
+      hands[0].position.lerp(new THREE.Vector3(-0.27, 0.4 + p * 0.1, 0.28), aim);
+      hands[1].position.lerp(new THREE.Vector3(-0.1, 0.42 + p * 0.16, 0.5), aim);
     }
     hold.visible = !!held && aim > 0.5 && fly < 0.5 && swim < 0.5;
     // chute libre

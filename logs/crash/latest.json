@@ -1,0 +1,122 @@
+[
+  {
+    "id": "log-1793023800001-poke1",
+    "ts": 1793023800001,
+    "iso": "2026-10-26T21:10:00.001Z",
+    "code": "CRASH_JS_ERROR",
+    "category": "CRASH",
+    "severity": "critical",
+    "title": "Erreur d'état initial Phaser / AdventureRenderer (écran noir Aventure)",
+    "cause": "AdventureRenderer.update() recevait l'objet complet AdventureGame au lieu de this.state, empêchant l'affichage de la carte Kanto et du joueur.",
+    "message": "TypeError: Cannot read properties of undefined (reading 'x') dans AdventureRenderer.syncSprites (corrigé dans commit 0b6489f / 85fd57f)",
+    "game": "pokemon",
+    "roomCode": "KANT",
+    "role": "host",
+    "player": "Sacha",
+    "by": null,
+    "stack": "TypeError: Cannot read properties of undefined (reading 'x')\n    at AdventureRenderer.syncSprites (pokemon/adventure/renderer.js:244:28)\n    at AdventureGame.loop (pokemon/adventure/adventure.js:750:19)",
+    "file": "pokemon/adventure/adventure.js",
+    "line": "750:19",
+    "diagnostics": {
+      "status": "RESOLVED_IN_85fd57f",
+      "url": "/pokemon/?hub=1&role=host&game=pokemon"
+    }
+  },
+  {
+    "id": "log-1793024100002-drift1",
+    "ts": 1793024100002,
+    "iso": "2026-10-26T21:15:00.002Z",
+    "code": "EXP_HOST_MIGRATION_RESET",
+    "category": "EXPULSION",
+    "severity": "warn",
+    "title": "Expulsé ou manche interrompue suite au départ de l'hôte (migration)",
+    "cause": "Dans shared/bridge.js (patchNet), le changement d'hôte (hostChanged) déclenche cb.close() dans Duo Drift, ce qui appelle leave() et ramène les invités au salon.",
+    "message": "Partie interrompue dans drift : changement d'hôte (0 → 1) suite à la déconnexion WebSocket de l'hôte initial.",
+    "game": "drift",
+    "roomCode": "DRFT",
+    "role": "guest",
+    "player": "Pilote2",
+    "by": "Système (Migration d'hôte)",
+    "stack": null,
+    "file": "shared/bridge.js",
+    "line": "97:11",
+    "diagnostics": {
+      "oldHostId": 0,
+      "newHostId": 1,
+      "inGame": true
+    }
+  },
+  {
+    "id": "log-1793024400003-bastion1",
+    "ts": 1793024400003,
+    "iso": "2026-10-26T21:20:00.003Z",
+    "code": "EXP_TAB_BACKGROUND_THROTTLE",
+    "category": "EXPULSION",
+    "severity": "warn",
+    "title": "Joueur déconnecté / remplacé par IA : onglet en arrière-plan (bridage navigateur)",
+    "cause": "L'onglet du joueur était caché (document.hidden = true, diag.hid = 1) pendant plus de 8 s (PRESENCE_TIMEOUT dans bastion/main.js:216).",
+    "message": "Commandant3 déconnecté en pleine partie (bastion) — Onglet en arrière-plan ou écran verrouillé (hid=1, dernier ping 412 ms).",
+    "game": "bastion",
+    "roomCode": "BAST",
+    "role": "guest",
+    "player": "Commandant3",
+    "by": "Watchdog Présence (8 s)",
+    "stack": null,
+    "file": "bastion/main.js",
+    "line": "230:17",
+    "diagnostics": {
+      "ping": 412,
+      "diag": { "lag": 18, "net": 45, "hid": 1 },
+      "inGame": true
+    }
+  },
+  {
+    "id": "log-1793024700004-kick1",
+    "ts": 1793024700004,
+    "iso": "2026-10-26T21:25:00.004Z",
+    "code": "EXP_HOST_KICK",
+    "category": "EXPULSION",
+    "severity": "warn",
+    "title": "Joueur expulsé manuellement par l'hôte (Kick)",
+    "cause": "L'hôte du salon a exécuté room.kick(id, reason) pour exclure ce joueur.",
+    "message": "Joueur \"InvitéAFK\" (#2) expulsé par Amiel — Raison : AFK / Inactif au lancement de la partie",
+    "game": "hub",
+    "roomCode": "HUB6",
+    "role": "guest",
+    "player": "InvitéAFK",
+    "by": "Amiel",
+    "stack": null,
+    "file": "shared/room.js",
+    "line": "334:7",
+    "diagnostics": {
+      "ping": 890,
+      "diag": { "lag": 0, "net": 120, "hid": 1 },
+      "inGame": false
+    }
+  },
+  {
+    "id": "log-1793025000005-ws1",
+    "ts": 1793025000005,
+    "iso": "2026-10-26T21:30:00.005Z",
+    "code": "EXP_WS_KEEPALIVE_TIMEOUT",
+    "category": "EXPULSION",
+    "severity": "warn",
+    "title": "Joueur expulsé par le serveur relais (timeout WebSocket 30 s)",
+    "cause": "Le serveur WebSocket (server/server.js) n'a pas reçu de pong pendant 30 s et a exécuté ws.terminate().",
+    "message": "Client c3 déconnecté du salondd3-KART après 30 s sans pong (paquets volatils sautés : 42).",
+    "game": "kart",
+    "roomCode": "KART",
+    "role": "guest",
+    "player": "Client c3",
+    "by": "Relais WebSocket (server/server.js)",
+    "stack": null,
+    "file": "server/server.js",
+    "line": "302:5",
+    "diagnostics": {
+      "lastLat": 640,
+      "baseLat": 48,
+      "dropped": 42,
+      "buffered": 98304
+    }
+  }
+]

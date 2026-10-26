@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.81';
+  const VERSION = '2.86';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -354,7 +354,7 @@
     $('#codeBox').hidden = solo; $('#chatBox').hidden = solo;
     $('#code').textContent = room.code || '----';
     const host = room.isHost;
-    renderPlayers(); renderNet(); pubState(); renderFriends();
+renderPlayers(); renderNet(); pubState(); renderFriends(); renderPings();
     // partie en cours que l'on a quittée
     const running = room.game && !frame;
     $('#runBanner').hidden = !running;
@@ -558,7 +558,14 @@
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
     $('#play').innerHTML = ''; $('#play').appendChild(el);
-    frame = { game: g.id, n: g.n, el, loaded: false, role };
+const watchdog = setTimeout(() => {
+      if (frame && frame.el === el && !frame.loaded && window.DDLogger) {
+        window.DDLogger.logCrash('CRASH_IFRAME_LOAD_FAIL', `Le jeu "${def.title}" (${g.id}) n'a pas envoyé le signal d'initialisation "hello" après 15 s.`, {
+          game: g.id, roomCode: room && room.code, file: src,
+        });
+      }
+    }, 15000);
+    frame = { game: g.id, n: g.n, el, loaded: false, role, watchdog };
     el.addEventListener('load', () => { try { el.contentWindow.focus(); } catch (e) {} });
     showScreen('play');
     renderRoom(); pubState();
@@ -566,6 +573,7 @@
 
   function closeFrame(toRoom) {
     if (!frame) return;
+    clearTimeout(frame.watchdog);
     frame.el.remove(); frame = null; $('#play').innerHTML = '';
     if (room) room.setReady(null);
     if (toRoom && room) { showScreen('room'); renderRoom(); }
@@ -583,6 +591,7 @@
     switch (d.k) {
       case 'hello':
         frame.loaded = true;
+        clearTimeout(frame.watchdog);
         frame.el.contentWindow.postMessage({ dd: 'hub', k: 'init', info: {
           role: room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest',
           myId: room.myId, hostId: room.hostId, code: room.code, game: frame.game,
@@ -593,9 +602,16 @@
       case 'ready': room.setReady(frame.game); break;
       case 'send': room.sendGame(d.to, d.m, !!d.v); break;
       case 'result': recordResult(frame.game, d.r); break;
+      case 'log': if (window.DDLogger && d.entry) window.DDLogger.receiveFromChild(d.entry); break;
       case 'exit':
-        if (room.isHost) room.setGame(null);
-        else { leftGame = frame.n; closeFrame(true); }
+        if (room.isHost) {
+          if (window.DDLogger && room.players.length > 1) {
+            window.DDLogger.logExpulsion('EXP_HOST_STOPPED_GAME', `L'hôte a quitté "${frame.game}" : fermeture de la partie pour les ${room.players.length} joueurs du salon.`, {
+              game: frame.game, roomCode: room.code,
+            });
+          }
+          room.setGame(null);
+        } else { leftGame = frame.n; closeFrame(true); }
         break;
     }
   });

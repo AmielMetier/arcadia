@@ -29,7 +29,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); onLost && onLost(); });
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 6000);
+  const camera = new THREE.PerspectiveCamera(72, 1, 0.15, 6000);
   const noise = noiseTexture();
   const T = TIMES[time], L = T ? { ...DAY, ...T } : DAY;
   const sunDir = new THREE.Vector3(...(T ? T.dir : DAY.dir)).normalize();
@@ -100,18 +100,26 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   if (renderer.compileAsync) await renderer.compileAsync(scene, camera).catch(() => {});
 
   let time0 = 0, disposed = false;
-  // cam : { pos, look } ; focus : le joueur (ombres, niveaux de détail)
+  // repère du soleil, pour caler l'ombre sur ses texels (sinon elle scintille quand on tourne ou qu'on avance)
+  const lx = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), sunDir).normalize(), ly = new THREE.Vector3().crossVectors(sunDir, lx);
+  const sc = new THREE.Vector3();
+  // cam : { pos, look, near? } ; focus : le joueur (ombres, niveaux de détail)
   function frame(dt, cam, focus) {
     if (disposed) return;
     time0 += dt;
     camera.position.set(cam.pos.x, cam.pos.y, cam.pos.z); camera.lookAt(cam.look.x, cam.look.y, cam.look.z);
+    // plan proche : la caméra garde sa distance, ce qui se trouve entre elle et le joueur est découpé
+    const near = cam.near || 0.15;
+    if (Math.abs(camera.near - near) > 0.002) { camera.near = near; camera.updateProjectionMatrix(); }
     terrain.update(camera.position.x, camera.position.z, 2);
     forest.update(camera.position.x, camera.position.z, 1);
-    // l'ombre couvre ce qui est autour du joueur et devant la caméra
-    const ax = cam.look.x - cam.pos.x, az = cam.look.z - cam.pos.z, al = Math.hypot(ax, az) || 1;
-    const fx = focus.x + ax / al * 22, fz = focus.z + az / al * 22, fy = focus.y;
-    sun.target.position.set(fx, fy, fz);
-    sun.position.set(fx + sunDir.x * 200, fy + sunDir.y * 200, fz + sunDir.z * 200);
+    // l'ombre couvre ce qui est autour du joueur, sans dépendre de la direction du regard, calée au texel près
+    const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
+    sc.set(focus.x, focus.y, focus.z);
+    const a = Math.round(sc.dot(lx) / texel) * texel, b = Math.round(sc.dot(ly) / texel) * texel, c = sc.dot(sunDir);
+    sc.copy(lx).multiplyScalar(a).addScaledVector(ly, b).addScaledVector(sunDir, c);
+    sun.target.position.copy(sc);
+    sun.position.copy(sc).addScaledVector(sunDir, 200);
     SWAY.uT.value = time0; SWAY.uWind.value = 0.35;
     water.update(time0);
     interior.update(dt);

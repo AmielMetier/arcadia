@@ -45,7 +45,8 @@ function botAnswerAfter(q, k, rnd, limit) {
     // market making : un bon bot cote serré autour du juste milieu ; un moins bon se décale d'un ou deux points
     const off = right ? 0 : (rnd() < 0.5 ? -1 : 1) * (1 + Math.floor(rnd() * 2));
     const raw = [0, 1, 2].map((k) => { const w = [1.5, 1, 0.75][k], m = mmFair(q.mm, k) + off; return `${m - w}/${m + w}`; }).join(';');
-    return { delay: Math.min(limit - 3000, limit * (0.35 + k.speed * 0.5)), raw };
+    // trois cotations en 20 à 30 secondes : le marché ne doit pas faire attendre les joueurs qui ont fini
+    return { delay: Math.min(limit - 3000, limit * (0.18 + k.speed * 0.3) * (0.85 + rnd() * 0.3)), raw };
   }
   // une mauvaise réponse tombe souvent dans le piège, comme un vrai candidat
   const trapped = !right && rnd() < 0.35;

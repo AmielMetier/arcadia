@@ -25,16 +25,16 @@ const BIO_LOOK = {
   foret: { ground: 0xc6d1cd, fog: 0x93a5a0, rough: 1, near: 10, far: 46 },
   ville: { ground: 0xcdcbc7, fog: 0xb3b3b8, rough: 1, near: 13, far: 54 },
   lac: { ground: 0xb4d6ee, fog: 0xcde2f0, rough: 0.28, near: 16, far: 62 },
-  col: { ground: 0xdbe2ed, fog: 0xc8d2df, rough: 1, near: 14, far: 58 },
+  col: { ground: 0xc4ccd8, fog: 0x9fb0c5, rough: 1, near: 12, far: 52 },
   usine: { ground: 0xc2beb9, fog: 0xa9a49d, rough: 1, near: 12, far: 50 },
-  toundra: { ground: 0xe2e7ee, fog: 0xd3dbe5, rough: 1, near: 15, far: 64 },
+  toundra: { ground: 0xdacfb6, fog: 0xe4e0d6, rough: 1, near: 17, far: 72 },
 };
 // aperçu de chaque paysage au bout de l'aiguillage (quelques pièces le long de la voie qui s'en va)
 const PREVIEW = {
   plaine: [['~mound', 1.5], ['nature/plant_bush', 3.5]], foret: [['holiday/tree-snow-a', 1], ['holiday/tree-snow-b', 1], ['nature/tree_pineTallD', 1]],
   ville: [['commercial/building-a', 6], ['commercial/building-d', 6]], lac: [['~slab', 2], ['pirate/boat-row-small', 2.4]],
   col: [['nature/rock_tallA', 7], ['nature/cliff_block_rock', 6]], usine: [['industrial/detail-tank-large', 4.4], ['industrial/shipping-container-a', 7]],
-  toundra: [['holiday/reindeer', 1.7], ['nature/tree_pineSmallA', 3]],
+  toundra: [['holiday/reindeer', 1.7], ['~moss', 2.4], ['nature/tree_pineSmallA', 3]],
 };
 
 export function createScene(host, { onLost } = {}) {
@@ -234,6 +234,11 @@ export function createScene(host, { onLost } = {}) {
   scatter.define('~slab', [{ geo: GEO.mound, mat: iceSlab, base: mat4(0, 0, 0, 1.2, 0.06, 1.2) }, { geo: GEO.box, mat: crackMat, base: mat4(0.8, 0.03, 0, 0.08, 0.02, 2.4, 0.7) }], { cast: false });
   scatter.define('~pole', [{ geo: GEO.box, mat: FM.wood, base: mat4(0, 2.1, 0, 0.18, 4.5, 0.18, 0, 0, 0.12) }]);
   scatter.define('~spire', [{ geo: GEO.cone, mat: FM.rock, base: mat4(0, 0.5, 0, 1, 1, 1) }]);
+  // toundra : la lande rousse que le vent a mise à nu, des touffes d'herbe sèche ; col : des éboulis de roche grise
+  const mossMat = M(0x6e4524, { roughness: 1 }), grassMat = M(0xd2a043, { roughness: 1 });
+  scatter.define('~moss', [{ geo: GEO.mound, mat: mossMat, base: mat4(0, 0, 0, 1, 0.07, 1) }, { geo: GEO.mound, mat: mossMat, base: mat4(0.7, 0, 0.35, 0.65, 0.06, 0.55, 0.9) },
+    ...[[0.35, 0.2, 0.5], [-0.4, -0.15, 0.4], [0.05, -0.45, 0.6], [-0.1, 0.45, 0.35], [0.85, 0.3, 0.45], [-0.6, 0.25, 0.3]].map(([x, z, h]) => ({ geo: GEO.cone, mat: grassMat, base: mat4(x, h / 2 + 0.03, z, 0.13, h * 1.3, 0.13) }))]);
+  scatter.define('~scree', [{ geo: GEO.mound, mat: FM.rock, base: mat4(0, 0, 0, 1, 0.55, 1) }, { geo: GEO.mound, mat: MAT.rock, base: mat4(0.9, 0, 0.4, 0.45, 0.3, 0.45, 0.7) }, { geo: GEO.mound, mat: FM.rock, base: mat4(-0.7, 0, -0.6, 0.35, 0.25, 0.35, 1.9) }]);
   scatter.define('~lamp', [{ geo: GEO.box, mat: FM.dark, base: mat4(0, 1.8, 0, 0.14, 3.6, 0.14) }, { geo: GEO.box, mat: FM.dark, base: mat4(0.4, 3.55, 0, 0.9, 0.1, 0.1) }, { geo: GEO.ball, mat: MAT.lamp, base: mat4(0.8, 3.4, 0, 0.7, 0.7, 0.7) }]);
   scatter.define('~pipe', [{ geo: GEO.cyl10, mat: FM.steel, base: mat4(0, 1.25, 0, 0.32, 6.1, 0.32, 0, Math.PI / 2) }, { geo: GEO.box, mat: FM.dark, base: mat4(0, 0.55, 0, 0.18, 1.1, 0.18) }, { geo: GEO.cyl10, mat: MAT.rust, base: mat4(0, 1.25, 2.9, 0.42, 0.2, 0.42, 0, Math.PI / 2) }]);
   scatter.define('~tunnel', [{ geo: shellGeo, mat: tunnelMat, base: mat4(0, 0, 0) }, { geo: shellGeo, mat: tunnelIn, base: mat4(0, 0, 0, 0.97, 0.97, 1) }]);
@@ -1340,6 +1345,14 @@ export function createScene(host, { onLost } = {}) {
       if (free(zw)) V.push({ m: '~spire', x, zw, y: -0.2, r: rr.range(0, 3), sx: rr.range(2, 3.5), sy: h, sz: rr.range(2, 3.5) });
     }
     if (rr.chance(0.5) && c.bio !== 'ville' && c.bio !== 'lac') { const zw = -k * CHUNK - rr.range(0, CHUNK); if (free(zw)) V.push({ m: '~pole', x: (rr.chance(0.5) ? -1 : 1) * 4.2, zw, y: 0, r: 0, sx: 1, sy: 1, sz: 1 }); }
+    if (c.bio === 'toundra') for (let i = 0; i < 22; i++) {
+      const x = (rr.chance(0.5) ? -1 : 1) * rr.range(3.2, 26), zw = -k * CHUNK - rr.range(0, CHUNK), s = rr.range(1.6, 4.5);
+      if (free(zw)) V.push({ m: '~moss', x, zw, y: 0.02, r: rr.range(0, 6.28), sx: s, sy: 1, sz: s * rr.range(0.5, 0.9) });
+    }
+    if (c.bio === 'col') for (let i = 0; i < 5; i++) {
+      const x = (rr.chance(0.5) ? -1 : 1) * rr.range(3.4, 13), zw = -k * CHUNK - rr.range(0, CHUNK), s = rr.range(0.6, 1.5);
+      if (free(zw)) V.push({ m: '~scree', x, zw, y: -0.05, r: rr.range(0, 6.28), sx: s, sy: s, sz: s });
+    }
     c.vis = V;
     return V;
   }
@@ -1433,6 +1446,7 @@ export function createScene(host, { onLost } = {}) {
       at(u, lat, O);
       if (m === '~mound') scatter.add('~mound', O.x, -0.05, O.z, O.yaw, s * 2, s * 0.5, s * 1.5);
       else if (m === '~slab') scatter.add('~slab', O.x, 0.01, O.z, O.yaw, s * 2, 1, s * 2);
+      else if (m === '~moss') scatter.add('~moss', O.x, 0.02, O.z, O.yaw + i, s, 1, s * 0.7);
       else { const sc = m.includes('tree') ? rr.range(4.5, 7) / 1.95 : s; put(m, O.x, 0, O.z, O.yaw + rr.range(0, 6.28) * (m.includes('building') ? 0 : 1) + (m.includes('building') ? (lat > 0 ? -Math.PI / 2 : Math.PI / 2) : 0), sc, sc, sc, i + fk.at, false); }
     }
   }

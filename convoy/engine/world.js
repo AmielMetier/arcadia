@@ -31,11 +31,12 @@ export const CHUNK = 36;            // longueur d'un tronçon de plaine (m)
 // ruins / trees : nombre de ruines et de sapins isolés par tronçon ; wolves, raid (écart entre deux raids), cold : multiplicateurs ;
 // ev : poids des événements de voie ; loot : poids des types de caisses ; moments : poids des moments forts ;
 // kinds : poids des types de ruines ; kmax : courbure maximale des virages (1/m) ; grade : pente maximale ;
-// ice : sol glissant qui craque ; tunnels : la voie passe sous la montagne ; snipers : tireurs sur les toits.
+// ice : sol glissant qui craque ; tunnels : la voie passe sous la montagne ; snipers : tireurs sur les toits ;
+// fast : la voie est dégagée, le convoi y file plus vite (multiplicateur de vitesse).
 export const BIOMES = {
-  plaine: { icon: '❄️', label: 'Plaine gelée', desc: 'Ruines éparses, un peu de tout.', ruins: [1, 3], trees: [2, 6], wolves: 1, raid: 1, cold: 1, kmax: 1 / 220, grade: 0,
+  plaine: { icon: '❄️', label: 'Plaine gelée', desc: 'Une voie droite et dégagée : le convoi file plus vite et reprend de l\'avance sur le Front. Des fermes isolées où recueillir des survivants.', ruins: [1, 3], trees: [2, 6], wolves: 1, raid: 1, cold: 1, kmax: 1 / 220, grade: 0, fast: 1.12,
     ev: { drift: 45, aval: 30, gust: 25 }, loot: { fuel: 62, coal: 18, ice: 14, parts: 6 }, moments: { wreck: 40, boss: 35, roar: 25 },
-    kinds: [['house', 30], ['depot', 12], ['hulk', 18], ['temple', 11], ['pylon', 9], ['silo', 8], ['platform', 10], ['cabin', 8]] },
+    kinds: [['farm', 24], ['house', 16], ['depot', 10], ['hulk', 14], ['temple', 9], ['pylon', 8], ['silo', 7], ['platform', 8], ['cabin', 6]] },
   foret: { icon: '🌲', label: 'Forêt noire', desc: 'Des sapins à perte de vue : on y abat du bois, à l\'abri du vent… mais les loups chassent en meute.', ruins: [0, 2], trees: [0, 0], wolves: 2.2, raid: 1.4, cold: 0.8, kmax: 1 / 150, grade: 0.015, dense: true,
     ev: { drift: 60, aval: 10, gust: 30 }, loot: { wood: 40, coal: 25, fuel: 27, parts: 8 }, moments: { roar: 50, wreck: 50 },
     kinds: [['sawmill', 35], ['cabin', 35], ['hulk', 15], ['house', 15]] },
@@ -59,7 +60,7 @@ export const BIOME_KEYS = Object.keys(BIOMES);
 
 // Ce que chaque type de ruine cache : butin favori, chance d'y trouver un survivant, chance d'embuscade, nombre de points de fouille
 const KIND_INFO = {
-  camp: { surv: 0.3 }, cabin: { surv: 0.35 }, hut: { surv: 0.3 }, house: { surv: 0.12 }, cache: { surv: 0.2, lk: 1.5 },
+  camp: { surv: 0.3 }, cabin: { surv: 0.35 }, hut: { surv: 0.3 }, house: { surv: 0.12 }, farm: { surv: 0.55 }, cache: { surv: 0.2, lk: 1.5 },
   block: { surv: 0.12, amb: 0.14, spots: 3 }, factory: { amb: 0.25, spots: 2, lb: 'parts' }, depot: { amb: 0.1 },
   sawmill: { lb: 'wood', lk: 1.3 }, mine: { lb: 'coal' }, boat: { lb: 'ice', lk: 1.3 }, tank: { lb: 'fuel' },
 };
@@ -263,6 +264,13 @@ function buildRuin(kind, rng, side) {
     const name = rng.pick(HOUSES), S = rng.range(4.6, 5.6);
     box(0, 0, S, S, HOUSE_H[name] * S, 0, 'model:city/' + name);
     if (rng.chance(0.7)) box(rng.chance(0.5) ? -S * 0.75 : S * 0.75, rng.range(-1, 1), 1.8, 1.4, 0.8, rng.range(-0.6, 0.6), 'model:arena/bricks');
+  } else if (kind === 'farm') {
+    // ferme isolée de la plaine : la maison, l'enclos derrière, la charrette et le bois du dernier hiver
+    const name = rng.pick(['building-small-a', 'building-small-d']), S = rng.range(4.8, 5.4);
+    box(0, 0, S, S, HOUSE_H[name] * S, 0, 'model:city/' + name);
+    for (const dz of [-2.25, 0, 2.25]) if (dz === 0 || rng.chance(0.8)) P.push(piece('survival/fence-fortified', 4.5, side * (S / 2 + 3.4), dz, Math.PI / 2));
+    P.push(piece('fantasy/cart', rng.range(1.8, 2.1), 0, S / 2 + 1.9, rng.range(-0.4, 0.4)));
+    P.push(piece('nature/log_stack', 4, side * 0.8, -(S / 2 + 1.4), Math.PI / 2));
   } else if (kind === 'depot') {
     const S = rng.range(5.6, 6.6);
     box(0, 0, S, S, 0.55 * S, 0, 'model:city/building-garage');

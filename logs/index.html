@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Logs & Diagnostic Crash / Expulsion — Game Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="../shared/logger.js"></script>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --card: #161a23;
+    --card2: #1d222e;
+    --line: rgba(255,255,255,0.09);
+    --tx: #f3f5f9;
+    --muted: #98a2b3;
+    --red: #ff4b2b;
+    --amber: #ffc531;
+    --green: #2fbf71;
+    --blue: #2b8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 15% 0%, #1c2233 0%, var(--bg) 60%);
+    color: var(--tx);
+    font-family: 'Chakra Petch', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 22px;
+  }
+  h1 { font-family: 'Bungee', Impact, sans-serif; font-size: 26px; margin: 0; letter-spacing: 0.5px; }
+  h1 span { color: var(--red); }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn {
+    background: var(--card2); color: var(--tx); border: 1px solid var(--line);
+    padding: 9px 15px; border-radius: 10px; font-family: inherit; font-weight: 700;
+    font-size: 13px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { border-color: rgba(255,255,255,0.28); background: #252b3b; }
+  .btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.yellow { background: var(--amber); border-color: var(--amber); color: #14161c; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px; margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+  }
+  .stat small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat b { display: block; font-size: 28px; margin-top: 4px; font-family: 'Bungee', sans-serif; }
+  .stat.crash b { color: var(--red); }
+  .stat.exp b { color: var(--amber); }
+  .stat.ok b { color: var(--green); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); color: var(--muted); font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .tab.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 18px;
+  }
+  select, input[type="search"] {
+    background: var(--card2); color: var(--tx); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px;
+  }
+
+  .log-list { display: flex; flex-direction: column; gap: 12px; }
+  .log-item {
+    background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--blue);
+    border-radius: 12px; padding: 16px;
+  }
+  .log-item.CRASH { border-left-color: var(--red); }
+  .log-item.EXPULSION { border-left-color: var(--amber); }
+  .log-top {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .badge.CRASH { background: rgba(255,75,43,0.18); color: #ff7a61; border: 1px solid rgba(255,75,43,0.4); }
+  .badge.EXPULSION { background: rgba(255,197,49,0.16); color: var(--amber); border: 1px solid rgba(255,197,49,0.4); }
+  .badge.game { background: rgba(43,140,255,0.16); color: #7cc0ff; border: 1px solid rgba(43,140,255,0.35); }
+  .badge.code { font-family: 'JetBrains Mono', monospace; background: var(--card2); color: #d0d7e6; }
+  .time { color: var(--muted); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .log-title { font-size: 16px; font-weight: 700; margin: 4px 0; }
+  .log-msg { color: #dce2f0; font-size: 14px; margin: 4px 0 8px; }
+  .log-cause {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; color: var(--muted);
+  }
+  .log-cause b { color: var(--tx); }
+  pre.stack {
+    margin: 10px 0 0; padding: 10px 12px; background: #090b0f; border: 1px solid var(--line);
+    border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: #ff9c87; overflow-x: auto; white-space: pre-wrap;
+  }
+
+  .catalog-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px;
+  }
+  .game-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  }
+  .game-card h3 { margin: 0 0 4px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .game-card .meta { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .game-card h4 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .game-card h4.c { color: #ff7a61; }
+  .game-card h4.e { color: var(--amber); }
+  .game-card ul { margin: 0; padding-left: 18px; font-size: 13px; color: #d5dce9; line-height: 1.5; }
+  .game-card li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>GAME HUB · <span>LOGS &amp; CRASHS</span></h1>
+      <div class="sub">Journal unifié des raisons de crash d'un jeu (<code>CRASH_*</code>) et d'expulsion/déconnexion d'un joueur (<code>EXP_*</code>)</div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="../">← Retour au Game Hub</a>
+      <button class="btn yellow" id="btnExport">⬇ Exporter JSON</button>
+      <button class="btn" id="btnClear">🗑 Vider le cache local</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><small>Total événements enregistrés</small><b id="stTotal">0</b></div>
+    <div class="stat crash"><small>Crashs de jeu (CRASH_*)</small><b id="stCrash">0</b></div>
+    <div class="stat exp"><small>Joueurs expulsés / déconnectés (EXP_*)</small><b id="stExp">0</b></div>
+    <div class="stat ok"><small>Jeux couverts par DDLogger</small><b id="stGames">11 / 11 + Hub</b></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="events">📡 Journal des événements (Crashs &amp; Expulsions)</button>
+    <button class="tab" data-tab="games">🎮 Diagnostic par Jeu (11 jeux &amp; Hub)</button>
+    <button class="tab" data-tab="codes">📖 Référentiel des Codes (CRASH_* / EXP_*)</button>
+  </div>
+
+  <!-- ONGLET 1 : ÉVÉNEMENTS -->
+  <section id="tab-events">
+    <div class="filters">
+      <label>Catégorie :
+        <select id="fCat">
+          <option value="all">Toutes (Crashs + Expulsions)</option>
+          <option value="CRASH">🔴 Crashs d'un jeu uniquement (CRASH_*)</option>
+          <option value="EXPULSION">🟠 Joueurs expulsés / déconnectés (EXP_*)</option>
+        </select>
+      </label>
+      <label>Jeu :
+        <select id="fGame">
+          <option value="all">Tous les jeux + Hub</option>
+          <option value="hub">Game Hub (Salon)</option>
+          <option value="drift">Duo Drift</option>
+          <option value="pokemon">Poké Duel</option>
+          <option value="kart">Cyber Kart GP</option>
+          <option value="bastion">Bastion Clash</option>
+          <option value="outbreak">Outbreak : Secteur Zéro</option>
+          <option value="convoy">Convoy Storm</option>
+          <option value="david">DavidSimulator</option>
+          <option value="calcul">Tête de Calcul</option>
+          <option value="filrouge">Fil Rouge</option>
+          <option value="golf">Birdie Party</option>
+          <option value="minigolf">Mini-Golf Party</option>
+        </select>
+      </label>
+      <input type="search" id="fSearch" placeholder="Rechercher un joueur, code salon, erreur…" style="flex:1;min-width:200px">
+    </div>
+    <div class="log-list" id="logList"></div>
+  </section>
+
+  <!-- ONGLET 2 : PAR JEU -->
+  <section id="tab-games" hidden>
+    <div class="catalog-grid" id="gameGrid"></div>
+  </section>
+
+  <!-- ONGLET 3 : CODES -->
+  <section id="tab-codes" hidden>
+    <div class="log-list" id="codeList"></div>
+  </section>
+</div>
+
+<script>
+(async function () {
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const GAME_LABELS = {
+    hub: 'Game Hub (Salon)', drift: 'Duo Drift', pokemon: 'Poké Duel', kart: 'Cyber Kart GP',
+    bastion: 'Bastion Clash', outbreak: 'Outbreak : Secteur Zéro', convoy: 'Convoy Storm',
+    david: 'DavidSimulator', calcul: 'Tête de Calcul', filrouge: 'Fil Rouge',
+    golf: 'Birdie Party', minigolf: 'Mini-Golf Party'
+  };
+
+  let serverLogs = [];
+  let catalog = { codes: {}, games: [] };
+  try {
+    const r = await fetch('crash/latest.json', { cache: 'no-cache' });
+    if (r.ok) serverLogs = await r.json();
+  } catch (e) {}
+  try {
+    const r2 = await fetch('crash/reasons-catalog.json', { cache: 'no-cache' });
+    if (r2.ok) catalog = await r2.json();
+  } catch (e) {}
+
+  function mergedLogs() {
+    const local = window.DDLogger ? window.DDLogger.getAll() : [];
+    const map = new Map();
+    for (const item of [...local, ...(Array.isArray(serverLogs) ? serverLogs : [])]) {
+      if (item && item.id) map.set(item.id, item);
+    }
+    return [...map.values()].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  }
+
+  function render() {
+    const all = mergedLogs();
+    const cat = document.getElementById('fCat').value;
+    const game = document.getElementById('fGame').value;
+    const q = document.getElementById('fSearch').value.trim().toLowerCase();
+
+    document.getElementById('stTotal').textContent = all.length;
+    document.getElementById('stCrash').textContent = all.filter((x) => x.category === 'CRASH').length;
+    document.getElementById('stExp').textContent = all.filter((x) => x.category === 'EXPULSION').length;
+
+    const filtered = all.filter((x) => {
+      if (cat !== 'all' && x.category !== cat) return false;
+      if (game !== 'all' && x.game !== game) return false;
+      if (q) {
+        const hay = `${x.code} ${x.title} ${x.message} ${x.cause} ${x.player} ${x.roomCode} ${x.game}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const box = document.getElementById('logList');
+    if (!filtered.length) {
+      box.innerHTML = '<div class="log-item"><div class="log-title">Aucun événement correspondant aux filtres.</div></div>';
+      return;
+    }
+    box.innerHTML = filtered.map((x) => {
+      const d = x.diagnostics ? JSON.stringify(x.diagnostics) : '';
+      return `<article class="log-item ${esc(x.category)}">
+        <div class="log-top">
+          <div class="badges">
+            <span class="badge ${esc(x.category)}">${x.category === 'CRASH' ? '🔴 CRASH JEU' : '🟠 JOUEUR EXPULSÉ'}</span>
+            <span class="badge game">${esc(GAME_LABELS[x.game] || x.game || 'Hub')}</span>
+            <span class="badge code">${esc(x.code)}</span>
+            ${x.roomCode ? `<span class="badge code">Salon #${esc(x.roomCode)}</span>` : ''}
+            ${x.player ? `<span class="badge code">👤 ${esc(x.player)} (${esc(x.role || 'guest')})</span>` : ''}
+            ${x.by ? `<span class="badge code">Par : ${esc(x.by)}</span>` : ''}
+          </div>
+          <span class="time">${esc(x.iso || new Date(x.ts).toISOString())}</span>
+        </div>
+        <div class="log-title">${esc(x.title || x.code)}</div>
+        <div class="log-msg">${esc(x.message)}</div>
+        <div class="log-cause">
+          <b>Raison / Diagnostic :</b> ${esc(x.cause || '')}
+          ${x.file ? `<br><b>Source :</b> <code>${esc(x.file)}${x.line ? ':' + esc(x.line) : ''}</code>` : ''}
+          ${d && d !== '{}' ? `<br><b>Métriques :</b> <code>${esc(d)}</code>` : ''}
+        </div>
+        ${x.stack ? `<pre class="stack">${esc(x.stack)}</pre>` : ''}
+      </article>`;
+    }).join('');
+  }
+
+  function renderCatalog() {
+    const gg = document.getElementById('gameGrid');
+    gg.innerHTML = (catalog.games || []).map((g) => `<div class="game-card">
+      <h3><span>${esc(g.title)}</span><span class="badge code">${g.maxPlayers} joueurs max</span></h3>
+      <div class="meta">ID : <code>${esc(g.id)}</code> · Moteur : ${esc(g.engine)}</div>
+      <h4 class="c">🔴 Raisons de Crash du jeu</h4>
+      <ul>${(g.crashReasons || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      <h4 class="e">🟠 Raisons d'Expulsion / Déconnexion d'un joueur</h4>
+      <ul>${(g.expulsionReasons || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+    </div>`).join('');
+
+    const cl = document.getElementById('codeList');
+    cl.innerHTML = Object.entries(catalog.codes || {}).map(([code, c]) => `<div class="log-item ${esc(c.category)}">
+      <div class="log-top">
+        <div class="badges">
+          <span class="badge ${esc(c.category)}">${esc(c.category)}</span>
+          <span class="badge code">${esc(code)}</span>
+        </div>
+      </div>
+      <div class="log-title">${esc(c.title)}</div>
+      <div class="log-cause">
+        <b>Cause technique :</b> ${esc(c.cause)}<br>
+        <b>Solution / Comportement :</b> ${esc(c.resolution || '')}
+      </div>
+    </div>`).join('');
+  }
+
+  for (const b of document.querySelectorAll('.tab')) {
+    b.onclick = () => {
+      for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t === b);
+      const target = b.dataset.tab;
+      document.getElementById('tab-events').hidden = target !== 'events';
+      document.getElementById('tab-games').hidden = target !== 'games';
+      document.getElementById('tab-codes').hidden = target !== 'codes';
+    };
+  }
+
+  document.getElementById('fCat').onchange = render;
+  document.getElementById('fGame').onchange = render;
+  document.getElementById('fSearch').oninput = render;
+  window.addEventListener('dd:log', render);
+
+  document.getElementById('btnExport').onclick = () => {
+    const blob = new Blob([JSON.stringify(mergedLogs(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `game-hub-crash-logs-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+  };
+
+  document.getElementById('btnClear').onclick = () => {
+    if (window.DDLogger) window.DDLogger.clear();
+    render();
+  };
+
+  render();
+  renderCatalog();
+})();
+</script>
+</body>
+</html>

@@ -53,12 +53,14 @@
 
     // Messages volatils reçus : on ne garde que le dernier de chaque expéditeur et de chaque sorte, transmis au jeu
     // au prochain tour de boucle ; un message normal fait d'abord passer ceux en attente (l'ordre est respecté).
+    // (« prochain tour » par un MessageChannel : un setTimeout(…, 0) attend jusqu'à une seconde, voire une minute,
+    // quand l'onglet de l'hôte est caché, et les commandes des invités arrivaient en retard dans le jeu)
     const pendingVol = new Map(); let volT = 0;
-    const flushVol = () => { clearTimeout(volT); volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
+    const flushVol = () => { volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
     function gameIn(from, m, v) {
       if (v && m && typeof m === 'object') {
         pendingVol.set(from + ':' + m.t, [from, m]);
-        if (!volT) volT = setTimeout(flushVol, 0);
+        if (!volT) { volT = 1; soon(flushVol); }
         return;
       }
       if (pendingVol.size) flushVol();
@@ -106,7 +108,14 @@
             changed();
             return;
           }
-          if (R.players.length >= MAX_PLAYERS) { net.to(cid, { t: 'full' }); net.drop(cid); return; }
+          if (R.players.length >= MAX_PLAYERS) {
+            if (window.DDLogger) {
+              window.DDLogger.logExpulsion('EXP_ROOM_FULL', `Joueur "${cleanName(m.name)}" refusé : salon ${R.code} complet (${MAX_PLAYERS}/${MAX_PLAYERS}).`, {
+                game: R.game ? R.game.id : 'hub', roomCode: R.code, targetPlayer: cleanName(m.name),
+              });
+            }
+            net.to(cid, { t: 'full' }); net.drop(cid); return;
+          }
           const used = new Set(R.players.map((q) => q.id)); let id = 0; while (used.has(id)) id++;
           // après une migration d'hôte, chacun garde son numéro (le jeu en cours en dépend)
           const prev = Number.isInteger(m.prevId) ? m.prevId : -1;
@@ -144,13 +153,24 @@
     function onHostLeave(cid) {
       const i = R.players.findIndex((q) => q.cid === cid); delete R.lastRecvC[cid];
       if (i < 0) return;
+      const p = R.players[i];
+      const ping = R.pings[p.id], diag = R.diag[p.id];
+      if (window.DDLogger) {
+        const d = window.DDLogger.diagnoseDisconnect(ping, diag, !!R.game);
+        window.DDLogger.logExpulsion(d.code, `${p.name} déconnecté ${R.game ? `en pleine partie (${R.game.id})` : 'du salon'} — ${d.detail}`, {
+          game: R.game ? R.game.id : 'hub',
+          roomCode: R.code,
+          targetPlayer: p.name,
+          diagnostics: { ping: ping || null, diag: diag || null, inGame: !!R.game, cid },
+        });
+      }
       // Si une partie est en cours, on conserve le joueur dans R.players (cid = null) pour qu'il puisse se reconnecter sans perdre ses troupes !
       if (R.game) {
         const q = R.players[i]; q.cid = null; q.away = true; lostAt[q.id] = Date.now();
         changed();
         return;
       }
-      removePlayer(R.players[i]);
+removePlayer(R.players[i]);
     }
     function removePlayer(p) {
       const i = R.players.indexOf(p); if (i < 0) return;
@@ -200,8 +220,14 @@
         case 'res': if (Array.isArray(m.list) && RES() && RES().merge(m.list.slice(0, 150))) emit('results'); break;
         case 'lobby': {
           const before = R.players;
+          const beforeGame = R.game;
           R.players = Array.isArray(m.players) ? m.players : []; R.game = m.game || null; R.ready = m.ready || {}; R.hostId = m.host | 0;
           if (m.pings) Object.assign(R.pings, m.pings);
+          if (beforeGame && !R.game && !R.isHost && window.DDLogger) {
+            window.DDLogger.logExpulsion('EXP_HOST_STOPPED_GAME', `Partie de "${beforeGame.id}" arrêtée par l'hôte (retour de tous les joueurs au salon).`, {
+              game: beforeGame.id, roomCode: R.code,
+            });
+          }
           for (const q of before) if (!R.players.some((x) => x.id === q.id)) emit('left', q);
           emit('update', R); break;
         }
@@ -217,7 +243,22 @@
           if (m.diag) Object.assign(R.diag, m.diag);
           R.pings[R.myId] = Math.max(1, Math.round(performance.now() - m.ts));
           break;
-        case 'full': emit('error', 'Le salon est complet (6 joueurs max).'); break;
+        case 'kicked': {
+          const reasonTxt = m.reason || 'Expulsé par l\'hôte du salon';
+          const byTxt = m.by || 'l\'hôte';
+          if (window.DDLogger) {
+            window.DDLogger.logExpulsion('EXP_HOST_KICK', `Expulsé du salon ${R.code || ''} par ${byTxt} : ${reasonTxt}`, {
+              game: R.game ? R.game.id : 'hub', roomCode: R.code, by: byTxt,
+            });
+          }
+          migrating = true; net.close(); R.mode = null;
+          emit('closed', `Tu as été expulsé de la partie par ${byTxt} (${reasonTxt}).`);
+          break;
+        }
+        case 'full':
+          if (window.DDLogger) window.DDLogger.logExpulsion('EXP_ROOM_FULL', `Accès refusé au salon ${R.code || ''} : complet (6 joueurs max).`, { roomCode: R.code });
+          emit('error', 'Le salon est complet (6 joueurs max).');
+          break;
         case 'bye': migrate("L'hôte a quitté le salon."); break;
       }
     }
@@ -237,6 +278,11 @@
       if (R.mode !== 'guest' || migrating) return;
       const oldHost = R.hostId;
       const cands = R.players.filter((p) => p.id !== oldHost).map((p) => p.id).sort((a, b) => a - b);
+      if (window.DDLogger) {
+        window.DDLogger.logExpulsion('EXP_HOST_MIGRATION_RESET', `Départ de l'hôte (#${oldHost}) dans le salon ${R.code || ''} : ${reason}`, {
+          game: R.game ? R.game.id : 'hub', roomCode: R.code,
+        });
+      }
       if (!cands.length || R.myId < 0) { emit('closed', reason); return; }
       migrating = true;
       const succ = cands[0], succName = (R.players.find((p) => p.id === succ) || {}).name || '?';
@@ -291,8 +337,7 @@
       join(code, me) {
         R.mode = 'guest'; R.players = []; R.chat = []; R.myId = -1; R.code = code; R.hostAway = false;
         net.join(code, {
-          // rappelé si la place a dû être reprise : on redonne son numéro pour retrouver la même
-          open() { R.lastRecv = performance.now(); R.hostAway = false; hello(me); },
+open() { R.lastRecv = performance.now(); R.hostAway = false; hello(me); },
           msg: onGuestMsg,
           close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
           error(msg) { R.mode = null; emit('error', msg); },
@@ -340,7 +385,36 @@
         else net.toHost({ t: 'g', fromId: R.myId, to, m, v: vol ? 1 : undefined }, vol);
       },
       netStats() { return { ...net.stats, buffered: net.buffered, proto: net.proto }; },
-      kick(id) { const p = R.players.find((q) => q.id === id); if (R.mode === 'host' && p && p.cid) net.drop(p.cid); },
+      kick(id, reason) {
+        if (R.mode !== 'host' || id === R.myId) return false;
+        const i = R.players.findIndex((q) => q.id === id);
+        if (i < 0) return false;
+        const p = R.players[i];
+        const reasonTxt = clean(reason || 'Expulsé par l\'hôte du salon', 100);
+        const hostName = (R.me && R.me.name) || 'Hôte';
+        if (window.DDLogger) {
+          window.DDLogger.logExpulsion('EXP_HOST_KICK', `Joueur "${p.name}" (#${p.id}) expulsé par ${hostName} — Raison : ${reasonTxt}`, {
+            game: R.game ? R.game.id : 'hub',
+            roomCode: R.code,
+            targetPlayer: p.name,
+            by: hostName,
+            diagnostics: { ping: R.pings[p.id] || null, diag: R.diag[p.id] || null, inGame: !!R.game },
+          });
+        }
+        if (p.cid) {
+          try { net.to(p.cid, { t: 'kicked', by: hostName, reason: reasonTxt }); } catch (e) {}
+          net.drop(p.cid);
+          delete R.lastRecvC[p.cid];
+        }
+        R.players.splice(i, 1);
+        delete R.ready[p.id];
+        delete R.pings[p.id];
+        delete R.diag[p.id];
+        sys(`${p.name} a été expulsé du salon (${reasonTxt})`);
+        emit('left', p);
+        changed();
+        return true;
+      },
       // à appeler régulièrement : pings temps réel sans déconnecter les joueurs en arrière-plan
       tick(now) {
         if (R.mode === 'host') {
@@ -356,6 +430,13 @@
       },
     });
     return R;
+  }
+
+  // Au prochain tour de boucle, sans subir le bridage des minuteries d'un onglet caché
+  function soon(fn) {
+    if (typeof MessageChannel !== 'function') { setTimeout(fn, 0); return; }
+    if (!soon.ch) { soon.q = []; soon.ch = new MessageChannel(); soon.ch.port1.onmessage = () => { const f = soon.q.shift(); if (f) f(); }; }
+    soon.q.push(fn); soon.ch.port2.postMessage(0);
   }
 
   window.DDRoom = { create: createRoom, MAX_PLAYERS, PALETTE, cleanName };

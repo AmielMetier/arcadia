@@ -1,20 +1,47 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.81 — 26 octobre 2026
+## 2.86 — 26 octobre 2026
 - **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.
 - **Mini-Golf Party** — Fini le vacarme contre les murets : un frottement ne fait plus de bruit, et un vrai choc ne donne qu'un son et quelques étincelles, sans secouer la caméra à chaque rebond.
 
-## 2.80 — 26 octobre 2026
+## 2.85 — 26 octobre 2026
 - **Cyber Kart GP** — Dérapage plus doux, plus proche de Mario Kart.
   - Passer du virage serré au virage large (ou l'inverse) se fait en souplesse : le kart ne part plus brusquement sur le côté.
   - Le kart glisse moins vers l'extérieur et suit mieux sa trajectoire ; le virage le plus serré est un peu moins violent, le plus large un peu moins mou.
 
-## 2.79 — 26 octobre 2026
+## 2.84 — 26 octobre 2026
 - **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
   - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.
   - Plage et fond des Abysses en sable fin, pontons en planches, arches en pierre, chemins caillouteux et temple en pierres de la jungle.
   - Murs en moellons et allées de gravier au Château Hanté.
   - Chaque circuit ne charge que ses textures ; en attendant, les anciennes s'affichent, la course n'attend pas.
+
+## 2.83 — 26 octobre 2026
+- Correction : chargement synchrone de logger.js dans tous les jeux et envoi direct à /api/log (Amiel)
+
+## 2.82 — 26 octobre 2026
+- Nouveau : ajout du dossier logs/crash et du système de diagnostic de crashs et d'expulsions pour tous les jeux (Amiel)
+
+## 2.81 — 26 octobre 2026
+- **Convoy Storm** — Chaque paysage a maintenant son caractère, à l'œil comme dans la partie.
+  - Plaine gelée : la voie droite et dégagée fait filer le convoi 12 % plus vite, de quoi reprendre de l'avance sur le Front. Des fermes isolées, avec leur enclos et leur charrette, abritent souvent des survivants.
+  - Toundra : la neige soufflée laisse voir une lande rousse et des touffes d'herbe sèche, sous un ciel blanc qui porte loin.
+  - Col des Glaces : un ciel gris-bleu de montagne, une neige plus sombre et des éboulis le long de la voie.
+
+## 2.80 — 26 octobre 2026
+- **Tous les jeux** — Quand l'hôte change d'onglet ou réduit sa fenêtre, la partie continue pour tout le monde.
+  - Le navigateur ralentit fortement une page cachée (un minuteur par seconde, puis par minute au bout de cinq minutes) et y arrête l'animation : chez l'hôte, la partie se figeait ou prenait des secondes de retard pour tous les joueurs. Les jeux gardent maintenant leur rythme dans un onglet caché, et chez l'hôte d'une partie à plusieurs, la simulation continue à 30 images par seconde.
+  - Les commandes des invités arrivent sans attendre au jeu de l'hôte, même quand son onglet est caché.
+- **Tête de Calcul** — Market making : après ta troisième cotation, le dernier dé, la somme et ton P&L s'affichent tout de suite, avec « on attend les autres ». Les bots cotent aussi plus vite : on n'attend plus la fin du chrono.
+
+## 2.79 — 26 octobre 2026
+- **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
+  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
+  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
+  - Les ombres ne scintillent plus quand on tourne la caméra.
+  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
+  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
+  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
 
 ## 2.78 — 26 octobre 2026
 - **Hub** — Plus de fausse « Connexion perdue » au lancement d'une partie : quand l'ordinateur rame quelques secondes (un jeu qui prépare son décor, une machine plus lente), ce n'est plus pris pour une coupure du réseau.

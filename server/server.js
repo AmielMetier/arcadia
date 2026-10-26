@@ -1,6 +1,8 @@
 'use strict';
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 
@@ -25,11 +27,57 @@ const AWAY_MS = Number(process.env.RELAY_AWAY_MS) || 5000;    // ami déconnect�
 const OUT_MAX = 4000, OUT_MAX_BYTES = 4 * 1024 * 1024; // messages gardés pour un joueur qui n'a pas encore accusé réception
 const TOMB_MS = 10 * 60000;            // on se souvient des places perdues, pour dire au joueur pourquoi la reprise échoue
 
-// Serveur HTTP minimal (utile pour les healthchecks Render / Railway / Fly.io)
+const CRASH_DIR = path.resolve(__dirname, '..', 'logs', 'crash');
+const JSONL_FILE = path.join(CRASH_DIR, 'crash-events.jsonl');
+const LATEST_FILE = path.join(CRASH_DIR, 'latest.json');
+
+function appendServerLog(entry) {
+  try {
+    fs.mkdirSync(CRASH_DIR, { recursive: true });
+    fs.appendFileSync(JSONL_FILE, JSON.stringify(entry) + '\n', 'utf8');
+    let list = [];
+    if (fs.existsSync(LATEST_FILE)) {
+      try { list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) { list = []; }
+    }
+    if (!Array.isArray(list)) list = [];
+    list.unshift(entry);
+    fs.writeFileSync(LATEST_FILE, JSON.stringify(list.slice(0, 200), null, 2) + '\n', 'utf8');
+  } catch (e) {}
+}
+
+// Serveur HTTP minimal (healthchecks + API de collecte des logs de crash/expulsion)
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
   if (req.url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ proto: PROTO, rooms: rooms.size, sessions: sessions.size, online: people.size }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/log') {
+    let body = '';
+    req.on('data', (c) => { if (body.length < 32768) body += c; });
+    req.on('end', () => {
+      try {
+        const entry = JSON.parse(body);
+        if (entry && typeof entry === 'object') appendServerLog(entry);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{"ok":true}');
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{"ok":false}');
+      }
+    });
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/logs') {
+    let list = [];
+    try { if (fs.existsSync(LATEST_FILE)) list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(list));
     return;
   }
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -406,6 +454,25 @@ wss.on('connection', (ws) => {
 const keepAliveInterval = setInterval(() => {
   for (const ws of wss.clients) {
     if (ws.isAlive === false) {
+      if (ws.roomId) {
+        appendServerLog({
+          id: 'srv-timeout-' + Date.now(),
+          ts: Date.now(),
+          iso: new Date().toISOString(),
+          code: 'EXP_WS_KEEPALIVE_TIMEOUT',
+          category: 'EXPULSION',
+          severity: 'warn',
+          title: 'Joueur expulsé par le serveur relais (timeout WebSocket 30 s)',
+          cause: 'Aucune réponse au ping WebSocket pendant 30 s (coupure Wi-Fi/4G ou appareil mobile verrouillé).',
+          message: `Client ${ws.cid || ws.role || '?'} déconnecté du salon ${ws.roomId} après 30 s sans pong (paquets volatils sautés : ${ws.dropped || 0}).`,
+          game: 'hub',
+          roomCode: ws.roomId,
+          role: ws.role || 'guest',
+          player: ws.cid || 'Client WebSocket',
+          diagnostics: { lastLat: ws.lastLat || null, baseLat: ws.baseLat || null, dropped: ws.dropped || 0, buffered: ws.bufferedAmount || 0 },
+        });
+      }
+      leaveCurrentRoom(ws);
       try {
         ws.terminate();
       } catch (e) {}
