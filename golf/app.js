@@ -34,8 +34,18 @@ sfx.unlock();
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
 let home = null;
 let scene = null;
-try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
-catch (e) { console.error(e); $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
+try {
+  scene = createScene($('#stage'), {
+    onLost: () => {
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_WEBGL_CONTEXT_LOST', 'Perte du contexte graphique WebGL dans Birdie Party', { game: 'golf' });
+      hud.toast('Affichage 3D interrompu : recharge la page', 6);
+    }
+  });
+} catch (e) {
+  console.error(e);
+  if (window.DDLogger) window.DDLogger.logCrash('CRASH_WEBGL_CONTEXT_LOST', 'Échec d\'initialisation WebGL dans Birdie Party : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+  $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>';
+}
 
 // ------------------------------------------------------------------ état de la vue
 const V = {
@@ -46,7 +56,10 @@ const V = {
   shot: null, playT: 0, evI: 0, timer: 0, oohed: false, introT: 0, outcome: null,
 };
 const golferOf = (p) => {
-  if (!V.golfers.has(p.id)) V.golfers.set(p.id, scene.addGolfer({ shirt: p.color, skin: p.look % 5, hair: (p.look * 3 + 1) % 5 }));
+  if (!V.golfers.has(p.id)) {
+    const lk = (typeof p.look === 'number' && !isNaN(p.look)) ? Math.abs(p.look | 0) : ((typeof p.id === 'number' ? p.id : 0) + 1);
+    V.golfers.set(p.id, scene.addGolfer({ shirt: p.color, skin: lk % 5, hair: (lk * 3 + 1) % 5 }));
+  }
   return V.golfers.get(p.id);
 };
 
@@ -119,9 +132,14 @@ function boot(info) {
   const meP = H.players.find((p) => p.id === info.myId);
   V.me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
   V.role = role;
-  if (role === 'solo') { if (QS.has('play')) return quickPlay(); return showTitle(); }
+  // Si le jeu est ouvert en solo HORS du Hub, on affiche l'écran titre
+  if (!H.embedded && role === 'solo') {
+    if (QS.has('play')) return quickPlay();
+    return showTitle();
+  }
+  // Lancé depuis le Hub (mode solo, hôte ou invité) : on démarre directement avec les réglages choisis dans le Hub
   V.settings = info.settings || {};
-  $('#screen').innerHTML = loadingHtml(role === 'host' ? 'Préparation du parcours' : 'On rejoint la partie');
+  $('#screen').innerHTML = loadingHtml(role === 'host' ? 'Préparation du parcours' : role === 'solo' ? 'Lancement du parcours' : 'On rejoint la partie');
   startSession(role);
   // l'hôte est parti et ce joueur reprend le salon : il devient l'hôte, à partir du dernier état reçu
   H.on('roster', () => {
@@ -189,15 +207,29 @@ async function applyState(R) {
   V.pars = R.holes.map((n) => holeByNumber(n).par);
   if (R.phase === 'over') {
     V.busy = true;
-    if (prev && prev.phase !== 'over') await holeCard(R);
-    finalCard(R);
+    try {
+      if (prev && prev.phase !== 'over') await holeCard(R);
+      finalCard(R);
+    } catch (e) {
+      console.error(e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur carte finale Birdie Party : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+    } finally {
+      V.busy = false;
+    }
     return;
   }
   if (R.hi !== V.hi) {
     V.busy = true;
-    if (V.hi >= 0 && prev && prev.hi !== R.hi && R.hi > 0) await holeCard(R);
-    await loadHole(R);
-    V.busy = false;
+    try {
+      if (V.hi >= 0 && prev && prev.hi !== R.hi && R.hi > 0) await holeCard(R);
+      await loadHole(R);
+    } catch (e) {
+      console.error('Erreur chargement trou', e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur chargement trou ' + (R.hi + 1) + ' (' + (currentHole(R)?.name || '') + ') : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+      hud.toast('Erreur de chargement du trou, passage au suivant...', 4);
+    } finally {
+      V.busy = false;
+    }
   }
   setTurn();
   pump();

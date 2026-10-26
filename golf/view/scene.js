@@ -33,7 +33,16 @@ export function createScene(host, { onLost } = {}) {
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 0.92;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); onLost && onLost(); });
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    if (window.DDLogger) {
+      window.DDLogger.logCrash('CRASH_WEBGL_CONTEXT_LOST', 'Perte du contexte WebGL sur le canvas (' + canvas.width + '×' + canvas.height + ')', {
+        game: 'golf',
+        diagnostics: { width: canvas.width, height: canvas.height, defaultPrevented: e.defaultPrevented, hidden: !!document.hidden }
+      });
+    }
+    onLost && onLost();
+  });
   // fondu enchaîné : l'image du moment est figée dans un calque posé sur la scène, qui s'efface pendant que la
   // nouvelle vue apparaît dessous (changement de plan sans coupure ni passage au blanc)
   const xf = document.createElement('canvas');
@@ -69,7 +78,11 @@ export function createScene(host, { onLost } = {}) {
   // ---------------------------------------------------------------- contenu d'un trou (reconstruit à chaque trou)
   let world = null, kitP = null, treeKit = null;
   // qualité : résolution, post-traitement (occlusion, halo), reflets, herbe 3D ; baissée automatiquement si la machine peine
-  const post = MOBILE ? null : createPost(renderer);
+  let post = null;
+  if (!MOBILE) {
+    try { post = createPost(renderer); }
+    catch (e) { console.warn('Post-traitement 3D indisponible, repli sur rendu direct :', e); post = null; }
+  }
   const quality = { refl: !MOBILE, grass: true, ao: !MOBILE, bloom: !MOBILE };
   // un cran plus bas : d'abord la résolution (jusqu'à un pixel par point), puis les effets, enfin encore la résolution
   function lowerQuality() {
