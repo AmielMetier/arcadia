@@ -81,8 +81,8 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
     const putt = putterRange(Math.hypot(hole.pin.x - from.x, hole.pin.z - from.z));
     const res = simulate(hole, ball, params, wind, { putt });
     const before = P.strokes;
-    const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf }, (x, z) => hole.surfaceAt(x, z));
-    const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
+    const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, surf: res.surf });
+    const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
     busy = true;
     emit({ type: 'shot', ev });
     send({ t: 'shot', ev });

@@ -33,8 +33,9 @@ export const LOOKS = {
 const PX = 0.5;        // mètres par texel de la carte des distances
 const FM = 6, SG = 6, SB = 3, STRIPE = 22; // plages des distances encodées (m) et période des bandes de tonte (m)
 
-// Carte des distances : R fairway, G green, B bunker (signées, positives dedans), A bandes de tonte
-function distanceMap(hole) {
+// Carte des distances : R fairway, G green, B bunker (signées, positives dedans), A bandes de tonte.
+// pace() rend la main au navigateur de temps en temps (calcul en tâche de fond).
+async function distanceMap(hole, pace) {
   const B = hole.bounds, M = 70;
   const area = { x0: B.x0 - M, z0: B.z0 - M, x1: B.x1 + M, z1: B.z1 + M };
   const W = Math.ceil((area.x1 - area.x0) / PX), H = Math.ceil((area.z1 - area.z0) / PX);
@@ -42,6 +43,7 @@ function distanceMap(hole) {
   const G = hole.green, rG = Math.min(G.rx, G.rz);
   const enc = (v, r) => Math.round(255 * Math.min(1, Math.max(0, (v + r) / (2 * r))));
   for (let j = 0; j < H; j++) {
+    await pace();
     const z = area.z0 + (j + 0.5) * PX;
     for (let i = 0; i < W; i++) {
       const x = area.x0 + (i + 0.5) * PX;
@@ -62,13 +64,14 @@ function distanceMap(hole) {
 }
 
 // Carte « hors jeu » (2 m par texel) : 0 dans le couloir du trou, 1 au-delà de la vallée et hors limites
-function zoneMap(hole) {
+async function zoneMap(hole, pace) {
   const B = hole.bounds, M = 260, P = 2;
   const area = { x0: B.x0 - M, z0: B.z0 - M, x1: B.x1 + M, z1: B.z1 + M };
   const W = Math.ceil((area.x1 - area.x0) / P), H = Math.ceil((area.z1 - area.z0) / P);
   const data = new Uint8Array(W * H * 4);
   const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   for (let j = 0; j < H; j++) {
+    await pace();
     const z = area.z0 + (j + 0.5) * P;
     for (let i = 0; i < W; i++) {
       const x = area.x0 + (i + 0.5) * P;
@@ -93,14 +96,17 @@ function axis(a, b, step, far) {
   return [...pre.reverse(), ...out];
 }
 
-export function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25 } = {}) {
+export async function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25, pace = async () => {} } = {}) {
   const B = hole.bounds;
   const xs = axis(B.x0 - 40, B.x1 + 40, step, 1600), zs = axis(B.z0 - 40, B.z1 + 40, step, 1600);
   const nx = xs.length, nz = zs.length;
   const pos = new Float32Array(nx * nz * 3);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const k = (j * nx + i) * 3, x = xs[i], z = zs[j];
-    pos[k] = x; pos[k + 1] = hole.heightAt(x, z); pos[k + 2] = z;
+  for (let j = 0; j < nz; j++) {
+    await pace();
+    for (let i = 0; i < nx; i++) {
+      const k = (j * nx + i) * 3, x = xs[i], z = zs[j];
+      pos[k] = x; pos[k + 1] = hole.heightAt(x, z); pos[k + 2] = z;
+    }
   }
   const idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
   let q = 0;
@@ -113,7 +119,8 @@ export function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25 } 
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   geo.computeVertexNormals();
 
-  const sdf = distanceMap(hole), zone = zoneMap(hole);
+  await pace();
+  const sdf = await distanceMap(hole, pace), zone = await zoneMap(hole, pace);
   const grass = grassTexture(), sand = sandTexture();
   grass.anisotropy = sand.anisotropy = anisotropy;
   const G = hole.green, td = hole.teeDir;

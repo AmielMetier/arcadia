@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Outbreak & Fil Rouge</title>
-<meta name="description" content="Jeux en ligne entre potes, directement dans le navigateur : Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Outbreak : Secteur Zéro et Fil Rouge.">
+<title>Game Hub — jeux en ligne entre potes</title>
+<meta name="description" content="Jeux en ligne entre potes, directement dans le navigateur : Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Poké Duel et Mini-Golf Party.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -19,28 +19,47 @@
 </div>
 <section class="screen on" id="home">
   <div class="home">
-    <div>
-      <h1 class="logo">GAME<br><span>HUB</span></h1>
-      <p class="tag">Un salon, tes potes, et le jeu de ton choix. Rien à installer.</p>
-      <div class="shelf" id="shelf"></div>
+    <div class="hero">
+      <div>
+        <h1 class="logo">GAME<br><span>HUB</span></h1>
+        <p class="tag">Un salon, tes potes, et le jeu de ton choix. Rien à installer.</p>
+      </div>
+      <div class="card friends" id="friendsHome"></div>
     </div>
     <div class="card">
       <div class="badge">En ligne · jusqu'à 6</div>
-      <label class="lbl" for="name">Ton pseudo</label>
-      <input type="text" id="name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Pilote">
-      <div class="lbl">Ta couleur</div>
-      <div class="swatches" id="swatches"></div>
-      <div style="height:18px"></div>
-      <button class="btn block big" id="btnHost">Créer un salon</button>
-      <div class="row" style="margin-top:12px">
-        <input type="text" id="joinCode" maxlength="4" autocomplete="off" spellcheck="false" placeholder="CODE"
-          style="text-transform:uppercase;letter-spacing:4px;text-align:center;font-family:Bungee,Impact,sans-serif">
-        <button class="btn yellow" id="btnJoin">Rejoindre</button>
+      <div class="acct" id="acct" hidden><span class="dot" id="acctDot"></span><div><b id="acctName"></b><small>Compte enregistré sur ce navigateur</small></div>
+        <button class="btn small ghost" id="btnProfile" aria-expanded="false" aria-controls="profileEdit">Modifier</button></div>
+      <div id="regHead" hidden><h2>Crée ton compte</h2><p class="sethint">Un pseudo, une couleur, et c'est parti : ton compte reste enregistré dans ce navigateur, avec tes amis.</p></div>
+      <div id="profileEdit">
+        <label class="lbl" for="name">Ton pseudo</label>
+        <input type="text" id="name" maxlength="12" autocomplete="nickname" spellcheck="false" placeholder="Pilote">
+        <div class="lbl">Ta couleur</div>
+        <div class="swatches" id="swatches"></div>
+        <div class="acctools" id="acctTools" hidden><button class="linkbtn" id="btnTransfer" type="button">📲 Mon compte sur un autre appareil</button><button class="linkbtn" id="btnLogout" type="button">Se déconnecter</button></div>
       </div>
-      <div class="err" id="homeErr"></div>
-      <button class="btn ghost block" id="btnSolo">Jouer seul</button>
+      <div id="regActions" hidden>
+        <div class="err" id="regErr"></div>
+        <button class="btn block big" id="btnRegister">Créer mon compte</button>
+        <button class="linkbtn" id="btnRestore" type="button">J'ai déjà un compte sur un autre appareil</button>
+      </div>
+      <div id="playActions">
+        <div style="height:18px"></div>
+        <button class="btn block big" id="btnHost">Créer un salon</button>
+        <div class="row" style="margin-top:12px">
+          <input type="text" id="joinCode" maxlength="4" autocomplete="off" spellcheck="false" placeholder="CODE" aria-label="Code du salon"
+            style="text-transform:uppercase;letter-spacing:4px;text-align:center;font-family:Bungee,Impact,sans-serif">
+          <button class="btn yellow" id="btnJoin">Rejoindre</button>
+        </div>
+        <div class="err" id="homeErr"></div>
+        <button class="btn ghost block" id="btnSolo">Jouer seul</button>
+      </div>
       <div class="links"><button class="linkbtn" id="btnNews">✨ Nouveautés</button><button class="linkbtn" id="btnBoard">🏆 Classement</button><button class="linkbtn" id="btnNetTest">📶 Tester ma connexion</button></div>
     </div>
+  </div>
+  <div class="gallery">
+    <h2>Les jeux <small id="shelfCount"></small></h2>
+    <div class="games" id="shelf"></div>
   </div>
   <div class="credit">by <b>Amiel</b>, <b>Nicolas</b>, <b>Gabriel</b> and <b>Claude</b> · <button class="verlink" id="ver" title="Voir les nouveautés"></button></div>
 </section>
@@ -59,6 +78,7 @@
     <div class="card">
       <h2>Joueurs</h2>
       <div class="players" id="players"></div>
+      <div class="invite" id="friendsRoom"></div>
       <div class="chat" id="chatBox">
         <div class="log" id="chatLog" aria-live="polite"></div>
         <form id="chatForm"><input type="text" id="chatIn" maxlength="140" placeholder="Message…" autocomplete="off"><button class="btn small">OK</button></form>
@@ -81,6 +101,7 @@
 <script src="shared/results.js"></script>
 <script src="hub/nettest.js"></script>
 <script src="hub/games.js"></script>
+<script src="hub/friends.js"></script>
 <script src="hub/hub.js"></script>
 <script type="module" src="hub/music.js"></script>
 </body>

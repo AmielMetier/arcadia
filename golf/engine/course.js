@@ -116,7 +116,8 @@ export const HOLES = [
     bunkers: [{ x: 26, z: 160, rx: 6, rz: 4, rot: -0.2, ph: 1 }, { x: -46, z: 290, rx: 6, rz: 4, rot: 0.6, ph: 2 }, { x: 24, z: 432, rx: 5, rz: 3.5, rot: 0.8, ph: 3 }],
     groves: [{ x: 24, z: 150, rx: 8, rz: 22, n: 6, kind: 'palm' }, { x: -8, z: 160, rx: 6, rz: 18, n: 3, kind: 'palm' }, { x: -44, z: 280, rx: 8, rz: 20, n: 5, kind: 'palm' }, { x: 26, z: 410, rx: 5, rz: 8, n: 2, kind: 'palm' }, { x: 48, z: 226, rx: 7, rz: 5, n: 3, kind: 'palm' }],
     coast: { level: -1.4, beach: 3, sea: [60, 220], ring: { x: 0, z: 210, rx: 170, rz: 300 },
-      land: [{ pts: [[0, -110, 18], [0, 22, 13]] }, { x: 6, z: 152, rx: 32, rz: 46, rot: 0.1, ph: 0.6 }, { x: -26, z: 282, rx: 34, rz: 40, rot: -0.2, ph: 1.4 }, { x: 10, z: 420, rx: 28, rz: 26, rot: 0.3, ph: 2.1 }, { x: 48, z: 226, rx: 15, rz: 12, rot: 0.4, ph: 2.6 }] },
+      // le départ sur une pointe de la rive (et pas sur un chemin dans l'eau) : la terre s'avance de chaque côté
+      land: [{ pts: [[0, -170, 100], [0, -70, 64], [0, -20, 24], [0, 22, 15]] }, { x: -62, z: -52, rx: 58, rz: 44, rot: 0.35, ph: 0.9 }, { x: 64, z: -48, rx: 60, rz: 40, rot: -0.4, ph: 1.9 }, { x: 6, z: 152, rx: 32, rz: 46, rot: 0.1, ph: 0.6 }, { x: -26, z: 282, rx: 34, rz: 40, rot: -0.2, ph: 1.4 }, { x: 10, z: 420, rx: 28, rz: 26, rot: 0.3, ph: 2.1 }, { x: 48, z: 226, rx: 15, rz: 12, rot: 0.4, ph: 2.6 }] },
   },
   {
     // par-dessus une anse, vers un green posé sur le cap

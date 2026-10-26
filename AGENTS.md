@@ -42,6 +42,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
   `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`, `node tools/test-golf.mjs`.
 - Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
+- Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
+  (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.

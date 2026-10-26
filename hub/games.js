@@ -3,22 +3,18 @@ window.HUB_GAMES = [
   {
     id: 'drift',
     title: 'Duo Drift',
-    tag: 'Course et bataille',
-    desc: 'Courses vues de dessus, Grand Prix, bataille, foot en voiture… avec bots et garage.',
+    tag: 'Course & bataille',
+    desc: 'Courses vues du ciel, batailles et foot en voiture : drifte, percute et décroche le Grand Prix.',
     url: 'drift/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#ff4b2b',
-    // affiche : rendu du jeu (drift/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#2b1a0e"/>
-      <image href="drift/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'drift/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'david',
     title: 'DavidSimulator',
-    tag: 'Monopoly édition Nice',
-    desc: 'De Saint-Roch à la Promenade des Anglais : achète, construis, négocie. Classique ou Express (40 min), seul ou en 2 contre 2.',
+    tag: 'Édition Nice',
+    desc: 'Le Monopoly de Nice : achète la Prom\', construis à Saint-Roch et ruine tes potes.',
     url: 'david/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#1C5FB4',
@@ -32,17 +28,13 @@ window.HUB_GAMES = [
       { key: 'doubleGo', label: 'Salaire doublé pile sur Départ', options: [[0, 'Non'], [1, 'Oui']], def: 0 },
       { key: 'auctions', label: 'Enchères', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
-    // affiche : rendu du jeu (david/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#3a2010"/>
-      <image href="david/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'david/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'calcul',
     title: 'Tête de Calcul',
     tag: 'Duel de calcul mental',
-    desc: 'Calcul, astuces, vrai ou faux, équations, géométrie, figures à compter, suites et Compte est bon. Le plus rapide gagne… et peut saboter les autres ! Mode The Candidate : un entretien éliminatoire, jusqu\'au code Python.',
+    desc: 'Le duel de calcul mental où le plus rapide gagne… et peut saboter les autres.',
     url: 'calcul/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 avec les bots
     accent: '#ff5fa2',
@@ -65,17 +57,13 @@ window.HUB_GAMES = [
       { key: 'duel', label: 'Face-à-face final', options: [[1, 'Oui'], [0, 'Non']], def: 1, onlyMode: 'chartier' },
       { key: 'chsab', label: 'Sabotage', options: [[0, 'Non'], [1, 'Oui']], def: 0, onlyMode: 'chartier' },
     ],
-    // affiche : rendu du jeu (calcul/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#0b0d1a"/>
-      <image href="calcul/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'calcul/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'bastion',
     title: 'Bastion Clash',
-    tag: 'RTS StarCraft · Base & Micro',
-    desc: 'Deux factions (Terriens ou Synthèse), cinq cartes, duel, 2 contre 2 et défense contre des vagues : récolte, construis, gère ton ravitaillement et mène ton armée.',
+    tag: 'Stratégie en temps réel',
+    desc: 'Récolte, bâtis ta base et lance ton armée à l\'assaut des bastions adverses.',
     url: 'bastion/',
     minPlayers: 1, maxPlayers: 4,
     accent: '#2fbf71',
@@ -94,17 +82,13 @@ window.HUB_GAMES = [
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
-    // affiche : rendu du jeu (bastion/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#0e1a12"/>
-      <image href="bastion/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'bastion/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'outbreak',
     title: 'Outbreak : Secteur Zéro',
-    tag: 'Survie zombie en coop',
-    desc: 'Twin-stick en équipe : 5 classes, 5 secteurs (dont les rues de Nice), boss, marchand, histoire. Campagne à embranchements, Survie ou Défense du fort.',
+    tag: 'Secteur Zéro',
+    desc: 'Survie zombie en équipe : choisis ta classe et tenez jusqu\'au boss, jusque dans les rues de Nice.',
     url: 'outbreak/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#f43f5e',
@@ -115,17 +99,13 @@ window.HUB_GAMES = [
       { key: 'startWeapon', label: 'Arme de départ', options: [['pistol', 'Pistolet'], ['shotgun', 'Fusil à pompe'], ['smg', 'Mitraillette']], def: 'pistol' },
       { key: 'sector', label: 'Secteur', options: [['random', 'Au hasard'], ['lab', 'Labo'], ['sewers', 'Égouts'], ['hospital', 'Hôpital'], ['metro', 'Métro'], ['nice', 'Rues de Nice']], def: 'random' },
     ],
-    // affiche : rendu du jeu (outbreak/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#0a0b10"/>
-      <image href="outbreak/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'outbreak/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'filrouge',
     title: 'Fil Rouge',
-    tag: 'Désamorçage à deux voix',
-    desc: 'Un démineur voit la bombe en 3D, l\'expert a le manuel posé sur sa table. Parlez-vous, coupez le bon fil… ou affrontez une autre équipe sur la même bombe.',
+    tag: 'Désamorçage à deux',
+    desc: 'L\'un voit la bombe, l\'autre a le manuel : parlez-vous pour couper le bon fil à temps.',
     url: 'filrouge/',
     minPlayers: 2, maxPlayers: 6,
     accent: '#c8102e',
@@ -135,31 +115,23 @@ window.HUB_GAMES = [
       { key: 'strikes', label: 'Fautes permises', options: [[1, '1'], [3, '3'], [5, '5']], def: 3 },
       { key: 'sabotage', label: 'Sabotages en duel', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
-    // affiche : rendu du jeu (filrouge/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#140608"/>
-      <image href="filrouge/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'filrouge/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'kart',
     title: 'Cyber Kart GP',
-    tag: 'Course de karts en 3D',
-    desc: 'Kart en 3D façon Mario Kart : Grand Prix de 7 circuits (Grand Circuit, Whisky Peak, Route Arc-en-ciel, Jungle Perdue, Château Hanté, Plage des Falaises, Abysses Néon) aux points cumulés, drift et mini-turbo, 16 objets, 8 pilotes et IA.',
+    tag: 'Grand Prix',
+    desc: 'Du kart en 3D avec drifts, mini-turbos et objets sur sept circuits déjantés.',
     url: 'kart/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5ff3ff',
-    // affiche : rendu du jeu (kart/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#1b0f4a"/>
-      <image href="kart/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'kart/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'convoy',
     title: 'Convoy Storm',
-    tag: 'Survie en coop dans le blizzard',
-    desc: 'Un convoi blindé traverse forêts, villes mortes, lacs gelés et cols. Choisissez la voie aux aiguillages, sautez du train, abattez des sapins, fouillez les ruines, repoussez les loups et gardez la chaudière en vie jusqu\'à Fort-Givre — ou aussi loin que possible.',
+    tag: 'Survie dans le blizzard',
+    desc: 'Gardez la chaudière du train en vie et traversez le blizzard jusqu\'à Fort-Givre.',
     url: 'convoy/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#9fd3ff',
@@ -167,17 +139,13 @@ window.HUB_GAMES = [
       { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition'], ['endless', 'Sans fin']], def: 'expedition' },
       { key: 'difficulty', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normale'], ['blizzard', 'Blizzard']], def: 'normal' },
     ],
-    // affiche : rendu du jeu (convoy/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#c3ced9"/>
-      <image href="convoy/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'convoy/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'golf',
     title: 'Birdie Party',
     tag: 'Golf 3D entre potes',
-    desc: 'Trente trous en campagne, au bord de la mer, en montagne et au désert. Un geste pour armer, un geste pour frapper : gare au vent, aux bunkers et à l\'eau. Chacun son tour ou en équipes, avec des bots.',
+    desc: 'Du golf en 3D sur trente trous, de la campagne au désert : joue avec le vent, seul ou en équipes.',
     url: 'golf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5cc425',
@@ -189,17 +157,13 @@ window.HUB_GAMES = [
       { key: 'wind', label: 'Vent', options: [['calme', 'Calme'], ['normal', 'Normal'], ['fort', 'Fort']], def: 'normal' },
       { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
     ],
-    // affiche : rendu du jeu (golf/img/affiche.jpg)
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="320" height="180" fill="#5cc425"/>
-      <image href="golf/img/affiche.jpg" x="0" y="0" width="320" height="180" preserveAspectRatio="xMidYMid slice"/>
-    </svg>`,
+    cover: 'golf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'pokemon',
     title: 'Poké Duel',
-    tag: 'Aventure & Tournoi 3v3',
-    desc: 'Aventure multijoueur à Menton (Kalos-Sud) : capture de Pokémon sauvages, citrons de Menton, et tournoi 3v3 en arène.',
+    tag: 'Aventure & tournoi 3v3',
+    desc: 'Explore Menton, capture des Pokémon et affronte tes potes en tournoi 3 contre 3.',
     url: 'pokemon/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ffcb05',
@@ -210,62 +174,16 @@ window.HUB_GAMES = [
       { key: 'bots', label: 'Bots si salon incomplet', onlyMode: 'tournament', options: [[1, 'Oui (remplir le tournoi)'], [0, 'Non']], def: 1 },
       { key: 'level', label: 'Niveau des bots', onlyMode: 'tournament', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <radialGradient id="pglow" cx="50%" cy="50%" r="60%">
-          <stop offset="0%" stop-color="#ffdd44" stop-opacity="0.5"/>
-          <stop offset="100%" stop-color="#1b2838" stop-opacity="0"/>
-        </radialGradient>
-        <linearGradient id="pbg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#1e3c72"/>
-          <stop offset="100%" stop-color="#0e1726"/>
-        </linearGradient>
-      </defs>
-      <rect width="320" height="180" fill="url(#pbg)"/>
-      <ellipse cx="160" cy="140" rx="140" ry="36" fill="#1b4d3e" stroke="#2a75bb" stroke-width="3"/>
-      <ellipse cx="160" cy="140" rx="100" ry="24" fill="none" stroke="#ffcb05" stroke-width="2" stroke-dasharray="8 6"/>
-      <circle cx="160" cy="90" r="80" fill="url(#pglow)"/>
-      <g transform="translate(160, 85)">
-        <ellipse cx="0" cy="55" rx="50" ry="12" fill="#000" opacity="0.45"/>
-        <path d="M-45 0 A 45 45 0 0 1 45 0 Z" fill="#ee1515" stroke="#16181d" stroke-width="4"/>
-        <path d="M-45 0 A 45 45 0 0 0 45 0 Z" fill="#f8f9fa" stroke="#16181d" stroke-width="4"/>
-        <rect x="-45" y="-5" width="90" height="10" fill="#16181d"/>
-        <circle cx="0" cy="0" r="16" fill="#16181d"/>
-        <circle cx="0" cy="0" r="10" fill="#ffffff" stroke="#16181d" stroke-width="2"/>
-        <circle cx="0" cy="0" r="5" fill="#ffcb05"/>
-      </g>
-      <path d="M70 40 L90 55 L82 62 L105 78 L85 70 L92 64 Z" fill="#ffcb05" stroke="#16181d" stroke-width="2"/>
-      <path d="M250 35 L230 52 L238 58 L215 76 L235 68 L228 62 Z" fill="#ffcb05" stroke="#16181d" stroke-width="2"/>
-      <circle cx="50" cy="120" r="18" fill="#e62829" stroke="#16181d" stroke-width="3"/>
-      <text x="50" y="125" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="11" fill="#ffffff">FEU</text>
-      <circle cx="270" cy="120" r="18" fill="#2980ef" stroke="#16181d" stroke-width="3"/>
-      <text x="270" y="125" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="11" fill="#ffffff">EAU</text>
-      <rect x="95" y="142" width="130" height="26" rx="8" fill="#ffcb05" stroke="#16181d" stroke-width="3"/>
-      <text x="160" y="160" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="14" fill="#16181d">3v3 SHOWDOWN</text>
-    </svg>`,
+    cover: 'pokemon/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'minigolf',
     title: 'Mini-Golf Party',
-    tag: 'Mini-golf en 3D, chacun son tour',
-    desc: 'Mini-golf façon Golf It, à la souris ou au doigt : 54 trous dans 9 parcours (pirates, zen, lave, canyon, station spatiale à plafonds aimantés, marais, glace, fête foraine), en 3, 6 ou 18 trous. Bots possibles.',
+    tag: 'Parcours déjantés',
+    desc: 'Du mini-golf en 3D à la souris ou au doigt : 54 trous sur neuf parcours, avec loopings, plafonds aimantés, glace, boue et lave.',
     url: 'minigolf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#2e8b57',
-    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs><linearGradient id="mgSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8fe8"/><stop offset="1" stop-color="#cfe9ff"/></linearGradient></defs>
-      <rect width="320" height="180" fill="url(#mgSky)"/>
-      <circle cx="262" cy="36" r="18" fill="#fff3b0" stroke="#16181d" stroke-width="3"/>
-      <path d="M0 118 Q80 100 160 112 T320 104 V180 H0Z" fill="#5daa3c" stroke="#16181d" stroke-width="3"/>
-      <path d="M26 160 C 90 120, 190 150, 286 124 L 296 142 C 196 170, 96 144, 36 176 Z" fill="#2f9a4c" stroke="#16181d" stroke-width="3"/>
-      <path d="M28 160 C 92 121, 190 151, 287 125" fill="none" stroke="#d9cfc2" stroke-width="4"/>
-      <g stroke="#16181d" stroke-width="3"><circle cx="70" cy="74" r="30" fill="none" stroke="#e8433b" stroke-width="10"/><circle cx="70" cy="74" r="30" fill="none"/></g>
-      <rect x="40" y="100" width="60" height="10" fill="#e8433b" stroke="#16181d" stroke-width="3"/>
-      <ellipse cx="236" cy="134" rx="9" ry="4" fill="#16181d"/>
-      <path d="M236 134 V70" stroke="#f4f1e8" stroke-width="4"/><path d="M236 134 V70" stroke="#16181d" stroke-width="1"/>
-      <path d="M238 70 l34 11 -34 11z" fill="#e8433b" stroke="#16181d" stroke-width="3" stroke-linejoin="round"/>
-      <g transform="translate(150 140)"><circle r="11" fill="#fafafa" stroke="#16181d" stroke-width="3"/><circle cx="-3" cy="-3" r="1.6" fill="#c9c9c9"/><circle cx="3" cy="1" r="1.6" fill="#c9c9c9"/><circle cx="-1" cy="4" r="1.6" fill="#c9c9c9"/></g>
-      <path d="M126 140 h-26 M128 132 h-20 M128 148 h-18" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-    </svg>`,
+    cover: 'minigolf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
 ];
