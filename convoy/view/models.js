@@ -49,6 +49,30 @@ export function frost(mat, amount = 1, tint = [0.8, 0.86, 0.94]) {
   return m;
 }
 
+// Vent dans les sapins : le haut des arbres ondule (plus fort dans les bourrasques). uT : temps, uWind : 0 → 1
+export const SWAY = { uT: { value: 0 }, uWind: { value: 0.3 } };
+function swayed(m) {
+  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    Object.assign(sh.uniforms, SWAY);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uWind;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        {
+          #ifdef USE_INSTANCING
+            vec2 ph = instanceMatrix[3].xz;
+          #else
+            vec2 ph = modelMatrix[3].xz;
+          #endif
+          float k = max(0.0, transformed.y - 0.25); k = k * k * (0.02 + uWind * 0.05);
+          transformed.x += sin(uT * 1.6 + ph.x * 0.31 + ph.y * 0.17) * k;
+          transformed.z += cos(uT * 1.3 + ph.x * 0.23 - ph.y * 0.29) * k * 0.7;
+        }`);
+  };
+  m.customProgramCacheKey = () => key + '|sway';
+  return m;
+}
+
 // Charge tous les modèles ; renvoie { make(), proto(), size(), has(), dispose() }
 export async function loadKit(base) {
   const loader = new GLTFLoader();
@@ -63,10 +87,13 @@ export async function loadKit(base) {
     } catch (e) { console.warn('modèle manquant', name, e); }
   }));
   // matériaux : une version givrée (décor) et une version propre (ville d'arrivée), partagées entre clones
-  const frosted = new Map(), clean = new Map();
-  const matOf = (src, cleanLook, name) => {
-    const cache = cleanLook ? clean : frosted;
-    if (!cache.has(src)) cache.set(src, cleanLook ? frost(src, 0.25, [0.95, 0.97, 1]) : frost(src, FROST[name.split('/')[0]] ?? 1));
+  const frosted = new Map(), clean = new Map(), windy = new Map();
+  const matOf = (src, cleanLook, name, sway = false) => {
+    const cache = cleanLook ? clean : sway ? windy : frosted;
+    if (!cache.has(src)) {
+      const m = cleanLook ? frost(src, 0.25, [0.95, 0.97, 1]) : frost(src, FROST[name.split('/')[0]] ?? 1);
+      cache.set(src, sway ? swayed(m) : m);
+    }
     return cache.get(src);
   };
   const protos = new Map();
@@ -94,13 +121,14 @@ export async function loadKit(base) {
       const c = k.box.getCenter(new THREE.Vector3());
       const T = new THREE.Matrix4().makeTranslation(-c.x, -k.box.min.y, -c.z);
       const parts = [];
-      k.root.traverse((m) => { if (m.isMesh) parts.push({ geo: m.geometry, mat: matOf(Array.isArray(m.material) ? m.material[0] : m.material, false, name), base: T.clone().multiply(m.matrixWorld) }); });
+      const sw = /tree/.test(name); // les sapins du décor ondulent au vent
+      k.root.traverse((m) => { if (m.isMesh) parts.push({ geo: m.geometry, mat: matOf(Array.isArray(m.material) ? m.material[0] : m.material, false, name, sw), base: T.clone().multiply(m.matrixWorld) }); });
       const p = { parts, size: k.size };
       protos.set(name, p);
       return p;
     },
     dispose() {
-      for (const m of [...frosted.values(), ...clean.values()]) m.dispose();
+      for (const m of [...frosted.values(), ...clean.values(), ...windy.values()]) m.dispose();
       for (const k of kit.values()) k.root.traverse((c) => { if (c.isMesh) { c.geometry.dispose(); const ms = Array.isArray(c.material) ? c.material : [c.material]; for (const m of ms) { m.map?.dispose(); m.dispose(); } } });
     },
   };

@@ -3,7 +3,7 @@
 // Les écrans sont reconstruits par innerHTML : leurs boutons disparaissent avec eux, aucun écouteur ne traîne.
 import { REAR, DECK_Y, LOST_DIST, DIFFICULTY, MODES, CARDS, STATION_NAMES, THROTTLE, personalScore, cardCost,
   ROLES, BIOMES, MOMENTS, CONTRACTS, ENCOUNTERS } from '../engine/sim.js';
-import { Line, forksOf, forkOptions, forkChoice, tunnelsOf, legAt, momentOf, momentPos, stationDist } from '../engine/line.js';
+import { Line, forksOf, forkOptions, forkChoice, tunnelsOf, legAt, momentOf, momentPos, momentKinds, stationDist } from '../engine/line.js';
 import { ic, ROLE_IC, CARD_CAT } from './icons.js';
 
 const $ = (s) => document.querySelector(s);
@@ -218,53 +218,36 @@ export class HUD {
     });
   }
 
-  // carte du trajet (touche M) : la voie réellement parcourue, les fourches à venir, le Front, les gares
+  // carte du trajet (Tab) : toutes les voies possibles, chaque aiguillage à venir ouvrant ses deux branches jusqu'au bout
+  // de l'expédition (700 m devant en mode sans fin). L'arbre est dessiné une fois par route ; par-dessus, à chaque image,
+  // la voie parcourue, le convoi et le Front.
   drawMap(v) {
     const cv = this.el.mapCanvas, ctx = cv.getContext('2d'), R = v.route || { legs: ['plaine'], mk: [], pc: null };
     const key = v.seed + ':' + v.mode + ':' + v.goal;
-    if (key !== this.lineKey) { this.lineKey = key; this.line = new Line(v.seed, v.mode, v.goal); }
+    if (key !== this.lineKey) { this.lineKey = key; this.line = new Line(v.seed, v.mode, v.goal); this.treeLine = new Line(v.seed, v.mode, v.goal); this.treeKey = ''; }
     const line = this.line; line.setRoute(R.legs, R.mk, R.pc);
     const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const end = v.mode === 'expedition' ? v.goal : v.dist + 700;
-    const pts = []; let mnx = 1e9, mxx = -1e9, mnz = 1e9, mxz = -1e9;
-    for (let d = 0; d <= end; d += 4) { const p = line.at(d); pts.push([d, p.x, p.z]); mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x); mnz = Math.min(mnz, p.z); mxz = Math.max(mxz, p.z); }
-    const pad = 46, sc = Math.min((W - pad * 2) / Math.max(60, mxx - mnx), (H - pad * 2) / Math.max(60, mxz - mnz));
-    const ox = (W - (mxx - mnx) * sc) / 2, oz = (H - (mxz - mnz) * sc) / 2;
-    const P = (x, z) => [ox + (x - mnx) * sc, oz + (z - mnz) * sc];
-    // tracé coloré par paysage ; en pointillé ce qui n'est pas encore choisi
-    for (let i = 1; i < pts.length; i++) {
-      const [d, x, z] = pts[i], [, x0, z0] = pts[i - 1], bio = R.legs[legAt(v.mode, v.goal, d)];
-      ctx.strokeStyle = bio ? BIO_COL[bio] : '#6a7080'; ctx.lineWidth = d < v.dist ? 5 : 4; ctx.globalAlpha = d < v.dist ? 0.55 : 1;
-      ctx.setLineDash(bio ? [] : [6, 6]);
-      ctx.beginPath(); ctx.moveTo(...P(x0, z0)); ctx.lineTo(...P(x, z)); ctx.stroke();
-    }
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
-    ctx.font = '700 12px "Chakra Petch", sans-serif'; ctx.textAlign = 'center';
-    // étiquette centrée en x, gardée dans le cadre (écran étroit)
-    const label = (t, x, y) => { const w = ctx.measureText(t).width / 2; ctx.fillText(t, Math.max(6 + w, Math.min(W - 6 - w, x)), y); };
-    for (let L = 1; L < 40; L++) {
-      if (stationDist(v.mode, v.goal, L - 1) == null) break;
-      for (const f of forksOf(v.seed, v.mode, v.goal, L)) {
-        if (f.at > end) continue;
-        const p = line.at(f.at), o = forkOptions(v.seed, R, f), c = forkChoice(v.seed, R, f), [px, pz] = P(p.x, p.z);
-        ctx.fillStyle = '#ffc531'; ctx.beginPath(); ctx.arc(px, pz, 5, 0, 7); ctx.fill();
-        if (o && f.at > v.dist - 40) {
-          const lab = (k) => (f.k === 'st' ? BIOMES[k]?.label : MOMENTS[k]?.label) || '';
-          const a = `◄ ${lab(o[0])}${c === 0 ? ' ✔' : ''}`, b = `${lab(o[1])}${c === 1 ? ' ✔' : ''} ►`;
-          ctx.fillStyle = '#fff8ea'; label(a, px - 12 - ctx.measureText(a).width / 2, pz - 10); label(b, px + 12 + ctx.measureText(b).width / 2, pz - 10);
-        }
-      }
-    }
-    for (let i = 0; i < 40; i++) {
-      const sd = stationDist(v.mode, v.goal, i); if (sd == null || sd > end) break;
-      const p = line.at(sd), [x, z] = P(p.x, p.z);
-      ctx.fillStyle = '#16181d'; ctx.strokeStyle = '#fff8ea'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, z, 8, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff8ea'; label(stName(i), x, z + 22);
-    }
-    if (v.mode === 'expedition') { const p = line.at(v.goal), [x, z] = P(p.x, p.z); ctx.fillStyle = '#ffc531'; ctx.beginPath(); ctx.arc(x, z, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#16181d'; ctx.fillText('♜', x, z + 4); ctx.fillStyle = '#ffc531'; label('Fort-Givre', x, z + 26); }
-    const ps = line.at(Math.max(0, v.dist - Math.max(0, v.gap))), [sx, sz] = P(ps.x, ps.z); ctx.fillStyle = '#ff4b2b'; ctx.beginPath(); ctx.arc(sx, sz, 7, 0, 7); ctx.fill(); label('Front', sx - 26, sz + 4);
-    const pm = line.at(v.dist), [mx, mz] = P(pm.x, pm.z); ctx.fillStyle = '#9fd3ff'; ctx.strokeStyle = '#16181d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mx, mz, 8, 0, 7); ctx.fill(); ctx.stroke();
+    const tk = R.legs.join(',') + '|' + R.mk.join(',') + '|' + (R.pc ? R.pc.at + ':' + R.pc.c : '') + '|' + (v.mode === 'expedition' ? '' : Math.floor(v.dist / 100));
+    if (this.treeKey !== tk) { this.treeKey = tk; this.tree = mapTree(this.treeLine, v, R); this.treeImg = null; }
+    const T = this.tree;
+    if (!this.treeImg || this.treeImg.w !== W || this.treeImg.h !== H || this.treeImg.dpr !== dpr) this.treeImg = paintTree(T, W, H, dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(this.treeImg.c, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const P = T.P;
+    // la voie déjà parcourue
+    ctx.strokeStyle = '#9fd3ff'; ctx.lineWidth = 5; ctx.globalAlpha = 0.85; ctx.lineCap = 'round'; ctx.beginPath();
+    for (let d = T.start; ; d = Math.min(v.dist, d + 4)) { const p = line.at(d), [x, z] = P(p.x, p.z); if (d === T.start) ctx.moveTo(x, z); else ctx.lineTo(x, z); if (d >= v.dist) break; }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    // le prochain aiguillage : il clignote
+    const nx = T.next;
+    if (nx) { const [x, z] = P(nx.x, nx.z); ctx.strokeStyle = '#ffc531'; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 180); ctx.beginPath(); ctx.arc(x, z, 11, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+    const ps = line.at(Math.max(0, v.dist - Math.max(0, v.gap))), [sx, sz] = P(ps.x, ps.z);
+    const pm = line.at(v.dist), [mx, mz] = P(pm.x, pm.z);
+    ctx.fillStyle = '#ff4b2b'; ctx.beginPath(); ctx.arc(sx, sz, 7, 0, 7); ctx.fill();
+    ctx.fillStyle = '#9fd3ff'; ctx.strokeStyle = '#16181d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mx, mz, 8, 0, 7); ctx.fill(); ctx.stroke();
+    // l'étiquette du Front se pose là où il reste de la place (pas sur une gare ni un nom déjà écrit)
+    placeLabels(ctx, W, T.H, [{ x: sx, y: sz, r: 7, t: 'Front', pri: 9, col: '#ff8a6a' }], [...T.blocks, [mx - 9, mz - 9, mx + 9, mz + 9]], []);
   }
 
   // tutoriel : quelques étapes cochées au fil de la première partie
@@ -338,6 +321,195 @@ export class HUD {
     setTimeout(() => d.remove(), 1600);
   }
 }
+// Les voies possibles sur les deux prochains aiguillages (quatre au plus) : on parcourt l'arbre (la voie retenue au levier
+// d'abord) et chaque branche n'est tracée qu'une fois, depuis l'aiguillage où elle se sépare ; elle s'arrête au troisième
+// aiguillage. La voie retenue (def : celle que suivra le convoi si personne ne touche aux leviers) continue en pointillé
+// jusqu'au bout. Les aiguillages déjà franchis gardent une amorce grisée de la voie laissée de côté.
+const MAP_DEPTH = 2;
+function mapTree(line, v, R) {
+  const { seed, mode, goal } = v, exp = mode === 'expedition';
+  const end = exp ? goal : v.dist + 700, start = exp ? 0 : Math.max(0, Math.floor(v.dist - 1600));
+  const forks = [];
+  for (let L = 1; L < 500; L++) {
+    const a = stationDist(mode, goal, L - 1); if (a == null || a > end) break;
+    for (const f of forksOf(seed, mode, goal, L)) if (f.at >= start && f.at < end) forks.push(f);
+  }
+  forks.sort((p, q) => p.at - q.at);
+  const T = { start, segs: [], nodes: [], cuts: [], stations: [], labels: [], ends: [], bio: new Set(), mom: new Set(), next: null, tail: false, box: [1e9, -1e9, 1e9, -1e9] };
+  const pt = (d) => { const p = line.at(d), B = T.box; B[0] = Math.min(B[0], p.x); B[1] = Math.max(B[1], p.x); B[2] = Math.min(B[2], p.z); B[3] = Math.max(B[3], p.z); return p; };
+  // une portion [d0, d1] de la route (legs, mk) ; kind : 'live' (voie possible), 'gone' (voie laissée), 'tail' (suite de la voie retenue)
+  const draw = (legs, mk, d0, d1, kind, def) => {
+    line.setRoute(legs, mk, null);
+    let seg = null, lx = 0, lz = 0;
+    for (let d = d0; ; d = Math.min(d1, d + 4)) {
+      const bio = legs[legAt(mode, goal, d)] || 'plaine', p = pt(d);
+      if (!seg || seg.bio !== bio) { seg = { bio, kind, def, pts: seg ? [lx, lz] : [] }; T.segs.push(seg); if (kind !== 'gone') T.bio.add(bio); }
+      seg.pts.push(p.x, p.z); lx = p.x; lz = p.z;
+      if (d >= d1) break;
+    }
+    if (kind === 'gone') return;
+    if (kind === 'tail') T.tail = true;
+    for (let i = 0; i < 99; i++) {
+      const sd = stationDist(mode, goal, i); if (sd == null || sd > d1) break;
+      if (sd > d0 || d0 === start) T.stations.push({ ...pt(sd), i, def });
+    }
+    if (exp && d1 >= goal) T.ends.push({ ...pt(goal), def });
+  };
+  const setC = (f, legs, mk, c) => {
+    const L2 = legs.slice(), M2 = mk.slice();
+    if (f.k === 'st') L2[f.L] = forkOptions(seed, { legs: L2, mk: M2 }, f)[c]; else M2[f.L] = c;
+    return [L2, M2];
+  };
+  const name = (f, o) => (f.k === 'st' ? `${BIOMES[o]?.icon || ''} ${BIOMES[o]?.label || o}` : `${MOMENTS[o]?.icon || ''} ${MOMENTS[o]?.label || o}`);
+  const node = (legs, mk, f, def, decided, c) => { line.setRoute(legs, mk, null); const n = { ...pt(f.at), f, def, decided, c }; T.nodes.push(n); return n; };
+  const dfs = (i, legs, mk, from, def, lvl) => {
+    if (i === forks.length) { draw(legs, mk, from, end, 'live', def); return; }
+    const f = forks[i], nextAt = forks[i + 1] ? forks[i + 1].at : end;
+    if (f.k === 'st' ? R.legs[f.L] != null : R.mk[f.L] != null) {
+      // aiguillage franchi : la voie prise continue, l'autre n'est plus qu'une amorce
+      const c = forkChoice(seed, R, f), [L1, M1] = setC(f, legs, mk, c), [L2, M2] = setC(f, legs, mk, 1 - c);
+      node(legs, mk, f, def, true, c);
+      dfs(i + 1, L1, M1, from, def, lvl);
+      draw(L2, M2, f.at, Math.min(end, nextAt, f.at + 260), 'gone', false);
+      return;
+    }
+    if (lvl >= MAP_DEPTH) {
+      // au-delà des deux prochains aiguillages : la branche s'arrête ; la voie retenue continue en pointillé
+      draw(legs, mk, from, f.at, 'live', def); T.cuts.push(pt(f.at));
+      if (def) { let L2 = legs, M2 = mk; for (let j = i; j < forks.length; j++) [L2, M2] = setC(forks[j], L2, M2, 0); draw(L2, M2, f.at, end, 'tail', true); }
+      return;
+    }
+    const cd = R.pc && R.pc.at === f.at ? R.pc.c : 0, n = node(legs, mk, f, def, false, cd), lc = Math.cos(n.th), ls = Math.sin(n.th);
+    if (def && !T.next) T.next = n;
+    for (const c of [cd, 1 - cd]) {
+      const [L2, M2] = setC(f, legs, mk, c), o = f.k === 'st' ? L2[f.L] : momentKinds(seed, f.L, L2[f.L])[c];
+      if (f.k === 'mid') T.mom.add(o);
+      // le nom de la branche (paysage ou moment fort), un peu après l'aiguille ; ✔ : la voie du levier
+      // l'étiquette se pose du côté où part la branche (dir : vers l'extérieur de l'aiguillage)
+      line.setRoute(L2, M2, null); const p = pt(Math.min(f.at + 60, nextAt - 12)), side = (p.x - n.x) * lc + (p.z - n.z) * ls >= 0 ? 1 : -1;
+      T.labels.push({ x: p.x, z: p.z, t: name(f, o) + (c === cd ? ' ✔' : ''), pri: lvl ? 4 : 5, col: def && c === cd ? '#fff8ea' : '#c9d2df', dir: [side * lc, side * ls], dot: BIO_COL[L2[legAt(mode, goal, f.at + 60)]] || '#c9d6e3' });
+      dfs(i + 1, L2, M2, c === cd ? from : f.at, def && c === cd, lvl + 1);
+    }
+  };
+  dfs(0, R.legs.slice(), R.mk.slice(), start, true, 0);
+  return T;
+}
+
+// Placement des étiquettes sans chevauchement : autour de chaque repère, on essaie plusieurs positions et l'on garde la
+// moins encombrée (une autre étiquette ou un repère : interdit ; une voie dessous : pénalité). Les moins utiles sautent.
+function placeLabels(ctx, W, H, items, blocks, dots) {
+  const hit = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+  const placed = [];
+  for (const it of [...items].sort((p, q) => q.pri - p.pri)) {
+    ctx.font = it.font || '700 12px "Chakra Petch", sans-serif';
+    const w = ctx.measureText(it.t).width + 6, h = 15, r = (it.r || 4) + 3, { x, y } = it;
+    const cand = [[x - w / 2, y + r], [x - w / 2, y - r - h], [x + r, y - h / 2], [x - r - w, y - h / 2], [x + r, y + 2], [x + r, y - h - 2], [x - r - w, y + 2], [x - r - w, y - h - 2],
+      [x - w / 2, y + r + 14], [x - w / 2, y - r - h - 14], [x + r + 16, y - h / 2], [x - r - w - 16, y - h / 2]];
+    // côté préféré d'abord (la branche part de ce côté-là)
+    if (it.dir) cand.sort((p, q) => ((q[0] + w / 2 - x) * it.dir[0] + (q[1] + h / 2 - y) * it.dir[1]) - ((p[0] + w / 2 - x) * it.dir[0] + (p[1] + h / 2 - y) * it.dir[1]));
+    let best = null, bs = Infinity;
+    for (const [cx, cy] of cand) {
+      const bx = [cx, cy, cx + w, cy + h];
+      if (bx[0] < 4 || bx[2] > W - 4 || bx[1] < 4 || bx[3] > H - 4) continue;
+      if (blocks.some((q) => hit(bx, q))) continue;
+      let sc = 0; for (const [px, py] of dots) if (px > bx[0] && px < bx[2] && py > bx[1] && py < bx[3]) sc++;
+      if (it.dir && ((cx + w / 2 - x) * it.dir[0] + (cy + h / 2 - y) * it.dir[1]) < 0) sc += 3; // du mauvais côté : on n'y va qu'à défaut
+      if (sc < bs) { bs = sc; best = bx; if (!sc) break; }
+    }
+    if (!best) continue;
+    blocks.push(best); placed.push([it, best]);
+  }
+  // un liseré sombre sous chaque texte : lisible même posé sur une voie
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (const [it, b] of placed) {
+    if (!it.dot) continue;
+    // trait de rappel jusqu'au point de la branche nommée
+    const qx = Math.max(b[0], Math.min(b[2], it.x)), qy = Math.max(b[1], Math.min(b[3], it.y));
+    ctx.strokeStyle = 'rgba(201,210,223,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(qx, qy); ctx.stroke();
+    ctx.fillStyle = it.dot; ctx.strokeStyle = '#0c0e14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(it.x, it.y, 3, 0, 7); ctx.fill(); ctx.stroke();
+  }
+  for (const [it, b] of placed) {
+    ctx.font = it.font || '700 12px "Chakra Petch", sans-serif';
+    ctx.strokeStyle = 'rgba(12,14,20,.92)'; ctx.lineWidth = 4; ctx.strokeText(it.t, b[0] + 3, (b[1] + b[3]) / 2);
+    ctx.fillStyle = it.col || '#fff8ea'; ctx.fillText(it.t, b[0] + 3, (b[1] + b[3]) / 2);
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+
+// L'arbre des voies, peint une fois dans une image (taille de la carte) ; garde la projection (T.P) et les zones occupées
+function paintTree(T, W, H, dpr) {
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * dpr)); c.height = Math.max(1, Math.round(H * dpr));
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // légende : symboles, paysages et moments forts présents sur la carte
+  ctx.font = '700 11px "Chakra Petch", sans-serif';
+  const items = [{ sym: 'fork', t: 'aiguillage' }, { sym: 'st', t: 'gare' }, ...(T.ends.length ? [{ sym: 'end', t: 'Fort-Givre' }] : []), { sym: 'def', t: 'voie retenue' },
+    ...(T.tail ? [{ sym: 'tail', t: 'suite prévue' }] : []),
+    ...[...T.bio].map((b) => ({ col: BIO_COL[b], t: BIOMES[b]?.label || b })), ...[...T.mom].map((k) => ({ ic: MOMENTS[k]?.icon, t: MOMENTS[k]?.label || k }))];
+  const rows = []; let row = [], rw = 12;
+  for (const it of items) { const w = 20 + ctx.measureText(it.t).width + 14; if (rw + w > W - 12 && row.length) { rows.push(row); row = []; rw = 12; } row.push({ ...it, x: rw }); rw += w; }
+  if (row.length) rows.push(row);
+  const legH = rows.length * 18 + 10;
+  const [mnx, mxx, mnz, mxz] = T.box, pad = 40;
+  const sc = Math.min((W - pad * 2) / Math.max(60, mxx - mnx), (H - legH - pad * 2) / Math.max(60, mxz - mnz));
+  const ox = (W - (mxx - mnx) * sc) / 2, oz = (H - legH - (mxz - mnz) * sc) / 2;
+  const P = T.P = (x, z) => [ox + (x - mnx) * sc, oz + (z - mnz) * sc];
+  // les voies (et des points de passage, pour que les étiquettes évitent de s'y poser)
+  const dots = [];
+  const path = (pts) => {
+    ctx.beginPath(); let qx = -99, qz = -99;
+    for (let i = 0; i < pts.length; i += 2) { const [x, z] = P(pts[i], pts[i + 1]); if (i) ctx.lineTo(x, z); else ctx.moveTo(x, z); if (Math.hypot(x - qx, z - qz) > 5) { dots.push([x, z]); qx = x; qz = z; } }
+    ctx.stroke();
+  };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = '#6a7080'; ctx.lineWidth = 2; ctx.globalAlpha = 0.55;
+  for (const s of T.segs) if (s.kind === 'gone') path(s.pts);
+  ctx.setLineDash([3, 6]); ctx.lineWidth = 2.5; ctx.globalAlpha = 0.6;
+  for (const s of T.segs) if (s.kind === 'tail') { ctx.strokeStyle = BIO_COL[s.bio] || '#6a7080'; path(s.pts); }
+  ctx.setLineDash([]); ctx.lineWidth = 3; ctx.globalAlpha = 0.85;
+  for (const s of T.segs) if (s.kind === 'live' && !s.def) { ctx.strokeStyle = BIO_COL[s.bio] || '#6a7080'; path(s.pts); }
+  ctx.strokeStyle = '#fff8ea'; ctx.lineWidth = 10; ctx.globalAlpha = 0.2;
+  for (const s of T.segs) if (s.kind === 'live' && s.def) path(s.pts);
+  ctx.lineWidth = 5; ctx.globalAlpha = 1;
+  for (const s of T.segs) if (s.kind === 'live' && s.def) { ctx.strokeStyle = BIO_COL[s.bio] || '#6a7080'; path(s.pts); }
+  // repères : aiguillages (losanges), bouts de branche, gares, Fort-Givre ; chacun réserve sa place
+  const blocks = [], reserve = (x, z, r) => blocks.push([x - r, z - r, x + r, z + r]);
+  const diamond = (x, z, r) => { ctx.beginPath(); ctx.moveTo(x, z - r); ctx.lineTo(x + r, z); ctx.lineTo(x, z + r); ctx.lineTo(x - r, z); ctx.closePath(); };
+  for (const q of T.cuts) { const [x, z] = P(q.x, q.z); ctx.strokeStyle = '#ffc531'; ctx.lineWidth = 1.5; diamond(x, z, 4); ctx.stroke(); reserve(x, z, 5); }
+  for (const n of T.nodes) { const [x, z] = P(n.x, n.z), r = n === T.next ? 7 : 5; ctx.fillStyle = n.decided ? '#8e99a8' : '#ffc531'; diamond(x, z, r); ctx.fill(); reserve(x, z, r + 1); }
+  const labels = [];
+  for (const s of T.stations) {
+    const [x, z] = P(s.x, s.z), r = s.def ? 7 : 4; ctx.fillStyle = '#16181d'; ctx.strokeStyle = '#fff8ea'; ctx.lineWidth = s.def ? 2 : 1.5;
+    ctx.beginPath(); ctx.arc(x, z, r, 0, 7); ctx.fill(); ctx.stroke(); reserve(x, z, r + 1);
+    if (s.def) labels.push({ x, y: z, r, t: stName(s.i), pri: 6 });
+  }
+  ctx.textAlign = 'center'; ctx.font = '700 12px "Chakra Petch", sans-serif';
+  for (const e of T.ends) {
+    const [x, z] = P(e.x, e.z);
+    if (e.def) { ctx.fillStyle = '#ffc531'; ctx.beginPath(); ctx.arc(x, z, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#16181d'; ctx.fillText('♜', x, z + 4); reserve(x, z, 12); labels.push({ x, y: z, r: 11, t: 'Fort-Givre', pri: 7, col: '#ffc531' }); }
+    else { ctx.fillStyle = '#ffc531'; ctx.fillText('♜', x, z + 4); reserve(x, z, 6); }
+  }
+  for (const l of T.labels) { const [x, y] = P(l.x, l.z); labels.push({ ...l, x, y, r: 2 }); }
+  placeLabels(ctx, W, H - legH, labels, blocks, dots);
+  T.blocks = blocks; T.H = H - legH;
+  // légende
+  ctx.font = '700 11px "Chakra Petch", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  rows.forEach((r, i) => {
+    const y = H - legH + 9 + i * 18;
+    for (const it of r) {
+      if (it.col) { ctx.fillStyle = it.col; ctx.fillRect(it.x, y - 4, 14, 8); }
+      else if (it.sym === 'fork') { ctx.fillStyle = '#ffc531'; diamond(it.x + 7, y, 5); ctx.fill(); }
+      else if (it.sym === 'st') { ctx.fillStyle = '#16181d'; ctx.strokeStyle = '#fff8ea'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(it.x + 7, y, 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
+      else if (it.sym === 'end') { ctx.fillStyle = '#ffc531'; ctx.fillText('♜', it.x + 2, y + 1); }
+      else if (it.sym === 'def') { ctx.strokeStyle = '#fff8ea'; ctx.globalAlpha = 0.35; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(it.x + 1, y); ctx.lineTo(it.x + 13, y); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineWidth = 3; ctx.strokeStyle = '#c9d6e3'; ctx.stroke(); }
+      else if (it.sym === 'tail') { ctx.strokeStyle = '#c9d6e3'; ctx.lineWidth = 2.5; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(it.x, y); ctx.lineTo(it.x + 14, y); ctx.stroke(); ctx.setLineDash([]); }
+      else { ctx.font = '12px sans-serif'; ctx.fillText(it.ic || '', it.x, y); ctx.font = '700 11px "Chakra Petch", sans-serif'; }
+      ctx.fillStyle = '#c9d2df'; ctx.fillText(it.t, it.x + 20, y);
+    }
+  });
+  ctx.textBaseline = 'alphabetic';
+  return { c, w: W, h: H, dpr };
+}
+
 function loadTuto() { try { return JSON.parse(localStorage.getItem('convoy_tuto2') || '{}') || {}; } catch (e) { return {}; } }
 function saveTuto(T) { try { localStorage.setItem('convoy_tuto2', JSON.stringify(T)); } catch (e) {} }
 

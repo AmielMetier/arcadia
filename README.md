@@ -85,6 +85,7 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
 - Gares : ravitaillement, trois cartes d'amélioration tirées au hasard (la première offerte), wagons à installer (tourelle-harpon, atelier, dortoir), un contrat et parfois une rencontre ; survivants à ramener ; rôles Mécano, Éclaireur, Chauffeur, Vigie
 - Deux modes : Expédition (rallier Fort-Givre) et Sans fin
 - Trois difficultés : Facile, Normale, Blizzard ; musique et sons générés en direct (WebAudio)
+- Rendu : post-traitement (ombre aux contacts, halo des lumières, étalonnage selon la nuit, les tunnels et le Front), sapins enneigés générés à la volée (comme ceux de Birdie Party), neige qui scintille ; les effets se coupent d'eux-mêmes si la machine peine
 - Décor et icônes : modèles 3D et pictogrammes de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/` et `convoy/img/icons/`
 
 ## Pour les développeurs

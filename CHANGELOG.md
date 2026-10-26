@@ -3,13 +3,15 @@
 ## 2.59 — 26 octobre 2026
 - **Convoy Storm** — Une vraie voie, de vrais paysages, et bien plus à faire que charger des caisses.
   - La voie tourne, monte et descend : le convoi peine en montée, file en descente, et les virages serrés font crisser les roues.
-  - De vrais aiguillages : un levier au bord de la voie, à basculer à la main avant le passage du convoi. L'autre voie part de son côté, avec un aperçu de son paysage. La carte du trajet (Tab) montre tous les embranchements.
+  - De vrais aiguillages : un levier au bord de la voie, à basculer à la main avant le passage du convoi. L'autre voie part de son côté, avec un aperçu de son paysage.
+  - La carte du trajet (Tab) montre les voies possibles sur les deux prochains aiguillages, nommées par paysage ou par moment fort, et en pointillé la suite de la voie retenue jusqu'à Fort-Givre.
   - Des paysages pleins : une forêt de sapins bien dense, une ville aux façades serrées, un lac gelé bordé de forêt avec campements de pêche et épaves prises dans la glace, un col avec sa falaise, son ravin et ses tunnels sous la montagne, une raffinerie, une toundra avec troupeaux de rennes et campements nomades, une plaine avec sa ligne télégraphique, ses clôtures et ses bosquets.
   - Chaque paysage a son geste : abattre des sapins à la hache (deux caisses de bûches), pousser le wagonnet d'une mine de charbon, tirer le tuyau d'une cuve de fioul jusqu'à la chaudière, fouiller un immeuble porte par porte, écarter un troupeau.
   - Des wagons à installer en gare : tourelle-harpon (elle abat loups, pillards et tireurs, et ramène les caisses au loin), atelier (2 ferraille pour une réparation ou une fusée), dortoir.
   - Des survivants cachés dans les ruines, à ramener jusqu'à Fort-Givre : à bord, ils aident à tenir la chaudière.
   - En gare, un contrat pour le tronçon suivant (livrer des pièces, amener un survivant, arriver vite ou en bon état) et parfois une rencontre : convoi en panne, marchand, cheminots, chasseurs.
   - De nouveaux dangers : pillards qui sautent à bord, tireurs sur les toits, loup alpha, incendie à bord, chute dans le ravin.
+  - Nouveaux graphismes : des sapins enneigés aux vraies branches, qui ondulent au vent ; une lumière plus réaliste (ombres plus fines, pénombre au pied des wagons et des ruines, halo autour du foyer, du phare et des lanternes la nuit) ; une neige qui scintille et se ride sous le vent, et de gros flocons au premier plan. Quand le Front approche, l'image se resserre et se délave. Sur les machines modestes, les effets se coupent d'eux-mêmes.
   - Nouvelle interface : tableau de bord de la locomotive (fioul, pression, vitesse), bandeau de la ligne avec les aiguillages, les tunnels et le Front, repères à l'écran, panneau de gare en cartes, premiers pas guidés lors de la première partie. Icônes et modèles 3D de Kenney (CC0).
   - Un peu plus de caisses le long des rails, et un sac de charbon sur chaque quai.
 

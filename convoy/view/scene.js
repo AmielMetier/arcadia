@@ -7,10 +7,13 @@ import { DECK_Y, HALF_W, REAR, BODY_FRONT, BOILER, DECK_BOXES, WAGONS, CHUNK, pi
 import { Ruins, DIFFICULTY, STATION_NAMES, WARM_R, FLARE_R, LEVER, VALVE, TURRET, BENCH, MOMENTS, BIOMES } from '../engine/sim.js';
 import { Line, stationDist, forksOf, forkOptions, forkChoice, forkBend, tunnelsOf, legAt, momentOf, BRIDGE_LEN } from '../engine/line.js';
 import { hash, makeRng } from '../engine/rng.js';
-import { loadKit, frost } from './models.js';
+import { loadKit, frost, SWAY } from './models.js';
 import { makeActors } from './actors.js';
 import { makeBend } from './curve.js';
 import { makeScatter } from './decor.js';
+import { createPost } from './post.js';
+import { createPineKit, PINE_H } from './trees.js';
+import { MODEL_SIZE } from '../engine/sizes.js';
 
 // Caméra isométrique : décalage fixe par rapport au point suivi. CAM_DIR sert à l'entrée (haut de l'écran = CAM_DIR).
 const CAM_OFF = new THREE.Vector3(11, 17, 15);
@@ -18,13 +21,13 @@ export const CAM_DIR = (() => { const l = Math.hypot(CAM_OFF.x, CAM_OFF.z); retu
 const FOG = 0xc3ced9, FOG_GUST = 0xdfe5ec, FOG_NIGHT = 0x131a29, FOG_TUNNEL = 0x0b0d12;
 // teinte du sol et du brouillard selon le paysage du tronçon
 const BIO_LOOK = {
-  plaine: { ground: 0xffffff, fog: 0xc3ced9, rough: 1, near: 14, far: 56 },
-  foret: { ground: 0xd2ddd9, fog: 0x93a5a0, rough: 1, near: 10, far: 46 },
-  ville: { ground: 0xd9d7d3, fog: 0xb3b3b8, rough: 1, near: 13, far: 54 },
+  plaine: { ground: 0xe4e9f0, fog: 0xbcc7d3, rough: 1, near: 14, far: 56 },
+  foret: { ground: 0xc6d1cd, fog: 0x93a5a0, rough: 1, near: 10, far: 46 },
+  ville: { ground: 0xcdcbc7, fog: 0xb3b3b8, rough: 1, near: 13, far: 54 },
   lac: { ground: 0xb4d6ee, fog: 0xcde2f0, rough: 0.28, near: 16, far: 62 },
-  col: { ground: 0xeaf0fb, fog: 0xd2dbe7, rough: 1, near: 14, far: 58 },
-  usine: { ground: 0xcfcbc6, fog: 0xa9a49d, rough: 1, near: 12, far: 50 },
-  toundra: { ground: 0xf4f6fa, fog: 0xdfe6ee, rough: 1, near: 15, far: 64 },
+  col: { ground: 0xdbe2ed, fog: 0xc8d2df, rough: 1, near: 14, far: 58 },
+  usine: { ground: 0xc2beb9, fog: 0xa9a49d, rough: 1, near: 12, far: 50 },
+  toundra: { ground: 0xe2e7ee, fog: 0xd3dbe5, rough: 1, near: 15, far: 64 },
 };
 // aperçu de chaque paysage au bout de l'aiguillage (quelques pièces le long de la voie qui s'en va)
 const PREVIEW = {
@@ -43,7 +46,11 @@ export function createScene(host, { onLost } = {}) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.92;
+  // post-traitement (occlusion ambiante, halo, étalonnage) hors téléphone ; il se coupe de lui-même si la machine peine
+  const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
+  const post = MOBILE ? null : createPost(renderer);
+  const perf = { ema: 16, slow: 0, step: 0 };
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -63,11 +70,11 @@ export function createScene(host, { onLost } = {}) {
     steel: M(0x4b525c, { metalness: 0.45, roughness: 0.55 }), dark: M(0x262a31, { metalness: 0.3 }), plate: M(0x6a5a48, { roughness: 0.95 }),
     rust: M(0x8a4b2e), red: M(0xb3362a), snow: M(0xf4f7fb, { roughness: 1 }), stone: M(0x8d8a86), concrete: M(0xa4a6a4), roof: M(0x5d4a3c),
     metal: M(0x5c6168, { metalness: 0.4 }), wood: M(0x7b5a3a), crate: M(0xc0821f), stripe: M(0x1d1f23),
-    glow: M(0xff8a2a, { emissive: 0xff6a10, emissiveIntensity: 2.2 }),
-    lamp: M(0xfff1c4, { emissive: 0xffe2a0, emissiveIntensity: 2 }), redLamp: M(0xff3b2f, { emissive: 0xff2010, emissiveIntensity: 2 }),
-    loot: M(0xffd34d, { emissive: 0xffb020, emissiveIntensity: 1.6 }), lootOff: M(0x5a5f66), coal: M(0x18191c),
+    glow: M(0xff8a2a, { emissive: 0xff6a10, emissiveIntensity: 4 }),
+    lamp: M(0xfff1c4, { emissive: 0xffe2a0, emissiveIntensity: 5 }), redLamp: M(0xff3b2f, { emissive: 0xff2010, emissiveIntensity: 3.5 }),
+    loot: M(0xffd34d, { emissive: 0xffb020, emissiveIntensity: 3.2 }), lootOff: M(0x5a5f66), coal: M(0x18191c),
     brass: M(0xc8a24a, { metalness: 0.6, roughness: 0.35 }), green: M(0x2fbf71, { emissive: 0x1a8a4a, emissiveIntensity: 0.6 }),
-    window: M(0xffd98a, { emissive: 0xffb84a, emissiveIntensity: 1.4 }), flare: M(0xff3b2f, { emissive: 0xff2a10, emissiveIntensity: 4 }),
+    window: M(0xffd98a, { emissive: 0xffb84a, emissiveIntensity: 2.4 }), flare: M(0xff3b2f, { emissive: 0xff2a10, emissiveIntensity: 7 }),
     warn: M(0xff4b2b, { emissive: 0xff2a10, emissiveIntensity: 0.6, transparent: true, opacity: 0.45, depthWrite: false }),
     rock: M(0x6b6f78), pine: M(0x2f5d4a), bark: M(0x5a4130),
   };
@@ -87,19 +94,74 @@ export function createScene(host, { onLost } = {}) {
   const hemi = new THREE.HemisphereLight(0xe2ebf5, 0x5f6b78, 1.05); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff4e6, 1.35);
   const hemiDay = new THREE.Color(0xe2ebf5), hemiNight = new THREE.Color(0x5d74a8), sunDay = new THREE.Color(0xfff4e6), sunNight = new THREE.Color(0x9fb4e0);
-  sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 80 });
+  sun.castShadow = true; sun.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 90 });
   sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
+  // lumière d'ambiance et reflets : un ciel d'hiver bas et laiteux, cuit en carte d'environnement (métal, glace, vitres)
+  {
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec3 vD;
+        void main(){
+          // ciel clair au-dessus, rebond du sol nettement plus sombre : les objets gardent leur modelé (dessus éclairé, dessous dans l'ombre)
+          float h = vD.y; vec3 sd = normalize(vec3(-0.45, 0.35, 0.3));
+          vec3 c = mix(vec3(0.7, 0.75, 0.82), vec3(0.36, 0.48, 0.68), pow(clamp(h, 0.0, 1.0), 0.55));
+          c = mix(c, vec3(0.26, 0.29, 0.34), smoothstep(0.02, -0.25, h));
+          float s = max(dot(normalize(vD), sd), 0.0); c += vec3(1.0, 0.86, 0.66) * (pow(s, 90.0) * 2.0 + pow(s, 8.0) * 0.15);
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    }));
+    const envScene = new THREE.Scene(); envScene.add(sky);
+    const pm = new THREE.PMREMGenerator(renderer), env = pm.fromScene(envScene, 0.04).texture;
+    pm.dispose(); sky.geometry.dispose(); sky.material.dispose();
+    scene.environment = env; scene.environmentIntensity = 0.45; owned.tex.add(env);
+  }
 
   // ---------------------------------------------------------------- sol enneigé (texture dessinée en canevas, fixe dans le monde)
   const snowTex = canvasTex(256, 256, (x) => {
-    x.fillStyle = '#eef2f7'; x.fillRect(0, 0, 256, 256);
+    x.fillStyle = '#eaeef4'; x.fillRect(0, 0, 256, 256);
     const r = makeRng(7);
-    for (let i = 0; i < 900; i++) { const v = 220 + r.int(0, 30); x.fillStyle = `rgba(${v - 12},${v - 4},${v},${r.range(0.15, 0.5)})`; x.beginPath(); x.ellipse(r.range(0, 256), r.range(0, 256), r.range(2, 14), r.range(1, 4), r.range(0, 3), 0, 7); x.fill(); }
+    for (let i = 0; i < 900; i++) { const v = 205 + r.int(0, 45); x.fillStyle = `rgba(${v - 12},${v - 4},${v},${r.range(0.15, 0.5)})`; x.beginPath(); x.ellipse(r.range(0, 256), r.range(0, 256), r.range(2, 14), r.range(1, 4), r.range(0, 3), 0, 7); x.fill(); }
   }, true);
-  snowTex.repeat.set(36, 36); snowTex.anisotropy = 4;
-  const groundMat = M(0xffffff, { map: snowTex, roughness: 1, flatShading: false });
+  snowTex.repeat.set(36, 36); snowTex.anisotropy = 8;
+  // relief : rides de neige soufflée par le vent et petites bosses (carte de normales peinte), qui accrochent le soleil bas
+  const snowNrm = (() => {
+    const N = 256, hgt = new Float32Array(N * N), r = makeRng(23), blobs = Array.from({ length: 40 }, () => [r.range(0, N), r.range(0, N), r.range(6, 22), r.range(-1, 1)]);
+    // ondulations douces et raccordées (fréquences entières : la dalle se répète sans couture) qui tordent et modulent les rides
+    const waves = (n) => Array.from({ length: n }, () => [r.int(-3, 3), r.int(-3, 3) || 1, r.range(0, 6.28), r.range(0.4, 1)]);
+    const warpW = waves(5), ampW = waves(4), wv = (W, x, y) => W.reduce((a, [fx, fy, ph, k]) => a + k * Math.sin((fx * x + fy * y) / N * Math.PI * 2 + ph), 0) / W.length;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const warp = wv(warpW, x, y) * 5, amp = 0.35 + 0.65 * (0.5 + 0.5 * wv(ampW, x, y) * 1.6);
+      let h = amp * (0.55 * Math.sin((x * 6 + y * 2) / N * Math.PI * 2 + warp) + 0.22 * Math.sin((x * 11 - y * 5) / N * Math.PI * 2 + warp * 1.7));
+      for (const [bx, by, br, bs] of blobs) { let dx = Math.abs(x - bx), dy = Math.abs(y - by); dx = Math.min(dx, N - dx); dy = Math.min(dy, N - dy); h += bs * Math.exp(-(dx * dx + dy * dy) / (br * br)); }
+      hgt[y * N + x] = h;
+    }
+    const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), im = g.createImageData(N, N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const H0 = (xx, yy) => hgt[((yy + N) % N) * N + ((xx + N) % N)], dx = (H0(x + 1, y) - H0(x - 1, y)) * 1.6, dy = (H0(x, y + 1) - H0(x, y - 1)) * 1.6, l = Math.hypot(dx, dy, 1), o = (y * N + x) * 4;
+      im.data[o] = (-dx / l * 0.5 + 0.5) * 255; im.data[o + 1] = (dy / l * 0.5 + 0.5) * 255; im.data[o + 2] = (1 / l * 0.5 + 0.5) * 255; im.data[o + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(36, 36); t.anisotropy = 8; owned.tex.add(t);
+    return t;
+  })();
+  const SNOWFX = { uT: { value: 0 }, uSpark: { value: 1 } };
+  const groundMat = M(0xffffff, { map: snowTex, normalMap: snowNrm, normalScale: new THREE.Vector2(0.75, 0.75), roughness: 1, flatShading: false });
+  // paillettes : quelques cristaux scintillent dans la neige (fixes au sol, comme la texture) ; le halo les fait briller
+  groundMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, SNOWFX);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uSpark;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        {
+          vec2 cell = vMapUv * 140.0, id = floor(cell), f = fract(cell) - 0.5;
+          float h = fract(sin(dot(id, vec2(127.1, 311.7))) * 43758.5453);
+          float tw = pow(max(0.0, sin(uT * (1.5 + h * 3.0) + h * 40.0)), 24.0);
+          totalEmissiveRadiance += vec3(3.2, 3.4, 3.8) * step(0.985, h) * smoothstep(0.22, 0.0, length(f)) * tw * uSpark;
+        }`);
+  };
+  groundMat.customProgramCacheKey = () => 'snowground';
   const groundPivot = new THREE.Group(); scene.add(groundPivot);
   const ground = mesh(G(new THREE.PlaneGeometry(360, 360)), groundMat, false, true);
   ground.rotation.x = -Math.PI / 2; groundPivot.add(ground);
@@ -164,7 +226,7 @@ export function createScene(host, { onLost } = {}) {
   const ROCK_A = new THREE.Color(0x58606b), ROCK_B = new THREE.Color(0x80878f), SNOW_C = new THREE.Color(0xeef3f9);
   const cliffStrip = makeStrip(reliefMat, CLIFF.length, 220), ravStrip = makeStrip(reliefMat, RAV.length, 220), ridgeStrip = makeStrip(ridgeMat, RIDGE_X.length, 180);
   const PX = new Float32Array(16), PY = new Float32Array(16), PC = Array.from({ length: 16 }, () => new THREE.Color());
-  let cutK = 0;
+  let cutK = 0, stormNear = 0;
   scatter.define('sleeper', [{ geo: GEO.box, mat: MAT.wood, base: mat4(0, 0, 0, 2.4, 0.12, 0.28) }], { cast: false });
   scatter.define('ballast', [{ geo: GEO.box, mat: M(0x6f6a66), base: mat4(0, 0, 0, 4.2, 0.12, 1.25) }], { cast: false });
   scatter.define('rail', [{ geo: GEO.box, mat: MAT.steel, base: mat4(0, 0, 0, 0.12, 0.16, 1.25) }], { cast: false });
@@ -183,8 +245,17 @@ export function createScene(host, { onLost } = {}) {
   scatter.define('tree~', [{ geo: GEO.box, mat: MAT.bark, base: mat4(0, 0.15, 0, 0.08, 0.3, 0.08) }, { geo: GEO.cone, mat: FM.pine, base: mat4(0, 0.55, 0, 0.4, 0.7, 0.4) }]);
   scatter.define('stump~', [{ geo: GEO.cyl10, mat: FM.bark, base: mat4(0, 0.25, 0, 0.35, 0.5, 0.35) }]);
   const fallbackOf = (key) => (key.includes('tree') ? 'tree~' : key.includes('stump') ? 'stump~' : null);
+  // sapins enneigés (les mêmes que ceux du golf, avec la neige sur les branches) à la place des sapins des kits Kenney ;
+  // vid : identifiant stable (le même sapin garde sa silhouette), far : loin de la voie, version allégée
+  const pines = createPineKit();
+  pines.variants.forEach((v, i) => scatter.define('pine~' + i, [{ geo: v.trunk, mat: pines.mats.bark, base: ident }, { geo: v.needles, mat: pines.mats.needle, base: ident }]));
+  pines.lo.forEach((v, i) => scatter.define('pineLo~' + i, [{ geo: v.trunk, mat: pines.mats.bark, base: ident }, { geo: v.needles, mat: pines.mats.needle, base: ident }], { cast: false }));
+  const PINE_MODELS = new Set(['holiday/tree-snow-a', 'holiday/tree-snow-b', 'holiday/tree-snow-c', 'nature/tree_pineTallA', 'nature/tree_pineTallB', 'nature/tree_pineTallC',
+    'nature/tree_pineTallD', 'nature/tree_pineRoundA', 'nature/tree_pineRoundC', 'nature/tree_cone_dark', 'nature/tree_pineDefaultA', 'nature/tree_pineSmallA', 'nature/tree_pineSmallC']);
+  const pineScale = (key, s) => s * (MODEL_SIZE[key]?.[1] || 2) / PINE_H;
   // ajoute une instance d'un modèle du décor (ou sa forme de secours tant que les modèles chargent)
-  const put = (key, x, y, z, yaw, s, sy = s, sz = s) => {
+  const put = (key, x, y, z, yaw, s, sy = s, sz = s, vid = 0, far = false) => {
+    if (PINE_MODELS.has(key)) { const v = Math.abs(Math.round(vid)) | 0; scatter.add(far ? 'pineLo~' + (v % 2) : 'pine~' + (v % 3), x, y, z, yaw, pineScale(key, sy)); return; }
     if (scatter.add(key, x, y, z, yaw, s, sy, sz)) return;
     const fb = fallbackOf(key); if (fb) scatter.add(fb, x, y, z, yaw, s * 1.6, sy * 1.6, sz * 1.6);
   };
@@ -312,6 +383,9 @@ export function createScene(host, { onLost } = {}) {
   const SNOW = 2600, BOX = { x: 46, y: 16, z: 46 };
   const snow = points(SNOW, { color: 0xffffff, size: 0.2, opacity: 0.95, fog: false }); const flakes = snow.pos; const fr = makeRng(99);
   for (let i = 0; i < SNOW; i++) { flakes[i * 3] = fr.range(-BOX.x / 2, BOX.x / 2); flakes[i * 3 + 1] = fr.range(0, BOX.y); flakes[i * 3 + 2] = fr.range(-BOX.z / 2, BOX.z / 2); }
+  // gros flocons tout près de l'objectif, flous : de la profondeur entre la caméra et le convoi
+  const NEARF = 150, NB = 9, nearF = points(NEARF, { color: 0xffffff, size: 0.55, opacity: 0.3, fog: false }); const nflakes = nearF.pos;
+  for (let i = 0; i < NEARF; i++) { nflakes[i * 3] = fr.range(-NB, NB); nflakes[i * 3 + 1] = fr.range(-NB, NB); nflakes[i * 3 + 2] = fr.range(-NB, NB); }
   // bouffées de neige (avalanche, congère déblayée, chute) — positions en repère du train, replacées sur la courbe
   const PUFF = 200, puff = points(PUFF, { color: 0xffffff, size: 1.6, opacity: 0.85 });
   const puffVel = new Float32Array(PUFF * 3), puffLife = new Float32Array(PUFF);
@@ -757,6 +831,7 @@ export function createScene(host, { onLost } = {}) {
   function resize() {
     W = Math.max(1, host.clientWidth); H = Math.max(1, host.clientHeight);
     renderer.setSize(W, H, false); camera.aspect = W / H;
+    if (post) { const pr = renderer.getPixelRatio(); post.setSize(Math.round(W * pr), Math.round(H * pr)); }
     camera.fov = W / H < 0.8 ? 52 : 38; // portrait : on recule un peu
     camera.updateProjectionMatrix();
   }
@@ -840,8 +915,10 @@ export function createScene(host, { onLost } = {}) {
     scene.fog.near = (bl ? fogNear - 5 : fogNear) - gustK * 6 - tunK * 6; scene.fog.far = (bl ? fogFar - 14 : fogFar) - gustK * 22 - nk * 8 - tunK * 18;
     scene.fog.color.copy(bioFog).lerp(fogG, gustK).lerp(fogN, nk * 0.88).lerp(fogT, tunK * 0.9); scene.background.copy(scene.fog.color);
     const dim = 1 - 0.85 * tunK;
-    hemi.intensity = 1.05 * (1 - 0.7 * nk) * dim; hemi.color.copy(hemiDay).lerp(hemiNight, nk);
-    sun.intensity = 1.35 * (1 - 0.82 * nk) * (1 - 0.95 * tunK); sun.color.copy(sunDay).lerp(sunNight, nk);
+    hemi.intensity = 0.72 * (1 - 0.7 * nk) * dim; hemi.color.copy(hemiDay).lerp(hemiNight, nk);
+    sun.intensity = 1.55 * (1 - 0.82 * nk) * (1 - 0.95 * tunK); sun.color.copy(sunDay).lerp(sunNight, nk);
+    scene.environmentIntensity = 0.2 * (1 - 0.75 * nk) * dim;
+    SNOWFX.uT.value = view.t; SNOWFX.uSpark.value = (1 - 0.7 * nk) * (1 - tunK) * (view.bio === 'ville' || view.bio === 'usine' ? 0.35 : 1);
     snow.mat.size = (bl ? 0.26 : 0.2) + gustK * 0.14;
     snow.mat.color.setRGB(1 - nk * 0.4, 1 - nk * 0.33, 1 - nk * 0.2); snow.mat.opacity = 0.95 * (1 - tunK * 0.9);
     const auroraK = nk * (view.bio === 'lac' || view.bio === 'toundra' || view.bio === 'col' ? 0.85 : 0.25) * (1 - tunK);
@@ -864,7 +941,7 @@ export function createScene(host, { onLost } = {}) {
     const wcx = A.x + focus.x * Math.cos(A.th) - focus.z * Math.sin(A.th), wcz = A.z + focus.x * Math.sin(A.th) + focus.z * Math.cos(A.th);
     const gx = Math.round(wcx / 10) * 10, gz = Math.round(wcz / 10) * 10;
     B.world(gx, gz, 0, O); groundPivot.position.set(O.x, 0, O.z);
-    snowTex.offset.set((gx / 10) % 1, (-gz / 10) % 1);
+    snowTex.offset.set((gx / 10) % 1, (-gz / 10) % 1); snowNrm.offset.copy(snowTex.offset);
 
     scatter.begin(); cliffStrip.begin(); ravStrip.begin(); ridgeStrip.begin();
     // la voie, et son tablier au-dessus de la gorge
@@ -879,7 +956,7 @@ export function createScene(host, { onLost } = {}) {
 
     // chaudière : feu et lumière selon le carburant
     const f = Math.min(1, view.fuel / 100), flick = 0.85 + Math.sin(view.t * 23) * 0.08 + Math.sin(view.t * 7.3) * 0.07;
-    fireMat.emissiveIntensity = (0.3 + 2.6 * f) * flick;
+    fireMat.emissiveIntensity = (0.6 + 5 * f) * flick;
     fireLight.intensity = (4 + 34 * f) * flick * (1 + 0.4 * tunK);
     fire.scale.setScalar(0.4 + 0.6 * Math.min(1, f * 1.6));
     beam.intensity = (view.speed > 0.05 ? 45 : 18) * (1 + 0.8 * nk + 1.2 * tunK); coneMat.opacity = (view.speed > 0.05 ? 0.1 : 0.05) + 0.1 * nk + 0.12 * tunK;
@@ -889,7 +966,9 @@ export function createScene(host, { onLost } = {}) {
     const pr = Math.max(0, Math.min(100, view.press || 0)) / 100;
     boilerMat.emissiveIntensity = pr > 0.6 ? (pr - 0.6) * 2.2 * (0.7 + 0.3 * Math.sin(view.t * (8 + pr * 14))) : 0;
     needlePiv.rotation.z = 2.2 - pr * 4.4;
-    leverA += ((view.thr - 1) * -0.65 - leverA) * Math.min(1, dt * 8); leverPiv.rotation.x = leverA;
+    // manette de vitesse : le convoi du menu n'a pas de cran (thr), et un angle invalide la ferait disparaître pour de bon
+    const thr = Number.isFinite(view.thr) ? view.thr : 1;
+    leverA += ((thr - 1) * -0.65 - leverA) * Math.min(1, dt * 8); if (!Number.isFinite(leverA)) leverA = 0; leverPiv.rotation.x = leverA;
     const venting = view.players.some((p) => p.dig && p.on && Math.hypot(p.x - VALVE.x, p.z - VALVE.z) < VALVE.r);
     if (venting) steamT = 0.2;
     steamT -= dt; valveSpin += (steamT > 0 ? 9 : 0) * dt; valvePiv.rotation.z = valveSpin;
@@ -915,6 +994,17 @@ export function createScene(host, { onLost } = {}) {
     // blizzard : vent latéral (renforcé et orienté par la bourrasque)
     const gs = view.gust > 0 ? (view.ev?.side || 1) : 1;
     const wx = 7 * gs * (1 + gustK * 1.6), wy = -3.2 - gustK, wz = 3 + view.speed;
+    // flocons proches : dans une boîte à mi-chemin entre la caméra et le point suivi
+    {
+      const cx = focus.x + CAM_OFF.x * 0.55, cy = CAM_OFF.y * 0.55, cz = focus.z + CAM_OFF.z * 0.55;
+      for (let i = 0; i < NEARF; i++) {
+        let x = nflakes[i * 3] + (wx * 0.6 + Math.sin(i * 1.7 + view.t) * 0.8) * dt, y = nflakes[i * 3 + 1] + wy * 0.5 * dt, z = nflakes[i * 3 + 2] + wz * 0.6 * dt;
+        x = ((x - cx + NB) % (2 * NB) + 2 * NB) % (2 * NB) - NB + cx; y = ((y - cy + NB) % (2 * NB) + 2 * NB) % (2 * NB) - NB + cy; z = ((z - cz + NB) % (2 * NB) + 2 * NB) % (2 * NB) - NB + cz;
+        nflakes[i * 3] = x; nflakes[i * 3 + 1] = y; nflakes[i * 3 + 2] = z;
+      }
+      nearF.geo.attributes.position.needsUpdate = true; nearF.mat.opacity = 0.3 * (1 - tunK) * (0.6 + 0.4 * gustK + 0.3 * (bl ? 1 : 0));
+    }
+    SWAY.uT.value = view.t; SWAY.uWind.value = Math.min(1, 0.25 + gustK * 0.75 + (bl ? 0.2 : 0));
     for (let i = 0; i < SNOW; i++) {
       let x = flakes[i * 3] + (wx + Math.sin(i + view.t * 2) * 1.5) * dt, y = flakes[i * 3 + 1] + wy * dt, z = flakes[i * 3 + 2] + wz * dt;
       if (y < 0) y += BOX.y;
@@ -939,12 +1029,12 @@ export function createScene(host, { onLost } = {}) {
       for (const t of c.trees) {
         B.ground(t.x, t.zw, O);
         if (cut.has(t.id)) { if (!prevCut.has(t.id) && Math.abs(t.zw + dist) < 80) startFall(t); put('nature/stump_old', O.x, 0, O.z, t.r, 2.6); continue; }
-        put(t.m, O.x, 0, O.z, t.r + O.yaw, t.s);
+        put(t.m, O.x, 0, O.z, t.r + O.yaw, t.s, t.s, t.s, t.id, Math.abs(t.x) > 22);
       }
       for (const q of c.decor) {
         if (q.wall) continue;
         if (q.m[0] === '~') { drawSpecial(q, c, view); continue; }
-        B.ground(q.x, q.zw, O); put(q.m, O.x, 0, O.z, -q.r + O.yaw, q.s);
+        B.ground(q.x, q.zw, O); put(q.m, O.x, 0, O.z, -q.r + O.yaw, q.s, q.s, q.s, q.x * 7.3 + q.zw * 3.1, Math.abs(q.x) > 22);
       }
       for (const q of c.vis) { B.ground(q.x, q.zw, O); scatter.add(q.m, O.x, q.y, O.z, q.r + O.yaw, q.sx, q.sy, q.sz); }
       for (const r of c.ruins) {
@@ -1095,7 +1185,7 @@ export function createScene(host, { onLost } = {}) {
     for (const [id, m] of crates) if (!seen.has(id)) { scene.remove(m); crates.delete(id); }
 
     // front de tempête
-    const gap = view.gap ?? 999;
+    const gap = view.gap ?? 999; stormNear = 0;
     stormG.visible = !view.calm && gap < 230;
     if (stormG.visible) {
       placeTrain(stormG, 0, 0, gap, 0);
@@ -1104,7 +1194,7 @@ export function createScene(host, { onLost } = {}) {
       const roar = view.mm && view.mm.k === 'roar' && view.mm.t < 40 ? 1 : 0;
       flashT -= dt; if (flashT <= 0) { flashT = roar ? 0.3 + Math.random() * 1.1 : 2 + Math.random() * 5; stormLight.intensity = 260; } stormLight.intensity *= Math.exp(-dt * 9);
       // plus il est proche, plus la lumière tombe et la neige s'épaissit
-      const near = Math.max(0, Math.min(1, (70 - gap) / 60));
+      const near = Math.max(0, Math.min(1, (70 - gap) / 60)); stormNear = near;
       scene.fog.color.lerp(fogS, near * 0.6 + roar * 0.3); scene.background.copy(scene.fog.color);
       scene.fog.far -= near * 14; snow.mat.size += near * 0.1;
       if (near > 0.5) shake = Math.max(shake, (near - 0.5) * 0.15);
@@ -1229,7 +1319,9 @@ export function createScene(host, { onLost } = {}) {
     for (let i = harpoons.length - 1; i >= 0; i--) { const h = harpoons[i]; h.t -= dt; if (h.t <= 0) { scene.remove(h.m); harpoons.splice(i, 1); } }
 
     scatter.end(); cliffStrip.end(); ravStrip.end(); ridgeStrip.end();
-    renderer.render(scene, camera);
+    if (post && (post.q.ao || post.q.bloom)) { post.grade(nk, stormNear, tunK); post.render(scene, camera, view.t); }
+    else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
+    adapt(dt);
   }
 
   // décor fixe d'un tronçon (monticules, poteaux, plaques de glace, aiguilles rocheuses), calculé une fois
@@ -1274,7 +1366,7 @@ export function createScene(host, { onLost } = {}) {
       const h = hash(Math.round(d) * 31 + 7);
       if (k > 0.95 && i < CHUNK / 3 && h % 3 === 0) {
         const t = (h % 97) / 97, u = Math.abs(PX[5]) + (Math.abs(PX[6]) - Math.abs(PX[5])) * t, y = PY[5] + (PY[6] - PY[5]) * t;
-        B.at(d + 1.5, cs * u, O); put(h % 2 ? 'holiday/tree-snow-a' : 'nature/tree_pineTallD', O.x, y - 0.3, O.z, h % 6.28, 2.6 + (h % 5) * 0.3);
+        B.at(d + 1.5, cs * u, O); { const sc = 2.6 + (h % 5) * 0.3; put(h % 2 ? 'holiday/tree-snow-a' : 'nature/tree_pineTallD', O.x, y - 0.3, O.z, h % 6.28, sc, sc, sc, h, true); }
       }
     }
     cliffStrip.cut();
@@ -1341,7 +1433,7 @@ export function createScene(host, { onLost } = {}) {
       at(u, lat, O);
       if (m === '~mound') scatter.add('~mound', O.x, -0.05, O.z, O.yaw, s * 2, s * 0.5, s * 1.5);
       else if (m === '~slab') scatter.add('~slab', O.x, 0.01, O.z, O.yaw, s * 2, 1, s * 2);
-      else put(m, O.x, 0, O.z, O.yaw + rr.range(0, 6.28) * (m.includes('building') ? 0 : 1) + (m.includes('building') ? (lat > 0 ? -Math.PI / 2 : Math.PI / 2) : 0), m.includes('tree') ? rr.range(4.5, 7) / 1.95 : s);
+      else { const sc = m.includes('tree') ? rr.range(4.5, 7) / 1.95 : s; put(m, O.x, 0, O.z, O.yaw + rr.range(0, 6.28) * (m.includes('building') ? 0 : 1) + (m.includes('building') ? (lat > 0 ? -Math.PI / 2 : Math.PI / 2) : 0), sc, sc, sc, i + fk.at, false); }
     }
   }
   function drawTrackAlt(at, u0, u1) {
@@ -1357,7 +1449,10 @@ export function createScene(host, { onLost } = {}) {
   }
   // un arbre abattu tombe vers l'extérieur, puis disparaît (la souche reste, les bûches attendent au sol)
   function startFall(t) {
-    const m = kit ? kit.make(t.m, 0, 0, 0, { s: t.s }) : null; if (!m) return;
+    let m = null;
+    if (PINE_MODELS.has(t.m)) { m = pines.mesh(Math.abs(t.id) % 3); m.scale.setScalar(pineScale(t.m, t.s)); }
+    else m = kit ? kit.make(t.m, 0, 0, 0, { s: t.s }) : null;
+    if (!m) return;
     const piv = new THREE.Group(); piv.add(m); scene.add(piv);
     falls.push({ piv, t: 0, x: t.x, zw: t.zw, r: t.r, s: Math.sign(t.x) || 1 });
   }
@@ -1414,8 +1509,21 @@ export function createScene(host, { onLost } = {}) {
     driftG.visible = false; lastDrift = null; camInit = false;
   }
 
+  // qualité : si les images traînent (plus de 26 ms en moyenne pendant 3 s), on coupe l'occlusion, puis le halo, puis la définition
+  function adapt(dt) {
+    if (!(dt > 0) || dt > 0.25) return;
+    perf.ema += (dt * 1000 - perf.ema) * 0.05;
+    perf.slow = perf.ema > 26 ? perf.slow + dt : Math.max(0, perf.slow - dt * 0.5);
+    if (perf.slow < 3 || perf.step > 2) return;
+    perf.slow = 0; perf.step++;
+    if (perf.step === 1 && post) post.q.ao = false;
+    else if (perf.step === 2 && post) post.q.bloom = false;
+    else { renderer.setPixelRatio(1); resize(); }
+  }
+
   function dispose() {
     if (disposed) return; disposed = true;
+    post && post.dispose(); pines.dispose();
     ro.disconnect();
     canvas.removeEventListener('webglcontextlost', onCtxLost);
     for (const id of [...players.keys()]) dropPlayer(id);
@@ -1431,5 +1539,5 @@ export function createScene(host, { onLost } = {}) {
     canvas.remove();
   }
 
-  return { frame, resize, toScreen, groundToScreen, reset, dispose, kick: (s = 0.35) => { shake = Math.max(shake, s); }, burst, harpoon, steam: () => { steamT = 0.6; }, canvas, _dbg: { scene, camera, renderer, get B() { return B; } } };
+  return { frame, resize, toScreen, groundToScreen, reset, dispose, kick: (s = 0.35) => { shake = Math.max(shake, s); }, burst, harpoon, steam: () => { steamT = 0.6; }, canvas, _dbg: { scene, camera, renderer, post, perf, get B() { return B; } } };
 }

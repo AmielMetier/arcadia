@@ -94,7 +94,7 @@ function boot(info) {
   if (H.embedded) H.signalReady();       // après on('msg') : sinon les premiers messages de l'hôte se perdent
   if (!scene) { showNoGL(); return; }
   // décor d'attente derrière le briefing : le convoi à l'arrêt dans la tempête
-  S.idleView = { seed: 20261023, diff: S.cfg.difficulty, dist: 0, speed: 0, fuel: 70, burn: 0, t: 0, fedTotal: 0, phase: 'play', players: [], crates: [], wolves: [], flares: [],
+  S.idleView = { seed: 20261023, diff: S.cfg.difficulty, dist: 0, speed: 0, thr: 1, fuel: 70, burn: 0, t: 0, fedTotal: 0, phase: 'play', players: [], crates: [], wolves: [], flares: [],
     looted: new Set(), me: null, focus: { x: 0, z: 2 }, ev: null, gust: 0, ns: 0, mode: 'endless', goal: 0, radar: false, legs: ['plaine'], up: {}, night: 0, hooks: [], boss: null, mm: null };
   showBriefing();
   if (S.role === 'guest') { H.send('host', { t: 'hi' }); H.send('host', { t: 'role', r: S.myRole }); }
