@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini-Golf Party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* Identité : la carte de score d'un mini-golf — carton vert d'eau, encre marine, chiffres au crayon,
+     fanion rouge. Bowlby One pour les titres, Kalam (écriture manuscrite) pour les noms et les scores. */
+  :root {
+    --card: #eef5e6; --card-2: #dfeccf; --ink: #1d2b4f; --flag: #e8433b; --fair: #2e8b57; --pencil: #3f4150; --hi: #ffd84a;
+    --shadow: 0 10px 30px rgba(10, 16, 36, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1424; color: var(--ink); font-family: 'Kalam', 'Comic Sans MS', cursive; user-select: none; -webkit-user-select: none; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .hidden { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--hi); outline-offset: 2px; }
+  .disp { font-family: 'Bowlby One', Impact, sans-serif; font-weight: 400; letter-spacing: .5px; }
+
+  /* ---------------- HUD ---------------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #hud > * { pointer-events: none; }
+  #pennant { position: absolute; top: 14px; left: 16px; display: flex; align-items: flex-start; gap: 10px; }
+  #pennant .flag { position: relative; width: 86px; height: 70px; background: var(--flag); clip-path: polygon(0 0, 100% 50%, 0 100%); display: flex; align-items: center; padding-left: 12px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.25)); }
+  #pennant .flag span { font-family: 'Bowlby One', sans-serif; color: #fff; font-size: 34px; line-height: 1; }
+  #pennant .pole { position: absolute; left: -5px; top: -4px; width: 5px; height: 98px; background: #f4f1e8; border-radius: 3px; box-shadow: 1px 1px 0 rgba(0,0,0,.3); }
+  #pennant .info { background: var(--card); border-radius: 4px; padding: 6px 12px 7px; box-shadow: var(--shadow); transform: rotate(-1deg); margin-top: 4px; }
+  #hname { font-family: 'Bowlby One', sans-serif; font-size: 20px; line-height: 1.1; }
+  #pennant .meta { display: flex; gap: 10px; align-items: baseline; font-size: 15px; color: var(--pencil); }
+  #hpar { font-weight: 700; color: var(--fair); font-size: 17px; }
+  #hstroke { margin-top: 8px; display: inline-flex; align-items: center; gap: 7px; background: rgba(20, 26, 46, .62); color: #fff; padding: 3px 12px 4px 8px; border-radius: 20px; font-size: 16px; font-weight: 700; backdrop-filter: blur(4px); }
+  #hstroke:empty { display: none; }
+  #hstroke i, #turnchip i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff; }
+  #hstroke small { opacity: .7; font-weight: 400; }
+
+  #card { position: absolute; top: 14px; right: 16px; background: var(--card); border-radius: 6px; padding: 8px 10px 10px; box-shadow: var(--shadow); transform: rotate(.8deg); transform-origin: top right; transition: transform .25s; max-width: calc(100vw - 32px);
+    background-image: repeating-linear-gradient(0deg, transparent 0 25px, rgba(29,43,79,.06) 25px 26px); }
+  #card.bump { animation: bump .5s ease-out; }
+  @keyframes bump { 0% { transform: rotate(.8deg) scale(1.035); } 100% { transform: rotate(.8deg) scale(1); } }
+  #card.big { transform: rotate(0) scale(1.35); }
+  #card table { border-collapse: collapse; font-size: 16px; }
+  #card th, #card td { text-align: center; min-width: 25px; height: 25px; padding: 0 3px; }
+  #card th { font-family: 'Bowlby One', sans-serif; font-size: 12px; color: var(--ink); font-weight: 400; }
+  #card tr.par td { font-size: 13px; color: var(--fair); border-bottom: 2px solid var(--ink); }
+  #card .nm { text-align: left; min-width: 96px; max-width: 120px; padding-right: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #card th.nm { font-size: 11px; opacity: .6; }
+  #card td.nm { font-weight: 700; display: flex; align-items: center; gap: 6px; height: 27px; }
+  #card td.nm i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1.5px var(--ink); }
+  #card td.nm span { overflow: hidden; text-overflow: ellipsis; }
+  #card .cur { background: linear-gradient(transparent 12%, rgba(255, 216, 74, .55) 12% 88%, transparent 88%); }
+  #card td.sc { color: var(--pencil); font-size: 19px; font-weight: 700; line-height: 1; }
+  #card .t { border-left: 2px solid var(--ink); min-width: 44px; padding-left: 6px; }
+  #card td.t b { font-size: 19px; }
+  #card td.t small { display: block; font-size: 11px; line-height: .8; color: var(--pencil); }
+  #card tr.turn td.nm { color: var(--c); filter: brightness(.75); }
+  #card tr.turn td.nm::before { content: '▸'; color: var(--ink); margin-right: -3px; }
+  #card tr.in td.nm span::after { content: ' ✓'; color: var(--fair); }
+
+  #spec { position: absolute; top: 16px; left: 50%; transform: translate(-50%, -8px); background: rgba(20, 26, 46, .62); color: #fff; padding: 5px 16px 6px; border-radius: 20px; font-size: 17px; opacity: 0; transition: .25s; backdrop-filter: blur(4px); white-space: nowrap; }
+  #spec.show { opacity: 1; transform: translate(-50%, 0); }
+  #turnchip { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%) scale(.8); background: var(--card); padding: 10px 26px 12px 20px; border-radius: 40px; font-family: 'Bowlby One', sans-serif; font-size: 30px; display: flex; align-items: center; gap: 14px; opacity: 0; transition: .3s cubic-bezier(.3,1.5,.5,1); box-shadow: var(--shadow); }
+  #turnchip.soft { font-size: 22px; }
+  #turnchip i { width: 20px; height: 20px; box-shadow: 0 0 0 3px var(--ink); }
+  #turnchip.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #big { position: absolute; top: 40%; left: 0; right: 0; text-align: center; opacity: 0; }
+  #big .t { font-family: 'Bowlby One', sans-serif; font-size: clamp(40px, 8vw, 92px); color: var(--c); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); line-height: 1; }
+  #big .s { font-size: 24px; color: #fff; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6); margin-top: 6px; }
+  #big.show { animation: big 2.6s cubic-bezier(.2,1.3,.4,1) forwards; }
+  @keyframes big { 0% { opacity: 0; transform: scale(.4) rotate(-6deg); } 12% { opacity: 1; transform: scale(1.08) rotate(-2deg); } 20% { transform: scale(1) rotate(-2deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1) translateY(-30px) rotate(-2deg); } }
+  #intro { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; opacity: 0; color: #fff; }
+  #intro.show { animation: intro 3.6s ease forwards; }
+  #intro .n { font-family: 'Bowlby One', sans-serif; font-size: 120px; line-height: .9; color: var(--flag); -webkit-text-stroke: 5px #fff; paint-order: stroke fill; text-shadow: 0 8px 0 rgba(0,0,0,.25); }
+  #intro .nm { font-family: 'Bowlby One', sans-serif; font-size: 40px; text-shadow: 0 3px 0 var(--ink), 0 0 20px rgba(0,0,0,.4); }
+  #intro .pr { font-size: 26px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+  @keyframes intro { 0% { opacity: 0; transform: translateX(-50%) translateY(20px); } 12% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+  #power { position: absolute; left: 50%; bottom: 46px; width: min(420px, 70vw); transform: translate(-50%, 20px); opacity: 0; transition: .18s; }
+  #power.show { opacity: 1; transform: translate(-50%, 0); }
+  #power .track { height: 22px; border-radius: 12px; background: rgba(20, 26, 46, .55); border: 3px solid #fff; overflow: hidden; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  #power .fill { position: absolute; inset: 0; width: calc(var(--p, 0) * 100%); background: linear-gradient(90deg, #3fe07a, #ffd84a 55%, #ff4a3a); background-size: min(420px, 70vw) 100%; }
+  #power .ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(255,255,255,.5) calc(10% - 2px) 10%); }
+  #power b { position: absolute; right: 0; top: -34px; font-family: 'Bowlby One', sans-serif; color: #fff; font-size: 24px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+  #power span { position: absolute; left: 0; top: -28px; color: #fff; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+  #timer { position: absolute; right: 22px; bottom: 22px; width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(var(--card) calc(var(--p, 1) * 360deg), rgba(20,26,46,.55) 0); display: grid; place-items: center; box-shadow: var(--shadow); }
+  #timer::before { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--ink); }
+  #timer b { position: relative; font-family: 'Bowlby One', sans-serif; color: #fff; font-size: 22px; }
+  #timer.low { background: conic-gradient(var(--flag) calc(var(--p, 1) * 360deg), rgba(20,26,46,.55) 0); animation: pulse .5s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
+  #help { position: absolute; left: 16px; bottom: 14px; color: #fff; font-size: 15px; text-shadow: 0 1px 4px rgba(0,0,0,.8); max-width: 55vw; }
+  #tags { position: absolute; inset: 0; overflow: hidden; }
+  .tag { position: absolute; left: 0; top: 0; padding: 1px 10px 2px; border-radius: 12px; background: rgba(16, 20, 36, .42); border-left: 4px solid var(--c); color: rgba(255,255,255,.92); font-weight: 700; font-size: 15px; white-space: nowrap; opacity: .82; transform-origin: 50% 100%; backdrop-filter: blur(2px); }
+  .tag.turn { background: rgba(16, 20, 36, .6); opacity: 1; }
+  #menubtn { pointer-events: auto !important; position: absolute; right: 18px; bottom: 98px; width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(20, 26, 46, .55); color: #fff; font-size: 22px; backdrop-filter: blur(4px); }
+  #lockhint { pointer-events: auto !important; position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(20, 26, 46, .7); color: #fff; padding: 6px 16px; border-radius: 16px; font-size: 15px; border: none; }
+  #summary { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -40%) rotate(-1deg); background: var(--card); padding: 16px 22px 12px; border-radius: 8px; box-shadow: var(--shadow); min-width: 300px; opacity: 0; transition: .4s; }
+  #summary.show { opacity: 1; transform: translate(-50%, -50%) rotate(-1deg); }
+  #summary h3 { margin: 0 0 8px; font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 22px; }
+  #summary .row { display: grid; grid-template-columns: 14px 1fr 40px 120px; align-items: center; gap: 10px; font-size: 19px; padding: 2px 0; border-bottom: 1px dashed rgba(29,43,79,.25); }
+  #summary .row i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1.5px var(--ink); }
+  #summary .s { font-family: 'Bowlby One', sans-serif; text-align: center; }
+  #summary .l { color: var(--fair); font-weight: 700; }
+  #summary p { margin: 8px 0 0; color: var(--pencil); font-size: 14px; }
+  #toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 6px 18px; border-radius: 18px; opacity: 0; transition: .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+
+  /* ---------------- écrans ---------------- */
+  .screen { position: fixed; inset: 0; overflow: auto; }
+  #lobby { background: radial-gradient(ellipse at 50% 120%, rgba(13,20,36,.15), rgba(13,20,36,.72)); display: flex; flex-direction: column; align-items: center; padding: 18px 18px 26px; gap: 14px; }
+  .logo { position: relative; display: flex; align-items: center; gap: 0; color: #fff; }
+  .logo .p { width: 8px; height: 96px; background: #f4f1e8; border-radius: 4px; margin-right: -2px; align-self: flex-start; box-shadow: 2px 2px 0 rgba(0,0,0,.3); }
+  .logo .f { background: var(--flag); clip-path: polygon(0 0, 100% 50%, 0 100%); padding: 8px 110px 8px 18px; align-self: flex-start; }
+  .logo .f span { display: block; font-family: 'Bowlby One', sans-serif; font-size: 36px; line-height: .95; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.2); }
+  .logo .sub { position: absolute; left: 22px; top: 98px; font-size: 18px; white-space: nowrap; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+  #cards { display: grid; grid-template-columns: repeat(4, minmax(0, 210px)); gap: 18px; margin-top: 26px; }
+  .card { position: relative; background: #fff; border: none; border-radius: 4px; padding: 8px 8px 10px; text-align: left; box-shadow: var(--shadow); transition: transform .2s; }
+  .card:nth-child(odd) { transform: rotate(-1.6deg); } .card:nth-child(even) { transform: rotate(1.4deg); }
+  .card:not([disabled]):hover { transform: rotate(0) translateY(-4px); }
+  .card.sel { transform: rotate(0) translateY(-8px) scale(1.03); box-shadow: 0 0 0 4px var(--hi), var(--shadow); }
+  .card.sel::after { content: 'Choisi'; position: absolute; right: 10px; top: 10px; font-family: 'Bowlby One', sans-serif; color: var(--flag); border: 3px solid var(--flag); padding: 0 8px; border-radius: 6px; transform: rotate(10deg); background: rgba(255,255,255,.85); font-size: 15px; }
+  .card[disabled] { cursor: default; }
+  .card .art svg { display: block; width: 100%; height: auto; border-radius: 2px; }
+  .card .txt { padding: 8px 4px 0; display: flex; flex-direction: column; gap: 2px; }
+  .card b { font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 19px; line-height: 1.1; }
+  .card span { font-size: 15px; color: var(--pencil); line-height: 1.2; }
+  .card .diff { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-style: normal; }
+  .card .diff em { width: 14px; height: 11px; background: #cfd5c4; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .card .diff em.on { background: var(--flag); }
+  .card .diff small { margin-left: 4px; font-size: 14px; color: var(--pencil); }
+  .panel { background: var(--card); border-radius: 6px; box-shadow: var(--shadow); padding: 14px 18px; background-image: repeating-linear-gradient(0deg, transparent 0 29px, rgba(29,43,79,.06) 29px 30px); }
+  .lbrow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; width: min(940px, 100%); }
+  .opt { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; font-size: 18px; font-weight: 700; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: rgba(29,43,79,.08); border-radius: 18px; padding: 3px; gap: 2px; }
+  .seg button { border: none; background: transparent; border-radius: 15px; padding: 2px 12px 3px; font-size: 16px; font-weight: 700; color: var(--pencil); }
+  .seg button.sel { background: var(--ink); color: #fff; }
+  .seg button[disabled] { cursor: default; }
+  .panel h2 { margin: 0 0 6px; font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 20px; }
+  #lbplayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 19px; font-weight: 700; }
+  #lbplayers li { display: flex; align-items: center; gap: 8px; }
+  #lbplayers i { width: 14px; height: 14px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--ink); }
+  #lbplayers small { font-weight: 400; color: var(--pencil); font-size: 14px; }
+  .ctrls { font-size: 15px; color: var(--pencil); margin-top: 10px; line-height: 1.35; }
+  .ctrls b { color: var(--ink); }
+  .actions { display: flex; gap: 12px; align-items: center; }
+  .btn { border: none; border-radius: 30px; padding: 10px 26px 12px; font-family: 'Bowlby One', sans-serif; font-size: 20px; background: var(--flag); color: #fff; box-shadow: 0 5px 0 #a8241e, var(--shadow); transition: transform .1s; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8241e; }
+  .btn.alt { background: var(--card); color: var(--ink); box-shadow: 0 5px 0 #b9c7a8, var(--shadow); }
+  #lbwait, #reswait { color: #fff; font-size: 19px; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+  #results { background: rgba(13,20,36,.6); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px 16px; }
+  #results h1 { margin: 0; font-family: 'Bowlby One', sans-serif; font-weight: 400; color: #fff; font-size: 40px; text-shadow: 0 4px 0 var(--ink); }
+  #podium { display: flex; align-items: flex-end; gap: 10px; }
+  .pod { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .pod .who { color: #fff; font-weight: 700; font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+  .pod .blk { width: 130px; background: var(--card); border-top: 8px solid var(--c); border-radius: 6px 6px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 8px; box-shadow: var(--shadow); }
+  .pod.p1 .blk { height: 150px; } .pod.p2 .blk { height: 112px; } .pod.p3 .blk { height: 86px; }
+  .pod.p1 { order: 2; } .pod.p2 { order: 1; } .pod.p3 { order: 3; }
+  .pod b { font-family: 'Bowlby One', sans-serif; font-size: 38px; line-height: 1; }
+  .pod span { font-weight: 700; } .pod small { color: var(--pencil); }
+  #resultcard table { border-collapse: collapse; font-size: 18px; }
+  #resultcard th, #resultcard td { text-align: center; min-width: 32px; height: 30px; padding: 0 4px; }
+  #resultcard th { font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 13px; }
+  #resultcard .nm { text-align: left; min-width: 130px; }
+  #resultcard td.nm { display: flex; align-items: center; gap: 7px; font-weight: 700; }
+  #resultcard td.nm i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1.5px var(--ink); }
+  #resultcard tr.par td { color: var(--fair); border-bottom: 2px solid var(--ink); font-size: 14px; }
+  #resultcard td.sc { font-weight: 700; font-size: 20px; color: var(--pencil); }
+  #resultcard td.under { color: var(--fair); } #resultcard td.over { color: #b8423a; }
+  #resultcard td.ace { color: #fff; background: radial-gradient(circle, var(--fair) 55%, transparent 58%); }
+  #resultcard .t { border-left: 2px solid var(--ink); min-width: 60px; }
+  #menu { position: fixed; inset: 0; background: rgba(13,20,36,.5); display: grid; place-items: center; }
+  #menu .panel { display: flex; flex-direction: column; gap: 10px; min-width: 300px; transform: rotate(-1deg); }
+  #menu .panel button { border: none; background: rgba(29,43,79,.08); border-radius: 10px; padding: 8px 14px; font-size: 19px; font-weight: 700; text-align: left; }
+  #menu .panel button:hover { background: rgba(29,43,79,.16); }
+  #menu .panel .btn { text-align: center; }
+  #menu .keys { font-size: 14px; color: var(--pencil); line-height: 1.4; }
+  #loading { position: fixed; inset: 0; background: #0d1424; display: grid; place-items: center; color: #fff; font-size: 22px; z-index: 5; }
+  #loading div { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #loading .ball { width: 26px; height: 26px; border-radius: 50%; background: #fff; animation: roll 1s ease-in-out infinite alternate; box-shadow: 0 10px 12px -6px rgba(0,0,0,.6); }
+  @keyframes roll { from { transform: translateX(-60px); } to { transform: translateX(60px); } }
+  #loading b { font-family: 'Bowlby One', sans-serif; font-weight: 400; }
+
+  @media (max-width: 980px) { #cards { grid-template-columns: repeat(2, minmax(0, 220px)); } .lbrow { grid-template-columns: 1fr; } }
+  @media (max-width: 1000px) { #spec { top: auto; bottom: 86px; } }
+  @media (max-width: 700px) {
+    #card { transform: rotate(0) scale(.78); } #card.big { transform: scale(1); }
+    #help { display: none; } #pennant .flag { width: 64px; height: 54px; } #pennant .flag span { font-size: 26px; } #pennant .pole { height: 78px; }
+    .logo .f span { font-size: 30px; } #summary { min-width: 0; width: calc(100vw - 32px); }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+<!-- Pont avec le Game Hub (salon, réseau). Absent = mode solo. -->
+<script src="../shared/bridge.js"></script>
+<script type="importmap">
+  { "imports": { "three": "../shared/vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud" class="hidden">
+  <div id="pennant">
+    <div class="flag"><div class="pole"></div><span id="hnum">1</span></div>
+    <div>
+      <div class="info"><div id="hname">—</div><div class="meta"><span id="hpar">Par 2</span><span id="hcourse"></span></div></div>
+      <div id="hstroke"></div>
+    </div>
+  </div>
+  <div id="card" aria-label="Carte de score"></div>
+  <div id="spec"></div>
+  <div id="tags"></div>
+  <div id="turnchip"></div>
+  <div id="intro"></div>
+  <div id="big"></div>
+  <div id="summary"></div>
+  <div id="power"><span>Puissance</span><b>0 %</b><div class="track"><div class="fill"></div><div class="ticks"></div></div></div>
+  <div id="timer" class="hidden"><b>45</b></div>
+  <div id="help"></div>
+  <button id="menubtn" title="Menu (Échap)" aria-label="Menu">≡</button>
+  <button id="lockhint" class="hidden">Clique dans le jeu pour piloter la caméra à la souris</button>
+</div>
+
+<div id="lobby" class="screen hidden">
+  <div class="logo"><div class="p"></div><div class="f"><span>MINI-GOLF</span><span>PARTY</span></div><div class="sub">Mini-golf entre potes, chacun son tour</div></div>
+  <div id="cards"></div>
+  <div class="lbrow">
+    <div class="panel"><h2>Règles de la partie</h2><div id="opts"></div></div>
+    <div class="panel"><h2>Joueurs</h2><ul id="lbplayers"></ul>
+      <div class="ctrls"><b>Souris :</b> bouger = caméra · molette = zoom · maintenir un clic (gauche ou droit) et reculer = puissance, relâcher = tirer.<br>
+      <b>Trackpad :</b> glisser sans appuyer = caméra · cliquer, glisser vers soi puis relâcher = tirer. <b>Espace</b> maintenu marche aussi.</div></div>
+  </div>
+  <div class="actions"><button class="btn alt" id="lbquit">Quitter</button><button class="btn" id="lbstart">Lancer la partie</button><span id="lbwait" class="hidden">L'hôte choisit le parcours…</span></div>
+</div>
+
+<div id="results" class="screen hidden">
+  <h1>Fin du parcours</h1>
+  <div id="podium"></div>
+  <div class="panel" id="resultcard"></div>
+  <div class="actions"><button class="btn alt" id="resquit">Quitter</button><button class="btn" id="resagain">Rejouer</button><span id="reswait" class="hidden">L'hôte va relancer une partie…</span></div>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="panel">
+    <h2 style="margin:0;font-family:'Bowlby One';font-weight:400">Pause</h2>
+    <button id="mresume" class="btn">Reprendre</button>
+    <button id="mqual">Graphismes</button>
+    <button id="msens">Sensibilité caméra</button>
+    <button id="msound">Son</button>
+    <button id="mquit">Quitter la partie</button>
+    <div class="keys">V : vue d'ensemble du trou · Tab : agrandir la carte · M : couper le son · flèches : caméra</div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="loading" class="hidden"><div><div class="ball"></div>Construction du parcours<b>…</b></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
