@@ -5,7 +5,8 @@
 // (l'herbe en 3D est dans grass.js)
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { makeRng } from '../engine/rng.js';
-import { leafTexture, needleTexture, barkTexture, frondTexture, palmBarkTexture, shadeTexture } from './textures.js';
+import { leafTexture, needleTexture, barkTexture, frondTexture, palmBarkTexture, shadeTexture, cactusTexture } from './textures.js';
+import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 
 // temps et vent partagés par tous les feuillages (le feuillage se balance)
 export const SWAY = { uT: { value: 0 }, uWind: { value: 0.3 } };
@@ -131,6 +132,32 @@ function palmGeo(seed, { height = 8, lean = 1.6, fronds = 10 } = {}) {
   return { trunk, crown };
 }
 
+// cactus (saguaro) : un tronc à côtes et un à trois bras qui partent de côté puis remontent ; ~5 m de haut
+function cactusGeo(seed) {
+  const r = makeRng(seed), parts = [];
+  const tube = (rad, h, x, y, z, rz = 0, ry = 0) => {
+    const g = new THREE.CylinderGeometry(rad * 0.92, rad, h, 12, 1, true);
+    g.translate(0, h / 2, 0); if (rz) g.rotateZ(rz); if (ry) g.rotateY(ry); g.translate(x, y, z); parts.push(g);
+  };
+  const cap = (rad, x, y, z) => { const g = new THREE.SphereGeometry(rad, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(x, y, z); parts.push(g); };
+  const elbow = (rad, x, y, z) => { const g = new THREE.SphereGeometry(rad, 12, 8); g.translate(x, y, z); parts.push(g); };
+  const H = r.range(4.2, 5.4), R = 0.42;
+  tube(R, H, 0, -0.2, 0); cap(R * 0.92, 0, H - 0.2, 0);
+  const arms = 1 + Math.floor(r.next() * 3);
+  for (let i = 0; i < arms; i++) {
+    const a = r.range(0, Math.PI * 2) + i * 2.1, y0 = r.range(1.6, 2.8), out = r.range(0.7, 1.1), up = r.range(1.0, 2.0), ar = R * 0.72;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    // bras horizontal (couché vers l'extérieur), coude, puis la partie qui remonte
+    const g = new THREE.CylinderGeometry(ar, ar, out, 10, 1, true); g.rotateZ(Math.PI / 2); g.translate(out / 2, 0, 0); g.rotateY(-a); g.translate(0, y0, 0); parts.push(g);
+    elbow(ar, dx * out, y0, dz * out);
+    tube(ar, up, dx * out, y0, dz * out); cap(ar * 0.92, dx * out, y0 + up, dz * out);
+  }
+  const geo = mergeGeometries(parts.map((p) => p.toNonIndexed()));
+  for (const p of parts) p.dispose();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 function trunkGeo(h, r0) {
   const g = new THREE.CylinderGeometry(r0 * 0.6, r0, h, 9, 1, true).translate(0, h / 2, 0);
   const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * h / 2);
@@ -159,14 +186,16 @@ function foliageMaterial(map) {
 
 const LEAF_TINTS = [0xf2f2e6, 0xdfe8cc, 0xcad8b4, 0xe8eed4, 0xbccca4, 0xd8d0b0];
 const PINE_TINTS = [0xd4e2d8, 0xb8ccbe, 0xa8bfb2, 0xc6d8cc];
+const CACTUS_TINTS = [0xffffff, 0xe6eed2, 0xd6e2c0, 0xf2f0d8];
 
 // ------------------------------------------------------------------ assemblage
 export function createTreeKit() {
   const leaves = leafTexture(256, 5), leaves2 = leafTexture(256, 17), needles = needleTexture(256, 9), bark = barkTexture();
-  const frond = frondTexture(), palmBark = palmBarkTexture(), shade = shadeTexture();
+  const frond = frondTexture(), palmBark = palmBarkTexture(), shade = shadeTexture(), cactus = cactusTexture();
   const mats = {
     leaf: foliageMaterial(leaves), leaf2: foliageMaterial(leaves2), pine: foliageMaterial(needles), frond: foliageMaterial(frond),
     bark: new THREE.MeshStandardMaterial({ map: bark, roughness: 0.95 }), palmBark: new THREE.MeshStandardMaterial({ map: palmBark, roughness: 0.9 }),
+    cactus: new THREE.MeshStandardMaterial({ map: cactus, roughness: 0.75 }),
     shade: new THREE.MeshBasicMaterial({ color: 0x0c2a06, alphaMap: shade, transparent: true, opacity: 0.42, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
   };
   const palmA = palmGeo(51), palmB = palmGeo(77, { height: 9.5, lean: 2.4, fronds: 11 });
@@ -177,13 +206,14 @@ export function createTreeKit() {
     trunkRound: trunkGeo(5.2, 0.32), trunkOak: trunkGeo(4.8, 0.42), trunkPine: trunkGeo(11, 0.3),
     palmA: palmA.crown, palmB: palmB.crown, palmTrunkA: palmA.trunk, palmTrunkB: palmB.trunk,
     shade: new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2),
+    cactusA: cactusGeo(3), cactusB: cactusGeo(19),
   };
-  const textures = [leaves, leaves2, needles, bark, frond, palmBark, shade];
+  const textures = [leaves, leaves2, needles, bark, frond, palmBark, shade, cactus];
 
   // instances : items = [{ x, y, z, s, rot, kind, v }]
   function plant(items, { lo = false, shadows = true, dark = false } = {}) {
     const group = new THREE.Group();
-    const byKind = { round: [], oak: [], pine: [], palm: [] };
+    const byKind = { round: [], oak: [], pine: [], palm: [], cactus: [] };
     for (const it of items) (byKind[it.kind] || byKind.round).push(it);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
     const add = (geo, mat, list, tints, isFoliage) => {
@@ -208,6 +238,8 @@ export function createTreeKit() {
       add(geos.pine, mats.pine, pinesA, PINE_TINTS, true);
       add(geos.pineB, mats.pine, pinesB, PINE_TINTS, true);
     }
+    const cactiA = byKind.cactus.filter((t) => !(t.v & 1)), cactiB = byKind.cactus.filter((t) => t.v & 1);
+    add(geos.cactusA, mats.cactus, cactiA, CACTUS_TINTS, true); add(geos.cactusB, mats.cactus, cactiB, CACTUS_TINTS, true);
     const palmsA = byKind.palm.filter((t) => !(t.v & 1)), palmsB = byKind.palm.filter((t) => t.v & 1);
     add(geos.palmA, mats.frond, palmsA, LEAF_TINTS, true); add(geos.palmB, mats.frond, palmsB, LEAF_TINTS, true);
     add(geos.palmTrunkA, mats.palmBark, palmsA, null, false); add(geos.palmTrunkB, mats.palmBark, palmsB, null, false);
@@ -238,19 +270,20 @@ export function createTreeKit() {
 export function forestItems(hole, { count = 1700 } = {}) {
   const r = makeRng(hole.def.seed * 41 + 7), items = [];
   const B = hole.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
-  const near = hole.valley + 100;
+  const near = 90;
   // densité en taches : forêts et clairières
   const dens = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.013 + 1.7) * Math.cos(z * 0.011 - 0.6) + 0.3 * Math.sin((x + z) * 0.029);
   let tries = 0;
   while (items.length < count && tries++ < count * 12) {
     const a = r.range(0, Math.PI * 2), d = r.range(0, 720);
     const x = cx + Math.sin(a) * d * 1.1, z = cz + Math.cos(a) * d * 1.25;
-    const cd = hole.centerDist(x, z);
-    if (cd < near || r.next() > dens(x, z)) continue;
+    if (-hole.landSD(x, z) < near || r.next() > dens(x, z)) continue;
     if (hole.waters.some((w) => Math.hypot(x - w.x, z - w.z) < Math.max(w.rx, w.rz) * 1.6)) continue;
     if (hole.coast && hole.heightAt(x, z) < hole.coast.level + 2.5) continue;
     // essences selon le décor : sapins en montagne, palmiers et feuillus au bord de la mer
-    const kind = hole.theme === 'montagne' ? (r.chance(0.88) ? 'pine' : 'round') : hole.theme === 'mer' ? r.pick(['palm', 'palm', 'round', 'oak']) : (r.chance(0.62) ? 'pine' : r.chance(0.5) ? 'round' : 'oak');
+    // (au désert : des cactus clairsemés, et quelques palmiers)
+    if (hole.theme === 'desert' && r.next() < 0.82) continue;
+    const kind = hole.theme === 'montagne' ? (r.chance(0.88) ? 'pine' : 'round') : hole.theme === 'mer' ? r.pick(['palm', 'palm', 'round', 'oak']) : hole.theme === 'desert' ? (r.chance(0.92) ? 'cactus' : 'palm') : (r.chance(0.62) ? 'pine' : r.chance(0.5) ? 'round' : 'oak');
     items.push({ x, z, y: hole.heightAt(x, z), kind, s: r.range(0.9, 1.45), rot: r.range(0, 6.283), v: r.int(0, 7) });
   }
   return items;

@@ -90,16 +90,21 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
 - Décor et icônes : modèles 3D et pictogrammes de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/` et `convoy/img/icons/`
 
 ## Birdie Party
-Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots (facile, moyen, difficile).
-- 18 trous originaux dans trois décors : campagne (étangs, ruisseau, chênes), bord de mer (plages, baies, palmiers) et montagne (falaises, torrents au fond des ravins, sommets enneigés)
-- Parties de 6 trous (un décor), 9 trous (aller ou retour) ou 18 trous ; carte de score entre les trous, podium à la fin
+Golf en 3D (Three.js), seul ou jusqu'à 6 joueurs chacun son tour ou en équipes, avec des bots (facile, moyen, difficile).
+- 30 trous originaux dans quatre décors : campagne (étangs, ruisseaux, chênes), bord de mer (îles, baies, lagune, palmiers), montagne (torrents, ravins, lacs alpins, lacets, sommets enneigés) et désert (oasis, canyon, mesas, cactus)
+- Chaque trou a sa forme : le terrain suit la ligne de jeu, au bord ondulé, bordé d'arbres, de forêt (hors-limites) ou d'eau ; îles, chaussées et passages à porter sont décrits dans `golf/engine/course.js`
+- Parties d'un décor (8 trous, 6 au désert), de 9 trous (aller ou retour), de 18 ou de 30 trous ; carte de score entre les trous, podium à la fin
+- Équipes en 2 contre 2 ou 3 contre 3 (scramble : on garde la meilleure balle de l'équipe), complétées par des bots
+- Jour, crépuscule ou soir (étoiles et clair de lune)
 - Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer et on relâche pour frapper ; tirer de travers fait un hook ou un slice, trop armer fait tourner la balle. Au clavier : Espace
-- Huit clubs (driver depuis le départ seulement), vent par trou, rough, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
-- Cible du coup plein sans le vent et grille animée de la pente sur le green, mini-carte en vue aérienne (rendue depuis la scène 3D)
+- Huit clubs (driver depuis le départ seulement), vent par trou, rough, sable dur au désert, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
+- Cible du coup plein sans le vent et grille animée de la pente sur le green ; ralenti des beaux coups
+- Mini-carte en vue aérienne (rendue depuis la scène 3D), zoomable (molette, Z) et déplaçable, ou en relief (R) : teintes d'altitude, estompage, courbes de niveau, courbes de 15 cm sur le green
+- Écran d'accueil : survol des trous en fond, cartes des parcours en photo, musique du menu (« Sunny Side Up » d'Alex McCulloch, CC0, dans `golf/music/`)
 - Rendu : herbe en 3D autour de la caméra, reflets dans l'eau, occlusion ambiante, halo et étalonnage ; si la machine peine, la résolution puis les effets baissent tout seuls
 - On voit le swing des autres en direct ; le plus loin du drapeau joue en premier, l'honneur au meilleur du trou précédent
-- Ambiance nature, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
-- Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, terrain, eau et ciel générés dans le code
+- Ambiance nature par décor, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
+- Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, cactus, terrain, eau et ciel générés dans le code
 
 ## Mini-Golf Party
 Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 joueurs (bots facile, normal, expert).

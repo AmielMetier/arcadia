@@ -177,15 +177,17 @@ window.HUB_GAMES = [
     id: 'golf',
     title: 'Birdie Party',
     tag: 'Golf 3D entre potes',
-    desc: 'Dix-huit trous en campagne, au bord de la mer et en montagne. Un geste pour armer, un geste pour frapper : gare au vent, aux bunkers et à l\'eau. Chacun son tour, avec des bots.',
+    desc: 'Trente trous en campagne, au bord de la mer, en montagne et au désert. Un geste pour armer, un geste pour frapper : gare au vent, aux bunkers et à l\'eau. Chacun son tour ou en équipes, avec des bots.',
     url: 'golf/',
-    minPlayers: 1, maxPlayers: 4,
+    minPlayers: 1, maxPlayers: 6,
     accent: '#5cc425',
     settings: [
-      { key: 'course', label: 'Parcours', options: [['campagne', 'Campagne · 6 trous'], ['mer', 'Bord de mer · 6 trous'], ['montagne', 'Montagne · 6 trous'], ['aller', 'Aller · 9 trous'], ['retour', 'Retour · 9 trous'], ['complet', 'Grand tour · 18 trous']], def: 'campagne' },
+      { key: 'course', label: 'Parcours', options: [['campagne', 'Campagne · 8 trous'], ['mer', 'Bord de mer · 8 trous'], ['montagne', 'Montagne · 8 trous'], ['desert', 'Désert · 6 trous'], ['aller', 'Aller · 9 trous'], ['retour', 'Retour · 9 trous'], ['complet', 'Grand tour · 18 trous'], ['tour', 'Les quatre décors · 30 trous']], def: 'campagne' },
+      { key: 'teams', label: 'Équipes', options: [['solo', 'Chacun pour soi'], ['2v2', '2 contre 2'], ['3v3', '3 contre 3']], def: 'solo' },
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'wind', label: 'Vent', options: [['calme', 'Calme'], ['normal', 'Normal'], ['fort', 'Fort']], def: 'normal' },
+      { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
     ],
     // affiche : rendu du jeu (golf/img/affiche.jpg)
     cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

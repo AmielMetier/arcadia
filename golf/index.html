@@ -30,24 +30,41 @@
     <div class="wband"><b id="windTxt">0 m/s</b></div>
     <div class="wtile"><div class="arrow" id="windArrow"><i></i></div><span>Vent</span></div>
   </div>
-  <div class="tbtns"><button class="round" id="btnView" title="Vue d'ensemble (V)">🗺️</button><button class="round" id="btnMute" title="Son (M)">🔊</button><button class="round" id="btnLeave" title="Quitter la partie">✕</button></div>
+  <div class="tbtns">
+    <button class="ico" id="btnView" aria-label="Vue d'ensemble" title="Vue d'ensemble (V)" data-icon="map"></button>
+    <button class="ico" id="btnMute" aria-label="Son" title="Son (M)" data-icon="soundOn"></button>
+    <button class="ico" id="btnLeave" aria-label="Quitter la partie" title="Quitter la partie" data-icon="exit"></button>
+  </div>
 
   <div class="clubbox" id="clubBox">
     <div class="band"></div>
-    <button class="arrowbtn" id="clubPrev" title="Club plus long (↑)">◀</button>
+    <button class="ico sm" id="clubPrev" aria-label="Club plus long" title="Club plus long (↑)" data-icon="chevL"></button>
     <div class="cicon" id="clubIcon"></div>
     <div class="club"><b id="clubName">Driver</b><span><i id="clubShort">1W</i> <em id="clubDist">230 m</em></span></div>
-    <button class="arrowbtn" id="clubNext" title="Club plus court (↓)">▶</button>
+    <button class="ico sm" id="clubNext" aria-label="Club plus court" title="Club plus court (↓)" data-icon="chevR"></button>
   </div>
 
   <div class="gauge" id="gauge" hidden><div class="tube"><i class="fill" id="gaugeFill"></i><i class="dot d1"></i><i class="dot d2"></i><i class="full"></i></div><b class="diamond"></b><span id="gaugeTxt">0 %</span></div>
-  <div class="mapframe"><canvas class="minimap" id="minimap" width="170" height="250"></canvas></div>
+  <div class="mapframe">
+    <canvas class="minimap" id="minimap" width="170" height="250" aria-label="Carte du trou"></canvas>
+    <div class="mapctl">
+      <button class="ico sm" id="mapIn" aria-label="Zoomer sur la carte" title="Zoomer (molette ou Z)" data-icon="plus"></button>
+      <button class="ico sm" id="mapOut" aria-label="Dézoomer la carte" title="Dézoomer" data-icon="minus"></button>
+      <button class="ico sm" id="mapRelief" aria-pressed="false" aria-label="Carte en relief" title="Relief (R)" data-icon="relief"></button>
+    </div>
+    <div class="maplegend" id="mapLegend" hidden></div>
+  </div>
   <div class="pintag" id="pinTag" hidden><b id="pinTxt">0 m</b><i></i></div>
-  <div class="aimpad" id="aimPad"><button class="round big" id="aimL" title="Viser à gauche (←)">⟲</button><div class="hint" id="hint">Tire vers le bas pour armer, relâche pour frapper</div><button class="round big" id="aimR" title="Viser à droite (→)">⟳</button></div>
+  <div class="aimpad" id="aimPad">
+    <button class="ico lg" id="aimL" aria-label="Viser à gauche" title="Viser à gauche (←)" data-icon="rotL"></button>
+    <div class="hint" id="hint">Tire vers le bas pour armer, relâche pour frapper</div>
+    <button class="ico lg" id="aimR" aria-label="Viser à droite" title="Viser à droite (→)" data-icon="rotR"></button>
+  </div>
   <div class="banner" id="banner" hidden></div>
   <div class="toast" id="toast" hidden></div>
 </div>
 
+<div class="replay" aria-hidden="true"><b>Ralenti</b><span>Clique pour passer</span></div>
 <div id="fade" class="fade"></div>
 <div id="screen" class="screen"></div>
 
