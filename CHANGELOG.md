@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.78 — 26 octobre 2026
+- **Hub** — Plus de fausse « Connexion perdue » au lancement d'une partie : quand l'ordinateur rame quelques secondes (un jeu qui prépare son décor, une machine plus lente), ce n'est plus pris pour une coupure du réseau.
+
 ## 2.77 — 26 octobre 2026
 - **Tête de Calcul** — The Candidate : nouvelles épreuves de réflexion.
   - Raisonnement abstrait : une grille de 3 × 3 motifs dont la dernière case manque. On choisit parmi quatre cases dessinées ; la forme, le nombre et le remplissage suivent chacun leur règle.
