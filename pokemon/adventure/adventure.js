@@ -52,8 +52,8 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   if (isSolid(mapGrids[currentMapId], player.x, player.y)) {
     currentMapId = 'outdoor';
     player.mapId = 'outdoor';
-    player.x = 6;
-    player.y = 9;
+    player.x = 28;
+    player.y = 94;
     player.dir = 'up';
   }
 
@@ -254,8 +254,8 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   function getActiveQuest() {
     if (!player.hasStarter) {
       return currentMapId === 'lab'
-        ? 'Objectif : Examiner les Poké Balls sur la table [E]'
-        : 'Objectif : Entrer dans le Laboratoire au Nord (6,8)';
+        ? 'Objectif : Examiner les Poké Balls sur la table [ESPACE]'
+        : 'Objectif : Entrer dans le Laboratoire (28,93)';
     }
     const defCount = (player.defeatedTrainers || []).length;
     if (defCount < 2) {
@@ -264,20 +264,19 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     if (!(player.badges || []).includes('citron_dor')) {
       return currentMapId === 'gym'
         ? 'Objectif : Défier la Championne Solène au fond de l\'Arène !'
-        : 'Objectif : Entrer dans l\'Arène de Menton au Nord-Est (38,5)';
+        : 'Objectif : Entrer dans l\'Arène de Jadielle au Nord (36,10)';
     }
     const caughtCount = (player.pokedex && player.pokedex.caught && player.pokedex.caught.length) || 0;
-    return `Maître de Menton • Pokédex : ${caughtCount}/28 espèces`;
+    return `Maître Pokémon • Pokédex : ${caughtCount}/28 espèces`;
   }
 
   function getZoneTitle() {
     if (currentMapId !== 'outdoor') {
       return MAPS[currentMapId]?.name || 'Intérieur';
     }
-    if (player.y > 23) return 'Plage des Sablettes (Bord de mer)';
-    if (player.x >= 34 && player.y <= 8) return 'Parvis de l\'Arène de Menton';
-    if (player.x > 22) return 'Route 1 Corniche (Hautes herbes)';
-    return 'Menton - La Cité des Citrons';
+    if (player.y >= 80) return 'Bourg-Palette (Village de Départ)';
+    if (player.y <= 39) return 'Cité de Jadielle (Centre • Boutique • Arène)';
+    return 'Route 1 (Sentier des Hautes Herbes)';
   }
 
   // --- TÉLÉPORTATION ENTRE EXTÉRIEUR ET INTÉRIEURS DE BÂTIMENTS ---
@@ -500,7 +499,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     if (!player.hasStarter) {
       showDialogue(
         'Professeur Platane',
-        'Attends ! Ne va pas dans les hautes herbes sans Pokémon !\nEntre d\'abord dans mon Laboratoire au Nord-Ouest (porte en 6,8) pour choisir ton Starter !',
+        'Attends ! Ne va pas dans les hautes herbes sans Pokémon !\nEntre d\'abord dans mon Laboratoire au Village (porte en 9,43) pour choisir ton Starter !',
         null,
         'assets/trainers/sycamore.png'
       );
@@ -1192,6 +1191,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     destroy: () => {
       destroyed = true;
       if (rafId) cancelAnimationFrame(rafId);
+      if (renderer && typeof renderer.destroy === 'function') renderer.destroy();
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);

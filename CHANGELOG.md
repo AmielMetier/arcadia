@@ -1,21 +1,54 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.70 — 26 octobre 2026
+- **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
+  - Tous les trous sont redessinés, chacun avec sa forme : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Le terrain est bordé d'arbres, puis de forêt ou d'eau.
+  - 8 trous en campagne, 8 au bord de mer, 8 en montagne, et un nouveau décor : le désert (6 trous), avec son oasis, son canyon, ses mesas, ses cactus et son sable dur. On peut aussi enchaîner les 30.
+  - Parties en équipes, 2 contre 2 ou 3 contre 3 : chacun joue depuis la balle de l'équipe et on garde la meilleure. Les bots complètent les équipes, jusqu'à 6 joueurs.
+  - On peut jouer en plein jour, au crépuscule ou le soir sous les étoiles.
+  - Les beaux coups repassent au ralenti : trou en un, chip rentré, long putt, approche collée au drapeau (un clic pour passer).
+  - Nouvel écran d'accueil : on survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
+  - La mini-carte se zoome (molette ou Z) et se fait glisser ; le bouton relief (ou R) montre les altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
+  - Interface refaite : boutons et icônes plus nets, carte de score et podium plus clairs (médailles, symboles birdie et bogey), mise en page revue sur téléphone.
+  - Les bots évitent mieux l'eau et la forêt et dosent mieux leurs approches.
+
+## 2.69 — 26 octobre 2026
+- Nouveau : integrate real Tiled Kanto open-world maps (Bourg-Palette, Route 1, Jadielle), 4 interiors & 4-dir walking spritesheets in PhaserJS (Amiel)
+
+## 2.68 — 26 octobre 2026
+- Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
+
+## 2.67 — 26 octobre 2026
+- **Mini-Golf Party** — Nouveau jeu : mini-golf en 3D façon Golf It, seul ou jusqu'à 6 joueurs, avec des bots si besoin (facile, normal, expert).
+  - Chacun son tour : quand la balle s'arrête, le coup est compté et la caméra passe sur la balle du joueur suivant. Le pseudo de chaque joueur flotte au-dessus de sa balle.
+  - La carte de score reste affichée sur le côté et se met à jour à chaque coup (par, total, écart au par).
+  - Une vraie physique : la balle roule, accélère dans les descentes, rebondit sur les murets, monte les loopings, saute sur les tremplins, et un coup trop fort peut ressortir du trou ou finir hors du terrain (+1 coup, retour à la position d'avant).
+  - 4 parcours de 6 trous : Green Park (le mini-golf classique, avec son moulin), l'Île aux Pirates (pontons au coucher du soleil, kraken, navire, cascade), le Jardin Zen (lanternes, pont rouge, entonnoir, bambous qui tournent) et la Forge Infernale (difficile : lave, pistons, tapis roulants, double looping, marteaux).
+  - Souris : bouger pour tourner la caméra, molette pour zoomer, maintenir un clic et reculer pour doser la puissance, relâcher pour tirer. Au trackpad : glisser sans appuyer pour la caméra, cliquer et tirer vers soi pour frapper. La touche Espace marche aussi.
+  - Options de l'hôte : nombre de trous, bots, balles qui se touchent ou non, temps par coup.
+
+## 2.66 — 26 octobre 2026
+- **Cyber Kart GP** — La musique a son propre réglage : elle ne se coupe plus quand on a éteint la musique d'ambiance du Hub.
+  - Bouton 🎵 dans les menus, la pause et les résultats : il coupe ou remet la musique et dit ce qui se passe (chargement, « touchez l'écran pour le son », fichier introuvable…).
+  - Si un appareil n'arrive pas à préparer un morceau (iPad à court de mémoire…), il est lu en flux à la place, et un morceau qui a échoué est réessayé au toucher suivant.
+  - La touche M coupe et remet en même temps la musique et les bruitages.
+
+## 2.65 — 26 octobre 2026
+- Implement PhaserJS 3 64x64 Gen 5 Unys overworld with 3 official tileset packs, Arcade Physics, and battle HUD/trainer fixes (Amiel)
+
+## 2.64 — 26 octobre 2026
+- Fix trainer intro sequence before Pokemon send-out, responsive battle HUD, and add Gen 5 Unova tilesets (Amiel)
+
 ## 2.63 — 26 octobre 2026
-- **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 6 joueurs chacun son tour ou en équipes, avec des bots.
-  - 30 trous dans quatre décors : la campagne, le bord de mer, la montagne et le désert (oasis, canyon, mesas et cactus).
-  - Des trous tous différents : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Chaque trou a sa forme, bordée d'arbres, de forêt ou d'eau.
-  - Une partie sur un décor (8 trous, 6 au désert), sur 9 trous (l'aller ou le retour), sur 18 trous ou sur les 30, avec la carte de score entre chaque trou et le podium à la fin.
-  - En équipes, 2 contre 2 ou 3 contre 3 : chacun joue depuis la balle de l'équipe et on garde la meilleure ; les bots complètent les équipes.
-  - On joue en plein jour, au crépuscule ou le soir sous les étoiles.
+- **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 4 joueurs chacun son tour, avec des bots.
+  - 18 trous dans trois décors : la campagne, le bord de mer (plages, baies, palmiers) et la montagne (falaises, torrents, sommets enneigés).
+  - Partie de 6 trous (un décor), de 9 trous (l'aller ou le retour) ou les 18 trous d'un coup, avec la carte de score entre chaque trou et le podium à la fin.
   - Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer, et on relâche pour frapper. Tirer de travers fait tourner la balle, et trop armer la fait partir en hook. Au clavier : maintenir Espace.
   - Huit clubs, du vent à chaque trou, des bunkers, la plage, l'eau et le hors-limites (un coup de pénalité), des arbres qui arrêtent la balle.
-  - Une cible montre où tombe un coup plein sans le vent, et sur le green une grille animée montre la pente.
-  - La mini-carte est une vue aérienne du trou : on zoome à la molette (ou Z) et on la fait glisser, et le bouton relief (ou R) la change en carte des altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
-  - Les beaux coups repassent au ralenti : trou en un, chip rentré, long putt, approche collée au drapeau.
-  - Un écran d'accueil qui survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
-  - Un rendu soigné : herbe haute en 3D qui ondule au vent, arbres, sapins, palmiers et cactus, reflets du décor dans l'eau, ombres douces, falaises et sommets enneigés.
+  - Une cible montre où tombe un coup plein sans le vent, et sur le green une grille animée montre la pente. La mini-carte est une vue aérienne du trou.
+  - Un rendu soigné : herbe haute en 3D qui ondule au vent, arbres et sapins touffus, reflets du décor dans l'eau, ombres douces, falaises et sommets enneigés.
   - On voit le swing des autres en direct. Le plus loin du drapeau joue en premier, et l'honneur revient au meilleur score du trou précédent.
-  - Ambiance de nature propre à chaque décor, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
+  - Ambiance de nature, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
   - Bots en trois niveaux : facile, moyen et difficile.
 
 ## 2.62 — 26 octobre 2026

@@ -11,7 +11,7 @@
   // Validation d'un enregistrement venu du réseau
   function sane(r) {
     if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !Array.isArray(r.players)) return null;
-    if (!['david', 'drift', 'bastion', 'calcul', 'phare', 'outbreak', 'filrouge', 'kart', 'convoy', 'golf'].includes(r.game)) return null;
+    if (!['david', 'drift', 'bastion', 'calcul', 'phare', 'outbreak', 'filrouge', 'kart', 'convoy', 'golf', 'minigolf'].includes(r.game)) return null;
     const players = r.players.slice(0, 8).map((p) => ({
       key: clean(p.key, 40), name: clean(p.name, 14) || '?', color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : '#888888',
       bot: !!p.bot, rank: Math.max(1, Math.min(8, p.rank | 0)), score: Number.isFinite(p.score) ? Math.round(p.score) : 0,

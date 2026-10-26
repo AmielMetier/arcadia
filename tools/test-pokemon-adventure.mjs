@@ -94,30 +94,29 @@ const map = createMentonMap();
 assert.strictEqual(map.length, MAP_HEIGHT, 'Hauteur de carte correcte');
 assert.strictEqual(map[0].length, MAP_WIDTH, 'Largeur de carte correcte');
 
-assert.strictEqual(getTile(map, 6, 8), TILE.DOOR, 'Porte du Labo à (6,8)');
-assert.strictEqual(getTile(map, 17, 8), TILE.DOOR, 'Porte du Centre Pokémon à (17,8)');
-assert.strictEqual(getTile(map, 19, 15), TILE.DOOR, 'Porte de la Boutique Pokémon à (19,15)');
-assert.strictEqual(getTile(map, 38, 5), TILE.DOOR, 'Porte de l\'Arène de Menton à (38,5)');
-assert.strictEqual(getTile(map, 12, 15), TILE.FOUNTAIN, 'Fontaine à (12,15)');
-assert.strictEqual(getTile(map, 9, 13), TILE.LEMON_TREE, 'Citronnier à (9,13)');
+assert.strictEqual(getTile(map, 28, 93), TILE.DOOR, 'Porte du Labo à (28,93)');
+assert.strictEqual(getTile(map, 26, 26), TILE.DOOR, 'Porte du Centre Pokémon à (26,26)');
+assert.strictEqual(getTile(map, 36, 19), TILE.DOOR, 'Porte de la Boutique Pokémon à (36,19)');
+assert.strictEqual(getTile(map, 36, 10), TILE.DOOR, 'Porte de l\'Arène Pokémon à (36,10)');
+assert.strictEqual(getTile(map, 16, 91), TILE.LEMON_TREE, 'Citronnier / Arbre à Baies à (16,91)');
 
 const labGrid = MAPS.lab.createGrid();
 const centerGrid = MAPS.pokecenter.createGrid();
 const martGrid = MAPS.pokemart.createGrid();
 const gymGrid = MAPS.gym.createGrid();
 
-assert.strictEqual(getTile(labGrid, 6, 4), TILE.LAB_TABLE, 'Table du labo à l\'intérieur du Labo (6,4)');
+assert.strictEqual(getTile(labGrid, 8, 3), TILE.LAB_TABLE, 'Table du labo à l\'intérieur du Labo (8,3)');
 assert.strictEqual(getTile(labGrid, 5, 9), TILE.EXIT_MAT, 'Tapis de sortie du Labo à (5,9)');
-assert.strictEqual(getTile(centerGrid, 5, 3), TILE.NURSE_DESK, 'Comptoir infirmière dans le Centre Pokémon à (5,3)');
-assert.strictEqual(getTile(centerGrid, 9, 3), TILE.PC_BOX, 'PC dans le Centre Pokémon à (9,3)');
-assert.strictEqual(getTile(martGrid, 4, 3), TILE.MART_DESK, 'Comptoir dans la Boutique Pokémon à (4,3)');
-assert.strictEqual(getTile(gymGrid, 6, 11), TILE.EXIT_MAT, 'Tapis de sortie de l\'Arène à (6,11)');
+assert.strictEqual(getTile(centerGrid, 5, 2), TILE.NURSE_DESK, 'Comptoir infirmière dans le Centre Pokémon à (5,2)');
+assert.strictEqual(getTile(centerGrid, 9, 1), TILE.PC_BOX, 'PC dans le Centre Pokémon à (9,1)');
+assert.strictEqual(getTile(martGrid, 3, 3), TILE.MART_DESK, 'Comptoir dans la Boutique Pokémon à (3,3)');
+assert.strictEqual(getTile(gymGrid, 6, 13), TILE.EXIT_MAT, 'Tapis de sortie de l\'Arène à (6,13)');
 
-assert.strictEqual(isSolid(labGrid, 6, 4), true, 'Table labo solide');
-assert.strictEqual(isSolid(martGrid, 4, 3), true, 'Comptoir boutique solide');
+assert.strictEqual(isSolid(labGrid, 8, 3), true, 'Table labo solide');
+assert.strictEqual(isSolid(martGrid, 3, 3), true, 'Comptoir boutique solide');
 assert.strictEqual(isSolid(labGrid, 5, 5), false, 'Intérieur labo marchable');
-assert.strictEqual(isSolid(map, 10, 29), true, 'Mer solide');
-assert.strictEqual(isSolid(map, 10, 25), false, 'Sable plage marchable');
+assert.strictEqual(isSolid(map, 20, 97), true, 'Eau solide');
+assert.strictEqual(isSolid(map, 28, 94), false, 'Parvis du Labo marchable');
 console.log('✓ Lieux emblématiques de Menton, portes franchissables et 4 intérieurs (Labo, Centre, Boutique, Arène) validés');
 
 console.log('\n--- 6. Test Joueur, Boutique, Soin Hors Combat, Suiveur & PC ---');

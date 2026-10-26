@@ -62,9 +62,12 @@ export function startAdventureBattle(container, {
   let isAnimating = false;
   let battleOver = false;
 
+  const hasTrainerIntro = !isWild && trainerInfo && trainerInfo.portrait;
   sfx.init();
   sfx.startBgm();
-  setTimeout(() => sfx.playCry(wildPoke.id), 250);
+  if (!hasTrainerIntro) {
+    setTimeout(() => sfx.playCry(wildPoke.id), 250);
+  }
 
   function renderPokeballsTray(partyList) {
     return partyList.map(p => {
@@ -111,9 +114,9 @@ export function startAdventureBattle(container, {
           </div>
 
           <div class="adv-platform-opp">
-            ${trainerInfo && trainerInfo.portrait ? `<img class="adv-trainer-avatar" id="oppTrainerAvatar" src="${trainerInfo.portrait}" alt="${trainerInfo.name}">` : ''}
+            ${hasTrainerIntro ? `<img class="adv-trainer-avatar" id="oppTrainerAvatar" src="${trainerInfo.portrait}" alt="${trainerInfo.name}">` : ''}
             <div class="damage-popup-anchor" id="oppPopupAnchor"></div>
-            <img class="adv-poke-sprite front anim-enter" id="oppSprite" src="${spriteUrls(wildPoke.id).front}" alt="${wildPoke.name}">
+            <img class="adv-poke-sprite front ${hasTrainerIntro ? '' : 'anim-enter'}" id="oppSprite" src="${spriteUrls(wildPoke.id).front}" alt="${wildPoke.name}" style="${hasTrainerIntro ? 'opacity:0;' : ''}">
             <img class="adv-pokeball-throw" id="pokeballThrow" src="assets/items/poke-ball.png" alt="ball">
           </div>
         </div>
@@ -150,7 +153,7 @@ export function startAdventureBattle(container, {
       <!-- Dialogue & Commandes en Bas -->
       <div class="adv-battle-bottom">
         <div class="adv-battle-dialogue" id="battleDialogue">
-          ${isWild ? `Un ${wildPoke.name} sauvage (N.${wildPoke.level}) apparaît !` : `${trainerInfo ? trainerInfo.name : 'Le dresseur'} envoie ${wildPoke.name} !`}
+          ${isWild ? `Un ${wildPoke.name} sauvage (N.${wildPoke.level}) apparaît !` : (hasTrainerIntro ? `${trainerInfo.name} veut se battre !` : `${trainerInfo ? trainerInfo.name : 'Le dresseur'} envoie ${wildPoke.name} !`)}
         </div>
         <div class="adv-battle-menu" id="battleMenu"></div>
       </div>
@@ -839,5 +842,25 @@ export function startAdventureBattle(container, {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  renderMainMenu();
+  if (hasTrainerIntro) {
+    isAnimating = true;
+    menuEl.innerHTML = '';
+    const trainerAvatarEl = container.querySelector('#oppTrainerAvatar');
+    setTimeout(() => {
+      if (trainerAvatarEl) trainerAvatarEl.classList.add('trainer-slide-out');
+      setTimeout(() => {
+        if (trainerAvatarEl) trainerAvatarEl.style.display = 'none';
+        setDialogue(`${trainerInfo.name} envoie ${wildPoke.name} !`);
+        oppSprite.style.opacity = '1';
+        oppSprite.classList.remove('anim-enter');
+        void oppSprite.offsetWidth;
+        oppSprite.classList.add('anim-enter');
+        sfx.playCry(wildPoke.id);
+        isAnimating = false;
+        renderMainMenu();
+      }, 380);
+    }, 1050);
+  } else {
+    renderMainMenu();
+  }
 }

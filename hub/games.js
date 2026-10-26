@@ -244,4 +244,28 @@ window.HUB_GAMES = [
       <text x="160" y="160" text-anchor="middle" font-family="Bungee,Impact,sans-serif" font-size="14" fill="#16181d">3v3 SHOWDOWN</text>
     </svg>`,
   },
+  {
+    id: 'minigolf',
+    title: 'Mini-Golf Party',
+    tag: 'Mini-golf en 3D, chacun son tour',
+    desc: 'Mini-golf à la souris façon Golf It : 4 parcours (Green Park, Île aux Pirates, Jardin Zen, Forge Infernale), loopings, lave, moulins et pistons. Bots possibles, parcours choisi dans le jeu.',
+    url: 'minigolf/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#2e8b57',
+    cover: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs><linearGradient id="mgSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8fe8"/><stop offset="1" stop-color="#cfe9ff"/></linearGradient></defs>
+      <rect width="320" height="180" fill="url(#mgSky)"/>
+      <circle cx="262" cy="36" r="18" fill="#fff3b0" stroke="#16181d" stroke-width="3"/>
+      <path d="M0 118 Q80 100 160 112 T320 104 V180 H0Z" fill="#5daa3c" stroke="#16181d" stroke-width="3"/>
+      <path d="M26 160 C 90 120, 190 150, 286 124 L 296 142 C 196 170, 96 144, 36 176 Z" fill="#2f9a4c" stroke="#16181d" stroke-width="3"/>
+      <path d="M28 160 C 92 121, 190 151, 287 125" fill="none" stroke="#d9cfc2" stroke-width="4"/>
+      <g stroke="#16181d" stroke-width="3"><circle cx="70" cy="74" r="30" fill="none" stroke="#e8433b" stroke-width="10"/><circle cx="70" cy="74" r="30" fill="none"/></g>
+      <rect x="40" y="100" width="60" height="10" fill="#e8433b" stroke="#16181d" stroke-width="3"/>
+      <ellipse cx="236" cy="134" rx="9" ry="4" fill="#16181d"/>
+      <path d="M236 134 V70" stroke="#f4f1e8" stroke-width="4"/><path d="M236 134 V70" stroke="#16181d" stroke-width="1"/>
+      <path d="M238 70 l34 11 -34 11z" fill="#e8433b" stroke="#16181d" stroke-width="3" stroke-linejoin="round"/>
+      <g transform="translate(150 140)"><circle r="11" fill="#fafafa" stroke="#16181d" stroke-width="3"/><circle cx="-3" cy="-3" r="1.6" fill="#c9c9c9"/><circle cx="3" cy="1" r="1.6" fill="#c9c9c9"/><circle cx="-1" cy="4" r="1.6" fill="#c9c9c9"/></g>
+      <path d="M126 140 h-26 M128 132 h-20 M128 148 h-18" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    </svg>`,
+  },
 ];

@@ -1,458 +1,422 @@
 // pokemon/adventure/map.js
-// Cartes du Mode Aventure Kalos-Sud (Menton) :
-// 1. Extérieur : Menton, Place aux Citrons, Route 1 Corniche, Plage des Sablettes (44x32)
-// 2. Intérieur Laboratoire du Prof. Platane (12x10)
-// 3. Intérieur Centre Pokémon de Menton (12x10)
-// 4. Intérieur Boutique Pokémon de Menton (10x9)
-// 5. Intérieur Arène Pokémon de Menton (14x12)
+// Carte Open-World continue 50x100 (tuiles de 32x32px = 1600x3200px) issue des vraies maps Tiled Pokémon :
+// - Bourg-Palette (Sud, y=80..99) avec le Laboratoire du Professeur (28,93) et les maisons
+// - Route 1 (Centre, y=40..79) avec les hautes herbes, rebords et dresseurs
+// - Cité de Jadielle (Nord, y=0..39) avec le Centre Pokémon (26,26), la Boutique (36,19) et l'Arène (36,10)
+// + 4 Intérieurs dédiés fidèles (Laboratoire, Centre Pokémon, Boutique, Arène).
 
-export const MAP_WIDTH = 44;
-export const MAP_HEIGHT = 32;
 export const TILE_SIZE = 32;
+export const MAP_WIDTH = 50;
+export const MAP_HEIGHT = 100;
 
 export const TILE = {
-  COBBLE: 0,        // Pavés clairs de Menton (walkable)
-  DIRT_PATH: 1,     // Chemin de terre Route 1 (walkable)
-  GRASS_TALL: 2,    // Hautes herbes sauvages (walkable + combat aléatoire)
-  GRASS_LAWN: 3,    // Pelouse rase (walkable)
-  SAND: 4,          // Sable fin de la plage des Sablettes (walkable)
-  WATER: 5,         // Mer Méditerranée (solide)
-  WALL_VILLA: 6,    // Murs des bâtiments (solide)
-  ROOF_TERRA: 7,    // Toiture tuiles terre cuite / Labo (solide)
-  FENCE: 8,         // Barrière blanche (solide)
-  TREE_PALM: 9,     // Arbre méditerranéen (solide)
-  LEMON_TREE: 10,   // Citronnier de Menton (solide + interactif)
-  FOUNTAIN: 11,     // Fontaine de la Place aux Citrons (solide)
-  LAB_TABLE: 12,    // Table des Poké Balls au Laboratoire (solide + starter)
-  NURSE_DESK: 13,   // Comptoir de l'Infirmière Joëlle (solide + soin)
-  PC_BOX: 14,       // Terminal PC de stockage (solide + PC)
-  DOOR: 15,         // Porte d'entrée de bâtiment (walkable + téléportation intérieur)
-  MART_DESK: 16,    // Comptoir de la Boutique Pokémon (solide + achat)
-  SIGN: 17,         // Panneau d'information (solide + lecture)
-  GYM_WALL: 18,     // Mur doré de l'Arène de Menton (solide)
-  GYM_ROOF: 19,     // Toiture azur et or de l'Arène (solide)
-  ROOF_CENTER: 20,  // Toiture rouge du Centre Pokémon (solide)
-  ROOF_MART: 21,    // Toiture bleue de la Boutique Pokémon (solide)
-  FLOOR_WOOD: 22,   // Parquet intérieur Laboratoire (walkable)
-  FLOOR_CENTER: 23, // Sol carrelé Centre Pokémon (walkable)
-  FLOOR_MART: 24,   // Sol carrelé Boutique Pokémon (walkable)
-  FLOOR_GYM: 25,    // Sol royal Arène de Menton (walkable)
-  WALL_INDOOR: 26,  // Mur intérieur de pièce (solide)
-  EXIT_MAT: 27,     // Tapis rouge de sortie intérieure (walkable + téléportation extérieur)
-  BOOKSHELF: 28,    // Bibliothèque / Étagère d'objets (solide)
-  POTTED_PLANT: 29, // Plante en pot décorative / Pilier (solide)
+  GRASS: 0,
+  PATH_COBBLESTONE: 1,
+  WATER: 2,
+  SAND: 3,
+  WALL_VILLA: 4,
+  ROOF_TERRA: 5,
+  GRASS_TALL: 6,
+  TREE_PINE: 7,
+  FLOWER: 8,
+  BRIDGE: 9,
+  SIGN: 10,
+  LEMON_TREE: 11,
+  DOOR: 12,
+  FENCE: 13,
+  WALL_ROCK: 14,
+  FLOOR_WOOD: 15,
+  WALL_INDOOR: 16,
+  EXIT_MAT: 17,
+  LAB_TABLE: 18,
+  NURSE_DESK: 19,
+  MART_DESK: 20,
+  PC_BOX: 21,
+  BOOKSHELF: 22,
+  GYM_STATUE: 23,
+  POTTED_PLANT: 24,
+  ROOF_CENTER: 25,
+  ROOF_MART: 26,
+  ROOF_GYM: 27,
+  GYM_WALL: 28,
+  DIRT_PATH: 29
 };
 
 export const SOLID_TILES = new Set([
   TILE.WATER,
   TILE.WALL_VILLA,
   TILE.ROOF_TERRA,
-  TILE.ROOF_CENTER,
-  TILE.ROOF_MART,
-  TILE.FENCE,
-  TILE.TREE_PALM,
+  TILE.TREE_PINE,
+  TILE.SIGN,
   TILE.LEMON_TREE,
-  TILE.FOUNTAIN,
+  TILE.FENCE,
+  TILE.WALL_ROCK,
+  TILE.WALL_INDOOR,
   TILE.LAB_TABLE,
   TILE.NURSE_DESK,
-  TILE.PC_BOX,
   TILE.MART_DESK,
-  TILE.SIGN,
-  TILE.GYM_WALL,
-  TILE.GYM_ROOF,
-  TILE.WALL_INDOOR,
+  TILE.PC_BOX,
   TILE.BOOKSHELF,
+  TILE.GYM_STATUE,
   TILE.POTTED_PLANT,
+  TILE.ROOF_CENTER,
+  TILE.ROOF_MART,
+  TILE.ROOF_GYM,
+  TILE.GYM_WALL
 ]);
 
 export const SIGNPOSTS = {
-  '8,9': {
+  '28,96': {
     title: 'Laboratoire Pokémon du Prof. Platane',
-    text: 'Entrez par la porte pour rencontrer le Professeur Platane\net choisir votre premier partenaire Pokémon !'
+    text: 'Centre de recherche Pokémon de Bourg-Palette.\nEntrez par la porte (28,93) pour recevoir votre premier Pokémon Starter !'
   },
-  '15,9': {
-    title: 'Centre Pokémon de Menton',
-    text: 'Entrez pour soigner gratuitement votre équipe auprès de l\'Infirmière Joëlle\net accéder au PC de stockage.'
+  '21,91': {
+    title: 'Bourg-Palette — Village de Départ',
+    text: 'Bienvenue à Bourg-Palette !\nLa Route 1 s\'ouvre au Nord vers la Cité de Jadielle.'
   },
-  '17,15': {
-    title: 'Boutique Pokémon de Menton',
-    text: 'Entrez pour acheter des Poké Balls, Potions, Rappels\net Citrons de Menton !'
+  '17,94': {
+    title: 'Conseil aux Dresseurs',
+    text: 'Appuyez sur [ESPACE] ou [ENTRÉE] devant une porte ou un personnage pour interagir, et sur [B] pour ouvrir votre Sac.'
   },
-  '22,12': {
-    title: 'Direction : Route 1 Corniche & Arène',
-    text: 'Est : Route 1 Corniche (Hautes herbes & Dresseurs)\nNord-Est : Arène Pokémon de Menton (Championne Solène).'
+  '16,86': {
+    title: 'Maison de Red',
+    text: 'Résidence familiale de Red à Bourg-Palette.'
   },
-  '14,22': {
-    title: 'Promenade du Soleil & Plage des Sablettes',
-    text: 'Attention : Des Pokémon Eau sauvages apparaissent parfois\nau bord des vagues sur le sable humide !'
+  '16,87': {
+    title: 'Maison de Red',
+    text: 'Résidence familiale de Red à Bourg-Palette.'
+  },
+  '25,86': {
+    title: 'Maison de Blue',
+    text: 'Résidence de Blue à Bourg-Palette.'
+  },
+  '25,87': {
+    title: 'Maison de Blue',
+    text: 'Résidence de Blue à Bourg-Palette.'
+  },
+  '21,71': {
+    title: 'Route 1 — Sentier des Hautes Herbes',
+    text: 'Sud : Bourg-Palette\nNord : Cité de Jadielle (Centre Pokémon, Boutique & Arène).'
+  },
+  '20,31': {
+    title: 'Cité de Jadielle — La Cité du Vert Éternel',
+    text: 'Centre Pokémon au Sud-Est (26,26) • Boutique à l\'Est (36,19) • Arène Pokémon au Nord-Est (36,10).'
+  },
+  '20,16': {
+    title: 'Conseil Stratégique',
+    text: 'Soignez gratuitement votre équipe au Centre Pokémon et achetez des Poké Balls à la Boutique avant de défier l\'Arène !'
+  },
+  '32,9': {
+    title: 'Arène Pokémon — Championne Solène',
+    text: 'Championne Solène : Maîtresse de la Lumière et de l\'Électrik.\nDéfiez-la à l\'intérieur pour remporter le Badge Officiel !'
+  },
+  '32,10': {
+    title: 'Arène Pokémon — Championne Solène',
+    text: 'Championne Solène : Maîtresse de la Lumière et de l\'Électrik.\nDéfiez-la à l\'intérieur pour remporter le Badge Officiel !'
+  },
+  '23,1': {
+    title: 'Route 2 — Nord de Jadielle',
+    text: 'Direction la Forêt de Jade.'
   }
 };
 
-export const BUILDING_SIGNS = [
-  { x: 6, y: 5, text: 'LABO POKÉMON', bg: '#1e3a8a', border: '#60a5fa' },
-  { x: 17, y: 5, text: 'CENTRE POKÉMON', bg: '#991b1b', border: '#f87171' },
-  { x: 19, y: 12, text: 'BOUTIQUE POKÉMON', bg: '#0369a1', border: '#38bdf8' },
-  { x: 38, y: 3, text: 'ARÈNE DE MENTON', bg: '#854d0e', border: '#facc15' },
+export const WORLD_PROPS = {
+  berryTrees: [
+    { x: 16, y: 91 },
+    { x: 32, y: 68 },
+    { x: 18, y: 52 },
+    { x: 33, y: 24 },
+    { x: 17, y: 22 },
+    { x: 22, y: 4 }
+  ]
+};
+
+const OUTDOOR_GRID_TEMPLATE = [
+  [14, 14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 0, 0, 0, 10, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 0, 1, 1, 1, 0, 7, 7, 7, 7, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 11, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 0, 4, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 11, 1, 1, 1, 11, 4, 4, 4, 4, 4, 0, 0, 0, 10, 4, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 1, 4, 4, 4, 4, 4, 0, 0, 0, 10, 4, 4, 4, 12, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 11, 1, 1, 1, 11, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 1, 1, 1, 1, 11, 11, 13, 13, 13, 13, 13, 13, 0, 0, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 11, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 8, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 14, 0, 13, 7, 7, 7, 7, 7, 7, 7, 7, 13, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 8, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 0, 0, 0, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 11, 1, 1, 1, 0, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 1, 11, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 4, 4, 4, 4, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 0, 1, 1, 1, 0, 4, 4, 4, 4, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 11, 4, 4, 4, 4, 4, 0, 1, 1, 1, 0, 4, 4, 4, 4, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 13, 1, 13, 13, 13, 0, 1, 1, 1, 0, 4, 4, 12, 4, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 0, 7, 7, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 4, 4, 4, 4, 4, 0, 1, 1, 1, 0, 8, 0, 8, 0, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 11, 7, 7, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 4, 4, 4, 4, 4, 0, 1, 1, 1, 11, 0, 8, 0, 8, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 0, 0, 0, 1, 1, 1, 0, 4, 4, 4, 4, 4, 0, 1, 1, 1, 0, 8, 0, 8, 0, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 0, 4, 4, 12, 4, 4, 0, 1, 1, 1, 0, 0, 8, 0, 8, 0, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 13, 13, 13, 13, 2, 2, 2, 2, 2, 2, 13, 13, 13, 0, 0, 0, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 8, 0, 8, 0, 8, 0, 0, 0, 8, 0, 8, 0, 8, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [14, 14, 14, 14, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 8, 0, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 7, 7, 13, 13, 13, 13, 13, 13, 0, 0, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 8, 0, 0, 0, 8, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 8, 0, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 8, 0, 0, 0, 8, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 8, 0, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 8, 0, 0, 0, 0, 7, 7, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 8, 0, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 8, 0, 8, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 0, 13, 13, 13, 13, 0, 0, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 8, 0, 8, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 8, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 1, 1, 11, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 0, 0, 0, 10, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 6, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 0, 0, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 6, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1, 0, 0, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 0, 8, 1, 1, 1, 1, 6, 6, 6, 6, 6, 8, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 8, 0, 0, 6, 6, 0, 6, 6, 6, 6, 6, 0, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 6, 6, 13, 13, 13, 13, 13, 13, 13, 13, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 0, 4, 4, 4, 4, 4, 1, 1, 1, 0, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 10, 4, 4, 4, 4, 4, 1, 1, 1, 10, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 10, 4, 4, 4, 4, 4, 1, 1, 1, 10, 4, 4, 4, 4, 4, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 11, 13, 13, 13, 13, 10, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 8, 8, 8, 8, 0, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 8, 8, 8, 8, 0, 1, 1, 1, 4, 4, 4, 12, 4, 4, 4, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 10, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 13, 13, 13, 10, 13, 13, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]
 ];
 
-// 1. Carte extérieure principale (44x32)
-export function createMentonMap() {
-  const grid = Array.from({ length: MAP_HEIGHT }, () => new Uint8Array(MAP_WIDTH).fill(TILE.GRASS_LAWN));
-
-  // Bordures extérieures de sécurité (barrières / arbres)
-  for (let x = 0; x < MAP_WIDTH; x++) {
-    grid[0][x] = TILE.FENCE;
-    grid[1][x] = TILE.TREE_PALM;
-  }
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    grid[y][0] = TILE.TREE_PALM;
-    grid[y][MAP_WIDTH - 1] = TILE.TREE_PALM;
-  }
-
-  // Mer Méditerranée au Sud (lignes 28 à 31)
-  for (let y = 28; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      grid[y][x] = TILE.WATER;
-    }
-  }
-
-  // Plage de sable fin (lignes 24 à 27)
-  for (let y = 24; y < 28; y++) {
-    for (let x = 1; x < MAP_WIDTH - 1; x++) {
-      grid[y][x] = TILE.SAND;
-    }
-  }
-
-  // Promenade du Soleil pavée (lignes 21 à 23)
-  for (let y = 21; y < 24; y++) {
-    for (let x = 1; x < MAP_WIDTH - 1; x++) {
-      grid[y][x] = TILE.COBBLE;
-    }
-  }
-  // Garde-corps entre la promenade et la plage (avec 2 ouvertures pour descendre)
-  for (let x = 1; x < MAP_WIDTH - 1; x++) {
-    if (x !== 12 && x !== 13 && x !== 30 && x !== 31) {
-      grid[23][x] = TILE.FENCE;
-    }
-  }
-
-  // Ville de Menton (Colonnes 2 à 22, Lignes 9 à 20)
-  for (let y = 9; y <= 20; y++) {
-    for (let x = 2; x <= 22; x++) {
-      grid[y][x] = TILE.COBBLE;
-    }
-  }
-
-  // Place aux Citrons (Colonnes 8 à 16, Lignes 13 à 18)
-  grid[15][12] = TILE.FOUNTAIN;
-  grid[13][9] = TILE.LEMON_TREE;
-  grid[13][15] = TILE.LEMON_TREE;
-  grid[17][9] = TILE.LEMON_TREE;
-  grid[17][15] = TILE.LEMON_TREE;
-
-  // Bâtiment 1 : Laboratoire Pokémon du Prof. Platane (x: 3..9, y: 3..8, porte en (6,8))
-  for (let y = 3; y <= 5; y++) {
-    for (let x = 3; x <= 9; x++) grid[y][x] = TILE.ROOF_TERRA;
-  }
-  for (let y = 6; y <= 8; y++) {
-    for (let x = 3; x <= 9; x++) grid[y][x] = TILE.WALL_VILLA;
-  }
-  grid[8][6] = TILE.DOOR;
-
-  // Bâtiment 2 : Centre Pokémon de Menton (x: 14..20, y: 3..8, porte en (17,8))
-  for (let y = 3; y <= 5; y++) {
-    for (let x = 14; x <= 20; x++) grid[y][x] = TILE.ROOF_CENTER;
-  }
-  for (let y = 6; y <= 8; y++) {
-    for (let x = 14; x <= 20; x++) grid[y][x] = TILE.WALL_VILLA;
-  }
-  grid[8][17] = TILE.DOOR;
-
-  // Bâtiment 3 : Boutique Pokémon de Menton (x: 17..21, y: 12..15, porte en (19,15))
-  for (let y = 12; y <= 13; y++) {
-    for (let x = 17; x <= 21; x++) grid[y][x] = TILE.ROOF_MART;
-  }
-  for (let y = 14; y <= 15; y++) {
-    for (let x = 17; x <= 21; x++) grid[y][x] = TILE.WALL_VILLA;
-  }
-  grid[15][19] = TILE.DOOR;
-
-  // Villa résidentielle de Menton (x: 3..6, y: 13..16)
-  for (let y = 13; y <= 14; y++) {
-    for (let x = 3; x <= 6; x++) grid[y][x] = TILE.ROOF_TERRA;
-  }
-  for (let y = 15; y <= 16; y++) {
-    for (let x = 3; x <= 6; x++) grid[y][x] = TILE.WALL_VILLA;
-  }
-
-  // Route 1 Corniche & Arène de Menton (Colonnes 23 à 42, Lignes 2 à 20)
-  for (let x = 22; x <= 38; x++) grid[11][x] = TILE.DIRT_PATH;
-  for (let y = 6; y <= 11; y++) grid[y][28] = TILE.DIRT_PATH;
-  for (let x = 28; x <= 38; x++) grid[6][x] = TILE.DIRT_PATH;
-  for (let y = 6; y <= 20; y++) grid[y][38] = TILE.DIRT_PATH;
-
-  // Bâtiment 4 : Arène Pokémon de Menton (Nord-Est, x: 35..41, y: 2..5, porte en (38,5))
-  for (let y = 2; y <= 3; y++) {
-    for (let x = 35; x <= 41; x++) grid[y][x] = TILE.GYM_ROOF;
-  }
-  for (let y = 4; y <= 5; y++) {
-    for (let x = 35; x <= 41; x++) grid[y][x] = TILE.GYM_WALL;
-  }
-  grid[5][38] = TILE.DOOR;
-  // Parvis pavé devant l'Arène
-  for (let y = 6; y <= 7; y++) {
-    for (let x = 35; x <= 41; x++) {
-      grid[y][x] = TILE.COBBLE;
-    }
-  }
-
-  // Hautes herbes (Zone 1 : Clairière des Passerouge)
-  for (let y = 3; y <= 9; y++) {
-    for (let x = 30; x <= 34; x++) {
-      if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
-    }
-  }
-
-  // Hautes herbes (Zone 2 : Bosquet aux Évoli / Flabébé)
-  for (let y = 7; y <= 10; y++) {
-    for (let x = 23; x <= 27; x++) {
-      if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
-    }
-  }
-
-  // Hautes herbes (Zone 3 : Plaine des Cabriolaine)
-  for (let y = 13; y <= 19; y++) {
-    for (let x = 26; x <= 34; x++) {
-      if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
-    }
-  }
-
-  // Hautes herbes (Zone 4 : Versant Est)
-  for (let y = 13; y <= 18; y++) {
-    for (let x = 39; x <= 41; x++) {
-      if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
-    }
-  }
-
-  // Panneaux indicateurs
-  grid[9][8] = TILE.SIGN;
-  grid[9][15] = TILE.SIGN;
-  grid[15][17] = TILE.SIGN;
-  grid[12][22] = TILE.SIGN;
-  grid[22][14] = TILE.SIGN;
-
-  // Arbres d'ornement le long de la Promenade
-  grid[21][3] = TILE.TREE_PALM;
-  grid[21][7] = TILE.TREE_PALM;
-  grid[21][11] = TILE.TREE_PALM;
-  grid[21][15] = TILE.TREE_PALM;
-  grid[21][19] = TILE.TREE_PALM;
-  grid[21][25] = TILE.TREE_PALM;
-  grid[21][31] = TILE.TREE_PALM;
-  grid[21][37] = TILE.TREE_PALM;
-
-  return grid;
+function createEmptyGrid(w, h, fillTile) {
+  return Array.from({ length: h }, () => Array(w).fill(fillTile));
 }
 
-// 2. Intérieur du Laboratoire du Professeur Platane (12x10)
-export function createLabMap() {
+function fillRect(grid, x, y, w, h, tile) {
+  const maxH = grid.length;
+  const maxW = grid[0].length;
+  for (let py = y; py < y + h; py++) {
+    for (let px = x; px < x + w; px++) {
+      if (py >= 0 && py < maxH && px >= 0 && px < maxW) {
+        grid[py][px] = tile;
+      }
+    }
+  }
+}
+
+export function createOutdoorGrid() {
+  return OUTDOOR_GRID_TEMPLATE.map(row => row.slice());
+}
+
+export function createLabGrid() {
   const w = 12, h = 10;
-  const grid = Array.from({ length: h }, () => new Uint8Array(w).fill(TILE.FLOOR_WOOD));
-  for (let x = 0; x < w; x++) {
-    grid[0][x] = TILE.WALL_INDOOR;
-    grid[1][x] = TILE.WALL_INDOOR;
-    grid[h - 1][x] = TILE.WALL_INDOOR;
-  }
-  for (let y = 0; y < h; y++) {
-    grid[y][0] = TILE.WALL_INDOOR;
-    grid[y][w - 1] = TILE.WALL_INDOOR;
-  }
-  // Bibliothèques et machines d'étude
-  grid[2][1] = TILE.BOOKSHELF;
-  grid[2][2] = TILE.BOOKSHELF;
-  grid[2][3] = TILE.BOOKSHELF;
-  grid[2][8] = TILE.BOOKSHELF;
-  grid[2][9] = TILE.BOOKSHELF;
-  grid[2][10] = TILE.PC_BOX;
-  // Plantes en pot
-  grid[8][1] = TILE.POTTED_PLANT;
-  grid[8][10] = TILE.POTTED_PLANT;
-  // Table des Starters Pokémon au centre
-  grid[4][6] = TILE.LAB_TABLE;
-  grid[4][7] = TILE.LAB_TABLE;
-  // Tapis de sortie au Sud
-  grid[8][5] = TILE.EXIT_MAT;
-  grid[8][6] = TILE.EXIT_MAT;
-  grid[9][5] = TILE.EXIT_MAT;
-  grid[9][6] = TILE.EXIT_MAT;
-  return grid;
+  const g = createEmptyGrid(w, h, TILE.FLOOR_WOOD);
+  fillRect(g, 0, 0, w, 2, TILE.WALL_INDOOR);
+  fillRect(g, 0, 0, 4, 2, TILE.BOOKSHELF);
+  fillRect(g, 8, 0, 4, 2, TILE.BOOKSHELF);
+  fillRect(g, 7, 3, 3, 1, TILE.LAB_TABLE);
+  g[4][1] = TILE.PC_BOX;
+  g[4][2] = TILE.PC_BOX;
+  fillRect(g, 0, 6, 4, 1, TILE.BOOKSHELF);
+  fillRect(g, 8, 6, 4, 1, TILE.BOOKSHELF);
+  g[8][0] = TILE.POTTED_PLANT;
+  g[8][11] = TILE.POTTED_PLANT;
+  g[9][5] = TILE.EXIT_MAT;
+  g[9][6] = TILE.EXIT_MAT;
+  return g;
 }
 
-// 3. Intérieur du Centre Pokémon de Menton (12x10)
-export function createPokeCenterMap() {
-  const w = 12, h = 10;
-  const grid = Array.from({ length: h }, () => new Uint8Array(w).fill(TILE.FLOOR_CENTER));
-  for (let x = 0; x < w; x++) {
-    grid[0][x] = TILE.WALL_INDOOR;
-    grid[1][x] = TILE.WALL_INDOOR;
-    grid[h - 1][x] = TILE.WALL_INDOOR;
-  }
-  for (let y = 0; y < h; y++) {
-    grid[y][0] = TILE.WALL_INDOOR;
-    grid[y][w - 1] = TILE.WALL_INDOOR;
-  }
-  // Comptoir de soin de l'Infirmière Joëlle + PC de stockage
-  grid[3][5] = TILE.NURSE_DESK;
-  grid[3][6] = TILE.NURSE_DESK;
-  grid[3][9] = TILE.PC_BOX;
-  grid[2][2] = TILE.BOOKSHELF;
-  grid[2][3] = TILE.BOOKSHELF;
-  grid[8][1] = TILE.POTTED_PLANT;
-  grid[8][10] = TILE.POTTED_PLANT;
-  // Tapis de sortie
-  grid[8][5] = TILE.EXIT_MAT;
-  grid[8][6] = TILE.EXIT_MAT;
-  grid[9][5] = TILE.EXIT_MAT;
-  grid[9][6] = TILE.EXIT_MAT;
-  return grid;
+export function createPokeCenterGrid() {
+  const w = 12, h = 9;
+  const g = createEmptyGrid(w, h, TILE.FLOOR_WOOD);
+  fillRect(g, 0, 0, w, 1, TILE.WALL_INDOOR);
+  fillRect(g, 4, 2, 4, 1, TILE.NURSE_DESK);
+  g[1][3] = TILE.WALL_INDOOR;
+  g[1][8] = TILE.WALL_INDOOR;
+  g[1][9] = TILE.PC_BOX;
+  g[7][0] = TILE.POTTED_PLANT;
+  g[7][11] = TILE.POTTED_PLANT;
+  g[8][5] = TILE.EXIT_MAT;
+  g[8][6] = TILE.EXIT_MAT;
+  return g;
 }
 
-// 4. Intérieur de la Boutique Pokémon de Menton (10x9)
-export function createPokeMartMap() {
-  const w = 10, h = 9;
-  const grid = Array.from({ length: h }, () => new Uint8Array(w).fill(TILE.FLOOR_MART));
-  for (let x = 0; x < w; x++) {
-    grid[0][x] = TILE.WALL_INDOOR;
-    grid[1][x] = TILE.WALL_INDOOR;
-    grid[h - 1][x] = TILE.WALL_INDOOR;
-  }
-  for (let y = 0; y < h; y++) {
-    grid[y][0] = TILE.WALL_INDOOR;
-    grid[y][w - 1] = TILE.WALL_INDOOR;
-  }
-  // Comptoir marchand + rayons d'articles
-  grid[3][4] = TILE.MART_DESK;
-  grid[3][5] = TILE.MART_DESK;
-  grid[2][7] = TILE.BOOKSHELF;
-  grid[2][8] = TILE.BOOKSHELF;
-  grid[5][2] = TILE.BOOKSHELF;
-  grid[5][7] = TILE.BOOKSHELF;
-  grid[7][1] = TILE.POTTED_PLANT;
-  grid[7][8] = TILE.POTTED_PLANT;
-  // Tapis de sortie
-  grid[7][4] = TILE.EXIT_MAT;
-  grid[7][5] = TILE.EXIT_MAT;
-  grid[8][4] = TILE.EXIT_MAT;
-  grid[8][5] = TILE.EXIT_MAT;
-  return grid;
+export function createPokeMartGrid() {
+  const w = 10, h = 8;
+  const g = createEmptyGrid(w, h, TILE.FLOOR_WOOD);
+  fillRect(g, 0, 0, w, 1, TILE.WALL_INDOOR);
+  g[2][1] = TILE.WALL_INDOOR;
+  g[3][2] = TILE.MART_DESK;
+  g[3][3] = TILE.MART_DESK;
+  g[4][1] = TILE.WALL_INDOOR;
+  fillRect(g, 6, 2, 2, 2, TILE.BOOKSHELF);
+  fillRect(g, 6, 5, 3, 1, TILE.BOOKSHELF);
+  g[6][0] = TILE.POTTED_PLANT;
+  g[6][9] = TILE.POTTED_PLANT;
+  g[7][4] = TILE.EXIT_MAT;
+  g[7][5] = TILE.EXIT_MAT;
+  return g;
 }
 
-// 5. Intérieur de l'Arène Pokémon de Menton (14x12)
-export function createGymMap() {
-  const w = 14, h = 12;
-  const grid = Array.from({ length: h }, () => new Uint8Array(w).fill(TILE.FLOOR_GYM));
-  for (let x = 0; x < w; x++) {
-    grid[0][x] = TILE.WALL_INDOOR;
-    grid[1][x] = TILE.WALL_INDOOR;
-    grid[h - 1][x] = TILE.WALL_INDOOR;
-  }
-  for (let y = 0; y < h; y++) {
-    grid[y][0] = TILE.WALL_INDOOR;
-    grid[y][w - 1] = TILE.WALL_INDOOR;
-  }
-  // Colonnes / Statues d'Arène et Citronniers d'Or
-  grid[3][3] = TILE.LEMON_TREE;
-  grid[3][10] = TILE.LEMON_TREE;
-  grid[5][3] = TILE.POTTED_PLANT;
-  grid[5][10] = TILE.POTTED_PLANT;
-  grid[8][3] = TILE.POTTED_PLANT;
-  grid[8][10] = TILE.POTTED_PLANT;
-  // Tapis de sortie
-  grid[10][6] = TILE.EXIT_MAT;
-  grid[10][7] = TILE.EXIT_MAT;
-  grid[11][6] = TILE.EXIT_MAT;
-  grid[11][7] = TILE.EXIT_MAT;
-  return grid;
+export function createGymGrid() {
+  const w = 14, h = 14;
+  const g = createEmptyGrid(w, h, TILE.FLOOR_WOOD);
+  fillRect(g, 0, 0, w, 1, TILE.WALL_INDOOR);
+  fillRect(g, 1, 2, 1, 10, TILE.GYM_STATUE);
+  fillRect(g, 12, 2, 1, 10, TILE.GYM_STATUE);
+  g[4][3] = TILE.WALL_ROCK;
+  g[4][10] = TILE.WALL_ROCK;
+  g[9][3] = TILE.WALL_ROCK;
+  g[9][10] = TILE.WALL_ROCK;
+  g[11][5] = TILE.GYM_STATUE;
+  g[11][8] = TILE.GYM_STATUE;
+  g[13][6] = TILE.EXIT_MAT;
+  g[13][7] = TILE.EXIT_MAT;
+  return g;
 }
 
 export const MAPS = {
   outdoor: {
     id: 'outdoor',
-    name: 'Menton - La Cité des Citrons',
+    name: 'Région de Kanto (Bourg-Palette • Route 1 • Jadielle)',
     width: MAP_WIDTH,
     height: MAP_HEIGHT,
-    createGrid: createMentonMap,
-    staticNpcs: [],
+    createGrid: createOutdoorGrid,
     warps: {
-      '6,8': { targetMap: 'lab', targetX: 6, targetY: 8, dir: 'up', label: 'Entrer au Laboratoire' },
-      '17,8': { targetMap: 'pokecenter', targetX: 6, targetY: 8, dir: 'up', label: 'Entrer au Centre Pokémon' },
-      '19,15': { targetMap: 'pokemart', targetX: 5, targetY: 7, dir: 'up', label: 'Entrer à la Boutique' },
-      '38,5': { targetMap: 'gym', targetX: 7, targetY: 10, dir: 'up', label: 'Entrer dans l\'Arène' },
-    }
+      '28,93': { targetMap: 'lab', targetX: 5, targetY: 8, dir: 'up', label: 'Entrer au Laboratoire' },
+      '26,26': { targetMap: 'pokecenter', targetX: 5, targetY: 7, dir: 'up', label: 'Entrer au Centre Pokémon' },
+      '36,19': { targetMap: 'pokemart', targetX: 4, targetY: 6, dir: 'up', label: 'Entrer à la Boutique' },
+      '36,10': { targetMap: 'gym', targetX: 6, targetY: 12, dir: 'up', label: 'Entrer dans l\'Arène' }
+    },
+    staticNpcs: []
   },
   lab: {
     id: 'lab',
     name: 'Laboratoire du Professeur Platane',
     width: 12,
     height: 10,
-    createGrid: createLabMap,
-    staticNpcs: [
-      { id: 'prof_platane', spriteKey: 'prof', name: 'Prof. Platane', x: 5, y: 4, dir: 'down' }
-    ],
+    createGrid: createLabGrid,
     warps: {
-      '5,9': { targetMap: 'outdoor', targetX: 6, targetY: 9, dir: 'down', label: 'Sortir vers Menton' },
-      '6,9': { targetMap: 'outdoor', targetX: 6, targetY: 9, dir: 'down', label: 'Sortir vers Menton' },
-    }
+      '5,9': { targetMap: 'outdoor', targetX: 28, targetY: 94, dir: 'down', label: 'Sortir vers Bourg-Palette' },
+      '6,9': { targetMap: 'outdoor', targetX: 28, targetY: 94, dir: 'down', label: 'Sortir vers Bourg-Palette' },
+      '5,10': { targetMap: 'outdoor', targetX: 28, targetY: 94, dir: 'down', label: 'Sortir vers Bourg-Palette' },
+      '6,10': { targetMap: 'outdoor', targetX: 28, targetY: 94, dir: 'down', label: 'Sortir vers Bourg-Palette' }
+    },
+    staticNpcs: [
+      {
+        id: 'prof_platane',
+        name: 'Prof. Platane',
+        x: 5,
+        y: 2,
+        dir: 'down',
+        sprite: 'prof'
+      }
+    ]
   },
   pokecenter: {
     id: 'pokecenter',
-    name: 'Centre Pokémon de Menton',
+    name: 'Centre Pokémon de Jadielle',
     width: 12,
-    height: 10,
-    createGrid: createPokeCenterMap,
-    staticNpcs: [],
+    height: 9,
+    createGrid: createPokeCenterGrid,
     warps: {
-      '5,9': { targetMap: 'outdoor', targetX: 17, targetY: 9, dir: 'down', label: 'Sortir vers Menton' },
-      '6,9': { targetMap: 'outdoor', targetX: 17, targetY: 9, dir: 'down', label: 'Sortir vers Menton' },
-    }
+      '5,8': { targetMap: 'outdoor', targetX: 26, targetY: 27, dir: 'down', label: 'Sortir vers Jadielle' },
+      '6,8': { targetMap: 'outdoor', targetX: 26, targetY: 27, dir: 'down', label: 'Sortir vers Jadielle' },
+      '5,9': { targetMap: 'outdoor', targetX: 26, targetY: 27, dir: 'down', label: 'Sortir vers Jadielle' },
+      '6,9': { targetMap: 'outdoor', targetX: 26, targetY: 27, dir: 'down', label: 'Sortir vers Jadielle' }
+    },
+    staticNpcs: []
   },
   pokemart: {
     id: 'pokemart',
-    name: 'Boutique Pokémon de Menton',
+    name: 'Boutique Pokémon de Jadielle',
     width: 10,
-    height: 9,
-    createGrid: createPokeMartMap,
-    staticNpcs: [],
+    height: 8,
+    createGrid: createPokeMartGrid,
     warps: {
-      '4,8': { targetMap: 'outdoor', targetX: 19, targetY: 16, dir: 'down', label: 'Sortir vers Menton' },
-      '5,8': { targetMap: 'outdoor', targetX: 19, targetY: 16, dir: 'down', label: 'Sortir vers Menton' },
-    }
+      '4,7': { targetMap: 'outdoor', targetX: 36, targetY: 20, dir: 'down', label: 'Sortir vers Jadielle' },
+      '5,7': { targetMap: 'outdoor', targetX: 36, targetY: 20, dir: 'down', label: 'Sortir vers Jadielle' },
+      '4,8': { targetMap: 'outdoor', targetX: 36, targetY: 20, dir: 'down', label: 'Sortir vers Jadielle' },
+      '5,8': { targetMap: 'outdoor', targetX: 36, targetY: 20, dir: 'down', label: 'Sortir vers Jadielle' }
+    },
+    staticNpcs: []
   },
   gym: {
     id: 'gym',
-    name: 'Arène Pokémon de Menton',
+    name: 'Arène Pokémon de Jadielle',
     width: 14,
-    height: 12,
-    createGrid: createGymMap,
-    staticNpcs: [],
+    height: 14,
+    createGrid: createGymGrid,
     warps: {
-      '6,11': { targetMap: 'outdoor', targetX: 38, targetY: 6, dir: 'down', label: 'Sortir vers Menton' },
-      '7,11': { targetMap: 'outdoor', targetX: 38, targetY: 6, dir: 'down', label: 'Sortir vers Menton' },
-    }
+      '6,13': { targetMap: 'outdoor', targetX: 36, targetY: 11, dir: 'down', label: 'Sortir vers Jadielle' },
+      '7,13': { targetMap: 'outdoor', targetX: 36, targetY: 11, dir: 'down', label: 'Sortir vers Jadielle' },
+      '6,14': { targetMap: 'outdoor', targetX: 36, targetY: 11, dir: 'down', label: 'Sortir vers Jadielle' },
+      '7,14': { targetMap: 'outdoor', targetX: 36, targetY: 11, dir: 'down', label: 'Sortir vers Jadielle' }
+    },
+    staticNpcs: []
   }
 };
 
-export function isSolid(grid, x, y) {
-  const h = grid.length;
-  const w = h > 0 ? grid[0].length : 0;
-  if (x < 0 || x >= w || y < 0 || y >= h) return true;
-  const tile = grid[y][x];
-  return SOLID_TILES.has(tile);
+export function createMentonMap() {
+  return MAPS.outdoor.createGrid();
 }
 
-export function getTile(grid, x, y) {
-  const h = grid.length;
-  const w = h > 0 ? grid[0].length : 0;
-  if (x < 0 || x >= w || y < 0 || y >= h) return TILE.WALL_INDOOR;
-  return grid[y][x];
+export function isSolid(grid, tx, ty) {
+  if (!grid || ty < 0 || ty >= grid.length || tx < 0 || tx >= grid[0].length) {
+    return true;
+  }
+  return SOLID_TILES.has(grid[ty][tx]);
+}
+
+export function getTile(grid, tx, ty) {
+  if (!grid || ty < 0 || ty >= grid.length || tx < 0 || tx >= grid[0].length) {
+    return TILE.TREE_PINE;
+  }
+  return grid[ty][tx];
 }
