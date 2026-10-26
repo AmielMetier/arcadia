@@ -3,10 +3,12 @@
 // au plus dans la ville et le bourg), bâtiments sur la terre ferme et sans chevauchement, une porte au rez-de-chaussée,
 // un escalier dès qu'il y a un étage, toutes les pièces accessibles, des routes qui relient tous les lieux, assez de
 // coffres, la tempête et le temps de génération.
-// Déplacement, sur l'île officielle : on entre par la porte de chaque bâtiment, on monte chaque escalier jusqu'à
-// l'étage (ou au toit), un mur plein arrête, on nage dans le lac ; et le coût d'un pas pour 30 joueurs.
+// Déplacement, sur l'île officielle : une porte fermée arrête, ouverte on entre dans chaque bâtiment, on monte chaque
+// escalier jusqu'à l'étage (ou au toit) sans qu'un meuble gêne, un mur plein arrête, on nage dans le lac ; et le coût
+// d'un pas pour 30 joueurs. Meubles : aucun ne déborde de sa pièce ni n'en chevauche un autre.
 import { generateMap, planStorm, planFlight, CELL, MAX_TOWN_BUILDINGS, ILE } from '../royale/engine/map.js';
 import { buildWorld, floorY } from '../royale/engine/world.js';
+import { FURN, furnRect } from '../royale/engine/furniture.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
 
 const SEEDS = +(process.argv[2] || 12);
@@ -96,7 +98,18 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     const door = b.levels[0].walls.find((e) => e.ext && (e.k === 'porte' || e.k === 'portail'));
     const mx = door.o === 'h' ? (door.x + 0.5) * CELL : door.x * CELL, mz = door.o === 'h' ? door.z * CELL : (door.z + 0.5) * CELL;
     const nx = door.o === 'h' ? 0 : door.x === b.x0 ? 1 : -1, nz = door.o === 'h' ? (door.z === b.z0 ? 1 : -1) : 0;
-    const p = newPlayer(mx - nx * 3, m.heightAt(mx - nx * 3, mz - nz * 3) + 0.5, mz - nz * 3, yawTo(nx, nz));
+    const start = () => newPlayer(mx - nx * 3, m.heightAt(mx - nx * 3, mz - nz * 3) + 0.5, mz - nz * 3, yawTo(nx, nz));
+    // porte fermée : elle arrête ; ouverte : on entre
+    const leaf = b.doors.find((d) => d.k === 0 && d.o === door.o && d.x === door.x && d.z === door.z);
+    if (leaf) {
+      W.setDoor(leaf.id, false);
+      const c = run(start(), { yaw: yawTo(nx, nz) }, 0.4); run(c, { mz: 1, yaw: c.yaw }, 1.3);
+      ok(!inside(c, b), `${b.label} n°${b.id} : une porte fermée ne retient pas`);
+      W.setDoor(leaf.id, true);
+      const nearDoor = W.doorNear(mx - nx * 1.2, b.y + 0.15, mz - nz * 1.2, nx, nz);
+      ok(nearDoor === leaf, `${b.label} n°${b.id} : la porte devant soi n'est pas trouvée`);
+    }
+    const p = start();
     run(p, { yaw: p.yaw }, 0.4); run(p, { mz: 1, yaw: p.yaw }, 1.3);
     ok(inside(p, b), `${b.label} n°${b.id} : on n'entre pas par la porte`);
     if (inside(p, b)) doors++;
@@ -111,6 +124,22 @@ for (let seed = 1; seed <= SEEDS; seed++) {
       if (up) stairs++;
     }
   }
+  // meubles : dans les murs du bâtiment, sans se chevaucher (les tapis passent sous les tables)
+  let furn = 0;
+  for (const b of m.buildings) {
+    furn += b.furniture.length;
+    const solid = b.furniture.filter((f) => FURN[f.kind].solid);
+    for (const f of b.furniture) {
+      const r = furnRect(f);
+      ok(r.x0 >= b.x0 * CELL && r.x1 <= (b.x0 + b.w) * CELL && r.z0 >= b.z0 * CELL && r.z1 <= (b.z0 + b.d) * CELL, `${b.label} n°${b.id} : ${f.kind} dépasse du bâtiment`);
+    }
+    for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) {
+      if (solid[i].k !== solid[j].k) continue;
+      const a = furnRect(solid[i]), c = furnRect(solid[j]);
+      ok(!(a.x0 < c.x1 - 0.01 && a.x1 > c.x0 + 0.01 && a.z0 < c.z1 - 0.01 && a.z1 > c.z0 + 0.01), `${b.label} n°${b.id} : ${solid[i].kind} et ${solid[j].kind} se chevauchent`);
+    }
+  }
+  console.log(`  ${furn} meubles, ${m.stats.doors} portes`);
   // un mur plein arrête
   const b = m.buildings.find((q) => q.levels[0].walls.some((e) => e.ext && e.k === 'mur' && e.o === 'h' && e.z === q.z0));
   const e = b.levels[0].walls.find((q) => q.ext && q.k === 'mur' && q.o === 'h' && q.z === b.z0);

@@ -4,6 +4,7 @@
 // Trois formes : boîte alignée sur les axes, cylindre vertical, boîte tournée autour de la verticale ; plus des
 // rampes (escaliers, pans de toit) qui ne font que porter. Une grille de 8 m range tout ça pour les recherches.
 import { CELL, STOREY } from './buildings.js';
+import { FURN, furnRect } from './furniture.js';
 
 export const WALL_T = 0.3;     // épaisseur d'un mur extérieur (m)
 export const INNER_T = 0.18;   // épaisseur d'une cloison
@@ -69,6 +70,21 @@ export function buildWorld(map) {
     cellRange(a, b, c, d, (k) => { const l = grid[k], i = l.indexOf(s); if (i >= 0) l.splice(i, 1); });
   }
   const box = (x0, y0, z0, x1, y1, z1, ref) => add({ t: 0, x0, y0, z0, x1, y1, z1, ref });
+  // portes : un battant fermé est une plaque dans l'ouverture ; ouvert, il ne gêne plus
+  const doors = new Map(), dgrid = Array.from({ length: GN * GN }, () => []);
+  const doorSolid = (d) => {
+    const b = map.buildings[d.b], F = floorY(b, d.k), sy = levelH(b) / STOREY;
+    const [u0, u1, top] = d.kind === 'portail' ? [0.2, 3.8, 2.9 * sy] : [1.3, 2.7, 2.35 * sy];
+    return d.o === 'h' ? box(d.x * CELL + u0, F, d.z * CELL - 0.07, d.x * CELL + u1, F + top, d.z * CELL + 0.07, { door: d.id })
+      : box(d.x * CELL - 0.07, F, d.z * CELL + u0, d.x * CELL + 0.07, F + top, d.z * CELL + u1, { door: d.id });
+  };
+  function setDoor(id, open) {
+    const d = doors.get(id);
+    if (!d || d.open === open) return d;
+    d.open = open;
+    if (open && d.solid) { remove(d.solid); d.solid = null; } else if (!open) d.solid = doorSolid(d);
+    return d;
+  }
   const ramp = (r) => { ramps.push(r); cellRange(r.x0, r.z0, r.x1, r.z1, (k) => rgrid[k].push(r)); return r; };
 
   // ------------------------------------------------------------------ bâtiments
@@ -92,6 +108,18 @@ export function buildWorld(map) {
         const st = lv.stairs;
         ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' } });
       }
+    }
+    // meubles (les tapis, plantes et lampes ne gênent pas), portes
+    for (const f of b.furniture || []) {
+      if (!FURN[f.kind].solid) continue;
+      const r = furnRect(f), y = floorY(b, f.k);
+      box(r.x0, y, r.z0, r.x1, y + f.h, r.z1, { furn: f.id, b: b.id, k: f.k });
+    }
+    for (const d of b.doors || []) {
+      doors.set(d.id, d);
+      d.cx = d.o === 'h' ? (d.x + 0.5) * CELL : d.x * CELL; d.cz = d.o === 'h' ? d.z * CELL : (d.z + 0.5) * CELL; d.y = floorY(b, d.k);
+      dgrid[Math.min(GN - 1, Math.floor(d.cz / G)) * GN + Math.min(GN - 1, Math.floor(d.cx / G))].push(d);
+      d.solid = d.open ? null : doorSolid(d);
     }
     // poteaux d'angle (les murs se rejoignent sans fente)
     const top = floorY(b, b.floors);
@@ -245,7 +273,25 @@ export function buildWorld(map) {
     return map.water[k] ? map.waterLevel[k] : -Infinity;
   }
 
-  return { solids, ramps, add, remove, box, support, ceiling, push, solidAt, ray, waterLevel, near, over };
+  // la porte la plus proche devant un joueur (x, y = pieds, z, regard fx, fz), à moins de r mètres
+  function doorNear(x, y, z, fx, fz, r = 2.4) {
+    let best = null, bd = Infinity;
+    const i0 = Math.max(0, Math.floor((x - r) / G)), i1 = Math.min(GN - 1, Math.floor((x + r) / G));
+    const j0 = Math.max(0, Math.floor((z - r) / G)), j1 = Math.min(GN - 1, Math.floor((z + r) / G));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) for (const d of dgrid[j * GN + i]) {
+      if (Math.abs(d.y - y) > 1.6) continue;
+      const dx = d.cx - x, dz = d.cz - z, dist = Math.hypot(dx, dz);
+      if (dist > r) continue;
+      // on préfère celle qu'on regarde
+      const facing = dist > 0.01 ? (dx * fx + dz * fz) / dist : 1;
+      if (facing < -0.2) continue;
+      const score = dist - facing * 0.8;
+      if (score < bd) { bd = score; best = d; }
+    }
+    return best;
+  }
+
+  return { solids, ramps, add, remove, box, support, ceiling, push, solidAt, ray, waterLevel, near, over, doors, setDoor, doorNear };
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)

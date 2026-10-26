@@ -7,8 +7,9 @@
 import { makeRng, hash as ihash } from './rng.js';
 import { makeNoise } from './noise.js';
 import { makeBuilding, CELL, STOREY, BTYPES, MATS } from './buildings.js';
+import { furnishBuilding, FURN } from './furniture.js';
 
-export { CELL, STOREY, BTYPES, MATS };
+export { CELL, STOREY, BTYPES, MATS, FURN };
 export const SIZE = 1600;   // côté de la carte (m)
 export const HRES = 2;      // pas de la grille des hauteurs (m)
 export const SNOW = 96;     // altitude des neiges (m)
@@ -876,6 +877,8 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
     if (RD[k] < RW[k] + 1.5 && H[k] < RL[k]) { WK[k] = WATER.RIVIERE; WL[k] = RL[k]; }
   }
   for (const b of buildings) b.y = hAt((b.x0 + b.w / 2) * CELL, (b.z0 + b.d / 2) * CELL);
+  // meubles et portes : tirage à part par bâtiment (ajouter un meuble ne change pas l'île)
+  for (const b of buildings) furnishBuilding(b, makeRng(ihash(seed * 7919 + b.id * 31 + 17)));
   for (let c = 0; c < GN * GN; c++) {
     const i = c % GN, j = (c - i) / GN, x = (i + 0.5) * CELL, z = (j + 0.5) * CELL, k = vi(x, z);
     if (ROADD[k] < ROADW[k] && (OCC[c] === OC.FREE || OCC[c] === OC.FIELD) && !WK[k]) OCC[c] = OC.ROAD;
@@ -1036,6 +1039,7 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
     spanM: Math.max(bx1 - bx0, bz1 - bz0) * CELL,
     buildings: buildings.length, byType, props: byKind,
     chests: chests.length, loot: loot.length, ammo: ammo.length,
+    furniture: buildings.reduce((n, b) => n + b.furniture.length, 0), doors: buildings.reduce((n, b) => n + b.doors.length, 0),
     towns: pois.filter((p) => p.town).length, lieuxDits: pois.filter((p) => !p.town).length,
     roadKm: roads.reduce((s, r) => s + r.pts.length * 4, 0) / 1000, bridges: bridges.length,
     groundCounts: counts,

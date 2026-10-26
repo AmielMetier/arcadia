@@ -2,6 +2,7 @@
 // puis tout le reste en vectoriel à chaque image (routes, bâtiments et leurs plans, décor, coffres, noms, grille,
 // tempête, montgolfière). Sert à l'aperçu de la carte et servira de carte du jeu (touche M) et de minicarte.
 import { CELL, SNOW, WATER, PROPS } from '../engine/map.js';
+import { furnRect } from '../engine/furniture.js';
 
 const ss = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
 const rgb = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
@@ -420,6 +421,11 @@ function drawRoof(ctx, b, s, px) {
 }
 
 const FLOORS = { bois: '#e6d1a8', pierre: '#ece5d6', metal: '#d8dcdf' };
+const FURN_COLORS = {
+  lit: '#5f86c4', lit_simple: '#7a9fd4', canape: '#c45a4a', fauteuil: '#d07a5a', tapis: 'rgba(170,90,70,.35)', cuisine: '#9aa3ab', frigo: '#dfe3e6',
+  baignoire: '#bfe3f2', douche: '#bfe3f2', toilettes: '#f4f6f8', lavabo: '#f4f6f8', etagere: '#8a9096', voiture: '#e8473a', foin: '#e0c25a',
+  plante: '#5fa04a', bibliotheque: '#8a5a32', armoire: '#a0703f',
+};
 function drawPlan(ctx, b, k, px) {
   const lv = b.levels[k], x0 = b.x0 * CELL, z0 = b.z0 * CELL, W = b.w * CELL, D = b.d * CELL;
   ctx.fillStyle = 'rgba(10,20,10,.25)'; ctx.fillRect(x0 + 0.6, z0 + 0.6, W, D);
@@ -446,6 +452,14 @@ function drawPlan(ctx, b, k, px) {
     ctx.lineTo(cx + st.dx * 0.6 - st.dz * 0.7, cz + st.dz * 0.6 + st.dx * 0.7);
     ctx.moveTo(cx + st.dx * 1.4, cz + st.dz * 1.4); ctx.lineTo(cx + st.dx * 0.6 + st.dz * 0.7, cz + st.dz * 0.6 - st.dx * 0.7);
     ctx.stroke();
+  }
+  // meubles de l'étage, en aplats (lits bleus, canapés rouges, cuisines grises, salles de bains bleu clair…)
+  for (const f of b.furniture || []) {
+    if (f.k !== k) continue;
+    const r = furnRect(f);
+    ctx.fillStyle = FURN_COLORS[f.kind] || '#b49a78';
+    ctx.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0);
+    if (f.kind !== 'tapis') { ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = px(0.8); ctx.strokeRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0); }
   }
   // pans : murs, fenêtres, portes, portails, trous
   const T = 0.42;

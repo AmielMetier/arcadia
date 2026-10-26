@@ -25,7 +25,8 @@ export class Input {
       if (e.code === 'Escape' && this.free) { this.free = false; this.keys.clear(); this.h.lock && this.h.lock(false); return; }
       if (e.code === 'Tab' || (e.ctrlKey && MOVE_KEYS[e.code])) e.preventDefault();
       this.keys.add(e.code);
-      this.h.key && this.h.key(e.code);
+      // lettres d'action lues par leur sens (E, R, M…) : la même touche sur un clavier français ou anglais
+      this.h.key && this.h.key(e.code, (e.key || '').toLowerCase());
     });
     on(window, 'keyup', (e) => this.keys.delete(e.code));
     on(window, 'blur', () => this.keys.clear());
@@ -59,7 +60,7 @@ export class Input {
     return { mx: Math.max(-1, Math.min(1, mx)), mz: Math.max(-1, Math.min(1, mz)) };
   }
   get sprint() { return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'); }
-  get crouch() { return this.keys.has('ControlLeft') || this.keys.has('KeyC'); }
+  get crouch() { return this.keys.has('ControlLeft') || this.keys.has('ControlRight'); }
   takeJump() { const j = this.jumps > 0; this.jumps = 0; return j; }
   takeMouse() { const d = [this.dx * this.sens, this.dy * this.sens]; this.dx = this.dy = 0; return d; }
   dispose() { this.unlock(); for (const f of this.offs) f(); }

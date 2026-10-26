@@ -4,6 +4,8 @@
 - **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré. Première étape : l'île à explorer, sans combat.
   - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
   - Tous les bâtiments s'ouvrent : on entre par les portes, on monte les escaliers jusqu'aux toits plats.
+  - Les portes s'ouvrent et se ferment avec la touche E, et pivotent du côté opposé à celui qui les pousse. Les garages et les hangars ont un rideau métallique qui s'enroule.
+  - Les bâtiments sont meublés selon leurs pièces : séjours et salons (canapés, fauteuils, télé, bibliothèques), cuisines, chambres (lits, armoires, commodes, tables de chevet), salles de bains, bureaux, magasins, garages avec leur voiture, entrepôts, granges, restaurants, et des tableaux aux murs. Les maisons abandonnées ont gardé quelques meubles, parfois renversés.
   - On court, on sprinte, on s'accroupit, on saute, et on nage dans le lac et dans la mer.
   - Minicarte en haut à droite, grande carte avec la touche M : pendant l'exploration, un clic sur la carte t'y emmène.
 

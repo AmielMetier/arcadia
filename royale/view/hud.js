@@ -11,7 +11,7 @@ export function createHud(map, { onTeleport } = {}) {
   const img = terrainImage(map, { ppm: 0.5 });
   const mini = $('#mini'), mctx = mini.getContext('2d');
   const big = $('#bigmap'), bcv = big.querySelector('canvas'), bctx = bcv.getContext('2d');
-  const place = $('#place'), fps = $('#fps');
+  const place = $('#place'), fps = $('#fps'), promptEl = $('#prompt');
   const dpr = () => Math.min(2, devicePixelRatio || 1);
   const LAY_MINI = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: false, coffres: false, noms: false, grille: false };
   const LAY_BIG = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: true, coffres: false, noms: true, grille: true };
@@ -65,5 +65,6 @@ export function createHud(map, { onTeleport } = {}) {
     get mapOpen() { return !big.hidden; },
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },
+    prompt(txt) { if (promptEl.dataset.t === txt) return; promptEl.dataset.t = txt; promptEl.hidden = !txt; promptEl.innerHTML = txt ? `<kbd>E</kbd> ${txt}` : ''; },
   };
 }

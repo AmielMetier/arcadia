@@ -8,6 +8,7 @@ import { createPost } from './post.js';
 import { buildTerrain, buildDecals } from './terrain.js';
 import { buildWater } from './water.js';
 import { buildStructures } from './structures.js';
+import { buildInterior } from './interior.js';
 import { buildForest, buildProps } from './props.js';
 import { SWAY } from './trees.js';
 
@@ -63,6 +64,8 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
   const structures = buildStructures(map); scene.add(structures.group);
+  progress('Meubles et portes', 0.56); await breathe();
+  const interior = buildInterior(map); scene.add(interior.group);
   progress('Forêts', 0.62); await breathe();
   const forest = buildForest(map); scene.add(forest.group);
   progress('Décor', 0.72); await breathe();
@@ -111,6 +114,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     sun.position.set(fx + sunDir.x * 200, fy + sunDir.y * 200, fz + sunDir.z * 200);
     SWAY.uT.value = time0; SWAY.uWind.value = 0.35;
     water.update(time0);
+    interior.update(dt);
     sky.userData.update(time0, { dir: 0.7, speed: 3 });
     if (post) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, time0); }
     else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
@@ -120,7 +124,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (disposed) return;
     disposed = true;
     removeEventListener('resize', resize);
-    terrain.dispose(); decals.dispose(); water.dispose(); structures.dispose(); forest.dispose(); props.dispose();
+    terrain.dispose(); decals.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
     scene.traverse((o) => {
       if ((o.isMesh || o.isPoints) && !o.userData.shared && !o.isInstancedMesh) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });
@@ -129,5 +133,5 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     canvas.remove();
   }
 
-  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, MOBILE };
+  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, MOBILE };
 }

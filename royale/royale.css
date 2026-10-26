@@ -16,6 +16,8 @@ kbd{display:inline-block;min-width:1.6em;padding:1px 6px;border-radius:6px;backg
 .cross::before,.cross::after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.45);border-radius:2px}
 .cross::before{left:10px;top:3px;width:2px;height:16px}
 .cross::after{top:10px;left:3px;height:2px;width:16px}
+.prompt{position:absolute;left:50%;top:calc(50% + 34px);transform:translateX(-50%);padding:6px 12px;border-radius:999px;background:rgba(14,22,34,.62);color:#fff;font-size:14px;white-space:nowrap}
+.prompt kbd{margin-right:4px}
 .mapframe{position:absolute;right:16px;top:16px;width:200px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
 #mini{width:200px;height:200px;border-radius:18px;border:3px solid var(--edge);box-shadow:0 8px 20px rgba(0,0,0,.25);background:#1f5f9e}
 .place{align-self:center;padding:4px 12px;border-radius:999px;background:oklch(0.985 0.006 95 / .92);font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,.18);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}

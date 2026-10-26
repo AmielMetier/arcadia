@@ -74,8 +74,9 @@ function teleport(x, z) {
   S.prev = { ...S.p };
 }
 
-function onKey(code) {
-  if (code === 'KeyM') { S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); }
+function onKey(code, key) {
+  if (key === 'e' && S.input.playing) interact();
+  else if (key === 'm' || code === 'KeyM') { S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); }
   else if (code === 'Escape' && S.hud.mapOpen) S.hud.toggleMap(false);
   else if (code === 'KeyH') $('#hints').classList.toggle('off');
   else if (code === 'KeyF' && DEBUG) S.hud.showFps(true);
@@ -83,6 +84,28 @@ function onKey(code) {
 function onLock(locked, free) {
   if (locked) { showScreen(null); S.hud.toggleMap(false); if (free) toast('Souris non capturée : maintiens le clic pour regarder', 4); return; }
   if (!S.hud.mapOpen) showScreen('pause');
+}
+
+// ------------------------------------------------------------------ interactions : portes (bientôt coffres et butin)
+function lookDir() { return [Math.sin(S.yaw), Math.cos(S.yaw)]; }
+function interact() {
+  const [fx, fz] = lookDir();
+  const d = S.world.doorNear(S.p.x, S.p.y, S.p.z, fx, fz);
+  if (d) toggleDoor(d.id, !d.open, S.p.x, S.p.z);
+}
+// la porte s'ouvre en s'éloignant de celui qui la pousse
+function toggleDoor(id, open, fromX, fromZ) {
+  const d = S.world.doors.get(id);
+  if (!d) return;
+  if (open) d.swing = d.o === 'h' ? (fromZ > d.cz ? -1 : 1) : (fromX > d.cx ? -1 : 1);
+  S.world.setDoor(id, open);
+  S.scene.interior.setDoor(id, open);
+}
+// ce qu'on peut faire avec E, affiché sous le viseur
+function showPrompt() {
+  const [fx, fz] = lookDir();
+  const d = S.world.doorNear(S.p.x, S.p.y, S.p.z, fx, fz);
+  S.hud.prompt(d ? (d.open ? 'Fermer' : 'Ouvrir') + (d.kind === 'portail' ? ' le portail' : ' la porte') : '');
 }
 
 // ------------------------------------------------------------------ boucle
@@ -130,6 +153,7 @@ function loop(now) {
   if (cy < wl + 0.35) cy = wl + 0.35;
   S.scene.frame(dt, { pos: { x: cx, y: cy, z: cz }, look: { x: px + fx * 20, y: py + fy * 20, z: pz + fz * 20 } }, { x, y, z });
   S.hud.update(S.t, { x, z }, S.yaw, S.ms);
+  if ((S.tick = (S.tick || 0) + 1) % 6 === 0) showPrompt();
   // qualité automatique : si l'image prend plus de 24 ms pendant 3 s, on allège
   if (S.ms > 24 && S.t > 6) { S.slow += dt; if (S.slow > 3) { S.slow = 0; const w = S.scene.lowerQuality(); if (w && DEBUG) toast('Qualité baissée : ' + w, 2); } }
   else S.slow = Math.max(0, S.slow - dt);
@@ -146,7 +170,7 @@ function showScreen(kind) {
     ? `<p class="eyebrow">Battle royale · phase 1</p><h1>L'île</h1>
        <p class="lede">Promène-toi : villes, villages, lieux-dits, maisons abandonnées. Entre dans les bâtiments, monte les escaliers, grimpe sur les toits plats, traverse le lac à la nage. Pas encore de combat.</p>
        ${matchMedia('(pointer: coarse)').matches ? '<p class="lede"><b>Pour l\'instant, Island Rush se joue au clavier et à la souris.</b></p>' : ''}
-       <ul class="keys"><li><kbd>Z Q S D</kbd> ou <kbd>W A S D</kbd> se déplacer</li><li><kbd>Souris</kbd> regarder</li><li><kbd>Espace</kbd> sauter</li><li><kbd>Maj</kbd> sprinter</li><li><kbd>Ctrl</kbd> ou <kbd>C</kbd> s'accroupir</li><li><kbd>M</kbd> carte (clic pour s'y rendre)</li><li><kbd>Échap</kbd> pause</li></ul>
+       <ul class="keys"><li><kbd>Z Q S D</kbd> ou <kbd>W A S D</kbd> se déplacer</li><li><kbd>Souris</kbd> regarder</li><li><kbd>Espace</kbd> sauter</li><li><kbd>Maj</kbd> sprinter</li><li><kbd>Ctrl</kbd> s'accroupir</li><li><kbd>E</kbd> ouvrir, fermer une porte</li><li><kbd>M</kbd> carte (clic pour s'y rendre)</li><li><kbd>Échap</kbd> pause</li></ul>
        <div class="row">${play}${back}</div>`
     : `<h1>Pause</h1><div class="row">${play}${back}</div>`;
   $('#go').onclick = () => S.input.lock();

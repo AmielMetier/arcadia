@@ -123,16 +123,32 @@ const unitBox = (sideOf) => { const B = builder(); B.box(0, 0, 0, 1, 1, 1, sideO
 
 // matériau à deux faces de couleur : aSide = 1 → couleur de l'instance, 0 → couleur uniforme (intérieur).
 // glow : lumière propre des faces intérieure (0) et extérieure (1) — les pièces restent lisibles loin des fenêtres
-function twoTone(map, inner, extra = {}, glow = [0.32, 0]) {
+function twoTone(map, inner, extra = {}, glow = [0.32, 0], plainInner = false) {
   const m = new THREE.MeshStandardMaterial({ map, roughness: 0.9, metalness: 0, ...extra });
-  const U = { uInner: { value: new THREE.Color(inner) }, uGlow: { value: new THREE.Vector2(...glow) } };
+  const U = { uInner: { value: new THREE.Color(inner) }, uGlow: { value: new THREE.Vector2(...glow) }, uPlain: { value: plainInner ? 1 : 0 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aSide; uniform vec3 uInner; varying float vSide;')
-      .replace('#include <color_vertex>', '#include <color_vertex>\nvColor = mix(uInner, vColor, aSide); vSide = aSide;');
+      .replace('#include <color_vertex>', '#include <color_vertex>\nvColor = mix(uInner, vColor, aSide); vSide = aSide;')
+      // texture plaquée selon la position dans le monde (2 m par motif) : les boîtes étirées (planchers, poteaux,
+      // garde-corps) gardent un motif à la bonne taille
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+        {
+          vec4 wp4 = vec4(transformed, 1.0);
+          vec3 wn = objectNormal;
+          #ifdef USE_INSTANCING
+            wp4 = instanceMatrix * wp4; wn = mat3(instanceMatrix) * wn;
+          #endif
+          wp4 = modelMatrix * wp4; wn = abs(normalize(mat3(modelMatrix) * wn));
+          #ifdef USE_MAP
+            vMapUv = wn.y > 0.5 ? wp4.xz * 0.5 : (wn.x > wn.z ? wp4.zy * 0.5 : wp4.xy * 0.5);
+          #endif
+        }`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec2 uGlow; varying float vSide;')
+      .replace('#include <common>', '#include <common>\nuniform vec2 uGlow; uniform float uPlain; varying float vSide;')
+      // plafonds unis (le dessous des dalles ne prend pas le parquet)
+      .replace('#include <map_fragment>', '#include <map_fragment>\nif (uPlain > 0.5 && vSide < 0.5) diffuseColor.rgb = diffuse;')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * mix(uGlow.x, uGlow.y, vSide);');
   };
   m.customProgramCacheKey = () => 'royale-twotone';
@@ -145,8 +161,8 @@ export function buildStructures(map) {
   const tex = Object.fromEntries(Object.keys(TEX).map((k) => [k, TEX[k]()]));
   const mats = {}, geos = {};
   for (const mat of ['pierre', 'bois', 'metal']) mats[mat] = twoTone(tex[mat], INTERIOR[mat], { roughness: mat === 'metal' ? 0.6 : 0.9, metalness: mat === 'metal' ? 0.25 : 0 });
-  mats.floor = twoTone(tex.parquet, 0xf3efe6, {}, [0.32, 0.28]);
-  mats.roof = twoTone(tex.gravier, 0xf3efe6, {}, [0.32, 0]);
+  mats.floor = twoTone(tex.parquet, 0xf3efe6, {}, [0.32, 0.28], true);
+  mats.roof = twoTone(tex.gravier, 0xf3efe6, {}, [0.32, 0], true);
   mats.socle = twoTone(tex.parquet, 0x8d877c, {}, [0, 0.28]);
   mats.stairs = new THREE.MeshStandardMaterial({ map: tex.parquet, color: 0xb98c5e, roughness: 0.85, emissive: 0x3a2a1a });
   for (const k of ['mur', 'fenetre', 'porte', 'portail', 'casse']) geos['ext:' + k] = panelGeo(k, WALL_T, true);
