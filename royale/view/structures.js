@@ -307,8 +307,11 @@ export function buildStructures(map) {
     cap.position.set(L.x, L.y + 3.5, L.z);
     for (const o of [gal, glass, cap]) { o.castShadow = true; group.add(o); extra.push(o); }
   }
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {
     group, index,
+    // un pan de mur cassé disparaît (clé « b:k:ox,z » du moteur)
+    hideWall(key) { const w = index.get(key); if (w) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; } },
     dispose() {
       for (const g of Object.values(geos)) g.dispose();
       for (const m of Object.values(mats)) m.dispose();

@@ -11,6 +11,9 @@ import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
+import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
+import { createBuilds } from './view/builds.js';
+import { MATERIALS } from './engine/items.js';
 import { Input } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
@@ -30,7 +33,9 @@ const S = {
   yaw: 0, pitch: -0.1, camD: 3.8, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
   cam: { x: 0, y: 0, z: 0 },
+  build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
 };
+const MATS = ['bois', 'pierre', 'metal'];
 
 function progress(label, f) {
   const t = $('#loadTxt'), b = $('#loadBar');
@@ -73,7 +78,11 @@ async function boot(info) {
   S.running = true;
   S.last = performance.now();
   requestAnimationFrame(loop);
-  if (DEBUG) window.__royale = S;
+  if (DEBUG) {
+    window.__royale = S;
+    // débogage : faire avancer le jeu de n images de 1/60 s (utile quand l'onglet est caché et ne dessine plus)
+    S.advance = (n = 1) => { for (let i = 0; i < n; i++) { const t = S.last + 1000 / 60; loop(t); } };
+  }
 }
 
 // ------------------------------------------------------------------ une partie
@@ -93,6 +102,9 @@ function newMatch() {
   if (S.fx) S.fx.dispose();
   S.actors = createActors(S.scene.scene, S.sim);
   S.fx = createFx(S.scene.scene);
+  S.buildApi = createBuild(S.sim, S.map, S.world);
+  if (S.builds) S.builds.dispose();
+  S.builds = createBuilds(S.scene.scene);
   for (const P of S.sim.S.players.values()) S.prev.set(P.id, { x: P.x, y: P.y, z: P.z, yaw: P.yaw });
   if (S.sim.S.flight) S.yaw = Math.atan2(S.sim.S.flight.ux, S.sim.S.flight.uz);
   S.sel = 0; S.ended = false; S.reported = false; S.spect = null;
@@ -121,12 +133,24 @@ function onKey(code, key) {
   if (key === 'e') S.cnt.use++;
   else if (key === 'r') S.cnt.reload++;
   else if (key === 'g') S.cnt.drop++;
-  else if (/^Digit[1-5]$/.test(code)) S.sel = +code.slice(5);
-  else if (code === 'Digit0' || code === 'Backquote' || key === 'x' || key === '²') S.sel = 0;
+  // construction : F mur, V sol, C escalier (encore une fois pour sortir), T matériau
+  else if (key === 'f' || key === 'v' || key === 'c') { const k = { f: 'mur', v: 'sol', c: 'escalier' }[key]; S.build = S.build === k ? null : k; buildBar(); }
+  else if (key === 't') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); }
+  else if (/^Digit[1-5]$/.test(code)) { S.sel = +code.slice(5); S.build = null; buildBar(); }
+  else if (code === 'Digit0' || code === 'Backquote' || key === 'x' || key === '²') { S.sel = 0; S.build = null; buildBar(); }
+}
+function buildBar() {
+  const el = $('#buildbar');
+  el.hidden = !S.build;
+  if (!S.build) return;
+  const P = me();
+  el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}"><kbd>${{ mur: 'F', sol: 'V', escalier: 'C' }[k]}</kbd>${l}</span>`).join('')
+    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}"><kbd>T</kbd>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
 }
 function onWheel(dir) {
   const P = me();
   if (!P) return;
+  if (S.build) { const ks = Object.keys(PIECES); S.build = ks[(ks.indexOf(S.build) + dir + ks.length) % ks.length]; buildBar(); return; }
   // on passe d'un objet tenu au suivant (l'outil et les cases occupées)
   const occupied = [0, ...P.inv.map((s, i) => (s ? i + 1 : -1)).filter((i) => i > 0)];
   const i = occupied.indexOf(S.sel);
@@ -157,7 +181,7 @@ function loop(now) {
   while (S.acc >= DT && steps < 6) {
     for (const Q of S.sim.S.players.values()) { const pr = S.prev.get(Q.id); if (pr) { pr.x = Q.x; pr.y = Q.y; pr.z = Q.z; pr.yaw = Q.yaw; } else S.prev.set(Q.id, { x: Q.x, y: Q.y, z: Q.z, yaw: Q.yaw }); }
     S.sim.input(S.me, { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, fire: on && inp.fire, aim: on && inp.aim, sprint: on && inp.sprint, crouch: on && inp.crouch,
-      jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel });
+      jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel, build: on ? S.build : null, mat: S.mat });
     S.sim.step(DT);
     S.acc -= DT; steps++;
   }
@@ -169,6 +193,12 @@ function loop(now) {
   const view = cameraFor(P, disp, dt);
   S.actors.update(dt, S.t, view.pos, disp, scoped ? S.me : null);
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
+  // fantôme de la pièce à construire
+  if (S.build && P && P.alive && P.mode === 'sol') {
+    const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces);
+    S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
+  } else S.builds.ghost(null);
+  S.builds.update(dt, S.buildApi.pieces);
   const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72;
   S.fov += (fov - S.fov) * (1 - Math.exp(-14 * dt));
   if (Math.abs(cam.fov - S.fov) > 0.01) { cam.fov = S.fov; cam.updateProjectionMatrix(); }
@@ -311,6 +341,27 @@ function handleEvents(list) {
       case 'saut': if (e.p === S.me) S.hud.say('Saut !<small>Espace pour ouvrir le planeur plus tôt</small>', 2.5); break;
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); break;
       case 'fin': endMatch(e.winner); break;
+      case 'construit': S.builds.add(e.piece); if (e.piece.owner === S.me) buildBar(); break;
+      case 'coup': {
+        const col = { bois: 0xb08a5a, pierre: 0xa9a49a, metal: 0xc8ccd0 }[e.mat] || 0xcfc6b5;
+        S.fx.puff(e.x, e.y, e.z, { color: col, size: 0.3, grow: 1.6, life: 0.4, op: 0.8 });
+        if (e.by === S.me) S.hud.structure(e.hp, e.max);
+        break;
+      }
+      case 'casse': {
+        const k = e.key, rest = k.slice(2);
+        if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); }
+        else if (k[0] === 'w') S.scene.structures.hideWall(rest);
+        else if (k[0] === 'f') S.scene.interior.hideFurn(+rest);
+        else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
+        else if (k[0] === 'b') S.builds.remove(+rest);
+        const col = { bois: 0x9a6a3a, pierre: 0x8a857c, metal: 0xaab2b8 }[e.mat] || 0x9a8a78;
+        for (let i = 0; i < 6; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
+        break;
+      }
+      case 'recolte': if (e.p === S.me) { S.hud.gain(`+${e.n} ${MATERIALS[e.m].label.toLowerCase()}`, MATERIALS[e.m].color); buildBar(); } break;
+      case 'pioche': { const h = S.actors.heroOf(e.p); if (h) h.shot(); break; }
+      case 'manque': if (e.p === S.me) toast(`Pas assez de ${MATERIALS[e.m].label.toLowerCase()} (${COST} par pièce)`, 1.6); break;
       default: break;
     }
   }
@@ -358,7 +409,8 @@ function showScreen(kind, data) {
   const keys = `<ul class="keys"><li><kbd>Z Q S D</kbd> ou <kbd>W A S D</kbd> se déplacer</li><li><kbd>Souris</kbd> regarder, <kbd>clic</kbd> tirer</li>
     <li><kbd>Clic droit</kbd> viser</li><li><kbd>1</kbd> à <kbd>5</kbd>, molette : objets ; <kbd>X</kbd> outil</li>
     <li><kbd>Espace</kbd> sauter, planer</li><li><kbd>Maj</kbd> sprinter, <kbd>Ctrl</kbd> s'accroupir</li>
-    <li><kbd>E</kbd> ouvrir, ramasser</li><li><kbd>R</kbd> recharger, <kbd>G</kbd> lâcher</li><li><kbd>M</kbd> carte</li><li><kbd>Échap</kbd> pause</li></ul>`;
+    <li><kbd>E</kbd> ouvrir, ramasser</li><li><kbd>R</kbd> recharger, <kbd>G</kbd> lâcher</li>
+    <li><kbd>X</kbd> pioche : casse et récolte</li><li><kbd>F</kbd> mur, <kbd>V</kbd> sol, <kbd>C</kbd> escalier, <kbd>T</kbd> matériau</li><li><kbd>M</kbd> carte</li><li><kbd>Échap</kbd> pause</li></ul>`;
   const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lede"><b>Pour l\'instant, Island Rush se joue au clavier et à la souris.</b></p>' : '';
   let html;
   if (kind === 'start') {

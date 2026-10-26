@@ -9,6 +9,9 @@
 import { generateMap, planStorm, planFlight, CELL, MAX_TOWN_BUILDINGS, ILE } from '../royale/engine/map.js';
 import { buildWorld, floorY } from '../royale/engine/world.js';
 import { FURN, furnRect } from '../royale/engine/furniture.js';
+import { createSim, DT } from '../royale/engine/sim.js';
+import { createBuild, slotFor } from '../royale/engine/build.js';
+import { weapon } from '../royale/engine/items.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
 
 const SEEDS = +(process.argv[2] || 12);
@@ -157,6 +160,85 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const step = (performance.now() - t) / 600;
   console.log(`  ${doors}/${m.buildings.length} entrées, ${stairs} escaliers montés · 30 joueurs : ${step.toFixed(3)} ms par pas`);
   ok(step < 2, `pas de simulation trop cher (${step.toFixed(2)} ms)`);
+}
+// ------------------------------------------------------------------ une partie : saut, combat, récolte, construction
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const sim = createSim({ map: m, world: W, seed: 5, roster: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }], mode: 'partie' });
+  const B = createBuild(sim, m, W);
+  const A = sim.player('a'), Bp = sim.player('b');
+  ok(sim.S.items.size > 600 && sim.S.chests.size > 150, `butin au départ : ${sim.S.items.size} objets, ${sim.S.chests.size} coffres`);
+  // saut de la montgolfière, atterrissage
+  for (let i = 0; i < 300; i++) sim.step(DT);
+  sim.input('a', { jump: 1 });
+  let landed = false;
+  for (let i = 0; i < 60 * 40 && !landed; i++) { sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'atterrit' && e.p === 'a') landed = true; }
+  ok(landed && A.mode === 'sol', 'A ne se pose pas après son saut');
+  // un coffre ouvert donne une arme, des munitions, un objet et des matériaux
+  const c = [...sim.S.chests.values()].find((q) => q.kind === 'coffre');
+  Object.assign(A, { x: c.x + (c.fx || 0) * 1.6, z: c.z + (c.fz || 1) * 1.6, y: c.y + 0.2, vx: 0, vz: 0 });
+  sim.input('a', { yaw: Math.atan2(-(c.fx || 0), -(c.fz || 1)), use: 1 });
+  sim.step(DT);
+  const spawned = [...sim.S.items.values()].filter((g) => Math.hypot(g.x - c.x, g.z - c.z) < 3.5).map((g) => g.it.t);
+  // (les munitions se ramassent toutes seules en passant dessus)
+  ok(c.open && spawned.includes('arme') && (spawned.includes('munitions') || Object.values(A.ammo).some((n) => n > 0)), `coffre : ${c.open ? 'ouvert' : 'fermé'}, ${spawned.join(', ')}`);
+  // un pré dégagé pour la suite
+  let spot = null;
+  for (let i = 0; i < 5000 && !spot; i++) {
+    const x = 300 + ((i * 7919) % 1000), z = 300 + ((i * 104729) % 1000);
+    if (m.groundAt(x, z) === 2 && m.groundAt(x, z + 14) === 2 && !m.poiAt(x, z) && !m.props.some((p) => Math.hypot(p.x - x, p.z - z) < 20) && W.support(x, z, 400) - m.heightAt(x, z) < 0.1) spot = { x, z };
+  }
+  // combat : A, fusil épique, élimine B planté devant lui ; B lâche son butin
+  Object.assign(A, { x: spot.x, z: spot.z, y: W.support(spot.x, spot.z, 400), vx: 0, vz: 0 });
+  Bp.mode = 'sol'; Bp.inv[0] = weapon('pompe', 1);
+  Object.assign(Bp, { x: A.x, z: A.z + 14, y: W.support(A.x, A.z + 14, A.y + 3), vx: 0, vy: 0, vz: 0 });
+  A.inv[0] = weapon('fusil', 3); A.ammo.moyennes = 90;
+  sim.input('a', { sel: 1, yaw: 0 }); for (let i = 0; i < 30; i++) sim.step(DT);
+  const ey = sim.eye(A), dx = Bp.x - ey[0], dy = Bp.y + 1.1 - ey[1], dz = Bp.z - ey[2];
+  sim.input('a', { yaw: Math.atan2(dx, dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fire: true, aim: true });
+  let elim = null;
+  for (let i = 0; i < 300 && !elim; i++) { sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'elim' && e.to === 'b') elim = e; }
+  sim.input('a', { fire: false });
+  ok(elim && elim.by === 'a' && A.kills === 1, 'A n\'élimine pas B');
+  ok([...sim.S.items.values()].some((g) => g.it.t === 'arme' && g.it.w === 'pompe' && Math.hypot(g.x - Bp.x, g.z - Bp.z) < 3), 'B ne lâche pas son arme');
+  // récolte : un arbre tombe à la pioche et donne du bois
+  const ti = m.props.findIndex((p) => p.kind === 'arbre'), t = m.props[ti];
+  Object.assign(A, { x: t.x - 1.6, z: t.z, y: W.support(t.x - 1.6, t.z, 400), vx: 0, vz: 0 });
+  let yaw = 0, pitch = 0;
+  for (let k = 0; k < 5; k++) { A.yaw = yaw = Math.atan2(t.x - sim.eye(A)[0], t.z - sim.eye(A)[2]); pitch = Math.atan2(A.y + 1 - sim.eye(A)[1], Math.hypot(t.x - sim.eye(A)[0], t.z - sim.eye(A)[2])); }
+  sim.input('a', { sel: 0, yaw, pitch, fire: true });
+  let felled = false;
+  for (let i = 0; i < 60 * 8 && !felled; i++) { sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'casse' && e.key === 'p:' + ti) felled = true; }
+  sim.input('a', { fire: false });
+  ok(felled && A.mats.bois >= 30, `arbre : ${felled ? 'abattu' : 'debout'}, ${A.mats.bois} de bois`);
+  // construction : escalier, mur et sol au niveau des pieds ; on monte l'escalier ; il s'effondre s'il ne tient plus
+  Object.assign(A, { x: spot.x + 8, z: spot.z - 8, y: W.support(spot.x + 8, spot.z - 8, 400), vx: 0, vz: 0 });
+  A.mats = { bois: 300, pierre: 100, metal: 100 };
+  let shots = 10;
+  const build = (k, yw, pt) => { sim.input('a', { build: k, mat: 'bois', yaw: yw, pitch: pt, shoot: ++shots }); for (let i = 0; i < 30; i++) sim.step(DT); sim.input('a', { build: null }); };
+  build('escalier', 0, -0.2); build('mur', Math.PI / 2, -0.1);
+  const kinds = [...B.pieces.values()].map((p) => p.kind).sort().join(',');
+  ok(kinds === 'escalier,mur' && A.mats.bois === 280, `construction : ${kinds}, ${A.mats.bois} de bois`);
+  const st = [...B.pieces.values()].find((p) => p.kind === 'escalier');
+  Object.assign(A, { x: (st.x + 0.5) * CELL - st.dx * 3, z: (st.z + 0.5) * CELL - st.dz * 3, vx: 0, vz: 0 }); A.y = W.support(A.x, A.z, A.y + 2);
+  sim.input('a', { mz: 1, yaw: Math.atan2(st.dx, st.dz) });
+  let top = 0; for (let i = 0; i < 100; i++) { sim.step(DT); top = Math.max(top, A.y); }
+  sim.input('a', { mz: 0 });
+  ok(Math.abs(top - (st.y0 + 3.2)) < 0.3, `escalier : sommet à ${top.toFixed(2)} au lieu de ${(st.y0 + 3.2).toFixed(2)}`);
+  // en haut de l'escalier, un sol qui ne tient que par lui : il tombe avec l'escalier (le mur, posé au sol, reste)
+  Object.assign(A, { x: (st.x + 0.5 + st.dx * 0.45) * CELL, z: (st.z + 0.5 + st.dz * 0.45) * CELL, y: st.y0 + 3.2, vx: 0, vz: 0 });
+  build('sol', Math.atan2(st.dx, st.dz), -0.2);
+  const before = B.pieces.size;
+  B.hit('b:' + st.id, 9999, null, [0, 0, 0], false);
+  ok(before === 3 && B.pieces.size === 1, `effondrement : ${before} pièces avant, ${B.pieces.size} après`);
+  // un mur de maison se casse à la pioche et donne son matériau
+  const bld = m.buildings.find((b) => b.type === 'maison'), wall = bld.levels[0].walls.find((e) => e.ext && e.k === 'mur');
+  const key = `w:${bld.id}:0:${wall.o}${wall.x},${wall.z}`, had = A.mats[bld.mat];
+  for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 50, A, [0, 0, 0], true);
+  ok(B.broken.has(key) && !(W.byKey.get(key) || []).length && A.mats[bld.mat] > had, 'un mur de maison ne se casse pas');
+  // coût d'un pas avec 3 joueurs et le butin de l'île
+  const t0 = performance.now(); for (let i = 0; i < 300; i++) sim.step(DT);
+  console.log(`  partie : saut, coffre, élimination, récolte, construction et effondrement vérifiés · ${((performance.now() - t0) / 300).toFixed(3)} ms par pas`);
 }
 console.log(fails ? `\n${fails} échec(s)` : '\nTout est bon.');
 process.exit(fails ? 1 : 0);

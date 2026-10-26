@@ -302,9 +302,11 @@ export function buildInterior(map) {
     mesh.count = list.length; mesh.castShadow = true; mesh.receiveShadow = true; mesh.computeBoundingSphere();
     group.add(mesh);
   }
-  const moving = new Set();
+  const moving = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {
     group, furnIndex,
+    hideFurn(id) { const w = furnIndex.get(id); if (w) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; } },
+    hideDoor(id) { const st = anim.get(id); if (st) { moving.delete(st); st.mesh.setMatrixAt(st.i, zero); st.mesh.instanceMatrix.needsUpdate = true; anim.delete(id); } },
     setDoor(id, open) { const st = anim.get(id); if (!st) return; st.want = open ? 1 : 0; moving.add(st); },
     update(dt) {
       for (const st of moving) {

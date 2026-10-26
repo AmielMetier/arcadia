@@ -119,3 +119,13 @@ kbd{display:inline-block;min-width:1.6em;padding:1px 6px;border-radius:6px;backg
 .ranking li.me{background:#ffd23f}
 .ranking li span{font-weight:900}
 .ranking li em{font-style:normal;color:var(--ink-2)}
+.structhp{position:absolute;left:50%;top:calc(50% - 64px);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff;font-size:11px;text-shadow:0 1px 2px #000}
+.structhp b{display:block;width:90px;height:6px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden}
+.structhp i{display:block;height:100%;background:#ffd23f}
+.gain{position:absolute;left:calc(50% + 30px);top:calc(50% - 30px);font-size:16px;font-weight:900;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .3s,transform .3s}
+.gain.on{opacity:1;transform:translateY(-8px)}
+.buildbar{position:absolute;left:50%;bottom:108px;transform:translateX(-50%);display:flex;gap:6px}
+.buildbar span{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:10px;background:rgba(14,22,34,.6);color:#fff;font-size:13px}
+.buildbar span.on{background:#3d8fe8}
+.buildbar span.mat{background:color-mix(in srgb,var(--c) 70%,#000)}
+.buildbar[hidden]{display:none}

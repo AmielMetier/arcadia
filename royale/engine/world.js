@@ -40,6 +40,17 @@ const PROP_SHAPES = {
 };
 const propScale = (p) => (p.kind === 'rocher' ? p.s : 1);
 
+// clé d'un objet destructible (toutes ses formes partagent la même) : pan de mur, meuble, décor, porte, construction
+export function keyOf(ref) {
+  if (!ref) return null;
+  if (ref.e) return `w:${ref.b}:${ref.k}:${ref.e.o}${ref.e.x},${ref.e.z}`;
+  if (ref.furn != null) return `f:${ref.furn}`;
+  if (ref.prop != null) return `p:${ref.prop}`;
+  if (ref.door != null) return `d:${ref.door}`;
+  if (ref.build != null) return `b:${ref.build}`;
+  return null;
+}
+
 export function buildWorld(map) {
   const S = map.size, GN = Math.ceil(S / G);
   const solids = [];   // { t: 0 boîte | 1 cylindre | 2 boîte tournée, …, y0, y1, ref }
@@ -57,10 +68,13 @@ export function buildWorld(map) {
     const e = Math.abs(s.ux) * s.hx + Math.abs(s.uz) * s.hz, f = Math.abs(s.uz) * s.hx + Math.abs(s.ux) * s.hz;
     return [s.cx - e, s.cz - f, s.cx + e, s.cz + f];
   };
+  const byKey = new Map();
   function add(s) {
     s.id = solids.length; solids.push(s);
     const [a, b, c, d] = bounds(s);
     cellRange(a, b, c, d, (k) => grid[k].push(s));
+    s.key = keyOf(s.ref);
+    if (s.key) { if (!byKey.has(s.key)) byKey.set(s.key, []); byKey.get(s.key).push(s); }
     return s;
   }
   function remove(s) {
@@ -68,6 +82,7 @@ export function buildWorld(map) {
     s.dead = true;
     const [a, b, c, d] = bounds(s);
     cellRange(a, b, c, d, (k) => { const l = grid[k], i = l.indexOf(s); if (i >= 0) l.splice(i, 1); });
+    if (s.key && byKey.has(s.key)) { const l = byKey.get(s.key), i = l.indexOf(s); if (i >= 0) l.splice(i, 1); }
   }
   const box = (x0, y0, z0, x1, y1, z1, ref) => add({ t: 0, x0, y0, z0, x1, y1, z1, ref });
   // portes : un battant fermé est une plaque dans l'ouverture ; ouvert, il ne gêne plus
@@ -80,12 +95,38 @@ export function buildWorld(map) {
   };
   function setDoor(id, open) {
     const d = doors.get(id);
-    if (!d || d.open === open) return d;
+    if (!d || d.dead || d.open === open) return d;
     d.open = open;
     if (open && d.solid) { remove(d.solid); d.solid = null; } else if (!open) d.solid = doorSolid(d);
     return d;
   }
-  const ramp = (r) => { ramps.push(r); cellRange(r.x0, r.z0, r.x1, r.z1, (k) => rgrid[k].push(r)); return r; };
+  const ramp = (r) => {
+    ramps.push(r); cellRange(r.x0, r.z0, r.x1, r.z1, (k) => rgrid[k].push(r));
+    r.key = keyOf(r.ref);
+    if (r.key) { if (!byKey.has(r.key)) byKey.set(r.key, []); byKey.get(r.key).push(r); }
+    return r;
+  };
+  function removeRamp(r) {
+    if (r.dead) return;
+    r.dead = true;
+    cellRange(r.x0, r.z0, r.x1, r.z1, (k) => { const l = rgrid[k], i = l.indexOf(r); if (i >= 0) l.splice(i, 1); });
+    const i = ramps.indexOf(r); if (i >= 0) ramps.splice(i, 1);
+    if (r.key && byKey.has(r.key)) { const l = byKey.get(r.key), j = l.indexOf(r); if (j >= 0) l.splice(j, 1); }
+  }
+  // retire tout un objet destructible (toutes ses formes) ; renvoie son centre et sa matière s'il existait
+  function removeKey(key) {
+    const list = byKey.get(key);
+    if (!list || !list.length) return null;
+    let x = 0, y = 0, z = 0;
+    for (const s of [...list]) {
+      const c = s.t === 0 ? [(s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2, (s.z0 + s.z1) / 2] : s.t != null ? [s.cx, (s.y0 + s.y1) / 2, s.cz] : [(s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2, (s.z0 + s.z1) / 2];
+      x += c[0]; y += c[1]; z += c[2];
+      if (s.t != null) remove(s); else removeRamp(s);
+    }
+    byKey.delete(key);
+    if (key.startsWith('d:')) { const d = doors.get(+key.slice(2)); if (d) { d.dead = true; d.solid = null; } }
+    return { x: x / list.length, y: y / list.length, z: z / list.length };
+  }
 
   // ------------------------------------------------------------------ bâtiments
   for (const b of map.buildings) {
@@ -370,7 +411,7 @@ export function buildWorld(map) {
     const i0 = Math.max(0, Math.floor((x - r) / G)), i1 = Math.min(GN - 1, Math.floor((x + r) / G));
     const j0 = Math.max(0, Math.floor((z - r) / G)), j1 = Math.min(GN - 1, Math.floor((z + r) / G));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) for (const d of dgrid[j * GN + i]) {
-      if (Math.abs(d.y - y) > 1.6) continue;
+      if (d.dead || Math.abs(d.y - y) > 1.6) continue;
       const dx = d.cx - x, dz = d.cz - z, dist = Math.hypot(dx, dz);
       if (dist > r) continue;
       // on préfère celle qu'on regarde
@@ -382,7 +423,7 @@ export function buildWorld(map) {
     return best;
   }
 
-  return { solids, ramps, add, remove, box, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, doors, setDoor, doorNear, grid, G, GN };
+  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, doors, setDoor, doorNear, grid, G, GN };
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)

@@ -225,6 +225,7 @@ export function createTreeKit() {
       });
       im.castShadow = shadows; im.receiveShadow = true; im.computeBoundingSphere();
       im.userData.shared = true;
+      im.userData.items = list; // pour retrouver l'instance d'un arbre (abattu)
       group.add(im);
     };
     const pines = byKind.pine, pinesA = pines.filter((t) => !(t.v & 1)), pinesB = pines.filter((t) => t.v & 1);

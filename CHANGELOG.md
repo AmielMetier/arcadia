@@ -13,6 +13,8 @@
   - Coffres dorés et caisses de munitions dans les maisons et en pleine nature, butin posé au sol, inventaire de cinq cases (touches 1 à 5 ou molette), E pour ramasser, G pour lâcher, R pour recharger.
   - Combat : 100 points de vie et jusqu'à 100 de bouclier, tir à la hanche ou en visant (clic droit), lunette du fusil de précision, tirs à la tête, roquettes et grenades qui explosent, dégâts de chute. Les éliminés lâchent tout leur butin.
   - Interface : barres de vie et de bouclier, munitions, chrono et cercle de la tempête sur la minicarte, fil des éliminations, marqueur de touche, chiffres de dégâts et direction des tirs reçus.
+  - Pioche (touche X) : tout se casse et se récolte. Les arbres donnent du bois ; les rochers, de la pierre ; les voitures et les conteneurs, du métal. Les murs des maisons, les portes et les meubles se cassent aussi. Les balles et les explosions abîment le décor et les constructions.
+  - Construction : mur (F), sol (V) et escalier (C) pour 10 de bois, de pierre ou de métal (T pour changer). Un fantôme bleu montre où la pièce va se poser. Les pièces durcissent en quelques secondes, et une construction qui ne repose plus sur rien s'effondre.
 
 ## 2.72 — 26 octobre 2026
 - **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.

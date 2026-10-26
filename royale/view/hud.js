@@ -200,8 +200,20 @@ export function createHud(map, { onTeleport, project } = {}) {
     $('#cross').hidden = !!scope;
   }
 
+  // points de vie de ce qu'on frappe, et matériaux récoltés
+  let structT = 0, gainT = 0;
+  function structure(hp, max) {
+    const el = $('#structhp'); el.hidden = false;
+    el.querySelector('i').style.width = Math.max(0, hp / max * 100) + '%';
+    el.querySelector('span').textContent = `${Math.ceil(hp)} / ${Math.round(max)}`;
+    clearTimeout(structT); structT = setTimeout(() => { el.hidden = true; }, 1500);
+  }
+  function gain(txt, color) {
+    const el = $('#gain'); el.textContent = txt; el.style.color = color; el.className = 'gain on';
+    clearTimeout(gainT); gainT = setTimeout(() => { el.className = 'gain'; }, 700);
+  }
   return {
-    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair,
+    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain,
     get mapOpen() { return !big.hidden; },
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },
