@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.72 — 26 octobre 2026
+- **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
+  - **Canyon Express** : une descente de 6 mètres, le saut du coyote au-dessus du ravin, des lacets qui grimpent, un pont de corde sans rambarde et une mine d'or avec tapis roulant.
+  - **Station Orbitale** : des plafonds aimantés où la balle roule la tête en bas, et on peut même tirer depuis le plafond, la caméra à l'envers. Il y a aussi des portes qui coulissent, un anneau géant, des astéroïdes qui tournent, et le vide tout autour.
+  - **Marais Brumeux** : des pontons sans rambarde, de la boue qui colle, des flaques de glu qui ralentissent la balle, des sauts de nénuphar en nénuphar et un moulin à eau.
+  - **Sommets Glacés** : de la glace qui glisse, de la neige qui freine, un grand tremplin, des télécabines qui traversent la piste, une crevasse et une piste de bobsleigh avec looping.
+  - **Fête Foraine** : un flipper plein de bumpers, des trampolines, une grande roue à passer au bon moment, un train fantôme et des montagnes russes.
+  - Nouveau choix « 18 trous » : trois parcours à la suite (aller et retour sur la carte de score).
+- **Mini-Golf Party** — Corrections :
+  - La balle ne revient plus une demi-seconde à sa position de départ à la fin d'un coup.
+  - Le résultat du trou (birdie, bogey…) ne se superpose plus au résumé du trou.
+  - La caméra tourne à 360° sans limite : un clic verrouille la souris, sinon il suffit de pousser le curseur contre le bord de l'écran ou de maintenir A / D (ou Q / D, ou les flèches). On peut donc tirer dans n'importe quelle direction.
+
 ## 2.71 — 26 octobre 2026
 - **Mini-Golf Party** — Jouable sur téléphone et tablette, à l'écran tactile.
   - On pose le doigt sur sa balle et on tire en arrière comme un lance-pierre : la flèche montre la direction, la jauge la puissance, et on lâche pour frapper. Revenir sur la balle annule le coup.

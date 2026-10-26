@@ -69,7 +69,7 @@
   #turnchip.soft { font-size: 22px; }
   #turnchip i { width: 20px; height: 20px; box-shadow: 0 0 0 3px var(--ink); }
   #turnchip.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  #big { position: absolute; top: 40%; left: 0; right: 0; text-align: center; opacity: 0; }
+  #big { position: absolute; top: 15%; left: 0; right: 0; text-align: center; opacity: 0; pointer-events: none; }
   #big .t { font-family: 'Bowlby One', sans-serif; font-size: clamp(40px, 8vw, 92px); color: var(--c); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); line-height: 1; }
   #big .s { font-size: 24px; color: #fff; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6); margin-top: 6px; }
   #big.show { animation: big 2.6s cubic-bezier(.2,1.3,.4,1) forwards; }
@@ -102,8 +102,8 @@
   #viewbtn.on { background: var(--hi); color: var(--ink); }
   body.touch #viewbtn { display: block; }
   body.touch #card { pointer-events: auto; }
-  #lockhint { pointer-events: auto !important; position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(20, 26, 46, .7); color: #fff; padding: 6px 16px; border-radius: 16px; font-size: 15px; border: none; }
-  #summary { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -40%) rotate(-1deg); background: var(--card); padding: 16px 22px 12px; border-radius: 8px; box-shadow: var(--shadow); min-width: 300px; opacity: 0; transition: .4s; }
+  #lockhint { pointer-events: auto !important; position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(20, 26, 46, .6); color: #fff; padding: 5px 14px; border-radius: 16px; font-size: 14px; border: none; }
+  #summary { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -40%) rotate(-1deg); background: var(--card); padding: 16px 22px 12px; border-radius: 8px; box-shadow: var(--shadow); min-width: 300px; opacity: 0; transition: .4s; }
   #summary.show { opacity: 1; transform: translate(-50%, -50%) rotate(-1deg); }
   #summary h3 { margin: 0 0 8px; font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 22px; }
   #summary .row { display: grid; grid-template-columns: 14px 1fr 40px 120px; align-items: center; gap: 10px; font-size: 19px; padding: 2px 0; border-bottom: 1px dashed rgba(29,43,79,.25); }
@@ -122,7 +122,8 @@
   .logo .f { background: var(--flag); clip-path: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%); padding: 8px 70px 8px 18px; align-self: flex-start; }
   .logo .f span { display: block; font-family: 'Bowlby One', sans-serif; font-size: 36px; line-height: .95; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.2); }
   .logo .sub { position: absolute; left: 22px; top: 98px; font-size: 18px; white-space: nowrap; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
-  #cards { display: grid; grid-template-columns: repeat(4, minmax(0, 210px)); gap: 18px; margin-top: 26px; }
+  #cards { display: grid; grid-template-columns: repeat(5, minmax(0, 178px)); gap: 14px; margin-top: 26px; }
+  #cards .card b { font-size: 16px; } #cards .card span { font-size: 13px; }
   .card { position: relative; background: #fff; border: none; border-radius: 4px; padding: 8px 8px 10px; text-align: left; box-shadow: var(--shadow); transition: transform .2s; }
   .card:nth-child(odd) { transform: rotate(-1.6deg); } .card:nth-child(even) { transform: rotate(1.4deg); }
   .card:not([disabled]):hover { transform: rotate(0) translateY(-4px); }
@@ -166,6 +167,7 @@
   .pod.p1 { order: 2; } .pod.p2 { order: 1; } .pod.p3 { order: 3; }
   .pod b { font-family: 'Bowlby One', sans-serif; font-size: 38px; line-height: 1; }
   .pod span { font-weight: 700; } .pod small { color: var(--pencil); }
+  #resultcard { max-width: calc(100vw - 24px); overflow-x: auto; }
   #resultcard table { border-collapse: collapse; font-size: 18px; }
   #resultcard th, #resultcard td { text-align: center; min-width: 32px; height: 30px; padding: 0 4px; }
   #resultcard th { font-family: 'Bowlby One', sans-serif; font-weight: 400; font-size: 13px; }
@@ -189,7 +191,7 @@
   @keyframes roll { from { transform: translateX(-60px); } to { transform: translateX(60px); } }
   #loading b { font-family: 'Bowlby One', sans-serif; font-weight: 400; }
 
-  @media (max-width: 980px) { #cards { grid-template-columns: repeat(2, minmax(0, 220px)); } .lbrow { grid-template-columns: 1fr; } }
+  @media (max-width: 980px) { #cards { grid-template-columns: repeat(3, minmax(0, 200px)); } .lbrow { grid-template-columns: 1fr; } }
   @media (max-width: 1000px) { #spec { top: auto; bottom: 86px; } }
   /* téléphone : tout tient à l'écran, en paysage comme en portrait */
   body.touch #help { display: block !important; font-size: 13px; max-width: 62vw; bottom: 10px; }
@@ -201,7 +203,7 @@
     #menubtn { bottom: 70px; right: 10px; } #viewbtn { bottom: 124px; right: 10px; } #timer { right: 10px; bottom: 10px; width: 52px; height: 52px; }
     #power { bottom: 30px; } #intro .n { font-size: 80px; } #intro .nm { font-size: 28px; } #intro { top: 14%; }
     #turnchip { font-size: 22px; } #big .s { font-size: 18px; }
-    #lobby { padding: 10px 12px 18px; } #cards { margin-top: 18px; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 10px; }
+    #lobby { padding: 10px 12px 18px; } #cards { margin-top: 18px; grid-template-columns: repeat(5, minmax(0, 150px)); gap: 10px; }
     .card b { font-size: 15px; } .card span { font-size: 13px; } .logo .f span { font-size: 26px; } .logo .p { height: 72px; } .logo .sub { top: 74px; font-size: 15px; }
   }
   @media (max-width: 700px) and (orientation: portrait) {
@@ -249,7 +251,7 @@
   <div id="help"></div>
   <button id="menubtn" title="Menu (Échap)" aria-label="Menu">≡</button>
   <button id="viewbtn" title="Vue d'ensemble du trou" aria-label="Vue d'ensemble du trou">⤢</button>
-  <button id="lockhint" class="hidden">Clique dans le jeu pour piloter la caméra à la souris</button>
+  <button id="lockhint" class="hidden">Un clic pour tourner à 360° · ou A / D</button>
 </div>
 
 <div id="lobby" class="screen hidden">

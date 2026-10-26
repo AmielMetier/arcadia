@@ -3,6 +3,7 @@
    Repère local d'un trou : on part de l'origine vers +z ; +x = gauche. Voir build.js pour la tortue.
    ============================================================================= */
 import { HoleBuilder, V } from './build.js';
+import { COURSES2, THEME_MATS2 } from './courses2.js';
 
 const D2R = Math.PI / 180;
 const ring = (c, R, a0, a1, n = 24) => { const pts = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; pts.push([c[0] + Math.sin(a) * R, c[2] + Math.cos(a) * R]); } return pts; };
@@ -304,7 +305,7 @@ const forge = {
   center: [{ type: 'forgefire', p: [30, 0, 37] }],
 };
 
-export const COURSES = [park, pirate, zen, forge];
+export const COURSES = [park, pirate, zen, forge, ...COURSES2];
 export const courseById = (id) => COURSES.find((c) => c.id === id) || COURSES[0];
 
 /** Construit un trou (géométrie + monde physique). Résultat mis en cache. */
@@ -314,7 +315,7 @@ export function buildHole(course, i, theme) {
   if (cache.has(key)) return cache.get(key);
   const h = course.holes[i];
   const th = { ...theme, ...(h.skirt ? { skirt: h.skirt } : {}) };
-  const B = new HoleBuilder({ theme: th, at: h.at, groundY: course.groundY, groundType: course.groundType });
+  const B = new HoleBuilder({ theme: th, at: h.at, groundY: course.groundY, groundType: course.groundType, base: course.base });
   h.build(B);
   const res = B.result({ name: h.name, par: h.par, index: i, course: course.id });
   cache.set(key, res);
@@ -327,5 +328,6 @@ export const THEME_MATS = {
   pirate: { floor: 'plank', wall: 'wood', trim: 'woodtrim', skirt: 'skirtwood' },
   zen: { floor: 'moss', wall: 'stonew', trim: 'stonecap', skirt: 'skirtstone' },
   forge: { floor: 'metal', wall: 'metalw', trim: 'neon', skirt: 'skirtmetal' },
+  ...THEME_MATS2,
 };
 export const buildCourseHole = (course, i) => buildHole(course, i, THEME_MATS[course.theme]);

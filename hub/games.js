@@ -248,7 +248,7 @@ window.HUB_GAMES = [
     id: 'minigolf',
     title: 'Mini-Golf Party',
     tag: 'Mini-golf en 3D, chacun son tour',
-    desc: 'Mini-golf à la souris façon Golf It : 4 parcours (Green Park, Île aux Pirates, Jardin Zen, Forge Infernale), loopings, lave, moulins et pistons. Bots possibles, parcours choisi dans le jeu.',
+    desc: 'Mini-golf façon Golf It, à la souris ou au doigt : 54 trous dans 9 parcours (pirates, zen, lave, canyon, station spatiale à plafonds aimantés, marais, glace, fête foraine), en 3, 6 ou 18 trous. Bots possibles.',
     url: 'minigolf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#2e8b57',
