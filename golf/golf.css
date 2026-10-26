@@ -131,7 +131,6 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 @keyframes pop{0%{transform:translate(-50%,-50%) scale(.82);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
 .toast{position:absolute;left:50%;top:44%;transform:translateX(-50%);color:var(--white);font-size:16px;font-weight:800;padding:9px 18px;border-radius:999px;background:oklch(0.25 0.05 255 / .78);box-shadow:var(--sh-1);white-space:nowrap}
 
-.fade{position:fixed;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .38s var(--ease)}
 /* ralenti : bandes de cinéma, l'étiquette en haut à gauche ; le reste de l'interface s'efface */
 .replay{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s var(--ease)}
 .replay::before,.replay::after{content:'';position:absolute;left:0;right:0;height:9vh;background:oklch(0.12 0.02 255)}
@@ -140,7 +139,6 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .replay span{position:absolute;right:28px;bottom:calc(9vh + 16px);font-size:14px;font-weight:700;color:oklch(1 0 0 / .85)}
 .replaying .replay{opacity:1}
 .replaying #hud{display:none}
-.fade.on{opacity:1}
 
 /* joueurs (sous la carte du trou) et annonce du tour */
 .players{position:absolute;left:14px;top:106px;display:flex;flex-direction:column;gap:3px}

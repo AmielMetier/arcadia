@@ -229,7 +229,7 @@ function endIntro() {
   if (V.phase !== 'intro') return;
   hud.hideBanner();
   V.phase = 'cut';
-  fadeCut(() => { const r = V.introDone; V.introDone = null; r && r(); });
+  const r = V.introDone; V.introDone = null; r && r();
 }
 
 // carte de score entre deux trous (ou après le dernier)
@@ -308,12 +308,10 @@ function setTurn() {
   t.hidden = !t.innerHTML; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
   clearTimeout(V.turnT); V.turnT = setTimeout(() => { t.hidden = true; }, 2200);
   if (R.players.length > 1) sfx.ui(V.mine ? 'confirm' : 'switch');
-  const fromCut = V.phase === 'cut' || V.phase === 'intro';
   V.phase = V.mine ? 'aim' : 'watch';
   hud.players(stripList(), V.R.teams);
-  // petit fondu au blanc entre deux joueurs, puis la caméra se pose derrière la balle
-  if (fromCut) aimCamera(true);
-  else fadeCut(() => aimCamera(true));
+  // coupe nette : la caméra se pose derrière la balle du joueur suivant
+  aimCamera(true);
   sendPose();
 }
 
@@ -463,18 +461,15 @@ function startReplay() {
   const cx = at.x + R.x * side + A.x * back, cz = at.z + R.z * side + A.z * back;
   V.replayCam = { pos: V3(cx, ground(cx, cz) + (putt ? 0.7 : 4.5), cz) };
   scene.trailClear();
-  fadeCut(() => { scene.camTo(V.replayCam.pos, V3(from.x, ground(from.x, from.z), from.z), 3, true); document.body.classList.add('replaying'); });
+  scene.camTo(V.replayCam.pos, V3(from.x, ground(from.x, from.z), from.z), 3, true); document.body.classList.add('replaying');
 }
 function replayCamera(p) { scene.camTo(V.replayCam.pos, V3(p.x, p.y, p.z), 6); }
 function endReplay() {
   if (V.phase !== 'replay') return;
-  V.phase = 'cut'; // le temps du fondu, plus rien ne bouge
-  fadeCut(() => {
-    document.body.classList.remove('replaying');
-    const r = V.shot.ev.res;
-    if (r.kind !== 'water') scene.setBall(r.end.x, r.end.y, r.end.z);
-    finishShot();
-  });
+  document.body.classList.remove('replaying');
+  const r = V.shot.ev.res;
+  if (r.kind !== 'water') scene.setBall(r.end.x, r.end.y, r.end.z);
+  finishShot();
 }
 
 function finishShot() {
@@ -484,12 +479,6 @@ function finishShot() {
   V.phase = 'wait';
   if (V.session && V.session.isHost) V.session.done(ev.no);
   unbusy();
-}
-
-function fadeCut(fn) {
-  const f = $('#fade');
-  f.classList.add('on');
-  setTimeout(() => { fn(); f.classList.remove('on'); }, 360);
 }
 
 // ------------------------------------------------------------------ caméras
@@ -531,18 +520,69 @@ function holeCamera(g) {
   const far = Math.min(4, 1.6 + L * 0.25), py = h.heightAt(h.pin.x, h.pin.z);
   scene.camTo(V3(h.pin.x - ax / L * far, py + 0.9 + Math.min(L, 25) * 0.06, h.pin.z - az / L * far), L > 25 ? V3(h.pin.x, py, h.pin.z) : V3((h.pin.x + gp.x) / 2, py + 0.5, (h.pin.z + gp.z) / 2), 1.6);
 }
-// survol : on file au-dessus de la ligne de jeu, du départ vers le green
-function introCamera(u, snap) {
-  const pts = V.hole.center, segs = []; let tot = 0;
-  for (let i = 0; i < pts.length - 1; i++) { const L = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); segs.push(L); tot += L; }
-  const at = (f) => {
-    let d = clamp(f, 0, 1) * tot;
-    for (let i = 0; i < segs.length; i++) { if (d <= segs[i] || i === segs.length - 1) { const k = clamp(d / segs[i], 0, 1); return { x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, z: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k }; } d -= segs[i]; }
-    return { x: pts[0][0], z: pts[0][1] };
+// ligne de jeu du survol : rééchantillonnée tous les 2 m, prolongée avant le départ et après le green, puis lissée
+// (les coudes deviennent des courbes, la caméra ne tourne jamais d'un coup)
+function introPath(h) {
+  if (V.introPath && V.introPath.hole === h) return V.introPath;
+  const c = h.center, raw = [];
+  for (let i = 0; i < c.length - 1; i++) {
+    const [x0, z0] = c[i], [x1, z1] = c[i + 1], n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 2));
+    for (let k = 0; k < n; k++) raw.push([x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n]);
+  }
+  raw.push(c[c.length - 1]);
+  const ext = (a, b, k) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [a[0] + (a[0] - b[0]) / L * 2 * k, a[1] + (a[1] - b[1]) / L * 2 * k]; };
+  const W = 22, M = 100, a = raw[0], b = raw[Math.min(3, raw.length - 1)], y = raw[raw.length - 1], z = raw[Math.max(0, raw.length - 4)];
+  let P = [...Array.from({ length: M }, (_, k) => ext(a, b, M - k)), ...raw, ...Array.from({ length: M }, (_, k) => ext(y, z, k + 1))];
+  for (let pass = 0; pass < 3; pass++) P = P.map((_, i) => { let x = 0, zz = 0, n = 0; for (let k = Math.max(0, i - W); k <= Math.min(P.length - 1, i + W); k++) { x += P[k][0]; zz += P[k][1]; n++; } return [x / n, zz / n]; });
+  const S = [0]; for (let i = 1; i < P.length; i++) S.push(S[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  const s0 = S[M], tot = S[M + raw.length - 1] - s0;
+  const on = (s) => {
+    const d = clamp(s + s0, 0, S[S.length - 1]);
+    let i = 1; while (i < S.length - 1 && S[i] < d) i++;
+    const k = (d - S[i - 1]) / ((S[i] - S[i - 1]) || 1), dx = P[i][0] - P[i - 1][0], dz = P[i][1] - P[i - 1][1], L = Math.hypot(dx, dz) || 1;
+    return { x: P[i - 1][0] + dx * k, z: P[i - 1][1] + dz * k, dx: dx / L, dz: dz / L };
   };
-  const e = u * u * (3 - 2 * u);
-  const p = at(-0.05 + e * 0.88), l = at(0.12 + e * 0.88);
-  scene.camTo(V3(p.x, ground(p.x, p.z) + 34 - e * 12, p.z), V3(l.x, ground(l.x, l.z), l.z), snap ? 1 : 6, snap);
+  // trou en lacets (des virages qui repartent dans l'autre sens) : suivre chaque épingle donnerait le tournis ; on glisse
+  // vers la ligne droite départ → green. Une grande courbe régulière (une baie, un croissant), elle, se suit très bien.
+  let turn = 0, net = 0;
+  for (let i = 1; i < c.length - 1; i++) {
+    let d = Math.atan2(c[i + 1][0] - c[i][0], c[i + 1][1] - c[i][1]) - Math.atan2(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]);
+    d = Math.atan2(Math.sin(d), Math.cos(d)); turn += Math.abs(d); net += d;
+  }
+  const A = on(0), B = on(tot), cx = B.x - A.x, cz = B.z - A.z, cl = Math.hypot(cx, cz) || 1, w = clamp(((turn - Math.abs(net)) * 180 / Math.PI - 130) / 60, 0, 1);
+  // at(s) : point et direction à s mètres du départ (négatif = derrière le départ) ; on rejoint la ligne de jeu peu à
+  // peu dans la seconde moitié, pour arriver au green par le fairway (et pas au milieu des arbres)
+  const back = (s) => { const t = clamp((s - tot * 0.45) / (tot * 0.55 - 40), 0, 1); return t * t * (3 - 2 * t); };
+  const at = (s) => {
+    const p = on(s), k = w * (1 - back(s));
+    if (!k) return p;
+    const f = s / tot, dx = p.dx + (cx / cl - p.dx) * k, dz = p.dz + (cz / cl - p.dz) * k, L = Math.hypot(dx, dz) || 1;
+    return { x: p.x + (A.x + cx * f - p.x) * k, z: p.z + (A.z + cz * f - p.z) * k, dx: dx / L, dz: dz / L };
+  };
+  return (V.introPath = { hole: h, at, tot, w, y0: h.heightAt(h.tee.x, h.tee.z), y1: h.heightAt(h.pin.x, h.pin.z) });
+}
+// présentation du trou : on part haut derrière le départ, on file le long du jeu en descendant, et on se pose face
+// au drapeau ; le regard reste assez loin devant pour que le trou soit sous le bandeau « Trou n », jamais à la verticale
+function introCamera(u, snap) {
+  const h = V.hole, P = introPath(h), tot = P.tot, e = u * u * (3 - 2 * u);
+  const back = 30 + tot * 0.05, stop = clamp(tot * 0.2, 32, 60);
+  const s = -back + (tot - stop + back) * e, c = P.at(s);
+  // hauteur au-dessus d'une pente douce départ → green (pas du sol sous la caméra : on ne plonge pas dans les ravins)
+  const base = (t) => P.y0 + (P.y1 - P.y0) * clamp(t / tot, 0, 1);
+  const H = clamp(16 + tot * 0.07, 28, 52) * (1 - e) + 13 * e;
+  const side = h.n % 2 ? 1 : -1, off = Math.sin(u * Math.PI) * Math.min(16, tot * 0.04) * side;
+  const x = c.x - c.dz * off, z = c.z + c.dx * off;
+  let gy = ground(x, z);
+  for (const [dx, dz] of [[10, 0], [-10, 0], [0, 10], [0, -10]]) gy = Math.max(gy, ground(x + dx, z + dz));
+  // et jamais dans les branches : chaque arbre proche repousse la caméra vers le haut (en cône, sans à-coup)
+  for (const t of h.treesNear(x, z)) gy = Math.max(gy, t.y + t.h - 3 - Math.max(0, Math.hypot(t.x - x, t.z - z) - t.r) * 0.6);
+  const y = Math.max(base(s) + H, gy + 9);
+  // sujet du plan : le drapeau s'il est à portée de vue, sinon un point du fairway loin devant ; on le cadre un peu
+  // sous le centre de l'image (le bandeau « Trou n » occupe le haut), de plus en plus bas en approchant
+  const ss = Math.min(s + Math.max(120, (y - base(s)) * 3.4), tot), sp = P.at(ss), end = P.at(tot);
+  const k = clamp(1 - (tot - ss) / 60, 0, 1), sx = sp.x + (h.pin.x - end.x) * k, sz = sp.z + (h.pin.z - end.z) * k;
+  const D = Math.max(1, Math.hypot(sx - x, sz - z)), pitch = Math.atan2(y - base(ss), D) - (2.5 + 3.5 * e) * Math.PI / 180;
+  scene.camTo(V3(x, y, z), V3(sx, y - D * Math.tan(pitch), sz), snap ? 1 : 4, snap);
 }
 
 // ------------------------------------------------------------------ boucle
@@ -680,7 +720,7 @@ addEventListener('pagehide', teardown);
 if (QS.has('debug')) {
   // step(n) : avance de n images à 60 i/s, même quand la page est en arrière-plan (tests)
   const step = (n = 1) => { for (let i = 0; i < n; i++) loop(last + 1000 / 60); };
-  window.__golf = { V, scene, hud, sfx, step, get session() { return V.session; } };
+  window.__golf = { V, scene, hud, sfx, step, introCamera, get session() { return V.session; } };
 }
 if (scene) {
   raf = requestAnimationFrame(loop);

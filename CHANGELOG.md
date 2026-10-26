@@ -1,6 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.71 — 26 octobre 2026
+- **Birdie Party** — La présentation des trous est mieux cadrée, et les fondus au blanc disparaissent.
+  - On part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou.
+  - Les lacets se survolent sans donner le tournis.
+  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
 - **Hub** — Nouvelle vitrine : les jeux s'affichent sur quatre colonnes, à l'accueil comme dans le salon.
   - Chaque jeu a la même vignette : une vraie image du jeu avec son titre en grand et son sous-titre, une phrase pour le présenter, le nombre de joueurs et les bots.
   - Nouvelles affiches tirées du vrai jeu pour Bastion Clash (un assaut sur une base, en 3D), Birdie Party (le trou des Îles, au bord du lac), Poké Duel (Pikachu face à Dracaufeu) et Mini-Golf Party (le Double Looping de la Forge Infernale).
