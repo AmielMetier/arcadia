@@ -129,3 +129,13 @@ kbd{display:inline-block;min-width:1.6em;padding:1px 6px;border-radius:6px;backg
 .buildbar span.on{background:#3d8fe8}
 .buildbar span.mat{background:color-mix(in srgb,var(--c) 70%,#000)}
 .buildbar[hidden]{display:none}
+/* salon : joueurs prêts, bots ; réglages (sensibilité, volume) */
+.lobby{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.lobby li{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;border-radius:999px;background:var(--paper-2);font-size:13.5px}
+.lobby li i{width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 2px var(--edge)}
+.lobby li em{font-style:normal;font-size:12px;color:var(--ink-3)}
+.lobby li.bots i{background:repeating-linear-gradient(45deg,var(--ink-3) 0 3px,var(--paper) 3px 6px)}
+.opts{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 16px;font-size:13.5px;color:var(--ink-2)}
+.opts label{display:flex;align-items:center;gap:8px}
+.opts input[type=range]{width:120px;accent-color:var(--accent)}
+.panel{max-height:calc(100vh - 32px);overflow:auto}

@@ -3,6 +3,8 @@
 // au plus dans la ville et le bourg), bâtiments sur la terre ferme et sans chevauchement, une porte au rez-de-chaussée,
 // un escalier dès qu'il y a un étage, toutes les pièces accessibles, des routes qui relient tous les lieux, assez de
 // coffres, la tempête et le temps de génération.
+// Bots et réseau : une partie de bots suivie par deux copies d'invités (dès le départ, et en cours de route), qui
+// restent identiques à l'hôte ; puis une copie reprend la partie (relais d'hôte) ; la prédiction de l'invité.
 // Déplacement, sur l'île officielle : une porte fermée arrête, ouverte on entre dans chaque bâtiment, on monte chaque
 // escalier jusqu'à l'étage (ou au toit) sans qu'un meuble gêne, un mur plein arrête, on nage dans le lac ; et le coût
 // d'un pas pour 30 joueurs. Meubles : aucun ne déborde de sa pièce ni n'en chevauche un autre.
@@ -13,6 +15,8 @@ import { createSim, DT } from '../royale/engine/sim.js';
 import { createBuild, slotFor } from '../royale/engine/build.js';
 import { weapon } from '../royale/engine/items.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
+import { createAI } from '../royale/engine/ai.js';
+import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from '../royale/engine/net.js';
 
 const SEEDS = +(process.argv[2] || 12);
 let fails = 0;
@@ -239,6 +243,100 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   // coût d'un pas avec 3 joueurs et le butin de l'île
   const t0 = performance.now(); for (let i = 0; i < 300; i++) sim.step(DT);
   console.log(`  partie : saut, coffre, élimination, récolte, construction et effondrement vérifiés · ${((performance.now() - t0) / 300).toFixed(3)} ms par pas`);
+}
+// ------------------------------------------------------------------ bots et réseau
+// Une partie de bots (et d'un joueur invité) suivie par deux copies d'invités : l'une là dès le départ, l'autre
+// arrivée en cours de route (état complet) ; les copies doivent rester identiques à la partie de l'hôte. Puis la
+// première copie reprend la partie comme si l'hôte était parti.
+{
+  const m = generateMap(ILE), Wh = buildWorld(m);
+  const roster = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }, ...Array.from({ length: 14 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'difficile' }))];
+  const host = createSim({ map: m, world: Wh, seed: 77, roster, mode: 'partie' });
+  const hb = createBuild(host, m, Wh);
+  createAI(host, m, Wh);
+  const copy = () => { const W = buildWorld(m), sim = createSim({ map: m, world: W, seed: 77, roster, mode: 'partie' }); return { W, sim, b: createBuild(sim, m, W) }; };
+  const wire = (x) => JSON.parse(JSON.stringify(x));
+  const g1 = copy();
+  let g2 = null, pend = [], kills = 0, built = false;
+  const t0 = performance.now();
+  for (let step = 0; step < 60 * 200 && host.S.phase !== 'fin'; step++) {
+    host.input(2, { mz: 1, yaw: step * 0.003, jump: step > 700 ? 1 : 0, sprint: true });
+    // un bot pose un mur une fois au sol
+    const B0 = [...host.S.players.values()].find((p) => p.bot && p.alive && p.mode === 'sol' && p.ground);
+    if (!built && B0 && step % 30 === 0) { B0.mats.bois = 60; built = !!hb.place(B0, 'mur', 'bois'); }
+    host.step(DT);
+    for (const e of host.takeEvents()) { pend.push(e); if (e.e === 'elim') kills++; }
+    if (step === 60 * 70) { g2 = copy(); applyFull(g2.sim, g2.W, g2.b, wire(fullState(host, Wh, hb))); }
+    if (step % 3 === 0) {
+      const msg = wire({ s: snapshot(host, step % 60 === 0 ? 'tous' : 'humains'), e: pend });
+      pend = [];
+      for (const g of [g1, g2]) if (g) { for (const e of msg.e) mirrorEvent(g.sim, g.W, g.b, e); applySnapshot(g.sim, msg.s, null); }
+    }
+  }
+  const ms = (performance.now() - t0) / (host.S.t * 60);
+  const same = (g, name) => {
+    const a = [...host.S.items.keys()].sort().join(), b = [...g.sim.S.items.keys()].sort().join();
+    ok(a === b, `${name} : même butin au sol (${host.S.items.size} / ${g.sim.S.items.size})`);
+    const oc = (sim) => [...sim.S.chests.values()].filter((c) => c.open).map((c) => c.id).sort().join();
+    ok(oc(host) === oc(g.sim), `${name} : mêmes coffres ouverts`);
+    const od = (W) => [...W.doors.values()].filter((d) => d.open && !d.dead).map((d) => d.id).sort().join();
+    ok(od(Wh) === od(g.W), `${name} : mêmes portes ouvertes`);
+    ok([...hb.broken].sort().join() === [...g.b.broken].sort().join(), `${name} : mêmes objets détruits (${hb.broken.size})`);
+    ok([...hb.pieces.keys()].join() === [...g.b.pieces.keys()].join(), `${name} : mêmes constructions`);
+    for (const k of hb.broken) if ((g.W.byKey.get(k) || []).some((s2) => !s2.dead)) { ok(false, `${name} : ${k} encore solide`); break; }
+    for (const P of host.S.players.values()) {
+      const Q = g.sim.player(P.id);
+      if (P.alive !== Q.alive || Math.abs(P.hp - Q.hp) > 1 || (P.alive && Math.hypot(P.x - Q.x, P.z - Q.z) > 0.3)) { ok(false, `${name} : joueur ${P.id} différent`); break; }
+    }
+  };
+  same(g1, 'invité du départ'); same(g2, 'invité arrivé en route');
+  ok(built && hb.pieces.size >= 1, 'une construction pendant la partie');
+  ok(kills >= 2 && hb.broken.size > 0, `des bots qui se battent (${kills} éliminations) et cassent le décor`);
+  // l'hôte s'en va : la copie reprend la partie et la mène à son terme
+  const G = g1.sim;
+  G.S.nextItem = Math.max(G.S.nextItem, ...[...G.S.items.keys()].map((k) => k + 1));
+  G.S.projectiles = [];
+  for (const P of G.S.players.values()) { P.ai = null; P.use = null; }
+  createAI(G, m, g1.W);
+  const before = G.alive().length;
+  let crash = null;
+  try { for (let i = 0; i < 60 * 240 && G.S.phase !== 'fin'; i++) { G.step(DT); G.takeEvents(); } } catch (e) { crash = e; }
+  ok(!crash, 'la partie continue chez le nouvel hôte' + (crash ? ' : ' + crash.message : ''));
+  ok(G.alive().length < before || G.S.phase === 'fin', 'les éliminations continuent après le relais');
+  console.log(`  réseau : 2 copies identiques à l'hôte (${hb.broken.size} destructions, ${host.S.items.size} objets), relais d'hôte · ${kills} éliminations · ${ms.toFixed(3)} ms par pas avec 14 bots`);
+}
+// Prédiction : l'invité avance tout de suite, l'hôte confirme 100 ms plus tard ; les corrections restent petites
+{
+  const m = generateMap(ILE), Wh = buildWorld(m), Wg = buildWorld(m);
+  const roster = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = createSim({ map: m, world: Wh, seed: 3, roster, mode: 'exploration' });
+  const guest = createSim({ map: m, world: Wg, seed: 3, roster, mode: 'exploration' });
+  const P = guest.player(2), wire = (x) => JSON.parse(JSON.stringify(x));
+  const up = [], down = [];
+  let seq = 0, hist = [], jumps = 0, predJump = 0, fix = 0, fixes = 0;
+  for (let step = 0; step < 60 * 30; step++) {
+    if (step % 240 === 120) jumps++;
+    const h = { mx: step % 500 < 250 ? 0 : 0.6, mz: 1, yaw: Math.sin(step * 0.01) * 2, pitch: 0, sprint: step % 400 < 200, crouch: false, aim: false, fire: false, jump: jumps, use: 0, reload: 0, shoot: 0, drop: 0, sel: 0 };
+    const edge = h.jump !== predJump; predJump = h.jump;
+    seq++;
+    predictStep(P, { ...h, jump: edge }, Wg, DT);
+    hist.push({ q: seq, ...h, jump: edge });
+    if (seq % 2 === 0) up.push({ at: step + 6, m: wire({ q: seq, ...h }) });
+    while (up.length && up[0].at <= step) { const msg = up.shift().m; host.input(2, cleanInput(msg)); host.player(2).q = msg.q; }
+    host.step(DT); host.takeEvents();
+    if (step % 3 === 0) down.push({ at: step + 6, s: wire(snapshot(host)) });
+    while (down.length && down[0].at <= step) {
+      const s = down.shift().s, row = s.P.find((r) => r[0] === 2), was = { x: P.x, z: P.z };
+      applySnapshot(guest, s, 2);
+      Object.assign(P, { x: row[1], y: row[2], z: row[3], vx: row[6], vy: row[7], vz: row[8], mode: MODES[row[10]] });
+      hist = hist.filter((q) => q.q > row[18]);
+      for (const q of hist) predictStep(P, q, Wg, DT);
+      const d = Math.hypot(was.x - P.x, was.z - P.z);
+      fix = Math.max(fix, d); fixes += d;
+    }
+  }
+  ok(fix < 1, `prédiction de l'invité : correction maximale ${fix.toFixed(2)} m`);
+  console.log(`  prédiction : correction moyenne ${(fixes / 600 * 100).toFixed(1)} cm, au pire ${(fix * 100).toFixed(0)} cm (100 ms aller, 100 ms retour)`);
 }
 console.log(fails ? `\n${fails} échec(s)` : '\nTout est bon.');
 process.exit(fails ? 1 : 0);

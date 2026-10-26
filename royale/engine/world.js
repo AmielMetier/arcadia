@@ -69,12 +69,15 @@ export function buildWorld(map) {
     return [s.cx - e, s.cz - f, s.cx + e, s.cz + f];
   };
   const byKey = new Map();
+  // qui veut savoir qu'une forme apparaît ou disparaît (les chemins des bots)
+  const watchers = [];
   function add(s) {
     s.id = solids.length; solids.push(s);
     const [a, b, c, d] = bounds(s);
     cellRange(a, b, c, d, (k) => grid[k].push(s));
     s.key = keyOf(s.ref);
     if (s.key) { if (!byKey.has(s.key)) byKey.set(s.key, []); byKey.get(s.key).push(s); }
+    for (const w of watchers) w(s, true);
     return s;
   }
   function remove(s) {
@@ -83,6 +86,7 @@ export function buildWorld(map) {
     const [a, b, c, d] = bounds(s);
     cellRange(a, b, c, d, (k) => { const l = grid[k], i = l.indexOf(s); if (i >= 0) l.splice(i, 1); });
     if (s.key && byKey.has(s.key)) { const l = byKey.get(s.key), i = l.indexOf(s); if (i >= 0) l.splice(i, 1); }
+    for (const w of watchers) w(s, false);
   }
   const box = (x0, y0, z0, x1, y1, z1, ref) => add({ t: 0, x0, y0, z0, x1, y1, z1, ref });
   // portes : un battant fermé est une plaque dans l'ouverture ; ouvert, il ne gêne plus
@@ -423,7 +427,7 @@ export function buildWorld(map) {
     return best;
   }
 
-  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, doors, setDoor, doorNear, grid, G, GN };
+  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)

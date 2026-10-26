@@ -190,11 +190,14 @@ window.HUB_GAMES = [
     id: 'royale',
     title: 'Island Rush',
     tag: 'Battle royale sur une île',
-    desc: 'Une île d\'un kilomètre carré à explorer, avec ses villes, ses villages, ses lieux-dits et ses maisons abandonnées, tous ouverts (pour l\'instant sans combat).',
+    desc: 'Saute de la montgolfière sur une île d\'un kilomètre carré, fouille maisons et coffres, casse et construis, et sois le dernier debout quand la tempête se referme. Les places libres sont prises par des bots.',
     url: 'royale/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#3d9fd9',
     settings: [
+      { key: 'mode', label: 'Mode', options: [['partie', 'Battle royale'], ['exploration', 'Exploration · sans combat']], def: 'partie' },
+      { key: 'places', label: 'Joueurs sur l\'île', options: [[16, '16'], [24, '24'], [30, '30']], def: 24 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['difficile', 'Difficile']], def: 'normal' },
       { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
     ],
     cover: 'royale/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau

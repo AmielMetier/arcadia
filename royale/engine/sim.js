@@ -212,13 +212,23 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
     return best;
   }
+  // où était Q il y a `lag` secondes ? (un invité vise ce qu'il voit, un peu en retard sur l'hôte)
+  function rewound(Q, lag) {
+    const tr = Q.trail;
+    if (!lag || !tr || !tr.length) return Q;
+    const t = S.t - lag;
+    let a = tr[0];
+    for (let i = tr.length - 1; i >= 0; i--) if (tr[i][0] <= t) { a = tr[i]; break; }
+    return { x: a[1], y: a[2], z: a[3], crouch: a[4] };
+  }
   function trace(P, o, d, range) {
     const w = world.raycast(o[0], o[1], o[2], d[0], d[1], d[2], range);
     let best = { t: w.t, who: null, head: false, solid: w.s };
+    const lag = P && P.lag > 0.02 ? P.lag : 0;
     for (const Q of S.players.values()) {
       if (Q === P || !Q.alive || Q.mode === 'ballon') continue;
       if (Math.abs(Q.x - o[0]) > range && Math.abs(Q.z - o[2]) > range) continue;
-      const h = hitPlayer(Q, o, d, best.t);
+      const h = hitPlayer(lag ? rewound(Q, lag) : Q, o, d, best.t);
       if (h && h.t < best.t) best = { t: h.t, who: Q, head: h.head, solid: null };
     }
     return best;
@@ -227,13 +237,13 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!Q.alive || n <= 0) return;
     const toSh = opt.storm ? 0 : Math.min(Q.sh, n);
     Q.sh -= toSh; Q.hp -= n - toSh;
-    if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; }
+    if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
     ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: toSh > 0, x: Q.x, y: Q.y + 1.4, z: Q.z, cause: opt.cause || null });
     if (Q.hp <= 0) eliminate(Q, by, opt.cause);
   }
   function shoot(P, it) {
     const W = WEAPONS[it.w];
-    it.mag--; P.cd = 1 / W.rate;
+    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t;
     const o = eye(P), moving = Math.hypot(P.vx, P.vz) > 1;
     let sp = (P.inp.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2) + P.bloom;
     if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
@@ -300,8 +310,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), x = P.x + fx * 2.2, z = P.z + fz * 2.2;
     const y = world.support(x, z, P.y + 0.6);
     if (Math.abs(y - P.y) > 1.2) return;
-    S.pads.push({ id: S.nextProj++, x, y, z, owner: P.id, t: 0 });
-    ev({ e: 'tremplin', x, y, z });
+    const id = S.nextProj++;
+    S.pads.push({ id, x, y, z, owner: P.id, t: 0 });
+    ev({ e: 'tremplin', id, x, y, z });
     consume(P); P.cd = 0.5;
   }
   function stepProjectiles(dt) {
@@ -430,6 +441,13 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       ev({ e: 'fin', winner: S.winner });
     }
   }
+  // un joueur quitte la partie (onglet fermé, retour au salon) : il est éliminé et lâche son sac
+  function leave(id) {
+    const Q = S.players.get(id);
+    if (!Q || !Q.alive) return;
+    if (Q.mode === 'ballon') { const b = balloonPos(); Object.assign(Q, { mode: 'sol', x: b.x, z: b.z, y: world.support(b.x, b.z, 400) }); }
+    eliminate(Q, null, 'depart');
+  }
   function results() {
     const list = [...S.players.values()].sort((a, b) => (a.place || 1) - (b.place || 1) || b.kills - a.kills);
     return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt) }));
@@ -503,6 +521,13 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       if (P.y < -30) { P.y = world.support(P.x, P.z, 400); P.vy = 0; }
       if (P.alive) act(P, dt);
     }
+    // un tiers de seconde de positions passées, pour viser juste malgré le décalage du réseau
+    for (const P of S.players.values()) {
+      if (!P.alive) continue;
+      const tr = P.trail || (P.trail = []);
+      tr.push([S.t, P.x, P.y, P.z, P.crouch]);
+      if (tr.length > 24) tr.shift();
+    }
     stepProjectiles(dt);
     stepStorm(dt);
     if (S.hooks.step) S.hooks.step(dt);
@@ -510,7 +535,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function takeEvents() { const e = S.events; S.events = []; return e; }
 
   return {
-    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos,
+    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave,
     player: (id) => S.players.get(id),
   };
 }

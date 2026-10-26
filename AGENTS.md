@@ -43,8 +43,10 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`, `node tools/test-golf.mjs`.
 - Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 24 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
 - Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`
-  la montre en 2D. `node tools/test-royale.mjs` vérifie l'île sur plusieurs graines et le déplacement (portes, escaliers, murs, nage)
-  sur l'île officielle : à lancer quand on touche à l'île, aux bâtiments, au monde solide ou au déplacement.
+  la montre en 2D. `node tools/test-royale.mjs` vérifie l'île sur plusieurs graines, le déplacement (portes, escaliers, murs, nage),
+  une partie (butin, combat, construction), les copies des invités et le relais d'hôte, la prédiction : à lancer quand on touche
+  au moteur (`royale/engine/`). `node tools/bench-royale.mjs [joueurs] [niveau] [graine] [minutes]` fait jouer une partie entière
+  entre bots (`WATCH=bot3` suit un bot) : coût d'un pas, éliminations, bots coincés, durée de la partie.
 - Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
   (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;

@@ -1,7 +1,7 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.73 — 26 octobre 2026
-- **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré. Première étape : l'île à explorer, sans combat.
+- **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré, jusqu'à six amis et des bots pour remplir la montgolfière (16, 24 ou 30 joueurs). On peut aussi simplement explorer l'île, sans combat.
   - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
   - Tous les bâtiments s'ouvrent : on entre par les portes, on monte les escaliers jusqu'aux toits plats.
   - Les portes s'ouvrent et se ferment avec la touche E, et pivotent du côté opposé à celui qui les pousse. Les garages et les hangars ont un rideau métallique qui s'enroule.
@@ -15,6 +15,12 @@
   - Interface : barres de vie et de bouclier, munitions, chrono et cercle de la tempête sur la minicarte, fil des éliminations, marqueur de touche, chiffres de dégâts et direction des tirs reçus.
   - Pioche (touche X) : tout se casse et se récolte. Les arbres donnent du bois ; les rochers, de la pierre ; les voitures et les conteneurs, du métal. Les murs des maisons, les portes et les meubles se cassent aussi. Les balles et les explosions abîment le décor et les constructions.
   - Construction : mur (F), sol (V) et escalier (C) pour 10 de bois, de pierre ou de métal (T pour changer). Un fantôme bleu montre où la pièce va se poser. Les pièces durcissent en quelques secondes, et une construction qui ne repose plus sur rien s'effondre.
+  - Les bots sautent vers un coin de l'île, fouillent maisons et coffres (en ouvrant les portes et en montant les escaliers), changent d'arme pour une meilleure, se soignent, suivent la tempête et se battent. Trois niveaux : facile, moyen ou difficile. Au début, ils fouillent avant de se chercher entre eux.
+  - À plusieurs : ton personnage répond tout de suite à tes touches, les autres joueurs se déplacent en douceur, et ce que tu vises est bien ce que tu touches. Si l'hôte quitte, un autre joueur reprend la partie là où elle en était. Un joueur qui arrive en retard regarde la partie et joue à la suivante.
+  - Réglages du salon : battle royale ou exploration, nombre de joueurs sur l'île, niveau des bots et moment de la journée.
+  - Les sons : une détonation par arme (étouffée au loin), impacts, explosions, portes, coffres, rechargement, soins, pioche, constructions, tes pas et ceux des joueurs qui approchent, vent en chute libre, grondement de la tempête, et l'ambiance de la campagne, du bord de mer ou de la montagne.
+  - Après une élimination, on regarde celui qui t'a eu, ou un autre joueur avec Espace. Le bilan de fin donne le classement, les éliminations et les dégâts de chacun ; l'hôte peut relancer une partie.
+  - Sensibilité de la souris et volume réglables à l'écran de départ et en pause.
 
 ## 2.72 — 26 octobre 2026
 - **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.

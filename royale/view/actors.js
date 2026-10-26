@@ -19,8 +19,8 @@ export function createActors(scene, sim) {
     let h = heroes.get(P.id);
     if (!h) {
       const c = parseInt(String(P.color || '#ff4b2b').replace('#', ''), 16);
-      const v = hash(String(P.id).split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7));
-      h = { hero: buildHero({ shirt: c, skin: v % 5, hair: (v >> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >> 6) % 4] }), key: null };
+      const v = hash(String(P.id).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7)) >>> 0;
+      h = { hero: buildHero({ shirt: c, skin: v % 5, hair: (v >>> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >>> 6) % 4] }), key: null };
       group.add(h.hero.root);
       heroes.set(P.id, h);
     }

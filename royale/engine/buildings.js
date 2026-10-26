@@ -53,6 +53,7 @@ export function makeBuilding(rng, id, spec) {
     perimeter(rng, b, T, k, walls);
     if (w * d >= T.rooms) splitRooms(rng, { x: x0, z: z0, w, d }, T.rooms, st, walls, rooms, 0);
     else rooms.push({ x: x0, z: z0, w, d });
+    connectRooms(b, st, walls);
     const lv = { k, walls, rooms, stairs: null, hole: null };
     if (st && (k < floors - 1 || T.roofAccess)) lv.stairs = { ...st };
     if (st && k > 0) lv.hole = { x: st.x, z: st.z };
@@ -69,6 +70,18 @@ function pickStairs(rng, b) {
   if (d >= 3) for (const x of w > 1 ? [x0, x0 + w - 1] : [x0]) for (let z = z0 + 1; z <= z0 + d - 2; z++) c.push({ x, z, dx: 0, dz: rng.chance(0.5) ? 1 : -1 });
   if (w >= 3) for (const z of d > 1 ? [z0, z0 + d - 1] : [z0]) for (let x = x0 + 1; x <= x0 + w - 2; x++) c.push({ x, z, dx: rng.chance(0.5) ? 1 : -1, dz: 0 });
   return c.length ? rng.pick(c) : null;
+}
+
+// le pan (o, x, z) borde-t-il la case de l'escalier ? (une porte là donnerait sur le flanc de la rampe)
+function bordersStairs(e, st) {
+  if (!st) return false;
+  return e.o === 'h' ? e.x === st.x && (e.z === st.z || e.z === st.z + 1) : e.z === st.z && (e.x === st.x || e.x === st.x + 1);
+}
+// décale une porte voulue en t sur un pan voisin qui ne borde pas l'escalier
+function besideStairs(at, n, t, st) {
+  if (!bordersStairs(at(t), st)) return t;
+  for (const u of [t - 1, t + 1, t - 2, t + 2]) if (u >= 0 && u < n && !bordersStairs(at(u), st)) return u;
+  return t;
 }
 
 // pans du pourtour d'un étage : porte(s) au rez-de-chaussée, fenêtres, portail des hangars, murs cassés
@@ -89,11 +102,11 @@ function perimeter(rng, b, T, k, walls) {
       const a = Math.floor(mid);
       doors.set(b.front + a, 'portail');
       if (f.n >= 5) doors.set(b.front + (a + 1), 'portail');
-    } else doors.set(b.front + Math.max(0, Math.min(f.n - 1, Math.round(mid + rng.range(-1, 1)))), 'porte');
+    } else doors.set(b.front + besideStairs(f.at, f.n, Math.max(0, Math.min(f.n - 1, Math.round(mid + rng.range(-1, 1)))), b.stairs), 'porte');
     // porte de derrière ou de côté
     if (rng.chance(T.portail ? 0.7 : 0.45)) {
       const s = rng.chance(0.6) ? opp[b.front] : rng.pick(['N', 'S', 'E', 'W'].filter((q) => q !== b.front));
-      doors.set(s + rng.int(0, sides[s].n - 1), 'porte');
+      doors.set(s + besideStairs(sides[s].at, sides[s].n, rng.int(0, sides[s].n - 1), b.stairs), 'porte');
     }
   }
   for (const s of ['N', 'S', 'W', 'E']) {
@@ -132,15 +145,49 @@ function splitRooms(rng, r, minArea, st, walls, rooms, depth) {
   if (!cands.length) { rooms.push(r); return; }
   const p = rng.pick(cands);
   if (axis === 'x') {
-    const cx = x + p, door = z + rng.int(0, d - 1);
+    const cx = x + p, door = z + besideStairs((t) => ({ o: 'v', x: cx, z: z + t }), d, rng.int(0, d - 1), st);
     for (let t = z; t < z + d; t++) walls.push({ x: cx, z: t, o: 'v', k: t === door ? 'porte' : 'mur', ext: false });
     splitRooms(rng, { x, z, w: p, d }, minArea, st, walls, rooms, depth + 1);
     splitRooms(rng, { x: cx, z, w: w - p, d }, minArea, st, walls, rooms, depth + 1);
   } else {
-    const cz = z + p, door = x + rng.int(0, w - 1);
+    const cz = z + p, door = x + besideStairs((t) => ({ o: 'h', x: x + t, z: cz }), w, rng.int(0, w - 1), st);
     for (let t = x; t < x + w; t++) walls.push({ x: t, z: cz, o: 'h', k: t === door ? 'porte' : 'mur', ext: false });
     splitRooms(rng, { x, z, w, d: p }, minArea, st, walls, rooms, depth + 1);
     splitRooms(rng, { x, z: cz, w, d: d - p }, minArea, st, walls, rooms, depth + 1);
+  }
+}
+
+// toutes les cases d'un étage (sauf celle de l'escalier) doivent communiquer sans passer par la rampe ni par la
+// trémie : sinon, on perce une porte dans une cloison entre la partie atteinte et le reste
+function connectRooms(b, st, walls) {
+  const { x0, z0, w, d } = b;
+  const edges = new Map();
+  for (const e of walls) edges.set(e.o + e.x + ',' + e.z, e);
+  const open = (e) => !e || e.k === 'porte' || e.k === 'portail' || e.k === 'casse';
+  const inside = (x, z) => x >= x0 && z >= z0 && x < x0 + w && z < z0 + d && !(st && x === st.x && z === st.z);
+  const steps = (x, z) => [[x + 1, z, 'v' + (x + 1) + ',' + z], [x - 1, z, 'v' + x + ',' + z], [x, z + 1, 'h' + x + ',' + (z + 1)], [x, z - 1, 'h' + x + ',' + z]];
+  const all = [];
+  for (let z = z0; z < z0 + d; z++) for (let x = x0; x < x0 + w; x++) if (inside(x, z)) all.push([x, z]);
+  if (!all.length) return;
+  for (let guard = 0; guard < 24; guard++) {
+    const seen = new Set([all[0].join(',')]), todo = [all[0]];
+    while (todo.length) {
+      const [x, z] = todo.pop();
+      for (const [nx, nz, ek] of steps(x, z)) {
+        const id = nx + ',' + nz;
+        if (!inside(nx, nz) || seen.has(id) || !open(edges.get(ek))) continue;
+        seen.add(id); todo.push([nx, nz]);
+      }
+    }
+    if (seen.size === all.length) return;
+    let fix = null;
+    for (const [x, z] of all) {
+      if (!seen.has(x + ',' + z)) continue;
+      for (const [nx, nz, ek] of steps(x, z)) if (inside(nx, nz) && !seen.has(nx + ',' + nz) && edges.get(ek)) { fix = edges.get(ek); break; }
+      if (fix) break;
+    }
+    if (!fix) return;
+    fix.k = 'porte';
   }
 }
 

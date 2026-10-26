@@ -217,6 +217,19 @@ export function createBuild(sim, map, world) {
   S.hooks.step = (dt) => {
     for (const p of pieces.values()) if (p.t < 1) { const g = dt / BUILD_TIME[p.mat]; p.t = Math.min(1, p.t + g); p.hp = Math.min(p.max, p.hp + p.max * 0.88 * g); }
   };
-  return { hit, place, slotFor, canPlace, pieces, broken, info };
+  // invités : la copie de la partie suit les constructions et les destructions décidées par l'hôte
+  function mirrorAdd(p) {
+    if (pieces.has(p.id) || broken.has('b:' + p.id)) return;
+    const q = { ...p };
+    pieces.set(q.id, q); bySlot.set(slotKey(q), q); addSolids(q);
+    nextId = Math.max(nextId, q.id + 1);
+  }
+  function mirrorBreak(key) {
+    if (broken.has(key)) return;
+    broken.add(key);
+    world.removeKey(key);
+    if (key[0] === 'b') { const p = pieces.get(+key.slice(2)); if (p) { pieces.delete(p.id); bySlot.delete(slotKey(p)); } }
+  }
+  return { hit, place, slotFor, canPlace, pieces, broken, info, mirrorAdd, mirrorBreak };
 }
 export { floorY };
