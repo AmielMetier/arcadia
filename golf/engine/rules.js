@@ -93,17 +93,17 @@ function resolveTeam(R, hole, k, out) {
   return best.i;
 }
 
-// résultat d'un coup du joueur i : res = { kind: rest|holed|water|ob, end:{x,z}, drop:{x,z}, surf }
-// lieAt(x, z) donne la surface d'un point de reprise. Renvoie { penalty, holed, pickedUp } (+ best en équipes).
-export function applyShot(R, hole, i, res, lieAt) {
+// résultat d'un coup du joueur i : res = { kind: rest|holed|water|ob, end:{x,z}, surf }
+// À l'eau ou hors limites : un coup de pénalité, et on rejoue du même endroit.
+// Renvoie { penalty, holed, pickedUp } (+ best en équipes).
+export function applyShot(R, hole, i, res) {
   const p = R.players[i], from = { ...p.ball };
   if (R.teams && p.team >= 0) {
     // scramble : le coup est noté, la balle de l'équipe ne bouge qu'à la fin de la volée
     R.shotNo++; p.played = true;
     const out = { penalty: 0, holed: false, pickedUp: false, team: true };
     let ball = null, pen = 0;
-    if (res.kind === 'water') { pen = 1; ball = { x: res.drop.x, z: res.drop.z, lie: lieAt(res.drop.x, res.drop.z) }; }
-    else if (res.kind === 'ob') { pen = 1; ball = from; }
+    if (res.kind === 'water' || res.kind === 'ob') { pen = 1; ball = from; }
     else if (res.kind !== 'holed') ball = { x: res.end.x, z: res.end.z, lie: res.surf };
     p.pending = { holed: res.kind === 'holed', pen, ball };
     out.penalty = pen;
@@ -114,8 +114,7 @@ export function applyShot(R, hole, i, res, lieAt) {
   p.strokes++; R.shotNo++;
   const out = { penalty: 0, holed: false, pickedUp: false };
   if (res.kind === 'holed') { p.done = true; out.holed = true; p.ball = { x: hole.pin.x, z: hole.pin.z, lie: 'green' }; }
-  else if (res.kind === 'water') { p.strokes++; out.penalty = 1; p.ball = { x: res.drop.x, z: res.drop.z, lie: lieAt(res.drop.x, res.drop.z) }; }
-  else if (res.kind === 'ob') { p.strokes++; out.penalty = 1; p.ball = from; }
+  else if (res.kind === 'water' || res.kind === 'ob') { p.strokes++; out.penalty = 1; p.ball = from; } // on rejoue du même endroit
   else p.ball = { x: res.end.x, z: res.end.z, lie: res.surf };
   if (!p.done && p.strokes >= MAX_STROKES) { p.done = true; p.strokes = MAX_STROKES; out.pickedUp = true; }
   R.turn = nextPlayer(R, hole);

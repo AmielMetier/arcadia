@@ -78,8 +78,9 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
       return { x: pts[0][0], z: pts[0][1], dx: 0, dz: 1 };
     };
     const side = h.n % 2 ? 1 : -1;
+    // vitesse constante, du premier au dernier instant : la caméra ne ralentit jamais avant le fondu vers le trou suivant
     return (u, snap) => {
-      const e = u * u * (3 - 2 * u), p = at(-0.1 + e * 0.8), l = at(0.32 + e * 0.68);
+      const e = u, p = at(-0.1 + e * 0.8), l = at(0.32 + e * 0.68);
       const off = Math.sin(u * Math.PI) * 24 * side, y = h.heightAt(p.x, p.z) + 24 - e * 8;
       const pos = new THREE.Vector3(p.x - p.dz * off, y, p.z + p.dx * off);
       scene.camTo(pos, new THREE.Vector3(l.x, h.heightAt(l.x, l.z) + 4, l.z), snap ? 1 : 2.2, snap);
@@ -89,8 +90,10 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
   async function fly(n) {
     if (loading) { pending = n; return; } // un trou à la fois : le dernier demandé passe ensuite
     loading = true;
+    // le trou suivant se construit en tâche de fond pendant que le survol continue ; dès qu'il est prêt, fondu
+    // enchaîné depuis l'image du moment, caméra toujours en mouvement
     const h = holeOf(n);
-    await scene.loadHole(h, { theme: h.theme, wind: CALM, time: set.time });
+    await scene.loadHole(h, { theme: h.theme, wind: CALM, time: set.time, swap: () => scene.dissolve(0.9) });
     if (!alive) return;
     scene.setWind(CALM);
     scene.showBall(false); scene.setTee(null, false); scene.setMarker(null, false); scene.setAimDots(null, null, false); scene.showGrid(false);
@@ -166,10 +169,12 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
 
   return {
     update(dt) {
-      if (!cur || loading || !alive) return;
+      if (!cur || !alive) return;
       t += dt;
-      path(Math.min(1, t / FLY), false);
-      if (t > FLY) { idx = (idx + 1) % list.length; fly(list[idx]); }
+      // le trou suivant est lancé avant la fin du survol (sa construction prend quelques secondes) ; d'ici là la
+      // caméra continue d'avancer, sans jamais s'arrêter
+      path(Math.min(1.3, t / FLY), false);
+      if (t > FLY - 3 && !loading) { idx = (idx + 1) % list.length; fly(list[idx]); }
     },
     dispose() { alive = false; removeEventListener('keydown', onKey); root.innerHTML = ''; },
   };

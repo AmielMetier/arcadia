@@ -1,10 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.71 — 26 octobre 2026
-- **Birdie Party** — La présentation des trous est mieux cadrée, et les fondus au blanc disparaissent.
-  - On part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou.
-  - Les lacets se survolent sans donner le tournis.
-  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
+- **Birdie Party** — Des plans plus beaux et plus doux, et une balle à l'eau fait rejouer le coup.
+  - La présentation de chaque trou est mieux cadrée : on part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou. Les lacets se survolent sans donner le tournis.
+  - Chaque coup se regarde comme à la télé : la balle part depuis derrière le golfeur, puis une caméra posée près du point de chute la regarde arriver et rouler. Le ralenti la montre depuis l'autre côté.
+  - Les changements de plan se font en fondu enchaîné, sans flash blanc ni coupure sèche. Sur l'écran d'accueil, la caméra ne s'arrête plus avant de passer au trou suivant.
+  - Balle à l'eau : un coup de pénalité, et on rejoue du même endroit (comme un hors-limites).
+  - Trou 9 (Les Îles) : le départ est sur une pointe de la rive, et non plus sur un chemin au milieu de l'eau.
+  - Le son est actif dès l'ouverture du jeu (au premier clic si le navigateur l'exige).
 
 ## 2.70 — 26 octobre 2026
 - **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
