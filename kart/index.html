@@ -350,8 +350,8 @@ const CFG = {
   G: 34, G_RAMP: 19, G_SLOPE: 20, HOP_V: 5.4,
   TOP_SPEED: 33, BOOST_MUL: 1.32,
   // drift : vitesse de rotation (rad/s) en contre-braquant / au neutre / en braquant dans le virage
-  DRIFT_OUT: 0.12, DRIFT_MID: 0.45, DRIFT_IN: 1.5,
-  GRIP: 8.5, DRIFT_GRIP: 7.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
+  DRIFT_OUT: 0.2, DRIFT_MID: 0.5, DRIFT_IN: 1.28, DRIFT_EASE: 4.5,   // DRIFT_EASE : souplesse du passage d'un rayon à l'autre (plus petit = plus doux)
+  GRIP: 8.5, DRIFT_GRIP: 10.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
   MT1: 1.0, MT2: 2.0, MT3: 3.0, // charge du mini-turbo (s) : bleu / orange / violet ; deux fois plus vite en gigotant (Q-D-Q-D)
   MT_BOOST: [0, 0.7, 1.25, 1.9], // durée du turbo selon le niveau
   DRAFT_TIME: 1.3, DRAFT_DIST: 22, DRAFT_W: 3.4,   // aspiration : temps dans le sillage, portée (m), demi-largeur du sillage (m)
@@ -4475,13 +4475,16 @@ class Kart {
     if (!this.drifting && drift && this.grounded && this.hopWindow > 0 && this.speedF > 8) {
       // sens du drift : celui vers lequel on tourne (à l'atterrissage ou juste après). Tout droit = un simple saut.
       const sgn = Math.abs(steer) > 0.2 ? Math.sign(steer) : this.hopSteer || 0;
-      if (sgn) { this.drifting = true; this.driftDir = sgn; this.driftCharge = 0; this.driftLevel = 0; this.driftT = 0; this.hopWindow = 0; this.wiggleT = 0; this.lastAxisSign = 0; }
+      if (sgn) { this.driftYR = clamp(Math.abs(this.yawRate) * 0.8, CFG.DRIFT_OUT, CFG.DRIFT_MID * 1.4); this.drifting = true; this.driftDir = sgn; this.driftCharge = 0; this.driftLevel = 0; this.driftT = 0; this.hopWindow = 0; this.wiggleT = 0; this.lastAxisSign = 0; }
     }
     if (this.drifting && !drift) this.endDrift(ctrl);
 
     // --- Lacet
     const vF0 = this.speedF; let yawRate;
-    if (this.drifting) { const tight = (steer * this.driftDir + 1) * 0.5; this.driftVis = this.driftDir * lerp(0.7, 1.25, tight); yawRate = this.driftDir * driftRate(tight) * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
+    if (this.drifting) {
+      // le rayon du drift suit le stick en douceur (pas de coup de volant brutal d'un côté à l'autre)
+      const tight = (steer * this.driftDir + 1) * 0.5; this.driftYR = damp(this.driftYR ?? CFG.DRIFT_MID, driftRate(tight), CFG.DRIFT_EASE, dt);
+      this.driftVis = this.driftDir * lerp(0.75, 1.2, driftTight(this.driftYR)); yawRate = this.driftDir * this.driftYR * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
     else { const sf = clamp(Math.abs(vF0) / 7, 0, 1) * (1 - 0.3 * clamp(Math.abs(vF0) / S.maxSpeed, 0, 1.3)); yawRate = steer * S.handling * sf * (vF0 < -0.5 ? -1 : 1); }
     if (!this.grounded) yawRate *= this.hop ? 0.5 : this.gliding ? 0.85 : 0.3;
     this.yawRate = yawRate; this.yaw -= yawRate * dt;
@@ -4679,7 +4682,7 @@ class Kart {
     const v = this.vis, n = this.grounded ? _v1.set(this.q2.nx, this.q2.ny, this.q2.nz) : _v1.copy(UP);
     this.vNormal.lerp(n, 1 - Math.exp(-12 * dt)).normalize();
     const sr = clamp(Math.abs(this.speedF) / CFG.TOP_SPEED, 0, 1.4);
-    v.drift = damp(v.drift, this.drifting ? (this.remote ? this.driftDir : this.driftVis || this.driftDir) : 0, 9, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
+    v.drift = damp(v.drift, this.drifting ? (this.remote ? this.driftDir : this.driftVis || this.driftDir) : 0, 6, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
     let extraYaw = 0, pitch = 0, roll = 0;
     if (this.hitT > 0) {
       const p = 1 - this.hitT / this.hitDur, e = 1 - Math.pow(1 - clamp(p, 0, 1), 2.2);
