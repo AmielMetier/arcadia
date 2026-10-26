@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.88 — 26 octobre 2026
+- Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)
+
 ## 2.87 — 26 octobre 2026
 - **Birdie Party** — Correction : résolution du crash Birdie Party, repli WebGL et fiabilisation des logs (Amiel)
 
