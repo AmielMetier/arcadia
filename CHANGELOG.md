@@ -1,5 +1,9 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.80 — 26 octobre 2026
+- **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.
+- **Mini-Golf Party** — Fini le vacarme contre les murets : un frottement ne fait plus de bruit, et un vrai choc ne donne qu'un son et quelques étincelles, sans secouer la caméra à chaque rebond.
+
 ## 2.79 — 26 octobre 2026
 - **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
   - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.

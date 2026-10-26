@@ -924,7 +924,7 @@ export class Renderer {
     } else if (kind === 'ace') {
       for (let k = 0; k < 4; k++) for (let i = 0; i < 70; i++) { const a = R() * 6.28, s = 1 + R() * 3; P.emit(p[0], p[1] + 0.2, p[2], Math.cos(a) * s, 5 + R() * 5, Math.sin(a) * s, col(['#ffd23f', '#ff5a7a', '#5ad1ff', '#7dff8a', '#c58aff'][(R() * 5) | 0]), 0.1 + R() * 0.1, 1.6 + R(), 7, 0.6); }
     } else if (kind === 'hit' || kind === 'bumper') {
-      const n = Math.min(14, 3 + (o.s || 1) * 2);
+      const n = Math.min(7, Math.max(2, Math.round((o.s || 1) * 0.8)));
       for (let i = 0; i < n; i++) P.emit(p[0], p[1], p[2], (R() - 0.5) * 2, R() * 2, (R() - 0.5) * 2, col(kind === 'bumper' ? '#ff6a5a' : '#ffffff', 0.8), 0.05, 0.3, 4, 1);
     } else if (kind === 'sand') {
       for (let i = 0; i < 18; i++) N.emit(p[0], p[1] - 0.05, p[2], (R() - 0.5) * 1.5, 1 + R() * 1.5, (R() - 0.5) * 1.5, col('#e6cf98', 0.9), 0.07, 0.6, 7, 1);
