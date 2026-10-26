@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.66 — 26 octobre 2026
+- Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
+
 ## 2.65 — 26 octobre 2026
 - Implement PhaserJS 3 64x64 Gen 5 Unys overworld with 3 official tileset packs, Arcade Physics, and battle HUD/trainer fixes (Amiel)
 
