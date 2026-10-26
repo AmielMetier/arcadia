@@ -22,6 +22,12 @@ export const LOOKS = {
     green1: 0x70a043, green2: 0x67963d, tee1: 0x649438, tee2: 0x578731, sand: 0xd9cba2, sandEdge: 0xbba878, bed: 0x2f4034,
     out1: 0x10240c, out2: 0x183012, rock: 0x7d786f, shallow: 0x6fb0aa, deep: 0x1d4a60,
   },
+  // désert : fairway irrigué, première coupe vert olive, puis le sable tassé ; hors-limites en terre rouge
+  desert: {
+    rough: 0xc49a62, rough2: 0xb0844f, cut: 0x7c8a3a, fair1: 0x6f9a3a, fair2: 0x628c33, fringe: 0x6a9338,
+    green1: 0x78a542, green2: 0x6f9c3c, tee1: 0x6f9a3a, tee2: 0x628c33, sand: 0xecd6a2, sandEdge: 0xcfb07a, bed: 0x5a5a3a,
+    out1: 0x8a5232, out2: 0x9c6038, rock: 0xb4674a, shallow: 0x4fb6a8, deep: 0x125a66,
+  },
 };
 
 const PX = 0.5;        // mètres par texel de la carte des distances
@@ -66,8 +72,7 @@ function zoneMap(hole) {
     const z = area.z0 + (j + 0.5) * P;
     for (let i = 0; i < W; i++) {
       const x = area.x0 + (i + 0.5) * P;
-      const ob = Math.max(B.x0 - x, x - B.x1, B.z0 - z, z - B.z1);
-      const k = Math.max(smooth(hole.valley - 8, hole.valley + 22, hole.centerDist(x, z)), smooth(-6, 10, ob));
+      const k = Math.max(smooth(4, -10, hole.landSD(x, z)), smooth(-6, 6, hole.obDist(x, z)));
       data[(j * W + i) * 4] = Math.round(k * 255);
     }
   }
@@ -238,7 +243,67 @@ export function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25 } 
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
   mesh.userData.textures = [sdf.tex, zone.tex, grass, sand];
-  return { mesh };
+  return { mesh, uniforms: U };
+}
+
+// Mini-carte en relief, vue du dessus et sans lumière : teintes d'altitude, estompage éclairé depuis le haut à gauche
+// de la carte, courbes de niveau (une ligne maîtresse sur cinq) et, sur le green, des courbes très serrées pour lire
+// la pente. Le parcours reste lisible : fairway, départ, green et bunkers en aplats clairs détourés.
+export function reliefMaterial(U, { hMin, hMax, step, light }) {
+  const col = (h) => new THREE.Color(h);
+  const R = {
+    uSdf: U.uSdf, uMin: U.uMin, uSize: U.uSize, uTee: U.uTee, uGreen: U.uGreen, uSea: U.uSea,
+    uH: { value: new THREE.Vector2(hMin, Math.max(hMin + 1, hMax)) }, uStep: { value: step }, uLight: { value: light },
+    cLow: { value: col(0x6fa65c) }, cMid: { value: col(0xb9cf7f) }, cHigh: { value: col(0xd9c48e) }, cTop: { value: col(0xb18a63) },
+    cFair: { value: col(0xd3eba4) }, cGreen: { value: col(0xa6df7c) }, cSand: { value: col(0xf1e2b0) }, cSea: { value: col(0x5ba8da) },
+    cLine: { value: col(0x3b4a2c) }, cEdge: { value: col(0xfbfdf2) },
+  };
+  return new THREE.ShaderMaterial({
+    uniforms: R,
+    vertexShader: `varying vec3 vW; varying vec3 vN;
+      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `varying vec3 vW; varying vec3 vN;
+      uniform sampler2D uSdf; uniform vec2 uMin; uniform vec2 uSize; uniform vec4 uTee; uniform vec4 uGreen; uniform float uSea;
+      uniform vec2 uH; uniform float uStep; uniform vec3 uLight;
+      uniform vec3 cLow; uniform vec3 cMid; uniform vec3 cHigh; uniform vec3 cTop; uniform vec3 cFair; uniform vec3 cGreen; uniform vec3 cSand; uniform vec3 cSea; uniform vec3 cLine; uniform vec3 cEdge;
+      float edge(float d) { float w = max(fwidth(d) * 0.75, 0.02); return smoothstep(-w, w, d); }
+      // ligne fine d'un pixel environ sur chaque multiple de 'k'
+      float iso(float v, float k, float px) { float c = v / k; float d = abs(fract(c + 0.5) - 0.5) / max(fwidth(c), 1e-4); return 1.0 - smoothstep(px * 0.5, px * 0.5 + 1.0, d); }
+      void main(){
+        float t = clamp((vW.y - uH.x) / (uH.y - uH.x), 0.0, 1.0);
+        vec3 c = t < 0.4 ? mix(cLow, cMid, t / 0.4) : t < 0.75 ? mix(cMid, cHigh, (t - 0.4) / 0.35) : mix(cHigh, cTop, (t - 0.75) / 0.25);
+        vec2 suv = (vW.xz - uMin) / uSize;
+        float inside = step(0.0, suv.x) * step(suv.x, 1.0) * step(0.0, suv.y) * step(suv.y, 1.0);
+        vec4 sd = texture2D(uSdf, clamp(suv, 0.0, 1.0));
+        float fm = mix(-${FM}.0, ${FM}.0, sd.r) * inside - 9.0 * (1.0 - inside);
+        float sg = mix(-${SG}.0, ${SG}.0, sd.g) * inside - 9.0 * (1.0 - inside);
+        float sb = mix(-${SB}.0, ${SB}.0, sd.b) * inside - 9.0 * (1.0 - inside);
+        vec2 tq = vW.xz - uTee.xy;
+        float tu = tq.x * uTee.z - tq.y * uTee.w, tv = tq.x * uTee.w + tq.y * uTee.z;
+        float tdist = -max(abs(tu) - 4.0, abs(tv - 1.0) - 5.0);
+        float fK = edge(fm), gK = edge(sg + 0.6), bK = edge(sb), teeK = edge(tdist);
+        c = mix(c, mix(c, cFair, 0.7), fK);
+        c = mix(c, cFair, teeK);
+        c = mix(c, cGreen, gK);
+        c = mix(c, cSand, bK);
+        // estompage
+        float sh = clamp(dot(normalize(vN), uLight), 0.0, 1.0);
+        c *= 0.62 + 0.55 * sh;
+        // mer
+        float under = uSea - vW.y;
+        c = mix(c, cSea * (1.0 - 0.25 * smoothstep(0.5, 6.0, under)), smoothstep(-0.05, 0.15, under));
+        // courbes de niveau : une maîtresse toutes les cinq ; sur le green, une tous les 15 cm
+        float minor = iso(vW.y, uStep, 1.0), major = iso(vW.y, uStep * 5.0, 1.8);
+        float fine = iso(vW.y, 0.15, 1.0) * gK;
+        float land = 1.0 - smoothstep(-0.05, 0.15, under);
+        c = mix(c, cLine, (max(minor * 0.28, major * 0.55) * (1.0 - gK) + fine * 0.45) * land);
+        // contours clairs du parcours
+        float outl = max(max(iso(fm, 100.0, 1.6) * step(-1.0, fm) * step(fm, 1.0), iso(sg + 0.6, 100.0, 1.6) * step(-1.6, sg) * step(sg, 0.4)), iso(sb, 100.0, 1.4) * step(-1.0, sb) * step(sb, 1.0));
+        c = mix(c, cEdge, outl * 0.9 * land);
+        gl_FragColor = vec4(c, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
 }
 
 // L'eau : étangs, mer et torrents. Bleu vif, vaguelettes animées, éclats de soleil, et reflet du décor
@@ -306,6 +371,7 @@ export function buildWater(hole, { noise, envMap, refl, sun }) {
   }
   // torrents au fond des ravins : un ruban d'eau qui suit le ravin et s'écoule
   for (const R of hole.ravines) {
+    if (R.dry) continue; // canyon sec : pas de torrent
     const pts = []; const L = R.line;
     for (let i = 0; i < L.length - 1; i++) {
       const [ax, az] = L[i], [bx, bz] = L[i + 1], len = Math.hypot(bx - ax, bz - az);

@@ -30,6 +30,7 @@ export const LIE = {
   rough: { label: 'Rough', dist: 0.8, spread: 0.18 },
   bunker: { label: 'Bunker', dist: 0.5, spread: 0.3, sandWedge: 0.85 },
   beach: { label: 'Plage', dist: 0.55, spread: 0.28, sandWedge: 0.85 },
+  desert: { label: 'Sable dur', dist: 0.86, spread: 0.12 },
 };
 
 // Portée du putter : elle s'adapte à la distance du trou pour garder une jauge précise sur les petits putts

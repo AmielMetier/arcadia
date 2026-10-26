@@ -1,11 +1,26 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.69 — 26 octobre 2026
+## 2.71 — 26 octobre 2026
 - **Mini-Golf Party** — Jouable sur téléphone et tablette, à l'écran tactile.
   - On pose le doigt sur sa balle et on tire en arrière comme un lance-pierre : la flèche montre la direction, la jauge la puissance, et on lâche pour frapper. Revenir sur la balle annule le coup.
   - Un doigt ailleurs fait tourner la caméra, deux doigts pour zoomer.
   - Un bouton affiche la vue d'ensemble du trou, et toucher la carte de score l'agrandit.
   - L'écran se réorganise en portrait comme en paysage pour que la carte de score, le minuteur et les boutons ne se chevauchent pas.
+
+## 2.70 — 26 octobre 2026
+- **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
+  - Tous les trous sont redessinés, chacun avec sa forme : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Le terrain est bordé d'arbres, puis de forêt ou d'eau.
+  - 8 trous en campagne, 8 au bord de mer, 8 en montagne, et un nouveau décor : le désert (6 trous), avec son oasis, son canyon, ses mesas, ses cactus et son sable dur. On peut aussi enchaîner les 30.
+  - Parties en équipes, 2 contre 2 ou 3 contre 3 : chacun joue depuis la balle de l'équipe et on garde la meilleure. Les bots complètent les équipes, jusqu'à 6 joueurs.
+  - On peut jouer en plein jour, au crépuscule ou le soir sous les étoiles.
+  - Les beaux coups repassent au ralenti : trou en un, chip rentré, long putt, approche collée au drapeau (un clic pour passer).
+  - Nouvel écran d'accueil : on survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
+  - La mini-carte se zoome (molette ou Z) et se fait glisser ; le bouton relief (ou R) montre les altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
+  - Interface refaite : boutons et icônes plus nets, carte de score et podium plus clairs (médailles, symboles birdie et bogey), mise en page revue sur téléphone.
+  - Les bots évitent mieux l'eau et la forêt et dosent mieux leurs approches.
+
+## 2.69 — 26 octobre 2026
+- Nouveau : integrate real Tiled Kanto open-world maps (Bourg-Palette, Route 1, Jadielle), 4 interiors & 4-dir walking spritesheets in PhaserJS (Amiel)
 
 ## 2.68 — 26 octobre 2026
 - Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)

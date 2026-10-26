@@ -27,6 +27,7 @@ export const SURF = {
   rough: { e: 0.15, f: 0.35, roll: 0.38 },
   bunker: { e: 0.03, f: 0.12, roll: 1.4 },
   beach: { e: 0.03, f: 0.12, roll: 1.4 },
+  desert: { e: 0.26, f: 0.5, roll: 0.24 },  // terre battue et sable tassé : ça rebondit et ça roule
   ob: { e: 0.15, f: 0.35, roll: 0.38 },
   water: { e: 0, f: 0, roll: 9 },
 };

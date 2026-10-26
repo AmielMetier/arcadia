@@ -3,8 +3,8 @@
 // createScene() monte le canevas ; loadHole() construit un trou ; dispose() libère tout (géométries, matériaux,
 // textures, contexte WebGL).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { buildTerrain, buildWater, noiseTexture, LOOKS } from './terrain.js';
-import { buildSky, buildPeaks, SKIES } from './sky.js';
+import { buildTerrain, buildWater, noiseTexture, reliefMaterial, LOOKS } from './terrain.js';
+import { buildSky, buildPeaks, skyFor, TIMES } from './sky.js';
 import { scatterNature, buildPin, buildTeeMarkers, buildGreenGrid } from './decor.js';
 import { createTreeKit, forestItems, SWAY } from './trees.js';
 import { createGrass } from './grass.js';
@@ -13,7 +13,10 @@ import { buildGolfer } from './golfer.js';
 import { loadNature } from './models.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
-const SUN_DIR = new THREE.Vector3(-0.45, 0.78, -0.42).normalize();
+// direction du soleil (la lune le soir) : réglée par le moment de la journée à chaque trou
+const DAY_DIR = new THREE.Vector3(-0.45, 0.78, -0.42).normalize();
+const SUN_DIR = DAY_DIR.clone();
+const DAY = { sunColor: 0xffeed4, sunInt: 4.2, hemiSky: 0xc4d8f0, hemiGround: 0x34481f, hemiInt: 0.42, exposure: 0.92, env: 0.3 };
 const BALL_VIS = 0.055; // rayon affiché de la balle (grossie pour rester visible)
 
 export function createScene(host, { onLost } = {}) {
@@ -117,9 +120,19 @@ export function createScene(host, { onLost } = {}) {
   function addGolfer(look) { const g = buildGolfer(look); scene.add(g.root); golfers.add(g); return g; }
   function removeGolfer(g) { if (!golfers.has(g)) return; scene.remove(g.root); g.dispose(); golfers.delete(g); }
 
-  async function loadHole(hole, { theme = 'campagne', wind } = {}) {
+  // lumière du moment de la journée (jour, crépuscule, soir)
+  function setLight(L) {
+    sun.color.setHex(L.sunColor); sun.intensity = L.sunInt;
+    hemi.color.setHex(L.hemiSky); hemi.groundColor.setHex(L.hemiGround); hemi.intensity = L.hemiInt;
+    renderer.toneMappingExposure = L.exposure;
+  }
+  let light = DAY;
+  async function loadHole(hole, { theme = 'campagne', wind, time = 'jour' } = {}) {
     if (world) unloadHole();
-    const look = LOOKS[theme] || LOOKS.campagne, skyLook = SKIES[theme] || SKIES.campagne;
+    const T = TIMES[time];
+    light = T || DAY; setLight(light);
+    if (T) SUN_DIR.set(...T.dir).normalize(); else SUN_DIR.copy(DAY_DIR);
+    const look = LOOKS[theme] || LOOKS.campagne, skyLook = skyFor(theme, time);
     const g = new THREE.Group();
     const center = { x: (hole.bounds.x0 + hole.bounds.x1) / 2, z: (hole.bounds.z0 + hole.bounds.z1) / 2 };
     // ciel → environnement (reflets et lumière d'ambiance)
@@ -129,7 +142,7 @@ export function createScene(host, { onLost } = {}) {
     const env = pmrem.fromScene(envScene, 0.02).texture;
     envScene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     pmrem.dispose();
-    scene.environment = env; scene.environmentIntensity = 0.3;
+    scene.environment = env; scene.environmentIntensity = light.env;
     // brume bleutée sur les collines lointaines
     // voile bleuté de la distance, le même pour tout (terrain, forêts, mer, sommets) : plus c'est loin, plus c'est bleu
     // (≈ 3 % à 300 m, 50 % à 1,5 km, 70 à 85 % pour les sommets à l'horizon)
@@ -144,7 +157,7 @@ export function createScene(host, { onLost } = {}) {
     // arbres du parcours (la balle les heurte), forêt des collines, herbes hautes
     if (!treeKit) treeKit = createTreeKit();
     // les arbres loin du couloir de jeu sont plus sombres
-    for (const t of hole.trees) t.dark = hole.centerDist(t.x, t.z) > hole.valley + 12;
+    for (const t of hole.trees) t.dark = hole.landSD(t.x, t.z) < -3;
     // pied du tronc enfoncé dans la pente (jamais de tronc qui flotte)
     const sink = (list) => { for (const t of list) { let m = t.y; for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7]]) m = Math.min(m, hole.heightAt(t.x + dx, t.z + dz)); t.y = m - 0.05; } return list; };
     g.add(treeKit.plant(sink(hole.trees.map((t) => ({ ...t })))));
@@ -166,6 +179,7 @@ export function createScene(host, { onLost } = {}) {
     if (!world) return;
     scene.remove(world.group);
     world.grass.dispose();
+    if (world.relief) { world.relief.mat.dispose(); world.relief.water.dispose(); }
     world.group.traverse((o) => {
       if (o.isMesh || o.isPoints || o.isInstancedMesh || o.isLineSegments) {
         // les géométries et matériaux partagés (arbres, décor Kenney) sont libérés par leur kit
@@ -182,23 +196,48 @@ export function createScene(host, { onLost } = {}) {
 
   // ---------------------------------------------------------------- mini-carte : photo aérienne du trou
   // caméra orthographique au-dessus du trou, green en haut ; sans brume, ombres sur tout le trou
-  function renderMap(f) {
+  // mini-carte : le trou vu du dessus dans le cadre f, à l'échelle `scale` (plus fin, pour zoomer sans flou).
+  // relief : seuls le terrain (teintes d'altitude, courbes de niveau) et l'eau en aplat, les arbres en pastilles
+  function renderMap(f, { relief = false, scale = 1 } = {}) {
     if (!world) return null;
-    const { W, H } = f, gy = world.hole.heightAt(f.cx, f.cz);
+    const hole = world.hole, W = Math.round(f.W * scale), H = Math.round(f.H * scale), gy = hole.heightAt(f.cx, f.cz);
     const oc = new THREE.OrthographicCamera(-f.wm / 2, f.wm / 2, f.hm / 2, -f.hm / 2, 1, 4000);
     oc.position.set(f.cx, gy + 1500, f.cz); oc.up.set(f.dx, 0, f.dz); oc.lookAt(f.cx, gy, f.cz); oc.updateMatrixWorld();
     const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
-    const hide = [ball, blob, others, trail, marker, dotsMesh, tee, world.grass.group, world.grid.group, world.sky, world.pin.group, ...[...golfers].map((g) => g.root)].filter((o) => o.visible);
+    const dyn = [ball, blob, others, trail, marker, dotsMesh, tee, ...[...golfers].map((g) => g.root)];
+    const hide = (relief ? [...dyn, ...world.group.children.filter((o) => o !== world.terrain.mesh && o !== world.water.group)]
+      : [...dyn, world.grass.group, world.grid.group, world.sky, world.pin.group]).filter((o) => o.visible);
     for (const o of hide) o.visible = false;
     const fog = scene.fog; scene.fog = null;
     const sc = sun.shadow.camera, saved = { l: sc.left, r: sc.right, t: sc.top, b: sc.bottom, far: sc.far, p: sun.position.clone(), q: sun.target.position.clone() };
-    const half = Math.max(f.wm, f.hm) * 0.6;
-    Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 2400 }); sc.updateProjectionMatrix();
-    sun.target.position.set(f.cx, gy, f.cz); sun.position.set(f.cx + SUN_DIR.x * 900, gy + SUN_DIR.y * 900, f.cz + SUN_DIR.z * 900);
+    const swapped = [];
+    if (relief) {
+      // altitudes du cadre, pour étaler les teintes et choisir l'écart entre deux courbes
+      let h0 = Infinity, h1 = -Infinity;
+      for (let j = 0; j <= 40; j++) for (let i = 0; i <= 30; i++) {
+        const u = (i / 30 - 0.5) * f.wm, v = (j / 40 - 0.5) * f.hm, x = f.cx + u * f.rx + v * f.dx, z = f.cz + u * f.rz + v * f.dz, h = hole.heightAt(x, z);
+        if (!hole.coast || h > hole.coast.level) { h0 = Math.min(h0, h); h1 = Math.max(h1, h); }
+      }
+      const step = [0.5, 1, 2, 5, 10].find((k) => (h1 - h0) / k <= 28) || 20;
+      // lumière venue du haut à gauche de la carte, comme sur les cartes topographiques
+      const lx = f.dx - f.rx, lz = f.dz - f.rz, ll = Math.hypot(lx, lz) || 1;
+      const light = new THREE.Vector3(lx / ll * 0.7, 0.75, lz / ll * 0.7).normalize();
+      if (!world.relief) world.relief = { mat: reliefMaterial(world.terrain.uniforms, { hMin: h0, hMax: h1, step, light }), water: new THREE.MeshBasicMaterial({ color: 0x5ba8da }), step };
+      swapped.push([world.terrain.mesh, world.terrain.mesh.material]); world.terrain.mesh.material = world.relief.mat;
+      world.water.group.traverse((o) => { if (o.isMesh) { swapped.push([o, o.material]); o.material = world.relief.water; } });
+    } else {
+      const half = Math.max(f.wm, f.hm) * 0.6;
+      Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 2400 }); sc.updateProjectionMatrix();
+      sun.target.position.set(f.cx, gy, f.cz); sun.position.set(f.cx + SUN_DIR.x * 900, gy + SUN_DIR.y * 900, f.cz + SUN_DIR.z * 900);
+    }
     world.water.setReflect(null);
+    // la carte reste lisible le soir : on l'éclaire comme en plein jour
+    setLight(DAY);
     renderer.setRenderTarget(rt); renderer.render(scene, oc);
+    setLight(light);
     const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
     renderer.setRenderTarget(null);
+    for (const [o, m] of swapped) o.material = m;
     Object.assign(sc, { left: saved.l, right: saved.r, top: saved.t, bottom: saved.b, far: saved.far }); sc.updateProjectionMatrix();
     sun.position.copy(saved.p); sun.target.position.copy(saved.q);
     scene.fog = fog;
@@ -208,9 +247,17 @@ export function createScene(host, { onLost } = {}) {
     const g = cv.getContext('2d'), img = g.createImageData(W, H);
     for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
     g.putImageData(img, 0, 0);
-    // léger contraste, comme une photo aérienne
-    g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    if (relief) {
+      // arbres du parcours : pastilles vert sombre, cernées de clair
+      const s = (W / f.W) * f.s, at = (x, z) => { const px = x - f.cx, pz = z - f.cz; return [W / 2 + (px * f.rx + pz * f.rz) * s, H / 2 - (px * f.dx + pz * f.dz) * s]; };
+      g.fillStyle = 'rgba(38,74,40,0.82)'; g.strokeStyle = 'rgba(240,248,228,0.55)'; g.lineWidth = Math.max(1, s * 0.25);
+      for (const t of hole.trees) { const [x, y] = at(t.x, t.z), r = Math.max(1.5, t.r * 0.75 * s); if (x < -r || y < -r || x > W + r || y > H + r) continue; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.stroke(); }
+      cv.contourStep = world.relief.step;
+    } else {
+      // léger contraste, comme une photo aérienne
+      g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    }
     return cv;
   }
 
@@ -317,7 +364,7 @@ export function createScene(host, { onLost } = {}) {
     world.water.setReflect(h);
   }
 
-  let T = 0, frameNo = 0;
+  let T = 0, frameNo = 0, shadowHalf = 50;
   function frame(dt) {
     if (disposed) return;
     T += dt;
@@ -326,8 +373,14 @@ export function createScene(host, { onLost } = {}) {
     // ne jamais passer sous le terrain
     if (world) { const gy = world.hole.heightAt(cam.pos.x, cam.pos.z) + 0.6; if (cam.pos.y < gy) cam.pos.y = gy; }
     camera.position.copy(cam.pos); camera.lookAt(cam.look);
-    // l'ombre du soleil suit ce que regarde la caméra
-    const fx = cam.look.x * 0.6 + cam.pos.x * 0.4, fz = cam.look.z * 0.6 + cam.pos.z * 0.4;
+    // l'ombre du soleil couvre ce qui est devant la caméra (pas le point visé, qui peut être très loin pendant un
+    // survol) ; plus la caméra est haute, plus la zone d'ombre est grande
+    const gy0 = world ? world.hole.heightAt(cam.pos.x, cam.pos.z) : 0, high = Math.max(0, cam.pos.y - gy0);
+    const ax = cam.look.x - cam.pos.x, az = cam.look.z - cam.pos.z, al = Math.hypot(ax, az) || 1;
+    const ahead = Math.min(al * 0.6, 34 + high * 0.8);
+    const fx = cam.pos.x + ax / al * ahead, fz = cam.pos.z + az / al * ahead;
+    const half = Math.round(Math.min(95, Math.max(50, 44 + high * 1.6)));
+    if (half !== shadowHalf) { shadowHalf = half; Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half }); sun.shadow.camera.updateProjectionMatrix(); }
     sun.target.position.set(fx, 0, fz);
     sun.position.set(fx + SUN_DIR.x * 120, SUN_DIR.y * 120 + (world ? world.hole.heightAt(fx, fz) : 0), fz + SUN_DIR.z * 120);
     SWAY.uT.value = T;

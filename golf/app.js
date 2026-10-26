@@ -8,7 +8,9 @@ import { suggestClub, suggestAim, clubReach, allowedClub, distToPin } from './en
 import { totals, ranking } from './engine/rules.js';
 import { startHost, startClient, holeByNumber, currentHole, windOf, simBall } from './net/session.js';
 import { createScene } from './view/scene.js';
-import { HUD, titleHtml, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, saveSetup, esc } from './view/hud.js';
+import { HUD, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, esc } from './view/hud.js';
+import { createHome } from './view/home.js';
+import { icon, fillIcons } from './view/icons.js';
 import { Sfx } from './view/sfx.js';
 import { Input, MAX_POWER } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
@@ -22,10 +24,14 @@ const INTRO = 5.5;          // s : survol du trou
 const CARD_T = 5;           // s : carte de score entre deux trous
 
 const hud = new HUD();
-const sfx = new Sfx(new URL('./sounds/', import.meta.url).href);
+const sfx = new Sfx(new URL('./sounds/', import.meta.url).href, new URL('./music/', import.meta.url).href);
+fillIcons();
+// ?mute : aucun son, sans toucher au réglage du joueur (tests automatiques)
+if (QS.has('mute')) sfx.silent = true;
+let home = null;
 let scene = null;
 try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
-catch (e) { console.error(e); $('#screen').innerHTML = '<div class="card panel"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
+catch (e) { console.error(e); $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
 
 // ------------------------------------------------------------------ état de la vue
 const V = {
@@ -63,14 +69,17 @@ for (const [id, k] of [['#aimL', 'l'], ['#aimR', 'r']]) {
   input.listen($(id), 'pointerup', () => { aimHold[k] = false; });
   input.listen($(id), 'pointerleave', () => { aimHold[k] = false; });
 }
-$('#btnMute').textContent = sfx.muted ? '🔇' : '🔊';
+$('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn');
 // clic pendant le survol : on passe directement au jeu
-input.listen($('#stage'), 'pointerdown', () => { if (V.phase === 'intro') endIntro(); });
+input.listen($('#stage'), 'pointerdown', () => { if (V.phase === 'intro') endIntro(); else if (V.phase === 'replay') endReplay(); });
 
 function onKey(k, down) {
   if (!down) return;
-  if (k === 'KeyM') return toggleMute();
+  if (k === 'KeyM' && V.phase !== 'title') return toggleMute();
+  if (V.hole && k === 'KeyZ') return hud.cycleZoom();
+  if (V.hole && k === 'KeyR') return hud.toggleRelief();
   if (V.phase === 'intro' && (k === 'Enter' || k === 'Escape')) return endIntro();
+  if (V.phase === 'replay' && (k === 'Enter' || k === 'Escape' || k === 'Space')) return endReplay();
   if (V.phase !== 'aim' || !V.mine) return;
   if (k === 'ArrowUp') changeClub(-1);
   else if (k === 'ArrowDown') changeClub(1);
@@ -85,7 +94,7 @@ function leaveGame() {
   V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null;
   hud.show(false); showTitle();
 }
-function toggleMute() { sfx.setMuted(!sfx.muted); $('#btnMute').textContent = sfx.muted ? '🔇' : '🔊'; }
+function toggleMute() { sfx.setMuted(!sfx.muted); $('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); }
 function toggleView() { if (V.phase !== 'aim' || !V.mine) return; V.view = !V.view; sfx.ui('switch'); aimCamera(false); }
 function changeClub(d) {
   if (V.phase !== 'aim' || !V.mine) return;
@@ -134,30 +143,25 @@ function startSession(role) {
 // raccourci de test : ?play lance directement une partie solo (?course=mer&bots=2)
 function quickPlay() {
   const s = loadSetup();
-  V.settings = { ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots, startHole: +QS.get('hole') || 0 };
+  V.settings = { ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots, startHole: +QS.get('hole') || 0, time: QS.get('time') || s.time, teams: QS.get('teams') || s.teams };
   $('#screen').innerHTML = loadingHtml();
   startSession('solo');
 }
+// accueil : survol des trous, logo, réglages ; « Jouer » lance une partie solo (avec bots)
 function showTitle() {
   V.phase = 'title';
   hud.show(false);
-  const set = loadSetup();
-  $('#screen').innerHTML = titleHtml(set);
-  for (const g of document.querySelectorAll('.title [data-k]')) {
-    for (const b of g.querySelectorAll('button')) b.onclick = () => {
-      sfx.unlock(); sfx.ui('click');
-      set[g.dataset.k] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v;
-      for (const o of g.querySelectorAll('button')) o.classList.toggle('on', o === b);
-      saveSetup(set);
-    };
-  }
-  $('#btnPlay').onclick = () => {
-    sfx.unlock(); sfx.ui('confirm');
-    V.settings = { ...set };
-    $('#screen').innerHTML = loadingHtml();
-    V.queue = []; V.busy = false; V.hi = -1; V.R = null;
-    startSession('solo');
-  };
+  for (const g of V.golfers.values()) g.root.visible = false;
+  home = createHome({
+    root: $('#screen'), scene, sfx, hole: holeByNumber,
+    onPlay: (set) => {
+      home.dispose(); home = null;
+      V.settings = set;
+      $('#screen').innerHTML = loadingHtml();
+      V.queue = []; V.busy = false; V.hi = -1; V.R = null;
+      startSession('solo');
+    },
+  });
 }
 
 // ------------------------------------------------------------------ événements de la session, traités dans l'ordre
@@ -203,11 +207,11 @@ async function loadHole(R) {
   $('#screen').innerHTML = loadingHtml(`Trou ${hole.n} · ${hole.name}`);
   await new Promise((r) => setTimeout(r, 40)); // laisse l'écran de chargement s'afficher
   const wind = windOf(R);
-  await scene.loadHole(hole, { theme: hole.theme, wind });
+  await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time });
   scene.setWind(wind);
   // mini-carte : photo aérienne du trou, prise une fois le décor posé
-  const frame = hud.mapFrame(hole);
-  hud.setMap(scene.renderMap(frame), frame);
+  const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
+  hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
   sfx.ambience(hole.theme);
   $('#screen').innerHTML = '';
   // survol du trou, depuis le départ jusqu'au green
@@ -215,7 +219,7 @@ async function loadHole(R) {
   hud.show(true); hud.controls(false); hud.gauge(0, false); $('#turn').hidden = true;
   scene.setMarker(null, false); scene.setAimDots(null, null, false); scene.showGrid(false); scene.showBall(false); scene.setTee(null, false); scene.setOthers([]);
   for (const g of V.golfers.values()) g.root.visible = false;
-  hud.hole(hole, 1); hud.players(stripList()); hud.dist(hole.length); hud.lie('tee');
+  hud.hole(hole, 1); hud.players(stripList(), V.R.teams); hud.dist(hole.length); hud.lie('tee');
   hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, INTRO - 0.6);
   sfx.holeStart();
   introCamera(0, true);
@@ -243,23 +247,30 @@ function finalCard(R) {
   V.phase = 'over';
   hud.show(false);
   const holes = R.holes.map((n) => holeByNumber(n));
-  const rk = ranking(R, V.pars);
+  let rk = ranking(R, V.pars), shown = R;
+  if (R.teams) {
+    // en équipes : une ligne par équipe (ses joueurs ont tous le même score)
+    const lead = R.teams.map((t, k) => R.players.find((p) => p.team === k)).filter(Boolean);
+    shown = { ...R, players: lead.map((p) => ({ ...p, name: R.teams[p.team].name, color: R.teams[p.team].color })) };
+    const mine = R.players.find((p) => p.id === V.me.id);
+    rk = ranking(shown, V.pars).map((x) => ({ ...x, id: x.team === mine?.team ? V.me.id : x.id }));
+  }
   const canReplay = V.role !== 'guest';
-  $('#screen').innerHTML = scorecardHtml(R, holes, { final: true, ranking: rk, canReplay, embedded: H.embedded, title: R.players.length > 1 ? `${rk[0].name} gagne la partie !` : 'Partie terminée !' });
+  $('#screen').innerHTML = scorecardHtml(shown, holes, { final: true, ranking: rk, canReplay, embedded: H.embedded, title: shown.players.length > 1 ? `${rk[0].name} gagne la partie !` : 'Partie terminée !' });
   sfx.react(rk[0].id === V.me.id ? 'birdie' : 'par');
   const again = $('#btnAgain');
   if (again) again.onclick = () => { sfx.ui('confirm'); $('#screen').innerHTML = loadingHtml(); V.hi = -1; V.queue = []; V.busy = false; V.session.begin(); };
   $('#btnQuit').onclick = () => {
     sfx.ui('close');
     if (H.embedded) { teardown(); H.exit(); }
-    else { V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; showTitle(); }
+    else { V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null; showTitle(); }
   };
 }
 
 // ------------------------------------------------------------------ tour de jeu
 function stripList() {
   const t = totals(V.R, V.pars);
-  return V.R.players.map((p, i) => ({ name: p.name, color: p.color, toPar: t[i].toPar, cur: i === V.R.turn && V.phase !== 'intro', done: p.done && V.R.phase === 'play' }));
+  return V.R.players.map((p, i) => ({ name: p.name, color: p.color, toPar: t[i].toPar, cur: i === V.R.turn && V.phase !== 'intro', done: p.done && V.R.phase === 'play', team: p.team, played: p.played }));
 }
 
 function setTurn() {
@@ -278,7 +289,12 @@ function setTurn() {
   placeSpectators();
   scene.showBall(true); scene.setBall(V.ball.x, V.ball.y, V.ball.z); scene.trailClear();
   scene.setTee(V.ball, V.ball.lie === 'tee');
-  scene.setOthers(R.players.filter((q, k) => k !== i && !q.done && q.ball && !(q.ball.lie === 'tee' && V.ball.lie === 'tee')).map((q) => ({ x: q.ball.x, z: q.ball.z, color: q.color })));
+  // les balles des autres ; en équipes, celles que les coéquipiers viennent de jouer depuis le même endroit
+  const others = R.teams
+    ? R.players.filter((q) => q.pending && q.pending.ball && q.team === P.team).map((q) => ({ x: q.pending.ball.x, z: q.pending.ball.z, color: q.color }))
+      .concat(R.players.filter((q) => q.team !== P.team && !q.done && q.ball && q.ball.lie !== 'tee').filter((q, k, a) => a.findIndex((o) => o.team === q.team) === k).map((q) => ({ x: q.ball.x, z: q.ball.z, color: R.teams[q.team].color })))
+    : R.players.filter((q, k) => k !== i && !q.done && q.ball && !(q.ball.lie === 'tee' && V.ball.lie === 'tee')).map((q) => ({ x: q.ball.x, z: q.ball.z, color: q.color }));
+  scene.setOthers(others);
   scene.showPole(!(V.club === PUTTER && distToPin(hole, V.ball) < 14));
   scene.showGrid(V.club === PUTTER);
   hud.hole(hole, P.strokes + 1); hud.lie(V.ball.lie);
@@ -286,13 +302,15 @@ function setTurn() {
   hud.controls(V.mine); hud.gauge(0, true);
   // annonce du tour
   const t = $('#turn');
-  t.innerHTML = V.mine ? (R.players.length > 1 ? `<i style="background:${esc(P.color)}"></i>À toi de jouer !` : '') : `<i style="background:${esc(P.color)}"></i>Au tour de ${esc(P.name)}`;
+  const team = R.teams && P.team >= 0 ? `<small>${esc(R.teams[P.team].name)}</small>` : '';
+  const call = V.mine ? (R.players.length > 1 ? `<i style="background:${esc(P.color)}"></i>À toi de jouer !` : '') : `<i style="background:${esc(P.color)}"></i>Au tour de ${esc(P.name)}`;
+  t.innerHTML = call ? call + team : '';
   t.hidden = !t.innerHTML; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
   clearTimeout(V.turnT); V.turnT = setTimeout(() => { t.hidden = true; }, 2200);
   if (R.players.length > 1) sfx.ui(V.mine ? 'confirm' : 'switch');
   const fromCut = V.phase === 'cut' || V.phase === 'intro';
   V.phase = V.mine ? 'aim' : 'watch';
-  hud.players(stripList());
+  hud.players(stripList(), V.R.teams);
   // petit fondu au blanc entre deux joueurs, puis la caméra se pose derrière la balle
   if (fromCut) aimCamera(true);
   else fadeCut(() => aimCamera(true));
@@ -424,6 +442,41 @@ function outcome() {
   if (msg[2] === 'bunker' || treeHit) g.sulk(); else if (great) g.cheer();
   return 2.4;
 }
+// ralenti des beaux coups : trou réussi hors du green (trou en un, chip, eagle), long putt rentré, approche collée au drapeau
+function replayWorthy() {
+  if (V.forceReplay) return true; // tests (?debug)
+  const ev = V.shot.ev, r = ev.res, h = V.hole, club = CLUBS[ev.params.club];
+  const d0 = Math.hypot(ev.from.x - h.pin.x, ev.from.z - h.pin.z);
+  if (r.kind === 'holed') return !club.putter || d0 > 8;
+  if (r.kind !== 'rest' || club.putter) return false;
+  return Math.hypot(r.end.x - h.pin.x, r.end.z - h.pin.z) < 2.5 && d0 > 50;
+}
+function startReplay() {
+  const sim = V.shot.sim, h = V.hole;
+  V.shot.replayed = true;
+  V.phase = 'replay'; V.playT = 0; V.evI = 0; V.timer = 1.4;
+  // caméra posée près du point de chute, de côté ; pour un putt, au ras du sol près du trou
+  const land = sim.carry || sim.end, from = V.shot.ev.from;
+  const ax = land.x - from.x, az = land.z - from.z, L = Math.hypot(ax, az) || 1, A = { x: ax / L, z: az / L }, R = { x: -A.z, z: A.x };
+  const putt = CLUBS[V.shot.ev.params.club].putter || L < 30;
+  const at = putt ? { x: h.pin.x, z: h.pin.z } : land, side = putt ? 3.2 : 17, back = putt ? 2.5 : 7;
+  const cx = at.x + R.x * side + A.x * back, cz = at.z + R.z * side + A.z * back;
+  V.replayCam = { pos: V3(cx, ground(cx, cz) + (putt ? 0.7 : 4.5), cz) };
+  scene.trailClear();
+  fadeCut(() => { scene.camTo(V.replayCam.pos, V3(from.x, ground(from.x, from.z), from.z), 3, true); document.body.classList.add('replaying'); });
+}
+function replayCamera(p) { scene.camTo(V.replayCam.pos, V3(p.x, p.y, p.z), 6); }
+function endReplay() {
+  if (V.phase !== 'replay') return;
+  V.phase = 'cut'; // le temps du fondu, plus rien ne bouge
+  fadeCut(() => {
+    document.body.classList.remove('replaying');
+    const r = V.shot.ev.res;
+    if (r.kind !== 'water') scene.setBall(r.end.x, r.end.y, r.end.z);
+    finishShot();
+  });
+}
+
 function finishShot() {
   const ev = V.shot.ev;
   V.shot = null;
@@ -497,11 +550,11 @@ let last = performance.now(), raf = 0, alive = true;
 function loop(now) {
   if (!alive) return;
   raf = requestAnimationFrame(loop);
-  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now;
+  const ms = Math.max(0, now - last), dt = Math.min(0.05, ms / 1000); last = Math.max(last, now);
   input.update();
   hud.tick(dt);
   if (!scene) return;
-  if (!V.hole) { scene.frame(dt); return; }
+  if (!V.hole) { home && home.update(dt); scene.frame(dt); return; }
   autoQuality(now, ms);
   sfx.wind(windOf(V.R).speed, dt);
 
@@ -563,8 +616,26 @@ function loop(now) {
   } else if (V.phase === 'after') {
     scene.trailFade(dt);
     V.timer -= dt;
-    if (V.timer <= 0 && !V.outcome) { V.outcome = true; V.timer = outcome(); hud.players(stripList()); }
-    else if (V.timer <= 0 && V.outcome) finishShot();
+    if (V.timer <= 0 && !V.outcome) {
+      V.outcome = true; V.timer = outcome(); hud.players(stripList(), V.R.teams);
+      const o = V.shot.ev.out;
+      if (o.resolved && o.best >= 0 && !o.holed && V.R.teams) { const b = V.R.players[o.best]; hud.toast(`Meilleure balle : ${b.name}`, 2.4); }
+    }
+    else if (V.timer <= 0 && V.outcome) { if (!V.shot.replayed && replayWorthy()) startReplay(); else finishShot(); }
+  } else if (V.phase === 'replay') {
+    // le ralenti : la balle refait son vol, filmée depuis le point de chute
+    const sim = V.shot.sim, P = sim.path;
+    V.playT += dt * 0.55;
+    const f = Math.min(sim.n - 1, V.playT * 60), i = Math.floor(f), k = f - i, j = Math.min(sim.n - 1, i + 1);
+    const p = { x: P[i * 3] + (P[j * 3] - P[i * 3]) * k, y: P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * k, z: P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * k };
+    scene.showBall(true); scene.setBall(p.x, p.y, p.z); scene.trailPush(p.x, p.y + 0.03, p.z);
+    while (V.evI < sim.events.length && sim.events[V.evI].i <= f) {
+      const e = sim.events[V.evI++];
+      if (e.type === 'bounce') sfx.bounce(e.surf, e.v * 0.7);
+      else if (e.type === 'cup') { sfx.cup(); sfx.react('par'); }
+    }
+    replayCamera(p);
+    if (f >= sim.n - 1 && (V.timer -= dt) <= 0) endReplay();
   }
 
   // drapeau à l'écran, distance et vent

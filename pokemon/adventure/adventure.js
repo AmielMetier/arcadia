@@ -52,8 +52,8 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   if (isSolid(mapGrids[currentMapId], player.x, player.y)) {
     currentMapId = 'outdoor';
     player.mapId = 'outdoor';
-    player.x = 9;
-    player.y = 44;
+    player.x = 28;
+    player.y = 94;
     player.dir = 'up';
   }
 
@@ -255,29 +255,28 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     if (!player.hasStarter) {
       return currentMapId === 'lab'
         ? 'Objectif : Examiner les Poké Balls sur la table [ESPACE]'
-        : 'Objectif : Entrer dans le Laboratoire au Nord (9,43)';
+        : 'Objectif : Entrer dans le Laboratoire (28,93)';
     }
     const defCount = (player.defeatedTrainers || []).length;
     if (defCount < 2) {
-      return `Objectif : Vaincre les Dresseurs (${defCount}/4) sur la Grande Route 1`;
+      return `Objectif : Vaincre les Dresseurs (${defCount}/4) sur la Route 1`;
     }
     if (!(player.badges || []).includes('citron_dor')) {
       return currentMapId === 'gym'
         ? 'Objectif : Défier la Championne Solène au fond de l\'Arène !'
-        : 'Objectif : Entrer dans l\'Arène au Nord-Est (43,10)';
+        : 'Objectif : Entrer dans l\'Arène de Jadielle au Nord (36,10)';
     }
     const caughtCount = (player.pokedex && player.pokedex.caught && player.pokedex.caught.length) || 0;
-    return `Maître d'Unys • Pokédex : ${caughtCount}/28 espèces`;
+    return `Maître Pokémon • Pokédex : ${caughtCount}/28 espèces`;
   }
 
   function getZoneTitle() {
     if (currentMapId !== 'outdoor') {
       return MAPS[currentMapId]?.name || 'Intérieur';
     }
-    if (player.x <= 22 && player.y >= 34) return 'Village de Renouet-Sud (Départ)';
-    if (player.x >= 26 && player.y <= 18) return 'Cité d\'Ogoesse (Unys-Nord)';
-    if (player.y >= 50) return 'Lac de la Route 1 (Bord de l\'eau)';
-    return 'Grande Route 1 d\'Unys (Hautes herbes)';
+    if (player.y >= 80) return 'Bourg-Palette (Village de Départ)';
+    if (player.y <= 39) return 'Cité de Jadielle (Centre • Boutique • Arène)';
+    return 'Route 1 (Sentier des Hautes Herbes)';
   }
 
   // --- TÉLÉPORTATION ENTRE EXTÉRIEUR ET INTÉRIEURS DE BÂTIMENTS ---
