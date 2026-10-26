@@ -9,13 +9,13 @@
 import {
   TILE_SIZE,
   TILE,
-  MAPS,
   WORLD_REGIONS,
   WORLD_BUILDINGS,
   WORLD_PROPS,
   SIGNPOSTS,
   isSolid
 } from './map.js';
+import { ADVENTURE_TRAINERS } from './data.js';
 
 function globalIdx(origCol, origRow) {
   const strip = Math.floor(origRow / 96);
@@ -45,10 +45,10 @@ export class AdventureRenderer {
     this.height = hudCanvas.height || window.innerHeight;
     this.animTick = 0;
 
-    // État courant transmis par adventure.js à chaque frame
     this.state = null;
     this.builtMapId = null;
     this.phaserReady = false;
+    this.activeTilemaps = [];
 
     this._initPhaserInstance();
   }
@@ -67,7 +67,6 @@ export class AdventureRenderer {
       phaserHost.style.cssText = 'position:absolute;inset:0;z-index:1;overflow:hidden;';
       parentEl.insertBefore(phaserHost, this.canvas);
     }
-    // Le canvas HUD 2D reste au-dessus du canvas Phaser (sans bloquer les clics)
     this.canvas.style.cssText = 'position:absolute;inset:0;z-index:5;pointer-events:none;width:100%;height:100%;';
 
     const self = this;
@@ -97,10 +96,10 @@ export class AdventureRenderer {
         // 3. Sprites Dresseurs & PNJ
         const trainers = {
           red: 'assets/trainers/red.png',
-          green: 'assets/trainers/leaf.png',
-          prof: 'assets/trainers/prof_oak.png',
-          nurse: 'assets/trainers/nurse_joy.png',
-          clerk: 'assets/trainers/super_nerd.png',
+          green: 'assets/trainers/serena.png',
+          prof: 'assets/trainers/sycamore.png',
+          nurse: 'assets/trainers/pokemoncenterlady.png',
+          clerk: 'assets/trainers/calem.png',
           youngster: 'assets/trainers/youngster.png',
           lass: 'assets/trainers/lass.png',
           sailor: 'assets/trainers/sailor.png',
@@ -146,13 +145,13 @@ export class AdventureRenderer {
         this.cameras.main.setZoom(1.85);
         this.cameras.main.startFollow(this.playerContainer, true, 0.16, 0.16);
 
-        if (self.state) {
+        if (self.state && self.state.map) {
           self._rebuildPhaserMap(this, self.state.mapId || 'outdoor', self.state.map);
         }
       }
 
       update() {
-        if (!self.state) return;
+        if (!self.state || !self.state.player) return;
         self._syncEntitiesInPhaser(this, self.state);
       }
     }
@@ -226,13 +225,11 @@ export class AdventureRenderer {
     } else {
       this._buildIndoorMap(scene, mapId, mapW, mapH, grid);
       scene.cameras.main.setZoom(2.15);
-      // Permettre le centrage parfait des petites pièces intérieures
       const pad = 256;
       scene.cameras.main.setBounds(-pad, -pad, mapW * TILE_SIZE + pad * 2, mapH * TILE_SIZE + pad * 2);
       scene.cameras.main.setBackgroundColor('#090e18');
     }
 
-    // Créer les corps physiques solides Arcade Physics pour les collisions
     this._buildArcadeCollisionBodies(scene, mapW, mapH, grid);
   }
 
@@ -250,7 +247,6 @@ export class AdventureRenderer {
     const tsNature = tmNature.addTilesetImage('tileset_nature', 'tileset_nature', 32, 32, 0, 0);
     const natureRouteLayer = tmNature.createBlankLayer('NatureRoute', tsNature, 0, 0).setDepth(2.5);
     const natureFloraLayer = tmNature.createBlankLayer('NatureFlora', tsNature, 0, 0).setDepth(4.2);
-    const natureOverheadLayer = tmNature.createBlankLayer('NatureOverhead', tsNature, 0, 0).setDepth(24);
 
     // 3. Tilemap Buildings (Pack 2 : WesleyFG Bâtiments 5G)
     const tmBuildings = scene.make.tilemap({ tileWidth: 32, tileHeight: 32, width: mapW, height: mapH });
@@ -281,7 +277,6 @@ export class AdventureRenderer {
       }
     }
 
-    // Helper 9-slice pour les places pavées et plans d'eau
     const fill9SliceGlobal = (layer, rx, ry, rw, rh, c0, r0) => {
       for (let dy = 0; dy < rh; dy++) {
         for (let dx = 0; dx < rw; dx++) {
@@ -369,7 +364,6 @@ export class AdventureRenderer {
       }
     }
     for (const l of WORLD_PROPS.lamps) {
-      // Lampadaire 1x3 (haut en overhead, pied au sol)
       globalOverheadLayer.putTileAt(globalIdx(3, 363), l.x, l.y - 2);
       globalOverheadLayer.putTileAt(globalIdx(3, 364), l.x, l.y - 1);
       globalPropsLayer.putTileAt(globalIdx(3, 365), l.x, l.y);
@@ -386,13 +380,13 @@ export class AdventureRenderer {
       }
     }
 
-    // Panneaux directionnels (Pack 3 Nature C7, R3)
+    // Panneaux directionnels
     for (const coord of Object.keys(SIGNPOSTS)) {
       const [sx, sy] = coord.split(',').map(Number);
       natureFloraLayer.putTileAt(natureIdx(7, 3), sx, sy);
     }
 
-    // --- G. Forêts denses et Arbres 5G (Pack 1 Global C1..C2, R253..R256 & Pack 3 Nature) ---
+    // --- G. Forêts denses et Arbres 5G ---
     const stampUnovaTree = (tx, ty, autumn = false) => {
       const r0 = autumn ? 243 : 253;
       for (let dy = 0; dy < 4; dy++) {
@@ -406,7 +400,6 @@ export class AdventureRenderer {
       }
     };
 
-    // Bordures forestières tout autour de la carte 64x64
     for (let y = 0; y < 60; y += 3) {
       stampUnovaTree(0, y, false);
       stampUnovaTree(2, y, true);
@@ -418,7 +411,6 @@ export class AdventureRenderer {
       stampUnovaTree(x, 60, x % 4 === 0);
     }
 
-    // Bosquets forestiers structurant le monde entre Renouet, la Route 1 et Ogoesse
     for (let y = 20; y <= 31; y += 3) {
       for (let x = 4; x <= 16; x += 2) {
         stampUnovaTree(x, y, (x + y) % 5 === 0);
@@ -553,18 +545,18 @@ export class AdventureRenderer {
       map,
       mapId = 'outdoor',
       player,
-      moveProgress = 0,
       remotePlayers = [],
       npcs = [],
-      staticNpcs = [],
-      lemonCooldowns = {}
+      staticNpcs = []
     } = state;
+
+    if (!player) return;
 
     if (this.builtMapId !== mapId && map) {
       this._rebuildPhaserMap(scene, mapId, map);
     }
 
-    // Mettre à jour l'état des arbres à baies
+    const lemonCooldowns = player.lemonCooldowns || {};
     if (mapId === 'outdoor' && scene.berrySprites) {
       const now = Date.now();
       for (const [key, sp] of scene.berrySprites.entries()) {
@@ -574,16 +566,13 @@ export class AdventureRenderer {
     }
 
     // 1. Synchroniser le joueur principal (position interpolée fluide + animation de pas)
-    const pRenderX = player.moving
-      ? player.prevX + (player.x - player.prevX) * moveProgress
-      : player.x;
-    const pRenderY = player.moving
-      ? player.prevY + (player.y - player.prevY) * moveProgress
-      : player.y;
+    const pRenderX = player.visualX !== undefined ? player.visualX : player.x;
+    const pRenderY = player.visualY !== undefined ? player.visualY : player.y;
 
     const px = pRenderX * TILE_SIZE + 16;
     const py = pRenderY * TILE_SIZE + 16;
-    const bob = player.moving ? Math.abs(Math.sin(moveProgress * Math.PI * 2)) * 4 : 0;
+    const stepPhase = ((pRenderX % 1) + (pRenderY % 1));
+    const bob = player.moving ? Math.abs(Math.sin(stepPhase * Math.PI * 2)) * 4 : 0;
 
     scene.playerContainer.setPosition(px, py);
     scene.playerContainer.setDepth(10 + pRenderY * 0.05);
@@ -591,7 +580,6 @@ export class AdventureRenderer {
     scene.playerSprite.setY(-4 - bob);
     scene.playerSprite.setFlipX(player.dir === 'right');
 
-    // Masquage authentique du bas des jambes dans les hautes herbes
     const curTile = map && map[player.y] ? map[player.y][player.x] : 0;
     scene.playerGrassOverlay.setVisible(curTile === TILE.GRASS_TALL);
 
@@ -693,27 +681,45 @@ export class AdventureRenderer {
     }
   }
 
-  render(state) {
+  render(rawState) {
     this.animTick++;
-    this.state = state;
+    if (!rawState) return;
+
+    const mapId = rawState.mapId || 'outdoor';
+    const map = rawState.grid || rawState.map;
+    const player = rawState.localPlayer || rawState.player;
+    if (!player) return;
+
+    const mapName = rawState.activeZoneName || rawState.mapName || 'Région d\'Unys (5G)';
+    const questText = rawState.questText || '';
+    const remotePlayers = rawState.remotePlayers || [];
+    const staticNpcs = rawState.staticNpcs || [];
+    const npcs = rawState.npcs || ADVENTURE_TRAINERS.filter(tr => (tr.mapId || 'outdoor') === mapId);
+    const activeDialogue = rawState.dialogueBox !== undefined ? rawState.dialogueBox : rawState.activeDialogue;
+    const targetObj = rawState.interactiveTarget !== undefined ? rawState.interactiveTarget : rawState.interactionHint;
+    const interactionHint = targetObj
+      ? (typeof targetObj === 'string' ? targetObj : `[ESPACE] ${targetObj.label || 'Interagir'}`)
+      : null;
+
+    this.state = {
+      mapId,
+      map,
+      player,
+      mapName,
+      questText,
+      remotePlayers,
+      staticNpcs,
+      npcs,
+      activeDialogue,
+      interactionHint
+    };
 
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    const {
-      map,
-      mapId = 'outdoor',
-      mapName = 'Région d\'Unys (5G)',
-      player,
-      remotePlayers = [],
-      npcs = [],
-      activeDialogue = null,
-      interactionHint = null
-    } = state;
-
     const sameMapRemotes = remotePlayers.filter(r => (r.mapId || 'outdoor') === mapId);
 
-    this.drawZoneBanner(ctx, player, mapName, sameMapRemotes.length);
+    this.drawZoneBanner(ctx, player, mapName, questText, sameMapRemotes.length);
     if (mapId === 'outdoor' && map) {
       this.drawMinimap(ctx, map, player, sameMapRemotes, npcs);
     }
@@ -727,13 +733,13 @@ export class AdventureRenderer {
     }
   }
 
-  drawZoneBanner(ctx, player, mapName, onlineCount) {
+  drawZoneBanner(ctx, player, mapName, questText, onlineCount) {
     ctx.save();
     ctx.fillStyle = 'rgba(11, 17, 28, 0.9)';
     ctx.strokeStyle = '#ffcb05';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(16, 16, 330, 88, 10);
+    ctx.roundRect(16, 16, 350, 96, 10);
     ctx.fill();
     ctx.stroke();
 
@@ -745,24 +751,31 @@ export class AdventureRenderer {
     const badgeText = player.badges && player.badges.includes('citron_dor') ? ' • BADGE OBTENU' : '';
     ctx.fillStyle = '#cbd5e1';
     ctx.font = '600 12px "Chakra Petch", sans-serif';
-    ctx.fillText(`Dresseur : ${player.name} • ${player.money} P$${badgeText}`, 28, 58);
+    ctx.fillText(`Dresseur : ${player.name} • ${player.money} P$${badgeText}`, 28, 57);
 
-    const aliveCount = player.party.filter(p => !p.fainted && p.currentHp > 0).length;
-    const dexCount = player.pokedex ? player.pokedex.caught.length : 0;
+    const party = player.party || [];
+    const aliveCount = party.filter(p => !p.fainted && p.currentHp > 0).length;
+    const dexCount = player.pokedex && player.pokedex.caught ? player.pokedex.caught.length : 0;
     ctx.fillStyle = '#38bdf8';
     ctx.fillText(
-      `Équipe : ${aliveCount}/${player.party.length} • Dex : ${dexCount} • En ligne : ${onlineCount + 1}`,
+      `Équipe : ${aliveCount}/${party.length} • Dex : ${dexCount} • En ligne : ${onlineCount + 1}`,
       28,
-      78
+      75
     );
 
+    if (questText) {
+      ctx.fillStyle = '#fde047';
+      ctx.font = '700 11px "Chakra Petch", sans-serif';
+      ctx.fillText(questText, 28, 95);
+    }
+
     for (let i = 0; i < 6; i++) {
-      const bx = 225 + i * 16;
-      const by = 92;
+      const bx = 268 + i * 14;
+      const by = 34;
       ctx.beginPath();
-      ctx.arc(bx, by, 5, 0, Math.PI * 2);
-      if (i < player.party.length) {
-        const poke = player.party[i];
+      ctx.arc(bx, by, 4.5, 0, Math.PI * 2);
+      if (i < party.length) {
+        const poke = party[i];
         ctx.fillStyle = poke.currentHp > 0 ? '#ef4444' : '#64748b';
       } else {
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
@@ -773,7 +786,7 @@ export class AdventureRenderer {
   }
 
   drawMinimap(ctx, map, player, remotePlayers, npcs) {
-    const scale = 2.6;
+    const scale = 2.5;
     const mapH = map.length;
     const mapW = map[0].length;
     const mw = mapW * scale;
@@ -819,9 +832,9 @@ export class AdventureRenderer {
     ctx.fillRect(mx + player.x * scale - 2, my + player.y * scale - 2, 5, 5);
 
     ctx.fillStyle = '#cbd5e1';
-    ctx.font = 'bold 10px "Chakra Petch", sans-serif';
+    ctx.font = 'bold 9px "Chakra Petch", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('CARTE D\'UNYS 64×64 (LABO • CITÉ • ARÈNE)', mx + mw / 2, my + mh + 13);
+    ctx.fillText('UNYS 64×64 (LABO • CITÉ • ARÈNE)', mx + mw / 2, my + mh + 13);
     ctx.restore();
   }
 
