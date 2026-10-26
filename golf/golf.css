@@ -64,13 +64,13 @@ button{font-family:var(--round);font-weight:900;color:var(--ink);cursor:pointer;
 .arrowbtn{width:34px;height:34px;border-radius:50%;border:3px solid #fff;background:rgba(255,255,255,.35);font-size:13px;color:#fff;-webkit-text-stroke:0;display:flex;align-items:center;justify-content:center;padding:0;text-shadow:0 1px 0 rgba(0,0,0,.4)}
 .arrowbtn:active{transform:scale(.92)}
 
-/* jauge de puissance : tube fin, trois repères, losange à 100 % */
+/* jauge de puissance : tube fin, repères à 1/3 et 2/3 (les points blancs de la mini-carte), losange à 100 % */
 .gauge{position:absolute;left:max(18px,calc(50% - 250px));top:50%;transform:translateY(-55%);display:flex;flex-direction:column;align-items:center}
 .tube{position:relative;width:30px;height:min(290px,40vh);border-radius:6px;border:3px solid #ffd23f;background:rgba(10,20,10,.62);box-shadow:0 0 0 2px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.3);overflow:hidden}
 .tube .fill{position:absolute;left:3px;right:3px;bottom:3px;height:0;border-radius:3px;background:linear-gradient(0deg,#ff2d1a,#ff6a3a);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
 .tube .fill.hot{background:linear-gradient(0deg,#ff2d1a,#ff6a3a 70%,#fff27a)}
 .tube .dot{position:absolute;left:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#cfd6e0);box-shadow:0 1px 2px rgba(0,0,0,.5)}
-.tube .d1{top:71.8%}.tube .d2{top:43.6%}.tube .d3{top:15.3%;width:12px;height:12px;margin:-6px 0 0 -6px}
+.tube .d1{top:71.8%}.tube .d2{top:43.6%}
 .tube .full{position:absolute;left:0;right:0;top:0;height:15.3%;background:repeating-linear-gradient(-45deg,rgba(255,60,40,.25) 0 5px,rgba(255,60,40,.08) 5px 10px)}
 .gauge .diamond{position:absolute;left:-26px;top:calc(15.3% - 9px);width:16px;height:16px;background:linear-gradient(135deg,#fff7b0,#ffd23f 50%,#e0a800);transform:rotate(45deg);border:2px solid #fff;box-shadow:0 2px 3px rgba(0,0,0,.4)}
 .gauge span{font-size:18px;margin-top:6px}

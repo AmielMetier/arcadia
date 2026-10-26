@@ -244,9 +244,9 @@ function dropFrom(hole, lastDry, x, z) {
 }
 
 // Point d'arrivée d'un coup plein, sans vent ni effet : la cible affichée pendant la visée
-export function previewLanding(hole, ball, club, traj, aim, putt) {
+export function previewLanding(hole, ball, club, traj, aim, putt, power = 1) {
   // au putter : la portée en ligne droite (la pente, c'est au joueur de la lire)
-  if (club === PUTTER) { const x = ball.x + Math.sin(aim) * putt, z = ball.z + Math.cos(aim) * putt; return { x, z, y: hole.heightAt(x, z) }; }
-  const r = simulate(hole, ball, { club, traj, aim, power: 1, curve: 0, seed: 1 }, null, { putt, noWind: true, stopAtLanding: true });
+  if (club === PUTTER) { const x = ball.x + Math.sin(aim) * putt * power, z = ball.z + Math.cos(aim) * putt * power; return { x, z, y: hole.heightAt(x, z) }; }
+  const r = simulate(hole, ball, { club, traj, aim, power, curve: 0, seed: 1 }, null, { putt, noWind: true, stopAtLanding: true });
   return { x: r.end.x, z: r.end.z, y: r.end.y };
 }

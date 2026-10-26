@@ -318,7 +318,7 @@ function placeGolfer() {
 }
 function refreshShotHud() {
   hud.club(V.club, V.club === PUTTER ? V.putt : clubReach(V.hole, V.ball, V.club));
-  hud.hint(V.club === PUTTER ? 'Putt : glisse vers le bas pour doser, puis pousse vers le haut' : 'Glisse vers le bas pour armer, puis lance vers le haut');
+  hud.hint(V.club === PUTTER ? 'Putt : tire vers le bas pour doser, relâche pour putter' : 'Tire vers le bas pour armer, relâche pour frapper');
   placeGolfer();
 }
 
@@ -335,13 +335,12 @@ function onPose(e) {
 }
 
 // ------------------------------------------------------------------ swing local
-function release({ power, curve, slow }) {
+function release({ power, curve }) {
   if (V.phase !== 'back') return;
   if (power < 0.03) { V.phase = 'aim'; V.power = 0; golferOf(V.cur).setBack(0); hud.gauge(0, true); sendPose(); return; }
   let p = Math.min(1, power), c = curve;
   const over = Math.max(0, power - 1);
   if (over > 0) { p += over * 0.3; c -= over * 3.2; hud.toast('Trop armé : la balle tourne !', 2); } // trop armé : un peu plus loin, mais ça hooke
-  if (slow) { p *= 0.88; hud.toast('Swing trop lent', 1.8); }
   let aim = V.aim;
   if (V.club === PUTTER) { aim += c * 0.035; c = 0; }
   V.phase = 'down';
@@ -498,12 +497,12 @@ let last = performance.now(), raf = 0, alive = true;
 function loop(now) {
   if (!alive) return;
   raf = requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now;
   input.update();
   hud.tick(dt);
   if (!scene) return;
   if (!V.hole) { scene.frame(dt); return; }
-  autoQuality(now);
+  autoQuality(now, ms);
   sfx.wind(windOf(V.R).speed, dt);
 
   if (V.phase === 'intro') {
@@ -522,6 +521,8 @@ function loop(now) {
     if (V.dirty) {
       V.dirty = false;
       V.preview = previewLanding(V.hole, V.ball, V.club, 'mid', V.aim, V.putt);
+      // points de chute aux repères 1/3 et 2/3 de la jauge, reportés sur la mini-carte
+      V.marks = [1 / 3, 2 / 3].map((p) => previewLanding(V.hole, V.ball, V.club, 'mid', V.aim, V.putt, p));
       const d = Math.hypot(V.preview.x - V.ball.x, V.preview.z - V.ball.z);
       scene.setMarker(V.preview, true, V.club === PUTTER ? 0.3 : clamp(d * 0.012, 0.6, 3.2), V.club !== PUTTER);
       scene.setAimDots(V.ball, V.preview, true);
@@ -573,24 +574,26 @@ function loop(now) {
     hud.pinTag(scene.project(h.pin.x, h.heightAt(h.pin.x, h.pin.z) + 3, h.pin.z), distToPin(h, b));
     hud.dist(distToPin(h, b));
     hud.wind(windOf(V.R), V.phase === 'intro' ? 0 : V.aim);
-    hud.drawMap(h, b, V.phase === 'intro' ? null : V.preview, V.aim, V.R.players.filter((q) => q !== V.cur && !q.done && q.ball).map((q) => ({ x: q.ball.x, z: q.ball.z, color: q.color })));
+    hud.drawMap(h, b, V.phase === 'intro' ? null : V.preview, V.aim, V.R.players.filter((q) => q !== V.cur && !q.done && q.ball).map((q) => ({ x: q.ball.x, z: q.ball.z, color: q.color })), V.phase === 'intro' ? [] : V.marks);
   } else hud.pinTag(null);
   scene.frame(dt);
 }
 
-// qualité automatique : si la machine peine (moins de 40 images/s), on coupe d'abord les reflets,
-// puis l'occlusion ambiante, puis l'herbe 3D, puis le halo
-const AQ = { t0: 0, n: 0, steps: ['refl', 'ao', 'grass', 'bloom'] };
-function autoQuality(now) {
-  if (document.hidden || V.phase === 'title' || V.phase === 'card') { AQ.t0 = 0; return; }
-  if (!AQ.t0) { AQ.t0 = now; AQ.n = 0; return; }
-  AQ.n++;
-  if (now - AQ.t0 < 3000) return;
-  const fps = AQ.n * 1000 / (now - AQ.t0);
-  AQ.t0 = now; AQ.n = 0;
-  if (fps >= 40) return;
-  const k = AQ.steps.find((s) => scene.quality[s]);
-  if (k) { scene.quality[k] = false; if (QS.has('debug')) console.info('qualité réduite :', k, Math.round(fps) + ' i/s'); }
+// qualité automatique : durée médiane d'une image sur 2 s, sans les à-coups isolés (chargement d'un trou, onglet
+// en arrière-plan). Deux mesures de suite sous 50 images/s : la scène baisse d'un cran (résolution, puis effets).
+const AQ = { t0: 0, ms: [], bad: 0 };
+function autoQuality(now, ms) {
+  if (document.hidden || V.phase === 'title' || V.phase === 'card') { AQ.t0 = 0; AQ.bad = 0; return; }
+  if (!AQ.t0) { AQ.t0 = now; AQ.ms = []; return; }
+  if (ms < 400) AQ.ms.push(ms);
+  if (now - AQ.t0 < 2000) return;
+  const s = AQ.ms.sort((a, b) => a - b), med = s[s.length >> 1];
+  AQ.t0 = now; AQ.ms = [];
+  if (s.length < 8 || med < 20) { AQ.bad = 0; return; }
+  if (++AQ.bad < 2) return;
+  AQ.bad = 0;
+  const k = scene.lowerQuality();
+  if (k && QS.has('debug')) console.info('qualité réduite :', k, Math.round(1000 / med) + ' i/s');
 }
 
 function teardown() {

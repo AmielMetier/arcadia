@@ -3,6 +3,12 @@ import { CLUBS, LIE } from '../engine/clubs.js';
 import { COURSES } from '../engine/course.js';
 
 const $ = (s) => document.querySelector(s);
+// écritures faites à chaque image : on ne touche au DOM que si la valeur change (sinon le navigateur refait la mise en page)
+const shown = new Map();
+const put = (sel, key, v, apply) => { const k = sel + key; if (shown.get(k) === v) return; shown.set(k, v); apply($(sel), v); };
+const setText = (sel, v) => put(sel, '#text', v, (el) => { el.textContent = v; });
+const setStyle = (sel, prop, v) => put(sel, prop, v, (el) => { el.style[prop] = v; });
+const setHidden = (sel, v) => put(sel, '#hidden', v, (el) => { el.hidden = v; });
 export const fmtM = (m) => (m < 10 ? m.toFixed(1).replace('.', ',') : Math.round(m)) + ' m';
 export const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 export const lieLabel = (l) => LIE[l]?.label || (l === 'water' ? 'Eau' : l === 'ob' ? 'Hors limites' : 'Rough');
@@ -38,14 +44,14 @@ export class HUD {
   players(list) {
     $('#players').innerHTML = list.map((p) => `<div class="pl ${p.cur ? 'cur' : ''} ${p.done ? 'done' : ''}"><i style="background:${esc(p.color)}"></i><b>${esc(p.name)}</b><span>${p.toPar === 0 ? 'E' : p.toPar > 0 ? '+' + p.toPar : p.toPar}</span>${p.done ? '<em>✓</em>' : ''}</div>`).join('');
   }
-  dist(m) { $('#distTxt').textContent = fmtM(m); }
+  dist(m) { setText('#distTxt', fmtM(m)); }
   lie(l) { $('#lieTxt').textContent = lieLabel(l); }
   // flèche du vent dans le repère de la caméra (vers le haut = vent dans le dos)
   wind(w, heading) {
     const a = (w.dir - heading) * 180 / Math.PI;
-    $('#windArrow').style.transform = `rotate(${-a}deg)`;
-    $('#windArrow').style.opacity = w.speed < 0.25 ? 0.25 : 1;
-    $('#windTxt').textContent = w.speed < 0.25 ? 'Calme' : `${String(w.speed).replace('.', ',')} m/s`;
+    setStyle('#windArrow', 'transform', `rotate(${(-a).toFixed(1)}deg)`);
+    setStyle('#windArrow', 'opacity', w.speed < 0.25 ? '0.25' : '1');
+    setText('#windTxt', w.speed < 0.25 ? 'Calme' : `${String(w.speed).replace('.', ',')} m/s`);
   }
   club(i, dist) {
     const c = CLUBS[i];
@@ -63,10 +69,9 @@ export class HUD {
     $('#gaugeTxt').textContent = p > 0 ? Math.round(p * 100) + ' %' : '';
   }
   pinTag(pos, d) {
-    const t = $('#pinTag');
-    if (!pos || !pos.on) { t.hidden = true; return; }
-    t.hidden = false; t.style.left = pos.x + 'px'; t.style.top = pos.y + 'px';
-    $('#pinTxt').textContent = fmtM(d);
+    if (!pos || !pos.on) { setHidden('#pinTag', true); return; }
+    setHidden('#pinTag', false); setStyle('#pinTag', 'left', pos.x.toFixed(1) + 'px'); setStyle('#pinTag', 'top', pos.y.toFixed(1) + 'px');
+    setText('#pinTxt', fmtM(d));
   }
   hint(txt) { $('#hint').textContent = txt; }
   banner(text, kind = '', sub = '', dur = 2) {
@@ -103,10 +108,16 @@ export class HUD {
     this.mini.width = frame.W; this.mini.height = frame.H;
     this.map = frame;
     this.miniBg = canvas;
+    this.mapKey = '';
   }
   toMap(x, z) { const m = this.map, px = x - m.cx, pz = z - m.cz; return { x: m.W / 2 + (px * m.rx + pz * m.rz) * m.s, y: m.H / 2 - (px * m.dx + pz * m.dz) * m.s }; }
-  drawMap(hole, ball, target, aim, others = []) {
+  drawMap(hole, ball, target, aim, others = [], marks = []) {
     if (!this.miniBg) return;
+    // redessinée seulement quand quelque chose a bougé
+    const r = (v) => Math.round(v * 20);
+    const key = [ball.x, ball.z, (aim || 0) * 100, ...(target ? [target.x, target.z] : []), ...marks.flatMap((m) => [m.x, m.z]), ...others.flatMap((o) => [o.x, o.z, o.color])].map((v) => (typeof v === 'number' ? r(v) : v)).join(',');
+    if (key === this.mapKey) return;
+    this.mapKey = key;
     const g = this.mctx, W = this.mini.width, H = this.mini.height, K = this.map.K;
     g.imageSmoothingEnabled = true;
     g.clearRect(0, 0, W, H);
@@ -114,13 +125,12 @@ export class HUD {
     const b = this.toMap(ball.x, ball.z), p = this.toMap(hole.pin.x, hole.pin.z);
     if (target) {
       const t = this.toMap(target.x, target.z);
-      // ligne de visée bleue, ponctuée de points blancs
+      // ligne de visée bleue ; les points blancs tombent là où la balle irait aux repères 1/3 et 2/3 de la jauge
       g.lineCap = 'round';
       g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 7 * K / 2; g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(t.x, t.y); g.stroke();
       g.strokeStyle = '#1f6bff'; g.lineWidth = 4 * K / 2; g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(t.x, t.y); g.stroke();
-      const L = Math.hypot(t.x - b.x, t.y - b.y), n = Math.max(1, Math.floor(L / (16 * K)));
       g.fillStyle = '#fff';
-      for (let k = 1; k < n; k++) { g.beginPath(); g.arc(b.x + (t.x - b.x) * k / n, b.y + (t.y - b.y) * k / n, 2.4 * K, 0, Math.PI * 2); g.fill(); }
+      for (const m of marks) { const q = this.toMap(m.x, m.z); g.beginPath(); g.arc(q.x, q.y, 2.6 * K, 0, Math.PI * 2); g.fill(); }
       // losange jaune : point de chute
       g.save(); g.translate(t.x, t.y); g.rotate(Math.PI / 4);
       g.fillStyle = '#ffd23f'; g.strokeStyle = '#fff'; g.lineWidth = 1.5 * K; g.fillRect(-4.5 * K, -4.5 * K, 9 * K, 9 * K); g.strokeRect(-4.5 * K, -4.5 * K, 9 * K, 9 * K);
@@ -162,7 +172,7 @@ export function titleHtml(set) {
       </div>
     </div>
     <button class="bigbtn" id="btnPlay">Jouer</button>
-    <div class="howto">Glisse vers le bas pour armer, lance vers le haut pour frapper · <b>Espace</b> au clavier · <b>← →</b> viser · <b>↑ ↓</b> club · <b>V</b> vue d'ensemble</div>
+    <div class="howto">Clic maintenu, tire vers le bas pour armer, relâche pour frapper · <b>Espace</b> au clavier · <b>← →</b> viser · <b>↑ ↓</b> club · <b>V</b> vue d'ensemble</div>
   </div>`;
 }
 export function loadingHtml(txt = 'Préparation du parcours') { return `<div class="title"><div class="logo">Birdie <span>Party</span></div><div class="loading dots">${esc(txt)}</div></div>`; }

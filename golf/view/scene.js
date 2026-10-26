@@ -20,8 +20,10 @@ export function createScene(host, { onLost } = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'gl';
   host.appendChild(canvas);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 1.6));
+  // sur ordinateur l'image passe toujours par la cible anticrénelée du post-traitement : le canevas n'a pas besoin de la sienne
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: MOBILE, powerPreference: 'high-performance' });
+  const PR_MAX = Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 1.6);
+  renderer.setPixelRatio(PR_MAX);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // tonalité neutre : hautes lumières douces sans éteindre les verts
@@ -39,7 +41,7 @@ export function createScene(host, { onLost } = {}) {
   const hemi = new THREE.HemisphereLight(0xc4d8f0, 0x34481f, 0.42); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffeed4, 4.2);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(MOBILE ? 1024 : 4096, MOBILE ? 1024 : 4096);
+  sun.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048);
   Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 1, far: 280 });
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.035; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
@@ -54,9 +56,18 @@ export function createScene(host, { onLost } = {}) {
 
   // ---------------------------------------------------------------- contenu d'un trou (reconstruit à chaque trou)
   let world = null, kitP = null, treeKit = null;
-  // qualité : post-traitement (occlusion, halo), reflets, herbe 3D ; baissée automatiquement si la machine peine
+  // qualité : résolution, post-traitement (occlusion, halo), reflets, herbe 3D ; baissée automatiquement si la machine peine
   const post = MOBILE ? null : createPost(renderer);
   const quality = { refl: !MOBILE, grass: true, ao: !MOBILE, bloom: !MOBILE };
+  // un cran plus bas : d'abord la résolution (jusqu'à un pixel par point), puis les effets, enfin encore la résolution
+  function lowerQuality() {
+    const pr = renderer.getPixelRatio();
+    const setPr = (v) => { renderer.setPixelRatio(v); resize(); return 'résolution ' + v.toFixed(2); };
+    if (pr > 1.01) return setPr(Math.max(1, pr * 0.85));
+    for (const k of ['refl', 'ao', 'grass', 'bloom']) if (quality[k]) { quality[k] = false; return k; }
+    if (pr > 0.76) return setPr(Math.max(0.75, pr * 0.85));
+    return null;
+  }
   const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_VIS, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.32, emissive: 0x404040 }));
   ball.castShadow = true; scene.add(ball);
   const blob = new THREE.Mesh(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0b1a06, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -306,7 +317,7 @@ export function createScene(host, { onLost } = {}) {
     world.water.setReflect(h);
   }
 
-  let T = 0;
+  let T = 0, frameNo = 0;
   function frame(dt) {
     if (disposed) return;
     T += dt;
@@ -323,7 +334,7 @@ export function createScene(host, { onLost } = {}) {
     if (world) {
       SWAY.uWind.value = Math.min(1, (world.wind?.speed || 0) / 7);
       world.water.update(T);
-      world.sky.userData.update(T);
+      world.sky.userData.update(T, world.wind);
       world.pin.update(T, world.wind);
       world.grid.update(T);
       // l'herbe 3D suit ce que regarde la caméra (entre la caméra et sa cible)
@@ -333,8 +344,9 @@ export function createScene(host, { onLost } = {}) {
       ring.scale.setScalar(ms * pulse); dot.scale.setScalar(ms); beam.scale.set(ms, 1 + ms * 0.3, ms);
     }
     for (const g of golfers) g.update(dt);
-    renderReflection();
-    if (post && (quality.ao || quality.bloom)) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, T); }
+    // le reflet de l'eau n'est recalculé qu'une image sur deux (il bouge lentement)
+    if ((frameNo++ & 1) === 0 || !quality.refl) renderReflection();
+    if (post) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, T); }
     else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
   }
 
@@ -360,7 +372,7 @@ export function createScene(host, { onLost } = {}) {
   }
 
   return {
-    renderer, scene, camera, MOBILE, quality,
+    renderer, scene, camera, MOBILE, quality, lowerQuality,
     loadHole, renderMap, setBall, setOthers, setMarker, setAimDots, trailPush, trailClear, trailFade, camTo, cam, frame, project, dispose, addGolfer, removeGolfer,
     get hole() { return world && world.hole; },
     setWind(w) { if (world) world.wind = w; },
