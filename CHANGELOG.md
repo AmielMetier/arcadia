@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.87 — 26 octobre 2026
+- **Birdie Party** — Les parties en ligne tiennent mieux la route.
+  - Tout le monde avance au même rythme : la partie attend que chacun ait fini de regarder un coup, et les bots attendent que tout le monde voie leur tour.
+  - Un joueur qui cache sa page ou perd sa connexion ne bloque plus les autres ; à son tour, son coup part tout seul au bout de 20 s (et au bout d'une minute pour quelqu'un qui ne joue pas, avec un rappel).
+  - En revenant après une absence, on rattrape la partie tout de suite au lieu de revoir chaque coup.
+  - Un coup qui ne part pas (perdu en route) rend la main au lieu de figer le joueur.
+  - Les trous se chargent beaucoup plus vite, et la balle roule en accéléré une fois au sol.
+
 ## 2.79 — 26 octobre 2026
 - **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
   - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.

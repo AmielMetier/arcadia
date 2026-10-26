@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.79';
+  const VERSION = '2.87';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -272,7 +272,7 @@
     room = null; closeFrame(false); leftGame = null;
     busy(false); $('#btnHost').textContent = 'Créer un salon'; $('#btnJoin').textContent = 'Rejoindre';
     showScreen('home'); homeErr(msg || '');
-    const keep = new URLSearchParams(); for (const k of ['local', 'ws', 'as', 'debug']) if (QS.has(k)) keep.set(k, QS.get(k));
+    const keep = new URLSearchParams(); for (const k of ['local', 'ws', 'as', 'debug', 'mute']) if (QS.has(k)) keep.set(k, QS.get(k));
     history.replaceState(null, '', location.pathname + (keep.toString() ? '?' + keep.toString().replace(/=(&|$)/g, '$1') : ''));
     renderNet(); pubState(); renderFriends();
   }
@@ -553,7 +553,7 @@
     const q = new URLSearchParams({ hub: '1', role, game: g.id });
     if (room.code) q.set('code', room.code);
     const pass = new URLSearchParams(location.search);
-    for (const k of ['debug', 'ws']) if (pass.has(k)) q.set(k, pass.get(k));
+    for (const k of ['debug', 'ws', 'mute']) if (pass.has(k)) q.set(k, pass.get(k));
     let src = def.url + '?' + q.toString() + (DDNet.LOCAL_TEST ? '&local' : '');
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';

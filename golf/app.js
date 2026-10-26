@@ -32,6 +32,8 @@ if (QS.has('mute')) sfx.silent = true;
 // fréquenté), sinon dès le premier geste, quel qu'il soit
 sfx.unlock();
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
+// page cachée : personne ne m'attend pour avancer (et à mon tour, l'hôte jouera pour moi au bout de quelques secondes)
+document.addEventListener('visibilitychange', () => { V.session && V.session.away(document.hidden); catchUp(); pump(); });
 let home = null;
 let scene = null;
 try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
@@ -171,8 +173,22 @@ function showTitle() {
 // ------------------------------------------------------------------ événements de la session, traités dans l'ordre
 function onEvent(e) {
   if (e.type === 'pose') return onPose(e);
+  if (e.type === 'note') return hud.toast(e.text, 3.5);
   V.queue.push(e);
+  if (e.type === 'shot') catchUp();
   pump();
+}
+// un nouveau coup arrive alors qu'on regarde encore le précédent (ou la page revient après une absence) : on finit
+// tout de suite la présentation ou le coup en cours pour rattraper les autres
+function catchUp() {
+  if (document.hidden || !behind()) return;
+  if (V.phase === 'intro') endIntro();
+  else if (V.shot && ['down', 'fly', 'after', 'replay'].includes(V.phase)) {
+    const r = V.shot.ev.res;
+    document.body.classList.remove('replaying');
+    if (r.kind === 'rest') scene.setBall(r.end.x, r.end.y, r.end.z);
+    finishShot();
+  }
 }
 function pump() {
   while (!V.busy && V.queue.length) {
@@ -211,7 +227,9 @@ async function loadHole(R) {
   $('#screen').innerHTML = loadingHtml(`Trou ${hole.n} · ${hole.name}`);
   await new Promise((r) => setTimeout(r, 40)); // laisse l'écran de chargement s'afficher
   const wind = windOf(R);
-  await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time });
+  // derrière l'écran de chargement, rien à dessiner : tout le temps va à la construction du trou
+  V.loading = true;
+  try { await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time, slice: 45 }); } finally { V.loading = false; }
   scene.setWind(wind);
   // mini-carte : photo aérienne du trou, prise une fois le décor posé
   const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
@@ -229,8 +247,11 @@ async function loadHole(R) {
   hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, INTRO - 0.6);
   sfx.holeStart();
   introCamera(0, true);
-  await new Promise((r) => { V.introDone = r; });
+  await new Promise((r) => { V.introDone = r; if (behind()) endIntro(); });
 }
+// en retard sur la partie (page restée cachée, machine lente) : des coups attendent déjà leur tour, ou personne ne
+// regarde ; on saute les présentations et on joue les coups sans animation pour rattraper les autres
+const behind = () => document.hidden || V.queue.some((e) => e.type === 'shot');
 function endIntro() {
   if (V.phase !== 'intro') return;
   hud.hideBanner();
@@ -246,7 +267,7 @@ function holeCard(R) {
     const holes = R.holes.map((n) => holeByNumber(n));
     $('#screen').innerHTML = scorecardHtml(R, holes, { title: R.phase === 'over' ? 'Dernier trou joué !' : `Après le trou ${holes[R.hi - 1].n}` });
     sfx.ui('card');
-    setTimeout(() => { $('#screen').innerHTML = ''; res(); }, CARD_T * 1000);
+    setTimeout(() => { $('#screen').innerHTML = ''; res(); }, (behind() ? 0.8 : CARD_T) * 1000);
   });
 }
 function finalCard(R) {
@@ -317,9 +338,11 @@ function setTurn() {
   V.phase = V.mine ? 'aim' : 'watch';
   hud.players(stripList(), V.R.teams);
   // fondu enchaîné vers la caméra posée derrière la balle du joueur suivant
-  scene.dissolve(0.6);
+  if (!document.hidden) scene.dissolve(0.6);
   aimCamera(true);
   sendPose();
+  // je vois ce tour : l'hôte peut faire jouer un bot
+  V.session && V.session.ready(R.shotNo);
 }
 
 function placeSpectators() {
@@ -386,6 +409,14 @@ function playShot(ev) {
   const sim = simulate(hole, from, ev.params, windOf(V.R), { putt: ev.putt });
   V.shot = { ev, sim, launched: false };
   V.playT = 0; V.evI = 0; V.oohed = false; V.outcome = null;
+  // en retard sur la partie : pas d'animation, la balle est posée là où elle s'arrête
+  if (behind()) {
+    const r = ev.res;
+    if (r.kind === 'rest') scene.setBall(r.end.x, r.end.y, r.end.z);
+    V.localSwing = null;
+    finishShot();
+    return;
+  }
   const g = golferOf(P);
   scene.setMarker(null, false); scene.setAimDots(null, null, false); hud.controls(false);
   $('#turn').hidden = true;
@@ -482,7 +513,7 @@ function finishShot() {
   V.shot = null;
   sfx.duck(false);
   V.phase = 'wait';
-  if (V.session && V.session.isHost) V.session.done(ev.no);
+  if (V.session) V.session.done(ev.no);
   unbusy();
 }
 
@@ -653,6 +684,7 @@ function loop(now) {
   hud.tick(dt);
   if (!scene) return;
   if (!V.hole) { home && home.update(dt); scene.frame(dt); return; }
+  if (V.loading) return;
   autoQuality(now, ms);
   sfx.wind(windOf(V.R).speed, dt);
 
@@ -682,9 +714,22 @@ function loop(now) {
   } else if (V.phase === 'down') {
     V.timer -= dt;
     if (V.timer <= 0 && V.shot && !V.shot.launched) launch();
+    // mon coup n'est jamais revenu de l'hôte (perdu en route, ou refusé) : on rend la main et on redemande l'état
+    else if (!V.shot && V.localSwing && performance.now() - V.localSwing.t0 > 7000) {
+      V.localSwing = null; V.session && V.session.resync();
+      hud.toast('Le coup n\'est pas parti : rejoue', 2.5);
+      setTurn();
+    }
   } else if (V.phase === 'fly') {
-    const sim = V.shot.sim, P = sim.path;
-    V.playT += dt;
+    const sim = V.shot.sim, P = sim.path, putter = CLUBS[V.shot.ev.params.club].putter;
+    // une fois au sol, la balle d'un coup roule en accéléré et la toute fin, quand elle se traîne loin du trou, est
+    // sautée : le résultat est connu, personne n'attend pour rien. Un putt garde son suspense jusqu'au bout.
+    const f0 = V.playT * 60, landed = !putter && sim.events.some((e) => e.type === 'bounce' && e.i <= f0);
+    V.playT += dt * (landed ? 1.7 : 1);
+    if (landed) {
+      const e = (sim.n - 1) * 3, c = Math.min(sim.n - 1, Math.floor(V.playT * 60)) * 3;
+      if (Math.hypot(P[e] - P[c], P[e + 2] - P[c + 2]) < 1.2 && Math.hypot(P[e] - V.hole.pin.x, P[e + 2] - V.hole.pin.z) > 4) V.playT = (sim.n - 1) / 60;
+    }
     const f = Math.min(sim.n - 1, V.playT * 60), i = Math.floor(f), k = f - i, j = Math.min(sim.n - 1, i + 1);
     const p = { x: P[i * 3] + (P[j * 3] - P[i * 3]) * k, y: P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * k, z: P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * k };
     scene.setBall(p.x, p.y, p.z);
