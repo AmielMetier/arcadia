@@ -65,9 +65,10 @@ Stratégie en temps réel en 3D (Three.js), seul contre des bots ou jusqu'à 4 j
 ## Cyber Kart GP
 Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par des IA jusqu'à 8 pilotes.
 
-- **Grand Prix de 6 circuits** aux points cumulés : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée,
+- **Grand Prix de 7 circuits** aux points cumulés : Grand Circuit (stade, cascades, tunnel), Whisky Peak (montagne enneigée,
   boules de neige, télésiège), Route Arc-en-ciel (espace), Jungle Perdue (forêt, précipice, pyramide inca en spirale),
-  Château Hanté (de nuit : lave, labyrinthe aux torches, jardin hanté), Plage des Falaises (crabes, pontons, arches de craie)
+  Château Hanté (de nuit : lave, labyrinthe aux torches, jardin hanté), Plage des Falaises (crabes, pontons, arches de craie),
+  Abysses Néon (route à moitié dans l'eau, récif sous la mer, tube de verre, spirale autour d'un pilier de lumière)
 - **Drift** à la touche Maj en tournant (tout droit = un saut) : on contre-braque pour filer droit, on braque pour serrer ; mini-turbo bleu, orange puis violet, deux fois plus rapide en alternant Q et D ; figures sur les sauts
 - **Physique façon MK8** : aspiration, planeur sur les grands tremplins, 50/100/150cc, adhérence et mini-turbo par pilote, conduite assistée en option
 - **16 objets** dans les cubes irisés (↓ + E pour lancer vers l'arrière), 8 pilotes originaux, 4 karts

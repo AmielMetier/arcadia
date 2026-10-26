@@ -1,6 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.59 — 26 octobre 2026
+- **Cyber Kart GP** — Nouveau circuit : **Abysses Néon** (le Grand Prix passe à 7 courses).
+  - Départ sur une autoroute posée sur pilotis au-dessus d'un lagon turquoise, puis une promenade à moitié noyée : les roues soulèvent des gerbes d'eau.
+  - Plongée vers le récif : sous l'eau, le kart est plus léger (sauts plus longs), le moteur laisse des bulles et le son est étouffé.
+  - Un tube de verre traverse la mer, au milieu des bancs de poissons, des raies mantas, des algues géantes et des rayons de soleil.
+  - Spirale suspendue autour d'un pilier de lumière qui monte du gouffre jusqu'au-dessus des vagues.
+  - Méduses électriques qui montent et descendent au-dessus de la route du récif : on passe dessous au bon moment.
+  - Remontée vers la surface et grand saut en planeur au-dessus de l'eau.
 - **Convoy Storm** — Une vraie voie, de vrais paysages, et bien plus à faire que charger des caisses.
   - La voie tourne, monte et descend : le convoi peine en montée, file en descente, et les virages serrés font crisser les roues.
   - De vrais aiguillages : un levier au bord de la voie, à basculer à la main avant le passage du convoi. L'autre voie part de son côté, avec un aperçu de son paysage.

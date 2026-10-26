@@ -11,6 +11,7 @@ Déposez vos morceaux **dans ce dossier** (`kart/music/`), avec exactement ces n
 | `jungle.mp3` | course dans la Jungle Perdue (sinon : musique du Grand Circuit) |
 | `chateau-hante.mp3` | course au Château Hanté (sinon : musique de Whisky Peak) |
 | `plage.mp3` | course sur la Plage des Falaises (sinon : musique de l'Arc-en-ciel) |
+| `abysses.mp3` | course dans les Abysses Néon (sinon : musique de l'Arc-en-ciel) |
 | `resultats.mp3` | écran de classement (facultatif : sinon la musique du circuit continue) |
 
 - Formats acceptés : `.mp3` (essayé en premier) ou `.ogg`. Un fichier absent donne simplement du silence, sans erreur.
