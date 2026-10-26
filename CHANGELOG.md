@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.81 — 26 octobre 2026
+- **Convoy Storm** — Chaque paysage a maintenant son caractère, à l'œil comme dans la partie.
+  - Plaine gelée : la voie droite et dégagée fait filer le convoi 12 % plus vite, de quoi reprendre de l'avance sur le Front. Des fermes isolées, avec leur enclos et leur charrette, abritent souvent des survivants.
+  - Toundra : la neige soufflée laisse voir une lande rousse et des touffes d'herbe sèche, sous un ciel blanc qui porte loin.
+  - Col des Glaces : un ciel gris-bleu de montagne, une neige plus sombre et des éboulis le long de la voie.
+
 ## 2.80 — 26 octobre 2026
 - **Tous les jeux** — Quand l'hôte change d'onglet ou réduit sa fenêtre, la partie continue pour tout le monde.
   - Le navigateur ralentit fortement une page cachée (un minuteur par seconde, puis par minute au bout de cinq minutes) et y arrête l'animation : chez l'hôte, la partie se figeait ou prenait des secondes de retard pour tous les joueurs. Les jeux gardent maintenant leur rythme dans un onglet caché, et chez l'hôte d'une partie à plusieurs, la simulation continue à 30 images par seconde.

@@ -498,7 +498,7 @@ function promptFor(v, snap) {
       for (let j = 0; j < r.spots.length; j++) {
         const sp = r.spots[j];
         if (v.looted.has(r.id * 4 + j)) continue;
-        if (Math.hypot(sp.x - me.x, sp.zw + v.dist - me.z) < 2.4) return me.sp > 0 ? `Fouille… ${pgb(me.sp)}` : `Maintiens ${kbd('E')} pour fouiller ${r.kind === 'block' ? 'l\'immeuble' : r.kind === 'boat' ? 'l\'épave (la glace craque !)' : 'la ruine'}`;
+        if (Math.hypot(sp.x - me.x, sp.zw + v.dist - me.z) < 2.4) return me.sp > 0 ? `Fouille… ${pgb(me.sp)}` : `Maintiens ${kbd('E')} pour fouiller ${r.kind === 'block' ? 'l\'immeuble' : r.kind === 'farm' ? 'la ferme' : r.kind === 'boat' ? 'l\'épave (la glace craque !)' : 'la ruine'}`;
       }
       if (r.sn) { const sq = (v.snipers || []).find((q) => q.id === r.id); if (sq && sq.st < 4 && Math.hypot(r.x - me.x, r.zw + v.dist - me.z) < 6.5) return `Maintiens ${kbd('E')} : monter déloger le tireur ${pgb(sq.dl || 0)}`; }
       // un arbre à abattre
