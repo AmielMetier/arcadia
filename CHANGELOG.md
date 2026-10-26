@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.83 — 26 octobre 2026
+- Correction : chargement synchrone de logger.js dans tous les jeux et envoi direct à /api/log (Amiel)
+
 ## 2.82 — 26 octobre 2026
 - Nouveau : ajout du dossier logs/crash et du système de diagnostic de crashs et d'expulsions pour tous les jeux (Amiel)
 
