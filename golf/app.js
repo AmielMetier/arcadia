@@ -8,7 +8,9 @@ import { suggestClub, suggestAim, clubReach, allowedClub, distToPin } from './en
 import { totals, ranking } from './engine/rules.js';
 import { startHost, startClient, holeByNumber, currentHole, windOf, simBall } from './net/session.js';
 import { createScene } from './view/scene.js';
-import { HUD, titleHtml, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, saveSetup, esc } from './view/hud.js';
+import { HUD, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, esc } from './view/hud.js';
+import { createHome } from './view/home.js';
+import { icon, fillIcons } from './view/icons.js';
 import { Sfx } from './view/sfx.js';
 import { Input, MAX_POWER } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
@@ -22,10 +24,12 @@ const INTRO = 5.5;          // s : survol du trou
 const CARD_T = 5;           // s : carte de score entre deux trous
 
 const hud = new HUD();
-const sfx = new Sfx(new URL('./sounds/', import.meta.url).href);
+const sfx = new Sfx(new URL('./sounds/', import.meta.url).href, new URL('./music/', import.meta.url).href);
+fillIcons();
+let home = null;
 let scene = null;
 try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
-catch (e) { console.error(e); $('#screen').innerHTML = '<div class="card panel"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
+catch (e) { console.error(e); $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
 
 // ------------------------------------------------------------------ état de la vue
 const V = {
@@ -63,13 +67,15 @@ for (const [id, k] of [['#aimL', 'l'], ['#aimR', 'r']]) {
   input.listen($(id), 'pointerup', () => { aimHold[k] = false; });
   input.listen($(id), 'pointerleave', () => { aimHold[k] = false; });
 }
-$('#btnMute').textContent = sfx.muted ? '🔇' : '🔊';
+$('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn');
 // clic pendant le survol : on passe directement au jeu
 input.listen($('#stage'), 'pointerdown', () => { if (V.phase === 'intro') endIntro(); });
 
 function onKey(k, down) {
   if (!down) return;
-  if (k === 'KeyM') return toggleMute();
+  if (k === 'KeyM' && V.phase !== 'title') return toggleMute();
+  if (V.hole && k === 'KeyZ') return hud.cycleZoom();
+  if (V.hole && k === 'KeyR') return hud.toggleRelief();
   if (V.phase === 'intro' && (k === 'Enter' || k === 'Escape')) return endIntro();
   if (V.phase !== 'aim' || !V.mine) return;
   if (k === 'ArrowUp') changeClub(-1);
@@ -85,7 +91,7 @@ function leaveGame() {
   V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null;
   hud.show(false); showTitle();
 }
-function toggleMute() { sfx.setMuted(!sfx.muted); $('#btnMute').textContent = sfx.muted ? '🔇' : '🔊'; }
+function toggleMute() { sfx.setMuted(!sfx.muted); $('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); }
 function toggleView() { if (V.phase !== 'aim' || !V.mine) return; V.view = !V.view; sfx.ui('switch'); aimCamera(false); }
 function changeClub(d) {
   if (V.phase !== 'aim' || !V.mine) return;
@@ -138,26 +144,21 @@ function quickPlay() {
   $('#screen').innerHTML = loadingHtml();
   startSession('solo');
 }
+// accueil : survol des trous, logo, réglages ; « Jouer » lance une partie solo (avec bots)
 function showTitle() {
   V.phase = 'title';
   hud.show(false);
-  const set = loadSetup();
-  $('#screen').innerHTML = titleHtml(set);
-  for (const g of document.querySelectorAll('.title [data-k]')) {
-    for (const b of g.querySelectorAll('button')) b.onclick = () => {
-      sfx.unlock(); sfx.ui('click');
-      set[g.dataset.k] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v;
-      for (const o of g.querySelectorAll('button')) o.classList.toggle('on', o === b);
-      saveSetup(set);
-    };
-  }
-  $('#btnPlay').onclick = () => {
-    sfx.unlock(); sfx.ui('confirm');
-    V.settings = { ...set };
-    $('#screen').innerHTML = loadingHtml();
-    V.queue = []; V.busy = false; V.hi = -1; V.R = null;
-    startSession('solo');
-  };
+  for (const g of V.golfers.values()) g.root.visible = false;
+  home = createHome({
+    root: $('#screen'), scene, sfx, hole: holeByNumber,
+    onPlay: (set) => {
+      home.dispose(); home = null;
+      V.settings = set;
+      $('#screen').innerHTML = loadingHtml();
+      V.queue = []; V.busy = false; V.hi = -1; V.R = null;
+      startSession('solo');
+    },
+  });
 }
 
 // ------------------------------------------------------------------ événements de la session, traités dans l'ordre
@@ -206,8 +207,8 @@ async function loadHole(R) {
   await scene.loadHole(hole, { theme: hole.theme, wind });
   scene.setWind(wind);
   // mini-carte : photo aérienne du trou, prise une fois le décor posé
-  const frame = hud.mapFrame(hole);
-  hud.setMap(scene.renderMap(frame), frame);
+  const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
+  hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
   sfx.ambience(hole.theme);
   $('#screen').innerHTML = '';
   // survol du trou, depuis le départ jusqu'au green
@@ -252,7 +253,7 @@ function finalCard(R) {
   $('#btnQuit').onclick = () => {
     sfx.ui('close');
     if (H.embedded) { teardown(); H.exit(); }
-    else { V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; showTitle(); }
+    else { V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null; showTitle(); }
   };
 }
 
@@ -497,11 +498,11 @@ let last = performance.now(), raf = 0, alive = true;
 function loop(now) {
   if (!alive) return;
   raf = requestAnimationFrame(loop);
-  const ms = now - last, dt = Math.min(0.05, ms / 1000); last = now;
+  const ms = Math.max(0, now - last), dt = Math.min(0.05, ms / 1000); last = Math.max(last, now);
   input.update();
   hud.tick(dt);
   if (!scene) return;
-  if (!V.hole) { scene.frame(dt); return; }
+  if (!V.hole) { home && home.update(dt); scene.frame(dt); return; }
   autoQuality(now, ms);
   sfx.wind(windOf(V.R).speed, dt);
 

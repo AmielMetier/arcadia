@@ -1,6 +1,5 @@
 // Birdie Party — interface : carte du trou, distance, vent, club, trajectoire, jauge, mini-carte, bannières, écrans.
 import { CLUBS, LIE } from '../engine/clubs.js';
-import { COURSES } from '../engine/course.js';
 
 const $ = (s) => document.querySelector(s);
 // écritures faites à chaque image : on ne touche au DOM que si la valeur change (sinon le navigateur refait la mise en page)
@@ -33,7 +32,8 @@ export class HUD {
     this.el = $('#hud');
     this.mini = $('#minimap'); this.mctx = this.mini.getContext('2d');
     this.bannerT = 0; this.toastT = 0;
-    this.miniBg = null;
+    this.bg = null;
+    this.initMap();
   }
   show(on) { this.el.hidden = !on; }
   hole(h, stroke) {
@@ -104,48 +104,117 @@ export class HUD {
     const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
     return { W, H, K, dx, dz, rx, rz, wm, hm, s: W / wm, cx: uc * rx + vc * dx, cz: uc * rz + vc * dz };
   }
-  setMap(canvas, frame) {
+  // fond rendu une fois par trou, plus grand que le canevas : zoomer et se déplacer ne font que recadrer l'image
+  mapScale(frame) { return Math.min(2.5, 4096 / frame.H); }
+  // photo : canevas de la vue aérienne ; relief : fonction qui calcule la carte en relief à la première demande
+  setMap(frame, { photo, relief }) {
     this.mini.width = frame.W; this.mini.height = frame.H;
     this.map = frame;
-    this.miniBg = canvas;
+    this.bg = { photo, relief: null, makeRelief: relief };
+    this.mv = { cx: frame.W / 2, cy: frame.H / 2, pan: [0, 0], ball: '' };
     this.mapKey = '';
+    this.mapUi();
   }
   toMap(x, z) { const m = this.map, px = x - m.cx, pz = z - m.cz; return { x: m.W / 2 + (px * m.rx + pz * m.rz) * m.s, y: m.H / 2 - (px * m.dx + pz * m.dz) * m.s }; }
+
+  // commandes de la mini-carte : molette et boutons pour zoomer, glisser pour se déplacer, bouton relief
+  initMap() {
+    try { this.mapPref = { z: 1, relief: false, ...JSON.parse(localStorage.getItem('golf_map') || '{}') }; } catch (e) { this.mapPref = { z: 1, relief: false }; }
+    const m = this.mini;
+    m.addEventListener('wheel', (e) => { e.preventDefault(); this.zoomMap(this.mapPref.z * Math.exp(-e.deltaY * 0.0018)); }, { passive: false });
+    m.addEventListener('pointerdown', (e) => {
+      if (this.mapPref.z <= 1.01 || !this.mv) return;
+      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, pan: [...this.mv.pan] };
+      try { m.setPointerCapture(e.pointerId); } catch (err) {}
+      m.classList.add('grab');
+    });
+    m.addEventListener('pointermove', (e) => {
+      const d = this.drag; if (!d || e.pointerId !== d.id) return;
+      const k = m.width / (m.clientWidth || 1) / this.mapPref.z;
+      this.mv.pan = [d.pan[0] - (e.clientX - d.x) * k, d.pan[1] - (e.clientY - d.y) * k];
+      this.redrawMap();
+    });
+    const end = () => { this.drag = null; m.classList.remove('grab'); };
+    m.addEventListener('pointerup', end); m.addEventListener('pointercancel', end);
+    $('#mapIn').addEventListener('click', () => this.zoomMap(this.mapPref.z * 1.6));
+    $('#mapOut').addEventListener('click', () => this.zoomMap(this.mapPref.z / 1.6));
+    $('#mapRelief').addEventListener('click', () => this.toggleRelief());
+  }
+  saveMap() { try { localStorage.setItem('golf_map', JSON.stringify(this.mapPref)); } catch (e) {} }
+  zoomMap(z) {
+    z = Math.min(3.5, Math.max(1, z));
+    if (Math.abs(z - this.mapPref.z) < 1e-3) return;
+    this.mapPref.z = z < 1.04 ? 1 : z; this.saveMap();
+    if (this.mapPref.z === 1 && this.mv) this.mv.pan = [0, 0];
+    this.mapUi(); this.redrawMap();
+  }
+  // zoom au clavier : 1 → 2 → 3,5 → 1
+  cycleZoom() { const z = this.mapPref.z; this.zoomMap(z < 1.9 ? 2 : z < 3.4 ? 3.5 : 1); }
+  toggleRelief() { this.mapPref.relief = !this.mapPref.relief; this.saveMap(); this.mapUi(); this.redrawMap(); }
+  mapUi() {
+    const r = this.mapPref.relief;
+    $('#mapRelief').setAttribute('aria-pressed', String(r));
+    $('#mapIn').disabled = this.mapPref.z >= 3.5; $('#mapOut').disabled = this.mapPref.z <= 1;
+    const bg = r && this.bg ? this.reliefBg() : null;
+    $('#mapLegend').hidden = !bg;
+    if (bg) $('#mapLegend').textContent = `Courbes tous les ${String(bg.contourStep).replace('.', ',')} m · green : 15 cm`;
+    this.mini.classList.toggle('zoomed', this.mapPref.z > 1);
+  }
+  reliefBg() { if (!this.bg.relief && this.bg.makeRelief) this.bg.relief = this.bg.makeRelief(); return this.bg.relief; }
+  // redessin demandé par le joueur (zoom, relief, glisser) : le cadre se pose tout de suite
+  redrawMap() { this.mapKey = ''; this.mapSnap = true; if (this.lastMap) this.drawMap(...this.lastMap); this.mapSnap = false; }
+
   drawMap(hole, ball, target, aim, others = [], marks = []) {
-    if (!this.miniBg) return;
+    if (!this.bg) return;
+    this.lastMap = [hole, ball, target, aim, others, marks];
+    const W = this.mini.width, H = this.mini.height, K = this.map.K, z = this.mapPref.z, mv = this.mv;
+    const b = this.toMap(ball.x, ball.z), p = this.toMap(hole.pin.x, hole.pin.z), t = target ? this.toMap(target.x, target.z) : null;
+    // zoomée, la carte suit la balle et le point visé ; on la déplace à la main jusqu'au coup suivant
+    const bk = `${Math.round(ball.x)},${Math.round(ball.z)}`;
+    if (bk !== mv.ball) { mv.ball = bk; mv.pan = [0, 0]; }
+    let fx = W / 2, fy = H / 2;
+    if (z > 1) { fx = (t ? (b.x + t.x) / 2 : b.x) + mv.pan[0]; fy = (t ? (b.y + t.y) / 2 : b.y) + mv.pan[1]; }
+    const hw = W / (2 * z), hh = H / (2 * z);
+    fx = Math.min(W - hw, Math.max(hw, fx)); fy = Math.min(H - hh, Math.max(hh, fy));
+    const k = this.mapSnap ? 1 : 0.22;
+    mv.cx += (fx - mv.cx) * k; mv.cy += (fy - mv.cy) * k;
+    if (Math.abs(fx - mv.cx) < 0.3) mv.cx = fx;
+    if (Math.abs(fy - mv.cy) < 0.3) mv.cy = fy;
     // redessinée seulement quand quelque chose a bougé
     const r = (v) => Math.round(v * 20);
-    const key = [ball.x, ball.z, (aim || 0) * 100, ...(target ? [target.x, target.z] : []), ...marks.flatMap((m) => [m.x, m.z]), ...others.flatMap((o) => [o.x, o.z, o.color])].map((v) => (typeof v === 'number' ? r(v) : v)).join(',');
+    const key = [this.mapPref.relief ? 'R' : 'P', z * 100, mv.cx, mv.cy, ball.x, ball.z, (aim || 0) * 100, ...(t ? [target.x, target.z] : []), ...marks.flatMap((m) => [m.x, m.z]), ...others.flatMap((o) => [o.x, o.z, o.color])].map((v) => (typeof v === 'number' ? r(v) : v)).join(',');
     if (key === this.mapKey) return;
     this.mapKey = key;
-    const g = this.mctx, W = this.mini.width, H = this.mini.height, K = this.map.K;
-    g.imageSmoothingEnabled = true;
+    const bg = this.mapPref.relief ? this.reliefBg() : this.bg.photo, S = bg.width / W;
+    const v = (q) => ({ x: (q.x - mv.cx) * z + W / 2, y: (q.y - mv.cy) * z + H / 2 });
+    const g = this.mctx;
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.clearRect(0, 0, W, H);
-    g.drawImage(this.miniBg, 0, 0);
-    const b = this.toMap(ball.x, ball.z), p = this.toMap(hole.pin.x, hole.pin.z);
-    if (target) {
-      const t = this.toMap(target.x, target.z);
+    g.drawImage(bg, (mv.cx - hw) * S, (mv.cy - hh) * S, 2 * hw * S, 2 * hh * S, 0, 0, W, H);
+    const B = v(b), P = v(p);
+    if (t) {
+      const T = v(t);
       // ligne de visée bleue ; les points blancs tombent là où la balle irait aux repères 1/3 et 2/3 de la jauge
       g.lineCap = 'round';
-      g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 7 * K / 2; g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(t.x, t.y); g.stroke();
-      g.strokeStyle = '#1f6bff'; g.lineWidth = 4 * K / 2; g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(t.x, t.y); g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 3.5 * K; g.beginPath(); g.moveTo(B.x, B.y); g.lineTo(T.x, T.y); g.stroke();
+      g.strokeStyle = '#1f6bff'; g.lineWidth = 2 * K; g.beginPath(); g.moveTo(B.x, B.y); g.lineTo(T.x, T.y); g.stroke();
       g.fillStyle = '#fff';
-      for (const m of marks) { const q = this.toMap(m.x, m.z); g.beginPath(); g.arc(q.x, q.y, 2.6 * K, 0, Math.PI * 2); g.fill(); }
+      for (const m of marks) { const q = v(this.toMap(m.x, m.z)); g.beginPath(); g.arc(q.x, q.y, 2.6 * K, 0, Math.PI * 2); g.fill(); }
       // losange jaune : point de chute
-      g.save(); g.translate(t.x, t.y); g.rotate(Math.PI / 4);
+      g.save(); g.translate(T.x, T.y); g.rotate(Math.PI / 4);
       g.fillStyle = '#ffd23f'; g.strokeStyle = '#fff'; g.lineWidth = 1.5 * K; g.fillRect(-4.5 * K, -4.5 * K, 9 * K, 9 * K); g.strokeRect(-4.5 * K, -4.5 * K, 9 * K, 9 * K);
       g.restore();
     }
-    for (const o of others) { const q = this.toMap(o.x, o.z); g.fillStyle = o.color; g.beginPath(); g.arc(q.x, q.y, 3.5 * K, 0, Math.PI * 2); g.fill(); }
+    for (const o of others) { const q = v(this.toMap(o.x, o.z)); g.fillStyle = o.color; g.strokeStyle = '#fff'; g.lineWidth = 1.2 * K; g.beginPath(); g.arc(q.x, q.y, 3.5 * K, 0, Math.PI * 2); g.fill(); g.stroke(); }
     // drapeau
-    g.fillStyle = '#fff'; g.fillRect(p.x - 1 * K, p.y - 14 * K, 2 * K, 14 * K);
+    g.fillStyle = '#fff'; g.fillRect(P.x - 1 * K, P.y - 14 * K, 2 * K, 14 * K);
     g.fillStyle = '#ff2d2d'; g.strokeStyle = '#fff'; g.lineWidth = K;
-    g.beginPath(); g.moveTo(p.x + 1 * K, p.y - 14 * K); g.lineTo(p.x + 11 * K, p.y - 10 * K); g.lineTo(p.x + 1 * K, p.y - 6 * K); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(P.x + 1 * K, P.y - 14 * K); g.lineTo(P.x + 11 * K, P.y - 10 * K); g.lineTo(P.x + 1 * K, P.y - 6 * K); g.closePath(); g.fill(); g.stroke();
     // balle : triangle cyan pointé dans la direction visée
     const ax = Math.sin(aim || 0), az = Math.cos(aim || 0), m = this.map;
     const dx = ax * m.rx + az * m.rz, dy = -(ax * m.dx + az * m.dz), sz = 8 * K;
     g.fillStyle = '#25d0f0'; g.strokeStyle = '#fff'; g.lineWidth = 1.6 * K;
-    g.beginPath(); g.moveTo(b.x + dx * sz, b.y + dy * sz); g.lineTo(b.x - dx * sz * 0.6 - dy * sz * 0.7, b.y - dy * sz * 0.6 + dx * sz * 0.7); g.lineTo(b.x - dx * sz * 0.6 + dy * sz * 0.7, b.y - dy * sz * 0.6 - dx * sz * 0.7); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(B.x + dx * sz, B.y + dy * sz); g.lineTo(B.x - dx * sz * 0.6 - dy * sz * 0.7, B.y - dy * sz * 0.6 + dx * sz * 0.7); g.lineTo(B.x - dx * sz * 0.6 + dy * sz * 0.7, B.y - dy * sz * 0.6 - dx * sz * 0.7); g.closePath(); g.fill(); g.stroke();
   }
 }
 
@@ -157,36 +226,21 @@ export function loadSetup() {
 }
 export function saveSetup(o) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(o)); } catch (e) {} }
 
-// écran titre (hors du Hub) : parcours, bots, niveau et vent
-export function titleHtml(set) {
-  const seg = (key, opts) => `<div class="seg" data-k="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(set[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  return `<div class="title">
-    <div class="logo">Birdie <span>Party</span></div>
-    <div class="setup panel">
-      <h3>Parcours</h3>
-      <div class="courses" data-k="course">${Object.entries(COURSES).map(([k, c]) => `<button data-v="${k}" class="course ${k} ${set.course === k ? 'on' : ''}"><b>${c.label.split(' · ')[0]}</b><small>${c.holes.length} trous</small></button>`).join('')}</div>
-      <div class="opts">
-        <label>Bots</label>${seg('bots', [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3']])}
-        <label>Niveau</label>${seg('level', [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']])}
-        <label>Vent</label>${seg('wind', [['calme', 'Calme'], ['normal', 'Normal'], ['fort', 'Fort']])}
-      </div>
-    </div>
-    <button class="bigbtn" id="btnPlay">Jouer</button>
-    <div class="howto">Clic maintenu, tire vers le bas pour armer, relâche pour frapper · <b>Espace</b> au clavier · <b>← →</b> viser · <b>↑ ↓</b> club · <b>V</b> vue d'ensemble</div>
-  </div>`;
+export function loadingHtml(txt = 'Préparation du parcours') {
+  return `<div class="loadscr"><div class="logo">Birdie <span>Party</span></div><div class="spinner" aria-hidden="true"></div><p class="loading" role="status">${esc(txt)}</p></div>`;
 }
-export function loadingHtml(txt = 'Préparation du parcours') { return `<div class="title"><div class="logo">Birdie <span>Party</span></div><div class="loading dots">${esc(txt)}</div></div>`; }
 
 // carte de score : un tableau par série de 9 trous ; `final` ajoute le podium et les boutons de fin
 export function scorecardHtml(R, holes, { final = false, ranking = null, canReplay = false, embedded = false, title = '' } = {}) {
   const cls = (s, par) => (s == null ? 'nd' : s === 1 ? 'eagle' : s - par <= -2 ? 'eagle' : s - par === -1 ? 'birdie' : s - par === 0 ? 'par' : s - par === 1 ? 'bogey' : 'worse');
   const chunks = []; for (let k = 0; k < holes.length; k += 9) chunks.push([k, Math.min(holes.length, k + 9)]);
   const tables = chunks.map(([a, b]) => `<table class="score">
-    <tr><th class="nm">Trou</th>${holes.slice(a, b).map((h) => `<th>${h.n}</th>`).join('')}<th class="tot">${b - a === holes.length ? 'Total' : a === 0 ? 'Aller' : 'Retour'}</th></tr>
-    <tr class="parrow"><td class="nm">Par</td>${holes.slice(a, b).map((h) => `<td>${h.par}</td>`).join('')}<td class="tot">${holes.slice(a, b).reduce((t, h) => t + h.par, 0)}</td></tr>
-    ${R.players.map((p) => { let t = 0; return `<tr><td class="nm"><i style="background:${esc(p.color)}"></i>${esc(p.name)}</td>${holes.slice(a, b).map((h, k) => { const s = p.scores[a + k]; if (s != null) t += s; return `<td><span class="${cls(s, h.par)}">${s ?? (a + k < R.hi ? '–' : '')}</span></td>`; }).join('')}<td class="tot">${t || ''}</td></tr>`; }).join('')}
+    <thead><tr><th class="nm" scope="col">Trou</th>${holes.slice(a, b).map((h) => `<th scope="col">${h.n}</th>`).join('')}<th class="tot" scope="col">${b - a === holes.length ? 'Total' : a === 0 ? 'Aller' : 'Retour'}</th></tr>
+    <tr class="parrow"><td class="nm">Par</td>${holes.slice(a, b).map((h) => `<td>${h.par}</td>`).join('')}<td class="tot">${holes.slice(a, b).reduce((t, h) => t + h.par, 0)}</td></tr></thead>
+    <tbody>${R.players.map((p) => { let t = 0; return `<tr><th class="nm" scope="row"><i style="background:${esc(p.color)}"></i>${esc(p.name)}</th>${holes.slice(a, b).map((h, k) => { const s = p.scores[a + k]; if (s != null) t += s; return `<td><span class="${cls(s, h.par)}">${s ?? (a + k < R.hi ? '–' : '')}</span></td>`; }).join('')}<td class="tot">${t || ''}</td></tr>`; }).join('')}</tbody>
   </table>`).join('');
-  const pod = final && ranking ? `<div class="podium">${ranking.map((x) => `<div class="rk r${Math.min(x.rank, 4)}"><b>${x.rank === 1 ? '🏆' : x.rank === 2 ? '🥈' : x.rank === 3 ? '🥉' : x.rank + 'e'}</b><i style="background:${esc(x.color)}"></i><span>${esc(x.name)}</span><em>${x.strokes} coups · ${toParTxt(x.toPar)}</em></div>`).join('')}</div>` : '';
-  const btns = final ? `<div class="row">${canReplay ? '<button class="bigbtn" id="btnAgain">Rejouer</button>' : ''}<button class="bigbtn blue" id="btnQuit">${embedded ? 'Retour au salon' : 'Menu'}</button></div>` : '';
-  return `<div class="card panel scorecard ${final ? 'final' : ''}"><h2>${esc(title)}</h2>${pod}${tables}${btns}</div>`;
+  const pod = final && ranking ? `<ol class="podium">${ranking.map((x) => `<li class="rk r${Math.min(x.rank, 4)}"><b class="medal">${x.rank}</b><i style="background:${esc(x.color)}"></i><span>${esc(x.name)}</span><em>${x.strokes} coups · <strong>${toParTxt(x.toPar)}</strong></em></li>`).join('')}</ol>` : '';
+  const legend = '<p class="sc-legend"><span><span class="eagle">2</span> eagle</span><span><span class="birdie">3</span> birdie</span><span><span class="bogey">5</span> bogey</span><span><span class="worse">6</span> double et plus</span></p>';
+  const btns = final ? `<div class="sheet-actions">${canReplay ? '<button class="btn primary big" id="btnAgain">Rejouer</button>' : ''}<button class="btn secondary big" id="btnQuit">${embedded ? 'Retour au salon' : 'Menu principal'}</button></div>` : '';
+  return `<div class="sheet ${final ? 'final' : ''}" role="dialog" aria-label="${esc(title)}"><h2>${esc(title)}</h2>${pod}<div class="tables">${tables}</div>${legend}${btns}</div>`;
 }
