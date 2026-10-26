@@ -257,10 +257,21 @@
       const tags = [];
       if (p.id === room.hostId) tags.push('<span class="pill">Hôte</span>');
       if (room.ready[p.id]) tags.push('<span class="pill in">En jeu</span>');
-      return `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span class="nm">${esc(p.name)}${p.id === room.myId ? ' <small>(toi)</small>' : ''}</span>${tags.join('')}${p.id !== room.myId ? `<small data-ping="${p.id}"></small>` : ''}</div>`;
+      const kickBtn = host && !solo && p.id !== room.myId
+        ? `<button class="kickbtn" data-kick="${p.id}" data-name="${esc(p.name)}" title="Expulser ${esc(p.name)} du salon" style="margin-left:6px;background:rgba(255,75,43,.14);border:1px solid rgba(255,75,43,.4);color:#ff6b4a;border-radius:6px;padding:1px 6px;font-size:11px;cursor:pointer">✕</button>`
+        : '';
+      return `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span class="nm">${esc(p.name)}${p.id === room.myId ? ' <small>(toi)</small>' : ''}</span>${tags.join('')}${p.id !== room.myId ? `<small data-ping="${p.id}"></small>` : ''}${kickBtn}</div>`;
     });
     if (!solo) for (let k = room.players.length; k < DDRoom.MAX_PLAYERS; k++) rows.push('<div class="pl empty">Place libre</div>');
     $('#players').innerHTML = rows.join('');
+    for (const kb of document.querySelectorAll('[data-kick]')) {
+      kb.onclick = () => {
+        const pid = Number(kb.dataset.kick), pName = kb.dataset.name || 'ce joueur';
+        const r = prompt(`Raison de l'expulsion de ${pName} (enregistrée dans logs/crash) :`, 'AFK / Inactif ou Lag excessif');
+        if (r === null) return;
+        if (room.kick(pid, r.trim() || 'Expulsé par l\'hôte')) toast(`${pName} a été expulsé du salon.`);
+      };
+    }
     renderPings();
     // partie en cours que l'on a quittée
     const running = room.game && !frame;
@@ -337,7 +348,14 @@
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
     $('#play').innerHTML = ''; $('#play').appendChild(el);
-    frame = { game: g.id, n: g.n, el, loaded: false };
+    const watchdog = setTimeout(() => {
+      if (frame && frame.el === el && !frame.loaded && window.DDLogger) {
+        window.DDLogger.logCrash('CRASH_IFRAME_LOAD_FAIL', `Le jeu "${def.title}" (${g.id}) n'a pas envoyé le signal d'initialisation "hello" après 15 s.`, {
+          game: g.id, roomCode: room && room.code, file: src,
+        });
+      }
+    }, 15000);
+    frame = { game: g.id, n: g.n, el, loaded: false, watchdog };
     el.addEventListener('load', () => { try { el.contentWindow.focus(); } catch (e) {} });
     showScreen('play');
     renderRoom();
@@ -345,6 +363,7 @@
 
   function closeFrame(toRoom) {
     if (!frame) return;
+    clearTimeout(frame.watchdog);
     frame.el.remove(); frame = null; $('#play').innerHTML = '';
     if (room) room.setReady(null);
     if (toRoom && room) { showScreen('room'); renderRoom(); }
@@ -362,6 +381,7 @@
     switch (d.k) {
       case 'hello':
         frame.loaded = true;
+        clearTimeout(frame.watchdog);
         frame.el.contentWindow.postMessage({ dd: 'hub', k: 'init', info: {
           role: room.mode === 'solo' ? 'solo' : room.isHost ? 'host' : 'guest',
           myId: room.myId, hostId: room.hostId, code: room.code, game: frame.game,
@@ -372,9 +392,16 @@
       case 'ready': room.setReady(frame.game); break;
       case 'send': room.sendGame(d.to, d.m, !!d.v); break;
       case 'result': recordResult(frame.game, d.r); break;
+      case 'log': if (window.DDLogger && d.entry) window.DDLogger.receiveFromChild(d.entry); break;
       case 'exit':
-        if (room.isHost) room.setGame(null);
-        else { leftGame = frame.n; closeFrame(true); }
+        if (room.isHost) {
+          if (window.DDLogger && room.players.length > 1) {
+            window.DDLogger.logExpulsion('EXP_HOST_STOPPED_GAME', `L'hôte a quitté "${frame.game}" : fermeture de la partie pour les ${room.players.length} joueurs du salon.`, {
+              game: frame.game, roomCode: room.code,
+            });
+          }
+          room.setGame(null);
+        } else { leftGame = frame.n; closeFrame(true); }
         break;
     }
   });

@@ -1,6 +1,8 @@
 'use strict';
 
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 8080;
@@ -14,8 +16,55 @@ const SLOW_CLIENT_BYTES = 96 * 1024; // tampon d'envoi au-delà duquel un destin
 // pour le flux, coupure wifi…) et on lui saute les instantanés d'état le temps que la file se vide.
 const PROBE_MS = 250, LAG_MARGIN_MS = 150, PROBE_WINDOW = 40;
 
-// Serveur HTTP minimal (utile pour les healthchecks Render / Railway / Fly.io)
+const CRASH_DIR = path.resolve(__dirname, '..', 'logs', 'crash');
+const JSONL_FILE = path.join(CRASH_DIR, 'crash-events.jsonl');
+const LATEST_FILE = path.join(CRASH_DIR, 'latest.json');
+
+function appendServerLog(entry) {
+  try {
+    fs.mkdirSync(CRASH_DIR, { recursive: true });
+    fs.appendFileSync(JSONL_FILE, JSON.stringify(entry) + '\n', 'utf8');
+    let list = [];
+    if (fs.existsSync(LATEST_FILE)) {
+      try { list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) { list = []; }
+    }
+    if (!Array.isArray(list)) list = [];
+    list.unshift(entry);
+    fs.writeFileSync(LATEST_FILE, JSON.stringify(list.slice(0, 200), null, 2) + '\n', 'utf8');
+  } catch (e) {}
+}
+
+// Serveur HTTP minimal (healthchecks + API de collecte des logs de crash/expulsion)
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  if (req.method === 'POST' && req.url === '/api/log') {
+    let body = '';
+    req.on('data', (c) => { if (body.length < 32768) body += c; });
+    req.on('end', () => {
+      try {
+        const entry = JSON.parse(body);
+        if (entry && typeof entry === 'object') appendServerLog(entry);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{"ok":true}');
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{"ok":false}');
+      }
+    });
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/logs') {
+    let list = [];
+    try { if (fs.existsSync(LATEST_FILE)) list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(list));
+    return;
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Duo Drift WebSocket Relay Server OK\n');
 });
@@ -253,6 +302,24 @@ wss.on('connection', (ws) => {
 const keepAliveInterval = setInterval(() => {
   for (const ws of wss.clients) {
     if (ws.isAlive === false) {
+      if (ws.roomId) {
+        appendServerLog({
+          id: 'srv-timeout-' + Date.now(),
+          ts: Date.now(),
+          iso: new Date().toISOString(),
+          code: 'EXP_WS_KEEPALIVE_TIMEOUT',
+          category: 'EXPULSION',
+          severity: 'warn',
+          title: 'Joueur expulsé par le serveur relais (timeout WebSocket 30 s)',
+          cause: 'Aucune réponse au ping WebSocket pendant 30 s (coupure Wi-Fi/4G ou appareil mobile verrouillé).',
+          message: `Client ${ws.cid || ws.role || '?'} déconnecté du salon ${ws.roomId} après 30 s sans pong (paquets volatils sautés : ${ws.dropped || 0}).`,
+          game: 'hub',
+          roomCode: ws.roomId,
+          role: ws.role || 'guest',
+          player: ws.cid || 'Client WebSocket',
+          diagnostics: { lastLat: ws.lastLat || null, baseLat: ws.baseLat || null, dropped: ws.dropped || 0, buffered: ws.bufferedAmount || 0 },
+        });
+      }
       leaveCurrentRoom(ws);
       try {
         ws.terminate();

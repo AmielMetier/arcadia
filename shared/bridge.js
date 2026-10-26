@@ -20,8 +20,33 @@
     info: { role: qs.get('role') || 'solo', code: qs.get('code') || null, game: qs.get('game') || null, myId: 0, hostId: 0, settings: {} },
     players: [], readyMap: {}, pings: {}, initDone: false, handlers: {},
   };
-  const emit = (k, ...a) => (H.handlers[k] || []).forEach((f) => { try { f(...a); } catch (e) { console.error(e); } });
+  const emit = (k, ...a) => (H.handlers[k] || []).forEach((f) => {
+    try { f(...a); } catch (e) {
+      console.error(e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', `Erreur dans HubBridge.on('${k}') : ${e && e.message ? e.message : e}`, { stack: e && e.stack });
+    }
+  });
   const post = (o) => { if (embedded) parent.postMessage({ dd: 'hub', ...o }, target); };
+
+  // Chargement automatique du capteur de crashs et d'expulsions (shared/logger.js) dans chaque jeu du Hub
+  if (!window.DDLogger && typeof document !== 'undefined') {
+    try {
+      const cur = document.currentScript && document.currentScript.src;
+      const src = cur ? cur.replace(/bridge\.js(?:\?.*)?$/, 'logger.js') : '../shared/logger.js';
+      const s = document.createElement('script');
+      s.src = src;
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) {}
+  }
+
+  H.logCrash = (code, msg, extra) => {
+    if (window.DDLogger) return window.DDLogger.logCrash(code, msg, extra);
+    post({ k: 'log', entry: { id: 'log-' + Date.now(), ts: Date.now(), iso: new Date().toISOString(), code: code || 'CRASH_JS_ERROR', category: 'CRASH', severity: 'critical', message: String(msg), game: H.info.game, roomCode: H.info.code, role: H.info.role, ...extra } });
+  };
+  H.logExpulsion = (code, msg, extra) => {
+    if (window.DDLogger) return window.DDLogger.logExpulsion(code, msg, extra);
+    post({ k: 'log', entry: { id: 'log-' + Date.now(), ts: Date.now(), iso: new Date().toISOString(), code: code || 'EXP_PEER_LEFT_MIDGAME', category: 'EXPULSION', severity: 'warn', message: String(msg), game: H.info.game, roomCode: H.info.code, role: H.info.role, ...extra } });
+  };
 
   H.on = (k, fn) => {
     (H.handlers[k] = H.handlers[k] || []).push(fn);
@@ -70,7 +95,12 @@
         // une course ne survit pas à un changement d'hôte : retour propre au salon
         const hostChanged = opened && openedHost !== H.info.hostId;
         if (hostReady && !opened) { opened = true; openedHost = H.info.hostId; Net.hostLink = { hub: true }; cb.open(); }
-        else if ((!hostReady || hostChanged) && opened) { opened = false; Net.hostLink = null; if (cb.close) cb.close(); }
+        else if ((!hostReady || hostChanged) && opened) {
+          opened = false; Net.hostLink = null;
+          if (hostChanged) H.logExpulsion('EXP_HOST_MIGRATION_RESET', `Partie interrompue dans ${H.info.game || 'le jeu'} : changement d'hôte (${openedHost} → ${H.info.hostId}).`);
+          else H.logExpulsion('EXP_HOST_NOT_READY_DESYNC', `Joueur renvoyé au salon depuis ${H.info.game || 'le jeu'} : l'hôte n'est plus dans la partie (!hostReady).`);
+          if (cb.close) cb.close();
+        }
       }
     }
     H.on('roster', sync);
@@ -93,7 +123,13 @@
       toHost(m, vol) { H.send('host', m, { volatile: !!vol }); },
       to(cid, m, vol) { H.send(Number(String(cid).slice(1)), m, { volatile: !!vol }); },
       bcast(m, except, vol) { for (const id of joined) if ('p' + id !== except) H.send(id, m, { volatile: !!vol }); },
-      drop(cid) { const id = Number(String(cid).slice(1)); H.send(id, { t: 'bye' }); Net._drop(cid); },
+      drop(cid, reason) {
+        const id = Number(String(cid).slice(1));
+        const pName = H.playerName(id);
+        H.logExpulsion('EXP_HOST_KICK', `Joueur ${pName} (#${id}) expulsé de la partie (${reason || 'canal fermé par l\'hôte'}).`, { targetPlayer: pName });
+        H.send(id, { t: 'bye', reason });
+        Net._drop(cid);
+      },
       _drop(cid) { const id = Number(String(cid).slice(1)); if (joined.delete(id) && cb && cb.leave) cb.leave(cid); },
       close() { cb = null; Net.cb = null; Net.hostLink = null; Net.role = null; joined.clear(); opened = false; },
     });

@@ -39,7 +39,7 @@
       </div>
       <div class="err" id="homeErr"></div>
       <button class="btn ghost block" id="btnSolo">Jouer seul</button>
-      <div class="links"><button class="linkbtn" id="btnNews">✨ Nouveautés</button><button class="linkbtn" id="btnBoard">🏆 Classement</button><button class="linkbtn" id="btnNetTest">📶 Tester ma connexion</button></div>
+      <div class="links"><button class="linkbtn" id="btnNews">✨ Nouveautés</button><button class="linkbtn" id="btnBoard">🏆 Classement</button><button class="linkbtn" id="btnNetTest">📶 Tester ma connexion</button><a class="linkbtn" id="btnLogs" href="logs/" target="_blank" rel="noopener" style="text-decoration:none">📋 Logs &amp; Crashs</a></div>
     </div>
   </div>
   <div class="credit">by <b>Amiel</b>, <b>Nicolas</b>, <b>Gabriel</b> and <b>Claude</b> · <button class="verlink" id="ver" title="Voir les nouveautés"></button></div>
@@ -52,6 +52,7 @@
     <div class="code" id="codeBox"><div><small>Code du salon</small><br><b id="code">----</b></div>
       <button class="btn small yellow" id="btnCopy">Copier le lien</button></div>
     <div class="spacer"></div>
+    <a class="btn small ghost" id="btnLogsRoom" href="logs/" target="_blank" rel="noopener" style="text-decoration:none">📋 Logs</a>
     <button class="btn small yellow" id="btnBoardRoom">🏆 Classement</button>
     <button class="btn small ghost" id="btnLeave">Quitter</button>
   </div>
@@ -75,6 +76,7 @@
 <!-- JEU -->
 <section class="screen" id="play"></section>
 
+<script src="shared/logger.js"></script>
 <script src="shared/net.js"></script>
 <script src="shared/room.js"></script>
 <script src="shared/profile.js"></script>
