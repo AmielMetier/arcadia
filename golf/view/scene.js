@@ -120,7 +120,8 @@ export function createScene(host, { onLost } = {}) {
     pmrem.dispose();
     scene.environment = env; scene.environmentIntensity = 0.3;
     // brume bleutée sur les collines lointaines
-    scene.fog = new THREE.Fog(skyLook.fog, 240, 1900);
+    // voile bleuté : les collines et forêts lointaines bleuissent avec la distance
+    scene.fog = new THREE.Fog(skyLook.fog, 180, 1650);
     scene.background = new THREE.Color(skyLook.horizon);
     g.add(sky);
     const peaks = buildPeaks(skyLook, hole.def.seed, center, noise); if (peaks) g.add(peaks);

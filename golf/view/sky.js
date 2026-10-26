@@ -4,9 +4,9 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { makeRng } from '../engine/rng.js';
 
 export const SKIES = {
-  campagne: { zenith: 0x2f66bd, horizon: 0xc9dbec, ground: 0xa9bccd, sun: 0xfff0d6, fog: 0xb4c6d8, cloudShade: 0xa7b3c4 },
-  mer: { zenith: 0x2a6bc4, horizon: 0xd2e3f0, ground: 0xb3c8d8, sun: 0xfff2da, fog: 0xbfd2e2, cloudShade: 0xb0bccc, peaks: 'iles', peak: 0x52767f, peakTop: 0x6c8a74 },
-  montagne: { zenith: 0x2a5cb4, horizon: 0xc4d4e6, ground: 0xa6b6c8, sun: 0xfff0d8, fog: 0xadbfd2, cloudShade: 0xa2aec0, peaks: 'alpes', peak: 0x66778f, peakTop: 0xeef2f8 },
+  campagne: { zenith: 0x2f66bd, horizon: 0xc9dbec, ground: 0xa9bccd, sun: 0xfff0d6, fog: 0x9fb8d8, cloudShade: 0xa7b3c4 },
+  mer: { zenith: 0x2a6bc4, horizon: 0xd2e3f0, ground: 0xb3c8d8, sun: 0xfff2da, fog: 0xa9c4e2, cloudShade: 0xb0bccc, peaks: 'iles', peak: 0x52767f, peakTop: 0x6c8a74 },
+  montagne: { zenith: 0x2a5cb4, horizon: 0xc4d4e6, ground: 0xa6b6c8, sun: 0xfff0d8, fog: 0x98b0d4, cloudShade: 0xa2aec0, peaks: 'alpes', peak: 0x66778f, peakTop: 0xeef2f8 },
 };
 export function buildSky(look, sunDir, noise) {
   const geo = new THREE.SphereGeometry(3000, 48, 24);
@@ -107,9 +107,9 @@ export function buildPeaks(look, seed, center, noise) {
         c = mix(c, vec3(0.93, 0.95, 0.99), sn);
         diffuseColor.rgb = c;`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
-        // voile de distance (perspective aérienne)
+        // voile bleuté de la distance (perspective aérienne) : plus loin, plus bleu et plus pâle
         float d = length(vW - cameraPosition);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, uFog, 0.24 + 0.28 * smoothstep(1500.0, 2600.0, d));`);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.86, 0.93, 1.08), uFog, 0.36 + 0.3 * smoothstep(1400.0, 2600.0, d));`);
   };
   mat.customProgramCacheKey = () => 'golf-peaks';
   const mesh = new THREE.Mesh(geo, mat);
