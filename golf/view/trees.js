@@ -2,6 +2,7 @@
 // (grappes de feuilles transparentes) réparties dans une boule ; sapins : des étages de branches inclinées.
 // Les normales du feuillage pointent hors de la couronne, pour une lumière douce et ronde. Tout est en instances :
 // les arbres du parcours (qui arrêtent la balle, venus du moteur) et une forêt dense sur les collines au loin.
+// (l'herbe en 3D est dans grass.js)
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { makeRng } from '../engine/rng.js';
 import { leafTexture, needleTexture, barkTexture, frondTexture, palmBarkTexture, shadeTexture } from './textures.js';
@@ -11,23 +12,23 @@ export const SWAY = { uT: { value: 0 }, uWind: { value: 0.3 } };
 
 // ------------------------------------------------------------------ fabrication des géométries (arbre de taille 1)
 function builder() {
-  const pos = [], nor = [], uv = [], idx = [];
+  const pos = [], nor = [], uv = [], idx = [], col = [];
   return {
-    // carte rectangulaire : centre c, demi-axes u et v, normale n (pour l'éclairage)
-    card(c, u, v, n) {
+    // carte rectangulaire : centre c, demi-axes u et v, normale n (pour l'éclairage), ao : ombre interne (0 → 1)
+    card(c, u, v, n, ao = 1) {
       const b = pos.length / 3;
       for (const [su, sv, tu, tv] of [[-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1], [-1, 1, 0, 1]]) {
         pos.push(c.x + u.x * su + v.x * sv, c.y + u.y * su + v.y * sv, c.z + u.z * su + v.z * sv);
-        nor.push(n.x, n.y, n.z); uv.push(tu, tv);
+        nor.push(n.x, n.y, n.z); uv.push(tu, tv); col.push(ao, ao, ao);
       }
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
     },
     // branche de sapin : la tige part de `root` vers `tip`, la largeur s'étale de part et d'autre
-    branch(root, tip, side, n) {
+    branch(root, tip, side, n, ao = 1) {
       const b = pos.length / 3;
-      for (const [p, s, tu, tv] of [[root, -1, 0, 0], [tip, -1, 1, 0], [tip, 1, 1, 1], [root, 1, 0, 1]]) {
+      for (const [p, s, tu, tv, a] of [[root, -1, 0, 0, ao * 0.6], [tip, -1, 1, 0, ao], [tip, 1, 1, 1, ao], [root, 1, 0, 1, ao * 0.6]]) {
         pos.push(p.x + side.x * s, p.y + side.y * s, p.z + side.z * s);
-        nor.push(n.x, n.y, n.z); uv.push(tu, tv);
+        nor.push(n.x, n.y, n.z); uv.push(tu, tv); col.push(a, a, a);
       }
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
     },
@@ -36,6 +37,7 @@ function builder() {
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
       g.setIndex(idx);
       g.computeBoundingSphere();
       return g;
@@ -45,7 +47,7 @@ function builder() {
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // feuillu : couronne ellipsoïdale (rx, ry) centrée à cy ; cards = nombre de grappes
-function broadleafGeo(seed, { rx = 3.3, ry = 2.9, cy = 5.6, cards = 34, size = 2.5 } = {}) {
+function broadleafGeo(seed, { rx = 3.3, ry = 2.9, cy = 5.6, cards = 95, size = 1.55 } = {}) {
   const r = makeRng(seed), b = builder(), up = V3(0, 1, 0);
   for (let i = 0; i < cards; i++) {
     // direction au hasard, un peu plus vers le haut ; surtout près de la surface de la couronne
@@ -60,13 +62,15 @@ function broadleafGeo(seed, { rx = 3.3, ry = 2.9, cy = 5.6, cards = 34, size = 2
     const s = size * r.range(0.8, 1.25);
     const uu = u.clone().multiplyScalar(ca).addScaledVector(v, sa).multiplyScalar(s), vv = v.clone().multiplyScalar(ca).addScaledVector(u, -sa).multiplyScalar(s);
     const light = d.clone().multiplyScalar(0.8).add(V3(0, 0.45, 0)).normalize();
-    b.card(c, uu, vv, light);
+    // ombre interne : cœur et dessous de la couronne plus sombres
+    const ao = Math.min(1, 0.35 + 0.65 * k) * (0.72 + 0.28 * (d.y * 0.5 + 0.5));
+    b.card(c, uu, vv, light, ao);
   }
   return b.geo();
 }
 
 // sapin : étages de branches inclinées vers le bas, de plus en plus courts vers la pointe
-function pineGeo(seed, { height = 13, base = 1.6, radius = 3.0, tiers = 11, per = 7 } = {}) {
+function pineGeo(seed, { height = 13, base = 1.2, radius = 3.4, tiers = 16, per = 9 } = {}) {
   const r = makeRng(seed), b = builder();
   for (let t = 0; t < tiers; t++) {
     const f = t / (tiers - 1), y = base + (height - base - 0.8) * f;
@@ -78,10 +82,10 @@ function pineGeo(seed, { height = 13, base = 1.6, radius = 3.0, tiers = 11, per 
       const dx = Math.sin(a), dz = Math.cos(a), droop = R * r.range(0.35, 0.55);
       const root = V3(dx * 0.15, y + 0.25, dz * 0.15), tip = V3(dx * R, y - droop, dz * R);
       // largeur : à plat, perpendiculaire à la branche, avec un léger roulis
-      const w = R * 0.62, roll = r.range(-0.35, 0.35);
+      const w = R * 0.85, roll = r.range(-0.35, 0.35);
       const side = V3(dz, roll, -dx).normalize().multiplyScalar(w);
       const nrm = V3(dx * 0.7, 0.75, dz * 0.7).normalize();
-      b.branch(root, tip, side, nrm);
+      b.branch(root, tip, side, nrm, 0.55 + 0.45 * f);
     }
   }
   // pointe
@@ -103,7 +107,7 @@ function palmGeo(seed, { height = 8, lean = 1.6, fronds = 10 } = {}) {
   }
   trunk.computeVertexNormals();
   const top = curve.getPoint(1);
-  const pos = [], nor = [], uv = [], idx = [];
+  const pos = [], nor = [], uv = [], idx = [], col = [];
   for (let f = 0; f < fronds; f++) {
     const a = (f / fronds) * Math.PI * 2 + r.range(-0.2, 0.2), L = r.range(3.2, 4.2), up = r.range(0.3, 0.9), seg = 7;
     const dx = Math.sin(a), dz = Math.cos(a), sx = dz, sz = -dx;
@@ -113,7 +117,7 @@ function palmGeo(seed, { height = 8, lean = 1.6, fronds = 10 } = {}) {
       const w = 0.75 * Math.sin(Math.PI * Math.min(1, u * 1.1 + 0.08)) + 0.08;
       for (const side of [-1, 1]) {
         pos.push(top.x + dx * d + sx * w * side, y, top.z + dz * d + sz * w * side);
-        nor.push(dx * 0.4, 0.9, dz * 0.4); uv.push(u, side < 0 ? 0 : 1);
+        nor.push(dx * 0.4, 0.9, dz * 0.4); uv.push(u, side < 0 ? 0 : 1); const ao = 0.6 + 0.4 * u; col.push(ao, ao, ao);
       }
       if (j < seg) { const k = b + j * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
     }
@@ -122,6 +126,7 @@ function palmGeo(seed, { height = 8, lean = 1.6, fronds = 10 } = {}) {
   crown.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   crown.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   crown.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  crown.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   crown.setIndex(idx); crown.computeBoundingSphere();
   return { trunk, crown };
 }
@@ -133,7 +138,7 @@ function trunkGeo(h, r0) {
 }
 
 function foliageMaterial(map) {
-  const m = new THREE.MeshStandardMaterial({ map, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.9, metalness: 0 });
+  const m = new THREE.MeshStandardMaterial({ map, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.85, metalness: 0, vertexColors: true });
   // un peu de lumière qui traverse les feuilles côté soleil ; le feuillage se balance au vent (plus fort en haut)
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, SWAY);
@@ -144,14 +149,16 @@ function foliageMaterial(map) {
         float k = max(0.0, transformed.y - 2.0) * (0.012 + uWind * 0.02);
         transformed.x += sin(uT * 1.4 + iw.x * 0.21 + transformed.y * 0.3) * k;
         transformed.z += cos(uT * 1.1 + iw.z * 0.17 + transformed.x * 0.4) * k * 0.8;`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.16;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal); nonPerturbedNormal = normal;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.06;');
   };
-  m.customProgramCacheKey = () => 'golf-foliage';
+  m.customProgramCacheKey = () => 'golf-foliage-2';
   return m;
 }
 
-const LEAF_TINTS = [0xffffff, 0xe6f5d6, 0xd2e8c0, 0xf0fbe4, 0xc4dcb0];
-const PINE_TINTS = [0xe4f2e8, 0xc8dfd0, 0xb5d0c0, 0xd6e9dc];
+const LEAF_TINTS = [0xf2f2e6, 0xdfe8cc, 0xcad8b4, 0xe8eed4, 0xbccca4, 0xd8d0b0];
+const PINE_TINTS = [0xd4e2d8, 0xb8ccbe, 0xa8bfb2, 0xc6d8cc];
 
 // ------------------------------------------------------------------ assemblage
 export function createTreeKit() {
@@ -164,10 +171,10 @@ export function createTreeKit() {
   };
   const palmA = palmGeo(51), palmB = palmGeo(77, { height: 9.5, lean: 2.4, fronds: 11 });
   const geos = {
-    round: broadleafGeo(3), oak: broadleafGeo(8, { rx: 3.9, ry: 2.8, cy: 5.3, cards: 40, size: 2.7 }),
+    round: broadleafGeo(3), oak: broadleafGeo(8, { rx: 3.9, ry: 2.8, cy: 5.3, cards: 120, size: 1.65 }),
     pine: pineGeo(4), pineB: pineGeo(12, { height: 11, radius: 2.7, tiers: 10 }),
-    roundLo: broadleafGeo(21, { cards: 16, size: 3.0 }), pineLo: pineGeo(30, { tiers: 6, per: 5, radius: 3.1 }),
-    trunkRound: trunkGeo(5.0, 0.32), trunkOak: trunkGeo(4.6, 0.4), trunkPine: trunkGeo(11, 0.3),
+    roundLo: broadleafGeo(21, { cards: 22, size: 2.8 }), pineLo: pineGeo(30, { tiers: 10, per: 7, radius: 3.3 }),
+    trunkRound: trunkGeo(5.2, 0.32), trunkOak: trunkGeo(4.8, 0.42), trunkPine: trunkGeo(11, 0.3),
     palmA: palmA.crown, palmB: palmB.crown, palmTrunkA: palmA.trunk, palmTrunkB: palmB.trunk,
     shade: new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2),
   };
@@ -185,7 +192,7 @@ export function createTreeKit() {
       list.forEach((it, i) => {
         q.setFromAxisAngle(up, it.rot); p.set(it.x, it.y - 0.15, it.z); sc.setScalar(it.s); m.compose(p, q, sc); im.setMatrixAt(i, m);
         // hors du jeu, le feuillage est plus sombre (sous-bois)
-        if (isFoliage) { col.setHex(tints[it.v % tints.length]); if (dark || it.dark) col.multiplyScalar(0.62); im.setColorAt(i, col); }
+        if (isFoliage) { col.setHex(tints[it.v % tints.length]); if (dark || it.dark) col.multiplyScalar(0.42); im.setColorAt(i, col); }
       });
       im.castShadow = shadows; im.receiveShadow = true; im.computeBoundingSphere();
       im.userData.shared = true;
@@ -247,61 +254,4 @@ export function forestItems(hole, { count = 1700 } = {}) {
     items.push({ x, z, y: hole.heightAt(x, z), kind, s: r.range(0.9, 1.45), rot: r.range(0, 6.283), v: r.int(0, 7) });
   }
   return items;
-}
-
-// ------------------------------------------------------------------ herbes hautes
-// touffe : quelques brins fins, sombres au pied et clairs à la pointe
-function tuftGeo(seed, blades = 7, h = 0.42) {
-  const r = makeRng(seed), pos = [], colr = [], nor = [];
-  const base = new THREE.Color(0x1f6a0c), tip = new THREE.Color(0x8fd94a);
-  for (let i = 0; i < blades; i++) {
-    const a = r.range(0, 6.283), lean = r.range(0.1, 0.45), len = h * r.range(0.6, 1.2), w = 0.035;
-    const ox = r.range(-0.12, 0.12), oz = r.range(-0.12, 0.12);
-    const px = Math.cos(a + 1.57) * w, pz = Math.sin(a + 1.57) * w;
-    const tx = ox + Math.cos(a) * lean * len, tz = oz + Math.sin(a) * lean * len;
-    pos.push(ox - px, 0, oz - pz, ox + px, 0, oz + pz, tx, len, tz);
-    for (let k = 0; k < 2; k++) colr.push(base.r, base.g, base.b);
-    colr.push(tip.r, tip.g, tip.b);
-    for (let k = 0; k < 3; k++) nor.push(0, 1, 0);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  return g;
-}
-
-// Touffes dans le rough au bord du fairway et autour du green, et frange d'herbe le long des rives
-export function buildTallGrass(hole, { count = 5000 } = {}) {
-  const r = makeRng(hole.def.seed * 53 + 1), items = [];
-  const B = hole.bounds;
-  let tries = 0;
-  // quelques bouquets au pied des arbres de lisière (le rough lui-même reste une texture, comme sur Wii)
-  for (const t of hole.trees) {
-    if (items.length >= count || !r.chance(0.6)) continue;
-    for (let k = 0; k < 6; k++) {
-      const a = r.range(0, 6.283), d = r.range(0.5, t.r * 0.8), x = t.x + Math.sin(a) * d, z = t.z + Math.cos(a) * d;
-      items.push({ x, z, s: r.range(1.0, 1.6) });
-    }
-  }
-  // rives : la frange d'herbe qui borde l'eau
-  hole.waters.forEach((w, i) => {
-    const lv = hole.waterLv[i], c = Math.cos(w.rot || 0), s = Math.sin(w.rot || 0);
-    for (let k = 0; k < 520; k++) {
-      const a = (k / 520) * Math.PI * 2 + r.range(-0.004, 0.004);
-      // on part du centre et on cherche la berge (là où le sol sort de l'eau)
-      for (let d = 0.6; d < 1.6; d += 0.02) {
-        const u = Math.cos(a) * w.rx * d, v = Math.sin(a) * w.rz * d;
-        const x = w.x + u * c + v * s, z = w.z - u * s + v * c;
-        if (hole.heightAt(x, z) > lv - 0.05) { for (let j = 0; j < 2; j++) items.push({ x: x + r.range(-0.3, 0.3), z: z + r.range(-0.3, 0.3), s: r.range(1.1, 1.7) }); break; }
-      }
-    }
-  });
-  const geo = tuftGeo(3);
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 });
-  const im = new THREE.InstancedMesh(geo, mat, items.length);
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  items.forEach((it, i) => { q.setFromAxisAngle(up, r.range(0, 6.283)); p.set(it.x, hole.heightAt(it.x, it.z) - 0.02, it.z); sc.setScalar(it.s); m.compose(p, q, sc); im.setMatrixAt(i, m); });
-  im.receiveShadow = true; im.computeBoundingSphere();
-  return im;
 }

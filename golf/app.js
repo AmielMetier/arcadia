@@ -134,7 +134,7 @@ function startSession(role) {
 // raccourci de test : ?play lance directement une partie solo (?course=mer&bots=2)
 function quickPlay() {
   const s = loadSetup();
-  V.settings = { ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots };
+  V.settings = { ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots, startHole: +QS.get('hole') || 0 };
   $('#screen').innerHTML = loadingHtml();
   startSession('solo');
 }
@@ -203,9 +203,11 @@ async function loadHole(R) {
   $('#screen').innerHTML = loadingHtml(`Trou ${hole.n} · ${hole.name}`);
   await new Promise((r) => setTimeout(r, 40)); // laisse l'écran de chargement s'afficher
   const wind = windOf(R);
-  const surf = await scene.loadHole(hole, { theme: hole.theme, wind });
+  await scene.loadHole(hole, { theme: hole.theme, wind });
   scene.setWind(wind);
-  hud.setMap(surf, hole);
+  // mini-carte : photo aérienne du trou, prise une fois le décor posé
+  const frame = hud.mapFrame(hole);
+  hud.setMap(scene.renderMap(frame), frame);
   sfx.ambience(hole.theme);
   $('#screen').innerHTML = '';
   // survol du trou, depuis le départ jusqu'au green
@@ -501,6 +503,7 @@ function loop(now) {
   hud.tick(dt);
   if (!scene) return;
   if (!V.hole) { scene.frame(dt); return; }
+  autoQuality(now);
   sfx.wind(windOf(V.R).speed, dt);
 
   if (V.phase === 'intro') {
@@ -575,6 +578,21 @@ function loop(now) {
   scene.frame(dt);
 }
 
+// qualité automatique : si la machine peine (moins de 40 images/s), on coupe d'abord les reflets,
+// puis l'occlusion ambiante, puis l'herbe 3D, puis le halo
+const AQ = { t0: 0, n: 0, steps: ['refl', 'ao', 'grass', 'bloom'] };
+function autoQuality(now) {
+  if (document.hidden || V.phase === 'title' || V.phase === 'card') { AQ.t0 = 0; return; }
+  if (!AQ.t0) { AQ.t0 = now; AQ.n = 0; return; }
+  AQ.n++;
+  if (now - AQ.t0 < 3000) return;
+  const fps = AQ.n * 1000 / (now - AQ.t0);
+  AQ.t0 = now; AQ.n = 0;
+  if (fps >= 40) return;
+  const k = AQ.steps.find((s) => scene.quality[s]);
+  if (k) { scene.quality[k] = false; if (QS.has('debug')) console.info('qualité réduite :', k, Math.round(fps) + ' i/s'); }
+}
+
 function teardown() {
   if (!alive) return;
   alive = false;
@@ -585,7 +603,11 @@ function teardown() {
 }
 addEventListener('pagehide', teardown);
 
-if (QS.has('debug')) window.__golf = { V, scene, hud, sfx, get session() { return V.session; } };
+if (QS.has('debug')) {
+  // step(n) : avance de n images à 60 i/s, même quand la page est en arrière-plan (tests)
+  const step = (n = 1) => { for (let i = 0; i < n; i++) loop(last + 1000 / 60); };
+  window.__golf = { V, scene, hud, sfx, step, get session() { return V.session; } };
+}
 if (scene) {
   raf = requestAnimationFrame(loop);
   if (H.embedded) H.on('init', boot);

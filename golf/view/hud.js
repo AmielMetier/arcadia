@@ -82,39 +82,33 @@ export class HUD {
   }
   hideBanner() { this.bannerT = 0; $('#banner').hidden = true; }
 
-  // ---------------------------------------------------------------- mini-carte (le green en haut)
-  setMap(surf, hole) {
-    // résolution du canevas calée sur sa taille affichée (écrans haute densité compris)
-    const K = Math.max(1.5, Math.min(2.5, devicePixelRatio || 1)) * Math.max(1, this.mini.clientHeight / 250);
-    const W = this.mini.width = Math.round(170 * K), H = this.mini.height = Math.round(250 * K), A = surf.area;
-    // cadrage sur le trou lui-même (la ligne de jeu et ses rives)
-    const reach = hole.valley + 26;
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (const [x, z] of hole.center) { x0 = Math.min(x0, x - reach); x1 = Math.max(x1, x + reach); z0 = Math.min(z0, z - reach); z1 = Math.max(z1, z + reach); }
-    const s = Math.min(W / (x1 - x0), H / (z1 - z0)) * 0.96;
-    this.map = { s, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, W, H, K };
-    const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
-    const g = bg.getContext('2d');
-    const P = this.toMap.bind(this);
-    const tl = P(A.x0, A.z1), br = P(A.x1, A.z0);
-    // vue depuis le départ : +x est à gauche, d'où l'image retournée horizontalement
-    g.imageSmoothingEnabled = true;
-    g.save(); g.translate(tl.x, tl.y); g.scale(-1, 1);
-    g.drawImage(surf.canvas, 0, 0, tl.x - br.x, br.y - tl.y);
-    g.restore();
-    // arbres : petites boules sombres avec un reflet
-    for (const t of hole.trees) {
-      if (hole.centerDist(t.x, t.z) > reach - 2) continue;
-      const c = P(t.x, t.z), r = Math.max(2.2 * K, t.r * s * 0.85);
-      g.fillStyle = '#123f0e'; g.beginPath(); g.arc(c.x, c.y, r, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(90,170,60,.55)'; g.beginPath(); g.arc(c.x - r * 0.3, c.y - r * 0.3, r * 0.45, 0, Math.PI * 2); g.fill();
-    }
-    this.miniBg = bg;
+  // ---------------------------------------------------------------- mini-carte : photo aérienne du trou
+  // cadre : rectangle orienté du départ vers le green (green en haut), à la taille affichée du canevas
+  mapFrame(hole) {
+    const css = this.mini.getBoundingClientRect().height || (innerWidth <= 720 ? Math.min(210, innerHeight * 0.3) : Math.min(500, innerHeight - 300));
+    const K = Math.max(1, Math.min(2.5, devicePixelRatio || 1)) * Math.max(1, css / 250);
+    const W = Math.round(170 * K), H = Math.round(250 * K);
+    const dxz = [hole.pin.x - hole.tee.x, hole.pin.z - hole.tee.z], L = Math.hypot(...dxz);
+    const dx = dxz[0] / L, dz = dxz[1] / L, rx = -dz, rz = dx; // d : vers le green ; r : à droite en regardant le green
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    const pts = [...hole.center.map(([x, z]) => [x, z]), [hole.pin.x, hole.pin.z]];
+    for (const [x, z] of pts) { const u = x * rx + z * rz, v = x * dx + z * dz; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+    u0 -= 48; u1 += 48; v0 -= 26; v1 += 34;
+    let wm = u1 - u0, hm = v1 - v0;
+    if (wm / hm < W / H) wm = hm * W / H; else hm = wm * H / W;
+    const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
+    return { W, H, K, dx, dz, rx, rz, wm, hm, s: W / wm, cx: uc * rx + vc * dx, cz: uc * rz + vc * dz };
   }
-  toMap(x, z) { const m = this.map; return { x: m.W / 2 - (x - m.cx) * m.s, y: m.H / 2 - (z - m.cz) * m.s }; }
+  setMap(canvas, frame) {
+    this.mini.width = frame.W; this.mini.height = frame.H;
+    this.map = frame;
+    this.miniBg = canvas;
+  }
+  toMap(x, z) { const m = this.map, px = x - m.cx, pz = z - m.cz; return { x: m.W / 2 + (px * m.rx + pz * m.rz) * m.s, y: m.H / 2 - (px * m.dx + pz * m.dz) * m.s }; }
   drawMap(hole, ball, target, aim, others = []) {
     if (!this.miniBg) return;
     const g = this.mctx, W = this.mini.width, H = this.mini.height, K = this.map.K;
+    g.imageSmoothingEnabled = true;
     g.clearRect(0, 0, W, H);
     g.drawImage(this.miniBg, 0, 0);
     const b = this.toMap(ball.x, ball.z), p = this.toMap(hole.pin.x, hole.pin.z);
@@ -138,7 +132,8 @@ export class HUD {
     g.fillStyle = '#ff2d2d'; g.strokeStyle = '#fff'; g.lineWidth = K;
     g.beginPath(); g.moveTo(p.x + 1 * K, p.y - 14 * K); g.lineTo(p.x + 11 * K, p.y - 10 * K); g.lineTo(p.x + 1 * K, p.y - 6 * K); g.closePath(); g.fill(); g.stroke();
     // balle : triangle cyan pointé dans la direction visée
-    const dx = -Math.sin(aim || 0), dy = -Math.cos(aim || 0), sz = 8 * K;
+    const ax = Math.sin(aim || 0), az = Math.cos(aim || 0), m = this.map;
+    const dx = ax * m.rx + az * m.rz, dy = -(ax * m.dx + az * m.dz), sz = 8 * K;
     g.fillStyle = '#25d0f0'; g.strokeStyle = '#fff'; g.lineWidth = 1.6 * K;
     g.beginPath(); g.moveTo(b.x + dx * sz, b.y + dy * sz); g.lineTo(b.x - dx * sz * 0.6 - dy * sz * 0.7, b.y - dy * sz * 0.6 + dx * sz * 0.7); g.lineTo(b.x - dx * sz * 0.6 + dy * sz * 0.7, b.y - dy * sz * 0.6 - dx * sz * 0.7); g.closePath(); g.fill(); g.stroke();
   }

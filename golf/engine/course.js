@@ -143,7 +143,7 @@ export const HOLES = [
     green: { x: 3, z: 162, rx: 13, rz: 12, rot: 0.2, lift: 0.6, sx: -0.01, sz: 0.012, ph: 2.6 },
     bunkers: [{ x: -12, z: 171, rx: 5, rz: 3.5, rot: 0.8, ph: 1 }, { x: 19, z: 158, rx: 4.5, rz: 3.5, rot: -0.7, ph: 2 }],
     hills: [{ x: -60, z: 190, r: 40, h: 9 }],
-    ravines: [{ pts: [[-400, 80], [-60, 86], [0, 90], [60, 82], [400, 74]], w: 22, depth: 9 }],
+    ravines: [{ pts: [[-400, 80], [-60, 86], [0, 90], [60, 82], [400, 74]], w: 28, depth: 6 }],
   },
   {
     n: 15, name: 'Les Sapins', theme: 'montagne', par: 4, seed: 1515, tee: T0, pin: { x: 64, z: 375 }, tilt: [0, 0.025],
@@ -158,7 +158,7 @@ export const HOLES = [
     green: { x: 10, z: 490, rx: 15, rz: 16, rot: 0.2, lift: 0.8, sx: 0.01, sz: -0.012, ph: 1.8 },
     bunkers: [{ x: 18, z: 250, rx: 7, rz: 5, rot: 0.2, ph: 1 }, { x: -15, z: 430, rx: 6, rz: 4, rot: -0.2, ph: 2 }, { x: -7, z: 500, rx: 5, rz: 3.5, rot: 0.8, ph: 3 }, { x: 29, z: 488, rx: 5, rz: 3.5, rot: -0.6, ph: 4 }],
     plateaus: [{ x: 0, z: 0, rx: 22, rz: 24, rot: 0, h: 12, ph: 0.5 }],
-    ravines: [{ pts: [[-400, 300], [0, 296], [400, 310]], w: 20, depth: 8 }],
+    ravines: [{ pts: [[-400, 300], [0, 296], [400, 310]], w: 26, depth: 5.5 }],
   },
   {
     n: 17, name: 'Le Lac Alpin', theme: 'montagne', par: 4, seed: 1717, tee: T0, pin: { x: 1, z: 320 },
@@ -173,7 +173,7 @@ export const HOLES = [
     line: [[0, 35, 15], [4, 130, 18], [0, 230, 18], [-6, 300, 15], [-6, 318, 0], [-4, 362, 0], [-3, 378, 11]],
     green: { x: -2, z: 400, rx: 15, rz: 16, rot: 0.1, lift: 0.8, sx: 0.012, sz: -0.012, ph: 0.4 },
     bunkers: [{ x: 21, z: 220, rx: 7, rz: 5, rot: -0.1, ph: 1 }, { x: -23, z: 395, rx: 5, rz: 3.5, rot: 0.8, ph: 2 }, { x: 17, z: 410, rx: 5, rz: 3.5, rot: -0.7, ph: 3 }],
-    ravines: [{ pts: [[-400, 333], [0, 338], [400, 326]], w: 16, depth: 7 }],
+    ravines: [{ pts: [[-400, 333], [0, 338], [400, 326]], w: 22, depth: 5 }],
   },
 ];
 
@@ -257,7 +257,7 @@ export function buildHole(def) {
     if (s > 0) h += bankH * (1 - Math.exp(-(s * s) / (bankR * bankR)));
     // au loin, de grandes collines qui ferment l'horizon
     const far = Math.max(0, Math.hypot(x - (B.x0 + B.x1) / 2, (z - (B.z0 + B.z1) / 2) * 0.7) - 260);
-    if (far > 0) h += far * (def.theme === 'montagne' ? 0.14 : 0.06) * (1.4 + Math.sin(x * 0.006 + 1) * Math.cos(z * 0.005));
+    if (far > 0) h += far * (def.theme === 'montagne' ? 0.085 : 0.06) * (1.4 + Math.sin(x * 0.006 + 1) * Math.cos(z * 0.005));
     h += tilt[0] * (x - tee.x) + tilt[1] * (z - tee.z);
     // plateaux aux bords à pic (falaises)
     for (const p of plateaus) { const d = ellD(p, x, z); if (d < 1.05) h += p.h * (1 - smooth(0.86, 1.0, d)); }
@@ -311,8 +311,8 @@ export function buildHole(def) {
     }
     // étangs : rive franche puis fond qui se creuse sous le niveau de l'eau
     if (f.wd < 1.5) h -= (waters[f.wi].depth || 2) * (1 - smooth(0.9, 1.03, f.wd));
-    // ravin : parois à pic, torrent au fond
-    if (f.rv < 40) { const R = ravines[f.ri]; h -= R.depth * (1 - smooth(R.w * 0.3, R.w * 0.5, f.rv)); }
+    // ravin : parois à pic au bord irrégulier, torrent au fond
+    if (f.rv < 40) { const R = ravines[f.ri], j = 1.6 * Math.sin(x * 0.13 + 1) * Math.sin(z * 0.17); h -= R.depth * (1 - smooth(R.w * 0.26, R.w * 0.52 + j, f.rv)); }
     // mer : plage en pente douce, puis fond qui plonge
     if (coast && f.sd < coast.beach + 18) {
       const sd = f.sd, L = coast.level;
@@ -327,7 +327,7 @@ export function buildHole(def) {
     // l'eau (étang, mer, torrent) est un obstacle d'eau même au-delà des limites : on repart de la rive
     if (f.wd < 1.5 && h < waterLv[f.wi]) return 'water';
     if (coast && h < coast.level) return 'water';
-    if (f.ri >= 0 && f.rv < ravines[f.ri].w * 0.33) return 'water';
+    if (f.ri >= 0 && f.rv < ravines[f.ri].w * 0.32) return 'water';
     if (x < B.x0 || x > B.x1 || z < B.z0 || z > B.z1) return 'ob';
     if (f.td === 0) return 'tee';
     if (f.gd < 1) return 'green';

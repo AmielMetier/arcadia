@@ -5,21 +5,22 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { grassTexture, sandTexture } from './textures.js';
 
+// couleurs naturelles (rendu AgX) : herbes tondues claires, rough olive, sous-bois très sombre hors du jeu
 export const LOOKS = {
   campagne: {
-    rough: 0x2b8c12, rough2: 0x3f9e16, cut: 0x3fa61a, fair1: 0x5cc425, fair2: 0x4cb41c, fringe: 0x55bf27,
-    green1: 0x6fd53a, green2: 0x63c933, tee1: 0x60c829, tee2: 0x52b922, sand: 0xf6e8bf, sandEdge: 0xdcc890, bed: 0x2e6b55,
-    out1: 0x175c08, out2: 0x1f6a0b, rock: 0xd8d2c4, shallow: 0x7fd6c8, deep: 0x1d5f8a,
+    rough: 0x44702a, rough2: 0x6a7d34, cut: 0x52802e, fair1: 0x6c9a3a, fair2: 0x5f8d32, fringe: 0x66953a,
+    green1: 0x78a542, green2: 0x6f9c3c, tee1: 0x6c9a3a, tee2: 0x608e33, sand: 0xe2d2a3, sandEdge: 0xc4ad7a, bed: 0x34442a,
+    out1: 0x14290d, out2: 0x1d3613, rock: 0xb0a897, shallow: 0x5fb3a8, deep: 0x0f4566,
   },
   mer: {
-    rough: 0x35951a, rough2: 0x48a61e, cut: 0x47ad22, fair1: 0x66cb2c, fair2: 0x55bb22, fringe: 0x5ec42d,
-    green1: 0x76da40, green2: 0x6acd38, tee1: 0x66cc2e, tee2: 0x57bd26, sand: 0xfbefcc, sandEdge: 0xe8d6a2, bed: 0x2e7a6a,
-    out1: 0x1d6a0c, out2: 0x267812, rock: 0xd9c8a6, shallow: 0x5fe0d4, deep: 0x0f6fa8,
+    rough: 0x4c7a2c, rough2: 0x7a8638, cut: 0x5a8a30, fair1: 0x74a23c, fair2: 0x669434, fringe: 0x6e9d3b,
+    green1: 0x7fac45, green2: 0x76a33f, tee1: 0x74a23c, tee2: 0x669434, sand: 0xeadcb2, sandEdge: 0xcdb888, bed: 0x3a5a48,
+    out1: 0x172f0f, out2: 0x213d15, rock: 0xbfa883, shallow: 0x58c2b6, deep: 0x0b4f78,
   },
   montagne: {
-    rough: 0x2a8618, rough2: 0x3a961c, cut: 0x3ba01e, fair1: 0x58c02a, fair2: 0x48ae20, fringe: 0x52b92a,
-    green1: 0x6ad23e, green2: 0x5ec636, tee1: 0x5cc42c, tee2: 0x4fb524, sand: 0xf1e6c8, sandEdge: 0xd6c595, bed: 0x2a5e58,
-    out1: 0x145408, out2: 0x1b600c, rock: 0x9d958a, shallow: 0x8fd8d0, deep: 0x245c78,
+    rough: 0x3d6a2a, rough2: 0x5f7436, cut: 0x4b7a2e, fair1: 0x649438, fair2: 0x578731, fringe: 0x5e8f37,
+    green1: 0x70a043, green2: 0x67963d, tee1: 0x649438, tee2: 0x578731, sand: 0xd9cba2, sandEdge: 0xbba878, bed: 0x2f4034,
+    out1: 0x10240c, out2: 0x183012, rock: 0x7d786f, shallow: 0x6fb0aa, deep: 0x1d4a60,
   },
 };
 
@@ -74,37 +75,6 @@ function zoneMap(hole) {
   tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.needsUpdate = true;
   return { tex, area };
-}
-
-// Mini-carte : le trou dessiné en couleurs franches, détouré (transparent hors de la vallée du trou)
-export function paintMap(hole, look) {
-  const P = 1.25, B = hole.bounds, M = 30;
-  const area = { x0: B.x0 - M, z0: B.z0 - M, x1: B.x1 + M, z1: B.z1 + M };
-  const W = Math.ceil((area.x1 - area.x0) / P), H = Math.ceil((area.z1 - area.z0) / P);
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const g = cv.getContext('2d'), img = g.createImageData(W, H), d = img.data;
-  const hex = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
-  const C = { rough: [34, 112, 20], edge: [20, 80, 14], fair1: hex(look.fair1), fair2: hex(look.fair2), green: hex(look.green1), sand: hex(look.sand), water: [60, 150, 225], tee: hex(look.tee1) };
-  const reach = hole.valley + 22;
-  for (let py = 0; py < H; py++) {
-    const z = area.z1 - (py + 0.5) * P;
-    for (let px = 0; px < W; px++) {
-      const x = area.x0 + (px + 0.5) * P, cd = hole.centerDist(x, z);
-      const k = (py * W + px) * 4;
-      if (cd > reach + 3) { d[k + 3] = 0; continue; }
-      const f = hole.fields(x, z), s = hole.surfaceF(x, z, f, hole.heightF(x, z, f));
-      let c = C.rough;
-      if (cd > reach) c = C.edge;
-      else if (s === 'water') c = C.water;
-      else if (s === 'bunker') c = C.sand;
-      else if (s === 'green' || s === 'fringe') c = C.green;
-      else if (s === 'tee') c = C.tee;
-      else if (s === 'fairway') c = (Math.floor(f.along / (STRIPE / 2)) & 1) ? C.fair1 : C.fair2;
-      d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = 255;
-    }
-  }
-  g.putImageData(img, 0, 0);
-  return { canvas: cv, area };
 }
 
 // Coordonnées d'un axe : pas fin sur [a, b], puis des pas qui s'allongent jusqu'à `far` de chaque côté
@@ -228,9 +198,16 @@ export function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25 } 
         vec3 sandC = mix(cSandEdge, cSand, smoothstep(0.0, 0.7, sb)) * (0.86 + 0.28 * sgr);
         col = mix(col, sandC, bK); detail = mix(detail, 0.0, bK);
         // roche sur les pentes raides : falaises, parois des ravins, berges des étangs
-        float rockK = smoothstep(0.8, 0.6, vWN.y);
-        float strata = texture2D(uNoise, vec2((vW.x + vW.z) * 0.09, vW.y * 0.55)).r * 0.6 + texture2D(uNoise, vec2((vW.x - vW.z) * 0.31, vW.y * 1.9)).g * 0.4;
-        col = mix(col, cRock * (0.72 + 0.5 * strata), rockK); detail = mix(detail, 0.25, rockK);
+        // (seulement sur le parcours : au loin, les collines restent boisées)
+        float rockK = smoothstep(0.8, 0.6, vWN.y) * zin;
+        // projections sur les plans verticaux (pas d'étirement sur les parois)
+        vec3 bw = abs(vWN); bw /= (bw.x + bw.y + bw.z);
+        float rn1 = texture2D(uNoise, vW.zy * 0.07).r * bw.x + texture2D(uNoise, vW.xy * 0.07).r * bw.z + texture2D(uNoise, vW.xz * 0.07).r * bw.y;
+        float rn2 = texture2D(uNoise, vW.zy * 0.23).g * bw.x + texture2D(uNoise, vW.xy * 0.23).g * bw.z + texture2D(uNoise, vW.xz * 0.23).g * bw.y;
+        float rn3 = texture2D(uNoise, vW.zy * 0.9).r * bw.x + texture2D(uNoise, vW.xy * 0.9).r * bw.z + texture2D(uNoise, vW.xz * 0.9).r * bw.y;
+        float crack = smoothstep(0.08, 0.0, abs(rn2 - 0.5)) * 0.8;
+        vec3 rockC = cRock * (0.62 + 0.55 * rn1) * (0.85 + 0.3 * rn3) * (1.0 - 0.45 * crack);
+        col = mix(col, rockC, rockK); detail = mix(detail, 0.3, rockK);
         // sous la mer : sable turquoise près du bord, bleu profond au large
         float under = uSea - vW.y;
         col = mix(col, mix(cShallow, cDeep, smoothstep(0.4, 6.0, under)), smoothstep(-0.05, 0.25, under));
@@ -245,25 +222,33 @@ export function buildTerrain(hole, { look, noise, anisotropy = 8, step = 1.25 } 
         float g1 = texture2D(uGrass, vW.xz / 1.7).r;
         float g2 = texture2D(uGrass, mat2(0.8, -0.6, 0.6, 0.8) * vW.xz / 5.3).r;
         col *= 1.0 + ((g1 * 0.62 + g2 * 0.38) - 0.5) * detail * 2.6;
-        diffuseColor.rgb *= col;`);
+        diffuseColor.rgb *= col;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        {
+          // relief fin de l'herbe : la lumière accroche les brins (s'efface au loin)
+          vec2 gq = vW.xz / 1.7; float ge = 1.0 / 512.0;
+          float g0 = texture2D(uGrass, gq).r, gx = texture2D(uGrass, gq + vec2(ge, 0.0)).r, gz = texture2D(uGrass, gq + vec2(0.0, ge)).r;
+          float fade = 1.0 - smoothstep(20.0, 90.0, length(vW - cameraPosition));
+          vec3 dn = vec3(g0 - gx, 0.0, g0 - gz) * 2.6 * detail * fade;
+          normal = normalize(normal + (viewMatrix * vec4(dn, 0.0)).xyz);
+        }`);
   };
-  mat.customProgramCacheKey = () => 'golf-terrain-2';
+  mat.customProgramCacheKey = () => 'golf-terrain-5';
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
   mesh.userData.textures = [sdf.tex, zone.tex, grass, sand];
-  const map = paintMap(hole, look);
-  return { mesh, canvas: map.canvas, area: map.area };
+  return { mesh };
 }
 
 // L'eau : étangs, mer et torrents. Bleu vif, vaguelettes animées, éclats de soleil, et reflet du décor
 // (rendu miroir partagé `refl`, calculé par la scène pour le plan d'eau le plus proche).
-export function buildWater(hole, { noise, envMap, refl }) {
+export function buildWater(hole, { noise, envMap, refl, sun }) {
   const group = new THREE.Group();
   const bodies = [];
-  const make = (geo, level, { color = 0x2a86e8, opacity = 0.93, flow = null } = {}) => {
+  const make = (geo, level, { color = 0x2b5b66, opacity = 0.9, flow = null } = {}) => {
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.12, metalness: 0.0, transparent: true, opacity, envMap, envMapIntensity: 1.1 });
-    const U = { uT: { value: 0 }, uNoise: { value: noise }, uReflOn: { value: 0 }, uFlow: { value: new THREE.Vector2(flow ? flow[0] : 0, flow ? flow[1] : 0) } };
+    const U = { uT: { value: 0 }, uNoise: { value: noise }, uReflOn: { value: 0 }, uSun: { value: sun.clone() }, uFlow: { value: new THREE.Vector2(flow ? flow[0] : 0, flow ? flow[1] : 0) } };
     mat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U, refl);
       sh.vertexShader = sh.vertexShader
@@ -271,27 +256,33 @@ export function buildWater(hole, { noise, envMap, refl }) {
         .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRefl = uReflM * vec4(vW, 1.0);');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying vec3 vW; varying vec4 vRefl; uniform float uT; uniform sampler2D uNoise; uniform sampler2D uRefl; uniform float uReflOn; uniform vec2 uFlow;
-          float wv(vec2 q){ q -= uFlow * uT; return texture2D(uNoise, q / 6.0 + vec2(uT * 0.02, uT * 0.013)).r + texture2D(uNoise, q / 2.3 - vec2(uT * 0.031, -uT * 0.017)).g * 0.7 + texture2D(uNoise, q / 0.9 + vec2(-uT * 0.05, uT * 0.04)).r * 0.35; }`)
+          varying vec3 vW; varying vec4 vRefl; uniform float uT; uniform sampler2D uNoise; uniform sampler2D uRefl; uniform float uReflOn; uniform vec2 uFlow; uniform vec3 uSun;
+          float wv(vec2 q){ q -= uFlow * uT; return texture2D(uNoise, q / 5.0 + vec2(uT * 0.018, uT * 0.012)).r * 0.75 + texture2D(uNoise, q / 1.8 - vec2(uT * 0.028, -uT * 0.016)).g * 0.35; }`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
           vec2 q = vW.xz; float e = 0.25;
           float h0 = wv(q), hx = wv(q + vec2(e, 0.0)), hz = wv(q + vec2(0.0, e));
-          vec3 wn = normalize(vec3((h0 - hx) * 2.2, 1.0, (h0 - hz) * 2.2));
+          vec3 wn = normalize(vec3((h0 - hx) * 0.75, 1.0, (h0 - hz) * 0.75));
           normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);`)
         .replace('#include <color_fragment>', `#include <color_fragment>
-          diffuseColor.rgb *= 0.82 + 0.36 * smoothstep(0.6, 1.5, wv(vW.xz));`)
+          diffuseColor.rgb *= 1.0;`)
         .replace('#include <dithering_fragment>', `#include <dithering_fragment>
           // reflet du décor : plus fort quand on regarde l'eau de biais
           if (uReflOn > 0.5) {
-            float fres = 0.2 + 0.6 * pow(1.0 - abs(normalize(cameraPosition - vW).y), 2.0);
-            vec4 rp = vRefl; rp.xy += (vec2(wv(vW.xz) - 1.0, wv(vW.xz + 7.0) - 1.0)) * 0.35 * rp.w * 0.06;
+            float fres = 0.38 + 0.58 * pow(1.0 - abs(normalize(cameraPosition - vW).y), 3.0);
+            vec4 rp = vRefl; rp.xy += wn.xz * rp.w * 0.014;
             vec3 rc = texture2DProj(uRefl, rp).rgb;
             gl_FragColor.rgb = mix(gl_FragColor.rgb, rc * vec3(0.85, 0.95, 1.05), fres);
           }
-          float sp = smoothstep(1.62, 1.85, wv(vW.xz * 1.7 + 3.0));
-          gl_FragColor.rgb += vec3(sp) * 0.9;`);
+          // reflet du soleil sur les vaguelettes
+          vec3 Vd = normalize(cameraPosition - vW), Rf = reflect(-Vd, wn);
+          float sd = max(dot(Rf, normalize(uSun)), 0.0);
+          gl_FragColor.rgb += vec3(1.0, 0.94, 0.82) * (pow(sd, 700.0) * 9.0 + pow(sd, 48.0) * 0.18);
+          // écume là où le torrent dévale une pente
+          float ny = normalize(cross(dFdx(vW), dFdy(vW))).y;
+          float foam = smoothstep(0.995, 0.93, abs(ny)) * smoothstep(0.45, 0.75, wv(vW.xz * 2.3 + 11.0));
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.95, 0.97), foam * 0.85);`);
     };
-    mat.customProgramCacheKey = () => 'golf-water-3';
+    mat.customProgramCacheKey = () => 'golf-water-7';
     const m = new THREE.Mesh(geo, mat);
     m.renderOrder = 2;
     group.add(m);
@@ -309,7 +300,7 @@ export function buildWater(hole, { noise, envMap, refl }) {
   if (hole.coast) {
     const B = hole.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     const geo = new THREE.CircleGeometry(2900, 96); geo.rotateX(-Math.PI / 2);
-    const m = make(geo, hole.coast.level, { color: 0x1aa6d6, opacity: 0.8 });
+    const m = make(geo, hole.coast.level, { color: 0x15758f, opacity: 0.78 });
     m.position.set(cx, hole.coast.level, cz);
     bodies[bodies.length - 1].center = { x: hole.coast.sea[0], z: hole.coast.sea[1], r: 400, sea: true };
   }
@@ -318,22 +309,24 @@ export function buildWater(hole, { noise, envMap, refl }) {
     const pts = []; const L = R.line;
     for (let i = 0; i < L.length - 1; i++) {
       const [ax, az] = L[i], [bx, bz] = L[i + 1], len = Math.hypot(bx - ax, bz - az);
-      for (let d = 0; d < len; d += 4) { const x = ax + (bx - ax) * d / len, z = az + (bz - az) * d / len; if (Math.abs(x - hole.tee.x) < 450 && z > hole.bounds.z0 - 200 && z < hole.bounds.z1 + 200) pts.push([x, z]); }
+      for (let d = 0; d < len; d += 3) { const x = ax + (bx - ax) * d / len, z = az + (bz - az) * d / len; if (x > hole.bounds.x0 - 120 && x < hole.bounds.x1 + 120 && z > hole.bounds.z0 - 120 && z < hole.bounds.z1 + 120) pts.push([x, z]); }
     }
     if (pts.length < 2) continue;
-    const pos = [], idx = [], w = R.w * 0.42;
+    const pos = [], idx = [], w = R.w * 0.36;
     let lvSum = 0;
     pts.forEach(([x, z], i) => {
       const [nx, nz] = i < pts.length - 1 ? [pts[i + 1][0] - x, pts[i + 1][1] - z] : [x - pts[i - 1][0], z - pts[i - 1][1]];
-      const l = Math.hypot(nx, nz) || 1, sx = -nz / l, sz = nx / l, y = hole.heightAt(x, z) + 0.45;
+      const l = Math.hypot(nx, nz) || 1, sx = -nz / l, sz = nx / l, y = hole.heightAt(x, z) + 1.5;
       lvSum += y;
       pos.push(x + sx * w, y, z + sz * w, x - sx * w, y, z - sz * w);
-      if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+      // triangles tournés vers le ciel
+      if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     const dir = [pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]], dl = Math.hypot(...dir) || 1;
-    make(geo, lvSum / pts.length, { color: 0x3a9fd8, opacity: 0.9, flow: [dir[0] / dl * 1.6, dir[1] / dl * 1.6] });
+    const m = make(geo, lvSum / pts.length, { color: 0x3a7a8c, opacity: 0.92, flow: [dir[0] / dl * 1.6, dir[1] / dl * 1.6] });
+    m.material.side = THREE.DoubleSide;
     bodies[bodies.length - 1].river = true;
   }
   return {

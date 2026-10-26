@@ -92,7 +92,8 @@ Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots
 - Parties de 6 trous (un décor), 9 trous (aller ou retour) ou 18 trous ; carte de score entre les trous, podium à la fin
 - Le swing se fait d'un geste : on tire vers le bas pour armer, on lance vers le haut pour frapper ; un geste de travers fait un hook ou un slice, trop armer fait tourner la balle. Au clavier : Espace
 - Huit clubs (driver depuis le départ seulement), vent par trou, rough, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
-- Cible du coup plein sans le vent et grille animée de la pente sur le green, mini-carte du trou
+- Cible du coup plein sans le vent et grille animée de la pente sur le green, mini-carte en vue aérienne (rendue depuis la scène 3D)
+- Rendu : herbe en 3D autour de la caméra, reflets dans l'eau, occlusion ambiante, halo et étalonnage ; qualité réduite automatiquement si la machine peine
 - On voit le swing des autres en direct ; le plus loin du drapeau joue en premier, l'honneur au meilleur du trou précédent
 - Ambiance nature, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
 - Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, terrain, eau et ciel générés dans le code

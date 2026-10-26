@@ -6,7 +6,9 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { buildTerrain, buildWater, noiseTexture, LOOKS } from './terrain.js';
 import { buildSky, buildPeaks, SKIES } from './sky.js';
 import { scatterNature, buildPin, buildTeeMarkers, buildGreenGrid } from './decor.js';
-import { createTreeKit, forestItems, buildTallGrass, SWAY } from './trees.js';
+import { createTreeKit, forestItems, SWAY } from './trees.js';
+import { createGrass } from './grass.js';
+import { createPost } from './post.js';
 import { buildGolfer } from './golfer.js';
 import { loadNature } from './models.js';
 
@@ -19,27 +21,27 @@ export function createScene(host, { onLost } = {}) {
   canvas.className = 'gl';
   host.appendChild(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 1.6));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // tonalité neutre : garde les couleurs franches (l'ACES les ternit)
+  // tonalité neutre : hautes lumières douces sans éteindre les verts
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.04;
+  renderer.toneMappingExposure = 0.92;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); onLost && onLost(); });
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.08, 4800);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.12, 4800);
   const noise = noiseTexture();
   let disposed = false;
 
   // ---------------------------------------------------------------- lumières : soleil chaud, ciel bleu, rebond vert
-  const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5d8a3a, 0.55); scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+  const hemi = new THREE.HemisphereLight(0xc4d8f0, 0x34481f, 0.42); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xffeed4, 4.2);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048);
-  Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 260 });
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+  sun.shadow.mapSize.set(MOBILE ? 1024 : 4096, MOBILE ? 1024 : 4096);
+  Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 1, far: 280 });
+  sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.035; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
 
   // ---------------------------------------------------------------- reflets : rendu miroir à mi-résolution
@@ -52,6 +54,9 @@ export function createScene(host, { onLost } = {}) {
 
   // ---------------------------------------------------------------- contenu d'un trou (reconstruit à chaque trou)
   let world = null, kitP = null, treeKit = null;
+  // qualité : post-traitement (occlusion, halo), reflets, herbe 3D ; baissée automatiquement si la machine peine
+  const post = MOBILE ? null : createPost(renderer);
+  const quality = { refl: !MOBILE, grass: true, ao: !MOBILE, bloom: !MOBILE };
   const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_VIS, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.32, emissive: 0x404040 }));
   ball.castShadow = true; scene.add(ball);
   const blob = new THREE.Mesh(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0b1a06, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -113,37 +118,41 @@ export function createScene(host, { onLost } = {}) {
     const env = pmrem.fromScene(envScene, 0.02).texture;
     envScene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     pmrem.dispose();
-    scene.environment = env; scene.environmentIntensity = 0.5;
+    scene.environment = env; scene.environmentIntensity = 0.3;
     // brume bleutée sur les collines lointaines
-    scene.fog = new THREE.Fog(skyLook.fog, 170, 1500);
+    scene.fog = new THREE.Fog(skyLook.fog, 240, 1900);
     scene.background = new THREE.Color(skyLook.horizon);
     g.add(sky);
-    const peaks = buildPeaks(skyLook, hole.def.seed, center); if (peaks) g.add(peaks);
+    const peaks = buildPeaks(skyLook, hole.def.seed, center, noise); if (peaks) g.add(peaks);
 
     const terrain = buildTerrain(hole, { look, noise, anisotropy: renderer.capabilities.getMaxAnisotropy(), step: MOBILE ? 2 : 1.5 });
     g.add(terrain.mesh);
-    const water = buildWater(hole, { noise, envMap: env, refl }); g.add(water.group);
+    const water = buildWater(hole, { noise, envMap: env, refl, sun: SUN_DIR }); g.add(water.group);
     // arbres du parcours (la balle les heurte), forêt des collines, herbes hautes
     if (!treeKit) treeKit = createTreeKit();
     // les arbres loin du couloir de jeu sont plus sombres
     for (const t of hole.trees) t.dark = hole.centerDist(t.x, t.z) > hole.valley + 12;
-    g.add(treeKit.plant(hole.trees));
+    // pied du tronc enfoncé dans la pente (jamais de tronc qui flotte)
+    const sink = (list) => { for (const t of list) { let m = t.y; for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7]]) m = Math.min(m, hole.heightAt(t.x + dx, t.z + dz)); t.y = m - 0.05; } return list; };
+    g.add(treeKit.plant(sink(hole.trees.map((t) => ({ ...t })))));
     g.add(treeKit.shades(hole));
-    g.add(treeKit.plant(forestItems(hole, { count: MOBILE ? 900 : 2600 }), { lo: true, shadows: false, dark: true }));
-    const grass = buildTallGrass(hole, { count: MOBILE ? 2200 : 5200 }); g.add(grass);
+    g.add(treeKit.plant(sink(forestItems(hole, { count: MOBILE ? 900 : 2600 })), { lo: true, shadows: false, dark: true }));
+    const grass = createGrass(hole, look, { mobile: MOBILE, sway: SWAY }); g.add(grass.group);
     const pin = buildPin(hole); g.add(pin.group);
     g.add(buildTeeMarkers(hole));
     const grid = buildGreenGrid(hole); g.add(grid.group);
     scene.add(g);
-    world = { group: g, hole, terrain, water, sky, pin, grid, env, wind, noReflect: [grass, grid.group, water.group] };
+    world = { group: g, hole, terrain, water, sky, pin, grid, env, wind, grass, noReflect: [grass.group, grid.group, water.group] };
+    // premières dalles d'herbe autour du départ, avant le survol
+    grass.update(new THREE.Vector3(hole.tee.x, 0, hole.tee.z + 10), 60);
     // décor Kenney : chargé une fois, semé à chaque trou
     if (!kitP) kitP = loadNature(new URL('../models/nature/', import.meta.url).href).catch(() => null);
     kitP.then((kit) => { if (!disposed && world && world.hole === hole && kit) world.group.add(scatterNature(hole, kit)); });
-    return { canvas: terrain.canvas, area: terrain.area };
   }
   function unloadHole() {
     if (!world) return;
     scene.remove(world.group);
+    world.grass.dispose();
     world.group.traverse((o) => {
       if (o.isMesh || o.isPoints || o.isInstancedMesh || o.isLineSegments) {
         // les géométries et matériaux partagés (arbres, décor Kenney) sont libérés par leur kit
@@ -156,6 +165,40 @@ export function createScene(host, { onLost } = {}) {
     });
     world.env.dispose();
     world = null;
+  }
+
+  // ---------------------------------------------------------------- mini-carte : photo aérienne du trou
+  // caméra orthographique au-dessus du trou, green en haut ; sans brume, ombres sur tout le trou
+  function renderMap(f) {
+    if (!world) return null;
+    const { W, H } = f, gy = world.hole.heightAt(f.cx, f.cz);
+    const oc = new THREE.OrthographicCamera(-f.wm / 2, f.wm / 2, f.hm / 2, -f.hm / 2, 1, 4000);
+    oc.position.set(f.cx, gy + 1500, f.cz); oc.up.set(f.dx, 0, f.dz); oc.lookAt(f.cx, gy, f.cz); oc.updateMatrixWorld();
+    const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
+    const hide = [ball, blob, others, trail, marker, dotsMesh, tee, world.grass.group, world.grid.group, world.sky, world.pin.group, ...[...golfers].map((g) => g.root)].filter((o) => o.visible);
+    for (const o of hide) o.visible = false;
+    const fog = scene.fog; scene.fog = null;
+    const sc = sun.shadow.camera, saved = { l: sc.left, r: sc.right, t: sc.top, b: sc.bottom, far: sc.far, p: sun.position.clone(), q: sun.target.position.clone() };
+    const half = Math.max(f.wm, f.hm) * 0.6;
+    Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 2400 }); sc.updateProjectionMatrix();
+    sun.target.position.set(f.cx, gy, f.cz); sun.position.set(f.cx + SUN_DIR.x * 900, gy + SUN_DIR.y * 900, f.cz + SUN_DIR.z * 900);
+    world.water.setReflect(null);
+    renderer.setRenderTarget(rt); renderer.render(scene, oc);
+    const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+    renderer.setRenderTarget(null);
+    Object.assign(sc, { left: saved.l, right: saved.r, top: saved.t, bottom: saved.b, far: saved.far }); sc.updateProjectionMatrix();
+    sun.position.copy(saved.p); sun.target.position.copy(saved.q);
+    scene.fog = fog;
+    for (const o of hide) o.visible = true;
+    rt.dispose();
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'), img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+    g.putImageData(img, 0, 0);
+    // léger contraste, comme une photo aérienne
+    g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    return cv;
   }
 
   // ---------------------------------------------------------------- balle, cible, ombre
@@ -225,13 +268,14 @@ export function createScene(host, { onLost } = {}) {
     trail.material.uniforms.uScale.value = h;
     const pr = renderer.getPixelRatio();
     reflRT.setSize(Math.round(w * pr * 0.5), Math.round(h * pr * 0.5));
+    if (post) post.setSize(Math.round(w * pr), Math.round(h * pr));
   }
   resize();
   addEventListener('resize', resize);
 
   // rendu miroir pour le plan d'eau le plus proche de ce que regarde la caméra
   function renderReflection() {
-    if (!world || MOBILE) { world && world.water.setReflect(null); return; }
+    if (!world || !quality.refl) { world && world.water.setReflect(null); return; }
     let best = null, bd = Infinity;
     for (const b of world.water.bodies) {
       if (b.river || !b.center) continue;
@@ -280,12 +324,16 @@ export function createScene(host, { onLost } = {}) {
       world.sky.userData.update(T);
       world.pin.update(T, world.wind);
       world.grid.update(T);
+      // l'herbe 3D suit ce que regarde la caméra (entre la caméra et sa cible)
+      if (quality.grass) { tmp.copy(cam.pos).lerp(cam.look, 0.35); world.grass.update(tmp, 2); }
+      world.grass.group.visible = quality.grass;
       const ms = marker.userData.size || 1, pulse = 1 + Math.sin(T * 4) * 0.06;
       ring.scale.setScalar(ms * pulse); dot.scale.setScalar(ms); beam.scale.set(ms, 1 + ms * 0.3, ms);
     }
     for (const g of golfers) g.update(dt);
     renderReflection();
-    renderer.render(scene, camera);
+    if (post && (quality.ao || quality.bloom)) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, T); }
+    else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
   }
 
   function project(x, y, z) {
@@ -303,15 +351,15 @@ export function createScene(host, { onLost } = {}) {
     treeKit && treeKit.dispose();
     for (const g of [...golfers]) removeGolfer(g);
     scene.traverse((o) => { if (o.isMesh || o.isPoints) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); } });
-    noise.dispose(); reflRT.dispose();
+    noise.dispose(); reflRT.dispose(); post && post.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
     canvas.remove();
   }
 
   return {
-    renderer, scene, camera, MOBILE,
-    loadHole, setBall, setOthers, setMarker, setAimDots, trailPush, trailClear, trailFade, camTo, cam, frame, project, dispose, addGolfer, removeGolfer,
+    renderer, scene, camera, MOBILE, quality,
+    loadHole, renderMap, setBall, setOthers, setMarker, setAimDots, trailPush, trailClear, trailFade, camTo, cam, frame, project, dispose, addGolfer, removeGolfer,
     get hole() { return world && world.hole; },
     setWind(w) { if (world) world.wind = w; },
     showBall(on) { ball.visible = on; blob.visible = on; },

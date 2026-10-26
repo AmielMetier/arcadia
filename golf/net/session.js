@@ -41,13 +41,15 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
 
   function begin() {
     const course = COURSES[settings.course] || COURSES.campagne;
+    // test : ?hole=N démarre la partie à ce trou du parcours
+    const holes = settings.startHole ? course.holes.filter((n) => n >= settings.startHole) : course.holes;
     const humans = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players.map((p) => ({ id: p.id, name: p.name, color: p.color }));
     const nb = Math.max(0, Math.min(4 - humans.length, +(settings.bots ?? (solo ? 1 : 0)) || 0));
     const used = new Set(humans.map((p) => p.color));
     const free = COLORS.filter((c) => !used.has(c));
     const bots = Array.from({ length: nb }, (_, k) => ({ id: 'b' + k, name: BOT_NAMES[k], color: free[k % free.length], bot: true, level: settings.level || 'normal' }));
     const seed = (Date.now() & 0x7fffffff) || 1;
-    R = newRound({ holes: course.holes, players: [...humans, ...bots], seed, wind: WIND[settings.wind] ?? 1 });
+    R = newRound({ holes: holes.length ? holes : course.holes, players: [...humans, ...bots], seed, wind: WIND[settings.wind] ?? 1 });
     R.course = settings.course || 'campagne';
     R.started = Date.now();
     startHole(R, currentHole(R));

@@ -56,22 +56,28 @@ export function sandTexture(size = 256) {
   return finish(c, { srgb: false });
 }
 
-// Grappe de feuilles (transparence) : feuilles ovales de plusieurs verts, plus denses au centre
-export function leafTexture(size = 256, seed = 5) {
+// Grappe de feuilles (transparence) : centaines de feuilles ovales nervurées, chacune éclairée d'un côté,
+// sombres au cœur de la grappe et plus claires en bordure (là où la lumière passe)
+export function leafTexture(size = 512, seed = 5) {
   const c = canvas(size), g = c.getContext('2d'), r = rng(seed);
   const cx = size / 2, R = size * 0.47;
-  for (let i = 0; i < 520; i++) {
-    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R * (0.75 + r() * 0.25);
-    const x = cx + Math.cos(a) * d, y = cx + Math.sin(a) * d * 0.92;
-    const l = 7 + r() * 9, w = l * (0.42 + r() * 0.15), rot = r() * Math.PI;
-    // plus sombre au fond de la grappe, plus clair au bord
-    // vert profond au cœur, quelques feuilles claires en bordure
-    const k = d / R, v = 0.25 + 0.75 * k * r() * r();
-    const gC = Math.round(95 + 110 * v), rC = Math.round(30 + 60 * v), bC = Math.round(18 + 35 * v);
+  // grappe en lobes : quelques sous-grappes autour du centre, pour un contour irrégulier
+  const lobes = Array.from({ length: 7 }, (_, k) => { const a = k * 0.9 + r() * 0.6, d = R * (0.25 + 0.4 * r()); return { x: cx + Math.cos(a) * d, y: cx + Math.sin(a) * d, s: R * (0.32 + 0.2 * r()) }; });
+  lobes.push({ x: cx, y: cx, s: R * 0.45 });
+  for (let i = 0; i < 1500; i++) {
+    const L = lobes[Math.floor(r() * lobes.length)], a = r() * Math.PI * 2, d = Math.sqrt(r()) * L.s;
+    const x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d;
+    if (Math.hypot(x - cx, y - cx) > R * 0.98) continue;
+    const l = 9 + r() * 12, w = l * (0.38 + r() * 0.14), rot = a + (r() - 0.5) * 1.6;
+    const k = Math.hypot(x - cx, y - cx) / R, v = 0.18 + 0.62 * k * (0.5 + 0.5 * r());
+    const G = Math.round(70 + 105 * v), Rr = Math.round(28 + 52 * v * (0.7 + 0.6 * r())), B = Math.round(16 + 28 * v);
     g.save(); g.translate(x, y); g.rotate(rot);
-    g.fillStyle = `rgb(${rC},${gC},${bC})`;
-    g.beginPath(); g.ellipse(0, 0, l, w, 0, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = 'rgba(30,70,20,0.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-l, 0); g.lineTo(l, 0); g.stroke();
+    const gr = g.createLinearGradient(-l, -w, l, w);
+    gr.addColorStop(0, `rgb(${Math.round(Rr * 0.7)},${Math.round(G * 0.72)},${Math.round(B * 0.7)})`);
+    gr.addColorStop(1, `rgb(${Math.min(255, Rr + 18)},${Math.min(255, G + 24)},${Math.min(255, B + 8)})`);
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(-l, 0); g.quadraticCurveTo(0, -w * 1.25, l, 0); g.quadraticCurveTo(0, w * 1.25, -l, 0); g.fill();
+    g.strokeStyle = 'rgba(20,45,12,0.45)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-l * 0.9, 0); g.lineTo(l * 0.9, 0); g.stroke();
     g.restore();
   }
   return finish(c, { repeat: false, aniso: 4 });
@@ -88,18 +94,18 @@ export function needleTexture(size = 256, seed = 9) {
     const ex = x + span * 0.55, ey = y0 + side * span * 0.8;
     g.strokeStyle = 'rgb(70,60,40)'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x, y0); g.lineTo(ex, ey); g.stroke();
-    for (let j = 0; j < 40; j++) {
-      const u = r(), px = x + (ex - x) * u, py = y0 + (ey - y0) * u, len = 9 + r() * 10, a = Math.atan2(ey - y0, ex - x) + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.5);
+    for (let j = 0; j < 75; j++) {
+      const u = r(), px = x + (ex - x) * u, py = y0 + (ey - y0) * u, len = 11 + r() * 13, a = Math.atan2(ey - y0, ex - x) + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.5);
       const v = 0.5 + r() * 0.5;
-      g.strokeStyle = `rgb(${Math.round(30 + 40 * v)},${Math.round(95 + 80 * v)},${Math.round(60 + 40 * v)})`; g.lineWidth = 2.2;
+      g.strokeStyle = `rgb(${Math.round(18 + 30 * v)},${Math.round(58 + 62 * v)},${Math.round(40 + 34 * v)})`; g.lineWidth = 3;
       g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * len, py + Math.sin(a) * len); g.stroke();
     }
   }
   // aiguilles le long de la tige
-  for (let j = 0; j < 260; j++) {
-    const u = r(), px = u * size * 0.97, w = size * 0.2 * (1 - u * 0.8), len = 8 + r() * w * 0.5, a = (r() < 0.5 ? 1 : -1) * (0.5 + r() * 0.9) + 0.15;
+  for (let j = 0; j < 520; j++) {
+    const u = r(), px = u * size * 0.97, w = size * 0.26 * (1 - u * 0.75), len = 10 + r() * w * 0.6, a = (r() < 0.5 ? 1 : -1) * (0.5 + r() * 0.9) + 0.15;
     const v = 0.4 + r() * 0.6;
-    g.strokeStyle = `rgb(${Math.round(25 + 40 * v)},${Math.round(90 + 85 * v)},${Math.round(55 + 45 * v)})`; g.lineWidth = 2.4;
+    g.strokeStyle = `rgb(${Math.round(16 + 30 * v)},${Math.round(55 + 66 * v)},${Math.round(38 + 36 * v)})`; g.lineWidth = 3.2;
     g.beginPath(); g.moveTo(px, y0); g.lineTo(px + Math.cos(a) * len, y0 + Math.sin(a) * len); g.stroke();
   }
   g.strokeStyle = 'rgb(80,62,40)'; g.lineWidth = 4; g.beginPath(); g.moveTo(0, y0); g.lineTo(size * 0.95, y0); g.stroke();
@@ -109,7 +115,7 @@ export function needleTexture(size = 256, seed = 9) {
 // Écorce : stries verticales brunes
 export function barkTexture(size = 128) {
   const c = canvas(size), g = c.getContext('2d'), r = rng(31);
-  g.fillStyle = '#7a5a3c'; g.fillRect(0, 0, size, size);
+  g.fillStyle = '#5e4632'; g.fillRect(0, 0, size, size);
   for (let i = 0; i < 160; i++) {
     const x = r() * size, w = 1 + r() * 3, v = r() < 0.5 ? 'rgba(60,40,25,0.6)' : 'rgba(150,120,90,0.35)';
     g.fillStyle = v;
@@ -151,4 +157,29 @@ export function shadeTexture(size = 128) {
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, size, size);
   return finish(c, { srgb: false, repeat: false });
+}
+
+// Touffes d'herbe (transparence) : quatre variantes dans un atlas 2 × 2 ; brins courbes, sombres au pied
+// (qui se fond dans le sol), clairs à la pointe
+export function tuftTexture(size = 512, seed = 61) {
+  const c = canvas(size), g = c.getContext('2d'), r = rng(seed), S = size / 2;
+  for (let q = 0; q < 4; q++) {
+    const ox = (q % 2) * S, oy = Math.floor(q / 2) * S;
+    const n = 26 + q * 9, spread = 0.45 + q * 0.12;
+    for (let i = 0; i < n; i++) {
+      const x0 = ox + S * (0.5 + (r() - 0.5) * spread), h = S * (0.4 + 0.55 * r()), lean = (r() - 0.5) * S * (0.4 + q * 0.12), w = 2.5 + r() * 4;
+      const x1 = x0 + lean, y1 = oy + S - h, cxp = x0 + lean * 0.25, cyp = oy + S - h * 0.55;
+      const gr = g.createLinearGradient(0, oy + S, 0, y1);
+      const v = 0.8 + r() * 0.35;
+      // tons neutres : la teinte vient de la surface (couleur des sommets), la texture ne donne que le modelé
+      const t = (k) => Math.min(255, Math.round(k * v));
+      gr.addColorStop(0, `rgba(${t(150)},${t(158)},${t(140)},0)`);
+      gr.addColorStop(0.14, `rgba(${t(165)},${t(175)},${t(152)},1)`);
+      gr.addColorStop(0.6, `rgb(${t(210)},${t(220)},${t(196)})`);
+      gr.addColorStop(1, `rgb(${t(238)},${t(245)},${t(222)})`);
+      g.fillStyle = gr;
+      g.beginPath(); g.moveTo(x0 - w, oy + S); g.quadraticCurveTo(cxp - w * 0.6, cyp, x1, y1); g.quadraticCurveTo(cxp + w * 0.6, cyp, x0 + w, oy + S); g.closePath(); g.fill();
+    }
+  }
+  return finish(c, { repeat: false, aniso: 4 });
 }
