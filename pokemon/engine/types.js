@@ -160,3 +160,12 @@ export function typeBadge(typeKey) {
   const t = TYPES[typeKey] || { name: typeKey, color: '#888' };
   return `<span class="type-badge" style="background:${t.color}">${t.name}</span>`;
 }
+
+
+export const TYPE_FR = Object.fromEntries(
+  Object.entries(TYPES).map(([k, v]) => [k, v.name])
+);
+
+export const TYPE_COLORS = Object.fromEntries(
+  Object.entries(TYPES).map(([k, v]) => [k, v.color])
+);

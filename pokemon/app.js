@@ -11,15 +11,17 @@ const H = window.HubBridge;
 const root = document.getElementById('app');
 
 let activeInstance = null;
+let hasBooted = false;
 
-function boot(info, forcedMode = null) {
+function boot(info = {}, forcedMode = null) {
+  hasBooted = true;
   if (activeInstance && activeInstance.destroy) {
     activeInstance.destroy();
     activeInstance = null;
   }
 
-  const role = H.embedded ? info.role : 'solo';
-  const meP = H.players.find((p) => p.id === info.myId);
+  const role = H.embedded ? (info.role || H.info.role || 'solo') : 'solo';
+  const meP = (H.players || []).find((p) => p.id === info.myId);
   const prof = (() => {
     try {
       return {
@@ -32,13 +34,13 @@ function boot(info, forcedMode = null) {
   })();
 
   const me = {
-    id: H.embedded ? info.myId : 0,
+    id: H.embedded ? (info.myId ?? 0) : 0,
     name: meP ? meP.name : prof.name,
     color: meP ? meP.color : prof.color
   };
 
   const qs = new URLSearchParams(location.search);
-  const settings = H.embedded ? (info.settings || {}) : {
+  const settings = H.embedded ? (info.settings || H.info.settings || {}) : {
     mode: qs.get('mode') || 'adventure',
     timer: qs.get('timer') || 25,
     gen: qs.get('gen') || 'all',
@@ -72,6 +74,7 @@ function boot(info, forcedMode = null) {
     startMatch: () => session.startMatch(),
     restart: () => session.restart(),
     submitAction: (act) => session.submitAction(act),
+    switchMode: (nextMode) => boot(info, nextMode),
     onSwitchMode: (nextMode) => boot(info, nextMode),
     exit: () => {
       if (H.embedded) H.exit();
@@ -112,5 +115,20 @@ function boot(info, forcedMode = null) {
   H.signalReady();
 }
 
-if (H.embedded) H.on('init', (info) => boot(info));
-else boot({ role: 'solo', myId: 0 });
+if (H.embedded) {
+  H.on('init', (info) => boot(info));
+  // Sécurité : si l'événement init a été manqué pendant le chargement des modules ES,
+  // on redemande l'initialisation au Hub parent.
+  setTimeout(() => {
+    if (!hasBooted) {
+      try {
+        window.parent.postMessage({ dd: 'hub', k: 'hello' }, '*');
+      } catch (e) {}
+    }
+  }, 150);
+  setTimeout(() => {
+    if (!hasBooted) boot(H.info);
+  }, 600);
+} else {
+  boot({ role: 'solo', myId: 0 });
+}
