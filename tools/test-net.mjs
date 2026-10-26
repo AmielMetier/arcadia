@@ -58,14 +58,15 @@ function browser(port) {
   return w;
 }
 function player(port, name, uid) {
-  const b = browser(port), log = { got: [], ev: [] };
+  const b = browser(port), log = { got: [], ev: [] }, nets = [];
+  const mk = b.DDNet.create; b.DDNet.create = (o) => { const n = mk(o); nets.push(n); return n; };
   const R = b.DDRoom.create({
     joined() { log.ev.push('joined'); }, update() {}, chat() {}, results() {}, left(p) { log.ev.push('left:' + p.name); },
     game(from, m) { log.got.push(m); },
     error(m) { log.ev.push('error:' + m); }, closed(m) { log.ev.push('closed:' + m); },
     migrating() { log.ev.push('migrating'); }, migrated() { log.ev.push('migrated'); }, net(s) { log.ev.push('net:' + s); },
   });
-  return { b, R, log, me: { name, color: '#2b8cff', lvl: 1, uid } };
+  return { b, R, log, nets, me: { name, color: '#2b8cff', lvl: 1, uid } };
 }
 const ids = (R) => R.players.map((p) => p.id).sort().join(',');
 const seqOf = (log, tag) => log.got.filter((m) => m.tag === tag).map((m) => m.k);
@@ -84,6 +85,15 @@ A.R.join(H.R.code, A.me); B.R.join(H.R.code, B.me);
 ok(await until(() => H.R.players.length === 3 && A.R.myId > 0 && B.R.myId > 0 && A.R.players.length === 3), 'deux invités entrent');
 const idA = A.R.myId, idB = B.R.myId;
 ok(H.b.DDRoom && A.R.netStats().proto === 3, 'protocole 3 négocié');
+
+/* ---------- 0. page figée (un jeu qui construit son décor) : pas de fausse coupure ---------- */
+// la page fige juste après l'envoi d'une sonde (avec un vrai réseau, il y en a presque toujours une en route)
+await sleep(800);
+const ev0 = [H, A, B].map((P) => P.log.ev.length), rc0 = [H, A, B].map((P) => P.R.netStats().reconnects);
+await until(() => A.nets.some((n) => n.probeAt), 3000);
+const tf = Date.now(); while (Date.now() - tf < 6500) { /* tout le fil d'exécution est bloqué, comme un onglet occupé */ }
+await sleep(1500);
+ok([H, A, B].every((P, k) => !P.log.ev.slice(ev0[k]).includes('net:down') && P.R.netStats().reconnects === rc0[k]), 'page figée 6 s : pas de fausse coupure ' + JSON.stringify([H, A, B].map((P, k) => [P.log.ev.slice(ev0[k]), P.R.netStats().reconnects - rc0[k]])));
 
 /* ---------- 1. coupure nette d'un invité ---------- */
 p1.cut();

@@ -38,6 +38,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   const PROTO = 3;
   const OUTBOX_MAX = 3000;   // messages gardés en attendant l'accusé de réception du serveur
   const DEAD_MS = 5000;      // sonde sans réponse : connexion morte, on en ouvre une autre
+  const FROZEN_MS = 2000;    // la sonde n'a pas pu tourner pendant ce temps : c'est la page qui était figée
   const GIVE_UP_MS = 60000;  // serveur injoignable depuis une minute : on abandonne
   const REJOIN_MS = 15000;   // place perdue : le temps que l'hôte rouvre son salon
 
@@ -341,12 +342,17 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       // Sonde vers le relais toutes les 250 ms (garde aussi la connexion ouverte, porte nos accusés de réception).
       // Si la réponse tarde nettement plus que d'habitude, nos envois s'empilent : on saute les instantanés d'état le
       // temps que la file se vide. Plus de réponse du tout depuis quelques secondes : la connexion est morte.
+      // Sauf si c'est la page qui était figée (un jeu qui construit son décor, une machine lente) : la réponse est
+      // peut-être arrivée et attend son tour ; on ne conclut rien et on refait une sonde.
       _startKeepAlive(ws) {
         this._stopKeepAlive();
         this.probeAt = 0; this.lats = []; this.fastCheck = 0;
         const gen = this.gen;
+        let tick = performance.now();
         this.pingIv = setInterval(() => {
           if (gen !== this.gen || ws.readyState !== WebSocket.OPEN) return;
+          const now = performance.now(), frozen = now - tick > FROZEN_MS; tick = now;
+          if (frozen) { this.probeAt = 0; this.fastCheck = 0; }
           if (this.probeAt) {
             const late = performance.now() - this.probeAt;
             if (late > DEAD_MS || (this.fastCheck && late > 2500)) this._down(gen);
