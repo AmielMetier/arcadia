@@ -74,6 +74,7 @@ Course de karts en 3D (Three.js), seul ou jusqu'à 6 joueurs, complétée par de
 - **16 objets** dans les cubes irisés (↓ + E pour lancer vers l'arrière), 8 pilotes originaux, 4 karts
 - L'hôte choisit le premier circuit, chacun son pilote ; musiques par circuit dans `kart/music/` (voir `kart/music/LISEZMOI.md`),
   captures des circuits et affiche dans `kart/img/` ; mode spectateur depuis l'écran des résultats
+- Textures photo libres de droits (Poly Haven, CC0) dans `kart/tex/` (voir `kart/tex/LISEZMOI.md`)
 
 ## Convoy Storm
 Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un blizzard.
