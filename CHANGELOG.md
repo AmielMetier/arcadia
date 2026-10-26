@@ -8,6 +8,11 @@
   - Les bâtiments sont meublés selon leurs pièces : séjours et salons (canapés, fauteuils, télé, bibliothèques), cuisines, chambres (lits, armoires, commodes, tables de chevet), salles de bains, bureaux, magasins, garages avec leur voiture, entrepôts, granges, restaurants, et des tableaux aux murs. Les maisons abandonnées ont gardé quelques meubles, parfois renversés.
   - On court, on sprinte, on s'accroupit, on saute, et on nage dans le lac et dans la mer.
   - Minicarte en haut à droite, grande carte avec la touche M : pendant l'exploration, un clic sur la carte t'y emmène.
+  - Une partie : on monte à plusieurs dans une montgolfière qui traverse l'île, on saute quand on veut (Espace), chute libre puis planeur jusqu'au sol. La tempête se referme en sept phases, et le dernier en vie gagne.
+  - Le butin : fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision et lance-roquettes, en gris, vert, bleu ou violet selon la rareté. Il y a aussi des munitions de cinq sortes, des bandages, des trousses de soin, des petites et grandes potions de bouclier, des grenades, des grenades de souffle et des tremplins.
+  - Coffres dorés et caisses de munitions dans les maisons et en pleine nature, butin posé au sol, inventaire de cinq cases (touches 1 à 5 ou molette), E pour ramasser, G pour lâcher, R pour recharger.
+  - Combat : 100 points de vie et jusqu'à 100 de bouclier, tir à la hanche ou en visant (clic droit), lunette du fusil de précision, tirs à la tête, roquettes et grenades qui explosent, dégâts de chute. Les éliminés lâchent tout leur butin.
+  - Interface : barres de vie et de bouclier, munitions, chrono et cercle de la tempête sur la minicarte, fil des éliminations, marqueur de touche, chiffres de dégâts et direction des tirs reçus.
 
 ## 2.72 — 26 octobre 2026
 - **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.

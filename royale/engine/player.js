@@ -13,6 +13,36 @@ export function newPlayer(x, y, z, yaw = 0) {
   return { x, y, z, vx: 0, vy: 0, vz: 0, yaw, ground: false, swim: false, crouch: false, sprint: false, air: 0, fall: 0 };
 }
 
+// ------------------------------------------------------------------ en l'air : chute libre puis planeur
+export const AIR = { fall: 34, fallH: 15, glideFall: 7.5, glide: 16, deploy: 55 };
+// mode 'chute' : on tombe vite et on se dirige ; 'planeur' : on plane (ouvert à `deploy` m du sol, ou plus tôt avec saut)
+export function stepAir(p, inp, world, dt) {
+  p.yaw = inp.yaw;
+  const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw), rx = -fz, rz = fx;
+  const mx = inp.mx || 0, mz = inp.mz || 0;
+  const glide = p.mode === 'planeur';
+  // en planeur on avance toujours un peu ; en chute libre, on se laisse porter
+  const sp = glide ? AIR.glide : AIR.fallH;
+  const wx = (rx * mx + fx * Math.max(mz, glide ? 0.35 : mz)) * sp, wz = (rz * mx + fz * Math.max(mz, glide ? 0.35 : mz)) * sp;
+  const k = 1 - Math.exp(-2.5 * dt);
+  p.vx += (wx - p.vx) * k; p.vz += (wz - p.vz) * k;
+  const target = glide ? -AIR.glideFall : -AIR.fall;
+  p.vy += (target - p.vy) * (1 - Math.exp(-(glide ? 3 : 1.2) * dt));
+  const [nx, nz] = world.push(p.x + p.vx * dt, p.z + p.vz * dt, MOVE.r, p.y + 0.3, p.y + MOVE.h);
+  p.x = nx; p.z = nz;
+  const ground = world.support(p.x, p.z, p.y + 0.3);
+  // le planeur s'ouvre en redescendant (après un tremplin, on monte d'abord)
+  if (!glide && p.vy <= 0 && (p.y - ground < AIR.deploy || inp.jump)) { p.mode = 'planeur'; p.vy = Math.max(p.vy, -12); }
+  p.y += p.vy * dt;
+  const wl = world.waterLevel(p.x, p.z);
+  if (p.y <= ground || p.y <= wl - MOVE.swimDepth) {
+    // atterrissage (sans dégâts de chute)
+    p.y = Math.max(ground, Math.min(p.y, wl - MOVE.swimDepth)); p.vy = 0; p.mode = 'sol'; p.ground = p.y <= ground + 0.01; p.fall = 0;
+    return true;
+  }
+  return false;
+}
+
 // inp : { mx, mz (−1 → 1, droite / devant), yaw, jump, sprint, crouch } ; dt en secondes (pas fixe conseillé : 1/60)
 export function stepPlayer(p, inp, world, dt) {
   const wl = world.waterLevel(p.x, p.z);
@@ -29,6 +59,8 @@ export function stepPlayer(p, inp, world, dt) {
   p.sprint = !!inp.sprint && mz > 0.3 && !p.crouch && !p.swim;
   let speed = p.swim ? MOVE.swim : p.crouch ? MOVE.crouch : p.sprint ? MOVE.sprint : MOVE.run;
   if (mz < -0.1) speed *= MOVE.back;
+  // ralenti en visant ou en se soignant (k : 0 → 1)
+  if (inp.k != null) speed *= inp.k;
   const wx = (rx * mx + fx * mz) * speed, wz = (rz * mx + fz * mz) * speed;
   // au sol (et dans l'eau) on obéit vite ; en l'air on garde son élan
   const k = 1 - Math.exp(-(p.ground || p.swim ? 14 : 2.2) * dt);

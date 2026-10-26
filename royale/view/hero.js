@@ -44,10 +44,26 @@ export function buildHero({ shirt = 0xff4b2b, pants = 0x2f3646, skin = 0, hair =
   const hairM = mesh(GEO.hair, mHair); hairM.rotation.x = -0.35; head.add(hairM);
   for (const sx of [-1, 1]) { const e = mesh(GEO.eye, mEye); e.scale.set(0.8, 1.45, 0.5); e.position.set(0.085 * sx, 0.0, 0.255); head.add(e); }
   const hands = [-1, 1].map((sx) => { const h = mesh(GEO.hand, mSkin); h.position.set(0.34 * sx, 0.3, 0.06); chest.add(h); return h; });
-
-  let phase = 0, crouch = 0, air = 0, swim = 0, lean = 0, speedS = 0;
-  // st : { speed, ground, swim, crouch, sprint, vy, turn }
+  // ce qu'on tient : accroché entre les deux mains, devant le buste
+  const hold = new THREE.Group(); hold.position.set(0.26, 0.42, 0.3); chest.add(hold);
+  let held = null;
+  // planeur : une aile au-dessus de la tête, à la couleur du joueur
+  const glider = new THREE.Group(); glider.visible = false; root.add(glider);
+  {
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32).scale(1.9, 0.55, 1.1), M(shirt, { side: THREE.DoubleSide }));
+    wing.position.y = 2.35; wing.castShadow = true; glider.add(wing);
+    for (const sx of [-1, 1]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.2, 4), M(0x2b2e36)); c.position.set(0.55 * sx, 1.75, 0); c.rotation.z = -sx * 0.45; glider.add(c); }
+  }
+  let phase = 0, crouch = 0, air = 0, swim = 0, lean = 0, speedS = 0, aim = 0, fly = 0, kick = 0, dead = 0;
+  // st : { speed, ground, swim, crouch, sprint, pitch, aim, mode ('sol', 'chute', 'planeur', 'ballon'), alive, held }
   function update(dt, st) {
+    // chute libre : à plat ventre, bras écartés ; planeur : suspendu sous l'aile
+    fly = damp(fly, st.mode === 'chute' ? 1 : 0, 4, dt);
+    glider.visible = st.mode === 'planeur';
+    aim = damp(aim, st.held ? 1 : 0, 10, dt);
+    kick = Math.max(0, kick - dt * 6);
+    dead = damp(dead, st.alive === false ? 1 : 0, 3, dt);
+    root.visible = dead < 0.98;
     speedS = damp(speedS, st.speed, 10, dt);
     const run = clamp(speedS / 5.6, 0, 1.4);
     phase += dt * (3 + speedS * 1.55);
@@ -71,9 +87,33 @@ export function buildHero({ shirt = 0xff4b2b, pants = 0x2f3646, skin = 0, hair =
       h.position.set(0.34 * sx + swim * 0.1 * sx * Math.cos(phase * 1.4), 0.3 + air * 0.35 + swim * (0.35 + 0.15 * Math.sin(phase * 1.4)), 0.06 + s * 0.22 * walk + swim * 0.25);
     }
     head.rotation.x = -lean * 0.6 - swim * 0.9 + clamp(st.pitch || 0, -0.5, 0.4) * (1 - swim);
+    // arme en main : les deux mains se rejoignent sur l'arme, qui suit le regard ; léger recul au tir
+    if (aim > 0.01) {
+      const p = clamp(st.pitch || 0, -1.1, 1.1);
+      // l'arme à l'épaule droite (visible de la caméra, placée derrière l'épaule droite)
+      hold.rotation.x = -p * 0.85; hold.position.set(0.26, 0.42 + p * 0.12, 0.3 - kick * 0.08);
+      hands[1].position.lerp(new THREE.Vector3(0.3, 0.4 + p * 0.1, 0.28), aim);
+      hands[0].position.lerp(new THREE.Vector3(0.18, 0.42 + p * 0.16, 0.5), aim);
+    }
+    hold.visible = !!held && aim > 0.5 && fly < 0.5 && swim < 0.5;
+    // chute libre
+    body.rotation.x += fly * 1.25;
+    body.position.y += fly * 0.9;
+    for (const [i, h] of hands.entries()) if (fly > 0.01) h.position.lerp(new THREE.Vector3((i ? 1 : -1) * 0.75, 0.55, 0.1), fly);
+    legs[0].rotation.x += fly * 0.5 * Math.sin(phase * 0.7); legs[1].rotation.x -= fly * 0.5 * Math.sin(phase * 0.7);
+    // éliminé : on s'effondre
+    body.rotation.z = dead * 1.4;
+    if (dead > 0.01) body.position.y -= dead * 0.5;
+  }
+  // objet tenu (modèle fourni par view/weapons.js) ; recul : à l'appel de shot()
+  function setHeld(obj) {
+    if (held === obj) return;
+    if (held) hold.remove(held);
+    held = obj; if (obj) hold.add(obj);
   }
   return {
-    root, update,
-    dispose() { for (const m of mats) m.dispose(); },
+    root, update, setHeld, shot() { kick = 1; },
+    get held() { return held; },
+    dispose() { for (const m of mats) m.dispose(); glider.traverse((o) => o.isMesh && o.geometry.dispose()); },
   };
 }

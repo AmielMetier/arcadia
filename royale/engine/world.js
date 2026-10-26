@@ -264,6 +264,97 @@ export function buildWorld(map) {
     for (let t = 0.2; t <= len; t += 0.2) if (solidAt(ox + dx * t, oy + dy * t, oz + dz * t, m)) return Math.max(0, t - 0.2);
     return len;
   }
+  // ------------------------------------------------------------------ tirs : premier obstacle exact sur un rayon
+  // (dx, dy, dz) unitaire ; renvoie { t, s } (s : forme touchée, null pour le sol, undefined si rien avant maxT)
+  const hitShape = (s, ox, oy, oz, dx, dy, dz) => {
+    if (s.t === 0 || s.t === 2) {
+      // boîte (tournée ou non) : méthode des plans, dans le repère de la boîte
+      let lx = ox, lz = oz, ldx = dx, ldz = dz, x0, x1, z0, z1;
+      if (s.t === 0) { x0 = s.x0; x1 = s.x1; z0 = s.z0; z1 = s.z1; }
+      else {
+        const rx = ox - s.cx, rz = oz - s.cz;
+        lx = rx * s.ux + rz * s.uz; lz = -rx * s.uz + rz * s.ux; ldx = dx * s.ux + dz * s.uz; ldz = -dx * s.uz + dz * s.ux;
+        x0 = -s.hx; x1 = s.hx; z0 = -s.hz; z1 = s.hz;
+      }
+      let tmin = 0, tmax = Infinity;
+      for (const [o, d, a, b] of [[lx, ldx, x0, x1], [oy, dy, s.y0, s.y1], [lz, ldz, z0, z1]]) {
+        if (Math.abs(d) < 1e-9) { if (o < a || o > b) return Infinity; continue; }
+        let ta = (a - o) / d, tb = (b - o) / d;
+        if (ta > tb) [ta, tb] = [tb, ta];
+        if (ta > tmin) tmin = ta; if (tb < tmax) tmax = tb;
+        if (tmin > tmax) return Infinity;
+      }
+      return tmin;
+    }
+    // cylindre vertical : paroi puis couvercle
+    const fx = ox - s.cx, fz = oz - s.cz, a = dx * dx + dz * dz;
+    let best = Infinity;
+    if (a > 1e-9) {
+      const b = 2 * (fx * dx + fz * dz), c = fx * fx + fz * fz - s.r * s.r, disc = b * b - 4 * a * c;
+      if (disc >= 0) {
+        const t = (-b - Math.sqrt(disc)) / (2 * a), y = oy + dy * t;
+        if (t >= 0 && y >= s.y0 && y <= s.y1) best = t;
+        else if (c < 0 && oy >= s.y0 && oy <= s.y1) best = 0;
+      }
+    }
+    if (Math.abs(dy) > 1e-9) for (const yc of [s.y1, s.y0]) {
+      const t = (yc - oy) / dy;
+      if (t >= 0 && t < best && (fx + dx * t) ** 2 + (fz + dz * t) ** 2 <= s.r * s.r) best = t;
+    }
+    return best;
+  };
+  const hitRamp = (r, ox, oy, oz, dx, dy, dz) => {
+    // plan incliné y = y0 + k·(avancée) borné au rectangle
+    const L = r.dx ? r.x1 - r.x0 : r.z1 - r.z0, k = (r.y1 - r.y0) / L;
+    const base = r.dx > 0 ? r.x0 : r.dx < 0 ? r.x1 : r.dz > 0 ? r.z0 : r.z1, sg = r.dx || r.dz;
+    const o = r.dx ? ox : oz, d = r.dx ? dx : dz;
+    // oy + dy·t = y0 + k·sg·(o + d·t − base)
+    const den = dy - k * sg * d;
+    if (Math.abs(den) < 1e-9) return Infinity;
+    const t = (r.y0 + k * sg * (o - base) - oy) / den;
+    if (t < 0) return Infinity;
+    const x = ox + dx * t, z = oz + dz * t;
+    return x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1 ? t : Infinity;
+  };
+  function raycast(ox, oy, oz, dx, dy, dz, maxT = 500) {
+    let best = maxT, hit;
+    const stamp = ++near.stamp;
+    // parcours des colonnes de la grille traversées (Amanatides et Woo, dans le plan xz)
+    let i = Math.floor(ox / G), j = Math.floor(oz / G);
+    const si = dx > 0 ? 1 : -1, sj = dz > 0 ? 1 : -1;
+    const tdx = Math.abs(dx) > 1e-9 ? G / Math.abs(dx) : Infinity, tdz = Math.abs(dz) > 1e-9 ? G / Math.abs(dz) : Infinity;
+    let tx = Math.abs(dx) > 1e-9 ? ((dx > 0 ? (i + 1) * G : i * G) - ox) / dx : Infinity;
+    let tz = Math.abs(dz) > 1e-9 ? ((dz > 0 ? (j + 1) * G : j * G) - oz) / dz : Infinity;
+    let tc = 0;
+    for (let n = 0; n < 400 && tc <= best; n++) {
+      if (i >= 0 && j >= 0 && i < GN && j < GN) {
+        const k = j * GN + i;
+        for (const s of grid[k]) {
+          if (s.seen === stamp) continue;
+          s.seen = stamp;
+          const t = hitShape(s, ox, oy, oz, dx, dy, dz);
+          if (t < best) { best = t; hit = s; }
+        }
+        for (const r of rgrid[k]) { const t = hitRamp(r, ox, oy, oz, dx, dy, dz); if (t < best) { best = t; hit = r; } }
+      }
+      if (tx < tz) { tc = tx; tx += tdx; i += si; } else { tc = tz; tz += tdz; j += sj; }
+    }
+    // le sol : pas de 1 m puis affinage par dichotomie
+    const below = (t) => oy + dy * t < map.heightAt(ox + dx * t, oz + dz * t);
+    if (below(0)) return { t: 0, s: null };
+    for (let t = 1; t <= best + 1; t += 1) {
+      const tt = Math.min(t, best);
+      if (below(tt)) {
+        let a = Math.max(0, tt - 1), b = tt;
+        for (let q = 0; q < 8; q++) { const m = (a + b) / 2; if (below(m)) b = m; else a = m; }
+        if (b < best) return { t: b, s: null };
+        break;
+      }
+      if (tt === best) break;
+    }
+    return { t: best, s: hit };
+  }
+
   // niveau de l'eau (mer, lac, rivière) en (x, z), ou -Infinity
   const N = map.n, HR = map.hres;
   function waterLevel(x, z) {
@@ -291,7 +382,7 @@ export function buildWorld(map) {
     return best;
   }
 
-  return { solids, ramps, add, remove, box, support, ceiling, push, solidAt, ray, waterLevel, near, over, doors, setDoor, doorNear };
+  return { solids, ramps, add, remove, box, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, doors, setDoor, doorNear, grid, G, GN };
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)

@@ -10,13 +10,14 @@ export class Input {
     this.keys = new Set();
     this.dx = 0; this.dy = 0;
     this.jumps = 0;
+    this.fire = false; this.aim = false; this.shots = 0;   // tir maintenu, visée (clic droit), clics de tir
     this.locked = false;   // souris capturée
     this.free = false;     // capture refusée : on joue quand même, la visée se fait en glissant
     this.sens = 0.0024;
     this.offs = [];
     const on = (el, ev, fn, o) => { el.addEventListener(ev, fn, o); this.offs.push(() => el.removeEventListener(ev, fn, o)); };
     on(surface, 'click', () => this.lock());
-    on(document, 'pointerlockchange', () => { this.locked = document.pointerLockElement === surface; if (!this.locked) this.keys.clear(); this.h.lock && this.h.lock(this.locked); });
+    on(document, 'pointerlockchange', () => { this.locked = document.pointerLockElement === surface; if (!this.locked) { this.keys.clear(); this.fire = this.aim = false; } this.h.lock && this.h.lock(this.locked); });
     on(document, 'pointerlockerror', () => this.fallback());
     on(document, 'mousemove', (e) => { if (this.locked || (this.free && (e.buttons & 1))) { this.dx += e.movementX; this.dy += e.movementY; } });
     on(window, 'keydown', (e) => {
@@ -29,7 +30,15 @@ export class Input {
       this.h.key && this.h.key(e.code, (e.key || '').toLowerCase());
     });
     on(window, 'keyup', (e) => this.keys.delete(e.code));
-    on(window, 'blur', () => this.keys.clear());
+    // souris : tir (gauche), visée (droit), molette (objet suivant ou précédent)
+    on(document, 'mousedown', (e) => {
+      if (!this.playing) return;
+      if (e.button === 0) { this.fire = true; this.shots++; }
+      if (e.button === 2) this.aim = true;
+    });
+    on(document, 'mouseup', (e) => { if (e.button === 0) this.fire = false; if (e.button === 2) this.aim = false; });
+    on(window, 'wheel', (e) => { if (this.playing && this.h.wheel) this.h.wheel(Math.sign(e.deltaY)); }, { passive: true });
+    on(window, 'blur', () => { this.keys.clear(); this.fire = this.aim = false; });
     on(surface, 'contextmenu', (e) => e.preventDefault());
   }
   get playing() { return this.locked || this.free; }
