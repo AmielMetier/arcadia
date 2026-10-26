@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.75 — 26 octobre 2026
+- **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
+  - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.
+  - Plage et fond des Abysses en sable fin, pontons en planches, arches en pierre, chemins caillouteux et temple en pierres de la jungle.
+  - Murs en moellons et allées de gravier au Château Hanté.
+  - Chaque circuit ne charge que ses textures ; en attendant, les anciennes s'affichent, la course n'attend pas.
+
 ## 2.74 — 26 octobre 2026
 - **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
   - **Canyon Express** : une descente de 6 mètres, le saut du coyote au-dessus du ravin, des lacets qui grimpent, un pont de corde sans rambarde et une mine d'or avec tapis roulant.
