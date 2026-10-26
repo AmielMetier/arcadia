@@ -1,5 +1,43 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.79 — 26 octobre 2026
+- **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
+  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
+  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
+  - Les ombres ne scintillent plus quand on tourne la caméra.
+  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
+  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
+  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
+
+## 2.78 — 26 octobre 2026
+- **Hub** — Plus de fausse « Connexion perdue » au lancement d'une partie : quand l'ordinateur rame quelques secondes (un jeu qui prépare son décor, une machine plus lente), ce n'est plus pris pour une coupure du réseau.
+
+## 2.77 — 26 octobre 2026
+- **Tête de Calcul** — The Candidate : nouvelles épreuves de réflexion.
+  - Raisonnement abstrait : une grille de 3 × 3 motifs dont la dernière case manque. On choisit parmi quatre cases dessinées ; la forme, le nombre et le remplissage suivent chacun leur règle.
+  - Mémoire : une liste de cours, d'ordres, un carnet ou une suite de chiffres s'affiche quelques secondes, puis disparaît avant la question.
+  - Attention : repérer les différences entre deux codes, compter un chiffre dans un bloc, filtrer une liste d'ordres.
+  - Statistiques : moyenne, médiane, écart-type, intervalle de confiance, loi normale, régression, corrélation, et les grands pièges (biais du survivant, p-value, surapprentissage, paradoxe de Simpson…).
+  - Probabilités avancées : ruine du joueur, chaînes de Markov, marche aléatoire, temps d'attente d'une série de piles, collectionneur, arrêt optimal.
+  - Analyse et algèbre : dérivées, intégrales, équations du second degré, systèmes, déterminants, valeurs propres, développements limités, optimisation, séries.
+  - Ces épreuves sortent plus souvent pour le poste Quant (et les statistiques pour Risques).
+- **Tête de Calcul** — The Candidate : le face-à-face final devient un sprint de calcul. 60 secondes, un calcul après l'autre, juste ou faux s'affiche tout de suite ; le plus de calculs justes gagne, chaque erreur retire un point. En cas d'égalité parfaite, on relance un sprint.
+
+## 2.76 — 26 octobre 2026
+- **Tête de Calcul** — The Candidate : beaucoup plus de questions, pour ne presque plus retomber sur les mêmes.
+  - Calcul mental, équations, taux, finance d'entreprise, marchés, dérivés, probabilités, risques et macro : une bonne partie des questions est maintenant tirée à la volée, avec des chiffres neufs à chaque partie (pourcentages, points de base, MEDAF, WACC, duration, VaR, straddle, Bayes, parité call-put…). Le piège reste l'erreur classique du calcul.
+  - Fat finger et numéros de téléphone : plus de liste fixe, chaque code, montant, ordre ou IBAN est nouveau (les IBAN et ISIN ont même une clé de contrôle valide).
+  - Les relances de Pierre changent de chiffres à chaque fois, et il y en a de nouvelles.
+  - Six nouveaux cas pratiques : valorisation par les flux, swap de taux, couverture de change, rachat payé en actions, prêt à une entreprise, straddle avant résultats. Le poste M&A n'a plus toujours le même dossier.
+  - Les épreuves SQL ont des énoncés et des bases différents à chaque partie.
+  - Sur 30 parties, environ 6 % des questions avaient déjà été vues, contre 20 % avant.
+- **Tête de Calcul** — The Candidate : les trois tours (premier tour, desk, comité final) durent chacun un tiers de l'entretien.
+- **Tête de Calcul** — The Candidate : plus de cas pratique dans les parties de 10 questions, il en prenait trop de place ; à partir de 15 questions, il arrive au comité final.
+- **Tête de Calcul** — Market making : la consigne tient en deux lignes, toujours visible pendant l'épreuve.
+- **Tête de Calcul** — Le menu des réactions (en bas à gauche) est lisible dans The Candidate : les phrases ne sont plus écrites en blanc sur fond clair.
+- **Tête de Calcul** — Figures à compter : des tailles plus variées, et trois nouvelles questions (carrés d'une taille donnée, triangles entre des points, cubes cachés d'un pavé).
+- **Tête de Calcul** — Les nombres négatifs s'affichent avec un vrai signe moins.
+
 ## 2.75 — 26 octobre 2026
 - **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré, jusqu'à six amis et des bots pour remplir la montgolfière (16, 24 ou 30 joueurs). On peut aussi simplement explorer l'île, sans combat.
   - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
@@ -21,12 +59,6 @@
   - Les sons : une détonation par arme (étouffée au loin), impacts, explosions, portes, coffres, rechargement, soins, pioche, constructions, tes pas et ceux des joueurs qui approchent, vent en chute libre, grondement de la tempête, et l'ambiance de la campagne, du bord de mer ou de la montagne.
   - Après une élimination, on regarde celui qui t'a eu, ou un autre joueur avec Espace. Le bilan de fin donne le classement, les éliminations et les dégâts de chacun ; l'hôte peut relancer une partie.
   - Sensibilité de la souris et volume réglables à l'écran de départ et en pause.
-  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
-  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
-  - Les ombres ne scintillent plus quand on tourne la caméra.
-  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
-  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
-  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
 
 ## 2.74 — 26 octobre 2026
 - **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
