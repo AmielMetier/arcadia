@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.72';
+  const VERSION = '2.73';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -220,7 +220,7 @@
     room.addResult({ id: String(r.id || game + '-' + Date.now()), game, mode: r.mode || '', at: Date.now(), players });
   }
   let lbOpen = false, lbGame = 'all', lbOnly = false, lbBots = true;
-  const GNAME = { all: 'Tous les jeux', david: 'DavidSimulator', drift: 'Duo Drift', bastion: 'Bastion Clash', calcul: 'Tête de Calcul', outbreak: 'Outbreak : Secteur Zéro', filrouge: 'Fil Rouge', kart: 'Cyber Kart GP', convoy: 'Convoy Storm', golf: 'Birdie Party', minigolf: 'Mini-Golf Party' };
+  const GNAME = { all: 'Tous les jeux', david: 'DavidSimulator', drift: 'Duo Drift', bastion: 'Bastion Clash', calcul: 'Tête de Calcul', outbreak: 'Outbreak : Secteur Zéro', filrouge: 'Fil Rouge', kart: 'Cyber Kart GP', convoy: 'Convoy Storm', golf: 'Birdie Party', minigolf: 'Mini-Golf Party', royale: 'Island Rush' };
   const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
   function renderBoard() {
     const ov = document.querySelector('.lbov'); if (!ov) return;
@@ -239,7 +239,7 @@
           <td><b>${x.wins}</b></td><td>${x.games}</td><td>${Math.round((x.wins / x.games) * 100)} %</td><td>${x.podiums}</td>${scoreLabel ? `<td>${lbGame === 'david' ? x.best.toLocaleString('fr-FR') + ' €' : x.best}</td>` : ''}</tr>`).join('')}</tbody></table>`
       : '<p class="lbempty">Pas encore de partie terminée. Le classement se remplit tout seul à la fin de chaque partie.</p>'}
       ${recent.length ? `<h3>Dernières parties</h3><ul class="lbrecent">${recent.map((r) => { const w = r.players.find((p) => p.rank === 1);
-        return `<li><span class="g">${r.game === 'david' ? '🎲' : r.game === 'bastion' ? '🏰' : r.game === 'calcul' ? '🧮' : r.game === 'filrouge' ? '💣' : r.game === 'outbreak' ? '🧟' : r.game === 'convoy' ? '🚂' : r.game === 'golf' ? '⛳' : r.game === 'minigolf' ? '🕳️' : '🏎️'}</span><span>${esc(GNAME[r.game])}${r.mode ? ' · ' + esc(r.mode) : ''}</span><b>${w ? '🏆 ' + esc(w.name) : ''}</b><small>${r.players.length} joueurs · ${ago(r.at)}</small></li>`; }).join('')}</ul>` : ''}
+        return `<li><span class="g">${r.game === 'david' ? '🎲' : r.game === 'bastion' ? '🏰' : r.game === 'calcul' ? '🧮' : r.game === 'filrouge' ? '💣' : r.game === 'outbreak' ? '🧟' : r.game === 'convoy' ? '🚂' : r.game === 'golf' ? '⛳' : r.game === 'minigolf' ? '🕳️' : r.game === 'royale' ? '🏝️' : '🏎️'}</span><span>${esc(GNAME[r.game])}${r.mode ? ' · ' + esc(r.mode) : ''}</span><b>${w ? '🏆 ' + esc(w.name) : ''}</b><small>${r.players.length} joueurs · ${ago(r.at)}</small></li>`; }).join('')}</ul>` : ''}
       <p class="nthint">Historique partagé : quand vous vous retrouvez dans un salon, les parties de chacun sont mises en commun.</p>`;
     for (const b of ov.querySelectorAll('[data-g]')) b.onclick = () => { lbGame = b.dataset.g; renderBoard(); };
     const o = ov.querySelector('#lbOnly'); if (o) o.onchange = () => { lbOnly = o.checked; renderBoard(); };

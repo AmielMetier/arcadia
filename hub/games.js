@@ -186,4 +186,17 @@ window.HUB_GAMES = [
     accent: '#2e8b57',
     cover: 'minigolf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
+  {
+    id: 'royale',
+    title: 'Island Rush',
+    tag: 'Battle royale sur une île',
+    desc: 'Une île d\'un kilomètre carré à explorer, avec ses villes, ses villages, ses lieux-dits et ses maisons abandonnées, tous ouverts (pour l\'instant sans combat).',
+    url: 'royale/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#3d9fd9',
+    settings: [
+      { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
+    ],
+    cover: 'royale/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
 ];

@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.73 — 26 octobre 2026
+- **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré. Première étape : l'île à explorer, sans combat.
+  - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
+  - Tous les bâtiments s'ouvrent : on entre par les portes, on monte les escaliers jusqu'aux toits plats.
+  - On court, on sprinte, on s'accroupit, on saute, et on nage dans le lac et dans la mer.
+  - Minicarte en haut à droite, grande carte avec la touche M : pendant l'exploration, un clic sur la carte t'y emmène.
+
 ## 2.72 — 26 octobre 2026
 - **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.
   - Chaque coup : la balle part depuis derrière le golfeur, puis une caméra posée près du point de chute la regarde arriver et rouler. Le ralenti la montre depuis l'autre côté.

@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party et Mini-Golf Party
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -114,6 +114,19 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
 - **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance) ou trackpad ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
 - Le joueur qui tire simule son coup chez lui et diffuse la trajectoire ; l'hôte tient les tours et les scores
 
+## Island Rush
+Battle royale en 3D (Three.js) sur une île d'un kilomètre carré, dans le style de Birdie Party. En construction : la
+phase 1 (l'île à explorer, sans combat) est jouable.
+
+- **L'île** tirée d'une graine : relief, montagne, lac, rivière, mer ; une ville et un bourg (18 bâtiments au plus),
+  quatre villages, un port, une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge, carrière, camping,
+  station-service) et une quarantaine de petits bâtiments dans la nature (maisons abandonnées, cabanes, tours de guet)
+- **Tous les bâtiments s'ouvrent** : pans de 4 m (murs, fenêtres, portes, portails, murs cassés) sur la même grille que
+  les futures constructions des joueurs, escaliers jusqu'aux toits plats ; coffres et butin déjà placés
+- **Déplacement** en troisième personne : course, sprint, accroupi, saut, nage ; minicarte et grande carte (M)
+- `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
+- Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -124,7 +137,8 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
   `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
   `node tools/test-minigolf.mjs` construit les 24 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
-  `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
+  `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
+  `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines) et le déplacement (portes, escaliers, murs, nage).
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
