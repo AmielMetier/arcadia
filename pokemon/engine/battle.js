@@ -1,27 +1,58 @@
 // pokemon/engine/battle.js
-// Moteur de combat Pokémon 3v3 : calcul des dégâts, statuts, switchs et résolution de tour.
+// Moteur de combat Pokémon 3v3 & Duel : calcul des dégâts, statuts (sommeil, dégel, toxik),
+// peur (flinch), paliers de statistiques, PP réels, switchs et résolution séquentielle de tour.
 
 import { getEffectiveness } from './types.js';
 import { MOVES } from './moves.js';
 
-const STAGE_MULTS = {
+export const STAGE_MULTS = {
   '-6': 2 / 8, '-5': 2 / 7, '-4': 2 / 6, '-3': 2 / 5, '-2': 2 / 4, '-1': 2 / 3,
   '0': 1,
   '1': 3 / 2, '2': 4 / 2, '3': 5 / 2, '4': 6 / 2, '5': 7 / 2, '6': 8 / 2
 };
 
+const STAT_LABELS = {
+  atk: 'Attaque',
+  def: 'Défense',
+  spa: 'Att. Spé.',
+  spd: 'Déf. Spé.',
+  spe: 'Vitesse'
+};
+
+function initPpMap(moves) {
+  const map = {};
+  for (const mId of (moves || [])) {
+    const m = MOVES[mId];
+    map[mId] = m && m.pp ? m.pp : 15;
+  }
+  return map;
+}
+
 export function createBattle({ trainerA, trainerB, teamA, teamB }) {
   return {
     trainerA: { id: trainerA.id, name: trainerA.name, color: trainerA.color || '#ff4b2b', bot: !!trainerA.bot },
     trainerB: { id: trainerB.id, name: trainerB.name, color: trainerB.color || '#2b8cff', bot: !!trainerB.bot },
-    teamA: teamA.map(p => ({ ...p, statStages: { ...p.statStages } })),
-    teamB: teamB.map(p => ({ ...p, statStages: { ...p.statStages } })),
+    teamA: teamA.map(p => ({
+      ...p,
+      statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(p.statStages || {}) },
+      ppMap: p.ppMap ? { ...p.ppMap } : initPpMap(p.moves),
+      sleepTurns: p.sleepTurns || 0,
+      toxicTurns: p.toxicTurns || 0
+    })),
+    teamB: teamB.map(p => ({
+      ...p,
+      statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(p.statStages || {}) },
+      ppMap: p.ppMap ? { ...p.ppMap } : initPpMap(p.moves),
+      sleepTurns: p.sleepTurns || 0,
+      toxicTurns: p.toxicTurns || 0
+    })),
     activeA: 0,
     activeB: 0,
     turn: 1,
-    phase: 'choose', // 'choose', 'switch_forced_A', 'switch_forced_B', 'over'
+    phase: 'choose', // 'choose', 'switch_forced_A', 'switch_forced_B', 'switch_forced_both', 'over'
     winner: null,
-    log: []
+    log: [],
+    history: []
   };
 }
 
@@ -37,7 +68,7 @@ export function getTrainer(battle, side) {
 
 export function getEffectiveSpeed(poke) {
   let spe = poke.stats.spe;
-  const stage = poke.statStages.spe || 0;
+  const stage = (poke.statStages && poke.statStages.spe) || 0;
   spe *= (STAGE_MULTS[stage] || 1);
   if (poke.status === 'paralysis') spe *= 0.5;
   return spe;
@@ -45,7 +76,7 @@ export function getEffectiveSpeed(poke) {
 
 export function getEffectiveStat(poke, statName) {
   let val = poke.stats[statName] || 100;
-  const stage = poke.statStages[statName] || 0;
+  const stage = (poke.statStages && poke.statStages[statName]) || 0;
   val *= (STAGE_MULTS[stage] || 1);
   return Math.max(1, val);
 }
@@ -54,7 +85,9 @@ export function getEffectiveStat(poke, statName) {
  * Calcul des dégâts selon la formule standard Pokémon
  */
 export function calculateDamage(attacker, defender, move) {
-  if (move.cat === 'status' || move.power === 0) return { damage: 0, mult: 1, crit: false, text: '' };
+  if (!move || move.cat === 'status' || !move.power || move.power === 0) {
+    return { damage: 0, mult: 1, crit: false, text: '' };
+  }
 
   const isPhys = move.cat === 'physical';
   let atk = getEffectiveStat(attacker, isPhys ? 'atk' : 'spa');
@@ -70,6 +103,14 @@ export function calculateDamage(attacker, defender, move) {
   const isCrit = Math.random() < critRate;
   const critMult = isCrit ? 1.5 : 1.0;
 
+  // En cas de coup critique, ignorer les baisses d'attaque du lanceur et les hausses de défense de la cible
+  if (isCrit) {
+    const atkStage = (attacker.statStages && attacker.statStages[isPhys ? 'atk' : 'spa']) || 0;
+    const defStage = (defender.statStages && defender.statStages[isPhys ? 'def' : 'spd']) || 0;
+    if (atkStage < 0) atk = attacker.stats[isPhys ? 'atk' : 'spa'] * (isPhys && attacker.status === 'burn' ? 0.5 : 1);
+    if (defStage > 0) def = defender.stats[isPhys ? 'def' : 'spd'];
+  }
+
   // STAB (Same-Type Attack Bonus)
   const isStab = attacker.types.includes(move.type);
   const stabMult = isStab ? 1.5 : 1.0;
@@ -84,8 +125,10 @@ export function calculateDamage(attacker, defender, move) {
   // Variation aléatoire entre 0.85 et 1.00
   const randomFactor = 0.85 + Math.random() * 0.15;
 
-  // Formule officielle de base niveau 50 : ((22 * Power * (A / D)) / 50 + 2)
-  const baseDmg = ((22 * move.power * (atk / def)) / 50 + 2);
+  // Formule officielle selon le niveau (défaut 50 en Tournoi)
+  const lvl = attacker.level || 50;
+  const levelFactor = Math.floor((2 * lvl) / 5) + 2;
+  const baseDmg = ((levelFactor * move.power * (atk / def)) / 50 + 2);
   const totalDmg = Math.max(1, Math.floor(baseDmg * stabMult * typeMult * critMult * randomFactor));
 
   let text = '';
@@ -96,12 +139,48 @@ export function calculateDamage(attacker, defender, move) {
   return { damage: totalDmg, mult: typeMult, crit: isCrit, text };
 }
 
+function applyStatEffect(eff, attPoke, defPoke, attSide, defSide, logEvent) {
+  const targetPoke = eff.target === 'self' ? attPoke : defPoke;
+  const targetSide = eff.target === 'self' ? attSide : defSide;
+  if (!targetPoke || targetPoke.fainted) return;
+  if (!targetPoke.statStages) targetPoke.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+
+  const statChanges = eff.stats ? Object.entries(eff.stats) : [[eff.stat, eff.val]];
+  for (const [stName, delta] of statChanges) {
+    const oldVal = targetPoke.statStages[stName] || 0;
+    const newVal = Math.max(-6, Math.min(6, oldVal + delta));
+    targetPoke.statStages[stName] = newVal;
+    const label = STAT_LABELS[stName] || stName;
+    if (newVal === oldVal) {
+      logEvent({
+        type: 'msg',
+        text: `${label} de ${targetPoke.name} ne peut pas aller plus ${delta > 0 ? 'haut' : 'bas'} !`
+      });
+    } else {
+      const upDown = delta > 0 ? (delta >= 2 ? 'augmente beaucoup !' : 'augmente !') : (delta <= -2 ? 'diminue beaucoup !' : 'diminue !');
+      logEvent({
+        type: 'stat_change',
+        side: targetSide,
+        stat: stName,
+        val: delta,
+        msg: `${label} de ${targetPoke.name} ${upDown}`
+      });
+    }
+  }
+}
+
 /**
  * Résolution complète d'un tour de combat (actions des deux côtés)
  */
 export function resolveTurn(state, actionA, actionB) {
   const events = [];
-  const logEvent = (e) => events.push(e);
+  const logEvent = (e) => {
+    events.push(e);
+    if (state.history) {
+      const txt = e.msg || e.text;
+      if (txt) state.history.push({ turn: state.turn, text: txt, type: e.type });
+    }
+  };
 
   let pA = getActivePokemon(state, 'A');
   let pB = getActivePokemon(state, 'B');
@@ -115,7 +194,19 @@ export function resolveTurn(state, actionA, actionB) {
       state.activeA = targetIdx;
       pA = state.teamA[targetIdx];
       pA.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-      logEvent({ type: 'switch', side: 'A', pokemonId: pA.id, name: pA.name, trainer: tA.name, msg: `${tA.name} rappelle son Pokémon et envoie ${pA.name} !` });
+      pA.toxicTurns = 0;
+      logEvent({
+        type: 'switch',
+        side: 'A',
+        pokemonId: pA.id,
+        name: pA.name,
+        hp: pA.hp,
+        maxHp: pA.maxHp,
+        types: pA.types,
+        status: pA.status || null,
+        trainer: tA.name,
+        msg: `${tA.name} rappelle son Pokémon et envoie ${pA.name} !`
+      });
     }
   }
 
@@ -125,7 +216,19 @@ export function resolveTurn(state, actionA, actionB) {
       state.activeB = targetIdx;
       pB = state.teamB[targetIdx];
       pB.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-      logEvent({ type: 'switch', side: 'B', pokemonId: pB.id, name: pB.name, trainer: tB.name, msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !` });
+      pB.toxicTurns = 0;
+      logEvent({
+        type: 'switch',
+        side: 'B',
+        pokemonId: pB.id,
+        name: pB.name,
+        hp: pB.hp,
+        maxHp: pB.maxHp,
+        types: pB.types,
+        status: pB.status || null,
+        trainer: tB.name,
+        msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !`
+      });
     }
   }
 
@@ -155,43 +258,79 @@ export function resolveTurn(state, actionA, actionB) {
   }
 
   const secondSide = firstSide === 'A' ? 'B' : 'A';
+  const flinched = { A: false, B: false };
 
   // --- 3. Exécution d'une attaque ---
-  function executeMove(attSide, defSide) {
+  function executeMove(attSide, defSide, isFirstMover) {
     const attPoke = getActivePokemon(state, attSide);
     const defPoke = getActivePokemon(state, defSide);
     const attAction = attSide === 'A' ? actionA : actionB;
-    const attMove = attAction && attAction.type === 'move' ? MOVES[attAction.moveId] : null;
+    const moveId = attAction && attAction.type === 'move' ? attAction.moveId : null;
+    const attMove = moveId ? MOVES[moveId] : null;
 
     if (!attMove || attPoke.fainted || defPoke.fainted) return;
 
-    // Vérification du statut de l'attaquant (paralysie, sommeil, gel)
+    // Vérifier si apeuré (flinch) par la première attaque
+    if (flinched[attSide]) {
+      logEvent({ type: 'msg', text: `${attPoke.name} a peur et ne peut pas attaquer !` });
+      return;
+    }
+
+    // Gestion du Sommeil (1 à 3 tours)
+    if (attPoke.status === 'sleep') {
+      if ((attPoke.sleepTurns || 0) <= 0) {
+        attPoke.status = null;
+        attPoke.sleepTurns = 0;
+        logEvent({ type: 'status_cured', side: attSide, msg: `${attPoke.name} se réveille !` });
+      } else {
+        attPoke.sleepTurns--;
+        logEvent({ type: 'msg', text: `${attPoke.name} dort profondément...` });
+        return;
+      }
+    }
+
+    // Gestion du Gel (20% de chance de dégeler par tour, ou attaque Feu du lanceur)
+    if (attPoke.status === 'freeze') {
+      if (Math.random() < 0.20 || attMove.type === 'fire') {
+        attPoke.status = null;
+        logEvent({ type: 'status_cured', side: attSide, msg: `${attPoke.name} dégèle !` });
+      } else {
+        logEvent({ type: 'msg', text: `${attPoke.name} est gelé et ne peut pas bouger !` });
+        return;
+      }
+    }
+
+    // Gestion de la Paralysie (25% d'immobilisation)
     if (attPoke.status === 'paralysis' && Math.random() < 0.25) {
       logEvent({ type: 'msg', text: `${attPoke.name} est paralysé ! Il ne peut pas attaquer !` });
       return;
     }
-    if (attPoke.status === 'sleep') {
-      logEvent({ type: 'msg', text: `${attPoke.name} dort profondément...` });
-      return;
-    }
-    if (attPoke.status === 'freeze') {
-      logEvent({ type: 'msg', text: `${attPoke.name} est gelé et ne peut pas bouger !` });
-      return;
+
+    // Décrémenter les PP
+    if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined) {
+      attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - 1);
     }
 
     logEvent({
       type: 'attack_start',
       side: attSide,
       pokemonId: attPoke.id,
+      attName: attPoke.name,
       moveName: attMove.name,
       moveType: attMove.type,
       msg: `${attPoke.name} utilise ${attMove.name} !`
     });
 
+    // Trempette
+    if (moveId === 'splash') {
+      logEvent({ type: 'msg', text: `Mais rien ne se passe !` });
+      return;
+    }
+
     // Test de précision
     const acc = attMove.acc || 100;
     if (acc < 100 && Math.random() * 100 > acc) {
-      logEvent({ type: 'msg', text: `Mais l'attaque a échoué !` });
+      logEvent({ type: 'msg', text: `Mais l'attaque de ${attPoke.name} a échoué !` });
       return;
     }
 
@@ -206,33 +345,34 @@ export function resolveTurn(state, actionA, actionB) {
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
         amount: healAmount,
-        msg: `${attPoke.name} récupère des PV !`
+        msg: `${attPoke.name} récupère ${healAmount} PV !`
       });
       return;
     }
 
-    // Gestion des boosts de stats purs (Danse Lames, Machination, etc.)
+    // Gestion des boosts/baisses de stats purs (Danse Lames, Danse Draco, Rugissement...)
     if (attMove.cat === 'status' && attMove.effect && attMove.effect.type === 'stat') {
-      const eff = attMove.effect;
-      const targetPoke = eff.target === 'self' ? attPoke : defPoke;
-      const targetSide = eff.target === 'self' ? attSide : defSide;
-      targetPoke.statStages[eff.stat] = Math.max(-6, Math.min(6, (targetPoke.statStages[eff.stat] || 0) + eff.val));
-      const statLabel = { atk: 'Attaque', def: 'Défense', spa: 'Att. Spé.', spd: 'Déf. Spé.', spe: 'Vitesse' }[eff.stat] || eff.stat;
-      const upDown = eff.val > 0 ? (eff.val >= 2 ? 'augmente beaucoup !' : 'augmente !') : 'diminue !';
-      logEvent({
-        type: 'stat_change',
-        side: targetSide,
-        msg: `${statLabel} de ${targetPoke.name} ${upDown}`
-      });
+      applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
       return;
     }
 
-    // Gestion des statuts purs (Cage-Éclair, Feu Follet, Toxik, Spore)
+    // Gestion des statuts purs (Cage-Éclair, Feu Follet, Toxik, Spore, Hypnose)
     if (attMove.cat === 'status' && attMove.effect && attMove.effect.type === 'status') {
       const st = attMove.effect.status;
-      if (!defPoke.status) {
+      // Immunités naturelles de type aux statuts
+      const immune =
+        (st === 'burn' && defPoke.types.includes('fire')) ||
+        (st === 'paralysis' && (defPoke.types.includes('electric') || (attMove.type === 'electric' && defPoke.types.includes('ground')))) ||
+        ((st === 'poison' || st === 'toxic') && (defPoke.types.includes('poison') || defPoke.types.includes('steel'))) ||
+        (st === 'sleep' && attMove.type === 'grass' && defPoke.types.includes('grass'));
+
+      if (immune) {
+        logEvent({ type: 'msg', text: `Ça n'affecte pas ${defPoke.name}...` });
+      } else if (!defPoke.status) {
         defPoke.status = st;
-        const stLabel = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', toxic: 'est gravement empoisonné', sleep: 's\'endort' }[st] || 'souffre d\'un statut';
+        if (st === 'sleep') defPoke.sleepTurns = 1 + Math.floor(Math.random() * 2); // 1 à 2 tours
+        if (st === 'toxic') defPoke.toxicTurns = 1;
+        const stLabel = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', toxic: 'est gravement empoisonné', sleep: "s'endort" }[st] || "souffre d'un statut";
         logEvent({
           type: 'status_applied',
           side: defSide,
@@ -240,7 +380,7 @@ export function resolveTurn(state, actionA, actionB) {
           msg: `${defPoke.name} ${stLabel} !`
         });
       } else {
-        logEvent({ type: 'msg', text: `Mais cela n'a aucun effet !` });
+        logEvent({ type: 'msg', text: `Mais ${defPoke.name} a déjà un statut !` });
       }
       return;
     }
@@ -255,10 +395,18 @@ export function resolveTurn(state, actionA, actionB) {
 
     defPoke.hp = Math.max(0, defPoke.hp - res.damage);
 
+    // Une attaque de type Feu dégèle la cible si elle était gelée
+    if (defPoke.status === 'freeze' && attMove.type === 'fire' && defPoke.hp > 0) {
+      defPoke.status = null;
+      logEvent({ type: 'status_cured', side: defSide, msg: `La chaleur dégèle ${defPoke.name} !` });
+    }
+
     logEvent({
       type: 'damage',
       attSide,
       defSide,
+      attName: attPoke.name,
+      defName: defPoke.name,
       moveName: attMove.name,
       moveType: attMove.type,
       damage: res.damage,
@@ -271,7 +419,7 @@ export function resolveTurn(state, actionA, actionB) {
 
     // Effet drain (Giga-Sangsue, Vampi-Poing)
     if (attMove.drain && res.damage > 0) {
-      const drainAmount = Math.floor(res.damage * attMove.drain);
+      const drainAmount = Math.max(1, Math.floor(res.damage * attMove.drain));
       attPoke.hp = Math.min(attPoke.maxHp, attPoke.hp + drainAmount);
       logEvent({
         type: 'heal',
@@ -280,7 +428,7 @@ export function resolveTurn(state, actionA, actionB) {
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
         amount: drainAmount,
-        msg: `${attPoke.name} draine l'énergie adverse !`
+        msg: `${attPoke.name} draine ${drainAmount} PV à ${defPoke.name} !`
       });
     }
 
@@ -294,7 +442,7 @@ export function resolveTurn(state, actionA, actionB) {
         damage: recoilDmg,
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
-        msg: `${attPoke.name} subit le contrecoup !`
+        msg: `${attPoke.name} subit ${recoilDmg} PV de contrecoup !`
       });
       if (attPoke.hp === 0) {
         attPoke.fainted = true;
@@ -302,32 +450,57 @@ export function resolveTurn(state, actionA, actionB) {
       }
     }
 
+    // Effet de stat sur le lanceur même si le défenseur tombe K.O. (Close Combat, Draco-Météore, Surpuissance)
+    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted) {
+      applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
+    }
+
     // K.O. du défenseur
     if (defPoke.hp === 0) {
       defPoke.fainted = true;
-      logEvent({ type: 'faint', side: defSide, pokemonId: defPoke.id, name: defPoke.name, msg: `${defPoke.name} ennemi est K.O. !` });
+      logEvent({ type: 'faint', side: defSide, pokemonId: defPoke.id, name: defPoke.name, msg: `${defPoke.name} est K.O. !` });
       return;
     }
 
-    // Effet secondaire de statut (ex: Brûlure sur Lance-Flammes 10%)
+    // Effet secondaire de baisse de stat sur la cible (Psyko, Ball'Ombre, Mâchouille, Piétinement, Écume)
+    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'opponent') {
+      const chance = attMove.effect.chance || 100;
+      if (Math.random() * 100 < chance) {
+        applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
+      }
+    }
+
+    // Effet secondaire de statut (ex: Brûlure sur Lance-Flammes 10%, Paralysie sur Tonnerre 10%)
     if (attMove.effect && attMove.effect.type === 'status' && !defPoke.status) {
-      if (Math.random() * 100 < (attMove.effect.chance || 10)) {
-        defPoke.status = attMove.effect.status;
+      const st = attMove.effect.status;
+      const immune =
+        (st === 'burn' && defPoke.types.includes('fire')) ||
+        (st === 'paralysis' && defPoke.types.includes('electric')) ||
+        (st === 'freeze' && defPoke.types.includes('ice')) ||
+        (st === 'poison' && (defPoke.types.includes('poison') || defPoke.types.includes('steel')));
+
+      if (!immune && Math.random() * 100 < (attMove.effect.chance || 10)) {
+        defPoke.status = st;
         const stLabel = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', freeze: 'est gelé' }[defPoke.status];
         if (stLabel) {
           logEvent({ type: 'status_applied', side: defSide, status: defPoke.status, msg: `${defPoke.name} ${stLabel} !` });
         }
       }
     }
+
+    // Effet secondaire de Peur (Flinch) si l'attaquant agit en premier
+    if (isFirstMover && attMove.flinch && Math.random() * 100 < attMove.flinch) {
+      flinched[defSide] = true;
+    }
   }
 
   // Exécution premier attaquant
-  executeMove(firstSide, secondSide);
+  executeMove(firstSide, secondSide, true);
 
   // Exécution second attaquant si encore en vie
-  executeMove(secondSide, firstSide);
+  executeMove(secondSide, firstSide, false);
 
-  // --- 4. Dégâts de statut de fin de tour (Brûlure, Poison) ---
+  // --- 4. Dégâts de statut de fin de tour (Brûlure, Poison, Toxik progressif) ---
   for (const side of ['A', 'B']) {
     const poke = getActivePokemon(state, side);
     if (!poke || poke.fainted) continue;
@@ -335,11 +508,17 @@ export function resolveTurn(state, actionA, actionB) {
     if (poke.status === 'burn') {
       const burnDmg = Math.max(1, Math.floor(poke.maxHp / 16));
       poke.hp = Math.max(0, poke.hp - burnDmg);
-      logEvent({ type: 'status_damage', side, damage: burnDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre de sa brûlure !` });
-    } else if (poke.status === 'poison' || poke.status === 'toxic') {
+      logEvent({ type: 'status_damage', side, damage: burnDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre de sa brûlure (-${burnDmg} PV) !` });
+    } else if (poke.status === 'poison') {
       const poisonDmg = Math.max(1, Math.floor(poke.maxHp / 8));
       poke.hp = Math.max(0, poke.hp - poisonDmg);
-      logEvent({ type: 'status_damage', side, damage: poisonDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre du poison !` });
+      logEvent({ type: 'status_damage', side, damage: poisonDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre du poison (-${poisonDmg} PV) !` });
+    } else if (poke.status === 'toxic') {
+      poke.toxicTurns = (poke.toxicTurns || 1);
+      const toxicDmg = Math.max(1, Math.floor((poke.maxHp * poke.toxicTurns) / 16));
+      poke.toxicTurns = Math.min(15, poke.toxicTurns + 1);
+      poke.hp = Math.max(0, poke.hp - toxicDmg);
+      logEvent({ type: 'status_damage', side, damage: toxicDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `Le venin ronge gravement ${poke.name} (-${toxicDmg} PV) !` });
     }
 
     if (poke.hp === 0 && !poke.fainted) {
@@ -360,7 +539,7 @@ export function resolveTurn(state, actionA, actionB) {
       type: 'victory',
       winner: state.winner,
       trainerName: winTrainer.name,
-      msg: state.winner === 'tie' ? "Match nul épique !" : `Victoire éclatante de ${winTrainer.name} !`
+      msg: state.winner === 'tie' ? 'Match nul épique !' : `Victoire éclatante de ${winTrainer.name} !`
     });
   } else {
     const curA = getActivePokemon(state, 'A');
@@ -393,6 +572,7 @@ export function forceSwitch(state, side, targetIdx) {
 
   const nextPoke = team[targetIdx];
   nextPoke.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+  nextPoke.toxicTurns = 0;
 
   const trainer = getTrainer(state, side);
   const event = {
@@ -400,9 +580,17 @@ export function forceSwitch(state, side, targetIdx) {
     side,
     pokemonId: nextPoke.id,
     name: nextPoke.name,
+    hp: nextPoke.hp,
+    maxHp: nextPoke.maxHp,
+    types: nextPoke.types,
+    status: nextPoke.status || null,
     trainer: trainer.name,
     msg: `${trainer.name} envoie ${nextPoke.name} au combat !`
   };
+
+  if (state.history) {
+    state.history.push({ turn: state.turn, text: event.msg, type: 'switch' });
+  }
 
   // Mise à jour de la phase
   if (state.phase === 'switch_forced_both') {
@@ -416,24 +604,23 @@ export function forceSwitch(state, side, targetIdx) {
   return event;
 }
 
-
 /**
- * Calcule la duree totale en millisecondes pour jouer l'animation sequentielle du tour
+ * Calcule la durée totale en millisecondes pour jouer l'animation séquentielle du tour
  */
 export function estimateTurnDuration(events) {
   if (!events || !events.length) return 0;
   let total = 0;
   for (const ev of events) {
-    if (ev.type === 'switch') total += 1100;
-    else if (ev.type === 'attack_start') total += 850;
-    else if (ev.type === 'damage') total += 1150;
-    else if (ev.type === 'heal' || ev.type === 'recoil') total += 900;
-    else if (ev.type === 'stat_change' || ev.type === 'status_applied') total += 900;
-    else if (ev.type === 'faint') total += 1200;
-    else if (ev.type === 'status_damage') total += 1000;
-    else if (ev.type === 'msg') total += 850;
-    else if (ev.type === 'victory') total += 1200;
-    else total += 600;
+    if (ev.type === 'switch') total += 1500;
+    else if (ev.type === 'attack_start') total += 1400;
+    else if (ev.type === 'damage') total += 1550;
+    else if (ev.type === 'heal' || ev.type === 'recoil') total += 1300;
+    else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured') total += 1300;
+    else if (ev.type === 'faint') total += 1500;
+    else if (ev.type === 'status_damage') total += 1350;
+    else if (ev.type === 'msg') total += 1300;
+    else if (ev.type === 'victory') total += 1600;
+    else total += 900;
   }
   return total;
 }

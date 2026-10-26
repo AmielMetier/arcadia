@@ -1,8 +1,10 @@
 // pokemon/view/game.js
-// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels Gen 5 animés, barres de PV progressives, sons officiels, musique Sandstorm et déroulement séquentiel des tours.
+// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels Gen 5 animés,
+// barres de PV progressives, paliers de stats en direct, PP réels, journal de combat et déroulement séquentiel.
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
+import { STAGE_MULTS } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
 import { sfx } from './sfx.js';
 import { battleMusic } from './music.js';
@@ -16,9 +18,17 @@ const STATUS_LABELS = {
   sleep: 'SOMMEIL'
 };
 
+const STAT_SHORT = {
+  atk: 'ATQ',
+  def: 'DÉF',
+  spa: 'ASP',
+  spd: 'DSP',
+  spe: 'VIT'
+};
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export function mountGame(root, { me, startMatch, restart, submitAction, exit }) {
+export function mountGame(root, { me, startMatch, restart, submitAction, switchMode, exit }) {
   root.className = 'poke-root';
   root.innerHTML = `
     <header class="poke-topbar">
@@ -28,12 +38,21 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         <span id="pokeRoundTitle">Tournoi</span>
       </div>
       <div class="poke-tools">
+        ${switchMode ? `<button class="poke-tool mode-switch-btn" id="btnSwitchAdv">MODE : <b>AVENTURE MENTON</b></button>` : ''}
+        <button class="poke-tool" id="btnLog">JOURNAL</button>
         <button class="poke-tool" id="btnMus">MUSIQUE : <b id="lblMus">ON</b></button>
         <button class="poke-tool" id="btnSnd">AUDIO : <b id="lblSnd">ON</b></button>
         <button class="poke-tool quit" id="btnQuit">QUITTER</button>
       </div>
     </header>
     <main class="poke-stage" id="pokeStage"></main>
+    <div class="poke-log-drawer" id="pokeLogDrawer" hidden>
+      <div class="pld-head">
+        <b>JOURNAL DE COMBAT</b>
+        <button class="pld-close" id="btnCloseLog">FERMER</button>
+      </div>
+      <div class="pld-list" id="pokeLogList"></div>
+    </div>
     <div class="poke-toast" id="pokeToast" hidden></div>`;
 
   const $ = (s) => root.querySelector(s);
@@ -65,7 +84,38 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
   $('#btnSnd').onclick = () => { sfx.toggle(); syncTools(); };
   $('#btnMus').onclick = () => { battleMusic.toggle(); syncTools(); };
-  $('#btnQuit').onclick = () => { battleMusic.stop(); exit(); };
+  $('#btnQuit').onclick = () => { battleMusic.stop(); cleanup(); exit(); };
+  if ($('#btnSwitchAdv') && switchMode) {
+    $('#btnSwitchAdv').onclick = () => {
+      battleMusic.stop();
+      cleanup();
+      switchMode('adventure');
+    };
+  }
+
+  const logDrawer = $('#pokeLogDrawer');
+  const logList = $('#pokeLogList');
+  $('#btnLog').onclick = () => {
+    logDrawer.hidden = !logDrawer.hidden;
+    renderLogHistory();
+  };
+  $('#btnCloseLog').onclick = () => { logDrawer.hidden = true; };
+
+  function renderLogHistory() {
+    if (!logList) return;
+    const hist = state && state.battle && state.battle.history ? state.battle.history : [];
+    if (hist.length === 0) {
+      logList.innerHTML = `<div class="pld-empty">Aucune action enregistrée pour le moment.</div>`;
+      return;
+    }
+    logList.innerHTML = hist.map(item => `
+      <div class="pld-row type-${item.type || 'msg'}">
+        <span class="pld-turn">T${item.turn || 1}</span>
+        <span class="pld-txt">${item.text}</span>
+      </div>
+    `).join('');
+    logList.scrollTop = logList.scrollHeight;
+  }
 
   function toast(msg, ms = 2400) {
     const t = $('#pokeToast');
@@ -84,7 +134,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     pop.className = `damage-popup ${isCrit ? 'crit' : ''}`;
     pop.textContent = isCrit ? `-${damage} CRITIQUE !` : `-${damage}`;
     anchor.appendChild(pop);
-    setTimeout(() => pop.remove(), 1050);
+    setTimeout(() => pop.remove(), 1150);
   }
 
   // --- Rendu des 3 Pokéballs d'équipe ---
@@ -98,12 +148,25 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     </div>`;
 
   // --- Rendu des badges de types officiels Showdown ---
-  const typeBadgesHtml = (types) => types.map(t => `
+  const typeBadgesHtml = (types) => (types || []).map(t => `
     <span class="type-pill" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
       <img class="type-pill-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
       <span class="type-pill-text">${TYPES[t].name.toUpperCase()}</span>
     </span>
   `).join('');
+
+  // --- Rendu des paliers de statistiques (+1 ATQ, -1 DÉF, etc.) ---
+  const statStagesHtml = (statStages) => {
+    if (!statStages) return '';
+    const entries = Object.entries(statStages).filter(([, val]) => val !== 0);
+    if (entries.length === 0) return '';
+    return entries.map(([k, val]) => {
+      const mult = STAGE_MULTS[val] || 1;
+      const multStr = Number.isInteger(mult) ? `${mult}` : mult.toFixed(1);
+      const cls = val > 0 ? 'up' : 'down';
+      return `<span class="sc-stage-pill ${cls}">${STAT_SHORT[k] || k.toUpperCase()} ×${multStr}</span>`;
+    }).join('');
+  };
 
   // --- Rendu du Bracket / Aperçu du Tournoi ---
   function renderBracket(s) {
@@ -215,6 +278,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     const isBottom = side === 'bottom';
     const fillEl = $(isBottom ? '#hpFillBottom' : '#hpFillTop');
     const numEl = $(isBottom ? '#hpNumBottom' : '#hpNumTop');
+    const maxEl = isBottom ? $('#hpMaxBottom') : null;
+    if (maxEl && maxHp) maxEl.textContent = `${maxHp}`;
     if (!fillEl) return;
 
     if (hpAnimRaf[side]) {
@@ -232,10 +297,11 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         numEl.textContent = `${toHp}`;
         numEl.className = hpClass;
       }
+      displayedHp[side] = toHp;
       return;
     }
 
-    const duration = Math.min(1100, Math.max(500, Math.abs(diff) * 10));
+    const duration = Math.min(1100, Math.max(550, Math.abs(diff) * 11));
     const startTime = performance.now();
 
     function step(now) {
@@ -277,7 +343,6 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
       return;
     }
 
-    // S'assurer que le plateau est affiché
     if (!$('#arenaCard')) {
       renderBattle(s);
     }
@@ -286,29 +351,38 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     const bottomSide = mySide === 'B' ? 'B' : 'A';
     const topSide = bottomSide === 'A' ? 'B' : 'A';
 
-    const setDialogue = (txt) => {
-      const dt = $('#dialogueText');
-      if (dt) dt.textContent = txt;
-    };
-
-    // Afficher le bandeau de résolution dans le dashboard pendant les animations
     const dash = $('#dashContainer');
     if (dash) {
       dash.innerHTML = `
         <div class="dash-resolving-view">
           <div class="dash-resolving-title">
-            <span class="live-pill">COMBAT</span>
-            <span>RÉSOLUTION DU TOUR EN COURS...</span>
+            <span class="live-pill">DÉROULEMENT DU TOUR</span>
+            <span id="liveTurnMainText">Préparation des actions...</span>
           </div>
-          <div class="dash-resolving-desc">Observez les capacités et les dégâts s'exécuter tour par tour !</div>
+          <div class="dash-resolving-steps" id="liveTurnSteps"></div>
         </div>`;
     }
 
-    // Dérouler chaque événement un par un de manière fluide et lisible
+    const setDialogue = (txt, tag = '') => {
+      const dt = $('#dialogueText');
+      if (dt) dt.textContent = txt;
+      const mainEl = $('#liveTurnMainText');
+      if (mainEl) mainEl.textContent = txt;
+      const stepsEl = $('#liveTurnSteps');
+      if (stepsEl && txt) {
+        const line = document.createElement('div');
+        line.className = `turn-step-item ${tag}`;
+        line.textContent = `▸ ${txt}`;
+        stepsEl.appendChild(line);
+        stepsEl.scrollTop = stepsEl.scrollHeight;
+      }
+    };
+
     for (const ev of s.events) {
       if (ev.type === 'switch') {
         const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg || `${ev.trainer} envoie ${ev.name} !`);
+        const sideKey = isBottom ? 'bottom' : 'top';
+        setDialogue(ev.msg || `${ev.trainer} envoie ${ev.name} !`, 'step-switch');
         sfx.play('switch');
         if (ev.pokemonId) sfx.playCry(ev.pokemonId);
 
@@ -319,18 +393,33 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         }
         const nameEl = $(isBottom ? '#nameBottom' : '#nameTop');
         if (nameEl) nameEl.textContent = ev.name.toUpperCase();
-        await sleep(1100);
+
+        if (ev.types) {
+          const typesEl = $(isBottom ? '#typesBottom' : '#typesTop');
+          if (typesEl) typesEl.innerHTML = typeBadgesHtml(ev.types);
+        }
+        const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
+        if (stEl) {
+          stEl.innerHTML = ev.status ? `<span class="status-badge status-${ev.status}">${STATUS_LABELS[ev.status] || ev.status.toUpperCase()}</span>` : '';
+        }
+        const stgEl = $(isBottom ? '#stagesBottom' : '#stagesTop');
+        if (stgEl) stgEl.innerHTML = '';
+
+        if (ev.hp !== undefined && ev.maxHp !== undefined) {
+          displayedHp[sideKey] = ev.hp;
+          animateHp(sideKey, ev.hp, ev.hp, ev.maxHp);
+        }
+
+        await sleep(1500);
 
       } else if (ev.type === 'attack_start') {
         const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg || `${ev.moveName} !`);
+        setDialogue(ev.msg || `${ev.attName || ''} utilise ${ev.moveName} !`, 'step-attack');
 
-        // Bruitage d'attaque
         const move = Object.values(MOVES).find(m => m.name === ev.moveName);
         if (move && move.cat === 'special') sfx.play('beam');
         else sfx.play('hit');
 
-        // Animation de charge/fente de l'attaquant
         const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
         if (spriteEl) {
           const animClass = isBottom ? 'anim-lunge-player' : 'anim-lunge-opponent';
@@ -338,7 +427,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           void spriteEl.offsetWidth;
           spriteEl.classList.add(animClass);
         }
-        await sleep(850);
+        await sleep(1400);
 
       } else if (ev.type === 'damage') {
         const targetIsBottom = (ev.defSide === bottomSide);
@@ -352,29 +441,33 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         sfx.playHit(ev.mult || 1);
         showDamagePopup(targetIsBottom ? 'bottom' : 'top', ev.damage, ev.crit);
 
+        let effText = '';
         if (ev.msg) {
-          setDialogue(ev.msg);
+          effText = ev.msg;
         } else if (ev.crit && ev.mult > 1) {
-          setDialogue("Coup critique ! C'est super efficace !");
+          effText = "Coup critique ! C'est super efficace !";
         } else if (ev.crit) {
-          setDialogue("Coup critique !");
+          effText = 'Coup critique !';
         } else if (ev.mult > 1) {
-          setDialogue("C'est super efficace !");
+          effText = "C'est super efficace !";
         } else if (ev.mult > 0 && ev.mult < 1) {
-          setDialogue("Ce n'est pas très efficace...");
+          effText = "Ce n'est pas très efficace...";
         }
 
-        // Animation de la barre de PV
+        const defLabel = ev.defName || (targetIsBottom ? ($('#nameBottom')?.textContent || 'Votre Pokémon') : ($('#nameTop')?.textContent || 'Le Pokémon adverse'));
+        const dmgLine = `${defLabel} perd ${ev.damage} PV !${effText ? ' ' + effText : ''}`;
+        setDialogue(dmgLine, ev.mult >= 2 ? 'step-super' : 'step-damage');
+
         const sideKey = targetIsBottom ? 'bottom' : 'top';
         const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.defHp + ev.damage);
         animateHp(sideKey, oldHp, ev.defHp, ev.defMaxHp);
         displayedHp[sideKey] = ev.defHp;
 
-        await sleep(1150);
+        await sleep(1550);
 
       } else if (ev.type === 'faint') {
         const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg || `${ev.name} est K.O. !`);
+        setDialogue(ev.msg || `${ev.name} est K.O. !`, 'step-faint');
         sfx.play('faint');
 
         const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
@@ -383,16 +476,15 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           spriteEl.classList.add('anim-faint');
         }
 
-        // Mettre à jour l'indicateur de balles
         const ballsEl = $(isBottom ? '#ballsBottom' : '#ballsTop');
         const team = isBottom ? (bottomSide === 'A' ? b.teamA : b.teamB) : (topSide === 'A' ? b.teamA : b.teamB);
         if (ballsEl) ballsEl.innerHTML = ballsHtml(team);
 
-        await sleep(1200);
+        await sleep(1500);
 
       } else if (ev.type === 'status_damage') {
         const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg);
+        setDialogue(ev.msg, 'step-damage');
         const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
         if (spriteEl) {
           spriteEl.classList.remove('anim-hit');
@@ -403,60 +495,67 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.hp + ev.damage);
         animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
         displayedHp[sideKey] = ev.hp;
-        await sleep(1000);
+        await sleep(1350);
 
       } else if (ev.type === 'heal' || ev.type === 'recoil') {
         const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg);
+        setDialogue(ev.msg, 'step-status');
         const sideKey = isBottom ? 'bottom' : 'top';
         const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : ev.hp;
         animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
         displayedHp[sideKey] = ev.hp;
-        await sleep(900);
+        await sleep(1300);
 
-      } else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'msg') {
-        setDialogue(ev.msg || ev.text);
+      } else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured' || ev.type === 'msg') {
+        setDialogue(ev.msg || ev.text, 'step-status');
         if (ev.type === 'status_applied') {
           const isBottom = (ev.side === bottomSide);
           const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
           if (stEl) {
             stEl.innerHTML = `<span class="status-badge status-${ev.status}">${STATUS_LABELS[ev.status] || ev.status.toUpperCase()}</span>`;
           }
+        } else if (ev.type === 'status_cured') {
+          const isBottom = (ev.side === bottomSide);
+          const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
+          if (stEl) stEl.innerHTML = '';
         }
-        await sleep(950);
+        await sleep(1300);
 
       } else if (ev.type === 'victory') {
-        setDialogue(ev.msg);
+        setDialogue(ev.msg, 'step-victory');
         sfx.play('victory');
-        await sleep(1400);
+        await sleep(1600);
       }
     }
 
     isResolvingTurn = false;
-    const targetState = queuedState || s;
+    const nextQueued = queuedState;
     queuedState = null;
+    if (nextQueued && nextQueued.events && nextQueued.events.length > 0) {
+      playSequentialTurn(nextQueued);
+      return;
+    }
+    const targetState = nextQueued || s;
     renderBattle(targetState);
+    if (!logDrawer.hidden) renderLogHistory();
   }
 
-  // --- Rendu du Combat (Arène Showdown avec Assets Authentiques) ---
+  // --- Rendu du Combat (Arène Showdown avec Assets Authentiques Gen 5) ---
   function renderBattle(s) {
     const b = s.battle;
     if (!b) return;
 
     if (isResolvingTurn) return;
 
-    // Lancer la musique officielle du combat (Sandstorm pour matchs classiques, Cynthia pour la Finale)
     const isFinalRound = s.rounds && s.currentRoundIdx === s.rounds.length - 1;
     const expectedTrack = isFinalRound ? 'cynthia' : 'sandstorm';
     if (!battleMusic.isPlaying() && battleMusic.musicEnabled) {
       battleMusic.start(expectedTrack);
     }
 
-    // Déterminer si le joueur local est un combattant
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const isSpectator = !mySide;
 
-    // Déterminer qui est en bas (joueur local / allié) et en haut (adversaire)
     const bottomSide = mySide === 'B' ? 'B' : 'A';
     const topSide = bottomSide === 'A' ? 'B' : 'A';
 
@@ -475,14 +574,13 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
 
     const isSubmitted = mySide === 'A' ? s.submittedA : mySide === 'B' ? s.submittedB : false;
     const isForcedSwitch = (mySide === 'A' && b.phase === 'switch_forced_A') ||
-                          (mySide === 'B' && b.phase === 'switch_forced_B') ||
-                          b.phase === 'switch_forced_both';
+                           (mySide === 'B' && b.phase === 'switch_forced_B') ||
+                           b.phase === 'switch_forced_both';
 
     if (isForcedSwitch) {
       activeTab = 'switch';
     }
 
-    // Message d'annonce contextuel
     let announcement = '';
     if (isForcedSwitch) {
       announcement = 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
@@ -491,15 +589,13 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
     } else if (isSubmitted) {
       announcement = "Attaque enregistrée ! En attente de l'adversaire...";
     } else {
-      announcement = `Que doit faire ${pBottom.name} ?`;
+      announcement = `Tour ${b.turn || 1} — Que doit faire ${pBottom.name} ?`;
     }
 
-    // Calcul du temps restant
     const leftMs = Math.max(0, s.turnEndsAt - Date.now());
     const leftSec = Math.ceil(leftMs / 1000);
     const timerWidth = Math.max(0, Math.min(100, (leftMs / (s.timerSecs * 1000)) * 100));
 
-    // Si l'arène est déjà montée, mettre à jour dynamiquement pour préserver les animations
     const existingArena = $('#arenaCard');
     if (!existingArena) {
       displayedHp.bottom = pBottom.hp;
@@ -508,16 +604,17 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
       stage.innerHTML = `
         <div class="arena-card deal" id="arenaCard">
           <div class="battlefield">
-            <!-- HUD Adversaire (Haut-Gauche) avec Plaque Authentique -->
+            <!-- HUD Adversaire (Haut-Gauche) -->
             <div class="hud-zone hud-top">
               <div class="status-card opponent-card">
                 <div class="sc-head">
                   <div class="sc-name-row">
                     <b class="sc-name" id="nameTop">${pTop.name.toUpperCase()}</b>
-                    <span class="sc-lvl">NV. 50</span>
+                    <span class="sc-lvl">NV. ${pTop.level || 50}</span>
                   </div>
                   <div class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</div>
                   <span id="statusTop">${pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : ''}</span>
+                  <div class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</div>
                 </div>
 
                 <div class="hp-gauge-row">
@@ -537,34 +634,35 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
               </div>
             </div>
 
-            <!-- Zone Combat Adversaire (Haut-Droite) : Socle officiel plains_b & Sprite Gen 5 animé -->
+            <!-- Zone Combat Adversaire (Haut-Droite) -->
             <div class="fighter-zone fighter-top">
               <div class="platform platform-top">
-                <img src="assets/platform_opponent.png" class="plat-img" alt="platform">
+                <img src="assets/plat_grass_enemy.png" class="plat-img" alt="platform">
                 <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
                 <div class="damage-popup-anchor" id="popupAnchorTop"></div>
               </div>
             </div>
 
-            <!-- Zone Combat Joueur (Bas-Gauche) : Socle officiel plains_a & Sprite arrière Gen 5 animé -->
+            <!-- Zone Combat Joueur (Bas-Gauche) -->
             <div class="fighter-zone fighter-bottom">
               <div class="platform platform-bottom">
-                <img src="assets/platform_player.png" class="plat-img" alt="platform">
+                <img src="assets/plat_grass_enemy.png" class="plat-img" alt="platform">
                 <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
                 <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
               </div>
             </div>
 
-            <!-- HUD Joueur (Bas-Droite) avec Plaque Authentique -->
+            <!-- HUD Joueur (Bas-Droite) -->
             <div class="hud-zone hud-bottom">
               <div class="status-card player-card">
                 <div class="sc-head">
                   <div class="sc-name-row">
                     <b class="sc-name" id="nameBottom">${pBottom.name.toUpperCase()}</b>
-                    <span class="sc-lvl">NV. 50</span>
+                    <span class="sc-lvl">NV. ${pBottom.level || 50}</span>
                   </div>
                   <div class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</div>
                   <span id="statusBottom">${pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : ''}</span>
+                  <div class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</div>
                 </div>
 
                 <div class="hp-gauge-row">
@@ -576,16 +674,16 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                 </div>
 
                 <div class="sc-foot">
-                  <span class="hp-fraction"><b id="hpNumBottom" class="${hpClassBottom}">${pBottom.hp}</b> / ${pBottom.maxHp} PV</span>
+                  <span class="hp-fraction"><b id="hpNumBottom" class="${hpClassBottom}">${pBottom.hp}</b> / <span id="hpMaxBottom">${pBottom.maxHp}</span> PV</span>
                   <div id="ballsBottom">${ballsHtml(teamBottom)}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Bandeau de Dialogue Showdown avec texture overlay_message -->
+          <!-- Bandeau de Dialogue Showdown -->
           <div class="battle-dialogue-bar">
-            <span class="dialogue-tag">DIRECT</span>
+            <span class="dialogue-tag" id="turnTag">TOUR ${b.turn || 1}</span>
             <span class="dialogue-text" id="dialogueText">${announcement}</span>
           </div>
 
@@ -593,37 +691,46 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           <div class="dashboard" id="dashContainer"></div>
         </div>`;
     } else {
-      // Mise à jour douce du DOM sans casser les animations
       $('#nameTop').textContent = pTop.name.toUpperCase();
       $('#typesTop').innerHTML = typeBadgesHtml(pTop.types);
       $('#statusTop').innerHTML = pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : '';
+      if ($('#stagesTop')) $('#stagesTop').innerHTML = statStagesHtml(pTop.statStages);
       $('#ballsTop').innerHTML = ballsHtml(teamTop);
 
       $('#nameBottom').textContent = pBottom.name.toUpperCase();
       $('#typesBottom').innerHTML = typeBadgesHtml(pBottom.types);
       $('#statusBottom').innerHTML = pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : '';
+      if ($('#stagesBottom')) $('#stagesBottom').innerHTML = statStagesHtml(pBottom.statStages);
       $('#ballsBottom').innerHTML = ballsHtml(teamBottom);
 
+      if ($('#turnTag')) $('#turnTag').textContent = `TOUR ${b.turn || 1}`;
+      if ($('#hpMaxBottom')) $('#hpMaxBottom').textContent = `${pBottom.maxHp}`;
       $('#dialogueText').textContent = announcement;
 
-      // Sprites (mettre à jour si changement de Pokémon)
       const sTop = $('#spriteTop');
-      if (sTop && !sTop.src.includes(`/${pTop.id}.gif`)) {
+      const topChanged = sTop && !sTop.src.includes(`/${pTop.id}.gif`);
+      if (topChanged) {
         sTop.src = spriteUrls(pTop.id).front;
-        sTop.className = 'poke-sprite front anim-enter';
-      }
-      const sBottom = $('#spriteBottom');
-      if (sBottom && !sBottom.src.includes(`/${pBottom.id}.gif`)) {
-        sBottom.src = spriteUrls(pBottom.id).back;
-        sBottom.className = 'poke-sprite back anim-enter';
+        sTop.className = `poke-sprite front ${pTop.fainted ? 'fainted' : 'anim-enter'}`;
+        displayedHp.top = pTop.hp;
+        animateHp('top', pTop.hp, pTop.hp, pTop.maxHp);
+      } else if (displayedHp.top !== null && displayedHp.top !== pTop.hp) {
+        animateHp('top', displayedHp.top, pTop.hp, pTop.maxHp);
+      } else {
+        animateHp('top', pTop.hp, pTop.hp, pTop.maxHp);
       }
 
-      // Animation progressive de PV si différence
-      if (displayedHp.bottom !== null && displayedHp.bottom !== pBottom.hp) {
+      const sBottom = $('#spriteBottom');
+      const bottomChanged = sBottom && !sBottom.src.includes(`/${pBottom.id}.gif`);
+      if (bottomChanged) {
+        sBottom.src = spriteUrls(pBottom.id).back;
+        sBottom.className = `poke-sprite back ${pBottom.fainted ? 'fainted' : 'anim-enter'}`;
+        displayedHp.bottom = pBottom.hp;
+        animateHp('bottom', pBottom.hp, pBottom.hp, pBottom.maxHp);
+      } else if (displayedHp.bottom !== null && displayedHp.bottom !== pBottom.hp) {
         animateHp('bottom', displayedHp.bottom, pBottom.hp, pBottom.maxHp);
-      }
-      if (displayedHp.top !== null && displayedHp.top !== pTop.hp) {
-        animateHp('top', displayedHp.top, pTop.hp, pTop.maxHp);
+      } else {
+        animateHp('bottom', pBottom.hp, pBottom.hp, pBottom.maxHp);
       }
     }
 
@@ -658,6 +765,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
             ${pBottom.moves.map((moveId, mIdx) => {
               const m = MOVES[moveId];
               if (!m) return '';
+              const maxPp = m.pp || 15;
+              const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
               const eff = getEffectiveness(m.type, pTop.types);
               let matchupClass = '';
               let matchupLabel = '';
@@ -688,7 +797,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
               }
 
               return `
-                <button class="pro-move-card" data-move="${moveId}" style="--mc:${TYPES[m.type].color};--mc-bg:${TYPES[m.type].bg}" ${isSubmitted ? 'disabled' : ''}>
+                <button class="pro-move-card" data-move="${moveId}" style="--mc:${TYPES[m.type].color};--mc-bg:${TYPES[m.type].bg}" ${isSubmitted || curPp <= 0 ? 'disabled' : ''}>
                   <div class="pm-top">
                     <span class="pm-key">${mIdx + 1}</span>
                     <span class="pm-name">${m.name}</span>
@@ -707,7 +816,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                       </div>
                       <div class="pm-stat-chip">
                         <span class="pm-stat-label">PP</span>
-                        <span class="pm-stat-val">${m.pp || 15} / ${m.pp || 15}</span>
+                        <span class="pm-stat-val">${curPp} / ${maxPp}</span>
                       </div>
                     </div>
                   </div>
@@ -734,7 +843,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
                   <div class="bs-details">
                     <div class="bs-title-row">
                       <b>${p.name.toUpperCase()}</b>
-                      <span class="bs-lvl">NV. 50</span>
+                      <span class="bs-lvl">NV. ${p.level || 50}</span>
                     </div>
                     <div class="bs-types">
                       ${p.types.map(t => `<img src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
@@ -749,7 +858,6 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
           </div>
         `}`;
 
-      // Gestion des clics d'attaques et de switch
       if (!isSpectator && !isSubmitted) {
         const bMoves = $('#tabMoves');
         const bSwitch = $('#tabSwitch');
@@ -815,11 +923,10 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
       </div>`;
 
     $('#btnPlayAgain').onclick = () => restart();
-    $('#btnBackLobby').onclick = () => exit();
+    $('#btnBackLobby').onclick = () => { cleanup(); exit(); };
   }
 
-  // Raccourcis clavier (1, 2, 3, 4 pour attaques)
-  addEventListener('keydown', (e) => {
+  function onKeyDown(e) {
     if (isResolvingTurn) return;
     if (!state || state.phase !== 'battle' || !state.battle) return;
     const b = state.battle;
@@ -839,13 +946,17 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         submitAction({ type: 'move', moveId: p.moves[idx] });
       }
     }
-  });
+  }
+
+  window.addEventListener('keydown', onKeyDown);
+
+  function cleanup() {
+    window.removeEventListener('keydown', onKeyDown);
+  }
 
   return {
     update(s, off) {
       state = s;
-
-      // Déclencher le rendu de phase
       if (s.phase === 'bracket_preview') {
         isResolvingTurn = false;
         renderBracket(s);
@@ -862,6 +973,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, exit })
         renderPodium(s);
       }
     },
-    toast
+    toast,
+    cleanup
   };
 }

@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.59 — 26 octobre 2026
+## 2.63 — 26 octobre 2026
 - **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 4 joueurs chacun son tour, avec des bots.
   - 18 trous dans trois décors : la campagne, le bord de mer (plages, baies, palmiers) et la montagne (falaises, torrents, sommets enneigés).
   - Partie de 6 trous (un décor), de 9 trous (l'aller ou le retour) ou les 18 trous d'un coup, avec la carte de score entre chaque trou et le podium à la fin.
@@ -11,6 +11,37 @@
   - On voit le swing des autres en direct. Le plus loin du drapeau joue en premier, et l'honneur revient au meilleur score du trou précédent.
   - Ambiance de nature, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
   - Bots en trois niveaux : facile, moyen et difficile.
+
+## 2.62 — 26 octobre 2026
+- Fix 3v3 battle platform alignment, sequential turn narration, and MMO pixel-art tileset + enterable buildings (Amiel)
+
+## 2.61 — 26 octobre 2026
+- Correction : export TYPE_FR and TYPE_COLORS in types.js and add HubBridge init handshake fallback (Amiel)
+
+## 2.60 — 26 octobre 2026
+- Nouveau : master edition upgrade with GBA FireRed sprites, follower pokemon, evolutions, Menton gym & mart, Showdown portraits and competitive battle mechanics (Amiel)
+
+## 2.59 — 26 octobre 2026
+- **Cyber Kart GP** — Nouveau circuit : **Abysses Néon** (le Grand Prix passe à 7 courses).
+  - Départ sur une autoroute posée sur pilotis au-dessus d'un lagon turquoise, puis une promenade à moitié noyée : les roues soulèvent des gerbes d'eau.
+  - Plongée vers le récif : sous l'eau, le kart est plus léger (sauts plus longs), le moteur laisse des bulles et le son est étouffé.
+  - Un tube de verre traverse la mer, au milieu des bancs de poissons, des raies mantas, des algues géantes et des rayons de soleil.
+  - Spirale suspendue autour d'un pilier de lumière qui monte du gouffre jusqu'au-dessus des vagues.
+  - Méduses électriques qui montent et descendent au-dessus de la route du récif : on passe dessous au bon moment.
+  - Remontée vers la surface et grand saut en planeur au-dessus de l'eau.
+- **Convoy Storm** — Une vraie voie, de vrais paysages, et bien plus à faire que charger des caisses.
+  - La voie tourne, monte et descend : le convoi peine en montée, file en descente, et les virages serrés font crisser les roues.
+  - De vrais aiguillages : un levier au bord de la voie, à basculer à la main avant le passage du convoi. L'autre voie part de son côté, avec un aperçu de son paysage.
+  - La carte du trajet (Tab) montre les voies possibles sur les deux prochains aiguillages, nommées par paysage ou par moment fort, et en pointillé la suite de la voie retenue jusqu'à Fort-Givre.
+  - Des paysages pleins : une forêt de sapins bien dense, une ville aux façades serrées, un lac gelé bordé de forêt avec campements de pêche et épaves prises dans la glace, un col avec sa falaise, son ravin et ses tunnels sous la montagne, une raffinerie, une toundra avec troupeaux de rennes et campements nomades, une plaine avec sa ligne télégraphique, ses clôtures et ses bosquets.
+  - Chaque paysage a son geste : abattre des sapins à la hache (deux caisses de bûches), pousser le wagonnet d'une mine de charbon, tirer le tuyau d'une cuve de fioul jusqu'à la chaudière, fouiller un immeuble porte par porte, écarter un troupeau.
+  - Des wagons à installer en gare : tourelle-harpon (elle abat loups, pillards et tireurs, et ramène les caisses au loin), atelier (2 ferraille pour une réparation ou une fusée), dortoir.
+  - Des survivants cachés dans les ruines, à ramener jusqu'à Fort-Givre : à bord, ils aident à tenir la chaudière.
+  - En gare, un contrat pour le tronçon suivant (livrer des pièces, amener un survivant, arriver vite ou en bon état) et parfois une rencontre : convoi en panne, marchand, cheminots, chasseurs.
+  - De nouveaux dangers : pillards qui sautent à bord, tireurs sur les toits, loup alpha, incendie à bord, chute dans le ravin.
+  - Nouveaux graphismes : des sapins enneigés aux vraies branches, qui ondulent au vent ; une lumière plus réaliste (ombres plus fines, pénombre au pied des wagons et des ruines, halo autour du foyer, du phare et des lanternes la nuit) ; une neige qui scintille et se ride sous le vent, et de gros flocons au premier plan. Quand le Front approche, l'image se resserre et se délave. Sur les machines modestes, les effets se coupent d'eux-mêmes.
+  - Nouvelle interface : tableau de bord de la locomotive (fioul, pression, vitesse), bandeau de la ligne avec les aiguillages, les tunnels et le Front, repères à l'écran, panneau de gare en cartes, premiers pas guidés lors de la première partie. Icônes et modèles 3D de Kenney (CC0).
+  - Un peu plus de caisses le long des rails, et un sac de charbon sur chaque quai.
 
 ## 2.58 — 26 octobre 2026
 - **Hub** — Nouveau : ajouter le mode aventure MMO multijoueur a Menton (Kalos-Sud) (Amiel)

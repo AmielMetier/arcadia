@@ -133,7 +133,9 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       const ev = forceSwitch(b, 'A', action.targetIndex);
       if (ev) {
         broadcast([ev]);
-        if (b.phase === 'choose') startTurnTimer();
+        if (b.phase === 'choose') {
+          setTimeout(startTurnTimer, 1500);
+        }
       }
       return;
     }
@@ -141,15 +143,26 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
       const ev = forceSwitch(b, 'B', action.targetIndex);
       if (ev) {
         broadcast([ev]);
-        if (b.phase === 'choose') startTurnTimer();
+        if (b.phase === 'choose') {
+          setTimeout(startTurnTimer, 1500);
+        }
       }
       return;
     }
     if (b.phase === 'switch_forced_both') {
-      if (side === 'A' && action.type === 'switch') forceSwitch(b, 'A', action.targetIndex);
-      if (side === 'B' && action.type === 'switch') forceSwitch(b, 'B', action.targetIndex);
-      broadcast();
-      if (b.phase === 'choose') startTurnTimer();
+      const evs = [];
+      if (side === 'A' && action.type === 'switch') {
+        const ev = forceSwitch(b, 'A', action.targetIndex);
+        if (ev) evs.push(ev);
+      }
+      if (side === 'B' && action.type === 'switch') {
+        const ev = forceSwitch(b, 'B', action.targetIndex);
+        if (ev) evs.push(ev);
+      }
+      broadcast(evs);
+      if (b.phase === 'choose') {
+        setTimeout(startTurnTimer, 1500);
+      }
       return;
     }
 
@@ -194,17 +207,17 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
         if ((state.phase === 'switch_forced_A' || state.phase === 'switch_forced_both') && state.trainerA.bot) {
           setTimeout(() => {
             const sw = chooseBotAction(state, 'A', difficulty);
-            if (sw && sw.type === 'switch') forceSwitch(state, 'A', sw.targetIndex);
-            broadcast();
-            if (state.phase === 'choose') startTurnTimer();
+            const ev = (sw && sw.type === 'switch') ? forceSwitch(state, 'A', sw.targetIndex) : null;
+            broadcast(ev ? [ev] : []);
+            if (state.phase === 'choose') setTimeout(startTurnTimer, 1500);
           }, 800);
         }
         if ((state.phase === 'switch_forced_B' || state.phase === 'switch_forced_both') && state.trainerB.bot) {
           setTimeout(() => {
             const sw = chooseBotAction(state, 'B', difficulty);
-            if (sw && sw.type === 'switch') forceSwitch(state, 'B', sw.targetIndex);
-            broadcast();
-            if (state.phase === 'choose') startTurnTimer();
+            const ev = (sw && sw.type === 'switch') ? forceSwitch(state, 'B', sw.targetIndex) : null;
+            broadcast(ev ? [ev] : []);
+            if (state.phase === 'choose') setTimeout(startTurnTimer, 1500);
           }, 1000);
         }
       }, animDuration);

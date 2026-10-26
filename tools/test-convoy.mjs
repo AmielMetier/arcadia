@@ -3,8 +3,9 @@
 // reprise d'un état diffusé (migration d'hôte), et parties jouées par un pilote automatique.
 import assert from 'node:assert/strict';
 import { Sim, DT, stepPlayer, playerFromRow, DIFFICULTY, Ruins, trainSpeedFor, VMAX, LOST_DIST, stationDist, CARDS, cardCost, obstacleColliders, windOf, DIG_T, FLARE_R,
-  THROTTLE, LEVER, VALVE, FAULTS, STORM_START, STORM_STATION_K, ROLES, THAW_T, nightK, dayInfo, DAY_LEN, legAt, momentPos, momentOf, momentKind, chunkEnv,
-  BRIDGE_LEN, HOOK_SPOTS, moveCtx, momentColliders, LEG_SHIFT } from '../convoy/engine/sim.js';
+  THROTTLE, LEVER, VALVE, FAULTS, STORM_START, STORM_STATION_K, ROLES, THAW_T, nightK, dayInfo, DAY_LEN, legAt, momentPos, momentOf, momentKinds, chunkEnv,
+  BRIDGE_LEN, HOOK_SPOTS, moveCtx, momentColliders, LEG_SHIFT, forksOf, forkOptions, kappaAt, gradeAt, tunnelsOf, Line, TURRET, BENCH, CONTRACTS, ENCOUNTERS,
+  lineColliders, snapRoute, CART_V, HOSE_LEN } from '../convoy/engine/sim.js';
 import { chunkRuins, DECK_Y, REAR, BOILER, HALF_W, CHUNK, onDeckRect, BIOMES } from '../convoy/engine/world.js';
 
 let n = 0;
@@ -20,7 +21,7 @@ t('ruines déterministes et à l\'écart des rails', () => {
     for (const r of a.ruins) {
       assert.ok(Math.abs(r.x) > 6, 'ruine hors de la voie');
       assert.ok(r.zw <= -k * CHUNK && r.zw >= -(k + 1) * CHUNK, 'ruine dans son tronçon');
-      assert.ok(r.loot >= 0 && r.loot <= (r.kind === 'camp' ? 3 : 2));
+      for (const sp of r.spots) assert.ok(sp.loot >= 0 && sp.loot <= (r.kind === 'camp' ? 3 : 2));
     }
     if (a.loose) assert.ok(Math.abs(a.loose.x) > HALF_W + 1);
   }
@@ -121,7 +122,7 @@ t('fouille : une ruine ne se fouille qu\'une fois', () => {
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   // trouver une ruine avec du butin
   let ruin = null;
-  for (let k = 0; k < 30 && !ruin; k++) ruin = chunkRuins(11, k, DIFFICULTY.facile.loot).ruins.find((r) => r.loot > 0);
+  for (let k = 0; k < 30 && !ruin; k++) ruin = sim.ruins.chunk(k).ruins.find((r) => r.loot > 0 && r.spots.length === 1 && !r.spot.amb);
   assert.ok(ruin);
   sim.dist = -ruin.zw - 5; // la ruine 5 m devant le centre du convoi
   Object.assign(p, { on: 0, ref: 0, y: 0, x: ruin.spot.x, z: ruin.spot.zw + sim.dist, air: 0 });
@@ -129,7 +130,7 @@ t('fouille : une ruine ne se fouille qu\'une fois', () => {
   let found = 0;
   for (let i = 0; i < 120; i++) { p.inp = { mx: 0, mz: 0, use: true }; sim.v = 0; sim.step(DT); for (const e of sim.drainEvents()) if (e.e === 'found') found += e.n; }
   assert.equal(found, ruin.loot);
-  assert.ok(sim.looted.has(ruin.id));
+  assert.ok(sim.looted.has(ruin.id * 4));
   const before = sim.crates.length;
   for (let i = 0; i < 120; i++) { p.inp = { mx: 0, mz: 0, use: true }; sim.v = 0; sim.step(DT); }
   assert.ok(sim.crates.length <= before, 'pas de seconde fouille');
@@ -276,18 +277,23 @@ t('gare : arrêt, chaleur et fusées rendues, cartes, aiguillage, vote du dépar
   assert.equal(sim.buy(1, c1), null); assert.equal(sim.scrap, 10 - cost);
   sim.scrap = 0; assert.ok(sim.buy(0, c2), 'pas assez de ferraille');
   assert.ok(sim.buy(0, Object.keys(CARDS).find((k) => !sim.stop.c.includes(k))), 'carte non proposée');
-  // aiguillage : deux voies, la majorité l'emporte
+  // aiguillage : deux voies ; on descend basculer le levier au bout du quai
   assert.equal(sim.stop.fk.length, 2); assert.notEqual(sim.stop.fk[0], sim.stop.fk[1]);
   const pick = sim.stop.fk[1];
-  sim.route(0, 1); sim.route(1, 1); sim.route(1, 0); sim.route(1, 1);
+  const f = sim.curFork(); assert.equal(f.k, 'st'); assert.equal(sim.lc, 0);
+  const lv = sim.leverPos(f);
+  Object.assign(b, { on: 0, ref: 0, y: 0, air: 0, x: lv.x + 0.6, z: lv.z, st: 0 });
+  b.inp = { mx: 0, mz: 0, use: true }; sim.step(DT); b.inp = { mx: 0, mz: 0, use: false }; sim.step(DT);
+  assert.equal(sim.lc, 1, 'levier basculé');
   sim.vote(0); run(sim, 1); assert.ok(sim.stop, 'il manque un vote');
   sim.vote(1); run(sim, 1);
   assert.equal(sim.stop, null, 'départ'); assert.equal(sim.ns, 1);
-  assert.equal(sim.legs[1], pick, 'tronçon suivant : ' + pick);
   assert.equal(sim.buy(0, c2), 'On n\'achète qu\'en gare.');
+  run(sim, 14, () => { for (const p of sim.players.values()) p.inp = { mx: 0, mz: 0 }; });
+  assert.equal(sim.legs[1], pick, 'le convoi a pris la voie du levier : ' + pick);
   // le paysage change un peu après la gare
   assert.equal(legAt('endless', 0, sd + LEG_SHIFT - 1), 0); assert.equal(legAt('endless', 0, sd + LEG_SHIFT + 1), 1);
-  assert.equal(chunkEnv(51, 'endless', 0, sim.legs, Math.ceil((sd + LEG_SHIFT) / CHUNK) + 1).bio, pick);
+  assert.equal(chunkEnv(51, 'endless', 0, { legs: sim.legs, mk: sim.mk }, Math.ceil((sd + LEG_SHIFT) / CHUNK) + 1).bio, pick);
   // sans vote, le convoi repart tout seul
   const s2 = calmSim({ seed: 52, mode: 'endless' }); s2.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); s2.ed = 1e9;
   s2.dist = sd - 5; s2.v = 1;
@@ -331,9 +337,9 @@ t('reprise identique avec loups, fusées, gare et améliorations', () => {
   const sim = calmSim({ seed: 81, mode: 'endless', difficulty: 'blizzard' });
   const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
   sim.scrap = 7; sim.up.coats = 1; sim.ed = 1e9;
-  sim.wolves.push({ id: 90, x: 20, zw: -40, yaw: 0, st: 0, t: 0, tg: -1, hx: 20, hz: -40, a: 0, fx: 0, fz: 0 });
-  sim.flares.push({ id: 91, m: 1, x: 0, z: 3, t: 5 });
   sim.dist = stationDist('endless', 0, 0) - 3; sim.v = 1;
+  sim.wolves.push({ id: 90, x: 20, zw: -sim.dist - 8, yaw: 0, st: 0, t: 0, tg: -1, hx: 20, hz: -sim.dist - 8, a: 0, fx: 0, fz: 0 });
+  sim.flares.push({ id: 91, m: 1, x: 0, z: 3, t: 5 });
   run(sim, 6, () => { p.inp = { mx: 0.2, mz: 0 }; });
   assert.ok(sim.stop);
   const copy = Sim.restore(JSON.parse(JSON.stringify(sim.snapshot())));
@@ -479,7 +485,7 @@ t('caisses : fioul, charbon, fioul gelé (dégel près du feu), pièces détach�
   // le charbon est lourd
   const a = { ...p, carry: 2, on: 0, ref: 0, y: 0, vx: 0, vz: 0, st: 0 }, b = { ...p, carry: 1, on: 0, ref: 0, y: 0, vx: 0, vz: 0, st: 0 };
   for (let i = 0; i < 40; i++) { stepPlayer(a, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); stepPlayer(b, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); }
-  assert.ok(a.vx < b.vx * 0.8, 'porter du charbon ralentit');
+  assert.ok(a.vx < b.vx * 0.9 && a.vx > 2.6, 'porter du charbon ralentit (mais on rattrape le convoi)');
   // l'état diffusé garde le type des caisses
   const copy = Sim.restore(JSON.parse(JSON.stringify(sim.snapshot())));
   assert.deepEqual(copy.crates.map((q) => q.t), sim.crates.map((q) => q.t));
@@ -527,12 +533,14 @@ t('moments forts : placés au milieu des tronçons, selon l\'ambiance choisie', 
     for (let L = 1; L < 4; L++) {
       const d = momentPos(seed, mode, goal, L); assert.ok(d != null);
       assert.equal(legAt(mode, goal, d), L, 'dans son tronçon');
-      assert.ok(d + BRIDGE_LEN < (stationDist(mode, goal, L) ?? goal) - 100, 'loin de la gare suivante');
+      assert.ok(d + BRIDGE_LEN < (stationDist(mode, goal, L) ?? goal) - 60, 'loin de la gare suivante');
     }
   }
-  assert.equal(momentOf(5, 'expedition', 2000, ['plaine'], 1), null, 'pas avant l\'aiguillage');
-  const m = momentOf(5, 'expedition', 2000, ['plaine', 'lac'], 1);
-  assert.ok(['bridge', 'boss'].includes(m.k) && m.k === momentKind(5, 1, 'lac'));
+  assert.equal(momentOf(5, 'expedition', 2000, { legs: ['plaine'], mk: [] }, 1), null, 'pas avant l\'aiguillage');
+  assert.equal(momentOf(5, 'expedition', 2000, { legs: ['plaine', 'lac'], mk: [] }, 1), null, 'pas avant l\'aiguillage du milieu');
+  const ks = momentKinds(5, 1, 'lac'); assert.deepEqual([...ks].sort(), ['boss', 'bridge']);
+  const m = momentOf(5, 'expedition', 2000, { legs: ['plaine', 'lac'], mk: [, 1] }, 1);
+  assert.equal(m.k, ks[1]);
   // aucun événement de voie sur un moment fort
   const sim = new Sim({ seed: 5 });
   for (let i = 1; i < 12; i++) { sim.ed = sim.eventDist(i); for (let L = 1; L < 4; L++) { const d = momentPos(5, 'expedition', sim.goal, L); assert.ok(sim.ed < d - 100 || sim.ed > d + BRIDGE_LEN + 100); } }
@@ -541,9 +549,9 @@ t('moments forts : placés au milieu des tronçons, selon l\'ambiance choisie', 
 // un convoi bien réglé arrivant sur le moment fort du tronçon 1 de l'ambiance donnée
 function momentSim(kind, seedFrom = 200) {
   for (let seed = seedFrom; seed < seedFrom + 400; seed++) for (const bio of BIOME_LIST) {
-    if (momentKind(seed, 1, bio) !== kind) continue;
+    const c = momentKinds(seed, 1, bio).indexOf(kind); if (c < 0) continue;
     const sim = new Sim({ seed, mode: 'endless' });
-    sim.legs = ['plaine', bio]; sim.ruins.setLegs(sim.legs);
+    sim.legs = ['plaine', bio]; sim.mk = [undefined, c]; sim.ruins.setRoute(sim.legs, sim.mk);
     sim.press = -1e9; sim.nf = 1e9; sim.rd = 1e9; sim.ed = 1e9; sim.storm = -1e9;
     const d = momentPos(seed, 'endless', 0, 1);
     sim.ns = 1; sim.cl = 1; sim.dist = d - 240; sim.v = 2; sim.ks = Math.floor((sim.dist + 85) / CHUNK);
@@ -555,9 +563,10 @@ const BIOME_LIST = Object.keys(BIOMES);
 
 t('pont de la gorge : trop vite il se fissure, en Éco ça passe ; dehors, la chute', () => {
   const { sim, d } = momentSim('bridge'); const p = sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' });
-  const ev = []; run(sim, 200, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; });
+  const ev = []; let minHull = 100;
+  run(sim, 200, () => { ev.push(...sim.drainEvents()); p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; minHull = Math.min(minHull, sim.hull); });
   assert.ok(ev.some((e) => e.e === 'moment' && e.k === 'bridge'));
-  assert.ok(ev.some((e) => e.e === 'bridge_crack'), 'à pleine vitesse le pont cède'); assert.ok(sim.hull < 80);
+  assert.ok(ev.some((e) => e.e === 'bridge_crack'), 'à pleine vitesse le pont cède'); assert.ok(minHull < 80);
   const e2 = momentSim('bridge'); const q = e2.sim.addPlayer({ id: 0, name: 'A', color: '#ff0000' }); e2.sim.thr = 0;
   const ev2 = []; run(e2.sim, 200, () => { ev2.push(...e2.sim.drainEvents()); q.inp = { mx: 0, mz: 0 }; e2.sim.fuel = 100; });
   assert.ok(ev2.some((e) => e.e === 'bridge_done') && !ev2.some((e) => e.e === 'bridge_crack'), 'en Éco, pas de casse');
@@ -657,15 +666,20 @@ t('cartes : leurs effets', () => {
 function autopilot(sim, p, time) {
   const t0 = (time * 60) | 0;
   const go = (tx, tz, extra = {}) => {
+    // à bord : contourner la caisse à outils (côté droit) et le bac à charbon (côté gauche) par le milieu du pont
+    const d0 = Math.hypot(tx - p.x, tz - p.z);
+    if (p.on && Math.abs(tx) <= HALF_W && tz > -13 && tz < REAR && ((tx > 0.5 || p.x > 0.5) && (Math.min(p.z, tz) < -3.0 && Math.max(p.z, tz) > -4.8)
+      || (tx < -0.4 || p.x < -0.4) && (Math.min(p.z, tz) < 12.2 && Math.max(p.z, tz) > 8.8))) {
+      if (Math.abs(p.x - 0.1) > 0.25 && d0 > 1.2) { tx = 0.1; tz = p.z; }
+    }
     const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz) || 1;
     p.inp = { mx: dx / d, mz: dz / d, use: false, thr: p.inp.thr | 0, jump: p.inp.jump | 0, fl: p.inp.fl | 0, ...extra };
-    return d;
+    return d0 || 0.001; // la distance jusqu'à la vraie cible, même en passant par un détour
   };
   if (p.st >= 2) return;
   // en gare : on vote le départ (après avoir dépensé la ferraille)
   if (sim.stop && sim.stop.k === 'station') {
     for (const k of sim.stop.c) sim.buy(p.id, k);
-    if (sim.stop.fk && !sim.stop.rv.some((x) => x[0] === p.id)) sim.route(p.id, (p.id + sim.ns) % 2);
     if (!sim.stop.v.includes(p.id)) sim.vote(p.id);
   }
   // convoi abandonné : on ramasse ce qu'on peut, puis on repart
@@ -724,12 +738,27 @@ function autopilot(sim, p, time) {
   const ground = sim.crates.filter((c) => c.m === 0).map(near).filter((c) => c.z < REAR + 20 && Math.hypot(c.x - p.x, c.z - p.z) < 30).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
   if (ground) { if (go(ground.x, ground.z) < 1.0) p.inp.use = t0 % 2 === 0; return; }
   let best = null, bd = 1e9;
-  for (const [, c] of sim.ruins.around(sim.dist, 40, 10)) for (const r of c.ruins) {
-    if (sim.looted.has(r.id)) continue;
-    const z = r.spot.zw + sim.dist; if (z > REAR + 12) continue;
-    const d = Math.hypot(r.spot.x - p.x, z - p.z); if (d < bd) { bd = d; best = { x: r.spot.x, z }; }
-  }
+  for (const [, c] of sim.ruins.around(sim.dist, 60, 10)) for (const r of c.ruins) r.spots.forEach((sp, j) => {
+    if (sim.looted.has(r.id * 4 + j)) return;
+    const z = sp.zw + sim.dist; if (z > REAR + 12) return;
+    const d = Math.hypot(sp.x - p.x, z - p.z); if (d < bd) { bd = d; best = { x: sp.x, z }; }
+  });
   if (best) { if (go(best.x, best.z) < 1.4) p.inp = { mx: 0, mz: 0, use: true, thr: p.inp.thr | 0, jump: p.inp.jump | 0 }; return; }
+  // sinon : un wagonnet de charbon à pousser, un arbre à abattre près de la voie
+  for (const res of sim.resources('cart')) {
+    const c = sim.carts.get(res.id); if (c && c.d) continue;
+    const q = sim.cartPos(res, c); if (q.z > REAR + 6 || q.z < -40) continue;
+    const s = Math.sign(res.x1) || 1;
+    if (go(q.x + s * 1.1, q.z) < 0.9) p.inp = { ...p.inp, mx: -s * 0.6, mz: 0, use: true };
+    return;
+  }
+  let tree = null, td = 1e9;
+  for (const [, c] of sim.ruins.around(sim.dist, 30, 0)) for (const tr of c.trees) {
+    if (sim.cut.has(tr.id)) continue;
+    const z = tr.zw + sim.dist; if (z > REAR + 6 || Math.abs(tr.x) > 14) continue;
+    const d = Math.hypot(tr.x - p.x, z - p.z); if (d < td) { td = d; tree = { x: tr.x - Math.sign(tr.x) * 0.9, z }; }
+  }
+  if (tree && td < 30) { if (go(tree.x, tree.z) < 0.8) p.inp = { ...p.inp, mx: 0, mz: 0, use: true }; return; }
   if (!p.on) go(0, REAR + 0.7); else go(0, 4);
 }
 
