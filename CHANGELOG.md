@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.71 — 26 octobre 2026
+- **Birdie Party** — La présentation des trous est mieux cadrée, et les fondus au blanc disparaissent.
+  - On part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou.
+  - Les lacets se survolent sans donner le tournis.
+  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
+
 ## 2.70 — 26 octobre 2026
 - **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
   - Tous les trous sont redessinés, chacun avec sa forme : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Le terrain est bordé d'arbres, puis de forêt ou d'eau.
@@ -10,8 +16,6 @@
   - Nouvel écran d'accueil : on survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
   - La mini-carte se zoome (molette ou Z) et se fait glisser ; le bouton relief (ou R) montre les altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
   - Interface refaite : boutons et icônes plus nets, carte de score et podium plus clairs (médailles, symboles birdie et bogey), mise en page revue sur téléphone.
-  - La présentation de chaque trou est mieux cadrée : on part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou. Les lacets se survolent sans donner le tournis.
-  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
   - Les bots évitent mieux l'eau et la forêt et dosent mieux leurs approches.
 
 ## 2.69 — 26 octobre 2026
