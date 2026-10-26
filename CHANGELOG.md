@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.82 — 26 octobre 2026
+- Nouveau : ajout du dossier logs/crash et du système de diagnostic de crashs et d'expulsions pour tous les jeux (Amiel)
+
 ## 2.81 — 26 octobre 2026
 - **Convoy Storm** — Chaque paysage a maintenant son caractère, à l'œil comme dans la partie.
   - Plaine gelée : la voie droite et dégagée fait filer le convoi 12 % plus vite, de quoi reprendre de l'avance sur le Front. Des fermes isolées, avec leur enclos et leur charrette, abritent souvent des survivants.
