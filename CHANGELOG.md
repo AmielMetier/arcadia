@@ -1,13 +1,35 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.71 — 26 octobre 2026
-- **Birdie Party** — Des plans plus beaux et plus doux, et une balle à l'eau fait rejouer le coup.
-  - La présentation de chaque trou est mieux cadrée : on part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou. Les lacets se survolent sans donner le tournis.
-  - Chaque coup se regarde comme à la télé : la balle part depuis derrière le golfeur, puis une caméra posée près du point de chute la regarde arriver et rouler. Le ralenti la montre depuis l'autre côté.
-  - Les changements de plan se font en fondu enchaîné, sans flash blanc ni coupure sèche. Sur l'écran d'accueil, la caméra ne s'arrête plus avant de passer au trou suivant.
+## 2.72 — 26 octobre 2026
+- **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.
+  - Chaque coup : la balle part depuis derrière le golfeur, puis une caméra posée près du point de chute la regarde arriver et rouler. Le ralenti la montre depuis l'autre côté.
+  - Les changements de plan se font en fondu enchaîné, sans coupure sèche : fin de la présentation, joueur suivant, ralenti, écran de chargement.
+  - Sur l'écran d'accueil, la caméra ne s'arrête plus avant de passer au trou suivant.
   - Balle à l'eau : un coup de pénalité, et on rejoue du même endroit (comme un hors-limites).
   - Trou 9 (Les Îles) : le départ est sur une pointe de la rive, et non plus sur un chemin au milieu de l'eau.
   - Le son est actif dès l'ouverture du jeu (au premier clic si le navigateur l'exige).
+
+## 2.71 — 26 octobre 2026
+- **Birdie Party** — La présentation des trous est mieux cadrée, et les fondus au blanc disparaissent.
+  - On part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou.
+  - Les lacets se survolent sans donner le tournis.
+  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
+- **Hub** — Nouvelle vitrine : les jeux s'affichent sur quatre colonnes, à l'accueil comme dans le salon.
+  - Chaque jeu a la même vignette : une vraie image du jeu avec son titre en grand et son sous-titre, une phrase pour le présenter, le nombre de joueurs et les bots.
+  - Nouvelles affiches tirées du vrai jeu pour Bastion Clash (un assaut sur une base, en 3D), Birdie Party (le trou des Îles, au bord du lac), Poké Duel (Pikachu face à Dracaufeu) et Mini-Golf Party (le Double Looping de la Forge Infernale).
+- **Hub** — Ton compte : à la première visite, tu choisis ton pseudo et ta couleur, et le navigateur s'en souvient.
+  - « Modifier » change ton pseudo ou ta couleur à tout moment.
+  - « 📲 Mon compte sur un autre appareil » donne un code à coller sur ton téléphone ou un autre ordinateur pour y retrouver ton compte et tes amis.
+- **Hub** — Les amis : rejoins tes potes sans copier de code.
+  - Chacun a un code ami ; ajoute un pote avec son code, ou d'un clic sur « ＋ Ami » à côté de son nom dans le salon. Il doit accepter.
+  - Ta liste d'amis montre qui est en ligne, à quoi il joue et dans quel salon : « Rejoindre » t'y emmène directement.
+  - Dans un salon, « Inviter » envoie une invitation à un ami en ligne ; il la reçoit même en pleine partie et la rejoint d'un clic.
+- **Tous les jeux** — Une connexion bien plus solide :
+  - Une coupure de quelques secondes (wifi qui saute, téléphone qui change de réseau, onglet mis de côté) ne fait plus quitter la partie : le jeu se reconnecte tout seul et récupère tout ce qui s'est passé entre-temps.
+  - Pendant la coupure, un bandeau « reconnexion… » s'affiche, et les autres voient « reconnexion… » à côté de ton nom au lieu de te voir partir.
+  - Si c'est l'hôte qui coupe, le salon l'attend au lieu de changer d'hôte, et personne ne perd la partie.
+  - Après une longue coupure, on retrouve sa place et son numéro dans le salon, sans apparaître en double.
+  - Même si le serveur redémarre, tout le monde se retrouve dans le même salon, avec le même code.
 
 ## 2.70 — 26 octobre 2026
 - **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.

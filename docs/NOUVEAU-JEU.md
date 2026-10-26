@@ -106,13 +106,16 @@ reprend le dernier état reçu et relance la question en cours (`restartQuestion
    { id: 'calcul', title: 'Tête de Calcul', tag: '…', desc: '…', url: 'calcul/',
      minPlayers: 1, maxPlayers: 6, accent: '#ff5fa2',
      settings: [ { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], …], def: 'classic' }, … ],
-     cover: `<svg viewBox="0 0 320 180">…</svg>` }
+     cover: 'calcul/img/affiche.jpg' }
    ```
    - `settings` : le Hub affiche les boutons, mémorise le choix et le passe au jeu dans `info.settings`
      (les valeurs numériques arrivent en nombres). Un réglage avec la clé `bots` est filtré pour ne pas dépasser `maxPlayers`.
      `group` ajoute un intertitre (ex. « Règles maison »).
    - `maxPlayers` ≤ 6 (capacité du salon, `DDRoom.MAX_PLAYERS`).
-   - `cover` : SVG 320 × 180, même style (contours `#16181d` de 3 px, couleurs franches).
+   - `tag` : le sous-titre de l'affiche ; `desc` : **une seule phrase**, écrite pour les joueurs.
+   - `cover` : affiche JPEG 960 × 540 dans `<jeu>/img/affiche.jpg`, dans le style commun à tous les jeux : une vraie
+     image du jeu (sans interface), le titre en grand en deux couleurs et un bandeau pour le sous-titre.
+     `tools/affiche.html?img=…&t1=…&t2=…&c1=…&c2=…&sub=…&pill=…` la compose à partir d'une capture du jeu.
 2. **`shared/results.js`** : ajouter l'id du jeu à la liste des jeux acceptés (`['david', 'drift', …, 'convoy']`),
    sinon les résultats sont **rejetés** par la validation et n'apparaissent pas au classement.
 3. **`hub/hub.js`** : nom du jeu dans `GNAME`, icône dans la liste des dernières parties, libellé de `scoreLabel`.

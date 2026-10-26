@@ -1,12 +1,17 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.71';
+  const VERSION = '2.72';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
   const gameDef = (id) => GAMES.find((g) => g.id === id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const QS = new URLSearchParams(location.search);
+  const FR = window.HubFriends;
+  // N'écrit que si le contenu change : un clic n'est jamais perdu parce que la liste a été reconstruite sous la souris
+  const shown = new WeakMap();
+  const setHTML = (el, html) => { if (shown.get(el) !== html) { shown.set(el, html); el.innerHTML = html; } };
 
   let me = DDProfile.load();
   let room = null;
@@ -27,14 +32,23 @@
 
   /* ------------------------------------------------------------ accueil */
   $('#ver').textContent = 'v' + VERSION;
-  $('#shelf').innerHTML = GAMES.map((g) => `<div class="mini"><div class="cv">${g.cover}</div><div><b>${esc(g.title)}</b><small>${esc(g.tag)} · ${g.minPlayers === 1 ? 'seul ou' : g.minPlayers + ' à'} ${g.maxPlayers} joueurs</small></div></div>`).join('');
+  // Vignette d'un jeu, la même à l'accueil et dans le salon : l'affiche porte le titre et le sous-titre
+  function gameCard(g, { el = 'div', cls = '', attrs = '', extra = '' } = {}) {
+    const bots = (g.settings || []).some((s) => s.key === 'bots');
+    return `<${el} class="game${cls}" ${attrs}>
+      <span class="cv"><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async"></span>
+      <span class="tx"><span class="ds">${esc(g.desc)}</span>
+        <span class="meta"><span class="chip">👥 ${g.minPlayers} à ${g.maxPlayers} joueurs</span>${bots ? '<span class="chip">🤖 Bots</span>' : ''}</span>${extra}</span></${el}>`;
+  }
+  $('#shelf').innerHTML = GAMES.map((g) => gameCard(g)).join('');
+  $('#shelfCount').textContent = GAMES.length + ' jeux';
   $('#name').value = me.name;
-  $('#name').addEventListener('input', (e) => { me.name = e.target.value.slice(0, 12); DDProfile.save(me); if (room) room.updateMe(me); });
+  $('#name').addEventListener('input', (e) => { me.name = e.target.value.slice(0, 12); DDProfile.save(me); FR.setMe(profile()); renderAccount(); if (room) room.updateMe(me); });
   function renderSwatches() {
     const box = $('#swatches'); box.innerHTML = '';
     for (const c of DDProfile.PALETTE) {
       const b = document.createElement('button'); b.className = 'sw' + (c === me.color ? ' sel' : ''); b.style.background = c;
-      b.setAttribute('aria-label', 'Couleur ' + c); b.onclick = () => { me.color = c; DDProfile.save(me); renderSwatches(); };
+      b.setAttribute('aria-label', 'Couleur ' + c); b.onclick = () => { me.color = c; DDProfile.save(me); FR.setMe(profile()); renderSwatches(); renderAccount(); };
       box.appendChild(b);
     }
   }
@@ -44,6 +58,75 @@
   $('#joinCode').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
   $('#joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnJoin').click(); });
   const homeErr = (m) => { $('#homeErr').textContent = m || ''; };
+
+  /* ------------------------------------------------------------ compte */
+  // Le compte vit dans ce navigateur : pseudo, couleur, identifiant du classement et clé du code ami. Un code de
+  // transfert l'emporte sur un autre appareil (le serveur relais ne garde rien).
+  const ACCT_K = FR.storeKey('hub_account');
+  let registered = !!DDProfile.get(ACCT_K, null), editing = false;
+  if (!registered && me.name.trim()) { registered = true; DDProfile.set(ACCT_K, Date.now()); } // joueurs d'avant les comptes
+  function renderAccount() {
+    $('#acct').hidden = !registered; $('#regHead').hidden = registered; $('#regActions').hidden = registered; $('#playActions').hidden = !registered;
+    $('#profileEdit').hidden = registered && !editing; $('#acctTools').hidden = !registered;
+    $('#acctName').textContent = DDRoom.cleanName(me.name); $('#acctDot').style.background = me.color;
+    $('#btnProfile').textContent = editing ? 'OK' : 'Modifier'; $('#btnProfile').setAttribute('aria-expanded', String(editing));
+  }
+  function register() {
+    const n = me.name.trim();
+    if (n.length < 2) { $('#regErr').textContent = 'Choisis un pseudo (2 caractères au moins).'; $('#name').focus(); return; }
+    registered = true; DDProfile.set(ACCT_K, Date.now()); DDProfile.save(me);
+    renderAccount(); FR.start(profile()); renderFriends();
+    toast(`Bienvenue ${DDRoom.cleanName(n)} ! Ton compte est enregistré dans ce navigateur.`, 3500);
+    if ($('#joinCode').value.length === 4) $('#btnJoin').click(); // arrivé par un lien d'invitation
+  }
+  $('#btnRegister').onclick = register;
+  $('#name').addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (!registered) register(); else if (editing) $('#btnProfile').click(); });
+  $('#btnProfile').onclick = () => { editing = !editing; renderAccount(); if (editing) $('#name').focus(); };
+  const b64 = {
+    enc: (t) => btoa(String.fromCharCode(...new TextEncoder().encode(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+    dec: (t) => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))),
+  };
+  function dialog(title, html) {
+    const ov = document.createElement('div'); ov.className = 'ntov';
+    ov.innerHTML = `<div class="nt card" role="dialog" aria-label="${esc(title)}"><button class="ntx" aria-label="Fermer">×</button><h2>${esc(title)}</h2>${html}</div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('.ntx').onclick = close;
+    ov.addEventListener('pointerdown', (e) => { if (e.target === ov) close(); });
+    return ov;
+  }
+  $('#btnTransfer').onclick = () => {
+    const code = 'GH1.' + b64.enc(JSON.stringify({ ...FR.backup(), u: me.uid, n: me.name, c: me.color }));
+    const ov = dialog('Ton compte sur un autre appareil', `<p class="nthint">Copie ce code, puis sur l'autre appareil : « J'ai déjà un compte sur un autre appareil ». Tu y retrouves ton pseudo, ton code ami et tes amis. Garde-le pour toi : il ouvre ton compte.</p>
+      <textarea class="xfer" readonly rows="4" aria-label="Code de transfert">${esc(code)}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn yellow" id="xCopy">Copier le code</button></div>`);
+    ov.querySelector('textarea').onfocus = (e) => e.target.select();
+    ov.querySelector('#xCopy').onclick = () => (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
+      .then(() => toast('Code de transfert copié'), () => { ov.querySelector('textarea').select(); toast('Sélectionne le code et copie-le'); });
+  };
+  $('#btnRestore').onclick = () => {
+    const ov = dialog("J'ai déjà un compte", `<p class="nthint">Sur ton autre appareil, ouvre « Modifier », puis « 📲 Mon compte sur un autre appareil », copie le code et colle-le ici.</p>
+      <textarea class="xfer" rows="4" aria-label="Code de transfert" placeholder="GH1.…"></textarea><div class="err" id="xErr"></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn" id="xGo">Récupérer mon compte</button></div>`);
+    const ta = ov.querySelector('textarea'); ta.focus();
+    ov.querySelector('#xGo').onclick = () => {
+      let d = null;
+      try { const t = ta.value.trim(); if (t.startsWith('GH1.')) d = JSON.parse(b64.dec(t.slice(4))); } catch (e) {}
+      if (!d || !FR.restore(d)) { ov.querySelector('#xErr').textContent = "Ce code n'est pas valide : copie-le en entier."; return; }
+      DDProfile.set('dd_name', String(d.n || '').slice(0, 12));
+      if (DDProfile.PALETTE.includes(d.c)) DDProfile.set('dd_color', d.c);
+      if (/^[a-z0-9]{6,16}$/.test(String(d.u))) DDProfile.set('dd_uid', d.u);
+      DDProfile.set(ACCT_K, Date.now());
+      location.reload();
+    };
+  };
+  $('#btnLogout').onclick = () => {
+    if (!confirm("Se déconnecter de ce navigateur ?\n\nSans ton code de transfert (📲), ce compte et ta liste d'amis seront perdus ici.")) return;
+    if (room) room.leave();
+    FR.forget(); DDProfile.set(ACCT_K, null); DDProfile.set('dd_name', ''); DDProfile.set('dd_uid', null);
+    location.reload();
+  };
+  renderAccount();
 
   /* ------------------------------------------------------------ test de connexion */
   function openNetTest() {
@@ -174,7 +257,7 @@
   for (const id of ['#btnBoard', '#btnBoardRoom']) { const b = $(id); if (b) b.onclick = openBoard; }
   if (new URLSearchParams(location.search).has('nettest')) setTimeout(openNetTest, 300);
   const busy = (b) => { for (const id of ['#btnHost', '#btnJoin', '#btnSolo']) $(id).disabled = b; };
-  const profile = () => ({ name: DDRoom.cleanName(me.name), color: me.color, lvl: me.lvl, uid: me.uid });
+  const profile = () => ({ name: DDRoom.cleanName(me.name), color: me.color, lvl: me.lvl, uid: me.uid, fid: me.fid || undefined });
 
   $('#btnHost').onclick = () => { homeErr(''); busy(true); $('#btnHost').textContent = 'Création…'; newRoom(); room.host(profile()); };
   $('#btnJoin').onclick = () => {
@@ -189,7 +272,16 @@
     room = null; closeFrame(false); leftGame = null;
     busy(false); $('#btnHost').textContent = 'Créer un salon'; $('#btnJoin').textContent = 'Rejoindre';
     showScreen('home'); homeErr(msg || '');
-    history.replaceState(null, '', location.pathname + (DDNet.LOCAL_TEST ? '?local' : ''));
+    const keep = new URLSearchParams(); for (const k of ['local', 'ws', 'as', 'debug']) if (QS.has(k)) keep.set(k, QS.get(k));
+    history.replaceState(null, '', location.pathname + (keep.toString() ? '?' + keep.toString().replace(/=(&|$)/g, '$1') : ''));
+    renderNet(); pubState(); renderFriends();
+  }
+  // Rejoindre un salon par son code, depuis la liste d'amis ou une invitation
+  function joinCode(code) {
+    if (room && room.code === code) { showScreen(frame ? 'play' : 'room'); return; }
+    goHome();
+    $('#joinCode').value = code;
+    $('#btnJoin').click();
   }
 
   /* ------------------------------------------------------------ salon */
@@ -206,10 +298,20 @@
       results() { if (lbOpen) renderBoard(); },
       migrating(info) { toast(info.me ? "L'hôte est parti : tu deviens l'hôte…" : `L'hôte est parti : ${info.name} reprend le salon…`, 5000); },
       migrated() { toast('Salon rétabli, la partie continue', 3000); renderRoom(); syncFrame(); postRoster(); },
+      net(st) { renderNet(); if (st === 'up') toast('Connexion rétablie', 2200); },
     });
     if (new URLSearchParams(location.search).has('debug')) window.__room = room; // tests
   }
   setInterval(() => { if (room) { room.tick(performance.now()); renderPings(); } }, 2000);
+
+  // Bandeau de connexion : notre réseau coupé, ou l'hôte en reconnexion (le serveur garde les places quelques secondes)
+  function renderNet() {
+    let b = $('#netbar');
+    const txt = !room || room.mode === 'solo' ? '' : !room.netUp ? 'Connexion perdue · reconnexion…' : room.hostAway ? "Coupure chez l'hôte · on l'attend…" : '';
+    if (!txt) { if (b) b.hidden = true; return; }
+    if (!b) { b = document.createElement('div'); b.id = 'netbar'; b.className = 'netbar'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
+    b.innerHTML = '<i></i>' + esc(txt); b.hidden = false;
+  }
 
   function appendChat(c) {
     const p = document.createElement('p');
@@ -252,37 +354,156 @@
     $('#codeBox').hidden = solo; $('#chatBox').hidden = solo;
     $('#code').textContent = room.code || '----';
     const host = room.isHost;
-    // joueurs
-    const rows = room.players.map((p) => {
-      const tags = [];
-      if (p.id === room.hostId) tags.push('<span class="pill">Hôte</span>');
-      if (room.ready[p.id]) tags.push('<span class="pill in">En jeu</span>');
-      return `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span class="nm">${esc(p.name)}${p.id === room.myId ? ' <small>(toi)</small>' : ''}</span>${tags.join('')}${p.id !== room.myId ? `<small data-ping="${p.id}"></small>` : ''}</div>`;
-    });
-    if (!solo) for (let k = room.players.length; k < DDRoom.MAX_PLAYERS; k++) rows.push('<div class="pl empty">Place libre</div>');
-    $('#players').innerHTML = rows.join('');
-    renderPings();
+    renderPlayers(); renderNet(); pubState(); renderFriends();
     // partie en cours que l'on a quittée
     const running = room.game && !frame;
     $('#runBanner').hidden = !running;
     if (running) $('#runText').textContent = 'Partie de ' + gameDef(room.game.id).title + ' en cours';
     // jeux
     const n = room.players.length;
-    $('#games').innerHTML = GAMES.map((g) => {
+    setHTML($('#games'), GAMES.map((g) => {
       const tooMany = n > g.maxPlayers;
       const sel = (room.game ? room.game.id : pick.game) === g.id && (host || room.game);
-      return `<button class="game${sel ? ' sel' : ''}${tooMany ? ' off' : ''}" data-game="${g.id}" ${host && !tooMany ? '' : 'tabindex="-1"'} aria-pressed="${sel}">
-        <span class="cv">${g.cover}</span>
-        <span class="tx"><span class="tg">${esc(g.tag)}</span><b>${esc(g.title)}</b><p>${esc(g.desc)}</p>
-        ${tooMany ? `<span class="why">${g.maxPlayers} joueurs maximum</span>` : ''}</span></button>`;
-    }).join('');
-    for (const b of document.querySelectorAll('.game')) b.onclick = () => {
-      if (!host || room.game) return;
-      const g = gameDef(b.dataset.game); if (n > g.maxPlayers) return;
-      pick.game = g.id; renderRoom();
-    };
+      return gameCard(g, { el: 'button', cls: (sel ? ' sel' : '') + (tooMany ? ' off' : ''),
+        attrs: `data-game="${g.id}" ${host && !tooMany ? '' : 'tabindex="-1"'} aria-pressed="${sel}"`,
+        extra: tooMany ? `<span class="why">${g.maxPlayers} joueurs maximum</span>` : '' });
+    }).join(''));
     renderLaunch();
   }
+
+  $('#games').addEventListener('click', (e) => {
+    const b = e.target.closest('.game');
+    if (!b || !room || !room.isHost || room.game) return;
+    const g = gameDef(b.dataset.game); if (room.players.length > g.maxPlayers) return;
+    pick.game = g.id; renderRoom();
+  });
+  $('#players').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-addf]');
+    if (b && FR.request(b.dataset.addf) === 'ok') renderPlayers();
+  });
+  function renderPlayers() {
+    if (!room) return;
+    const rows = room.players.map((p) => {
+      const tags = [];
+      if (p.id === room.hostId) tags.push('<span class="pill">Hôte</span>');
+      if (p.away) tags.push('<span class="pill away" title="Sa connexion a sauté : le serveur lui garde sa place">reconnexion…</span>');
+      else if (room.ready[p.id]) tags.push('<span class="pill in">En jeu</span>');
+      const other = p.id !== room.myId;
+      if (other && p.fid && FR.isFriend(p.fid)) tags.push('<span class="pill fr" title="Ton ami">Ami</span>');
+      else if (other && p.fid && FR.status === 'on' && p.fid !== FR.fid) tags.push(FR.sent.has(p.fid)
+        ? '<span class="addf" aria-disabled="true">Demandé</span>'
+        : `<button class="addf" data-addf="${esc(p.fid)}" title="Envoyer une demande d'ami à ${esc(p.name)}">＋ Ami</button>`);
+      return `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span class="nm">${esc(p.name)}${p.id === room.myId ? ' <small>(toi)</small>' : ''}</span>${tags.join('')}${other ? `<small data-ping="${p.id}"></small>` : ''}</div>`;
+    });
+    if (room.mode !== 'solo') for (let k = room.players.length; k < DDRoom.MAX_PLAYERS; k++) rows.push('<div class="pl empty">Place libre</div>');
+    setHTML($('#players'), rows.join(''));
+    renderPings();
+  }
+
+  /* ------------------------------------------------------------ amis */
+  me.fid = FR.fid;
+  // ce que voient nos amis : sur l'accueil, en solo, ou dans un salon qu'ils peuvent rejoindre
+  function pubState() {
+    if (!room || !room.mode) { FR.setState({ w: 'menu' }); return; }
+    if (room.mode === 'solo') { FR.setState({ w: 'solo', game: frame ? frame.game : undefined }); return; }
+    const g = room.game && gameDef(room.game.id);
+    FR.setState({ w: 'room', code: room.code || undefined, game: g ? g.id : room.isHost ? pick.game : undefined, n: room.players.length,
+      max: g ? Math.min(DDRoom.MAX_PLAYERS, g.maxPlayers) : DDRoom.MAX_PLAYERS, play: !!room.game });
+  }
+  function friendWhere(st) {
+    if (!st) return 'Hors ligne';
+    const g = st.game && gameDef(st.game);
+    if (st.w === 'solo') return 'Joue seul' + (g ? ' · ' + g.title : '');
+    if (st.w === 'room') return (st.play ? 'En partie' : 'Dans un salon') + (g ? ' · ' + g.title : '') + ` · ${st.n}/${st.max}`;
+    return "Sur l'accueil";
+  }
+  const joinable = (st) => !!(st && st.w === 'room' && st.code && st.n < st.max && !(room && room.code === st.code));
+  function friendList() {
+    const rank = (x) => (!x.l ? 3 : joinable(x.l.st) ? 0 : x.l.st && x.l.st.w === 'room' ? 1 : 2);
+    return FR.friends.map((f) => ({ f, l: FR.live.get(f.fid) })).sort((a, b) => rank(a) - rank(b) || a.f.name.localeCompare(b.f.name));
+  }
+  const fdot = (f, l) => `<span class="dot${l ? ' on' : ''}" style="background:${esc(f.color || '#c9c0ad')}"></span>`;
+  const invitedAt = new Map();
+  function buildFriendsHome() {
+    $('#friendsHome').innerHTML = `<div class="fhead"><h2>Amis</h2><span class="fon" id="fOn"></span></div>
+      <div class="fcode" id="fCode"></div><div id="fReqs"></div><ul class="flist" id="fList"></ul>
+      <form class="fadd" id="fAdd"><input type="text" id="fAddIn" maxlength="9" placeholder="Code ami d'un pote" autocomplete="off" spellcheck="false" aria-label="Code ami d'un pote"><button class="btn small">Ajouter</button></form>`;
+    $('#fAddIn').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''); });
+    $('#fAdd').onsubmit = (e) => {
+      e.preventDefault();
+      const r = FR.request($('#fAddIn').value);
+      if (r === 'ok') { $('#fAddIn').value = ''; return; }
+      toast({ invalid: 'Un code ami fait 8 caractères, par exemple K7QM-2XPA.', self: "C'est ton propre code ami.", already: 'Vous êtes déjà amis.', offline: 'Connexion aux amis en cours, réessaie dans un instant.' }[r], 3500);
+    };
+    $('#friendsHome').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.id === 'fCopy') {
+        const txt = FR.format(FR.fid);
+        (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Code ami copié : envoie-le à tes potes'), () => toast('Ton code ami : ' + txt));
+      } else if (b.dataset.join) joinCode(b.dataset.join);
+      else if (b.dataset.acc) FR.accept(b.dataset.acc);
+      else if (b.dataset.dec) FR.decline(b.dataset.dec);
+      else if (b.dataset.rm) { const f = FR.friends.find((x) => x.fid === b.dataset.rm); if (f && confirm(`Retirer ${f.name} de tes amis ?`)) FR.remove(f.fid); }
+    });
+  }
+  function renderFriends() {
+    const list = friendList(), on = list.filter((x) => x.l).length;
+    $('#fOn').textContent = list.length ? `${on} en ligne` : '';
+    $('#fAdd').hidden = $('#fList').hidden = $('#fReqs').hidden = !registered;
+    setHTML($('#fCode'), !registered ? '<span>Crée ton compte pour ajouter tes potes en ami.</span>' : FR.status === 'on' ? `<span>Ton code ami</span><b>${esc(FR.format(FR.fid))}</b><button class="btn small ghost" id="fCopy" type="button">Copier</button>`
+      : FR.status === 'local' ? '<span>Amis indisponibles en mode test entre onglets.</span>'
+      : FR.status === 'unsupported' ? '<span>Les amis seront disponibles après la mise à jour du serveur.</span>'
+      : '<span class="wait"><i></i>Connexion aux amis…</span>');
+    setHTML($('#fReqs'), FR.requests.map((r) => `<div class="freq"><span class="nm"><b style="color:${esc(r.color)}">${esc(r.name)}</b> veut être ton ami</span>
+      <button class="btn small yellow" data-acc="${esc(r.fid)}">Accepter</button><button class="linkbtn" data-dec="${esc(r.fid)}">Refuser</button></div>`).join(''));
+    setHTML($('#fList'), list.length ? list.map(({ f, l }) => `<li class="${l ? '' : 'off'}">${fdot(f, l)}<span class="fn">${esc(f.name)}<small>${esc(friendWhere(l && l.st))}</small></span>
+      ${l && joinable(l.st) ? `<button class="btn small yellow" data-join="${esc(l.st.code)}">Rejoindre</button>` : ''}
+      <button class="fx" data-rm="${esc(f.fid)}" aria-label="Retirer ${esc(f.name)} de tes amis" title="Retirer de tes amis">×</button></li>`).join('')
+      : `<li class="fempty">Pas encore d'amis. Donne ton code ami à tes potes, ou ajoute-les d'un clic sur <b>＋ Ami</b> à côté de leur nom dans un salon.</li>`);
+    // salon : inviter les amis en ligne qui n'y sont pas
+    const box = $('#friendsRoom');
+    if (!room || room.mode === 'solo' || !room.code || FR.status !== 'on') { setHTML(box, ''); return; }
+    const here = new Set(room.players.map((p) => p.fid).filter(Boolean));
+    const cands = list.filter((x) => x.l && !here.has(x.f.fid));
+    const now = Date.now();
+    setHTML(box, `<div class="lbl">Inviter des amis</div>` + (cands.length
+      ? `<ul class="flist">${cands.map(({ f, l }) => { const sent = now - (invitedAt.get(f.fid) || 0) < 20000;
+        return `<li>${fdot(f, l)}<span class="fn">${esc(f.name)}<small>${esc(friendWhere(l.st))}</small></span><button class="btn small ${sent ? 'ghost' : 'yellow'}" data-inv="${esc(f.fid)}" ${sent ? 'disabled' : ''}>${sent ? 'Invité ✓' : 'Inviter'}</button></li>`; }).join('')}</ul>`
+      : `<p class="sethint">${FR.friends.length ? 'Aucun autre ami en ligne pour le moment.' : 'Ajoute tes potes en ami (＋ Ami à côté de leur nom) : la prochaine fois, tu les inviteras d\'un clic.'}</p>`));
+  }
+  $('#friendsRoom').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-inv]');
+    if (!b || b.disabled || !room || !room.code) return;
+    FR.invite(b.dataset.inv, room.code, room.game ? room.game.id : pick.game);
+    invitedAt.set(b.dataset.inv, Date.now()); renderFriends(); setTimeout(renderFriends, 20500);
+  });
+  // Petites cartes en haut à droite : demandes d'ami et invitations
+  function notify(html, actions, ttl, id) {
+    let box = $('#notifs');
+    if (!box) { box = document.createElement('div'); box.id = 'notifs'; box.className = 'notifs'; box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
+    if (id) for (const o of box.querySelectorAll('.notif')) if (o.dataset.id === id) o.remove();
+    const n = document.createElement('div'); n.className = 'notif'; if (id) n.dataset.id = id;
+    n.innerHTML = `<div>${html}</div><div class="row">${actions.map(([l, c], k) => `<button class="btn small ${c}" data-k="${k}">${esc(l)}</button>`).join('')}</div>`;
+    const t = setTimeout(() => n.remove(), ttl);
+    for (const b of n.querySelectorAll('button')) b.onclick = () => { clearTimeout(t); n.remove(); const fn = actions[b.dataset.k][2]; if (fn) fn(); };
+    box.appendChild(n);
+  }
+  buildFriendsHome();
+  FR.on('change', () => { renderFriends(); if (room && $('#room').classList.contains('on')) renderPlayers(); });
+  FR.on('me', (fid) => { me.fid = fid; if (room && room.mode !== 'solo') room.updateMe(me); });
+  FR.on('request', (r) => notify(`<b style="color:${esc(r.color)}">${esc(r.name)}</b> veut t'ajouter en ami.`,
+    [['Accepter', 'yellow', () => { FR.accept(r.fid); toast(`${r.name} est maintenant ton ami`); }], ['Refuser', 'ghost', () => FR.decline(r.fid)]], 60000, 'req' + r.fid));
+  FR.on('added', (f) => toast(`${f.name} a accepté : vous êtes amis !`, 3000));
+  FR.on('sent', () => toast("Demande d'ami envoyée"));
+  FR.on('err', (e) => toast(e.reason === 'self' ? "C'est ton propre code ami." : "Ce joueur n'est pas en ligne : il doit être connecté pour accepter ta demande.", 4000));
+  FR.on('invite', (m) => {
+    if (room && room.code === m.code) return;
+    const g = m.game && gameDef(m.game);
+    notify(`<b style="color:${esc(m.color)}">${esc(m.name)}</b> t'invite dans son salon${g ? ` pour jouer à <b>${esc(g.title)}</b>` : ''}.`,
+      [['Rejoindre', 'yellow', () => joinCode(m.code)], ['Plus tard', 'ghost', null]], 45000, 'inv' + m.from);
+  });
+  if (registered) FR.start(profile());
+  renderFriends();
 
   function renderLaunch() {
     const box = $('#launchBox'), host = room.isHost;
@@ -321,7 +542,7 @@
     if (!room) return;
     const g = room.game;
     if (!g) { if (frame) closeFrame(true); leftGame = null; return; }
-    if (frame && frame.n !== g.n) closeFrame(false);
+    if (frame && (frame.n !== g.n || (frame.role === 'host' && !room.isHost))) closeFrame(false);
     if (!frame && leftGame !== g.n) openFrame(g);
   }
 
@@ -337,10 +558,10 @@
     const el = document.createElement('iframe');
     el.title = def.title; el.src = src; el.allow = 'autoplay; fullscreen; gamepad';
     $('#play').innerHTML = ''; $('#play').appendChild(el);
-    frame = { game: g.id, n: g.n, el, loaded: false };
+    frame = { game: g.id, n: g.n, el, loaded: false, role };
     el.addEventListener('load', () => { try { el.contentWindow.focus(); } catch (e) {} });
     showScreen('play');
-    renderRoom();
+    renderRoom(); pubState();
   }
 
   function closeFrame(toRoom) {
