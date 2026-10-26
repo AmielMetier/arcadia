@@ -6,7 +6,11 @@ import { evalExpr, parseNumber, usesOnly } from '../calcul/engine/expr.js';
 import { createGame, nextQuestion, answer, reveal, check, publicState, fullQuestion, standings, restartQuestion, sabotage, deadlineOf, STEAL_MS, describeAnswer, gradeCode, useJoker, isTrap, LIVES } from '../calcul/engine/rules.js';
 import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ, buildProgram, scoreRun } from '../calcul/engine/code-data.js';
 import { STRATS, payoffAt } from '../calcul/engine/charts.js';
-import { PHONES, FAT_FINGER } from '../calcul/engine/drills.js';
+import { fatFinger, phoneNumber, ibanKey, isinKey } from '../calcul/engine/drills.js';
+import { rngOf } from '../calcul/engine/rng.js';
+import { GENS } from '../calcul/engine/gen-candidate.js';
+import { sqlQuestion } from '../calcul/engine/sql-gen.js';
+import { abstractMatrix, describeCell, memoryQ, attentionQ } from '../calcul/engine/mind.js';
 import { spawnSync } from 'node:child_process';
 import { botAnswer, botSabotage } from '../calcul/engine/bot.js';
 
@@ -17,8 +21,8 @@ const mmGood = (q) => {
   const V = q.mm.dice.reduce((x, y) => x + y, 0);
   return [0, 1, 2].map((k) => { const c = q.mm.dice.slice(0, k).reduce((x, y) => x + y, 0) + 3.5 * (3 - k) + q.mm.noise[k]; const m = (c + V) / 2; return c > V ? `${m - 1}/${m}` : `${m}/${m + 1}`; }).join(';');
 };
-const good = (q) => (q.input === 'expr' ? q.sol : q.input === 'mm' ? mmGood(q) : String(q.answer));
-const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'mm' ? '0/30;0/30;0/30' : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
+const good = (q) => (q.input === 'expr' ? q.sol : q.input === 'mm' ? mmGood(q) : q.input === 'sprint' ? q.answer.join(';') : String(q.answer));
+const bad = (q) => (q.input === 'expr' ? `${q.nums[0]}+${q.nums[1]}` : q.input === 'mm' ? '0/30;0/30;0/30' : q.input === 'sprint' ? q.answer.map((x) => x + 1).join(';') : q.input === 'choice' ? String((q.answer + 1) % q.choices.length) : String(q.answer * 3 + 7));
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
 
 t('lecture des nombres', () => {
@@ -46,7 +50,9 @@ t('cas pratique, relance et market making : placés dans la partie et notés com
   for (const len of [10, 15, 20, 30]) for (const diff of DIFFS) for (let seed = 1; seed < 40; seed++) {
     const cats = planCats(seed, len, 'chartier', { d: DIFFS.indexOf(diff) });
     const n = (c) => cats.filter((x) => x === c).length;
-    assert.ok(n('case') === 3 && n('relance') === 2 && n('mm') === 1, `${len} ${diff} ${cats}`);
+    // en 10 questions, pas de cas pratique : il prendrait trop de place
+    assert.ok(n('case') === (len >= 15 ? 3 : 0) && n('relance') === 2 && n('mm') === 1, `${len} ${diff} ${cats}`);
+    if (len < 15) continue;
     const k = cats.indexOf('case');
     assert.ok(cats[k + 1] === 'case' && cats[k + 2] === 'case' && k + 2 < len - 1, cats.join(','));
     assert.ok(new Set([k, k + 1, k + 2].map((i) => chartierTier(DIFFS.indexOf(diff), i, len))).size === 1, 'le cas tient dans un tour');
@@ -97,9 +103,18 @@ t('les questions sont reproductibles et justes', () => {
     if (q.kind === 'case' || q.kind === 'relance') {
       assert.ok(Number.isFinite(q.answer) && q.tip && q.input === 'num' && [1, 2, 3].includes(q.tier), q.text);
       assert.ok(check(q, String(q.answer)).ok && check(q, String(q.answer).replace('.', ',')).ok, `${q.text} → ${q.answer}`);
-      assert.ok(!check(q, String(q.answer * 3 + 7)).ok, `${q.text} : réponse fausse refusée`);
+      assert.ok(!check(q, String(q.answer * 3 + 7 === q.answer ? q.answer + 10 : q.answer * 3 + 7)).ok, `${q.text} : réponse fausse refusée`);
       assert.ok(!/NaN|undefined|Infinity/.test(q.text + q.tip + q.sub + q.show), `${q.text} | ${q.tip}`);
       for (const t of q.traps) assert.ok(!check(q, String(t)).ok, `${q.text} : le piège ${t} est refusé`);
+      continue;
+    }
+    if (q.kind === 'sprint') {
+      // sprint : chaque calcul s'évalue tel quel (la vue dit juste ou faux sans connaître la réponse)
+      assert.ok(q.input === 'sprint' && q.sprint.items.length === q.answer.length && q.answer.length >= 40 && q.time === 60, q.text);
+      q.sprint.items.forEach((t, k) => { const e = evalExpr(t); assert.ok(e.ok && e.value.d === 1 && e.value.n === q.answer[k] && q.answer[k] >= 0, t); });
+      assert.deepEqual(check(q, q.answer.slice(0, 10).join(';')).sprint, { right: 10, wrong: 0 });
+      assert.deepEqual(check(q, `${q.answer[0]};${q.answer[1] + 1};;${q.answer[3]}`).sprint, { right: 2, wrong: 1 }, 'une case vide ne compte pas');
+      assert.equal(check(q, '').value, 0);
       continue;
     }
     if (q.kind === 'mm') {
@@ -323,6 +338,11 @@ t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur',
   for (let i = 0; i < 4000; i++) { const q = makeQuestion(i * 7919 + 3, i % 15, 'chartier', 'normal', 0, 15); if (q.kind === 'chartier') pos[q.answer]++; }
   for (const n of pos) assert.ok(n > 0.2 * pos.reduce((x, y) => x + y, 0), `bonne réponse trop souvent au même endroit : ${pos}`);
   assert.deepEqual([0, 5, 9, 13, 14].map((i) => chartierTier(1, i, 15)), [1, 2, 2, 3, 3]);
+  // trois tours de même longueur : un tiers de la partie chacun
+  for (const [len, want] of [[15, [5, 5, 5]], [30, [10, 10, 10]], [10, [4, 3, 3]]]) {
+    const per = [1, 2, 3].map((t) => [...Array(len).keys()].filter((i) => chartierTier(1, i, len) === t).length);
+    assert.deepEqual(per, want, `${len} questions`);
+  }
   assert.equal(chartierTier(0, 9, 10), 2); assert.equal(chartierTier(0, 0, 10), 1);
   assert.equal(chartierTier(2, 0, 10), 2); assert.equal(chartierTier(2, 9, 10), 3);
   // banque : 4 choix distincts, explication, pas de choix vide
@@ -343,7 +363,7 @@ t('The Candidate : choix mélangés, difficulté qui monte, finale au plus dur',
       const r = answer(s, { by: 0, raw: q.show, idx: i, now: i * 1e5 + 1000 });
       assert.ok(r.ok && r.pending); s = r.state;
       s = gradeCode(s, { by: 0, idx: i, passed: q.tests.length, total: q.tests.length }).state;
-    } else s = answer(s, { by: 0, raw: q.input === 'mm' ? '9/12;9/12;9/12' : String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
+    } else s = answer(s, { by: 0, raw: q.input === 'mm' ? mmGood(q) : String(q.answer), idx: i, now: i * 1e5 + 1000 }).state;
     s = reveal(s, i * 1e5 + 2000);
     if (s.last.input === 'choice') assert.equal(s.last.choices[s.last.answer], s.last.show);
   }
@@ -561,41 +581,115 @@ t('The Candidate : piège plus cher à chaque tour, estimation presque juste san
   assert.ok(check(f, '3000').near && !check(f, '5000').near && check(f, '1500').ok);
 });
 
-t('The Candidate : face-à-face final en mort subite entre les deux premiers', () => {
+t('The Candidate : face-à-face final, un sprint de calcul entre les deux premiers', () => {
   const players = [0, 1, 2].map((id) => ({ id, name: 'P' + id }));
-  const run = (duelHow) => {
+  const run = () => {
     let s = createGame({ players, cfg: { mode: 'chartier', len: 10, cut: 0, code: 0 }, seed: 12, now: 0 });
     let now = 0;
     // 0 répond vite, 1 lentement, 2 se trompe : 0 et 1 finissent premiers
     while (!s.duel && s.phase !== 'over') { s = nextQuestion(s, now); if (s.duel || s.phase === 'over') break; s = play(s, { 0: 'good', 1: 'slow', 2: s.idx % 4 ? 'good' : 'bad' }, now); now += 1e5; }
     return { s, now };
   };
+  const sprintRaw = (q, right, wrong) => [...q.answer.slice(0, right), ...q.answer.slice(right, right + wrong).map((x) => x + 1)].join(';');
   let { s, now } = run();
   assert.ok(s.duel && s.phase === 'question' && s.idx === 10, 'le face-à-face commence après la dernière question');
   assert.deepEqual(s.duel.ids, [0, 1]);
+  let q = fullQuestion(s);
+  assert.equal(q.input, 'sprint'); assert.equal(q.time, 60);
   assert.equal(answer(s, { by: 2, raw: '0', idx: s.idx, now: now + 100 }).ok, false, 'le troisième regarde');
   assert.equal(useJoker(s, { by: 1, kind: 'half' }).ok, false, 'pas de joker');
-  // le second (moins de points) répond juste le premier : il gagne et passe devant
-  const q = fullQuestion(s);
-  const r = answer(s, { by: 1, raw: good(q), idx: s.idx, now: now + 500 });
-  assert.ok(r.ok && r.done, 'la première réponse décide');
-  s = reveal(r.state, now + 600);
-  assert.equal(s.duel.winner, 1);
+  // le second (moins de points à l'entretien) fait le meilleur sprint : il gagne et passe devant
+  let r = answer(s, { by: 1, raw: sprintRaw(q, 14, 1), idx: s.idx, now: now + 59000 });
+  assert.ok(r.ok && !r.done, 'on attend le sprint de l\'autre finaliste');
+  r = answer(r.state, { by: 0, raw: sprintRaw(q, 11, 0), idx: s.idx, now: now + 59500 });
+  assert.ok(r.ok && r.done, 'les deux sprints rendus : la manche se termine');
+  s = reveal(r.state, now + 59600);
+  assert.equal(s.duel.winner, 1); assert.deepEqual(s.duel.scores[1], { right: 14, wrong: 1 });
+  assert.equal(s.last.results.find((x) => x.id === 1).sprint.right, 14);
   s = nextQuestion(s, now + 1e5);
   assert.equal(s.phase, 'over'); assert.deepEqual(s.ranking.slice(0, 2), [1, 0]);
-  // une réponse fausse fait perdre, même la première
-  ({ s, now } = run());
-  s = reveal(answer(s, { by: 0, raw: bad(fullQuestion(s)), idx: s.idx, now: now + 500 }).state, now + 600);
-  assert.equal(s.duel.winner, 1, 'le premier qui se trompe perd');
-  // personne ne répond : on enchaîne, puis le score départage
-  ({ s, now } = run());
-  for (let k = 0; k < 5 && s.phase !== 'over'; k++) { s = reveal(s, now + 1); now += 1e5; s = nextQuestion(s, now); }
-  assert.equal(s.phase, 'over'); assert.equal(s.ranking[0], 0, 'après 5 silences, le meilleur score gagne');
+  // les erreurs se paient : 16 justes et 7 fausses (9) perdent contre 10 justes sans faute (10)
+  ({ s, now } = run()); q = fullQuestion(s);
+  s = answer(s, { by: 0, raw: sprintRaw(q, 16, 7), idx: s.idx, now: now + 500 }).state;
+  s = reveal(answer(s, { by: 1, raw: sprintRaw(q, 10, 0), idx: s.idx, now: now + 600 }).state, now + 700);
+  assert.equal(s.duel.winner, 1, 'chaque erreur retire un point');
+  // égalité parfaite : une manche de plus ; personne ne répond trois fois : le score de l'entretien départage
+  ({ s, now } = run()); q = fullQuestion(s);
+  s = answer(s, { by: 0, raw: sprintRaw(q, 8, 0), idx: s.idx, now: now + 500 }).state;
+  s = reveal(answer(s, { by: 1, raw: sprintRaw(q, 8, 0), idx: s.idx, now: now + 600 }).state, now + 700);
+  assert.equal(s.duel.winner, null, 'égalité : on relance un sprint');
+  for (let k = 0; k < 5 && s.phase !== 'over'; k++) { now += 1e5; s = nextQuestion(s, now); if (s.phase === 'over') break; s = reveal(s, now + 1); }
+  assert.equal(s.phase, 'over'); assert.equal(s.ranking[0], 0, 'après trois manches nulles, le meilleur score gagne');
   // désactivé : pas de face-à-face
   let g = createGame({ players, cfg: { mode: 'chartier', len: 10, cut: 0, code: 0, duel: 0 }, seed: 12, now: 0 });
   now = 0;
   while (g.phase !== 'over') { g = nextQuestion(g, now); if (g.phase === 'over') break; g = play(g, { 0: 'good', 1: 'good', 2: 'good' }, now); now += 1e5; }
   assert.ok(!g.duel && g.history.length === 10);
+});
+
+t('The Candidate : questions tirées à la volée (calcul, finance, probas, risques…)', () => {
+  assert.ok(GENS.length >= 100, `${GENS.length} modèles`);
+  for (const g of GENS) for (const tier of g.tiers) {
+    const r = rngOf({ seed: 77 + tier }), texts = new Set();
+    let made = 0;
+    for (let i = 0; i < 150; i++) {
+      const q = g.f(r, tier);
+      if (!q) continue;
+      made++; texts.add(q.text + '|' + (q.good || q.answer));
+      assert.ok(q.text && q.tip && !/NaN|undefined|Infinity|null/.test([q.text, q.tip, q.good, ...(q.wrong || [])].join(' ')), `${g.id} : ${q.text} | ${q.tip}`);
+      if (q.type === 'choice') {
+        assert.equal(new Set([q.good, ...q.wrong]).size, 4, `${g.id} : choix distincts ${q.text}`);
+        assert.ok(q.wrong.includes(q.trap), `${g.id} : piège parmi les mauvaises réponses`);
+      } else {
+        const Q = { input: 'num', answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps };
+        assert.ok(check(Q, String(q.answer)).ok && check(Q, String(q.answer).replace('.', ',')).ok, `${g.id} : ${q.text} → ${q.answer}`);
+        for (const tr of q.traps) assert.ok(!check(Q, String(tr)).ok && isTrap(Q, String(tr)), `${g.id} : le piège ${tr} est refusé et reconnu`);
+      }
+    }
+    assert.ok(made > 75, `${g.id} : trop de tirages ratés`);
+    assert.ok(texts.size > 3, `${g.id} : trop peu de variantes`);
+  }
+  // en partie : les questions générées gardent la rubrique tirée, et le même modèle ne revient pas deux fois dans une partie
+  for (let seed = 1; seed < 60; seed++) {
+    let s = createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 30, code: 0 }, seed, now: 0 });
+    const keys = [];
+    for (let i = 0; i < 30; i++) { const q = fullQuestion(s, i); s.history.push({ idx: i, key: q.key }); keys.push(q.key); }
+    const gen = keys.filter((k) => /^(gen|mental):/.test(k));
+    assert.equal(new Set(gen).size, gen.length, `modèle répété dans la partie ${seed}`);
+  }
+});
+
+t('The Candidate : matrices à une seule solution, mémoire et attention recomptées', () => {
+  // pour chaque attribut, toutes les règles possibles qui expliquent les 8 cases connues doivent prédire la même 9e case
+  const RULES = [() => 0, (i) => i, (i, j) => j, (i, j) => (i + j) % 3, (i, j) => (j - i + 3) % 3];
+  const predict = (grid, a) => {
+    const out = new Set();
+    for (const f of RULES) {
+      const map = {}; let ok = true;
+      for (let k = 0; k < 8 && ok; k++) { const key = f(Math.floor(k / 3), k % 3), v = grid[k][a]; if (key in map && map[key] !== v) ok = false; else map[key] = v; }
+      const key = f(2, 2);
+      if (ok && key in map) out.add(map[key]);
+    }
+    return [...out];
+  };
+  for (const tier of [1, 2, 3]) for (let seed = 1; seed < 400; seed++) {
+    const m = abstractMatrix(rngOf({ seed: seed * 13 + tier }), tier);
+    if (!m) continue;
+    for (const a of ['s', 'n', 'f']) assert.deepEqual(predict(m.grid, a), [m.good[a]], `matrice ambiguë (${a}) : ${JSON.stringify(m.grid)}`);
+    const all = [m.good, ...m.wrong].map(describeCell);
+    assert.equal(new Set(all).size, 4, all.join(' / ')); assert.ok(m.wrong.includes(m.trap) && m.tip);
+  }
+  for (const tier of [1, 2, 3]) for (let seed = 1; seed < 300; seed++) {
+    for (const q of [memoryQ(rngOf({ seed }), tier), attentionQ(rngOf({ seed: seed + 9999 }), tier)]) {
+      assert.ok(q.text && q.tip && q.time > 0 && (q.memo ? q.memo.ms > 1000 && q.memo.text : q.copy), q.text);
+      if (q.type === 'choice') { assert.equal(new Set([q.good, ...q.wrong]).size, 4, q.text); assert.ok(q.wrong.includes(q.trap)); continue; }
+      assert.ok(Number.isInteger(q.answer) && q.answer >= 0 && !q.traps.includes(q.answer), q.text);
+      if (/diffèrent/.test(q.text)) { const [x, y] = q.copy.split('\n').map((l) => l.replace(/ /g, '')); assert.equal([...x].filter((c, k) => c !== y[k]).length, q.answer); }
+      if (/Combien de fois le chiffre (\d)/.test(q.text)) { const d = q.text.match(/chiffre (\d)/)[1]; assert.equal([...q.copy].filter((c) => c === d).length, q.answer); }
+      if (/ordres d'ACHAT de plus de (\d+)/.test(q.text)) { const th = Number(q.text.match(/plus de (\d+)/)[1]); assert.equal(q.copy.split('\n').filter((l) => { const [sd, n] = l.split(' '); return sd === 'ACHAT' && Number(n) > th; }).length, q.answer); }
+      if (/achetés au total/.test(q.text)) { const t = q.text.match(/titres (\S+) ont/)[1]; assert.equal(q.memo.text.split('\n').filter((l) => l.startsWith('ACHAT') && l.endsWith(' ' + t)).reduce((a, l) => a + Number(l.split(' ')[1]), 0), q.answer); }
+    }
+  }
 });
 
 t('The Candidate : modules par métier, rubriques orientées', () => {
@@ -618,8 +712,18 @@ t('The Candidate : fat finger, numéro de téléphone, réponses multiples', () 
     }
   }
   assert.ok(kinds.fatfinger > 150 && kinds.phone > 60 && kinds['chartier-multi'] > 20, JSON.stringify(kinds));
-  assert.equal(FAT_FINGER.length, 80); assert.equal(new Set(FAT_FINGER.map((f) => f.text)).size, 80);
-  assert.equal(PHONES.length, 50); assert.equal(new Set(PHONES).size, 50);
+  // tirés à la volée : pratiquement jamais deux fois le même, et des clés de contrôle valides
+  const r = rngOf({ seed: 5 }), drawn = { 1: new Set(), 2: new Set(), 3: new Set() }, phones = new Set();
+  for (let i = 0; i < 2000; i++) for (const t of [1, 2, 3]) {
+    const f = fatFinger(r, t); drawn[t].add(f.text);
+    assert.ok(f.label && f.text && f.text === f.text.trim() && !/NaN|undefined/.test(f.text), f.text);
+    if (/IBAN/.test(f.label)) { const x = f.text.replace(/ /g, ''); assert.ok(/^FR\d{25}$/.test(x) && ibanKey('FR', x.slice(4)) === x.slice(2, 4), f.text); }
+    if (/ISIN/.test(f.label)) assert.ok(f.text.length === 12 && isinKey(f.text.slice(0, 11)) === f.text[11], f.text);
+    phones.add(phoneNumber(r));
+  }
+  for (const t of [1, 2, 3]) assert.ok(drawn[t].size > 1990, `tour ${t} : ${drawn[t].size} fat finger différents sur 2 000`);
+  assert.ok(phones.size > 5990, `${phones.size} numéros différents`);
+  assert.equal(ibanKey('FR', '30006000011234567890189'), '76'); assert.equal(isinKey('US037833100'), '5');
   // une partie : la question à cocher compte juste, la mauvaise sélection coûte une vie
   const g = (cfg) => createGame({ players: [{ id: 0, name: 'A' }], cfg: { mode: 'chartier', len: 15, code: 0, ...cfg }, seed: 3, now: 0 });
   let s = g({}), now = 0, seen = 0;
@@ -709,6 +813,9 @@ t('figures à compter : chaque réponse recomptée par force brute', () => {
     if (q.kind === 'grid-sq' || q.kind === 'grid-sq-rect') { n = 0; for (let k = 1; k <= Math.min(f.n, f.m); k++) n += (f.m - k + 1) * (f.n - k + 1); }
     if (q.kind === 'strip') { n = 0; for (let a = 0; a <= f.m; a++) for (let b = a + 1; b <= f.m; b++) n++; }
     if (q.kind === 'fan') { n = 0; for (let a = 0; a < f.k + 2; a++) for (let b = a + 1; b < f.k + 2; b++) n++; }
+    if (q.kind === 'grid-sq-k') { n = 0; for (let x = 0; x + f.k <= f.m; x++) for (let y = 0; y + f.k <= f.n; y++) n++; }
+    if (q.kind === 'dots-tri') { n = 0; for (let a = 0; a < f.n; a++) for (let b = a + 1; b < f.n; b++) for (let c = b + 1; c < f.n; c++) n++; }
+    if (q.kind === 'box-hidden') { n = 0; for (let x = 0; x < f.a; x++) for (let y = 0; y < f.b; y++) for (let z = 0; z < f.c; z++) n += x < f.a - 1 && y < f.b - 1 && z < f.c - 1; }
     if (q.kind === 'grid-rect') { n = 0; for (let x1 = 0; x1 <= f.m; x1++) for (let x2 = x1 + 1; x2 <= f.m; x2++) for (let y1 = 0; y1 <= f.n; y1++) for (let y2 = y1 + 1; y2 <= f.n; y2++) n++; }
     if (n != null) assert.equal(q.answer, n, `${q.kind} ${q.text} ${JSON.stringify(f)}`);
     assert.ok(Number.isInteger(q.answer) && q.answer > 0 && q.tip && !/NaN|undefined/.test(q.text + q.tip + q.sub), `${q.kind} ${q.tip}`);
@@ -796,6 +903,13 @@ if (py.status === 0) t('code : lire du code, corriger un bug, SQL (python3)', ()
     assert.equal(scoreRun(runSql('SELECT 1', q), 3), 0, `${q.title} : une requête quelconque échoue`);
     assert.ok(runSql('SELEC nimporte', q).error, 'erreur de syntaxe signalée');
     assert.ok(q.tests.every(([, exp]) => exp.length > 0));
+  }
+  // épreuves SQL tirées à la volée : la référence passe les trois bases, une requête quelconque échoue
+  for (let seed = 1; seed <= 40; seed++) for (const lvl of [1, 2, 3]) {
+    const q = sqlQuestion(rngOf({ seed: seed * 31 + lvl }), lvl);
+    assert.ok(q && q.tests.length === 3 && q.tests.every(([, exp]) => exp.length > 0), `SQL généré ${seed} ${lvl}`);
+    assert.equal(scoreRun(runSql(q.ref, q), 3), 3, `${q.prompt} : requête de référence`);
+    assert.equal(scoreRun(runSql('SELECT 1', q), 3), 0, `${q.prompt} : une requête quelconque échoue`);
   }
   // l'ordre ne compte que si l'énoncé le demande
   const cnt = SQL_QUESTIONS.find((q) => q.id === 'sql_count');
