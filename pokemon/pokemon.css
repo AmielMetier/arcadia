@@ -152,7 +152,8 @@ button { font: inherit; color: inherit; }
    ========================================================================== */
 .arena-card {
   width: min(980px, 98vw);
-  height: min(700px, 95vh);
+  height: min(680px, calc(100vh - 68px));
+  max-height: calc(100dvh - 68px);
   background: #0d1421;
   border: 2px solid #2b3d58;
   border-radius: 16px;
@@ -166,7 +167,7 @@ button { font: inherit; color: inherit; }
 /* Champ de Bataille avec Arrière-plan Pixel Art Gen 5 Authentique */
 .battlefield {
   flex: 1;
-  min-height: 420px;
+  min-height: 250px;
   position: relative;
   background: #70c850 url('assets/plains_bg.png') center center / 100% 100% no-repeat;
   image-rendering: pixelated;
@@ -1891,20 +1892,24 @@ b.hp-red { color: #ef4444; background: none !important; }
   transition: width 0.4s ease;
 }
 
-/* Panneau inférieur de combat */
+/* Panneau inférieur de combat (adaptatif à toutes les tailles d'écran) */
 .adv-battle-bottom {
-  height: 140px;
+  min-height: 162px;
+  height: auto;
+  max-height: 34vh;
+  flex-shrink: 0;
   background: rgba(11, 17, 28, 0.98);
   border-top: 3px solid #ffcb05;
   display: flex;
+  align-items: stretch;
   z-index: 5;
 }
 
 .adv-battle-dialogue {
-  flex: 1.2;
-  padding: 20px 28px;
-  font-size: 17px;
-  line-height: 1.5;
+  flex: 1.15;
+  padding: 14px 24px;
+  font-size: clamp(14px, 1.8vw, 17px);
+  line-height: 1.45;
   color: #fff;
   font-weight: 600;
   display: flex;
@@ -1914,24 +1919,25 @@ b.hp-red { color: #ef4444; background: none !important; }
 
 .adv-battle-menu {
   flex: 1;
-  padding: 12px 18px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow-y: auto;
 }
 
 .adv-menu-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   max-width: 380px;
 }
 
 .adv-btn {
-  padding: 12px 16px;
+  padding: 10px 14px;
   font-family: var(--bung);
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 1px;
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -1954,13 +1960,13 @@ b.hp-red { color: #ef4444; background: none !important; }
 .adv-moves-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   max-width: 440px;
 }
 
 .adv-move-card {
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: #1e293b;
   border: 2px solid #334155;
   border-radius: 8px;
@@ -1975,12 +1981,12 @@ b.hp-red { color: #ef4444; background: none !important; }
 
 .adv-move-card:hover {
   border-color: #ffcb05;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .adv-move-card .m-name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .adv-move-card .m-info {
@@ -1991,13 +1997,13 @@ b.hp-red { color: #ef4444; background: none !important; }
 
 .adv-move-back {
   grid-column: span 2;
-  padding: 6px;
+  padding: 5px 10px;
   background: #334155;
   border: 1px solid #475569;
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -2442,14 +2448,23 @@ b.hp-red { color: #ef4444; background: none !important; }
 
 .adv-trainer-avatar {
   position: absolute;
-  right: 10px;
-  bottom: 50px;
-  width: 96px;
-  height: 96px;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: 112px;
+  height: 112px;
   object-fit: contain;
+  object-position: center bottom;
   image-rendering: pixelated;
-  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
-  opacity: 0.92;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55));
+  opacity: 1;
+  z-index: 4;
+  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+}
+
+.adv-trainer-avatar.trainer-slide-out {
+  transform: translateX(130px);
+  opacity: 0;
 }
 
 .adv-move-card .m-top {
