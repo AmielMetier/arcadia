@@ -511,6 +511,16 @@ t('ambiances : la ville regorge de ruines, la forêt d\'arbres, le pont reste d�
   const ice = { x: 0, z: 0, y: 0, vx: 0, vz: 0, on: 0, ref: 0, air: 0, st: 0 }, snow = { ...ice };
   for (let i = 0; i < 20; i++) { stepPlayer(ice, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {}, ice: true }, [])); stepPlayer(snow, { mx: 1, mz: 0 }, DT, moveCtx({ v: 0, up: {} }, [])); }
   assert.ok(ice.vx < snow.vx * 0.6, 'ça glisse : on démarre lentement');
+  // plaine gelée : la voie dégagée fait filer le convoi, et ses fermes cachent des survivants
+  const pl = new Sim({ seed: 5, mode: 'endless' }), fo = new Sim({ seed: 5, mode: 'endless' });
+  fo.legs = ['foret']; fo.ruins.setLegs(fo.legs);
+  assert.ok(pl.speedK() > fo.speedK() * 1.08, 'le convoi file plus vite dans la plaine');
+  let farms = 0, fs = 0, hs = 0, houses = 0;
+  for (let k = 2; k < 200; k++) for (const r of chunkRuins(7, k, 0.6, { bio: 'plaine' }).ruins) {
+    if (r.kind === 'farm') { farms++; fs += r.spots.reduce((a, s) => a + s.surv, 0); }
+    if (r.kind === 'house') { houses++; hs += r.spots.reduce((a, s) => a + s.surv, 0); }
+  }
+  assert.ok(farms > 20 && fs / farms > 2 * hs / Math.max(1, houses), 'des fermes, plus souvent habitées que les maisons');
 });
 
 t('jour et nuit : la nuit tombe, les loups sont plus nombreux, pas de pillards', () => {
@@ -603,7 +613,7 @@ t('le Brise-Glace : grappins qui freinent, coupés au couteau, abattu à coups d
   const ev = [];
   for (let i = 0; i < 200 * 60 && !sim.hooks.length; i++) { p.inp = m.inp = { mx: 0, mz: 0 }; sim.fuel = 100; sim.step(DT); ev.push(...sim.drainEvents()); }
   assert.ok(sim.boss && ev.some((e) => e.e === 'moment' && e.k === 'boss') && ev.some((e) => e.e === 'hook'), 'grappin lancé');
-  assert.ok(sim.speedK() < 0.8, 'le grappin freine');
+  assert.ok(sim.speedK() < 0.8 * (sim.B().fast || 1), 'le grappin freine');
   const h = sim.hooks[0];
   Object.assign(m, { x: h.x * 0.85, z: h.z, on: 1, ref: 1, y: DECK_Y, air: 0, st: 0 });
   run(sim, 1.2, () => { m.inp = { mx: 0, mz: 0, use: true }; p.inp = { mx: 0, mz: 0 }; sim.fuel = 100; ev.push(...sim.drainEvents()); });
