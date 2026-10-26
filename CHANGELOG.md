@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.65 — 26 octobre 2026
+- **Cyber Kart GP** — La musique a son propre réglage : elle ne se coupe plus quand on a éteint la musique d'ambiance du Hub.
+  - Bouton 🎵 dans les menus, la pause et les résultats : il coupe ou remet la musique et dit ce qui se passe (chargement, « touchez l'écran pour le son », fichier introuvable…).
+  - Si un appareil n'arrive pas à préparer un morceau (iPad à court de mémoire…), il est lu en flux à la place, et un morceau qui a échoué est réessayé au toucher suivant.
+  - La touche M coupe et remet en même temps la musique et les bruitages.
+
 ## 2.64 — 26 octobre 2026
 - Fix trainer intro sequence before Pokemon send-out, responsive battle HUD, and add Gen 5 Unova tilesets (Amiel)
 

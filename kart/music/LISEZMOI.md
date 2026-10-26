@@ -22,6 +22,7 @@ Déposez vos morceaux **dans ce dossier** (`kart/music/`), avec exactement ces n
 - Réglages modifiables en haut du code de `kart/index.html`, objet `MUSIC` :
   - `tracks` : les noms de fichiers ci-dessus ;
   - `lapRate` : la vitesse de lecture tour par tour ;
-  - `volume` : volume relatif de la musique (le volume général se règle dans le Hub, 🎵).
-- La touche **M** coupe ou remet le son en course ; le réglage est partagé avec le Hub.
+  - `volume` : volume relatif de la musique.
+- Le bouton **🎵** des menus (et la touche **M**) coupe ou remet la musique du jeu ; ce réglage est indépendant de la musique d'ambiance du Hub.
+  Le bouton indique aussi l'état : chargement, « touchez l'écran pour le son », fichier introuvable, lecture en flux.
 - Taille conseillée : 2 à 5 Mo par morceau (mp3 128 à 192 kb/s), pour que le chargement reste rapide sur GitHub Pages.

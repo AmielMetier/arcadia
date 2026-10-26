@@ -138,6 +138,8 @@
   #kgrid { margin-top: 14px; padding-top: 12px; border-top: 2px dashed rgba(255, 255, 255, .22); position: relative; }
   #kgrid::before { content: 'TON KART'; position: absolute; top: -11px; left: 14px; padding: 0 8px; font-size: 15px; color: #9fd8ff; background: rgba(12, 16, 40, .9); border-radius: 8px; -webkit-text-stroke: 0; }
   #kgrid .card { aspect-ratio: 1.35 / 1; }
+  #musbtn { position: fixed; left: 12px; bottom: 12px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; max-width: 70vw; text-align: left; }
+  #musbtn.off { border-color: #777; color: #bbb; } #musbtn.warn { border-color: #ffb03a; }
   #assist { font-size: 15px; padding: 5px 14px; } #assist.on { background: #4dff7a; }
   #kgrid .card img { object-fit: contain; inset: 4% 4% 24% 4%; width: 92%; height: 72%; }
   .card img { position: absolute; inset: 0 0 20% 0; width: 100%; height: 80%; object-fit: cover; }
@@ -260,9 +262,10 @@
 <div id="starfx"></div>
 <div id="pause" class="ol hidden">PAUSE</div>
 
+<button id="musbtn" class="hidden" title="Musique : marche / arrêt (touche M)">🎵 Musique</button>
 <div id="title" class="screen hidden">
   <div class="logo"><span class="l1">CYBER</span><span class="l2">KART</span><span class="gp ol">GP</span></div>
-  <div class="tag">6 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis le Game Hub</div>
+  <div class="tag">7 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis le Game Hub</div>
   <div class="start">Appuie sur <b>ENTRÉE</b> ou clique pour jouer</div>
 </div>
 
@@ -5334,58 +5337,88 @@ class Sound {
 }
 const sfx = new Sound();
 /** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle, par le même moteur audio que les bruitages (Web Audio) :
-    s'ils s'entendent, la musique aussi (iPad / iPhone, Brave, Safari…). Réglages partagés avec le Hub (marche/arrêt, volume). */
+    s'ils s'entendent, la musique aussi (iPad / iPhone, Brave, Safari…). Réglage propre au jeu (bouton 🎵 du menu, touche M) :
+    il ne dépend plus de la musique d'ambiance du Hub. Si le décodage échoue (mémoire de l'iPad…), lecture en flux par un élément audio. */
 class Music {
   constructor() {
     this.key = null; this.url = null; this.cache = new Map(); this.src = null; this.srcGain = null; this.out = null; this.rate = 1;
+    this.status = 'attente'; this.err = ''; this.mode = '';
     const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
-    this.on = get('david_music', true); this.vol = get('david_music_vol', 0.55);
+    this.on = get('kart_music', true); this.vol = get('kart_music_vol', 0.8);
   }
-  save() { try { localStorage.setItem('david_music', JSON.stringify(this.on)); } catch (e) {} }
+  save() { try { localStorage.setItem('kart_music', JSON.stringify(this.on)); } catch (e) {} }
   ctx() { sfx.init(); const c = sfx.ctx; if (c && !this.out) { this.out = c.createGain(); this.out.connect(sfx.lp || c.destination); this.applyVol(); } return c; }
-  applyVol() { if (this.out) this.out.gain.value = this.on ? this.vol * MUSIC.volume : 0; }
-  /** télécharge et décode le morceau (mp3, sinon ogg) ; null s'il n'existe pas */
+  applyVol() { if (this.out) this.out.gain.value = this.on ? this.vol * MUSIC.volume : 0; this.onChange(); }
+  onChange() { if (typeof updateMusicBtn === 'function') updateMusicBtn(); }
+  /** télécharge et décode le morceau (mp3, sinon ogg). Renvoie { buf } ou { url } (flux) ou null s'il n'existe pas. Les échecs ne sont pas mémorisés. */
   async load(name) {
     if (this.cache.has(name)) return this.cache.get(name);
-    const c = this.ctx(); if (!c) return null;
-    let buf = null;
+    const c = this.ctx(); if (!c) { this.err = 'Web Audio indisponible'; return null; }
     for (const ext of MUSIC.ext) {
+      const url = `${MUSIC.folder}${name}.${ext}`;
+      let r; try { r = await fetch(url); } catch (e) { this.err = `réseau (${name}.${ext})`; continue; }
+      if (!r.ok) { this.err = `${name}.${ext} introuvable (${r.status})`; continue; }
       try {
-        const r = await fetch(`${MUSIC.folder}${name}.${ext}`); if (!r.ok) continue;
         const ab = await r.arrayBuffer();
-        buf = await new Promise((res, rej) => { const p = c.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
-        if (buf) break;
-      } catch (e) { buf = null; }
+        const buf = await new Promise((res, rej) => { const p = c.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+        if (buf) { const e = { buf }; this.cache.set(name, e);
+          // un morceau décodé pèse ~80 Mo : on n'en garde que 2 en mémoire (celui qui joue et le précédent), pour l'iPad
+          if (this.cache.size > 2) for (const k of this.cache.keys()) { if (k !== name && k !== this.url && this.cache.size > 2) this.cache.delete(k); }
+          return e; }
+      } catch (e) { this.err = `décodage impossible (${(e && (e.name || e.message)) || e}) : lecture en flux`; }
+      return { url };   // le fichier existe mais n'a pas pu être décodé : on le lit en flux
     }
-    this.cache.set(name, buf);
-    // un morceau décodé pèse ~80 Mo : on n'en garde que 2 en mémoire (celui qui joue et le précédent), pour l'iPad
-    if (this.cache.size > 2) for (const k of this.cache.keys()) { if (k !== name && k !== this.url && this.cache.size > 2) this.cache.delete(k); }
-    return buf;
+    return null;
   }
   /** keepIfMissing : si le morceau n'existe pas, la musique en cours continue (écran de résultats) */
   async play(key, keepIfMissing = false) {
-    if (this.key === key) return; const prevKey = this.key; this.key = key;
-    let name = MUSIC.tracks[key] || key, buf = await this.load(name);
-    if (!buf && MUSIC.fallback && MUSIC.fallback[key]) { name = MUSIC.tracks[MUSIC.fallback[key]] || MUSIC.fallback[key]; buf = await this.load(name); }
+    if (this.key === key && (this.src || this.status === 'chargement')) return; const prevKey = this.key; this.key = key;
+    this.status = 'chargement'; this.onChange();
+    let name = MUSIC.tracks[key] || key, e = await this.load(name);
+    if (!e && MUSIC.fallback && MUSIC.fallback[key]) { name = MUSIC.tracks[MUSIC.fallback[key]] || MUSIC.fallback[key]; e = await this.load(name); }
     if (this.key !== key) return;
-    if (!buf && keepIfMissing) { this.key = prevKey; return; }
+    if (!e && keepIfMissing) { this.key = prevKey; this.status = this.src ? 'lecture' : 'erreur'; this.onChange(); return; }
     this.fadeOut();
-    if (!buf) { this.url = null; return; }
-    const c = this.ctx(), s = c.createBufferSource(), g = c.createGain(), t = c.currentTime;
-    s.buffer = buf; s.loop = true; s.playbackRate.value = this.rate;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.35);
-    s.connect(g); g.connect(this.out); s.start();
-    this.src = s; this.srcGain = g; this.url = name;
+    if (!e) { this.url = null; this.status = 'erreur'; this.onChange(); return; }
+    const c = this.ctx(), g = c.createGain(), t = c.currentTime;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 0.35); g.connect(this.out);
+    if (e.buf) {
+      const s = c.createBufferSource(); s.buffer = e.buf; s.loop = true; s.playbackRate.value = this.rate; s.connect(g); s.start();
+      this.src = s; this.mode = 'mémoire';
+    } else {
+      const a = new Audio(); a.src = e.url; a.loop = true; a.preload = 'auto'; a.setAttribute('playsinline', ''); a.preservesPitch = false; a.playbackRate = this.rate;
+      try { c.createMediaElementSource(a).connect(g); } catch (err) { this.err = 'flux : ' + err.message; }
+      this.src = { el: a, stop() { a.pause(); a.removeAttribute('src'); a.load(); } }; this.mode = 'flux';
+      a.play().catch(() => { this.status = 'bloquée'; this.onChange(); });
+    }
+    this.srcGain = g; this.url = name; this.status = 'lecture'; this.err = e.buf ? '' : this.err; this.onChange();
   }
   fadeOut() {
     if (!this.src) return; const c = sfx.ctx, s = this.src, g = this.srcGain, t = c.currentTime;
-    try { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); s.stop(t + 0.32); } catch (e) {}
+    try { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); } catch (e) {}
+    if (s.el) setTimeout(() => s.stop(), 330); else try { s.stop(t + 0.32); } catch (e) {}
     this.src = null; this.srcGain = null;
   }
-  unlock() { if (sfx.ctx && sfx.ctx.state !== 'running') sfx.ctx.resume(); }
-  setRate(r) { this.rate = r; if (this.src) this.src.playbackRate.setTargetAtTime(r, sfx.ctx.currentTime, 0.25); }
-  stop() { this.key = null; this.url = null; this.fadeOut(); }
-  toggle() { this.on = !this.on; this.save(); this.applyVol(); }
+  /** geste de l'utilisateur : réveille le moteur audio, relance un morceau resté bloqué ou en échec */
+  unlock() {
+    const c = sfx.ctx; if (c && c.state !== 'running') c.resume().then(() => this.onChange(), () => {});
+    if (this.src && this.src.el && this.src.el.paused) this.src.el.play().then(() => { this.status = 'lecture'; this.onChange(); }, () => {});
+    if (this.key && !this.src && this.status === 'erreur' && performance.now() - (this.retryT || 0) > 4000) { this.retryT = performance.now(); const k = this.key; this.key = null; this.play(k); }
+  }
+  setRate(r) { this.rate = r; if (!this.src) return; if (this.src.el) this.src.el.playbackRate = r; else this.src.playbackRate.setTargetAtTime(r, sfx.ctx.currentTime, 0.25); }
+  stop() { this.key = null; this.url = null; this.fadeOut(); this.status = 'attente'; this.onChange(); }
+  setOn(on) { this.on = on; this.save(); this.applyVol(); }
+  toggle() { this.setOn(!this.on); }
+  /** texte court pour le bouton 🎵 */
+  label() {
+    if (!this.on) return '🎵 Musique : coupée';
+    const c = sfx.ctx;
+    if (!c || c.state !== 'running' || this.status === 'bloquée') return '🎵 Touchez l\'écran pour le son';
+    if (this.status === 'chargement') return '🎵 Musique : chargement…';
+    if (this.status === 'erreur') return '🎵 Musique : ' + (this.err || 'erreur');
+    if (this.status === 'lecture') return '🎵 Musique : oui' + (this.mode === 'flux' ? ' (flux)' : '');
+    return '🎵 Musique : oui';
+  }
 }
 const music = new Music();
 for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => { sfx.init(); music.unlock(); }, { capture: true });
@@ -5715,6 +5748,13 @@ function updateNameTags() {
 function clearNameTags() { for (const s of nameTags.values()) scene.remove(s); nameTags.clear(); }
 
 /* ---------------------------------------------------------------------------- MENUS */
+/** Bouton 🎵 (menus, pause, résultats) : marche / arrêt et état de la musique (chargement, fichier introuvable, son à débloquer…) */
+function updateMusicBtn() {
+  const b = $('musbtn'); if (!b) return;
+  b.classList.toggle('hidden', !['title', 'maps', 'chars', 'results', 'escmenu'].includes(UI.screen) && !(race && race.paused));
+  b.textContent = music.label(); b.classList.toggle('off', !music.on); b.classList.toggle('warn', music.on && music.status !== 'lecture');
+}
+setInterval(updateMusicBtn, 1000);
 const UI = {
   screen: 'none',
   show(name) {
@@ -5722,7 +5762,7 @@ const UI = {
     for (const id of ['title', 'maps', 'chars', 'loadscr', 'results', 'escmenu']) $(id).classList.toggle('hidden', id !== ({ loading: 'loadscr' }[name] || name));
     $('hud').classList.toggle('hidden', !['race'].includes(name));
     if (name === 'maps' || name === 'chars' || name === 'title') music.play('menu');
-    UI.refresh();
+    updateMusicBtn(); UI.refresh();
   },
   refresh() {
     if (UI.screen === 'maps') renderMaps();
@@ -5825,6 +5865,7 @@ function renderChars() {
   else { $('charok').textContent = mine.ready ? 'Pas prêt' : 'Prêt ✓'; $('charok').disabled = false; $('charback').textContent = 'Quitter'; }
 }
 $('assist').onclick = () => { PREFS.assist = !PREFS.assist; savePrefs(); renderChars(); };
+$('musbtn').onclick = (e) => { e.stopPropagation(); music.toggle(); if (music.on && !music.src && music.key) { const k = music.key; music.key = null; music.play(k); } updateMusicBtn(); };
 $('charok').onclick = () => {
   sfx.tone(880, 0.12, 'square', 0.15);
   if (NET.isHost) { const m = myPick(); LOBBY.picks[NET.myId] = { ...m, ready: true }; hostStartRace('new'); }
@@ -6029,7 +6070,7 @@ function onKeyPress(code) {
   }
   if (UI.screen === 'results' && SPEC.on) { if (code === 'ArrowLeft' || code === 'KeyA') specStep(-1); else if (code === 'ArrowRight' || code === 'KeyD') specStep(1); else if (code === 'Escape') specStop(); return; }
   if (UI.screen === 'results') { if (NET.isHost && (code === 'Enter' || code === 'NumpadEnter')) ($('rnext') || $('rnew'))?.click(); else if (code === 'Escape') $('rquit').click(); return; }
-  if (code === 'KeyM') { sfx.setMuted(!sfx.muted); music.toggle(); toast(sfx.muted ? 'Son coupé' : 'Son activé'); }
+  if (code === 'KeyM') { const m = !sfx.muted; sfx.setMuted(m); music.setOn(!m); toast(m ? 'Son coupé' : 'Son activé'); }
   if (code === 'KeyP') togglePixelMode();
   if (code === 'Escape' && UI.screen === 'race') { if (escOpen()) { $('escmenu').classList.add('hidden'); race.paused = false; } else openEscMenu(); }
 }
