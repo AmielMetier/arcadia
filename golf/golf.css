@@ -53,7 +53,7 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .ico.lg{width:56px;height:56px}.ico.lg .ico-svg{width:28px;height:28px}
 
 /* ------------------------------------------------------------------ jeu : texte détouré, lisible sur l'herbe comme sur le ciel */
-.ol,#hud .htitle,#hud .hsub,#hud .dist,#hud .lie,#hud .wband b,#hud .club b,#hud .club span,#hud .gauge span,.banner,.pintag b,#hud .pl b,#hud .pl span,#hud .turn,.press{
+.ol,#hud .htitle,#hud .hsub,#hud .dist,#hud .lie,#hud .wband b,#hud .club b,#hud .club span,#hud .gauge span,.banner,.pintag b,#hud .pl b,#hud .pl span,#hud .tm-h b,#hud .tm-h span,#hud .turn,.press{
   color:var(--white);-webkit-text-stroke:5px var(--stroke);paint-order:stroke fill;text-shadow:0 3px 0 oklch(0.2 0.05 255 / .3)}
 #hud{position:fixed;inset:0;pointer-events:none;font-variant-numeric:tabular-nums}
 #hud button,#hud canvas{pointer-events:auto}
@@ -132,6 +132,14 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .toast{position:absolute;left:50%;top:44%;transform:translateX(-50%);color:var(--white);font-size:16px;font-weight:800;padding:9px 18px;border-radius:999px;background:oklch(0.25 0.05 255 / .78);box-shadow:var(--sh-1);white-space:nowrap}
 
 .fade{position:fixed;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .38s var(--ease)}
+/* ralenti : bandes de cinéma, l'étiquette en haut à gauche ; le reste de l'interface s'efface */
+.replay{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s var(--ease)}
+.replay::before,.replay::after{content:'';position:absolute;left:0;right:0;height:9vh;background:oklch(0.12 0.02 255)}
+.replay::before{top:0}.replay::after{bottom:0}
+.replay b{position:absolute;left:28px;top:calc(9vh + 18px);font-size:26px;letter-spacing:2px;text-transform:uppercase;color:var(--white);-webkit-text-stroke:5px var(--stroke);paint-order:stroke fill;animation:breathe 1.6s ease-in-out infinite}
+.replay span{position:absolute;right:28px;bottom:calc(9vh + 16px);font-size:14px;font-weight:700;color:oklch(1 0 0 / .85)}
+.replaying .replay{opacity:1}
+.replaying #hud{display:none}
 .fade.on{opacity:1}
 
 /* joueurs (sous la carte du trou) et annonce du tour */
@@ -144,6 +152,13 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .pl.cur{opacity:1;transform:translateX(6px) scale(1.08)}
 .pl.cur b{color:oklch(0.96 0.07 95)}
 .pl.done{opacity:.55}
+.tm{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.tm-h{display:flex;align-items:center;gap:8px;font-size:17px}
+.tm-h i{width:16px;height:16px;border-radius:4px;box-shadow:0 0 0 2px var(--white),0 1px 3px oklch(0.2 0.04 255 / .4)}
+.tm-h span{color:oklch(0.96 0.07 95)}
+.tm-h em{font-style:normal;color:oklch(0.9 0.15 135);font-size:14px}
+.tm .pl{padding-left:18px;font-size:14px}
+.turn small{display:block;text-align:center;font-size:.5em;margin-top:2px;-webkit-text-stroke-width:4px}
 .turn{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-size:clamp(24px,4vw,40px);white-space:nowrap;animation:turnIn .42s var(--ease)}
 .turn i{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:10px;vertical-align:-2px;box-shadow:0 0 0 3px var(--white),0 2px 4px oklch(0.2 0.04 255 / .4)}
 @keyframes turnIn{0%{transform:translateX(-50%) translateY(-10px);opacity:0}100%{transform:translateX(-50%);opacity:1}}
@@ -187,13 +202,13 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .credit{position:absolute;right:16px;bottom:8px;margin:0;font-size:12px;font-weight:700;color:oklch(1 0 0 / .78);text-shadow:0 1px 2px oklch(0.2 0.05 255 / .6)}
 .home[data-state="setup"] .credit{bottom:auto;top:24px;right:76px}
 
-.setup{position:absolute;left:24px;top:24px;max-height:calc(100% - 48px);width:min(460px,calc(100vw - 48px));display:flex;flex-direction:column;gap:12px;padding:20px 22px 16px;overflow:auto;
+.setup{position:absolute;left:24px;top:24px;max-height:calc(100% - 48px);width:min(540px,calc(100vw - 48px));display:flex;flex-direction:column;gap:12px;padding:20px 22px 16px;overflow:auto;
   border-radius:var(--r-l);background:var(--paper);box-shadow:var(--sh-2);opacity:0;visibility:hidden;transform:translateX(-24px);
   transition:opacity .3s var(--ease),transform .3s var(--ease),visibility 0s linear .3s}
 .home[data-state="setup"] .setup{opacity:1;visibility:visible;transform:none;transition:opacity .3s var(--ease),transform .3s var(--ease)}
 .setup-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:2px}
 .sect{margin:6px 0 0;font-size:12.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
-.courses{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.courses{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .course{position:relative;display:flex;flex-direction:column;padding:0;border:0;border-radius:var(--r-m);overflow:hidden;text-align:left;background:var(--paper-2);
   box-shadow:inset 0 0 0 2px var(--line);transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .course img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;pointer-events:none}
@@ -204,7 +219,7 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .course:hover,.combo:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 2px var(--line),var(--sh-1)}
 .course[aria-pressed="true"],.combo[aria-pressed="true"]{box-shadow:inset 0 0 0 3px var(--sky-deep),var(--sh-1)}
 .course[aria-pressed="true"] .c-ok{opacity:1;transform:none}
-.combos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.combos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .combo{display:flex;flex-direction:column;gap:1px;text-align:left;padding:10px 11px 9px;border:0;border-radius:var(--r-s);background:var(--paper-2);
   box-shadow:inset 0 0 0 2px var(--line);transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .combo b{font-size:14px;font-weight:900;color:var(--ink)}
@@ -278,6 +293,7 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
   .setup{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:74vh;padding:16px}
   .setup-head,.keys,.home[data-state="setup"] .now,.credit{display:none}
   .opt{grid-template-columns:1fr;gap:5px}
+  .courses,.combos{grid-template-columns:repeat(2,1fr)}
   .setup{gap:10px;max-height:80vh}
   .course img{aspect-ratio:16/10}
   .c-txt{padding:6px 8px 7px}.c-txt b{font-size:13px}.c-txt small,.combo small{font-size:11px}

@@ -3,7 +3,7 @@
 // Moteur pur : l'hôte calcule le coup d'un bot, puis le joue comme celui d'un joueur.
 import { CLUBS, PUTTER, putterRange } from './clubs.js';
 import { simulate } from './physics.js';
-import { suggestClub, clubReach, distToPin, layupPoint } from './advice.js';
+import { suggestClub, clubReach, distToPin, layupPoint, pinReachable } from './advice.js';
 import { makeRng } from './rng.js';
 
 // pow / curve / aim : dispersion de la force, de l'effet, de la direction ; read : part du vent et de la pente prise en compte
@@ -40,15 +40,17 @@ export function botShot(hole, ball, wind, level = 'normal', seed = 1) {
   }
 
   // coup plein : cible = drapeau à portée, sinon un point de la ligne de jeu
-  const reach = clubReach(hole, ball, club);
-  const target = d <= reach * 1.05 ? { x: hole.pin.x, z: hole.pin.z } : (layupPoint(hole, ball, reach * 0.95) || { x: hole.pin.x, z: hole.pin.z });
+  const reach = clubReach(hole, ball, club), direct = pinReachable(hole, ball, reach);
+  const target = direct ? { x: hole.pin.x, z: hole.pin.z } : (layupPoint(hole, ball, reach * 0.95) || { x: hole.pin.x, z: hole.pin.z });
   let aim = Math.atan2(target.x - ball.x, target.z - ball.z);
   let power = clamp(Math.hypot(target.x - ball.x, target.z - ball.z) / reach, 0.15, 1);
-  // deux corrections : la portée (force) puis la dérive (direction), au point de chute
+  // deux corrections : la portée (force) puis la dérive (direction), au point de chute ; vers le drapeau on vise un
+  // peu court pour laisser rouler la balle, d'autant plus que l'approche est courte (elle roule beaucoup)
+  const short = !direct ? 1 : d < 35 ? 0.78 : d < 70 ? 0.86 : 0.93;
   for (let it = 0; it < 3; it++) {
     const res = simulate(hole, ball, { club, traj: 'mid', aim, power, curve: 0, seed: 1 }, readWind, { stopAtLanding: true });
     const lx = res.end.x - ball.x, lz = res.end.z - ball.z, tx = target.x - ball.x, tz = target.z - ball.z;
-    const carry = Math.hypot(lx, lz), want = Math.hypot(tx, tz) * (d <= reach * 1.05 ? 0.93 : 1);
+    const carry = Math.hypot(lx, lz), want = Math.hypot(tx, tz) * short;
     if (carry > 1) power = clamp(power * Math.pow(want / carry, 0.8), 0.12, 1);
     aim += (Math.atan2(tx, tz) - Math.atan2(lx, lz));
   }

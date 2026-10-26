@@ -21,3 +21,4 @@ Freesound (freesound.org), auteurs :
   - Mafon2 — « Park ambience - mostly birds » : amb-campagne
   - jackmichaelking — « Gentle ocean waves birdsong and gull » : amb-mer
   - Tonmeister88 — « Mountain Meadow Switzerland Birds Insects distant cowbells » : amb-montagne
+  - Vrymaa — « Desert sand - Dune atmosphere » et TRP — « Semi desert insects ravens birds quiet » : amb-desert (mélangés)

@@ -41,8 +41,14 @@ export class HUD {
     $('#hStroke').textContent = stroke;
   }
   // bandeau des joueurs : couleur, nom, score par rapport au par ; celui qui joue est mis en avant
-  players(list) {
-    $('#players').innerHTML = list.map((p) => `<div class="pl ${p.cur ? 'cur' : ''} ${p.done ? 'done' : ''}"><i style="background:${esc(p.color)}"></i><b>${esc(p.name)}</b><span>${p.toPar === 0 ? 'E' : p.toPar > 0 ? '+' + p.toPar : p.toPar}</span>${p.done ? '<em>✓</em>' : ''}</div>`).join('');
+  // en équipes : les joueurs sont rangés sous leur équipe (même score), un point blanc pour ceux qui ont joué la volée
+  players(list, teams) {
+    const row = (p) => `<div class="pl ${p.cur ? 'cur' : ''} ${p.done ? 'done' : ''}"><i style="background:${esc(p.color)}"></i><b>${esc(p.name)}</b>${teams ? (p.played ? '<em>•</em>' : '') : `<span>${toParTxt(p.toPar)}</span>${p.done ? '<em>✓</em>' : ''}`}</div>`;
+    if (!teams) { $('#players').innerHTML = list.map(row).join(''); return; }
+    $('#players').innerHTML = teams.map((t, k) => {
+      const m = list.filter((p) => p.team === k);
+      return m.length ? `<div class="tm"><div class="tm-h"><i style="background:${esc(t.color)}"></i><b>${esc(t.name)}</b><span>${toParTxt(m[0].toPar)}</span>${m[0].done ? '<em>✓</em>' : ''}</div>${m.map(row).join('')}</div>` : '';
+    }).join('');
   }
   dist(m) { setText('#distTxt', fmtM(m)); }
   lie(l) { $('#lieTxt').textContent = lieLabel(l); }
@@ -96,7 +102,12 @@ export class HUD {
     const dxz = [hole.pin.x - hole.tee.x, hole.pin.z - hole.tee.z], L = Math.hypot(...dxz);
     const dx = dxz[0] / L, dz = dxz[1] / L, rx = -dz, rz = dx; // d : vers le green ; r : à droite en regardant le green
     let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    // la ligne de jeu, plus les terres posées sur l'eau (îles, anneau d'un lagon) pour qu'on les voie en entier
     const pts = [...hole.center.map(([x, z]) => [x, z]), [hole.pin.x, hole.pin.z]];
+    for (const L of hole.coast?.land || []) {
+      if (L.pts) for (const [x, z] of L.pts) { if (Math.hypot(x - hole.tee.x, z - hole.tee.z) < 260) pts.push([x, z]); }
+      else pts.push([L.x - L.rx, L.z - L.rz], [L.x + L.rx, L.z + L.rz]);
+    }
     for (const [x, z] of pts) { const u = x * rx + z * rz, v = x * dx + z * dz; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
     u0 -= 48; u1 += 48; v0 -= 26; v1 += 34;
     let wm = u1 - u0, hm = v1 - v0;
@@ -221,7 +232,7 @@ export class HUD {
 // ------------------------------------------------------------------ écrans
 const SETTINGS_KEY = 'golf_setup';
 export function loadSetup() {
-  const d = { course: 'campagne', bots: 1, level: 'normal', wind: 'normal' };
+  const d = { course: 'campagne', bots: 1, level: 'normal', wind: 'normal', time: 'jour', teams: 'solo' };
   try { return { ...d, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch (e) { return d; }
 }
 export function saveSetup(o) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(o)); } catch (e) {} }

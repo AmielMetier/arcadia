@@ -22,6 +22,12 @@ export const LOOKS = {
     green1: 0x70a043, green2: 0x67963d, tee1: 0x649438, tee2: 0x578731, sand: 0xd9cba2, sandEdge: 0xbba878, bed: 0x2f4034,
     out1: 0x10240c, out2: 0x183012, rock: 0x7d786f, shallow: 0x6fb0aa, deep: 0x1d4a60,
   },
+  // désert : fairway irrigué, première coupe vert olive, puis le sable tassé ; hors-limites en terre rouge
+  desert: {
+    rough: 0xc49a62, rough2: 0xb0844f, cut: 0x7c8a3a, fair1: 0x6f9a3a, fair2: 0x628c33, fringe: 0x6a9338,
+    green1: 0x78a542, green2: 0x6f9c3c, tee1: 0x6f9a3a, tee2: 0x628c33, sand: 0xecd6a2, sandEdge: 0xcfb07a, bed: 0x5a5a3a,
+    out1: 0x8a5232, out2: 0x9c6038, rock: 0xb4674a, shallow: 0x4fb6a8, deep: 0x125a66,
+  },
 };
 
 const PX = 0.5;        // mètres par texel de la carte des distances
@@ -66,8 +72,7 @@ function zoneMap(hole) {
     const z = area.z0 + (j + 0.5) * P;
     for (let i = 0; i < W; i++) {
       const x = area.x0 + (i + 0.5) * P;
-      const ob = Math.max(B.x0 - x, x - B.x1, B.z0 - z, z - B.z1);
-      const k = Math.max(smooth(hole.valley - 8, hole.valley + 22, hole.centerDist(x, z)), smooth(-6, 10, ob));
+      const k = Math.max(smooth(4, -10, hole.landSD(x, z)), smooth(-6, 6, hole.obDist(x, z)));
       data[(j * W + i) * 4] = Math.round(k * 255);
     }
   }
@@ -366,6 +371,7 @@ export function buildWater(hole, { noise, envMap, refl, sun }) {
   }
   // torrents au fond des ravins : un ruban d'eau qui suit le ravin et s'écoule
   for (const R of hole.ravines) {
+    if (R.dry) continue; // canyon sec : pas de torrent
     const pts = []; const L = R.line;
     for (let i = 0; i < L.length - 1; i++) {
       const [ax, az] = L[i], [bx, bz] = L[i + 1], len = Math.hypot(bx - ax, bz - az);

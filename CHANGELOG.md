@@ -1,17 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 2.63 — 26 octobre 2026
-- **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 4 joueurs chacun son tour, avec des bots.
-  - 18 trous dans trois décors : la campagne, le bord de mer (plages, baies, palmiers) et la montagne (falaises, torrents, sommets enneigés).
-  - Partie de 6 trous (un décor), de 9 trous (l'aller ou le retour) ou les 18 trous d'un coup, avec la carte de score entre chaque trou et le podium à la fin.
+- **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 6 joueurs chacun son tour ou en équipes, avec des bots.
+  - 30 trous dans quatre décors : la campagne, le bord de mer, la montagne et le désert (oasis, canyon, mesas et cactus).
+  - Des trous tous différents : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Chaque trou a sa forme, bordée d'arbres, de forêt ou d'eau.
+  - Une partie sur un décor (8 trous, 6 au désert), sur 9 trous (l'aller ou le retour), sur 18 trous ou sur les 30, avec la carte de score entre chaque trou et le podium à la fin.
+  - En équipes, 2 contre 2 ou 3 contre 3 : chacun joue depuis la balle de l'équipe et on garde la meilleure ; les bots complètent les équipes.
+  - On joue en plein jour, au crépuscule ou le soir sous les étoiles.
   - Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer, et on relâche pour frapper. Tirer de travers fait tourner la balle, et trop armer la fait partir en hook. Au clavier : maintenir Espace.
   - Huit clubs, du vent à chaque trou, des bunkers, la plage, l'eau et le hors-limites (un coup de pénalité), des arbres qui arrêtent la balle.
   - Une cible montre où tombe un coup plein sans le vent, et sur le green une grille animée montre la pente.
   - La mini-carte est une vue aérienne du trou : on zoome à la molette (ou Z) et on la fait glisser, et le bouton relief (ou R) la change en carte des altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
+  - Les beaux coups repassent au ralenti : trou en un, chip rentré, long putt, approche collée au drapeau.
   - Un écran d'accueil qui survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
-  - Un rendu soigné : herbe haute en 3D qui ondule au vent, arbres et sapins touffus, reflets du décor dans l'eau, ombres douces, falaises et sommets enneigés.
+  - Un rendu soigné : herbe haute en 3D qui ondule au vent, arbres, sapins, palmiers et cactus, reflets du décor dans l'eau, ombres douces, falaises et sommets enneigés.
   - On voit le swing des autres en direct. Le plus loin du drapeau joue en premier, et l'honneur revient au meilleur score du trou précédent.
-  - Ambiance de nature, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
+  - Ambiance de nature propre à chaque décor, applaudissements, « oh ! » de la foule quand la balle frôle le trou et petits jingles quand elle s'arrête.
   - Bots en trois niveaux : facile, moyen et difficile.
 
 ## 2.62 — 26 octobre 2026

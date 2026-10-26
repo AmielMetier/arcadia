@@ -22,7 +22,7 @@ export class Sfx {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.9; this.master.connect(c.destination);
+    this.master = c.createGain(); this.master.gain.value = this.muted || this.silent ? 0 : 0.9; this.master.connect(c.destination);
     this.fx = c.createGain(); this.fx.gain.value = 1; this.fx.connect(this.master);
     this.bed = c.createGain(); this.bed.gain.value = 0.55; this.bed.connect(this.master);
     this.songs = c.createGain(); this.songs.gain.value = 0.42; this.songs.connect(this.master);
@@ -47,7 +47,7 @@ export class Sfx {
   setMuted(m) {
     this.muted = m;
     try { localStorage.setItem('golf_mute', m ? '1' : '0'); } catch (e) {}
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
+    if (this.master) this.master.gain.setTargetAtTime(m || this.silent ? 0 : 0.9, this.ctx.currentTime, 0.05);
   }
   play(name, { vol = 1, rate = 1, delay = 0, bus } = {}) {
     const c = this.ctx, b = this.buf.get(name); if (!c || !b) return null;
