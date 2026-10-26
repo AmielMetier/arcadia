@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.65 — 26 octobre 2026
+- Implement PhaserJS 3 64x64 Gen 5 Unys overworld with 3 official tileset packs, Arcade Physics, and battle HUD/trainer fixes (Amiel)
+
 ## 2.64 — 26 octobre 2026
 - Fix trainer intro sequence before Pokemon send-out, responsive battle HUD, and add Gen 5 Unova tilesets (Amiel)
 
