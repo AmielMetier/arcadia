@@ -53,12 +53,14 @@
 
     // Messages volatils reçus : on ne garde que le dernier de chaque expéditeur et de chaque sorte, transmis au jeu
     // au prochain tour de boucle ; un message normal fait d'abord passer ceux en attente (l'ordre est respecté).
+    // (« prochain tour » par un MessageChannel : un setTimeout(…, 0) attend jusqu'à une seconde, voire une minute,
+    // quand l'onglet de l'hôte est caché, et les commandes des invités arrivaient en retard dans le jeu)
     const pendingVol = new Map(); let volT = 0;
-    const flushVol = () => { clearTimeout(volT); volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
+    const flushVol = () => { volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
     function gameIn(from, m, v) {
       if (v && m && typeof m === 'object') {
         pendingVol.set(from + ':' + m.t, [from, m]);
-        if (!volT) volT = setTimeout(flushVol, 0);
+        if (!volT) { volT = 1; soon(flushVol); }
         return;
       }
       if (pendingVol.size) flushVol();
@@ -356,6 +358,13 @@
       },
     });
     return R;
+  }
+
+  // Au prochain tour de boucle, sans subir le bridage des minuteries d'un onglet caché
+  function soon(fn) {
+    if (typeof MessageChannel !== 'function') { setTimeout(fn, 0); return; }
+    if (!soon.ch) { soon.q = []; soon.ch = new MessageChannel(); soon.ch.port1.onmessage = () => { const f = soon.q.shift(); if (f) f(); }; }
+    soon.q.push(fn); soon.ch.port2.postMessage(0);
   }
 
   window.DDRoom = { create: createRoom, MAX_PLAYERS, PALETTE, cleanName };
