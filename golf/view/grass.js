@@ -13,6 +13,7 @@ const KINDS = {
   cut: { dens: 6, h: [0.09, 0.15], w: [0.2, 0.3] },
   rough: { dens: 10, h: [0.16, 0.28], w: [0.24, 0.38] },
   out: { dens: 8, h: [0.24, 0.42], w: [0.3, 0.48] },
+  dry: { dens: 2.5, h: [0.12, 0.24], w: [0.2, 0.32] },  // touffes sèches éparses sur le sable du désert
 };
 
 export function createGrass(hole, look, { mobile = false, sway }) {
@@ -42,7 +43,7 @@ export function createGrass(hole, look, { mobile = false, sway }) {
   const col = (h) => new THREE.Color(h);
   const C = {
     cut: [col(look.cut), col(look.fair2)],
-    rough: [col(look.rough), col(look.rough2)], out: [col(look.out1), col(look.out2)],
+    rough: [col(look.rough), col(look.rough2)], out: [col(look.out1), col(look.out2)], dry: [col(0xa69256), col(0x8c7c46)],
   };
   const lv = hole.waterLv, coast = hole.coast;
 
@@ -54,7 +55,8 @@ export function createGrass(hole, look, { mobile = false, sway }) {
     if (f.bd < 1.04 || f.gd < 1.03) return null;
     if (f.td < 1.2 || f.gd < 1.18 || f.fm > -0.3) return null;
     if (f.fm > -2.4) return 'cut';
-    if (hole.centerDist(x, z) > hole.valley + 14 || x < hole.bounds.x0 || x > hole.bounds.x1 || z < hole.bounds.z0 || z > hole.bounds.z1) return 'out';
+    if (hole.theme === 'desert') return f.fm < -3.5 && Math.sin(x * 1.7 + z * 2.3) * Math.sin(x * 0.37 - z * 0.53) > 0.55 ? 'dry' : f.fm > -3.5 ? 'cut' : null;
+    if (hole.landSD(x, z) < 2 || hole.obDist(x, z) > 0) return 'out';
     return 'rough';
   }
 

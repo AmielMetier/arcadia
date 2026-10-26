@@ -76,7 +76,7 @@
       emit('pings', H.pings);
     } else if (d.k === 'msg') emit('msg', d.from, d.m);
   });
-  if (embedded) post({ k: 'hello' });
+  if (embedded) { keepAwake(H); post({ k: 'hello' }); }
 
   // Duo Drift parle à un objet Net (host/join/to/bcast…) : on le branche sur le salon du Hub.
   // Côté hôte, chaque joueur dont le jeu est prêt devient un « lien » 'p<id>'.
@@ -138,4 +138,58 @@
   };
 
   window.HubBridge = H;
+
+  /* Onglet caché : les navigateurs brident les minuteries d'une page cachée (un déclenchement par seconde, puis
+     par minute au bout de 5 minutes sous Chrome) et coupent requestAnimationFrame. Chez l'hôte, la partie se figeait
+     alors pour tout le monde dès qu'il changeait d'onglet. Dans une partie lancée par le Hub :
+     - setTimeout et setInterval passent par un Worker, que les navigateurs ne brident pas ;
+     - chez l'hôte d'une partie à plusieurs, requestAnimationFrame est relayé par ce Worker (30 images par seconde)
+       tant que l'onglet est caché. Un jeu qui fait déjà tourner sa simulation à part (Duo Drift, Bastion Clash)
+       s'en passe avec HubBridge.ownBackgroundLoop = true. window.__forceHidden simule l'onglet caché (tests). */
+  function keepAwake(H) {
+    let w;
+    try {
+      const src = 'const t=new Map();onmessage=(e)=>{const[k,id,ms]=e.data;'
+        + 'if(k==="c"){clearTimeout(t.get(id));clearInterval(t.get(id));t.delete(id);}'
+        + 'else if(k==="t"){t.set(id,setTimeout(()=>{t.delete(id);postMessage(id);},ms));}'
+        + 'else{t.set(id,setInterval(()=>postMessage(id),ms));}};';
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      w = new Worker(url);
+      URL.revokeObjectURL(url);
+    } catch (e) { return; } // pas de Worker possible : on garde les minuteries du navigateur
+    const nST = window.setTimeout.bind(window), nSI = window.setInterval.bind(window), nCT = window.clearTimeout.bind(window), nCI = window.clearInterval.bind(window);
+    const jobs = new Map();
+    let seq = 1e7; // loin des numéros du navigateur (minuteries posées avant ce script)
+    w.onmessage = (e) => {
+      const j = jobs.get(e.data); if (!j) return;
+      if (!j.repeat) jobs.delete(e.data);
+      try { j.fn(...j.args); } catch (err) { console.error(err); }
+    };
+    const add = (repeat) => function (fn, ms, ...args) {
+      if (typeof fn !== 'function') return (repeat ? nSI : nST)(fn, ms, ...args);
+      const id = ++seq;
+      jobs.set(id, { fn, args, repeat });
+      w.postMessage([repeat ? 'i' : 't', id, Math.max(repeat ? 4 : 0, Number(ms) || 0)]);
+      return id;
+    };
+    const clear = (id) => { if (jobs.has(id)) { jobs.delete(id); w.postMessage(['c', id]); } else { nCT(id); nCI(id); } };
+    window.setTimeout = add(false); window.setInterval = add(true);
+    window.clearTimeout = clear; window.clearInterval = clear;
+
+    // Images : celles du navigateur quand l'onglet est visible ; chez l'hôte, des images de 33 ms quand il est caché
+    const nRAF = window.requestAnimationFrame.bind(window);
+    const cbs = new Map();
+    let fseq = 0, nativeId = 0, relayId = 0;
+    const hidden = () => document.hidden || !!window.__forceHidden;
+    const relay = () => hidden() && !H.ownBackgroundLoop && H.info.role === 'host' && H.players.length > 1;
+    const run = (t) => { const list = [...cbs.values()]; cbs.clear(); for (const cb of list) { try { cb(t); } catch (err) { console.error(err); } } };
+    const arm = () => {
+      if (!cbs.size) return;
+      if (relay()) { if (!relayId) relayId = window.setTimeout(() => { relayId = 0; run(performance.now()); }, 33); }
+      else if (!nativeId) nativeId = nRAF((t) => { nativeId = 0; run(t); });
+    };
+    window.requestAnimationFrame = (cb) => { const id = ++fseq; cbs.set(id, cb); arm(); return id; };
+    window.cancelAnimationFrame = (id) => { cbs.delete(id); };
+    document.addEventListener('visibilitychange', arm);
+  }
 })();

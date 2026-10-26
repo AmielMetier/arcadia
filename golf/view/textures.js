@@ -150,6 +150,20 @@ export function palmBarkTexture(size = 128) {
   return finish(c, {});
 }
 
+// Cactus : côtes verticales claires et sombres, piquées d'épines
+export function cactusTexture(size = 128) {
+  const c = canvas(size), g = c.getContext('2d'), r = rng(73);
+  g.fillStyle = '#4e7a3a'; g.fillRect(0, 0, size, size);
+  const ribs = 8, w = size / ribs;
+  for (let i = 0; i < ribs; i++) {
+    const x = i * w, grd = g.createLinearGradient(x, 0, x + w, 0);
+    grd.addColorStop(0, 'rgba(30,60,28,0.55)'); grd.addColorStop(0.5, 'rgba(150,190,110,0.35)'); grd.addColorStop(1, 'rgba(30,60,28,0.55)');
+    g.fillStyle = grd; g.fillRect(x, 0, w, size);
+    for (let y = 2; y < size; y += 6) { g.fillStyle = `rgba(235,230,200,${0.35 + r() * 0.4})`; g.fillRect(x + w / 2 - 0.5, y + r() * 2, 1.2, 1.2); }
+  }
+  return finish(c, {});
+}
+
 // Ombre douce au pied des arbres (disque dégradé)
 export function shadeTexture(size = 128) {
   const c = canvas(size), g = c.getContext('2d');

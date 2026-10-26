@@ -1,5 +1,137 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.80 — 26 octobre 2026
+- **Tous les jeux** — Quand l'hôte change d'onglet ou réduit sa fenêtre, la partie continue pour tout le monde.
+  - Le navigateur ralentit fortement une page cachée (un minuteur par seconde, puis par minute au bout de cinq minutes) et y arrête l'animation : chez l'hôte, la partie se figeait ou prenait des secondes de retard pour tous les joueurs. Les jeux gardent maintenant leur rythme dans un onglet caché, et chez l'hôte d'une partie à plusieurs, la simulation continue à 30 images par seconde.
+  - Les commandes des invités arrivent sans attendre au jeu de l'hôte, même quand son onglet est caché.
+- **Tête de Calcul** — Market making : après ta troisième cotation, le dernier dé, la somme et ton P&L s'affichent tout de suite, avec « on attend les autres ». Les bots cotent aussi plus vite : on n'attend plus la fin du chrono.
+
+## 2.79 — 26 octobre 2026
+- **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
+  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
+  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
+  - Les ombres ne scintillent plus quand on tourne la caméra.
+  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
+  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
+  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
+
+## 2.78 — 26 octobre 2026
+- **Hub** — Plus de fausse « Connexion perdue » au lancement d'une partie : quand l'ordinateur rame quelques secondes (un jeu qui prépare son décor, une machine plus lente), ce n'est plus pris pour une coupure du réseau.
+
+## 2.77 — 26 octobre 2026
+- **Tête de Calcul** — The Candidate : nouvelles épreuves de réflexion.
+  - Raisonnement abstrait : une grille de 3 × 3 motifs dont la dernière case manque. On choisit parmi quatre cases dessinées ; la forme, le nombre et le remplissage suivent chacun leur règle.
+  - Mémoire : une liste de cours, d'ordres, un carnet ou une suite de chiffres s'affiche quelques secondes, puis disparaît avant la question.
+  - Attention : repérer les différences entre deux codes, compter un chiffre dans un bloc, filtrer une liste d'ordres.
+  - Statistiques : moyenne, médiane, écart-type, intervalle de confiance, loi normale, régression, corrélation, et les grands pièges (biais du survivant, p-value, surapprentissage, paradoxe de Simpson…).
+  - Probabilités avancées : ruine du joueur, chaînes de Markov, marche aléatoire, temps d'attente d'une série de piles, collectionneur, arrêt optimal.
+  - Analyse et algèbre : dérivées, intégrales, équations du second degré, systèmes, déterminants, valeurs propres, développements limités, optimisation, séries.
+  - Ces épreuves sortent plus souvent pour le poste Quant (et les statistiques pour Risques).
+- **Tête de Calcul** — The Candidate : le face-à-face final devient un sprint de calcul. 60 secondes, un calcul après l'autre, juste ou faux s'affiche tout de suite ; le plus de calculs justes gagne, chaque erreur retire un point. En cas d'égalité parfaite, on relance un sprint.
+
+## 2.76 — 26 octobre 2026
+- **Tête de Calcul** — The Candidate : beaucoup plus de questions, pour ne presque plus retomber sur les mêmes.
+  - Calcul mental, équations, taux, finance d'entreprise, marchés, dérivés, probabilités, risques et macro : une bonne partie des questions est maintenant tirée à la volée, avec des chiffres neufs à chaque partie (pourcentages, points de base, MEDAF, WACC, duration, VaR, straddle, Bayes, parité call-put…). Le piège reste l'erreur classique du calcul.
+  - Fat finger et numéros de téléphone : plus de liste fixe, chaque code, montant, ordre ou IBAN est nouveau (les IBAN et ISIN ont même une clé de contrôle valide).
+  - Les relances de Pierre changent de chiffres à chaque fois, et il y en a de nouvelles.
+  - Six nouveaux cas pratiques : valorisation par les flux, swap de taux, couverture de change, rachat payé en actions, prêt à une entreprise, straddle avant résultats. Le poste M&A n'a plus toujours le même dossier.
+  - Les épreuves SQL ont des énoncés et des bases différents à chaque partie.
+  - Sur 30 parties, environ 6 % des questions avaient déjà été vues, contre 20 % avant.
+- **Tête de Calcul** — The Candidate : les trois tours (premier tour, desk, comité final) durent chacun un tiers de l'entretien.
+- **Tête de Calcul** — The Candidate : plus de cas pratique dans les parties de 10 questions, il en prenait trop de place ; à partir de 15 questions, il arrive au comité final.
+- **Tête de Calcul** — Market making : la consigne tient en deux lignes, toujours visible pendant l'épreuve.
+- **Tête de Calcul** — Le menu des réactions (en bas à gauche) est lisible dans The Candidate : les phrases ne sont plus écrites en blanc sur fond clair.
+- **Tête de Calcul** — Figures à compter : des tailles plus variées, et trois nouvelles questions (carrés d'une taille donnée, triangles entre des points, cubes cachés d'un pavé).
+- **Tête de Calcul** — Les nombres négatifs s'affichent avec un vrai signe moins.
+
+## 2.75 — 26 octobre 2026
+- **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré, jusqu'à six amis et des bots pour remplir la montgolfière (16, 24 ou 30 joueurs). On peut aussi simplement explorer l'île, sans combat.
+  - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
+  - Tous les bâtiments s'ouvrent : on entre par les portes, on monte les escaliers jusqu'aux toits plats.
+  - Les portes s'ouvrent et se ferment avec la touche E, et pivotent du côté opposé à celui qui les pousse. Les garages et les hangars ont un rideau métallique qui s'enroule.
+  - Les bâtiments sont meublés selon leurs pièces : séjours et salons (canapés, fauteuils, télé, bibliothèques), cuisines, chambres (lits, armoires, commodes, tables de chevet), salles de bains, bureaux, magasins, garages avec leur voiture, entrepôts, granges, restaurants, et des tableaux aux murs. Les maisons abandonnées ont gardé quelques meubles, parfois renversés.
+  - On court, on sprinte, on s'accroupit, on saute, et on nage dans le lac et dans la mer.
+  - Minicarte en haut à droite, grande carte avec la touche M : pendant l'exploration, un clic sur la carte t'y emmène.
+  - Une partie : on monte à plusieurs dans une montgolfière qui traverse l'île, on saute quand on veut (Espace), chute libre puis planeur jusqu'au sol. La tempête se referme en sept phases, et le dernier en vie gagne.
+  - Le butin : fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision et lance-roquettes, en gris, vert, bleu ou violet selon la rareté. Il y a aussi des munitions de cinq sortes, des bandages, des trousses de soin, des petites et grandes potions de bouclier, des grenades, des grenades de souffle et des tremplins.
+  - Coffres dorés et caisses de munitions dans les maisons et en pleine nature, butin posé au sol, inventaire de cinq cases (touches 1 à 5 ou molette), E pour ramasser, G pour lâcher, R pour recharger.
+  - Combat : 100 points de vie et jusqu'à 100 de bouclier, tir à la hanche ou en visant (clic droit), lunette du fusil de précision, tirs à la tête, roquettes et grenades qui explosent, dégâts de chute. Les éliminés lâchent tout leur butin.
+  - Interface : barres de vie et de bouclier, munitions, chrono et cercle de la tempête sur la minicarte, fil des éliminations, marqueur de touche, chiffres de dégâts et direction des tirs reçus.
+  - Pioche (touche X) : tout se casse et se récolte. Les arbres donnent du bois ; les rochers, de la pierre ; les voitures et les conteneurs, du métal. Les murs des maisons, les portes et les meubles se cassent aussi. Les balles et les explosions abîment le décor et les constructions.
+  - Construction : mur (F), sol (V) et escalier (C) pour 10 de bois, de pierre ou de métal (T pour changer). Un fantôme bleu montre où la pièce va se poser. Les pièces durcissent en quelques secondes, et une construction qui ne repose plus sur rien s'effondre.
+  - Les bots sautent vers un coin de l'île, fouillent maisons et coffres (en ouvrant les portes et en montant les escaliers), changent d'arme pour une meilleure, se soignent, suivent la tempête et se battent. Trois niveaux : facile, moyen ou difficile. Au début, ils fouillent avant de se chercher entre eux.
+  - À plusieurs : ton personnage répond tout de suite à tes touches, les autres joueurs se déplacent en douceur, et ce que tu vises est bien ce que tu touches. Si l'hôte quitte, un autre joueur reprend la partie là où elle en était. Un joueur qui arrive en retard regarde la partie et joue à la suivante.
+  - Réglages du salon : battle royale ou exploration, nombre de joueurs sur l'île, niveau des bots et moment de la journée.
+  - Les sons : une détonation par arme (étouffée au loin), impacts, explosions, portes, coffres, rechargement, soins, pioche, constructions, tes pas et ceux des joueurs qui approchent, vent en chute libre, grondement de la tempête, et l'ambiance de la campagne, du bord de mer ou de la montagne.
+  - Après une élimination, on regarde celui qui t'a eu, ou un autre joueur avec Espace. Le bilan de fin donne le classement, les éliminations et les dégâts de chacun ; l'hôte peut relancer une partie.
+  - Sensibilité de la souris et volume réglables à l'écran de départ et en pause.
+
+## 2.74 — 26 octobre 2026
+- **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
+  - **Canyon Express** : une descente de 6 mètres, le saut du coyote au-dessus du ravin, des lacets qui grimpent, un pont de corde sans rambarde et une mine d'or avec tapis roulant.
+  - **Station Orbitale** : des plafonds aimantés où la balle roule la tête en bas, et on peut même tirer depuis le plafond, la caméra à l'envers. Il y a aussi des portes qui coulissent, un anneau géant, des astéroïdes qui tournent, et le vide tout autour.
+  - **Marais Brumeux** : des pontons sans rambarde, de la boue qui colle, des flaques de glu qui ralentissent la balle, des sauts de nénuphar en nénuphar et un moulin à eau.
+  - **Sommets Glacés** : de la glace qui glisse, de la neige qui freine, un grand tremplin, des télécabines qui traversent la piste, une crevasse et une piste de bobsleigh avec looping.
+  - **Fête Foraine** : un flipper plein de bumpers, des trampolines, une grande roue à passer au bon moment, un train fantôme et des montagnes russes.
+  - Nouveau choix « 18 trous » : trois parcours à la suite (aller et retour sur la carte de score).
+- **Mini-Golf Party** — Corrections :
+  - La balle ne revient plus une demi-seconde à sa position de départ à la fin d'un coup.
+  - Le résultat du trou (birdie, bogey…) ne se superpose plus au résumé du trou.
+  - La caméra tourne à 360° sans limite : un clic verrouille la souris, sinon il suffit de pousser le curseur contre le bord de l'écran ou de maintenir A / D (ou Q / D, ou les flèches). On peut donc tirer dans n'importe quelle direction.
+
+## 2.73 — 26 octobre 2026
+- **Mini-Golf Party** — Jouable sur téléphone et tablette, à l'écran tactile.
+  - On pose le doigt sur sa balle et on tire en arrière comme un lance-pierre : la flèche montre la direction, la jauge la puissance, et on lâche pour frapper. Revenir sur la balle annule le coup.
+  - Un doigt ailleurs fait tourner la caméra, deux doigts pour zoomer.
+  - Un bouton affiche la vue d'ensemble du trou, et toucher la carte de score l'agrandit.
+  - L'écran se réorganise en portrait comme en paysage pour que la carte de score, le minuteur et les boutons ne se chevauchent pas.
+
+## 2.72 — 26 octobre 2026
+- **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.
+  - Chaque coup : la balle part depuis derrière le golfeur, puis une caméra posée près du point de chute la regarde arriver et rouler. Le ralenti la montre depuis l'autre côté.
+  - Les changements de plan se font en fondu enchaîné, sans coupure sèche : fin de la présentation, joueur suivant, ralenti, écran de chargement.
+  - Sur l'écran d'accueil, la caméra ne s'arrête plus avant de passer au trou suivant.
+  - Balle à l'eau : un coup de pénalité, et on rejoue du même endroit (comme un hors-limites).
+  - Trou 9 (Les Îles) : le départ est sur une pointe de la rive, et non plus sur un chemin au milieu de l'eau.
+  - Le son est actif dès l'ouverture du jeu (au premier clic si le navigateur l'exige).
+
+## 2.71 — 26 octobre 2026
+- **Birdie Party** — La présentation des trous est mieux cadrée, et les fondus au blanc disparaissent.
+  - On part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou.
+  - Les lacets se survolent sans donner le tournis.
+  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
+- **Hub** — Nouvelle vitrine : les jeux s'affichent sur quatre colonnes, à l'accueil comme dans le salon.
+  - Chaque jeu a la même vignette : une vraie image du jeu avec son titre en grand et son sous-titre, une phrase pour le présenter, le nombre de joueurs et les bots.
+  - Nouvelles affiches tirées du vrai jeu pour Bastion Clash (un assaut sur une base, en 3D), Birdie Party (le trou des Îles, au bord du lac), Poké Duel (Pikachu face à Dracaufeu) et Mini-Golf Party (le Double Looping de la Forge Infernale).
+- **Hub** — Ton compte : à la première visite, tu choisis ton pseudo et ta couleur, et le navigateur s'en souvient.
+  - « Modifier » change ton pseudo ou ta couleur à tout moment.
+  - « 📲 Mon compte sur un autre appareil » donne un code à coller sur ton téléphone ou un autre ordinateur pour y retrouver ton compte et tes amis.
+- **Hub** — Les amis : rejoins tes potes sans copier de code.
+  - Chacun a un code ami ; ajoute un pote avec son code, ou d'un clic sur « ＋ Ami » à côté de son nom dans le salon. Il doit accepter.
+  - Ta liste d'amis montre qui est en ligne, à quoi il joue et dans quel salon : « Rejoindre » t'y emmène directement.
+  - Dans un salon, « Inviter » envoie une invitation à un ami en ligne ; il la reçoit même en pleine partie et la rejoint d'un clic.
+- **Tous les jeux** — Une connexion bien plus solide :
+  - Une coupure de quelques secondes (wifi qui saute, téléphone qui change de réseau, onglet mis de côté) ne fait plus quitter la partie : le jeu se reconnecte tout seul et récupère tout ce qui s'est passé entre-temps.
+  - Pendant la coupure, un bandeau « reconnexion… » s'affiche, et les autres voient « reconnexion… » à côté de ton nom au lieu de te voir partir.
+  - Si c'est l'hôte qui coupe, le salon l'attend au lieu de changer d'hôte, et personne ne perd la partie.
+  - Après une longue coupure, on retrouve sa place et son numéro dans le salon, sans apparaître en double.
+  - Même si le serveur redémarre, tout le monde se retrouve dans le même salon, avec le même code.
+
+## 2.70 — 26 octobre 2026
+- **Birdie Party** — 30 trous au lieu de 18, un quatrième décor, les parties en équipes et un vrai écran d'accueil.
+  - Tous les trous sont redessinés, chacun avec sa forme : greens sur une île, d'île en île, une baie en croissant, une lagune, un estuaire à franchir, deux fairways autour d'un bosquet, des lacets en montagne, un green au sommet d'une mesa… Le terrain est bordé d'arbres, puis de forêt ou d'eau.
+  - 8 trous en campagne, 8 au bord de mer, 8 en montagne, et un nouveau décor : le désert (6 trous), avec son oasis, son canyon, ses mesas, ses cactus et son sable dur. On peut aussi enchaîner les 30.
+  - Parties en équipes, 2 contre 2 ou 3 contre 3 : chacun joue depuis la balle de l'équipe et on garde la meilleure. Les bots complètent les équipes, jusqu'à 6 joueurs.
+  - On peut jouer en plein jour, au crépuscule ou le soir sous les étoiles.
+  - Les beaux coups repassent au ralenti : trou en un, chip rentré, long putt, approche collée au drapeau (un clic pour passer).
+  - Nouvel écran d'accueil : on survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
+  - La mini-carte se zoome (molette ou Z) et se fait glisser ; le bouton relief (ou R) montre les altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
+  - Interface refaite : boutons et icônes plus nets, carte de score et podium plus clairs (médailles, symboles birdie et bogey), mise en page revue sur téléphone.
+  - Les bots évitent mieux l'eau et la forêt et dosent mieux leurs approches.
+
+## 2.69 — 26 octobre 2026
+- Nouveau : integrate real Tiled Kanto open-world maps (Bourg-Palette, Route 1, Jadielle), 4 interiors & 4-dir walking spritesheets in PhaserJS (Amiel)
+
 ## 2.68 — 26 octobre 2026
 - Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
 

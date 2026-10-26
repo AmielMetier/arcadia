@@ -17,6 +17,9 @@ import { botShot, BOT_NAMES } from '../engine/bot.js';
 import { putterRange, PUTTER } from '../engine/clubs.js';
 
 const COLORS = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
+const TEAM_SIZE = { '2v2': 2, '3v3': 3 };
+const TEAMS = [{ name: 'Équipe bleue', color: '#2b7bff' }, { name: 'Équipe rouge', color: '#ff4b2b' }];
+const TIMES = ['jour', 'crepuscule', 'soir'];
 const holeCache = new Map();
 export function holeByNumber(n) {
   if (!holeCache.has(n)) holeCache.set(n, buildHole(HOLES.find((h) => h.n === n)));
@@ -43,13 +46,19 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
     const course = COURSES[settings.course] || COURSES.campagne;
     // test : ?hole=N démarre la partie à ce trou du parcours
     const holes = settings.startHole ? course.holes.filter((n) => n >= settings.startHole) : course.holes;
-    const humans = solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players.map((p) => ({ id: p.id, name: p.name, color: p.color }));
-    const nb = Math.max(0, Math.min(4 - humans.length, +(settings.bots ?? (solo ? 1 : 0)) || 0));
+    const humans = (solo ? [{ id: me.id, name: me.name, color: me.color }] : bridge.players.map((p) => ({ id: p.id, name: p.name, color: p.color }))).slice(0, 6);
+    // équipes (2 contre 2, 3 contre 3) : les bots complètent les deux équipes
+    const size = TEAM_SIZE[settings.teams] || 0;
+    const nb = size ? Math.max(0, size * 2 - humans.length) : Math.max(0, Math.min(4 - humans.length, +(settings.bots ?? (solo ? 1 : 0)) || 0));
     const used = new Set(humans.map((p) => p.color));
     const free = COLORS.filter((c) => !used.has(c));
     const bots = Array.from({ length: nb }, (_, k) => ({ id: 'b' + k, name: BOT_NAMES[k], color: free[k % free.length], bot: true, level: settings.level || 'normal' }));
     const seed = (Date.now() & 0x7fffffff) || 1;
-    R = newRound({ holes: holes.length ? holes : course.holes, players: [...humans, ...bots], seed, wind: WIND[settings.wind] ?? 1 });
+    const players = [...humans, ...bots];
+    // les humains sont répartis d'une équipe à l'autre, puis les bots comblent les places
+    if (size) { const n = [0, 0]; for (const p of players) { const k = n[0] < size && (n[0] <= n[1] || n[1] >= size) ? 0 : 1; p.team = k; n[k]++; } }
+    R = newRound({ holes: holes.length ? holes : course.holes, players: size ? players.slice(0, size * 2) : players, seed, wind: WIND[settings.wind] ?? 1, teams: size ? TEAMS : null });
+    R.time = TIMES.includes(settings.time) ? settings.time : 'jour';
     R.course = settings.course || 'campagne';
     R.started = Date.now();
     startHole(R, currentHole(R));
@@ -72,13 +81,13 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
     const putt = putterRange(Math.hypot(hole.pin.x - from.x, hole.pin.z - from.z));
     const res = simulate(hole, ball, params, wind, { putt });
     const before = P.strokes;
-    const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf }, (x, z) => hole.surfaceAt(x, z));
-    const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, drop: res.drop, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
+    const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, surf: res.surf });
+    const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
     busy = true;
     emit({ type: 'shot', ev });
     send({ t: 'shot', ev });
     // filet de sécurité : si l'animation de l'hôte ne rend pas la main (onglet caché), on avance quand même
-    later(() => done(ev.no), (res.n / 60 + 6) * 1000);
+    later(() => done(ev.no), (res.n / 60 * 2.9 + 9) * 1000);
   }
 
   // l'animation du coup est finie chez l'hôte : trou suivant, joueur suivant ou fin de partie

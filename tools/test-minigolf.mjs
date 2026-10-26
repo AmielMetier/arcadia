@@ -1,4 +1,4 @@
-/* Tests de Mini-Golf Party : construction des 24 trous et vérification qu'un bot expert peut les finir.
+/* Tests de Mini-Golf Party : construction des 54 trous et vérification qu'un bot expert peut les finir.
    node tools/test-minigolf.mjs [parcours] [trou]   (ex. node tools/test-minigolf.mjs forge 3) */
 import { COURSES, buildCourseHole } from '../minigolf/js/courses.js';
 import { makeBall, strike, simulate, resetOOB, BALL_R } from '../minigolf/js/physics.js';

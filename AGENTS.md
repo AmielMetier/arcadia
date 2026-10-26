@@ -1,7 +1,7 @@
 # Consignes pour les assistants de code (Claude, Codex, Copilot, Cursor, Gemini…) et les contributeurs
 
 Ce dépôt est le **Game Hub** d'Amiel : un site statique (GitHub Pages, sans étape de build) qui réunit plusieurs
-jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party.
+jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Calcul, Bastion Clash, Outbreak, Fil Rouge, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush.
 
 ## À chaque modification poussée sur `main` : journal + version
 
@@ -28,12 +28,12 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
@@ -41,7 +41,14 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge, Outbreak, Convoy Storm ou Birdie Party :
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
   `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`, `node tools/test-golf.mjs`.
-- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 24 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
+- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
+- Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`
+  la montre en 2D. `node tools/test-royale.mjs` vérifie l'île sur plusieurs graines, le déplacement (portes, escaliers, murs, nage),
+  une partie (butin, combat, construction), les copies des invités et le relais d'hôte, la prédiction : à lancer quand on touche
+  au moteur (`royale/engine/`). `node tools/bench-royale.mjs [joueurs] [niveau] [graine] [minutes]` fait jouer une partie entière
+  entre bots (`WATCH=bot3` suit un bot) : coût d'un pas, éliminations, bots coincés, durée de la partie.
+- Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
+  (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;
   `node tools/bench-bastion.mjs [minutes] [graine] [mode] [carte]` fait jouer 4 bots hors navigateur et mesure
   le coût d'un pas de simulation (doit rester sous 33 ms), les éliminations, les cibles des bots et les unités bloquées.

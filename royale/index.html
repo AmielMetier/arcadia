@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Island Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="royale.css">
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="hud" hidden>
+  <!-- effets d'écran -->
+  <div class="stormtint" id="stormtint"></div>
+  <div class="hurt" id="hurt"></div>
+  <div class="scope" id="scope" hidden></div>
+  <div id="dmgdir"></div>
+  <div id="dmgnums"></div>
+
+  <!-- centre : viseur, touche, soin ou rechargement, ce qu'on peut faire -->
+  <div class="cross" id="cross" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+  <div class="hitm" id="hitm" aria-hidden="true"></div>
+  <div class="structhp" id="structhp" hidden><b><i></i></b><span></span></div>
+  <div class="gain" id="gain"></div>
+  <div class="gauge" id="gauge" hidden><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="18"/><circle class="fg" cx="22" cy="22" r="18"/></svg><span></span></div>
+  <div class="prompt" id="prompt" hidden></div>
+
+  <!-- haut gauche : la partie -->
+  <div class="match panel-d" id="match">
+    <span><small>EN VIE</small><b id="mAlive">0</b></span>
+    <span><small>ÉLIMINATIONS</small><b id="mKills">0</b></span>
+    <span class="st" id="mStorm" hidden><small id="mStormL">TEMPÊTE</small><b id="mStormT">0:00</b></span>
+  </div>
+  <div class="phase" id="phase"><span id="phaseTxt"></span></div>
+
+  <!-- haut droite : minicarte, lieu, fil des éliminations -->
+  <div class="mapbox panel-d">
+    <canvas id="mini" aria-label="Minicarte"></canvas>
+    <div class="place" id="place"></div>
+  </div>
+  <div class="feed" id="feed"></div>
+
+  <!-- bas gauche : bouclier, vie, matériaux -->
+  <div class="vit panel-d" id="vit">
+    <div class="vb sh"><img class="ic" src="img/icons/shield.png" alt=""><div class="bt"><i></i></div><b>0</b></div>
+    <div class="vb hp"><svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 3 4.5 6.8 4.5c2.2 0 3.6 1.2 5.2 3 1.6-1.8 3-3 5.2-3 3.8 0 5.9 4 4.4 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg><div class="bt"><i></i></div><b>100</b></div>
+    <div class="mats" id="mats"></div>
+  </div>
+
+  <!-- bas centre : la barre d'objets -->
+  <div class="hot">
+    <div class="heldname" id="heldname"></div>
+    <div class="inv" id="inv"></div>
+  </div>
+
+  <!-- bas droite : munitions -->
+  <div class="ammo panel-d" id="ammo"></div>
+
+  <!-- gauche : rappel des touches (H pour masquer) -->
+  <div class="keys panel-d" id="hints">
+    <b>Touches <kbd>H</kbd></b>
+    <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</div>
+    <div><kbd>Espace</kbd> sauter, planer</div>
+    <div><kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</div>
+    <div><kbd>1</kbd>…<kbd>5</kbd> objets · <kbd>X</kbd> pioche</div>
+    <div><kbd>E</kbd> ouvrir, ramasser</div>
+    <div><kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</div>
+    <div><kbd>Tab</kbd> sac · <kbd>M</kbd> carte</div>
+    <div><kbd>F</kbd><kbd>V</kbd><kbd>C</kbd> construire · <kbd>T</kbd> matériau</div>
+  </div>
+
+  <div class="buildbar" id="buildbar" hidden></div>
+  <div class="spect panel-d" id="spect" hidden></div>
+  <div class="banner" id="center"></div>
+  <div class="fps" id="fps" hidden></div>
+</div>
+
+<!-- le sac : ranger, lâcher, voir ses munitions -->
+<div id="bag" hidden>
+  <div class="bagp panel-d">
+    <div class="bh"><b>Sac</b><span>Glisse un objet sur une autre case pour le ranger · hors du sac ou clic droit : le lâcher</span><kbd>Tab</kbd></div>
+    <div class="bslots" id="bslots"></div>
+    <div class="bdet" id="bdet"></div>
+    <div class="bcols"><div><h3>Munitions</h3><div id="bammo"></div></div><div><h3>Matériaux</h3><div id="bmats"></div></div></div>
+  </div>
+</div>
+
+<!-- grande carte -->
+<div id="bigmap" hidden>
+  <div class="mapview panel-d">
+    <div class="mh"><b>Carte de l'île</b><span id="mapHint"><kbd>M</kbd> fermer</span></div>
+    <canvas aria-label="Carte de l'île"></canvas>
+  </div>
+</div>
+
+<div id="screen" class="screen">
+  <div class="panel card">
+    <div id="load">
+      <p class="eyebrow">Battle royale</p>
+      <h1>Island <span>Rush</span></h1>
+      <p class="lead">L'île se prépare…</p>
+      <div class="lbar"><i id="loadBar"></i></div>
+      <p class="hint" id="loadTxt">Chargement</p>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="../shared/bridge.js"></script>
+<script src="../shared/profile.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

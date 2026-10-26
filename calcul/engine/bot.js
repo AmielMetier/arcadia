@@ -14,7 +14,21 @@ const HARD = { base: 1, astuce: 0.85, theorie: 0.85, fraction: 0.85, suite: 0.85
 // (pour le code : { delay, raw, passed }, le nombre de tests que son programme réussit)
 export function botAnswer(q, level, rnd = Math.random) {
   const k = SKILL[level] || SKILL.normal;
-  const limit = q.time * 1000;
+  if (q.input === 'sprint') return botSprint(q, k, rnd);
+  // mémoire : le bot ne répond qu'une fois l'écran effacé
+  const memo = q.memo ? q.memo.ms : 0;
+  const a = botAnswerAfter(q, k, rnd, q.time * 1000 - memo);
+  return a && memo ? { ...a, delay: a.delay + memo } : a;
+}
+
+// Sprint : un calcul toutes les 2 à 4 secondes selon le niveau, juste le plus souvent ; tout part à la fin
+function botSprint(q, k, rnd) {
+  const per = 1200 + k.speed * 5000, limit = q.time * 1000 - 1500, out = [];
+  for (let t = per * (0.8 + rnd() * 0.4), j = 0; t < limit && j < q.answer.length; t += per * (0.7 + rnd() * 0.6), j++) out.push(rnd() < Math.min(0.97, k.acc + 0.12) ? q.answer[j] : nearMiss(q.answer[j], rnd));
+  return { delay: limit, raw: out.join(';') };
+}
+
+function botAnswerAfter(q, k, rnd, limit) {
   if (rnd() < k.skip * (q.cat === 'compte' ? 2.5 : q.cat === 'devinette' ? 1.5 : 1)) return null;
   // temps de réponse : autour de speed × limite, jamais avant 1,2 s
   const spread = 0.55 + rnd() * 0.9;
@@ -31,7 +45,8 @@ export function botAnswer(q, level, rnd = Math.random) {
     // market making : un bon bot cote serré autour du juste milieu ; un moins bon se décale d'un ou deux points
     const off = right ? 0 : (rnd() < 0.5 ? -1 : 1) * (1 + Math.floor(rnd() * 2));
     const raw = [0, 1, 2].map((k) => { const w = [1.5, 1, 0.75][k], m = mmFair(q.mm, k) + off; return `${m - w}/${m + w}`; }).join(';');
-    return { delay: Math.min(limit - 3000, limit * (0.35 + k.speed * 0.5)), raw };
+    // trois cotations en 20 à 30 secondes : le marché ne doit pas faire attendre les joueurs qui ont fini
+    return { delay: Math.min(limit - 3000, limit * (0.18 + k.speed * 0.3) * (0.85 + rnd() * 0.3)), raw };
   }
   // une mauvaise réponse tombe souvent dans le piège, comme un vrai candidat
   const trapped = !right && rnd() < 0.35;

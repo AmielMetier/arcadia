@@ -1,4 +1,4 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party et Mini-Golf Party
+# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -90,24 +90,47 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
 - Décor et icônes : modèles 3D et pictogrammes de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/` et `convoy/img/icons/`
 
 ## Birdie Party
-Golf en 3D (Three.js), seul ou jusqu'à 4 joueurs chacun son tour, avec des bots (facile, moyen, difficile).
-- 18 trous originaux dans trois décors : campagne (étangs, ruisseau, chênes), bord de mer (plages, baies, palmiers) et montagne (falaises, torrents au fond des ravins, sommets enneigés)
-- Parties de 6 trous (un décor), 9 trous (aller ou retour) ou 18 trous ; carte de score entre les trous, podium à la fin
+Golf en 3D (Three.js), seul ou jusqu'à 6 joueurs chacun son tour ou en équipes, avec des bots (facile, moyen, difficile).
+- 30 trous originaux dans quatre décors : campagne (étangs, ruisseaux, chênes), bord de mer (îles, baies, lagune, palmiers), montagne (torrents, ravins, lacs alpins, lacets, sommets enneigés) et désert (oasis, canyon, mesas, cactus)
+- Chaque trou a sa forme : le terrain suit la ligne de jeu, au bord ondulé, bordé d'arbres, de forêt (hors-limites) ou d'eau ; îles, chaussées et passages à porter sont décrits dans `golf/engine/course.js`
+- Parties d'un décor (8 trous, 6 au désert), de 9 trous (aller ou retour), de 18 ou de 30 trous ; carte de score entre les trous, podium à la fin
+- Équipes en 2 contre 2 ou 3 contre 3 (scramble : on garde la meilleure balle de l'équipe), complétées par des bots
+- Jour, crépuscule ou soir (étoiles et clair de lune)
 - Le swing se fait d'un geste : clic maintenu, on tire vers le bas pour armer et on relâche pour frapper ; tirer de travers fait un hook ou un slice, trop armer fait tourner la balle. Au clavier : Espace
-- Huit clubs (driver depuis le départ seulement), vent par trou, rough, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
-- Cible du coup plein sans le vent et grille animée de la pente sur le green, mini-carte en vue aérienne (rendue depuis la scène 3D)
+- Huit clubs (driver depuis le départ seulement), vent par trou, rough, sable dur au désert, bunkers, plage, eau et hors-limites (un coup de pénalité), arbres qui arrêtent la balle
+- Cible du coup plein sans le vent et grille animée de la pente sur le green ; ralenti des beaux coups
+- Mini-carte en vue aérienne (rendue depuis la scène 3D), zoomable (molette, Z) et déplaçable, ou en relief (R) : teintes d'altitude, estompage, courbes de niveau, courbes de 15 cm sur le green
+- Écran d'accueil : survol des trous en fond, cartes des parcours en photo, musique du menu (« Sunny Side Up » d'Alex McCulloch, CC0, dans `golf/music/`)
 - Rendu : herbe en 3D autour de la caméra, reflets dans l'eau, occlusion ambiante, halo et étalonnage ; si la machine peine, la résolution puis les effets baissent tout seuls
 - On voit le swing des autres en direct ; le plus loin du drapeau joue en premier, l'honneur au meilleur du trou précédent
-- Ambiance nature, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
-- Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, terrain, eau et ciel générés dans le code
+- Ambiance nature par décor, foule (applaudissements, « oh ! »), jingles à l'arrêt de la balle : sons libres de droits (CC0) listés dans `golf/sounds/LICENSE.txt`
+- Décor : quelques modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `golf/models/` ; arbres, cactus, terrain, eau et ciel générés dans le code
 
 ## Mini-Golf Party
 Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 joueurs (bots facile, normal, expert).
 
-- **4 parcours de 6 trous** : Green Park (classique), Île aux Pirates et Jardin Zen (décorés), Forge Infernale (difficile : lave, pistons, tapis roulants, loopings, marteaux)
+- **9 parcours de 6 trous (54 trous)** : Green Park (classique), Île aux Pirates, Jardin Zen, Forge Infernale, Canyon Express, Station Orbitale (plafonds aimantés, on joue la tête en bas), Marais Brumeux (boue, glu), Sommets Glacés (glace, tremplin, bobsleigh), Fête Foraine (trampolines, flipper) ; partie de 3, 6 ou 18 trous (3 parcours à la suite)
 - **Physique maison** : la balle roule sur les vrais triangles du décor (pentes, dévers, loopings, tremplins), vrai trou dans lequel elle peut tomber ou dont elle peut ressortir, obstacles mobiles, sable, accélérateurs, eau et lave
-- **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance) ou trackpad ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
+- **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance), trackpad ou écran tactile (lance-pierre depuis la balle, un doigt = caméra, deux doigts = zoom) ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
 - Le joueur qui tire simule son coup chez lui et diffuse la trajectoire ; l'hôte tient les tours et les scores
+
+## Island Rush
+Battle royale en 3D (Three.js) sur une île d'un kilomètre carré, dans le style de Birdie Party : de 1 à 6 joueurs, et des
+bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin, combat, pioche et construction, tempête.
+
+- **L'île** tirée d'une graine : relief, montagne, lac, rivière, mer ; une ville et un bourg (18 bâtiments au plus),
+  quatre villages, un port, une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge, carrière, camping,
+  station-service) et une quarantaine de petits bâtiments dans la nature (maisons abandonnées, cabanes, tours de guet)
+- **Tous les bâtiments s'ouvrent** : pans de 4 m (murs, fenêtres, portes, portails, murs cassés) sur la même grille que
+  les futures constructions des joueurs, escaliers jusqu'aux toits plats ; coffres et butin déjà placés
+- **Déplacement** en troisième personne : course, sprint, accroupi, saut, nage ; minicarte et grande carte (M)
+- **Bots** (`royale/engine/ai.js`) : chemins sur une grille de 1 m de toute l'île et de chaque étage (`royale/engine/nav.js`),
+  fouille, soins, zone, combat ; trois niveaux
+- **Réseau** (`royale/engine/net.js`) : l'hôte fait tourner la partie et envoie 20 instantanés par seconde ; les invités
+  tiennent une copie à jour, prédisent leur propre déplacement, et l'hôte vise avec le retard de chacun ; relais d'hôte
+- **Sons** synthétisés (WebAudio) et ambiances de Birdie Party (`royale/view/sound.js`)
+- `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
+- Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
@@ -117,15 +140,17 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
   `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
-  `node tools/test-minigolf.mjs` construit les 24 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
+  `node tools/test-minigolf.mjs` construit les 54 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
-  `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
+  `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
+  `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
+  `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.67** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.74** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

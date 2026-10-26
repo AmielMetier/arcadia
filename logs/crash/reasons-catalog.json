@@ -266,6 +266,20 @@
       "expulsionReasons": [
         "EXP_PEER_LEFT_MIDGAME : joueur quittant en cours de trou marqué done[id] = 'left' (minigolf/js/main.js:742) et son tour est immédiatement passé (hostNextTurn)"
       ]
+    },
+    {
+      "id": "royale",
+      "title": "Island Rush (Royale)",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D Island Battle)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL sur l'île 3D (modèles GLTF, shaders d'eau, herbe et météo)",
+        "Dépassement mémoire lors du chargement des modèles 3D basse déf (GLTF)"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a quitté l'île ou arrêté la partie",
+        "EXP_PEER_LEFT_MIDGAME : joueur déconnecté pendant la tempête (personnage retiré ou laissé statique)"
+      ]
     }
   ]
 }

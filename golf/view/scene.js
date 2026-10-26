@@ -3,8 +3,8 @@
 // createScene() monte le canevas ; loadHole() construit un trou ; dispose() libère tout (géométries, matériaux,
 // textures, contexte WebGL).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { buildTerrain, buildWater, noiseTexture, LOOKS } from './terrain.js';
-import { buildSky, buildPeaks, SKIES } from './sky.js';
+import { buildTerrain, buildWater, noiseTexture, reliefMaterial, LOOKS } from './terrain.js';
+import { buildSky, buildPeaks, skyFor, TIMES } from './sky.js';
 import { scatterNature, buildPin, buildTeeMarkers, buildGreenGrid } from './decor.js';
 import { createTreeKit, forestItems, SWAY } from './trees.js';
 import { createGrass } from './grass.js';
@@ -13,7 +13,10 @@ import { buildGolfer } from './golfer.js';
 import { loadNature } from './models.js';
 
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
-const SUN_DIR = new THREE.Vector3(-0.45, 0.78, -0.42).normalize();
+// direction du soleil (la lune le soir) : réglée par le moment de la journée à chaque trou
+const DAY_DIR = new THREE.Vector3(-0.45, 0.78, -0.42).normalize();
+const SUN_DIR = DAY_DIR.clone();
+const DAY = { sunColor: 0xffeed4, sunInt: 4.2, hemiSky: 0xc4d8f0, hemiGround: 0x34481f, hemiInt: 0.42, exposure: 0.92, env: 0.3 };
 const BALL_VIS = 0.055; // rayon affiché de la balle (grossie pour rester visible)
 
 export function createScene(host, { onLost } = {}) {
@@ -31,6 +34,15 @@ export function createScene(host, { onLost } = {}) {
   renderer.toneMappingExposure = 0.92;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); onLost && onLost(); });
+  // fondu enchaîné : l'image du moment est figée dans un calque posé sur la scène, qui s'efface pendant que la
+  // nouvelle vue apparaît dessous (changement de plan sans coupure ni passage au blanc)
+  const xf = document.createElement('canvas');
+  xf.className = 'xfade';
+  host.appendChild(xf);
+  const xctx = xf.getContext('2d');
+  const fade = { a: 0, left: 0, dur: 1 };
+  // rend la main au navigateur entre deux étapes lourdes : il affiche une image, les animations continuent
+  const breathe = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.12, 4800);
@@ -117,56 +129,124 @@ export function createScene(host, { onLost } = {}) {
   function addGolfer(look) { const g = buildGolfer(look); scene.add(g.root); golfers.add(g); return g; }
   function removeGolfer(g) { if (!golfers.has(g)) return; scene.remove(g.root); g.dispose(); golfers.delete(g); }
 
-  async function loadHole(hole, { theme = 'campagne', wind } = {}) {
-    if (world) unloadHole();
-    const look = LOOKS[theme] || LOOKS.campagne, skyLook = SKIES[theme] || SKIES.campagne;
+  // lumière du moment de la journée (jour, crépuscule, soir)
+  function setLight(L) {
+    sun.color.setHex(L.sunColor); sun.intensity = L.sunInt;
+    hemi.color.setHex(L.hemiSky); hemi.groundColor.setHex(L.hemiGround); hemi.intensity = L.hemiInt;
+    renderer.toneMappingExposure = L.exposure;
+  }
+  let light = DAY;
+  // construit le décor d'un trou en tâche de fond, par tranches de quelques millisecondes : le trou affiché reste
+  // vivant (la caméra continue de voler) jusqu'à ce que le nouveau soit prêt, puis on bascule d'un coup. `swap` est
+  // appelé juste avant la bascule (pour lancer un fondu depuis l'image du moment). Si un autre trou est demandé
+  // entre-temps (on lance la partie pendant le survol de l'accueil), celui-ci est abandonné.
+  let builds = 0;
+  const STALE = {};
+  async function loadHole(hole, { theme = 'campagne', wind, time = 'jour', swap } = {}) {
+    const id = ++builds;
+    let t0 = performance.now();
+    const pace = async () => {
+      if (performance.now() - t0 < 10) return;
+      await breathe(); t0 = performance.now();
+      if (disposed || id !== builds) throw STALE;
+    };
+    const T = TIMES[time], lt = T || DAY, sunDir = T ? new THREE.Vector3(...T.dir).normalize() : DAY_DIR.clone();
+    const look = LOOKS[theme] || LOOKS.campagne, skyLook = skyFor(theme, time);
     const g = new THREE.Group();
     const center = { x: (hole.bounds.x0 + hole.bounds.x1) / 2, z: (hole.bounds.z0 + hole.bounds.z1) / 2 };
-    // ciel → environnement (reflets et lumière d'ambiance)
-    const sky = buildSky(skyLook, SUN_DIR, noise);
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envScene = new THREE.Scene(); envScene.add(buildSky(skyLook, SUN_DIR, noise));
-    const env = pmrem.fromScene(envScene, 0.02).texture;
-    envScene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
-    pmrem.dispose();
-    scene.environment = env; scene.environmentIntensity = 0.3;
-    // brume bleutée sur les collines lointaines
+    let env = null, terrain, water, sky, grass, pin, grid;
+    try {
+      // ciel → environnement (reflets et lumière d'ambiance)
+      sky = buildSky(skyLook, sunDir, noise);
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envScene = new THREE.Scene(); envScene.add(buildSky(skyLook, sunDir, noise));
+      env = pmrem.fromScene(envScene, 0.02).texture;
+      envScene.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      pmrem.dispose();
+      g.add(sky);
+      const peaks = buildPeaks(skyLook, hole.def.seed, center, noise); if (peaks) g.add(peaks);
+      await pace();
+      terrain = await buildTerrain(hole, { look, noise, anisotropy: renderer.capabilities.getMaxAnisotropy(), step: MOBILE ? 2 : 1.5, pace });
+      g.add(terrain.mesh);
+      await pace();
+      water = buildWater(hole, { noise, envMap: env, refl, sun: sunDir }); g.add(water.group);
+      // arbres du parcours (la balle les heurte), forêt des collines, herbes hautes
+      if (!treeKit) treeKit = createTreeKit();
+      // les arbres loin du couloir de jeu sont plus sombres
+      for (const t of hole.trees) t.dark = hole.landSD(t.x, t.z) < -3;
+      // pied du tronc enfoncé dans la pente (jamais de tronc qui flotte)
+      const sink = (list) => { for (const t of list) { let m = t.y; for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7]]) m = Math.min(m, hole.heightAt(t.x + dx, t.z + dz)); t.y = m - 0.05; } return list; };
+      g.add(treeKit.plant(sink(hole.trees.map((t) => ({ ...t })))));
+      await pace();
+      g.add(treeKit.shades(hole));
+      await pace();
+      g.add(treeKit.plant(sink(forestItems(hole, { count: MOBILE ? 900 : 2600 })), { lo: true, shadows: false, dark: true }));
+      await pace();
+      grass = createGrass(hole, look, { mobile: MOBILE, sway: SWAY }); g.add(grass.group);
+      pin = buildPin(hole); g.add(pin.group);
+      g.add(buildTeeMarkers(hole));
+      grid = buildGreenGrid(hole); g.add(grid.group);
+      await pace();
+      // premières dalles d'herbe autour du départ, quelques-unes à la fois
+      const focus = new THREE.Vector3(hole.tee.x, 0, hole.tee.z + 10);
+      for (let k = 0; k < 15; k++) { grass.update(focus, 4); await pace(); }
+      // shaders compilés à l'avance (en parallèle), puis chaque morceau dessiné une fois hors écran : la première
+      // vraie image du nouveau décor ne fige pas
+      if (renderer.compileAsync) await renderer.compileAsync(g, camera, scene).catch(() => {});
+      await warmUp(g, center, pace);
+    } catch (e) {
+      freeGroup(g); env && env.dispose(); grass && grass.dispose();
+      if (e === STALE) return;
+      throw e;
+    }
+    // bascule : l'ancien trou s'en va, le nouveau prend sa place (lumière, brume, ciel)
+    swap && swap();
+    if (world) unloadHole();
+    light = lt; setLight(light); SUN_DIR.copy(sunDir);
+    scene.environment = env; scene.environmentIntensity = light.env;
     // voile bleuté de la distance, le même pour tout (terrain, forêts, mer, sommets) : plus c'est loin, plus c'est bleu
     // (≈ 3 % à 300 m, 50 % à 1,5 km, 70 à 85 % pour les sommets à l'horizon)
     scene.fog = new THREE.FogExp2(skyLook.fog, 0.000555);
     scene.background = new THREE.Color(skyLook.horizon);
-    g.add(sky);
-    const peaks = buildPeaks(skyLook, hole.def.seed, center, noise); if (peaks) g.add(peaks);
-
-    const terrain = buildTerrain(hole, { look, noise, anisotropy: renderer.capabilities.getMaxAnisotropy(), step: MOBILE ? 2 : 1.5 });
-    g.add(terrain.mesh);
-    const water = buildWater(hole, { noise, envMap: env, refl, sun: SUN_DIR }); g.add(water.group);
-    // arbres du parcours (la balle les heurte), forêt des collines, herbes hautes
-    if (!treeKit) treeKit = createTreeKit();
-    // les arbres loin du couloir de jeu sont plus sombres
-    for (const t of hole.trees) t.dark = hole.centerDist(t.x, t.z) > hole.valley + 12;
-    // pied du tronc enfoncé dans la pente (jamais de tronc qui flotte)
-    const sink = (list) => { for (const t of list) { let m = t.y; for (const [dx, dz] of [[0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7]]) m = Math.min(m, hole.heightAt(t.x + dx, t.z + dz)); t.y = m - 0.05; } return list; };
-    g.add(treeKit.plant(sink(hole.trees.map((t) => ({ ...t })))));
-    g.add(treeKit.shades(hole));
-    g.add(treeKit.plant(sink(forestItems(hole, { count: MOBILE ? 900 : 2600 })), { lo: true, shadows: false, dark: true }));
-    const grass = createGrass(hole, look, { mobile: MOBILE, sway: SWAY }); g.add(grass.group);
-    const pin = buildPin(hole); g.add(pin.group);
-    g.add(buildTeeMarkers(hole));
-    const grid = buildGreenGrid(hole); g.add(grid.group);
     scene.add(g);
     world = { group: g, hole, terrain, water, sky, pin, grid, env, wind, grass, noReflect: [grass.group, grid.group, water.group] };
-    // premières dalles d'herbe autour du départ, avant le survol
-    grass.update(new THREE.Vector3(hole.tee.x, 0, hole.tee.z + 10), 60);
     // décor Kenney : chargé une fois, semé à chaque trou
     if (!kitP) kitP = loadNature(new URL('../models/nature/', import.meta.url).href).catch(() => null);
     kitP.then((kit) => { if (!disposed && world && world.hole === hole && kit) world.group.add(scatterNature(hole, kit)); });
+  }
+  // préchauffage d'un décor neuf, morceau par morceau : chacun passe un instant sur un calque que seule une caméra
+  // hors écran regarde (avec les vraies lumières), pour l'image normale et pour celle des reflets (plan de coupe)
+  const WARM = 5, warmCam = new THREE.OrthographicCamera(-3200, 3200, 3200, -3200, 1, 9000);
+  warmCam.layers.set(WARM); hemi.layers.enable(WARM); sun.layers.enable(WARM);
+  let warmRT = null;
+  async function warmUp(g, center, pace) {
+    if (!warmRT) warmRT = new THREE.WebGLRenderTarget(8, 8);
+    warmCam.position.set(center.x, 4000, center.z); warmCam.lookAt(center.x, 0, center.z); warmCam.updateMatrixWorld();
+    for (const o of [...g.children]) {
+      o.traverse((c) => c.layers.enable(WARM));
+      scene.add(g);
+      renderer.setRenderTarget(warmRT);
+      renderer.render(scene, warmCam);
+      renderer.clippingPlanes = [clipPlane]; renderer.shadowMap.autoUpdate = false;
+      renderer.render(scene, warmCam);
+      renderer.clippingPlanes = []; renderer.shadowMap.autoUpdate = true;
+      renderer.setRenderTarget(null);
+      scene.remove(g);
+      o.traverse((c) => c.layers.disable(WARM));
+      await pace();
+    }
   }
   function unloadHole() {
     if (!world) return;
     scene.remove(world.group);
     world.grass.dispose();
-    world.group.traverse((o) => {
+    if (world.relief) { world.relief.mat.dispose(); world.relief.water.dispose(); }
+    freeGroup(world.group);
+    world.env.dispose();
+    world = null;
+  }
+  function freeGroup(group) {
+    group.traverse((o) => {
       if (o.isMesh || o.isPoints || o.isInstancedMesh || o.isLineSegments) {
         // les géométries et matériaux partagés (arbres, décor Kenney) sont libérés par leur kit
         if (o.userData.shared) return;
@@ -176,29 +256,52 @@ export function createScene(host, { onLost } = {}) {
         for (const m of ms) { m.map && m.map !== noise && m.map.dispose(); m.dispose(); }
       }
     });
-    world.env.dispose();
-    world = null;
   }
 
   // ---------------------------------------------------------------- mini-carte : photo aérienne du trou
   // caméra orthographique au-dessus du trou, green en haut ; sans brume, ombres sur tout le trou
-  function renderMap(f) {
+  // mini-carte : le trou vu du dessus dans le cadre f, à l'échelle `scale` (plus fin, pour zoomer sans flou).
+  // relief : seuls le terrain (teintes d'altitude, courbes de niveau) et l'eau en aplat, les arbres en pastilles
+  function renderMap(f, { relief = false, scale = 1 } = {}) {
     if (!world) return null;
-    const { W, H } = f, gy = world.hole.heightAt(f.cx, f.cz);
+    const hole = world.hole, W = Math.round(f.W * scale), H = Math.round(f.H * scale), gy = hole.heightAt(f.cx, f.cz);
     const oc = new THREE.OrthographicCamera(-f.wm / 2, f.wm / 2, f.hm / 2, -f.hm / 2, 1, 4000);
     oc.position.set(f.cx, gy + 1500, f.cz); oc.up.set(f.dx, 0, f.dz); oc.lookAt(f.cx, gy, f.cz); oc.updateMatrixWorld();
     const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
-    const hide = [ball, blob, others, trail, marker, dotsMesh, tee, world.grass.group, world.grid.group, world.sky, world.pin.group, ...[...golfers].map((g) => g.root)].filter((o) => o.visible);
+    const dyn = [ball, blob, others, trail, marker, dotsMesh, tee, ...[...golfers].map((g) => g.root)];
+    const hide = (relief ? [...dyn, ...world.group.children.filter((o) => o !== world.terrain.mesh && o !== world.water.group)]
+      : [...dyn, world.grass.group, world.grid.group, world.sky, world.pin.group]).filter((o) => o.visible);
     for (const o of hide) o.visible = false;
     const fog = scene.fog; scene.fog = null;
     const sc = sun.shadow.camera, saved = { l: sc.left, r: sc.right, t: sc.top, b: sc.bottom, far: sc.far, p: sun.position.clone(), q: sun.target.position.clone() };
-    const half = Math.max(f.wm, f.hm) * 0.6;
-    Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 2400 }); sc.updateProjectionMatrix();
-    sun.target.position.set(f.cx, gy, f.cz); sun.position.set(f.cx + SUN_DIR.x * 900, gy + SUN_DIR.y * 900, f.cz + SUN_DIR.z * 900);
+    const swapped = [];
+    if (relief) {
+      // altitudes du cadre, pour étaler les teintes et choisir l'écart entre deux courbes
+      let h0 = Infinity, h1 = -Infinity;
+      for (let j = 0; j <= 40; j++) for (let i = 0; i <= 30; i++) {
+        const u = (i / 30 - 0.5) * f.wm, v = (j / 40 - 0.5) * f.hm, x = f.cx + u * f.rx + v * f.dx, z = f.cz + u * f.rz + v * f.dz, h = hole.heightAt(x, z);
+        if (!hole.coast || h > hole.coast.level) { h0 = Math.min(h0, h); h1 = Math.max(h1, h); }
+      }
+      const step = [0.5, 1, 2, 5, 10].find((k) => (h1 - h0) / k <= 28) || 20;
+      // lumière venue du haut à gauche de la carte, comme sur les cartes topographiques
+      const lx = f.dx - f.rx, lz = f.dz - f.rz, ll = Math.hypot(lx, lz) || 1;
+      const light = new THREE.Vector3(lx / ll * 0.7, 0.75, lz / ll * 0.7).normalize();
+      if (!world.relief) world.relief = { mat: reliefMaterial(world.terrain.uniforms, { hMin: h0, hMax: h1, step, light }), water: new THREE.MeshBasicMaterial({ color: 0x5ba8da }), step };
+      swapped.push([world.terrain.mesh, world.terrain.mesh.material]); world.terrain.mesh.material = world.relief.mat;
+      world.water.group.traverse((o) => { if (o.isMesh) { swapped.push([o, o.material]); o.material = world.relief.water; } });
+    } else {
+      const half = Math.max(f.wm, f.hm) * 0.6;
+      Object.assign(sc, { left: -half, right: half, top: half, bottom: -half, far: 2400 }); sc.updateProjectionMatrix();
+      sun.target.position.set(f.cx, gy, f.cz); sun.position.set(f.cx + SUN_DIR.x * 900, gy + SUN_DIR.y * 900, f.cz + SUN_DIR.z * 900);
+    }
     world.water.setReflect(null);
+    // la carte reste lisible le soir : on l'éclaire comme en plein jour
+    setLight(DAY);
     renderer.setRenderTarget(rt); renderer.render(scene, oc);
+    setLight(light);
     const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
     renderer.setRenderTarget(null);
+    for (const [o, m] of swapped) o.material = m;
     Object.assign(sc, { left: saved.l, right: saved.r, top: saved.t, bottom: saved.b, far: saved.far }); sc.updateProjectionMatrix();
     sun.position.copy(saved.p); sun.target.position.copy(saved.q);
     scene.fog = fog;
@@ -208,9 +311,17 @@ export function createScene(host, { onLost } = {}) {
     const g = cv.getContext('2d'), img = g.createImageData(W, H);
     for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
     g.putImageData(img, 0, 0);
-    // léger contraste, comme une photo aérienne
-    g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    if (relief) {
+      // arbres du parcours : pastilles vert sombre, cernées de clair
+      const s = (W / f.W) * f.s, at = (x, z) => { const px = x - f.cx, pz = z - f.cz; return [W / 2 + (px * f.rx + pz * f.rz) * s, H / 2 - (px * f.dx + pz * f.dz) * s]; };
+      g.fillStyle = 'rgba(38,74,40,0.82)'; g.strokeStyle = 'rgba(240,248,228,0.55)'; g.lineWidth = Math.max(1, s * 0.25);
+      for (const t of hole.trees) { const [x, y] = at(t.x, t.z), r = Math.max(1.5, t.r * 0.75 * s); if (x < -r || y < -r || x > W + r || y > H + r) continue; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.stroke(); }
+      cv.contourStep = world.relief.step;
+    } else {
+      // léger contraste, comme une photo aérienne
+      g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    }
     return cv;
   }
 
@@ -317,7 +428,7 @@ export function createScene(host, { onLost } = {}) {
     world.water.setReflect(h);
   }
 
-  let T = 0, frameNo = 0;
+  let T = 0, frameNo = 0, shadowHalf = 50;
   function frame(dt) {
     if (disposed) return;
     T += dt;
@@ -326,8 +437,14 @@ export function createScene(host, { onLost } = {}) {
     // ne jamais passer sous le terrain
     if (world) { const gy = world.hole.heightAt(cam.pos.x, cam.pos.z) + 0.6; if (cam.pos.y < gy) cam.pos.y = gy; }
     camera.position.copy(cam.pos); camera.lookAt(cam.look);
-    // l'ombre du soleil suit ce que regarde la caméra
-    const fx = cam.look.x * 0.6 + cam.pos.x * 0.4, fz = cam.look.z * 0.6 + cam.pos.z * 0.4;
+    // l'ombre du soleil couvre ce qui est devant la caméra (pas le point visé, qui peut être très loin pendant un
+    // survol) ; plus la caméra est haute, plus la zone d'ombre est grande
+    const gy0 = world ? world.hole.heightAt(cam.pos.x, cam.pos.z) : 0, high = Math.max(0, cam.pos.y - gy0);
+    const ax = cam.look.x - cam.pos.x, az = cam.look.z - cam.pos.z, al = Math.hypot(ax, az) || 1;
+    const ahead = Math.min(al * 0.6, 34 + high * 0.8);
+    const fx = cam.pos.x + ax / al * ahead, fz = cam.pos.z + az / al * ahead;
+    const half = Math.round(Math.min(95, Math.max(50, 44 + high * 1.6)));
+    if (half !== shadowHalf) { shadowHalf = half; Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half }); sun.shadow.camera.updateProjectionMatrix(); }
     sun.target.position.set(fx, 0, fz);
     sun.position.set(fx + SUN_DIR.x * 120, SUN_DIR.y * 120 + (world ? world.hole.heightAt(fx, fz) : 0), fz + SUN_DIR.z * 120);
     SWAY.uT.value = T;
@@ -348,6 +465,32 @@ export function createScene(host, { onLost } = {}) {
     if ((frameNo++ & 1) === 0 || !quality.refl) renderReflection();
     if (post) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, T); }
     else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
+    if (fade.left > 0) {
+      fade.left = Math.max(0, fade.left - dt);
+      const t = 1 - fade.left / fade.dur;
+      fade.a = 1 - t * t * (3 - 2 * t);
+      xf.style.opacity = fade.a;
+      if (!fade.left) xf.style.display = 'none';
+    }
+  }
+  // à appeler juste avant de changer de plan : l'image actuelle s'efface en dur secondes au-dessus de la nouvelle.
+  // Si un fondu est déjà en cours, on part de ce qu'on voit (les deux images mêlées), sans saut.
+  function dissolve(dur = 0.6) {
+    if (disposed) return;
+    frame(0); // l'image actuelle, lue tant qu'elle est encore dans le tampon
+    const W = canvas.width, H = canvas.height;
+    if (fade.a > 0.01 && xf.width === W && xf.height === H) {
+      xctx.globalCompositeOperation = 'destination-in';
+      xctx.fillStyle = `rgba(0,0,0,${fade.a})`; xctx.fillRect(0, 0, W, H);
+      xctx.globalCompositeOperation = 'destination-over';
+      xctx.drawImage(canvas, 0, 0);
+      xctx.globalCompositeOperation = 'source-over';
+    } else {
+      if (xf.width !== W || xf.height !== H) { xf.width = W; xf.height = H; }
+      xctx.drawImage(canvas, 0, 0);
+    }
+    Object.assign(fade, { a: 1, left: dur, dur });
+    xf.style.opacity = 1; xf.style.display = 'block';
   }
 
   function project(x, y, z) {
@@ -365,15 +508,15 @@ export function createScene(host, { onLost } = {}) {
     treeKit && treeKit.dispose();
     for (const g of [...golfers]) removeGolfer(g);
     scene.traverse((o) => { if (o.isMesh || o.isPoints) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); } });
-    noise.dispose(); reflRT.dispose(); post && post.dispose();
+    noise.dispose(); reflRT.dispose(); warmRT && warmRT.dispose(); post && post.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
-    canvas.remove();
+    canvas.remove(); xf.remove();
   }
 
   return {
     renderer, scene, camera, MOBILE, quality, lowerQuality,
-    loadHole, renderMap, setBall, setOthers, setMarker, setAimDots, trailPush, trailClear, trailFade, camTo, cam, frame, project, dispose, addGolfer, removeGolfer,
+    loadHole, renderMap, setBall, setOthers, setMarker, setAimDots, trailPush, trailClear, trailFade, camTo, cam, frame, dissolve, project, dispose, addGolfer, removeGolfer,
     get hole() { return world && world.hole; },
     setWind(w) { if (world) world.wind = w; },
     showBall(on) { ball.visible = on; blob.visible = on; },

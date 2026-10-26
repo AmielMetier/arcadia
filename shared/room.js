@@ -2,11 +2,15 @@
    le jeu choisi et l'état « prêt » de chaque joueur dans ce jeu ; il relaie les messages des jeux.
 
    Protocole (champ t) :
-     invité → hôte : hello {name,color,lvl} · me {name,color,lvl} · chat {txt} · ready {game} · g {to,m} · ping · bye
+     invité → hôte : hello {name,color,lvl,uid,fid,sid,prevId} · me {name,lvl,fid} · chat {txt} · ready {game} · g {to,m} · ping · bye
      hôte → invité : welcome {id} · lobby {players,game,ready,code,host} · chat {...} · g {from,m} · pong · full · bye
    `g` transporte les messages d'un jeu ; le Hub ne les lit pas. `to` vaut un id de joueur, 'host' ou 'all'.
    `v` (volatil) : instantané d'état continu ; sauté si la connexion sature, et à l'arrivée seul le plus récent
-   de chaque expéditeur est transmis au jeu (un ordinateur lent ne prend pas de retard en rattrapant une file). */
+   de chaque expéditeur est transmis au jeu (un ordinateur lent ne prend pas de retard en rattrapant une file).
+
+   Coupures : DDNet reprend d'abord la place sur le serveur sans que rien ne se voie ; le joueur coupé est marqué
+   `away` le temps de revenir. Si la place est perdue, l'invité renvoie hello avec son numéro (prevId) et l'identifiant
+   de sa page (sid) : l'hôte lui rend sa place, sans doublon, même si l'ancienne connexion n'a pas encore été fermée. */
 (function () {
   const MAX_PLAYERS = 6;
   const PREFIX = 'ddhub-v1-';
@@ -14,6 +18,9 @@
   const clean = (s, n) => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, n);
   const cleanName = (s) => clean(s, 12) || 'Joueur';
   const cleanUid = (s) => (/^[a-z0-9]{6,16}$/.test(String(s)) ? String(s) : null);
+  const cleanFid = (s) => (/^[A-Z2-9]{8}$/.test(String(s)) ? String(s) : undefined); // code ami (hub/friends.js)
+  const SID = Math.random().toString(36).slice(2, 12); // identifiant de cette page : retrouver sa place après une coupure
+  const LOST_MS = 20000; // joueur coupé sans partie en cours : retiré du salon après ce délai
   const RES = () => window.DDResults;
 
   // Charge de l'ordinateur : retard moyen de la boucle d'événements (un PC qui rame répond tard à tout, ping compris)
@@ -32,10 +39,13 @@
       chat: [],
       pings: {}, lastRecv: 0, lastRecvC: {},
       diag: {},                 // { playerId: { lag, net, hid } } : d'où vient un gros ping (ordinateur, onglet caché, réseau)
+      hostAway: false,          // invité : l'hôte a une coupure, le serveur garde sa place
+      netUp: true,              // notre propre connexion au serveur
       get isHost() { return this.mode === 'host' || this.mode === 'solo'; },
       get me() { return this.players.find((p) => p.id === this.myId); },
     };
     const emit = (k, ...a) => { if (handlers[k]) handlers[k](...a); };
+    const sids = {}, lostAt = {}; // hôte : page de chaque joueur, et depuis quand il est coupé (privé, pas diffusé)
     const pub = () => ({ players: R.players.map(({ cid, ...p }) => p), game: R.game, ready: R.ready, code: R.code, host: R.hostId });
     const changed = () => { if (R.mode === 'host') net.bcast({ t: 'lobby', ...pub() }); emit('update', R); };
     const pushChat = (c) => { R.chat.push(c); R.chat = R.chat.slice(-40); emit('chat', c); };
@@ -43,12 +53,14 @@
 
     // Messages volatils reçus : on ne garde que le dernier de chaque expéditeur et de chaque sorte, transmis au jeu
     // au prochain tour de boucle ; un message normal fait d'abord passer ceux en attente (l'ordre est respecté).
+    // (« prochain tour » par un MessageChannel : un setTimeout(…, 0) attend jusqu'à une seconde, voire une minute,
+    // quand l'onglet de l'hôte est caché, et les commandes des invités arrivaient en retard dans le jeu)
     const pendingVol = new Map(); let volT = 0;
-    const flushVol = () => { clearTimeout(volT); volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
+    const flushVol = () => { volT = 0; const list = [...pendingVol.values()]; pendingVol.clear(); for (const [f, x] of list) emit('game', f, x); };
     function gameIn(from, m, v) {
       if (v && m && typeof m === 'object') {
         pendingVol.set(from + ':' + m.t, [from, m]);
-        if (!volT) volT = setTimeout(flushVol, 0);
+        if (!volT) { volT = 1; soon(flushVol); }
         return;
       }
       if (pendingVol.size) flushVol();
@@ -81,12 +93,16 @@
       }
       switch (m.t) {
         case 'hello': {
-          const uid = cleanUid(m.uid);
-          const existing = p || (uid && R.players.find((q) => q.uid === uid && q.id !== R.hostId && !q.cid))
+          const uid = cleanUid(m.uid), sid = typeof m.sid === 'string' ? m.sid.slice(0, 16) : null;
+          // même page (reconnexion, même si l'ancienne connexion traîne encore), sinon même joueur dont la place est libre
+          const existing = p || (sid && R.players.find((q) => q.id !== R.hostId && sids[q.id] === sid))
+            || (uid && R.players.find((q) => q.uid === uid && q.id !== R.hostId && !q.cid))
             || (Number.isInteger(m.prevId) && m.prevId > 0 && R.players.find((q) => q.id === m.prevId && !q.cid));
           if (existing) {
-            existing.cid = cid;
+            existing.cid = cid; delete existing.away; delete lostAt[existing.id];
+            if (sid) sids[existing.id] = sid;
             existing.name = cleanName(m.name);
+            if (cleanFid(m.fid)) existing.fid = cleanFid(m.fid);
             if (m.ready) R.ready[existing.id] = m.ready;
             net.to(cid, { t: 'welcome', id: existing.id, chat: R.chat.slice(-20) });
             changed();
@@ -107,13 +123,15 @@
           const usedC = new Set(R.players.map((q) => q.color));
           const color = PALETTE.includes(m.color) && !usedC.has(m.color) ? m.color : PALETTE.find((c) => !usedC.has(c));
           const np = { id, cid, name: cleanName(m.name), color, lvl: Math.max(1, Math.min(99, m.lvl | 0)), uid: uid || 'g' + Math.random().toString(36).slice(2, 10) };
+          if (cleanFid(m.fid)) np.fid = cleanFid(m.fid);
+          if (sid) sids[id] = sid;
           R.players.push(np);
           if (m.ready) R.ready[id] = m.ready;
           net.to(cid, { t: 'welcome', id, chat: R.chat.slice(-20) });
           sys(np.name + (prev >= 0 ? ' est reconnecté' : ' a rejoint le salon')); changed();
           break;
         }
-        case 'me': if (p) { p.name = cleanName(m.name); p.lvl = Math.max(1, Math.min(99, m.lvl | 0)); changed(); } break;
+        case 'me': if (p) { p.name = cleanName(m.name); p.lvl = Math.max(1, Math.min(99, m.lvl | 0)); if (cleanFid(m.fid)) p.fid = cleanFid(m.fid); changed(); } break;
         case 'res': if (p && Array.isArray(m.list) && RES()) { const added = RES().merge(m.list.slice(0, 150)); if (added) { net.bcast({ t: 'res', list: RES().all().slice(0, 150) }); emit('results'); } } break;
         case 'chat': if (p) { const txt = clean(m.txt, 140); if (txt) { const c = { id: p.id, name: p.name, color: p.color, txt }; pushChat(c); net.bcast({ t: 'chat', ...c }); } } break;
         case 'ready': if (p) { if (m.game) R.ready[p.id] = m.game; else delete R.ready[p.id]; changed(); } break;
@@ -148,12 +166,48 @@
       }
       // Si une partie est en cours, on conserve le joueur dans R.players (cid = null) pour qu'il puisse se reconnecter sans perdre ses troupes !
       if (R.game) {
-        R.players[i].cid = null;
+        const q = R.players[i]; q.cid = null; q.away = true; lostAt[q.id] = Date.now();
+        changed();
         return;
       }
-      R.players.splice(i, 1); delete R.ready[p.id]; delete R.pings[p.id];
+removePlayer(R.players[i]);
+    }
+    function removePlayer(p) {
+      const i = R.players.indexOf(p); if (i < 0) return;
+      R.players.splice(i, 1); delete R.ready[p.id]; delete R.pings[p.id]; delete sids[p.id]; delete lostAt[p.id];
       sys(p.name + ' a quitté le salon'); emit('left', p); changed();
     }
+    // Coupure d'un invité : le serveur garde sa place, les autres le voient « en reconnexion »
+    function onHostAway(cid, away) {
+      const p = R.players.find((q) => q.cid === cid); if (!p) return;
+      if (away) p.away = true; else delete p.away;
+      changed();
+    }
+    // Notre place d'hôte a été perdue puis rouverte sous le même code : chacun revient avec son numéro
+    function onHostReset() {
+      const now = Date.now(); R.lastRecvC = {};
+      for (const q of R.players) if (q.id !== R.myId) { q.cid = null; q.away = true; lostAt[q.id] = now; }
+      changed();
+    }
+    // Notre place d'hôte a expiré (coupure trop longue) : les autres ont déjà migré vers un nouvel hôte, on les y rejoint
+    function onHostLost(reason) {
+      const others = R.players.filter((q) => q.id !== R.myId).map((q) => q.id).sort((a, b) => a - b);
+      if (reason !== 'expired' || !others.length) return false;
+      const succ = others[0], succName = (R.players.find((q) => q.id === succ) || {}).name || '?';
+      const me = R.me || { name: 'Joueur', color: PALETTE[0], lvl: 1 };
+      migrating = true;
+      emit('migrating', { to: succ, name: succName, me: false });
+      const code2 = deriveCode(R.code, succ);
+      setTimeout(() => { net.close(); R.hostId = succ; rejoin(code2, me, Date.now() + 30000); }, 0);
+      return true;
+    }
+    const netStatus = (st) => { R.netUp = st === 'up'; emit('net', st); };
+    const hostCallbacks = (ready, error) => ({
+      ready, error, join(cid) { R.lastRecvC[cid] = performance.now(); },
+      msg: onHostMsg, leave: onHostLeave, away: onHostAway, reset: onHostReset, lost: onHostLost, status: netStatus,
+    });
+    const hello = (me, extra) => net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, uid: me.uid, fid: me.fid, sid: SID,
+      prevId: R.myId >= 0 ? R.myId : undefined, ready: myReady || undefined, ...extra });
 
     /* ---------- invité ---------- */
     function onGuestMsg(m) {
@@ -243,26 +297,25 @@
     }
     function becomeHost(code, me) {
       R.mode = 'host'; R.hostId = R.myId; R.lastRecvC = {}; R.pings = {};
-      R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
+      for (const k in sids) delete sids[k];
+      for (const k in lostAt) delete lostAt[k];
+      R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
       R.ready = myReady ? { [R.myId]: myReady } : {};
       let tries = 0;
-      const go = () => net.host({
-        ready(c) { migrating = false; R.code = c; sys('Tu es maintenant l\'hôte du salon.'); emit('migrated', R); changed(); },
-        join(cid) { R.lastRecvC[cid] = performance.now(); },
-        msg: onHostMsg, leave: onHostLeave,
-        error(msg) { if (++tries < 6) setTimeout(go, 1500); else { migrating = false; emit('closed', msg); } },
-      }, code);
+      const go = () => net.host(hostCallbacks(
+        (c) => { migrating = false; R.code = c; sys('Tu es maintenant l\'hôte du salon.'); emit('migrated', R); changed(); },
+        (msg) => { if (R.code === code && !migrating) emit('closed', msg); else if (++tries < 6) setTimeout(go, 1500); else { migrating = false; emit('closed', msg); } },
+      ), code);
       go();
     }
     function rejoin(code, me, deadline) {
-      R.mode = 'guest'; R.code = code;
+      R.mode = 'guest'; R.code = code; R.hostAway = false;
       net.join(code, {
-        open() {
-          migrating = false; R.lastRecv = performance.now();
-          net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, uid: me.uid, prevId: R.myId, ready: myReady });
-        },
+        open() { migrating = false; R.lastRecv = performance.now(); hello(me); },
         msg: (m) => { onGuestMsg(m); if (m && m.t === 'welcome') emit('migrated', R); },
         close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
+        hostAway(a) { R.hostAway = a; emit('update', R); },
+        status: netStatus,
         error(msg) {
           if (Date.now() < deadline) { R.mode = 'guest'; setTimeout(() => rejoin(code, me, deadline), 1500); }
           else { migrating = false; R.mode = null; emit('closed', 'Impossible de joindre le nouvel hôte.'); }
@@ -273,33 +326,34 @@
     /* ---------- API ---------- */
     Object.assign(R, {
       host(me) {
-        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
-        R.chat = []; R.ready = {}; R.game = null;
-        net.host({
-          ready(code) { R.code = code; emit('joined', R); changed(); },
-          join(cid) { R.lastRecvC[cid] = performance.now(); },
-          msg: onHostMsg, leave: onHostLeave,
-          error(msg) { emit('error', msg); },
-        });
+        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
+        R.chat = []; R.ready = {}; R.game = null; R.code = null;
+        net.host(hostCallbacks(
+          (code) => { R.code = code; emit('joined', R); changed(); },
+          // une fois le salon ouvert, une erreur réseau le ferme (serveur injoignable trop longtemps)
+          (msg) => { if (R.code) emit('closed', msg); else emit('error', msg); },
+        ));
       },
       join(code, me) {
-        R.mode = 'guest'; R.players = []; R.chat = []; R.myId = -1; R.code = code;
+        R.mode = 'guest'; R.players = []; R.chat = []; R.myId = -1; R.code = code; R.hostAway = false;
         net.join(code, {
-          open() { R.lastRecv = performance.now(); net.toHost({ t: 'hello', name: me.name, color: me.color, lvl: me.lvl, uid: me.uid, prevId: R.myId >= 0 ? R.myId : undefined, ready: myReady }); },
+open() { R.lastRecv = performance.now(); R.hostAway = false; hello(me); },
           msg: onGuestMsg,
           close() { if (R.mode === 'guest') migrate("Connexion perdue avec l'hôte."); },
           error(msg) { R.mode = null; emit('error', msg); },
+          hostAway(a) { R.hostAway = a; emit('update', R); },
+          status: netStatus,
         });
       },
       solo(me) {
         R.mode = 'solo'; R.myId = 0; R.hostId = 0; R.code = null; R.chat = []; R.ready = {}; R.game = null;
-        R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid }];
+        R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
         setTimeout(() => { emit('joined', R); emit('update', R); }, 0);
       },
       leave() { migrating = false; myReady = null; net.close(); R.mode = null; R.players = []; R.game = null; R.ready = {}; R.code = null; },
       updateMe(me) {
-        if (R.isHost) { const p = R.me; if (p) { p.name = cleanName(me.name); p.lvl = me.lvl | 0 || 1; changed(); } }
-        else if (R.mode === 'guest') net.toHost({ t: 'me', name: me.name, lvl: me.lvl });
+        if (R.isHost) { const p = R.me; if (p) { p.name = cleanName(me.name); p.lvl = me.lvl | 0 || 1; if (cleanFid(me.fid)) p.fid = me.fid; changed(); } }
+        else if (R.mode === 'guest') net.toHost({ t: 'me', name: me.name, lvl: me.lvl, fid: me.fid });
       },
       sendChat(txt) {
         txt = clean(txt, 140); if (!txt) return;
@@ -364,6 +418,8 @@
       // à appeler régulièrement : pings temps réel sans déconnecter les joueurs en arrière-plan
       tick(now) {
         if (R.mode === 'host') {
+          // joueurs coupés qui ne sont pas revenus, alors qu'aucune partie ne les attend
+          if (!R.game) for (const q of [...R.players]) if (!q.cid && q.id !== R.myId && lostAt[q.id] && Date.now() - lostAt[q.id] > LOST_MS) removePlayer(q);
           if (net.rtt) R.pings[R.hostId] = net.rtt;
           R.diag[R.hostId] = myDiag(net);
           net.bcast({ t: 'ping', ts: now, pings: R.pings, diag: R.diag });
@@ -374,6 +430,13 @@
       },
     });
     return R;
+  }
+
+  // Au prochain tour de boucle, sans subir le bridage des minuteries d'un onglet caché
+  function soon(fn) {
+    if (typeof MessageChannel !== 'function') { setTimeout(fn, 0); return; }
+    if (!soon.ch) { soon.q = []; soon.ch = new MessageChannel(); soon.ch.port1.onmessage = () => { const f = soon.q.shift(); if (f) f(); }; }
+    soon.q.push(fn); soon.ch.port2.postMessage(0);
   }
 
   window.DDRoom = { create: createRoom, MAX_PLAYERS, PALETTE, cleanName };

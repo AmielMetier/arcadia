@@ -8,7 +8,8 @@ import { buildProgram } from '../engine/code-data.js';
 import { runPython, preloadPython } from './py.js';
 import { highlightPy, highlightCode } from './pyhl.js';
 import { EMOTES, PHRASES, emoteOf } from './emotes.js';
-import { figureSvg } from './figure.js';
+import { figureSvg, cellSvg } from './figure.js';
+import { evalExpr, parseNumber } from '../engine/expr.js';
 import { sfx } from './sfx.js';
 import { wallStreetMusic } from './music.js';
 import { esc, el, prefersReducedMotion } from './util.js';
@@ -30,7 +31,7 @@ const THEME_LABEL = {
 const LEVEL_WORDS = { facile: ['facile', 'faciles'], normal: ['moyen', 'moyens'], expert: ['difficile', 'difficiles'] };
 const qText = (t) => esc(t).replace(/\^(\d+)/g, '<sup>$1</sup>');
 const secs = (ms) => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
-const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir', trap: '🪤 Piège', cut: '✂️ Coupé', life: '♥ +1 vie', relance: '↻ Relance' };
+const TAGS = { eclair: '⚡ Le plus rapide', serie: '🔥 Série', peril: '💀 Pénalité', power: '🎁 Pouvoir', trap: '🪤 Piège', cut: '✂️ Coupé', life: '♥ +1 vie', relance: '↻ Relance', duel: '⚔️ Gagne le face-à-face' };
 const hearts = (n, max = LIVES) => `${'♥'.repeat(Math.max(0, n))}<s>${'♥'.repeat(Math.max(0, max - n))}</s>`;
 // valeurs des tests (JSON) écrites comme en Python
 const pyRepr = (v) => (v === true ? 'True' : v === false ? 'False' : v == null ? 'None' : Array.isArray(v) ? `[${v.map(pyRepr).join(', ')}]` : typeof v === 'string' ? `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
@@ -106,7 +107,7 @@ const PC_LIVE = {
   },
   code: ['Montrez-moi votre code.', 'Deux minutes. Pas une de plus.'], sql: ['La base est à vous.', 'Une requête propre, s\'il vous plaît.'],
   bug: ['Quelqu\'un a cassé ce code. Réparez-le.'], chart: ['Lisez bien le graphique.', 'Tout est sur le schéma.'], read: ['Lisez ce code ligne par ligne.'],
-  duel: ['Mort subite. Le premier qui se trompe sort.'], final: ['Quitte ou double. Pas de deuxième chance.'],
+  duel: ['Soixante secondes. Le plus de calculs justes.', 'Sprint. Vite, mais juste : chaque erreur se paie.'], final: ['Quitte ou double. Pas de deuxième chance.'],
   casep: ['Un dossier complet. Prenez des notes.', 'Trois questions, un seul dossier.'], caseNext: ['On continue le dossier.', 'Étape suivante. Gardez vos chiffres en tête.'],
   relance: ['Et si on change un paramètre ?', 'Je relance.', 'Pas si vite. Et si…'], mm: ['Faites-moi un marché. Achat, vente.', 'Je veux un prix. Tout de suite.'],
   half: ['Alors ?', 'Je n\'ai pas toute la journée.', 'Le marché bouge pendant que vous réfléchissez.', 'Hmm…'],
@@ -386,7 +387,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
            <li><b>${hearts(c.lives, c.lives)}</b> ${['', 'une vie', 'deux vies', 'trois vies', 'quatre vies', 'cinq vies'][c.lives]} : une erreur ou un silence en coûte une. <b>Le piège</b> 🪤 coûte de plus en plus cher : 1 vie au premier tour, 2 au desk, 2 et des points au comité. Une estimation presque juste ne coûte rien, et trois bonnes réponses d'affilée rendent une vie.</li>
            ${c.cut ? '<li>À la fin de chaque tour, le dernier du classement est <b>coupé</b> ✂️ (tant qu\'il reste trois candidats).</li>' : ''}
            ${c.jokers ? '<li>Deux jokers, une fois chacun : <b>✂️ 50/50</b> et <b>📞 Appel à un ami</b> (qui a souvent raison…).</li>' : ''}
-           ${c.duel ? '<li>À la fin, les deux meilleurs encore en lice s\'affrontent en <b>face-à-face</b> ⚔️ : la première bonne réponse gagne, la première erreur perd.</li>' : ''}
+           ${c.duel ? '<li>À la fin, les deux meilleurs encore en lice s\'affrontent en <b>face-à-face</b> ⚔️ : un <b>sprint de calcul</b> de 60 secondes. Le plus de calculs justes gagne, chaque erreur retire un point.</li>' : ''}
            <li>🎬 en haut à droite : coupe la scène d'ouverture et les réactions de Pierre.</li>
            ${c.sabotage ? '<li>Sabotage activé : trois bonnes réponses d\'affilée donnent un pouvoir à lancer sur un adversaire.</li>' : ''}
            <li>Le dernier debout décroche le poste ; sinon, le meilleur score.</li>
@@ -461,21 +462,24 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     }
     if (q.input === 'mm') {
       return `<div class="mm" id="mm">
+          <p class="mm-how">Cote la somme des 3 dés : <b>un prix d'achat</b>, et <b>un prix de vente</b> plus haut.<br>
+            Vise <b>les dés vus + 3,5 par dé caché</b> : un prix mal placé, le client en profite.</p>
           <div class="mm-dice">${[0, 1, 2].map((k) => `<span class="die" data-d="${k}">?</span>`).join('<i>+</i>')}<i>=</i><span class="die sum">?</span></div>
           <form class="mm-quote" id="mmform" autocomplete="off">
             <label>J'achète à<input id="mmbid" inputmode="decimal" maxlength="6" aria-label="Prix d'achat"></label>
             <label>Je vends à<input id="mmask" inputmode="decimal" maxlength="6" aria-label="Prix de vente"></label>
             <button class="btn yellow" id="mmgo">Coter</button>
           </form>
-          <p class="mm-ctx" id="mmctx"></p>
           <p class="tolhint" id="mmrule"></p>
           <ol class="mm-log" id="mmlog"></ol>
-          <details class="mm-help"${S.history.some((h) => h.input === 'mm') ? '' : ' open'}><summary>Comment ça marche ?</summary><ol>
-            <li>Tu ne devines pas la somme : tu donnes <b>deux prix</b>, un pour acheter, un pour vendre, un peu plus haut.</li>
-            <li>Le client choisit : si ton prix de vente lui paraît bas, il t'achète ${MM_LOT} lots (tu es <b>vendeur</b>) ; si ton prix d'achat lui paraît haut, il te vend ${MM_LOT} lots (tu es <b>acheteur</b>).</li>
-            <li>À la fin, tout est soldé à la vraie somme. Vendeur, tu gagnes si elle finit sous ton prix ; acheteur, si elle finit au-dessus.</li>
-            <li>Le bon centre : les dés déjà vus, plus <b>3,5</b> par dé restant. Avant tout dé : 3 × 3,5 = 10,5, donc par exemple 8,5 / 12,5.</li>
-          </ol></details>
+        </div>`;
+    }
+    if (q.input === 'sprint') {
+      return `<div class="sprint" id="sprint">
+          <div class="sp-score"><span class="sp-ok" id="spokb">✓ <b id="spok">0</b></span><span class="sp-n">calcul <b id="spn">1</b></span><span class="sp-ko" id="spkob">✗ <b id="spko">0</b></span></div>
+          <div class="sp-q" id="spq">${esc(q.sprint.items[0])}</div>
+          <form class="answer sp-form" id="spform" autocomplete="off"><input id="spin" inputmode="numeric" maxlength="8" placeholder="=" aria-label="Ton résultat" spellcheck="false"><button class="btn yellow" id="spgo">OK</button></form>
+          <p class="tolhint">Entrée pour valider et passer au suivant · une erreur retire un point</p>
         </div>`;
     }
     if (q.input === 'multi') {
@@ -489,8 +493,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         </form><p class="tolhint">Tout compte : chaque caractère, les espaces et les majuscules. Copier-coller interdit.</p>`;
     }
     if (q.isChartier && q.input === 'choice') {
-      return `<div class="cand-choices">${q.choices.map((c, k) => `<button type="button" class="cchoice" data-c="${k}" style="--k:${k}">
-          <span class="cl">${LETTERS[k]}</span><span class="ct">${qText(c)}</span><kbd>${k + 1}</kbd></button>`).join('')}</div>`;
+      return `<div class="cand-choices${q.choiceFigs ? ' figs' : ''}">${q.choices.map((c, k) => `<button type="button" class="cchoice" data-c="${k}" style="--k:${k}">
+          <span class="cl">${LETTERS[k]}</span><span class="ct">${q.choiceFigs ? cellSvg(q.choiceFigs[k]) : qText(c)}</span><kbd>${k + 1}</kbd></button>`).join('')}</div>`;
     }
     if (q.input === 'choice') {
       const vf = q.choices.length === 2 && q.choices[0] === 'Vrai';
@@ -512,21 +516,36 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     // la musique monte d'un cran à chaque tour : premier tour, desk, comité final, et le face-à-face au sommet
     if (ch) { wallStreetMusic.setMode(duelOn() ? 'duel' : q.final || q.tier === 3 ? 'final' : q.tier === 2 ? 'desk' : 'question'); wallStreetMusic.start(); }
     myAns = null; lastTick = -1;
+    clearTimeout(memoT);
     const curses = myCurses();
     const head = ch
       ? `<span class="cat"><i>${cat.icon}</i>${esc(q.rubric || cat.label)}</span>
-         <span class="tierb t${q.tier}">${'★'.repeat(q.tier)} ${esc(TIER_LABEL[q.tier])}</span>
-         <span class="pts">${q.pts * 100} pts</span>
+         ${q.input === 'sprint' ? '' : `<span class="tierb t${q.tier}">${'★'.repeat(q.tier)} ${esc(TIER_LABEL[q.tier])}</span>
+         <span class="pts">${q.pts * 100} pts</span>`}
          ${q.final ? '<span class="final">Quitte ou double</span>' : ''}
          ${q.kind === 'case' || q.kind === 'mm' || q.bonus ? `<span class="final special">${q.kind === 'case' ? '📁' : q.kind === 'mm' ? '⇅' : '↻'} ${esc(q.sub)}</span>` : ''}
-         ${duelOn() ? `<span class="final duelb">⚔️ ${esc(name(S.duel.ids[0]))} contre ${esc(name(S.duel.ids[1]))} · mort subite</span>` : ''}
+         ${duelOn() ? `<span class="final duelb">⚔️ ${esc(name(S.duel.ids[0]))} contre ${esc(name(S.duel.ids[1]))} · sprint</span>` : ''}
          <span class="live"><i></i>EN DIRECT</span>
          ${S.cfg.lives && meP() && !meP().out ? `<span class="mylives" title="Tes vies">${hearts(meP().lives, S.cfg.lives)}</span>` : ''}
-         <span class="qnum">${q.n} / ${S.cfg.len}</span>`
+         <span class="qnum">${duelOn() ? 'Face-à-face' : `${q.n} / ${S.cfg.len}`}</span>`
       : `<span class="cat"><i>${cat.icon}</i>${esc(cat.label)}</span>
          <span class="pts">${q.pts * 100} pts</span>
          ${q.final ? '<span class="final">Quitte ou double</span>' : ''}
          <span class="qnum">${q.n} / ${S.cfg.len}</span>`;
+    // mémoire : on montre d'abord ce qu'il faut retenir, puis on l'efface et la question arrive
+    const memoLeft = q.memo ? q.memo.ms - (now() - S.qAt) : 0;
+    if (memoLeft > 150) {
+      stage.innerHTML = `
+      <div class="card pupitre in-memo${ch ? ' cand' : ''} deal" style="--cc:${cat.color}">
+        <div class="qhead">${head}</div>
+        <div class="timer" id="timer"><i id="tbar"></i><b id="tsec"></b></div>
+        <div class="memo"><small>👁 Mémorise : ça va disparaître</small><pre class="memo-box">${esc(q.memo.text)}</pre><div class="memo-bar"><i style="animation-duration:${Math.round(memoLeft)}ms"></i></div></div>
+      </div>`;
+      const idx = S.idx;
+      memoT = setTimeout(() => { if (S && S.phase === 'question' && S.idx === idx) renderQuestion(); }, memoLeft);
+      sfx.play('question');
+      return;
+    }
     stage.innerHTML = `
       <div class="card pupitre in-${q.input}${ch ? ' cand' : ''}${q.final ? ' isfinal' : ''} deal" style="--cc:${cat.color}">
         ${curses.map((c) => `<div class="cursed c-${c.power}">${POWERS[c.power].icon} <b>${esc(name(c.from))}</b> t'a envoyé « ${esc(POWERS[c.power].label)} »${c.power === 'time' ? ' : −5 s' : ''}</div>`).join('')}
@@ -548,6 +567,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
 
     if (q.input === 'code') wireCode(q);
     else if (q.input === 'mm') wireMarket(q);
+    else if (q.input === 'sprint') wireSprint(q);
     else if (q.input === 'multi') {
       for (const b of root.querySelectorAll('[data-m]')) b.onclick = () => { if (myAns != null) return; const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); sfx.play('pop'); };
       $('#msend').onclick = () => {
@@ -673,7 +693,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   }
 
   // Pierre Chartier pendant la question : une phrase d'entrée, une relance à mi-temps, une autre à 5 secondes
-  let pcT = [];
+  let pcT = [], memoT = null;
   const pcPick = (l, salt = 0) => l[(S.seed + S.idx * 7 + salt) % l.length];
   // Market making : trois cotations ; chaque deal s'affiche tout de suite, puis le dé suivant se dévoile.
   // La réponse envoyée est la liste des cotations (l'hôte rejoue le marché pour noter)
@@ -682,10 +702,20 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const n = (v) => Number(String(v).trim().replace(',', '.'));
     const rule = () => {
       const k = quotes.length, seen = q.mm.dice.slice(0, k);
-      $('#mmrule').innerHTML = k < 3 ? `Cotation <b>${k + 1}/3</b> · écart de ${fmt(MM_MAX_SPREAD[k])} au plus entre tes deux prix` : 'Trois cotations envoyées. Le dernier dé se dévoile à la correction.';
-      $('#mmctx').innerHTML = k < 3 ? `${seen.length ? `Dés vus : <b>${seen.join(' + ')}</b>.` : 'Aucun dé vu.'} Il en reste ${3 - k}, qui valent 3,5 en moyenne chacun.` : '';
+      $('#mmrule').innerHTML = k < 3 ? `Cotation <b>${k + 1}/3</b> · ${fmt(MM_MAX_SPREAD[k])} d'écart au plus · ${seen.length ? `dés vus : <b>${seen.join(' + ')}</b>` : 'aucun dé vu'}` : 'Trois cotations envoyées. Le dernier dé se dévoile à la correction.';
     };
-    const send = () => { if (myAns != null || !quotes.length) return; myAns = quotes.map((x) => x.join('/')).join(';'); answer(myAns); sfx.play('lock'); pcAnswered(); for (const e of root.querySelectorAll('#mmform input, #mmgo')) e.disabled = true; };
+    const send = () => {
+      if (myAns != null || !quotes.length) return;
+      myAns = quotes.map((x) => x.join('/')).join(';'); answer(myAns); sfx.play('lock'); pcAnswered();
+      for (const e of root.querySelectorAll('#mmform input, #mmgo')) e.disabled = true;
+      // marché bouclé : le joueur voit tout de suite le dernier dé, la somme et son P&L, puis on attend les autres
+      const run = runMarket(q.mm, quotes), V = run.V;
+      for (const [k, d] of q.mm.dice.entries()) { const die = root.querySelector(`.die[data-d="${k}"]`); if (die && !die.classList.contains('shown')) { die.textContent = d; die.classList.add('shown'); } }
+      const sum = root.querySelector('.mm-dice .die.sum'); if (sum) { sum.textContent = V; sum.classList.add('shown'); }
+      $('#mmrule').innerHTML = `Somme des dés : <b>${V}</b>`;
+      const st = $('#sent'); st.hidden = false; st.className = 'sent';
+      st.innerHTML = `Marché bouclé : ton P&L <b>${run.pnl > 0 ? '+' : ''}${fmt(run.pnl)}</b> · on attend les autres…`;
+    };
     rule();
     setTimeout(() => { try { $('#mmbid').focus({ preventScroll: true }); } catch (e) {} }, 60);
     // le temps file : on envoie ce qui a été coté (les cotations manquantes comptent comme trop larges)
@@ -709,6 +739,35 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       $('#mmbid').value = ''; $('#mmask').value = '';
       rule();
       if (quotes.length === 3) { clearTimeout(auto); send(); } else $('#mmbid').focus({ preventScroll: true });
+    };
+  }
+
+  // Sprint du face-à-face : un calcul après l'autre ; juste ou faux s'affiche tout de suite (le calcul s'évalue tel quel),
+  // et tout part à l'hôte à la fin des 60 secondes
+  function wireSprint(q) {
+    const inp = $('#spin'); if (!inp) return; // spectateur
+    const items = q.sprint.items, idx = S.idx, got = [];
+    let k = 0, ok = 0, ko = 0;
+    const send = () => {
+      if (myAns != null) return;
+      myAns = got.join(';'); answer(myAns); sfx.play('lock');
+      inp.disabled = true; $('#spgo').disabled = true;
+      const s2 = $('#sent'); s2.hidden = false; s2.className = 'sent'; s2.innerHTML = `Sprint rendu : <b>${ok} juste${ok > 1 ? 's' : ''}</b>, ${ko} erreur${ko > 1 ? 's' : ''} · on attend l'autre finaliste…`;
+    };
+    const auto = setTimeout(() => { if (S && S.phase === 'question' && S.idx === idx) send(); }, Math.max(0, q.time * 1000 - (now() - S.qAt) - 900));
+    setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) {} }, 60);
+    $('#spform').onsubmit = (e) => {
+      e.preventDefault();
+      if (myAns != null) return;
+      const n = parseNumber(inp.value);
+      if (n == null) return toast('Un nombre');
+      const v = evalExpr(items[k]), right = v.ok && v.value.d === 1 && v.value.n === n;
+      got.push(String(n)); if (right) ok++; else ko++;
+      sfx.play(right ? 'pop' : 'snip');
+      const flash = $(right ? '#spokb' : '#spkob'); flash.classList.remove('bump'); void flash.offsetWidth; flash.classList.add('bump');
+      $('#spok').textContent = ok; $('#spko').textContent = ko; inp.value = ''; k++;
+      if (k >= items.length) { clearTimeout(auto); send(); return; }
+      $('#spq').textContent = items[k]; $('#spn').textContent = k + 1;
     };
   }
 
@@ -807,8 +866,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   function candGrid(L) {
     const who = (k) => L.results.filter((r) => r.raw != null && Number(r.raw) === k).map((r) => { const p = S.players.find((x) => x.id === r.id); return p ? `<i class="dot" title="${esc(p.name)}" style="background:${esc(p.color)}"></i>` : ''; }).join('');
     const mine = L.results.find((r) => r.id === me.id), mk = mine && mine.raw != null ? Number(mine.raw) : -1;
-    return `<div class="cand-choices rev">${L.choices.map((c, k) => `<div class="cchoice ${k === L.answer ? 'good' : k === mk ? 'bad' : 'dim'}${k === L.trap ? ' trap' : ''}" style="--k:${k}">
-        <span class="cl">${k === L.answer ? '✓' : k === mk ? '✗' : LETTERS[k]}</span><span class="ct">${qText(c)}${k === L.trap ? '<em class="trapmark">🪤 le piège</em>' : ''}</span><span class="who">${who(k)}</span></div>`).join('')}</div>`;
+    return `<div class="cand-choices rev${L.choiceFigs ? ' figs' : ''}">${L.choices.map((c, k) => `<div class="cchoice ${k === L.answer ? 'good' : k === mk ? 'bad' : 'dim'}${k === L.trap ? ' trap' : ''}" style="--k:${k}">
+        <span class="cl">${k === L.answer ? '✓' : k === mk ? '✗' : LETTERS[k]}</span><span class="ct">${L.choiceFigs ? cellSvg(L.choiceFigs[k]) : qText(c)}${k === L.trap ? '<em class="trapmark">🪤 le piège</em>' : ''}</span><span class="who">${who(k)}</span></div>`).join('')}</div>`;
   }
 
   // ce que j'avais coché (question à réponses multiples)
@@ -826,6 +885,8 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       : L.input === 'multi' ? `<div class="multi-choices rev">${L.choices.map((c, k) => { const good = L.answer.includes(k), mine = myPick(k); return `<div class="mchoice ${good ? 'good' : mine ? 'bad' : 'dim'}"><span class="mbox">${good ? '✓' : mine ? '✗' : ''}</span><span class="ct">${qText(c)}</span></div>`; }).join('')}</div>`
       : L.input === 'text' ? `<div class="copybox">${esc(L.show)}</div>`
       : L.input === 'mm' ? `<div class="mm-dice rev">${L.mm.dice.map((d) => `<span class="die shown">${d}</span>`).join('<i>+</i>')}<i>=</i><span class="die sum shown">${L.mm.dice.reduce((a, b) => a + b, 0)}</span></div>${mmDetail(L, mine)}`
+      : L.input === 'sprint' && L.duel ? `<div class="sprint-res">${L.duel.ids.map((id) => { const x = (L.duel.scores || {})[id] || { right: 0, wrong: 0 }, net = x.right - x.wrong;
+        return `<div class="${id === L.duel.winner ? 'win' : ''}"><b>${esc(name(id))}</b><span class="ok">✓ ${x.right}</span><span class="ko">✗ ${x.wrong}</span><em>${net > 0 ? '+' : ''}${net}</em></div>`; }).join('')}</div>`
       : `<div class="bigans">${qText(L.show)}</div>`;
     const fast = L.results.find((r) => r.tags.includes('eclair') || (S.cfg.mode === 'eclair' && r.pts > 0));
     const recall = q.input === 'expr' ? `${qText(h.text)} 🎯` : q.input === 'choice' ? qText(h.text) : qText(h.eq === false ? h.text.replace(/\?$/, '…').replace(/ \? /, ' … ') : h.text) + (h.eq === false ? '' : ' =');
@@ -835,7 +896,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <div class="card reveal${ch ? ' cand' : ''} flipin" style="--cc:${cat.color}">
         ${fast ? `<div class="buzz">⚡ <b>${esc(name(fast.id))}</b> a dégainé le premier !</div>` : ''}
         ${elim}
-        <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(ch ? h.rubric || cat.label : cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.idx + 1} / ${S.cfg.len}</span></div>
+        <div class="qhead"><span class="cat"><i>${cat.icon}</i>${esc(ch ? h.rubric || cat.label : cat.label)}</span>${L.final ? '<span class="final">Quitte ou double</span>' : ''}<span class="qnum">${L.duel ? 'Face-à-face' : `${L.idx + 1} / ${S.cfg.len}`}</span></div>
         ${ch ? '<div class="rv-cols"><div class="rv-l">' : ''}
         ${h.fig ? `<div class="figmini">${figureSvg(h.fig)}</div>` : ''}
         <div class="qrecall">${recall}</div>${L.snippet ? `<pre class="code-snip mini">${highlightCode(L.snippet, L.lang)}</pre>` : ''}
@@ -850,7 +911,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
           const p = S.players.find((x) => x.id === r.id); if (!p) return '';
           const tags = r.tags.map((t) => `<span class="tag t-${t}">${TAGS[t]}${t === 'serie' ? ' ×' + r.streak : ''}${t === 'power' ? ' ' + POWERS[r.power].icon : ''}</span>`).join('')
             + (r.lost ? `<span class="tag t-lost">−${'♥'.repeat(r.lost)}</span>` : '');
-          const raw = r.raw == null ? '—' : ch && L.input === 'choice' ? LETTERS[Number(r.raw)] || '?' : qText(describeAnswer({ ...q, input: L.input }, r.raw));
+          const raw = r.sprint ? `✓ ${r.sprint.right} · ✗ ${r.sprint.wrong}` : r.raw == null ? '—' : ch && L.input === 'choice' ? LETTERS[Number(r.raw)] || '?' : qText(describeAnswer({ ...q, input: L.input }, r.raw));
           return `<li class="${r.ok ? 'ok' : r.raw != null ? 'ko' : 'none'}" style="--k:${k}"><i class="dot" style="background:${esc(p.color)}"></i><span class="nm">${esc(p.name)}</span>
             <span class="raw">${raw}</span><span class="tm">${r.at != null ? secs(r.at) : ''}</span>${tags}<b class="gain">${r.pts > 0 ? '+' : ''}${r.pts ? fmt(r.pts) : '0'}</b></li>`;
         }).join('')}</ol>
@@ -1100,8 +1161,9 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       : [e.why === 'palier' ? '✂️' : '🚪', `${name(e.id)} quitte l'entretien`, e.why === 'palier' ? `Dernier du classement à la fin du ${(TIER_LABEL[L.tierEnd] || 'tour').toLowerCase()}` : 'Plus aucune vie', 'out', e.why === 'palier' ? 'cut' : 'elim']);
     if (L.duel) {
       const d = L.duel;
-      if (d.winner != null) list.push(['⚔️', `${name(d.winner)} remporte le face-à-face`, d.why === 'juste' ? 'La première bonne réponse' : d.why === 'faux' ? `Première mauvaise réponse : ${name(d.by)}` : 'Le meilleur score départage', d.winner === me.id ? 'life' : 'out', d.winner === me.id ? 'life' : 'cut']);
-      else list.push(['⚔️', 'Personne ne tranche', 'On continue, toujours en mort subite', 'out', 'pop']);
+      const sc = d.scores || {}, other = d.ids.find((id) => id !== d.winner), w = sc[d.winner], o = sc[other];
+      if (d.winner != null) list.push(['⚔️', `${name(d.winner)} remporte le face-à-face`, d.why === 'sprint' && w && o ? `${w.right} calculs justes (${w.wrong} erreur${w.wrong > 1 ? 's' : ''}) contre ${o.right} (${o.wrong})` : 'Égalité : le score de l\'entretien départage', d.winner === me.id ? 'life' : 'out', d.winner === me.id ? 'life' : 'cut']);
+      else list.push(['⚔️', 'Égalité parfaite', 'On relance un sprint', 'out', 'pop']);
     }
     const mine = L.results.find((r) => r.id === me.id);
     if (mine && mine.gained) list.push(['♥', 'Une vie de plus !', 'Trois bonnes réponses d\'affilée', 'life', 'life']);
@@ -1114,7 +1176,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const [a, b] = ids.map((id) => S.players.find((p) => p.id === id));
     $('#cuend').textContent = 'Fin de l\'entretien';
     $('#cuppl').innerHTML = `<span class="cu-p" style="--k:0;--pc:${esc(a.color)}"><i></i>${esc(a.name)}<b>${fmt(a.score)}</b></span><span class="cu-vs">⚔️</span><span class="cu-p" style="--k:2;--pc:${esc(b.color)}"><i></i>${esc(b.name)}<b>${fmt(b.score)}</b></span>`;
-    const rule = 'Mort subite : la première bonne réponse gagne, la première erreur perd. Le vainqueur aura le poste.';
+    const rule = 'Un sprint de calcul : soixante secondes, le plus de calculs justes gagne, chaque erreur retire un point. Le vainqueur aura le poste.';
     $('#cuquote').textContent = `« ${rule} »`;
     $('#custars').textContent = '⚔️'; $('#cutitle').textContent = 'Face-à-face'; $('#cusub').textContent = `${a.name} contre ${b.name}`;
     o.classList.remove('play'); void o.offsetWidth; o.classList.add('play'); endAfter(o, 'play', DUEL_SHOW_MS);
@@ -1123,7 +1185,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   }
   function nextInter() {
     const n = S.idx + 1, ch = S.cfg.mode === 'chartier';
-    if (duelOn()) return showInter('⚔️ Face-à-face', 'Mort subite', `Question ${S.duel.k + 1} sur 5 au plus`, 'final');
+    if (duelOn()) return showInter('⚔️ Face-à-face', 'Sprint de calcul', `Manche ${S.duel.k + 1} · 60 secondes`, 'final');
     if (n >= S.cfg.len || (S.last && S.last.endEarly)) return showInter(ch ? 'Fin de l\'entretien' : 'Fin de la partie', ch ? 'Le verdict' : 'Les résultats', '', 'end');
     const cat = CATS[S.cats && S.cats[n]] || null, final = S.cfg.finale && n === S.cfg.len - 1;
     const d = Math.max(0, DIFFS.indexOf(S.cfg.diff)), tier = ch ? chartierTier(d, n, S.cfg.len) : 0;

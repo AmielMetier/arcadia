@@ -1,7 +1,8 @@
 // Birdie Party — sons : enregistrements libres (CC0, voir sounds/LICENSE.txt) joués en WebAudio.
 // Ambiance de nature en boucle selon le décor, vent qui souffle selon sa force, frappes de club, rebonds,
 // foule (applaudissements, « oh ! », « oh non… ») et petits jingles quand la balle s'arrête.
-// Le contexte audio naît au premier geste du joueur (unlock) et se ferme dans dispose().
+// Musique du menu en boucle (dossier music/, CC0 aussi). Le contexte audio naît au premier geste du joueur (unlock)
+// et se ferme dans dispose().
 const FILES = [
   'hit-drive', 'hit-iron', 'hit-chip', 'hit-putt', 'swoosh', 'cup-rattle', 'cup-drop', 'cup', 'bounce-grass1', 'bounce-grass2', 'bounce-sand', 'tree', 'trunk',
   'splash', 'splash-small', 'applause-big', 'applause-big2', 'clap', 'cheer', 'pleased', 'gasp', 'ooh1', 'ooh2', 'ooh3', 'aww', 'aww2',
@@ -11,18 +12,20 @@ const FILES = [
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export class Sfx {
-  constructor(base) {
-    this.base = base; this.ctx = null; this.buf = new Map(); this.muted = false;
+  constructor(base, musicBase) {
+    this.base = base; this.musicBase = musicBase; this.ctx = null; this.buf = new Map(); this.muted = false;
     this.amb = { name: null, src: null, gain: null };
+    this.mus = { name: null, want: null, src: null, gain: null };
     try { this.muted = localStorage.getItem('golf_mute') === '1'; } catch (e) {}
   }
   unlock() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.9; this.master.connect(c.destination);
+    this.master = c.createGain(); this.master.gain.value = this.muted || this.silent ? 0 : 0.9; this.master.connect(c.destination);
     this.fx = c.createGain(); this.fx.gain.value = 1; this.fx.connect(this.master);
     this.bed = c.createGain(); this.bed.gain.value = 0.55; this.bed.connect(this.master);
+    this.songs = c.createGain(); this.songs.gain.value = 0.42; this.songs.connect(this.master);
     // bruit blanc partagé (vent)
     const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -33,17 +36,18 @@ export class Sfx {
     this.windT = 0;
     for (const f of FILES) this.load(f);
     if (this.amb.want) this.ambience(this.amb.want);
+    if (this.mus.want) this.music(this.mus.want);
   }
-  load(f) {
+  load(f, base = this.base) {
     if (!this.ctx || this.buf.has(f)) return Promise.resolve(this.buf.get(f));
-    const p = fetch(`${this.base}${f}.mp3`).then((r) => r.arrayBuffer()).then((a) => this.ctx.decodeAudioData(a)).then((buf) => { this.buf.set(f, buf); return buf; }).catch(() => null);
+    const p = fetch(`${base}${f}.mp3`).then((r) => r.arrayBuffer()).then((a) => this.ctx.decodeAudioData(a)).then((buf) => { this.buf.set(f, buf); return buf; }).catch(() => null);
     this.buf.set(f, null);
     return p;
   }
   setMuted(m) {
     this.muted = m;
     try { localStorage.setItem('golf_mute', m ? '1' : '0'); } catch (e) {}
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
+    if (this.master) this.master.gain.setTargetAtTime(m || this.silent ? 0 : 0.9, this.ctx.currentTime, 0.05);
   }
   play(name, { vol = 1, rate = 1, delay = 0, bus } = {}) {
     const c = this.ctx, b = this.buf.get(name); if (!c || !b) return null;
@@ -68,6 +72,26 @@ export class Sfx {
       s.connect(g).connect(this.bed); s.start();
       this.amb.src = s; this.amb.gain = g;
     });
+  }
+  // musique en boucle (null : elle s'efface) ; sous la musique, l'ambiance du décor reste discrète
+  music(name) {
+    this.mus.want = name;
+    if (!this.ctx || this.mus.name === name) return;
+    const c = this.ctx, old = this.mus;
+    if (old.gain) { old.gain.gain.setTargetAtTime(0, c.currentTime, 0.5); const s = old.src; setTimeout(() => { try { s.stop(); } catch (e) {} }, 2500); }
+    this.mus = { name, want: name, src: null, gain: null };
+    this.bed.gain.setTargetAtTime(name ? 0.25 : 0.55, c.currentTime, 0.6);
+    if (!name) return;
+    // le morceau décodé reste en mémoire : revenir au menu ne le retélécharge pas
+    const key = `music/${name}`;
+    if (!this.buf.get(key)) this.buf.set(key, fetch(`${this.musicBase}${name}.mp3`).then((r) => r.arrayBuffer()).then((a) => c.decodeAudioData(a)));
+    Promise.resolve(this.buf.get(key)).then((buf) => {
+      if (this.mus.name !== name || !this.ctx) return;
+      const s = c.createBufferSource(); s.buffer = buf; s.loop = true;
+      const g = c.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(1, c.currentTime, 0.4);
+      s.connect(g).connect(this.songs); s.start();
+      this.mus.src = s; this.mus.gain = g;
+    }).catch(() => { this.buf.delete(key); });
   }
   // le vent souffle plus ou moins fort ; avec quelques rafales
   wind(speed, dt) {

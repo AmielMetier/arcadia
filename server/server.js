@@ -3,18 +3,29 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 8080;
 const PING_INTERVAL_MS = 30000;
 // Protocole 2 : trames compactes « #{en-tête}\n<données> » retransmises sans relire les données,
 // et messages volatils (instantanés d'état) sautés pour un destinataire dont la connexion n'arrive plus à suivre.
-const PROTO = 2;
+// Protocole 3 : une place dans un salon survit aux coupures. Chaque message non volatil envoyé à un joueur porte un
+// numéro (s) et reste gardé jusqu'à ce que le joueur en accuse réception (ack, dans ses sondes) ; les siens portent un
+// numéro (c) que l'on accuse dans les réponses. Si sa connexion tombe, sa place est gardée GRACE_MS : il revient avec
+// « resume », on lui renvoie ce qu'il a manqué, il renvoie ce qui ne nous est pas parvenu. Les autres voient seulement
+// « en reconnexion ». Les pages restées en cache (protocole 1 ou 2) gardent l'ancien fonctionnement.
+const PROTO = 3;
 const SLOW_CLIENT_BYTES = 96 * 1024; // tampon d'envoi au-delà duquel un destinataire ne reçoit plus les messages volatils
 // Sonde de retard : un ping WebSocket toutes les 250 ms à chaque joueur. Le pong revient après tout ce qui le précède
 // dans la file : s'il tarde nettement plus que d'habitude pour ce joueur, ses données s'empilent (connexion trop juste
 // pour le flux, coupure wifi…) et on lui saute les instantanés d'état le temps que la file se vide.
 const PROBE_MS = 250, LAG_MARGIN_MS = 150, PROBE_WINDOW = 40;
+const DEAD_MS = 12000;                 // sonde sans réponse depuis 12 s : connexion morte (wifi coupé, téléphone en veille)
+const GRACE_MS = Number(process.env.RELAY_GRACE_MS) || 20000; // place gardée après une coupure (réglable pour les tests)
+const AWAY_MS = Number(process.env.RELAY_AWAY_MS) || 5000;    // ami déconnecté : annoncé hors ligne après ce délai
+const OUT_MAX = 4000, OUT_MAX_BYTES = 4 * 1024 * 1024; // messages gardés pour un joueur qui n'a pas encore accusé réception
+const TOMB_MS = 10 * 60000;            // on se souvient des places perdues, pour dire au joueur pourquoi la reprise échoue
 
 const CRASH_DIR = path.resolve(__dirname, '..', 'logs', 'crash');
 const JSONL_FILE = path.join(CRASH_DIR, 'crash-events.jsonl');
@@ -41,6 +52,11 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  if (req.url === '/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ proto: PROTO, rooms: rooms.size, sessions: sessions.size, online: people.size }));
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/log') {
     let body = '';
     req.on('data', (c) => { if (body.length < 32768) body += c; });
@@ -64,23 +80,21 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(list));
     return;
   }
-
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Duo Drift WebSocket Relay Server OK\n');
 });
 
 const wss = new WebSocketServer({ server });
 
+/* ------------------------------------------------------------ salons */
 /**
- * rooms: Map<roomId, {
- *   host: WebSocket | null,
- *   guests: Map<cid, WebSocket>,
- *   clients: Set<WebSocket>,
- *   nextCid: number,
- *   maxPeers: number
- * }>
+ * rooms: Map<roomId, { id, host: Sess | null, guests: Map<cid, Sess>, maxPeers }>
+ * Sess (une place dans un salon) : { sid, key, roomId, role, cid, ws (null pendant une coupure), v3,
+ *   seq, out: [[s, chaîne]], outBytes, inSeq, awayT, gone }
  */
 const rooms = new Map();
+const sessions = new Map(); // sid → Sess (protocole 3)
+const tombs = new Map();    // sid → fin de mémoire
 
 // Envoi d'une chaîne déjà sérialisée (une seule sérialisation pour tous les destinataires).
 // volatile : on saute le message si ce destinataire a déjà du retard, au lieu d'allonger sa file d'attente.
@@ -103,81 +117,262 @@ function sendJson(ws, payload) {
   }
 }
 
-function getOrCreateRoom(roomId) {
-  let room = rooms.get(roomId);
-  if (!room) {
-    room = {
-      host: null,
-      guests: new Map(),
-      clients: new Set(),
-      nextCid: 0,
-      maxPeers: 5,
-    };
-    rooms.set(roomId, room);
+// Message vers une place : un objet JSON déjà sérialisé. Non volatil et protocole 3 : numéroté et gardé jusqu'à
+// l'accusé de réception, y compris pendant une coupure (il partira au retour du joueur).
+function deliver(s, json, volatile) {
+  if (!s || s.gone) return;
+  if (volatile || !s.v3) { sendRaw(s.ws, json, volatile); return; }
+  const n = ++s.seq;
+  const str = '{"s":' + n + ',' + json.slice(1);
+  s.out.push([n, str]); s.outBytes += str.length;
+  if (s.out.length > OUT_MAX || s.outBytes > OUT_MAX_BYTES) {
+    if (!s.ws) { leave(s); return; } // trop de retard accumulé pendant la coupure : la place est libérée
+    while (s.out.length > OUT_MAX || s.outBytes > OUT_MAX_BYTES) s.outBytes -= s.out.shift()[1].length;
   }
-  return room;
+  if (s.ws) sendRaw(s.ws, str, false);
+}
+function acked(s, a) {
+  if (!s || !s.v3 || !Number.isFinite(a)) return;
+  while (s.out.length && s.out[0][0] <= a) s.outBytes -= s.out.shift()[1].length;
 }
 
-function leaveCurrentRoom(ws) {
-  const roomId = ws.roomId;
-  if (!roomId) return;
-  ws.roomId = null;
+const newId = (n) => crypto.randomBytes(n).toString('base64url');
+function openSession(ws, room, role, v3) {
+  const s = {
+    sid: v3 ? newId(12) : null, key: v3 ? newId(18) : null,
+    roomId: room.id, role, cid: role === 'host' ? 'host' : 'c' + crypto.randomBytes(4).toString('hex'),
+    ws, v3, seq: 0, out: [], outBytes: 0, inSeq: 0, awayT: null, gone: false,
+  };
+  if (v3) sessions.set(s.sid, s);
+  ws.sess = s;
+  if (role === 'host') room.host = s; else room.guests.set(s.cid, s);
+  return s;
+}
 
-  const room = rooms.get(roomId);
+// Départ définitif d'une place (volontaire, ou coupure qui a trop duré)
+function leave(s) {
+  if (!s || s.gone) return;
+  s.gone = true; clearTimeout(s.awayT);
+  if (s.sid) { sessions.delete(s.sid); tombs.set(s.sid, Date.now() + TOMB_MS); }
+  if (s.ws && s.ws.sess === s) s.ws.sess = null;
+  const room = rooms.get(s.roomId);
   if (!room) return;
-
-  room.clients.delete(ws);
-
-  if (room.host === ws) {
+  const rid = JSON.stringify(room.id);
+  if (room.host === s) {
     room.host = null;
     // Prévenir tous les invités que l'hôte a quitté
-    for (const [, guestWs] of room.guests) {
-      sendJson(guestWs, { type: 'host_left', roomId });
-    }
-  } else if (ws.cid && room.guests.get(ws.cid) === ws) {
-    room.guests.delete(ws.cid);
+    for (const g of room.guests.values()) deliver(g, '{"type":"host_left","roomId":' + rid + '}');
+  } else if (room.guests.get(s.cid) === s) {
+    room.guests.delete(s.cid);
     // Prévenir l'hôte que cet invité a quitté
-    if (room.host) {
-      sendJson(room.host, { type: 'peer_left', roomId, cid: ws.cid });
-    }
+    if (room.host) deliver(room.host, '{"type":"peer_left","roomId":' + rid + ',"cid":' + JSON.stringify(s.cid) + '}');
   }
-
-  ws.role = null;
-  ws.cid = null;
-
   // Nettoyage automatique des salles vides
-  if (room.clients.size === 0 || (!room.host && room.guests.size === 0)) {
-    rooms.delete(roomId);
-  }
+  if (!room.host && room.guests.size === 0) rooms.delete(room.id);
+}
+
+// Coupure (ou retour) d'un joueur : les autres sont prévenus, sa place reste réservée
+function announce(s, away) {
+  const room = rooms.get(s.roomId);
+  if (!room) return;
+  const rid = JSON.stringify(room.id);
+  if (room.host === s) for (const g of room.guests.values()) deliver(g, '{"type":"' + (away ? 'host_away' : 'host_back') + '","roomId":' + rid + '}');
+  else if (room.host) deliver(room.host, '{"type":"' + (away ? 'peer_away' : 'peer_back') + '","roomId":' + rid + ',"cid":' + JSON.stringify(s.cid) + '}');
+}
+
+// La connexion d'une place est tombée sans « leave_room »
+function dropped(ws) {
+  const s = ws.sess;
+  ws.sess = null;
+  if (!s || s.ws !== ws) return;
+  s.ws = null;
+  if (!s.v3) { leave(s); return; }
+  announce(s, true);
+  s.awayT = setTimeout(() => leave(s), GRACE_MS);
+}
+
+function resume(ws, msg) {
+  const sid = String(msg.sid || '');
+  const s = sessions.get(sid);
+  if (!s || s.key !== msg.key) { sendJson(ws, { type: 'resume_failed', reason: tombs.has(sid) ? 'expired' : 'unknown' }); return; }
+  const a = Number(msg.ack) || 0;
+  const first = s.out.length ? s.out[0][0] : s.seq + 1;
+  if (a + 1 < first || a > s.seq) { leave(s); sendJson(ws, { type: 'resume_failed', reason: 'expired' }); return; }
+  if (ws.sess && ws.sess !== s) leave(ws.sess);
+  const old = s.ws;
+  if (old && old !== ws) { old.sess = null; try { old.terminate(); } catch (e) {} } // l'ancienne connexion était morte sans le savoir
+  clearTimeout(s.awayT); s.awayT = null;
+  s.ws = ws; ws.sess = s;
+  acked(s, a);
+  sendJson(ws, { type: 'resumed', roomId: s.roomId, cid: s.cid, ack: s.inSeq });
+  for (const [, str] of s.out) sendRaw(ws, str, false);
+  if (!old) announce(s, false);
 }
 
 // Relais d'un paquet de jeu : vers l'hôte, vers un invité (cid) ou à toute la salle (sauf l'expéditeur et `except`).
 // `data` est le JSON des données, déjà sérialisé : le paquet sortant est construit une seule fois.
-function relay(ws, roomId, to, except, volatile, data) {
-  if (!roomId) return;
-  const room = rooms.get(roomId);
-  if (!room || !room.clients.has(ws)) return;
-  const from = ws.cid || (ws === room.host ? 'host' : null);
-  const out = '{"type":"relay","roomId":' + JSON.stringify(roomId) + ',"from":' + JSON.stringify(from) + ',"data":' + data + '}';
+function relay(s, to, except, volatile, data, c) {
+  if (!s || s.gone) return;
+  if (s.v3 && Number.isInteger(c)) { if (c <= s.inSeq) return; s.inSeq = c; } // renvoi d'un message déjà reçu
+  const room = rooms.get(s.roomId);
+  if (!room) return;
+  const out = '{"type":"relay","roomId":' + JSON.stringify(room.id) + ',"from":' + JSON.stringify(s.cid) + ',"data":' + data + '}';
   if (to === 'host') {
-    if (room.host && room.host !== ws) sendRaw(room.host, out, volatile);
+    if (room.host && room.host !== s) deliver(room.host, out, volatile);
     return;
   }
   if (typeof to === 'string' && to !== 'all') {
     const target = room.guests.get(to);
-    if (target && target !== ws) sendRaw(target, out, volatile);
+    if (target && target !== s) deliver(target, out, volatile);
     return;
   }
-  for (const client of room.clients) {
-    if (client !== ws && (!except || client.cid !== except)) sendRaw(client, out, volatile);
-  }
+  if (room.host && room.host !== s) deliver(room.host, out, volatile);
+  for (const g of room.guests.values()) if (g !== s && (!except || g.cid !== except)) deliver(g, out, volatile);
 }
 
+function joinRoom(ws, roomId, msg) {
+  if (ws.sess) leave(ws.sess);
+  const v3 = Number(msg.proto) >= 3;
+  const role = msg.role === 'host' ? 'host' : 'guest';
+  const joined = (s) => sendJson(ws, { type: 'room_joined', roomId, role, cid: s.cid, proto: v3 ? PROTO : 2, sid: s.sid || undefined, key: s.key || undefined });
+
+  if (role === 'host') {
+    const existing = rooms.get(roomId);
+    // salon déjà tenu (y compris par un hôte en reconnexion)
+    if (existing && existing.host) {
+      sendJson(ws, { type: 'error', roomId, reason: 'unavailable-id', message: 'Ce code de salon est déjà utilisé.' });
+      return;
+    }
+    const room = existing || { id: roomId, host: null, guests: new Map(), maxPeers: 5 };
+    rooms.set(roomId, room);
+    if (Number.isInteger(msg.maxPeers) && msg.maxPeers > 0) room.maxPeers = Math.min(msg.maxPeers, 15);
+    joined(openSession(ws, room, 'host', v3));
+    return;
+  }
+
+  // Invité (guest) : un hôte en reconnexion compte comme présent, ses messages l'attendront
+  const room = rooms.get(roomId);
+  if (!room || !room.host) {
+    sendJson(ws, { type: 'error', roomId, reason: 'room-not-found', message: 'Aucun salon avec ce code.' });
+    return;
+  }
+  if (room.guests.size >= room.maxPeers) {
+    sendJson(ws, { type: 'error', roomId, reason: 'room-full', message: 'Le salon est complet.' });
+    return;
+  }
+  joined(openSession(ws, room, 'guest', v3));
+}
+
+/* ------------------------------------------------------------ amis : présence en ligne */
+// Chaque joueur a une clé secrète (gardée dans son navigateur) ; son code ami public en est tiré, personne ne peut
+// donc se faire passer pour lui. On ne voit l'état d'un joueur (et le code de son salon) que si l'amitié est mutuelle.
+const FID_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function fidOf(key) {
+  const h = crypto.createHash('sha256').update('ddhub-friend:' + key).digest();
+  let out = ''; for (let k = 0; k < 8; k++) out += FID_ALPHA[h[k] & 31];
+  return out;
+}
+const isFid = (f) => typeof f === 'string' && /^[A-Z2-9]{8}$/.test(f);
+const cleanTxt = (s, n) => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, n);
+const cleanColor = (c) => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#ff4b2b');
+function cleanState(st) {
+  st = st && typeof st === 'object' ? st : {};
+  const w = ['menu', 'room', 'solo'].includes(st.w) ? st.w : 'menu';
+  const out = { w };
+  if (typeof st.game === 'string' && /^[a-z0-9-]{1,16}$/.test(st.game)) out.game = st.game;
+  if (w === 'room') {
+    if (typeof st.code === 'string' && /^[A-Z0-9]{4}$/.test(st.code)) out.code = st.code;
+    out.n = Math.max(1, Math.min(16, st.n | 0 || 1));
+    out.max = Math.max(out.n, Math.min(16, st.max | 0 || 6));
+    if (st.play) out.play = 1;
+  }
+  return out;
+}
+
+const people = new Map(); // fid → { fid, socks: Set<ws>, name, color, st, friends: Set<fid>, reqsIn: Map<fid, t>, downT }
+const online = (p) => p && p.socks.size > 0;
+const mutual = (a, b) => a.friends.has(b.fid) && b.friends.has(a.fid);
+const card = (p) => ({ fid: p.fid, name: p.name, color: p.color, st: p.st });
+function pushTo(p, payload) { const str = JSON.stringify(payload); for (const ws of p.socks) sendRaw(ws, str, false); }
+function mutualsOnline(p) {
+  const out = [];
+  for (const f of p.friends) { const q = people.get(f); if (online(q) && q.friends.has(p.fid)) out.push(q); }
+  return out;
+}
+function presence(ws, msg) {
+  const t = msg.type;
+  if (t === 'p_hello') {
+    if (typeof msg.key !== 'string' || msg.key.length < 16 || msg.key.length > 64) return;
+    const fid = fidOf(msg.key);
+    if (ws.pfid && ws.pfid !== fid) presenceGone(ws);
+    let p = people.get(fid);
+    if (!p) { p = { fid, socks: new Set(), name: 'Joueur', color: '#ff4b2b', st: { w: 'menu' }, friends: new Set(), reqsIn: new Map(), downT: null }; people.set(fid, p); }
+    clearTimeout(p.downT); p.downT = null;
+    p.socks.add(ws); ws.pfid = fid;
+    p.name = cleanTxt(msg.name, 12) || 'Joueur'; p.color = cleanColor(msg.color); p.st = cleanState(msg.st);
+    if (Array.isArray(msg.friends)) p.friends = new Set(msg.friends.filter(isFid).slice(0, 300));
+    sendJson(ws, { type: 'p_me', fid });
+    const ms = mutualsOnline(p);
+    sendJson(ws, { type: 'p_list', list: ms.map(card) });
+    for (const q of ms) pushTo(q, { type: 'p_up', ...card(p) });
+    return;
+  }
+  const p = ws.pfid && people.get(ws.pfid);
+  if (!p) return;
+  if (t === 'p_state') {
+    if (msg.name !== undefined) p.name = cleanTxt(msg.name, 12) || 'Joueur';
+    if (msg.color !== undefined) p.color = cleanColor(msg.color);
+    p.st = cleanState(msg.st);
+    for (const q of mutualsOnline(p)) pushTo(q, { type: 'p_up', ...card(p) });
+  } else if (t === 'p_friends') {
+    if (!Array.isArray(msg.friends)) return;
+    const before = new Set(mutualsOnline(p));
+    p.friends = new Set(msg.friends.filter(isFid).slice(0, 300));
+    const after = mutualsOnline(p);
+    for (const q of after) if (!before.has(q)) { pushTo(q, { type: 'p_up', ...card(p) }); pushTo(p, { type: 'p_up', ...card(q) }); }
+    for (const q of before) if (!after.includes(q)) pushTo(q, { type: 'p_down', fid: p.fid });
+  } else if (t === 'p_req' || t === 'p_accept' || t === 'p_invite') {
+    const now = Date.now();
+    ws.reqs = (ws.reqs || []).filter((x) => now - x < 60000);
+    if (ws.reqs.length >= 30) return; // pas d'avalanche de demandes
+    ws.reqs.push(now);
+    const q = isFid(msg.to) && people.get(msg.to);
+    if (t === 'p_req') {
+      if (!online(q) || q === p) { sendJson(ws, { type: 'p_err', to: msg.to, reason: q === p ? 'self' : 'offline' }); return; }
+      q.reqsIn.set(p.fid, now);
+      pushTo(q, { type: 'p_req', from: p.fid, name: p.name, color: p.color });
+      sendJson(ws, { type: 'p_sent', to: q.fid });
+    } else if (t === 'p_accept') {
+      // on n'accepte qu'une vraie demande : personne ne peut s'inviter dans la liste d'amis d'un autre
+      const at = p.reqsIn.get(msg.to);
+      if (!at || now - at > 30 * 60000) return;
+      p.reqsIn.delete(msg.to);
+      if (online(q)) pushTo(q, { type: 'p_ok', from: p.fid, name: p.name, color: p.color });
+    } else if (online(q) && mutual(p, q) && typeof msg.code === 'string' && /^[A-Z0-9]{4}$/.test(msg.code)) {
+      pushTo(q, { type: 'p_invite', from: p.fid, name: p.name, color: p.color, code: msg.code, game: cleanState({ w: 'menu', game: msg.game }).game });
+    }
+  }
+}
+function presenceGone(ws) {
+  const p = ws.pfid && people.get(ws.pfid);
+  ws.pfid = null;
+  if (!p) return;
+  p.socks.delete(ws);
+  if (p.socks.size) return;
+  // quelques secondes de répit : un rechargement de page ne fait pas clignoter « hors ligne » chez les amis
+  clearTimeout(p.downT);
+  p.downT = setTimeout(() => {
+    if (p.socks.size) return;
+    for (const q of mutualsOnline(p)) pushTo(q, { type: 'p_down', fid: p.fid });
+    people.delete(p.fid);
+  }, AWAY_MS);
+}
+
+/* ------------------------------------------------------------ connexions */
 wss.on('connection', (ws) => {
   ws.isAlive = true;
-  ws.roomId = null;
-  ws.role = null;
-  ws.cid = null;
+  ws.sess = null;
+  ws.pfid = null;
 
   ws.on('pong', () => {
     ws.isAlive = true;
@@ -199,7 +394,7 @@ wss.on('connection', (ws) => {
       let h;
       try { h = JSON.parse(text.slice(1, nl)); } catch (e) { return; }
       if (!h || typeof h !== 'object') return;
-      relay(ws, ws.roomId, h.to, typeof h.x === 'string' ? h.x : null, !!h.v, text.slice(nl + 1));
+      relay(ws.sess, h.to, typeof h.x === 'string' ? h.x : null, !!h.v, text.slice(nl + 1), h.c);
       return;
     }
     let msg;
@@ -211,91 +406,48 @@ wss.on('connection', (ws) => {
     if (!msg || typeof msg !== 'object') return;
 
     const action = msg.type;
-    const roomId = typeof msg.roomId === 'string' ? msg.roomId.trim().slice(0, 64) : ws.roomId;
+    const s = ws.sess;
 
-    // Keep-alive applicatif
+    // Keep-alive applicatif (et accusés de réception du protocole 3)
     if (action === 'ping') {
-      sendJson(ws, { type: 'pong', roomId, ts: msg.ts });
+      if (s && s.v3) { acked(s, Number(msg.ack)); sendJson(ws, { type: 'pong', ts: msg.ts, ack: s.inSeq }); }
+      else sendJson(ws, { type: 'pong', roomId: msg.roomId, ts: msg.ts });
       return;
     }
-    if (action === 'pong') {
-      return;
-    }
+    if (action === 'ack') { acked(s, Number(msg.a)); return; }
+    if (action === 'pong') return;
+    if (typeof action === 'string' && action.startsWith('p_')) { presence(ws, msg); return; }
+
+    // Retour après une coupure
+    if (action === 'resume') { resume(ws, msg); return; }
 
     // Déconnexion volontaire d'un salon
     if (action === 'leave_room') {
-      leaveCurrentRoom(ws);
+      if (s) { ws.sess = null; leave(s); }
       return;
     }
 
     // Association d'un joueur à un salon
     if (action === 'join_room') {
+      const roomId = typeof msg.roomId === 'string' ? msg.roomId.trim().slice(0, 64) : '';
       if (!roomId) {
         sendJson(ws, { type: 'error', reason: 'invalid-room', message: 'Identifiant de salon manquant.' });
         return;
       }
-
-      if (ws.roomId && ws.roomId !== roomId) {
-        leaveCurrentRoom(ws);
-      }
-
-      const role = msg.role === 'host' ? 'host' : 'guest';
-
-      if (role === 'host') {
-        const existing = rooms.get(roomId);
-        if (existing && existing.host && existing.host !== ws && existing.host.readyState === WebSocket.OPEN) {
-          sendJson(ws, { type: 'error', roomId, reason: 'unavailable-id', message: 'Ce code de salon est déjà utilisé.' });
-          return;
-        }
-        const room = getOrCreateRoom(roomId);
-        room.host = ws;
-        if (Number.isInteger(msg.maxPeers) && msg.maxPeers > 0) {
-          room.maxPeers = msg.maxPeers;
-        }
-        room.clients.add(ws);
-        ws.roomId = roomId;
-        ws.role = 'host';
-        ws.cid = 'host';
-        sendJson(ws, { type: 'room_joined', roomId, role: 'host', cid: 'host', proto: PROTO });
-        return;
-      }
-
-      // Invité (guest)
-      const room = rooms.get(roomId);
-      if (!room || !room.host || room.host.readyState !== WebSocket.OPEN) {
-        sendJson(ws, { type: 'error', roomId, reason: 'room-not-found', message: 'Aucun salon avec ce code.' });
-        return;
-      }
-      if (room.guests.size >= room.maxPeers) {
-        sendJson(ws, { type: 'error', roomId, reason: 'room-full', message: 'Le salon est complet.' });
-        return;
-      }
-
-      const cid = 'c' + (++room.nextCid);
-      ws.roomId = roomId;
-      ws.role = 'guest';
-      ws.cid = cid;
-      room.guests.set(cid, ws);
-      room.clients.add(ws);
-
-      sendJson(ws, { type: 'room_joined', roomId, role: 'guest', cid, proto: PROTO });
+      joinRoom(ws, roomId, msg);
       return;
     }
 
     // Relais des paquets de jeu (ancien format JSON, gardé pour les pages restées en cache)
     if (action === 'relay') {
       if (msg.data === undefined) return;
-      relay(ws, roomId, msg.to, typeof msg.except === 'string' ? msg.except : null, !!msg.v, JSON.stringify(msg.data));
+      relay(s, msg.to, typeof msg.except === 'string' ? msg.except : null, !!msg.v, JSON.stringify(msg.data), msg.c);
     }
   });
 
-  ws.on('close', () => {
-    leaveCurrentRoom(ws);
-  });
-
-  ws.on('error', () => {
-    leaveCurrentRoom(ws);
-  });
+  const closed = () => { dropped(ws); presenceGone(ws); };
+  ws.on('close', closed);
+  ws.on('error', closed);
 });
 
 // Ping/Pong (keep-alive toutes les 30 secondes) pour éviter les coupures des hébergeurs gratuits
@@ -336,15 +488,26 @@ const keepAliveInterval = setInterval(() => {
 const probeInterval = setInterval(() => {
   const now = Date.now();
   for (const ws of wss.clients) {
-    if (!ws.roomId || ws.probeAt || ws.readyState !== WebSocket.OPEN) continue;
+    if (!ws.sess || ws.readyState !== WebSocket.OPEN) continue;
+    if (ws.probeAt) {
+      // plus aucune réponse : connexion morte sans avoir été fermée (wifi coupé, téléphone en veille)
+      if (now - ws.probeAt > DEAD_MS) { try { ws.terminate(); } catch (e) {} }
+      continue;
+    }
     ws.probeAt = now;
     try { ws.ping(); } catch (e) {}
   }
 }, PROBE_MS);
 
+const tombInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [sid, t] of tombs) if (t < now) tombs.delete(sid);
+}, 60000);
+
 wss.on('close', () => {
   clearInterval(keepAliveInterval);
   clearInterval(probeInterval);
+  clearInterval(tombInterval);
 });
 
 server.listen(PORT, () => {

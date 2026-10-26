@@ -9,7 +9,14 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
    Messages « volatils » (to / toHost / bcast avec vol = true) : instantanés d'état envoyés en continu, dont seul le plus
    récent compte. Quand la connexion sature (tampon d'envoi plein), on les saute au lieu de les empiler : sinon la file
    d'attente grossit et le joueur se retrouve avec des secondes de retard (ping à 1 500 ms) alors que sa connexion est bonne.
-   Le serveur relais fait de même pour chaque destinataire. */
+   Le serveur relais fait de même pour chaque destinataire.
+
+   Coupures (protocole 3) : le serveur garde notre place une vingtaine de secondes. On s'en aperçoit vite (sonde sans
+   réponse, retour du réseau, onglet qui revient au premier plan), on se reconnecte et on reprend la place : le serveur
+   renvoie ce qu'on a manqué, on renvoie ce qu'il n'a pas reçu (messages numérotés, accusés de réception dans les sondes).
+   Le salon et la partie continuent sans rien remarquer. Si la place est perdue, l'invité rentre à nouveau dans le salon
+   (cb.open est rappelé) et l'hôte rouvre le même code (cb.reset), ou laisse cb.lost décider.
+   Rappels facultatifs : cb.status('down' | 'up'), hôte : cb.away(cid, coupé ?), invité : cb.hostAway(coupé ?). */
 (function () {
   const CODE_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const genCode = () => Array.from({ length: 4 }, () => CODE_ALPHA[(Math.random() * CODE_ALPHA.length) | 0]).join('');
@@ -28,15 +35,39 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   const BLOCKED = "Impossible de joindre le serveur relais WebSocket. Vérifie ta connexion internet ou réessaie dans quelques secondes.";
   const SEND_BUFFER_MAX = 48 * 1024; // au-delà, la connexion n'arrive plus à suivre : les messages volatils attendront le suivant
   const isVol = (o) => o === true || !!(o && o.volatile);
+  const PROTO = 3;
+  const OUTBOX_MAX = 3000;   // messages gardés en attendant l'accusé de réception du serveur
+  const DEAD_MS = 5000;      // sonde sans réponse : connexion morte, on en ouvre une autre
+  const FROZEN_MS = 2000;    // la sonde n'a pas pu tourner pendant ce temps : c'est la page qui était figée
+  const GIVE_UP_MS = 60000;  // serveur injoignable depuis une minute : on abandonne
+  const REJOIN_MS = 15000;   // place perdue : le temps que l'hôte rouvre son salon
+
+  // Réseau revenu ou onglet de nouveau au premier plan : on vérifie tout de suite la connexion de chaque salon
+  const nets = new Set();
+  const checkAll = () => { for (const n of nets) n._check(); };
+  addEventListener('online', checkAll);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkAll(); });
 
   function create({ prefix, maxPeers = 5 }) {
     const net = {
       ws: null, bc: null, links: new Map(), hostLink: null, cb: null, cidc: 0, role: null, code: null, roomId: null, pingIv: null, retryTo: null,
-      proto: 1, stats: { sent: 0, dropped: 0 },
+      proto: 1, stats: { sent: 0, dropped: 0, resumed: 0, reconnects: 0 },
+      gen: 0, up: false, established: false, opened: false, dead: false, lostAt: 0, downs: 0, wasDown: false,
+      sid: null, skey: null, rseq: 0, ackSent: 0, cseq: 0, outbox: [], rejoinUntil: 0,
+
+      _reset() {
+        this.gen++; this._stopKeepAlive(); clearTimeout(this.retryTo); clearTimeout(this.joinTo); clearTimeout(this.rejoinTo);
+        const w = this.ws;
+        if (w) { w.onclose = w.onmessage = w.onopen = null; try { w.close(); } catch (e) {} }
+        this.ws = null; this.up = false; this.established = false; this.opened = false; this.dead = false;
+        this.lostAt = 0; this.downs = 0; this.wasDown = false; this.signaled = false;
+        this.sid = null; this.skey = null; this.rseq = 0; this.ackSent = 0; this.cseq = 0; this.outbox = []; this.rejoinUntil = 0;
+      },
       // fixedCode : code imposé (migration d'hôte) ; sinon un code au hasard
       host(cb, fixedCode) {
+        this._reset();
         this.role = 'host'; this.cb = cb; this.links = new Map();
-        const code = fixedCode || genCode(); this.code = code;
+        const code = fixedCode || genCode(); this.code = code; this.fixed = !!fixedCode;
         const roomId = prefix + code; this.roomId = roomId;
         if (LOCAL_TEST) {
           const bc = new BroadcastChannel(roomId); this.bc = bc; setTimeout(() => cb.ready(code), 30);
@@ -53,115 +84,218 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           };
           return;
         }
-        this._hostWs(cb, code, fixedCode, roomId, Date.now() + 60000);
+        nets.add(this);
+        this.deadline = Date.now() + 60000;
+        this._open();
       },
-      _hostWs(cb, code, fixedCode, roomId, deadline) {
+      join(code, cb, timeout = 60000) {
+        this._reset();
+        this.role = 'guest'; this.cb = cb; this.code = code;
+        const roomId = prefix + code; this.roomId = roomId;
+        this.deadline = Date.now() + timeout;
+        this.joinTo = setTimeout(() => this._fail(this.signaled ? "Aucun salon avec ce code ou l'hôte ne répond pas." : BLOCKED), timeout);
+        if (LOCAL_TEST) {
+          const cid = 'g' + Math.random().toString(36).slice(2, 9), bc = new BroadcastChannel(roomId); this.bc = bc; let closed = false;
+          this.hostLink = { send: (x) => bc.postMessage({ k: 'd', to: 'host', from: cid, m: x }), close: () => bc.postMessage({ k: 'bye', to: 'host', from: cid }) };
+          bc.onmessage = (e) => {
+            const m = e.data; if (!m || m.to !== cid) return;
+            if (m.k === 'ok') this._opened();
+            else if (m.k === 'full') this._fail(`Le salon est complet (${maxPeers + 1} joueurs max).`);
+            else if (m.k === 'd') cb.msg(m.m);
+            else if (m.k === 'bye' && !closed) { closed = true; cb.close(); }
+          };
+          bc.postMessage({ k: 'hi', cid }); return;
+        }
+        this.hostLink = {
+          send: (x, v) => this._relay('host', x, v),
+          close: () => this._relay('host', { _ctrl: 'bye' }),
+        };
+        nets.add(this);
+        this._open();
+      },
+
+      /* ---------- connexion ---------- */
+      _open() {
+        const gen = ++this.gen;
+        clearTimeout(this.retryTo);
         wakeServer();
         let ws;
-        try { ws = new WebSocket(getWsUrl()); } catch (e) { cb.error(BLOCKED); return; }
-        this.ws = ws;
-        let ready = false, retried = false;
-        const retryOrFail = () => {
-          if (retried || ready || this.cb !== cb) return;
-          retried = true;
-          this._stopKeepAlive();
-          try { ws.close(); } catch (e) {}
-          if (Date.now() < deadline) {
-            this.retryTo = setTimeout(() => {
-              if (this.cb === cb && this.role === 'host') this._hostWs(cb, code, fixedCode, roomId, deadline);
-            }, 2500);
-          } else {
-            cb.error(BLOCKED);
-          }
-        };
-        const sendWs = (obj) => { if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} } };
-        this._startKeepAlive(ws, roomId);
+        try { ws = new WebSocket(getWsUrl()); } catch (e) { this._down(gen); return; }
+        this.ws = ws; this.up = false;
         ws.onopen = () => {
-          sendWs({ type: 'join_room', roomId, role: 'host', maxPeers });
+          if (gen !== this.gen) return;
+          this.signaled = true;
+          this._startKeepAlive(ws);
+          if (this.sid) this._raw({ type: 'resume', sid: this.sid, key: this.skey, ack: this.rseq });
+          else this._joinRoom();
         };
-        ws.onmessage = (ev) => {
-          if (this.ws !== ws) return;
-          let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-          if (!msg || typeof msg !== 'object') return;
-          if (msg.type === 'pong') { this._pong(msg.ts); return; }
-          if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
-          if (msg.type === 'room_joined') {
-            this.proto = msg.proto || 1; // 2 : le serveur relaie sans relire les données et protège les connexions lentes
-            ready = true; cb.ready(code);
+        ws.onmessage = (ev) => { if (gen === this.gen) this._onMsg(ev.data); };
+        ws.onclose = () => this._down(gen);
+      },
+      _joinRoom() {
+        this._raw(this.role === 'host'
+          ? { type: 'join_room', roomId: this.roomId, role: 'host', maxPeers, proto: PROTO }
+          : { type: 'join_room', roomId: this.roomId, role: 'guest', proto: PROTO });
+      },
+      // La connexion en cours est tombée (ou jugée morte) : on en rouvre une
+      _down(gen) {
+        if (gen !== this.gen || !this.role || this.dead) return;
+        this.gen++; this._stopKeepAlive();
+        const ws = this.ws; this.ws = null; this.up = false;
+        if (ws) { ws.onclose = ws.onmessage = ws.onopen = null; try { ws.close(); } catch (e) {} }
+        if (!this.established && !this.opened) {
+          if (Date.now() < this.deadline) this.retryTo = setTimeout(() => this._open(), 2500);
+          else this._fail(BLOCKED);
+          return;
+        }
+        if (!this.wasDown) { this.wasDown = true; this._status('down'); }
+        if (!this.lostAt) this.lostAt = Date.now();
+        if (Date.now() - this.lostAt > GIVE_UP_MS) { this._giveUp(); return; }
+        this.stats.reconnects++;
+        this.retryTo = setTimeout(() => this._open(), this.downs++ < 2 ? 250 : 1500);
+      },
+      _up() {
+        this.up = true; this.lostAt = 0; this.downs = 0;
+        if (this.wasDown) { this.wasDown = false; this._status('up'); }
+      },
+      _status(s) { if (this.cb && this.cb.status) this.cb.status(s); },
+      _check() {
+        if (!this.role || this.dead || LOCAL_TEST) return;
+        if (!this.ws) { if (this.retryTo) { clearTimeout(this.retryTo); this._open(); } return; }
+        // sonde immédiate, jugée plus sévèrement
+        if (this.ws.readyState === WebSocket.OPEN && !this.probeAt) this._probe(this.ws);
+        this.fastCheck = performance.now();
+      },
+      _giveUp() {
+        const cb = this.cb, role = this.role;
+        this.dead = true; this.gen++; this._stopKeepAlive(); clearTimeout(this.retryTo);
+        if (role === 'host') cb.error(BLOCKED);
+        else if (cb.close) cb.close();
+      },
+      _fail(msg) {
+        if (this.opened || this.dead) return;
+        this.dead = true; this.gen++; this._stopKeepAlive(); clearTimeout(this.retryTo); clearTimeout(this.joinTo);
+        const ws = this.ws; this.ws = null;
+        if (ws) { ws.onclose = ws.onmessage = null; try { ws.close(); } catch (e) {} }
+        this.cb.error(msg);
+      },
+      _opened() {
+        clearTimeout(this.joinTo);
+        this.opened = true;
+        this.cb.open();
+      },
+      // L'hôte est parti (ou nous a renvoyés) : l'invité le signale une seule fois
+      _closed() {
+        if (this.dead) return;
+        this.dead = true; this.gen++; this._stopKeepAlive(); clearTimeout(this.retryTo); clearTimeout(this.rejoinTo);
+        if (this.cb && this.cb.close) this.cb.close();
+      },
+
+      _onMsg(raw) {
+        let msg; try { msg = JSON.parse(raw); } catch (e) { return; }
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.s) {
+          if (msg.s <= this.rseq) return; // déjà reçu avant la coupure
+          this.rseq = msg.s;
+          if (this.rseq - this.ackSent >= 64) { this.ackSent = this.rseq; this._raw({ type: 'ack', a: this.rseq }); }
+        }
+        switch (msg.type) {
+          case 'pong': this._pong(msg.ts); if (msg.ack != null) this._acked(msg.ack); return;
+          case 'ping': this._raw({ type: 'pong', roomId: this.roomId, ts: msg.ts }); return;
+          case 'room_joined':
+            this.proto = msg.proto || 1; // 2 : relais sans relecture des données ; 3 : places qui survivent aux coupures
+            if (this.proto >= 3 && msg.sid) { this.sid = msg.sid; this.skey = msg.key; } else { this.sid = null; this.skey = null; }
+            this.rseq = 0; this.ackSent = 0; this.cseq = 0; this.outbox = [];
+            this._up();
+            if (this.role === 'host') {
+              const first = !this.established; this.established = true;
+              if (first) this.cb.ready(this.code);
+              else if (this.cb.reset) this.cb.reset();
+            } else this._relay('host', { _ctrl: 'hi' });
+            return;
+          case 'resumed':
+            this.stats.resumed++;
+            this._acked(msg.ack);
+            for (const [, f] of this.outbox) this._sendFrame(f); // avant tout nouveau message, pour garder l'ordre
+            this._up();
+            return;
+          case 'resume_failed': this._lost(msg.reason); return;
+          case 'error': this._onError(msg); return;
+          case 'host_left':
+            if (this.role !== 'guest') return;
+            if (!this.opened) this._fail("Aucun salon avec ce code. Vérifie-le avec ton pote.");
+            else this._closed();
+            return;
+          case 'host_away': case 'host_back':
+            if (this.role === 'guest' && this.cb.hostAway) this.cb.hostAway(msg.type === 'host_away');
+            return;
+          case 'peer_away': case 'peer_back':
+            if (this.role === 'host' && msg.cid && this.cb.away) this.cb.away(msg.cid, msg.type === 'peer_away');
+            return;
+          case 'peer_left': if (this.role === 'host' && msg.cid) this._drop(msg.cid); return;
+          case 'relay': if (msg.data) { if (this.role === 'host') this._hostData(msg.from, msg.data); else this._guestData(msg.data); } return;
+        }
+      },
+      _onError(msg) {
+        if (this.role === 'host') {
+          if (msg.reason === 'unavailable-id' && !this.established && !this.fixed) {
+            // code déjà pris : on en tire un autre
+            this.code = genCode(); this.roomId = prefix + this.code; this._joinRoom();
             return;
           }
-          if (msg.type === 'error') {
-            if (msg.reason === 'unavailable-id') {
-              retried = true;
-              this._stopKeepAlive(); try { ws.close(); } catch (e) {} this.ws = null;
-              if (fixedCode) cb.error('Code indisponible.'); else this.host(cb);
-              return;
-            }
-            retried = true;
-            cb.error(msg.message || 'Erreur de connexion.');
-            return;
-          }
-          if (msg.type === 'peer_joined') {
-            const cid = msg.cid;
-            if (!cid) return;
-            if (this.links.size >= maxPeers && !this.links.has(cid)) {
-              sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'full' } });
-              return;
-            }
-            this.links.set(cid, {
-              send: (x, v) => this._relay(cid, x, v),
-              close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
-            });
-            sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
-            cb.join(cid);
-            return;
-          }
-          if (msg.type === 'peer_left') {
-            if (msg.cid) this._drop(msg.cid);
-            return;
-          }
-          if (msg.type === 'relay') {
-            const cid = msg.from;
-            const d = msg.data;
-            if (!cid || !d) return;
-            if (d._ctrl === 'hi') {
-              if (!this.links.has(cid) && this.links.size >= maxPeers) {
-                sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'full' } });
-                return;
-              }
-              this.links.set(cid, {
-                send: (x, v) => this._relay(cid, x, v),
-                close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
-              });
-              sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'ok' } });
-              cb.join(cid);
-              return;
-            }
-            if (d._ctrl === 'bye') { this._drop(cid); return; }
-            if (!this.links.has(cid)) {
-              this.links.set(cid, {
-                send: (x, v) => this._relay(cid, x, v),
-                close: () => this._sendWs({ type: 'relay', roomId, to: cid, data: { _ctrl: 'bye' } }),
-              });
-              cb.join(cid);
-            }
-            cb.msg(cid, d);
-          }
-        };
-        ws.onerror = () => {
-          if (this.ws !== ws) return;
-          if (!ready) retryOrFail();
-        };
-        ws.onclose = () => {
-          if (this.ws !== ws) return;
-          this._stopKeepAlive();
-          if (!ready) retryOrFail();
-          else if (this.role === 'host' && this.cb === cb) {
-            this.retryTo = setTimeout(() => {
-              if (this.cb === cb && this.role === 'host') this._hostWs(cb, code, code, roomId, Date.now() + 60000);
-            }, 1200);
-          }
-        };
+          this.dead = true; this.gen++; this._stopKeepAlive();
+          this.cb.error(msg.reason === 'unavailable-id' ? 'Code indisponible.' : msg.message || 'Erreur de connexion.');
+          return;
+        }
+        if (msg.reason === 'room-not-found' && this.opened) {
+          // place perdue pendant que l'hôte rouvre son salon : on réessaie un moment
+          if (Date.now() < this.rejoinUntil) { this.rejoinTo = setTimeout(() => this._joinRoom(), 1000); return; }
+          this._closed(); return;
+        }
+        const full = `Le salon est complet (${maxPeers + 1} joueurs max).`;
+        if (this.opened) { this._closed(); return; }
+        this._fail(msg.reason === 'room-not-found' ? "Aucun salon avec ce code. Vérifie-le avec ton pote." : msg.reason === 'room-full' ? full : msg.message || 'Erreur de connexion.');
+      },
+      // Le serveur ne nous a pas gardé notre place (redémarrage, ou coupure trop longue)
+      _lost(reason) {
+        this.sid = null; this.skey = null; this.rseq = 0; this.ackSent = 0; this.cseq = 0; this.outbox = [];
+        if (this.role === 'host') {
+          this.links = new Map();
+          if (this.cb.lost && this.cb.lost(reason)) return; // le salon a déjà migré : l'appelant s'en occupe
+          this._joinRoom(); // même code : les invités reviennent d'eux-mêmes
+        } else {
+          this.rejoinUntil = Date.now() + REJOIN_MS;
+          this._joinRoom();
+        }
+      },
+      _hostData(cid, d) {
+        if (!cid) return;
+        if (d._ctrl === 'hi') {
+          if (!this.links.has(cid) && this.links.size >= maxPeers) { this._relay(cid, { _ctrl: 'full' }); return; }
+          this._link(cid);
+          this._relay(cid, { _ctrl: 'ok' });
+          this.cb.join(cid);
+          return;
+        }
+        if (d._ctrl === 'bye') { this._drop(cid); return; }
+        if (!this.links.has(cid)) { this._link(cid); this.cb.join(cid); }
+        this.cb.msg(cid, d);
+      },
+      _link(cid) {
+        this.links.set(cid, {
+          send: (x, v) => this._relay(cid, x, v),
+          close: () => this._relay(cid, { _ctrl: 'bye' }),
+        });
+      },
+      _guestData(d) {
+        if (d._ctrl === 'ok') { this._opened(); return; }
+        if (d._ctrl === 'full' || d.t === 'full') {
+          if (this.opened) this._closed(); else this._fail(`Le salon est complet (${maxPeers + 1} joueurs max).`);
+          return;
+        }
+        if (d._ctrl === 'bye') { this._closed(); return; }
+        if (!this.opened) this._opened();
+        this.cb.msg(d);
       },
       _drop(cid) { if (!this.links.has(cid)) return; this.links.delete(cid); if (this.cb && this.cb.leave) this.cb.leave(cid); },
       drop(cid) {
@@ -169,145 +303,75 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
         try { L.send({ t: 'bye' }); } catch (e) {}
         setTimeout(() => { try { L.close(); } catch (e) {} }, 80); this._drop(cid);
       },
-      join(code, cb, timeout = 60000) {
-        this.role = 'guest'; this.cb = cb; this.code = code;
-        const roomId = prefix + code; this.roomId = roomId;
-        let done = false; const fin = (fn, a) => { if (done) return; done = true; clearTimeout(to); clearTimeout(this.retryTo); fn(a); };
-        let signaled = false;
-        const deadline = Date.now() + timeout;
-        const to = setTimeout(() => fin(cb.error, signaled ? "Aucun salon avec ce code ou l'hôte ne répond pas." : BLOCKED), timeout);
-        if (LOCAL_TEST) {
-          const cid = 'g' + Math.random().toString(36).slice(2, 9), bc = new BroadcastChannel(roomId); this.bc = bc; let closed = false;
-          this.hostLink = { send: (x) => bc.postMessage({ k: 'd', to: 'host', from: cid, m: x }), close: () => bc.postMessage({ k: 'bye', to: 'host', from: cid }) };
-          bc.onmessage = (e) => {
-            const m = e.data; if (!m || m.to !== cid) return;
-            if (m.k === 'ok') fin(cb.open);
-            else if (m.k === 'full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
-            else if (m.k === 'd') cb.msg(m.m);
-            else if (m.k === 'bye' && !closed) { closed = true; cb.close(); }
-          };
-          bc.postMessage({ k: 'hi', cid }); return;
-        }
-        const connectGuest = () => {
-          if (done || this.cb !== cb) return;
-          wakeServer();
-          let ws;
-          try { ws = new WebSocket(getWsUrl()); } catch (e) { fin(cb.error, BLOCKED); return; }
-          this.ws = ws;
-          let closed = false, retried = false;
-          const sendWs = (obj) => { if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} } };
-          this._startKeepAlive(ws, roomId);
-          const fireClose = () => { if (closed) return; closed = true; if (done && this.cb === cb) cb.close(); };
-          const retryOrFail = () => {
-            if (retried || done || this.cb !== cb) return;
-            retried = true;
-            this._stopKeepAlive();
-            try { ws.close(); } catch (e) {}
-            if (Date.now() < deadline) {
-              this.retryTo = setTimeout(connectGuest, 2500);
-            } else {
-              fin(cb.error, BLOCKED);
-            }
-          };
-          this.hostLink = {
-            send: (x, v) => this._relay('host', x, v),
-            close: () => { this._sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'bye' } }); try { ws.close(); } catch (e) {} },
-          };
-          ws.onopen = () => {
-            signaled = true;
-            sendWs({ type: 'join_room', roomId, role: 'guest' });
-          };
-          ws.onmessage = (ev) => {
-            if (this.ws !== ws) return;
-            let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-            if (!msg || typeof msg !== 'object') return;
-            if (msg.type === 'pong') { this._pong(msg.ts); return; }
-            if (msg.type === 'ping') { sendWs({ type: 'pong', roomId, ts: msg.ts }); return; }
-            if (msg.type === 'room_joined') {
-              this.proto = msg.proto || 1;
-              sendWs({ type: 'relay', roomId, to: 'host', data: { _ctrl: 'hi' } });
-              return;
-            }
-            if (msg.type === 'error') {
-              retried = true;
-              if (msg.reason === 'room-not-found') {
-                if (done) fireClose();
-                else fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
-              } else if (msg.reason === 'room-full') fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`);
-              else fin(cb.error, msg.message || "Erreur de connexion.");
-              return;
-            }
-            if (msg.type === 'host_left') {
-              retried = true;
-              if (!done) fin(cb.error, "Aucun salon avec ce code. Vérifie-le avec ton pote.");
-              else fireClose();
-              return;
-            }
-            if (msg.type === 'relay') {
-              const d = msg.data;
-              if (!d) return;
-              if (d._ctrl === 'ok') { fin(cb.open); return; }
-              if (d._ctrl === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
-              if (d._ctrl === 'bye') { fireClose(); return; }
-              if (!done) fin(cb.open);
-              if (d.t === 'full') { fin(cb.error, `Le salon est complet (${maxPeers + 1} joueurs max).`); return; }
-              cb.msg(d);
-            }
-          };
-          ws.onerror = () => { if (this.ws !== ws) return; if (!done) retryOrFail(); };
-          ws.onclose = () => {
-            if (this.ws !== ws) return;
-            this._stopKeepAlive();
-            if (!done) retryOrFail();
-            else if (this.role === 'guest' && this.cb === cb && !closed) {
-              // Reconnexion transparente au même salon si la WebSocket a eu une micro-coupure
-              this.retryTo = setTimeout(() => {
-                if (this.role === 'guest' && this.cb === cb && !closed) {
-                  done = false;
-                  connectGuest();
-                }
-              }, 1000);
-            }
-          };
-        };
-        connectGuest();
+      _raw(obj) {
+        const ws = this.ws;
+        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify(obj)); } catch (e) {} }
       },
-      _sendWs(obj) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          try { this.ws.send(JSON.stringify(obj)); } catch (e) {}
-        }
+      _sendFrame(f) {
+        const ws = this.ws;
+        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send(f); } catch (e) {} }
+      },
+      _acked(a) {
+        if (!Number.isFinite(a)) return;
+        let k = 0; while (k < this.outbox.length && this.outbox[k][0] <= a) k++;
+        if (k) this.outbox.splice(0, k);
       },
       // Paquet de jeu vers 'host', un invité (cid) ou 'all' (except : cid exclu)
       _relay(to, data, vol, except) {
         const ws = this.ws;
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const open = this.up && ws && ws.readyState === WebSocket.OPEN;
         const v = isVol(vol);
-        if (v && (ws.bufferedAmount > SEND_BUFFER_MAX || this._lagging())) { this.stats.dropped++; return; }
+        if (v && (!open || ws.bufferedAmount > SEND_BUFFER_MAX || this._lagging())) { this.stats.dropped++; return; }
+        if (!open && !this.sid) return;
         this.stats.sent++;
         try {
           if (this.proto >= 2) {
             // trame compacte : en-tête court + données brutes, que le serveur retransmet sans les relire
             const h = { to }; if (except) h.x = except; if (v) h.v = 1;
-            ws.send('#' + JSON.stringify(h) + '\n' + JSON.stringify(data));
-          } else ws.send(JSON.stringify({ type: 'relay', roomId: this.roomId, to: to === 'all' ? undefined : to, except: except || undefined, v: v ? 1 : undefined, data }));
+            if (!v && this.sid) h.c = ++this.cseq;
+            const f = '#' + JSON.stringify(h) + '\n' + JSON.stringify(data);
+            if (h.c) {
+              // gardé jusqu'à l'accusé de réception ; pendant une coupure, il partira à la reprise
+              this.outbox.push([h.c, f]);
+              if (this.outbox.length > OUTBOX_MAX) { this.sid = null; this.outbox = []; } // trop de retard : on rentrera à neuf
+            }
+            if (open) ws.send(f);
+          } else if (open) ws.send(JSON.stringify({ type: 'relay', roomId: this.roomId, to: to === 'all' ? undefined : to, except: except || undefined, v: v ? 1 : undefined, data }));
         } catch (e) {}
       },
-      // Sonde vers le relais toutes les 250 ms (garde aussi la connexion ouverte). Si la réponse tarde nettement plus
-      // que d'habitude, nos envois s'empilent : on saute les instantanés d'état le temps que la file se vide.
-      _startKeepAlive(ws, roomId) {
+      // Sonde vers le relais toutes les 250 ms (garde aussi la connexion ouverte, porte nos accusés de réception).
+      // Si la réponse tarde nettement plus que d'habitude, nos envois s'empilent : on saute les instantanés d'état le
+      // temps que la file se vide. Plus de réponse du tout depuis quelques secondes : la connexion est morte.
+      // Sauf si c'est la page qui était figée (un jeu qui construit son décor, une machine lente) : la réponse est
+      // peut-être arrivée et attend son tour ; on ne conclut rien et on refait une sonde.
+      _startKeepAlive(ws) {
         this._stopKeepAlive();
-        this.probeAt = 0; this.lats = [];
+        this.probeAt = 0; this.lats = []; this.fastCheck = 0;
+        const gen = this.gen;
+        let tick = performance.now();
         this.pingIv = setInterval(() => {
-          if (ws.readyState !== WebSocket.OPEN || this.probeAt) return;
-          this.probeAt = performance.now();
-          try { ws.send(JSON.stringify({ type: 'ping', roomId, ts: this.probeAt })); } catch (e) {}
+          if (gen !== this.gen || ws.readyState !== WebSocket.OPEN) return;
+          const now = performance.now(), frozen = now - tick > FROZEN_MS; tick = now;
+          if (frozen) { this.probeAt = 0; this.fastCheck = 0; }
+          if (this.probeAt) {
+            const late = performance.now() - this.probeAt;
+            if (late > DEAD_MS || (this.fastCheck && late > 2500)) this._down(gen);
+            return;
+          }
+          this._probe(ws);
         }, 250);
+      },
+      _probe(ws) {
+        this.probeAt = performance.now();
+        const m = { type: 'ping', roomId: this.roomId, ts: this.probeAt };
+        if (this.sid) { m.ack = this.rseq; this.ackSent = this.rseq; }
+        try { ws.send(JSON.stringify(m)); } catch (e) {}
       },
       _pong(ts) {
         if (!ts) return;
         const lat = Math.max(1, Math.round(performance.now() - ts));
         this.rtt = lat;
-        if (ts === this.probeAt) this.probeAt = 0;
+        if (ts === this.probeAt) { this.probeAt = 0; this.fastCheck = 0; }
         this.lats.push(lat); if (this.lats.length > 40) this.lats.shift();
         this.baseLat = Math.min(...this.lats);
       },
@@ -318,6 +382,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       },
       _stopKeepAlive() {
         if (this.pingIv) { clearInterval(this.pingIv); this.pingIv = null; }
+        this.probeAt = 0;
       },
       toHost(m, vol) { this.hostLink && this.hostLink.send(m, vol); },
       to(cid, m, vol) { const L = this.links.get(cid); L && L.send(m, vol); },
@@ -330,10 +395,13 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       },
       // taille du tampon d'envoi (diagnostic)
       get buffered() { return this.ws ? this.ws.bufferedAmount : 0; },
+      get connected() { return LOCAL_TEST ? !!this.role : this.up; },
       close() {
-        this._stopKeepAlive();
-        clearTimeout(this.retryTo);
+        nets.delete(this);
+        this.gen++; this._stopKeepAlive();
+        clearTimeout(this.retryTo); clearTimeout(this.joinTo); clearTimeout(this.rejoinTo);
         const w = this.ws, b = this.bc, roomId = this.roomId;
+        if (w) { w.onclose = w.onmessage = w.onopen = null; }
         if (this.role === 'host') {
           if (LOCAL_TEST) {
             const ls = [...this.links.values()]; for (const L of ls) L.send({ t: 'bye' });
@@ -344,13 +412,14 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           }
           this.links = new Map();
         } else if (this.hostLink) {
-          const L = this.hostLink; L.send({ t: 'bye' });
-          if (w && w.readyState === WebSocket.OPEN) {
+          if (LOCAL_TEST) { const L = this.hostLink; L.send({ t: 'bye' }); setTimeout(() => L.close(), 60); }
+          else if (w && w.readyState === WebSocket.OPEN) {
+            try { w.send(JSON.stringify({ type: 'relay', roomId, to: 'host', data: { t: 'bye' } })); } catch (e) {}
             try { w.send(JSON.stringify({ type: 'leave_room', roomId })); } catch (e) {}
           }
-          setTimeout(() => L.close(), 60);
         }
         this.hostLink = null; this.ws = null; this.bc = null; this.role = null; this.cb = null; this.code = null; this.roomId = null;
+        this.up = false; this.sid = null; this.outbox = [];
         setTimeout(() => { try { w && w.close(); } catch (e) {} try { b && b.close(); } catch (e) {} }, 150);
       },
     };
@@ -360,4 +429,3 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   window.WS_SERVER_URL = WS_SERVER_URL;
   window.DDNet = { create, LOCAL_TEST, BLOCKED, getWsUrl, wakeServer, WS_SERVER_URL };
 })();
-

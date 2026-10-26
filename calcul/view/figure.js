@@ -1,6 +1,7 @@
 // Figures des questions de géométrie : petits dessins SVG cotés, dans le style du jeu (encre épaisse, aplats).
 import { esc } from './util.js';
 import { payoffAt } from '../engine/charts.js';
+import { describeCell } from '../engine/mind.js';
 
 const INK = '#16181d', FILL = '#d8f3ea', ACC = '#0f8a6a';
 // Empilement de cubes en perspective isométrique, mis à l'échelle de la vignette (peint : faces visibles en couleur)
@@ -21,6 +22,26 @@ function isoCubes(cubes, colors = ['#d8f3ea', '#8fd9c1', '#b5e9d8']) {
 const box = (a, b, c) => { const l = []; for (let z = 0; z < c; z++) for (let x = 0; x < a; x++) for (let y = 0; y < b; y++) l.push([x, y, z]); return l; };
 const label = (x, y, t, anchor = 'middle', unknown = false) =>
   `<text x="${x}" y="${y}" text-anchor="${anchor}" class="${unknown || t === '?' ? 'unk' : ''}">${esc(t)}</text>`;
+
+// Raisonnement abstrait : une case de la grille (n formes identiques, vides, grises ou pleines) dans un carré de côté w
+const CELL_FILL = ['none', '#8a94a6', INK];
+const CELL_POS = [[[0, 0]], [[-0.22, 0], [0.22, 0]], [[0, -0.2], [-0.22, 0.19], [0.22, 0.19]], [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]];
+function regular(cx, cy, R, k, rot) {
+  return Array.from({ length: k }, (_, j) => { const a = rot + (j * 2 * Math.PI) / k; return `${(cx + R * Math.cos(a)).toFixed(1)},${(cy + R * Math.sin(a)).toFixed(1)}`; }).join(' ');
+}
+function cellShapes(c, x, y, w) {
+  const R = w * [0.28, 0.17, 0.15, 0.14][c.n - 1], st = `fill="${CELL_FILL[c.f]}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"`;
+  return CELL_POS[c.n - 1].map(([dx, dy]) => {
+    const cx = x + w / 2 + dx * w, cy = y + w / 2 + dy * w;
+    if (c.s === 0) return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R.toFixed(1)}" ${st}/>`;
+    if (c.s === 1) return `<rect x="${(cx - 0.85 * R).toFixed(1)}" y="${(cy - 0.85 * R).toFixed(1)}" width="${(1.7 * R).toFixed(1)}" height="${(1.7 * R).toFixed(1)}" ${st}/>`;
+    if (c.s === 2) return `<polygon points="${regular(cx, cy + 0.15 * R, 1.15 * R, 3, -Math.PI / 2)}" ${st}/>`;
+    if (c.s === 3) return `<polygon points="${regular(cx, cy, 1.15 * R, 4, -Math.PI / 2)}" ${st}/>`;
+    return `<polygon points="${regular(cx, cy, 1.05 * R, 6, 0)}" ${st}/>`;
+  }).join('');
+}
+// une case seule, pour les réponses à choisir
+export const cellSvg = (c) => `<svg class="fig figc" viewBox="0 0 60 60" role="img" aria-label="${esc(describeCell(c))}">${cellShapes(c, 0, 0, 60)}</svg>`;
 
 export function figureSvg(fig) {
   if (!fig) return '';
@@ -116,6 +137,12 @@ export function figureSvg(fig) {
     body = `<polygon points="${pts.map(f).join(' ')}" fill="${FILL}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>
       <path d="M${f(pts[0])} L${f(pts[2])}" stroke="${ACC}" stroke-width="3" stroke-dasharray="7 5"/>
       ${pts.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" fill="${INK}"/>`).join('')}`;
+  } else if (fig.t === 'matrix') {
+    // raisonnement abstrait : grille 3 × 3, la dernière case est à trouver
+    const w = 56, x0 = 140 - (3 * w) / 2, y0 = 6;
+    body = fig.cells.map((c, k) => { const x = x0 + (k % 3) * w, y = y0 + Math.floor(k / 3) * w;
+      return `<rect x="${x + 2}" y="${y + 2}" width="${w - 4}" height="${w - 4}" rx="6" fill="none" stroke="${INK}" stroke-width="${c ? 1.5 : 2.5}"${c ? '' : ' stroke-dasharray="6 4"'}/>`
+        + (c ? cellShapes(c, x, y, w) : label(x + w / 2, y + w / 2 + 9, '?')); }).join('');
   } else if (fig.t === 'dots') {
     const n = fig.n;
     body = Array.from({ length: n }, (_, k) => {

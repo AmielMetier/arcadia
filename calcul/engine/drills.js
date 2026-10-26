@@ -1,87 +1,78 @@
-// Exercices « fat finger » et numéros de téléphone de The Candidate (générés une fois, graine fixe).
+// Exercices « fat finger » et numéros de téléphone de The Candidate, tirés à la volée (jamais deux fois le même).
 // Fat finger : recopier exactement, sans erreur, ce qui est affiché (espaces et majuscules compris).
-// Les IBAN sont fictifs ; les numéros de téléphone aussi (06 et 07 tirés au hasard).
-export const PHONES = ["06 03 47 80 64", "06 08 17 39 53", "06 11 58 13 22", "06 12 98 42 55", "06 13 77 99 28", "06 17 72 24 87", "06 26 26 37 23", "06 29 19 48 16", "06 34 35 03 05", "06 38 11 92 09", "06 51 76 29 56", "06 56 06 84 95", "06 58 60 89 71", "06 58 67 49 11", "06 61 12 32 91", "06 62 04 91 54", "06 64 27 65 88", "06 67 47 11 56", "06 79 06 86 71", "06 85 24 64 90", "06 85 54 66 66", "06 87 59 66 09", "06 89 29 94 58", "06 93 29 53 64", "06 95 92 84 59", "07 00 00 11 08", "07 04 81 11 75", "07 05 32 09 79", "07 06 72 07 07", "07 09 82 52 77", "07 20 98 70 25", "07 23 17 09 12", "07 25 76 30 88", "07 28 82 98 95", "07 28 85 49 60", "07 30 99 78 40", "07 36 48 83 38", "07 36 63 84 00", "07 37 74 72 69", "07 43 86 84 11", "07 56 12 21 91", "07 58 31 33 81", "07 61 39 12 89", "07 62 03 24 67", "07 62 14 62 62", "07 71 94 61 47", "07 75 43 31 37", "07 81 98 60 42", "07 94 13 84 96", "07 99 78 66 58"];
+// Les IBAN et les ISIN sont fictifs mais ont une clé de contrôle valide ; les numéros de téléphone aussi sont inventés.
+const between = (r, a, b) => a + r.int(b - a + 1);
+const pick = (r, l) => l[r.int(l.length)];
+// sans O ni I : on ne les confond pas avec 0 et 1
+const ALNUM = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789', LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const chars = (r, n, set = ALNUM) => Array.from({ length: n }, () => set[r.int(set.length)]).join('');
+const digits = (r, n) => Array.from({ length: n }, () => r.int(10)).join('');
+// 1234567 → « 1 234 567 » (espace simple : c'est ce qu'on tape au clavier)
+const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const money = (r, lo, hi) => `${group(between(r, lo, hi))},${String(r.int(100)).padStart(2, '0')}`;
 
-export const FAT_FINGER = [
-  {"tier": 1, "label": "Code de confirmation", "text": "4JK-M5GP"},
-  {"tier": 1, "label": "Code de confirmation", "text": "LTX-7M7S"},
-  {"tier": 1, "label": "Code de confirmation", "text": "VP8-KBRN"},
-  {"tier": 1, "label": "Code de confirmation", "text": "RSJ-VVSX"},
-  {"tier": 1, "label": "Code de confirmation", "text": "UMJ-SA83"},
-  {"tier": 1, "label": "Code de confirmation", "text": "1D4-J1PP"},
-  {"tier": 1, "label": "Code de confirmation", "text": "EFW-N8QG"},
-  {"tier": 1, "label": "Montant en euros", "text": "51 815,73"},
-  {"tier": 1, "label": "Montant en euros", "text": "80 249,97"},
-  {"tier": 1, "label": "Montant en euros", "text": "7 484,00"},
-  {"tier": 1, "label": "Montant en euros", "text": "32 938,34"},
-  {"tier": 1, "label": "Montant en euros", "text": "85 077,25"},
-  {"tier": 1, "label": "Montant en euros", "text": "1 065,21"},
-  {"tier": 1, "label": "Montant en euros", "text": "98 897,77"},
-  {"tier": 1, "label": "Liste de nombres", "text": "125 - 215 - 533 - 745"},
-  {"tier": 1, "label": "Liste de nombres", "text": "936 - 523 - 878 - 918"},
-  {"tier": 1, "label": "Liste de nombres", "text": "725 - 814 - 353 - 171"},
-  {"tier": 1, "label": "Liste de nombres", "text": "610 - 249 - 687 - 46"},
-  {"tier": 1, "label": "Liste de nombres", "text": "36 - 460 - 542 - 203"},
-  {"tier": 1, "label": "Liste de nombres", "text": "830 - 647 - 930 - 837"},
-  {"tier": 1, "label": "Liste de nombres", "text": "613 - 400 - 94 - 785"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-863064"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-118501"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-383858"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-694235"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-748851"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-558952"},
-  {"tier": 1, "label": "Référence d'ordre", "text": "ORD-730077"},
-  {"tier": 2, "label": "Code ISIN", "text": "US73097223000"},
-  {"tier": 2, "label": "Code ISIN", "text": "IT077492206S6"},
-  {"tier": 2, "label": "Code ISIN", "text": "US325907617C6"},
-  {"tier": 2, "label": "Code ISIN", "text": "NL317035463J2"},
-  {"tier": 2, "label": "Code ISIN", "text": "DE452406588T2"},
-  {"tier": 2, "label": "Code ISIN", "text": "US55643965520"},
-  {"tier": 2, "label": "Code ISIN", "text": "IT92214751448"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "ACHAT 3100 OR @ 20,57"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "ACHAT 8900 MC @ 898,39"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "VENTE 3200 CAP @ 131,10"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "ACHAT 2300 CAP @ 755,41"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "VENTE 5700 SAN @ 173,35"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "VENTE 2800 OR @ 700,57"},
-  {"tier": 2, "label": "Ordre à saisir", "text": "VENTE 3200 AIR @ 200,90"},
-  {"tier": 2, "label": "Montant en euros", "text": "13 424 223,06"},
-  {"tier": 2, "label": "Montant en euros", "text": "13 901 838,35"},
-  {"tier": 2, "label": "Montant en euros", "text": "63 706 258,71"},
-  {"tier": 2, "label": "Montant en euros", "text": "46 083 016,93"},
-  {"tier": 2, "label": "Montant en euros", "text": "53 190 914,82"},
-  {"tier": 2, "label": "Montant en euros", "text": "94 795 212,73"},
-  {"tier": 2, "label": "Montant en euros", "text": "79 002 227,60"},
-  {"tier": 2, "label": "Liste de nombres", "text": "4525 - 9313 - 5201 - 6521 - 8798 - 3142"},
-  {"tier": 2, "label": "Liste de nombres", "text": "4305 - 278 - 8670 - 7741 - 8996 - 1197"},
-  {"tier": 2, "label": "Liste de nombres", "text": "5836 - 9824 - 9228 - 3161 - 9722 - 6248"},
-  {"tier": 2, "label": "Liste de nombres", "text": "3943 - 3302 - 7698 - 9046 - 6307 - 7594"},
-  {"tier": 2, "label": "Liste de nombres", "text": "3646 - 7203 - 1166 - 7120 - 9603 - 192"},
-  {"tier": 2, "label": "Liste de nombres", "text": "5683 - 8989 - 2439 - 1703 - 3099 - 5345"},
-  {"tier": 2, "label": "Liste de nombres", "text": "853 - 4626 - 6038 - 5191 - 3401 - 2558"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 0868 6706 4351 0178 0459 566"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 1213 2961 9055 8746 9141 956"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 2247 6632 9948 0302 3049 938"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 1145 2026 2678 5446 2553 178"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 3760 9353 7787 5917 7341 909"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 7976 7229 0689 1505 7755 471"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 5834 0230 5398 0613 1280 001"},
-  {"tier": 3, "label": "IBAN (fictif)", "text": "FR76 9206 3019 3079 2541 8615 912"},
-  {"tier": 3, "label": "Code de transfert", "text": "373D-RFFG-HAPM-661H"},
-  {"tier": 3, "label": "Code de transfert", "text": "V4DP-UEXD-U68N-07AA"},
-  {"tier": 3, "label": "Code de transfert", "text": "1R9D-6BW8-7PR8-HPFH"},
-  {"tier": 3, "label": "Code de transfert", "text": "JCU0-0A5D-KLJT-AWUU"},
-  {"tier": 3, "label": "Code de transfert", "text": "67HX-CR5K-LU3Z-YYKP"},
-  {"tier": 3, "label": "Code de transfert", "text": "8FNU-L984-KMXT-SMA6"},
-  {"tier": 3, "label": "Code de transfert", "text": "DK14-4GAD-D0DU-65ZN"},
-  {"tier": 3, "label": "Code de transfert", "text": "96V9-2XZ8-RY09-TUJH"},
-  {"tier": 3, "label": "Liste de prix", "text": "335,21 - 517,24 - 926,10 - 690,61 - 409,60 - 468,50"},
-  {"tier": 3, "label": "Liste de prix", "text": "254,66 - 748,95 - 605,45 - 406,49 - 95,08 - 486,06"},
-  {"tier": 3, "label": "Liste de prix", "text": "684,20 - 126,13 - 515,23 - 877,36 - 691,53 - 72,62"},
-  {"tier": 3, "label": "Liste de prix", "text": "270,47 - 874,07 - 260,69 - 649,03 - 108,29 - 255,81"},
-  {"tier": 3, "label": "Liste de prix", "text": "657,09 - 514,10 - 276,76 - 54,54 - 900,77 - 307,69"},
-  {"tier": 3, "label": "Liste de prix", "text": "322,03 - 10,71 - 929,51 - 16,76 - 72,10 - 842,54"},
-  {"tier": 3, "label": "Liste de prix", "text": "586,02 - 660,11 - 441,67 - 16,14 - 373,43 - 150,59"},
-  {"tier": 3, "label": "Liste de prix", "text": "541,78 - 153,50 - 854,50 - 185,86 - 152,64 - 933,03"},
-];
+// Clé ISIN (Luhn sur les chiffres, les lettres valant 10 à 35)
+function isinKey(body) {
+  const ds = [...body].map((c) => (/\d/.test(c) ? c : String(c.charCodeAt(0) - 55))).join('');
+  let sum = 0;
+  [...ds].reverse().forEach((c, k) => { let v = Number(c) * (k % 2 === 0 ? 2 : 1); if (v > 9) v -= 9; sum += v; });
+  return String((10 - (sum % 10)) % 10);
+}
+// Clé IBAN (ISO 13616 : modulo 97 du BBAN suivi du code pays et de 00)
+function ibanKey(country, bban) {
+  const s = (bban + country + '00').replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  let m = 0;
+  for (const c of s) m = (m * 10 + Number(c)) % 97;
+  return String(98 - m).padStart(2, '0');
+}
+
+const TICKERS = ['AIR', 'BNP', 'CAP', 'DSY', 'MC', 'OR', 'SAN', 'TTE', 'GLE', 'ACA', 'KER', 'RMS', 'SU', 'EL', 'VIE', 'ENGI', 'ORA', 'STLA', 'HO', 'SGO', 'DG', 'RI', 'BN', 'CS'];
+// paire, cours plancher et plafond (en 1/10 000, ou en 1/100 pour le yen)
+const FX = [['EUR/USD', 10000, 12000, 4], ['EUR/GBP', 8000, 9000, 4], ['EUR/CHF', 9000, 10000, 4], ['GBP/USD', 12000, 14000, 4], ['AUD/USD', 6000, 7000, 4], ['USD/JPY', 13000, 16000, 2], ['EUR/JPY', 15000, 17500, 2]];
+const COUNTRIES = ['FR', 'US', 'DE', 'NL', 'IT', 'GB', 'ES', 'CH', 'LU', 'BE'];
+const MONTHS = ['JAN', 'FEV', 'MAR', 'AVR', 'MAI', 'JUN', 'JUL', 'AOU', 'SEP', 'OCT', 'NOV', 'DEC'];
+const side = (r) => pick(r, ['ACHAT', 'VENTE']);
+const two = (n) => String(n).padStart(2, '0');
+const fx = (n, dec) => (n / 10 ** dec).toFixed(dec).replace('.', ',');
+const price = (r, lo, hi, dec = 2) => (between(r, lo * 10 ** dec, hi * 10 ** dec) / 10 ** dec).toFixed(dec).replace('.', ',');
+
+// Les formats, par tour : du code court au premier tour, jusqu'aux IBAN et aux ordres complets au comité
+const FORMATS = {
+  1: [
+    ['Code de confirmation', (r) => `${chars(r, 3)}-${chars(r, 4)}`],
+    ['Montant en euros', (r) => money(r, 1000, 99999)],
+    ['Liste de nombres', (r) => Array.from({ length: 4 }, () => between(r, 10, 999)).join(' - ')],
+    ['Référence d\'ordre', (r) => `ORD-${digits(r, 6)}`],
+    ['Date et heure d\'exécution', (r) => `${two(between(r, 1, 28))}/${two(between(r, 1, 12))}/${between(r, 2026, 2031)} ${two(between(r, 9, 17))}:${two(r.int(60))}`],
+    ['Ticker et quantité', (r) => `${pick(r, TICKERS)} x ${group(between(r, 1, 999) * 10)}`],
+  ],
+  2: [
+    ['Code ISIN (fictif)', (r) => { const b = pick(r, COUNTRIES) + chars(r, 9, '0123456789' + LETTERS.slice(0, 6)); return b + isinKey(b); }],
+    ['Ordre à saisir', (r) => `${side(r)} ${group(between(r, 1, 99) * 100)} ${pick(r, TICKERS)} @ ${price(r, 5, 900)}`],
+    ['Montant en euros', (r) => money(r, 1e6, 99e6)],
+    ['Liste de nombres', (r) => Array.from({ length: 6 }, () => between(r, 100, 9999)).join(' - ')],
+    ['Code BIC (fictif)', (r) => `${chars(r, 4, LETTERS)}${pick(r, COUNTRIES)}${chars(r, 2, LETTERS)}${r.next() < 0.5 ? chars(r, 3) : ''}`],
+    ['Cours de change', (r) => { const [pair, lo, hi, dec] = pick(r, FX), b = between(r, lo, hi); return `${pair} ${fx(b, dec)} / ${fx(b + between(r, 1, 6), dec)}`; }],
+  ],
+  3: [
+    ['IBAN (fictif)', (r) => { const bban = digits(r, 23), k = ibanKey('FR', bban); return `FR${k}${bban}`.replace(/(.{4})/g, '$1 ').trim(); }],
+    ['Code de transfert', (r) => Array.from({ length: 4 }, () => chars(r, 4)).join('-')],
+    ['Liste de prix', (r) => Array.from({ length: 6 }, () => price(r, 10, 999)).join(' - ')],
+    ['Ordre à cours limité', (r) => `${side(r)} ${group(between(r, 1, 250) * 50)} ${pick(r, TICKERS)} LIM ${price(r, 5, 900, 3)} VAL ${String(between(r, 1, 28)).padStart(2, '0')}/${String(between(r, 1, 12)).padStart(2, '0')}`],
+    ['Option à saisir', (r) => `${side(r)} ${between(r, 1, 50) * 10} ${pick(r, ['CALL', 'PUT'])} ${pick(r, TICKERS)} ${pick(r, MONTHS)}${between(r, 27, 30)} K${between(r, 10, 300) * 5} @ ${price(r, 0, 40)}`],
+    ['Ordre de change', (r) => { const [pair, lo, hi, dec] = pick(r, FX); return `${side(r)} ${group(between(r, 1, 50) * 100000)} ${pair} @ ${fx(between(r, lo * 10, hi * 10), dec + 1)}`; }],
+  ],
+};
+
+// Un exercice de fat finger tiré pour le tour : { label, text }
+export function fatFinger(r, tier) {
+  const [label, make] = pick(r, FORMATS[tier] || FORMATS[1]);
+  return { label, text: make(r) };
+}
+export const FAT_FINGER_FORMATS = Object.fromEntries(Object.entries(FORMATS).map(([t, l]) => [t, l.map(([label]) => label)]));
+export { isinKey, ibanKey };
+
+// Un numéro de portable inventé : 06 ou 07, puis quatre paires
+export function phoneNumber(r) {
+  return [pick(r, ['06', '07']), ...Array.from({ length: 4 }, () => String(r.int(100)).padStart(2, '0'))].join(' ');
+}
