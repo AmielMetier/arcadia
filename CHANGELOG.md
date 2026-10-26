@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.61 — 26 octobre 2026
+- Correction : export TYPE_FR and TYPE_COLORS in types.js and add HubBridge init handshake fallback (Amiel)
+
 ## 2.60 — 26 octobre 2026
 - Nouveau : master edition upgrade with GBA FireRed sprites, follower pokemon, evolutions, Menton gym & mart, Showdown portraits and competitive battle mechanics (Amiel)
 
