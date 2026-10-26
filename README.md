@@ -81,11 +81,13 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
 - Sauter du train, fouiller les ruines, ramasser et lancer les caisses ; dans la neige, rattraper l'échelle de queue
 - Un front de tempête poursuit le convoi (il ralentit en gare) ; manette de vitesse, pression de la chaudière, pannes à bord, pillards en motoneige
 - Le froid (chaleur de chaque joueur), les loups (fusées éclairantes), les congères, avalanches et bourrasques, le jour et la nuit
-- Un paysage par tronçon (plaine, forêt, ville, lac gelé, col), choisi à l'aiguillage, et un moment fort (Brise-Glace, Pont de la Gorge, convoi abandonné, rugissement du Front)
-- Gares : ravitaillement, trois cartes d'amélioration tirées au hasard (la première offerte) ; rôles Mécano, Éclaireur, Chauffeur, Vigie
+- Une voie qui tourne, monte et descend, avec de vrais aiguillages (un levier à basculer au bord de la voie) et une carte du trajet
+- Un paysage par tronçon (plaine, forêt dense, ville, lac gelé, col avec falaise, ravin et tunnels, raffinerie, toundra), chacun avec son geste : abattre des sapins, pousser un wagonnet de charbon, brancher une cuve de fioul, fouiller les immeubles, écarter un troupeau ; et un moment fort (Brise-Glace, Pont de la Gorge, convoi abandonné, rugissement du Front)
+- Gares : ravitaillement, trois cartes d'amélioration tirées au hasard (la première offerte), wagons à installer (tourelle-harpon, atelier, dortoir), un contrat et parfois une rencontre ; survivants à ramener ; rôles Mécano, Éclaireur, Chauffeur, Vigie
 - Deux modes : Expédition (rallier Fort-Givre) et Sans fin
 - Trois difficultés : Facile, Normale, Blizzard ; musique et sons générés en direct (WebAudio)
-- Décor : modèles 3D de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/`
+- Rendu : post-traitement (ombre aux contacts, halo des lumières, étalonnage selon la nuit, les tunnels et le Front), sapins enneigés générés à la volée (comme ceux de Birdie Party), neige qui scintille ; les effets se coupent d'eux-mêmes si la machine peine
+- Décor et icônes : modèles 3D et pictogrammes de [Kenney](https://kenney.nl) (licence CC0, domaine public), dans `convoy/models/` et `convoy/img/icons/`
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
@@ -94,7 +96,7 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   `node tools/bot-arena.mjs 100 expert,normal,normal,facile` fait s'affronter les niveaux de bots ;
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
-  `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillage, paysages, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
+  `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots.
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -102,6 +104,6 @@ Survie en coopération en 3D (Three.js), seul ou jusqu'à 6 joueurs, dans un bli
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.49** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.59** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude
