@@ -8,13 +8,13 @@ const STORAGE_KEY = 'dd_poke_adventure_menton';
 
 export function getInitialPlayerData(name = 'Dresseur', color = '#ff4b2b') {
   return {
-    version: 2,
+    version: 3,
     name,
     color,
     avatar: 'red', // 'red' ou 'green'
     mapId: 'outdoor',
-    x: 6, // Devant le Laboratoire Pokémon de Menton
-    y: 9,
+    x: 9, // Devant le Laboratoire Pokémon du Village de départ (64x64 Unys)
+    y: 44,
     dir: 'up',
     moving: false,
     money: 1500,
@@ -53,6 +53,13 @@ export function loadPlayerData(defaultName = 'Dresseur', defaultColor = '#ff4b2b
     parsed.name = defaultName || parsed.name || 'Dresseur';
     parsed.color = defaultColor || parsed.color || '#ff4b2b';
     if (!parsed.avatar) parsed.avatar = 'red';
+    if (parsed.version !== 3) {
+      parsed.version = 3;
+      parsed.mapId = 'outdoor';
+      parsed.x = 9;
+      parsed.y = 44;
+      parsed.dir = 'up';
+    }
     if (!parsed.mapId) parsed.mapId = 'outdoor';
     if (!parsed.inventory) parsed.inventory = { poke_ball: 5, potion: 3, citron_menton: 2 };
     if (!parsed.box) parsed.box = [];

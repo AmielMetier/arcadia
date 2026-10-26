@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.66 — 26 octobre 2026
+## 2.67 — 26 octobre 2026
 - **Mini-Golf Party** — Nouveau jeu : mini-golf en 3D façon Golf It, seul ou jusqu'à 6 joueurs, avec des bots si besoin (facile, normal, expert).
   - Chacun son tour : quand la balle s'arrête, le coup est compté et la caméra passe sur la balle du joueur suivant. Le pseudo de chaque joueur flotte au-dessus de sa balle.
   - La carte de score reste affichée sur le côté et se met à jour à chaque coup (par, total, écart au par).
@@ -9,11 +9,14 @@
   - Souris : bouger pour tourner la caméra, molette pour zoomer, maintenir un clic et reculer pour doser la puissance, relâcher pour tirer. Au trackpad : glisser sans appuyer pour la caméra, cliquer et tirer vers soi pour frapper. La touche Espace marche aussi.
   - Options de l'hôte : nombre de trous, bots, balles qui se touchent ou non, temps par coup.
 
-## 2.65 — 26 octobre 2026
+## 2.66 — 26 octobre 2026
 - **Cyber Kart GP** — La musique a son propre réglage : elle ne se coupe plus quand on a éteint la musique d'ambiance du Hub.
   - Bouton 🎵 dans les menus, la pause et les résultats : il coupe ou remet la musique et dit ce qui se passe (chargement, « touchez l'écran pour le son », fichier introuvable…).
   - Si un appareil n'arrive pas à préparer un morceau (iPad à court de mémoire…), il est lu en flux à la place, et un morceau qui a échoué est réessayé au toucher suivant.
   - La touche M coupe et remet en même temps la musique et les bruitages.
+
+## 2.65 — 26 octobre 2026
+- Implement PhaserJS 3 64x64 Gen 5 Unys overworld with 3 official tileset packs, Arcade Physics, and battle HUD/trainer fixes (Amiel)
 
 ## 2.64 — 26 octobre 2026
 - Fix trainer intro sequence before Pokemon send-out, responsive battle HUD, and add Gen 5 Unova tilesets (Amiel)

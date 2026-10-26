@@ -52,8 +52,8 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   if (isSolid(mapGrids[currentMapId], player.x, player.y)) {
     currentMapId = 'outdoor';
     player.mapId = 'outdoor';
-    player.x = 6;
-    player.y = 9;
+    player.x = 9;
+    player.y = 44;
     player.dir = 'up';
   }
 
@@ -1192,6 +1192,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     destroy: () => {
       destroyed = true;
       if (rafId) cancelAnimationFrame(rafId);
+      if (renderer && typeof renderer.destroy === 'function') renderer.destroy();
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);

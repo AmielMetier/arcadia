@@ -94,12 +94,12 @@ const map = createMentonMap();
 assert.strictEqual(map.length, MAP_HEIGHT, 'Hauteur de carte correcte');
 assert.strictEqual(map[0].length, MAP_WIDTH, 'Largeur de carte correcte');
 
-assert.strictEqual(getTile(map, 6, 8), TILE.DOOR, 'Porte du Labo à (6,8)');
-assert.strictEqual(getTile(map, 17, 8), TILE.DOOR, 'Porte du Centre Pokémon à (17,8)');
-assert.strictEqual(getTile(map, 19, 15), TILE.DOOR, 'Porte de la Boutique Pokémon à (19,15)');
-assert.strictEqual(getTile(map, 38, 5), TILE.DOOR, 'Porte de l\'Arène de Menton à (38,5)');
-assert.strictEqual(getTile(map, 12, 15), TILE.FOUNTAIN, 'Fontaine à (12,15)');
-assert.strictEqual(getTile(map, 9, 13), TILE.LEMON_TREE, 'Citronnier à (9,13)');
+assert.strictEqual(getTile(map, 8, 42), TILE.DOOR, 'Porte du Labo à (8,42)');
+assert.strictEqual(getTile(map, 14, 11), TILE.DOOR, 'Porte du Centre Pokémon à (14,11)');
+assert.strictEqual(getTile(map, 23, 11), TILE.DOOR, 'Porte de la Boutique Pokémon à (23,11)');
+assert.strictEqual(getTile(map, 43, 10), TILE.DOOR, 'Porte de l\'Arène d\'Unys à (43,10)');
+assert.strictEqual(getTile(map, 13, 45), TILE.FOUNTAIN, 'Fontaine à (13,45)');
+assert.strictEqual(getTile(map, 9, 43), TILE.LEMON_TREE, 'Citronnier / Arbre à Baies à (9,43)');
 
 const labGrid = MAPS.lab.createGrid();
 const centerGrid = MAPS.pokecenter.createGrid();
@@ -116,8 +116,8 @@ assert.strictEqual(getTile(gymGrid, 6, 11), TILE.EXIT_MAT, 'Tapis de sortie de l
 assert.strictEqual(isSolid(labGrid, 6, 4), true, 'Table labo solide');
 assert.strictEqual(isSolid(martGrid, 4, 3), true, 'Comptoir boutique solide');
 assert.strictEqual(isSolid(labGrid, 5, 5), false, 'Intérieur labo marchable');
-assert.strictEqual(isSolid(map, 10, 29), true, 'Mer solide');
-assert.strictEqual(isSolid(map, 10, 25), false, 'Sable plage marchable');
+assert.strictEqual(isSolid(map, 30, 32), true, 'Rivière solide');
+assert.strictEqual(isSolid(map, 25, 44), false, 'Route 1 sable marchable');
 console.log('✓ Lieux emblématiques de Menton, portes franchissables et 4 intérieurs (Labo, Centre, Boutique, Arène) validés');
 
 console.log('\n--- 6. Test Joueur, Boutique, Soin Hors Combat, Suiveur & PC ---');
