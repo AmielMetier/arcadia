@@ -180,7 +180,7 @@ window.HUB_GAMES = [
     id: 'minigolf',
     title: 'Mini-Golf Party',
     tag: 'Parcours déjantés',
-    desc: 'Du mini-golf en 3D à la souris, avec loopings, moulins, pistons et lave sur quatre parcours.',
+    desc: 'Du mini-golf en 3D à la souris ou au doigt : 54 trous sur neuf parcours, avec loopings, plafonds aimantés, glace, boue et lave.',
     url: 'minigolf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#2e8b57',

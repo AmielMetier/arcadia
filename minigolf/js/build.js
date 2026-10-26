@@ -35,7 +35,7 @@ class Path {
     this.P = st; this.yaw = o.wyaw ?? (B.yaw + (o.yaw || 0) * D2R); this.bank = 0;
     this.w = o.w ?? 2.2; this.floor = o.floor || B.theme.floor; this.wallM = o.wall || B.theme.wall;
     this.wh = o.wh ?? 0.3; this.wt = o.wt ?? 0.2; this.wl = o.walls !== false; this.wr = o.walls !== false;
-    this.roofOn = false; this.base = o.base ?? 'ground'; this.prm = null; this.s = 0;
+    this.roofOn = false; this.roofMat = null; this.noFloor = false; this.base = o.base ?? B.defaultBase ?? 'ground'; this.prm = null; this.s = 0;
     this.trim = o.trim ?? B.theme.trim ?? null;
     this.pieces = []; this.frames = []; this.main = o.main !== false;
     this.newPiece();
@@ -55,7 +55,7 @@ class Path {
     }
     const l = norm(cross(u, f));
     const fr = { p: p.slice(), f, u, l, w: this.w, wl: this.wl, wr: this.wr, wh: this.wh, wt: this.wt, s: this.s,
-      floor: this.floor, wall: this.wallM, roof: this.roofOn, prm: this.prm, base: this.piece.base, trim: this.trim };
+      floor: this.floor, wall: this.wallM, roof: this.roofOn, roofMat: this.roofMat, nofloor: this.noFloor, prm: this.prm, base: this.piece.base, trim: this.trim };
     this.piece.frames.push(fr); this.frames.push(fr);
     return fr;
   }
@@ -113,7 +113,9 @@ class Path {
   walls(l, r = l) { this.wl = l; this.wr = r; this.last.wl = this.last.wl && l; this.last.wr = this.last.wr && r; return this; }
   wallH(h) { this.wh = h; return this; }
   mat(floor, wall) { if (floor) this.floor = floor; if (wall) this.wallM = wall; return this; }
-  roof(on) { this.roofOn = on; return this; }
+  roof(on, mat) { this.roofOn = on; this.roofMat = mat || null; if (!on) { this.last.roof = this.last.roof; } return this; }
+  /** Pas de sol sur la suite (vide sous un plafond aimanté, par exemple) */
+  floorOff(on) { this.noFloor = on; return this; }
   boostOn(on) { this.flowSign = 1; this.prmMode = on ? 'fwd' : null; if (!on) this.prm = null; else this.prm = norm(this.last.f); return this; }
   /** Sens du tapis roulant / accélérateur : +1 vers l'avant, -1 vers l'arrière, 0 coupé */
   flow(sign) { if (!sign) { this.prmMode = null; this.prm = null; return this; } this.prmMode = 'fwd'; this.flowSign = sign; this.prm = mul(norm(this.last.f), sign); return this; }
@@ -139,7 +141,7 @@ class Path {
 export class HoleBuilder {
   constructor(o) {
     this.ox = o.at?.[0] || 0; this.oz = o.at?.[1] || 0; this.oy = o.at?.[3] || 0; this.yaw = (o.at?.[2] || 0) * D2R;
-    this.theme = o.theme; this.groundY = o.groundY ?? 0; this.groundType = o.groundType || 'grass';
+    this.theme = o.theme; this.groundY = o.groundY ?? 0; this.groundType = o.groundType || 'grass'; this.defaultBase = o.base || null;
     this.groups = new Map(); this.kins = []; this.zones = []; this.decor = []; this.lights = []; this.paths = [];
     this.teeP = null; this.cupP = null; this.foot = []; this.piles = [];   // empreinte au sol (pour placer le décor autour)
     this.cam = null;
@@ -330,6 +332,20 @@ export class HoleBuilder {
     return k;
   }
   zone(type, c, h, yaw = 0, extra = {}) { this.zones.push({ type, c, h, yaw, ...extra }); }
+  /** Zone (boîte alignée) qui englobe l'allée entre les abscisses s0 et s1, de la hauteur du sol (moins below) à celle du toit (plus above) */
+  zoneAlong(t, s0, s1, type, o = {}) {
+    const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+    for (const fr of t.frames) {
+      if (fr.s < s0 - 1e-6 || fr.s > s1 + 1e-6) continue;
+      for (const side of [1, -1]) for (const up of [-(o.below ?? 0.1), fr.wh + (o.above ?? 0.05)]) {
+        const q = add(add(fr.p, mul(fr.l, side * (fr.w / 2 + (o.pad ?? 0)))), mul(fr.u, up));
+        for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], q[k]); mx[k] = Math.max(mx[k], q[k]); }
+      }
+    }
+    const c = [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2], h = [(mx[0] - mn[0]) / 2, (mx[1] - mn[1]) / 2, (mx[2] - mn[2]) / 2];
+    this.zone(type, c, h, 0, o.extra || {});
+    return { c, h };
+  }
   water(c, h, yaw = 0) { this.zone('water', c, h, yaw); }
   lava(c, h, yaw = 0) { this.zone('lava', c, h, yaw); }
   tele(c, h, to, toYaw, extra = {}) { this.zone('tele', c, h, 0, { to, toYaw, ...extra }); }
@@ -349,6 +365,7 @@ export class HoleBuilder {
     // sol (2 bandes : gauche-centre et centre-droite)
     for (let i = 0; i < F.length - 1; i++) {
       const a = F[i], b = F[i + 1], mat = b.floor;
+      if (a.nofloor && b.nofloor) continue;
       const aoE = (fr, side) => (side > 0 ? (fr.wl ? 0.72 : 0.95) : (fr.wr ? 0.72 : 0.95));
       const V3 = (fr, side) => ({ p: side === 0 ? fr.p : E(fr, side), n: fr.u, uv: [(side * fr.w / 2) * 0.5, fr.s * 0.5], ao: side === 0 ? 1 : aoE(fr, side) });
       this.quad(mat, V3(a, 1), V3(b, 1), V3(b, 0), V3(a, 0), { ref: a.u, prm: b.prm });
@@ -405,7 +422,7 @@ export class HoleBuilder {
       if (!a.roof || !b.roof) continue;
       const r = (fr, side) => add(E(fr, side, 0.02), mul(fr.u, fr.wh));
       const n = mul(a.u, -1);
-      this.quad(theme.roof || 'glassroof', { p: r(a, 1), n, uv: [0, a.s] }, { p: r(b, 1), n, uv: [0, b.s] }, { p: r(b, -1), n, uv: [1, b.s] }, { p: r(a, -1), n, uv: [1, a.s] }, { ref: n });
+      this.quad(b.roofMat || theme.roof || 'glassroof', { p: r(a, 1), n, uv: [0, a.s] }, { p: r(b, 1), n, uv: [0, b.s] }, { p: r(b, -1), n, uv: [1, b.s] }, { p: r(a, -1), n, uv: [1, a.s] }, { ref: n });
     }
     // bouts arrondis
     if (pc.capS) this.cap(F[0], -1);
@@ -456,6 +473,7 @@ export class HoleBuilder {
     if (this.teeP) route.unshift(this.teeP);
     if (this.cupP) route.push(this.cupP);
     const world = new World({ mesh, kin: this.kins, zones, cup: this.cupP, groundY: this.groundY, groundType: this.groundType,
+      ceilY: zones.some((z) => z.type === 'antigrav') ? mesh.max[1] + 10 : null,
       killY: Math.min(mesh.min[1], this.groundY) - 4,
       bounds: [mesh.min[0] - 12, mesh.min[2] - 12, mesh.max[0] + 12, mesh.max[2] + 12] });
     // départ posé au sol

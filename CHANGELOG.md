@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.73 — 26 octobre 2026
+## 2.75 — 26 octobre 2026
 - **Island Rush** — Nouveau jeu : un battle royale sur une île d'un kilomètre carré, jusqu'à six amis et des bots pour remplir la montgolfière (16, 24 ou 30 joueurs). On peut aussi simplement explorer l'île, sans combat.
   - Une ville, un bourg, quatre villages, un port et une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge en montagne, carrière, camping, station-service), plus des maisons abandonnées, des cabanes et des tours de guet en pleine nature.
   - Tous les bâtiments s'ouvrent : on entre par les portes, on monte les escaliers jusqu'aux toits plats.
@@ -21,6 +21,26 @@
   - Les sons : une détonation par arme (étouffée au loin), impacts, explosions, portes, coffres, rechargement, soins, pioche, constructions, tes pas et ceux des joueurs qui approchent, vent en chute libre, grondement de la tempête, et l'ambiance de la campagne, du bord de mer ou de la montagne.
   - Après une élimination, on regarde celui qui t'a eu, ou un autre joueur avec Espace. Le bilan de fin donne le classement, les éliminations et les dégâts de chacun ; l'hôte peut relancer une partie.
   - Sensibilité de la souris et volume réglables à l'écran de départ et en pause.
+
+## 2.74 — 26 octobre 2026
+- **Mini-Golf Party** — 30 nouveaux trous, plus longs et plus fous, dans 5 nouveaux parcours (54 trous en tout).
+  - **Canyon Express** : une descente de 6 mètres, le saut du coyote au-dessus du ravin, des lacets qui grimpent, un pont de corde sans rambarde et une mine d'or avec tapis roulant.
+  - **Station Orbitale** : des plafonds aimantés où la balle roule la tête en bas, et on peut même tirer depuis le plafond, la caméra à l'envers. Il y a aussi des portes qui coulissent, un anneau géant, des astéroïdes qui tournent, et le vide tout autour.
+  - **Marais Brumeux** : des pontons sans rambarde, de la boue qui colle, des flaques de glu qui ralentissent la balle, des sauts de nénuphar en nénuphar et un moulin à eau.
+  - **Sommets Glacés** : de la glace qui glisse, de la neige qui freine, un grand tremplin, des télécabines qui traversent la piste, une crevasse et une piste de bobsleigh avec looping.
+  - **Fête Foraine** : un flipper plein de bumpers, des trampolines, une grande roue à passer au bon moment, un train fantôme et des montagnes russes.
+  - Nouveau choix « 18 trous » : trois parcours à la suite (aller et retour sur la carte de score).
+- **Mini-Golf Party** — Corrections :
+  - La balle ne revient plus une demi-seconde à sa position de départ à la fin d'un coup.
+  - Le résultat du trou (birdie, bogey…) ne se superpose plus au résumé du trou.
+  - La caméra tourne à 360° sans limite : un clic verrouille la souris, sinon il suffit de pousser le curseur contre le bord de l'écran ou de maintenir A / D (ou Q / D, ou les flèches). On peut donc tirer dans n'importe quelle direction.
+
+## 2.73 — 26 octobre 2026
+- **Mini-Golf Party** — Jouable sur téléphone et tablette, à l'écran tactile.
+  - On pose le doigt sur sa balle et on tire en arrière comme un lance-pierre : la flèche montre la direction, la jauge la puissance, et on lâche pour frapper. Revenir sur la balle annule le coup.
+  - Un doigt ailleurs fait tourner la caméra, deux doigts pour zoomer.
+  - Un bouton affiche la vue d'ensemble du trou, et toucher la carte de score l'agrandit.
+  - L'écran se réorganise en portrait comme en paysage pour que la carte de score, le minuteur et les boutons ne se chevauchent pas.
 
 ## 2.72 — 26 octobre 2026
 - **Birdie Party** — Les coups se regardent comme à la télé, les plans s'enchaînent en douceur, et une balle à l'eau fait rejouer le coup.

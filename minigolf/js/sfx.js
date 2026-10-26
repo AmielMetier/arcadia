@@ -55,6 +55,8 @@ export const sfx = {
   out() { tone('sine', 140, 60, 0.2, 0.4); tone('triangle', 392, 330, 0.18, 0.12, 0.25); tone('triangle', 330, 262, 0.3, 0.12, 0.45); },
   boost() { noise(0.45, 0.35, 'bandpass', 500, 3500, 2); tone('sawtooth', 220, 880, 0.35, 0.08); },
   tramp() { tone('sine', 180, 520, 0.22, 0.35); },
+  slow() { tone('sine', 300, 120, 0.5, 0.15); noise(0.4, 0.15, 'lowpass', 600, 200, 1); },
+  flip(sg) { tone('sine', sg < 0 ? 300 : 900, sg < 0 ? 900 : 300, 0.35, 0.18); tone('triangle', sg < 0 ? 450 : 1350, sg < 0 ? 1350 : 450, 0.35, 0.06); },
   tele() { tone('sine', 300, 1600, 0.3, 0.2); tone('sine', 1600, 300, 0.3, 0.15, 0.25); },
   turn() { tone('triangle', 660, 660, 0.12, 0.18); tone('triangle', 990, 990, 0.2, 0.18, 0.12); },
   tick() { tone('square', 1200, 1200, 0.03, 0.06); },
