@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.68 — 26 octobre 2026
+- Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
+
 ## 2.67 — 26 octobre 2026
 - **Mini-Golf Party** — Nouveau jeu : mini-golf en 3D façon Golf It, seul ou jusqu'à 6 joueurs, avec des bots si besoin (facile, normal, expert).
   - Chacun son tour : quand la balle s'arrête, le coup est compté et la caméra passe sur la balle du joueur suivant. Le pseudo de chaque joueur flotte au-dessus de sa balle.
