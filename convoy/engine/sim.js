@@ -444,7 +444,7 @@ export class Sim {
     return this.D.burn * Math.min(2.6, 1 + this.D.ramp * this.t / 60) * (1 + 0.15 * (n - 1)) * (1 - 0.12 * this.up.boiler) * THROTTLE[this.thr].burn * clamp(1 + 6 * this.gr, 0.75, 1.3);
   }
   gradeK() { const g = this.gr; return g > 0 ? 1 - 5 * g : 1 - 4 * g; }
-  speedK() { return THROTTLE[this.thr].v * PIPE_K ** this.pipes() * HOOK_K ** this.hooks.length * (1 + 0.08 * this.up.pistons) * this.gradeK(); }
+  speedK() { return THROTTLE[this.thr].v * PIPE_K ** this.pipes() * HOOK_K ** this.hooks.length * (1 + 0.08 * this.up.pistons) * this.gradeK() * (this.B().fast || 1); }
   // au-delà, le pont souffre : il faut le passer en Éco
   bridgeLimit() { return VMAX * THROTTLE[0].v * (1 + 0.08 * this.up.pistons) * 1.2 + 0.15; }
 
