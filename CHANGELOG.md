@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.60 — 26 octobre 2026
+- Nouveau : master edition upgrade with GBA FireRed sprites, follower pokemon, evolutions, Menton gym & mart, Showdown portraits and competitive battle mechanics (Amiel)
+
 ## 2.59 — 26 octobre 2026
 - **Cyber Kart GP** — Nouveau circuit : **Abysses Néon** (le Grand Prix passe à 7 courses).
   - Départ sur une autoroute posée sur pilotis au-dessus d'un lagon turquoise, puis une promenade à moitié noyée : les roues soulèvent des gerbes d'eau.
