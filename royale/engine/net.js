@@ -126,6 +126,7 @@ export function cleanInput(m) {
     jump: m.jump | 0, use: m.use | 0, reload: m.reload | 0, shoot: m.shoot | 0, drop: m.drop | 0, sel: num(m.sel | 0, 0, 5),
     build: m.build === 'mur' || m.build === 'sol' || m.build === 'escalier' ? m.build : null,
     mat: m.mat === 'pierre' || m.mat === 'metal' ? m.mat : 'bois',
+    mv: Array.isArray(m.mv) && m.mv.length === 3 ? [m.mv[0] | 0, Math.max(0, Math.min(4, m.mv[1] | 0)), Math.max(-1, Math.min(4, m.mv[2] | 0))] : null,
   };
 }
 

@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.79 — 26 octobre 2026
+- **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
+  - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
+  - La caméra reste toujours à la même distance de ton personnage, sauf quand tu vises : un mur ou une porte entre elle et toi est découpé au lieu de la faire bondir. Elle est placée plus à droite, et l'arme se porte à l'épaule droite.
+  - Les ombres ne scintillent plus quand on tourne la caméra.
+  - Le sac (Tab) : glisse un objet sur une autre case pour le ranger, hors du sac ou clic droit pour le lâcher. Il montre les dégâts, la cadence et le chargeur de chaque arme, l'effet de chaque objet, et toutes tes munitions et matériaux.
+  - Nouvelle interface dans le style de Convoy Storm : panneaux sombres, barres de bouclier et de vie, barre d'objets, munitions de toutes sortes, chrono de la tempête, jauge ronde de soin et de rechargement. Le rappel des touches ne recouvre plus l'inventaire (H pour le masquer).
+  - Écrans de départ, de pause et de fin redessinés, avec le classement complet des joueurs.
+
 ## 2.78 — 26 octobre 2026
 - **Hub** — Plus de fausse « Connexion perdue » au lancement d'une partie : quand l'ordinateur rame quelques secondes (un jeu qui prépare son décor, une machine plus lente), ce n'est plus pris pour une coupure du réseau.
 
