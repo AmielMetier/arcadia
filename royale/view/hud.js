@@ -15,7 +15,11 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 
 // ------------------------------------------------------------------ pictogrammes des objets (silhouettes au canevas)
 const iconCache = new Map();
+let rendered = new Map();   // icônes rendues à partir des modèles 3D (view/weapons.js)
+const renderedKey = (it) => (!it ? 'pioche' : it.t === 'arme' ? 'arme' + it.w + it.r : it.t + (it.c || it.a || it.m));
 export function itemIcon(it) {
+  const rk = renderedKey(it);
+  if (rendered.has(rk)) return rendered.get(rk);
   const key = it ? it.t + (it.w || it.c || it.a || it.m) : 'pioche';
   if (iconCache.has(key)) return iconCache.get(key);
   const c = document.createElement('canvas'); c.width = 96; c.height = 64;
@@ -319,6 +323,8 @@ export function createHud(map, { onTeleport, project } = {}) {
       promptEl.innerHTML = txt ? `<kbd>E</kbd><span>${esc(txt)}${what ? ` <i style="--rc:${color || '#fff8ea'}">${esc(what)}</i>` : ''}</span>` : '';
     },
     spectate(name) { const s = $('#spect'); s.hidden = !name; if (name) s.innerHTML = `Tu regardes <b>${esc(name)}</b> · <kbd>Espace</kbd> joueur suivant`; },
+    // icônes rendues à partir des modèles : on redessine la barre d'objets et le sac
+    setIcons(map) { rendered = map; invKey = ''; bagKey = ''; },
     get bagOpen() { return !bagEl.hidden; },
     openBag(P, move) { bagP = P; onMove = move; bagKey = ''; hoverI = -1; bagEl.hidden = false; bagRender(P); },
     closeBag() { bagEl.hidden = true; bagP = null; drag = null; for (const g of document.querySelectorAll('.dragghost')) g.remove(); },

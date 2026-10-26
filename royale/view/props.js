@@ -6,6 +6,7 @@ import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { createTreeKit } from './trees.js';
 import { hash } from '../engine/rng.js';
+import { tintMaterial } from './kit.js';
 
 const TILE = 200;
 const HI_D = 260;   // tuiles détaillées jusqu'à cette distance (m)
@@ -128,7 +129,18 @@ function tractorGeo() {
   return mergeGeometries(g);
 }
 
-export async function buildProps(map, { base }) {
+// décor du « Toon Shooter Game Kit » : sorte d'objet de l'île → fichier du kit (models/toon/)
+const TOON = { lampadaire: 'lampadaire', benne: 'benne', poubelle: 'poubelle', baril: 'baril', bonbonne: 'bonbonne', cone: 'cone', barriere: 'barriere',
+  sacs: 'sacs', pneus: 'pneus', reservoir: 'reservoir', epave: 'epave', palette: 'palette', cartons: 'cartons-pile', gravats: 'gravats',
+  tuyaux: 'tuyaux', planches: 'planches', caisson: 'caisson', caisse: 'caisse' };
+
+// mobilier urbain du City Pack : sorte → [fichier, taille du plus grand côté (m), second modèle]
+const CITY = { banc: ['banc', 1.8], bouche: ['bouche', 0.85], corbeille: ['poubelle-rue', 1.0], boite: ['boite-lettres', 1.25], abribus: ['abribus', 3.4],
+  pot: ['pot-arbuste', 1.3, 'pot-plante'], jardiniere: ['jardiniere', 2.0], transfo: ['armoire-elec', 1.4], linge: ['corde-linge', 3.2],
+  sacpoubelle: ['sac-poubelle', 0.6], plaque: ['plaque', 0.9] };
+const FLAT = new Set(['gravats', 'planches', 'plaque', 'palette']);
+
+export async function buildProps(map, { base, kit: toon = null }) {
   const group = new THREE.Group(), own = [], idx = indexer();
   const pidOf = new Map(map.props.map((p, i) => [p, i]));
   const { kit, mats } = await loadKit(base);
@@ -161,6 +173,8 @@ export async function buildProps(map, { base }) {
   };
   const by = {};
   for (const p of map.props) (by[p.kind] = by[p.kind] || []).push(p);
+  // voitures abandonnées : l'épave du kit
+  if (toon && toon.props.epave && by.voiture) { by.epave = [...(by.epave || []), ...by.voiture.filter((p) => p.epave)]; by.voiture = by.voiture.filter((p) => !p.epave); }
   const ground = (p) => map.heightAt(p.x, p.z);
   const at = (p, extra = {}) => ({ x: p.x, y: ground(p), z: p.z, rot: yawOf(p), pid: pidOf.get(p), ...extra });
 
@@ -184,18 +198,81 @@ export async function buildProps(map, { base }) {
   instanced('chimney', (by.cheminee || []).map((p) => at(p)), { size: 3.6 });
   instanced('tent', (by.tente || []).map((p) => at(p)), { size: 2.8 });
   instanced('fire', (by.feu || []).map((p) => at(p)), { size: 1.6 });
-  instanced('crate', (by.caisse || []).map((p) => at(p)), { size: 1.2 });
+  if (!(toon && toon.props.caisse)) instanced('crate', (by.caisse || []).map((p) => at(p)), { size: 1.2 });
+  // décor du kit : posé au sol, centré, son grand côté dans la direction de l'objet
+  if (toon) {
+    const kitMat = tintMaterial({}, { roughness: 0.75 });
+    own.push(kitMat);
+    const sources = [...Object.entries(TOON).map(([kind, file]) => [kind, toon.props[file], null, by[kind] || []]),
+      ...Object.entries(CITY).map(([kind, [file, size, alt]]) => {
+        const list = by[kind] || [];
+        // deux modèles pour la même sorte (pots) : un sur deux
+        if (alt) return [[kind, toon.city[file], size, list.filter((p, i) => i % 2 === 0)], [kind, toon.city[alt], size, list.filter((p, i) => i % 2 === 1)]];
+        return [[kind, toon.city[file], size, list]];
+      }).flat()];
+    for (const [kind, src, size, list] of sources) {
+      if (!src || !src.geo || !list.length) continue;
+      const g = src.geo.clone();
+      g.computeBoundingBox();
+      let bb = g.boundingBox;
+      // mobilier urbain : ramené à sa taille réelle (le plus grand côté)
+      if (size) { const k = size / Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z); g.scale(k, k, k); g.computeBoundingBox(); bb = g.boundingBox; }
+      const longX = bb.max.x - bb.min.x >= bb.max.z - bb.min.z;
+      // lampadaire : le mât (et non le milieu du bras) sur le point de l'objet
+      const pz = kind === 'lampadaire' ? bb.min.z + 0.2 : (bb.min.z + bb.max.z) / 2;
+      g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -pz);
+      own.push(g);
+      const im = new THREE.InstancedMesh(g, kitMat, list.length);
+      const items = list.map((p) => ({ x: p.x, y: ground(p) - 0.02, z: p.z, rot: longX && kind !== 'lampadaire' ? Math.atan2(-(p.dz || 0), p.dx || 0) : Math.atan2(p.dx || 0, p.dz || 0), pid: pidOf.get(p) }));
+      items.forEach((it, i) => { q.setFromAxisAngle(up, it.rot); p3.set(it.x, it.y, it.z); s3.setScalar(1); m4.compose(p3, q, s3); im.setMatrixAt(i, m4); });
+      im.castShadow = !FLAT.has(kind); im.receiveShadow = true; im.computeBoundingSphere();
+      im.userData.items = items;
+      group.add(im);
+    }
+  }
   instanced('logs', (by.grume || []).map((p) => at(p, { rot: yawOf(p) + Math.PI / 2 })), { size: 6 });
   instanced('boat', (by.bateau || []).map((p) => ({ x: p.x, y: Math.max(0, map.waterLevel[Math.round(p.z / map.hres) * map.n + Math.round(p.x / map.hres)] || ground(p)) - 0.1, z: p.z, rot: yawOf(p) + Math.PI / 2, pid: pidOf.get(p) })), { size: 5.2 });
   instanced('truck', (by.camion || []).map((p) => at(p, { rot: yawOf(p) - Math.PI / 2 })), { size: 7.5 });
   instanced('truckY', (by.engin || []).map((p) => at(p, { rot: yawOf(p) - Math.PI / 2 })), { size: 5.5 });
 
-  // voitures : caisse à la couleur de chaque voiture, vitres et roues communes
-  const cars = (by.voiture || []).map((p) => at(p, { rot: yawOf(p) - Math.PI / 2, c: p.c, epave: p.epave }));
-  const cg = carGeos();
-  simple(cg.body, new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.3 }), cars, (it) => (it.epave ? 0x6d5a4a : CAR_COLORS[it.c % CAR_COLORS.length]));
-  simple(cg.glass, new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.15, metalness: 0.5 }), cars);
-  simple(cg.dark, new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.8 }), cars);
+  // voitures : modèles du City Pack (carrosserie à la couleur de chaque voiture), épaves du kit ; sinon volumes simples
+  if (toon && Object.keys(toon.cars).length) {
+    const names = Object.keys(toon.cars).filter((n) => n !== 'voiture-police'), police = toon.cars['voiture-police'];
+    const bodyMat = tintMaterial({}, { roughness: 0.35, metalness: 0.35 }), restMat = tintMaterial({}, { roughness: 0.5, metalness: 0.2 });
+    own.push(bodyMat, restMat);
+    const groups = new Map();
+    for (const p of by.voiture || []) {
+      const pid = pidOf.get(p), h = hash(pid * 31 + 7);
+      const name = police && h % 11 === 0 ? 'voiture-police' : names[(p.c + (h >>> 3)) % names.length];
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push({ p, pid, c: name === 'voiture-police' ? 0xf4f2ea : CAR_COLORS[p.c % CAR_COLORS.length] });
+    }
+    for (const [name, list] of groups) {
+      const src = toon.cars[name];
+      for (const [part, mat] of [['body', bodyMat], ['rest', restMat]]) {
+        if (!src[part]) continue;
+        const g = src[part].clone();
+        const bb = (src.rest.boundingBox || (src.rest.computeBoundingBox(), src.rest.boundingBox)), k = 4.3 / Math.max(bb.max.z - bb.min.z, bb.max.x - bb.min.x);
+        g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2).scale(k, k, k);
+        own.push(g);
+        const im = new THREE.InstancedMesh(g, mat, list.length);
+        const items = list.map(({ p, pid, c }) => ({ x: p.x, y: ground(p), z: p.z, rot: Math.atan2(p.dx || 0, p.dz || 0), pid, c }));
+        items.forEach((it, i) => {
+          q.setFromAxisAngle(up, it.rot); p3.set(it.x, it.y, it.z); s3.setScalar(1); m4.compose(p3, q, s3); im.setMatrixAt(i, m4);
+          if (part === 'body') im.setColorAt(i, new THREE.Color(it.c));
+        });
+        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere();
+        im.userData.items = items;
+        group.add(im);
+      }
+    }
+  } else {
+    const cars = (by.voiture || []).map((p) => at(p, { rot: yawOf(p) - Math.PI / 2, c: p.c, epave: p.epave }));
+    const cg = carGeos();
+    simple(cg.body, new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.3 }), cars, (it) => (it.epave ? 0x6d5a4a : CAR_COLORS[it.c % CAR_COLORS.length]));
+    simple(cg.glass, new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.15, metalness: 0.5 }), cars);
+    simple(cg.dark, new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.8 }), cars);
+  }
   simple(tractorGeo(), new THREE.MeshStandardMaterial({ color: 0x3f9d4a, roughness: 0.6 }), (by.tracteur || []).map((p) => at(p, { rot: yawOf(p) - Math.PI / 2 })));
   // bottes de foin, silos, citerne, fontaine, pompes, tables, auvents
   simple(new THREE.CylinderGeometry(1, 1, 1.2, 16).rotateZ(Math.PI / 2).translate(0, 1, 0), new THREE.MeshStandardMaterial({ color: 0xd9b95a, roughness: 1 }), (by.botte || []).map((p) => at(p)));

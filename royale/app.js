@@ -18,6 +18,7 @@ import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
 import { createSound } from './view/sound.js';
+import { setKit, renderIcons } from './view/weapons.js';
 import { Input } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
@@ -83,6 +84,9 @@ async function boot(info) {
   }
   progress('Carte', 0.95); await breathe();
   S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project });
+  // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
+  setKit(S.scene.kit);
+  try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
@@ -131,7 +135,7 @@ function newMatch({ run, seed, roster, mode, mirror = false }) {
   const start = pl ? { x: (pl.x0 + pl.x1) / 2 + 6, z: (pl.z0 + pl.z1) / 2 + 6 } : null;
   S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
   S.startedAt = Date.now();
-  S.actors = createActors(S.scene.scene, S.sim);
+  S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
   S.fx = createFx(S.scene.scene);
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);

@@ -37,6 +37,18 @@ export const PROPS = {
   caisse: { label: 'Caisse', mat: 'bois', r: 0.7 }, grume: { label: 'Tas de bûches', mat: 'bois', r: 2.2 }, tente: { label: 'Tente', mat: null, r: 1.2 }, table: { label: 'Table', mat: 'bois', r: 1 },
   feu: { label: 'Feu de camp', mat: null, r: 0.8 }, fontaine: { label: 'Fontaine', mat: 'pierre', r: 3 }, pompe: { label: 'Pompe à essence', mat: 'metal', r: 0.6 },
   auvent: { label: 'Auvent', mat: 'metal', r: 0 }, bateau: { label: 'Barque', mat: 'bois', r: 2 }, cheminee: { label: 'Cheminée', mat: 'pierre', r: 2 },
+  // décor du « Toon Shooter Game Kit » (view/kit.js)
+  lampadaire: { label: 'Lampadaire', mat: 'metal', r: 0.3 }, benne: { label: 'Benne', mat: 'metal', r: 1.4 }, poubelle: { label: 'Conteneur à ordures', mat: 'metal', r: 1.7 },
+  baril: { label: 'Baril', mat: 'metal', r: 0.5 }, bonbonne: { label: 'Bonbonne de gaz', mat: 'metal', r: 0.6 }, cone: { label: 'Plot', mat: null, r: 0.35 },
+  barriere: { label: 'Barrière', mat: 'metal', r: 1 }, sacs: { label: 'Sacs de sable', mat: 'bois', r: 1.6 }, pneus: { label: 'Pneus', mat: 'metal', r: 0.9 },
+  reservoir: { label: 'Réservoir', mat: 'metal', r: 2.3 }, epave: { label: 'Épave', mat: 'metal', r: 2.8 }, palette: { label: 'Palette', mat: 'bois', r: 0 },
+  cartons: { label: 'Cartons', mat: 'bois', r: 0.8 }, gravats: { label: 'Gravats', mat: null, r: 0 }, tuyaux: { label: 'Tuyaux', mat: 'metal', r: 2.1 },
+  planches: { label: 'Planches', mat: null, r: 0 }, caisson: { label: 'Caisson', mat: 'metal', r: 1.5 },
+  // mobilier urbain du « City Pack » (view/kit.js)
+  banc: { label: 'Banc', mat: 'bois', r: 0.9 }, bouche: { label: 'Bouche d\'incendie', mat: 'metal', r: 0.25 }, corbeille: { label: 'Poubelle', mat: 'metal', r: 0.35 },
+  boite: { label: 'Boîte aux lettres', mat: 'metal', r: 0.3 }, abribus: { label: 'Abribus', mat: 'metal', r: 1.7 }, pot: { label: 'Pot de fleurs', mat: null, r: 0 },
+  jardiniere: { label: 'Jardinière', mat: 'bois', r: 1 }, transfo: { label: 'Armoire électrique', mat: 'metal', r: 0.5 }, linge: { label: 'Corde à linge', mat: null, r: 0 },
+  sacpoubelle: { label: 'Sac poubelle', mat: null, r: 0 }, plaque: { label: 'Plaque d\'égout', mat: null, r: 0 },
 };
 
 const NAMES = {
@@ -935,6 +947,90 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
         const side = rng.chance(0.5) ? 1.6 : -1.6;
         prop('voiture', p.x - tz * side, p.z + tx * side, { dx: tx, dz: tz, c: rng.int(0, CARS - 1) });
       }
+    }
+  }
+
+  // décor du kit : lampadaires des rues ; bennes et conteneurs à ordures des immeubles et commerces ; barils, pneus,
+  // bonbonnes, palettes et cartons des garages, stations, usines, du port et des fermes ; épaves et gravats des
+  // maisons abandonnées. Tirage à part : le reste de l'île ne change pas.
+  {
+    const R = makeRng(ihash(seed * 4243 + 77));
+    const free = (x, z, r) => {
+      if (x < 20 || z < 20 || x > S - 20 || z > S - 20 || WK[vi(x, z)]) return false;
+      if (buildings.some((b) => x > b.x0 * CELL - r - 0.4 && x < (b.x0 + b.w) * CELL + r + 0.4 && z > b.z0 * CELL - r - 0.4 && z < (b.z0 + b.d) * CELL + r + 0.4)) return false;
+      return !props.some((p) => { const q = PROPS[p.kind] ? PROPS[p.kind].r * (p.kind === 'rocher' ? p.s : 1) : 0; return sq(p.x - x) + sq(p.z - z) < sq(r + q + 0.4); });
+    };
+    const put = (kind, x, z, dx = 1, dz = 0) => (free(x, z, PROPS[kind].r) ? prop(kind, x, z, { dx, dz }) : null);
+    // lampadaires sur les trottoirs, en quinconce, le bras vers la chaussée
+    for (const st of streets) {
+      const alongX = st.x1 - st.x0 > st.z1 - st.z0, len = alongX ? st.x1 - st.x0 : st.z1 - st.z0, wid = alongX ? st.z1 - st.z0 : st.x1 - st.x0;
+      for (let s2 = 10, k = 0; s2 < len - 4; s2 += 22, k++) {
+        const off = k % 2 ? 0.45 : wid - 0.45, toward = k % 2 ? 1 : -1;
+        const x = alongX ? st.x0 + s2 : st.x0 + off, z = alongX ? st.z0 + off : st.z0 + s2;
+        if (streets.some((o) => o !== st && inRect(o, x, z, 1))) continue;
+        put('lampadaire', x, z, alongX ? 0 : toward, alongX ? toward : 0);
+      }
+    }
+    // le long d'un mur qui n'est pas la façade principale : point à `dist` m du mur, et la direction du mur
+    const SIDES = { N: [0, -1], S: [0, 1], W: [-1, 0], E: [1, 0] };
+    const beside = (b, dist) => {
+      const sides = Object.keys(SIDES).filter((k) => k !== b.front), sd = sides[R.int(0, sides.length - 1)], [nx, nz] = SIDES[sd];
+      const X0 = b.x0 * CELL, Z0 = b.z0 * CELL, X1 = (b.x0 + b.w) * CELL, Z1 = (b.z0 + b.d) * CELL, t = 0.15 + R.next() * 0.7;
+      const x = nx ? (nx < 0 ? X0 : X1) + nx * dist : X0 + (X1 - X0) * t, z = nz ? (nz < 0 ? Z0 : Z1) + nz * dist : Z0 + (Z1 - Z0) * t;
+      return [x, z, nz ? 1 : 0, nx ? 1 : 0];
+    };
+    const near = (b, kind, dist = 1.8) => { const [x, z, dx, dz] = beside(b, dist + PROPS[kind].r); return put(kind, x, z, dx, dz); };
+    // mobilier urbain : bancs, bouches d'incendie, poubelles et plaques d'égout le long des rues, abribus
+    for (const st of streets) {
+      const alongX = st.x1 - st.x0 > st.z1 - st.z0, len = alongX ? st.x1 - st.x0 : st.z1 - st.z0, wid = alongX ? st.z1 - st.z0 : st.x1 - st.x0;
+      const at = (s2, off) => [alongX ? st.x0 + s2 : st.x0 + off, alongX ? st.z0 + off : st.z0 + s2];
+      for (let s2 = 21, k = 0; s2 < len - 4; s2 += 22, k++) {
+        const side = k % 2 ? wid - 0.5 : 0.5, toward = k % 2 ? -1 : 1;
+        const [x, z] = at(s2, side);
+        if (streets.some((o) => o !== st && inRect(o, x, z, 1))) continue;
+        const r = R.next();
+        if (r < 0.35) { if (put('banc', x, z, alongX ? 0 : toward, alongX ? toward : 0)) { const [cx, cz] = at(s2 + 2.1, side); put('corbeille', cx, cz); } }
+        else if (r < 0.6) put('bouche', x, z);
+        else if (r < 0.7 && len > 40) put('abribus', ...at(s2, k % 2 ? wid - 0.75 : 0.75), alongX ? 1 : 0, alongX ? 0 : 1);
+      }
+      for (let s2 = 15; s2 < len - 4; s2 += 30) { const [x, z] = at(s2, wid / 2); if (!streets.some((o) => o !== st && inRect(o, x, z, 1))) put('plaque', x, z); }
+    }
+    // places : bancs tournés vers la fontaine, jardinières aux coins
+    for (const pl of plazas) {
+      const cx = (pl.x0 + pl.x1) / 2, cz = (pl.z0 + pl.z1) / 2, h = (pl.x1 - pl.x0) / 2;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put('banc', cx + dx * (h - 7), cz + dz * (h - 7), -dz, dx);
+      for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) put('jardiniere', cx + dx * (h - 3), cz + dz * (h - 3), 1, 0);
+    }
+    for (const b of buildings) {
+      const poi = b.poi >= 0 ? pois[b.poi] : null, pk = poi ? poi.kind : '';
+      // devant les maisons : boîte aux lettres ; derrière : corde à linge ; à côté des portes des commerces : pots de fleurs
+      const fd = b.doors.find((d) => d.ext && d.k === 0 && d.kind === 'porte');
+      if (fd) {
+        const dcx = fd.o === 'h' ? (fd.x + 0.5) * CELL : fd.x * CELL, dcz = fd.o === 'h' ? fd.z * CELL : (fd.z + 0.5) * CELL, tx = fd.nz ? 1 : 0, tz = fd.nx ? 1 : 0;
+        if ((b.type === 'maison' || b.type === 'chalet') && R.chance(0.55)) put('boite', dcx + fd.nx * 2 + tx * 3, dcz + fd.nz * 2 + tz * 3, fd.nx, fd.nz);
+        if (b.type === 'boutique' || b.type === 'auberge' || b.type === 'mairie' || b.type === 'manoir') for (const sd of [-1, 1]) put('pot', dcx + fd.nx * 0.7 + tx * sd * 1.9, dcz + fd.nz * 0.7 + tz * sd * 1.9);
+        if ((b.type === 'maison' || b.type === 'chalet' || pk === 'ferme') && R.chance(0.3)) near(b, 'linge', 3.5);
+      }
+      if (b.type === 'immeuble' && R.chance(0.35)) near(b, 'transfo', 1);
+      if ((b.type === 'immeuble' || b.type === 'boutique' || b.type === 'bureaux') && R.chance(0.55)) {
+        const d = near(b, R.chance(0.6) ? 'benne' : 'poubelle');
+        // des sacs poubelle à côté
+        if (d) for (let i = 0; i < 2; i++) put('sacpoubelle', d.x + (d.dx ? 1.9 + i * 0.6 : 0.4 + i * 0.5) * (i ? 1 : -1), d.z + (d.dz ? 1.9 + i * 0.6 : 0.4) * (i ? 1 : -1));
+      }
+      if (b.type === 'station') { near(b, 'pneus'); near(b, 'bonbonne'); for (let i = 0; i < 3; i++) near(b, 'cone', 1.2 + i * 1.3); }
+      if (b.type === 'garage') { near(b, 'pneus'); if (R.chance(0.6)) near(b, 'baril'); if (R.chance(0.5)) near(b, 'palette'); }
+      if (b.type === 'hangar' || pk === 'usine' || pk === 'port') {
+        for (let i = 0; i < 2; i++) near(b, 'baril', 1.4 + i * 1.1);
+        if (R.chance(0.7)) near(b, 'palette', 2);
+        if (R.chance(0.6)) near(b, 'cartons', 1.6);
+        if (R.chance(0.4)) near(b, 'tuyaux', 2.5);
+        if (pk === 'usine' && R.chance(0.6)) near(b, 'caisson', 2.5);
+      }
+      if (b.type === 'grange' || pk === 'ferme') { if (R.chance(0.6)) near(b, 'reservoir', 2.5); if (R.chance(0.5)) near(b, 'palette', 2); }
+      if (pk === 'scierie' && R.chance(0.8)) near(b, 'planches', 2);
+      if (pk === 'carriere' && R.chance(0.7)) near(b, 'sacs', 2);
+      if (b.type === 'abandonnee') { if (R.chance(0.5)) near(b, 'gravats', 2.5); if (R.chance(0.35)) near(b, 'epave', 3.5); }
+      if (pk === 'camping' && R.chance(0.5)) near(b, 'cartons', 1.5);
     }
   }
 

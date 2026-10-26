@@ -11,6 +11,7 @@ import { buildStructures } from './structures.js';
 import { buildInterior } from './interior.js';
 import { buildForest, buildProps } from './props.js';
 import { SWAY } from './trees.js';
+import { loadKit } from './kit.js';
 
 export const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const DAY = { dir: [-0.45, 0.78, -0.42], sunColor: 0xffeed4, sunInt: 4.0, hemiSky: 0xc4d8f0, hemiGround: 0x34481f, hemiInt: 0.5, exposure: 0.95, env: 0.32 };
@@ -63,13 +64,15 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const decals = buildDecals(map); scene.add(decals.group);
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
-  const structures = buildStructures(map); scene.add(structures.group);
+  const structures = buildStructures(map, { time }); scene.add(structures.group);
   progress('Meubles et portes', 0.56); await breathe();
   const interior = buildInterior(map); scene.add(interior.group);
   progress('Forêts', 0.62); await breathe();
   const forest = buildForest(map); scene.add(forest.group);
+  progress('Soldats, armes et décor', 0.68); await breathe();
+  const kit = await loadKit(new URL('../models/', import.meta.url).href);
   progress('Décor', 0.72); await breathe();
-  const props = await buildProps(map, { base: new URL('../models/', import.meta.url).href }); scene.add(props.group);
+  const props = await buildProps(map, { base: new URL('../models/', import.meta.url).href, kit }); scene.add(props.group);
 
   // qualité : résolution, effets ; baissée automatiquement si la machine peine
   const post = MOBILE ? null : createPost(renderer);
@@ -113,6 +116,9 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (Math.abs(camera.near - near) > 0.002) { camera.near = near; camera.updateProjectionMatrix(); }
     terrain.update(camera.position.x, camera.position.z, 2);
     forest.update(camera.position.x, camera.position.z, 1);
+    // de loin, on ne voit ni les meubles ni les petits ornements des façades
+    interior.cull(camera.position.x, camera.position.z);
+    structures.cull(camera.position.x, camera.position.z);
     // l'ombre couvre ce qui est autour du joueur, sans dépendre de la direction du regard, calée au texel près
     const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
     sc.set(focus.x, focus.y, focus.z);
@@ -141,5 +147,5 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     canvas.remove();
   }
 
-  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, MOBILE };
+  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, kit, MOBILE };
 }

@@ -2,15 +2,17 @@
 // le butin posé au sol (modèle qui tourne et rayon de la couleur de sa rareté), les coffres et caisses de munitions
 // (couvercle qui s'ouvre) et les tremplins.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { buildHero } from './hero.js';
+import { buildHero, SKINS } from './hero.js';
+import { buildSoldier } from './soldier.js';
 import { itemModel } from './weapons.js';
 import { RARITY } from '../engine/items.js';
 import { hash } from '../engine/rng.js';
 
 const keyOf = (it) => (it ? it.t + (it.w || it.c || it.a || it.m || '') + (it.r ?? '') : 'pioche');
-const LOOT_R = 85;
+const LOOT_R = 65;
 
-export function createActors(scene, sim) {
+const PANTS = [0x3a3f4a, 0x4a3a2a, 0x3d4a3a, 0x2a2a30, 0x5a4a3a, 0x4a4f5a];
+export function createActors(scene, sim, kit = null) {
   const group = new THREE.Group(); scene.add(group);
   const own = [];
   // ------------------------------------------------------------------ joueurs
@@ -20,7 +22,8 @@ export function createActors(scene, sim) {
     if (!h) {
       const c = parseInt(String(P.color || '#ff4b2b').replace('#', ''), 16);
       const v = hash(String(P.id).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7)) >>> 0;
-      h = { hero: buildHero({ shirt: c, skin: v % 5, hair: (v >>> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >>> 6) % 4] }), key: null };
+      h = { hero: kit && kit.soldier ? buildSoldier(kit, { shirt: c, skin: SKINS[v % 5], pants: PANTS[(v >>> 6) % PANTS.length] })
+        : buildHero({ shirt: c, skin: v % 5, hair: (v >>> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >>> 6) % 4] }), key: null };
       group.add(h.hero.root);
       heroes.set(P.id, h);
     }
@@ -126,7 +129,11 @@ export function createActors(scene, sim) {
       hero.root.position.set(a.x, a.y, a.z);
       hero.root.rotation.y = a.yaw;
       const it = P.sel > 0 ? P.inv[P.sel - 1] : null, k = P.alive ? keyOf(it) : null;
-      if (k !== h.key) { h.key = k; hero.setHeld(P.alive ? itemModel(it) : null); }
+      if (k !== h.key) {
+        h.key = k;
+        if (hero.setItem) hero.setItem(P.alive ? it : null, P.alive && it && it.t !== 'arme' ? itemModel(it) : null);
+        else hero.setHeld(P.alive ? itemModel(it) : null);
+      }
       hero.update(dt, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key });
       hero.root.visible = P.mode !== 'ballon' && P.id !== hideId && (P.alive || hero.root.visible);
     }

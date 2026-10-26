@@ -21,6 +21,11 @@ const PROP_HP = {
   engin: [450, 'metal', 10], conteneur: [520, 'metal', 10], citerne: [350, 'metal', 8], silo: [700, 'metal', 10], botte: [70, 'bois', 5], caisse: [90, 'bois', 6],
   grume: [220, 'bois', 10], tente: [60, null, 0], table: [70, 'bois', 5], fontaine: [400, 'pierre', 8], pompe: [120, 'metal', 6], cheminee: [900, 'pierre', 10], bateau: [160, 'bois', 7],
   auvent: [260, 'metal', 6],
+  lampadaire: [120, 'metal', 5], benne: [380, 'metal', 9], poubelle: [420, 'metal', 9], baril: [90, 'metal', 5], bonbonne: [110, 'metal', 6], cone: [30, null, 0],
+  barriere: [140, 'metal', 5], sacs: [320, 'bois', 6], pneus: [160, 'metal', 5], reservoir: [480, 'metal', 10], epave: [360, 'metal', 9],
+  cartons: [60, 'bois', 5], tuyaux: [240, 'metal', 7], caisson: [400, 'metal', 9],
+  banc: [80, 'bois', 5], bouche: [100, 'metal', 4], corbeille: [60, 'metal', 3], boite: [60, 'metal', 3], abribus: [220, 'metal', 7],
+  jardiniere: [90, 'bois', 5], transfo: [150, 'metal', 6],
 };
 const WALL_HP = { bois: 170, pierre: 300, metal: 420 };
 

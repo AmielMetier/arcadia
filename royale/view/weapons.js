@@ -1,8 +1,12 @@
-// Les objets en 3D : armes (avec une bande à la couleur de leur rareté), outil de récolte, soins, potions,
-// grenades, tremplin, munitions et matériaux. Volumes simples, origine à la poignée, canon vers +z.
-// Les géométries et matériaux sont partagés : un modèle coûte peu, on peut en créer pour chaque objet au sol.
+// Les objets en 3D : armes, outil de récolte, soins, potions, grenades, tremplin, munitions et matériaux.
+// Avec le « Toon Shooter Game Kit » chargé (view/kit.js), les armes, la pelle, les grenades et la trousse de soin
+// viennent du kit (corps de l'arme à la couleur de sa rareté) ; sinon, volumes simples, origine à la poignée, canon
+// vers +z. Géométries et matériaux partagés : un modèle coûte peu, on peut en créer pour chaque objet au sol.
+// Les icônes de l'inventaire sont rendues à partir de ces mêmes modèles (renderIcons).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { RARITY, AMMO, MATERIALS } from '../engine/items.js';
+import { RARITY, AMMO, MATERIALS, WEAPONS, ITEMS } from '../engine/items.js';
+import { tintMaterial } from './kit.js';
+import { rarityMaterial, aimFrame } from './soldier.js';
 
 const geoCache = new Map(), matCache = new Map();
 const box = (w, h, d) => { const k = `b${w},${h},${d}`; if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d)); return geoCache.get(k); };
@@ -80,9 +84,50 @@ const ITEM_MODELS = {
   tremplin(g) { part(g, cyl(0.28, 0.06, 0.28, 18), mat(0xf2c14e), 0, 0, 0.1); part(g, cyl(0.12, 0.07, 0.12, 3), mat(0xd8432f), 0, 0.01, 0.1); },
 };
 
+// ------------------------------------------------------------------ modèles du kit, posés à plat (canon +z, haut +y)
+let KIT = null;
+const kitGeos = new Map();
+const LEN = { fusil: 0.95, pompe: 1.0, pistolet: 0.34, smg: 0.62, sniper: 1.25, roquette: 1.2, pioche: 0.95 };
+const ITEM_SIZE = { grenade: 0.22, souffle: 0.24, soin: 0.42 };
+export function setKit(kit) { KIT = kit && kit.soldier ? kit : null; kitGeos.clear(); }
+function fit(g, len) {
+  g.computeBoundingBox();
+  const b = g.boundingBox, sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), k = len / Math.max(sz.x, sz.y, sz.z);
+  g.translate(-c.x, -c.y, -c.z).scale(k, k, k);
+  g.computeBoundingBox(); g.computeBoundingSphere();
+  return g;
+}
+function kitWeaponGeo(w) {
+  if (kitGeos.has(w)) return kitGeos.get(w);
+  const src = w === 'pioche' ? KIT.tool : KIT.weapons[w];
+  const g = src ? fit(src.hand.clone().applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
+  kitGeos.set(w, g);
+  return g;
+}
+function kitItemGeo(c) {
+  const key = 'o:' + c;
+  if (kitGeos.has(key)) return kitGeos.get(key);
+  const src = KIT.items[c];
+  const g = src && src.geo ? fit(src.geo.clone(), ITEM_SIZE[c]) : null;
+  kitGeos.set(key, g);
+  return g;
+}
+const plainKit = tintMaterial();
+const blastKit = tintMaterial({}, { color: 0xc9a0ff, emissive: 0x2a0a4a });
+function kitMesh(geo, material) { const m = new THREE.Mesh(geo, material); m.castShadow = true; return m; }
+
 // modèle d'un objet d'inventaire (ou de l'outil de récolte si it est null)
 export function itemModel(it) {
   const g = new THREE.Group();
+  if (KIT) {
+    if (!it || it.t === 'arme') {
+      const geo = kitWeaponGeo(it ? it.w : 'pioche');
+      if (geo) { g.add(kitMesh(geo, rarityMaterial(it ? it.r : 0))); return g; }
+    } else if (it.t === 'objet' && ITEM_SIZE[it.c]) {
+      const geo = kitItemGeo(it.c);
+      if (geo) { g.add(kitMesh(geo, it.c === 'souffle' ? blastKit : plainKit)); return g; }
+    }
+  }
   if (!it) { ITEM_MODELS.pioche(g); return g; }
   if (it.t === 'arme') { WEAPON_MODELS[it.w](g, mat(new THREE.Color(RARITY[it.r].color).getHex(), { emissive: new THREE.Color(RARITY[it.r].color).multiplyScalar(0.35).getHex() })); return g; }
   if (it.t === 'objet') { ITEM_MODELS[it.c](g); return g; }
@@ -96,3 +141,34 @@ export function itemModel(it) {
   return g;
 }
 export function disposeModels() { for (const g of geoCache.values()) g.dispose(); for (const m of matCache.values()) m.dispose(); geoCache.clear(); matCache.clear(); }
+
+// ------------------------------------------------------------------ icônes de l'inventaire : les modèles, vus de côté
+export const iconKey = (it) => (!it ? 'pioche' : it.t === 'arme' ? 'arme' + it.w + it.r : it.t + (it.c || it.a || it.m));
+export function renderIcons() {
+  const out = new Map();
+  let r;
+  try { r = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true }); } catch (e) { return out; }
+  r.setPixelRatio(1); r.setSize(192, 128, false); r.setClearColor(0x000000, 0);
+  r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.NeutralToneMapping;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x50586a, 2.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(-3, 4, 2); scene.add(sun);
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 50);
+  const shoot = (key, obj, view = 'cote') => {
+    scene.add(obj);
+    const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    // de côté (canon vers la droite) pour les armes ; de trois quarts pour les objets
+    if (view === 'cote') cam.position.set(c.x - 10, c.y + 0.6, c.z); else cam.position.set(c.x - 6, c.y + 5, c.z - 6);
+    cam.lookAt(c);
+    const half = Math.max(sz.z / 1.5, sz.y, view === 'cote' ? 0 : Math.max(sz.x, sz.z)) * 0.58;
+    cam.left = -half * 1.5; cam.right = half * 1.5; cam.top = half; cam.bottom = -half; cam.updateProjectionMatrix();
+    r.render(scene, cam);
+    out.set(key, r.domElement.toDataURL());
+    scene.remove(obj);
+  };
+  for (const w of Object.keys(WEAPONS)) for (let k = 0; k < RARITY.length; k++) shoot(iconKey({ t: 'arme', w, r: k }), itemModel({ t: 'arme', w, r: k }));
+  shoot('pioche', itemModel(null));
+  for (const c of Object.keys(ITEMS)) shoot(iconKey({ t: 'objet', c }), itemModel({ t: 'objet', c, n: 1, r: 0 }), 'objet');
+  r.dispose(); r.forceContextLoss();
+  return out;
+}
