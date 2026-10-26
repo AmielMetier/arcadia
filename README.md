@@ -106,7 +106,7 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
 
 - **4 parcours de 6 trous** : Green Park (classique), Île aux Pirates et Jardin Zen (décorés), Forge Infernale (difficile : lave, pistons, tapis roulants, loopings, marteaux)
 - **Physique maison** : la balle roule sur les vrais triangles du décor (pentes, dévers, loopings, tremplins), vrai trou dans lequel elle peut tomber ou dont elle peut ressortir, obstacles mobiles, sable, accélérateurs, eau et lave
-- **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance) ou trackpad ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
+- **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance), trackpad ou écran tactile (lance-pierre depuis la balle, un doigt = caméra, deux doigts = zoom) ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
 - Le joueur qui tire simule son coup chez lui et diffuse la trajectoire ; l'hôte tient les tours et les scores
 
 ## Pour les développeurs
@@ -126,6 +126,6 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.67** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **2.69** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

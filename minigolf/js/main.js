@@ -478,7 +478,9 @@ function updateCamera(dt) {
 }
 
 /* ================================================================ CONTRÔLES */
-const INPUT = { aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false };
+const INPUT = { aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false, yaw: null };
+const TOUCHDEV = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+const aimYaw = () => (INPUT.yaw != null ? INPUT.yaw : CAM.yaw);
 const canvasEl = () => R.renderer.domElement;
 function myTurn() { return G.phase === 'play' && G.turn === ME() && !G.shot && !SIM; }
 function requestLock() { const c = canvasEl(); try { if (document.pointerLockElement !== c) { const p = c.requestPointerLock({ unadjustedMovement: false }); if (p && p.catch) p.catch(() => {}); } } catch (e) {} }
@@ -490,10 +492,75 @@ function startAim(btn) {
 function releaseAim() {
   if (!INPUT.aiming) return;
   INPUT.aiming = false;
-  const pw = INPUT.power; INPUT.power = 0;
-  sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false });
+  const pw = INPUT.power, yaw = aimYaw(); INPUT.power = 0; INPUT.yaw = null;
+  sendAim({ pid: ME(), yaw, power: 0, on: false });
   if (pw < 0.02 || !myTurn()) return;
-  doShoot(CAM.yaw, pw);
+  doShoot(yaw, pw);
+}
+function cancelAim() { if (!INPUT.aiming) return; INPUT.aiming = false; INPUT.power = 0; INPUT.yaw = null; sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false }); }
+
+/* ---- écran tactile ----
+   un doigt : tourner la caméra ; deux doigts : zoomer ;
+   poser le doigt sur sa balle et tirer en arrière (lance-pierre) : la balle part à l'opposé, plus on tire loin, plus c'est fort */
+const TOUCH = { pts: new Map(), mode: null, aimId: null, d0: 0, dist0: 0 };
+function ballScreen() {
+  const b = G.balls[ME()]; if (!b) return null;
+  const v = ballsVisual.get(ME()), p = v && v.p ? v.p : b.p;
+  const pr = R.project(p); if (!pr.front) return null;
+  return { x: pr.x * innerWidth, y: pr.y * innerHeight, p };
+}
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _plane = new THREE.Plane(), _hit = new THREE.Vector3();
+function touchAim(x, y) {
+  const bs = ballScreen(); if (!bs) return;
+  const sd = Math.hypot(x - bs.x, y - bs.y), full = Math.min(innerWidth, innerHeight) * 0.38;
+  INPUT.power = clamp((sd - 14) / full, 0, 1);
+  if (sd < 14) return;
+  // direction : du doigt vers la balle, mesurée sur le sol (plan horizontal à hauteur de balle)
+  _ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); _ray.setFromCamera(_ndc, R.camera);
+  _plane.set(new THREE.Vector3(0, 1, 0), -bs.p[1]);
+  const ok = _ray.ray.intersectPlane(_plane, _hit);
+  if (ok && Math.hypot(_hit.x - bs.p[0], _hit.z - bs.p[2]) < 60) INPUT.yaw = Math.atan2(bs.p[0] - _hit.x, bs.p[2] - _hit.z);
+  else INPUT.yaw = CAM.yaw - Math.atan2(bs.x - x, -(bs.y - y));   // doigt au-dessus de l'horizon : repli sur l'écran
+}
+function bindTouch(c) {
+  const pinchDist = () => { const a = [...TOUCH.pts.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+  c.addEventListener('touchstart', (e) => {
+    e.preventDefault(); initAudio();
+    if (UI.screen !== 'game' || UI.menuOpen) return;
+    for (const t of e.changedTouches) TOUCH.pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+    if (TOUCH.pts.size === 1) {
+      const t = e.changedTouches[0], bs = myTurn() ? ballScreen() : null;
+      const reach = Math.max(70, Math.min(innerWidth, innerHeight) * 0.13);
+      if (bs && Math.hypot(t.clientX - bs.x, t.clientY - bs.y) < reach) { TOUCH.mode = 'aim'; TOUCH.aimId = t.identifier; INPUT.aiming = true; INPUT.power = 0; INPUT.btn = -3; INPUT.yaw = CAM.yaw; }
+      else TOUCH.mode = 'cam';
+    } else if (TOUCH.pts.size === 2) {
+      if (TOUCH.mode === 'aim') cancelAim();
+      TOUCH.mode = 'pinch'; TOUCH.d0 = pinchDist(); TOUCH.dist0 = CAM.dist;
+    }
+  }, { passive: false });
+  c.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (UI.screen !== 'game' || UI.menuOpen) return;
+    for (const t of e.changedTouches) {
+      const prevP = TOUCH.pts.get(t.identifier); if (!prevP) continue;
+      const dx = t.clientX - prevP.x, dy = t.clientY - prevP.y;
+      TOUCH.pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (TOUCH.mode === 'cam') { CAM.yaw -= dx * 0.0065 * SENS.cam; CAM.pitch = clamp(CAM.pitch + dy * 0.005 * SENS.cam, 0.05, 1.35); CAM.lastInput = nowMs(); }
+      else if (TOUCH.mode === 'aim' && t.identifier === TOUCH.aimId) touchAim(t.clientX, t.clientY);
+    }
+    if (TOUCH.mode === 'pinch' && TOUCH.d0 > 10) { const d = pinchDist(); if (d > 10) { CAM.dist = clamp(TOUCH.dist0 * TOUCH.d0 / d, 1.3, 18); CAM.lastInput = nowMs(); } }
+  }, { passive: false });
+  const end = (e, cancel) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      TOUCH.pts.delete(t.identifier);
+      if (TOUCH.mode === 'aim' && t.identifier === TOUCH.aimId) { if (cancel) cancelAim(); else releaseAim(); TOUCH.mode = null; }
+    }
+    if (TOUCH.pts.size === 0) TOUCH.mode = null;
+    else if (TOUCH.mode === 'pinch' && TOUCH.pts.size === 1) TOUCH.mode = 'cam';
+  };
+  c.addEventListener('touchend', (e) => end(e, false), { passive: false });
+  c.addEventListener('touchcancel', (e) => end(e, true), { passive: false });
 }
 function doShoot(yaw, power) {
   const T0 = kT();
@@ -508,6 +575,7 @@ function doShoot(yaw, power) {
 let pendingShot = null;
 function bindInput() {
   const c = canvasEl();
+  bindTouch(c);
   c.addEventListener('contextmenu', (e) => e.preventDefault());
   c.addEventListener('mousedown', (e) => {
     initAudio();
@@ -538,7 +606,7 @@ function bindInput() {
   addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     initAudio();
-    if (e.code === 'Escape') { if (INPUT.aiming) { INPUT.aiming = false; INPUT.power = 0; sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false }); return; } if (UI.screen === 'game') UI.toggleMenu(); return; }
+    if (e.code === 'Escape') { if (INPUT.aiming) { cancelAim(); return; } if (UI.screen === 'game') UI.toggleMenu(); return; }
     if (UI.screen !== 'game' || UI.menuOpen) return;
     if (e.code === 'KeyM') { const m = toggleMute(); UI.toast(m ? 'Son coupé' : 'Son activé'); }
     if (e.code === 'KeyV') { CAM.overview = !CAM.overview; }
@@ -557,7 +625,7 @@ const SENS = { cam: PREFS.sens ?? 1, power: 1 };
 function inputTick(dt) {
   if (INPUT.aiming && INPUT.space) INPUT.power = clamp(INPUT.power + dt * 0.55, 0, 1);
   if (INPUT.aiming && !myTurn()) { INPUT.aiming = false; INPUT.power = 0; }
-  if (INPUT.aiming && nowMs() - INPUT.lastAimSend > 100) { INPUT.lastAimSend = nowMs(); sendAim({ pid: ME(), yaw: CAM.yaw, power: INPUT.power, on: true }); }
+  if (INPUT.aiming && nowMs() - INPUT.lastAimSend > 100) { INPUT.lastAimSend = nowMs(); sendAim({ pid: ME(), yaw: aimYaw(), power: INPUT.power, on: true }); }
 }
 
 /* ================================================================ INTERFACE */
@@ -669,7 +737,7 @@ const UI = {
   },
   lockHint() {
     if (INPUT.locked) this.lockSeen = true;
-    $('lockhint').classList.toggle('hidden', INPUT.locked || this.lockSeen || UI.screen !== 'game' || !myTurn());
+    $('lockhint').classList.toggle('hidden', TOUCHDEV || INPUT.locked || this.lockSeen || UI.screen !== 'game' || !myTurn());
   },
   /** éléments qui bougent à chaque image */
   frame() {
@@ -690,7 +758,10 @@ const UI = {
     if (aiming) { pw.style.setProperty('--p', val); pw.querySelector('b').textContent = Math.round(val * 100) + ' %'; }
     // aide
     const mine = myTurn();
-    $('help').innerHTML = mine
+    $('help').innerHTML = TOUCHDEV
+      ? (mine ? (INPUT.aiming ? 'Tire en arrière pour doser · lâche pour frapper · reviens sur la balle pour annuler' : 'Pose le doigt sur ta balle et tire en arrière · un doigt ailleurs : caméra · deux doigts : zoom')
+        : (G.shot && G.shot.pid === ME() ? 'Ta balle roule…' : G.phase === 'play' ? 'Spectateur · un doigt : caméra · deux doigts : zoom' : ''))
+      : mine
       ? (INPUT.aiming ? 'Recule la souris pour doser · relâche pour tirer · Échap annule' : 'Bouge la souris pour viser · maintiens un clic et recule pour la puissance · molette : zoom · V : vue du trou')
       : (G.shot && G.shot.pid === ME() ? 'Ta balle roule…' : G.phase === 'play' ? 'Mode spectateur · bouge la souris pour tourner autour · molette : zoom · Tab : carte' : '');
     $('spec').classList.toggle('show', G.phase === 'play' && G.turn !== ME() && !!p);
@@ -766,8 +837,11 @@ function boot() {
   $('msens').onclick = () => { SENS.cam = SENS.cam >= 1.8 ? 0.4 : +(SENS.cam + 0.2).toFixed(1); PREFS.sens = SENS.cam; savePrefs(); UI.toggleMenu(true); };
   $('mquit').onclick = () => (H.embedded ? H.exit() : location.reload());
   $('menubtn').onclick = () => UI.toggleMenu();
+  $('viewbtn').onclick = () => { CAM.overview = !CAM.overview; $('viewbtn').classList.toggle('on', CAM.overview); };
+  $('card').onclick = () => { if (TOUCHDEV) $('card').classList.toggle('big'); };
+  document.body.classList.toggle('touch', TOUCHDEV);
   $('lockhint').onclick = () => { requestLock(); };
-  if (PREFS.quality === 'low') R.setQuality('low');
+  R.touch = TOUCHDEV; R.setQuality(PREFS.quality === 'low' ? 'low' : 'high');
   // décor du salon : premier parcours chargé derrière le menu
   loadCourse(G.course);
   bootNet(() => {
@@ -776,7 +850,7 @@ function boot() {
     if (NET.role === 'guest') setInterval(() => H.send('host', { t: 'ping', c: nowMs() }), 2000);
     requestAnimationFrame(frame);
   });
-  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
+  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, INPUT, TOUCHDEV, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
 }
 
 let last = nowMs(), menuSpin = 0;
@@ -796,7 +870,7 @@ function frame() {
     const fb = ballsVisual.get(focusBall());
     if (holeNow()) R.flagFade(G.holeList[G.hi], fb && fb.p ? Math.hypot(fb.p[0] - holeNow().cup[0], fb.p[2] - holeNow().cup[2]) : 99);
     const me = G.balls[ME()];
-    R.aim(myTurn() && !!me, me ? me.p : [0, 0, 0], CAM.yaw, INPUT.aiming ? INPUT.power : 0);
+    R.aim(myTurn() && !!me, me ? me.p : [0, 0, 0], INPUT.aiming ? aimYaw() : CAM.yaw, INPUT.aiming ? INPUT.power : 0);
     if (!myTurn() && AIM.on && AIM.pid === G.turn && G.balls[AIM.pid] && nowMs() - AIM.at < 600) R.aim(true, G.balls[AIM.pid].p, AIM.yaw, AIM.power);
     R.update(dt, kin, fb && fb.p ? new THREE.Vector3(...fb.p) : CAM.cur);
   } else if (COURSE && HOLES.length) {

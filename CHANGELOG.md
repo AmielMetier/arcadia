@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.69 — 26 octobre 2026
+- **Mini-Golf Party** — Jouable sur téléphone et tablette, à l'écran tactile.
+  - On pose le doigt sur sa balle et on tire en arrière comme un lance-pierre : la flèche montre la direction, la jauge la puissance, et on lâche pour frapper. Revenir sur la balle annule le coup.
+  - Un doigt ailleurs fait tourner la caméra, deux doigts pour zoomer.
+  - Un bouton affiche la vue d'ensemble du trou, et toucher la carte de score l'agrandit.
+  - L'écran se réorganise en portrait comme en paysage pour que la carte de score, le minuteur et les boutons ne se chevauchent pas.
+
 ## 2.68 — 26 octobre 2026
 - Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
 

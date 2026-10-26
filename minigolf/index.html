@@ -15,9 +15,10 @@
     --shadow: 0 10px 30px rgba(10, 16, 36, .35);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1424; color: var(--ink); font-family: 'Kalam', 'Comic Sans MS', cursive; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; background: #0d1424; color: var(--ink); font-family: 'Kalam', 'Comic Sans MS', cursive; user-select: none; -webkit-user-select: none; }
   #game { position: fixed; inset: 0; }
-  #game canvas { display: block; }
+  #game, #game canvas { display: block; touch-action: none; }
+  .screen { touch-action: pan-y; }
   .hidden { display: none !important; }
   button { font: inherit; color: inherit; cursor: pointer; }
   button:focus-visible { outline: 3px solid var(--hi); outline-offset: 2px; }
@@ -97,6 +98,10 @@
   .tag { position: absolute; left: 0; top: 0; padding: 1px 10px 2px; border-radius: 12px; background: rgba(16, 20, 36, .42); border-left: 4px solid var(--c); color: rgba(255,255,255,.92); font-weight: 700; font-size: 15px; white-space: nowrap; opacity: .82; transform-origin: 50% 100%; backdrop-filter: blur(2px); }
   .tag.turn { background: rgba(16, 20, 36, .6); opacity: 1; }
   #menubtn { pointer-events: auto !important; position: absolute; right: 18px; bottom: 98px; width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(20, 26, 46, .55); color: #fff; font-size: 22px; backdrop-filter: blur(4px); }
+  #viewbtn { pointer-events: auto !important; position: absolute; right: 18px; bottom: 150px; width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(20, 26, 46, .55); color: #fff; font-size: 20px; backdrop-filter: blur(4px); display: none; }
+  #viewbtn.on { background: var(--hi); color: var(--ink); }
+  body.touch #viewbtn { display: block; }
+  body.touch #card { pointer-events: auto; }
   #lockhint { pointer-events: auto !important; position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(20, 26, 46, .7); color: #fff; padding: 6px 16px; border-radius: 16px; font-size: 15px; border: none; }
   #summary { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -40%) rotate(-1deg); background: var(--card); padding: 16px 22px 12px; border-radius: 8px; box-shadow: var(--shadow); min-width: 300px; opacity: 0; transition: .4s; }
   #summary.show { opacity: 1; transform: translate(-50%, -50%) rotate(-1deg); }
@@ -114,7 +119,7 @@
   #lobby { background: radial-gradient(ellipse at 50% 120%, rgba(13,20,36,.15), rgba(13,20,36,.72)); display: flex; flex-direction: column; align-items: center; padding: 18px 18px 26px; gap: 14px; }
   .logo { position: relative; display: flex; align-items: center; gap: 0; color: #fff; }
   .logo .p { width: 8px; height: 96px; background: #f4f1e8; border-radius: 4px; margin-right: -2px; align-self: flex-start; box-shadow: 2px 2px 0 rgba(0,0,0,.3); }
-  .logo .f { background: var(--flag); clip-path: polygon(0 0, 100% 50%, 0 100%); padding: 8px 110px 8px 18px; align-self: flex-start; }
+  .logo .f { background: var(--flag); clip-path: polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%); padding: 8px 70px 8px 18px; align-self: flex-start; }
   .logo .f span { display: block; font-family: 'Bowlby One', sans-serif; font-size: 36px; line-height: .95; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.2); }
   .logo .sub { position: absolute; left: 22px; top: 98px; font-size: 18px; white-space: nowrap; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
   #cards { display: grid; grid-template-columns: repeat(4, minmax(0, 210px)); gap: 18px; margin-top: 26px; }
@@ -186,6 +191,28 @@
 
   @media (max-width: 980px) { #cards { grid-template-columns: repeat(2, minmax(0, 220px)); } .lbrow { grid-template-columns: 1fr; } }
   @media (max-width: 1000px) { #spec { top: auto; bottom: 86px; } }
+  /* téléphone : tout tient à l'écran, en paysage comme en portrait */
+  body.touch #help { display: block !important; font-size: 13px; max-width: 62vw; bottom: 10px; }
+  body.touch #menubtn, body.touch #viewbtn { width: 48px; height: 48px; }
+  @media (max-height: 500px) {
+    #pennant { top: 8px; left: 10px; } #pennant .flag { width: 56px; height: 46px; } #pennant .flag span { font-size: 22px; } #pennant .pole { height: 66px; }
+    #hname { font-size: 16px; } #pennant .meta { font-size: 13px; } #hstroke { font-size: 14px; margin-top: 4px; }
+    #card { top: 8px; right: 8px; transform: rotate(0) scale(.7); } #card.big { transform: scale(1); }
+    #menubtn { bottom: 70px; right: 10px; } #viewbtn { bottom: 124px; right: 10px; } #timer { right: 10px; bottom: 10px; width: 52px; height: 52px; }
+    #power { bottom: 30px; } #intro .n { font-size: 80px; } #intro .nm { font-size: 28px; } #intro { top: 14%; }
+    #turnchip { font-size: 22px; } #big .s { font-size: 18px; }
+    #lobby { padding: 10px 12px 18px; } #cards { margin-top: 18px; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 10px; }
+    .card b { font-size: 15px; } .card span { font-size: 13px; } .logo .f span { font-size: 26px; } .logo .p { height: 72px; } .logo .sub { top: 74px; font-size: 15px; }
+  }
+  @media (max-width: 700px) and (orientation: portrait) {
+    #card { top: auto; bottom: 120px; right: 8px; transform: rotate(0) scale(.72); transform-origin: bottom right; }
+    #card.big { transform: scale(.95); }
+    #menubtn { bottom: 64px; right: 10px; } #viewbtn { bottom: 64px; right: 66px; }
+    #timer { top: 10px; right: 10px; bottom: auto; width: 54px; height: 54px; }
+    #pennant .info { max-width: calc(100vw - 150px); }
+    #cards { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    #big .t { font-size: 44px; }
+  }
   @media (max-width: 700px) {
     #card { transform: rotate(0) scale(.78); } #card.big { transform: scale(1); }
     #help { display: none; } #pennant .flag { width: 64px; height: 54px; } #pennant .flag span { font-size: 26px; } #pennant .pole { height: 78px; }
@@ -221,6 +248,7 @@
   <div id="timer" class="hidden"><b>45</b></div>
   <div id="help"></div>
   <button id="menubtn" title="Menu (Échap)" aria-label="Menu">≡</button>
+  <button id="viewbtn" title="Vue d'ensemble du trou" aria-label="Vue d'ensemble du trou">⤢</button>
   <button id="lockhint" class="hidden">Clique dans le jeu pour piloter la caméra à la souris</button>
 </div>
 
@@ -231,7 +259,8 @@
     <div class="panel"><h2>Règles de la partie</h2><div id="opts"></div></div>
     <div class="panel"><h2>Joueurs</h2><ul id="lbplayers"></ul>
       <div class="ctrls"><b>Souris :</b> bouger = caméra · molette = zoom · maintenir un clic (gauche ou droit) et reculer = puissance, relâcher = tirer.<br>
-      <b>Trackpad :</b> glisser sans appuyer = caméra · cliquer, glisser vers soi puis relâcher = tirer. <b>Espace</b> maintenu marche aussi.</div></div>
+      <b>Trackpad :</b> glisser sans appuyer = caméra · cliquer, glisser vers soi puis relâcher = tirer. <b>Espace</b> maintenu marche aussi.<br>
+      <b>Téléphone :</b> poser le doigt sur sa balle et tirer en arrière comme un lance-pierre, lâcher pour frapper · un doigt ailleurs = caméra · deux doigts = zoom.</div></div>
   </div>
   <div class="actions"><button class="btn alt" id="lbquit">Quitter</button><button class="btn" id="lbstart">Lancer la partie</button><span id="lbwait" class="hidden">L'hôte choisit le parcours…</span></div>
 </div>
