@@ -159,7 +159,7 @@ window.HUB_GAMES = [
     id: 'convoy',
     title: 'Convoy Storm',
     tag: 'Survie en coop dans le blizzard',
-    desc: 'Un convoi blindé traverse une plaine gelée. Sautez du train, fouillez les ruines, repoussez les loups et gardez la chaudière en vie jusqu\'à Fort-Givre — ou aussi loin que possible.',
+    desc: 'Un convoi blindé traverse forêts, villes mortes, lacs gelés et cols. Choisissez la voie aux aiguillages, sautez du train, abattez des sapins, fouillez les ruines, repoussez les loups et gardez la chaudière en vie jusqu\'à Fort-Givre — ou aussi loin que possible.',
     url: 'convoy/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#9fd3ff',
