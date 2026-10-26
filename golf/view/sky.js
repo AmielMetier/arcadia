@@ -50,7 +50,7 @@ export function buildSky(look, sunDir, noise) {
 }
 
 // Horizon lointain : chaîne de sommets (montagne) ou îles sur la mer. Relief à crêtes ; le shader peint la forêt
-// en bas, la roche, puis la neige en altitude (moins sur les pentes raides), et voile le tout par la distance.
+// en bas, la roche, puis la neige en altitude (moins sur les pentes raides) ; la brume de la scène les voile.
 export function buildPeaks(look, seed, center, noise) {
   if (!look.peaks) return null;
   const alps = look.peaks === 'alpes';
@@ -85,7 +85,7 @@ export function buildPeaks(look, seed, center, noise) {
   geo.computeVertexNormals();
   const U = { uNoise: { value: noise }, uFog: { value: new THREE.Color(look.fog) }, uSnow: { value: alps ? 200 : 9999 }, uTree: { value: alps ? 70 : 9999 },
     uRock: { value: new THREE.Color(look.peak) }, uForest: { value: new THREE.Color(alps ? 0x1d2f1b : 0x3c5a34) } };
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, fog: false, side: THREE.DoubleSide });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide });
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
@@ -105,11 +105,8 @@ export function buildPeaks(look, seed, center, noise) {
         sn *= smoothstep(0.36, 0.62, rk + (vW.y - uSnow) * 0.002);
         c = mix(c, c * 0.8, smoothstep(0.5, 0.3, rk) * (1.0 - tree));
         c = mix(c, vec3(0.93, 0.95, 0.99), sn);
-        diffuseColor.rgb = c;`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
-        // voile bleuté de la distance (perspective aérienne) : plus loin, plus bleu et plus pâle
-        float d = length(vW - cameraPosition);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb * vec3(0.86, 0.93, 1.08), uFog, 0.36 + 0.3 * smoothstep(1400.0, 2600.0, d));`);
+        diffuseColor.rgb = c * vec3(0.92, 0.96, 1.04);`)
+      ;
   };
   mat.customProgramCacheKey = () => 'golf-peaks';
   const mesh = new THREE.Mesh(geo, mat);
