@@ -1,5 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.86 — 26 octobre 2026
+- **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.
+- **Mini-Golf Party** — Fini le vacarme contre les murets : un frottement ne fait plus de bruit, et un vrai choc ne donne qu'un son et quelques étincelles, sans secouer la caméra à chaque rebond.
+
+## 2.85 — 26 octobre 2026
+- **Cyber Kart GP** — Dérapage plus doux, plus proche de Mario Kart.
+  - Passer du virage serré au virage large (ou l'inverse) se fait en souplesse : le kart ne part plus brusquement sur le côté.
+  - Le kart glisse moins vers l'extérieur et suit mieux sa trajectoire ; le virage le plus serré est un peu moins violent, le plus large un peu moins mou.
+
+## 2.84 — 26 octobre 2026
+- **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
+  - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.
+  - Plage et fond des Abysses en sable fin, pontons en planches, arches en pierre, chemins caillouteux et temple en pierres de la jungle.
+  - Murs en moellons et allées de gravier au Château Hanté.
+  - Chaque circuit ne charge que ses textures ; en attendant, les anciennes s'affichent, la course n'attend pas.
+
 ## 2.83 — 26 octobre 2026
 - Correction : chargement synchrone de logger.js dans tous les jeux et envoi direct à /api/log (Amiel)
 

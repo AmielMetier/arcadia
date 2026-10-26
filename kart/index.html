@@ -351,8 +351,8 @@ const CFG = {
   G: 34, G_RAMP: 19, G_SLOPE: 20, HOP_V: 5.4,
   TOP_SPEED: 33, BOOST_MUL: 1.32,
   // drift : vitesse de rotation (rad/s) en contre-braquant / au neutre / en braquant dans le virage
-  DRIFT_OUT: 0.12, DRIFT_MID: 0.45, DRIFT_IN: 1.5,
-  GRIP: 8.5, DRIFT_GRIP: 7.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
+  DRIFT_OUT: 0.2, DRIFT_MID: 0.5, DRIFT_IN: 1.28, DRIFT_EASE: 4.5,   // DRIFT_EASE : souplesse du passage d'un rayon à l'autre (plus petit = plus doux)
+  GRIP: 8.5, DRIFT_GRIP: 10.5, OFFROAD_GRIP: 6, DIRT_GRIP: 6.8, ICE_GRIP: 1.7, SNOW_GRIP: 7.2,
   MT1: 1.0, MT2: 2.0, MT3: 3.0, // charge du mini-turbo (s) : bleu / orange / violet ; deux fois plus vite en gigotant (Q-D-Q-D)
   MT_BOOST: [0, 0.7, 1.25, 1.9], // durée du turbo selon le niveau
   DRAFT_TIME: 1.3, DRAFT_DIST: 22, DRAFT_W: 3.4,   // aspiration : temps dans le sillage, portée (m), demi-largeur du sillage (m)
@@ -932,6 +932,40 @@ TEX.pineSnow = toTex((() => {
   }
 })();
 
+/* --- Textures photo (Poly Haven, licence CC0 : libres, sans attribution obligatoire), dans kart/tex/.
+   Chaque carte demande celles qu'elle utilise ; tant qu'elles chargent (ou si elles manquent), les textures procédurales restent. */
+const flatNormal = () => toTex(fillPixels(4, 4, (x, y, o) => { o[0] = 128; o[1] = 128; o[2] = 255; }), { srgb: false });
+const PHOTO = {
+  asphalt: { t: () => [TEX.asphalt, TEX.asphaltN], rep: 3 },
+  concrete: { t: () => [TEX.concrete, TEX.concreteN], rep: 2 },
+  brick: { t: () => [TEX.brick, TEX.brickN], rep: 2 },
+  grass: { t: () => [TEX.grass, TEX.grassN], rep: 3 },
+  dirt: { t: () => [TEX.dirt, TEX.dirtN], rep: 2 },
+  rock: { t: () => [TEX.rock, TEX.rockN], rep: 1.5 },
+  bark: { t: () => [TEX.bark, TEX.barkN], rep: 1 },
+  snow: { t: () => [TEX.snow, TEX.snowN], rep: 3 },
+  sand: { t: () => { const T = beachTextures(); return [T.sand, T.sandN]; }, rep: 2 },
+  chalk: { t: () => { const T = beachTextures(); return [T.chalk, T.chalkN]; }, rep: 1.5 },
+  planks: { t: () => { const T = beachTextures(); return [T.planks, T.planksN]; }, rep: 1 },
+  stone: { t: () => { const T = envTextures(); return [T.stone, T.stoneN]; }, rep: 1.5 },
+  trail: { t: () => { const T = envTextures(); return [T.trail, T.trailN]; }, rep: 3 },
+  cwall: { t: () => { const T = castleTextures(); return [T.wall, T.wallN]; }, rep: 1.5 },
+  gravel: { t: () => { const T = castleTextures(); return [T.gravel, T.gravelN]; }, rep: 2 },
+};
+const PHOTO_DONE = new Set();
+function loadPhotos(names = []) {
+  for (const name of names) {
+    const P = PHOTO[name]; if (!P || PHOTO_DONE.has(name)) continue; PHOTO_DONE.add(name);
+    const [d, n] = P.t();
+    [[d, `tex/${name}.jpg`], [n, `tex/${name}_n.jpg`]].forEach(([tex, url]) => {
+      if (!tex) return; const img = new Image(); img.decoding = 'async';
+      img.onload = () => { tex.dispose(); tex.source = new THREE.Source(img); tex.repeat.set(P.rep, P.rep); tex.needsUpdate = true; };   // nouvelle source : la taille change
+      img.onerror = () => { PHOTO_DONE.delete(name); console.warn('Texture photo introuvable :', url); };
+      img.src = url;
+    });
+  }
+}
+
 /* =============================================================================
    6. PISTE GÉNÉRIQUE : Catmull-Rom fermée, sections, largeur variable, tremplins, requêtes physiques
    ============================================================================= */
@@ -1400,7 +1434,7 @@ function loadMap(id) {
   buildTrackHash();
   MAP = def;
   def.dashPanels = buildDashPanels((typeof def.dash === 'function' ? def.dash() : def.dash) || []);
-  def.build(); setupLampPool();
+  def.build(); setupLampPool(); loadPhotos(def.photos);
   WORLD.tunnelLight = (() => { let a = new Float32Array(N); for (let i = 0; i < N; i++) { const S = track.secs[track.sec[i]]; a[i] = S.tunnel && !S.glass ? 0.32 : 1; }
     for (let p = 0; p < 6; p++) { const o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = (a[(i - 1 + N) % N] + a[i] * 2 + a[(i + 1) % N]) / 4; a = o; } return a; })();
   placeBoxes(typeof def.boxes === 'function' ? def.boxes() : def.boxes);
@@ -1416,6 +1450,7 @@ const SEC = { STADIUM: 0, COUNTRY: 1, CLIFF: 2, DIRT: 3, TUNNEL: 4 };
 let waterfalls = [], crowdMats = [];
 const pagoda = { canvas: null, tex: null };
 const GC_DEF = {
+  photos: ['asphalt', 'concrete', 'brick', 'grass', 'dirt', 'rock', 'bark'],
   id: 'gc', name: 'Grand Circuit', theme: 'day', music: 'gc', seed: 20261021, accent: '#2f6bff',
   desc: 'Stade bétonné, falaise aux cascades, tout-terrain, tremplin et tunnel.', tags: ['Stade', 'Cascades', 'Tremplin', 'Tunnel'],
   points: [[0, 0, 0], [160, 0, 0], [270, 0, -12], [330, 1, -70], [342, 2, -150], [322, 3, -225], [262, 4, -268], [180, 5, -276],
@@ -1907,6 +1942,7 @@ function buildGrandCircuit() {
    ============================================================================= */
 const WK = { CANYON: 0, CLIMB: 1, ICE: 2, WINDING: 3, DESCENT: 4, CURVE: 5 };
 const WHISKY_DEF = {
+  photos: ['snow', 'rock', 'bark'],
   id: 'whisky', name: 'Whisky Peak', theme: 'snow', music: 'whisky', seed: 4242, accent: '#5fb7ff',
   desc: 'Canyon de glace, boules de neige géantes, route gelée, lacets jusqu\'au sommet puis la grande descente.', tags: ['Boules de neige', 'Glace', 'Télésiège', 'Skieurs'],
   points: [[0, 0, 0], [150, 0, 0], [300, 0, 0], [400, 0, 10], [470, 1, 50], [500, 1, 120], [570, 1, 160], [650, 2, 150], [720, 2, 190], [750, 4, 270],
@@ -2540,6 +2576,7 @@ const JUNGLE_PATH = turtlePath(['start', ['S', 375], 'forest', ['T', 40, 125], [
   ['S', 225.2], ['T', 90, 112.5]]);
 const HELIX_R = 34;
 const JUNGLE_DEF = {
+  photos: ['stone', 'trail', 'rock', 'bark', 'grass', 'dirt'],
   id: 'jungle', name: 'Jungle Perdue', theme: 'jungle', music: 'jungle', seed: 5151, accent: '#3fbf4a',
   desc: 'Forêt luxuriante, précipice et grand virage serré, puis la pyramide inca : on y entre en haut et on descend sa rampe en spirale.', tags: ['Forêt', 'Précipice', 'Pyramide', 'Spirale'],
   points: JUNGLE_PATH.points, marks: JUNGLE_PATH.marks,
@@ -2769,6 +2806,7 @@ const CASTLE_PATH = turtlePath(['start', ['S', 200], 'serp', ['T', -50, 55], ['S
   ['T', -90, 70], 'moat', ['S', 70, 3], 'gate', ['S', 45], 'castleIn', ['S', 55], ['T', 90, 21], ['S', 55], ['T', -90, 21], ['S', 70], ['T', -90, 21], ['S', 95], ['T', 90, 21], ['S', 55], ['T', 90, 21], ['S', 75], ['T', -90, 21], ['S', 60], 'castleOut',
   ['S', 50], 'garden', ['T', -60, 70], ['S', 70], ['T', 55, 60], ['S', 40], ['T', -85, 62], ['S', 60], ['T', 30, 80], ['T', -30, 80], ['S', 289.2], ['T', -90, 85], ['S', 110], ['T', 45, 80], ['S', 70], ['T', -45, 80], ['S', 330, -2], 'lavaWest', ['S', 150.9, -1], ['T', -90, 85]]);
 const CASTLE_DEF = {
+  photos: ['cwall', 'gravel', 'rock', 'bark', 'grass'],
   id: 'castle', name: 'Château Hanté', theme: 'night', music: 'castle', seed: 6666, accent: '#ff5a2a',
   desc: 'De nuit : lave et serpentins jusqu\'à la grande porte, labyrinthe sur tapis rouge à la lueur des torches, puis le jardin hanté sous la lune.', tags: ['Lave', 'Labyrinthe', 'Torches', 'Jardin hanté'],
   points: CASTLE_PATH.points, marks: CASTLE_PATH.marks,
@@ -2841,6 +2879,7 @@ function castleTextures() {
     g.beginPath(); g.moveTo(0, 300); g.lineTo(64, 320); g.lineTo(128, 300); g.fill(); g.strokeStyle = '#e8b33a'; g.lineWidth = 8; g.strokeRect(10, 10, 108, 280);
     g.fillStyle = '#e8b33a'; g.beginPath(); g.moveTo(64, 90); g.lineTo(96, 140); g.lineTo(64, 230); g.lineTo(32, 140); g.fill(); g.fillStyle = '#7a0d18'; g.beginPath(); g.arc(64, 145, 16, 0, 7); g.fill(); return c; })());
   // gravier sombre du jardin
+  CASTLE_TEX.wallN = flatNormal(); CASTLE_TEX.gravelN = flatNormal();
   CASTLE_TEX.gravel = toTex(fillPixels(256, 256, (x, y, o) => { const n = tnoise(x / 3, y / 3, 85), m = tfbm(x / 256 * 6, y / 256 * 6, 6, 4), k = 0.55 + n * 0.35 + m * 0.2; o[0] = 92 * k; o[1] = 88 * k; o[2] = 84 * k; }));
   return CASTLE_TEX;
 }
@@ -2867,9 +2906,9 @@ function buildCastle() {
   const rockRoad = std({ map: T.rock, normalMap: T.rockN, emissive: 0xffffff, emissiveMap: T.rockE, emissiveIntensity: 0.4, roughness: 0.85 });
   const rockSide = std({ map: T.rock, normalMap: T.rockN, emissive: 0xffffff, emissiveMap: T.rockE, emissiveIntensity: 0.35, roughness: 0.9, color: 0x9a7a72 });
   const carpet = std({ map: T.carpet, roughness: 0.95 });
-  const wallMat = std({ map: T.wall, normalMap: ENV_TEX.stoneN || TEX.concreteN, roughness: 0.92 });
+  const wallMat = std({ map: T.wall, normalMap: T.wallN, roughness: 0.92 });
   const floorMat = std({ map: T.wall, color: 0x8a8890, roughness: 0.6, metalness: 0.1 });
-  const gravel = std({ map: T.gravel, color: 0xc8c4c0, roughness: 0.95 });
+  const gravel = std({ map: T.gravel, normalMap: T.gravelN, color: 0xc8c4c0, roughness: 0.95 });
   const darkGrass = std({ map: TEX.grass, normalMap: TEX.grassN, color: 0x2a3d26, roughness: 0.95 });
   const wood = std({ map: TEX.wood, color: 0x7a5a3a, roughness: 0.85 });
   const gold = std({ color: 0xe8b33a, metalness: 1, roughness: 0.3 });
@@ -3046,6 +3085,7 @@ const BEACH_PATH = turtlePath(['start', ['S', 240], ['T', 25, 160], 'sand', ['S'
   ['T', -60, 90, -6], ['T', -30, 90, -6], 'down', ['S', 174, -22], ['T', -90, 90, 0]]);
 const SEA_Y = -1.3;
 const BEACH_DEF = {
+  photos: ['sand', 'chalk', 'planks', 'asphalt', 'grass', 'rock', 'bark'],
   id: 'beach', name: 'Plage des Falaises', theme: 'beach', music: 'beach', seed: 8181, accent: '#1fc8e8',
   desc: 'Plein soleil : sable et crabes, pontons au pied des falaises de craie et leurs arches, puis le plateau et son phare.', tags: ['Plage', 'Crabes', 'Arches', 'Phare'],
   points: BEACH_PATH.points, marks: BEACH_PATH.marks,
@@ -3305,6 +3345,7 @@ const ABYSS_PATH = turtlePath(['start', ['S', 224.0], ['T', 60, 132.0], ['S', 72
   'tube', ['S', 72.0, 10], ['T', 25, 168.0], ['S', 156.0, -2], ['T', -25, 168.0], 'tubeEnd', ['S', 60.0, -2],
   'vortex', ['T', 360, 55.2, -14], 'vortexEnd', ['S', 60.0], ['T', 90, 108.0], 'climb', ['S', 301.8, 36], 'leap', ['S', 120.0, 2], ['T', 90, 132.0], ['S', 144.0]]);
 const ABYSS_DEF = {
+  photos: ['sand', 'rock', 'asphalt', 'grass', 'bark'],
   id: 'abyss', name: 'Abysses Néon', theme: 'ocean', music: 'abyss', seed: 4242, accent: '#28e0ff', waterY: WATER_Y,
   desc: 'Autoroute sur le lagon, route à moitié noyée, plongée dans le récif, tube de verre sous la mer et spirale autour du pilier de lumière.',
   tags: ['Sous l’eau', 'Tube de verre', 'Spirale', 'Méduses'],
@@ -4435,13 +4476,16 @@ class Kart {
     if (!this.drifting && drift && this.grounded && this.hopWindow > 0 && this.speedF > 8) {
       // sens du drift : celui vers lequel on tourne (à l'atterrissage ou juste après). Tout droit = un simple saut.
       const sgn = Math.abs(steer) > 0.2 ? Math.sign(steer) : this.hopSteer || 0;
-      if (sgn) { this.drifting = true; this.driftDir = sgn; this.driftCharge = 0; this.driftLevel = 0; this.driftT = 0; this.hopWindow = 0; this.wiggleT = 0; this.lastAxisSign = 0; }
+      if (sgn) { this.driftYR = clamp(Math.abs(this.yawRate) * 0.8, CFG.DRIFT_OUT, CFG.DRIFT_MID * 1.4); this.drifting = true; this.driftDir = sgn; this.driftCharge = 0; this.driftLevel = 0; this.driftT = 0; this.hopWindow = 0; this.wiggleT = 0; this.lastAxisSign = 0; }
     }
     if (this.drifting && !drift) this.endDrift(ctrl);
 
     // --- Lacet
     const vF0 = this.speedF; let yawRate;
-    if (this.drifting) { const tight = (steer * this.driftDir + 1) * 0.5; this.driftVis = this.driftDir * lerp(0.7, 1.25, tight); yawRate = this.driftDir * driftRate(tight) * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
+    if (this.drifting) {
+      // le rayon du drift suit le stick en douceur (pas de coup de volant brutal d'un côté à l'autre)
+      const tight = (steer * this.driftDir + 1) * 0.5; this.driftYR = damp(this.driftYR ?? CFG.DRIFT_MID, driftRate(tight), CFG.DRIFT_EASE, dt);
+      this.driftVis = this.driftDir * lerp(0.75, 1.2, driftTight(this.driftYR)); yawRate = this.driftDir * this.driftYR * clamp(vF0 / 14, 0.5, 1) * (S.handling / 2.06); }
     else { const sf = clamp(Math.abs(vF0) / 7, 0, 1) * (1 - 0.3 * clamp(Math.abs(vF0) / S.maxSpeed, 0, 1.3)); yawRate = steer * S.handling * sf * (vF0 < -0.5 ? -1 : 1); }
     if (!this.grounded) yawRate *= this.hop ? 0.5 : this.gliding ? 0.85 : 0.3;
     this.yawRate = yawRate; this.yaw -= yawRate * dt;
@@ -4639,7 +4683,7 @@ class Kart {
     const v = this.vis, n = this.grounded ? _v1.set(this.q2.nx, this.q2.ny, this.q2.nz) : _v1.copy(UP);
     this.vNormal.lerp(n, 1 - Math.exp(-12 * dt)).normalize();
     const sr = clamp(Math.abs(this.speedF) / CFG.TOP_SPEED, 0, 1.4);
-    v.drift = damp(v.drift, this.drifting ? (this.remote ? this.driftDir : this.driftVis || this.driftDir) : 0, 9, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
+    v.drift = damp(v.drift, this.drifting ? (this.remote ? this.driftDir : this.driftVis || this.driftDir) : 0, 6, dt); v.steer = damp(v.steer, this.hitT > 0 ? 0 : this.input.steer, 14, dt);
     let extraYaw = 0, pitch = 0, roll = 0;
     if (this.hitT > 0) {
       const p = 1 - this.hitT / this.hitDur, e = 1 - Math.pow(1 - clamp(p, 0, 1), 2.2);
