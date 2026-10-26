@@ -145,7 +145,7 @@ window.HUB_GAMES = [
     id: 'kart',
     title: 'Cyber Kart GP',
     tag: 'Course de karts en 3D',
-    desc: 'Kart en 3D façon Mario Kart : Grand Prix de 6 circuits (Grand Circuit, Whisky Peak, Route Arc-en-ciel, Jungle Perdue, Château Hanté, Plage des Falaises) aux points cumulés, drift et mini-turbo, 16 objets, 8 pilotes et IA.',
+    desc: 'Kart en 3D façon Mario Kart : Grand Prix de 7 circuits (Grand Circuit, Whisky Peak, Route Arc-en-ciel, Jungle Perdue, Château Hanté, Plage des Falaises, Abysses Néon) aux points cumulés, drift et mini-turbo, 16 objets, 8 pilotes et IA.',
     url: 'kart/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5ff3ff',
