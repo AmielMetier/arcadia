@@ -10,6 +10,8 @@
   - Nouvel écran d'accueil : on survole les trous en musique (« Sunny Side Up », jazz manouche libre de droits), avec les parcours en photo et des réglages simples.
   - La mini-carte se zoome (molette ou Z) et se fait glisser ; le bouton relief (ou R) montre les altitudes, avec des courbes de niveau très serrées sur le green pour lire la pente.
   - Interface refaite : boutons et icônes plus nets, carte de score et podium plus clairs (médailles, symboles birdie et bogey), mise en page revue sur téléphone.
+  - La présentation de chaque trou est mieux cadrée : on part de derrière le départ, on voit toujours où l'on va (fini la vue plongeante sur l'eau des par 3), et on arrive face au drapeau, sous le titre du trou. Les lacets se survolent sans donner le tournis.
+  - Plus de fondu au blanc : on passe directement d'un plan à l'autre (entre deux joueurs, au ralenti, sur l'écran d'accueil).
   - Les bots évitent mieux l'eau et la forêt et dosent mieux leurs approches.
 
 ## 2.69 — 26 octobre 2026

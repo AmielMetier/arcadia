@@ -55,14 +55,13 @@ function html(set, musicOn) {
   </div>`;
 }
 
-// scene, sfx : moteurs du jeu ; hole(n) : trou n construit ; fade(fn) : fondu blanc ; onPlay(réglages)
+// scene, sfx : moteurs du jeu ; hole(n) : trou n construit ; onPlay(réglages)
 export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
   const set = loadSetup();
   let musicOn = true;
   try { musicOn = localStorage.getItem('golf_music') !== '0'; } catch (e) {}
   root.innerHTML = html(set, musicOn);
   const el = root.querySelector('.home'), $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
-  const fadeEl = document.querySelector('#fade');
   let state = 'title', alive = true, cur = null, loading = false, pending = null, t = 0, list = SHOWCASE, idx = 0, path = null;
 
   // ---------------------------------------------------------------- survol
@@ -90,9 +89,6 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
   async function fly(n) {
     if (loading) { pending = n; return; } // un trou à la fois : le dernier demandé passe ensuite
     loading = true;
-    fadeEl.classList.add('on');
-    await new Promise((r) => setTimeout(r, 380));
-    if (!alive) return;
     const h = holeOf(n);
     await scene.loadHole(h, { theme: h.theme, wind: CALM, time: set.time });
     if (!alive) return;
@@ -102,7 +98,6 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
     cur = h; t = 0; path = makePath(h); path(0, true);
     caption(h);
     loading = false;
-    fadeEl.classList.remove('on');
     const p = pending; pending = null;
     if (p != null && p !== n) fly(p);
   }
@@ -176,6 +171,6 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
       path(Math.min(1, t / FLY), false);
       if (t > FLY) { idx = (idx + 1) % list.length; fly(list[idx]); }
     },
-    dispose() { alive = false; removeEventListener('keydown', onKey); fadeEl.classList.remove('on'); root.innerHTML = ''; },
+    dispose() { alive = false; removeEventListener('keydown', onKey); root.innerHTML = ''; },
   };
 }
