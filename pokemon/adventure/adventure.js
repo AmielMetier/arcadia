@@ -1,9 +1,10 @@
 // pokemon/adventure/adventure.js
 // Contrôleur principal de l'Aventure Kalos-Sud (Menton).
-// Boucle de jeu 60 FPS, entrées clavier / tactile, Pokémon suiveur, Pokémon sauvages visibles,
-// dresseurs PNJ, Arène de Menton, Boutique Pokémon, PC interactif, Pokédex et duels JcJ.
+// Boucle de jeu 60 FPS, entrées clavier / tactile, bâtiments visitables avec intérieurs dédiés
+// (Laboratoire, Centre Pokémon, Boutique, Arène de Menton), rencontres aléatoires classiques
+// dans les hautes herbes, dresseurs PNJ, PC interactif, Pokédex et duels JcJ.
 
-import { createMentonMap, isSolid, getTile, TILE, SIGNPOSTS } from './map.js';
+import { MAPS, isSolid, getTile, TILE, SIGNPOSTS } from './map.js';
 import {
   loadPlayerData,
   savePlayerData,
@@ -16,8 +17,7 @@ import {
   depositToBox,
   withdrawFromBox,
   addPokemonToPlayer,
-  getFirstAlivePokemon,
-  registerSeen
+  getFirstAlivePokemon
 } from './player.js';
 import { AdventureRenderer } from './renderer.js';
 import {
@@ -35,13 +35,32 @@ import { sfx } from '../view/sfx.js';
 
 export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode }) {
   let player = loadPlayerData(me.name, me.color);
-  if (player.prevX === undefined) {
-    player.prevX = player.x;
-    player.prevY = player.y - 1;
-  }
-  player.followerX = player.prevX;
-  player.followerY = player.prevY;
 
+  // Précharger toutes les grilles des cartes (Extérieur + 4 Intérieurs de bâtiments)
+  const mapGrids = {};
+  for (const [mId, mDef] of Object.entries(MAPS)) {
+    mapGrids[mId] = mDef.createGrid();
+  }
+
+  if (!player.mapId || !MAPS[player.mapId]) {
+    player.mapId = 'outdoor';
+  }
+
+  let currentMapId = player.mapId;
+
+  // Sécurité : si une ancienne sauvegarde place le joueur dans un mur, le replacer devant le Labo
+  if (isSolid(mapGrids[currentMapId], player.x, player.y)) {
+    currentMapId = 'outdoor';
+    player.mapId = 'outdoor';
+    player.x = 6;
+    player.y = 9;
+    player.dir = 'up';
+  }
+
+  player.prevX = player.x;
+  player.prevY = player.y;
+
+  me.mapId = currentMapId;
   me.x = player.x;
   me.y = player.y;
   me.prevX = player.prevX;
@@ -50,35 +69,11 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   me.avatar = player.avatar || 'red';
   me.leadPokeId = player.party && player.party[0] ? player.party[0].id : null;
 
-  const grid = createMentonMap();
-
   let state = 'overworld'; // 'overworld', 'battle', 'starter_modal', 'menu_bag', 'pc_modal', 'mart_modal', 'dex_modal', 'transition'
   let activeDialogue = null;
   let dialogueCallback = null;
   let destroyed = false;
   let rafId = null;
-
-  // Pokémon sauvages visibles sur la carte
-  let roamingWilds = [];
-  function spawnRoamingWilds() {
-    const spots = [
-      { x: 32, y: 7, zone: 'grass' },
-      { x: 25, y: 8, zone: 'grass' },
-      { x: 29, y: 15, zone: 'grass' },
-      { x: 20, y: 26, zone: 'water' }
-    ];
-    roamingWilds = spots.map(sp => {
-      const poke = rollWildEncounter(sp.zone);
-      return {
-        x: sp.x,
-        y: sp.y,
-        zone: sp.zone,
-        id: poke.id,
-        pokemon: poke
-      };
-    });
-  }
-  spawnRoamingWilds();
 
   // DOM de base pour l'aventure
   root.innerHTML = `
@@ -250,7 +245,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   if (!player.hasStarter) {
     showDialogue(
       'Professeur Platane',
-      'Bienvenue à Menton, la perle de Kalos-Sud !\nApproche-toi de la table du laboratoire au Nord et appuie sur [E] pour choisir ton Pokémon !',
+      'Bienvenue à Menton, la perle de Kalos-Sud !\nAvance vers la porte du Laboratoire juste devant toi pour choisir ton premier Pokémon !',
       null,
       'assets/trainers/sycamore.png'
     );
@@ -258,17 +253,60 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
 
   function getActiveQuest() {
     if (!player.hasStarter) {
-      return 'Objectif : Choisir un Starter au Labo (6,7)';
+      return currentMapId === 'lab'
+        ? 'Objectif : Examiner les Poké Balls sur la table [E]'
+        : 'Objectif : Entrer dans le Laboratoire au Nord (6,8)';
     }
     const defCount = (player.defeatedTrainers || []).length;
     if (defCount < 2) {
       return `Objectif : Vaincre les Dresseurs (${defCount}/4) sur la Route 1`;
     }
     if (!(player.badges || []).includes('citron_dor')) {
-      return 'Objectif : Défier la Championne Solène à l\'Arène (Nord-Est)';
+      return currentMapId === 'gym'
+        ? 'Objectif : Défier la Championne Solène au fond de l\'Arène !'
+        : 'Objectif : Entrer dans l\'Arène de Menton au Nord-Est (38,5)';
     }
     const caughtCount = (player.pokedex && player.pokedex.caught && player.pokedex.caught.length) || 0;
     return `Maître de Menton • Pokédex : ${caughtCount}/28 espèces`;
+  }
+
+  function getZoneTitle() {
+    if (currentMapId !== 'outdoor') {
+      return MAPS[currentMapId]?.name || 'Intérieur';
+    }
+    if (player.y > 23) return 'Plage des Sablettes (Bord de mer)';
+    if (player.x >= 34 && player.y <= 8) return 'Parvis de l\'Arène de Menton';
+    if (player.x > 22) return 'Route 1 Corniche (Hautes herbes)';
+    return 'Menton - La Cité des Citrons';
+  }
+
+  // --- TÉLÉPORTATION ENTRE EXTÉRIEUR ET INTÉRIEURS DE BÂTIMENTS ---
+  function triggerWarp(warp) {
+    if (!warp || !MAPS[warp.targetMap]) return;
+    isMoving = false;
+    moveProgress = 0;
+    player.moving = false;
+    sfx.playSwitch();
+
+    currentMapId = warp.targetMap;
+    player.mapId = currentMapId;
+    player.x = warp.targetX;
+    player.y = warp.targetY;
+    player.prevX = warp.targetX;
+    player.prevY = warp.targetY;
+    player.visualX = warp.targetX;
+    player.visualY = warp.targetY;
+    if (warp.dir) player.dir = warp.dir;
+
+    me.mapId = currentMapId;
+    me.x = player.x;
+    me.y = player.y;
+    me.prevX = player.prevX;
+    me.prevY = player.prevY;
+    me.dir = player.dir;
+
+    savePlayerData(player);
+    net.broadcastPos(player);
   }
 
   // --- BOUCLE DE JEU 60 FPS ---
@@ -284,25 +322,19 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       updateMovement(dt);
       net.updateInterpolation();
 
-      // Interpolation douce du Pokémon suiveur
-      player.followerX += (player.prevX - player.followerX) * 0.22;
-      player.followerY += (player.prevY - player.followerY) * 0.22;
-
       const frontPos = getFrontTile(player.x, player.y, player.dir);
       const target = getInteractiveTarget(frontPos.x, frontPos.y);
-
-      const zoneName = player.y > 23 ? 'Plage des Sablettes (Bord de mer)' :
-                       (player.x >= 35 && player.y <= 7 ? 'Parvis de l\'Arène de Menton' :
-                       (player.x > 22 ? 'Route 1 Corniche (Hauts de Menton)' : 'Menton - La Cité des Citrons'));
+      const curDef = MAPS[currentMapId] || MAPS.outdoor;
 
       renderer.render({
-        grid,
+        mapId: currentMapId,
+        grid: mapGrids[currentMapId],
+        staticNpcs: curDef.staticNpcs || [],
         localPlayer: player,
         remotePlayers: net.getPlayersList(),
-        roamingWilds,
         interactiveTarget: target,
         dialogueBox: activeDialogue,
-        activeZoneName: zoneName,
+        activeZoneName: getZoneTitle(),
         questText: getActiveQuest()
       });
     }
@@ -314,18 +346,24 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
 
   // --- COLLISIONS AVEC PNJ ET OBSTACLES ---
   function isBlocked(tx, ty) {
+    const grid = mapGrids[currentMapId];
     if (isSolid(grid, tx, ty)) return true;
-    // Professeur Platane en (5,6)
-    if (tx === 5 && ty === 6) return true;
-    // Dresseurs PNJ
-    if (ADVENTURE_TRAINERS.some(tr => tr.x === tx && tr.y === ty)) return true;
+
+    const curDef = MAPS[currentMapId];
+    if (curDef && curDef.staticNpcs && curDef.staticNpcs.some(n => n.x === tx && n.y === ty)) {
+      return true;
+    }
+
+    if (ADVENTURE_TRAINERS.some(tr => (tr.mapId || 'outdoor') === currentMapId && tr.x === tx && tr.y === ty)) {
+      return true;
+    }
     return false;
   }
 
   // --- DÉPLACEMENTS CASE PAR CASE (STYLE GBA) ---
   function updateMovement(dt) {
     const isRunning = keysDown.has('shift');
-    const moveSpeed = isRunning ? 6.8 : 4.4;
+    const moveSpeed = isRunning ? 6.8 : 4.5;
 
     if (isMoving) {
       moveProgress += dt * moveSpeed;
@@ -340,6 +378,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
         isMoving = false;
         moveProgress = 0;
 
+        me.mapId = currentMapId;
         me.x = player.x;
         me.y = player.y;
         me.prevX = player.prevX;
@@ -348,6 +387,14 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
         me.leadPokeId = player.party && player.party[0] ? player.party[0].id : null;
         savePlayerData(player);
         net.broadcastPos(player);
+
+        // Vérifier si le joueur vient de marcher sur une porte (DOOR) ou un tapis de sortie (EXIT_MAT)
+        const curDef = MAPS[currentMapId];
+        const warp = curDef && curDef.warps ? curDef.warps[`${player.x},${player.y}`] : null;
+        if (warp) {
+          triggerWarp(warp);
+          return;
+        }
 
         checkWildEncounter();
       } else {
@@ -365,6 +412,20 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       if (wantedDir) {
         player.dir = wantedDir;
         me.dir = wantedDir;
+
+        // Si le joueur est déjà sur le bord du tapis de sortie intérieur et appuie vers le bas, sortir immédiatement
+        const curDef = MAPS[currentMapId];
+        if (wantedDir === 'down' && curDef && curDef.warps) {
+          const curTile = getTile(mapGrids[currentMapId], player.x, player.y);
+          if (curTile === TILE.EXIT_MAT) {
+            const exitWarp = curDef.warps[`${player.x},${player.y}`] || curDef.warps[`${player.x},${player.y + 1}`];
+            if (exitWarp) {
+              triggerWarp(exitWarp);
+              return;
+            }
+          }
+        }
+
         const target = getFrontTile(player.x, player.y, wantedDir);
 
         if (!isBlocked(target.x, target.y)) {
@@ -392,7 +453,13 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   }
 
   function getInteractiveTarget(fx, fy) {
+    const grid = mapGrids[currentMapId];
     const tile = getTile(grid, fx, fy);
+    const curDef = MAPS[currentMapId];
+
+    if (curDef && curDef.warps && curDef.warps[`${fx},${fy}`]) {
+      return { x: fx, y: fy, label: curDef.warps[`${fx},${fy}`].label || 'Entrer' };
+    }
     if (tile === TILE.LEMON_TREE) return { x: fx, y: fy, label: 'Cueillir Citron' };
     if (tile === TILE.LAB_TABLE) return { x: fx, y: fy, label: player.hasStarter ? 'Examiner' : 'Choisir Starter' };
     if (tile === TILE.NURSE_DESK) return { x: fx, y: fy, label: 'Soigner l\'équipe' };
@@ -400,9 +467,12 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     if (tile === TILE.PC_BOX) return { x: fx, y: fy, label: 'Ouvrir PC' };
     if (tile === TILE.SIGN) return { x: fx, y: fy, label: 'Lire Panneau' };
 
-    if (fx === 5 && fy === 6) return { x: fx, y: fy, label: 'Parler au Prof. Platane' };
+    if (curDef && curDef.staticNpcs) {
+      const sNpc = curDef.staticNpcs.find(n => n.x === fx && n.y === fy);
+      if (sNpc) return { x: fx, y: fy, label: `Parler à ${sNpc.name}` };
+    }
 
-    const npcTrainer = ADVENTURE_TRAINERS.find(tr => tr.x === fx && tr.y === fy);
+    const npcTrainer = ADVENTURE_TRAINERS.find(tr => (tr.mapId || 'outdoor') === currentMapId && tr.x === fx && tr.y === fy);
     if (npcTrainer) {
       const defeated = (player.defeatedTrainers || []).includes(npcTrainer.id);
       return {
@@ -412,30 +482,28 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       };
     }
 
-    const wildOnTile = roamingWilds.find(rw => rw.x === fx && rw.y === fy);
-    if (wildOnTile) {
-      return { x: fx, y: fy, label: `Affronter ${wildOnTile.pokemon.name}` };
-    }
-
-    const peer = net.getPlayersList().find(p => p.x === fx && p.y === fy);
+    const peer = net.getPlayersList().find(p => (p.mapId || 'outdoor') === currentMapId && p.x === fx && p.y === fy);
     if (peer) return { x: fx, y: fy, label: `Duel JcJ : ${peer.name}` };
 
     return null;
   }
 
-  // --- RENCONTRES SAUVAGES ---
+  // --- RENCONTRES SAUVAGES CLASSIQUES DANS LES HAUTES HERBES & BORD DE MER ---
   function checkWildEncounter() {
-    if (!player.hasStarter) return;
+    if (currentMapId !== 'outdoor') return;
 
-    // 1. Contact direct avec un Pokémon sauvage visible sur la carte
-    const touchedIdx = roamingWilds.findIndex(rw => rw.x === player.x && rw.y === player.y);
-    if (touchedIdx !== -1) {
-      const rw = roamingWilds[touchedIdx];
-      roamingWilds.splice(touchedIdx, 1);
-      setTimeout(() => {
-        if (!destroyed && roamingWilds.length < 4) spawnRoamingWilds();
-      }, 15000);
-      launchBattle({ opponentPokemon: rw.pokemon, isWild: true });
+    const currentTile = getTile(mapGrids[currentMapId], player.x, player.y);
+    if (currentTile !== TILE.GRASS_TALL && !(currentTile === TILE.SAND && player.y >= 26)) {
+      return;
+    }
+
+    if (!player.hasStarter) {
+      showDialogue(
+        'Professeur Platane',
+        'Attends ! Ne va pas dans les hautes herbes sans Pokémon !\nEntre d\'abord dans mon Laboratoire au Nord-Ouest (porte en 6,8) pour choisir ton Starter !',
+        null,
+        'assets/trainers/sycamore.png'
+      );
       return;
     }
 
@@ -444,16 +512,15 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       return;
     }
 
-    const currentTile = getTile(grid, player.x, player.y);
     if (currentTile === TILE.GRASS_TALL) {
-      if (Math.random() < 0.15) {
-        encounterCooldown = 4;
+      if (Math.random() < 0.22) {
+        encounterCooldown = 3;
         const wild = rollWildEncounter('grass');
         launchBattle({ opponentPokemon: wild, isWild: true });
       }
     } else if (currentTile === TILE.SAND && player.y >= 26) {
-      if (Math.random() < 0.09) {
-        encounterCooldown = 5;
+      if (Math.random() < 0.14) {
+        encounterCooldown = 4;
         const wild = rollWildEncounter('water');
         launchBattle({ opponentPokemon: wild, isWild: true });
       }
@@ -465,7 +532,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     if (!alivePoke) {
       showDialogue(
         'Infirmière Joëlle',
-        'Tous vos Pokémon sont K.O. ! Passez d\'abord au Centre Pokémon pour les remettre sur pied.',
+        'Tous vos Pokémon sont K.O. ! Entrez au Centre Pokémon de Menton pour les remettre sur pied.',
         null,
         'assets/trainers/pokemoncenterlady.png'
       );
@@ -520,18 +587,24 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
               );
             }
           } else if (result === 'lost') {
-            player.x = 17;
-            player.y = 9;
-            player.prevX = 17;
-            player.prevY = 8;
-            player.dir = 'down';
-            player.visualX = 17;
-            player.visualY = 9;
+            currentMapId = 'pokecenter';
+            player.mapId = 'pokecenter';
+            player.x = 6;
+            player.y = 5;
+            player.prevX = 6;
+            player.prevY = 5;
+            player.dir = 'up';
+            player.visualX = 6;
+            player.visualY = 5;
+            me.mapId = 'pokecenter';
+            me.x = 6;
+            me.y = 5;
             healParty(player);
             sfx.playHeal();
+            net.broadcastPos(player);
             showDialogue(
               'Infirmière Joëlle',
-              'Vous avez été rapatrié au Centre Pokémon de Menton.\nVos compagnons sont entièrement rétablis !',
+              'Vous avez été rapatrié à l\'intérieur du Centre Pokémon de Menton.\nVos compagnons sont entièrement rétablis !',
               null,
               'assets/trainers/pokemoncenterlady.png'
             );
@@ -557,22 +630,36 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     }
 
     const front = getFrontTile(player.x, player.y, player.dir);
+    const grid = mapGrids[currentMapId];
     const tile = getTile(grid, front.x, front.y);
+    const curDef = MAPS[currentMapId];
 
-    // 1. Parler au Professeur Platane en (5,6)
-    if (front.x === 5 && front.y === 6) {
-      if (!player.hasStarter) {
-        openStarterModal();
-      } else {
-        const caughtCount = (player.pokedex && player.pokedex.caught && player.pokedex.caught.length) || 0;
-        showDialogue(
-          'Professeur Platane',
-          `Voyons ton Pokédex... Tu as déjà capturé ${caughtCount} espèce(s) sur 28 à Menton !\nN'oublie pas que tes Pokémon évoluent en montant de niveau face aux dresseurs de la Route 1 !`,
-          null,
-          'assets/trainers/sycamore.png'
-        );
+    // 0. Entrer / Sortir si on fait face à une porte ou un tapis de sortie
+    if (curDef && curDef.warps) {
+      const frontWarp = curDef.warps[`${front.x},${front.y}`] || curDef.warps[`${player.x},${player.y}`];
+      if (frontWarp) {
+        triggerWarp(frontWarp);
+        return;
       }
-      return;
+    }
+
+    // 1. Parler au Professeur Platane dans le Laboratoire
+    if (curDef && curDef.staticNpcs) {
+      const sNpc = curDef.staticNpcs.find(n => n.x === front.x && n.y === front.y);
+      if (sNpc && sNpc.id === 'prof_platane') {
+        if (!player.hasStarter) {
+          openStarterModal();
+        } else {
+          const caughtCount = (player.pokedex && player.pokedex.caught && player.pokedex.caught.length) || 0;
+          showDialogue(
+            'Professeur Platane',
+            `Voyons ton Pokédex... Tu as déjà capturé ${caughtCount} espèce(s) sur 28 à Menton !\nN'oublie pas que tes Pokémon évoluent en montant de niveau face aux dresseurs de la Route 1 !`,
+            null,
+            'assets/trainers/sycamore.png'
+          );
+        }
+        return;
+      }
     }
 
     // 2. Table du Laboratoire (Starters)
@@ -618,7 +705,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       sfx.playHeal();
       showDialogue(
         'Infirmière Joëlle',
-        'Bienvenue au Centre Pokémon de Menton !\n♪ Tut-tut-tut-tulut ! Vos Pokémon ont retrouvé toute leur énergie et leurs PP !',
+        'Bienvenue au Centre Pokémon de Menton !\nVos Pokémon ont retrouvé toute leur énergie et leurs PP !',
         null,
         'assets/trainers/pokemoncenterlady.png'
       );
@@ -651,7 +738,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
     }
 
     // 8. Dresseur PNJ ou Championne d'Arène Solène
-    const npcTrainer = ADVENTURE_TRAINERS.find(tr => tr.x === front.x && tr.y === front.y);
+    const npcTrainer = ADVENTURE_TRAINERS.find(tr => (tr.mapId || 'outdoor') === currentMapId && tr.x === front.x && tr.y === front.y);
     if (npcTrainer) {
       if (!player.hasStarter) {
         showDialogue(npcTrainer.name, 'Choisis d\'abord ton premier Pokémon au Laboratoire du Prof. Platane !', null, npcTrainer.portrait);
@@ -674,17 +761,8 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
       return;
     }
 
-    // 9. Pokémon sauvage visible en face
-    const wildIdx = roamingWilds.findIndex(rw => rw.x === front.x && rw.y === front.y);
-    if (wildIdx !== -1 && player.hasStarter) {
-      const rw = roamingWilds[wildIdx];
-      roamingWilds.splice(wildIdx, 1);
-      launchBattle({ opponentPokemon: rw.pokemon, isWild: true });
-      return;
-    }
-
-    // 10. Duel avec un joueur multijoueur
-    const peer = net.getPlayersList().find(p => p.x === front.x && p.y === front.y);
+    // 9. Duel avec un joueur multijoueur
+    const peer = net.getPlayersList().find(p => (p.mapId || 'outdoor') === currentMapId && p.x === front.x && p.y === front.y);
     if (peer) {
       showDialogue(peer.name, `Vous lancez un défi Pokémon à ${peer.name} ! En attente de sa réponse...`);
       net.sendDuelRequest(peer.id);
@@ -759,7 +837,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
         net.broadcastPos(player);
         showDialogue(
           'Professeur Platane',
-          `Excellent choix ! ${starter.name} marche désormais derrière toi sur la carte !\nVa défier les dresseurs de la Route 1 à l'Est avant d'affronter la Championne Solène !`,
+          `Excellent choix ! ${starter.name} rejoint ton équipe !\nSors par le tapis rouge au Sud pour explorer les hautes herbes de la Route 1 et défier l'Arène de Menton !`,
           null,
           'assets/trainers/sycamore.png'
         );
@@ -785,7 +863,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
               <h2>Sac & Équipe Pokémon</h2>
-              <p>Dresseur : <strong>${player.name}</strong> • Argent : <strong style="color:#ffd700">${player.money || 0} ₽</strong> • Victoires : <strong>${player.stats?.battlesWon || 0}</strong></p>
+              <p>Dresseur : <strong>${player.name}</strong> • Argent : <strong style="color:#ffd700">${player.money || 0} P$</strong> • Victoires : <strong>${player.stats?.battlesWon || 0}</strong></p>
             </div>
             ${statusMessage ? `<div class="adv-bag-feedback">${statusMessage}</div>` : ''}
           </div>
@@ -796,14 +874,14 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
           <div class="adv-section-col">
             <h3>Mon Équipe (${player.party.length}/6) ${selectedBagItem ? `<span style="color:#facc15;font-size:12px;">— Cliquez sur un Pokémon pour utiliser ${ITEMS[selectedBagItem]?.name}</span>` : ''}</h3>
             <div class="adv-party-cards">
-              ${player.party.length === 0 ? '<div class="adv-empty">Aucun Pokémon. Allez au Laboratoire !</div>' : ''}
+              ${player.party.length === 0 ? '<div class="adv-empty">Aucun Pokémon. Entrez au Laboratoire !</div>' : ''}
               ${player.party.map((p, idx) => `
                 <div class="adv-poke-card ${p.fainted ? 'fainted' : ''} ${selectedBagItem ? 'selectable-target' : ''}" data-idx="${idx}">
                   <img src="${spriteUrls(p.id).icon}" alt="${p.name}" class="poke-icon">
                   <div class="poke-info">
                     <div class="pi-title">
                       ${p.name} <span class="pi-lv">N.${p.level}</span>
-                      ${idx === 0 ? '<span class="adv-lead-tag">SUIVEUR</span>' : ''}
+                      ${idx === 0 ? '<span class="adv-lead-tag">EN TÊTE</span>' : ''}
                     </div>
                     <div class="pi-hp-bar">
                       <div class="pi-hp-fill" style="width: ${(p.currentHp / p.maxHp) * 100}%"></div>
@@ -857,7 +935,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
           sfx.playSwitch();
           me.leadPokeId = player.party[0].id;
           net.broadcastPos(player);
-          openBagModal(`${player.party[0].name} marche désormais à vos côtés !`);
+          openBagModal(`${player.party[0].name} est désormais en tête de votre équipe !`);
         }
       };
     });
@@ -901,7 +979,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
               <h2>Boutique Pokémon & Marché de Menton</h2>
-              <p>Votre portefeuille : <strong style="color:#ffd700;font-size:16px;">${player.money || 0} ₽</strong></p>
+              <p>Votre portefeuille : <strong style="color:#ffd700;font-size:16px;">${player.money || 0} P$</strong></p>
             </div>
             ${feedback ? `<div class="adv-bag-feedback">${feedback}</div>` : ''}
           </div>
@@ -919,7 +997,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
                   <div class="mart-desc">${it.desc}</div>
                 </div>
                 <button class="adv-btn mart-buy-btn" data-key="${k}" ${(player.money || 0) < it.price ? 'disabled' : ''}>
-                  Acheter ${it.price} ₽
+                  Acheter ${it.price} P$
                 </button>
               </div>
             `;
@@ -938,7 +1016,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
         const res = buyItem(player, key, 1);
         if (res.ok) {
           sfx.playItem();
-          openMartModal(`Vous avez acheté 1 ${res.item.name} (-${res.totalCost} ₽) !`);
+          openMartModal(`Vous avez acheté 1 ${res.item.name} (-${res.totalCost} P$) !`);
         } else {
           sfx.playMiss();
           openMartModal(res.reason);
@@ -1049,7 +1127,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
           <div class="badge-medal">${hasGymBadge ? '★' : '?'}</div>
           <div>
             <div class="badge-title">Badge Citron d'Or — Arène de Menton</div>
-            <div class="badge-desc">${hasGymBadge ? 'Obtenu en triomphant de la Championne Solène !' : 'Vainquez la Championne Solène à l\'Arène de Menton (Nord-Est) pour l\'obtenir.'}</div>
+            <div class="badge-desc">${hasGymBadge ? 'Obtenu en triomphant de la Championne Solène !' : 'Vainquez la Championne Solène dans l\'Arène de Menton (Nord-Est) pour l\'obtenir.'}</div>
           </div>
         </div>
 

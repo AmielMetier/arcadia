@@ -14,6 +14,7 @@ import {
 } from '../pokemon/adventure/data.js';
 import {
   createMentonMap,
+  MAPS,
   isSolid,
   getTile,
   TILE,
@@ -88,25 +89,36 @@ const gymParty = createTrainerParty(gymLeader);
 assert.strictEqual(gymParty.length, 3, 'Solène possède 3 Pokémon');
 console.log(`✓ Dresseurs PNJ et Championne ${gymLeader.name} (${gymParty.map(p => p.name).join(', ')}) validés`);
 
-console.log('\n--- 5. Test Carte de Menton, Boutique, Arène & Collisions ---');
+console.log('\n--- 5. Test Carte de Menton, Portes des Bâtiments, Intérieurs & Collisions ---');
 const map = createMentonMap();
 assert.strictEqual(map.length, MAP_HEIGHT, 'Hauteur de carte correcte');
 assert.strictEqual(map[0].length, MAP_WIDTH, 'Largeur de carte correcte');
 
-assert.strictEqual(getTile(map, 6, 6), TILE.LAB_TABLE, 'Table du labo à (6,6)');
-assert.strictEqual(getTile(map, 17, 6), TILE.NURSE_DESK, 'Comptoir infirmière à (17,6)');
-assert.strictEqual(getTile(map, 19, 6), TILE.PC_BOX, 'PC à (19,6)');
-assert.strictEqual(getTile(map, 19, 14), TILE.MART_DESK, 'Boutique Pokémon à (19,14)');
-assert.strictEqual(getTile(map, 38, 4), TILE.DOOR, 'Porte de l\'Arène de Menton à (38,4)');
+assert.strictEqual(getTile(map, 6, 8), TILE.DOOR, 'Porte du Labo à (6,8)');
+assert.strictEqual(getTile(map, 17, 8), TILE.DOOR, 'Porte du Centre Pokémon à (17,8)');
+assert.strictEqual(getTile(map, 19, 15), TILE.DOOR, 'Porte de la Boutique Pokémon à (19,15)');
+assert.strictEqual(getTile(map, 38, 5), TILE.DOOR, 'Porte de l\'Arène de Menton à (38,5)');
 assert.strictEqual(getTile(map, 12, 15), TILE.FOUNTAIN, 'Fontaine à (12,15)');
 assert.strictEqual(getTile(map, 9, 13), TILE.LEMON_TREE, 'Citronnier à (9,13)');
 
-assert.strictEqual(isSolid(map, 6, 6), true, 'Table labo solide');
-assert.strictEqual(isSolid(map, 19, 14), true, 'Comptoir boutique solide');
-assert.strictEqual(isSolid(map, 6, 7), false, 'Intérieur labo marchable');
+const labGrid = MAPS.lab.createGrid();
+const centerGrid = MAPS.pokecenter.createGrid();
+const martGrid = MAPS.pokemart.createGrid();
+const gymGrid = MAPS.gym.createGrid();
+
+assert.strictEqual(getTile(labGrid, 6, 4), TILE.LAB_TABLE, 'Table du labo à l\'intérieur du Labo (6,4)');
+assert.strictEqual(getTile(labGrid, 5, 9), TILE.EXIT_MAT, 'Tapis de sortie du Labo à (5,9)');
+assert.strictEqual(getTile(centerGrid, 5, 3), TILE.NURSE_DESK, 'Comptoir infirmière dans le Centre Pokémon à (5,3)');
+assert.strictEqual(getTile(centerGrid, 9, 3), TILE.PC_BOX, 'PC dans le Centre Pokémon à (9,3)');
+assert.strictEqual(getTile(martGrid, 4, 3), TILE.MART_DESK, 'Comptoir dans la Boutique Pokémon à (4,3)');
+assert.strictEqual(getTile(gymGrid, 6, 11), TILE.EXIT_MAT, 'Tapis de sortie de l\'Arène à (6,11)');
+
+assert.strictEqual(isSolid(labGrid, 6, 4), true, 'Table labo solide');
+assert.strictEqual(isSolid(martGrid, 4, 3), true, 'Comptoir boutique solide');
+assert.strictEqual(isSolid(labGrid, 5, 5), false, 'Intérieur labo marchable');
 assert.strictEqual(isSolid(map, 10, 29), true, 'Mer solide');
 assert.strictEqual(isSolid(map, 10, 25), false, 'Sable plage marchable');
-console.log('✓ Lieux emblématiques de Menton (Labo, Centre, Boutique, Arène) et collisions validés');
+console.log('✓ Lieux emblématiques de Menton, portes franchissables et 4 intérieurs (Labo, Centre, Boutique, Arène) validés');
 
 console.log('\n--- 6. Test Joueur, Boutique, Soin Hors Combat, Suiveur & PC ---');
 const player = getInitialPlayerData('Red', '#ff0000');
@@ -169,7 +181,7 @@ const net = createAdventureNetwork({
 net.broadcastPos(player);
 assert.strictEqual(sentTarget, 'all');
 assert.strictEqual(sentPayload.t, 'adv_pos');
-assert.strictEqual(sentPayload.leadPokeId, player.party[0].id);
+assert.strictEqual(sentPayload.mapId, 'outdoor');
 
 // Réception d'un message HubBridge ('msg', fromId, payload)
 msgListener('p2', {
@@ -178,14 +190,14 @@ msgListener('p2', {
   name: 'Serena',
   color: '#3b82f6',
   avatar: 'green',
+  mapId: 'outdoor',
   x: 12,
   y: 15,
-  dir: 'down',
-  leadPokeId: 653
+  dir: 'down'
 });
 assert.strictEqual(remoteList.length, 1);
 assert.strictEqual(remoteList[0].name, 'Serena');
-assert.strictEqual(remoteList[0].leadPokeId, 653);
-console.log('✓ Synchronisation multijoueur HubBridge et Pokémon suiveur distant validés');
+assert.strictEqual(remoteList[0].mapId, 'outdoor');
+console.log('✓ Synchronisation multijoueur HubBridge et filtrage par salle/carte validés');
 
 console.log('\nTOUS LES TESTS DU MODE AVENTURE KALOS-SUD (MASTER EDITION) SONT AU VERT !');

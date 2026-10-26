@@ -18,7 +18,71 @@ class SoundManager {
     this.audioPool = new Map();
     this.cryCache = new Map();
     this.ctx = null;
+    this.bgmAudio = null;
     this.preload();
+  }
+
+  init() {
+    this.getAudioContext();
+  }
+
+  startBgm() {
+    if (!this.enabled || typeof window === 'undefined') return;
+    try {
+      if (!this.bgmAudio) {
+        this.bgmAudio = new Audio('assets/bgm_battle.mp3');
+        this.bgmAudio.loop = true;
+        this.bgmAudio.volume = 0.25;
+      }
+      this.bgmAudio.currentTime = 0;
+      this.bgmAudio.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  stopBgm() {
+    try {
+      if (this.bgmAudio) {
+        this.bgmAudio.pause();
+        this.bgmAudio.currentTime = 0;
+      }
+    } catch (e) {}
+  }
+
+  playClick() {
+    this.playTone(720, 45, 0, 'triangle', 0.12);
+  }
+
+  playSelect() {
+    this.playTone(880, 55, 0, 'sine', 0.15);
+    this.playTone(1174.66, 70, 50, 'sine', 0.14);
+  }
+
+  playFaint() {
+    this.playAudioFile('faint', 0.7);
+  }
+
+  playMiss() {
+    this.playAudioFile('hit_weak', 0.5);
+  }
+
+  playStatChange(delta = 1) {
+    if (delta > 0) {
+      this.playTone(523.25, 70, 0, 'sine', 0.15);
+      this.playTone(659.25, 70, 70, 'sine', 0.15);
+      this.playTone(783.99, 110, 140, 'sine', 0.16);
+    } else {
+      this.playTone(659.25, 70, 0, 'sawtooth', 0.12);
+      this.playTone(523.25, 70, 70, 'sawtooth', 0.12);
+      this.playTone(392.00, 110, 140, 'sawtooth', 0.14);
+    }
+  }
+
+  playSwitch() {
+    this.playAudioFile('switch', 0.6);
+  }
+
+  playVictory() {
+    this.playAudioFile('victory', 0.75);
   }
 
   getAudioContext() {
@@ -203,6 +267,7 @@ class SoundManager {
 
   toggle() {
     this.enabled = !this.enabled;
+    if (!this.enabled) this.stopBgm();
     return this.enabled;
   }
 }

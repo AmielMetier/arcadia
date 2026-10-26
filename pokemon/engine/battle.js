@@ -195,7 +195,18 @@ export function resolveTurn(state, actionA, actionB) {
       pA = state.teamA[targetIdx];
       pA.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       pA.toxicTurns = 0;
-      logEvent({ type: 'switch', side: 'A', pokemonId: pA.id, name: pA.name, trainer: tA.name, msg: `${tA.name} rappelle son Pokémon et envoie ${pA.name} !` });
+      logEvent({
+        type: 'switch',
+        side: 'A',
+        pokemonId: pA.id,
+        name: pA.name,
+        hp: pA.hp,
+        maxHp: pA.maxHp,
+        types: pA.types,
+        status: pA.status || null,
+        trainer: tA.name,
+        msg: `${tA.name} rappelle son Pokémon et envoie ${pA.name} !`
+      });
     }
   }
 
@@ -206,7 +217,18 @@ export function resolveTurn(state, actionA, actionB) {
       pB = state.teamB[targetIdx];
       pB.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       pB.toxicTurns = 0;
-      logEvent({ type: 'switch', side: 'B', pokemonId: pB.id, name: pB.name, trainer: tB.name, msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !` });
+      logEvent({
+        type: 'switch',
+        side: 'B',
+        pokemonId: pB.id,
+        name: pB.name,
+        hp: pB.hp,
+        maxHp: pB.maxHp,
+        types: pB.types,
+        status: pB.status || null,
+        trainer: tB.name,
+        msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !`
+      });
     }
   }
 
@@ -293,6 +315,7 @@ export function resolveTurn(state, actionA, actionB) {
       type: 'attack_start',
       side: attSide,
       pokemonId: attPoke.id,
+      attName: attPoke.name,
       moveName: attMove.name,
       moveType: attMove.type,
       msg: `${attPoke.name} utilise ${attMove.name} !`
@@ -322,7 +345,7 @@ export function resolveTurn(state, actionA, actionB) {
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
         amount: healAmount,
-        msg: `${attPoke.name} récupère des PV !`
+        msg: `${attPoke.name} récupère ${healAmount} PV !`
       });
       return;
     }
@@ -382,6 +405,8 @@ export function resolveTurn(state, actionA, actionB) {
       type: 'damage',
       attSide,
       defSide,
+      attName: attPoke.name,
+      defName: defPoke.name,
       moveName: attMove.name,
       moveType: attMove.type,
       damage: res.damage,
@@ -403,7 +428,7 @@ export function resolveTurn(state, actionA, actionB) {
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
         amount: drainAmount,
-        msg: `${attPoke.name} draine l'énergie de ${defPoke.name} !`
+        msg: `${attPoke.name} draine ${drainAmount} PV à ${defPoke.name} !`
       });
     }
 
@@ -417,7 +442,7 @@ export function resolveTurn(state, actionA, actionB) {
         damage: recoilDmg,
         hp: attPoke.hp,
         maxHp: attPoke.maxHp,
-        msg: `${attPoke.name} subit le contrecoup !`
+        msg: `${attPoke.name} subit ${recoilDmg} PV de contrecoup !`
       });
       if (attPoke.hp === 0) {
         attPoke.fainted = true;
@@ -483,17 +508,17 @@ export function resolveTurn(state, actionA, actionB) {
     if (poke.status === 'burn') {
       const burnDmg = Math.max(1, Math.floor(poke.maxHp / 16));
       poke.hp = Math.max(0, poke.hp - burnDmg);
-      logEvent({ type: 'status_damage', side, damage: burnDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre de sa brûlure !` });
+      logEvent({ type: 'status_damage', side, damage: burnDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre de sa brûlure (-${burnDmg} PV) !` });
     } else if (poke.status === 'poison') {
       const poisonDmg = Math.max(1, Math.floor(poke.maxHp / 8));
       poke.hp = Math.max(0, poke.hp - poisonDmg);
-      logEvent({ type: 'status_damage', side, damage: poisonDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre du poison !` });
+      logEvent({ type: 'status_damage', side, damage: poisonDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre du poison (-${poisonDmg} PV) !` });
     } else if (poke.status === 'toxic') {
       poke.toxicTurns = (poke.toxicTurns || 1);
       const toxicDmg = Math.max(1, Math.floor((poke.maxHp * poke.toxicTurns) / 16));
       poke.toxicTurns = Math.min(15, poke.toxicTurns + 1);
       poke.hp = Math.max(0, poke.hp - toxicDmg);
-      logEvent({ type: 'status_damage', side, damage: toxicDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `Le venin ronge gravement ${poke.name} !` });
+      logEvent({ type: 'status_damage', side, damage: toxicDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `Le venin ronge gravement ${poke.name} (-${toxicDmg} PV) !` });
     }
 
     if (poke.hp === 0 && !poke.fainted) {
@@ -555,6 +580,10 @@ export function forceSwitch(state, side, targetIdx) {
     side,
     pokemonId: nextPoke.id,
     name: nextPoke.name,
+    hp: nextPoke.hp,
+    maxHp: nextPoke.maxHp,
+    types: nextPoke.types,
+    status: nextPoke.status || null,
     trainer: trainer.name,
     msg: `${trainer.name} envoie ${nextPoke.name} au combat !`
   };
@@ -582,16 +611,16 @@ export function estimateTurnDuration(events) {
   if (!events || !events.length) return 0;
   let total = 0;
   for (const ev of events) {
-    if (ev.type === 'switch') total += 1100;
-    else if (ev.type === 'attack_start') total += 850;
-    else if (ev.type === 'damage') total += 1150;
-    else if (ev.type === 'heal' || ev.type === 'recoil') total += 900;
-    else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured') total += 900;
-    else if (ev.type === 'faint') total += 1200;
-    else if (ev.type === 'status_damage') total += 1000;
-    else if (ev.type === 'msg') total += 850;
-    else if (ev.type === 'victory') total += 1200;
-    else total += 600;
+    if (ev.type === 'switch') total += 1500;
+    else if (ev.type === 'attack_start') total += 1400;
+    else if (ev.type === 'damage') total += 1550;
+    else if (ev.type === 'heal' || ev.type === 'recoil') total += 1300;
+    else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured') total += 1300;
+    else if (ev.type === 'faint') total += 1500;
+    else if (ev.type === 'status_damage') total += 1350;
+    else if (ev.type === 'msg') total += 1300;
+    else if (ev.type === 'victory') total += 1600;
+    else total += 900;
   }
   return total;
 }

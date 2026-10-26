@@ -163,12 +163,14 @@ button { font: inherit; color: inherit; }
   position: relative;
 }
 
-/* Champ de Bataille avec Arrière-plan Officiel Showdown */
+/* Champ de Bataille avec Arrière-plan Pixel Art Gen 5 Authentique */
 .battlefield {
   flex: 1;
   min-height: 420px;
   position: relative;
-  background: #070c18 url('assets/arena_stadium.jpg') center center / cover no-repeat;
+  background: #70c850 url('assets/plains_bg.png') center center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
   overflow: hidden;
   display: block;
 }
@@ -177,67 +179,67 @@ button { font: inherit; color: inherit; }
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 35%, rgba(5, 10, 22, 0.45) 75%, rgba(4, 8, 18, 0.8) 100%),
-              linear-gradient(180deg, rgba(8, 14, 28, 0.25) 0%, transparent 45%, rgba(8, 14, 28, 0.75) 100%);
+  background: linear-gradient(180deg, rgba(8, 14, 28, 0.12) 0%, transparent 35%, transparent 75%, rgba(8, 14, 28, 0.35) 100%);
   pointer-events: none;
   z-index: 2;
 }
 
-/* Zones de combat (Socles Officiels & Sprites Pokémon) */
+/* Zones de combat (Socles Officiels Gen 5 & Sprites Pokémon) */
 .fighter-zone {
   position: absolute;
   z-index: 5;
 }
 
 .fighter-top {
-  top: 95px;
-  right: 110px;
+  top: 112px;
+  right: 115px;
 }
 
 .fighter-bottom {
-  bottom: 25px;
-  left: 90px;
+  bottom: 24px;
+  left: 95px;
   z-index: 6;
 }
 
-/* Plateformes de Combat avec Socles Officiels plains_a / plains_b */
+/* Plateformes de Combat avec Socles Officiels Gen 5 (128x36) */
 .platform {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  display: block;
 }
 
 .platform-top {
-  width: 250px;
-  height: 125px;
+  width: 240px;
+  height: 68px;
 }
 
 .platform-bottom {
-  width: 320px;
-  height: 155px;
+  width: 300px;
+  height: 84px;
 }
 
 .plat-img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: fill;
   position: absolute;
   bottom: 0;
   left: 0;
   display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
   pointer-events: none;
   user-select: none;
 }
 
 .platform-top .plat-img {
-  filter: drop-shadow(0 14px 20px rgba(0,0,0,0.85)) drop-shadow(0 0 16px rgba(255, 75, 43, 0.4));
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
 .platform-bottom .plat-img {
-  filter: drop-shadow(0 18px 24px rgba(0,0,0,0.9)) drop-shadow(0 0 22px rgba(0, 229, 255, 0.45));
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
 }
 
-/* Sprites Pokémon Gen 5 Pixel Art Animés */
+/* Sprites Pokémon Gen 5 Pixel Art Animés — Pieds ancrés au centre du socle */
 .poke-sprite {
   position: absolute;
   left: 50%;
@@ -245,28 +247,26 @@ button { font: inherit; color: inherit; }
   image-rendering: pixelated;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
-  filter: drop-shadow(0 10px 12px rgba(0,0,0,0.65));
+  filter: drop-shadow(0 8px 8px rgba(0,0,0,0.55));
   transition: opacity 0.4s ease, filter 0.3s ease;
   pointer-events: none;
   z-index: 3;
 }
 
 .poke-sprite.front {
-  bottom: 26px;
-  max-width: 160px;
-  max-height: 140px;
-  width: auto;
-  height: auto;
+  bottom: 24px;
+  width: 145px;
+  height: 135px;
   object-fit: contain;
+  object-position: center bottom;
 }
 
 .poke-sprite.back {
-  bottom: 32px;
-  max-width: 230px;
-  max-height: 195px;
-  width: auto;
-  height: auto;
+  bottom: 28px;
+  width: 175px;
+  height: 160px;
   object-fit: contain;
+  object-position: center bottom;
 }
 
 .poke-sprite.fainted {
@@ -1085,8 +1085,9 @@ b.hp-red { color: #ef4444; background: none !important; }
    ========================================================================== */
 .bracket-screen {
   width: min(980px, 98vw);
-  background: radial-gradient(circle at 50% 20%, rgba(18, 28, 52, 0.85) 0%, rgba(8, 12, 22, 0.97) 100%),
-              url('assets/tournament_stage.jpg') center center / cover no-repeat;
+  background: radial-gradient(circle at 50% 20%, rgba(18, 28, 52, 0.88) 0%, rgba(8, 12, 22, 0.96) 100%),
+              url('assets/metropolis_bg.png') center center / cover no-repeat;
+  image-rendering: pixelated;
   border: 2px solid #2e4363;
   box-shadow: 0 20px 60px rgba(0,0,0,0.85), inset 0 0 40px rgba(0,0,0,0.6);
   border-radius: 18px;
@@ -1328,7 +1329,8 @@ b.hp-red { color: #ef4444; background: none !important; }
 .podium-screen {
   width: min(920px, 96vw);
   background: radial-gradient(circle at 50% 25%, rgba(255, 203, 5, 0.18) 0%, rgba(10, 15, 26, 0.96) 100%),
-              url('assets/tournament_stage.jpg') center center / cover no-repeat;
+              url('assets/metropolis_bg.png') center center / cover no-repeat;
+  image-rendering: pixelated;
   border: 2px solid #ffd27a;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 50px rgba(255, 203, 5, 0.3);
   border-radius: 20px;
@@ -1465,16 +1467,15 @@ b.hp-red { color: #ef4444; background: none !important; }
 .dash-resolving-view {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 130px;
-  background: linear-gradient(180deg, rgba(14, 22, 38, 0.95), rgba(7, 12, 22, 0.98));
-  border: 2px solid rgba(255, 203, 5, 0.45);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 0 16px rgba(255, 203, 5, 0.1);
-  border-radius: 14px;
-  padding: 16px 24px;
-  text-align: center;
+  background: linear-gradient(180deg, rgba(14, 22, 38, 0.96), rgba(7, 12, 22, 0.99));
+  border: 2px solid rgba(255, 203, 5, 0.55);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), inset 0 0 16px rgba(255, 203, 5, 0.12);
+  border-radius: 12px;
+  padding: 12px 20px;
 }
 
 .dash-resolving-title {
@@ -1482,10 +1483,33 @@ b.hp-red { color: #ef4444; background: none !important; }
   align-items: center;
   gap: 10px;
   font-family: var(--bung);
-  font-size: 15px;
+  font-size: 14px;
   color: #ffcb05;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.dash-resolving-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+}
+
+.turn-step-item {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  background: rgba(30, 41, 59, 0.72);
+  border-left: 3px solid #ffcb05;
+  padding: 5px 10px;
+  border-radius: 5px;
+  animation: stepFadeIn 0.22s ease-out forwards;
+}
+
+@keyframes stepFadeIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .dash-resolving-desc {
@@ -1645,14 +1669,16 @@ b.hp-red { color: #ef4444; background: none !important; }
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: url('assets/arena_stadium.jpg') center/cover no-repeat;
+  background: #70c850 url('assets/plains_bg.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .adv-battle-screen::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.85));
+  background: linear-gradient(180deg, rgba(8, 14, 28, 0.08) 0%, transparent 40%, rgba(8, 14, 28, 0.28) 100%);
   pointer-events: none;
 }
 
@@ -1668,8 +1694,8 @@ b.hp-red { color: #ef4444; background: none !important; }
 }
 
 .adv-side.top {
-  top: 30px;
-  right: 5%;
+  top: 26px;
+  right: 7%;
   width: 440px;
   display: flex;
   flex-direction: column;
@@ -1677,8 +1703,8 @@ b.hp-red { color: #ef4444; background: none !important; }
 }
 
 .adv-side.bottom {
-  bottom: 20px;
-  left: 5%;
+  bottom: 18px;
+  left: 7%;
   width: 440px;
   display: flex;
   flex-direction: column;
@@ -1687,69 +1713,80 @@ b.hp-red { color: #ef4444; background: none !important; }
 
 .adv-platform-opp {
   position: relative;
-  width: 320px;
-  height: 140px;
-  background: url('assets/platform_opponent.png') center/contain no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 240px;
+  height: 68px;
+  margin-top: 28px;
+  margin-right: 24px;
+  background: url('assets/plat_grass_enemy.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45));
 }
 
 .adv-platform-player {
   position: relative;
-  width: 340px;
-  height: 150px;
-  background: url('assets/platform_player.png') center/contain no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 300px;
+  height: 84px;
+  margin-left: 24px;
+  background: url('assets/plat_grass_enemy.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,0.5));
 }
 
 .adv-poke-sprite {
   position: absolute;
-  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6));
-  transition: transform 0.2s ease;
+  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.55));
+  transition: transform 0.2s ease, opacity 0.3s ease;
 }
 
 .adv-poke-sprite.front {
-  width: 140px;
-  height: 140px;
+  bottom: 24px;
+  width: 145px;
+  height: 135px;
   object-fit: contain;
+  object-position: center bottom;
 }
 
 .adv-poke-sprite.back {
-  width: 180px;
-  height: 180px;
+  bottom: 28px;
+  width: 175px;
+  height: 160px;
   object-fit: contain;
+  object-position: center bottom;
 }
 
 /* Lancer de Poké Ball animé */
 .adv-pokeball-throw {
   position: absolute;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   display: none;
   z-index: 10;
+  image-rendering: pixelated;
 }
 
 .adv-pokeball-throw.anim-ball-arc {
   display: block;
+  left: 50%;
+  bottom: 26px;
   animation: pokeballArc 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .adv-pokeball-throw.landed {
   display: block;
-  left: 140px;
-  bottom: 35px;
+  left: calc(50% - 17px);
+  bottom: 26px;
 }
 
 @keyframes pokeballArc {
   0% { transform: translate(-300px, 180px) rotate(0deg) scale(1.4); }
   50% { transform: translate(-100px, -60px) rotate(360deg) scale(1.1); }
-  100% { transform: translate(0, 0) rotate(720deg) scale(0.9); }
+  100% { transform: translate(-50%, 0) rotate(720deg) scale(0.95); }
 }
 
 .adv-pokeball-throw.wobble {
@@ -1769,8 +1806,8 @@ b.hp-red { color: #ef4444; background: none !important; }
 }
 
 @keyframes pokeCaughtShrink {
-  0% { transform: scale(1); filter: drop-shadow(0 0 20px #ef4444) brightness(1.5); }
-  100% { transform: scale(0.05) translate(0, 80px); opacity: 0; }
+  0% { transform: translateX(-50%) scale(1); filter: drop-shadow(0 0 20px #ef4444) brightness(1.5); }
+  100% { transform: translate(-50%, 40px) scale(0.05); opacity: 0; }
 }
 
 .adv-poke-sprite.anim-break-free {
@@ -1778,8 +1815,8 @@ b.hp-red { color: #ef4444; background: none !important; }
 }
 
 @keyframes pokeBreakFree {
-  0% { transform: scale(0.2); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: translateX(-50%) scale(0.2); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
 }
 
 /* Cartes HUD de combat */
@@ -2234,11 +2271,13 @@ b.hp-red { color: #ef4444; background: none !important; }
    ========================================================================== */
 
 .adv-battle-screen {
-  background: url('assets/menton_battle_bg.jpg') center/cover no-repeat !important;
+  background: #70c850 url('assets/plains_bg.png') center / 100% 100% no-repeat !important;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .adv-battle-screen::before {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.58)) !important;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.28)) !important;
 }
 
 /* Transition flash GBA à l'entrée en combat */

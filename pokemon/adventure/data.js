@@ -433,6 +433,7 @@ export const ITEMS = {
 export const ADVENTURE_TRAINERS = [
   {
     id: 'theo',
+    mapId: 'outdoor',
     name: 'Scout Théo',
     role: 'Dresseur en herbe',
     sprite: 'youngster',
@@ -451,6 +452,7 @@ export const ADVENTURE_TRAINERS = [
   },
   {
     id: 'chloe',
+    mapId: 'outdoor',
     name: 'Fleuriste Chloé',
     role: 'Jardinière de Garavan',
     sprite: 'lass',
@@ -469,6 +471,7 @@ export const ADVENTURE_TRAINERS = [
   },
   {
     id: 'marius',
+    mapId: 'outdoor',
     name: 'Marin Marius',
     role: 'Pêcheur des Sablettes',
     sprite: 'sailor',
@@ -487,6 +490,7 @@ export const ADVENTURE_TRAINERS = [
   },
   {
     id: 'lucas',
+    mapId: 'outdoor',
     name: 'Montagnard Lucas',
     role: 'Randonneur de la Corniche',
     sprite: 'hiker',
@@ -506,6 +510,7 @@ export const ADVENTURE_TRAINERS = [
   },
   {
     id: 'solene',
+    mapId: 'gym',
     name: 'Championne Solène',
     role: 'Maîtresse de l\'Arène de Menton',
     sprite: 'cooltrainer_f',
@@ -513,8 +518,8 @@ export const ADVENTURE_TRAINERS = [
     isGymLeader: true,
     badge: 'citron_dor',
     badgeName: 'Badge Citron d\'Or',
-    x: 38,
-    y: 5,
+    x: 7,
+    y: 3,
     dir: 'down',
     color: '#eab308',
     rewardMoney: 1500,

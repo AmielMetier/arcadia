@@ -30,6 +30,7 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
       name: me.name,
       color: me.color,
       avatar: player.avatar || 'red',
+      mapId: player.mapId || 'outdoor',
       x: player.x,
       y: player.y,
       prevX: player.prevX ?? player.x,
@@ -47,6 +48,7 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
       name: me.name,
       color: me.color,
       avatar: player.avatar || 'red',
+      mapId: player.mapId || 'outdoor',
       x: player.x,
       y: player.y,
       prevX: player.prevX ?? player.x,
@@ -99,6 +101,7 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
         existing.name = msg.name;
         existing.color = msg.color;
         existing.avatar = msg.avatar || 'blue';
+        existing.mapId = msg.mapId || 'outdoor';
         existing.x = msg.x;
         existing.y = msg.y;
         existing.prevX = msg.prevX ?? msg.x;
@@ -115,6 +118,7 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
           name: me.name,
           color: me.color,
           avatar: me.avatar || 'red',
+          mapId: me.mapId || 'outdoor',
           x: me.x || 6,
           y: me.y || 9,
           prevX: me.prevX || 6,
@@ -136,6 +140,10 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
           };
           remotePlayers.set(msg.id, rp);
         }
+        if (rp.mapId !== (msg.mapId || 'outdoor')) {
+          rp.visualX = msg.x;
+          rp.visualY = msg.y;
+        }
         if (rp.x !== msg.x || rp.y !== msg.y) {
           rp.prevX = rp.x ?? msg.x;
           rp.prevY = rp.y ?? msg.y;
@@ -143,6 +151,7 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
         rp.name = msg.name || rp.name;
         rp.color = msg.color || rp.color;
         rp.avatar = msg.avatar || rp.avatar || 'blue';
+        rp.mapId = msg.mapId || 'outdoor';
         rp.x = msg.x;
         rp.y = msg.y;
         rp.dir = msg.dir;
