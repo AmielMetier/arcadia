@@ -1,5 +1,6 @@
 // pokemon/adventure/map.js
-// Carte du monde ouverte de Menton (Kalos-Sud) et de la Route 1 Corniche.
+// Carte du monde ouverte de Menton (Kalos-Sud), de la Plage des Sablettes,
+// de la Route 1 Corniche et de l'Arène Pokémon de Menton.
 // Grille 44 colonnes x 32 lignes (32x32 px par case).
 
 export const MAP_WIDTH = 44;
@@ -22,7 +23,11 @@ export const TILE = {
   LAB_TABLE: 12,  // Table des Poké Balls au Laboratoire (solide + starter)
   NURSE_DESK: 13, // Comptoir de l'infirmière Joëlle (solide + soin)
   PC_BOX: 14,     // Terminal PC de stockage (solide + PC)
-  DOOR: 15,       // Portes de bâtiments
+  DOOR: 15,       // Portes de bâtiments (walkable)
+  MART_DESK: 16,  // Comptoir de la Boutique Pokémon (solide + achat)
+  SIGN: 17,       // Panneau d'information (solide + lecture)
+  GYM_WALL: 18,   // Mur doré de l'Arène de Menton (solide)
+  GYM_ROOF: 19,   // Toiture azur et or de l'Arène de Menton (solide)
 };
 
 export const SOLID_TILES = new Set([
@@ -36,7 +41,37 @@ export const SOLID_TILES = new Set([
   TILE.LAB_TABLE,
   TILE.NURSE_DESK,
   TILE.PC_BOX,
+  TILE.MART_DESK,
+  TILE.SIGN,
+  TILE.GYM_WALL,
+  TILE.GYM_ROOF,
 ]);
+
+export const SIGNPOSTS = {
+  '8,9': {
+    title: 'Laboratoire Pokémon du Prof. Platane',
+    text: 'Centre d\'étude de la biodiversité de Kalos-Sud.\nLes nouveaux dresseurs peuvent y choisir leur premier Pokémon.'
+  },
+  '15,9': {
+    title: 'Centre Pokémon de Menton',
+    text: 'Soignez gratuitement votre équipe auprès de l\'Infirmière Joëlle\net gérez vos Pokémon grâce au PC de stockage.'
+  },
+  '22,12': {
+    title: 'Direction : Route 1 Corniche & Arène',
+    text: 'Est : Route 1 Corniche (Hautes herbes & Dresseurs)\nNord-Est : Arène Pokémon de Menton (Championne Solène).'
+  },
+  '14,22': {
+    title: 'Promenade du Soleil & Plage des Sablettes',
+    text: 'Attention : Des Pokémon Eau sauvages apparaissent parfois\nau bord des vagues sur le sable humide !'
+  }
+};
+
+export const BUILDING_SIGNS = [
+  { x: 6, y: 5, text: 'LABO POKÉMON', bg: '#1e3a8a', border: '#60a5fa' },
+  { x: 17, y: 5, text: 'CENTRE POKÉMON', bg: '#991b1b', border: '#f87171' },
+  { x: 19, y: 13, text: 'BOUTIQUE', bg: '#0369a1', border: '#38bdf8' },
+  { x: 38, y: 3, text: 'ARÈNE DE MENTON', bg: '#854d0e', border: '#facc15' },
+];
 
 // Génère la matrice de la carte de Menton
 export function createMentonMap() {
@@ -79,17 +114,15 @@ export function createMentonMap() {
     }
   }
 
-  // 5. Ville de Menton (Colonnes 2 à 22, Lignes 4 à 20)
-  for (let y = 10; y <= 20; y++) {
+  // 5. Ville de Menton (Colonnes 2 à 22, Lignes 9 à 20)
+  for (let y = 9; y <= 20; y++) {
     for (let x = 2; x <= 22; x++) {
       grid[y][x] = TILE.COBBLE;
     }
   }
 
   // Place aux Citrons (Colonnes 8 à 16, Lignes 13 à 18)
-  // Fontaine au centre
   grid[15][12] = TILE.FOUNTAIN;
-  // Arbres à citrons autour de la place
   grid[13][9] = TILE.LEMON_TREE;
   grid[13][15] = TILE.LEMON_TREE;
   grid[17][9] = TILE.LEMON_TREE;
@@ -103,9 +136,9 @@ export function createMentonMap() {
     for (let x = 3; x <= 9; x++) grid[y][x] = TILE.WALL_VILLA;
   }
   // Intérieur / Portique ouvert du Laboratoire
-  grid[7][6] = TILE.COBBLE; // Intérieur accessible
-  grid[8][6] = TILE.DOOR;   // Entrée du Labo
-  grid[6][6] = TILE.LAB_TABLE; // Table avec les 3 Poké Balls !
+  grid[7][6] = TILE.COBBLE;
+  grid[8][6] = TILE.DOOR;
+  grid[6][6] = TILE.LAB_TABLE;
 
   // Bâtiment 2 : Centre Pokémon de Menton (Haut Droite de la ville, x: 14 à 20, y: 3 à 8)
   for (let y = 3; y <= 5; y++) {
@@ -114,13 +147,19 @@ export function createMentonMap() {
   for (let y = 6; y <= 8; y++) {
     for (let x = 14; x <= 20; x++) grid[y][x] = TILE.WALL_VILLA;
   }
-  // Entrée et comptoir du Centre Pokémon
   grid[8][17] = TILE.DOOR;
   grid[7][17] = TILE.COBBLE;
-  grid[6][17] = TILE.NURSE_DESK; // Comptoir Infirmière Joëlle
-  grid[6][19] = TILE.PC_BOX;    // Terminal PC
+  grid[6][17] = TILE.NURSE_DESK;
+  grid[6][19] = TILE.PC_BOX;
 
-  // Villas résidentielles pastel (x: 2 à 5, y: 13 à 17)
+  // Bâtiment 3 : Boutique Pokémon / Marché de Menton (x: 18 à 21, y: 13 à 15)
+  for (let x = 18; x <= 21; x++) {
+    grid[13][x] = TILE.ROOF_TERRA;
+    grid[14][x] = TILE.WALL_VILLA;
+  }
+  grid[14][19] = TILE.MART_DESK; // Comptoir marchand accessible depuis (19,15)
+
+  // Villas résidentielles pastel (x: 3 à 5, y: 13 à 16)
   for (let y = 13; y <= 14; y++) {
     for (let x = 3; x <= 5; x++) grid[y][x] = TILE.ROOF_TERRA;
   }
@@ -128,16 +167,29 @@ export function createMentonMap() {
     for (let x = 3; x <= 5; x++) grid[y][x] = TILE.WALL_VILLA;
   }
 
-  // 6. Route 1 Corniche (Colonnes 23 à 42, Lignes 2 à 20)
-  // Chemin de terre principal reliant Menton aux collines
-  for (let x = 22; x <= 36; x++) grid[11][x] = TILE.DIRT_PATH;
-  for (let y = 5; y <= 11; y++) grid[y][28] = TILE.DIRT_PATH;
-  for (let x = 28; x <= 41; x++) grid[5][x] = TILE.DIRT_PATH;
-  for (let y = 11; y <= 20; y++) grid[y][36] = TILE.DIRT_PATH;
+  // 6. Route 1 Corniche & Arène de Menton (Colonnes 23 à 42, Lignes 2 à 20)
+  for (let x = 22; x <= 38; x++) grid[11][x] = TILE.DIRT_PATH;
+  for (let y = 6; y <= 11; y++) grid[y][28] = TILE.DIRT_PATH;
+  for (let x = 28; x <= 38; x++) grid[6][x] = TILE.DIRT_PATH;
+  for (let y = 6; y <= 20; y++) grid[y][38] = TILE.DIRT_PATH;
+
+  // Bâtiment 4 : Arène Pokémon de Menton (Nord-Est, x: 36 à 40, y: 2 à 4)
+  for (let x = 36; x <= 40; x++) {
+    grid[2][x] = TILE.GYM_ROOF;
+    grid[3][x] = TILE.GYM_ROOF;
+    grid[4][x] = TILE.GYM_WALL;
+  }
+  grid[4][38] = TILE.DOOR;
+  // Parvis pavé devant l'Arène (où se tient la Championne Solène en x:38, y:5)
+  for (let y = 5; y <= 6; y++) {
+    for (let x = 36; x <= 40; x++) {
+      grid[y][x] = TILE.COBBLE;
+    }
+  }
 
   // Hautes herbes (Zone 1 : Clairière des Passerouge)
   for (let y = 3; y <= 9; y++) {
-    for (let x = 30; x <= 36; x++) {
+    for (let x = 30; x <= 34; x++) {
       if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
     }
   }
@@ -158,10 +210,16 @@ export function createMentonMap() {
 
   // Hautes herbes (Zone 4 : Versant Est)
   for (let y = 13; y <= 18; y++) {
-    for (let x = 38; x <= 41; x++) {
+    for (let x = 39; x <= 41; x++) {
       if (grid[y][x] === TILE.GRASS_LAWN) grid[y][x] = TILE.GRASS_TALL;
     }
   }
+
+  // Panneaux indicateurs
+  grid[9][8] = TILE.SIGN;
+  grid[9][15] = TILE.SIGN;
+  grid[12][22] = TILE.SIGN;
+  grid[22][14] = TILE.SIGN;
 
   // Palmiers d'ornement le long de la Promenade et de la place
   grid[21][3] = TILE.TREE_PALM;

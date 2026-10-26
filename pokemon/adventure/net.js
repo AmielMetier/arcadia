@@ -1,40 +1,63 @@
 // pokemon/adventure/net.js
 // Synchronisation multijoueur temps réel sur la carte de Menton via HubBridge.
-// Diffuse les positions, directions, animations de pas et défis en duel direct.
+// Diffuse les positions, directions, animations de pas, Pokémon suiveurs (Follower) et défis en duel direct.
 
-export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelRequest, onDuelStart }) {
-  const remotePlayers = new Map(); // id -> { id, name, color, x, y, visualX, visualY, dir, moving }
+export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelRequest, onDuelStart, onDuelDeclined }) {
+  const remotePlayers = new Map(); // id -> { id, name, color, avatar, x, y, visualX, visualY, prevX, prevY, dir, moving, leadPokeId }
+
+  function sendToAll(payload, volatile = false) {
+    if (!bridge || !bridge.send) return;
+    try {
+      bridge.send('all', payload, { volatile });
+    } catch (e) {}
+  }
+
+  function sendToPeer(targetId, payload) {
+    if (!bridge || !bridge.send) return;
+    try {
+      bridge.send(targetId, payload);
+    } catch (e) {}
+  }
+
+  function getLeadId(player) {
+    return (player && Array.isArray(player.party) && player.party[0]) ? player.party[0].id : null;
+  }
 
   function broadcastPos(player) {
-    if (!bridge || !bridge.send) return;
-    bridge.send({
+    sendToAll({
       t: 'adv_pos',
       id: me.id,
       name: me.name,
       color: me.color,
+      avatar: player.avatar || 'red',
       x: player.x,
       y: player.y,
+      prevX: player.prevX ?? player.x,
+      prevY: player.prevY ?? player.y,
       dir: player.dir,
-      moving: player.moving
-    });
+      moving: player.moving,
+      leadPokeId: getLeadId(player)
+    }, true);
   }
 
   function broadcastJoin(player) {
-    if (!bridge || !bridge.send) return;
-    bridge.send({
+    sendToAll({
       t: 'adv_join',
       id: me.id,
       name: me.name,
       color: me.color,
+      avatar: player.avatar || 'red',
       x: player.x,
       y: player.y,
-      dir: player.dir
-    });
+      prevX: player.prevX ?? player.x,
+      prevY: player.prevY ?? player.y,
+      dir: player.dir,
+      leadPokeId: getLeadId(player)
+    }, false);
   }
 
   function sendDuelRequest(targetPlayerId) {
-    if (!bridge || !bridge.send) return;
-    bridge.send({
+    sendToPeer(targetPlayerId, {
       t: 'adv_duel_req',
       to: targetPlayerId,
       from: me.id,
@@ -42,31 +65,32 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
     });
   }
 
-  function sendDuelAccept(requesterId, myActivePokemon) {
-    if (!bridge || !bridge.send) return;
-    bridge.send({
+  function sendDuelAccept(requesterId, myParty) {
+    sendToPeer(requesterId, {
       t: 'adv_duel_acc',
       to: requesterId,
       from: me.id,
-      poke: myActivePokemon
+      name: me.name,
+      party: myParty
     });
   }
 
   function sendDuelDecline(requesterId) {
-    if (!bridge || !bridge.send) return;
-    bridge.send({
+    sendToPeer(requesterId, {
       t: 'adv_duel_dec',
       to: requesterId,
-      from: me.id
+      from: me.id,
+      name: me.name
     });
   }
 
   if (bridge && bridge.on) {
-    bridge.on('msg', (msg) => {
+    bridge.on('msg', (arg1, arg2) => {
+      // HubBridge émet ('msg', fromId, payload). On supporte aussi (payload) en fallback.
+      const msg = (arg2 && typeof arg2 === 'object') ? arg2 : arg1;
       if (!msg || typeof msg !== 'object') return;
 
       if (msg.t === 'adv_join' && msg.id !== me.id) {
-        // Un nouveau dresseur arrive : on l'enregistre
         const existing = remotePlayers.get(msg.id) || {
           id: msg.id,
           visualX: msg.x,
@@ -74,25 +98,31 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
         };
         existing.name = msg.name;
         existing.color = msg.color;
+        existing.avatar = msg.avatar || 'blue';
         existing.x = msg.x;
         existing.y = msg.y;
+        existing.prevX = msg.prevX ?? msg.x;
+        existing.prevY = msg.prevY ?? msg.y;
         existing.dir = msg.dir || 'down';
         existing.moving = false;
+        existing.leadPokeId = msg.leadPokeId || null;
         remotePlayers.set(msg.id, existing);
 
-        // On lui renvoie notre propre position en réponse
-        if (bridge.send) {
-          bridge.send({
-            t: 'adv_pos',
-            id: me.id,
-            name: me.name,
-            color: me.color,
-            x: me.x || 6,
-            y: me.y || 8,
-            dir: me.dir || 'down',
-            moving: false
-          });
-        }
+        // Renvoyer notre propre position au nouvel arrivant
+        sendToPeer(msg.id, {
+          t: 'adv_pos',
+          id: me.id,
+          name: me.name,
+          color: me.color,
+          avatar: me.avatar || 'red',
+          x: me.x || 6,
+          y: me.y || 9,
+          prevX: me.prevX || 6,
+          prevY: me.prevY || 9,
+          dir: me.dir || 'down',
+          moving: false,
+          leadPokeId: me.leadPokeId || null
+        });
         if (onRemoteUpdate) onRemoteUpdate(Array.from(remotePlayers.values()));
       }
 
@@ -106,30 +136,41 @@ export function createAdventureNetwork({ bridge, me, onRemoteUpdate, onDuelReque
           };
           remotePlayers.set(msg.id, rp);
         }
+        if (rp.x !== msg.x || rp.y !== msg.y) {
+          rp.prevX = rp.x ?? msg.x;
+          rp.prevY = rp.y ?? msg.y;
+        }
         rp.name = msg.name || rp.name;
         rp.color = msg.color || rp.color;
+        rp.avatar = msg.avatar || rp.avatar || 'blue';
         rp.x = msg.x;
         rp.y = msg.y;
         rp.dir = msg.dir;
         rp.moving = !!msg.moving;
+        if (msg.leadPokeId !== undefined) rp.leadPokeId = msg.leadPokeId;
         if (onRemoteUpdate) onRemoteUpdate(Array.from(remotePlayers.values()));
       }
 
-      if (msg.t === 'adv_duel_req' && msg.to === me.id) {
+      if (msg.t === 'adv_duel_req' && (msg.to === me.id || msg.to === undefined)) {
         if (onDuelRequest) onDuelRequest({ fromId: msg.from, fromName: msg.name });
       }
 
-      if (msg.t === 'adv_duel_acc' && msg.to === me.id) {
-        if (onDuelStart) onDuelStart({ opponentId: msg.from, opponentPokemon: msg.poke });
+      if (msg.t === 'adv_duel_acc' && (msg.to === me.id || msg.to === undefined)) {
+        if (onDuelStart) {
+          onDuelStart({
+            opponentId: msg.from,
+            opponentName: msg.name || 'Dresseur',
+            opponentParty: msg.party || (msg.poke ? [msg.poke] : [])
+          });
+        }
       }
 
-      if (msg.t === 'adv_duel_dec' && msg.to === me.id) {
-        alert('Le dresseur a décliné le duel.');
+      if (msg.t === 'adv_duel_dec' && (msg.to === me.id || msg.to === undefined)) {
+        if (onDuelDeclined) onDuelDeclined({ fromId: msg.from, fromName: msg.name || 'Le dresseur' });
       }
     });
 
     bridge.on('roster', () => {
-      // Nettoyer les joueurs qui se sont déconnectés
       if (bridge.players) {
         const activeIds = new Set(bridge.players.map(p => p.id));
         for (const [id] of remotePlayers) {

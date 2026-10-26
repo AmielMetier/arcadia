@@ -2227,3 +2227,461 @@ b.hp-red { color: #ef4444; background: none !important; }
   background: #334155;
   border-color: #475569;
 }
+
+
+/* ==========================================================================
+   AMÉLIORATIONS MASTER EDITION (MENTON BG, BOUTIQUE, POKÉDEX, STATS, LOGS)
+   ========================================================================== */
+
+.adv-battle-screen {
+  background: url('assets/menton_battle_bg.jpg') center/cover no-repeat !important;
+}
+
+.adv-battle-screen::before {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.58)) !important;
+}
+
+/* Transition flash GBA à l'entrée en combat */
+.adv-transition-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.adv-transition-layer.active {
+  animation: gbaEncounterFlash 0.65s ease-in-out forwards;
+}
+
+@keyframes gbaEncounterFlash {
+  0% { background: rgba(255, 255, 255, 0); }
+  18% { background: rgba(255, 255, 255, 0.95); }
+  36% { background: rgba(15, 23, 42, 0.9); }
+  54% { background: rgba(255, 255, 255, 0.95); }
+  100% { background: rgba(9, 14, 24, 1); }
+}
+
+/* Pastilles de boost/baisse de statistiques (Mode Tournoi 3v3) */
+.sc-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.sc-stage-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.4px;
+  font-family: monospace;
+}
+
+.sc-stage-pill.up {
+  background: rgba(34, 197, 94, 0.22);
+  border: 1px solid #22c55e;
+  color: #86efac;
+}
+
+.sc-stage-pill.down {
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+
+/* Tiroir Journal de Combat (Mode Tournoi 3v3) */
+.poke-log-drawer {
+  position: fixed;
+  top: 58px;
+  right: 16px;
+  width: 310px;
+  max-height: 360px;
+  background: rgba(11, 17, 28, 0.96);
+  border: 1.5px solid #ffcb05;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pld-header {
+  padding: 10px 14px;
+  font-family: var(--bung);
+  font-size: 12px;
+  color: #ffcb05;
+  background: rgba(30, 41, 59, 0.8);
+  border-bottom: 1px solid #334155;
+}
+
+.pld-body {
+  padding: 10px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.pld-line {
+  padding: 4px 6px;
+  background: rgba(30, 41, 59, 0.5);
+  border-left: 2px solid #38bdf8;
+  border-radius: 3px;
+}
+
+.pld-empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+.topbar-mode-btn {
+  background: rgba(234, 179, 8, 0.18) !important;
+  border-color: #ffcb05 !important;
+  color: #ffcb05 !important;
+}
+
+/* HUD Combat Aventure (Pokéballs d'équipe, statut, portrait dresseur) */
+.adv-hud-toprow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.adv-combat-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.6px;
+}
+
+.adv-tray {
+  display: flex;
+  gap: 4px;
+}
+
+.adv-tray-ball {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid rgba(0,0,0,0.6);
+}
+
+.adv-tray-ball.alive {
+  background: radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #ffffff 65%);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.7);
+}
+
+.adv-tray-ball.ko {
+  background: #334155;
+  opacity: 0.5;
+}
+
+.adv-hud-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adv-status-pill {
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #fff;
+}
+.adv-status-pill.st-burn { background: #ea580c; }
+.adv-status-pill.st-paralysis { background: #ca8a04; }
+.adv-status-pill.st-poison, .adv-status-pill.st-toxic { background: #9333ea; }
+.adv-status-pill.st-sleep { background: #64748b; }
+.adv-status-pill.st-freeze { background: #0284c7; }
+
+.adv-trainer-avatar {
+  position: absolute;
+  right: 10px;
+  bottom: 50px;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+  opacity: 0.92;
+}
+
+.adv-move-card .m-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.adv-eff-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.adv-eff-pill.super { background: #14532d; color: #86efac; border: 1px solid #22c55e; }
+.adv-eff-pill.low { background: #78350f; color: #fde68a; border: 1px solid #f59e0b; }
+.adv-eff-pill.zero { background: #1e293b; color: #94a3b8; border: 1px solid #64748b; }
+.adv-eff-pill.st { background: #3b0764; color: #e9d5ff; border: 1px solid #a855f7; }
+
+/* Sélecteur d'avatar & Starters */
+.adv-avatar-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #1e293b;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.adv-avatar-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #0f172a;
+  border: 2px solid #334155;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.adv-avatar-btn img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.adv-avatar-btn.active {
+  border-color: #ffcb05;
+  background: rgba(255, 203, 5, 0.14);
+  color: #fff;
+}
+
+.st-region-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+/* Boutique Pokémon de Menton */
+.adv-mart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.adv-mart-card {
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adv-mart-card .mart-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.adv-mart-card .mart-info {
+  flex: 1;
+}
+
+.adv-mart-card .mart-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+
+.adv-mart-card .mart-owned {
+  font-size: 11px;
+  color: #38bdf8;
+}
+
+.adv-mart-card .mart-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.mart-buy-btn {
+  background: #eab308;
+  color: #0f172a;
+  font-size: 11px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.mart-buy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Sac interactif & PC */
+.adv-bag-feedback {
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid #22c55e;
+  color: #86efac;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.adv-lead-tag {
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.adv-mini-btn {
+  padding: 5px 10px;
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.adv-mini-btn:hover {
+  background: #ffcb05;
+  color: #0f172a;
+  border-color: #ffcb05;
+}
+
+.adv-item-row-card.selected, .adv-poke-card.selectable-target:hover, .adv-pc-slot.selectable-target:hover {
+  border-color: #ffcb05;
+  background: #273549;
+  cursor: pointer;
+}
+
+/* Pokédex & Badges */
+.adv-badge-showcase {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #1e293b;
+  border: 2px solid #334155;
+}
+
+.adv-badge-showcase.earned {
+  border-color: #facc15;
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.18), rgba(30, 41, 59, 0.9));
+}
+
+.badge-medal {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--bung);
+  font-size: 24px;
+  background: #facc15;
+  color: #0f172a;
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.6);
+}
+
+.adv-badge-showcase.locked .badge-medal {
+  background: #334155;
+  color: #64748b;
+  box-shadow: none;
+}
+
+.badge-title {
+  font-family: var(--bung);
+  font-size: 15px;
+  color: #ffcb05;
+}
+
+.badge-desc {
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.adv-dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.adv-dex-card {
+  background: #1e293b;
+  border: 1.5px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.adv-dex-card.caught {
+  border-color: #22c55e;
+  background: rgba(20, 83, 45, 0.25);
+}
+
+.adv-dex-card.unknown .dex-img {
+  filter: brightness(0) opacity(0.35);
+}
+
+.dex-num {
+  font-size: 10px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.dex-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.dex-name {
+  font-weight: 700;
+  font-size: 12px;
+  color: #f8fafc;
+}
+
+.dex-status {
+  font-size: 9px;
+  font-weight: 800;
+  color: #94a3b8;
+}
+.adv-dex-card.caught .dex-status {
+  color: #4ade80;
+}

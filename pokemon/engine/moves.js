@@ -17,6 +17,7 @@ export const MOVES = {
 
   // --- FEU ---
   ember: { name: 'Flammèche', type: 'fire', cat: 'special', power: 40, acc: 100, pp: 25, effect: { type: 'status', status: 'burn', chance: 10 } },
+  flame_wheel: { name: 'Roue de Feu', type: 'fire', cat: 'physical', power: 60, acc: 100, pp: 25, effect: { type: 'status', status: 'burn', chance: 10 } },
   flamethrower: { name: 'Lance-Flammes', type: 'fire', cat: 'special', power: 90, acc: 100, pp: 15, effect: { type: 'status', status: 'burn', chance: 10 } },
   fire_blast: { name: 'Déflagration', type: 'fire', cat: 'special', power: 110, acc: 85, pp: 5, effect: { type: 'status', status: 'burn', chance: 20 } },
   flare_blitz: { name: 'Boutefeu', type: 'fire', cat: 'physical', power: 120, acc: 100, pp: 15, recoil: 0.33, effect: { type: 'status', status: 'burn', chance: 10 } },
@@ -26,14 +27,16 @@ export const MOVES = {
   // --- EAU ---
   water_gun: { name: 'Pistolet à O', type: 'water', cat: 'special', power: 40, acc: 100, pp: 25 },
   bubble: { name: 'Écume', type: 'water', cat: 'special', power: 40, acc: 100, pp: 30, effect: { type: 'stat', target: 'opponent', stat: 'spe', val: -1, chance: 10 } },
+  water_pulse: { name: 'Vibraqua', type: 'water', cat: 'special', power: 60, acc: 100, pp: 20 },
   surf: { name: 'Surf', type: 'water', cat: 'special', power: 90, acc: 100, pp: 15 },
   hydro_pump: { name: 'Hydrocanon', type: 'water', cat: 'special', power: 110, acc: 80, pp: 5 },
-  waterfall: { name: 'Cascade', type: 'water', cat: 'physical', power: 80, acc: 100, pp: 15 },
+  waterfall: { name: 'Cascade', type: 'water', cat: 'physical', power: 80, acc: 100, flinch: 20, pp: 15 },
   aqua_jet: { name: 'Aqua-Jet', type: 'water', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 20 },
   scald: { name: 'Ébullition', type: 'water', cat: 'special', power: 80, acc: 100, pp: 15, effect: { type: 'status', status: 'burn', chance: 30 } },
 
   // --- PLANTE ---
   vine_whip: { name: 'Fouet Lianes', type: 'grass', cat: 'physical', power: 45, acc: 100, pp: 25 },
+  razor_leaf: { name: 'Tranch\'Herbe', type: 'grass', cat: 'physical', power: 55, acc: 95, crit: 2, pp: 25 },
   energy_ball: { name: 'Éco-Sphère', type: 'grass', cat: 'special', power: 90, acc: 100, pp: 10 },
   solar_beam: { name: 'Lance-Soleil', type: 'grass', cat: 'special', power: 120, acc: 100, pp: 10 },
   giga_drain: { name: 'Giga-Sangsue', type: 'grass', cat: 'special', power: 75, acc: 100, pp: 10, drain: 0.5 },
@@ -56,16 +59,17 @@ export const MOVES = {
   ice_shard: { name: 'Éclats Glace', type: 'ice', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
 
   // --- COMBAT ---
-  close_combat: { name: 'Close Combat', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'def', val: -1 } },
-  superpower: { name: 'Surpuissance', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'atk', val: -1 } },
+  close_combat: { name: 'Close Combat', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'def', val: -1, stats: { def: -1, spd: -1 } } },
+  superpower: { name: 'Surpuissance', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'atk', val: -1, stats: { atk: -1, def: -1 } } },
   focus_blast: { name: 'Exploforce', type: 'fighting', cat: 'special', power: 120, acc: 70, pp: 5 },
+  aura_sphere: { name: 'Aurasphère', type: 'fighting', cat: 'special', power: 80, acc: 100, pp: 20 },
   drain_punch: { name: 'Vampi-Poing', type: 'fighting', cat: 'physical', power: 75, acc: 100, drain: 0.5, pp: 10 },
   mach_punch: { name: 'Mach Punch', type: 'fighting', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
 
   // --- SOL ---
   earthquake: { name: 'Séisme', type: 'ground', cat: 'physical', power: 100, acc: 100, pp: 10 },
   earth_power: { name: 'Telluriforce', type: 'ground', cat: 'special', power: 90, acc: 100, pp: 10 },
-  bulldoze: { name: 'Piétinement', type: 'ground', cat: 'physical', power: 60, acc: 100, pp: 20 },
+  bulldoze: { name: 'Piétinement', type: 'ground', cat: 'physical', power: 60, acc: 100, pp: 20, effect: { type: 'stat', target: 'opponent', stat: 'spe', val: -1, chance: 100 } },
 
   // --- VOL ---
   peck: { name: 'Picpic', type: 'flying', cat: 'physical', power: 35, acc: 100, pp: 35 },
@@ -76,19 +80,21 @@ export const MOVES = {
   roost: { name: 'Atterrissage', type: 'flying', cat: 'status', power: 0, acc: 100, effect: { type: 'heal', val: 0.5 }, pp: 10 },
 
   // --- PSY ---
-  psychic: { name: 'Psyko', type: 'psychic', cat: 'special', power: 90, acc: 100, pp: 10 },
+  psybeam: { name: 'Rafale Psy', type: 'psychic', cat: 'special', power: 65, acc: 100, pp: 20 },
+  psychic: { name: 'Psyko', type: 'psychic', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
   psyshock: { name: 'Choc Psy', type: 'psychic', cat: 'special', power: 80, acc: 100, pp: 10 },
   zen_headbutt: { name: 'Psykoud\'Boul', type: 'psychic', cat: 'physical', power: 80, acc: 90, pp: 15, flinch: 20 },
-  calm_mind: { name: 'Plénitude', type: 'psychic', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 1 }, pp: 20 },
+  calm_mind: { name: 'Plénitude', type: 'psychic', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 1, stats: { spa: 1, spd: 1 } }, pp: 20 },
   hypnosis: { name: 'Hypnose', type: 'psychic', cat: 'status', power: 0, acc: 60, effect: { type: 'status', status: 'sleep', chance: 100 }, pp: 20 },
 
   // --- ROCHE ---
+  rock_throw: { name: 'Jet-Pierres', type: 'rock', cat: 'physical', power: 50, acc: 90, pp: 15 },
   stone_edge: { name: 'Lame de Roc', type: 'rock', cat: 'physical', power: 100, acc: 80, crit: 2, pp: 5 },
   rock_slide: { name: 'Éboulement', type: 'rock', cat: 'physical', power: 75, acc: 90, flinch: 30, pp: 10 },
   power_gem: { name: 'Rayon Gemme', type: 'rock', cat: 'special', power: 80, acc: 100, pp: 20 },
 
   // --- SPECTRE ---
-  shadow_ball: { name: 'Ball\'Ombre', type: 'ghost', cat: 'special', power: 80, acc: 100, pp: 15 },
+  shadow_ball: { name: 'Ball\'Ombre', type: 'ghost', cat: 'special', power: 80, acc: 100, pp: 15, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 20 } },
   shadow_claw: { name: 'Griffe Ombre', type: 'ghost', cat: 'physical', power: 70, acc: 100, crit: 2, pp: 15 },
   shadow_sneak: { name: 'Ombre Portée', type: 'ghost', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
 
@@ -97,12 +103,12 @@ export const MOVES = {
   draco_meteor: { name: 'Draco-Météore', type: 'dragon', cat: 'special', power: 130, acc: 90, pp: 5, effect: { type: 'stat', target: 'self', stat: 'spa', val: -2 } },
   dragon_claw: { name: 'Dracogriffe', type: 'dragon', cat: 'physical', power: 80, acc: 100, pp: 15 },
   outrage: { name: 'Colère', type: 'dragon', cat: 'physical', power: 120, acc: 100, pp: 10 },
-  dragon_dance: { name: 'Danse Draco', type: 'dragon', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1 }, pp: 20 },
+  dragon_dance: { name: 'Danse Draco', type: 'dragon', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1, stats: { atk: 1, spe: 1 } }, pp: 20 },
 
   // --- TÉNÈBRES ---
-  bite: { name: 'Morsure', type: 'dark', cat: 'physical', power: 60, acc: 100, pp: 25 },
+  bite: { name: 'Morsure', type: 'dark', cat: 'physical', power: 60, acc: 100, flinch: 30, pp: 25 },
   dark_pulse: { name: 'Vibrobscur', type: 'dark', cat: 'special', power: 80, acc: 100, flinch: 20, pp: 15 },
-  crunch: { name: 'Mâchouille', type: 'dark', cat: 'physical', power: 80, acc: 100, pp: 15 },
+  crunch: { name: 'Mâchouille', type: 'dark', cat: 'physical', power: 80, acc: 100, pp: 15, effect: { type: 'stat', target: 'opponent', stat: 'def', val: -1, chance: 20 } },
   sucker_punch: { name: 'Coup Bas', type: 'dark', cat: 'physical', power: 70, acc: 100, priority: 1, pp: 5 },
   nasty_plot: { name: 'Machination', type: 'dark', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 2 }, pp: 20 },
 

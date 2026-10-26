@@ -1,6 +1,6 @@
 // pokemon/app.js
 // Point d'entrée de Poké Duel : écoute le HubBridge, lance soit l'Aventure Kalos-Sud (Menton),
-// soit le Tournoi 3v3 en Arène selon le mode choisi dans le Hub.
+// soit le Tournoi 3v3 en Arène selon le mode choisi dans le Hub ou via le sélecteur en jeu.
 
 import { startHost } from './net/host.js';
 import { startClient } from './net/client.js';
@@ -10,7 +10,14 @@ import { mountAdventure } from './adventure/adventure.js';
 const H = window.HubBridge;
 const root = document.getElementById('app');
 
-function boot(info) {
+let activeInstance = null;
+
+function boot(info, forcedMode = null) {
+  if (activeInstance && activeInstance.destroy) {
+    activeInstance.destroy();
+    activeInstance = null;
+  }
+
   const role = H.embedded ? info.role : 'solo';
   const meP = H.players.find((p) => p.id === info.myId);
   const prof = (() => {
@@ -39,14 +46,15 @@ function boot(info) {
     level: qs.get('level') || 'normal'
   };
 
-  const mode = settings.mode || 'adventure';
+  const mode = forcedMode || settings.mode || 'adventure';
 
   // --- MODE AVENTURE MULTIJOUEUR À MENTON ---
   if (mode === 'adventure') {
-    mountAdventure(root, {
+    activeInstance = mountAdventure(root, {
       me,
       bridge: H,
       settings,
+      onSwitchMode: (nextMode) => boot(info, nextMode),
       exit: () => {
         if (H.embedded) H.exit();
         else location.reload();
@@ -64,11 +72,18 @@ function boot(info) {
     startMatch: () => session.startMatch(),
     restart: () => session.restart(),
     submitAction: (act) => session.submitAction(act),
+    onSwitchMode: (nextMode) => boot(info, nextMode),
     exit: () => {
       if (H.embedded) H.exit();
       else location.reload();
     }
   });
+
+  activeInstance = {
+    destroy: () => {
+      if (view && view.cleanup) view.cleanup();
+    }
+  };
 
   const handlers = {
     bridge: H,
@@ -85,7 +100,6 @@ function boot(info) {
     session = startHost(handlers);
   }
 
-  // Si l'hôte quitte le salon et que ce joueur reprend l'hôte
   let currentRole = role;
   H.on('roster', () => {
     if (currentRole === 'guest' && H.info.role === 'host') {
@@ -98,5 +112,5 @@ function boot(info) {
   H.signalReady();
 }
 
-if (H.embedded) H.on('init', boot);
+if (H.embedded) H.on('init', (info) => boot(info));
 else boot({ role: 'solo', myId: 0 });
