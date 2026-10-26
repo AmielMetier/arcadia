@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.69 — 26 octobre 2026
+- Nouveau : integrate real Tiled Kanto open-world maps (Bourg-Palette, Route 1, Jadielle), 4 interiors & 4-dir walking spritesheets in PhaserJS (Amiel)
+
 ## 2.68 — 26 octobre 2026
 - Correction : resolve AdventureRenderer state mapping & trainer asset paths in Phaser 5G map (Amiel)
 
