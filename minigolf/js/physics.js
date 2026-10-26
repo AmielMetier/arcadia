@@ -41,6 +41,13 @@ export const MATS = {
   ice:      { kind: 'floor', roll: 0.28, e: 0.3 },
   boost:    { kind: 'floor', roll: 0.6, e: 0.3, boost: 12.5 },
   beach:    { kind: 'floor', roll: 2.6, e: 0.15 },
+  sandstone:{ kind: 'floor', roll: 2.0, e: 0.28 },
+  mud:      { kind: 'floor', roll: 8.0, e: 0.0, sand: 1, mud: 1 },
+  snow:     { kind: 'floor', roll: 4.6, e: 0.05, sand: 1 },
+  candy:    { kind: 'floor', roll: 1.7, e: 0.32 },
+  snowpack: { kind: 'floor', roll: 2.3, e: 0.15 },
+  magnet:   { kind: 'floor', roll: 1.7, e: 0.2 },
+  logf:     { kind: 'floor', roll: 2.1, e: 0.3 },
   redwood:  { kind: 'floor', roll: 2.0, e: 0.3 },
   lavarock: { kind: 'floor', roll: 2.1, e: 0.3 },
   conveyor: { kind: 'floor', roll: 2.2, e: 0.3, conveyor: 3.2 },
@@ -58,6 +65,13 @@ export const MATS = {
   bumper:   { kind: 'wall', e: 0.92, fr: 0.05, kick: 3.6 },
   glass:    { kind: 'wall', e: 0.55, fr: 0.06 },
   hull:     { kind: 'wall', e: 0.5, fr: 0.14 },
+  redrock:  { kind: 'wall', e: 0.5, fr: 0.15 },
+  icew:     { kind: 'wall', e: 0.66, fr: 0.03 },
+  snowcap:  { kind: 'wall', e: 0.4, fr: 0.2 },
+  candyw:   { kind: 'wall', e: 0.62, fr: 0.08 },
+  jelly:    { kind: 'wall', e: 0.95, fr: 0.04, kick: 1.5 },
+  glassroof:{ kind: 'wall', e: 0.5, fr: 0.06 },
+  logw:     { kind: 'wall', e: 0.52, fr: 0.14 },
   stonew:   { kind: 'wall', e: 0.55, fr: 0.13 },
   stonecap: { kind: 'wall', e: 0.55, fr: 0.12 },
   woodtrim: { kind: 'wall', e: 0.55, fr: 0.12 },
@@ -191,6 +205,7 @@ export class World {
     this.mesh = o.mesh; this.kin = o.kin || []; this.zones = o.zones || [];
     this.cup = o.cup; this.groundY = o.groundY ?? -50; this.groundType = o.groundType || 'grass';
     this.killY = o.killY ?? (this.groundY - 6);
+    this.ceilY = o.ceilY ?? null;
     this.bounds = o.bounds || null;   // [minx, minz, maxx, maxz] au-delà = hors-jeu
     for (const k of this.kin) {
       if (k.r == null) { let r = 0; for (const b of k.boxes) r = Math.max(r, Math.hypot(Math.abs(b.c[0]) + b.s[0] / 2, Math.abs(b.c[1]) + b.s[1] / 2, Math.abs(b.c[2]) + b.s[2] / 2)); k.r = r + Math.hypot(...(k.pose.dir || [0, 0, 0])) * (k.pose.amp || 0); }
@@ -202,7 +217,7 @@ export class World {
 
 export function makeBall(id, p) {
   return { id, p: p.slice(), v: [0, 0, 0], awake: false, grounded: false, gn: [0, 1, 0], gmat: 0, gvs: [0, 0, 0],
-    rest: 0, holed: false, holedT: 0, oob: null, oobT: 0, air: 0, lastHit: 0, start: p.slice(), t: 0, inPlay: true };
+    rest: 0, holed: false, holedT: 0, oob: null, oobT: 0, air: 0, lastHit: 0, start: p.slice(), t: 0, inPlay: true, gs: 1 };
 }
 
 const _c = [0, 0, 0], _w = [0, 0, 0], _w2 = [0, 0, 0];
@@ -212,7 +227,8 @@ const VS0 = [0, 0, 0];
 function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
   const M = MAT_ARR[mi];
   b.p[0] += nx * depth; b.p[1] += ny * depth; b.p[2] += nz * depth;
-  const isFloor = M.kind === 'floor' || ny > 0.7;
+  const gs = b.gs || 1, up = ny * gs;
+  const isFloor = M.kind === 'floor' || up > 0.7;
   let rx = b.v[0] - vs[0], ry = b.v[1] - vs[1], rz = b.v[2] - vs[2];
   const vn = rx * nx + ry * ny + rz * nz;
   if (vn < 0) {
@@ -220,7 +236,7 @@ function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
     if (isFloor) {
       e = imp > 1.4 ? (M.kind === 'floor' ? M.e : 0.3) : 0;
       if (M.tramp && imp > 1.0) { e = Math.max(M.e, M.tramp / imp); if (ev && t - b.lastHit > 0.08) { ev.push({ k: 'tramp', b: b.id, p: b.p.slice(), s: imp }); b.lastHit = t; } }
-      else if (ev && imp > 2.2 && t - b.lastHit > 0.07) { ev.push({ k: M.sand ? 'sand' : 'bounce', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
+      else if (ev && imp > 2.2 && t - b.lastHit > 0.07) { ev.push({ k: M.mud ? 'mud' : M.sand ? 'sand' : 'bounce', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
     } else {
       e = imp > 0.25 ? M.e : 0;
       if (ev && imp > 0.6 && t - b.lastHit > 0.05) { ev.push({ k: M.kick ? 'bumper' : 'hit', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
@@ -234,7 +250,7 @@ function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
     }
     b.v[0] = rx + vs[0]; b.v[1] = ry + vs[1]; b.v[2] = rz + vs[2];
   }
-  if (isFloor && ny > -0.95) {
+  if (isFloor && up > -0.95) {
     // contact de roulement : on retient la normale la plus « porteuse »
     if (!b.grounded || depth > b._gd) {
       b.grounded = true; b._gd = depth; b.gn[0] = nx; b.gn[1] = ny; b.gn[2] = nz;
@@ -312,12 +328,20 @@ function subStep(w, b, t, h, ev) {
     if (b.oob === 'water' || b.oob === 'lava') { v[0] *= 1 - 3 * h; v[2] *= 1 - 3 * h; v[1] = v[1] * (1 - 4 * h) - 2 * h; }
     else v[1] -= GRAV * h;
     p[0] += v[0] * h; p[1] += v[1] * h; p[2] += v[2] * h;
-    if (b.oob !== 'water' && b.oob !== 'lava' && p[1] - BALL_R < w.groundY && v[1] < 0) { p[1] = w.groundY + BALL_R; v[1] *= -0.35; v[0] *= 0.8; v[2] *= 0.8; }
+    if (b.oob !== 'water' && b.oob !== 'lava' && b.oob !== 'void' && p[1] - BALL_R < w.groundY && v[1] < 0) { p[1] = w.groundY + BALL_R; v[1] *= -0.35; v[0] *= 0.8; v[2] *= 0.8; }
     return;
   }
-  v[1] -= GRAV * h;
-  // zones de vent
-  for (const z of w.zones) if (z.type === 'wind' && inBox(p, z)) { v[0] += z.f[0] * h; v[1] += z.f[1] * h; v[2] += z.f[2] * h; }
+  // gravité : inversée dans les zones aimantées (on roule au plafond)
+  let gs = 1;
+  for (const z of w.zones) {
+    if (z.type === 'antigrav') { if (inBox(p, z)) gs = -1; }
+    else if (z.type === 'wind') { if (inBox(p, z)) { v[0] += z.f[0] * h; v[1] += z.f[1] * h; v[2] += z.f[2] * h; } }
+    else if (z.type === 'slow' && inBox(p, z)) { const k = Math.max(0, 1 - (z.k || 2.2) * h); v[0] *= k; v[1] *= k; v[2] *= k; if (ev && !b.inSlow) ev.push({ k: 'slow', b: b.id, p: p.slice(), s: 1 }); b.inSlowT = b.t; }
+  }
+  b.inSlow = b.inSlowT === b.t;
+  if (gs !== (b.gs || 1) && ev) ev.push({ k: 'flip', b: b.id, p: p.slice(), s: gs });
+  b.gs = gs;
+  v[1] -= GRAV * h * gs;
   const drag = 1 - 0.015 * h; v[0] *= drag; v[1] *= drag; v[2] *= drag;
   p[0] += v[0] * h; p[1] += v[1] * h; p[2] += v[2] * h;
   b.grounded = false; b._gd = -1; b.gprm = null;
@@ -368,12 +392,12 @@ function subStep(w, b, t, h, ev) {
   if (b.grounded) {
     const n = b.gn, M = MAT_ARR[b.gmat], vs = b.gvs;
     // gravité tangentielle gt = G (n.y n - ŷ) ; on en retire 2/7
-    const k27 = (2 / 7) * GRAV * h;
+    const k27 = (2 / 7) * GRAV * h * gs;
     v[0] -= k27 * (n[1] * n[0]); v[1] -= k27 * (n[1] * n[1] - 1); v[2] -= k27 * (n[1] * n[2]);
     let rx = v[0] - vs[0], ry = v[1] - vs[1], rz = v[2] - vs[2];
     const rn = rx * n[0] + ry * n[1] + rz * n[2];
     let tx = rx - rn * n[0], ty = ry - rn * n[1], tz = rz - rn * n[2];
-    const sp = Math.hypot(tx, ty, tz), dec = M.roll * h * Math.max(0.4, n[1]);
+    const sp = Math.hypot(tx, ty, tz), dec = M.roll * h * Math.max(0.4, n[1] * gs);
     if (sp > dec) { const f = 1 - dec / sp; tx *= f; ty *= f; tz *= f; } else { tx = ty = tz = 0; }
     v[0] = vs[0] + tx + rn * n[0]; v[1] = vs[1] + ty + rn * n[1]; v[2] = vs[2] + tz + rn * n[2];
     if (M.boost && b.gprm) {
@@ -404,11 +428,13 @@ function subStep(w, b, t, h, ev) {
   if (p[1] - BALL_R < w.groundY && !b.holed) {
     const gt = w.groundType;
     if (gt === 'water' || gt === 'lava') { setOOB(b, gt, ev, t); return; }
+    if (gt === 'void') { setOOB(b, 'void', ev, t); return; }
     p[1] = w.groundY + BALL_R; if (v[1] < 0) v[1] *= -0.35;
     setOOB(b, 'out', ev, t); return;
   }
-  if (p[1] < w.killY) { setOOB(b, 'out', ev, t); return; }
-  if (w.bounds && (p[0] < w.bounds[0] || p[2] < w.bounds[1] || p[0] > w.bounds[2] || p[2] > w.bounds[3])) { setOOB(b, 'out', ev, t); return; }
+  if (p[1] < w.killY) { setOOB(b, w.groundType === 'void' ? 'void' : 'out', ev, t); return; }
+  if (w.ceilY != null && p[1] > w.ceilY) { setOOB(b, 'void', ev, t); return; }
+  if (w.bounds && (p[0] < w.bounds[0] || p[2] < w.bounds[1] || p[0] > w.bounds[2] || p[2] > w.bounds[3])) { setOOB(b, w.groundType === 'void' ? 'void' : 'out', ev, t); return; }
 }
 
 /** Collisions entre balles (masses égales, quasi élastiques) ; réveille une balle à l'arrêt */
@@ -464,6 +490,9 @@ export function tick(w, balls, t, ev, opts) {
   return moving;
 }
 
+/** -1 si le point est dans une zone aimantée (gravité vers le haut), 1 sinon */
+export function gravSign(w, p) { for (const z of w.zones) if (z.type === 'antigrav' && inBox(p, z)) return -1; return 1; }
+
 /** Vecteur de frappe : direction horizontale (yaw), projetée sur le sol sous la balle */
 export function shotVelocity(w, ball, yaw, power) {
   const sp = shotSpeed(power);
@@ -479,9 +508,10 @@ export function groundNormal(w, p) {
   for (const tI of list) {
     closestOnTri(w.mesh.V, tI * 9, p[0], p[1], p[2], _c);
     const d = Math.hypot(p[0] - _c[0], p[1] - _c[1], p[2] - _c[2]);
-    if (d < bd && d > 1e-6 && p[1] >= _c[1] - 0.01) { bd = d; best = [(p[0] - _c[0]) / d, (p[1] - _c[1]) / d, (p[2] - _c[2]) / d]; }
+    if (d < bd && d > 1e-6) { bd = d; best = [(p[0] - _c[0]) / d, (p[1] - _c[1]) / d, (p[2] - _c[2]) / d]; }
   }
-  return best && best[1] > 0.3 ? best : null;
+  const gs = gravSign(w, p);
+  return best && best[1] * gs > 0.3 ? best : null;
 }
 
 /** Frappe la balle */

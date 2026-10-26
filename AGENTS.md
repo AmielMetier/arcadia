@@ -41,7 +41,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge, Outbreak, Convoy Storm ou Birdie Party :
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
   `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`, `node tools/test-golf.mjs`.
-- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 24 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
+- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
 - Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
   (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;

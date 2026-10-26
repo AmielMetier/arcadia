@@ -9,7 +9,7 @@
    ============================================================================= */
 import * as THREE from 'three';
 import { COURSES, courseById, buildCourseHole } from './courses.js';
-import { makeBall, strike, tick, TICK, BALL_R } from './physics.js';
+import { makeBall, strike, tick, TICK, BALL_R, gravSign } from './physics.js';
 import { Renderer } from './render.js';
 import { planShot, BOT_LEVELS } from './ai.js';
 import { initAudio, sfx, toggleMute, ambience, isMuted } from './sfx.js';
@@ -51,7 +51,11 @@ const capOf = (par) => Math.max(7, par + 4);
 
 /* ---------------------------------------------------------------- parcours chargé */
 let COURSE = null, HOLES = [], R = null;
-function holeNow() { return HOLES[G.holeList[G.hi]] || null; }
+/** Entrée k de la liste des trous : [id du parcours, numéro du trou] */
+function entry(k, s = G) { const e = s.holeList[k]; return Array.isArray(e) ? e : [s.course, e ?? 0]; }
+const parOf = (k, s = G) => { const [c, i] = entry(k, s); return courseById(c).holes[i]?.par ?? 3; };
+function holeNow() { const [c, i] = entry(G.hi); if (!COURSE || COURSE.id !== c) return null; return HOLES[i] || null; }
+function ensureCourse(id) { if (!COURSE || COURSE.id !== id || !HOLES.length) loadCourse(id); }
 function loadCourse(id) {
   if (COURSE && COURSE.id === id && HOLES.length) return;
   COURSE = courseById(id);
@@ -88,14 +92,21 @@ function hostSetLobby(patch) {
 function hostStart() {
   G.players = lobbyPlayers();
   const c = courseById(G.course);
-  G.holeList = G.opts.holes === 'first' ? [0, 1, 2] : G.opts.holes === 'last' ? [3, 4, 5] : c.holes.map((_, i) => i);
+  if (G.opts.holes === 'eighteen') {
+    const k = COURSES.findIndex((q) => q.id === c.id);
+    G.holeList = [];
+    for (let j = 0; j < 3; j++) { const cc = COURSES[(k + j) % COURSES.length]; cc.holes.forEach((_, i) => G.holeList.push([cc.id, i])); }
+  } else {
+    const idx = G.opts.holes === 'first' ? [0, 1, 2] : G.opts.holes === 'last' ? [3, 4, 5] : c.holes.map((_, i) => i);
+    G.holeList = idx.map((i) => [c.id, i]);
+  }
   G.scores = {}; for (const p of G.players) G.scores[p.id] = G.holeList.map(() => null);
   G.hi = 0; G.last = null;
-  loadCourse(G.course);
   hostStartHole(0);
 }
 function hostStartHole(i) {
-  G.hi = i; G.phase = 'intro'; G.phaseEnds = NET.hostNow() + 3800; G.shot = null; G.turn = null;
+  G.hi = i; ensureCourse(entry(i)[0]);
+  G.phase = 'intro'; G.phaseEnds = NET.hostNow() + 3800; G.shot = null; G.turn = null;
   const h = holeNow();
   G.strokes = {}; G.done = {}; G.balls = {};
   for (const p of G.players) { G.strokes[p.id] = 0; G.done[p.id] = false; G.balls[p.id] = { p: h.tee.slice(), inPlay: false }; }
@@ -171,7 +182,7 @@ function reportResult() {
   const tot = (id) => G.scores[id].reduce((a, b) => a + (b || 0), 0);
   const sorted = G.players.slice().sort((a, b) => tot(a.id) - tot(b.id));
   try {
-    H.report({ id: 'minigolf-' + Math.round(G.phaseEnds) + '-' + G.players.map((p) => p.id).join(''), mode: courseById(G.course).name,
+    H.report({ id: 'minigolf-' + Math.round(G.phaseEnds) + '-' + G.players.map((p) => p.id).join(''), mode: new Set(G.holeList.map((e) => entry(0, { holeList: [e], course: G.course })[0])).size > 1 ? 'Grand Tour 18 trous' : courseById(G.course).name,
       players: sorted.map((p) => ({ id: p.bot ? null : Number(p.id), name: p.name, color: p.color, bot: p.bot, rank: 1 + sorted.filter((q) => tot(q.id) < tot(p.id)).length, score: tot(p.id) })) });
   } catch (e) { console.warn(e); }
 }
@@ -299,7 +310,7 @@ function sendAim(a) {
 /* ================================================================ RÉACTIONS À L'ÉTAT */
 let prev = { phase: null, hi: -1, turn: null, lastN: -1, shotId: 0, course: null };
 function onState(s) {
-  if (s.phase !== 'lobby' && s.phase !== 'over' && (!COURSE || COURSE.id !== s.course || !HOLES.length)) loadCourse(s.course);
+  if (s.phase !== 'lobby' && s.phase !== 'over') ensureCourse(entry(s.hi, s)[0]);
   if (s.phase === 'lobby') {
     UI.show('lobby'); UI.lobby();
     if (COURSE && COURSE.id !== s.course) { clearTimeout(onState._lt); onState._lt = setTimeout(() => { if (G.phase === 'lobby') loadCourse(G.course); }, 60); }
@@ -308,12 +319,12 @@ function onState(s) {
   else UI.show('game');
   if (s.phase !== 'lobby' && s.phase !== 'over') {
     if (prev.hi !== s.hi || prev.course !== s.course || (prev.phase !== 'intro' && s.phase === 'intro')) {
-      R.setHole(s.holeList[s.hi]); CAM.introStart = nowMs(); CAM.mode = 'intro';
+      R.setHole(entry(s.hi, s)[1]); CAM.introStart = nowMs(); CAM.mode = 'intro';
       for (const id of [...ballsVisual.keys()]) { ballsVisual.get(id).sink = 0; }
       UI.holeBanner();
     }
     if (s.phase === 'play' && prev.phase === 'intro') CAM.mode = 'follow';
-    if (s.phase === 'holeEnd' && prev.phase !== 'holeEnd') { CAM.mode = 'orbit'; UI.holeSummary(); }
+    if (s.phase === 'holeEnd' && prev.phase !== 'holeEnd') { CAM.mode = 'orbit'; setTimeout(() => { if (G.phase === 'holeEnd') UI.holeSummary(); }, 1500); }
     if (s.last && s.last.n !== prev.lastN && prev.lastN !== -1) announceLast(s.last);
     if (s.turn !== prev.turn && s.turn) onTurn(s.turn);
     if (s.shot && s.shot.id !== prev.shotId) {
@@ -352,7 +363,7 @@ function announceLast(L) {
     UI.big(label, `${p.name} · ${L.strokes} coup${L.strokes > 1 ? 's' : ''}`, p.color);
     if (L.strokes === 1) { sfx.ace(); R.fx('ace', h.cup); } else sfx.cheer(d < 0);
   } else if (L.kind === 'oob') {
-    UI.big(L.oob === 'water' ? 'Plouf !' : L.oob === 'lava' ? 'Dans la lave !' : 'Hors-jeu !', `${p.name} · +1 coup de pénalité`, '#ff5a4a');
+    UI.big(L.oob === 'water' ? 'Plouf !' : L.oob === 'lava' ? 'Dans la lave !' : L.oob === 'void' ? 'Perdu dans le vide !' : 'Hors-jeu !', `${p.name} · +1 coup de pénalité`, '#ff5a4a');
   } else if (L.kind === 'timeout') UI.big('Temps écoulé', `${p.name} · +1 coup`, '#ff9a3c');
   else if (L.kind === 'max') UI.big('Coups épuisés', `${p.name} · ${L.strokes} sur ce trou`, '#ff9a3c');
 }
@@ -373,6 +384,10 @@ function handleEvent(e) {
     case 'water': sfx.water(); R.fx('water', p); break;
     case 'lava': sfx.lava(); R.fx('lava', p); break;
     case 'out': sfx.out(); R.fx('out', p); break;
+    case 'void': sfx.out(); R.fx('void', p); break;
+    case 'mud': sfx.sand(); R.fx('mud', p); break;
+    case 'slow': sfx.slow(); R.fx('slow', p); break;
+    case 'flip': sfx.flip(e.s); R.fx('flip', p, { s: e.s }); break;
     case 'boost': sfx.boost(); R.fx('boost', p); break;
     case 'tramp': sfx.tramp(); R.fx('tramp', p); break;
     case 'tele': sfx.tele(); R.fx('tele', p); break;
@@ -387,7 +402,8 @@ const ballsVisual = new Map();   // id → { p, vis, sink }
 function updateBalls(dt) {
   const h = holeNow(); if (!h) return;
   const live = new Map();
-  if (SIM && !SIM.done) for (const b of SIM.balls) live.set(K(b.id), { p: b.p, holed: b.holed, oob: b.oob });
+  const simLive = SIM && (!SIM.done || pendingShot || (G.shot && (G.shot.id === SIM.id || SIM.id === 'pending')));
+  if (simLive) for (const b of SIM.balls) live.set(K(b.id), { p: b.p, holed: b.holed, oob: b.oob });
   else if (G.shot && STREAM.id === G.shot.id && STREAM.buf.length) {
     // interpolation avec ~110 ms de retard
     const buf = STREAM.buf, last = buf[buf.length - 1];
@@ -427,7 +443,7 @@ function focusBall() {
 }
 
 /* ================================================================ CAMÉRA */
-const CAM = { yaw: 0, pitch: 0.42, dist: 5.2, target: new THREE.Vector3(), cur: new THREE.Vector3(), mode: 'follow', introStart: 0, trans: 0, lastInput: 0, shake: 0, overview: false };
+const CAM = { flipSign: 1, roll: 0, yaw: 0, pitch: 0.42, dist: 5.2, target: new THREE.Vector3(), cur: new THREE.Vector3(), mode: 'follow', introStart: 0, trans: 0, lastInput: 0, shake: 0, overview: false };
 function camYawToRoute(p) {
   const h = holeNow(); if (!h) return 0;
   const r = h.route; let bi = 0, bd = 1e9;
@@ -452,6 +468,7 @@ function updateCamera(dt) {
     const fwd = new THREE.Vector3(Math.sin(yawT), 0, Math.cos(yawT));
     const p0 = cup.clone().add(new THREE.Vector3(3, 7, 3)), p1 = tee.clone().addScaledVector(fwd, -5).add(new THREE.Vector3(0, 2.6, 0));
     const look = cup.clone().lerp(tee.clone().addScaledVector(fwd, 2), e);
+    cam.up.set(0, 1, 0); CAM.roll = 0; CAM.flipSign = 1;
     cam.position.copy(p0.lerp(p1, e)); cam.lookAt(look);
     CAM.cur.copy(tee); CAM.yaw = yawT; CAM.pitch = 0.42;
     if (u >= 1 && G.phase !== 'intro') CAM.mode = 'follow';
@@ -459,7 +476,7 @@ function updateCamera(dt) {
   }
   if (CAM.mode === 'orbit') {
     const c = new THREE.Vector3(...h.cup), a = nowMs() / 4000;
-    cam.position.set(c.x + Math.sin(a) * 6, c.y + 3.5, c.z + Math.cos(a) * 6); cam.lookAt(c);
+    cam.up.set(0, 1, 0); cam.position.set(c.x + Math.sin(a) * 6, c.y + 3.5, c.z + Math.cos(a) * 6); cam.lookAt(c);
     return;
   }
   if (CAM.overview) { const b = h.bounds; tgt = new THREE.Vector3((b.min[0] + b.max[0]) / 2, b.min[1], (b.min[2] + b.max[2]) / 2); }
@@ -469,8 +486,17 @@ function updateCamera(dt) {
   const dist = CAM.overview ? Math.max(18, Math.hypot(h.bounds.max[0] - h.bounds.min[0], h.bounds.max[2] - h.bounds.min[2]) * 0.8) : CAM.dist;
   const pitch = CAM.overview ? 1.05 : CAM.pitch;
   const fwd = new THREE.Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw));
-  const look = CAM.cur.clone().add(new THREE.Vector3(0, 0.25, 0));
-  let desired = look.clone().addScaledVector(fwd, -dist * Math.cos(pitch)).add(new THREE.Vector3(0, dist * Math.sin(pitch), 0));
+  // au plafond aimanté, la caméra se retourne : on joue à l'envers
+  const gsF = !CAM.overview && v && v.p ? gravSign(h.world, v.p) : 1;
+  CAM.roll += ((gsF < 0 ? Math.PI : 0) - CAM.roll) * Math.min(1, dt * 3.5);
+  const cr = Math.cos(CAM.roll), sr = Math.sin(CAM.roll);
+  const upv = new THREE.Vector3(0, cr, 0).addScaledVector(new THREE.Vector3(-Math.cos(CAM.yaw), 0, Math.sin(CAM.yaw)), sr);
+  CAM.flipSign = cr < 0 ? -1 : 1;
+  cam.up.copy(upv);
+  // la tête en bas, on reste dans le tunnel : caméra basse et proche
+  const inv = Math.max(0, -cr), pitchE = pitch + (Math.min(pitch, 0.12) - pitch) * inv, distE = dist + (Math.min(dist, 3.0) - dist) * inv;
+  const look = CAM.cur.clone().addScaledVector(upv, 0.25 * (1 - inv) + 0.04 * inv);
+  let desired = look.clone().addScaledVector(fwd, -distE * Math.cos(pitchE)).addScaledVector(upv, distE * Math.sin(pitchE));
   if (!CAM.overview) desired = R.camClip(look, desired);
   cam.position.copy(desired);
   if (CAM.shake > 0.001) { cam.position.x += (Math.random() - 0.5) * CAM.shake; cam.position.y += (Math.random() - 0.5) * CAM.shake; CAM.shake *= Math.exp(-dt * 10); }
@@ -478,7 +504,9 @@ function updateCamera(dt) {
 }
 
 /* ================================================================ CONTRÔLES */
-const INPUT = { aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false };
+const INPUT = { aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false, yaw: null, mx: -1, inside: false, keys: new Set() };
+const TOUCHDEV = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+const aimYaw = () => (INPUT.yaw != null ? INPUT.yaw : CAM.yaw);
 const canvasEl = () => R.renderer.domElement;
 function myTurn() { return G.phase === 'play' && G.turn === ME() && !G.shot && !SIM; }
 function requestLock() { const c = canvasEl(); try { if (document.pointerLockElement !== c) { const p = c.requestPointerLock({ unadjustedMovement: false }); if (p && p.catch) p.catch(() => {}); } } catch (e) {} }
@@ -490,10 +518,75 @@ function startAim(btn) {
 function releaseAim() {
   if (!INPUT.aiming) return;
   INPUT.aiming = false;
-  const pw = INPUT.power; INPUT.power = 0;
-  sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false });
+  const pw = INPUT.power, yaw = aimYaw(); INPUT.power = 0; INPUT.yaw = null;
+  sendAim({ pid: ME(), yaw, power: 0, on: false });
   if (pw < 0.02 || !myTurn()) return;
-  doShoot(CAM.yaw, pw);
+  doShoot(yaw, pw);
+}
+function cancelAim() { if (!INPUT.aiming) return; INPUT.aiming = false; INPUT.power = 0; INPUT.yaw = null; sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false }); }
+
+/* ---- écran tactile ----
+   un doigt : tourner la caméra ; deux doigts : zoomer ;
+   poser le doigt sur sa balle et tirer en arrière (lance-pierre) : la balle part à l'opposé, plus on tire loin, plus c'est fort */
+const TOUCH = { pts: new Map(), mode: null, aimId: null, d0: 0, dist0: 0 };
+function ballScreen() {
+  const b = G.balls[ME()]; if (!b) return null;
+  const v = ballsVisual.get(ME()), p = v && v.p ? v.p : b.p;
+  const pr = R.project(p); if (!pr.front) return null;
+  return { x: pr.x * innerWidth, y: pr.y * innerHeight, p };
+}
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _plane = new THREE.Plane(), _hit = new THREE.Vector3();
+function touchAim(x, y) {
+  const bs = ballScreen(); if (!bs) return;
+  const sd = Math.hypot(x - bs.x, y - bs.y), full = Math.min(innerWidth, innerHeight) * 0.38;
+  INPUT.power = clamp((sd - 14) / full, 0, 1);
+  if (sd < 14) return;
+  // direction : du doigt vers la balle, mesurée sur le sol (plan horizontal à hauteur de balle)
+  _ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); _ray.setFromCamera(_ndc, R.camera);
+  _plane.set(new THREE.Vector3(0, 1, 0), -bs.p[1]);
+  const ok = _ray.ray.intersectPlane(_plane, _hit);
+  if (ok && Math.hypot(_hit.x - bs.p[0], _hit.z - bs.p[2]) < 60) INPUT.yaw = Math.atan2(bs.p[0] - _hit.x, bs.p[2] - _hit.z);
+  else INPUT.yaw = CAM.yaw - Math.atan2(bs.x - x, -(bs.y - y));   // doigt au-dessus de l'horizon : repli sur l'écran
+}
+function bindTouch(c) {
+  const pinchDist = () => { const a = [...TOUCH.pts.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+  c.addEventListener('touchstart', (e) => {
+    e.preventDefault(); initAudio();
+    if (UI.screen !== 'game' || UI.menuOpen) return;
+    for (const t of e.changedTouches) TOUCH.pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+    if (TOUCH.pts.size === 1) {
+      const t = e.changedTouches[0], bs = myTurn() ? ballScreen() : null;
+      const reach = Math.max(70, Math.min(innerWidth, innerHeight) * 0.13);
+      if (bs && Math.hypot(t.clientX - bs.x, t.clientY - bs.y) < reach) { TOUCH.mode = 'aim'; TOUCH.aimId = t.identifier; INPUT.aiming = true; INPUT.power = 0; INPUT.btn = -3; INPUT.yaw = CAM.yaw; }
+      else TOUCH.mode = 'cam';
+    } else if (TOUCH.pts.size === 2) {
+      if (TOUCH.mode === 'aim') cancelAim();
+      TOUCH.mode = 'pinch'; TOUCH.d0 = pinchDist(); TOUCH.dist0 = CAM.dist;
+    }
+  }, { passive: false });
+  c.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (UI.screen !== 'game' || UI.menuOpen) return;
+    for (const t of e.changedTouches) {
+      const prevP = TOUCH.pts.get(t.identifier); if (!prevP) continue;
+      const dx = t.clientX - prevP.x, dy = t.clientY - prevP.y;
+      TOUCH.pts.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (TOUCH.mode === 'cam') { CAM.yaw -= dx * 0.0065 * SENS.cam * CAM.flipSign; CAM.pitch = clamp(CAM.pitch + dy * 0.005 * SENS.cam, 0.05, 1.35); CAM.lastInput = nowMs(); }
+      else if (TOUCH.mode === 'aim' && t.identifier === TOUCH.aimId) touchAim(t.clientX, t.clientY);
+    }
+    if (TOUCH.mode === 'pinch' && TOUCH.d0 > 10) { const d = pinchDist(); if (d > 10) { CAM.dist = clamp(TOUCH.dist0 * TOUCH.d0 / d, 1.3, 18); CAM.lastInput = nowMs(); } }
+  }, { passive: false });
+  const end = (e, cancel) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      TOUCH.pts.delete(t.identifier);
+      if (TOUCH.mode === 'aim' && t.identifier === TOUCH.aimId) { if (cancel) cancelAim(); else releaseAim(); TOUCH.mode = null; }
+    }
+    if (TOUCH.pts.size === 0) TOUCH.mode = null;
+    else if (TOUCH.mode === 'pinch' && TOUCH.pts.size === 1) TOUCH.mode = 'cam';
+  };
+  c.addEventListener('touchend', (e) => end(e, false), { passive: false });
+  c.addEventListener('touchcancel', (e) => end(e, true), { passive: false });
 }
 function doShoot(yaw, power) {
   const T0 = kT();
@@ -508,6 +601,7 @@ function doShoot(yaw, power) {
 let pendingShot = null;
 function bindInput() {
   const c = canvasEl();
+  bindTouch(c);
   c.addEventListener('contextmenu', (e) => e.preventDefault());
   c.addEventListener('mousedown', (e) => {
     initAudio();
@@ -518,14 +612,15 @@ function bindInput() {
   addEventListener('mousemove', (e) => {
     if (UI.screen !== 'game' || UI.menuOpen) return;
     const locked = document.pointerLockElement === c;
+    INPUT.mx = e.clientX; INPUT.inside = e.target === c;
     if (!locked && e.target !== c) return;
     const dx = e.movementX || 0, dy = e.movementY || 0;
     if (Math.abs(dx) > 300 || Math.abs(dy) > 300) return;
     if (INPUT.aiming) {
       INPUT.power = clamp(INPUT.power + dy * 0.0032 * SENS.power, 0, 1);
-      CAM.yaw -= dx * 0.0009 * SENS.cam;
+      CAM.yaw -= dx * 0.0009 * SENS.cam * CAM.flipSign;
     } else {
-      CAM.yaw -= dx * 0.0032 * SENS.cam; CAM.pitch = clamp(CAM.pitch + dy * 0.0026 * SENS.cam, 0.05, 1.35);
+      CAM.yaw -= dx * 0.0032 * SENS.cam * CAM.flipSign; CAM.pitch = clamp(CAM.pitch + dy * 0.0026 * SENS.cam, 0.05, 1.35);
       CAM.lastInput = nowMs();
     }
   });
@@ -538,26 +633,39 @@ function bindInput() {
   addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     initAudio();
-    if (e.code === 'Escape') { if (INPUT.aiming) { INPUT.aiming = false; INPUT.power = 0; sendAim({ pid: ME(), yaw: CAM.yaw, power: 0, on: false }); return; } if (UI.screen === 'game') UI.toggleMenu(); return; }
+    if (e.code === 'Escape') { if (INPUT.aiming) { cancelAim(); return; } if (UI.screen === 'game') UI.toggleMenu(); return; }
     if (UI.screen !== 'game' || UI.menuOpen) return;
     if (e.code === 'KeyM') { const m = toggleMute(); UI.toast(m ? 'Son coupé' : 'Son activé'); }
     if (e.code === 'KeyV') { CAM.overview = !CAM.overview; }
     if (e.code === 'Tab') { e.preventDefault(); UI.bigCard(true); }
     if (e.code === 'Space' && !e.repeat) { if (myTurn()) { INPUT.aiming = true; INPUT.power = 0; INPUT.btn = -2; INPUT.space = true; } e.preventDefault(); }
-    if (e.code === 'ArrowLeft') CAM.yaw += 0.06; if (e.code === 'ArrowRight') CAM.yaw -= 0.06;
-    if (e.code === 'ArrowUp') CAM.pitch = clamp(CAM.pitch - 0.05, 0.05, 1.35); if (e.code === 'ArrowDown') CAM.pitch = clamp(CAM.pitch + 0.05, 0.05, 1.35);
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyQ', 'KeyW', 'KeyS', 'KeyZ'].includes(e.code)) { INPUT.keys.add(e.code); e.preventDefault(); }
   });
   addEventListener('keyup', (e) => {
     if (e.code === 'Tab') UI.bigCard(false);
+    INPUT.keys.delete(e.code);
     if (e.code === 'Space' && INPUT.space) { INPUT.space = false; releaseAim(); }
   });
-  addEventListener('blur', () => { if (INPUT.aiming) { INPUT.aiming = false; INPUT.power = 0; } });
+  addEventListener('blur', () => { if (INPUT.aiming) { INPUT.aiming = false; INPUT.power = 0; } INPUT.keys.clear(); INPUT.inside = false; });
+  document.addEventListener('mouseleave', () => { INPUT.inside = false; });
 }
 const SENS = { cam: PREFS.sens ?? 1, power: 1 };
 function inputTick(dt) {
+  // touches maintenues : la caméra tourne sans limite
+  const K_ = INPUT.keys, left = K_.has('ArrowLeft') || K_.has('KeyA') || K_.has('KeyQ'), right = K_.has('ArrowRight') || K_.has('KeyD');
+  const up = K_.has('ArrowUp') || K_.has('KeyW') || K_.has('KeyZ'), down = K_.has('ArrowDown') || K_.has('KeyS');
+  const ks = INPUT.aiming ? 0.5 : 2.2;
+  if (left) CAM.yaw += ks * dt * CAM.flipSign; if (right) CAM.yaw -= ks * dt * CAM.flipSign;
+  if (up) CAM.pitch = clamp(CAM.pitch - 1.2 * dt, 0.05, 1.35); if (down) CAM.pitch = clamp(CAM.pitch + 1.2 * dt, 0.05, 1.35);
+  // souris non verrouillée : pousser le curseur contre un bord fait tourner la caméra en continu
+  if (!INPUT.locked && !TOUCHDEV && INPUT.inside && UI.screen === 'game' && !UI.menuOpen && INPUT.mx >= 0) {
+    const W = innerWidth, edge = Math.max(40, W * 0.06);
+    const k = INPUT.mx < edge ? 1 - INPUT.mx / edge : INPUT.mx > W - edge ? -(1 - (W - INPUT.mx) / edge) : 0;
+    if (k) { CAM.yaw += k * (INPUT.aiming ? 0.6 : 2.4) * dt * CAM.flipSign; CAM.lastInput = nowMs(); }
+  }
   if (INPUT.aiming && INPUT.space) INPUT.power = clamp(INPUT.power + dt * 0.55, 0, 1);
   if (INPUT.aiming && !myTurn()) { INPUT.aiming = false; INPUT.power = 0; }
-  if (INPUT.aiming && nowMs() - INPUT.lastAimSend > 100) { INPUT.lastAimSend = nowMs(); sendAim({ pid: ME(), yaw: CAM.yaw, power: INPUT.power, on: true }); }
+  if (INPUT.aiming && nowMs() - INPUT.lastAimSend > 100) { INPUT.lastAimSend = nowMs(); sendAim({ pid: ME(), yaw: aimYaw(), power: INPUT.power, on: true }); }
 }
 
 /* ================================================================ INTERFACE */
@@ -582,7 +690,7 @@ const UI = {
     $('cards').querySelectorAll('.card').forEach((b) => b.onclick = () => { sfx.click(); hostSetLobby({ course: b.dataset.c }); });
     const opt = (key, label, vals) => `<div class="opt"><span>${label}</span><div class="seg">${vals.map(([v, l]) => `<button data-k="${key}" data-v="${v}" class="${String(G.opts[key]) === String(v) ? 'sel' : ''}" ${host ? '' : 'disabled'}>${l}</button>`).join('')}</div></div>`;
     const nh = humans().length;
-    $('opts').innerHTML = opt('holes', 'Trous', [['all', 'Les 6'], ['first', '1 à 3'], ['last', '4 à 6']])
+    $('opts').innerHTML = opt('holes', 'Trous', [['all', 'Les 6'], ['first', '1 à 3'], ['last', '4 à 6'], ['eighteen', '18 (3 parcours)']])
       + opt('bots', 'Bots', [0, 1, 2, 3].filter((n) => n + nh <= 6).map((n) => [n, n ? String(n) : 'Aucun']))
       + (G.opts.bots ? opt('level', 'Niveau des bots', [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']]) : '')
       + opt('collide', 'Les balles se touchent', [[true, 'Oui'], [false, 'Non']])
@@ -598,6 +706,7 @@ const UI = {
     const h = holeNow(); if (!h) return;
     $('hnum').textContent = G.hi + 1; $('hname').textContent = h.name; $('hpar').textContent = 'Par ' + h.par;
     $('hcourse').textContent = COURSE.name + ' · trou ' + (G.hi + 1) + ' sur ' + G.holeList.length;
+    document.body.dataset.theme = COURSE.theme;
     const intro = $('intro'); intro.innerHTML = `<div class="n">${G.hi + 1}</div><div class="nm">${esc(h.name)}</div><div class="pr">Par ${h.par}</div>`;
     intro.classList.remove('show'); void intro.offsetWidth; intro.classList.add('show');
   },
@@ -608,13 +717,13 @@ const UI = {
     $('summary').innerHTML = `<h3>Trou ${G.hi + 1} · ${esc(h.name)}</h3>` + rows.map((r) => `<div class="row" style="--c:${r.p.color}"><i></i><b>${esc(r.p.name)}</b><span class="s">${r.s}</span><span class="l">${lab(r)}</span></div>`).join('')
       + `<p>${G.hi + 1 < G.holeList.length ? 'Trou suivant dans un instant…' : 'Résultats…'}</p>`;
     const el = $('summary'); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 4900);
+    setTimeout(() => el.classList.remove('show'), 3500);
   },
   /** carte de score sur le côté */
   score() {
     if (!G.players.length || G.phase === 'lobby') return;
-    const c = courseById(G.course), list = G.holeList;
-    const pars = list.map((i) => c.holes[i].par);
+    const list = G.holeList, pars = list.map((_, k) => parOf(k));
+    const w0 = list.length > 9 ? (G.hi < 9 ? 0 : 9) : 0, w1 = Math.min(list.length, w0 + 9), win = (k) => k >= w0 && k < w1;
     const tot = (id) => list.reduce((a, _, k) => a + (k === G.hi && G.phase !== 'holeEnd' && G.phase !== 'over' ? (G.strokes[id] || 0) : (G.scores[id]?.[k] || 0)), 0);
     const parSoFar = (id) => list.reduce((a, _, k) => a + (k < G.hi || (k === G.hi && (G.done[id] || G.phase === 'holeEnd' || G.phase === 'over')) ? pars[k] : 0), 0);
     const doneK = G.phase === 'holeEnd' || G.phase === 'over' ? G.hi + 1 : G.hi;
@@ -625,11 +734,11 @@ const UI = {
       if (k === G.hi) { const s = G.phase === 'holeEnd' ? G.scores[id]?.[k] : G.strokes[id]; return s ? s + (G.done[id] === 'holed' ? '' : G.done[id] === 'max' ? '×' : '') : ''; }
       return '';
     };
-    const html = `<table><thead><tr><th class="nm">Trou</th>${list.map((_, k) => `<th class="${k === G.hi ? 'cur' : ''}">${k + 1}</th>`).join('')}<th class="t">Tot</th></tr>
-      <tr class="par"><td class="nm">Par</td>${pars.map((p, k) => `<td class="${k === G.hi ? 'cur' : ''}">${p}</td>`).join('')}<td class="t">${pars.reduce((a, b) => a + b, 0)}</td></tr></thead><tbody>
+    const html = `<table><thead><tr><th class="nm">${list.length > 9 ? (w0 ? 'Retour' : 'Aller') : 'Trou'}</th>${list.map((_, k) => win(k) ? `<th class="${k === G.hi ? 'cur' : ''}">${k + 1}</th>` : '').join('')}<th class="t">Tot</th></tr>
+      <tr class="par"><td class="nm">Par</td>${pars.map((p, k) => win(k) ? `<td class="${k === G.hi ? 'cur' : ''}">${p}</td>` : '').join('')}<td class="t">${pars.reduce((a, b) => a + b, 0)}</td></tr></thead><tbody>
       ${G.players.map((p) => `<tr class="${G.turn === p.id ? 'turn' : ''} ${G.done[p.id] === 'holed' ? 'in' : ''}" style="--c:${p.color}">
         <td class="nm"><i></i><span>${esc(p.name)}</span></td>
-        ${list.map((_, k) => `<td class="${k === G.hi ? 'cur' : ''} sc">${cell(p.id, k)}</td>`).join('')}
+        ${list.map((_, k) => win(k) ? `<td class="${k === G.hi ? 'cur' : ''} sc">${cell(p.id, k)}</td>` : '').join('')}
         <td class="t"><b>${tot(p.id)}</b><small>${rel(p.id)}</small></td></tr>`).join('')}</tbody></table>`;
     const key = html.length + ':' + html;
     if (this._lastCard !== key) {
@@ -640,12 +749,13 @@ const UI = {
   },
   bigCard(on) { $('card').classList.toggle('big', on); },
   results() {
-    const c = courseById(G.course), list = G.holeList, pars = list.map((i) => c.holes[i].par), parT = pars.reduce((a, b) => a + b, 0);
+    const c = courseById(G.course), list = G.holeList, pars = list.map((_, k) => parOf(k)), parT = pars.reduce((a, b) => a + b, 0);
+    const multi = new Set(list.map((_, k) => entry(k)[0])).size > 1;
     const tot = (id) => list.reduce((a, _, k) => a + (G.scores[id]?.[k] || 0), 0);
     const rows = G.players.slice().sort((a, b) => tot(a.id) - tot(b.id));
     const rank = (p) => 1 + rows.filter((q) => tot(q.id) < tot(p.id)).length;
     $('podium').innerHTML = rows.slice(0, 3).map((p, i) => `<div class="pod p${rank(p)}" style="--c:${p.color}"><div class="who">${esc(p.name)}</div><div class="blk"><b>${rank(p)}</b><span>${tot(p.id)} coups</span><small>${tot(p.id) - parT === 0 ? 'par' : (tot(p.id) - parT > 0 ? '+' : '') + (tot(p.id) - parT)}</small></div></div>`).join('');
-    $('resultcard').innerHTML = `<table><thead><tr><th class="nm">${esc(c.name)}</th>${list.map((_, k) => `<th>${k + 1}</th>`).join('')}<th class="t">Total</th></tr><tr class="par"><td class="nm">Par</td>${pars.map((p) => `<td>${p}</td>`).join('')}<td class="t">${parT}</td></tr></thead>
+    $('resultcard').innerHTML = `<table><thead><tr><th class="nm">${esc(multi ? 'Grand Tour' : c.name)}</th>${list.map((_, k) => `<th>${k + 1}</th>`).join('')}<th class="t">Total</th></tr><tr class="par"><td class="nm">Par</td>${pars.map((p) => `<td>${p}</td>`).join('')}<td class="t">${parT}</td></tr></thead>
       <tbody>${rows.map((p) => `<tr style="--c:${p.color}"><td class="nm"><i></i><span>${esc(p.name)}</span></td>${list.map((_, k) => { const s = G.scores[p.id]?.[k]; const d = s - pars[k]; return `<td class="sc ${s === 1 ? 'ace' : d < 0 ? 'under' : d > 0 ? 'over' : ''}">${s ?? ''}</td>`; }).join('')}<td class="t"><b>${tot(p.id)}</b></td></tr>`).join('')}</tbody></table>`;
     $('resagain').classList.toggle('hidden', !NET.isHost);
     $('reswait').classList.toggle('hidden', NET.isHost);
@@ -669,7 +779,8 @@ const UI = {
   },
   lockHint() {
     if (INPUT.locked) this.lockSeen = true;
-    $('lockhint').classList.toggle('hidden', INPUT.locked || this.lockSeen || UI.screen !== 'game' || !myTurn());
+    if (myTurn() && !this._hintAt) this._hintAt = nowMs(); if (!myTurn()) this._hintAt = 0;
+    $('lockhint').classList.toggle('hidden', TOUCHDEV || INPUT.locked || UI.screen !== 'game' || !myTurn() || INPUT.aiming || (this._hintAt && nowMs() - this._hintAt > 6000));
   },
   /** éléments qui bougent à chaque image */
   frame() {
@@ -690,7 +801,10 @@ const UI = {
     if (aiming) { pw.style.setProperty('--p', val); pw.querySelector('b').textContent = Math.round(val * 100) + ' %'; }
     // aide
     const mine = myTurn();
-    $('help').innerHTML = mine
+    $('help').innerHTML = TOUCHDEV
+      ? (mine ? (INPUT.aiming ? 'Tire en arrière pour doser · lâche pour frapper · reviens sur la balle pour annuler' : 'Pose le doigt sur ta balle et tire en arrière · un doigt ailleurs : caméra · deux doigts : zoom')
+        : (G.shot && G.shot.pid === ME() ? 'Ta balle roule…' : G.phase === 'play' ? 'Spectateur · un doigt : caméra · deux doigts : zoom' : ''))
+      : mine
       ? (INPUT.aiming ? 'Recule la souris pour doser · relâche pour tirer · Échap annule' : 'Bouge la souris pour viser · maintiens un clic et recule pour la puissance · molette : zoom · V : vue du trou')
       : (G.shot && G.shot.pid === ME() ? 'Ta balle roule…' : G.phase === 'play' ? 'Mode spectateur · bouge la souris pour tourner autour · molette : zoom · Tab : carte' : '');
     $('spec').classList.toggle('show', G.phase === 'play' && G.turn !== ME() && !!p);
@@ -702,7 +816,8 @@ const UI = {
       if (!el) { el = document.createElement('div'); el.className = 'tag'; el.dataset.id = pl.id; tags.appendChild(el); }
       const v = ballsVisual.get(pl.id);
       if (!v || !v.show || !v.p) { el.style.display = 'none'; continue; }
-      const pr = R.project([v.p[0], v.p[1] + 0.32, v.p[2]]);
+      const hw = holeNow(), up = hw ? gravSign(hw.world, v.p) * CAM.flipSign : 1;
+      const pr = R.project([v.p[0], v.p[1] + 0.32 * up, v.p[2]]);
       const d = R.camera.position.distanceTo(new THREE.Vector3(...v.p));
       if (!pr.front || d > 45) { el.style.display = 'none'; continue; }
       el.style.display = ''; el.textContent = pl.name; el.style.setProperty('--c', pl.color);
@@ -720,6 +835,11 @@ const ART = {
   pirate: `<svg viewBox="0 0 200 120"><defs><linearGradient id="ps" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a6e"/><stop offset=".6" stop-color="#d9668f"/><stop offset="1" stop-color="#ffc07a"/></linearGradient></defs><rect width="200" height="120" fill="url(#ps)"/><circle cx="60" cy="74" r="18" fill="#ffd27a"/><rect y="74" width="200" height="46" fill="#1b6f88"/><path d="M0 84 h200 M20 92 h60 M110 96 h70" stroke="#ffd9a0" stroke-width="2" opacity=".6"/><ellipse cx="150" cy="80" rx="34" ry="8" fill="#e9d39c"/><path d="M148 78 q-4 -24 6 -36" stroke="#7a5c3a" stroke-width="4" fill="none"/><path d="M154 42 q-16 -2 -24 8 M154 42 q14 -6 24 4 M154 42 q-6 -12 -18 -14 M154 42 q10 -12 22 -10" stroke="#2f8a35" stroke-width="5" fill="none"/><path d="M20 80 h70 l-8 12 h-54z" fill="#5a3a20"/><path d="M50 80 V44 M50 46 l16 16 h-16z" stroke="#4a3220" stroke-width="3" fill="#f2e6c8"/></svg>`,
   zen: `<svg viewBox="0 0 200 120"><defs><linearGradient id="zs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#191b46"/><stop offset=".55" stop-color="#7a4d86"/><stop offset="1" stop-color="#f3a27a"/></linearGradient></defs><rect width="200" height="120" fill="url(#zs)"/><rect y="84" width="200" height="36" fill="#3b5a2c"/><path d="M30 92 Q100 56 170 92" stroke="#d22f2a" stroke-width="6" fill="none"/><path d="M40 90 v10 M70 76 v18 M100 70 v20 M130 76 v18 M160 90 v10" stroke="#d22f2a" stroke-width="3"/><ellipse cx="100" cy="102" rx="60" ry="8" fill="#1d5a6a"/><g transform="translate(36 40)"><rect x="-3" y="10" width="6" height="40" fill="#5a3d24"/><circle cx="0" cy="8" r="16" fill="#ffb7d0"/><circle cx="12" cy="16" r="10" fill="#ff9ec2"/></g><g transform="translate(166 62)"><rect x="-6" y="6" width="12" height="14" fill="#8f8a82"/><rect x="-5" y="-4" width="10" height="10" fill="#ffd38a"/><path d="M-10 -4 L0 -12 L10 -4Z" fill="#8f8a82"/></g><circle cx="172" cy="56" r="14" fill="#ffb050" opacity=".25"/></svg>`,
   forge: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#12070a"/><path d="M0 120 V96 Q50 88 100 98 T200 92 V120Z" fill="#ff5a12"/><path d="M0 104 Q60 96 120 106 T200 102" stroke="#ffd060" stroke-width="3" fill="none"/><path d="M120 96 L150 30 L180 96Z" fill="#2a1c18"/><path d="M144 40 h12" stroke="#ff7a20" stroke-width="5"/><g transform="translate(60 62)"><circle r="20" fill="none" stroke="#5b5f68" stroke-width="8"/><circle r="20" fill="none" stroke="#39e6ff" stroke-width="2" opacity=".8"/></g><rect x="20" y="80" width="90" height="6" fill="#3c4048"/><rect x="20" y="78" width="90" height="2" fill="#39e6ff"/><path d="M96 44 l-10 0 l0 -14 l10 0" stroke="#ffc21a" stroke-width="5" fill="none"/></svg>`,
+  canyon: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#8fbde8"/><circle cx="40" cy="26" r="13" fill="#fff3c8"/><path d="M0 70 L30 40 L60 40 L70 70Z M120 70 L135 30 L175 30 L190 70Z" fill="#c77a4a"/><rect y="70" width="200" height="50" fill="#e2b77c"/><path d="M10 112 C 60 70, 90 110, 140 84 S 190 80, 196 74" fill="none" stroke="#a85e34" stroke-width="11"/><path d="M10 112 C 60 70, 90 110, 140 84 S 190 80, 196 74" fill="none" stroke="#e0a070" stroke-width="7"/><g fill="#3f8a4a"><rect x="96" y="56" width="7" height="26" rx="3"/><rect x="88" y="62" width="6" height="12" rx="3"/><rect x="105" y="60" width="6" height="12" rx="3"/></g></svg>`,
+  space: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#0b0a2a"/><g fill="#fff"><circle cx="20" cy="18" r="1"/><circle cx="60" cy="40" r="1.4"/><circle cx="120" cy="12" r="1"/><circle cx="170" cy="30" r="1.3"/><circle cx="90" cy="70" r="1"/><circle cx="185" cy="90" r="1"/></g><circle cx="160" cy="88" r="30" fill="#4a6aff"/><ellipse cx="160" cy="88" rx="48" ry="9" fill="none" stroke="#d8c8ff" stroke-width="3" opacity=".7"/><rect x="20" y="48" width="110" height="28" rx="4" fill="#3c4048"/><rect x="20" y="48" width="110" height="5" fill="#b36bff"/><rect x="20" y="71" width="110" height="3" fill="#ff3fa8"/><circle cx="70" cy="58" r="5" fill="#fafafa"/><path d="M70 64 v8" stroke="#d39bff" stroke-width="2" stroke-dasharray="2 2"/></svg>`,
+  swamp: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#3b5446"/><rect y="0" width="200" height="60" fill="#5a7462"/><rect y="74" width="200" height="46" fill="#2c3a22"/><ellipse cx="60" cy="96" rx="14" ry="4" fill="#4a8a3a"/><ellipse cx="140" cy="104" rx="10" ry="3" fill="#4a8a3a"/><path d="M0 84 h200" stroke="#a3aa78" stroke-width="2" opacity=".4"/><path d="M20 82 L120 76 L190 82" stroke="#6b5038" stroke-width="8" fill="none"/><path d="M40 82 v14 M80 79 v16 M120 77 v16 M160 80 v14" stroke="#4a3420" stroke-width="3"/><path d="M168 74 V20 M168 40 l-14 -12 M168 30 l12 -10" stroke="#4a3a2a" stroke-width="4" fill="none"/><g fill="#d8ff6a"><circle cx="40" cy="50" r="2"/><circle cx="96" cy="36" r="1.6"/><circle cx="130" cy="58" r="2"/></g></svg>`,
+  ice: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#a5d0f2"/><path d="M0 80 L50 24 L80 54 L110 14 L160 64 L200 40 V120 H0Z" fill="#e8f2fb"/><path d="M50 24 L60 36 L48 34 Z M110 14 L122 28 L106 26Z" fill="#fff"/><path d="M0 112 C 50 80, 80 112, 120 92 S 180 70, 200 66" fill="none" stroke="#7fb8e0" stroke-width="12"/><path d="M0 112 C 50 80, 80 112, 120 92 S 180 70, 200 66" fill="none" stroke="#dff4ff" stroke-width="7"/><path d="M150 100 l8 -14 8 14z M164 100 l7 -12 7 12z" fill="#2a5a4a"/></svg>`,
+  candy: `<svg viewBox="0 0 200 120"><rect width="200" height="120" fill="#ffd0ec"/><rect y="84" width="200" height="36" fill="#a8f0d8"/><g transform="translate(150 50)"><circle r="34" fill="none" stroke="#fff" stroke-width="3"/><g stroke="#fff" stroke-width="2"><path d="M-34 0 H34 M0 -34 V34 M-24 -24 L24 24 M-24 24 L24 -24"/></g><rect x="-6" y="-40" width="12" height="9" fill="#ff5a8a"/><rect x="-40" y="-5" width="12" height="9" fill="#5ab8ff"/><rect x="28" y="-5" width="12" height="9" fill="#ffd23f"/></g><path d="M10 100 Q40 40 70 96 T 120 70" fill="none" stroke="#e8263c" stroke-width="7"/><path d="M10 100 Q40 40 70 96 T 120 70" fill="none" stroke="#fff" stroke-width="7" stroke-dasharray="6 6"/><circle cx="40" cy="30" r="9" fill="#5af0a0"/><rect x="39" y="38" width="2" height="30" fill="#fff"/></svg>`,
 };
 
 /* ================================================================ DÉMARRAGE */
@@ -766,8 +886,11 @@ function boot() {
   $('msens').onclick = () => { SENS.cam = SENS.cam >= 1.8 ? 0.4 : +(SENS.cam + 0.2).toFixed(1); PREFS.sens = SENS.cam; savePrefs(); UI.toggleMenu(true); };
   $('mquit').onclick = () => (H.embedded ? H.exit() : location.reload());
   $('menubtn').onclick = () => UI.toggleMenu();
+  $('viewbtn').onclick = () => { CAM.overview = !CAM.overview; $('viewbtn').classList.toggle('on', CAM.overview); };
+  $('card').onclick = () => { if (TOUCHDEV) $('card').classList.toggle('big'); };
+  document.body.classList.toggle('touch', TOUCHDEV);
   $('lockhint').onclick = () => { requestLock(); };
-  if (PREFS.quality === 'low') R.setQuality('low');
+  R.touch = TOUCHDEV; R.setQuality(PREFS.quality === 'low' ? 'low' : 'high');
   // décor du salon : premier parcours chargé derrière le menu
   loadCourse(G.course);
   bootNet(() => {
@@ -776,7 +899,7 @@ function boot() {
     if (NET.role === 'guest') setInterval(() => H.send('host', { t: 'ping', c: nowMs() }), 2000);
     requestAnimationFrame(frame);
   });
-  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
+  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, INPUT, TOUCHDEV, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
 }
 
 let last = nowMs(), menuSpin = 0;
@@ -791,25 +914,27 @@ function frame() {
   let kin = kT();
   if (SIM && !SIM.done) kin = SIM.T0 + SIM.t;
   else if (G.shot && STREAM.id === G.shot.id && STREAM.rt != null) kin = G.shot.T0 + STREAM.rt;
-  if (UI.screen === 'game' && COURSE) {
+  if (UI.screen === 'game' && COURSE && holeNow()) {
     updateBalls(dt); updateCamera(dt);
     const fb = ballsVisual.get(focusBall());
-    if (holeNow()) R.flagFade(G.holeList[G.hi], fb && fb.p ? Math.hypot(fb.p[0] - holeNow().cup[0], fb.p[2] - holeNow().cup[2]) : 99);
+    if (holeNow()) R.flagFade(entry(G.hi)[1], fb && fb.p ? Math.hypot(fb.p[0] - holeNow().cup[0], fb.p[2] - holeNow().cup[2]) : 99);
     const me = G.balls[ME()];
-    R.aim(myTurn() && !!me, me ? me.p : [0, 0, 0], CAM.yaw, INPUT.aiming ? INPUT.power : 0);
-    if (!myTurn() && AIM.on && AIM.pid === G.turn && G.balls[AIM.pid] && nowMs() - AIM.at < 600) R.aim(true, G.balls[AIM.pid].p, AIM.yaw, AIM.power);
+    const hw = holeNow().world;
+    R.aim(myTurn() && !!me, me ? me.p : [0, 0, 0], INPUT.aiming ? aimYaw() : CAM.yaw, INPUT.aiming ? INPUT.power : 0, null, me ? gravSign(hw, me.p) < 0 : false);
+    if (!myTurn() && AIM.on && AIM.pid === G.turn && G.balls[AIM.pid] && nowMs() - AIM.at < 600) R.aim(true, G.balls[AIM.pid].p, AIM.yaw, AIM.power, null, gravSign(hw, G.balls[AIM.pid].p) < 0);
     R.update(dt, kin, fb && fb.p ? new THREE.Vector3(...fb.p) : CAM.cur);
   } else if (COURSE && HOLES.length) {
     // menu : survol lent du parcours
     menuSpin += dt * 0.05;
     const h = HOLES[0], c = new THREE.Vector3((h.bounds.min[0] + h.bounds.max[0]) / 2, 0, (h.bounds.min[2] + h.bounds.max[2]) / 2 + 20);
-    R.camera.position.set(c.x + Math.sin(menuSpin) * 40, 18, c.z + Math.cos(menuSpin) * 40); R.camera.lookAt(c);
+    R.camera.up.set(0, 1, 0); R.camera.position.set(c.x + Math.sin(menuSpin) * 40, 18, c.z + Math.cos(menuSpin) * 40); R.camera.lookAt(c);
     R.update(dt, kin, c);
   }
   R.render();
   UI.frame();
   perfWatch(dt);
-  if (UI.screen === 'game' && (myTurn() !== UI._mt)) { UI._mt = myTurn(); UI.lockHint(); }
+  const lk = myTurn() + ':' + INPUT.aiming + ':' + INPUT.locked + ':' + (UI._hintAt && nowMs() - UI._hintAt > 6000);
+  if (UI.screen === 'game' && lk !== UI._mt) { UI._mt = lk; UI.lockHint(); }
   requestAnimationFrame(frame);
 }
 
