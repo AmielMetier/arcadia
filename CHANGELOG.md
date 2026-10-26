@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.64 — 26 octobre 2026
+- Fix trainer intro sequence before Pokemon send-out, responsive battle HUD, and add Gen 5 Unova tilesets (Amiel)
+
 ## 2.63 — 26 octobre 2026
 - **Birdie Party** — Nouveau jeu : du golf en 3D entre potes, jusqu'à 4 joueurs chacun son tour, avec des bots.
   - 18 trous dans trois décors : la campagne, le bord de mer (plages, baies, palmiers) et la montagne (falaises, torrents, sommets enneigés).
