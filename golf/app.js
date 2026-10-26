@@ -28,6 +28,10 @@ const sfx = new Sfx(new URL('./sounds/', import.meta.url).href, new URL('./music
 fillIcons();
 // ?mute : aucun son, sans toucher au réglage du joueur (tests automatiques)
 if (QS.has('mute')) sfx.silent = true;
+// le son est actif d'emblée : tout de suite si le navigateur le permet (partie lancée depuis le Hub, site déjà
+// fréquenté), sinon dès le premier geste, quel qu'il soit
+sfx.unlock();
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
 let home = null;
 let scene = null;
 try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
@@ -213,7 +217,9 @@ async function loadHole(R) {
   const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
   hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
   sfx.ambience(hole.theme);
-  $('#screen').innerHTML = '';
+  // l'écran de chargement s'efface sur le survol qui commence
+  const scr = $('#screen'), ld = scr.firstElementChild;
+  if (ld) { ld.classList.add('out'); setTimeout(() => { if (scr.firstElementChild === ld) scr.innerHTML = ''; }, 600); }
   // survol du trou, depuis le départ jusqu'au green
   V.phase = 'intro'; V.introT = 0;
   hud.show(true); hud.controls(false); hud.gauge(0, false); $('#turn').hidden = true;
@@ -310,7 +316,8 @@ function setTurn() {
   if (R.players.length > 1) sfx.ui(V.mine ? 'confirm' : 'switch');
   V.phase = V.mine ? 'aim' : 'watch';
   hud.players(stripList(), V.R.teams);
-  // coupe nette : la caméra se pose derrière la balle du joueur suivant
+  // fondu enchaîné vers la caméra posée derrière la balle du joueur suivant
+  scene.dissolve(0.6);
   aimCamera(true);
   sendPose();
 }
@@ -396,7 +403,7 @@ function playShot(ev) {
 function launch() {
   const ev = V.shot.ev, c = CLUBS[ev.params.club];
   V.shot.launched = true;
-  V.phase = 'fly'; V.flyAim = ev.params.aim;
+  V.phase = 'fly';
   sfx.hit(c.putter ? 'putter' : ev.params.club <= 1 ? 'wood' : ev.params.club >= 5 ? 'wedge' : 'iron', ev.params.power);
   sfx.duck(true);
   hud.gauge(0, false);
@@ -408,7 +415,7 @@ function launch() {
 // résultat du coup, une fois la balle arrêtée : bannière, foule, jingle, réaction du golfeur
 function outcome() {
   const ev = V.shot.ev, r = ev.res, hole = V.hole, P = V.R.players[ev.i], club = CLUBS[ev.params.club];
-  const end = r.kind === 'water' ? r.drop : r.end, d = Math.hypot(end.x - hole.pin.x, end.z - hole.pin.z);
+  const end = r.kind === 'water' ? ev.from : r.end, d = Math.hypot(end.x - hole.pin.x, end.z - hole.pin.z);
   const g = golferOf(P), trees = V.shot.sim.events.some((e) => e.type === 'tree' || e.type === 'trunk');
   const who = V.mine || V.R.players.length === 1 ? '' : `${P.name} · `;
   if (r.kind === 'holed') {
@@ -416,10 +423,11 @@ function outcome() {
     hud.banner(name, s === 1 || diff <= -2 ? 'gold' : diff < 0 ? 'good' : diff === 0 ? '' : 'bad', s === 1 ? `${who}du premier coup !` : `${who}${s} coups`, 3);
     sfx.react(s === 1 ? 'holeinone' : diff <= -2 ? 'eagle' : diff === -1 ? 'birdie' : diff === 0 ? 'par' : diff === 1 ? 'bogey' : 'worse');
     g.cheer();
+    V.shot.cam = null; // gros plan sur le trou à la place
     holeCamera(g);
     return 3.6;
   }
-  if (r.kind === 'water') { hud.banner('Plouf !', 'bad', `${who}dans l'eau · 1 coup de pénalité`, 2.4); sfx.react('water'); g.sulk(); return 2.8; }
+  if (r.kind === 'water') { hud.banner('Plouf !', 'bad', `${who}on rejoue du même endroit · +1`, 2.4); sfx.react('water'); g.sulk(); return 2.8; }
   if (r.kind === 'ob') { hud.banner('Hors limites !', 'bad', `${who}on rejoue du même endroit · +1`, 2.4); sfx.react('ob'); g.sulk(); return 2.8; }
   if (ev.out.pickedUp) { hud.banner('Balle ramassée', 'bad', `${who}${ev.strokes} coups`, 2.4); sfx.react('worse'); return 2.8; }
   if (club.putter) {
@@ -450,22 +458,19 @@ function replayWorthy() {
   return Math.hypot(r.end.x - h.pin.x, r.end.z - h.pin.z) < 2.5 && d0 > 50;
 }
 function startReplay() {
-  const sim = V.shot.sim, h = V.hole;
   V.shot.replayed = true;
   V.phase = 'replay'; V.playT = 0; V.evI = 0; V.timer = 1.4;
-  // caméra posée près du point de chute, de côté ; pour un putt, au ras du sol près du trou
-  const land = sim.carry || sim.end, from = V.shot.ev.from;
-  const ax = land.x - from.x, az = land.z - from.z, L = Math.hypot(ax, az) || 1, A = { x: ax / L, z: az / L }, R = { x: -A.z, z: A.x };
-  const putt = CLUBS[V.shot.ev.params.club].putter || L < 30;
-  const at = putt ? { x: h.pin.x, z: h.pin.z } : land, side = putt ? 3.2 : 17, back = putt ? 2.5 : 7;
-  const cx = at.x + R.x * side + A.x * back, cz = at.z + R.z * side + A.z * back;
-  V.replayCam = { pos: V3(cx, ground(cx, cz) + (putt ? 0.7 : 4.5), cz) };
+  // le même plan que pendant le coup, mais depuis l'autre côté (si on y voit quelque chose)
+  const from = V.shot.ev.from;
+  V.replayCam = shotCamera(true);
   scene.trailClear();
-  scene.camTo(V.replayCam.pos, V3(from.x, ground(from.x, from.z), from.z), 3, true); document.body.classList.add('replaying');
+  scene.dissolve(0.5);
+  scene.camTo(V3(V.replayCam.pos.x, V.replayCam.pos.y, V.replayCam.pos.z), V3(from.x, ground(from.x, from.z), from.z), 3, true); document.body.classList.add('replaying');
 }
-function replayCamera(p) { scene.camTo(V.replayCam.pos, V3(p.x, p.y, p.z), 6); }
+function replayCamera(p, dt) { trackShot(V.replayCam, p, dt); }
 function endReplay() {
   if (V.phase !== 'replay') return;
+  scene.dissolve(0.5);
   document.body.classList.remove('replaying');
   const r = V.shot.ev.res;
   if (r.kind !== 'water') scene.setBall(r.end.x, r.end.y, r.end.z);
@@ -502,17 +507,69 @@ function aimCamera(snap) {
   const px = cx - A.x * 5.6, pz = cz - A.z * 5.6;
   scene.camTo(V3(px, Math.max(ground(px, pz), b.y) + 1.95, pz), V3(b.x + A.x * 26, b.y + 1.1, b.z + A.z * 26), 5, snap);
 }
-function flyCamera(p, t, rolling) {
-  const A = { x: Math.sin(V.flyAim), z: Math.cos(V.flyAim) };
-  if (CLUBS[V.shot.ev.params.club].putter) {
-    // putt : la caméra reste derrière le golfeur et suit la balle des yeux
-    scene.cam.tLook.lerp(V3(p.x, p.y, p.z), 0.08); scene.cam.k = 3;
-    return;
+// pendant un coup, comme à la télé : on voit la balle partir depuis derrière le golfeur, puis un fondu enchaîné passe
+// sur une caméra posée près du point de chute, de côté, qui regarde la balle arriver et rouler (pour un putt ou une
+// petite approche : au ras du green, près du trou). La caméra ne suit jamais la balle ; elle glisse lentement.
+function flyCamera(p, dt) {
+  const sh = V.shot, club = CLUBS[sh.ev.params.club];
+  if (!sh.cam) {
+    const long = sh.sim.n > 80 && (!club.putter || Math.hypot(sh.ev.from.x - V.hole.pin.x, sh.ev.from.z - V.hole.pin.z) > 6);
+    if (long && V.playT > (club.putter ? 0.35 : 0.5)) {
+      sh.cam = shotCamera(false);
+      scene.dissolve(0.55);
+      scene.camTo(V3(sh.cam.pos.x, sh.cam.pos.y, sh.cam.pos.z), V3(p.x, p.y, p.z), 6, true);
+    } else {
+      // le départ (ou un tout petit coup) : derrière le golfeur, on suit la balle des yeux
+      scene.cam.tLook.lerp(V3(p.x, p.y, p.z), club.putter ? 0.08 : 0.25); scene.cam.k = 3;
+      return;
+    }
   }
-  if (t < 0.55) { scene.cam.tLook.lerp(V3(p.x, p.y, p.z), 0.25); return; }
-  const back = rolling ? 9 : 15, up = rolling ? 4.2 : 6.5;
-  const px = p.x - A.x * back, pz = p.z - A.z * back;
-  scene.camTo(V3(px, Math.max(p.y + up, ground(px, pz) + 2), pz), V3(p.x + A.x * 4, p.y, p.z + A.z * 4), rolling ? 2.4 : 1.7);
+  trackShot(sh.cam, p, dt);
+}
+// caméra d'un coup : près du point de chute (ou du trou), du côté le plus dégagé (relief, arbres) ; `other` prend
+// l'autre côté, pour le ralenti, sauf s'il est bien plus bouché
+function shotCamera(other) {
+  const sim = V.shot.sim, h = V.hole, from = V.shot.ev.from, land = sim.carry || sim.end;
+  const ax = land.x - from.x, az = land.z - from.z, L = Math.hypot(ax, az) || 1, A = { x: ax / L, z: az / L }, R = { x: -A.z, z: A.x };
+  // putt ou petite approche vers le green : au ras du green, près du trou ; sinon près du point de chute
+  const near = CLUBS[V.shot.ev.params.club].putter || (L < 30 && Math.hypot(land.x - h.pin.x, land.z - h.pin.z) < 35);
+  const at = near ? { x: h.pin.x, z: h.pin.z } : { x: land.x, z: land.z }, side = near ? 3.2 : Math.min(17, 6 + L * 0.12), back = near ? 2.5 : Math.min(7, 2 + L * 0.05), up = near ? 0.7 : 4.5;
+  const ty = ground(at.x, at.z) + 0.4;
+  // de chaque côté, plus ou moins écartée, à hauteur d'homme ou un peu plus haut : on garde la position la plus dégagée
+  const pose = (sd, lift) => {
+    const x = at.x + R.x * sd + A.x * back, z = at.z + R.z * sd + A.z * back;
+    let y = ground(x, z) + up + lift;
+    if (h.coast) y = Math.max(y, h.coast.level + up + lift);
+    for (const t of h.treesNear(x, z)) if (Math.hypot(t.x - x, t.z - z) < t.r + 1.5) y = Math.max(y, t.y + t.h + 1.5);
+    // les arbres proches, devant la caméra, mangent une partie de l'image
+    const vx = at.x - x, vz = at.z - z, vl = Math.hypot(vx, vz) || 1;
+    let cost = sightCost(x, y, z, at, ty) + lift * 0.12 + (Math.abs(sd) < side ? 0.6 : 0), clutter = 0;
+    for (const t of h.treesNear(x, z)) {
+      const dx = t.x - x, dz = t.z - z, d = Math.hypot(dx, dz);
+      if (d < 22 + t.r && (dx * vx + dz * vz) / (d * vl || 1) > 0.2 && t.y + t.h > y - 2) clutter++;
+    }
+    return { x, y, z, cost: cost + Math.min(6, clutter) };
+  };
+  const best = (sd) => [sd, sd * 0.55].flatMap((s) => [0, near ? 1.2 : 7].map((lift) => pose(s, lift))).sort((p, q) => p.cost - q.cost)[0];
+  const [a, b] = [best(side), best(-side)].sort((p, q) => p.cost - q.cost);
+  return { pos: other && b.cost <= a.cost + 1 ? b : a, at, near, t: 0, turn: other ? -1 : 1 };
+}
+// obstacles entre la caméra et le point filmé : relief au-dessus de la ligne de vue, houppiers qu'elle traverse
+function sightCost(x0, y0, z0, at, ty) {
+  let n = 0;
+  for (let k = 1; k < 12; k++) {
+    const f = k / 12, x = x0 + (at.x - x0) * f, z = z0 + (at.z - z0) * f, y = y0 + (ty - y0) * f;
+    if (ground(x, z) > y - 0.2) n++;
+    for (const t of V.hole.treesNear(x, z)) if (Math.hypot(t.x - x, t.z - z) < t.r * 0.9 && t.y + t.h * 0.95 > y && t.y + t.h * 0.25 < y) { n++; break; }
+  }
+  return n;
+}
+// la caméra regarde la balle et tourne très lentement autour du point filmé : l'image n'est jamais figée
+function trackShot(c, p, dt) {
+  c.t += dt;
+  const a = c.t * (c.near ? 0.05 : 0.025) * c.turn, dx = c.pos.x - c.at.x, dz = c.pos.z - c.at.z;
+  const x = c.at.x + dx * Math.cos(a) - dz * Math.sin(a), z = c.at.z + dx * Math.sin(a) + dz * Math.cos(a);
+  scene.camTo(V3(x, Math.max(c.pos.y, ground(x, z) + (c.near ? 0.6 : 3)), z), V3(p.x, p.y, p.z), 6);
 }
 // gros plan quand la balle tombe : depuis l'autre côté du trou, on voit le golfeur sauter de joie
 function holeCamera(g) {
@@ -564,7 +621,8 @@ function introPath(h) {
 // présentation du trou : on part haut derrière le départ, on file le long du jeu en descendant, et on se pose face
 // au drapeau ; le regard reste assez loin devant pour que le trou soit sous le bandeau « Trou n », jamais à la verticale
 function introCamera(u, snap) {
-  const h = V.hole, P = introPath(h), tot = P.tot, e = u * u * (3 - 2 * u);
+  // départ déjà lancé, arrivée encore en mouvement : la caméra n'est jamais à l'arrêt avant le fondu vers le joueur
+  const h = V.hole, P = introPath(h), tot = P.tot, e = (u ** 3 - 2 * u * u + u) * 0.5 + (3 * u * u - 2 * u ** 3) + (u ** 3 - u * u) * 0.2;
   const back = 30 + tot * 0.05, stop = clamp(tot * 0.2, 32, 60);
   const s = -back + (tot - stop + back) * e, c = P.at(s);
   // hauteur au-dessus d'une pente douce départ → green (pas du sol sous la caméra : on ne plonge pas dans les ravins)
@@ -645,7 +703,8 @@ function loop(now) {
     // la foule retient son souffle quand la balle file vers le trou
     const dp = Math.hypot(p.x - V.hole.pin.x, p.z - V.hole.pin.z);
     if (!V.oohed && dp < 2.2 && (rolling || CLUBS[V.shot.ev.params.club].putter) && sim.kind !== 'holed' && f < sim.n - 20) { V.oohed = true; sfx.ooh(); }
-    flyCamera(p, V.playT, rolling);
+    V.shot.last = p;
+    flyCamera(p, dt);
     hud.dist(dp);
     if (f >= sim.n - 1) {
       // arrivée : on se cale sur le résultat de l'hôte
@@ -655,6 +714,7 @@ function loop(now) {
     }
   } else if (V.phase === 'after') {
     scene.trailFade(dt);
+    if (V.shot.cam && V.shot.last) trackShot(V.shot.cam, V.shot.last, dt);
     V.timer -= dt;
     if (V.timer <= 0 && !V.outcome) {
       V.outcome = true; V.timer = outcome(); hud.players(stripList(), V.R.teams);
@@ -674,7 +734,7 @@ function loop(now) {
       if (e.type === 'bounce') sfx.bounce(e.surf, e.v * 0.7);
       else if (e.type === 'cup') { sfx.cup(); sfx.react('par'); }
     }
-    replayCamera(p);
+    replayCamera(p, dt * 0.55);
     if (f >= sim.n - 1 && (V.timer -= dt) <= 0) endReplay();
   }
 

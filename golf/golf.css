@@ -18,6 +18,7 @@
 html,body{margin:0;height:100%;overflow:hidden;background:oklch(0.82 0.06 230);color:var(--ink);font-family:var(--font);font-weight:800;-webkit-font-smoothing:antialiased;touch-action:none;user-select:none;-webkit-user-select:none}
 #stage{position:fixed;inset:0}
 #stage canvas.gl{display:block;width:100%;height:100%}
+#stage canvas.xfade{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none}
 .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 60%,oklch(0.25 0.06 250 / .2) 100%)}
 button{font-family:var(--font);color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
@@ -171,9 +172,10 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 .logo.sm span{text-shadow:0 4px 0 oklch(0.45 0.1 60)}
 
 /* chargement */
-.loadscr{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+.loadscr{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .55s var(--ease);
   background:radial-gradient(ellipse 140% 60% at 50% 128%,oklch(0.68 0.19 138) 0 45%,transparent 46%),linear-gradient(oklch(0.55 0.15 255),oklch(0.86 0.06 230) 75%)}
 .spinner{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--white),oklch(0.88 0.01 250));box-shadow:0 6px 0 oklch(0.2 0.05 255 / .18);animation:hop .9s var(--ease) infinite alternate}
+.loadscr.out{opacity:0}
 @keyframes hop{0%{transform:translateY(0)}100%{transform:translateY(-16px)}}
 .loading{margin:0;font-size:20px;color:var(--white);-webkit-text-stroke:4px oklch(0.33 0.11 258);paint-order:stroke fill}
 

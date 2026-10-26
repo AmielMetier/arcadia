@@ -139,8 +139,7 @@ function autoplay(h, seed) {
     const r = simulate(h, ball, { club, traj: 'mid', aim, power, curve: 0, seed: seed * 13 + k }, w, { putt });
     strokes++;
     if (r.kind === 'holed') return strokes;
-    if (r.kind === 'water') { strokes++; ball = { x: r.drop.x, z: r.drop.z, lie: h.surfaceAt(r.drop.x, r.drop.z) }; }
-    else if (r.kind === 'ob') { strokes++; }
+    if (r.kind === 'water' || r.kind === 'ob') strokes++; // on rejoue du même endroit
     else ball = { x: r.end.x, z: r.end.z, lie: r.surf };
   }
   return 99;
@@ -241,8 +240,10 @@ t('ordre de jeu : honneur au départ, puis le plus loin du drapeau', () => {
   applyShot(R, h, 1, { kind: 'rest', end: { x: 0, z: 150 }, surf: 'fairway' }, lie);
   applyShot(R, h, 2, { kind: 'rest', end: { x: 0, z: 200 }, surf: 'fairway' }, lie);
   assert.equal(R.turn, 1, 'le plus loin joue');
-  // eau : un coup de pénalité ; hors limites : on rejoue du même endroit
-  applyShot(R, h, 1, { kind: 'water', end: { x: 0, z: 0 }, drop: { x: 0, z: 140 } }, lie);
+  // eau ou hors limites : un coup de pénalité, et on rejoue du même endroit
+  const wet = { ...R.players[1].ball };
+  applyShot(R, h, 1, { kind: 'water', end: { x: 0, z: 0 } }, lie);
+  assert.deepEqual(R.players[1].ball, wet, 'à l\'eau : on rejoue du même endroit');
   assert.equal(R.players[1].strokes, 3);
   const before = { ...R.players[2].ball };
   applyShot(R, h, 2, { kind: 'ob', end: { x: 500, z: 0 } }, lie);
@@ -286,7 +287,7 @@ t('équipes (scramble) : chacun joue depuis la balle de l\'équipe, on garde la 
   assert.equal(R.players[0].strokes, 1, 'une volée = un coup pour l\'équipe');
   assert.deepEqual([R.players[0].ball.z, R.players[2].ball.z], [230, 230]);
   assert.equal(R.turn, 1, 'puis l\'autre équipe');
-  applyShot(R, h, 1, { kind: 'water', end: { x: 0, z: 100 }, drop: { x: 0, z: 60 } }, lie);
+  applyShot(R, h, 1, { kind: 'water', end: { x: 0, z: 100 } }, lie);
   const o2 = applyShot(R, h, 3, { kind: 'rest', end: { x: 0, z: 120 }, surf: 'fairway' }, lie);
   assert.equal(o2.best, 3, 'une balle sans pénalité vaut mieux qu\'une balle à l\'eau');
   assert.equal(R.players[1].strokes, 1);
@@ -307,8 +308,7 @@ t('bots : les trois niveaux finissent les 30 trous, le meilleur niveau joue mieu
         const r = simulate(h, ball, { ...b, seed: seed + k }, w, { putt: b.putt });
         s++;
         if (r.kind === 'holed') break;
-        if (r.kind === 'water') { s++; ball = { x: r.drop.x, z: r.drop.z, lie: h.surfaceAt(r.drop.x, r.drop.z) }; }
-        else if (r.kind === 'ob') s++;
+        if (r.kind === 'water' || r.kind === 'ob') s++; // on rejoue du même endroit
         else ball = { x: r.end.x, z: r.end.z, lie: r.surf };
       }
       total += Math.min(s, MAX_STROKES);
