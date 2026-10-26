@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.62 — 26 octobre 2026
+- Fix 3v3 battle platform alignment, sequential turn narration, and MMO pixel-art tileset + enterable buildings (Amiel)
+
 ## 2.61 — 26 octobre 2026
 - Correction : export TYPE_FR and TYPE_COLORS in types.js and add HubBridge init handshake fallback (Amiel)
 
