@@ -14,7 +14,10 @@ import { getQuestionsByLevel } from './chartier-data.js';
 import { CODE_QUESTIONS, FIX_QUESTIONS, SQL_QUESTIONS, READ_QUESTIONS, JAVA_READ } from './code-data.js';
 import { chartQuestion, CHART_P } from './charts.js';
 import { schemaFor } from './schemas.js';
-import { PHONES, FAT_FINGER } from './drills.js';
+import { fatFinger, phoneNumber } from './drills.js';
+import { gensFor, genQuestion } from './gen-candidate.js';
+import { sqlQuestion } from './sql-gen.js';
+import { abstractMatrix, describeCell, memoryQ, attentionQ, sprintItems, SPRINT_MS } from './mind.js';
 import { caseStep, relanceStep, makeMarket, runMarket, mmFair, MM_TIME } from './cases.js';
 
 export const CATS = {
@@ -36,6 +39,7 @@ export const CATS = {
   case:     { label: 'Cas pratique',      pts: 2, color: '#d97706', icon: '📁' },
   relance:  { label: 'Relance',           pts: 2, color: '#ef4444', icon: '↻' },
   mm:       { label: 'Market making',     pts: 3, color: '#10b981', icon: '⇅' },
+  sprint:   { label: 'Sprint',            pts: 0, color: '#f43f5e', icon: '⚡' },
 };
 export const DIFFS = ['facile', 'normal', 'expert'];
 
@@ -55,7 +59,7 @@ export const THEMES = {
 };
 
 const round4 = (x) => Math.round(x * 1e4) / 1e4;
-export const fmt = (n) => (Number.isInteger(n) ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : String(round4(n)).replace('.', ','));
+export const fmt = (n) => ((Number.isInteger(n) ? n.toLocaleString('fr-FR').replace(/ /g, ' ') : String(round4(n)).replace('.', ','))).replace(/^-/, '−');
 
 // Graine propre à la question i (salt : autre tirage pour la même question, voir rules.fullQuestion)
 function qSeed(seed, i, salt = 0) {
@@ -89,11 +93,12 @@ export function planCats(seed, len, theme, { code = true, d = 1 } = {}) {
 
 // Les épreuves sur plusieurs questions de The Candidate (voir cases.js) : nombre de questions de chacune,
 // et où elles tombent (jamais sur l'épreuve de code ni sur la dernière question, toujours dans un même tour) :
-// une relance au premier tour, le market making au desk, un cas pratique au plus, au desk ou au comité
+// une relance au premier tour, le market making au desk, un cas pratique au comité final à partir de 15 questions
+// (en 10 questions, il prendrait trop de place)
 export const BLOCK = { relance: 2, case: 3, mm: 1 };
 function blockSlots(len, cats, d) {
   const used = new Set(cats.map((c, k) => (c === 'code' ? k : -1)).filter((k) => k >= 0)), out = {};
-  const want = [['case', 0.5, 10], ['relance', 0.12, 8], ['mm', 0.4, 10]]; // le cas pratique d'abord : c'est le plus long à caser
+  const want = [['case', 0.7, 15], ['relance', 0.12, 8], ['mm', 0.4, 10]]; // le cas pratique d'abord : c'est le plus long à caser
   for (const [cat, at, min] of want) {
     if (len < min) continue;
     const n = BLOCK[cat], fits = (k) => k >= 1 && k + n <= len - 1 && [...Array(n).keys()].every((j) => !used.has(k + j) && chartierTier(d, k + j, len) === chartierTier(d, k, len));
@@ -106,7 +111,7 @@ function blockSlots(len, cats, d) {
   return out;
 }
 
-export const codeSlots = (len) => (len >= 15 ? [Math.round(len * 0.45), Math.round(len * 0.75)] : len >= 8 ? [Math.round(len * 0.55)] : []).filter((k) => k > 0 && k < len - 1);
+export const codeSlots = (len) => (len >= 15 ? [Math.round(len * 0.6), Math.round(len * 0.85)] : len >= 8 ? [Math.round(len * 0.55)] : []).filter((k) => k > 0 && k < len - 1);
 const D = (diff) => Math.max(0, DIFFS.indexOf(diff)); // 0, 1, 2
 const between = (r, a, b) => a + r.int(b - a + 1);
 const pick = (r, list) => list[r.int(list.length)];
@@ -709,25 +714,40 @@ function devinette(r, d) {
 // Le dessin est dans la question (fig) ; on compte toutes les figures, petites et grandes, cachées comprises.
 const C2 = (n) => (n * (n - 1)) / 2;
 function visuel(r, d) {
-  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths', 'strip', 'fan']
-    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan']);
+  const kind = pick(r, d === 0 ? ['grid-sq', 'tri', 'dots', 'pyramid', 'box', 'stair', 'diag', 'paths', 'strip', 'fan', 'dots-tri']
+    : ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan', 'grid-sq-k', 'dots-tri', 'box-hidden']);
+  if (kind === 'grid-sq-k') {
+    const n = between(r, 3, [4, 5, 6][d]), m = between(r, n, [5, 6, 7][d]), k = between(r, 2, n - 1), ans = (m - k + 1) * (n - k + 1);
+    return { kind, text: `Combien de carrés de ${k} × ${k} cases ?`, sub: `Une grille de ${m} × ${n}, les carrés peuvent se chevaucher`, answer: ans, fig: { t: 'grid', n, m, k },
+      tip: `Le coin en haut à gauche d'un carré ${k} × ${k} peut se placer sur ${m - k + 1} colonnes et ${n - k + 1} lignes : ${m - k + 1} × ${n - k + 1} = ${ans}.` };
+  }
+  if (kind === 'dots-tri') {
+    const n = between(r, [4, 5, 6][d], [6, 8, 10][d]), ans = (n * (n - 1) * (n - 2)) / 6;
+    return { kind, text: `Combien de triangles différents en reliant 3 de ces points ?`, sub: `${n} points sur un cercle`, answer: ans, fig: { t: 'dots', n },
+      tip: `Trois points d'un cercle ne sont jamais alignés : chaque trio fait un triangle. C(${n}, 3) = ${n} × ${n - 1} × ${n - 2} / 6 = ${ans}.` };
+  }
+  if (kind === 'box-hidden') {
+    const a = between(r, 3, [4, 5, 6][d]), b = between(r, 3, [4, 4, 5][d]), c = between(r, 2, [3, 4, 5][d]), ans = (a - 1) * (b - 1) * (c - 1);
+    return { kind, text: `Combien de petits cubes de ce pavé plein ne se voient pas sur le dessin ?`, sub: `${a} × ${b} × ${c} cubes, vus de trois côtés`, answer: ans, fig: { t: 'box', a, b, c },
+      tip: `On voit le dessus et deux côtés. Les cachés forment un pavé de (${a} − 1) × (${b} − 1) × (${c} − 1) = ${ans} cubes.` };
+  }
   if (kind === 'strip') {
-    const n = between(r, [3, 4, 5][d], [5, 7, 9][d]);
+    const n = between(r, [3, 4, 6][d], [6, 9, 12][d]);
     return { kind, text: `Combien de rectangles dans cette bande ?`, sub: `${n} cases alignées (une case seule compte)`, answer: (n * (n + 1)) / 2, fig: { t: 'grid', n: 1, m: n },
       tip: `Un rectangle, c'est un bord gauche et un bord droit parmi ${n + 1} traits : ${n + 1} × ${n} / 2 = ${(n * (n + 1)) / 2}.` };
   }
   if (kind === 'fan') {
-    const k = between(r, [1, 2, 3][d], [3, 4, 6][d]), ans = ((k + 2) * (k + 1)) / 2;
+    const k = between(r, [1, 2, 3][d], [4, 5, 7][d]), ans = ((k + 2) * (k + 1)) / 2;
     return { kind, text: `Combien de triangles en tout ?`, sub: `${k} trait${k > 1 ? 's' : ''} parte${k > 1 ? 'nt' : ''} du sommet vers la base`, answer: ans, fig: { t: 'fan', k },
       tip: `Chaque triangle a deux côtés parmi les ${k + 2} traits issus du sommet : ${k + 2} × ${k + 1} / 2 = ${ans}.` };
   }
   if (kind === 'box') {
-    const a = between(r, 2, [3, 4, 5][d]), b = between(r, 2, [3, 4, 4][d]), c = between(r, [1, 2, 2][d], [3, 3, 4][d]);
+    const a = between(r, 2, [4, 5, 6][d]), b = between(r, 2, [3, 4, 5][d]), c = between(r, [1, 2, 2][d], [3, 4, 5][d]);
     return { kind, text: `Combien de petits cubes forment ce pavé ?`, sub: `Un bloc plein, y compris les cubes cachés`, answer: a * b * c, fig: { t: 'box', a, b, c },
       tip: `Longueur × largeur × hauteur : ${a} × ${b} × ${c} = ${a * b * c}. Compter les cubes visibles un par un fait oublier ceux du milieu.` };
   }
   if (kind === 'painted') {
-    const n = between(r, 3, [4, 5, 6][d]), m = n - 2;
+    const n = between(r, 3, [5, 6, 7][d]), m = n - 2;
     const asks = [[3, 8, 'les 8 coins'], [2, 12 * m, `${m} par arête, sur 12 arêtes`], [1, 6 * m * m, `${m}² = ${m * m} par face, sur 6 faces`], [0, m ** 3, `le cœur de ${m} × ${m} × ${m}`]];
     const [f, ans, why] = d === 0 ? asks[between(r, 0, 1)] : pick(r, asks);
     return { kind, text: `Combien de petits cubes ont ${f ? `exactement ${f} face${f > 1 ? 's' : ''} peinte${f > 1 ? 's' : ''}` : 'aucune face peinte'} ?`,
@@ -735,54 +755,54 @@ function visuel(r, d) {
       tip: `${f === 3 ? '3 faces peintes' : f === 2 ? '2 faces' : f === 1 ? '1 face' : '0 face'} : ${why}, soit ${ans}. Vérification : 8 + 12×${m} + 6×${m * m} + ${m ** 3} = ${n ** 3} = ${n}³.` };
   }
   if (kind === 'stair') {
-    const n = between(r, [3, 3, 4][d], [4, 5, 6][d]), w = between(r, 1, [2, 3, 3][d]), t = (n * (n + 1)) / 2;
+    const n = between(r, [3, 3, 4][d], [5, 6, 7][d]), w = between(r, 1, [2, 3, 4][d]), t = (n * (n + 1)) / 2;
     return { kind, text: `Combien de cubes dans cet escalier ?`, sub: `${n} marches pleines, ${w} cube${w > 1 ? 's' : ''} de large`, answer: t * w, fig: { t: 'stair', n, w },
       tip: `Les marches font 1, 2, …, ${n} cubes de haut : ${n} × ${n + 1} / 2 = ${t}${w > 1 ? `, fois ${w} de large = ${t * w}` : ''}.` };
   }
   if (kind === 'paths') {
-    const m = between(r, 2, [4, 5, 6][d]), n = between(r, 2, [3, 4, 4][d]);
+    const m = between(r, 2, [4, 6, 7][d]), n = between(r, 2, [3, 4, 5][d]);
     let ans = 1; for (let k = 1; k <= n; k++) ans = (ans * (m + k)) / k;
     return { kind, text: `Combien de chemins de A à B, en allant seulement à droite ou vers le haut ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'paths', m, n },
       tip: `Tout chemin fait ${m} pas à droite et ${n} vers le haut : on choisit où placer les ${n} montées parmi ${m + n} pas, C(${m + n}, ${n}) = ${ans}.` };
   }
   if (kind === 'diag') {
-    const n = between(r, [5, 5, 6][d], [7, 9, 12][d]);
+    const n = between(r, [5, 5, 6][d], [8, 10, 14][d]);
     return { kind, text: `Combien de diagonales a ce polygone ?`, sub: `${n} sommets (une diagonale en pointillés)`, answer: (n * (n - 3)) / 2, fig: { t: 'polyd', n },
       tip: `Chaque sommet se relie à ${n - 3} autres (pas à lui-même ni à ses 2 voisins), et chaque diagonale est comptée deux fois : ${n} × ${n - 3} / 2 = ${(n * (n - 3)) / 2}.` };
   }
   if (kind === 'grid-sq') {
-    const n = between(r, [2, 3, 4][d], [4, 5, 6][d]);
+    const n = between(r, [2, 3, 4][d], [5, 6, 7][d]);
     let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
     return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${n} × ${n} : les petits, les moyens, le grand…`, answer: ans, fig: { t: 'grid', n, m: n },
       tip: `On compte par taille : ${Array.from({ length: n }, (_, k) => `${(n - k) ** 2} de ${k + 1}×${k + 1}`).join(', ')}. Total : ${Array.from({ length: n }, (_, k) => `${n - k}²`).join(' + ')} = ${ans}.` };
   }
   if (kind === 'grid-sq-rect') {
-    const n = between(r, 2, [3, 4, 5][d]), m = n + between(r, 1, [2, 2, 3][d]);
+    const n = between(r, 2, [4, 5, 6][d]), m = n + between(r, 1, [2, 3, 3][d]);
     let ans = 0; const parts = [];
     for (let k = 1; k <= n; k++) { const c = (n - k + 1) * (m - k + 1); ans += c; parts.push(`${c} de ${k}×${k}`); }
     return { kind, text: `Combien de carrés en tout ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
       tip: `Un carré k×k peut se placer de (${m} − k + 1) × (${n} − k + 1) façons : ${parts.join(', ')}. Total : ${ans}.` };
   }
   if (kind === 'grid-rect') {
-    const n = between(r, 2, [3, 3, 4][d]), m = between(r, n, [4, 5, 6][d]);
+    const n = between(r, 2, [3, 4, 5][d]), m = between(r, n, [5, 6, 7][d]);
     const ans = C2(n + 1) * C2(m + 1);
     return { kind, text: `Combien de rectangles en tout (les carrés comptent) ?`, sub: `Une grille de ${m} × ${n}`, answer: ans, fig: { t: 'grid', n, m },
       tip: `Un rectangle, c'est 2 lignes verticales parmi ${m + 1} et 2 horizontales parmi ${n + 1} : ${C2(m + 1)} × ${C2(n + 1)} = ${ans}.` };
   }
   if (kind === 'tri') {
-    const n = between(r, [2, 2, 3][d], [3, 4, 5][d]);
+    const n = between(r, [2, 3, 3][d], [4, 5, 6][d]);
     const ans = Math.floor((n * (n + 2) * (2 * n + 1)) / 8);
     let up = 0; for (let k = 1; k <= n; k++) up += ((n - k + 1) * (n - k + 2)) / 2;
     return { kind, text: `Combien de triangles en tout ?`, sub: `Un triangle découpé en ${n} rangées`, answer: ans, fig: { t: 'trigrid', n },
       tip: `${up} triangles pointe en haut (de toutes tailles) et ${ans - up} pointe en bas : ${ans} en tout. Formule : ⌊n(n + 2)(2n + 1)/8⌋.` };
   }
   if (kind === 'pyramid') {
-    const n = between(r, [2, 3, 3][d], [3, 4, 5][d]);
+    const n = between(r, [2, 3, 3][d], [4, 5, 6][d]);
     let ans = 0; for (let k = 1; k <= n; k++) ans += k * k;
     return { kind, text: `Combien de cubes dans cette pyramide ?`, sub: `${n} étages pleins, y compris les cubes cachés`, answer: ans, fig: { t: 'pyramid', n },
       tip: `Chaque étage est un carré : ${Array.from({ length: n }, (_, k) => `${k + 1}²`).join(' + ')} = ${ans}.` };
   }
-  const n = between(r, [4, 5, 7][d], [6, 9, 12][d]);
+  const n = between(r, [4, 5, 7][d], [8, 10, 14][d]);
   return { kind: 'dots', text: `Combien de segments pour relier chaque point à tous les autres ?`, sub: `${n} points`, answer: C2(n), fig: { t: 'dots', n },
     tip: `Chaque point se relie aux ${n - 1} autres, et chaque segment est compté deux fois : ${n} × ${n - 1} / 2 = ${C2(n)}.` };
 }
@@ -794,27 +814,60 @@ export const TIER_LABEL = { 1: 'Premier tour', 2: 'Desk', 3: 'Comité final' };
 // Modules par métier : ils orientent les rubriques tirées (poids par rubrique) et le poste annoncé par Pierre Chartier
 export const MODULES = {
   gen: { label: 'Généraliste', job: 'Analyste', post: 'un poste d\'analyste', weights: null },
-  trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10 } },
+  trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10, Stats: 5 } },
   ma: { label: 'M&A / Corporate', job: 'Analyste M&A', post: 'un poste en fusions-acquisitions', weights: { Corporate: 45, Taux: 15, Calcul: 20, Marchés: 10, Macro: 10 } },
-  quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 35, Logique: 20, Calcul: 20, Dérivés: 15, Estimation: 10 } },
-  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Risques: 35, Taux: 20, Marchés: 15, Probas: 15, Dérivés: 10, Macro: 5 } },
+  quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 30, Logique: 15, Calcul: 15, Dérivés: 15, Estimation: 5, Stats: 12, Maths: 12 } },
+  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Risques: 35, Taux: 20, Marchés: 15, Probas: 15, Stats: 10, Dérivés: 10, Macro: 5 } },
 };
+// Trois tours de même longueur (un tiers de la partie chacun) ; facile s'arrête au desk, difficile commence au desk
 export function chartierTier(d, i, len) {
-  const last = i >= len - 1, f = len > 1 ? i / (len - 1) : 1;
-  if (d === 0) return last || f >= 0.7 ? 2 : 1;
-  if (d === 1) return last || f >= 0.8 ? 3 : f < 0.3 ? 1 : 2;
-  return f < 0.25 && !last ? 2 : 3;
+  const third = Math.min(2, Math.floor((3 * Math.max(0, i)) / Math.max(1, len)));
+  return [[1, 1, 2], [1, 2, 3], [2, 3, 3]][Math.min(2, Math.max(0, d))][third];
 }
 const CH_POOL = { 1: getQuestionsByLevel('facile'), 2: getQuestionsByLevel('normal'), 3: getQuestionsByLevel('expert') };
 // les mêmes, rangées par rubrique (pour les modules par métier)
 const CH_BY_CAT = Object.fromEntries(Object.entries(CH_POOL).map(([t, l]) => [t, l.reduce((m, q) => ((m[q.cat] = m[q.cat] || []).push(q), m), {})]));
-// tirage d'une question de la banque, orienté par les poids du module
+// Part des questions tirées à la volée (gen-candidate.js), par rubrique, quand des modèles existent pour ce tour.
+// Le calcul mental ne vient presque plus de la banque : les modèles posent le même genre de questions sans jamais se répéter.
+const GEN_SHARE = { Calcul: 0.8, Probas: 0.5, Taux: 0.45, Corporate: 0.45, Risques: 0.55, Marchés: 0.35, Dérivés: 0.3, Macro: 0.3, Logique: 0.3, Estimation: 0.3, Stats: 0.6, Maths: 0.6 };
+// tirage d'une question de la banque, orienté par les poids du module ; la rubrique choisie, une question générée peut la remplacer
 function bankPick(r, tier, M) {
-  if (!M.weights) return pick(r, CH_POOL[tier]);
-  const by = CH_BY_CAT[tier], cats = Object.keys(M.weights).filter((c) => by[c] && by[c].length);
-  let x = r.next() * cats.reduce((t, c) => t + M.weights[c], 0);
-  for (const c of cats) { x -= M.weights[c]; if (x < 0) return pick(r, by[c]); }
-  return pick(r, by[cats[cats.length - 1]]);
+  let q;
+  // poste généraliste : la banque décide de la rubrique, sauf les statistiques et les maths, qui ont leur part fixe
+  // (leurs questions sont surtout tirées à la volée, la banque n'en a que quelques-unes)
+  const extra = !M.weights && r.next() < 0.12 ? (r.next() < 0.55 ? 'Stats' : 'Maths') : null;
+  if (extra && CH_BY_CAT[tier][extra]) q = pick(r, CH_BY_CAT[tier][extra]);
+  else if (!M.weights) q = pick(r, CH_POOL[tier]);
+  else {
+    const by = CH_BY_CAT[tier], cats = Object.keys(M.weights).filter((c) => by[c] && by[c].length);
+    let x = r.next() * cats.reduce((t, c) => t + M.weights[c], 0);
+    q = pick(r, by[cats.find((c) => (x -= M.weights[c]) < 0) || cats[cats.length - 1]]);
+  }
+  if (GEN_SHARE[q.cat] && r.next() < GEN_SHARE[q.cat]) {
+    const g = q.cat === 'Calcul' && r.next() < 0.5 ? mentalQ(r, tier) : genQuestion(r, gensFor(q.cat, tier), tier);
+    if (g) return { ...g, cat: q.cat };
+  }
+  return q;
+}
+// Calcul mental de The Candidate : les générateurs du mode classique (opérations, astuces, fractions, nombres, équations),
+// au niveau du tour, présentés comme les questions de la banque
+const MENTAL = [base, base, astuce, astuce, fraction, theorie, equation, equation];
+const leftToRight = (t) => t.split(' ').reduce((acc, tok, k, a) => (k % 2 ? acc : k === 0 ? Number(tok) : a[k - 1] === '+' ? acc + Number(tok) : a[k - 1] === '×' ? acc * Number(tok) : acc - Number(tok)), 0);
+function mentalQ(r, tier) {
+  for (let k = 0; k < 4; k++) {
+    const q = pick(r, MENTAL)(r, tier === 1 ? 1 : 2);
+    if (q.kind === 'sqrt') continue; // « entre quels entiers ? » : trop long à expliquer en une ligne
+    const text = q.kind === 'mod' || q.kind === 'prime' ? `${q.sub} ?`
+      : q.kind === 'divs' ? `Combien de diviseurs a ${q.text.replace('Diviseurs de ', '')}, 1 et lui-même compris ?`
+      : q.kind === 'binary' ? `${q.text} : combien en décimal ?`
+      : q.kind === 'fracadd' ? `${q.text} ? (en décimal)`
+      : /^eq\d$/.test(q.kind) ? `${q.text}. Combien vaut x ?`
+      : q.eq === false ? q.text : `${q.text} ?`;
+    // priorités opératoires : le piège, c'est de calculer de gauche à droite
+    const traps = q.kind === 'prio' && !q.text.includes('(') ? [leftToRight(q.text)].filter((t) => t !== q.answer) : [];
+    return { type: 'num', text, answer: q.answer, tol: Number.isInteger(q.answer) ? 0 : 0.001, tolMode: 'rel', unit: '', traps, tip: q.tip, genId: 'mental-' + q.kind, dedup: 'mental:' + q.kind };
+  }
+  return null;
 }
 const CH_TIME = { 1: 12, 2: 17, 3: 24 };
 const UNIT_TIME = 10; // une réponse à taper prend plus de temps qu'un clic
@@ -831,6 +884,26 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
     const q = g(r, Math.min(2, tier - 1));
     return { ...q, ...head(g === suite ? 'Suite logique' : 'Figures'), sub: q.sub ? `${q.sub} · ${TIER_LABEL[tier]}` : TIER_LABEL[tier], time: CH_TIME[tier] + UNIT_TIME + (q.fig ? 6 : 0) };
   }
+  // raisonnement abstrait : une matrice de motifs à compléter (plus souvent en quant)
+  if (r.next() < (module === 'quant' ? 0.08 : 0.05)) {
+    const m = abstractMatrix(r, tier);
+    if (m) {
+      const opts = r.shuffle([m.good, ...m.wrong]), choices = opts.map(describeCell);
+      return { kind: 'abstract', text: 'Quelle case complète la grille ?', ...head('Raisonnement abstrait'), sub: `Raisonnement abstrait · ${TIER_LABEL[tier]}`, fig: { t: 'matrix', cells: m.grid },
+        choices, choiceFigs: opts, answer: opts.indexOf(m.good), trap: opts.indexOf(m.trap), show: describeCell(m.good), tip: m.tip, time: CH_TIME[tier] + 20, eq: false, dedup: 'abstract' };
+    }
+  }
+  // mémoire (on montre, on efface, on demande) et attention (repérer, compter, filtrer)
+  if (r.next() < 0.06) {
+    const memo = r.next() < 0.55, m = memo ? memoryQ(r, tier) : attentionQ(r, tier);
+    const base = { ...head('Mémoire et attention'), sub: `${memo ? 'Mémoire' : 'Attention'} · ${TIER_LABEL[tier]}${m.unit ? ' · réponse en ' + m.unit : ''}`, memo: m.memo || null, copy: m.copy || null,
+      tip: m.tip, eq: false, time: Math.round((m.memo ? m.memo.ms / 1000 : 0) + m.time), dedup: 'mind:' + m.text };
+    if (m.type === 'choice') {
+      const choices = r.shuffle([m.good, ...m.wrong]);
+      return { ...base, kind: memo ? 'memory' : 'attention', text: m.text, choices, answer: choices.indexOf(m.good), trap: choices.indexOf(m.trap), show: m.good };
+    }
+    return { ...base, kind: memo ? 'memory' : 'attention', text: m.text, answer: m.answer, traps: m.traps, unit: m.unit || '', show: fmt(m.answer) + (m.unit ? ' ' + m.unit : '') };
+  }
   if (r.next() < (module === 'quant' ? 0.14 : 0.06)) {
     const c = readCode(r, tier);
     return { ...c, ...head('Code'), sub: `Lire du code · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 14 };
@@ -840,21 +913,22 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
     const c = chartQuestion(r, tier, module);
     if (c) return { ...c, ...head(c.rubric), sub: `Lecture de graphique · ${TIER_LABEL[tier]}`, time: CH_TIME[tier] + 12 };
   }
-  // fat finger : recopier exactement un code, un IBAN, un montant (environ une question sur seize)
+  // fat finger : recopier exactement un code, un IBAN, un montant (environ une question sur seize), tiré à la volée
   if (r.next() < 0.06) {
-    const pool = FAT_FINGER.filter((f) => f.tier === tier), f = pick(r, pool);
-    return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, sub: `Fat finger · ${f.label} · ${TIER_LABEL[tier]}`,
+    const f = fatFinger(r, tier);
+    return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, sub: `Fat finger · ${f.label} · ${TIER_LABEL[tier]}`, dedup: 'fat:' + f.text,
       answer: f.text, show: f.text, ...head('Fat finger'), time: 8 + Math.ceil(f.text.length / 2.2), eq: false,
       tip: 'Sur un desk, une faute de frappe dans un montant ou un code coûte cher : on relit avant de valider. Chaque caractère compte, espaces et majuscules compris.' };
   }
   // la somme des chiffres d'un numéro de téléphone (et, au comité, fois 53)
   if (r.next() < 0.03) {
-    const ph = pick(r, PHONES), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0), x53 = tier === 3;
-    return { kind: 'phone', text: x53 ? 'Somme des chiffres de ce numéro, multipliée par 53 ?' : 'Somme des chiffres de ce numéro ?', copy: ph, ...head('Calcul'), eq: false,
+    const ph = phoneNumber(r), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0), x53 = tier === 3;
+    return { kind: 'phone', text: x53 ? 'Somme des chiffres de ce numéro, multipliée par 53 ?' : 'Somme des chiffres de ce numéro ?', copy: ph, ...head('Calcul'), eq: false, dedup: 'phone:' + ph,
       answer: x53 ? sum * 53 : sum, time: x53 ? CH_TIME[tier] + 14 : CH_TIME[tier] + 6,
       tip: x53 ? `Somme : ${sum}. Puis ${sum} × 53 = ${sum} × 50 + ${sum} × 3 = ${sum * 50} + ${sum * 3} = ${sum * 53}.` : `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}. On regroupe par paires pour aller plus vite.` };
   }
   const q = bankPick(r, tier, M);
+  const dedup = q.dedup ? { dedup: q.dedup } : {};
   if (q.type === 'multi') {
     // « coche toutes les bonnes réponses » : il faut toutes les bonnes, et aucune mauvaise
     const choices = r.shuffle([...q.good, ...q.wrong]);
@@ -863,7 +937,7 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
       time: CH_TIME[tier] + 8 + choices.length * 2 };
   }
   if (q.type === 'num') {
-    return {
+    return { ...dedup,
       kind: 'chartier-num', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip), sub: `${q.cat} · ${TIER_LABEL[tier]}${q.unit ? ' · réponse en ' + q.unit : ''}`,
       time: CH_TIME[tier] + UNIT_TIME + Math.min(10, Math.floor(q.text.length / 22)), eq: false,
       answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps, unit: q.unit,
@@ -873,7 +947,7 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
   // les choix sont mélangés à chaque tirage : la bonne réponse n'a pas de place fixe
   const choices = r.shuffle([q.good, ...q.wrong]);
   const longest = Math.max(...choices.map((c) => c.length));
-  return {
+  return { ...dedup,
     kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip),
     time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0),
     answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip,
@@ -883,8 +957,8 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
 function demoPick(r, tier, head) {
   const roll = r.next();
-  if (roll < 0.1) { const f = pick(r, FAT_FINGER.filter((x) => x.tier === tier)); return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, answer: f.text, show: f.text, ...head('Fat finger'), sub: `Fat finger · ${f.label}`, time: 8 + Math.ceil(f.text.length / 2.2), eq: false, tip: 'Chaque caractère compte, espaces et majuscules compris.' }; }
-  if (roll < 0.16) { const ph = pick(r, PHONES), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0); return { kind: 'phone', text: 'Somme des chiffres de ce numéro ?', copy: ph, answer: sum, ...head('Calcul'), eq: false, time: CH_TIME[tier] + 6, tip: `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}.` }; }
+  if (roll < 0.1) { const f = fatFinger(r, tier); return { kind: 'fatfinger', input: 'text', text: 'Recopie exactement, sans erreur :', copy: f.text, answer: f.text, show: f.text, ...head('Fat finger'), sub: `Fat finger · ${f.label}`, time: 8 + Math.ceil(f.text.length / 2.2), eq: false, tip: 'Chaque caractère compte, espaces et majuscules compris.' }; }
+  if (roll < 0.16) { const ph = phoneNumber(r), sum = [...ph.replace(/\D/g, '')].reduce((t, c) => t + Number(c), 0); return { kind: 'phone', text: 'Somme des chiffres de ce numéro ?', copy: ph, answer: sum, ...head('Calcul'), eq: false, time: CH_TIME[tier] + 6, tip: `${[...ph.replace(/\D/g, '')].join(' + ')} = ${sum}.` }; }
   const set = new Set(globalThis.__candidateDemo), all = Object.values(CH_POOL).flat().filter((q) => set.has(q.text));
   const pool = all.filter((q) => q.tier === tier).length ? all.filter((q) => q.tier === tier) : all;
   const q = pick(r, pool);
@@ -902,9 +976,11 @@ function code(r, d, i = 0, len = 10, module = 'gen', { python = true, sql: sqlOn
   const lvl = (l) => l.filter((q) => q.level === tier);
   // SQL seul, Python seul (fonction ou bug à corriger), ou les deux selon le module
   const sqlP = !python ? 1 : !sqlOn ? 0 : SQL_P[module] ?? 0.3;
-  const pool = roll < sqlP && lvl(SQL_QUESTIONS).length ? lvl(SQL_QUESTIONS)
+  const useSql = roll < sqlP && lvl(SQL_QUESTIONS).length;
+  const pool = useSql ? lvl(SQL_QUESTIONS)
     : roll < sqlP + (1 - sqlP) * 0.3 && lvl(FIX_QUESTIONS).length ? lvl(FIX_QUESTIONS) : lvl(CODE_QUESTIONS);
-  const q = pick(r, pool), isSql = q.lang === 'sql';
+  // en SQL, deux fois sur trois une épreuve tirée à la volée : énoncé et bases neufs (sql-gen.js)
+  const q = (useSql && r.next() < 0.65 && sqlQuestion(r, tier)) || pick(r, pool), isSql = q.lang === 'sql';
   return {
     kind: 'code', input: 'code', text: q.title, sub: `${isSql ? 'SQL' : q.bug ? 'Corrige le bug' : 'Code'} · ${TIER_LABEL[tier]}`, eq: false,
     prompt: q.prompt, starter: q.starter, fn: q.fn || null, tests: q.tests, examples: q.tests.slice(0, isSql ? 1 : 2), codeId: q.id,
@@ -947,14 +1023,22 @@ function mm(r, d, i = 0, len = 10) {
     tip: `Avant le premier dé, l'espérance vaut 3 × 3,5 = 10,5 ; après chaque dé, on remplace un 3,5 par la valeur sortie. Coter serré autour de ce juste milieu fait gagner la fourchette à chaque deal (cotations à ±1 ici : P&L de ${ideal.pnl >= 0 ? '+' : ''}${fmt(ideal.pnl)}). Après un deal, décale ton prix pour ne pas accumuler la position.` };
 }
 
-const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code, case: caseQ, relance, mm };
+// Sprint du face-à-face : un maximum de calculs justes en 60 secondes (une erreur retire un point)
+function sprint(r) {
+  const items = sprintItems(r);
+  return { kind: 'sprint', input: 'sprint', text: 'Sprint : un maximum de calculs justes en 60 secondes.', isChartier: true, pts: 0, tier: 3, rubric: 'Sprint', eq: false,
+    sprint: { items: items.map((x) => x.text), ms: SPRINT_MS }, answer: items.map((x) => x.ans), show: 'Le plus de calculs justes, moins les erreurs', time: SPRINT_MS / 1000,
+    tip: 'Sur un desk, la vitesse ne vaut rien sans la justesse : chaque erreur retire un point. On garde un rythme régulier plutôt que de foncer.' };
+}
+
+const GEN = { base, astuce, theorie, fraction, suite, estim, compte, vf, compare, equation, geo, devinette, visuel, chartier, code, case: caseQ, relance, mm, sprint };
 export const KINDS = {
   base: ['add', 'sub', 'mul', 'div', 'chain', 'missing', 'half', 'prio'],
   astuce: ['equi', 'sq5', 'x11', 'pct', 'x5', 'x25', 'x9', 'x99', 'sqnear', 'compl', 'pct2', 'x15'],
   theorie: ['pow', 'mod', 'sqrt', 'cube', 'pgcd', 'ppcm', 'fact', 'binary', 'prime', 'divs'],
   fraction: ['fracof', 'dec', 'fracdec', 'fracpct', 'fracadd'],
   suite: ['arith', 'geom', 'squares', 'fibo', 'incr', 'alt', 'primes', 'cubes', 'cross', 'affine', 'tri', 'pow2m1', 'sqplus', 'fact'],
-  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan'],
+  visuel: ['grid-sq', 'grid-sq-rect', 'grid-rect', 'tri', 'pyramid', 'dots', 'box', 'painted', 'stair', 'paths', 'diag', 'strip', 'fan', 'grid-sq-k', 'dots-tri', 'box-hidden'],
   estim: ['kmh', 'ms', 'train', 'time', 'units', 'promo', 'rule3', 'avg', 'evol', 'famous', 'approx'],
   compte: ['compte'],
   vf: ['vf-mul', 'vf-add', 'vf-div', 'vf-prime', 'vf-pct', 'vf-pow', 'vf-frac'],
@@ -967,6 +1051,7 @@ export const KINDS = {
   case: ['case'],
   relance: ['relance'],
   mm: ['mm'],
+  sprint: ['sprint'],
 };
 
 export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'gen', opts = {}) {
@@ -987,12 +1072,14 @@ export function makeQuestion(seed, i, cat, diff, salt = 0, len = 10, module = 'g
     trap: q.trap ?? -1, traps: q.traps || [], tolMode: q.tolMode || 'rel', unit: q.unit || '',
     prompt: q.prompt || null, starter: q.starter || null, fn: q.fn || null, tests: q.tests || null, examples: q.examples || null, codeId: q.codeId || null,
     lang: q.lang || null, ordered: q.ordered !== false, bug: !!q.bug, snippet: q.snippet || null, schema: q.schema || null, copy: q.copy || null,
-    bonus: !!q.bonus, mm: q.mm || null, caseStep: q.caseStep ?? null,
-    key: q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : ''),
+    bonus: !!q.bonus, mm: q.mm || null, caseStep: q.caseStep ?? null, memo: q.memo || null, choiceFigs: q.choiceFigs || null, sprint: q.sprint || null,
+    // doublons dans la partie : le texte, ou ce qui distingue vraiment la question (texte à recopier, code à lire, modèle de question générée)
+    key: q.dedup || q.text + '|' + (q.sub || '') + '|' + (q.fig ? JSON.stringify(q.fig) : '') + '|' + (q.nums ? q.nums.join(',') : '') + '|' + (q.snippet || ''),
   };
 }
 
 // Ce que voient les joueurs pendant la question (sans la réponse)
 // (ni la bonne réponse, ni le piège, ni les tests cachés du code)
 export const publicQuestion = (q) => ({ cat: q.cat, kind: q.kind, text: q.text, sub: q.sub, eq: q.eq, input: q.input, time: q.time, nums: q.nums, target: q.target, tol: q.tol, tolMode: q.tolMode, unit: q.unit, choices: q.choices, fig: q.fig, isChartier: !!q.isChartier, tier: q.tier, rubric: q.rubric,
-  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet, copy: q.copy, bonus: q.bonus, mm: q.mm, caseStep: q.caseStep });
+  prompt: q.prompt, starter: q.starter, fn: q.fn, examples: q.examples, ntests: q.tests ? q.tests.length : 0, lang: q.lang, ordered: q.ordered, bug: q.bug, snippet: q.snippet, copy: q.copy, bonus: q.bonus, mm: q.mm, caseStep: q.caseStep,
+  memo: q.memo, choiceFigs: q.choiceFigs, sprint: q.sprint });

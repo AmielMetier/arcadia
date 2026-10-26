@@ -17,7 +17,7 @@ export const LENGTHS = [10, 15, 20, 30];
 export const INTRO_MS = 3500;
 export const INTRO_CH_MS = 12000; // The Candidate : la scène d'ouverture (ascenseur, accueil de Pierre Chartier avec sa voix enregistrée)
 export const DUEL_SHOW_MS = 9200; // annonce du face-à-face final (même mise en scène qu'un changement de tour)
-export const DUEL_MAX = 5; // questions de mort subite au plus, puis le score départage
+export const DUEL_MAX = 3; // sprints au plus en cas d'égalité, puis le score de l'entretien départage
 export const REVEAL_MS = 5200;
 export const TIER_SHOW_MS = 9200; // passage d'un tour à l'autre en The Candidate (la grande scène)
 export const INTER_MS = 2400; // bandeau de transition avant la question suivante (ou le verdict)
@@ -34,7 +34,7 @@ export const JOKERS = {
   friend: { label: 'Appel à un ami', icon: '📞', desc: 'Un ami te souffle une réponse (il se trompe parfois)' },
 };
 const FRIEND_ACC = { 1: 0.85, 2: 0.75, 3: 0.62 };
-const MAX_RAW = 60, MAX_CODE = 6000;
+const MAX_RAW = 60, MAX_CODE = 6000, MAX_SPRINT = 600;
 
 // Sabotage : une série de 3 bonnes réponses rapporte un pouvoir, à lancer sur un adversaire entre deux questions.
 // Il agit sur sa question suivante. Le bouclier, gardé en réserve, annule le prochain sabotage reçu.
@@ -112,7 +112,7 @@ export function nextQuestion(state, now) {
   if (inDuel(s)) s.duel.k++;
   else if (duelAhead(s)) s.duel = { ids: duelists(s), k: 1, winner: null, why: null };
   else if (s.idx + 1 >= s.cfg.len || s.endEarly) return finish(s);
-  if (inDuel(s)) s.cats.push('chartier'); // une question de plus, au niveau du comité
+  if (inDuel(s)) s.cats.push('sprint'); // une manche de plus : un sprint de calcul
   s.idx++;
   const q = fullQuestion(s);
   s.q = { ...publicQuestion(q), n: s.idx + 1, pts: q.pts * (isFinal(s) ? 2 : 1), final: isFinal(s) };
@@ -186,6 +186,12 @@ export function check(q, raw) {
     if (!String(raw).trim()) return { ok: false, error: 'Écris ton code avant de l’envoyer' };
     return { ok: false, pending: true };
   }
+  if (q.input === 'sprint') {
+    // sprint : les réponses dans l'ordre des calculs, séparées par « ; » ; une erreur retire un point
+    let right = 0, wrong = 0;
+    String(raw).split(';').slice(0, q.answer.length).forEach((x, k) => { if (!x.trim()) return; const n = parseNumber(x); if (n === q.answer[k]) right++; else wrong++; });
+    return { ok: right > wrong, value: right - wrong, sprint: { right, wrong } };
+  }
   if (q.input === 'mm') {
     // market making : juste si le P&L est positif ; à zéro, pas de vie perdue
     const quotes = parseQuotes(raw);
@@ -230,15 +236,15 @@ export function answer(state, { by, raw, idx, now }) {
   if (state.answers[by]) return { ok: false, error: 'Tu as déjà répondu' };
   if (now > deadlineOf(state, by) + GRACE_MS) return { ok: false, error: 'Temps écoulé' };
   const q = fullQuestion(state);
-  const text = String(raw ?? '').slice(0, q.input === 'code' ? MAX_CODE : MAX_RAW);
+  const text = String(raw ?? '').slice(0, q.input === 'code' ? MAX_CODE : q.input === 'sprint' ? MAX_SPRINT : MAX_RAW);
   const c = check(q, text);
   // saisie illisible : on prévient le joueur sans lui compter de réponse (sauf en Éclair, où il faut assumer)
   if (c.error && state.cfg.mode !== 'eclair') return { ok: false, error: c.error, soft: true };
   const s = clone(state);
-  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' || q.input === 'mm' ? text : text.slice(0, 40), ok: !!c.ok, ...(c.pnl != null ? { pnl: c.pnl } : {}),
+  s.answers[by] = { at: Math.max(0, Math.min(now, deadlineOf(s, by)) - s.qAt), raw: q.input === 'code' || q.input === 'mm' || q.input === 'sprint' ? text : text.slice(0, 40), ok: !!c.ok, ...(c.pnl != null ? { pnl: c.pnl } : {}), ...(c.sprint ? { sprint: c.sprint } : {}),
     trap: !c.ok && isTrap(q, text), near: !!c.near, ...(c.pending ? { pending: true, passed: 0, total: q.tests.length } : {}) };
-  // face-à-face : la première réponse décide (juste, elle gagne ; fausse, elle perd)
-  const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok) || inDuel(s);
+  // face-à-face : la manche se termine quand les deux finalistes ont rendu leur sprint
+  const done = allDone(s) || (s.cfg.mode === 'eclair' && c.ok) || (inDuel(s) && s.duel.ids.every((id) => s.answers[id]));
   return { ok: true, state: s, done, right: !!c.ok, pending: !!c.pending };
 }
 
@@ -384,7 +390,7 @@ export function reveal(state, now) {
   const standing = alive(s).length, humans = s.players.filter((p) => !p.bot);
   if (s.cfg.lives && (standing === 0 || !humans.some((p) => !p.out) || (humans.length > 1 && standing <= 1))) s.endEarly = true;
   s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: isFinal(s), choices: q.choices, answer: q.input === 'choice' || q.input === 'multi' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
-    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, mm: q.mm, bonus: q.bonus, sub: q.sub, eliminated, tierEnd, endEarly: !!s.endEarly };
+    isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, mm: q.mm, bonus: q.bonus, sub: q.sub, choiceFigs: q.choiceFigs, eliminated, tierEnd, endEarly: !!s.endEarly };
   s.history.push({ idx: s.idx, key: q.key, cat: q.cat, kind: q.kind, text: q.text, fig: q.fig, sub: q.sub, eq: q.eq, show: q.show, tip: q.tip, choices: q.choices, input: q.input, isChartier: q.isChartier, tier: q.tier, rubric: q.rubric, pts: q.pts, unit: q.unit, lang: q.lang, snippet: q.snippet, schema: q.schema, mm: q.mm, bonus: q.bonus,
     results: results.map(({ id, ok, at, pts, raw, out }) => ({ id, ok, at, pts, raw, out })) });
   // pause plus longue quand quelqu'un peut saboter : le temps de choisir son pouvoir et sa cible
@@ -410,17 +416,21 @@ export function standings(s) {
     || b.score - a.score || b.right - a.right || a.totalMs - b.totalMs).map((p) => p.id);
 }
 
-// Révélation d'une question du face-à-face : pas de points ni de vies, seulement un vainqueur (ou une question de plus)
+// Révélation d'une manche du face-à-face (un sprint de calcul) : pas de points ni de vies, seulement un vainqueur
+// (le meilleur solde de calculs justes moins les erreurs, puis le plus de justes), ou une manche de plus
 function revealDuel(state, now) {
   const s = clone(state);
   const q = fullQuestion(s), d = s.duel;
-  const first = d.ids.map((id) => [id, s.answers[id]]).filter(([, a]) => a).sort((a, b) => a[1].at - b[1].at)[0];
-  if (first) { d.winner = first[1].ok ? first[0] : d.ids.find((id) => id !== first[0]); d.why = first[1].ok ? 'juste' : 'faux'; d.by = first[0]; }
+  const sc = Object.fromEntries(d.ids.map((id) => [id, (s.answers[id] && s.answers[id].sprint) || { right: 0, wrong: 0 }]));
+  const net = (id) => sc[id].right - sc[id].wrong, [x, y] = d.ids;
+  d.scores = sc;
+  if (net(x) !== net(y)) { d.winner = net(x) > net(y) ? x : y; d.why = 'sprint'; }
+  else if (sc[x].right !== sc[y].right) { d.winner = sc[x].right > sc[y].right ? x : y; d.why = 'sprint'; }
   else if (d.k >= DUEL_MAX) { d.winner = duelists(s)[0]; d.why = 'score'; }
   if (d.winner != null) s.endEarly = true;
   const results = s.players.map((p) => {
     const a = s.answers[p.id], duelist = d.ids.includes(p.id);
-    return { id: p.id, raw: a ? a.raw : null, ok: !!(a && a.ok), at: a ? a.at : null, pts: 0, tags: duelist && p.id === d.winner ? ['duel'] : [], out: !duelist };
+    return { id: p.id, raw: a ? a.raw : null, ok: duelist && p.id === d.winner, at: a ? a.at : null, pts: 0, tags: duelist && p.id === d.winner ? ['duel'] : [], out: !duelist, ...(duelist ? { sprint: sc[p.id] } : {}) };
   });
   s.last = { idx: s.idx, show: q.show, tip: q.tip, cat: q.cat, results, final: false, choices: q.choices, answer: q.input === 'choice' || q.input === 'multi' ? q.answer : null, trap: q.input === 'choice' ? q.trap : -1,
     isChartier: q.isChartier, tier: q.tier, input: q.input, unit: q.unit, eliminated: [], tierEnd: null, endEarly: d.winner != null, duel: { ...d } };
@@ -461,6 +471,7 @@ export function describeAnswer(q, raw) {
   if (q && q.input === 'code') return String(raw);
   if (q && q.input === 'multi') return String(raw).split(',').map((k) => 'ABCDEFGHIJ'[Number(k)] || '?').join(', ');
   if (q && q.input === 'text') return String(raw);
+  if (q && q.input === 'sprint') return `${String(raw).split(';').filter((x) => x.trim()).length} réponses`;
   if (q && q.input === 'mm') { if (!q.mm) return String(raw); const { pnl } = runMarket(q.mm, parseQuotes(raw)); return `P&L ${pnl > 0 ? '+' : ''}${fmt(pnl)}`; }
   const n = parseNumber(raw);
   return n == null ? String(raw) : fmt(n);

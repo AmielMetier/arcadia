@@ -192,13 +192,19 @@ p{margin:6px 0 10px}
 @keyframes fall{to{top:110%;rotate:720deg}}
 
 /* réactions */
-.dock{position:absolute;left:14px;bottom:14px;z-index:40}
+.dock{position:absolute;left:14px;bottom:14px;z-index:40;color:var(--ink)} /* texte foncé sur les panneaux clairs, même sur le plateau sombre de The Candidate */
 .emobtn{font-size:22px;padding:4px 10px}
 .emopanel{position:absolute;bottom:56px;left:0;width:280px;background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:5px 5px 0 rgba(0,0,0,.4);padding:10px}
 .emogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.emogrid button{font-size:24px;background:#fff;border:2px solid var(--ink);border-radius:10px;cursor:pointer;padding:4px}
+.emogrid button{font-size:24px;background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:10px;cursor:pointer;padding:4px}
 .phrases{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.phrases button{font-weight:700;font-size:13px;background:var(--cream);border:2px solid var(--ink);border-radius:14px;padding:3px 9px;cursor:pointer}
+.phrases button{font-weight:700;font-size:13px;background:var(--cream);color:var(--ink);border:2px solid var(--ink);border-radius:14px;padding:3px 9px;cursor:pointer}
+.emogrid button:hover,.phrases button:hover{filter:brightness(.94)}
+/* The Candidate : le texte du plateau est clair, le menu des réactions passe en sombre */
+.game.mode-chartier .emopanel{background:var(--panel);border-color:var(--gold);box-shadow:5px 5px 0 #000}
+.game.mode-chartier .emogrid button{background:#1b2232;border-color:#333e54}
+.game.mode-chartier .phrases button{background:#1b2232;color:var(--txt);border-color:#333e54}
+.game.mode-chartier .emogrid button:hover,.game.mode-chartier .phrases button:hover{filter:none;border-color:var(--gold);background:#232c40}
 .toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:var(--ink);color:var(--paper);border:3px solid var(--paper);border-radius:12px;
   padding:10px 16px;font-weight:700;z-index:70;box-shadow:4px 4px 0 rgba(0,0,0,.4);max-width:calc(100% - 32px);text-align:center}
 
@@ -941,9 +947,34 @@ button.mchoice:disabled{cursor:default;opacity:.7}
 .bilan-notes li span{font-weight:800;color:var(--sea)}
 @media (max-width:600px){ .bb{grid-template-columns:90px 1fr 40px} .mm-quote input{width:100px} }
 .qtext.cand.dense{font-size:clamp(17px,2.1vw,23px);line-height:1.38;text-align:left;max-width:760px;margin-inline:auto}
-.mm-ctx{text-align:center;margin:10px 0 0;font-weight:700;color:#eef3fa}
-.mm-help{margin-top:12px;padding:10px 14px;border-radius:12px;background:#0d111a;border:2px solid var(--edge,#2a3142);color:#d9e1ec;font-size:14px;text-align:left}
-.mm-help summary{cursor:pointer;font-weight:800;color:var(--gold,#e5a93c)}
-.mm-help ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.mm-how{margin:2px 0 10px;padding:8px 14px;border-radius:12px;background:#0d111a;border:2px solid var(--edge,#2a3142);color:#d9e1ec;font-size:15px;line-height:1.5;text-align:center}
+.mm-how b{color:var(--gold2,#ffd27a)}
+@media (max-width:600px){ .mm-how{font-size:13px;line-height:1.4;padding:6px 10px} }
 .mm-sum{list-style:none;margin:6px auto 0;padding:0;max-width:520px;font-size:14px;display:flex;flex-direction:column;gap:4px}
 .mm-sum li.tot{margin-top:4px;font-size:16px}
+
+/* The Candidate : mémoire (on montre, puis on efface) */
+.memo{margin:18px auto 6px;max-width:560px;text-align:center}
+.memo small{display:block;font-weight:800;color:var(--gold2,#ffd27a);letter-spacing:.3px;margin-bottom:8px}
+.memo-box{margin:0;padding:16px 20px;border-radius:12px;background:#05070b;border:2px solid var(--gold);color:#f5f8fc;text-align:left;display:inline-block;min-width:240px;
+  font:700 clamp(20px,2.6vw,28px)/1.45 ui-monospace,'SF Mono',Menlo,Consolas,monospace;white-space:pre}
+.memo-bar{height:6px;margin:12px auto 0;max-width:320px;border-radius:4px;background:#1b2232;overflow:hidden}
+.memo-bar i{display:block;height:100%;background:var(--gold);transform-origin:left;animation:memoout linear forwards}
+@keyframes memoout{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.copybox{white-space:pre-wrap}
+/* raisonnement abstrait : les réponses sont des cases dessinées */
+.cand-choices.figs .cchoice{justify-content:flex-start}
+.cand-choices.figs .ct{display:flex;justify-content:center}
+.fig.figc,.game.mode-chartier .fig.figc{width:64px;height:64px;margin:0}
+.cand-choices.rev.figs .fig.figc{width:46px;height:46px}
+/* sprint du face-à-face */
+.sprint{max-width:520px;margin:14px auto 0;text-align:center}
+.sp-score{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;margin-bottom:8px}
+.sp-score .sp-ok{color:var(--up,#2fbf71)}.sp-score .sp-ko{color:var(--down,#ff5a3c)}.sp-score .sp-n{color:var(--dim,#8c9cb3);font-size:14px}
+.sp-score .bump{animation:pop .3s cubic-bezier(.2,1.6,.4,1)}
+.sp-q{font:800 clamp(34px,6vw,56px)/1.2 ui-monospace,'SF Mono',Menlo,Consolas,monospace;color:#f5f8fc;padding:14px;border-radius:14px;background:#05070b;border:2px solid var(--gold);margin-bottom:12px}
+.sp-form{justify-content:center}
+.sprint-res{display:flex;flex-direction:column;gap:8px;max-width:460px;margin:10px auto}
+.sprint-res div{display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:12px;background:#0d111a;border:2px solid var(--edge,#2a3142);font-size:17px}
+.sprint-res div.win{border-color:var(--up,#2fbf71);background:#0f2a1b}
+.sprint-res b{flex:1;text-align:left}.sprint-res .ok{color:var(--up,#2fbf71)}.sprint-res .ko{color:var(--down,#ff5a3c)}.sprint-res em{font-style:normal;font-weight:800;min-width:42px;text-align:right}
