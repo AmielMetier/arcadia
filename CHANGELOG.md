@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.80 — 26 octobre 2026
+- **Tous les jeux** — Quand l'hôte change d'onglet ou réduit sa fenêtre, la partie continue pour tout le monde.
+  - Le navigateur ralentit fortement une page cachée (un minuteur par seconde, puis par minute au bout de cinq minutes) et y arrête l'animation : chez l'hôte, la partie se figeait ou prenait des secondes de retard pour tous les joueurs. Les jeux gardent maintenant leur rythme dans un onglet caché, et chez l'hôte d'une partie à plusieurs, la simulation continue à 30 images par seconde.
+  - Les commandes des invités arrivent sans attendre au jeu de l'hôte, même quand son onglet est caché.
+- **Tête de Calcul** — Market making : après ta troisième cotation, le dernier dé, la somme et ton P&L s'affichent tout de suite, avec « on attend les autres ». Les bots cotent aussi plus vite : on n'attend plus la fin du chrono.
+
 ## 2.79 — 26 octobre 2026
 - **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
   - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.
