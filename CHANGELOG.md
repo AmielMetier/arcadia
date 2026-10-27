@@ -1,5 +1,31 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.89 — 27 octobre 2026
+- **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
+  - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.
+  - Les armes ont leur vrai modèle : en main, posées au sol et dans la barre d'objets (fusil d'assaut, pompe, pistolet, mitraillette, sniper, lance-roquettes, grenades, soins).
+  - Bâtiments bien plus travaillés : enduits colorés, soubassement en pierre, chaînes d'angle, bandeaux et corniches, fenêtres encadrées et vitrées qui s'allument le soir, volets, garde-corps, jardinières fleuries.
+  - Portes avec marche, lampe et marquise ; boutiques avec store rayé et enseigne ; toits en tuiles avec rives, faîtage et cheminées ; toits plats avec climatiseurs, ventilations et réservoirs d'eau.
+  - Les rues se remplissent : lampadaires, voitures, bancs, abribus, bornes à incendie, poubelles, boîtes aux lettres, pots de fleurs, bennes, barils, palettes, épaves… On peut s'en servir comme abri, les casser et en récolter les matériaux.
+  - Le mobilier des maisons n'est dessiné qu'à proximité : le jeu reste fluide malgré tous ces détails.
+- **Island Rush** — Routes refaites : vrai enrobé, lignes usées, traces de pneus et accotements de gravier.
+  - En ville : trottoirs dallés, bordures et caniveaux, carrefours aux angles arrondis et passages piétons ; les rues ne scintillent plus aux croisements.
+  - Les chemins de terre ont leurs deux ornières et une bande d'herbe au milieu ; les places sont pavées, avec une rosace autour de la fontaine.
+  - Les voitures garées ne mordent plus sur le trottoir.
+- **Island Rush** — Saut plus lisible : dans la montgolfière et pendant la chute, une petite bulle rappelle seulement la touche Espace, et le rappel des touches s'efface tant qu'on est en l'air.
+- **Island Rush** — L'île est plus vivante.
+  - De l'herbe pousse autour de soi, avec des fleurs des prés (marguerites, boutons d'or, lavande, coquelicots), et se balance au vent.
+  - En ville et au village : allées pavées jusqu'aux portes, parvis dallés devant les immeubles et les boutiques, haies taillées devant les jardins des maisons (on peut s'y abriter, les casser et en récolter du bois).
+  - Les cheminées fument ; la poussière se soulève à l'atterrissage et sous les pas de ceux qui sprintent ; murs et décor cassés projettent des débris, les explosions de la terre, les armes éjectent leurs douilles.
+  - Les vagues roulent vers les plages en lignes d'écume.
+  - Au crépuscule et le soir, lampadaires, lampes des portes et enseignes s'allument, avec des flaques de lumière sur la chaussée.
+- **Island Rush** — Butin plus lisible : chaque objet au sol a un faisceau et un halo à la couleur de sa rareté ; les coffres dorés fermés luisent et scintillent.
+- **Island Rush** — Les armes posées au sol retrouvent leur vraie taille.
+- **Island Rush** — Objets en main revus.
+  - Grenades, potions, bandages et trousses se voient dans la main (ils disparaissaient dans le poing).
+  - Vrai coup de pelle pour récolter, lancer de grenade par-dessus l'épaule, geste pour poser un tremplin ou construire.
+  - On enroule son bandage ou on ouvre sa trousse devant soi, on boit sa potion ; au rechargement, l'arme baisse et pivote.
+  - Accroupi, on garde son arme en joue au lieu de la pointer vers le sol.
 ## 2.92 — 27 octobre 2026
 - **Tous les jeux** — Le volume de la musique et celui des effets se règlent dans chaque jeu, et chaque jeu retient son propre réglage.
   - DavidSimulator, Tête de Calcul, Outbreak, Convoy Storm et Poké Duel : un bouton Volume dans la barre du haut ouvre un curseur Musique et un curseur Effets.

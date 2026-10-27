@@ -5,6 +5,7 @@
 // rampes (escaliers, pans de toit) qui ne font que porter. Une grille de 8 m range tout ça pour les recherches.
 import { CELL, STOREY } from './buildings.js';
 import { FURN, furnRect } from './furniture.js';
+import { roofDetails } from './decor.js';
 
 export const WALL_T = 0.3;     // épaisseur d'un mur extérieur (m)
 export const INNER_T = 0.18;   // épaisseur d'une cloison
@@ -37,6 +38,13 @@ const PROP_SHAPES = {
   conteneur: { obb: [3.0, 1.25], h: 2.6 }, citerne: { cyl: 2.4, h: 4.2 }, silo: { cyl: 3, h: 11 }, botte: { cyl: 1, h: 1.2 },
   caisse: { obb: [0.6, 0.6], h: 1.2 }, grume: { obb: [3, 1.3], h: 1.5 }, tente: { obb: [1.3, 1.2], h: 1.5 }, table: { obb: [1, 0.5], h: 0.8 },
   fontaine: { cyl: 3.2, h: 0.75 }, pompe: { obb: [0.5, 0.4], h: 1.7 }, cheminee: { cyl: 1.7, h: 20 }, bateau: { obb: [2.6, 1.0], h: 0.7 },
+  lampadaire: { cyl: 0.14, h: 5.6 }, benne: { obb: [1.2, 0.65], h: 1.9 }, poubelle: { obb: [1.55, 1.3], h: 1.8 }, baril: { cyl: 0.4, h: 1.0 },
+  bonbonne: { cyl: 0.5, h: 1.4 }, cone: { cyl: 0.25, h: 0.62 }, barriere: { obb: [0.95, 0.33], h: 0.65 }, sacs: { obb: [1.58, 0.4], h: 1.15 },
+  pneus: { obb: [0.88, 0.57], h: 1.05 }, reservoir: { obb: [2.28, 0.9], h: 1.9 }, epave: { obb: [2.7, 1.3], h: 1.7 }, cartons: { obb: [0.71, 0.5], h: 1.7 },
+  tuyaux: { obb: [2.1, 0.5], h: 0.95 }, caisson: { obb: [1.1, 1.05], h: 2.1 },
+  banc: { obb: [0.9, 0.32], h: 0.85 }, bouche: { cyl: 0.2, h: 0.85 }, corbeille: { cyl: 0.3, h: 1.0 }, boite: { cyl: 0.22, h: 1.25 },
+  abribus: { obb: [1.7, 0.6], h: 2.3 }, jardiniere: { obb: [1.0, 0.4], h: 0.75 }, transfo: { obb: [0.45, 0.32], h: 1.4 },
+  haie: { obb: [1.0, 0.36], h: 1.05 },
 };
 const propScale = (p) => (p.kind === 'rocher' ? p.s : 1);
 
@@ -184,7 +192,13 @@ export function buildWorld(map) {
         ramp({ x0: X0, z0: Z0, x1: X0 + half, z1: Z1, dx: 1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
         ramp({ x0: X0 + half, z0: Z0, x1: X1, z1: Z1, dx: -1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
       }
-    } else {
+    }
+    // cheminées, climatiseurs, ventilations, réservoirs
+    for (const r of roofDetails(b, map.seed, top, ROOF_SLOPE)) {
+      if (r.kind === 'reservoir') add({ t: 1, cx: r.cx, cz: r.cz, r: r.r, y0: r.y0, y1: r.y1, ref: { b: b.id, part: 'toit' } });
+      else box(r.x0, r.y0, r.z0, r.x1, r.y1, r.z1, { b: b.id, part: 'toit' });
+    }
+    if (b.roof !== 'pente') {
       // garde-corps du toit plat
       for (let x = b.x0; x < b.x0 + b.w; x++) for (const z of [b.z0, b.z0 + b.d]) box(x * CELL, top, z * CELL - WALL_T / 2, (x + 1) * CELL, top + 1, z * CELL + WALL_T / 2, { b: b.id, part: 'parapet' });
       for (let z = b.z0; z < b.z0 + b.d; z++) for (const x of [b.x0, b.x0 + b.w]) box(x * CELL - WALL_T / 2, top, z * CELL, x * CELL + WALL_T / 2, top + 1, (z + 1) * CELL, { b: b.id, part: 'parapet' });

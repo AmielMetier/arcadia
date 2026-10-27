@@ -18,6 +18,7 @@ import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
 import { createSound } from './view/sound.js';
+import { setKit, renderIcons } from './view/weapons.js';
 import { Input } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
@@ -83,6 +84,9 @@ async function boot(info) {
   }
   progress('Carte', 0.95); await breathe();
   S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project });
+  // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
+  setKit(S.scene.kit);
+  try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
@@ -131,8 +135,8 @@ function newMatch({ run, seed, roster, mode, mirror = false }) {
   const start = pl ? { x: (pl.x0 + pl.x1) / 2 + 6, z: (pl.z0 + pl.z1) / 2 + 6 } : null;
   S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
   S.startedAt = Date.now();
-  S.actors = createActors(S.scene.scene, S.sim);
-  S.fx = createFx(S.scene.scene);
+  S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
+  S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
   // les bots ne réfléchissent que là où la partie tourne
@@ -213,11 +217,10 @@ function onWheel(dir) {
   const i = occupied.indexOf(S.sel);
   S.sel = occupied[(i + dir + occupied.length) % occupied.length];
 }
-function onLock(locked, free) {
+function onLock(locked) {
   if (locked) {
     showScreen(null); S.hud.toggleMap(false); S.sfx.unlock();
     if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
-    if (free && !S.freeTold) { S.freeTold = true; toast('Bouge la souris pour regarder ; contre un bord de l\'écran, la vue continue de tourner', 5); }
     return;
   }
   if (S.bagLock || S.hud.mapOpen || S.ended || !S.sim) return;
@@ -278,6 +281,9 @@ function loop(now) {
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
+  // en l'air (montgolfière, chute, planeur) ou éliminé : le rappel des touches s'efface, la vue reste dégagée
+  const air = !P || !P.alive || P.mode !== 'sol';
+  if (air !== S.hintsAir) { S.hintsAir = air; $('#hints').classList.toggle('air', air); }
   S.hud.frame(dt);
   S.hud.crosshair(P ? spreadOf(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
@@ -553,7 +559,7 @@ const CAUSES = { fusil: 'au fusil d\'assaut', pompe: 'au fusil à pompe', pistol
   grenade: 'à la grenade', tempete: 'par la tempête', chute: 'par une chute', pioche: 'à la pioche', depart: '(parti)' };
 function hideBroken(k) {
   const rest = k.slice(2);
-  if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); }
+  if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); if (S.scene.lights) S.scene.lights.hide(+rest); }
   else if (k[0] === 'w') S.scene.structures.hideWall(rest);
   else if (k[0] === 'f') S.scene.interior.hideFurn(+rest);
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
@@ -565,7 +571,10 @@ function handleEvents(list) {
     switch (e.e) {
       case 'feu': {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
-        if (h && Q) { h.shot(); if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); } }
+        if (h && Q) {
+          h.shot();
+          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); }
+        }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
         break;
       }
@@ -627,24 +636,27 @@ function handleEvents(list) {
       case 'arme': if (e.p === S.me) S.sfx.play('change'); break;
       case 'soigne': if (e.p === S.me) S.sfx.play(ITEMS[e.c] && ITEMS[e.c].shield ? 'potion' : 'bandage'); break;
       case 'soin': if (e.p === S.me) S.sfx.play('soigne'); break;
-      case 'lance': { const Q = S.sim.player(e.p); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
-      case 'tremplin': S.sfx.at('pose', e.x, e.y, e.z, 0.8); break;
+      case 'lance': { const Q = S.sim.player(e.p), h = S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('lancer'); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
+      case 'tremplin': { const h = e.p != null && S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('pose'); S.sfx.at('pose', e.x, e.y, e.z, 0.8); break; }
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
-      case 'saut': if (e.p === S.me) { S.hud.say('Saut !<small>Espace pour ouvrir le planeur plus tôt</small>', 2.5); S.sfx.play('saut'); } break;
-      case 'atterrit': if (e.p === S.me) S.sfx.play('atterrit'); break;
+      case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
+      case 'atterrit': { const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 }); if (e.p === S.me) S.sfx.play('atterrit'); break; }
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
-      case 'construit': S.builds.add(e.piece); if (e.piece.owner === S.me) buildBar(); S.sfx.at('construit', (e.piece.x + 0.5) * 4, e.piece.y0 + 1, (e.piece.z + 0.5) * 4, 0.9); break;
+      case 'construit': { const h = S.actors.heroOf(e.piece.owner); if (h && h.gesture) h.gesture('pose'); }
+        S.builds.add(e.piece); if (e.piece.owner === S.me) buildBar(); S.sfx.at('construit', (e.piece.x + 0.5) * 4, e.piece.y0 + 1, (e.piece.z + 0.5) * 4, 0.9); break;
       case 'coup': {
         const col = { bois: 0xb08a5a, pierre: 0xa9a49a, metal: 0xc8ccd0 }[e.mat] || 0xcfc6b5;
         S.fx.puff(e.x, e.y, e.z, { color: col, size: 0.3, grow: 1.6, life: 0.4, op: 0.8 });
+        S.fx.debris(e.x, e.y, e.z, e.mat, { n: 3, spread: 0.2, power: 2.5 });
         if (e.by === S.me) { S.hud.structure(e.hp, e.max); S.sfx.play('coup-' + (e.mat || 'bois')); }
         break;
       }
       case 'casse': {
         hideBroken(e.key);
         const col = { bois: 0x9a6a3a, pierre: 0x8a857c, metal: 0xaab2b8 }[e.mat] || 0x9a8a78;
-        for (let i = 0; i < 6; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
+        for (let i = 0; i < 4; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
+        S.fx.debris(e.x, e.y, e.z, e.mat, { n: 16, spread: 1.6, power: 4.5 });
         S.sfx.at('casse', e.x, e.y, e.z, 0.9);
         break;
       }
@@ -680,6 +692,8 @@ function report(res) {
 // ------------------------------------------------------------------ interactions affichées sous le viseur
 function showPrompt() {
   const P = me();
+  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le planeur', '', '', 'Espace'); return; }
   if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
@@ -705,6 +719,8 @@ const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kb
   <span><kbd>Espace</kbd> sauter, ouvrir le planeur</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
   <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
+// modèles 3D sous licence CC BY : l'attribution doit rester visible
+const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0)</p>';
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
@@ -727,7 +743,7 @@ function showScreen(kind, data) {
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
       ${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
-      <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>`;
+      <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
     html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {

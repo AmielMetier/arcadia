@@ -1,6 +1,6 @@
 // L'eau : la mer (un grand plan au niveau 0 qui file jusqu'à l'horizon), le lac (un plan à son niveau, découpé à sa
 // forme) et la rivière (un ruban qui descend du lac à la mer). Couleur selon la profondeur (lue dans une image cuite
-// depuis l'île), vaguelettes, reflet du ciel, éclat du soleil et écume au bord.
+// depuis l'île), vaguelettes, reflet du ciel, éclat du soleil, écume au bord et lignes de vagues qui roulent vers les plages.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const MAXD = 12; // profondeur codée dans l'image (m)
@@ -58,9 +58,15 @@ export function buildWater(map, { noise, sunDir, sky }) {
         col = mix(col, uSky, clamp(fres * 0.65, 0.0, 0.8));
         vec3 Hh = normalize(normalize(uSun) + V);
         col += uSunCol * pow(max(dot(nrm, Hh), 0.0), 240.0) * 2.2;
-        // écume qui va et vient au bord
+        // écume qui va et vient au bord, et des lignes de vagues qui roulent vers la plage (en mer), brisées par le bruit
         float wave = 0.5 + 0.5 * sin(uT * 1.3 - depth * 6.0 + n1 * 4.0);
-        float foam = (1.0 - smoothstep(0.0, 0.5 + 0.25 * wave, depth)) * smoothstep(0.3, 0.6, texture2D(uNoise, p / 3.5 + uT * 0.02).b + 0.2);
+        float grain = texture2D(uNoise, p / 3.5 + uT * 0.02).b;
+        float foam = (1.0 - smoothstep(0.0, 0.5 + 0.25 * wave, depth)) * smoothstep(0.3, 0.6, grain + 0.2);
+        if (uLake < 0.5) {
+          float roll = sin(depth * 2.4 + uT * 1.7 + n1 * 2.5);
+          float lines = smoothstep(0.82, 0.97, roll) * (1.0 - smoothstep(0.6, 3.2, depth)) * smoothstep(0.15, 0.6, depth);
+          foam = max(foam, lines * smoothstep(0.35, 0.65, grain + n2 * 0.4) * 0.8);
+        }
         col = mix(col, vec3(0.93, 0.97, 0.97), foam * 0.85);
         float alpha = max(mix(0.5, 0.97, smoothstep(0.0, 2.2, depth)), foam);
         gl_FragColor = vec4(col, alpha);
