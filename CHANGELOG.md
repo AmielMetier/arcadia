@@ -7,6 +7,14 @@
 - **Bastion Clash** — Le bruit des VCS qui récoltent est beaucoup plus discret : un petit tintement doux toutes les une à deux secondes au lieu d'un crépitement aigu en continu.
 
 ## 2.89 — 27 octobre 2026
+## 2.94 — 27 octobre 2026
+- **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.
+  - Le pistolet se tient à deux mains, le lance-roquettes à l'épaule ; le fusil à pompe ne pointe plus vers le ciel, en main comme au sol.
+- **Island Rush** — Les coffres et le butin ne brillent plus à travers les murs, et le halo des coffres est plus discret.
+- **Island Rush** — Bots plus vigilants : ils entendent quelqu'un courir tout près d'eux et, sans arme, attaquent à la pelle un joueur qui s'approche.
+- **Birdie Party** — Le parcours, les équipes, les bots, le vent et le moment se choisissent sur l'écran d'accueil du jeu, et non plus dans le salon du Hub.
+
+## 2.93 — 27 octobre 2026
 - **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
   - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.
   - Les armes ont leur vrai modèle : en main, posées au sol et dans la barre d'objets (fusil d'assaut, pompe, pistolet, mitraillette, sniper, lance-roquettes, grenades, soins).

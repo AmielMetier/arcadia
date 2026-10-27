@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { RARITY, AMMO, MATERIALS, WEAPONS, ITEMS } from '../engine/items.js';
 import { tintMaterial } from './kit.js';
-import { rarityMaterial, aimFrame } from './soldier.js';
+import { rarityMaterial, aimFrame, barrelFix } from './soldier.js';
 
 const geoCache = new Map(), matCache = new Map();
 const box = (w, h, d) => { const k = `b${w},${h},${d}`; if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d)); return geoCache.get(k); };
@@ -100,7 +100,8 @@ function fit(g, len) {
 function kitWeaponGeo(w) {
   if (kitGeos.has(w)) return kitGeos.get(w);
   const src = w === 'pioche' ? KIT.tool : KIT.weapons[w];
-  const g = src ? fit(src.hand.clone().applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
+  const fix = w === 'pioche' ? new THREE.Matrix4() : new THREE.Matrix4().makeRotationFromQuaternion(barrelFix(KIT, w));
+  const g = src ? fit(src.hand.clone().applyMatrix4(fix).applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
   kitGeos.set(w, g);
   return g;
 }
