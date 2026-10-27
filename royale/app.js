@@ -147,6 +147,7 @@ function newMatch({ run, seed, roster, mode, mirror = false }) {
   S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
+  S.actors.onBurn = (p) => S.sfx.at('bruleur', p.x, p.y + 4, p.z, 1, 140);
   S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);

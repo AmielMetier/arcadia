@@ -175,7 +175,7 @@ export function createSound() {
     const side = d > 0.5 ? (-dx * Math.cos(ear.yaw) + dz * Math.sin(ear.yaw)) / Math.hypot(dx, dz || 0.001) : 0;
     return { v, d, pan: Math.max(-0.85, Math.min(0.85, side * 0.85)), cut: d > 25 ? Math.max(500, 9000 - d * 45) : 0 };
   }
-  const gap = { touche: 0.03, impact: 0.05, bouclier: 0.03, pas: 0.08, recharge: 0.1, coup: 0.05, aie: 0.08, tempete: 0.5, casse: 0.08, 'impact-': 0.03 };
+  const gap = { bruleur: 0.8, touche: 0.03, impact: 0.05, bouclier: 0.03, pas: 0.08, recharge: 0.1, coup: 0.05, aie: 0.08, tempete: 0.5, casse: 0.08, 'impact-': 0.03 };
   function ok(name) {
     const now = ctx.currentTime, g = gap[name] || 0;
     if (g && last[name] && now - last[name] < g) return false;
@@ -236,6 +236,8 @@ export function createSound() {
       case 'construit': noise(o, t, 0.08, { type: 'bandpass', f0: 520, q: 1.4, v: 0.5 }); noise(o, t + 0.11, 0.08, { type: 'bandpass', f0: 600, q: 1.4, v: 0.45 }); break;
       case 'casse': noise(o, t, 0.6, { f0: 1500, f1: 120, v: 0.65 }); for (let i = 0; i < 4; i++) noise(o, t + 0.05 + Math.random() * 0.3, 0.05, { type: 'bandpass', f0: 800 + Math.random() * 1500, v: 0.3 }); break;
       case 'clic': noise(o, t, 0.03, { type: 'bandpass', f0: 2200, v: 0.2 }); break;
+      // brûleur de la montgolfière : souffle grave qui rugit
+      case 'bruleur': noise(o, t, 1.5, { type: 'bandpass', f0: 380, f1: 300, q: 0.6, a: 0.12, v: 0.7 }); noise(o, t, 1.5, { f0: 260, f1: 180, a: 0.15, v: 0.9, buf: brown }); break;
       default: break;
     }
   }

@@ -14,6 +14,7 @@ import { buildStructures } from './structures.js';
 import { buildInterior } from './interior.js';
 import { buildForest, buildProps } from './props.js';
 import { SWAY } from './trees.js';
+import { createSkyLife } from './life.js';
 import { loadKit } from './kit.js';
 
 export const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
@@ -67,6 +68,8 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const decals = buildDecals(map); scene.add(decals.group);
   const roads = await buildRoads(map, { anisotropy: renderer.capabilities.getMaxAnisotropy() }); scene.add(roads.group);
   const grass = createGrass(map, terrain.ground, { mobile: MOBILE }); scene.add(grass.group);
+  // nuages bas et vols d'oiseaux (couleur des nuages : celle du ciel du moment)
+  const life = createSkyLife(map, { tint: look.cloudLit || 0xffffff }); scene.add(life.group);
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
   const structures = buildStructures(map, { time }); scene.add(structures.group);
@@ -127,6 +130,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     terrain.update(camera.position.x, camera.position.z, 2);
     forest.update(camera.position.x, camera.position.z, 1);
     // l'herbe pousse autour du joueur ; inutile vue de la montgolfière ou en chute libre
+    life.update(dt, camera.position);
     grass.group.visible = camera.position.y - map.heightAt(camera.position.x, camera.position.z) < 70;
     if (grass.group.visible) grass.update(focus, 2);
     // de loin, on ne voit ni les meubles ni les petits ornements des façades
@@ -151,7 +155,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (disposed) return;
     disposed = true;
     removeEventListener('resize', resize);
-    terrain.dispose(); decals.dispose(); roads.dispose(); grass.dispose(); lights && lights.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
+    life.dispose(); terrain.dispose(); decals.dispose(); roads.dispose(); grass.dispose(); lights && lights.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
     scene.traverse((o) => {
       if ((o.isMesh || o.isPoints) && !o.userData.shared && !o.isInstancedMesh) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });

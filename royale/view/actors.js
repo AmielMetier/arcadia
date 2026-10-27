@@ -7,6 +7,7 @@ import { buildSoldier } from './soldier.js';
 import { itemModel, lootScale } from './weapons.js';
 import { RARITY } from '../engine/items.js';
 import { createBillboards } from './fx.js';
+import { buildBalloon } from './balloon.js';
 import { hash } from '../engine/rng.js';
 
 const keyOf = (it) => (it ? it.t + (it.w || it.c || it.a || it.m || '') + (it.r ?? '') : 'pioche');
@@ -41,25 +42,9 @@ export function createActors(scene, sim, kit = null) {
     }
     return h;
   }
-  // ------------------------------------------------------------------ montgolfière
-  const balloon = new THREE.Group();
-  {
-    const stripes = [0xe8473a, 0xffd23f, 0xe8473a, 0x3d8fe8, 0xffd23f, 0x3fbf4a];
-    for (let i = 0; i < stripes.length; i++) {
-      const g = new THREE.SphereGeometry(9, 32, 20, (i / stripes.length) * Math.PI * 2, Math.PI * 2 / stripes.length, 0, Math.PI * 0.78);
-      const m = new THREE.MeshStandardMaterial({ color: stripes[i], roughness: 0.6, side: THREE.DoubleSide });
-      const o = new THREE.Mesh(g, m); o.scale.set(1, 1.18, 1); o.position.y = 15; o.castShadow = true; balloon.add(o); own.push(g, m);
-    }
-    const basket = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 5), new THREE.MeshStandardMaterial({ color: 0x9a6a3a, roughness: 0.9 }));
-    basket.position.y = 1.1; balloon.add(basket); own.push(basket.geometry, basket.material);
-    const rope = new THREE.MeshStandardMaterial({ color: 0x3a2a1a });
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const g = new THREE.CylinderGeometry(0.05, 0.05, 8.5, 4); const o = new THREE.Mesh(g, rope);
-      o.position.set(sx * 3.2, 6, sz * 3.2); o.rotation.set(sz * 0.2, 0, -sx * 0.2); balloon.add(o); own.push(g);
-    }
-    own.push(rope);
-    balloon.visible = false; group.add(balloon);
-  }
+  // ------------------------------------------------------------------ montgolfière (view/balloon.js)
+  const bal = buildBalloon(), balloon = bal.group;
+  balloon.visible = false; group.add(balloon); own.push(bal);
   // ------------------------------------------------------------------ butin au sol
   const loot = new Map(); // id d'objet → { g, model, ph, n, r, beam }
   // faisceau (deux plans croisés, lumineux en bas, qui s'efface en haut) et halo au sol, à la couleur de la rareté
@@ -195,7 +180,7 @@ export function createActors(scene, sim, kit = null) {
       const far = Math.hypot(a.x - cam.x, a.z - cam.z), every = far < 50 ? 1 : far < 120 ? 2 : 4;
       h.acc += dt;
       if (!hero.root.visible || ++h.tick % every) continue;
-      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0 });
+      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
       h.acc = 0;
     }
     // montgolfière
@@ -204,6 +189,7 @@ export function createActors(scene, sim, kit = null) {
       balloon.visible = !gone;
       balloon.position.set(b.x, b.y - 2, b.z);
       balloon.rotation.y = Math.atan2(S.flight.ux, S.flight.uz);
+      if (!gone) bal.update(dt, (sec) => api.onBurn && api.onBurn(balloon.position, sec));
       if (S.flight.t * S.flight.speed > S.flight.len) {
         // elle s'éloigne après le dernier saut
         const extra = S.flight.t * S.flight.speed - S.flight.len;
@@ -277,8 +263,8 @@ export function createActors(scene, sim, kit = null) {
       g.position.set(pad.x, pad.y, pad.z); group.add(g); pads.set(pad.id, g);
     }
   }
-  return {
-    group, update,
+  const api = {
+    group, update, onBurn: null,
     heroOf: (id) => heroes.get(id) && heroes.get(id).hero,
     dispose() {
       for (const h of heroes.values()) h.hero.dispose();
@@ -286,4 +272,5 @@ export function createActors(scene, sim, kit = null) {
       scene.remove(group);
     },
   };
+  return api;
 }
