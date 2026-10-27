@@ -195,9 +195,14 @@ function onKey(code, key) {
   if (!S.sim) return;
   const P = me();
   if (code === 'Tab') { toggleBag(); return; }
-  if (code === 'Escape' && S.hud.bagOpen) { toggleBag(false); showScreen('pause'); return; }
+  // Échap ferme le sac ou la carte, et rien d'autre (un clic sur l'image reprend la souris)
+  if (code === 'Escape' && (S.hud.bagOpen || S.hud.mapOpen)) {
+    if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
+    S.hud.toggleMap(false);
+    toast('Clique pour reprendre', 1.5);
+    return;
+  }
   if (key === 'm' || code === 'KeyM') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
-  if (code === 'Escape' && S.hud.mapOpen) { S.hud.toggleMap(false); return; }
   if (key === 'h') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
   if (!S.input.playing) return;
   if ((!P || !P.alive) && code === 'Space') { nextSpectate(); return; }
@@ -607,6 +612,7 @@ function hideBroken(k) {
   const rest = k.slice(2);
   if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); if (S.scene.lights) S.scene.lights.hide(+rest); }
   else if (k[0] === 'w') S.scene.structures.hideWall(rest);
+  else if (k[0] === 's') S.scene.structures.hideWall(k);
   else if (k[0] === 'f') S.scene.interior.hideFurn(+rest);
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
   else if (k[0] === 'b') S.builds.remove(+rest);
@@ -656,7 +662,7 @@ function handleEvents(list) {
         const h = S.actors.heroOf(e.p);
         let muzzle = null;
         if (h && h.held && e.p !== S.me) { muzzle = new THREE.Vector3(); h.held.getWorldPosition(muzzle); }
-        S.fx.shot(e.from, e.to, e.w, e.hit, muzzle);
+        S.fx.shot(e.from, e.to, e.w, e.hit, muzzle, !!e.late);
         if (e.hit === 1 && e.k < 3) S.sfx.at(impactAt(e.to[0], e.to[1], e.to[2]), e.to[0], e.to[1], e.to[2], 0.7, 45);
         if (e.p !== S.me && e.k === 0) S.sfx.whiz(e.from, e.to);
         break;

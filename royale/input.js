@@ -21,6 +21,8 @@ export class Input {
     on(surface, 'click', () => this.lock());
     on(document, 'pointerlockchange', () => { this.locked = document.pointerLockElement === surface; if (!this.locked) { this.keys.clear(); this.fire = this.aim = false; } this.h.lock && this.h.lock(this.locked); });
     on(document, 'pointerlockerror', () => this.fallback());
+    // plein écran : Échap revient au jeu au lieu de quitter le plein écran (Chrome, Edge ; un appui long le quitte)
+    on(document, 'fullscreenchange', () => { const kb = navigator.keyboard; if (document.fullscreenElement && kb && kb.lock) kb.lock(['Escape']).catch(() => {}); });
     on(document, 'mousemove', (e) => {
       if (this.free) { const r = surface.getBoundingClientRect(); this.cx = (e.clientX - r.left) / (r.width || 1); this.cy = (e.clientY - r.top) / (r.height || 1); }
       if (this.locked || (this.free && this.over)) { this.dx += e.movementX; this.dy += e.movementY; }
@@ -30,6 +32,8 @@ export class Input {
     on(window, 'keydown', (e) => {
       if (e.repeat) { if (MOVE_KEYS[e.code] || e.code === 'Space') e.preventDefault(); return; }
       if (e.code === 'Space') { this.jumps++; e.preventDefault(); }
+      // Échap reste dans le jeu (fermer le sac, la carte) : pas d'action du navigateur
+      if (e.code === 'Escape') e.preventDefault();
       if (e.code === 'Escape' && this.free) { this.free = false; this.surface.style.cursor = ''; this.keys.clear(); this.h.lock && this.h.lock(false); return; }
       if (e.code === 'Tab' || (e.ctrlKey && MOVE_KEYS[e.code])) e.preventDefault();
       this.keys.add(e.code);
