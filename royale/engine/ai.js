@@ -263,7 +263,7 @@ export function createAI(sim, map, world) {
     const e = sim.eye(P), fx = Math.sin(B.yaw), fz = Math.cos(B.yaw), lv = B.lv;
     const cands = [];
     for (const Q of S.players.values()) {
-      if (Q === P || !Q.alive || Q.mode === 'ballon') continue;
+      if (Q === P || !Q.alive || Q.mode === 'ballon' || sim.mates(P, Q)) continue;
       const dx = Q.x - P.x, dz = Q.z - P.z, d = Math.hypot(dx, dz);
       if (d > Math.max(lv.see, 110) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
       if (d > lv.see && !(Q.shotT != null && S.t - Q.shotT < 1.2) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
@@ -273,12 +273,13 @@ export function createAI(sim, map, world) {
       const hurt = P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5;
       if (d < 12 || front > lv.cone || heard || hurt) cands.push({ Q, d, hurt, heard });
     }
-    cands.sort((a, b) => a.d - b.d);
+    // ceux qui tiennent debout d'abord : un ennemi à terre ne menace plus (on l'achève quand plus personne n'est en vue)
+    cands.sort((a, b) => a.d + (a.Q.down ? 45 : 0) - b.d - (b.Q.down ? 45 : 0));
     let seen = null;
     for (const c of cands.slice(0, 3)) {
       const Q = c.Q, ty = Q.y + (Q.crouch ? 0.85 : 1.3), dx = Q.x - e[0], dy = ty - e[1], dz = Q.z - e[2], L = Math.hypot(dx, dy, dz);
       const h = world.raycast(e[0], e[1], e[2], dx / L, dy / L, dz / L, L);
-      if (h.t >= L - 0.5) { if (B.enemy === Q.id || wants(P, B, Q, c.hurt)) { seen = c; break; } }
+      if (h.t >= L - 0.5) { if ((B.enemy === Q.id && !Q.down) || wants(P, B, Q, c.hurt)) { seen = c; break; } }
     }
     if (seen) {
       if (B.enemy !== seen.Q.id) { B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; }
@@ -297,9 +298,20 @@ export function createAI(sim, map, world) {
 
   // ------------------------------------------------------------------ décision (deux fois par seconde)
   function decide(P, B) {
+    if (P.revive) return; // on relève un coéquipier : on ne bouge pas
     // (l'hôte du salon a l'identifiant 0 : on teste toujours != null, jamais la valeur elle-même)
     const E = B.enemy != null ? S.players.get(B.enemy) : null;
     const danger = stormDanger(P), gun = armed(P);
+    // équipes : un coéquipier à terre pas trop loin, et pas d'ennemi en vue tout près : on va le relever
+    if (S.teams > 1 && danger < 2) {
+      const down = [...S.players.values()].filter((Q) => Q.alive && Q.down && sim.mates(P, Q)).map((Q) => [Q, Math.hypot(Q.x - P.x, Q.z - P.z)]).filter(([, d]) => d < 80).sort((a, b) => a[1] - b[1])[0];
+      const close = E && E.alive && B.visible && Math.hypot(E.x - P.x, E.z - P.z) < 22;
+      if (down && !close) {
+        B.state = 'go'; B.enemy = close ? B.enemy : null;
+        if (!B.goal || B.goal.kind !== 'releve' || B.goal.id !== down[0].id) setGoal(P, B, { kind: 'releve', id: down[0].id, x: down[0].x, y: down[0].y, z: down[0].z, r: 1.6 });
+        return;
+      }
+    }
     if (E && E.alive) {
       const d = Math.hypot(E.x - P.x, E.z - P.z);
       let reach = 0;
@@ -324,6 +336,13 @@ export function createAI(sim, map, world) {
     const h = needHeal(P);
     if (h && S.t - (P.hitT || -9) > 2.5 && (!E || !B.visible || P.hp + P.sh < 40)) { B.state = 'heal'; B.healSlot = h; return; }
     if (B.state === 'fight' || B.state === 'heal' || B.state === 'zone') { B.state = 'go'; B.goal = null; }
+    // équipes : on ne s'éloigne pas de son chef (le joueur de l'équipe, ou le premier bot)
+    const L = leaderOf(P, B);
+    if (L && L.alive && L.mode === 'sol' && Math.hypot(L.x - P.x, L.z - P.z) > 35) {
+      if (!B.goal || B.goal.kind !== 'escorte' || Math.hypot(B.goal.x - L.x, B.goal.z - L.z) > 12) setGoal(P, B, { kind: 'escorte', id: null, x: L.x, z: L.z, r: 8 });
+      B.state = 'go';
+      return;
+    }
     if (B.goal && B.goal.kind !== 'roam' && B.goal.kind !== 'zone' && B.goal.kind !== 'rota' && S.t - B.goal.since < 40) return;
     // début de partie : on fouille et on se protège ; une fois équipé, on ne ramasse plus que ce qui est tout près
     const ready = geared(P, B);
@@ -350,7 +369,7 @@ export function createAI(sim, map, world) {
   function heardFight(P, B) {
     let best = null, bd = 160 * agg();
     for (const Q of S.players.values()) {
-      if (Q === P || !Q.alive || Q.mode !== 'sol' || Q.shotT == null || S.t - Q.shotT > 6) continue;
+      if (Q === P || !Q.alive || Q.mode !== 'sol' || Q.shotT == null || S.t - Q.shotT > 6 || sim.mates(P, Q)) continue;
       const d = Math.hypot(Q.x - P.x, Q.z - P.z);
       if (d < bd && stormDanger(Q) < 2) { bd = d; best = Q; }
     }
@@ -390,6 +409,15 @@ export function createAI(sim, map, world) {
   function arrive(P, B, dt) {
     const g = B.goal, I = P.inp;
     const done = () => { claims.delete(keyOfGoal(g)); B.goal = null; B.decideT = 0; };
+    if (g.kind === 'releve') {
+      // à côté du coéquipier : E, puis on reste immobile jusqu'à ce qu'il soit debout
+      const Q = S.players.get(g.id);
+      if (!Q || !Q.alive || !Q.down) { if (!P.revive) done(); return; }
+      if (Math.hypot(Q.x - P.x, Q.z - P.z) > 2) { g.x = Q.x; g.z = Q.z; g.y = Q.y; B.path = null; askPath(P, B); return; }
+      face(B, Q.x, Q.z, dt, P);
+      if (!P.revive && S.t - B.useT > 0.6) { I.use++; B.useT = S.t; if (++g.tries > 6) { ban(B, g, 10); done(); } }
+      return;
+    }
     if (g.kind === 'coffre') {
       const c = S.chests.get(g.id);
       if (!c || c.open) return done();
@@ -529,6 +557,18 @@ export function createAI(sim, map, world) {
     return ml > 0.1 ? { x: mx / ml, z: mz / ml, k: Math.min(1, ml) } : null;
   }
 
+  // chef d'équipe : le joueur de l'équipe (le premier), sinon le premier bot ; null pour le chef lui-même et en solo
+  function leaderOf(P, B) {
+    if (S.teams <= 1 || P.team == null) return null;
+    if (B.leader === undefined) {
+      const team = [...S.players.values()].filter((q) => q.team === P.team);
+      const L = team.find((q) => !q.bot) || team[0];
+      B.leader = L && L !== P ? L.id : null;
+    }
+    const L = B.leader != null ? S.players.get(B.leader) : null;
+    return L && L.alive ? L : null;
+  }
+
   // ------------------------------------------------------------------ un bot, un pas
   function init(P) {
     const n = typeof P.id === 'string' ? [...P.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) : P.id;
@@ -540,8 +580,9 @@ export function createAI(sim, map, world) {
       ban: new Map(), ignore: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
       sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,
     };
-    const humans = [...S.players.values()].filter((q) => !q.bot);
-    if (humans.length && followers < FOLLOW_MAX && rng.next() < 1 / 3) { followers++; P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id; }
+    const humans = [...S.players.values()].filter((q) => !q.bot && !sim.mates(P, q));
+    // (un bot d'équipe suit son chef, pas un adversaire)
+    if (humans.length && followers < FOLLOW_MAX && !leaderOf(P, P.ai) && rng.next() < 1 / 3) { followers++; P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id; }
     return P.ai;
   }
   function think(P, dt) {
@@ -551,6 +592,30 @@ export function createAI(sim, map, world) {
       while (queue.length) { const Q = queue.shift(); if (Q.alive && Q.ai && Q.ai.waiting) { plan(Q); break; } }
     }
     const B = P.ai || init(P), I = P.inp;
+    if (P.down) {
+      // à terre : on rampe vers le coéquipier debout le plus proche (il viendra nous relever)
+      const M = [...S.players.values()].filter((Q) => Q.alive && !Q.down && sim.mates(P, Q)).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z))[0];
+      B.goal = null; B.path = null; B.state = 'go'; B.enemy = null;
+      const dx = M ? M.x - P.x : 0, dz = M ? M.z - P.z : 0, d = Math.hypot(dx, dz);
+      if (d > 0.1) B.yaw = Math.atan2(dx, dz);
+      I.yaw = B.yaw; I.pitch = 0; I.mx = 0; I.mz = d > 2.5 ? 1 : 0; I.fire = false; I.build = null;
+      return;
+    }
+    const L = leaderOf(P, B);
+    if (L && P.mode !== 'sol') {
+      // équipe : on saute avec son chef et on se pose près de lui
+      if (P.mode === 'ballon') {
+        if (L.mode === 'ballon') { B.prevD = null; return; }
+        if (B.jumpAt == null) B.jumpAt = S.t + 0.3 + B.rng.next() * 0.8;
+        if (S.t >= B.jumpAt) I.jump++;
+        return;
+      }
+      if ((B.followT -= dt) <= 0) {
+        B.followT = 0.5;
+        const lead = L.mode === 'chute' ? 6 : L.mode === 'planeur' ? 3 : 0, side = (B.rng.next() - 0.5) * 8;
+        B.drop = L.mode === 'sol' ? { x: L.x + side, z: L.z + side, b: -1 } : L.ai && L.ai.drop && L.mode === 'ballon' ? L.ai.drop : { x: L.x + L.vx * lead + side, z: L.z + L.vz * lead + side, b: -1 };
+      }
+    }
     if (B.follow != null && P.mode !== 'sol' && (B.followT -= dt) <= 0) {
       B.followT = 0.5;
       const f = followDrop(P, B);

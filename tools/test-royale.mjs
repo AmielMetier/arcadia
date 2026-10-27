@@ -16,6 +16,7 @@ import { createBuild, slotFor } from '../royale/engine/build.js';
 import { weapon } from '../royale/engine/items.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
 import { createAI } from '../royale/engine/ai.js';
+import { makeTeams } from '../royale/engine/teams.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from '../royale/engine/net.js';
 
 const SEEDS = +(process.argv[2] || 12);
@@ -476,6 +477,89 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
   ok(walls >= 1 && bot.mats.bois === 50 && B.pieces.size >= 1, `un bot touché de loin ne pose pas de mur (${walls} mur, bois ${bot.mats.bois})`);
   console.log(`bot touché de loin : ${walls} mur posé, bois ${bot.mats.bois}`);
+}
+// ------------------------------------------------------------------ équipes : qui joue avec qui
+{
+  const H = ['a', 'b', 'c', 'd'].map((id) => ({ id }));
+  // a et c choisissent l'équipe 3, b l'équipe 0 ; d n'a rien choisi : il rejoint l'équipe la moins remplie
+  const t = makeTeams(H, new Map([['a', 3], ['c', 3], ['b', 0]]), 12, 3);
+  ok(t.humans.get('a') === t.humans.get('c') && t.humans.get('b') !== t.humans.get('a'), 'équipes choisies respectées');
+  ok(t.humans.get('d') === t.humans.get('b'), `d rejoint l'équipe la moins remplie (${t.humans.get('d')})`);
+  ok(t.bots.length === 8 && t.bots.filter((k) => k === t.humans.get('a')).length === 1 && t.bots.filter((k) => k === t.humans.get('b')).length === 1, 'les bots complètent d\'abord les équipes des joueurs');
+  const sizes = new Map(); for (const k of [...t.humans.values(), ...t.bots]) sizes.set(k, (sizes.get(k) || 0) + 1);
+  ok([...sizes.values()].every((n) => n === 3), `trios complets : ${[...sizes.values()].join(',')}`);
+  const solo = makeTeams(H, new Map(), 6, 1);
+  ok(new Set([...solo.humans.values(), ...solo.bots]).size === 6, 'en solo, chacun son équipe');
+}
+// ------------------------------------------------------------------ équipes : tir ami, à terre, relevé, élimination d'équipe
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [['a', 0], ['b', 0], ['c', 1], ['d', 1]].map(([id, team]) => ({ id, name: id.toUpperCase(), team }));
+  const sim = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  while (sim.S.phase === 'vol') { for (const id of ['a', 'b', 'c', 'd']) sim.input(id, { jump: (sim.S.t * 60) | 0 }); sim.step(DT); }
+  const P = (id) => sim.player(id), C = { x: m.center, z: m.center };
+  const put = (id, dx, dz) => { const x = C.x + dx, z = C.z + dz; Object.assign(P(id), { x, z, y: W.support(x, z, 400), vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 0, ground: true }); };
+  put('a', 0, 0); put('b', 1.5, 0); put('c', 40, 0); put('d', 45, 0);
+  const evs = () => sim.takeEvents();
+  sim.damage(P('b'), 50, P('a'), { cause: 'fusil' });
+  ok(P('b').hp === 100, 'pas de tir ami');
+  sim.damage(P('a'), 250, P('c'), { cause: 'fusil' });
+  ok(P('a').alive && P('a').down && evs().some((e) => e.e === 'abattu' && e.to === 'a' && e.by === 'c'), 'A tombe à terre au lieu d\'être éliminé');
+  // B relève A : E à côté, immobile, 5 s
+  sim.input('b', { yaw: Math.atan2(P('a').x - P('b').x, P('a').z - P('b').z), use: 1, mx: 0, mz: 0 });
+  sim.step(DT);
+  ok(P('b').revive && P('b').revive.id === 'a', 'B commence à relever A');
+  // pendant ce temps, l'état passe par le réseau
+  const copy = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  applySnapshot(copy, snapshot(sim), 'c');
+  ok(copy.player('a').down && copy.player('b').revive && copy.player('b').revive.id === 'a', 'à terre et relevé passent par le réseau');
+  for (let i = 0; i < 5.1 / DT; i++) sim.step(DT);
+  ok(!P('a').down && P('a').hp === 30 && evs().some((e) => e.e === 'releve' && e.to === 'a' && e.by === 'b'), `A relevé avec 30 PV (${P('a').hp})`);
+  // à terre trop longtemps : éliminé, mis au crédit de celui qui l'a mis à terre ; l'équipe tient encore
+  sim.damage(P('a'), 250, P('c'), { cause: 'fusil' });
+  for (let i = 0; i < 31 / DT && P('a').alive; i++) sim.step(DT);
+  ok(!P('a').alive && P('c').kills === 1 && P('a').place === 0, `A éliminé au bout de 30 s, élimination pour C (${P('c').kills}), place en attente`);
+  // dernier debout éliminé : toute l'équipe sort, l'autre gagne
+  sim.damage(P('b'), 250, P('d'), { cause: 'fusil' });
+  ok(!P('b').alive && P('a').place === 2 && P('b').place === 2, `équipe de A et B éliminée, 2e (${P('a').place}, ${P('b').place})`);
+  ok(sim.S.phase === 'fin' && sim.S.winTeam === 1 && P('c').place === 1 && P('d').place === 1, 'l\'équipe de C et D gagne');
+  // trio : deux à terre, le troisième éliminé : les deux à terre sortent aussi
+  const r3 = [['x', 0], ['y', 0], ['z', 0], ['e', 1]].map(([id, team]) => ({ id, name: id, team }));
+  const s3 = createSim({ map: m, world: W, seed: 6, roster: r3, mode: 'partie', teams: 3 });
+  for (const id of ['x', 'y', 'z', 'e']) Object.assign(s3.player(id), { mode: 'sol', x: C.x, z: C.z, y: W.support(C.x, C.z, 400) });
+  s3.damage(s3.player('x'), 250, s3.player('e')); s3.damage(s3.player('y'), 250, s3.player('e'));
+  ok(s3.player('x').down && s3.player('y').down, 'deux membres du trio à terre');
+  s3.damage(s3.player('z'), 250, s3.player('e'));
+  ok(!s3.player('x').alive && !s3.player('y').alive && !s3.player('z').alive && s3.player('e').kills === 3 && s3.S.phase === 'fin', 'tous à terre ou éliminés : l\'équipe sort');
+}
+// ------------------------------------------------------------------ équipes : une partie en trios entre bots
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const T = makeTeams([], new Map(), 30, 3);
+  const roster = T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal', team }));
+  const sim = createSim({ map: m, world: W, seed: 8, roster, mode: 'partie', teams: 3 });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  let revives = 0, downs = 0, friendly = 0, apart = 0, checks = 0;
+  while (sim.S.phase !== 'fin' && sim.S.t < 700) {
+    sim.step(DT);
+    for (const e of sim.takeEvents()) {
+      if (e.e === 'releve') revives++;
+      else if (e.e === 'abattu') downs++;
+      else if (e.e === 'degat' && e.by != null && sim.mates(sim.player(e.by), sim.player(e.to))) friendly++;
+    }
+    // une minute après le départ : les membres d'une équipe restent proches
+    if (Math.abs(sim.S.t - 90) < DT / 2) for (let k = 0; k < 10; k++) {
+      const live = [...sim.S.players.values()].filter((p) => p.alive && p.team === k && p.mode === 'sol');
+      if (live.length < 2) continue;
+      checks++;
+      if (Math.max(...live.map((p) => Math.hypot(p.x - live[0].x, p.z - live[0].z))) > 80) apart++;
+    }
+  }
+  ok(sim.S.phase === 'fin' && sim.S.winTeam != null, 'la partie en trios va jusqu\'au bout');
+  ok(friendly === 0, `${friendly} tirs amis`);
+  ok(downs > 0 && revives > 0, `bots à terre ${downs}, relevés ${revives}`);
+  ok(apart <= Math.ceil(checks / 3), `équipes dispersées à 1:30 : ${apart}/${checks}`);
+  console.log(`trios entre bots : fin à ${Math.floor(sim.S.t / 60)}:${String(Math.floor(sim.S.t % 60)).padStart(2, '0')}, équipe ${sim.S.winTeam} · ${downs} à terre, ${revives} relevés · équipes groupées ${checks - apart}/${checks}`);
 }
 // ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
 // 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles
