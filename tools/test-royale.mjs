@@ -586,6 +586,33 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   ok(knocked >= 3 && raised === knocked, `joueur à terre relevé par ses bots : ${raised}/${knocked}`);
   console.log(`joueur à terre relevé par ses bots coéquipiers : ${raised}/${knocked}`);
 }
+// ------------------------------------------------------------------ repères d'équipe : réseau, bots qui y vont et qui signalent
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const T = makeTeams([{ id: 'moi' }], new Map(), 30, 2);
+  const roster = [{ id: 'moi', name: 'Moi', team: T.humans.get('moi') }, ...T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal', team }))];
+  const sim = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const me = sim.player('moi'), mate = [...sim.S.players.values()].find((q) => sim.mates(me, q));
+  let jump = 0, calls = 0;
+  const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { sim.input('moi', { jump }); sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'repere' && e.p !== 'moi') calls++; } };
+  step(60 * 6); jump++; step(60 * 30);
+  ok(!sim.ping(me, 'bidon', me.x, me.y, me.z) && !sim.ping(me, 'ici', NaN, 0, 0), 'repère invalide refusé');
+  // « Ici » à 50 m : le bot coéquipier y va
+  const a = Math.atan2(m.center - me.x, m.center - me.z), x = me.x + Math.sin(a) * 50, z = me.z + Math.cos(a) * 50;
+  ok(sim.ping(me, 'ici', x, W.support(x, z, 400), z), 'repère posé');
+  const copy = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  for (const e of sim.takeEvents()) mirrorEvent(copy, W, null, e);
+  ok(copy.S.pings.get('moi') && copy.S.pings.get('moi').kind === 'ici', 'le repère passe par le réseau');
+  const d0 = Math.hypot(mate.x - x, mate.z - z);
+  let best = d0;
+  for (let i = 0; i < 25 && mate.alive; i++) { step(60); best = Math.min(best, Math.hypot(mate.x - x, mate.z - z)); }
+  ok(!mate.alive || best < 12, `le bot coéquipier va au repère (${d0.toFixed(0)} m → ${best.toFixed(0)} m)`);
+  // les bots signalent les ennemis qu'ils voient au joueur de leur équipe
+  step(60 * 120);
+  ok(calls > 0, `repères posés par les bots : ${calls}`);
+  console.log(`repères : bot coéquipier ${d0.toFixed(0)} → ${best.toFixed(0)} m du repère · ${calls} ennemis signalés par les bots`);
+}
 // ------------------------------------------------------------------ niveau « Auto » : il suit les résultats
 {
   const fresh = skillOf([]), strong = skillOf([{ place: 1, n: 30, kills: 6 }, { place: 2, n: 45, kills: 4 }, { place: 1, n: 30, kills: 5 }]);

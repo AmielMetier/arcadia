@@ -25,6 +25,8 @@ const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 // équipes : à terre, on rampe (CRAWL × la vitesse) et sa réserve (DOWN_HP) fond en BLEED s ; un coéquipier immobile à
 // moins de REVIVE_R m le relève en REVIVE s (E), avec RAISE_HP points de vie
 export const CRAWL = 0.35, DOWN_HP = 100, BLEED = 30, REVIVE = 5, REVIVE_R = 2.4, RAISE_HP = 30;
+// repères d'équipe : un par joueur, visible PING_T secondes par ses coéquipiers ; sortes : ici, ennemi, butin, largage
+export const PING_T = 12, PING_KINDS = ['ici', 'ennemi', 'butin', 'largage'];
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
@@ -34,7 +36,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   const rng = makeRng(hash(seed * 31 + 7));
   const TEAMS = mode !== 'exploration' && teams > 1;
   const S = {
-    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null,
+    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null, pings: new Map(),
     players: new Map(), items: new Map(), nextItem: 1, chests: new Map(), projectiles: [], pads: [], nextProj: 1,
     flight: null, storm: null, order: [], winner: null, events: [], hooks: {}, stormTick: 0,
   };
@@ -651,6 +653,16 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     stepStorm(dt);
     if (S.hooks.step) S.hooks.step(dt);
   }
+  // repère d'équipe (le dernier de chaque joueur compte) ; what : ce qu'il désigne (« Fusil d'assaut épique »…)
+  function ping(P, kind, x, y, z, target = null, what = '') {
+    if (!P || !P.alive || !PING_KINDS.includes(kind) || ![x, y, z].every(Number.isFinite)) return false;
+    const last = S.pings.get(P.id);
+    if (last && S.t - last.t < 0.35) return false; // pas de rafale
+    const pg = { p: P.id, team: P.team, kind, x, y, z, target: target ?? null, what: String(what || '').slice(0, 40), t: S.t };
+    S.pings.set(P.id, pg);
+    ev({ e: 'repere', ...pg });
+    return true;
+  }
   // relever un coéquipier : rester à côté, immobile, sans tirer, REVIVE secondes
   function stepRevive(P, dt) {
     const Q = S.players.get(P.revive.id);
@@ -667,7 +679,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function takeEvents() { const e = S.events; S.events = []; return e; }
 
   return {
-    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates,
+    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates, ping,
     player: (id) => S.players.get(id),
   };
 }

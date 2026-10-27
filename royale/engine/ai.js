@@ -8,6 +8,7 @@ import { makeRng, hash } from './rng.js';
 import { WEAPONS, ITEMS } from './items.js';
 import { COST } from './build.js';
 import { STORM_TIMES } from './map.js';
+import { PING_T } from './sim.js';
 
 export const LEVELS = {
   facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35, wall: 0.25 },
@@ -283,7 +284,10 @@ export function createAI(sim, map, world) {
       if (h.t >= L - 0.5) { if ((B.enemy === Q.id && !Q.down) || wants(P, B, Q, c.hurt)) { seen = c; break; } }
     }
     if (seen) {
-      if (B.enemy !== seen.Q.id) { B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; }
+      if (B.enemy !== seen.Q.id) {
+        B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0;
+        if (!seen.Q.down) callOut(P, B, seen.Q);
+      }
       B.visible = true; B.seenT = S.t; B.last = { x: seen.Q.x, y: seen.Q.y, z: seen.Q.z };
       return;
     }
@@ -330,6 +334,19 @@ export function createAI(sim, map, world) {
       }
       if (B.goal && B.goal.kind === 'chasse' && danger < 2) return;
     } else B.enemy = null;
+    // repère tout neuf d'un joueur de l'équipe : on y va (ici, largage), ou l'on s'occupe de l'ennemi désigné
+    const pg = S.teams > 1 ? humanPing(P) : null;
+    if (pg && pg.t > (B.pingSeen || -99) && danger < 2) {
+      B.pingSeen = pg.t;
+      const T = pg.kind === 'ennemi' && pg.target != null ? S.players.get(pg.target) : null;
+      if (T && T.alive && !sim.mates(P, T) && gun) {
+        B.enemy = T.id; B.last = { x: T.x, y: T.y, z: T.z }; B.seenT = S.t; B.react = B.lv.react[1];
+        B.state = 'go'; setGoal(P, B, { kind: 'chasse', id: T.id, x: T.x, z: T.z, r: 4 });
+        return;
+      }
+      if (pg.kind === 'ici' || pg.kind === 'largage') { B.state = 'go'; setGoal(P, B, { kind: 'repere', id: null, x: pg.x, z: pg.z, r: 5 }); return; }
+    }
+    if (B.goal && B.goal.kind === 'repere' && S.t - B.goal.since < 25 && danger < 2) return;
     // équipes : on ne laisse pas son chef derrière (la tempête ne passe devant que si on y est déjà)
     const L = leaderOf(P, B);
     if (L && L.alive && L.mode === 'sol' && danger < 2 && Math.hypot(L.x - P.x, L.z - P.z) > 35) {
@@ -558,6 +575,25 @@ export function createAI(sim, map, world) {
     return ml > 0.1 ? { x: mx / ml, z: mz / ml, k: Math.min(1, ml) } : null;
   }
 
+  // repères : le dernier repère encore frais d'un joueur (humain) de l'équipe
+  function humanPing(P) {
+    let best = null;
+    for (const pg of S.pings.values()) {
+      if (pg.team !== P.team || pg.p === P.id || S.t - pg.t > PING_T) continue;
+      const Q = S.players.get(pg.p);
+      if (Q && !Q.bot && (!best || pg.t > best.t)) best = pg;
+    }
+    return best;
+  }
+  // un bot dont l'équipe compte un joueur lui signale l'ennemi qu'il voit (pas plus d'une fois par 15 s, et pas un
+  // ennemi qu'un coéquipier vient de signaler)
+  function callOut(P, B, Q) {
+    if (S.teams <= 1 || P.team == null || S.t - (B.pingT || -99) < 15) return;
+    if (B.withHuman === undefined) B.withHuman = [...S.players.values()].some((q) => !q.bot && q.team === P.team);
+    if (!B.withHuman) return;
+    for (const pg of S.pings.values()) if (pg.team === P.team && pg.target === Q.id && S.t - pg.t < 8) return;
+    if (sim.ping(P, 'ennemi', Q.x, Q.y + 1.3, Q.z, Q.id)) B.pingT = S.t;
+  }
   // chef d'équipe : le joueur de l'équipe (le premier), sinon le premier bot ; null pour le chef lui-même et en solo
   function leaderOf(P, B) {
     if (S.teams <= 1 || P.team == null) return null;

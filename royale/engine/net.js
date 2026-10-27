@@ -91,6 +91,7 @@ export function mirrorEvent(sim, world, build, e) {
     case 'tremplin': if (!S.pads.some((p) => p.id === e.id)) S.pads.push({ id: e.id, x: e.x, y: e.y, z: e.z, t: 0 }); S.nextProj = Math.max(S.nextProj, e.id + 1); break;
     case 'elim': { const p = S.players.get(e.to); if (p) { p.alive = false; p.place = e.place; p.hp = 0; } if (!S.order.includes(e.to)) S.order.push(e.to); break; }
     case 'fin': S.phase = 'fin'; S.winner = e.winner; S.winTeam = e.team ?? null; break;
+    case 'repere': S.pings.set(e.p, { p: e.p, team: e.team, kind: e.kind, x: e.x, y: e.y, z: e.z, target: e.target, what: e.what, t: e.t }); break;
     default: break;
   }
 }

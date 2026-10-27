@@ -246,6 +246,9 @@ export function createSound() {
       case 'construit': noise(o, t, 0.08, { type: 'bandpass', f0: 520, q: 1.4, v: 0.5 }); noise(o, t + 0.11, 0.08, { type: 'bandpass', f0: 600, q: 1.4, v: 0.45 }); break;
       case 'casse': noise(o, t, 0.6, { f0: 1500, f1: 120, v: 0.65 }); for (let i = 0; i < 4; i++) noise(o, t + 0.05 + Math.random() * 0.3, 0.05, { type: 'bandpass', f0: 800 + Math.random() * 1500, v: 0.3 }); break;
       case 'clic': noise(o, t, 0.03, { type: 'bandpass', f0: 2200, v: 0.2 }); break;
+      // repère d'équipe : deux notes claires ; largage annoncé : appel de cor qui monte
+      case 'repere': tone(o, t, 0.12, { type: 'triangle', f0: 1175, v: 0.22 }); tone(o, t + 0.09, 0.2, { type: 'triangle', f0: 1568, v: 0.2 }); break;
+      case 'largage': [392, 523, 659].forEach((f, i) => tone(o, t + i * 0.16, 0.42, { type: 'sawtooth', f0: f, f1: f * 1.01, v: 0.09 })); tone(o, t + 0.48, 0.7, { type: 'triangle', f0: 784, v: 0.18 }); break;
       // brûleur de la montgolfière : souffle grave qui rugit
       case 'bruleur': noise(o, t, 1.5, { type: 'bandpass', f0: 380, f1: 300, q: 0.6, a: 0.12, v: 0.7 }); noise(o, t, 1.5, { f0: 260, f1: 180, a: 0.15, v: 0.9, buf: brown }); break;
       default: break;

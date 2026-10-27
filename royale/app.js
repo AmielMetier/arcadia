@@ -7,7 +7,7 @@
 import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
-import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP } from './engine/sim.js';
+import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP, PING_T } from './engine/sim.js';
 import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
@@ -113,7 +113,7 @@ async function boot(info) {
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
-  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel });
+  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel, ping: () => { if (S.input.playing) sendPing(); } });
   loadOpts();
   try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
@@ -169,7 +169,7 @@ function resetMatch() {
   S.world = buildWorld(S.map);
   S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
   S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
-  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.prompt('');
+  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt('');
   $('#hud').hidden = true; $('#feed').innerHTML = '';
 }
 const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
@@ -230,6 +230,7 @@ function onKey(code, key) {
   if (key === 'e') S.cnt.use++;
   else if (key === 'r') S.cnt.reload++;
   else if (key === 'g') S.cnt.drop++;
+  else if (key === 'b') sendPing();
   // construction : F mur, V sol, C escalier (encore une fois pour sortir), T matériau
   else if (key === 'f' || key === 'v' || key === 'c') { const k = { f: 'mur', v: 'sol', c: 'escalier' }[key]; S.build = S.build === k ? null : k; buildBar(); S.sfx.play('clic'); }
   else if (key === 't') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
@@ -332,7 +333,9 @@ function loop(now) {
   if (focusP) {
     const fp = disp(focusP);
     const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
-    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }));
+    const pg = pingsOf(focusP, fp, view);
+    S.hud.pings(pg);
+    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), pg.map((m) => ({ x: m.x, z: m.z, color: m.color })));
     const rv = focusP.revive && S.sim.player(focusP.revive.id);
     S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat, revive: rv ? { f: focusP.revive.t / REVIVE, name: rv.name } : null });
     if ((S.tick3 = (S.tick3 || 0) + 1) % 5 === 0) S.hud.team(team.map((Q) => ({ id: Q.id, name: Q.name, color: Q.color, hp: Q.hp, sh: Q.sh, down: Q.down ? Q.down.hp : null, alive: Q.alive })));
@@ -551,6 +554,9 @@ function onMsg(from, m) {
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
       else H.send(from, { t: 'salon', picks: [...S.picks] });
+    } else if (m.t === 'repere' && S.sim) {
+      const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
+      if (P && !P.bot) S.sim.ping(P, String(m.kind), +m.x, +m.y, +m.z, m.target != null && S.sim.player(m.target) ? m.target : null, String(m.what || ''));
     } else if (m.t === 'i' && S.sim) {
       const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
       if (!P || P.bot) return;
@@ -758,6 +764,7 @@ function handleEvents(list) {
         break;
       }
       case 'releve…': if (e.p === S.me) S.sfx.play('bandage'); break;
+      case 'repere': { const Q = P && S.sim.player(e.p); if (Q && (e.p === S.me || S.sim.mates(P, Q))) S.sfx.play('repere'); break; }
       case 'releve-': if (e.p === S.me) toast('Relevé interrompu : il faut rester à côté sans bouger ni tirer', 2.5); break;
       case 'boum': {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
@@ -915,6 +922,54 @@ function teamPicker() {
   return `<h2>Ton équipe · ${TEAM_LABEL[size]}</h2><div class="teams">${cards}</div><p class="hint">${loose.length ? `Pas encore choisi : ${loose.map((h) => esc(h.name)).join(', ')} (réparti${loose.length > 1 ? 's' : ''} au lancement). ` : ''}Les places libres sont prises par des bots coéquipiers.</p>`;
 }
 // un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
+// ------------------------------------------------------------------ repères d'équipe
+// ce que vise le réticule : un ennemi près du rayon (avant le premier obstacle), sinon, au point visé, un largage, le
+// butin le plus rare, un coffre fermé, ou simplement l'endroit (« Ici »)
+function aimPing() {
+  const P = me();
+  if (!P || !P.alive || P.mode === 'ballon') return null;
+  const c = S.cam, cp = Math.cos(S.pitch), d = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
+  const hit = S.world.raycast(c.x, c.y, c.z, d[0], d[1], d[2], 400), L = hit.t < 400 ? hit.t : null;
+  let foe = null, fd = Infinity;
+  for (const Q of S.sim.S.players.values()) {
+    if (Q === P || !Q.alive || Q.mode === 'ballon' || S.sim.mates(P, Q)) continue;
+    const ox = Q.x - c.x, oy = Q.y + 1 - c.y, oz = Q.z - c.z, t = ox * d[0] + oy * d[1] + oz * d[2];
+    if (t < 0 || t > 400 || (L != null && t > L + 1)) continue;
+    const off = Math.hypot(ox - d[0] * t, oy - d[1] * t, oz - d[2] * t);
+    if (off < Math.max(1.3, t * 0.025) && t < fd) { fd = t; foe = Q; }
+  }
+  if (foe) return { kind: 'ennemi', x: foe.x, y: foe.y + 1.3, z: foe.z, target: foe.id };
+  if (L == null) return null;
+  const x = c.x + d[0] * L, y = c.y + d[1] * L, z = c.z + d[2] * L, SS = S.sim.S;
+  for (const dr of (SS.drops || new Map()).values()) if (!dr.open && Math.hypot(dr.x - x, dr.z - z) < 5) return { kind: 'largage', x: dr.x, y: dr.gy + 1.6, z: dr.z, what: 'Largage' };
+  let g = null;
+  for (const it of SS.items.values()) if ((it.it.t === 'arme' || it.it.t === 'objet') && Math.hypot(it.x - x, it.z - z) < 2.5 && Math.abs(it.y - y) < 2.5 && (!g || it.it.r > g.it.r)) g = it;
+  if (g) return { kind: 'butin', x: g.x, y: g.y + 0.9, z: g.z, what: itemLabel(g.it) };
+  for (const ch of SS.chests.values()) if (!ch.open && Math.hypot(ch.x - x, ch.z - z) < 3 && Math.abs(ch.y - y) < 2.5) return { kind: 'butin', x: ch.x, y: ch.y + 1.1, z: ch.z, what: ch.kind === 'coffre' ? 'Coffre' : 'Caisse de munitions' };
+  return { kind: 'ici', x, y: y + 0.3, z };
+}
+function sendPing() {
+  const pg = aimPing();
+  if (!pg) return;
+  if (S.role === 'guest') H.send('host', { t: 'repere', ...pg });
+  else S.sim.ping(me(), pg.kind, pg.x, pg.y, pg.z, pg.target, pg.what);
+}
+// repères visibles par le joueur suivi : les siens et (en équipe) ceux de ses coéquipiers, encore frais
+const PING_LABEL = { ici: 'Ici', ennemi: 'Ennemi', butin: 'Butin', largage: 'Largage' };
+function pingsOf(F, fp, view) {
+  const SS = S.sim.S, out = [];
+  const camYaw = view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw;
+  for (const pg of SS.pings.values()) {
+    const age = SS.t - pg.t, Q = SS.players.get(pg.p);
+    if (age > PING_T || !Q || !(pg.p === F.id || (SS.teams > 1 && pg.team === F.team))) continue;
+    const color = pg.kind === 'ennemi' ? '#ff5a4a' : pg.kind === 'largage' ? '#b77dff' : pg.kind === 'butin' ? '#ffc531' : Q.color || '#ffd23f';
+    const dist = Math.round(Math.hypot(pg.x - fp.x, pg.z - fp.z));
+    out.push({ key: pg.p, x: pg.x, y: pg.y, z: pg.z, color, label: pg.what || PING_LABEL[pg.kind] || 'Ici',
+      sub: `${pg.p === F.id ? '' : Q.name + ' · '}${dist} m`, fade: Math.min(1, (PING_T - age) / 2),
+      rel: Math.atan2(pg.x - view.pos.x, pg.z - view.pos.z) - camYaw });
+  }
+  return out;
+}
 // historique des parties de ce navigateur (niveau « Auto ») ; niveau moyen des joueurs du salon
 function loadHist() { try { const h = JSON.parse(localStorage.getItem('royale_hist') || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } }
 function saveHist(r) {
@@ -929,7 +984,7 @@ function roomSkill() {
   return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
 }
 function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
-const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
+const KEYS = `<div class="keylist"><span><kbd>B</kbd> ou <kbd>Clic molette</kbd> repère pour l'équipe</span><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
   <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
   <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;

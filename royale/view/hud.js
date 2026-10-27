@@ -77,7 +77,15 @@ export function createHud(map, { onTeleport, project } = {}) {
   };
 
   // ------------------------------------------------------------------ cartes
-  let mates = [];
+  let mates = [], marks = [];
+  // repères et largages : un losange de leur couleur
+  const markDots = (ctx, cx, cz, s, W, H) => {
+    for (const m of marks) {
+      const x = Math.max(6, Math.min(W - 6, (m.x - cx) * s + W / 2)), y = Math.max(6, Math.min(H - 6, (m.z - cz) * s + H / 2)), r = m.big ? 7 : 5.5;
+      ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+      ctx.fillStyle = m.color; ctx.strokeStyle = '#16181d'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+    }
+  };
   const mateDots = (ctx, cx, cz, s, W, H) => {
     for (const m of mates) {
       const x = (m.x - cx) * s + W / 2, y = (m.z - cz) * s + H / 2;
@@ -86,14 +94,15 @@ export function createHud(map, { onTeleport, project } = {}) {
       ctx.fillStyle = m.down ? '#ff5a4a' : m.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
     }
   };
-  function maps(t, p, yaw, frameMs, team = []) {
-    mates = team;
+  function maps(t, p, yaw, frameMs, team = [], mk = []) {
+    mates = team; marks = mk;
     if (t - last > 0.12) {
       last = t;
       const W = mini.clientWidth, H = mini.clientHeight, d = dpr();
       if (mini.width !== Math.round(W * d)) { mini.width = Math.round(W * d); mini.height = Math.round(H * d); }
       drawMap(mctx, map, img, { x: p.x, z: p.z, s: MINI_S, w: W, h: H, dpr: d }, mapOpts(LAY_MINI));
       mctx.setTransform(d, 0, 0, d, 0, 0);
+      markDots(mctx, p.x, p.z, MINI_S, W, H);
       mateDots(mctx, p.x, p.z, MINI_S, W, H);
       arrow(mctx, W / 2, H / 2, yaw);
       const poi = map.poiAt(p.x, p.z);
@@ -108,6 +117,7 @@ export function createHud(map, { onTeleport, project } = {}) {
     if (!bigView) bigView = { x: map.center, z: map.center, s: Math.min(W, H) / (map.stats.spanM + 120) };
     drawMap(bctx, map, img, { ...bigView, w: W, h: H, dpr: d }, mapOpts(LAY_BIG));
     bctx.setTransform(d, 0, 0, d, 0, 0);
+    markDots(bctx, bigView.x, bigView.z, bigView.s, W, H);
     mateDots(bctx, bigView.x, bigView.z, bigView.s, W, H);
     arrow(bctx, (p.x - bigView.x) * bigView.s + W / 2, (p.z - bigView.z) * bigView.s + H / 2, yaw, 12);
   }
@@ -216,6 +226,27 @@ export function createHud(map, { onTeleport, project } = {}) {
       seen.add(m.id);
     }
     for (const [id, el] of tagEls) el.hidden = !seen.has(id);
+  }
+  // repères à l'écran : [{ key, x, y, z, label, sub, color, fade (0-1), rel (angle par rapport au regard) }] ;
+  // hors champ, ils se collent au bord, du côté où il faut se tourner
+  const pingsEl = $('#pings'), pingEls = new Map();
+  function pings(list) {
+    const seen = new Set(), W = pingsEl.clientWidth, H = pingsEl.clientHeight;
+    for (const m of list) {
+      let el = pingEls.get(m.key);
+      if (!el) { el = document.createElement('div'); el.className = 'ping'; pingsEl.appendChild(el); pingEls.set(m.key, el); }
+      const html = `<i></i><b>${esc(m.label)}</b><small>${esc(m.sub)}</small>`;
+      if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+      const q = project(m.x, m.y, m.z);
+      let x = q.x, y = q.y;
+      const edge = !q.on;
+      if (edge) { x = W / 2 + Math.sin(m.rel) * W * 0.46; y = H / 2 - Math.cos(m.rel) * H * 0.42; }
+      el.classList.toggle('edge', edge);
+      el.style.setProperty('--c', m.color); el.style.opacity = m.fade.toFixed(2);
+      el.style.left = Math.max(30, Math.min(W - 30, x)).toFixed(0) + 'px'; el.style.top = Math.max(40, Math.min(H - 30, y)).toFixed(0) + 'px';
+      seen.add(m.key);
+    }
+    for (const [k, el] of pingEls) if (!seen.has(k)) { el.remove(); pingEls.delete(k); }
   }
   // à terre : ce qu'il reste (secondes) et, si un coéquipier relève, où il en est
   function downed(st) {
@@ -369,7 +400,7 @@ export function createHud(map, { onTeleport, project } = {}) {
     clearTimeout(gainT); gainT = setTimeout(() => { el.className = 'gain'; }, 700);
   }
   return {
-    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain, team, tags, downed,
+    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain, team, tags, downed, pings,
     get mapOpen() { return !big.hidden; },
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },
