@@ -209,7 +209,7 @@ export function buildWorld(map) {
   for (const br of map.bridges) {
     const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
     const cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
-    add({ t: 2, cx, cz, ux, uz, hx: L / 2 + 2, hz: br.hw, y0: br.y - 0.6, y1: br.y + 0.05, ref: { part: 'pont' } });
+    add({ t: 2, cx, cz, ux, uz, hx: L / 2 + 0.5, hz: br.hw, y0: br.y - 0.6, y1: br.y + 0.05, ref: { part: 'pont' } });
     for (const sd of [-1, 1]) add({ t: 2, cx: cx - uz * sd * (br.hw + 0.1), cz: cz + ux * sd * (br.hw + 0.1), ux, uz, hx: L / 2, hz: 0.12, y0: br.y, y1: br.y + 1.0, ref: { part: 'rambarde' } });
   }
   for (const d of map.docks) box(d.x0, -2, d.z0, d.x1, 1.2, d.z1, { part: 'quai' });
@@ -262,6 +262,13 @@ export function buildWorld(map) {
     const k = Math.min(GN - 1, Math.max(0, Math.floor(z / G))) * GN + Math.min(GN - 1, Math.max(0, Math.floor(x / G)));
     for (const r of rgrid[k]) { const y = rampY(r, x, z); if (y != null && y <= maxY && y > best) best = y; }
     return best;
+  }
+  // pente du relief (dh/dx, dh/dz) sous des pieds à la hauteur y ; null si l'on se tient sur autre chose (plancher,
+  // construction, pont, toit) : seul le terrain naturel fait glisser
+  function slope(x, z, y) {
+    const h = map.heightAt(x, z);
+    if (y - h > 0.08) return null;
+    return [(map.heightAt(x + 0.6, z) - map.heightAt(x - 0.6, z)) / 1.2, (map.heightAt(x, z + 0.6) - map.heightAt(x, z - 0.6)) / 1.2];
   }
   // plafond le plus bas au-dessus de minY en (x, z)
   function ceiling(x, z, minY, m = 0.2) {
@@ -441,7 +448,7 @@ export function buildWorld(map) {
     return best;
   }
 
-  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
+  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, slope, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)

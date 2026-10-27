@@ -15,6 +15,7 @@ export const SLOTS = 5;
 export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon de tir part de là, comme celui de la caméra)
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
+const FALL_SAFE = 8;               // m de chute sans dégâts
 const STORM_START = 30;           // s après le départ de la montgolfière
 const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 
@@ -530,7 +531,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {
-        if (P.fall > 14 && !P.safeFall) damage(P, (P.fall - 14) * 6.5, null, { cause: 'chute' });
+        // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
+        const h = P.fall * P.fall / (2 * MOVE.g);
+        if (h > FALL_SAFE && !P.safeFall) damage(P, (h - FALL_SAFE) * 7, null, { cause: 'chute' });
         P.safeFall = false; P.fall = 0;
       }
       // tombé hors de l'île ou sous la mer : on remonte au bord (sécurité)

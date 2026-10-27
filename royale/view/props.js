@@ -345,7 +345,7 @@ export async function buildProps(map, { base, kit: toon = null }) {
   const stone = new THREE.MeshStandardMaterial({ color: 0xb7aa92, roughness: 0.9 }); own.push(stone);
   const wood = new THREE.MeshStandardMaterial({ color: 0x9a6c42, roughness: 0.85 }); own.push(wood);
   for (const br of map.bridges) {
-    const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) + 4, rot = Math.atan2(dx, dz), cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
+    const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) + 1, rot = Math.atan2(dx, dz), cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
     const g = new THREE.Group(); g.position.set(cx, br.y, cz); g.rotation.y = rot;
     const deck = new THREE.Mesh(new THREE.BoxGeometry(br.hw * 2 + 0.6, 0.6, L).translate(0, -0.32, 0), stone);
     g.add(deck);
