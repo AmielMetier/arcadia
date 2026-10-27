@@ -12,6 +12,10 @@
   - Les balles qui frôlent sifflent, les impacts sonnent selon la matière (bois, pierre, métal), le bouclier qui casse s'entend.
   - Écho de pièce à l'intérieur, écho du relief dehors ; vraies explosions, portes qui grincent.
   - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas.
+- **Island Rush** — Les combats se sentent : la vue recule à chaque tir (fort au fusil à pompe et au fusil de précision), la flamme de bouche éclaire autour, l'image tremble quand on est touché.
+  - Touches plus lisibles : marqueur qui claque (rouge à l'élimination), chiffres de dégâts plus gros qui s'écartent, arc rouge plus net du côté d'où l'on te tire dessus.
+  - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
+- **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 
 ## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.

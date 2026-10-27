@@ -254,25 +254,29 @@ export function createHud(map, { onTeleport, project } = {}) {
   }
   let hitT = 0;
   function hitMarker(head, kill) {
+    // on relance l'animation à chaque touche
+    hit.className = 'hitm'; void hit.offsetWidth;
     hit.className = 'hitm on' + (head ? ' head' : '') + (kill ? ' kill' : '');
-    clearTimeout(hitT); hitT = setTimeout(() => { hit.className = 'hitm'; }, 160);
+    clearTimeout(hitT); hitT = setTimeout(() => { hit.className = 'hitm'; }, kill ? 420 : 200);
   }
   const floating = [];
   function damageNumber(x, y, z, n, head, shield) {
     const el = document.createElement('div');
-    el.className = 'dn' + (head ? ' head' : '') + (shield ? ' sh' : '');
+    el.className = 'dn' + (head ? ' head' : '') + (shield ? ' sh' : '') + (n >= 50 ? ' big' : '');
     el.textContent = n;
     nums.appendChild(el);
-    floating.push({ el, x, y, z, t: 0, dx: (Math.random() - 0.5) * 30 });
+    // les chiffres s'écartent en arc de part et d'autre de la cible
+    const side = Math.random() < 0.5 ? -1 : 1;
+    floating.push({ el, x, y, z, t: 0, dx: side * (18 + Math.random() * 30), up: 40 + Math.random() * 25 });
   }
   let hurtT = 0;
-  function hurtFrom(angle) {
+  function hurtFrom(angle, n = 20) {
     // angle : direction du tireur par rapport au regard (0 = devant), en radians ; null : sans direction (tempête, chute)
     if (angle != null) {
-      const el = document.createElement('div'); el.className = 'arc';
+      const el = document.createElement('div'); el.className = 'arc' + (n >= 40 ? ' hard' : '');
       el.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
       dir.appendChild(el);
-      setTimeout(() => el.remove(), 900);
+      setTimeout(() => el.remove(), 1200);
     }
     hurtEl.className = 'hurt on';
     clearTimeout(hurtT); hurtT = setTimeout(() => { hurtEl.className = 'hurt'; }, 60);
@@ -285,10 +289,10 @@ export function createHud(map, { onTeleport, project } = {}) {
   function frame(dt) {
     for (let i = floating.length - 1; i >= 0; i--) {
       const f = floating[i]; f.t += dt;
-      if (f.t > 0.9) { f.el.remove(); floating.splice(i, 1); continue; }
-      const p = project(f.x, f.y + f.t * 1.2, f.z);
-      f.el.style.opacity = p.on ? String(Math.min(1, (0.9 - f.t) * 3)) : '0';
-      f.el.style.transform = `translate(${p.x + f.dx}px, ${p.y}px) translate(-50%, -50%) scale(${1 + Math.max(0, 0.15 - f.t) * 3})`;
+      if (f.t > 1.1) { f.el.remove(); floating.splice(i, 1); continue; }
+      const p = project(f.x, f.y, f.z), k = Math.min(1, f.t / 0.35), ease = 1 - (1 - k) * (1 - k);
+      f.el.style.opacity = p.on ? String(Math.min(1, (1.1 - f.t) * 3)) : '0';
+      f.el.style.transform = `translate(${p.x + f.dx * ease}px, ${p.y - f.up * ease - f.t * 18}px) translate(-50%, -50%) scale(${1 + Math.max(0, 0.12 - f.t) * 6})`;
     }
   }
   // viseur : écart selon la dispersion ; lunette pour le fusil de précision

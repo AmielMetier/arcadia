@@ -42,6 +42,8 @@ const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'he
 const FLOOR_SURF = { immeuble: 'carrelage', tour: 'carrelage', boutique: 'carrelage', mairie: 'carrelage', bureaux: 'carrelage', station: 'carrelage',
   garage: 'beton', hangar: 'beton', phare: 'beton', abri: 'metal' };
 const MAT_SURF = { bois: 'bois', pierre: 'beton', metal: 'metal' };
+// recul de chaque arme : [saut de la vue vers le haut (rad), écart de côté, secousse]
+const KICK = { fusil: [0.011, 0.006, 0.05], smg: [0.007, 0.006, 0.03], pistolet: [0.016, 0.005, 0.04], pompe: [0.05, 0.012, 0.28], sniper: [0.075, 0.01, 0.32], roquette: [0.045, 0.01, 0.35] };
 const INTERP = 0.1;          // invités : les autres sont dessinés un dixième de seconde en arrière
 const HOST_SILENCE = 3, HOST_GIVEUP = 15;
 const MATS = ['bois', 'pierre', 'metal'];
@@ -416,7 +418,9 @@ function cameraFor(P, disp, dt) {
   }
   if (!target) { const C = S.map.center; return { pos: { x: C, y: 200, z: C + 300 }, look: { x: C, y: 0, z: C }, focus: { x: C, y: 0, z: C } }; }
   const d = disp(target);
-  const yaw = target === P ? S.yaw : d.yaw, pitch = target === P ? S.pitch : clamp(target.pitch || 0, -0.6, 0.6);
+  // le recul retombe vite (il ne touche que la vue, pas la visée)
+  S.kick = (S.kick || 0) * Math.exp(-11 * dt); S.kickYaw = (S.kickYaw || 0) * Math.exp(-13 * dt);
+  const yaw = target === P ? S.yaw + S.kickYaw : d.yaw, pitch = target === P ? S.pitch + S.kick : clamp(target.pitch || 0, -0.6, 0.6);
   const cp = Math.cos(pitch), fx = Math.sin(yaw) * cp, fy = Math.sin(pitch), fz = Math.cos(yaw) * cp;
   const rx = -Math.cos(yaw), rz = Math.sin(yaw);
   let dist = S.camD, sh = SHOULDER, headY;
@@ -621,9 +625,11 @@ function handleEvents(list) {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
         if (h && Q) {
           h.shot();
-          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); }
+          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
+        // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
+        if (e.p === S.me) { const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
         break;
       }
       case 'tir': {
@@ -636,6 +642,7 @@ function handleEvents(list) {
         break;
       }
       case 'degat': {
+        S.fx.hitSpark(e.x, e.y - 0.2, e.z, e.head ? 'tete' : e.sh ? 'bouclier' : 'vie', e.n > 40 ? 12 : 7);
         if (e.by === S.me && e.to !== S.me) {
           const Q = S.sim.player(e.to);
           S.hud.hitMarker(e.head, Q && !Q.alive);
@@ -645,7 +652,8 @@ function handleEvents(list) {
         }
         if (e.to === S.me) {
           const A = e.by != null ? S.sim.player(e.by) : null;
-          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null);
+          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null, e.n);
+          S.shake = Math.max(S.shake, Math.min(0.5, 0.12 + e.n / 120));
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
         }
         break;
