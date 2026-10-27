@@ -15,7 +15,7 @@ const Sfx = (() => {
   let ctx = null, musicTimer = null;
   let stepIdx = 0, nextNoteTime = 0, noiseBuf = null, masterComp = null;
   let masterGain = null, musicBus = null, sfxBus = null;
-  let lastMineSound = 0, lastShotSound = 0, lastBoomSound = 0;
+  let lastMineSound = 0, nextMineGap = 0, lastShotSound = 0, lastBoomSound = 0;
   let combatUntil = 0, musicMode = 'calm', pendingMode = 'calm';
 
   function applyGains() {
@@ -698,26 +698,14 @@ const Sfx = (() => {
       o.start(t); o.stop(t + 0.45);
     },
 
-    // Récolte de minéraux / étincelle de soudure VCS : crépitement laser discret
+    // Récolte de minéraux / soudure des VCS : un petit « tic » cristallin, doux et espacé d'une à deux secondes.
+    // Il revient pendant toute la partie : en crépitement aigu sept fois par seconde, il devenait vite insupportable
     mine() {
       const now = performance.now();
-      if (now - lastMineSound < 130) return;
+      if (now - lastMineSound < nextMineGap) return;
       lastMineSound = now;
-      const c = ensure(); if (!c) return;
-      const t = c.currentTime;
-      if (noiseBuf) {
-        const src = c.createBufferSource();
-        src.buffer = noiseBuf;
-        const flt = c.createBiquadFilter(), g = c.createGain();
-        flt.type = 'bandpass';
-        flt.frequency.setValueAtTime(2900 + Math.random() * 400, t);
-        flt.Q.setValueAtTime(3.0, t);
-        g.gain.setValueAtTime(0.045, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-        src.connect(flt); flt.connect(g); g.connect(dest());
-        src.start(t); src.stop(t + 0.045);
-      }
-      tone(1350 + Math.random() * 150, 0.035, 'triangle', 0.03, -150);
+      nextMineGap = 1100 + Math.random() * 900;
+      tone(660 + Math.random() * 180, 0.09, 'sine', 0.016, -40);
     },
 
     // Action impossible / Ravitaillement bloqué : double buzzer grave feutré

@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.93 — 27 octobre 2026
+- **Bastion Clash** — Les combats ne font plus ramer le jeu.
+  - Le premier gros affrontement de la partie ne fige plus l'écran une demi-seconde, et les batailles suivantes restent fluides : les tirs, explosions et étincelles coûtent environ cinq fois moins cher à afficher.
+  - Les éclairs des explosions sont devenus des halos de lumière au sol, aussi visibles qu'avant.
+- **Bastion Clash** — Le bruit des VCS qui récoltent est beaucoup plus discret : un petit tintement doux toutes les une à deux secondes au lieu d'un crépitement aigu en continu.
+
+## 2.89 — 27 octobre 2026
 ## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.
   - Le pistolet se tient à deux mains, le lance-roquettes à l'épaule ; le fusil à pompe ne pointe plus vers le ciel, en main comme au sol.
