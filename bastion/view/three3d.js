@@ -1273,6 +1273,91 @@ function createUnitMesh3D(kind, color) {
   return grp;
 }
 
+/* ---------- Effets de combat ----------
+   Tirs et particules : un seul maillage « instancié » (une sphère répétée, une couleur par exemplaire), dessiné en un
+   seul appel. Ondes de choc, rayons et éclairs : des maillages gardés d'une image à l'autre et simplement replacés.
+   Aucun n'est éclairé (ils brillent par eux-mêmes). Avant, chaque effet devenait à chaque image un nouvel objet 3D
+   éclairé : des centaines en plein combat, et autant d'appels de dessin. */
+const FX_ORBS_MAX = 900;
+let fxOrbsMesh3D = null, fxPoolState3D = null;
+const fxDummy3D = window.THREE ? new THREE.Object3D() : null;
+const fxColor3D = window.THREE ? new THREE.Color() : null;
+function fxOrbs3D() {
+  if (fxOrbsMesh3D) return fxOrbsMesh3D;
+  const m = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), FX_ORBS_MAX);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.setColorAt(0, fxColor3D.set(0xffffff)); // crée le tampon des couleurs par exemplaire
+  m.frustumCulled = false; // les exemplaires sont partout sur la carte, pas autour de l'origine du maillage
+  m.count = 0;
+  fxGroup3D.add(m);
+  fxOrbsMesh3D = m;
+  return m;
+}
+function setFxOrb3D(m, i, x, y, z, r, color) {
+  fxDummy3D.position.set(x, y, z);
+  fxDummy3D.scale.setScalar(r);
+  fxDummy3D.updateMatrix();
+  m.setMatrixAt(i, fxDummy3D.matrix);
+  m.setColorAt(i, fxColor3D.set(color));
+}
+// Matières sans éclairage, partagées par couleur et opacité (arrondie au 1/20)
+const fxMatCache3D = new Map();
+function fxMat3D(color, opacity, additive) {
+  opacity = Math.round(clamp(opacity, 0, 1) * 20) / 20;
+  const key = `${color}|${opacity}|${additive ? 1 : 0}`;
+  let m = fxMatCache3D.get(key);
+  if (!m) {
+    m = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(color), transparent: additive || opacity < 1, opacity, depthWrite: !additive && opacity >= 1,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, map: additive ? fxFlashTexture3D() : null,
+    });
+    m.userData.shared = true;
+    fxMatCache3D.set(key, m);
+  }
+  return m;
+}
+let fxFlashTex3D = null;
+function fxFlashTexture3D() {
+  if (fxFlashTex3D) return fxFlashTex3D;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  fxFlashTex3D = new THREE.CanvasTexture(c);
+  return fxFlashTex3D;
+}
+// Réserve de maillages par sorte : take() en sort un (créé au besoin), done() cache ceux qui n'ont pas servi
+function fxPool3D() {
+  if (!fxPoolState3D) {
+    const geos = {
+      ring: new THREE.RingGeometry(0.86, 1.0, 24),
+      beam: new THREE.CylinderGeometry(1, 1, 1, 6),
+      flash: new THREE.PlaneGeometry(1, 1),
+    };
+    const lists = { ring: [], beam: [], flash: [] }, used = { ring: 0, beam: 0, flash: 0 };
+    fxPoolState3D = {
+      take(kind, color, opacity) {
+        let m = lists[kind][used[kind]];
+        if (!m) { m = new THREE.Mesh(geos[kind]); m.frustumCulled = false; fxGroup3D.add(m); lists[kind].push(m); }
+        used[kind]++;
+        m.material = fxMat3D(color, opacity, kind === 'flash');
+        m.quaternion.identity();
+        m.visible = true;
+        return m;
+      },
+      done() {
+        for (const kind in lists) {
+          for (let i = used[kind]; i < lists[kind].length; i++) lists[kind][i].visible = false;
+          used[kind] = 0;
+        }
+      },
+    };
+  }
+  return fxPoolState3D;
+}
+
 function syncAndRenderThree3D(dt, now, shX, shY) {
   if (!threeReady && !initThree3D()) return false;
   try {
@@ -1523,74 +1608,72 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
       ghostGroup3D.visible = false;
     }
 
-    // Projectiles, Rayons Tesla/Laser, Ondes de choc et Particules en 3D
-    while (fxGroup3D.children.length > 0) {
-      fxGroup3D.remove(fxGroup3D.children[0]);
-    }
-    if (!geoCache3D.proj) {
-      geoCache3D.proj = new THREE.SphereGeometry(1, 8, 8);
-      geoCache3D.ring = new THREE.RingGeometry(0.86, 1.0, 24);
-      geoCache3D.beamCyl = new THREE.CylinderGeometry(1, 1, 1, 6);
-    }
+    // Projectiles, Rayons Tesla/Laser, Ondes de choc, Particules et Éclairs en 3D (voir drawCombatFx3D)
+    let nOrb = 0;
+    const orbs = fxOrbs3D();
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const pr = projectiles[i];
       pr.prog += pr.speed * dt;
       if (pr.prog >= 1) { projectiles.splice(i, 1); continue; }
+      if (nOrb >= FX_ORBS_MAX) continue;
       const px = lerp(pr.x, pr.tx, pr.prog), py = lerp(pr.y, pr.ty, pr.prog);
       const arcH = lerp(heightAt(pr.x, pr.y), heightAt(pr.tx, pr.ty), pr.prog) + 14 + Math.sin(pr.prog * Math.PI) * 16;
-      const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(pr.color, 0.1, 0.1, pr.color, 0.95));
-      pm.position.set(px, arcH, py);
-      pm.scale.setScalar(pr.r * 1.15);
-      fxGroup3D.add(pm);
-    }
-    for (let i = shockwaves.length - 1; i >= 0; i--) {
-      const sw = shockwaves[i];
-      sw.life -= dt;
-      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
-      const u = 1 - sw.life / sw.maxLife;
-      const rad = lerp(sw.r, sw.maxR, u);
-      const rm = new THREE.Mesh(geoCache3D.ring, getMat3D(sw.color, 0.2, 0.1, sw.color, 0.85, 1 - u));
-      rm.rotation.x = -Math.PI / 2;
-      rm.position.set(sw.x, heightAt(sw.x, sw.y) + 3.5, sw.y);
-      rm.scale.setScalar(rad);
-      fxGroup3D.add(rm);
-    }
-    for (let i = beams.length - 1; i >= 0; i--) {
-      const bm = beams[i];
-      bm.life -= dt;
-      if (bm.life <= 0) { beams.splice(i, 1); continue; }
-      const d = hypot(bm.x1, bm.y1, bm.x2, bm.y2);
-      const beamMesh = new THREE.Mesh(
-        geoCache3D.beamCyl,
-        getMat3D(bm.color, 0.1, 0.1, bm.color, 0.95, clamp(bm.life / bm.maxLife, 0, 1))
-      );
-      beamMesh.scale.set(bm.w * 0.35, d, bm.w * 0.35);
-      beamMesh.position.set((bm.x1 + bm.x2) * 0.5, 22 + heightAt((bm.x1 + bm.x2) * 0.5, (bm.y1 + bm.y2) * 0.5), (bm.y1 + bm.y2) * 0.5);
-      beamMesh.rotation.z = Math.PI / 2;
-      beamMesh.rotation.y = -Math.atan2(bm.y2 - bm.y1, bm.x2 - bm.x1);
-      fxGroup3D.add(beamMesh);
-    }
-    // Rayons nanites des Navettes Médicales : un tube vert qui pulse
-    for (const [x1, y1, z1, x2, y2, z2] of healLinks) {
-      const len = Math.hypot(x2 - x1, y2 - y1, z2 - z1) || 1;
-      const ray = new THREE.Mesh(geoCache3D.beamCyl, getMat3D('#2fbf71', 0.2, 0.1, '#2fbf71', 1.1, 0.55 + 0.25 * Math.sin(now * 0.012)));
-      ray.scale.set(1.6, len, 1.6);
-      ray.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
-      ray.quaternion.setFromUnitVectors(UP_3D, tmpVec3D.set(x2 - x1, y2 - y1, z2 - z1).normalize());
-      fxGroup3D.add(ray);
+      setFxOrb3D(orbs, nOrb++, px, arcH, py, pr.r * 1.15, pr.color);
     }
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life -= dt;
       if (p.life <= 0) { particles.splice(i, 1); continue; }
       p.x += p.vx * dt; p.y += p.vy * dt;
-      const pm = new THREE.Mesh(geoCache3D.proj, getMat3D(p.color, 0.2, 0.1, p.color, 0.8));
-      pm.position.set(p.x, heightAt(p.x, p.y) + 10 + p.life * 28, p.y);
-      pm.scale.setScalar(p.r * 0.85);
-      fxGroup3D.add(pm);
+      if (nOrb >= FX_ORBS_MAX) continue;
+      setFxOrb3D(orbs, nOrb++, p.x, heightAt(p.x, p.y) + 10 + p.life * 28, p.y, p.r * 0.85, p.color);
     }
+    orbs.count = nOrb;
+    orbs.instanceMatrix.needsUpdate = true;
+    if (orbs.instanceColor) orbs.instanceColor.needsUpdate = true;
 
-    updateFlashes3D(dt);
+    const pool = fxPool3D();
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const sw = shockwaves[i];
+      sw.life -= dt;
+      if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+      const u = 1 - sw.life / sw.maxLife;
+      const rm = pool.take('ring', sw.color, 1 - u);
+      rm.rotation.set(-Math.PI / 2, 0, 0);
+      rm.position.set(sw.x, heightAt(sw.x, sw.y) + 3.5, sw.y);
+      rm.scale.setScalar(lerp(sw.r, sw.maxR, u));
+    }
+    for (let i = beams.length - 1; i >= 0; i--) {
+      const bm = beams[i];
+      bm.life -= dt;
+      if (bm.life <= 0) { beams.splice(i, 1); continue; }
+      const d = hypot(bm.x1, bm.y1, bm.x2, bm.y2);
+      const beamMesh = pool.take('beam', bm.color, clamp(bm.life / bm.maxLife, 0, 1));
+      beamMesh.scale.set(bm.w * 0.35, d, bm.w * 0.35);
+      beamMesh.position.set((bm.x1 + bm.x2) * 0.5, 22 + heightAt((bm.x1 + bm.x2) * 0.5, (bm.y1 + bm.y2) * 0.5), (bm.y1 + bm.y2) * 0.5);
+      beamMesh.rotation.set(0, -Math.atan2(bm.y2 - bm.y1, bm.x2 - bm.x1), Math.PI / 2);
+    }
+    // Rayons nanites des Navettes Médicales : un tube vert qui pulse
+    for (const [x1, y1, z1, x2, y2, z2] of healLinks) {
+      const len = Math.hypot(x2 - x1, y2 - y1, z2 - z1) || 1;
+      const ray = pool.take('beam', '#2fbf71', 0.55 + 0.25 * Math.sin(now * 0.012));
+      ray.scale.set(1.6, len, 1.6);
+      ray.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
+      ray.quaternion.setFromUnitVectors(UP_3D, tmpVec3D.set(x2 - x1, y2 - y1, z2 - z1).normalize());
+    }
+    // Éclairs des explosions : un halo lumineux posé au sol (voir flash3D)
+    for (let i = flashes3D.length - 1; i >= 0; i--) {
+      const f = flashes3D[i];
+      f.life -= dt;
+      if (f.life <= 0) { flashes3D.splice(i, 1); continue; }
+      const k = f.life / f.max;
+      const fm = pool.take('flash', f.color, Math.min(1, 0.95 * k * (0.6 + 0.4 * f.power)));
+      fm.rotation.set(-Math.PI / 2, 0, 0);
+      fm.position.set(f.x, heightAt(f.x, f.y) + 4, f.y);
+      fm.scale.setScalar(f.r * (0.75 + 0.25 * k));
+    }
+    pool.done();
+
     renderFrame3D();
     return true;
   } catch (err) {

@@ -79,28 +79,17 @@ function renderFrame3D() {
   threeRenderer.render(threeScene, threeCam);
 }
 
-/* ---------- Éclairs lumineux des explosions (Haut et Ultra) ---------- */
-const flashLights = [];
+/* ---------- Éclairs des explosions (Haut et Ultra) ----------
+   Un halo de lumière posé au sol qui s'éteint en un tiers de seconde (dessiné dans syncAndRenderThree3D). Ce ne sont
+   plus de vraies lumières : chacune ajoutée à la scène faisait recompiler toutes les matières (image figée une
+   demi-seconde au premier combat), puis alourdissait chaque pixel de l'écran pour le reste de la partie. */
+const flashes3D = [];
 function flash3D(x, y, color, power = 1) {
   if (!threeScene || !gfxPreset().lights) return;
   if (hypot(x, y, cam.x, cam.y) > 1400) return;
-  let l = flashLights.find((f) => f.life <= 0);
-  if (!l) {
-    if (flashLights.length >= 6) l = flashLights.reduce((a, b) => (a.life < b.life ? a : b));
-    else { l = { light: new THREE.PointLight(0xffffff, 0, 260, 2), life: 0, max: 1 }; threeScene.add(l.light); flashLights.push(l); }
-  }
-  l.light.color.set(color);
-  l.light.position.set(x, heightAt(x, y) + 40, y);
-  l.light.distance = 200 + 160 * power;
-  l.max = l.life = 0.32 + 0.18 * power;
-  l.power = 3.2 * power;
-}
-function updateFlashes3D(dt) {
-  for (const l of flashLights) {
-    if (l.life <= 0) { l.light.intensity = 0; continue; }
-    l.life -= dt;
-    l.light.intensity = Math.max(0, l.life / l.max) * l.power;
-  }
+  if (flashes3D.length >= 24) flashes3D.shift();
+  const max = 0.32 + 0.18 * power;
+  flashes3D.push({ x, y, color, r: 150 + 130 * power, power, life: max, max });
 }
 
 /* ---------- Panneau Réglages (commun à tous les jeux) : le son, puis les graphismes ---------- */

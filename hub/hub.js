@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '2.95';
+  const VERSION = '2.97';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -34,7 +34,7 @@
   $('#ver').textContent = 'v' + VERSION;
   // Vignette d'un jeu, la même à l'accueil et dans le salon : l'affiche porte le titre et le sous-titre
   function gameCard(g, { el = 'div', cls = '', attrs = '', extra = '' } = {}) {
-    const bots = (g.settings || []).some((s) => s.key === 'bots');
+    const bots = g.bots || (g.settings || []).some((s) => s.key === 'bots');
     return `<${el} class="game${cls}" ${attrs}>
       <span class="cv"><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async"></span>
       <span class="tx"><span class="ds">${esc(g.desc)}</span>
