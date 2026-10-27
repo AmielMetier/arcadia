@@ -265,6 +265,7 @@ export function createAI(sim, map, world) {
     for (const Q of S.players.values()) {
       if (Q === P || !Q.alive || Q.mode === 'ballon' || sim.mates(P, Q)) continue;
       const dx = Q.x - P.x, dz = Q.z - P.z, d = Math.hypot(dx, dz);
+      if (Q.down && d > 30) continue; // à terre et loin : pas la peine (ses coéquipiers, debout, sont la menace)
       if (d > Math.max(lv.see, 110) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
       if (d > lv.see && !(Q.shotT != null && S.t - Q.shotT < 1.2) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
       const front = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
@@ -304,7 +305,7 @@ export function createAI(sim, map, world) {
     const danger = stormDanger(P), gun = armed(P);
     // équipes : un coéquipier à terre pas trop loin, et pas d'ennemi en vue tout près : on va le relever
     if (S.teams > 1 && danger < 2) {
-      const down = [...S.players.values()].filter((Q) => Q.alive && Q.down && sim.mates(P, Q)).map((Q) => [Q, Math.hypot(Q.x - P.x, Q.z - P.z)]).filter(([, d]) => d < 80).sort((a, b) => a[1] - b[1])[0];
+      const down = [...S.players.values()].filter((Q) => Q.alive && Q.down && sim.mates(P, Q)).map((Q) => [Q, Math.hypot(Q.x - P.x, Q.z - P.z)]).filter(([, d]) => d < 130).sort((a, b) => a[1] - b[1])[0];
       const close = E && E.alive && B.visible && Math.hypot(E.x - P.x, E.z - P.z) < 22;
       if (down && !close) {
         B.state = 'go'; B.enemy = close ? B.enemy : null;
@@ -329,6 +330,13 @@ export function createAI(sim, map, world) {
       }
       if (B.goal && B.goal.kind === 'chasse' && danger < 2) return;
     } else B.enemy = null;
+    // équipes : on ne laisse pas son chef derrière (la tempête ne passe devant que si on y est déjà)
+    const L = leaderOf(P, B);
+    if (L && L.alive && L.mode === 'sol' && danger < 2 && Math.hypot(L.x - P.x, L.z - P.z) > 35) {
+      if (!B.goal || B.goal.kind !== 'escorte' || Math.hypot(B.goal.x - L.x, B.goal.z - L.z) > 12) setGoal(P, B, { kind: 'escorte', id: null, x: L.x, z: L.z, r: 8 });
+      B.state = 'go';
+      return;
+    }
     if (danger) {
       if (B.state !== 'zone' || !B.goal) { B.state = 'zone'; setGoal(P, B, zonePoint(P, B, false)); }
       return;
@@ -336,13 +344,6 @@ export function createAI(sim, map, world) {
     const h = needHeal(P);
     if (h && S.t - (P.hitT || -9) > 2.5 && (!E || !B.visible || P.hp + P.sh < 40)) { B.state = 'heal'; B.healSlot = h; return; }
     if (B.state === 'fight' || B.state === 'heal' || B.state === 'zone') { B.state = 'go'; B.goal = null; }
-    // équipes : on ne s'éloigne pas de son chef (le joueur de l'équipe, ou le premier bot)
-    const L = leaderOf(P, B);
-    if (L && L.alive && L.mode === 'sol' && Math.hypot(L.x - P.x, L.z - P.z) > 35) {
-      if (!B.goal || B.goal.kind !== 'escorte' || Math.hypot(B.goal.x - L.x, B.goal.z - L.z) > 12) setGoal(P, B, { kind: 'escorte', id: null, x: L.x, z: L.z, r: 8 });
-      B.state = 'go';
-      return;
-    }
     if (B.goal && B.goal.kind !== 'roam' && B.goal.kind !== 'zone' && B.goal.kind !== 'rota' && S.t - B.goal.since < 40) return;
     // début de partie : on fouille et on se protège ; une fois équipé, on ne ramasse plus que ce qui est tout près
     const ready = geared(P, B);

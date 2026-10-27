@@ -169,7 +169,8 @@ export function createActors(scene, sim, kit = null) {
       const h = heroFor(P), a = pos(P), hero = h.hero;
       hero.root.position.set(a.x, a.y, a.z);
       hero.root.rotation.y = a.yaw;
-      const it = P.sel > 0 ? P.inv[P.sel - 1] : null, k = P.alive ? keyOf(it) : null;
+      // à terre : plus rien en main
+      const it = P.sel > 0 && !P.down ? P.inv[P.sel - 1] : null, k = P.alive ? keyOf(it) : null;
       if (k !== h.key) {
         h.key = k;
         if (hero.setItem) hero.setItem(P.alive ? it : null, P.alive && it && it.t !== 'arme' ? itemModel(it) : null);
@@ -182,7 +183,7 @@ export function createActors(scene, sim, kit = null) {
       if (h.shadow !== far < 70) { h.shadow = far < 70; hero.root.traverse((o) => { if (o.isMesh) o.castShadow = h.shadow; }); }
       h.acc += dt;
       if (!hero.root.visible || ++h.tick % every) continue;
-      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
+      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, down: !!P.down, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
       h.acc = 0;
     }
     // montgolfière

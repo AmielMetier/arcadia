@@ -7,10 +7,11 @@
 import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
-import { createSim, DT, SHOULDER } from './engine/sim.js';
+import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP } from './engine/sim.js';
 import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
+import { makeTeams, TEAM_LABEL } from './engine/teams.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
@@ -57,6 +58,7 @@ const S = {
   yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
   look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
+  picks: new Map(), // équipes choisies sur l'écran d'accueil : id du joueur → numéro d'équipe
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -82,6 +84,7 @@ async function boot(info) {
     mode: QS.get('mode') || set.mode || 'partie',
     places: +(QS.get('places') || set.places || 45),
     level: QS.get('level') || set.level || 'normal',
+    teams: clamp(+(QS.get('equipes') || set.teams || 1) | 0, 1, 3),
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
   try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
@@ -140,24 +143,25 @@ function setLook(l) {
 // hôte (ou solo) : on remplit la montgolfière (les joueurs du salon, puis des bots jusqu'au nombre de places)
 function startMatch() {
   if (S.role === 'guest' || S.sim) return;
-  const roster = humans().map((h) => ({ ...h, bot: false }));
-  if (S.settings.mode !== 'exploration') {
-    const n = clamp(S.settings.places, 2, MAX_PLACES) - roster.length;
-    const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level });
-  }
-  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode });
+  const hs = humans(), expl = S.settings.mode === 'exploration';
+  const size = expl ? 1 : S.settings.teams;
+  // équipes : les choix de l'écran d'accueil, les autres répartis, puis des bots (coéquipiers d'abord)
+  const T = makeTeams(hs, S.picks, expl ? hs.length : clamp(S.settings.places, 2, MAX_PLACES), size);
+  const roster = hs.map((h) => ({ ...h, bot: false, team: T.humans.get(h.id) }));
+  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
+  T.bots.forEach((team, i) => roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + hs.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level, team }));
+  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode, teams: size });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
   showScreen(null);
   S.input.lock();
 }
-const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode });
-function newMatch({ run, seed, roster, mode, mirror = false }) {
+const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
+function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.run = run; S.seed = seed; S.roster = roster;
   const city = S.map.pois.find((p) => p.kind === 'ville');
   const pl = city && S.map.plazas.find((q) => q.x0 >= city.rect.x0 && q.x1 <= city.rect.x1 && q.z0 >= city.rect.z0 && q.z1 <= city.rect.z1);
   const start = pl ? { x: (pl.x0 + pl.x1) / 2 + 6, z: (pl.z0 + pl.z1) / 2 + 6 } : null;
-  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
+  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start, teams });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
   S.actors.onBurn = (p) => S.sfx.at('bruleur', p.x, p.y + 4, p.z, 1, 140);
@@ -310,8 +314,15 @@ function loop(now) {
   const focusP = P && P.alive ? P : S.sim.player(S.spect) || P;
   if (focusP) {
     const fp = disp(focusP);
-    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms);
-    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat });
+    const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
+    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }));
+    const rv = focusP.revive && S.sim.player(focusP.revive.id);
+    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat, revive: rv ? { f: focusP.revive.t / REVIVE, name: rv.name } : null });
+    if ((S.tick3 = (S.tick3 || 0) + 1) % 5 === 0) S.hud.team(team.map((Q) => ({ id: Q.id, name: Q.name, color: Q.color, hp: Q.hp, sh: Q.sh, down: Q.down ? Q.down.hp : null, alive: Q.alive })));
+    S.hud.tags(team.filter((Q) => Q.alive && Q.mode === 'sol').map((Q) => { const d = disp(Q); return { id: Q.id, name: Q.name, color: Q.color, x: d.x, y: d.y + 2.3, z: d.z, down: !!Q.down }; }));
+    // à terre : ce qu'il reste, et le coéquipier qui relève
+    const helper = focusP.down && [...S.sim.S.players.values()].find((Q) => Q.revive && Q.revive.id === focusP.id);
+    S.hud.downed(focusP.alive && focusP.down ? { left: focusP.down.hp / DOWN_HP * BLEED, by: helper ? helper.name : null, f: helper ? helper.revive.t / REVIVE : 0 } : null);
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
@@ -495,6 +506,8 @@ function cameraFor(P, disp, dt) {
 }
 function pickSpectate() {
   const P = me();
+  const mate = P && [...S.sim.S.players.values()].find((Q) => Q.alive && S.sim.mates(P, Q));
+  if (mate) return mate.id;
   const killer = P && P.hitBy != null && S.sim.player(P.hitBy);
   if (killer && killer.alive) return killer.id;
   const live = S.sim.alive();
@@ -511,12 +524,14 @@ function nextSpectate() {
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
   if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
+  if (m.t === 'team') { S.picks.set(from, Number.isInteger(m.k) && m.k >= 0 && m.k < 30 ? m.k : -1); refreshLobby(); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
       if (m.look) S.looks.set(from, cleanLook(m.look));
+      if (Number.isInteger(m.team)) S.picks.set(from, m.team);
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
-      else H.send(from, { t: 'salon' });
+      else H.send(from, { t: 'salon', picks: [...S.picks] });
     } else if (m.t === 'i' && S.sim) {
       const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
       if (!P || P.bot) return;
@@ -530,11 +545,15 @@ function onMsg(from, m) {
   }
   if (from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   S.gotHost = true;
-  if (m.t === 'salon') { if (!S.sim) showScreen('attente'); return; }
+  if (m.t === 'salon') {
+    if (Array.isArray(m.picks)) for (const [id, k] of m.picks) if (id !== S.me && Number.isInteger(k)) S.picks.set(id, k);
+    if (!S.sim) showScreen('attente');
+    return;
+  }
   if (m.t === 'go') {
     if (S.sim && m.run !== S.run) { location.reload(); return; } // nouvelle partie : on repart d'une île neuve
     if (S.sim) return;
-    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, mirror: true });
+    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, teams: m.teams | 0 || 1, mirror: true });
     if (m.full) {
       applyFull(S.sim, S.world, S.buildApi, m.full);
       for (const k of m.full.broken) hideBroken(k);
@@ -578,7 +597,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look, team: S.picks.get(S.me) }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -698,12 +717,28 @@ function handleEvents(list) {
         const icon = (id) => (S.sim.player(id) && S.sim.player(id).bot ? ' 🤖' : '');
         S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`, e.by === S.me || e.to === S.me);
         if (e.to === S.me) {
-          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur</small>`, 5);
+          // en équipe, la place n'est connue qu'à la sortie du dernier coéquipier
+          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${!e.place ? 'Ton équipe continue · <kbd>Espace</kbd> : suivre un autre joueur' : `${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.teams > 1 ? new Set([...S.sim.S.players.values()].map((Q) => Q.team)).size + ' équipes' : S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur`}</small>`, 5);
           S.spect = e.by != null && S.sim.player(e.by) && S.sim.player(e.by).alive ? e.by : pickSpectate();
           S.sfx.play('elimine');
         } else if (e.by === S.me) { S.hud.say(`Tu as éliminé <b>${esc(nameOf(e.to))}</b><small>${e.left} encore en vie</small>`, 2.5); S.sfx.play('elimination'); }
         break;
       }
+      case 'abattu': {
+        S.hud.feedLine(`${e.by != null ? `<b>${esc(nameOf(e.by))}</b> a mis` : ''} <b>${esc(nameOf(e.to))}</b> à terre ${CAUSES[e.cause] || ''}`, e.to === S.me || e.by === S.me);
+        if (e.to === S.me) { S.hud.say('À terre !<small>Rampe vers tes coéquipiers : ils peuvent te relever</small>', 3); S.sfx.play('aie'); }
+        else if (e.by === S.me) { S.hud.say(`<b>${esc(nameOf(e.to))}</b> est à terre<small>Ses coéquipiers peuvent le relever</small>`, 2); S.sfx.play('elimination'); }
+        break;
+      }
+      case 'releve': {
+        const mine = P && (e.to === S.me || e.by === S.me || S.sim.mates(P, S.sim.player(e.to) || {}));
+        S.hud.feedLine(`<b>${esc(nameOf(e.by))}</b> a relevé <b>${esc(nameOf(e.to))}</b>`, mine);
+        if (e.to === S.me) { S.hud.say(`Relevé par <b>${esc(nameOf(e.by))}</b> !<small>Soigne-toi vite</small>`, 2.5); S.sfx.play('soigne'); }
+        else if (e.by === S.me) { S.hud.say(`Tu as relevé <b>${esc(nameOf(e.to))}</b>`, 2); S.sfx.play('soigne'); }
+        break;
+      }
+      case 'releve…': if (e.p === S.me) S.sfx.play('bandage'); break;
+      case 'releve-': if (e.p === S.me) toast('Relevé interrompu : il faut rester à côté sans bouger ni tirer', 2.5); break;
       case 'boum': {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
         const d = Math.hypot(e.x - S.cam.x, e.y - S.cam.y, e.z - S.cam.z);
@@ -775,11 +810,17 @@ function handleEvents(list) {
 }
 
 // ------------------------------------------------------------------ fin de partie
+// a-t-on gagné ? (en équipe : son équipe est la dernière debout)
+function iWon(winner) {
+  const P = me();
+  return S.sim.S.teams > 1 ? !!P && P.team != null && P.team === S.sim.S.winTeam : winner === S.me;
+}
 function endMatch(winner) {
   if (S.ended) return;
   S.ended = true;
+  S.hud.downed(null);
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
-  if (winner === S.me) { S.hud.say('Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
+  if (iWon(winner)) { S.hud.say(S.sim.S.teams > 1 ? 'Dernière équipe debout !<small>Ton équipe a gagné la partie</small>' : 'Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
   report(res);
   setTimeout(() => { S.input.unlock(); showScreen('fin', { res, mine, winner }); }, 3500);
 }
@@ -789,7 +830,7 @@ function report(res) {
   if (!H.embedded) return;
   try {
     H.report({
-      id: `royale-${S.run}-${res.length}`, mode: 'Battle royale',
+      id: `royale-${S.run}-${res.length}`, mode: S.sim.S.teams > 1 ? 'Battle royale · ' + TEAM_LABEL[S.sim.S.teams].toLowerCase() : 'Battle royale',
       players: res.map((r) => ({ id: r.bot ? null : r.id, name: r.name, color: r.color, bot: r.bot, rank: r.place, score: r.kills })),
     });
   } catch (e) { console.warn(e); }
@@ -800,9 +841,11 @@ function showPrompt() {
   const P = me();
   if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
   if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', 'Espace'); return; }
-  if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
+  if (!P || !P.alive || P.mode !== 'sol' || P.down) { S.hud.prompt(''); return; }
+  if (P.revive) { S.hud.prompt('Ne bouge pas, tu relèves', (S.sim.player(P.revive.id) || {}).name || '', '#4ade80', '…'); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
+  if (tg.kind === 'releve') { S.hud.prompt('Relever', tg.o.name, '#4ade80'); return; }
   if (tg.kind === 'porte') S.hud.prompt((tg.o.open ? 'Fermer' : 'Ouvrir') + (tg.o.kind === 'portail' ? ' le portail' : ' la porte'));
   else if (tg.kind === 'coffre') S.hud.prompt(tg.o.kind === 'coffre' ? 'Ouvrir le coffre' : 'Ouvrir la caisse de munitions');
   else {
@@ -821,6 +864,22 @@ function lobbyList() {
   }).join('');
   return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
 }
+// équipes (duos, trios) : chacun clique sur une équipe ; les places libres sont prises par des bots coéquipiers
+function teamPicker() {
+  const size = S.settings.teams;
+  if (S.settings.mode === 'exploration' || size <= 1) return '';
+  const hs = humans(), label = TEAM_LABEL[size].toLowerCase(), s = size > 2 ? 's' : '';
+  if (hs.length <= 1) return `<h2>Ton équipe</h2><p class="hint">Tu joues en ${label} avec ${size - 1} bot${s} coéquipier${s} : ils sautent avec toi, te suivent et te relèvent.</p>`;
+  const K = Math.min(hs.length, Math.ceil(clamp(S.settings.places, 2, MAX_PLACES) / size)), mine = S.picks.get(S.me);
+  const cards = Array.from({ length: K }, (_, k) => {
+    const mem = hs.filter((h) => S.picks.get(h.id) === k), full = mem.length >= size && mine !== k;
+    return `<button class="teamc${mine === k ? ' on' : ''}" data-team="${k}" ${full ? 'disabled' : ''}><b>Équipe ${k + 1}</b>${mem.map((h) => `<span><i style="--c:${esc(h.color || '#888')}"></i>${esc(h.name)}${h.id === S.me ? ' <em>toi</em>' : ''}</span>`).join('')}${mem.length < size ? `<span class="free">${size - mem.length} place${size - mem.length > 1 ? 's' : ''} : bots si personne</span>` : ''}</button>`;
+  }).join('');
+  const loose = hs.filter((h) => { const k = S.picks.get(h.id); return !(Number.isInteger(k) && k >= 0 && k < K); });
+  return `<h2>Ton équipe · ${TEAM_LABEL[size]}</h2><div class="teams">${cards}</div><p class="hint">${loose.length ? `Pas encore choisi : ${loose.map((h) => esc(h.name)).join(', ')} (réparti${loose.length > 1 ? 's' : ''} au lancement). ` : ''}Les places libres sont prises par des bots coéquipiers.</p>`;
+}
+// un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
+function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
 const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
   <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
@@ -830,6 +889,7 @@ const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) 
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
+  S.screen = kind; S.screenData = data;
   if (!kind) return;
   const expl = S.settings.mode === 'exploration';
   const play = (label) => `<button class="btn big" id="go">${label}</button>`;
@@ -842,7 +902,9 @@ function showScreen(kind, data) {
     ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
     : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
       ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
-      ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+      S.settings.teams > 1
+        ? ['crown_a', 'Dernière équipe debout', `${n} joueurs en ${TEAM_LABEL[S.settings.teams].toLowerCase()} : à 0 PV, on tombe à terre et un coéquipier relève (E, 5 s sans bouger).`]
+        : ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
   // son personnage et sa couleur
   const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
   if (!S.portraits || S.portraits.col !== col) S.portraits = { col, img: renderPortraits(S.scene.kit, col) };
@@ -852,10 +914,10 @@ function showScreen(kind, data) {
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${lookHtml}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${teamPicker()}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${teamPicker()}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
     html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
@@ -866,13 +928,13 @@ function showScreen(kind, data) {
     html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
   } else {
     const { res, mine, winner } = data;
-    const won = winner === S.me;
-    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : ''}"><td>${r.place}</td><td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
-    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${res.length}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
+    const won = iWon(winner), tm = S.sim.S.teams > 1, nTeams = tm ? new Set(res.map((r) => r.team)).size : res.length;
+    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : mine && tm && r.team === mine.team ? 'mate' : ''}"><td>${r.place}</td>${tm ? `<td>${r.team + 1}</td>` : ''}<td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
+    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${nTeams}${tm ? ' équipes' : ''}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
     const tags = mine ? `<div class="tags"><span>${icon('skull')}<b>${mine.kills}</b> élimination${mine.kills > 1 ? 's' : ''}</span><span>${icon('target')}<b>${mine.dealt}</b> dégâts</span><span>${icon('hourglass')}<b>${fmtTime((Date.now() - S.startedAt) / 1000)}</b></span></div>` : '';
     const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
-    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? 'Dernier <span>debout</span> !' : 'Island <span>Rush</span>'}</h1>${head}${tags}
-      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th><th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
+    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? (tm ? 'Dernière équipe <span>debout</span> !' : 'Dernier <span>debout</span> !') : 'Island <span>Rush</span>'}</h1>${head}${tags}
+      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th>${tm ? '<th>Éq.</th>' : ''}<th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
       <div class="row end">${back}${S.role !== 'guest' ? '<button class="btn big" id="again">Rejouer</button>' : ''}</div>`;
     el.querySelector('.panel').classList.toggle('win', won);
   }
@@ -880,6 +942,7 @@ function showScreen(kind, data) {
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
   el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
   el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
+  el.querySelectorAll('.teamc').forEach((b) => { b.onclick = () => { const k = +b.dataset.team; S.picks.set(S.me, k); if (H.embedded) H.send('all', { t: 'team', k }); showScreen(kind, data); }; });
   // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
   const again = $('#again'); if (again) again.onclick = () => location.reload();
   $('#quit').onclick = quit;

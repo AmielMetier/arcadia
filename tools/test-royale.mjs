@@ -561,6 +561,30 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   ok(apart <= Math.ceil(checks / 3), `équipes dispersées à 1:30 : ${apart}/${checks}`);
   console.log(`trios entre bots : fin à ${Math.floor(sim.S.t / 60)}:${String(Math.floor(sim.S.t % 60)).padStart(2, '0')}, équipe ${sim.S.winTeam} · ${downs} à terre, ${revives} relevés · équipes groupées ${checks - apart}/${checks}`);
 }
+// ------------------------------------------------------------------ équipes : le joueur à terre est relevé par ses bots
+// (il saute, se pose et ne bouge plus ; ses coéquipiers ne partent pas vers la zone sans lui et viennent le relever)
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  let knocked = 0, raised = 0;
+  for (const seed of [1, 3, 5, 7]) {
+    const T = makeTeams([{ id: 'moi' }], new Map(), 30, 3);
+    const roster = [{ id: 'moi', name: 'Moi', team: T.humans.get('moi') }, ...T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal', team }))];
+    const sim = createSim({ map: m, world: W, seed, roster, mode: 'partie', teams: 3 });
+    createBuild(sim, m, W); createAI(sim, m, W);
+    const me = sim.player('moi');
+    let jump = 0;
+    const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { sim.input('moi', { jump }); sim.step(DT); sim.takeEvents(); } };
+    step(60 * 6); jump++; step(60 * 25);
+    const foe = [...sim.S.players.values()].find((q) => q.alive && !sim.mates(me, q) && q !== me);
+    sim.damage(me, 300, foe, { cause: 'fusil' });
+    if (!me.down) continue;
+    knocked++;
+    step(60 * 25);
+    if (me.alive && !me.down) raised++;
+  }
+  ok(knocked >= 3 && raised === knocked, `joueur à terre relevé par ses bots : ${raised}/${knocked}`);
+  console.log(`joueur à terre relevé par ses bots coéquipiers : ${raised}/${knocked}`);
+}
 // ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
 // 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles
 {
