@@ -146,6 +146,7 @@ function startMatch(info) {
   selectedBlds.clear();
   buildMode = null;
   orderCursor = null;
+  allyViews.clear();
   exploredGrid.fill(0);
   if (exploredCtx) exploredCtx.clearRect(0, 0, FOG_RES, FOG_RES);
   lastFogUpdate = 0;
@@ -285,6 +286,30 @@ function becomeHost() {
   toast('L’hôte est parti : tu reprends la partie, elle continue.', 3600);
 }
 
+// Zone que je regarde, envoyée à mes alliés humains (cadre rose sur leur minimap) : dès qu'elle change, au plus
+// 5 fois par seconde, et une fois par seconde quand elle ne bouge pas pour qu'ils sachent que je suis toujours là
+let lastViewSent = { key: '', at: 0 };
+function shareMyView() {
+  const H = window.HubBridge;
+  if (!H || !H.embedded || !state || isSpectatorView()) return;
+  const allies = state.players.filter((p) => isAllyOf(p.id));
+  if (!allies.length) return;
+  const v = camViewRect();
+  const msg = { t: 'cam', x: Math.round(v.x), y: Math.round(v.y), w: Math.round(v.w), h: Math.round(v.h) };
+  const key = `${msg.x},${msg.y},${msg.w},${msg.h}`;
+  const now = performance.now();
+  if (key === lastViewSent.key && now - lastViewSent.at < 1000) return;
+  lastViewSent = { key, at: now };
+  for (const p of allies) H.send(p.id, msg, { volatile: true });
+}
+function noteAllyView(from, m) {
+  if (!isAllyOf(from) || ![m.x, m.y, m.w, m.h].every(Number.isFinite)) return;
+  allyViews.set(Number(from), {
+    x: clamp(m.x, 0, WORLD_SIZE), y: clamp(m.y, 0, WORLD_SIZE),
+    w: clamp(m.w, 1, WORLD_SIZE * 2), h: clamp(m.h, 1, WORLD_SIZE * 2), at: performance.now(),
+  });
+}
+
 if (window.HubBridge && HubBridge.embedded) {
   let centeredOnce = false;
   let lastStateAt = performance.now();
@@ -321,8 +346,12 @@ if (window.HubBridge && HubBridge.embedded) {
     }
   }, 1800);
 
+  setInterval(shareMyView, 200);
+
   HubBridge.on('msg', (from, m) => {
     if (!m || typeof m !== 'object') return;
+    // Zone regardée par un allié : elle vient directement de lui, pas de l'hôte
+    if (m.t === 'cam') { noteAllyView(from, m); return; }
     if (role === 'host') {
       lastHeard[from] = performance.now();
       if (m.t === 'sync' && state) {
