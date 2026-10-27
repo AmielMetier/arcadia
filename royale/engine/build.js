@@ -7,7 +7,7 @@
 import { CELL, STOREY } from './buildings.js';
 import { keyOf, floorY } from './world.js';
 import { PROPS } from './map.js';
-import { FURN } from './furniture.js';
+import { FURN, furnRect } from './furniture.js';
 import { MAT_MAX } from './items.js';
 
 export const COST = 10;
@@ -88,6 +88,11 @@ export function createBuild(sim, map, world) {
       const f = findFurn(+rest), F = f && FURN[f.kind];
       if (F) r = { hp: F.mat === 'metal' ? 140 : 90, mat: F.mat, yield: F.mat ? 5 : 0, what: f.kind };
     } else if (kind === 'd') r = { hp: 90, mat: 'bois', yield: 5, what: 'porte' };
+    else if (kind === 's') {
+      // dalle d'étage ou de toit (une case de 4 m) : un peu moins solide qu'un mur
+      const B = map.buildings[+rest.split(':')[0]];
+      if (B) r = { hp: Math.round(WALL_HP[B.mat] * 0.8), mat: B.mat, yield: 5, what: 'dalle' };
+    }
     else if (kind === 'b') { const p = pieces.get(+rest); if (p) r = p; }
     if (r) { r.max = r.max || r.hp; if (kind !== 'b') hp.set(key, r); }
     return r;
@@ -115,6 +120,15 @@ export function createBuild(sim, map, world) {
     const c = world.removeKey(key) || { x: 0, y: 0, z: 0 };
     if (key[0] === 'b') { const p = pieces.get(+key.slice(2)); if (p) { pieces.delete(p.id); bySlot.delete(slotKey(p)); } }
     ev({ e: 'casse', key, x: c.x, y: c.y, z: c.z, mat: I && I.mat, what: I && I.what });
+    // une dalle cassée : les meubles posés dessus tombent en morceaux
+    if (key[0] === 's') {
+      const [b, k, cell] = key.slice(2).split(':'), [cx, cz] = cell.split(',').map(Number), B = map.buildings[+b];
+      if (B) for (const f of B.furniture) {
+        if (f.k !== +k) continue;
+        const R = furnRect(f), mx = (R.x0 + R.x1) / 2, mz = (R.z0 + R.z1) / 2;
+        if (mx >= cx * CELL && mx < (cx + 1) * CELL && mz >= cz * CELL && mz < (cz + 1) * CELL && !broken.has('f:' + f.id) && world.byKey.has('f:' + f.id)) destroy('f:' + f.id, info('f:' + f.id));
+      }
+    }
     settle();
   }
 

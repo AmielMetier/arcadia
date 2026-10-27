@@ -1,5 +1,16 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.1 — 27 octobre 2026
+- **Island Rush** — Les bots t'attaquent enfin : celui qui crée la partie dans le Hub leur était invisible comme cible. Ils te traitent maintenant comme n'importe quel autre joueur.
+- **Island Rush** — Les bots jouent comme des joueurs : au début, ils fouillent et se mettent du bouclier ; une fois équipés, ils vont là où ça tire et tournent vers le prochain cercle. S'ils croisent un joueur avant, ils engagent le combat.
+- **Island Rush** — Le fusil de précision tire une vraie balle : elle met du temps à arriver, tombe avec la distance (environ 2 m à 300 m) et dérive un peu à droite sous l'effet de Coriolis. Il faut viser devant et au-dessus ; les bots le font aussi.
+- **Island Rush** — On peut casser les sols et les plafonds, case par case : on passe à travers, et les meubles posés dessus tombent en morceaux.
+- **Island Rush** — Les chutes enlèvent de la vie, plus du bouclier.
+- **Island Rush** — Tirs plus percutants : prises plus pleines, coup sourd dans les graves sous chaque détonation, grondement qui roule pour les tirs lointains.
+- **Island Rush** — Échap ferme le sac ou la carte, sans rien faire d'autre.
+- **Island Rush** — La caméra ne traverse plus les murs, les portes ni les plafonds : elle se rapproche quand un obstacle passe derrière toi, puis recule doucement ; collée à un mur, elle se recentre sur ta tête.
+- **Island Rush** — Moins de ralentissements, surtout à 60 joueurs : image calculée à une définition raisonnable, ombres et personnages hors champ allégés, bots qui cherchent leur chemin bien plus vite.
+
 ## 3.0 — 27 octobre 2026
 - **Hub** — Version 3.0 : Island Rush change de dimension (sons enregistrés, armes détaillées, deltaplane, île plus belle vue du ciel, jusqu'à 60 joueurs) et les affiches de Birdie Party et d'Island Rush sont refaites à partir du jeu actuel.
 - **Island Rush** — Les montagnes ne s'escaladent plus : on ralentit dans les pentes fortes et, au-delà d'environ 40°, on glisse vers le bas sans pouvoir sauter. Les chemins restent praticables à pied (le refuge du sommet se rejoint par son sentier), et une rampe construite permet toujours de grimper.

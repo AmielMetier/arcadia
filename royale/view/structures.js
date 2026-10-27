@@ -9,7 +9,7 @@
 // et réservoirs (engine/decor.js, qui donne aussi leurs collisions).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL, STOREY } from '../engine/buildings.js';
-import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY } from '../engine/world.js';
+import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY, slabCells } from '../engine/world.js';
 import { roofDetails } from '../engine/decor.js';
 import { makeRng } from '../engine/rng.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
@@ -441,7 +441,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
           push('sign', 'sign', m, null, ref, { cell });
         }
       }
-      if (k > 0) rows(b, lv.hole, (x0, x1, z) => push('deck', 'floor', place(x0 * CELL, F - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), floorC, { b: b.id, k }));
+      if (k > 0) slabCells(b, lv.hole, (x, z) => push('deck', 'floor', place(x * CELL, F - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), floorC, { b: b.id, k, slab: `${x},${z}` }));
       if (lv.stairs) {
         const st = lv.stairs;
         // la géométrie monte vers +z : on la tourne dans le sens de l'escalier
@@ -470,7 +470,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     // toit plat : dalle de gravier + garde-corps à couvertine ; toit en pente : plafond + deux pans + pignons + rives
     const roofC = color(ROOFS[mat][rng.int(0, ROOFS[mat].length - 1)]);
     if (b.roof !== 'pente') {
-      rows(b, b.roofHatch || null, (x0, x1, z) => push('deck', 'roof', place(x0 * CELL, top - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id }));
+      slabCells(b, b.roofHatch || null, (x, z) => push('deck', 'roof', place(x * CELL, top - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id, k: b.floors, slab: `${x},${z}` }));
       const pc = face.clone().multiplyScalar(0.92);
       push('parapet', mat, place(X0 - WALL_T / 2, top, Z0 - WALL_T / 2, 0, X1 - X0 + WALL_T, 1, WALL_T), pc, { b: b.id });
       push('parapet', mat, place(X0 - WALL_T / 2, top, Z1 - WALL_T / 2, 0, X1 - X0 + WALL_T, 1, WALL_T), pc, { b: b.id });
@@ -484,7 +484,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       push('box', cm, place(X1 - WALL_T / 2 - 0.06, top + 1, Z0, 0, WALL_T + 0.12, 0.08, Z1 - Z0), cc, { b: b.id });
       if (b.roof === 'phare') lanterns.push({ x: (X0 + X1) / 2, y: top, z: (Z0 + Z1) / 2 });
     } else {
-      rows(b, null, (x0, x1, z) => push('deck', 'roof', place(x0 * CELL, top - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id }));
+      slabCells(b, null, (x, z) => push('deck', 'roof', place(x * CELL, top - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id, k: b.floors, slab: `${x},${z}` }));
       const alongX = b.w >= b.d, o = 0.55; // débord du toit
       const half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE, drop = o * ROOF_SLOPE;
       const rc = [roofC.r, roofC.g, roofC.b];
@@ -556,8 +556,9 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       im.setMatrixAt(i, it.m);
       if (it.c) im.setColorAt(i, it.c);
       if (cells) cells[i] = it.cell || 0;
-      if (it.ref && it.ref.e) {
-        const k = it.ref.b + ':' + it.ref.k + ':' + it.ref.e.o + it.ref.e.x + ',' + it.ref.e.z;
+      if (it.ref && (it.ref.e || it.ref.slab != null)) {
+        // pan de mur « b:k:ox,z » ou dalle « s:b:k:x,z » (clés du moteur)
+        const k = it.ref.e ? it.ref.b + ':' + it.ref.k + ':' + it.ref.e.o + it.ref.e.x + ',' + it.ref.e.z : 's:' + it.ref.b + ':' + it.ref.k + ':' + it.ref.slab;
         if (!index.has(k)) index.set(k, []);
         index.get(k).push({ mesh: im, i });
       }
@@ -635,18 +636,4 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       group.traverse((o) => { if (o.isMesh && !o.isInstancedMesh) { o.geometry.dispose(); if (extra.includes(o)) o.material.dispose(); } });
     },
   };
-}
-
-// dalles par rangées de cases (on saute la trémie)
-function rows(b, hole, fn) {
-  for (let z = b.z0; z < b.z0 + b.d; z++) {
-    let x = b.x0;
-    while (x < b.x0 + b.w) {
-      if (hole && hole.x === x && hole.z === z) { x++; continue; }
-      let e = x;
-      while (e < b.x0 + b.w && !(hole && hole.x === e && hole.z === z)) e++;
-      fn(x, e, z);
-      x = e;
-    }
-  }
 }

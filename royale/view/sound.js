@@ -9,7 +9,7 @@ const AMB = { campagne: '../golf/sounds/amb-campagne.mp3', mer: '../golf/sounds/
 const DIR = 'sounds/';
 // enregistrements : nom → nombre de variantes (fichiers nom-1.mp3 … ; 0 : un seul fichier nom.mp3)
 const BANK = {
-  'tir-fusil': 3, 'tir-smg': 3, 'tir-pistolet': 2, 'tir-pompe': 2, 'tir-sniper': 2,
+  'tir-fusil': 4, 'tir-smg': 3, 'tir-pistolet': 3, 'tir-pompe': 3, 'tir-sniper': 3,
   'loin-fusil': 0, 'loin-smg': 0, 'loin-pistolet': 0, 'loin-pompe': 0, 'loin-sniper': 0,
   'pompe-arme': 0, 'pompe-rack': 0, 'culasse-sniper': 0, 'chargeur-sort': 0, 'chargeur-entre': 0, 'chargeur-clic': 0, armement: 0,
   'pistolet-sort': 0, 'pistolet-culasse': 0, cartouche: 0, 'balle-sniper': 0,
@@ -22,7 +22,9 @@ const EXTRA = { 'jingle-victoire': '../golf/sounds/jingle-great.mp3', 'jingle-el
 const MUSIC = DIR + 'musique-saut.mp3';
 // on entend un tir jusqu'à… (m) ; volume de chaque arme
 const SHOT_RANGE = { fusil: 340, smg: 240, pistolet: 220, pompe: 240, sniper: 560, roquette: 320 };
-const SHOT_VOL = { fusil: 0.8, smg: 0.68, pistolet: 0.72, pompe: 0.95, sniper: 1, roquette: 0.8 };
+const SHOT_VOL = { fusil: 0.85, smg: 0.72, pistolet: 0.78, pompe: 1, sniper: 1, roquette: 0.8 };
+// sous chaque détonation, un coup sourd synthétisé qui donne du corps : [fréquence de départ, d'arrivée (Hz), durée (s), volume]
+const PUNCH = { fusil: [105, 42, 0.16, 0.95], smg: [125, 52, 0.1, 0.7], pistolet: [140, 55, 0.13, 0.8], pompe: [85, 32, 0.3, 1.15], sniper: [72, 28, 0.42, 1.25] };
 // un bruitage = des enregistrements superposés [nom, volume, vitesse, retard] et, si syn > 0, sa version synthétisée
 const LAYERS = {
   boum: { s: [['boum', 1], ['boum-grave', 0.9]], syn: 0.5 },
@@ -57,7 +59,7 @@ const RELOAD = {
 const STEP_V = { herbe: 0.55, beton: 0.5, bois: 0.6, neige: 0.55, gravier: 0.5, metal: 0.5, eau: 0.65, carrelage: 0.45 };
 
 export function createSound() {
-  let ctx = null, master = null, comp = null, fxBus = null, bed = null, noiseBuf = null, brown = null, revBus = null, revOut = null, revIn = null;
+  let ctx = null, master = null, comp = null, fxBus = null, gunBus = null, bed = null, noiseBuf = null, brown = null, revBus = null, revOut = null, revIn = null;
   let voices = 0, music = null, musicOn = false;
   const amb = {}, last = {}, bufs = new Map();
   let wind = null, storm = null, stepT = 0, stepsOther = new Map();
@@ -73,6 +75,13 @@ export function createSound() {
     comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.15;
     master.connect(DDVolume.gain(ctx, 'fx')).connect(comp); comp.connect(ctx.destination);
     fxBus = ctx.createGain(); fxBus.gain.value = 0.9; fxBus.connect(master);
+    // les détonations passent par une légère saturation : plus denses, plus fortes sans saturer la sortie
+    gunBus = ctx.createGain(); gunBus.gain.value = 1;
+    const sat = ctx.createWaveShaper(), curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); }
+    sat.curve = curve; sat.oversample = '2x';
+    const satOut = ctx.createGain(); satOut.gain.value = 0.85;
+    gunBus.connect(sat); sat.connect(satOut); satOut.connect(fxBus);
     bed = ctx.createGain(); bed.gain.value = 0.5; bed.connect(master);
     const len = ctx.sampleRate * 2;
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -131,23 +140,23 @@ export function createSound() {
   }
 
   // ------------------------------------------------------------------ briques
-  function out(v, pan = 0, cut = 0, rev = 0) {
+  function out(v, pan = 0, cut = 0, rev = 0, bus = fxBus) {
     const g = ctx.createGain(); g.gain.value = v;
     let node = g;
     if (cut) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; g.connect(f); node = f; }
     if (ctx.createStereoPanner && pan) { const p = ctx.createStereoPanner(); p.pan.value = pan; node.connect(p); node = p; }
-    node.connect(fxBus);
+    node.connect(bus);
     if (rev > 0) { const r = ctx.createGain(); r.gain.value = rev; node.connect(r); r.connect(revBus); }
     return g;
   }
   // un enregistrement (une variante au hasard) ; faux s'il n'est pas (encore) chargé
-  function voice(name, { v = 1, pan = 0, cut = 0, rate = 1, rev = 0.12, t = 0 } = {}) {
+  function voice(name, { v = 1, pan = 0, cut = 0, rate = 1, rev = 0.12, t = 0, bus = fxBus } = {}) {
     const list = bufs.get(name);
     if (!list) return false;
     if (voices > 56) return true;
     const s = ctx.createBufferSource(); s.buffer = list[Math.floor(Math.random() * list.length)];
     s.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
-    s.connect(out(v, pan, cut, rev));
+    s.connect(out(v, pan, cut, rev, bus));
     voices++; s.onended = () => { voices--; };
     s.start(Math.max(ctx.currentTime, t || 0));
     return true;
@@ -273,7 +282,8 @@ export function createSound() {
     const t = ctx.currentTime + 0.003, vol = SHOT_VOL[w] || 0.8;
     if (w === 'roquette') { if (mine) fire('roquette', { v: 0.9, rev: 0.15 }); else at('roquette', Q.x, Q.y + 1.4, Q.z, 1, SHOT_RANGE.roquette); return; }
     if (mine) {
-      if (!voice('tir-' + w, { v: vol, rev: 0.22, t })) synth(w, out(0.75), t);
+      if (!voice('tir-' + w, { v: vol, rev: 0.22, t, bus: gunBus })) synth(w, out(0.75), t);
+      punch(w, out(1, 0, 0, 0.1, gunBus), t, 1);
       if (w === 'pompe') voice('pompe-arme', { v: 0.55, t: t + 0.42, rev: 0.05 });
       if (w === 'sniper') voice('culasse-sniper', { v: 0.5, t: t + 0.55, rev: 0.05 });
       return;
@@ -286,9 +296,24 @@ export function createSound() {
     const v = vol / (1 + d / 22) * (1 - d / range) ** 0.7;
     const near = Math.max(0, Math.min(1, 1 - (d - 20) / 45)), far = Math.max(0, Math.min(1, (d - 12) / 40));
     let played = false;
-    if (near > 0) played = voice('tir-' + w, { v: v * near, pan, cut: d > 15 ? Math.max(2500, 14000 - d * 160) : 0, rev: 0.18 + d / 120, t: t + delay }) || played;
-    if (far > 0) played = voice('loin-' + w, { v: v * far * 1.7, pan, cut: Math.max(650, 4200 - d * 9), rev: 0.45, t: t + delay }) || played;
+    if (near > 0) {
+      played = voice('tir-' + w, { v: v * near, pan, cut: d > 15 ? Math.max(2500, 14000 - d * 160) : 0, rev: 0.18 + d / 120, t: t + delay, bus: gunBus }) || played;
+      punch(w, out(v * near, pan, 0, 0.15, gunBus), t + delay, 1);
+    }
+    if (far > 0) {
+      played = voice('loin-' + w, { v: v * far * 1.7, pan, cut: Math.max(650, 4200 - d * 9), rev: 0.45, t: t + delay }) || played;
+      // de loin, il reste le grondement grave qui roule
+      punch(w, out(v * far * 0.9, pan, 300, 0.5), t + delay, 1.8);
+    }
     if (!played) at(w, Q.x, Q.y + 1.4, Q.z, 1.1, range);
+  }
+  // coup sourd sous la détonation (grave qui descend) et claquement très bref ; slow > 1 : plus lent (de loin)
+  function punch(w, o, t, slow = 1) {
+    const P = PUNCH[w];
+    if (!P) return;
+    tone(o, t, P[2] * slow, { f0: P[0], f1: P[1], a: 0.002, v: P[3] });
+    tone(o, t, P[2] * 0.6 * slow, { type: 'triangle', f0: P[0] * 2, f1: P[1] * 1.5, a: 0.001, v: P[3] * 0.35 });
+    if (slow === 1) noise(o, t, 0.018, { type: 'highpass', f0: 3500, a: 0.0005, v: 0.55 });
   }
   // une balle qui passe près de l'oreille (tirée par un autre)
   function whiz(from, to) {

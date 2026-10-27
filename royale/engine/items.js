@@ -41,6 +41,8 @@ export const WEAPONS = {
   sniper: {
     label: 'Fusil de précision', ammo: 'lourdes', dmg: [95, 100, 105, 110], rate: 0.35, mag: 1, reload: [3.0, 2.9, 2.8, 2.7],
     spread: [0.12, 0], bloom: 0, range: 450, falloff: [450, 450, 1], head: 2.5, auto: false, struct: 1.4, zoom: 4,
+    // une vraie balle : elle vole (≈ 1 s pour 450 m), tombe, et dérive à droite (Coriolis, voir sim.js)
+    bullet: { speed: 460, g: 9.81 },
   },
   roquette: {
     label: 'Lance-roquettes', ammo: 'roquettes', dmg: [100, 105, 110, 116], rate: 0.75, mag: 1, reload: [3.2, 3.0, 2.9, 2.8],

@@ -318,6 +318,9 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     // un bot pose un mur une fois au sol
     const B0 = [...host.S.players.values()].find((p) => p.bot && p.alive && p.mode === 'sol' && p.ground);
     if (!built && B0 && step % 30 === 0) { B0.mats.bois = 60; built = !!hb.place(B0, 'mur', 'bois'); }
+    // une voiture cassée avant l'arrivée du second invité, une dalle d'étage après : les copies doivent suivre
+    if (step === 60 * 50) { const pi = m.props.findIndex((p) => p.kind === 'voiture'); if (pi >= 0) hb.hit('p:' + pi, 1e5, null, [m.props[pi].x, 1, m.props[pi].z], false); }
+    if (step === 60 * 100) { const bb = m.buildings.find((b) => b.floors > 1 && !(b.levels[1].hole && b.levels[1].hole.x === b.x0 && b.levels[1].hole.z === b.z0)); hb.hit(`s:${bb.id}:1:${bb.x0},${bb.z0}`, 1e5, null, [bb.x0 * 4 + 2, floorY(bb, 1), bb.z0 * 4 + 2], false); }
     host.step(DT);
     for (const e of host.takeEvents()) { pend.push(e); if (e.e === 'elim') kills++; }
     if (step === 60 * 70) { g2 = copy(); applyFull(g2.sim, g2.W, g2.b, wire(fullState(host, Wh, hb))); }
@@ -345,7 +348,7 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   };
   same(g1, 'invité du départ'); same(g2, 'invité arrivé en route');
   ok(built && hb.pieces.size >= 1, 'une construction pendant la partie');
-  ok(kills >= 2 && hb.broken.size > 0, `des bots qui se battent (${kills} éliminations) et cassent le décor`);
+  ok(kills >= 2 && hb.broken.size >= 2, `des bots qui se battent (${kills} éliminations), du décor cassé (${hb.broken.size})`);
   // l'hôte s'en va : la copie reprend la partie et la mène à son terme
   const G = g1.sim;
   G.S.nextItem = Math.max(G.S.nextItem, ...[...G.S.items.keys()].map((k) => k + 1));
@@ -391,6 +394,60 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
   ok(fix < 1, `prédiction de l'invité : correction maximale ${fix.toFixed(2)} m`);
   console.log(`  prédiction : correction moyenne ${(fixes / 600 * 100).toFixed(1)} cm, au pire ${(fix * 100).toFixed(0)} cm (100 ms aller, 100 ms retour)`);
+}
+// ------------------------------------------------------------------ bots contre l'hôte, balle du sniper, chutes, dalles
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  // l'hôte du salon a l'identifiant 0 : les bots doivent l'attaquer comme les autres
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, ...Array.from({ length: 11 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal' }))];
+  const sim = createSim({ map: m, world: W, seed: 7, roster, mode: 'partie' });
+  const B = createBuild(sim, m, W);
+  createAI(sim, m, W);
+  const host = sim.player(0);
+  while (sim.S.t < 140) { sim.step(DT); sim.takeEvents(); }
+  const armed = [...sim.S.players.values()].filter((P) => P.bot && P.alive && P.mode === 'sol' && P.inv.some((it) => it && it.t === 'arme' && it.mag > 0));
+  let attacked = 0, tries = 0;
+  for (const P of armed.slice(0, 4)) {
+    const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
+    const x = P.x + fx * 12, z = P.z + fz * 12, y = W.support(x, z, P.y + 1.5);
+    if (Math.abs(y - P.y) > 1.5) continue;
+    Object.assign(host, { x, y, z, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 0, alive: true });
+    tries++;
+    const t0 = sim.S.t;
+    let hurt = false;
+    while (sim.S.t < t0 + 8 && host.alive && !hurt) { sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'degat' && e.to === 0 && e.by != null) hurt = true; }
+    if (hurt) attacked++;
+  }
+  ok(tries > 0 && attacked >= Math.ceil(tries / 2), `les bots n'attaquent pas l'hôte (identifiant 0) : ${attacked}/${tries}`);
+  // balle du fusil de précision : elle vole, tombe et dérive à droite (Coriolis) ; tirée à 150 m d'altitude vers le nord
+  const shooter = armed[0] || [...sim.S.players.values()].find((P) => P.bot && P.alive);
+  sim.S.hooks.think = null;
+  sim.S.projectiles.length = 0;
+  const o = [400, 150, 400];
+  const pr = { id: 9999, kind: 'balle', x: o[0], y: o[1], z: o[2], vx: 0, vy: 0, vz: 460, owner: shooter.id, it: { t: 'arme', w: 'sniper', r: 3, mag: 0 }, life: 2, from: [...o], dist: 0 };
+  sim.S.projectiles.push(pr);
+  if (pr) {
+    let t = 0;
+    while (sim.S.projectiles.includes(pr) && pr.z < o[2] + 300) { sim.step(DT); t += DT; }
+    const drop = o[1] - pr.y, drift = o[0] - pr.x; // regard vers +z : la droite est vers −x
+    ok(t > 0.5 && t < 0.9, `vol de 300 m en ${t.toFixed(2)} s`);
+    ok(drop > 1.2 && drop < 3.5, `chute de la balle à 300 m : ${drop.toFixed(2)} m`);
+    ok(drift > 0.1 && drift < 1.5, `dérive de Coriolis à 300 m : ${drift.toFixed(2)} m vers la droite`);
+    console.log(`\nbots contre l'hôte : ${attacked}/${tries} · balle à 300 m : ${t.toFixed(2)} s, chute ${drop.toFixed(2)} m, dérive ${drift.toFixed(2)} m à droite`);
+  }
+  // une chute enlève de la vie, pas du bouclier
+  Object.assign(host, { alive: true, hp: 100, sh: 50 });
+  sim.damage(host, 20, null, { cause: 'chute' });
+  ok(host.sh === 50 && host.hp === 80, `chute : bouclier ${host.sh}, vie ${host.hp}`);
+  // une dalle d'étage se casse, et l'on passe au travers
+  const bb = m.buildings.find((b) => b.floors > 1 && b.levels[1]);
+  const cx = bb.x0 + (bb.levels[1].hole && bb.levels[1].hole.x === bb.x0 ? 1 : 0), cz = bb.z0;
+  const key = `s:${bb.id}:1:${cx},${cz}`;
+  ok(W.byKey.has(key), `dalle ${key} introuvable`);
+  const px = (cx + 0.5) * 4, pz = (cz + 0.5) * 4, F1 = floorY(bb, 1);
+  ok(Math.abs(W.support(px, pz, F1 + 0.3) - F1) < 0.05, 'on ne tient pas sur la dalle de l\'étage');
+  for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 100, null, [px, F1, pz], false);
+  ok(B.broken.has(key) && W.support(px, pz, F1 + 0.3) < F1 - 1, 'la dalle cassée tient encore');
 }
 console.log(fails ? `\n${fails} échec(s)` : '\nTout est bon.');
 process.exit(fails ? 1 : 0);

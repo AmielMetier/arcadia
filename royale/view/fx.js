@@ -157,7 +157,10 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
   // ------------------------------------------------------------------ projectiles en vol
   const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2), rocketMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a });
   const nadeGeo = new THREE.SphereGeometry(0.09, 10, 8), nadeMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a }), blastMat = new THREE.MeshStandardMaterial({ color: 0x9b59d0, emissive: 0x3a1a6a });
-  own.push(rocketGeo, rocketMat, nadeGeo, nadeMat, blastMat);
+  // balle du fusil de précision : un trait lumineux de 4 m dans l'axe de son vol
+  const bulletGeo = new THREE.CylinderGeometry(0.025, 0.012, 4, 5).rotateX(Math.PI / 2).translate(0, 0, -2);
+  const bulletMat = new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  own.push(rocketGeo, rocketMat, nadeGeo, nadeMat, blastMat, bulletGeo, bulletMat);
   const projMeshes = new Map();
   // ------------------------------------------------------------------ tempête : un grand cylindre violet translucide
   const stormMat = new THREE.ShaderMaterial({
@@ -180,12 +183,17 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
 
   // ------------------------------------------------------------------ réactions aux événements de la partie
   const TRACER_COLORS = { fusil: 0xffe08a, smg: 0xffd070, pistolet: 0xfff0b0, pompe: 0xffb060, sniper: 0xbfe0ff };
-  function shot(from, to, w, hit, muzzle) {
+  // late : la balle (fusil de précision) a déjà été dessinée en vol, on ne montre que l'impact
+  function shot(from, to, w, hit, muzzle, late = false) {
+    if (late) { impact(to, hit); return; }
     const tr = trList[trNext]; trNext = (trNext + 1) % N;
     tr.from.set(from[0], from[1], from[2]); tr.to.set(to[0], to[1], to[2]);
     // la traînée part de la bouche de l'arme si on la connaît
     if (muzzle) tr.from.copy(muzzle);
     tr.life = tr.max = w === 'sniper' ? 0.35 : 0.09; tr.color.setHex(TRACER_COLORS[w] || 0xffffff);
+    impact(to, hit);
+  }
+  function impact(to, hit) {
     if (hit === 1) {
       puff(to[0], to[1], to[2], { color: 0xc8bfa8, size: 0.25, grow: 2.5, life: 0.45, op: 0.7 });
       puff(to[0], to[1], to[2], { tex: T.glow, color: 0xffd080, size: 0.25, grow: 0.5, life: 0.08, add: true });
@@ -301,10 +309,11 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       seen.add(pr.id);
       let o = projMeshes.get(pr.id);
       if (!o) {
-        o = pr.kind === 'roquette' ? new THREE.Mesh(rocketGeo, rocketMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
+        o = pr.kind === 'roquette' ? new THREE.Mesh(rocketGeo, rocketMat) : pr.kind === 'balle' ? new THREE.Mesh(bulletGeo, bulletMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
         group.add(o); projMeshes.set(pr.id, o);
       }
       o.position.set(pr.x, pr.y, pr.z);
+      if (pr.kind === 'balle') o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz);
       if (pr.kind === 'roquette') { o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz); puff(pr.x - pr.vx * 0.012, pr.y - pr.vy * 0.012, pr.z - pr.vz * 0.012, { color: 0xd8d0c8, size: 0.25, grow: 1.4, life: 0.7, op: 0.5 }); }
     }
     for (const [id, o] of projMeshes) if (!seen.has(id)) { group.remove(o); projMeshes.delete(id); }
