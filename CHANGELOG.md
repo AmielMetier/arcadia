@@ -1,6 +1,7 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.95 — 27 octobre 2026
+## 3.0 — 27 octobre 2026
+- **Hub** — Version 3.0 : Island Rush change de dimension (sons enregistrés, armes détaillées, deltaplane, île plus belle vue du ciel, jusqu'à 60 joueurs) et les affiches de Birdie Party et d'Island Rush sont refaites à partir du jeu actuel.
 - **Island Rush** — Les montagnes ne s'escaladent plus : on ralentit dans les pentes fortes et, au-delà d'environ 40°, on glisse vers le bas sans pouvoir sauter. Les chemins restent praticables à pied (le refuge du sommet se rejoint par son sentier), et une rampe construite permet toujours de grimper.
 - **Island Rush** — Les ponts sont droits et à niveau de la route : plus de marche à l'entrée, plus de virage qui sortait du tablier contre le garde-corps.
 - **Island Rush** — Les chutes ne blessent qu'au-delà d'environ 8 m, en proportion de la hauteur.
@@ -27,16 +28,15 @@
 - **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 
-## 2.94 — 27 octobre 2026
+## 2.96 — 27 octobre 2026
 - **Mini-Golf Party** — Correction : la caméra tourne sans limite à la souris (Claude)
 
-## 2.93 — 27 octobre 2026
+## 2.95 — 27 octobre 2026
 - **Bastion Clash** — Les combats ne font plus ramer le jeu.
   - Le premier gros affrontement de la partie ne fige plus l'écran une demi-seconde, et les batailles suivantes restent fluides : les tirs, explosions et étincelles coûtent environ cinq fois moins cher à afficher.
   - Les éclairs des explosions sont devenus des halos de lumière au sol, aussi visibles qu'avant.
 - **Bastion Clash** — Le bruit des VCS qui récoltent est beaucoup plus discret : un petit tintement doux toutes les une à deux secondes au lieu d'un crépitement aigu en continu.
 
-## 2.89 — 27 octobre 2026
 ## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.
   - Le pistolet se tient à deux mains, le lance-roquettes à l'épaule ; le fusil à pompe ne pointe plus vers le ciel, en main comme au sol.

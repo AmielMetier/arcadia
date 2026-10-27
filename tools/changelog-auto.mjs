@@ -1,7 +1,7 @@
 // Journal des versions automatique.
 // Lancé par .github/workflows/changelog.yml à chaque push sur main : si les commits poussés n'ont pas touché
 // CHANGELOG.md (autre compte, autre IA, oubli), on ajoute une entrée rédigée à partir des messages de commit
-// et on monte la version du Hub (2.15 → 2.16). Si le journal a été écrit à la main, on vérifie seulement que
+// et on monte la version du Hub (3.0 → 3.1). Si le journal a été écrit à la main, on vérifie seulement que
 // la version affichée par le Hub correspond à la dernière entrée.
 //
 //   node tools/changelog-auto.mjs <sha avant> <sha après> [--dry-run]

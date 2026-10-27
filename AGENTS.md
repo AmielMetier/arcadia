@@ -8,11 +8,12 @@ jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Cal
 Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), qui lit `CHANGELOG.md`.
 **Toute modification visible par les joueurs doit donc :**
 
-1. **Monter la version** dans `hub/hub.js` : `const VERSION = '2.15';` → `'2.16'` (on reste en 2.x, +1 sur le second nombre).
+1. **Monter la version** dans `hub/hub.js` : `const VERSION = '3.0';` → `'3.1'` (le Hub est en 3.x depuis le 27 octobre 2026,
+   +1 sur le second nombre).
 2. **Ajouter une entrée en haut de `CHANGELOG.md`**, juste sous le titre, au format :
 
    ```markdown
-   ## 2.16 — 22 octobre 2026
+   ## 3.1 — 28 octobre 2026
    - **Nom du jeu** — ce qui change, écrit pour les joueurs (pas pour les développeurs).
      - détail éventuel (sous-liste indentée de deux espaces)
    ```
@@ -20,7 +21,7 @@ Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), q
    - En français, phrases courtes, du point de vue du joueur (« Les échanges se proposent pendant son tour »),
      pas de noms de fichiers ni de fonctions.
    - Une ligne par nouveauté ou correction ; regrouper ce qui concerne le même jeu.
-   - La date est celle du jour, en toutes lettres (`22 octobre 2026`).
+   - La date est celle du jour, en toutes lettres (`28 octobre 2026`).
 3. **Faire les deux dans le même commit** que le changement (ou le même push).
 
 Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'action GitHub
