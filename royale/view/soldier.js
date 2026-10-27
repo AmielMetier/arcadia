@@ -57,6 +57,29 @@ export function aimFrame(kit) {
   return S.aim;
 }
 
+// les armes du kit ne sont pas toutes posées pareil dans la main : rotation (repère de la main, autour de la poignée)
+// qui couche le canon dans l'axe du regard quand il épaule. Axe du canon : direction principale des sommets (de la
+// poignée vers la bouche)
+const fixes = new Map();
+export function barrelFix(kit, w) {
+  if (fixes.has(w)) return fixes.get(w);
+  const g = kit.weapons[w].hand, aim = aimFrame(kit), P = g.attributes.position, v = new THREE.Vector3();
+  const pts = [];
+  for (let i = 0; i < P.count; i += Math.max(1, Math.floor(P.count / 2000))) pts.push(v.fromBufferAttribute(P, i).applyMatrix4(aim).clone());
+  const c = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / pts.length);
+  // direction principale (méthode des puissances sur la covariance)
+  const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (const p of pts) { const d = [p.x - c.x, p.y - c.y, p.z - c.z]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i][j] += d[i] * d[j]; }
+  let a = new THREE.Vector3(0, 0, 1);
+  for (let k = 0; k < 30; k++) a = new THREE.Vector3(C[0][0] * a.x + C[0][1] * a.y + C[0][2] * a.z, C[1][0] * a.x + C[1][1] * a.y + C[1][2] * a.z, C[2][0] * a.x + C[2][1] * a.y + C[2][2] * a.z).normalize();
+  if (a.z < 0) a.negate();
+  const qc = new THREE.Quaternion().setFromUnitVectors(a, new THREE.Vector3(0, 0, 1));
+  const qa = new THREE.Quaternion().setFromRotationMatrix(aim);
+  const fix = qa.clone().invert().multiply(qc).multiply(qa);
+  fixes.set(w, fix);
+  return fix;
+}
+
 export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0xc98f64, items } = {}) {
   const S = kit.soldier, cal = calibrate(kit);
   const root = new THREE.Group();
@@ -70,8 +93,15 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   mesh.material = mat; mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
   const hand = model.getObjectByName('Index1R'), torso = model.getObjectByName('Torso'), neck = model.getObjectByName('Neck');
   const upperArm = model.getObjectByName('UpperArmR'), lowerArm = model.getObjectByName('LowerArmR');
-  const baseTorso = torso ? torso.quaternion.clone() : null, baseNeck = neck ? neck.quaternion.clone() : null;
-  const baseUpper = upperArm ? upperArm.quaternion.clone() : null, baseLower = lowerArm ? lowerArm.quaternion.clone() : null, baseHand = hand.quaternion.clone();
+  // les deux bras (main droite : l'index qui porte l'arme ; main gauche : celle qui tient le garde-main)
+  const ARMS = {
+    R: { up: upperArm, low: lowerArm, end: hand },
+    L: { up: model.getObjectByName('UpperArmL'), low: model.getObjectByName('LowerArmL'), end: model.getObjectByName('Index1L') },
+  };
+  const armsOk = !!(ARMS.R.up && ARMS.R.low && ARMS.L.up && ARMS.L.low && ARMS.L.end);
+  // os qu'on tourne nous-mêmes : ils reprennent la pose de l'animation avant chaque image (sinon ça s'accumule)
+  const posed = [torso, neck, upperArm, lowerArm, hand, ARMS.L.up, ARMS.L.low, ARMS.L.end].filter(Boolean);
+  const base = posed.map((b) => b.quaternion.clone());
   const qx = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0);
   // objets tenus qui ne viennent pas du kit : dans un support à l'échelle du monde, accroché à la main
   const holder = new THREE.Group(); hand.add(holder);
@@ -108,7 +138,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   }
 
   let held = null, heldKind = null, heldC = null, fly = 0, swim = 0, deadT = 0, air = 0, kick = 0, aimLift = 0;
-  let arm = null, use = 0, reload = 0, crouchGun = 0, clock = 0;
+  let arm = null, use = 0, reload = 0, hold = 0, clock = 0, heldW = null;
   // ---------------------------------------------------------------- gestes : la main va à un point, épaule et coude suivent
   // (cinématique inverse à deux os : bras et avant-bras). Points et coude exprimés dans le repère du corps, depuis
   // l'épaule : x vers la gauche du personnage (le milieu du corps pour la main droite), y en haut, z devant.
@@ -121,12 +151,15 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     bone.parent.getWorldQuaternion(qp);
     bone.quaternion.premultiply(qp.clone().invert().multiply(qd).multiply(qp));
   }
-  function reach(target, w, pole, roll = 0) {
+  // target : point du repère du corps depuis l'épaule (ou point du monde si world) ; side : 'R' ou 'L'
+  function reach(target, w, pole, roll = 0, side = 'R', world = false) {
     if (w <= 0.002) return;
+    const A = ARMS[side], upperArm = A.up, lowerArm = A.low, hand = A.end;
     body.getWorldQuaternion(qb);
     upperArm.getWorldPosition(S0); lowerArm.getWorldPosition(E0); hand.getWorldPosition(H0);
     const L1 = S0.distanceTo(E0), L2 = E0.distanceTo(H0);
-    T.copy(target).applyQuaternion(qb).add(S0).sub(H0).multiplyScalar(w).add(H0);
+    if (world) T.copy(target); else T.copy(target).applyQuaternion(qb).add(S0);
+    T.sub(H0).multiplyScalar(w).add(H0);
     dir.subVectors(T, S0);
     const d = clamp(dir.length(), Math.abs(L1 - L2) + 0.01, L1 + L2 - 0.005);
     dir.normalize(); T.copy(S0).addScaledVector(dir, d);
@@ -142,13 +175,35 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       lowerArm.quaternion.premultiply(qp.clone().invert().multiply(qd.setFromAxisAngle(v1, roll)).multiply(qp));
     }
   }
-  // l'arme tenue pointe droit devant (orientation de la main quand il épaule)
-  const aimQ = new THREE.Quaternion().setFromRotationMatrix(aimFrame(kit)), qh = new THREE.Quaternion();
-  function aimHand(w) {
+  // l'arme tenue pointe dans l'axe du regard (orientation de la main quand il épaule, inclinée de pitch)
+  const aimQ = new THREE.Quaternion().setFromRotationMatrix(aimFrame(kit)), qh = new THREE.Quaternion(), qpi = new THREE.Quaternion();
+  function aimHand(w, pitch = 0) {
     body.getWorldQuaternion(qb); hand.parent.getWorldQuaternion(qp);
-    qh.copy(qp).invert().multiply(qb).multiply(aimQ);
+    qh.copy(qp).invert().multiply(qb).multiply(qpi.setFromAxisAngle(X, -pitch)).multiply(aimQ);
     hand.quaternion.slerp(qh, w);
   }
+  // tenue de chaque arme : main droite (depuis l'épaule droite, repère du corps), main gauche à `l` m devant elle
+  // le long de l'arme et `ld` m plus bas (garde-main) ; le pistolet se tient à deux mains, le lance-roquettes à l'épaule
+  const HOLD = {
+    fusil: { r: [-0.03, -0.24, 0.34], l: 0.34, ld: 0.04 }, pompe: { r: [-0.03, -0.24, 0.34], l: 0.36, ld: 0.04 },
+    smg: { r: [-0.02, -0.22, 0.32], l: 0.2, ld: 0.05 }, sniper: { r: [-0.03, -0.22, 0.34], l: 0.42, ld: 0.04 },
+    pistolet: { r: [0.06, -0.14, 0.44], l: 0.0, ld: 0.06 }, roquette: { r: [-0.03, -0.14, 0.2], l: 0.32, ld: 0.06 },
+  };
+  const POLE_L = new THREE.Vector3(0.6, -0.8, -0.2), gf = V(), gd = V();
+  function holdGun(w, pitch, k) {
+    const H = HOLD[heldW] || HOLD.fusil;
+    // main droite devant l'épaule, l'arme dans l'axe du regard ; recul au tir
+    tgt.set(H.r[0], H.r[1], H.r[2] - 0.05 * k).applyAxisAngle(X, -pitch);
+    reach(tgt, w, POLE.bas);
+    aimHand(w, pitch + 0.1 * k);
+    // main gauche sur le garde-main
+    body.getWorldQuaternion(qb);
+    gf.set(0, 0, 1).applyAxisAngle(X, -pitch).applyQuaternion(qb);
+    gd.set(0, -1, 0).applyQuaternion(qb);
+    hand.getWorldPosition(T2).addScaledVector(gf, H.l).addScaledVector(gd, H.ld);
+    reach(T2, w, POLE_L, 0, 'L', true);
+  }
+  const T2 = V();
   const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
   const P3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const POLE = { bas: P3(-0.6, -0.8, -0.2), haut: P3(-0.7, 0.35, 0.55), avant: P3(-0.7, -0.5, 0.45) };
@@ -173,8 +228,10 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   function setItem(it, model3d) {
     if (held) { held.parent && held.parent.remove(held); held = null; }
     heldKind = it ? (it.t === 'arme' ? 'arme' : 'objet') : 'outil';
+    heldW = it && it.t === 'arme' ? it.w : null;
     if (it && it.t === 'arme' && kit.weapons[it.w]) {
       held = new THREE.Mesh(kit.weapons[it.w].hand, rarityMaterial(it.r));
+      held.quaternion.copy(barrelFix(kit, it.w));
       held.castShadow = true;
       hand.add(held);
     } else if (!it && kit.tool) {
@@ -220,13 +277,9 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       else play('Idle', 0.25);
     }
     // les os qu'on penche nous-mêmes reprennent la pose de l'animation avant chaque image (sinon ça s'accumule)
-    if (torso) torso.quaternion.copy(baseTorso);
-    if (neck) neck.quaternion.copy(baseNeck);
-    if (upperArm) { upperArm.quaternion.copy(baseUpper); lowerArm.quaternion.copy(baseLower); hand.quaternion.copy(baseHand); }
+    posed.forEach((b, i) => b.quaternion.copy(base[i]));
     mixer.update(dt);
-    if (torso) baseTorso.copy(torso.quaternion);
-    if (neck) baseNeck.copy(neck.quaternion);
-    if (upperArm) { baseUpper.copy(upperArm.quaternion); baseLower.copy(lowerArm.quaternion); baseHand.copy(hand.quaternion); }
+    posed.forEach((b, i) => base[i].copy(b.quaternion));
     // le buste suit le regard (haut, bas) ; recul au tir
     kick = Math.max(0, kick - dt * 8);
     aimLift = damp(aimLift, st.alive === false || fly > 0.5 ? 0 : clamp(st.pitch || 0, -0.9, 0.9), 12, dt);
@@ -237,7 +290,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     const alive = st.alive !== false && fly < 0.5 && swim < 0.5;
     use = damp(use, alive && st.use ? 1 : 0, 9, dt);
     reload = damp(reload, alive && st.reload && gun ? 1 : 0, 10, dt);
-    if (upperArm && lowerArm) {
+    if (armsOk) {
       if (arm) {
         arm.t += dt;
         const a = arm.t / arm.T;
@@ -256,9 +309,10 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
           if (neck) neck.quaternion.multiply(qx.setFromAxisAngle(X, -0.3 * use));
         } else reach(tgt.set(0.22 + Math.cos(clock * 7) * 0.05, -0.18 + Math.sin(clock * 7) * 0.05, 0.36), use, POLE.bas, 0.4 * use);
       }
-      // accroupi l'arme à la main : l'animation du kit (sans arme) la pointerait vers le sol ; on la garde en joue
-      crouchGun = damp(crouchGun, alive && st.crouch && gun && !arm ? 1 - reload : 0, 10, dt);
-      if (crouchGun > 0.01) { reach(tgt.set(0.06, 0.0, 0.6), crouchGun, POLE.bas); aimHand(crouchGun); }
+      // arme à la main : tenue à deux mains, épaulée dans l'axe du regard (debout, en courant, accroupi, en l'air) ;
+      // les animations du kit la tiennent d'une main, à bout de bras ou vers le sol
+      hold = damp(hold, alive && gun && !arm ? 1 - reload : 0, 12, dt);
+      if (hold > 0.01) holdGun(hold, aimLift, kick);
       // rechargement : l'arme descend et pivote, petit à-coup au milieu
       if (reload > 0.01 && !arm) reach(tgt.set(0.08, -0.25, 0.4), reload, POLE.bas, (0.9 + 0.2 * Math.sin(clock * 9)) * reload);
     }

@@ -167,7 +167,9 @@ export function createActors(scene, sim, kit = null) {
 
   // ------------------------------------------------------------------ chaque image
   // pos(P) : position affichée d'un joueur (interpolée par l'appli)
-  function update(dt, t, cam, pos, hideId) {
+  // see(x, y, z) : vrai si rien ne cache ce point (un mur, un plancher) ; les lueurs ne se voient pas à travers
+  const chestSeen = new Map();
+  function update(dt, t, cam, pos, hideId, see = null) {
     const S = sim.S;
     for (const P of S.players.values()) {
       const h = heroFor(P), a = pos(P), hero = h.hero;
@@ -196,11 +198,17 @@ export function createActors(scene, sim, kit = null) {
     }
     // butin : rafraîchi 4 fois par seconde, animé à chaque image
     lootClock += dt;
-    if (lootClock > 0.25) { lootClock = 0; syncLoot(cam.x, cam.z); }
+    if (lootClock > 0.25) {
+      lootClock = 0; syncLoot(cam.x, cam.z);
+      for (const l of loot.values()) { const p = l.g.position; l.vis = !see || see(p.x, p.y + 0.5, p.z); }
+      chestSeen.clear();
+      if (see) for (const c of S.chests.values()) if (c.kind === 'coffre' && !c.open && Math.abs(c.x - cam.x) < 55 && Math.abs(c.z - cam.z) < 55) chestSeen.set(c.id, see(c.x, c.y + 0.6, c.z));
+    }
     let nb = 0, nr = 0;
     for (const l of loot.values()) {
       l.model.rotation.y = t * 1.2 + l.ph; l.model.position.y = 0.45 + Math.sin(t * 2 + l.ph) * 0.08;
       const p = l.g.position, k = RGLOW[l.r], pulse = 0.85 + 0.15 * Math.sin(t * 3 + l.ph);
+      if (l.vis === false) continue;
       if (nr < LCAP) {
         q.identity(); p3.set(p.x, p.y + 0.04, p.z); s3.setScalar(1.4 + 0.3 * l.r + 0.12 * Math.sin(t * 2.5 + l.ph));
         ringMesh.setMatrixAt(nr, m4.compose(p3, q, s3)); ringMesh.setColorAt(nr, tmpC.copy(RCOL[l.r]).multiplyScalar(k * 1.3 * pulse)); nr++;
@@ -215,9 +223,9 @@ export function createActors(scene, sim, kit = null) {
     // coffres dorés fermés à portée : lueur qui palpite et étincelles qui montent
     let ng = 0;
     for (const c of S.chests.values()) {
-      if (c.kind !== 'coffre' || c.open || Math.abs(c.x - cam.x) > 55 || Math.abs(c.z - cam.z) > 55) continue;
-      const ph = (c.id * 1.7) % 6.28, a = 0.55 + 0.25 * Math.sin(t * 3 + ph);
-      if (ng < 100) glows.set(ng++, c.x, c.y + 0.75, c.z, 1.9, 1, 0.78, 0.3, a);
+      if (c.kind !== 'coffre' || c.open || Math.abs(c.x - cam.x) > 55 || Math.abs(c.z - cam.z) > 55 || chestSeen.get(c.id) === false) continue;
+      const ph = (c.id * 1.7) % 6.28, a = 0.32 + 0.14 * Math.sin(t * 3 + ph);
+      if (ng < 100) glows.set(ng++, c.x, c.y + 0.6, c.z, 1.15, 1, 0.74, 0.28, a);
       if (Math.random() < dt * 5 && sparks.length < 160) sparks.push({ x: c.x + (Math.random() - 0.5) * 0.9, y: c.y + 0.4 + Math.random() * 0.4, z: c.z + (Math.random() - 0.5) * 0.9, t: 0, life: 0.7 + Math.random() * 0.5 });
     }
     for (let i = sparks.length - 1; i >= 0; i--) {

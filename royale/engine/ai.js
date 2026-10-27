@@ -208,7 +208,8 @@ export function createAI(sim, map, world) {
       const dx = Q.x - P.x, dz = Q.z - P.z, d = Math.hypot(dx, dz);
       if (d > lv.see && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
       const front = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
-      const heard = Q.shotT != null && S.t - Q.shotT < 0.6 && d < 70;
+      // on entend les coups de feu de loin, et quelqu'un qui court tout près (même dans son dos)
+      const heard = (Q.shotT != null && S.t - Q.shotT < 0.6 && d < 70) || (d < 15 && Q.mode === 'sol' && Math.hypot(Q.vx, Q.vz) > 4.5);
       const hurt = P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5;
       if (d < 12 || front > lv.cone || heard || hurt) cands.push({ Q, d, hurt, heard });
     }
@@ -245,7 +246,8 @@ export function createAI(sim, map, world) {
       const hunted = S.t - (P.hitT || -9) < 4 && P.hitBy === E.id;
       // entre bots, on se cherche moins de loin, surtout en début de partie (on fouille d'abord)
       if (E.bot) reach *= S.t - (B.landT || 0) < 150 ? 0.3 : 0.5;
-      if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && hunted && d < 5 && B.visible)) { B.state = 'fight'; return; }
+      // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
+      if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
     } else B.enemy = null;
     if (danger) {
       if (B.state !== 'zone' || !B.goal) { B.state = 'zone'; setGoal(P, B, zonePoint(P, B, false)); }
