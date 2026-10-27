@@ -942,10 +942,10 @@ function teamPicker() {
 // un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
 // ------------------------------------------------------------------ repères d'équipe
 // ce que vise le réticule : un ennemi près du rayon (avant le premier obstacle), sinon, au point visé, un largage, le
-// butin le plus rare, un coffre fermé, ou simplement l'endroit (« Ici »)
+// butin le plus rare, un coffre fermé, ou simplement l'endroit (« Ici » : depuis la montgolfière, là où l'on va se poser)
 function aimPing() {
   const P = me();
-  if (!P || !P.alive || P.mode === 'ballon') return null;
+  if (!P || !P.alive) return null;
   const c = S.cam, cp = Math.cos(S.pitch), d = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
   const hit = S.world.raycast(c.x, c.y, c.z, d[0], d[1], d[2], 400), L = hit.t < 400 ? hit.t : null;
   let foe = null, fd = Infinity;
