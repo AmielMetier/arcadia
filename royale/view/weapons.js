@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { RARITY, AMMO, MATERIALS, WEAPONS, ITEMS } from '../engine/items.js';
 import { tintMaterial } from './kit.js';
-import { rarityMaterial, aimFrame, barrelFix } from './soldier.js';
+import { rarityMaterial, aimFrame, weaponHand } from './soldier.js';
 
 const geoCache = new Map(), matCache = new Map();
 const box = (w, h, d) => { const k = `b${w},${h},${d}`; if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d)); return geoCache.get(k); };
@@ -97,12 +97,12 @@ function fit(g, len) {
   g.computeBoundingBox(); g.computeBoundingSphere();
   return g;
 }
-function kitWeaponGeo(w) {
-  if (kitGeos.has(w)) return kitGeos.get(w);
-  const src = w === 'pioche' ? KIT.tool : KIT.weapons[w];
-  const fix = w === 'pioche' ? new THREE.Matrix4() : new THREE.Matrix4().makeRotationFromQuaternion(barrelFix(KIT, w));
-  const g = src ? fit(src.hand.clone().applyMatrix4(fix).applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
-  kitGeos.set(w, g);
+function kitWeaponGeo(w, r = 0) {
+  const key = w + (r >= 2 ? 1 : 0);
+  if (kitGeos.has(key)) return kitGeos.get(key);
+  const W = w === 'pioche' ? (KIT.tool ? { geo: KIT.tool.hand, fix: new THREE.Quaternion() } : null) : KIT.weapons[w] ? weaponHand(KIT, w, r) : null;
+  const g = W && W.geo ? fit(W.geo.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(W.fix)).applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
+  kitGeos.set(key, g);
   return g;
 }
 function kitItemGeo(c) {
@@ -128,7 +128,7 @@ export function itemModel(it) {
   const g = new THREE.Group();
   if (KIT) {
     if (!it || it.t === 'arme') {
-      const geo = kitWeaponGeo(it ? it.w : 'pioche');
+      const geo = kitWeaponGeo(it ? it.w : 'pioche', it ? it.r : 0);
       if (geo) { g.add(kitMesh(geo, rarityMaterial(it ? it.r : 0))); g.userData.kit = true; return g; }
     } else if (it.t === 'objet' && ITEM_SIZE[it.c]) {
       const geo = kitItemGeo(it.c);

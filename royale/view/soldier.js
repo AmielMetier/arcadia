@@ -6,7 +6,7 @@
 // bouche) et rechargement (l'arme baisse et pivote). Même façon de faire que view/hero.js (repère local : il regarde
 // +z, pieds à l'origine), qui reste là si le kit ne charge pas.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { cloneSkinned, tintMaterial } from './kit.js';
+import { cloneSkinned, tintMaterial, GUN_FIT } from './kit.js';
 import { RARITY } from '../engine/items.js';
 
 const HEIGHT = 1.8;
@@ -55,6 +55,31 @@ export function aimFrame(kit) {
   m.getObjectByName('Index1R').matrixWorld.decompose(new THREE.Vector3(), q, new THREE.Vector3());
   S.aim = new THREE.Matrix4().makeRotationFromQuaternion(q);
   return S.aim;
+}
+
+// arme tenue : l'arme détaillée de sa rareté si elle existe (géométrie dans le repère de la main, canon déjà dans l'axe
+// du regard : pas de correction), sinon celle du kit. La main (l'index) se cale 3,5 cm derrière la détente et 2 cm
+// dessous ; l'axe de l'arme reste celui de l'arme du kit
+const hands = new Map();
+export function weaponHand(kit, w, r = 0) {
+  const tier = r >= 2 ? 1 : 0, key = w + tier;
+  if (hands.has(key)) return hands.get(key);
+  const old = kit.weapons[w] ? kit.weapons[w].hand : null, canon = kit.guns && kit.guns[w] && kit.guns[w][tier], F = GUN_FIT[w];
+  let out = { geo: old, fix: old ? barrelFix(kit, w) : new THREE.Quaternion() };
+  if (canon && old && F && kit.weapons.fusil) {
+    const aim = aimFrame(kit), box = (ww) => {
+      const o = kit.weapons[ww].hand.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(barrelFix(kit, ww))).applyMatrix4(aim);
+      o.computeBoundingBox(); const b = o.boundingBox.clone(); o.dispose(); return b;
+    };
+    const ob = box(w), ref = box('fusil').getSize(new THREE.Vector3()).z;
+    const k = ref * F.len, m = 0.95 * F.len, [tz, ty0] = F.trig[tier], ty = ty0 * 1.35;
+    const g = canon.clone().scale(k, k, k);
+    g.translate((ob.min.x + ob.max.x) / 2, -(ty - 0.02 / m) * k, -(tz - 0.035 / m) * k).applyMatrix4(aim.clone().invert());
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    out = { geo: g, fix: new THREE.Quaternion() };
+  }
+  hands.set(key, out);
+  return out;
 }
 
 // les armes du kit ne sont pas toutes posées pareil dans la main : rotation (repère de la main, autour de la poignée)
@@ -230,8 +255,9 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     heldKind = it ? (it.t === 'arme' ? 'arme' : 'objet') : 'outil';
     heldW = it && it.t === 'arme' ? it.w : null;
     if (it && it.t === 'arme' && kit.weapons[it.w]) {
-      held = new THREE.Mesh(kit.weapons[it.w].hand, rarityMaterial(it.r));
-      held.quaternion.copy(barrelFix(kit, it.w));
+      const W = weaponHand(kit, it.w, it.r);
+      held = new THREE.Mesh(W.geo, rarityMaterial(it.r));
+      held.quaternion.copy(W.fix);
       held.castShadow = true;
       hand.add(held);
     } else if (!it && kit.tool) {

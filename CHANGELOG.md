@@ -15,6 +15,8 @@
 - **Island Rush** — Les combats se sentent : la vue recule à chaque tir (fort au fusil à pompe et au fusil de précision), la flamme de bouche éclaire autour, l'image tremble quand on est touché.
   - Touches plus lisibles : marqueur qui claque (rouge à l'élimination), chiffres de dégâts plus gros qui s'écartent, arc rouge plus net du côté d'où l'on te tire dessus.
   - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
+- **Island Rush** — Nouvelles armes, bien plus détaillées : un modèle pour les raretés commune et peu commune, un plus moderne pour rare et épique (fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision), à la couleur de leur rareté, en main comme dans le sac.
+  - Au sol, l'arme flotte en tournant au-dessus d'un socle hexagonal lumineux ; une poussière de lumière monte autour du butin rare.
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 
 ## 2.94 — 27 octobre 2026

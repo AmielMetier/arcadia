@@ -16,6 +16,17 @@ export const WEAPON_NODES = { fusil: 'AK', pompe: 'Shotgun', pistolet: 'Pistol',
 export const PROP_FILES = ['caisse', 'baril', 'bonbonne', 'benne', 'poubelle', 'cone', 'barriere', 'barriere-grande', 'sacs', 'sacs-petit', 'pneus', 'citerne-eau', 'reservoir',
   'lampadaire', 'conteneur', 'epave', 'grillage', 'grillage-long', 'palette', 'palette-cassee', 'cartons', 'cartons-pile', 'gravats', 'tuyaux', 'jerrican', 'planches', 'caisson', 'panneau'];
 const ITEM_FILES = { grenade: 'grenade', souffle: 'grenade-feu', soin: 'soin' };
+// armes détaillées (« Ultimate Gun Pack » de Quaternius, models/armes/) : un modèle pour les raretés commune et peu
+// commune, un plus moderne pour rare et épique ; posées canon vers +z, haut +y, longueur 1 (le lance-roquettes reste
+// celui du kit)
+export const GUNS = ['fusil', 'pompe', 'pistolet', 'smg', 'sniper'];
+// détente de chaque modèle [ordinaire, rare] dans ce repère (z, y) : la main se cale juste derrière ; longueur relative
+// au fusil d'assaut du kit
+export const GUN_FIT = {
+  fusil: { trig: [[-0.305, 0.005], [-0.125, 0.02]], len: 1.05 }, pompe: { trig: [[-0.15, -0.01], [-0.22, -0.01]], len: 1.08 },
+  pistolet: { trig: [[-0.0625, 0.05], [-0.075, 0.03]], len: 0.38 }, smg: { trig: [[0.042, 0.0225], [-0.0625, 0.005]], len: 0.72 },
+  sniper: { trig: [[-0.2, -0.015], [-0.155, -0.015]], len: 1.25 },
+};
 // « City Pack » (models/city/) : voitures (la carrosserie prend la couleur de chaque voiture) et mobilier urbain
 export const CARS = ['voiture-a', 'voiture-b', 'voiture-sport', 'voiture-suv', 'voiture-police'];
 export const CITY_FILES = ['banc', 'bouche', 'poubelle-rue', 'boite-lettres', 'abribus', 'pot-arbuste', 'pot-plante', 'jardiniere', 'armoire-elec', 'corde-linge', 'sac-poubelle', 'plaque'];
@@ -88,7 +99,7 @@ export function cloneSkinned(src) {
 
 export async function loadKit(base) {
   const loader = new GLTFLoader(), url = (f) => `${base}toon/${f}.glb`;
-  const kit = { soldier: null, weapons: {}, items: {}, props: {}, city: {}, cars: {} };
+  const kit = { soldier: null, weapons: {}, guns: {}, items: {}, props: {}, city: {}, cars: {} };
   // ---------------------------------------------------------------- le soldat et ses armes
   try {
     const gl = await loader.loadAsync(url('soldat'));
@@ -176,7 +187,26 @@ export async function loadKit(base) {
     });
     return { body: body.length ? merge(body) : null, rest: merge(rest) };
   };
+  // arme détaillée : la partie la plus grande qui n'est ni du bois, ni du noir, ni du verre prend la couleur de rareté
+  const gun = async (f) => {
+    const gl = await loader.loadAsync(`${base}armes/${f}.glb`);
+    gl.scene.updateMatrixWorld(true);
+    const meshes = [], area = new Map();
+    gl.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (const o of meshes) {
+      const P = o.geometry.attributes.position, name = baseName((Array.isArray(o.material) ? o.material[0] : o.material).name);
+      let s = 0;
+      for (let i = 0; i + 2 < P.count; i += 3) { a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, i + 1).sub(a); c.fromBufferAttribute(P, i + 2).sub(a); s += b.cross(c).length() / 2; }
+      area.set(name, (area.get(name) || 0) + s);
+    }
+    const body = [...area].filter(([n]) => !/wood|black|glass/i.test(n)).sort((x, y) => y[1] - x[1])[0];
+    const flags = body ? { [body[0]]: 4 } : {};
+    // un peu plus épaisses que nature, comme les gros gants des personnages
+    return merge(meshes.map((o) => bakePart(o, o.matrixWorld, flags))).scale(1.35, 1.35, 1);
+  };
   await Promise.all([
+    ...GUNS.map(async (w) => { try { kit.guns[w] = await Promise.all([gun(w + '-1'), gun(w + '-2')]); } catch (e) { console.warn('arme détaillée indisponible', w, e); } }),
     ...Object.entries(ITEM_FILES).map(async ([k, f]) => { try { kit.items[k] = await solo(f); } catch (e) { console.warn('objet du kit indisponible', f, e); } }),
     ...PROP_FILES.map(async (f) => { try { kit.props[f] = await solo(f); } catch (e) { console.warn('décor du kit indisponible', f, e); } }),
     ...CITY_FILES.map(async (f) => { try { kit.city[f] = await solo('../city/' + f); } catch (e) { console.warn('mobilier urbain indisponible', f, e); } }),

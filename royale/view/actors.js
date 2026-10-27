@@ -77,6 +77,13 @@ export function createActors(scene, sim, kit = null) {
     grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.55, 'rgba(255,255,255,0.35)'); grd.addColorStop(0.72, 'rgba(255,255,255,0.8)'); grd.addColorStop(0.8, 'rgba(255,255,255,0.25)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = grd; g.fillRect(0, 0, w, w);
   });
+  // socle : un hexagone net qui tourne lentement sous l'objet, cerclé d'un trait clair
+  const padTex = canvasTex(128, 128, (g, w) => {
+    const c = w / 2, hex = (r) => { g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * r, c + Math.sin(a) * r); } g.closePath(); };
+    hex(w * 0.46); g.fillStyle = 'rgba(255,255,255,0.16)'; g.fill();
+    g.lineWidth = w * 0.035; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.stroke();
+    hex(w * 0.36); g.lineWidth = w * 0.012; g.strokeStyle = 'rgba(255,255,255,0.55)'; g.stroke();
+  });
   const glowTex = canvasTex(64, 64, (g, w) => {
     const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
     grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.3, 'rgba(255,240,200,0.55)'); grd.addColorStop(1, 'rgba(255,220,140,0)');
@@ -87,7 +94,8 @@ export function createActors(scene, sim, kit = null) {
   const beamGeo2 = beamGeo.clone().rotateY(Math.PI / 2);
   const beamMesh = new THREE.InstancedMesh(mergeTwo(beamGeo, beamGeo2), new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), LCAP);
   const ringMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), LCAP);
-  for (const m of [beamMesh, ringMesh]) {
+  const padMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), LCAP);
+  for (const m of [beamMesh, ringMesh, padMesh]) {
     m.frustumCulled = false; m.count = 0; m.renderOrder = 3;
     for (let i = 0; i < LCAP; i++) m.setColorAt(i, new THREE.Color(0));
     group.add(m); own.push(m.geometry, m.material);
@@ -95,9 +103,10 @@ export function createActors(scene, sim, kit = null) {
   own.push(beamGeo, beamGeo2);
   const RCOL = RARITY.map((r) => new THREE.Color(r.color));
   const RGLOW = [0.5, 0.95, 1.15, 1.35];
-  // lueur des coffres dorés et étincelles
+  // lueur des coffres dorés et étincelles ; poussière lumineuse qui monte autour du butin rare
   const glows = createBillboards(128, glowTex, { additive: true }); glows.mesh.renderOrder = 3; group.add(glows.mesh); own.push(glows);
-  const sparks = [];
+  const motes = createBillboards(220, glowTex, { additive: true }); motes.mesh.renderOrder = 3; group.add(motes.mesh); own.push(motes);
+  const sparks = [], dust = [];
   let lootClock = 0;
   function syncLoot(cx, cz) {
     const S = sim.S;
@@ -113,7 +122,7 @@ export function createActors(scene, sim, kit = null) {
       root.add(model);
       root.position.set(g.x, g.y, g.z);
       group.add(root);
-      loot.set(g.id, { g: root, model, ph: (g.id * 0.77) % 6.28, n: it.n, r: Math.min(RARITY.length - 1, it.r || 0), beam: it.t === 'arme' || (it.t === 'objet' && it.r > 0) });
+      loot.set(g.id, { g: root, model, ph: (g.id * 0.77) % 6.28, n: it.n, r: Math.min(RARITY.length - 1, it.r || 0), beam: it.t === 'arme' || (it.t === 'objet' && it.r > 0), weapon: it.t === 'arme' });
     }
   }
   // ------------------------------------------------------------------ coffres et caisses de munitions (instanciés)
@@ -211,20 +220,36 @@ export function createActors(scene, sim, kit = null) {
     }
     let nb = 0, nr = 0;
     for (const l of loot.values()) {
-      l.model.rotation.y = t * 1.2 + l.ph; l.model.position.y = 0.45 + Math.sin(t * 2 + l.ph) * 0.08;
+      // l'objet flotte en tournant, un peu penché
+      l.model.rotation.set(0, t * 1.1 + l.ph, l.weapon ? 0.18 : 0); l.model.position.y = 0.55 + Math.sin(t * 2 + l.ph) * 0.09;
       const p = l.g.position, k = RGLOW[l.r], pulse = 0.85 + 0.15 * Math.sin(t * 3 + l.ph);
       if (l.vis === false) continue;
       if (nr < LCAP) {
         q.identity(); p3.set(p.x, p.y + 0.04, p.z); s3.setScalar(1.4 + 0.3 * l.r + 0.12 * Math.sin(t * 2.5 + l.ph));
-        ringMesh.setMatrixAt(nr, m4.compose(p3, q, s3)); ringMesh.setColorAt(nr, tmpC.copy(RCOL[l.r]).multiplyScalar(k * 1.3 * pulse)); nr++;
+        ringMesh.setMatrixAt(nr, m4.compose(p3, q, s3)); ringMesh.setColorAt(nr, tmpC.copy(RCOL[l.r]).multiplyScalar(k * 1.3 * pulse));
+        q.setFromAxisAngle(up, t * 0.5 + l.ph); p3.set(p.x, p.y + 0.06, p.z); s3.setScalar(1.05 + 0.12 * l.r);
+        padMesh.setMatrixAt(nr, m4.compose(p3, q, s3)); padMesh.setColorAt(nr, tmpC.copy(RCOL[l.r]).multiplyScalar(k * (0.9 + 0.2 * pulse)));
+        nr++;
+      }
+      // poussière lumineuse : plus il est rare, plus il en monte (seulement près de soi)
+      if (l.r > 0 && dust.length < 200 && Math.abs(p.x - cam.x) < 30 && Math.abs(p.z - cam.z) < 30 && Math.random() < dt * l.r * 1.6) {
+        const a = Math.random() * Math.PI * 2, rr = 0.25 + Math.random() * 0.35;
+        dust.push({ x: p.x + Math.cos(a) * rr, y: p.y + 0.1, z: p.z + Math.sin(a) * rr, t: 0, life: 1 + Math.random() * 0.6, c: RCOL[l.r] });
       }
       if (l.beam && nb < LCAP) {
         q.setFromAxisAngle(up, t * 0.4 + l.ph); p3.set(p.x, p.y, p.z); s3.set(1, 2.2 + 0.6 * l.r, 1);
         beamMesh.setMatrixAt(nb, m4.compose(p3, q, s3)); beamMesh.setColorAt(nb, tmpC.copy(RCOL[l.r]).multiplyScalar(k * pulse)); nb++;
       }
     }
-    beamMesh.count = nb; ringMesh.count = nr;
-    for (const m of [beamMesh, ringMesh]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    beamMesh.count = nb; ringMesh.count = nr; padMesh.count = nr;
+    for (const m of [beamMesh, ringMesh, padMesh]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    let nm = 0;
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const d = dust[i]; d.t += dt; d.y += dt * 0.55;
+      if (d.t >= d.life) { dust.splice(i, 1); continue; }
+      motes.set(nm++, d.x, d.y, d.z, 0.09, d.c.r * 1.4, d.c.g * 1.4, d.c.b * 1.4, Math.sin(Math.PI * d.t / d.life) * 0.9);
+    }
+    motes.count(nm);
     // coffres dorés fermés à portée : lueur qui palpite et étincelles qui montent
     let ng = 0;
     for (const c of S.chests.values()) {
