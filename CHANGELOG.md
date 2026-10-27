@@ -6,6 +6,12 @@
 - **Island Rush** — Les chutes ne blessent qu'au-delà d'environ 8 m, en proportion de la hauteur.
 - **Island Rush** — Plus de monde sur l'île : 30, 45 ou 60 joueurs (45 par défaut), bots compris.
   - Un tiers des bots sautent près de l'endroit où tu te poses : ça se bat dès l'atterrissage.
+- **Island Rush** — Nouveaux sons, enregistrés sur de vraies armes : chaque arme a sa détonation, sèche de près, claquement étouffé avec écho de loin, et le son arrive en retard quand le tireur est loin.
+  - Rechargements complets (chargeur qui sort et rentre, culasse, cartouches une à une et pompe du fusil à pompe), bruit de l'arme qu'on dégaine.
+  - Les pas changent selon le sol : herbe, route, plancher, carrelage, gravier, neige, métal, eau ; on entend aussi sur quoi marchent les autres.
+  - Les balles qui frôlent sifflent, les impacts sonnent selon la matière (bois, pierre, métal), le bouclier qui casse s'entend.
+  - Écho de pièce à l'intérieur, écho du relief dehors ; vraies explosions, portes qui grincent.
+  - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas.
 
 ## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.

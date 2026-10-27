@@ -4,7 +4,7 @@
 // chaque invité tient une copie à jour, prédit son propre déplacement, dessine les autres un peu en retard et envoie
 // ses commandes. Si l'hôte s'en va, le Hub en désigne un autre qui reprend la partie là où elle en était.
 // Le jeu ne parle jamais au réseau directement : tout passe par HubBridge.
-import { generateMap, ILE } from './engine/map.js';
+import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
 import { createSim, DT, SHOULDER } from './engine/sim.js';
@@ -36,6 +36,12 @@ const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Li
   'Lison', 'Hector', 'Salomé', 'Ethan', 'Apolline', 'Milo', 'Céleste', 'Samuel', 'Olivia', 'Tom', 'Maëlys', 'Aaron', 'Héloïse', 'Lucas', 'Manon'];
 const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
 const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
+// sons des pas : le sol naturel, le plancher de chaque type de bâtiment
+const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
+  [GR.ROUTE]: 'beton', [GR.VILLE]: 'beton', [GR.BATI]: 'bois', [GR.CHAMP]: 'herbe', [GR.LIEU]: 'gravier' };
+const FLOOR_SURF = { immeuble: 'carrelage', tour: 'carrelage', boutique: 'carrelage', mairie: 'carrelage', bureaux: 'carrelage', station: 'carrelage',
+  garage: 'beton', hangar: 'beton', phare: 'beton', abri: 'metal' };
+const MAT_SURF = { bois: 'bois', pierre: 'beton', metal: 'metal' };
 const INTERP = 0.1;          // invités : les autres sont dessinés un dixième de seconde en arrière
 const HOST_SILENCE = 3, HOST_GIVEUP = 15;
 const MATS = ['bois', 'pierre', 'metal'];
@@ -292,7 +298,10 @@ function loop(now) {
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
   if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
-  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP) });
+  // écho de pièce quand la tête du joueur suivi est sous un toit
+  const fp = view.focus, roof = fp ? S.world.ceiling(fp.x, fp.z, fp.y + 0.2) - fp.y : 99;
+  S.indoor = (S.indoor || 0) + ((roof < 9 ? 1 : 0) - (S.indoor || 0)) * Math.min(1, dt * 4);
+  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP), surface, indoor: S.indoor });
   // qualité automatique : si l'image prend plus de 24 ms pendant 3 s, on allège
   if (S.ms > 24 && S.t > 6) { S.slow += dt; if (S.slow > 3) { S.slow = 0; const w = S.scene.lowerQuality(); if (w && DEBUG) toast('Qualité baissée : ' + w, 2); } }
   else S.slow = Math.max(0, S.slow - dt);
@@ -578,6 +587,32 @@ function hideBroken(k) {
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
   else if (k[0] === 'b') S.builds.remove(+rest);
 }
+// ce qu'il y a sous les pieds (pour le son des pas)
+function surface(Q) {
+  if (S.world.waterLevel(Q.x, Q.z) > Q.y + 0.08) return 'eau';
+  if (Q.y - S.map.heightAt(Q.x, Q.z) < 0.12) return GROUND_SURF[S.map.groundAt(Q.x, Q.z)] || 'herbe';
+  let best = null;
+  S.world.near(Q.x, Q.z, 4.5, (s) => { if (Math.abs(s.y1 - Q.y) < 0.25 && S.world.over(s, Q.x, Q.z, 0.1)) best = s; });
+  return best ? surfOf(best) : 'bois';
+}
+function surfOf(s) {
+  const r = s.ref || {};
+  if (r.part === 'pont') return 'beton';
+  if (r.part === 'quai') return 'bois';
+  if (r.prop != null) { const m = (PROPS[S.map.props[r.prop].kind] || {}).mat; return m === 'metal' ? 'metal' : m === 'pierre' ? 'gravier' : 'bois'; }
+  if (r.b != null) { const b = S.map.buildings[r.b]; return r.part === 'toit' ? 'beton' : FLOOR_SURF[b.type] || 'bois'; }
+  if (s.key && s.key[0] === 'b') { const pc = S.sim.S.build && S.sim.S.build.pieces.get(+s.key.slice(2)); return MAT_SURF[pc && pc.mat] || 'bois'; }
+  return 'beton';
+}
+// matière touchée par une balle (pour le son de l'impact)
+function impactAt(x, y, z) {
+  if (y < S.map.heightAt(x, z) + 0.3) return 'impact-sol';
+  let found = null;
+  S.world.near(x, z, 4.5, (s) => { if (!found && y >= s.y0 - 0.25 && y <= s.y1 + 0.25 && S.world.over(s, x, z, 0.25)) found = s; });
+  if (!found) return 'impact-sol';
+  const m = surfOf(found);
+  return m === 'metal' ? 'impact-metal' : m === 'bois' ? 'impact-bois' : 'impact-pierre';
+}
 function handleEvents(list) {
   const P = me();
   for (const e of list) {
@@ -596,7 +631,8 @@ function handleEvents(list) {
         let muzzle = null;
         if (h && h.held && e.p !== S.me) { muzzle = new THREE.Vector3(); h.held.getWorldPosition(muzzle); }
         S.fx.shot(e.from, e.to, e.w, e.hit, muzzle);
-        if (e.hit === 1 && e.k === 0) S.sfx.at('impact', e.to[0], e.to[1], e.to[2], 0.5);
+        if (e.hit === 1 && e.k < 3) S.sfx.at(impactAt(e.to[0], e.to[1], e.to[2]), e.to[0], e.to[1], e.to[2], 0.7, 45);
+        if (e.p !== S.me && e.k === 0) S.sfx.whiz(e.from, e.to);
         break;
       }
       case 'degat': {
@@ -605,6 +641,7 @@ function handleEvents(list) {
           S.hud.hitMarker(e.head, Q && !Q.alive);
           S.hud.damageNumber(e.x, e.y, e.z, e.n, e.head, e.sh);
           S.sfx.play(e.head ? 'tete' : e.sh ? 'bouclier' : 'touche');
+          if (e.sh && Q && Q.sh <= 0) S.sfx.play('bouclier-casse');
         }
         if (e.to === S.me) {
           const A = e.by != null ? S.sim.player(e.by) : null;
@@ -645,8 +682,13 @@ function handleEvents(list) {
       case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it), 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
       case 'vide': if (e.p === S.me) { toast('Plus de munitions pour cette arme', 1.6); S.sfx.play('vide'); } break;
       case 'inutile': if (e.p === S.me) toast(ITEMS[e.c].heal ? 'Ta vie est déjà au maximum' : 'Ton bouclier est déjà au maximum', 1.6); break;
-      case 'recharge': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('recharge'); else if (Q) S.sfx.at('recharge', Q.x, Q.y + 1, Q.z, 0.45); break; }
-      case 'arme': if (e.p === S.me) S.sfx.play('change'); break;
+      case 'recharge': {
+        const Q = S.sim.player(e.p);
+        if (e.p === S.me && P) { const it = P.inv[P.sel - 1], W = it && WEAPONS[it.w]; S.sfx.reload(e.w, e.T || 2, null, W ? Math.max(1, Math.min(W.mag - it.mag, P.ammo[W.ammo])) : 3); }
+        else if (Q) S.sfx.reload(e.w, e.T || 2, Q);
+        break;
+      }
+      case 'arme': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('change'); else if (Q) S.sfx.at('change', Q.x, Q.y + 1, Q.z, 0.5, 18); break; }
       case 'soigne': if (e.p === S.me) S.sfx.play(ITEMS[e.c] && ITEMS[e.c].shield ? 'potion' : 'bandage'); break;
       case 'soin': if (e.p === S.me) S.sfx.play('soigne'); break;
       case 'lance': { const Q = S.sim.player(e.p), h = S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('lancer'); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }

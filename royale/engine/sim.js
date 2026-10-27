@@ -394,7 +394,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!it) return;
     if (it.t === 'arme') {
       const W = WEAPONS[it.w];
-      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       if (P.rl > 0) {
         P.rl -= dt;
         if (P.rl <= 0) { const n = Math.min(W.mag - it.mag, P.ammo[W.ammo]); it.mag += n; P.ammo[W.ammo] -= n; P.rl = 0; }
@@ -403,11 +403,11 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const trigger = W.auto ? P.inp.fire : shot;
       if (trigger && P.cd <= 0) {
         if (it.mag > 0) shoot(P, it);
-        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
         else if (shot) ev({ e: 'vide', p: P.id });
       }
       // chargeur vide : rechargement automatique
-      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       return;
     }
     if (it.t === 'objet') {
