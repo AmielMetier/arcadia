@@ -1,4 +1,5 @@
 // Sons synthétisés (WebAudio), sans fichier. Volume selon la distance à l'écouteur (le joueur local).
+// Deux réglages du joueur (panneau Volume) : la musique d'ambiance et les bruitages, chacun sur son bus.
 export class Audio {
   constructor() {
     this.ctx = null; this.master = null; this.lx = 0; this.ly = 0; this.intensity = 0; this.musicOn = false;
@@ -12,6 +13,8 @@ export class Audio {
     this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.55;
     const comp = this.ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 6;
     this.master.connect(comp); comp.connect(this.ctx.destination);
+    this.fx = DDVolume.gain(this.ctx, 'fx'); this.fx.connect(this.master);
+    this.mus = DDVolume.gain(this.ctx, 'music'); this.mus.connect(this.master);
     const len = this.ctx.sampleRate * 1.5;
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -33,10 +36,10 @@ export class Audio {
     return base * Math.max(0.08, 1 - d / 1400);
   }
   pan(x) { return x == null ? 0 : Math.max(-0.8, Math.min(0.8, (x - this.lx) / 700)); }
-  out(v, x) {
+  out(v, x, bus = this.fx) {
     const g = this.ctx.createGain(); g.gain.value = v;
-    if (this.ctx.createStereoPanner) { const p = this.ctx.createStereoPanner(); p.pan.value = this.pan(x); g.connect(p); p.connect(this.master); }
-    else g.connect(this.master);
+    if (this.ctx.createStereoPanner) { const p = this.ctx.createStereoPanner(); p.pan.value = this.pan(x); g.connect(p); p.connect(bus); }
+    else g.connect(bus);
     return g;
   }
   noise(dest, t, dur, { type = 'lowpass', f0 = 1000, f1 = f0, q = 1, a = 0.002, v = 1 } = {}) {
@@ -151,7 +154,7 @@ export class Audio {
     if (this.musicOn || !this.ctx) return;
     this.musicOn = true;
     const c = this.ctx;
-    const drone = c.createGain(); drone.gain.value = 0.05; drone.connect(this.master);
+    const drone = c.createGain(); drone.gain.value = 0.05; drone.connect(this.mus);
     const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180; lp.connect(drone);
     for (const f of [55, 55.4, 82.4]) { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(lp); o.start(); }
     const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 90; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
@@ -161,7 +164,7 @@ export class Audio {
       const t = this.ctx.currentTime + 0.05, I = this.intensity;
       if (!this.muted && I > 0.08) {
         const step = this.beat % 8;
-        const o = this.out(1, null);
+        const o = this.out(1, null, this.mus);
         if (step % 4 === 0) this.tone(o, t, 0.25, { f0: 90, f1: 40, v: 0.32 * I });
         if (I > 0.35 && step % 2 === 1) this.noise(o, t, 0.05, { type: 'highpass', f0: 6000, v: 0.08 * I });
         if (I > 0.55 && (step === 3 || step === 6)) this.tone(o, t, 0.18, { type: 'square', f0: [110, 98, 131, 117][(this.beat >> 3) % 4], v: 0.04 * I });

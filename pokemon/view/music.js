@@ -28,7 +28,7 @@ class BattleMusicPlayer {
     try {
       this.audio = new Audio(path);
       this.audio.loop = true;
-      this.audio.volume = this.volume;
+      DDVolume.media(this.audio, 'music', this.volume);
       this.audio.play().catch(() => {
         // En attente d'interaction utilisateur (navigateur autoplay policy)
         const unlock = () => {

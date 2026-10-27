@@ -47,7 +47,7 @@ function build() {
   comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
   filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 2400; filt.Q.value = 0.7;
-  filt.connect(comp); comp.connect(out); out.connect(ctx.destination);
+  filt.connect(comp); comp.connect(out); out.connect(DDVolume.gain(ctx, 'music')).connect(ctx.destination);
   // bus « pompé » par la grosse caisse (sidechain)
   duck = ctx.createGain(); duck.connect(filt);
   // réverbe : réponse impulsionnelle de bruit qui décroît
