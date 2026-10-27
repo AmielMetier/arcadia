@@ -17,6 +17,7 @@ import { weapon } from '../royale/engine/items.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
 import { createAI } from '../royale/engine/ai.js';
 import { makeTeams } from '../royale/engine/teams.js';
+import { skillOf, botLevels } from '../royale/engine/skill.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from '../royale/engine/net.js';
 
 const SEEDS = +(process.argv[2] || 12);
@@ -584,6 +585,17 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
   ok(knocked >= 3 && raised === knocked, `joueur à terre relevé par ses bots : ${raised}/${knocked}`);
   console.log(`joueur à terre relevé par ses bots coéquipiers : ${raised}/${knocked}`);
+}
+// ------------------------------------------------------------------ niveau « Auto » : il suit les résultats
+{
+  const fresh = skillOf([]), strong = skillOf([{ place: 1, n: 30, kills: 6 }, { place: 2, n: 45, kills: 4 }, { place: 1, n: 30, kills: 5 }]);
+  const weak = skillOf([{ place: 40, n: 45, kills: 0 }, { place: 25, n: 30, kills: 0 }, { place: 55, n: 60, kills: 1 }]);
+  ok(fresh.s === 0.5 && botLevels(40, fresh.s).every((l) => l === 'normal'), 'sans historique : des bots normaux');
+  ok(strong.s > 0.85 && weak.s < 0.2, `niveaux : fort ${strong.s.toFixed(2)}, débutant ${weak.s.toFixed(2)}`);
+  const cnt = (s) => { const L = botLevels(40, s); return ['facile', 'normal', 'difficile'].map((k) => L.filter((l) => l === k).length); };
+  const [fe, , ft] = cnt(strong.s), [we, , wt] = cnt(weak.s);
+  ok(ft >= 20 && fe === 0 && we >= 20 && wt === 0, `bots : contre un fort ${ft} coriaces, contre un débutant ${we} faciles`);
+  console.log(`niveau auto : fort ${strong.s.toFixed(2)} → ${cnt(strong.s).join('/')} · débutant ${weak.s.toFixed(2)} → ${cnt(weak.s).join('/')} (faciles/normaux/coriaces sur 40)`);
 }
 // ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
 // 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles

@@ -12,6 +12,7 @@ import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js'
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
 import { makeTeams, TEAM_LABEL } from './engine/teams.js';
+import { skillOf, botLevels, botMix, HIST_MAX } from './engine/skill.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
@@ -40,7 +41,7 @@ const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Li
 const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
 const LOOKS = Object.keys(CHARACTERS);
 const cleanLook = (l) => ({ char: LOOKS.includes(l && l.char) ? l.char : 'soldat', color: /^#[0-9a-f]{6}$/i.test(l && l.color) ? l.color : null });
-const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
+const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces', auto: 'au niveau auto' };
 // sons des pas : le sol naturel, le plancher de chaque type de bâtiment
 const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
   [GR.ROUTE]: 'beton', [GR.VILLE]: 'beton', [GR.BATI]: 'bois', [GR.CHAMP]: 'herbe', [GR.LIEU]: 'gravier' };
@@ -59,6 +60,7 @@ const S = {
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
   look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
   picks: new Map(), // équipes choisies sur l'écran d'accueil : id du joueur → numéro d'équipe
+  skills: new Map(), mySkill: { s: 0.5, games: 0 }, // niveau « Auto » : celui de chaque joueur du salon (engine/skill.js)
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -83,11 +85,12 @@ async function boot(info) {
     time: QS.get('time') || set.time || 'jour',
     mode: QS.get('mode') || set.mode || 'partie',
     places: +(QS.get('places') || set.places || 45),
-    level: QS.get('level') || set.level || 'normal',
+    level: QS.get('level') || set.level || 'auto',
     teams: clamp(+(QS.get('equipes') || set.teams || 1) | 0, 1, 3),
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
   try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(loadHist());
   H.on('msg', onMsg);
   H.on('roster', onRoster);
 
@@ -149,7 +152,9 @@ function startMatch() {
   const T = makeTeams(hs, S.picks, expl ? hs.length : clamp(S.settings.places, 2, MAX_PLACES), size);
   const roster = hs.map((h) => ({ ...h, bot: false, team: T.humans.get(h.id) }));
   const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-  T.bots.forEach((team, i) => roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + hs.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level, team }));
+  // niveau « Auto » : composé d'après les résultats des joueurs du salon
+  const levels = S.settings.level === 'auto' ? botLevels(T.bots.length, roomSkill()) : T.bots.map(() => S.settings.level);
+  T.bots.forEach((team, i) => roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + hs.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: levels[i], team }));
   newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode, teams: size });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
   showScreen(null);
@@ -536,11 +541,13 @@ function nextSpectate() {
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
   if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
+  if (m.t === 'skill') { if (Number.isFinite(m.s)) S.skills.set(from, Math.max(0, Math.min(1, m.s))); refreshLobby(); return; }
   if (m.t === 'team') { S.picks.set(from, Number.isInteger(m.k) && m.k >= 0 && m.k < 30 ? m.k : -1); refreshLobby(); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
       if (m.look) S.looks.set(from, cleanLook(m.look));
       if (Number.isInteger(m.team)) S.picks.set(from, m.team);
+      if (Number.isFinite(m.skill)) S.skills.set(from, Math.max(0, Math.min(1, m.skill)));
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
       else H.send(from, { t: 'salon', picks: [...S.picks] });
@@ -610,7 +617,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look, team: S.picks.get(S.me) }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look, team: S.picks.get(S.me), skill: S.mySkill.s }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -833,6 +840,10 @@ function endMatch(winner) {
   S.ended = true;
   S.hud.downed(null);
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
+  if (mine && S.sim.S.mode !== 'exploration') {
+    const n = S.sim.S.teams > 1 ? new Set(res.map((r) => r.team)).size : res.length;
+    saveHist({ place: iWon(winner) ? 1 : mine.place || n, n, kills: mine.kills });
+  }
   if (iWon(winner)) { S.hud.say(S.sim.S.teams > 1 ? 'Dernière équipe debout !<small>Ton équipe a gagné la partie</small>' : 'Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
   report(res);
   // l'hôte fait foi : son bilan (tirs, distance, relevés…) part chez les invités
@@ -882,7 +893,12 @@ function lobbyList() {
     const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
     return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
   }).join('');
-  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
+  let lvl = LEVEL_LABEL[S.settings.level] || '';
+  if (S.settings.level === 'auto') {
+    const mix = botMix(roomSkill()), parts = [['facile', 'faciles'], ['normal', 'normaux'], ['difficile', 'coriaces']].map(([k, l]) => [Math.round(bots * mix[k]), l]).filter(([v]) => v > 0);
+    lvl = `au niveau auto : ${parts.map(([v, l]) => `${v} ${l}`).join(', ')}`;
+  }
+  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${lvl}</span>` : ''}</div>`;
 }
 // équipes (duos, trios) : chacun clique sur une équipe ; les places libres sont prises par des bots coéquipiers
 function teamPicker() {
@@ -899,6 +915,19 @@ function teamPicker() {
   return `<h2>Ton équipe · ${TEAM_LABEL[size]}</h2><div class="teams">${cards}</div><p class="hint">${loose.length ? `Pas encore choisi : ${loose.map((h) => esc(h.name)).join(', ')} (réparti${loose.length > 1 ? 's' : ''} au lancement). ` : ''}Les places libres sont prises par des bots coéquipiers.</p>`;
 }
 // un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
+// historique des parties de ce navigateur (niveau « Auto ») ; niveau moyen des joueurs du salon
+function loadHist() { try { const h = JSON.parse(localStorage.getItem('royale_hist') || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } }
+function saveHist(r) {
+  const h = [r, ...loadHist()].slice(0, HIST_MAX);
+  try { localStorage.setItem('royale_hist', JSON.stringify(h)); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(h);
+  if (H.embedded && S.role === 'guest') H.send('host', { t: 'skill', s: S.mySkill.s });
+}
+function roomSkill() {
+  const hs = humans();
+  const v = hs.map((h) => (h.id === S.me ? S.mySkill.s : S.skills.has(h.id) ? S.skills.get(h.id) : 0.5));
+  return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
+}
 function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
 const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
   <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
