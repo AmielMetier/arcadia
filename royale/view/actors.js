@@ -35,7 +35,7 @@ export function createActors(scene, sim, kit = null) {
       const c = parseInt(String(P.color || '#ff4b2b').replace('#', ''), 16);
       const v = hash(String(P.id).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7)) >>> 0;
       h = { hero: kit && kit.soldier ? buildSoldier(kit, { shirt: c, skin: SKINS[v % 5], pants: PANTS[(v >>> 6) % PANTS.length] })
-        : buildHero({ shirt: c, skin: v % 5, hair: (v >>> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >>> 6) % 4] }), key: null };
+        : buildHero({ shirt: c, skin: v % 5, hair: (v >>> 3) % 5, pants: [0x2f3646, 0x4a3a2a, 0x3a4a3a, 0x2a2a30][(v >>> 6) % 4] }), key: null, tick: v & 3, acc: 0 };
       group.add(h.hero.root);
       heroes.set(P.id, h);
     }
@@ -181,8 +181,13 @@ export function createActors(scene, sim, kit = null) {
         if (hero.setItem) hero.setItem(P.alive ? it : null, P.alive && it && it.t !== 'arme' ? itemModel(it) : null);
         else hero.setHeld(P.alive ? itemModel(it) : null);
       }
-      hero.update(dt, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0 });
       hero.root.visible = P.mode !== 'ballon' && P.id !== hideId && (P.alive || hero.root.visible);
+      // animation : à chaque image de près, une sur deux au-delà de 50 m, une sur quatre au-delà de 120 m (60 joueurs)
+      const far = Math.hypot(a.x - cam.x, a.z - cam.z), every = far < 50 ? 1 : far < 120 ? 2 : 4;
+      h.acc += dt;
+      if (!hero.root.visible || ++h.tick % every) continue;
+      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0 });
+      h.acc = 0;
     }
     // montgolfière
     if (S.flight) {

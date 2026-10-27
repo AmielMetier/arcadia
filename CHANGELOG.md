@@ -4,6 +4,8 @@
 - **Island Rush** — Les montagnes ne s'escaladent plus : on ralentit dans les pentes fortes et, au-delà d'environ 40°, on glisse vers le bas sans pouvoir sauter. Les chemins restent praticables à pied (le refuge du sommet se rejoint par son sentier), et une rampe construite permet toujours de grimper.
 - **Island Rush** — Les ponts sont droits et à niveau de la route : plus de marche à l'entrée, plus de virage qui sortait du tablier contre le garde-corps.
 - **Island Rush** — Les chutes ne blessent qu'au-delà d'environ 8 m, en proportion de la hauteur.
+- **Island Rush** — Plus de monde sur l'île : 30, 45 ou 60 joueurs (45 par défaut), bots compris.
+  - Un tiers des bots sautent près de l'endroit où tu te poses : ça se bat dès l'atterrissage.
 
 ## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.

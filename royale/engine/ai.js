@@ -125,6 +125,23 @@ export function createAI(sim, map, world) {
     return pick;
   }
 
+  // un tiers des bots suivent un joueur : pendant qu'il est en l'air, ils visent l'un des bâtiments les plus proches de
+  // l'endroit où il va se poser (combats dès l'atterrissage)
+  const doorPts = [];
+  for (const b of map.buildings) {
+    const d = b.doors.find((q) => q.ext && q.k === 0);
+    if (d) doorPts.push({ x: (d.o === 'h' ? (d.x + 0.5) * 4 : d.x * 4) + d.nx * 4, z: (d.o === 'h' ? d.z * 4 : (d.z + 0.5) * 4) + d.nz * 4, b: b.id });
+  }
+  function followDrop(P, B) {
+    const H = S.players.get(B.follow);
+    if (!H || !H.alive || (H.mode !== 'chute' && H.mode !== 'planeur')) return null;
+    const lead = H.mode === 'chute' ? 6 : 3, x = H.x + H.vx * lead, z = H.z + H.vz * lead;
+    const near = doorPts.map((q) => [q, Math.hypot(q.x - x, q.z - z)]).filter((a) => a[1] < 130).sort((a, b) => a[1] - b[1]).slice(0, 4);
+    if (!near.length) return { x: x + (B.rng.next() - 0.5) * 50, z: z + (B.rng.next() - 0.5) * 50, b: -1 };
+    if (!B.followPick || !near.some((a) => a[0] === B.followPick)) B.followPick = near[Math.floor(B.rng.next() * near.length)][0];
+    return B.followPick;
+  }
+
   // ------------------------------------------------------------------ chemins
   function setGoal(P, B, g) {
     B.goal = g; B.path = null; B.wp = 0; B.stuckN = 0;
@@ -418,8 +435,10 @@ export function createAI(sim, map, world) {
       enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false,
       strafe: 1, strafeT: 0, burstOn: true, burstT: 0, scanT: rng.next() * 0.25, decideT: rng.next() * 0.5,
       ban: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
-      sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0,
+      sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,
     };
+    const humans = [...S.players.values()].filter((q) => !q.bot);
+    if (humans.length && rng.next() < 1 / 3) P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id;
     return P.ai;
   }
   function think(P, dt) {
@@ -429,6 +448,11 @@ export function createAI(sim, map, world) {
       while (queue.length) { const Q = queue.shift(); if (Q.alive && Q.ai && Q.ai.waiting) { plan(Q); break; } }
     }
     const B = P.ai || init(P), I = P.inp;
+    if (B.follow != null && P.mode !== 'sol' && (B.followT -= dt) <= 0) {
+      B.followT = 0.5;
+      const f = followDrop(P, B);
+      if (f && f !== B.drop) { B.drop = f; B.prevD = null; }
+    }
     if (P.mode === 'ballon') {
       if (!B.drop) B.drop = chooseDrop(P, B);
       const b = sim.balloonPos(), d = Math.hypot(b.x - B.drop.x, b.z - B.drop.z);

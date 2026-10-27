@@ -31,7 +31,10 @@ const breathe = () => new Promise((r) => setTimeout(r, 0));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Lina', 'Timéo', 'Jade', 'Nino', 'Rose', 'Eliott', 'Mila', 'Gabin',
-  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa'];
+  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa',
+  'Arthur', 'Louise', 'Adam', 'Chloé', 'Victor', 'Margaux', 'Léon', 'Agathe', 'Raphaël', 'Capucine', 'Maël', 'Romane', 'Simon', 'Juliette', 'Axel',
+  'Lison', 'Hector', 'Salomé', 'Ethan', 'Apolline', 'Milo', 'Céleste', 'Samuel', 'Olivia', 'Tom', 'Maëlys', 'Aaron', 'Héloïse', 'Lucas', 'Manon'];
+const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
 const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
 const INTERP = 0.1;          // invités : les autres sont dessinés un dixième de seconde en arrière
 const HOST_SILENCE = 3, HOST_GIVEUP = 15;
@@ -64,7 +67,7 @@ async function boot(info) {
   S.settings = {
     time: QS.get('time') || set.time || 'jour',
     mode: QS.get('mode') || set.mode || 'partie',
-    places: +(QS.get('places') || set.places || 24),
+    places: +(QS.get('places') || set.places || 45),
     level: QS.get('level') || set.level || 'normal',
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
@@ -118,7 +121,7 @@ function startMatch() {
   if (S.role === 'guest' || S.sim) return;
   const roster = humans().map((h) => ({ ...h, bot: false }));
   if (S.settings.mode !== 'exploration') {
-    const n = clamp(S.settings.places, 2, 30) - roster.length;
+    const n = clamp(S.settings.places, 2, MAX_PLACES) - roster.length;
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
     for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], bot: true, level: S.settings.level });
   }
@@ -718,7 +721,7 @@ function showPrompt() {
 // ------------------------------------------------------------------ écrans
 const icon = (n) => `<img class="ic" src="img/icons/${n}.png" alt="">`;
 function lobbyList() {
-  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, 30) - hs.length);
+  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, MAX_PLACES) - hs.length);
   const rows = hs.map((p) => {
     const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
     return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
@@ -742,7 +745,7 @@ function showScreen(kind, data) {
   const opts = `<div class="opts"><label>Sensibilité <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="${(S.input.sens / 0.0024).toFixed(1)}"></label>
     <label>Volume <input type="range" id="vol" min="0" max="1" step="0.05" value="${S.sfx.volume}"></label></div>`;
   const title = '<h1>Island <span>Rush</span></h1>';
-  const n = clamp(S.settings.places, 2, 30);
+  const n = clamp(S.settings.places, 2, MAX_PLACES);
   const rules = expl
     ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
     : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
