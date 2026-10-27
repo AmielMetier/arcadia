@@ -2,16 +2,17 @@
 // et écrit les mêmes commandes qu'un joueur dans P.inp : la simulation les traite pareil. Il saute de la
 // montgolfière vers un lieu choisi, fouille coffres et butin, se soigne, suit la zone et se bat. Trois niveaux
 // (facile, normal, difficile) : portée de vue, temps de réaction, précision et vitesse de visée. Les bots ne
-// construisent pas. Moteur PUR, branché par sim.S.hooks.think ; ne tourne que là où la partie tourne.
+// récoltent pas, mais ramassent des matériaux et posent un mur pour se couvrir quand on leur tire dessus. Moteur PUR, branché par sim.S.hooks.think ; ne tourne que là où la partie tourne.
 import { createNav } from './nav.js';
 import { makeRng, hash } from './rng.js';
 import { WEAPONS, ITEMS } from './items.js';
+import { COST } from './build.js';
 import { STORM_TIMES } from './map.js';
 
 export const LEVELS = {
-  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35 },
-  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5, push: 0.6 },
-  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1, push: 0.85 },
+  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35, wall: 0.25 },
+  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5, push: 0.6, wall: 0.6 },
+  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1, push: 0.85, wall: 0.9 },
 };
 const WSCORE = { fusil: 10, pompe: 9.5, smg: 8, sniper: 7, roquette: 6.5, pistolet: 4.5 };
 const WANT_D = { pompe: 5, smg: 11, pistolet: 14, fusil: 24, sniper: 60, roquette: 22 };
@@ -60,7 +61,8 @@ export function createAI(sim, map, world) {
       const used = P.inv.some((s) => s && s.t === 'arme' && WEAPONS[s.w].ammo === it.a);
       return { v: used && P.ammo[it.a] < 90 ? 4 : 0 };
     }
-    if (it.t === 'materiaux') return { v: 0 };
+    // des matériaux pour se couvrir d'un mur en combat (les bots ne récoltent pas à la pioche)
+    if (it.t === 'materiaux') return { v: P.mats[it.m] < 60 ? 2.5 : 0 };
     const free = P.inv.some((s) => !s);
     let v;
     if (it.t === 'arme') {
@@ -448,6 +450,25 @@ export function createAI(sim, map, world) {
     }
     I.sel = slot;
     const it = slot ? P.inv[slot - 1] : null, W = it ? WEAPONS[it.w] : null;
+    // touché de loin par celui qu'on combat : un mur entre lui et nous (de quoi construire, pas trop souvent), puis on
+    // reste à couvert un moment, accroupi, le temps de recharger (et de se soigner si besoin, voir decide)
+    if (P.hitBy === E.id && P.hitT > (B.hitSeen || -99) && S.t - P.hitT < 1.2 && d > 7 && P.ground && S.t - (B.wallT || -99) > 5) {
+      B.hitSeen = P.hitT;
+      const mat = ['bois', 'pierre', 'metal'].find((m) => P.mats[m] >= COST);
+      if (mat && B.rng.next() < lv.wall) {
+        B.wallT = S.t;
+        B.yaw = Math.atan2(dx, dz); B.pitch = 0;
+        I.build = 'mur'; I.mat = mat; I.shoot++;
+        B.coverT = S.t + 1.2 + B.rng.next() * 1.6;
+        return null;
+      }
+      B.wallT = S.t - 3.5; // pas cette fois : on y repense à la prochaine touche, dans 1,5 s au plus tôt
+    }
+    if (S.t < (B.coverT || 0) && d > 6) {
+      I.crouch = true;
+      if (W && it.mag < W.mag * 0.7 && P.ammo[W.ammo] > 0 && !P.rl) I.reload++;
+      return null;
+    }
     if (B.visible) {
       B.track += dt; B.react -= dt;
       const head = B.headshot && it && it.w !== 'roquette';
@@ -495,7 +516,8 @@ export function createAI(sim, map, world) {
     }
     // déplacement : garder sa distance, pas de côté, petits sauts ; bien amoché face à un bot : on décroche
     if (it && it.w === 'sniper' && I.aim) { I.crouch = true; return null; }
-    const retreat = E.bot && P.hp + P.sh < 35 && needHeal(P);
+    // bien amoché, de quoi se soigner : on décroche (de près face à un joueur, mieux vaut finir le combat)
+    const retreat = P.hp + P.sh < 35 && needHeal(P) && (E.bot || d > 10);
     if (retreat) { I.fire = false; I.aim = false; }
     const want = retreat ? 80 : W ? WANT_D[it.w] : 1.5;
     const ux = dx / d, uz = dz / d;
@@ -551,7 +573,7 @@ export function createAI(sim, map, world) {
     }
     if ((B.scanT -= dt) <= 0) { B.scanT = 0.25; perceive(P, B); }
     if ((B.decideT -= dt) <= 0) { B.decideT = 0.5; decide(P, B); }
-    I.fire = false; I.aim = false; I.sprint = false; I.crouch = false;
+    I.fire = false; I.aim = false; I.sprint = false; I.crouch = false; I.build = null;
     let mv = null;
     if (B.state === 'fight') mv = fight(P, B, dt);
     else if (B.state === 'heal') mv = heal(P, B, dt);

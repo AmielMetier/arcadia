@@ -449,6 +449,34 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 100, null, [px, F1, pz], false);
   ok(B.broken.has(key) && W.support(px, pz, F1 + 0.3) < F1 - 1, 'la dalle cassée tient encore');
 }
+// ------------------------------------------------------------------ un bot touché de loin pose un mur et se couvre
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, { id: 'b', name: 'Bot', color: '#888', bot: true, level: 'difficile' }];
+  const sim = createSim({ map: m, world: W, seed: 3, roster, mode: 'partie' });
+  const B = createBuild(sim, m, W); createAI(sim, m, W);
+  while (sim.S.phase === 'vol') { sim.step(DT); sim.takeEvents(); }
+  const host = sim.player(0), bot = sim.player('b');
+  // sur un terrain dégagé : le bot armé, avec du bois ; l'hôte à 15 m devant lui
+  let spot = null;
+  for (let i = 0; i < 400 && !spot; i++) {
+    const x = 300 + (i % 20) * 30, z = 300 + Math.floor(i / 20) * 30, y = W.support(x, z, 200);
+    if (y > 2 && Math.abs(W.support(x, z + 15, 200) - y) < 0.5 && !m.waterAt(x, z) && !m.waterAt(x, z + 15)) spot = { x, y, z };
+  }
+  Object.assign(bot, { x: spot.x, y: spot.y, z: spot.z, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 100, alive: true, ground: true });
+  bot.inv[0] = weapon('fusil', 2); bot.ammo.moyennes = 200; bot.mats.bois = 60;
+  Object.assign(host, { x: spot.x, y: W.support(spot.x, spot.z + 15, 200), z: spot.z + 15, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 100, alive: true });
+  // l'hôte le touche toutes les demi-secondes (et reste en vie) : en 4 s, le bot doit s'être couvert
+  let walls = 0;
+  for (let k = 0; k < 4 / DT && !walls; k++) {
+    if (k % Math.round(0.5 / DT) === 0) sim.damage(bot, 5, host, { cause: 'fusil' });
+    Object.assign(host, { hp: 100, sh: 100 });
+    sim.step(DT);
+    for (const e of sim.takeEvents()) if (e.e === 'construit' && e.piece.owner === 'b' && e.piece.kind === 'mur') walls++;
+  }
+  ok(walls >= 1 && bot.mats.bois === 50 && B.pieces.size >= 1, `un bot touché de loin ne pose pas de mur (${walls} mur, bois ${bot.mats.bois})`);
+  console.log(`bot touché de loin : ${walls} mur posé, bois ${bot.mats.bois}`);
+}
 // ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
 // 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles
 {
