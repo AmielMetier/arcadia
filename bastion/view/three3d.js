@@ -91,10 +91,11 @@ function initThree3D() {
     threeProjVec = new THREE.Vector3();
 
     // Éclairage 3D directionnel + hémisphérique avec vraies ombres portées au sol
-    hemiLight3D = new THREE.HemisphereLight(def.hemiSky, def.hemiGround, 0.78);
+    // Lumière d'ambiance un peu en retrait : les ombres du soleil se lisent mieux
+    hemiLight3D = new THREE.HemisphereLight(def.hemiSky, def.hemiGround, 0.64);
     threeScene.add(hemiLight3D);
 
-    const sun = new THREE.DirectionalLight(def.sunColor, 0.98);
+    const sun = new THREE.DirectionalLight(def.sunColor, 1.1);
     sun.position.set(WORLD_SIZE * 0.26, 1750, WORLD_SIZE * 0.82);
     sun.target.position.set(HALF_W, 0, HALF_W);
     sun.castShadow = gfxPreset().shadows;
@@ -169,6 +170,7 @@ function buildTerrainMeshes3D(def) {
     threeScene.remove(groundMesh3D);
     groundMesh3D.geometry.dispose();
     if (groundMesh3D.material.map) groundMesh3D.material.map.dispose();
+    if (groundMesh3D.material.userData.detail) groundMesh3D.material.userData.detail.dispose();
     groundMesh3D.material.dispose();
   }
   if (liquidMesh3D) { threeScene.remove(liquidMesh3D); liquidMesh3D.geometry.dispose(); liquidMesh3D.material.dispose(); }
@@ -185,6 +187,7 @@ function buildTerrainMeshes3D(def) {
   const tex = new THREE.CanvasTexture(terrainCanvas);
   tex.anisotropy = threeRenderer ? Math.min(8, threeRenderer.capabilities.getMaxAnisotropy()) : 4;
   const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0.04 });
+  addGroundDetail3D(mat, def.id);
   groundMesh3D = new THREE.Mesh(geo, mat);
   groundMesh3D.rotation.x = -Math.PI / 2;
   groundMesh3D.position.set(HALF_W, 0, HALF_W);
@@ -223,6 +226,115 @@ function buildTerrainMeshes3D(def) {
   fogMesh3D.position.set(HALF_W, 1.5, HALF_W);
   fogMesh3D.renderOrder = 10;
   threeScene.add(fogMesh3D);
+}
+
+// Texture de détail répétée sur le sol (herbe, cendres, neige, sable, béton selon la carte) : la grande texture de la
+// carte n'a qu'un point par unité du monde et devenait floue dès qu'on zoomait. Elle est en niveaux de gris autour du
+// gris moyen et multiplie la couleur du sol ; lue à deux échelles pour que la répétition ne se voie pas.
+function buildGroundDetailCanvas(mapId) {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgb(128,128,128)';
+  g.fillRect(0, 0, S, S);
+  const rnd = mulberry({ magma: 731, glace: 732, desert: 733, ruines: 734 }[mapId] || 730);
+  const gray = (v, a) => `rgba(${v | 0},${v | 0},${v | 0},${a})`;
+  // Chaque motif est dessiné aussi de l'autre côté des bords : la texture se raccorde sans couture
+  const wrap = (x, y, r, fn) => {
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+      const px = x + ox, py = y + oy;
+      if (px + r < 0 || py + r < 0 || px - r > S || py - r > S) continue;
+      fn(px, py);
+    }
+  };
+  const blot = (x, y, r, v, a) => wrap(x, y, r, (px, py) => {
+    const gr = g.createRadialGradient(px, py, 0, px, py, r);
+    gr.addColorStop(0, gray(v, a)); gr.addColorStop(1, gray(v, 0));
+    g.fillStyle = gr; g.beginPath(); g.arc(px, py, r, 0, TAU); g.fill();
+  });
+  const pebble = (x, y, r, dark, light) => wrap(x, y, r + 2, (px, py) => {
+    g.fillStyle = gray(dark, 0.55); g.beginPath(); g.arc(px + r * 0.35, py + r * 0.45, r, 0, TAU); g.fill();
+    g.fillStyle = gray(light, 0.75); g.beginPath(); g.arc(px, py, r, 0, TAU); g.fill();
+  });
+  const crack = (n, v, a) => {
+    for (let k = 0; k < n; k++) {
+      let x = rnd() * S, y = rnd() * S;
+      g.strokeStyle = gray(v, a); g.lineWidth = 0.8 + rnd() * 1.2;
+      g.beginPath(); g.moveTo(x, y);
+      for (let st = 0; st < 5; st++) { x += (rnd() - 0.5) * 46; y += (rnd() - 0.5) * 46; g.lineTo(x, y); }
+      g.stroke();
+    }
+  };
+  for (let k = 0; k < 60; k++) blot(rnd() * S, rnd() * S, 20 + rnd() * 60, rnd() < 0.5 ? 96 : 160, 0.32);
+  g.lineCap = 'round';
+  if (mapId === 'magma') {
+    for (let k = 0; k < 3800; k++) {
+      const x = rnd() * S, y = rnd() * S, r = 0.6 + rnd() * 1.8, v = rnd() < 0.7 ? 70 + rnd() * 40 : 175 + rnd() * 40;
+      wrap(x, y, r, (px, py) => { g.fillStyle = gray(v, 0.6); g.beginPath(); g.arc(px, py, r, 0, TAU); g.fill(); });
+    }
+    crack(40, 60, 0.5);
+    for (let k = 0; k < 90; k++) pebble(rnd() * S, rnd() * S, 1.5 + rnd() * 3, 50, 150);
+  } else if (mapId === 'glace') {
+    for (let k = 0; k < 40; k++) blot(rnd() * S, rnd() * S, 30 + rnd() * 70, 175, 0.3);
+    crack(26, 92, 0.38);
+    for (let k = 0; k < 900; k++) {
+      const x = rnd() * S, y = rnd() * S;
+      wrap(x, y, 2, (px, py) => { g.fillStyle = gray(225, 0.75); g.fillRect(px, py, 1.4, 1.4); });
+    }
+  } else if (mapId === 'desert') {
+    for (let k = 0; k < 360; k++) {
+      const x = rnd() * S, y = rnd() * S, l = 18 + rnd() * 40, bend = 4 + rnd() * 5, v = rnd() < 0.55 ? 92 : 172;
+      const lw = 1.5 + rnd() * 2;
+      wrap(x, y, l + 10, (px, py) => {
+        g.strokeStyle = gray(v, 0.42); g.lineWidth = lw;
+        g.beginPath(); g.moveTo(px, py); g.quadraticCurveTo(px + l / 2, py - bend, px + l, py); g.stroke();
+      });
+    }
+    for (let k = 0; k < 2600; k++) {
+      const x = rnd() * S, y = rnd() * S, v = rnd() < 0.5 ? 90 : 180;
+      wrap(x, y, 2, (px, py) => { g.fillStyle = gray(v, 0.5); g.fillRect(px, py, 1.3, 1.3); });
+    }
+    for (let k = 0; k < 120; k++) pebble(rnd() * S, rnd() * S, 1.2 + rnd() * 2.6, 70, 165);
+  } else if (mapId === 'ruines') {
+    for (let k = 0; k < 4200; k++) {
+      const x = rnd() * S, y = rnd() * S, v = rnd() < 0.5 ? 92 : 166;
+      wrap(x, y, 2, (px, py) => { g.fillStyle = gray(v, 0.45); g.fillRect(px, py, 1.5, 1.5); });
+    }
+    crack(55, 52, 0.5);
+    for (let k = 0; k < 60; k++) pebble(rnd() * S, rnd() * S, 1.5 + rnd() * 3.5, 60, 150);
+  } else {
+    // Vallée : brins d'herbe surtout sombres (profondeur), quelques reflets clairs, et des cailloux
+    for (let k = 0; k < 5200; k++) {
+      const x = rnd() * S, y = rnd() * S, a = -Math.PI / 2 + (rnd() - 0.5) * 1.1, l = 4 + rnd() * 9;
+      const v = rnd() < 0.7 ? 70 + rnd() * 30 : 170 + rnd() * 40, lw = 1 + rnd() * 1.4;
+      wrap(x, y, l, (px, py) => {
+        g.strokeStyle = gray(v, 0.55); g.lineWidth = lw;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); g.stroke();
+      });
+    }
+    for (let k = 0; k < 160; k++) pebble(rnd() * S, rnd() * S, 1.5 + rnd() * 3, 60, 190);
+  }
+  return c;
+}
+function addGroundDetail3D(mat, mapId) {
+  const tex = new THREE.CanvasTexture(buildGroundDetailCanvas(mapId));
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = threeRenderer ? Math.min(8, threeRenderer.capabilities.getMaxAnisotropy()) : 4;
+  mat.userData.detail = tex;
+  const strength = { glace: 0.55, ruines: 0.65, vallee: 0.68 }[mapId] || 0.75;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.detailMap = { value: tex };
+    sh.uniforms.detailRep = { value: WORLD_SIZE / 160 };
+    sh.uniforms.detailAmt = { value: strength };
+    sh.fragmentShader = 'uniform sampler2D detailMap;\nuniform float detailRep;\nuniform float detailAmt;\n' + sh.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+      vec3 dNear = texture2D(detailMap, vUv * detailRep).rgb;
+      vec3 dFar = texture2D(detailMap, vUv * detailRep * 0.29 + vec2(0.37, 0.61)).rgb;
+      diffuseColor.rgb *= mix(vec3(1.0), dNear * dFar * 4.0, detailAmt);`,
+    );
+  };
 }
 
 function setupThreeMapScenery(mapId = activeMapId) {
@@ -1177,11 +1289,18 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
     threeCam.lookAt(cam.x + shX, 0, cam.y + shY);
     threeCam.updateMatrixWorld();
 
-    // Éclairage solaire dynamique aligné sur le centre de vision pour des ombres portées prononcées
+    // Soleil au nord-ouest, comme l'ombrage peint sur le relief : les ombres tombent vers le bas à droite de l'écran.
+    // Il suit le centre de vision et son cadre d'ombres épouse la zone visible : plus on zoome, plus elles sont nettes
     if (sunLight3D) {
-      sunLight3D.position.set(cam.x - 650, 1800, cam.y + 800);
+      sunLight3D.position.set(cam.x - 760, 1300, cam.y - 560);
       sunLight3D.target.position.set(cam.x, 0, cam.y);
       sunLight3D.target.updateMatrixWorld();
+      const sc = sunLight3D.shadow.camera;
+      const half = clamp((Math.max(W, H / Math.sin(pitchRad)) / cam.z) * 0.62 + 160, 320, 2400);
+      if (Math.abs(sc.right - half) > half * 0.04) {
+        sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half;
+        sc.updateProjectionMatrix();
+      }
     }
 
     // Brouillard atmosphérique au loin adaptatif selon la distance caméra

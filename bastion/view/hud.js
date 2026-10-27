@@ -255,7 +255,7 @@ function renderConsoleUI(force = false) {
     : '';
 
   const grid = $('#uiCmdGrid');
-  const sig = `${modeKey}|${armyAbil}|${buildMode}|${buildKeysArmed}|${orderCursor}|${pc(me)}|${factionOf(me).id}|${buildOrder().map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}|${state.buildings.filter((b) => b.owner === me.id && !b.constructing).length}`;
+  const sig = `${modeKey}|${armyAbil}|${buildMode}|${orderCursor}|${pc(me)}|${factionOf(me).id}|${buildOrder().map((k) => (isBuildLocked(me, k) ? 1 : 0)).join('')}|${state.buildings.filter((b) => b.owner === me.id && !b.constructing).length}`;
   if (!force && sig === lastCmdSig) {
     refreshCmdAffordability(grid, me, firstB);
     return;
@@ -267,12 +267,12 @@ function renderConsoleUI(force = false) {
 
   if (modeKey === 'SCV') {
     $('#uiCmdTitle').textContent = 'Construction';
-    $('#uiCmdHint').textContent = buildKeysArmed ? 'Choisis : 1-0 ou R · Échap pour annuler' : 'B puis 1-0 ou R · Échap pour annuler';
+    $('#uiCmdHint').textContent = `Touches ${Object.values(myFaction().keys).includes('R') ? '1-0 ou R' : '1-0'} · Échap pour annuler`;
     for (const k of buildOrder()) {
       const def = BUILDINGS[k];
       const locked = isBuildLocked(me, k);
       const poor = me.minerals < def.min || me.gas < def.gas;
-      cards.push(`<button class="cbtn ${buildMode === k ? 'sel' : ''} ${buildKeysArmed ? 'armed' : ''} ${locked ? 'locked' : poor ? 'cant' : ''}" data-cmd-build="${k}" data-tip-kind="bld" data-tip-id="${k}">
+      cards.push(`<button class="cbtn ${buildMode === k ? 'sel' : ''} ${locked ? 'locked' : poor ? 'cant' : ''}" data-cmd-build="${k}" data-tip-kind="bld" data-tip-id="${k}">
         <span class="key">${buildKeyOf(k)}</span>
         <canvas class="thumb" width="120" height="60" data-thumb="${k}"></canvas>
         <span class="lbl-b">${def.short}</span>

@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.90 — 27 octobre 2026
+- **Bastion Clash** — Plus besoin de la touche B pour construire : avec un VCS (ou un Drone) sélectionné, les touches 1 à 0 (et R) choisissent directement le bâtiment à poser.
+  - Sans ouvrier sélectionné, les chiffres rappellent toujours tes groupes de contrôle, et Ctrl + chiffre les assigne.
+- **Bastion Clash** — Sur la minimap, la zone que regarde ton allié s'affiche en rose, à côté de ton propre cadre blanc : tu vois tout de suite où il joue.
+- **Bastion Clash** — Graphismes améliorés.
+  - Le soleil vient du nord-ouest, comme l'ombrage du relief : bâtiments, unités et cristaux projettent des ombres plus longues et plus nettes, surtout quand on zoome.
+  - Le sol garde son détail de près sur toutes les cartes : brins d'herbe et cailloux dans la Vallée, cendres dans le Magma, neige et givre sur le Glacier, sable ridé dans le Canyon, béton fissuré dans les Ruines.
+  - La dalle de chaque QG est faite de plaques de blindage avec joints, rivets et traces d'usure.
 ## 2.89 — 27 octobre 2026
 - **Birdie Party** — Les parties en ligne tiennent mieux la route.
   - Tout le monde avance au même rythme : la partie attend que chacun ait fini de regarder un coup, et les bots attendent que tout le monde voie leur tour.

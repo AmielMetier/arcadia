@@ -208,8 +208,7 @@ function buildTerrainCanvas(mapId = activeMapId) {
     g.setLineDash([18, 14]);
     g.strokeStyle = T.padRing; g.lineWidth = 4;
     if (P.main) {
-      g.fillStyle = T.pad;
-      g.beginPath(); g.arc(P.x, P.y, 96, 0, TAU); g.fill();
+      drawBasePad(g, P.x, P.y, T, rnd);
       g.beginPath(); g.arc(P.x, P.y, 106, 0, TAU); g.stroke();
     } else {
       g.beginPath(); g.arc(P.x, P.y, 112, 0, TAU); g.stroke();
@@ -263,6 +262,57 @@ function buildTerrainCanvas(mapId = activeMapId) {
   terrainCanvas = c;
 }
 
+
+// Dalle du QG : plaques de blindage en anneaux, joints, rivets et traces d'usure
+function drawBasePad(g, x, y, T, rnd) {
+  g.save();
+  g.setLineDash([]);
+  g.fillStyle = 'rgba(0,0,0,0.38)';
+  g.beginPath(); g.arc(x, y, 101, 0, TAU); g.fill();
+  const grad = g.createRadialGradient(x - 22, y - 26, 10, x, y, 98);
+  grad.addColorStop(0, shadeHex(T.pad, 1.22)); grad.addColorStop(1, shadeHex(T.pad, 0.88));
+  g.fillStyle = grad;
+  g.beginPath(); g.arc(x, y, 96, 0, TAU); g.fill();
+  g.beginPath(); g.arc(x, y, 96, 0, TAU); g.clip();
+  // Taches d'huile et de poussière
+  for (let k = 0; k < 26; k++) {
+    const a = rnd() * TAU, rr = Math.sqrt(rnd()) * 92, r = 6 + rnd() * 16;
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    const gr = g.createRadialGradient(px, py, 0, px, py, r);
+    gr.addColorStop(0, rnd() < 0.6 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(px, py, r, 0, TAU); g.fill();
+  }
+  // Joints : deux anneaux et des rayons décalés d'un anneau à l'autre, avec un liseré clair (bord biseauté)
+  const seam = (draw) => {
+    g.strokeStyle = 'rgba(0,0,0,0.42)'; g.lineWidth = 2.4; draw(0);
+    g.strokeStyle = 'rgba(255,255,255,0.1)'; g.lineWidth = 1.2; draw(1.6);
+  };
+  for (const r of [40, 70]) seam((o) => { g.beginPath(); g.arc(x + o, y + o, r, 0, TAU); g.stroke(); });
+  for (const [r0, r1, n, off] of [[40, 70, 8, 0], [70, 96, 12, 0.5]]) {
+    for (let k = 0; k < n; k++) {
+      const a = ((k + off) / n) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+      seam((o) => { g.beginPath(); g.moveTo(x + ca * r0 + o, y + sa * r0 + o); g.lineTo(x + ca * r1 + o, y + sa * r1 + o); g.stroke(); });
+    }
+  }
+  // Rivets le long du bord
+  for (let k = 0; k < 24; k++) {
+    const a = (k / 24) * TAU, px = x + Math.cos(a) * 89, py = y + Math.sin(a) * 89;
+    g.fillStyle = 'rgba(0,0,0,0.45)'; g.beginPath(); g.arc(px + 0.8, py + 1, 2.4, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.32)'; g.beginPath(); g.arc(px, py, 1.9, 0, TAU); g.fill();
+  }
+  g.restore();
+  g.save();
+  g.setLineDash([]);
+  g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3;
+  g.beginPath(); g.arc(x, y, 96, 0, TAU); g.stroke();
+  g.restore();
+}
+// Éclaircit (k > 1) ou assombrit (k < 1) une couleur #rrggbb
+function shadeHex(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v) => clamp(Math.round(v * k), 0, 255);
+  return `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+}
 
 function onMapInitView(mapId) {
   buildTerrainCanvas(mapId);
