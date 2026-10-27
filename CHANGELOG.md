@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.94 — 27 octobre 2026
+- **Mini-Golf Party** — Correction : la caméra tourne sans limite à la souris (Claude)
+
 ## 2.93 — 27 octobre 2026
 - **Bastion Clash** — Les combats ne font plus ramer le jeu.
   - Le premier gros affrontement de la partie ne fige plus l'écran une demi-seconde, et les batailles suivantes restent fluides : les tirs, explosions et étincelles coûtent environ cinq fois moins cher à afficher.
