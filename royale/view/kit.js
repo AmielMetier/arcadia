@@ -97,6 +97,51 @@ export function cloneSkinned(src) {
   return clone;
 }
 
+// mains deux fois plus petites que celles du kit : la peau des mains (paume et doigts) se resserre vers le poignet, et
+// les articulations des doigts avec elle (les animations ne font que les tourner)
+const HAND_SCALE = 0.5;
+function shrinkHands(geo, skel, bind, bindInv, k) {
+  const P = geo.attributes.position, J = geo.attributes.skinIndex, Wt = geo.attributes.skinWeight, F = geo.attributes.aTint;
+  const idx = (n) => skel.bones.findIndex((b) => b.name.replace(/\./g, '') === n);
+  const bindPos = (i) => new THREE.Vector3().setFromMatrixPosition(skel.boneInverses[i].clone().invert());
+  const v = new THREE.Vector3(), T = new THREE.Matrix4(), m3 = new THREE.Matrix3();
+  for (const s of ['R', 'L']) {
+    const la = idx('LowerArm' + s), ix = idx('Index1' + s), mid = idx('Middle1' + s);
+    if (la < 0 || ix < 0 || mid < 0) continue;
+    const fingers = new Set();
+    skel.bones.forEach((b, i) => { const n = b.name.replace(/\./g, ''); if (/^(Pinky|Middle|Index|Thumb)\d/.test(n) && n.endsWith(s)) fingers.add(i); });
+    const elbow = bindPos(la), ax = bindPos(mid).sub(elbow).normalize();
+    const list = [];
+    for (let i = 0; i < P.count; i++) {
+      if (Math.round(F.getX(i)) !== SOLDIER_TINT.Skin) continue;
+      let best = -1, bw = -1;
+      for (let c = 0; c < 4; c++) { const w = Wt.getComponent(i, c); if (w > bw) { bw = w; best = J.getComponent(i, c); } }
+      if (best !== la && !fingers.has(best)) continue;
+      v.fromBufferAttribute(P, i).applyMatrix4(bind);
+      list.push([i, v.clone(), v.clone().sub(elbow).dot(ax)]);
+    }
+    if (!list.length) continue;
+    // poignet : le centre de l'anneau de peau le plus proche du coude
+    let t0 = Infinity, t1 = -Infinity;
+    for (const e of list) { t0 = Math.min(t0, e[2]); t1 = Math.max(t1, e[2]); }
+    const ring = list.filter((e) => e[2] < t0 + (t1 - t0) * 0.15);
+    const pivot = ring.reduce((a, e) => a.add(e[1]), new THREE.Vector3()).multiplyScalar(1 / ring.length);
+    for (const [i, p] of list) { p.sub(pivot).multiplyScalar(k).add(pivot).applyMatrix4(bindInv); P.setXYZ(i, p.x, p.y, p.z); }
+    // articulations : des premières phalanges aux bouts des doigts
+    const depth = (i) => { let d = 0; for (let b = skel.bones[i].parent; b && fingers.has(skel.bones.indexOf(b)); b = b.parent) d++; return d; };
+    // (déplacement dans le repère du parent, tiré des matrices de bind : la pose du fichier n'est pas forcément celle-là)
+    const moved = new Map();
+    for (const i of [...fingers].sort((a, b) => depth(a) - depth(b))) {
+      const bone = skel.bones[i], pi = skel.bones.indexOf(bone.parent), p = bindPos(i);
+      const d = p.clone().sub(pivot).multiplyScalar(k).add(pivot).sub(p);
+      moved.set(i, d);
+      bone.position.add(d.clone().sub(moved.get(pi) || v.set(0, 0, 0)).applyMatrix3(m3.setFromMatrix4(skel.boneInverses[pi])));
+      skel.boneInverses[i].multiply(T.makeTranslation(-d.x, -d.y, -d.z));
+    }
+  }
+  P.needsUpdate = true; geo.computeBoundingBox(); geo.computeBoundingSphere();
+}
+
 export async function loadKit(base) {
   const loader = new GLTFLoader(), url = (f) => `${base}toon/${f}.glb`;
   const kit = { soldier: null, weapons: {}, guns: {}, items: {}, props: {}, city: {}, cars: {} };
@@ -145,6 +190,8 @@ export async function loadKit(base) {
       });
       kit.weapons[w] = { hand: merge(inHand), solo: merge(own) };
     }
+    // mains réduites (après les armes : celles-ci, accrochées à l'index, suivent la main)
+    shrinkHands(geo, skel, body.bindMatrix, bindInv, HAND_SCALE);
     // l'outil de récolte : la pelle du kit
     kit.tool = kit.weapons.pioche || null;
     delete kit.weapons.pioche;

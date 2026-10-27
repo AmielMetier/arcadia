@@ -17,6 +17,7 @@
   - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
 - **Island Rush** — Nouvelles armes, bien plus détaillées : un modèle pour les raretés commune et peu commune, un plus moderne pour rare et épique (fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision), à la couleur de leur rareté, en main comme dans le sac.
   - Au sol, l'arme flotte en tournant au-dessus d'un socle hexagonal lumineux ; une poussière de lumière monte autour du butin rare.
+- **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 
 ## 2.94 — 27 octobre 2026
