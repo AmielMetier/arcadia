@@ -260,7 +260,7 @@ function loop(now) {
   handleEvents(events);
   // caméra
   const view = cameraFor(P, disp, dt);
-  S.actors.update(dt, S.t, view.pos, disp, scoped ? S.me : null);
+  S.actors.update(dt, S.t, view.pos, disp, scoped ? S.me : null, seeFrom(view.focus));
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
   // fantôme de la pièce à construire
   if (S.build && P && P.alive && P.mode === 'sol') {
@@ -384,6 +384,16 @@ function stormGap(P) {
   return st.cur.r - Math.hypot(P.x - st.cur.x, P.z - st.cur.z);
 }
 
+// ce que voit le joueur : rien entre sa tête et le point (mur, plancher) ; sert à ne pas montrer les lueurs du
+// butin et des coffres à travers les murs
+function seeFrom(f) {
+  const ox = f.x, oy = f.y + 1.5, oz = f.z;
+  return (x, y, z) => {
+    const dx = x - ox, dy = y - oy, dz = z - oz, L = Math.hypot(dx, dy, dz);
+    if (L < 1) return true;
+    return S.world.raycast(ox, oy, oz, dx / L, dy / L, dz / L, L).t >= L - 0.45;
+  };
+}
 // caméra : par-dessus l'épaule droite (au sol), loin derrière (montgolfière, chute libre), à l'œil (lunette)
 function cameraFor(P, disp, dt) {
   const W = S.world;
