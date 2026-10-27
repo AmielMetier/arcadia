@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.3 — 27 octobre 2026
+- **Island Rush** — L'île ne se vide plus en deux minutes : les bots se battent de plus en plus au fil des cercles de la tempête, et la partie dure jusqu'au dernier cercle (une dizaine de minutes).
+  - Ils se posent répartis sur toute l'île au lieu de s'empiler, et 5 au plus atterrissent près de toi.
+- **Island Rush** — Équipes : solo, duos ou trios, au choix dans le salon. Les places libres de ton équipe sont prises par des bots coéquipiers qui sautent avec toi, te suivent et te relèvent.
+  - À 0 PV, tu tombes à terre : tu rampes, et un coéquipier te relève en restant 5 s à côté de toi (E). Sans aide au bout de 30 s, ou si toute l'équipe est à terre, c'est l'élimination.
+  - Sur l'écran d'accueil, chacun choisit son équipe. En jeu, tes coéquipiers ont leur pseudo au-dessus de la tête, leur point sur la carte et un panneau avec leur vie.
+- **Island Rush** — Les bots se protègent : touchés de loin, ils posent un mur et rechargent à l'abri ; bien amochés, ils décrochent pour se soigner.
+- **Island Rush** — Chaque coffre contient un petit bouclier.
+- **Island Rush** — Niveau des bots « Auto », le nouveau réglage par défaut : il suit vos dernières parties, avec plus de bots faciles pour qui débute et plus de coriaces pour qui gagne souvent.
+- **Island Rush** — Fin de partie : un bilan (précision, distance parcourue, temps de survie, coéquipiers relevés, qui t'a éliminé), et « Rejouer » relance tout de suite, sans recharger la page, pour toi comme pour tes invités.
+- **Island Rush** — Chargement plus rapide : les personnages pèsent 1 Mo au lieu de 4.
+
 ## 3.1 — 27 octobre 2026
 - **Island Rush** — Les bots t'attaquent enfin : celui qui crée la partie dans le Hub leur était invisible comme cible. Ils te traitent maintenant comme n'importe quel autre joueur.
 - **Island Rush** — Les bots jouent comme des joueurs : au début, ils fouillent et se mettent du bouclier ; une fois équipés, ils vont là où ça tire et tournent vers le prochain cercle. S'ils croisent un joueur avant, ils engagent le combat.

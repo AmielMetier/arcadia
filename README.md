@@ -117,7 +117,12 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
 
 ## Island Rush
 Battle royale en 3D (Three.js) sur une île d'un kilomètre carré, dans le style de Birdie Party : de 1 à 6 joueurs, et des
-bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin, combat, pioche et construction, tempête.
+bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, butin, combat, pioche et construction, tempête.
+
+- **Équipes** : solo, duos ou trios, complétées par des bots coéquipiers ; à 0 PV on tombe à terre et un coéquipier
+  relève (E, 5 s) ; l'équipe se choisit sur l'écran d'accueil (`royale/engine/teams.js`)
+- **Rythme** : un « directeur » cale les combats entre bots sur les cercles de la tempête (≈ 10 min de partie) ; niveau
+  des bots « Auto » d'après les dernières parties des joueurs (`royale/engine/skill.js`)
 
 - **L'île** tirée d'une graine : relief, montagne, lac, rivière, mer ; une ville et un bourg (18 bâtiments au plus),
   quatre villages, un port, une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge, carrière, camping,
@@ -152,6 +157,6 @@ bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin,
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **3.0** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **3.3** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude
