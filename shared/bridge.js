@@ -20,8 +20,33 @@
     info: { role: qs.get('role') || 'solo', code: qs.get('code') || null, game: qs.get('game') || null, myId: 0, hostId: 0, settings: {} },
     players: [], readyMap: {}, pings: {}, initDone: false, handlers: {},
   };
-  const emit = (k, ...a) => (H.handlers[k] || []).forEach((f) => { try { f(...a); } catch (e) { console.error(e); } });
+  const emit = (k, ...a) => (H.handlers[k] || []).forEach((f) => {
+    try { f(...a); } catch (e) {
+      console.error(e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', `Erreur dans HubBridge.on('${k}') : ${e && e.message ? e.message : e}`, { stack: e && e.stack });
+    }
+  });
   const post = (o) => { if (embedded) parent.postMessage({ dd: 'hub', ...o }, target); };
+
+  // Chargement automatique du capteur de crashs et d'expulsions (shared/logger.js) dans chaque jeu du Hub
+  if (!window.DDLogger && typeof document !== 'undefined') {
+    try {
+      const cur = document.currentScript && document.currentScript.src;
+      const src = cur ? cur.replace(/bridge\.js(?:\?.*)?$/, 'logger.js') : '../shared/logger.js';
+      const s = document.createElement('script');
+      s.src = src;
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) {}
+  }
+
+  H.logCrash = (code, msg, extra) => {
+    if (window.DDLogger) return window.DDLogger.logCrash(code, msg, extra);
+    post({ k: 'log', entry: { id: 'log-' + Date.now(), ts: Date.now(), iso: new Date().toISOString(), code: code || 'CRASH_JS_ERROR', category: 'CRASH', severity: 'critical', message: String(msg), game: H.info.game, roomCode: H.info.code, role: H.info.role, ...extra } });
+  };
+  H.logExpulsion = (code, msg, extra) => {
+    if (window.DDLogger) return window.DDLogger.logExpulsion(code, msg, extra);
+    post({ k: 'log', entry: { id: 'log-' + Date.now(), ts: Date.now(), iso: new Date().toISOString(), code: code || 'EXP_PEER_LEFT_MIDGAME', category: 'EXPULSION', severity: 'warn', message: String(msg), game: H.info.game, roomCode: H.info.code, role: H.info.role, ...extra } });
+  };
 
   H.on = (k, fn) => {
     (H.handlers[k] = H.handlers[k] || []).push(fn);
@@ -51,7 +76,7 @@
       emit('pings', H.pings);
     } else if (d.k === 'msg') emit('msg', d.from, d.m);
   });
-  if (embedded) post({ k: 'hello' });
+  if (embedded) { keepAwake(H); post({ k: 'hello' }); }
 
   // Duo Drift parle à un objet Net (host/join/to/bcast…) : on le branche sur le salon du Hub.
   // Côté hôte, chaque joueur dont le jeu est prêt devient un « lien » 'p<id>'.
@@ -70,7 +95,12 @@
         // une course ne survit pas à un changement d'hôte : retour propre au salon
         const hostChanged = opened && openedHost !== H.info.hostId;
         if (hostReady && !opened) { opened = true; openedHost = H.info.hostId; Net.hostLink = { hub: true }; cb.open(); }
-        else if ((!hostReady || hostChanged) && opened) { opened = false; Net.hostLink = null; if (cb.close) cb.close(); }
+        else if ((!hostReady || hostChanged) && opened) {
+          opened = false; Net.hostLink = null;
+          if (hostChanged) H.logExpulsion('EXP_HOST_MIGRATION_RESET', `Partie interrompue dans ${H.info.game || 'le jeu'} : changement d'hôte (${openedHost} → ${H.info.hostId}).`);
+          else H.logExpulsion('EXP_HOST_NOT_READY_DESYNC', `Joueur renvoyé au salon depuis ${H.info.game || 'le jeu'} : l'hôte n'est plus dans la partie (!hostReady).`);
+          if (cb.close) cb.close();
+        }
       }
     }
     H.on('roster', sync);
@@ -93,7 +123,13 @@
       toHost(m, vol) { H.send('host', m, { volatile: !!vol }); },
       to(cid, m, vol) { H.send(Number(String(cid).slice(1)), m, { volatile: !!vol }); },
       bcast(m, except, vol) { for (const id of joined) if ('p' + id !== except) H.send(id, m, { volatile: !!vol }); },
-      drop(cid) { const id = Number(String(cid).slice(1)); H.send(id, { t: 'bye' }); Net._drop(cid); },
+      drop(cid, reason) {
+        const id = Number(String(cid).slice(1));
+        const pName = H.playerName(id);
+        H.logExpulsion('EXP_HOST_KICK', `Joueur ${pName} (#${id}) expulsé de la partie (${reason || 'canal fermé par l\'hôte'}).`, { targetPlayer: pName });
+        H.send(id, { t: 'bye', reason });
+        Net._drop(cid);
+      },
       _drop(cid) { const id = Number(String(cid).slice(1)); if (joined.delete(id) && cb && cb.leave) cb.leave(cid); },
       close() { cb = null; Net.cb = null; Net.hostLink = null; Net.role = null; joined.clear(); opened = false; },
     });
@@ -102,4 +138,58 @@
   };
 
   window.HubBridge = H;
+
+  /* Onglet caché : les navigateurs brident les minuteries d'une page cachée (un déclenchement par seconde, puis
+     par minute au bout de 5 minutes sous Chrome) et coupent requestAnimationFrame. Chez l'hôte, la partie se figeait
+     alors pour tout le monde dès qu'il changeait d'onglet. Dans une partie lancée par le Hub :
+     - setTimeout et setInterval passent par un Worker, que les navigateurs ne brident pas ;
+     - chez l'hôte d'une partie à plusieurs, requestAnimationFrame est relayé par ce Worker (30 images par seconde)
+       tant que l'onglet est caché. Un jeu qui fait déjà tourner sa simulation à part (Duo Drift, Bastion Clash)
+       s'en passe avec HubBridge.ownBackgroundLoop = true. window.__forceHidden simule l'onglet caché (tests). */
+  function keepAwake(H) {
+    let w;
+    try {
+      const src = 'const t=new Map();onmessage=(e)=>{const[k,id,ms]=e.data;'
+        + 'if(k==="c"){clearTimeout(t.get(id));clearInterval(t.get(id));t.delete(id);}'
+        + 'else if(k==="t"){t.set(id,setTimeout(()=>{t.delete(id);postMessage(id);},ms));}'
+        + 'else{t.set(id,setInterval(()=>postMessage(id),ms));}};';
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      w = new Worker(url);
+      URL.revokeObjectURL(url);
+    } catch (e) { return; } // pas de Worker possible : on garde les minuteries du navigateur
+    const nST = window.setTimeout.bind(window), nSI = window.setInterval.bind(window), nCT = window.clearTimeout.bind(window), nCI = window.clearInterval.bind(window);
+    const jobs = new Map();
+    let seq = 1e7; // loin des numéros du navigateur (minuteries posées avant ce script)
+    w.onmessage = (e) => {
+      const j = jobs.get(e.data); if (!j) return;
+      if (!j.repeat) jobs.delete(e.data);
+      try { j.fn(...j.args); } catch (err) { console.error(err); }
+    };
+    const add = (repeat) => function (fn, ms, ...args) {
+      if (typeof fn !== 'function') return (repeat ? nSI : nST)(fn, ms, ...args);
+      const id = ++seq;
+      jobs.set(id, { fn, args, repeat });
+      w.postMessage([repeat ? 'i' : 't', id, Math.max(repeat ? 4 : 0, Number(ms) || 0)]);
+      return id;
+    };
+    const clear = (id) => { if (jobs.has(id)) { jobs.delete(id); w.postMessage(['c', id]); } else { nCT(id); nCI(id); } };
+    window.setTimeout = add(false); window.setInterval = add(true);
+    window.clearTimeout = clear; window.clearInterval = clear;
+
+    // Images : celles du navigateur quand l'onglet est visible ; chez l'hôte, des images de 33 ms quand il est caché
+    const nRAF = window.requestAnimationFrame.bind(window);
+    const cbs = new Map();
+    let fseq = 0, nativeId = 0, relayId = 0;
+    const hidden = () => document.hidden || !!window.__forceHidden;
+    const relay = () => hidden() && !H.ownBackgroundLoop && H.info.role === 'host' && H.players.length > 1;
+    const run = (t) => { const list = [...cbs.values()]; cbs.clear(); for (const cb of list) { try { cb(t); } catch (err) { console.error(err); } } };
+    const arm = () => {
+      if (!cbs.size) return;
+      if (relay()) { if (!relayId) relayId = window.setTimeout(() => { relayId = 0; run(performance.now()); }, 33); }
+      else if (!nativeId) nativeId = nRAF((t) => { nativeId = 0; run(t); });
+    };
+    window.requestAnimationFrame = (cb) => { const id = ++fseq; cbs.set(id, cb); arm(); return id; };
+    window.cancelAnimationFrame = (id) => { cbs.delete(id); };
+    document.addEventListener('visibilitychange', arm);
+  }
 })();

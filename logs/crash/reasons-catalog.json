@@ -1,0 +1,285 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-10-26T21:45:00.000Z",
+  "description": "Catalogue officiel des raisons de crash d'un jeu (CRASH_*) et d'expulsion/déconnexion d'un joueur (EXP_*) pour le Game Hub et ses 11 jeux.",
+  "codes": {
+    "CRASH_JS_ERROR": {
+      "category": "CRASH",
+      "severity": "critical",
+      "title": "Erreur JavaScript fatale en cours de partie",
+      "cause": "Exception non interceptée (TypeError, ReferenceError, RangeError) dans la boucle de simulation, de rendu ou de réception réseau.",
+      "resolution": "Vérifier la pile d'appels (stack, fichier et ligne) dans le rapport du crash pour protéger l'accès à la propriété nulle ou corriger l'état désynchronisé."
+    },
+    "CRASH_UNHANDLED_REJECTION": {
+      "category": "CRASH",
+      "severity": "error",
+      "title": "Promesse rejetée non gérée (chargement d'asset / réseau)",
+      "cause": "Échec asynchrone lors d'un fetch JSON, du décodage d'une texture/modèle 3D ou d'une ressource audio.",
+      "resolution": "Vérifier la disponibilité du fichier dans le réseau (onglet Network) et entourer le chargement d'un bloc try/catch avec fallback."
+    },
+    "CRASH_WEBGL_CONTEXT_LOST": {
+      "category": "CRASH",
+      "severity": "critical",
+      "title": "Perte du contexte graphique 3D / WebGL (écran noir ou figé)",
+      "cause": "Le pilote graphique a réinitialisé le contexte WebGL (mémoire vidéo GPU saturée, trop d'onglets 3D ouverts ou mise en veille).",
+      "resolution": "Fermer les autres onglets utilisant la 3D, activer l'accélération matérielle du navigateur ou passer les graphismes en qualité Basse (Mini-Golf / Kart)."
+    },
+    "CRASH_ASSET_LOAD_ERROR": {
+      "category": "CRASH",
+      "severity": "error",
+      "title": "Échec de chargement d'un script ou module critique",
+      "cause": "Un fichier .js ou .mjs requis au démarrage du jeu a renvoyé une erreur 404 ou a été interrompu.",
+      "resolution": "Rafraîchir le cache du navigateur (Ctrl+F5) et vérifier le chemin relatif de l'asset."
+    },
+    "CRASH_IFRAME_LOAD_FAIL": {
+      "category": "CRASH",
+      "severity": "critical",
+      "title": "Le jeu n'a pas répondu au lancement dans l'iframe du Hub (timeout 15 s)",
+      "cause": "L'iframe du jeu n'a pas envoyé le message { dd: 'hub', k: 'hello' } dans les 15 secondes suivant son ouverture.",
+      "resolution": "Ouvrir la console pour inspecter l'erreur de syntaxe ou de module qui a bloqué l'exécution avant shared/bridge.js."
+    },
+    "EXP_HOST_KICK": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Joueur expulsé manuellement par l'hôte du salon (Kick)",
+      "cause": "L'hôte a cliqué sur le bouton d'expulsion (✕) ou appelé room.kick(id, reason) / Net.drop(cid).",
+      "resolution": "Action volontaire de l'hôte (ex. joueur AFK ou ping trop élevé). Le joueur peut rejoindre à nouveau si l'hôte l'accepte."
+    },
+    "EXP_ROOM_FULL": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Expulsé à l'entrée : salon ou jeu complet",
+      "cause": "Le salon a atteint 6 joueurs (DDRoom.MAX_PLAYERS) ou le jeu actif est limité à moins de joueurs (4 sur Bastion/Golf, 5 sur Duo Drift/Outbreak).",
+      "resolution": "Choisir un jeu supportant 6 joueurs ou attendre qu'une place se libère dans le salon."
+    },
+    "EXP_HOST_STOPPED_GAME": {
+      "category": "EXPULSION",
+      "severity": "info",
+      "title": "Partie arrêtée par l'hôte pour tout le monde",
+      "cause": "L'hôte a quitté la partie ou cliqué sur « Arrêter pour tout le monde » (room.setGame(null)), fermant l'iframe chez tous les invités.",
+      "resolution": "Comportement normal lorsque l'hôte met fin à la session de jeu pour changer de jeu dans le salon."
+    },
+    "EXP_HOST_NOT_READY_DESYNC": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Expulsé de la partie : l'hôte n'est plus dans le jeu (!hostReady)",
+      "cause": "Dans shared/bridge.js (patchNet), readyMap[hostId] ne correspond plus au jeu actif, déclenchant cb.close() chez l'invité.",
+      "resolution": "Attendre que l'hôte relance la partie depuis le salon commun."
+    },
+    "EXP_HOST_MIGRATION_RESET": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Déconnexion de l'hôte (host_left) et migration du salon",
+      "cause": "L'hôte a fermé son onglet ou perdu sa connexion WebSocket. Le salon migre vers le joueur suivant ; les jeux sans reprise d'état de course (ex. Duo Drift) ferment la manche.",
+      "resolution": "Le nouveau salon est rétabli automatiquement ; le nouvel hôte peut relancer une manche."
+    },
+    "EXP_WS_KEEPALIVE_TIMEOUT": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Joueur expulsé par le serveur relais (timeout WebSocket 30 s)",
+      "cause": "Le serveur relais (server/server.js) n'a reçu aucun pong pendant 30 s (perte Wi-Fi/4G ou mise en veille mobile) et a fermé la connexion (ws.terminate).",
+      "resolution": "Vérifier la stabilité Wi-Fi/4G via « Tester ma connexion » sur l'accueil du Hub et garder l'écran actif sur mobile."
+    },
+    "EXP_TAB_BACKGROUND_THROTTLE": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Joueur déconnecté ou passé en IA : onglet en arrière-plan (hid=1)",
+      "cause": "L'onglet du joueur n'était plus au premier plan (document.hidden = true) : le navigateur a bridé ou suspendu ses timers réseau et sa boucle de jeu.",
+      "resolution": "Garder l'onglet du Game Hub visible au premier plan pendant toute la durée de la partie multijoueur."
+    },
+    "EXP_SLOW_CLIENT_OVERFLOW": {
+      "category": "EXPULSION",
+      "severity": "warn",
+      "title": "Joueur désynchronisé / expulsé : tampon WebSocket saturé ou PC trop lent",
+      "cause": "Le tampon d'envoi a dépassé 96 Ko (SLOW_CLIENT_BYTES) ou l'ordinateur du joueur accuse plus de 60 ms de retard par image (diag.lag > 60).",
+      "resolution": "Fermer les applications lourdes en arrière-plan, brancher le PC portable sur secteur et privilégier le Wi-Fi 5 GHz ou Ethernet."
+    },
+    "EXP_PEER_LEFT_MIDGAME": {
+      "category": "EXPULSION",
+      "severity": "info",
+      "title": "Coupure WebSocket d'un joueur en pleine partie (peer_left)",
+      "cause": "La socket WebSocket de l'invité s'est fermée pendant une partie active. Sa place est conservée (cid = null) dans le salon pour permettre sa reconnexion.",
+      "resolution": "La reconnexion automatique s'effectue en 1 seconde dès le retour du réseau."
+    }
+  },
+  "games": [
+    {
+      "id": "hub",
+      "title": "Game Hub (Salon & Relais)",
+      "maxPlayers": 6,
+      "engine": "DOM + WebSocket Relay (Protocole 2)",
+      "crashReasons": [
+        "Blocage WebSocket par un pare-feu d'école/entreprise sur le serveur relais",
+        "Iframe d'un jeu ne répondant pas au signal 'hello' sous 15 s (CRASH_IFRAME_LOAD_FAIL)"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_KICK : exclusion manuelle d'un joueur par l'hôte (bouton ✕ dans le salon)",
+        "EXP_ROOM_FULL : 7e joueur tentant de rejoindre un salon complet de 6 joueurs",
+        "EXP_WS_KEEPALIVE_TIMEOUT : absence de pong pendant 30 s sur server/server.js",
+        "EXP_TAB_BACKGROUND_THROTTLE : onglet mis en arrière-plan ou smartphone verrouillé (diag.hid = 1)"
+      ]
+    },
+    {
+      "id": "drift",
+      "title": "Duo Drift",
+      "maxPlayers": 5,
+      "engine": "Canvas 2D + HubBridge.patchNet",
+      "crashReasons": [
+        "Saturation mémoire Canvas lors du pré-rendu des grands circuits urbains",
+        "Exception dans updateRace / render si un état de voiture corrompu est reçu"
+      ],
+      "expulsionReasons": [
+        "EXP_ROOM_FULL : 6e joueur d'un salon Hub expulsé par drift/index.html:2016 (MAX_PLAYERS = 5)",
+        "EXP_HOST_MIGRATION_RESET : un changement d'hôte déclenche cb.close() dans shared/bridge.js:97, ce qui appelle leave() et ferme la course",
+        "EXP_HOST_NOT_READY_DESYNC : si l'hôte quitte ou recharge Duo Drift, !hostReady renvoie tous les invités au salon"
+      ]
+    },
+    {
+      "id": "pokemon",
+      "title": "Poké Duel (Aventure & Tournoi 3v3)",
+      "maxPlayers": 6,
+      "engine": "Phaser 3.80 (PixelArt Arcade) + Arène DOM/Canvas",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte du contexte WebGL Phaser sur la carte 50×100 tuiles",
+        "CRASH_ASSET_LOAD_ERROR : échec de chargement des tilesets Kanto (map_outdoor_base.png, chars_overworld.png) ou des sprites de combat"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte ferme le tournoi ou le monde Aventure pour revenir au salon",
+        "Déconnexion d'un dresseur pendant un duel d'arène 3v3 (victoire par forfait attribuée à l'adversaire)",
+        "EXP_PEER_LEFT_MIDGAME : joueur quittant la carte multijoueur (son sprite distant est retiré de remotePlayers)"
+      ]
+    },
+    {
+      "id": "kart",
+      "title": "Cyber Kart GP",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte du contexte 3D sur les 7 circuits (shaders, particules et post-processing)",
+        "Dépassement VRAM sur appareils mobiles ou GPU intégrés"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_MIGRATION_RESET : si l'hôte quitte en pleine course (kart/index.html:5597), endRaceLocal() interrompt la course et ramène le salon au choix du circuit",
+        "EXP_PEER_LEFT_MIDGAME : le kart d'un joueur déconnecté passe automatiquement sous contrôle IA (kart/index.html:5602)"
+      ]
+    },
+    {
+      "id": "bastion",
+      "title": "Bastion Clash",
+      "maxPlayers": 4,
+      "engine": "Three.js + Brouillard de guerre Canvas",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST sur le rendu 3D du champ de bataille",
+        "Surcharge CPU/mémoire lors de vagues massives d'unités (diag.lag > 60 ms)"
+      ],
+      "expulsionReasons": [
+        "EXP_TAB_BACKGROUND_THROTTLE : après 8 s sans message gping (PRESENCE_TIMEOUT = 8000 ms dans bastion/main.js:216), le joueur est marqué AFK et remplacé par une IA",
+        "EXP_ROOM_FULL : limité à 4 joueurs maximum (et 2 joueurs en mode Duel 1v1, les autres passent spectateurs)"
+      ]
+    },
+    {
+      "id": "outbreak",
+      "title": "Outbreak : Secteur Zéro",
+      "maxPlayers": 5,
+      "engine": "Canvas 2D Twin-Stick",
+      "crashReasons": [
+        "CRASH_ASSET_LOAD_ERROR : image de secteur ou spritesheet de survivant/zombie non chargée",
+        "Exception dans la simulation des vagues ou des boss"
+      ],
+      "expulsionReasons": [
+        "EXP_ROOM_FULL : limité à 5 survivants maximum",
+        "Joueur non prêt (!isReady(p.id)) au moment où l'hôte clique sur Lancer : non inclus dans la mission en cours"
+      ]
+    },
+    {
+      "id": "convoy",
+      "title": "Convoy Storm",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte ou absence de support WebGL (déclenche l'écran d'erreur showNoGL() dans convoy/app.js:95)"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : arrêt de l'expédition par l'hôte",
+        "Joueur rejoignant après le départ du train ou non prêt au briefing"
+      ]
+    },
+    {
+      "id": "david",
+      "title": "DavidSimulator",
+      "maxPlayers": 6,
+      "engine": "Plateau DOM / 3D",
+      "crashReasons": [
+        "CRASH_JS_ERROR : état de transaction ou d'enchère incomplet lors d'un échange entre joueurs"
+      ],
+      "expulsionReasons": [
+        "EXP_ROOM_FULL : limité à 4 joueurs en mode équipes 2 contre 2",
+        "Faillite (patrimoine négatif) éliminant le joueur de la partie en cours"
+      ]
+    },
+    {
+      "id": "calcul",
+      "title": "Tête de Calcul",
+      "maxPlayers": 6,
+      "engine": "DOM + Évaluateur mathématique / Python / SQL",
+      "crashReasons": [
+        "CRASH_JS_ERROR : boucle ou expression invalide dans l'épreuve de code du mode The Candidate"
+      ],
+      "expulsionReasons": [
+        "Élimination par règles de jeu : dernier candidat coupé à chaque manche (mode The Candidate, cut=1) ou perte de toutes ses vies (mode Péril)"
+      ]
+    },
+    {
+      "id": "filrouge",
+      "title": "Fil Rouge",
+      "maxPlayers": 6,
+      "engine": "Three.js (Bombe 3D) + Manuel DOM",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST sur la vue 3D de la bombe du démineur"
+      ],
+      "expulsionReasons": [
+        "Explosion de la bombe (nombre maximal de fautes atteint) ou départ du partenaire en mode Coop / Duel 2v2"
+      ]
+    },
+    {
+      "id": "golf",
+      "title": "Birdie Party",
+      "maxPlayers": 4,
+      "engine": "Three.js (WebGL 3D)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : intercepté dans golf/app.js:27 (« Affichage 3D interrompu : recharge la page »)"
+      ],
+      "expulsionReasons": [
+        "EXP_ROOM_FULL : parcours limité à 4 golfeurs maximum",
+        "EXP_HOST_STOPPED_GAME : lorsque l'hôte confirme « Arrêter la partie pour tout le monde et revenir au salon » (golf/app.js:81)"
+      ]
+    },
+    {
+      "id": "minigolf",
+      "title": "Mini-Golf Party",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST sur le rendu 3D du parcours",
+        "Chute sévère de FPS déclenchant perfWatch et la bascule forcée en qualité graphique basse"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : joueur quittant en cours de trou marqué done[id] = 'left' (minigolf/js/main.js:742) et son tour est immédiatement passé (hostNextTurn)"
+      ]
+    },
+    {
+      "id": "royale",
+      "title": "Island Rush (Royale)",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D Island Battle)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL sur l'île 3D (modèles GLTF, shaders d'eau, herbe et météo)",
+        "Dépassement mémoire lors du chargement des modèles 3D basse déf (GLTF)"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a quitté l'île ou arrêté la partie",
+        "EXP_PEER_LEFT_MIDGAME : joueur déconnecté pendant la tempête (personnage retiré ou laissé statique)"
+      ]
+    }
+  ]
+}

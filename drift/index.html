@@ -472,6 +472,7 @@ body.in-hub #menu .menu-actions{visibility:hidden}
 <div id="toast"></div>
 
 <script src="../shared/net.js"></script>
+<script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
 <script>
 'use strict';
@@ -4487,6 +4488,7 @@ function step(draw){
 }
 function frame(){ if(!isHidden()) step(true); requestAnimationFrame(frame); }
 (function backgroundTicker(){
+  if(window.HubBridge) HubBridge.ownBackgroundLoop=true; // le Hub n'a pas à relayer nos images : on s'en charge ici
   const tick=()=>{ if(isHidden()){ step(false); AudioSys.tick(); } };
   try{
     const w=new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},33)'],{type:'text/javascript'})));

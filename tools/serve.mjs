@@ -29,11 +29,61 @@ const MIME_TYPES = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.m4a': 'audio/mp4',
-  '.wav': 'audio/wav'
+  '.wav': 'audio/wav',
+  '.jsonl': 'application/x-ndjson; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8'
 };
+
+const CRASH_DIR = path.join(ROOT, 'logs', 'crash');
+const JSONL_FILE = path.join(CRASH_DIR, 'crash-events.jsonl');
+const LATEST_FILE = path.join(CRASH_DIR, 'latest.json');
+
+function appendCrashLog(entry) {
+  try {
+    fs.mkdirSync(CRASH_DIR, { recursive: true });
+    fs.appendFileSync(JSONL_FILE, JSON.stringify(entry) + '\n', 'utf8');
+    let list = [];
+    if (fs.existsSync(LATEST_FILE)) {
+      try { list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) { list = []; }
+    }
+    if (!Array.isArray(list)) list = [];
+    list.unshift(entry);
+    fs.writeFileSync(LATEST_FILE, JSON.stringify(list.slice(0, 200), null, 2) + '\n', 'utf8');
+  } catch (e) {
+    console.error('Erreur écriture log crash :', e);
+  }
+}
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+
+  if (req.method === 'POST' && urlPath === '/api/log') {
+    let body = '';
+    req.on('data', (chunk) => { if (body.length < 32768) body += chunk; });
+    req.on('end', () => {
+      try {
+        const entry = JSON.parse(body);
+        if (entry && typeof entry === 'object') appendCrashLog(entry);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && urlPath === '/api/logs') {
+    let list = [];
+    try {
+      if (fs.existsSync(LATEST_FILE)) list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8'));
+    } catch (e) {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify(list));
+    return;
+  }
+
   let safePath = path.normalize(path.join(ROOT, urlPath));
 
   if (!safePath.startsWith(ROOT)) {

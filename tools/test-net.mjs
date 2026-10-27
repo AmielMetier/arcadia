@@ -46,7 +46,7 @@ const SRC = ['shared/net.js', 'shared/room.js'].map((f) => fs.readFileSync(ROOT 
 function browser(port) {
   const L = {};
   const w = {
-    console, setTimeout, clearTimeout, setInterval, clearInterval, performance, URLSearchParams, BroadcastChannel, crypto: globalThis.crypto,
+    console, setTimeout, clearTimeout, setInterval, clearInterval, performance, URLSearchParams, BroadcastChannel, MessageChannel, crypto: globalThis.crypto,
     location: { search: `?ws=ws://127.0.0.1:${port}`, origin: 'http://localhost', pathname: '/' },
     fetch: () => Promise.resolve(), WebSocket,
     document: { hidden: false, addEventListener: () => {} },

@@ -235,7 +235,7 @@ function startSim(shot) {
   const me = balls[idx]; if (!me) return;
   me.p = shot.from.slice();
   strike(h.world, me, shot.yaw, shot.power);
-  SIM = { id: shot.id, pid: shot.pid, balls, T0: shot.T0, t: 0, acc: 0, ev: [], send: 0, done: false, start: Object.fromEntries(balls.map((b) => [b.id, b.p.slice()])) };
+  SIM = { id: shot.id, pid: shot.pid, balls, T0: shot.T0, t: 0, acc: 0, ev: [], send: 0, done: false, moved: new Set([shot.pid]), start: Object.fromEntries(balls.map((b) => [b.id, b.p.slice()])) };
   FX.shot(me.p, shot.power);
 }
 function simTick(dt) {
@@ -253,7 +253,8 @@ function simTick(dt) {
   SIM.send += dt;
   if (SIM.send > 1 / 30 || !moving) {
     SIM.send = 0;
-    const m = { t: 'bs', i: SIM.id, T: +SIM.t.toFixed(3), b: SIM.balls.filter((b) => b.awake || b.oob || b.holed).map((b) => [b.id, +b.p[0].toFixed(3), +b.p[1].toFixed(3), +b.p[2].toFixed(3), b.holed ? 1 : b.oob ? 2 : 0]), e: SIM.ev };
+    for (const b of SIM.balls) if (b.awake || b.oob || b.holed) SIM.moved.add(b.id);
+    const m = { t: 'bs', i: SIM.id, T: +SIM.t.toFixed(3), b: SIM.balls.filter((b) => SIM.moved.has(b.id)).map((b) => [b.id, +b.p[0].toFixed(3), +b.p[1].toFixed(3), +b.p[2].toFixed(3), b.holed ? 1 : b.oob ? 2 : 0]), e: SIM.ev };
     SIM.ev = [];
     if (NET.role === 'host') NET.all(m); else if (NET.role === 'guest') H.send('host', m);
   }
@@ -289,14 +290,15 @@ function onMsg(from, m, local) {
   switch (m.t) {
     case 'pong': { const now = nowMs(), rtt = now - m.c; if (rtt < NET.rtt * 1.5 || rtt < 120) { NET.rtt = Math.min(rtt, NET.rtt * 0.8 + rtt * 0.2); NET.offset = m.h + rtt / 2 - now; } break; }
     case 'st': if (m.s && m.s.n >= G.n) { G = m.s; onState(G); } break;
-    case 'bs': if (!SIM || SIM.id !== m.i) onStream(m); break;
+    case 'bs': if ((!SIM || SIM.id !== m.i) && G.shot && m.i === G.shot.id) onStream(m); break;
     case 'aim': onAim(m); break;
   }
 }
 function onStream(m) {
-  if (m.i !== STREAM.id) { STREAM.id = m.i; STREAM.buf = []; }
+  if (m.i !== STREAM.id) { STREAM.id = m.i; STREAM.buf = []; STREAM.clock = null; }
+  if (STREAM.buf.length && m.T <= STREAM.buf[STREAM.buf.length - 1].T) return;   // paquet en double ou en retard
   STREAM.buf.push({ T: m.T, at: nowMs(), b: m.b });
-  if (STREAM.buf.length > 90) STREAM.buf.shift();
+  if (STREAM.buf.length > 240) STREAM.buf.shift();
   STREAM.lastArr = nowMs();
   for (const e of m.e || []) handleEvent({ k: e[0], b: e[1], p: [e[2], e[3], e[4]], s: e[5], m: e[6] }, true);
 }
@@ -372,24 +374,31 @@ function announceLast(L) {
 const FX = {
   shot(p, pw) { sfx.putt(pw); R.fx('shot', p); },
 };
+const EVT = {};
+function evOk(k, gap) { const t = nowMs(); if (t - (EVT[k] || -1e9) < gap) return false; EVT[k] = t; return true; }
 function handleEvent(e) {
   const p = e.p;
   switch (e.k) {
-    case 'hit': sfx.hit(e.s, MAT_NAMES_CACHE[e.m]); R.fx('hit', p, { s: e.s }); shake(Math.min(0.12, e.s * 0.01)); break;
-    case 'bumper': sfx.bumper(); R.fx('bumper', p); break;
-    case 'bounce': sfx.bounce(e.s); break;
-    case 'sand': sfx.sand(); R.fx('sand', p); break;
-    case 'ball': sfx.ball(e.s); R.fx('hit', p, { s: e.s }); break;
+    case 'hit':
+      if (!evOk('hit', 90)) break;
+      sfx.hit(e.s, MAT_NAMES_CACHE[e.m]);
+      if (e.s > 2.5 && evOk('hitfx', 160)) R.fx('hit', p, { s: e.s });
+      if (e.s > 6) shake(Math.min(0.08, e.s * 0.006));
+      break;
+    case 'bumper': if (evOk('bumper', 120)) { sfx.bumper(); R.fx('bumper', p); } break;
+    case 'bounce': if (evOk('bounce', 110)) sfx.bounce(e.s); break;
+    case 'sand': if (evOk('sand', 150)) { sfx.sand(); R.fx('sand', p); } break;
+    case 'ball': if (evOk('ball', 100)) { sfx.ball(e.s); R.fx('hit', p, { s: e.s }); } break;
     case 'cup': sfx.cup(); R.fx('cup', [p[0], p[1] + 0.2, p[2]]); { const v = ballsVisual.get(K(e.b)); if (v) v.sinkStart = nowMs(); } break;
     case 'water': sfx.water(); R.fx('water', p); break;
     case 'lava': sfx.lava(); R.fx('lava', p); break;
     case 'out': sfx.out(); R.fx('out', p); break;
     case 'void': sfx.out(); R.fx('void', p); break;
-    case 'mud': sfx.sand(); R.fx('mud', p); break;
-    case 'slow': sfx.slow(); R.fx('slow', p); break;
-    case 'flip': sfx.flip(e.s); R.fx('flip', p, { s: e.s }); break;
-    case 'boost': sfx.boost(); R.fx('boost', p); break;
-    case 'tramp': sfx.tramp(); R.fx('tramp', p); break;
+    case 'mud': if (evOk('sand', 150)) { sfx.sand(); R.fx('mud', p); } break;
+    case 'slow': if (evOk('slow', 400)) { sfx.slow(); R.fx('slow', p); } break;
+    case 'flip': if (evOk('flip', 300)) { sfx.flip(e.s); R.fx('flip', p, { s: e.s }); } break;
+    case 'boost': if (evOk('boost', 300)) { sfx.boost(); R.fx('boost', p); } break;
+    case 'tramp': if (evOk('tramp', 150)) { sfx.tramp(); R.fx('tramp', p); } break;
     case 'tele': sfx.tele(); R.fx('tele', p); break;
   }
 }
@@ -406,13 +415,24 @@ function updateBalls(dt) {
   if (simLive) for (const b of SIM.balls) live.set(K(b.id), { p: b.p, holed: b.holed, oob: b.oob });
   else if (G.shot && STREAM.id === G.shot.id && STREAM.buf.length) {
     // interpolation avec ~110 ms de retard
-    const buf = STREAM.buf, last = buf[buf.length - 1];
-    const rt = last.T + (nowMs() - last.at) / 1000 - 0.11;
-    let a = buf[0], b = buf[0];
-    for (let i = 0; i < buf.length; i++) { if (buf[i].T <= rt) a = buf[i]; if (buf[i].T >= rt) { b = buf[i]; break; } b = buf[i]; }
+    const buf = STREAM.buf, last = buf[buf.length - 1], DELAY = 0.14;
+    const target = Math.min(last.T, last.T + (nowMs() - last.at) / 1000 - DELAY);
+    if (STREAM.clock == null) STREAM.clock = Math.max(buf[0].T, target);
+    else {
+      STREAM.clock += dt;
+      const err = target - STREAM.clock;
+      if (err > 0.6) STREAM.clock = target;                         // très en retard : on rattrape d'un coup
+      else STREAM.clock += clamp(err * dt * 3, -dt * 0.6, dt * 0.8);  // sinon on accélère ou ralentit un peu, sans reculer
+      STREAM.clock = Math.min(STREAM.clock, last.T);
+    }
+    const rt = STREAM.clock;
+    let lo = 0, hi = buf.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (buf[mid].T <= rt) lo = mid; else hi = mid - 1; }
+    const a = buf[lo], b = buf[Math.min(buf.length - 1, lo + 1)];
     const t = b.T > a.T ? clamp((rt - a.T) / (b.T - a.T), 0, 1) : 1;
     const ma = new Map(a.b.map((r) => [K(r[0]), r])), mb = new Map(b.b.map((r) => [K(r[0]), r]));
     for (const [id, rb] of mb) { const ra = ma.get(id) || rb; live.set(id, { p: [ra[1] + (rb[1] - ra[1]) * t, ra[2] + (rb[2] - ra[2]) * t, ra[3] + (rb[3] - ra[3]) * t], holed: rb[4] === 1, oob: rb[4] === 2 }); }
+    for (const [id, ra] of ma) if (!live.has(id)) live.set(id, { p: [ra[1], ra[2], ra[3]], holed: ra[4] === 1, oob: ra[4] === 2 });
     STREAM.rt = rt;
   }
   for (const p of G.players) {
@@ -899,7 +919,7 @@ function boot() {
     if (NET.role === 'guest') setInterval(() => H.send('host', { t: 'ping', c: nowMs() }), 2000);
     requestAnimationFrame(frame);
   });
-  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, INPUT, TOUCHDEV, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
+  if (DEBUG) window.__golf = { get G() { return G; }, R, NET, INPUT, TOUCHDEV, BV: ballsVisual, hostStart, doShoot, goHole: (i) => hostStartHole(i), CAM, get SIM() { return SIM; }, HOLES: () => HOLES };
 }
 
 let last = nowMs(), menuSpin = 0;

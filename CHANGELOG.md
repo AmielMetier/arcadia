@@ -1,5 +1,45 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.88 — 26 octobre 2026
+- Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)
+
+## 2.87 — 26 octobre 2026
+- **Birdie Party** — Correction : résolution du crash Birdie Party, repli WebGL et fiabilisation des logs (Amiel)
+
+## 2.86 — 26 octobre 2026
+- **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.
+- **Mini-Golf Party** — Fini le vacarme contre les murets : un frottement ne fait plus de bruit, et un vrai choc ne donne qu'un son et quelques étincelles, sans secouer la caméra à chaque rebond.
+
+## 2.85 — 26 octobre 2026
+- **Cyber Kart GP** — Dérapage plus doux, plus proche de Mario Kart.
+  - Passer du virage serré au virage large (ou l'inverse) se fait en souplesse : le kart ne part plus brusquement sur le côté.
+  - Le kart glisse moins vers l'extérieur et suit mieux sa trajectoire ; le virage le plus serré est un peu moins violent, le plus large un peu moins mou.
+
+## 2.84 — 26 octobre 2026
+- **Cyber Kart GP** — Graphismes : les circuits passent aux textures photo haute qualité, libres de droits.
+  - Routes en vrai asphalte, herbe dense, falaises de roche moussue, troncs en écorce, neige poudreuse.
+  - Plage et fond des Abysses en sable fin, pontons en planches, arches en pierre, chemins caillouteux et temple en pierres de la jungle.
+  - Murs en moellons et allées de gravier au Château Hanté.
+  - Chaque circuit ne charge que ses textures ; en attendant, les anciennes s'affichent, la course n'attend pas.
+
+## 2.83 — 26 octobre 2026
+- Correction : chargement synchrone de logger.js dans tous les jeux et envoi direct à /api/log (Amiel)
+
+## 2.82 — 26 octobre 2026
+- Nouveau : ajout du dossier logs/crash et du système de diagnostic de crashs et d'expulsions pour tous les jeux (Amiel)
+
+## 2.81 — 26 octobre 2026
+- **Convoy Storm** — Chaque paysage a maintenant son caractère, à l'œil comme dans la partie.
+  - Plaine gelée : la voie droite et dégagée fait filer le convoi 12 % plus vite, de quoi reprendre de l'avance sur le Front. Des fermes isolées, avec leur enclos et leur charrette, abritent souvent des survivants.
+  - Toundra : la neige soufflée laisse voir une lande rousse et des touffes d'herbe sèche, sous un ciel blanc qui porte loin.
+  - Col des Glaces : un ciel gris-bleu de montagne, une neige plus sombre et des éboulis le long de la voie.
+
+## 2.80 — 26 octobre 2026
+- **Tous les jeux** — Quand l'hôte change d'onglet ou réduit sa fenêtre, la partie continue pour tout le monde.
+  - Le navigateur ralentit fortement une page cachée (un minuteur par seconde, puis par minute au bout de cinq minutes) et y arrête l'animation : chez l'hôte, la partie se figeait ou prenait des secondes de retard pour tous les joueurs. Les jeux gardent maintenant leur rythme dans un onglet caché, et chez l'hôte d'une partie à plusieurs, la simulation continue à 30 images par seconde.
+  - Les commandes des invités arrivent sans attendre au jeu de l'hôte, même quand son onglet est caché.
+- **Tête de Calcul** — Market making : après ta troisième cotation, le dernier dé, la somme et ton P&L s'affichent tout de suite, avec « on attend les autres ». Les bots cotent aussi plus vite : on n'attend plus la fin du chrono.
+
 ## 2.79 — 26 octobre 2026
 - **Island Rush** — Une caméra qui ne bondit plus, la souris qui suffit pour regarder, un sac à ranger et une interface toute neuve.
   - La vue tourne en bougeant simplement la souris, même quand le navigateur refuse de la capturer : contre un bord de l'écran, elle continue de tourner.

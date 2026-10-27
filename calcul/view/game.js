@@ -704,7 +704,18 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       const k = quotes.length, seen = q.mm.dice.slice(0, k);
       $('#mmrule').innerHTML = k < 3 ? `Cotation <b>${k + 1}/3</b> · ${fmt(MM_MAX_SPREAD[k])} d'écart au plus · ${seen.length ? `dés vus : <b>${seen.join(' + ')}</b>` : 'aucun dé vu'}` : 'Trois cotations envoyées. Le dernier dé se dévoile à la correction.';
     };
-    const send = () => { if (myAns != null || !quotes.length) return; myAns = quotes.map((x) => x.join('/')).join(';'); answer(myAns); sfx.play('lock'); pcAnswered(); for (const e of root.querySelectorAll('#mmform input, #mmgo')) e.disabled = true; };
+    const send = () => {
+      if (myAns != null || !quotes.length) return;
+      myAns = quotes.map((x) => x.join('/')).join(';'); answer(myAns); sfx.play('lock'); pcAnswered();
+      for (const e of root.querySelectorAll('#mmform input, #mmgo')) e.disabled = true;
+      // marché bouclé : le joueur voit tout de suite le dernier dé, la somme et son P&L, puis on attend les autres
+      const run = runMarket(q.mm, quotes), V = run.V;
+      for (const [k, d] of q.mm.dice.entries()) { const die = root.querySelector(`.die[data-d="${k}"]`); if (die && !die.classList.contains('shown')) { die.textContent = d; die.classList.add('shown'); } }
+      const sum = root.querySelector('.mm-dice .die.sum'); if (sum) { sum.textContent = V; sum.classList.add('shown'); }
+      $('#mmrule').innerHTML = `Somme des dés : <b>${V}</b>`;
+      const st = $('#sent'); st.hidden = false; st.className = 'sent';
+      st.innerHTML = `Marché bouclé : ton P&L <b>${run.pnl > 0 ? '+' : ''}${fmt(run.pnl)}</b> · on attend les autres…`;
+    };
     rule();
     setTimeout(() => { try { $('#mmbid').focus({ preventScroll: true }); } catch (e) {} }, 60);
     // le temps file : on envoie ce qui a été coté (les cotations manquantes comptent comme trop larges)
