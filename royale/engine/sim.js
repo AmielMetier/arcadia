@@ -16,6 +16,9 @@ export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon 
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
 const FALL_SAFE = 8;               // m de chute sans dégâts
+// Coriolis pour les balles du fusil de précision : rotation de la Terre à 46° de latitude (x vers l'est, z vers le
+// nord, y en haut), forcée ×60 pour qu'on la sente sur l'île (≈ 65 cm de dérive à droite à 300 m)
+const OMEGA = (() => { const w = 7.292e-5 * 60, lat = 46 * Math.PI / 180; return [0, w * Math.sin(lat), w * Math.cos(lat)]; })();
 const STORM_START = 30;           // s après le départ de la montgolfière
 const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 
@@ -249,7 +252,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
-    const toSh = opt.storm ? 0 : Math.min(Q.sh, n);
+    // la tempête et les chutes enlèvent de la vie, pas du bouclier
+    const toSh = opt.storm || opt.cause === 'chute' ? 0 : Math.min(Q.sh, n);
     Q.sh -= toSh; Q.hp -= n - toSh;
     if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
     ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: toSh > 0, x: Q.x, y: Q.y + 1.4, z: Q.z, cause: opt.cause || null });
@@ -263,6 +267,12 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
     P.bloom = Math.min(P.bloom + W.bloom, 0.09);
     ev({ e: 'feu', p: P.id, w: it.w });
+    if (W.bullet) {
+      const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp, d = aimDir(P.inp.yaw + Math.cos(a) * r, P.inp.pitch + Math.sin(a) * r);
+      const v = W.bullet.speed;
+      S.projectiles.push({ id: S.nextProj++, kind: 'balle', x: o[0], y: o[1], z: o[2], vx: d[0] * v, vy: d[1] * v, vz: d[2] * v, owner: P.id, it: { ...it }, life: W.range / v + 0.3, from: [o[0], o[1], o[2]], dist: 0 });
+      return;
+    }
     if (W.rocket) {
       const d = aimDir(P.inp.yaw + (rng.next() - 0.5) * sp, P.inp.pitch + (rng.next() - 0.5) * sp);
       S.projectiles.push({ id: S.nextProj++, kind: 'roquette', x: o[0] + d[0] * 0.8, y: o[1] + d[1] * 0.8, z: o[2] + d[2] * 0.8, vx: d[0] * W.rocket.speed, vy: d[1] * W.rocket.speed, vz: d[2] * W.rocket.speed, owner: P.id, it: { ...it }, life: 6 });
@@ -279,6 +289,24 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       if (h.who) damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w });
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[it.r] * W.struct, P, to);
     }
+  }
+  // balle du fusil de précision : pesanteur et Coriolis (a = −2 Ω × v), touche ce qu'elle croise pendant le pas
+  function stepBullet(pr, dt) {
+    const W = WEAPONS[pr.it.w], owner = S.players.get(pr.owner);
+    const cx = OMEGA[1] * pr.vz - OMEGA[2] * pr.vy, cy = OMEGA[2] * pr.vx - OMEGA[0] * pr.vz, cz = OMEGA[0] * pr.vy - OMEGA[1] * pr.vx;
+    pr.vx -= 2 * cx * dt; pr.vy -= (W.bullet.g + 2 * cy) * dt; pr.vz -= 2 * cz * dt;
+    const sp = Math.hypot(pr.vx, pr.vy, pr.vz), step = sp * dt, d = [pr.vx / sp, pr.vy / sp, pr.vz / sp];
+    const h = trace(owner || null, [pr.x, pr.y, pr.z], d, step);
+    const end = () => S.projectiles.splice(S.projectiles.indexOf(pr), 1);
+    if (h.t < step) {
+      const to = [pr.x + d[0] * h.t, pr.y + d[1] * h.t, pr.z + d[2] * h.t];
+      ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to, hit: h.who ? 2 : 1, k: 0, late: true });
+      if (h.who) damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w });
+      else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[pr.it.r] * W.struct, owner || null, to);
+      end(); return;
+    }
+    pr.x += d[0] * step; pr.y += d[1] * step; pr.z += d[2] * step; pr.dist += step;
+    if (pr.life <= 0 || pr.y < -20) { ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to: [pr.x, pr.y, pr.z], hit: 0, k: 0, late: true }); end(); }
   }
   function explode(x, y, z, owner, dmg, radius, struct, kind = 'boum') {
     ev({ e: 'boum', x, y, z, r: radius, kind });
@@ -332,6 +360,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function stepProjectiles(dt) {
     for (const pr of [...S.projectiles]) {
       pr.life -= dt;
+      if (pr.kind === 'balle') { stepBullet(pr, dt); continue; }
       const grav = pr.kind === 'roquette' ? 0 : 22;
       pr.vy -= grav * dt;
       const sp = Math.hypot(pr.vx, pr.vy, pr.vz), step = sp * dt;
@@ -383,9 +412,16 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (mv && mv[0] !== P.last.mv) { P.last.mv = mv[0]; moveSlot(P, mv[1], mv[2]); }
     if (fired(P, 'use')) interact(P);
     if (fired(P, 'drop')) dropHeld(P);
-    // ramassage automatique des munitions et matériaux
-    for (const g of S.items.values()) {
-      if ((g.it.t === 'munitions' || g.it.t === 'materiaux') && Math.abs(g.x - P.x) < AUTO_R && Math.abs(g.z - P.z) < AUTO_R && Math.abs(g.y - P.y) < 1.4) pickUp(P, g);
+    // ramassage automatique des munitions et matériaux : une liste des tas proches (12 m), refaite trois fois par
+    // seconde, suffit à chaque pas (passer tous les objets de l'île pour chaque joueur coûtait cher à 60)
+    if ((P.nearT = (P.nearT || 0) - dt) <= 0) {
+      P.nearT = 0.33;
+      P.near = [];
+      for (const g of S.items.values()) if ((g.it.t === 'munitions' || g.it.t === 'materiaux') && Math.abs(g.x - P.x) < 12 && Math.abs(g.z - P.z) < 12) P.near.push(g.id);
+    }
+    for (const id of P.near) {
+      const g = S.items.get(id);
+      if (g && Math.abs(g.x - P.x) < AUTO_R && Math.abs(g.z - P.z) < AUTO_R && Math.abs(g.y - P.y) < 1.4) pickUp(P, g);
     }
     const it = heldItem(P);
     // les appuis ponctuels sont lus à chaque pas (sinon un R pressé avec une potion en main rechargerait plus tard)
@@ -514,7 +550,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (P.mode !== 'ballon') continue;
         if (fired(P, 'jump') || over) jumpOut(P); else placeInBalloon(P);
       }
-      if (S.phase === 'vol' && ![...S.players.values()].some((p) => p.mode === 'ballon')) S.phase = 'jeu';
+      if (S.phase === 'vol') { let any = false; for (const p of S.players.values()) if (p.mode === 'ballon') { any = true; break; } if (!any) S.phase = 'jeu'; }
     }
     if (S.hooks.think) for (const P of S.players.values()) if (P.bot && P.alive) S.hooks.think(P, dt);
     for (const P of S.players.values()) {
@@ -544,8 +580,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     for (const P of S.players.values()) {
       if (!P.alive) continue;
       const tr = P.trail || (P.trail = []);
-      tr.push([S.t, P.x, P.y, P.z, P.crouch]);
-      if (tr.length > 24) tr.shift();
+      // (on réutilise la plus ancienne entrée : pas de nouveau tableau à chaque pas)
+      const a = tr.length >= 24 ? tr.shift() : [];
+      a[0] = S.t; a[1] = P.x; a[2] = P.y; a[3] = P.z; a[4] = P.crouch;
+      tr.push(a);
     }
     stepProjectiles(dt);
     stepStorm(dt);
