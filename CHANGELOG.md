@@ -1,5 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.87 — 27 octobre 2026
+- **Mini-Golf Party** — La caméra tourne enfin sans limite à la souris, même sans clic.
+  - Pousser le curseur contre le bord gauche ou droit fait tourner la caméra en continu, à pleine vitesse, même s'il sort de la fenêtre.
+  - Un rappel s'affiche alors : un clic verrouille la souris pour tourner librement dans tous les sens.
+
 ## 2.86 — 26 octobre 2026
 - **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.
 - **Mini-Golf Party** — Fini le vacarme contre les murets : un frottement ne fait plus de bruit, et un vrai choc ne donne qu'un son et quelques étincelles, sans secouer la caméra à chaque rebond.
