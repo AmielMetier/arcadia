@@ -171,5 +171,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     canvas.remove();
   }
 
-  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, kit, lights, MOBILE };
+  // nouvelle partie sans recharger la page : tout ce qu'une partie a cassé ou ouvert revient comme au départ
+  const reset = () => { props.restore(); forest.restore(); if (lights) lights.restore(); structures.restore(); interior.restore(); };
+  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, reset, structures, interior, props, forest, kit, lights, MOBILE };
 }

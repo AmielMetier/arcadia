@@ -26,9 +26,11 @@ export function buildNightLights(lamps, bulbs, night) {
   pools.frustumCulled = false; pools.renderOrder = 1; group.add(pools);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
   const lampCol = new THREE.Color(1, 0.86, 0.62), bulbCol = new THREE.Color(1, 0.8, 0.5);
-  const byPid = new Map();
+  const byPid = new Map(), off = new Map();
   let i = 0;
+  const lit = [];
   for (const l of lamps) {
+    lit.push(i);
     halos.set(i, l.x, l.y, l.z, 2.6, lampCol.r, lampCol.g, lampCol.b, 0.85 * night);
     pools.setMatrixAt(i, m4.compose(p.set(l.x, l.gy + 0.12, l.z), q, s.set(10, 1, 10)));
     pools.setColorAt(i, col.copy(lampCol).multiplyScalar(0.26 * night));
@@ -48,9 +50,19 @@ export function buildNightLights(lamps, bulbs, night) {
     // lampadaire cassé (numéro d'objet de l'île)
     hide(pid) {
       const k = byPid.get(pid);
-      if (k == null) return;
+      if (k == null || off.has(k)) return;
+      const m = new THREE.Matrix4(); pools.getMatrixAt(k, m); off.set(k, m);
       halos.set(k, 0, -999, 0, 0, 0, 0, 0, 0); halos.count(n);
       pools.setMatrixAt(k, m4.makeScale(0, 0, 0)); pools.instanceMatrix.needsUpdate = true;
+    },
+    // nouvelle partie : les lampadaires cassés se rallument
+    restore() {
+      for (const [k, m] of off) {
+        const l = lamps[k];
+        if (l) halos.set(k, l.x, l.y, l.z, 2.6, lampCol.r, lampCol.g, lampCol.b, 0.85 * night);
+        pools.setMatrixAt(k, m);
+      }
+      off.clear(); halos.count(n); pools.instanceMatrix.needsUpdate = true;
     },
     dispose() { halos.dispose(); pools.geometry.dispose(); pools.material.dispose(); glowTex.dispose(); poolTex.dispose(); },
   };

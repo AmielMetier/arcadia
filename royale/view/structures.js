@@ -615,6 +615,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     for (const o of [gal, glass, cap]) { o.castShadow = true; group.add(o); extra.push(o); }
   }
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const hiddenWalls = new Map(); // clé → [[mesh, i, matrice d'origine]]
   return {
     group, index, chimneys, bulbs,
     // ornements : seulement les tuiles à moins de far mètres de (x, z)
@@ -626,7 +627,15 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     },
     // un pan de mur cassé disparaît avec ses ornements (clé « b:k:ox,z » du moteur)
     hideWall(key) {
-      for (const w of index.get(key) || []) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
+      if (hiddenWalls.has(key)) return;
+      const list = [];
+      for (const w of index.get(key) || []) { const m = new THREE.Matrix4(); w.mesh.getMatrixAt(w.i, m); list.push([w.mesh, w.i, m]); w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
+      hiddenWalls.set(key, list);
+    },
+    // nouvelle partie : les murs cassés reviennent
+    restore() {
+      for (const list of hiddenWalls.values()) for (const [mesh, i, m] of list) { mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; }
+      hiddenWalls.clear();
     },
     dispose() {
       for (const g of Object.values(geos)) g.dispose();

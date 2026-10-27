@@ -61,6 +61,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function addPlayer(r) {
     const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, look: r.look || 'soldat', bot: !!r.bot, level: r.level || 'normal',
       team: TEAMS && r.team != null ? r.team : null, down: null, revive: null,
+      // bilan de fin : tirs (et ceux qui ont touché), distance au sol, relevés, quand et par qui on a été éliminé
+      shots: 0, hits: 0, dist: 0, revives: 0, outT: null, outBy: null, outHow: null,
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
       inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };
@@ -299,7 +301,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function shoot(P, it) {
     const W = WEAPONS[it.w];
-    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t;
+    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t; P.shots++;
     const o = eye(P), moving = Math.hypot(P.vx, P.vz) > 1;
     let sp = (P.inp.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2) + P.bloom;
     if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
@@ -317,6 +319,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       return;
     }
     const n = W.pellets || 1;
+    let touched = false;
     for (let k = 0; k < n; k++) {
       // dispersion dans un cône
       const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp;
@@ -324,9 +327,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const h = trace(P, o, d, W.range);
       const to = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t];
       ev({ e: 'tir', p: P.id, w: it.w, from: o, to, hit: h.who ? 2 : h.t < W.range ? 1 : 0, k });
-      if (h.who) damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w });
+      if (h.who) { if (!mates(P, h.who)) touched = true; damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w }); }
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[it.r] * W.struct, P, to);
     }
+    if (touched) P.hits++;
   }
   // balle du fusil de précision : pesanteur et Coriolis (a = −2 Ω × v), touche ce qu'elle croise pendant le pas
   function stepBullet(pr, dt) {
@@ -339,7 +343,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (h.t < step) {
       const to = [pr.x + d[0] * h.t, pr.y + d[1] * h.t, pr.z + d[2] * h.t];
       ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to, hit: h.who ? 2 : 1, k: 0, late: true });
-      if (h.who) damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w });
+      if (h.who) { if (owner && !mates(owner, h.who)) owner.hits++; damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w }); }
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[pr.it.r] * W.struct, owner || null, to);
       end(); return;
     }
@@ -349,6 +353,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function explode(x, y, z, owner, dmg, radius, struct, kind = 'boum') {
     ev({ e: 'boum', x, y, z, r: radius, kind });
     const by = S.players.get(owner);
+    let touched = false;
     for (const Q of S.players.values()) {
       if (!Q.alive || Q.mode === 'ballon') continue;
       const cy = Q.y + 0.9, dd = Math.hypot(Q.x - x, cy - y, Q.z - z);
@@ -357,8 +362,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const dx = (Q.x - x) / (dd || 1), dy = (cy - y) / (dd || 1), dz = (Q.z - z) / (dd || 1);
       const w = world.raycast(x - dx * 0.05, y - dy * 0.05, z - dz * 0.05, dx, dy, dz, dd);
       if (w.t < dd - 0.5) continue;
+      if (by && Q !== by && !mates(by, Q)) touched = true;
       damage(Q, dmg * (1 - 0.6 * dd / radius), by || null, { cause: kind === 'roquette' ? 'roquette' : 'grenade' });
     }
+    if (touched) by.hits++;
     if (S.hooks.blast) S.hooks.blast(x, y, z, radius, dmg * struct, by);
   }
   function blastPush(x, y, z, radius, push) {
@@ -508,6 +515,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   // ------------------------------------------------------------------ éliminations, fin
   function eliminate(Q, by, cause) {
     Q.alive = false; Q.hp = 0; Q.use = null; Q.rl = 0; Q.down = null; Q.revive = null;
+    Q.outT = S.t; Q.outBy = by && by !== Q ? by.id : null; Q.outHow = cause || null;
     S.order.push(Q.id);
     if (!TEAMS) Q.place = alive().length + 1;
     // en équipe, la place se donne quand le dernier membre tombe (à toute l'équipe)
@@ -545,7 +553,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function results() {
     const list = [...S.players.values()].sort((a, b) => (a.place || 1) - (b.place || 1) || b.kills - a.kills);
-    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt), team: p.team }));
+    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt), team: p.team,
+      shots: p.shots, hits: p.hits, dist: Math.round(p.dist), revives: p.revives, out: p.outT == null ? null : Math.round(p.outT), by: p.outBy, how: p.outHow }));
   }
 
   // ------------------------------------------------------------------ tempête
@@ -614,8 +623,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       }
       const jump = fired(P, 'jump');
       const slow = P.use ? 0.5 : inp.aim ? 0.7 : 1;
-      const wasAir = !P.ground;
+      const wasAir = !P.ground, x0 = P.x, z0 = P.z;
       stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
+      P.dist += Math.hypot(P.x - x0, P.z - z0);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {
         // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
@@ -650,7 +660,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
     P.revive.t += dt;
     if (P.revive.t >= REVIVE) {
-      Q.down = null; Q.hp = RAISE_HP; P.revive = null;
+      Q.down = null; Q.hp = RAISE_HP; P.revive = null; P.revives++;
       ev({ e: 'releve', to: Q.id, by: P.id });
     }
   }

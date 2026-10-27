@@ -155,6 +155,18 @@ function startMatch() {
   showScreen(null);
   S.input.lock();
 }
+// nouvelle partie sans recharger la page : on démonte la partie finie (personnages, effets, constructions, bots), la
+// scène reprend son état de départ (murs, meubles, décor, portes) et le monde solide est reconstruit (≈ 65 ms)
+function resetMatch() {
+  if (!S.sim) return;
+  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); } catch (e) { console.warn(e); }
+  S.scene.reset();
+  S.world = buildWorld(S.map);
+  S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
+  S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
+  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.prompt('');
+  $('#hud').hidden = true; $('#feed').innerHTML = '';
+}
 const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
 function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.run = run; S.seed = seed; S.roster = roster;
@@ -551,7 +563,7 @@ function onMsg(from, m) {
     return;
   }
   if (m.t === 'go') {
-    if (S.sim && m.run !== S.run) { location.reload(); return; } // nouvelle partie : on repart d'une île neuve
+    if (S.sim && m.run !== S.run) resetMatch(); // nouvelle partie : l'île revient comme au départ
     if (S.sim) return;
     newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, teams: m.teams | 0 || 1, mirror: true });
     if (m.full) {
@@ -565,6 +577,7 @@ function onMsg(from, m) {
     return;
   }
   if (m.t === 's' && S.sim && m.run === S.run && m.s) receiveSnap(m.s, m.e || []);
+  if (m.t === 'bilan' && m.run === S.run && Array.isArray(m.res)) S.bilan = m.res;
 }
 function receiveSnap(s, events) {
   const now = performance.now() / 1000;
@@ -822,7 +835,14 @@ function endMatch(winner) {
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
   if (iWon(winner)) { S.hud.say(S.sim.S.teams > 1 ? 'Dernière équipe debout !<small>Ton équipe a gagné la partie</small>' : 'Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
   report(res);
-  setTimeout(() => { S.input.unlock(); showScreen('fin', { res, mine, winner }); }, 3500);
+  // l'hôte fait foi : son bilan (tirs, distance, relevés…) part chez les invités
+  if (S.role === 'host' && H.embedded) H.send('all', { t: 'bilan', run: S.run, res });
+  const run = S.run;
+  setTimeout(() => {
+    if (S.run !== run || !S.sim) return;
+    const all = S.bilan || res;
+    S.input.unlock(); showScreen('fin', { res: all, mine: all.find((r) => r.id === S.me), winner });
+  }, 3500);
 }
 function report(res) {
   if (S.reported || S.role === 'guest') return;
@@ -931,7 +951,7 @@ function showScreen(kind, data) {
     const won = iWon(winner), tm = S.sim.S.teams > 1, nTeams = tm ? new Set(res.map((r) => r.team)).size : res.length;
     const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : mine && tm && r.team === mine.team ? 'mate' : ''}"><td>${r.place}</td>${tm ? `<td>${r.team + 1}</td>` : ''}<td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
     const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${nTeams}${tm ? ' équipes' : ''}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
-    const tags = mine ? `<div class="tags"><span>${icon('skull')}<b>${mine.kills}</b> élimination${mine.kills > 1 ? 's' : ''}</span><span>${icon('target')}<b>${mine.dealt}</b> dégâts</span><span>${icon('hourglass')}<b>${fmtTime((Date.now() - S.startedAt) / 1000)}</b></span></div>` : '';
+    const tags = mine ? bilanHtml(mine, res) : '';
     const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
     html = `<p class="eyebrow">Fin de partie</p><h1>${won ? (tm ? 'Dernière équipe <span>debout</span> !' : 'Dernier <span>debout</span> !') : 'Island <span>Rush</span>'}</h1>${head}${tags}
       <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th>${tm ? '<th>Éq.</th>' : ''}<th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
@@ -943,12 +963,25 @@ function showScreen(kind, data) {
   el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
   el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
   el.querySelectorAll('.teamc').forEach((b) => { b.onclick = () => { const k = +b.dataset.team; S.picks.set(S.me, k); if (H.embedded) H.send('all', { t: 'team', k }); showScreen(kind, data); }; });
-  // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
-  const again = $('#again'); if (again) again.onclick = () => location.reload();
+  // rejouer : tout de suite, sur l'île remise à neuf (les invités suivent quand la partie part)
+  const again = $('#again'); if (again) again.onclick = () => { S.sfx.unlock(); resetMatch(); startMatch(); };
   $('#quit').onclick = quit;
   const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// bilan personnel : éliminations, dégâts, précision, distance, temps de survie, relevés, et qui nous a éliminés
+function bilanHtml(r, res) {
+  const time = r.out != null ? r.out : S.sim ? S.sim.S.t : (Date.now() - S.startedAt) / 1000;
+  const acc = r.shots ? Math.round(r.hits / r.shots * 100) + ' %' : '–';
+  const killer = r.by != null && res.find((q) => q.id === r.by);
+  const cards = [
+    ['skull', r.kills, `élimination${r.kills > 1 ? 's' : ''}`], ['sword', r.dealt, 'dégâts'], ['target', acc, `précision (${r.hits || 0}/${r.shots || 0} tirs)`],
+    ['hourglass', fmtTime(time), r.out != null ? 'de survie' : 'jusqu\'au bout'], ['compass', r.dist >= 1000 ? (r.dist / 1000).toFixed(1).replace('.', ',') + ' km' : (r.dist || 0) + ' m', 'parcourus'],
+  ];
+  if (S.sim && S.sim.S.teams > 1) cards.push(['hand', r.revives || 0, `coéquipier${r.revives > 1 ? 's' : ''} relevé${r.revives > 1 ? 's' : ''}`]);
+  return `<div class="bilan">${cards.map(([i, v, l]) => `<span>${icon(i)}<b>${v}</b><small>${l}</small></span>`).join('')}</div>`
+    + (killer ? `<p class="hint">Éliminé par <b>${esc(killer.name)}</b>${killer.bot ? ' 🤖' : ''} ${CAUSES[r.how] || ''} · ${killer.kills} élimination${killer.kills > 1 ? 's' : ''} dans la partie</p>` : r.how ? `<p class="hint">Éliminé ${CAUSES[r.how] || ''}</p>` : '');
+}
 // panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, puis la sensibilité
 const SETTINGS = {
   kinds: ['music', 'fx'], accent: '#3d9fd9',
