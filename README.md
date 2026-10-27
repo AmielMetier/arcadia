@@ -146,12 +146,17 @@ bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin,
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots.
+- Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
+  (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
+  `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous
+  (client muet, message de plus d'1 Mo, inondation, rafale de reprise).
+- `?debug` dans l'adresse du Hub affiche le bouton « 📋 Logs & Crashs ».
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **3.0** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **3.2** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

@@ -2,11 +2,15 @@
 // node tools/test-relay.mjs      (prérequis : cd server && npm install)
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const { WebSocket } = createRequire(new URL('../server/package.json', import.meta.url))('ws');
 
 const PORT = 8187, URL_WS = 'ws://127.0.0.1:' + PORT;
+const RELAY_LOG_DIR = mkdtempSync(join(tmpdir(), 'relais-logs-')); // pas dans logs/crash du dépôt
 const srv = spawn('node', [new URL('../server/server.js', import.meta.url).pathname], {
-  env: { ...process.env, PORT: String(PORT), RELAY_GRACE_MS: '1500', RELAY_AWAY_MS: '300' }, stdio: ['ignore', 'ignore', 'inherit'],
+  env: { ...process.env, PORT: String(PORT), RELAY_GRACE_MS: '1500', RELAY_AWAY_MS: '300', RELAY_LOG_DIR }, stdio: ['ignore', 'ignore', 'inherit'],
 });
 await new Promise((r) => setTimeout(r, 500));
 
@@ -192,6 +196,83 @@ const relays = (c, pred = () => true) => c.got.filter((m) => m.type === 'relay' 
   const list = await B2.wait((m) => m.type === 'p_list');
   ok(list && list.list.some((c) => c.fid === fa && c.st.code === 'K7QM'), 'au retour, B reçoit l\'état de ses amis');
   for (const c of [A, B2, C]) c.ws.close();
+}
+
+/* ---------- 5. garde-fous : client muet, message géant, inondation, logs ---------- */
+{
+  // limites réelles : la rafale de renvoi au retour d'une coupure (jusqu'à 3000 messages, OUTBOX_MAX de net.js) passe
+  const room = 'rafale-' + Date.now();
+  const H = await client(), G = await client();
+  H.send({ type: 'join_room', roomId: room, role: 'host', proto: 3 });
+  await H.wait((m) => m.type === 'room_joined');
+  G.send({ type: 'join_room', roomId: room, role: 'guest', proto: 3 });
+  await G.wait((m) => m.type === 'room_joined');
+  let closed = false; G.ws.on('close', () => { closed = true; });
+  for (let k = 1; k <= 3000; k++) G.frame({ to: 'host', c: k }, { k, pad: 'x'.repeat(200) });
+  await H.wait((m) => m.type === 'relay' && m.data.k === 3000, 5000);
+  ok(!closed && relays(H).length === 3000, 'rafale de 3000 messages au retour d\'une coupure : rien n\'est coupé');
+  for (const c of [H, G]) c.ws.close();
+}
+{
+  // second serveur aux limites réduites (connexion muette repérée en 2 × 300 ms)
+  const P2 = PORT + 1, U2 = 'ws://127.0.0.1:' + P2, H2 = 'http://127.0.0.1:' + P2;
+  const srv2 = spawn('node', [new URL('../server/server.js', import.meta.url).pathname], {
+    env: { ...process.env, PORT: String(P2), RELAY_PING_MS: '300', RELAY_MAX_FRAME: '4096', RELAY_RATE_MSGS: '50', LOGS_TOKEN: 'secret-de-test', RELAY_LOG_DIR },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let srvErr = ''; srv2.stderr.on('data', (d) => { srvErr += d; });
+  let exited = false; srv2.on('exit', () => { exited = true; });
+  await sleep(500);
+  // (serveur tombé : la connexion échoue et le test s'arrête là, au lieu d'attendre indéfiniment)
+  const open = (opts) => new Promise((res, rej) => { const ws = new WebSocket(U2, opts); const c = { ws, got: [], code: null }; ws.on('message', (d) => c.got.push(JSON.parse(d.toString()))); ws.on('close', (code) => { c.code = code; }); ws.on('error', rej); ws.on('open', () => { ws.removeListener('error', rej); ws.on('error', () => {}); res(c); }); });
+  const status = async () => (await fetch(H2 + '/status')).json();
+
+  // un salon qui doit survivre à tout ce qui suit
+  const H = await open(), G = await open();
+  H.ws.send(JSON.stringify({ type: 'join_room', roomId: 'garde', role: 'host', proto: 3 }));
+  await sleep(100);
+  G.ws.send(JSON.stringify({ type: 'join_room', roomId: 'garde', role: 'guest', proto: 3 }));
+  await sleep(100);
+
+  // client qui ne répond plus aux pings (téléphone en veille) : connexion amis, puis place dans le salon
+  const muteP = await open({ autoPong: false });
+  muteP.ws.send(JSON.stringify({ type: 'p_hello', key: 'k'.repeat(20), name: 'Muet' }));
+  const muteR = await open({ autoPong: false });
+  muteR.ws.send(JSON.stringify({ type: 'join_room', roomId: 'garde', role: 'guest', proto: 3 }));
+  await sleep(1200);
+  ok(!exited && !/ReferenceError/.test(srvErr), 'un client muet ne fait plus tomber le serveur' + (exited ? ' :\n' + srvErr.split('\n').slice(0, 6).join('\n') : ''));
+  if (exited) { srv.kill(); console.log(`\n${fails} échec(s), ${passes} réussis`); process.exit(1); }
+  ok(muteP.code === 1006 && muteR.code === 1006, 'les connexions muettes sont fermées');
+
+  // message plus gros que la limite
+  const big = await open();
+  big.ws.send('#' + JSON.stringify({ to: 'host' }) + '\n' + JSON.stringify({ x: 'a'.repeat(5000) }));
+  await sleep(200);
+  ok(big.code === 1009, 'message trop gros : connexion fermée (1009)');
+
+  // inondation
+  const flood = await open();
+  for (let k = 0; k < 300; k++) flood.ws.send(JSON.stringify({ type: 'pong' })); // au-delà de la réserve (50/s × 4)
+  await sleep(200);
+  ok(flood.code === 1008, 'trop de messages en une seconde : connexion fermée (1008)');
+
+  // le salon continue de fonctionner
+  G.ws.send('#' + JSON.stringify({ to: 'host', c: 1 }) + '\n' + JSON.stringify({ n: 7 }));
+  await sleep(150);
+  ok(H.got.some((m) => m.type === 'relay' && m.data.n === 7), 'le salon des autres continue de fonctionner');
+  const st = await status();
+  ok(st.closedFlood === 1 && st.closedBig === 1 && st.maxFrame > 0 && st.maxFrame <= 4096 && st.peakMsgs > 50, '/status compte les fermetures et les pics : ' + JSON.stringify(st));
+
+  // logs : lecture réservée, envois plafonnés
+  ok((await fetch(H2 + '/api/logs')).status === 403, 'GET /api/logs sans jeton refusé');
+  ok((await fetch(H2 + '/api/logs?token=faux-jeton-de-test')).status === 403, 'GET /api/logs avec un mauvais jeton refusé');
+  ok((await fetch(H2 + '/api/logs', { headers: { Authorization: 'Bearer secret-de-test' } })).status === 200, 'GET /api/logs avec le jeton accepté');
+  const codes = [];
+  for (let k = 0; k < 61; k++) codes.push((await fetch(H2 + '/api/log', { method: 'POST', body: JSON.stringify({ code: 'TEST', k }) })).status);
+  ok(codes.slice(0, 60).every((c) => c === 200 || c === 400) && codes[60] === 429, 'POST /api/log plafonné par adresse (429)');
+
+  for (const c of [H, G]) c.ws.close();
+  srv2.kill();
 }
 
 srv.kill();

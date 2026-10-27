@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="../shared/logger.js"></script>
+<script src="../hub/games.js"></script>
 <style>
   :root {
     --bg: #0d0f14;
@@ -144,12 +145,12 @@
     <div class="stat"><small>Total événements enregistrés</small><b id="stTotal">0</b></div>
     <div class="stat crash"><small>Crashs de jeu (CRASH_*)</small><b id="stCrash">0</b></div>
     <div class="stat exp"><small>Joueurs expulsés / déconnectés (EXP_*)</small><b id="stExp">0</b></div>
-    <div class="stat ok"><small>Jeux couverts par DDLogger</small><b id="stGames">11 / 11 + Hub</b></div>
+    <div class="stat ok"><small>Jeux couverts par DDLogger</small><b id="stGames"></b></div>
   </div>
 
   <div class="tabs">
     <button class="tab on" data-tab="events">📡 Journal des événements (Crashs &amp; Expulsions)</button>
-    <button class="tab" data-tab="games">🎮 Diagnostic par Jeu (11 jeux &amp; Hub)</button>
+    <button class="tab" data-tab="games" id="tabGames">🎮 Diagnostic par Jeu</button>
     <button class="tab" data-tab="codes">📖 Référentiel des Codes (CRASH_* / EXP_*)</button>
   </div>
 
@@ -167,17 +168,6 @@
         <select id="fGame">
           <option value="all">Tous les jeux + Hub</option>
           <option value="hub">Game Hub (Salon)</option>
-          <option value="drift">Duo Drift</option>
-          <option value="pokemon">Poké Duel</option>
-          <option value="kart">Cyber Kart GP</option>
-          <option value="bastion">Bastion Clash</option>
-          <option value="outbreak">Outbreak : Secteur Zéro</option>
-          <option value="convoy">Convoy Storm</option>
-          <option value="david">DavidSimulator</option>
-          <option value="calcul">Tête de Calcul</option>
-          <option value="filrouge">Fil Rouge</option>
-          <option value="golf">Birdie Party</option>
-          <option value="minigolf">Mini-Golf Party</option>
         </select>
       </label>
       <input type="search" id="fSearch" placeholder="Rechercher un joueur, code salon, erreur…" style="flex:1;min-width:200px">
@@ -199,12 +189,12 @@
 <script>
 (async function () {
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const GAME_LABELS = {
-    hub: 'Game Hub (Salon)', drift: 'Duo Drift', pokemon: 'Poké Duel', kart: 'Cyber Kart GP',
-    bastion: 'Bastion Clash', outbreak: 'Outbreak : Secteur Zéro', convoy: 'Convoy Storm',
-    david: 'DavidSimulator', calcul: 'Tête de Calcul', filrouge: 'Fil Rouge',
-    golf: 'Birdie Party', minigolf: 'Mini-Golf Party'
-  };
+  // jeux du registre du Hub (hub/games.js) : un nouveau jeu apparaît ici sans rien changer
+  const GAMES = window.HUB_GAMES || [];
+  const GAME_LABELS = { hub: 'Game Hub (Salon)', ...Object.fromEntries(GAMES.map((g) => [g.id, g.title])) };
+  document.getElementById('fGame').insertAdjacentHTML('beforeend', GAMES.map((g) => `<option value="${esc(g.id)}">${esc(g.title)}</option>`).join(''));
+  document.getElementById('stGames').textContent = `${GAMES.length} / ${GAMES.length} + Hub`;
+  document.getElementById('tabGames').textContent = `🎮 Diagnostic par Jeu (${GAMES.length} jeux & Hub)`;
 
   let serverLogs = [];
   let catalog = { codes: {}, games: [] };
