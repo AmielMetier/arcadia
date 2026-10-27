@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.90 — 27 octobre 2026
+- **Odyssée** — Nouveau jeu : une grande aventure Pokémon en fausse 3D, avec l'ambiance des jeux DS (prototype, les Pokémon servent de remplaçants).
+  - Une région aussi grande que Kanto : 10 villes, 10 routes, un pont sur la mer, deux grottes, 8 arènes et la Ligue.
+  - Choisis ton premier Pokémon chez le professeur, capture les Pokémon sauvages dans les hautes herbes et affronte 77 dresseurs, ton rival et les Champions.
+  - Combats au tour par tour fidèles à la 4e génération : types, attaques physiques et spéciales, statuts, coups critiques, expérience, nouvelles attaques et évolutions.
+  - Centres Pokémon, boutiques, PC, Pokédex, sac, carte de la région, carte de dresseur et sauvegarde.
+  - Le ciel suit l'heure réelle : matin doré, soirée orangée, nuit bleutée avec fenêtres et lampadaires allumés.
+  - Au clavier : flèches ou ZQSD pour marcher, Maj pour courir, Espace pour parler, Échap pour le menu.
+
 ## 2.89 — 27 octobre 2026
 - **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
   - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.

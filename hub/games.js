@@ -177,6 +177,16 @@ window.HUB_GAMES = [
     cover: 'pokemon/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
+    id: 'odyssee',
+    title: 'Odyssée',
+    tag: 'Aventure façon DS',
+    desc: 'Une grande aventure Pokémon en fausse 3D, comme sur DS : 10 villes, 8 arènes, captures, combats et la Ligue. Chacun joue sa partie, au clavier.',
+    url: 'odyssee/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#5a88c8',
+    cover: 'odyssee/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
+  {
     id: 'minigolf',
     title: 'Mini-Golf Party',
     tag: 'Parcours déjantés',
