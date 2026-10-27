@@ -105,6 +105,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
         <button class="adv-top-btn" id="btnMenuBag">Sac & Équipe [B]</button>
         <button class="adv-top-btn" id="btnMenuDex">Pokédex & Badges</button>
         <button class="adv-top-btn adv-mode-btn" id="btnSwitchTournament">Mode : Tournoi 3v3</button>
+        <button class="adv-top-btn" id="btnVolAdv" aria-label="Volume">Volume</button>
         <button class="adv-top-btn" id="btnExitHub">Hub</button>
       </div>
     </div>
@@ -225,6 +226,7 @@ export function mountAdventure(root, { me, bridge, settings, exit, onSwitchMode 
   root.querySelector('#touchBtnB').onclick = () => openBagModal();
   root.querySelector('#btnMenuBag').onclick = () => { sfx.playClick(); openBagModal(); };
   root.querySelector('#btnMenuDex').onclick = () => { sfx.playClick(); openPokedexModal(); };
+  DDVolume.panel(root.querySelector('#btnVolAdv'));
   root.querySelector('#btnSwitchTournament').onclick = () => {
     sfx.playClick();
     if (onSwitchMode) {

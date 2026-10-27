@@ -42,6 +42,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
         <button class="poke-tool" id="btnLog">JOURNAL</button>
         <button class="poke-tool" id="btnMus">MUSIQUE : <b id="lblMus">ON</b></button>
         <button class="poke-tool" id="btnSnd">AUDIO : <b id="lblSnd">ON</b></button>
+        <button class="poke-tool" id="btnVol" aria-label="Volume">VOLUME</button>
         <button class="poke-tool quit" id="btnQuit">QUITTER</button>
       </div>
     </header>
@@ -84,6 +85,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
 
   $('#btnSnd').onclick = () => { sfx.toggle(); syncTools(); };
   $('#btnMus').onclick = () => { battleMusic.toggle(); syncTools(); };
+  DDVolume.panel($('#btnVol'));
   $('#btnQuit').onclick = () => { battleMusic.stop(); cleanup(); exit(); };
   if ($('#btnSwitchAdv') && switchMode) {
     $('#btnSwitchAdv').onclick = () => {

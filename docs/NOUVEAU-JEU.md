@@ -149,6 +149,9 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 - **Horloges** : les machines ne sont pas à l'heure ; l'hôte envoie `now` et chaque invité calcule son décalage.
   La durée de réponse est mesurée à la réception chez l'hôte (la latence pèse un peu sur les invités).
 - **Sons** : le navigateur bloque l'audio avant un clic ; créer l'`AudioContext` au premier `pointerdown`.
+- **Volume** : charger `../shared/volume.js` après `bridge.js`, faire passer la musique par `DDVolume.gain(ctx, 'music')`
+  et les bruitages par `DDVolume.gain(ctx, 'fx')` (ou `DDVolume.media(el, kind, volume)` pour un `<audio>`), et ouvrir le
+  panneau depuis un bouton : `DDVolume.panel(bouton)` (`{ kinds: ['fx'] }` pour un jeu sans musique).
 - **Temps réel** : pour un jeu d'action, voir Outbreak (`outbreak/app.js`) : l'hôte simule à 60 Hz et diffuse l'état à 20 Hz,
   les invités envoient leurs commandes (compteurs pour les actions ponctuelles), prédisent leur propre déplacement et
   affichent les autres avec ~110 ms de retard, interpolés entre deux états. Convoy Storm (`convoy/`) suit le même schéma

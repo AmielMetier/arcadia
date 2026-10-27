@@ -155,11 +155,12 @@ export function createScene(host, { onLost } = {}) {
   // entre-temps (on lance la partie pendant le survol de l'accueil), celui-ci est abandonné.
   let builds = 0;
   const STALE = {};
-  async function loadHole(hole, { theme = 'campagne', wind, time = 'jour', swap } = {}) {
+  // slice : durée d'une tranche de calcul (courte quand un survol tourne à l'écran, longue derrière un écran de chargement)
+  async function loadHole(hole, { theme = 'campagne', wind, time = 'jour', swap, slice = 10 } = {}) {
     const id = ++builds;
     let t0 = performance.now();
     const pace = async () => {
-      if (performance.now() - t0 < 10) return;
+      if (performance.now() - t0 < slice) return;
       await breathe(); t0 = performance.now();
       if (disposed || id !== builds) throw STALE;
     };
@@ -404,6 +405,8 @@ export function createScene(host, { onLost } = {}) {
 
   function resize() {
     const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
+    // page masquée par le Hub (taille nulle) : on garde la taille d'avant
+    if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = w / h < 0.8 ? 62 : 50;
@@ -496,8 +499,10 @@ export function createScene(host, { onLost } = {}) {
   // Si un fondu est déjà en cours, on part de ce qu'on voit (les deux images mêlées), sans saut.
   function dissolve(dur = 0.6) {
     if (disposed) return;
-    frame(0); // l'image actuelle, lue tant qu'elle est encore dans le tampon
     const W = canvas.width, H = canvas.height;
+    // rien à l'écran (page masquée, taille nulle) : pas de fondu
+    if (!W || !H) return;
+    frame(0); // l'image actuelle, lue tant qu'elle est encore dans le tampon
     if (fade.a > 0.01 && xf.width === W && xf.height === H) {
       xctx.globalCompositeOperation = 'destination-in';
       xctx.fillStyle = `rgba(0,0,0,${fade.a})`; xctx.fillRect(0, 0, W, H);

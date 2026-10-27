@@ -140,6 +140,7 @@
   #kgrid .card { aspect-ratio: 1.35 / 1; }
   #musbtn { position: fixed; left: 12px; bottom: 12px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; max-width: 70vw; text-align: left; }
   #musbtn.off { border-color: #777; color: #bbb; } #musbtn.warn { border-color: #ffb03a; }
+  #volbtn { position: fixed; left: 12px; bottom: 54px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; }
   #assist { font-size: 15px; padding: 5px 14px; } #assist.on { background: #4dff7a; }
   #kgrid .card img { object-fit: contain; inset: 4% 4% 24% 4%; width: 92%; height: 72%; }
   .card img { position: absolute; inset: 0 0 20% 0; width: 100%; height: 80%; object-fit: cover; }
@@ -224,6 +225,7 @@
 <!-- Pont avec le Game Hub (salon, réseau). Absent = mode solo. -->
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
 <!-- Three.js r169 embarqué dans le dépôt (shared/vendor) + modules complémentaires (kart/vendor) -->
 <script type="importmap">
   { "imports": {
@@ -264,6 +266,7 @@
 <div id="pause" class="ol hidden">PAUSE</div>
 
 <button id="musbtn" class="hidden" title="Musique : marche / arrêt (touche M)">🎵 Musique</button>
+<button id="volbtn" class="hidden" title="Volume de la musique et des effets" aria-label="Volume">🎚️ Volume</button>
 <div id="title" class="screen hidden">
   <div class="logo"><span class="l1">CYBER</span><span class="l2">KART</span><span class="gp ol">GP</span></div>
   <div class="tag">7 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis le Game Hub</div>
@@ -5314,7 +5317,7 @@ class Sound {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = (this.ctx = new AC());
     this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 22000; this.lp.Q.value = 0.7; this.lp.connect(c.destination);
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.3; this.master.connect(this.lp);
+    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.3; this.master.connect(DDVolume.gain(c, 'fx')).connect(this.lp); // réglage « Effets » du joueur
     this.ef = c.createBiquadFilter(); this.ef.type = 'lowpass'; this.ef.Q.value = 3; this.eg = c.createGain(); this.eg.gain.value = 0;
     this.o1 = c.createOscillator(); this.o1.type = 'sawtooth'; this.o2 = c.createOscillator(); this.o2.type = 'square';
     const g2 = c.createGain(); g2.gain.value = 0.45; this.o1.connect(this.ef); this.o2.connect(g2); g2.connect(this.ef); this.ef.connect(this.eg); this.eg.connect(this.master); this.o1.start(); this.o2.start();
@@ -5392,7 +5395,7 @@ class Music {
     this.on = get('kart_music', true); this.vol = get('kart_music_vol', 0.8);
   }
   save() { try { localStorage.setItem('kart_music', JSON.stringify(this.on)); } catch (e) {} }
-  ctx() { sfx.init(); const c = sfx.ctx; if (c && !this.out) { this.out = c.createGain(); this.out.connect(sfx.lp || c.destination); this.applyVol(); } return c; }
+  ctx() { sfx.init(); const c = sfx.ctx; if (c && !this.out) { this.out = c.createGain(); this.out.connect(DDVolume.gain(c, 'music')).connect(sfx.lp || c.destination); this.applyVol(); } return c; }
   applyVol() { if (this.out) this.out.gain.value = this.on ? this.vol * MUSIC.volume : 0; this.onChange(); }
   onChange() { if (typeof updateMusicBtn === 'function') updateMusicBtn(); }
   /** télécharge et décode le morceau (mp3, sinon ogg). Renvoie { buf } ou { url } (flux) ou null s'il n'existe pas. Les échecs ne sont pas mémorisés. */
@@ -5797,6 +5800,7 @@ function clearNameTags() { for (const s of nameTags.values()) scene.remove(s); n
 function updateMusicBtn() {
   const b = $('musbtn'); if (!b) return;
   b.classList.toggle('hidden', !['title', 'maps', 'chars', 'results', 'escmenu'].includes(UI.screen) && !(race && race.paused));
+  $('volbtn').classList.toggle('hidden', b.classList.contains('hidden'));
   b.textContent = music.label(); b.classList.toggle('off', !music.on); b.classList.toggle('warn', music.on && music.status !== 'lecture');
 }
 setInterval(updateMusicBtn, 1000);
@@ -5910,6 +5914,7 @@ function renderChars() {
   else { $('charok').textContent = mine.ready ? 'Pas prêt' : 'Prêt ✓'; $('charok').disabled = false; $('charback').textContent = 'Quitter'; }
 }
 $('assist').onclick = () => { PREFS.assist = !PREFS.assist; savePrefs(); renderChars(); };
+DDVolume.panel($('volbtn'));
 $('musbtn').onclick = (e) => { e.stopPropagation(); music.toggle(); if (music.on && !music.src && music.key) { const k = music.key; music.key = null; music.play(k); } updateMusicBtn(); };
 $('charok').onclick = () => {
   sfx.tone(880, 0.12, 'square', 0.15);

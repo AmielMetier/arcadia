@@ -153,7 +153,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'F2') { e.preventDefault(); selectAllArmy(); return; }
 
   if (k === 'escape') {
-    buildMode = null; orderCursor = null; buildKeysArmed = false;
+    buildMode = null; orderCursor = null;
     updateCursorClass(); renderConsoleUI(true);
     return;
   }
@@ -174,16 +174,9 @@ window.addEventListener('keydown', (e) => {
   const selUList = state ? state.units.filter((u) => selectedUnits.has(u.id)) : [];
   const hasScvSelected = selUList.some((u) => isWorker(u.kind));
 
-  // VCS sélectionné : B ouvre le menu de construction, puis 1..0 / R choisit le bâtiment.
-  // Sans B, les chiffres restent les groupes de contrôle.
-  if (!hasScvSelected) buildKeysArmed = false;
-  if (hasScvSelected && k === 'b' && !e.ctrlKey && !e.metaKey && !e.repeat) {
-    buildKeysArmed = !buildKeysArmed;
-    renderConsoleUI(true);
-    return;
-  }
-  if (buildKeysArmed && !e.ctrlKey && !e.metaKey && keyToBuild(k) && !e.repeat) {
-    buildKeysArmed = false;
+  // VCS sélectionné : 1..0 / R choisit directement le bâtiment à poser.
+  // Sans VCS sélectionné, les chiffres restent les groupes de contrôle (Ctrl + chiffre pour les assigner).
+  if (hasScvSelected && !e.ctrlKey && !e.metaKey && keyToBuild(k) && !e.repeat) {
     pickBuildMode(keyToBuild(k));
     return;
   }

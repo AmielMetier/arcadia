@@ -903,6 +903,7 @@ function boot() {
   $('mresume').onclick = () => UI.toggleMenu(false);
   $('mqual').onclick = () => { R.setQuality(R.quality === 'low' ? 'high' : 'low'); PREFS.quality = R.quality; PERF.done = true; savePrefs(); UI.toggleMenu(true); };
   $('msound').onclick = () => { toggleMute(); UI.toggleMenu(true); };
+  DDVolume.panel($('mvol'), { kinds: ['fx'] }); // pas de musique dans Mini-Golf Party
   $('msens').onclick = () => { SENS.cam = SENS.cam >= 1.8 ? 0.4 : +(SENS.cam + 0.2).toFixed(1); PREFS.sens = SENS.cam; savePrefs(); UI.toggleMenu(true); };
   $('mquit').onclick = () => (H.embedded ? H.exit() : location.reload());
   $('menubtn').onclick = () => UI.toggleMenu();

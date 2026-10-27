@@ -45,8 +45,8 @@ export function botShot(hole, ball, wind, level = 'normal', seed = 1) {
   let aim = Math.atan2(target.x - ball.x, target.z - ball.z);
   let power = clamp(Math.hypot(target.x - ball.x, target.z - ball.z) / reach, 0.15, 1);
   // deux corrections : la portée (force) puis la dérive (direction), au point de chute ; vers le drapeau on vise un
-  // peu court pour laisser rouler la balle, d'autant plus que l'approche est courte (elle roule beaucoup)
-  const short = !direct ? 1 : d < 35 ? 0.78 : d < 70 ? 0.86 : 0.93;
+  // peu court pour laisser rouler la balle (quelques mètres sur le green)
+  const short = !direct ? 1 : d < 35 ? 0.88 : d < 70 ? 0.92 : 0.95;
   for (let it = 0; it < 3; it++) {
     const res = simulate(hole, ball, { club, traj: 'mid', aim, power, curve: 0, seed: 1 }, readWind, { stopAtLanding: true });
     const lx = res.end.x - ball.x, lz = res.end.z - ball.z, tx = target.x - ball.x, tz = target.z - ball.z;

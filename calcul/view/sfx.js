@@ -8,7 +8,7 @@ function ac() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.3; master.connect(ctx.destination);
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.3; master.connect(DDVolume.gain(ctx, 'fx')).connect(ctx.destination);
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
