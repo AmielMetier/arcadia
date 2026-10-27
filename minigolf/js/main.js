@@ -524,7 +524,7 @@ function updateCamera(dt) {
 }
 
 /* ================================================================ CONTRÔLES */
-const INPUT = { aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false, yaw: null, mx: -1, inside: false, keys: new Set() };
+const INPUT = { lastDx: 0, lastDy: 0, aiming: false, power: 0, btn: -1, space: false, lastAimSend: 0, locked: false, yaw: null, mx: -1, inside: false, keys: new Set() };
 const TOUCHDEV = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 const aimYaw = () => (INPUT.yaw != null ? INPUT.yaw : CAM.yaw);
 const canvasEl = () => R.renderer.domElement;
@@ -636,6 +636,7 @@ function bindInput() {
     if (!locked && e.target !== c) return;
     const dx = e.movementX || 0, dy = e.movementY || 0;
     if (Math.abs(dx) > 300 || Math.abs(dy) > 300) return;
+    if (dx || dy) { INPUT.lastDx = dx; INPUT.lastDy = dy; }
     if (INPUT.aiming) {
       INPUT.power = clamp(INPUT.power + dy * 0.0032 * SENS.power, 0, 1);
       CAM.yaw -= dx * 0.0009 * SENS.cam * CAM.flipSign;
@@ -667,7 +668,14 @@ function bindInput() {
     if (e.code === 'Space' && INPUT.space) { INPUT.space = false; releaseAim(); }
   });
   addEventListener('blur', () => { if (INPUT.aiming) { INPUT.aiming = false; INPUT.power = 0; } INPUT.keys.clear(); INPUT.inside = false; });
-  document.addEventListener('mouseleave', () => { INPUT.inside = false; });
+  // le curseur quitte la fenêtre par un côté : la caméra continue de tourner comme s'il restait collé au bord
+  document.addEventListener('mouseout', (e) => {
+    if (e.relatedTarget) return;
+    const W = innerWidth, x = e.clientX, sideways = Math.abs(INPUT.lastDx) >= Math.abs(INPUT.lastDy);
+    if (UI.screen === 'game' && sideways && x < W * 0.3 && INPUT.lastDx <= 0) { INPUT.mx = 0; INPUT.inside = true; }
+    else if (UI.screen === 'game' && sideways && x > W * 0.7 && INPUT.lastDx >= 0) { INPUT.mx = W - 1; INPUT.inside = true; }
+    else INPUT.inside = false;
+  });
 }
 const SENS = { cam: PREFS.sens ?? 1, power: 1 };
 function inputTick(dt) {
@@ -680,8 +688,12 @@ function inputTick(dt) {
   // souris non verrouillée : pousser le curseur contre un bord fait tourner la caméra en continu
   if (!INPUT.locked && !TOUCHDEV && INPUT.inside && UI.screen === 'game' && !UI.menuOpen && INPUT.mx >= 0) {
     const W = innerWidth, edge = Math.max(40, W * 0.06);
-    const k = INPUT.mx < edge ? 1 - INPUT.mx / edge : INPUT.mx > W - edge ? -(1 - (W - INPUT.mx) / edge) : 0;
-    if (k) { CAM.yaw += k * (INPUT.aiming ? 0.6 : 2.4) * dt * CAM.flipSign; CAM.lastInput = nowMs(); }
+    // pleine vitesse sur la moitié extérieure de la bande du bord
+    const k = INPUT.mx < edge ? Math.min(1, 2 * (1 - INPUT.mx / edge)) : INPUT.mx > W - edge ? -Math.min(1, 2 * (1 - (W - 1 - INPUT.mx) / edge)) : 0;
+    if (k) {
+      CAM.yaw += k * (INPUT.aiming ? 0.6 : 2.4) * dt * CAM.flipSign; CAM.lastInput = nowMs();
+      if (myTurn()) UI._hintAt = nowMs();   // rappelle qu'un clic verrouille la souris pour tourner librement
+    }
   }
   if (INPUT.aiming && INPUT.space) INPUT.power = clamp(INPUT.power + dt * 0.55, 0, 1);
   if (INPUT.aiming && !myTurn()) { INPUT.aiming = false; INPUT.power = 0; }
