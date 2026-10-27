@@ -41,11 +41,18 @@ const BODY = { Blue: 1, LightBlue: 1, White: 1 };
 const baseName = (n) => String(n || '').replace(/\.\d+$/, '');
 
 // une partie de maillage → géométrie aux attributs communs (position, normale, couleur, drapeau ; os si animé)
+// un attribut en flottants : les modèles allégés (KHR_mesh_quantization) stockent positions et normales en entiers
+// normalisés ; les transformer ou les fusionner tels quels les écraserait entre −1 et 1
+function f32(a) {
+  const out = new Float32Array(a.count * a.itemSize), get = [(i) => a.getX(i), (i) => a.getY(i), (i) => a.getZ(i), (i) => a.getW(i)];
+  for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = get[k](i);
+  return new THREE.BufferAttribute(out, a.itemSize);
+}
 function bakePart(mesh, matrix, flags, { skin = null, bone = -1 } = {}) {
   const src = mesh.geometry, g = new THREE.BufferGeometry();
   const n = src.attributes.position.count;
-  g.setAttribute('position', src.attributes.position.clone());
-  g.setAttribute('normal', src.attributes.normal ? src.attributes.normal.clone() : new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute('position', f32(src.attributes.position));
+  g.setAttribute('normal', src.attributes.normal ? f32(src.attributes.normal) : new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
   if (src.index) g.setIndex(src.index.clone());
   g.applyMatrix4(matrix);
   if (!src.attributes.normal) g.computeVertexNormals();
@@ -156,6 +163,9 @@ function shrinkHands(geo, skel, bind, bindInv, k) {
   P.needsUpdate = true; geo.computeBoundingBox(); geo.computeBoundingSphere();
 }
 
+// Les trois personnages sont allégés (≈ 4,2 Mo → 1 Mo) avec gltf-transform : armes du kit inutilisées retirées (le soldat
+// garde celles de WEAPON_NODES et la pelle), puis prune, dedup, resample et quantize({ quantizationVolume: 'scene' })
+// (KHR_mesh_quantization, lu tel quel par three.js ; un seul volume, car les parties animées partagent le squelette).
 export async function loadKit(base) {
   const loader = new GLTFLoader(), url = (f) => `${base}toon/${f}.glb`;
   const kit = { soldier: null, weapons: {}, guns: {}, items: {}, props: {}, city: {}, cars: {} };
