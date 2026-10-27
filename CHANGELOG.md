@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.89 — 27 octobre 2026
+- **Birdie Party** — Les parties en ligne tiennent mieux la route.
+  - Tout le monde avance au même rythme : la partie attend que chacun ait fini de regarder un coup, et les bots attendent que tout le monde voie leur tour.
+  - Un joueur qui cache sa page ou perd sa connexion ne bloque plus les autres ; à son tour, son coup part tout seul au bout de 20 s (et au bout d'une minute pour quelqu'un qui ne joue pas, avec un rappel).
+  - En revenant après une absence, on rattrape la partie tout de suite au lieu de revoir chaque coup.
+  - Un coup qui ne part pas (perdu en route) rend la main au lieu de figer le joueur.
+  - Les trous se chargent beaucoup plus vite, et la balle roule en accéléré une fois au sol.
+
 ## 2.88 — 26 octobre 2026
 - Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)
 

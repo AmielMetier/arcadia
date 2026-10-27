@@ -385,4 +385,63 @@ await new Promise((resolve, reject) => {
   setTimeout(() => reject(new Error('la partie en équipes ne se termine pas')), 60000);
 });
 
+// partie à deux en réseau (pont simulé) : l'hôte attend que l'invité ait vu chaque coup, n'attend plus un joueur
+// coupé, joue pour lui s'il ne joue pas, et un bot attend que tout le monde voie son tour
+{
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const host = { id: 0, name: 'Hôte', color: '#ff4b2b' }, guest = { id: 1, name: 'Invité', color: '#2b8cff' };
+  const handlers = {}, sent = [], states = [], shots = [];
+  const bridge = { embedded: false, players: [host, guest], on(k, fn) { (handlers[k] = handlers[k] || []).push(fn); }, send(to, m) { sent.push({ to, m }); }, report() {} };
+  const fire = (k, ...a) => (handlers[k] || []).forEach((f) => f(...a));
+  const emit = (e) => { if (e.type === 'state') states.push(e.R); if (e.type === 'shot') shots.push(e.ev); };
+  const S = startHost({ bridge, solo: false, settings: { course: 'campagne', bots: 1, level: 'normal' }, me: host, emit, speed: 20 });
+  S.begin();
+  await wait(20);
+  let R = states.at(-1);
+  assert.equal(R.players[R.turn].id, 0, 'l\'hôte ouvre');
+  S.shot({ club: 0, aim: 0, power: 0.8, curve: 0 });
+  assert.equal(shots.length, 1);
+  S.done(0);
+  await wait(150);
+  assert.equal(states.length, 1, 'l\'hôte a vu le coup, mais l\'invité le regarde encore : on attend');
+  fire('msg', 1, { t: 'seen', no: 0 });
+  await wait(20);
+  assert.equal(states.length, 2, 'tout le monde a vu le coup : on passe au suivant');
+  R = states.at(-1);
+  // l'invité ou le bot est le plus loin du drapeau (tous deux au départ) ; si c'est le bot, il attend que chacun voie son tour
+  if (R.players[R.turn].bot) {
+    await wait(300);
+    assert.equal(shots.length, 1, 'le bot attend que tout le monde voie son tour');
+    S.ready(R.shotNo); fire('msg', 1, { t: 'ready', no: R.shotNo });
+    for (let k = 0; k < 40 && shots.length < 2; k++) await wait(20);
+    assert.equal(shots.length, 2, 'tout le monde est prêt : le bot joue');
+    S.done(1); fire('msg', 1, { t: 'seen', no: 1 });
+    await wait(20);
+    R = states.at(-1);
+  }
+  assert.equal(R.players[R.turn].id, 1, 'au tour de l\'invité');
+  // l'invité perd sa connexion (le salon lui garde sa place) : son coup part tout seul au bout de 20 s, et personne ne
+  // l'attend plus pour regarder les coups
+  const before = shots.length;
+  bridge.players = [host, { ...guest, away: true }]; fire('roster');
+  for (let k = 0; k < 120 && shots.length === before; k++) await wait(20);
+  assert.equal(shots.length, before + 1, 'joueur coupé : son coup part tout seul');
+  assert.ok(sent.some(({ m }) => m.t === 'note'), 'les autres sont prévenus');
+  const nst = states.length;
+  S.done(shots.at(-1).no);
+  await wait(20);
+  assert.ok(states.length > nst, 'on n\'attend pas le joueur coupé pour avancer');
+  // le bot (encore au départ) joue ensuite : il attend que l'hôte voie son tour (l'invité coupé n'est pas attendu)
+  R = states.at(-1);
+  assert.ok(R.players[R.turn].bot, 'au tour du bot');
+  const nb = shots.length;
+  await wait(300);
+  assert.equal(shots.length, nb, 'le bot attend que tout le monde voie son tour');
+  S.ready(R.shotNo);
+  for (let k = 0; k < 40 && shots.length === nb; k++) await wait(20);
+  assert.equal(shots.length, nb + 1, 'tout le monde est prêt : le bot joue');
+  S.stop();
+  n++; console.log('✓ partie en réseau : on avance quand tout le monde a vu le coup, sans attendre un joueur coupé');
+}
+
 console.log(`\n${n} tests réussis`);
