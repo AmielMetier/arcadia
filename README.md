@@ -121,6 +121,8 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 
 - **Équipes** : solo, duos ou trios, complétées par des bots coéquipiers ; à 0 PV on tombe à terre et un coéquipier
   relève (E, 5 s) ; l'équipe se choisit sur l'écran d'accueil (`royale/engine/teams.js`)
+- **Repères d'équipe** (B ou clic molette) et **largages** (une caisse de butin épique en parachute à chaque fermeture
+  de la tempête, quatre par partie)
 - **Rythme** : un « directeur » cale les combats entre bots sur les cercles de la tempête (≈ 10 min de partie) ; niveau
   des bots « Auto » d'après les dernières parties des joueurs (`royale/engine/skill.js`)
 
