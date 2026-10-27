@@ -8,7 +8,7 @@ import { makeRng, hash } from './rng.js';
 import { CELL } from './buildings.js';
 import { newPlayer, stepPlayer, stepAir, MOVE } from './player.js';
 import { planStorm, planFlight, STORM_TIMES } from './map.js';
-import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, weaponDamage, weapon, item, ammo, mats } from './items.js';
+import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, rollDrop, weaponDamage, weapon, item, ammo, mats } from './items.js';
 
 export const DT = 1 / 60;
 export const HP = 100, SHIELD = 100;
@@ -27,6 +27,10 @@ const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 export const CRAWL = 0.35, DOWN_HP = 100, BLEED = 30, REVIVE = 5, REVIVE_R = 2.4, RAISE_HP = 30;
 // repères d'équipe : un par joueur, visible PING_T secondes par ses coéquipiers ; sortes : ici, ennemi, butin, largage
 export const PING_T = 12, PING_KINDS = ['ici', 'ennemi', 'butin', 'largage'];
+// largages : au début des quatre premières fermetures de la tempête, une caisse descend en parachute (DROP_H m à
+// DROP_SPEED m/s, ≈ 26 s) quelque part dans le prochain cercle ; posée, elle s'ouvre comme un coffre (engine/items.js)
+export const DROP_H = 110, DROP_SPEED = 4.2, DROP_PHASES = 4;
+export const dropY = (d, t) => d.gy + Math.max(0, DROP_H - (t - d.t0) * DROP_SPEED);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
@@ -36,7 +40,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   const rng = makeRng(hash(seed * 31 + 7));
   const TEAMS = mode !== 'exploration' && teams > 1;
   const S = {
-    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null, pings: new Map(),
+    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null, pings: new Map(), drops: new Map(), nextDrop: 1,
     players: new Map(), items: new Map(), nextItem: 1, chests: new Map(), projectiles: [], pads: [], nextProj: 1,
     flight: null, storm: null, order: [], winner: null, events: [], hooks: {}, stormTick: 0,
   };
@@ -182,6 +186,25 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       spawnItem(it, c.x + fx * 1.1 - fz * a, c.y + 0.5, c.z + fz * 1.1 + fx * a);
     });
   }
+  // largage : quelque part dans le prochain cercle, sur la terre ferme ; ouvert, son butin jaillit autour
+  function spawnDrop() {
+    const c = S.storm && S.storm.next;
+    if (!c) return;
+    for (let i = 0; i < 40; i++) {
+      const a = rng.next() * Math.PI * 2, r = c.r * (0.15 + rng.next() * 0.55), x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+      if (x < 12 || z < 12 || x > map.size - 12 || z > map.size - 12 || map.waterAt(x, z) !== 0) continue;
+      const gy = world.support(x, z, 400), id = 'L' + S.nextDrop++;
+      S.drops.set(id, { id, x, z, y: gy, gy, t0: S.t, open: false, landed: false });
+      ev({ e: 'largage', id, x, z, gy, t0: S.t });
+      return;
+    }
+  }
+  function openDrop(P, d) {
+    d.open = true;
+    const list = rollDrop(makeRng(hash(seed * 911 + +d.id.slice(1))));
+    ev({ e: 'largage-ouvert', id: d.id, p: P.id });
+    list.forEach((it, k) => { const a = (k / list.length) * Math.PI * 2; spawnItem(it, d.x + Math.cos(a) * 1.5, d.gy + 0.6, d.z + Math.sin(a) * 1.5); });
+  }
   // ce que le joueur peut faire avec E : coffre, objet, porte (le plus proche de son regard)
   function target(P) {
     const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
@@ -197,6 +220,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     for (const Q of S.players.values()) if (Q.alive && Q.down && mates(P, Q)) consider('releve', Q, REVIVE_R, 1.6);
     if (best) return best; // relever passe avant tout le reste
     for (const c of S.chests.values()) if (!c.open) consider('coffre', c, CHEST_R, 1.6);
+    for (const d of S.drops.values()) if (d.landed && !d.open) consider('largage', d, CHEST_R + 0.6, 2);
     for (const g of S.items.values()) if (g.it.t === 'arme' || g.it.t === 'objet') consider('objet', g, PICK_R, 1.6);
     // la porte la plus proche concourt avec la même règle (un peu moins prioritaire qu'un objet)
     const d = world.doorNear(P.x, P.y, P.z, fx, fz);
@@ -216,6 +240,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!tg) return;
     if (tg.kind === 'releve') { P.revive = { id: tg.o.id, t: 0 }; P.use = null; P.rl = 0; ev({ e: 'releve…', p: P.id, to: tg.o.id }); }
     else if (tg.kind === 'coffre') openChest(P, tg.o);
+    else if (tg.kind === 'largage') openDrop(P, tg.o);
     else if (tg.kind === 'objet') pickUp(P, tg.o);
     else setDoor(tg.o, !tg.o.open, P);
   }
@@ -582,6 +607,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (k !== st.k) { st.k = k; ev({ e: 'tempete', k, state: st.state }); }
     st.next = C[Math.min(C.length - 1, k + 1)];
     st.dps = (STORM_TIMES[k] || STORM_TIMES[STORM_TIMES.length - 1]).dps;
+    if (S.mode === 'partie' && st.state === 'fermeture' && k < DROP_PHASES && st.dropK !== k) { st.dropK = k; spawnDrop(); }
     if (T < st.t0) return;
     // dégâts une fois par seconde, à ceux qui sont dehors (pas en l'air au-dessus de la montgolfière)
     S.stormTick += dt;
@@ -651,6 +677,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
     stepProjectiles(dt);
     stepStorm(dt);
+    for (const d of S.drops.values()) if (!d.landed && S.t - d.t0 >= DROP_H / DROP_SPEED) { d.landed = true; ev({ e: 'largage-pose', id: d.id, x: d.x, y: d.gy, z: d.z }); }
     if (S.hooks.step) S.hooks.step(dt);
   }
   // repère d'équipe (le dernier de chaque joueur compte) ; what : ce qu'il désigne (« Fusil d'assaut épique »…)

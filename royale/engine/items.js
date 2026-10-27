@@ -108,6 +108,12 @@ export function rollChest(rng) {
   if (rng.chance(0.25)) out.push(item(rng.weighted(C_CHEST)));
   return out;
 }
+// largage : une arme épique et beaucoup de munitions, une grande potion de bouclier, une trousse de soin, du métal
+const W_DROP = [['fusil', 30], ['pompe', 20], ['smg', 20], ['sniper', 20], ['roquette', 10]];
+export function rollDrop(rng) {
+  const w = rng.weighted(W_DROP), A = WEAPONS[w].ammo;
+  return [weapon(w, 3), ammo(A, AMMO[A].drop * (w === 'roquette' ? 2 : 4)), item('potion'), item('soin'), mats('metal', 60)];
+}
 // caisse de munitions : deux sortes
 export function rollAmmoBox(rng) {
   const keys = rng.shuffle(Object.keys(AMMO).filter((a) => a !== 'roquettes'));

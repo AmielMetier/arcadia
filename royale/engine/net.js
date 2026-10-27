@@ -91,6 +91,9 @@ export function mirrorEvent(sim, world, build, e) {
     case 'tremplin': if (!S.pads.some((p) => p.id === e.id)) S.pads.push({ id: e.id, x: e.x, y: e.y, z: e.z, t: 0 }); S.nextProj = Math.max(S.nextProj, e.id + 1); break;
     case 'elim': { const p = S.players.get(e.to); if (p) { p.alive = false; p.place = e.place; p.hp = 0; } if (!S.order.includes(e.to)) S.order.push(e.to); break; }
     case 'fin': S.phase = 'fin'; S.winner = e.winner; S.winTeam = e.team ?? null; break;
+    case 'largage': S.drops.set(e.id, { id: e.id, x: e.x, z: e.z, y: e.gy, gy: e.gy, t0: e.t0, open: false, landed: false }); break;
+    case 'largage-pose': { const d = S.drops.get(e.id); if (d) d.landed = true; break; }
+    case 'largage-ouvert': { const d = S.drops.get(e.id); if (d) d.open = true; break; }
     case 'repere': S.pings.set(e.p, { p: e.p, team: e.team, kind: e.kind, x: e.x, y: e.y, z: e.z, target: e.target, what: e.what, t: e.t }); break;
     default: break;
   }
@@ -107,6 +110,7 @@ export function fullState(sim, world, build) {
     pieces: [...build.pieces.values()].map((p) => ({ ...p })),
     pads: S.pads.map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z)]),
     order: [...S.order],
+    drops: [...S.drops.values()].map((d) => [d.id, r2(d.x), r2(d.z), r2(d.gy), r3(d.t0), d.landed ? 1 : 0, d.open ? 1 : 0]),
   };
 }
 export function applyFull(sim, world, build, st) {
@@ -120,6 +124,7 @@ export function applyFull(sim, world, build, st) {
   for (const p of st.pieces) build.mirrorAdd(p);
   S.pads = st.pads.map(([id, x, y, z]) => ({ id, x, y, z, t: 0 }));
   S.order = [...st.order];
+  for (const [id, x, z, gy, t0, landed, open] of st.drops || []) S.drops.set(id, { id, x, z, y: gy, gy, t0, landed: !!landed, open: !!open });
 }
 
 // ------------------------------------------------------------------ commandes (invité → hôte)

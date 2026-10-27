@@ -613,6 +613,41 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   ok(calls > 0, `repères posés par les bots : ${calls}`);
   console.log(`repères : bot coéquipier ${d0.toFixed(0)} → ${best.toFixed(0)} m du repère · ${calls} ennemis signalés par les bots`);
 }
+// ------------------------------------------------------------------ largages : descente, ouverture, butin, réseau, bots
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = Array.from({ length: 30 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal' }));
+  const sim = createSim({ map: m, world: W, seed: 6, roster, mode: 'partie' });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const copy = createSim({ map: m, world: W, seed: 6, roster, mode: 'partie' });
+  const spawned = [], opened = new Map();
+  let landT = null;
+  while (sim.S.phase !== 'fin' && sim.S.t < 620) {
+    sim.step(DT);
+    for (const e of sim.takeEvents()) {
+      if (e.e === 'largage') { spawned.push({ t: sim.S.t, k: sim.S.storm.k, inside: Math.hypot(e.x - sim.S.storm.next.x, e.z - sim.S.storm.next.z) < sim.S.storm.next.r }); mirrorEvent(copy, W, null, e); }
+      else if (e.e === 'largage-pose') { if (landT == null) landT = sim.S.t - spawned[0].t; mirrorEvent(copy, W, null, e); }
+      else if (e.e === 'largage-ouvert') { opened.set(e.id, e.p); mirrorEvent(copy, W, null, e); }
+    }
+  }
+  ok(spawned.length >= 3 && spawned.every((d) => d.inside), `largages : ${spawned.length}, tous dans le prochain cercle`);
+  ok(landT != null && Math.abs(landT - 110 / 4.2) < 0.5, `descente du premier largage : ${landT && landT.toFixed(1)} s`);
+  ok(opened.size >= 1, `largages ouverts par les bots : ${opened.size}/${spawned.length}`);
+  const d0 = [...sim.S.drops.values()][0], c0 = copy.S.drops.get(d0.id);
+  ok(c0 && c0.landed === d0.landed && c0.open === d0.open, 'les largages passent par le réseau');
+  // ouvert par un joueur : une arme épique, une grande potion, une trousse
+  const s2 = createSim({ map: m, world: W, seed: 9, roster: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], mode: 'partie' });
+  while (s2.S.drops.size === 0 && s2.S.t < 200) { s2.step(DT); s2.takeEvents(); }
+  const d = [...s2.S.drops.values()][0];
+  while (!d.landed) { s2.step(DT); s2.takeEvents(); }
+  const A = s2.player('a');
+  Object.assign(A, { mode: 'sol', x: d.x, z: d.z - 1.8, y: d.gy, vx: 0, vz: 0, alive: true });
+  s2.input('a', { yaw: 0, use: 1 }); s2.step(DT);
+  const loot = [...s2.S.items.values()].filter((g) => Math.hypot(g.x - d.x, g.z - d.z) < 3).map((g) => g.it);
+  ok(d.open && loot.some((it) => it.t === 'arme' && it.r === 3) && loot.some((it) => it.c === 'potion') && loot.some((it) => it.c === 'soin'), `butin du largage : ${loot.map((it) => it.w || it.c || it.a || it.m).join(', ')}`);
+  ok(JSON.stringify(fullState(s2, W, { broken: new Set(), pieces: new Map() }).drops[0]).includes(d.id), 'état complet : largages compris');
+  console.log(`largages : ${spawned.length} (à ${spawned.map((x) => Math.round(x.t) + ' s').join(', ')}), descente ${landT.toFixed(1)} s, ${opened.size} ouverts par les bots`);
+}
 // ------------------------------------------------------------------ niveau « Auto » : il suit les résultats
 {
   const fresh = skillOf([]), strong = skillOf([{ place: 1, n: 30, kills: 6 }, { place: 2, n: 45, kills: 4 }, { place: 1, n: 30, kills: 5 }]);

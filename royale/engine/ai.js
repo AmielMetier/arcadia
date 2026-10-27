@@ -203,6 +203,12 @@ export function createAI(sim, map, world) {
       consider({ kind: g.it.t === 'munitions' || g.it.t === 'materiaux' ? 'tas' : 'objet', id: g.id, x: g.x, y: g.y, z: g.z, swap: w.swap }, w.v, d);
     }
     if (best) claims.set(keyOfGoal(best), { id: P.id, until: S.t + 25 });
+    // un largage posé attire de loin (170 m), et plusieurs bots peuvent s'y rendre : c'est là que ça se bat
+    for (const d of S.drops.values()) {
+      if (!d.landed || d.open || banned(B, 'largage:' + d.id)) continue;
+      const dd = Math.hypot(d.x - P.x, d.z - P.z) + Math.abs(d.gy - P.y) * 2;
+      if (dd < 170 && 30 / (dd + 6) > bs) { bs = 30 / (dd + 6); best = { kind: 'largage', id: d.id, x: d.x, y: d.gy, z: d.z }; }
+    }
     return best;
   }
   // un point sûr dans le prochain cercle (ou une maison à fouiller dedans)
@@ -436,8 +442,8 @@ export function createAI(sim, map, world) {
       if (!P.revive && S.t - B.useT > 0.6) { I.use++; B.useT = S.t; if (++g.tries > 6) { ban(B, g, 10); done(); } }
       return;
     }
-    if (g.kind === 'coffre') {
-      const c = S.chests.get(g.id);
+    if (g.kind === 'coffre' || g.kind === 'largage') {
+      const c = g.kind === 'coffre' ? S.chests.get(g.id) : S.drops.get(g.id);
       if (!c || c.open) return done();
       face(B, c.x, c.z, dt, P);
       if (S.t - B.useT > 0.45 && Math.abs(wrap(Math.atan2(c.x - P.x, c.z - P.z) - B.yaw)) < 0.5) { I.use++; B.useT = S.t; if (++g.tries > 5) { ban(B, g); done(); } }

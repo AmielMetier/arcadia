@@ -19,6 +19,7 @@ import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
+import { createDrops } from './view/drops.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
 import { CHARACTERS } from './view/kit.js';
@@ -164,7 +165,7 @@ function startMatch() {
 // scène reprend son état de départ (murs, meubles, décor, portes) et le monde solide est reconstruit (≈ 65 ms)
 function resetMatch() {
   if (!S.sim) return;
-  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); } catch (e) { console.warn(e); }
+  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); S.drops3d.dispose(); } catch (e) { console.warn(e); }
   S.scene.reset();
   S.world = buildWorld(S.map);
   S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
@@ -185,6 +186,7 @@ function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
+  S.drops3d = createDrops(S.scene.scene);
   // les bots ne réfléchissent que là où la partie tourne
   S.ai = !mirror && mode !== 'exploration' ? createAI(S.sim, S.map, S.world) : null;
   for (const P of S.sim.S.players.values()) S.prev.set(P.id, { x: P.x, y: P.y, z: P.z, yaw: P.yaw });
@@ -320,6 +322,7 @@ function loop(now) {
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
+  S.drops3d.update(dt, S.t, S.sim.S);
   // chute libre : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
   const fall = P && P.alive && P.mode === 'chute' ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
   S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
@@ -335,7 +338,8 @@ function loop(now) {
     const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
     const pg = pingsOf(focusP, fp, view);
     S.hud.pings(pg);
-    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), pg.map((m) => ({ x: m.x, z: m.z, color: m.color })));
+    const drops = [...S.sim.S.drops.values()].filter((d) => !d.open).map((d) => ({ x: d.x, z: d.z, color: '#b77dff', big: true }));
+    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), [...drops, ...pg.map((m) => ({ x: m.x, z: m.z, color: m.color }))]);
     const rv = focusP.revive && S.sim.player(focusP.revive.id);
     S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat, revive: rv ? { f: focusP.revive.t / REVIVE, name: rv.name } : null });
     if ((S.tick3 = (S.tick3 || 0) + 1) % 5 === 0) S.hud.team(team.map((Q) => ({ id: Q.id, name: Q.name, color: Q.color, hp: Q.hp, sh: Q.sh, down: Q.down ? Q.down.hp : null, alive: Q.alive })));
@@ -764,6 +768,19 @@ function handleEvents(list) {
         break;
       }
       case 'releve…': if (e.p === S.me) S.sfx.play('bandage'); break;
+      case 'largage': {
+        S.hud.say('Largage en approche !<small>Une caisse de butin épique descend dans le cercle (losange violet sur la carte)</small>', 3.5);
+        S.hud.feedLine('📦 Un largage descend dans le cercle');
+        S.sfx.play('largage');
+        break;
+      }
+      case 'largage-pose': S.fx.dust(e.x, e.y, e.z, { n: 14, r: 0.8, speed: 3 }); S.sfx.at('atterrit', e.x, e.y + 1, e.z, 1, 90); break;
+      case 'largage-ouvert': {
+        const d = S.sim.S.drops.get(e.id);
+        if (d) { S.fx.puff(d.x, d.gy + 1, d.z, { color: 0xb77dff, size: 0.8, grow: 3, life: 0.8, add: true, op: 0.9 }); S.sfx.at('coffre', d.x, d.gy + 0.5, d.z, 1); }
+        if (e.p !== S.me) S.hud.feedLine(`<b>${esc(nameOf(e.p))}</b> a ouvert un largage`, P && S.sim.mates(P, S.sim.player(e.p) || {}));
+        break;
+      }
       case 'repere': { const Q = P && S.sim.player(e.p); if (Q && (e.p === S.me || S.sim.mates(P, Q))) S.sfx.play('repere'); break; }
       case 'releve-': if (e.p === S.me) toast('Relevé interrompu : il faut rester à côté sans bouger ni tirer', 2.5); break;
       case 'boum': {
@@ -886,6 +903,7 @@ function showPrompt() {
   if (tg.kind === 'releve') { S.hud.prompt('Relever', tg.o.name, '#4ade80'); return; }
   if (tg.kind === 'porte') S.hud.prompt((tg.o.open ? 'Fermer' : 'Ouvrir') + (tg.o.kind === 'portail' ? ' le portail' : ' la porte'));
   else if (tg.kind === 'coffre') S.hud.prompt(tg.o.kind === 'coffre' ? 'Ouvrir le coffre' : 'Ouvrir la caisse de munitions');
+  else if (tg.kind === 'largage') S.hud.prompt('Ouvrir le largage', 'butin épique', '#b77dff');
   else {
     const it = tg.o.it, full = P.inv.every(Boolean) && !(it.t === 'objet' && P.inv.some((q) => q && q.t === 'objet' && q.c === it.c));
     S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
