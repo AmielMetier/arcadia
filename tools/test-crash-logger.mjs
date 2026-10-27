@@ -53,4 +53,22 @@ for (const line of lines) {
   JSON.parse(line);
 }
 
-console.log(`SUCCESS: Tous les tests de structure et validation de logs/crash sont validés (${catalog.games.length} jeux référencés, ${latest.length} incidents répertoriés).`);
+// 5. Chaque jeu du registre (hub/games.js) est reconnu par le capteur quand il est ouvert seul, et décrit dans le catalogue
+globalThis.window = {};
+await import(path.join(ROOT, 'hub/games.js'));
+const ids = window.HUB_GAMES.map((g) => g.id);
+const loggerSrc = fs.readFileSync(path.join(ROOT, 'shared/logger.js'), 'utf8');
+const pathRe = /\/\(([a-z|]+)\)\(\?:\\\/\|\$\)/.exec(loggerSrc);
+const known = pathRe ? pathRe[1].split('|') : [];
+const missingLogger = ids.filter((id) => !known.includes(id));
+if (missingLogger.length) {
+  console.error(`FAIL: shared/logger.js (detectGameId) ne reconnaît pas : ${missingLogger.join(', ')}`);
+  process.exit(1);
+}
+const missingCatalog = ids.filter((id) => !catalog.games.some((g) => g.id === id));
+if (missingCatalog.length) {
+  console.error(`FAIL: logs/crash/reasons-catalog.json ne décrit pas : ${missingCatalog.join(', ')}`);
+  process.exit(1);
+}
+
+console.log(`SUCCESS: Tous les tests de structure et validation de logs/crash sont validés (${catalog.games.length} jeux référencés, ${latest.length} incidents répertoriés, ${ids.length} jeux du registre reconnus).`);

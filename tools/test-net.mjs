@@ -5,16 +5,19 @@ import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import vm from 'node:vm';
 const { WebSocket: NodeWS } = createRequire(new URL('../server/package.json', import.meta.url))('ws');
 // comme dans un navigateur, une erreur de connexion n'est qu'un événement (suivi de la fermeture)
 class WebSocket extends NodeWS { constructor(u) { super(u); this.on('error', () => {}); } }
 
 const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT_TMP = path.join(tmpdir(), 'relais-logs-'); // logs du serveur hors du dépôt
 const SPORT = 8188;
 let srv = null;
 const startServer = async () => {
-  srv = spawn('node', [ROOT + 'server/server.js'], { env: { ...process.env, PORT: String(SPORT), RELAY_GRACE_MS: '2500' }, stdio: ['ignore', 'ignore', 'inherit'] });
+  srv = spawn('node', [ROOT + 'server/server.js'], { env: { ...process.env, PORT: String(SPORT), RELAY_GRACE_MS: '2500', RELAY_LOG_DIR: fs.mkdtempSync(ROOT_TMP) }, stdio: ['ignore', 'ignore', 'inherit'] });
   await sleep(400);
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

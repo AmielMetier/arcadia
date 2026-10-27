@@ -14,6 +14,12 @@
 - **Island Rush** — Niveau des bots « Auto », le nouveau réglage par défaut : il suit vos dernières parties, avec plus de bots faciles pour qui débute et plus de coriaces pour qui gagne souvent.
 - **Island Rush** — Fin de partie : un bilan (précision, distance parcourue, temps de survie, coéquipiers relevés, qui t'a éliminé), et « Rejouer » relance tout de suite, sans recharger la page, pour toi comme pour tes invités.
 - **Island Rush** — Chargement plus rapide : les personnages pèsent 1 Mo au lieu de 4.
+## 3.2 — 27 octobre 2026
+- **Poké Duel** — Les tournois comptent enfin au classement entre potes, avec leur onglet et le record de matchs gagnés.
+  - Chacun prend la place que lui donne le tableau : champion, finaliste, puis demi-finalistes et quarts de finalistes.
+- **Tous les jeux** — Correction : un joueur dont la connexion se figeait (téléphone en veille, wifi coupé) pouvait faire tomber le serveur, et avec lui tous les salons en cours.
+  - Le serveur tient aussi bon face à un appareil qui enverrait des messages géants ou en rafale.
+- **Hub** — Le bouton « 📋 Logs & Crashs » quitte l'accueil et le salon : c'était un outil de développement.
 
 ## 3.1 — 27 octobre 2026
 - **Island Rush** — Les bots t'attaquent enfin : celui qui crée la partie dans le Hub leur était invisible comme cible. Ils te traitent maintenant comme n'importe quel autre joueur.

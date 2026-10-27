@@ -62,16 +62,27 @@ export function startHost({ bridge, solo, settings, me, onState, onSetup, onErro
 
   function reportResults() {
     if (!bridge || !bridge.embedded || !bridge.report || !tournament || !tournament.champion) return;
+    // Place tirée de l'arbre : 1 le champion, 2 le finaliste, 3 les perdants des demies, 5 ceux des quarts ;
+    // score = matchs gagnés pendant le tournoi
+    const same = (a, b) => a && b && String(a.id) === String(b.id);
+    const R = tournament.rounds.length;
+    const placeOf = (p) => {
+      if (same(p, tournament.champion)) return 1;
+      let last = 0;
+      tournament.rounds.forEach((round, r) => { if (round.some((m) => same(m.playerA, p) || same(m.playerB, p))) last = r; });
+      return 2 ** (R - 1 - last) + 1;
+    };
+    const wins = (p) => tournament.rounds.reduce((n, round) => n + round.filter((m) => same(m.winner, p)).length, 0);
     bridge.report({
       id: `pokemon-${Date.now()}`,
       mode: 'Tournoi 3v3',
-      players: tournament.participants.map((p, idx) => ({
+      players: tournament.participants.map((p) => ({
         id: p.bot ? null : p.id,
         name: p.name,
         color: p.color,
         bot: p.bot,
-        rank: String(p.id) === String(tournament.champion.id) ? 1 : idx + 2,
-        score: String(p.id) === String(tournament.champion.id) ? 300 : 100
+        rank: placeOf(p),
+        score: wins(p)
       }))
     });
   }
