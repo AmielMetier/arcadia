@@ -56,6 +56,7 @@ export function keyOf(ref) {
   if (ref.prop != null) return `p:${ref.prop}`;
   if (ref.door != null) return `d:${ref.door}`;
   if (ref.build != null) return `b:${ref.build}`;
+  if (ref.slab != null) return `s:${ref.b}:${ref.k}:${ref.slab}`;
   return null;
 }
 
@@ -155,8 +156,8 @@ export function buildWorld(map) {
         }
         if (e.ext) { nodes.add(e.x + ',' + e.z); nodes.add(e.o === 'h' ? (e.x + 1) + ',' + e.z : e.x + ',' + (e.z + 1)); }
       }
-      // dalle de l'étage (sauf la trémie de l'escalier), par rangées de cases
-      if (k > 0) slabRows(b, lv.hole, (x0, x1, z) => box(x0 * CELL, F - SLAB_T, z * CELL, x1 * CELL, F, (z + 1) * CELL, { b: b.id, k, part: 'dalle' }));
+      // dalle de l'étage (sauf la trémie de l'escalier), case par case : chacune se casse (sol d'en haut, plafond d'en bas)
+      if (k > 0) slabCells(b, lv.hole, (x, z) => box(x * CELL, F - SLAB_T, z * CELL, (x + 1) * CELL, F, (z + 1) * CELL, { b: b.id, k, part: 'dalle', slab: `${x},${z}` }));
       if (lv.stairs) {
         const st = lv.stairs;
         ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' } });
@@ -181,7 +182,7 @@ export function buildWorld(map) {
       box(x * CELL - WALL_T / 2, b.y, z * CELL - WALL_T / 2, x * CELL + WALL_T / 2, top, z * CELL + WALL_T / 2, { b: b.id, part: 'poteau' });
     }
     // toit
-    slabRows(b, b.roof !== 'pente' ? b.roofHatch : null, (x0, x1, z) => box(x0 * CELL, top - SLAB_T, z * CELL, x1 * CELL, top, (z + 1) * CELL, { b: b.id, part: 'toit' }));
+    slabCells(b, b.roof !== 'pente' ? b.roofHatch : null, (x, z) => box(x * CELL, top - SLAB_T, z * CELL, (x + 1) * CELL, top, (z + 1) * CELL, { b: b.id, k: b.floors, part: 'toit', slab: `${x},${z}` }));
     if (b.roof === 'pente') {
       // deux pans qui montent vers le faîtage, le long du grand côté
       const alongX = b.w >= b.d, half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE;
@@ -452,15 +453,7 @@ export function buildWorld(map) {
 }
 
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)
-function slabRows(b, hole, fn) {
-  for (let z = b.z0; z < b.z0 + b.d; z++) {
-    let x = b.x0;
-    while (x < b.x0 + b.w) {
-      if (hole && hole.x === x && hole.z === z) { x++; continue; }
-      let e = x;
-      while (e < b.x0 + b.w && !(hole && hole.x === e && hole.z === z)) e++;
-      fn(x, e, z);
-      x = e;
-    }
-  }
+// dalles case par case (on saute la trémie)
+export function slabCells(b, hole, fn) {
+  for (let z = b.z0; z < b.z0 + b.d; z++) for (let x = b.x0; x < b.x0 + b.w; x++) if (!(hole && hole.x === x && hole.z === z)) fn(x, z);
 }
