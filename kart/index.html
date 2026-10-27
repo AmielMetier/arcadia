@@ -138,9 +138,8 @@
   #kgrid { margin-top: 14px; padding-top: 12px; border-top: 2px dashed rgba(255, 255, 255, .22); position: relative; }
   #kgrid::before { content: 'TON KART'; position: absolute; top: -11px; left: 14px; padding: 0 8px; font-size: 15px; color: #9fd8ff; background: rgba(12, 16, 40, .9); border-radius: 8px; -webkit-text-stroke: 0; }
   #kgrid .card { aspect-ratio: 1.35 / 1; }
-  #musbtn { position: fixed; left: 12px; bottom: 12px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; max-width: 70vw; text-align: left; }
-  #musbtn.off { border-color: #777; color: #bbb; } #musbtn.warn { border-color: #ffb03a; }
-  #volbtn { position: fixed; left: 12px; bottom: 54px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; }
+  #setbtn { position: fixed; left: 12px; bottom: 12px; z-index: 60; font: 700 14px/1 Arial, sans-serif; color: #fff; background: rgba(10,14,30,0.78); border: 2px solid #5ff3ff; border-radius: 20px; padding: 8px 14px; cursor: pointer; }
+  #setbtn.warn { border-color: #ffb03a; }
   #assist { font-size: 15px; padding: 5px 14px; } #assist.on { background: #4dff7a; }
   #kgrid .card img { object-fit: contain; inset: 4% 4% 24% 4%; width: 92%; height: 72%; }
   .card img { position: absolute; inset: 0 0 20% 0; width: 100%; height: 80%; object-fit: cover; }
@@ -265,8 +264,7 @@
 <div id="starfx"></div>
 <div id="pause" class="ol hidden">PAUSE</div>
 
-<button id="musbtn" class="hidden" title="Musique : marche / arrêt (touche M)">🎵 Musique</button>
-<button id="volbtn" class="hidden" title="Volume de la musique et des effets" aria-label="Volume">🎚️ Volume</button>
+<button id="setbtn" class="hidden" title="Réglages : musique et effets (M : couper le son)" aria-label="Réglages">⚙️ Réglages</button>
 <div id="title" class="screen hidden">
   <div class="logo"><span class="l1">CYBER</span><span class="l2">KART</span><span class="gp ol">GP</span></div>
   <div class="tag">7 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis le Game Hub</div>
@@ -5311,13 +5309,13 @@ class AIDriver {
    17. SON : effets synthétisés (WebAudio) + musique (fichiers de kart/music/, en boucle)
    ============================================================================= */
 class Sound {
-  constructor() { this.ctx = null; this.muted = false; this.starT = 0; }
+  constructor() { this.ctx = null; this.starT = 0; }
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = (this.ctx = new AC());
     this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 22000; this.lp.Q.value = 0.7; this.lp.connect(c.destination);
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.3; this.master.connect(DDVolume.gain(c, 'fx')).connect(this.lp); // réglage « Effets » du joueur
+    this.master = c.createGain(); this.master.gain.value = 0.3; this.master.connect(DDVolume.gain(c, 'fx')).connect(this.lp); // réglage « Effets » du joueur
     this.ef = c.createBiquadFilter(); this.ef.type = 'lowpass'; this.ef.Q.value = 3; this.eg = c.createGain(); this.eg.gain.value = 0;
     this.o1 = c.createOscillator(); this.o1.type = 'sawtooth'; this.o2 = c.createOscillator(); this.o2.type = 'square';
     const g2 = c.createGain(); g2.gain.value = 0.45; this.o1.connect(this.ef); this.o2.connect(g2); g2.connect(this.ef); this.ef.connect(this.eg); this.eg.connect(this.master); this.o1.start(); this.o2.start();
@@ -5381,23 +5379,25 @@ class Sound {
   }
   /** 0 = son normal, 1 = étouffé (sous l'eau) */
   muffle(u) { if (!this.ctx || this.muffleU === u) return; this.muffleU = u; this.lp.frequency.setTargetAtTime(u > 0 ? lerp(22000, 650, u) : 22000, this.ctx.currentTime, 0.07); }
-  setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.3; }
 }
 const sfx = new Sound();
 /** Musique : lit kart/music/<nom>.(mp3|ogg) en boucle, par le même moteur audio que les bruitages (Web Audio) :
-    s'ils s'entendent, la musique aussi (iPad / iPhone, Brave, Safari…). Réglage propre au jeu (bouton 🎵 du menu, touche M) :
-    il ne dépend plus de la musique d'ambiance du Hub. Si le décodage échoue (mémoire de l'iPad…), lecture en flux par un élément audio. */
+    s'ils s'entendent, la musique aussi (iPad / iPhone, Brave, Safari…). Son volume : le curseur « Musique » des réglages
+    du jeu (à 0 : coupée ; touche M : tout le son), qui ne dépend pas de la musique d'ambiance du Hub. Si le décodage échoue (mémoire de l'iPad…), lecture en flux par un élément audio. */
 class Music {
   constructor() {
     this.key = null; this.url = null; this.cache = new Map(); this.src = null; this.srcGain = null; this.out = null; this.rate = 1;
     this.status = 'attente'; this.err = ''; this.mode = '';
     const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
-    this.on = get('kart_music', true); this.vol = get('kart_music_vol', 0.8);
+    this.vol = get('kart_music_vol', 0.8);
+    DDVolume.legacy('kart_music', ['music'], (v) => v === 'false'); // l'ancien bouton 🎵 coupé : curseur à 0
+    // curseur relevé : le morceau resté en attente démarre
+    DDVolume.on(() => { if (this.on && !this.src && this.key && this.status !== 'chargement') { const k = this.key; this.key = null; this.play(k); } this.onChange(); });
   }
-  save() { try { localStorage.setItem('kart_music', JSON.stringify(this.on)); } catch (e) {} }
+  get on() { return DDVolume.get('music') > 0; }
   ctx() { sfx.init(); const c = sfx.ctx; if (c && !this.out) { this.out = c.createGain(); this.out.connect(DDVolume.gain(c, 'music')).connect(sfx.lp || c.destination); this.applyVol(); } return c; }
-  applyVol() { if (this.out) this.out.gain.value = this.on ? this.vol * MUSIC.volume : 0; this.onChange(); }
-  onChange() { if (typeof updateMusicBtn === 'function') updateMusicBtn(); }
+  applyVol() { if (this.out) this.out.gain.value = this.vol * MUSIC.volume; this.onChange(); }
+  onChange() { if (typeof updateSetBtn === 'function') updateSetBtn(); }
   /** télécharge et décode le morceau (mp3, sinon ogg). Renvoie { buf } ou { url } (flux) ou null s'il n'existe pas. Les échecs ne sont pas mémorisés. */
   async load(name) {
     if (this.cache.has(name)) return this.cache.get(name);
@@ -5455,17 +5455,14 @@ class Music {
   }
   setRate(r) { this.rate = r; if (!this.src) return; if (this.src.el) this.src.el.playbackRate = r; else this.src.playbackRate.setTargetAtTime(r, sfx.ctx.currentTime, 0.25); }
   stop() { this.key = null; this.url = null; this.fadeOut(); this.status = 'attente'; this.onChange(); }
-  setOn(on) { this.on = on; this.save(); this.applyVol(); }
-  toggle() { this.setOn(!this.on); }
-  /** texte court pour le bouton 🎵 */
+  /** état de la musique, affiché dans les réglages quand elle ne joue pas comme prévu ('' : tout va bien) */
   label() {
-    if (!this.on) return '🎵 Musique : coupée';
+    if (!this.on) return '';
     const c = sfx.ctx;
-    if (!c || c.state !== 'running' || this.status === 'bloquée') return '🎵 Touchez l\'écran pour le son';
-    if (this.status === 'chargement') return '🎵 Musique : chargement…';
-    if (this.status === 'erreur') return '🎵 Musique : ' + (this.err || 'erreur');
-    if (this.status === 'lecture') return '🎵 Musique : oui' + (this.mode === 'flux' ? ' (flux)' : '');
-    return '🎵 Musique : oui';
+    if (!c || c.state !== 'running' || this.status === 'bloquée') return 'Touchez l\'écran pour entendre le son.';
+    if (this.status === 'chargement') return 'Musique : chargement…';
+    if (this.status === 'erreur') return 'Musique : ' + (this.err || 'erreur');
+    return '';
   }
 }
 const music = new Music();
@@ -5796,14 +5793,14 @@ function updateNameTags() {
 function clearNameTags() { for (const s of nameTags.values()) scene.remove(s); nameTags.clear(); }
 
 /* ---------------------------------------------------------------------------- MENUS */
-/** Bouton 🎵 (menus, pause, résultats) : marche / arrêt et état de la musique (chargement, fichier introuvable, son à débloquer…) */
-function updateMusicBtn() {
-  const b = $('musbtn'); if (!b) return;
+/** Bouton ⚙️ Réglages (menus, pause, résultats) : bordé d'orange quand la musique ne joue pas comme prévu
+    (chargement, fichier introuvable, son à débloquer…) ; le détail s'affiche dans le panneau */
+function updateSetBtn() {
+  const b = $('setbtn'); if (!b) return;
   b.classList.toggle('hidden', !['title', 'maps', 'chars', 'results', 'escmenu'].includes(UI.screen) && !(race && race.paused));
-  $('volbtn').classList.toggle('hidden', b.classList.contains('hidden'));
-  b.textContent = music.label(); b.classList.toggle('off', !music.on); b.classList.toggle('warn', music.on && music.status !== 'lecture');
+  b.classList.toggle('warn', !!music.label());
 }
-setInterval(updateMusicBtn, 1000);
+setInterval(updateSetBtn, 1000);
 const UI = {
   screen: 'none',
   show(name) {
@@ -5811,7 +5808,7 @@ const UI = {
     for (const id of ['title', 'maps', 'chars', 'loadscr', 'results', 'escmenu']) $(id).classList.toggle('hidden', id !== ({ loading: 'loadscr' }[name] || name));
     $('hud').classList.toggle('hidden', !['race'].includes(name));
     if (name === 'maps' || name === 'chars' || name === 'title') music.play('menu');
-    updateMusicBtn(); UI.refresh();
+    updateSetBtn(); UI.refresh();
   },
   refresh() {
     if (UI.screen === 'maps') renderMaps();
@@ -5914,8 +5911,11 @@ function renderChars() {
   else { $('charok').textContent = mine.ready ? 'Pas prêt' : 'Prêt ✓'; $('charok').disabled = false; $('charback').textContent = 'Quitter'; }
 }
 $('assist').onclick = () => { PREFS.assist = !PREFS.assist; savePrefs(); renderChars(); };
-DDVolume.panel($('volbtn'));
-$('musbtn').onclick = (e) => { e.stopPropagation(); music.toggle(); if (music.on && !music.src && music.key) { const k = music.key; music.key = null; music.play(k); } updateMusicBtn(); };
+DDVolume.panel($('setbtn'), {
+  accent: '#5ff3ff',
+  sections: [{ title: 'Musique', items: [{ note: () => music.label() }], hidden: () => !music.label() }],
+  hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.',
+});
 $('charok').onclick = () => {
   sfx.tone(880, 0.12, 'square', 0.15);
   if (NET.isHost) { const m = myPick(); LOBBY.picks[NET.myId] = { ...m, ready: true }; hostStartRace('new'); }
@@ -6120,7 +6120,7 @@ function onKeyPress(code) {
   }
   if (UI.screen === 'results' && SPEC.on) { if (code === 'ArrowLeft' || code === 'KeyA') specStep(-1); else if (code === 'ArrowRight' || code === 'KeyD') specStep(1); else if (code === 'Escape') specStop(); return; }
   if (UI.screen === 'results') { if (NET.isHost && (code === 'Enter' || code === 'NumpadEnter')) ($('rnext') || $('rnew'))?.click(); else if (code === 'Escape') $('rquit').click(); return; }
-  if (code === 'KeyM') { const m = !sfx.muted; sfx.setMuted(m); music.setOn(!m); toast(m ? 'Son coupé' : 'Son activé'); }
+  if (code === 'KeyM') { const m = DDVolume.toggle(); toast(m ? 'Son coupé' : 'Son activé'); }
   if (code === 'KeyP') togglePixelMode();
   if (code === 'Escape' && UI.screen === 'race') { if (escOpen()) { $('escmenu').classList.add('hidden'); race.paused = false; } else openEscMenu(); }
 }

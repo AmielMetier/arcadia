@@ -14,7 +14,6 @@ const SFX_FILES = {
 
 class SoundManager {
   constructor() {
-    this.enabled = true;
     this.audioPool = new Map();
     this.cryCache = new Map();
     this.ctx = null;
@@ -26,8 +25,11 @@ class SoundManager {
     this.getAudioContext();
   }
 
+  // à 0, le curseur « Effets » des réglages coupe les bruitages et les cris
+  get enabled() { return DDVolume.get('fx') > 0; }
+
   startBgm() {
-    if (!this.enabled || typeof window === 'undefined') return;
+    if (!(DDVolume.get('music') > 0) || typeof window === 'undefined') return;
     try {
       if (!this.bgmAudio) {
         this.bgmAudio = new Audio('assets/bgm_battle.mp3');
@@ -269,11 +271,6 @@ class SoundManager {
     }
   }
 
-  toggle() {
-    this.enabled = !this.enabled;
-    if (!this.enabled) this.stopBgm();
-    return this.enabled;
-  }
 }
 
 export const sfx = new SoundManager();

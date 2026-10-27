@@ -1,8 +1,9 @@
 // Birdie Party — sons : enregistrements libres (CC0, voir sounds/LICENSE.txt) joués en WebAudio.
 // Ambiance de nature en boucle selon le décor, vent qui souffle selon sa force, frappes de club, rebonds,
 // foule (applaudissements, « oh ! », « oh non… ») et petits jingles quand la balle s'arrête.
-// Musique du menu en boucle (dossier music/, CC0 aussi). Deux volumes réglables, retenus d'une partie à l'autre :
-// la musique (menu et petits airs de fin de coup) et les effets (frappes, foule, nature, vent, interface).
+// Musique du menu en boucle (dossier music/, CC0 aussi). Deux volumes : les curseurs du panneau Réglages, retenus
+// d'une partie à l'autre (à 0 : coupé) : la musique (menu et petits airs de fin de coup) et les effets (frappes, foule,
+// nature, vent, interface).
 // Le contexte audio naît au premier geste du joueur (unlock) et se ferme dans dispose().
 const FILES = [
   'hit-drive', 'hit-iron', 'hit-chip', 'hit-putt', 'swoosh', 'cup-rattle', 'cup-drop', 'cup', 'bounce-grass1', 'bounce-grass2', 'bounce-sand', 'tree', 'trunk',
@@ -11,29 +12,30 @@ const FILES = [
   'ui-click', 'ui-select', 'ui-confirm', 'ui-tick', 'ui-switch', 'ui-open', 'ui-close', 'ui-card',
 ];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
-const VOL_KEY = 'golf_vol';
+// anciens réglages du jeu (ses curseurs, son bouton « couper le son ») : point de départ des curseurs communs
+function migrate() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem('golf_vol') || 'null'); } catch (e) {}
+  if (v) { DDVolume.migrate('music', v.music / 0.8); DDVolume.migrate('fx', v.fx); }
+  DDVolume.legacy('golf_mute');
+  DDVolume.legacy('golf_music', ['music'], (x) => x === '0' && !v);
+}
 
 export class Sfx {
   constructor(base, musicBase) {
-    this.base = base; this.musicBase = musicBase; this.ctx = null; this.buf = new Map(); this.muted = false;
+    this.base = base; this.musicBase = musicBase; this.ctx = null; this.buf = new Map();
     this.amb = { name: null, src: null, gain: null };
     this.mus = { name: null, want: null, src: null, gain: null };
-    this.vol = { music: 0.8, fx: 1 };
-    try {
-      this.muted = localStorage.getItem('golf_mute') === '1';
-      const v = JSON.parse(localStorage.getItem(VOL_KEY) || 'null');
-      if (v) for (const k of ['music', 'fx']) { if (typeof v[k] === 'number') this.vol[k] = Math.max(0, Math.min(1, v[k])); }
-      else if (localStorage.getItem('golf_music') === '0') this.vol.music = 0; // ancien réglage : musique coupée
-    } catch (e) {}
+    migrate();
   }
   unlock() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
-    this.master = c.createGain(); this.master.gain.value = this.muted || this.silent ? 0 : 0.9; this.master.connect(c.destination);
+    this.master = c.createGain(); this.master.gain.value = this.silent ? 0 : 0.9; this.master.connect(c.destination);
     // deux volumes : musique (morceau du menu, jingles) et effets (bruitages, foule, ambiance)
-    this.musBus = c.createGain(); this.musBus.gain.value = this.vol.music; this.musBus.connect(this.master);
-    this.sfxBus = c.createGain(); this.sfxBus.gain.value = this.vol.fx; this.sfxBus.connect(this.master);
+    this.musBus = c.createGain(); this.musBus.gain.value = 0.8; this.musBus.connect(DDVolume.gain(c, 'music')).connect(this.master);
+    this.sfxBus = c.createGain(); this.sfxBus.gain.value = 1; this.sfxBus.connect(DDVolume.gain(c, 'fx')).connect(this.master);
     this.fx = c.createGain(); this.fx.gain.value = 1; this.fx.connect(this.sfxBus);
     this.bed = c.createGain(); this.bed.gain.value = 0.55; this.bed.connect(this.sfxBus);
     this.songs = c.createGain(); this.songs.gain.value = 0.42; this.songs.connect(this.musBus);
@@ -55,18 +57,6 @@ export class Sfx {
     const p = fetch(`${base}${f}.mp3`).then((r) => r.arrayBuffer()).then((a) => this.ctx.decodeAudioData(a)).then((buf) => { this.buf.set(f, buf); return buf; }).catch(() => null);
     this.buf.set(f, null);
     return p;
-  }
-  setMuted(m) {
-    this.muted = m;
-    try { localStorage.setItem('golf_mute', m ? '1' : '0'); } catch (e) {}
-    if (this.master) this.master.gain.setTargetAtTime(m || this.silent ? 0 : 0.9, this.ctx.currentTime, 0.05);
-  }
-  // volume de la musique ou des effets (kind : 'music' ou 'fx'), de 0 à 1
-  setVolume(kind, v) {
-    this.vol[kind] = Math.max(0, Math.min(1, v));
-    try { localStorage.setItem(VOL_KEY, JSON.stringify(this.vol)); } catch (e) {}
-    const bus = kind === 'music' ? this.musBus : this.sfxBus;
-    if (bus) bus.gain.setTargetAtTime(this.vol[kind], this.ctx.currentTime, 0.05);
   }
   play(name, { vol = 1, rate = 1, delay = 0, bus } = {}) {
     const c = this.ctx, b = this.buf.get(name); if (!c || !b) return null;

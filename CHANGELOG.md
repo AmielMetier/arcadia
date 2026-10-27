@@ -12,7 +12,7 @@
   - Les pas changent selon le sol : herbe, route, plancher, carrelage, gravier, neige, métal, eau ; on entend aussi sur quoi marchent les autres.
   - Les balles qui frôlent sifflent, les impacts sonnent selon la matière (bois, pierre, métal), le bouclier qui casse s'entend.
   - Écho de pièce à l'intérieur, écho du relief dehors ; vraies explosions, portes qui grincent.
-  - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas.
+  - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas ; elle suit le curseur Musique des réglages.
 - **Island Rush** — Les combats se sentent : la vue recule à chaque tir (fort au fusil à pompe et au fusil de précision), la flamme de bouche éclaire autour, l'image tremble quand on est touché.
   - Touches plus lisibles : marqueur qui claque (rouge à l'élimination), chiffres de dégâts plus gros qui s'écartent, arc rouge plus net du côté d'où l'on te tire dessus.
   - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
@@ -27,6 +27,16 @@
 - **Island Rush** — Choisis ton personnage sur l'écran d'accueil : soldat, combinaison ou mercenaire, et sa couleur ; le choix est gardé d'une partie à l'autre. Les bots en tirent un au hasard.
 - **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
+
+## 2.97 — 27 octobre 2026
+- **Tous les jeux** — Un seul bouton ⚙️ Réglages, le même dans chaque jeu, qui ouvre le même panneau.
+  - Le son d'abord : un curseur Musique et un curseur Effets. Pour couper le son, on glisse son curseur à 0 : les boutons 🔊, 🎵, « Couper le son » ou « Tout couper », qui faisaient doublon avec les curseurs, disparaissent.
+  - La touche M coupe le son et le remet où il était, en déplaçant ces mêmes curseurs (N pour la musique dans Duo Drift).
+  - Ensuite, les réglages propres au jeu, rangés de la même façon : graphismes de Bastion Clash, plateau et caméra qui suit de DavidSimulator, mise en scène de The Candidate, graphismes et sensibilité de Mini-Golf Party, sensibilité d'Island Rush, options et commandes de Duo Drift.
+  - Un son coupé avec l'ancien bouton reste coupé : son curseur est simplement à 0.
+- **Hub** — Le bouton 🎵 et le petit curseur de l'accueil laissent la place au même bouton ⚙️ Réglages.
+- **Outbreak, Convoy Storm, Mini-Golf Party, Island Rush** — Dans le menu de pause (et l'écran de départ d'Island Rush), un bouton Réglages remplace les boutons et curseurs du son.
+- **Cyber Kart GP** — « 🎵 Musique » et « 🎚️ Volume » ne font plus qu'un bouton, « ⚙️ Réglages ». Quand la musique ne joue pas (chargement, son à débloquer), il se borde d'orange et le panneau dit pourquoi.
 
 ## 2.96 — 27 octobre 2026
 - **Mini-Golf Party** — Correction : la caméra tourne sans limite à la souris (Claude)

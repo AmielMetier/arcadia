@@ -1,8 +1,8 @@
-// Sons synthétisés (WebAudio) : aucun fichier à charger. Coupables, réglage mémorisé.
-import { store, save } from './util.js';
-
+// Sons synthétisés (WebAudio) : aucun fichier à charger. Leur volume : le curseur « Effets » des réglages (0 : coupés).
 let ctx = null, master = null;
-let on = store('calcul_sound', true);
+// l'ancien bouton 🔊 / 🔇 : des bruitages coupés passent le curseur à 0
+DDVolume.legacy('calcul_sound', ['fx'], (v) => v === 'false');
+const on = () => DDVolume.get('fx') > 0;
 
 function ac() {
   if (!ctx) {
@@ -14,7 +14,7 @@ function ac() {
   return ctx;
 }
 // Le navigateur exige un geste de l'utilisateur avant de jouer du son
-for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (on) ac(); }, { once: true, capture: true });
+for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (on()) ac(); }, { once: true, capture: true });
 
 function tone(freq, t0, dur, { type = 'sine', vol = 0.5, slide = 0 } = {}) {
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -62,10 +62,9 @@ const SOUNDS = {
 };
 
 export const sfx = {
-  get on() { return on; },
-  toggle() { on = !on; save('calcul_sound', on); if (on) ac(); },
+  get on() { return on(); },
   play(name) {
-    if (!on || !SOUNDS[name]) return;
+    if (!on() || !SOUNDS[name]) return;
     const c = ac(); if (!c) return;
     try { SOUNDS[name](c, c.currentTime + 0.01); } catch (e) {}
   },

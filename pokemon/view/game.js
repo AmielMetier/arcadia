@@ -40,9 +40,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
       <div class="poke-tools">
         ${switchMode ? `<button class="poke-tool mode-switch-btn" id="btnSwitchAdv">MODE : <b>AVENTURE MENTON</b></button>` : ''}
         <button class="poke-tool" id="btnLog">JOURNAL</button>
-        <button class="poke-tool" id="btnMus">MUSIQUE : <b id="lblMus">ON</b></button>
-        <button class="poke-tool" id="btnSnd">AUDIO : <b id="lblSnd">ON</b></button>
-        <button class="poke-tool" id="btnVol" aria-label="Volume">VOLUME</button>
+        <button class="poke-tool" id="btnSet" aria-label="Réglages">RÉGLAGES</button>
         <button class="poke-tool quit" id="btnQuit">QUITTER</button>
       </div>
     </header>
@@ -66,26 +64,8 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
   let isResolvingTurn = false;
   let queuedState = null;
 
-  // --- Outils & Audio ---
-  const syncTools = () => {
-    const lblS = $('#lblSnd');
-    const btnS = $('#btnSnd');
-    if (lblS && btnS) {
-      lblS.textContent = sfx.enabled ? 'ACTIF' : 'MUET';
-      btnS.classList.toggle('off', !sfx.enabled);
-    }
-    const lblM = $('#lblMus');
-    const btnM = $('#btnMus');
-    if (lblM && btnM) {
-      lblM.textContent = battleMusic.musicEnabled ? 'ACTIVE' : 'MUETTE';
-      btnM.classList.toggle('off', !battleMusic.musicEnabled);
-    }
-  };
-  syncTools();
-
-  $('#btnSnd').onclick = () => { sfx.toggle(); syncTools(); };
-  $('#btnMus').onclick = () => { battleMusic.toggle(); syncTools(); };
-  DDVolume.panel($('#btnVol'));
+  // --- Outils & Audio : la musique et les effets se règlent dans le panneau Réglages (à 0 : coupés) ---
+  DDVolume.panel($('#btnSet'), { accent: '#ffcb05' });
   $('#btnQuit').onclick = () => { battleMusic.stop(); cleanup(); exit(); };
   if ($('#btnSwitchAdv') && switchMode) {
     $('#btnSwitchAdv').onclick = () => {

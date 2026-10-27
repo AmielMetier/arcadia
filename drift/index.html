@@ -67,9 +67,6 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
 .err{color:#c4231a;font-weight:700;margin-top:10px;font-size:14px}
 .err:empty{display:none}
 .menu-actions .err{margin-top:-4px}
-.vol{display:grid;grid-template-columns:70px 1fr 34px;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px}
-.vol input{width:100%;accent-color:var(--red)}
-.vol span{text-align:right;color:var(--muted);font-size:12px}
 .padinfo{font-size:12.5px;font-weight:700;color:var(--green);margin-top:8px;min-height:16px}
 .code-box{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:var(--paper);
   border-radius:12px;padding:10px 14px}
@@ -191,11 +188,6 @@ kbd{font-family:inherit;font-weight:700;background:#fff;border:2px solid var(--i
 .mc-edit{margin-top:6px;font-weight:700;font-size:13px;color:var(--yellow)}
 .credit{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);background:rgba(22,24,29,.82);border:2px solid rgba(255,248,234,.25);border-radius:999px;padding:5px 16px;color:var(--paper);font-weight:600;font-size:15px;letter-spacing:1.5px;pointer-events:none;white-space:nowrap}
 .credit b{font-family:Bungee,Impact,sans-serif;font-weight:400;color:var(--yellow);letter-spacing:1px}
-.pref-row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px;font-weight:700;font-size:14px}
-.ctrl{width:100%;border-collapse:collapse;font-size:13px}
-.ctrl th{text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:0 6px 6px}
-.ctrl td{padding:5px 6px;border-top:2px dashed var(--line2);font-weight:600}
-.ctrl td:first-child{font-weight:700}
 #menu{padding-bottom:48px}
 .ver{position:fixed;left:14px;bottom:14px;background:rgba(22,24,29,.82);border:2px solid rgba(255,248,234,.25);border-radius:999px;padding:5px 14px;color:var(--yellow);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .ver:hover{border-color:var(--yellow)}
@@ -357,43 +349,6 @@ body.in-hub #menu .menu-actions{visibility:hidden}
   </div>
 </div>
 
-<!-- PARAMÈTRES -->
-<div class="screen" id="prefs">
-  <div class="card wide">
-    <h2>Paramètres</h2>
-    <div class="garage-grid">
-      <div>
-        <div class="lbl" style="margin-top:0">Son</div>
-        <div class="vol"><label for="vMus">Musique</label><input type="range" id="vMus" min="0" max="100"><span id="vMusT"></span></div>
-        <div class="vol"><label for="vSfx">Effets</label><input type="range" id="vSfx" min="0" max="100"><span id="vSfxT"></span></div>
-        <div class="lbl">Jeu</div>
-        <div class="pref-row"><span>Secousses de l'écran</span><div class="seg" id="pShake"></div></div>
-        <div class="pref-row"><span>Vibrations de la manette</span><div class="seg" id="pRumble"></div></div>
-        <div class="pref-row"><span>Noms au-dessus des voitures</span><div class="seg" id="pTags"></div></div>
-        <div class="padinfo" id="padInfo2"></div>
-      </div>
-      <div>
-        <div class="lbl" style="margin-top:0">Commandes</div>
-        <table class="ctrl">
-          <tr><th></th><th>Clavier</th><th>Manette</th></tr>
-          <tr><td>Accélérer / freiner</td><td><kbd>Z</kbd> <kbd>S</kbd> · <kbd>↑</kbd> <kbd>↓</kbd></td><td>RT / LT</td></tr>
-          <tr><td>Tourner</td><td><kbd>Q</kbd> <kbd>D</kbd> · <kbd>←</kbd> <kbd>→</kbd></td><td>Stick gauche</td></tr>
-          <tr><td>Drift</td><td><kbd>Espace</kbd></td><td>X</td></tr>
-          <tr><td>Nitro</td><td><kbd>Maj</kbd></td><td>RB</td></tr>
-          <tr><td>Utiliser l'objet</td><td><kbd>E</kbd></td><td>Y ou LB</td></tr>
-          <tr><td>Klaxon</td><td><kbd>H</kbd></td><td>L3</td></tr>
-          <tr><td>Emotes</td><td><kbd>1</kbd> à <kbd>6</kbd></td><td>Croix</td></tr>
-          <tr><td>Chat</td><td><kbd>T</kbd></td><td>—</td></tr>
-          <tr><td>Se replacer</td><td><kbd>R</kbd></td><td>View</td></tr>
-          <tr><td>Spectateur</td><td><kbd>Tab</kbd></td><td>Start</td></tr>
-          <tr><td>Couper musique / effets</td><td><kbd>N</kbd> / <kbd>M</kbd></td><td>—</td></tr>
-        </table>
-      </div>
-    </div>
-    <div class="lobby-foot"><span class="hint">Réglages gardés sur cet ordinateur.</span><button class="btn" id="btnPrefsOk">Terminé</button></div>
-  </div>
-</div>
-
 <!-- LOBBY -->
 <div class="screen" id="lobby">
   <div class="card lobby">
@@ -474,6 +429,7 @@ body.in-hub #menu .menu-actions{visibility:hidden}
 <script src="../shared/net.js"></script>
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -526,10 +482,12 @@ function toast(msg, ms=2600){ const t=$('#toast'); t.textContent=msg; t.classLis
    SON : moteur, effets, klaxons, pluie et musique synthétisés (WebAudio)
    ===================================================================== */
 const mtof = m => 440*Math.pow(2,(m-69)/12);
+DDVolume.migrate('music', store.get('dd_vmus',55)/55); DDVolume.migrate('fx', store.get('dd_vsfx',75)/75);
+DDVolume.legacy('dd_mon',['music'],v=>v==='false'); DDVolume.legacy('dd_son',['fx'],v=>v==='false');
 const AudioSys = {
   ctx:null, master:null, sfx:null, mus:null, noiseBuf:null, eng:null, delay:null, vm:1,
-  volMus: store.get('dd_vmus',55)/100, volSfx: store.get('dd_vsfx',75)/100,
-  musOn: store.get('dd_mon',true), sfxOn: store.get('dd_son',true),
+  // volume : les curseurs du panneau Réglages (à 0 : coupé ; N et M coupent ou remettent la musique, les effets)
+  get musOn(){ return DDVolume.get('music')>0; }, get sfxOn(){ return DDVolume.get('fx')>0; },
   song:null, songName:null, step:0, nextT:0, loop:0,
   init(){
     if(this.ctx) return;
@@ -537,19 +495,16 @@ const AudioSys = {
       const A=window.AudioContext||window.webkitAudioContext; const c=this.ctx=new A();
       const comp=c.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; comp.connect(c.destination);
       this.master=c.createGain(); this.master.gain.value=0.9; this.master.connect(comp);
-      this.sfx=c.createGain(); this.sfx.connect(this.master);
-      this.mus=c.createGain(); this.mus.connect(this.master);
+      this.sfx=c.createGain(); this.sfx.gain.value=0.75; this.sfx.connect(DDVolume.gain(c,'fx')).connect(this.master);
+      this.mus=c.createGain(); this.mus.gain.value=0.55*0.6; this.mus.connect(DDVolume.gain(c,'music')).connect(this.master);
       this.delay=c.createDelay(1); this.delay.delayTime.value=0.34; const fb=c.createGain(); fb.gain.value=0.28;
       const wet=c.createGain(); wet.gain.value=0.22; const dlp=c.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value=2600;
       this.delay.connect(dlp); dlp.connect(fb); fb.connect(this.delay); dlp.connect(wet); wet.connect(this.mus);
       const nb=c.createBuffer(1,c.sampleRate*2,c.sampleRate), d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; this.noiseBuf=nb;
-      this.buildEngine(); this.applyVol();
+      this.buildEngine();
       if(!this._iv) this._iv=setInterval(()=>this.tick(), 25);
     }catch(e){ console.warn(e); this.ctx=null; }
   },
-  applyVol(){ if(!this.ctx) return; const t=this.ctx.currentTime;
-    this.sfx.gain.setTargetAtTime(this.sfxOn?this.volSfx:0,t,0.05);
-    this.mus.gain.setTargetAtTime(this.musOn?this.volMus*0.6:0,t,0.15); },
   noiseSrc(){ const s=this.ctx.createBufferSource(); s.buffer=this.noiseBuf; s.loop=true; return s; },
   buildEngine(){
     const c=this.ctx;
@@ -1961,7 +1916,7 @@ if(!PALETTE.includes(G.me.color)) G.me.color=PALETTE[0];
 if(!CLASSES[G.me.car]) G.me.car='equi';
 const records = store.get('dd_records',{});
 G.prefs = Object.assign({shake:true, rumble:true, tags:true}, store.get('dd_prefs',{}));
-function setPref(k,v){ G.prefs[k]=!!v; store.set('dd_prefs',G.prefs); renderPrefs(); AudioSys.play('click'); }
+function setPref(k,v){ G.prefs[k]=!!v; store.set('dd_prefs',G.prefs); AudioSys.play('click'); }
 const isHost = () => G.mode==='host' || G.mode==='solo';
 const meInfo = () => ({ name:G.me.name, color:G.me.color, car:G.me.car, deco:cleanDeco(G.me.deco), lvl:levelInfo().lvl, title:P.title||null });
 
@@ -3943,8 +3898,8 @@ addEventListener('keydown', e=>{
   if(e.repeat) return;
   if(G.state==='ceremony' && (e.code==='Space'||e.key==='Enter'||e.key==='Escape')){ e.preventDefault(); skipCeremony(); return; }
   const key=(e.key||'').toLowerCase();
-  if(key==='m'){ AudioSys.sfxOn=!AudioSys.sfxOn; store.set('dd_son',AudioSys.sfxOn); AudioSys.applyVol(); toast(AudioSys.sfxOn?'Effets sonores activés':'Effets sonores coupés',1200); }
-  if(key==='n'){ AudioSys.musOn=!AudioSys.musOn; store.set('dd_mon',AudioSys.musOn); AudioSys.applyVol(); toast(AudioSys.musOn?'Musique activée':'Musique coupée',1200); }
+  if(key==='m'){ toast(DDVolume.toggle('fx')?'Effets sonores coupés':'Effets sonores activés',1200); }
+  if(key==='n'){ toast(DDVolume.toggle('music')?'Musique coupée':'Musique activée',1200); }
   if(G.state==='race' && G.race){
     if(key==='e' || e.code==='KeyE') keys.item=true;
     if(key==='r') respawn(G.race.local);
@@ -3993,7 +3948,7 @@ const Pad = {
   rumble(s, ms){ if(!s || !this.gp || !G.prefs.rumble) return; const v=this.gp.vibrationActuator; if(v && v.playEffect){ try{ v.playEffect('dual-rumble',{duration:ms, strongMagnitude:clamp(s,0,1), weakMagnitude:clamp(s*0.6,0,1)}).catch(()=>{}); }catch(e){} } },
   /* navigation simple dans les menus : croix/stick pour se déplacer, A pour valider, Start pour l'action principale */
   focusables(){
-    const scr=document.querySelector('.screen.on'); if(!scr) return [];
+    const scr=DDVolume.isOpen() ? document.querySelector('.ddvol') : document.querySelector('.screen.on'); if(!scr) return [];
     return [...scr.querySelectorAll('button:not(:disabled), input')].filter(el=>el.offsetParent!==null && !el.closest('.locked'));
   },
   menuNav(cur, now){
@@ -4006,18 +3961,20 @@ const Pad = {
     let el=list[this.focus];
     if(!el || !list.includes(el)){ this.focus=list.findIndex(x=>x===document.activeElement); el=list[this.focus]; }
     if(fire){
-      if(el && el.type==='range' && horiz){ el.value=+el.value+dir*5; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); }
+      if(el && el.type==='range' && horiz){ el.value=+el.value+dir*5; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); }
       else { this.focus = this.focus<0 ? 0 : (this.focus+dir+list.length)%list.length; this.mark(list); }
     }
     el=list[this.focus];
     if(this.take('a') && el){ if(el.tagName==='INPUT') el.focus(); else el.click(); AudioSys.play('click'); }
-    if(this.take('start')){ const p = $('.screen.on #btnStart:not(:disabled)') || $('.screen.on #resActions .btn') || $('.screen.on #btnGarageOk') || $('.screen.on #btnPrefsOk') || $('.screen.on #btnSolo'); if(p) p.click(); }
-    if(this.take('b')){ if(G.state==='garage') $('#btnGarageOk').click(); else if(G.state==='prefs') $('#btnPrefsOk').click(); else if(G.state==='profile') $('#btnProfileOk').click(); else if(G.state==='news') $('#btnNewsOk').click(); }
+    if(DDVolume.isOpen() && (this.take('start') || this.take('b'))){ DDVolume.close(); this.focus=-1; return; }
+    if(this.take('start')){ const p = $('.screen.on #btnStart:not(:disabled)') || $('.screen.on #resActions .btn') || $('.screen.on #btnGarageOk') || $('.screen.on #btnSolo'); if(p) p.click(); }
+    if(this.take('b')){ if(G.state==='garage') $('#btnGarageOk').click(); else if(G.state==='profile') $('#btnProfileOk').click(); else if(G.state==='news') $('#btnNewsOk').click(); }
   },
   mark(list){ document.querySelectorAll('.padfocus').forEach(x=>x.classList.remove('padfocus')); const el=list[this.focus]; if(el){ el.classList.add('padfocus'); el.scrollIntoView({block:'nearest'}); } }
 };
 addEventListener('mousedown', ()=>{ document.querySelectorAll('.padfocus').forEach(x=>x.classList.remove('padfocus')); Pad.focus=-1; });
-function padInfo(){ const t = Pad.gp ? '🎮 Manette détectée : '+String(Pad.gp.id).replace(/\(.*\)/,'').trim().slice(0,40) : ''; for(const id of ['#padInfo','#padInfo2']){ const el=$(id); if(el) el.textContent=t; } }
+const padText = () => Pad.gp ? '🎮 Manette détectée : '+String(Pad.gp.id).replace(/\(.*\)/,'').trim().slice(0,40) : '';
+function padInfo(){ const el=$('#padInfo'); if(el) el.textContent=padText(); }
 addEventListener('gamepadconnected', ()=>{});
 
 /* =====================================================================
@@ -4060,15 +4017,6 @@ function buildClasses(){
       r.innerHTML='<span>'+lab+'</span><i>'+[1,2,3,4,5].map(v=>'<span class="'+(v<=K.stats[k]?'on':'')+'"></span>').join('')+'</i>'; b.appendChild(r); });
     b.onclick=()=>{ G.me.car=id; store.set('dd_car',id); buildClasses(); renderMenuCar(); AudioSys.play('click'); };
     box.appendChild(b); }
-}
-function buildVolumes(){
-  const m=$('#vMus'), s=$('#vSfx');
-  m.value=Math.round(AudioSys.volMus*100); s.value=Math.round(AudioSys.volSfx*100);
-  const upd=()=>{ $('#vMusT').textContent=m.value; $('#vSfxT').textContent=s.value; };
-  m.oninput=()=>{ AudioSys.volMus=m.value/100; AudioSys.musOn=true; store.set('dd_mon',true); store.set('dd_vmus',+m.value); AudioSys.applyVol(); upd(); };
-  s.oninput=()=>{ AudioSys.volSfx=s.value/100; AudioSys.sfxOn=true; store.set('dd_son',true); store.set('dd_vsfx',+s.value); AudioSys.applyVol(); upd(); };
-  s.onchange=()=>AudioSys.play('box');
-  upd();
 }
 $('#name').value = store.get('dd_name','');
 $('#name').addEventListener('input', e=>{ G.me.name=cleanName(e.target.value); store.set('dd_name', e.target.value.slice(0,12)); });
@@ -4123,15 +4071,31 @@ $('#gNum').addEventListener('input', e=>{ e.target.value=e.target.value.replace(
 function openGarage(){ G.state='garage'; G.garage.parts=[]; buildClasses(); buildSwatches(); renderGarageUI(); showScreen('garage'); AudioSys.play('click'); }
 $('#btnGarage').onclick = openGarage; $('#menuCarBtn').onclick = openGarage;
 $('#btnGarageOk').onclick = ()=>{ saveDeco(); backFromSub(); };
-/* ---------- paramètres ---------- */
-function renderPrefs(){
-  buildSeg('pShake', [[true,'Oui'],[false,'Non']], G.prefs.shake, v=>setPref('shake',v));
-  buildSeg('pRumble', [[true,'Oui'],[false,'Non']], G.prefs.rumble, v=>setPref('rumble',v));
-  buildSeg('pTags', [[true,'Oui'],[false,'Non']], G.prefs.tags, v=>setPref('tags',v));
-  padInfo();
-}
-$('#btnPrefs').onclick = ()=>{ G.state='prefs'; buildVolumes(); renderPrefs(); showScreen('prefs'); AudioSys.play('click'); };
-$('#btnPrefsOk').onclick = ()=>backFromSub();
+/* ---------- réglages : le panneau commun à tous les jeux (son, jeu, commandes), au menu comme au salon ---------- */
+const SETTINGS = {
+  accent: '#ff4b2b',
+  test: k=>AudioSys.play(k==='fx'?'box':'click'),
+  sections: [
+    { title: 'Jeu', items: [
+      { label: "Secousses de l'écran", get: ()=>G.prefs.shake, set: v=>setPref('shake',v) },
+      { label: 'Vibrations de la manette', get: ()=>G.prefs.rumble, set: v=>setPref('rumble',v) },
+      { label: 'Noms au-dessus des voitures', get: ()=>G.prefs.tags, set: v=>setPref('tags',v) },
+    ] },
+    { title: 'Commandes', items: [
+      { note: padText },
+      { head: ['', 'Clavier', 'Manette'], keys: [
+        ['Accélérer / freiner', '<kbd>Z</kbd> <kbd>S</kbd> · <kbd>↑</kbd> <kbd>↓</kbd>', 'RT / LT'],
+        ['Tourner', '<kbd>Q</kbd> <kbd>D</kbd> · <kbd>←</kbd> <kbd>→</kbd>', 'Stick gauche'],
+        ['Drift', '<kbd>Espace</kbd>', 'X'], ['Nitro', '<kbd>Maj</kbd>', 'RB'], ["Utiliser l'objet", '<kbd>E</kbd>', 'Y ou LB'],
+        ['Klaxon', '<kbd>H</kbd>', 'L3'], ['Emotes', '<kbd>1</kbd> à <kbd>6</kbd>', 'Croix'], ['Chat', '<kbd>T</kbd>', '—'],
+        ['Se replacer', '<kbd>R</kbd>', 'View'], ['Spectateur', '<kbd>Tab</kbd>', 'Start'],
+        ['Couper musique / effets', '<kbd>N</kbd> / <kbd>M</kbd>', '—'],
+      ] },
+    ] },
+  ],
+  hint: 'Réglages gardés sur cet ordinateur.',
+};
+for(const id of ['#btnPrefs','#lobPrefs']){ const b=$(id); b.addEventListener('click', ()=>AudioSys.play('click')); DDVolume.panel(b, SETTINGS); }
 
 /* ---------- salon ---------- */
 function trackPreview(tr, w, h){
@@ -4381,7 +4345,6 @@ function syncMyCar(){
 }
 $('#lobGarage').onclick=openGarage;
 $('#lobProfile').onclick=openProfile;
-$('#lobPrefs').onclick=()=>$('#btnPrefs').click();
 $('#btnGhostIn').onclick=()=>{ const g=importGhost($('#ghostIn').value);
   if(!g){ toast('Code de fantôme invalide',2200); return; }
   $('#ghostIn').value=''; toast('Fantôme de '+g.by+' importé sur '+TRACKS[g.tid].name+' ('+fmtTime(g.t)+'). Bats-le en solo !',3500); AudioSys.play('box'); renderProfile(); };
@@ -4496,7 +4459,7 @@ function frame(){ if(!isHidden()) step(true); requestAnimationFrame(frame); }
   }catch(e){ setInterval(tick,33); }
 })();
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ for(const k in keys) keys[k]=false; } });
-buildSwatches(); buildClasses(); buildVolumes(); padInfo(); renderMenuCar(); renderProfChip();
+buildSwatches(); buildClasses(); padInfo(); renderMenuCar(); renderProfChip();
 if(IN_HUB){
   document.body.classList.add('in-hub'); $('#btnLeave').textContent='Retour au salon';
   const hi=HubBridge.info;

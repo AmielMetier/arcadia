@@ -43,31 +43,8 @@
     <span id="uiMapBadgeTxt">🌲 <span class="mtxt">Vallée Tempérée</span></span>
   </div>
   <button class="ibtn" id="btnCenter" title="Recentrer sur ton QG (Espace)">🎯 <span>QG</span></button>
-  <div class="audio-grp">
-    <button class="ibtn" id="btnAudio" title="Couper / remettre le son (M)">🔊</button>
-    <button class="ibtn caret" id="btnAudioMore" title="Réglages du son (musique, effets)">▾</button>
-  </div>
-  <button class="ibtn" id="btnGfx" title="Réglages graphiques (qualité, mode daltonien…)">⚙️</button>
+  <button class="ibtn" id="btnSettings" title="Réglages : son et graphismes" aria-label="Réglages">⚙️</button>
   <button class="ibtn danger" id="btnExit">Quitter</button>
-</div>
-
-<div class="audio-pop glass" id="audioPop" hidden>
-  <h4>SON</h4>
-  <div class="a-row"><span>🎵 Musique</span><input type="range" id="volMusic" min="0" max="100" value="55"><button class="tg on" id="tgMusic">ON</button></div>
-  <div class="a-row"><span>💥 Effets</span><input type="range" id="volSfx" min="0" max="100" value="80"><button class="tg on" id="tgSfx">ON</button></div>
-  <div class="a-row"><span>🔇 Tout couper</span><span></span><button class="tg" id="tgAll">OFF</button></div>
-  <div class="a-hint">Touche <b>M</b> ou clic sur 🔊 : couper / remettre tout le son.</div>
-</div>
-
-<div class="audio-pop gfx-pop glass" id="gfxPop" hidden>
-  <h4>GRAPHISMES</h4>
-  <div class="q-row">
-    <button class="tg" data-gfx-q="bas">Bas</button><button class="tg" data-gfx-q="moyen">Moyen</button><button class="tg" data-gfx-q="haut">Haut</button><button class="tg" data-gfx-q="ultra">Ultra</button>
-  </div>
-  <div class="a-row"><span>🎨 Couleurs pour daltoniens</span><span></span><button class="tg" id="tgCvd">OFF</button></div>
-  <div class="a-row"><span>📳 Secousses de caméra</span><span></span><button class="tg" id="tgShake">ON</button></div>
-  <div class="a-row"><span>❤️ Barres de vie</span><span></span><button class="tg" id="tgBars">BLESSÉS</button></div>
-  <div class="a-hint">Bas : sans ombres, pour les petites machines. Ultra : lueurs et ombres fines.</div>
 </div>
 
 <div class="roster-top" id="uiRoster"></div>
@@ -127,6 +104,7 @@
 
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
 <script src="engine/core.js"></script>
 <script src="engine/map.js"></script>
 <script src="engine/vision.js"></script>

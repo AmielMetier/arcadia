@@ -37,14 +37,13 @@ catch (e) { console.error(e); }
 const input = new Input(document.body, { menu: () => toggleMenu(), mute: () => toggleMute(), unlock: () => sfx.unlock(), key: (k) => onKey(k) });
 hud.onBuy = (k) => doBuy(k); hud.onVote = () => doVote(); hud.onChoose = (o) => doChoose(o);
 input.bindTouchButtons($('#tbtns'));
-input.listen($('#btnMute'), 'click', () => toggleMute());
-DDVolume.panel($('#btnVol'));
+// le son se règle dans le panneau Réglages (bouton du coin, ou du menu de pause) ; M coupe ou remet tout
+const SETTINGS = { accent: '#9fd3ff', hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.' };
+DDVolume.panel($('#btnSet'), SETTINGS);
 input.listen($('#btnMap'), 'click', () => hud.toggleMap());
 input.listen($('#btnMenu'), 'click', () => toggleMenu());
 // en solo, la partie se met en pause quand l'onglet passe en arrière-plan
 input.listen(document, 'visibilitychange', () => { if (document.hidden && S.role === 'solo' && S.sim && !S.menu && !S.endShown && !S.lobby) toggleMenu(); });
-const muteIcon = () => { const i = $('#btnMute img'); if (i) i.src = `img/icons/${sfx.muted ? 'audioOff' : 'audioOn'}.png`; };
-muteIcon();
 
 // Démontage : boucle, écouteurs, WebGL, audio. Appelé avant de rendre la main au Hub et quand la page se ferme,
 // pour que le contexte WebGL soit libéré tout de suite (les navigateurs en limitent le nombre).
@@ -762,13 +761,13 @@ function toggleMenu() {
   S.menu = !S.menu;
   if (!S.menu) { hideScreen(); return; }
   screenEl.className = 'screen dim'; screenEl.hidden = false;
-  screenEl.innerHTML = menuHtml({ muted: sfx.muted, solo: S.role === 'solo' });
+  screenEl.innerHTML = menuHtml({ solo: S.role === 'solo' });
   $('#btnResume').onclick = () => toggleMenu();
-  $('#btnSound').onclick = () => { toggleMute(); toggleMenu(); toggleMenu(); };
+  DDVolume.panel($('#btnSettings'), SETTINGS);
   $('#btnQuit').onclick = exitToLobby;
   $('#btnTuto').onclick = () => { hud.resetTuto(); toggleMenu(); };
 }
-function toggleMute() { sfx.unlock(); sfx.setMuted(!sfx.muted); muteIcon(); }
+function toggleMute() { sfx.unlock(); DDVolume.toggle(); }
 
 // ambiance musicale : calme en gare, tendue quand le fioul baisse ou que les loups chassent
 function musicState(v) {

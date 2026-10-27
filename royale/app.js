@@ -820,8 +820,7 @@ function showScreen(kind, data) {
   const play = (label) => `<button class="btn big" id="go">${label}</button>`;
   const back = `<button class="btn ghost" id="quit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button>`;
   const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris.</p>' : '';
-  const opts = `<div class="opts"><label>Sensibilité <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="${(S.input.sens / 0.0024).toFixed(1)}"></label>
-    <label>Volume <input type="range" id="vol" min="0" max="1" step="0.05" value="${S.sfx.volume}"></label></div>`;
+  const opts = '<div class="opts"><button class="btn ghost" id="settings" type="button">⚙️ Réglages</button></div>';
   const title = '<h1>Island <span>Rush</span></h1>';
   const n = clamp(S.settings.places, 2, MAX_PLACES);
   const rules = expl
@@ -869,13 +868,19 @@ function showScreen(kind, data) {
   // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
   const again = $('#again'); if (again) again.onclick = () => location.reload();
   $('#quit').onclick = quit;
-  const sens = $('#sens'); if (sens) sens.oninput = () => { S.input.sens = 0.0024 * +sens.value; saveOpts(); };
-  const vol = $('#vol'); if (vol) vol.oninput = () => { S.sfx.setVolume(+vol.value); saveOpts(); };
+  const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens, vol: S.sfx.volume })); } catch (e) { /* pas de stockage */ } }
+// panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, puis la sensibilité
+const SETTINGS = {
+  kinds: ['music', 'fx'], accent: '#3d9fd9',
+  sections: [{ title: 'Jeu', items: [{ label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +(S.input.sens / 0.0024).toFixed(1),
+    set: (v) => { S.input.sens = 0.0024 * v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) }] }],
+};
+function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens })); } catch (e) { /* pas de stockage */ } }
 function loadOpts() {
-  try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) S.sfx.setVolume(clamp(+o.vol, 0, 1)); } catch (e) { /* pas de stockage */ }
+  // l'ancien curseur « Volume » (0,8 par défaut) devient le point de départ du curseur « Effets »
+  try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) DDVolume.migrate('fx', clamp(+o.vol, 0, 1) / 0.8); } catch (e) { /* pas de stockage */ }
 }
 function quit() {
   S.running = false;

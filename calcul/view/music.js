@@ -10,7 +10,6 @@
 //   reveal   le morceau passe « derrière la vitre » (filtre fermé, demi-temps) le temps de la correction
 //   over     « Closing Bell », un autre morceau pour l'écran des scores : cloche de clôture, 98 BPM, piano,
 //            mélodie et claps. En majeur (Fa) pour qui gagne, en mineur (Rém, plus doux-amer) sinon
-import { store, save } from './util.js';
 
 const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
 // une mesure par accord ; basse, nappe et arpège suivent la même grille
@@ -34,7 +33,9 @@ const OVER = {
 };
 let overSide = 'win';
 
-let enabled = store('calcul_music', true);
+// coupée quand le curseur « Musique » des réglages est à 0 (l'ancien bouton 🎵 / 🔇 y est repris)
+DDVolume.legacy('calcul_music', ['music'], (v) => v === 'false');
+const enabled = () => DDVolume.get('music') > 0;
 let ctx = null, out = null, filt = null, comp = null, duck = null, verb = null, echo = null, noiseBuf = null;
 let playing = false, wanted = false, timer = 0, step = 0, nextT = 0, mode = 'lobby', tension = 0, smooth = 0, riserArmed = true;
 
@@ -303,18 +304,13 @@ function setFilter(freq, time = 0.4) {
 const FILTER = { lobby: 2400, intro: 6000, question: 16000, desk: 17000, final: 18000, duel: 20000, reveal: 750, over: 9000 };
 
 export const wallStreetMusic = {
-  get on() { return enabled; },
+  get on() { return enabled(); },
   get playing() { return playing; },
   get mode() { return mode; },
-  toggle() {
-    enabled = !enabled; save('calcul_music', enabled);
-    if (enabled && wanted) this.start(); else if (!enabled) halt();
-    return enabled;
-  },
   // la musique est voulue pour ce mode de jeu ; elle ne joue que si le joueur ne l'a pas coupée
   start() {
     wanted = true;
-    if (!enabled || playing) return;
+    if (!enabled() || playing) return;
     if (!build()) return;
     unlock();
     playing = true; step = 0; nextT = ctx.currentTime + 0.08;
@@ -347,3 +343,5 @@ export const wallStreetMusic = {
     }
   },
 };
+// curseur « Musique » à 0 : elle s'arrête ; relevé : elle reprend si la partie la veut
+DDVolume.on(() => { if (!enabled()) halt(); else if (wanted && !playing) wallStreetMusic.start(); });

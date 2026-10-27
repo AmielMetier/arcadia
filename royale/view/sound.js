@@ -57,8 +57,8 @@ const RELOAD = {
 const STEP_V = { herbe: 0.55, beton: 0.5, bois: 0.6, neige: 0.55, gravier: 0.5, metal: 0.5, eau: 0.65, carrelage: 0.45 };
 
 export function createSound() {
-  let ctx = null, master = null, fxBus = null, bed = null, noiseBuf = null, brown = null, revBus = null, revOut = null, revIn = null;
-  let volume = 0.8, voices = 0, music = null, musicOn = false;
+  let ctx = null, master = null, comp = null, fxBus = null, bed = null, noiseBuf = null, brown = null, revBus = null, revOut = null, revIn = null;
+  let voices = 0, music = null, musicOn = false;
   const amb = {}, last = {}, bufs = new Map();
   let wind = null, storm = null, stepT = 0, stepsOther = new Map();
   let ear = { x: 0, y: 0, z: 0, yaw: 0 };
@@ -68,9 +68,10 @@ export function createSound() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
-    master = ctx.createGain(); master.gain.value = volume;
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.15;
-    master.connect(comp); comp.connect(ctx.destination);
+    // volume : le curseur « Effets » du panneau Réglages (à 0 : coupé) ; la musique a le sien (setMusic)
+    master = ctx.createGain(); master.gain.value = 0.8;
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.15;
+    master.connect(DDVolume.gain(ctx, 'fx')).connect(comp); comp.connect(ctx.destination);
     fxBus = ctx.createGain(); fxBus.gain.value = 0.9; fxBus.connect(master);
     bed = ctx.createGain(); bed.gain.value = 0.5; bed.connect(master);
     const len = ctx.sampleRate * 2;
@@ -376,8 +377,8 @@ export function createSound() {
     musicOn = on;
     if (on && !music) {
       const a = new Audio(MUSIC); a.loop = true; a.preload = 'auto';
-      const g = ctx.createGain(); g.gain.value = 0; g.connect(master);
-      try { ctx.createMediaElementSource(a).connect(g); } catch (e) { a.volume = 0.4; }
+      const g = ctx.createGain(); g.gain.value = 0; g.connect(DDVolume.gain(ctx, 'music')).connect(comp);
+      try { ctx.createMediaElementSource(a).connect(g); } catch (e) { a.volume = 0.4 * DDVolume.get('music'); }
       music = { a, g, stop: 0 };
     }
     if (!music) return;
@@ -395,8 +396,6 @@ export function createSound() {
   return {
     unlock, play, at, shot, whiz, reload, update,
     island(c, r) { coastRef = { x: c, z: c, r }; },
-    get volume() { return volume; },
-    setVolume(v) { volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); },
     dispose() { try { if (music) music.a.pause(); if (ctx) ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; },
   };
 }

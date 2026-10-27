@@ -1,16 +1,17 @@
 // Sons synthétisés (WebAudio), sans fichier. Volume selon la distance à l'écouteur (le joueur local).
-// Deux réglages du joueur (panneau Volume) : la musique d'ambiance et les bruitages, chacun sur son bus.
+// Deux réglages du joueur (panneau Réglages) : la musique d'ambiance et les bruitages, chacun sur son bus ;
+// à 0, ils se taisent (l'ancien bouton « son coupé » met les deux à 0).
 export class Audio {
   constructor() {
     this.ctx = null; this.master = null; this.lx = 0; this.ly = 0; this.intensity = 0; this.musicOn = false;
-    try { this.muted = localStorage.getItem('outbreak_mute') === '1'; } catch (e) { this.muted = false; }
+    DDVolume.legacy('outbreak_mute');
     this.last = {};
   }
   unlock() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     this.ctx = new AC();
-    this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.55;
+    this.master = this.ctx.createGain(); this.master.gain.value = 0.55;
     const comp = this.ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 6;
     this.master.connect(comp); comp.connect(this.ctx.destination);
     this.fx = DDVolume.gain(this.ctx, 'fx'); this.fx.connect(this.master);
@@ -19,12 +20,6 @@ export class Audio {
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startMusic();
-  }
-  toggleMute() {
-    this.muted = !this.muted;
-    try { localStorage.setItem('outbreak_mute', this.muted ? '1' : '0'); } catch (e) {}
-    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.55, this.ctx.currentTime, 0.05);
-    return this.muted;
   }
   listener(x, y) { this.lx = x; this.ly = y; }
 
@@ -59,7 +54,7 @@ export class Audio {
   }
 
   play(name, x, y, base = 1) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || !(DDVolume.get('fx') > 0)) return;
     // limiter les sons répétés (rafales, impacts)
     const now = this.ctx.currentTime, gap = { hit: 0.03, smg: 0.04, minigun: 0.04, flamer: 0.09, groan: 0.5, zs: 0.08, spark: 0.05, step: 0.1 }[name] || 0;
     if (gap && this.last[name] && now - this.last[name] < gap) return;
@@ -162,7 +157,7 @@ export class Audio {
     const tick = () => {
       if (!this.ctx) return;
       const t = this.ctx.currentTime + 0.05, I = this.intensity;
-      if (!this.muted && I > 0.08) {
+      if (DDVolume.get('music') > 0 && I > 0.08) {
         const step = this.beat % 8;
         const o = this.out(1, null, this.mus);
         if (step % 4 === 0) this.tone(o, t, 0.25, { f0: 90, f1: 40, v: 0.32 * I });
