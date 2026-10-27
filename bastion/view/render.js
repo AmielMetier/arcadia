@@ -661,10 +661,30 @@ function renderMinimap() {
     mc.restore();
   }
 
-  // Cadre de la caméra
-  const isoSin = Math.sin(((cam.pitch || 70) * Math.PI) / 180);
-  const vw = (W / cam.z) * sx, vh = ((H / cam.z) / isoSin) * sy;
+  // Zone regardée par chaque allié (en rose), puis cadre de ma caméra (en blanc)
+  for (const [id, v] of allyViews) {
+    if (nowT - v.at > 4000 || !isAllyOf(id)) { allyViews.delete(id); continue; }
+    mc.fillStyle = 'rgba(255,92,184,.12)';
+    mc.fillRect((v.x - v.w / 2) * sx, (v.y - v.h / 2) * sy, v.w * sx, v.h * sy);
+    mc.strokeStyle = 'rgba(255,92,184,.95)';
+    mc.lineWidth = 2;
+    mc.strokeRect((v.x - v.w / 2) * sx, (v.y - v.h / 2) * sy, v.w * sx, v.h * sy);
+  }
+  const mine = camViewRect();
   mc.strokeStyle = 'rgba(255,255,255,.9)';
   mc.lineWidth = 2;
-  mc.strokeRect(cam.x * sx - vw / 2, cam.y * sy - vh / 2, vw, vh);
+  mc.strokeRect((mine.x - mine.w / 2) * sx, (mine.y - mine.h / 2) * sy, mine.w * sx, mine.h * sy);
+}
+
+// Zone du monde visible à l'écran (centre et taille, en unités du monde)
+function camViewRect() {
+  const isoSin = Math.sin(((cam.pitch || 70) * Math.PI) / 180);
+  return { x: cam.x, y: cam.y, w: W / cam.z, h: (H / cam.z) / isoSin };
+}
+// Joueur humain de mon équipe (pas moi) : on partage nos zones regardées
+function isAllyOf(id) {
+  if (!state) return false;
+  const me = state.players.find((p) => Number(p.id) === Number(myId));
+  const p = state.players.find((q) => Number(q.id) === Number(id));
+  return !!(me && p && p !== me && p.team === me.team && !p.bot && !p.horde && !p.dead && !p.spectator);
 }
