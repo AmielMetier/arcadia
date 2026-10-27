@@ -200,6 +200,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .panel p{margin:8px 0;line-height:1.4}
 .lead{font-weight:600;font-size:15px}
 .hint{font-size:12.5px;color:var(--muted)}
+.credits{margin-top:14px;font-size:11px;opacity:.75;text-align:center}
 .lbar{height:12px;border-radius:7px;background:var(--cream);border:2px solid var(--ink);overflow:hidden;margin:14px 0 6px}
 .lbar i{display:block;height:100%;width:0;background:var(--red);transition:width .25s}
 .panel img.ic{filter:invert(1) brightness(.18)}

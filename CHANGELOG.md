@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.89 — 27 octobre 2026
+- **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
+  - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.
+  - Les armes ont leur vrai modèle : en main, posées au sol et dans la barre d'objets (fusil d'assaut, pompe, pistolet, mitraillette, sniper, lance-roquettes, grenades, soins).
+  - Bâtiments bien plus travaillés : enduits colorés, soubassement en pierre, chaînes d'angle, bandeaux et corniches, fenêtres encadrées et vitrées qui s'allument le soir, volets, garde-corps, jardinières fleuries.
+  - Portes avec marche, lampe et marquise ; boutiques avec store rayé et enseigne ; toits en tuiles avec rives, faîtage et cheminées ; toits plats avec climatiseurs, ventilations et réservoirs d'eau.
+  - Les rues se remplissent : lampadaires, voitures, bancs, abribus, bornes à incendie, poubelles, boîtes aux lettres, pots de fleurs, bennes, barils, palettes, épaves… On peut s'en servir comme abri, les casser et en récolter les matériaux.
+  - Le mobilier des maisons n'est dessiné qu'à proximité : le jeu reste fluide malgré tous ces détails.
+
 ## 2.88 — 26 octobre 2026
 - Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)
 
