@@ -290,7 +290,7 @@ function loop(now) {
   handleEvents(events);
   // caméra
   const view = cameraFor(P, disp, dt);
-  S.actors.update(dt, S.t, view.pos, disp, scoped ? S.me : null, seeFrom(view.focus));
+  S.actors.update(dt, S.t, view.pos, disp, scoped || S.camClose ? S.me : null, seeFrom(view.focus));
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
   // fantôme de la pièce à construire
   if (S.build && P && P.alive && P.mode === 'sol') {
@@ -457,27 +457,36 @@ function cameraFor(P, disp, dt) {
   else headY = target.swim ? d.y + MOVE.swimDepth + 0.6 : d.y + (target.crouch ? MOVE.hc : MOVE.h) - 0.25;
   if (target === P && S.input.aim && heldWeapon(P)) dist = 2.1;
   if (isScoped(P) && target === P) dist = 0;
-  // distance fixe : elle ne change que pour viser (ou en l'air), jamais à cause d'un mur
+  // distance voulue : elle change pour viser (ou en l'air) ; les murs la raccourcissent plus bas
   S.camDist = dist === 0 ? 0 : S.camDist + (dist - S.camDist) * (1 - Math.exp(-12 * dt));
   // épaule droite (même axe que les tirs) ; un mur collé à droite la fait glisser doucement vers le centre
   const wantSide = sh ? Math.max(0, W.ray(d.x, headY, d.z, rx, 0, rz, sh, 0.2)) : 0;
-  S.camSide += (wantSide - S.camSide) * (1 - Math.exp(-8 * dt));
-  const D = S.camDist, px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide, py = headY;
+  // (vers le centre tout de suite, sinon l'épaule entrerait dans le mur ; vers l'épaule en douceur)
+  S.camSide = wantSide < S.camSide ? wantSide : S.camSide + (wantSide - S.camSide) * (1 - Math.exp(-8 * dt));
+  let px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide;
+  const py = headY;
+  // la caméra ne traverse ni mur, ni porte, ni plafond, ni le sol : un obstacle derrière le joueur la rapproche aussitôt,
+  // elle recule doucement quand la voie se libère ; collée au mur, elle se recentre sur la tête du joueur
+  let D = S.camDist;
+  if (D > 0.3) {
+    let free = W.ray(px, py, pz, -fx, -fy, -fz, D, 0.24);
+    if (free < 0.5) { px = d.x; pz = d.z; S.camSide = 0; free = W.ray(px, py, pz, -fx, -fy, -fz, D, 0.24); }
+    const want = Math.max(0, free - 0.12);
+    const pull = S.camPull == null ? D : S.camPull;
+    S.camPull = want < pull ? want : pull + (want - pull) * (1 - Math.exp(-5 * dt));
+    D = Math.min(D, S.camPull);
+  } else S.camPull = null;
+  // tout contre le joueur, on ne dessine pas son personnage (sinon on voit l'intérieur de sa tête)
+  S.camClose = target === P && D > 0 && D < 0.75;
   let cx = px - fx * D, cy = py - fy * D, cz = pz - fz * D;
   const wl = W.waterLevel(cx, cz);
   if (cy < wl + 0.35) cy = wl + 0.35;
   const gh = S.map.heightAt(cx, cz);
   if (cy < gh + 0.3) cy = gh + 0.3;
-  // ce qui se trouve entre la caméra et le joueur (mur, porte, arbre) est découpé par le plan proche : la caméra
-  // reste où elle est, on voit le joueur à travers
-  let near = 0.15;
-  if (D > 0.3) {
-    const vx = cx - d.x, vy = cy - py, vz = cz - d.z, L = Math.hypot(vx, vy, vz);
-    const free = W.ray(d.x, py, d.z, vx / L, vy / L, vz / L, L, 0.05);
-    if (free < L - 0.05) near = clamp(L - free + 0.25, 0.15, Math.max(0.15, D - 0.75));
-  }
-  // secousse des explosions proches
-  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); cx += (Math.random() - 0.5) * S.shake * 0.4; cy += (Math.random() - 0.5) * S.shake * 0.4; cz += (Math.random() - 0.5) * S.shake * 0.4; }
+  // plan proche court : la caméra reste dans le vide, rien n'est découpé devant elle
+  const near = 0.1;
+  // secousse des explosions proches (moindre quand la caméra est collée à un mur, pour ne pas y entrer)
+  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); const k = S.shake * 0.4 * Math.min(1, D / 2); cx += (Math.random() - 0.5) * k; cy += (Math.random() - 0.5) * k; cz += (Math.random() - 0.5) * k; }
   return look(cx, cy, cz, fx, fy, fz, d, near);
   function look(x, y, z, a, b, c, focus, nearP = 0.15) {
     S.cam = { x, y, z };

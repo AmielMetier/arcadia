@@ -8,6 +8,7 @@
 - **Island Rush** — Les chutes enlèvent de la vie, plus du bouclier.
 - **Island Rush** — Tirs plus percutants : prises plus pleines, coup sourd dans les graves sous chaque détonation, grondement qui roule pour les tirs lointains.
 - **Island Rush** — Échap ferme le sac ou la carte, sans rien faire d'autre.
+- **Island Rush** — La caméra ne traverse plus les murs, les portes ni les plafonds : elle se rapproche quand un obstacle passe derrière toi, puis recule doucement ; collée à un mur, elle se recentre sur ta tête.
 - **Island Rush** — Moins de ralentissements, surtout à 60 joueurs : image calculée à une définition raisonnable, ombres et personnages hors champ allégés, bots qui cherchent leur chemin bien plus vite.
 
 ## 3.0 — 27 octobre 2026
