@@ -31,8 +31,9 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         <button class="tool" id="t3d" title="Vue 3D ou vue de dessus">3D</button>
         <button class="tool" id="trend" title="Plateau en vraie 3D ou plateau classique">🧊</button>
         <button class="tool" id="tcam" title="Caméra qui suit le pion">🎥</button>
-        <span class="musicctl"><button class="tool" id="tmus" title="Musique d'ambiance">🎵</button><input type="range" id="mvol" min="0" max="1" step="0.05" aria-label="Volume de la musique"></span>
+        <button class="tool" id="tmus" title="Musique d'ambiance">🎵</button>
         <button class="tool" id="tsnd" title="Bruitages">🔊</button>
+        <button class="tool" id="tvol" title="Volume de la musique et des effets" aria-label="Volume">🎚️</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
@@ -86,8 +87,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
   const music = createMusic(audioContext);
   // le navigateur n'autorise le son qu'après un geste : la musique démarre au premier clic ou touche
   for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (music.on) music.start(); }, { once: true, capture: true });
-  $('#mvol').value = music.volume;
-  $('#mvol').oninput = (e) => music.setVolume(+e.target.value);
+  DDVolume.panel($('#tvol'));
   $('#tmus').onclick = () => { music.toggle(); syncTools(); };
   const syncTools = () => {
     $('#tmus').classList.toggle('off', !music.on); $('#tmus').title = music.on ? 'Couper la musique' : 'Mettre la musique'; $('#t3d').textContent = B.is3d() ? '3D' : '2D'; $('#tcam').classList.toggle('off', !B.follow()); $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; };

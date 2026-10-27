@@ -237,8 +237,19 @@ export function buildInterior(map) {
     byKind.get(f.kind).push({ f, y: floorY(b, f.k), ab: b.abandoned });
   }
   const furnIndex = new Map();
+  // par tuiles de 160 m : on ne dessine que les meubles des tuiles proches de la caméra (cull)
+  const TILE = 160, tiles = [];
+  const groups = [];
   for (const [kind, list] of byKind) {
+    const byTile = new Map();
+    for (const it of list) { const k = Math.floor(it.f.x / TILE) + ',' + Math.floor(it.f.z / TILE); if (!byTile.has(k)) byTile.set(k, []); byTile.get(k).push(it); }
+    for (const [k, sub] of byTile) groups.push({ kind, k, list: sub });
+  }
+  for (const { kind, k, list } of groups) {
     const im = new THREE.InstancedMesh(geoOf(kind), mat, list.length);
+    const [tx, tz] = k.split(',').map(Number);
+    im.userData.tile = { x0: tx * TILE, z0: tz * TILE, x1: (tx + 1) * TILE, z1: (tz + 1) * TILE };
+    tiles.push(im);
     const pal = TINTS[kind] || [0xffffff];
     list.forEach(({ f, y, ab }, i) => {
       // un meuble renversé dans les maisons abandonnées, de temps en temps
@@ -305,6 +316,13 @@ export function buildInterior(map) {
   const moving = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {
     group, furnIndex,
+    // meubles : seulement les tuiles à moins de far mètres de (x, z)
+    cull(x, z, far = 90) {
+      for (const im of tiles) {
+        const t = im.userData.tile, dx = Math.max(t.x0 - x, 0, x - t.x1), dz = Math.max(t.z0 - z, 0, z - t.z1);
+        im.visible = dx * dx + dz * dz < far * far;
+      }
+    },
     hideFurn(id) { const w = furnIndex.get(id); if (w) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; } },
     hideDoor(id) { const st = anim.get(id); if (st) { moving.delete(st); st.mesh.setMatrixAt(st.i, zero); st.mesh.instanceMatrix.needsUpdate = true; anim.delete(id); } },
     setDoor(id, open) { const st = anim.get(id); if (!st) return; st.want = open ? 1 : 0; moving.add(st); },

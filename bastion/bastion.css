@@ -191,8 +191,6 @@ canvas#minimap{width:202px;height:202px;display:block;border-radius:6px;backgrou
 .cbtn:hover:not(.locked){border-color:rgba(63,224,216,.65);background:linear-gradient(180deg,#25343f,#17212b);box-shadow:0 0 14px rgba(63,224,216,.2),inset 0 1px 0 rgba(255,255,255,.07)}
 .cbtn:active:not(.locked){transform:translateY(1px)}
 .cbtn.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(255,197,49,.35);background:linear-gradient(180deg,#3a3016,#1c1a12)}
-.cbtn.armed:not(.locked){border-color:rgba(255,197,49,.55)}
-.cbtn.armed:not(.locked) .key{background:var(--gold);color:#16181d}
 .cbtn .key{position:absolute;top:3px;left:4px;min-width:15px;height:15px;padding:0 3px;border-radius:4px;background:rgba(0,0,0,.45);border:1px solid rgba(255,197,49,.35);
   font-size:9.5px;font-weight:700;color:var(--gold);line-height:13px;text-align:center}
 .cbtn canvas.thumb{width:72px;height:36px;display:block;flex:1 1 auto;min-height:0;max-height:40px;object-fit:contain;margin-top:15px}

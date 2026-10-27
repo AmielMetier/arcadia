@@ -38,6 +38,7 @@ const input = new Input(document.body, { menu: () => toggleMenu(), mute: () => t
 hud.onBuy = (k) => doBuy(k); hud.onVote = () => doVote(); hud.onChoose = (o) => doChoose(o);
 input.bindTouchButtons($('#tbtns'));
 input.listen($('#btnMute'), 'click', () => toggleMute());
+DDVolume.panel($('#btnVol'));
 input.listen($('#btnMap'), 'click', () => hud.toggleMap());
 input.listen($('#btnMenu'), 'click', () => toggleMenu());
 // en solo, la partie se met en pause quand l'onglet passe en arrière-plan

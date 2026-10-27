@@ -325,7 +325,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (Math.abs(y - P.y) > 1.2) return;
     const id = S.nextProj++;
     S.pads.push({ id, x, y, z, owner: P.id, t: 0 });
-    ev({ e: 'tremplin', id, x, y, z });
+    ev({ e: 'tremplin', id, x, y, z, p: P.id });
     consume(P); P.cd = 0.5;
   }
   function stepProjectiles(dt) {

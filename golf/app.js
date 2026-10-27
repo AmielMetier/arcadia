@@ -8,9 +8,11 @@ import { suggestClub, suggestAim, clubReach, allowedClub, distToPin } from './en
 import { totals, ranking } from './engine/rules.js';
 import { startHost, startClient, holeByNumber, currentHole, windOf, simBall } from './net/session.js';
 import { createScene } from './view/scene.js';
+import { lookOf } from './view/golfer.js';
 import { HUD, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, esc } from './view/hud.js';
 import { createHome } from './view/home.js';
-import { icon, fillIcons } from './view/icons.js';
+import { soundPanel } from './view/sound.js';
+import { fillIcons } from './view/icons.js';
 import { Sfx } from './view/sfx.js';
 import { Input, MAX_POWER } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
@@ -32,21 +34,34 @@ if (QS.has('mute')) sfx.silent = true;
 // fréquenté), sinon dès le premier geste, quel qu'il soit
 sfx.unlock();
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => sfx.unlock(), { capture: true, passive: true });
+// page cachée : personne ne m'attend pour avancer (et à mon tour, l'hôte jouera pour moi au bout de quelques secondes)
+document.addEventListener('visibilitychange', () => { V.session && V.session.away(document.hidden); catchUp(); pump(); });
 let home = null;
 let scene = null;
-try { scene = createScene($('#stage'), { onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
-catch (e) { console.error(e); $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>'; }
+try {
+  scene = createScene($('#stage'), {
+    onLost: () => {
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_WEBGL_CONTEXT_LOST', 'Perte du contexte graphique WebGL dans Birdie Party', { game: 'golf' });
+      hud.toast('Affichage 3D interrompu : recharge la page', 6);
+    }
+  });
+} catch (e) {
+  console.error(e);
+  if (window.DDLogger) window.DDLogger.logCrash('CRASH_WEBGL_CONTEXT_LOST', 'Échec d\'initialisation WebGL dans Birdie Party : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+  $('#screen').innerHTML = '<div class="sheet"><h2>Oups</h2><p>Ton navigateur ne peut pas afficher la 3D (WebGL).</p></div>';
+}
 
 // ------------------------------------------------------------------ état de la vue
 const V = {
   phase: 'title', role: 'solo', me: null, session: null, settings: {},
   R: null, hole: null, hi: -1, queue: [], busy: false, pars: [],
   cur: null, mine: false, ball: null, club: 0, aim: 0, power: 0, putt: 20, preview: null, dirty: true, view: false,
-  golfers: new Map(), localSwing: null, poseT: 0,
-  shot: null, playT: 0, evI: 0, timer: 0, oohed: false, introT: 0, outcome: null,
+  golfers: new Map(), localSwing: null, poseT: 0, gen: 0,
+  shot: null, playT: 0, evI: 0, timer: 0, oohed: false, introT: 0, outcome: null, wd: { phase: null, t: 0 },
 };
+// chaque joueur garde la même allure d'une partie à l'autre : elle vient de son nom
 const golferOf = (p) => {
-  if (!V.golfers.has(p.id)) V.golfers.set(p.id, scene.addGolfer({ shirt: p.color, skin: p.look % 5, hair: (p.look * 3 + 1) % 5 }));
+  if (!V.golfers.has(p.id)) V.golfers.set(p.id, scene.addGolfer({ shirt: p.color, look: lookOf(p.name) }));
   return V.golfers.get(p.id);
 };
 
@@ -65,7 +80,6 @@ const input = new Input($('#stage'), {
 input.listen($('#clubPrev'), 'click', () => changeClub(-1));
 input.listen($('#clubNext'), 'click', () => changeClub(1));
 input.listen($('#btnView'), 'click', () => toggleView());
-input.listen($('#btnMute'), 'click', () => toggleMute());
 input.listen($('#btnLeave'), 'click', () => leaveGame());
 const aimHold = { l: false, r: false };
 for (const [id, k] of [['#aimL', 'l'], ['#aimR', 'r']]) {
@@ -73,7 +87,8 @@ for (const [id, k] of [['#aimL', 'l'], ['#aimR', 'r']]) {
   input.listen($(id), 'pointerup', () => { aimHold[k] = false; });
   input.listen($(id), 'pointerleave', () => { aimHold[k] = false; });
 }
-$('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn');
+// bouton haut-parleur : volume de la musique et des effets
+const snd = soundPanel(sfx, $('#btnMute'));
 // clic pendant le survol : on passe directement au jeu
 input.listen($('#stage'), 'pointerdown', () => { if (V.phase === 'intro') endIntro(); else if (V.phase === 'replay') endReplay(); });
 
@@ -95,10 +110,10 @@ function leaveGame() {
   if (!confirm(msg)) return;
   sfx.ui('close');
   if (H.embedded) { teardown(); H.exit(); return; }
-  V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null;
-  hud.show(false); showTitle();
+  V.session && V.session.stop(); V.session = null;
+  showMenu('local');
 }
-function toggleMute() { sfx.setMuted(!sfx.muted); $('#btnMute').innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); }
+function toggleMute() { sfx.setMuted(!sfx.muted); snd.refresh(); }
 function toggleView() { if (V.phase !== 'aim' || !V.mine) return; V.view = !V.view; sfx.ui('switch'); aimCamera(false); }
 function changeClub(d) {
   if (V.phase !== 'aim' || !V.mine) return;
@@ -119,60 +134,94 @@ function boot(info) {
   const meP = H.players.find((p) => p.id === info.myId);
   V.me = { id: H.embedded ? info.myId : 0, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
   V.role = role;
-  if (role === 'solo') { if (QS.has('play')) return quickPlay(); return showTitle(); }
-  V.settings = info.settings || {};
-  $('#screen').innerHTML = loadingHtml(role === 'host' ? 'Préparation du parcours' : 'On rejoint la partie');
-  startSession(role);
-  // l'hôte est parti et ce joueur reprend le salon : il devient l'hôte, à partir du dernier état reçu
+  // hors du Hub : écran titre, puis menu (?play lance directement une partie, pour les tests)
+  if (!H.embedded) {
+    if (QS.has('play')) return quickPlay();
+    return showMenu('local');
+  }
+  // lancé depuis le Hub : le menu du jeu, prérempli avec les réglages choisis dans le salon. L'hôte (ou le joueur
+  // seul) lance la partie ; les invités voient ses choix et la partie démarre chez eux quand il la lance
+  V.settings = { ...loadSetup(), ...(info.settings || {}) };
+  if (role === 'guest') V.session = startClient({ bridge: H, me: V.me, emit: onEvent });
+  else if (role === 'host') V.session = startHost({ bridge: H, solo: false, settings: V.settings, me: V.me, emit: onEvent });
+  showMenu(role, V.settings);
   H.on('roster', () => {
+    // l'hôte est parti et ce joueur reprend le salon : il devient l'hôte, à partir du dernier état reçu (au menu : il
+    // choisit le parcours à son tour)
     if (V.role === 'guest' && H.info.role === 'host') {
       V.role = 'host';
       const last = V.session && V.session.state;
       V.session && V.session.stop();
       V.session = startHost({ bridge: H, solo: false, settings: V.settings, me: V.me, emit: onEvent, initial: last });
-      if (!last) V.session.begin();
+      if (!last) showMenu('host', V.settings);
       hud.toast('Tu reprends la partie en tant qu\'hôte', 3);
     }
+    home && home.setPlayers(roomPlayers());
   });
   H.signalReady();
 }
-function startSession(role) {
-  if (role === 'guest') V.session = startClient({ bridge: H, me: V.me, emit: onEvent });
-  else {
-    V.session = startHost({ bridge: H, solo: role === 'solo', settings: V.settings, me: V.me, emit: onEvent });
-    // laisse aux invités le temps d'ouvrir le jeu avant le survol du premier trou
-    setTimeout(() => V.session && V.session.begin(), role === 'solo' ? 50 : 1500);
-  }
+// joueurs du salon, pour le menu : qui est là, qui a fini de charger le jeu
+const roomPlayers = () => H.players.map((p) => ({ name: p.name, color: p.color, host: p.id === H.info.hostId, me: p.id === H.info.myId, ready: p.id === H.info.myId || H.readyMap[p.id] === 'golf' }));
+// partie solo (avec ou sans bots) : une session neuve à chaque partie
+function soloGame(set) {
+  V.session && V.session.stop();
+  V.settings = set;
+  V.session = startHost({ bridge: H, solo: true, settings: set, me: V.me, emit: onEvent });
+  setTimeout(() => V.session && V.session.begin(), 50);
 }
 // raccourci de test : ?play lance directement une partie solo (?course=mer&bots=2)
 function quickPlay() {
   const s = loadSetup();
-  V.settings = { ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots, startHole: +QS.get('hole') || 0, time: QS.get('time') || s.time, teams: QS.get('teams') || s.teams };
   $('#screen').innerHTML = loadingHtml();
-  startSession('solo');
+  soloGame({ ...s, course: QS.get('course') || s.course, bots: QS.has('bots') ? +QS.get('bots') : s.bots, startHole: +QS.get('hole') || 0, time: QS.get('time') || s.time, teams: QS.get('teams') || s.teams });
 }
-// accueil : survol des trous, logo, réglages ; « Jouer » lance une partie solo (avec bots)
-function showTitle() {
+// menu du jeu (mode : 'local' hors du Hub, 'solo', 'host' ou 'guest' depuis le Hub), survol des trous en fond
+function showMenu(mode, initial = null) {
+  V.gen++;
   V.phase = 'title';
+  V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null; V.shot = null;
   hud.show(false);
+  document.body.classList.remove('replaying');
   for (const g of V.golfers.values()) g.root.visible = false;
+  home && home.dispose();
   home = createHome({
-    root: $('#screen'), scene, sfx, hole: holeByNumber,
+    root: $('#screen'), scene, sfx, hole: holeByNumber, mode, initial,
+    onChange: (set) => { V.settings = set; if (mode === 'host' && V.session) V.session.configure(set); },
+    onQuit: () => { sfx.ui('close'); teardown(); H.exit(); },
     onPlay: (set) => {
       home.dispose(); home = null;
-      V.settings = set;
-      $('#screen').innerHTML = loadingHtml();
-      V.queue = []; V.busy = false; V.hi = -1; V.R = null;
-      startSession('solo');
+      $('#screen').innerHTML = loadingHtml(mode === 'host' ? 'Préparation du parcours' : 'Lancement du parcours');
+      if (mode === 'host') { V.settings = set; V.session.configure(set); V.session.begin(); }
+      else soloGame(set);
     },
   });
+  if (mode === 'host' || mode === 'guest') home.setPlayers(roomPlayers());
 }
 
 // ------------------------------------------------------------------ événements de la session, traités dans l'ordre
 function onEvent(e) {
   if (e.type === 'pose') return onPose(e);
+  if (e.type === 'note') return hud.toast(e.text, 3.5);
+  // invité au menu : les choix de l'hôte s'affichent en direct ; l'hôte revient au menu après une partie
+  if (e.type === 'setup') { V.settings = e.set; if (home && home.mode === 'guest') home.mirror(e.set); return; }
+  if (e.type === 'menu') { V.settings = e.set; showMenu('guest', e.set); return; }
+  // la partie démarre : le menu laisse place au chargement du premier trou
+  if (e.type === 'state' && home) { home.dispose(); home = null; sfx.music(null); $('#screen').innerHTML = loadingHtml('La partie commence'); }
   V.queue.push(e);
+  if (e.type === 'shot') catchUp();
   pump();
+}
+// un nouveau coup arrive alors qu'on regarde encore le précédent (ou la page revient après une absence) : on finit
+// tout de suite la présentation ou le coup en cours pour rattraper les autres
+function catchUp() {
+  if (document.hidden || !behind()) return;
+  if (V.phase === 'intro') endIntro();
+  else if (V.shot && ['down', 'fly', 'after', 'replay'].includes(V.phase)) {
+    const r = V.shot.ev.res;
+    document.body.classList.remove('replaying');
+    if (r.kind === 'rest') scene.setBall(r.end.x, r.end.y, r.end.z);
+    finishShot();
+  }
 }
 function pump() {
   while (!V.busy && V.queue.length) {
@@ -183,39 +232,69 @@ function pump() {
 }
 function unbusy() { V.busy = false; pump(); }
 
+// (retour au menu pendant un chargement ou une carte de score : V.gen change et la suite est abandonnée)
 async function applyState(R) {
-  const prev = V.R;
+  const prev = V.R, gen = V.gen;
   V.R = R;
   V.pars = R.holes.map((n) => holeByNumber(n).par);
   if (R.phase === 'over') {
     V.busy = true;
-    if (prev && prev.phase !== 'over') await holeCard(R);
-    finalCard(R);
+    try {
+      if (prev && prev.phase !== 'over') await holeCard(R);
+      if (gen !== V.gen) return;
+      finalCard(R);
+    } catch (e) {
+      console.error(e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur carte finale Birdie Party : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+    } finally {
+      V.busy = false;
+    }
     return;
   }
   if (R.hi !== V.hi) {
     V.busy = true;
-    if (V.hi >= 0 && prev && prev.hi !== R.hi && R.hi > 0) await holeCard(R);
-    await loadHole(R);
-    V.busy = false;
+    try {
+      if (V.hi >= 0 && prev && prev.hi !== R.hi && R.hi > 0) await holeCard(R);
+      if (gen !== V.gen) return;
+      await loadHole(R);
+      if (gen !== V.gen) return;
+    } catch (e) {
+      console.error('Erreur chargement trou', e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur chargement trou ' + (R.hi + 1) + ' (' + (currentHole(R)?.name || '') + ') : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+      hud.toast('Erreur de chargement du trou, passage au suivant...', 4);
+    } finally {
+      V.busy = false;
+    }
   }
-  setTurn();
+  // une erreur d'affichage ne doit jamais bloquer la partie : le tour est annoncé à l'hôte quoi qu'il arrive
+  try { setTurn(); } catch (e) {
+    console.error(e);
+    if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur à l\'annonce du tour Birdie Party : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+    if (V.R && V.session) V.session.ready(V.R.shotNo);
+  }
   pump();
 }
 
 // ------------------------------------------------------------------ trous
 async function loadHole(R) {
-  const hole = currentHole(R);
+  const hole = currentHole(R), gen = V.gen;
   V.hi = R.hi; V.hole = hole;
   hud.show(false);
   $('#screen').innerHTML = loadingHtml(`Trou ${hole.n} · ${hole.name}`);
   await new Promise((r) => setTimeout(r, 40)); // laisse l'écran de chargement s'afficher
   const wind = windOf(R);
-  await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time });
+  // derrière l'écran de chargement, rien à dessiner : tout le temps va à la construction du trou
+  V.loading = true;
+  try { await scene.loadHole(hole, { theme: hole.theme, wind, time: R.time, slice: 45 }); } finally { V.loading = false; }
+  if (gen !== V.gen) return;
   scene.setWind(wind);
   // mini-carte : photo aérienne du trou, prise une fois le décor posé
-  const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
-  hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
+  try {
+    const frame = hud.mapFrame(hole), scale = hud.mapScale(frame);
+    hud.setMap(frame, { photo: scene.renderMap(frame, { scale }), relief: () => scene.renderMap(frame, { relief: true, scale }) });
+  } catch (e) {
+    console.warn('Mini-carte non initialisée :', e);
+  }
   sfx.ambience(hole.theme);
   // l'écran de chargement s'efface sur le survol qui commence
   const scr = $('#screen'), ld = scr.firstElementChild;
@@ -229,8 +308,15 @@ async function loadHole(R) {
   hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, INTRO - 0.6);
   sfx.holeStart();
   introCamera(0, true);
-  await new Promise((r) => { V.introDone = r; });
+  await new Promise((r) => {
+    V.introDone = r;
+    if (behind()) endIntro();
+    setTimeout(() => { if (V.phase === 'intro') endIntro(); }, (INTRO + 1) * 1000);
+  });
 }
+// en retard sur la partie (page restée cachée, machine lente) : des coups attendent déjà leur tour, ou personne ne
+// regarde ; on saute les présentations et on joue les coups sans animation pour rattraper les autres
+const behind = () => document.hidden || V.queue.some((e) => e.type === 'shot');
 function endIntro() {
   if (V.phase !== 'intro') return;
   hud.hideBanner();
@@ -240,13 +326,14 @@ function endIntro() {
 
 // carte de score entre deux trous (ou après le dernier)
 function holeCard(R) {
+  const gen = V.gen;
   return new Promise((res) => {
     V.phase = 'card';
     hud.controls(false); hud.gauge(0, false); $('#turn').hidden = true;
     const holes = R.holes.map((n) => holeByNumber(n));
     $('#screen').innerHTML = scorecardHtml(R, holes, { title: R.phase === 'over' ? 'Dernier trou joué !' : `Après le trou ${holes[R.hi - 1].n}` });
     sfx.ui('card');
-    setTimeout(() => { $('#screen').innerHTML = ''; res(); }, CARD_T * 1000);
+    setTimeout(() => { if (gen === V.gen) $('#screen').innerHTML = ''; res(); }, (behind() ? 0.8 : CARD_T) * 1000);
   });
 }
 function finalCard(R) {
@@ -266,10 +353,17 @@ function finalCard(R) {
   sfx.react(rk[0].id === V.me.id ? 'birdie' : 'par');
   const again = $('#btnAgain');
   if (again) again.onclick = () => { sfx.ui('confirm'); $('#screen').innerHTML = loadingHtml(); V.hi = -1; V.queue = []; V.busy = false; V.session.begin(); };
+  // changer de parcours : retour au menu (pour tout le salon si on est l'hôte)
+  const menu = $('#btnMenu');
+  if (menu) menu.onclick = () => {
+    sfx.ui('open');
+    if (V.role === 'host') { V.session.menu(); showMenu('host', V.settings); }
+    else { V.session && V.session.stop(); V.session = null; showMenu('solo', V.settings); }
+  };
   $('#btnQuit').onclick = () => {
     sfx.ui('close');
     if (H.embedded) { teardown(); H.exit(); }
-    else { V.session && V.session.stop(); V.session = null; V.queue = []; V.busy = false; V.hi = -1; V.R = null; V.hole = null; showTitle(); }
+    else { V.session && V.session.stop(); V.session = null; showMenu('local'); }
   };
 }
 
@@ -317,9 +411,11 @@ function setTurn() {
   V.phase = V.mine ? 'aim' : 'watch';
   hud.players(stripList(), V.R.teams);
   // fondu enchaîné vers la caméra posée derrière la balle du joueur suivant
-  scene.dissolve(0.6);
+  if (!document.hidden) try { scene.dissolve(0.6); } catch (e) { console.warn(e); }
   aimCamera(true);
   sendPose();
+  // je vois ce tour : l'hôte peut faire jouer un bot
+  V.session && V.session.ready(R.shotNo);
 }
 
 function placeSpectators() {
@@ -386,6 +482,14 @@ function playShot(ev) {
   const sim = simulate(hole, from, ev.params, windOf(V.R), { putt: ev.putt });
   V.shot = { ev, sim, launched: false };
   V.playT = 0; V.evI = 0; V.oohed = false; V.outcome = null;
+  // en retard sur la partie : pas d'animation, la balle est posée là où elle s'arrête
+  if (behind()) {
+    const r = ev.res;
+    if (r.kind === 'rest') scene.setBall(r.end.x, r.end.y, r.end.z);
+    V.localSwing = null;
+    finishShot();
+    return;
+  }
   const g = golferOf(P);
   scene.setMarker(null, false); scene.setAimDots(null, null, false); hud.controls(false);
   $('#turn').hidden = true;
@@ -482,7 +586,7 @@ function finishShot() {
   V.shot = null;
   sfx.duck(false);
   V.phase = 'wait';
-  if (V.session && V.session.isHost) V.session.done(ev.no);
+  if (V.session) V.session.done(ev.no);
   unbusy();
 }
 
@@ -653,7 +757,9 @@ function loop(now) {
   hud.tick(dt);
   if (!scene) return;
   if (!V.hole) { home && home.update(dt); scene.frame(dt); return; }
+  if (V.loading) return;
   autoQuality(now, ms);
+  watchdog(dt);
   sfx.wind(windOf(V.R).speed, dt);
 
   if (V.phase === 'intro') {
@@ -682,9 +788,22 @@ function loop(now) {
   } else if (V.phase === 'down') {
     V.timer -= dt;
     if (V.timer <= 0 && V.shot && !V.shot.launched) launch();
+    // mon coup n'est jamais revenu de l'hôte (perdu en route, ou refusé) : on rend la main et on redemande l'état
+    else if (!V.shot && V.localSwing && performance.now() - V.localSwing.t0 > 7000) {
+      V.localSwing = null; V.session && V.session.resync();
+      hud.toast('Le coup n\'est pas parti : rejoue', 2.5);
+      setTurn();
+    }
   } else if (V.phase === 'fly') {
-    const sim = V.shot.sim, P = sim.path;
-    V.playT += dt;
+    const sim = V.shot.sim, P = sim.path, putter = CLUBS[V.shot.ev.params.club].putter;
+    // une fois au sol, la balle d'un coup roule en accéléré et la toute fin, quand elle se traîne loin du trou, est
+    // sautée : le résultat est connu, personne n'attend pour rien. Un putt garde son suspense jusqu'au bout.
+    const f0 = V.playT * 60, landed = !putter && sim.events.some((e) => e.type === 'bounce' && e.i <= f0);
+    V.playT += dt * (landed ? 1.7 : 1);
+    if (landed) {
+      const e = (sim.n - 1) * 3, c = Math.min(sim.n - 1, Math.floor(V.playT * 60)) * 3;
+      if (Math.hypot(P[e] - P[c], P[e + 2] - P[c + 2]) < 1.2 && Math.hypot(P[e] - V.hole.pin.x, P[e + 2] - V.hole.pin.z) > 4) V.playT = (sim.n - 1) / 60;
+    }
     const f = Math.min(sim.n - 1, V.playT * 60), i = Math.floor(f), k = f - i, j = Math.min(sim.n - 1, i + 1);
     const p = { x: P[i * 3] + (P[j * 3] - P[i * 3]) * k, y: P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * k, z: P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * k };
     scene.setBall(p.x, p.y, p.z);
@@ -748,6 +867,20 @@ function loop(now) {
     hud.drawMap(h, b, V.phase === 'intro' ? null : V.preview, V.aim, V.R.players.filter((q) => q !== V.cur && !q.done && q.ball).map((q) => ({ x: q.ball.x, z: q.ball.z, color: q.color })), V.phase === 'intro' ? [] : V.marks);
   } else hud.pinTag(null);
   scene.frame(dt);
+}
+
+// filet de sécurité : un coup dont l'animation n'en finit pas (ou une annonce de tour restée en plan) est terminé
+// d'office, pour que personne ne reste bloqué devant un écran figé
+function watchdog(dt) {
+  if (V.phase !== V.wd.phase) { V.wd.phase = V.phase; V.wd.t = 0; return; }
+  V.wd.t += dt;
+  if (V.shot && ['down', 'fly', 'after', 'replay'].includes(V.phase) && V.wd.t > V.shot.sim.n / 60 * 2 + 12) {
+    console.warn('Birdie Party : coup terminé d\'office (' + V.phase + ')');
+    document.body.classList.remove('replaying');
+    const r = V.shot.ev.res;
+    if (r.kind !== 'water') scene.setBall(r.end.x, r.end.y, r.end.z);
+    finishShot();
+  } else if (V.phase === 'cut' && !V.busy && V.R && V.wd.t > 4) setTurn();
 }
 
 // qualité automatique : durée médiane d'une image sur 2 s, sans les à-coups isolés (chargement d'un trou, onglet

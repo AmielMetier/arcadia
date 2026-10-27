@@ -1,7 +1,7 @@
 // Le sol de l'île : des dalles de 100 m dont la finesse dépend de la distance (2, 4, 10 ou 20 m entre deux points),
 // bordées d'une jupe qui cache les raccords. Les couleurs viennent d'une image du sol cuite une fois (herbe, sous-bois,
 // sable, roche, neige, fonds sous l'eau) ; le shader y ajoute le grain de l'herbe, du sable ou de la roche et la roche
-// sur les pentes fortes. Les routes, rues, places et champs sont des rubans posés sur le relief.
+// sur les pentes fortes. Les champs sont des nappes posées sur le relief (routes, rues et places : view/roads.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { SNOW, CELL } from '../engine/map.js';
 import { grassTexture, sandTexture } from './textures.js';
@@ -184,40 +184,7 @@ export function buildTerrain(map, { noise, anisotropy = 8 } = {}) {
   };
 }
 
-// ------------------------------------------------------------------ rubans : routes, rues, places, champs
-function roadTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 256;
-  const g = c.getContext('2d');
-  // enrobé gris, grain, bandes blanches en bordure, tirets au centre
-  g.fillStyle = '#6f6e6b'; g.fillRect(0, 0, 64, 256);
-  for (let i = 0; i < 1400; i++) { const v = 90 + Math.random() * 40; g.fillStyle = `rgba(${v},${v},${v - 4},.35)`; g.fillRect(Math.random() * 64, Math.random() * 256, 1.5, 1.5); }
-  g.fillStyle = 'rgba(236,236,228,.85)'; g.fillRect(3, 0, 2, 256); g.fillRect(59, 0, 2, 256);
-  g.fillStyle = 'rgba(240,240,232,.9)'; g.fillRect(31, 20, 2.5, 90); g.fillRect(31, 148, 2.5, 90);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
-  return t;
-}
-function dirtTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#b39468'; g.fillRect(0, 0, 64, 128);
-  for (let i = 0; i < 900; i++) { const v = Math.random(); g.fillStyle = v < 0.5 ? 'rgba(120,92,58,.35)' : 'rgba(214,190,150,.35)'; g.fillRect(Math.random() * 64, Math.random() * 128, 2, 2); }
-  // ornières plus sombres, bords qui se fondent dans l'herbe
-  g.fillStyle = 'rgba(110,84,52,.35)'; g.fillRect(16, 0, 7, 128); g.fillRect(41, 0, 7, 128);
-  const grd = g.createLinearGradient(0, 0, 64, 0);
-  grd.addColorStop(0, 'rgba(110,150,70,.8)'); grd.addColorStop(0.12, 'rgba(110,150,70,0)'); grd.addColorStop(0.88, 'rgba(110,150,70,0)'); grd.addColorStop(1, 'rgba(110,150,70,.8)');
-  g.fillStyle = grd; g.fillRect(0, 0, 64, 128);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
-  return t;
-}
-function pavedTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#cfc7b6'; g.fillRect(0, 0, 128, 128);
-  g.strokeStyle = 'rgba(120,110,95,.45)'; g.lineWidth = 1.5;
-  for (let y = 0; y < 128; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke(); for (let x = (y / 16) % 2 ? 8 : 0; x < 128; x += 16) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.stroke(); } }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
-  return t;
-}
+// ------------------------------------------------------------------ champs (les routes, rues et places : view/roads.js)
 function cropTexture(a, b) {
   const c = document.createElement('canvas'); c.width = 64; c.height = 64;
   const g = c.getContext('2d');
@@ -232,51 +199,6 @@ const decalMat = (map, extra = {}) => new THREE.MeshStandardMaterial({ map, roug
 export function buildDecals(map) {
   const group = new THREE.Group(), textures = [], mats = [];
   const hAt = map.heightAt;
-  const road = roadTexture(), dirt = dirtTexture(), paved = pavedTexture();
-  textures.push(road, dirt, paved);
-  const mRoad = decalMat(road), mDirt = decalMat(dirt), mPaved = decalMat(paved), mStreet = decalMat(road);
-  mats.push(mRoad, mDirt, mPaved, mStreet);
-  // rubans le long des routes : hauteur prise sur le relief à chaque bord (ou sur le tablier des ponts)
-  const ribbon = (list, matFor) => {
-    const by = new Map();
-    for (const r of list) {
-      const P = r.pts, pos = [], uv = [], idx = [];
-      let dist = 0;
-      for (let i = 0; i < P.length; i++) {
-        const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
-        let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-        if (i > 0) dist += Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z);
-        for (const sd of [-1, 1]) {
-          const x = P[i].x - tz * r.hw * sd, z = P[i].z + tx * r.hw * sd;
-          const y = P[i].bridge ? P[i].y + 0.06 : hAt(x, z) + 0.07;
-          pos.push(x, y, z); uv.push(sd < 0 ? 0 : 1, dist / (r.hw * 4));
-        }
-        if (i < P.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      g.setIndex(idx); g.computeVertexNormals();
-      const m = matFor(r);
-      if (!by.has(m)) by.set(m, []);
-      by.get(m).push(g);
-    }
-    for (const [m, geos] of by) for (const g of geos) { const mesh = new THREE.Mesh(g, m); mesh.receiveShadow = true; group.add(mesh); }
-  };
-  ribbon(map.roads.filter((r) => r.pts.length > 1), (r) => (r.kind === 'route' ? mRoad : mDirt));
-  // rues et places : des dalles plates au niveau du plateau de la ville
-  const flat = (rect, m, uvScale, along) => {
-    const w = rect.x1 - rect.x0, d = rect.z1 - rect.z0, y = hAt((rect.x0 + rect.x1) / 2, (rect.z0 + rect.z1) / 2) + 0.07;
-    const g = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate((rect.x0 + rect.x1) / 2, y, (rect.z0 + rect.z1) / 2);
-    const uvA = g.attributes.uv;
-    for (let i = 0; i < uvA.count; i++) {
-      const u = uvA.getX(i), v = uvA.getY(i);
-      if (along === 'x') uvA.setXY(i, v, u * w / uvScale); else if (along === 'z') uvA.setXY(i, u, v * d / uvScale); else uvA.setXY(i, u * w / uvScale, v * d / uvScale);
-    }
-    const mesh = new THREE.Mesh(g, m); mesh.receiveShadow = true; group.add(mesh);
-  };
-  for (const st of map.streets) flat(st, mStreet, 32, st.x1 - st.x0 > st.z1 - st.z0 ? 'x' : 'z');
-  for (const p of map.plazas) flat(p, mPaved, 4);
   // champs : posés sur le relief, rangs le long du grand côté
   const CROPS = { ble: ['#d9b94e', '#c4a23c'], mais: ['#9fb043', '#7f9233'], colza: ['#e8d434', '#a9b23a'] };
   for (const f of map.fields) {

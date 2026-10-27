@@ -533,6 +533,7 @@ function toggleMenu() {
 }
 function toggleMute() { audio.unlock(); const m = audio.toggleMute(); $('#btnMute').innerHTML = svg(m ? 'mute' : 'sound'); }
 $('#btnMute').onclick = () => toggleMute();
+DDVolume.panel($('#btnVol'));
 for (const b of document.querySelectorAll('#tbtns button')) {
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault(); audio.unlock();

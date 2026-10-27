@@ -1,9 +1,68 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.87 — 27 octobre 2026
-- **Mini-Golf Party** — La caméra tourne enfin sans limite à la souris, même sans clic.
-  - Pousser le curseur contre le bord gauche ou droit fait tourner la caméra en continu, à pleine vitesse, même s'il sort de la fenêtre.
-  - Un rappel s'affiche alors : un clic verrouille la souris pour tourner librement dans tous les sens.
+## 2.89 — 27 octobre 2026
+- **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
+  - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.
+  - Les armes ont leur vrai modèle : en main, posées au sol et dans la barre d'objets (fusil d'assaut, pompe, pistolet, mitraillette, sniper, lance-roquettes, grenades, soins).
+  - Bâtiments bien plus travaillés : enduits colorés, soubassement en pierre, chaînes d'angle, bandeaux et corniches, fenêtres encadrées et vitrées qui s'allument le soir, volets, garde-corps, jardinières fleuries.
+  - Portes avec marche, lampe et marquise ; boutiques avec store rayé et enseigne ; toits en tuiles avec rives, faîtage et cheminées ; toits plats avec climatiseurs, ventilations et réservoirs d'eau.
+  - Les rues se remplissent : lampadaires, voitures, bancs, abribus, bornes à incendie, poubelles, boîtes aux lettres, pots de fleurs, bennes, barils, palettes, épaves… On peut s'en servir comme abri, les casser et en récolter les matériaux.
+  - Le mobilier des maisons n'est dessiné qu'à proximité : le jeu reste fluide malgré tous ces détails.
+- **Island Rush** — Routes refaites : vrai enrobé, lignes usées, traces de pneus et accotements de gravier.
+  - En ville : trottoirs dallés, bordures et caniveaux, carrefours aux angles arrondis et passages piétons ; les rues ne scintillent plus aux croisements.
+  - Les chemins de terre ont leurs deux ornières et une bande d'herbe au milieu ; les places sont pavées, avec une rosace autour de la fontaine.
+  - Les voitures garées ne mordent plus sur le trottoir.
+- **Island Rush** — Saut plus lisible : dans la montgolfière et pendant la chute, une petite bulle rappelle seulement la touche Espace, et le rappel des touches s'efface tant qu'on est en l'air.
+- **Island Rush** — L'île est plus vivante.
+  - De l'herbe pousse autour de soi, avec des fleurs des prés (marguerites, boutons d'or, lavande, coquelicots), et se balance au vent.
+  - En ville et au village : allées pavées jusqu'aux portes, parvis dallés devant les immeubles et les boutiques, haies taillées devant les jardins des maisons (on peut s'y abriter, les casser et en récolter du bois).
+  - Les cheminées fument ; la poussière se soulève à l'atterrissage et sous les pas de ceux qui sprintent ; murs et décor cassés projettent des débris, les explosions de la terre, les armes éjectent leurs douilles.
+  - Les vagues roulent vers les plages en lignes d'écume.
+  - Au crépuscule et le soir, lampadaires, lampes des portes et enseignes s'allument, avec des flaques de lumière sur la chaussée.
+- **Island Rush** — Butin plus lisible : chaque objet au sol a un faisceau et un halo à la couleur de sa rareté ; les coffres dorés fermés luisent et scintillent.
+- **Island Rush** — Les armes posées au sol retrouvent leur vraie taille.
+- **Island Rush** — Objets en main revus.
+  - Grenades, potions, bandages et trousses se voient dans la main (ils disparaissaient dans le poing).
+  - Vrai coup de pelle pour récolter, lancer de grenade par-dessus l'épaule, geste pour poser un tremplin ou construire.
+  - On enroule son bandage ou on ouvre sa trousse devant soi, on boit sa potion ; au rechargement, l'arme baisse et pivote.
+  - Accroupi, on garde son arme en joue au lieu de la pointer vers le sol.
+## 2.92 — 27 octobre 2026
+- **Tous les jeux** — Le volume de la musique et celui des effets se règlent dans chaque jeu, et chaque jeu retient son propre réglage.
+  - DavidSimulator, Tête de Calcul, Outbreak, Convoy Storm et Poké Duel : un bouton Volume dans la barre du haut ouvre un curseur Musique et un curseur Effets.
+  - Cyber Kart GP : bouton « 🎚️ Volume » au-dessus du bouton Musique, dans les menus et la pause.
+  - Fil Rouge et Mini-Golf Party, qui n'ont pas de musique : un curseur Effets (dans la pause pour Mini-Golf Party).
+  - Duo Drift, Bastion Clash, Birdie Party et Island Rush avaient déjà leur réglage.
+
+## 2.91 — 27 octobre 2026
+- **Birdie Party** — Le menu du jeu s'affiche aussi quand on lance la partie depuis le Hub, à plusieurs comme seul.
+  - L'hôte choisit le parcours, le moment de la journée, les équipes, les bots et le vent, puis lance la partie ; les autres voient ses choix en direct en attendant.
+  - En fin de partie, l'hôte peut rejouer ou revenir au menu pour changer de parcours, et tout le salon le suit.
+- **Birdie Party** — De nouveaux golfeurs : des personnages complets, avec des bras qui suivent le swing, un visage, des coiffures et des casquettes variées, un polo, un gant et des chaussures de golf. Chacun garde la même allure d'une partie à l'autre.
+- **Birdie Party** — Réglage du son : le bouton haut-parleur ouvre un curseur pour la musique et un pour les effets (frappes, foule, nature), retenus d'une partie à l'autre.
+- **Birdie Party** — La balle glisse moins sur le green : une approche s'arrête à quelques mètres au lieu de filer au loin, et un putt dans une pente s'emballe beaucoup moins.
+- **Birdie Party** — Correction : la partie ne reste plus figée quand l'écran du jeu a été masqué un instant (le tour suivant ne s'affichait plus), et un coup dont l'animation n'en finit pas se termine tout seul.
+
+## 2.90 — 27 octobre 2026
+- **Bastion Clash** — Plus besoin de la touche B pour construire : avec un VCS (ou un Drone) sélectionné, les touches 1 à 0 (et R) choisissent directement le bâtiment à poser.
+  - Sans ouvrier sélectionné, les chiffres rappellent toujours tes groupes de contrôle, et Ctrl + chiffre les assigne.
+- **Bastion Clash** — Sur la minimap, la zone que regarde ton allié s'affiche en rose, à côté de ton propre cadre blanc : tu vois tout de suite où il joue.
+- **Bastion Clash** — Graphismes améliorés.
+  - Le soleil vient du nord-ouest, comme l'ombrage du relief : bâtiments, unités et cristaux projettent des ombres plus longues et plus nettes, surtout quand on zoome.
+  - Le sol garde son détail de près sur toutes les cartes : brins d'herbe et cailloux dans la Vallée, cendres dans le Magma, neige et givre sur le Glacier, sable ridé dans le Canyon, béton fissuré dans les Ruines.
+  - La dalle de chaque QG est faite de plaques de blindage avec joints, rivets et traces d'usure.
+## 2.89 — 27 octobre 2026
+- **Birdie Party** — Les parties en ligne tiennent mieux la route.
+  - Tout le monde avance au même rythme : la partie attend que chacun ait fini de regarder un coup, et les bots attendent que tout le monde voie leur tour.
+  - Un joueur qui cache sa page ou perd sa connexion ne bloque plus les autres ; à son tour, son coup part tout seul au bout de 20 s (et au bout d'une minute pour quelqu'un qui ne joue pas, avec un rappel).
+  - En revenant après une absence, on rattrape la partie tout de suite au lieu de revoir chaque coup.
+  - Un coup qui ne part pas (perdu en route) rend la main au lieu de figer le joueur.
+  - Les trous se chargent beaucoup plus vite, et la balle roule en accéléré une fois au sol.
+
+## 2.88 — 26 octobre 2026
+- Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)
+
+## 2.87 — 26 octobre 2026
+- **Birdie Party** — Correction : résolution du crash Birdie Party, repli WebGL et fiabilisation des logs (Amiel)
 
 ## 2.86 — 26 octobre 2026
 - **Mini-Golf Party** — À plusieurs, la balle des autres avance de façon fluide : elle ne saute plus en arrière et ne revient plus à sa position de départ en s'arrêtant.

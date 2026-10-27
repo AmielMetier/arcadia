@@ -105,7 +105,8 @@ ok(A.R.netStats().resumed >= 1, 'coupure nette : place reprise sur le serveur');
 /* ---------- 2. connexion figée (wifi mort sans fermeture) ---------- */
 p2.freeze();
 await Promise.all([burst(H, idB, 'c2', 20), burst(B, 'host', 'c2', 20)]);
-ok(await until(() => inOrder(seqOf(B.log, 'c2'), 20) && inOrder(seqOf(H.log, 'c2'), 20), 12000), 'connexion figée : détectée et reprise, messages complets ' + JSON.stringify([seqOf(B.log, 'c2'), seqOf(H.log, 'c2').length]));
+// une sonde sans réponse pendant 14 s (DEAD_MS) signe une connexion morte : on laisse le temps de la détecter et de reprendre
+ok(await until(() => inOrder(seqOf(B.log, 'c2'), 20) && inOrder(seqOf(H.log, 'c2'), 20), 24000), 'connexion figée : détectée et reprise, messages complets ' + JSON.stringify([seqOf(B.log, 'c2'), seqOf(H.log, 'c2').length]));
 ok(B.log.ev.includes('net:down') && B.log.ev.includes('net:up'), 'connexion figée : le joueur voit la coupure puis le retour');
 ok(H.R.players.length === 3 && !H.R.players.some((p) => p.away), 'connexion figée : même salon, plus personne en reconnexion');
 

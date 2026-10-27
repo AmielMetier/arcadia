@@ -6,11 +6,15 @@ import { buildSky, buildPeaks, skyFor, TIMES } from './sky.js';
 import { noiseTexture } from './textures.js';
 import { createPost } from './post.js';
 import { buildTerrain, buildDecals } from './terrain.js';
+import { buildRoads } from './roads.js';
+import { createGrass } from './grass.js';
+import { buildNightLights } from './lights.js';
 import { buildWater } from './water.js';
 import { buildStructures } from './structures.js';
 import { buildInterior } from './interior.js';
 import { buildForest, buildProps } from './props.js';
 import { SWAY } from './trees.js';
+import { loadKit } from './kit.js';
 
 export const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
 const DAY = { dir: [-0.45, 0.78, -0.42], sunColor: 0xffeed4, sunInt: 4.0, hemiSky: 0xc4d8f0, hemiGround: 0x34481f, hemiInt: 0.5, exposure: 0.95, env: 0.32 };
@@ -61,15 +65,23 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const terrain = buildTerrain(map, { noise, anisotropy: renderer.capabilities.getMaxAnisotropy() });
   scene.add(terrain.group);
   const decals = buildDecals(map); scene.add(decals.group);
+  const roads = await buildRoads(map, { anisotropy: renderer.capabilities.getMaxAnisotropy() }); scene.add(roads.group);
+  const grass = createGrass(map, terrain.ground, { mobile: MOBILE }); scene.add(grass.group);
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
-  const structures = buildStructures(map); scene.add(structures.group);
+  const structures = buildStructures(map, { time }); scene.add(structures.group);
   progress('Meubles et portes', 0.56); await breathe();
   const interior = buildInterior(map); scene.add(interior.group);
   progress('Forêts', 0.62); await breathe();
   const forest = buildForest(map); scene.add(forest.group);
+  progress('Soldats, armes et décor', 0.68); await breathe();
+  const kit = await loadKit(new URL('../models/', import.meta.url).href);
   progress('Décor', 0.72); await breathe();
-  const props = await buildProps(map, { base: new URL('../models/', import.meta.url).href }); scene.add(props.group);
+  const props = await buildProps(map, { base: new URL('../models/', import.meta.url).href, kit }); scene.add(props.group);
+  // au crépuscule et le soir, lampadaires et lampes des portes allumés
+  const night = time === 'soir' ? 1 : time === 'crepuscule' ? 0.45 : 0;
+  const lights = night > 0 ? buildNightLights(props.lampHeads, structures.bulbs || [], night) : null;
+  if (lights) scene.add(lights.group);
 
   // qualité : résolution, effets ; baissée automatiquement si la machine peine
   const post = MOBILE ? null : createPost(renderer);
@@ -79,6 +91,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     const setPr = (v) => { renderer.setPixelRatio(v); resize(); return 'résolution ' + v.toFixed(2); };
     if (pr > 1.01) return setPr(Math.max(1, pr * 0.85));
     for (const k of ['ao', 'bloom']) if (quality[k]) { quality[k] = false; return k; }
+    if (grass.range > 24) { grass.shrink(); return 'herbe'; }
     if (sun.castShadow && sun.shadow.mapSize.x > 1024) { sun.shadow.mapSize.set(1024, 1024); sun.shadow.map && sun.shadow.map.dispose(); sun.shadow.map = null; return 'ombres'; }
     if (pr > 0.76) return setPr(Math.max(0.75, pr * 0.85));
     return null;
@@ -113,6 +126,12 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (Math.abs(camera.near - near) > 0.002) { camera.near = near; camera.updateProjectionMatrix(); }
     terrain.update(camera.position.x, camera.position.z, 2);
     forest.update(camera.position.x, camera.position.z, 1);
+    // l'herbe pousse autour du joueur ; inutile vue de la montgolfière ou en chute libre
+    grass.group.visible = camera.position.y - map.heightAt(camera.position.x, camera.position.z) < 70;
+    if (grass.group.visible) grass.update(focus, 2);
+    // de loin, on ne voit ni les meubles ni les petits ornements des façades
+    interior.cull(camera.position.x, camera.position.z);
+    structures.cull(camera.position.x, camera.position.z);
     // l'ombre couvre ce qui est autour du joueur, sans dépendre de la direction du regard, calée au texel près
     const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
     sc.set(focus.x, focus.y, focus.z);
@@ -132,7 +151,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (disposed) return;
     disposed = true;
     removeEventListener('resize', resize);
-    terrain.dispose(); decals.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
+    terrain.dispose(); decals.dispose(); roads.dispose(); grass.dispose(); lights && lights.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
     scene.traverse((o) => {
       if ((o.isMesh || o.isPoints) && !o.userData.shared && !o.isInstancedMesh) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });
@@ -141,5 +160,5 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     canvas.remove();
   }
 
-  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, MOBILE };
+  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, kit, lights, MOBILE };
 }

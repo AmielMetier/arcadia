@@ -252,6 +252,9 @@ export function scorecardHtml(R, holes, { final = false, ranking = null, canRepl
   </table>`).join('');
   const pod = final && ranking ? `<ol class="podium">${ranking.map((x) => `<li class="rk r${Math.min(x.rank, 4)}"><b class="medal">${x.rank}</b><i style="background:${esc(x.color)}"></i><span>${esc(x.name)}</span><em>${x.strokes} coups · <strong>${toParTxt(x.toPar)}</strong></em></li>`).join('')}</ol>` : '';
   const legend = '<p class="sc-legend"><span><span class="eagle">2</span> eagle</span><span><span class="birdie">3</span> birdie</span><span><span class="bogey">5</span> bogey</span><span><span class="worse">6</span> double et plus</span></p>';
-  const btns = final ? `<div class="sheet-actions">${canReplay ? '<button class="btn primary big" id="btnAgain">Rejouer</button>' : ''}<button class="btn secondary big" id="btnQuit">${embedded ? 'Retour au salon' : 'Menu principal'}</button></div>` : '';
+  // fin de partie : rejouer ou changer de parcours (l'hôte, ou le joueur seul) ; un invité attend que l'hôte choisisse
+  const btns = !final ? '' : `<div class="sheet-actions">${canReplay
+    ? `<button class="btn primary big" id="btnAgain">Rejouer</button>${embedded ? '<button class="btn secondary big" id="btnMenu">Changer de parcours</button>' : ''}`
+    : '<p class="wait-host" role="status"><i aria-hidden="true"></i>L\'hôte choisit la suite : rejouer ou changer de parcours</p>'}<button class="btn ${canReplay && embedded ? 'ghost' : 'secondary big'}" id="btnQuit">${embedded ? 'Retour au salon' : 'Menu principal'}</button></div>`;
   return `<div class="sheet ${final ? 'final' : ''}" role="dialog" aria-label="${esc(title)}"><h2>${esc(title)}</h2>${pod}<div class="tables">${tables}</div>${legend}${btns}</div>`;
 }

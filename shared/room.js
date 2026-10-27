@@ -193,6 +193,12 @@ removePlayer(R.players[i]);
     function onHostLost(reason) {
       const others = R.players.filter((q) => q.id !== R.myId).map((q) => q.id).sort((a, b) => a - b);
       if (reason !== 'expired' || !others.length) return false;
+      // Si une partie est en cours, ne pas abandonner le rôle d'hôte immédiatement sur un hoquet réseau
+      if (R.game && R.isHost && (!R.lostHostAt || Date.now() - R.lostHostAt < 20000)) {
+        if (!R.lostHostAt) R.lostHostAt = Date.now();
+        return false;
+      }
+      R.lostHostAt = 0;
       const succ = others[0], succName = (R.players.find((q) => q.id === succ) || {}).name || '?';
       const me = R.me || { name: 'Joueur', color: PALETTE[0], lvl: 1 };
       migrating = true;

@@ -22,8 +22,8 @@ const MAX_T = 45;             // s : sécurité
 export const SURF = {
   tee: { e: 0.3, f: 0.55, roll: 0.12 },
   fairway: { e: 0.3, f: 0.55, roll: 0.12 },
-  fringe: { e: 0.26, f: 0.55, roll: 0.09 },
-  green: { e: 0.22, f: 0.6, roll: 0.065 },
+  fringe: { e: 0.24, f: 0.45, roll: 0.13 },
+  green: { e: 0.18, f: 0.42, roll: 0.1 },   // la balle mord le green : une approche s'arrête à quelques mètres
   rough: { e: 0.15, f: 0.35, roll: 0.38 },
   bunker: { e: 0.03, f: 0.12, roll: 1.4 },
   beach: { e: 0.03, f: 0.12, roll: 1.4 },

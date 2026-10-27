@@ -19,9 +19,15 @@ function kernel(n) {
 }
 
 export function createPost(renderer) {
-  // profondeur en 32 bits flottants : assez précise au loin (sinon l'occlusion dessine des bandes)
-  const depth = new THREE.DepthTexture(1, 1); depth.type = THREE.FloatType;
-  const main = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: depth });
+  // profondeur en 32 bits flottants si possible, sinon fallback sur type standard
+  const depth = new THREE.DepthTexture(1, 1);
+  try { depth.type = THREE.FloatType; } catch (e) { depth.type = THREE.UnsignedIntType; }
+  let main;
+  try {
+    main = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: depth });
+  } catch (e) {
+    main = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0, depthTexture: depth });
+  }
   const lin = { type: THREE.HalfFloatType, depthBuffer: false };
   const aoRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
   const aoBlur = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
@@ -130,24 +136,30 @@ export function createPost(renderer) {
       blurMat.uniforms.uTexel.value.set(2 / w, 2 / h);
     },
     render(scene, camera, t) {
-      renderer.setRenderTarget(main);
-      renderer.render(scene, camera);
-      if (q.ao) {
-        aoMat.uniforms.uProj.value.copy(camera.projectionMatrix);
-        aoMat.uniforms.uInv.value.copy(camera.projectionMatrixInverse);
-        blurMat.uniforms.uNear.value = camera.near; blurMat.uniforms.uFar.value = camera.far;
-        pass(aoMat, aoRT);
-        pass(blurMat, aoBlur);
+      try {
+        renderer.setRenderTarget(main);
+        renderer.render(scene, camera);
+        if (q.ao) {
+          aoMat.uniforms.uProj.value.copy(camera.projectionMatrix);
+          aoMat.uniforms.uInv.value.copy(camera.projectionMatrixInverse);
+          blurMat.uniforms.uNear.value = camera.near; blurMat.uniforms.uFar.value = camera.far;
+          pass(aoMat, aoRT);
+          pass(blurMat, aoBlur);
+        }
+        if (q.bloom) {
+          pass(brightMat, bloomA);
+          gaussMat.uniforms.tex.value = bloomA.texture; gaussMat.uniforms.uDir.value.set(4 / W, 0); pass(gaussMat, bloomB);
+          gaussMat.uniforms.tex.value = bloomB.texture; gaussMat.uniforms.uDir.value.set(0, 4 / H); pass(gaussMat, bloomA);
+          gaussMat.uniforms.tex.value = bloomA.texture; gaussMat.uniforms.uDir.value.set(9 / W, 0); pass(gaussMat, bloomB);
+          gaussMat.uniforms.tex.value = bloomB.texture; gaussMat.uniforms.uDir.value.set(0, 9 / H); pass(gaussMat, bloomA);
+        }
+        finalMat.uniforms.uAO.value = q.ao ? 1 : 0; finalMat.uniforms.uBloom.value = q.bloom ? 0.28 : 0; finalMat.uniforms.uT.value = t % 100;
+        pass(finalMat, null);
+      } catch (err) {
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+        throw err;
       }
-      if (q.bloom) {
-        pass(brightMat, bloomA);
-        gaussMat.uniforms.tex.value = bloomA.texture; gaussMat.uniforms.uDir.value.set(4 / W, 0); pass(gaussMat, bloomB);
-        gaussMat.uniforms.tex.value = bloomB.texture; gaussMat.uniforms.uDir.value.set(0, 4 / H); pass(gaussMat, bloomA);
-        gaussMat.uniforms.tex.value = bloomA.texture; gaussMat.uniforms.uDir.value.set(9 / W, 0); pass(gaussMat, bloomB);
-        gaussMat.uniforms.tex.value = bloomB.texture; gaussMat.uniforms.uDir.value.set(0, 9 / H); pass(gaussMat, bloomA);
-      }
-      finalMat.uniforms.uAO.value = q.ao ? 1 : 0; finalMat.uniforms.uBloom.value = q.bloom ? 0.28 : 0; finalMat.uniforms.uT.value = t % 100;
-      pass(finalMat, null);
     },
     dispose() {
       for (const r of [main, aoRT, aoBlur, bloomA, bloomB]) r.dispose();
