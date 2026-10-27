@@ -203,7 +203,8 @@ window.HUB_GAMES = [
     settings: [
       { key: 'mode', label: 'Mode', options: [['partie', 'Battle royale'], ['exploration', 'Exploration · sans combat']], def: 'partie' },
       { key: 'places', label: 'Joueurs sur l\'île', options: [[30, '30'], [45, '45'], [60, '60']], def: 45 },
-      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['difficile', 'Difficile']], def: 'normal' },
+      { key: 'teams', label: 'Équipes', options: [[1, 'Solo'], [2, 'Duos'], [3, 'Trios']], def: 1, notMode: 'exploration' },
+      { key: 'level', label: 'Niveau des bots', options: [['auto', 'Auto (selon vos parties)'], ['facile', 'Facile'], ['normal', 'Moyen'], ['difficile', 'Difficile']], def: 'auto' },
       { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
     ],
     cover: 'royale/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau

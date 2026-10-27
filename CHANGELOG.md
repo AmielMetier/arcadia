@@ -1,5 +1,19 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.3 — 27 octobre 2026
+- **Island Rush** — L'île ne se vide plus en deux minutes : les bots se battent de plus en plus au fil des cercles de la tempête, et la partie dure jusqu'au dernier cercle (une dizaine de minutes).
+  - Ils se posent répartis sur toute l'île au lieu de s'empiler, et 5 au plus atterrissent près de toi.
+- **Island Rush** — Équipes : solo, duos ou trios, au choix dans le salon. Les places libres de ton équipe sont prises par des bots coéquipiers qui sautent avec toi, te suivent et te relèvent.
+  - À 0 PV, tu tombes à terre : tu rampes, et un coéquipier te relève en restant 5 s à côté de toi (E). Sans aide au bout de 30 s, ou si toute l'équipe est à terre, c'est l'élimination.
+  - Sur l'écran d'accueil, chacun choisit son équipe. En jeu, tes coéquipiers ont leur pseudo au-dessus de la tête, leur point sur la carte et un panneau avec leur vie.
+- **Island Rush** — Repères d'équipe : B ou le clic molette marque ce que tu vises (un ennemi, du butin, un largage, ou simplement « Ici »). Tes coéquipiers le voient 12 secondes, sur l'écran et sur la carte, même dans leur dos (le repère se colle au bord de l'écran). Depuis la montgolfière, tu montres où tu vas te poser.
+  - Tes bots coéquipiers vont où tu leur montres, s'occupent de l'ennemi que tu désignes, et te signalent ceux qu'ils voient.
+- **Island Rush** — Largages : quatre fois par partie, une caisse descend en parachute dans le cercle, annoncée et marquée d'un losange violet sur la carte. Elle contient une arme épique, une grande potion de bouclier et une trousse de soin… et les bots la veulent aussi.
+- **Island Rush** — Les bots se protègent : touchés de loin, ils posent un mur et rechargent à l'abri ; bien amochés, ils décrochent pour se soigner.
+- **Island Rush** — Chaque coffre contient un petit bouclier.
+- **Island Rush** — Niveau des bots « Auto », le nouveau réglage par défaut : il suit vos dernières parties, avec plus de bots faciles pour qui débute et plus de coriaces pour qui gagne souvent.
+- **Island Rush** — Fin de partie : un bilan (précision, distance parcourue, temps de survie, coéquipiers relevés, qui t'a éliminé), et « Rejouer » relance tout de suite, sans recharger la page, pour toi comme pour tes invités.
+- **Island Rush** — Chargement plus rapide : les personnages pèsent 1 Mo au lieu de 4.
 ## 3.2 — 27 octobre 2026
 - **Poké Duel** — Les tournois comptent enfin au classement entre potes, avec leur onglet et le record de matchs gagnés.
   - Chacun prend la place que lui donne le tableau : champion, finaliste, puis demi-finalistes et quarts de finalistes.

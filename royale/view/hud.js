@@ -3,6 +3,8 @@
 // (pioche + 5 cases, couleur de rareté) ; munitions ; viseur qui s'ouvre avec la dispersion, marqueur de touche,
 // chiffres de dégâts, direction des tirs reçus, jauge ronde de soin et de rechargement, lunette du fusil de
 // précision, messages au centre ; le sac (Tab) où l'on range ses objets en les glissant ; la grande carte (M).
+// En équipe : les coéquipiers (vie, bouclier, à terre) au-dessus de la vie, leur pseudo au-dessus de leur tête, leur
+// point sur les cartes, et le bandeau « à terre » avec ce qu'il reste de réserve et le relevé en cours.
 // Les cartes sont dessinées par view/maprender.js, comme l'aperçu de l'île.
 import { terrainImage, drawMap, gridRef } from './maprender.js';
 import { GROUND } from '../engine/map.js';
@@ -75,13 +77,33 @@ export function createHud(map, { onTeleport, project } = {}) {
   };
 
   // ------------------------------------------------------------------ cartes
-  function maps(t, p, yaw, frameMs) {
+  let mates = [], marks = [];
+  // repères et largages : un losange de leur couleur
+  const markDots = (ctx, cx, cz, s, W, H) => {
+    for (const m of marks) {
+      const x = Math.max(6, Math.min(W - 6, (m.x - cx) * s + W / 2)), y = Math.max(6, Math.min(H - 6, (m.z - cz) * s + H / 2)), r = m.big ? 7 : 5.5;
+      ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+      ctx.fillStyle = m.color; ctx.strokeStyle = '#16181d'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+    }
+  };
+  const mateDots = (ctx, cx, cz, s, W, H) => {
+    for (const m of mates) {
+      const x = (m.x - cx) * s + W / 2, y = (m.z - cz) * s + H / 2;
+      if (x < 4 || y < 4 || x > W - 4 || y > H - 4) continue;
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = m.down ? '#ff5a4a' : m.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+    }
+  };
+  function maps(t, p, yaw, frameMs, team = [], mk = []) {
+    mates = team; marks = mk;
     if (t - last > 0.12) {
       last = t;
       const W = mini.clientWidth, H = mini.clientHeight, d = dpr();
       if (mini.width !== Math.round(W * d)) { mini.width = Math.round(W * d); mini.height = Math.round(H * d); }
       drawMap(mctx, map, img, { x: p.x, z: p.z, s: MINI_S, w: W, h: H, dpr: d }, mapOpts(LAY_MINI));
       mctx.setTransform(d, 0, 0, d, 0, 0);
+      markDots(mctx, p.x, p.z, MINI_S, W, H);
+      mateDots(mctx, p.x, p.z, MINI_S, W, H);
       arrow(mctx, W / 2, H / 2, yaw);
       const poi = map.poiAt(p.x, p.z);
       place.innerHTML = `<em>${gridRef(map, p.x, p.z)}</em>${esc(poi ? poi.name : GROUND[map.groundAt(p.x, p.z)])}`;
@@ -95,6 +117,8 @@ export function createHud(map, { onTeleport, project } = {}) {
     if (!bigView) bigView = { x: map.center, z: map.center, s: Math.min(W, H) / (map.stats.spanM + 120) };
     drawMap(bctx, map, img, { ...bigView, w: W, h: H, dpr: d }, mapOpts(LAY_BIG));
     bctx.setTransform(d, 0, 0, d, 0, 0);
+    markDots(bctx, bigView.x, bigView.z, bigView.s, W, H);
+    mateDots(bctx, bigView.x, bigView.z, bigView.s, W, H);
     arrow(bctx, (p.x - bigView.x) * bigView.s + W / 2, (p.z - bigView.z) * bigView.s + H / 2, yaw, 12);
   }
   bcv.addEventListener('click', (e) => {
@@ -163,7 +187,8 @@ export function createHud(map, { onTeleport, project } = {}) {
     }
     // jauge ronde : soin, bouclier ou rechargement
     let f = -1, label = '', kind = '';
-    if (P.use && P.use.T) { f = P.use.t / P.use.T; const I = ITEMS[P.use.c]; label = I ? I.label : 'Soin'; kind = I && I.shield ? 'shield' : 'heal'; }
+    if (extra.revive) { f = extra.revive.f; label = 'Relève ' + extra.revive.name; kind = 'heal'; }
+    else if (P.use && P.use.T) { f = P.use.t / P.use.T; const I = ITEMS[P.use.c]; label = I ? I.label : 'Soin'; kind = I && I.shield ? 'shield' : 'heal'; }
     else if (P.rl > 0 && held && held.t === 'arme') { f = 1 - P.rl / WEAPONS[held.w].reload[held.r]; label = 'Rechargement'; }
     gauge.hidden = f < 0;
     if (f >= 0) {
@@ -171,6 +196,63 @@ export function createHud(map, { onTeleport, project } = {}) {
       gauge.querySelector('.fg').style.strokeDashoffset = (113.1 * (1 - Math.min(1, f))).toFixed(1);
       gauge.querySelector('span').textContent = label;
     }
+  }
+  // ------------------------------------------------------------------ équipe
+  const teamEl = $('#team'), tagsEl = $('#tags'), downEl = $('#downed');
+  let teamKey = '';
+  // list : [{ id, name, color, hp, sh, down (réserve 0-100 ou null), alive }]
+  function team(list) {
+    teamEl.hidden = !list.length;
+    const k = list.map((m) => `${m.id}:${Math.round(m.hp)}:${Math.round(m.sh)}:${m.down == null ? '' : Math.round(m.down)}:${m.alive}`).join('|');
+    if (k === teamKey) return;
+    teamKey = k;
+    teamEl.innerHTML = list.map((m) => `<div class="m${!m.alive ? ' out' : m.down != null ? ' down' : ''}" style="--c:${esc(m.color)}"><i></i><span>${esc(m.name)}${!m.alive ? ' · éliminé' : m.down != null ? ' · à terre' : ''}</span>
+      <span class="bars"><span class="s"><b style="width:${m.down != null || !m.alive ? 0 : Math.max(0, m.sh)}%"></b></span><span class="h"><b style="width:${!m.alive ? 0 : m.down != null ? m.down : Math.max(0, m.hp)}%"></b></span></span></div>`).join('');
+  }
+  // pseudos des coéquipiers au-dessus de leur tête (à travers les murs) : [{ id, name, color, x, y, z, down }]
+  const tagEls = new Map();
+  function tags(list) {
+    const seen = new Set();
+    for (const m of list) {
+      const q = project(m.x, m.y, m.z);
+      if (!q.on) continue;
+      let el = tagEls.get(m.id);
+      if (!el) { el = document.createElement('div'); el.className = 'tag'; tagsEl.appendChild(el); tagEls.set(m.id, el); }
+      const html = esc(m.name) + (m.down ? ' · à terre' : '');
+      if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = `<span>${html}</span>`; }
+      el.classList.toggle('down', !!m.down);
+      el.style.setProperty('--c', m.color);
+      el.style.left = q.x.toFixed(0) + 'px'; el.style.top = q.y.toFixed(0) + 'px';
+      seen.add(m.id);
+    }
+    for (const [id, el] of tagEls) el.hidden = !seen.has(id);
+  }
+  // repères à l'écran : [{ key, x, y, z, label, sub, color, fade (0-1), rel (angle par rapport au regard) }] ;
+  // hors champ, ils se collent au bord, du côté où il faut se tourner
+  const pingsEl = $('#pings'), pingEls = new Map();
+  function pings(list) {
+    const seen = new Set(), W = pingsEl.clientWidth, H = pingsEl.clientHeight;
+    for (const m of list) {
+      let el = pingEls.get(m.key);
+      if (!el) { el = document.createElement('div'); el.className = 'ping'; pingsEl.appendChild(el); pingEls.set(m.key, el); }
+      const html = `<i></i><b>${esc(m.label)}</b><small>${esc(m.sub)}</small>`;
+      if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+      const q = project(m.x, m.y, m.z);
+      let x = q.x, y = q.y;
+      const edge = !q.on;
+      if (edge) { x = W / 2 + Math.sin(m.rel) * W * 0.46; y = H / 2 - Math.cos(m.rel) * H * 0.42; }
+      el.classList.toggle('edge', edge);
+      el.style.setProperty('--c', m.color); el.style.opacity = m.fade.toFixed(2);
+      el.style.left = Math.max(30, Math.min(W - 30, x)).toFixed(0) + 'px'; el.style.top = Math.max(40, Math.min(H - 30, y)).toFixed(0) + 'px';
+      seen.add(m.key);
+    }
+    for (const [k, el] of pingEls) if (!seen.has(k)) { el.remove(); pingEls.delete(k); }
+  }
+  // à terre : ce qu'il reste (secondes) et, si un coéquipier relève, où il en est
+  function downed(st) {
+    downEl.hidden = !st;
+    if (!st) return;
+    downEl.innerHTML = `<b>À terre</b>${st.by ? `${esc(st.by)} te relève…` : `Encore ${Math.ceil(st.left)} s · rampe vers tes coéquipiers`}<div class="bt"><i style="width:${(st.by ? st.f : st.left / 30) * 100}%;${st.by ? 'background:#4ade80' : ''}"></i></div>`;
   }
   function storm(st, me) {
     S.storm = st && st.cur ? st : null;
@@ -318,7 +400,7 @@ export function createHud(map, { onTeleport, project } = {}) {
     clearTimeout(gainT); gainT = setTimeout(() => { el.className = 'gain'; }, 700);
   }
   return {
-    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain,
+    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain, team, tags, downed, pings,
     get mapOpen() { return !big.hidden; },
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },

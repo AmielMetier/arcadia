@@ -327,6 +327,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       if (st.mode === 'chute' || st.mode === 'planeur') play('Jump_Idle', 0.3);
       else if (st.swim) play(sp > 0.4 ? 'Run' : 'Jump_Idle', 0.25, sp > 0.4 ? 0.55 : 0.5);
       else if (air > 0.18) play('Jump_Idle', 0.15);
+      else if (st.down) play('Duck', 0.2, sp > 0.3 ? 0.8 : 0.12); // à terre : recroquevillé, il avance à peine
       else if (st.crouch) play('Duck', 0.15, sp > 0.4 ? 1.2 : 0.4);
       else if (sp > 0.5) play(gun ? 'Run_Gun' : 'Run', 0.15, clamp(sp / 5.6, 0.55, 1.45));
       else if (gun) play('Idle_Shoot', 0.18, 0);   // arme épaulée, immobile

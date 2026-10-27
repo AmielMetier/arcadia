@@ -1,13 +1,14 @@
 // Island Rush — la partie. Simulation qui fait autorité (en solo et chez l'hôte) : joueurs et bots, commandes,
 // montgolfière, chute libre et planeur, inventaire de 5 cases, butin au sol, coffres et caisses de munitions,
 // portes, tirs (balles, plombs, roquettes, grenades), soins et boucliers, rechargement, tempête, éliminations,
-// classement. Moteur PUR à pas fixe ; tout ce qui se voit ou s'entend sort en événements (sim.takeEvents()).
+// classement ; en équipes (duos, trios) : pas de tir ami, un joueur à 0 PV tombe « à terre » et un coéquipier peut le
+// relever. Moteur PUR à pas fixe ; tout ce qui se voit ou s'entend sort en événements (sim.takeEvents()).
 // Les bots (engine/ai.js) et la construction (engine/build.js) se branchent par S.hooks.
 import { makeRng, hash } from './rng.js';
 import { CELL } from './buildings.js';
 import { newPlayer, stepPlayer, stepAir, MOVE } from './player.js';
 import { planStorm, planFlight, STORM_TIMES } from './map.js';
-import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, weaponDamage, weapon, item, ammo, mats } from './items.js';
+import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, rollDrop, weaponDamage, weapon, item, ammo, mats } from './items.js';
 
 export const DT = 1 / 60;
 export const HP = 100, SHIELD = 100;
@@ -21,15 +22,25 @@ const FALL_SAFE = 8;               // m de chute sans dégâts
 const OMEGA = (() => { const w = 7.292e-5 * 60, lat = 46 * Math.PI / 180; return [0, w * Math.sin(lat), w * Math.cos(lat)]; })();
 const STORM_START = 30;           // s après le départ de la montgolfière
 const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
+// équipes : à terre, on rampe (CRAWL × la vitesse) et sa réserve (DOWN_HP) fond en BLEED s ; un coéquipier immobile à
+// moins de REVIVE_R m le relève en REVIVE s (E), avec RAISE_HP points de vie
+export const CRAWL = 0.35, DOWN_HP = 100, BLEED = 30, REVIVE = 5, REVIVE_R = 2.4, RAISE_HP = 30;
+// repères d'équipe : un par joueur, visible PING_T secondes par ses coéquipiers ; sortes : ici, ennemi, butin, largage
+export const PING_T = 12, PING_KINDS = ['ici', 'ennemi', 'butin', 'largage'];
+// largages : au début des quatre premières fermetures de la tempête, une caisse descend en parachute (DROP_H m à
+// DROP_SPEED m/s, ≈ 26 s) quelque part dans le prochain cercle ; posée, elle s'ouvre comme un coffre (engine/items.js)
+export const DROP_H = 110, DROP_SPEED = 4.2, DROP_PHASES = 4;
+export const dropY = (d, t) => d.gy + Math.max(0, DROP_H - (t - d.t0) * DROP_SPEED);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
 const emptyInput = () => ({ mx: 0, mz: 0, yaw: 0, pitch: 0, fire: false, aim: false, sprint: false, crouch: false, jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, sel: 1, build: null, place: 0, rotate: 0, edit: 0, mv: null });
 
-export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', start = null } = {}) {
+export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', start = null, teams = 1 } = {}) {
   const rng = makeRng(hash(seed * 31 + 7));
+  const TEAMS = mode !== 'exploration' && teams > 1;
   const S = {
-    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol',
+    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null, pings: new Map(), drops: new Map(), nextDrop: 1,
     players: new Map(), items: new Map(), nextItem: 1, chests: new Map(), projectiles: [], pads: [], nextProj: 1,
     flight: null, storm: null, order: [], winner: null, events: [], hooks: {}, stormTick: 0,
   };
@@ -55,6 +66,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   // ------------------------------------------------------------------ joueurs
   function addPlayer(r) {
     const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, look: r.look || 'soldat', bot: !!r.bot, level: r.level || 'normal',
+      team: TEAMS && r.team != null ? r.team : null, down: null, revive: null,
+      // bilan de fin : tirs (et ceux qui ont touché), distance au sol, relevés, quand et par qui on a été éliminé
+      shots: 0, hits: 0, dist: 0, revives: 0, outT: null, outBy: null, outHow: null,
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
       inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };
@@ -63,6 +77,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   for (const r of roster) addPlayer(r);
   const alive = () => [...S.players.values()].filter((p) => p.alive);
+  // coéquipiers (jamais soi-même) ; équipes encore en lice
+  const mates = (a, b) => TEAMS && a !== b && a.team != null && a.team === b.team;
+  const teamOf = (P) => [...S.players.values()].filter((q) => q === P || mates(P, q));
+  const liveTeams = () => new Set(alive().map((p) => (TEAMS ? p.team : p.id))).size;
 
   // départ : la montgolfière (partie) ou la ville (exploration)
   if (S.phase === 'vol') {
@@ -168,6 +186,25 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       spawnItem(it, c.x + fx * 1.1 - fz * a, c.y + 0.5, c.z + fz * 1.1 + fx * a);
     });
   }
+  // largage : quelque part dans le prochain cercle, sur la terre ferme ; ouvert, son butin jaillit autour
+  function spawnDrop() {
+    const c = S.storm && S.storm.next;
+    if (!c) return;
+    for (let i = 0; i < 40; i++) {
+      const a = rng.next() * Math.PI * 2, r = c.r * (0.15 + rng.next() * 0.55), x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+      if (x < 12 || z < 12 || x > map.size - 12 || z > map.size - 12 || map.waterAt(x, z) !== 0) continue;
+      const gy = world.support(x, z, 400), id = 'L' + S.nextDrop++;
+      S.drops.set(id, { id, x, z, y: gy, gy, t0: S.t, open: false, landed: false });
+      ev({ e: 'largage', id, x, z, gy, t0: S.t });
+      return;
+    }
+  }
+  function openDrop(P, d) {
+    d.open = true;
+    const list = rollDrop(makeRng(hash(seed * 911 + +d.id.slice(1))));
+    ev({ e: 'largage-ouvert', id: d.id, p: P.id });
+    list.forEach((it, k) => { const a = (k / list.length) * Math.PI * 2; spawnItem(it, d.x + Math.cos(a) * 1.5, d.gy + 0.6, d.z + Math.sin(a) * 1.5); });
+  }
   // ce que le joueur peut faire avec E : coffre, objet, porte (le plus proche de son regard)
   function target(P) {
     const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
@@ -180,7 +217,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const sc = d - facing * 1.2;
       if (sc < bs) { bs = sc; best = { kind, o }; }
     };
+    for (const Q of S.players.values()) if (Q.alive && Q.down && mates(P, Q)) consider('releve', Q, REVIVE_R, 1.6);
+    if (best) return best; // relever passe avant tout le reste
     for (const c of S.chests.values()) if (!c.open) consider('coffre', c, CHEST_R, 1.6);
+    for (const d of S.drops.values()) if (d.landed && !d.open) consider('largage', d, CHEST_R + 0.6, 2);
     for (const g of S.items.values()) if (g.it.t === 'arme' || g.it.t === 'objet') consider('objet', g, PICK_R, 1.6);
     // la porte la plus proche concourt avec la même règle (un peu moins prioritaire qu'un objet)
     const d = world.doorNear(P.x, P.y, P.z, fx, fz);
@@ -198,7 +238,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function interact(P) {
     const tg = target(P);
     if (!tg) return;
-    if (tg.kind === 'coffre') openChest(P, tg.o);
+    if (tg.kind === 'releve') { P.revive = { id: tg.o.id, t: 0 }; P.use = null; P.rl = 0; ev({ e: 'releve…', p: P.id, to: tg.o.id }); }
+    else if (tg.kind === 'coffre') openChest(P, tg.o);
+    else if (tg.kind === 'largage') openDrop(P, tg.o);
     else if (tg.kind === 'objet') pickUp(P, tg.o);
     else setDoor(tg.o, !tg.o.open, P);
   }
@@ -252,16 +294,41 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
+    if (by && mates(by, Q)) return; // pas de tir ami
+    if (Q.down) {
+      // à terre : les coups entament sa réserve ; à zéro, il est éliminé (par celui qui l'a mis à terre, à défaut)
+      Q.down.hp -= n;
+      if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
+      ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: false, x: Q.x, y: Q.y + 0.8, z: Q.z, cause: opt.cause || null });
+      if (Q.down.hp <= 0) eliminate(Q, by && by !== Q ? by : S.players.get(Q.down.by) || null, opt.cause || Q.down.cause);
+      return;
+    }
     // la tempête et les chutes enlèvent de la vie, pas du bouclier
     const toSh = opt.storm || opt.cause === 'chute' ? 0 : Math.min(Q.sh, n);
     Q.sh -= toSh; Q.hp -= n - toSh;
     if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
     ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: toSh > 0, x: Q.x, y: Q.y + 1.4, z: Q.z, cause: opt.cause || null });
-    if (Q.hp <= 0) eliminate(Q, by, opt.cause);
+    if (Q.hp <= 0) {
+      // en équipe, tant qu'un coéquipier tient debout : à terre plutôt qu'éliminé
+      if (TEAMS && teamOf(Q).some((q) => q !== Q && q.alive && !q.down)) knock(Q, by, opt.cause);
+      else eliminate(Q, by, opt.cause);
+    }
+  }
+  function knock(Q, by, cause) {
+    Q.hp = 0; Q.sh = 0; Q.use = null; Q.rl = 0; Q.revive = null; Q.sprint = false;
+    Q.down = { t: S.t, by: by && by !== Q ? by.id : null, cause: cause || null, hp: DOWN_HP };
+    ev({ e: 'abattu', to: Q.id, by: Q.down.by, cause: cause || null });
+  }
+  // une équipe dont tous les membres encore en vie sont à terre est éliminée
+  function wipe(team) {
+    if (!TEAMS || team == null) return;
+    const live = [...S.players.values()].filter((q) => q.alive && q.team === team);
+    if (!live.length || live.some((q) => !q.down)) return;
+    for (const q of live) if (q.alive) eliminate(q, S.players.get(q.down.by) || null, q.down.cause);
   }
   function shoot(P, it) {
     const W = WEAPONS[it.w];
-    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t;
+    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t; P.shots++;
     const o = eye(P), moving = Math.hypot(P.vx, P.vz) > 1;
     let sp = (P.inp.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2) + P.bloom;
     if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
@@ -279,6 +346,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       return;
     }
     const n = W.pellets || 1;
+    let touched = false;
     for (let k = 0; k < n; k++) {
       // dispersion dans un cône
       const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp;
@@ -286,9 +354,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const h = trace(P, o, d, W.range);
       const to = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t];
       ev({ e: 'tir', p: P.id, w: it.w, from: o, to, hit: h.who ? 2 : h.t < W.range ? 1 : 0, k });
-      if (h.who) damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w });
+      if (h.who) { if (!mates(P, h.who)) touched = true; damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w }); }
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[it.r] * W.struct, P, to);
     }
+    if (touched) P.hits++;
   }
   // balle du fusil de précision : pesanteur et Coriolis (a = −2 Ω × v), touche ce qu'elle croise pendant le pas
   function stepBullet(pr, dt) {
@@ -301,7 +370,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (h.t < step) {
       const to = [pr.x + d[0] * h.t, pr.y + d[1] * h.t, pr.z + d[2] * h.t];
       ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to, hit: h.who ? 2 : 1, k: 0, late: true });
-      if (h.who) damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w });
+      if (h.who) { if (owner && !mates(owner, h.who)) owner.hits++; damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w }); }
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[pr.it.r] * W.struct, owner || null, to);
       end(); return;
     }
@@ -311,6 +380,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function explode(x, y, z, owner, dmg, radius, struct, kind = 'boum') {
     ev({ e: 'boum', x, y, z, r: radius, kind });
     const by = S.players.get(owner);
+    let touched = false;
     for (const Q of S.players.values()) {
       if (!Q.alive || Q.mode === 'ballon') continue;
       const cy = Q.y + 0.9, dd = Math.hypot(Q.x - x, cy - y, Q.z - z);
@@ -319,8 +389,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const dx = (Q.x - x) / (dd || 1), dy = (cy - y) / (dd || 1), dz = (Q.z - z) / (dd || 1);
       const w = world.raycast(x - dx * 0.05, y - dy * 0.05, z - dz * 0.05, dx, dy, dz, dd);
       if (w.t < dd - 0.5) continue;
+      if (by && Q !== by && !mates(by, Q)) touched = true;
       damage(Q, dmg * (1 - 0.6 * dd / radius), by || null, { cause: kind === 'roquette' ? 'roquette' : 'grenade' });
     }
+    if (touched) by.hits++;
     if (S.hooks.blast) S.hooks.blast(x, y, z, radius, dmg * struct, by);
   }
   function blastPush(x, y, z, radius, push) {
@@ -469,9 +541,12 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ éliminations, fin
   function eliminate(Q, by, cause) {
-    Q.alive = false; Q.hp = 0; Q.use = null; Q.rl = 0;
+    Q.alive = false; Q.hp = 0; Q.use = null; Q.rl = 0; Q.down = null; Q.revive = null;
+    Q.outT = S.t; Q.outBy = by && by !== Q ? by.id : null; Q.outHow = cause || null;
     S.order.push(Q.id);
-    Q.place = alive().length + 1;
+    if (!TEAMS) Q.place = alive().length + 1;
+    // en équipe, la place se donne quand le dernier membre tombe (à toute l'équipe)
+    else if (!teamOf(Q).some((q) => q.alive)) { const place = liveTeams() + 1; for (const q of teamOf(Q)) q.place = place; }
     if (by && by !== Q) by.kills++;
     // tout ce qu'il portait tombe autour de lui
     const drops = [...Q.inv.filter(Boolean), ...Object.entries(Q.ammo).filter(([, n]) => n > 0).map(([a, n]) => ammo(a, n)),
@@ -482,16 +557,18 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     });
     Q.inv = [null, null, null, null, null]; for (const a in Q.ammo) Q.ammo[a] = 0; for (const m in Q.mats) Q.mats[m] = 0;
     ev({ e: 'elim', to: Q.id, by: by && by !== Q ? by.id : null, cause: cause || null, place: Q.place, left: alive().length });
+    wipe(Q.team);
     checkEnd();
   }
   function checkEnd() {
     if (S.mode === 'exploration' || S.winner || S.phase === 'fin') return;
     const live = alive();
-    if (live.length <= 1 && S.players.size > 1) {
+    if (liveTeams() <= 1 && S.players.size > 1 && (!TEAMS || new Set([...S.players.values()].map((p) => p.team)).size > 1)) {
       S.phase = 'fin';
       S.winner = live[0] ? live[0].id : S.order[S.order.length - 1];
-      if (live[0]) live[0].place = 1;
-      ev({ e: 'fin', winner: S.winner });
+      S.winTeam = TEAMS ? (S.players.get(S.winner) || {}).team ?? null : null;
+      for (const q of S.players.values()) if (TEAMS ? q.team === S.winTeam : q.id === S.winner) q.place = 1;
+      ev({ e: 'fin', winner: S.winner, team: S.winTeam });
     }
   }
   // un joueur quitte la partie (onglet fermé, retour au salon) : il est éliminé et lâche son sac
@@ -503,7 +580,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function results() {
     const list = [...S.players.values()].sort((a, b) => (a.place || 1) - (b.place || 1) || b.kills - a.kills);
-    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt) }));
+    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt), team: p.team,
+      shots: p.shots, hits: p.hits, dist: Math.round(p.dist), revives: p.revives, out: p.outT == null ? null : Math.round(p.outT), by: p.outBy, how: p.outHow }));
   }
 
   // ------------------------------------------------------------------ tempête
@@ -529,6 +607,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (k !== st.k) { st.k = k; ev({ e: 'tempete', k, state: st.state }); }
     st.next = C[Math.min(C.length - 1, k + 1)];
     st.dps = (STORM_TIMES[k] || STORM_TIMES[STORM_TIMES.length - 1]).dps;
+    if (S.mode === 'partie' && st.state === 'fermeture' && k < DROP_PHASES && st.dropK !== k) { st.dropK = k; spawnDrop(); }
     if (T < st.t0) return;
     // dégâts une fois par seconde, à ceux qui sont dehors (pas en l'air au-dessus de la montgolfière)
     S.stormTick += dt;
@@ -561,10 +640,20 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (stepAir(P, { ...inp, jump }, world, dt)) ev({ e: 'atterrit', p: P.id });
         continue;
       }
+      if (P.down) {
+        // à terre : on rampe, rien d'autre ; la réserve fond (la tempête l'entame aussi)
+        fired(P, 'jump'); fired(P, 'use'); fired(P, 'shoot'); fired(P, 'reload'); fired(P, 'drop');
+        stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump: false, sprint: false, crouch: true, k: CRAWL }, world, dt);
+        P.pitch = inp.pitch;
+        P.down.hp -= DOWN_HP / BLEED * dt;
+        if (P.down.hp <= 0) eliminate(P, S.players.get(P.down.by) || null, P.down.cause);
+        continue;
+      }
       const jump = fired(P, 'jump');
       const slow = P.use ? 0.5 : inp.aim ? 0.7 : 1;
-      const wasAir = !P.ground;
+      const wasAir = !P.ground, x0 = P.x, z0 = P.z;
       stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
+      P.dist += Math.hypot(P.x - x0, P.z - z0);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {
         // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
@@ -575,6 +664,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       // tombé hors de l'île ou sous la mer : on remonte au bord (sécurité)
       if (P.y < -30) { P.y = world.support(P.x, P.z, 400); P.vy = 0; }
       if (P.alive) act(P, dt);
+      if (P.revive) stepRevive(P, dt);
     }
     // un tiers de seconde de positions passées, pour viser juste malgré le décalage du réseau
     for (const P of S.players.values()) {
@@ -587,12 +677,36 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
     stepProjectiles(dt);
     stepStorm(dt);
+    for (const d of S.drops.values()) if (!d.landed && S.t - d.t0 >= DROP_H / DROP_SPEED) { d.landed = true; ev({ e: 'largage-pose', id: d.id, x: d.x, y: d.gy, z: d.z }); }
     if (S.hooks.step) S.hooks.step(dt);
+  }
+  // repère d'équipe (le dernier de chaque joueur compte) ; what : ce qu'il désigne (« Fusil d'assaut épique »…)
+  function ping(P, kind, x, y, z, target = null, what = '') {
+    if (!P || !P.alive || !PING_KINDS.includes(kind) || ![x, y, z].every(Number.isFinite)) return false;
+    const last = S.pings.get(P.id);
+    if (last && S.t - last.t < 0.35) return false; // pas de rafale
+    const pg = { p: P.id, team: P.team, kind, x, y, z, target: target ?? null, what: String(what || '').slice(0, 40), t: S.t };
+    S.pings.set(P.id, pg);
+    ev({ e: 'repere', ...pg });
+    return true;
+  }
+  // relever un coéquipier : rester à côté, immobile, sans tirer, REVIVE secondes
+  function stepRevive(P, dt) {
+    const Q = S.players.get(P.revive.id);
+    const moving = Math.abs(P.inp.mx) + Math.abs(P.inp.mz) > 0.1 || P.inp.fire;
+    if (!P.alive || P.down || !Q || !Q.alive || !Q.down || moving || Math.hypot(Q.x - P.x, Q.z - P.z) > REVIVE_R + 0.6) {
+      ev({ e: 'releve-', p: P.id, to: P.revive.id }); P.revive = null; return;
+    }
+    P.revive.t += dt;
+    if (P.revive.t >= REVIVE) {
+      Q.down = null; Q.hp = RAISE_HP; P.revive = null; P.revives++;
+      ev({ e: 'releve', to: Q.id, by: P.id });
+    }
   }
   function takeEvents() { const e = S.events; S.events = []; return e; }
 
   return {
-    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave,
+    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates, ping,
     player: (id) => S.players.get(id),
   };
 }

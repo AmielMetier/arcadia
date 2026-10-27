@@ -46,6 +46,8 @@ export class Input {
       if (!this.playing) return;
       if (e.button === 0) { this.fire = true; this.shots++; }
       if (e.button === 2) this.aim = true;
+      // clic molette : repère pour l'équipe (sans le défilement automatique du navigateur)
+      if (e.button === 1) { e.preventDefault(); this.h.ping && this.h.ping(); }
     });
     on(document, 'mouseup', (e) => { if (e.button === 0) this.fire = false; if (e.button === 2) this.aim = false; });
     on(window, 'wheel', (e) => { if (this.playing && this.h.wheel) this.h.wheel(Math.sign(e.deltaY)); }, { passive: true });

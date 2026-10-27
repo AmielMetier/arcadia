@@ -100,11 +100,19 @@ export function rollFloor(rng) {
   if (r < 0.88) return [item(rng.weighted(C_FLOOR))];
   return [ammo(rng.pick(Object.keys(AMMO).filter((a) => a !== 'roquettes')))];
 }
-// coffre : une arme et ses munitions, un consommable, des matériaux, parfois un second objet
+// coffre : une arme et ses munitions, toujours du bouclier (sans lui, un combat se joue en trois balles), un consommable,
+// des matériaux, parfois un second objet
+const C_SHIELD = [['potion_petite', 70], ['potion', 30]];
 export function rollChest(rng) {
-  const out = [...armed(rng, RAR_CHEST, W_CHEST), item(rng.weighted(C_CHEST)), mats(rng.pick(['bois', 'bois', 'pierre', 'metal']), 30)];
-  if (rng.chance(0.35)) out.push(item(rng.weighted(C_CHEST)));
+  const out = [...armed(rng, RAR_CHEST, W_CHEST), item(rng.weighted(C_SHIELD)), item(rng.weighted(C_CHEST)), mats(rng.pick(['bois', 'bois', 'pierre', 'metal']), 30)];
+  if (rng.chance(0.25)) out.push(item(rng.weighted(C_CHEST)));
   return out;
+}
+// largage : une arme épique et beaucoup de munitions, une grande potion de bouclier, une trousse de soin, du métal
+const W_DROP = [['fusil', 30], ['pompe', 20], ['smg', 20], ['sniper', 20], ['roquette', 10]];
+export function rollDrop(rng) {
+  const w = rng.weighted(W_DROP), A = WEAPONS[w].ammo;
+  return [weapon(w, 3), ammo(A, AMMO[A].drop * (w === 'roquette' ? 2 : 4)), item('potion'), item('soin'), mats('metal', 60)];
 }
 // caisse de munitions : deux sortes
 export function rollAmmoBox(rng) {

@@ -7,16 +7,19 @@
 import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
-import { createSim, DT, SHOULDER } from './engine/sim.js';
+import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP, PING_T } from './engine/sim.js';
 import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
+import { makeTeams, TEAM_LABEL } from './engine/teams.js';
+import { skillOf, botLevels, botMix, HIST_MAX } from './engine/skill.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
+import { createDrops } from './view/drops.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
 import { CHARACTERS } from './view/kit.js';
@@ -39,7 +42,7 @@ const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Li
 const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
 const LOOKS = Object.keys(CHARACTERS);
 const cleanLook = (l) => ({ char: LOOKS.includes(l && l.char) ? l.char : 'soldat', color: /^#[0-9a-f]{6}$/i.test(l && l.color) ? l.color : null });
-const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
+const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces', auto: 'au niveau auto' };
 // sons des pas : le sol naturel, le plancher de chaque type de bâtiment
 const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
   [GR.ROUTE]: 'beton', [GR.VILLE]: 'beton', [GR.BATI]: 'bois', [GR.CHAMP]: 'herbe', [GR.LIEU]: 'gravier' };
@@ -57,6 +60,8 @@ const S = {
   yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
   look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
+  picks: new Map(), // équipes choisies sur l'écran d'accueil : id du joueur → numéro d'équipe
+  skills: new Map(), mySkill: { s: 0.5, games: 0 }, // niveau « Auto » : celui de chaque joueur du salon (engine/skill.js)
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -81,10 +86,12 @@ async function boot(info) {
     time: QS.get('time') || set.time || 'jour',
     mode: QS.get('mode') || set.mode || 'partie',
     places: +(QS.get('places') || set.places || 45),
-    level: QS.get('level') || set.level || 'normal',
+    level: QS.get('level') || set.level || 'auto',
+    teams: clamp(+(QS.get('equipes') || set.teams || 1) | 0, 1, 3),
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
   try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(loadHist());
   H.on('msg', onMsg);
   H.on('roster', onRoster);
 
@@ -107,7 +114,7 @@ async function boot(info) {
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
-  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel });
+  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel, ping: () => { if (S.input.playing) sendPing(); } });
   loadOpts();
   try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
@@ -140,30 +147,46 @@ function setLook(l) {
 // hôte (ou solo) : on remplit la montgolfière (les joueurs du salon, puis des bots jusqu'au nombre de places)
 function startMatch() {
   if (S.role === 'guest' || S.sim) return;
-  const roster = humans().map((h) => ({ ...h, bot: false }));
-  if (S.settings.mode !== 'exploration') {
-    const n = clamp(S.settings.places, 2, MAX_PLACES) - roster.length;
-    const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level });
-  }
-  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode });
+  const hs = humans(), expl = S.settings.mode === 'exploration';
+  const size = expl ? 1 : S.settings.teams;
+  // équipes : les choix de l'écran d'accueil, les autres répartis, puis des bots (coéquipiers d'abord)
+  const T = makeTeams(hs, S.picks, expl ? hs.length : clamp(S.settings.places, 2, MAX_PLACES), size);
+  const roster = hs.map((h) => ({ ...h, bot: false, team: T.humans.get(h.id) }));
+  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
+  // niveau « Auto » : composé d'après les résultats des joueurs du salon
+  const levels = S.settings.level === 'auto' ? botLevels(T.bots.length, roomSkill()) : T.bots.map(() => S.settings.level);
+  T.bots.forEach((team, i) => roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + hs.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: levels[i], team }));
+  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode, teams: size });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
   showScreen(null);
   S.input.lock();
 }
-const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode });
-function newMatch({ run, seed, roster, mode, mirror = false }) {
+// nouvelle partie sans recharger la page : on démonte la partie finie (personnages, effets, constructions, bots), la
+// scène reprend son état de départ (murs, meubles, décor, portes) et le monde solide est reconstruit (≈ 65 ms)
+function resetMatch() {
+  if (!S.sim) return;
+  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); S.drops3d.dispose(); } catch (e) { console.warn(e); }
+  S.scene.reset();
+  S.world = buildWorld(S.map);
+  S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
+  S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
+  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt('');
+  $('#hud').hidden = true; $('#feed').innerHTML = '';
+}
+const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
+function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.run = run; S.seed = seed; S.roster = roster;
   const city = S.map.pois.find((p) => p.kind === 'ville');
   const pl = city && S.map.plazas.find((q) => q.x0 >= city.rect.x0 && q.x1 <= city.rect.x1 && q.z0 >= city.rect.z0 && q.z1 <= city.rect.z1);
   const start = pl ? { x: (pl.x0 + pl.x1) / 2 + 6, z: (pl.z0 + pl.z1) / 2 + 6 } : null;
-  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
+  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start, teams });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
   S.actors.onBurn = (p) => S.sfx.at('bruleur', p.x, p.y + 4, p.z, 1, 140);
   S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
+  S.drops3d = createDrops(S.scene.scene);
   // les bots ne réfléchissent que là où la partie tourne
   S.ai = !mirror && mode !== 'exploration' ? createAI(S.sim, S.map, S.world) : null;
   for (const P of S.sim.S.players.values()) S.prev.set(P.id, { x: P.x, y: P.y, z: P.z, yaw: P.yaw });
@@ -209,6 +232,7 @@ function onKey(code, key) {
   if (key === 'e') S.cnt.use++;
   else if (key === 'r') S.cnt.reload++;
   else if (key === 'g') S.cnt.drop++;
+  else if (key === 'b') sendPing();
   // construction : F mur, V sol, C escalier (encore une fois pour sortir), T matériau
   else if (key === 'f' || key === 'v' || key === 'c') { const k = { f: 'mur', v: 'sol', c: 'escalier' }[key]; S.build = S.build === k ? null : k; buildBar(); S.sfx.play('clic'); }
   else if (key === 't') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
@@ -298,6 +322,7 @@ function loop(now) {
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
+  S.drops3d.update(dt, S.t, S.sim.S);
   // chute libre : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
   const fall = P && P.alive && P.mode === 'chute' ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
   S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
@@ -310,8 +335,18 @@ function loop(now) {
   const focusP = P && P.alive ? P : S.sim.player(S.spect) || P;
   if (focusP) {
     const fp = disp(focusP);
-    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms);
-    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat });
+    const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
+    const pg = pingsOf(focusP, fp, view);
+    S.hud.pings(pg);
+    const drops = [...S.sim.S.drops.values()].filter((d) => !d.open).map((d) => ({ x: d.x, z: d.z, color: '#b77dff', big: true }));
+    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), [...drops, ...pg.map((m) => ({ x: m.x, z: m.z, color: m.color }))]);
+    const rv = focusP.revive && S.sim.player(focusP.revive.id);
+    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat, revive: rv ? { f: focusP.revive.t / REVIVE, name: rv.name } : null });
+    if ((S.tick3 = (S.tick3 || 0) + 1) % 5 === 0) S.hud.team(team.map((Q) => ({ id: Q.id, name: Q.name, color: Q.color, hp: Q.hp, sh: Q.sh, down: Q.down ? Q.down.hp : null, alive: Q.alive })));
+    S.hud.tags(team.filter((Q) => Q.alive && Q.mode === 'sol').map((Q) => { const d = disp(Q); return { id: Q.id, name: Q.name, color: Q.color, x: d.x, y: d.y + 2.3, z: d.z, down: !!Q.down }; }));
+    // à terre : ce qu'il reste, et le coéquipier qui relève
+    const helper = focusP.down && [...S.sim.S.players.values()].find((Q) => Q.revive && Q.revive.id === focusP.id);
+    S.hud.downed(focusP.alive && focusP.down ? { left: focusP.down.hp / DOWN_HP * BLEED, by: helper ? helper.name : null, f: helper ? helper.revive.t / REVIVE : 0 } : null);
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
@@ -495,6 +530,8 @@ function cameraFor(P, disp, dt) {
 }
 function pickSpectate() {
   const P = me();
+  const mate = P && [...S.sim.S.players.values()].find((Q) => Q.alive && S.sim.mates(P, Q));
+  if (mate) return mate.id;
   const killer = P && P.hitBy != null && S.sim.player(P.hitBy);
   if (killer && killer.alive) return killer.id;
   const live = S.sim.alive();
@@ -511,12 +548,19 @@ function nextSpectate() {
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
   if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
+  if (m.t === 'skill') { if (Number.isFinite(m.s)) S.skills.set(from, Math.max(0, Math.min(1, m.s))); refreshLobby(); return; }
+  if (m.t === 'team') { S.picks.set(from, Number.isInteger(m.k) && m.k >= 0 && m.k < 30 ? m.k : -1); refreshLobby(); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
       if (m.look) S.looks.set(from, cleanLook(m.look));
+      if (Number.isInteger(m.team)) S.picks.set(from, m.team);
+      if (Number.isFinite(m.skill)) S.skills.set(from, Math.max(0, Math.min(1, m.skill)));
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
-      else H.send(from, { t: 'salon' });
+      else H.send(from, { t: 'salon', picks: [...S.picks] });
+    } else if (m.t === 'repere' && S.sim) {
+      const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
+      if (P && !P.bot) S.sim.ping(P, String(m.kind), +m.x, +m.y, +m.z, m.target != null && S.sim.player(m.target) ? m.target : null, String(m.what || ''));
     } else if (m.t === 'i' && S.sim) {
       const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
       if (!P || P.bot) return;
@@ -530,11 +574,15 @@ function onMsg(from, m) {
   }
   if (from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   S.gotHost = true;
-  if (m.t === 'salon') { if (!S.sim) showScreen('attente'); return; }
+  if (m.t === 'salon') {
+    if (Array.isArray(m.picks)) for (const [id, k] of m.picks) if (id !== S.me && Number.isInteger(k)) S.picks.set(id, k);
+    if (!S.sim) showScreen('attente');
+    return;
+  }
   if (m.t === 'go') {
-    if (S.sim && m.run !== S.run) { location.reload(); return; } // nouvelle partie : on repart d'une île neuve
+    if (S.sim && m.run !== S.run) resetMatch(); // nouvelle partie : l'île revient comme au départ
     if (S.sim) return;
-    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, mirror: true });
+    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, teams: m.teams | 0 || 1, mirror: true });
     if (m.full) {
       applyFull(S.sim, S.world, S.buildApi, m.full);
       for (const k of m.full.broken) hideBroken(k);
@@ -546,6 +594,7 @@ function onMsg(from, m) {
     return;
   }
   if (m.t === 's' && S.sim && m.run === S.run && m.s) receiveSnap(m.s, m.e || []);
+  if (m.t === 'bilan' && m.run === S.run && Array.isArray(m.res)) S.bilan = m.res;
 }
 function receiveSnap(s, events) {
   const now = performance.now() / 1000;
@@ -578,7 +627,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look, team: S.picks.get(S.me), skill: S.mySkill.s }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -698,12 +747,42 @@ function handleEvents(list) {
         const icon = (id) => (S.sim.player(id) && S.sim.player(id).bot ? ' 🤖' : '');
         S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`, e.by === S.me || e.to === S.me);
         if (e.to === S.me) {
-          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur</small>`, 5);
+          // en équipe, la place n'est connue qu'à la sortie du dernier coéquipier
+          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${!e.place ? 'Ton équipe continue · <kbd>Espace</kbd> : suivre un autre joueur' : `${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.teams > 1 ? new Set([...S.sim.S.players.values()].map((Q) => Q.team)).size + ' équipes' : S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur`}</small>`, 5);
           S.spect = e.by != null && S.sim.player(e.by) && S.sim.player(e.by).alive ? e.by : pickSpectate();
           S.sfx.play('elimine');
         } else if (e.by === S.me) { S.hud.say(`Tu as éliminé <b>${esc(nameOf(e.to))}</b><small>${e.left} encore en vie</small>`, 2.5); S.sfx.play('elimination'); }
         break;
       }
+      case 'abattu': {
+        S.hud.feedLine(`${e.by != null ? `<b>${esc(nameOf(e.by))}</b> a mis` : ''} <b>${esc(nameOf(e.to))}</b> à terre ${CAUSES[e.cause] || ''}`, e.to === S.me || e.by === S.me);
+        if (e.to === S.me) { S.hud.say('À terre !<small>Rampe vers tes coéquipiers : ils peuvent te relever</small>', 3); S.sfx.play('aie'); }
+        else if (e.by === S.me) { S.hud.say(`<b>${esc(nameOf(e.to))}</b> est à terre<small>Ses coéquipiers peuvent le relever</small>`, 2); S.sfx.play('elimination'); }
+        break;
+      }
+      case 'releve': {
+        const mine = P && (e.to === S.me || e.by === S.me || S.sim.mates(P, S.sim.player(e.to) || {}));
+        S.hud.feedLine(`<b>${esc(nameOf(e.by))}</b> a relevé <b>${esc(nameOf(e.to))}</b>`, mine);
+        if (e.to === S.me) { S.hud.say(`Relevé par <b>${esc(nameOf(e.by))}</b> !<small>Soigne-toi vite</small>`, 2.5); S.sfx.play('soigne'); }
+        else if (e.by === S.me) { S.hud.say(`Tu as relevé <b>${esc(nameOf(e.to))}</b>`, 2); S.sfx.play('soigne'); }
+        break;
+      }
+      case 'releve…': if (e.p === S.me) S.sfx.play('bandage'); break;
+      case 'largage': {
+        S.hud.say('Largage en approche !<small>Une caisse de butin épique descend dans le cercle (losange violet sur la carte)</small>', 3.5);
+        S.hud.feedLine('📦 Un largage descend dans le cercle');
+        S.sfx.play('largage');
+        break;
+      }
+      case 'largage-pose': S.fx.dust(e.x, e.y, e.z, { n: 14, r: 0.8, speed: 3 }); S.sfx.at('atterrit', e.x, e.y + 1, e.z, 1, 90); break;
+      case 'largage-ouvert': {
+        const d = S.sim.S.drops.get(e.id);
+        if (d) { S.fx.puff(d.x, d.gy + 1, d.z, { color: 0xb77dff, size: 0.8, grow: 3, life: 0.8, add: true, op: 0.9 }); S.sfx.at('coffre', d.x, d.gy + 0.5, d.z, 1); }
+        if (e.p !== S.me) S.hud.feedLine(`<b>${esc(nameOf(e.p))}</b> a ouvert un largage`, P && S.sim.mates(P, S.sim.player(e.p) || {}));
+        break;
+      }
+      case 'repere': { const Q = P && S.sim.player(e.p); if (Q && (e.p === S.me || S.sim.mates(P, Q))) S.sfx.play('repere'); break; }
+      case 'releve-': if (e.p === S.me) toast('Relevé interrompu : il faut rester à côté sans bouger ni tirer', 2.5); break;
       case 'boum': {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
         const d = Math.hypot(e.x - S.cam.x, e.y - S.cam.y, e.z - S.cam.z);
@@ -775,13 +854,30 @@ function handleEvents(list) {
 }
 
 // ------------------------------------------------------------------ fin de partie
+// a-t-on gagné ? (en équipe : son équipe est la dernière debout)
+function iWon(winner) {
+  const P = me();
+  return S.sim.S.teams > 1 ? !!P && P.team != null && P.team === S.sim.S.winTeam : winner === S.me;
+}
 function endMatch(winner) {
   if (S.ended) return;
   S.ended = true;
+  S.hud.downed(null);
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
-  if (winner === S.me) { S.hud.say('Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
+  if (mine && S.sim.S.mode !== 'exploration') {
+    const n = S.sim.S.teams > 1 ? new Set(res.map((r) => r.team)).size : res.length;
+    saveHist({ place: iWon(winner) ? 1 : mine.place || n, n, kills: mine.kills });
+  }
+  if (iWon(winner)) { S.hud.say(S.sim.S.teams > 1 ? 'Dernière équipe debout !<small>Ton équipe a gagné la partie</small>' : 'Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
   report(res);
-  setTimeout(() => { S.input.unlock(); showScreen('fin', { res, mine, winner }); }, 3500);
+  // l'hôte fait foi : son bilan (tirs, distance, relevés…) part chez les invités
+  if (S.role === 'host' && H.embedded) H.send('all', { t: 'bilan', run: S.run, res });
+  const run = S.run;
+  setTimeout(() => {
+    if (S.run !== run || !S.sim) return;
+    const all = S.bilan || res;
+    S.input.unlock(); showScreen('fin', { res: all, mine: all.find((r) => r.id === S.me), winner });
+  }, 3500);
 }
 function report(res) {
   if (S.reported || S.role === 'guest') return;
@@ -789,7 +885,7 @@ function report(res) {
   if (!H.embedded) return;
   try {
     H.report({
-      id: `royale-${S.run}-${res.length}`, mode: 'Battle royale',
+      id: `royale-${S.run}-${res.length}`, mode: S.sim.S.teams > 1 ? 'Battle royale · ' + TEAM_LABEL[S.sim.S.teams].toLowerCase() : 'Battle royale',
       players: res.map((r) => ({ id: r.bot ? null : r.id, name: r.name, color: r.color, bot: r.bot, rank: r.place, score: r.kills })),
     });
   } catch (e) { console.warn(e); }
@@ -800,11 +896,14 @@ function showPrompt() {
   const P = me();
   if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
   if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', 'Espace'); return; }
-  if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
+  if (!P || !P.alive || P.mode !== 'sol' || P.down) { S.hud.prompt(''); return; }
+  if (P.revive) { S.hud.prompt('Ne bouge pas, tu relèves', (S.sim.player(P.revive.id) || {}).name || '', '#4ade80', '…'); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
+  if (tg.kind === 'releve') { S.hud.prompt('Relever', tg.o.name, '#4ade80'); return; }
   if (tg.kind === 'porte') S.hud.prompt((tg.o.open ? 'Fermer' : 'Ouvrir') + (tg.o.kind === 'portail' ? ' le portail' : ' la porte'));
   else if (tg.kind === 'coffre') S.hud.prompt(tg.o.kind === 'coffre' ? 'Ouvrir le coffre' : 'Ouvrir la caisse de munitions');
+  else if (tg.kind === 'largage') S.hud.prompt('Ouvrir le largage', 'butin épique', '#b77dff');
   else {
     const it = tg.o.it, full = P.inv.every(Boolean) && !(it.t === 'objet' && P.inv.some((q) => q && q.t === 'objet' && q.c === it.c));
     S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
@@ -819,9 +918,91 @@ function lobbyList() {
     const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
     return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
   }).join('');
-  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
+  let lvl = LEVEL_LABEL[S.settings.level] || '';
+  if (S.settings.level === 'auto') {
+    const mix = botMix(roomSkill()), parts = [['facile', 'faciles'], ['normal', 'normaux'], ['difficile', 'coriaces']].map(([k, l]) => [Math.round(bots * mix[k]), l]).filter(([v]) => v > 0);
+    lvl = `au niveau auto : ${parts.map(([v, l]) => `${v} ${l}`).join(', ')}`;
+  }
+  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${lvl}</span>` : ''}</div>`;
 }
-const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
+// équipes (duos, trios) : chacun clique sur une équipe ; les places libres sont prises par des bots coéquipiers
+function teamPicker() {
+  const size = S.settings.teams;
+  if (S.settings.mode === 'exploration' || size <= 1) return '';
+  const hs = humans(), label = TEAM_LABEL[size].toLowerCase(), s = size > 2 ? 's' : '';
+  if (hs.length <= 1) return `<h2>Ton équipe</h2><p class="hint">Tu joues en ${label} avec ${size - 1} bot${s} coéquipier${s} : ils sautent avec toi, te suivent et te relèvent.</p>`;
+  const K = Math.min(hs.length, Math.ceil(clamp(S.settings.places, 2, MAX_PLACES) / size)), mine = S.picks.get(S.me);
+  const cards = Array.from({ length: K }, (_, k) => {
+    const mem = hs.filter((h) => S.picks.get(h.id) === k), full = mem.length >= size && mine !== k;
+    return `<button class="teamc${mine === k ? ' on' : ''}" data-team="${k}" ${full ? 'disabled' : ''}><b>Équipe ${k + 1}</b>${mem.map((h) => `<span><i style="--c:${esc(h.color || '#888')}"></i>${esc(h.name)}${h.id === S.me ? ' <em>toi</em>' : ''}</span>`).join('')}${mem.length < size ? `<span class="free">${size - mem.length} place${size - mem.length > 1 ? 's' : ''} : bots si personne</span>` : ''}</button>`;
+  }).join('');
+  const loose = hs.filter((h) => { const k = S.picks.get(h.id); return !(Number.isInteger(k) && k >= 0 && k < K); });
+  return `<h2>Ton équipe · ${TEAM_LABEL[size]}</h2><div class="teams">${cards}</div><p class="hint">${loose.length ? `Pas encore choisi : ${loose.map((h) => esc(h.name)).join(', ')} (réparti${loose.length > 1 ? 's' : ''} au lancement). ` : ''}Les places libres sont prises par des bots coéquipiers.</p>`;
+}
+// un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
+// ------------------------------------------------------------------ repères d'équipe
+// ce que vise le réticule : un ennemi près du rayon (avant le premier obstacle), sinon, au point visé, un largage, le
+// butin le plus rare, un coffre fermé, ou simplement l'endroit (« Ici » : depuis la montgolfière, là où l'on va se poser)
+function aimPing() {
+  const P = me();
+  if (!P || !P.alive) return null;
+  const c = S.cam, cp = Math.cos(S.pitch), d = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
+  const hit = S.world.raycast(c.x, c.y, c.z, d[0], d[1], d[2], 400), L = hit.t < 400 ? hit.t : null;
+  let foe = null, fd = Infinity;
+  for (const Q of S.sim.S.players.values()) {
+    if (Q === P || !Q.alive || Q.mode === 'ballon' || S.sim.mates(P, Q)) continue;
+    const ox = Q.x - c.x, oy = Q.y + 1 - c.y, oz = Q.z - c.z, t = ox * d[0] + oy * d[1] + oz * d[2];
+    if (t < 0 || t > 400 || (L != null && t > L + 1)) continue;
+    const off = Math.hypot(ox - d[0] * t, oy - d[1] * t, oz - d[2] * t);
+    if (off < Math.max(1.3, t * 0.025) && t < fd) { fd = t; foe = Q; }
+  }
+  if (foe) return { kind: 'ennemi', x: foe.x, y: foe.y + 1.3, z: foe.z, target: foe.id };
+  if (L == null) return null;
+  const x = c.x + d[0] * L, y = c.y + d[1] * L, z = c.z + d[2] * L, SS = S.sim.S;
+  for (const dr of (SS.drops || new Map()).values()) if (!dr.open && Math.hypot(dr.x - x, dr.z - z) < 5) return { kind: 'largage', x: dr.x, y: dr.gy + 1.6, z: dr.z, what: 'Largage' };
+  let g = null;
+  for (const it of SS.items.values()) if ((it.it.t === 'arme' || it.it.t === 'objet') && Math.hypot(it.x - x, it.z - z) < 2.5 && Math.abs(it.y - y) < 2.5 && (!g || it.it.r > g.it.r)) g = it;
+  if (g) return { kind: 'butin', x: g.x, y: g.y + 0.9, z: g.z, what: itemLabel(g.it) };
+  for (const ch of SS.chests.values()) if (!ch.open && Math.hypot(ch.x - x, ch.z - z) < 3 && Math.abs(ch.y - y) < 2.5) return { kind: 'butin', x: ch.x, y: ch.y + 1.1, z: ch.z, what: ch.kind === 'coffre' ? 'Coffre' : 'Caisse de munitions' };
+  return { kind: 'ici', x, y: y + 0.3, z };
+}
+function sendPing() {
+  const pg = aimPing();
+  if (!pg) return;
+  if (S.role === 'guest') H.send('host', { t: 'repere', ...pg });
+  else S.sim.ping(me(), pg.kind, pg.x, pg.y, pg.z, pg.target, pg.what);
+}
+// repères visibles par le joueur suivi : les siens et (en équipe) ceux de ses coéquipiers, encore frais
+const PING_LABEL = { ici: 'Ici', ennemi: 'Ennemi', butin: 'Butin', largage: 'Largage' };
+function pingsOf(F, fp, view) {
+  const SS = S.sim.S, out = [];
+  const camYaw = view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw;
+  for (const pg of SS.pings.values()) {
+    const age = SS.t - pg.t, Q = SS.players.get(pg.p);
+    if (age > PING_T || !Q || !(pg.p === F.id || (SS.teams > 1 && pg.team === F.team))) continue;
+    const color = pg.kind === 'ennemi' ? '#ff5a4a' : pg.kind === 'largage' ? '#b77dff' : pg.kind === 'butin' ? '#ffc531' : Q.color || '#ffd23f';
+    const dist = Math.round(Math.hypot(pg.x - fp.x, pg.z - fp.z));
+    out.push({ key: pg.p, x: pg.x, y: pg.y, z: pg.z, color, label: pg.what || PING_LABEL[pg.kind] || 'Ici',
+      sub: `${pg.p === F.id ? '' : Q.name + ' · '}${dist} m`, fade: Math.min(1, (PING_T - age) / 2),
+      rel: Math.atan2(pg.x - view.pos.x, pg.z - view.pos.z) - camYaw });
+  }
+  return out;
+}
+// historique des parties de ce navigateur (niveau « Auto ») ; niveau moyen des joueurs du salon
+function loadHist() { try { const h = JSON.parse(localStorage.getItem('royale_hist') || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } }
+function saveHist(r) {
+  const h = [r, ...loadHist()].slice(0, HIST_MAX);
+  try { localStorage.setItem('royale_hist', JSON.stringify(h)); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(h);
+  if (H.embedded && S.role === 'guest') H.send('host', { t: 'skill', s: S.mySkill.s });
+}
+function roomSkill() {
+  const hs = humans();
+  const v = hs.map((h) => (h.id === S.me ? S.mySkill.s : S.skills.has(h.id) ? S.skills.get(h.id) : 0.5));
+  return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
+}
+function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
+const KEYS = `<div class="keylist"><span><kbd>B</kbd> ou <kbd>Clic molette</kbd> repère pour l'équipe</span><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
   <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
   <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
@@ -830,6 +1011,7 @@ const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) 
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
+  S.screen = kind; S.screenData = data;
   if (!kind) return;
   const expl = S.settings.mode === 'exploration';
   const play = (label) => `<button class="btn big" id="go">${label}</button>`;
@@ -842,7 +1024,9 @@ function showScreen(kind, data) {
     ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
     : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
       ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
-      ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+      S.settings.teams > 1
+        ? ['crown_a', 'Dernière équipe debout', `${n} joueurs en ${TEAM_LABEL[S.settings.teams].toLowerCase()} : à 0 PV, on tombe à terre et un coéquipier relève (E, 5 s sans bouger).`]
+        : ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
   // son personnage et sa couleur
   const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
   if (!S.portraits || S.portraits.col !== col) S.portraits = { col, img: renderPortraits(S.scene.kit, col) };
@@ -852,10 +1036,10 @@ function showScreen(kind, data) {
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${lookHtml}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${teamPicker()}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${teamPicker()}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
     html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
@@ -866,13 +1050,13 @@ function showScreen(kind, data) {
     html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
   } else {
     const { res, mine, winner } = data;
-    const won = winner === S.me;
-    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : ''}"><td>${r.place}</td><td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
-    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${res.length}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
-    const tags = mine ? `<div class="tags"><span>${icon('skull')}<b>${mine.kills}</b> élimination${mine.kills > 1 ? 's' : ''}</span><span>${icon('target')}<b>${mine.dealt}</b> dégâts</span><span>${icon('hourglass')}<b>${fmtTime((Date.now() - S.startedAt) / 1000)}</b></span></div>` : '';
+    const won = iWon(winner), tm = S.sim.S.teams > 1, nTeams = tm ? new Set(res.map((r) => r.team)).size : res.length;
+    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : mine && tm && r.team === mine.team ? 'mate' : ''}"><td>${r.place}</td>${tm ? `<td>${r.team + 1}</td>` : ''}<td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
+    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${nTeams}${tm ? ' équipes' : ''}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
+    const tags = mine ? bilanHtml(mine, res) : '';
     const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
-    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? 'Dernier <span>debout</span> !' : 'Island <span>Rush</span>'}</h1>${head}${tags}
-      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th><th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
+    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? (tm ? 'Dernière équipe <span>debout</span> !' : 'Dernier <span>debout</span> !') : 'Island <span>Rush</span>'}</h1>${head}${tags}
+      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th>${tm ? '<th>Éq.</th>' : ''}<th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
       <div class="row end">${back}${S.role !== 'guest' ? '<button class="btn big" id="again">Rejouer</button>' : ''}</div>`;
     el.querySelector('.panel').classList.toggle('win', won);
   }
@@ -880,12 +1064,26 @@ function showScreen(kind, data) {
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
   el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
   el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
-  // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
-  const again = $('#again'); if (again) again.onclick = () => location.reload();
+  el.querySelectorAll('.teamc').forEach((b) => { b.onclick = () => { const k = +b.dataset.team; S.picks.set(S.me, k); if (H.embedded) H.send('all', { t: 'team', k }); showScreen(kind, data); }; });
+  // rejouer : tout de suite, sur l'île remise à neuf (les invités suivent quand la partie part)
+  const again = $('#again'); if (again) again.onclick = () => { S.sfx.unlock(); resetMatch(); startMatch(); };
   $('#quit').onclick = quit;
   const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// bilan personnel : éliminations, dégâts, précision, distance, temps de survie, relevés, et qui nous a éliminés
+function bilanHtml(r, res) {
+  const time = r.out != null ? r.out : S.sim ? S.sim.S.t : (Date.now() - S.startedAt) / 1000;
+  const acc = r.shots ? Math.round(r.hits / r.shots * 100) + ' %' : '–';
+  const killer = r.by != null && res.find((q) => q.id === r.by);
+  const cards = [
+    ['skull', r.kills, `élimination${r.kills > 1 ? 's' : ''}`], ['sword', r.dealt, 'dégâts'], ['target', acc, `précision (${r.hits || 0}/${r.shots || 0} tirs)`],
+    ['hourglass', fmtTime(time), r.out != null ? 'de survie' : 'jusqu\'au bout'], ['compass', r.dist >= 1000 ? (r.dist / 1000).toFixed(1).replace('.', ',') + ' km' : (r.dist || 0) + ' m', 'parcourus'],
+  ];
+  if (S.sim && S.sim.S.teams > 1) cards.push(['hand', r.revives || 0, `coéquipier${r.revives > 1 ? 's' : ''} relevé${r.revives > 1 ? 's' : ''}`]);
+  return `<div class="bilan">${cards.map(([i, v, l]) => `<span>${icon(i)}<b>${v}</b><small>${l}</small></span>`).join('')}</div>`
+    + (killer ? `<p class="hint">Éliminé par <b>${esc(killer.name)}</b>${killer.bot ? ' 🤖' : ''} ${CAUSES[r.how] || ''} · ${killer.kills} élimination${killer.kills > 1 ? 's' : ''} dans la partie</p>` : r.how ? `<p class="hint">Éliminé ${CAUSES[r.how] || ''}</p>` : '');
+}
 // panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, puis la sensibilité
 const SETTINGS = {
   kinds: ['music', 'fx'], accent: '#3d9fd9',
