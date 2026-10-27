@@ -21,6 +21,8 @@
 - **Island Rush** — En chute libre, la vue s'élargit avec la vitesse et des traits de vitesse filent sur les bords de l'écran.
 - **Island Rush** — Nouvelle montgolfière : enveloppe en poire à fuseaux colorés avec le nom du jeu, nacelle en osier et sacs de lest, brûleur dont la flamme rugit par moments.
 - **Island Rush** — L'île est plus riche vue du ciel : champs bordés de haies, prés fleuris, creux et crêtes mieux marqués, touffes d'herbe ; des nuages bas qu'on traverse en sautant et des vols d'oiseaux.
+- **Island Rush** — Interface plus épurée : panneaux en verre dépoli, barres de vie et de bouclier fines avec une traînée blanche quand on perd des points, cases d'objets à liseré lumineux de la couleur de rareté, armes dessinées en silhouette.
+  - Le rappel des touches se replie en une petite pastille 20 secondes après l'atterrissage (H le rouvre).
 - **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 

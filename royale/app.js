@@ -708,7 +708,15 @@ function handleEvents(list) {
       case 'tremplin': { const h = e.p != null && S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('pose'); S.sfx.at('pose', e.x, e.y, e.z, 0.8); break; }
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
       case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
-      case 'atterrit': { const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 }); if (e.p === S.me) S.sfx.play('atterrit'); break; }
+      case 'atterrit': {
+        const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 });
+        if (e.p === S.me) {
+          S.sfx.play('atterrit');
+          // le rappel des touches se replie en une pastille peu après l'atterrissage (H le rouvre)
+          if (!S.hintsFolded) { S.hintsFolded = true; setTimeout(() => $('#hints').classList.add('off'), 20000); }
+        }
+        break;
+      }
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
       case 'construit': { const h = S.actors.heroOf(e.piece.owner); if (h && h.gesture) h.gesture('pose'); }

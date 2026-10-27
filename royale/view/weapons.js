@@ -161,7 +161,10 @@ export function renderIcons() {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x50586a, 2.4));
   const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(-3, 4, 2); scene.add(sun);
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 50);
-  const shoot = (key, obj, view = 'cote') => {
+  // armes et pioche en silhouettes claires (la rareté se lit à la lueur de la case) ; les objets en couleurs
+  const sil = new THREE.MeshBasicMaterial({ color: 0xf4f1ea });
+  const shoot = (key, obj, view = 'cote', flat = false) => {
+    scene.overrideMaterial = flat ? sil : null;
     scene.add(obj);
     const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
     // de côté (canon vers la droite) pour les armes ; de trois quarts pour les objets
@@ -173,8 +176,9 @@ export function renderIcons() {
     out.set(key, r.domElement.toDataURL());
     scene.remove(obj);
   };
-  for (const w of Object.keys(WEAPONS)) for (let k = 0; k < RARITY.length; k++) shoot(iconKey({ t: 'arme', w, r: k }), itemModel({ t: 'arme', w, r: k }));
-  shoot('pioche', itemModel(null));
+  for (const w of Object.keys(WEAPONS)) for (let k = 0; k < RARITY.length; k++) shoot(iconKey({ t: 'arme', w, r: k }), itemModel({ t: 'arme', w, r: k }), 'cote', true);
+  shoot('pioche', itemModel(null), 'cote', true);
+  scene.overrideMaterial = null; sil.dispose();
   for (const c of Object.keys(ITEMS)) shoot(iconKey({ t: 'objet', c }), itemModel({ t: 'objet', c, n: 1, r: 0 }), 'objet');
   r.dispose(); r.forceContextLoss();
   return out;

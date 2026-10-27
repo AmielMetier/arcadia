@@ -114,6 +114,9 @@ export function createHud(map, { onTeleport, project } = {}) {
     const hp = Math.max(0, P.hp), sh = Math.max(0, P.sh);
     vit.querySelector('.hp .bt i').style.width = hp + '%';
     vit.querySelector('.sh .bt i').style.width = sh + '%';
+    // traînée blanche : ce qu'on vient de perdre, qui fond après un instant
+    vit.querySelector('.hp .bt s').style.width = hp + '%';
+    vit.querySelector('.sh .bt s').style.width = sh + '%';
     vit.querySelector('.hp b').textContent = Math.ceil(hp);
     vit.querySelector('.sh b').textContent = Math.ceil(sh);
     vit.querySelector('.hp').classList.toggle('low', hp > 0 && hp < 30);
