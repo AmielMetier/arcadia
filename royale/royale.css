@@ -216,6 +216,13 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .lbar{height:12px;border-radius:7px;background:var(--cream);border:2px solid var(--ink);overflow:hidden;margin:14px 0 6px}
 .lbar i{display:block;height:100%;width:0;background:var(--red);transition:width .25s}
 .panel img.ic{filter:invert(1) brightness(.18)}
+.looks{display:flex;gap:8px;margin:6px 0 8px}
+.look{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px 7px;background:var(--cream);border:2px solid var(--ink);border-radius:12px;cursor:pointer;font:inherit;font-weight:700;font-size:12.5px;color:var(--ink);transition:transform .1s}
+.look img{width:88px;height:100px;object-fit:contain}
+.look:hover{transform:translateY(-2px)}.look.on{background:#fff;box-shadow:0 0 0 3px #1c5fb4}
+.swatches{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px}
+.sw{width:26px;height:26px;border-radius:50%;background:var(--c);border:2px solid var(--ink);cursor:pointer}
+.sw.on{box-shadow:0 0 0 3px #fff,0 0 0 5px #1c5fb4}
 .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px;margin:12px 0}
 .rules div{display:flex;gap:9px;align-items:flex-start;background:var(--cream);border:2px solid var(--ink);border-radius:10px;padding:8px 9px;font-size:12.5px;line-height:1.35}
 .rules div>.ic{width:26px;height:26px;margin-top:1px}

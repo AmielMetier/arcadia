@@ -19,6 +19,8 @@ import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
+import { CHARACTERS } from './view/kit.js';
+import { renderPortraits } from './view/soldier.js';
 import { Input } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
@@ -35,6 +37,8 @@ const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Li
   'Arthur', 'Louise', 'Adam', 'Chloé', 'Victor', 'Margaux', 'Léon', 'Agathe', 'Raphaël', 'Capucine', 'Maël', 'Romane', 'Simon', 'Juliette', 'Axel',
   'Lison', 'Hector', 'Salomé', 'Ethan', 'Apolline', 'Milo', 'Céleste', 'Samuel', 'Olivia', 'Tom', 'Maëlys', 'Aaron', 'Héloïse', 'Lucas', 'Manon'];
 const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
+const LOOKS = Object.keys(CHARACTERS);
+const cleanLook = (l) => ({ char: LOOKS.includes(l && l.char) ? l.char : 'soldat', color: /^#[0-9a-f]{6}$/i.test(l && l.color) ? l.color : null });
 const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
 // sons des pas : le sol naturel, le plancher de chaque type de bâtiment
 const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
@@ -52,6 +56,7 @@ const S = {
   role: 'solo', me: 'moi', settings: {}, map: null, world: null, sim: null, scene: null, actors: null, fx: null, hud: null, input: null, sfx: null,
   yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
+  look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -79,6 +84,7 @@ async function boot(info) {
     level: QS.get('level') || set.level || 'normal',
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
+  try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
   H.on('msg', onMsg);
   H.on('roster', onRoster);
 
@@ -120,9 +126,16 @@ async function boot(info) {
 }
 
 // ------------------------------------------------------------------ une partie
+// chaque joueur : son personnage et sa couleur (choisis sur l'écran d'accueil, envoyés à l'hôte)
 function humans() {
-  if (!H.embedded) return [{ ...S.meInfo }];
-  return H.players.map((p, i) => ({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+  const withLook = (h) => { const l = h.id === S.me ? S.look : S.looks.get(h.id); return l ? { ...h, look: l.char, color: l.color || h.color } : h; };
+  if (!H.embedded) return [withLook({ ...S.meInfo })];
+  return H.players.map((p, i) => withLook({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+}
+function setLook(l) {
+  S.look = cleanLook(l);
+  try { localStorage.setItem('royale_look', JSON.stringify(S.look)); } catch (e) { /* pas de stockage */ }
+  if (H.embedded) H.send('all', { t: 'look', look: S.look });
 }
 // hôte (ou solo) : on remplit la montgolfière (les joueurs du salon, puis des bots jusqu'au nombre de places)
 function startMatch() {
@@ -131,7 +144,7 @@ function startMatch() {
   if (S.settings.mode !== 'exploration') {
     const n = clamp(S.settings.places, 2, MAX_PLACES) - roster.length;
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], bot: true, level: S.settings.level });
+    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level });
   }
   newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
@@ -483,8 +496,10 @@ function nextSpectate() {
 // ------------------------------------------------------------------ réseau : messages
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
+  if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
+      if (m.look) S.looks.set(from, cleanLook(m.look));
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
       else H.send(from, { t: 'salon' });
@@ -549,7 +564,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi' }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -814,14 +829,19 @@ function showScreen(kind, data) {
     : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
       ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
       ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+  // son personnage et sa couleur
+  const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
+  if (!S.portraits || S.portraits.col !== col) S.portraits = { col, img: renderPortraits(S.scene.kit, col) };
+  const lookHtml = LOOKS.length > 1 && S.portraits.img.soldat ? `<h2>Ton personnage</h2><div class="looks">${LOOKS.map((k) => `<button class="look${k === S.look.char ? ' on' : ''}" data-char="${k}"><img src="${S.portraits.img[k] || ''}" alt=""><span>${CHARACTERS[k].label}</span></button>`).join('')}</div>
+    <div class="swatches">${PALETTE.map((c) => `<button class="sw${c === col ? ' on' : ''}" data-color="${c}" style="--c:${c}" aria-label="Couleur ${c}"></button>`).join('')}</div>` : '';
   const rulesHtml = `<div class="rules">${rules.map(([i, b, t]) => `<div>${icon(i)}<span><b>${b}</b>${t}</span></div>`).join('')}</div>`;
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
     html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
@@ -844,6 +864,8 @@ function showScreen(kind, data) {
   }
   el.querySelector('.panel').innerHTML = html;
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
+  el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
+  el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
   // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
   const again = $('#again'); if (again) again.onclick = () => location.reload();
   $('#quit').onclick = quit;

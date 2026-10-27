@@ -51,7 +51,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ joueurs
   function addPlayer(r) {
-    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, bot: !!r.bot, level: r.level || 'normal',
+    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, look: r.look || 'soldat', bot: !!r.bot, level: r.level || 'normal',
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
       inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };

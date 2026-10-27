@@ -10,6 +10,12 @@ import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.j
 
 // parties recolorées (nom de matériau du kit → drapeau)
 const SOLDIER_TINT = { Character_Main: 1, Pants: 2, Skin: 3 };
+// personnages au choix (models/toon/) : la tenue prend la couleur du joueur (drapeau 1)
+export const CHARACTERS = {
+  soldat: { label: 'Soldat', file: 'soldat', tint: SOLDIER_TINT },
+  hazmat: { label: 'Combinaison', file: 'hazmat', tint: { Hazmat_Main: 1, Skin: 3 } },
+  ennemi: { label: 'Mercenaire', file: 'ennemi', tint: { Enemy_Red: 1, Skin: 3 } },
+};
 const WEAPON_TINT = { Grey: 4 };
 // armes du jeu → nœud du kit dans la main du soldat
 export const WEAPON_NODES = { fusil: 'AK', pompe: 'Shotgun', pistolet: 'Pistol', smg: 'SMG', sniper: 'Sniper_2', roquette: 'RocketLauncher' };
@@ -110,16 +116,24 @@ function shrinkHands(geo, skel, bind, bindInv, k) {
     if (la < 0 || ix < 0 || mid < 0) continue;
     const fingers = new Set();
     skel.bones.forEach((b, i) => { const n = b.name.replace(/\./g, ''); if (/^(Pinky|Middle|Index|Thumb)\d/.test(n) && n.endsWith(s)) fingers.add(i); });
-    const elbow = bindPos(la), ax = bindPos(mid).sub(elbow).normalize();
-    const list = [];
-    for (let i = 0; i < P.count; i++) {
-      if (Math.round(F.getX(i)) !== SOLDIER_TINT.Skin) continue;
-      let best = -1, bw = -1;
-      for (let c = 0; c < 4; c++) { const w = Wt.getComponent(i, c); if (w > bw) { bw = w; best = J.getComponent(i, c); } }
-      if (best !== la && !fingers.has(best)) continue;
-      v.fromBufferAttribute(P, i).applyMatrix4(bind);
-      list.push([i, v.clone(), v.clone().sub(elbow).dot(ax)]);
-    }
+    const elbow = bindPos(la), len = bindPos(mid).distanceTo(elbow), ax = bindPos(mid).sub(elbow).normalize();
+    // la main : sa peau ; sans peau (gants), ce qui suit les doigts et le bout de l'avant-bras après le poignet
+    const collect = (bySkin) => {
+      const out = [];
+      for (let i = 0; i < P.count; i++) {
+        if (bySkin && Math.round(F.getX(i)) !== SOLDIER_TINT.Skin) continue;
+        let best = -1, bw = -1;
+        for (let c = 0; c < 4; c++) { const w = Wt.getComponent(i, c); if (w > bw) { bw = w; best = J.getComponent(i, c); } }
+        if (best !== la && !fingers.has(best)) continue;
+        v.fromBufferAttribute(P, i).applyMatrix4(bind);
+        const t = v.clone().sub(elbow).dot(ax);
+        if (!bySkin && best === la && t < len * 0.8) continue;
+        out.push([i, v.clone(), t]);
+      }
+      return out;
+    };
+    let list = collect(true);
+    if (list.length < 40) list = collect(false);
     if (!list.length) continue;
     // poignet : le centre de l'anneau de peau le plus proche du coude
     let t0 = Infinity, t1 = -Infinity;
@@ -145,9 +159,10 @@ function shrinkHands(geo, skel, bind, bindInv, k) {
 export async function loadKit(base) {
   const loader = new GLTFLoader(), url = (f) => `${base}toon/${f}.glb`;
   const kit = { soldier: null, weapons: {}, guns: {}, items: {}, props: {}, city: {}, cars: {} };
-  // ---------------------------------------------------------------- le soldat et ses armes
-  try {
-    const gl = await loader.loadAsync(url('soldat'));
+  // ---------------------------------------------------------------- les personnages (même squelette, mêmes
+  // animations) ; les armes viennent de la main du soldat
+  const character = async (file, tint, withWeapons) => {
+    const gl = await loader.loadAsync(url(file));
     const scene = gl.scene;
     scene.updateMatrixWorld(true);
     let body = null;
@@ -155,7 +170,7 @@ export async function loadKit(base) {
     const skel = body.skeleton, bindInv = body.bindMatrix.clone().invert();
     const boneIndex = (name) => skel.bones.findIndex((b) => b.name === name);
     const parts = [];
-    scene.traverse((o) => { if (o.isSkinnedMesh) parts.push(bakePart(o, new THREE.Matrix4(), SOLDIER_TINT, { skin: true })); });
+    scene.traverse((o) => { if (o.isSkinnedMesh) parts.push(bakePart(o, new THREE.Matrix4(), tint, { skin: true })); });
     // tête et épaulettes : posées sur un os, on les colle au maillage animé
     // (le chargeur retire les points des noms : « Index1.R » devient « Index1R »)
     const hand = skel.bones.find((b) => b.name.replace(/\./g, '') === 'Index1R');
@@ -172,12 +187,12 @@ export async function loadKit(base) {
       // sommet → espace du maillage animé : inv(bind) · inv(boneInverse) · (position sous l'os)
       const L = bone.matrixWorld.clone().invert().multiply(o.matrixWorld);
       const M = bindInv.clone().multiply(skel.boneInverses[bi].clone().invert()).multiply(L);
-      parts.push(bakePart(o, M, SOLDIER_TINT, { skin: true, bone: bi }));
+      parts.push(bakePart(o, M, tint, { skin: true, bone: bi }));
     }
     const geo = merge(parts);
     // armes : géométrie dans le repère de la main (pour la tenir) et dans le leur (pour le sol et les icônes)
     const handInv = hand.matrixWorld.clone().invert();
-    for (const [w, node] of Object.entries({ ...WEAPON_NODES, pioche: 'Shovel' })) {
+    if (withWeapons) for (const [w, node] of Object.entries({ ...WEAPON_NODES, pioche: 'Shovel' })) {
       const W = scene.getObjectByName(node);
       if (!W) continue;
       const inHand = [], own = [];
@@ -192,17 +207,25 @@ export async function loadKit(base) {
     }
     // mains réduites (après les armes : celles-ci, accrochées à l'index, suivent la main)
     shrinkHands(geo, skel, body.bindMatrix, bindInv, HAND_SCALE);
-    // l'outil de récolte : la pelle du kit
-    kit.tool = kit.weapons.pioche || null;
-    delete kit.weapons.pioche;
     // le modèle animé garde la structure du fichier : son premier maillage reçoit la géométrie fusionnée, les
     // autres parties et les objets posés sur les os disparaissent (leur forme est dans la géométrie fusionnée)
     for (const o of rigid) if (o.parent) o.parent.remove(o);
-    for (const o of [...body.parent.children]) if (o.isSkinnedMesh && o !== body) o.parent.remove(o);
+    const extra = []; scene.traverse((o) => { if (o.isSkinnedMesh && o !== body) extra.push(o); });
+    for (const o of extra) o.parent.remove(o);
     body.geometry = geo; body.material = tintMaterial(); body.name = 'Corps';
     // taille : on la ramènera à 1,8 m debout
     const box = new THREE.Box3().setFromBufferAttribute(geo.attributes.position).applyMatrix4(body.bindMatrix);
-    kit.soldier = { tmpl: scene, clips: gl.animations, height: box.max.y - box.min.y, minY: box.min.y, box };
+    return { tmpl: scene, clips: gl.animations, height: box.max.y - box.min.y, minY: box.min.y, box };
+  };
+  try {
+    kit.soldier = await character('soldat', SOLDIER_TINT, true);
+    // l'outil de récolte : la pelle du kit
+    kit.tool = kit.weapons.pioche || null;
+    delete kit.weapons.pioche;
+    kit.chars = { soldat: kit.soldier };
+    await Promise.all(Object.entries(CHARACTERS).filter(([k]) => k !== 'soldat').map(async ([k, C]) => {
+      try { kit.chars[k] = await character(C.file, C.tint, false); } catch (e) { console.warn('personnage indisponible', k, e); }
+    }));
   } catch (e) { console.warn('soldat du kit indisponible', e); }
   // ---------------------------------------------------------------- objets et décor : un maillage par modèle
   const solo = async (f) => {

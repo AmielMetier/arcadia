@@ -20,8 +20,7 @@ export function rarityMaterial(r) {
 }
 
 // mesure une fois la taille et l'orientation du modèle (pour le ramener à 1,8 m, pieds au sol, regard vers +z)
-function calibrate(kit) {
-  const S = kit.soldier;
+function calibrate(S) {
   if (S.cal) return S.cal;
   const m = cloneSkinned(S.tmpl);
   m.updateMatrixWorld(true);
@@ -50,7 +49,7 @@ export function aimFrame(kit) {
   const m = cloneSkinned(S.tmpl), mixer = new THREE.AnimationMixer(m);
   const clip = S.clips.find((c) => c.name.endsWith('Idle_Shoot'));
   if (clip) { mixer.clipAction(clip).play(); mixer.update(0); }
-  m.rotation.y = calibrate(kit).yaw;
+  m.rotation.y = calibrate(S).yaw;
   m.updateMatrixWorld(true);
   const q = new THREE.Quaternion();
   m.getObjectByName('Index1R').matrixWorld.decompose(new THREE.Vector3(), q, new THREE.Vector3());
@@ -106,8 +105,30 @@ export function barrelFix(kit, w) {
   return fix;
 }
 
-export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0xc98f64, items } = {}) {
-  const S = kit.soldier, cal = calibrate(kit);
+// portraits des personnages (écran d'accueil), à la couleur choisie ; un seul rendu réutilisé
+let portraitR = null;
+export function renderPortraits(kit, color) {
+  const out = {};
+  if (!kit || !kit.chars) return out;
+  try { portraitR = portraitR || new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true }); } catch (e) { return out; }
+  const r = portraitR;
+  r.setPixelRatio(1); r.setSize(132, 150, false); r.setClearColor(0x000000, 0); r.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x50586a, 2.3));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2, 3, 4); scene.add(sun);
+  const cam = new THREE.PerspectiveCamera(28, 132 / 150, 0.1, 20); cam.position.set(1.0, 1.5, 3.4); cam.lookAt(0, 1.0, 0);
+  for (const k of Object.keys(kit.chars)) {
+    const h = buildSoldier(kit, { shirt: color, look: k });
+    h.root.rotation.y = 0.35;
+    h.update(0.016, { speed: 0, ground: true, mode: 'sol', alive: true, pitch: 0 });
+    scene.add(h.root); r.render(scene, cam); out[k] = r.domElement.toDataURL();
+    scene.remove(h.root); h.dispose();
+  }
+  return out;
+}
+
+export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0xc98f64, items, look = 'soldat' } = {}) {
+  const S = (kit.chars && kit.chars[look]) || kit.soldier, cal = calibrate(S);
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const model = cloneSkinned(S.tmpl);
