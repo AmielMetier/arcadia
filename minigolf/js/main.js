@@ -12,7 +12,7 @@ import { COURSES, courseById, buildCourseHole } from './courses.js';
 import { makeBall, strike, tick, TICK, BALL_R, gravSign } from './physics.js';
 import { Renderer } from './render.js';
 import { planShot, BOT_LEVELS } from './ai.js';
-import { initAudio, sfx, toggleMute, ambience, isMuted } from './sfx.js';
+import { initAudio, sfx, ambience } from './sfx.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -345,7 +345,7 @@ function perfWatch(dt) {
   PERF.t += dt; PERF.n++;
   if (PERF.t > 5) {
     PERF.done = true;
-    if (PERF.n / PERF.t < 28 && PREFS.quality !== 'high') { R.setQuality('low'); UI.toast('Graphismes allégés pour garder le jeu fluide (menu Échap pour changer)'); }
+    if (PERF.n / PERF.t < 28 && PREFS.quality !== 'high') { R.setQuality('low'); UI.toast('Graphismes allégés pour garder le jeu fluide (Échap, puis Réglages, pour changer)'); }
   }
 }
 function onTurn(pid) {
@@ -656,7 +656,7 @@ function bindInput() {
     initAudio();
     if (e.code === 'Escape') { if (INPUT.aiming) { cancelAim(); return; } if (UI.screen === 'game') UI.toggleMenu(); return; }
     if (UI.screen !== 'game' || UI.menuOpen) return;
-    if (e.code === 'KeyM') { const m = toggleMute(); UI.toast(m ? 'Son coupé' : 'Son activé'); }
+    if (e.code === 'KeyM') { const m = DDVolume.toggle(['fx']); UI.toast(m ? 'Son coupé' : 'Son activé'); }
     if (e.code === 'KeyV') { CAM.overview = !CAM.overview; }
     if (e.code === 'Tab') { e.preventDefault(); UI.bigCard(true); }
     if (e.code === 'Space' && !e.repeat) { if (myTurn()) { INPUT.aiming = true; INPUT.power = 0; INPUT.btn = -2; INPUT.space = true; } e.preventDefault(); }
@@ -805,9 +805,6 @@ const UI = {
   toggleMenu(force) {
     this.menuOpen = force ?? !this.menuOpen; $('menu').classList.toggle('hidden', !this.menuOpen);
     if (this.menuOpen && document.pointerLockElement) document.exitPointerLock();
-    $('mqual').textContent = 'Graphismes : ' + (R.quality === 'low' ? 'légers' : 'détaillés');
-    $('msound').textContent = isMuted() ? 'Son : coupé' : 'Son : activé';
-    $('msens').textContent = 'Sensibilité caméra : ' + Math.round(SENS.cam * 100) + ' %';
   },
   lockHint() {
     if (INPUT.locked) this.lockSeen = true;
@@ -913,10 +910,20 @@ function boot() {
   $('resagain').onclick = () => { if (NET.isHost) { G.phase = 'lobby'; G.players = lobbyPlayers(); commit(); } };
   $('resquit').onclick = () => (H.embedded ? H.exit() : location.reload());
   $('mresume').onclick = () => UI.toggleMenu(false);
-  $('mqual').onclick = () => { R.setQuality(R.quality === 'low' ? 'high' : 'low'); PREFS.quality = R.quality; PERF.done = true; savePrefs(); UI.toggleMenu(true); };
-  $('msound').onclick = () => { toggleMute(); UI.toggleMenu(true); };
-  DDVolume.panel($('mvol'), { kinds: ['fx'] }); // pas de musique dans Mini-Golf Party
-  $('msens').onclick = () => { SENS.cam = SENS.cam >= 1.8 ? 0.4 : +(SENS.cam + 0.2).toFixed(1); PREFS.sens = SENS.cam; savePrefs(); UI.toggleMenu(true); };
+  // un seul panneau Réglages : le son (pas de musique dans Mini-Golf Party), les graphismes et la caméra
+  DDVolume.panel($('mset'), {
+    kinds: ['fx'], accent: '#2e8b57',
+    sections: [{
+      title: 'Jeu',
+      items: [
+        { label: 'Graphismes', options: [['high', 'Détaillés'], ['low', 'Légers']], get: () => (R.quality === 'low' ? 'low' : 'high'),
+          set: (v) => { R.setQuality(v); PREFS.quality = R.quality; PERF.done = true; savePrefs(); } },
+        { label: 'Sensibilité caméra', range: [0.4, 1.8, 0.1], get: () => SENS.cam, format: (v) => Math.round(v * 100) + ' %',
+          set: (v) => { SENS.cam = +(+v).toFixed(1); PREFS.sens = SENS.cam; savePrefs(); } },
+      ],
+    }],
+    hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.',
+  });
   $('mquit').onclick = () => (H.embedded ? H.exit() : location.reload());
   $('menubtn').onclick = () => UI.toggleMenu();
   $('viewbtn').onclick = () => { CAM.overview = !CAM.overview; $('viewbtn').classList.toggle('on', CAM.overview); };

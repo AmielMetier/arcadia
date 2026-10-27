@@ -4,10 +4,14 @@
 class BattleMusicPlayer {
   constructor() {
     this.audio = null;
-    this.musicEnabled = true;
+    this.wanted = false; // le combat veut sa musique
     this.currentTrack = 'sandstorm';
     this.volume = 0.35;
+    // curseur « Musique » des réglages à 0 : elle s'arrête ; relevé : elle reprend
+    DDVolume.on(() => { if (!this.musicEnabled) this.halt(); else if (this.wanted && !this.isPlaying()) this.start(this.currentTrack); });
   }
+
+  get musicEnabled() { return DDVolume.get('music') > 0; }
 
   getTrackPath(trackName) {
     if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3';
@@ -16,13 +20,14 @@ class BattleMusicPlayer {
   }
 
   start(trackName = 'sandstorm') {
-    if (!this.musicEnabled) return;
+    this.wanted = true;
     this.currentTrack = trackName;
+    if (!this.musicEnabled) return;
     const path = this.getTrackPath(trackName);
 
     if (this.audio) {
       if (this.audio.src.includes(path) && !this.audio.paused) return;
-      this.stop();
+      this.halt();
     }
 
     try {
@@ -44,7 +49,9 @@ class BattleMusicPlayer {
     } catch (e) {}
   }
 
-  stop() {
+  stop() { this.wanted = false; this.halt(); }
+
+  halt() {
     if (this.audio) {
       try {
         this.audio.pause();
@@ -52,16 +59,6 @@ class BattleMusicPlayer {
       } catch (e) {}
       this.audio = null;
     }
-  }
-
-  toggle() {
-    this.musicEnabled = !this.musicEnabled;
-    if (this.musicEnabled) {
-      this.start(this.currentTrack);
-    } else {
-      this.stop();
-    }
-    return this.musicEnabled;
   }
 
   isPlaying() {

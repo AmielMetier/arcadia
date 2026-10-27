@@ -549,11 +549,11 @@ export function briefingHtml({ role, squad, cfg, embedded, myRole = -1 }) {
     </div></div>`;
 }
 
-export function menuHtml({ muted, solo }) {
+export function menuHtml({ solo }) {
   return `<div class="panel card" style="width:min(360px,100%)"><h1 style="font-size:28px">PAUSE${solo ? '' : ' <small style="font-size:14px">(le convoi roule toujours)</small>'}</h1>
     <div class="row" style="flex-direction:column;align-items:stretch;margin-top:16px">
       <button class="btn yellow" id="btnResume">Reprendre</button>
-      <button class="btn ghost" id="btnSound">${muted ? 'Activer le son' : 'Couper le son'}</button>
+      <button class="btn ghost" id="btnSettings">Réglages</button>
       <button class="btn ghost" id="btnTuto">Revoir les premiers pas</button>
       <button class="btn" id="btnQuit">Quitter la partie</button></div></div>`;
 }

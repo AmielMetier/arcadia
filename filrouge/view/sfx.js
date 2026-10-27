@@ -1,10 +1,11 @@
 // Sons synthétisés (WebAudio), sans fichier. Le contexte audio naît au premier clic (règle des navigateurs).
-let ac = null, master = null, muted = false;
-try { muted = localStorage.getItem('fil_mute') === '1'; } catch (e) {}
+// volume : le curseur « Effets » des réglages (l'ancien bouton 🔇 le met à 0)
+let ac = null, master = null;
+DDVolume.legacy('fil_mute', ['fx']);
 function ctx() {
   if (!ac) {
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
-    ac = new C(); master = ac.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(DDVolume.gain(ac, 'fx')).connect(ac.destination);
+    ac = new C(); master = ac.createGain(); master.gain.value = 0.5; master.connect(DDVolume.gain(ac, 'fx')).connect(ac.destination);
   }
   if (ac.state === 'suspended') ac.resume();
   return ac;
@@ -37,8 +38,6 @@ const MEL = [261.6, 293.7, 329.6, 392.0, 440.0];
 const KEYS = [523.3, 659.3, 784.0, 987.8];
 
 export const sfx = {
-  get muted() { return muted; },
-  toggle() { muted = !muted; try { localStorage.setItem('fil_mute', muted ? '1' : '0'); } catch (e) {} if (master) master.gain.value = muted ? 0 : 0.5; return muted; },
   click() { tone(1800, 0.04, { type: 'square', vol: 0.08 }); tone(900, 0.05, { type: 'triangle', vol: 0.1, at: 0.01 }); },
   clack() { noise(0.06, { vol: 0.35, freq: 2600, type: 'bandpass', q: 2 }); tone(220, 0.06, { type: 'square', vol: 0.06 }); },
   cut() { noise(0.09, { vol: 0.5, freq: 5000, type: 'highpass' }); tone(3200, 0.05, { type: 'square', vol: 0.05 }); },

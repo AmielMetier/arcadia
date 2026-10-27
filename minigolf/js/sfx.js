@@ -1,11 +1,13 @@
 /* Golf Party — sons synthétisés (WebAudio), aucun fichier */
-let ctx = null, master = null, noiseBuf = null, muted = false, rollG = null, rollF = null, ambG = null, ambTimer = null;
-try { muted = localStorage.getItem('minigolf_mute') === '1'; } catch (e) {}
+// volume : le curseur « Effets » des réglages (à 0, plus de son ; l'ancien bouton « son coupé » y est repris)
+let ctx = null, master = null, noiseBuf = null, rollG = null, rollF = null, ambG = null, ambTimer = null;
+DDVolume.legacy('minigolf_mute', ['fx']);
+const muted = () => !(DDVolume.get('fx') > 0);
 
 export function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-  ctx = new AC(); master = ctx.createGain(); master.gain.value = muted ? 0 : 0.7;
+  ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.7;
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
   master.connect(comp); comp.connect(DDVolume.gain(ctx, 'fx')).connect(ctx.destination);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -15,8 +17,6 @@ export function initAudio() {
   rollF = ctx.createBiquadFilter(); rollF.type = 'lowpass'; rollF.frequency.value = 400; rollF.Q.value = 0.7;
   rollG = ctx.createGain(); rollG.gain.value = 0; src.connect(rollF); rollF.connect(rollG); rollG.connect(master); src.start();
 }
-export const isMuted = () => muted;
-export function toggleMute() { muted = !muted; try { localStorage.setItem('minigolf_mute', muted ? '1' : '0'); } catch (e) {} if (master) master.gain.setTargetAtTime(muted ? 0 : 0.7, ctx.currentTime, 0.05); return muted; }
 
 function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); }
 function tone(type, f0, f1, dur, vol, delay = 0, dest = master) {
@@ -84,7 +84,7 @@ export function ambience(theme) {
   else { f.type = 'highpass'; f.frequency.value = 3000; g.gain.setTargetAtTime(0.008, ctx.currentTime, 1); }
   lfo.start();
   ambTimer = setInterval(() => {
-    if (!ctx || muted) return;
+    if (!ctx || muted()) return;
     if (theme === 'park' && Math.random() < 0.5) { const b = 2200 + Math.random() * 1500; for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) tone('sine', b, b * 1.25, 0.07, 0.03, i * 0.11); }
     if (theme === 'zen' && Math.random() < 0.35) { const n = [523, 587, 659, 784, 880, 1047][(Math.random() * 6) | 0]; tone('sine', n, n, 2.2, 0.035); tone('sine', n * 2.76, n * 2.76, 1.2, 0.01); }
     if (theme === 'pirate' && Math.random() < 0.2) { tone('sine', 1800, 1300, 0.25, 0.02); tone('sine', 1700, 1200, 0.3, 0.02, 0.3); }

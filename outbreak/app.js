@@ -526,14 +526,15 @@ function toggleMenu() {
   S.menu = !S.menu;
   if (!S.menu) { hideScreen(); return; }
   screenEl.className = 'screen dim'; screenEl.hidden = false;
-  screenEl.innerHTML = menuHtml({ muted: audio.muted, canQuit: true, solo: S.role === 'solo' });
+  screenEl.innerHTML = menuHtml({ canQuit: true, solo: S.role === 'solo' });
   $('#btnResume').onclick = () => toggleMenu();
-  $('#btnSound').onclick = () => { toggleMute(); toggleMenu(); toggleMenu(); };
+  DDVolume.panel($('#btnSettings'), SETTINGS);
   const q = $('#btnQuit'); if (q) q.onclick = () => { if (H.embedded) H.exit(); else location.reload(); };
 }
-function toggleMute() { audio.unlock(); const m = audio.toggleMute(); $('#btnMute').innerHTML = svg(m ? 'mute' : 'sound'); }
-$('#btnMute').onclick = () => toggleMute();
-DDVolume.panel($('#btnVol'));
+// le son se règle dans le panneau Réglages (bouton du coin, ou du menu) ; M coupe ou remet tout, en déplaçant ses curseurs
+function toggleMute() { audio.unlock(); DDVolume.toggle(); }
+const SETTINGS = { accent: '#f43f5e', hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.' };
+DDVolume.panel($('#btnSet'), SETTINGS);
 for (const b of document.querySelectorAll('#tbtns button')) {
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault(); audio.unlock();
@@ -548,7 +549,6 @@ for (const b of document.querySelectorAll('#tbtns button')) {
 // en solo, la partie se met en pause quand l'onglet passe en arrière-plan
 document.addEventListener('visibilitychange', () => { if (document.hidden && S.role === 'solo' && S.sim && !S.menu && !S.endShown && !S.lobby) toggleMenu(); });
 $('#btnMenu').onclick = () => toggleMenu();
-$('#btnMute').innerHTML = svg(audio.muted ? 'mute' : 'sound');
 
 // ------------------------------------------------------------------ boucle
 let lastT = performance.now();

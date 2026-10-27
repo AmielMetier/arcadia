@@ -6,11 +6,19 @@
    AUDIO SYNTHÉTISÉ + BANDE-SON ORCHESTRALE RTS ÉPIQUE (WebAudio)
    ============================================================================ */
 const Sfx = (() => {
-  // Bus audio : musique et effets ont chacun leur volume, et un gain maître coupe TOUT (bouton / touche M)
-  const SAVE_KEY = 'bastion_audio_v2';
-  const cfg = { musicOn: true, sfxOn: true, musicVol: 0.55, sfxVol: 0.8, allMuted: false };
-  try { Object.assign(cfg, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) { /* stockage indisponible */ }
-  const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(cfg)); } catch (e) { /* ignoré */ } };
+  // Bus audio : musique et effets suivent chacun leur curseur du panneau Réglages (à 0 : coupés ; touche M : tout)
+  const MUSIC_VOL = 0.55 * 0.9, SFX_VOL = 0.8; // niveau normal du jeu (curseurs à 100 %)
+  const musicOn = () => DDVolume.get('music') > 0, sfxOn = () => DDVolume.get('fx') > 0;
+  // ancien réglage du jeu (curseurs, interrupteurs ON/OFF et « tout couper ») : point de départ des curseurs
+  (function migrate() {
+    let old = null;
+    try { old = JSON.parse(localStorage.getItem('bastion_audio_v2') || 'null'); } catch (e) { /* stockage indisponible */ }
+    if (!old) return;
+    if (typeof old.musicVol === 'number') DDVolume.migrate('music', old.musicVol / 0.55);
+    if (typeof old.sfxVol === 'number') DDVolume.migrate('fx', old.sfxVol / 0.8);
+    const off = old.allMuted ? ['music', 'fx'] : [old.musicOn === false && 'music', old.sfxOn === false && 'fx'].filter(Boolean);
+    DDVolume.legacy('bastion_audio_v2', off, () => off.length > 0);
+  }());
 
   let ctx = null, musicTimer = null;
   let stepIdx = 0, nextNoteTime = 0, noiseBuf = null, masterComp = null;
@@ -18,13 +26,6 @@ const Sfx = (() => {
   let lastMineSound = 0, nextMineGap = 0, lastShotSound = 0, lastBoomSound = 0;
   let combatUntil = 0, musicMode = 'calm', pendingMode = 'calm';
 
-  function applyGains() {
-    if (!ctx || !masterGain) return;
-    const t = ctx.currentTime;
-    masterGain.gain.setTargetAtTime(cfg.allMuted ? 0 : 1, t, 0.03);
-    musicBus.gain.setTargetAtTime(cfg.musicOn ? cfg.musicVol * 0.9 : 0, t, 0.05);
-    sfxBus.gain.setTargetAtTime(cfg.sfxOn ? cfg.sfxVol : 0, t, 0.03);
-  }
 
   function ensureContext() {
     if (!ctx) {
@@ -42,11 +43,12 @@ const Sfx = (() => {
       masterGain = ctx.createGain();
       musicBus = ctx.createGain();
       sfxBus = ctx.createGain();
-      musicBus.connect(masterComp);
-      sfxBus.connect(masterComp);
+      musicBus.gain.value = MUSIC_VOL;
+      sfxBus.gain.value = SFX_VOL;
+      musicBus.connect(DDVolume.gain(ctx, 'music')).connect(masterComp);
+      sfxBus.connect(DDVolume.gain(ctx, 'fx')).connect(masterComp);
       masterComp.connect(masterGain);
       masterGain.connect(ctx.destination);
-      applyGains();
     }
     if (ctx && !noiseBuf) {
       const len = ctx.sampleRate * 1.0;
@@ -66,7 +68,7 @@ const Sfx = (() => {
   function mdest() { return musicBus || (ctx ? ctx.destination : null); }
 
   function ensure() {
-    if (cfg.allMuted || !cfg.sfxOn) return null;
+    if (!sfxOn()) return null;
     return ensureContext();
   }
 
@@ -309,7 +311,7 @@ const Sfx = (() => {
   }
 
   function scheduleMusic() {
-    if (!cfg.musicOn || cfg.allMuted) return;
+    if (!musicOn()) return;
     const c = ensureContext();
     if (!c || c.state !== 'running') return;
     const stepDur = 60 / 132 / 4;
@@ -343,7 +345,7 @@ const Sfx = (() => {
   }
 
   function chime(notes, type = 'triangle', vol = 0.07, gap = 0.07, len = 0.16, bus = dest) {
-    const c = ensureContext(); if (!c || cfg.allMuted) return;
+    const c = ensureContext(); if (!c || !(bus === mdest ? musicOn() : sfxOn())) return;
     const t = c.currentTime;
     notes.forEach((f, i) => {
       const o = c.createOscillator(), g = c.createGain(), flt = c.createBiquadFilter();
@@ -359,21 +361,15 @@ const Sfx = (() => {
   }
 
   return {
-    get muted() { return cfg.allMuted; },
-    get settings() { return { ...cfg }; },
-    get musicPlaying() { return cfg.musicOn && !cfg.allMuted; },
-    toggleAll() { cfg.allMuted = !cfg.allMuted; ensureContext(); applyGains(); save(); return cfg.allMuted; },
-    setMusicOn(v) { cfg.musicOn = !!v; ensureContext(); applyGains(); if (cfg.musicOn) startMusic(); save(); },
-    setSfxOn(v) { cfg.sfxOn = !!v; ensureContext(); applyGains(); save(); },
-    setMusicVol(v) { cfg.musicVol = clamp(v, 0, 1); ensureContext(); applyGains(); save(); },
-    setSfxVol(v) { cfg.sfxVol = clamp(v, 0, 1); ensureContext(); applyGains(); save(); },
+    get musicPlaying() { return musicOn(); },
+    // touche M : tous les curseurs à 0, ou remis où ils étaient ; renvoie true si le son est coupé
+    toggleAll() { ensureContext(); return DDVolume.toggle(); },
     // Appelé à chaque échange de tirs visible : la musique passe en mode bataille ~14 s
     combat() { combatUntil = performance.now() + 14000; },
     startMusic,
     stopMusic,
     wake() {
       ensureContext();
-      applyGains();
       if (!musicTimer) startMusic();
     },
     victory() { stopMusic(); chime([587, 740, 880, 1175, 1480], 'sawtooth', 0.06, 0.13, 0.55, mdest); setTimeout(() => chime([294, 440, 587, 880], 'triangle', 0.07, 0.0, 1.6, mdest), 700); },
