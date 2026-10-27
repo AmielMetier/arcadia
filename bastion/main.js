@@ -95,6 +95,7 @@ function startTicker(fn, ms) {
   }
 }
 let stopTicker = null;
+if (window.HubBridge) window.HubBridge.ownBackgroundLoop = true; // notre simulation a déjà son Worker : le Hub n'a pas à relayer les images
 const MAX_STEPS_PER_CALL = 60;       // 2 s de jeu rattrapées au plus d'un coup
 const STEP_BUDGET_MS = 250;          // au-delà, on abandonne le retard plutôt que de geler la page
 

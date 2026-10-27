@@ -35,7 +35,7 @@ const METAL = new Set(['metalw', 'neon', 'hazard', 'goldtrim']);
 export const sfx = {
   putt(p) { noise(0.05, 0.5 + p * 0.4, 'bandpass', 2600, 2000, 2); tone('sine', 260 + p * 80, 120, 0.12, 0.35 + p * 0.3); },
   hit(s, mat) {
-    const v = Math.min(1, s / 8);
+    const v = Math.min(0.85, s / 10);
     if (METAL.has(mat)) { tone('triangle', 900 + Math.random() * 200, 700, 0.25, 0.15 + v * 0.3); tone('sine', 1840, 1500, 0.3, 0.05 + v * 0.1); }
     else if (mat === 'rock' || mat === 'stonew' || mat === 'brick' || mat === 'stonecap') { noise(0.06, 0.25 + v * 0.4, 'bandpass', 1800, 900, 1.5); tone('sine', 420, 260, 0.06, 0.15 + v * 0.3); }
     else { tone('sine', 520 + Math.random() * 80, 330, 0.09, 0.2 + v * 0.45); noise(0.04, 0.15 + v * 0.3, 'bandpass', 1400, 900, 2); }

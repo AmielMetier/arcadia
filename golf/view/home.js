@@ -88,21 +88,25 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
   }
   function caption(h) { $('#homeNow').innerHTML = `<b>Trou ${h.n}</b> ${esc(h.name)} <span>${THEMES[h.theme]} · par ${h.par} · ${h.length} m</span>`; }
   async function fly(n) {
-    if (loading) { pending = n; return; } // un trou à la fois : le dernier demandé passe ensuite
+    if (loading) { pending = n; return; }
     loading = true;
-    // le trou suivant se construit en tâche de fond pendant que le survol continue ; dès qu'il est prêt, fondu
-    // enchaîné depuis l'image du moment, caméra toujours en mouvement
-    const h = holeOf(n);
-    await scene.loadHole(h, { theme: h.theme, wind: CALM, time: set.time, swap: () => scene.dissolve(0.9) });
-    if (!alive) return;
-    scene.setWind(CALM);
-    scene.showBall(false); scene.setTee(null, false); scene.setMarker(null, false); scene.setAimDots(null, null, false); scene.showGrid(false);
-    sfx.ambience(h.theme);
-    cur = h; t = 0; path = makePath(h); path(0, true);
-    caption(h);
-    loading = false;
-    const p = pending; pending = null;
-    if (p != null && p !== n) fly(p);
+    try {
+      const h = holeOf(n);
+      await scene.loadHole(h, { theme: h.theme, wind: CALM, time: set.time, swap: () => scene.dissolve(0.9) });
+      if (!alive) return;
+      scene.setWind(CALM);
+      scene.showBall(false); scene.setTee(null, false); scene.setMarker(null, false); scene.setAimDots(null, null, false); scene.showGrid(false);
+      sfx.ambience(h.theme);
+      cur = h; t = 0; path = makePath(h); path(0, true);
+      caption(h);
+    } catch (e) {
+      console.warn('Erreur survol trou accueil', n, e);
+      if (window.DDLogger) window.DDLogger.logCrash('CRASH_JS_ERROR', 'Erreur survol trou ' + n + ' (accueil) : ' + (e && e.message ? e.message : e), { stack: e && e.stack, game: 'golf' });
+    } finally {
+      loading = false;
+      const p = pending; pending = null;
+      if (p != null && p !== n) fly(p);
+    }
   }
   function playlist(next) {
     list = next; idx = 0;

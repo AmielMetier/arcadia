@@ -13,7 +13,7 @@ const fmtM = (m) => (m >= 1000 ? (m / 1000).toFixed(2).replace('.', ',') + ' km'
 const stName = (i) => STATION_NAMES[i % STATION_NAMES.length];
 const set = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
 const html = (el, h, cache, key) => { if (cache[key] !== h) { cache[key] = h; el.innerHTML = h; } };
-const BIO_COL = { plaine: '#c9d6e3', foret: '#3f7a5c', ville: '#8d8a93', lac: '#7cc2ea', col: '#a3a9b8', usine: '#b07a46', toundra: '#e9eef5' };
+const BIO_COL = { plaine: '#c9d6e3', foret: '#3f7a5c', ville: '#8d8a93', lac: '#7cc2ea', col: '#a3a9b8', usine: '#b07a46', toundra: '#c9b48a' };
 const CAT_COL = { fire: '#ff7a3d', fuel: '#ffc531', gauge: '#ff4b2b', heat: '#ff9a4a', train: '#9fd3ff', storm: '#8e99a8', hull: '#6fa0d8', compass: '#62d6a7',
   flare: '#ff5a3a', crate: '#c0821f', ladder: '#d8c49a', snow: '#bfe4ff', pouch: '#c79a6a', wrench: '#9aa3ad', axe: '#b98552', scrap: '#c8a24a', harpoon: '#ffd34d', gear: '#c8a24a', survivor: '#a8b8c8' };
 

@@ -37,10 +37,10 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   const isVol = (o) => o === true || !!(o && o.volatile);
   const PROTO = 3;
   const OUTBOX_MAX = 3000;   // messages gardés en attendant l'accusé de réception du serveur
-  const DEAD_MS = 5000;      // sonde sans réponse : connexion morte, on en ouvre une autre
+  const DEAD_MS = 14000;      // sonde sans réponse : connexion morte, on en ouvre une autre
   const FROZEN_MS = 2000;    // la sonde n'a pas pu tourner pendant ce temps : c'est la page qui était figée
-  const GIVE_UP_MS = 60000;  // serveur injoignable depuis une minute : on abandonne
-  const REJOIN_MS = 15000;   // place perdue : le temps que l'hôte rouvre son salon
+  const GIVE_UP_MS = 90000;  // serveur injoignable depuis une minute : on abandonne
+  const REJOIN_MS = 25000;   // place perdue : le temps que l'hôte rouvre son salon
 
   // Réseau revenu ou onglet de nouveau au premier plan : on vérifie tout de suite la connexion de chaque salon
   const nets = new Set();
@@ -238,10 +238,20 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       },
       _onError(msg) {
         if (this.role === 'host') {
-          if (msg.reason === 'unavailable-id' && !this.established && !this.fixed) {
-            // code déjà pris : on en tire un autre
-            this.code = genCode(); this.roomId = prefix + this.code; this._joinRoom();
-            return;
+          if (msg.reason === 'unavailable-id') {
+            if (!this.established && !this.fixed) {
+              // code déjà pris : on en tire un autre
+              this.code = genCode(); this.roomId = prefix + this.code; this._joinRoom();
+              return;
+            }
+            if (this.established) {
+              // L'hôte tente de reprendre son salon après une micro-coupure : le serveur garde encore l'ancienne socket dans sa période de grâce
+              if (!this.rejoinUntil) this.rejoinUntil = Date.now() + 25000;
+              if (Date.now() < this.rejoinUntil) {
+                this.retryTo = setTimeout(() => this._joinRoom(), 1200);
+                return;
+              }
+            }
           }
           this.dead = true; this.gen++; this._stopKeepAlive();
           this.cb.error(msg.reason === 'unavailable-id' ? 'Code indisponible.' : msg.message || 'Erreur de connexion.');
@@ -262,6 +272,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
         if (this.role === 'host') {
           this.links = new Map();
           if (this.cb.lost && this.cb.lost(reason)) return; // le salon a déjà migré : l'appelant s'en occupe
+          this.rejoinUntil = Date.now() + REJOIN_MS;
           this._joinRoom(); // même code : les invités reviennent d'eux-mêmes
         } else {
           this.rejoinUntil = Date.now() + REJOIN_MS;
@@ -355,7 +366,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (frozen) { this.probeAt = 0; this.fastCheck = 0; }
           if (this.probeAt) {
             const late = performance.now() - this.probeAt;
-            if (late > DEAD_MS || (this.fastCheck && late > 2500)) this._down(gen);
+            if (late > DEAD_MS || (this.fastCheck && late > 6000)) this._down(gen);
             return;
           }
           this._probe(ws);

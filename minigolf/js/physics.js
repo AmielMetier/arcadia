@@ -236,10 +236,10 @@ function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
     if (isFloor) {
       e = imp > 1.4 ? (M.kind === 'floor' ? M.e : 0.3) : 0;
       if (M.tramp && imp > 1.0) { e = Math.max(M.e, M.tramp / imp); if (ev && t - b.lastHit > 0.08) { ev.push({ k: 'tramp', b: b.id, p: b.p.slice(), s: imp }); b.lastHit = t; } }
-      else if (ev && imp > 2.2 && t - b.lastHit > 0.07) { ev.push({ k: M.mud ? 'mud' : M.sand ? 'sand' : 'bounce', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
+      else if (ev && imp > 2.6 && t - b.lastHit > 0.12) { ev.push({ k: M.mud ? 'mud' : M.sand ? 'sand' : 'bounce', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
     } else {
       e = imp > 0.25 ? M.e : 0;
-      if (ev && imp > 0.6 && t - b.lastHit > 0.05) { ev.push({ k: M.kick ? 'bumper' : 'hit', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
+      if (ev && imp > (M.kick ? 0.6 : 1.1) && t - b.lastHit > 0.12) { ev.push({ k: M.kick ? 'bumper' : 'hit', b: b.id, p: b.p.slice(), s: imp, m: mi }); b.lastHit = t; }
     }
     rx -= (1 + e) * vn * nx; ry -= (1 + e) * vn * ny; rz -= (1 + e) * vn * nz;
     if (!isFloor) {
