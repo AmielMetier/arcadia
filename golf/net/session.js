@@ -14,7 +14,9 @@
 //                   { t:'ready', no }                           « je vois le tour no (prêt à regarder le prochain coup) »
 //                   { t:'away', on }                            page cachée / revenue
 //                   { t:'sync' }                                « renvoie-moi l'état »
-//   hôte → tous :   { t:'st', R }                               état de la partie (après chaque coup animé)
+//   hôte → tous :   { t:'setup', set }                          réglages choisis par l'hôte au menu (avant la partie)
+//                   { t:'menu', set }                           retour au menu (l'hôte va changer de parcours)
+//                   { t:'st', R }                               état de la partie (après chaque coup animé)
 //                   { t:'shot', ev }                            un coup vient d'être joué (paramètres + résultat)
 //                   { t:'pose', id, aim, club, back }           posture du joueur qui joue
 //                   { t:'note', text, id? }                     message à afficher (à un joueur, ou à tous)
@@ -46,7 +48,8 @@ export function simBall(hole, b) { return { x: b.x, z: b.z, lie: b.lie, y: hole.
 
 // ------------------------------------------------------------------ hôte (et partie solo)
 // speed : accélère les délais (tests hors navigateur)
-export function startHost({ bridge, solo, settings = {}, me, emit, initial = null, speed = 1 }) {
+export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial = null, speed = 1 }) {
+  let settings = { ...set0 };
   let R = initial ? clone(initial) : null, busy = false, reported = false, ended = false;
   const timers = new Set();
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms / speed); timers.add(t); return t; };
@@ -73,7 +76,14 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
   const away = new Set(); // joueurs dont la page est cachée
   let turnGone = false;   // le joueur dont c'est le tour était-il absent quand son compte a démarré
 
+  // repart de zéro : plus de coup en attente, de vote ni de compte à rebours de la partie d'avant
+  function clear() {
+    for (const t of timers) clearTimeout(t);
+    timers.clear(); turnT = []; botWait = null; busy = false;
+    votes.seen.clear(); votes.ready.clear();
+  }
   function begin() {
+    clear(); ended = false; reported = false;
     const course = COURSES[settings.course] || COURSES.campagne;
     // test : ?hole=N démarre la partie à ce trou du parcours
     const holes = settings.startHole ? course.holes.filter((n) => n >= settings.startHole) : course.holes;
@@ -233,7 +243,8 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
   // messages des invités
   const onMsg = (from, m) => {
     if (!m || typeof m !== 'object') return;
-    if (m.t === 'sync') { if (R) bridge.send(from, { t: 'st', R: clone(R) }); }
+    // pas encore de partie : l'invité voit les réglages du menu
+    if (m.t === 'sync') bridge.send(from, R ? { t: 'st', R: clone(R) } : { t: 'setup', set: settings });
     else if (m.t === 'shot') shot(from, m);
     else if (m.t === 'seen') seen(m.no | 0, from);
     else if (m.t === 'ready') ready(m.no | 0, from);
@@ -260,6 +271,9 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
   return {
     get state() { return R; }, isHost: true,
     begin,
+    // menu : l'hôte change un réglage (les invités le voient), ou y revient après une partie
+    configure(set) { settings = { ...set }; send({ t: 'setup', set: settings }); },
+    menu() { clear(); R = null; send({ t: 'menu', set: settings }); },
     // le joueur local joue son coup
     shot: (p) => shot(me.id, { ...p, no: R ? R.shotNo : 0 }),
     pose: (p) => { if (R && R.players[R.turn]?.id === me.id) { const pose = { t: 'pose', id: me.id, ...p }; send(pose, true); watchTurn(); } },
@@ -277,18 +291,21 @@ export function startHost({ bridge, solo, settings = {}, me, emit, initial = nul
 
 // ------------------------------------------------------------------ invité
 export function startClient({ bridge, me, emit }) {
-  let R = null, gotState = false, lastShot = -1;
-  const ask = setInterval(() => { if (!gotState) bridge.send('host', { t: 'sync' }); }, 1500);
+  let R = null, gotState = false, gotSetup = false, lastShot = -1, alive = true, tick = 0;
+  // on redemande l'état tant qu'on ne l'a pas ; au menu, de temps en temps (au cas où le départ se serait perdu)
+  const ask = setInterval(() => { if (!gotState && (!gotSetup || ++tick % 4 === 0)) bridge.send('host', { t: 'sync' }); }, 1500);
   bridge.send('host', { t: 'sync' });
   bridge.on('msg', (from, m) => {
-    if (!m || typeof m !== 'object') return;
+    if (!alive || !m || typeof m !== 'object') return;
     if (m.t === 'st' && m.R) {
       gotState = true; R = m.R; emit({ type: 'state', R: m.R });
       if (hiddenNow()) bridge.send('host', { t: 'ready', no: R.shotNo }); // page cachée : personne ne m'attend
     } else if (m.t === 'shot' && m.ev) {
       lastShot = m.ev.no; emit({ type: 'shot', ev: m.ev });
       if (hiddenNow()) bridge.send('host', { t: 'seen', no: m.ev.no });
-    } else if (m.t === 'pose' && m.id !== me.id) emit({ type: 'pose', ...m });
+    } else if (m.t === 'setup' && !R && m.set && typeof m.set === 'object') { gotSetup = true; emit({ type: 'setup', set: m.set }); }
+    else if (m.t === 'menu') { R = null; gotState = false; gotSetup = true; emit({ type: 'menu', set: m.set && typeof m.set === 'object' ? m.set : {} }); }
+    else if (m.t === 'pose' && m.id !== me.id) emit({ type: 'pose', ...m });
     else if (m.t === 'note' && typeof m.text === 'string') emit({ type: 'note', text: m.text.slice(0, 120) });
   });
   let lastPose = 0;
@@ -304,7 +321,7 @@ export function startClient({ bridge, me, emit }) {
       if (on) { if (R) bridge.send('host', { t: 'ready', no: R.shotNo }); if (lastShot >= 0) bridge.send('host', { t: 'seen', no: lastShot }); }
     },
     resync: () => bridge.send('host', { t: 'sync' }),
-    stop() { clearInterval(ask); },
+    stop() { alive = false; clearInterval(ask); },
   };
 }
 

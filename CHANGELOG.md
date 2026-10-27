@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.91 — 27 octobre 2026
+- **Birdie Party** — Le menu du jeu s'affiche aussi quand on lance la partie depuis le Hub, à plusieurs comme seul.
+  - L'hôte choisit le parcours, le moment de la journée, les équipes, les bots et le vent, puis lance la partie ; les autres voient ses choix en direct en attendant.
+  - En fin de partie, l'hôte peut rejouer ou revenir au menu pour changer de parcours, et tout le salon le suit.
+- **Birdie Party** — De nouveaux golfeurs : des personnages complets, avec des bras qui suivent le swing, un visage, des coiffures et des casquettes variées, un polo, un gant et des chaussures de golf. Chacun garde la même allure d'une partie à l'autre.
+- **Birdie Party** — Réglage du son : le bouton haut-parleur ouvre un curseur pour la musique et un pour les effets (frappes, foule, nature), retenus d'une partie à l'autre.
+- **Birdie Party** — La balle glisse moins sur le green : une approche s'arrête à quelques mètres au lieu de filer au loin, et un putt dans une pente s'emballe beaucoup moins.
+- **Birdie Party** — Correction : la partie ne reste plus figée quand l'écran du jeu a été masqué un instant (le tour suivant ne s'affichait plus), et un coup dont l'animation n'en finit pas se termine tout seul.
+
 ## 2.89 — 27 octobre 2026
 - **Birdie Party** — Les parties en ligne tiennent mieux la route.
   - Tout le monde avance au même rythme : la partie attend que chacun ait fini de regarder un coup, et les bots attendent que tout le monde voie leur tour.

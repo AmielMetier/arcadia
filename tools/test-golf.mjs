@@ -9,7 +9,7 @@ import { HOLES, buildHole, windFor, COURSES } from '../golf/engine/course.js';
 import { newRound, startHole, applyShot, holeOver, finishHole, ranking, totals, stableford, MAX_STROKES, nextPlayer } from '../golf/engine/rules.js';
 import { botShot } from '../golf/engine/bot.js';
 import { suggestClub, layupPoint } from '../golf/engine/advice.js';
-import { startHost, holeByNumber } from '../golf/net/session.js';
+import { startHost, startClient, holeByNumber } from '../golf/net/session.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; console.log('✓', name); };
@@ -442,6 +442,64 @@ await new Promise((resolve, reject) => {
   assert.equal(shots.length, nb + 1, 'tout le monde est prêt : le bot joue');
   S.stop();
   n++; console.log('✓ partie en réseau : on avance quand tout le monde a vu le coup, sans attendre un joueur coupé');
+}
+
+// menu en réseau (pont simulé entre un hôte et un invité) : l'invité voit les réglages de l'hôte et leurs changements,
+// la partie démarre chez lui quand l'hôte la lance, l'hôte peut revenir au menu, et chaque partie terminée compte
+{
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const host = { id: 0, name: 'Hôte', color: '#ff4b2b' }, guest = { id: 1, name: 'Invité', color: '#2b8cff' };
+  const hH = {}, gH = {}, reports = [], gEv = [];
+  const fire = (hs, k, ...a) => (hs[k] || []).forEach((f) => f(...a));
+  const hostBridge = { embedded: true, players: [host, guest], on(k, fn) { (hH[k] = hH[k] || []).push(fn); }, report(r) { reports.push(r); },
+    send(to, m) { if (to === 'all' || to === 1) setTimeout(() => fire(gH, 'msg', 0, JSON.parse(JSON.stringify(m))), 0); } };
+  const guestBridge = { embedded: true, players: [host, guest], on(k, fn) { (gH[k] = gH[k] || []).push(fn); }, report() {},
+    send(to, m) { if (to === 'host') setTimeout(() => fire(hH, 'msg', 1, JSON.parse(JSON.stringify(m))), 0); } };
+  let S = null;
+  // l'hôte joue ses coups comme un bot ; les deux regardent chaque coup jusqu'au bout
+  const emit = (e) => {
+    if (e.type === 'shot') { S.done(e.ev.no); return; }
+    if (e.type !== 'state' || e.R.phase !== 'play') return;
+    const P = e.R.players[e.R.turn], h = holeByNumber(e.R.holes[e.R.hi]);
+    if (P.id === host.id) setTimeout(() => S.shot(botShot(h, P.ball, windFor(h, e.R.seed, e.R.wind), 'expert', e.R.shotNo + 1)), 0);
+  };
+  const C = startClient({ bridge: guestBridge, me: guest, emit: (e) => {
+    gEv.push(e);
+    if (e.type === 'shot') guestBridge.send('host', { t: 'seen', no: e.ev.no });
+    if (e.type === 'state' && e.R.phase === 'play') {
+      const P = e.R.players[e.R.turn], h = holeByNumber(e.R.holes[e.R.hi]);
+      if (P.id === guest.id) setTimeout(() => C.shot(botShot(h, P.ball, windFor(h, e.R.seed, e.R.wind), 'expert', e.R.shotNo + 3)), 0);
+    }
+  } });
+  S = startHost({ bridge: hostBridge, solo: false, settings: { course: 'campagne', bots: 0, time: 'jour' }, me: host, emit, speed: 200 });
+  await wait(30);
+  const setups = () => gEv.filter((e) => e.type === 'setup');
+  assert.equal(setups().at(-1)?.set.course, 'campagne', 'l\'invité qui arrive au menu reçoit les réglages de l\'hôte');
+  S.configure({ course: 'desert', bots: 0, time: 'soir', startHole: 30 });
+  await wait(20);
+  assert.equal(setups().at(-1).set.course, 'desert', 'l\'invité voit le parcours choisi par l\'hôte');
+  assert.equal(setups().at(-1).set.time, 'soir');
+  const playOnce = async () => {
+    S.begin();
+    for (let k = 0; k < 500 && !gEv.some((e) => e.type === 'state' && e.R.phase === 'over' && e.R.started === S.state?.started); k++) await wait(20);
+  };
+  await playOnce();
+  const first = gEv.find((e) => e.type === 'state');
+  assert.ok(first && first.R.course === 'desert' && first.R.time === 'soir', 'la partie démarre chez l\'invité avec les réglages de l\'hôte');
+  assert.equal(S.state.phase, 'over', 'la partie se termine');
+  assert.equal(reports.length, 1, 'la partie est comptée dans le classement');
+  S.menu();
+  await wait(20);
+  assert.equal(gEv.at(-1).type, 'menu', 'l\'hôte revient au menu : l\'invité aussi');
+  assert.equal(gEv.at(-1).set.course, 'desert');
+  // au menu, l'invité qui redemande l'état reçoit les réglages, pas l'ancienne partie
+  C.resync(); await wait(20);
+  assert.equal(gEv.at(-1).type, 'setup');
+  await wait(5);
+  await playOnce();
+  assert.equal(reports.length, 2, 'la seconde partie compte aussi');
+  C.stop(); S.stop();
+  n++; console.log('✓ menu en réseau : l\'invité suit les choix de l\'hôte, la partie démarre chez lui, retour au menu et nouvelle partie');
 }
 
 console.log(`\n${n} tests réussis`);
