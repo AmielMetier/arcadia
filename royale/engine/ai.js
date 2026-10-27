@@ -8,9 +8,9 @@ import { makeRng, hash } from './rng.js';
 import { WEAPONS, ITEMS } from './items.js';
 
 export const LEVELS = {
-  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0 },
-  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5 },
-  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1 },
+  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35 },
+  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5, push: 0.6 },
+  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1, push: 0.85 },
 };
 const WSCORE = { fusil: 10, pompe: 9.5, smg: 8, sniper: 7, roquette: 6.5, pistolet: 4.5 };
 const WANT_D = { pompe: 5, smg: 11, pistolet: 14, fusil: 24, sniper: 60, roquette: 22 };
@@ -158,7 +158,8 @@ export function createAI(sim, map, world) {
     const high = g.y != null && g.y - nav.stand0(g.x, g.z) > 2;
     const to = hd > 40 && high ? { x: g.x, y: nav.stand0(g.x, g.z), z: g.z } : { x: g.x, y: g.y != null ? g.y + 0.2 : nav.stand0(g.x, g.z), z: g.z };
     B.approach = to.y !== (g.y != null ? g.y + 0.2 : to.y);
-    const p = nav.path({ x: P.x, y: P.y, z: P.z }, to, 9000);
+    // but lointain (rotation, zone) : un chemin partiel suffit, repris en route ; ça évite les à-coups (60 bots)
+    const p = nav.path({ x: P.x, y: P.y, z: P.z }, to, hd > 120 ? 4500 : 9000);
     // parti de l'eau ou d'un endroit coincé : tout droit un moment, puis on réessaie
     if (p.fail === 'depart') { B.path = null; B.direct = S.t + 2; return; }
     if (p.fail) { ban(B, g); B.goal = null; return; }
@@ -171,7 +172,7 @@ export function createAI(sim, map, world) {
   function claimed(P, k) { const c = claims.get(k); return c && c.id !== P.id && c.until > S.t && S.players.get(c.id) && S.players.get(c.id).alive; }
 
   // ------------------------------------------------------------------ choix d'une cible de fouille
-  function pickLoot(P, B) {
+  function pickLoot(P, B, range = 1) {
     let best = null, bs = 0;
     const consider = (g, v, d) => {
       const k = keyOfGoal(g);
@@ -183,12 +184,12 @@ export function createAI(sim, map, world) {
     for (const c of S.chests.values()) {
       if (c.open) continue;
       const d = Math.hypot(c.x - P.x, c.z - P.z) + Math.abs(c.y - P.y) * 2;
-      if (d > 60) continue;
+      if (d > 60 * range) continue;
       consider({ kind: 'coffre', id: c.id, x: c.x, y: c.y, z: c.z }, c.kind === 'coffre' ? 10 : ammoLow ? 5 : 1, d);
     }
     for (const g of S.items.values()) {
       const d = Math.hypot(g.x - P.x, g.z - P.z) + Math.abs(g.y - P.y) * 2;
-      if (d > 38) continue;
+      if (d > 38 * range) continue;
       const w = want(P, g.it);
       consider({ kind: g.it.t === 'munitions' || g.it.t === 'materiaux' ? 'tas' : 'objet', id: g.id, x: g.x, y: g.y, z: g.z, swap: w.swap }, w.v, d);
     }
@@ -246,24 +247,26 @@ export function createAI(sim, map, world) {
     B.visible = false;
     // touché ou entendu sans voir : on se tourne par là
     const alert = cands.find((c) => c.hurt || c.heard);
-    if (alert && (!B.enemy || B.enemy === alert.Q.id || S.t - B.seenT > 3)) {
+    if (alert && (B.enemy == null || B.enemy === alert.Q.id || S.t - B.seenT > 3)) {
       if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; }
       B.last = { x: alert.Q.x, y: alert.Q.y, z: alert.Q.z };
     }
-    if (B.enemy && S.t - B.seenT > 6) B.enemy = null;
+    if (B.enemy != null && S.t - B.seenT > 6) B.enemy = null;
   }
 
   // ------------------------------------------------------------------ décision (deux fois par seconde)
   function decide(P, B) {
-    const E = B.enemy ? S.players.get(B.enemy) : null;
+    // (l'hôte du salon a l'identifiant 0 : on teste toujours != null, jamais la valeur elle-même)
+    const E = B.enemy != null ? S.players.get(B.enemy) : null;
     const danger = stormDanger(P), gun = armed(P);
     if (E && E.alive) {
       const d = Math.hypot(E.x - P.x, E.z - P.z);
       let reach = 0;
       for (const it of P.inv) if (usable(P, it)) reach = Math.max(reach, ENGAGE[it.w]);
       const hunted = S.t - (P.hitT || -9) < 4 && P.hitBy === E.id;
-      // entre bots, on se cherche un peu moins de loin, surtout juste après l'atterrissage (on s'arme d'abord)
-      if (E.bot) reach *= S.t - (B.landT || 0) < 60 ? 0.55 : 0.8;
+      // comme un joueur : tant qu'on s'équipe, on ne cherche pas la bagarre de loin (mais on se défend, et un joueur
+      // croisé de près est engagé) ; une fois équipé, on va au combat
+      if (!geared(P, B)) reach *= E.bot ? 0.55 : 0.85;
       // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
       if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
       // entendu sans le voir : armé et en forme, on va voir (on pousse vers les coups de feu)
@@ -279,11 +282,37 @@ export function createAI(sim, map, world) {
     const h = needHeal(P);
     if (h && S.t - (P.hitT || -9) > 2.5 && (!E || !B.visible || P.hp + P.sh < 40)) { B.state = 'heal'; B.healSlot = h; return; }
     if (B.state === 'fight' || B.state === 'heal' || B.state === 'zone') { B.state = 'go'; B.goal = null; }
-    if (B.goal && B.goal.kind !== 'roam' && B.goal.kind !== 'zone' && S.t - B.goal.since < 40) return;
-    // une fouille en route vaut mieux qu'une promenade
-    const g = pickLoot(P, B);
+    if (B.goal && B.goal.kind !== 'roam' && B.goal.kind !== 'zone' && B.goal.kind !== 'rota' && S.t - B.goal.since < 40) return;
+    // début de partie : on fouille et on se protège ; une fois équipé, on ne ramasse plus que ce qui est tout près
+    const ready = geared(P, B);
+    const g = pickLoot(P, B, ready ? 0.45 : 1);
     if (g) { B.state = 'go'; setGoal(P, B, g); return; }
+    if (ready) {
+      // équipé : on va là où ça tire (on entend les combats de loin), sinon on tourne vers le prochain cercle
+      const fight = heardFight(P, B);
+      if (fight) { B.state = 'go'; setGoal(P, B, { kind: 'chasse', id: fight.id, x: fight.x, z: fight.z, r: 6 }); return; }
+      if (!B.goal || (B.goal.kind === 'roam' && S.t - B.goal.since > 25)) { B.state = 'go'; setGoal(P, B, { ...zonePoint(P, B, false), kind: 'rota' }); }
+      return;
+    }
     if (!B.goal) { B.state = 'go'; setGoal(P, B, zonePoint(P, B, true)); }
+  }
+  // équipé : une arme chargée et de quoi tirer, un bouclier (ou plus rien pour en mettre), ou déjà deux minutes au sol
+  function geared(P, B) {
+    const gun = P.inv.some((it) => it && it.t === 'arme' && WEAPONS[it.w] && (it.mag > 0 || P.ammo[WEAPONS[it.w].ammo] > 0));
+    if (!gun) return false;
+    const shieldLeft = P.inv.some((it) => it && it.t === 'objet' && ITEMS[it.c] && ITEMS[it.c].shield);
+    const guns = P.inv.filter((it) => it && it.t === 'arme').length;
+    return S.t - (B.landT || 0) > 120 || ((P.sh >= 50 || !shieldLeft) && guns >= 2) || P.sh >= 75;
+  }
+  // un combat qu'on entend (des tirs depuis moins de 6 s, à moins de 160 m, hors tempête) : le plus proche
+  function heardFight(P, B) {
+    let best = null, bd = 160;
+    for (const Q of S.players.values()) {
+      if (Q === P || !Q.alive || Q.mode !== 'sol' || Q.shotT == null || S.t - Q.shotT > 6) continue;
+      const d = Math.hypot(Q.x - P.x, Q.z - P.z);
+      if (d < bd && stormDanger(Q) < 2) { bd = d; best = Q; }
+    }
+    return best && B.rng.next() < B.lv.push ? best : null;
   }
 
   // ------------------------------------------------------------------ actions
@@ -313,7 +342,7 @@ export function createAI(sim, map, world) {
       const d = world.doorNear(P.x, P.y, P.z, dx / l, dz / l, 1.9);
       if (d && !d.open && !d.dead) { B.yaw = Math.atan2(d.cx - P.x, d.cz - P.z); I.use++; B.useT = S.t; }
     }
-    I.sprint = hd > 8 && !B.enemy;
+    I.sprint = hd > 8 && B.enemy == null;
     return { x: dx / l, z: dz / l };
   }
   function arrive(P, B, dt) {
@@ -383,14 +412,20 @@ export function createAI(sim, map, world) {
       B.track += dt; B.react -= dt;
       const head = B.headshot && it && it.w !== 'roquette';
       const ty = E.y + (it && it.w === 'roquette' ? 0.4 : head ? (E.crouch ? 1.05 : 1.55) : (E.crouch ? 0.85 : 1.2));
-      const ax = E.x - e[0], ay = ty - e[1], az = E.z - e[2], ah = Math.hypot(ax, az);
+      const ax = E.x - e[0], ay = ty - e[1], az = E.z - e[2];
       if ((B.errT -= dt) <= 0) {
         B.errT = 0.3 + B.rng.next() * 0.2;
         const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 : 1);
         B.ex = (B.rng.next() - 0.5) * 2 * m; B.ey = (B.rng.next() - 0.5) * 1.2 * m;
         B.headshot = B.rng.next() < lv.head;
       }
-      const wy = Math.atan2(ax, az) + B.ex, wp = Math.atan2(ay, ah) + B.ey;
+      // balle lente (fusil de précision) : on vise devant la cible et un peu au-dessus (temps de vol, chute)
+      let lx = ax, lz = az, ly = ay;
+      if (W && W.bullet) {
+        const tf = Math.hypot(ax, ay, az) / W.bullet.speed;
+        lx += E.vx * tf; lz += E.vz * tf; ly += 0.5 * W.bullet.g * tf * tf;
+      }
+      const wy = Math.atan2(lx, lz) + B.ex, wp = Math.atan2(ly, Math.hypot(lx, lz)) + B.ey;
       turn(B, wy, wp, lv.turn * dt);
       const tol = Math.max(0.025, Math.atan(0.7 / d));
       const aligned = Math.abs(wrap(B.yaw - wy)) < tol && Math.abs(B.pitch - wp) < tol;
