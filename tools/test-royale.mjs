@@ -449,5 +449,24 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 100, null, [px, F1, pz], false);
   ok(B.broken.has(key) && W.support(px, pz, F1 + 0.3) < F1 - 1, 'la dalle cassée tient encore');
 }
+// ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
+// 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, ...Array.from({ length: 59 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal' }))];
+  const sim = createSim({ map: m, world: W, seed: 2, roster, mode: 'partie' });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const at = {}, follow = [...sim.S.players.values()].filter((P) => P.bot);
+  let jumped = false;
+  while (sim.S.t < 180) {
+    if (!jumped && sim.S.flight.t > 15) { sim.input(0, { jump: 1 }); jumped = true; }
+    sim.step(DT); sim.takeEvents();
+    for (const s of [60, 120, 180]) if (at[s] == null && sim.S.t >= s) at[s] = sim.alive().length;
+  }
+  const followers = follow.filter((P) => P.ai && P.ai.follow != null).length;
+  ok(followers <= 5, `${followers} bots suivent le joueur (5 au plus)`);
+  ok(at[60] >= 48 && at[120] >= 32 && at[180] >= 20, `rythme : ${at[60]} en vie à 1 min, ${at[120]} à 2 min, ${at[180]} à 3 min (au moins 48, 32, 20)`);
+  console.log(`rythme (60 places) : ${at[60]} en vie à 1 min, ${at[120]} à 2 min, ${at[180]} à 3 min · ${followers} bots suivent le joueur`);
+}
 console.log(fails ? `\n${fails} échec(s)` : '\nTout est bon.');
 process.exit(fails ? 1 : 0);

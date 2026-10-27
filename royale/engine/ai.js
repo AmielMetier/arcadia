@@ -6,6 +6,7 @@
 import { createNav } from './nav.js';
 import { makeRng, hash } from './rng.js';
 import { WEAPONS, ITEMS } from './items.js';
+import { STORM_TIMES } from './map.js';
 
 export const LEVELS = {
   facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35 },
@@ -104,9 +105,11 @@ export function createAI(sim, map, world) {
   }
 
   // ------------------------------------------------------------------ montgolfière : où sauter
-  const dropCount = new Map();
+  const dropCount = new Map(), dropPts = [];
   function chooseDrop(P, B) {
     const f = S.flight, cands = [];
+    // déjà visé tout près par d'autres bots : moins tentant (on se répartit sur l'île au lieu de s'empiler)
+    const crowd = (x, z) => dropPts.reduce((n, q) => n + (Math.hypot(q.x - x, q.z - z) < 60 ? 1 : 0), 0);
     const lineD = (x, z) => Math.abs((x - f.x0) * f.uz - (z - f.z0) * f.ux);
     for (const b of map.buildings) {
       if (!b.chests.length && B.rng.next() < 0.6) continue;
@@ -114,19 +117,22 @@ export function createAI(sim, map, world) {
       if (!d) continue;
       const x = (d.o === 'h' ? (d.x + 0.5) * 4 : d.x * 4) + d.nx * 4, z = (d.o === 'h' ? d.z * 4 : (d.z + 0.5) * 4) + d.nz * 4;
       // à portée de vol plané de la ligne de la montgolfière, et pas tous au même endroit
-      if (lineD(x, z) > 230) continue;
-      const w = (b.chests.length + 1) / (1 + (dropCount.get(b.id) || 0) * 4);
+      if (lineD(x, z) > 320) continue;
+      const w = (b.chests.length + 1) / (1 + (dropCount.get(b.id) || 0) * 4 + crowd(x, z) * 3);
       cands.push([{ x, z, b: b.id }, w]);
     }
-    for (const c of map.chests) if (c.b < 0 && lineD(c.x, c.z) < 230) cands.push([{ x: c.x + 2, z: c.z + 2, b: -1 }, 0.8]);
+    for (const c of map.chests) if (c.b < 0 && lineD(c.x, c.z) < 320) cands.push([{ x: c.x + 2, z: c.z + 2, b: -1 }, 0.8 / (1 + crowd(c.x, c.z) * 3)]);
     if (!cands.length) return { x: map.center, z: map.center };
     const pick = B.rng.weighted(cands);
     dropCount.set(pick.b, (dropCount.get(pick.b) || 0) + 1);
+    dropPts.push(pick);
     return pick;
   }
 
-  // un tiers des bots suivent un joueur : pendant qu'il est en l'air, ils visent l'un des bâtiments les plus proches de
-  // l'endroit où il va se poser (combats dès l'atterrissage)
+  // quelques bots (un tiers, 5 au plus) suivent un joueur : pendant qu'il est en l'air, ils visent l'un des bâtiments les plus
+  // proches de l'endroit où il va se poser (combats dès l'atterrissage, sans mêlée géante autour de lui)
+  const FOLLOW_MAX = 5;
+  let followers = 0;
   const doorPts = [];
   for (const b of map.buildings) {
     const d = b.doors.find((q) => q.ext && q.k === 0);
@@ -217,6 +223,39 @@ export function createAI(sim, map, world) {
     return { kind: 'zone', id: null, x: c.x, z: c.z, r: 3 };
   }
 
+  // rythme de la partie (« directeur ») : part des joueurs encore en vie visée à la fin de chaque phase de la tempête
+  // (≈ 10 min en tout). Entre bots, l'envie de se battre monte quand il reste plus de monde que prévu et retombe quand il
+  // en reste moins ; un humain est toujours engagé. Recalculé une fois par seconde.
+  const SHARE = [0.75, 0.5, 0.32, 0.18, 0.1, 0.05];
+  let pace = null;
+  function target(t) {
+    if (!pace) {
+      pace = [[0, 1], [60, 0.95]];
+      let at = S.storm ? S.storm.t0 : 30;
+      SHARE.forEach((v, k) => { const P = STORM_TIMES[Math.min(k, STORM_TIMES.length - 1)]; at += P.wait + P.shrink; pace.push([at, v]); });
+      pace.push([at + 20, 0]);
+    }
+    for (let i = 1; i < pace.length; i++) if (t < pace[i][0]) { const [t0, a] = pace[i - 1], [t1, b] = pace[i]; return a + (b - a) * (t - t0) / (t1 - t0); }
+    return 0;
+  }
+  let aggT = -9, aggV = 0.3;
+  const agg = () => {
+    if (S.t - aggT < 1) return aggV;
+    aggT = S.t;
+    const n = S.players.size, live = sim.alive().length, want = Math.max(1, target(S.t) * n);
+    aggV = clamp(0.25 + (live - want) / Math.max(4, n * 0.1), 0.04, 1);
+    return aggV;
+  };
+  // un bot croisé sans qu'il nous vise : on ne l'engage qu'avec la probabilité du moment, sinon on l'ignore un temps
+  // (on continue sa fouille ou sa route, comme un joueur qui évite un combat inutile) ; un humain est toujours engagé
+  function wants(P, B, Q, hurt) {
+    if (hurt || !Q.bot) return true;
+    const k = Q.id, u = B.ignore.get(k);
+    if (u != null && u > S.t) return false;
+    if (B.rng.next() < agg()) return true;
+    B.ignore.set(k, S.t + 10);
+    return false;
+  }
   // ------------------------------------------------------------------ perception
   function perceive(P, B) {
     const e = sim.eye(P), fx = Math.sin(B.yaw), fz = Math.cos(B.yaw), lv = B.lv;
@@ -237,7 +276,7 @@ export function createAI(sim, map, world) {
     for (const c of cands.slice(0, 3)) {
       const Q = c.Q, ty = Q.y + (Q.crouch ? 0.85 : 1.3), dx = Q.x - e[0], dy = ty - e[1], dz = Q.z - e[2], L = Math.hypot(dx, dy, dz);
       const h = world.raycast(e[0], e[1], e[2], dx / L, dy / L, dz / L, L);
-      if (h.t >= L - 0.5) { seen = c; break; }
+      if (h.t >= L - 0.5) { if (B.enemy === Q.id || wants(P, B, Q, c.hurt)) { seen = c; break; } }
     }
     if (seen) {
       if (B.enemy !== seen.Q.id) { B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; }
@@ -246,7 +285,7 @@ export function createAI(sim, map, world) {
     }
     B.visible = false;
     // touché ou entendu sans voir : on se tourne par là
-    const alert = cands.find((c) => c.hurt || c.heard);
+    const alert = cands.find((c) => c.hurt || (c.heard && !(B.ignore.get(c.Q.id) > S.t)));
     if (alert && (B.enemy == null || B.enemy === alert.Q.id || S.t - B.seenT > 3)) {
       if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; }
       B.last = { x: alert.Q.x, y: alert.Q.y, z: alert.Q.z };
@@ -267,10 +306,11 @@ export function createAI(sim, map, world) {
       // comme un joueur : tant qu'on s'équipe, on ne cherche pas la bagarre de loin (mais on se défend, et un joueur
       // croisé de près est engagé) ; une fois équipé, on va au combat
       if (!geared(P, B)) reach *= E.bot ? 0.55 : 0.85;
+      if (E.bot) reach *= agg();
       // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
       if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
       // entendu sans le voir : armé et en forme, on va voir (on pousse vers les coups de feu)
-      if (gun && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')) {
+      if (gun && (!E.bot || (geared(P, B) && B.rng.next() < agg())) && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')) {
         B.state = 'go'; setGoal(P, B, { kind: 'chasse', id: E.id, x: B.last.x, z: B.last.z, r: 4 }); return;
       }
       if (B.goal && B.goal.kind === 'chasse' && danger < 2) return;
@@ -302,11 +342,11 @@ export function createAI(sim, map, world) {
     if (!gun) return false;
     const shieldLeft = P.inv.some((it) => it && it.t === 'objet' && ITEMS[it.c] && ITEMS[it.c].shield);
     const guns = P.inv.filter((it) => it && it.t === 'arme').length;
-    return S.t - (B.landT || 0) > 120 || ((P.sh >= 50 || !shieldLeft) && guns >= 2) || P.sh >= 75;
+    return S.t - (B.landT || 0) > 120 || (P.sh >= 50 && guns >= 2) || P.sh >= 75 || (!shieldLeft && guns >= 2 && S.t - (B.landT || 0) > 60);
   }
   // un combat qu'on entend (des tirs depuis moins de 6 s, à moins de 160 m, hors tempête) : le plus proche
   function heardFight(P, B) {
-    let best = null, bd = 160;
+    let best = null, bd = 160 * agg();
     for (const Q of S.players.values()) {
       if (Q === P || !Q.alive || Q.mode !== 'sol' || Q.shotT == null || S.t - Q.shotT > 6) continue;
       const d = Math.hypot(Q.x - P.x, Q.z - P.z);
@@ -475,11 +515,11 @@ export function createAI(sim, map, world) {
       rng, lv: LEVELS[P.level] || LEVELS.normal, state: 'go', goal: null, path: null, wp: 0, waiting: false, partial: false, approach: false,
       enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false,
       strafe: 1, strafeT: 0, burstOn: true, burstT: 0, scanT: rng.next() * 0.25, decideT: rng.next() * 0.5,
-      ban: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
+      ban: new Map(), ignore: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
       sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,
     };
     const humans = [...S.players.values()].filter((q) => !q.bot);
-    if (humans.length && rng.next() < 1 / 3) P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id;
+    if (humans.length && followers < FOLLOW_MAX && rng.next() < 1 / 3) { followers++; P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id; }
     return P.ai;
   }
   function think(P, dt) {
@@ -505,6 +545,8 @@ export function createAI(sim, map, world) {
       B.landT = S.t;
       const t = B.drop || { x: P.x, z: P.z }, dx = t.x - P.x, dz = t.z - P.z, d = Math.hypot(dx, dz);
       B.yaw = Math.atan2(dx, dz); I.yaw = B.yaw; I.pitch = -0.4; I.mx = 0; I.mz = d > 4 ? 1 : 0;
+      // point lointain : on ouvre le deltaplane tout de suite, comme un joueur (il porte bien plus loin que la chute)
+      if (P.mode === 'chute' && d > 150) I.jump++;
       return;
     }
     if ((B.scanT -= dt) <= 0) { B.scanT = 0.25; perceive(P, B); }
