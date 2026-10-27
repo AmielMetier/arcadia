@@ -15,7 +15,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yellow);color:var(--ink);border:2px solid var(--ink);border-radius:5px;padding:0 5px;margin:0 1px;display:inline-block;line-height:1.35;white-space:nowrap}
 
 /* ------------------------------------------------------------------ HUD : panneaux sombres */
-#hud{position:fixed;inset:0;pointer-events:none;color:var(--d-text);z-index:5}
+#hud{position:fixed;inset:0;pointer-events:none;color:var(--d-text);z-index:5;overflow:hidden}
 .panel-d{background:var(--d-bg);border:1.5px solid var(--d-line);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(3px)}
 #hud img.ic{filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
 .num{font-family:var(--bung);font-weight:400}
@@ -134,6 +134,10 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 @keyframes fadeout{to{opacity:0}}
 .hurt{position:absolute;inset:0;opacity:0;transition:opacity .35s;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(200,20,10,.5) 100%)}
 .hurt.on{opacity:1;transition:none}
+.speedlines{position:absolute;inset:-20%;opacity:0;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,0) 0deg 2.6deg,rgba(255,255,255,.55) 2.8deg,rgba(255,255,255,0) 3.1deg 7.4deg);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 34%,#000 70%);mask:radial-gradient(circle at 50% 50%,transparent 34%,#000 70%);animation:speedspin .5s linear infinite}
+@keyframes speedspin{from{transform:rotate(0deg) scale(1)}50%{transform:rotate(1.5deg) scale(1.04)}to{transform:rotate(0deg) scale(1)}}
 .stormtint{position:absolute;inset:0;opacity:0;transition:opacity .6s;background:radial-gradient(ellipse at 50% 50%,rgba(120,50,200,.1) 30%,rgba(100,30,180,.55) 100%)}
 .scope{position:absolute;inset:0;background:radial-gradient(circle at center,transparent 0,transparent 30vmin,rgba(0,0,0,.92) 30.5vmin)}
 .scope::before,.scope::after{content:"";position:absolute;background:rgba(0,0,0,.85)}

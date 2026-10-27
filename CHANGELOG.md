@@ -18,6 +18,7 @@
 - **Island Rush** — Nouvelles armes, bien plus détaillées : un modèle pour les raretés commune et peu commune, un plus moderne pour rare et épique (fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision), à la couleur de leur rareté, en main comme dans le sac.
   - Au sol, l'arme flotte en tournant au-dessus d'un socle hexagonal lumineux ; une poussière de lumière monte autour du butin rare.
 - **Island Rush** — Le planeur devient un vrai deltaplane : armature en tubes, voile aux couleurs du joueur avec chevrons, barre tenue à deux mains ; l'aile se déplie à l'ouverture, ondule, s'incline dans les virages et laisse deux traînées au bout des ailes.
+- **Island Rush** — En chute libre, la vue s'élargit avec la vitesse et des traits de vitesse filent sur les bords de l'écran.
 - **Island Rush** — Nouvelle montgolfière : enveloppe en poire à fuseaux colorés avec le nom du jeu, nacelle en osier et sacs de lest, brûleur dont la flamme rugit par moments.
 - **Island Rush** — L'île est plus riche vue du ciel : champs bordés de haies, prés fleuris, creux et crêtes mieux marqués, touffes d'herbe ; des nuages bas qu'on traverse en sautant et des vols d'oiseaux.
 - **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.

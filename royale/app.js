@@ -280,7 +280,11 @@ function loop(now) {
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
-  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72;
+  // chute libre : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
+  const fall = P && P.alive && P.mode === 'chute' ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
+  S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
+  $('#speedlines').style.opacity = (S.fall * 0.85).toFixed(3);
+  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72 + S.fall * 14;
   S.fov += (fov - S.fov) * (1 - Math.exp(-14 * dt));
   if (Math.abs(cam.fov - S.fov) > 0.01) { cam.fov = S.fov; cam.updateProjectionMatrix(); }
   S.scene.frame(dt, view, view.focus);
@@ -757,7 +761,7 @@ function report(res) {
 function showPrompt() {
   const P = me();
   if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
-  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le planeur', '', '', 'Espace'); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', 'Espace'); return; }
   if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
