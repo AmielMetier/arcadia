@@ -26,8 +26,13 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   canvas.className = 'gl';
   host.appendChild(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: MOBILE, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 1.5));
+  // définition interne : au plus 1,25 pixel par point d'écran et 3,4 millions de pixels (voir resize)
+  let prMax = Math.min(devicePixelRatio || 1, 1.25);
+  renderer.setPixelRatio(prMax);
   renderer.shadowMap.enabled = true;
+  // l'ombre du soleil est recalculée une image sur deux (voir frame)
+  renderer.shadowMap.autoUpdate = false;
+  let shadowTick = 0;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -91,7 +96,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const quality = { ao: !MOBILE, bloom: !MOBILE };
   function lowerQuality() {
     const pr = renderer.getPixelRatio();
-    const setPr = (v) => { renderer.setPixelRatio(v); resize(); return 'résolution ' + v.toFixed(2); };
+    const setPr = (v) => { prMax = v; resize(); return 'résolution ' + renderer.getPixelRatio().toFixed(2); };
     if (pr > 1.01) return setPr(Math.max(1, pr * 0.85));
     for (const k of ['ao', 'bloom']) if (quality[k]) { quality[k] = false; return k; }
     if (grass.range > 24) { grass.shrink(); return 'herbe'; }
@@ -102,6 +107,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
 
   function resize() {
     const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
+    renderer.setPixelRatio(Math.max(0.75, Math.min(prMax, Math.sqrt(3.4e6 / (w * h)))));
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     const pr = renderer.getPixelRatio();
@@ -123,6 +129,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   function frame(dt, cam, focus) {
     if (disposed) return;
     time0 += dt;
+    if ((shadowTick = (shadowTick + 1) % 2) === 0) renderer.shadowMap.needsUpdate = true;
     camera.position.set(cam.pos.x, cam.pos.y, cam.pos.z); camera.lookAt(cam.look.x, cam.look.y, cam.look.z);
     // plan proche : la caméra garde sa distance, ce qui se trouve entre elle et le joueur est découpé
     const near = cam.near || 0.15;

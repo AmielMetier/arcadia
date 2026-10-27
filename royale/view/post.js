@@ -124,6 +124,9 @@ export function createPost(renderer) {
     q, main,
     setSize(w, h) {
       W = w; H = h;
+      // anticrénelage 4× ; 2× sur les grandes images (l'essentiel du coût de la carte graphique)
+      const samples = w * h > 2.6e6 ? 2 : 4;
+      if (main.samples !== samples) { main.dispose(); main.samples = samples; }
       main.setSize(w, h);
       aoRT.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1)); aoBlur.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
       bloomA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); bloomB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));

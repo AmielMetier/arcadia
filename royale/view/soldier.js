@@ -105,6 +105,15 @@ export function barrelFix(kit, w) {
   return fix;
 }
 
+// sphère englobante du personnage dans le repère de son maillage, élargie pour les bras tendus et l'arme
+function boundSphere(mesh) {
+  const g = mesh.geometry;
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  const sp = g.boundingSphere.clone();
+  sp.radius *= 1.6;
+  return sp;
+}
+
 // portraits des personnages (écran d'accueil), à la couleur choisie ; un seul rendu réutilisé
 let portraitR = null;
 export function renderPortraits(kit, color) {
@@ -137,7 +146,10 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   let mesh = null;
   model.traverse((o) => { if (o.isSkinnedMesh) mesh = o; });
   const mat = tintMaterial({ 1: { color: new THREE.Color(shirt), mix: 0.82 }, 2: { color: new THREE.Color(pants), mix: 1 }, 3: { color: new THREE.Color(skin), mix: 1 } });
-  mesh.material = mat; mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+  // hors du champ, on ne le dessine pas : une sphère englobante fixe, assez large pour toutes les poses (le calcul
+  // exact, os par os, coûterait plus cher que le dessin)
+  mesh.material = mat; mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.boundingSphere = (S.sphere || (S.sphere = boundSphere(mesh))).clone();
   const hand = model.getObjectByName('Index1R'), torso = model.getObjectByName('Torso'), neck = model.getObjectByName('Neck');
   const upperArm = model.getObjectByName('UpperArmR'), lowerArm = model.getObjectByName('LowerArmR');
   // les deux bras (main droite : l'index qui porte l'arme ; main gauche : celle qui tient le garde-main)

@@ -178,6 +178,8 @@ export function createActors(scene, sim, kit = null) {
       hero.root.visible = P.mode !== 'ballon' && P.id !== hideId && (P.alive || hero.root.visible);
       // animation : à chaque image de près, une sur deux au-delà de 50 m, une sur quatre au-delà de 120 m (60 joueurs)
       const far = Math.hypot(a.x - cam.x, a.z - cam.z), every = far < 50 ? 1 : far < 120 ? 2 : 4;
+      // l'ombre du soleil ne couvre que les environs : les personnages lointains n'en projettent pas
+      if (h.shadow !== far < 70) { h.shadow = far < 70; hero.root.traverse((o) => { if (o.isMesh) o.castShadow = h.shadow; }); }
       h.acc += dt;
       if (!hero.root.visible || ++h.tick % every) continue;
       hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
