@@ -6,6 +6,7 @@ import { buildSky, buildPeaks, skyFor, TIMES } from './sky.js';
 import { noiseTexture } from './textures.js';
 import { createPost } from './post.js';
 import { buildTerrain, buildDecals } from './terrain.js';
+import { buildRoads } from './roads.js';
 import { buildWater } from './water.js';
 import { buildStructures } from './structures.js';
 import { buildInterior } from './interior.js';
@@ -62,6 +63,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const terrain = buildTerrain(map, { noise, anisotropy: renderer.capabilities.getMaxAnisotropy() });
   scene.add(terrain.group);
   const decals = buildDecals(map); scene.add(decals.group);
+  const roads = await buildRoads(map, { anisotropy: renderer.capabilities.getMaxAnisotropy() }); scene.add(roads.group);
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
   const structures = buildStructures(map, { time }); scene.add(structures.group);
@@ -138,7 +140,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (disposed) return;
     disposed = true;
     removeEventListener('resize', resize);
-    terrain.dispose(); decals.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
+    terrain.dispose(); decals.dispose(); roads.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
     scene.traverse((o) => {
       if ((o.isMesh || o.isPoints) && !o.userData.shared && !o.isInstancedMesh) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });

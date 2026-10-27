@@ -8,6 +8,11 @@
   - Portes avec marche, lampe et marquise ; boutiques avec store rayé et enseigne ; toits en tuiles avec rives, faîtage et cheminées ; toits plats avec climatiseurs, ventilations et réservoirs d'eau.
   - Les rues se remplissent : lampadaires, voitures, bancs, abribus, bornes à incendie, poubelles, boîtes aux lettres, pots de fleurs, bennes, barils, palettes, épaves… On peut s'en servir comme abri, les casser et en récolter les matériaux.
   - Le mobilier des maisons n'est dessiné qu'à proximité : le jeu reste fluide malgré tous ces détails.
+- **Island Rush** — Routes refaites : vrai enrobé, lignes usées, traces de pneus et accotements de gravier.
+  - En ville : trottoirs dallés, bordures et caniveaux, carrefours aux angles arrondis et passages piétons ; les rues ne scintillent plus aux croisements.
+  - Les chemins de terre ont leurs deux ornières et une bande d'herbe au milieu ; les places sont pavées, avec une rosace autour de la fontaine.
+  - Les voitures garées ne mordent plus sur le trottoir.
+- **Island Rush** — Saut plus lisible : dans la montgolfière et pendant la chute, une petite bulle rappelle seulement la touche Espace, et le rappel des touches s'efface tant qu'on est en l'air.
 
 ## 2.88 — 26 octobre 2026
 - Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)

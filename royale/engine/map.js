@@ -411,7 +411,7 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
     const len = alongX ? st.x1 - st.x0 : st.z1 - st.z0;
     for (let s = 6; s < len - 6; s += 9) {
       if (!rng.chance(prob)) continue;
-      const side = rng.chance(0.5) ? 1.6 : 6.4;
+      const side = rng.chance(0.5) ? 2.35 : 5.65; // dans la chaussée, entre le caniveau et l'axe
       const x = alongX ? st.x0 + s : st.x0 + side, z = alongX ? st.z0 + side : st.z0 + s;
       // pas au milieu d'un carrefour
       if (streets.some((o) => o !== st && inRect(o, x, z, 2))) continue;
@@ -993,7 +993,7 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
         else if (r < 0.6) put('bouche', x, z);
         else if (r < 0.7 && len > 40) put('abribus', ...at(s2, k % 2 ? wid - 0.75 : 0.75), alongX ? 1 : 0, alongX ? 0 : 1);
       }
-      for (let s2 = 15; s2 < len - 4; s2 += 30) { const [x, z] = at(s2, wid / 2); if (!streets.some((o) => o !== st && inRect(o, x, z, 1))) put('plaque', x, z); }
+      for (let s2 = 15, k = 0; s2 < len - 4; s2 += 30, k++) { const [x, z] = at(s2, wid / 2 + (k % 2 ? 1.3 : -1.3)); if (!streets.some((o) => o !== st && inRect(o, x, z, 1))) put('plaque', x, z); }
     }
     // places : bancs tournés vers la fontaine, jardinières aux coins
     for (const pl of plazas) {

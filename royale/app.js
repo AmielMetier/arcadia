@@ -217,11 +217,10 @@ function onWheel(dir) {
   const i = occupied.indexOf(S.sel);
   S.sel = occupied[(i + dir + occupied.length) % occupied.length];
 }
-function onLock(locked, free) {
+function onLock(locked) {
   if (locked) {
     showScreen(null); S.hud.toggleMap(false); S.sfx.unlock();
     if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
-    if (free && !S.freeTold) { S.freeTold = true; toast('Bouge la souris pour regarder ; contre un bord de l\'écran, la vue continue de tourner', 5); }
     return;
   }
   if (S.bagLock || S.hud.mapOpen || S.ended || !S.sim) return;
@@ -282,6 +281,9 @@ function loop(now) {
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
+  // en l'air (montgolfière, chute, planeur) ou éliminé : le rappel des touches s'efface, la vue reste dégagée
+  const air = !P || !P.alive || P.mode !== 'sol';
+  if (air !== S.hintsAir) { S.hintsAir = air; $('#hints').classList.toggle('air', air); }
   S.hud.frame(dt);
   S.hud.crosshair(P ? spreadOf(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
@@ -634,7 +636,7 @@ function handleEvents(list) {
       case 'lance': { const Q = S.sim.player(e.p); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
       case 'tremplin': S.sfx.at('pose', e.x, e.y, e.z, 0.8); break;
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
-      case 'saut': if (e.p === S.me) { S.hud.say('Saut !<small>Espace pour ouvrir le planeur plus tôt</small>', 2.5); S.sfx.play('saut'); } break;
+      case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
       case 'atterrit': if (e.p === S.me) S.sfx.play('atterrit'); break;
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
@@ -684,6 +686,8 @@ function report(res) {
 // ------------------------------------------------------------------ interactions affichées sous le viseur
 function showPrompt() {
   const P = me();
+  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le planeur', '', '', 'Espace'); return; }
   if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
@@ -710,7 +714,7 @@ const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kb
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
   <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
 // modèles 3D sous licence CC BY : l'attribution doit rester visible
-const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza)</p>';
+const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0)</p>';
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;

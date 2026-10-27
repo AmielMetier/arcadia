@@ -90,7 +90,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .keys{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:230px;padding:9px 11px;font-size:12px;transition:opacity .3s}
 .keys>b{display:flex;align-items:center;justify-content:space-between;font-family:var(--bung);font-weight:400;font-size:13px;color:var(--yellow);margin-bottom:5px}
 .keys div{padding:2px 0;color:var(--d-text);line-height:1.35}
-.keys.off{opacity:0}
+.keys.off,.keys.air{opacity:0}
 .keys kbd{font-size:10px}
 
 /* centre : viseur, marqueur de touche, consigne */

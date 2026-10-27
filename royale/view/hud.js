@@ -316,11 +316,11 @@ export function createHud(map, { onTeleport, project } = {}) {
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },
     // txt : l'action ; what : ce sur quoi elle porte (couleur de rareté)
-    prompt(txt, what = '', color = '') {
-      const key = txt + what + color;
+    prompt(txt, what = '', color = '', kbd = 'E') {
+      const key = txt + what + color + kbd;
       if (promptEl.dataset.t === key) return;
       promptEl.dataset.t = key; promptEl.hidden = !txt;
-      promptEl.innerHTML = txt ? `<kbd>E</kbd><span>${esc(txt)}${what ? ` <i style="--rc:${color || '#fff8ea'}">${esc(what)}</i>` : ''}</span>` : '';
+      promptEl.innerHTML = txt ? `<kbd>${kbd}</kbd><span>${esc(txt)}${what ? ` <i style="--rc:${color || '#fff8ea'}">${esc(what)}</i>` : ''}</span>` : '';
     },
     spectate(name) { const s = $('#spect'); s.hidden = !name; if (name) s.innerHTML = `Tu regardes <b>${esc(name)}</b> · <kbd>Espace</kbd> joueur suivant`; },
     // icônes rendues à partir des modèles : on redessine la barre d'objets et le sac
