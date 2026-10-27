@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.2 — 27 octobre 2026
+- **Poké Duel** — Les tournois comptent enfin au classement entre potes, avec leur onglet et le record de matchs gagnés.
+  - Chacun prend la place que lui donne le tableau : champion, finaliste, puis demi-finalistes et quarts de finalistes.
+- **Tous les jeux** — Correction : un joueur dont la connexion se figeait (téléphone en veille, wifi coupé) pouvait faire tomber le serveur, et avec lui tous les salons en cours.
+  - Le serveur tient aussi bon face à un appareil qui enverrait des messages géants ou en rafale.
+- **Hub** — Le bouton « 📋 Logs & Crashs » quitte l'accueil et le salon : c'était un outil de développement.
+
 ## 3.1 — 27 octobre 2026
 - **Island Rush** — Les bots t'attaquent enfin : celui qui crée la partie dans le Hub leur était invisible comme cible. Ils te traitent maintenant comme n'importe quel autre joueur.
 - **Island Rush** — Les bots jouent comme des joueurs : au début, ils fouillent et se mettent du bouclier ; une fois équipés, ils vont là où ça tire et tournent vers le prochain cercle. S'ils croisent un joueur avant, ils engagent le combat.

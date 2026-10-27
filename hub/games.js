@@ -8,6 +8,7 @@ window.HUB_GAMES = [
     url: 'drift/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#ff4b2b',
+    icon: '🏎️', score: 'Meilleurs points', // classement : émoji des dernières parties, libellé et unité du meilleur score
     cover: 'drift/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
@@ -18,6 +19,7 @@ window.HUB_GAMES = [
     url: 'david/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#1C5FB4',
+    icon: '🎲', score: 'Meilleur patrimoine', scoreUnit: ' €',
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['express', 'Express · 40 min']], def: 'classic' },
       { key: 'teams', label: 'Équipes', options: [['solo', 'Chacun pour soi'], ['2v2', '2 contre 2']], def: 'solo' },
@@ -38,6 +40,7 @@ window.HUB_GAMES = [
     url: 'calcul/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 avec les bots
     accent: '#ff5fa2',
+    icon: '🧮', score: 'Meilleur score',
     settings: [
       { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], ['chartier', 'The Candidate'], ['peril', 'Péril'], ['eclair', 'Éclair']], def: 'classic' },
       { key: 'theme', label: 'Questions', options: [['mix', 'Mélangé'], ['base', '4 opérations'], ['malin', 'Astuces'], ['frac', 'Fractions'], ['logique', 'Logique'], ['flash', 'Vrai/Faux'], ['algebre', 'Équations'], ['geo', 'Géométrie'], ['vite', 'Vitesse'], ['compte', 'Compte est bon']], def: 'mix' },
@@ -67,6 +70,7 @@ window.HUB_GAMES = [
     url: 'bastion/',
     minPlayers: 1, maxPlayers: 4,
     accent: '#2fbf71',
+    icon: '🏰', score: 'Meilleur score',
     settings: [
       { key: 'map', label: 'Champ de bataille', options: [['vallee', '🌲 Vallée Tempérée (Classique)'], ['magma', '🌋 Fissures de Magma (+Gaz & Chokepoints)'], ['glace', '❄️ Glacier Boréal (+Vitesse & Forage Rapide)'], ['desert', '🏜️ Canyon de Cuivre (Oasis & Récolte Rapide)'], ['ruines', '🌃 Ruines Néon (Nuit & Avant-postes Riches)']], def: 'vallee' },
       { key: 'mode', label: 'Format & Équipes', options: [
@@ -92,6 +96,7 @@ window.HUB_GAMES = [
     url: 'outbreak/',
     minPlayers: 1, maxPlayers: 5,
     accent: '#f43f5e',
+    icon: '🧟', score: 'Meilleur score',
     settings: [
       { key: 'mode', label: 'Mode', options: [['campaign', 'Campagne · 7 salles'], ['survival', 'Survie · vagues infinies'], ['defense', 'Défense · tenir le fort']], def: 'campaign' },
       { key: 'difficulty', label: 'Difficulté', options: [['arcade', 'Arcade'], ['normal', 'Normale'], ['hardcore', 'Cauchemar']], def: 'normal' },
@@ -109,6 +114,7 @@ window.HUB_GAMES = [
     url: 'filrouge/',
     minPlayers: 2, maxPlayers: 6,
     accent: '#c8102e',
+    icon: '💣', score: 'Secondes restantes',
     settings: [
       { key: 'mode', label: 'Mode', options: [['coop', '🤝 Coopération'], ['versus', '⚔️ Duel · 2 contre 2']], def: 'coop' },
       { key: 'diff', label: 'Bombe', options: [['initiation', 'Initiation · 2 modules'], ['facile', 'Facile · 3'], ['normal', 'Moyen · 5'], ['expert', 'Difficile · 7']], def: 'facile' },
@@ -125,6 +131,7 @@ window.HUB_GAMES = [
     url: 'kart/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5ff3ff',
+    icon: '🏎️', score: 'Meilleurs points',
     cover: 'kart/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
@@ -135,6 +142,7 @@ window.HUB_GAMES = [
     url: 'convoy/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#9fd3ff',
+    icon: '🚂', score: 'Meilleure distance (m)',
     settings: [
       { key: 'mode', label: 'Mode', options: [['expedition', 'Expédition'], ['endless', 'Sans fin']], def: 'expedition' },
       { key: 'difficulty', label: 'Difficulté', options: [['facile', 'Facile'], ['normal', 'Normale'], ['blizzard', 'Blizzard']], def: 'normal' },
@@ -149,6 +157,7 @@ window.HUB_GAMES = [
     url: 'golf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5cc425',
+    icon: '⛳', score: 'Meilleur Stableford',
     // parcours, équipes, bots, vent et moment se choisissent sur l'écran d'accueil du jeu (golf/view/home.js)
     bots: true,
     cover: 'golf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
@@ -161,6 +170,7 @@ window.HUB_GAMES = [
     url: 'pokemon/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#ffcb05',
+    icon: '🏟️', score: 'Record de matchs gagnés',
     settings: [
       { key: 'mode', label: 'Mode de jeu', options: [['adventure', 'Aventure Kalos-Sud (Menton)'], ['tournament', 'Tournoi 3v3 (Arène)']], def: 'adventure' },
       { key: 'timer', label: 'Chrono par tour', onlyMode: 'tournament', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
@@ -178,6 +188,7 @@ window.HUB_GAMES = [
     url: 'minigolf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#2e8b57',
+    icon: '🕳️',
     cover: 'minigolf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
@@ -188,6 +199,7 @@ window.HUB_GAMES = [
     url: 'royale/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#3d9fd9',
+    icon: '🏝️',
     settings: [
       { key: 'mode', label: 'Mode', options: [['partie', 'Battle royale'], ['exploration', 'Exploration · sans combat']], def: 'partie' },
       { key: 'places', label: 'Joueurs sur l\'île', options: [[30, '30'], [45, '45'], [60, '60']], def: 45 },
