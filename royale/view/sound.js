@@ -8,7 +8,6 @@ const SHOT_RANGE = { fusil: 180, smg: 120, pistolet: 120, pompe: 140, sniper: 32
 
 export function createSound() {
   let ctx = null, master = null, fxBus = null, bed = null, noiseBuf = null, brown = null;
-  let volume = 0.8;
   const amb = {}, last = {};
   let wind = null, storm = null, stepT = 0, stepsOther = new Map();
   let ear = { x: 0, y: 0, z: 0, yaw: 0 };
@@ -18,9 +17,10 @@ export function createSound() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
-    master = ctx.createGain(); master.gain.value = volume;
+    // volume : le curseur « Effets » du panneau Réglages (à 0 : coupé)
+    master = ctx.createGain(); master.gain.value = 0.8;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5;
-    master.connect(comp); comp.connect(ctx.destination);
+    master.connect(DDVolume.gain(ctx, 'fx')).connect(comp); comp.connect(ctx.destination);
     fxBus = ctx.createGain(); fxBus.gain.value = 0.9; fxBus.connect(master);
     bed = ctx.createGain(); bed.gain.value = 0.5; bed.connect(master);
     const len = ctx.sampleRate * 2;
@@ -219,8 +219,6 @@ export function createSound() {
   return {
     unlock, play, at, shot, update,
     island(c, r) { coastRef = { x: c, z: c, r }; },
-    get volume() { return volume; },
-    setVolume(v) { volume = v; if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); },
     dispose() { try { if (ctx) ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; },
   };
 }

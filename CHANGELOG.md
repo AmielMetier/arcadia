@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.95 — 27 octobre 2026
+- **Tous les jeux** — Un seul bouton ⚙️ Réglages, le même dans chaque jeu, qui ouvre le même panneau.
+  - Le son d'abord : un curseur Musique et un curseur Effets. Pour couper le son, on glisse son curseur à 0 : les boutons 🔊, 🎵, « Couper le son » ou « Tout couper », qui faisaient doublon avec les curseurs, disparaissent.
+  - La touche M coupe le son et le remet où il était, en déplaçant ces mêmes curseurs (N pour la musique dans Duo Drift).
+  - Ensuite, les réglages propres au jeu, rangés de la même façon : graphismes de Bastion Clash, plateau et caméra qui suit de DavidSimulator, mise en scène de The Candidate, graphismes et sensibilité de Mini-Golf Party, sensibilité d'Island Rush, options et commandes de Duo Drift.
+  - Un son coupé avec l'ancien bouton reste coupé : son curseur est simplement à 0.
+- **Hub** — Le bouton 🎵 et le petit curseur de l'accueil laissent la place au même bouton ⚙️ Réglages.
+- **Outbreak, Convoy Storm, Mini-Golf Party, Island Rush** — Dans le menu de pause (et l'écran de départ d'Island Rush), un bouton Réglages remplace les boutons et curseurs du son.
+- **Cyber Kart GP** — « 🎵 Musique » et « 🎚️ Volume » ne font plus qu'un bouton, « ⚙️ Réglages ». Quand la musique ne joue pas (chargement, son à débloquer), il se borde d'orange et le panneau dit pourquoi.
+
 ## 2.89 — 27 octobre 2026
 - **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
   - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.

@@ -103,30 +103,26 @@ function updateFlashes3D(dt) {
   }
 }
 
-/* ---------- Panneau des réglages ---------- */
-function syncGfxUI() {
-  const pop = $('#gfxPop');
-  if (!pop) return;
-  for (const b of pop.querySelectorAll('[data-gfx-q]')) b.classList.toggle('on', b.dataset.gfxQ === GFX.quality);
-  $('#tgCvd').textContent = GFX.colorblind ? 'ON' : 'OFF';
-  $('#tgCvd').classList.toggle('on', GFX.colorblind);
-  $('#tgShake').textContent = GFX.shake ? 'ON' : 'OFF';
-  $('#tgShake').classList.toggle('on', GFX.shake);
-  $('#tgBars').textContent = GFX.bars === 'always' ? 'TOUJOURS' : 'BLESSÉS';
-  $('#tgBars').classList.toggle('on', GFX.bars === 'always');
-}
-(function setupGfxPanel() {
-  const pop = $('#gfxPop');
-  if (!pop) return;
-  $('#btnGfx').onclick = (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; $('#audioPop').hidden = true; syncGfxUI(); };
-  $('#btnGfx').addEventListener('pointerdown', (e) => e.stopPropagation());
-  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
-  window.addEventListener('pointerdown', () => { pop.hidden = true; });
-  for (const b of pop.querySelectorAll('[data-gfx-q]')) {
-    b.onclick = () => { GFX.quality = b.dataset.gfxQ; saveGfx(); applyGfx(); syncGfxUI(); };
-  }
-  $('#tgCvd').onclick = () => { GFX.colorblind = !GFX.colorblind; saveGfx(); applyGfx(); syncGfxUI(); };
-  $('#tgShake').onclick = () => { GFX.shake = !GFX.shake; saveGfx(); syncGfxUI(); };
-  $('#tgBars').onclick = () => { GFX.bars = GFX.bars === 'always' ? 'damaged' : 'always'; saveGfx(); syncGfxUI(); };
-  syncGfxUI();
+/* ---------- Panneau Réglages (commun à tous les jeux) : le son, puis les graphismes ---------- */
+(function setupSettingsPanel() {
+  const btn = $('#btnSettings');
+  if (!btn || !window.DDVolume) return;
+  btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); Sfx.wake(); });
+  DDVolume.panel(btn, {
+    accent: '#2fbf71',
+    test: (k) => { if (k === 'fx') Sfx.ack('marine'); },
+    sections: [{
+      title: 'Graphismes',
+      items: [
+        { label: 'Qualité', options: Object.keys(GFX_PRESETS).map((k) => [k, GFX_PRESETS[k].label]), get: () => GFX.quality,
+          set: (v) => { GFX.quality = v; saveGfx(); applyGfx(); } },
+        { label: 'Couleurs pour daltoniens', get: () => GFX.colorblind, set: (v) => { GFX.colorblind = v; saveGfx(); applyGfx(); } },
+        { label: 'Secousses de caméra', get: () => GFX.shake, set: (v) => { GFX.shake = v; saveGfx(); } },
+        { label: 'Barres de vie', options: [['damaged', 'Unités blessées'], ['always', 'Toujours']], get: () => GFX.bars,
+          set: (v) => { GFX.bars = v; saveGfx(); } },
+      ],
+      hint: 'Bas : sans ombres, pour les petites machines. Ultra : lueurs et ombres fines.',
+    }],
+    hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.',
+  });
 }());

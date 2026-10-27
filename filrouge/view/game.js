@@ -28,8 +28,7 @@ export function mountGame(root, { me, session, exit }) {
       <div class="tools">
         <button class="tool" id="tReset" title="Remettre la bombe de face (R)" hidden>⟲</button>
         <button class="tool" id="tFlip" title="Retourner la bombe (F)" hidden>⇋</button>
-        <button class="tool" id="tSound" title="Son">🔊</button>
-        <button class="tool" id="tVol" title="Volume des effets" aria-label="Volume">🎚️</button>
+        <button class="tool" id="tSet" title="Réglages" aria-label="Réglages">⚙️</button>
         <button class="tool quit" id="tQuit">Quitter</button>
       </div>
     </header>
@@ -124,9 +123,7 @@ export function mountGame(root, { me, session, exit }) {
   }
 
   /* ---------------------------------------------------------- outils */
-  $('#tSound').textContent = sfx.muted ? '🔇' : '🔊';
-  $('#tSound').onclick = () => { $('#tSound').textContent = sfx.toggle() ? '🔇' : '🔊'; };
-  DDVolume.panel($('#tVol'), { kinds: ['fx'] }); // pas de musique dans Fil Rouge
+  DDVolume.panel($('#tSet'), { kinds: ['fx'], accent: '#c8102e' }); // pas de musique dans Fil Rouge
   $('#tQuit').onclick = exit;
   $('#tReset').onclick = () => scene && scene.reset();
   $('#tFlip').onclick = () => scene && scene.flip();

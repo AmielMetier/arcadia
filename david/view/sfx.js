@@ -1,8 +1,9 @@
 // Sons synthétisés (WebAudio) : aucun fichier à charger. Coupables, réglage mémorisé.
-import { store, save } from './util.js';
 
 let ctx = null, master = null;
-let on = store('david_sound', true);
+// volume : le curseur « Effets » des réglages ; à 0, plus aucun son (l'ancien bouton 🔇 y est repris)
+DDVolume.legacy('david_sound', ['fx'], (v) => v === 'false');
+const on = () => DDVolume.get('fx') > 0;
 
 function ac() {
   if (!ctx) {
@@ -15,7 +16,7 @@ function ac() {
 }
 // Le navigateur exige un geste de l'utilisateur avant de jouer du son
 // (la musique, si elle est activée, démarre au même moment : voir game.js)
-for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (on) ac(); }, { once: true, capture: true });
+for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (on()) ac(); }, { once: true, capture: true });
 
 function tone(freq, t0, dur, { type = 'sine', vol = 0.5, slide = 0 } = {}) {
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -53,10 +54,9 @@ const SOUNDS = {
 export const audioContext = () => ac();
 export const sfx = {
   play(name) {
-    if (!on || !SOUNDS[name]) return;
+    if (!on() || !SOUNDS[name]) return;
     const c = ac(); if (!c) return;
     try { SOUNDS[name](c, c.currentTime + 0.01); } catch (e) {}
   },
-  get on() { return on; },
-  toggle() { on = !on; save('david_sound', on); if (on) ac(); return on; },
+  get on() { return on(); },
 };

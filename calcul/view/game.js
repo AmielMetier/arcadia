@@ -130,10 +130,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       <div class="info"><b id="ibrand">Tête de Calcul</b><span id="round"></span></div>
       <div class="ticker" id="ticker" aria-hidden="true"><div class="ticker-track" id="ttrack"></div></div>
       <div class="tools">
-        <button class="tool" id="tshow" title="Mise en scène : scène d'ouverture et réactions de Pierre Chartier" hidden>🎬</button>
-        <button class="tool" id="tmus" title="Musique de salle de marché" hidden>🎵</button>
-        <button class="tool" id="tsnd" title="Bruitages">🔊</button>
-        <button class="tool" id="tvol" title="Volume de la musique et des effets" aria-label="Volume">🎚️</button>
+        <button class="tool" id="tset" title="Réglages : son et mise en scène" aria-label="Réglages">⚙️</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
@@ -197,22 +194,16 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   const myDeadline = () => S.endsAt - (myCurses().some((c) => c.power === 'time') ? STEAL_MS : 0);
 
   /* ---------------------------------------------------------- outils */
-  const syncTools = () => {
-    $('#tsnd').textContent = sfx.on ? '🔊' : '🔇';
-    $('#tsnd').classList.toggle('off', !sfx.on);
-    const tm = $('#tmus');
-    if (tm) {
-      tm.textContent = wallStreetMusic.on ? '🎵' : '🔇';
-      tm.classList.toggle('off', !wallStreetMusic.on);
-    }
-    $('#tshow').classList.toggle('off', !staging.on);
-  };
-  syncTools();
-  $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
-  DDVolume.panel($('#tvol'));
-  const tm = $('#tmus');
-  if (tm) tm.onclick = () => { wallStreetMusic.toggle(); syncTools(); };
-  $('#tshow').onclick = () => { const on = staging.toggle(); syncTools(); toast(on ? '🎬 Mise en scène : ouverture et réactions de Pierre' : '🎬 Animations réduites : sans ouverture ni réactions de Pierre'); if (!on) { const l = $('#pclive'); if (l) l.remove(); } };
+  // un seul bouton : le son (musique de salle de marché, bruitages) et, pour The Candidate, la mise en scène
+  let chartierUI = false;
+  DDVolume.panel($('#tset'), {
+    accent: '#ff5fa2',
+    sections: [{
+      title: 'The Candidate', hidden: () => !chartierUI,
+      items: [{ label: "Mise en scène (ouverture, réactions de Pierre)", get: () => staging.on,
+        set: (v) => { if (v !== staging.on) staging.toggle(); if (!v) { const l = $('#pclive'); if (l) l.remove(); } } }],
+    }],
+  });
   $('#tquit').onclick = () => { wallStreetMusic.stop(); exit(); };
   let toastT = 0;
   function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.hidden = false; t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, ms); }
@@ -373,7 +364,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const isHost = s.hostId === me.id, c = s.cfg, ready = s.players.filter((p) => p.ready);
     const isChartier = c.mode === 'chartier';
     root.classList.toggle('mode-chartier', isChartier);
-    $('#tmus').hidden = !isChartier; $('#tshow').hidden = !isChartier;
+    chartierUI = isChartier;
     $('#ibrand').textContent = isChartier ? 'The Candidate' : 'Tête de Calcul';
     const w = LEVEL_WORDS[s.level] || LEVEL_WORDS.normal;
     if (isChartier) { wallStreetMusic.setMode('lobby'); wallStreetMusic.start(); renderTicker(); }
@@ -952,10 +943,10 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const fl = $('#opfloor'); let f = 0;
     const tick = setInterval(() => { f = Math.min(40, f + 1); if (fl) fl.textContent = f; if (f >= 40) clearInterval(tick); }, 58);
     // la voix de Pierre : préchargée tout de suite, lancée quand il apparaît (si le son est activé)
-    const voice = new Audio(PC_VOICE); voice.preload = 'auto'; voice.volume = DDVolume.level('fx');
+    const voice = DDVolume.media(new Audio(PC_VOICE), 'fx'); voice.preload = 'auto';
     const face = stage.querySelector('.op-pierre .pc-face');
     opT.push(setTimeout(() => clearInterval(tick), 3000), setTimeout(() => sfx.play('ding'), 2500), setTimeout(() => {
-      if (!sfx.on || !stage.querySelector('.opening')) return;
+      if (!sfx.on || !stage.querySelector('.opening')) return; // effets à 0 : pas de voix non plus
       voice.onplaying = () => { if (face) face.classList.add('speaking'); wallStreetMusic.duck(Math.round((voice.duration || 4.7) * 1000) + 300); };
       voice.onended = () => { if (face) face.classList.remove('speaking'); };
       voice.play().catch(() => {}); // lecture refusée par le navigateur : le texte reste affiché
@@ -1267,7 +1258,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
       // décor du tour : open space, salle de marché, salle du conseil (il change pendant la scène de passage)
       const tierNow = state.phase === 'question' && state.q ? state.q.tier : state.phase === 'reveal' && state.last ? state.last.tier : state.phase === 'over' ? 3 : 1;
       for (const k of [1, 2, 3]) root.classList.toggle('scene-' + k, isChartier && tierNow === k);
-      $('#tmus').hidden = !isChartier; $('#tshow').hidden = !isChartier;
+      chartierUI = isChartier;
       $('#ibrand').textContent = isChartier ? 'The Candidate' : 'Tête de Calcul';
       if (!isChartier) wallStreetMusic.stop();
       // quelqu'un d'autre vient de répondre : Pierre le fait remarquer (une fois par question)
