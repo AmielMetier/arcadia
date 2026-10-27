@@ -140,8 +140,42 @@ const CITY = { banc: ['banc', 1.8], bouche: ['bouche', 0.85], corbeille: ['poube
   sacpoubelle: ['sac-poubelle', 0.6], plaque: ['plaque', 0.9] };
 const FLAT = new Set(['gravats', 'planches', 'plaque', 'palette']);
 
+// haie taillée de 2 × 1 × 0,7 m : un pavé bosselé (bosses tirées de la position, les arêtes restent fermées), plus
+// étroit en haut ; feuillage dessiné plaqué selon la position
+function hedgeGeo() {
+  const g = new THREE.BoxGeometry(2.0, 1.0, 0.72, 10, 5, 4).translate(0, 0.5, 0);
+  const P = g.attributes.position, Nn = g.attributes.normal, uv = g.attributes.uv;
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+    const n = (hash(Math.round(x * 20) * 7919 + Math.round(y * 20) * 131 + Math.round(z * 20)) % 1000) / 1000;
+    const k = 1 + (n - 0.4) * 0.09, top = y / 1.0;
+    P.setXYZ(i, x * k * (1 - 0.05 * top), y * (1 + (n - 0.5) * 0.06), z * k * (1 - 0.12 * top));
+    const ax = Math.abs(Nn.getX(i)), ay = Math.abs(Nn.getY(i)), az = Math.abs(Nn.getZ(i));
+    uv.setXY(i, ay > 0.5 ? x * 1.3 : ax > az ? z * 1.3 : x * 1.3, ay > 0.5 ? z * 1.3 : y * 1.3);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+function hedgeTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  let s = 4242;
+  const r = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  g.fillStyle = '#2f5a22'; g.fillRect(0, 0, 256, 256);
+  const greens = ['#3d6e2a', '#4c8234', '#5a943c', '#6aa548', '#35632a', '#7ab452'];
+  for (let i = 0; i < 2600; i++) {
+    const x = r() * 256, y = r() * 256, a = r() * Math.PI, rx = 3 + r() * 4, ry = 1.8 + r() * 2;
+    g.fillStyle = greens[Math.floor(r() * greens.length)];
+    for (const [ox, oy] of [[0, 0], [256, 0], [-256, 0], [0, 256], [0, -256]]) { g.beginPath(); g.ellipse(x + ox, y + oy, rx, ry, a, 0, Math.PI * 2); g.fill(); }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+  return t;
+}
+const HEDGE_TINTS = [0xffffff, 0xe6efda, 0xd6e6c4, 0xf2f4e2, 0xdfe9cf];
+
 export async function buildProps(map, { base, kit: toon = null }) {
-  const group = new THREE.Group(), own = [], idx = indexer();
+  const group = new THREE.Group(), own = [], idx = indexer(), lampHeads = [];
   const pidOf = new Map(map.props.map((p, i) => [p, i]));
   const { kit, mats } = await loadKit(base);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -192,6 +226,12 @@ export async function buildProps(map, { base, kit: toon = null }) {
     bushes[['bush', 'bushL', 'bushD'][h % 3]].push({ x: p.x, y: ground(p) - 0.1, z: p.z, rot: (h % 628) / 100, s: p.s * 2.2, pid: pidOf.get(p) });
   }
   for (const [name, list] of Object.entries(bushes)) instanced(name, list, { size: 1, castShadow: false });
+  // haies des jardins
+  if (by.haie && by.haie.length) {
+    const tex = hedgeTexture(); own.push(tex);
+    simple(hedgeGeo(), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 }), by.haie.map((p) => at(p, { rot: yawOf(p) - Math.PI / 2 })),
+      (it) => HEDGE_TINTS[hash(Math.round(it.x * 3) + Math.round(it.z * 7) * 31) % HEDGE_TINTS.length]);
+  }
   instanced('container', (by.conteneur || []).filter((p) => p.c % 2 === 0).map((p) => at(p, { rot: yawOf(p) + Math.PI / 2 })), { size: 6 });
   instanced('container2', (by.conteneur || []).filter((p) => p.c % 2 === 1).map((p) => at(p, { rot: yawOf(p) + Math.PI / 2 })), { size: 6 });
   instanced('tank', (by.citerne || []).map((p) => at(p)), { size: 4.8 });
@@ -224,6 +264,8 @@ export async function buildProps(map, { base, kit: toon = null }) {
       own.push(g);
       const im = new THREE.InstancedMesh(g, kitMat, list.length);
       const items = list.map((p) => ({ x: p.x, y: ground(p) - 0.02, z: p.z, rot: longX && kind !== 'lampadaire' ? Math.atan2(-(p.dz || 0), p.dx || 0) : Math.atan2(p.dx || 0, p.dz || 0), pid: pidOf.get(p) }));
+      // tête des lampadaires (au bout du bras, sous le chapeau) : on y accroche la lumière du soir
+      if (kind === 'lampadaire') for (const it of items) { const L = bb.max.z - pz - 0.35; lampHeads.push({ x: it.x + Math.sin(it.rot) * L, y: it.y + bb.max.y - bb.min.y - 0.35, z: it.z + Math.cos(it.rot) * L, gy: it.y, pid: it.pid }); }
       items.forEach((it, i) => { q.setFromAxisAngle(up, it.rot); p3.set(it.x, it.y, it.z); s3.setScalar(1); m4.compose(p3, q, s3); im.setMatrixAt(i, m4); });
       im.castShadow = !FLAT.has(kind); im.receiveShadow = true; im.computeBoundingSphere();
       im.userData.items = items;
@@ -321,7 +363,7 @@ export async function buildProps(map, { base, kit: toon = null }) {
   }
   idx.scan(group);
   return {
-    group, hide: (pid) => idx.hide(pid),
+    group, lampHeads, hide: (pid) => idx.hide(pid),
     dispose() {
       for (const k of kit.values()) for (const p of k.parts) p.geo.dispose();
       for (const m of mats.values()) { m.map && m.map.dispose(); m.dispose(); }

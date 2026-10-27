@@ -136,7 +136,7 @@ function newMatch({ run, seed, roster, mode, mirror = false }) {
   S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
-  S.fx = createFx(S.scene.scene);
+  S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
   // les bots ne réfléchissent que là où la partie tourne
@@ -559,7 +559,7 @@ const CAUSES = { fusil: 'au fusil d\'assaut', pompe: 'au fusil à pompe', pistol
   grenade: 'à la grenade', tempete: 'par la tempête', chute: 'par une chute', pioche: 'à la pioche', depart: '(parti)' };
 function hideBroken(k) {
   const rest = k.slice(2);
-  if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); }
+  if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); if (S.scene.lights) S.scene.lights.hide(+rest); }
   else if (k[0] === 'w') S.scene.structures.hideWall(rest);
   else if (k[0] === 'f') S.scene.interior.hideFurn(+rest);
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
@@ -571,7 +571,10 @@ function handleEvents(list) {
     switch (e.e) {
       case 'feu': {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
-        if (h && Q) { h.shot(); if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); } }
+        if (h && Q) {
+          h.shot();
+          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); }
+        }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
         break;
       }
@@ -633,24 +636,27 @@ function handleEvents(list) {
       case 'arme': if (e.p === S.me) S.sfx.play('change'); break;
       case 'soigne': if (e.p === S.me) S.sfx.play(ITEMS[e.c] && ITEMS[e.c].shield ? 'potion' : 'bandage'); break;
       case 'soin': if (e.p === S.me) S.sfx.play('soigne'); break;
-      case 'lance': { const Q = S.sim.player(e.p); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
-      case 'tremplin': S.sfx.at('pose', e.x, e.y, e.z, 0.8); break;
+      case 'lance': { const Q = S.sim.player(e.p), h = S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('lancer'); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
+      case 'tremplin': { const h = e.p != null && S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('pose'); S.sfx.at('pose', e.x, e.y, e.z, 0.8); break; }
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
       case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
-      case 'atterrit': if (e.p === S.me) S.sfx.play('atterrit'); break;
+      case 'atterrit': { const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 }); if (e.p === S.me) S.sfx.play('atterrit'); break; }
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
-      case 'construit': S.builds.add(e.piece); if (e.piece.owner === S.me) buildBar(); S.sfx.at('construit', (e.piece.x + 0.5) * 4, e.piece.y0 + 1, (e.piece.z + 0.5) * 4, 0.9); break;
+      case 'construit': { const h = S.actors.heroOf(e.piece.owner); if (h && h.gesture) h.gesture('pose'); }
+        S.builds.add(e.piece); if (e.piece.owner === S.me) buildBar(); S.sfx.at('construit', (e.piece.x + 0.5) * 4, e.piece.y0 + 1, (e.piece.z + 0.5) * 4, 0.9); break;
       case 'coup': {
         const col = { bois: 0xb08a5a, pierre: 0xa9a49a, metal: 0xc8ccd0 }[e.mat] || 0xcfc6b5;
         S.fx.puff(e.x, e.y, e.z, { color: col, size: 0.3, grow: 1.6, life: 0.4, op: 0.8 });
+        S.fx.debris(e.x, e.y, e.z, e.mat, { n: 3, spread: 0.2, power: 2.5 });
         if (e.by === S.me) { S.hud.structure(e.hp, e.max); S.sfx.play('coup-' + (e.mat || 'bois')); }
         break;
       }
       case 'casse': {
         hideBroken(e.key);
         const col = { bois: 0x9a6a3a, pierre: 0x8a857c, metal: 0xaab2b8 }[e.mat] || 0x9a8a78;
-        for (let i = 0; i < 6; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
+        for (let i = 0; i < 4; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
+        S.fx.debris(e.x, e.y, e.z, e.mat, { n: 16, spread: 1.6, power: 4.5 });
         S.sfx.at('casse', e.x, e.y, e.z, 0.9);
         break;
       }

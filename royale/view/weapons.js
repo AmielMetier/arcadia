@@ -115,6 +115,12 @@ function kitItemGeo(c) {
 const plainKit = tintMaterial();
 const blastKit = tintMaterial({}, { color: 0xc9a0ff, emissive: 0x2a0a4a });
 function kitMesh(geo, material) { const m = new THREE.Mesh(geo, material); m.castShadow = true; return m; }
+// taille d'un objet posé au sol : les modèles du kit sont déjà à leur vraie taille (les petits un peu grossis pour
+// qu'on les repère), les volumes simples sont agrandis
+export function lootScale(model, it) {
+  if (model.userData.kit) return it && it.t === 'arme' ? 1 : 1.35;
+  return it && it.t === 'arme' ? 1.5 : 1.6;
+}
 
 // modèle d'un objet d'inventaire (ou de l'outil de récolte si it est null)
 export function itemModel(it) {
@@ -122,10 +128,10 @@ export function itemModel(it) {
   if (KIT) {
     if (!it || it.t === 'arme') {
       const geo = kitWeaponGeo(it ? it.w : 'pioche');
-      if (geo) { g.add(kitMesh(geo, rarityMaterial(it ? it.r : 0))); return g; }
+      if (geo) { g.add(kitMesh(geo, rarityMaterial(it ? it.r : 0))); g.userData.kit = true; return g; }
     } else if (it.t === 'objet' && ITEM_SIZE[it.c]) {
       const geo = kitItemGeo(it.c);
-      if (geo) { g.add(kitMesh(geo, it.c === 'souffle' ? blastKit : plainKit)); return g; }
+      if (geo) { g.add(kitMesh(geo, it.c === 'souffle' ? blastKit : plainKit)); g.userData.kit = true; return g; }
     }
   }
   if (!it) { ITEM_MODELS.pioche(g); return g; }

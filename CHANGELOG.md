@@ -13,6 +13,19 @@
   - Les chemins de terre ont leurs deux ornières et une bande d'herbe au milieu ; les places sont pavées, avec une rosace autour de la fontaine.
   - Les voitures garées ne mordent plus sur le trottoir.
 - **Island Rush** — Saut plus lisible : dans la montgolfière et pendant la chute, une petite bulle rappelle seulement la touche Espace, et le rappel des touches s'efface tant qu'on est en l'air.
+- **Island Rush** — L'île est plus vivante.
+  - De l'herbe pousse autour de soi, avec des fleurs des prés (marguerites, boutons d'or, lavande, coquelicots), et se balance au vent.
+  - En ville et au village : allées pavées jusqu'aux portes, parvis dallés devant les immeubles et les boutiques, haies taillées devant les jardins des maisons (on peut s'y abriter, les casser et en récolter du bois).
+  - Les cheminées fument ; la poussière se soulève à l'atterrissage et sous les pas de ceux qui sprintent ; murs et décor cassés projettent des débris, les explosions de la terre, les armes éjectent leurs douilles.
+  - Les vagues roulent vers les plages en lignes d'écume.
+  - Au crépuscule et le soir, lampadaires, lampes des portes et enseignes s'allument, avec des flaques de lumière sur la chaussée.
+- **Island Rush** — Butin plus lisible : chaque objet au sol a un faisceau et un halo à la couleur de sa rareté ; les coffres dorés fermés luisent et scintillent.
+- **Island Rush** — Les armes posées au sol retrouvent leur vraie taille.
+- **Island Rush** — Objets en main revus.
+  - Grenades, potions, bandages et trousses se voient dans la main (ils disparaissaient dans le poing).
+  - Vrai coup de pelle pour récolter, lancer de grenade par-dessus l'épaule, geste pour poser un tremplin ou construire.
+  - On enroule son bandage ou on ouvre sa trousse devant soi, on boit sa potion ; au rechargement, l'arme baisse et pivote.
+  - Accroupi, on garde son arme en joue au lieu de la pointer vers le sol.
 
 ## 2.88 — 26 octobre 2026
 - Correction : fiabilisation multijoueur, tolérance au chargement 3D et maintien du rôle d'hôte (Amiel)

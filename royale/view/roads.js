@@ -5,6 +5,7 @@
 // Rues de ville : trottoir, bordure, caniveau puis chaussée ; chaque carrefour est dessiné une seule fois (deux rues
 // qui se croisent ne se superposent plus), bordures arrondies aux angles, trottoir continu du côté sans rue.
 // Chemins de terre et accotements des routes : la terre se fond dans l'herbe, une bande d'herbe au milieu des chemins.
+// Devant les bâtiments des villes et villages : allées pavées jusqu'au trottoir, parvis dallés des immeubles et commerces.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const PHOTO = 4;            // m couverts par une photo du revêtement
@@ -222,6 +223,24 @@ function plazaMark(size) {
   return finish(c, false);
 }
 
+// allée : petits pavés de 25 cm en rangées décalées ; parvis : dalles claires de 50 cm (motif de 2 m, posé selon x, z)
+function pavingMark(kind) {
+  const w = 2 * PX, c = canvas(w, w), g = c.getContext('2d'), r = rng(kind === 'allee' ? 51 : 53);
+  const img = g.createImageData(w, w), D = img.data, size = kind === 'allee' ? 0.25 : 0.5;
+  for (let j = 0; j < w; j++) for (let i = 0; i < w; i++) {
+    const x = (i + 0.5) / PX, z = (j + 0.5) / PX, row = Math.floor(z / size), fx = x / size + (kind === 'allee' ? (row % 2) * 0.5 : 0);
+    const k = Math.floor(fx), ex = Math.min(fx - k, 1 - (fx - k)), ez = Math.min(z / size - row, 1 - (z / size - row));
+    const e = Math.min(ex, ez), v = (hash2(k + 101, row + 7) - 0.5) * (kind === 'allee' ? 30 : 14), n = (r() - 0.5) * 10;
+    const base = kind === 'allee' ? [172, 162, 146] : [206, 200, 188];
+    // joints sombres, bords des pavés un peu ombrés (ils semblent bombés)
+    const k2 = e < 0.04 ? 0.55 : kind === 'allee' ? 0.86 + 0.14 * Math.min(1, e / 0.18) : 1;
+    const o = (j * w + i) * 4;
+    D[o] = (base[0] + v + n) * k2; D[o + 1] = (base[1] + v + n) * k2; D[o + 2] = (base[2] + v * 0.8 + n) * k2; D[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return finish(c, true, true);
+}
+
 // ------------------------------------------------------------------ géométrie
 function builder() {
   const pos = [], uv = [], uv1 = [], idx = [];
@@ -370,6 +389,14 @@ export async function buildRoads(map, { anisotropy = 8 } = {}) {
     for (const p of map.plazas) {
       const B = add(mPlaza), y = hAt((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2) + LIFT;
       B.quad(B.v(p.x0, y, p.z0, 0, 0), B.v(p.x1, y, p.z0, 1, 0), B.v(p.x1, y, p.z1, 1, 1), B.v(p.x0, y, p.z1, 0, 1));
+    }
+  }
+  // allées et parvis devant les bâtiments des villes et villages (sous le bord du trottoir)
+  if (map.paths && map.paths.length) {
+    const mAllee = marked(pavingMark('allee'), { grain: 0.6, offset: -2 }), mParvis = marked(pavingMark('parvis'), { grain: 0.5, offset: -2 });
+    for (const p of map.paths) {
+      const B = add(p.kind === 'parvis' ? mParvis : mAllee), y = (x, z) => hAt(x, z) + LIFT - 0.012;
+      B.quad(...[[p.x0, p.z0], [p.x1, p.z0], [p.x1, p.z1], [p.x0, p.z1]].map(([x, z]) => B.v(x, y(x, z), z, x / 2, z / 2)));
     }
   }
   // un maillage par matériau pour toute l'île

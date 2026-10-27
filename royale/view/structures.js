@@ -313,7 +313,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   const night = time === 'soir' ? 1 : time === 'crepuscule' ? 0.45 : 0;
   const tex = Object.fromEntries(Object.keys(TEX).map((k) => [k, TEX[k]()]));
   tex.store = stripes(); tex.enseignes = signAtlas();
-  const mats = {}, geos = {};
+  const mats = {}, geos = {}, chimneys = [], bulbs = [];
   mats.pierre = twoTone(tex.enduit, INTERIOR.pierre, { roughness: 0.92 });
   mats.bois = twoTone(tex.bois, INTERIOR.bois, { roughness: 0.9 });
   mats.metal = twoTone(tex.metal, INTERIOR.metal, { roughness: 0.6, metalness: 0.25 });
@@ -332,6 +332,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   mats.planter = new THREE.MeshStandardMaterial({ color: 0x8a5a3c, roughness: 0.85 });
   mats.awning = awningMaterial(tex.store);
   mats.sign = signMaterial(tex.enseignes);
+  mats.sign.emissiveIntensity = 0.15 + night * 0.85;
   mats.brick = new THREE.MeshStandardMaterial({ map: tex.brique, roughness: 0.9 });
   mats.unit = new THREE.MeshStandardMaterial({ color: 0xd9dcdd, roughness: 0.5, metalness: 0.35 });
   mats.grille = new THREE.MeshStandardMaterial({ map: tex.grille, roughness: 0.5, metalness: 0.3 });
@@ -427,7 +428,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
           push('porteCadre', 'trim', pm, trim, ref);
           if (k === 0) {
             push('porteMarche', 'stone', pm, stone, ref);
-            if (!b.abandoned) { push('lampe', 'iron', pm, null, ref); push('ampoule', 'bulb', pm, null, ref); }
+            if (!b.abandoned) { push('lampe', 'iron', pm, null, ref); push('ampoule', 'bulb', pm, null, ref); bulbs.push(new THREE.Vector3(3.08, 2.05, O + 0.2).applyMatrix4(pm)); }
             if (CANOPY_TYPES.has(b.type) && front) push('porteAuvent', 'trim', pm, trim, ref);
           }
         }
@@ -523,6 +524,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     // cheminées, climatiseurs, ventilations, réservoirs (mêmes positions que leurs collisions)
     for (const r of roofDetails(b, map.seed, top, ROOF_SLOPE)) {
       if (r.kind === 'cheminee') {
+        if (!b.abandoned) chimneys.push({ x: (r.x0 + r.x1) / 2, y: r.y1 + 0.12, z: (r.z0 + r.z1) / 2 });
         push('box', 'brick', place(r.x0, r.y0, r.z0, 0, r.x1 - r.x0, r.y1 - r.y0, r.z1 - r.z0), color(b.abandoned ? 0x7a6a5e : 0xb46a52), { b: b.id });
         push('box', 'stone', place(r.x0 - 0.08, r.y1, r.z0 - 0.08, 0, r.x1 - r.x0 + 0.16, 0.12, r.z1 - r.z0 + 0.16), stone, { b: b.id });
       } else if (r.kind === 'clim') {
@@ -613,7 +615,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   }
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {
-    group, index,
+    group, index, chimneys, bulbs,
     // ornements : seulement les tuiles à moins de far mètres de (x, z)
     cull(x, z, far = 240) {
       for (const im of tiles) {

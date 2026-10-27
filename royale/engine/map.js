@@ -19,7 +19,7 @@ export const ILE = 51;      // graine de l'île officielle (choisie dans l'aper�
 export const GROUND = ['Mer', 'Plage', 'Plaine', 'Forêt', 'Montagne', 'Roche', 'Neige', 'Lac', 'Rivière', 'Route', 'Ville', 'Bâtiment', 'Champ', 'Lieu-dit'];
 export const GR = { MER: 0, PLAGE: 1, PLAINE: 2, FORET: 3, MONTAGNE: 4, ROCHE: 5, NEIGE: 6, LAC: 7, RIVIERE: 8, ROUTE: 9, VILLE: 10, BATI: 11, CHAMP: 12, LIEU: 13 };
 export const WATER = { NONE: 0, MER: 1, LAC: 2, RIVIERE: 3 };
-const OC = { FREE: 0, BUILD: 1, STREET: 2, ROAD: 3, FIELD: 4, DOCK: 5, PLAZA: 6 };
+export const OC = { FREE: 0, BUILD: 1, STREET: 2, ROAD: 3, FIELD: 4, DOCK: 5, PLAZA: 6 };
 
 export const POI_KINDS = {
   ville: 'Ville', bourg: 'Bourg', village: 'Village', port: 'Port', scierie: 'Scierie', manoir: 'Manoir', ferme: 'Ferme', usine: 'Usine', camping: 'Camping', phare: 'Phare',
@@ -49,6 +49,8 @@ export const PROPS = {
   boite: { label: 'Boîte aux lettres', mat: 'metal', r: 0.3 }, abribus: { label: 'Abribus', mat: 'metal', r: 1.7 }, pot: { label: 'Pot de fleurs', mat: null, r: 0 },
   jardiniere: { label: 'Jardinière', mat: 'bois', r: 1 }, transfo: { label: 'Armoire électrique', mat: 'metal', r: 0.5 }, linge: { label: 'Corde à linge', mat: null, r: 0 },
   sacpoubelle: { label: 'Sac poubelle', mat: null, r: 0 }, plaque: { label: 'Plaque d\'égout', mat: null, r: 0 },
+  // abords des maisons
+  haie: { label: 'Haie', mat: 'bois', r: 0.6 },
 };
 
 const NAMES = {
@@ -1034,6 +1036,52 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
     }
   }
 
+  // abords des bâtiments des villes et villages : une allée pavée va de chaque porte au trottoir, un parvis dallé
+  // s'étend devant les immeubles et les commerces, une haie taillée borde le jardin des maisons côté rue (ouverte
+  // au droit de l'allée). Sans tirage : le reste de l'île ne change pas.
+  const paths = [];
+  {
+    const PARVIS = new Set(['immeuble', 'tour', 'bureaux', 'boutique', 'mairie', 'auberge', 'garage']);
+    const HEDGE = new Set(['maison', 'chalet', 'manoir']);
+    const inStreet = (x, z) => streets.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || plazas.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+    const inBuilding = (x, z, m = 0) => buildings.some((b) => x > b.x0 * CELL - m && x < (b.x0 + b.w) * CELL + m && z > b.z0 * CELL - m && z < (b.z0 + b.d) * CELL + m);
+    const hedgeFree = (x, z) => !WK[vi(x, z)] && !inBuilding(x, z, 0.5) && !props.some((p) => p.kind !== 'haie' && PROPS[p.kind] && PROPS[p.kind].r > 0 && sq(p.x - x) + sq(p.z - z) < sq(PROPS[p.kind].r + 1.1));
+    for (const b of buildings) {
+      const poi = b.poi >= 0 ? pois[b.poi] : null;
+      if (!poi || !poi.town || b.abandoned) continue;
+      for (const e of b.levels[0].walls) {
+        if (!e.ext || (e.k !== 'porte' && e.k !== 'portail')) continue;
+        const h = e.o === 'h', nx = h ? 0 : e.x === b.x0 ? -1 : 1, nz = h ? (e.z === b.z0 ? -1 : 1) : 0;
+        const mx = h ? (e.x + 0.5) * CELL : e.x * CELL, mz = h ? e.z * CELL : (e.z + 0.5) * CELL;
+        // jusqu'au trottoir (rien s'il y a un bâtiment ou le bord du lieu avant)
+        let gap = 0;
+        for (let t = 0.25; t <= 14; t += 0.25) {
+          const x = mx + nx * t, z = mz + nz * t;
+          if (inStreet(x, z)) { gap = t - 0.25; break; }
+          if (inBuilding(x, z) || !inRect(poi.rect, x, z, 0)) break;
+        }
+        if (gap < 0.75) continue;
+        const front = (h ? (nz < 0 ? 'N' : 'S') : nx < 0 ? 'W' : 'E') === b.front;
+        const a0 = h ? b.x0 * CELL : b.z0 * CELL, a1 = h ? (b.x0 + b.w) * CELL : (b.z0 + b.d) * CELL, door = h ? mx : mz;
+        const wide = front && PARVIS.has(b.type) && gap <= 8;
+        const c0 = wide ? a0 : door - 0.8, c1 = wide ? a1 : door + 0.8;
+        const n0 = h ? mz : mx, n1 = n0 + (h ? nz : nx) * (gap + 0.25); // jusque sous le trottoir
+        paths.push(h ? { x0: c0, x1: c1, z0: Math.min(n0, n1), z1: Math.max(n0, n1), kind: wide ? 'parvis' : 'allee' }
+          : { x0: Math.min(n0, n1), x1: Math.max(n0, n1), z0: c0, z1: c1, kind: wide ? 'parvis' : 'allee' });
+        // haie : devant les maisons, à 0,6 m du trottoir, en tronçons de 2 m, ouverte devant l'allée
+        if (!front || !HEDGE.has(b.type) || gap < 2.5) continue;
+        const off = gap - 0.6;
+        for (let a = a0 - 1; a <= a1 + 1.01; a += 2) {
+          if (Math.abs(a - door) < 2.1) continue;
+          const x = h ? a : mx + nx * off, z = h ? mz + nz * off : a;
+          const ends = h ? [[x - 1, z], [x + 1, z]] : [[x, z - 1], [x, z + 1]];
+          if (ends.some(([ex, ez]) => inStreet(ex, ez) || inBuilding(ex, ez, 0.3) || !inRect(poi.rect, ex, ez, 0)) || !hedgeFree(x, z)) continue;
+          prop('haie', x, z, { dx: h ? 1 : 0, dz: h ? 0 : 1 });
+        }
+      }
+    }
+  }
+
   // rien ne bouche une porte : le décor solide posé juste devant une porte ou un portail du rez-de-chaussée est retiré
   {
     const fronts = [];
@@ -1158,7 +1206,7 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
     lake: { x: LC.x, z: LC.z, a: la, b: lb, ax: LA.x, az: LA.z, level: LL, name: lakeName },
     river: river ? { pts: river.map((p) => ({ x: p.x, z: p.z, hw: p.hw, lv: p.lv })), name: riverName } : null,
     peak: { ...peak, name: montName },
-    pois, buildings, props, streets, roads, bridges, fields, docks, plazas,
+    pois, buildings, props, streets, roads, bridges, fields, docks, plazas, paths,
     chests, loot, ammo, labels, stats, hash: hh >>> 0, ms: Math.round(now() - T0),
   };
 }

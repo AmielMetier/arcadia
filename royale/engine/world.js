@@ -44,6 +44,7 @@ const PROP_SHAPES = {
   tuyaux: { obb: [2.1, 0.5], h: 0.95 }, caisson: { obb: [1.1, 1.05], h: 2.1 },
   banc: { obb: [0.9, 0.32], h: 0.85 }, bouche: { cyl: 0.2, h: 0.85 }, corbeille: { cyl: 0.3, h: 1.0 }, boite: { cyl: 0.22, h: 1.25 },
   abribus: { obb: [1.7, 0.6], h: 2.3 }, jardiniere: { obb: [1.0, 0.4], h: 0.75 }, transfo: { obb: [0.45, 0.32], h: 1.4 },
+  haie: { obb: [1.0, 0.36], h: 1.05 },
 };
 const propScale = (p) => (p.kind === 'rocher' ? p.s : 1);
 

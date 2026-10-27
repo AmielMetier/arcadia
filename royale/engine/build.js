@@ -25,6 +25,7 @@ const PROP_HP = {
   barriere: [140, 'metal', 5], sacs: [320, 'bois', 6], pneus: [160, 'metal', 5], reservoir: [480, 'metal', 10], epave: [360, 'metal', 9],
   cartons: [60, 'bois', 5], tuyaux: [240, 'metal', 7], caisson: [400, 'metal', 9],
   banc: [80, 'bois', 5], bouche: [100, 'metal', 4], corbeille: [60, 'metal', 3], boite: [60, 'metal', 3], abribus: [220, 'metal', 7],
+  haie: [90, 'bois', 4],
   jardiniere: [90, 'bois', 5], transfo: [150, 'metal', 6],
 };
 const WALL_HP = { bois: 170, pierre: 300, metal: 420 };
