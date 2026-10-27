@@ -7,7 +7,7 @@ export function initAudio() {
   const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
   ctx = new AC(); master = ctx.createGain(); master.gain.value = muted ? 0 : 0.7;
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-  master.connect(comp); comp.connect(ctx.destination);
+  master.connect(comp); comp.connect(DDVolume.gain(ctx, 'fx')).connect(ctx.destination);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   // roulement continu

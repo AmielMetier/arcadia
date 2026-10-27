@@ -305,3 +305,29 @@ kbd{display:inline-block;min-width:1.7em;padding:1px 6px;border-radius:6px;font:
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* ------------------------------------------------------------------ réglage du son (en jeu et au menu) */
+.sndpop{position:absolute;top:calc(100% + 10px);right:0;z-index:20;width:262px;display:flex;flex-direction:column;gap:10px;padding:14px 16px 14px;border-radius:var(--r-m);
+  background:var(--paper);box-shadow:var(--sh-2);color:var(--ink);pointer-events:auto;cursor:default;animation:sp-in .18s var(--ease)}
+@keyframes sp-in{from{opacity:0;transform:translateY(-6px)}}
+.sp-t{font-size:12.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.sp-row{display:grid;grid-template-columns:66px 1fr 44px;align-items:center;gap:8px;font-size:14px;color:var(--ink-2)}
+.sp-row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.sp-row input{width:100%;margin:0;accent-color:var(--sky-deep);cursor:pointer;height:24px}
+.sndpop.muted .sp-row{opacity:.5}
+.sp-mute{padding:8px 14px;font-size:14px;margin-top:2px}
+
+/* ------------------------------------------------------------------ menu lancé depuis le Hub : joueurs du salon, attente de l'hôte */
+.who-tag{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--sky-deep);background:oklch(0.58 0.14 236 / .1);padding:4px 10px;border-radius:999px}
+.who{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.who li{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;background:var(--paper-2);box-shadow:inset 0 0 0 2px var(--line);font-size:14px}
+.who li i{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px var(--white)}
+.who li em{font-style:normal;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:var(--sky-deep)}
+.who li small{font-size:12px;font-weight:700;color:var(--ink-3)}
+.wait-host{margin:6px 0 0;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 16px;border-radius:999px;background:var(--paper-2);box-shadow:inset 0 0 0 2px var(--line);color:var(--ink-2);font-size:16px;text-align:center}
+.wait-host i{width:16px;height:16px;flex:none;border-radius:50%;border:3px solid var(--line);border-top-color:var(--sky-deep);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.setup.ro .course:hover,.setup.ro .combo:hover{transform:none;box-shadow:inset 0 0 0 2px var(--line)}
+.setup.ro .course[aria-pressed="true"]:hover,.setup.ro .combo[aria-pressed="true"]:hover{box-shadow:inset 0 0 0 3px var(--sky-deep),var(--sh-1)}
+.sheet-actions .wait-host{flex-basis:100%;margin:0}
+@media (prefers-reduced-motion:reduce){ .wait-host i{animation-duration:3s} .sndpop{animation:none} }

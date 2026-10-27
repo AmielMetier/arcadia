@@ -34,14 +34,17 @@ export function createMusic(getCtx) {
   let mood = 'calm', wanted = 'calm', M = MOODS.calm, tone = null;
   const beat = () => 60 / M.bpm, stepLen = () => beat() / 4;
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  let on = store('david_music', true), vol = store('david_music_vol', 0.55);
+  // volume : le réglage « Musique » du panneau du son (l'ancien curseur du jeu devient son point de départ)
+  let on = store('david_music', true);
+  const vol = 0.55;
+  DDVolume.migrate('music', store('david_music_vol', vol) / vol);
 
   function build() {
     ctx = getCtx(); if (!ctx) return false;
     out = ctx.createGain(); out.gain.value = 0;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = M.tone; lp.Q.value = 0.4; tone = lp;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.25;
-    out.connect(lp); lp.connect(comp); comp.connect(ctx.destination);
+    out.connect(lp); lp.connect(comp); comp.connect(DDVolume.gain(ctx, 'music')).connect(ctx.destination);
     // écho doux (delay en boucle filtrée)
     verbIn = ctx.createGain(); verbIn.gain.value = 0.32;
     const dl = ctx.createDelay(1.5); dl.delayTime.value = (60 / 76) * 0.75;
@@ -171,7 +174,6 @@ export function createMusic(getCtx) {
 
   const api = {
     get on() { return on; },
-    get volume() { return vol; },
     start() {
       if (playing || !on) return;
       if (!ctx && !build()) return;
@@ -189,10 +191,6 @@ export function createMusic(getCtx) {
       out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
     },
     toggle() { on = !on; save('david_music', on); if (on) api.start(); else api.stop(); return on; },
-    setVolume(v) {
-      vol = Math.max(0, Math.min(1, v)); save('david_music_vol', vol);
-      if (playing) { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(vol, ctx.currentTime, 0.1); }
-    },
     get mood() { return wanted; },
     setMood(m) { if (MOODS[m]) wanted = m; },
     win() {

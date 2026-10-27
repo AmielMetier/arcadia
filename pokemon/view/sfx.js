@@ -32,7 +32,7 @@ class SoundManager {
       if (!this.bgmAudio) {
         this.bgmAudio = new Audio('assets/bgm_battle.mp3');
         this.bgmAudio.loop = true;
-        this.bgmAudio.volume = 0.25;
+        DDVolume.media(this.bgmAudio, 'music', 0.25);
       }
       this.bgmAudio.currentTime = 0;
       this.bgmAudio.play().catch(() => {});
@@ -89,7 +89,11 @@ class SoundManager {
     if (typeof window === 'undefined') return null;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) this.ctx = new AudioCtx();
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        // réglage « Effets » du joueur (panneau Volume)
+        this.fxBus = DDVolume.gain(this.ctx, 'fx'); this.fxBus.connect(this.ctx.destination);
+      }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
@@ -123,7 +127,7 @@ class SoundManager {
       gain.gain.linearRampToValueAtTime(gainVal, start + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.fxBus);
       osc.start(start);
       osc.stop(start + dur + 0.02);
     } catch (e) {}
@@ -188,7 +192,7 @@ class SoundManager {
       let audio = this.cryCache.get(pokemonId);
       if (!audio) {
         audio = new Audio(`https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${pokemonId}.ogg`);
-        audio.volume = 0.55;
+        DDVolume.media(audio, 'fx', 0.55);
         this.cryCache.set(pokemonId, audio);
       }
       audio.currentTime = 0;
@@ -202,7 +206,7 @@ class SoundManager {
       const src = SFX_FILES[key];
       if (!src) return;
       const sound = new Audio(src);
-      sound.volume = volume;
+      sound.volume = DDVolume.level('fx', volume);
       sound.play().catch(() => {});
     } catch (e) {}
   }

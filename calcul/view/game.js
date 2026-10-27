@@ -133,6 +133,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
         <button class="tool" id="tshow" title="Mise en scène : scène d'ouverture et réactions de Pierre Chartier" hidden>🎬</button>
         <button class="tool" id="tmus" title="Musique de salle de marché" hidden>🎵</button>
         <button class="tool" id="tsnd" title="Bruitages">🔊</button>
+        <button class="tool" id="tvol" title="Volume de la musique et des effets" aria-label="Volume">🎚️</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
@@ -208,6 +209,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
   };
   syncTools();
   $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
+  DDVolume.panel($('#tvol'));
   const tm = $('#tmus');
   if (tm) tm.onclick = () => { wallStreetMusic.toggle(); syncTools(); };
   $('#tshow').onclick = () => { const on = staging.toggle(); syncTools(); toast(on ? '🎬 Mise en scène : ouverture et réactions de Pierre' : '🎬 Animations réduites : sans ouverture ni réactions de Pierre'); if (!on) { const l = $('#pclive'); if (l) l.remove(); } };
@@ -950,7 +952,7 @@ export function mountGame(root, { me, answer, emote, sabotage = () => {}, joker 
     const fl = $('#opfloor'); let f = 0;
     const tick = setInterval(() => { f = Math.min(40, f + 1); if (fl) fl.textContent = f; if (f >= 40) clearInterval(tick); }, 58);
     // la voix de Pierre : préchargée tout de suite, lancée quand il apparaît (si le son est activé)
-    const voice = new Audio(PC_VOICE); voice.preload = 'auto';
+    const voice = new Audio(PC_VOICE); voice.preload = 'auto'; voice.volume = DDVolume.level('fx');
     const face = stage.querySelector('.op-pierre .pc-face');
     opT.push(setTimeout(() => clearInterval(tick), 3000), setTimeout(() => sfx.play('ding'), 2500), setTimeout(() => {
       if (!sfx.on || !stage.querySelector('.opening')) return;

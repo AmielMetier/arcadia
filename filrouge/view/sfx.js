@@ -4,7 +4,7 @@ try { muted = localStorage.getItem('fil_mute') === '1'; } catch (e) {}
 function ctx() {
   if (!ac) {
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
-    ac = new C(); master = ac.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(ac.destination);
+    ac = new C(); master = ac.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(DDVolume.gain(ac, 'fx')).connect(ac.destination);
   }
   if (ac.state === 'suspended') ac.resume();
   return ac;

@@ -1,10 +1,13 @@
-// Birdie Party — accueil (hors du Hub) : survol des trous en fond, logo, puis réglages de la partie.
-// Le survol enchaîne les trous du parcours choisi (un mélange des trois décors sur l'écran titre), avec un
-// fondu blanc entre deux trous ; la musique du menu démarre au premier geste du joueur.
+// Birdie Party — menu du jeu : survol des trous en fond, logo, puis réglages de la partie (parcours, équipes, bots,
+// vent, moment de la journée). Hors du Hub, on passe d'abord par l'écran titre. Lancé depuis le Hub, on arrive
+// directement aux réglages : l'hôte (ou le joueur seul) choisit et lance la partie, les invités voient ses choix
+// en direct en attendant. Le survol enchaîne les trous du parcours choisi (un mélange des décors sur l'écran titre) ;
+// la musique du menu démarre au premier geste du joueur.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { COURSES, HOLES } from '../engine/course.js';
 import { esc, loadSetup, saveSetup } from './hud.js';
 import { icon } from './icons.js';
+import { soundPanel } from './sound.js';
 
 const FLY = 16;                       // s de survol par trou
 const SHOWCASE = [11, 9, 4, 21, 25, 16, 14, 27, 2, 18];
@@ -16,20 +19,22 @@ const parOf = (k) => COURSES[k].holes.reduce((t, n) => t + HOLES.find((h) => h.n
 const mixOf = (k) => Object.entries(COURSES[k].holes.reduce((m, n) => { const t = HOLES.find((h) => h.n === n).theme; m[t] = (m[t] || 0) + 1; return m; }, {}));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-function html(set, musicOn) {
+// mode : 'local' (hors du Hub), 'solo' (seul, depuis le Hub), 'host' (hôte d'un salon), 'guest' (invité)
+function html(set, mode) {
+  const hub = mode !== 'local', multi = mode === 'host' || mode === 'guest';
   const seg = (key, label, opts) => `<div class="opt"><span class="opt-l" id="l-${key}">${label}</span><div class="seg" role="radiogroup" aria-labelledby="l-${key}" data-k="${key}">${opts.map(([v, l]) => `<button role="radio" data-v="${v}" aria-checked="${String(set[key]) === String(v)}">${l}</button>`).join('')}</div></div>`;
   const card = (k) => `<button class="course" data-v="${k}" aria-pressed="${set.course === k}">
       <img src="img/c-${k}.jpg" alt="" draggable="false"><span class="c-txt"><b>${THEMES[k]}</b><small>${COURSES[k].holes.length} trous · par ${parOf(k)}</small></span>${icon('check', 'c-ok')}</button>`;
   const combo = (k, name) => `<button class="combo" data-v="${k}" aria-pressed="${set.course === k}"><span class="mix" aria-hidden="true">${mixOf(k).map(([t, n]) => `<i class="t-${t}" style="flex:${n}"></i>`).join('')}</span><b>${name}</b><small>${COURSES[k].holes.length} trous · par ${parOf(k)}</small></button>`;
-  return `<div class="home" data-state="title">
+  return `<div class="home" data-state="${hub ? 'setup' : 'title'}" data-mode="${mode}">
     <div class="home-scrim"></div>
     <header class="home-title">
       <h1 class="logo">Birdie <span>Party</span></h1>
       <p class="tagline">Du golf en 3D entre potes · 30 trous · jusqu'à 6 joueurs</p>
     </header>
     <button class="press" id="homeStart"><span class="k-desk">Clique ou appuie sur <kbd>Entrée</kbd> pour jouer</span><span class="k-touch">Touche l'écran pour jouer</span></button>
-    <section class="setup" aria-label="Nouvelle partie">
-      <div class="setup-head"><div class="logo sm">Birdie <span>Party</span></div></div>
+    <section class="setup${mode === 'guest' ? ' ro' : ''}" aria-label="Nouvelle partie">
+      <div class="setup-head"><div class="logo sm">Birdie <span>Party</span></div>${mode === 'guest' ? '<span class="who-tag">Choix de l\'hôte</span>' : ''}</div>
       <h2 class="sect">Parcours</h2>
       <div class="courses">${['campagne', 'mer', 'montagne', 'desert'].map(card).join('')}</div>
       <div class="combos">${combo('aller', 'Aller')}${combo('retour', 'Retour')}${combo('complet', 'Grand tour')}${combo('tour', 'Les quatre')}</div>
@@ -41,28 +46,33 @@ function html(set, musicOn) {
         ${seg('wind', 'Vent', [['calme', 'Calme'], ['normal', 'Normal'], ['fort', 'Fort']])}
         ${seg('time', 'Moment', [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']])}
       </div>
-      <button class="btn primary big" id="btnPlay">Jouer <kbd>Entrée</kbd></button>
+      ${multi ? '<h2 class="sect">Joueurs</h2><ul class="who" id="homeWho"></ul>' : ''}
+      ${mode === 'guest' ? '<p class="wait-host" role="status"><i aria-hidden="true"></i>L\'hôte choisit le parcours et lance la partie…</p>'
+        : `<button class="btn primary big" id="btnPlay">${mode === 'host' ? 'Lancer la partie' : 'Jouer'} <kbd>Entrée</kbd></button>`}
       <ul class="keys">
         <li><b>Frapper</b> clic maintenu, tirer vers le bas, relâcher (ou <kbd>Espace</kbd>)</li>
         <li><b>Viser</b> <kbd>←</kbd> <kbd>→</kbd> · <b>Club</b> <kbd>↑</kbd> <kbd>↓</kbd> · <b>Vue d'ensemble</b> <kbd>V</kbd></li>
         <li><b>Carte</b> molette ou <kbd>Z</kbd> pour zoomer · <kbd>R</kbd> relief</li>
       </ul>
-      <button class="btn ghost" id="homeBack">${icon('back')}Écran titre</button>
+      ${hub ? `<button class="btn ghost" id="homeQuit">${icon('back')}Retour au salon</button>` : `<button class="btn ghost" id="homeBack">${icon('back')}Écran titre</button>`}
     </section>
     <p class="now" id="homeNow" aria-live="polite"></p>
-    <div class="home-tools"><button class="ico" id="homeMusic" aria-pressed="${musicOn}" aria-label="Musique" title="Musique (M)">${icon('music')}</button></div>
+    <div class="home-tools"><button class="ico" id="homeSound" aria-label="Son" title="Son (M)">${icon('soundOn')}</button></div>
     <p class="credit">Musique : « Sunny Side Up », Alex McCulloch (CC0)</p>
   </div>`;
 }
 
-// scene, sfx : moteurs du jeu ; hole(n) : trou n construit ; onPlay(réglages)
-export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
-  const set = loadSetup();
-  let musicOn = true;
-  try { musicOn = localStorage.getItem('golf_music') !== '0'; } catch (e) {}
-  root.innerHTML = html(set, musicOn);
+// scene, sfx : moteurs du jeu ; hole(n) : trou n construit ; mode : voir html() ; initial : réglages de départ (ceux
+// du Hub) ; onPlay(réglages) : lancer la partie ; onChange(réglages) : l'hôte a changé un réglage ; onQuit : retour au salon
+export function createHome({ root, scene, sfx, hole: holeOf, mode = 'local', initial = null, onPlay, onChange, onQuit }) {
+  const set = { ...loadSetup(), ...(initial || {}) };
+  if (!COURSES[set.course]) set.course = 'campagne';
+  root.innerHTML = html(set, mode);
   const el = root.querySelector('.home'), $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
-  let state = 'title', alive = true, cur = null, loading = false, pending = null, t = 0, list = SHOWCASE, idx = 0, path = null;
+  let state = mode === 'local' ? 'title' : 'setup', alive = true, cur = null, loading = false, pending = null, t = 0, list = SHOWCASE, idx = 0, path = null;
+  // invité : les choix de l'hôte s'affichent, sans qu'on puisse les changer
+  if (mode === 'guest') for (const c of $$('.courses,.combos,.opts')) c.inert = true;
+  const snd = soundPanel(sfx, $('#homeSound'));
 
   // ---------------------------------------------------------------- survol
   // trajectoire : on file au-dessus de l'axe du trou, en décrivant une large courbe, du départ jusqu'au green
@@ -115,49 +125,59 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
   }
 
   // ---------------------------------------------------------------- réglages
-  function pick(k, v) {
-    set[k] = isNaN(+v) ? v : +v; saveSetup(set);
-    if (k === 'course') {
-      for (const b of $$('.course,.combo')) b.setAttribute('aria-pressed', String(b.dataset.v === v));
-      playlist(COURSES[v].holes);
-    } else for (const b of $$(`[data-k="${k}"] button`)) b.setAttribute('aria-checked', String(b.dataset.v === String(v)));
+  // affiche les réglages de `set` (cases cochées, options grisées)
+  function render() {
+    for (const b of $$('.course,.combo')) b.setAttribute('aria-pressed', String(b.dataset.v === set.course));
+    for (const g of $$('.seg')) for (const b of g.querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.v === String(set[g.dataset.k])));
     // en équipes, les bots complètent les équipes tout seuls
     const teams = set.teams && set.teams !== 'solo';
     $('[data-k="bots"]').classList.toggle('off', teams);
     for (const b of $$('[data-k="bots"] button')) b.disabled = teams;
     $('[data-k="level"]').classList.toggle('off', !set.bots && !teams);
     for (const b of $$('[data-k="level"] button')) b.disabled = !set.bots && !teams;
+  }
+  function pick(k, v) {
+    set[k] = isNaN(+v) ? v : +v;
+    if (mode !== 'guest') saveSetup(set);
+    render();
+    if (k === 'course') playlist(COURSES[v].holes);
     // le survol passe au moment de la journée choisi
     if (k === 'time' && cur) fly(cur.n);
+    onChange && onChange({ ...set });
+  }
+  // invité : l'hôte a changé ses réglages
+  function mirror(next) {
+    const course = set.course, time = set.time;
+    Object.assign(set, next || {});
+    if (!COURSES[set.course]) set.course = 'campagne';
+    render();
+    if (set.course !== course) playlist(COURSES[set.course].holes);
+    else if (set.time !== time && cur) fly(cur.n);
   }
   function toSetup() {
     if (state === 'setup') return;
     state = 'setup'; el.dataset.state = 'setup';
     sfx.unlock(); sfx.ui('open');
-    if (musicOn) sfx.music('menu');
+    sfx.music('menu');
     playlist(COURSES[set.course].holes);
     setTimeout(() => $(`.course[aria-pressed="true"],.combo[aria-pressed="true"]`)?.focus({ preventScroll: true }), 50);
   }
   function toTitle() { state = 'title'; el.dataset.state = 'title'; sfx.ui('close'); playlist(SHOWCASE); }
-  function play() { sfx.unlock(); sfx.ui('confirm'); sfx.music(null); onPlay({ ...set }); }
-  function toggleMusic() {
-    musicOn = !musicOn;
-    try { localStorage.setItem('golf_music', musicOn ? '1' : '0'); } catch (e) {}
-    $('#homeMusic').setAttribute('aria-pressed', String(musicOn));
-    sfx.unlock(); sfx.music(musicOn ? 'menu' : null);
-  }
+  function play() { if (mode === 'guest') return; sfx.unlock(); sfx.ui('confirm'); sfx.music(null); onPlay({ ...set }); }
+  function toggleMute() { sfx.unlock(); sfx.setMuted(!sfx.muted); snd.refresh(); }
 
   $('#homeStart').addEventListener('click', toSetup);
   el.addEventListener('pointerdown', (e) => { if (state === 'title' && !e.target.closest('.home-tools')) toSetup(); });
   for (const b of $$('.course,.combo')) b.addEventListener('click', () => { sfx.ui('select'); pick('course', b.dataset.v); });
   for (const g of $$('.seg')) for (const b of g.querySelectorAll('button')) b.addEventListener('click', () => { sfx.ui('click'); pick(g.dataset.k, b.dataset.v); });
-  $('#btnPlay').addEventListener('click', play);
-  $('#homeBack').addEventListener('click', toTitle);
-  $('#homeMusic').addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
+  $('#btnPlay')?.addEventListener('click', play);
+  $('#homeBack')?.addEventListener('click', toTitle);
+  $('#homeQuit')?.addEventListener('click', () => onQuit && onQuit());
   const onKey = (e) => {
-    if (e.code === 'KeyM') return toggleMusic();
+    if (e.code === 'KeyM') return toggleMute();
+    if (mode === 'guest') return;
     if (state === 'title') { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); toSetup(); } return; }
-    if (e.code === 'Escape') return toTitle();
+    if (e.code === 'Escape') { if (mode === 'local') toTitle(); return; }
     if (e.code === 'Enter' && !e.target.closest?.('.seg,.course,.combo')) { e.preventDefault(); return play(); }
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
       if (e.target.closest?.('.seg')) return;
@@ -167,9 +187,10 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
     }
   };
   addEventListener('keydown', onKey);
-  pick('bots', set.bots);
-  if (musicOn) sfx.music('menu'); // démarre au premier geste (contexte audio)
-  fly(list[0]);
+  render();
+  sfx.music('menu'); // démarre au premier geste (contexte audio) ; son volume se règle dans le panneau du son
+  // depuis le Hub, on arrive directement aux réglages : le survol montre le parcours choisi
+  if (state === 'setup') playlist(COURSES[set.course].holes); else fly(list[0]);
 
   return {
     update(dt) {
@@ -180,6 +201,12 @@ export function createHome({ root, scene, sfx, hole: holeOf, onPlay }) {
       path(Math.min(1.3, t / FLY), false);
       if (t > FLY - 3 && !loading) { idx = (idx + 1) % list.length; fly(list[idx]); }
     },
-    dispose() { alive = false; removeEventListener('keydown', onKey); root.innerHTML = ''; },
+    mode, mirror,
+    // joueurs du salon : [{ name, color, host, me, ready }]
+    setPlayers(players) {
+      const ul = $('#homeWho'); if (!ul) return;
+      ul.innerHTML = players.map((p) => `<li><i style="background:${esc(p.color || '#888')}"></i><b>${esc(p.name)}</b>${p.me ? '<em>toi</em>' : ''}<small>${p.host ? 'hôte' : p.ready ? 'prêt' : 'arrive…'}</small></li>`).join('');
+    },
+    dispose() { alive = false; removeEventListener('keydown', onKey); snd.dispose(); root.innerHTML = ''; },
   };
 }

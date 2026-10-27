@@ -1,5 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.92 — 27 octobre 2026
+- **Tous les jeux** — Le volume de la musique et celui des effets se règlent dans chaque jeu, et chaque jeu retient son propre réglage.
+  - DavidSimulator, Tête de Calcul, Outbreak, Convoy Storm et Poké Duel : un bouton Volume dans la barre du haut ouvre un curseur Musique et un curseur Effets.
+  - Cyber Kart GP : bouton « 🎚️ Volume » au-dessus du bouton Musique, dans les menus et la pause.
+  - Fil Rouge et Mini-Golf Party, qui n'ont pas de musique : un curseur Effets (dans la pause pour Mini-Golf Party).
+  - Duo Drift, Bastion Clash, Birdie Party et Island Rush avaient déjà leur réglage.
+
+## 2.91 — 27 octobre 2026
+- **Birdie Party** — Le menu du jeu s'affiche aussi quand on lance la partie depuis le Hub, à plusieurs comme seul.
+  - L'hôte choisit le parcours, le moment de la journée, les équipes, les bots et le vent, puis lance la partie ; les autres voient ses choix en direct en attendant.
+  - En fin de partie, l'hôte peut rejouer ou revenir au menu pour changer de parcours, et tout le salon le suit.
+- **Birdie Party** — De nouveaux golfeurs : des personnages complets, avec des bras qui suivent le swing, un visage, des coiffures et des casquettes variées, un polo, un gant et des chaussures de golf. Chacun garde la même allure d'une partie à l'autre.
+- **Birdie Party** — Réglage du son : le bouton haut-parleur ouvre un curseur pour la musique et un pour les effets (frappes, foule, nature), retenus d'une partie à l'autre.
+- **Birdie Party** — La balle glisse moins sur le green : une approche s'arrête à quelques mètres au lieu de filer au loin, et un putt dans une pente s'emballe beaucoup moins.
+- **Birdie Party** — Correction : la partie ne reste plus figée quand l'écran du jeu a été masqué un instant (le tour suivant ne s'affichait plus), et un coup dont l'animation n'en finit pas se termine tout seul.
+
 ## 2.90 — 27 octobre 2026
 - **Bastion Clash** — Plus besoin de la touche B pour construire : avec un VCS (ou un Drone) sélectionné, les touches 1 à 0 (et R) choisissent directement le bâtiment à poser.
   - Sans ouvrier sélectionné, les chiffres rappellent toujours tes groupes de contrôle, et Ctrl + chiffre les assigne.

@@ -30,12 +30,16 @@ export class Sfx {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
     this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.7; this.master.connect(c.destination);
+    // réglages du joueur (panneau Volume) : la musique d'un côté, les bruitages et le vent de l'autre
+    this.fx = DDVolume.gain(c, 'fx'); this.fx.connect(this.master);
+    this.mus = DDVolume.gain(c, 'music'); this.mus.connect(this.master);
     // un peu d'écho pour la musique et les sons lointains (loups, cloche)
     this.verb = c.createDelay(1); this.verb.delayTime.value = 0.29;
     const fb = c.createGain(); fb.gain.value = 0.32; const vf = c.createBiquadFilter(); vf.type = 'lowpass'; vf.frequency.value = 2200;
     this.verb.connect(vf).connect(fb).connect(this.verb); this.verbOut = c.createGain(); this.verbOut.gain.value = 0.5;
     vf.connect(this.verbOut).connect(this.master);
-    this.music = c.createGain(); this.music.gain.value = 0.2; this.music.connect(this.master); this.music.connect(this.verb);
+    this.fxVerb = DDVolume.gain(c, 'fx'); this.fxVerb.connect(this.verb); // écho des bruitages
+    this.music = c.createGain(); this.music.gain.value = 0.2; this.music.connect(this.mus); this.mus.connect(this.verb);
     // bruit blanc partagé
     const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -44,7 +48,7 @@ export class Sfx {
     const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
     this.windF = c.createBiquadFilter(); this.windF.type = 'bandpass'; this.windF.frequency.value = 500; this.windF.Q.value = 0.7;
     this.windG = c.createGain(); this.windG.gain.value = 0.0;
-    src.connect(this.windF).connect(this.windG).connect(this.master); src.start();
+    src.connect(this.windF).connect(this.windG).connect(this.fx); src.start();
     this.windSrc = src;
     this.m.next = c.currentTime + 0.2;
   }
@@ -132,7 +136,7 @@ export class Sfx {
   }
 
   /* ------------------------------------------------------------ effets */
-  burst(dur, freq, vol, type = 'bandpass', q = 1, delay = 0, out = this.master) {
+  burst(dur, freq, vol, type = 'bandpass', q = 1, delay = 0, out = this.fx) {
     const c = this.ctx; if (!c) return;
     const s = c.createBufferSource(); s.buffer = this.noise; s.playbackRate.value = 0.7 + Math.random() * 0.6;
     const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
@@ -141,7 +145,7 @@ export class Sfx {
     s.connect(f).connect(g).connect(out); s.start(t, Math.random()); s.stop(t + dur + 0.05);
     return f;
   }
-  tone(freq, dur, vol, type = 'sine', to = null, delay = 0, out = this.master) {
+  tone(freq, dur, vol, type = 'sine', to = null, delay = 0, out = this.fx) {
     const c = this.ctx; if (!c) return;
     const o = c.createOscillator(); o.type = type; const g = c.createGain(); const t = c.currentTime + delay;
     o.frequency.setValueAtTime(freq, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
@@ -156,7 +160,7 @@ export class Sfx {
     o.frequency.setValueAtTime(330 * pitch, t); o.frequency.exponentialRampToValueAtTime(560 * pitch, t + 0.5); o.frequency.setValueAtTime(560 * pitch, t + 1.2); o.frequency.exponentialRampToValueAtTime(380 * pitch, t + 2);
     lfo.frequency.value = 5.5; lg.gain.value = 9; lfo.connect(lg).connect(o.frequency);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.35); g.gain.setValueAtTime(0.07, t + 1.4); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.1);
-    o.connect(lp).connect(g); g.connect(this.master); g.connect(this.verb);
+    o.connect(lp).connect(g); g.connect(this.fx); g.connect(this.fxVerb);
     o.start(t); lfo.start(t); o.stop(t + 2.2); lfo.stop(t + 2.2);
   }
   play(name) {
@@ -193,7 +197,7 @@ export class Sfx {
       case 'aval': this.burst(2.4, 380, 0.7, 'lowpass', 0.6); this.burst(1.8, 120, 0.6, 'lowpass', 0.6, 0.1); break;
       case 'gust': { const f = this.burst(2.2, 400, 0.3, 'bandpass', 0.8); if (f) f.frequency.exponentialRampToValueAtTime(1600, this.ctx.currentTime + 1.6); break; }
       // gares
-      case 'bell': for (const [f, v] of [[880, 0.08], [1318, 0.05], [2217, 0.025]]) { this.tone(f, 2.2, v, 'sine', null, 0, this.verb); this.tone(f, 1.6, v, 'sine'); } break;
+      case 'bell': for (const [f, v] of [[880, 0.08], [1318, 0.05], [2217, 0.025]]) { this.tone(f, 2.2, v, 'sine', null, 0, this.fxVerb); this.tone(f, 1.6, v, 'sine'); } break;
       case 'whistle': this.tone(523, 0.9, 0.06, 'square', 520); this.tone(659, 0.9, 0.05, 'square', 655); this.burst(0.9, 1800, 0.08, 'bandpass', 2); break;
       case 'buy': this.tone(1175, 0.1, 0.07, 'triangle'); this.tone(1568, 0.25, 0.07, 'triangle', null, 0.08); this.burst(0.1, 5000, 0.05, 'highpass'); break;
       case 'arrive': this.play('whistle'); break;
@@ -206,7 +210,7 @@ export class Sfx {
       case 'crash': this.burst(0.5, 700, 0.5, 'lowpass'); this.burst(0.3, 2600, 0.2, 'bandpass', 3, 0.05); this.tone(300, 0.3, 0.06, 'square', 90, 0.05); break;
       // caisses, ambiances, moments forts
       case 'sizzle': { const f = this.burst(0.9, 5000, 0.14, 'highpass', 0.6); if (f) f.frequency.exponentialRampToValueAtTime(2500, this.ctx.currentTime + 0.9); this.tone(180, 0.4, 0.05, 'triangle', 120); break; }
-      case 'leg': [392, 523, 659].forEach((f, i) => { this.tone(f, 0.7, 0.05, 'triangle', null, i * 0.12, this.verb); this.tone(f, 0.5, 0.04, 'sine', null, i * 0.12); }); break;
+      case 'leg': [392, 523, 659].forEach((f, i) => { this.tone(f, 0.7, 0.05, 'triangle', null, i * 0.12, this.fxVerb); this.tone(f, 0.5, 0.04, 'sine', null, i * 0.12); }); break;
       case 'horn': for (const [f, d] of [[110, 0], [104, 0.55]]) { this.tone(f, 0.5, 0.16, 'sawtooth', f * 0.98, d); this.tone(f * 1.5, 0.5, 0.08, 'square', f * 1.47, d); } break;
       case 'roar': { const f = this.burst(3.2, 90, 0.8, 'lowpass', 0.8); if (f) f.frequency.exponentialRampToValueAtTime(700, this.ctx.currentTime + 2.2); this.tone(55, 2.6, 0.2, 'sawtooth', 42); this.burst(2.4, 1800, 0.18, 'bandpass', 0.7, 0.4); break; }
       case 'creak': { const o = this.tone(140 + Math.random() * 60, 0.45, 0.07, 'sawtooth', 90); this.burst(0.3, 900, 0.1, 'bandpass', 6); if (o) { const l = this.ctx.createOscillator(), lg = this.ctx.createGain(); l.frequency.value = 37; lg.gain.value = 25; l.connect(lg).connect(o.frequency); l.start(); l.stop(this.ctx.currentTime + 0.5); } break; }

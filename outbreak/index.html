@@ -20,6 +20,7 @@
   <div class="hud-tr">
     <div class="card stats"><span title="Score de l'escouade" data-i="star"><b id="score">0</b></span><span title="Zombies éliminés" data-i="skull"><b id="kills">0</b></span><span class="scrap" title="Ferraille de l'escouade (marchand, pièges)" data-i="nut"><b id="scrap">0</b></span><span title="Temps" data-i="clock"><b id="clock">0:00</b></span></div>
     <button class="icon card" id="btnMute" title="Son (M)"></button>
+    <button class="icon card" id="btnVol" title="Volume de la musique et des effets" aria-label="Volume" data-i="sliders"></button>
     <button class="icon card" id="btnMenu" title="Menu (Échap)" data-i="menu"></button>
   </div>
   <div class="boss gen" id="gen" hidden><span data-i="bolt">GÉNÉRATEUR</span><div class="bar"><i id="genBar"></i></div></div>
@@ -46,6 +47,7 @@
 
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
