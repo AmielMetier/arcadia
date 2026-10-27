@@ -28,6 +28,16 @@
 - **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
 
 ## 2.94 — 27 octobre 2026
+- **Mini-Golf Party** — Correction : la caméra tourne sans limite à la souris (Claude)
+
+## 2.93 — 27 octobre 2026
+- **Bastion Clash** — Les combats ne font plus ramer le jeu.
+  - Le premier gros affrontement de la partie ne fige plus l'écran une demi-seconde, et les batailles suivantes restent fluides : les tirs, explosions et étincelles coûtent environ cinq fois moins cher à afficher.
+  - Les éclairs des explosions sont devenus des halos de lumière au sol, aussi visibles qu'avant.
+- **Bastion Clash** — Le bruit des VCS qui récoltent est beaucoup plus discret : un petit tintement doux toutes les une à deux secondes au lieu d'un crépitement aigu en continu.
+
+## 2.89 — 27 octobre 2026
+## 2.94 — 27 octobre 2026
 - **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.
   - Le pistolet se tient à deux mains, le lance-roquettes à l'épaule ; le fusil à pompe ne pointe plus vers le ciel, en main comme au sol.
 - **Island Rush** — Les coffres et le butin ne brillent plus à travers les murs, et le halo des coffres est plus discret.
