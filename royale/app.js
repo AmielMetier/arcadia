@@ -4,7 +4,7 @@
 // chaque invité tient une copie à jour, prédit son propre déplacement, dessine les autres un peu en retard et envoie
 // ses commandes. Si l'hôte s'en va, le Hub en désigne un autre qui reprend la partie là où elle en était.
 // Le jeu ne parle jamais au réseau directement : tout passe par HubBridge.
-import { generateMap, ILE } from './engine/map.js';
+import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
 import { createSim, DT, SHOULDER } from './engine/sim.js';
@@ -19,6 +19,8 @@ import { createHud } from './view/hud.js';
 import { createBuilds } from './view/builds.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
+import { CHARACTERS } from './view/kit.js';
+import { renderPortraits } from './view/soldier.js';
 import { Input } from './input.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
@@ -31,8 +33,21 @@ const breathe = () => new Promise((r) => setTimeout(r, 0));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Lina', 'Timéo', 'Jade', 'Nino', 'Rose', 'Eliott', 'Mila', 'Gabin',
-  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa'];
+  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa',
+  'Arthur', 'Louise', 'Adam', 'Chloé', 'Victor', 'Margaux', 'Léon', 'Agathe', 'Raphaël', 'Capucine', 'Maël', 'Romane', 'Simon', 'Juliette', 'Axel',
+  'Lison', 'Hector', 'Salomé', 'Ethan', 'Apolline', 'Milo', 'Céleste', 'Samuel', 'Olivia', 'Tom', 'Maëlys', 'Aaron', 'Héloïse', 'Lucas', 'Manon'];
+const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
+const LOOKS = Object.keys(CHARACTERS);
+const cleanLook = (l) => ({ char: LOOKS.includes(l && l.char) ? l.char : 'soldat', color: /^#[0-9a-f]{6}$/i.test(l && l.color) ? l.color : null });
 const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
+// sons des pas : le sol naturel, le plancher de chaque type de bâtiment
+const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
+  [GR.ROUTE]: 'beton', [GR.VILLE]: 'beton', [GR.BATI]: 'bois', [GR.CHAMP]: 'herbe', [GR.LIEU]: 'gravier' };
+const FLOOR_SURF = { immeuble: 'carrelage', tour: 'carrelage', boutique: 'carrelage', mairie: 'carrelage', bureaux: 'carrelage', station: 'carrelage',
+  garage: 'beton', hangar: 'beton', phare: 'beton', abri: 'metal' };
+const MAT_SURF = { bois: 'bois', pierre: 'beton', metal: 'metal' };
+// recul de chaque arme : [saut de la vue vers le haut (rad), écart de côté, secousse]
+const KICK = { fusil: [0.011, 0.006, 0.05], smg: [0.007, 0.006, 0.03], pistolet: [0.016, 0.005, 0.04], pompe: [0.05, 0.012, 0.28], sniper: [0.075, 0.01, 0.32], roquette: [0.045, 0.01, 0.35] };
 const INTERP = 0.1;          // invités : les autres sont dessinés un dixième de seconde en arrière
 const HOST_SILENCE = 3, HOST_GIVEUP = 15;
 const MATS = ['bois', 'pierre', 'metal'];
@@ -41,6 +56,7 @@ const S = {
   role: 'solo', me: 'moi', settings: {}, map: null, world: null, sim: null, scene: null, actors: null, fx: null, hud: null, input: null, sfx: null,
   yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
+  look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -64,10 +80,11 @@ async function boot(info) {
   S.settings = {
     time: QS.get('time') || set.time || 'jour',
     mode: QS.get('mode') || set.mode || 'partie',
-    places: +(QS.get('places') || set.places || 24),
+    places: +(QS.get('places') || set.places || 45),
     level: QS.get('level') || set.level || 'normal',
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
+  try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
   H.on('msg', onMsg);
   H.on('roster', onRoster);
 
@@ -109,18 +126,25 @@ async function boot(info) {
 }
 
 // ------------------------------------------------------------------ une partie
+// chaque joueur : son personnage et sa couleur (choisis sur l'écran d'accueil, envoyés à l'hôte)
 function humans() {
-  if (!H.embedded) return [{ ...S.meInfo }];
-  return H.players.map((p, i) => ({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+  const withLook = (h) => { const l = h.id === S.me ? S.look : S.looks.get(h.id); return l ? { ...h, look: l.char, color: l.color || h.color } : h; };
+  if (!H.embedded) return [withLook({ ...S.meInfo })];
+  return H.players.map((p, i) => withLook({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+}
+function setLook(l) {
+  S.look = cleanLook(l);
+  try { localStorage.setItem('royale_look', JSON.stringify(S.look)); } catch (e) { /* pas de stockage */ }
+  if (H.embedded) H.send('all', { t: 'look', look: S.look });
 }
 // hôte (ou solo) : on remplit la montgolfière (les joueurs du salon, puis des bots jusqu'au nombre de places)
 function startMatch() {
   if (S.role === 'guest' || S.sim) return;
   const roster = humans().map((h) => ({ ...h, bot: false }));
   if (S.settings.mode !== 'exploration') {
-    const n = clamp(S.settings.places, 2, 30) - roster.length;
+    const n = clamp(S.settings.places, 2, MAX_PLACES) - roster.length;
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], bot: true, level: S.settings.level });
+    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: S.settings.level });
   }
   newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
@@ -136,6 +160,7 @@ function newMatch({ run, seed, roster, mode, mirror = false }) {
   S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
+  S.actors.onBurn = (p) => S.sfx.at('bruleur', p.x, p.y + 4, p.z, 1, 140);
   S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
@@ -268,7 +293,11 @@ function loop(now) {
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
-  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72;
+  // chute libre : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
+  const fall = P && P.alive && P.mode === 'chute' ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
+  S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
+  $('#speedlines').style.opacity = (S.fall * 0.85).toFixed(3);
+  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72 + S.fall * 14;
   S.fov += (fov - S.fov) * (1 - Math.exp(-14 * dt));
   if (Math.abs(cam.fov - S.fov) > 0.01) { cam.fov = S.fov; cam.updateProjectionMatrix(); }
   S.scene.frame(dt, view, view.focus);
@@ -289,7 +318,10 @@ function loop(now) {
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
   if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
-  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP) });
+  // écho de pièce quand la tête du joueur suivi est sous un toit
+  const fp = view.focus, roof = fp ? S.world.ceiling(fp.x, fp.z, fp.y + 0.2) - fp.y : 99;
+  S.indoor = (S.indoor || 0) + ((roof < 9 ? 1 : 0) - (S.indoor || 0)) * Math.min(1, dt * 4);
+  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP), surface, indoor: S.indoor });
   // qualité automatique : si l'image prend plus de 24 ms pendant 3 s, on allège
   if (S.ms > 24 && S.t > 6) { S.slow += dt; if (S.slow > 3) { S.slow = 0; const w = S.scene.lowerQuality(); if (w && DEBUG) toast('Qualité baissée : ' + w, 2); } }
   else S.slow = Math.max(0, S.slow - dt);
@@ -404,7 +436,9 @@ function cameraFor(P, disp, dt) {
   }
   if (!target) { const C = S.map.center; return { pos: { x: C, y: 200, z: C + 300 }, look: { x: C, y: 0, z: C }, focus: { x: C, y: 0, z: C } }; }
   const d = disp(target);
-  const yaw = target === P ? S.yaw : d.yaw, pitch = target === P ? S.pitch : clamp(target.pitch || 0, -0.6, 0.6);
+  // le recul retombe vite (il ne touche que la vue, pas la visée)
+  S.kick = (S.kick || 0) * Math.exp(-11 * dt); S.kickYaw = (S.kickYaw || 0) * Math.exp(-13 * dt);
+  const yaw = target === P ? S.yaw + S.kickYaw : d.yaw, pitch = target === P ? S.pitch + S.kick : clamp(target.pitch || 0, -0.6, 0.6);
   const cp = Math.cos(pitch), fx = Math.sin(yaw) * cp, fy = Math.sin(pitch), fz = Math.cos(yaw) * cp;
   const rx = -Math.cos(yaw), rz = Math.sin(yaw);
   let dist = S.camD, sh = SHOULDER, headY;
@@ -462,8 +496,10 @@ function nextSpectate() {
 // ------------------------------------------------------------------ réseau : messages
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
+  if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
+      if (m.look) S.looks.set(from, cleanLook(m.look));
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
       else H.send(from, { t: 'salon' });
@@ -528,7 +564,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi' }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -575,6 +611,32 @@ function hideBroken(k) {
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
   else if (k[0] === 'b') S.builds.remove(+rest);
 }
+// ce qu'il y a sous les pieds (pour le son des pas)
+function surface(Q) {
+  if (S.world.waterLevel(Q.x, Q.z) > Q.y + 0.08) return 'eau';
+  if (Q.y - S.map.heightAt(Q.x, Q.z) < 0.12) return GROUND_SURF[S.map.groundAt(Q.x, Q.z)] || 'herbe';
+  let best = null;
+  S.world.near(Q.x, Q.z, 4.5, (s) => { if (Math.abs(s.y1 - Q.y) < 0.25 && S.world.over(s, Q.x, Q.z, 0.1)) best = s; });
+  return best ? surfOf(best) : 'bois';
+}
+function surfOf(s) {
+  const r = s.ref || {};
+  if (r.part === 'pont') return 'beton';
+  if (r.part === 'quai') return 'bois';
+  if (r.prop != null) { const m = (PROPS[S.map.props[r.prop].kind] || {}).mat; return m === 'metal' ? 'metal' : m === 'pierre' ? 'gravier' : 'bois'; }
+  if (r.b != null) { const b = S.map.buildings[r.b]; return r.part === 'toit' ? 'beton' : FLOOR_SURF[b.type] || 'bois'; }
+  if (s.key && s.key[0] === 'b') { const pc = S.sim.S.build && S.sim.S.build.pieces.get(+s.key.slice(2)); return MAT_SURF[pc && pc.mat] || 'bois'; }
+  return 'beton';
+}
+// matière touchée par une balle (pour le son de l'impact)
+function impactAt(x, y, z) {
+  if (y < S.map.heightAt(x, z) + 0.3) return 'impact-sol';
+  let found = null;
+  S.world.near(x, z, 4.5, (s) => { if (!found && y >= s.y0 - 0.25 && y <= s.y1 + 0.25 && S.world.over(s, x, z, 0.25)) found = s; });
+  if (!found) return 'impact-sol';
+  const m = surfOf(found);
+  return m === 'metal' ? 'impact-metal' : m === 'bois' ? 'impact-bois' : 'impact-pierre';
+}
 function handleEvents(list) {
   const P = me();
   for (const e of list) {
@@ -583,9 +645,11 @@ function handleEvents(list) {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
         if (h && Q) {
           h.shot();
-          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); }
+          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
+        // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
+        if (e.p === S.me) { const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
         break;
       }
       case 'tir': {
@@ -593,19 +657,23 @@ function handleEvents(list) {
         let muzzle = null;
         if (h && h.held && e.p !== S.me) { muzzle = new THREE.Vector3(); h.held.getWorldPosition(muzzle); }
         S.fx.shot(e.from, e.to, e.w, e.hit, muzzle);
-        if (e.hit === 1 && e.k === 0) S.sfx.at('impact', e.to[0], e.to[1], e.to[2], 0.5);
+        if (e.hit === 1 && e.k < 3) S.sfx.at(impactAt(e.to[0], e.to[1], e.to[2]), e.to[0], e.to[1], e.to[2], 0.7, 45);
+        if (e.p !== S.me && e.k === 0) S.sfx.whiz(e.from, e.to);
         break;
       }
       case 'degat': {
+        S.fx.hitSpark(e.x, e.y - 0.2, e.z, e.head ? 'tete' : e.sh ? 'bouclier' : 'vie', e.n > 40 ? 12 : 7);
         if (e.by === S.me && e.to !== S.me) {
           const Q = S.sim.player(e.to);
           S.hud.hitMarker(e.head, Q && !Q.alive);
           S.hud.damageNumber(e.x, e.y, e.z, e.n, e.head, e.sh);
           S.sfx.play(e.head ? 'tete' : e.sh ? 'bouclier' : 'touche');
+          if (e.sh && Q && Q.sh <= 0) S.sfx.play('bouclier-casse');
         }
         if (e.to === S.me) {
           const A = e.by != null ? S.sim.player(e.by) : null;
-          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null);
+          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null, e.n);
+          S.shake = Math.max(S.shake, Math.min(0.5, 0.12 + e.n / 120));
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
         }
         break;
@@ -642,15 +710,28 @@ function handleEvents(list) {
       case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it), 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
       case 'vide': if (e.p === S.me) { toast('Plus de munitions pour cette arme', 1.6); S.sfx.play('vide'); } break;
       case 'inutile': if (e.p === S.me) toast(ITEMS[e.c].heal ? 'Ta vie est déjà au maximum' : 'Ton bouclier est déjà au maximum', 1.6); break;
-      case 'recharge': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('recharge'); else if (Q) S.sfx.at('recharge', Q.x, Q.y + 1, Q.z, 0.45); break; }
-      case 'arme': if (e.p === S.me) S.sfx.play('change'); break;
+      case 'recharge': {
+        const Q = S.sim.player(e.p);
+        if (e.p === S.me && P) { const it = P.inv[P.sel - 1], W = it && WEAPONS[it.w]; S.sfx.reload(e.w, e.T || 2, null, W ? Math.max(1, Math.min(W.mag - it.mag, P.ammo[W.ammo])) : 3); }
+        else if (Q) S.sfx.reload(e.w, e.T || 2, Q);
+        break;
+      }
+      case 'arme': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('change'); else if (Q) S.sfx.at('change', Q.x, Q.y + 1, Q.z, 0.5, 18); break; }
       case 'soigne': if (e.p === S.me) S.sfx.play(ITEMS[e.c] && ITEMS[e.c].shield ? 'potion' : 'bandage'); break;
       case 'soin': if (e.p === S.me) S.sfx.play('soigne'); break;
       case 'lance': { const Q = S.sim.player(e.p), h = S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('lancer'); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
       case 'tremplin': { const h = e.p != null && S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('pose'); S.sfx.at('pose', e.x, e.y, e.z, 0.8); break; }
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
       case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
-      case 'atterrit': { const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 }); if (e.p === S.me) S.sfx.play('atterrit'); break; }
+      case 'atterrit': {
+        const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 });
+        if (e.p === S.me) {
+          S.sfx.play('atterrit');
+          // le rappel des touches se replie en une pastille peu après l'atterrissage (H le rouvre)
+          if (!S.hintsFolded) { S.hintsFolded = true; setTimeout(() => $('#hints').classList.add('off'), 20000); }
+        }
+        break;
+      }
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
       case 'construit': { const h = S.actors.heroOf(e.piece.owner); if (h && h.gesture) h.gesture('pose'); }
@@ -703,7 +784,7 @@ function report(res) {
 function showPrompt() {
   const P = me();
   if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
-  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le planeur', '', '', 'Espace'); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', 'Espace'); return; }
   if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
@@ -718,7 +799,7 @@ function showPrompt() {
 // ------------------------------------------------------------------ écrans
 const icon = (n) => `<img class="ic" src="img/icons/${n}.png" alt="">`;
 function lobbyList() {
-  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, 30) - hs.length);
+  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, MAX_PLACES) - hs.length);
   const rows = hs.map((p) => {
     const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
     return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
@@ -726,11 +807,11 @@ function lobbyList() {
   return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
 }
 const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
-  <span><kbd>Espace</kbd> sauter, ouvrir le planeur</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
+  <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
   <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
   <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
 // modèles 3D sous licence CC BY : l'attribution doit rester visible
-const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0)</p>';
+const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0) · Sons : Free Firearm Sound Library, Kenney, SpringySpringo, BMacZero, zer0_sol, Emma_MA (CC0) · Pas : congusbongus, swuing, Eelke, EminYILDIRIM, ceberation (CC BY 3.0)</p>';
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
@@ -741,20 +822,25 @@ function showScreen(kind, data) {
   const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris.</p>' : '';
   const opts = '<div class="opts"><button class="btn ghost" id="settings" type="button">⚙️ Réglages</button></div>';
   const title = '<h1>Island <span>Rush</span></h1>';
-  const n = clamp(S.settings.places, 2, 30);
+  const n = clamp(S.settings.places, 2, MAX_PLACES);
   const rules = expl
     ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
     : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
       ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
       ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+  // son personnage et sa couleur
+  const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
+  if (!S.portraits || S.portraits.col !== col) S.portraits = { col, img: renderPortraits(S.scene.kit, col) };
+  const lookHtml = LOOKS.length > 1 && S.portraits.img.soldat ? `<h2>Ton personnage</h2><div class="looks">${LOOKS.map((k) => `<button class="look${k === S.look.char ? ' on' : ''}" data-char="${k}"><img src="${S.portraits.img[k] || ''}" alt=""><span>${CHARACTERS[k].label}</span></button>`).join('')}</div>
+    <div class="swatches">${PALETTE.map((c) => `<button class="sw${c === col ? ' on' : ''}" data-color="${c}" style="--c:${c}" aria-label="Couleur ${c}"></button>`).join('')}</div>` : '';
   const rulesHtml = `<div class="rules">${rules.map(([i, b, t]) => `<div>${icon(i)}<span><b>${b}</b>${t}</span></div>`).join('')}</div>`;
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
     html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
@@ -777,15 +863,17 @@ function showScreen(kind, data) {
   }
   el.querySelector('.panel').innerHTML = html;
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
+  el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
+  el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
   // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
   const again = $('#again'); if (again) again.onclick = () => location.reload();
   $('#quit').onclick = quit;
   const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-// panneau Réglages (commun à tous les jeux) : le volume des effets (pas de musique), puis la sensibilité de la souris
+// panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, puis la sensibilité
 const SETTINGS = {
-  kinds: ['fx'], accent: '#3d9fd9',
+  kinds: ['music', 'fx'], accent: '#3d9fd9',
   sections: [{ title: 'Jeu', items: [{ label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +(S.input.sens / 0.0024).toFixed(1),
     set: (v) => { S.input.sens = 0.0024 * v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) }] }],
 };

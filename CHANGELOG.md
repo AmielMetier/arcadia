@@ -1,5 +1,33 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.0 — 27 octobre 2026
+- **Hub** — Version 3.0 : Island Rush change de dimension (sons enregistrés, armes détaillées, deltaplane, île plus belle vue du ciel, jusqu'à 60 joueurs) et les affiches de Birdie Party et d'Island Rush sont refaites à partir du jeu actuel.
+- **Island Rush** — Les montagnes ne s'escaladent plus : on ralentit dans les pentes fortes et, au-delà d'environ 40°, on glisse vers le bas sans pouvoir sauter. Les chemins restent praticables à pied (le refuge du sommet se rejoint par son sentier), et une rampe construite permet toujours de grimper.
+- **Island Rush** — Les ponts sont droits et à niveau de la route : plus de marche à l'entrée, plus de virage qui sortait du tablier contre le garde-corps.
+- **Island Rush** — Les chutes ne blessent qu'au-delà d'environ 8 m, en proportion de la hauteur.
+- **Island Rush** — Plus de monde sur l'île : 30, 45 ou 60 joueurs (45 par défaut), bots compris.
+  - Un tiers des bots sautent près de l'endroit où tu te poses : ça se bat dès l'atterrissage.
+- **Island Rush** — Nouveaux sons, enregistrés sur de vraies armes : chaque arme a sa détonation, sèche de près, claquement étouffé avec écho de loin, et le son arrive en retard quand le tireur est loin.
+  - Rechargements complets (chargeur qui sort et rentre, culasse, cartouches une à une et pompe du fusil à pompe), bruit de l'arme qu'on dégaine.
+  - Les pas changent selon le sol : herbe, route, plancher, carrelage, gravier, neige, métal, eau ; on entend aussi sur quoi marchent les autres.
+  - Les balles qui frôlent sifflent, les impacts sonnent selon la matière (bois, pierre, métal), le bouclier qui casse s'entend.
+  - Écho de pièce à l'intérieur, écho du relief dehors ; vraies explosions, portes qui grincent.
+  - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas ; elle suit le curseur Musique des réglages.
+- **Island Rush** — Les combats se sentent : la vue recule à chaque tir (fort au fusil à pompe et au fusil de précision), la flamme de bouche éclaire autour, l'image tremble quand on est touché.
+  - Touches plus lisibles : marqueur qui claque (rouge à l'élimination), chiffres de dégâts plus gros qui s'écartent, arc rouge plus net du côté d'où l'on te tire dessus.
+  - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
+- **Island Rush** — Nouvelles armes, bien plus détaillées : un modèle pour les raretés commune et peu commune, un plus moderne pour rare et épique (fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision), à la couleur de leur rareté, en main comme dans le sac.
+  - Au sol, l'arme flotte en tournant au-dessus d'un socle hexagonal lumineux ; une poussière de lumière monte autour du butin rare.
+- **Island Rush** — Le planeur devient un vrai deltaplane : armature en tubes, voile aux couleurs du joueur avec chevrons, barre tenue à deux mains ; l'aile se déplie à l'ouverture, ondule, s'incline dans les virages et laisse deux traînées au bout des ailes.
+- **Island Rush** — En chute libre, la vue s'élargit avec la vitesse et des traits de vitesse filent sur les bords de l'écran.
+- **Island Rush** — Nouvelle montgolfière : enveloppe en poire à fuseaux colorés avec le nom du jeu, nacelle en osier et sacs de lest, brûleur dont la flamme rugit par moments.
+- **Island Rush** — L'île est plus riche vue du ciel : champs bordés de haies, prés fleuris, creux et crêtes mieux marqués, touffes d'herbe ; des nuages bas qu'on traverse en sautant et des vols d'oiseaux.
+- **Island Rush** — Interface plus épurée : panneaux en verre dépoli, barres de vie et de bouclier fines avec une traînée blanche quand on perd des points, cases d'objets à liseré lumineux de la couleur de rareté, armes dessinées en silhouette.
+  - Le rappel des touches se replie en une petite pastille 20 secondes après l'atterrissage (H le rouvre).
+- **Island Rush** — Choisis ton personnage sur l'écran d'accueil : soldat, combinaison ou mercenaire, et sa couleur ; le choix est gardé d'une partie à l'autre. Les bots en tirent un au hasard.
+- **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
+- **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
+
 ## 2.97 — 27 octobre 2026
 - **Tous les jeux** — Un seul bouton ⚙️ Réglages, le même dans chaque jeu, qui ouvre le même panneau.
   - Le son d'abord : un curseur Musique et un curseur Effets. Pour couper le son, on glisse son curseur à 0 : les boutons 🔊, 🎵, « Couper le son » ou « Tout couper », qui faisaient doublon avec les curseurs, disparaissent.

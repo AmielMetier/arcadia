@@ -93,9 +93,9 @@ function armed(rng, rar, wt) {
 // butin au sol : rien (un quart des fois), une arme et ses munitions, un consommable ou des munitions
 export function rollFloor(rng) {
   const r = rng.next();
-  if (r < 0.25) return [];
-  if (r < 0.62) return armed(rng, RAR_FLOOR, W_FLOOR);
-  if (r < 0.86) return [item(rng.weighted(C_FLOOR))];
+  if (r < 0.18) return [];
+  if (r < 0.66) return armed(rng, RAR_FLOOR, W_FLOOR);
+  if (r < 0.88) return [item(rng.weighted(C_FLOOR))];
   return [ammo(rng.pick(Object.keys(AMMO).filter((a) => a !== 'roquettes')))];
 }
 // coffre : une arme et ses munitions, un consommable, des matériaux, parfois un second objet

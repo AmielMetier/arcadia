@@ -157,6 +157,60 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const sw = newPlayer(m.lake.x, m.lake.level, m.lake.z, 0);
   run(sw, { mz: 1, yaw: 0 }, 1);
   ok(sw.swim && sw.y > m.lake.level - 1.6 && sw.y < m.lake.level - 1, `on ne nage pas dans le lac (${sw.y.toFixed(2)} pour un niveau de ${m.lake.level.toFixed(2)})`);
+  // suivre une route à pied, point par point ; low : plus bas atteint sous la route (on tombe d'un pont, dans l'eau)
+  const follow = (p, pts) => {
+    let low = 0, swim = false;
+    for (const q of pts) {
+      for (let f = 0; f < 360 && Math.hypot(q.x - p.x, q.z - p.z) > 1.2; f++) {
+        stepPlayer(p, { mz: 1, yaw: yawTo(q.x - p.x, q.z - p.z) }, W, 1 / 60);
+        low = Math.max(low, q.y - p.y); swim ||= p.swim;
+      }
+      if (Math.hypot(q.x - p.x, q.z - p.z) > 1.2) return { done: false, low, swim };
+    }
+    return { done: true, low, swim };
+  };
+  // ponts : on les traverse sans tomber ni buter, dans les deux sens
+  let bridgesOk = 0;
+  for (const r of m.roads) {
+    const i0 = r.pts.findIndex((q) => q.bridge);
+    if (i0 < 0) continue;
+    let i1 = i0; while (i1 + 1 < r.pts.length && r.pts[i1 + 1].bridge) i1++;
+    const pts = r.pts.slice(Math.max(0, i0 - 3), i1 + 4);
+    for (const way of [pts, [...pts].reverse()]) {
+      const p = newPlayer(way[0].x, way[0].y + 0.3, way[0].z, 0);
+      run(p, { yaw: 0 }, 0.3);
+      const res = follow(p, way.slice(1));
+      ok(res.done && !res.swim && res.low < 0.7, `pont : traversée ratée (arrivé ${res.done}, à l'eau ${res.swim}, ${res.low.toFixed(2)} m sous la route)`);
+      if (res.done && !res.swim && res.low < 0.7) bridgesOk++;
+    }
+  }
+  // pentes : un flanc de montagne à plus de 45° ne s'escalade pas (même en sautant) ; on glisse vers le bas
+  let steep = null;
+  for (let z = 8; z < m.size - 8 && !steep; z += 3) for (let x = 8; x < m.size - 8; x += 3) {
+    if (m.waterAt(x, z) || m.heightAt(x, z) < 30) continue;
+    const s = W.slope(x, z, m.heightAt(x, z));
+    if (s && Math.hypot(s[0], s[1]) > 1.1) { steep = { x, z, s }; break; }
+  }
+  ok(steep, 'aucun flanc raide sur l\'île');
+  if (steep) {
+    const cp = newPlayer(steep.x, m.heightAt(steep.x, steep.z), steep.z, 0), y0 = cp.y;
+    run(cp, { mz: 1, sprint: true, jump: true, yaw: yawTo(steep.s[0], steep.s[1]) }, 3);
+    ok(cp.y < y0 - 1, `on escalade un flanc de ${Math.round(Math.atan(Math.hypot(...steep.s)) * 180 / Math.PI)}° (${y0.toFixed(1)} → ${cp.y.toFixed(1)} m)`);
+  }
+  // par le chemin, on monte à pied jusqu'au refuge du sommet
+  const chalet = m.pois.find((q) => q.kind === 'chalet');
+  if (chalet) {
+    const dc = (q) => Math.hypot(q.x - chalet.x, q.z - chalet.z);
+    const road = m.roads.find((r) => Math.min(...r.pts.map(dc)) < 40);
+    ok(road, 'pas de chemin jusqu\'au refuge');
+    if (road) {
+      const pts = dc(road.pts[0]) < dc(road.pts[road.pts.length - 1]) ? [...road.pts].reverse() : road.pts;
+      const p = newPlayer(pts[0].x, pts[0].y + 0.3, pts[0].z, 0);
+      const res = follow(p, pts.slice(1));
+      ok(res.done && dc(p) < 40, `le chemin du refuge ne se monte pas à pied (arrêté à ${Math.round(dc(p))} m, ${p.y.toFixed(1)} m d'altitude)`);
+    }
+  }
+  console.log(`  ${bridgesOk} traversées de pont · flanc raide ${steep ? 'glissant' : '—'} · refuge du sommet ${chalet ? 'atteint par le chemin' : '—'}`);
   // 30 joueurs qui courent et sautent : coût d'un pas
   const pl = Array.from({ length: 30 }, (_, i) => newPlayer(m.center - 300 + i * 20, 40, m.center));
   t = performance.now();

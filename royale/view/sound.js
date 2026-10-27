@@ -1,14 +1,65 @@
-// Island Rush — les sons. Les bruitages sont synthétisés (WebAudio, sans fichier) : armes (une signature par arme,
-// étouffée au loin), impacts, explosions, portes, coffres, rechargements, soins, pioche, constructions, pas (les
-// siens et ceux des joueurs proches : on entend venir), interface. Ambiance de nature en boucle (campagne, bord de
-// mer, montagne selon l'endroit), vent en altitude et grondement de la tempête. Les ambiances viennent de
-// Birdie Party (enregistrements CC0, voir golf/sounds/LICENSE.txt). Le contexte audio naît au premier geste.
+// Island Rush — les sons. De vrais enregistrements (sounds/, libres : voir sounds/LICENSE.txt) : tirs de chaque arme
+// de près et de loin (le son arrive en retard au loin, à 343 m/s, étouffé, avec son écho), mécanique (pompe, culasse,
+// chargeurs), dégainer, impacts selon la matière, pas selon le sol (herbe, route, bois, gravier, neige, métal, eau,
+// carrelage), portes, explosions, sons de touche et d'élimination. Un écho d'extérieur ou de pièce selon l'endroit où
+// l'on se tient. Ce qui n'a pas d'enregistrement (ou avant leur chargement) est synthétisé (WebAudio). Ambiances de
+// nature (Birdie Party, CC0), vent en altitude, grondement de la tempête ; musique pendant la montgolfière et la
+// descente seulement, jingles de fin. Le contexte audio naît au premier geste.
 const AMB = { campagne: '../golf/sounds/amb-campagne.mp3', mer: '../golf/sounds/amb-mer.mp3', montagne: '../golf/sounds/amb-montagne.mp3' };
-const SHOT_RANGE = { fusil: 180, smg: 120, pistolet: 120, pompe: 140, sniper: 320, roquette: 220 };
+const DIR = 'sounds/';
+// enregistrements : nom → nombre de variantes (fichiers nom-1.mp3 … ; 0 : un seul fichier nom.mp3)
+const BANK = {
+  'tir-fusil': 3, 'tir-smg': 3, 'tir-pistolet': 2, 'tir-pompe': 2, 'tir-sniper': 2,
+  'loin-fusil': 0, 'loin-smg': 0, 'loin-pistolet': 0, 'loin-pompe': 0, 'loin-sniper': 0,
+  'pompe-arme': 0, 'pompe-rack': 0, 'culasse-sniper': 0, 'chargeur-sort': 0, 'chargeur-entre': 0, 'chargeur-clic': 0, armement: 0,
+  'pistolet-sort': 0, 'pistolet-culasse': 0, cartouche: 0, 'balle-sniper': 0,
+  tissu: 4, degaine: 2, 'ramasse-cuir': 0, ceinture: 0, 'porte-ouvre': 2, 'porte-ferme': 4, grince: 3, pieces: 0,
+  'impact-corps': 3, 'impact-bouclier': 3, 'impact-bois': 3, 'impact-metal': 3, 'impact-pierre': 3, 'impact-sol': 3,
+  'coup-metal': 3, 'coup-plaque': 3, 'bouclier-casse': 0, boum: 3, 'boum-grave': 0, 'roquette-part': 0,
+  'pas-herbe': 5, 'pas-beton': 5, 'pas-bois': 5, 'pas-neige': 5, 'pas-gravier': 5, 'pas-metal': 5, 'pas-eau': 5, 'pas-carrelage': 5,
+};
+const EXTRA = { 'jingle-victoire': '../golf/sounds/jingle-great.mp3', 'jingle-elimine': '../golf/sounds/jingle-bad.mp3' };
+const MUSIC = DIR + 'musique-saut.mp3';
+// on entend un tir jusqu'à… (m) ; volume de chaque arme
+const SHOT_RANGE = { fusil: 340, smg: 240, pistolet: 220, pompe: 240, sniper: 560, roquette: 320 };
+const SHOT_VOL = { fusil: 0.8, smg: 0.68, pistolet: 0.72, pompe: 0.95, sniper: 1, roquette: 0.8 };
+// un bruitage = des enregistrements superposés [nom, volume, vitesse, retard] et, si syn > 0, sa version synthétisée
+const LAYERS = {
+  boum: { s: [['boum', 1], ['boum-grave', 0.9]], syn: 0.5 },
+  'coup-bois': { s: [['impact-bois', 0.9, 0.9]] }, 'coup-pierre': { s: [['impact-pierre', 0.9]] }, 'coup-metal': { s: [['coup-metal', 0.6]] },
+  porte: { s: [['porte-ouvre', 0.8], ['grince', 0.25, 1.1, 0.05]] }, porteF: { s: [['porte-ferme', 0.9]] },
+  coffre: { s: [['grince', 0.5, 0.9], ['pieces', 0.35, 1, 0.15]], syn: 0.8 }, caisse: { s: [['coup-plaque', 0.6, 0.8], ['impact-bois', 0.5]] },
+  construit: { s: [['impact-bois', 0.75, 0.85], ['impact-bois', 0.55, 0.95, 0.11]] },
+  casse: { s: [['impact-bois', 1, 0.7], ['impact-pierre', 0.6, 0.8, 0.06]], syn: 0.6 },
+  change: { s: [['tissu', 0.45], ['degaine', 0.6, 1, 0.07]] }, arme: { s: [['tissu', 0.45], ['degaine', 0.75, 1, 0.06]], syn: 0.5 },
+  ramasse: { s: [['ramasse-cuir', 0.6]], syn: 0.6 }, impact: { s: [['impact-sol', 0.6]] },
+  'impact-bois': { s: [['impact-bois', 0.7, 1.15]] }, 'impact-pierre': { s: [['impact-pierre', 0.7, 1.2]] }, 'impact-metal': { s: [['impact-metal', 0.55, 1.1]] },
+  'impact-sol': { s: [['impact-sol', 0.6, 1.1]] }, 'impact-verre': { s: [['impact-bouclier', 0.6, 0.9]] },
+  atterrit: { s: [['pas-gravier', 0.9, 0.8], ['tissu', 0.4, 0.9, 0.03]], syn: 0.6 }, pose: { s: [['impact-bois', 0.5, 1.1]] },
+  vide: { s: [['degaine', 0.35, 1.5]], syn: 0.6 }, lance: { s: [['tissu', 0.6, 1.2]], syn: 0.6 },
+  roquette: { s: [['roquette-part', 0.9], ['boum-grave', 0.25, 1.6]], syn: 0.4 },
+  touche: { s: [['impact-corps', 0.32, 1.15]], syn: 1 }, bouclier: { s: [['impact-bouclier', 0.42, 1.25]], syn: 1 },
+  tete: { s: [['impact-metal', 0.3, 1.5]], syn: 1 }, 'bouclier-casse': { s: [['bouclier-casse', 0.7, 1.1]], syn: 0 },
+  elimination: { s: [['impact-corps', 0.6, 0.8], ['boum-grave', 0.25, 1.4]], syn: 1 },
+  aie: { s: [['impact-corps', 0.65, 0.85]], syn: 0.5 },
+  victoire: { s: [['jingle-victoire', 0.8]] }, elimine: { s: [['jingle-elimine', 0.8]] },
+  pioche: { s: [['tissu', 0.35, 1.3]], syn: 0.6 }, bandage: { s: [['tissu', 0.5, 0.8], ['tissu', 0.45, 0.9, 0.45]] },
+};
+// rechargement : [instant (part du temps de recharge), enregistrement, volume]
+const RELOAD = {
+  fusil: [[0.1, 'chargeur-sort', 0.7], [0.5, 'chargeur-entre', 0.8], [0.8, 'armement', 0.7]],
+  smg: [[0.1, 'chargeur-sort', 0.65], [0.5, 'chargeur-clic', 0.8], [0.82, 'armement', 0.6]],
+  pistolet: [[0.06, 'pistolet-sort', 0.7], [0.45, 'chargeur-clic', 0.75], [0.8, 'pistolet-culasse', 0.75]],
+  sniper: [[0.08, 'culasse-sniper', 0.55], [0.42, 'balle-sniper', 0.8], [0.74, 'culasse-sniper', 0.7]],
+  roquette: [[0.12, 'tissu', 0.6], [0.55, 'coup-plaque', 0.45], [0.85, 'degaine', 0.7]],
+};
+// pas : volume par sol
+const STEP_V = { herbe: 0.55, beton: 0.5, bois: 0.6, neige: 0.55, gravier: 0.5, metal: 0.5, eau: 0.65, carrelage: 0.45 };
 
 export function createSound() {
-  let ctx = null, master = null, fxBus = null, bed = null, noiseBuf = null, brown = null;
-  const amb = {}, last = {};
+  let ctx = null, master = null, comp = null, fxBus = null, bed = null, noiseBuf = null, brown = null, revBus = null, revOut = null, revIn = null;
+  let voices = 0, music = null, musicOn = false;
+  const amb = {}, last = {}, bufs = new Map();
   let wind = null, storm = null, stepT = 0, stepsOther = new Map();
   let ear = { x: 0, y: 0, z: 0, yaw: 0 };
 
@@ -17,9 +68,9 @@ export function createSound() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
-    // volume : le curseur « Effets » du panneau Réglages (à 0 : coupé)
+    // volume : le curseur « Effets » du panneau Réglages (à 0 : coupé) ; la musique a le sien (setMusic)
     master = ctx.createGain(); master.gain.value = 0.8;
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5;
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.15;
     master.connect(DDVolume.gain(ctx, 'fx')).connect(comp); comp.connect(ctx.destination);
     fxBus = ctx.createGain(); fxBus.gain.value = 0.9; fxBus.connect(master);
     bed = ctx.createGain(); bed.gain.value = 0.5; bed.connect(master);
@@ -30,17 +81,28 @@ export function createSound() {
     brown = ctx.createBuffer(1, len, ctx.sampleRate);
     const b = brown.getChannelData(0); let l = 0;
     for (let i = 0; i < len; i++) { l = (l + 0.02 * (Math.random() * 2 - 1)) / 1.02; b[i] = l * 3.5; }
+    // écho : dehors, une longue queue sombre et quelques échos sur le relief ; dedans, une pièce courte et claire
+    revBus = ctx.createGain();
+    revOut = reverb(impulse(2.6, 3.2, 0.18, [[0.16, 0.5], [0.37, 0.32], [0.71, 0.18]]), 0.75);
+    revIn = reverb(impulse(0.75, 2.4, 0.55, [[0.018, 0.5], [0.041, 0.35], [0.07, 0.2]]), 0);
     // vent et tempête : deux boucles filtrées dont on règle le volume à chaque image
     wind = loopNoise(noiseBuf, 'bandpass', 420, 0.5);
     storm = loopNoise(brown, 'lowpass', 220, 0.7);
     for (const [k, url] of Object.entries(AMB)) {
       const g = ctx.createGain(); g.gain.value = 0; g.connect(bed);
       amb[k] = { g, src: null };
-      fetch(url).then((r) => r.arrayBuffer()).then((a) => ctx.decodeAudioData(a)).then((buf) => {
+      decode(url).then((buf) => {
         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(g); s.start(0, Math.random() * buf.duration); amb[k].src = s;
       }).catch(() => {});
     }
+    // les enregistrements (≈ 1 Mo) : chacun sert dès qu'il est prêt
+    for (const [name, n] of Object.entries(BANK)) {
+      const files = n ? Array.from({ length: n }, (_, i) => `${DIR}${name}-${i + 1}.mp3`) : [`${DIR}${name}.mp3`];
+      Promise.all(files.map((f) => decode(f).catch(() => null))).then((list) => { const ok = list.filter(Boolean); if (ok.length) bufs.set(name, ok); });
+    }
+    for (const [name, url] of Object.entries(EXTRA)) decode(url).then((buf) => bufs.set(name, [buf])).catch(() => {});
   }
+  const decode = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); }).then((a) => new Promise((res, rej) => ctx.decodeAudioData(a, res, rej)));
   function loopNoise(buf, type, f, q) {
     const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
     const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q;
@@ -48,15 +110,47 @@ export function createSound() {
     s.connect(fl); fl.connect(g); g.connect(bed); s.start();
     return { g, f: fl };
   }
+  // réponse impulsionnelle : bruit filtré (damp : clarté) qui s'éteint, plus quelques échos francs
+  function impulse(sec, decay, damp, echoes) {
+    const sr = ctx.sampleRate, n = Math.floor(sec * sr), buf = ctx.createBuffer(2, n, sr);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c); let lp = 0;
+      for (let i = 0; i < n; i++) { lp += (Math.random() * 2 - 1 - lp) * damp; d[i] = lp * Math.pow(1 - i / n, decay); }
+      for (const [at, g] of echoes) {
+        const i0 = Math.floor(at * sr) + c * 41;
+        for (let k = 0; k < 400 && i0 + k < n; k++) d[i0 + k] += (Math.random() * 2 - 1) * g * (1 - k / 400);
+      }
+    }
+    return buf;
+  }
+  function reverb(ir, v) {
+    const c = ctx.createConvolver(); c.buffer = ir;
+    const g = ctx.createGain(); g.gain.value = v;
+    revBus.connect(c); c.connect(g); g.connect(master);
+    return g;
+  }
 
   // ------------------------------------------------------------------ briques
-  function out(v, pan = 0, cut = 0) {
+  function out(v, pan = 0, cut = 0, rev = 0) {
     const g = ctx.createGain(); g.gain.value = v;
     let node = g;
     if (cut) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; g.connect(f); node = f; }
-    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; node.connect(p); p.connect(fxBus); }
-    else node.connect(fxBus);
+    if (ctx.createStereoPanner && pan) { const p = ctx.createStereoPanner(); p.pan.value = pan; node.connect(p); node = p; }
+    node.connect(fxBus);
+    if (rev > 0) { const r = ctx.createGain(); r.gain.value = rev; node.connect(r); r.connect(revBus); }
     return g;
+  }
+  // un enregistrement (une variante au hasard) ; faux s'il n'est pas (encore) chargé
+  function voice(name, { v = 1, pan = 0, cut = 0, rate = 1, rev = 0.12, t = 0 } = {}) {
+    const list = bufs.get(name);
+    if (!list) return false;
+    if (voices > 56) return true;
+    const s = ctx.createBufferSource(); s.buffer = list[Math.floor(Math.random() * list.length)];
+    s.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
+    s.connect(out(v, pan, cut, rev));
+    voices++; s.onended = () => { voices--; };
+    s.start(Math.max(ctx.currentTime, t || 0));
+    return true;
   }
   function noise(dest, t, dur, { type = 'lowpass', f0 = 1000, f1 = f0, q = 1, a = 0.002, v = 1, buf = noiseBuf } = {}) {
     const s = ctx.createBufferSource(); s.buffer = buf;
@@ -80,16 +174,16 @@ export function createSound() {
     const v = Math.min(1, 1 / (1 + d / 9)) * (1 - d / range) ** 0.6;
     // à droite de la caméra : (−cos yaw, sin yaw)
     const side = d > 0.5 ? (-dx * Math.cos(ear.yaw) + dz * Math.sin(ear.yaw)) / Math.hypot(dx, dz || 0.001) : 0;
-    return { v, pan: Math.max(-0.85, Math.min(0.85, side * 0.85)), cut: d > 25 ? Math.max(500, 9000 - d * 45) : 0 };
+    return { v, d, pan: Math.max(-0.85, Math.min(0.85, side * 0.85)), cut: d > 25 ? Math.max(500, 9000 - d * 45) : 0 };
   }
-  const gap = { touche: 0.03, impact: 0.05, bouclier: 0.03, pas: 0.08, recharge: 0.1, coup: 0.05, aie: 0.08, tempete: 0.5, casse: 0.08 };
+  const gap = { bruleur: 0.8, touche: 0.03, impact: 0.05, bouclier: 0.03, pas: 0.08, recharge: 0.1, coup: 0.05, aie: 0.08, tempete: 0.5, casse: 0.08, 'impact-': 0.03 };
   function ok(name) {
     const now = ctx.currentTime, g = gap[name] || 0;
     if (g && last[name] && now - last[name] < g) return false;
     last[name] = now; return true;
   }
 
-  // ------------------------------------------------------------------ bruitages
+  // ------------------------------------------------------------------ bruitages synthétisés (repli, et couches d'interface)
   function synth(name, o, t) {
     switch (name) {
       // armes
@@ -106,13 +200,15 @@ export function createSound() {
       case 'recharge': noise(o, t, 0.04, { type: 'highpass', f0: 2600, v: 0.32 }); noise(o, t + 0.16, 0.05, { type: 'bandpass', f0: 1500, v: 0.34 }); noise(o, t + 0.32, 0.05, { type: 'highpass', f0: 2200, v: 0.3 }); break;
       case 'change': noise(o, t, 0.05, { type: 'bandpass', f0: 1800, v: 0.28 }); break;
       case 'lance': noise(o, t, 0.25, { type: 'bandpass', f0: 600, f1: 1500, q: 0.7, v: 0.35 }); break;
-      // touché, éliminations
-      case 'touche': tone(o, t, 0.06, { type: 'triangle', f0: 950, f1: 900, v: 0.22 }); break;
-      case 'bouclier': tone(o, t, 0.08, { type: 'triangle', f0: 1350, f1: 1500, v: 0.2 }); break;
-      case 'tete': tone(o, t, 0.16, { type: 'triangle', f0: 1900, f1: 2200, v: 0.26 }); tone(o, t + 0.03, 0.12, { f0: 2850, v: 0.12 }); break;
+      // une balle qui frôle : claquement sec puis souffle qui passe
+      case 'siffle': noise(o, t, 0.02, { type: 'highpass', f0: 5000, v: 0.5 }); noise(o, t + 0.01, 0.18, { type: 'bandpass', f0: 3800, f1: 900, q: 2.5, v: 0.4 }); break;
+      // touché, éliminations (le tireur entend tout de suite qu'il touche)
+      case 'touche': tone(o, t, 0.045, { type: 'triangle', f0: 1700, f1: 1500, v: 0.22 }); noise(o, t, 0.02, { type: 'highpass', f0: 4500, v: 0.18 }); break;
+      case 'bouclier': tone(o, t, 0.07, { type: 'triangle', f0: 2300, f1: 2600, v: 0.18 }); tone(o, t + 0.01, 0.12, { f0: 3500, v: 0.07 }); break;
+      case 'tete': tone(o, t, 0.2, { type: 'triangle', f0: 2100, f1: 2250, v: 0.28 }); tone(o, t + 0.02, 0.24, { f0: 3150, v: 0.13 }); tone(o, t + 0.04, 0.2, { f0: 4200, v: 0.06 }); break;
       case 'aie': noise(o, t, 0.12, { f0: 700, f1: 160, v: 0.55 }); tone(o, t, 0.1, { f0: 120, f1: 60, v: 0.5 }); break;
       case 'tempete': tone(o, t, 0.25, { type: 'sawtooth', f0: 90, f1: 70, v: 0.25 }); noise(o, t, 0.25, { type: 'bandpass', f0: 500, v: 0.25 }); break;
-      case 'elimination': [660, 990].forEach((f, i) => tone(o, t + i * 0.09, 0.2, { type: 'triangle', f0: f, v: 0.3 })); break;
+      case 'elimination': tone(o, t, 0.5, { type: 'triangle', f0: 880, v: 0.26 }); tone(o, t + 0.09, 0.6, { type: 'triangle', f0: 1320, v: 0.26 }); tone(o, t + 0.09, 0.6, { f0: 2640, v: 0.06 }); tone(o, t, 0.25, { f0: 90, f1: 45, v: 0.5 }); break;
       case 'elimine': [440, 370, 294, 220].forEach((f, i) => tone(o, t + i * 0.16, 0.32, { type: 'triangle', f0: f, f1: f * 0.98, v: 0.3 })); break;
       case 'victoire': [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(o, t + i * 0.13, i === 5 ? 0.9 : 0.22, { type: 'triangle', f0: f, v: 0.32, vib: i === 5 ? 6 : 0 })); break;
       case 'alerte': tone(o, t, 0.22, { type: 'square', f0: 520, v: 0.12 }); tone(o, t + 0.3, 0.22, { type: 'square', f0: 390, v: 0.12 }); break;
@@ -141,74 +237,155 @@ export function createSound() {
       case 'construit': noise(o, t, 0.08, { type: 'bandpass', f0: 520, q: 1.4, v: 0.5 }); noise(o, t + 0.11, 0.08, { type: 'bandpass', f0: 600, q: 1.4, v: 0.45 }); break;
       case 'casse': noise(o, t, 0.6, { f0: 1500, f1: 120, v: 0.65 }); for (let i = 0; i < 4; i++) noise(o, t + 0.05 + Math.random() * 0.3, 0.05, { type: 'bandpass', f0: 800 + Math.random() * 1500, v: 0.3 }); break;
       case 'clic': noise(o, t, 0.03, { type: 'bandpass', f0: 2200, v: 0.2 }); break;
+      // brûleur de la montgolfière : souffle grave qui rugit
+      case 'bruleur': noise(o, t, 1.5, { type: 'bandpass', f0: 380, f1: 300, q: 0.6, a: 0.12, v: 0.7 }); noise(o, t, 1.5, { f0: 260, f1: 180, a: 0.15, v: 0.9, buf: brown }); break;
       default: break;
     }
+  }
+  // un bruitage : ses enregistrements s'ils sont là, sinon (ou en plus) sa version synthétisée
+  function fire(name, { v = 1, pan = 0, cut = 0, rev = 0.12, t = ctx.currentTime + 0.005 } = {}) {
+    const L = LAYERS[name];
+    let played = false;
+    if (L) for (const [s, sv = 1, rate = 1, dt = 0] of L.s) played = voice(s, { v: v * sv, pan, cut, rate, rev, t: t + dt }) || played;
+    else if (bufs.has(name)) played = voice(name, { v, pan, cut, rev, t });
+    if (!played || (L && L.syn)) synth(name, out(v * (played ? L.syn : 1), pan, cut, rev * 0.5), t);
   }
   // un son « dans la tête » (le sien, l'interface)
   function play(name, v = 1) {
     if (!ctx || !master) return;
-    const key = name.startsWith('coup') ? 'coup' : name;
+    const key = name.startsWith('coup') ? 'coup' : name.startsWith('impact-') ? 'impact-' : name;
     if (!ok(key)) return;
-    synth(name, out(v), ctx.currentTime + 0.005);
+    fire(name, { v, rev: 0.06 });
   }
   // un son posé dans le monde
   function at(name, x, y, z, v = 1, range = 60) {
     if (!ctx) return;
     const p = place(x, y, z, range);
     if (!p) return;
-    const key = name.startsWith('coup') ? 'coup' : name;
+    const key = name.startsWith('coup') ? 'coup' : name.startsWith('impact-') ? 'impact-' : name;
     if (!ok(key + (p.v > 0.5 ? '' : '~'))) return;
-    synth(name, out(p.v * v, p.pan, p.cut), ctx.currentTime + 0.005);
+    fire(name, { v: p.v * v, pan: p.pan, cut: p.cut, rev: 0.1 + Math.min(0.5, p.d / 80) });
   }
-  // un tir : le sien plein pot, les autres selon la distance (on les entend de loin, étouffés)
+  // un tir. Le sien plein pot ; les autres : de près la détonation, de loin le claquement étouffé et son écho, qui
+  // arrive en retard (le son parcourt 343 m par seconde)
   function shot(w, Q, mine) {
     if (!ctx) return;
-    if (mine) { synth(w, out(0.75), ctx.currentTime + 0.003); return; }
-    at(w, Q.x, Q.y + 1.4, Q.z, 1.1, SHOT_RANGE[w] || 150);
+    const t = ctx.currentTime + 0.003, vol = SHOT_VOL[w] || 0.8;
+    if (w === 'roquette') { if (mine) fire('roquette', { v: 0.9, rev: 0.15 }); else at('roquette', Q.x, Q.y + 1.4, Q.z, 1, SHOT_RANGE.roquette); return; }
+    if (mine) {
+      if (!voice('tir-' + w, { v: vol, rev: 0.22, t })) synth(w, out(0.75), t);
+      if (w === 'pompe') voice('pompe-arme', { v: 0.55, t: t + 0.42, rev: 0.05 });
+      if (w === 'sniper') voice('culasse-sniper', { v: 0.5, t: t + 0.55, rev: 0.05 });
+      return;
+    }
+    const range = SHOT_RANGE[w] || 220, dx = Q.x - ear.x, dy = Q.y + 1.4 - ear.y, dz = Q.z - ear.z, d = Math.hypot(dx, dy, dz);
+    if (d > range) return;
+    if (!ok('tir' + w + (d < 40 ? '' : '~'))) return;
+    const side = d > 0.5 ? (-dx * Math.cos(ear.yaw) + dz * Math.sin(ear.yaw)) / Math.hypot(dx, dz || 0.001) : 0;
+    const pan = Math.max(-0.85, Math.min(0.85, side * 0.85)), delay = Math.min(1.3, d / 343);
+    const v = vol / (1 + d / 22) * (1 - d / range) ** 0.7;
+    const near = Math.max(0, Math.min(1, 1 - (d - 20) / 45)), far = Math.max(0, Math.min(1, (d - 12) / 40));
+    let played = false;
+    if (near > 0) played = voice('tir-' + w, { v: v * near, pan, cut: d > 15 ? Math.max(2500, 14000 - d * 160) : 0, rev: 0.18 + d / 120, t: t + delay }) || played;
+    if (far > 0) played = voice('loin-' + w, { v: v * far * 1.7, pan, cut: Math.max(650, 4200 - d * 9), rev: 0.45, t: t + delay }) || played;
+    if (!played) at(w, Q.x, Q.y + 1.4, Q.z, 1.1, range);
+  }
+  // une balle qui passe près de l'oreille (tirée par un autre)
+  function whiz(from, to) {
+    if (!ctx) return;
+    const ax = to[0] - from[0], ay = to[1] - from[1], az = to[2] - from[2], L2 = ax * ax + ay * ay + az * az || 1;
+    const k = Math.max(0, Math.min(1, ((ear.x - from[0]) * ax + (ear.y - from[1]) * ay + (ear.z - from[2]) * az) / L2));
+    const d = Math.hypot(from[0] + ax * k - ear.x, from[1] + ay * k - ear.y, from[2] + az * k - ear.z);
+    if (d > 3.2 || k <= 0.02 || k >= 0.99 || !ok('siffle')) return;
+    const side = (-(from[0] + ax * k - ear.x) * Math.cos(ear.yaw) + (from[2] + az * k - ear.z) * Math.sin(ear.yaw)) / Math.max(0.3, d);
+    synth('siffle', out(0.8 * (1 - d / 3.4), Math.max(-0.8, Math.min(0.8, side * 0.8))), ctx.currentTime + 0.005);
+  }
+  // rechargement : chargeur, culasse, cartouches une à une pour le fusil à pompe ; pos : un autre joueur (sinon soi)
+  function reload(w, T, pos = null, n = 3) {
+    if (!ctx) return;
+    let p = { v: 1, pan: 0, cut: 0, d: 0 };
+    if (pos) { p = place(pos.x, pos.y + 1, pos.z, 26); if (!p) return; }
+    const t = ctx.currentTime + 0.01, base = pos ? 0.55 : 0.85;
+    let steps = RELOAD[w];
+    if (w === 'pompe') {
+      steps = [];
+      for (let i = 0; i < n; i++) steps.push([(i + 0.6) / (n + 1), 'cartouche', 0.75]);
+      steps.push([0.93, 'pompe-rack', 0.75]);
+    }
+    if (!steps || !bufs.has('chargeur-sort')) { fire('recharge', { v: p.v * base, pan: p.pan, cut: p.cut }); return; }
+    for (const [f, s, sv] of steps) voice(s, { v: p.v * base * sv, pan: p.pan, cut: p.cut, rev: 0.06, t: t + f * T });
   }
 
-  // ------------------------------------------------------------------ chaque image : oreille, ambiances, pas
-  function update(dt, { cam, yaw, sim, me, disp, storm: gapStorm }) {
+  // ------------------------------------------------------------------ chaque image : oreille, ambiances, pas, musique
+  // surface(Q) : sol sous les pieds ('herbe', 'beton', 'bois', 'gravier', 'neige', 'metal', 'eau', 'carrelage') ;
+  // indoor : 0 → 1, l'oreille est sous un toit (écho de pièce)
+  function update(dt, { cam, yaw, sim, me, disp, storm: gapStorm, surface = null, indoor = 0 }) {
     if (!ctx) return;
     ear = { x: cam.x, y: cam.y, z: cam.z, yaw };
     const t = ctx.currentTime, S = sim.S;
-    // ambiance : bord de mer, campagne, montagne (selon où l'on est)
+    revOut.gain.setTargetAtTime(0.75 * (1 - indoor), t, 0.25);
+    revIn.gain.setTargetAtTime(0.9 * indoor, t, 0.25);
+    // ambiance : bord de mer, campagne, montagne (selon où l'on est), étouffée dedans
     const ground = me && me.alive ? me : null;
     const h = cam.y, coast = ambCoast(cam);
     const air = ground && (ground.mode === 'chute' || ground.mode === 'planeur' || ground.mode === 'ballon') ? 1 : 0;
-    const high = Math.min(1, Math.max(0, (h - 45) / 50));
-    setG(amb.mer, (1 - air) * coast * 0.9 * (1 - high));
-    setG(amb.campagne, (1 - air) * (1 - coast) * (1 - high) * 0.8);
-    setG(amb.montagne, (1 - air) * high * 0.8);
+    const high = Math.min(1, Math.max(0, (h - 45) / 50)), inside = 1 - indoor * 0.6;
+    setG(amb.mer, (1 - air) * coast * 0.9 * (1 - high) * inside);
+    setG(amb.campagne, (1 - air) * (1 - coast) * (1 - high) * 0.8 * inside);
+    setG(amb.montagne, (1 - air) * high * 0.8 * inside);
     // vent : fort en chute libre, souffle en planeur, léger au sol en hauteur
-    const wv = air ? (ground.mode === 'chute' ? 0.55 : ground.mode === 'planeur' ? 0.35 : 0.18) : 0.04 + high * 0.12;
+    const wv = air ? (ground.mode === 'chute' ? 0.55 : ground.mode === 'planeur' ? 0.35 : 0.18) : (0.04 + high * 0.12) * inside;
     wind.g.gain.setTargetAtTime(wv, t, 0.3);
     wind.f.frequency.setTargetAtTime(air ? 650 : 380, t, 0.5);
     // tempête : grondement à l'approche du mur, fort dedans
     const sv = gapStorm < 0 ? 0.65 : gapStorm < 40 ? (1 - gapStorm / 40) * 0.35 : 0;
     storm.g.gain.setTargetAtTime(sv, t, 0.4);
-    // ses pas
+    // musique : dans la montgolfière et pendant la descente, puis elle s'efface à l'atterrissage
+    setMusic(!!air && S.mode !== 'exploration');
+    // ses pas : plus forts en courant, discrets accroupi
     if (ground && ground.mode === 'sol') {
       const sp = Math.hypot(ground.vx, ground.vz);
       if (sp > 1.2 && (ground.ground || ground.swim)) {
         stepT -= dt;
-        if (stepT <= 0) { stepT = ground.swim ? 0.55 : ground.sprint ? 0.27 : ground.crouch ? 0.5 : 0.36; synth(ground.swim ? 'nage' : 'pas', out(ground.crouch ? 0.25 : 0.55), t + 0.005); }
+        if (stepT <= 0) {
+          stepT = ground.swim ? 0.55 : ground.sprint ? 0.27 : ground.crouch ? 0.5 : 0.36;
+          const s = ground.swim ? 'eau' : surface ? surface(ground) : 'herbe', k = ground.crouch ? 0.35 : ground.sprint ? 1.05 : 0.8;
+          if (!voice('pas-' + s, { v: (STEP_V[s] || 0.5) * k, rate: ground.swim ? 0.8 : 1, rev: 0.04 })) synth(ground.swim ? 'nage' : 'pas', out(ground.crouch ? 0.25 : 0.55), t + 0.005);
+        }
       } else stepT = 0.05;
     }
-    // les pas des joueurs proches : on entend quelqu'un approcher
+    // les pas des joueurs proches : on entend quelqu'un approcher (et sur quoi il marche)
     let n = 0;
     for (const Q of S.players.values()) {
-      if (Q === me || !Q.alive || Q.mode !== 'sol' || n >= 4) continue;
+      if (Q === me || !Q.alive || Q.mode !== 'sol' || n >= 5) continue;
       const pos = disp ? disp(Q) : Q;
-      if (Math.abs(pos.x - cam.x) > 22 || Math.abs(pos.z - cam.z) > 22) continue;
+      if (Math.abs(pos.x - cam.x) > 26 || Math.abs(pos.z - cam.z) > 26) continue;
       const sp = Math.hypot(Q.vx, Q.vz);
-      if (sp < 1.5 || Q.crouch) continue;
+      if (sp < 1.5 || Q.crouch || !Q.ground) continue;
       n++;
       const k = (stepsOther.get(Q.id) || 0) - dt;
-      if (k <= 0) { stepsOther.set(Q.id, Q.sprint ? 0.28 : 0.37); at('pas', pos.x, pos.y, pos.z, 0.9, 22); } else stepsOther.set(Q.id, k);
+      if (k <= 0) {
+        stepsOther.set(Q.id, Q.sprint ? 0.28 : 0.37);
+        const p = place(pos.x, pos.y, pos.z, 26), s = Q.swim ? 'eau' : surface ? surface(Q) : 'herbe';
+        if (p && !voice('pas-' + s, { v: p.v * (STEP_V[s] || 0.5) * (Q.sprint ? 1.6 : 1.2), pan: p.pan, cut: p.cut, rev: 0.06 })) at('pas', pos.x, pos.y, pos.z, 0.9, 22);
+      } else stepsOther.set(Q.id, k);
     }
   }
   function setG(a, v) { if (a && a.g) a.g.gain.setTargetAtTime(Math.max(0, v), ctx.currentTime, 0.8); }
+  function setMusic(on) {
+    if (on === musicOn) return;
+    musicOn = on;
+    if (on && !music) {
+      const a = new Audio(MUSIC); a.loop = true; a.preload = 'auto';
+      const g = ctx.createGain(); g.gain.value = 0; g.connect(DDVolume.gain(ctx, 'music')).connect(comp);
+      try { ctx.createMediaElementSource(a).connect(g); } catch (e) { a.volume = 0.4 * DDVolume.get('music'); }
+      music = { a, g, stop: 0 };
+    }
+    if (!music) return;
+    clearTimeout(music.stop);
+    if (on) { music.a.play().catch(() => {}); music.g.gain.setTargetAtTime(0.38, ctx.currentTime, 0.6); }
+    else { music.g.gain.setTargetAtTime(0, ctx.currentTime, 1.4); music.stop = setTimeout(() => { if (!musicOn) music.a.pause(); }, 7000); }
+  }
   // près de la côte ? (au-delà des trois quarts du rayon de l'île)
   let coastRef = null;
   function ambCoast(cam) {
@@ -217,8 +394,8 @@ export function createSound() {
     return Math.max(0, Math.min(1, (d - coastRef.r * 0.75) / (coastRef.r * 0.3)));
   }
   return {
-    unlock, play, at, shot, update,
+    unlock, play, at, shot, whiz, reload, update,
     island(c, r) { coastRef = { x: c, z: c, r }; },
-    dispose() { try { if (ctx) ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; },
+    dispose() { try { if (music) music.a.pause(); if (ctx) ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; },
   };
 }

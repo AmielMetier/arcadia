@@ -5,7 +5,7 @@
 // construction met la grille à jour (world.watch). Moteur PUR, utilisé seulement là où la partie tourne.
 import { CELL } from './buildings.js';
 import { floorY, levelH } from './world.js';
-import { WATER } from './map.js';
+import { WATER, SLIDE } from './map.js';
 
 const MARGIN = 0.4;           // marge autour des obstacles (un peu plus que le rayon d'un joueur ; les portes passent)
 const LOW = 0.5, HIGH = 1.7;  // tranche de hauteur qui gêne (au-dessus des pieds) : la marche franchie, la tête
@@ -52,17 +52,15 @@ export function createNav(map, world, { r: R = MARGIN } = {}) {
     if (wk === WATER.MER && depth > 2.2) ground[k] = FIXED;
     else if (depth > 1.25) ground[k] = SWIM;
   }
-  // falaises : là où le terrain tombe de plus de 2,5 m par mètre, on ne passe pas (on tomberait de haut)
+  // pentes trop raides : on y glisse (player.js), les bots n'y passent pas
   const Hh = map.heights;
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const h = Hh[j * N + i];
-    for (const [di, dj] of [[1, 0], [0, 1]]) {
-      const ii = i + di, jj = j + dj;
-      if (ii >= N || jj >= N || Math.abs(Hh[jj * N + ii] - h) < 2.5 * HR) continue;
-      for (let t = 0; t <= HR; t++) {
-        const x = i * HR + di * t, z = j * HR + dj * t;
-        if (x < W && z < W) ground[z * W + x] |= FIXED;
-      }
+  for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
+    const h = Hh[j * N + i], gx = (Hh[j * N + i + 1] - h) / HR, gz = (Hh[(j + 1) * N + i] - h) / HR;
+    const gx2 = (Hh[(j + 1) * N + i + 1] - Hh[(j + 1) * N + i]) / HR, gz2 = (Hh[(j + 1) * N + i + 1] - Hh[j * N + i + 1]) / HR;
+    if (Math.max(Math.hypot(gx, gz), Math.hypot(gx2, gz2)) < SLIDE) continue;
+    for (let dz = 0; dz <= HR; dz++) for (let dx = 0; dx <= HR; dx++) {
+      const x = i * HR + dx, z = j * HR + dz;
+      if (x < W && z < W) ground[z * W + x] |= FIXED;
     }
   }
   // escaliers : la case de la rampe et la trémie au-dessus sont bouchées ; on passe par les liens

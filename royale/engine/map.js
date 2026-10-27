@@ -14,6 +14,8 @@ export const SIZE = 1600;   // côté de la carte (m)
 export const HRES = 2;      // pas de la grille des hauteurs (m)
 export const SNOW = 96;     // altitude des neiges (m)
 export const ILE = 51;      // graine de l'île officielle (choisie dans l'aperçu : tous les lieux-dits, un pont, 1 km²)
+export const SLIDE = 0.84;  // pente (tan) au-delà de laquelle on glisse (≈ 40°) : les montagnes ne s'escaladent plus
+const ROAD_GRADE = 0.4;     // pente en long des routes et chemins (≈ 22°) : toujours praticable à pied
 
 // classes du sol, une par case de 4 m (carte, statistiques, plus tard la navigation des bots)
 export const GROUND = ['Mer', 'Plage', 'Plaine', 'Forêt', 'Montagne', 'Roche', 'Neige', 'Lac', 'Rivière', 'Route', 'Ville', 'Bâtiment', 'Champ', 'Lieu-dit'];
@@ -757,21 +759,34 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
           h[i] = s / n;
         }
       }
+      // pente en long bornée (ROAD_GRADE) : on monte partout à pied sans glisser, même jusqu'au refuge du sommet
+      const lim = (i, j) => { const d = Math.hypot(P[i].x - P[j].x, P[i].z - P[j].z) * ROAD_GRADE; h[i] = clamp(h[i], h[j] - d, h[j] + d); };
+      for (let i = 1; i < h.length; i++) lim(i, i - 1);
+      for (let i = h.length - 2; i >= 0; i--) lim(i, i + 1);
       const wet = P.map((p) => { const k = vi(p.x, p.z); return RD[k] < RW[k] + 1.5 ? RL[k] : null; });
       // tablier à 2,6 m au-dessus de l'eau, rampes d'accès à 9 %
       for (let i = 0; i < P.length; i++) {
         for (let t = Math.max(0, i - 8); t <= Math.min(P.length - 1, i + 8); t++) if (wet[t] != null) h[i] = Math.max(h[i], wet[t] + 2.6 - Math.abs(i - t) * 0.36);
         P[i].y = h[i];
       }
-      // tronçons au-dessus de l'eau : ponts
+      // tronçons au-dessus de l'eau : ponts. Le tablier est une dalle droite et plate ; la route s'y aligne (sinon un
+      // virage sortait du tablier) et les rampes d'accès montent jusqu'à son niveau (sinon une marche à chaque bout)
       let st = -1;
       for (let i = 0; i <= P.length; i++) {
         const w = i < P.length && wet[i] != null;
         if (w && st < 0) st = i;
         if (!w && st >= 0) {
-          const a = P[Math.max(0, st - 2)], b = P[Math.min(P.length - 1, i + 1)];
-          bridges.push({ x0: a.x, z0: a.z, x1: b.x, z1: b.z, y: Math.max(a.y, b.y), hw: road.hw + 0.8 });
-          for (let t = Math.max(0, st - 2); t <= Math.min(P.length - 1, i + 1); t++) P[t].bridge = true;
+          const i0 = Math.max(0, st - 2), i1 = Math.min(P.length - 1, i + 1);
+          const ax = P[i0].x, az = P[i0].z, bx = P[i1].x, bz = P[i1].z;
+          let D = 0;
+          for (let t = i0; t <= i1; t++) D = Math.max(D, P[t].y);
+          for (let t = i0; t <= i1; t++) { const f = (t - i0) / (i1 - i0 || 1); Object.assign(P[t], { x: ax + (bx - ax) * f, z: az + (bz - az) * f, y: D, bridge: true }); }
+          for (let t = Math.max(0, i0 - 10); t <= Math.min(P.length - 1, i1 + 10); t++) {
+            if (t >= i0 && t <= i1) continue;
+            const d = t < i0 ? Math.hypot(P[t].x - ax, P[t].z - az) : Math.hypot(P[t].x - bx, P[t].z - bz);
+            P[t].y = Math.max(P[t].y, D - d * 0.09);
+          }
+          bridges.push({ x0: ax, z0: az, x1: bx, z1: bz, y: D, hw: road.hw + 0.8 });
           st = -1;
         }
       }

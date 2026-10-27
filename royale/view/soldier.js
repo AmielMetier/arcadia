@@ -6,8 +6,9 @@
 // bouche) et rechargement (l'arme baisse et pivote). Même façon de faire que view/hero.js (repère local : il regarde
 // +z, pieds à l'origine), qui reste là si le kit ne charge pas.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { cloneSkinned, tintMaterial } from './kit.js';
+import { cloneSkinned, tintMaterial, GUN_FIT } from './kit.js';
 import { RARITY } from '../engine/items.js';
+import { buildGlider } from './glider.js';
 
 const HEIGHT = 1.8;
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -19,8 +20,7 @@ export function rarityMaterial(r) {
 }
 
 // mesure une fois la taille et l'orientation du modèle (pour le ramener à 1,8 m, pieds au sol, regard vers +z)
-function calibrate(kit) {
-  const S = kit.soldier;
+function calibrate(S) {
   if (S.cal) return S.cal;
   const m = cloneSkinned(S.tmpl);
   m.updateMatrixWorld(true);
@@ -49,12 +49,37 @@ export function aimFrame(kit) {
   const m = cloneSkinned(S.tmpl), mixer = new THREE.AnimationMixer(m);
   const clip = S.clips.find((c) => c.name.endsWith('Idle_Shoot'));
   if (clip) { mixer.clipAction(clip).play(); mixer.update(0); }
-  m.rotation.y = calibrate(kit).yaw;
+  m.rotation.y = calibrate(S).yaw;
   m.updateMatrixWorld(true);
   const q = new THREE.Quaternion();
   m.getObjectByName('Index1R').matrixWorld.decompose(new THREE.Vector3(), q, new THREE.Vector3());
   S.aim = new THREE.Matrix4().makeRotationFromQuaternion(q);
   return S.aim;
+}
+
+// arme tenue : l'arme détaillée de sa rareté si elle existe (géométrie dans le repère de la main, canon déjà dans l'axe
+// du regard : pas de correction), sinon celle du kit. La main (l'index) se cale 3,5 cm derrière la détente et 2 cm
+// dessous ; l'axe de l'arme reste celui de l'arme du kit
+const hands = new Map();
+export function weaponHand(kit, w, r = 0) {
+  const tier = r >= 2 ? 1 : 0, key = w + tier;
+  if (hands.has(key)) return hands.get(key);
+  const old = kit.weapons[w] ? kit.weapons[w].hand : null, canon = kit.guns && kit.guns[w] && kit.guns[w][tier], F = GUN_FIT[w];
+  let out = { geo: old, fix: old ? barrelFix(kit, w) : new THREE.Quaternion() };
+  if (canon && old && F && kit.weapons.fusil) {
+    const aim = aimFrame(kit), box = (ww) => {
+      const o = kit.weapons[ww].hand.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(barrelFix(kit, ww))).applyMatrix4(aim);
+      o.computeBoundingBox(); const b = o.boundingBox.clone(); o.dispose(); return b;
+    };
+    const ob = box(w), ref = box('fusil').getSize(new THREE.Vector3()).z;
+    const k = ref * F.len, m = 0.95 * F.len, [tz, ty0] = F.trig[tier], ty = ty0 * 1.35;
+    const g = canon.clone().scale(k, k, k);
+    g.translate((ob.min.x + ob.max.x) / 2, -(ty - 0.02 / m) * k, -(tz - 0.035 / m) * k).applyMatrix4(aim.clone().invert());
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    out = { geo: g, fix: new THREE.Quaternion() };
+  }
+  hands.set(key, out);
+  return out;
 }
 
 // les armes du kit ne sont pas toutes posées pareil dans la main : rotation (repère de la main, autour de la poignée)
@@ -80,8 +105,30 @@ export function barrelFix(kit, w) {
   return fix;
 }
 
-export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0xc98f64, items } = {}) {
-  const S = kit.soldier, cal = calibrate(kit);
+// portraits des personnages (écran d'accueil), à la couleur choisie ; un seul rendu réutilisé
+let portraitR = null;
+export function renderPortraits(kit, color) {
+  const out = {};
+  if (!kit || !kit.chars) return out;
+  try { portraitR = portraitR || new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true }); } catch (e) { return out; }
+  const r = portraitR;
+  r.setPixelRatio(1); r.setSize(132, 150, false); r.setClearColor(0x000000, 0); r.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x50586a, 2.3));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2, 3, 4); scene.add(sun);
+  const cam = new THREE.PerspectiveCamera(28, 132 / 150, 0.1, 20); cam.position.set(1.0, 1.5, 3.4); cam.lookAt(0, 1.0, 0);
+  for (const k of Object.keys(kit.chars)) {
+    const h = buildSoldier(kit, { shirt: color, look: k });
+    h.root.rotation.y = 0.35;
+    h.update(0.016, { speed: 0, ground: true, mode: 'sol', alive: true, pitch: 0 });
+    scene.add(h.root); r.render(scene, cam); out[k] = r.domElement.toDataURL();
+    scene.remove(h.root); h.dispose();
+  }
+  return out;
+}
+
+export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0xc98f64, items, look = 'soldat' } = {}) {
+  const S = (kit.chars && kit.chars[look]) || kit.soldier, cal = calibrate(S);
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const model = cloneSkinned(S.tmpl);
@@ -127,15 +174,10 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     cur = a; curName = name;
   }
 
-  // ---------------------------------------------------------------- planeur : une aile au-dessus de la tête
-  const glider = new THREE.Group(); glider.visible = false; root.add(glider);
-  const wingMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.6, side: THREE.DoubleSide });
-  const cableMat = new THREE.MeshStandardMaterial({ color: 0x2b2e36 });
-  {
-    const wing = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, 0, Math.PI * 0.32).scale(1.9, 0.55, 1.1), wingMat);
-    wing.position.y = 2.45; wing.castShadow = true; glider.add(wing);
-    for (const sx of [-1, 1]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.2, 4), cableMat); c.position.set(0.55 * sx, 1.85, 0); c.rotation.z = -sx * 0.45; glider.add(c); }
-  }
+  // ---------------------------------------------------------------- deltaplane de la descente (view/glider.js)
+  const glider = buildGlider(shirt); root.add(glider.root);
+  let trailsIn = false, glide = 0;
+  const POLE_UP = { R: new THREE.Vector3(-0.9, -0.3, -0.1), L: new THREE.Vector3(0.9, -0.3, -0.1) };
 
   let held = null, heldKind = null, heldC = null, fly = 0, swim = 0, deadT = 0, air = 0, kick = 0, aimLift = 0;
   let arm = null, use = 0, reload = 0, hold = 0, clock = 0, heldW = null;
@@ -230,8 +272,9 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     heldKind = it ? (it.t === 'arme' ? 'arme' : 'objet') : 'outil';
     heldW = it && it.t === 'arme' ? it.w : null;
     if (it && it.t === 'arme' && kit.weapons[it.w]) {
-      held = new THREE.Mesh(kit.weapons[it.w].hand, rarityMaterial(it.r));
-      held.quaternion.copy(barrelFix(kit, it.w));
+      const W = weaponHand(kit, it.w, it.r);
+      held = new THREE.Mesh(W.geo, rarityMaterial(it.r));
+      held.quaternion.copy(W.fix);
       held.castShadow = true;
       hand.add(held);
     } else if (!it && kit.tool) {
@@ -259,7 +302,8 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     fly = damp(fly, st.mode === 'chute' ? 1 : 0, 4, dt);
     swim = damp(swim, st.swim ? 1 : 0, 6, dt);
     air = !st.ground && !st.swim ? air + dt : 0;
-    glider.visible = st.mode === 'planeur';
+    glider.update(dt, st.mode === 'planeur' && st.alive !== false, root.rotation.y, st.far || 0);
+    if (!trailsIn && root.parent) { for (const l of glider.trails) root.parent.add(l); trailsIn = true; }
     // état → animation
     if (st.alive === false) {
       play('Death', 0.12);
@@ -315,11 +359,18 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       if (hold > 0.01) holdGun(hold, aimLift, kick);
       // rechargement : l'arme descend et pivote, petit à-coup au milieu
       if (reload > 0.01 && !arm) reach(tgt.set(0.08, -0.25, 0.4), reload, POLE.bas, (0.9 + 0.2 * Math.sin(clock * 9)) * reload);
+      // deltaplane : les deux mains sur la barre de contrôle, au-dessus de la tête
+      glide = damp(glide, st.mode === 'planeur' && st.alive !== false ? 1 : 0, 8, dt);
+      if (glide > 0.01) {
+        root.updateMatrixWorld(true);
+        reach(glider.bar(-1, T2), glide, POLE_UP.R, 0, 'R', true);
+        reach(glider.bar(1, T2), glide, POLE_UP.L, 0, 'L', true);
+      }
     }
     // chute libre : à plat ventre ; nage : penché, à la surface
     body.rotation.x = fly * 1.2 + swim * 0.9;
     body.position.y = fly * 0.9 + swim * 0.55;
-    if (held) held.visible = fly < 0.5 && swim < 0.5 && st.alive !== false;
+    if (held) held.visible = fly < 0.5 && swim < 0.5 && glide < 0.5 && st.alive !== false;
   }
   return {
     root, update, setItem,
@@ -334,6 +385,6 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     // gestes ponctuels : 'pelle', 'lancer', 'pose'
     gesture(kind) { if (GESTURES[kind]) gestureArm(kind); },
     get held() { return held; },
-    dispose() { mixer.stopAllAction(); mat.dispose(); wingMat.dispose(); cableMat.dispose(); glider.traverse((o) => o.isMesh && o.geometry.dispose()); },
+    dispose() { mixer.stopAllAction(); mat.dispose(); glider.dispose(); },
   };
 }

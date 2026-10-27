@@ -153,7 +153,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
 
   // lumière partagée des explosions
   const flash = new THREE.PointLight(0xffa040, 0, 30, 1.6); group.add(flash);
-  let flashT = 0;
+  let flashT = 0, flashMax = 0.25, flashI = 90;
   // ------------------------------------------------------------------ projectiles en vol
   const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2), rocketMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a });
   const nadeGeo = new THREE.SphereGeometry(0.09, 10, 8), nadeMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a }), blastMat = new THREE.MeshStandardMaterial({ color: 0x9b59d0, emissive: 0x3a1a6a });
@@ -189,9 +189,26 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     if (hit === 1) {
       puff(to[0], to[1], to[2], { color: 0xc8bfa8, size: 0.25, grow: 2.5, life: 0.45, op: 0.7 });
       puff(to[0], to[1], to[2], { tex: T.glow, color: 0xffd080, size: 0.25, grow: 0.5, life: 0.08, add: true });
-    } else if (hit === 2) puff(to[0], to[1], to[2], { tex: T.glow, color: 0xff6a4a, size: 0.35, grow: 1.5, life: 0.15, add: true });
+    } else if (hit === 2) puff(to[0], to[1], to[2], { tex: T.glow, color: 0xfff4e0, size: 0.3, grow: 1.4, life: 0.1, add: true });
   }
-  function muzzleFlash(p) { puff(p.x, p.y, p.z, { tex: T.glow, color: 0xffd890, size: 0.5, grow: 0.6, life: 0.06, add: true }); }
+  // flamme de bouche : plus grosse pour le fusil à pompe et le fusil de précision, et un éclair de lumière
+  const MUZZLE = { pompe: 1.1, sniper: 1, fusil: 0.75, smg: 0.6, pistolet: 0.55, roquette: 1.2 };
+  function muzzleFlash(p, w = 'fusil') {
+    const k = MUZZLE[w] || 0.7;
+    puff(p.x, p.y, p.z, { tex: T.glow, color: 0xffd890, size: 0.55 * k, grow: 0.9, life: 0.06, add: true });
+    puff(p.x, p.y, p.z, { tex: T.glow, color: 0xfff6d8, size: 0.25 * k, grow: 0.5, life: 0.035, add: true, op: 1 });
+    if (flashT <= 0.05) { flash.position.set(p.x, p.y, p.z); flashI = 7 * k; flashMax = flashT = 0.06; }
+  }
+  // éclats à l'impact sur un joueur, sans sang : bleus sur le bouclier, blancs sur la vie, jaunes à la tête
+  const HIT_COL = { bouclier: [0x5ad1ff, 0xc4f1ff, 0x2f8fe0], vie: [0xffffff, 0xffeede, 0xd9d9d9], tete: [0xffd23f, 0xfff2a8, 0xffffff] };
+  function hitSpark(x, y, z, kind = 'vie', n = 8) {
+    const cols = HIT_COL[kind] || HIT_COL.vie;
+    puff(x, y, z, { tex: T.glow, color: cols[0], size: 0.45, grow: 1.6, life: 0.16, add: true, op: 1 });
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, k = 1.8 + Math.random() * 3, sz = 0.025 + Math.random() * 0.04;
+      chip(x, y, z, { vx: Math.cos(a) * k, vy: 0.8 + Math.random() * 3, vz: Math.sin(a) * k, sx: sz, sy: sz, sz, color: cols[i % cols.length], life: 0.45 + Math.random() * 0.35, metal: kind === 'bouclier' });
+    }
+  }
   function boom(x, y, z, r, kind) {
     if (kind === 'souffle') {
       puff(x, y + 0.5, z, { tex: T.glow, color: 0xc08aff, size: 1, grow: r * 1.6, life: 0.45, add: true, op: 0.9 });
@@ -203,7 +220,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     puff(x, y, z, { tex: T.glow, color: 0xffa040, size: 1.5, grow: r * 1.8, life: 0.45, add: true, op: 1 });
     puff(x, y, z, { tex: T.glow, color: 0xfff0c0, size: 1, grow: r, life: 0.18, add: true, op: 1 });
     for (let i = 0; i < 6; i++) puff(x + (Math.random() - 0.5) * r * 0.6, y + Math.random() * r * 0.4, z + (Math.random() - 0.5) * r * 0.6, { color: 0x5a5550, size: 1.2, grow: 3.5, life: 1.6 + Math.random(), rise: 1.2, op: 0.55 });
-    flash.position.set(x, y + 1, z); flash.intensity = 90; flashT = 0.25;
+    flash.position.set(x, y + 1, z); flashI = 90; flashMax = flashT = 0.25;
   }
 
   function update(dt, t, sim, stormState, cam) {
@@ -228,7 +245,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       L.s.m.opacity = L.op * (1 - k);
       L.s.o.position.y += L.rise * dt;
     }
-    if (flashT > 0) { flashT -= dt; flash.intensity = Math.max(0, flashT / 0.25) * 90; }
+    if (flashT > 0) { flashT -= dt; flash.intensity = Math.max(0, flashT / flashMax) * flashI; }
     // fumée des cheminées proches
     if (cam) for (const c of smokers) {
       if (Math.abs(c.x - cam.x) > 160 || Math.abs(c.z - cam.z) > 160) continue;
@@ -300,7 +317,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     }
   }
   return {
-    group, shot, muzzleFlash, boom, update, puff, cloud, dust, debris, casing, chip,
+    group, shot, muzzleFlash, hitSpark, boom, update, puff, cloud, dust, debris, casing, chip,
     dispose() { for (const o of own) o.dispose(); scene.remove(group); },
   };
 }

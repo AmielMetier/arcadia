@@ -190,7 +190,7 @@ window.HUB_GAMES = [
     accent: '#3d9fd9',
     settings: [
       { key: 'mode', label: 'Mode', options: [['partie', 'Battle royale'], ['exploration', 'Exploration · sans combat']], def: 'partie' },
-      { key: 'places', label: 'Joueurs sur l\'île', options: [[16, '16'], [24, '24'], [30, '30']], def: 24 },
+      { key: 'places', label: 'Joueurs sur l\'île', options: [[30, '30'], [45, '45'], [60, '60']], def: 45 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['difficile', 'Difficile']], def: 'normal' },
       { key: 'time', label: 'Moment', options: [['jour', 'Jour'], ['crepuscule', 'Crépuscule'], ['soir', 'Soir']], def: 'jour' },
     ],

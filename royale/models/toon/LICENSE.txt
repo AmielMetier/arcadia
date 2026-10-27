@@ -2,3 +2,5 @@ Modèles : « Toon Shooter Game Kit » de Quaternius (https://quaternius.com), v
 https://poly.pizza/bundle/Toon-Shooter-Game-Kit-qraiSXoAru
 Licence : Creative Commons Zero (CC0 1.0) — domaine public. https://creativecommons.org/publicdomain/zero/1.0/
 Fichiers renommés en français ; le soldat porte les armes du kit dans sa main droite.
+Personnages au choix (même kit, même licence) : soldat.glb (« Character Soldier »), hazmat.glb (« Character Hazmat »),
+ennemi.glb (« Character Enemy »), https://poly.pizza/m/z3TSQYx1Kn et https://poly.pizza/m/mdGe4IN31v

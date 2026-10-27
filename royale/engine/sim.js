@@ -15,6 +15,7 @@ export const SLOTS = 5;
 export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon de tir part de là, comme celui de la caméra)
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
+const FALL_SAFE = 8;               // m de chute sans dégâts
 const STORM_START = 30;           // s après le départ de la montgolfière
 const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
 
@@ -50,7 +51,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ joueurs
   function addPlayer(r) {
-    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, bot: !!r.bot, level: r.level || 'normal',
+    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, look: r.look || 'soldat', bot: !!r.bot, level: r.level || 'normal',
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
       inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };
@@ -393,7 +394,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!it) return;
     if (it.t === 'arme') {
       const W = WEAPONS[it.w];
-      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       if (P.rl > 0) {
         P.rl -= dt;
         if (P.rl <= 0) { const n = Math.min(W.mag - it.mag, P.ammo[W.ammo]); it.mag += n; P.ammo[W.ammo] -= n; P.rl = 0; }
@@ -402,11 +403,11 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const trigger = W.auto ? P.inp.fire : shot;
       if (trigger && P.cd <= 0) {
         if (it.mag > 0) shoot(P, it);
-        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
         else if (shot) ev({ e: 'vide', p: P.id });
       }
       // chargeur vide : rechargement automatique
-      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       return;
     }
     if (it.t === 'objet') {
@@ -530,7 +531,9 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {
-        if (P.fall > 14 && !P.safeFall) damage(P, (P.fall - 14) * 6.5, null, { cause: 'chute' });
+        // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
+        const h = P.fall * P.fall / (2 * MOVE.g);
+        if (h > FALL_SAFE && !P.safeFall) damage(P, (h - FALL_SAFE) * 7, null, { cause: 'chute' });
         P.safeFall = false; P.fall = 0;
       }
       // tombé hors de l'île ou sous la mer : on remonte au bord (sécurité)

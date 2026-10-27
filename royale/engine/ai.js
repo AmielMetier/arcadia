@@ -125,6 +125,23 @@ export function createAI(sim, map, world) {
     return pick;
   }
 
+  // un tiers des bots suivent un joueur : pendant qu'il est en l'air, ils visent l'un des bâtiments les plus proches de
+  // l'endroit où il va se poser (combats dès l'atterrissage)
+  const doorPts = [];
+  for (const b of map.buildings) {
+    const d = b.doors.find((q) => q.ext && q.k === 0);
+    if (d) doorPts.push({ x: (d.o === 'h' ? (d.x + 0.5) * 4 : d.x * 4) + d.nx * 4, z: (d.o === 'h' ? d.z * 4 : (d.z + 0.5) * 4) + d.nz * 4, b: b.id });
+  }
+  function followDrop(P, B) {
+    const H = S.players.get(B.follow);
+    if (!H || !H.alive || (H.mode !== 'chute' && H.mode !== 'planeur')) return null;
+    const lead = H.mode === 'chute' ? 6 : 3, x = H.x + H.vx * lead, z = H.z + H.vz * lead;
+    const near = doorPts.map((q) => [q, Math.hypot(q.x - x, q.z - z)]).filter((a) => a[1] < 130).sort((a, b) => a[1] - b[1]).slice(0, 4);
+    if (!near.length) return { x: x + (B.rng.next() - 0.5) * 50, z: z + (B.rng.next() - 0.5) * 50, b: -1 };
+    if (!B.followPick || !near.some((a) => a[0] === B.followPick)) B.followPick = near[Math.floor(B.rng.next() * near.length)][0];
+    return B.followPick;
+  }
+
   // ------------------------------------------------------------------ chemins
   function setGoal(P, B, g) {
     B.goal = g; B.path = null; B.wp = 0; B.stuckN = 0;
@@ -206,10 +223,11 @@ export function createAI(sim, map, world) {
     for (const Q of S.players.values()) {
       if (Q === P || !Q.alive || Q.mode === 'ballon') continue;
       const dx = Q.x - P.x, dz = Q.z - P.z, d = Math.hypot(dx, dz);
-      if (d > lv.see && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
+      if (d > Math.max(lv.see, 110) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
+      if (d > lv.see && !(Q.shotT != null && S.t - Q.shotT < 1.2) && !(P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5)) continue;
       const front = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
       // on entend les coups de feu de loin, et quelqu'un qui court tout près (même dans son dos)
-      const heard = (Q.shotT != null && S.t - Q.shotT < 0.6 && d < 70) || (d < 15 && Q.mode === 'sol' && Math.hypot(Q.vx, Q.vz) > 4.5);
+      const heard = (Q.shotT != null && S.t - Q.shotT < 1.2 && d < 110) || (d < 15 && Q.mode === 'sol' && Math.hypot(Q.vx, Q.vz) > 4.5);
       const hurt = P.hitBy === Q.id && S.t - (P.hitT || -9) < 1.5;
       if (d < 12 || front > lv.cone || heard || hurt) cands.push({ Q, d, hurt, heard });
     }
@@ -244,17 +262,22 @@ export function createAI(sim, map, world) {
       let reach = 0;
       for (const it of P.inv) if (usable(P, it)) reach = Math.max(reach, ENGAGE[it.w]);
       const hunted = S.t - (P.hitT || -9) < 4 && P.hitBy === E.id;
-      // entre bots, on se cherche moins de loin, surtout en début de partie (on fouille d'abord)
-      if (E.bot) reach *= S.t - (B.landT || 0) < 150 ? 0.3 : 0.5;
+      // entre bots, on se cherche un peu moins de loin, surtout juste après l'atterrissage (on s'arme d'abord)
+      if (E.bot) reach *= S.t - (B.landT || 0) < 60 ? 0.55 : 0.8;
       // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
       if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
+      // entendu sans le voir : armé et en forme, on va voir (on pousse vers les coups de feu)
+      if (gun && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')) {
+        B.state = 'go'; setGoal(P, B, { kind: 'chasse', id: E.id, x: B.last.x, z: B.last.z, r: 4 }); return;
+      }
+      if (B.goal && B.goal.kind === 'chasse' && danger < 2) return;
     } else B.enemy = null;
     if (danger) {
       if (B.state !== 'zone' || !B.goal) { B.state = 'zone'; setGoal(P, B, zonePoint(P, B, false)); }
       return;
     }
     const h = needHeal(P);
-    if (h && S.t - (P.hitT || -9) > 2.5 && (!E || !B.visible || P.hp + P.sh < 60)) { B.state = 'heal'; B.healSlot = h; return; }
+    if (h && S.t - (P.hitT || -9) > 2.5 && (!E || !B.visible || P.hp + P.sh < 40)) { B.state = 'heal'; B.healSlot = h; return; }
     if (B.state === 'fight' || B.state === 'heal' || B.state === 'zone') { B.state = 'go'; B.goal = null; }
     if (B.goal && B.goal.kind !== 'roam' && B.goal.kind !== 'zone' && S.t - B.goal.since < 40) return;
     // une fouille en route vaut mieux qu'une promenade
@@ -397,7 +420,7 @@ export function createAI(sim, map, world) {
     }
     // déplacement : garder sa distance, pas de côté, petits sauts ; bien amoché face à un bot : on décroche
     if (it && it.w === 'sniper' && I.aim) { I.crouch = true; return null; }
-    const retreat = E.bot && P.hp + P.sh < 60 && needHeal(P);
+    const retreat = E.bot && P.hp + P.sh < 35 && needHeal(P);
     if (retreat) { I.fire = false; I.aim = false; }
     const want = retreat ? 80 : W ? WANT_D[it.w] : 1.5;
     const ux = dx / d, uz = dz / d;
@@ -418,8 +441,10 @@ export function createAI(sim, map, world) {
       enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false,
       strafe: 1, strafeT: 0, burstOn: true, burstT: 0, scanT: rng.next() * 0.25, decideT: rng.next() * 0.5,
       ban: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
-      sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0,
+      sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,
     };
+    const humans = [...S.players.values()].filter((q) => !q.bot);
+    if (humans.length && rng.next() < 1 / 3) P.ai.follow = humans[Math.floor(rng.next() * humans.length)].id;
     return P.ai;
   }
   function think(P, dt) {
@@ -429,6 +454,11 @@ export function createAI(sim, map, world) {
       while (queue.length) { const Q = queue.shift(); if (Q.alive && Q.ai && Q.ai.waiting) { plan(Q); break; } }
     }
     const B = P.ai || init(P), I = P.inp;
+    if (B.follow != null && P.mode !== 'sol' && (B.followT -= dt) <= 0) {
+      B.followT = 0.5;
+      const f = followDrop(P, B);
+      if (f && f !== B.drop) { B.drop = f; B.prevD = null; }
+    }
     if (P.mode === 'ballon') {
       if (!B.drop) B.drop = chooseDrop(P, B);
       const b = sim.balloonPos(), d = Math.hypot(b.x - B.drop.x, b.z - B.drop.z);
