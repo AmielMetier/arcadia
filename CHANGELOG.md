@@ -8,6 +8,8 @@
   - Après un ralentissement passager du serveur, l'hôte n'est plus coupé à chaque reprise de la connexion : les invités ne l'attendent plus indéfiniment.
   - Island Rush, Outbreak, Convoy Storm et Bastion Clash envoient les tirs, les portes, le butin et les effets à part : ils arrivent toujours, même quand une image est sautée.
   - Un invité qui reprend le salon ne voit plus « Coupure chez l'hôte » au-dessus de sa propre partie.
+## 3.4 — 28 octobre 2026
+- **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
 
 ## 3.3 — 27 octobre 2026
 - **Island Rush** — L'île ne se vide plus en deux minutes : les bots se battent de plus en plus au fil des cercles de la tempête, et la partie dure jusqu'au dernier cercle (une dizaine de minutes).

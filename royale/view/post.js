@@ -41,7 +41,12 @@ export function createPost(renderer) {
         float d = texture2D(tDepth, vUv).x;
         if (d >= 0.99999) { gl_FragColor = vec4(1.0); return; }
         vec3 p = vpos(vUv);
-        vec3 n = normalize(cross(dFdx(p), dFdy(p)));
+        // dérivées nulles (surface vue de très loin, précision de la profondeur) : pas d'occlusion plutôt qu'une
+        // normale invalide, que certaines cartes graphiques rendent en carrés noirs
+        vec3 cr = cross(dFdx(p), dFdy(p));
+        float cl = dot(cr, cr);
+        if (!(cl > 1e-24) || isinf(cl)) { gl_FragColor = vec4(1.0); return; }
+        vec3 n = cr * inversesqrt(cl);
         // repère tourné au hasard par pixel (bruit à gradient entrelacé), lissé ensuite par le flou
         float a = 6.2831 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
         vec3 t = normalize(cross(n, abs(n.y) < 0.9 ? vec3(cos(a), 0.0, sin(a)) : vec3(cos(a), sin(a), 0.0))), b = cross(n, t);
@@ -57,7 +62,8 @@ export function createPost(renderer) {
           float range = smoothstep(0.0, 1.0, r / max(0.001, abs(p.z - sz)));
           occ += step(s.z + 0.02 * r, sz) * range;
         }
-        gl_FragColor = vec4(vec3(mix(1.0 - occ / 14.0, 1.0, far)), 1.0);
+        float ao = mix(1.0 - occ / 14.0, 1.0, far);
+        gl_FragColor = vec4(vec3(isnan(ao) ? 1.0 : clamp(ao, 0.0, 1.0)), 1.0);
       }`,
   });
   const blurMat = new THREE.ShaderMaterial({
@@ -79,7 +85,7 @@ export function createPost(renderer) {
     uniforms: { tColor: { value: main.texture }, uThr: { value: 1.6 } },
     vertexShader: VERT, depthTest: false, depthWrite: false,
     fragmentShader: `varying vec2 vUv; uniform sampler2D tColor; uniform float uThr;
-      void main(){ vec3 c = texture2D(tColor, vUv).rgb; float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = vec4(c * max(0.0, l - uThr) / max(l, 0.001), 1.0); }`,
+      void main(){ vec3 c = texture2D(tColor, vUv).rgb; if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0); c = min(c, vec3(256.0)); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = vec4(c * max(0.0, l - uThr) / max(l, 0.001), 1.0); }`,
   });
   const gaussMat = new THREE.ShaderMaterial({
     uniforms: { tex: { value: null }, uDir: { value: new THREE.Vector2() } },
@@ -96,11 +102,26 @@ export function createPost(renderer) {
     uniforms: { tColor: { value: main.texture }, tAO: { value: aoBlur.texture }, tBloom: { value: bloomA.texture }, uAO: { value: 1 }, uBloom: { value: 0.28 }, uT: { value: 0 } },
     vertexShader: VERT, depthTest: false, depthWrite: false, toneMapped: true,
     fragmentShader: `varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tAO; uniform sampler2D tBloom; uniform float uAO; uniform float uBloom; uniform float uT;
+      // une valeur invalide (NaN, infini) sortie d'un calcul de la scène s'afficherait en noir (et le halo l'étalerait
+      // en carrés) : on la remplace par la moyenne des voisins valides
+      bool bad3(vec3 v){ return any(isnan(v)) || any(isinf(v)); }
+      vec3 safeColor(sampler2D t, vec2 uv){
+        vec3 c = texture2D(t, uv).rgb;
+        if (!bad3(c)) return min(c, vec3(60000.0));
+        vec2 px = 2.0 / vec2(textureSize(t, 0));
+        vec3 s = vec3(0.0); float n = 0.0;
+        for (int i = 0; i < 4; i++) {
+          vec2 o = (i < 2 ? vec2(i == 0 ? 1.0 : -1.0, 0.0) : vec2(0.0, i == 2 ? 1.0 : -1.0)) * px;
+          vec3 q = texture2D(t, uv + o).rgb;
+          if (!bad3(q)) { s += q; n += 1.0; }
+        }
+        return n > 0.0 ? min(s / n, vec3(60000.0)) : vec3(0.0);
+      }
       void main(){
-        vec3 c = texture2D(tColor, vUv).rgb;
-        float ao = texture2D(tAO, vUv).r;
+        vec3 c = safeColor(tColor, vUv);
+        float ao = texture2D(tAO, vUv).r; if (isnan(ao)) ao = 1.0;
         c *= mix(1.0, ao * sqrt(ao), 0.7 * uAO);
-        c += texture2D(tBloom, vUv).rgb * uBloom;
+        vec3 bl = texture2D(tBloom, vUv).rgb; if (!bad3(bl)) c += bl * uBloom;
         // lumière du soleil un peu chaude, ombres un peu froides
         float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
         c *= mix(vec3(0.97, 1.0, 1.05), vec3(1.03, 1.0, 0.96), smoothstep(0.05, 0.8, l));
