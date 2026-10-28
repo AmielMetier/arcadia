@@ -27,6 +27,10 @@
                   { label, get, set, range: [min, max, pas], format }   curseur (format(v) : texte affiché)
                   { note: () => texte }                                 ligne d'information
                   { keys: [[action, touches, manette?], …] }            commandes (HTML : <kbd>…</kbd>)
+                  { bind: { rows, set, clear, reset } }                 touches modifiables, deux par action :
+                      rows() → [[id, libellé, [touche 1, touche 2]], …] (texte ; '' : case vide)
+                      set(id, case, { code, key } ou { mouse }) → texte affiché sous la liste (touche reprise ailleurs…)
+                      clear(id, case), reset() : effacer une case, revenir aux touches d'origine
                   hidden: () => true masque la ligne (ou la section)
      hint       rappel en bas du panneau (HTML), par exemple la touche qui coupe le son
      test(kind) appelé quand on lâche un curseur du son : un petit bruit pour entendre le niveau
@@ -181,7 +185,17 @@
 .ddvol kbd{display:inline-block;min-width:20px;margin:0 1px;padding:1px 5px;border:0;border-radius:5px;background:rgba(255,255,255,.12);box-shadow:inset 0 -1px 0 rgba(0,0,0,.35);
   font:700 11.5px/1.5 system-ui,sans-serif;text-align:center;color:inherit}
 .ddvol button:focus-visible,.ddvol input:focus-visible{outline:2px solid var(--ddvol-a);outline-offset:2px}
-.ddvol-ico{display:inline-block;vertical-align:-0.125em}`;
+.ddvol-ico{display:inline-block;vertical-align:-0.125em}
+.ddvol-b{display:grid;grid-template-columns:minmax(0,1fr) 92px 92px;gap:4px 6px;align-items:center;margin:4px 0 0;font-size:12.5px;font-weight:500}
+.ddvol-b>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ddvol-key{min-width:0;height:28px;margin:0;padding:0 6px;border:0;border-radius:6px;background:rgba(255,255,255,.12);box-shadow:inset 0 -1px 0 rgba(0,0,0,.35);
+  color:inherit;font:700 12px/1 system-ui,sans-serif;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ddvol-key:hover{background:rgba(255,255,255,.2)}
+.ddvol-key.empty{opacity:.45;font-weight:500}
+.ddvol-key.wait{background:var(--ddvol-a);color:var(--ddvol-on);animation:ddvol-blink 1s steps(2) infinite}
+@keyframes ddvol-blink{50%{opacity:.6}}
+.ddvol-reset{margin:8px 0 0;padding:6px 10px;border:0;border-radius:7px;background:rgba(255,255,255,.1);color:inherit;font:inherit;font-size:12.5px;cursor:pointer}
+.ddvol-reset:hover{background:rgba(255,255,255,.18)}`;
     document.head.appendChild(s);
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -197,6 +211,10 @@
   // un seul panneau par page, rattaché au bouton qui l'ouvre (les jeux qui redessinent leur barre d'outils en
   // créent de nouveaux : chacun l'ouvre à son tour)
   let pop = null, anchor = null, cur = null, watch = 0;
+  // touche modifiable en attente : { btn, it, id, slot } ; skip : le clic qui suit un bouton de souris choisi
+  let wait = null, skip = false;
+  function endWait() { if (wait) { wait.btn.classList.remove('wait'); wait = null; } refresh(); }
+  function bindNote(it, id, text) { const n = pop.querySelector(`[data-bn="${id}"]`); if (n) { n.textContent = text || ''; n.hidden = !text; } }
   const item = (id) => { const [s, i] = id.split('.').map(Number); return cur.sections[s].items[i]; };
   const pct = (v) => (v > 0 ? Math.round(v * 100) + ' %' : 'Coupé');
   function build() {
@@ -224,17 +242,53 @@
     pop.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
+      if (skip) { skip = false; return; }
       if (b.classList.contains('ddvol-x')) { const a = anchor; close(); if (a) a.focus(); return; }
       const it = b.dataset.i && item(b.dataset.i);
       if (!it) return;
+      if (b.classList.contains('ddvol-key')) {
+        // une case de touche : on attend la nouvelle touche (ou un bouton de la souris sur cette même case)
+        const again = wait && wait.btn === b;
+        endWait();
+        if (again) return;
+        wait = { btn: b, it, id: b.dataset.i, act: b.dataset.b, slot: +b.dataset.s };
+        b.classList.add('wait'); b.textContent = 'Touche…';
+        bindNote(it, wait.id, '');
+        return;
+      }
+      if (b.classList.contains('ddvol-reset')) { endWait(); it.bind.reset(); bindNote(it, b.dataset.i, 'Touches d\'origine remises.'); refresh(); return; }
       if (b.classList.contains('ddvol-sw')) it.set(!it.get());
       else it.set(it.options[+b.dataset.v][0]);
       refresh();
     });
+    // touche modifiable en attente : la touche appuyée, où qu'elle arrive (Safari ne donne pas le focus au bouton cliqué) ;
+    // Échap annule, Suppr ou Retour efface la case ; le jeu ne la voit pas
+    addEventListener('keydown', (e) => {
+      if (!wait) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.repeat) return;
+      const w = wait;
+      if (e.code === 'Escape') { endWait(); return; }
+      if (e.code === 'Delete' || e.code === 'Backspace') { w.it.bind.clear(w.act, w.slot); endWait(); return; }
+      const note = w.it.bind.set(w.act, w.slot, { code: e.code, key: e.key });
+      endWait(); bindNote(w.it, w.id, note);
+    }, true);
+    // un bouton de la souris sur la case en attente la prend ; ailleurs dans le panneau, l'attente s'arrête
+    pop.addEventListener('mousedown', (e) => {
+      if (!wait) return;
+      const w = wait;
+      if (e.target.closest('button') !== w.btn) { endWait(); return; }
+      e.preventDefault();
+      const note = w.it.bind.set(w.act, w.slot, { mouse: e.button });
+      skip = e.button === 0;
+      endWait(); bindNote(w.it, w.id, note);
+    }, true);
+    pop.addEventListener('mouseup', (e) => { if (e.button > 2) e.preventDefault(); });
     // le panneau garde ses clics et ses touches : le jeu ne réagit pas pendant qu'on règle
     for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'click', 'keydown', 'keyup', 'wheel', 'contextmenu']) {
       pop.addEventListener(ev, (e) => {
         e.stopPropagation();
+        if (ev === 'contextmenu' && e.target.closest('.ddvol-key')) e.preventDefault();
         if (ev === 'keydown' && e.key === 'Escape') { e.preventDefault(); const a = anchor; close(); if (a) a.focus(); }
       }, { passive: ev === 'touchstart' || ev === 'wheel' });
     }
@@ -243,6 +297,10 @@
   }
   function itemHtml(it, id) {
     if (it.note) return `<p class="ddvol-n" data-n="${id}"></p>`;
+    if (it.bind) {
+      const rows = it.bind.rows().map(([a, l]) => `<span>${esc(l)}</span>${[0, 1].map((k) => `<button type="button" class="ddvol-key" data-i="${id}" data-b="${esc(a)}" data-s="${k}" aria-label="${esc(l)}, touche ${k + 1}"></button>`).join('')}`).join('');
+      return `<div data-r="${id}"><div class="ddvol-b">${rows}</div><p class="ddvol-n" data-bn="${id}" hidden></p><button type="button" class="ddvol-reset" data-i="${id}">Touches d'origine</button></div>`;
+    }
     if (it.keys) {
       const three = it.keys.some((r) => r.length > 2);
       const head = it.head ? it.head.map((h, j) => `<i${j ? '' : ' class="a"'}>${esc(h)}</i>`).join('') : '';
@@ -267,7 +325,7 @@
     if (cur.hint) h += `<p class="ddvol-hint">${cur.hint}</p>`;
     pop.innerHTML = h;
     // tableau de commandes à trois colonnes (clavier et manette) : panneau plus large
-    pop.classList.toggle('wide', cur.sections.some((s) => (s.items || []).some((it) => it.keys && it.keys.some((r) => r.length > 2))));
+    pop.classList.toggle('wide', cur.sections.some((s) => (s.items || []).some((it) => it.bind || (it.keys && it.keys.some((r) => r.length > 2)))));
     pop.style.setProperty('--ddvol-a', cur.accent || '#5aa9ff');
     pop.style.setProperty('--ddvol-on', onColor(cur.accent || '#5aa9ff'));
   }
@@ -288,6 +346,14 @@
         const row = pop.querySelector(`[data-r="${id}"], [data-n="${id}"]`);
         if (row) row.hidden = hid(it);
         if (it.keys) return;
+        if (it.bind) {
+          for (const [a, , ks] of it.bind.rows()) for (let k = 0; k < 2; k++) {
+            const b = pop.querySelector(`.ddvol-key[data-i="${id}"][data-b="${a}"][data-s="${k}"]`);
+            if (!b || (wait && wait.btn === b)) continue;
+            b.textContent = ks[k] || '—'; b.classList.toggle('empty', !ks[k]); b.title = ks[k] || '';
+          }
+          return;
+        }
         if (it.note) { const n = pop.querySelector(`[data-n="${id}"]`); let t = ''; try { t = it.note() || ''; } catch (e) {} n.textContent = t; n.hidden = n.hidden || !t; return; }
         let v; try { v = it.get(); } catch (e) { v = null; }
         if (it.range) {
@@ -310,6 +376,7 @@
   }
   function close() {
     if (!pop || pop.hidden) return;
+    if (wait) { wait.btn.classList.remove('wait'); wait = null; }
     pop.hidden = true; clearInterval(watch);
     if (anchor) anchor.setAttribute('aria-expanded', 'false');
     anchor = null;

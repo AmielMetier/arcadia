@@ -51,12 +51,13 @@ export function itemIcon(it) {
   return url;
 }
 
-export function createHud(map, { onTeleport, project } = {}) {
+// key(action) : la touche de cette action, telle qu'elle est écrite (modifiable dans les Réglages)
+export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
   const img = terrainImage(map, { ppm: 0.5 });
   const mini = $('#mini'), mctx = mini.getContext('2d');
   const big = $('#bigmap'), bcv = big.querySelector('canvas'), bctx = bcv.getContext('2d');
   const place = $('#place'), fps = $('#fps'), promptEl = $('#prompt');
-  if (onTeleport) $('#mapHint').innerHTML = 'Clique pour t\'y rendre · <kbd>M</kbd> fermer';
+  if (onTeleport) $('#mapHint').innerHTML = `Clique pour t'y rendre · <kbd data-k="carte">${esc(key('carte'))}</kbd> fermer`;
   const dpr = () => Math.min(2, devicePixelRatio || 1);
   const LAY_MINI = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: false, coffres: false, noms: false, grille: false, tempete: false, vol: false };
   const LAY_BIG = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: true, coffres: false, noms: true, grille: true, tempete: false, vol: false };
@@ -271,7 +272,7 @@ export function createHud(map, { onTeleport, project } = {}) {
   let bagKey = '', bagP = null, onMove = null, hoverI = -1, drag = null;
   const fmt = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
   function detail(it) {
-    if (!it) { bdet.innerHTML = '<b>Case vide</b><div class="st">Ramasse une arme ou un objet (E) pour la remplir.</div>'; return; }
+    if (!it) { bdet.innerHTML = `<b>Case vide</b><div class="st">Ramasse une arme ou un objet (${esc(key('utiliser'))}) pour la remplir.</div>`; return; }
     const r = RARITY[it.r], head = `<b style="color:${r.color}">${esc(itemLabel(it))}</b>`;
     if (it.t === 'arme') {
       const W = WEAPONS[it.w];
@@ -380,9 +381,9 @@ export function createHud(map, { onTeleport, project } = {}) {
       f.el.style.transform = `translate(${p.x + f.dx * ease}px, ${p.y - f.up * ease - f.t * 18}px) translate(-50%, -50%) scale(${1 + Math.max(0, 0.12 - f.t) * 6})`;
     }
   }
-  // viseur : écart selon la dispersion ; lunette pour le fusil de précision
-  function crosshair(spread, scope) {
-    $('#cross').style.setProperty('--g', Math.round(6 + spread * 520) + 'px');
+  // viseur : ses branches s'écartent jusqu'au bord du cône de dispersion (gap, en pixels) ; lunette pour le fusil de précision
+  function crosshair(gap, scope) {
+    $('#cross').style.setProperty('--g', Math.round(4 + Math.min(gap, 220)) + 'px');
     $('#scope').hidden = !scope;
     $('#cross').hidden = !!scope;
   }
@@ -405,13 +406,13 @@ export function createHud(map, { onTeleport, project } = {}) {
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },
     // txt : l'action ; what : ce sur quoi elle porte (couleur de rareté)
-    prompt(txt, what = '', color = '', kbd = 'E') {
+    prompt(txt, what = '', color = '', kbd = key('utiliser')) {
       const key = txt + what + color + kbd;
       if (promptEl.dataset.t === key) return;
       promptEl.dataset.t = key; promptEl.hidden = !txt;
-      promptEl.innerHTML = txt ? `<kbd>${kbd}</kbd><span>${esc(txt)}${what ? ` <i style="--rc:${color || '#fff8ea'}">${esc(what)}</i>` : ''}</span>` : '';
+      promptEl.innerHTML = txt ? `<kbd>${esc(kbd)}</kbd><span>${esc(txt)}${what ? ` <i style="--rc:${color || '#fff8ea'}">${esc(what)}</i>` : ''}</span>` : '';
     },
-    spectate(name) { const s = $('#spect'); s.hidden = !name; if (name) s.innerHTML = `Tu regardes <b>${esc(name)}</b> · <kbd>Espace</kbd> joueur suivant`; },
+    spectate(name) { const s = $('#spect'); s.hidden = !name; if (name) s.innerHTML = `Tu regardes <b>${esc(name)}</b> · <kbd>${esc(key('saut'))}</kbd> joueur suivant`; },
     // icônes rendues à partir des modèles : on redessine la barre d'objets et le sac
     setIcons(map) { rendered = map; invKey = ''; bagKey = ''; },
     get bagOpen() { return !bagEl.hidden; },

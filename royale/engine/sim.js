@@ -8,7 +8,7 @@ import { makeRng, hash } from './rng.js';
 import { CELL } from './buildings.js';
 import { newPlayer, stepPlayer, stepAir, MOVE } from './player.js';
 import { planStorm, planFlight, STORM_TIMES } from './map.js';
-import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, rollDrop, weaponDamage, weapon, item, ammo, mats } from './items.js';
+import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, rollDrop, weaponDamage, weapon, item, ammo, mats, spreadOf, REST } from './items.js';
 
 export const DT = 1 / 60;
 export const HP = 100, SHIELD = 100;
@@ -247,9 +247,19 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ tirs
   // l'épaule : le rayon de la caméra passe par là (la caméra est derrière, sur le même axe)
-  function eye(P) {
-    const rx = -Math.cos(P.yaw), rz = Math.sin(P.yaw), h = P.crouch ? MOVE.hc : MOVE.h;
-    return [P.x + rx * SHOULDER, P.y + h - 0.25, P.z + rz * SHOULDER];
+  // solid : l'épaule s'arrête contre un mur à droite (comme la caméra), pour ne jamais tirer depuis l'autre côté du mur
+  function eye(P, solid) {
+    const rx = -Math.cos(P.yaw), rz = Math.sin(P.yaw), h = P.crouch ? MOVE.hc : MOVE.h, y = P.y + h - 0.25;
+    const side = solid ? Math.max(0, world.ray(P.x, y, P.z, rx, 0, rz, SHOULDER, 0.2)) : SHOULDER;
+    return [P.x + rx * side, y, P.z + rz * side];
+  }
+  // direction des tirs : celle du viseur envoyée par le joueur (ay, ap : depuis l'épaule vers ce que montre le centre de
+  // l'image), à défaut celle du regard ; un écart trop grand avec le regard est ignoré
+  function aimOf(P) {
+    const I = P.inp;
+    if (I.ay == null || I.ap == null) return [I.yaw, I.pitch];
+    const dy = Math.atan2(Math.sin(I.ay - I.yaw), Math.cos(I.ay - I.yaw));
+    return Math.abs(dy) < 0.6 && Math.abs(I.ap - I.pitch) < 0.6 ? [I.yaw + dy, I.ap] : [I.yaw, I.pitch];
   }
   const aimDir = (yaw, pitch) => { const c = Math.cos(pitch); return [Math.sin(yaw) * c, Math.sin(pitch), Math.cos(yaw) * c]; };
   // rayon contre un joueur : corps (cylindre) et tête (sphère) ; renvoie { t, head } ou null
@@ -295,6 +305,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
     if (by && mates(by, Q)) return; // pas de tir ami
+    if (by && by.bot && Q.bot && S.hooks.pace) n *= S.hooks.pace(); // entre bots, le rythme de la partie (voir ai.js)
     if (Q.down) {
       // à terre : les coups entament sa réserve ; à zéro, il est éliminé (par celui qui l'a mis à terre, à défaut)
       Q.down.hp -= n;
@@ -328,20 +339,20 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function shoot(P, it) {
     const W = WEAPONS[it.w];
+    // les bots gardent la dispersion d'avant (×1,4, sans le premier tir précis) : leur visée a déjà sa propre erreur
+    const sp = P.bot ? spreadOf(it.w, P, P.inp.aim, false) * 1.4 : spreadOf(it.w, P, P.inp.aim, S.t - (P.shotT != null ? P.shotT : -9) > REST);
     it.mag--; P.cd = 1 / W.rate; P.shotT = S.t; P.shots++;
-    const o = eye(P), moving = Math.hypot(P.vx, P.vz) > 1;
-    let sp = (P.inp.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2) + P.bloom;
-    if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
+    const o = eye(P, true), [yaw, pitch] = aimOf(P);
     P.bloom = Math.min(P.bloom + W.bloom, 0.09);
     ev({ e: 'feu', p: P.id, w: it.w });
     if (W.bullet) {
-      const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp, d = aimDir(P.inp.yaw + Math.cos(a) * r, P.inp.pitch + Math.sin(a) * r);
+      const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp, d = aimDir(yaw + Math.cos(a) * r, pitch + Math.sin(a) * r);
       const v = W.bullet.speed;
       S.projectiles.push({ id: S.nextProj++, kind: 'balle', x: o[0], y: o[1], z: o[2], vx: d[0] * v, vy: d[1] * v, vz: d[2] * v, owner: P.id, it: { ...it }, life: W.range / v + 0.3, from: [o[0], o[1], o[2]], dist: 0 });
       return;
     }
     if (W.rocket) {
-      const d = aimDir(P.inp.yaw + (rng.next() - 0.5) * sp, P.inp.pitch + (rng.next() - 0.5) * sp);
+      const d = aimDir(yaw + (rng.next() - 0.5) * sp, pitch + (rng.next() - 0.5) * sp);
       S.projectiles.push({ id: S.nextProj++, kind: 'roquette', x: o[0] + d[0] * 0.8, y: o[1] + d[1] * 0.8, z: o[2] + d[2] * 0.8, vx: d[0] * W.rocket.speed, vy: d[1] * W.rocket.speed, vz: d[2] * W.rocket.speed, owner: P.id, it: { ...it }, life: 6 });
       return;
     }
@@ -350,7 +361,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     for (let k = 0; k < n; k++) {
       // dispersion dans un cône
       const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp;
-      const d = aimDir(P.inp.yaw + Math.cos(a) * r, P.inp.pitch + Math.sin(a) * r);
+      const d = aimDir(yaw + Math.cos(a) * r, pitch + Math.sin(a) * r);
       const h = trace(P, o, d, W.range);
       const to = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t];
       ev({ e: 'tir', p: P.id, w: it.w, from: o, to, hit: h.who ? 2 : h.t < W.range ? 1 : 0, k });
@@ -407,7 +418,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
   }
   function throwItem(P, it) {
-    const I = ITEMS[it.c], o = eye(P), d = aimDir(P.inp.yaw, P.inp.pitch + 0.18);
+    const I = ITEMS[it.c], o = eye(P, true), d = aimDir(P.inp.yaw, P.inp.pitch + 0.18);
     const v = 22;
     S.projectiles.push({ id: S.nextProj++, kind: I.throw, x: o[0] + d[0] * 0.6, y: o[1] + d[1] * 0.6, z: o[2] + d[2] * 0.6, vx: d[0] * v + P.vx * 0.5, vy: d[1] * v, vz: d[2] * v + P.vz * 0.5, owner: P.id, c: it.c, life: I.fuse });
     ev({ e: 'lance', p: P.id, c: it.c });
@@ -706,7 +717,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function takeEvents() { const e = S.events; S.events = []; return e; }
 
   return {
-    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates, ping,
+    S, step, input, takeEvents, addPlayer, results, target, eye, trace, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates, ping,
     player: (id) => S.players.get(id),
   };
 }

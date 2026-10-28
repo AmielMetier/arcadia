@@ -1,6 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 3.5 — 28 octobre 2026
+- **Island Rush** — Touches modifiables : dans ⚙️ Réglages, chaque action peut avoir deux touches, au clavier ou à la souris (boutons du côté compris). Ton choix est retenu dans ton navigateur, et tous les rappels à l'écran le suivent.
+  - Les touches s'affichent comme sur ton clavier (Z Q S D sur un clavier français). Une touche déjà utilisée ailleurs y est retirée, et un message le dit.
+- **Island Rush** — Armes plus précises : environ un tiers de dispersion en moins, et à l'arrêt, le premier tir après une courte pause part presque droit (sauf au fusil à pompe).
+  - Le viseur s'ouvre exactement de la dispersion réelle : avant, il paraissait plus serré qu'en vrai, surtout en visant.
+  - Les balles partent vers ce que montre le viseur, même collé à un mur, et plus jamais depuis l'autre côté d'un mur à ta droite.
+  - La précision gagnée est pour les joueurs : les bots gardent la leur.
+- **Island Rush** — Fini les attroupements de bots qui ne se tirent pas dessus : un bot qui en voit un autre à moins de 30 m l'engage (à moins de 10 m tant qu'il fouille en début de partie) et va au bout du combat au lieu de l'oublier en route. À bout de forces, il se met à couvert pour se soigner.
+  - Ils ne marchent plus en file vers la zone et ne s'entassent plus sur le même butin, le même combat ou le même largage. La partie dure toujours une dizaine de minutes.
+- **Island Rush** — Les bots ne restent plus coincés : posés sur une pente trop raide, sur le socle d'un bâtiment ou contre un obstacle, ils cherchent un autre chemin, font un détour ou redescendent au lieu de piétiner sur place jusqu'à la tempête. Partis rejoindre la zone, ils ne font plus demi-tour pour un objet.
+- **Island Rush** — La première zone n'arrive plus en pleine fouille : la tempête ne bouge qu'au bout de 3 minutes, son bord avance moins vite que toi en courant, et le premier cercle reste près du centre de l'île. Les cercles suivants vont un peu plus vite, pour une partie d'une dizaine de minutes.
+
 - **Tous les jeux en ligne** — Beaucoup moins de « Coupure chez l'hôte · on l'attend… », et le salon ne casse plus pour une micro-coupure.
   - L'hôte qui attend son tour dans un autre onglet (Mini-Golf Party, Birdie Party…) garde une connexion bien vive : à la moindre coupure il revient aussitôt, au lieu de perdre sa place au bout de 20 secondes et de voir un invité reprendre le salon.
   - Quand la connexion de l'hôte n'arrive plus à suivre, les images de la partie devenues trop anciennes sont sautées au lieu de s'empiler : la partie reste fluide, au lieu de prendre du retard jusqu'à ce que l'hôte se croie déconnecté.

@@ -1228,18 +1228,23 @@ export function generateMap(seed = 1, { size = SIZE } = {}) {
 
 // ------------------------------------------------------------------ la tempête : des cercles de plus en plus petits
 // Chaque partie tire sa propre tempête (graine de partie), sur la même île.
-export const STORM_TIMES = [ // attente avant de se refermer, durée de la fermeture (s), dégâts par seconde
-  { wait: 75, shrink: 60, dps: 1 }, { wait: 60, shrink: 50, dps: 1 }, { wait: 50, shrink: 45, dps: 2 }, { wait: 45, shrink: 40, dps: 3 },
-  { wait: 40, shrink: 30, dps: 5 }, { wait: 30, shrink: 25, dps: 8 }, { wait: 20, shrink: 20, dps: 10 },
+// attente avant de se refermer, durée de la fermeture (s), dégâts par seconde. La première phase laisse le temps de se
+// poser et de fouiller (elle ne bouge qu'au bout de 3 min), puis se referme lentement ; la partie dure une dizaine de minutes
+export const STORM_TIMES = [
+  { wait: 150, shrink: 90, dps: 1 }, { wait: 50, shrink: 45, dps: 1 }, { wait: 45, shrink: 40, dps: 2 }, { wait: 40, shrink: 35, dps: 3 },
+  { wait: 35, shrink: 25, dps: 5 }, { wait: 25, shrink: 20, dps: 8 }, { wait: 20, shrink: 20, dps: 10 },
 ];
 export function planStorm(map, seed) {
   const rng = makeRng(ihash(seed ^ 0x5eed));
   const R = map.islandR, radii = [0.66, 0.42, 0.26, 0.15, 0.08, 0.035, 0].map((f) => f * R);
   const land = (x, z) => x > 0 && z > 0 && x < map.size && z < map.size && map.waterAt(x, z) === 0;
-  let cur = { x: map.center, z: map.center, r: map.size * 0.75 };
+  // au départ, la tempête entoure toute l'île (la terre va jusqu'à ≈ 1,23 R du centre) : son bord ne court pas plus vite qu'un
+  // joueur pendant la première fermeture
+  let cur = { x: map.center, z: map.center, r: R * 1.25 };
   const out = [{ ...cur, ...STORM_TIMES[0] }];
   for (let i = 0; i < radii.length; i++) {
-    const r = radii[i], span = cur.r - r;
+    // le premier cercle reste près du centre de l'île : où qu'on se pose, on a le temps de le rejoindre
+    const r = radii[i], span = i === 0 ? R * 0.3 : cur.r - r;
     let pick = null;
     for (let t = 0; t < 400 && !pick; t++) {
       const dx = rng.range(-1, 1), dz = rng.range(-1, 1);
