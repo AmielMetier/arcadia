@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 2.91 — 28 octobre 2026
+- **Birdie Party** — Nouveau parcours « Les Géants » : 18 trous immenses, de 600 m à plus d'un kilomètre (par 6 à 8), à travers la campagne, la mer, la montagne et le désert.
+  - Un double dogleg de 1,1 km, un archipel à traverser d'île en île, une crique à porter, un torrent qui coupe deux fois la vallée, deux canyons dans le désert…
+  - Sur ces trous, la balle n'est ramassée qu'à par + 5, et le survol du trou prend un peu plus son temps.
+- **Birdie Party** — Quand l'hôte perd sa connexion en pleine partie, la partie continue vraiment chez le nouvel hôte.
+  - Les autres joueurs ne sont plus comptés comme partis pendant qu'ils rejoignent le nouvel hôte : chacun garde sa place et ses scores, l'ancien hôte compris quand il revient.
+  - Chacun reçoit tout de suite l'état de la partie en arrivant, et un joueur qui n'a plus de nouvelles de l'hôte le redemande tout seul au lieu de rester bloqué.
+- **Birdie Party** — Les bots évitent mieux de poser leur balle juste devant un torrent ou un étang.
+
 ## 2.90 — 27 octobre 2026
 - **Odyssée** — Nouveau jeu : une grande aventure Pokémon en fausse 3D, avec l'ambiance des jeux DS (prototype, les Pokémon servent de remplaçants).
   - Une région aussi grande que Kanto : 10 villes, 10 routes, un pont sur la mer, deux grottes, 8 arènes et la Ligue.

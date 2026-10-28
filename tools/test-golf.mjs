@@ -1,12 +1,12 @@
 // Tests du moteur de Birdie Party : node tools/test-golf.mjs
-// Distances des clubs, surfaces des 30 trous (îles, lacs, passages à porter, désert), coups reproductibles, eau et
+// Distances des clubs, surfaces des 48 trous (dont les 18 géants) (îles, lacs, passages à porter, désert), coups reproductibles, eau et
 // hors-limites, putts, règles d'une partie (ordre de jeu, pénalités, classement, équipes), bots des trois niveaux,
 // et des parties entières jouées par la session (chacun pour soi, puis en équipes).
 import assert from 'node:assert/strict';
 import { CLUBS, TRAJ, PUTTER, putterRange, lieFactor } from '../golf/engine/clubs.js';
 import { simulate, previewLanding, CUP_R } from '../golf/engine/physics.js';
 import { HOLES, buildHole, windFor, COURSES } from '../golf/engine/course.js';
-import { newRound, startHole, applyShot, holeOver, finishHole, ranking, totals, stableford, MAX_STROKES, nextPlayer } from '../golf/engine/rules.js';
+import { newRound, startHole, applyShot, holeOver, finishHole, ranking, totals, stableford, MAX_STROKES, maxStrokes, nextPlayer } from '../golf/engine/rules.js';
 import { botShot } from '../golf/engine/bot.js';
 import { suggestClub, layupPoint } from '../golf/engine/advice.js';
 import { startHost, startClient, holeByNumber } from '../golf/net/session.js';
@@ -163,20 +163,23 @@ t('un coup se calcule vite (moins de 60 ms)', () => {
 
 const holes = HOLES.map(buildHole);
 const byName = (name) => holes.find((h) => h.name === name);
-t('les 30 trous : départ, green, drapeau, longueur conforme au par', () => {
-  assert.equal(holes.length, 30);
-  let par = 0;
+t('les 48 trous : départ, green, drapeau, longueur conforme au par', () => {
+  assert.equal(holes.length, 48);
+  let par = 0, parG = 0;
   for (const h of holes) {
-    par += h.par;
+    if (h.n <= 30) par += h.par; else parG += h.par;
     assert.equal(h.surfaceAt(h.tee.x, h.tee.z), 'tee', `départ du trou ${h.n}`);
     assert.equal(h.surfaceAt(h.pin.x, h.pin.z), 'green', `drapeau du trou ${h.n}`);
-    const [lo, hi] = { 3: [95, 210], 4: [280, 440], 5: [430, 560] }[h.par];
+    const [lo, hi] = { 3: [95, 210], 4: [280, 440], 5: [430, 560], 6: [600, 860], 7: [780, 1060], 8: [950, 1200] }[h.par];
     assert.ok(h.length >= lo && h.length <= hi, `trou ${h.n} : ${h.length} m pour un par ${h.par}`);
     assert.equal(suggestClub(h, { x: h.tee.x, z: h.tee.z, lie: 'tee' }) < 7, true);
   }
   assert.equal(par, 122);
+  assert.equal(parG, 127);
+  assert.ok(holes.filter((h) => h.n > 30).every((h) => h.long && h.par >= 6), 'les géants sont tous très longs');
   for (const c of Object.values(COURSES)) assert.ok([6, 8, 9, 18, 30].includes(c.holes.length));
-  assert.equal(new Set(HOLES.map((d) => d.seed)).size, 30, 'une graine par trou');
+  assert.deepEqual(COURSES.geant.holes, Array.from({ length: 18 }, (_, i) => i + 31));
+  assert.equal(new Set(HOLES.map((d) => d.seed)).size, 48, 'une graine par trou');
 });
 
 t('îles et lacs : le green sur son île, l\'eau autour, le départ au sec', () => {
@@ -297,10 +300,29 @@ t('équipes (scramble) : chacun joue depuis la balle de l\'équipe, on garde la 
   assert.ok(o3.holed && R.players[k].done && R.players[mate].done);
 });
 
-t('bots : les trois niveaux finissent les 30 trous, le meilleur niveau joue mieux', () => {
+// un bot joue chaque trou de la liste ; total des coups (balle ramassée au plafond du trou)
+const botRound = (list, level, seed) => {
+  let total = 0;
+  for (const h of list) {
+    const w = windFor(h, seed), cap = maxStrokes(h.par);
+    let ball = { x: h.tee.x, z: h.tee.z, lie: 'tee' }, s = 0;
+    for (let k = 0; k < cap && s < cap; k++) {
+      const b = botShot(h, ball, w, level, seed * 100 + h.n * 10 + k);
+      const r = simulate(h, ball, { ...b, seed: seed + k }, w, { putt: b.putt });
+      s++;
+      if (r.kind === 'holed') break;
+      if (r.kind === 'water' || r.kind === 'ob') s++; // on rejoue du même endroit
+      else ball = { x: r.end.x, z: r.end.z, lie: r.surf };
+    }
+    total += Math.min(s, cap);
+  }
+  return total;
+};
+
+t('bots : les trois niveaux finissent les 30 premiers trous, le meilleur niveau joue mieux', () => {
   const play = (level, seed) => {
     let total = 0;
-    for (const h of holes) {
+    for (const h of holes.slice(0, 30)) {
       const w = windFor(h, seed);
       let ball = { x: h.tee.x, z: h.tee.z, lie: 'tee' }, s = 0;
       for (let k = 0; k < MAX_STROKES; k++) {
@@ -319,6 +341,14 @@ t('bots : les trois niveaux finissent les 30 trous, le meilleur niveau joue mieu
   console.log(`   30 trous (par 122) : facile ${f}, moyen ${m}, difficile ${e}`);
   assert.ok(e < f, 'le niveau difficile bat le niveau facile');
   assert.ok(e < 140 && f < 190);
+});
+
+t('les géants : le meilleur bot boucle les 18 très longs trous autour du par, sans balle perdue en route', () => {
+  const geants = holes.filter((h) => h.n > 30);
+  const e = botRound(geants, 'expert', 5);
+  console.log(`   18 géants (par 127) : difficile ${e}`);
+  assert.ok(e > 105 && e < 135, `total ${e}`);
+  for (const h of geants) assert.ok(botRound([h], 'expert', 7) < maxStrokes(h.par), `trou ${h.n} terminé avant d'avoir à ramasser la balle`);
 });
 
 // une partie entière déroulée par la session : un joueur (joué ici par l'IA) et deux bots
@@ -500,6 +530,93 @@ await new Promise((resolve, reject) => {
   assert.equal(reports.length, 2, 'la seconde partie compte aussi');
   C.stop(); S.stop();
   n++; console.log('✓ menu en réseau : l\'invité suit les choix de l\'hôte, la partie démarre chez lui, retour au menu et nouvelle partie');
+}
+
+// changement d'hôte en pleine partie (pont simulé à trois) : l'hôte disparaît, un invité reprend la partie depuis le
+// dernier état reçu ; les autres le rejoignent un par un sans être comptés partis, reçoivent l'état, et la partie
+// va jusqu'au bout avec tout le monde ; l'ancien hôte revient ensuite comme invité
+{
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const P = [0, 1, 2].map((id) => ({ id, name: 'J' + id, color: ['#ff4b2b', '#2b8cff', '#ffc531'][id] }));
+  const net = { host: 0, room: new Set([0, 1, 2]) };
+  const B = {}, S = {}, views = {};
+  const mkBridge = (id) => {
+    const hs = {};
+    const b = {
+      embedded: true, info: { hostId: net.host, myId: id }, players: P.filter((p) => net.room.has(p.id)), hs,
+      on(k, fn) { (hs[k] = hs[k] || []).push(fn); }, report() {},
+      send(to, m) {
+        if (!net.room.has(id)) return;
+        const dst = to === 'all' ? [...net.room].filter((x) => x !== id) : to === 'host' ? [net.host] : [to];
+        for (const d of dst) if (d !== id && net.room.has(d)) setTimeout(() => { const t = B[d]; if (t && net.room.has(d) && net.room.has(id)) (t.hs.msg || []).forEach((f) => f(id, JSON.parse(JSON.stringify(m)))); }, 1);
+      },
+    };
+    return (B[id] = b);
+  };
+  const roster = () => { for (const id of net.room) { const b = B[id]; b.players = P.filter((p) => net.room.has(p.id)); b.info.hostId = net.host; (b.hs.roster || []).forEach((f) => f()); } };
+  // chaque joueur regarde les coups jusqu'au bout et joue le sien comme un bon joueur
+  const mkEmit = (id) => (e) => {
+    if (e.type === 'shot') { setTimeout(() => S[id] && S[id].done(e.ev.no), 3); return; }
+    if (e.type !== 'state') return;
+    views[id] = e.R;
+    if (e.R.phase !== 'play') return;
+    setTimeout(() => {
+      const s = S[id]; if (!s || views[id] !== e.R) return;
+      s.ready(e.R.shotNo);
+      const Q = e.R.players[e.R.turn];
+      if (Q && Q.id === id) { const h = holeByNumber(e.R.holes[e.R.hi]); s.shot(botShot(h, Q.ball, windFor(h, e.R.seed, e.R.wind), 'expert', e.R.shotNo + id)); }
+    }, 3);
+  };
+  for (const id of [0, 1, 2]) mkBridge(id);
+  S[0] = startHost({ bridge: B[0], solo: false, settings: { course: 'desert', startHole: 29, bots: 0, time: 'jour' }, me: P[0], emit: mkEmit(0), speed: 40 });
+  S[1] = startClient({ bridge: B[1], me: P[1], emit: mkEmit(1) });
+  S[2] = startClient({ bridge: B[2], me: P[2], emit: mkEmit(2) });
+  S[0].begin();
+  for (let k = 0; k < 300 && !(views[2] && views[2].shotNo >= 2); k++) await wait(10);
+  assert.ok(views[2] && views[2].shotNo >= 2, 'la partie a commencé chez les invités');
+  // l'hôte disparaît ; J1 reprend le salon, seul d'abord (les autres n'y sont pas encore revenus)
+  S[0].stop(); net.host = 1; net.room = new Set([1]);
+  const last = S[1].state; S[1].stop();
+  S[1] = startHost({ bridge: B[1], solo: false, settings: {}, me: P[1], emit: mkEmit(1), initial: last, speed: 40 });
+  roster();
+  await wait(60);
+  // J2 rejoint le nouvel hôte
+  net.room.add(2); roster();
+  await wait(200);
+  assert.ok(views[2].shotNo >= last.shotNo, 'J2 a reçu l\'état du nouvel hôte');
+  // l'ancien hôte revient, comme invité (son jeu est rechargé)
+  net.room.add(0); mkBridge(0); S[0] = startClient({ bridge: B[0], me: P[0], emit: mkEmit(0) }); roster();
+  for (let k = 0; k < 1500 && !(views[1] && views[1].phase === 'over' && views[2]?.phase === 'over' && views[0]?.phase === 'over'); k++) await wait(10);
+  const R = S[1].state;
+  assert.equal(R.phase, 'over', 'la partie se termine chez le nouvel hôte');
+  assert.ok(views[0].phase === 'over' && views[2].phase === 'over', 'et chez les deux invités');
+  assert.ok(R.players.every((p) => !p.left && p.scores.length === 2 && p.scores.every((x) => x >= 1)), 'personne n\'a été compté parti : ' + JSON.stringify(R.players.map((p) => [p.name, p.left, p.scores])));
+  for (const id of [0, 1, 2]) S[id].stop();
+  n++; console.log('✓ changement d\'hôte : la partie reprend chez le nouvel hôte, chacun le rejoint et la termine');
+}
+
+// un invité qui redemande l'état (sans nouvelles de l'hôte) redit qu'il est prêt : ça ne doit pas relancer le compte à
+// rebours de son tour, sinon un joueur parti de son clavier bloquerait la partie
+{
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const host = { id: 0, name: 'Hôte', color: '#ff4b2b' }, guest = { id: 1, name: 'Invité', color: '#2b8cff' };
+  const hs = {}, states = [], shots = [];
+  const bridge = { embedded: false, players: [host, guest], on(k, fn) { (hs[k] = hs[k] || []).push(fn); }, send() {}, report() {} };
+  const fire = (k, ...a) => (hs[k] || []).forEach((f) => f(...a));
+  const S = startHost({ bridge, solo: false, settings: { course: 'campagne', bots: 0 }, me: host, emit: (e) => { if (e.type === 'state') states.push(e.R); if (e.type === 'shot') shots.push(e.ev); }, speed: 200 });
+  S.begin();
+  await wait(10);
+  let R = states.at(-1);
+  if (R.players[R.turn].id === 0) { S.shot({ club: 0, aim: 0, power: 0.8, curve: 0 }); S.done(0); fire('msg', 1, { t: 'seen', no: 0 }); await wait(10); R = states.at(-1); }
+  assert.equal(R.players[R.turn].id, 1, 'au tour de l\'invité');
+  const before = shots.length, no = R.shotNo;
+  fire('msg', 1, { t: 'ready', no });
+  // 60 s de jeu (300 ms ici) : l'invité redit « prêt » toutes les 7 s environ, sans jouer
+  for (let k = 0; k < 16 && shots.length === before; k++) { await wait(35); fire('msg', 1, { t: 'sync', no, g: R.started }); fire('msg', 1, { t: 'ready', no }); }
+  for (let k = 0; k < 20 && shots.length === before; k++) await wait(20);
+  assert.equal(shots.length, before + 1, 'son coup part quand même tout seul au bout du temps');
+  S.stop();
+  n++; console.log('✓ un « prêt » redit ne relance pas le compte à rebours du tour');
 }
 
 console.log(`\n${n} tests réussis`);

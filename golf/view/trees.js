@@ -273,10 +273,13 @@ export function forestItems(hole, { count = 1700 } = {}) {
   const near = 90;
   // densité en taches : forêts et clairières
   const dens = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.013 + 1.7) * Math.cos(z * 0.011 - 0.6) + 0.3 * Math.sin((x + z) * 0.029);
+  // très long trou : la forêt s'étire avec lui (et compte plus d'arbres)
+  const ex = hole.long ? Math.max(0, (B.x1 - B.x0) / 2 - 150) : 0, ez = hole.long ? Math.max(0, (B.z1 - B.z0) / 2 - 300) : 0;
+  if (hole.long) count = Math.round(count * Math.min(1.8, 1 + (ex + ez) / 700));
   let tries = 0;
   while (items.length < count && tries++ < count * 12) {
     const a = r.range(0, Math.PI * 2), d = r.range(0, 720);
-    const x = cx + Math.sin(a) * d * 1.1, z = cz + Math.cos(a) * d * 1.25;
+    const x = cx + Math.sin(a) * (d * 1.1 + ex), z = cz + Math.cos(a) * (d * 1.25 + ez);
     if (-hole.landSD(x, z) < near || r.next() > dens(x, z)) continue;
     if (hole.waters.some((w) => Math.hypot(x - w.x, z - w.z) < Math.max(w.rx, w.rz) * 1.6)) continue;
     if (hole.coast && hole.heightAt(x, z) < hole.coast.level + 2.5) continue;

@@ -1,4 +1,4 @@
-// Birdie Party — les 30 trous et leur terrain. Moteur pur (aucun DOM) : le même code donne le relief et les surfaces
+// Birdie Party — les 48 trous et leur terrain. Moteur pur (aucun DOM) : le même code donne le relief et les surfaces
 // à la physique (hôte et invités) et au rendu. Repère : x vers la gauche quand on regarde le green depuis le départ,
 // y vers le haut, z du départ vers le green.
 //
@@ -304,10 +304,183 @@ export const HOLES = [
     bunkers: [{ x: -14, z: 146, rx: 4.5, rz: 3, rot: 0.9, ph: 1 }],
     plateaus: [{ x: 0, z: -3, rx: 20, rz: 20, rot: 0, h: 8, ph: 0.3 }, { x: 2, z: 140, rx: 34, rz: 31, rot: 0.3, h: 7, ph: 1.7, soft: true }],
   },
-
+  // --------------------------------------------------------------- les géants : 18 trous de 600 m à plus d'un kilomètre
+  // (par 6 à 8), à travers les quatre décors
+  {
+    // un long S à travers les prés, un ruisseau à franchir avant le green
+    n: 31, name: 'La Grande Traversée', theme: 'campagne', par: 7, seed: 3101, tee: T0, pin: { x: 13, z: 862 },
+    ravines: [{ pts: [[-400, 630], [-60, 648], [0, 654], [60, 662], [400, 676]], w: 14, depth: 2.2 }],
+    line: [[0, 35, 14], [8, 120, 17], [20, 210, 18, 57], [18, 300, 17, 57], [2, 380, 16], [-16, 460, 17, 77], [-24, 540, 17, 77], [-20, 610, 15], [-16, 640, 0], [-12, 668, 0], [-8, 700, 15], [2, 770, 14, 48], [8, 822, 12]],
+    green: { x: 12, z: 860, rx: 15, rz: 16, rot: 0.15, lift: 0.7, sx: 0.011, sz: -0.01, ph: 1.2 },
+    bunkers: [{ x: 55, z: 225, rx: 8, rz: 5, rot: -0.02, ph: 2.6 }, { x: -15, z: 298, rx: 7, rz: 5, rot: -0.02, ph: 5.6 }, { x: 9, z: 543, rx: 7, rz: 5, rot: -0.1, ph: 3.3 }, { x: -28, z: 757, rx: 6, rz: 4, rot: 0.14, ph: 2.2 }, { x: 31, z: 872, rx: 6, rz: 3.5, rot: 2.58, ph: 3.7 }, { x: -3, z: 878, rx: 5, rz: 3.5, rot: 0.88, ph: -1.4 }],
+    water: [{ x: -63, z: 461, rx: 16, rz: 24, rot: -0.1, ph: 0.3, depth: 2.4 }],
+    hills: [{ x: 138, z: 301, r: 60, h: 8 }, { x: -138, z: 631, r: 60, h: 7 }],
+  },
+  {
+    // deux allées de part et d'autre d'une longue rangée de peupliers
+    n: 32, name: 'Les Peupliers', theme: 'campagne', par: 6, seed: 3202, tee: T0, pin: { x: 4, z: 818 },
+    line: [[0, 44, 14], [-6, 150, 17, 57], [-18, 250, 17, 57], [-34, 350, 15], [-36, 450, 15], [-26, 550, 15], [-8, 638, 16, 51], [0, 725, 13, 61], [2, 778, 12, 61]],
+    alt: [[[-4, 269, 8], [24, 338, 11], [34, 438, 11], [26, 538, 10], [6, 613, 8]]],
+    green: { x: 3, z: 816, rx: 15, rz: 16, rot: -0.1, lift: 0.7, sx: -0.011, sz: 0.01, ph: 2.2 },
+    bunkers: [{ x: 20, z: 228, rx: 8, rz: 5, rot: -0.12, ph: 2.6 }, { x: -36, z: 667, rx: 7, rz: 5, rot: 0.09, ph: 5.6 }, { x: 20, z: 832, rx: 6, rz: 3.5, rot: 2.4, ph: 3.4 }, { x: -11, z: 834, rx: 5, rz: 3.5, rot: 0.9, ph: -1.1 }],
+    water: [{ x: 36, z: 744, rx: 12, rz: 16, rot: 0.04, ph: 4.7, depth: 2.4 }],
+    groves: [{ x: 0, z: 440, rx: 6, rz: 112.5, n: 46, kind: 'pine' }],
+    hills: [{ x: -127, z: 236, r: 60, h: 7 }, { x: 102, z: 635, r: 55, h: 7 }],
+  },
+  {
+    // double dogleg : à droite autour des étangs, puis à gauche jusqu'au bout
+    n: 33, name: 'Le Marathon', theme: 'campagne', par: 8, seed: 3303, tee: T0, pin: { x: 17, z: 1062 },
+    line: [[0, 35, 15], [-6, 120, 18], [-14, 210, 18, 57], [-30, 290, 17, 57], [-60, 360, 17, 79], [-100, 420, 17, 79], [-130, 490, 17, 54], [-138, 570, 17, 74], [-128, 650, 16, 74], [-100, 720, 17, 53], [-62, 780, 17, 55], [-24, 840, 16, 55], [2, 910, 15, 63], [12, 980, 13, 63], [14, 1022, 12]],
+    green: { x: 16, z: 1060, rx: 15, rz: 16, rot: 0.3, lift: 0.7, sx: 0.01, sz: -0.012, ph: 0.6 },
+    bunkers: [{ x: 16, z: 236, rx: 8, rz: 5, rot: -0.2, ph: 4.5 }, { x: -81, z: 460, rx: 7, rz: 5, rot: -0.4, ph: 0.3 }, { x: -142, z: 701, rx: 7, rz: 5, rot: 0.38, ph: 6 }, { x: -9, z: 801, rx: 8, rz: 5, rot: 0.56, ph: 5.7 }, { x: 32, z: 1077, rx: 6, rz: 3.5, rot: 2.32, ph: 3.1 }, { x: -2, z: 1076, rx: 5, rz: 4, rot: 0.72, ph: -1.7 }, { x: 18, z: 1082, rx: 6, rz: 3, rot: 1.67, ph: 1.2 }],
+    water: [{ x: -111, z: 352, rx: 18, rz: 26, rot: -0.59, ph: 1.7, depth: 2.4 }, { x: -89, z: 607, rx: 16, rz: 24, rot: 0.12, ph: 1.2, depth: 2.4 }, { x: 43, z: 935, rx: 12, rz: 18, rot: 0.14, ph: 4.2, depth: 2.4 }],
+    hills: [{ x: 77, z: 344, r: 60, h: 8 }, { x: -257, z: 588, r: 60, h: 8 }, { x: -135, z: 886, r: 55, h: 7 }],
+  },
+  {
+    // le fairway se faufile entre quatre étangs, tantôt à gauche, tantôt à droite
+    n: 34, name: 'La Chaîne des Étangs', theme: 'campagne', par: 7, seed: 3404, tee: T0, pin: { x: -7, z: 984 },
+    line: [[0, 41, 14], [2, 142, 16], [-2, 236, 15, 64], [-14, 330, 15, 64], [-20, 425, 14, 65], [-12, 519, 15, 65], [6, 614, 15, 64], [18, 708, 14, 64], [14, 802, 14, 63], [2, 885, 13, 63], [-4, 944, 12]],
+    green: { x: -8, z: 982, rx: 15, rz: 16, rot: -0.2, lift: 0.9, sx: -0.012, sz: 0.01, ph: 0.7 },
+    bunkers: [{ x: 14, z: 355, rx: 7, rz: 5, rot: -0.06, ph: 0.8 }, { x: -38, z: 547, rx: 7, rz: 5, rot: 0.19, ph: 2.4 }, { x: -12, z: 727, rx: 7, rz: 5, rot: -0.04, ph: 4.1 }, { x: 10, z: 996, rx: 6, rz: 3.5, rot: 2.47, ph: 4 }, { x: -23, z: 1000, rx: 5, rz: 4, rot: 0.87, ph: -0.8 }],
+    water: [{ x: 32, z: 258, rx: 14, rz: 24, rot: -0.13, ph: 0.9, depth: 2.4 }, { x: -54, z: 450, rx: 15, rz: 26, rot: 0.08, ph: 4.7, depth: 2.4 }, { x: 44, z: 629, rx: 14, rz: 24, rot: 0.13, ph: 0.2, depth: 2.4 }, { x: -23, z: 817, rx: 14, rz: 22, rot: -0.14, ph: 1.8, depth: 2.4 }],
+    hills: [{ x: -124, z: 280, r: 55, h: 7 }, { x: 132, z: 690, r: 60, h: 8 }],
+  },
+  {
+    // en arc autour d'un grand lac : couper par-dessus l'eau fait gagner un coup
+    n: 35, name: 'Le Domaine', theme: 'campagne', par: 6, seed: 3505, tee: T0, pin: { x: 233, z: 702 },
+    line: [[0, 47, 15], [6, 162, 17], [20, 270, 17, 56], [46, 365, 17, 56], [86, 432, 16], [134, 473, 16, 51], [182, 513, 15, 51], [214, 581, 14], [226, 662, 13]],
+    green: { x: 232, z: 700, rx: 15, rz: 16, rot: 0.9, lift: 0.7, sx: 0.012, sz: 0.008, ph: 2.9 },
+    bunkers: [{ x: -2, z: 317, rx: 8, rz: 5, rot: 0.27, ph: 3.3 }, { x: 158, z: 532, rx: 7, rz: 5, rot: 0.88, ph: 5.2 }, { x: 252, z: 711, rx: 6, rz: 3.5, rot: 2.63, ph: 3.7 }, { x: 215, z: 715, rx: 5, rz: 3.5, rot: 0.73, ph: -2 }],
+    water: [{ x: 120, z: 310.5, rx: 48, rz: 83.7, rot: 0.6, ph: 1.1, depth: 2.8 }],
+    groves: [{ x: 120, z: 310.5, rx: 70, rz: 113.4, n: 12, kind: 'oak' }],
+    hills: [{ x: -99, z: 284, r: 60, h: 8 }],
+  },
+  {
+    // la mer longe tout le trou à gauche ; le fairway épouse la côte
+    n: 36, name: 'La Côte Sauvage', theme: 'mer', par: 7, seed: 3606, tee: T0, pin: { x: -16, z: 948 },
+    coast: { pts: [[72, -345], [70, 138], [60, 345], [72, 529], [80, 690], [62, 828], [44, 966], [-20, 1035], [-300, 1058]], sea: [300, 575], level: -1.4, beach: 9 },
+    line: [[0, 40, 15], [4, 138, 17], [-2, 230, 17, 56], [-16, 322, 17, 56], [-20, 414, 16], [-8, 506, 16, 53], [8, 598, 16, 53], [10, 690, 15, 50], [-4, 782, 14, 50], [-14, 851, 13], [-16, 908, 12]],
+    green: { x: -17, z: 946, rx: 15, rz: 16, rot: -0.2, lift: 0.7, sx: 0.012, sz: -0.01, ph: 1.4 },
+    bunkers: [{ x: -41, z: 259, rx: 8, rz: 5, rot: -0.15, ph: 4.9 }, { x: -34, z: 543, rx: 7, rz: 5, rot: 0.17, ph: 1.6 }, { x: 32, z: 736, rx: 7, rz: 5, rot: -0.15, ph: 5.7 }, { x: -1, z: 963, rx: 5, rz: 3.5, rot: 2.34, ph: 3.4 }, { x: -34, z: 962, rx: 6, rz: 3.5, rot: 0.74, ph: -1.4 }],
+    groves: [{ x: -63, z: 376, rx: 10, rz: 30, n: 6, kind: 'palm' }],
+    hills: [{ x: -136, z: 451, r: 65, h: 9 }],
+  },
+  {
+    // d'île en île : trois bras de mer à porter
+    n: 37, name: 'L\'Archipel', theme: 'mer', par: 8, seed: 3707, tee: T0, pin: { x: 14, z: 1020 }, relief: 0.5, wobble: 10, bankH: 6,
+    coast: { hug: true, level: -1.4, beach: 6, sea: [120, 300], ring: { x: 0, z: 500, rx: 260, rz: 640 } },
+    line: [[0, 35, 14], [10, 120, 17, 53], [16, 200, 17, 53], [10, 262, 15], [8, 290, 0], [4, 330, 0], [0, 360, 15], [-14, 440, 17, 53], [-30, 520, 16, 53], [-34, 580, 0], [-36, 620, 0], [-36, 650, 15], [-22, 730, 17, 53], [2, 800, 16, 53], [14, 850, 0], [18, 890, 0], [20, 920, 14], [16, 980, 12]],
+    green: { x: 13, z: 1018, rx: 15, rz: 16, rot: 0.3, lift: 0.5, sx: -0.012, sz: 0.01, ph: 0.9 },
+    bunkers: [{ x: -17, z: 182, rx: 7, rz: 5, rot: 0.07, ph: 4.6 }, { x: 12, z: 473, rx: 7, rz: 5, rot: -0.2, ph: 0.3 }, { x: -44, z: 763, rx: 7, rz: 5, rot: 0.33, ph: 2.2 }, { x: 30, z: 1034, rx: 5, rz: 3.5, rot: 2.39, ph: 3.7 }, { x: -6, z: 1031, rx: 5, rz: 3.5, rot: 0.59, ph: -1.7 }],
+    groves: [{ x: 49, z: 232, rx: 6, rz: 18, n: 4, kind: 'palm' }, { x: -61, z: 489, rx: 6, rz: 18, n: 4, kind: 'palm' }, { x: 11, z: 708, rx: 6, rz: 18, n: 4, kind: 'palm' }],
+    gaps: [[285, 337], [579, 631], [855, 907]],
+  },
+  {
+    // le long de la mer, puis par-dessus une crique jusqu'au green
+    n: 38, name: 'La Crique', theme: 'mer', par: 6, seed: 3808, tee: T0, pin: { x: -6, z: 774 },
+    coast: { pts: [[74, -300], [72, 200], [66, 400], [64, 560], [60, 650], [30, 678], [-6, 684], [-34, 694], [-30, 712], [0, 716], [50, 722], [80, 744], [90, 900], [90, 1400]], sea: [300, 500], level: -1.4, beach: 7 },
+    line: [[0, 35, 15], [2, 120, 17], [-4, 210, 17, 56], [-12, 300, 17, 56], [-16, 390, 16, 53], [-12, 480, 16, 53], [-4, 560, 15, 51], [-2, 640, 14, 51], [-2, 672, 0], [-2, 712, 0], [-4, 736, 12]],
+    green: { x: -7, z: 772, rx: 15, rz: 16, rot: 0.3, lift: 0.7, sx: 0.012, sz: -0.012, ph: 2.2 },
+    bunkers: [{ x: -40, z: 232, rx: 8, rz: 5, rot: -0.09, ph: 0.2 }, { x: -45, z: 451, rx: 7, rz: 5, rot: 0.04, ph: 5.3 }, { x: -33, z: 600, rx: 7, rz: 5, rot: 0.02, ph: 5 }, { x: 10, z: 788, rx: 5, rz: 3.5, rot: 2.39, ph: 3.7 }, { x: -27, z: 783, rx: 5, rz: 3.5, rot: 0.49, ph: -2 }],
+    groves: [{ x: 26, z: 351, rx: 8, rz: 26, n: 5, kind: 'palm' }],
+    hills: [{ x: -126, z: 289, r: 60, h: 9 }],
+  },
+  {
+    // entre les dunes et les palmiers, une lagune au milieu du chemin
+    n: 39, name: 'Les Dunes', theme: 'mer', par: 7, seed: 3909, tee: T0, pin: { x: 2, z: 882 },
+    line: [[0, 39, 15], [-8, 134, 17], [-20, 224, 17, 59], [-22, 314, 16, 59], [-10, 392, 15, 56], [-4, 426, 0], [2, 482, 0], [8, 517, 15], [20, 605, 16, 56], [24, 694, 15, 56], [14, 784, 13, 53], [6, 842, 12]],
+    green: { x: 1, z: 880, rx: 15, rz: 16, rot: -0.3, lift: 0.7, sx: -0.012, sz: 0.01, ph: 0.4 },
+    bunkers: [{ x: 14, z: 268, rx: 10, rz: 6, rot: -0.02, ph: 0.3 }, { x: -54, z: 329, rx: 9, rz: 6, rot: 0.15, ph: 2.4 }, { x: -12, z: 624, rx: 9, rz: 6, rot: 0.04, ph: 2.7 }, { x: 52, z: 716, rx: 8, rz: 5, rot: -0.11, ph: 4.8 }, { x: 15, z: 898, rx: 6, rz: 3.5, rot: 2.24, ph: 3.4 }, { x: -18, z: 894, rx: 5, rz: 3.5, rot: 0.64, ph: -1.4 }],
+    water: [{ x: -2, z: 454.72, rx: 44, rz: 24.64, rot: 0.1, ph: 1.2, depth: 2.4 }],
+    groves: [{ x: 29, z: 184, rx: 10, rz: 26, n: 6, kind: 'palm' }, { x: -18, z: 670, rx: 10, rz: 26, n: 6, kind: 'palm' }, { x: -2, z: 454.72, rx: 60, rz: 38.08, n: 8, kind: 'palm' }],
+  },
+  {
+    // on descend la vallée le long du torrent, qui coupe deux fois le chemin
+    n: 40, name: 'La Vallée Perdue', theme: 'montagne', par: 8, seed: 4010, tee: T0, pin: { x: 9, z: 1040 },
+    tilt: [0, -0.015],
+    ravines: [{ pts: [[-60, -300], [-54, 200], [-40, 330], [8, 400], [56, 470], [62, 640], [36, 730], [-30, 790], [-70, 900], [-80, 1300]], w: 20, depth: 4 }],
+    line: [[0, 35, 14], [10, 120, 17], [22, 200, 17, 53], [26, 280, 16, 53], [16, 350, 15], [6, 380, 0], [-4, 420, 0], [-14, 450, 16], [-26, 530, 17, 54], [-28, 610, 17, 54], [-16, 690, 16], [-6, 740, 0], [4, 782, 0], [12, 810, 15, 50], [18, 890, 14, 50], [16, 960, 13], [12, 1000, 12]],
+    green: { x: 8, z: 1038, rx: 15, rz: 16, rot: 0.4, lift: 0.7, sx: 0.012, sz: 0.01, ph: 1.1 },
+    bunkers: [{ x: -8, z: 240, rx: 7, rz: 5, rot: 0.05, ph: 2 }, { x: 6, z: 553, rx: 7, rz: 5, rot: -0.02, ph: 2.6 }, { x: -11, z: 890, rx: 7, rz: 5, rot: 0.07, ph: 4.4 }, { x: 24, z: 1054, rx: 5, rz: 3.5, rot: 2.37, ph: 3.7 }, { x: -12, z: 1051, rx: 5, rz: 4, rot: 0.57, ph: -1.7 }],
+  },
+  {
+    // longue montée en lacets jusqu'au col, le green sur un replat
+    n: 41, name: 'Le Col', theme: 'montagne', par: 7, seed: 4111, tee: T0, pin: { x: -8, z: 887 },
+    tilt: [0, 0.03],
+    line: [[0, 39, 14], [-14, 132, 16], [-40, 209, 16, 52], [-50, 297, 15, 52], [-30, 374, 15], [10, 429, 15, 51], [46, 495, 15, 51], [56, 583, 15, 50], [36, 660, 14, 50], [6, 726, 13], [-6, 792, 12], [-8, 847, 12]],
+    green: { x: -9, z: 885, rx: 15, rz: 16, rot: 0.1, lift: 0.5, sx: 0.012, sz: -0.012, ph: 0.4 },
+    bunkers: [{ x: -12, z: 240, rx: 7, rz: 5, rot: -0.11, ph: 2.7 }, { x: -11, z: 454, rx: 7, rz: 5, rot: 0.5, ph: 3.5 }, { x: 70, z: 645, rx: 7, rz: 5, rot: -0.25, ph: 0.3 }, { x: 7, z: 902, rx: 5, rz: 3.5, rot: 2.34, ph: 3.4 }, { x: -26, z: 901, rx: 5, rz: 3.5, rot: 0.74, ph: -1.4 }],
+    groves: [{ x: 0, z: 312, rx: 12, rz: 30, n: 14, kind: 'pine' }, { x: 7, z: 546, rx: 12, rz: 30, n: 14, kind: 'pine' }],
+    plateaus: [{ x: -9, z: 885, rx: 40, rz: 34, rot: 0.1, h: 5, ph: 2, soft: true }],
+  },
+  {
+    // départ perché au-dessus de la vallée : tout descend, la balle roule loin
+    n: 42, name: 'La Descente', theme: 'montagne', par: 6, seed: 4212, tee: T0, pin: { x: -2, z: 820 },
+    tilt: [0, -0.04],
+    plateaus: [{ x: 0, z: -2.6, rx: 26, rz: 33.8, rot: 0, h: 16, ph: 0.4 }],
+    line: [[0, 52, 0], [4, 143, 16], [8, 260, 18, 57], [2, 377, 18, 57], [-10, 494, 17, 57], [-16, 611, 16, 65], [-12, 715, 14, 65], [-6, 780, 12]],
+    green: { x: -3, z: 818, rx: 15, rz: 16, rot: 0.2, lift: 0.7, sx: -0.01, sz: 0.012, ph: 2.6 },
+    bunkers: [{ x: 38, z: 366, rx: 8, rz: 5, rot: -0.05, ph: 4.5 }, { x: -38, z: 425, rx: 8, rz: 5, rot: -0.1, ph: 3.7 }, { x: 16, z: 612, rx: 7, rz: 5, rot: -0.05, ph: 2.9 }, { x: 15, z: 833, rx: 5, rz: 3.5, rot: 2.45, ph: 3.4 }, { x: -20, z: 834, rx: 6, rz: 3.5, rot: 0.75, ph: -1.7 }, { x: 0, z: 840, rx: 6, rz: 3, rot: 1.7, ph: 1.2 }],
+    water: [{ x: -51, z: 676, rx: 13, rz: 18, rot: 0.04, ph: 2.1, depth: 2.4 }],
+  },
+  {
+    // un grand S entre trois lacs de montagne
+    n: 43, name: 'Les Trois Lacs', theme: 'montagne', par: 7, seed: 4313, tee: T0, pin: { x: -15, z: 925 },
+    tilt: [0, 0.012],
+    line: [[0, 40, 14], [-18, 138, 16, 73], [-34, 230, 17, 73], [-24, 322, 17, 54], [8, 402, 16, 70], [34, 483, 16, 70], [38, 575, 16, 53], [16, 656, 16, 53], [-16, 736, 15, 68], [-28, 816, 14, 68], [-20, 885, 12]],
+    green: { x: -16, z: 923, rx: 15, rz: 16, rot: -0.5, lift: 0.7, sx: -0.012, sz: -0.01, ph: 0.9 },
+    bunkers: [{ x: -47, z: 352, rx: 7, rz: 5, rot: 0.38, ph: 3.6 }, { x: 60, z: 614, rx: 7, rz: 5, rot: -0.27, ph: 0.4 }, { x: 3, z: 935, rx: 5, rz: 3.5, rot: 2.58, ph: 3.7 }, { x: -31, z: 941, rx: 5, rz: 3.5, rot: 0.88, ph: -1.4 }],
+    water: [{ x: 9, z: 234, rx: 16, rz: 28, rot: -0.17, ph: 4.5, depth: 2.4 }, { x: -5, z: 493, rx: 15, rz: 26, rot: 0.31, ph: 3.2, depth: 2.4 }, { x: 23, z: 742, rx: 15, rz: 26, rot: -0.15, ph: 1.8, depth: 2.4 }],
+  },
+  {
+    // le long d'un lac glaciaire, puis par-dessus la gorge qui garde le green
+    n: 44, name: 'Le Glacier', theme: 'montagne', par: 8, seed: 4414, tee: T0, pin: { x: 9, z: 1109 },
+    tilt: [0, 0.01],
+    ravines: [{ pts: [[-400, 995.76], [-60, 1004.4], [0, 1008.72], [60, 1017.36], [400, 1028.16]], w: 32, depth: 7 }],
+    line: [[0, 38, 15], [6, 130, 18], [14, 227, 18, 57], [12, 324, 18, 57], [2, 421, 17], [-10, 518, 17, 56], [-14, 616, 17, 56], [-6, 713, 16], [8, 799, 16, 52], [16, 886, 15, 52], [16, 950, 14], [14, 985, 0], [12, 1035, 0], [10, 1069, 12]],
+    green: { x: 8, z: 1107, rx: 15, rz: 16, rot: 0.2, lift: 0.7, sx: 0.012, sz: -0.01, ph: 2.3 },
+    bunkers: [{ x: -22, z: 258, rx: 8, rz: 5, rot: -0.02, ph: 2.9 }, { x: -46, z: 558, rx: 8, rz: 5, rot: -0.04, ph: 3.2 }, { x: -19, z: 842, rx: 7, rz: 5, rot: 0.09, ph: 1.7 }, { x: 25, z: 1122, rx: 5, rz: 3.5, rot: 2.42, ph: 3.7 }, { x: -11, z: 1120, rx: 5, rz: 3.5, rot: 0.62, ph: -1.7 }],
+    water: [{ x: 96, z: 453.6, rx: 40, rz: 216, rot: 0.02, ph: 0.6, depth: 3 }],
+    groves: [{ x: -58, z: 672, rx: 12, rz: 40, n: 16, kind: 'pine' }],
+  },
+  {
+    // une longue piste qui descend, des îlots de fairway dans le sable
+    n: 45, name: 'La Caravane', theme: 'desert', par: 7, seed: 4515, tee: T0, pin: { x: 3, z: 1019 }, valley: 46,
+    tilt: [0, -0.03],
+    line: [[0, 41, 14], [2, 142, 16], [3, 189, 0], [4, 236, 0], [5, 271, 16, 57], [6, 378, 17, 57], [4, 425, 0], [2, 484, 0], [0, 519, 16, 57], [-6, 625, 17, 57], [-10, 673, 0], [-12, 720, 0], [-12, 755, 16, 54], [-8, 850, 15, 54], [-2, 932, 13], [0, 979, 12]],
+    green: { x: 2, z: 1017, rx: 15, rz: 16, rot: 0.1, lift: 0.7, sx: -0.012, sz: 0.012, ph: 2.7 },
+    bunkers: [{ x: 40, z: 330, rx: 9, rz: 6, rot: 0.01, ph: 4.4 }, { x: -38, z: 576, rx: 9, rz: 6, rot: -0.06, ph: 3.1 }, { x: 22, z: 812, rx: 8, rz: 5, rot: 0.04, ph: 3.7 }, { x: 19, z: 1032, rx: 5, rz: 3.5, rot: 2.42, ph: 3.4 }, { x: -14, z: 1034, rx: 5, rz: 3.5, rot: 0.82, ph: -1.4 }],
+  },
+  {
+    // deux canyons à porter, entre les mesas
+    n: 46, name: 'Les Canyons', theme: 'desert', par: 8, seed: 4616, tee: T0, pin: { x: 12, z: 1107 },
+    ravines: [{ pts: [[-400, 363], [-40, 380.6], [20, 387.2], [80, 380.6], [400, 396]], w: 42, depth: 12, dry: true }, { pts: [[-400, 770], [-80, 778.8], [-30, 785.4], [20, 778.8], [400, 792]], w: 40, depth: 12, dry: true }],
+    plateaus: [{ x: 90, z: 220, rx: 28, rz: 50.6, rot: 0.2, h: 22, ph: 1 }, { x: -86, z: 528, rx: 26, rz: 48.4, rot: -0.2, h: 24, ph: 2 }, { x: 64, z: 946, rx: 24, rz: 44, rot: 0.3, h: 20, ph: 3 }],
+    line: [[0, 39, 15], [10, 132, 17], [24, 220, 17, 59], [30, 308, 16, 59], [28, 363, 0], [24, 409, 0], [20, 440, 16], [4, 528, 17, 60], [-18, 616, 17, 60], [-30, 704, 16], [-32, 759, 0], [-30, 810, 0], [-26, 847, 16], [-10, 935, 15, 55], [4, 1012, 13, 55], [8, 1067, 12]],
+    green: { x: 11, z: 1105, rx: 15, rz: 16, rot: -0.2, lift: 0.7, sx: 0.01, sz: 0.012, ph: 2.2 },
+    bunkers: [{ x: -8, z: 265, rx: 10, rz: 6, rot: 0.07, ph: 4.7 }, { x: 26, z: 586, rx: 10, rz: 6, rot: -0.24, ph: 4.9 }, { x: -41, z: 943, rx: 9, rz: 5, rot: 0.18, ph: 2.8 }, { x: 29, z: 1120, rx: 5, rz: 3.5, rot: 2.45, ph: 3.4 }, { x: -4, z: 1122, rx: 5, rz: 3.5, rot: 0.85, ph: -1.4 }],
+  },
+  {
+    // dogleg à gauche autour de deux oasis bordées de palmiers
+    n: 47, name: 'L\'Oasis Lointaine', theme: 'desert', par: 6, seed: 4717, tee: T0, pin: { x: 208, z: 656 },
+    line: [[0, 51, 15], [2, 174, 17], [10, 290, 17, 63], [30, 392, 16, 63], [64, 479, 16], [106, 537, 15, 54], [150, 580, 14, 54], [184, 624, 13]],
+    green: { x: 207, z: 654, rx: 15, rz: 16, rot: 0.9, lift: 0.7, sx: 0.012, sz: -0.01, ph: 1.3 },
+    bunkers: [{ x: -18, z: 340, rx: 12, rz: 7, rot: 0.19, ph: 5.6 }, { x: 120, z: 594, rx: 9, rz: 6, rot: 0.8, ph: 2.1 }, { x: 230, z: 654, rx: 5, rz: 3.5, rot: 3.12, ph: 3.7 }, { x: 201, z: 676, rx: 5, rz: 3.5, rot: 1.32, ph: -1.7 }],
+    water: [{ x: 76, z: 333.5, rx: 26, rz: 46.4, rot: 0.6, ph: 0.8, depth: 2.4 }, { x: 150, z: 478.5, rx: 20, rz: 34.8, rot: 0.9, ph: 1.8, depth: 2.4 }],
+    groves: [{ x: 76, z: 333.5, rx: 40, rz: 66.7, n: 14, kind: 'palm' }, { x: 150, z: 478.5, rx: 32, rz: 52.2, n: 10, kind: 'palm' }],
+  },
+  {
+    // le plus long de tous : un grand S entre les mesas, le green tout là-haut
+    n: 48, name: 'Le Bout du Monde', theme: 'desert', par: 8, seed: 4818, tee: T0, pin: { x: 18, z: 1120 },
+    tilt: [0, 0.006],
+    line: [[0, 35, 15], [12, 120, 18], [34, 200, 18, 63], [48, 290, 18, 63], [40, 380, 17, 60], [12, 460, 17, 60], [-24, 540, 17], [-44, 630, 17, 59], [-38, 720, 16, 59], [-12, 800, 16], [18, 880, 15, 55], [30, 960, 14, 55], [28, 1030, 13], [22, 1080, 12]],
+    green: { x: 17, z: 1118, rx: 15, rz: 16, rot: -0.2, lift: 0.8, sx: 0.01, sz: 0.012, ph: 2.2 },
+    bunkers: [{ x: 2, z: 242, rx: 11, rz: 6, rot: 0.15, ph: 2 }, { x: 46, z: 472, rx: 10, rz: 6, rot: -0.34, ph: 0.3 }, { x: -76, z: 682, rx: 10, rz: 6, rot: 0.07, ph: 4.8 }, { x: 54, z: 905, rx: 9, rz: 6, rot: 0.15, ph: 0.6 }, { x: 31, z: 1136, rx: 5, rz: 3.5, rot: 2.24, ph: 3.4 }, { x: -2, z: 1132, rx: 5, rz: 3.5, rot: 0.64, ph: -1.4 }, { x: 15, z: 1141, rx: 6, rz: 3, rot: 1.49, ph: 1.2 }],
+    plateaus: [{ x: -52, z: 286, rx: 28, rz: 46, rot: -0.09, h: 22, ph: 1 }, { x: 56, z: 642, rx: 26, rz: 44, rot: -0.22, h: 24, ph: 2 }, { x: -73, z: 945, rx: 24, rz: 40, rot: 0.15, h: 20, ph: 3 }, { x: 17, z: 1118, rx: 40, rz: 36, rot: -0.2, h: 6, ph: 1.7, soft: true }],
+  },
 ];
 
-// Parcours proposés : un décor (8 trous, 6 au désert), l'aller, le retour, les 18 premiers trous ou les 30
+// Parcours proposés : un décor (8 trous, 6 au désert), l'aller, le retour, les 18 premiers trous, les 30, ou les géants
 export const COURSES = {
   campagne: { label: 'Campagne · 8 trous', holes: [1, 2, 3, 4, 5, 6, 7, 8] },
   mer: { label: 'Bord de mer · 8 trous', holes: [9, 10, 11, 12, 13, 14, 15, 16] },
@@ -317,6 +490,7 @@ export const COURSES = {
   retour: { label: 'Retour · 9 trous', holes: [10, 11, 12, 13, 14, 15, 16, 17, 18] },
   complet: { label: 'Grand tour · 18 trous', holes: Array.from({ length: 18 }, (_, i) => i + 1) },
   tour: { label: 'Les quatre décors · 30 trous', holes: Array.from({ length: 30 }, (_, i) => i + 1) },
+  geant: { label: 'Les Géants · 18 trous', holes: Array.from({ length: 18 }, (_, i) => i + 31) },
 };
 
 // ------------------------------------------------------------------ formes
@@ -411,6 +585,10 @@ export function buildHole(def) {
   const corridor = (x, z) => { let d = lineInfo(center, x, z).dist; for (const a of alts) d = Math.min(d, lineInfo(a, x, z).dist); return d; };
   const teeDir = Math.atan2(fair[0][0] - tee.x, fair[0][1] - tee.z);
   const hills = def.hills || [], bunkers = def.bunkers || [], waters = def.water || [], plateaus = def.plateaus || [];
+  // très long trou (les géants) : les grandes collines de l'horizon suivent le couloir de jeu au lieu d'un cercle autour
+  // du centre (sinon le départ et le green se retrouveraient à flanc de colline)
+  let span = 0; for (let i = 1; i < center.length; i++) span += Math.hypot(center[i][0] - center[i - 1][0], center[i][1] - center[i - 1][1]);
+  const longHole = span > 620;
   const tilt = def.tilt || [0, 0], relief = def.relief ?? 1;
   // limites du terrain jouable : la ligne de jeu et ses obstacles, avec de la marge
   const B = def.bounds || (() => {
@@ -446,7 +624,7 @@ export function buildHole(def) {
     const s = -landSD(x, z) - 6;
     if (s > 0) h += bankH * (1 - Math.exp(-(s * s) / (bankR * bankR)));
     // au loin, de grandes collines qui ferment l'horizon
-    const far = Math.max(0, Math.hypot(x - (B.x0 + B.x1) / 2, (z - (B.z0 + B.z1) / 2) * 0.7) - 260);
+    const far = longHole ? (s < 1e5 ? Math.max(0, s - 190) : 0) : Math.max(0, Math.hypot(x - (B.x0 + B.x1) / 2, (z - (B.z0 + B.z1) / 2) * 0.7) - 260);
     if (far > 0) h += far * (def.theme === 'montagne' ? 0.085 : 0.06) * (1.4 + Math.sin(x * 0.006 + 1) * Math.cos(z * 0.005));
     h += tilt[0] * (x - tee.x) + tilt[1] * (z - tee.z);
     // plateaux aux bords à pic (falaises)
@@ -622,7 +800,7 @@ export function buildHole(def) {
   return {
     def, n: def.n, name: def.name, par: def.par, theme: def.theme, tee, pin, green: G, bunkers, waters, waterLv, bounds: B, length,
     fields, heightAt, heightF, surfaceAt, surfaceF, slopeAt, trees, treesNear, teeDir, center, fair,
-    centerDist: corridor, obDist, landSD, valley, coast, ravines, plateaus,
+    centerDist: corridor, obDist, landSD, valley, coast, ravines, plateaus, long: longHole,
   };
 }
 
