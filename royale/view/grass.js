@@ -71,18 +71,30 @@ export function createGrass(map, ground, { mobile = false } = {}) {
   let R = mobile ? 22 : 36;
   const dens = mobile ? 0.5 : 1;
   const group = new THREE.Group(), tiles = new Map();
-  const U = { uFocus: { value: new THREE.Vector3() }, uR: { value: R } };
+  // ce qui couche l'herbe : les personnages qui la traversent, le souffle des explosions (x, z, rayon, force)
+  const PUSH = 8;
+  const U = { uFocus: { value: new THREE.Vector3() }, uR: { value: R }, uPush: { value: Array.from({ length: PUSH }, () => new THREE.Vector4()) } };
   const tex = atlas();
   const mat = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, side: THREE.DoubleSide, alphaTest: 0.5, alphaToCoverage: true, roughness: 0.9, metalness: 0 });
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, SWAY, U);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aBend; attribute float aGround; uniform float uT; uniform float uWind; uniform vec3 uFocus; uniform float uR;')
+      .replace('#include <common>', `#include <common>\nattribute float aBend; attribute float aGround; uniform float uT; uniform float uWind; uniform vec3 uFocus; uniform float uR; uniform vec4 uPush[${PUSH}];`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         // le brin plie au vent (plus fort à la pointe) et rentre dans le sol au bord du champ
         float wv = sin(uT * 2.3 + transformed.x * 0.8 + transformed.z * 0.5) + 0.5 * sin(uT * 3.7 + transformed.z * 1.3);
         transformed.x += wv * aBend * (0.012 + uWind * 0.05);
         transformed.z += cos(uT * 1.9 + transformed.x * 0.6) * aBend * (0.008 + uWind * 0.03);
+        // couché par qui passe (ou par un souffle) : la pointe s'écarte et descend
+        for (int i = 0; i < ${PUSH}; i++) {
+          vec4 p = uPush[i];
+          if (p.w <= 0.0) continue;
+          vec2 d = transformed.xz - p.xy;
+          float l = length(d), k = p.w * aBend * (1.0 - smoothstep(p.z * 0.35, p.z, l));
+          if (k <= 0.0) continue;
+          transformed.xz += (l > 0.001 ? d / l : vec2(0.0)) * k * 0.32;
+          transformed.y -= (transformed.y - aGround) * k * 0.6;
+        }
         float fade = smoothstep(uR, uR * 0.72, distance(transformed.xz, uFocus.xz));
         transformed.y = aGround + (transformed.y - aGround) * fade;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal); nonPerturbedNormal = normal;');
@@ -195,6 +207,10 @@ export function createGrass(map, ground, { mobile = false } = {}) {
   return {
     group, update,
     get range() { return R; },
+    // list : [{ x, z, r, k }] (les plus proches d'abord, huit au plus)
+    push(list) {
+      for (let i = 0; i < PUSH; i++) { const p = list[i]; if (p) U.uPush.value[i].set(p.x, p.z, p.r, p.k); else U.uPush.value[i].set(0, 0, 0, 0); }
+    },
     // machine qui peine : l'herbe s'arrête plus près
     shrink() { R = Math.max(18, R * 0.7); U.uR.value = R; },
     dispose() { for (const t of tiles.values()) if (t) t.geometry.dispose(); tiles.clear(); mat.dispose(); tex.dispose(); },

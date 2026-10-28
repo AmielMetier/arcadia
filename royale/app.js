@@ -17,6 +17,9 @@ import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput,
 import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
+import { createMarks } from './view/marks.js';
+import { createAmbiance } from './view/ambiance.js';
+import { createMotion } from './view/motion.js';
 import { createHud } from './view/hud.js';
 import { createCompass } from './view/compass.js';
 import { createBuilds } from './view/builds.js';
@@ -174,10 +177,11 @@ function startMatch() {
 // scène reprend son état de départ (murs, meubles, décor, portes) et le monde solide est reconstruit (≈ 65 ms)
 function resetMatch() {
   if (!S.sim) return;
-  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); S.drops3d.dispose(); } catch (e) { console.warn(e); }
+  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); S.drops3d.dispose(); S.marks.dispose(); S.amb.dispose(); S.motion.dispose(); } catch (e) { console.warn(e); }
   S.scene.reset();
+  Object.assign(S.scene.screen, { hurt: 0, shield: 0, low: 0, speed: 0, flash: 0 }); S.scene.screen.booms.length = 0; S.blasts = [];
   S.world = buildWorld(S.map);
-  S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
+  S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null; S.marks = null; S.amb = null; S.motion = null;
   S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
   S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt(''); S.compass.clear();
   $('#hud').hidden = true; $('#feed').innerHTML = '';
@@ -196,6 +200,12 @@ function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
   S.drops3d = createDrops(S.scene.scene);
+  // traces sur les surfaces, air ambiant (poussière, feuilles, oiseaux, orage), mouvement (vitesse, eau)
+  S.marks = createMarks(S.scene.scene, S.world, S.map);
+  S.amb = createAmbiance(S.scene.scene, S.map, { time: S.scene.time, quality: S.scene.quality, screen: S.scene.screen,
+    broken: (k) => !!S.buildApi && S.buildApi.broken.has(k), sfx: { thunder: (d) => S.sfx && S.sfx.thunder(d) } });
+  S.motion = createMotion(S.scene.scene, S.world, S.fx);
+  S.blasts = [];
   // les bots ne réfléchissent que là où la partie tourne
   S.ai = !mirror && mode !== 'exploration' ? createAI(S.sim, S.map, S.world) : null;
   // journal des parties (soirées de test, voir stats.html) : tenu là où la partie tourne
@@ -344,6 +354,7 @@ function loop(now) {
   const view = cameraFor(P, disp, dt);
   S.actors.update(dt, S.t, view.pos, disp, scoped || S.camClose ? S.me : null, seeFrom(view.focus));
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
+  ambient(dt, P, view);
   // fantôme de la pièce à construire
   if (S.build && P && P.alive && P.mode === 'sol') {
     const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces, S.world);
@@ -351,8 +362,8 @@ function loop(now) {
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
   S.drops3d.update(dt, S.t, S.sim.S);
-  // chute libre : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
-  const fall = P && P.alive && P.mode === 'chute' ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
+  // chute libre, deltaplane, tremplin : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
+  const fall = P && P.alive && (P.mode === 'chute' || P.mode === 'planeur') ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
   S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
   $('#speedlines').style.opacity = (S.fall * 0.85).toFixed(3);
   const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72 + S.fall * 14;
@@ -512,6 +523,36 @@ function seeFrom(f) {
   };
 }
 // caméra : par-dessus l'épaule droite (au sol), loin derrière (montgolfière, chute libre), à l'œil (lunette)
+// ------------------------------------------------------------------ ambiance, traces, réactions de l'écran
+const camF = new THREE.Vector3(), camR = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+function ambient(dt, P, view) {
+  const tgt = P && P.alive ? P : S.sim.player(S.spect) || P;
+  camF.set(view.look.x - view.pos.x, view.look.y - view.pos.y, view.look.z - view.pos.z).normalize();
+  camR.crossVectors(camF, UP).normalize();
+  S.marks.update(dt);
+  S.motion.update(dt, S.sim, tgt, view.pos, camF);
+  S.amb.update(dt, view.pos, camR, S.sim, S.sim.S.storm && S.sim.S.storm.cur);
+  // l'écran pâlit et bat quand la vie est basse (tout à fait à terre) ; il file avec la vitesse
+  const sc = S.scene.screen, low = P && P.alive && P.mode === 'sol' ? (P.down ? 1 : P.hp < 35 ? 0.25 + 0.75 * (1 - P.hp / 35) : 0) : 0;
+  sc.low += (low - sc.low) * (1 - Math.exp(-3 * dt));
+  sc.speed = S.motion.rush * 0.8;
+  // herbe couchée : les personnages proches, et le souffle des explosions de la dernière seconde
+  if (S.scene.grass.group.visible) {
+    const f = view.focus, push = [];
+    for (const Q of S.sim.S.players.values()) {
+      if (!Q.alive || Q.mode !== 'sol' || Q.swim) continue;
+      const d = Math.abs(Q.x - f.x) + Math.abs(Q.z - f.z);
+      if (d < 40) push.push({ x: Q.x, z: Q.z, r: Q.crouch ? 1.1 : 0.85, k: 1, d });
+    }
+    for (let i = S.blasts.length - 1; i >= 0; i--) {
+      const b = S.blasts[i], age = S.t - b.t;
+      if (age > 1.2) { S.blasts.splice(i, 1); continue; }
+      push.push({ x: b.x, z: b.z, r: b.r * 1.6, k: 1 - age / 1.2, d: -1 });
+    }
+    push.sort((a, b) => a.d - b.d);
+    S.scene.grass.push(push);
+  }
+}
 function cameraFor(P, disp, dt) {
   const W = S.world;
   let target = P;
@@ -731,6 +772,12 @@ function hideBroken(k) {
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
   else if (k[0] === 'b') S.builds.remove(+rest);
 }
+// clé « p:… » d'un feuillu : son houppier (là d'où tombent les feuilles)
+function treeOf(key) {
+  if (!key || key[0] !== 'p') return null;
+  const p = S.map.props[+key.slice(2)];
+  return p && p.kind === 'arbre' ? { x: p.x, y: S.map.heightAt(p.x, p.z) + 4.5 * (p.s || 1), z: p.z } : null;
+}
 // ce qu'il y a sous les pieds (pour le son des pas)
 function surface(Q) {
   if (S.world.waterLevel(Q.x, Q.z) > Q.y + 0.08) return 'eau';
@@ -768,7 +815,7 @@ function handleEvents(list) {
           h.shot();
           if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
-        if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
+        if (Q) { S.sfx.shot(e.w, Q, e.p === S.me); S.amb.scare(Q.x, Q.z, 35); }
         // la boussole : d'où vient le tir (pas les siens)
         if (Q && e.p !== S.me && Q.mode === 'sol') S.compass.shot(e.p, Q.x, Q.y + 1.4, Q.z, Math.hypot(Q.x - S.cam.x, Q.z - S.cam.z), { mate: !!P && S.sim.mates(P, Q), far: e.w === 'sniper' || e.w === 'roquette' ? 420 : 220 });
         // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
@@ -780,6 +827,10 @@ function handleEvents(list) {
         let muzzle = null;
         if (h && h.held && e.p !== S.me) { muzzle = new THREE.Vector3(); h.held.getWorldPosition(muzzle); }
         S.fx.shot(e.from, e.to, e.w, e.hit, muzzle, !!e.late);
+        // la trace reste sur ce qui est touché ; une balle qui finit dans l'eau y fait un petit jet
+        // (de près seulement : les combats lointains ne chassent pas les traces qu'on a sous les yeux)
+        if (e.hit === 1 && Math.hypot(e.to[0] - S.cam.x, e.to[2] - S.cam.z) < 120) S.marks.impact(e.from, e.to, e.w, e.w === 'pompe');
+        if (e.hit !== 2) S.motion.shotWater(e.from, e.to);
         if (e.hit === 1 && e.k < 3) S.sfx.at(impactAt(e.to[0], e.to[1], e.to[2]), e.to[0], e.to[1], e.to[2], 0.7, 45);
         if (e.p !== S.me && e.k === 0) S.sfx.whiz(e.from, e.to);
         break;
@@ -804,6 +855,10 @@ function handleEvents(list) {
           if (A && A !== P) S.compass.shot(A.id, A.x, A.y + 1.4, A.z, Math.hypot(A.x - S.cam.x, A.z - S.cam.z), { hit: true });
           S.shake = Math.max(S.shake, Math.min(0.5, 0.12 + e.n / 120));
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
+          // l'écran encaisse : couleurs qui se séparent, éclat bleu si le bouclier a pris le coup
+          const sc = S.scene.screen;
+          sc.hurt = Math.min(1, sc.hurt + (e.cause === 'tempete' ? 0.12 : 0.3 + e.n / 70));
+          if (e.sh) sc.shield = 1;
         }
         break;
       }
@@ -852,6 +907,13 @@ function handleEvents(list) {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
         const d = Math.hypot(e.x - S.cam.x, e.y - S.cam.y, e.z - S.cam.z);
         if (d < 30) S.shake = Math.max(S.shake, (1 - d / 30) * 1.2);
+        // onde de choc (l'image se déforme), herbe couchée, oiseaux qui fuient ; au sol une brûlure, dans l'eau une gerbe
+        S.scene.screen.booms.push({ x: e.x, y: e.y + 0.5, z: e.z, r: e.r, t: S.scene.now });
+        S.blasts.push({ x: e.x, z: e.z, r: e.r, t: S.t });
+        S.amb.scare(e.x, e.z, 70);
+        const wl = S.world.waterLevel(e.x, e.z);
+        if (wl > e.y - 0.8) S.motion.splash(e.x, wl, e.z, 1);
+        else if (e.kind !== 'souffle') { S.marks.scorch(e.x, e.y, e.z, e.r); S.motion.ring(e.x, S.world.support(e.x, e.z, e.y + 1) + 0.08, e.z, { r0: 0.5, r1: e.r * 2.6, life: 0.45, color: 0xffd9a0, alpha: 0.9 }); }
         S.sfx.at(e.kind === 'souffle' ? 'souffle' : 'boum', e.x, e.y, e.z, 1);
         break;
       }
@@ -900,10 +962,19 @@ function handleEvents(list) {
         S.fx.puff(e.x, e.y, e.z, { color: col, size: 0.3, grow: 1.6, life: 0.4, op: 0.8 });
         S.fx.debris(e.x, e.y, e.z, e.mat, { n: 3, spread: 0.2, power: 2.5 });
         if (e.by === S.me) { S.hud.structure(e.hp, e.max); S.sfx.play('coup-' + (e.mat || 'bois')); }
+        // ce qu'on abîme se fissure ; un arbre frappé perd des feuilles
+        const A = e.by != null ? S.sim.player(e.by) : null;
+        S.marks.hit(e.key, e.x, e.y, e.z, e.hp, e.max, A ? [A.x, A.y + 1.5, A.z] : null);
+        const tree = treeOf(e.key);
+        if (tree) S.amb.leaves(tree.x, tree.y, tree.z, 4);
         break;
       }
       case 'casse': {
         hideBroken(e.key);
+        S.marks.broken(e.key);
+        { const tree = treeOf(e.key); if (tree) S.amb.leaves(tree.x, tree.y, tree.z, 18); }
+        // tableau ou horloge tombé avec son mur : quelques éclats, le mur fait déjà le bruit
+        if (e.small) { S.fx.debris(e.x, e.y, e.z, e.mat, { n: 5, spread: 0.3, power: 2 }); break; }
         const col = { bois: 0x9a6a3a, pierre: 0x8a857c, metal: 0xaab2b8 }[e.mat] || 0x9a8a78;
         for (let i = 0; i < 4; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
         S.fx.debris(e.x, e.y, e.z, e.mat, { n: 16, spread: 1.6, power: 4.5 });

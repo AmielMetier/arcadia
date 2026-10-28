@@ -303,6 +303,26 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const key = `w:${bld.id}:0:${wall.o}${wall.x},${wall.z}`, had = A.mats[bld.mat];
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 50, A, [0, 0, 0], true);
   ok(B.broken.has(key) && !(W.byKey.get(key) || []).length && A.mats[bld.mat] > had, 'un mur de maison ne se casse pas');
+  // un tableau (ou une horloge) tombe avec le mur où il est accroché, pas avec le voisin
+  let deco = null, dk = null;
+  for (const b of m.buildings) for (const f of b.furniture) {
+    if (deco || (f.kind !== 'cadre' && f.kind !== 'horloge')) continue;
+    const e = b.levels[f.k].walls.find((w) => (w.o === 'h' ? Math.abs(f.z - w.z * CELL) < 0.4 && f.x > w.x * CELL && f.x < (w.x + 1) * CELL
+      : Math.abs(f.x - w.x * CELL) < 0.4 && f.z > w.z * CELL && f.z < (w.z + 1) * CELL));
+    if (e) { deco = f; dk = `w:${b.id}:${f.k}:${e.o}${e.x},${e.z}`; }
+  }
+  ok(deco, 'aucun tableau accroché à un mur');
+  if (deco) {
+    const others = m.buildings[deco.b].furniture.filter((f) => f !== deco && (f.kind === 'cadre' || f.kind === 'horloge') && !B.broken.has('f:' + f.id));
+    for (let i = 0; i < 40 && !B.broken.has(dk); i++) B.hit(dk, 100, null, [deco.x, 1, deco.z], false);
+    const gone = others.filter((f) => B.broken.has('f:' + f.id)).length;
+    ok(B.broken.has(dk) && B.broken.has('f:' + deco.id) && gone <= 2, `tableau resté en l'air (${B.broken.has('f:' + deco.id)}), ${gone} autres tombés`);
+  }
+  // une porte part avec le pan de mur qui la tient
+  const db = m.buildings.find((b) => b.doors.length && !B.broken.has('d:' + b.doors[0].id)), door = db.doors[0];
+  const doorWall = `w:${db.id}:${door.k}:${door.o}${door.x},${door.z}`;
+  for (let i = 0; i < 40 && !B.broken.has(doorWall); i++) B.hit(doorWall, 100, null, [0, 0, 0], false);
+  ok(B.broken.has(doorWall) && B.broken.has('d:' + door.id) && !W.byKey.has('d:' + door.id), `porte restée debout dans le mur cassé ${doorWall}`);
   // visée : le mur va sur le trait de grille juste devant soi, pas deux cases plus loin
   const gx = Math.floor((spot.x + 20) / CELL), gz = Math.floor((spot.z + 20) / CELL), gy = W.support((gx + 0.5) * CELL, (gz + 0.5) * CELL, 400);
   const ws = slotFor(gx * CELL + 3.2, gy, (gz + 0.5) * CELL, Math.PI / 2, 0, 'mur', B.pieces, W);

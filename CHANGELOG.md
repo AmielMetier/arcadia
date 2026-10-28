@@ -1,5 +1,22 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.9 — 28 octobre 2026
+- **Island Rush** — Un mur cassé emporte ce qu'il porte : sa porte, et les tableaux et horloges accrochés dessus (ils restaient suspendus dans le vide).
+- **Island Rush** — Plus de bandes qui scintillent dans les pièces là où les murs se rejoignent, ni de trait clair qui traversait le plancher de l'étage.
+- **Island Rush** — Des combats qui marquent :
+  - les balles laissent des impacts sur les murs, le décor et le sol, et ce qu'on abîme se fissure de plus en plus ;
+  - une explosion fait trembler l'air autour d'elle, couche l'herbe et laisse une brûlure au sol (une gerbe dans l'eau) ;
+  - touché, l'écran réagit : les couleurs se séparent, un éclat bleu passe quand le bouclier encaisse ;
+  - la vie basse fait pâlir l'image, qui bat comme un cœur.
+- **Island Rush** — Une île plus vivante :
+  - rayons de soleil entre les arbres et les maisons, brume légère au ras du sol et de la mer ;
+  - poussière et pollen dans l'air (des lucioles le soir), feuilles qui tombent des arbres, et en gerbe quand on les frappe ;
+  - des petits oiseaux picorent dans les prés et s'envolent quand on approche ou qu'on tire ;
+  - dans la tempête, pluie violette, éclairs et tonnerre.
+- **Island Rush** — Sensation de vitesse en chute libre, en deltaplane et sur les tremplins : traînées d'air, image qui file vers les bords.
+- **Island Rush** — On éclabousse en plongeant, on laisse des ronds dans l'eau en nageant, et l'herbe se couche sur son passage.
+- **Island Rush** — Sur une machine qui peine, ces effets s'allègent d'eux-mêmes.
+
 ## 3.8 — 28 octobre 2026
 - **Island Rush** — Un tir, c'est une détonation : le fusil d'assaut et le pistolet-mitrailleur jouaient une petite rafale à chaque balle (de près comme de loin). Chaque tir garde maintenant sa vraie queue, avec son écho.
 - **Island Rush** — Un coffre ouvert se tait aussitôt. Son carillon ne passe plus au coffre voisin dans la seconde, et ne s'entend plus qu'à une douzaine de mètres.

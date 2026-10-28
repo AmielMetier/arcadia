@@ -1,6 +1,9 @@
 // Battle royale (repris de Birdie Party) — post-traitement. La scène est rendue en couleurs linéaires (HDR, anticrénelage 4×) avec sa profondeur ;
 // on en tire l'occlusion ambiante (les creux, le pied des arbres et des golfeurs s'assombrissent), un halo sur les
 // éclats de soleil, puis la passe finale applique la tonalité, une vignette et l'étalonnage des couleurs.
+// Island Rush y ajoute (voir createPost : fx) des rayons de soleil entre les arbres et les maisons, une brume au ras du
+// sol et de la mer, et les réactions de l'écran : onde de choc et chaleur des explosions, coups encaissés (couleurs qui
+// se séparent, éclat bleu du bouclier, image qui pâlit et bat quand la vie est basse), flou de vitesse, éclair d'orage.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
@@ -26,6 +29,7 @@ export function createPost(renderer) {
   const aoRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
   const aoBlur = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
   const bloomA = new THREE.WebGLRenderTarget(1, 1, lin), bloomB = new THREE.WebGLRenderTarget(1, 1, lin);
+  const raysRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false });
   const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
   quad.frustumCulled = false;
@@ -98,10 +102,41 @@ export function createPost(renderer) {
         gl_FragColor = vec4(c, 1.0);
       }`,
   });
+  // rayons de soleil : depuis chaque pixel, on remonte vers le soleil à l'écran en comptant le ciel dégagé autour de
+  // lui ; arbres, toits et reliefs y découpent des faisceaux (quart de la définition, assez pour une lumière diffuse)
+  const raysMat = new THREE.ShaderMaterial({
+    uniforms: { tDepth: { value: depth }, uSun: { value: new THREE.Vector3() }, uAspect: { value: 1 } },
+    vertexShader: VERT, depthTest: false, depthWrite: false,
+    fragmentShader: `varying vec2 vUv; uniform sampler2D tDepth; uniform vec3 uSun; uniform float uAspect;
+      void main(){
+        vec2 d = (uSun.xy - vUv) * (0.9 / 28.0), uv = vUv;
+        float sum = 0.0, decay = 1.0;
+        for (int i = 0; i < 28; i++) {
+          uv += d;
+          vec2 q = (uv - uSun.xy) * vec2(uAspect, 1.0);
+          float sky = step(0.99999, texture2D(tDepth, clamp(uv, 0.001, 0.999)).x);
+          sum += sky * exp(-dot(q, q) * 9.0) * decay;
+          decay *= 0.96;
+        }
+        gl_FragColor = vec4(vec3(sum / 28.0), 1.0);
+      }`,
+  });
+  const MAXW = 4;
   const finalMat = new THREE.ShaderMaterial({
-    uniforms: { tColor: { value: main.texture }, tAO: { value: aoBlur.texture }, tBloom: { value: bloomA.texture }, uAO: { value: 1 }, uBloom: { value: 0.28 }, uT: { value: 0 } },
+    uniforms: {
+      tColor: { value: main.texture }, tAO: { value: aoBlur.texture }, tBloom: { value: bloomA.texture }, uAO: { value: 1 }, uBloom: { value: 0.28 }, uT: { value: 0 },
+      tDepth: { value: depth }, tRays: { value: raysRT.texture }, uInv: { value: new THREE.Matrix4() }, uCamW: { value: new THREE.Matrix4() }, uAspect: { value: 1 },
+      uSun: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uRays: { value: 0 }, uMist: { value: 0 }, uMistCol: { value: new THREE.Color() },
+      uWaves: { value: Array.from({ length: MAXW }, () => new THREE.Vector4()) }, uHurt: { value: 0 }, uShield: { value: 0 }, uLow: { value: 0 }, uSpeed: { value: 0 }, uFlash: { value: 0 },
+    },
     vertexShader: VERT, depthTest: false, depthWrite: false, toneMapped: true,
     fragmentShader: `varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tAO; uniform sampler2D tBloom; uniform float uAO; uniform float uBloom; uniform float uT;
+      uniform sampler2D tDepth; uniform sampler2D tRays; uniform mat4 uInv; uniform mat4 uCamW; uniform float uAspect;
+      uniform vec3 uSun; uniform vec3 uSunCol; uniform float uRays; uniform float uMist; uniform vec3 uMistCol;
+      uniform vec4 uWaves[${MAXW}]; uniform float uHurt; uniform float uShield; uniform float uLow; uniform float uSpeed; uniform float uFlash;
+      float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
       // une valeur invalide (NaN, infini) sortie d'un calcul de la scène s'afficherait en noir (et le halo l'étalerait
       // en carrés) : on la remplace par la moyenne des voisins valides
       bool bad3(vec3 v){ return any(isnan(v)) || any(isinf(v)); }
@@ -118,13 +153,59 @@ export function createPost(renderer) {
         return n > 0.0 ? min(s / n, vec3(60000.0)) : vec3(0.0);
       }
       void main(){
-        vec3 c = safeColor(tColor, vUv);
-        float ao = texture2D(tAO, vUv).r; if (isnan(ao)) ao = 1.0;
+        // ondes de choc et chaleur des explosions : l'image se déforme autour du point (anneau qui s'élargit, puis
+        // air qui tremble)
+        vec2 uv = vUv;
+        for (int i = 0; i < ${MAXW}; i++) {
+          vec4 w = uWaves[i];
+          if (w.w <= 0.0) continue;
+          vec2 dv = (vUv - w.xy) * vec2(uAspect, 1.0);
+          float L = length(dv), R = w.w * min(1.0, w.z * 3.0);
+          float ring = exp(-pow((L - R) / (0.12 * w.w + 0.004), 2.0)) * (1.0 - w.z) * (1.0 - w.z);
+          float heat = smoothstep(w.w * 0.8, 0.0, L) * sin(w.z * 3.14159);
+          vec2 dir = L > 1e-4 ? dv / L : vec2(0.0);
+          uv += (dir * ring * 0.03 + vec2(sin(vUv.y * 140.0 + uT * 23.0), cos(vUv.x * 120.0 + uT * 19.0)) * heat * 0.0035) / vec2(uAspect, 1.0);
+        }
+        vec2 dc = uv - 0.5;
+        vec3 c = safeColor(tColor, uv);
+        // coup encaissé : les couleurs se séparent vers les bords
+        if (uHurt > 0.01) { vec2 o = dc * uHurt * 0.018; c.r = safeColor(tColor, uv + o).r; c.b = safeColor(tColor, uv - o).b; }
+        // vitesse (chute libre, deltaplane, tremplin) : l'image file vers les bords
+        if (uSpeed > 0.01) {
+          float k = uSpeed * smoothstep(0.12, 0.6, length(dc));
+          vec3 acc = c;
+          for (int i = 1; i < 6; i++) acc += safeColor(tColor, uv - dc * k * 0.028 * float(i));
+          c = acc / 6.0;
+        }
+        float ao = texture2D(tAO, uv).r; if (isnan(ao)) ao = 1.0;
         c *= mix(1.0, ao * sqrt(ao), 0.7 * uAO);
-        vec3 bl = texture2D(tBloom, vUv).rgb; if (!bad3(bl)) c += bl * uBloom;
+        vec3 bl = texture2D(tBloom, uv).rgb; if (!bad3(bl)) c += bl * uBloom;
+        // brume au ras du sol et de la mer, en nappes qui dérivent : légère tout près, épaisse au loin et dans les creux
+        float d = texture2D(tDepth, uv).x;
+        if (uMist > 0.0 && d < 0.99999) {
+          vec4 vp = uInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+          vec3 v = vp.xyz / vp.w, wp = (uCamW * vec4(v, 1.0)).xyz;
+          float n = vnoise(wp.xz * 0.018 + uT * vec2(0.012, 0.007)) * 0.6 + vnoise(wp.xz * 0.05 - uT * 0.01) * 0.4;
+          float dens = exp(-max(0.0, wp.y - 0.5) / 5.0) * (0.45 + 0.75 * n);
+          float m = (1.0 - exp(-length(v) * 0.011 * dens)) * uMist;
+          c = mix(c, uMistCol, clamp(m, 0.0, 0.85));
+        }
+        // rayons de soleil
+        if (uRays > 0.0) c += uSunCol * texture2D(tRays, uv).r * uRays;
         // lumière du soleil un peu chaude, ombres un peu froides
         float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
         c *= mix(vec3(0.97, 1.0, 1.05), vec3(1.03, 1.0, 0.96), smoothstep(0.05, 0.8, l));
+        // bouclier touché : un éclat bleu ondule sur les bords
+        float edge = smoothstep(0.3, 0.75, length(dc * vec2(1.15, 1.0)));
+        if (uShield > 0.01) c += vec3(0.25, 0.7, 1.0) * 0.6 * uShield * edge * (0.65 + 0.35 * sin(dc.x * 70.0 + dc.y * 45.0 + uT * 14.0));
+        // vie basse : l'image pâlit et ses bords s'assombrissent au rythme d'un cœur
+        if (uLow > 0.01) {
+          float beat = pow(max(0.0, sin(uT * 7.5)), 6.0), g = dot(c, vec3(0.2126, 0.7152, 0.0722));
+          c = mix(c, vec3(g), 0.45 * uLow);
+          c *= 1.0 - uLow * edge * (0.3 + 0.35 * beat);
+        }
+        // éclair d'orage
+        c += vec3(0.75, 0.72, 1.0) * uFlash;
         // vignette douce
         vec2 q = vUv - 0.5; c *= mix(0.74, 1.0, smoothstep(0.82, 0.22, length(q * vec2(1.15, 1.0))));
         gl_FragColor = vec4(c, 1.0);
@@ -139,7 +220,7 @@ export function createPost(renderer) {
       }`,
   });
 
-  const q = { ao: true, bloom: true };
+  const q = { ao: true, bloom: true, fx: true };
   let W = 1, H = 1;
   return {
     q, main,
@@ -151,9 +232,12 @@ export function createPost(renderer) {
       main.setSize(w, h);
       aoRT.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1)); aoBlur.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
       bloomA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2)); bloomB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
+      raysRT.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
       blurMat.uniforms.uTexel.value.set(2 / w, 2 / h);
     },
-    render(scene, camera, t) {
+    // fx : { sun (x, y à l'écran entre 0 et 1, z : force selon qu'il est dans le champ), sunCol, rays, mist, mistCol,
+    // waves [{ x, y, age (0 → 1), r (rayon, en hauteur d'écran) }], hurt, shield, low, speed, flash }
+    render(scene, camera, t, fx = null) {
       renderer.setRenderTarget(main);
       renderer.render(scene, camera);
       if (q.ao) {
@@ -170,13 +254,24 @@ export function createPost(renderer) {
         gaussMat.uniforms.tex.value = bloomA.texture; gaussMat.uniforms.uDir.value.set(9 / W, 0); pass(gaussMat, bloomB);
         gaussMat.uniforms.tex.value = bloomB.texture; gaussMat.uniforms.uDir.value.set(0, 9 / H); pass(gaussMat, bloomA);
       }
-      finalMat.uniforms.uAO.value = q.ao ? 1 : 0; finalMat.uniforms.uBloom.value = q.bloom ? 0.28 : 0; finalMat.uniforms.uT.value = t % 100;
+      const F = finalMat.uniforms, sunOn = !!(q.fx && fx && fx.rays > 0 && fx.sun.z > 0.01);
+      if (sunOn) { raysMat.uniforms.uSun.value.copy(fx.sun); raysMat.uniforms.uAspect.value = W / H; pass(raysMat, raysRT); }
+      F.uAO.value = q.ao ? 1 : 0; F.uBloom.value = q.bloom ? 0.28 : 0; F.uT.value = t % 100;
+      F.uAspect.value = W / H;
+      F.uRays.value = sunOn ? fx.rays * fx.sun.z : 0;
+      F.uMist.value = q.fx && fx ? fx.mist : 0;
+      if (fx) {
+        F.uSun.value.copy(fx.sun); F.uSunCol.value.copy(fx.sunCol); F.uMistCol.value.copy(fx.mistCol);
+        F.uInv.value.copy(camera.projectionMatrixInverse); F.uCamW.value.copy(camera.matrixWorld);
+        for (let i = 0; i < MAXW; i++) { const w = fx.waves[i]; if (w) F.uWaves.value[i].set(w.x, w.y, w.age, w.r); else F.uWaves.value[i].set(0, 0, 0, 0); }
+        F.uHurt.value = fx.hurt; F.uShield.value = fx.shield; F.uLow.value = fx.low; F.uSpeed.value = fx.speed; F.uFlash.value = fx.flash;
+      }
       pass(finalMat, null);
     },
     dispose() {
-      for (const r of [main, aoRT, aoBlur, bloomA, bloomB]) r.dispose();
+      for (const r of [main, aoRT, aoBlur, bloomA, bloomB, raysRT]) r.dispose();
       depth.dispose();
-      for (const m of [aoMat, blurMat, brightMat, gaussMat, finalMat]) m.dispose();
+      for (const m of [aoMat, blurMat, brightMat, gaussMat, raysMat, finalMat]) m.dispose();
       quad.geometry.dispose();
     },
   };

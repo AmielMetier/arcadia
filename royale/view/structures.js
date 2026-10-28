@@ -177,9 +177,11 @@ function builder() {
   };
 }
 // pan de 4 m sur un étage normal ; +z = dehors
+// les cloisons s'arrêtent 3 cm sous le plancher du dessus (leur dessus, au ras du parquet, le traversait en scintillant
+// là où l'étage n'a pas de cloison) : il reste dans l'épaisseur de la dalle, sans fente au plafond
 function panelGeo(kind, T, exterior) {
   const B = builder();
-  for (const [u0, u1, v0, v1] of panelSolids(kind, STOREY)) B.box(u0, v0, -T / 2, u1, v1, T / 2, (n) => (exterior ? (n[2] < 0 ? 0 : 1) : 0));
+  for (const [u0, u1, v0, v1] of panelSolids(kind, STOREY)) B.box(u0, v0, -T / 2, u1, exterior ? v1 : Math.min(v1, STOREY - 0.03), T / 2, (n) => (exterior ? (n[2] < 0 ? 0 : 1) : 0));
   return B.geo();
 }
 const boxes = (list) => { const B = builder(); for (const b of list) B.box(...b); return B.geo(); };
@@ -455,10 +457,14 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     const top = floorY(b, b.floors);
     for (const n of nodes) {
       const [x, z] = n.split(',').map(Number);
-      push('box', mat, place(x * CELL - WALL_T / 2, b.y, z * CELL - WALL_T / 2, 0, WALL_T, top - b.y, WALL_T), face, { b: b.id });
+      // poteau 4 cm plus fin que les murs : caché dedans tant qu'ils tiennent (ses faces, confondues avec les leurs,
+      // scintillaient en bandes sombres dans les pièces), seul visible quand ils sont cassés ; aux coins du bâtiment, un
+      // bouchon comble l'angle extérieur au ras des deux façades
+      const I = WALL_T / 2 - 0.02, sx = x === b.x0 ? -1 : x === b.x0 + b.w ? 1 : 0, sz = z === b.z0 ? -1 : z === b.z0 + b.d ? 1 : 0;
+      push('box', mat, place(x * CELL - I, b.y, z * CELL - I, 0, 2 * I, top - b.y, 2 * I), face, { b: b.id });
+      if (sx && sz) push('box', mat, place(x * CELL - (sx < 0 ? WALL_T / 2 : 0), b.y, z * CELL - (sz < 0 ? WALL_T / 2 : 0), 0, WALL_T / 2, top - b.y, WALL_T / 2), face, { b: b.id });
       // chaînes d'angle en pierre aux coins du bâtiment (une pierre sur deux plus longue de chaque côté), qui
       // dépassent un peu des deux façades sans entrer dans les pièces
-      const sx = x === b.x0 ? -1 : x === b.x0 + b.w ? 1 : 0, sz = z === b.z0 ? -1 : z === b.z0 + b.d ? 1 : 0;
       if (fancy && sx && sz) {
         let i = 0;
         for (let y = b.y + BASE_UP + 0.55; y < top - 0.3; y += 0.42, i++) {
