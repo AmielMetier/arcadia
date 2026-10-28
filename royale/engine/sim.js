@@ -197,12 +197,26 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     const r = makeRng(hash(seed * 977 + hash(c.id.charCodeAt(0) * 131 + +c.id.slice(1))));
     const list = c.kind === 'coffre' ? rollChest(r) : rollAmmoBox(r);
     ev({ e: 'coffre', id: c.id, p: P.id });
-    // le butin jaillit devant le coffre
-    list.forEach((it, k) => {
-      const a = (k - (list.length - 1) / 2) * 0.7;
-      const fx = c.fx || 0, fz = c.fz || 1;
-      spawnItem(it, c.x + fx * 1.1 - fz * a, c.y + 0.5, c.z + fz * 1.1 + fx * a);
-    });
+    // le butin jaillit devant le coffre, l'arme d'abord, juste en face (premier de la liste)
+    const spots = lootSpots(c, list.length);
+    list.forEach((it, k) => spawnItem(it, spots[k][0], c.y + 0.5, spots[k][1]));
+  }
+  // places du butin devant un coffre : de face, puis sur les côtés, puis un rang plus loin ; une place compte si on
+  // l'atteint depuis le coffre sans mur ni meuble entre les deux et qu'elle est à son niveau (pas sur un meuble, pas
+  // dans la pièce d'à côté). Lancé en éventail fixe, un objet sur quatre — souvent l'arme, au bout — passait derrière.
+  const LOOT_SLOTS = [[0, 1.0], [-0.65, 1.0], [0.65, 1.0], [0, 1.6], [-0.65, 1.6], [0.65, 1.6], [-1.2, 0.9], [1.2, 0.9], [-1.2, 1.6], [1.2, 1.6], [0, 2.2], [0, 0.7]];
+  function lootSpots(c, n) {
+    const fx = c.fx || 0, fz = c.fz || 1, ox = c.x + fx * 0.55, oz = c.z + fz * 0.55, oy = c.y + 0.4, out = [];
+    for (const [a, f] of LOOT_SLOTS) {
+      if (out.length >= n) break;
+      const x = c.x + fx * f - fz * a, z = c.z + fz * f + fx * a, dx = x - ox, dz = z - oz, L = Math.hypot(dx, dz) || 1;
+      if (world.raycast(ox, oy, oz, dx / L, 0, dz / L, L + 0.25).t < L + 0.25) continue;
+      if (Math.abs(world.support(x, z, c.y + 0.6, 0.05) - c.y) > 0.35) continue;
+      out.push([x, z]);
+    }
+    // coffre coincé : le reste s'empile juste devant lui
+    while (out.length < n) out.push([ox + fx * 0.15 + (out.length % 3 - 1) * 0.2 * -fz, oz + fz * 0.15 + (out.length % 3 - 1) * 0.2 * fx]);
+    return out;
   }
   // largage : quelque part dans le prochain cercle, sur la terre ferme ; ouvert, son butin jaillit autour
   function spawnDrop() {

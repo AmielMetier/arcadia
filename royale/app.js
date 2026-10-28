@@ -553,6 +553,43 @@ function ambient(dt, P, view) {
     S.scene.grass.push(push);
   }
 }
+// petit décor que la caméra traverse (poteaux, panneaux, troncs, bancs, haies, bornes…) : il ne la fait pas plonger
+// sur la tête du joueur chaque fois qu'il passe entre eux
+const camThin = (s) => !!s && s.key != null && s.key[0] === 'p' && (s.t === 1 ? s.r < 0.6 : s.t === 2 ? Math.min(s.hx, s.hz) < 0.45 && Math.max(s.hx, s.hz) < 1.2 : false);
+// distance libre devant une boule de rayon CAM_R qui part de (x, y, z) dans la direction (dx, dy, dz) unitaire : le plus
+// court de cinq rayons exacts (l'axe, et quatre rayons parallèles décalés de CAM_R) ; un rayon qui partirait de
+// l'intérieur d'un mur (épaule collée contre lui) ne compte pas, ni celui décalé du côté `skip` (x, z) s'il est donné
+const CAM_R = 0.22, cu = new THREE.Vector3(), cv = new THREE.Vector3(), cw = new THREE.Vector3();
+function camFree(x, y, z, dx, dy, dz, len, skip = null) {
+  const W = S.world;
+  cw.set(dx, dy, dz);
+  cu.set(Math.abs(dy) > 0.9 ? 1 : 0, Math.abs(dy) > 0.9 ? 0 : 1, 0).cross(cw).normalize();
+  cv.copy(cw).cross(cu).normalize();
+  let best = len;
+  for (let k = 0; k < 5; k++) {
+    const a = k === 1 ? CAM_R : k === 2 ? -CAM_R : 0, b = k === 3 ? CAM_R : k === 4 ? -CAM_R : 0;
+    const ex = cu.x * a + cv.x * b, ey = cu.y * a + cv.y * b, ez = cu.z * a + cv.z * b;
+    if (skip && ex * skip[0] + ez * skip[1] > CAM_R * 0.5) continue;
+    const ox = x + ex, oy = y + ey, oz = z + ez;
+    if (k && camInside(ox, oy, oz, 0)) continue;
+    // on passe à travers le petit décor : le rayon repart juste derrière lui
+    for (let t0 = 0, n = 0; n < 4 && t0 < best; n++) {
+      const h = W.raycast(ox + dx * t0, oy + dy * t0, oz + dz * t0, dx, dy, dz, best - t0);
+      if (t0 + h.t >= best) break;
+      if (!camThin(h.s)) { best = t0 + h.t; break; }
+      t0 += h.t + 2 * (h.s.t === 1 ? h.s.r : Math.max(h.s.hx, h.s.hz)) + 0.02;
+    }
+  }
+  return best;
+}
+// la caméra (boule de rayon m) touche-t-elle le sol, un mur, un meuble… (pas le petit décor, ni les escaliers) ?
+function camInside(x, y, z, m = 0.2) {
+  const W = S.world;
+  if (y < S.map.heightAt(x, z) + 0.05) return true;
+  let hit = false;
+  W.near(x, z, m + 4, (s) => { if (!hit && !camThin(s) && y >= s.y0 - m && y <= s.y1 + m && W.over(s, x, z, m)) hit = true; });
+  return hit;
+}
 function cameraFor(P, disp, dt) {
   const W = S.world;
   let target = P;
@@ -580,27 +617,36 @@ function cameraFor(P, disp, dt) {
   if (isScoped(P) && target === P) dist = 0;
   // distance voulue : elle change pour viser (ou en l'air) ; les murs la raccourcissent plus bas
   S.camDist = dist === 0 ? 0 : S.camDist + (dist - S.camDist) * (1 - Math.exp(-12 * dt));
-  // épaule droite (même axe que les tirs) ; un mur collé à droite la fait glisser doucement vers le centre
-  const wantSide = sh ? Math.max(0, W.ray(d.x, headY, d.z, rx, 0, rz, sh, 0.2)) : 0;
+  // épaule droite (même axe que les tirs) ; un mur à droite la ramène vers le centre. Les distances sont exactes (voir
+  // camFree) : elles suivent le mur sans à-coups (mesurées par pas de 10 à 20 cm, elles sautaient d'un pas à l'autre et
+  // la caméra faisait l'essuie-glace contre les murs)
+  // (10 cm de plus que la boule : le rayon arrière décalé vers le mur ne frôle pas la façade, la moindre saillie le
+  // faisait plonger sur la tête ; mesurée aussi à hauteur du buste, sous les appuis de fenêtre, et un peu en arrière :
+  // à hauteur de tête, une fenêtre ou une porte ouverte laissaient l'épaule s'y engager)
+  let wantSide = 0;
+  if (sh) {
+    const L = sh + CAM_R + 0.1, bx = d.x - Math.sin(yaw) * 0.6, bz = d.z - Math.cos(yaw) * 0.6;
+    wantSide = Math.min(camFree(d.x, headY, d.z, rx, 0, rz, L), camFree(d.x, d.y + 0.85, d.z, rx, 0, rz, L), camFree(bx, headY, bz, rx, 0, rz, L));
+    wantSide = Math.max(0, Math.min(sh, wantSide - CAM_R - 0.1));
+  }
   // (vers le centre tout de suite, sinon l'épaule entrerait dans le mur ; vers l'épaule en douceur)
-  S.camSide = wantSide < S.camSide ? wantSide : S.camSide + (wantSide - S.camSide) * (1 - Math.exp(-8 * dt));
-  let px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide;
-  const py = headY;
+  S.camSide = wantSide < S.camSide ? wantSide : S.camSide + (wantSide - S.camSide) * (1 - Math.exp(-4 * dt));
+  const px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide, py = headY;
   // la caméra ne traverse ni mur, ni porte, ni plafond, ni le sol : un obstacle derrière le joueur la rapproche aussitôt,
-  // elle recule doucement quand la voie se libère ; collée au mur, elle se recentre sur la tête du joueur
+  // elle recule doucement quand la voie se libère
   let D = S.camDist, free = 0;
-  if (D > 0.3) {
-    // (pas de 10 cm et boule de 30 cm : un mur fin ou un coin ne passent pas entre deux essais)
-    // (on regarde un peu au-delà de la caméra : la marge sert à la secousse)
-    free = W.ray(px, py, pz, -fx, -fy, -fz, D + 0.6, 0.3, 0.1);
-    if (free < 0.5) { px = d.x; pz = d.z; S.camSide = 0; free = W.ray(px, py, pz, -fx, -fy, -fz, D + 0.6, 0.3, 0.1); }
-    const want = Math.max(0, free - 0.12);
+  if (D > 0.05) {
+    // (on regarde un peu au-delà de la caméra : la marge sert à la secousse ; pas de rayon décalé vers l'épaule, qui
+    // garde déjà ses distances : il accrochait le bord des vitrines et des portails)
+    free = camFree(px, py, pz, -fx, -fy, -fz, D + 0.6, S.camSide > 0.05 ? [rx, rz] : null);
+    const want = Math.max(0, free - CAM_R);
     const pull = S.camPull == null ? D : S.camPull;
     S.camPull = want < pull ? want : pull + (want - pull) * (1 - Math.exp(-5 * dt));
     D = Math.min(D, S.camPull);
   } else S.camPull = null;
-  // tout contre le joueur, on ne dessine pas son personnage (sinon on voit l'intérieur de sa tête)
-  S.camClose = target === P && D > 0 && D < 0.75;
+  // tout contre le joueur, on ne dessine pas son personnage (sinon on voit l'intérieur de sa tête) ; il disparaît sous
+  // 0,7 m et ne revient qu'au-delà de 0,95 m (un seul seuil le faisait clignoter)
+  S.camClose = target === P && S.camDist > 0 && D < (S.camClose ? 0.95 : 0.7);
   let cx = px - fx * D, cy = py - fy * D, cz = pz - fz * D;
   const wl = W.waterLevel(cx, cz);
   if (cy < wl + 0.35) cy = wl + 0.35;
@@ -612,7 +658,7 @@ function cameraFor(P, disp, dt) {
   if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); const k = Math.min(S.shake * 0.4 * Math.min(1, D / 2), Math.max(0, free - D - 0.12)); cx += (Math.random() - 0.5) * k; cy += (Math.random() - 0.5) * k; cz += (Math.random() - 0.5) * k; }
   // dernier contrôle, après les relèvements au-dessus de l'eau et du sol : si la caméra (avec son plan proche) touche
   // quoi que ce soit, on la ramène vers la tête jusqu'à ce qu'elle soit libre
-  for (let k = 0; k < 10 && D > 0 && W.solidAt(cx, cy, cz, 0.2); k++) { cx += (px - cx) * 0.35; cy += (py - cy) * 0.35; cz += (pz - cz) * 0.35; S.camClose = target === P; }
+  for (let k = 0; k < 10 && D > 0 && camInside(cx, cy, cz, 0.2); k++) { cx += (px - cx) * 0.35; cy += (py - cy) * 0.35; cz += (pz - cz) * 0.35; S.camClose = target === P; }
   return look(cx, cy, cz, fx, fy, fz, d, near);
   function look(x, y, z, a, b, c, focus, nearP = 0.15) {
     S.cam = { x, y, z };

@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.11 — 28 octobre 2026
+- **Island Rush** — Caméra calme contre les murs :
+  - elle ne fait plus l'essuie-glace quand on longe une façade, ni quand l'épaule passe devant une fenêtre ou une vitrine ;
+  - le personnage ne clignote plus quand la caméra s'approche de lui ;
+  - un poteau, un panneau, un tronc ou un banc qui passe entre elle et toi ne la fait plus plonger sur ta tête.
+- **Island Rush** — Les fenêtres n'ont plus de vitre : on tirait déjà à travers, maintenant on voit aussi à travers.
+- **Island Rush** — L'arme d'un coffre tombe toujours devant lui, à portée de main. Avant, une fois sur quatre, elle passait derrière un mur ou sous un meuble et on croyait le coffre sans arme.
+
 ## 3.10 — 28 octobre 2026
 - **Island Rush** — Le lance-roquettes, repris de zéro :
   - un vrai tube posé sur l'épaule droite, à côté de la tête (il passait devant le visage, penché vers le bas) ;
