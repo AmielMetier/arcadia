@@ -697,7 +697,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const jump = fired(P, 'jump');
       const slow = P.use ? 0.5 : inp.aim ? 0.7 : 1;
       const wasAir = !P.ground, x0 = P.x, z0 = P.z;
-      stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
+      stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow, glisse: !P.bot }, world, dt);
       P.dist += Math.hypot(P.x - x0, P.z - z0);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {

@@ -217,7 +217,8 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       }`,
   });
   const storm = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 128, 1, true).translate(0, 0.5, 0), stormMat);
-  storm.frustumCulled = false; storm.visible = false; storm.renderOrder = 5; group.add(storm);
+  // (dessiné après les nuages du ciel, avant la fumée et les flammes : sinon il les teintait de violet devant le ciel)
+  storm.frustumCulled = false; storm.visible = false; storm.renderOrder = 1.5; group.add(storm);
   own.push(storm.geometry, stormMat);
 
   // ------------------------------------------------------------------ réactions aux événements de la partie
@@ -269,14 +270,73 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     for (let i = 0; i < 4; i++) cloud(front.x, front.y, front.z, { vx: dir.x * 2 + (Math.random() - 0.5), vy: 0.4, vz: dir.z * 2 + (Math.random() - 0.5), size: 0.3, grow: 1.8, life: 0.9, color: 0xd8d2c8, op: 0.45, drag: 2 });
     if (flashT <= 0.1) { flash.position.copy(front); flashI = 25; flashMax = flashT = 0.12; }
   }
-  // explosion : pas une grosse boule, mais un cœur blanc très bref, une boule de feu faite d'une douzaine de flammes
-  // qui jaillissent et s'étalent (jaunes, orange, rouges), des braises qui retombent, une fumée sombre qui monte ;
-  // la grenade de souffle fait de même en violet, sans feu ni fumée
+  // ------------------------------------------------------------------ boules de feu des explosions
+  // des sphères cabossées dont la surface bouillonne (bruit animé dans le shader) : elles gonflent vite, passent du blanc
+  // au jaune, à l'orange et au rouge, puis deviennent une fumée noire qui s'élève et s'efface ; bord doux (on les voit
+  // de biais comme des volutes, pas comme des boules)
+  const FB = 48;
+  const fbGeo = new THREE.InstancedBufferGeometry().copy(new THREE.IcosahedronGeometry(1, 4));
+  const fbAge = new THREE.InstancedBufferAttribute(new Float32Array(FB), 1), fbSeed = new THREE.InstancedBufferAttribute(new Float32Array(FB), 1);
+  fbAge.setUsage(THREE.DynamicDrawUsage);
+  fbGeo.setAttribute('aAge', fbAge); fbGeo.setAttribute('aSeed', fbSeed);
+  const fbMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, uniforms: { uT: { value: 0 } },
+    vertexShader: `attribute float aAge; attribute float aSeed; uniform float uT; varying float vAge; varying float vN; varying vec3 vNrm; varying vec3 vW;
+      float h3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float n3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+                   mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+      void main(){
+        vAge = aAge;
+        vec3 q = normal * 2.3 + aSeed * 7.0 + vec3(0.0, -uT * 1.7 - aAge * 3.0, 0.0);
+        float n = n3(q) * 0.55 + n3(q * 2.1) * 0.3 + n3(q * 4.4) * 0.15;
+        vN = n;
+        vec4 w = modelMatrix * instanceMatrix * vec4(position * (0.72 + n * 0.62), 1.0);
+        vW = w.xyz; vNrm = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: `varying float vAge; varying float vN; varying vec3 vNrm; varying vec3 vW;
+      void main(){
+        float heat = clamp(1.15 - vAge * 2.2 + (vN - 0.5) * 1.3, 0.0, 1.0);
+        vec3 fire = heat > 0.8 ? mix(vec3(1.0, 0.62, 0.16), vec3(1.0, 0.88, 0.5), (heat - 0.8) / 0.2)
+                  : heat > 0.45 ? mix(vec3(0.88, 0.24, 0.03), vec3(1.0, 0.62, 0.16), (heat - 0.45) / 0.35)
+                  : mix(vec3(0.28, 0.06, 0.02), vec3(0.88, 0.24, 0.03), heat / 0.45);
+        float glow = smoothstep(0.12, 0.5, heat);
+        vec3 smoke = vec3(0.11, 0.1, 0.095) * (0.6 + 0.4 * max(0.0, vNrm.y));
+        vec3 c = mix(smoke, fire * (0.9 + 1.7 * heat), glow);
+        float edge = smoothstep(0.0, 0.5, abs(dot(vNrm, normalize(cameraPosition - vW))));
+        float a = (1.0 - smoothstep(0.55, 1.0, vAge)) * mix(0.92, 1.0, glow) * mix(edge, 1.0, glow * 0.6);
+        gl_FragColor = vec4(c, a);
+      }`,
+  });
+  const fireballs = new THREE.InstancedMesh(fbGeo, fbMat, FB); fireballs.frustumCulled = false; fireballs.count = FB; fireballs.renderOrder = 3;
+  for (let i = 0; i < FB; i++) fireballs.setMatrixAt(i, zero);
+  group.add(fireballs); own.push(fbGeo, fbMat);
+  const fb = new Array(FB).fill(null);
+  let fbNext = 0;
+  function fireball(x, y, z, { s0, s1, life = 1.6, delay = 0, vx = 0, vy = 2, vz = 0 }) {
+    const i = fbNext; fbNext = (fbNext + 1) % FB;
+    fb[i] = { x, y, z, s0, s1, life, t: -delay, vx, vy, vz };
+    fbSeed.setX(i, Math.random() * 10); fbSeed.needsUpdate = true;
+  }
+
+  // explosion : un éclair blanc, une boule de feu qui bouillonne et gonfle (avec quatre ou cinq boules plus petites autour,
+  // décalées dans le temps, pour une forme irrégulière), des flammes et des braises qui jaillissent, puis la fumée ;
+  // la grenade de souffle fait des flammes violettes, sans boule de feu ni fumée
   const FIRE = [0xffb347, 0xff7a1a, 0xe2481a], BLAST = [0xe2c4ff, 0xb77dff, 0x8a4fe0];
   function boom(x, y, z, r, kind) {
     const purple = kind === 'souffle', cols = purple ? BLAST : FIRE, R = r * 0.45, y0 = y + 0.5;
     puff(x, y0, z, { tex: T.glow, color: purple ? 0xf2e6ff : 0xfff6e0, size: 1.2, grow: 1.4, life: 0.09, add: true, op: 1 });
-    for (let i = 0; i < 14; i++) {
+    if (!purple) {
+      fireball(x, y0 + 0.3, z, { s0: 0.4, s1: r * 0.52, life: 1.7, vy: 1.8 });
+      const n = 4 + (Math.random() < 0.5 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.8, d = r * (0.22 + Math.random() * 0.18);
+        fireball(x + Math.cos(a) * d, y0 + 0.2 + Math.random() * r * 0.25, z + Math.sin(a) * d,
+          { s0: 0.3, s1: r * (0.26 + Math.random() * 0.12), life: 1.3 + Math.random() * 0.5, delay: Math.random() * 0.09, vx: Math.cos(a) * 1.6, vy: 2 + Math.random() * 1.8, vz: Math.sin(a) * 1.6 });
+      }
+    }
+    for (let i = 0; i < (purple ? 14 : 8); i++) {
       const a = Math.random() * Math.PI * 2, e = Math.random() * 1.1, sp = 3 + Math.random() * 6;
       puff(x, y0, z, { tex: T.fire, color: cols[i % 3], size: 0.6 + Math.random() * 0.5, grow: R * (0.7 + Math.random() * 0.6), life: 0.3 + Math.random() * 0.32, add: true, op: 0.75,
         vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp + 1.5, vz: Math.sin(a) * Math.cos(e) * sp, drag: 5, rot: Math.random() * 6.28 });
@@ -334,11 +394,18 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       cloud(c.x + (Math.random() - 0.5) * 0.2, c.y + 0.1, c.z + (Math.random() - 0.5) * 0.2,
         { vx: 0.35 + Math.random() * 0.2, vy: 1.1 + Math.random() * 0.4, vz: 0.15, size: 0.55, grow: 3.4, life: 4 + Math.random() * 1.5, color: 0xc4c1bb, op: 0.7, drag: 0.15 });
     }
-    // poussière sous les pieds de ceux qui sprintent
+    // poussière sous les pieds de ceux qui sprintent ; en glissade, une traînée continue de chaque côté
     if (cam) for (const P of sim.S.players.values()) {
-      if (!P.alive || P.mode !== 'sol' || !P.ground || P.swim || Math.hypot(P.vx, P.vz) < 6.2 || Math.abs(P.x - cam.x) > 60 || Math.abs(P.z - cam.z) > 60) continue;
+      const slide = P.slideT > 0;
+      if (!P.alive || P.mode !== 'sol' || !P.ground || P.swim || (!slide && Math.hypot(P.vx, P.vz) < 6.2) || Math.abs(P.x - cam.x) > 60 || Math.abs(P.z - cam.z) > 60) continue;
       const k = (runDust.get(P.id) || 0) - dt;
       if (k > 0) { runDust.set(P.id, k); continue; }
+      if (slide) {
+        runDust.set(P.id, 0.045);
+        const sp = Math.hypot(P.vx, P.vz) || 1, sx = -P.vz / sp, sz = P.vx / sp;
+        for (const sd of [-1, 1]) cloud(P.x + sx * sd * 0.3, P.y + 0.08, P.z + sz * sd * 0.3, { vx: -P.vx * 0.15 + sx * sd * 1.2, vy: 0.5 + Math.random() * 0.4, vz: -P.vz * 0.15 + sz * sd * 1.2, size: 0.4, grow: 1.6, life: 0.8, color: 0xbcb19a, op: 0.4 });
+        continue;
+      }
       runDust.set(P.id, 0.16 + Math.random() * 0.08);
       cloud(P.x - P.vx * 0.05, P.y + 0.1, P.z - P.vz * 0.05, { vx: -P.vx * 0.08, vy: 0.4, vz: -P.vz * 0.08, size: 0.35, grow: 1.1, life: 0.7, color: 0xbcb19a, op: 0.35 });
     }
@@ -414,6 +481,23 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       }
     }
     for (const [id, o] of projMeshes) if (!seen.has(id)) { group.remove(o); projMeshes.delete(id); }
+    // boules de feu : elles gonflent (vite puis lentement), montent en ralentissant, vieillissent
+    fbMat.uniforms.uT.value = t;
+    let fbMoved = false;
+    for (let i = 0; i < FB; i++) {
+      const B = fb[i];
+      if (!B) continue;
+      B.t += dt; fbMoved = true;
+      if (B.t >= B.life) { fb[i] = null; fireballs.setMatrixAt(i, zero); continue; }
+      if (B.t < 0) { fireballs.setMatrixAt(i, zero); continue; }
+      const k = B.t / B.life, g = 1 - Math.pow(1 - Math.min(1, k * 1.6), 3), sc = B.s0 + (B.s1 - B.s0) * g * (1 + 0.25 * k);
+      const d = Math.exp(-1.6 * dt); B.vx *= d; B.vz *= d; B.vy = B.vy * d + 0.6 * dt;
+      B.x += B.vx * dt; B.y += B.vy * dt; B.z += B.vz * dt;
+      kp.set(B.x, B.y, B.z); kz.set(sc, sc * 0.92, sc);
+      fireballs.setMatrixAt(i, km.compose(kp, kq.identity(), kz));
+      fbAge.setX(i, k);
+    }
+    if (fbMoved) { fireballs.instanceMatrix.needsUpdate = true; fbAge.needsUpdate = true; }
     // tempête
     storm.visible = !!stormState;
     if (stormState) {

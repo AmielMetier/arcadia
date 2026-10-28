@@ -101,6 +101,31 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const yawTo = (dx, dz) => Math.atan2(dx, dz);
   const run = (p, inp, sec) => { for (let i = 0; i < sec * 60; i++) stepPlayer(p, inp, W, 1 / 60); return p; };
   const inside = (p, b) => p.x > b.x0 * CELL && p.x < (b.x0 + b.w) * CELL && p.z > b.z0 * CELL && p.z < (b.z0 + b.d) * CELL;
+  // glissade : en sprintant, s'accroupir lance une glissade (bien plus loin qu'en marchant accroupi), qui s'arrête
+  // seule ; pas à simple course, ni pour les bots (glisse absent)
+  {
+    let sx = 0, sz = 0;
+    for (let i = 0; i < 6000 && !sx; i++) {
+      const x = 300 + ((i * 7919) % 1000), z = 300 + ((i * 104729) % 1000), y = m.heightAt(x, z);
+      if (m.groundAt(x, z) !== 2 || m.waterAt(x, z) || Math.abs(m.heightAt(x, z + 30) - y) > 0.5) continue;
+      let clear = true;
+      for (let d = 0; d <= 30 && clear; d += 1) if (W.solidAt(x, m.heightAt(x, z + d) + 1, z + d, 0.6)) clear = false;
+      if (clear) { sx = x; sz = z; }
+    }
+    const go = (sprint, glisse) => {
+      const p = newPlayer(sx, m.heightAt(sx, sz) + 0.2, sz, 0);
+      run(p, { mz: 1, yaw: 0, sprint }, 1.2);
+      const z0 = p.z;
+      run(p, { mz: 1, yaw: 0, sprint, crouch: true, glisse }, 1 / 60);
+      const started = p.slideT > 0, v0 = Math.hypot(p.vx, p.vz);
+      run(p, { mz: 1, yaw: 0, sprint, crouch: true, glisse }, 1.6);
+      return { started, v0, d: p.z - z0, over: p.slideT === 0, crouch: p.crouch };
+    };
+    const g = go(true, true), bot = go(true, false), walk = go(false, true);
+    ok(sx && g.started && g.v0 > 8.5 && g.over && g.crouch && !bot.started && !walk.started && g.d > bot.d + 2,
+      `glissade : lancée ${g.started} à ${g.v0.toFixed(1)} m/s, ${g.d.toFixed(1)} m (accroupi sans glisser : ${bot.d.toFixed(1)} m), finie ${g.over}, bot ${bot.started}, à la course ${walk.started}`);
+    console.log(`glissade : ${g.v0.toFixed(1)} m/s au départ, ${g.d.toFixed(1)} m en 1,6 s (accroupi : ${bot.d.toFixed(1)} m)`);
+  }
   let doors = 0, stairs = 0;
   for (const b of m.buildings) {
     // par la porte d'entrée (ou le portail)

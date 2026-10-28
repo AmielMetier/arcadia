@@ -23,7 +23,7 @@ export function createSkyLife(map, { tint = 0xffffff } = {}) {
   const group = new THREE.Group(), rng = makeRng((map.seed | 0) ^ 0xc10d), C = map.center, R = map.islandR;
   // ---------------------------------------------------------------- nuages : amas de bouffées
   const tex = cloudTexture(), bb = createBillboards(CLOUDS * PUFFS, tex);
-  bb.mesh.renderOrder = 2; group.add(bb.mesh);
+  bb.mesh.renderOrder = 1; group.add(bb.mesh);
   const col = new THREE.Color(tint);
   const clouds = Array.from({ length: CLOUDS }, () => {
     const a = rng.range(0, Math.PI * 2), d = Math.sqrt(rng.next()) * R * 1.15;

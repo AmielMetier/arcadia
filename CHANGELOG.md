@@ -1,5 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.16 — 28 octobre 2026
+- **Island Rush** — Une vraie explosion : une boule de feu qui gonfle et bouillonne, passe du blanc à l'orange puis au rouge, se change en fumée noire qui monte, avec des flammes et des braises qui jaillissent autour.
+- **Island Rush** — Glissade : en sprintant, s'accroupir te fait glisser sur quelques mètres, plus vite qu'en courant, et plus loin en descente. On peut sauter en pleine glissade.
+- **Island Rush** — La fumée et les flammes ne prennent plus la teinte violette du mur de la tempête quand il est derrière elles.
+
 ## 3.15 — 28 octobre 2026
 - **Island Rush** — On joue à la manette :
   - boutons à la façon de Fortnite (A sauter, B s'accroupir, X ouvrir et recharger, Y sac, gâchettes viser et tirer, LB / RB changer d'objet, croix pour construire, Menu pause), tous modifiables dans ⚙️ Réglages ;

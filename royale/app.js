@@ -630,6 +630,13 @@ function ambient(dt, P, view) {
   S.marks.update(dt);
   S.motion.update(dt, S.sim, tgt, view.pos, camF);
   S.amb.update(dt, view.pos, camR, S.sim, S.sim.S.storm && S.sim.S.storm.cur);
+  // glissades qui commencent : un frottement (le sien plus fort)
+  S.slid = S.slid || new Set();
+  for (const Q of S.sim.S.players.values()) {
+    const on = Q.alive && Q.slideT > 0;
+    if (on && !S.slid.has(Q.id)) { S.slid.add(Q.id); if (Q.id === S.me) S.sfx.play('glisse'); else S.sfx.at('glisse', Q.x, Q.y, Q.z, 0.8, 35); }
+    else if (!on) S.slid.delete(Q.id);
+  }
   // l'écran pâlit et bat quand la vie est basse (tout à fait à terre) ; il file avec la vitesse
   const sc = S.scene.screen, low = P && P.alive && P.mode === 'sol' ? (P.down ? 1 : P.hp < 35 ? 0.25 + 0.75 * (1 - P.hp / 35) : 0) : 0;
   sc.low += (low - sc.low) * (1 - Math.exp(-3 * dt));

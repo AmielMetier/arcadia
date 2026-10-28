@@ -248,7 +248,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   let trailsIn = false, glide = 0;
   const POLE_UP = { R: new THREE.Vector3(-0.9, -0.3, -0.1), L: new THREE.Vector3(0.9, -0.3, -0.1) };
 
-  let held = null, heldKind = null, heldC = null, fly = 0, swim = 0, deadT = 0, air = 0, kick = 0, aimLift = 0;
+  let held = null, heldKind = null, heldC = null, fly = 0, swim = 0, deadT = 0, air = 0, kick = 0, aimLift = 0, slideW = 0;
   let arm = null, use = 0, reload = 0, hold = 0, clock = 0, heldW = null;
   // chute libre : piqué (on file devant soi), inclinaison dans les virages, culbute en quittant la nacelle (ou le tremplin)
   let dive = 0, bank = 0, flipT = null, prevMode = 'sol';
@@ -448,6 +448,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       else if (st.swim) play(sp > 0.4 ? 'Run' : 'Jump_Idle', 0.25, sp > 0.4 ? 0.55 : 0.5);
       else if (air > 0.18) play('Jump_Idle', 0.15);
       else if (st.down) play('Duck', 0.2, sp > 0.3 ? 0.8 : 0.12); // à terre : recroquevillé, il avance à peine
+      else if (st.slide) play('Jump_Idle', 0.08, 0);                // glissade : posée plus bas (voir plus loin)
       else if (st.crouch) play('Duck', 0.15, sp > 0.4 ? 1.2 : 0.4);
       else if (sp > 0.5) play(gun ? 'Run_Gun' : 'Run', 0.15, clamp(sp / 5.6, 0.55, 1.45));
       else if (gun) play('Idle_Shoot', 0.18, 0);   // arme épaulée, immobile
@@ -477,6 +478,19 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       if (legsOk) {
         turnBone(LEGS.R.up, X, -0.55 * land); turnBone(LEGS.L.up, X, -0.55 * land);
         turnBone(LEGS.R.low, X, 0.95 * land); turnBone(LEGS.L.low, X, 0.95 * land);
+      }
+    }
+    // glissade : assis en arrière, la jambe droite tendue devant, la gauche repliée dessous, le buste penché en arrière
+    slideW = damp(slideW, st.slide && st.alive !== false ? 1 : 0, 16, dt);
+    model.position.y = cal.y - 0.42 * slideW;
+    if (slideW > 0.01) {
+      if (torso) torso.quaternion.multiply(qx.setFromAxisAngle(X, -0.55 * slideW));
+      if (legsOk) {
+        // (depuis la pose de repos : celle du saut écarte déjà les jambes)
+        legBones.forEach((b, i) => b.quaternion.slerp(legRest[i], slideW));
+        turnBone(LEGS.R.up, X, 1.3 * slideW); turnBone(LEGS.R.low, X, -0.12 * slideW);
+        turnBone(LEGS.L.up, X, 0.55 * slideW); turnBone(LEGS.L.low, X, -1.75 * slideW);
+        turnBone(LEGS.L.up, Z, 0.22 * slideW);
       }
     }
     // gestes du bras droit (pris sur la pose de l'animation de cette image)
