@@ -383,7 +383,7 @@ export function createAI(sim, map, world) {
     }
     if (seen) {
       if (B.enemy !== seen.Q.id) {
-        B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneak = false; B.sneakT = S.t;
+        B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneak = false; B.sneakT = S.t; B.exposed = false;
         if (!seen.Q.down) callOut(P, B, seen.Q);
       }
       B.visible = true; B.seenT = S.t; B.last = { x: seen.Q.x, y: seen.Q.y, z: seen.Q.z };
@@ -393,7 +393,7 @@ export function createAI(sim, map, world) {
     // touché ou entendu sans voir : on se tourne par là
     const alert = cands.find((c) => c.hurt || (c.heard && !(B.ignore.get(c.Q.id) > S.t)));
     if (alert && (B.enemy == null || B.enemy === alert.Q.id || S.t - B.seenT > 3)) {
-      if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneakT = S.t; }
+      if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneakT = S.t; B.exposed = false; }
       B.last = { x: alert.Q.x, y: alert.Q.y, z: alert.Q.z };
     }
     if (B.enemy != null && S.t - B.seenT > 6) B.enemy = null;
@@ -533,8 +533,9 @@ export function createAI(sim, map, world) {
       if (d && !d.open && !d.dead) { B.yaw = Math.atan2(d.cx - P.x, d.cz - P.z); I.use++; B.useT = S.t; }
     }
     I.sprint = hd > 8 && B.enemy == null;
-    // on va voir des coups de feu : les 25 derniers mètres accroupi, sans bruit de pas
-    if (g.kind === 'chasse' && hd < 25 && B.enemy != null) I.crouch = true;
+    // on va voir où il était (ou d'où venaient les coups de feu) à allure normale ; les derniers mètres accroupi, sans
+    // bruit de pas, seulement à couvert (ramper à découvert le laissait approcher lentement, en pleine vue)
+    if (g.kind === 'chasse' && hd < 8 && B.enemy != null && covered(P, B)) I.crouch = true;
     return { x: dx / l, z: dz / l };
   }
   function arrive(P, B, dt) {
@@ -588,6 +589,15 @@ export function createAI(sim, map, world) {
     if (P.sel === slot) I.fire = true;
     I.crouch = B.lv.hop > 0;
     return null;
+  }
+  // à couvert : sous un toit, ou contre un mur, une voiture, un rocher… (à moins de 1,5 m, à hauteur du buste) ; revu
+  // trois fois par seconde
+  function covered(P, B) {
+    if (S.t - (B.covT || -9) < 0.33) return B.cov;
+    B.covT = S.t;
+    let c = world.ceiling(P.x, P.z, P.y + 1.9) < P.y + 7;
+    if (!c) world.near(P.x, P.z, 2, (s) => { if (!c && s.y1 > P.y + 0.8 && s.y0 < P.y + 1.2 && world.over(s, P.x, P.z, 1.5)) c = true; });
+    return (B.cov = c);
   }
   // l'ennemi nous a-t-il repérés ? Un bot qui nous a pour cible et nous voit ; un joueur tourné vers nous ou qui vient de
   // nous toucher. Tirer trahit sa position (quelques secondes)
@@ -661,11 +671,13 @@ export function createAI(sim, map, world) {
       const tol = Math.max(0.025, Math.atan(0.7 / d));
       const aligned = Math.abs(wrap(B.yaw - wy)) < tol && Math.abs(B.pitch - wp) < tol;
       I.aim = !!W && d > 14 && it.w !== 'pompe';
-      // pas encore repéré : accroupi (sans bruit de pas), on s'approche à bonne portée sans tirer, puis on ouvre le feu
-      // posément ; au bout de 10 s de traque (ou repéré), on se bat normalement
-      B.sneak = !!W && P.ground && !P.swim && S.t - B.sneakT < 10 && !spotted(P, E, d);
+      // pas encore repéré : on s'approche à bonne portée sans tirer (accroupi, sans bruit de pas, seulement à couvert :
+      // à découvert, on avance à allure normale), puis on ouvre le feu posément. Une fois repéré, c'est fini pour ce
+      // combat (il ne suffit pas que l'ennemi tourne la tête pour qu'on se remette à ramper) ; au bout de 10 s aussi
+      if (spotted(P, E, d)) B.exposed = true;
+      B.sneak = !!W && P.ground && !P.swim && !B.exposed && S.t - B.sneakT < 10;
       const hold = B.sneak && it.w !== 'sniper' && it.w !== 'roquette' && d > Math.max(WANT_D[it.w] * 1.3, 8);
-      if (B.sneak) I.crouch = true;
+      if (B.sneak && covered(P, B)) I.crouch = true;
       if (W && B.react <= 0 && aligned && P.sel === slot && !hold) {
         if (W.auto) {
           if ((B.burstT -= dt) <= 0) { B.burstOn = !B.burstOn; B.burstT = (B.burstOn ? lv.burst[0] : lv.burst[1]) * (0.6 + B.rng.next() * 0.8); }
@@ -743,7 +755,7 @@ export function createAI(sim, map, world) {
     const rng = makeRng(hash((S.seed | 0) * 7 + (n | 0)));
     P.ai = {
       rng, lv: LEVELS[P.level] || LEVELS.normal, state: 'go', goal: null, path: null, wp: 0, waiting: false, partial: false, approach: false,
-      enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false, tvx: 0, tvy: 0, tvz: 0, sneak: false, sneakT: -99,
+      enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false, tvx: 0, tvy: 0, tvz: 0, sneak: false, sneakT: -99, exposed: false, cov: false, covT: -9,
       strafe: 1, strafeT: 0, burstOn: true, burstT: 0, scanT: rng.next() * 0.25, decideT: rng.next() * 0.5,
       ban: new Map(), ignore: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
       sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,
@@ -854,6 +866,8 @@ export function createAI(sim, map, world) {
   S.hooks.think = think;
   // rythme de la partie entre bots : quand il est déjà tombé plus de monde que prévu, les coups d'un bot sur un autre bot
   // font moins mal (les combats se voient toujours, ils durent un peu plus) ; ni les joueurs ni les coups reçus par eux ne changent
-  S.hooks.pace = () => clamp(0.04 + agg() * 1.4, 0.04, 1);
+  // (en fin de partie, à quatre ou moins, un peu moins encore : les derniers bots ne rampent plus pour se surprendre,
+  // leurs duels s'achevaient deux minutes avant la dernière tempête)
+  S.hooks.pace = () => clamp(0.04 + agg() * 1.4, 0.04, 1) * (sim.alive().length <= 4 ? 0.4 : 1);
   return { think, nav, LEVELS };
 }

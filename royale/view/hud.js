@@ -282,6 +282,9 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
   // ------------------------------------------------------------------ le sac (Tab) : ranger en glissant, lâcher, détails
   const bagEl = $('#bag'), bslots = $('#bslots'), bdet = $('#bdet');
   let bagKey = '', bagP = null, onMove = null, hoverI = -1, drag = null;
+  // à la manette : case choisie (padI), objet pris (padPick) ; marques redessinées après chaque rendu du sac
+  let padI = -1, padPick = -1;
+  const padMark = () => { for (const c of bslots.children) { const i = +c.dataset.i; c.classList.toggle('pad', i === padI); c.classList.toggle('lift', i === padPick); } };
   const fmt = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
   function detail(it) {
     if (!it) { bdet.innerHTML = `<b>Case vide</b><div class="st">Ramasse une arme ou un objet (${esc(key('utiliser'))}) pour la remplir.</div>`; return; }
@@ -307,6 +310,7 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
     $('#bammo').innerHTML = Object.entries(AMMO).map(([a, A]) => `<div class="row2${P.ammo[a] ? '' : ' zero'}"><i class="bul" style="--c:${A.color}"></i>${A.label}<b>${P.ammo[a]}</b></div>`).join('');
     $('#bmats').innerHTML = Object.entries(MATERIALS).map(([m, M]) => `<div class="row2${P.mats[m] ? '' : ' zero'}"><i style="--c:${M.color}"></i>${M.label}<b>${P.mats[m]}</b></div>`).join('');
     detail(P.inv[hoverI >= 0 ? hoverI : P.sel - 1] || null);
+    padMark();
   }
   const slotAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest('.bs') : null; };
   bslots.addEventListener('pointerover', (e) => { const el = e.target.closest('.bs'); if (!el || !bagP) return; hoverI = +el.dataset.i; detail(bagP.inv[hoverI]); });
@@ -438,8 +442,23 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
     // touches changées : les cases de la barre affichent les nouvelles
     refreshKeys() { invKey = ''; },
     get bagOpen() { return !bagEl.hidden; },
-    openBag(P, move) { bagP = P; onMove = move; bagKey = ''; hoverI = -1; bagEl.hidden = false; bagRender(P); },
-    closeBag() { bagEl.hidden = true; bagP = null; drag = null; for (const g of document.querySelectorAll('.dragghost')) g.remove(); },
+    openBag(P, move) { bagP = P; onMove = move; bagKey = ''; hoverI = -1; padI = -1; padPick = -1; bagEl.hidden = false; bagRender(P); },
+    closeBag() { bagEl.hidden = true; bagP = null; drag = null; padI = -1; padPick = -1; for (const g of document.querySelectorAll('.dragghost')) g.remove(); },
+    // manette : la croix change de case, A prend l'objet puis le pose sur une autre case (échange), X le lâche
+    bagNav(dir) {
+      if (!bagP) return;
+      const n = bagP.inv.length, step = dir === 'left' || dir === 'up' ? -1 : 1;
+      padI = padI < 0 ? Math.max(0, bagP.sel - 1) : (padI + step + n) % n;
+      hoverI = padI; detail(bagP.inv[padI] || null); padMark();
+    },
+    bagPick() {
+      if (!bagP) return;
+      if (padI < 0) { this.bagNav('right'); return; }
+      if (padPick < 0) { if (bagP.inv[padI]) padPick = padI; }
+      else { if (padPick !== padI && onMove) onMove(padPick, padI); padPick = -1; }
+      padMark();
+    },
+    bagDrop() { if (bagP && padI >= 0 && bagP.inv[padI] && onMove) { onMove(padI, -1); padPick = -1; padMark(); } },
     bag(P) { if (!bagEl.hidden && P) { bagP = P; bagRender(P); } },
   };
 }

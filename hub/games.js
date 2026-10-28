@@ -196,7 +196,7 @@ window.HUB_GAMES = [
     id: 'royale',
     title: 'Island Rush',
     tag: 'Battle royale sur une île',
-    desc: 'Saute de la montgolfière sur une île d\'un kilomètre carré, fouille maisons et coffres, casse et construis, et sois le dernier debout quand la tempête se referme. Les places libres sont prises par des bots.',
+    desc: 'Saute de la montgolfière sur une île d\'un kilomètre carré, fouille maisons et coffres, casse et construis, et sois le dernier debout quand la tempête se referme. Les places libres sont prises par des bots. Au clavier et à la souris, ou à la manette.',
     url: 'royale/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#3d9fd9',
