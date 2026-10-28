@@ -64,6 +64,47 @@ export function createSound() {
   const amb = {}, last = {}, bufs = new Map();
   let wind = null, storm = null, stepT = 0, stepsOther = new Map();
   let ear = { x: 0, y: 0, z: 0, yaw: 0 };
+  // coffre doré tout proche : un accord doux qui frémit et des notes scintillantes, de plus en plus fort en approchant
+  // (on le trouve à l'oreille, même derrière un mur)
+  const HUM_R = 16, SPARK = [1318.5, 1568, 1760, 1975.5, 2349.3, 2637];
+  let hum = null, humT = 0;
+  function makeHum() {
+    const g = ctx.createGain(); g.gain.value = 0;
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    // l'accord (mi majeur, avec l'octave) : chaque note vibre un peu, l'ensemble palpite
+    const trem = ctx.createGain(); trem.gain.value = 0.7;
+    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.5; lg.gain.value = 0.3; lfo.connect(lg); lg.connect(trem.gain); lfo.start();
+    for (const [f, v] of [[659.3, 0.32], [830.6, 0.22], [987.8, 0.2], [1318.5, 0.09]]) {
+      const o = ctx.createOscillator(), vg = ctx.createGain(), vib = ctx.createOscillator(), vibG = ctx.createGain();
+      o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 10; vg.gain.value = v;
+      vib.frequency.value = 3.5 + Math.random() * 1.5; vibG.gain.value = f * 0.004; vib.connect(vibG); vibG.connect(o.frequency);
+      o.connect(vg); vg.connect(trem); o.start(); vib.start();
+    }
+    const sp = ctx.createGain(); sp.gain.value = 0;
+    trem.connect(g);
+    if (pan) { g.connect(pan); sp.connect(pan); pan.connect(fxBus); } else { g.connect(fxBus); sp.connect(fxBus); }
+    hum = { g, sp, pan };
+  }
+  function chestHum(dt, S, t) {
+    let best = null, bd = HUM_R;
+    for (const c of S.chests.values()) {
+      if (c.kind !== 'coffre' || c.open || Math.abs(c.x - ear.x) > HUM_R || Math.abs(c.z - ear.z) > HUM_R) continue;
+      const d = Math.hypot(c.x - ear.x, c.y + 0.5 - ear.y, c.z - ear.z);
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (!best && !hum) return;
+    if (!hum) makeHum();
+    const p = best ? place(best.x, best.y + 0.5, best.z, HUM_R) : null, k = p ? Math.pow(1 - p.d / HUM_R, 1.5) : 0;
+    hum.g.gain.setTargetAtTime(k * 0.13, t, 0.2);
+    hum.sp.gain.setTargetAtTime(k * 0.22, t, 0.2);
+    if (hum.pan && p) hum.pan.pan.setTargetAtTime(p.pan * 0.8, t, 0.1);
+    // de petites notes aiguës au hasard, comme des paillettes
+    if (k > 0.02 && (humT -= dt) <= 0) {
+      humT = 0.18 + Math.random() * 0.45;
+      const f = SPARK[Math.floor(Math.random() * SPARK.length)];
+      tone(hum.sp, t + 0.01, 0.5 + Math.random() * 0.4, { type: 'sine', f0: f, f1: f * 1.002, a: 0.006, v: 0.35 + Math.random() * 0.35 });
+    }
+  }
 
   function unlock() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -370,6 +411,7 @@ export function createSound() {
     storm.g.gain.setTargetAtTime(sv, t, 0.4);
     // musique : dans la montgolfière et pendant la descente, puis elle s'efface à l'atterrissage
     setMusic(!!air && S.mode !== 'exploration');
+    chestHum(dt, S, t);
     // ses pas : plus forts en courant, discrets accroupi
     if (ground && ground.mode === 'sol') {
       const sp = Math.hypot(ground.vx, ground.vz);

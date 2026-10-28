@@ -11,9 +11,9 @@ import { STORM_TIMES } from './map.js';
 import { PING_T } from './sim.js';
 
 export const LEVELS = {
-  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35, wall: 0.25 },
-  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5, push: 0.6, wall: 0.6 },
-  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1, push: 0.85, wall: 0.9 },
+  facile: { see: 40, cone: 0.35, react: [0.75, 1.3], err: 0.085, lag: 0.24, adapt: 0.4, turn: 3.2, burst: [0.45, 0.75], head: 0.04, strafe: 0.35, hop: 0, nade: 0, push: 0.35, wall: 0.25 },
+  normal: { see: 55, cone: 0.1, react: [0.42, 0.75], err: 0.05, lag: 0.16, adapt: 0.25, turn: 5.5, burst: [0.9, 0.4], head: 0.14, strafe: 0.7, hop: 0.12, nade: 0.5, push: 0.6, wall: 0.6 },
+  difficile: { see: 80, cone: -0.25, react: [0.22, 0.42], err: 0.026, lag: 0.11, adapt: 0.18, turn: 9, burst: [1.6, 0.2], head: 0.3, strafe: 1, hop: 0.3, nade: 1, push: 0.85, wall: 0.9 },
 };
 const WSCORE = { fusil: 10, pompe: 9.5, smg: 8, sniper: 7, roquette: 6.5, pistolet: 4.5 };
 const WANT_D = { pompe: 5, smg: 11, pistolet: 14, fusil: 24, sniper: 60, roquette: 22 };
@@ -70,7 +70,8 @@ export function createAI(sim, map, world) {
     let v;
     if (it.t === 'arme') {
       const same = P.inv.find((s) => s && s.t === 'arme' && s.w === it.w);
-      if (same) { v = it.r > same.r ? (it.r - same.r) * 3 : 0; if (v) return { v, swap: P.inv.indexOf(same) }; return { v: 0 }; }
+      // la même en mieux : le ramassage l'échange tout seul contre l'ancienne
+      if (same) return { v: it.r > same.r ? (it.r - same.r) * 3 : 0 };
       const nW = P.inv.filter((s) => s && s.t === 'arme').length;
       v = WSCORE[it.w] * (1 + 0.18 * it.r) * (nW === 0 ? 2 : 1);
       if (nW >= 3) {
@@ -382,7 +383,7 @@ export function createAI(sim, map, world) {
     }
     if (seen) {
       if (B.enemy !== seen.Q.id) {
-        B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0;
+        B.enemy = seen.Q.id; B.react = lv.react[0] + B.rng.next() * (lv.react[1] - lv.react[0]); B.track = 0; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneak = false; B.sneakT = S.t;
         if (!seen.Q.down) callOut(P, B, seen.Q);
       }
       B.visible = true; B.seenT = S.t; B.last = { x: seen.Q.x, y: seen.Q.y, z: seen.Q.z };
@@ -392,7 +393,7 @@ export function createAI(sim, map, world) {
     // touché ou entendu sans voir : on se tourne par là
     const alert = cands.find((c) => c.hurt || (c.heard && !(B.ignore.get(c.Q.id) > S.t)));
     if (alert && (B.enemy == null || B.enemy === alert.Q.id || S.t - B.seenT > 3)) {
-      if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; }
+      if (B.enemy !== alert.Q.id) { B.enemy = alert.Q.id; B.react = lv.react[1]; B.track = 0; B.seenT = S.t; B.tvx = 0; B.tvy = 0; B.tvz = 0; B.sneakT = S.t; }
       B.last = { x: alert.Q.x, y: alert.Q.y, z: alert.Q.z };
     }
     if (B.enemy != null && S.t - B.seenT > 6) B.enemy = null;
@@ -532,6 +533,8 @@ export function createAI(sim, map, world) {
       if (d && !d.open && !d.dead) { B.yaw = Math.atan2(d.cx - P.x, d.cz - P.z); I.use++; B.useT = S.t; }
     }
     I.sprint = hd > 8 && B.enemy == null;
+    // on va voir des coups de feu : les 25 derniers mètres accroupi, sans bruit de pas
+    if (g.kind === 'chasse' && hd < 25 && B.enemy != null) I.crouch = true;
     return { x: dx / l, z: dz / l };
   }
   function arrive(P, B, dt) {
@@ -586,6 +589,13 @@ export function createAI(sim, map, world) {
     I.crouch = B.lv.hop > 0;
     return null;
   }
+  // l'ennemi nous a-t-il repérés ? Un bot qui nous a pour cible et nous voit ; un joueur tourné vers nous ou qui vient de
+  // nous toucher. Tirer trahit sa position (quelques secondes)
+  function spotted(P, E, d) {
+    if (S.t - (P.shotT != null ? P.shotT : -9) < 4 || (P.hitBy === E.id && S.t - (P.hitT || -9) < 4)) return true;
+    if (E.bot) return !!E.ai && E.ai.enemy === P.id && E.ai.visible;
+    return d < 12 || (d < 90 && ((P.x - E.x) * Math.sin(E.yaw) + (P.z - E.z) * Math.cos(E.yaw)) / d > 0.7);
+  }
   function fight(P, B, dt) {
     const I = P.inp, lv = B.lv, E = S.players.get(B.enemy);
     if (!E || !E.alive) { B.enemy = null; B.state = 'go'; B.decideT = 0; return null; }
@@ -629,7 +639,11 @@ export function createAI(sim, map, world) {
       B.track += dt; B.react -= dt;
       const head = B.headshot && it && it.w !== 'roquette';
       const ty = E.y + (it && it.w === 'roquette' ? 0.4 : head ? (E.crouch ? 1.05 : 1.55) : (E.crouch ? 0.85 : 1.2));
-      const ax = E.x - e[0], ay = ty - e[1], az = E.z - e[2];
+      // comme un joueur, on voit la cible avec un temps de retard (lag) et on devine où elle va d'après son allure des
+      // derniers instants (adapt) : qui court droit est bien suivi, mais un changement de direction ou un saut fait rater
+      const a = 1 - Math.exp(-dt / lv.adapt);
+      B.tvx += (E.vx - B.tvx) * a; B.tvy += ((E.ground ? 0 : E.vy) - B.tvy) * a; B.tvz += (E.vz - B.tvz) * a;
+      const ax = E.x + (B.tvx - E.vx) * lv.lag - e[0], ay = ty + (B.tvy - (E.ground ? 0 : E.vy)) * lv.lag - e[1], az = E.z + (B.tvz - E.vz) * lv.lag - e[2];
       if ((B.errT -= dt) <= 0) {
         B.errT = 0.3 + B.rng.next() * 0.2;
         const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 : 1);
@@ -647,7 +661,12 @@ export function createAI(sim, map, world) {
       const tol = Math.max(0.025, Math.atan(0.7 / d));
       const aligned = Math.abs(wrap(B.yaw - wy)) < tol && Math.abs(B.pitch - wp) < tol;
       I.aim = !!W && d > 14 && it.w !== 'pompe';
-      if (W && B.react <= 0 && aligned && P.sel === slot) {
+      // pas encore repéré : accroupi (sans bruit de pas), on s'approche à bonne portée sans tirer, puis on ouvre le feu
+      // posément ; au bout de 10 s de traque (ou repéré), on se bat normalement
+      B.sneak = !!W && P.ground && !P.swim && S.t - B.sneakT < 10 && !spotted(P, E, d);
+      const hold = B.sneak && it.w !== 'sniper' && it.w !== 'roquette' && d > Math.max(WANT_D[it.w] * 1.3, 8);
+      if (B.sneak) I.crouch = true;
+      if (W && B.react <= 0 && aligned && P.sel === slot && !hold) {
         if (W.auto) {
           if ((B.burstT -= dt) <= 0) { B.burstOn = !B.burstOn; B.burstT = (B.burstOn ? lv.burst[0] : lv.burst[1]) * (0.6 + B.rng.next() * 0.8); }
           I.fire = B.burstOn;
@@ -678,6 +697,8 @@ export function createAI(sim, map, world) {
     const want = retreat ? 80 : W ? WANT_D[it.w] : 1.5;
     const ux = dx / d, uz = dz / d;
     const fwd = clamp((d - want) / 6, -1, 1);
+    // à l'affût : on avance accroupi droit sur lui (ni pas de côté ni sauts, qui se voient), ou l'on reste immobile en tirant
+    if (B.sneak && !retreat) return fwd > 0.2 ? { x: ux, z: uz, k: 1 } : null;
     if ((B.strafeT -= dt) <= 0) { B.strafe = B.rng.next() < 0.5 ? -1 : 1; B.strafeT = 0.5 + B.rng.next() * 1.1; }
     const side = B.strafe * lv.strafe;
     if (lv.hop && P.ground && B.rng.next() < lv.hop * dt * 1.5) I.jump++;
@@ -722,7 +743,7 @@ export function createAI(sim, map, world) {
     const rng = makeRng(hash((S.seed | 0) * 7 + (n | 0)));
     P.ai = {
       rng, lv: LEVELS[P.level] || LEVELS.normal, state: 'go', goal: null, path: null, wp: 0, waiting: false, partial: false, approach: false,
-      enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false,
+      enemy: null, visible: false, seenT: -99, last: null, react: 0, track: 0, ex: 0, ey: 0, errT: 0, headshot: false, tvx: 0, tvy: 0, tvz: 0, sneak: false, sneakT: -99,
       strafe: 1, strafeT: 0, burstOn: true, burstT: 0, scanT: rng.next() * 0.25, decideT: rng.next() * 0.5,
       ban: new Map(), ignore: new Map(), useT: -9, yaw: P.yaw || 0, pitch: 0, drop: null, prevD: null, minJump: 1 + rng.next() * 5,
       sx: P.x, sz: P.z, stuckT: 0, stuckN: 0, nade: null, nadeT: -99, healSlot: 0, follow: null, followPick: null, followT: 0,

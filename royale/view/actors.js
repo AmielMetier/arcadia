@@ -74,6 +74,19 @@ export function createActors(scene, sim, kit = null) {
     grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.3, 'rgba(255,240,200,0.55)'); grd.addColorStop(1, 'rgba(255,220,140,0)');
     g.fillStyle = grd; g.fillRect(0, 0, w, w);
   });
+  // coffres : halo doré creux (le coffre cache le milieu, la lumière déborde de sa silhouette) et lueur dorée au sol
+  const haloTex = canvasTex(128, 128, (g, w) => {
+    const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    grd.addColorStop(0, 'rgba(255,214,110,0.05)'); grd.addColorStop(0.32, 'rgba(255,208,96,0.22)'); grd.addColorStop(0.46, 'rgba(255,196,70,0.85)');
+    grd.addColorStop(0.62, 'rgba(255,172,40,0.32)'); grd.addColorStop(0.82, 'rgba(240,140,20,0.08)'); grd.addColorStop(1, 'rgba(240,140,20,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, w, w);
+  });
+  const floorTex = canvasTex(128, 128, (g, w) => {
+    const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    grd.addColorStop(0, 'rgba(255,200,90,0.5)'); grd.addColorStop(0.55, 'rgba(255,184,64,0.32)'); grd.addColorStop(0.7, 'rgba(255,206,110,0.7)');
+    grd.addColorStop(0.78, 'rgba(255,170,40,0.18)'); grd.addColorStop(1, 'rgba(255,150,20,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, w, w);
+  });
   const LCAP = 256;
   const beamGeo = new THREE.PlaneGeometry(0.8, 1).translate(0, 0.5, 0);
   const beamGeo2 = beamGeo.clone().rotateY(Math.PI / 2);
@@ -90,6 +103,10 @@ export function createActors(scene, sim, kit = null) {
   const RGLOW = [0.5, 0.95, 1.15, 1.35];
   // lueur des coffres dorés et étincelles ; poussière lumineuse qui monte autour du butin rare
   const glows = createBillboards(128, glowTex, { additive: true }); glows.mesh.renderOrder = 3; group.add(glows.mesh); own.push(glows);
+  const halos = createBillboards(100, haloTex, { additive: true }); halos.mesh.renderOrder = 3; group.add(halos.mesh); own.push(halos);
+  const chestFloor = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), 100);
+  chestFloor.frustumCulled = false; chestFloor.count = 0; chestFloor.renderOrder = 3; group.add(chestFloor); own.push(chestFloor.geometry, chestFloor.material);
+  for (let i = 0; i < 100; i++) chestFloor.setColorAt(i, new THREE.Color(0));
   const motes = createBillboards(220, glowTex, { additive: true }); motes.mesh.renderOrder = 3; group.add(motes.mesh); own.push(motes);
   const sparks = [], dust = [];
   let lootClock = 0;
@@ -181,9 +198,10 @@ export function createActors(scene, sim, kit = null) {
       const far = Math.hypot(a.x - cam.x, a.z - cam.z), every = far < 50 ? 1 : far < 120 ? 2 : 4;
       // l'ombre du soleil ne couvre que les environs : les personnages lointains n'en projettent pas
       if (h.shadow !== far < 70) { h.shadow = far < 70; hero.root.traverse((o) => { if (o.isMesh) o.castShadow = h.shadow; }); }
-      h.acc += dt;
+      // (caché, dans la montgolfière : le temps ne s'accumule pas, sinon la première image en chute sauterait la culbute)
+      h.acc = hero.root.visible ? h.acc + dt : 0;
       if (!hero.root.visible || ++h.tick % every) continue;
-      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, down: !!P.down, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
+      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), vx: P.vx, vz: P.vz, ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, down: !!P.down, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
       h.acc = 0;
     }
     // montgolfière
@@ -239,18 +257,29 @@ export function createActors(scene, sim, kit = null) {
       motes.set(nm++, d.x, d.y, d.z, 0.09, d.c.r * 1.4, d.c.g * 1.4, d.c.b * 1.4, Math.sin(Math.PI * d.t / d.life) * 0.9);
     }
     motes.count(nm);
-    // coffres dorés fermés à portée : lueur qui palpite et étincelles qui montent
-    let ng = 0;
+    // coffres dorés fermés à portée : halo doré autour du coffre, lueur au sol qui palpite, paillettes d'or qui montent
+    let ng = 0, nh = 0;
     for (const c of S.chests.values()) {
       if (c.kind !== 'coffre' || c.open || Math.abs(c.x - cam.x) > 55 || Math.abs(c.z - cam.z) > 55 || chestSeen.get(c.id) === false) continue;
-      const ph = (c.id * 1.7) % 6.28, a = 0.32 + 0.14 * Math.sin(t * 3 + ph);
-      if (ng < 100) glows.set(ng++, c.x, c.y + 0.6, c.z, 1.15, 1, 0.74, 0.28, a);
-      if (Math.random() < dt * 5 && sparks.length < 160) sparks.push({ x: c.x + (Math.random() - 0.5) * 0.9, y: c.y + 0.4 + Math.random() * 0.4, z: c.z + (Math.random() - 0.5) * 0.9, t: 0, life: 0.7 + Math.random() * 0.5 });
+      // (l'identifiant d'un coffre est « c12 » : sa phase vient du numéro, sinon elle vaut NaN et la lueur devient une tache blanche)
+      const ph = ((+c.id.slice(1) || 0) * 1.7) % 6.28, pulse = 0.5 + 0.5 * Math.sin(t * 2.6 + ph);
+      if (nh < 100) {
+        halos.set(nh, c.x, c.y + 0.5, c.z, 1.9 + 0.12 * pulse, 1, 1, 1, 0.55 + 0.3 * pulse);
+        q.setFromAxisAngle(up, t * 0.3 + ph); p3.set(c.x, c.y + 0.17, c.z); s3.setScalar(2.3 + 0.25 * pulse);
+        chestFloor.setMatrixAt(nh, m4.compose(p3, q, s3)); chestFloor.setColorAt(nh, tmpC.setRGB(0.55 + 0.35 * pulse, 0.42 + 0.27 * pulse, 0.16 + 0.1 * pulse));
+        nh++;
+      }
+      if (Math.random() < dt * 6 && sparks.length < 160) {
+        const a = Math.random() * Math.PI * 2, r = 0.45 + Math.random() * 0.25;
+        sparks.push({ x: c.x + Math.cos(a) * r, y: c.y + 0.25 + Math.random() * 0.3, z: c.z + Math.sin(a) * r, t: 0, life: 0.9 + Math.random() * 0.6 });
+      }
     }
+    halos.count(nh); chestFloor.count = nh;
+    chestFloor.instanceMatrix.needsUpdate = true; if (chestFloor.instanceColor) chestFloor.instanceColor.needsUpdate = true;
     for (let i = sparks.length - 1; i >= 0; i--) {
-      const sp = sparks[i]; sp.t += dt; sp.y += dt * 0.7;
+      const sp = sparks[i]; sp.t += dt; sp.y += dt * 0.6;
       if (sp.t >= sp.life) { sparks.splice(i, 1); continue; }
-      if (ng < 128) glows.set(ng++, sp.x, sp.y, sp.z, 0.16, 1, 0.9, 0.5, Math.sin(Math.PI * sp.t / sp.life));
+      if (ng < 128) glows.set(ng++, sp.x, sp.y, sp.z, 0.11, 1, 0.78, 0.3, Math.sin(Math.PI * sp.t / sp.life) * 0.9);
     }
     glows.count(ng);
     // coffres : le couvercle s'ouvre quand le coffre est ouvert ; les coffres fermés luisent doucement

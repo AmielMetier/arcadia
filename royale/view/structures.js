@@ -9,7 +9,7 @@
 // et réservoirs (engine/decor.js, qui donne aussi leurs collisions).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL, STOREY } from '../engine/buildings.js';
-import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY, slabCells } from '../engine/world.js';
+import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY, slabCells, roofPanes } from '../engine/world.js';
 import { roofDetails } from '../engine/decor.js';
 import { makeRng } from '../engine/rng.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
@@ -368,6 +368,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
 
   // toits en pente et pignons, fusionnés ; boiseries des toits (rives, faîtières) fusionnées aussi
   const roofPos = [], roofCol = [], roofUv = [], gabPos = [], gabCol = [];
+  const roofKeys = new Map(); // dalle « s:b:k:x,z » → premiers sommets des morceaux de pan au-dessus (6 sommets chacun)
   const trimParts = [], trimCols = [];
   const lanterns = [];
   const addBeam = (len, w, h, cx, cy, cz, rx, ry, c) => {
@@ -489,12 +490,24 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       const half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE, drop = o * ROOF_SLOPE;
       const rc = [roofC.r, roofC.g, roofC.b];
       if (b.abandoned) for (let i = 0; i < 3; i++) rc[i] *= 0.7;
-      const quad = (a, bb, c, d) => {
-        for (const p of [a, bb, c, a, c, d]) { roofPos.push(...p); roofCol.push(...rc); }
-        // UV : le long du faîtage et dans la pente, en mètres / 2
-        const L = Math.hypot(bb[0] - a[0], bb[2] - a[2]), Hs = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]);
-        for (const [u, w] of [[0, 0], [L, 0], [L, Hs], [0, 0], [L, Hs], [0, Hs]]) roofUv.push(u / 2, w / 2);
-      };
+      // les pans, case par case (même découpe que le moteur, débord en plus) : un morceau cassé disparaît seul
+      const S0 = (alongX ? b.x0 : b.z0) * CELL, S1 = S0 + (alongX ? b.w : b.d) * CELL, T0 = (alongX ? b.z0 : b.x0) * CELL, T1 = T0 + (alongX ? b.d : b.w) * CELL;
+      const sec = Math.hypot(1, ROOF_SLOPE);
+      for (const p of roofPanes(b)) {
+        const s0 = p.s0 === S0 ? S0 - o : p.s0, s1 = p.s1 === S1 ? S1 + o : p.s1;
+        const t0 = p.dir > 0 && p.t0 === T0 ? T0 - o : p.t0, t1 = p.dir < 0 && p.t1 === T1 ? T1 + o : p.t1;
+        const eave = p.dir > 0 ? T0 - o : T1 + o, tE = p.dir > 0 ? t0 : t1, tR = p.dir > 0 ? t1 : t0;
+        // UV : le long du faîtage (depuis le coin d'où partait le pan entier) et dans la pente, en mètres / 2
+        const sg = (alongX ? p.dir > 0 : p.dir < 0) ? 1 : -1, org = sg > 0 ? S0 - o : S1 + o, sA = sg > 0 ? s0 : s1, sB = sg > 0 ? s1 : s0;
+        const at = (ss, tt) => { const y = top + (p.dir > 0 ? tt - T0 : T1 - tt) * ROOF_SLOPE; return alongX ? [ss, y, tt] : [tt, y, ss]; };
+        const a = at(sA, tE), bb = at(sB, tE), c = at(sB, tR), d = at(sA, tR);
+        const key = 's:' + b.id + ':' + b.floors + ':' + p.x + ',' + p.z;
+        if (!roofKeys.has(key)) roofKeys.set(key, []);
+        roofKeys.get(key).push(roofPos.length / 3);
+        for (const q of [a, bb, c, a, c, d]) { roofPos.push(...q); roofCol.push(...rc); }
+        const uA = Math.abs(sA - org), uB = Math.abs(sB - org), wE = Math.abs(tE - eave) * sec, wR = Math.abs(tR - eave) * sec;
+        for (const [u, w] of [[uA, wE], [uB, wE], [uB, wR], [uA, wE], [uB, wR], [uA, wR]]) roofUv.push(u / 2, w / 2);
+      }
       const tri = (a, bb, c) => { for (const p of [a, bb, c]) { gabPos.push(...p); gabCol.push(face.r, face.g, face.b); } };
       const ty = top - drop, ry = top + rise;
       const slope = Math.atan(ROOF_SLOPE), sl = Math.hypot(half + o, rise + drop);
@@ -502,8 +515,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       const ridgeC = roofC.clone().multiplyScalar(0.75);
       if (alongX) {
         const zm = (Z0 + Z1) / 2;
-        quad([X0 - o, ty, Z0 - o], [X1 + o, ty, Z0 - o], [X1 + o, ry, zm], [X0 - o, ry, zm]);
-        quad([X1 + o, ty, Z1 + o], [X0 - o, ty, Z1 + o], [X0 - o, ry, zm], [X1 + o, ry, zm]);
         tri([X0, top, Z1], [X0, top, Z0], [X0, ry - 0.05, zm]); tri([X1, top, Z0], [X1, top, Z1], [X1, ry - 0.05, zm]);
         // planches de rive (bas des pans), rives des pignons, faîtière
         addBeam(X1 - X0 + 2 * o + 0.1, 0.06, 0.22, (X0 + X1) / 2, ty - 0.08, Z0 - o, 0, 0, tc);
@@ -512,8 +523,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
         addBeam(X1 - X0 + 2 * o, 0.26, 0.16, (X0 + X1) / 2, ry + 0.03, zm, 0, 0, ridgeC);
       } else {
         const xm = (X0 + X1) / 2;
-        quad([X0 - o, ty, Z1 + o], [X0 - o, ty, Z0 - o], [xm, ry, Z0 - o], [xm, ry, Z1 + o]);
-        quad([X1 + o, ty, Z0 - o], [X1 + o, ty, Z1 + o], [xm, ry, Z1 + o], [xm, ry, Z0 - o]);
         tri([X0, top, Z0], [X1, top, Z0], [xm, ry - 0.05, Z0]); tri([X1, top, Z1], [X0, top, Z1], [xm, ry - 0.05, Z1]);
         addBeam(Z1 - Z0 + 2 * o + 0.1, 0.06, 0.22, X0 - o, ty - 0.08, (Z0 + Z1) / 2, 0, Math.PI / 2, tc);
         addBeam(Z1 - Z0 + 2 * o + 0.1, 0.06, 0.22, X1 + o, ty - 0.08, (Z0 + Z1) / 2, 0, Math.PI / 2, tc);
@@ -574,13 +583,14 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   const roofMat = new THREE.MeshStandardMaterial({ map: roofTex, vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
   const gableMat = new THREE.MeshStandardMaterial({ map: tex.enduit, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
   const trimMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
+  let roofMesh = null;
   if (roofPos.length) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(roofPos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(roofCol, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(roofUv, 2));
     g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, roofMat); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+    roofMesh = new THREE.Mesh(g, roofMat); roofMesh.castShadow = roofMesh.receiveShadow = true; group.add(roofMesh);
   }
   if (gabPos.length) {
     const g = new THREE.BufferGeometry();
@@ -631,10 +641,23 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       const list = [];
       for (const w of index.get(key) || []) { const m = new THREE.Matrix4(); w.mesh.getMatrixAt(w.i, m); list.push([w.mesh, w.i, m]); w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
       hiddenWalls.set(key, list);
+      // dalle sous un toit en pente : le morceau de pan du dessus part avec (ses sommets ramenés en un point)
+      const at = roofMesh && roofKeys.get(key);
+      if (at) {
+        const pos = roofMesh.geometry.attributes.position;
+        for (const i0 of at) {
+          list.push([null, i0, pos.array.slice(i0 * 3, i0 * 3 + 18)]);
+          for (let i = 1; i < 6; i++) pos.setXYZ(i0 + i, pos.getX(i0), pos.getY(i0), pos.getZ(i0));
+        }
+        pos.needsUpdate = true;
+      }
     },
     // nouvelle partie : les murs cassés reviennent
     restore() {
-      for (const list of hiddenWalls.values()) for (const [mesh, i, m] of list) { mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; }
+      for (const list of hiddenWalls.values()) for (const [mesh, i, m] of list) {
+        if (mesh) { mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; }
+        else { roofMesh.geometry.attributes.position.array.set(m, i * 3); roofMesh.geometry.attributes.position.needsUpdate = true; }
+      }
       hiddenWalls.clear();
     },
     dispose() {

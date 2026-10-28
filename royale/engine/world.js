@@ -184,14 +184,12 @@ export function buildWorld(map) {
     // toit
     slabCells(b, b.roof !== 'pente' ? b.roofHatch : null, (x, z) => box(x * CELL, top - SLAB_T, z * CELL, (x + 1) * CELL, top, (z + 1) * CELL, { b: b.id, k: b.floors, part: 'toit', slab: `${x},${z}` }));
     if (b.roof === 'pente') {
-      // deux pans qui montent vers le faîtage, le long du grand côté
-      const alongX = b.w >= b.d, half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE;
-      if (alongX) {
-        ramp({ x0: X0, z0: Z0, x1: X1, z1: Z0 + half, dx: 0, dz: 1, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-        ramp({ x0: X0, z0: Z0 + half, x1: X1, z1: Z1, dx: 0, dz: -1, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-      } else {
-        ramp({ x0: X0, z0: Z0, x1: X0 + half, z1: Z1, dx: 1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-        ramp({ x0: X0 + half, z0: Z0, x1: X1, z1: Z1, dx: -1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
+      // deux pans qui montent vers le faîtage, le long du grand côté, découpés case par case : chaque morceau a la clé de la
+      // dalle du dessous, et se casse avec elle (on entre par le toit)
+      for (const p of roofPanes(b)) {
+        const ref = { b: b.id, k: b.floors, part: 'toit', slab: `${p.x},${p.z}` };
+        if (p.alongX) ramp({ x0: p.s0, z0: p.t0, x1: p.s1, z1: p.t1, dx: 0, dz: p.dir, y0: p.y0, y1: p.y1, ref });
+        else ramp({ x0: p.t0, z0: p.s0, x1: p.t1, z1: p.s1, dx: p.dir, dz: 0, y0: p.y0, y1: p.y1, ref });
       }
     }
     // cheminées, climatiseurs, ventilations, réservoirs
@@ -452,6 +450,22 @@ export function buildWorld(map) {
   return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, slope, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
 }
 
+// toit en pente : les morceaux de ses deux pans au-dessus de chaque case (x, z), sans le débord ; s le long du faîtage,
+// t en travers (de t0 à t1), dir : sens de la montée (+1 : vers les t croissants) ; y0 en bas, y1 en haut du morceau
+export function roofPanes(b) {
+  const alongX = b.w >= b.d, top = floorY(b, b.floors), out = [];
+  const T0 = (alongX ? b.z0 : b.x0) * CELL, T1 = T0 + (alongX ? b.d : b.w) * CELL, Tm = (T0 + T1) / 2;
+  slabCells(b, null, (x, z) => {
+    const s = alongX ? x : z, t = alongX ? z : x;
+    for (const dir of [1, -1]) {
+      const t0 = Math.max(t * CELL, dir > 0 ? T0 : Tm), t1 = Math.min((t + 1) * CELL, dir > 0 ? Tm : T1);
+      if (t1 - t0 < 1e-6) continue;
+      const h = (u) => top + (dir > 0 ? u - T0 : T1 - u) * ROOF_SLOPE;
+      out.push({ x, z, alongX, dir, s0: s * CELL, s1: (s + 1) * CELL, t0, t1, y0: Math.min(h(t0), h(t1)), y1: Math.max(h(t0), h(t1)) });
+    }
+  });
+  return out;
+}
 // dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)
 // dalles case par case (on saute la trémie)
 export function slabCells(b, hole, fn) {

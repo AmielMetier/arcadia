@@ -261,6 +261,13 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   sim.input('a', { fire: false });
   ok(elim && elim.by === 'a' && A.kills === 1, 'A n\'élimine pas B');
   ok([...sim.S.items.values()].some((g) => g.it.t === 'arme' && g.it.w === 'pompe' && Math.hypot(g.x - Bp.x, g.z - Bp.z) < 3), 'B ne lâche pas son arme');
+  // la même arme en mieux remplace l'ancienne (lâchée au sol) au lieu de prendre une case de plus
+  A.inv = [weapon('fusil', 3), weapon('pompe', 0), weapon('smg', 1), null, null];
+  for (const g of [...sim.S.items.values()]) if (Math.hypot(g.x - A.x, g.z - A.z) < 4) sim.S.items.delete(g.id);
+  sim.spawnItem(weapon('pompe', 2), A.x + Math.sin(A.yaw) * 1, A.y + 0.2, A.z + Math.cos(A.yaw) * 1, true);
+  sim.input('a', { pitch: -0.5, use: 2, fire: false, aim: false }); sim.step(DT);
+  const old = [...sim.S.items.values()].find((g) => g.it.t === 'arme' && g.it.w === 'pompe' && Math.hypot(g.x - A.x, g.z - A.z) < 3);
+  ok(A.inv[1] && A.inv[1].w === 'pompe' && A.inv[1].r === 2 && !A.inv[3] && old && old.it.r === 0, `même arme en mieux : ${A.inv.map((q) => q ? q.w + q.r : '-').join(' ')}, au sol ${old ? old.it.w + old.it.r : 'rien'}`);
   // récolte : un arbre tombe à la pioche et donne du bois
   const ti = m.props.findIndex((p) => p.kind === 'arbre'), t = m.props[ti];
   Object.assign(A, { x: t.x - 1.6, z: t.z, y: W.support(t.x - 1.6, t.z, 400), vx: 0, vz: 0 });
@@ -450,6 +457,26 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   ok(Math.abs(W.support(px, pz, F1 + 0.3) - F1) < 0.05, 'on ne tient pas sur la dalle de l\'étage');
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 100, null, [px, F1, pz], false);
   ok(B.broken.has(key) && W.support(px, pz, F1 + 0.3) < F1 - 1, 'la dalle cassée tient encore');
+  // on se pose sur un toit (en pente ou plat), on le casse à la pioche et l'on tombe dans le dernier étage
+  sim.S.hooks.think = null;
+  for (const kind of ['pente', 'plat']) {
+    const rb = m.buildings.find((b) => b.roof === kind && b.w >= 3 && b.d >= 3 && b.floors <= 3 && !b.abandoned);
+    const cx = rb.x0 + 1, cz = rb.z0 + 1, rx = (cx + 0.5) * 4, rz = (cz + 0.5) * 4, top = floorY(rb, rb.floors), last = floorY(rb, rb.floors - 1);
+    const rkey = `s:${rb.id}:${rb.floors}:${cx},${cz}`, roofY = W.support(rx, rz, 400);
+    ok(roofY >= top - 0.05, `toit ${kind} : on ne tient pas dessus (${roofY.toFixed(1)} / ${top.toFixed(1)})`);
+    Object.assign(host, { x: rx, y: roofY, z: rz, vx: 0, vy: 0, vz: 0, mode: 'sol', alive: true, hp: 100, sh: 100, ground: true, sel: 0, swing: 0 });
+    let swings = 0;
+    for (let k = 0; k < 20 / DT && !B.broken.has(rkey); k++) {
+      host.inp = { ...host.inp, mx: 0, mz: 0, yaw: 0, pitch: -1.5, fire: true, sel: 0, build: null, aim: false };
+      Object.assign(host, { hp: 100, sh: 100 });
+      sim.step(DT);
+      for (const e of sim.takeEvents()) if (e.e === 'pioche' && e.p === host.id) swings++;
+    }
+    for (let k = 0; k < 2 / DT; k++) { host.inp = { ...host.inp, fire: false }; sim.step(DT); sim.takeEvents(); }
+    ok(B.broken.has(rkey), `toit ${kind} : pas cassé en ${swings} coups de pioche`);
+    ok(host.y < top - 1 && host.y >= last - 0.05, `toit ${kind} : on ne tombe pas dans le dernier étage (y ${host.y.toFixed(1)}, étage ${last.toFixed(1)})`);
+    console.log(`toit ${kind} (${rb.type}) cassé en ${swings} coups de pioche, on tombe à ${host.y.toFixed(1)} m (dernier étage à ${last.toFixed(1)} m)`);
+  }
 }
 // ------------------------------------------------------------------ un bot touché de loin pose un mur et se couvre
 {
@@ -607,7 +634,11 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   ok(copy.S.pings.get('moi') && copy.S.pings.get('moi').kind === 'ici', 'le repère passe par le réseau');
   const d0 = Math.hypot(mate.x - x, mate.z - z);
   let best = d0;
+  // on teste le repère, pas une rencontre en chemin : le temps d'y aller, les ennemis proches ne sont plus des ennemis
+  const calm = [...sim.S.players.values()].filter((q) => q.bot && !sim.mates(me, q) && Math.hypot(q.x - mate.x, q.z - mate.z) < 120).map((q) => [q, q.team]);
+  for (const [q] of calm) q.team = me.team;
   for (let i = 0; i < 25 && mate.alive; i++) { step(60); best = Math.min(best, Math.hypot(mate.x - x, mate.z - z)); }
+  for (const [q, t] of calm) q.team = t;
   ok(!mate.alive || best < 12, `le bot coéquipier va au repère (${d0.toFixed(0)} m → ${best.toFixed(0)} m)`);
   // les bots signalent les ennemis qu'ils voient au joueur de leur équipe
   step(60 * 120);
