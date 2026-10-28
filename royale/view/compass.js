@@ -12,7 +12,8 @@ export function createCompass(root) {
   const marks = new Map(); // tireur → { x, y, z, t, hit, mate, k }
   let W = 0, H = 0, D = 1, shown = '';
   function fit() {
-    const w = cv.clientWidth, h = cv.clientHeight, d = Math.min(2, devicePixelRatio || 1);
+    // (agrandie sur les grands écrans par --ui : on dessine à la taille affichée)
+    const w = cv.clientWidth, h = cv.clientHeight, d = Math.min(3, (devicePixelRatio || 1) * (+document.documentElement.style.getPropertyValue('--ui') || 1));
     if (w === W && h === H && d === D) return;
     W = w; H = h; D = d; cv.width = Math.round(w * d); cv.height = Math.round(h * d);
   }

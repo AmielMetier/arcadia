@@ -58,7 +58,17 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
   const big = $('#bigmap'), bcv = big.querySelector('canvas'), bctx = bcv.getContext('2d');
   const place = $('#place'), fps = $('#fps'), promptEl = $('#prompt');
   if (onTeleport) $('#mapHint').innerHTML = `Clique pour t'y rendre · <kbd data-k="carte">${esc(key('carte'))}</kbd> fermer`;
-  const dpr = () => Math.min(2, devicePixelRatio || 1);
+  // grands écrans (au-delà du Full HD) : l'interface grandit avec l'image (--ui, voir royale.css) ; les cartes se dessinent
+  // à la taille où elles s'affichent
+  let ui = 1, uiW = 0, uiH = 0;
+  const uiScale = () => {
+    if (innerWidth === uiW && innerHeight === uiH) return;
+    uiW = innerWidth; uiH = innerHeight;
+    ui = Math.max(1, Math.min(1.75, uiW / 1920, uiH / 1080));
+    document.documentElement.style.setProperty('--ui', ui.toFixed(3));
+  };
+  uiScale();
+  const dpr = () => Math.min(3, (devicePixelRatio || 1) * ui);
   const LAY_MINI = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: false, coffres: false, noms: false, grille: false, tempete: false, vol: false };
   const LAY_BIG = { relief: true, routes: true, batiments: true, vegetation: true, vehicules: true, coffres: false, noms: true, grille: true, tempete: false, vol: false };
   let last = 0, bigView = null, lastSide = 0;
@@ -375,6 +385,7 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
     clearTimeout(centerT); if (sec) centerT = setTimeout(() => { center.className = 'banner'; }, sec * 1000);
   }
   function frame(dt) {
+    uiScale(); // (la fenêtre a pu changer de taille)
     for (let i = floating.length - 1; i >= 0; i--) {
       const f = floating[i]; f.t += dt;
       if (f.t > 1.1) { f.el.remove(); floating.splice(i, 1); continue; }
@@ -398,12 +409,19 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
     el.querySelector('span').textContent = `${Math.ceil(hp)} / ${Math.round(max)}`;
     clearTimeout(structT); structT = setTimeout(() => { el.hidden = true; }, 1500);
   }
+  // astuce : html (touches en <kbd>) pendant sec secondes
+  let tipT = 0;
+  function tip(html, sec = 6) {
+    const el = $('#tipbar');
+    el.querySelector('span').innerHTML = html; el.classList.add('on');
+    clearTimeout(tipT); tipT = setTimeout(() => el.classList.remove('on'), sec * 1000);
+  }
   function gain(txt, color) {
     const el = $('#gain'); el.textContent = txt; el.style.color = color; el.className = 'gain on';
     clearTimeout(gainT); gainT = setTimeout(() => { el.className = 'gain'; }, 700);
   }
   return {
-    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain, team, tags, downed, pings,
+    maps, player, storm, flight, feedLine, hitMarker, damageNumber, hurtFrom, say, frame, crosshair, structure, gain, tip, team, tags, downed, pings,
     get mapOpen() { return !big.hidden; },
     toggleMap(on = big.hidden) { big.hidden = !on; bigView = null; },
     showFps(on) { fps.hidden = !on; },

@@ -1,6 +1,7 @@
 /* Island Rush — écrans aux couleurs du Hub (encre épaisse, papier crème, Bungee), comme Convoy Storm ; en jeu, des
    panneaux sombres et translucides, chiffres en Bungee, icônes Kenney blanches. */
 :root{
+  --ui:1; /* échelle de l'interface en jeu : 1 jusqu'au Full HD, plus au-delà (voir view/hud.js) */
   --ink:#16181d; --paper:#fff8ea; --cream:#f3e9d2; --muted:#6d675c;
   --red:#ff4b2b; --yellow:#ffc531; --green:#2fbf71; --ice:#9fd3ff; --blue:#3d8fe8; --purple:#a557e0;
   --d-bg:rgba(14,16,22,.52); --d-bg2:rgba(30,33,42,.9); --d-line:rgba(255,255,255,.12); --d-text:#fff8ea; --d-mut:#a8a296;
@@ -21,7 +22,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .num{font-family:var(--bung);font-weight:400}
 
 /* la partie : survivants, éliminations, tempête */
-.match{position:absolute;top:12px;left:12px;display:flex;gap:16px;padding:7px 13px}
+.match{position:absolute;top:12px;left:12px;display:flex;gap:16px;padding:7px 13px;transform:scale(var(--ui));transform-origin:0 0}
 .match span{display:flex;flex-direction:column;line-height:1.05;min-width:44px}
 .match small{font-size:9.5px;font-weight:700;color:var(--d-mut);letter-spacing:1px}
 .match b{font-family:var(--bung);font-weight:400;font-size:19px}
@@ -29,28 +30,28 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .match .st.closing b{color:#fff;animation:blink .6s infinite alternate}
 .match .st.out small{color:var(--red)}.match .st.out b{color:var(--red);animation:blink .35s infinite alternate}
 /* boussole : en haut au centre, les tirs entendus y laissent leur marque */
-.compass{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:clamp(160px,calc(100vw - 640px),560px);display:flex;flex-direction:column;align-items:center}
+.compass{position:absolute;top:6px;left:50%;transform:translateX(-50%) scale(var(--ui));transform-origin:50% 0;width:clamp(160px,calc(100vw / var(--ui) - 640px),560px);display:flex;flex-direction:column;align-items:center}
 .compass canvas{display:block;width:100%;height:44px;background:linear-gradient(180deg,rgba(14,16,22,0),rgba(14,16,22,.34) 30%,rgba(14,16,22,.34) 75%,rgba(14,16,22,0));-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
 .compass::before{content:'';position:absolute;top:0;left:50%;margin-left:-6px;border:6px solid transparent;border-top:7px solid var(--yellow);border-bottom:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.7))}
 .compass b{font-family:var(--bung);font-weight:400;font-size:11px;line-height:1.5;margin-top:1px;padding:0 7px;min-width:38px;text-align:center;border-radius:6px;background:var(--d-bg);border:1px solid var(--d-line)}
-.phase{position:absolute;top:66px;left:12px;font-size:12px;font-weight:700;color:var(--d-text);text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.85}
+.phase{position:absolute;top:calc(12px + 54px * var(--ui));left:12px;transform:scale(var(--ui));transform-origin:0 0;font-size:12px;font-weight:700;color:var(--d-text);text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.85}
 @keyframes blink{to{opacity:.35}}
 
 /* minicarte et lieu */
-.mapbox{position:absolute;top:12px;right:12px;padding:6px;width:212px}
+.mapbox{position:absolute;top:12px;right:12px;padding:6px;width:212px;transform:scale(var(--ui));transform-origin:100% 0}
 #mini{display:block;width:198px;height:198px;border-radius:8px;background:#1f5f9e}
 .place{margin-top:5px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--d-text)}
 .place em{font-style:normal;color:var(--d-mut);margin-right:4px}
-.feed{position:absolute;top:258px;right:12px;display:flex;flex-direction:column;gap:4px;align-items:flex-end;width:290px}
+.feed{position:absolute;top:calc(12px + 246px * var(--ui));right:12px;transform:scale(var(--ui));transform-origin:100% 0;display:flex;flex-direction:column;gap:4px;align-items:flex-end;width:290px}
 .feed .line{padding:4px 10px;border-radius:8px;background:var(--d-bg);border:1px solid var(--d-line);font-size:12.5px;font-weight:600;transition:opacity .8s;max-width:290px}
 .feed .line.old{opacity:0}
 .feed .line b{font-weight:700}
 .feed .line.me{border-color:rgba(255,197,49,.6)}
 
 /* vie, bouclier, matériaux */
-.vit{position:absolute;left:12px;bottom:12px;width:280px;padding:9px 11px 8px}
+.vit{position:absolute;left:12px;bottom:12px;width:280px;padding:9px 11px 8px;transform:scale(var(--ui));transform-origin:0 100%}
 /* équipe : coéquipiers (vie, bouclier, à terre), pseudos au-dessus des têtes, bandeau « à terre » */
-.team{position:absolute;left:12px;bottom:128px;width:280px;display:flex;flex-direction:column;gap:6px;padding:8px 11px}
+.team{position:absolute;left:12px;bottom:calc(12px + 116px * var(--ui));transform:scale(var(--ui));transform-origin:0 100%;width:280px;display:flex;flex-direction:column;gap:6px;padding:8px 11px}
 .team .m{display:grid;grid-template-columns:10px 1fr;gap:3px 8px;align-items:center;font-size:12.5px;font-weight:700}
 .team .m>i{width:10px;height:10px;border-radius:50%;background:var(--c);grid-row:span 2;box-shadow:0 0 0 2px rgba(255,255,255,.8)}
 .team .m .bars{display:flex;gap:3px;height:5px}
@@ -63,7 +64,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 #tags .tag{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85);white-space:nowrap}
 #tags .tag::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 #tags .tag.down{color:#ff8a7a}#tags .tag.down::after{background:#ff5a4a;animation:blink .5s infinite alternate}
-.downed{position:absolute;left:50%;top:64%;transform:translateX(-50%);min-width:260px;padding:9px 16px 11px;text-align:center;font-size:13px;font-weight:700}
+.downed{position:absolute;left:50%;top:64%;transform:translateX(-50%) scale(var(--ui));transform-origin:50% 0;min-width:260px;padding:9px 16px 11px;text-align:center;font-size:13px;font-weight:700}
 .downed b{display:block;font-family:var(--bung);font-weight:400;font-size:20px;color:#ff8a7a;letter-spacing:.5px}
 .downed .bt{height:6px;margin-top:7px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden}
 .downed .bt i{display:block;height:100%;background:#ff5a4a;transition:width .2s}
@@ -86,7 +87,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .mats span.sel{background:rgba(255,197,49,.22);box-shadow:inset 0 0 0 1.5px var(--yellow)}
 
 /* barre d'objets */
-.hot{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px}
+.hot{position:absolute;left:50%;bottom:12px;transform:translateX(-50%) scale(var(--ui));transform-origin:50% 100%;display:flex;flex-direction:column;align-items:center;gap:5px}
 .heldname{font-family:var(--bung);font-size:13px;letter-spacing:.5px;text-shadow:0 2px 0 var(--ink),0 0 6px rgba(0,0,0,.6);min-height:18px}
 .inv{display:flex;gap:5px;padding:5px;border-radius:12px;background:rgba(14,16,22,.38);border:1px solid var(--d-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .slot{position:relative;width:62px;height:62px;border-radius:8px;background:radial-gradient(120% 90% at 50% 115%,color-mix(in srgb,var(--r) 55%,transparent),transparent 70%),rgba(14,16,22,.55);border:1px solid rgba(255,255,255,.12);display:grid;place-items:center;transition:transform .12s,border-color .12s;overflow:hidden}
@@ -100,7 +101,7 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .slot.reload::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(255,197,49,.35) var(--p),transparent var(--p))}
 
 /* munitions */
-.ammo{position:absolute;right:12px;bottom:12px;min-width:170px;padding:8px 12px}
+.ammo{position:absolute;right:12px;bottom:12px;min-width:170px;padding:8px 12px;transform:scale(var(--ui));transform-origin:100% 100%}
 .ammo .cur{display:flex;align-items:baseline;gap:5px;line-height:1}
 .ammo .cur b{font-family:var(--bung);font-weight:400;font-size:32px}
 .ammo .cur b.low{color:var(--red)}
@@ -112,8 +113,8 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .bul{display:inline-block;width:6px;height:13px;border-radius:3px 3px 1px 1px;background:var(--c);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
 
 /* rappel des touches */
-.keys{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:230px;padding:9px 11px;font-size:12px;transition:opacity .3s}
-.keychip{position:absolute;left:12px;top:50%;transform:translateY(-50%);padding:4px 9px;font-size:11px;font-weight:700;color:var(--d-mut);opacity:0;transition:opacity .3s}
+.keys{position:absolute;left:12px;top:50%;transform:translateY(-50%) scale(var(--ui));transform-origin:0 50%;width:230px;padding:9px 11px;font-size:12px;transition:opacity .3s}
+.keychip{position:absolute;left:12px;top:50%;transform:translateY(-50%) scale(var(--ui));transform-origin:0 50%;padding:4px 9px;font-size:11px;font-weight:700;color:var(--d-mut);opacity:0;transition:opacity .3s}
 .keys.off~.keychip{opacity:.8}.keys.air~.keychip{opacity:0}
 .keys>b{display:flex;align-items:center;justify-content:space-between;font-family:var(--bung);font-weight:400;font-size:13px;color:var(--yellow);margin-bottom:5px}
 .keys div{padding:2px 0;color:var(--d-text);line-height:1.35}
@@ -136,18 +137,22 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .hitm.kill.on{animation:hitkill .32s ease-out}
 @keyframes hitpop{from{transform:translate(-50%,-50%) rotate(45deg) scale(1.45)}to{transform:translate(-50%,-50%) rotate(45deg) scale(1)}}
 @keyframes hitkill{0%{transform:translate(-50%,-50%) rotate(45deg) scale(1.9)}60%{transform:translate(-50%,-50%) rotate(45deg) scale(1.1)}100%{transform:translate(-50%,-50%) rotate(45deg) scale(1.25)}}
-.prompt{position:absolute;left:50%;top:calc(50% + 44px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 13px;border-radius:10px;background:var(--d-bg);border:1.5px solid var(--d-line);font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.prompt{position:absolute;left:50%;top:calc(50% + 44px * var(--ui));transform:translateX(-50%) scale(var(--ui));transform-origin:50% 0;display:flex;align-items:center;gap:8px;padding:6px 13px;border-radius:10px;background:var(--d-bg);border:1.5px solid var(--d-line);font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .prompt i{font-style:normal;color:var(--rc,var(--d-text))}
-.gauge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center}
+.gauge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--ui));display:flex;flex-direction:column;align-items:center}
 .gauge svg{width:66px;height:66px;transform:rotate(-90deg)}
 .gauge circle{fill:none;stroke-width:3.5}
 .gauge .bg{stroke:rgba(0,0,0,.35)}
 .gauge .fg{stroke:var(--yellow);stroke-linecap:round;stroke-dasharray:113.1;stroke-dashoffset:113.1}
 .gauge.heal .fg{stroke:#7fe08a}.gauge.shield .fg{stroke:var(--ice)}
 .gauge span{position:absolute;top:calc(100% + 2px);font-family:var(--bung);font-size:11px;white-space:nowrap;text-shadow:0 1px 3px #000}
-.structhp{position:absolute;left:50%;top:calc(50% - 62px);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--bung);font-size:10px;text-shadow:0 1px 2px #000}
+.structhp{position:absolute;left:50%;top:calc(50% - 62px * var(--ui));transform:translateX(-50%) scale(var(--ui));transform-origin:50% 0;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--bung);font-size:10px;text-shadow:0 1px 2px #000}
 .structhp b{display:block;width:96px;height:6px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden}
 .structhp i{display:block;height:100%;background:var(--yellow)}
+.tipbar{position:absolute;left:50%;bottom:calc(150px * var(--ui));transform:translate(-50%,8px) scale(var(--ui));transform-origin:50% 100%;display:flex;align-items:center;gap:9px;max-width:min(620px,calc(100vw - 32px));padding:7px 13px;font-size:13.5px;font-weight:700;line-height:1.5;opacity:0;transition:opacity .35s,transform .35s}
+.tipbar.on{opacity:1;transform:translate(-50%,0) scale(var(--ui))}
+.tipbar b{flex:none;font-family:var(--bung);font-weight:400;font-size:10.5px;letter-spacing:.6px;color:var(--yellow)}
+.tipbar kbd{font-size:10.5px}
 .gain{position:absolute;left:calc(50% + 30px);top:calc(50% - 32px);font-family:var(--bung);font-size:15px;text-shadow:0 1px 0 var(--ink),0 0 4px #000;opacity:0;transition:opacity .3s,transform .3s}
 .gain.on{opacity:1;transform:translateY(-8px)}
 
@@ -179,9 +184,9 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .banner small kbd{-webkit-text-stroke:0}
 .banner.win{color:var(--yellow);font-size:clamp(30px,6vw,60px)}
 .toast{position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:20;font-family:var(--bung);font-size:clamp(14px,2vw,19px);color:var(--paper);-webkit-text-stroke:1px var(--ink);text-shadow:3px 3px 0 var(--ink);text-align:center;max-width:calc(100vw - 30px);pointer-events:none}
-.spect{position:absolute;left:50%;bottom:112px;transform:translateX(-50%);padding:6px 14px;font-size:14px;font-weight:700}
+.spect{position:absolute;left:50%;bottom:calc(112px * var(--ui));transform:translateX(-50%) scale(var(--ui));transform-origin:50% 100%;padding:6px 14px;font-size:14px;font-weight:700}
 .spect b{color:var(--yellow)}
-.buildbar{position:absolute;left:50%;bottom:112px;transform:translateX(-50%);display:flex;gap:6px}
+.buildbar{position:absolute;left:50%;bottom:calc(112px * var(--ui));transform:translateX(-50%) scale(var(--ui));transform-origin:50% 100%;display:flex;gap:6px}
 .buildbar span{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:9px;background:var(--d-bg);border:1.5px solid var(--d-line);font-size:13px;font-weight:700}
 .buildbar span.on{background:rgba(61,143,232,.9);border-color:#9fd3ff}
 .buildbar span.mat i{width:12px;height:12px;border-radius:3px;background:var(--c)}
@@ -286,6 +291,8 @@ table.res tr.me td{background:#ffe9a8}
 .resbox{max-height:34vh;overflow:auto;border:2px solid var(--ink);border-radius:10px;padding:0 8px 4px;background:#fff}
 
 @media (max-width:980px){.keys{display:none}.ammo{min-width:0}.feed{width:220px}}
+/* écran étroit : la barre d'objets et la vie se partagent le bas sans se chevaucher */
+@media (max-width:1000px){.slot{width:50px;height:50px}.slot img{width:44px;height:29px}.vit{width:220px}}
 @media (max-width:760px){.slot{width:48px;height:48px}.slot img{width:42px;height:28px}.vit{width:210px}.mapbox{width:152px}#mini{width:138px;height:138px}.feed{top:200px}.ammo .list{display:none}}
 /* écran d'accueil : choix de l'équipe ; classement : ses coéquipiers */
 .teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0 4px}

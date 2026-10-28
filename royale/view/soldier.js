@@ -166,7 +166,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   // os qu'on tourne nous-mêmes : ils reprennent la pose de l'animation avant chaque image (sinon ça s'accumule)
   const posed = [torso, neck, upperArm, lowerArm, hand, ARMS.L.up, ARMS.L.low, ARMS.L.end, LEGS.R.up, LEGS.R.low, LEGS.L.up, LEGS.L.low].filter(Boolean);
   const base = posed.map((b) => b.quaternion.clone());
-  const qx = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0);
+  const qx = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0);
   // objets tenus qui ne viennent pas du kit : dans un support à l'échelle du monde, accroché à la main
   const holder = new THREE.Group(); hand.add(holder);
   model.updateMatrixWorld(true);
@@ -201,6 +201,9 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
   // chute libre : piqué (on file devant soi), inclinaison dans les virages, culbute en quittant la nacelle (ou le tremplin)
   let dive = 0, bank = 0, flipT = null, prevMode = 'sol';
   const FLIP = 1.1;
+  // sursaut quand on est touché, réception après un saut
+  let hitT = null, hitSide = 1, hitK = 1, landT = null, landK = 1;
+  const LAND = 0.34;
   // ---------------------------------------------------------------- gestes : la main va à un point, épaule et coude suivent
   // (cinématique inverse à deux os : bras et avant-bras). Points et coude exprimés dans le repère du corps, depuis
   // l'épaule : x vers la gauche du personnage (le milieu du corps pour la main droite), y en haut, z devant.
@@ -359,7 +362,12 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     const ry = root.rotation.y, fwd = (st.vx || 0) * Math.sin(ry) + (st.vz || 0) * Math.cos(ry), side = -(st.vx || 0) * Math.cos(ry) + (st.vz || 0) * Math.sin(ry);
     dive = damp(dive, st.mode === 'chute' ? clamp(fwd / 15, 0, 1) : 0, 3, dt);
     bank = damp(bank, st.mode === 'chute' ? clamp(side / 15, -1, 1) : 0, 3, dt);
+    // retombée après un vrai saut ou une descente : genoux pliés un instant, d'autant plus que la chute a duré
+    const wasAir = air;
     air = !st.ground && !st.swim ? air + dt : 0;
+    if (wasAir > 0.45 && air === 0 && st.mode === 'sol' && st.alive !== false) { landT = 0; landK = clamp(wasAir / 1.2, 0.45, 1); }
+    if (landT != null && (landT += dt) > LAND) landT = null;
+    if (hitT != null && (hitT += dt) > 0.5) hitT = null;
     glider.update(dt, st.mode === 'planeur' && st.alive !== false, root.rotation.y, st.far || 0);
     if (!trailsIn && root.parent) { for (const l of glider.trails) root.parent.add(l); trailsIn = true; }
     // état → animation
@@ -388,6 +396,21 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     aimLift = damp(aimLift, st.alive === false || fly > 0.5 ? 0 : clamp(st.pitch || 0, -0.9, 0.9), 12, dt);
     if (torso) torso.quaternion.multiply(qx.setFromAxisAngle(X, -(aimLift * 0.55 + kick * 0.06)));
     if (neck) neck.quaternion.multiply(qx.setFromAxisAngle(X, -aimLift * 0.3));
+    // touché : le buste part en arrière et se tord, la tête suit, puis tout revient (un quart de seconde)
+    if (hitT != null && st.alive !== false && fly < 0.5) {
+      const f = (hitT < 0.05 ? hitT / 0.05 : Math.exp(-(hitT - 0.05) * 10)) * hitK;
+      if (torso) { torso.quaternion.multiply(qx.setFromAxisAngle(X, -0.32 * f)); torso.quaternion.multiply(qx.setFromAxisAngle(Y, hitSide * 0.24 * f)); }
+      if (neck) neck.quaternion.multiply(qx.setFromAxisAngle(X, -0.3 * f));
+    }
+    // réception : on plie les genoux et le buste se penche, puis on se redresse
+    const land = landT != null ? Math.sin(Math.PI * landT / LAND) * landK : 0;
+    if (land > 0.01) {
+      if (torso) torso.quaternion.multiply(qx.setFromAxisAngle(X, 0.3 * land));
+      if (legsOk) {
+        turnBone(LEGS.R.up, X, -0.55 * land); turnBone(LEGS.L.up, X, -0.55 * land);
+        turnBone(LEGS.R.low, X, 0.95 * land); turnBone(LEGS.L.low, X, 0.95 * land);
+      }
+    }
     // gestes du bras droit (pris sur la pose de l'animation de cette image)
     clock += dt;
     const alive = st.alive !== false && fly < 0.5 && swim < 0.5;
@@ -439,7 +462,7 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     if (fly > 0.001 || flip) {
       piv.set(0, 0.95, 0).applyEuler(body.rotation);
       body.position.set(-piv.x, 0.95 - piv.y, -piv.z);
-    } else body.position.set(0, swim * 0.55, 0);
+    } else body.position.set(0, swim * 0.55 - land * 0.2, 0);
     if (held) held.visible = fly < 0.5 && swim < 0.5 && glide < 0.5 && st.alive !== false;
   }
   return {
@@ -454,6 +477,8 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     },
     // gestes ponctuels : 'pelle', 'lancer', 'pose'
     gesture(kind) { if (GESTURES[kind]) gestureArm(kind); },
+    // touché par une balle : side, le côté d'où vient le tir (+1 à sa droite, −1 à sa gauche) ; k : force (gros dégâts : plus fort)
+    hit(side = 0, k = 1) { hitT = 0; hitSide = side || (Math.random() < 0.5 ? -1 : 1); hitK = clamp(k, 0.5, 1.4); },
     get held() { return held; },
     dispose() { mixer.stopAllAction(); mat.dispose(); glider.dispose(); },
   };
