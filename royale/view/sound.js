@@ -315,6 +315,9 @@ export function createSound() {
       // repère d'équipe : deux notes claires ; largage annoncé : appel de cor qui monte
       case 'repere': tone(o, t, 0.12, { type: 'triangle', f0: 1175, v: 0.22 }); tone(o, t + 0.09, 0.2, { type: 'triangle', f0: 1568, v: 0.2 }); break;
       case 'largage': [392, 523, 659].forEach((f, i) => tone(o, t + i * 0.16, 0.42, { type: 'sawtooth', f0: f, f1: f * 1.01, v: 0.09 })); tone(o, t + 0.48, 0.7, { type: 'triangle', f0: 784, v: 0.18 }); break;
+      // orage de la tempête : le claquement de la foudre (de près), puis le grondement qui roule
+      case 'foudre': noise(o, t, 0.3, { type: 'highpass', f0: 3000, f1: 700, v: 0.7 }); noise(o, t, 0.6, { f0: 1800, f1: 200, v: 0.6, buf: brown }); break;
+      case 'tonnerre': noise(o, t, 3, { f0: 480, f1: 60, a: 0.05, v: 1, buf: brown }); noise(o, t + 0.35, 2.4, { f0: 300, f1: 45, a: 0.25, v: 0.8, buf: brown }); tone(o, t, 1.4, { f0: 52, f1: 28, a: 0.08, v: 0.45 }); break;
       // brûleur de la montgolfière : souffle grave qui rugit
       case 'bruleur': noise(o, t, 1.5, { type: 'bandpass', f0: 380, f1: 300, q: 0.6, a: 0.12, v: 0.7 }); noise(o, t, 1.5, { f0: 260, f1: 180, a: 0.15, v: 0.9, buf: brown }); break;
       default: break;
@@ -493,6 +496,13 @@ export function createSound() {
   return {
     unlock, play, at, shot, whiz, reload, update,
     island(c, r) { coastRef = { x: c, z: c, r }; },
+    // un éclair à d mètres : le tonnerre arrive après (343 m/s), plus sourd et plus faible de loin
+    thunder(d) {
+      if (!ctx || !master) return;
+      const t = ctx.currentTime + 0.02 + d / 343, v = Math.max(0.12, Math.min(0.9, 1 - d / 900)), cut = d > 150 ? Math.max(260, 1400 - d) : 0;
+      if (d < 160) fire('foudre', { v: v * 0.8, cut, rev: 0.3, t });
+      fire('tonnerre', { v, cut, rev: 0.45, t: t + 0.05 });
+    },
     dispose() { try { if (music) music.a.pause(); if (ctx) ctx.close(); } catch (e) { /* déjà fermé */ } ctx = null; },
   };
 }

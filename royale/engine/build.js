@@ -143,6 +143,19 @@ export function createBuild(sim, map, world) {
         if (mx >= cx * CELL && mx < (cx + 1) * CELL && mz >= cz * CELL && mz < (cz + 1) * CELL && !broken.has('f:' + f.id) && world.byKey.has('f:' + f.id)) destroy('f:' + f.id, info('f:' + f.id));
       }
     }
+    // un pan de mur cassé : sa porte, et les tableaux et horloges accrochés dessus (des deux côtés), partent avec lui
+    if (key[0] === 'w') {
+      const [b, k, edge] = key.slice(2).split(':'), o = edge[0], [ex, ez] = edge.slice(1).split(',').map(Number), B = map.buildings[+b];
+      if (B) for (const d of B.doors || []) if (d.k === +k && d.o === o && d.x === ex && d.z === ez && !broken.has('d:' + d.id) && world.byKey.has('d:' + d.id)) destroy('d:' + d.id, info('d:' + d.id));
+      if (B) for (const f of B.furniture) {
+        if (f.k !== +k || !FURN[f.kind].deco || broken.has('f:' + f.id)) continue;
+        const on = o === 'h' ? Math.abs(f.z - ez * CELL) < 0.4 && f.x > ex * CELL && f.x < (ex + 1) * CELL
+          : Math.abs(f.x - ex * CELL) < 0.4 && f.z > ez * CELL && f.z < (ez + 1) * CELL;
+        if (!on) continue;
+        broken.add('f:' + f.id);
+        ev({ e: 'casse', key: 'f:' + f.id, x: f.x, y: floorY(B, f.k) + f.y + f.h / 2, z: f.z, mat: 'bois', what: f.kind, small: true });
+      }
+    }
     settle();
   }
 
