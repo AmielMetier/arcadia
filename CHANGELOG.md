@@ -1,5 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.10 — 28 octobre 2026
+- **Island Rush** — Le lance-roquettes, repris de zéro :
+  - un vrai tube posé sur l'épaule droite, à côté de la tête (il passait devant le visage, penché vers le bas) ;
+  - au tir, flamme à la bouche, souffle et fumée par l'arrière du tube, et tout le buste encaisse le recul ;
+  - la roquette sort du tube : ogive rouge, ailettes, flamme derrière elle et longue traînée de fumée continue (avant, un simple bâton vert suivi de quelques bouffées) ;
+  - au rechargement, le tube se redresse devant lui et la main gauche y pousse la roquette suivante.
+
 ## 3.9 — 28 octobre 2026
 - **Island Rush** — Un mur cassé emporte ce qu'il porte : sa porte, et les tableaux et horloges accrochés dessus (ils restaient suspendus dans le vide).
 - **Island Rush** — Plus de bandes qui scintillent dans les pièces là où les murs se rejoignent, ni de trait clair qui traversait le plancher de l'étage.

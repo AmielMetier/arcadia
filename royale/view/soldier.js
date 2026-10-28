@@ -6,6 +6,7 @@
 // bouche) et rechargement (l'arme baisse et pivote). Même façon de faire que view/hero.js (repère local : il regarde
 // +z, pieds à l'origine), qui reste là si le kit ne charge pas.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 import { cloneSkinned, tintMaterial, GUN_FIT } from './kit.js';
 import { RARITY } from '../engine/items.js';
 import { buildGlider } from './glider.js';
@@ -61,9 +62,60 @@ export function aimFrame(kit) {
 // du regard : pas de correction), sinon celle du kit. La main (l'index) se cale 3,5 cm derrière la détente et 2 cm
 // dessous ; l'axe de l'arme reste celui de l'arme du kit
 const hands = new Map();
+// mètres → unités du repère de la main (le squelette du kit est à petite échelle)
+function handUnit(kit) {
+  const S = kit.soldier;
+  if (S.unit) return S.unit;
+  const m = cloneSkinned(S.tmpl);
+  m.updateMatrixWorld(true);
+  const s = new THREE.Vector3(); m.getObjectByName('Index1R').getWorldScale(s);
+  S.unit = 1 / (calibrate(S).k * s.x);
+  return S.unit;
+}
+// lance-roquettes tenu, dessiné ici (celui du kit, trapu et penché vers le bas, passait devant le visage) : un tube
+// droit posé sur l'épaule, évasé derrière, poignée sous la main droite, poignée avant pour la gauche, viseur sur le
+// côté ; deux bagues de la couleur de la rareté. Dessiné dans le repère de visée (canon +z, haut +y, en mètres, l'index
+// à l'origine), puis ramené dans celui de la main
+export const ROCKET_TUBE = { y: 0.13, back: -0.54, front: 0.72 };
+function rocketHand(kit) {
+  const parts = [], Y = ROCKET_TUBE.y;
+  const put = (geo, hex, tint = 0) => {
+    const g = geo.index ? geo.toNonIndexed() : geo, c = new THREE.Color(hex), n = g.attributes.position.count;
+    if (g !== geo) geo.dispose();
+    const col = new Float32Array(n * 3), t = new Float32Array(n).fill(tint);
+    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aTint', new THREE.BufferAttribute(t, 1));
+    g.deleteAttribute('uv');
+    parts.push(g);
+  };
+  // tronçon de tube de rayon r0 (arrière) à r1 (avant), centré en z
+  const tube = (r0, r1, len, z, seg = 20) => new THREE.CylinderGeometry(r1, r0, len, seg).rotateX(Math.PI / 2).translate(0, Y, z);
+  const box = (w, h, d, x, y, z, rx = 0) => new THREE.BoxGeometry(w, h, d).rotateX(rx).translate(x, y, z);
+  const OLIVE = 0x5d6e3e, DARK = 0x2c3124, RUBBER = 0x262626;
+  put(tube(0.068, 0.068, 1.0, 0.12), OLIVE);
+  put(tube(0.105, 0.07, 0.16, -0.46), DARK);           // tuyère arrière
+  put(tube(0.08, 0.086, 0.1, 0.67), DARK);             // bouche
+  put(new THREE.CircleGeometry(0.066, 20).translate(0, Y, 0.721), 0x0d0d0d);
+  put(new THREE.CircleGeometry(0.09, 20).rotateY(Math.PI).translate(0, Y, -0.541), 0x0d0d0d);
+  put(tube(0.072, 0.072, 0.05, -0.2), 0xffffff, 4);    // bagues de rareté
+  put(tube(0.072, 0.072, 0.05, 0.44), 0xffffff, 4);
+  put(box(0.07, 0.03, 0.26, 0, Y - 0.08, -0.22), RUBBER);                     // appui d'épaule
+  put(box(0.034, 0.13, 0.05, 0, -0.035, -0.015, -0.22), RUBBER);             // poignée
+  put(box(0.03, 0.05, 0.08, 0, Y - 0.085, 0.02), DARK);                       // détente
+  put(box(0.03, 0.11, 0.04, 0, Y - 0.13, 0.34, -0.12), RUBBER);              // poignée avant
+  put(box(0.03, 0.06, 0.11, 0.075, Y + 0.05, 0.2), DARK);                     // viseur
+  put(box(0.032, 0.035, 0.012, 0.075, Y + 0.06, 0.26), 0x9fd8ff);
+  const g = mergeGeometries(parts);
+  for (const p of parts) p.dispose();
+  const u = handUnit(kit);
+  g.scale(u, u, u).applyMatrix4(aimFrame(kit).clone().invert());
+  g.computeBoundingBox(); g.computeBoundingSphere();
+  return g;
+}
 export function weaponHand(kit, w, r = 0) {
   const tier = r >= 2 ? 1 : 0, key = w + tier;
   if (hands.has(key)) return hands.get(key);
+  if (w === 'roquette' && kit.soldier) { const out = { geo: rocketHand(kit), fix: new THREE.Quaternion() }; hands.set(key, out); return out; }
   const old = kit.weapons[w] ? kit.weapons[w].hand : null, canon = kit.guns && kit.guns[w] && kit.guns[w][tier], F = GUN_FIT[w];
   let out = { geo: old, fix: old ? barrelFix(kit, w) : new THREE.Quaternion() };
   if (canon && old && F && kit.weapons.fusil) {
@@ -248,19 +300,20 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     hand.quaternion.slerp(qh, w);
   }
   // tenue de chaque arme : main droite (depuis l'épaule droite, repère du corps), main gauche à `l` m devant elle
-  // le long de l'arme et `ld` m plus bas (garde-main) ; le pistolet se tient à deux mains, le lance-roquettes à l'épaule
+  // le long de l'arme et `ld` m plus bas (garde-main) ; le pistolet se tient à deux mains, le lance-roquettes sur
+  // l'épaule, en dehors de la tête (son tube passe 13 cm au-dessus de la main) ; kick : force du recul
   const HOLD = {
     fusil: { r: [-0.03, -0.24, 0.34], l: 0.34, ld: 0.04 }, pompe: { r: [-0.03, -0.24, 0.34], l: 0.36, ld: 0.04 },
     smg: { r: [-0.02, -0.22, 0.32], l: 0.2, ld: 0.05 }, sniper: { r: [-0.03, -0.22, 0.34], l: 0.42, ld: 0.04 },
-    pistolet: { r: [0.06, -0.14, 0.44], l: 0.0, ld: 0.06 }, roquette: { r: [-0.03, -0.14, 0.2], l: 0.32, ld: 0.06 },
+    pistolet: { r: [0.06, -0.14, 0.44], l: 0.0, ld: 0.06 }, roquette: { r: [-0.22, 0.03, 0.15], l: 0.34, ld: 0.04, kick: 2.6 },
   };
   const POLE_L = new THREE.Vector3(0.6, -0.8, -0.2), gf = V(), gd = V();
   function holdGun(w, pitch, k) {
-    const H = HOLD[heldW] || HOLD.fusil;
+    const H = HOLD[heldW] || HOLD.fusil, K = k * (H.kick || 1);
     // main droite devant l'épaule, l'arme dans l'axe du regard ; recul au tir
-    tgt.set(H.r[0], H.r[1], H.r[2] - 0.05 * k).applyAxisAngle(X, -pitch);
+    tgt.set(H.r[0], H.r[1], H.r[2] - 0.05 * K).applyAxisAngle(X, -pitch);
     reach(tgt, w, POLE.bas);
-    aimHand(w, pitch + 0.1 * k);
+    aimHand(w, pitch + 0.1 * K);
     // main gauche sur le garde-main
     body.getWorldQuaternion(qb);
     gf.set(0, 0, 1).applyAxisAngle(X, -pitch).applyQuaternion(qb);
@@ -269,6 +322,19 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     reach(T2, w, POLE_L, 0, 'L', true);
   }
   const T2 = V();
+  // rechargement du lance-roquettes : descendu de l'épaule, bouche levée vers l'avant, la main gauche remonte le long du
+  // tube et pousse la nouvelle roquette par à-coups
+  function rocketReload(w) {
+    const up = 0.35;
+    tgt.set(-0.2, -0.22, 0.22);
+    reach(tgt, w, POLE.bas);
+    aimHand(w, up);
+    body.getWorldQuaternion(qb);
+    gf.set(0, 0, 1).applyAxisAngle(X, -up).applyQuaternion(qb);
+    gd.set(0, 1, 0).applyAxisAngle(X, -up).applyQuaternion(qb);
+    hand.getWorldPosition(T2).addScaledVector(gd, ROCKET_TUBE.y + 0.06).addScaledVector(gf, 0.42 + 0.08 * Math.sin(clock * 7));
+    reach(T2, w, POLE_L, 0, 'L', true);
+  }
   // tourne un os d'un angle autour d'un axe du repère du corps (x vers la gauche du personnage, y en haut, z devant)
   const axW = V(), Z = new THREE.Vector3(0, 0, 1);
   function turnBone(bone, axis, a) {
@@ -392,9 +458,11 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     mixer.update(dt);
     posed.forEach((b, i) => base[i].copy(b.quaternion));
     // le buste suit le regard (haut, bas) ; recul au tir
-    kick = Math.max(0, kick - dt * 8);
+    // (le lance-roquettes repousse plus fort et plus longtemps : tout le buste part en arrière)
+    const heavy = heldW === 'roquette';
+    kick = Math.max(0, kick - dt * (heavy ? 3.2 : 8));
     aimLift = damp(aimLift, st.alive === false || fly > 0.5 ? 0 : clamp(st.pitch || 0, -0.9, 0.9), 12, dt);
-    if (torso) torso.quaternion.multiply(qx.setFromAxisAngle(X, -(aimLift * 0.55 + kick * 0.06)));
+    if (torso) torso.quaternion.multiply(qx.setFromAxisAngle(X, -(aimLift * 0.55 + kick * (heavy ? 0.22 : 0.06))));
     if (neck) neck.quaternion.multiply(qx.setFromAxisAngle(X, -aimLift * 0.3));
     // touché : le buste part en arrière et se tord, la tête suit, puis tout revient (un quart de seconde)
     if (hitT != null && st.alive !== false && fly < 0.5) {
@@ -439,8 +507,11 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
       // les animations du kit la tiennent d'une main, à bout de bras ou vers le sol
       hold = damp(hold, alive && gun && !arm ? 1 - reload : 0, 12, dt);
       if (hold > 0.01) holdGun(hold, aimLift, kick);
-      // rechargement : l'arme descend et pivote, petit à-coup au milieu
-      if (reload > 0.01 && !arm) reach(tgt.set(0.08, -0.25, 0.4), reload, POLE.bas, (0.9 + 0.2 * Math.sin(clock * 9)) * reload);
+      // rechargement : l'arme descend et pivote, petit à-coup au milieu ; le lance-roquettes se redresse devant lui
+      if (reload > 0.01 && !arm) {
+        if (heldW === 'roquette') rocketReload(reload);
+        else reach(tgt.set(0.08, -0.25, 0.4), reload, POLE.bas, (0.9 + 0.2 * Math.sin(clock * 9)) * reload);
+      }
       // deltaplane : les deux mains sur la barre de contrôle, au-dessus de la tête
       glide = damp(glide, st.mode === 'planeur' && st.alive !== false ? 1 : 0, 8, dt);
       if (glide > 0.01) {

@@ -4,6 +4,7 @@
 // brouillard. Débris (casse, explosions, coups de pelle) et douilles éjectées : de petits éclats qui tombent,
 // rebondissent et s'éteignent.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 
 function spriteTex(draw, size = 64) {
   const c = document.createElement('canvas'); c.width = c.height = size;
@@ -155,7 +156,32 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
   const flash = new THREE.PointLight(0xffa040, 0, 30, 1.6); group.add(flash);
   let flashT = 0, flashMax = 0.25, flashI = 90;
   // ------------------------------------------------------------------ projectiles en vol
-  const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2), rocketMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a });
+  // roquette : corps olive, ogive rouge sombre à pointe grise, ailettes en croix, tuyère ; une flamme et un halo derrière
+  const rocketGeo = (() => {
+    const parts = [];
+    const put = (geo, hex) => {
+      const g = geo.index ? geo.toNonIndexed() : geo, c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3);
+      if (g !== geo) geo.dispose();
+      for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); parts.push(g);
+    };
+    const along = (geo, z) => geo.rotateX(Math.PI / 2).translate(0, 0, z);
+    put(along(new THREE.CylinderGeometry(0.058, 0.058, 0.5, 14), 0), 0x58683c);
+    put(along(new THREE.CylinderGeometry(0.061, 0.061, 0.04, 14), 0.2), 0xd8b23a);
+    put(along(new THREE.CylinderGeometry(0.02, 0.07, 0.22, 14), 0.36), 0x7a3326);
+    put(along(new THREE.SphereGeometry(0.021, 8, 6), 0.47), 0x9aa0a6);
+    put(along(new THREE.CylinderGeometry(0.045, 0.036, 0.07, 12), -0.28), 0x2c2f30);
+    put(new THREE.BoxGeometry(0.26, 0.008, 0.13).translate(0, 0, -0.2), 0x3a4228);
+    put(new THREE.BoxGeometry(0.008, 0.26, 0.13).translate(0, 0, -0.2), 0x3a4228);
+    const g = mergeGeometries(parts);
+    for (const p of parts) p.dispose();
+    return g;
+  })();
+  const rocketMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.15 });
+  const flameGeo = new THREE.ConeGeometry(0.06, 0.6, 10, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.6);
+  const flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.6, 0.5), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  own.push(flameGeo, flameMat);
+  const launches = new Map(); // tireur → bouche du tube au moment du tir (la roquette en part, puis rejoint sa trajectoire)
   const nadeGeo = new THREE.SphereGeometry(0.09, 10, 8), nadeMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a }), blastMat = new THREE.MeshStandardMaterial({ color: 0x9b59d0, emissive: 0x3a1a6a });
   // balle du fusil de précision : un trait lumineux de 4 m dans l'axe de son vol
   const bulletGeo = new THREE.CylinderGeometry(0.025, 0.012, 4, 5).rotateX(Math.PI / 2).translate(0, 0, -2);
@@ -216,6 +242,19 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       const a = Math.random() * Math.PI * 2, k = 1.8 + Math.random() * 3, sz = 0.025 + Math.random() * 0.04;
       chip(x, y, z, { vx: Math.cos(a) * k, vy: 0.8 + Math.random() * 3, vz: Math.sin(a) * k, sx: sz, sy: sz, sz, color: cols[i % cols.length], life: 0.45 + Math.random() * 0.35, metal: kind === 'bouclier' });
     }
+  }
+  // départ d'une roquette : flamme à la bouche, souffle et fumée qui jaillissent derrière le tube (front, back : bouche
+  // et arrière du tube, dir : sens du tir)
+  function launch(owner, front, back, dir) {
+    launches.set(owner, { p: front.clone(), age: 0 });
+    puff(front.x, front.y, front.z, { tex: T.glow, color: 0xffc070, size: 0.9, grow: 1.4, life: 0.09, add: true, op: 1 });
+    puff(back.x, back.y, back.z, { tex: T.glow, color: 0xff9a40, size: 1.1, grow: 1.8, life: 0.14, add: true, op: 1 });
+    for (let i = 0; i < 10; i++) {
+      const k = 3 + Math.random() * 6;
+      cloud(back.x, back.y, back.z, { vx: -dir.x * k + (Math.random() - 0.5) * 2, vy: -dir.y * k + Math.random() * 1.2, vz: -dir.z * k + (Math.random() - 0.5) * 2, size: 0.4, grow: 2.6, life: 1.2 + Math.random() * 0.8, color: 0xcfc9c0, op: 0.6, drag: 2.2 });
+    }
+    for (let i = 0; i < 4; i++) cloud(front.x, front.y, front.z, { vx: dir.x * 2 + (Math.random() - 0.5), vy: 0.4, vz: dir.z * 2 + (Math.random() - 0.5), size: 0.3, grow: 1.8, life: 0.9, color: 0xd8d2c8, op: 0.45, drag: 2 });
+    if (flashT <= 0.1) { flash.position.copy(front); flashI = 25; flashMax = flashT = 0.12; }
   }
   function boom(x, y, z, r, kind) {
     if (kind === 'souffle') {
@@ -305,16 +344,42 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     chips.instanceMatrix.needsUpdate = true;
     // projectiles
     const seen = new Set();
+    for (const L of launches.values()) L.age += dt;
+    for (const [k, L] of launches) if (L.age > 0.5) launches.delete(k);
     for (const pr of sim.S.projectiles) {
       seen.add(pr.id);
       let o = projMeshes.get(pr.id);
       if (!o) {
-        o = pr.kind === 'roquette' ? new THREE.Mesh(rocketGeo, rocketMat) : pr.kind === 'balle' ? new THREE.Mesh(bulletGeo, bulletMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
+        if (pr.kind === 'roquette') {
+          o = new THREE.Group(); o.add(new THREE.Mesh(rocketGeo, rocketMat));
+          const fl = new THREE.Mesh(flameGeo, flameMat); o.add(fl);
+          // elle sort de la bouche du tube (la simulation la lance depuis l'épaule de visée) et rejoint sa trajectoire
+          const L = launches.get(pr.owner);
+          o.userData = { flame: fl, age: 0, last: null, off: L ? new THREE.Vector3(L.p.x - pr.x, L.p.y - pr.y, L.p.z - pr.z) : null };
+          launches.delete(pr.owner);
+        } else o = pr.kind === 'balle' ? new THREE.Mesh(bulletGeo, bulletMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
         group.add(o); projMeshes.set(pr.id, o);
       }
       o.position.set(pr.x, pr.y, pr.z);
       if (pr.kind === 'balle') o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz);
-      if (pr.kind === 'roquette') { o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz); puff(pr.x - pr.vx * 0.012, pr.y - pr.vy * 0.012, pr.z - pr.vz * 0.012, { color: 0xd8d0c8, size: 0.25, grow: 1.4, life: 0.7, op: 0.5 }); }
+      if (pr.kind === 'roquette') {
+        const U = o.userData, p = o.position;
+        U.age += dt;
+        if (U.off) { const k = Math.max(0, 1 - U.age / 0.22); p.addScaledVector(U.off, k * k); }
+        o.lookAt(p.x + pr.vx, p.y + pr.vy, p.z + pr.vz);
+        U.flame.scale.set(0.8 + Math.random() * 0.5, 0.8 + Math.random() * 0.5, 0.7 + Math.random() * 0.7);
+        // traînée continue : une bouffée tous les 45 cm du trajet, et une lueur juste derrière la tuyère
+        if (!U.last) U.last = p.clone();
+        const ex = p.x - U.last.x, ey = p.y - U.last.y, ez = p.z - U.last.z, n = Math.min(40, Math.floor(Math.hypot(ex, ey, ez) / 0.45));
+        for (let i = 1; i <= n; i++) {
+          const k = i / n;
+          cloud(U.last.x + ex * k + (Math.random() - 0.5) * 0.1, U.last.y + ey * k + (Math.random() - 0.5) * 0.1, U.last.z + ez * k + (Math.random() - 0.5) * 0.1,
+            { vx: (Math.random() - 0.5) * 0.6, vy: 0.25 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.6, size: 0.26, grow: 2.3, life: 1.4 + Math.random() * 0.8, color: 0xdcd8d0, op: 0.55, drag: 1.4 });
+        }
+        if (n) U.last.copy(p);
+        const L = Math.hypot(pr.vx, pr.vy, pr.vz) || 1;
+        puff(p.x - pr.vx / L * 0.45, p.y - pr.vy / L * 0.45, p.z - pr.vz / L * 0.45, { tex: T.glow, color: 0xffa040, size: 0.55, grow: 0.3, life: 0.05, add: true, op: 0.9 });
+      }
     }
     for (const [id, o] of projMeshes) if (!seen.has(id)) { group.remove(o); projMeshes.delete(id); }
     // tempête
@@ -326,7 +391,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     }
   }
   return {
-    group, shot, muzzleFlash, hitSpark, boom, update, puff, cloud, dust, debris, casing, chip,
+    group, shot, muzzleFlash, launch, hitSpark, boom, update, puff, cloud, dust, debris, casing, chip,
     dispose() { for (const o of own) o.dispose(); scene.remove(group); },
   };
 }

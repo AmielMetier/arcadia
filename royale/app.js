@@ -27,7 +27,7 @@ import { createDrops } from './view/drops.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
 import { CHARACTERS } from './view/kit.js';
-import { renderPortraits } from './view/soldier.js';
+import { renderPortraits, ROCKET_TUBE } from './view/soldier.js';
 import { Input } from './input.js';
 import { createKeys } from './keys.js';
 import { createRecorder } from './journal.js';
@@ -813,7 +813,13 @@ function handleEvents(list) {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
         if (h && Q) {
           h.shot();
-          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
+          if (h.held && e.w === 'roquette') {
+            // le tube sur l'épaule : flamme à sa bouche, souffle par l'arrière
+            const yaw = e.p === S.me ? S.yaw : Q.yaw, pitch = e.p === S.me ? S.pitch : Q.pitch || 0, cp = Math.cos(pitch);
+            const dir = new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp), v = new THREE.Vector3();
+            h.held.getWorldPosition(v); v.y += ROCKET_TUBE.y;
+            S.fx.launch(e.p, v.clone().addScaledVector(dir, ROCKET_TUBE.front), v.clone().addScaledVector(dir, ROCKET_TUBE.back), dir);
+          } else if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
         if (Q) { S.sfx.shot(e.w, Q, e.p === S.me); S.amb.scare(Q.x, Q.z, 35); }
         // la boussole : d'où vient le tir (pas les siens)
