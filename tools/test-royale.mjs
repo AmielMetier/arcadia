@@ -595,7 +595,8 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   createBuild(sim, m, W); createAI(sim, m, W);
   const me = sim.player('moi'), mate = [...sim.S.players.values()].find((q) => sim.mates(me, q));
   let jump = 0, calls = 0;
-  const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { sim.input('moi', { jump }); sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'repere' && e.p !== 'moi') calls++; } };
+  // on teste les repères, pas la survie : le joueur, immobile, ne perd pas de vie
+  const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { if (me.alive) { me.hp = 100; me.sh = 100; } sim.input('moi', { jump }); sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'repere' && e.p !== 'moi') calls++; } };
   step(60 * 6); jump++; step(60 * 30);
   ok(!sim.ping(me, 'bidon', me.x, me.y, me.z) && !sim.ping(me, 'ici', NaN, 0, 0), 'repère invalide refusé');
   // « Ici » à 50 m : le bot coéquipier y va

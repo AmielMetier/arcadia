@@ -305,6 +305,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
     if (by && mates(by, Q)) return; // pas de tir ami
+    if (by && by.bot && Q.bot && S.hooks.pace) n *= S.hooks.pace(); // entre bots, le rythme de la partie (voir ai.js)
     if (Q.down) {
       // à terre : les coups entament sa réserve ; à zéro, il est éliminé (par celui qui l'a mis à terre, à défaut)
       Q.down.hp -= n;

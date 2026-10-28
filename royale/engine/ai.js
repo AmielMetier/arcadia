@@ -21,10 +21,6 @@ const WANT_D = { pompe: 5, smg: 11, pistolet: 14, fusil: 24, sniper: 60, roquett
 const ENGAGE = { pompe: 18, smg: 32, pistolet: 32, fusil: 50, sniper: 110, roquette: 45 };
 const ISCORE = { potion: 8, soin: 6, potion_petite: 5, bandage: 3, grenade: 2.5, souffle: 0.5, tremplin: 0.3 };
 const RUN = 5.6;
-// nez à nez, deux bots équipés se battent toujours : on ne reste pas côte à côte sans se tirer dessus (en début de partie,
-// chacun fouille de son côté). La distance suit le rythme de la partie (voir agg) : 5 m quand il doit tomber peu de monde,
-// jusqu'à 12 m quand il en reste trop
-const close = (a) => 5 + 7 * a;
 // pas plus de bots à la fois sur un même combat entendu (plus pour un humain) ni sur un même largage
 const HUNT_MAX = 2, HUNT_HUMAN = 3, DROP_MAX = 3;
 
@@ -173,13 +169,74 @@ export function createAI(sim, map, world) {
     const high = g.y != null && g.y - nav.stand0(g.x, g.z) > 2;
     const to = hd > 40 && high ? { x: g.x, y: nav.stand0(g.x, g.z), z: g.z } : { x: g.x, y: g.y != null ? g.y + 0.2 : nav.stand0(g.x, g.z), z: g.z };
     B.approach = to.y !== (g.y != null ? g.y + 0.2 : to.y);
-    // but lointain (rotation, zone) : un chemin partiel suffit, repris en route ; ça évite les à-coups (60 bots)
-    const p = nav.path({ x: P.x, y: P.y, z: P.z }, to, hd > 120 ? 4500 : 9000);
-    // parti de l'eau ou d'un endroit coincé : tout droit un moment, puis on réessaie
-    if (p.fail === 'depart') { B.path = null; B.direct = S.t + 2; return; }
+    // but lointain (rotation, zone) : un chemin partiel suffit, repris en route ; ça évite les à-coups (60 bots). Après un
+    // blocage (voir unstick), on cherche bien plus loin : le chemin partiel menait au pied d'une pente ou d'un mur
+    const p = nav.path({ x: P.x, y: P.y, z: P.z }, to, B.big ? 40000 : hd > 120 ? 4500 : 9000);
+    B.big = false;
+    // parti de l'eau, d'une pente trop raide ou d'un rebord : on rejoint d'abord l'endroit praticable le plus proche
+    if (p.fail === 'depart') { B.path = null; B.escape = escapeFrom(P, B); B.direct = B.escape.until; return; }
     if (p.fail) { ban(B, g); B.goal = null; return; }
-    B.path = p.pts; B.wp = 1; B.partial = !p.reached;
+    B.path = p.pts; B.wp = 1; B.partial = !p.reached; B.escape = null;
     if (!p.reached && hd < 30 && !B.approach) { ban(B, g); B.goal = null; B.path = null; }
+  }
+  // l'endroit praticable (pour la grille des chemins) le plus proche, à rejoindre tout droit ; à défaut, vers le bas de la pente
+  function escapeFrom(P, B) {
+    for (let r = 1; r <= 14; r += 1.5) {
+      const a0 = B.rng.next() * Math.PI * 2;
+      for (let k = 0; k < 16; k++) {
+        const a = a0 + k * Math.PI / 8, x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+        if (nav.free(x, P.y, z)) return { x, z, until: S.t + 3 };
+      }
+    }
+    const sl = world.slope ? world.slope(P.x, P.z, P.y) : null, g = sl ? Math.hypot(sl[0], sl[1]) : 0;
+    return g > 0.05 ? { x: P.x - sl[0] / g * 8, z: P.z - sl[1] / g * 8, until: S.t + 3 } : { x: P.x + (B.rng.next() - 0.5) * 12, z: P.z + (B.rng.next() - 0.5) * 12, until: S.t + 3 };
+  }
+  // un point libre à portée (rMin à rMax mètres), qu'on voit et qu'on peut rejoindre tout droit : pour un détour
+  function freeAround(P, B, rMin, rMax) {
+    for (let k = 0; k < 20; k++) {
+      const a = B.rng.next() * Math.PI * 2, r = rMin + B.rng.next() * (rMax - rMin), dx = Math.cos(a), dz = Math.sin(a);
+      const x = P.x + dx * r, z = P.z + dz * r;
+      if (!nav.free(x, P.y, z) || world.ray(P.x, P.y + 1, P.z, dx, 0, dz, r, 0.3) < r - 0.5) continue;
+      return { x, z };
+    }
+    return null;
+  }
+  // un point praticable à 25-60 m, plutôt vers le bas de la pente et dans le cercle : un détour par là (une poche à flanc de
+  // montagne, un recoin) permet souvent de trouver ensuite le chemin du but
+  function detourPoint(P, B) {
+    const sl = world.slope ? world.slope(P.x, P.z, P.y) : null, g = sl ? Math.hypot(sl[0], sl[1]) : 0, st = S.storm;
+    const down = g > 0.1 ? Math.atan2(-sl[1], -sl[0]) : null;
+    for (let k = 0; k < 24; k++) {
+      const a = down != null && k < 12 ? down + (B.rng.next() - 0.5) * 1.6 : B.rng.next() * Math.PI * 2, r = 25 + B.rng.next() * 35;
+      const x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+      if (st && st.cur && Math.hypot(x - st.cur.x, z - st.cur.z) > st.cur.r - 5) continue;
+      if (nav.free(x, nav.stand0(x, z), z)) return { x, z };
+    }
+    return null;
+  }
+  // on veut avancer mais on reste sur place depuis 10 s (pente, socle, rebord, obstacle que la grille croit franchissable),
+  // quel que soit le but : on bouche devant soi et on cherche un chemin bien plus long, puis on fait un détour par un endroit
+  // praticable, puis on s'en va tout droit (en sautant), puis on renonce à ce but
+  function unstick(P, B) {
+    const n = B.unstuck = (B.unstuck || 0) + 1;
+    if (n === 1) {
+      const fx = Math.sin(B.yaw), fz = Math.cos(B.yaw);
+      nav.expire(S.t);
+      for (const k of [0.6, 1.1, 1.6]) nav.block(P.x + fx * k, P.y, P.z + fz * k, 30, S.t);
+      B.big = true; B.path = null; askPath(P, B);
+    } else if (n === 2) {
+      const d = detourPoint(P, B);
+      if (d) setGoal(P, B, { kind: 'detour', id: null, x: d.x, z: d.z, r: 4 });
+      else B.unstuck++;
+    }
+    if (B.unstuck === 3) {
+      const e = freeAround(P, B, 6, 15) || escapeFrom(P, B);
+      B.escape = { x: e.x, z: e.z, until: S.t + 4 }; B.direct = S.t + 4; B.path = null; P.inp.jump++;
+    } else if (B.unstuck >= 4) {
+      if (B.goal) ban(B, B.goal);
+      B.goal = null; B.path = null; B.escape = null; B.unstuck = 0; B.decideT = 0;
+      if (B.state === 'zone') B.state = 'go';
+    }
   }
   const keyOfGoal = (g) => g.kind + ':' + g.id;
   // combien d'autres bots se dirigent vers ce but (un combat entendu, un largage)
@@ -289,14 +346,14 @@ export function createAI(sim, map, world) {
     aggV = clamp(0.25 + (live - want) / Math.max(4, n * 0.1), 0.04, 1);
     return aggV;
   };
-  // un bot croisé sans qu'il nous vise : on ne l'engage qu'avec la probabilité du moment, sinon on l'ignore un temps
-  // (on continue sa fouille ou sa route, comme un joueur qui évite un combat inutile) ; un humain est toujours engagé
+  // un bot en voit un autre : à moins de 30 m (10 m tant qu'on s'équipe), il l'engage, comme un joueur (deux bots ne restent
+  // pas à se regarder). Plus loin, il choisit ses combats selon le rythme de la partie (voir agg) : sinon il le laisse un temps
   function wants(P, B, Q, hurt, d) {
-    if (hurt || !Q.bot || (d < close(agg()) && geared(P, B))) return true;
-    const k = Q.id, u = B.ignore.get(k);
+    if (hurt || !Q.bot || d < (geared(P, B) ? 30 : 10)) return true;
+    const u = B.ignore.get(Q.id);
     if (u != null && u > S.t) return false;
     if (B.rng.next() < agg()) return true;
-    B.ignore.set(k, S.t + 10);
+    B.ignore.set(Q.id, S.t + 10);
     return false;
   }
   // ------------------------------------------------------------------ perception
@@ -365,9 +422,14 @@ export function createAI(sim, map, world) {
       // comme un joueur : tant qu'on s'équipe, on ne cherche pas la bagarre de loin (mais on se défend, et un joueur
       // croisé de près est engagé) ; une fois équipé, on va au combat
       if (!geared(P, B)) reach *= E.bot ? 0.55 : 0.85;
-      if (E.bot) reach = geared(P, B) ? Math.max(reach * agg(), Math.min(reach, close(agg()))) : reach * agg();
+      // contre un bot lointain, on ne cherche la bagarre que si la partie le demande ; à moins de 30 m, toujours
+      if (E.bot && d > 30) reach *= agg();
+      // un combat commencé continue tant qu'on a vu l'ennemi il y a moins de 4 s (on ne l'« oublie » pas en route), sauf à
+      // bout de forces : on se met à couvert pour se soigner (voir plus bas), comme un joueur
+      const low = P.hp + P.sh < 35 && needHeal(P) && S.t - (P.hitT || -9) > 1.5;
+      const sticky = B.state === 'fight' && S.t - B.seenT < 4 && !low;
       // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
-      if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
+      if ((gun && (d < reach || hunted || sticky) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || d < (E.bot ? 4 : 6)))) { B.state = 'fight'; return; }
       // entendu sans le voir : armé et en forme, on va voir (on pousse vers les coups de feu)
       if (gun && (!E.bot || (geared(P, B) && B.rng.next() < agg())) && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')
         && heading(P, 'chasse', E.id) < (E.bot ? HUNT_MAX : HUNT_HUMAN)) {
@@ -395,7 +457,9 @@ export function createAI(sim, map, world) {
       B.state = 'go';
       return;
     }
-    if (danger) {
+    // en route vers la zone : on va jusqu'à être bien dedans (sinon on fait demi-tour pour un objet, on repart, et ainsi de suite)
+    const st = S.storm, hold = B.state === 'zone' && B.goal && st && st.next && Math.hypot(P.x - st.next.x, P.z - st.next.z) > st.next.r * 0.75;
+    if (danger || hold) {
       if (B.state !== 'zone' || !B.goal) { B.state = 'zone'; setGoal(P, B, zonePoint(P, B, false)); }
       return;
     }
@@ -456,6 +520,11 @@ export function createAI(sim, map, world) {
       if (!w) { B.path = null; if (B.partial || B.approach || hd > 3) askPath(P, B); }
       else { tx = w.x; tz = w.z; }
     } else if (!B.waiting && hd > 3 && S.t > (B.direct || 0)) askPath(P, B);
+    // on se dégage (pente trop raide, rebord, détour) : tout droit vers l'endroit choisi, puis on reprend le chemin
+    if (B.escape) {
+      if (S.t < B.escape.until && Math.hypot(B.escape.x - P.x, B.escape.z - P.z) > 0.8) { tx = B.escape.x; tz = B.escape.z; }
+      else { B.escape = null; B.direct = 0; if (!B.path) askPath(P, B); }
+    }
     const dx = tx - P.x, dz = tz - P.z, l = Math.hypot(dx, dz) || 1;
     // portes fermées sur le passage : on les ouvre
     if (S.t - B.useT > 0.6) {
@@ -563,8 +632,7 @@ export function createAI(sim, map, world) {
       const ax = E.x - e[0], ay = ty - e[1], az = E.z - e[2];
       if ((B.errT -= dt) <= 0) {
         B.errT = 0.3 + B.rng.next() * 0.2;
-        // entre bots, la précision suit le rythme voulu (moins il doit tomber de monde, plus ils se ratent) ; contre un humain, jamais
-        const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 + 3.5 * (1 - agg()) : 1);
+        const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 : 1);
         B.ex = (B.rng.next() - 0.5) * 2 * m; B.ey = (B.rng.next() - 0.5) * 1.2 * m;
         B.headshot = B.rng.next() < lv.head;
       }
@@ -715,7 +783,12 @@ export function createAI(sim, map, world) {
       if (P.mode === 'chute' && d > 150) I.jump++;
       return;
     }
-    if ((B.scanT -= dt) <= 0) { B.scanT = 0.25; perceive(P, B); }
+    if ((B.scanT -= dt) <= 0) {
+      B.scanT = 0.25; perceive(P, B);
+      // les combats entre bots durent (voir S.hooks.pace) : passé le début de partie (où l'on cherche ses munitions comme tout
+      // le monde), un bot garde de quoi recharger ses armes, sinon il finirait par errer sans pouvoir tirer
+      if (S.t - (B.landT || S.t) > 90) for (const it of P.inv) if (it && it.t === 'arme') { const W = WEAPONS[it.w]; if (P.ammo[W.ammo] < W.mag * 2) P.ammo[W.ammo] = W.mag * 2; }
+    }
     if ((B.decideT -= dt) <= 0) { B.decideT = 0.5; decide(P, B); }
     I.fire = false; I.aim = false; I.sprint = false; I.crouch = false; I.build = null;
     let mv = null;
@@ -726,6 +799,11 @@ export function createAI(sim, map, world) {
       if (!B.goal || B.goal.kind !== 'objet' || B.goal.swap == null) { const s = bestSlot(P, 20); if (s) I.sel = s; }
       mv = travel(P, B, dt);
       if (mv) turn(B, Math.atan2(mv.x, mv.z), 0, 8 * dt);
+      // on veut avancer : sorti d'un rayon de 5 m, tout va bien ; 10 s dedans, on se dégage (voir unstick)
+      if (mv && !P.revive) {
+        if (!B.anchor || Math.hypot(P.x - B.anchor.x, P.z - B.anchor.z) > 5) { B.anchor = { x: P.x, z: P.z, t: S.t }; B.unstuck = 0; }
+        else if (S.t - B.anchor.t > 10) { B.anchor.t = S.t; unstick(P, B); }
+      }
     }
     I.yaw = B.yaw; I.pitch = B.pitch;
     if (mv) {
@@ -753,5 +831,8 @@ export function createAI(sim, map, world) {
     }
   }
   S.hooks.think = think;
+  // rythme de la partie entre bots : quand il est déjà tombé plus de monde que prévu, les coups d'un bot sur un autre bot
+  // font moins mal (les combats se voient toujours, ils durent un peu plus) ; ni les joueurs ni les coups reçus par eux ne changent
+  S.hooks.pace = () => clamp(0.04 + agg() * 1.4, 0.04, 1);
   return { think, nav, LEVELS };
 }

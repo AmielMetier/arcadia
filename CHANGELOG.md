@@ -7,7 +7,10 @@
   - Le viseur s'ouvre exactement de la dispersion réelle : avant, il paraissait plus serré qu'en vrai, surtout en visant.
   - Les balles partent vers ce que montre le viseur, même collé à un mur, et plus jamais depuis l'autre côté d'un mur à ta droite.
   - La précision gagnée est pour les joueurs : les bots gardent la leur.
-- **Island Rush** — Fini les attroupements de bots : ils ne marchent plus en file vers le même coin de la zone et ne s'entassent plus sur le même butin, le même combat ou le même largage. Deux bots équipés nez à nez se battent au lieu de s'ignorer, et la partie dure toujours une dizaine de minutes.
+- **Island Rush** — Fini les attroupements de bots qui ne se tirent pas dessus : un bot qui en voit un autre à moins de 30 m l'engage (à moins de 10 m tant qu'il fouille en début de partie) et va au bout du combat au lieu de l'oublier en route. À bout de forces, il se met à couvert pour se soigner.
+  - Ils ne marchent plus en file vers la zone et ne s'entassent plus sur le même butin, le même combat ou le même largage. La partie dure toujours une dizaine de minutes.
+- **Island Rush** — Les bots ne restent plus coincés : posés sur une pente trop raide, sur le socle d'un bâtiment ou contre un obstacle, ils cherchent un autre chemin, font un détour ou redescendent au lieu de piétiner sur place jusqu'à la tempête. Partis rejoindre la zone, ils ne font plus demi-tour pour un objet.
+- **Island Rush** — La première zone n'arrive plus en pleine fouille : la tempête ne bouge qu'au bout de 3 minutes, son bord avance moins vite que toi en courant, et le premier cercle reste près du centre de l'île. Les cercles suivants vont un peu plus vite, pour une partie d'une dizaine de minutes.
 
 ## 3.4 — 28 octobre 2026
 - **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
