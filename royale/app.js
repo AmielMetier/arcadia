@@ -27,6 +27,7 @@ import { CHARACTERS } from './view/kit.js';
 import { renderPortraits } from './view/soldier.js';
 import { Input } from './input.js';
 import { createKeys } from './keys.js';
+import { createRecorder } from './journal.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
 const H = window.HubBridge;
@@ -112,6 +113,7 @@ async function boot(info) {
   S.keys = createKeys();
   S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project, key: kl });
   S.compass = createCompass($('#compass'));
+  S.journal = createRecorder();
   // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
   setKit(S.scene.kit);
   try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
@@ -122,7 +124,8 @@ async function boot(info) {
   // touches changées dans les Réglages (ou apprises du clavier) : les rappels à l'écran suivent
   paintKeys(); S.keys.onChange(paintKeys);
   loadOpts();
-  try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
+  // rappel des touches : replié pour qui l'a demandé (H), ou qui a déjà trois parties derrière lui (les astuces suffisent)
+  try { const h = localStorage.getItem('royale_hints'); if (h === '0' || (h !== '1' && loadHist().length >= 3)) $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
   S.loaded = true;
   if (H.embedded) H.signalReady();
@@ -195,9 +198,15 @@ function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.drops3d = createDrops(S.scene.scene);
   // les bots ne réfléchissent que là où la partie tourne
   S.ai = !mirror && mode !== 'exploration' ? createAI(S.sim, S.map, S.world) : null;
+  // journal des parties (soirées de test, voir stats.html) : tenu là où la partie tourne
+  if (!mirror && mode !== 'exploration') {
+    const levels = {};
+    for (const r of roster) if (r.bot) levels[r.level] = (levels[r.level] || 0) + 1;
+    S.journal.start({ id: run, at: Date.now(), map: +QS.get('graine') || ILE, mode, teams, places: roster.length, humans: roster.filter((r) => !r.bot).length, bots: roster.filter((r) => r.bot).length, levels });
+  }
   for (const P of S.sim.S.players.values()) S.prev.set(P.id, { x: P.x, y: P.y, z: P.z, yaw: P.yaw });
   if (S.sim.S.flight) S.yaw = Math.atan2(S.sim.S.flight.ux, S.sim.S.flight.uz);
-  S.sel = 0; S.ended = false; S.reported = false; S.spect = null; S.build = null;
+  S.sel = 0; S.ended = false; S.reported = false; S.spect = null; S.build = null; S.landT = null; S.tipSeen = new Set(); S.tipUntil = 0;
   S.cnt = { jump: 0, use: 0, reload: 0, drop: 0 };
   S.netEv = []; S.tick = 0; S.lastSend = -99; S.buf = []; S.hist = []; S.seq = 0; S.predJump = 0; S.po = { x: 0, y: 0, z: 0 }; S.off = null; S.evq = [];
   const P = me();
@@ -377,6 +386,7 @@ function loop(now) {
   S.hud.crosshair(P ? crossGap(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
+  if (S.tick2 % 30 === 0) tips(P);
   if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
   // écho de pièce quand la tête du joueur suivi est sous un toit
   const fp = view.focus, roof = fp ? S.world.ceiling(fp.x, fp.z, fp.y + 0.2) - fp.y : 99;
@@ -745,6 +755,7 @@ function impactAt(x, y, z) {
 function handleEvents(list) {
   const P = me();
   for (const e of list) {
+    if (S.journal.on) S.journal.event(e, S.sim);
     switch (e.e) {
       case 'feu': {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
@@ -770,6 +781,11 @@ function handleEvents(list) {
       }
       case 'degat': {
         S.fx.hitSpark(e.x, e.y - 0.2, e.z, e.head ? 'tete' : e.sh ? 'bouclier' : 'vie', e.n > 40 ? 12 : 7);
+        // le touché sursaute, du côté opposé au tir (pas pour la tempête ni une chute)
+        if (e.cause !== 'tempete' && e.cause !== 'chute') {
+          const V = S.sim.player(e.to), A = e.by != null ? S.sim.player(e.by) : null, h = S.actors.heroOf(e.to);
+          if (V && h && h.hit) h.hit(A ? Math.sign(-(A.x - V.x) * Math.cos(V.yaw) + (A.z - V.z) * Math.sin(V.yaw)) : 0, 0.6 + e.n / 60);
+        }
         if (e.by === S.me && e.to !== S.me) {
           const Q = S.sim.player(e.to);
           S.hud.hitMarker(e.head, Q && !Q.alive);
@@ -864,7 +880,7 @@ function handleEvents(list) {
       case 'atterrit': {
         const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 });
         if (e.p === S.me) {
-          S.sfx.play('atterrit');
+          S.sfx.play('atterrit'); S.landT = S.t;
           // le rappel des touches se replie en une pastille peu après l'atterrissage (H le rouvre)
           if (!S.hintsFolded) { S.hintsFolded = true; setTimeout(() => $('#hints').classList.add('off'), 20000); }
         }
@@ -908,6 +924,7 @@ function endMatch(winner) {
   S.ended = true;
   S.hud.downed(null);
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
+  if (S.journal.on) S.journal.end(S.sim, res, 'fin');
   if (mine && S.sim.S.mode !== 'exploration') {
     const n = S.sim.S.teams > 1 ? new Set(res.map((r) => r.team)).size : res.length;
     saveHist({ place: iWon(winner) ? 1 : mine.place || n, n, kills: mine.kills });
@@ -933,6 +950,35 @@ function report(res) {
       players: res.map((r) => ({ id: r.bot ? null : r.id, name: r.name, color: r.color, bot: r.bot, rank: r.place, score: r.kills })),
     });
   } catch (e) { console.warn(e); }
+}
+
+// ------------------------------------------------------------------ astuces : la bonne touche au bon moment
+// chacune au plus une fois par partie et trois fois en tout (ensuite, le joueur la connaît) ; une à la fois, sans rafale
+const TIP_MAX = 3;
+function tipCounts() { try { const o = JSON.parse(localStorage.getItem('royale_tips') || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+function tips(P) {
+  if (!P || !P.alive || P.mode !== 'sol' || P.down || S.sim.S.mode === 'exploration' || S.ended || S.t < (S.tipUntil || 0) + 6) return;
+  const inv = P.inv, n = inv.filter(Boolean).length, mats = P.mats.bois + P.mats.pierre + P.mats.metal, T = S.sim.S.t;
+  const heal = inv.findIndex((it) => { const I = it && it.t === 'objet' && ITEMS[it.c]; return I && (I.heal ? P.hp < I.max : I.shield && P.sh < I.maxShield); }) + 1;
+  const st = S.sim.S.storm, outside = !!(st && st.next && st.state === 'fermeture' && Math.hypot(P.x - st.next.x, P.z - st.next.z) > st.next.r);
+  const since = T - (P.hitT != null ? P.hitT : -99), landed = S.landT != null ? S.t - S.landT : -1;
+  const list = [
+    ['coffre', landed >= 0 && landed < 12, `Les coffres brillent en doré et s'entendent de près : ${kb('utiliser')} pour les ouvrir`],
+    ['arme', inv.some((it) => it && it.t === 'arme') && !P.shots, `${kb('tir')} tirer · ${kb('visee')} viser · ${kb('recharger')} recharger`],
+    ['objets', n >= 2, `${kb('objet1')} à ${kb('objet5')} : changer d'objet · ${kb('pioche')} : la pioche`],
+    ['mur', since < 1.5 && mats >= COST, `${kb('mur')} : un mur entre toi et le tireur`],
+    ['soin', heal > 0 && P.hp + P.sh < 70 && since > 4, `Soigne-toi : ${kb('objet' + heal)} puis ${kb('tir')}`],
+    ['tempete', outside, `La tempête se referme : ${kb('carte')} pour la carte, rejoins le cercle blanc`],
+    ['recolte', landed > 70 && mats < COST, `Avec la pioche (${kb('pioche')}), frappe arbres, rochers et murs : des matériaux pour construire`],
+    ['sac', n === inv.length, `Sac plein : ${kb('sac')} pour ranger, ${kb('lacher')} pour lâcher l'objet en main`],
+    ['repere', S.sim.S.teams > 1 && landed > 20, `${kb('repere')} : un repère pour ton équipe, là où tu vises`],
+  ];
+  const seen = S.tipSeen || (S.tipSeen = new Set()), counts = tipCounts();
+  const tip = list.find(([id, on]) => on && !seen.has(id) && (counts[id] || 0) < TIP_MAX);
+  if (!tip) return;
+  seen.add(tip[0]); counts[tip[0]] = (counts[tip[0]] || 0) + 1;
+  try { localStorage.setItem('royale_tips', JSON.stringify(counts)); } catch (e) { /* pas de stockage */ }
+  S.hud.tip(tip[2], 6); S.tipUntil = S.t + 6;
 }
 
 // ------------------------------------------------------------------ interactions affichées sous le viseur
@@ -1106,7 +1152,8 @@ function showScreen(kind, data) {
     const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : mine && tm && r.team === mine.team ? 'mate' : ''}"><td>${r.place}</td>${tm ? `<td>${r.team + 1}</td>` : ''}<td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
     const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${nTeams}${tm ? ' équipes' : ''}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
     const tags = mine ? bilanHtml(mine, res) : '';
-    const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
+    // l'hôte (ou le joueur seul) garde le journal des parties : la page de statistiques le lit
+    const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '<p class="hint">Cette partie rejoint ton <a href="stats.html" target="_blank" rel="noopener">journal des parties</a> (statistiques, carte des atterrissages et des éliminations).</p>';
     html = `<p class="eyebrow">Fin de partie</p><h1>${won ? (tm ? 'Dernière équipe <span>debout</span> !' : 'Dernier <span>debout</span> !') : 'Island <span>Rush</span>'}</h1>${head}${tags}
       <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th>${tm ? '<th>Éq.</th>' : ''}<th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
       <div class="row end">${back}${S.role !== 'guest' ? '<button class="btn big" id="again">Rejouer</button>' : ''}</div>`;
@@ -1155,7 +1202,11 @@ function loadOpts() {
   // l'ancien curseur « Volume » (0,8 par défaut) devient le point de départ du curseur « Effets »
   try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) DDVolume.migrate('fx', clamp(+o.vol, 0, 1) / 0.8); } catch (e) { /* pas de stockage */ }
 }
+// partie quittée avant la fin : elle entre au journal comme abandonnée
+function abandon() { if (S.journal && S.journal.on && S.sim) S.journal.end(S.sim, S.sim.results(), 'abandon'); }
+addEventListener('pagehide', abandon);
 function quit() {
+  abandon();
   S.running = false;
   try { S.input && S.input.dispose(); S.actors && S.actors.dispose(); S.fx && S.fx.dispose(); S.scene && S.scene.dispose(); S.sfx && S.sfx.dispose(); } catch (e) { console.error(e); }
   if (H.embedded) H.exit(); else location.reload();

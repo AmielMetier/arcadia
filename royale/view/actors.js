@@ -9,6 +9,7 @@ import { RARITY } from '../engine/items.js';
 import { createBillboards } from './fx.js';
 import { buildBalloon } from './balloon.js';
 import { hash } from '../engine/rng.js';
+import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 
 const keyOf = (it) => (it ? it.t + (it.w || it.c || it.a || it.m || '') + (it.r ?? '') : 'pioche');
 const LOOT_R = 65;
@@ -137,39 +138,73 @@ export function createActors(scene, sim, kit = null) {
   own.push(...Object.values(cGeo));
   const cMat = {
     wood: new THREE.MeshStandardMaterial({ color: 0x8a5a2e, roughness: 0.8 }),
+    // bois du coffre du kit : plus clair, il porte la lueur dorée (un rien d'émission pour qu'il ne disparaisse pas dans l'ombre)
+    oak: new THREE.MeshStandardMaterial({ color: 0xc0824a, roughness: 0.72, emissive: 0x2a1400 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xffc531, roughness: 0.3, metalness: 0.6, emissive: 0x6a4a00 }),
     green: new THREE.MeshStandardMaterial({ color: 0x4f6a3a, roughness: 0.7 }),
   };
   own.push(...Object.values(cMat));
   const kinds = { coffre: chests.filter((c) => c.kind === 'coffre'), munitions: chests.filter((c) => c.kind === 'munitions') };
+  // chaque sorte : des pièces posées comme le coffre (body), d'autres comme son couvercle (lids), tournées sur la charnière
+  // (hinge, à l'arrière en haut) ; d'abord des boîtes, puis le coffre du « Survival Kit » de Kenney une fois chargé
   const im = {};
+  const instanced = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; group.add(m); return m; };
   for (const [kind, list] of Object.entries(kinds)) {
-    const n = Math.max(1, list.length);
+    const n = Math.max(1, list.length), gold = kind === 'coffre';
     im[kind] = {
-      base: new THREE.InstancedMesh(cGeo.base, kind === 'coffre' ? cMat.wood : cMat.green, n),
-      lid: new THREE.InstancedMesh(cGeo.lid, kind === 'coffre' ? cMat.gold : cMat.green, n),
-      trim: new THREE.InstancedMesh(cGeo.trim, cMat.gold, n),
-      list,
+      body: [instanced(cGeo.base, gold ? cMat.wood : cMat.green, n), instanced(cGeo.trim, cMat.gold, n)],
+      lids: [instanced(cGeo.lid, gold ? cMat.gold : cMat.green, n)],
+      hinge: new THREE.Vector3(0, 0.55, -0.31), list,
     };
-    for (const m of Object.values(im[kind])) if (m.isInstancedMesh) { m.castShadow = true; m.receiveShadow = true; group.add(m); }
   }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qx = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0), ax = new THREE.Vector3(1, 0, 0);
-  const tmpC = new THREE.Color();
+  const tmpC = new THREE.Color(), back = new THREE.Vector3();
   const lidOpen = new Map();
   function placeChest(kind, i, c, open) {
     const M = im[kind], yaw = Math.atan2(c.fx || 0, c.fz || 1), sc = kind === 'coffre' ? 1 : 0.75;
     q.setFromAxisAngle(up, yaw); p3.set(c.x, c.y + 0.15, c.z); s3.set(sc, sc, sc);
-    m4.compose(p3, q, s3); M.base.setMatrixAt(i, m4); M.trim.setMatrixAt(i, m4);
-    // couvercle : charnière à l'arrière (z = −0,31)
-    const back = new THREE.Vector3(0, 0.55 * sc, -0.31 * sc).applyQuaternion(q);
+    m4.compose(p3, q, s3);
+    for (const m of M.body) m.setMatrixAt(i, m4);
+    back.copy(M.hinge).multiplyScalar(sc).applyQuaternion(q);
     qx.setFromAxisAngle(ax, -open * 1.9);
     const ql = q.clone().multiply(qx);
     p3.set(c.x + back.x, c.y + 0.15 + back.y, c.z + back.z);
-    m4.compose(p3, ql, s3); M.lid.setMatrixAt(i, m4);
-    for (const m of [M.base, M.lid, M.trim]) m.instanceMatrix.needsUpdate = true;
+    m4.compose(p3, ql, s3);
+    for (const m of M.lids) m.setMatrixAt(i, m4);
+    for (const m of [...M.body, ...M.lids]) m.instanceMatrix.needsUpdate = true;
   }
-  for (const [kind, M] of Object.entries(im)) M.list.forEach((c, i) => { placeChest(kind, i, c, 0); lidOpen.set(c.id, { kind, i, t: 0 }); });
-  for (const M of Object.values(im)) for (const m of [M.base, M.lid, M.trim]) m.computeBoundingSphere();
+  function placeAll(kind) {
+    const M = im[kind];
+    M.list.forEach((c, i) => placeChest(kind, i, c, lidOpen.has(c.id) ? lidOpen.get(c.id).t : 0));
+    for (const m of [...M.body, ...M.lids]) m.computeBoundingSphere();
+  }
+  for (const [kind, M] of Object.entries(im)) { M.list.forEach((c, i) => lidOpen.set(c.id, { kind, i, t: 0 })); placeAll(kind); }
+  // le vrai coffre : bois et ferrures (dorées) séparés d'après la case de la palette Kenney qu'utilise chaque triangle
+  const CHEST_K = 3.5, GOLD_CELL = 5;
+  function woodAndGold(geo) {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone(), pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+    const parts = { wood: [[], []], gold: [[], []] };
+    for (let t = 0; t < pos.count; t += 3) {
+      const u = (uv.getX(t) + uv.getX(t + 1) + uv.getX(t + 2)) / 3, o = parts[Math.floor(u * 16) === GOLD_CELL ? 'gold' : 'wood'];
+      for (let k = t; k < t + 3; k++) { o[0].push(pos.getX(k), pos.getY(k), pos.getZ(k)); o[1].push(nor.getX(k), nor.getY(k), nor.getZ(k)); }
+    }
+    g.dispose();
+    const make = ([p, n]) => { const b = new THREE.BufferGeometry(); b.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); b.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); b.scale(CHEST_K, CHEST_K, CHEST_K); own.push(b); return b; };
+    return { wood: make(parts.wood), gold: make(parts.gold) };
+  }
+  new GLTFLoader().loadAsync('models/survival/chest.glb').then((g) => {
+    // (le nœud « chest » est un groupe : son maillage et le couvercle, placé par rapport à lui)
+    const lid = g.scene.getObjectByName('lid');
+    let body = null;
+    g.scene.traverse((o) => { if (o.isMesh && o !== lid && !body) body = o; });
+    if (!body || !lid || !lid.isMesh) return;
+    const M = im.coffre, n = Math.max(1, M.list.length), B = woodAndGold(body.geometry), L = woodAndGold(lid.geometry);
+    for (const m of [...M.body, ...M.lids]) { group.remove(m); m.dispose(); }
+    M.body = [instanced(B.wood, cMat.oak, n), instanced(B.gold, cMat.gold, n)];
+    M.lids = [instanced(L.wood, cMat.oak, n), instanced(L.gold, cMat.gold, n)];
+    M.hinge = lid.position.clone().multiplyScalar(CHEST_K);
+    placeAll('coffre');
+  }).catch((e) => console.warn('coffre du kit indisponible', e));
   // ------------------------------------------------------------------ tremplins
   const padGeo = new THREE.CylinderGeometry(0.9, 1.0, 0.2, 20).translate(0, 0.1, 0), padMat = new THREE.MeshStandardMaterial({ color: 0xf2c14e, roughness: 0.4, emissive: 0x3a2a00 });
   const arrowGeo = new THREE.ConeGeometry(0.45, 0.5, 3).translate(0, 0.45, 0), arrowMat = new THREE.MeshStandardMaterial({ color: 0xd8432f });

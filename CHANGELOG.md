@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.7 — 28 octobre 2026
+- **Island Rush** — Les personnages réagissent : un sursaut quand une balle les touche (le buste part en arrière, la tête suit), et ils plient les genoux en retombant d'un saut ou du deltaplane.
+- **Island Rush** — Un vrai coffre au trésor, en bois avec couvercle bombé et serrure dorée, remplace la caisse faite de trois blocs.
+- **Island Rush** — Son plus propre :
+  - les différentes versions d'un même bruit (pas, impacts, tirs) ont maintenant le même volume ;
+  - la culasse du pistolet ne couvre plus tout le rechargement ;
+  - pendant un combat proche, l'ambiance de nature s'efface pour qu'on entende mieux les tirs et les pas.
+- **Island Rush** — Des astuces au bon moment, avec tes touches : ouvrir les coffres en arrivant, tirer et recharger à la première arme, poser un mur quand on te tire dessus, te soigner, rejoindre la zone… Chacune revient au plus trois fois, puis disparaît. Après trois parties, le rappel des touches reste replié (H le rouvre).
+- **Island Rush** — L'interface s'adapte à l'écran : plus grande sur les grands écrans (1440p, 4K, ultra-large), plus compacte sur les petits, sans que rien ne se chevauche.
+- **Island Rush** — Journal des parties, pour les soirées de test : l'hôte garde un résumé de chaque partie dans son navigateur (rien n'est envoyé).
+  - Une page de statistiques le montre : comment et à quelle minute tombent les joueurs, armes des éliminations, carte des atterrissages et des éliminations.
+  - Le lien est sur l'écran de fin de partie, et le journal s'exporte pour le réunir avec celui des amis.
+
 ## 3.6 — 28 octobre 2026
 - **Island Rush** — Une boussole en haut de l'écran : les points cardinaux défilent avec ton regard, et chaque coup de feu entendu y laisse une marque à sa direction pendant quelques secondes.
   - Plus la marque est grande, plus le tireur est proche. Elle est rouge vif s'il te touche, bleue s'il est de ton équipe, avec ▲ ou ▼ s'il tire d'au-dessus ou d'en dessous.

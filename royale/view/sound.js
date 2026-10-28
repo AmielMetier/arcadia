@@ -68,6 +68,8 @@ export function createSound() {
   // (on le trouve à l'oreille, même derrière un mur)
   const HUM_R = 16, SPARK = [1318.5, 1568, 1760, 1975.5, 2349.3, 2637];
   let hum = null, humT = 0;
+  // combat proche (des tirs à moins de 60 m, ou les siens) : l'ambiance de nature s'efface un moment, on entend mieux le combat
+  let fightT = -99;
   function makeHum() {
     const g = ctx.createGain(); g.gain.value = 0;
     const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
@@ -148,9 +150,24 @@ export function createSound() {
     // les enregistrements (≈ 1 Mo) : chacun sert dès qu'il est prêt
     for (const [name, n] of Object.entries(BANK)) {
       const files = n ? Array.from({ length: n }, (_, i) => `${DIR}${name}-${i + 1}.mp3`) : [`${DIR}${name}.mp3`];
-      Promise.all(files.map((f) => decode(f).catch(() => null))).then((list) => { const ok = list.filter(Boolean); if (ok.length) bufs.set(name, ok); });
+      Promise.all(files.map((f) => decode(f).catch(() => null))).then((list) => { const ok = list.filter(Boolean); if (ok.length) { level(name, ok); bufs.set(name, ok); } });
     }
     for (const [name, url] of Object.entries(EXTRA)) decode(url).then((buf) => bufs.set(name, [buf])).catch(() => {});
+  }
+  // mixage : les variantes d'un même bruitage n'ont pas la même force (jusqu'à 5 dB d'écart d'un pas à l'autre) ; chacune
+  // est ramenée au niveau médian de sa famille (crête d'intensité sur 50 ms), et TRIM corrige ce qui détonne d'une famille
+  // à l'autre (la culasse du pistolet couvrait tout son rechargement)
+  const TRIM = { 'pistolet-culasse': -6, 'pompe-rack': -2.5, 'chargeur-entre': -2 };
+  const gainOf = new WeakMap();
+  function peakDb(buf) {
+    const a = buf.getChannelData(0), W = Math.max(1, Math.round(buf.sampleRate * 0.05));
+    let s = 0, best = 0;
+    for (let i = 0; i < a.length; i++) { s += a[i] * a[i]; if (i >= W) s -= a[i - W] * a[i - W]; if (s > best) best = s; }
+    return 10 * Math.log10(best / W + 1e-12);
+  }
+  function level(name, list) {
+    const db = list.map(peakDb), mid = [...db].sort((x, y) => x - y)[Math.floor(db.length / 2)], trim = TRIM[name] || 0;
+    list.forEach((b, i) => gainOf.set(b, 10 ** ((Math.max(-6, Math.min(6, mid - db[i])) + trim) / 20)));
   }
   const decode = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); }).then((a) => new Promise((res, rej) => ctx.decodeAudioData(a, res, rej)));
   function loopNoise(buf, type, f, q) {
@@ -197,7 +214,7 @@ export function createSound() {
     if (voices > 56) return true;
     const s = ctx.createBufferSource(); s.buffer = list[Math.floor(Math.random() * list.length)];
     s.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
-    s.connect(out(v, pan, cut, rev, bus));
+    s.connect(out(v * (gainOf.get(s.buffer) || 1), pan, cut, rev, bus));
     voices++; s.onended = () => { voices--; };
     s.start(Math.max(ctx.currentTime, t || 0));
     return true;
@@ -326,6 +343,7 @@ export function createSound() {
     const t = ctx.currentTime + 0.003, vol = SHOT_VOL[w] || 0.8;
     if (w === 'roquette') { if (mine) fire('roquette', { v: 0.9, rev: 0.15 }); else at('roquette', Q.x, Q.y + 1.4, Q.z, 1, SHOT_RANGE.roquette); return; }
     if (mine) {
+      fightT = ctx.currentTime;
       if (!voice('tir-' + w, { v: vol, rev: 0.22, t, bus: gunBus })) synth(w, out(0.75), t);
       punch(w, out(1, 0, 0, 0.1, gunBus), t, 1);
       if (w === 'pompe') voice('pompe-arme', { v: 0.55, t: t + 0.42, rev: 0.05 });
@@ -334,6 +352,7 @@ export function createSound() {
     }
     const range = SHOT_RANGE[w] || 220, dx = Q.x - ear.x, dy = Q.y + 1.4 - ear.y, dz = Q.z - ear.z, d = Math.hypot(dx, dy, dz);
     if (d > range) return;
+    if (d < 60) fightT = ctx.currentTime;
     if (!ok('tir' + w + (d < 40 ? '' : '~'))) return;
     const side = d > 0.5 ? (-dx * Math.cos(ear.yaw) + dz * Math.sin(ear.yaw)) / Math.hypot(dx, dz || 0.001) : 0;
     const pan = Math.max(-0.85, Math.min(0.85, side * 0.85)), delay = Math.min(1.3, d / 343);
@@ -398,7 +417,7 @@ export function createSound() {
     const ground = me && me.alive ? me : null;
     const h = cam.y, coast = ambCoast(cam);
     const air = ground && (ground.mode === 'chute' || ground.mode === 'planeur' || ground.mode === 'ballon') ? 1 : 0;
-    const high = Math.min(1, Math.max(0, (h - 45) / 50)), inside = 1 - indoor * 0.6;
+    const high = Math.min(1, Math.max(0, (h - 45) / 50)), inside = (1 - indoor * 0.6) * (t - fightT < 3 ? 0.35 : 1);
     setG(amb.mer, (1 - air) * coast * 0.9 * (1 - high) * inside);
     setG(amb.campagne, (1 - air) * (1 - coast) * (1 - high) * 0.8 * inside);
     setG(amb.montagne, (1 - air) * high * 0.8 * inside);
