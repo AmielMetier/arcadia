@@ -106,19 +106,49 @@ export function buildWorld(map) {
     return d.o === 'h' ? box(d.x * CELL + u0, F, d.z * CELL - 0.07, d.x * CELL + u1, F + top, d.z * CELL + 0.07, { door: d.id })
       : box(d.x * CELL - 0.07, F, d.z * CELL + u0, d.x * CELL + 0.07, F + top, d.z * CELL + u1, { door: d.id });
   };
+  // battant ouvert : plaqué en travers du mur, du côté où il s'est ouvert (comme à l'écran, voir view/interior.js) ; on ne
+  // le traverse pas. Le rideau d'un portail, lui, s'enroule en haut
+  const openSolid = (d) => {
+    if (d.kind === 'portail') return null;
+    const b = map.buildings[d.b], F = floorY(b, d.k), top = F + 2.35 * levelH(b) / STOREY;
+    if (d.o === 'h') {
+      const s = d.swing || (d.nz ? -d.nz : 1), hx = d.x * CELL + 1.3, z0 = d.z * CELL;
+      return box(hx - 0.07, F, Math.min(z0, z0 + s * 1.4), hx + 0.07, top, Math.max(z0, z0 + s * 1.4), { door: d.id });
+    }
+    const s = d.swing || (d.nx ? -d.nx : 1), hz = d.z * CELL + 1.3, x0 = d.x * CELL;
+    return box(Math.min(x0, x0 + s * 1.4), F, hz - 0.07, Math.max(x0, x0 + s * 1.4), top, hz + 0.07, { door: d.id });
+  };
   function setDoor(id, open) {
     const d = doors.get(id);
     if (!d || d.dead || d.open === open) return d;
     d.open = open;
-    if (open && d.solid) { remove(d.solid); d.solid = null; } else if (!open) d.solid = doorSolid(d);
+    if (d.solid) remove(d.solid);
+    d.solid = open ? openSolid(d) : doorSolid(d);
     return d;
   }
   const ramp = (r) => {
     ramps.push(r); cellRange(r.x0, r.z0, r.x1, r.z1, (k) => rgrid[k].push(r));
     r.key = keyOf(r.ref);
     if (r.key) { if (!byKey.has(r.key)) byKey.set(r.key, []); byKey.get(r.key).push(r); }
+    if (r.solid) underRamp(r);
     return r;
   };
+  // un escalier a une épaisseur : sous la rampe, une dalle en pente (boîtes de 40 cm, 55 cm sous les marches), pour ne
+  // passer au travers ni par le côté ni en sautant dessous. Leur dessus reste sous la rampe (on y marche toujours) et on
+  // garde la hauteur de passage sous la volée de l'étage du dessus (empilée dans la même case). Elles partent avec la rampe
+  const RAMP_T = 0.55;
+  function underRamp(r) {
+    const alongX = !!r.dx, L = alongX ? r.x1 - r.x0 : r.z1 - r.z0, n = Math.max(2, Math.ceil(L / 0.4)), up = r.dx || r.dz;
+    const at = (f) => r.y0 + (r.y1 - r.y0) * f;
+    for (let i = 0; i < n; i++) {
+      // i compte depuis le bas de la rampe
+      const top = at(i / n) - 0.02, bottom = Math.max(r.y0 - 0.02, at((i + 1) / n) - RAMP_T);
+      if (top - r.y0 < 0.25 || top - bottom < 0.05) continue;
+      const u0 = up > 0 ? i / n : 1 - (i + 1) / n, u1 = up > 0 ? (i + 1) / n : 1 - i / n;
+      if (alongX) box(r.x0 + L * u0, bottom, r.z0, r.x0 + L * u1, top, r.z1, r.ref);
+      else box(r.x0, bottom, r.z0 + L * u0, r.x1, top, r.z0 + L * u1, r.ref);
+    }
+  }
   function removeRamp(r) {
     if (r.dead) return;
     r.dead = true;
@@ -160,7 +190,7 @@ export function buildWorld(map) {
       if (k > 0) slabCells(b, lv.hole, (x, z) => box(x * CELL, F - SLAB_T, z * CELL, (x + 1) * CELL, F, (z + 1) * CELL, { b: b.id, k, part: 'dalle', slab: `${x},${z}` }));
       if (lv.stairs) {
         const st = lv.stairs;
-        ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' } });
+        ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' }, solid: true });
       }
     }
     // meubles (les tapis, plantes et lampes ne gênent pas), portes
@@ -173,7 +203,7 @@ export function buildWorld(map) {
       doors.set(d.id, d);
       d.cx = d.o === 'h' ? (d.x + 0.5) * CELL : d.x * CELL; d.cz = d.o === 'h' ? d.z * CELL : (d.z + 0.5) * CELL; d.y = floorY(b, d.k);
       dgrid[Math.min(GN - 1, Math.floor(d.cz / G)) * GN + Math.min(GN - 1, Math.floor(d.cx / G))].push(d);
-      d.solid = d.open ? null : doorSolid(d);
+      d.solid = d.open ? openSolid(d) : doorSolid(d);
     }
     // poteaux d'angle (les murs se rejoignent sans fente)
     const top = floorY(b, b.floors);
@@ -324,9 +354,9 @@ export function buildWorld(map) {
     for (const r of rgrid[k]) { const ry = rampY(r, x, z); if (ry != null && y <= ry + m && y >= ry - 0.3 - m) return true; }
     return false;
   }
-  // distance libre le long d'un rayon (pas de 0,2 m), plafonnée à len
-  function ray(ox, oy, oz, dx, dy, dz, len, m = 0.15) {
-    for (let t = 0.2; t <= len; t += 0.2) if (solidAt(ox + dx * t, oy + dy * t, oz + dz * t, m)) return Math.max(0, t - 0.2);
+  // distance libre le long d'un rayon (pas de step, 0,2 m par défaut), plafonnée à len
+  function ray(ox, oy, oz, dx, dy, dz, len, m = 0.15, step = 0.2) {
+    for (let t = step; t <= len; t += step) if (solidAt(ox + dx * t, oy + dy * t, oz + dz * t, m)) return Math.max(0, t - step);
     return len;
   }
   // ------------------------------------------------------------------ tirs : premier obstacle exact sur un rayon

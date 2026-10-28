@@ -303,6 +303,28 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const key = `w:${bld.id}:0:${wall.o}${wall.x},${wall.z}`, had = A.mats[bld.mat];
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 50, A, [0, 0, 0], true);
   ok(B.broken.has(key) && !(W.byKey.get(key) || []).length && A.mats[bld.mat] > had, 'un mur de maison ne se casse pas');
+  // visée : le mur va sur le trait de grille juste devant soi, pas deux cases plus loin
+  const gx = Math.floor((spot.x + 20) / CELL), gz = Math.floor((spot.z + 20) / CELL), gy = W.support((gx + 0.5) * CELL, (gz + 0.5) * CELL, 400);
+  const ws = slotFor(gx * CELL + 3.2, gy, (gz + 0.5) * CELL, Math.PI / 2, 0, 'mur', B.pieces, W);
+  ok(ws.o === 'v' && ws.x === gx + 1 && Math.abs(ws.y0 - gy) < 0.5, `mur visé : ${JSON.stringify(ws)} au lieu du trait x = ${gx + 1}`);
+  // pas de construction dans le vide : un sol deux étages au-dessus du sol, sans rien autour, est refusé
+  ok(!B.canPlace({ kind: 'sol', x: gx + 3, z: gz + 3, y0: W.support((gx + 3.5) * CELL, (gz + 3.5) * CELL, 400) + 6.4 }), 'on construit dans le vide');
+  // un escalier construit ne se traverse ni par le côté ni par-dessous
+  Object.assign(A, { x: (gx + 0.5) * CELL, z: (gz - 0.5) * CELL, y: W.support((gx + 0.5) * CELL, (gz - 0.5) * CELL, 400), vx: 0, vz: 0 });
+  sim.input('a', { build: 'escalier', mat: 'bois', yaw: 0, pitch: -0.3, shoot: ++shots }); for (let i = 0; i < 10; i++) sim.step(DT); sim.input('a', { build: null });
+  const ramp = [...B.pieces.values()].find((p) => p.kind === 'escalier' && p !== st);
+  ok(ramp, 'escalier de l\'essai non posé');
+  if (ramp) {
+    for (let i = 0; i < 200; i++) sim.step(DT); // il durcit
+    const walk = (p, inp, sec) => { for (let i = 0; i < sec * 60; i++) stepPlayer(p, inp, W, 1 / 60); return p; };
+    const mid = (ramp.z + 0.5) * CELL, side = newPlayer((ramp.x - 0.6) * CELL, W.support((ramp.x - 0.6) * CELL, mid, ramp.y0 + 0.5), mid, Math.PI / 2);
+    walk(side, { mz: 1, yaw: side.yaw }, 1.2);
+    ok(side.x < ramp.x * CELL + 0.2, `on traverse un escalier par le côté (x ${side.x.toFixed(2)}, bord ${ramp.x * CELL})`);
+    const under = newPlayer((ramp.x + 0.5) * CELL, ramp.y0, (ramp.z + 0.85) * CELL, 0);
+    stepPlayer(under, { jump: true, yaw: 0 }, W, 1 / 60); walk(under, { yaw: 0 }, 0.8);
+    const top = W.support(under.x, under.z, ramp.y0 + 4);
+    ok(under.y < top - 0.4, `on traverse un escalier en sautant dessous (y ${under.y.toFixed(2)}, marche ${top.toFixed(2)})`);
+  }
   // coût d'un pas avec 3 joueurs et le butin de l'île
   const t0 = performance.now(); for (let i = 0; i < 300; i++) sim.step(DT);
   console.log(`  partie : saut, coffre, élimination, récolte, construction et effondrement vérifiés · ${((performance.now() - t0) / 300).toFixed(3)} ms par pas`);

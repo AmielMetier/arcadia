@@ -16,7 +16,9 @@ export const SLOTS = 5;
 export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon de tir part de là, comme celui de la caméra)
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
-const FALL_SAFE = 8;               // m de chute sans dégâts
+const FALL_SAFE = 10;              // m de chute sans dégâts (au-delà, FALL_DMG par mètre)
+const FALL_DMG = 4;
+const PAD_VY = 85;                 // élan d'un tremplin (m/s, freiné par l'air : ≈ 40 m de haut)
 // Coriolis pour les balles du fusil de précision : rotation de la Terre à 46° de latitude (x vers l'est, z vers le
 // nord, y en haut), forcée ×60 pour qu'on la sente sur l'île (≈ 65 cm de dérive à droite à 300 m)
 const OMEGA = (() => { const w = 7.292e-5 * 60, lat = 46 * Math.PI / 180; return [0, w * Math.sin(lat), w * Math.cos(lat)]; })();
@@ -493,7 +495,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       for (const Q of S.players.values()) {
         if (!Q.alive || Q.mode !== 'sol' || Q.vy > 1) continue;
         if (Math.hypot(Q.x - pad.x, Q.z - pad.z) < 1.2 && Math.abs(Q.y - pad.y) < 0.6) {
-          Object.assign(Q, { mode: 'chute', vy: 30, safeFall: true }); Q.vx *= 0.5; Q.vz *= 0.5;
+          // haut (une quarantaine de mètres) et un peu devant soi : le deltaplane s'ouvre en haut de la course et porte loin
+          Object.assign(Q, { mode: 'chute', vy: PAD_VY, safeFall: true, vx: Q.vx * 0.5 + Math.sin(Q.yaw) * 8, vz: Q.vz * 0.5 + Math.cos(Q.yaw) * 8 });
           ev({ e: 'propulse', p: Q.id, x: pad.x, y: pad.y, z: pad.z });
         }
       }
@@ -686,7 +689,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       if (P.ground && wasAir) {
         // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
         const h = P.fall * P.fall / (2 * MOVE.g);
-        if (h > FALL_SAFE && !P.safeFall) damage(P, (h - FALL_SAFE) * 7, null, { cause: 'chute' });
+        if (h > FALL_SAFE && !P.safeFall) damage(P, (h - FALL_SAFE) * FALL_DMG, null, { cause: 'chute' });
         P.safeFall = false; P.fall = 0;
       }
       // tombé hors de l'île ou sous la mer : on remonte au bord (sécurité)

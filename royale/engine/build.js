@@ -30,23 +30,37 @@ const PROP_HP = {
 };
 const WALL_HP = { bois: 170, pierre: 300, metal: 420 };
 
-// emplacement visé pour une pièce, depuis la position et le regard d'un joueur. Grille de 4 m en plan ; en hauteur,
-// des étages de 3,2 m calés sur les constructions voisines (à moins de 10 m), sinon sur les pieds du joueur.
-export function slotFor(x, y, z, yaw, pitch, kind, pieces) {
-  const fx = Math.sin(yaw), fz = Math.cos(yaw);
+// emplacement visé pour une pièce, depuis la position (pieds) et le regard d'un joueur. Grille de 4 m en plan ; en
+// hauteur, des étages de 3,2 m calés sur les constructions voisines (à moins de 10 m), sinon sur les pieds du joueur.
+// On suit le point visé (arrêté par le décor si world est donné, à 5 m au plus) :
+//  - mur : sur le premier trait de la grille devant soi (dans l'axe du regard), à l'étage de la hauteur visée là ;
+//  - sol : la case visée, à ses pieds, ou à l'étage du dessus en visant haut ;
+//  - escalier : la case visée (la sienne en regardant à ses pieds), qui monte devant soi.
+export function slotFor(x, y, z, yaw, pitch, kind, pieces, world = null) {
+  const fx = Math.sin(yaw), fz = Math.cos(yaw), c = Math.cos(pitch), s = Math.sin(pitch);
   let off = ((y % STOREY) + STOREY) % STOREY, best = 100;
   if (pieces) for (const p of pieces.values()) {
     const d = Math.hypot((p.x + 0.5) * CELL - x, (p.z + 0.5) * CELL - z);
     if (d < 10 && d < best) { best = d; off = ((p.y0 % STOREY) + STOREY) % STOREY; }
   }
-  const y0 = off + (Math.floor((y + 0.4 - off) / STOREY) + (pitch > 0.45 ? 1 : 0)) * STOREY;
+  const level = (h) => off + Math.floor((h - off) / STOREY) * STOREY, feet = level(y + 0.4), eye = y + 1.6;
+  let t = 5;
+  if (world) t = Math.min(t, world.raycast(x, eye, z, fx * c, s, fz * c, 5).t);
+  const reach = Math.max(0, t * c), aimY = eye + s * t;
   if (kind === 'mur') {
-    // le bord de la case devant soi (on construit un mur pour se couvrir)
-    const ax = x + fx * 1.2, az = z + fz * 1.2, cx = Math.floor(ax / CELL), cz = Math.floor(az / CELL);
-    if (Math.abs(fx) > Math.abs(fz)) return { kind, o: 'v', x: fx > 0 ? cx + 1 : cx, z: Math.floor(z / CELL), y0 };
-    return { kind, o: 'h', x: Math.floor(x / CELL), z: fz > 0 ? cz + 1 : cz, y0 };
+    // le trait de la grille devant soi le plus proche (à 0,3 m au moins), dans l'axe dominant du regard
+    const alongX = Math.abs(fx) > Math.abs(fz), u = alongX ? x : z, f = alongX ? fx : fz;
+    const line = f > 0 ? Math.ceil((u + 0.3) / CELL) : Math.floor((u - 0.3) / CELL), dist = Math.abs(line * CELL - u);
+    // la hauteur visée au droit du mur (un étage au-dessus ou au-dessous au plus)
+    const h = eye + Math.tan(Math.max(-1.2, Math.min(1.2, pitch))) * dist / Math.max(0.2, Math.abs(f));
+    const y0 = Math.max(feet - STOREY, Math.min(feet + STOREY, level(h)));
+    return alongX ? { kind, o: 'v', x: line, z: Math.floor(z / CELL), y0 } : { kind, o: 'h', x: Math.floor(x / CELL), z: line, y0 };
   }
-  const ahead = pitch < -0.8 ? 0 : 2.8, cx = Math.floor((x + fx * ahead) / CELL), cz = Math.floor((z + fz * ahead) / CELL);
+  // la case visée : la sienne si l'on vise dedans (à ses pieds), sinon la case juste devant (1 m après le bord de la sienne)
+  const edge = (u, f) => (Math.abs(f) < 1e-6 ? Infinity : f > 0 ? (Math.floor(u / CELL + 1) * CELL - u) / f : (u - Math.floor(u / CELL) * CELL) / -f);
+  const out = Math.min(edge(x, fx), edge(z, fz)), ahead = reach < out ? reach : out + 1;
+  const cx = Math.floor((x + fx * ahead) / CELL), cz = Math.floor((z + fz * ahead) / CELL);
+  const y0 = aimY > y + (kind === 'sol' ? 2.2 : 3.4) ? feet + STOREY : feet;
   if (kind === 'sol') return { kind, x: cx, z: cz, y0 };
   const [dx, dz] = Math.abs(fx) > Math.abs(fz) ? [Math.sign(fx), 0] : [0, Math.sign(fz)];
   return { kind, x: cx, z: cz, y0, dx, dz };
@@ -143,18 +157,22 @@ export function createBuild(sim, map, world) {
     if (B.y1 < Math.min(map.heightAt(B.x0 + 0.3, B.z0 + 0.3), map.heightAt(B.x1 - 0.3, B.z1 - 0.3), map.heightAt(cx, cz)) - 0.1) return false;
     let blocked = false;
     world.near(cx, cz, 3, (s) => { if (!blocked && !(s.ref && s.ref.build) && s.y1 > probe[1] - 0.05 && s.y0 < probe[1] + 0.05 && world.over(s, probe[0], probe[2], -0.15)) blocked = true; });
-    return !blocked;
+    if (blocked) return false;
+    // pas dans le vide : elle doit reposer sur le sol, un bâtiment ou une construction (qui tient, puisque les autres tombent)
+    if (grounded(slot)) return true;
+    for (const p of pieces.values()) if (touch(B, pieceBox(p))) return true;
+    return false;
   }
   function addSolids(p) {
     const ref = { build: p.id }, B = pieceBox(p);
     if (p.kind === 'escalier') {
-      world.ramp({ x0: p.x * CELL, z0: p.z * CELL, x1: (p.x + 1) * CELL, z1: (p.z + 1) * CELL, dx: p.dx, dz: p.dz, y0: B.y0, y1: B.y1, ref });
-      // sous l'escalier, une fine planche qui arrête les balles (le dessus reste une rampe)
+      // une rampe, pleine en dessous (on ne la traverse ni par le côté ni en sautant dessous)
+      world.ramp({ x0: p.x * CELL, z0: p.z * CELL, x1: (p.x + 1) * CELL, z1: (p.z + 1) * CELL, dx: p.dx, dz: p.dz, y0: B.y0, y1: B.y1, ref, solid: true });
     } else world.box(B.x0, B.y0, B.z0, B.x1, B.y1, B.z1, ref);
   }
   function place(P, kind, mat) {
     if (P.mats[mat] < COST) { ev({ e: 'manque', p: P.id, m: mat }); return null; }
-    const slot = slotFor(P.x, P.y, P.z, P.inp.yaw, P.inp.pitch, kind, pieces);
+    const slot = slotFor(P.x, P.y, P.z, P.inp.yaw, P.inp.pitch, kind, pieces, world);
     if (!canPlace(slot)) return null;
     P.mats[mat] -= COST;
     const p = { id: nextId++, ...slot, mat, owner: P.id, max: PIECE_HP[mat], hp: PIECE_HP[mat] * 0.12, t: 0, what: kind, yield: 0 };

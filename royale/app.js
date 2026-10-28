@@ -346,7 +346,7 @@ function loop(now) {
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
   // fantôme de la pièce à construire
   if (S.build && P && P.alive && P.mode === 'sol') {
-    const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces);
+    const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces, S.world);
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
@@ -547,10 +547,12 @@ function cameraFor(P, disp, dt) {
   const py = headY;
   // la caméra ne traverse ni mur, ni porte, ni plafond, ni le sol : un obstacle derrière le joueur la rapproche aussitôt,
   // elle recule doucement quand la voie se libère ; collée au mur, elle se recentre sur la tête du joueur
-  let D = S.camDist;
+  let D = S.camDist, free = 0;
   if (D > 0.3) {
-    let free = W.ray(px, py, pz, -fx, -fy, -fz, D, 0.24);
-    if (free < 0.5) { px = d.x; pz = d.z; S.camSide = 0; free = W.ray(px, py, pz, -fx, -fy, -fz, D, 0.24); }
+    // (pas de 10 cm et boule de 30 cm : un mur fin ou un coin ne passent pas entre deux essais)
+    // (on regarde un peu au-delà de la caméra : la marge sert à la secousse)
+    free = W.ray(px, py, pz, -fx, -fy, -fz, D + 0.6, 0.3, 0.1);
+    if (free < 0.5) { px = d.x; pz = d.z; S.camSide = 0; free = W.ray(px, py, pz, -fx, -fy, -fz, D + 0.6, 0.3, 0.1); }
     const want = Math.max(0, free - 0.12);
     const pull = S.camPull == null ? D : S.camPull;
     S.camPull = want < pull ? want : pull + (want - pull) * (1 - Math.exp(-5 * dt));
@@ -565,8 +567,11 @@ function cameraFor(P, disp, dt) {
   if (cy < gh + 0.3) cy = gh + 0.3;
   // plan proche court : la caméra reste dans le vide, rien n'est découpé devant elle
   const near = 0.1;
-  // secousse des explosions proches (moindre quand la caméra est collée à un mur, pour ne pas y entrer)
-  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); const k = S.shake * 0.4 * Math.min(1, D / 2); cx += (Math.random() - 0.5) * k; cy += (Math.random() - 0.5) * k; cz += (Math.random() - 0.5) * k; }
+  // secousse des explosions proches : jamais plus que la marge libre derrière la caméra (elle n'entre pas dans un mur)
+  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); const k = Math.min(S.shake * 0.4 * Math.min(1, D / 2), Math.max(0, free - D - 0.12)); cx += (Math.random() - 0.5) * k; cy += (Math.random() - 0.5) * k; cz += (Math.random() - 0.5) * k; }
+  // dernier contrôle, après les relèvements au-dessus de l'eau et du sol : si la caméra (avec son plan proche) touche
+  // quoi que ce soit, on la ramène vers la tête jusqu'à ce qu'elle soit libre
+  for (let k = 0; k < 10 && D > 0 && W.solidAt(cx, cy, cz, 0.2); k++) { cx += (px - cx) * 0.35; cy += (py - cy) * 0.35; cz += (pz - cz) * 0.35; S.camClose = target === P; }
   return look(cx, cy, cz, fx, fy, fz, d, near);
   function look(x, y, z, a, b, c, focus, nearP = 0.15) {
     S.cam = { x, y, z };

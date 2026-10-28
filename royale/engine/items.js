@@ -23,29 +23,29 @@ export const MAT_MAX = 999;
 // portée (m) et baisse des dégâts (début → fin, part restante), multiplicateur à la tête, auto : tir maintenu
 export const WEAPONS = {
   fusil: {
-    label: 'Fusil d\'assaut', ammo: 'moyennes', dmg: [30, 31, 33, 35], rate: 5.5, mag: 30, reload: [2.4, 2.3, 2.2, 2.1],
+    label: 'Fusil d\'assaut', ammo: 'moyennes', dmg: [30, 31, 33, 35], rate: 5.5, mag: 30, reload: [2.16, 2.07, 1.98, 1.89],
     spread: [0.032, 0.007], bloom: 0.012, range: 180, falloff: [50, 180, 0.65], head: 1.5, auto: true, struct: 1, zoom: 1.4,
   },
   pompe: {
-    label: 'Fusil à pompe', ammo: 'cartouches', dmg: [10, 10.5, 11, 12], pellets: 10, rate: 1.05, mag: 5, reload: [4.6, 4.4, 4.2, 4.0],
+    label: 'Fusil à pompe', ammo: 'cartouches', dmg: [10, 10.5, 11, 12], pellets: 10, rate: 1.05, mag: 5, reload: [4.14, 3.96, 3.78, 3.6],
     spread: [0.1, 0.075], bloom: 0, range: 40, falloff: [7, 40, 0.25], head: 1.7, auto: false, struct: 0.6, zoom: 1.15,
   },
   pistolet: {
-    label: 'Pistolet', ammo: 'legeres', dmg: [24, 25, 26, 27], rate: 6.5, mag: 16, reload: [1.5, 1.45, 1.4, 1.3],
+    label: 'Pistolet', ammo: 'legeres', dmg: [24, 25, 26, 27], rate: 6.5, mag: 16, reload: [1.35, 1.3, 1.26, 1.17],
     spread: [0.026, 0.009], bloom: 0.01, range: 110, falloff: [30, 110, 0.6], head: 1.6, auto: false, struct: 0.8, zoom: 1.25,
   },
   smg: {
-    label: 'Pistolet-mitrailleur', ammo: 'legeres', dmg: [17, 18, 19, 20], rate: 11, mag: 30, reload: [2.2, 2.1, 2.0, 1.9],
+    label: 'Pistolet-mitrailleur', ammo: 'legeres', dmg: [17, 18, 19, 20], rate: 11, mag: 30, reload: [1.98, 1.89, 1.8, 1.71],
     spread: [0.042, 0.02], bloom: 0.009, range: 80, falloff: [20, 80, 0.55], head: 1.5, auto: true, struct: 0.7, zoom: 1.2,
   },
   sniper: {
-    label: 'Fusil de précision', ammo: 'lourdes', dmg: [95, 100, 105, 110], rate: 0.35, mag: 1, reload: [3.0, 2.9, 2.8, 2.7],
+    label: 'Fusil de précision', ammo: 'lourdes', dmg: [95, 100, 105, 110], rate: 0.35, mag: 3, reload: [2.7, 2.61, 2.52, 2.43],
     spread: [0.09, 0], bloom: 0, range: 450, falloff: [450, 450, 1], head: 2.5, auto: false, struct: 1.4, zoom: 4,
     // une vraie balle : elle vole (≈ 1 s pour 450 m), tombe, et dérive à droite (Coriolis, voir sim.js)
     bullet: { speed: 460, g: 9.81 },
   },
   roquette: {
-    label: 'Lance-roquettes', ammo: 'roquettes', dmg: [100, 105, 110, 116], rate: 0.75, mag: 1, reload: [3.2, 3.0, 2.9, 2.8],
+    label: 'Lance-roquettes', ammo: 'roquettes', dmg: [100, 105, 110, 116], rate: 0.75, mag: 1, reload: [2.88, 2.7, 2.61, 2.52],
     spread: [0.014, 0.005], bloom: 0, range: 300, falloff: [300, 300, 1], head: 1, auto: false, struct: 4, zoom: 1.3, rocket: { speed: 55, radius: 4.5 },
   },
 };

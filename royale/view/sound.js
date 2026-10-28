@@ -66,8 +66,8 @@ export function createSound() {
   let ear = { x: 0, y: 0, z: 0, yaw: 0 };
   // coffre doré tout proche : un accord doux qui frémit et des notes scintillantes, de plus en plus fort en approchant
   // (on le trouve à l'oreille, même derrière un mur)
-  const HUM_R = 16, SPARK = [1318.5, 1568, 1760, 1975.5, 2349.3, 2637];
-  let hum = null, humT = 0;
+  const HUM_R = 12, SPARK = [1318.5, 1568, 1760, 1975.5, 2349.3, 2637];
+  let hum = null, humT = 0, humFrom = null, hush = 0;
   // combat proche (des tirs à moins de 60 m, ou les siens) : l'ambiance de nature s'efface un moment, on entend mieux le combat
   let fightT = -99;
   function makeHum() {
@@ -96,7 +96,15 @@ export function createSound() {
     }
     if (!best && !hum) return;
     if (!hum) makeHum();
-    const p = best ? place(best.x, best.y + 0.5, best.z, HUM_R) : null, k = p ? Math.pow(1 - p.d / HUM_R, 1.5) : 0;
+    // le coffre qu'on entendait vient d'être ouvert : silence net (paillettes déjà lancées comprises), puis un moment sans
+    // carillon, pour qu'on ne croie pas qu'il sonne encore (un autre coffre proche reprend ensuite, de sa direction)
+    const was = humFrom != null && S.chests.get(humFrom);
+    if (was && was.open) {
+      hush = t + 4;
+      for (const g of [hum.g.gain, hum.sp.gain]) { g.cancelScheduledValues(t); g.setValueAtTime(0, t); }
+    }
+    humFrom = best ? best.id : null;
+    const p = best && t >= hush ? place(best.x, best.y + 0.5, best.z, HUM_R) : null, k = p ? Math.pow(1 - p.d / HUM_R, 1.5) : 0;
     hum.g.gain.setTargetAtTime(k * 0.13, t, 0.2);
     hum.sp.gain.setTargetAtTime(k * 0.22, t, 0.2);
     if (hum.pan && p) hum.pan.pan.setTargetAtTime(p.pan * 0.8, t, 0.1);
