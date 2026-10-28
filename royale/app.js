@@ -400,8 +400,10 @@ function hostSteps(dt, on, ax) {
   if (S.acc > DT) S.acc = 0;
   if (net() && (S.tick - S.lastSend >= 3 || (S.sim.S.phase === 'fin' && S.netEv.length))) {
     S.lastSend = S.tick;
-    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature
-    H.send('all', { t: 's', run: S.run, s: snapshot(S.sim, S.snapN++ % 20 === 0 ? 'tous' : 'humains'), e: S.netEv }, { volatile: !S.netEv.length });
+    // les événements (portes, butin, constructions, tirs) partent à part, petits et garantis, juste avant l'instantané :
+    // lui, gros, est volatil (sauté si la connexion de l'hôte sature, le suivant le remplace)
+    if (S.netEv.length) H.send('all', { t: 'e', run: S.run, e: S.netEv });
+    H.send('all', { t: 's', run: S.run, s: snapshot(S.sim, S.snapN++ % 20 === 0 ? 'tous' : 'humains') }, { volatile: true });
     S.netEv = [];
   }
   return out;
@@ -623,7 +625,13 @@ function onMsg(from, m) {
     return;
   }
   if (m.t === 's' && S.sim && m.run === S.run && m.s) receiveSnap(m.s, m.e || []);
+  else if (m.t === 'e' && S.sim && m.run === S.run && Array.isArray(m.e)) receiveEvents(m.e);
   if (m.t === 'bilan' && m.run === S.run && Array.isArray(m.res)) S.bilan = m.res;
+}
+// événements arrivés à part, avant l'instantané qui les montre : le monde de la copie change tout de suite
+function receiveEvents(events) {
+  for (const e of events) mirrorEvent(S.sim, S.world, S.buildApi, e);
+  S.evq.push(...events);
 }
 function receiveSnap(s, events) {
   const now = performance.now() / 1000;

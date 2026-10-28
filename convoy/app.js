@@ -167,9 +167,13 @@ function hostFrame(dt) {
   const snap = sim.snapshot(); snap.run = S.runId;
   // 20 Hz ; l'état final part tout de suite pour que tout le monde voie la fin en même temps
   if (H.embedded && H.players.length > 1 && (S.tick - S.lastSend >= 3 || (snap.ph !== 'play' && !S.sentOver))) {
+    const final = snap.ph !== 'play' && !S.sentOver;
     S.lastSend = S.tick; if (snap.ph !== 'play') S.sentOver = true;
-    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature, seul le plus récent est livré
-    H.send('all', { t: 's', s: snap, e: S.netEv }, { volatile: !S.netEv.length }); S.netEv = [];
+    // l'instantané, gros, est volatil (sauf le premier de la fin) : sauté si la connexion de l'hôte sature, le suivant
+    // le remplace. Les événements partent à part, petits et garantis : ils ne se perdent jamais et n'encombrent pas la ligne
+    H.send('all', { t: 's', s: snap }, { volatile: !final });
+    if (S.netEv.length) H.send('all', { t: 'e', run: snap.run, ts: snap.t, e: S.netEv });
+    S.netEv = [];
   }
   if (snap.ph === 'play') S.sentOver = false;
   S.last = snap;
@@ -245,6 +249,7 @@ function onMsg(from, m) {
   }
   else if (m.t === 'go') { const fresh = S.lobby || S.endShown; S.goRun = m.run; S.lobby = false; S.endShown = false; hideScreen(); if (fresh) startIntro(); }
   else if (m.t === 's' && m.s) receiveSnap(m.s, m.e || []);
+  else if (m.t === 'e' && Array.isArray(m.e)) receiveEvents(m);
   else if (m.t === 'err' && typeof m.m === 'string') { hud.toast(m.m.slice(0, 60), 2); sfx.play('nope'); }
 }
 
@@ -265,6 +270,12 @@ function receiveSnap(s, events) {
   for (const e of events) S.evq.push({ t: s.t, e });
   S.last = s;
   reconcile(s);
+}
+
+// événements arrivés à part (l'instantané qui les accompagnait a pu être sauté) : rangés à l'heure de cet instantané
+function receiveEvents(m) {
+  if (S.lobby || !S.last || m.run !== S.last.run) return;
+  for (const e of m.e) S.evq.push({ t: m.ts, e });
 }
 
 function ruinsFor(s) {

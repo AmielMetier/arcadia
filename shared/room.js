@@ -12,6 +12,8 @@
    `away` le temps de revenir. Si la place est perdue, l'invité renvoie hello avec son numéro (prevId) et l'identifiant
    de sa page (sid) : l'hôte lui rend sa place, sans doublon, même si l'ancienne connexion n'a pas encore été fermée. */
 (function () {
+  // relances après une coupure ou une migration : les minuteries de DDNet, pas bridées quand l'onglet est caché
+  const { setTimeout } = window.DDNet.timers || window;
   const MAX_PLAYERS = 6;
   const PREFIX = 'ddhub-v1-';
   const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
@@ -302,7 +304,7 @@ removePlayer(R.players[i]);
       }, 400);
     }
     function becomeHost(code, me) {
-      R.mode = 'host'; R.hostId = R.myId; R.lastRecvC = {}; R.pings = {};
+      R.mode = 'host'; R.hostId = R.myId; R.lastRecvC = {}; R.pings = {}; R.hostAway = false; // l'hôte, c'est nous désormais
       for (const k in sids) delete sids[k];
       for (const k in lostAt) delete lostAt[k];
       R.players = [{ id: R.myId, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
@@ -332,7 +334,7 @@ removePlayer(R.players[i]);
     /* ---------- API ---------- */
     Object.assign(R, {
       host(me) {
-        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
+        R.mode = 'host'; R.myId = 0; R.hostId = 0; R.hostAway = false; R.players = [{ id: 0, name: cleanName(me.name), color: me.color, lvl: me.lvl | 0 || 1, uid: me.uid, fid: cleanFid(me.fid) }];
         R.chat = []; R.ready = {}; R.game = null; R.code = null;
         net.host(hostCallbacks(
           (code) => { R.code = code; emit('joined', R); changed(); },

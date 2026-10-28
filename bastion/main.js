@@ -35,7 +35,10 @@ function broadcastState(fx = []) {
   if (!H || !H.embedded || role !== 'host' || !state) return;
   for (const p of H.players) {
     if (Number(p.id) === Number(myId)) continue;
-    H.send(p.id, { t: 'st', s: snapshotFor(p.id), fx }, { volatile: !fx.length }); // instantané : seul le plus récent compte
+    // instantané volatil : seul le plus récent compte, sauté si la connexion de l'hôte sature ; les effets partent à
+    // part, petits et garantis
+    H.send(p.id, { t: 'st', s: snapshotFor(p.id) }, { volatile: true });
+    if (fx.length) H.send(p.id, { t: 'fx', fx });
   }
 }
 
@@ -391,6 +394,8 @@ if (window.HubBridge && HubBridge.embedded) {
           renderConsoleUI(true);
         }
         if (m.fx && m.fx.length) handleFxEvents(m.fx);
+      } else if (m.t === 'fx' && Array.isArray(m.fx)) {
+        if (state) handleFxEvents(m.fx);
       } else if (m.t === 'bk' && m.s) {
         backupState = unpackState(m.s);
       } else if (m.t === 'rcmd' && state) {
