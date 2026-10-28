@@ -157,8 +157,14 @@ function hostFrame(dt) {
   const snap = sim.snapshot(); snap.run = S.runId;
   if (H.embedded && H.players.length > 1 && S.tick - (S.lastSend || 0) >= 3) {
     S.lastSend = S.tick;
-    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature, seul le plus récent est livré
-    H.send('all', { t: 's', s: snap, e: S.netEv }, { volatile: !S.netEv.length }); S.netEv = [];
+    // l'instantané, gros, est volatil (sauf le premier de la fin, que tout le monde doit voir) : sauté si la connexion de
+    // l'hôte sature, le suivant le remplace. Les événements (tirs, dégâts, butin) partent à part, petits et garantis :
+    // ils ne se perdent jamais et n'encombrent pas la ligne
+    const final = snap.ph !== 'play' && !S.sentOver;
+    S.sentOver = snap.ph !== 'play';
+    H.send('all', { t: 's', s: snap }, { volatile: !final });
+    if (S.netEv.length) H.send('all', { t: 'e', run: snap.run, ts: snap.t, e: S.netEv });
+    S.netEv = [];
   }
   S.last = snap;
   const view = buildView(snap, snap, 0, dt);
@@ -229,6 +235,7 @@ function onMsg(from, m) {
   }
   else if (m.t === 'go') { S.lobby = false; S.endShown = false; hideScreen(); }
   else if (m.t === 's' && m.s) receiveSnap(m.s, m.e || []);
+  else if (m.t === 'e' && Array.isArray(m.e)) receiveEvents(m);
 }
 
 function cleanInput(m) {
@@ -249,6 +256,12 @@ function receiveSnap(s, events) {
   for (const e of events) S.evq.push({ t: s.t, e });
   S.last = s;
   reconcile(s);
+}
+
+// événements arrivés à part (l'instantané qui les accompagnait a pu être sauté) : rangés à l'heure de cet instantané
+function receiveEvents(m) {
+  if (S.lobby || !S.last || m.run !== S.last.run) return;
+  for (const e of m.e) S.evq.push({ t: m.ts, e });
 }
 
 function guestFrame(dt) {
