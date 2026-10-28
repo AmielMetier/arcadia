@@ -4,7 +4,7 @@
 import { getRandomTeam } from '../pokemon/engine/data.js';
 import { createBattle, resolveTurn, forceSwitch } from '../pokemon/engine/battle.js';
 import { chooseBotAction } from '../pokemon/engine/bot.js';
-import { createTournament, startCurrentMatch, finishCurrentMatch } from '../pokemon/engine/tournament.js';
+import { createTournament } from '../pokemon/engine/tournament.js';
 
 console.log('--- 1. Test génération d\'équipe ---');
 const teamA = getRandomTeam(3);
@@ -44,31 +44,14 @@ while (battle.phase !== 'over' && turnCount < 80) {
 if (!battle.winner) throw new Error('Combat non terminé après 80 tours');
 console.log(`✓ Combat terminé en ${turnCount} tours ! Vainqueur: ${battle.winner === 'A' ? 'Sacha' : 'Régis'}`);
 
-console.log('\n--- 3. Test tournoi 2 joueurs (Duel Direct 1v1 sans bots) ---');
-const tourneyDuo = createTournament([
-  { id: 10, name: 'Alice', color: '#ff4b2b' },
-  { id: 11, name: 'Bob', color: '#2b8cff' }
-]);
-if (tourneyDuo.bracketSize !== 2) throw new Error('Taille de bracket duo incorrecte');
-if (tourneyDuo.participants.filter(p => p.bot).length !== 0) throw new Error('Un duo ne doit avoir aucun bot');
-console.log('✓ Tournoi 2 joueurs initialisé en Duel direct 1v1 (0 bots)');
-
-startCurrentMatch(tourneyDuo);
-if (tourneyDuo.phase !== 'battle') throw new Error('Match non démarré');
-console.log('✓ Duel Alice vs Bob démarré avec succès');
-
-finishCurrentMatch(tourneyDuo, 'A');
-if (tourneyDuo.champion.name !== 'Alice') throw new Error('Champion incorrect');
-console.log('✓ Duel terminé, Alice couronnée championne');
-
-console.log('\n--- 4. Test tournoi 4 joueurs (0 bots) ---');
+console.log('\n--- 3. Tournoi (détails dans tools/test-pokemon-tournament.mjs) ---');
 const tourney4 = createTournament([
   { id: 10, name: 'Alice', color: '#ff4b2b' },
   { id: 11, name: 'Bob', color: '#2b8cff' },
   { id: 12, name: 'Charlie', color: '#2fbf71' },
   { id: 13, name: 'David', color: '#ffd27a' }
 ]);
-if (tourney4.bracketSize !== 4) throw new Error('Taille de bracket 4 joueurs incorrecte');
+if (tourney4.size !== 4) throw new Error('Taille de bracket 4 joueurs incorrecte');
 if (tourney4.participants.filter(p => p.bot).length !== 0) throw new Error('4 joueurs humains ne doivent avoir aucun bot');
 console.log('✓ Tournoi 4 joueurs humains initialisé (0 bots, 2 demi-finales)');
 

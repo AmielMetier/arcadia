@@ -175,7 +175,8 @@ window.HUB_GAMES = [
       { key: 'mode', label: 'Mode de jeu', options: [['adventure', 'Aventure Kalos-Sud (Menton)'], ['tournament', 'Tournoi 3v3 (Arène)']], def: 'adventure' },
       { key: 'timer', label: 'Chrono par tour', onlyMode: 'tournament', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
       { key: 'gen', label: 'Génération', onlyMode: 'tournament', options: [['all', 'Gens 1 à 3 (Iconiques)'], ['kanto', 'Gen 1 (Kanto 151)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)']], def: 'all' },
-      { key: 'bots', label: 'Bots si salon incomplet', onlyMode: 'tournament', options: [[1, 'Oui (remplir le tournoi)'], [0, 'Non']], def: 1 },
+      { key: 'final', label: 'Finale', onlyMode: 'tournament', options: [[3, '2 manches gagnantes'], [1, 'Une seule manche']], def: 3 },
+      { key: 'bots', label: 'Places libres', onlyMode: 'tournament', options: [[1, 'Remplies par des bots'], [0, 'Qualifié d\'office']], def: 1 },
       { key: 'level', label: 'Niveau des bots', onlyMode: 'tournament', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
     cover: 'pokemon/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau

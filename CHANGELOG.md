@@ -1,5 +1,20 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.11 — 28 octobre 2026
+- **Poké Duel** — Le tournoi, repris de fond en comble :
+  - un draft pour commencer : chacun garde 3 Pokémon sur 6 proposés, avec la couverture de son équipe et ses faiblesses communes sous les yeux (ou le choix conseillé) ;
+  - avant chaque match, les deux équipes face à face : tu choisis en secret ton Pokémon de tête, et des ×2 / ×½ montrent qui frappe fort contre qui. On clique « Prêt », ou le combat part tout seul au bout de 25 s ;
+  - un tableau tiré au sort, lisible : portraits, scores, matchs en direct, qualifiés d'office, forfaits. On l'ouvre à tout moment avec le bouton Tableau ;
+  - la finale se joue en 2 manches gagnantes (réglage « Finale » dans le salon) ;
+  - après chaque manche, un résumé : vainqueur, PV restants, K.O. de chaque Pokémon et Pokémon du match ;
+  - les matchs entre bots se jouent en un instant au lieu de les regarder en entier ;
+  - un vrai podium : marches 1-2-3, champion et son équipe, statistiques de chacun et Pokémon du tournoi.
+- **Poké Duel** — Plus de tournoi bloqué :
+  - le chrono du tour défile enfin, et il compte aussi pour choisir son remplaçant après un K.O. (choix automatique s'il s'écoule) ;
+  - un joueur qui quitte perd par forfait et le tournoi continue ; si c'est l'hôte, un autre joueur reprend le tournoi là où il en était ;
+  - seul l'hôte peut relancer un tournoi (un invité pouvait tout effacer d'un clic).
+- **Poké Duel** — Le tournoi change d'allure : salle de tournoi éclairée par des projecteurs en fond, écran « VS » des deux dresseurs avant chaque manche, combats dans le stade sur des socles lumineux (dorés en finale), portraits des dresseurs, trophée et confettis au podium.
+
 ## 3.10 — 28 octobre 2026
 - **Island Rush** — Le lance-roquettes, repris de zéro :
   - un vrai tube posé sur l'épaule droite, à côté de la tête (il passait devant le visage, penché vers le bas) ;

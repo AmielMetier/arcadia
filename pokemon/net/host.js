@@ -1,313 +1,448 @@
 // pokemon/net/host.js
-// Hôte autoritaire de Poké Duel : gère le tournoi, chronomètre les tours, fait jouer les bots et synchronise tous les joueurs.
+// Hôte autoritaire du tournoi Poké Duel : enchaîne les phases (draft → arbre → aperçu → combat → résumé → podium),
+// tient tous les chronos, fait jouer les bots et diffuse l'état à tous les joueurs.
+// Les invités ne font qu'envoyer leurs choix ; seul l'hôte peut relancer un tournoi.
 
-import { createTournament, startCurrentMatch, finishCurrentMatch } from '../engine/tournament.js';
+import {
+  createTournament, submitDraft, draftComplete, closeDraft, resolveAutomatic, nextPlayableMatch,
+  openPreview, setReady, buildBattle, recordGame, koCredits, markGone, isOver, currentMatch,
+  getParticipant, sideOf, placeOf,
+} from '../engine/tournament.js';
 import { resolveTurn, forceSwitch, estimateTurnDuration } from '../engine/battle.js';
-import { chooseBotAction } from '../engine/bot.js';
+import { chooseBotAction, chooseBestSwitch } from '../engine/bot.js';
 
-export function startHost({ bridge, solo, settings, me, onState, onSetup, onError }) {
-  let tournament = null;
-  let timerInterval = null;
-  let turnEndsAt = 0;
-  let pendingActions = { A: null, B: null };
-  let reported = false;
+const DRAFT_SECS = 50;
+const REVEAL_SECS = 8;     // premier affichage de l'arbre après le draft
+const BRACKET_SECS = 6;    // arbre entre deux matchs
+const PREVIEW_SECS = 25;   // aperçu des équipes et choix du Pokémon de tête
+const SUMMARY_SECS = 9;    // résumé de manche
+const AFTER_VICTORY_MS = 1200;
+const SPLASH_MS = 2300;     // écran « VS » avant chaque manche
 
+export function startHost({ bridge, solo, settings, me, onState, resume = null }) {
   const timerSecs = Number(settings.timer) || 25;
-  const genFilter = settings.gen || 'all';
   const difficulty = settings.level || 'normal';
 
-  function getHumanPlayers() {
+  let t = null;            // tournoi
+  let battle = null;       // combat en cours
+  let credits = [];        // K.O. de la manche en cours
+  let pending = { A: null, B: null };
+  let leadPick = { A: null, B: null }; // choix de tête des humains, gardés secrets jusqu'à l'envoi
+  let cont = { A: false, B: false };   // « Continuer » sur le résumé
+  let deadline = 0;        // fin de la phase en cours (draft, arbre, aperçu, résumé)
+  let turnEndsAt = 0;      // fin du choix en combat (attaque ou remplacement)
+  let evSeq = 0;
+  let reported = false;
+  let alive = true;
+
+  let phaseTimer = null;
+  let turnTimer = null;
+  const later = [];        // délais liés au combat en cours, annulés en cas de forfait
+
+  const same = (a, b) => String(a) === String(b);
+  const clearPhase = () => { clearTimeout(phaseTimer); phaseTimer = null; };
+  const clearTurn = () => { clearTimeout(turnTimer); turnTimer = null; turnEndsAt = 0; };
+  const clearLater = () => { while (later.length) clearTimeout(later.pop()); };
+  const after = (ms, fn) => { const id = setTimeout(() => { if (alive) fn(); }, ms); later.push(id); return id; };
+  const setDeadline = (secs, fn) => {
+    clearPhase();
+    deadline = Date.now() + secs * 1000;
+    phaseTimer = setTimeout(() => { if (alive) fn(); }, secs * 1000);
+  };
+
+  // ------------------------------------------------------------------ joueurs
+
+  function humanPlayers() {
     if (solo) return [{ id: me.id, name: me.name, color: me.color }];
-    if (bridge && Array.isArray(bridge.players) && bridge.players.length > 0) {
-      const list = bridge.players.map(p => ({
-        id: p.id,
-        name: p.name || 'Dresseur',
-        color: p.color || '#ff4b2b'
-      }));
-      // S'assurer que le joueur local est toujours dans la liste
-      if (!list.some(p => String(p.id) === String(me.id))) {
-        list.unshift({ id: me.id, name: me.name, color: me.color });
-      }
-      return list;
-    }
-    return [{ id: me.id, name: me.name, color: me.color }];
+    const list = (bridge && Array.isArray(bridge.players) ? bridge.players : []).map((p) => ({
+      id: p.id, name: p.name || 'Dresseur', color: p.color || '#ff4b2b',
+    }));
+    if (!list.some((p) => same(p.id, me.id))) list.unshift({ id: me.id, name: me.name, color: me.color });
+    return list;
   }
 
-  function broadcast(extraEvents = []) {
-    if (!tournament) return;
+  // ------------------------------------------------------------------ diffusion
+
+  function broadcast(events = []) {
+    if (!t || !alive) return;
+    if (events.length) evSeq++;
+    const m = currentMatch(t);
     const pub = {
-      phase: tournament.phase,
-      bracketSize: tournament.bracketSize,
-      rounds: tournament.rounds,
-      currentRoundIdx: tournament.currentRoundIdx,
-      currentMatchIdx: tournament.currentMatchIdx,
-      champion: tournament.champion,
-      podium: tournament.podium,
-      battle: tournament.activeBattle,
+      v: 2,
+      phase: t.phase,
+      t: { ...t, lead: { A: null, B: null } }, // les têtes restent secrètes jusqu'au combat
+      battle: t.phase === 'battle' ? battle : null,
+      deadline,
       turnEndsAt,
       timerSecs,
-      events: extraEvents,
-      submittedA: !!pendingActions.A,
-      submittedB: !!pendingActions.B
+      submittedA: !!pending.A,
+      submittedB: !!pending.B,
+      cont,
+      events,
+      evSeq,
+      hostId: me.id,
+      isFinal: !!(m && m.r === t.rounds.length - 1),
     };
-
     if (!solo && bridge) bridge.send('all', { t: 'st', s: pub, now: Date.now() });
     onState(pub, 0);
-
-    if (tournament.phase === 'podium' && !reported) {
+    if (t.phase === 'podium' && !reported) {
       reported = true;
       reportResults();
     }
   }
 
   function reportResults() {
-    if (!bridge || !bridge.embedded || !bridge.report || !tournament || !tournament.champion) return;
-    // Place tirée de l'arbre : 1 le champion, 2 le finaliste, 3 les perdants des demies, 5 ceux des quarts ;
-    // score = matchs gagnés pendant le tournoi
-    const same = (a, b) => a && b && String(a.id) === String(b.id);
-    const R = tournament.rounds.length;
-    const placeOf = (p) => {
-      if (same(p, tournament.champion)) return 1;
-      let last = 0;
-      tournament.rounds.forEach((round, r) => { if (round.some((m) => same(m.playerA, p) || same(m.playerB, p))) last = r; });
-      return 2 ** (R - 1 - last) + 1;
-    };
-    const wins = (p) => tournament.rounds.reduce((n, round) => n + round.filter((m) => same(m.winner, p)).length, 0);
+    if (!bridge || !bridge.embedded || !bridge.report || !t || t.champion == null) return;
     bridge.report({
       id: `pokemon-${Date.now()}`,
       mode: 'Tournoi 3v3',
-      players: tournament.participants.map((p) => ({
+      players: t.participants.map((p) => ({
         id: p.bot ? null : p.id,
         name: p.name,
         color: p.color,
         bot: p.bot,
-        rank: placeOf(p),
-        score: wins(p)
-      }))
+        rank: placeOf(t, p.id),
+        score: p.stats.matchW,
+      })),
     });
   }
 
-  function startTurnTimer() {
-    clearInterval(timerInterval);
-    turnEndsAt = Date.now() + timerSecs * 1000;
-    pendingActions = { A: null, B: null };
+  // ------------------------------------------------------------------ phases
 
-    const b = tournament.activeBattle;
-    if (!b) return;
-
-    // Si l'un des dresseurs est un bot, planifier sa réponse avec un temps de réflexion réaliste
-    if (b.trainerA.bot) {
-      setTimeout(() => {
-        if (tournament && tournament.activeBattle === b && !pendingActions.A) {
-          submitAction('A', chooseBotAction(b, 'A', difficulty));
-        }
-      }, 900 + Math.random() * 900);
-    }
-    if (b.trainerB.bot) {
-      setTimeout(() => {
-        if (tournament && tournament.activeBattle === b && !pendingActions.B) {
-          submitAction('B', chooseBotAction(b, 'B', difficulty));
-        }
-      }, 1100 + Math.random() * 900);
-    }
-
-    timerInterval = setInterval(() => {
-      const remaining = turnEndsAt - Date.now();
-      if (remaining <= 0) {
-        clearInterval(timerInterval);
-        onTurnTimeout();
-      }
-    }, 500);
-  }
-
-  function onTurnTimeout() {
-    const b = tournament.activeBattle;
-    if (!b || b.phase === 'over') return;
-
-    // Attribuer une action par défaut aux joueurs retardataires
-    if (!pendingActions.A) {
-      pendingActions.A = chooseBotAction(b, 'A', 'facile');
-    }
-    if (!pendingActions.B) {
-      pendingActions.B = chooseBotAction(b, 'B', 'facile');
-    }
-
-    executeTurnResolution();
-  }
-
-  function submitAction(side, action) {
-    if (!tournament || !tournament.activeBattle || tournament.activeBattle.phase === 'over') return;
-    const b = tournament.activeBattle;
-
-    // Cas d'un switch forcé après un K.O.
-    if (b.phase === 'switch_forced_A' && side === 'A' && action.type === 'switch') {
-      const ev = forceSwitch(b, 'A', action.targetIndex);
-      if (ev) {
-        broadcast([ev]);
-        if (b.phase === 'choose') {
-          setTimeout(startTurnTimer, 1500);
-        }
-      }
-      return;
-    }
-    if (b.phase === 'switch_forced_B' && side === 'B' && action.type === 'switch') {
-      const ev = forceSwitch(b, 'B', action.targetIndex);
-      if (ev) {
-        broadcast([ev]);
-        if (b.phase === 'choose') {
-          setTimeout(startTurnTimer, 1500);
-        }
-      }
-      return;
-    }
-    if (b.phase === 'switch_forced_both') {
-      const evs = [];
-      if (side === 'A' && action.type === 'switch') {
-        const ev = forceSwitch(b, 'A', action.targetIndex);
-        if (ev) evs.push(ev);
-      }
-      if (side === 'B' && action.type === 'switch') {
-        const ev = forceSwitch(b, 'B', action.targetIndex);
-        if (ev) evs.push(ev);
-      }
-      broadcast(evs);
-      if (b.phase === 'choose') {
-        setTimeout(startTurnTimer, 1500);
-      }
-      return;
-    }
-
-    if (b.phase !== 'choose') return;
-
-    if (side === 'A') pendingActions.A = action;
-    if (side === 'B') pendingActions.B = action;
-
-    broadcast();
-
-    // Si les deux joueurs ont validé leur coup
-    if (pendingActions.A && pendingActions.B) {
-      clearInterval(timerInterval);
-      setTimeout(executeTurnResolution, 400);
-    }
-  }
-
-  function executeTurnResolution() {
-    if (!tournament || !tournament.activeBattle) return;
-    const b = tournament.activeBattle;
-    const actA = pendingActions.A;
-    const actB = pendingActions.B;
-    pendingActions = { A: null, B: null };
-
-    const { state, events } = resolveTurn(b, actA, actB);
-    tournament.activeBattle = state;
-
-    broadcast(events);
-
-    // Calcul du temps nécessaire pour dérouler toutes les animations du tour
-    const animDuration = estimateTurnDuration(events);
-
-    if (state.phase === 'over') {
-      // Fin du combat : laisser le temps de voir la victoire avant l'arbre
-      setTimeout(() => {
-        finishCurrentMatch(tournament, state.winner);
-        broadcast();
-      }, animDuration + 2500);
-    } else if (state.phase.startsWith('switch_forced')) {
-      // Attendre la fin complète des animations du tour avant que les bots ne choisissent leur remplaçant
-      setTimeout(() => {
-        if ((state.phase === 'switch_forced_A' || state.phase === 'switch_forced_both') && state.trainerA.bot) {
-          setTimeout(() => {
-            const sw = chooseBotAction(state, 'A', difficulty);
-            const ev = (sw && sw.type === 'switch') ? forceSwitch(state, 'A', sw.targetIndex) : null;
-            broadcast(ev ? [ev] : []);
-            if (state.phase === 'choose') setTimeout(startTurnTimer, 1500);
-          }, 800);
-        }
-        if ((state.phase === 'switch_forced_B' || state.phase === 'switch_forced_both') && state.trainerB.bot) {
-          setTimeout(() => {
-            const sw = chooseBotAction(state, 'B', difficulty);
-            const ev = (sw && sw.type === 'switch') ? forceSwitch(state, 'B', sw.targetIndex) : null;
-            broadcast(ev ? [ev] : []);
-            if (state.phase === 'choose') setTimeout(startTurnTimer, 1500);
-          }, 1000);
-        }
-      }, animDuration);
-    } else {
-      // Démarrer le chronomètre du prochain tour UNIQUEMENT après la fin des animations
-      setTimeout(() => {
-        startTurnTimer();
-      }, animDuration);
-    }
-  }
-
-  function startMatch() {
-    if (!tournament) return;
-    const battle = startCurrentMatch(tournament);
-    if (!battle) return;
-    broadcast();
-    startTurnTimer();
-  }
-
-  function startNewTournament() {
+  function newTournament() {
+    clearPhase(); clearTurn(); clearLater();
     reported = false;
-    const humans = getHumanPlayers();
-    tournament = createTournament(humans, {
-      gen: genFilter,
-      bots: settings.bots !== undefined ? Number(settings.bots) : 1
+    battle = null;
+    t = createTournament(humanPlayers(), {
+      gen: settings.gen || 'all',
+      bots: settings.bots !== undefined ? Number(settings.bots) : 1,
+      finalBestOf: settings.final !== undefined ? Number(settings.final) : 3,
     });
+    setDeadline(DRAFT_SECS, endDraft);
     broadcast();
   }
+
+  function endDraft() {
+    if (t.phase !== 'draft') return;
+    closeDraft(t, { difficulty });
+    showBracket(REVEAL_SECS);
+  }
+
+  function showBracket(secs) {
+    battle = null;
+    t.phase = 'bracket';
+    setDeadline(secs, nextMatch);
+    broadcast();
+    t.recent = [];
+  }
+
+  function nextMatch() {
+    resolveAutomatic(t, { difficulty });
+    if (isOver(t)) return podium();
+    const m = nextPlayableMatch(t);
+    if (!m) return podium();
+    if (t.recent.length) return showBracket(BRACKET_SECS); // des matchs viennent de se régler tout seuls
+    preview(m);
+  }
+
+  function preview(m) {
+    battle = null;
+    leadPick = { A: null, B: null };
+    openPreview(t, m);
+    setDeadline(PREVIEW_SECS, startGame);
+    broadcast();
+  }
+
+  function startGame() {
+    const m = currentMatch(t);
+    if (!m || t.phase !== 'preview') return;
+    clearPhase();
+    deadline = 0;
+    if (leadPick.A != null) t.lead.A = leadPick.A;
+    if (leadPick.B != null) t.lead.B = leadPick.B;
+    battle = buildBattle(t, m);
+    credits = [];
+    pending = { A: null, B: null };
+    const intro = ['A', 'B'].map((side) => {
+      const p = side === 'A' ? battle.teamA[0] : battle.teamB[0];
+      const tr = side === 'A' ? battle.trainerA : battle.trainerB;
+      return {
+        type: 'switch', side, pokemonId: p.id, name: p.name, hp: p.hp, maxHp: p.maxHp,
+        types: p.types, status: null, trainer: tr.name, msg: `${tr.name} envoie ${p.name} !`,
+      };
+    });
+    // L'écran « VS » s'affiche d'abord, puis les deux dresseurs envoient leur Pokémon
+    broadcast();
+    after(SPLASH_MS, () => {
+      broadcast(intro);
+      after(estimateTurnDuration(intro), startTurn);
+    });
+  }
+
+  function startTurn() {
+    if (!battle || battle.phase !== 'choose') return;
+    clearTurn();
+    pending = { A: null, B: null };
+    turnEndsAt = Date.now() + timerSecs * 1000;
+    const b = battle;
+    for (const side of ['A', 'B']) {
+      const tr = side === 'A' ? b.trainerA : b.trainerB;
+      if (tr.bot) after(900 + Math.random() * 1000, () => {
+        if (battle === b && b.phase === 'choose' && !pending[side]) submit(side, chooseBotAction(b, side, difficulty));
+      });
+    }
+    turnTimer = setTimeout(() => {
+      if (!alive || battle !== b || b.phase !== 'choose') return;
+      for (const side of ['A', 'B']) if (!pending[side]) pending[side] = chooseBotAction(b, side, 'facile');
+      resolve();
+    }, timerSecs * 1000);
+    broadcast();
+  }
+
+  function submit(side, action) {
+    const b = battle;
+    if (!b || t.phase !== 'battle' || !action) return;
+
+    // Remplacement après un K.O.
+    if (b.phase.startsWith('switch_forced')) {
+      const needs = b.phase === 'switch_forced_both' || b.phase === `switch_forced_${side}`;
+      if (!needs || action.type !== 'switch') return;
+      const ev = forceSwitch(b, side, action.targetIndex);
+      if (!ev) return;
+      if (b.phase === 'choose') {
+        clearTurn();
+        broadcast([ev]);
+        after(estimateTurnDuration([ev]), startTurn);
+      } else {
+        broadcast([ev]);
+      }
+      return;
+    }
+
+    if (b.phase !== 'choose' || pending[side]) return;
+    if (action.type !== 'move' && action.type !== 'switch') return;
+    pending[side] = action;
+    broadcast();
+    if (pending.A && pending.B) {
+      clearTurn();
+      after(350, resolve);
+    }
+  }
+
+  function resolve() {
+    const b = battle;
+    if (!b || b.phase !== 'choose') return;
+    const actA = pending.A;
+    const actB = pending.B;
+    pending = { A: null, B: null };
+    clearTurn();
+    const { state, events } = resolveTurn(b, actA, actB);
+    battle = state;
+    credits.push(...koCredits(battle, events));
+    broadcast(events);
+    const anim = estimateTurnDuration(events);
+
+    if (battle.phase === 'over') after(anim + AFTER_VICTORY_MS, endGame);
+    else if (battle.phase.startsWith('switch_forced')) after(anim, forcedSwitches);
+    else after(anim, startTurn);
+  }
+
+  // Après un K.O. : les bots choisissent leur remplaçant, les humains ont un chrono (sinon choix auto)
+  function forcedSwitches() {
+    const b = battle;
+    if (!b || !b.phase.startsWith('switch_forced')) return;
+    const sides = b.phase === 'switch_forced_both' ? ['A', 'B'] : [b.phase.slice(-1)];
+    let humanWaits = false;
+    for (const side of sides) {
+      const tr = side === 'A' ? b.trainerA : b.trainerB;
+      if (tr.bot) {
+        after(700 + Math.random() * 500, () => {
+          if (battle !== b) return;
+          const sw = chooseBotAction(b, side, difficulty);
+          if (sw && sw.type === 'switch') submit(side, sw);
+        });
+      } else {
+        humanWaits = true;
+      }
+    }
+    if (!humanWaits) return;
+    clearTurn();
+    turnEndsAt = Date.now() + timerSecs * 1000;
+    turnTimer = setTimeout(() => {
+      if (!alive || battle !== b) return;
+      for (const side of ['A', 'B']) {
+        if (b.phase === 'switch_forced_both' || b.phase === `switch_forced_${side}`) {
+          const team = side === 'A' ? b.teamA : b.teamB;
+          const cur = side === 'A' ? b.activeA : b.activeB;
+          const opp = side === 'A' ? b.teamB[b.activeB] : b.teamA[b.activeA];
+          const sw = chooseBestSwitch(team, cur, opp);
+          if (sw) submit(side, sw);
+        }
+      }
+    }, timerSecs * 1000);
+    broadcast();
+  }
+
+  function endGame() {
+    const m = currentMatch(t);
+    if (!m || !battle) return;
+    clearTurn();
+    recordGame(t, m, battle, credits);
+    summary();
+  }
+
+  function summary() {
+    const m = currentMatch(t);
+    t.phase = 'summary';
+    const A = m && getParticipant(t, m.a);
+    const B = m && getParticipant(t, m.b);
+    cont = { A: !A || A.bot || A.gone, B: !B || B.bot || B.gone };
+    setDeadline(SUMMARY_SECS, afterSummary);
+    broadcast();
+  }
+
+  function afterSummary() {
+    if (t.phase !== 'summary') return;
+    clearPhase();
+    const m = currentMatch(t);
+    battle = null;
+    if (m && m.status !== 'done') return preview(m); // manche suivante de la finale, ou manche nulle à rejouer
+    resolveAutomatic(t, { difficulty });
+    if (isOver(t)) return podium();
+    showBracket(BRACKET_SECS);
+  }
+
+  function podium() {
+    clearPhase(); clearTurn(); clearLater();
+    battle = null;
+    deadline = 0;
+    t.phase = 'podium';
+    broadcast();
+  }
+
+  // ------------------------------------------------------------------ actions des joueurs
+
+  function handle(from, m) {
+    if (!t || !m) return;
+    const match = currentMatch(t);
+    const side = sideOf(match, from);
+    switch (m.t) {
+      case 'draft':
+        if (submitDraft(t, from, m.picks)) {
+          broadcast();
+          if (draftComplete(t)) { clearPhase(); setTimeout(() => alive && endDraft(), 600); }
+        }
+        break;
+      case 'lead':
+        if (t.phase === 'preview' && side && !t.ready[side]) leadPick[side] = Number(m.idx);
+        break;
+      case 'ready':
+        if (t.phase === 'preview' && side && !t.ready[side]) {
+          if (m.idx != null) leadPick[side] = Number(m.idx);
+          setReady(t, side, null);
+          broadcast();
+          if (t.ready.A && t.ready.B) { clearPhase(); setTimeout(() => alive && startGame(), 700); }
+        }
+        break;
+      case 'action':
+        if (side) submit(side, m.action);
+        break;
+      case 'continue':
+        if (t.phase === 'summary' && side && !cont[side]) {
+          cont[side] = true;
+          broadcast();
+          if (cont.A && cont.B) afterSummary();
+        }
+        break;
+      case 'skip': // l'hôte écourte l'écran d'arbre
+        if (same(from, me.id) && t.phase === 'bracket') { clearPhase(); nextMatch(); }
+        break;
+      case 'restart':
+        if (same(from, me.id)) newTournament();
+        break;
+      case 'sync':
+        broadcast();
+        break;
+      default:
+    }
+  }
+
+  // ------------------------------------------------------------------ arrivées et départs
+
+  function onRoster() {
+    if (!t || solo || !alive) return;
+    const ids = new Set(humanPlayers().map((p) => String(p.id)));
+    const humans = t.participants.filter((p) => !p.bot);
+
+    // Pendant le draft, tant que personne n'a validé, on refait le tournoi avec le nouveau salon
+    const nobodyDrafted = humans.every((p) => !p.team);
+    const changed = humans.length !== ids.size || humans.some((p) => !ids.has(String(p.id)));
+    if (t.phase === 'draft' && nobodyDrafted && changed) return newTournament();
+
+    for (const p of humans) {
+      if (ids.has(String(p.id)) || p.gone) continue;
+      const live = markGone(t, p.id);
+      if (t.phase === 'draft') {
+        broadcast();
+        if (draftComplete(t)) { clearPhase(); endDraft(); }
+      } else if (live) {
+        // Forfait pendant le match : on coupe le combat et on montre le résultat
+        clearTurn(); clearLater();
+        battle = null;
+        summary();
+      } else {
+        broadcast();
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------ démarrage
 
   if (!solo && bridge) {
-    // Mettre à jour l'arbre de tournoi dynamiquement si des joueurs rejoignent avant le match 1
-    bridge.on('roster', () => {
-      if (!tournament) return;
-      if (tournament.phase === 'bracket_preview' && tournament.currentRoundIdx === 0 && tournament.currentMatchIdx === 0) {
-        const currentHumanIds = tournament.participants
-          .filter(p => !p.bot)
-          .map(p => String(p.id))
-          .sort()
-          .join(',');
-        const newHumans = getHumanPlayers();
-        const newHumanIds = newHumans
-          .map(p => String(p.id))
-          .sort()
-          .join(',');
-
-        if (currentHumanIds !== newHumanIds) {
-          startNewTournament();
-        }
-      }
-    });
-
-    // Écoute des messages réseau envoyés par les invités
+    bridge.on('roster', onRoster);
     bridge.on('msg', (from, m) => {
-      if (!m || typeof m !== 'object') return;
-      if (m.t === 'action' && tournament && tournament.activeBattle) {
-        const b = tournament.activeBattle;
-        if (String(b.trainerA.id) === String(from)) submitAction('A', m.action);
-        else if (String(b.trainerB.id) === String(from)) submitAction('B', m.action);
-      } else if (m.t === 'start_match') {
-        startMatch();
-      } else if (m.t === 'restart') {
-        startNewTournament();
-      } else if (m.t === 'sync') {
-        broadcast();
-      }
+      if (!alive || !m || typeof m !== 'object') return;
+      handle(from, m);
     });
   }
 
-  // Initialisation du tournoi
-  startNewTournament();
-
-  return {
-    startMatch,
-    restart: startNewTournament,
-    submitAction(action) {
-      if (!tournament || !tournament.activeBattle) return;
-      const b = tournament.activeBattle;
-      if (String(b.trainerA.id) === String(me.id)) submitAction('A', action);
-      else if (String(b.trainerB.id) === String(me.id)) submitAction('B', action);
+  // Reprise après changement d'hôte : on repart du dernier état diffusé par l'ancien hôte
+  if (resume && resume.t && resume.v === 2) {
+    t = resume.t;
+    battle = resume.battle || null;
+    evSeq = resume.evSeq || 0;
+    const m = currentMatch(t);
+    switch (t.phase) {
+      case 'draft': setDeadline(30, endDraft); broadcast(); break;
+      case 'bracket': showBracket(3); break;
+      case 'preview': if (m) preview(m); else nextMatch(); break;
+      case 'battle':
+        if (!battle) { if (m) preview(m); else nextMatch(); }
+        else if (battle.phase === 'choose') startTurn();
+        else if (battle.phase.startsWith('switch_forced')) forcedSwitches();
+        else endGame();
+        break;
+      case 'summary': summary(); break;
+      default: broadcast();
     }
+    onRoster();
+  } else {
+    newTournament();
+  }
+
+  const mine = (msg) => handle(me.id, msg);
+  return {
+    draft: (picks) => mine({ t: 'draft', picks }),
+    lead: (idx) => mine({ t: 'lead', idx }),
+    ready: (idx) => mine({ t: 'ready', idx }),
+    submitAction: (action) => mine({ t: 'action', action }),
+    cont: () => mine({ t: 'continue' }),
+    skip: () => mine({ t: 'skip' }),
+    restart: () => mine({ t: 'restart' }),
+    isHost: true,
+    destroy() {
+      alive = false;
+      clearPhase(); clearTurn(); clearLater();
+    },
   };
 }
