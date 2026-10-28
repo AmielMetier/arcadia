@@ -9,6 +9,8 @@ import { STAGE_MULTS } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
 import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
 import { sfx } from './sfx.js';
+import { createFx } from './fx.js';
+import { eventMs, drainMs, damageText, typeMs, TYPE_MS } from '../engine/timing.js';
 import { battleMusic } from './music.js';
 import { renderDraft, renderBracket, renderPreview, renderSummary, renderPodium, bracketHtml, esc, trainerAvatar } from './screens.js';
 
@@ -75,6 +77,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
   let displayedHp = { bottom: null, top: null };
+  let shownMon = { bottom: null, top: null }; // Pokémon visible de chaque côté (null : rien sur le terrain)
   let hpAnimRaf = { bottom: null, top: null };
   let isResolvingTurn = false;
   let animGen = 0;          // change quand on quitte le combat : coupe une animation en cours
@@ -83,6 +86,14 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   let clockOff = 0;         // décalage d'horloge avec l'hôte
   let lastPhase = null;
   const now = () => Date.now() + clockOff;
+
+  // Taille de l'interface selon la fenêtre (écrans hors combat, message et commandes du combat)
+  function setUiZoom() {
+    const z = Math.max(0.8, Math.min(1.6, Math.min(window.innerWidth / 1280, window.innerHeight / 820)));
+    root.style.setProperty('--ui-zoom', window.innerWidth < 760 ? 1 : z.toFixed(3));
+  }
+  setUiZoom();
+  window.addEventListener('resize', setUiZoom);
 
   // --- Outils & Audio : la musique et les effets se règlent dans le panneau Réglages (à 0 : coupés) ---
   DDVolume.panel($('#btnSet'), { accent: '#ffcb05' });
@@ -181,255 +192,293 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   };
 
 
-  // --- Animation progressive et fluide de la barre de PV ---
-  function animateHp(side, fromHp, toHp, maxHp) {
+  // --- Barre de PV qui descend (ou remonte) à vitesse réglée par timing.js ---
+  function animateHp(side, fromHp, toHp, maxHp, duration = 0) {
     const isBottom = side === 'bottom';
     const fillEl = $(isBottom ? '#hpFillBottom' : '#hpFillTop');
     const numEl = $(isBottom ? '#hpNumBottom' : '#hpNumTop');
     const maxEl = isBottom ? $('#hpMaxBottom') : null;
     if (maxEl && maxHp) maxEl.textContent = `${maxHp}`;
-    if (!fillEl) return;
+    if (!fillEl) return Promise.resolve();
 
     if (hpAnimRaf[side]) {
       cancelAnimationFrame(hpAnimRaf[side]);
       hpAnimRaf[side] = null;
     }
+    const paint = (hp) => {
+      const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
+      fillEl.style.width = `${pct}%`;
+      const hpClass = pct > 50 ? 'hp-green' : pct > 20 ? 'hp-yellow' : 'hp-red';
+      fillEl.className = `hp-fill ${hpClass}`;
+      if (numEl) {
+        numEl.textContent = `${Math.round(hp)}`;
+        numEl.className = hpClass;
+      }
+      return pct;
+    };
 
     const diff = toHp - fromHp;
-    if (diff === 0) {
-      const pct = Math.max(0, Math.min(100, Math.round((toHp / maxHp) * 100)));
-      fillEl.style.width = `${pct}%`;
-      const hpClass = pct > 50 ? 'hp-green' : pct > 20 ? 'hp-yellow' : 'hp-red';
-      fillEl.className = `hp-fill ${hpClass} ${pct <= 20 ? 'critical' : ''}`;
-      if (numEl) {
-        numEl.textContent = `${toHp}`;
-        numEl.className = hpClass;
-      }
+    if (diff === 0 || !duration) {
+      paint(toHp);
       displayedHp[side] = toHp;
-      return;
+      return Promise.resolve();
     }
-
-    const duration = Math.min(1100, Math.max(550, Math.abs(diff) * 11));
     const startTime = performance.now();
-
-    function step(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(1, elapsed / duration);
-      const eased = 1 - Math.pow(1 - progress, 2);
-      const currHp = Math.round(fromHp + diff * eased);
-      const pct = Math.max(0, Math.min(100, Math.round((currHp / maxHp) * 100)));
-
-      fillEl.style.width = `${pct}%`;
-      const hpClass = pct > 50 ? 'hp-green' : pct > 20 ? 'hp-yellow' : 'hp-red';
-      fillEl.className = `hp-fill ${hpClass} ${pct <= 20 ? 'critical' : ''}`;
-
-      if (numEl) {
-        numEl.textContent = `${currHp}`;
-        numEl.className = hpClass;
-      }
-
-      if (progress < 1) {
-        hpAnimRaf[side] = requestAnimationFrame(step);
-      } else {
-        hpAnimRaf[side] = null;
-        displayedHp[side] = toHp;
-        if (pct <= 20 && pct > 0) {
-          sfx.play('low_hp');
+    return new Promise((resolve) => {
+      function step(now) {
+        const progress = Math.min(1, (now - startTime) / duration);
+        const pct = paint(fromHp + diff * progress);
+        if (progress < 1) {
+          hpAnimRaf[side] = requestAnimationFrame(step);
+        } else {
+          hpAnimRaf[side] = null;
+          displayedHp[side] = toHp;
+          if (pct <= 20 && pct > 0 && diff < 0) sfx.play('low_hp');
+          resolve();
         }
       }
-    }
-
-    hpAnimRaf[side] = requestAnimationFrame(step);
+      hpAnimRaf[side] = requestAnimationFrame(step);
+    });
   }
 
-  // --- Déroulement séquentiel et authentique d'un tour de combat ---
+  // --- Mise à l'échelle de l'arène : la scène est dessinée à taille fixe puis ajustée à la fenêtre ---
+  const SCENE = { wide: [960, 420], narrow: [600, 470] };
+  let sceneK = 1;
+  let sceneObserver = null;
+  function fitScene() {
+    const card = $('#arenaCard');
+    const field = card && card.querySelector('.battlefield');
+    const inner = $('#bfInner');
+    if (!field || !inner) return;
+    const narrow = card.clientWidth < 680;
+    card.classList.toggle('narrow', narrow);
+    const [w, h] = narrow ? SCENE.narrow : SCENE.wide;
+    inner.style.width = `${w}px`;
+    inner.style.height = `${h}px`;
+    sceneK = field.clientWidth / w;
+    inner.style.transform = `scale(${sceneK})`;
+  }
+  function watchScene() {
+    if (sceneObserver) sceneObserver.disconnect();
+    const card = $('#arenaCard');
+    if (!card || typeof ResizeObserver === 'undefined') { fitScene(); return; }
+    sceneObserver = new ResizeObserver(() => fitScene());
+    sceneObserver.observe(card);
+    fitScene();
+  }
+
+  // --- Texte qui s'écrit lettre par lettre dans la fenêtre de message ---
+  function typeText(txt, gen) {
+    const el = $('#dialogueText');
+    if (!el) return Promise.resolve();
+    const full = String(txt || '');
+    const total = typeMs(full);
+    el.textContent = '';
+    if (!full) return Promise.resolve();
+    const start = performance.now();
+    return new Promise((resolve) => {
+      const tickType = () => {
+        if (gen !== animGen) return resolve();
+        const n = total ? Math.ceil((full.length * (performance.now() - start)) / total) : full.length;
+        el.textContent = full.slice(0, n);
+        if (n >= full.length) return resolve();
+        setTimeout(tickType, TYPE_MS);
+      };
+      tickType();
+    });
+  }
+
+  // --- Déroulement d'un tour, événement par événement, au rythme de timing.js ---
   async function playSequentialTurn(s) {
     const b = s.battle;
     if (!b) return;
     if (!$('#arenaCard')) renderBattle(s);
     isResolvingTurn = true;
     const gen = animGen;
-    const pause = async (ms) => { await sleep(ms); return gen !== animGen; };
+    const stale = () => gen !== animGen;
+    const pause = async (ms) => { if (ms > 0) await sleep(ms); return stale(); };
+    const fx = createFx({ inner: $('#bfInner'), layer: $('#fxLayer'), scale: () => sceneK });
 
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const bottomSide = mySide === 'B' ? 'B' : 'A';
-    const topSide = bottomSide === 'A' ? 'B' : 'A';
+    const keyOf = (side) => (side === bottomSide ? 'bottom' : 'top');
+    const spriteOf = (side) => $(side === bottomSide ? '#spriteBottom' : '#spriteTop');
+    const boxOf = (side) => $(side === bottomSide ? '.hud-bottom' : '.hud-top');
+    const teamOf = (side) => (side === 'A' ? b.teamA : b.teamB);
 
     const dash = $('#dashContainer');
     if (dash) {
       dash.innerHTML = `
         <div class="dash-resolving-view">
           <div class="dash-resolving-title">
-            <span class="live-pill">DÉROULEMENT DU TOUR</span>
-            <span id="liveTurnMainText">Préparation des actions...</span>
+            <span class="live-pill">TOUR ${b.turn > 1 ? b.turn - 1 : 1}</span>
+            <span id="liveTurnMainText">Le tour se déroule…</span>
           </div>
           <div class="dash-resolving-steps" id="liveTurnSteps"></div>
         </div>`;
     }
-
-    const setDialogue = (txt, tag = '') => {
-      const dt = $('#dialogueText');
-      if (dt) dt.textContent = txt;
-      const mainEl = $('#liveTurnMainText');
-      if (mainEl) mainEl.textContent = txt;
+    const logStep = (txt, tag = '') => {
       const stepsEl = $('#liveTurnSteps');
-      if (stepsEl && txt) {
-        const line = document.createElement('div');
-        line.className = `turn-step-item ${tag}`;
-        line.textContent = `▸ ${txt}`;
-        stepsEl.appendChild(line);
-        stepsEl.scrollTop = stepsEl.scrollHeight;
-      }
+      if (!stepsEl || !txt) return;
+      const line = document.createElement('div');
+      line.className = `turn-step-item ${tag}`;
+      line.textContent = txt;
+      stepsEl.appendChild(line);
+      stepsEl.scrollTop = stepsEl.scrollHeight;
     };
+    const say = (txt, tag) => { logStep(txt, tag); return typeText(txt, gen); };
 
     for (const ev of s.events) {
+      const t0 = performance.now();
+      const budget = eventMs(ev);
+      const msg = ev.msg || ev.text || '';
+
       if (ev.type === 'switch') {
-        const isBottom = (ev.side === bottomSide);
-        const sideKey = isBottom ? 'bottom' : 'top';
-        setDialogue(ev.msg || `${ev.trainer} envoie ${ev.name} !`, 'step-switch');
-        sfx.play('switch');
-        if (ev.pokemonId) sfx.playCry(ev.pokemonId);
-
-        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
-        if (spriteEl) {
-          spriteEl.src = isBottom ? spriteUrls(ev.pokemonId).back : spriteUrls(ev.pokemonId).front;
-          spriteEl.className = `poke-sprite ${isBottom ? 'back' : 'front'} anim-enter`;
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        if (sprite && !sprite.classList.contains('fx-hidden') && shownMon[key] && shownMon[key] !== ev.pokemonId) {
+          sfx.play('switch');
+          await fx.recall(sprite);
+          if (stale()) return;
         }
-        const nameEl = $(isBottom ? '#nameBottom' : '#nameTop');
+        // Le cadre se met à jour pour le nouveau Pokémon
+        const nameEl = $(key === 'bottom' ? '#nameBottom' : '#nameTop');
         if (nameEl) nameEl.textContent = ev.name;
-
-        if (ev.types) {
-          const typesEl = $(isBottom ? '#typesBottom' : '#typesTop');
-          if (typesEl) typesEl.innerHTML = typeBadgesHtml(ev.types);
-        }
-        const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
-        if (stEl) {
-          stEl.innerHTML = ev.status ? `<span class="status-badge status-${ev.status}">${STATUS_LABELS[ev.status] || ev.status.toUpperCase()}</span>` : '';
-        }
-        const stgEl = $(isBottom ? '#stagesBottom' : '#stagesTop');
+        const typesEl = $(key === 'bottom' ? '#typesBottom' : '#typesTop');
+        if (typesEl && ev.types) typesEl.innerHTML = typeBadgesHtml(ev.types);
+        const stEl = $(key === 'bottom' ? '#statusBottom' : '#statusTop');
+        if (stEl) stEl.innerHTML = statusBadge(ev.status);
+        const stgEl = $(key === 'bottom' ? '#stagesBottom' : '#stagesTop');
         if (stgEl) stgEl.innerHTML = '';
-
-        if (ev.hp !== undefined && ev.maxHp !== undefined) {
-          displayedHp[sideKey] = ev.hp;
-          animateHp(sideKey, ev.hp, ev.hp, ev.maxHp);
+        if (ev.hp !== undefined) animateHp(key, ev.hp, ev.hp, ev.maxHp);
+        const box = boxOf(ev.side);
+        if (box && box.classList.contains('hud-out')) {
+          box.classList.remove('hud-out');
+          box.animate([{ transform: `translateX(${key === 'bottom' ? 110 : -110}%)` }, { transform: 'none' }], { duration: 300, easing: 'ease-out' });
         }
-
-        if (await pause(1500)) return;
+        if (sprite) {
+          sprite.classList.add('fx-hidden');
+          sprite.src = key === 'bottom' ? spriteUrls(ev.pokemonId).back : spriteUrls(ev.pokemonId).front;
+        }
+        const talk = say(msg, 'step-switch');
+        if (sprite) {
+          await fx.throwBall(sprite, key === 'bottom');
+          if (stale()) return;
+          sfx.play('switch');
+          if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+          await fx.appear(sprite);
+        }
+        await talk;
+        shownMon[key] = ev.pokemonId;
 
       } else if (ev.type === 'attack_start') {
-        const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg || `${ev.attName || ''} utilise ${ev.moveName} !`, 'step-attack');
-
-        const move = Object.values(MOVES).find(m => m.name === ev.moveName);
-        if (move && move.cat === 'special') sfx.play('beam');
-        else sfx.play('hit');
-
-        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
-        if (spriteEl) {
-          const animClass = isBottom ? 'anim-lunge-player' : 'anim-lunge-opponent';
-          spriteEl.classList.remove(animClass);
-          void spriteEl.offsetWidth;
-          spriteEl.classList.add(animClass);
+        await say(msg, 'step-attack');
+        if (stale()) return;
+        const att = spriteOf(ev.side);
+        const def = spriteOf(ev.side === 'A' ? 'B' : 'A');
+        const color = (TYPES[ev.moveType] || TYPES.normal).color;
+        const towardsTop = ev.side === bottomSide;
+        if (ev.moveCat === 'special') {
+          sfx.play('beam');
+          await fx.lunge(att, towardsTop);
+          if (def) await fx.projectile(att, def, color);
+          if (def) fx.impact(def, color);
+        } else if (ev.moveCat === 'physical') {
+          sfx.play('hit');
+          await fx.lunge(att, towardsTop);
+          if (def) fx.impact(def, color, true);
+        } else {
+          sfx.play('item');
+          if (att) fx.sparkles(att, color);
         }
-        if (await pause(1400)) return;
 
       } else if (ev.type === 'damage') {
-        const targetIsBottom = (ev.defSide === bottomSide);
-        const spriteEl = $(targetIsBottom ? '#spriteBottom' : '#spriteTop');
-        if (spriteEl) {
-          spriteEl.classList.remove('anim-hit');
-          void spriteEl.offsetWidth;
-          spriteEl.classList.add('anim-hit');
+        const key = keyOf(ev.defSide);
+        const target = spriteOf(ev.defSide);
+        if (ev.damage > 0) {
+          sfx.playHit(ev.mult || 1);
+          if (ev.crit || ev.mult >= 2) fx.shake(ev.crit ? 9 : 6);
+          showDamagePopup(key, ev.damage, ev.crit);
+          if (target) await fx.blink(target);
+          if (stale()) return;
+          const oldHp = displayedHp[key] !== null ? displayedHp[key] : ev.defHp + ev.damage;
+          await animateHp(key, oldHp, ev.defHp, ev.defMaxHp, drainMs(ev.damage, ev.defMaxHp));
+          if (stale()) return;
+          logStep(`${ev.defName || ''} perd ${ev.damage} PV`, ev.mult >= 2 ? 'step-super' : 'step-damage');
         }
-
-        sfx.playHit(ev.mult || 1);
-        showDamagePopup(targetIsBottom ? 'bottom' : 'top', ev.damage, ev.crit);
-
-        let effText = '';
-        if (ev.msg) {
-          effText = ev.msg;
-        } else if (ev.crit && ev.mult > 1) {
-          effText = "Coup critique ! C'est super efficace !";
-        } else if (ev.crit) {
-          effText = 'Coup critique !';
-        } else if (ev.mult > 1) {
-          effText = "C'est super efficace !";
-        } else if (ev.mult > 0 && ev.mult < 1) {
-          effText = "Ce n'est pas très efficace...";
-        }
-
-        const defLabel = ev.defName || (targetIsBottom ? ($('#nameBottom')?.textContent || 'Votre Pokémon') : ($('#nameTop')?.textContent || 'Le Pokémon adverse'));
-        const dmgLine = `${defLabel} perd ${ev.damage} PV !${effText ? ' ' + effText : ''}`;
-        setDialogue(dmgLine, ev.mult >= 2 ? 'step-super' : 'step-damage');
-
-        const sideKey = targetIsBottom ? 'bottom' : 'top';
-        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.defHp + ev.damage);
-        animateHp(sideKey, oldHp, ev.defHp, ev.defMaxHp);
-        displayedHp[sideKey] = ev.defHp;
-
-        if (await pause(1550)) return;
-
-      } else if (ev.type === 'faint') {
-        const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg || `${ev.name} est K.O. !`, 'step-faint');
-        sfx.play('faint');
-
-        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
-        if (spriteEl) {
-          spriteEl.classList.remove('anim-hit', 'anim-lunge-player', 'anim-lunge-opponent');
-          spriteEl.classList.add('anim-faint');
-        }
-
-        const ballsEl = $(isBottom ? '#ballsBottom' : '#ballsTop');
-        const team = isBottom ? (bottomSide === 'A' ? b.teamA : b.teamB) : (topSide === 'A' ? b.teamA : b.teamB);
-        if (ballsEl) ballsEl.innerHTML = ballsHtml(team);
-
-        if (await pause(1500)) return;
+        const eff = damageText(ev);
+        if (eff) await say(eff, ev.mult >= 2 ? 'step-super' : 'step-damage');
 
       } else if (ev.type === 'status_damage') {
-        const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg, 'step-damage');
-        const spriteEl = $(isBottom ? '#spriteBottom' : '#spriteTop');
-        if (spriteEl) {
-          spriteEl.classList.remove('anim-hit');
-          void spriteEl.offsetWidth;
-          spriteEl.classList.add('anim-hit');
-        }
-        const sideKey = isBottom ? 'bottom' : 'top';
-        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.hp + ev.damage);
-        animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
-        displayedHp[sideKey] = ev.hp;
-        if (await pause(1350)) return;
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        const st = teamOf(ev.side)[ev.side === 'A' ? b.activeA : b.activeB];
+        const talk = say(msg, 'step-damage');
+        if (sprite) await fx.statusPulse(sprite, st && st.status);
+        await talk;
+        if (stale()) return;
+        const oldHp = displayedHp[key] !== null ? displayedHp[key] : ev.hp + ev.damage;
+        await animateHp(key, oldHp, ev.hp, ev.maxHp, drainMs(ev.damage, ev.maxHp));
 
       } else if (ev.type === 'heal' || ev.type === 'recoil') {
-        const isBottom = (ev.side === bottomSide);
-        setDialogue(ev.msg, 'step-status');
-        const sideKey = isBottom ? 'bottom' : 'top';
-        const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : ev.hp;
-        animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
-        displayedHp[sideKey] = ev.hp;
-        if (await pause(1300)) return;
-
-      } else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured' || ev.type === 'msg') {
-        setDialogue(ev.msg || ev.text, 'step-status');
-        if (ev.type === 'status_applied') {
-          const isBottom = (ev.side === bottomSide);
-          const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
-          if (stEl) {
-            stEl.innerHTML = `<span class="status-badge status-${ev.status}">${STATUS_LABELS[ev.status] || ev.status.toUpperCase()}</span>`;
-          }
-        } else if (ev.type === 'status_cured') {
-          const isBottom = (ev.side === bottomSide);
-          const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
-          if (stEl) stEl.innerHTML = '';
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        await say(msg, 'step-status');
+        if (stale()) return;
+        if (ev.type === 'heal') {
+          sfx.play('heal');
+          if (sprite) fx.sparkles(sprite, '#78e070');
+        } else if (sprite) {
+          await fx.blink(sprite);
         }
-        if (await pause(1300)) return;
+        const amount = ev.type === 'heal' ? ev.amount : ev.damage;
+        const oldHp = displayedHp[key] !== null ? displayedHp[key] : (ev.type === 'heal' ? ev.hp - amount : ev.hp + amount);
+        await animateHp(key, oldHp, ev.hp, ev.maxHp, drainMs(amount, ev.maxHp));
+
+      } else if (ev.type === 'stat_change') {
+        const sprite = spriteOf(ev.side);
+        if (sprite) fx.statArrows(sprite, ev.val > 0);
+        sfx.play(ev.val > 0 ? 'levelup' : 'wobble');
+        await say(msg, 'step-status');
+
+      } else if (ev.type === 'status_applied') {
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        const stEl = $(key === 'bottom' ? '#statusBottom' : '#statusTop');
+        if (stEl) stEl.innerHTML = statusBadge(ev.status);
+        const talk = say(msg, 'step-status');
+        if (sprite) fx.statusPulse(sprite, ev.status);
+        await talk;
+
+      } else if (ev.type === 'status_cured') {
+        const key = keyOf(ev.side);
+        const stEl = $(key === 'bottom' ? '#statusBottom' : '#statusTop');
+        if (stEl) stEl.innerHTML = '';
+        await say(msg, 'step-status');
+
+      } else if (ev.type === 'faint') {
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+        sfx.play('faint');
+        if (sprite) await fx.faint(sprite);
+        if (stale()) return;
+        shownMon[key] = null;
+        const ballsEl = $(key === 'bottom' ? '#ballsBottom' : '#ballsTop');
+        if (ballsEl) ballsEl.innerHTML = ballsHtml(teamOf(ev.side));
+        await say(msg, 'step-faint');
 
       } else if (ev.type === 'victory') {
-        setDialogue(ev.msg, 'step-victory');
         sfx.play('victory');
-        if (await pause(1600)) return;
+        await say(msg, 'step-victory');
+
+      } else {
+        await say(msg, 'step-status');
       }
+
+      if (stale()) return;
+      // On tient le rythme de l'hôte : chaque événement dure exactement eventMs
+      if (await pause(budget - (performance.now() - t0))) return;
     }
 
     isResolvingTurn = false;
@@ -497,12 +546,14 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     if (!existingArena) {
       displayedHp.bottom = pBottom.hp;
       displayedHp.top = pTop.hp;
+      shownMon = s.intro ? { bottom: null, top: null } : { bottom: pBottom.fainted ? null : pBottom.id, top: pTop.fainted ? null : pTop.id };
 
       stage.innerHTML = `
         <div class="arena-card deal ${s.isFinal ? 'final' : ''}" id="arenaCard">
-          <div class="battlefield">
+          <div class="battlefield"><div class="bf-inner" id="bfInner">
+            <div class="fx-layer" id="fxLayer"></div>
             <!-- Cadre de l'adversaire (Haut-Gauche), cadre Noir & Blanc -->
-            <div class="hud-zone hud-top">
+            <div class="hud-zone hud-top ${s.intro ? 'hud-out' : ''}">
               <div class="bw-trainer-row"><span class="bw-trainer" style="--tc:${tTop.color}">${esc(tTop.name)}</span><div id="ballsTop" class="bw-balls">${ballsHtml(teamTop)}</div></div>
               <div class="bw-box enemy">
                 <b class="bw-name" id="nameTop">${esc(pTop.name)}</b>
@@ -517,7 +568,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             <div class="fighter-zone fighter-top">
               <div class="platform platform-top">
                 <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
-                <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
+                <img class="poke-sprite front ${pTop.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
                 <div class="damage-popup-anchor" id="popupAnchorTop"></div>
               </div>
             </div>
@@ -526,13 +577,13 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             <div class="fighter-zone fighter-bottom">
               <div class="platform platform-bottom">
                 <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
-                <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
+                <img class="poke-sprite back ${pBottom.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
                 <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
               </div>
             </div>
 
             <!-- Cadre du joueur (Bas-Droite), cadre Noir & Blanc -->
-            <div class="hud-zone hud-bottom">
+            <div class="hud-zone hud-bottom ${s.intro ? 'hud-out' : ''}">
               <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
               <div class="bw-box player">
                 <b class="bw-name" id="nameBottom">${esc(pBottom.name)}</b>
@@ -545,6 +596,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             </div>
           </div>
 
+          </div>
           <!-- Fenêtre de message -->
           <div class="battle-dialogue-bar">
             <span class="dialogue-tag" id="turnTag">TOUR ${b.turn || 1}</span>
@@ -554,6 +606,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
           <!-- Pupitre de Commandes Tactiles Professionnel -->
           <div class="dashboard" id="dashContainer"></div>
         </div>`;
+      watchScene();
     } else {
       $('#nameTop').textContent = pTop.name;
       $('#typesTop').innerHTML = typeBadgesHtml(pTop.types);
@@ -575,7 +628,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const topChanged = sTop && !sTop.src.includes(`/${pTop.id}.gif`);
       if (topChanged) {
         sTop.src = spriteUrls(pTop.id).front;
-        sTop.className = `poke-sprite front ${pTop.fainted ? 'fainted' : 'anim-enter'}`;
+        sTop.className = `poke-sprite front ${pTop.fainted ? 'fx-hidden' : 'anim-enter'}`;
         displayedHp.top = pTop.hp;
         animateHp('top', pTop.hp, pTop.hp, pTop.maxHp);
       } else if (displayedHp.top !== null && displayedHp.top !== pTop.hp) {
@@ -588,7 +641,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const bottomChanged = sBottom && !sBottom.src.includes(`/${pBottom.id}.gif`);
       if (bottomChanged) {
         sBottom.src = spriteUrls(pBottom.id).back;
-        sBottom.className = `poke-sprite back ${pBottom.fainted ? 'fainted' : 'anim-enter'}`;
+        sBottom.className = `poke-sprite back ${pBottom.fainted ? 'fx-hidden' : 'anim-enter'}`;
         displayedHp.bottom = pBottom.hp;
         animateHp('bottom', pBottom.hp, pBottom.hp, pBottom.maxHp);
       } else if (displayedHp.bottom !== null && displayedHp.bottom !== pBottom.hp) {
@@ -885,6 +938,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   function cleanup() {
     window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('resize', setUiZoom);
+    if (sceneObserver) sceneObserver.disconnect();
     clearInterval(tickTimer);
     animGen++;
   }
@@ -912,6 +967,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
           isResolvingTurn = false;
           evQueue.length = 0;
           displayedHp = { bottom: null, top: null };
+          shownMon = { bottom: null, top: null };
+          if (sceneObserver) { sceneObserver.disconnect(); sceneObserver = null; }
           activeTab = 'moves';
           logDrawer.hidden = true;
         }

@@ -641,3 +641,93 @@
   .tz-root #btnLog { display: none; }
   .bw-eff { position: static; align-self: flex-start; order: -1; margin-bottom: -2px; }
 }
+
+/* ==========================================================================
+   ARÈNE À L'ÉCHELLE DE LA FENÊTRE
+   La scène (terrain, cadres, Pokémon, effets) est dessinée à taille fixe — 960×420, ou 600×470 sur
+   écran étroit — puis agrandie ou réduite d'un bloc : rien ne peut plus se décaler.
+   ========================================================================== */
+.tz-root { --ui-zoom: 1; }
+.tz-root .tz-screen { zoom: var(--ui-zoom); }
+.tz-root .battle-dialogue-bar, .tz-root .dashboard { zoom: var(--ui-zoom); }
+.tz-root .arena-card {
+  width: clamp(320px, min(100%, 1500px, calc((100dvh - 96px - 276px * var(--ui-zoom)) * 960 / 420)), 1500px);
+  height: auto; max-height: none;
+}
+.tz-root .arena-card.narrow { width: 100%; }
+.tz-root .battlefield { flex: none; min-height: 0; aspect-ratio: 960 / 420; position: relative; overflow: hidden; }
+.tz-root .arena-card.narrow .battlefield { aspect-ratio: 600 / 470; background-position: 50% 70%; }
+.bf-inner { position: absolute; left: 0; top: 0; width: 960px; height: 420px; transform-origin: 0 0; }
+.fx-layer { position: absolute; inset: 0; z-index: 8; pointer-events: none; overflow: visible; }
+
+/* Cadres : la case de PV d'origine est à x=69 (joueur) / x=59 (adversaire), y=20, sur 48×2 px — ici ×2 */
+.bw-box.player .bw-hp { left: 138px; top: 40px; width: 96px; height: 4px; }
+.bw-box.enemy .bw-hp { left: 118px; top: 40px; width: 96px; height: 4px; }
+.bw-box.player .bw-hpnum { right: 30px; top: 50px; }
+.tz-root .hud-zone { transition: none; }
+.tz-root .hud-zone.hud-out { visibility: hidden; }
+
+/* Positions dans la scène large */
+.tz-root .hud-top { top: 14px; left: 16px; }
+.tz-root .hud-bottom { bottom: 12px; right: 16px; }
+.tz-root .fighter-top { top: 108px; right: 110px; }
+.tz-root .fighter-bottom { bottom: 22px; left: 90px; }
+
+/* Scène étroite (téléphone) : on resserre */
+.tz-root .narrow .hud-top { top: 10px; left: 10px; }
+.tz-root .narrow .hud-bottom { bottom: 10px; right: 10px; }
+.tz-root .narrow .fighter-top { top: 130px; right: 8px; }
+.tz-root .narrow .fighter-bottom { bottom: 120px; left: 0; }
+.tz-root .narrow .platform-bottom { width: 260px; }
+
+/* Les cadres ne sont plus réduits par les règles « téléphone » : toute la scène l'est déjà */
+@media (max-width: 760px) { .tz-root .hud-top, .tz-root .hud-bottom { transform: none; } }
+@media (max-width: 420px) { .tz-root .hud-top, .tz-root .hud-bottom { transform: none; } }
+
+/* Tableau de commande de hauteur fixe : l'arène ne saute plus entre les tours */
+.bw-dash-body { min-height: 168px; }
+.tz-root .moves-grid { grid-auto-rows: 1fr; }
+.tz-root .dash-resolving-view { height: 192px; display: flex; flex-direction: column; overflow: hidden; }
+.tz-root .dash-resolving-steps { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.tz-root .bw-spect { min-height: 192px; }
+
+/* ==========================================================================
+   EFFETS DE COMBAT
+   ========================================================================== */
+.poke-sprite.fx-hidden { opacity: 0 !important; animation: none !important; }
+.fx { position: absolute; pointer-events: none; }
+.fx-ball { left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; image-rendering: pixelated; z-index: 2; }
+.fx-flash { transform: translate(-50%, -50%); border-radius: 50%; mix-blend-mode: screen; }
+.fx-orb { left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; }
+.fx-orb.small { width: 26px; height: 26px; }
+.fx-star {
+  width: 120px; height: 120px;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.7);
+}
+.fx-chip { width: 10px; height: 10px; border: 2px solid rgba(0, 0, 0, 0.5); }
+.fx-spark { width: 10px; height: 10px; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.fx-stat {
+  transform: translate(-50%, -50%);
+  -webkit-mask: linear-gradient(transparent, #000 25%, #000 75%, transparent);
+  mask: linear-gradient(transparent, #000 25%, #000 75%, transparent);
+  background-size: 28px 28px;
+  mix-blend-mode: screen;
+}
+.fx-stat.up {
+  background-image: linear-gradient(135deg, transparent 0 35%, #58a8ff 35% 50%, transparent 50%), linear-gradient(225deg, transparent 0 35%, #58a8ff 35% 50%, transparent 50%);
+  animation: fxRise 0.45s linear infinite;
+}
+.fx-stat.down {
+  background-image: linear-gradient(45deg, transparent 0 35%, #ff5848 35% 50%, transparent 50%), linear-gradient(315deg, transparent 0 35%, #ff5848 35% 50%, transparent 50%);
+  animation: fxFall 0.45s linear infinite;
+}
+@keyframes fxRise { from { background-position: 0 0, 0 0; } to { background-position: 0 -28px, 0 -28px; } }
+@keyframes fxFall { from { background-position: 0 0, 0 0; } to { background-position: 0 28px, 0 28px; } }
+.tz-root .damage-popup { z-index: 9; }
+@media (max-width: 760px) {
+  .tz-root .poke-brand { min-width: 0; flex-shrink: 1; }
+  .tz-root .poke-brand b { display: none; }
+  .tz-root .poke-tools { min-width: 0; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .tz-root .poke-tool { flex-shrink: 0; }
+}

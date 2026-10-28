@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.13 — 28 octobre 2026
+- **Poké Duel** — Les combats du tournoi se suivent enfin :
+  - les messages s'écrivent lettre par lettre et restent affichés le temps de les lire ; chaque étape attend la fin de la précédente ;
+  - la barre de PV descend à son rythme, et le tour suivant ne s'ouvre qu'une fois tout joué, chez tous les joueurs.
+- **Poké Duel** — De vraies animations de combat :
+  - lancer de Poké Ball et Pokémon qui en sort en silhouette blanche, rappel en rouge quand on change ;
+  - attaques physiques : élan et impact à la couleur du type ; attaques spéciales : projectile d'énergie ; capacités de statut : étincelles ;
+  - la cible touchée clignote, l'écran tremble sur un coup critique ou super efficace ;
+  - K.O. : le Pokémon s'enfonce sous son socle ; flèches bleues ou rouges quand une stat change, effets colorés pour brûlure, poison, paralysie…
+- **Poké Duel** — La barre de PV est remise exactement dans sa case (elle était décalée).
+- **Poké Duel** — L'arène s'adapte à la fenêtre : elle grandit sur un grand écran, se réduit sur un petit, et passe en format plus haut sur téléphone ; les menus du tournoi suivent aussi la taille de l'écran.
+
 ## 3.12 — 28 octobre 2026
 - **Island Rush** — Caméra calme contre les murs :
   - elle ne fait plus l'essuie-glace quand on longe une façade, ni quand l'épaule passe devant une fenêtre ou une vitrine ;
