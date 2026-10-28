@@ -1,5 +1,13 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.5 — 28 octobre 2026
+- **Tous les jeux en ligne** — Beaucoup moins de « Coupure chez l'hôte · on l'attend… », et le salon ne casse plus pour une micro-coupure.
+  - L'hôte qui attend son tour dans un autre onglet (Mini-Golf Party, Birdie Party…) garde une connexion bien vive : à la moindre coupure il revient aussitôt, au lieu de perdre sa place au bout de 20 secondes et de voir un invité reprendre le salon.
+  - Quand la connexion de l'hôte n'arrive plus à suivre, les images de la partie devenues trop anciennes sont sautées au lieu de s'empiler : la partie reste fluide, au lieu de prendre du retard jusqu'à ce que l'hôte se croie déconnecté.
+  - Une connexion chargée mais bien vivante n'est plus prise pour une coupure.
+  - Après un ralentissement passager du serveur, l'hôte n'est plus coupé à chaque reprise de la connexion : les invités ne l'attendent plus indéfiniment.
+  - Island Rush, Outbreak, Convoy Storm et Bastion Clash envoient les tirs, les portes, le butin et les effets à part : ils arrivent toujours, même quand une image est sautée.
+  - Un invité qui reprend le salon ne voit plus « Coupure chez l'hôte » au-dessus de sa propre partie.
 ## 3.4 — 28 octobre 2026
 - **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
 

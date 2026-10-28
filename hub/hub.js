@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '3.4';
+  const VERSION = '3.5';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -309,7 +309,7 @@
   // Bandeau de connexion : notre réseau coupé, ou l'hôte en reconnexion (le serveur garde les places quelques secondes)
   function renderNet() {
     let b = $('#netbar');
-    const txt = !room || room.mode === 'solo' ? '' : !room.netUp ? 'Connexion perdue · reconnexion…' : room.hostAway ? "Coupure chez l'hôte · on l'attend…" : '';
+    const txt = !room || room.mode === 'solo' ? '' : !room.netUp ? 'Connexion perdue · reconnexion…' : room.mode === 'guest' && room.hostAway ? "Coupure chez l'hôte · on l'attend…" : '';
     if (!txt) { if (b) b.hidden = true; return; }
     if (!b) { b = document.createElement('div'); b.id = 'netbar'; b.className = 'netbar'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
     b.innerHTML = '<i></i>' + esc(txt); b.hidden = false;

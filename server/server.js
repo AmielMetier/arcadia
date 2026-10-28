@@ -31,8 +31,12 @@ const TOMB_MS = 10 * 60000;            // on se souvient des places perdues, pou
 const MAX_FRAME = Number(process.env.RELAY_MAX_FRAME) || 1024 * 1024;        // plus gros message accepté (sinon fermeture 1009)
 const RATE_MSGS = Number(process.env.RELAY_RATE_MSGS) || 1000;               // messages par seconde et par connexion, en continu
 const RATE_BYTES = Number(process.env.RELAY_RATE_BYTES) || 8 * 1024 * 1024; // octets par seconde et par connexion, en continu
-// réserve pour les rafales : au retour d'une coupure, un navigateur renvoie d'un coup jusqu'à 3000 messages (OUTBOX_MAX de net.js)
-const BURST = 4;
+// réserve pour les rafales, en secondes : au retour d'une coupure, un navigateur renvoie d'un coup jusqu'à 3000 messages
+// (OUTBOX_MAX de net.js) ; et quand ce serveur s'est figé quelques secondes (petite instance débordée), tout ce que les
+// joueurs ont envoyé entre-temps arrive d'un bloc. Avec 4 s, un gel de 13 s suffisait à couper l'hôte pour
+// « inondation », puis à chaque reprise : les invités l'attendaient indéfiniment. Un vrai flot continu est coupé quand même.
+const BURST = Number(process.env.RELAY_BURST_S) || 15;
+const BURST_BYTES = 4;
 const LOG_FILE_MAX = 5 * 1024 * 1024;  // journal des crashs : au-delà, il passe en .1.jsonl et un nouveau commence
 const LOG_WINDOW_MS = 10 * 60000, LOG_PER_IP = 60, LOG_ALL = 600; // envois de logs acceptés par fenêtre de 10 min
 const LOGS_TOKEN = process.env.LOGS_TOKEN || ''; // lecture des logs (GET /api/logs) : fermée tant qu'il n'est pas défini
@@ -432,14 +436,14 @@ wss.on('connection', (ws) => {
 
   ws.on('message', safe((raw) => {
     if (ws.flooded) return; // déjà coupée pour inondation : les messages encore en file sont ignorés
-    ws.isAlive = true;
+    ws.isAlive = true; ws.lastMsg = Date.now();
     // débit de cette connexion (seau qui se remplit à RATE_* par seconde, jusqu'à BURST secondes de réserve) :
     // un client qui inonde le relais est coupé ; les pics seconde par seconde sont relevés pour /status
     const now = Date.now(), len = raw.length;
-    if (ws.tokT == null) { ws.tokT = now; ws.tokN = RATE_MSGS * BURST; ws.tokB = RATE_BYTES * BURST; }
+    if (ws.tokT == null) { ws.tokT = now; ws.tokN = RATE_MSGS * BURST; ws.tokB = RATE_BYTES * BURST_BYTES; }
     const dt = (now - ws.tokT) / 1000; ws.tokT = now;
     ws.tokN = Math.min(RATE_MSGS * BURST, ws.tokN + dt * RATE_MSGS) - 1;
-    ws.tokB = Math.min(RATE_BYTES * BURST, ws.tokB + dt * RATE_BYTES) - len;
+    ws.tokB = Math.min(RATE_BYTES * BURST_BYTES, ws.tokB + dt * RATE_BYTES) - len;
     if (now - (ws.rateT || 0) >= 1000) { ws.rateT = now; ws.rateN = 0; ws.rateB = 0; }
     ws.rateN++; ws.rateB += len;
     if (len > stats.maxFrame) stats.maxFrame = len;
@@ -552,8 +556,9 @@ const probeInterval = setInterval(safe(() => {
   for (const ws of wss.clients) {
     if (!ws.sess || ws.readyState !== WebSocket.OPEN) continue;
     if (ws.probeAt) {
-      // plus aucune réponse : connexion morte sans avoir été fermée (wifi coupé, téléphone en veille)
-      if (now - ws.probeAt > DEAD_MS) { try { ws.terminate(); } catch (e) {} }
+      // plus aucune réponse : connexion morte sans avoir été fermée (wifi coupé, téléphone en veille). Tant que ses
+      // messages arrivent, elle vit : la réponse attend derrière ses propres envois (débit montant trop juste)
+      if (now - ws.probeAt > DEAD_MS && now - (ws.lastMsg || 0) > DEAD_MS) { try { ws.terminate(); } catch (e) {} }
       continue;
     }
     ws.probeAt = now;

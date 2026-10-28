@@ -252,7 +252,7 @@ const relays = (c, pred = () => true) => c.got.filter((m) => m.type === 'relay' 
 
   // inondation
   const flood = await open();
-  for (let k = 0; k < 300; k++) flood.ws.send(JSON.stringify({ type: 'pong' })); // au-delà de la réserve (50/s × 4)
+  for (let k = 0; k < 1000; k++) flood.ws.send(JSON.stringify({ type: 'pong' })); // au-delà de la réserve (50/s × 15 s)
   await sleep(200);
   ok(flood.code === 1008, 'trop de messages en une seconde : connexion fermée (1008)');
 

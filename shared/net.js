@@ -18,6 +18,33 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
    (cb.open est rappelé) et l'hôte rouvre le même code (cb.reset), ou laisse cb.lost décider.
    Rappels facultatifs : cb.status('down' | 'up'), hôte : cb.away(cid, coupé ?), invité : cb.hostAway(coupé ?). */
 (function () {
+  // Minuteries de la connexion (sonde, reconnexion, reprise de place) : un onglet caché depuis quelques minutes ne
+  // réveille plus ses minuteries qu'une fois par minute (Chrome). L'hôte qui attend son tour dans un autre onglet
+  // dépassait alors les 20 s pendant lesquelles le relais lui garde sa place, et le salon cassait à la moindre
+  // micro-coupure. Elles passent par un Worker, que les navigateurs ne brident pas (repli : minuteries de la page).
+  const { setTimeout, setInterval, clearTimeout, clearInterval } = (function workerTimers() {
+    const native = { setTimeout: window.setTimeout.bind(window), setInterval: window.setInterval.bind(window), clearTimeout: window.clearTimeout.bind(window), clearInterval: window.clearInterval.bind(window) };
+    let w;
+    try {
+      const src = 'const t=new Map();onmessage=(e)=>{const[k,id,ms]=e.data;'
+        + 'if(k==="c"){clearTimeout(t.get(id));clearInterval(t.get(id));t.delete(id);}'
+        + 'else if(k==="t"){t.set(id,setTimeout(()=>{t.delete(id);postMessage(id);},ms));}'
+        + 'else{t.set(id,setInterval(()=>postMessage(id),ms));}};';
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      w = new Worker(url);
+      URL.revokeObjectURL(url);
+    } catch (e) { return native; }
+    const jobs = new Map();
+    let seq = 0;
+    w.onmessage = (e) => {
+      const j = jobs.get(e.data); if (!j) return;
+      if (!j.repeat) jobs.delete(e.data);
+      try { j.fn(); } catch (err) { console.error(err); }
+    };
+    const add = (repeat) => (fn, ms) => { const id = ++seq; jobs.set(id, { fn, repeat }); w.postMessage([repeat ? 'i' : 't', id, Math.max(0, Number(ms) || 0)]); return id; };
+    const clear = (id) => { if (id && jobs.delete(id)) w.postMessage(['c', id]); };
+    return { setTimeout: add(false), setInterval: add(true), clearTimeout: clear, clearInterval: clear };
+  })();
   const CODE_ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const genCode = () => Array.from({ length: 4 }, () => CODE_ALPHA[(Math.random() * CODE_ALPHA.length) | 0]).join('');
   const QS = new URLSearchParams(location.search);
@@ -34,7 +61,9 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
 
   const BLOCKED = "Impossible de joindre le serveur relais WebSocket. Vérifie ta connexion internet ou réessaie dans quelques secondes.";
   const SEND_BUFFER_MAX = 48 * 1024; // au-delà, la connexion n'arrive plus à suivre : les messages volatils attendront le suivant
-  const isVol = (o) => o === true || !!(o && o.volatile);
+  // volatil : true, 1 (ce que passe le salon de l'hôte) ou { volatile: true }. Sans le 1, tous les instantanés de l'hôte
+  // partaient comme des messages garantis : jamais sautés quand sa connexion sature, renvoyés par milliers à la reprise
+  const isVol = (o) => (o && typeof o === 'object' ? !!o.volatile : !!o);
   const PROTO = 3;
   const OUTBOX_MAX = 3000;   // messages gardés en attendant l'accusé de réception du serveur
   const DEAD_MS = 14000;      // sonde sans réponse : connexion morte, on en ouvre une autre
@@ -129,7 +158,7 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
           if (this.sid) this._raw({ type: 'resume', sid: this.sid, key: this.skey, ack: this.rseq });
           else this._joinRoom();
         };
-        ws.onmessage = (ev) => { if (gen === this.gen) this._onMsg(ev.data); };
+        ws.onmessage = (ev) => { if (gen === this.gen) { this.lastIn = performance.now(); this._onMsg(ev.data); } };
         ws.onclose = () => this._down(gen);
       },
       _joinRoom() {
@@ -354,19 +383,22 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
       // Si la réponse tarde nettement plus que d'habitude, nos envois s'empilent : on saute les instantanés d'état le
       // temps que la file se vide. Plus de réponse du tout depuis quelques secondes : la connexion est morte.
       // Sauf si c'est la page qui était figée (un jeu qui construit son décor, une machine lente) : la réponse est
-      // peut-être arrivée et attend son tour ; on ne conclut rien et on refait une sonde.
+      // peut-être arrivée et attend son tour ; on ne conclut rien et on refait une sonde. Sauf aussi si des messages
+      // arrivent encore : la sonde attend derrière nos propres envois (débit montant trop juste), la connexion vit ;
+      // la couper ne ferait que tout renvoyer.
       _startKeepAlive(ws) {
         this._stopKeepAlive();
         this.probeAt = 0; this.lats = []; this.fastCheck = 0;
         const gen = this.gen;
         let tick = performance.now();
+        this.lastIn = tick;
         this.pingIv = setInterval(() => {
           if (gen !== this.gen || ws.readyState !== WebSocket.OPEN) return;
           const now = performance.now(), frozen = now - tick > FROZEN_MS; tick = now;
           if (frozen) { this.probeAt = 0; this.fastCheck = 0; }
           if (this.probeAt) {
-            const late = performance.now() - this.probeAt;
-            if (late > DEAD_MS || (this.fastCheck && late > 6000)) this._down(gen);
+            const late = now - this.probeAt, quiet = now - this.lastIn;
+            if ((late > DEAD_MS && quiet > DEAD_MS) || (this.fastCheck && late > 6000 && quiet > 6000)) this._down(gen);
             return;
           }
           this._probe(ws);
@@ -438,5 +470,6 @@ const WS_SERVER_URL = "wss://duo-drift-relay.onrender.com";
   }
 
   window.WS_SERVER_URL = WS_SERVER_URL;
-  window.DDNet = { create, LOCAL_TEST, BLOCKED, getWsUrl, wakeServer, WS_SERVER_URL };
+  // timers : les minuteries ci-dessus, pour le salon (relances après une coupure ou une migration)
+  window.DDNet = { create, LOCAL_TEST, BLOCKED, getWsUrl, wakeServer, WS_SERVER_URL, timers: { setTimeout, clearTimeout } };
 })();
