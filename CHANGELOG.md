@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.4 — 28 octobre 2026
+- **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
+
 ## 3.3 — 27 octobre 2026
 - **Island Rush** — L'île ne se vide plus en deux minutes : les bots se battent de plus en plus au fil des cercles de la tempête, et la partie dure jusqu'au dernier cercle (une dizaine de minutes).
   - Ils se posent répartis sur toute l'île au lieu de s'empiler, et 5 au plus atterrissent près de toi.
