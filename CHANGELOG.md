@@ -1,5 +1,9 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.14 — 28 octobre 2026
+- **Poké Duel** — Cadres de PV refaits pour se lire d'un coup d'œil : le nom et le niveau, puis « PV » et la jauge, puis les PV restants sur les PV max (« 85 / 180 ») en gros chiffres. Les bandes blanches qui ressemblaient à une jauge pleine ont disparu.
+- **Poké Duel** — Nouvelle police pixel, Jersey 15, bien plus lisible : on ne confond plus 5 et S, 0 et O, ni C et O (« N.50 » se lisait « N.SO »).
+
 ## 3.13 — 28 octobre 2026
 - **Poké Duel** — Les combats du tournoi se suivent enfin :
   - les messages s'écrivent lettre par lettre et restent affichés le temps de les lire ; chaque étape attend la fin de la précédente ;

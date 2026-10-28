@@ -1,18 +1,18 @@
 /* pokemon/bw.css — Habillage Pokémon Noir & Blanc du tournoi Poké Duel
    Cadres de PV et panneaux d'équipe d'origine (assets/pbinfo_*.png, party_slot.png, overlay_message.png),
-   police pixel Pixelify Sans (Google Fonts), fenêtres et boutons plats façon écran tactile de la DS.
+   police pixel Jersey 15 (Google Fonts, licence OFL), fenêtres et boutons plats façon écran tactile de la DS.
    Tout est rangé sous .tz-root : le mode Aventure n'est pas touché. */
 
 @font-face {
-  font-family: 'Pixelify Sans';
-  src: url('assets/fonts/PixelifySans.ttf') format('truetype');
-  font-weight: 400 700;
+  font-family: 'Jersey 15';
+  src: url('assets/fonts/Jersey15.ttf') format('truetype');
   font-display: swap;
+  size-adjust: 128%;
 }
 
 .tz-root {
-  --bung: 'Pixelify Sans', 'Chakra Petch', monospace;
-  --chakra: 'Pixelify Sans', 'Chakra Petch', monospace;
+  --bung: 'Jersey 15', 'Chakra Petch', sans-serif;
+  --chakra: 'Jersey 15', 'Chakra Petch', sans-serif;
   --bw-win: #2c333d;        /* fond des fenêtres */
   --bw-win-2: #232931;      /* fond des cases */
   --bw-edge: #0f1216;       /* contour extérieur */
@@ -731,3 +731,49 @@
   .tz-root .poke-tools { min-width: 0; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
   .tz-root .poke-tool { flex-shrink: 0; }
 }
+
+
+/* ==========================================================================
+   CADRES DE PV redessinés : nom et niveau, puis « PV » + jauge, puis PV restants / PV max.
+   (Les bandes blanches du cadre d'origine se lisaient comme une jauge pleine : remplacées.)
+   ========================================================================== */
+.tz-root .bw-box {
+  background: none; height: auto; width: 270px;
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  grid-template-areas: "name lv" "hp hp" "st num";
+  column-gap: 8px; row-gap: 3px;
+  padding: 7px 20px 8px 24px;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4));
+}
+.tz-root .bw-box.enemy { grid-template-areas: "name lv" "hp hp" "st st"; padding: 7px 24px 8px 20px; }
+.tz-root .bw-box::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(180deg, #474b56 0 46%, #33363f 46%);
+  border: 2px solid #0d0f12; border-radius: 5px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.2), inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+  transform: skewX(-12deg);
+}
+.tz-root .bw-box.enemy::before { transform: skewX(12deg); }
+.tz-root .bw-box > * { position: relative; z-index: 1; }
+.tz-root .bw-name { position: relative; left: auto !important; top: auto !important; grid-area: name; font-size: 21px; max-width: 170px; text-overflow: ellipsis; }
+.tz-root .bw-lv { position: relative; left: auto !important; top: auto !important; grid-area: lv; font-size: 17px; color: #ffd848; }
+.tz-root .bw-status { position: relative; left: auto !important; top: auto !important; grid-area: st; min-height: 0; }
+.tz-root .bw-status:empty { display: none; }
+.tz-root .bw-box .bw-hp {
+  position: relative; left: auto !important; top: auto !important; grid-area: hp;
+  width: auto !important; height: 10px !important; margin-left: 30px;
+  background: #1c1e23; border: 2px solid #0d0f12; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px #5a5f6b;
+}
+.tz-root .bw-box .bw-hp::before {
+  content: 'PV'; position: absolute; left: -31px; top: 50%; transform: translateY(-50%);
+  font-family: var(--chakra); font-size: 13px; line-height: 1; padding: 1px 4px 0;
+  color: #fff; background: #e8742a; border: 1px solid #0d0f12; border-radius: 2px; text-shadow: none;
+}
+.tz-root .bw-box .bw-hp .hp-fill { height: 100%; border-radius: 1px; transition: none; }
+.tz-root .bw-box.player .bw-hpnum {
+  position: relative; right: auto !important; top: auto !important; grid-area: num; justify-self: end;
+  font-size: 22px; letter-spacing: 0.5px;
+}
+.tz-root .bw-hpnum b { margin-right: 4px; }
+.tz-root .bw-hpnum #hpMaxBottom { margin-left: 4px; }
