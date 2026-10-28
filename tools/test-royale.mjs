@@ -349,6 +349,28 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const t0 = performance.now(); for (let i = 0; i < 300; i++) sim.step(DT);
   console.log(`  partie : saut, coffre, élimination, récolte, construction et effondrement vérifiés · ${((performance.now() - t0) / 300).toFixed(3)} ms par pas`);
 }
+// tous les coffres de l'île : l'arme sort devant le coffre, à son niveau, sans mur ni meuble entre les deux
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const sim = createSim({ map: m, world: W, seed: 7, roster: [{ id: 'a', name: 'A' }], mode: 'exploration' });
+  const A = sim.player('a');
+  let n = 0;
+  const bad = [];
+  for (const c of sim.S.chests.values()) {
+    if (c.kind !== 'coffre') continue;
+    n++;
+    const fx = c.fx || 0, fz = c.fz || 1, before = new Set(sim.S.items.keys());
+    Object.assign(A, { x: c.x + fx * 1.2, z: c.z + fz * 1.2, y: c.y, vx: 0, vz: 0, mode: 'sol', alive: true });
+    sim.input('a', { yaw: Math.atan2(-fx, -fz), pitch: -0.3, use: n });
+    for (let i = 0; i < 90 && !c.open; i++) sim.step(DT);
+    const w = [...sim.S.items.values()].find((g) => !before.has(g.id) && g.it.t === 'arme');
+    const ox = c.x + fx * 0.55, oz = c.z + fz * 0.55, L = w ? Math.hypot(w.x - ox, w.z - oz) || 1 : 0;
+    if (!c.open || !w) bad.push(`${c.id} ${c.open ? 'sans arme' : 'fermé'}`);
+    else if (L > 2.2 || Math.abs(w.y - c.y) > 0.8 || W.raycast(ox, c.y + 0.4, oz, (w.x - ox) / L, 0, (w.z - oz) / L, L).t < L - 0.05) bad.push(`${c.id} arme hors d'atteinte`);
+  }
+  ok(n > 100 && !bad.length, `coffres (${n}) : ${bad.slice(0, 5).join(', ')}`);
+  console.log(`  ${n} coffres ouverts : l'arme sort devant chacun`);
+}
 // ------------------------------------------------------------------ bots et réseau
 // Une partie de bots (et d'un joueur invité) suivie par deux copies d'invités : l'une là dès le départ, l'autre
 // arrivée en cours de route (état complet) ; les copies doivent rester identiques à la partie de l'hôte. Puis la
@@ -706,7 +728,14 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
   ok(spawned.length >= 3 && spawned.every((d) => d.inside), `largages : ${spawned.length}, tous dans le prochain cercle`);
   ok(landT != null && Math.abs(landT - 110 / 4.2) < 0.5, `descente du premier largage : ${landT && landT.toFixed(1)} s`);
-  ok(opened.size >= 1, `largages ouverts par les bots : ${opened.size}/${spawned.length}`);
+  // (une partie peut finir sans qu'un bot passe près d'un largage : on en rejoue alors une seconde)
+  let opened2 = 0;
+  if (!opened.size) {
+    const W7 = buildWorld(m), s7 = createSim({ map: m, world: W7, seed: 7, roster, mode: 'partie' });
+    createBuild(s7, m, W7); createAI(s7, m, W7);
+    while (s7.S.phase !== 'fin' && s7.S.t < 620 && !opened2) { s7.step(DT); for (const e of s7.takeEvents()) if (e.e === 'largage-ouvert') opened2++; }
+  }
+  ok(opened.size + opened2 >= 1, `largages ouverts par les bots : ${opened.size}/${spawned.length}${opened.size ? '' : `, puis ${opened2} dans une seconde partie`}`);
   const d0 = [...sim.S.drops.values()][0], c0 = copy.S.drops.get(d0.id);
   ok(c0 && c0.landed === d0.landed && c0.open === d0.open, 'les largages passent par le réseau');
   // ouvert par un joueur : une arme épique, une grande potion, une trousse

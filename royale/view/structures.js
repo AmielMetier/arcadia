@@ -3,7 +3,7 @@
 // Toute l'île tient en quelques dizaines de maillages instanciés ; chaque pan garde son numéro d'instance (et ceux de
 // ses ornements) pour pouvoir être cassé. Face extérieure à la couleur du bâtiment, face intérieure en plâtre.
 // Les façades sont travaillées : enduit coloré, soubassement et chaînes d'angle en pierre, bandeaux entre les étages,
-// corniche ; fenêtres avec encadrement, croisillon, vitre (allumée le soir), appui et linteau, volets, garde-corps
+// corniche ; fenêtres avec encadrement, croisillon (sans vitre : on tire au travers), appui et linteau, volets, garde-corps
 // et jardinières selon le bâtiment ; portes encadrées avec marche, lampe et marquise ; devantures à store rayé et
 // enseigne. Toits en pente avec rives, faîtière et cheminée ; toits plats avec couvertine, climatiseurs, ventilations
 // et réservoirs (engine/decor.js, qui donne aussi leurs collisions).
@@ -33,7 +33,7 @@ const SHUTTER_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie', 'manoir'
 const RAIL_TYPES = new Set(['immeuble', 'mairie', 'bureaux', 'auberge', 'manoir', 'tour']);
 const FLOWER_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie']);
 const CANOPY_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie', 'manoir', 'immeuble', 'bureaux']);
-const SMALL = new Set(['fenCadre', 'fenVerre', 'fenPierre', 'fenVolets', 'fenGarde', 'fenJardin', 'fenFleurs', 'porteCadre', 'porteMarche', 'lampe', 'ampoule', 'soclePlein', 'soclePorte', 'soclePortail', 'bandeau', 'corniche', 'sign', 'grilleFace']);
+const SMALL = new Set(['fenCadre', 'fenPierre', 'fenVolets', 'fenGarde', 'fenJardin', 'fenFleurs', 'porteCadre', 'porteMarche', 'lampe', 'ampoule', 'soclePlein', 'soclePorte', 'soclePortail', 'bandeau', 'corniche', 'sign', 'grilleFace']);
 const CORNICE_TYPES = new Set(['immeuble', 'tour', 'mairie', 'bureaux', 'manoir', 'auberge', 'boutique', 'maison']);
 
 // ------------------------------------------------------------------ textures peintes (motif clair multiplié par la couleur)
@@ -193,7 +193,6 @@ const DECO = {
     [0.76, 0.94, -O - 0.05, 0.9, 2.44, -O + 0.03], [3.1, 0.94, -O - 0.05, 3.24, 2.44, -O + 0.03], [0.76, 2.3, -O - 0.05, 3.24, 2.44, -O + 0.03],
     [1.975, 1.0, -0.035, 2.025, 2.3, 0.035], [0.9, 1.83, -0.035, 3.1, 1.88, 0.035],
   ]),
-  fenVerre: () => boxes([[0.9, 1.0, -0.006, 3.1, 2.3, 0.006]]),
   fenPierre: () => boxes([[0.68, 0.86, O - 0.04, 3.32, 1.0, O + 0.17], [0.68, 2.44, O - 0.03, 3.32, 2.62, O + 0.07]]),
   fenVolets: () => boxes([[-0.3, 0.96, O + 0.01, 0.84, 2.34, O + 0.06], [3.16, 0.96, O + 0.01, 4.3, 2.34, O + 0.06]]),
   fenGarde: () => {
@@ -273,20 +272,6 @@ function twoTone(map, inner, extra = {}, glow = [0.32, 0], plainInner = false) {
   m.userData.inner = U.uInner;
   return m;
 }
-// vitres : légèrement teintées, reflets du ciel ; le soir, certaines sont allumées (couleur de l'instance)
-function glassMaterial(night) {
-  const m = new THREE.MeshStandardMaterial({ color: 0x9cc4dc, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.38, depthWrite: false, envMapIntensity: 1.6 });
-  const U = { uNight: { value: night } };
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\nvec3 lit = vColor; diffuseColor.rgb = diffuse;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += lit * uNight * 1.6; diffuseColor.a = mix(diffuseColor.a, 0.85, uNight * step(0.05, lit.r));');
-  };
-  m.customProgramCacheKey = () => 'royale-vitre';
-  return m;
-}
 // store : blanc là où la texture est noire, couleur de l'instance ailleurs
 function awningMaterial(map) {
   const m = new THREE.MeshStandardMaterial({ map, roughness: 0.85, side: THREE.DoubleSide });
@@ -327,7 +312,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   mats.trim = new THREE.MeshStandardMaterial({ roughness: 0.55 });
   mats.stone = new THREE.MeshStandardMaterial({ map: tex.pierre, roughness: 0.9 });
   mats.shutter = new THREE.MeshStandardMaterial({ map: tex.volet, roughness: 0.7 });
-  mats.glass = glassMaterial(night);
   mats.iron = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.45, metalness: 0.6 });
   mats.bulb = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffd27a, emissiveIntensity: 0.4 + night * 2.2 });
   mats.flower = new THREE.MeshStandardMaterial({ roughness: 0.8 });
@@ -417,7 +401,9 @@ export function buildStructures(map, { time = 'jour' } = {}) {
         if (k === b.floors - 1 && CORNICE_TYPES.has(b.type) && mat === 'pierre') push('corniche', 'stone', pm, stone, ref);
         if (e.k === 'fenetre') {
           push('fenCadre', 'trim', pm, trim, ref);
-          if (!b.abandoned) push('fenVerre', 'glass', pm, br.next() < 0.35 ? color(0xffd69a) : color(0x000000), ref);
+          // pas de vitre : on tire à travers les fenêtres, on voit donc à travers (le tirage reste, pour que les
+          // jardinières gardent leur place)
+          if (!b.abandoned) br.next();
           if (mat === 'pierre') push('fenPierre', 'stone', pm, stone, ref);
           if (shutters && !(shopFront && k === 0)) push('fenVolets', 'shutter', pm, shutter, ref);
           if (rails && k > 0) push('fenGarde', 'iron', pm, null, ref);
@@ -580,8 +566,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     });
     if (cells) im.geometry = geos[g].clone(), im.geometry.setAttribute('aCell', new THREE.InstancedBufferAttribute(cells, 1));
     // les petits ornements ne projettent pas d'ombre (ce serait cher pour presque rien)
-    im.castShadow = !SMALL.has(g) && m !== 'glass' && m !== 'bulb' && !(g === 'box' && m === 'stone'); im.receiveShadow = true;
-    if (m === 'glass') im.renderOrder = 2;
+    im.castShadow = !SMALL.has(g) && m !== 'bulb' && !(g === 'box' && m === 'stone'); im.receiveShadow = true;
     im.computeBoundingSphere();
     group.add(im);
   }

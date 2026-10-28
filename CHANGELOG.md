@@ -1,6 +1,12 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
 ## 3.12 — 28 octobre 2026
+- **Island Rush** — Caméra calme contre les murs :
+  - elle ne fait plus l'essuie-glace quand on longe une façade, ni quand l'épaule passe devant une fenêtre ou une vitrine ;
+  - le personnage ne clignote plus quand la caméra s'approche de lui ;
+  - un poteau, un panneau, un tronc ou un banc qui passe entre elle et toi ne la fait plus plonger sur ta tête.
+- **Island Rush** — Les fenêtres n'ont plus de vitre : on tirait déjà à travers, maintenant on voit aussi à travers.
+- **Island Rush** — L'arme d'un coffre tombe toujours devant lui, à portée de main. Avant, une fois sur quatre, elle passait derrière un mur ou sous un meuble et on croyait le coffre sans arme.
 - **Poké Duel** — Le tournoi prend le look de Pokémon Noir & Blanc :
   - en combat, les vrais cadres de PV de la 5e génération, la fenêtre de message d'origine et une police pixel ;
   - les attaques sont de gros boutons à la couleur de leur type, avec PP et efficacité, à côté des boutons Attaque et Pokémon, comme sur l'écran tactile de la DS ;
