@@ -53,6 +53,7 @@ function boot(info = {}, forcedMode = null) {
 
   // --- MODE AVENTURE MULTIJOUEUR À MENTON ---
   if (mode === 'adventure') {
+    root.className = ''; // le tournoi a son propre habillage (tz-root) : on repart d'une page neutre
     activeInstance = mountAdventure(root, {
       me,
       bridge: H,

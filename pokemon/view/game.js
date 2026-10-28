@@ -13,13 +13,14 @@ import { battleMusic } from './music.js';
 import { renderDraft, renderBracket, renderPreview, renderSummary, renderPodium, bracketHtml, esc, trainerAvatar } from './screens.js';
 
 const STATUS_LABELS = {
-  burn: 'BRÛLURE',
-  paralysis: 'PARALYSIE',
-  poison: 'POISON',
-  toxic: 'TOXIK',
+  burn: 'BRÛ',
+  paralysis: 'PAR',
+  poison: 'PSN',
+  toxic: 'PSN',
   freeze: 'GEL',
-  sleep: 'SOMMEIL'
+  sleep: 'SOM'
 };
+const statusBadge = (st) => st ? `<span class="status-badge status-${st}">${STATUS_LABELS[st] || st.toUpperCase()}</span>` : '';
 
 const STAT_SHORT = {
   atk: 'ATQ',
@@ -164,12 +165,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     </div>`;
 
   // --- Rendu des badges de types officiels Showdown ---
-  const typeBadgesHtml = (types) => (types || []).map(t => `
-    <span class="type-pill" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
-      <img class="type-pill-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
-      <span class="type-pill-text">${TYPES[t].name.toUpperCase()}</span>
-    </span>
-  `).join('');
+  const typeBadgesHtml = (types) => (types || []).map(t => `<span class="tz-type" style="--tc:${TYPES[t].color}">${TYPES[t].name}</span>`).join('');
 
   // --- Rendu des paliers de statistiques (+1 ATQ, -1 DÉF, etc.) ---
   const statStagesHtml = (statStages) => {
@@ -300,7 +296,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
           spriteEl.className = `poke-sprite ${isBottom ? 'back' : 'front'} anim-enter`;
         }
         const nameEl = $(isBottom ? '#nameBottom' : '#nameTop');
-        if (nameEl) nameEl.textContent = ev.name.toUpperCase();
+        if (nameEl) nameEl.textContent = ev.name;
 
         if (ev.types) {
           const typesEl = $(isBottom ? '#typesBottom' : '#typesTop');
@@ -505,34 +501,16 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       stage.innerHTML = `
         <div class="arena-card deal ${s.isFinal ? 'final' : ''}" id="arenaCard">
           <div class="battlefield">
-            <!-- HUD Adversaire (Haut-Gauche) -->
+            <!-- Cadre de l'adversaire (Haut-Gauche), cadre Noir & Blanc -->
             <div class="hud-zone hud-top">
-              <div class="status-card opponent-card">
-                <div class="sc-head">
-                  <div class="sc-name-row">
-                    <b class="sc-name" id="nameTop">${pTop.name.toUpperCase()}</b>
-                    <span class="sc-lvl">NV. ${pTop.level || 50}</span>
-                  </div>
-                  <div class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</div>
-                  <span id="statusTop">${pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : ''}</span>
-                  <div class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</div>
-                </div>
-
-                <div class="hp-gauge-row">
-                  <span class="hp-tag">PV</span>
-                  <div class="hp-track">
-                    <div class="hp-fill ${hpClassTop} ${hpPctTop <= 20 ? 'critical' : ''}" id="hpFillTop" style="width:${hpPctTop}%"></div>
-                    <div class="hp-gloss"></div>
-                  </div>
-                </div>
-
-                <div class="sc-foot">
-                  <span class="trainer-badge" style="--tc:${tTop.color}">
-                    <i class="trainer-dot"></i>${esc(tTop.name.toUpperCase())}
-                  </span>
-                  <div id="ballsTop">${ballsHtml(teamTop)}</div>
-                </div>
+              <div class="bw-trainer-row"><span class="bw-trainer" style="--tc:${tTop.color}">${esc(tTop.name)}</span><div id="ballsTop" class="bw-balls">${ballsHtml(teamTop)}</div></div>
+              <div class="bw-box enemy">
+                <b class="bw-name" id="nameTop">${esc(pTop.name)}</b>
+                <span class="bw-lv">N.${pTop.level || 50}</span>
+                <span class="bw-status" id="statusTop">${statusBadge(pTop.status)}</span>
+                <div class="bw-hp"><div class="hp-fill ${hpClassTop}" id="hpFillTop" style="width:${hpPctTop}%"></div></div>
               </div>
+              <div class="bw-extra"><span class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</span><span class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</span></div>
             </div>
 
             <!-- Zone Combat Adversaire (Haut-Droite) -->
@@ -553,36 +531,21 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
               </div>
             </div>
 
-            <!-- HUD Joueur (Bas-Droite) -->
+            <!-- Cadre du joueur (Bas-Droite), cadre Noir & Blanc -->
             <div class="hud-zone hud-bottom">
-              <div class="status-card player-card">
-                <div class="sc-head">
-                  <div class="sc-name-row">
-                    <b class="sc-name" id="nameBottom">${pBottom.name.toUpperCase()}</b>
-                    <span class="sc-lvl">NV. ${pBottom.level || 50}</span>
-                  </div>
-                  <div class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</div>
-                  <span id="statusBottom">${pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : ''}</span>
-                  <div class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</div>
-                </div>
-
-                <div class="hp-gauge-row">
-                  <span class="hp-tag">PV</span>
-                  <div class="hp-track">
-                    <div class="hp-fill ${hpClassBottom} ${hpPctBottom <= 20 ? 'critical' : ''}" id="hpFillBottom" style="width:${hpPctBottom}%"></div>
-                    <div class="hp-gloss"></div>
-                  </div>
-                </div>
-
-                <div class="sc-foot">
-                  <span class="hp-fraction"><b id="hpNumBottom" class="${hpClassBottom}">${pBottom.hp}</b> / <span id="hpMaxBottom">${pBottom.maxHp}</span> PV</span>
-                  <div id="ballsBottom">${ballsHtml(teamBottom)}</div>
-                </div>
+              <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
+              <div class="bw-box player">
+                <b class="bw-name" id="nameBottom">${esc(pBottom.name)}</b>
+                <span class="bw-lv">N.${pBottom.level || 50}</span>
+                <span class="bw-status" id="statusBottom">${statusBadge(pBottom.status)}</span>
+                <div class="bw-hp"><div class="hp-fill ${hpClassBottom}" id="hpFillBottom" style="width:${hpPctBottom}%"></div></div>
+                <span class="bw-hpnum"><b id="hpNumBottom" class="${hpClassBottom}">${pBottom.hp}</b>/<span id="hpMaxBottom">${pBottom.maxHp}</span></span>
               </div>
+              <div class="bw-trainer-row right"><div id="ballsBottom" class="bw-balls">${ballsHtml(teamBottom)}</div><span class="bw-trainer" style="--tc:${tBottom.color}">${esc(tBottom.name)}</span></div>
             </div>
           </div>
 
-          <!-- Bandeau de Dialogue Showdown -->
+          <!-- Fenêtre de message -->
           <div class="battle-dialogue-bar">
             <span class="dialogue-tag" id="turnTag">TOUR ${b.turn || 1}</span>
             <span class="dialogue-text" id="dialogueText">${announcement}</span>
@@ -592,15 +555,15 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
           <div class="dashboard" id="dashContainer"></div>
         </div>`;
     } else {
-      $('#nameTop').textContent = pTop.name.toUpperCase();
+      $('#nameTop').textContent = pTop.name;
       $('#typesTop').innerHTML = typeBadgesHtml(pTop.types);
-      $('#statusTop').innerHTML = pTop.status ? `<span class="status-badge status-${pTop.status}">${STATUS_LABELS[pTop.status] || pTop.status.toUpperCase()}</span>` : '';
+      $('#statusTop').innerHTML = statusBadge(pTop.status);
       if ($('#stagesTop')) $('#stagesTop').innerHTML = statStagesHtml(pTop.statStages);
       $('#ballsTop').innerHTML = ballsHtml(teamTop);
 
-      $('#nameBottom').textContent = pBottom.name.toUpperCase();
+      $('#nameBottom').textContent = pBottom.name;
       $('#typesBottom').innerHTML = typeBadgesHtml(pBottom.types);
-      $('#statusBottom').innerHTML = pBottom.status ? `<span class="status-badge status-${pBottom.status}">${STATUS_LABELS[pBottom.status] || pBottom.status.toUpperCase()}</span>` : '';
+      $('#statusBottom').innerHTML = statusBadge(pBottom.status);
       if ($('#stagesBottom')) $('#stagesBottom').innerHTML = statStagesHtml(pBottom.statStages);
       $('#ballsBottom').innerHTML = ballsHtml(teamBottom);
 
@@ -638,126 +601,74 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     // Rendu du Pupitre de Commandes
     const dash = $('#dashContainer');
     if (dash) {
+      const effTag = (m) => {
+        if (!(m.power > 0)) return '';
+        const eff = getEffectiveness(m.type, pTop.types);
+        if (eff === 0) return '<span class="bw-eff zero">Aucun effet</span>';
+        if (eff >= 2) return `<span class="bw-eff super">Super efficace${eff >= 4 ? ' ×4' : ''}</span>`;
+        if (eff < 1) return '<span class="bw-eff low">Pas très efficace</span>';
+        return '';
+      };
+      const aliveCount = teamBottom.filter(p => !p.fainted).length;
+      // Pas encore de chrono (écran VS, envoi des Pokémon) : les choix ne sont pas encore ouverts
+      const notYet = !s.turnEndsAt;
       dash.innerHTML = isSpectator ? `
-        <div class="spectator-bar">
-          <span class="live-pill">DIRECT</span>
-          <span>MATCH EN COURS : <b>${esc(tBottom.name.toUpperCase())}</b> CONTRE <b>${esc(tTop.name.toUpperCase())}</b></span>
+        <div class="bw-spect">
+          <span class="bw-live">EN DIRECT</span>
+          <span><b>${esc(tBottom.name)}</b> contre <b>${esc(tTop.name)}</b></span>
         </div>
       ` : `
-        <div class="dash-top-row">
+        <div class="bw-dash-head">
           <div class="dash-timer">
             <div class="dt-fill" id="timerFill" style="width:${timerWidth}%"></div>
             <span class="dt-text" id="timerText">${leftSec}</span>
           </div>
-          ${isSubmitted ? '<span class="action-locked"><span class="lock-indicator"></span> ORDRE ENREGISTRÉ · EN ATTENTE</span>' : ''}
+          ${isSubmitted ? '<span class="action-locked">Choix envoyé. En attente…</span>' : ''}
         </div>
-
-        <div class="dash-tabs">
-          <button class="dash-tab ${activeTab === 'moves' ? 'active' : ''}" id="tabMoves" ${isForcedSwitch ? 'disabled' : ''}>
-            ATTAQUE
-          </button>
-          <button class="dash-tab ${activeTab === 'switch' ? 'active' : ''}" id="tabSwitch">
-            ÉQUIPE (${teamBottom.filter(p => !p.fainted).length}/3)
-          </button>
-        </div>
-
-        ${activeTab === 'moves' && !isForcedSwitch ? `
-          <div class="moves-grid">
-            ${pBottom.moves.map((moveId, mIdx) => {
-              const m = MOVES[moveId];
-              if (!m) return '';
-              const maxPp = m.pp || 15;
-              const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
-              const eff = getEffectiveness(m.type, pTop.types);
-              let matchupClass = '';
-              let matchupLabel = '';
-              let multiplierLabel = '';
-
-              if (m.power > 0) {
-                if (eff >= 2) {
-                  matchupClass = 'eff-super';
-                  matchupLabel = 'SUPER EFFICACE';
-                  multiplierLabel = `×${eff}`;
-                } else if (eff <= 0.5 && eff > 0) {
-                  matchupClass = 'eff-low';
-                  matchupLabel = 'PEU EFFICACE';
-                  multiplierLabel = `×${eff}`;
-                } else if (eff === 0) {
-                  matchupClass = 'eff-zero';
-                  matchupLabel = 'AUCUN EFFET';
-                  multiplierLabel = '×0';
-                } else {
-                  matchupClass = 'eff-normal';
-                  matchupLabel = 'EFFICACITÉ STANDARD';
-                  multiplierLabel = '×1';
-                }
-              } else {
-                matchupClass = 'eff-status';
-                matchupLabel = 'CAPACITÉ DE STATUT';
-                multiplierLabel = 'TACTIQUE';
-              }
-
-              return `
-                <button class="pro-move-card" data-move="${moveId}" style="--mc:${TYPES[m.type].color};--mc-bg:${TYPES[m.type].bg}" ${isSubmitted || curPp <= 0 ? 'disabled' : ''}>
-                  <div class="pm-top">
+        <div class="bw-dash-body">
+          ${activeTab === 'moves' && !isForcedSwitch ? `
+            <div class="moves-grid">
+              ${pBottom.moves.map((moveId, mIdx) => {
+                const m = MOVES[moveId];
+                if (!m) return '';
+                const maxPp = m.pp || 15;
+                const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
+                return `
+                  <button class="bw-move" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 ? 'disabled' : ''}
+                    title="${esc(m.name)} · puissance ${m.power || '—'} · précision ${m.acc}%">
                     <span class="pm-key">${mIdx + 1}</span>
-                    <span class="pm-name">${m.name}</span>
-                    <img src="${getCategoryIcon(m.cat)}" class="pm-cat-img" alt="${m.cat}" title="${m.cat.toUpperCase()}">
-                  </div>
-                  <div class="pm-mid">
-                    <img class="pm-type-img" src="${getShowdownTypeIcon(m.type)}" alt="${TYPES[m.type].name}">
-                    <div class="pm-stats-group">
-                      <div class="pm-stat-chip">
-                        <span class="pm-stat-label">PUISS</span>
-                        <span class="pm-stat-val">${m.power ? m.power : '—'}</span>
-                      </div>
-                      <div class="pm-stat-chip">
-                        <span class="pm-stat-label">PRÉC</span>
-                        <span class="pm-stat-val">${m.acc}%</span>
-                      </div>
-                      <div class="pm-stat-chip">
-                        <span class="pm-stat-label">PP</span>
-                        <span class="pm-stat-val">${curPp} / ${maxPp}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="pm-matchup ${matchupClass}">
-                    <span class="pm-matchup-label">${matchupLabel}</span>
-                    <span class="pm-matchup-factor">${multiplierLabel}</span>
-                  </div>
-                </button>`;
-            }).join('')}
+                    <span class="bw-move-name">${esc(m.name)}</span>
+                    <span class="bw-move-meta">
+                      <span class="tz-type" style="--tc:${TYPES[m.type].color}">${TYPES[m.type].name}</span>
+                      <img src="${getCategoryIcon(m.cat)}" class="bw-cat" alt="">
+                      <span class="bw-pp ${curPp <= Math.ceil(maxPp / 4) ? 'low' : ''}">PP ${curPp}/${maxPp}</span>
+                    </span>
+                    ${effTag(m)}
+                  </button>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div class="switch-grid">
+              ${teamBottom.map((p, pIdx) => {
+                const isCurrent = pIdx === (bottomSide === 'A' ? b.activeA : b.activeB);
+                const hpPct = Math.max(0, Math.min(100, Math.round((p.hp / p.maxHp) * 100)));
+                const hpCls = hpPct > 50 ? 'hp-green' : hpPct > 20 ? 'hp-yellow' : 'hp-red';
+                return `
+                  <button class="bw-party ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted || notYet ? 'disabled' : ''}>
+                    <img src="${spriteUrls(p.id).icon}" alt="" class="bw-party-icon">
+                    <b class="bw-party-name">${esc(p.name)}</b>
+                    <span class="bw-party-lv">N.${p.level || 50}</span>
+                    <span class="bw-party-hp"><span class="bw-hp mini"><span class="hp-fill ${hpCls}" style="width:${hpPct}%"></span></span></span>
+                    <span class="bw-party-num">${p.fainted ? 'K.O.' : isCurrent ? 'Au combat' : `${p.hp}/${p.maxHp}`}</span>
+                  </button>`;
+              }).join('')}
+            </div>
+          `}
+          <div class="bw-menu">
+            <button class="bw-menu-btn fight ${activeTab === 'moves' && !isForcedSwitch ? 'on' : ''}" id="tabMoves" ${isForcedSwitch ? 'disabled' : ''}>Attaque</button>
+            <button class="bw-menu-btn party ${activeTab === 'switch' || isForcedSwitch ? 'on' : ''}" id="tabSwitch">Pokémon <small>${aliveCount}/3</small></button>
           </div>
-        ` : `
-          <div class="switch-grid">
-            ${teamBottom.map((p, pIdx) => {
-              const isCurrent = pIdx === (bottomSide === 'A' ? b.activeA : b.activeB);
-              const hpPct = Math.max(0, Math.min(100, Math.round((p.hp / p.maxHp) * 100)));
-              const hpCol = hpPct > 50 ? '#22c55e' : hpPct > 20 ? '#eab308' : '#ef4444';
-              return `
-                <button class="btn-switch ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted ? 'disabled' : ''}>
-                  <div class="bs-avatar">
-                    <img src="${spriteUrls(p.id).icon}" alt="${p.name}" class="bs-icon">
-                    ${isCurrent ? '<span class="bs-tag-current">ACTIF</span>' : ''}
-                    ${p.fainted ? '<span class="bs-tag-ko">K.O.</span>' : ''}
-                  </div>
-                  <div class="bs-details">
-                    <div class="bs-title-row">
-                      <b>${p.name.toUpperCase()}</b>
-                      <span class="bs-lvl">NV. ${p.level || 50}</span>
-                    </div>
-                    <div class="bs-types">
-                      ${p.types.map(t => `<img src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}" class="bs-type-icon">`).join('')}
-                    </div>
-                    <div class="bs-hp-track">
-                      <div class="bs-hp-fill" style="width:${hpPct}%;background:${hpCol}"></div>
-                    </div>
-                    <div class="bs-hp-num">${p.fainted ? 'HORS COMBAT' : `${p.hp} / ${p.maxHp} PV`}</div>
-                  </div>
-                </button>`;
-            }).join('')}
-          </div>
-        `}`;
+        </div>`;
 
       if (!isSpectator && !isSubmitted) {
         const bMoves = $('#tabMoves');
@@ -957,7 +868,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     if (!mySide) return;
     if (mySide === 'A' ? s.submittedA : s.submittedB) return;
-    if (b.phase !== 'choose') return;
+    if (b.phase !== 'choose' || !s.turnEndsAt) return;
     const p = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB];
     if (['1', '2', '3', '4'].includes(e.key)) {
       const moveId = p.moves[Number(e.key) - 1];

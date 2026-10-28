@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.12 — 28 octobre 2026
+- **Poké Duel** — Le tournoi prend le look de Pokémon Noir & Blanc :
+  - en combat, les vrais cadres de PV de la 5e génération, la fenêtre de message d'origine et une police pixel ;
+  - les attaques sont de gros boutons à la couleur de leur type, avec PP et efficacité, à côté des boutons Attaque et Pokémon, comme sur l'écran tactile de la DS ;
+  - le changement de Pokémon se fait dans les panneaux d'équipe d'origine (bleu, rouge si K.O.) ;
+  - draft, tableau, aperçu, résumé et podium passent en fenêtres pixel sobres, sans effets de verre ni néons ;
+  - badges de types et de statuts façon Noir & Blanc, en français (PAR, BRÛ, PSN…).
+- **Poké Duel** — On ne peut plus cliquer une attaque pendant l'écran « VS » : les choix s'ouvrent quand le chrono du tour démarre (le clic se perdait).
+
 ## 3.11 — 28 octobre 2026
 - **Poké Duel** — Le tournoi, repris de fond en comble :
   - un draft pour commencer : chacun garde 3 Pokémon sur 6 proposés, avec la couverture de son équipe et ses faiblesses communes sous les yeux (ou le choix conseillé) ;
