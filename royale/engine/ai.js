@@ -21,6 +21,12 @@ const WANT_D = { pompe: 5, smg: 11, pistolet: 14, fusil: 24, sniper: 60, roquett
 const ENGAGE = { pompe: 18, smg: 32, pistolet: 32, fusil: 50, sniper: 110, roquette: 45 };
 const ISCORE = { potion: 8, soin: 6, potion_petite: 5, bandage: 3, grenade: 2.5, souffle: 0.5, tremplin: 0.3 };
 const RUN = 5.6;
+// nez à nez, deux bots équipés se battent toujours : on ne reste pas côte à côte sans se tirer dessus (en début de partie,
+// chacun fouille de son côté). La distance suit le rythme de la partie (voir agg) : 5 m quand il doit tomber peu de monde,
+// jusqu'à 12 m quand il en reste trop
+const close = (a) => 5 + 7 * a;
+// pas plus de bots à la fois sur un même combat entendu (plus pour un humain) ni sur un même largage
+const HUNT_MAX = 2, HUNT_HUMAN = 3, DROP_MAX = 3;
 
 const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -176,6 +182,26 @@ export function createAI(sim, map, world) {
     if (!p.reached && hd < 30 && !B.approach) { ban(B, g); B.goal = null; B.path = null; }
   }
   const keyOfGoal = (g) => g.kind + ':' + g.id;
+  // combien d'autres bots se dirigent vers ce but (un combat entendu, un largage)
+  function heading(P, kind, id) {
+    let n = 0;
+    for (const Q of S.players.values()) if (Q !== P && Q.alive && Q.ai && Q.ai.goal && Q.ai.goal.kind === kind && Q.ai.goal.id === id) n++;
+    return n;
+  }
+  // un autre bot (pas un coéquipier) se dirige-t-il vers un point à moins de r mètres de (x, z) ?
+  function bound(P, x, z, r) {
+    for (const Q of S.players.values()) {
+      const g = Q !== P && Q.alive && Q.ai && !sim.mates(P, Q) && Q.ai.goal;
+      if (g && Math.abs(g.x - x) < r && Math.abs(g.z - z) < r) return true;
+    }
+    return false;
+  }
+  // combien d'adversaires debout à moins de r mètres de (x, z)
+  function others(P, x, z, r) {
+    let n = 0;
+    for (const Q of S.players.values()) if (Q !== P && Q.alive && Q.mode === 'sol' && !sim.mates(P, Q) && Math.abs(Q.x - x) < r && Math.abs(Q.z - z) < r && Math.hypot(Q.x - x, Q.z - z) < r) n++;
+    return n;
+  }
   function ban(B, g, sec = 40) { if (g && g.id != null) B.ban.set(keyOfGoal(g), S.t + sec); }
   const banned = (B, k) => { const t = B.ban.get(k); return t != null && t > S.t; };
   function claimed(P, k) { const c = claims.get(k); return c && c.id !== P.id && c.until > S.t && S.players.get(c.id) && S.players.get(c.id).alive; }
@@ -186,7 +212,9 @@ export function createAI(sim, map, world) {
     const consider = (g, v, d) => {
       const k = keyOfGoal(g);
       if (v <= 0 || banned(B, k) || claimed(P, k)) return;
-      const s = v / (d + 6);
+      let s = v / (d + 6);
+      // déjà du monde sur place (le butin d'un éliminé, un coffre disputé, la même maison) : on va plutôt ailleurs
+      if (s > bs) s /= 1 + 3 * others(P, g.x, g.z, 14);
       if (s > bs) { bs = s; best = g; }
     };
     const ammoLow = P.inv.some((s) => s && s.t === 'arme' && P.ammo[WEAPONS[s.w].ammo] < 30);
@@ -206,6 +234,7 @@ export function createAI(sim, map, world) {
     // un largage posé attire de loin (170 m), et plusieurs bots peuvent s'y rendre : c'est là que ça se bat
     for (const d of S.drops.values()) {
       if (!d.landed || d.open || banned(B, 'largage:' + d.id)) continue;
+      if (heading(P, 'largage', d.id) >= DROP_MAX) continue;
       const dd = Math.hypot(d.x - P.x, d.z - P.z) + Math.abs(d.gy - P.y) * 2;
       if (dd < 170 && 30 / (dd + 6) > bs) { bs = 30 / (dd + 6); best = { kind: 'largage', id: d.id, x: d.x, y: d.gy, z: d.z }; }
     }
@@ -222,14 +251,19 @@ export function createAI(sim, map, world) {
         if (d) return { kind: 'roam', id: 'b' + b.id, x: (d.o === 'h' ? (d.x + 0.5) * 4 : d.x * 4) - d.nx * 2, z: (d.o === 'h' ? d.z * 4 : (d.z + 0.5) * 4) - d.nz * 2, r: 2 };
       }
     }
+    // un point libre, loin des autres et de là où vont les autres bots (sinon ils y marchent en colonne)
+    let fallback = null;
     for (let i = 0; i < 12; i++) {
       let dx = P.x - c.x, dz = P.z - c.z;
       const l = Math.hypot(dx, dz) || 1;
       const a = Math.atan2(dz / l, dx / l) + (B.rng.next() - 0.5) * (i < 4 ? 0.8 : 3), rr = c.r * (0.25 + B.rng.next() * 0.4);
       const x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
-      if (nav.free(x, nav.stand0(x, z), z)) return { kind: roam ? 'roam' : 'zone', id: null, x, z, r: 3 };
+      if (!nav.free(x, nav.stand0(x, z), z)) continue;
+      const g = { kind: roam ? 'roam' : 'zone', id: null, x, z, r: 3 };
+      if (others(P, x, z, 18) || bound(P, x, z, 18)) { fallback = fallback || g; continue; }
+      return g;
     }
-    return { kind: 'zone', id: null, x: c.x, z: c.z, r: 3 };
+    return fallback || { kind: 'zone', id: null, x: c.x, z: c.z, r: 3 };
   }
 
   // rythme de la partie (« directeur ») : part des joueurs encore en vie visée à la fin de chaque phase de la tempête
@@ -257,8 +291,8 @@ export function createAI(sim, map, world) {
   };
   // un bot croisé sans qu'il nous vise : on ne l'engage qu'avec la probabilité du moment, sinon on l'ignore un temps
   // (on continue sa fouille ou sa route, comme un joueur qui évite un combat inutile) ; un humain est toujours engagé
-  function wants(P, B, Q, hurt) {
-    if (hurt || !Q.bot) return true;
+  function wants(P, B, Q, hurt, d) {
+    if (hurt || !Q.bot || (d < close(agg()) && geared(P, B))) return true;
     const k = Q.id, u = B.ignore.get(k);
     if (u != null && u > S.t) return false;
     if (B.rng.next() < agg()) return true;
@@ -287,7 +321,7 @@ export function createAI(sim, map, world) {
     for (const c of cands.slice(0, 3)) {
       const Q = c.Q, ty = Q.y + (Q.crouch ? 0.85 : 1.3), dx = Q.x - e[0], dy = ty - e[1], dz = Q.z - e[2], L = Math.hypot(dx, dy, dz);
       const h = world.raycast(e[0], e[1], e[2], dx / L, dy / L, dz / L, L);
-      if (h.t >= L - 0.5) { if ((B.enemy === Q.id && !Q.down) || wants(P, B, Q, c.hurt)) { seen = c; break; } }
+      if (h.t >= L - 0.5) { if ((B.enemy === Q.id && !Q.down) || wants(P, B, Q, c.hurt, c.d)) { seen = c; break; } }
     }
     if (seen) {
       if (B.enemy !== seen.Q.id) {
@@ -331,11 +365,12 @@ export function createAI(sim, map, world) {
       // comme un joueur : tant qu'on s'équipe, on ne cherche pas la bagarre de loin (mais on se défend, et un joueur
       // croisé de près est engagé) ; une fois équipé, on va au combat
       if (!geared(P, B)) reach *= E.bot ? 0.55 : 0.85;
-      if (E.bot) reach *= agg();
+      if (E.bot) reach = geared(P, B) ? Math.max(reach * agg(), Math.min(reach, close(agg()))) : reach * agg();
       // sans arme : à la pelle, si on l'attaque ou si un joueur vient tout près
       if ((gun && (d < reach || hunted) && (danger < 2 || d < 25)) || (!gun && B.visible && ((hunted && d < 5) || (!E.bot && d < 6)))) { B.state = 'fight'; return; }
       // entendu sans le voir : armé et en forme, on va voir (on pousse vers les coups de feu)
-      if (gun && (!E.bot || (geared(P, B) && B.rng.next() < agg())) && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')) {
+      if (gun && (!E.bot || (geared(P, B) && B.rng.next() < agg())) && !B.visible && B.last && P.hp + P.sh > 70 && d < 110 && danger < 2 && (!B.goal || B.goal.kind !== 'chasse')
+        && heading(P, 'chasse', E.id) < (E.bot ? HUNT_MAX : HUNT_HUMAN)) {
         B.state = 'go'; setGoal(P, B, { kind: 'chasse', id: E.id, x: B.last.x, z: B.last.z, r: 4 }); return;
       }
       if (B.goal && B.goal.kind === 'chasse' && danger < 2) return;
@@ -395,7 +430,7 @@ export function createAI(sim, map, world) {
     for (const Q of S.players.values()) {
       if (Q === P || !Q.alive || Q.mode !== 'sol' || Q.shotT == null || S.t - Q.shotT > 6 || sim.mates(P, Q)) continue;
       const d = Math.hypot(Q.x - P.x, Q.z - P.z);
-      if (d < bd && stormDanger(Q) < 2) { bd = d; best = Q; }
+      if (d < bd && stormDanger(Q) < 2 && heading(P, 'chasse', Q.id) < (Q.bot ? HUNT_MAX : HUNT_HUMAN)) { bd = d; best = Q; }
     }
     return best && B.rng.next() < B.lv.push ? best : null;
   }
@@ -528,7 +563,8 @@ export function createAI(sim, map, world) {
       const ax = E.x - e[0], ay = ty - e[1], az = E.z - e[2];
       if ((B.errT -= dt) <= 0) {
         B.errT = 0.3 + B.rng.next() * 0.2;
-        const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 : 1);
+        // entre bots, la précision suit le rythme voulu (moins il doit tomber de monde, plus ils se ratent) ; contre un humain, jamais
+        const m = lv.err * (0.35 + 0.65 * Math.exp(-B.track / 1.4)) * (1 + Math.min(1, Math.hypot(E.vx, E.vz) / 6) * 0.6) * (E.bot ? 1.8 + 3.5 * (1 - agg()) : 1);
         B.ex = (B.rng.next() - 0.5) * 2 * m; B.ey = (B.rng.next() - 0.5) * 1.2 * m;
         B.headshot = B.rng.next() < lv.head;
       }

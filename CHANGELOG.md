@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.5 — 28 octobre 2026
+- **Island Rush** — Touches modifiables : dans ⚙️ Réglages, chaque action peut avoir deux touches, au clavier ou à la souris (boutons du côté compris). Ton choix est retenu dans ton navigateur, et tous les rappels à l'écran le suivent.
+  - Les touches s'affichent comme sur ton clavier (Z Q S D sur un clavier français). Une touche déjà utilisée ailleurs y est retirée, et un message le dit.
+- **Island Rush** — Armes plus précises : environ un tiers de dispersion en moins, et à l'arrêt, le premier tir après une courte pause part presque droit (sauf au fusil à pompe).
+  - Le viseur s'ouvre exactement de la dispersion réelle : avant, il paraissait plus serré qu'en vrai, surtout en visant.
+  - Les balles partent vers ce que montre le viseur, même collé à un mur, et plus jamais depuis l'autre côté d'un mur à ta droite.
+  - La précision gagnée est pour les joueurs : les bots gardent la leur.
+- **Island Rush** — Fini les attroupements de bots : ils ne marchent plus en file vers le même coin de la zone et ne s'entassent plus sur le même butin, le même combat ou le même largage. Deux bots équipés nez à nez se battent au lieu de s'ignorer, et la partie dure toujours une dizaine de minutes.
+
 ## 3.4 — 28 octobre 2026
 - **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
 

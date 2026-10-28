@@ -8,7 +8,7 @@ import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
 import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP, PING_T } from './engine/sim.js';
-import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
+import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS, spreadOf, REST } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
 import { makeTeams, TEAM_LABEL } from './engine/teams.js';
@@ -25,6 +25,7 @@ import { setKit, renderIcons } from './view/weapons.js';
 import { CHARACTERS } from './view/kit.js';
 import { renderPortraits } from './view/soldier.js';
 import { Input } from './input.js';
+import { createKeys } from './keys.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
 const H = window.HubBridge;
@@ -107,14 +108,17 @@ async function boot(info) {
     return;
   }
   progress('Carte', 0.95); await breathe();
-  S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project });
+  S.keys = createKeys();
+  S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project, key: kl });
   // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
   setKit(S.scene.kit);
   try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
-  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel, ping: () => { if (S.input.playing) sendPing(); } });
+  S.input = new Input(S.scene.canvas, S.keys, { key: onKey, action: onAction, lock: onLock, wheel: onWheel });
+  // touches changées dans les Réglages (ou apprises du clavier) : les rappels à l'écran suivent
+  paintKeys(); S.keys.onChange(paintKeys);
   loadOpts();
   try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
@@ -214,30 +218,42 @@ function project(x, y, z) {
 
 // ------------------------------------------------------------------ commandes
 function me() { return S.sim ? S.sim.player(S.me) : null; }
-function onKey(code, key) {
+// Échap ferme le sac ou la carte, et rien d'autre (un clic sur l'image reprend la souris)
+function onKey(code) {
+  if (!S.sim || code !== 'Escape' || !(S.hud.bagOpen || S.hud.mapOpen)) return;
+  if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
+  S.hud.toggleMap(false);
+  toast('Clique pour reprendre', 1.5);
+}
+// une action appuyée (ses touches : keys.js, modifiables dans les Réglages) ; saut, tir et visée sont lus par input.js
+function onAction(a) {
   if (!S.sim) return;
   const P = me();
-  if (code === 'Tab') { toggleBag(); return; }
-  // Échap ferme le sac ou la carte, et rien d'autre (un clic sur l'image reprend la souris)
-  if (code === 'Escape' && (S.hud.bagOpen || S.hud.mapOpen)) {
-    if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
-    S.hud.toggleMap(false);
-    toast('Clique pour reprendre', 1.5);
-    return;
-  }
-  if (key === 'm' || code === 'KeyM') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
-  if (key === 'h') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
+  if (a === 'sac') { toggleBag(); return; }
+  if (a === 'carte') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
+  if (a === 'aide') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
   if (!S.input.playing) return;
-  if ((!P || !P.alive) && code === 'Space') { nextSpectate(); return; }
-  if (key === 'e') S.cnt.use++;
-  else if (key === 'r') S.cnt.reload++;
-  else if (key === 'g') S.cnt.drop++;
-  else if (key === 'b') sendPing();
-  // construction : F mur, V sol, C escalier (encore une fois pour sortir), T matériau
-  else if (key === 'f' || key === 'v' || key === 'c') { const k = { f: 'mur', v: 'sol', c: 'escalier' }[key]; S.build = S.build === k ? null : k; buildBar(); S.sfx.play('clic'); }
-  else if (key === 't') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
-  else if (/^Digit[1-5]$/.test(code)) { S.sel = +code.slice(5); S.build = null; buildBar(); }
-  else if (code === 'Digit0' || code === 'Backquote' || key === 'x' || key === '²') { S.sel = 0; S.build = null; buildBar(); }
+  if ((!P || !P.alive) && a === 'saut') { nextSpectate(); return; }
+  if (a === 'utiliser') S.cnt.use++;
+  else if (a === 'recharger') S.cnt.reload++;
+  else if (a === 'lacher') S.cnt.drop++;
+  else if (a === 'repere') sendPing();
+  // construction : mur, sol, escalier (encore une fois pour sortir), matériau
+  else if (a === 'mur' || a === 'sol' || a === 'escalier') { S.build = S.build === a ? null : a; buildBar(); S.sfx.play('clic'); }
+  else if (a === 'materiau') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
+  else if (/^objet[1-5]$/.test(a)) { S.sel = +a.slice(5); S.build = null; buildBar(); }
+  else if (a === 'pioche') { S.sel = 0; S.build = null; buildBar(); }
+}
+// la touche d'une action, telle qu'elle est écrite ; kb : dans une étiquette <kbd>
+const kl = (a) => (S.keys ? S.keys.first(a) : '');
+const kb = (a) => `<kbd>${esc(kl(a))}</kbd>`;
+// rappels des touches à l'écran : <kbd data-k="action"> (sa première touche), <span data-ks="action"> (toutes)
+function paintKeys() {
+  for (const el of document.querySelectorAll('[data-k]')) el.textContent = kl(el.dataset.k);
+  for (const el of document.querySelectorAll('[data-ks]')) el.innerHTML = S.keys.labels(el.dataset.ks).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
+  const list = $('#keylist');
+  if (list) list.innerHTML = keysHtml();
+  buildBar();
 }
 // le sac : la souris est libérée pour glisser les objets ; Tab pour revenir au jeu
 function toggleBag(open = !S.hud.bagOpen) {
@@ -259,8 +275,8 @@ function buildBar() {
   el.hidden = !S.build;
   if (!S.build) return;
   const P = me();
-  el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}"><kbd>${{ mur: 'F', sol: 'V', escalier: 'C' }[k]}</kbd>${l}</span>`).join('')
-    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}"><kbd>T</kbd><i></i>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
+  el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}">${kb(k)}${l}</span>`).join('')
+    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}">${kb('materiau')}<i></i>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
 }
 function onWheel(dir) {
   const P = me();
@@ -281,8 +297,8 @@ function onLock(locked) {
   showScreen('pause');
 }
 function myInput(on, ax) {
-  const inp = S.input;
-  return { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, fire: !!(on && inp.fire), aim: !!(on && inp.aim), sprint: !!(on && inp.sprint), crouch: !!(on && inp.crouch),
+  const inp = S.input, aim = on ? aimAt(me()) : null;
+  return { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, ay: aim ? aim[0] : null, ap: aim ? aim[1] : null, fire: !!(on && inp.fire), aim: !!(on && inp.aim), sprint: !!(on && inp.sprint), crouch: !!(on && inp.crouch),
     jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel, build: on ? S.build : null, mat: S.mat, mv: S.mv };
 }
 
@@ -354,7 +370,7 @@ function loop(now) {
   const air = !P || !P.alive || P.mode !== 'sol';
   if (air !== S.hintsAir) { S.hintsAir = air; $('#hints').classList.toggle('air', air); }
   S.hud.frame(dt);
-  S.hud.crosshair(P ? spreadOf(P) : 0, scoped);
+  S.hud.crosshair(P ? crossGap(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
   if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
@@ -439,11 +455,24 @@ function idleFrame(dt) {
 }
 function heldWeapon(P) { const it = P.sel > 0 ? P.inv[P.sel - 1] : null; return it && it.t === 'arme' ? it : null; }
 function isScoped(P) { const w = P && P.alive && heldWeapon(P); return !!(w && w.w === 'sniper' && S.input && S.input.aim && P.mode === 'sol'); }
-function spreadOf(P) {
+// écart du viseur (pixels) : la dispersion réelle du prochain tir, vue à travers l'objectif du moment
+function crossGap(P) {
   const it = heldWeapon(P);
-  if (!it) return 0.01;
-  const W = WEAPONS[it.w], moving = Math.hypot(P.vx, P.vz) > 1;
-  return (S.input.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground ? 1 : 2) + (P.bloom || 0);
+  const sp = it ? spreadOf(it.w, P, S.input.aim, S.t - (S.shotAt != null ? S.shotAt : -9) > REST) : 0.01;
+  return sp * (S.scene.canvas.clientHeight / 2) / Math.tan(S.fov * Math.PI / 360);
+}
+// où partent les tirs : de l'épaule vers ce que montre le centre de l'image. La caméra n'est pas toujours dans l'axe de
+// l'épaule (recentrée sur la tête contre un mur, relevée au-dessus du sol) : sans ça, la balle partirait à côté du viseur.
+function aimAt(P) {
+  if (!P || !P.alive || P.mode !== 'sol' || !S.cam || isScoped(P)) return null;
+  const cp = Math.cos(S.pitch), f = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
+  const T = Math.max(2, S.sim.trace(P, [S.cam.x, S.cam.y, S.cam.z], f, 450).t);
+  const tx = S.cam.x + f[0] * T, ty = S.cam.y + f[1] * T, tz = S.cam.z + f[2] * T;
+  const [ex, ey, ez] = S.sim.eye(P, true), dx = tx - ex, dy = ty - ey, dz = tz - ez, L = Math.hypot(dx, dy, dz);
+  if (L < 1.5) return null;
+  // même tour que le regard (S.yaw n'est pas ramené entre −π et π)
+  const yaw = Math.atan2(dx, dz);
+  return [S.yaw + Math.atan2(Math.sin(yaw - S.yaw), Math.cos(yaw - S.yaw)), Math.asin(clamp(dy / L, -1, 1))];
 }
 function flightLine() {
   const f = S.sim.S.flight;
@@ -713,7 +742,7 @@ function handleEvents(list) {
         }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
         // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
-        if (e.p === S.me) { const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
+        if (e.p === S.me) { S.shotAt = S.t; const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
         break;
       }
       case 'tir': {
@@ -748,7 +777,7 @@ function handleEvents(list) {
         S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`, e.by === S.me || e.to === S.me);
         if (e.to === S.me) {
           // en équipe, la place n'est connue qu'à la sortie du dernier coéquipier
-          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${!e.place ? 'Ton équipe continue · <kbd>Espace</kbd> : suivre un autre joueur' : `${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.teams > 1 ? new Set([...S.sim.S.players.values()].map((Q) => Q.team)).size + ' équipes' : S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur`}</small>`, 5);
+          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${!e.place ? `Ton équipe continue · ${kb('saut')} : suivre un autre joueur` : `${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.teams > 1 ? new Set([...S.sim.S.players.values()].map((Q) => Q.team)).size + ' équipes' : S.sim.S.players.size} · ${kb('saut')} : regarder un autre joueur`}</small>`, 5);
           S.spect = e.by != null && S.sim.player(e.by) && S.sim.player(e.by).alive ? e.by : pickSpectate();
           S.sfx.play('elimine');
         } else if (e.by === S.me) { S.hud.say(`Tu as éliminé <b>${esc(nameOf(e.to))}</b><small>${e.left} encore en vie</small>`, 2.5); S.sfx.play('elimination'); }
@@ -894,8 +923,8 @@ function report(res) {
 // ------------------------------------------------------------------ interactions affichées sous le viseur
 function showPrompt() {
   const P = me();
-  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
-  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', 'Espace'); return; }
+  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', kl('saut')); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', kl('saut')); return; }
   if (!P || !P.alive || P.mode !== 'sol' || P.down) { S.hud.prompt(''); return; }
   if (P.revive) { S.hud.prompt('Ne bouge pas, tu relèves', (S.sim.player(P.revive.id) || {}).name || '', '#4ade80', '…'); return; }
   const tg = S.sim.target(P);
@@ -1002,10 +1031,15 @@ function roomSkill() {
   return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
 }
 function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
-const KEYS = `<div class="keylist"><span><kbd>B</kbd> ou <kbd>Clic molette</kbd> repère pour l'équipe</span><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
-  <span><kbd>Espace</kbd> sauter, ouvrir le deltaplane</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
-  <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
-  <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
+// liste des commandes (écran d'accueil, pause), avec les touches choisies par le joueur
+function keysHtml() {
+  const ks = (a) => S.keys.labels(a).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
+  return `<div class="keylist"><span>${ks('repere')} repère pour l'équipe</span><span>${kb('avant')}${kb('gauche')}${kb('arriere')}${kb('droite')} se déplacer</span><span><kbd>Souris</kbd> regarder · ${kb('tir')} tirer · ${kb('visee')} viser</span>
+  <span>${kb('saut')} sauter, ouvrir le deltaplane</span><span>${kb('sprint')} sprinter · ${kb('accroupi')} s'accroupir</span>
+  <span>${kb('objet1')}…${kb('objet5')} ou molette : objets · ${kb('pioche')} pioche</span><span>${kb('utiliser')} ouvrir, ramasser · ${kb('recharger')} recharger · ${kb('lacher')} lâcher</span>
+  <span>${kb('sac')} sac (ranger ses objets) · ${kb('carte')} carte</span><span>${kb('mur')} mur · ${kb('sol')} sol · ${kb('escalier')} escalier · ${kb('materiau')} matériau</span></div>
+  <p class="hint">Toutes les touches se changent dans ⚙️ Réglages.</p>`;
+}
 // modèles 3D sous licence CC BY : l'attribution doit rester visible
 const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0) · Sons : Free Firearm Sound Library, Kenney, SpringySpringo, BMacZero, zer0_sol, Emma_MA (CC0) · Pas : congusbongus, swuing, Eelke, EminYILDIRIM, ceberation (CC BY 3.0)</p>';
 function showScreen(kind, data) {
@@ -1021,11 +1055,11 @@ function showScreen(kind, data) {
   const title = '<h1>Island <span>Rush</span></h1>';
   const n = clamp(S.settings.places, 2, MAX_PLACES);
   const rules = expl
-    ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
-    : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
-      ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
+    ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', `Portes (${kl('utiliser')}), escaliers jusqu'aux toits plats, pièces meublées.`], ['flag', 'Voyage', `Clique sur la carte (${kl('carte')}) pour t'y rendre.`]]
+    : [['flag', 'Saute', `Quitte la montgolfière quand tu veux (${kl('saut')}), puis plane jusqu'au sol.`], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
+      ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', `La pioche (${kl('pioche')}) récolte bois, pierre et métal ; ${kl('mur')}, ${kl('sol')}, ${kl('escalier')} posent murs, sols et escaliers.`],
       S.settings.teams > 1
-        ? ['crown_a', 'Dernière équipe debout', `${n} joueurs en ${TEAM_LABEL[S.settings.teams].toLowerCase()} : à 0 PV, on tombe à terre et un coéquipier relève (E, 5 s sans bouger).`]
+        ? ['crown_a', 'Dernière équipe debout', `${n} joueurs en ${TEAM_LABEL[S.settings.teams].toLowerCase()} : à 0 PV, on tombe à terre et un coéquipier relève (${kl('utiliser')}, 5 s sans bouger).`]
         : ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
   // son personnage et sa couleur
   const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
@@ -1036,18 +1070,18 @@ function showScreen(kind, data) {
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${lookHtml}${teamPicker()}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${teamPicker()}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${teamPicker()}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${teamPicker()}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
-    html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
+    html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? `Tu es dans la montgolfière : saute quand tu veux (${kl('saut')}).` : 'La partie a commencé.'}</p><h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
-    html = `<p class="eyebrow">Partie en cours</p>${title}<p class="lead">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (<kbd>Espace</kbd> pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row end">${back}${play('Regarder')}</div>`;
+    html = `<p class="eyebrow">Partie en cours</p>${title}<p class="lead">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (${kb('saut')} pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row end">${back}${play('Regarder')}</div>`;
   } else if (kind === 'perdu') {
     html = `<p class="eyebrow">Liaison perdue</p>${title}<p class="lead">L'hôte ne répond plus.</p><div class="row end">${back}</div>`;
   } else if (kind === 'pause') {
-    html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
+    html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
   } else {
     const { res, mine, winner } = data;
     const won = iWon(winner), tm = S.sim.S.teams > 1, nTeams = tm ? new Set(res.map((r) => r.team)).size : res.length;
@@ -1084,11 +1118,19 @@ function bilanHtml(r, res) {
   return `<div class="bilan">${cards.map(([i, v, l]) => `<span>${icon(i)}<b>${v}</b><small>${l}</small></span>`).join('')}</div>`
     + (killer ? `<p class="hint">Éliminé par <b>${esc(killer.name)}</b>${killer.bot ? ' 🤖' : ''} ${CAUSES[r.how] || ''} · ${killer.kills} élimination${killer.kills > 1 ? 's' : ''} dans la partie</p>` : r.how ? `<p class="hint">Éliminé ${CAUSES[r.how] || ''}</p>` : '');
 }
-// panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, puis la sensibilité
+// panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, la sensibilité, puis
+// les touches (deux par action, retenues dans ce navigateur)
 const SETTINGS = {
   kinds: ['music', 'fx'], accent: '#3d9fd9',
   sections: [{ title: 'Jeu', items: [{ label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +(S.input.sens / 0.0024).toFixed(1),
-    set: (v) => { S.input.sens = 0.0024 * v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) }] }],
+    set: (v) => { S.input.sens = 0.0024 * v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) }] },
+  { title: 'Touches', hint: 'Clique sur une case puis appuie sur la touche voulue, ou clique sur la case avec le bouton de souris voulu. Suppr efface la case, Échap annule.',
+    items: [{ bind: {
+      rows: () => S.keys.ACTIONS.map(([id, label]) => [id, label, S.keys.binds[id].map((b) => (b ? S.keys.label(b) : ''))]),
+      set: (id, slot, ev) => { const lost = S.keys.set(id, slot, ev); return lost.length ? `Cette touche servait aussi à : ${lost.join(', ')}. Elle n'y sert plus.` : ''; },
+      clear: (id, slot) => S.keys.clear(id, slot),
+      reset: () => S.keys.reset(),
+    } }] }],
 };
 function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens })); } catch (e) { /* pas de stockage */ } }
 function loadOpts() {

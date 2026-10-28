@@ -68,18 +68,18 @@
 
   <!-- gauche : rappel des touches (H pour masquer) -->
   <div class="keys panel-d" id="hints">
-    <b>Touches <kbd>H</kbd></b>
-    <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</div>
-    <div><kbd>Espace</kbd> sauter, deltaplane</div>
-    <div><kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</div>
-    <div><kbd>1</kbd>…<kbd>5</kbd> objets · <kbd>X</kbd> pioche</div>
-    <div><kbd>E</kbd> ouvrir, ramasser</div>
-    <div><kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</div>
-    <div><kbd>Tab</kbd> sac · <kbd>M</kbd> carte</div>
-    <div><kbd>B</kbd> ou clic molette : repère</div>
-    <div><kbd>F</kbd><kbd>V</kbd><kbd>C</kbd> construire · <kbd>T</kbd> matériau</div>
+    <b>Touches <kbd data-k="aide">H</kbd></b>
+    <div><kbd data-k="avant">Z</kbd><kbd data-k="gauche">Q</kbd><kbd data-k="arriere">S</kbd><kbd data-k="droite">D</kbd> se déplacer</div>
+    <div><kbd data-k="saut">Espace</kbd> sauter, deltaplane</div>
+    <div><kbd data-k="tir">Clic gauche</kbd> tirer · <kbd data-k="visee">Clic droit</kbd> viser</div>
+    <div><kbd data-k="objet1">1</kbd>…<kbd data-k="objet5">5</kbd> objets · <kbd data-k="pioche">X</kbd> pioche</div>
+    <div><kbd data-k="utiliser">E</kbd> ouvrir, ramasser</div>
+    <div><kbd data-k="recharger">R</kbd> recharger · <kbd data-k="lacher">G</kbd> lâcher</div>
+    <div><kbd data-k="sac">Tab</kbd> sac · <kbd data-k="carte">M</kbd> carte</div>
+    <div><span data-ks="repere"><kbd>B</kbd> ou <kbd>Clic molette</kbd></span> : repère</div>
+    <div><kbd data-k="mur">F</kbd><kbd data-k="sol">V</kbd><kbd data-k="escalier">C</kbd> construire · <kbd data-k="materiau">T</kbd> matériau</div>
   </div>
-  <div class="keychip panel-d" id="keychip"><kbd>H</kbd> commandes</div>
+  <div class="keychip panel-d" id="keychip"><kbd data-k="aide">H</kbd> commandes</div>
 
   <div class="buildbar" id="buildbar" hidden></div>
   <div class="spect panel-d" id="spect" hidden></div>
@@ -90,7 +90,7 @@
 <!-- le sac : ranger, lâcher, voir ses munitions -->
 <div id="bag" hidden>
   <div class="bagp panel-d">
-    <div class="bh"><b>Sac</b><span>Glisse un objet sur une autre case pour le ranger · hors du sac ou clic droit : le lâcher</span><kbd>Tab</kbd></div>
+    <div class="bh"><b>Sac</b><span>Glisse un objet sur une autre case pour le ranger · hors du sac ou clic droit : le lâcher</span><kbd data-k="sac">Tab</kbd></div>
     <div class="bslots" id="bslots"></div>
     <div class="bdet" id="bdet"></div>
     <div class="bcols"><div><h3>Munitions</h3><div id="bammo"></div></div><div><h3>Matériaux</h3><div id="bmats"></div></div></div>
@@ -100,7 +100,7 @@
 <!-- grande carte -->
 <div id="bigmap" hidden>
   <div class="mapview panel-d">
-    <div class="mh"><b>Carte de l'île</b><span id="mapHint"><kbd>M</kbd> fermer</span></div>
+    <div class="mh"><b>Carte de l'île</b><span id="mapHint"><kbd data-k="carte">M</kbd> fermer</span></div>
     <canvas aria-label="Carte de l'île"></canvas>
   </div>
 </div>

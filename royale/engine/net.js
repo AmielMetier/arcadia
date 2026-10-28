@@ -132,6 +132,7 @@ const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0
 export function cleanInput(m) {
   return {
     mx: num(m.mx, -1, 1), mz: num(m.mz, -1, 1), yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.6, 1.6),
+    ay: m.ay == null ? null : num(m.ay, -1e4, 1e4), ap: m.ap == null ? null : num(m.ap, -1.6, 1.6),
     fire: !!m.fire, aim: !!m.aim, sprint: !!m.sprint, crouch: !!m.crouch,
     jump: m.jump | 0, use: m.use | 0, reload: m.reload | 0, shoot: m.shoot | 0, drop: m.drop | 0, sel: num(m.sel | 0, 0, 5),
     build: m.build === 'mur' || m.build === 'sol' || m.build === 'escalier' ? m.build : null,
