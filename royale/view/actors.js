@@ -236,7 +236,7 @@ export function createActors(scene, sim, kit = null) {
       // (caché, dans la montgolfière : le temps ne s'accumule pas, sinon la première image en chute sauterait la culbute)
       h.acc = hero.root.visible ? h.acc + dt : 0;
       if (!hero.root.visible || ++h.tick % every) continue;
-      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), vx: P.vx, vz: P.vz, ground: P.ground, swim: P.swim, crouch: P.crouch, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, down: !!P.down, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
+      hero.update(h.acc, { speed: Math.hypot(P.vx, P.vz), vx: P.vx, vz: P.vz, ground: P.ground, swim: P.swim, crouch: P.crouch, slide: P.slideT > 0, sprint: P.sprint, pitch: P.pitch, mode: P.mode, alive: P.alive, down: !!P.down, held: !!h.key, use: !!P.use, reload: P.rl > 0, far });
       h.acc = 0;
     }
     // montgolfière

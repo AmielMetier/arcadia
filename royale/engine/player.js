@@ -14,8 +14,13 @@ export const MOVE = {
 // pouvoir sauter ; les routes et les chemins restent sous `slow` (voir map.js)
 export const SLOPE = { slow: 0.45, slide: SLIDE, uphill: 0.35, slip: 5, maxSlip: 11 };
 
+// glissade : en courant vite (au-delà de `min` m/s), s'accroupir lance une glissade. Élan relancé (`boost`, au moins la
+// vitesse du sprint), qui se perd peu à peu (`drag`) ; on tourne un peu (`steer`), plus vite en descente ; elle s'arrête
+// en se relevant, sous `end` m/s ou au bout de `time` s (pas tant qu'on descend), puis `cd` s avant la suivante
+export const GLIDE = { min: 6.5, boost: 1.15, drag: 1.05, steer: 2.2, end: 3.2, time: 1.2, cd: 0.45, downhill: 10 };
+
 export function newPlayer(x, y, z, yaw = 0) {
-  return { x, y, z, vx: 0, vy: 0, vz: 0, yaw, ground: false, swim: false, crouch: false, sprint: false, air: 0, fall: 0 };
+  return { x, y, z, vx: 0, vy: 0, vz: 0, yaw, ground: false, swim: false, crouch: false, sprint: false, air: 0, fall: 0, slideT: 0, slideCd: 0, crouchIn: false };
 }
 
 // ------------------------------------------------------------------ en l'air : chute libre puis planeur
@@ -48,7 +53,8 @@ export function stepAir(p, inp, world, dt) {
   return false;
 }
 
-// inp : { mx, mz (−1 → 1, droite / devant), yaw, jump, sprint, crouch } ; dt en secondes (pas fixe conseillé : 1/60)
+// inp : { mx, mz (−1 → 1, droite / devant), yaw, jump, sprint, crouch, glisse (la glissade est permise ; pas aux bots) } ;
+// dt en secondes (pas fixe conseillé : 1/60)
 export function stepPlayer(p, inp, world, dt) {
   const wl = world.waterLevel(p.x, p.z);
   p.swim = wl - p.y > MOVE.swimDepth;
@@ -59,8 +65,20 @@ export function stepPlayer(p, inp, world, dt) {
   if (ml > 1) { mx /= ml; mz /= ml; }
   // s'accroupir : pas dans l'eau ; on ne se relève que s'il y a la place
   const wantCrouch = !!inp.crouch && !p.swim;
-  if (!wantCrouch && p.crouch && world.ceiling(p.x, p.z, p.y + MOVE.hc - 0.05) < p.y + MOVE.h) p.crouch = true;
+  const press = wantCrouch && !p.crouchIn;
+  p.crouchIn = wantCrouch;
+  const room = !(world.ceiling(p.x, p.z, p.y + MOVE.hc - 0.05) < p.y + MOVE.h);
+  if (!wantCrouch && p.crouch && !room) p.crouch = true;
   else p.crouch = wantCrouch;
+  // glissade : lancée en s'accroupissant à pleine course, au sol
+  p.slideCd = Math.max(0, (p.slideCd || 0) - dt);
+  const hs = Math.hypot(p.vx, p.vz);
+  if (press && inp.glisse && p.ground && !p.swim && !p.slideT && p.slideCd <= 0 && hs >= GLIDE.min) {
+    const k = Math.max(hs, MOVE.sprint) * GLIDE.boost / hs;
+    p.vx *= k; p.vz *= k; p.slideT = GLIDE.time;
+  }
+  if (p.slideT > 0 && (p.swim || (!wantCrouch && room))) { p.slideT = 0; p.slideCd = GLIDE.cd; }
+  if (p.slideT > 0) p.crouch = true;
   p.sprint = !!inp.sprint && mz > 0.3 && !p.crouch && !p.swim;
   let speed = p.swim ? MOVE.swim : p.crouch ? MOVE.crouch : p.sprint ? MOVE.sprint : MOVE.run;
   if (mz < -0.1) speed *= MOVE.back;
@@ -79,9 +97,26 @@ export function stepPlayer(p, inp, world, dt) {
     }
     if (steep) { const v = Math.min(SLOPE.maxSlip, SLOPE.slip + (g - SLOPE.slide) * 12); wx -= ux * v; wz -= uz * v; }
   }
-  // au sol (et dans l'eau) on obéit vite ; en l'air on garde son élan ; en glissade on a peu de prise
-  const k = 1 - Math.exp(-(steep ? 4 : p.ground || p.swim ? 14 : 2.2) * dt);
-  p.vx += (wx - p.vx) * k; p.vz += (wz - p.vz) * k;
+  if (p.slideT > 0 && p.ground) {
+    // en glissade : l'élan se perd peu à peu, la pente l'entretient en descente, on tourne un peu vers où l'on pousse
+    p.slideT -= dt;
+    const d = Math.exp(-GLIDE.drag * dt);
+    p.vx *= d; p.vz *= d;
+    if (sl) { p.vx -= sl[0] * GLIDE.downhill * dt; p.vz -= sl[1] * GLIDE.downhill * dt; if (p.vx * sl[0] + p.vz * sl[1] < -0.5) p.slideT = Math.max(p.slideT, 0.15); }
+    const sp = Math.hypot(p.vx, p.vz), wl2 = Math.hypot(wx, wz);
+    if (wl2 > 0.1 && sp > 0.1) {
+      const t = 1 - Math.exp(-GLIDE.steer * dt);
+      const nx = p.vx / sp + (wx / wl2 - p.vx / sp) * t, nz = p.vz / sp + (wz / wl2 - p.vz / sp) * t, nl = Math.hypot(nx, nz) || 1;
+      p.vx = nx / nl * sp; p.vz = nz / nl * sp;
+    }
+    if (sp < GLIDE.end || p.slideT <= 0) { p.slideT = 0; p.slideCd = GLIDE.cd; }
+  } else {
+    // en l'air, une glissade s'arrête (on garde son élan, comme en sautant)
+    if (p.slideT > 0) { p.slideT = 0; p.slideCd = GLIDE.cd; }
+    // au sol (et dans l'eau) on obéit vite ; en l'air on garde son élan ; en glissade on a peu de prise
+    const k = 1 - Math.exp(-(steep ? 4 : p.ground || p.swim ? 14 : 2.2) * dt);
+    p.vx += (wx - p.vx) * k; p.vz += (wz - p.vz) * k;
+  }
 
   if (p.swim) {
     // on flotte : la tête hors de l'eau ; saut = remonter vite (pour sortir sur un quai)

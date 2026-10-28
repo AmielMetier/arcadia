@@ -302,6 +302,8 @@ export function createSound() {
       case 'nage': noise(o, t, 0.22, { type: 'bandpass', f0: 900, f1: 400, q: 0.6, v: 0.25 }); break;
       case 'tremplin': tone(o, t, 0.4, { f0: 180, f1: 720, v: 0.45 }); noise(o, t, 0.4, { type: 'bandpass', f0: 400, f1: 1500, v: 0.3 }); break;
       case 'pose': noise(o, t, 0.1, { f0: 700, f1: 160, v: 0.45 }); break;
+      // glissade : frottement qui s'éteint
+      case 'glisse': noise(o, t, 0.75, { type: 'bandpass', f0: 1400, f1: 500, q: 0.7, a: 0.02, v: 0.55 }); noise(o, t, 0.6, { f0: 400, f1: 150, v: 0.35, buf: brown }); break;
       // portes, récolte, constructions
       case 'porte': tone(o, t, 0.38, { type: 'sawtooth', f0: 210, f1: 300, v: 0.05, vib: 18 }); noise(o, t, 0.08, { f0: 900, f1: 200, v: 0.25 }); break;
       case 'porteF': noise(o, t, 0.12, { f0: 500, f1: 90, v: 0.55 }); tone(o, t, 0.1, { f0: 110, f1: 60, v: 0.35 }); break;
