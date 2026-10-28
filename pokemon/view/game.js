@@ -1,13 +1,16 @@
 // pokemon/view/game.js
-// Interface visuelle de Poké Duel : Arbre de tournoi, arène Showdown avec assets officiels Gen 5 animés,
-// barres de PV progressives, paliers de stats en direct, PP réels, journal de combat et déroulement séquentiel.
+// Interface du tournoi Poké Duel : enchaîne les écrans (draft, tableau, aperçu, combat, résumé, podium)
+// selon l'état diffusé par l'hôte. L'arène de combat (sprites Showdown animés, barres de PV progressives,
+// paliers de stats, PP réels, journal, déroulement séquentiel des tours) vit ici ; les autres écrans dans screens.js.
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { STAGE_MULTS } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
+import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
 import { sfx } from './sfx.js';
 import { battleMusic } from './music.js';
+import { renderDraft, renderBracket, renderPreview, renderSummary, renderPodium, bracketHtml, esc, trainerAvatar } from './screens.js';
 
 const STATUS_LABELS = {
   burn: 'BRÛLURE',
@@ -28,17 +31,20 @@ const STAT_SHORT = {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export function mountGame(root, { me, startMatch, restart, submitAction, switchMode, exit }) {
-  root.className = 'poke-root';
+export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, submitAction, isHost, switchMode, exit }) {
+  root.className = 'poke-root tz-root';
   root.innerHTML = `
+    <div class="tz-backdrop" aria-hidden="true"><i class="beam b1"></i><i class="beam b2"></i><i class="beam b3"></i></div>
     <header class="poke-topbar">
       <div class="poke-brand">
-        <span class="poke-badge">3v3</span>
+        <svg class="tz-logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#fff" stroke="#000" stroke-width="2.5"/><path d="M2 16a14 14 0 0 1 28 0z" fill="#ee1515" stroke="#000" stroke-width="2.5"/><circle cx="16" cy="16" r="4.5" fill="#fff" stroke="#000" stroke-width="2.5"/></svg>
         <b>POKÉ DUEL</b>
+        <span class="poke-badge">TOURNOI 3v3</span>
         <span id="pokeRoundTitle">Tournoi</span>
       </div>
       <div class="poke-tools">
         ${switchMode ? `<button class="poke-tool mode-switch-btn" id="btnSwitchAdv">MODE : <b>AVENTURE MENTON</b></button>` : ''}
+        <button class="poke-tool" id="btnTree">TABLEAU</button>
         <button class="poke-tool" id="btnLog">JOURNAL</button>
         <button class="poke-tool" id="btnSet" aria-label="Réglages">RÉGLAGES</button>
         <button class="poke-tool quit" id="btnQuit">QUITTER</button>
@@ -52,6 +58,14 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
       </div>
       <div class="pld-list" id="pokeLogList"></div>
     </div>
+    <div class="tz-tree-drawer" id="pokeTreeDrawer" hidden>
+      <div class="pld-head">
+        <b>TABLEAU DU TOURNOI</b>
+        <button class="pld-close" id="btnCloseTree">FERMER</button>
+      </div>
+      <div class="tz-tree-body" id="pokeTreeBody"></div>
+    </div>
+    <div class="tz-splash" id="pokeSplash" hidden></div>
     <div class="poke-toast" id="pokeToast" hidden></div>`;
 
   const $ = (s) => root.querySelector(s);
@@ -62,7 +76,12 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
   let displayedHp = { bottom: null, top: null };
   let hpAnimRaf = { bottom: null, top: null };
   let isResolvingTurn = false;
-  let queuedState = null;
+  let animGen = 0;          // change quand on quitte le combat : coupe une animation en cours
+  const evQueue = [];       // tours reçus pendant qu'un autre se déroule à l'écran
+  let lastEvSeq = 0;
+  let clockOff = 0;         // décalage d'horloge avec l'hôte
+  let lastPhase = null;
+  const now = () => Date.now() + clockOff;
 
   // --- Outils & Audio : la musique et les effets se règlent dans le panneau Réglages (à 0 : coupés) ---
   DDVolume.panel($('#btnSet'), { accent: '#ffcb05' });
@@ -79,9 +98,23 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
   const logList = $('#pokeLogList');
   $('#btnLog').onclick = () => {
     logDrawer.hidden = !logDrawer.hidden;
+    treeDrawer.hidden = true;
     renderLogHistory();
   };
   $('#btnCloseLog').onclick = () => { logDrawer.hidden = true; };
+
+  const treeDrawer = $('#pokeTreeDrawer');
+  $('#btnTree').onclick = () => {
+    treeDrawer.hidden = !treeDrawer.hidden;
+    logDrawer.hidden = true;
+    renderTreeDrawer();
+  };
+  $('#btnCloseTree').onclick = () => { treeDrawer.hidden = true; };
+
+  function renderTreeDrawer() {
+    if (treeDrawer.hidden || !state || !state.t) return;
+    $('#pokeTreeBody').innerHTML = bracketHtml(state.t, me.id, true);
+  }
 
   function renderLogHistory() {
     if (!logList) return;
@@ -93,7 +126,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
     logList.innerHTML = hist.map(item => `
       <div class="pld-row type-${item.type || 'msg'}">
         <span class="pld-turn">T${item.turn || 1}</span>
-        <span class="pld-txt">${item.text}</span>
+        <span class="pld-txt">${esc(item.text)}</span>
       </div>
     `).join('');
     logList.scrollTop = logList.scrollHeight;
@@ -107,6 +140,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.hidden = true; }, ms);
   }
+
 
   // --- Rendu des Popups de dégâts flottants ---
   function showDamagePopup(side, damage, isCrit) {
@@ -150,110 +184,6 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
     }).join('');
   };
 
-  // --- Rendu du Bracket / Aperçu du Tournoi ---
-  function renderBracket(s) {
-    battleMusic.stop();
-    displayedHp = { bottom: null, top: null };
-    const round = s.rounds[s.currentRoundIdx];
-    const match = round ? round[s.currentMatchIdx] : null;
-    const roundTitle = match ? match.roundName : 'Arbre du Tournoi';
-    $('#pokeRoundTitle').textContent = roundTitle;
-
-    const matchCardHtml = match ? `
-      <div class="match-card deal">
-        <div class="match-badge">${match.roundName.toUpperCase()} · MATCH ${s.currentMatchIdx + 1}/${round.length}</div>
-        <div class="versus-row">
-          <div class="fighter-card ${String(match.playerA.id) === String(me.id) ? 'me' : ''}" style="--c:${match.playerA.color}">
-            <div class="trainer-header">
-              <i class="dot"></i>
-              <b>${match.playerA.name.toUpperCase()}</b>
-              ${match.playerA.bot ? '<span class="tag-bot">BOT</span>' : '<span class="tag-human">JOUEUR</span>'}
-            </div>
-            <div class="team-preview">
-              ${match.playerA.team.map(p => `
-                <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
-                  <img class="preview-poke-icon" src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
-                  <span class="preview-poke-name">${p.name.toUpperCase()}</span>
-                  <div class="preview-types">
-                    ${p.types.map(t => `
-                      <span class="preview-type-chip" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
-                        <img class="preview-type-chip-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
-                        <span>${TYPES[t].name.slice(0, 4).toUpperCase()}</span>
-                      </span>
-                    `).join('')}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="versus-sep">VS</div>
-
-          <div class="fighter-card ${String(match.playerB.id) === String(me.id) ? 'me' : ''}" style="--c:${match.playerB.color}">
-            <div class="trainer-header">
-              <i class="dot"></i>
-              <b>${match.playerB.name.toUpperCase()}</b>
-              ${match.playerB.bot ? '<span class="tag-bot">BOT</span>' : '<span class="tag-human">JOUEUR</span>'}
-            </div>
-            <div class="team-preview">
-              ${match.playerB.team.map(p => `
-                <div class="preview-slot" title="${p.name} (${p.types.map(t => TYPES[t].name).join('/')})">
-                  <img class="preview-poke-icon" src="${spriteUrls(p.id).icon}" alt="${p.name}" loading="lazy">
-                  <span class="preview-poke-name">${p.name.toUpperCase()}</span>
-                  <div class="preview-types">
-                    ${p.types.map(t => `
-                      <span class="preview-type-chip" style="background:${TYPES[t].color}" title="${TYPES[t].name}">
-                        <img class="preview-type-chip-img" src="${getShowdownTypeIcon(t)}" alt="${TYPES[t].name}">
-                        <span>${TYPES[t].name.slice(0, 4).toUpperCase()}</span>
-                      </span>
-                    `).join('')}
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-
-        <div class="match-action-row">
-          <button class="btn big yellow btn-start-match" id="btnStartFight">LANCER LE COMBAT</button>
-        </div>
-      </div>` : '';
-
-    stage.innerHTML = `
-      <div class="bracket-screen">
-        <h2 class="bracket-title">CHAMPIONNAT POKÉMON · TOURNOI 3v3</h2>
-        <div class="bracket-tree">
-          ${s.rounds.map((r, rIdx) => `
-            <div class="bracket-round">
-              <div class="round-header">${r[0] ? r[0].roundName.toUpperCase() : `TOUR ${rIdx + 1}`}</div>
-              <div class="round-matches">
-                ${r.map((m, mIdx) => {
-                  const isCurrent = rIdx === s.currentRoundIdx && mIdx === s.currentMatchIdx;
-                  return `
-                    <div class="tree-match ${isCurrent ? 'current' : ''} ${m.status}">
-                      <div class="tree-trainer ${m.winner && m.playerA && String(m.winner.id) === String(m.playerA.id) ? 'win' : ''}">
-                        <span class="tree-name">${m.playerA ? m.playerA.name.toUpperCase() : '—'}</span>
-                      </div>
-                      <div class="tree-trainer ${m.winner && m.playerB && String(m.winner.id) === String(m.playerB.id) ? 'win' : ''}">
-                        <span class="tree-name">${m.playerB ? m.playerB.name.toUpperCase() : '—'}</span>
-                      </div>
-                    </div>`;
-                }).join('')}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        ${matchCardHtml}
-      </div>`;
-
-    const bStart = $('#btnStartFight');
-    if (bStart) {
-      bStart.onclick = () => {
-        sfx.play('hit');
-        startMatch();
-      };
-    }
-  }
 
   // --- Animation progressive et fluide de la barre de PV ---
   function animateHp(side, fromHp, toHp, maxHp) {
@@ -318,16 +248,12 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
 
   // --- Déroulement séquentiel et authentique d'un tour de combat ---
   async function playSequentialTurn(s) {
-    isResolvingTurn = true;
     const b = s.battle;
-    if (!b) {
-      isResolvingTurn = false;
-      return;
-    }
-
-    if (!$('#arenaCard')) {
-      renderBattle(s);
-    }
+    if (!b) return;
+    if (!$('#arenaCard')) renderBattle(s);
+    isResolvingTurn = true;
+    const gen = animGen;
+    const pause = async (ms) => { await sleep(ms); return gen !== animGen; };
 
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const bottomSide = mySide === 'B' ? 'B' : 'A';
@@ -392,7 +318,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
           animateHp(sideKey, ev.hp, ev.hp, ev.maxHp);
         }
 
-        await sleep(1500);
+        if (await pause(1500)) return;
 
       } else if (ev.type === 'attack_start') {
         const isBottom = (ev.side === bottomSide);
@@ -409,7 +335,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
           void spriteEl.offsetWidth;
           spriteEl.classList.add(animClass);
         }
-        await sleep(1400);
+        if (await pause(1400)) return;
 
       } else if (ev.type === 'damage') {
         const targetIsBottom = (ev.defSide === bottomSide);
@@ -445,7 +371,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
         animateHp(sideKey, oldHp, ev.defHp, ev.defMaxHp);
         displayedHp[sideKey] = ev.defHp;
 
-        await sleep(1550);
+        if (await pause(1550)) return;
 
       } else if (ev.type === 'faint') {
         const isBottom = (ev.side === bottomSide);
@@ -462,7 +388,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
         const team = isBottom ? (bottomSide === 'A' ? b.teamA : b.teamB) : (topSide === 'A' ? b.teamA : b.teamB);
         if (ballsEl) ballsEl.innerHTML = ballsHtml(team);
 
-        await sleep(1500);
+        if (await pause(1500)) return;
 
       } else if (ev.type === 'status_damage') {
         const isBottom = (ev.side === bottomSide);
@@ -477,7 +403,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
         const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : (ev.hp + ev.damage);
         animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
         displayedHp[sideKey] = ev.hp;
-        await sleep(1350);
+        if (await pause(1350)) return;
 
       } else if (ev.type === 'heal' || ev.type === 'recoil') {
         const isBottom = (ev.side === bottomSide);
@@ -486,7 +412,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
         const oldHp = displayedHp[sideKey] !== null ? displayedHp[sideKey] : ev.hp;
         animateHp(sideKey, oldHp, ev.hp, ev.maxHp);
         displayedHp[sideKey] = ev.hp;
-        await sleep(1300);
+        if (await pause(1300)) return;
 
       } else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured' || ev.type === 'msg') {
         setDialogue(ev.msg || ev.text, 'step-status');
@@ -501,24 +427,21 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
           const stEl = $(isBottom ? '#statusBottom' : '#statusTop');
           if (stEl) stEl.innerHTML = '';
         }
-        await sleep(1300);
+        if (await pause(1300)) return;
 
       } else if (ev.type === 'victory') {
         setDialogue(ev.msg, 'step-victory');
         sfx.play('victory');
-        await sleep(1600);
+        if (await pause(1600)) return;
       }
     }
 
     isResolvingTurn = false;
-    const nextQueued = queuedState;
-    queuedState = null;
-    if (nextQueued && nextQueued.events && nextQueued.events.length > 0) {
-      playSequentialTurn(nextQueued);
+    if (evQueue.length) {
+      playSequentialTurn(evQueue.shift());
       return;
     }
-    const targetState = nextQueued || s;
-    renderBattle(targetState);
+    if (state && state.phase === 'battle') renderBattle(state);
     if (!logDrawer.hidden) renderLogHistory();
   }
 
@@ -529,11 +452,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
 
     if (isResolvingTurn) return;
 
-    const isFinalRound = s.rounds && s.currentRoundIdx === s.rounds.length - 1;
-    const expectedTrack = isFinalRound ? 'cynthia' : 'sandstorm';
-    if (!battleMusic.isPlaying() && battleMusic.musicEnabled) {
-      battleMusic.start(expectedTrack);
-    }
+    if (battleMusic.musicEnabled) battleMusic.start(s.isFinal ? 'cynthia' : 'sandstorm');
 
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     const isSpectator = !mySide;
@@ -574,9 +493,9 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
       announcement = `Tour ${b.turn || 1} — Que doit faire ${pBottom.name} ?`;
     }
 
-    const leftMs = Math.max(0, s.turnEndsAt - Date.now());
-    const leftSec = Math.ceil(leftMs / 1000);
-    const timerWidth = Math.max(0, Math.min(100, (leftMs / (s.timerSecs * 1000)) * 100));
+    const leftMs = s.turnEndsAt ? Math.max(0, s.turnEndsAt - now()) : 0;
+    const leftSec = s.turnEndsAt ? `${Math.ceil(leftMs / 1000)} s` : '—';
+    const timerWidth = s.turnEndsAt ? Math.max(0, Math.min(100, (leftMs / (s.timerSecs * 1000)) * 100)) : 100;
 
     const existingArena = $('#arenaCard');
     if (!existingArena) {
@@ -584,7 +503,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
       displayedHp.top = pTop.hp;
 
       stage.innerHTML = `
-        <div class="arena-card deal" id="arenaCard">
+        <div class="arena-card deal ${s.isFinal ? 'final' : ''}" id="arenaCard">
           <div class="battlefield">
             <!-- HUD Adversaire (Haut-Gauche) -->
             <div class="hud-zone hud-top">
@@ -609,7 +528,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
 
                 <div class="sc-foot">
                   <span class="trainer-badge" style="--tc:${tTop.color}">
-                    <i class="trainer-dot"></i>${tTop.name.toUpperCase()}
+                    <i class="trainer-dot"></i>${esc(tTop.name.toUpperCase())}
                   </span>
                   <div id="ballsTop">${ballsHtml(teamTop)}</div>
                 </div>
@@ -619,7 +538,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
             <!-- Zone Combat Adversaire (Haut-Droite) -->
             <div class="fighter-zone fighter-top">
               <div class="platform platform-top">
-                <img src="assets/plat_grass_enemy.png" class="plat-img" alt="platform">
+                <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
                 <img class="poke-sprite front ${pTop.fainted ? 'fainted' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
                 <div class="damage-popup-anchor" id="popupAnchorTop"></div>
               </div>
@@ -628,7 +547,7 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
             <!-- Zone Combat Joueur (Bas-Gauche) -->
             <div class="fighter-zone fighter-bottom">
               <div class="platform platform-bottom">
-                <img src="assets/plat_grass_enemy.png" class="plat-img" alt="platform">
+                <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
                 <img class="poke-sprite back ${pBottom.fainted ? 'fainted' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
                 <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
               </div>
@@ -722,13 +641,13 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
       dash.innerHTML = isSpectator ? `
         <div class="spectator-bar">
           <span class="live-pill">DIRECT</span>
-          <span>MATCH EN COURS : <b>${tBottom.name.toUpperCase()}</b> CONTRE <b>${tTop.name.toUpperCase()}</b></span>
+          <span>MATCH EN COURS : <b>${esc(tBottom.name.toUpperCase())}</b> CONTRE <b>${esc(tTop.name.toUpperCase())}</b></span>
         </div>
       ` : `
         <div class="dash-top-row">
           <div class="dash-timer">
             <div class="dt-fill" id="timerFill" style="width:${timerWidth}%"></div>
-            <span class="dt-text" id="timerText">${leftSec} s</span>
+            <span class="dt-text" id="timerText">${leftSec}</span>
           </div>
           ${isSubmitted ? '<span class="action-locked"><span class="lock-indicator"></span> ORDRE ENREGISTRÉ · EN ATTENTE</span>' : ''}
         </div>
@@ -867,65 +786,186 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
     }
   }
 
-  // --- Rendu du Podium Final ---
-  function renderPodium(s) {
-    battleMusic.stop();
-    sfx.play('victory');
-    const champ = s.champion;
+  // ==========================================================================
+  // Écrans hors combat
+  // ==========================================================================
 
-    stage.innerHTML = `
-      <div class="podium-screen deal">
-        <h1 class="podium-title">VAINQUEUR DE LA LIGUE POKÉMON</h1>
-        <div class="champ-banner" style="--cc:${champ.color}">
-          <div class="champ-crown-tag">MAÎTRE DU TOURNOI</div>
-          <h2>${champ.name.toUpperCase()}</h2>
-          <p>Champion Officiel de la Ligue Pokémon 3v3</p>
-          <div class="champ-team">
-            ${champ.team.map(p => `
-              <div class="champ-poke-card">
-                <img src="${spriteUrls(p.id).artwork}" alt="${p.name}">
-                <b>${p.name.toUpperCase()}</b>
-                <div class="champ-types">
-                  ${p.types.map(t => `
-                    <span class="preview-type-chip" style="background:${TYPES[t].color}">
-                      <img class="preview-type-chip-img" src="${getShowdownTypeIcon(t)}" alt="${t}">
-                      <span>${TYPES[t].name.toUpperCase()}</span>
-                    </span>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
+  const local = { draft: [], draftKey: null, lead: null, leadKey: null };
+  const ctx = {
+    me,
+    local,
+    sfx,
+    isHost,
+    actions: { skip, cont, restart, lead },
+    exit: () => { battleMusic.stop(); cleanup(); exit(); },
+    rerender: () => { if (state) renderPhase(state); },
+    toggleDraft(dex) {
+      const i = local.draft.indexOf(dex);
+      if (i >= 0) local.draft.splice(i, 1);
+      else if (local.draft.length < TEAM_SIZE) local.draft.push(dex);
+      else { local.draft.shift(); local.draft.push(dex); }
+      sfx.play('switch');
+      ctx.rerender();
+    },
+    submitDraft() {
+      if (local.draft.length !== TEAM_SIZE) return;
+      sfx.play('levelup');
+      draft([...local.draft]);
+    },
+    pickLead(idx) {
+      local.lead = idx;
+      lead(idx);
+      sfx.play('switch');
+      ctx.rerender();
+    },
+    sendReady() {
+      sfx.play('hit');
+      ready(local.lead);
+    },
+  };
 
-        <div class="podium-actions">
-          <button class="btn big yellow" id="btnPlayAgain">NOUVEAU TOURNOI</button>
-          <button class="btn big ghost" id="btnBackLobby">RETOUR AU SALON</button>
-        </div>
-      </div>`;
-
-    $('#btnPlayAgain').onclick = () => restart();
-    $('#btnBackLobby').onclick = () => { cleanup(); exit(); };
+  // --- Écran « VS » façon combat de dresseurs, à l'entrée de chaque manche ---
+  let splashTimer = null;
+  function showSplash(s) {
+    const m = currentMatch(s.t);
+    const el = $('#pokeSplash');
+    if (!m || !el) return;
+    const mine = String(m.b) === String(me.id);
+    const L = getParticipant(s.t, mine ? m.b : m.a);
+    const R = getParticipant(s.t, mine ? m.a : m.b);
+    if (!L || !R) return;
+    const sub = m.bestOf > 1 ? `MANCHE ${s.t.gameNo} · ${mine ? `${m.scoreB}-${m.scoreA}` : `${m.scoreA}-${m.scoreB}`}` : 'UNE SEULE MANCHE';
+    el.innerHTML = `
+      <div class="sp-half left" style="--pc:${L.color}">${trainerAvatar(L, 'splash')}<b>${esc(L.name)}</b></div>
+      <div class="sp-half right" style="--pc:${R.color}">${trainerAvatar(R, 'splash')}<b>${esc(R.name)}</b></div>
+      <div class="sp-center"><span class="sp-round">${esc(m.name.toUpperCase())}</span><span class="sp-vs">VS</span><span class="sp-sub">${sub}</span></div>`;
+    el.hidden = false;
+    el.classList.remove('out');
+    void el.offsetWidth;
+    el.classList.add('in');
+    sfx.play('encounter');
+    clearTimeout(splashTimer);
+    splashTimer = setTimeout(() => {
+      el.classList.add('out');
+      splashTimer = setTimeout(() => { el.hidden = true; el.classList.remove('in', 'out'); }, 450);
+    }, 1900);
   }
 
+  function headerTitle(s) {
+    const t = s.t;
+    const m = currentMatch(t);
+    const el = $('#pokeRoundTitle');
+    if (!el) return;
+    if (s.phase === 'draft') el.textContent = 'Draft';
+    else if (s.phase === 'bracket') el.textContent = 'Tableau';
+    else if (s.phase === 'podium') el.textContent = 'Podium';
+    else if (m) {
+      const mine = String(m.b) === String(me.id);
+      el.textContent = m.bestOf > 1 ? `${m.name} · ${mine ? `${m.scoreB}-${m.scoreA}` : `${m.scoreA}-${m.scoreB}`}` : m.name;
+    }
+  }
+
+  let lastRenderKey = null;
+  function renderPhase(s) {
+    headerTitle(s);
+    const renderKey = `${s.phase}:${s.t.cur || ''}:${s.t.gameNo || 0}`;
+    const fresh = renderKey !== lastRenderKey;
+    lastRenderKey = renderKey;
+    if (s.phase === 'draft') {
+      const meP = getParticipant(s.t, me.id);
+      const key = meP ? meP.offer.join(',') : '';
+      if (local.draftKey !== key) { local.draftKey = key; local.draft = []; }
+      renderDraft(stage, s, ctx);
+    } else if (s.phase === 'bracket') renderBracket(stage, s, ctx);
+    else if (s.phase === 'preview') renderPreview(stage, s, ctx);
+    else if (s.phase === 'summary') renderSummary(stage, s, ctx);
+    else if (s.phase === 'podium') renderPodium(stage, s, ctx);
+    // Même écran redessiné (un joueur valide, l'adversaire est prêt…) : pas de nouvelle animation d'entrée
+    if (!fresh && stage.firstElementChild) stage.firstElementChild.classList.add('still');
+    tick();
+  }
+
+  function music(s) {
+    if (s.phase === 'draft' || s.phase === 'bracket' || s.phase === 'preview') {
+      if (battleMusic.musicEnabled) battleMusic.start('trainer');
+    } else if (s.phase === 'summary') {
+      battleMusic.stop();
+    } else if (s.phase === 'podium') {
+      battleMusic.stop();
+      if (lastPhase !== 'podium') sfx.play('victory');
+    }
+  }
+
+  // --- Comptes à rebours (draft, aperçu, résumé…) et chrono de combat ---
+  function tick() {
+    for (const el of root.querySelectorAll('[data-deadline]')) {
+      const left = Math.max(0, Math.ceil((Number(el.dataset.deadline) - now()) / 1000));
+      el.textContent = `${left} s`;
+      el.classList.toggle('urgent', left <= 5);
+    }
+    for (const el of root.querySelectorAll('[data-deadline-bar]')) {
+      const left = Math.max(0, Number(el.dataset.deadlineBar) - now());
+      el.style.width = `${Math.min(100, (left / Number(el.dataset.total)) * 100)}%`;
+    }
+    if (state && state.phase === 'battle') {
+      const fill = $('#timerFill');
+      const txt = $('#timerText');
+      if (fill && txt) {
+        if (!state.turnEndsAt || isResolvingTurn) {
+          fill.style.width = '100%';
+          txt.textContent = '—';
+          fill.parentElement.classList.remove('urgent');
+        } else {
+          const leftMs = Math.max(0, state.turnEndsAt - now());
+          const sec = Math.ceil(leftMs / 1000);
+          fill.style.width = `${Math.min(100, (leftMs / (state.timerSecs * 1000)) * 100)}%`;
+          txt.textContent = `${sec} s`;
+          fill.parentElement.classList.toggle('urgent', sec <= 5);
+        }
+      }
+    }
+  }
+  const tickTimer = setInterval(tick, 200);
+
+  // --- Raccourcis clavier ---
   function onKeyDown(e) {
-    if (isResolvingTurn) return;
-    if (!state || state.phase !== 'battle' || !state.battle) return;
-    const b = state.battle;
+    if (!state || !state.t || e.target.closest('input, textarea')) return;
+    const s = state;
+    if (s.phase === 'draft') {
+      const meP = getParticipant(s.t, me.id);
+      if (!meP || meP.team) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= meP.offer.length) ctx.toggleDraft(meP.offer[n - 1]);
+      else if (e.key === 'Enter') ctx.submitDraft();
+      return;
+    }
+    if (s.phase === 'preview') {
+      const m = currentMatch(s.t);
+      const side = m && (String(m.a) === String(me.id) ? 'A' : String(m.b) === String(me.id) ? 'B' : null);
+      if (!side || s.t.ready[side]) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= TEAM_SIZE) ctx.pickLead(n - 1);
+      else if (e.key === 'Enter') ctx.sendReady();
+      return;
+    }
+    if (s.phase === 'summary') {
+      if (e.key === 'Enter') { const b = $('#smGo'); if (b && !b.disabled) b.click(); }
+      return;
+    }
+    if (s.phase !== 'battle' || !s.battle || isResolvingTurn) return;
+    const b = s.battle;
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     if (!mySide) return;
-
-    const isSubmitted = mySide === 'A' ? state.submittedA : state.submittedB;
-    if (isSubmitted) return;
-
+    if (mySide === 'A' ? s.submittedA : s.submittedB) return;
+    if (b.phase !== 'choose') return;
     const p = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB];
     if (['1', '2', '3', '4'].includes(e.key)) {
-      const idx = Number(e.key) - 1;
-      if (p.moves[idx]) {
-        const moveObj = MOVES[p.moves[idx]];
-        if (moveObj && moveObj.cat === 'special') sfx.play('beam');
-        else sfx.play('hit');
-        submitAction({ type: 'move', moveId: p.moves[idx] });
+      const moveId = p.moves[Number(e.key) - 1];
+      const curPp = p.ppMap && p.ppMap[moveId] !== undefined ? p.ppMap[moveId] : 1;
+      if (moveId && curPp > 0) {
+        const moveObj = MOVES[moveId];
+        sfx.play(moveObj && moveObj.cat === 'special' ? 'beam' : 'hit');
+        submitAction({ type: 'move', moveId });
       }
     }
   }
@@ -934,26 +974,41 @@ export function mountGame(root, { me, startMatch, restart, submitAction, switchM
 
   function cleanup() {
     window.removeEventListener('keydown', onKeyDown);
+    clearInterval(tickTimer);
+    animGen++;
   }
 
   return {
     update(s, off) {
+      if (!s || !s.t) return;
+      clockOff = off || 0;
       state = s;
-      if (s.phase === 'bracket_preview') {
-        isResolvingTurn = false;
-        renderBracket(s);
-      } else if (s.phase === 'battle') {
-        if (s.events && s.events.length > 0 && !isResolvingTurn) {
-          playSequentialTurn(s);
-        } else if (isResolvingTurn) {
-          queuedState = s;
-        } else {
-          renderBattle(s);
+      music(s);
+
+      if (s.phase === 'battle') {
+        if (lastPhase && lastPhase !== 'battle') showSplash(s);
+        if (s.evSeq > lastEvSeq && s.events && s.events.length) evQueue.push(s);
+        lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
+        headerTitle(s);
+        if (!isResolvingTurn) {
+          if (evQueue.length) playSequentialTurn(evQueue.shift());
+          else renderBattle(s);
         }
-      } else if (s.phase === 'podium') {
-        isResolvingTurn = false;
-        renderPodium(s);
+      } else {
+        if (lastPhase === 'battle') {
+          // On quitte l'arène : on coupe une animation en cours et on remet l'arène à zéro
+          animGen++;
+          isResolvingTurn = false;
+          evQueue.length = 0;
+          displayedHp = { bottom: null, top: null };
+          activeTab = 'moves';
+          logDrawer.hidden = true;
+        }
+        lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
+        renderPhase(s);
       }
+      lastPhase = s.phase;
+      renderTreeDrawer();
     },
     toast,
     cleanup

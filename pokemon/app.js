@@ -45,6 +45,7 @@ function boot(info = {}, forcedMode = null) {
     timer: qs.get('timer') || 25,
     gen: qs.get('gen') || 'all',
     bots: qs.get('bots') ?? 1,
+    final: qs.get('final') ?? 3,
     level: qs.get('level') || 'normal'
   };
 
@@ -67,15 +68,21 @@ function boot(info = {}, forcedMode = null) {
   }
 
   // --- MODE TOURNOI 3V3 ARÈNE ---
-  let session;
+  let session = null;
+  let destroyed = false;
+  const call = (k) => (...a) => session && session[k] && session[k](...a);
 
   const view = mountGame(root, {
     me,
-    startMatch: () => session.startMatch(),
-    restart: () => session.restart(),
-    submitAction: (act) => session.submitAction(act),
+    draft: call('draft'),
+    lead: call('lead'),
+    ready: call('ready'),
+    cont: call('cont'),
+    skip: call('skip'),
+    restart: call('restart'),
+    submitAction: call('submitAction'),
+    isHost: () => !!(session && session.isHost),
     switchMode: (nextMode) => boot(info, nextMode),
-    onSwitchMode: (nextMode) => boot(info, nextMode),
     exit: () => {
       if (H.embedded) H.exit();
       else location.reload();
@@ -84,6 +91,8 @@ function boot(info = {}, forcedMode = null) {
 
   activeInstance = {
     destroy: () => {
+      destroyed = true;
+      if (session && session.destroy) session.destroy();
       if (view && view.cleanup) view.cleanup();
     }
   };
@@ -93,21 +102,21 @@ function boot(info = {}, forcedMode = null) {
     solo: role === 'solo',
     settings,
     me,
-    onState: (state, offset) => view.update(state, offset),
+    onState: (state, offset) => { if (!destroyed) view.update(state, offset); },
     onError: (msg) => view.toast(msg)
   };
 
-  if (role === 'guest') {
-    session = startClient(handlers);
-  } else {
-    session = startHost(handlers);
-  }
+  session = role === 'guest' ? startClient(handlers) : startHost(handlers);
 
+  // L'hôte est parti : ce joueur reprend le tournoi là où il en était
   let currentRole = role;
   H.on('roster', () => {
+    if (destroyed) return;
     if (currentRole === 'guest' && H.info.role === 'host') {
       currentRole = 'host';
-      session = startHost(handlers);
+      const last = session && session.state;
+      if (session && session.destroy) session.destroy();
+      session = startHost({ ...handlers, solo: false, resume: last });
       view.toast('Tu es maintenant l\'hôte du tournoi !');
     }
   });
