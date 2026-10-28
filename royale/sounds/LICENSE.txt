@@ -4,6 +4,8 @@ Tous libres : domaine public (CC0 1.0, https://creativecommons.org/publicdomain/
 Domaine public (CC0), crédits non obligatoires mais mérités :
   - The Free Firearm Sound Library (freefirearmsfx.com, publiée sur OpenGameArt) : tir-*, loin-*, pompe-arme, culasse-sniper
     https://opengameart.org/content/the-free-firearm-sound-library
+    (tir-fusil-*, tir-smg-*, loin-fusil et loin-smg étaient des rafales : on n'en garde qu'un tir, raccordé en fondu à
+    la fin naturelle du dernier tir de la rafale)
   - SpringySpringo — « gun reload sounds » : chargeur-sort, armement, pistolet-sort, pistolet-culasse
     https://opengameart.org/content/gun-reload-sounds
   - Brian MacIntosh (BMacZero) — « gun reload sound effects » : chargeur-entre, chargeur-clic, balle-sniper

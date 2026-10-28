@@ -1,5 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.8 — 28 octobre 2026
+- **Island Rush** — Un tir, c'est une détonation : le fusil d'assaut et le pistolet-mitrailleur jouaient une petite rafale à chaque balle (de près comme de loin). Chaque tir garde maintenant sa vraie queue, avec son écho.
+- **Island Rush** — Un coffre ouvert se tait aussitôt. Son carillon ne passe plus au coffre voisin dans la seconde, et ne s'entend plus qu'à une douzaine de mètres.
+- **Island Rush** — Collisions :
+  - on ne traverse plus une porte ouverte : le battant est plaqué contre le mur, du côté où il s'est ouvert ;
+  - on ne traverse plus un escalier, construit ou de bâtiment, ni par le côté ni en sautant dessous : il a maintenant une épaisseur sous ses marches.
+- **Island Rush** — Construction plus juste :
+  - le mur se pose sur le trait de la grille juste devant toi (et non plus parfois deux cases plus loin) ;
+  - le sol et l'escalier vont sur la case que tu regardes, sous toi en regardant à tes pieds ;
+  - en visant haut, ils montent d'un étage.
+  - On ne construit plus dans le vide : une pièce doit reposer sur le sol, un bâtiment ou une autre construction.
+- **Island Rush** — La caméra ne passe plus à travers les murs : contrôle plus fin derrière toi, secousse des explosions bornée par la place disponible, et un dernier contrôle qui la ramène vers toi si elle touche quoi que ce soit.
+- **Island Rush** — Tremplins : on monte à une quarantaine de mètres, un peu vers l'avant, puis le deltaplane s'ouvre tout seul en haut. Environ 70 m parcourus d'un saut, de quoi traverser un village.
+- **Island Rush** — Dégâts de chute réduits : rien jusqu'à 10 m (8 avant), puis environ deux fois moins par mètre.
+- **Island Rush** — Armes : le fusil de précision a 3 balles par chargeur (1 avant), et toutes les armes rechargent 10 % plus vite.
+
 ## 3.7 — 28 octobre 2026
 - **Island Rush** — Les personnages réagissent : un sursaut quand une balle les touche (le buste part en arrière, la tête suit), et ils plient les genoux en retombant d'un saut ou du deltaplane.
 - **Island Rush** — Un vrai coffre au trésor, en bois avec couvercle bombé et serrure dorée, remplace la caisse faite de trois blocs.
