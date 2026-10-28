@@ -327,7 +327,7 @@ function previewCard(dex, idx, oppTeam, { pickable, chosen, suggested, ready }) 
       <img class="pv-sprite" src="${spriteUrls(dex).front}" alt="" loading="lazy">
       <div class="pv-info">
         <b>${esc(b.name)}</b>
-        <div class="pv-types">${b.types.map((ty) => typeChip(ty, true)).join('')}</div>
+        <div class="pv-types">${b.types.map((ty) => typeChip(ty)).join('')}</div>
         <div class="pv-vs" title="Efficacité de ses meilleures attaques contre l'équipe d'en face">
           ${oppTeam.map((o) => `<span><img src="${spriteUrls(o).icon}" alt="">${effBadge(bestEff(dex, o))}</span>`).join('')}
         </div>

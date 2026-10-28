@@ -4,6 +4,7 @@
 
 import { getEffectiveness } from './types.js';
 import { MOVES } from './moves.js';
+import { turnMs } from './timing.js';
 
 export const STAGE_MULTS = {
   '-6': 2 / 8, '-5': 2 / 7, '-4': 2 / 6, '-3': 2 / 5, '-2': 2 / 4, '-1': 2 / 3,
@@ -318,6 +319,7 @@ export function resolveTurn(state, actionA, actionB) {
       attName: attPoke.name,
       moveName: attMove.name,
       moveType: attMove.type,
+      moveCat: attMove.cat,
       msg: `${attPoke.name} utilise ${attMove.name} !`
     });
 
@@ -608,19 +610,5 @@ export function forceSwitch(state, side, targetIdx) {
  * Calcule la durée totale en millisecondes pour jouer l'animation séquentielle du tour
  */
 export function estimateTurnDuration(events) {
-  if (!events || !events.length) return 0;
-  let total = 0;
-  for (const ev of events) {
-    if (ev.type === 'switch') total += 1500;
-    else if (ev.type === 'attack_start') total += 1400;
-    else if (ev.type === 'damage') total += 1550;
-    else if (ev.type === 'heal' || ev.type === 'recoil') total += 1300;
-    else if (ev.type === 'stat_change' || ev.type === 'status_applied' || ev.type === 'status_cured') total += 1300;
-    else if (ev.type === 'faint') total += 1500;
-    else if (ev.type === 'status_damage') total += 1350;
-    else if (ev.type === 'msg') total += 1300;
-    else if (ev.type === 'victory') total += 1600;
-    else total += 900;
-  }
-  return total;
+  return turnMs(events);
 }

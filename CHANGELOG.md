@@ -1,5 +1,21 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.14 — 28 octobre 2026
+- **Poké Duel** — Cadres de PV refaits pour se lire d'un coup d'œil : le nom et le niveau, puis « PV » et la jauge, puis les PV restants sur les PV max (« 85 / 180 ») en gros chiffres. Les bandes blanches qui ressemblaient à une jauge pleine ont disparu.
+- **Poké Duel** — Nouvelle police pixel, Jersey 15, bien plus lisible : on ne confond plus 5 et S, 0 et O, ni C et O (« N.50 » se lisait « N.SO »).
+
+## 3.13 — 28 octobre 2026
+- **Poké Duel** — Les combats du tournoi se suivent enfin :
+  - les messages s'écrivent lettre par lettre et restent affichés le temps de les lire ; chaque étape attend la fin de la précédente ;
+  - la barre de PV descend à son rythme, et le tour suivant ne s'ouvre qu'une fois tout joué, chez tous les joueurs.
+- **Poké Duel** — De vraies animations de combat :
+  - lancer de Poké Ball et Pokémon qui en sort en silhouette blanche, rappel en rouge quand on change ;
+  - attaques physiques : élan et impact à la couleur du type ; attaques spéciales : projectile d'énergie ; capacités de statut : étincelles ;
+  - la cible touchée clignote, l'écran tremble sur un coup critique ou super efficace ;
+  - K.O. : le Pokémon s'enfonce sous son socle ; flèches bleues ou rouges quand une stat change, effets colorés pour brûlure, poison, paralysie…
+- **Poké Duel** — La barre de PV est remise exactement dans sa case (elle était décalée).
+- **Poké Duel** — L'arène s'adapte à la fenêtre : elle grandit sur un grand écran, se réduit sur un petit, et passe en format plus haut sur téléphone ; les menus du tournoi suivent aussi la taille de l'écran.
+
 ## 3.12 — 28 octobre 2026
 - **Island Rush** — Caméra calme contre les murs :
   - elle ne fait plus l'essuie-glace quand on longe une façade, ni quand l'épaule passe devant une fenêtre ou une vitrine ;
@@ -7,6 +23,13 @@
   - un poteau, un panneau, un tronc ou un banc qui passe entre elle et toi ne la fait plus plonger sur ta tête.
 - **Island Rush** — Les fenêtres n'ont plus de vitre : on tirait déjà à travers, maintenant on voit aussi à travers.
 - **Island Rush** — L'arme d'un coffre tombe toujours devant lui, à portée de main. Avant, une fois sur quatre, elle passait derrière un mur ou sous un meuble et on croyait le coffre sans arme.
+- **Poké Duel** — Le tournoi prend le look de Pokémon Noir & Blanc :
+  - en combat, les vrais cadres de PV de la 5e génération, la fenêtre de message d'origine et une police pixel ;
+  - les attaques sont de gros boutons à la couleur de leur type, avec PP et efficacité, à côté des boutons Attaque et Pokémon, comme sur l'écran tactile de la DS ;
+  - le changement de Pokémon se fait dans les panneaux d'équipe d'origine (bleu, rouge si K.O.) ;
+  - draft, tableau, aperçu, résumé et podium passent en fenêtres pixel sobres, sans effets de verre ni néons ;
+  - badges de types et de statuts façon Noir & Blanc, en français (PAR, BRÛ, PSN…).
+- **Poké Duel** — On ne peut plus cliquer une attaque pendant l'écran « VS » : les choix s'ouvrent quand le chrono du tour démarre (le clic se perdait).
 
 ## 3.11 — 28 octobre 2026
 - **Poké Duel** — Le tournoi, repris de fond en comble :

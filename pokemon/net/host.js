@@ -32,6 +32,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
   let deadline = 0;        // fin de la phase en cours (draft, arbre, aperçu, résumé)
   let turnEndsAt = 0;      // fin du choix en combat (attaque ou remplacement)
   let evSeq = 0;
+  let intro = false;       // combat affiché, Pokémon pas encore envoyés
   let reported = false;
   let alive = true;
 
@@ -82,6 +83,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       evSeq,
       hostId: me.id,
       isFinal: !!(m && m.r === t.rounds.length - 1),
+      intro,
     };
     if (!solo && bridge) bridge.send('all', { t: 'st', s: pub, now: Date.now() });
     onState(pub, 0);
@@ -163,7 +165,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     battle = buildBattle(t, m);
     credits = [];
     pending = { A: null, B: null };
-    const intro = ['A', 'B'].map((side) => {
+    const introEvents = ['A', 'B'].map((side) => {
       const p = side === 'A' ? battle.teamA[0] : battle.teamB[0];
       const tr = side === 'A' ? battle.trainerA : battle.trainerB;
       return {
@@ -172,10 +174,12 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       };
     });
     // L'écran « VS » s'affiche d'abord, puis les deux dresseurs envoient leur Pokémon
+    intro = true;
     broadcast();
     after(SPLASH_MS, () => {
-      broadcast(intro);
-      after(estimateTurnDuration(intro), startTurn);
+      intro = false;
+      broadcast(introEvents);
+      after(estimateTurnDuration(introEvents), startTurn);
     });
   }
 
