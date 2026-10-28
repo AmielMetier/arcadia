@@ -31,6 +31,7 @@
                       rows() → [[id, libellé, [touche 1, touche 2]], …] (texte ; '' : case vide)
                       set(id, case, { code, key } ou { mouse }) → texte affiché sous la liste (touche reprise ailleurs…)
                       clear(id, case), reset() : effacer une case, revenir aux touches d'origine
+                      pad: true : boutons de manette (la case attend un bouton de la manette ; set reçoit { pad: n })
                   hidden: () => true masque la ligne (ou la section)
      hint       rappel en bas du panneau (HTML), par exemple la touche qui coupe le son
      test(kind) appelé quand on lâche un curseur du son : un petit bruit pour entendre le niveau
@@ -131,6 +132,7 @@
     panel,
     close: () => close(),
     isOpen: () => !!(pop && !pop.hidden),
+    waiting: () => !!wait,  // une case attend sa touche (ou son bouton de manette) : le jeu ne réagit pas
     ICON: '<svg class="ddvol-ico" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   };
 
@@ -252,11 +254,12 @@
         endWait();
         if (again) return;
         wait = { btn: b, it, id: b.dataset.i, act: b.dataset.b, slot: +b.dataset.s };
-        b.classList.add('wait'); b.textContent = 'Touche…';
+        b.classList.add('wait'); b.textContent = it.bind.pad ? 'Bouton…' : 'Touche…';
         bindNote(it, wait.id, '');
+        if (it.bind.pad) padWait(wait);
         return;
       }
-      if (b.classList.contains('ddvol-reset')) { endWait(); it.bind.reset(); bindNote(it, b.dataset.i, 'Touches d\'origine remises.'); refresh(); return; }
+      if (b.classList.contains('ddvol-reset')) { endWait(); it.bind.reset(); bindNote(it, b.dataset.i, it.bind.pad ? 'Boutons d\'origine remis.' : 'Touches d\'origine remises.'); refresh(); return; }
       if (b.classList.contains('ddvol-sw')) it.set(!it.get());
       else it.set(it.options[+b.dataset.v][0]);
       refresh();
@@ -270,6 +273,7 @@
       const w = wait;
       if (e.code === 'Escape') { endWait(); return; }
       if (e.code === 'Delete' || e.code === 'Backspace') { w.it.bind.clear(w.act, w.slot); endWait(); return; }
+      if (w.it.bind.pad) return; // une case de manette ne prend pas les touches du clavier
       const note = w.it.bind.set(w.act, w.slot, { code: e.code, key: e.key });
       endWait(); bindNote(w.it, w.id, note);
     }, true);
@@ -278,6 +282,7 @@
       if (!wait) return;
       const w = wait;
       if (e.target.closest('button') !== w.btn) { endWait(); return; }
+      if (w.it.bind.pad) return; // ni les boutons de la souris (un second clic sur la case l'abandonne)
       e.preventDefault();
       const note = w.it.bind.set(w.act, w.slot, { mouse: e.button });
       skip = e.button === 0;
@@ -295,11 +300,29 @@
     addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !(anchor && anchor.contains(e.target))) close(); }, true);
     addEventListener('resize', () => { if (!pop.hidden) place(); });
   }
+  // case de manette en attente : on lit les manettes toutes les 30 ms ; le premier bouton enfoncé la prend (ceux qui
+  // l'étaient déjà quand on a cliqué ne comptent qu'une fois relâchés)
+  const padDown = () => {
+    const s = new Set();
+    for (const g of (navigator.getGamepads ? navigator.getGamepads() : [])) if (g) g.buttons.forEach((b, i) => { if (b.pressed || b.value > 0.5) s.add(i); });
+    return s;
+  };
+  function padWait(w) {
+    const held = padDown();
+    const tick = () => {
+      if (wait !== w) return;
+      const now = padDown();
+      for (const i of now) if (!held.has(i)) { const note = w.it.bind.set(w.act, w.slot, { pad: i }); endWait(); bindNote(w.it, w.id, note); return; }
+      for (const i of [...held]) if (!now.has(i)) held.delete(i);
+      setTimeout(tick, 30);
+    };
+    setTimeout(tick, 30);
+  }
   function itemHtml(it, id) {
     if (it.note) return `<p class="ddvol-n" data-n="${id}"></p>`;
     if (it.bind) {
-      const rows = it.bind.rows().map(([a, l]) => `<span>${esc(l)}</span>${[0, 1].map((k) => `<button type="button" class="ddvol-key" data-i="${id}" data-b="${esc(a)}" data-s="${k}" aria-label="${esc(l)}, touche ${k + 1}"></button>`).join('')}`).join('');
-      return `<div data-r="${id}"><div class="ddvol-b">${rows}</div><p class="ddvol-n" data-bn="${id}" hidden></p><button type="button" class="ddvol-reset" data-i="${id}">Touches d'origine</button></div>`;
+      const rows = it.bind.rows().map(([a, l]) => `<span>${esc(l)}</span>${[0, 1].map((k) => `<button type="button" class="ddvol-key" data-i="${id}" data-b="${esc(a)}" data-s="${k}" aria-label="${esc(l)}, ${it.bind.pad ? 'bouton' : 'touche'} ${k + 1}"></button>`).join('')}`).join('');
+      return `<div data-r="${id}"><div class="ddvol-b">${rows}</div><p class="ddvol-n" data-bn="${id}" hidden></p><button type="button" class="ddvol-reset" data-i="${id}">${it.bind.pad ? 'Boutons' : 'Touches'} d'origine</button></div>`;
     }
     if (it.keys) {
       const three = it.keys.some((r) => r.length > 2);

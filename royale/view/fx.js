@@ -64,6 +64,15 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
   const T = {
     glow: radial([[0, 'rgba(255,255,255,1)'], [0.25, 'rgba(255,230,160,.9)'], [1, 'rgba(255,160,40,0)']]),
     puff: radial([[0, 'rgba(255,255,255,.9)'], [0.6, 'rgba(255,255,255,.35)'], [1, 'rgba(255,255,255,0)']]),
+    // flamme : quelques taches chaudes serrées, au bord irrégulier (teintée par la couleur du sprite)
+    fire: spriteTex((g, S) => {
+      for (let i = 0; i < 9; i++) {
+        const a = Math.random() * Math.PI * 2, d = Math.random() * S * 0.17, x = S / 2 + Math.cos(a) * d, y = S / 2 + Math.sin(a) * d, r = S * (0.16 + Math.random() * 0.16);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r);
+        grd.addColorStop(0, 'rgba(255,255,255,0.85)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.45)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grd; g.fillRect(0, 0, S, S);
+      }
+    }, 128),
   };
   own.push(...Object.values(T));
   // ------------------------------------------------------------------ traînées : bâtonnets lumineux étirés
@@ -87,14 +96,18 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       s = { o, m, tex, blend: blending, on: false };
       pool.push(s); own.push(m);
     }
-    s.on = true; s.o.visible = true; s.m.color.set(color);
+    s.on = true; s.o.visible = true; s.m.color.set(color); s.m.rotation = 0;
     return s;
   }
   const live = [];
-  function puff(x, y, z, { tex = T.puff, color = 0xffffff, size = 0.5, grow = 2, life = 0.5, add = false, rise = 0, op = 0.8 } = {}) {
+  // effets différés de quelques dixièmes de seconde
+  const timers = [];
+  const later = (sec, fn) => timers.push({ t: sec, fn });
+  // (vx, vy, vz : vitesse de départ, freinée par drag ; g : pesanteur ; rot : rotation de l'image)
+  function puff(x, y, z, { tex = T.puff, color = 0xffffff, size = 0.5, grow = 2, life = 0.5, add = false, rise = 0, op = 0.8, vx = 0, vy = 0, vz = 0, drag = 0, g = 0, rot = 0 } = {}) {
     const s = sprite(tex, color, add ? THREE.AdditiveBlending : THREE.NormalBlending);
-    s.o.position.set(x, y, z); s.o.scale.setScalar(size);
-    live.push({ s, t: 0, life, size, grow, rise, op });
+    s.o.position.set(x, y, z); s.o.scale.setScalar(size); s.m.rotation = rot;
+    live.push({ s, t: 0, life, size, grow, rise, op, vx, vy, vz, drag, g });
   }
   // ------------------------------------------------------------------ particules douces (fumée, poussière) : un seul dessin
   const CN = 480;
@@ -256,17 +269,33 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     for (let i = 0; i < 4; i++) cloud(front.x, front.y, front.z, { vx: dir.x * 2 + (Math.random() - 0.5), vy: 0.4, vz: dir.z * 2 + (Math.random() - 0.5), size: 0.3, grow: 1.8, life: 0.9, color: 0xd8d2c8, op: 0.45, drag: 2 });
     if (flashT <= 0.1) { flash.position.copy(front); flashI = 25; flashMax = flashT = 0.12; }
   }
+  // explosion : pas une grosse boule, mais un cœur blanc très bref, une boule de feu faite d'une douzaine de flammes
+  // qui jaillissent et s'étalent (jaunes, orange, rouges), des braises qui retombent, une fumée sombre qui monte ;
+  // la grenade de souffle fait de même en violet, sans feu ni fumée
+  const FIRE = [0xffb347, 0xff7a1a, 0xe2481a], BLAST = [0xe2c4ff, 0xb77dff, 0x8a4fe0];
   function boom(x, y, z, r, kind) {
-    if (kind === 'souffle') {
-      puff(x, y + 0.5, z, { tex: T.glow, color: 0xc08aff, size: 1, grow: r * 1.6, life: 0.45, add: true, op: 0.9 });
-      dust(x, y, z, { n: 10, r: 0.8, speed: 5, size: 0.9, op: 0.4, color: 0xc9b8e0 });
-      return;
+    const purple = kind === 'souffle', cols = purple ? BLAST : FIRE, R = r * 0.45, y0 = y + 0.5;
+    puff(x, y0, z, { tex: T.glow, color: purple ? 0xf2e6ff : 0xfff6e0, size: 1.2, grow: 1.4, life: 0.09, add: true, op: 1 });
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, e = Math.random() * 1.1, sp = 3 + Math.random() * 6;
+      puff(x, y0, z, { tex: T.fire, color: cols[i % 3], size: 0.6 + Math.random() * 0.5, grow: R * (0.7 + Math.random() * 0.6), life: 0.3 + Math.random() * 0.32, add: true, op: 0.75,
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp + 1.5, vz: Math.sin(a) * Math.cos(e) * sp, drag: 5, rot: Math.random() * 6.28 });
     }
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2, e = 0.3 + Math.random() * 1.1, sp = 6 + Math.random() * 7;
+      puff(x, y0, z, { tex: T.glow, color: purple ? 0xd0a8ff : 0xffb050, size: 0.14, grow: 0, life: 0.6 + Math.random() * 0.5, add: true, op: 1,
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp, vz: Math.sin(a) * Math.cos(e) * sp, drag: 0.8, g: 14 });
+    }
+    if (purple) { dust(x, y, z, { n: 10, r: 0.8, speed: 5, size: 0.9, op: 0.4, color: 0xc9b8e0 }); return; }
     debris(x, y + 0.3, z, 'terre', { n: 14, spread: 0.8, power: 6 });
     dust(x, y, z, { n: 12, r: 1, speed: 4, size: 1.1, op: 0.5, color: 0x8a7e6c });
-    puff(x, y, z, { tex: T.glow, color: 0xffa040, size: 1.5, grow: r * 1.8, life: 0.45, add: true, op: 1 });
-    puff(x, y, z, { tex: T.glow, color: 0xfff0c0, size: 1, grow: r, life: 0.18, add: true, op: 1 });
-    for (let i = 0; i < 6; i++) puff(x + (Math.random() - 0.5) * r * 0.6, y + Math.random() * r * 0.4, z + (Math.random() - 0.5) * r * 0.6, { color: 0x5a5550, size: 1.2, grow: 3.5, life: 1.6 + Math.random(), rise: 1.2, op: 0.55 });
+    // (la fumée vient après le feu, pas devant lui)
+    later(0.16, () => {
+      for (let i = 0; i < 10; i++) {
+        cloud(x + (Math.random() - 0.5) * R, y0 + Math.random() * R * 0.6, z + (Math.random() - 0.5) * R,
+          { vx: (Math.random() - 0.5) * 2.4, vy: 1.4 + Math.random() * 1.6, vz: (Math.random() - 0.5) * 2.4, size: 1.1, grow: 3.2, life: 2.4 + Math.random() * 1.2, color: 0x3e3a37, op: 0.6, drag: 1.2 });
+      }
+    });
     flash.position.set(x, y + 1, z); flashI = 90; flashMax = flashT = 0.25;
   }
 
@@ -283,14 +312,17 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       tracers.setColorAt(i, new THREE.Color().copy(tr.color).multiplyScalar(tr.life / tr.max));
     }
     tracers.instanceMatrix.needsUpdate = true; if (tracers.instanceColor) tracers.instanceColor.needsUpdate = true;
+    for (let i = timers.length - 1; i >= 0; i--) if ((timers[i].t -= dt) <= 0) { const f = timers[i].fn; timers.splice(i, 1); f(); }
     // sprites
     for (let i = live.length - 1; i >= 0; i--) {
       const L = live[i]; L.t += dt;
       const k = L.t / L.life;
       if (k >= 1) { L.s.on = false; L.s.o.visible = false; live.splice(i, 1); continue; }
-      L.s.o.scale.setScalar(L.size + L.grow * k);
+      L.s.o.scale.setScalar(L.size + L.grow * Math.sqrt(k));
       L.s.m.opacity = L.op * (1 - k);
-      L.s.o.position.y += L.rise * dt;
+      if (L.drag) { const d = Math.exp(-L.drag * dt); L.vx *= d; L.vy *= d; L.vz *= d; }
+      L.vy -= L.g * dt;
+      L.s.o.position.x += L.vx * dt; L.s.o.position.y += (L.vy + L.rise) * dt; L.s.o.position.z += L.vz * dt;
     }
     if (flashT > 0) { flashT -= dt; flash.intensity = Math.max(0, flashT / flashMax) * flashI; }
     // fumée des cheminées proches

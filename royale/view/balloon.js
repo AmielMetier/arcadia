@@ -60,14 +60,15 @@ export function buildBalloon() {
   // ---------------------------------------------------------------- enveloppe et jupe
   const env = new THREE.Mesh(keep(new THREE.LatheGeometry(PROFILE.map(([r, y]) => new THREE.Vector2(r, y)), 48)),
     keep(new THREE.MeshStandardMaterial({ map: keep(envelopeTexture()), roughness: 0.62, side: THREE.DoubleSide })));
-  env.castShadow = true; sway.add(env);
+  // pas d'ombre : à 165 m, elle tombait sur le sable mais pas sur l'eau, et mordait les plages d'une demi-lune sombre
+  sway.add(env);
   const skirt = new THREE.Mesh(keep(new THREE.CylinderGeometry(1.7, 1.95, 1.4, 24, 1, true).translate(0, 3.5, 0)), keep(new THREE.MeshStandardMaterial({ color: 0x3a2f2a, roughness: 0.8, side: THREE.DoubleSide })));
   sway.add(skirt);
   // ---------------------------------------------------------------- nacelle
   const half = BASKET.w / 2, wicker = keep(new THREE.MeshStandardMaterial({ map: keep(wickerTexture()), roughness: 0.9 }));
   const leather = keep(new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.7 }));
   const basket = new THREE.Mesh(keep(new THREE.BoxGeometry(BASKET.w, BASKET.h, BASKET.w).translate(0, BASKET.h / 2, 0)), wicker);
-  basket.castShadow = true; sway.add(basket);
+  sway.add(basket);
   for (const [w, d, x, z] of [[BASKET.w + 0.2, 0.18, 0, half], [BASKET.w + 0.2, 0.18, 0, -half], [0.18, BASKET.w + 0.2, half, 0], [0.18, BASKET.w + 0.2, -half, 0]]) {
     const rim = new THREE.Mesh(keep(new THREE.BoxGeometry(w, 0.18, d)), leather); rim.position.set(x, BASKET.h + 0.02, z); sway.add(rim);
   }

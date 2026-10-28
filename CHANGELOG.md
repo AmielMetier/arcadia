@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.15 — 28 octobre 2026
+- **Island Rush** — On joue à la manette :
+  - boutons à la façon de Fortnite (A sauter, B s'accroupir, X ouvrir et recharger, Y sac, gâchettes viser et tirer, LB / RB changer d'objet, croix pour construire, Menu pause), tous modifiables dans ⚙️ Réglages ;
+  - le stick gauche fait avancer, doucement s'il est à peine poussé ; le droit fait regarder, avec sa propre sensibilité (et haut et bas inversables) ;
+  - s'accroupir et sprinter s'enclenchent d'un appui ;
+  - aide à la visée légère : la visée ralentit sur un ennemi, et en visant elle glisse doucement vers lui (elle se coupe dans les Réglages) ;
+  - les menus, le sac, la carte et les Réglages se font aussi à la manette (croix et A, B pour revenir) ;
+  - la manette vibre aux tirs, aux coups reçus et aux explosions, et les rappels à l'écran montrent ses boutons (Xbox ou PlayStation).
+- **Island Rush** — Les bots ne s'avancent plus lentement vers toi à découvert dès que tu ne les regardes plus. Ils restent discrets à l'approche, mais seulement à couvert ; une fois repérés, ils se battent pour de bon ; et ils vont voir où tu étais à allure normale.
+- **Island Rush** — Les explosions ne font plus une grosse boule : flammes qui jaillissent, braises qui retombent, puis fumée qui monte.
+- **Island Rush** — La montgolfière ne fait plus d'ombre : vue d'en haut, une demi-lune sombre mordait les plages au bord de l'eau.
+
 ## 3.14 — 28 octobre 2026
 - **Poké Duel** — Cadres de PV refaits pour se lire d'un coup d'œil : le nom et le niveau, puis « PV » et la jauge, puis les PV restants sur les PV max (« 85 / 180 ») en gros chiffres. Les bandes blanches qui ressemblaient à une jauge pleine ont disparu.
 - **Poké Duel** — Nouvelle police pixel, Jersey 15, bien plus lisible : on ne confond plus 5 et S, 0 et O, ni C et O (« N.50 » se lisait « N.SO »).

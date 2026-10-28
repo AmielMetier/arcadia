@@ -123,7 +123,7 @@ async function boot(info) {
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
-  S.input = new Input(S.scene.canvas, S.keys, { key: onKey, action: onAction, lock: onLock, wheel: onWheel });
+  S.input = new Input(S.scene.canvas, S.keys, { key: onKey, action: onAction, lock: onLock, wheel: onWheel, pad: padMenu });
   // touches changées dans les Réglages (ou apprises du clavier) : les rappels à l'écran suivent
   paintKeys(); S.keys.onChange(paintKeys);
   loadOpts();
@@ -264,12 +264,17 @@ function onAction(a) {
   else if (a === 'materiau') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
   else if (/^objet[1-5]$/.test(a)) { S.sel = +a.slice(5); S.build = null; buildBar(); }
   else if (a === 'pioche') { S.sel = 0; S.build = null; buildBar(); }
+  else if (a === 'prec' || a === 'suiv') onWheel(a === 'prec' ? -1 : 1);
 }
 // la touche d'une action, telle qu'elle est écrite ; kb : dans une étiquette <kbd>
 const kl = (a) => (S.keys ? S.keys.first(a) : '');
 const kb = (a) => `<kbd>${esc(kl(a))}</kbd>`;
 // rappels des touches à l'écran : <kbd data-k="action"> (sa première touche), <span data-ks="action"> (toutes)
 function paintKeys() {
+  const pad = S.keys.device === 'pad';
+  for (const el of document.querySelectorAll('#hints .kbkeys')) el.hidden = pad;
+  for (const el of document.querySelectorAll('#hints .padkeys')) el.hidden = !pad;
+  for (const el of document.querySelectorAll('[data-pad]')) el.textContent = S.keys.label('Pad' + el.dataset.pad);
   for (const el of document.querySelectorAll('[data-k]')) el.textContent = kl(el.dataset.k);
   for (const el of document.querySelectorAll('[data-ks]')) el.innerHTML = S.keys.labels(el.dataset.ks).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
   const list = $('#keylist');
@@ -332,8 +337,10 @@ function loop(now) {
   S.last = Math.max(S.last, now); S.t += dt;
   S.ms = S.ms * 0.95 + dt * 1000 * 0.05;
   if (S.role === 'guest') guestNet(dt);
+  if (S.input) S.input.poll(dt);
   if (!S.sim) { idleFrame(dt); return; }
   const inp = S.input, P = me();
+  aimAssist(P, dt);
   const [mx, my] = inp.takeMouse(dt);
   const scoped = isScoped(P);
   const sens = scoped ? 0.25 : inp.aim ? 0.6 : 1;
@@ -523,6 +530,97 @@ function seeFrom(f) {
   };
 }
 // caméra : par-dessus l'épaule droite (au sol), loin derrière (montgolfière, chute libre), à l'œil (lunette)
+// ------------------------------------------------------------------ manette hors du jeu : écrans, sac, carte, Réglages
+// la croix (ou le stick gauche) déplace la sélection d'un bouton au plus proche dans cette direction ; A appuie, B
+// revient ; sur un curseur, gauche et droite le règlent. Dans le sac : la croix choisit une case, A prend un objet puis
+// le pose (échange), X le lâche
+let padEl = null;
+function padFocusEl(el) {
+  if (padEl) padEl.classList.remove('padfocus');
+  padEl = el || null;
+  if (!el) return;
+  el.classList.add('padfocus');
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+const padList = (root) => [...root.querySelectorAll('button, a[href], input[type=range], select')].filter((e) => !e.disabled && e.getClientRects().length && !e.closest('[hidden]'));
+function padNav(root, dir) {
+  const list = padList(root);
+  if (!list.length) return;
+  const cur = list.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { padFocusEl(list.find((e) => e.id === 'go') || list[0]); return; }
+  // curseur : gauche et droite le règlent
+  if (cur.type === 'range' && (dir === 'left' || dir === 'right')) {
+    const st = +cur.step || 1, v = Math.min(+cur.max, Math.max(+cur.min, +cur.value + (dir === 'right' ? st : -st)));
+    cur.value = v; cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bs = Infinity;
+  for (const e of list) {
+    if (e === cur) continue;
+    const b = e.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+    const along = dir === 'right' ? dx : dir === 'left' ? -dx : dir === 'down' ? dy : -dy, across = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (along < 4) continue;
+    const sc = along + across * 2.5;
+    if (sc < bs) { bs = sc; best = e; }
+  }
+  if (best) padFocusEl(best);
+}
+function padMenu(ev) {
+  const V = window.DDVolume;
+  if (V && V.waiting && V.waiting()) return; // une case des Réglages attend son bouton
+  const panel = V && V.isOpen() ? document.querySelector('.ddvol') : null;
+  if (ev.nav) {
+    if (panel) padNav(panel, ev.nav);
+    else if (S.hud.bagOpen) S.hud.bagNav(ev.nav);
+    else if (S.screen) padNav($('#screen'), ev.nav);
+    return;
+  }
+  const b = ev.button, acts = ev.acts || [], A = b === 0, B = b === 1, X = b === 2, START = b === 9;
+  const press = (root) => { const el = document.activeElement; if (el && root.contains(el) && el.tagName !== 'INPUT') el.click(); else padNav(root, 'down'); };
+  if (panel) { if (A) press(panel); else if (B || START) { V.close(); padFocusEl($('#settings')); } return; }
+  if (S.hud.bagOpen) {
+    if (A) S.hud.bagPick(); else if (X) S.hud.bagDrop();
+    else if (B || START || acts.includes('sac')) toggleBag(false);
+    return;
+  }
+  if (S.hud.mapOpen) { if (B || START || acts.includes('carte')) { S.hud.toggleMap(false); S.input.lock(); } return; }
+  if (S.screen) {
+    if (A) press($('#screen'));
+    else if (START || (B && S.screen === 'pause')) { const go = $('#go'); if (go) go.click(); }
+    return;
+  }
+  // en jeu, souris libérée (Échap) : A ou Menu reprend la partie à la manette
+  if (S.sim && (A || START)) S.input.lock();
+}
+addEventListener('gamepadconnected', (e) => { if (S.loaded) toast(`Manette branchée : ${/054c|playstation|dualsense|dualshock/i.test(e.gamepad.id) ? 'PlayStation' : 'prête'}. A (ou ✕) pour jouer.`, 3); });
+addEventListener('gamepaddisconnected', () => { if (S.loaded) toast('Manette débranchée', 2.5); if (S.input && S.input.padOn) S.input.unlock(); });
+
+// aide à la visée (manette seulement, légère) : la vue ralentit quand le viseur passe sur un ennemi visible ; en visant,
+// elle glisse doucement vers lui (au plus 0,45 rad/s, moins au bord). Rien au-delà de 90 m, derrière un mur, ni sur un
+// coéquipier
+function aimAssist(P, dt) {
+  const I = S.input;
+  I.assistSlow = 1;
+  if (!I.assist || !I.padOn || S.keys.device !== 'pad' || !P || !P.alive || P.mode !== 'sol' || !heldWeapon(P) || !S.cam) return;
+  const c = S.cam, cp = Math.cos(S.pitch), fx = Math.sin(S.yaw) * cp, fy = Math.sin(S.pitch), fz = Math.cos(S.yaw) * cp, R = 0.1;
+  let best = null, ba = R;
+  for (const Q of S.sim.S.players.values()) {
+    if (Q === P || !Q.alive || Q.mode !== 'sol' || S.sim.mates(P, Q)) continue;
+    const dx = Q.x - c.x, dy = Q.y + (Q.crouch ? 0.8 : 1.15) - c.y, dz = Q.z - c.z, d = Math.hypot(dx, dy, dz);
+    if (d < 1.5 || d > 90) continue;
+    const ang = Math.acos(Math.min(1, (dx * fx + dy * fy + dz * fz) / d));
+    if (ang < ba) { ba = ang; best = { dx, dy, dz, d }; }
+  }
+  if (!best || S.world.raycast(c.x, c.y, c.z, best.dx / best.d, best.dy / best.d, best.dz / best.d, best.d).t < best.d - 1) return;
+  I.assistSlow = ba < 0.05 ? 0.55 : 0.8;
+  if (!I.aim) return;
+  const dyaw = Math.atan2(best.dx, best.dz) - S.yaw, wy = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)), wp = Math.atan2(best.dy, Math.hypot(best.dx, best.dz)) - S.pitch;
+  const L = Math.hypot(wy, wp), step = Math.min(L, 0.45 * (1 - ba / R) * dt);
+  if (L > 1e-4) { S.yaw += wy / L * step; S.pitch += wp / L * step; }
+}
+
 // ------------------------------------------------------------------ ambiance, traces, réactions de l'écran
 const camF = new THREE.Vector3(), camR = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 function ambient(dt, P, view) {
@@ -871,7 +969,12 @@ function handleEvents(list) {
         // la boussole : d'où vient le tir (pas les siens)
         if (Q && e.p !== S.me && Q.mode === 'sol') S.compass.shot(e.p, Q.x, Q.y + 1.4, Q.z, Math.hypot(Q.x - S.cam.x, Q.z - S.cam.z), { mate: !!P && S.sim.mates(P, Q), far: e.w === 'sniper' || e.w === 'roquette' ? 420 : 220 });
         // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
-        if (e.p === S.me) { S.shotAt = S.t; const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
+        if (e.p === S.me) {
+          S.shotAt = S.t; const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]);
+          // manette : un petit coup à chaque tir, franc pour les armes lourdes
+          const heavy = e.w === 'roquette' || e.w === 'pompe' || e.w === 'sniper';
+          S.input.rumble(heavy ? 0.7 : 0.12, heavy ? 0.5 : 0.25, heavy ? 160 : 45);
+        }
         break;
       }
       case 'tir': {
@@ -911,6 +1014,7 @@ function handleEvents(list) {
           const sc = S.scene.screen;
           sc.hurt = Math.min(1, sc.hurt + (e.cause === 'tempete' ? 0.12 : 0.3 + e.n / 70));
           if (e.sh) sc.shield = 1;
+          S.input.rumble(0.25 + e.n / 90, 0.45, 140);
         }
         break;
       }
@@ -958,14 +1062,14 @@ function handleEvents(list) {
       case 'boum': {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
         const d = Math.hypot(e.x - S.cam.x, e.y - S.cam.y, e.z - S.cam.z);
-        if (d < 30) S.shake = Math.max(S.shake, (1 - d / 30) * 1.2);
+        if (d < 30) { S.shake = Math.max(S.shake, (1 - d / 30) * 1.2); S.input.rumble(1 - d / 30, 0.6, 280); }
         // onde de choc (l'image se déforme), herbe couchée, oiseaux qui fuient ; au sol une brûlure, dans l'eau une gerbe
         S.scene.screen.booms.push({ x: e.x, y: e.y + 0.5, z: e.z, r: e.r, t: S.scene.now });
         S.blasts.push({ x: e.x, z: e.z, r: e.r, t: S.t });
         S.amb.scare(e.x, e.z, 70);
         const wl = S.world.waterLevel(e.x, e.z);
         if (wl > e.y - 0.8) S.motion.splash(e.x, wl, e.z, 1);
-        else if (e.kind !== 'souffle') { S.marks.scorch(e.x, e.y, e.z, e.r); S.motion.ring(e.x, S.world.support(e.x, e.z, e.y + 1) + 0.08, e.z, { r0: 0.5, r1: e.r * 2.6, life: 0.45, color: 0xffd9a0, alpha: 0.9 }); }
+        else if (e.kind !== 'souffle') S.marks.scorch(e.x, e.y, e.z, e.r);
         S.sfx.at(e.kind === 'souffle' ? 'souffle' : 'boum', e.x, e.y, e.z, 1);
         break;
       }
@@ -1226,6 +1330,13 @@ function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'a
 // liste des commandes (écran d'accueil, pause), avec les touches choisies par le joueur
 function keysHtml() {
   const ks = (a) => S.keys.labels(a).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
+  if (S.keys.device === 'pad') {
+    return `<div class="keylist"><span><kbd>Stick gauche</kbd> se déplacer · <kbd>Stick droit</kbd> regarder</span><span>${kb('tir')} tirer · ${kb('visee')} viser (aide à la visée légère)</span>
+  <span>${kb('saut')} sauter, ouvrir le deltaplane</span><span>${kb('accroupi')} s'accroupir · ${kb('sprint')} sprinter (un appui suffit)</span>
+  <span>${kb('prec')} ${kb('suiv')} objets · ${kb('utiliser')} ouvrir, ramasser · ${kb('recharger')} recharger</span><span>${kb('sac')} sac · ${kb('carte')} carte · <kbd>${esc(S.keys.label('Pad9'))}</kbd> pause · ${ks('repere')} repère</span>
+  <span>${kb('mur')} mur · ${kb('sol')} sol · ${kb('escalier')} escalier · ${kb('materiau')} matériau</span></div>
+  <p class="hint">Tous les boutons se changent dans ⚙️ Réglages. Croix (ou stick gauche) et A pour les menus, B pour revenir.</p>`;
+  }
   return `<div class="keylist"><span>${ks('repere')} repère pour l'équipe</span><span>${kb('avant')}${kb('gauche')}${kb('arriere')}${kb('droite')} se déplacer</span><span><kbd>Souris</kbd> regarder · ${kb('tir')} tirer · ${kb('visee')} viser</span>
   <span>${kb('saut')} sauter, ouvrir le deltaplane</span><span>${kb('sprint')} sprinter · ${kb('accroupi')} s'accroupir</span>
   <span>${kb('objet1')}…${kb('objet5')} ou molette : objets · ${kb('pioche')} pioche</span><span>${kb('utiliser')} ouvrir, ramasser · ${kb('recharger')} recharger · ${kb('lacher')} lâcher</span>
@@ -1239,10 +1350,11 @@ function showScreen(kind, data) {
   el.hidden = !kind;
   S.screen = kind; S.screenData = data;
   if (!kind) return;
+  if (S.input && S.input.padOn) { S.input.padOn = false; S.input.release(); }
   const expl = S.settings.mode === 'exploration';
   const play = (label) => `<button class="btn big" id="go">${label}</button>`;
   const back = `<button class="btn ghost" id="quit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button>`;
-  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris.</p>' : '';
+  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris, ou à la manette.</p>' : '';
   const opts = '<div class="opts"><button class="btn ghost" id="settings" type="button">⚙️ Réglages</button></div>';
   const title = '<h1>Island <span>Rush</span></h1>';
   const n = clamp(S.settings.places, 2, MAX_PLACES);
@@ -1296,6 +1408,7 @@ function showScreen(kind, data) {
   const again = $('#again'); if (again) again.onclick = () => { S.sfx.unlock(); resetMatch(); startMatch(); };
   $('#quit').onclick = quit;
   const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
+  if (S.keys && S.keys.device === 'pad') padFocusEl($('#go') || $('#again') || $('#quit'));
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 // bilan personnel : éliminations, dégâts, précision, distance, temps de survie, relevés, et qui nous a éliminés
@@ -1323,12 +1436,34 @@ const SETTINGS = {
       set: (id, slot, ev) => { const lost = S.keys.set(id, slot, ev); return lost.length ? `Cette touche servait aussi à : ${lost.join(', ')}. Elle n'y sert plus.` : ''; },
       clear: (id, slot) => S.keys.clear(id, slot),
       reset: () => S.keys.reset(),
-    } }] }],
+    } }] },
+  { title: 'Manette', hint: 'Choisis une case (clic, ou croix puis A), puis appuie sur le bouton voulu de la manette. Suppr efface la case, Échap annule. Les sticks et Menu (pause) ne se changent pas.',
+    items: [
+      { label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +S.input.padSens.toFixed(1), set: (v) => { S.input.padSens = v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) },
+      { label: 'Aide à la visée', get: () => S.input.assist, set: (v) => { S.input.assist = !!v; saveOpts(); } },
+      { label: 'Inverser haut et bas', get: () => S.input.padInvert, set: (v) => { S.input.padInvert = !!v; saveOpts(); } },
+      { bind: {
+        pad: true,
+        rows: () => S.keys.padRows(),
+        set: (id, slot, ev) => { const lost = S.keys.padSet(id, slot, ev); return lost.length ? `Ce bouton servait aussi à : ${lost.join(', ')}. Il n'y sert plus.` : ''; },
+        clear: (id, slot) => S.keys.padClear(id, slot),
+        reset: () => S.keys.padReset(),
+      } }] }],
 };
-function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens })); } catch (e) { /* pas de stockage */ } }
+function saveOpts() {
+  const I = S.input;
+  try { localStorage.setItem('royale_opts', JSON.stringify({ sens: I.sens, padSens: I.padSens, assist: I.assist, padInvert: I.padInvert })); } catch (e) { /* pas de stockage */ }
+}
 function loadOpts() {
   // l'ancien curseur « Volume » (0,8 par défaut) devient le point de départ du curseur « Effets »
-  try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) DDVolume.migrate('fx', clamp(+o.vol, 0, 1) / 0.8); } catch (e) { /* pas de stockage */ }
+  try {
+    const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'), I = S.input;
+    if (o.sens) I.sens = clamp(+o.sens, 0.0005, 0.008);
+    if (o.padSens) I.padSens = clamp(+o.padSens, 0.4, 2.2);
+    if (o.assist != null) I.assist = !!o.assist;
+    if (o.padInvert != null) I.padInvert = !!o.padInvert;
+    if (o.vol != null) DDVolume.migrate('fx', clamp(+o.vol, 0, 1) / 0.8);
+  } catch (e) { /* pas de stockage */ }
 }
 // partie quittée avant la fin : elle entre au journal comme abandonnée
 function abandon() { if (S.journal && S.journal.on && S.sim) S.journal.end(S.sim, S.sim.results(), 'abandon'); }
