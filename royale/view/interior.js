@@ -306,14 +306,14 @@ export function buildInterior(map) {
   };
   for (const [list, mesh] of [[leaves, mLeaf], [rolls, mRoll]]) {
     list.forEach(({ d, b }, i) => {
-      const st = { d, b, mesh, i, t: d.open ? 1 : 0, want: d.open ? 1 : 0 };
+      const st = { d, b, mesh, i, t: d.open ? 1 : 0, want: d.open ? 1 : 0, init: d.open ? 1 : 0 };
       anim.set(d.id, st); place(st);
       mesh.setColorAt(i, col.setHex(d.kind === 'portail' ? [0xc8ccd0, 0x9aa9b2, 0xb84a3a, 0x3f6a4a][hash(d.id) % 4] : DOOR_TINTS[hash(d.id) % DOOR_TINTS.length]));
     });
     mesh.count = list.length; mesh.castShadow = true; mesh.receiveShadow = true; mesh.computeBoundingSphere();
     group.add(mesh);
   }
-  const moving = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const moving = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0), goneFurn = new Map(), goneDoor = new Map();
   return {
     group, furnIndex,
     // meubles : seulement les tuiles à moins de far mètres de (x, z)
@@ -323,8 +323,21 @@ export function buildInterior(map) {
         im.visible = dx * dx + dz * dz < far * far;
       }
     },
-    hideFurn(id) { const w = furnIndex.get(id); if (w) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; } },
-    hideDoor(id) { const st = anim.get(id); if (st) { moving.delete(st); st.mesh.setMatrixAt(st.i, zero); st.mesh.instanceMatrix.needsUpdate = true; anim.delete(id); } },
+    hideFurn(id) {
+      const w = furnIndex.get(id);
+      if (!w || goneFurn.has(id)) return;
+      const m = new THREE.Matrix4(); w.mesh.getMatrixAt(w.i, m); goneFurn.set(id, m);
+      w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true;
+    },
+    hideDoor(id) { const st = anim.get(id); if (st) { moving.delete(st); st.mesh.setMatrixAt(st.i, zero); st.mesh.instanceMatrix.needsUpdate = true; anim.delete(id); goneDoor.set(id, st); } },
+    // nouvelle partie : meubles et portes cassés reviennent, chaque porte reprend son état de départ
+    restore() {
+      for (const [id, m] of goneFurn) { const w = furnIndex.get(id); w.mesh.setMatrixAt(w.i, m); w.mesh.instanceMatrix.needsUpdate = true; }
+      goneFurn.clear();
+      for (const [id, st] of goneDoor) anim.set(id, st);
+      goneDoor.clear(); moving.clear();
+      for (const st of anim.values()) { st.t = st.want = st.init; place(st); }
+    },
     setDoor(id, open) { const st = anim.get(id); if (!st) return; st.want = open ? 1 : 0; moving.add(st); },
     update(dt) {
       for (const st of moving) {

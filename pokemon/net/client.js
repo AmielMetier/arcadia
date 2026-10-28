@@ -1,11 +1,12 @@
 // pokemon/net/client.js
-// Invité de Poké Duel : écoute les états diffusés par l'hôte et transmet ses choix de combat.
+// Invité du tournoi Poké Duel : affiche l'état diffusé par l'hôte et lui transmet ses choix.
 
-export function startClient({ bridge, me, onState, onError }) {
+export function startClient({ bridge, onState, onError }) {
   let state = null;
+  let alive = true;
 
   bridge.on('msg', (from, m) => {
-    if (!m || typeof m !== 'object') return;
+    if (!alive || !m || typeof m !== 'object') return;
     if (String(from) !== String(bridge.info.hostId)) return;
     if (m.t === 'st' && m.s) {
       state = m.s;
@@ -15,19 +16,22 @@ export function startClient({ bridge, me, onState, onError }) {
     }
   });
 
-  // Demander immédiatement l'état à l'hôte dès la connexion
-  bridge.send('host', { t: 'sync' });
+  const send = (msg) => { if (alive) bridge.send('host', msg); };
+
+  // Demander l'état à l'hôte dès la connexion (et une seconde fois si la première réponse se perd)
+  send({ t: 'sync' });
+  setTimeout(() => { if (alive && !state) send({ t: 'sync' }); }, 1500);
 
   return {
-    startMatch() {
-      bridge.send('host', { t: 'start_match' });
-    },
-    restart() {
-      bridge.send('host', { t: 'restart' });
-    },
-    submitAction(action) {
-      bridge.send('host', { t: 'action', action });
-    },
-    get state() { return state; }
+    draft: (picks) => send({ t: 'draft', picks }),
+    lead: (idx) => send({ t: 'lead', idx }),
+    ready: (idx) => send({ t: 'ready', idx }),
+    submitAction: (action) => send({ t: 'action', action }),
+    cont: () => send({ t: 'continue' }),
+    skip: () => {},
+    restart: () => {},
+    isHost: false,
+    get state() { return state; },
+    destroy() { alive = false; },
   };
 }

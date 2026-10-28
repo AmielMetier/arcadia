@@ -6,6 +6,7 @@
 // complet. Moteur PUR (testé hors navigateur).
 import { AMMO } from './items.js';
 import { stepPlayer, stepAir } from './player.js';
+import { CRAWL, REVIVE } from './sim.js';
 
 export const MODES = ['sol', 'ballon', 'chute', 'planeur'];
 const AMMO_K = Object.keys(AMMO), MATS_K = ['bois', 'pierre', 'metal'];
@@ -21,9 +22,11 @@ export function snapshot(sim, inv = 'humains') {
   const S = sim.S, P = [], I = [];
   for (const p of S.players.values()) {
     const held = p.sel > 0 ? p.inv[p.sel - 1] : null;
-    const bits = (p.alive ? 1 : 0) | (p.ground ? 2 : 0) | (p.swim ? 4 : 0) | (p.crouch ? 8 : 0) | (p.sprint ? 16 : 0) | (p.inp.aim ? 32 : 0) | (p.rl > 0 ? 64 : 0);
+    const bits = (p.alive ? 1 : 0) | (p.ground ? 2 : 0) | (p.swim ? 4 : 0) | (p.crouch ? 8 : 0) | (p.sprint ? 16 : 0) | (p.inp.aim ? 32 : 0) | (p.rl > 0 ? 64 : 0) | (p.slideT > 0 ? 128 : 0);
     P.push([p.id, r2(p.x), r2(p.y), r2(p.z), r3(p.yaw), r3(p.pitch || 0), r2(p.vx), r2(p.vy), r2(p.vz), bits, MODES.indexOf(p.mode),
-      Math.max(0, Math.round(p.hp)), Math.round(p.sh), p.sel, encIt(held), p.use ? r2(p.use.t / p.use.T) : -1, p.kills, p.place, p.q | 0, Math.round(p.dealt), p.hitBy ?? null]);
+      Math.max(0, Math.round(p.hp)), Math.round(p.sh), p.sel, encIt(held), p.use ? r2(p.use.t / p.use.T) : -1, p.kills, p.place, p.q | 0, Math.round(p.dealt), p.hitBy ?? null,
+      // équipes : réserve quand on est à terre (−1 debout), coéquipier qu'on relève et où on en est
+      p.down ? Math.max(0, Math.round(p.down.hp)) : -1, p.revive ? [p.revive.id, r2(p.revive.t / REVIVE)] : 0]);
     if (inv === 'tous' || !p.bot) I.push([p.id, p.inv.map(encIt), AMMO_K.map((a) => p.ammo[a]), MATS_K.map((m) => p.mats[m]), r2(p.rl), r2(p.cd), p.use ? p.use.c : 0, p.use ? r2(p.use.T) : 0]);
   }
   const st = S.storm;
@@ -50,8 +53,10 @@ export function applySnapshot(sim, s, me) {
     if (p.id !== me) { p.x = r[1]; p.y = r[2]; p.z = r[3]; p.yaw = r[4]; p.vx = r[6]; p.vy = r[7]; p.vz = r[8]; p.mode = MODES[r[10]]; }
     p.pitch = r[5];
     p.alive = !!(r[9] & 1); p.ground = !!(r[9] & 2); p.swim = !!(r[9] & 4); p.crouch = !!(r[9] & 8); p.sprint = !!(r[9] & 16);
-    if (p.id !== me) p.inp.aim = !!(r[9] & 32);
+    // (la glissade des autres : pour la dessiner ; la sienne, l'invité la prédit lui-même)
+    if (p.id !== me) { p.inp.aim = !!(r[9] & 32); p.slideT = r[9] & 128 ? 0.1 : 0; }
     p.hp = r[11]; p.sh = r[12]; p.sel = r[13]; p.kills = r[16]; p.place = r[17]; p.q = r[18]; p.dealt = r[19]; p.hitBy = r[20];
+    p.down = r[21] >= 0 ? { hp: r[21] } : null; p.revive = r[22] ? { id: r[22][0], t: r[22][1] * REVIVE } : null;
     if (!withInv.has(p.id)) {
       // des autres, on ne connaît que l'objet en main (pour le dessiner)
       p.inv = [null, null, null, null, null];
@@ -86,7 +91,11 @@ export function mirrorEvent(sim, world, build, e) {
     case 'casse': build.mirrorBreak(e.key); break;
     case 'tremplin': if (!S.pads.some((p) => p.id === e.id)) S.pads.push({ id: e.id, x: e.x, y: e.y, z: e.z, t: 0 }); S.nextProj = Math.max(S.nextProj, e.id + 1); break;
     case 'elim': { const p = S.players.get(e.to); if (p) { p.alive = false; p.place = e.place; p.hp = 0; } if (!S.order.includes(e.to)) S.order.push(e.to); break; }
-    case 'fin': S.phase = 'fin'; S.winner = e.winner; break;
+    case 'fin': S.phase = 'fin'; S.winner = e.winner; S.winTeam = e.team ?? null; break;
+    case 'largage': S.drops.set(e.id, { id: e.id, x: e.x, z: e.z, y: e.gy, gy: e.gy, t0: e.t0, open: false, landed: false }); break;
+    case 'largage-pose': { const d = S.drops.get(e.id); if (d) d.landed = true; break; }
+    case 'largage-ouvert': { const d = S.drops.get(e.id); if (d) d.open = true; break; }
+    case 'repere': S.pings.set(e.p, { p: e.p, team: e.team, kind: e.kind, x: e.x, y: e.y, z: e.z, target: e.target, what: e.what, t: e.t }); break;
     default: break;
   }
 }
@@ -102,6 +111,7 @@ export function fullState(sim, world, build) {
     pieces: [...build.pieces.values()].map((p) => ({ ...p })),
     pads: S.pads.map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z)]),
     order: [...S.order],
+    drops: [...S.drops.values()].map((d) => [d.id, r2(d.x), r2(d.z), r2(d.gy), r3(d.t0), d.landed ? 1 : 0, d.open ? 1 : 0]),
   };
 }
 export function applyFull(sim, world, build, st) {
@@ -115,6 +125,7 @@ export function applyFull(sim, world, build, st) {
   for (const p of st.pieces) build.mirrorAdd(p);
   S.pads = st.pads.map(([id, x, y, z]) => ({ id, x, y, z, t: 0 }));
   S.order = [...st.order];
+  for (const [id, x, z, gy, t0, landed, open] of st.drops || []) S.drops.set(id, { id, x, z, y: gy, gy, t0, landed: !!landed, open: !!open });
 }
 
 // ------------------------------------------------------------------ commandes (invité → hôte)
@@ -122,6 +133,7 @@ const num = (v, a, b) => (Number.isFinite(+v) ? Math.max(a, Math.min(b, +v)) : 0
 export function cleanInput(m) {
   return {
     mx: num(m.mx, -1, 1), mz: num(m.mz, -1, 1), yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.6, 1.6),
+    ay: m.ay == null ? null : num(m.ay, -1e4, 1e4), ap: m.ap == null ? null : num(m.ap, -1.6, 1.6),
     fire: !!m.fire, aim: !!m.aim, sprint: !!m.sprint, crouch: !!m.crouch,
     jump: m.jump | 0, use: m.use | 0, reload: m.reload | 0, shoot: m.shoot | 0, drop: m.drop | 0, sel: num(m.sel | 0, 0, 5),
     build: m.build === 'mur' || m.build === 'sol' || m.build === 'escalier' ? m.build : null,
@@ -135,7 +147,8 @@ export function cleanInput(m) {
 export function predictStep(P, h, world, dt) {
   if (!P.alive || P.mode === 'ballon') return;
   if (P.mode === 'chute' || P.mode === 'planeur') { stepAir(P, { ...h }, world, dt); return; }
+  if (P.down) { stepPlayer(P, { mx: h.mx, mz: h.mz, yaw: h.yaw, jump: false, sprint: false, crouch: true, k: CRAWL }, world, dt); P.pitch = h.pitch; return; }
   const slow = P.use ? 0.5 : h.aim ? 0.7 : 1;
-  stepPlayer(P, { mx: h.mx, mz: h.mz, yaw: h.yaw, jump: h.jump, sprint: h.sprint && !P.use && !h.aim, crouch: h.crouch, k: slow }, world, dt);
+  stepPlayer(P, { mx: h.mx, mz: h.mz, yaw: h.yaw, jump: h.jump, sprint: h.sprint && !P.use && !h.aim, crouch: h.crouch, k: slow, glisse: true }, world, dt);
   P.pitch = h.pitch;
 }

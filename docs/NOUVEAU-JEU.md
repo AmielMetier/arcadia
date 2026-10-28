@@ -99,12 +99,13 @@ Les invités ne voient que « a répondu ». La réponse n'est envoyée qu'à la
 Reprise : la question n° i ne dépend que de `state.seed`, de i et de la difficulté. Si l'hôte part, le nouvel hôte
 reprend le dernier état reçu et relance la question en cours (`restartQuestion`).
 
-## 5. Brancher le jeu sur le Hub (3 fichiers à modifier)
+## 5. Brancher le jeu sur le Hub (2 fichiers à modifier)
 
 1. **`hub/games.js`** : ajouter une entrée au tableau `HUB_GAMES`.
    ```js
    { id: 'calcul', title: 'Tête de Calcul', tag: '…', desc: '…', url: 'calcul/',
      minPlayers: 1, maxPlayers: 6, accent: '#ff5fa2',
+     icon: '🧮', score: 'Meilleur score',
      settings: [ { key: 'mode', label: 'Mode', options: [['classic', 'Classique'], …], def: 'classic' }, … ],
      cover: 'calcul/img/affiche.jpg' }
    ```
@@ -116,9 +117,12 @@ reprend le dernier état reçu et relance la question en cours (`restartQuestion
    - `cover` : affiche JPEG 960 × 540 dans `<jeu>/img/affiche.jpg`, dans le style commun à tous les jeux : une vraie
      image du jeu (sans interface), le titre en grand en deux couleurs et un bandeau pour le sous-titre.
      `tools/affiche.html?img=…&t1=…&t2=…&c1=…&c2=…&sub=…&pill=…` la compose à partir d'une capture du jeu.
-2. **`shared/results.js`** : ajouter l'id du jeu à la liste des jeux acceptés (`['david', 'drift', …, 'convoy']`),
-   sinon les résultats sont **rejetés** par la validation et n'apparaissent pas au classement.
-3. **`hub/hub.js`** : nom du jeu dans `GNAME`, icône dans la liste des dernières parties, libellé de `scoreLabel`.
+   - Classement : `icon` (émoji des dernières parties), `score` (libellé de la colonne du meilleur score, à omettre si
+     le jeu n'en a pas) et `scoreUnit` (ex. `' €'`). Le classement, la validation des résultats (`shared/results.js`)
+     et la page `logs/` lisent le registre : rien d'autre à y ajouter.
+2. **`shared/logger.js`** : ajouter le dossier du jeu à la liste de `detectGameId`, pour que ses plantages soient
+   attribués au bon jeu quand il est ouvert seul. `node tools/test-crash-logger.mjs` le vérifie pour chaque entrée
+   du registre (et que `logs/crash/reasons-catalog.json` décrit le jeu).
    (Bonus : `VERSION`, `README.md`, `CHANGELOG.md`.)
 
 ## 6. Tester
@@ -149,9 +153,12 @@ Le site est statique : il suffit de pousser sur la branche publiée par GitHub P
 - **Horloges** : les machines ne sont pas à l'heure ; l'hôte envoie `now` et chaque invité calcule son décalage.
   La durée de réponse est mesurée à la réception chez l'hôte (la latence pèse un peu sur les invités).
 - **Sons** : le navigateur bloque l'audio avant un clic ; créer l'`AudioContext` au premier `pointerdown`.
-- **Volume** : charger `../shared/volume.js` après `bridge.js`, faire passer la musique par `DDVolume.gain(ctx, 'music')`
-  et les bruitages par `DDVolume.gain(ctx, 'fx')` (ou `DDVolume.media(el, kind, volume)` pour un `<audio>`), et ouvrir le
-  panneau depuis un bouton : `DDVolume.panel(bouton)` (`{ kinds: ['fx'] }` pour un jeu sans musique).
+- **Réglages et volume** : charger `../shared/volume.js` après `bridge.js`, faire passer la musique par
+  `DDVolume.gain(ctx, 'music')` et les bruitages par `DDVolume.gain(ctx, 'fx')` (ou `DDVolume.media(el, kind, volume)`
+  pour un `<audio>`), et mettre **un seul** bouton ⚙️ « Réglages » qui ouvre le panneau commun : `DDVolume.panel(bouton,
+  { sections })` (`kinds: ['fx']` pour un jeu sans musique). Les réglages propres au jeu (graphismes, caméra…) vont dans
+  `sections`, pas dans un menu à part. Pas de bouton muet : le son se coupe en mettant son curseur à 0 ; une touche
+  « couper le son » appelle `DDVolume.toggle()`, qui déplace les mêmes curseurs. Détail de l'API en tête de `shared/volume.js`.
 - **Temps réel** : pour un jeu d'action, voir Outbreak (`outbreak/app.js`) : l'hôte simule à 60 Hz et diffuse l'état à 20 Hz,
   les invités envoient leurs commandes (compteurs pour les actions ponctuelles), prédisent leur propre déplacement et
   affichent les autres avec ~110 ms de retard, interpolés entre deux états. Convoy Storm (`convoy/`) suit le même schéma

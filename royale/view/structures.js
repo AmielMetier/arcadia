@@ -3,13 +3,13 @@
 // Toute l'île tient en quelques dizaines de maillages instanciés ; chaque pan garde son numéro d'instance (et ceux de
 // ses ornements) pour pouvoir être cassé. Face extérieure à la couleur du bâtiment, face intérieure en plâtre.
 // Les façades sont travaillées : enduit coloré, soubassement et chaînes d'angle en pierre, bandeaux entre les étages,
-// corniche ; fenêtres avec encadrement, croisillon, vitre (allumée le soir), appui et linteau, volets, garde-corps
+// corniche ; fenêtres avec encadrement, croisillon (sans vitre : on tire au travers), appui et linteau, volets, garde-corps
 // et jardinières selon le bâtiment ; portes encadrées avec marche, lampe et marquise ; devantures à store rayé et
 // enseigne. Toits en pente avec rives, faîtière et cheminée ; toits plats avec couvertine, climatiseurs, ventilations
 // et réservoirs (engine/decor.js, qui donne aussi leurs collisions).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CELL, STOREY } from '../engine/buildings.js';
-import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY } from '../engine/world.js';
+import { panelSolids, WALL_T, INNER_T, SLAB_T, BASE_UP, ROOF_SLOPE, levelH, floorY, slabCells, roofPanes } from '../engine/world.js';
 import { roofDetails } from '../engine/decor.js';
 import { makeRng } from '../engine/rng.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
@@ -33,7 +33,7 @@ const SHUTTER_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie', 'manoir'
 const RAIL_TYPES = new Set(['immeuble', 'mairie', 'bureaux', 'auberge', 'manoir', 'tour']);
 const FLOWER_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie']);
 const CANOPY_TYPES = new Set(['maison', 'chalet', 'auberge', 'mairie', 'manoir', 'immeuble', 'bureaux']);
-const SMALL = new Set(['fenCadre', 'fenVerre', 'fenPierre', 'fenVolets', 'fenGarde', 'fenJardin', 'fenFleurs', 'porteCadre', 'porteMarche', 'lampe', 'ampoule', 'soclePlein', 'soclePorte', 'soclePortail', 'bandeau', 'corniche', 'sign', 'grilleFace']);
+const SMALL = new Set(['fenCadre', 'fenPierre', 'fenVolets', 'fenGarde', 'fenJardin', 'fenFleurs', 'porteCadre', 'porteMarche', 'lampe', 'ampoule', 'soclePlein', 'soclePorte', 'soclePortail', 'bandeau', 'corniche', 'sign', 'grilleFace']);
 const CORNICE_TYPES = new Set(['immeuble', 'tour', 'mairie', 'bureaux', 'manoir', 'auberge', 'boutique', 'maison']);
 
 // ------------------------------------------------------------------ textures peintes (motif clair multiplié par la couleur)
@@ -177,9 +177,11 @@ function builder() {
   };
 }
 // pan de 4 m sur un étage normal ; +z = dehors
+// les cloisons s'arrêtent 3 cm sous le plancher du dessus (leur dessus, au ras du parquet, le traversait en scintillant
+// là où l'étage n'a pas de cloison) : il reste dans l'épaisseur de la dalle, sans fente au plafond
 function panelGeo(kind, T, exterior) {
   const B = builder();
-  for (const [u0, u1, v0, v1] of panelSolids(kind, STOREY)) B.box(u0, v0, -T / 2, u1, v1, T / 2, (n) => (exterior ? (n[2] < 0 ? 0 : 1) : 0));
+  for (const [u0, u1, v0, v1] of panelSolids(kind, STOREY)) B.box(u0, v0, -T / 2, u1, exterior ? v1 : Math.min(v1, STOREY - 0.03), T / 2, (n) => (exterior ? (n[2] < 0 ? 0 : 1) : 0));
   return B.geo();
 }
 const boxes = (list) => { const B = builder(); for (const b of list) B.box(...b); return B.geo(); };
@@ -191,7 +193,6 @@ const DECO = {
     [0.76, 0.94, -O - 0.05, 0.9, 2.44, -O + 0.03], [3.1, 0.94, -O - 0.05, 3.24, 2.44, -O + 0.03], [0.76, 2.3, -O - 0.05, 3.24, 2.44, -O + 0.03],
     [1.975, 1.0, -0.035, 2.025, 2.3, 0.035], [0.9, 1.83, -0.035, 3.1, 1.88, 0.035],
   ]),
-  fenVerre: () => boxes([[0.9, 1.0, -0.006, 3.1, 2.3, 0.006]]),
   fenPierre: () => boxes([[0.68, 0.86, O - 0.04, 3.32, 1.0, O + 0.17], [0.68, 2.44, O - 0.03, 3.32, 2.62, O + 0.07]]),
   fenVolets: () => boxes([[-0.3, 0.96, O + 0.01, 0.84, 2.34, O + 0.06], [3.16, 0.96, O + 0.01, 4.3, 2.34, O + 0.06]]),
   fenGarde: () => {
@@ -271,20 +272,6 @@ function twoTone(map, inner, extra = {}, glow = [0.32, 0], plainInner = false) {
   m.userData.inner = U.uInner;
   return m;
 }
-// vitres : légèrement teintées, reflets du ciel ; le soir, certaines sont allumées (couleur de l'instance)
-function glassMaterial(night) {
-  const m = new THREE.MeshStandardMaterial({ color: 0x9cc4dc, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.38, depthWrite: false, envMapIntensity: 1.6 });
-  const U = { uNight: { value: night } };
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\nvec3 lit = vColor; diffuseColor.rgb = diffuse;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += lit * uNight * 1.6; diffuseColor.a = mix(diffuseColor.a, 0.85, uNight * step(0.05, lit.r));');
-  };
-  m.customProgramCacheKey = () => 'royale-vitre';
-  return m;
-}
 // store : blanc là où la texture est noire, couleur de l'instance ailleurs
 function awningMaterial(map) {
   const m = new THREE.MeshStandardMaterial({ map, roughness: 0.85, side: THREE.DoubleSide });
@@ -325,7 +312,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   mats.trim = new THREE.MeshStandardMaterial({ roughness: 0.55 });
   mats.stone = new THREE.MeshStandardMaterial({ map: tex.pierre, roughness: 0.9 });
   mats.shutter = new THREE.MeshStandardMaterial({ map: tex.volet, roughness: 0.7 });
-  mats.glass = glassMaterial(night);
   mats.iron = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.45, metalness: 0.6 });
   mats.bulb = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffd27a, emissiveIntensity: 0.4 + night * 2.2 });
   mats.flower = new THREE.MeshStandardMaterial({ roughness: 0.8 });
@@ -368,6 +354,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
 
   // toits en pente et pignons, fusionnés ; boiseries des toits (rives, faîtières) fusionnées aussi
   const roofPos = [], roofCol = [], roofUv = [], gabPos = [], gabCol = [];
+  const roofKeys = new Map(); // dalle « s:b:k:x,z » → premiers sommets des morceaux de pan au-dessus (6 sommets chacun)
   const trimParts = [], trimCols = [];
   const lanterns = [];
   const addBeam = (len, w, h, cx, cy, cz, rx, ry, c) => {
@@ -414,7 +401,9 @@ export function buildStructures(map, { time = 'jour' } = {}) {
         if (k === b.floors - 1 && CORNICE_TYPES.has(b.type) && mat === 'pierre') push('corniche', 'stone', pm, stone, ref);
         if (e.k === 'fenetre') {
           push('fenCadre', 'trim', pm, trim, ref);
-          if (!b.abandoned) push('fenVerre', 'glass', pm, br.next() < 0.35 ? color(0xffd69a) : color(0x000000), ref);
+          // pas de vitre : on tire à travers les fenêtres, on voit donc à travers (le tirage reste, pour que les
+          // jardinières gardent leur place)
+          if (!b.abandoned) br.next();
           if (mat === 'pierre') push('fenPierre', 'stone', pm, stone, ref);
           if (shutters && !(shopFront && k === 0)) push('fenVolets', 'shutter', pm, shutter, ref);
           if (rails && k > 0) push('fenGarde', 'iron', pm, null, ref);
@@ -441,7 +430,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
           push('sign', 'sign', m, null, ref, { cell });
         }
       }
-      if (k > 0) rows(b, lv.hole, (x0, x1, z) => push('deck', 'floor', place(x0 * CELL, F - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), floorC, { b: b.id, k }));
+      if (k > 0) slabCells(b, lv.hole, (x, z) => push('deck', 'floor', place(x * CELL, F - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), floorC, { b: b.id, k, slab: `${x},${z}` }));
       if (lv.stairs) {
         const st = lv.stairs;
         // la géométrie monte vers +z : on la tourne dans le sens de l'escalier
@@ -454,10 +443,14 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     const top = floorY(b, b.floors);
     for (const n of nodes) {
       const [x, z] = n.split(',').map(Number);
-      push('box', mat, place(x * CELL - WALL_T / 2, b.y, z * CELL - WALL_T / 2, 0, WALL_T, top - b.y, WALL_T), face, { b: b.id });
+      // poteau 4 cm plus fin que les murs : caché dedans tant qu'ils tiennent (ses faces, confondues avec les leurs,
+      // scintillaient en bandes sombres dans les pièces), seul visible quand ils sont cassés ; aux coins du bâtiment, un
+      // bouchon comble l'angle extérieur au ras des deux façades
+      const I = WALL_T / 2 - 0.02, sx = x === b.x0 ? -1 : x === b.x0 + b.w ? 1 : 0, sz = z === b.z0 ? -1 : z === b.z0 + b.d ? 1 : 0;
+      push('box', mat, place(x * CELL - I, b.y, z * CELL - I, 0, 2 * I, top - b.y, 2 * I), face, { b: b.id });
+      if (sx && sz) push('box', mat, place(x * CELL - (sx < 0 ? WALL_T / 2 : 0), b.y, z * CELL - (sz < 0 ? WALL_T / 2 : 0), 0, WALL_T / 2, top - b.y, WALL_T / 2), face, { b: b.id });
       // chaînes d'angle en pierre aux coins du bâtiment (une pierre sur deux plus longue de chaque côté), qui
       // dépassent un peu des deux façades sans entrer dans les pièces
-      const sx = x === b.x0 ? -1 : x === b.x0 + b.w ? 1 : 0, sz = z === b.z0 ? -1 : z === b.z0 + b.d ? 1 : 0;
       if (fancy && sx && sz) {
         let i = 0;
         for (let y = b.y + BASE_UP + 0.55; y < top - 0.3; y += 0.42, i++) {
@@ -470,7 +463,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     // toit plat : dalle de gravier + garde-corps à couvertine ; toit en pente : plafond + deux pans + pignons + rives
     const roofC = color(ROOFS[mat][rng.int(0, ROOFS[mat].length - 1)]);
     if (b.roof !== 'pente') {
-      rows(b, b.roofHatch || null, (x0, x1, z) => push('deck', 'roof', place(x0 * CELL, top - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id }));
+      slabCells(b, b.roofHatch || null, (x, z) => push('deck', 'roof', place(x * CELL, top - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id, k: b.floors, slab: `${x},${z}` }));
       const pc = face.clone().multiplyScalar(0.92);
       push('parapet', mat, place(X0 - WALL_T / 2, top, Z0 - WALL_T / 2, 0, X1 - X0 + WALL_T, 1, WALL_T), pc, { b: b.id });
       push('parapet', mat, place(X0 - WALL_T / 2, top, Z1 - WALL_T / 2, 0, X1 - X0 + WALL_T, 1, WALL_T), pc, { b: b.id });
@@ -484,17 +477,29 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       push('box', cm, place(X1 - WALL_T / 2 - 0.06, top + 1, Z0, 0, WALL_T + 0.12, 0.08, Z1 - Z0), cc, { b: b.id });
       if (b.roof === 'phare') lanterns.push({ x: (X0 + X1) / 2, y: top, z: (Z0 + Z1) / 2 });
     } else {
-      rows(b, null, (x0, x1, z) => push('deck', 'roof', place(x0 * CELL, top - SLAB_T, z * CELL, 0, (x1 - x0) * CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id }));
+      slabCells(b, null, (x, z) => push('deck', 'roof', place(x * CELL, top - SLAB_T, z * CELL, 0, CELL, SLAB_T, CELL), color(0xb7b4ac), { b: b.id, k: b.floors, slab: `${x},${z}` }));
       const alongX = b.w >= b.d, o = 0.55; // débord du toit
       const half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE, drop = o * ROOF_SLOPE;
       const rc = [roofC.r, roofC.g, roofC.b];
       if (b.abandoned) for (let i = 0; i < 3; i++) rc[i] *= 0.7;
-      const quad = (a, bb, c, d) => {
-        for (const p of [a, bb, c, a, c, d]) { roofPos.push(...p); roofCol.push(...rc); }
-        // UV : le long du faîtage et dans la pente, en mètres / 2
-        const L = Math.hypot(bb[0] - a[0], bb[2] - a[2]), Hs = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]);
-        for (const [u, w] of [[0, 0], [L, 0], [L, Hs], [0, 0], [L, Hs], [0, Hs]]) roofUv.push(u / 2, w / 2);
-      };
+      // les pans, case par case (même découpe que le moteur, débord en plus) : un morceau cassé disparaît seul
+      const S0 = (alongX ? b.x0 : b.z0) * CELL, S1 = S0 + (alongX ? b.w : b.d) * CELL, T0 = (alongX ? b.z0 : b.x0) * CELL, T1 = T0 + (alongX ? b.d : b.w) * CELL;
+      const sec = Math.hypot(1, ROOF_SLOPE);
+      for (const p of roofPanes(b)) {
+        const s0 = p.s0 === S0 ? S0 - o : p.s0, s1 = p.s1 === S1 ? S1 + o : p.s1;
+        const t0 = p.dir > 0 && p.t0 === T0 ? T0 - o : p.t0, t1 = p.dir < 0 && p.t1 === T1 ? T1 + o : p.t1;
+        const eave = p.dir > 0 ? T0 - o : T1 + o, tE = p.dir > 0 ? t0 : t1, tR = p.dir > 0 ? t1 : t0;
+        // UV : le long du faîtage (depuis le coin d'où partait le pan entier) et dans la pente, en mètres / 2
+        const sg = (alongX ? p.dir > 0 : p.dir < 0) ? 1 : -1, org = sg > 0 ? S0 - o : S1 + o, sA = sg > 0 ? s0 : s1, sB = sg > 0 ? s1 : s0;
+        const at = (ss, tt) => { const y = top + (p.dir > 0 ? tt - T0 : T1 - tt) * ROOF_SLOPE; return alongX ? [ss, y, tt] : [tt, y, ss]; };
+        const a = at(sA, tE), bb = at(sB, tE), c = at(sB, tR), d = at(sA, tR);
+        const key = 's:' + b.id + ':' + b.floors + ':' + p.x + ',' + p.z;
+        if (!roofKeys.has(key)) roofKeys.set(key, []);
+        roofKeys.get(key).push(roofPos.length / 3);
+        for (const q of [a, bb, c, a, c, d]) { roofPos.push(...q); roofCol.push(...rc); }
+        const uA = Math.abs(sA - org), uB = Math.abs(sB - org), wE = Math.abs(tE - eave) * sec, wR = Math.abs(tR - eave) * sec;
+        for (const [u, w] of [[uA, wE], [uB, wE], [uB, wR], [uA, wE], [uB, wR], [uA, wR]]) roofUv.push(u / 2, w / 2);
+      }
       const tri = (a, bb, c) => { for (const p of [a, bb, c]) { gabPos.push(...p); gabCol.push(face.r, face.g, face.b); } };
       const ty = top - drop, ry = top + rise;
       const slope = Math.atan(ROOF_SLOPE), sl = Math.hypot(half + o, rise + drop);
@@ -502,8 +507,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       const ridgeC = roofC.clone().multiplyScalar(0.75);
       if (alongX) {
         const zm = (Z0 + Z1) / 2;
-        quad([X0 - o, ty, Z0 - o], [X1 + o, ty, Z0 - o], [X1 + o, ry, zm], [X0 - o, ry, zm]);
-        quad([X1 + o, ty, Z1 + o], [X0 - o, ty, Z1 + o], [X0 - o, ry, zm], [X1 + o, ry, zm]);
         tri([X0, top, Z1], [X0, top, Z0], [X0, ry - 0.05, zm]); tri([X1, top, Z0], [X1, top, Z1], [X1, ry - 0.05, zm]);
         // planches de rive (bas des pans), rives des pignons, faîtière
         addBeam(X1 - X0 + 2 * o + 0.1, 0.06, 0.22, (X0 + X1) / 2, ty - 0.08, Z0 - o, 0, 0, tc);
@@ -512,8 +515,6 @@ export function buildStructures(map, { time = 'jour' } = {}) {
         addBeam(X1 - X0 + 2 * o, 0.26, 0.16, (X0 + X1) / 2, ry + 0.03, zm, 0, 0, ridgeC);
       } else {
         const xm = (X0 + X1) / 2;
-        quad([X0 - o, ty, Z1 + o], [X0 - o, ty, Z0 - o], [xm, ry, Z0 - o], [xm, ry, Z1 + o]);
-        quad([X1 + o, ty, Z0 - o], [X1 + o, ty, Z1 + o], [xm, ry, Z1 + o], [xm, ry, Z0 - o]);
         tri([X0, top, Z0], [X1, top, Z0], [xm, ry - 0.05, Z0]); tri([X1, top, Z1], [X0, top, Z1], [xm, ry - 0.05, Z1]);
         addBeam(Z1 - Z0 + 2 * o + 0.1, 0.06, 0.22, X0 - o, ty - 0.08, (Z0 + Z1) / 2, 0, Math.PI / 2, tc);
         addBeam(Z1 - Z0 + 2 * o + 0.1, 0.06, 0.22, X1 + o, ty - 0.08, (Z0 + Z1) / 2, 0, Math.PI / 2, tc);
@@ -556,16 +557,16 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       im.setMatrixAt(i, it.m);
       if (it.c) im.setColorAt(i, it.c);
       if (cells) cells[i] = it.cell || 0;
-      if (it.ref && it.ref.e) {
-        const k = it.ref.b + ':' + it.ref.k + ':' + it.ref.e.o + it.ref.e.x + ',' + it.ref.e.z;
+      if (it.ref && (it.ref.e || it.ref.slab != null)) {
+        // pan de mur « b:k:ox,z » ou dalle « s:b:k:x,z » (clés du moteur)
+        const k = it.ref.e ? it.ref.b + ':' + it.ref.k + ':' + it.ref.e.o + it.ref.e.x + ',' + it.ref.e.z : 's:' + it.ref.b + ':' + it.ref.k + ':' + it.ref.slab;
         if (!index.has(k)) index.set(k, []);
         index.get(k).push({ mesh: im, i });
       }
     });
     if (cells) im.geometry = geos[g].clone(), im.geometry.setAttribute('aCell', new THREE.InstancedBufferAttribute(cells, 1));
     // les petits ornements ne projettent pas d'ombre (ce serait cher pour presque rien)
-    im.castShadow = !SMALL.has(g) && m !== 'glass' && m !== 'bulb' && !(g === 'box' && m === 'stone'); im.receiveShadow = true;
-    if (m === 'glass') im.renderOrder = 2;
+    im.castShadow = !SMALL.has(g) && m !== 'bulb' && !(g === 'box' && m === 'stone'); im.receiveShadow = true;
     im.computeBoundingSphere();
     group.add(im);
   }
@@ -573,13 +574,14 @@ export function buildStructures(map, { time = 'jour' } = {}) {
   const roofMat = new THREE.MeshStandardMaterial({ map: roofTex, vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
   const gableMat = new THREE.MeshStandardMaterial({ map: tex.enduit, vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
   const trimMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
+  let roofMesh = null;
   if (roofPos.length) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(roofPos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(roofCol, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(roofUv, 2));
     g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, roofMat); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+    roofMesh = new THREE.Mesh(g, roofMat); roofMesh.castShadow = roofMesh.receiveShadow = true; group.add(roofMesh);
   }
   if (gabPos.length) {
     const g = new THREE.BufferGeometry();
@@ -614,6 +616,7 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     for (const o of [gal, glass, cap]) { o.castShadow = true; group.add(o); extra.push(o); }
   }
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const hiddenWalls = new Map(); // clé → [[mesh, i, matrice d'origine]]
   return {
     group, index, chimneys, bulbs,
     // ornements : seulement les tuiles à moins de far mètres de (x, z)
@@ -625,7 +628,28 @@ export function buildStructures(map, { time = 'jour' } = {}) {
     },
     // un pan de mur cassé disparaît avec ses ornements (clé « b:k:ox,z » du moteur)
     hideWall(key) {
-      for (const w of index.get(key) || []) { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
+      if (hiddenWalls.has(key)) return;
+      const list = [];
+      for (const w of index.get(key) || []) { const m = new THREE.Matrix4(); w.mesh.getMatrixAt(w.i, m); list.push([w.mesh, w.i, m]); w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
+      hiddenWalls.set(key, list);
+      // dalle sous un toit en pente : le morceau de pan du dessus part avec (ses sommets ramenés en un point)
+      const at = roofMesh && roofKeys.get(key);
+      if (at) {
+        const pos = roofMesh.geometry.attributes.position;
+        for (const i0 of at) {
+          list.push([null, i0, pos.array.slice(i0 * 3, i0 * 3 + 18)]);
+          for (let i = 1; i < 6; i++) pos.setXYZ(i0 + i, pos.getX(i0), pos.getY(i0), pos.getZ(i0));
+        }
+        pos.needsUpdate = true;
+      }
+    },
+    // nouvelle partie : les murs cassés reviennent
+    restore() {
+      for (const list of hiddenWalls.values()) for (const [mesh, i, m] of list) {
+        if (mesh) { mesh.setMatrixAt(i, m); mesh.instanceMatrix.needsUpdate = true; }
+        else { roofMesh.geometry.attributes.position.array.set(m, i * 3); roofMesh.geometry.attributes.position.needsUpdate = true; }
+      }
+      hiddenWalls.clear();
     },
     dispose() {
       for (const g of Object.values(geos)) g.dispose();
@@ -635,18 +659,4 @@ export function buildStructures(map, { time = 'jour' } = {}) {
       group.traverse((o) => { if (o.isMesh && !o.isInstancedMesh) { o.geometry.dispose(); if (extra.includes(o)) o.material.dispose(); } });
     },
   };
-}
-
-// dalles par rangées de cases (on saute la trémie)
-function rows(b, hole, fn) {
-  for (let z = b.z0; z < b.z0 + b.d; z++) {
-    let x = b.x0;
-    while (x < b.x0 + b.w) {
-      if (hole && hole.x === x && hole.z === z) { x++; continue; }
-      let e = x;
-      while (e < b.x0 + b.w && !(hole && hole.x === e && hole.z === z)) e++;
-      fn(x, e, z);
-      x = e;
-    }
-  }
 }

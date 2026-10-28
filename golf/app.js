@@ -10,8 +10,7 @@ import { startHost, startClient, holeByNumber, currentHole, windOf, simBall } fr
 import { createScene } from './view/scene.js';
 import { lookOf } from './view/golfer.js';
 import { HUD, loadingHtml, scorecardHtml, scoreName, fmtM, loadSetup, esc } from './view/hud.js';
-import { createHome } from './view/home.js';
-import { soundPanel } from './view/sound.js';
+import { createHome, SOUND_SETTINGS } from './view/home.js';
 import { fillIcons } from './view/icons.js';
 import { Sfx } from './view/sfx.js';
 import { Input, MAX_POWER } from './input.js';
@@ -89,8 +88,9 @@ for (const [id, k] of [['#aimL', 'l'], ['#aimR', 'r']]) {
   input.listen($(id), 'pointerup', () => { aimHold[k] = false; });
   input.listen($(id), 'pointerleave', () => { aimHold[k] = false; });
 }
-// bouton haut-parleur : volume de la musique et des effets
-const snd = soundPanel(sfx, $('#btnMute'));
+// bouton Réglages : le panneau commun à tous les jeux (volume de la musique et des effets)
+input.listen($('#btnSet'), 'pointerdown', () => sfx.unlock());
+DDVolume.panel($('#btnSet'), SOUND_SETTINGS(sfx));
 // clic pendant le survol : on passe directement au jeu
 input.listen($('#stage'), 'pointerdown', () => { if (V.phase === 'intro') endIntro(); else if (V.phase === 'replay') endReplay(); });
 
@@ -115,7 +115,7 @@ function leaveGame() {
   V.session && V.session.stop(); V.session = null;
   showMenu('local');
 }
-function toggleMute() { sfx.setMuted(!sfx.muted); snd.refresh(); }
+function toggleMute() { sfx.unlock(); DDVolume.toggle(); }
 function toggleView() { if (V.phase !== 'aim' || !V.mine) return; V.view = !V.view; sfx.ui('switch'); aimCamera(false); }
 function changeClub(d) {
   if (V.phase !== 'aim' || !V.mine) return;

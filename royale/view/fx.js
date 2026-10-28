@@ -4,6 +4,7 @@
 // brouillard. Débris (casse, explosions, coups de pelle) et douilles éjectées : de petits éclats qui tombent,
 // rebondissent et s'éteignent.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
+import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
 
 function spriteTex(draw, size = 64) {
   const c = document.createElement('canvas'); c.width = c.height = size;
@@ -63,6 +64,15 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
   const T = {
     glow: radial([[0, 'rgba(255,255,255,1)'], [0.25, 'rgba(255,230,160,.9)'], [1, 'rgba(255,160,40,0)']]),
     puff: radial([[0, 'rgba(255,255,255,.9)'], [0.6, 'rgba(255,255,255,.35)'], [1, 'rgba(255,255,255,0)']]),
+    // flamme : quelques taches chaudes serrées, au bord irrégulier (teintée par la couleur du sprite)
+    fire: spriteTex((g, S) => {
+      for (let i = 0; i < 9; i++) {
+        const a = Math.random() * Math.PI * 2, d = Math.random() * S * 0.17, x = S / 2 + Math.cos(a) * d, y = S / 2 + Math.sin(a) * d, r = S * (0.16 + Math.random() * 0.16);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r);
+        grd.addColorStop(0, 'rgba(255,255,255,0.85)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.45)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grd; g.fillRect(0, 0, S, S);
+      }
+    }, 128),
   };
   own.push(...Object.values(T));
   // ------------------------------------------------------------------ traînées : bâtonnets lumineux étirés
@@ -86,14 +96,18 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       s = { o, m, tex, blend: blending, on: false };
       pool.push(s); own.push(m);
     }
-    s.on = true; s.o.visible = true; s.m.color.set(color);
+    s.on = true; s.o.visible = true; s.m.color.set(color); s.m.rotation = 0;
     return s;
   }
   const live = [];
-  function puff(x, y, z, { tex = T.puff, color = 0xffffff, size = 0.5, grow = 2, life = 0.5, add = false, rise = 0, op = 0.8 } = {}) {
+  // effets différés de quelques dixièmes de seconde
+  const timers = [];
+  const later = (sec, fn) => timers.push({ t: sec, fn });
+  // (vx, vy, vz : vitesse de départ, freinée par drag ; g : pesanteur ; rot : rotation de l'image)
+  function puff(x, y, z, { tex = T.puff, color = 0xffffff, size = 0.5, grow = 2, life = 0.5, add = false, rise = 0, op = 0.8, vx = 0, vy = 0, vz = 0, drag = 0, g = 0, rot = 0 } = {}) {
     const s = sprite(tex, color, add ? THREE.AdditiveBlending : THREE.NormalBlending);
-    s.o.position.set(x, y, z); s.o.scale.setScalar(size);
-    live.push({ s, t: 0, life, size, grow, rise, op });
+    s.o.position.set(x, y, z); s.o.scale.setScalar(size); s.m.rotation = rot;
+    live.push({ s, t: 0, life, size, grow, rise, op, vx, vy, vz, drag, g });
   }
   // ------------------------------------------------------------------ particules douces (fumée, poussière) : un seul dessin
   const CN = 480;
@@ -153,11 +167,39 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
 
   // lumière partagée des explosions
   const flash = new THREE.PointLight(0xffa040, 0, 30, 1.6); group.add(flash);
-  let flashT = 0;
+  let flashT = 0, flashMax = 0.25, flashI = 90;
   // ------------------------------------------------------------------ projectiles en vol
-  const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2), rocketMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a });
+  // roquette : corps olive, ogive rouge sombre à pointe grise, ailettes en croix, tuyère ; une flamme et un halo derrière
+  const rocketGeo = (() => {
+    const parts = [];
+    const put = (geo, hex) => {
+      const g = geo.index ? geo.toNonIndexed() : geo, c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3);
+      if (g !== geo) geo.dispose();
+      for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); parts.push(g);
+    };
+    const along = (geo, z) => geo.rotateX(Math.PI / 2).translate(0, 0, z);
+    put(along(new THREE.CylinderGeometry(0.058, 0.058, 0.5, 14), 0), 0x58683c);
+    put(along(new THREE.CylinderGeometry(0.061, 0.061, 0.04, 14), 0.2), 0xd8b23a);
+    put(along(new THREE.CylinderGeometry(0.02, 0.07, 0.22, 14), 0.36), 0x7a3326);
+    put(along(new THREE.SphereGeometry(0.021, 8, 6), 0.47), 0x9aa0a6);
+    put(along(new THREE.CylinderGeometry(0.045, 0.036, 0.07, 12), -0.28), 0x2c2f30);
+    put(new THREE.BoxGeometry(0.26, 0.008, 0.13).translate(0, 0, -0.2), 0x3a4228);
+    put(new THREE.BoxGeometry(0.008, 0.26, 0.13).translate(0, 0, -0.2), 0x3a4228);
+    const g = mergeGeometries(parts);
+    for (const p of parts) p.dispose();
+    return g;
+  })();
+  const rocketMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.15 });
+  const flameGeo = new THREE.ConeGeometry(0.06, 0.6, 10, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -0.6);
+  const flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.6, 0.5), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  own.push(flameGeo, flameMat);
+  const launches = new Map(); // tireur → bouche du tube au moment du tir (la roquette en part, puis rejoint sa trajectoire)
   const nadeGeo = new THREE.SphereGeometry(0.09, 10, 8), nadeMat = new THREE.MeshStandardMaterial({ color: 0x4f6a3a }), blastMat = new THREE.MeshStandardMaterial({ color: 0x9b59d0, emissive: 0x3a1a6a });
-  own.push(rocketGeo, rocketMat, nadeGeo, nadeMat, blastMat);
+  // balle du fusil de précision : un trait lumineux de 4 m dans l'axe de son vol
+  const bulletGeo = new THREE.CylinderGeometry(0.025, 0.012, 4, 5).rotateX(Math.PI / 2).translate(0, 0, -2);
+  const bulletMat = new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  own.push(rocketGeo, rocketMat, nadeGeo, nadeMat, blastMat, bulletGeo, bulletMat);
   const projMeshes = new Map();
   // ------------------------------------------------------------------ tempête : un grand cylindre violet translucide
   const stormMat = new THREE.ShaderMaterial({
@@ -175,35 +217,146 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       }`,
   });
   const storm = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 128, 1, true).translate(0, 0.5, 0), stormMat);
-  storm.frustumCulled = false; storm.visible = false; storm.renderOrder = 5; group.add(storm);
+  // (dessiné après les nuages du ciel, avant la fumée et les flammes : sinon il les teintait de violet devant le ciel)
+  storm.frustumCulled = false; storm.visible = false; storm.renderOrder = 1.5; group.add(storm);
   own.push(storm.geometry, stormMat);
 
   // ------------------------------------------------------------------ réactions aux événements de la partie
   const TRACER_COLORS = { fusil: 0xffe08a, smg: 0xffd070, pistolet: 0xfff0b0, pompe: 0xffb060, sniper: 0xbfe0ff };
-  function shot(from, to, w, hit, muzzle) {
+  // late : la balle (fusil de précision) a déjà été dessinée en vol, on ne montre que l'impact
+  function shot(from, to, w, hit, muzzle, late = false) {
+    if (late) { impact(to, hit); return; }
     const tr = trList[trNext]; trNext = (trNext + 1) % N;
     tr.from.set(from[0], from[1], from[2]); tr.to.set(to[0], to[1], to[2]);
     // la traînée part de la bouche de l'arme si on la connaît
     if (muzzle) tr.from.copy(muzzle);
     tr.life = tr.max = w === 'sniper' ? 0.35 : 0.09; tr.color.setHex(TRACER_COLORS[w] || 0xffffff);
+    impact(to, hit);
+  }
+  function impact(to, hit) {
     if (hit === 1) {
       puff(to[0], to[1], to[2], { color: 0xc8bfa8, size: 0.25, grow: 2.5, life: 0.45, op: 0.7 });
       puff(to[0], to[1], to[2], { tex: T.glow, color: 0xffd080, size: 0.25, grow: 0.5, life: 0.08, add: true });
-    } else if (hit === 2) puff(to[0], to[1], to[2], { tex: T.glow, color: 0xff6a4a, size: 0.35, grow: 1.5, life: 0.15, add: true });
+    } else if (hit === 2) puff(to[0], to[1], to[2], { tex: T.glow, color: 0xfff4e0, size: 0.3, grow: 1.4, life: 0.1, add: true });
   }
-  function muzzleFlash(p) { puff(p.x, p.y, p.z, { tex: T.glow, color: 0xffd890, size: 0.5, grow: 0.6, life: 0.06, add: true }); }
-  function boom(x, y, z, r, kind) {
-    if (kind === 'souffle') {
-      puff(x, y + 0.5, z, { tex: T.glow, color: 0xc08aff, size: 1, grow: r * 1.6, life: 0.45, add: true, op: 0.9 });
-      dust(x, y, z, { n: 10, r: 0.8, speed: 5, size: 0.9, op: 0.4, color: 0xc9b8e0 });
-      return;
+  // flamme de bouche : plus grosse pour le fusil à pompe et le fusil de précision, et un éclair de lumière
+  const MUZZLE = { pompe: 1.1, sniper: 1, fusil: 0.75, smg: 0.6, pistolet: 0.55, roquette: 1.2 };
+  function muzzleFlash(p, w = 'fusil') {
+    const k = MUZZLE[w] || 0.7;
+    puff(p.x, p.y, p.z, { tex: T.glow, color: 0xffd890, size: 0.55 * k, grow: 0.9, life: 0.06, add: true });
+    puff(p.x, p.y, p.z, { tex: T.glow, color: 0xfff6d8, size: 0.25 * k, grow: 0.5, life: 0.035, add: true, op: 1 });
+    if (flashT <= 0.05) { flash.position.set(p.x, p.y, p.z); flashI = 7 * k; flashMax = flashT = 0.06; }
+  }
+  // éclats à l'impact sur un joueur, sans sang : bleus sur le bouclier, blancs sur la vie, jaunes à la tête
+  const HIT_COL = { bouclier: [0x5ad1ff, 0xc4f1ff, 0x2f8fe0], vie: [0xffffff, 0xffeede, 0xd9d9d9], tete: [0xffd23f, 0xfff2a8, 0xffffff] };
+  function hitSpark(x, y, z, kind = 'vie', n = 8) {
+    const cols = HIT_COL[kind] || HIT_COL.vie;
+    puff(x, y, z, { tex: T.glow, color: cols[0], size: 0.45, grow: 1.6, life: 0.16, add: true, op: 1 });
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, k = 1.8 + Math.random() * 3, sz = 0.025 + Math.random() * 0.04;
+      chip(x, y, z, { vx: Math.cos(a) * k, vy: 0.8 + Math.random() * 3, vz: Math.sin(a) * k, sx: sz, sy: sz, sz, color: cols[i % cols.length], life: 0.45 + Math.random() * 0.35, metal: kind === 'bouclier' });
     }
+  }
+  // départ d'une roquette : flamme à la bouche, souffle et fumée qui jaillissent derrière le tube (front, back : bouche
+  // et arrière du tube, dir : sens du tir)
+  function launch(owner, front, back, dir) {
+    launches.set(owner, { p: front.clone(), age: 0 });
+    puff(front.x, front.y, front.z, { tex: T.glow, color: 0xffc070, size: 0.9, grow: 1.4, life: 0.09, add: true, op: 1 });
+    puff(back.x, back.y, back.z, { tex: T.glow, color: 0xff9a40, size: 1.1, grow: 1.8, life: 0.14, add: true, op: 1 });
+    for (let i = 0; i < 10; i++) {
+      const k = 3 + Math.random() * 6;
+      cloud(back.x, back.y, back.z, { vx: -dir.x * k + (Math.random() - 0.5) * 2, vy: -dir.y * k + Math.random() * 1.2, vz: -dir.z * k + (Math.random() - 0.5) * 2, size: 0.4, grow: 2.6, life: 1.2 + Math.random() * 0.8, color: 0xcfc9c0, op: 0.6, drag: 2.2 });
+    }
+    for (let i = 0; i < 4; i++) cloud(front.x, front.y, front.z, { vx: dir.x * 2 + (Math.random() - 0.5), vy: 0.4, vz: dir.z * 2 + (Math.random() - 0.5), size: 0.3, grow: 1.8, life: 0.9, color: 0xd8d2c8, op: 0.45, drag: 2 });
+    if (flashT <= 0.1) { flash.position.copy(front); flashI = 25; flashMax = flashT = 0.12; }
+  }
+  // ------------------------------------------------------------------ boules de feu des explosions
+  // des sphères cabossées dont la surface bouillonne (bruit animé dans le shader) : elles gonflent vite, passent du blanc
+  // au jaune, à l'orange et au rouge, puis deviennent une fumée noire qui s'élève et s'efface ; bord doux (on les voit
+  // de biais comme des volutes, pas comme des boules)
+  const FB = 48;
+  const fbGeo = new THREE.InstancedBufferGeometry().copy(new THREE.IcosahedronGeometry(1, 4));
+  const fbAge = new THREE.InstancedBufferAttribute(new Float32Array(FB), 1), fbSeed = new THREE.InstancedBufferAttribute(new Float32Array(FB), 1);
+  fbAge.setUsage(THREE.DynamicDrawUsage);
+  fbGeo.setAttribute('aAge', fbAge); fbGeo.setAttribute('aSeed', fbSeed);
+  const fbMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, uniforms: { uT: { value: 0 } },
+    vertexShader: `attribute float aAge; attribute float aSeed; uniform float uT; varying float vAge; varying float vN; varying vec3 vNrm; varying vec3 vW;
+      float h3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float n3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+                   mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+      void main(){
+        vAge = aAge;
+        vec3 q = normal * 2.3 + aSeed * 7.0 + vec3(0.0, -uT * 1.7 - aAge * 3.0, 0.0);
+        float n = n3(q) * 0.55 + n3(q * 2.1) * 0.3 + n3(q * 4.4) * 0.15;
+        vN = n;
+        vec4 w = modelMatrix * instanceMatrix * vec4(position * (0.72 + n * 0.62), 1.0);
+        vW = w.xyz; vNrm = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: `varying float vAge; varying float vN; varying vec3 vNrm; varying vec3 vW;
+      void main(){
+        float heat = clamp(1.15 - vAge * 2.2 + (vN - 0.5) * 1.3, 0.0, 1.0);
+        vec3 fire = heat > 0.8 ? mix(vec3(1.0, 0.62, 0.16), vec3(1.0, 0.88, 0.5), (heat - 0.8) / 0.2)
+                  : heat > 0.45 ? mix(vec3(0.88, 0.24, 0.03), vec3(1.0, 0.62, 0.16), (heat - 0.45) / 0.35)
+                  : mix(vec3(0.28, 0.06, 0.02), vec3(0.88, 0.24, 0.03), heat / 0.45);
+        float glow = smoothstep(0.12, 0.5, heat);
+        vec3 smoke = vec3(0.11, 0.1, 0.095) * (0.6 + 0.4 * max(0.0, vNrm.y));
+        vec3 c = mix(smoke, fire * (0.9 + 1.7 * heat), glow);
+        float edge = smoothstep(0.0, 0.5, abs(dot(vNrm, normalize(cameraPosition - vW))));
+        float a = (1.0 - smoothstep(0.55, 1.0, vAge)) * mix(0.92, 1.0, glow) * mix(edge, 1.0, glow * 0.6);
+        gl_FragColor = vec4(c, a);
+      }`,
+  });
+  const fireballs = new THREE.InstancedMesh(fbGeo, fbMat, FB); fireballs.frustumCulled = false; fireballs.count = FB; fireballs.renderOrder = 3;
+  for (let i = 0; i < FB; i++) fireballs.setMatrixAt(i, zero);
+  group.add(fireballs); own.push(fbGeo, fbMat);
+  const fb = new Array(FB).fill(null);
+  let fbNext = 0;
+  function fireball(x, y, z, { s0, s1, life = 1.6, delay = 0, vx = 0, vy = 2, vz = 0 }) {
+    const i = fbNext; fbNext = (fbNext + 1) % FB;
+    fb[i] = { x, y, z, s0, s1, life, t: -delay, vx, vy, vz };
+    fbSeed.setX(i, Math.random() * 10); fbSeed.needsUpdate = true;
+  }
+
+  // explosion : un éclair blanc, une boule de feu qui bouillonne et gonfle (avec quatre ou cinq boules plus petites autour,
+  // décalées dans le temps, pour une forme irrégulière), des flammes et des braises qui jaillissent, puis la fumée ;
+  // la grenade de souffle fait des flammes violettes, sans boule de feu ni fumée
+  const FIRE = [0xffb347, 0xff7a1a, 0xe2481a], BLAST = [0xe2c4ff, 0xb77dff, 0x8a4fe0];
+  function boom(x, y, z, r, kind) {
+    const purple = kind === 'souffle', cols = purple ? BLAST : FIRE, R = r * 0.45, y0 = y + 0.5;
+    puff(x, y0, z, { tex: T.glow, color: purple ? 0xf2e6ff : 0xfff6e0, size: 1.2, grow: 1.4, life: 0.09, add: true, op: 1 });
+    if (!purple) {
+      fireball(x, y0 + 0.3, z, { s0: 0.4, s1: r * 0.52, life: 1.7, vy: 1.8 });
+      const n = 4 + (Math.random() < 0.5 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.8, d = r * (0.22 + Math.random() * 0.18);
+        fireball(x + Math.cos(a) * d, y0 + 0.2 + Math.random() * r * 0.25, z + Math.sin(a) * d,
+          { s0: 0.3, s1: r * (0.26 + Math.random() * 0.12), life: 1.3 + Math.random() * 0.5, delay: Math.random() * 0.09, vx: Math.cos(a) * 1.6, vy: 2 + Math.random() * 1.8, vz: Math.sin(a) * 1.6 });
+      }
+    }
+    for (let i = 0; i < (purple ? 14 : 8); i++) {
+      const a = Math.random() * Math.PI * 2, e = Math.random() * 1.1, sp = 3 + Math.random() * 6;
+      puff(x, y0, z, { tex: T.fire, color: cols[i % 3], size: 0.6 + Math.random() * 0.5, grow: R * (0.7 + Math.random() * 0.6), life: 0.3 + Math.random() * 0.32, add: true, op: 0.75,
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp + 1.5, vz: Math.sin(a) * Math.cos(e) * sp, drag: 5, rot: Math.random() * 6.28 });
+    }
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2, e = 0.3 + Math.random() * 1.1, sp = 6 + Math.random() * 7;
+      puff(x, y0, z, { tex: T.glow, color: purple ? 0xd0a8ff : 0xffb050, size: 0.14, grow: 0, life: 0.6 + Math.random() * 0.5, add: true, op: 1,
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp, vz: Math.sin(a) * Math.cos(e) * sp, drag: 0.8, g: 14 });
+    }
+    if (purple) { dust(x, y, z, { n: 10, r: 0.8, speed: 5, size: 0.9, op: 0.4, color: 0xc9b8e0 }); return; }
     debris(x, y + 0.3, z, 'terre', { n: 14, spread: 0.8, power: 6 });
     dust(x, y, z, { n: 12, r: 1, speed: 4, size: 1.1, op: 0.5, color: 0x8a7e6c });
-    puff(x, y, z, { tex: T.glow, color: 0xffa040, size: 1.5, grow: r * 1.8, life: 0.45, add: true, op: 1 });
-    puff(x, y, z, { tex: T.glow, color: 0xfff0c0, size: 1, grow: r, life: 0.18, add: true, op: 1 });
-    for (let i = 0; i < 6; i++) puff(x + (Math.random() - 0.5) * r * 0.6, y + Math.random() * r * 0.4, z + (Math.random() - 0.5) * r * 0.6, { color: 0x5a5550, size: 1.2, grow: 3.5, life: 1.6 + Math.random(), rise: 1.2, op: 0.55 });
-    flash.position.set(x, y + 1, z); flash.intensity = 90; flashT = 0.25;
+    // (la fumée vient après le feu, pas devant lui)
+    later(0.16, () => {
+      for (let i = 0; i < 10; i++) {
+        cloud(x + (Math.random() - 0.5) * R, y0 + Math.random() * R * 0.6, z + (Math.random() - 0.5) * R,
+          { vx: (Math.random() - 0.5) * 2.4, vy: 1.4 + Math.random() * 1.6, vz: (Math.random() - 0.5) * 2.4, size: 1.1, grow: 3.2, life: 2.4 + Math.random() * 1.2, color: 0x3e3a37, op: 0.6, drag: 1.2 });
+      }
+    });
+    flash.position.set(x, y + 1, z); flashI = 90; flashMax = flashT = 0.25;
   }
 
   function update(dt, t, sim, stormState, cam) {
@@ -219,16 +372,19 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       tracers.setColorAt(i, new THREE.Color().copy(tr.color).multiplyScalar(tr.life / tr.max));
     }
     tracers.instanceMatrix.needsUpdate = true; if (tracers.instanceColor) tracers.instanceColor.needsUpdate = true;
+    for (let i = timers.length - 1; i >= 0; i--) if ((timers[i].t -= dt) <= 0) { const f = timers[i].fn; timers.splice(i, 1); f(); }
     // sprites
     for (let i = live.length - 1; i >= 0; i--) {
       const L = live[i]; L.t += dt;
       const k = L.t / L.life;
       if (k >= 1) { L.s.on = false; L.s.o.visible = false; live.splice(i, 1); continue; }
-      L.s.o.scale.setScalar(L.size + L.grow * k);
+      L.s.o.scale.setScalar(L.size + L.grow * Math.sqrt(k));
       L.s.m.opacity = L.op * (1 - k);
-      L.s.o.position.y += L.rise * dt;
+      if (L.drag) { const d = Math.exp(-L.drag * dt); L.vx *= d; L.vy *= d; L.vz *= d; }
+      L.vy -= L.g * dt;
+      L.s.o.position.x += L.vx * dt; L.s.o.position.y += (L.vy + L.rise) * dt; L.s.o.position.z += L.vz * dt;
     }
-    if (flashT > 0) { flashT -= dt; flash.intensity = Math.max(0, flashT / 0.25) * 90; }
+    if (flashT > 0) { flashT -= dt; flash.intensity = Math.max(0, flashT / flashMax) * flashI; }
     // fumée des cheminées proches
     if (cam) for (const c of smokers) {
       if (Math.abs(c.x - cam.x) > 160 || Math.abs(c.z - cam.z) > 160) continue;
@@ -238,11 +394,18 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
       cloud(c.x + (Math.random() - 0.5) * 0.2, c.y + 0.1, c.z + (Math.random() - 0.5) * 0.2,
         { vx: 0.35 + Math.random() * 0.2, vy: 1.1 + Math.random() * 0.4, vz: 0.15, size: 0.55, grow: 3.4, life: 4 + Math.random() * 1.5, color: 0xc4c1bb, op: 0.7, drag: 0.15 });
     }
-    // poussière sous les pieds de ceux qui sprintent
+    // poussière sous les pieds de ceux qui sprintent ; en glissade, une traînée continue de chaque côté
     if (cam) for (const P of sim.S.players.values()) {
-      if (!P.alive || P.mode !== 'sol' || !P.ground || P.swim || Math.hypot(P.vx, P.vz) < 6.2 || Math.abs(P.x - cam.x) > 60 || Math.abs(P.z - cam.z) > 60) continue;
+      const slide = P.slideT > 0;
+      if (!P.alive || P.mode !== 'sol' || !P.ground || P.swim || (!slide && Math.hypot(P.vx, P.vz) < 6.2) || Math.abs(P.x - cam.x) > 60 || Math.abs(P.z - cam.z) > 60) continue;
       const k = (runDust.get(P.id) || 0) - dt;
       if (k > 0) { runDust.set(P.id, k); continue; }
+      if (slide) {
+        runDust.set(P.id, 0.045);
+        const sp = Math.hypot(P.vx, P.vz) || 1, sx = -P.vz / sp, sz = P.vx / sp;
+        for (const sd of [-1, 1]) cloud(P.x + sx * sd * 0.3, P.y + 0.08, P.z + sz * sd * 0.3, { vx: -P.vx * 0.15 + sx * sd * 1.2, vy: 0.5 + Math.random() * 0.4, vz: -P.vz * 0.15 + sz * sd * 1.2, size: 0.4, grow: 1.6, life: 0.8, color: 0xbcb19a, op: 0.4 });
+        continue;
+      }
       runDust.set(P.id, 0.16 + Math.random() * 0.08);
       cloud(P.x - P.vx * 0.05, P.y + 0.1, P.z - P.vz * 0.05, { vx: -P.vx * 0.08, vy: 0.4, vz: -P.vz * 0.08, size: 0.35, grow: 1.1, life: 0.7, color: 0xbcb19a, op: 0.35 });
     }
@@ -280,17 +443,61 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     chips.instanceMatrix.needsUpdate = true;
     // projectiles
     const seen = new Set();
+    for (const L of launches.values()) L.age += dt;
+    for (const [k, L] of launches) if (L.age > 0.5) launches.delete(k);
     for (const pr of sim.S.projectiles) {
       seen.add(pr.id);
       let o = projMeshes.get(pr.id);
       if (!o) {
-        o = pr.kind === 'roquette' ? new THREE.Mesh(rocketGeo, rocketMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
+        if (pr.kind === 'roquette') {
+          o = new THREE.Group(); o.add(new THREE.Mesh(rocketGeo, rocketMat));
+          const fl = new THREE.Mesh(flameGeo, flameMat); o.add(fl);
+          // elle sort de la bouche du tube (la simulation la lance depuis l'épaule de visée) et rejoint sa trajectoire
+          const L = launches.get(pr.owner);
+          o.userData = { flame: fl, age: 0, last: null, off: L ? new THREE.Vector3(L.p.x - pr.x, L.p.y - pr.y, L.p.z - pr.z) : null };
+          launches.delete(pr.owner);
+        } else o = pr.kind === 'balle' ? new THREE.Mesh(bulletGeo, bulletMat) : new THREE.Mesh(nadeGeo, pr.kind === 'souffle' ? blastMat : nadeMat);
         group.add(o); projMeshes.set(pr.id, o);
       }
       o.position.set(pr.x, pr.y, pr.z);
-      if (pr.kind === 'roquette') { o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz); puff(pr.x - pr.vx * 0.012, pr.y - pr.vy * 0.012, pr.z - pr.vz * 0.012, { color: 0xd8d0c8, size: 0.25, grow: 1.4, life: 0.7, op: 0.5 }); }
+      if (pr.kind === 'balle') o.lookAt(pr.x + pr.vx, pr.y + pr.vy, pr.z + pr.vz);
+      if (pr.kind === 'roquette') {
+        const U = o.userData, p = o.position;
+        U.age += dt;
+        if (U.off) { const k = Math.max(0, 1 - U.age / 0.22); p.addScaledVector(U.off, k * k); }
+        o.lookAt(p.x + pr.vx, p.y + pr.vy, p.z + pr.vz);
+        U.flame.scale.set(0.8 + Math.random() * 0.5, 0.8 + Math.random() * 0.5, 0.7 + Math.random() * 0.7);
+        // traînée continue : une bouffée tous les 45 cm du trajet, et une lueur juste derrière la tuyère
+        if (!U.last) U.last = p.clone();
+        const ex = p.x - U.last.x, ey = p.y - U.last.y, ez = p.z - U.last.z, n = Math.min(40, Math.floor(Math.hypot(ex, ey, ez) / 0.45));
+        for (let i = 1; i <= n; i++) {
+          const k = i / n;
+          cloud(U.last.x + ex * k + (Math.random() - 0.5) * 0.1, U.last.y + ey * k + (Math.random() - 0.5) * 0.1, U.last.z + ez * k + (Math.random() - 0.5) * 0.1,
+            { vx: (Math.random() - 0.5) * 0.6, vy: 0.25 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.6, size: 0.26, grow: 2.3, life: 1.4 + Math.random() * 0.8, color: 0xdcd8d0, op: 0.55, drag: 1.4 });
+        }
+        if (n) U.last.copy(p);
+        const L = Math.hypot(pr.vx, pr.vy, pr.vz) || 1;
+        puff(p.x - pr.vx / L * 0.45, p.y - pr.vy / L * 0.45, p.z - pr.vz / L * 0.45, { tex: T.glow, color: 0xffa040, size: 0.55, grow: 0.3, life: 0.05, add: true, op: 0.9 });
+      }
     }
     for (const [id, o] of projMeshes) if (!seen.has(id)) { group.remove(o); projMeshes.delete(id); }
+    // boules de feu : elles gonflent (vite puis lentement), montent en ralentissant, vieillissent
+    fbMat.uniforms.uT.value = t;
+    let fbMoved = false;
+    for (let i = 0; i < FB; i++) {
+      const B = fb[i];
+      if (!B) continue;
+      B.t += dt; fbMoved = true;
+      if (B.t >= B.life) { fb[i] = null; fireballs.setMatrixAt(i, zero); continue; }
+      if (B.t < 0) { fireballs.setMatrixAt(i, zero); continue; }
+      const k = B.t / B.life, g = 1 - Math.pow(1 - Math.min(1, k * 1.6), 3), sc = B.s0 + (B.s1 - B.s0) * g * (1 + 0.25 * k);
+      const d = Math.exp(-1.6 * dt); B.vx *= d; B.vz *= d; B.vy = B.vy * d + 0.6 * dt;
+      B.x += B.vx * dt; B.y += B.vy * dt; B.z += B.vz * dt;
+      kp.set(B.x, B.y, B.z); kz.set(sc, sc * 0.92, sc);
+      fireballs.setMatrixAt(i, km.compose(kp, kq.identity(), kz));
+      fbAge.setX(i, k);
+    }
+    if (fbMoved) { fireballs.instanceMatrix.needsUpdate = true; fbAge.needsUpdate = true; }
     // tempête
     storm.visible = !!stormState;
     if (stormState) {
@@ -300,7 +507,7 @@ export function createFx(scene, { floor = null, chimneys = [] } = {}) {
     }
   }
   return {
-    group, shot, muzzleFlash, boom, update, puff, cloud, dust, debris, casing, chip,
+    group, shot, muzzleFlash, launch, hitSpark, boom, update, puff, cloud, dust, debris, casing, chip,
     dispose() { for (const o of own) o.dispose(); scene.remove(group); },
   };
 }

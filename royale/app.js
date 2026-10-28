@@ -4,22 +4,33 @@
 // chaque invité tient une copie à jour, prédit son propre déplacement, dessine les autres un peu en retard et envoie
 // ses commandes. Si l'hôte s'en va, le Hub en désigne un autre qui reprend la partie là où elle en était.
 // Le jeu ne parle jamais au réseau directement : tout passe par HubBridge.
-import { generateMap, ILE } from './engine/map.js';
+import { generateMap, ILE, GR, PROPS } from './engine/map.js';
 import { buildWorld } from './engine/world.js';
 import { MOVE } from './engine/player.js';
-import { createSim, DT, SHOULDER } from './engine/sim.js';
-import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS } from './engine/items.js';
+import { createSim, DT, SHOULDER, REVIVE, BLEED, DOWN_HP, PING_T } from './engine/sim.js';
+import { WEAPONS, ITEMS, RARITY, itemLabel, MATERIALS, spreadOf, REST } from './engine/items.js';
 import { createBuild, slotFor, COST, PIECES } from './engine/build.js';
 import { createAI } from './engine/ai.js';
+import { makeTeams, TEAM_LABEL } from './engine/teams.js';
+import { skillOf, botLevels, botMix, HIST_MAX } from './engine/skill.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from './engine/net.js';
 import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
+import { createMarks } from './view/marks.js';
+import { createAmbiance } from './view/ambiance.js';
+import { createMotion } from './view/motion.js';
 import { createHud } from './view/hud.js';
+import { createCompass } from './view/compass.js';
 import { createBuilds } from './view/builds.js';
+import { createDrops } from './view/drops.js';
 import { createSound } from './view/sound.js';
 import { setKit, renderIcons } from './view/weapons.js';
+import { CHARACTERS } from './view/kit.js';
+import { renderPortraits, ROCKET_TUBE } from './view/soldier.js';
 import { Input } from './input.js';
+import { createKeys } from './keys.js';
+import { createRecorder } from './journal.js';
 import * as THREE from '../shared/vendor/three/three.module.min.js';
 
 const H = window.HubBridge;
@@ -31,8 +42,21 @@ const breathe = () => new Promise((r) => setTimeout(r, 0));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const PALETTE = ['#ff4b2b', '#2b8cff', '#ffc531', '#2fbf71', '#b45cff', '#ff5fa2', '#1fc7c1', '#ff8a1f'];
 const BOT_NAMES = ['Hugo', 'Léa', 'Malo', 'Inès', 'Noah', 'Zoé', 'Sacha', 'Lina', 'Timéo', 'Jade', 'Nino', 'Rose', 'Eliott', 'Mila', 'Gabin',
-  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa'];
-const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces' };
+  'Alma', 'Robin', 'Nora', 'Basile', 'Lou', 'Oscar', 'Iris', 'Marius', 'Ambre', 'Félix', 'Clara', 'Jules', 'Anna', 'Paul', 'Elsa',
+  'Arthur', 'Louise', 'Adam', 'Chloé', 'Victor', 'Margaux', 'Léon', 'Agathe', 'Raphaël', 'Capucine', 'Maël', 'Romane', 'Simon', 'Juliette', 'Axel',
+  'Lison', 'Hector', 'Salomé', 'Ethan', 'Apolline', 'Milo', 'Céleste', 'Samuel', 'Olivia', 'Tom', 'Maëlys', 'Aaron', 'Héloïse', 'Lucas', 'Manon'];
+const MAX_PLACES = 60;       // joueurs sur l'île, bots compris
+const LOOKS = Object.keys(CHARACTERS);
+const cleanLook = (l) => ({ char: LOOKS.includes(l && l.char) ? l.char : 'soldat', color: /^#[0-9a-f]{6}$/i.test(l && l.color) ? l.color : null });
+const LEVEL_LABEL = { facile: 'faciles', normal: 'normaux', difficile: 'coriaces', auto: 'au niveau auto' };
+// sons des pas : le sol naturel, le plancher de chaque type de bâtiment
+const GROUND_SURF = { [GR.PLAGE]: 'neige', [GR.PLAINE]: 'herbe', [GR.FORET]: 'herbe', [GR.MONTAGNE]: 'gravier', [GR.ROCHE]: 'gravier', [GR.NEIGE]: 'neige',
+  [GR.ROUTE]: 'beton', [GR.VILLE]: 'beton', [GR.BATI]: 'bois', [GR.CHAMP]: 'herbe', [GR.LIEU]: 'gravier' };
+const FLOOR_SURF = { immeuble: 'carrelage', tour: 'carrelage', boutique: 'carrelage', mairie: 'carrelage', bureaux: 'carrelage', station: 'carrelage',
+  garage: 'beton', hangar: 'beton', phare: 'beton', abri: 'metal' };
+const MAT_SURF = { bois: 'bois', pierre: 'beton', metal: 'metal' };
+// recul de chaque arme : [saut de la vue vers le haut (rad), écart de côté, secousse]
+const KICK = { fusil: [0.011, 0.006, 0.05], smg: [0.007, 0.006, 0.03], pistolet: [0.016, 0.005, 0.04], pompe: [0.05, 0.012, 0.28], sniper: [0.075, 0.01, 0.32], roquette: [0.045, 0.01, 0.35] };
 const INTERP = 0.1;          // invités : les autres sont dessinés un dixième de seconde en arrière
 const HOST_SILENCE = 3, HOST_GIVEUP = 15;
 const MATS = ['bois', 'pierre', 'metal'];
@@ -41,6 +65,9 @@ const S = {
   role: 'solo', me: 'moi', settings: {}, map: null, world: null, sim: null, scene: null, actors: null, fx: null, hud: null, input: null, sfx: null,
   yaw: 0, pitch: -0.1, camD: 3.6, camDist: 3.6, camSide: SHOULDER, sel: 0, cnt: { jump: 0, use: 0, reload: 0, drop: 0 }, mv: [0, 0, 0], prev: new Map(),
   acc: 0, last: 0, t: 0, ms: 16, slow: 0, running: false, spect: null, shake: 0, fov: 72, ended: false, reported: false, startedAt: 0,
+  look: { char: 'soldat', color: null }, looks: new Map(), portraits: null,
+  picks: new Map(), // équipes choisies sur l'écran d'accueil : id du joueur → numéro d'équipe
+  skills: new Map(), mySkill: { s: 0.5, games: 0 }, // niveau « Auto » : celui de chaque joueur du salon (engine/skill.js)
   cam: { x: 0, y: 0, z: 0 }, loaded: false,
   build: null, mat: 'bois', // mode construction : pièce choisie (mur, sol, escalier) et matériau
   // réseau
@@ -64,10 +91,13 @@ async function boot(info) {
   S.settings = {
     time: QS.get('time') || set.time || 'jour',
     mode: QS.get('mode') || set.mode || 'partie',
-    places: +(QS.get('places') || set.places || 24),
-    level: QS.get('level') || set.level || 'normal',
+    places: +(QS.get('places') || set.places || 45),
+    level: QS.get('level') || set.level || 'auto',
+    teams: clamp(+(QS.get('equipes') || set.teams || 1) | 0, 1, 3),
   };
   S.meInfo = { id: S.me, name: meP ? meP.name : prof.name || 'Moi', color: meP ? meP.color : prof.color };
+  try { S.look = cleanLook(JSON.parse(localStorage.getItem('royale_look') || 'null')); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(loadHist());
   H.on('msg', onMsg);
   H.on('roster', onRoster);
 
@@ -83,16 +113,22 @@ async function boot(info) {
     return;
   }
   progress('Carte', 0.95); await breathe();
-  S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project });
+  S.keys = createKeys();
+  S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project, key: kl });
+  S.compass = createCompass($('#compass'));
+  S.journal = createRecorder();
   // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
   setKit(S.scene.kit);
   try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
   S.hud.showFps(DEBUG);
   S.sfx = createSound();
   S.sfx.island(S.map.center, S.map.islandR);
-  S.input = new Input(S.scene.canvas, { key: onKey, lock: onLock, wheel: onWheel });
+  S.input = new Input(S.scene.canvas, S.keys, { key: onKey, action: onAction, lock: onLock, wheel: onWheel, pad: padMenu });
+  // touches changées dans les Réglages (ou apprises du clavier) : les rappels à l'écran suivent
+  paintKeys(); S.keys.onChange(paintKeys);
   loadOpts();
-  try { if (localStorage.getItem('royale_hints') === '0') $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
+  // rappel des touches : replié pour qui l'a demandé (H), ou qui a déjà trois parties derrière lui (les astuces suffisent)
+  try { const h = localStorage.getItem('royale_hints'); if (h === '0' || (h !== '1' && loadHist().length >= 3)) $('#hints').classList.add('off'); } catch (e) { /* pas de stockage */ }
   $('#phaseTxt').textContent = S.settings.mode === 'exploration' ? 'Exploration, sans combat' : `${S.settings.places} joueurs · tempête`;
   S.loaded = true;
   if (H.embedded) H.signalReady();
@@ -109,41 +145,78 @@ async function boot(info) {
 }
 
 // ------------------------------------------------------------------ une partie
+// chaque joueur : son personnage et sa couleur (choisis sur l'écran d'accueil, envoyés à l'hôte)
 function humans() {
-  if (!H.embedded) return [{ ...S.meInfo }];
-  return H.players.map((p, i) => ({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+  const withLook = (h) => { const l = h.id === S.me ? S.look : S.looks.get(h.id); return l ? { ...h, look: l.char, color: l.color || h.color } : h; };
+  if (!H.embedded) return [withLook({ ...S.meInfo })];
+  return H.players.map((p, i) => withLook({ id: p.id, name: p.name, color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : PALETTE[i % PALETTE.length] }));
+}
+function setLook(l) {
+  S.look = cleanLook(l);
+  try { localStorage.setItem('royale_look', JSON.stringify(S.look)); } catch (e) { /* pas de stockage */ }
+  if (H.embedded) H.send('all', { t: 'look', look: S.look });
 }
 // hôte (ou solo) : on remplit la montgolfière (les joueurs du salon, puis des bots jusqu'au nombre de places)
 function startMatch() {
   if (S.role === 'guest' || S.sim) return;
-  const roster = humans().map((h) => ({ ...h, bot: false }));
-  if (S.settings.mode !== 'exploration') {
-    const n = clamp(S.settings.places, 2, 30) - roster.length;
-    const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < n; i++) roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + roster.length) % PALETTE.length], bot: true, level: S.settings.level });
-  }
-  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode });
+  const hs = humans(), expl = S.settings.mode === 'exploration';
+  const size = expl ? 1 : S.settings.teams;
+  // équipes : les choix de l'écran d'accueil, les autres répartis, puis des bots (coéquipiers d'abord)
+  const T = makeTeams(hs, S.picks, expl ? hs.length : clamp(S.settings.places, 2, MAX_PLACES), size);
+  const roster = hs.map((h) => ({ ...h, bot: false, team: T.humans.get(h.id) }));
+  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
+  // niveau « Auto » : composé d'après les résultats des joueurs du salon
+  const levels = S.settings.level === 'auto' ? botLevels(T.bots.length, roomSkill()) : T.bots.map(() => S.settings.level);
+  T.bots.forEach((team, i) => roster.push({ id: 'bot' + i, name: names[i % names.length], color: PALETTE[(i + hs.length) % PALETTE.length], look: LOOKS[Math.floor(Math.random() * LOOKS.length)], bot: true, level: levels[i], team }));
+  newMatch({ run: Date.now(), seed: (Math.random() * 1e9) | 0, roster, mode: S.settings.mode, teams: size });
   if (H.embedded) H.send('all', { t: 'go', ...matchInfo() });
   showScreen(null);
   S.input.lock();
 }
-const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode });
-function newMatch({ run, seed, roster, mode, mirror = false }) {
+// nouvelle partie sans recharger la page : on démonte la partie finie (personnages, effets, constructions, bots), la
+// scène reprend son état de départ (murs, meubles, décor, portes) et le monde solide est reconstruit (≈ 65 ms)
+function resetMatch() {
+  if (!S.sim) return;
+  try { S.actors.dispose(); S.fx.dispose(); S.builds.dispose(); S.drops3d.dispose(); S.marks.dispose(); S.amb.dispose(); S.motion.dispose(); } catch (e) { console.warn(e); }
+  S.scene.reset();
+  Object.assign(S.scene.screen, { hurt: 0, shield: 0, low: 0, speed: 0, flash: 0 }); S.scene.screen.booms.length = 0; S.blasts = [];
+  S.world = buildWorld(S.map);
+  S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null; S.marks = null; S.amb = null; S.motion = null;
+  S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
+  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt(''); S.compass.clear();
+  $('#hud').hidden = true; $('#feed').innerHTML = '';
+}
+const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
+function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   S.run = run; S.seed = seed; S.roster = roster;
   const city = S.map.pois.find((p) => p.kind === 'ville');
   const pl = city && S.map.plazas.find((q) => q.x0 >= city.rect.x0 && q.x1 <= city.rect.x1 && q.z0 >= city.rect.z0 && q.z1 <= city.rect.z1);
   const start = pl ? { x: (pl.x0 + pl.x1) / 2 + 6, z: (pl.z0 + pl.z1) / 2 + 6 } : null;
-  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start });
+  S.sim = createSim({ map: S.map, world: S.world, seed, roster, mode, start, teams });
   S.startedAt = Date.now();
   S.actors = createActors(S.scene.scene, S.sim, S.scene.kit);
+  S.actors.onBurn = (p) => S.sfx.at('bruleur', p.x, p.y + 4, p.z, 1, 140);
   S.fx = createFx(S.scene.scene, { floor: (x, z, y) => S.world.support(x, z, y), chimneys: S.scene.structures.chimneys || [] });
   S.buildApi = createBuild(S.sim, S.map, S.world);
   S.builds = createBuilds(S.scene.scene);
+  S.drops3d = createDrops(S.scene.scene);
+  // traces sur les surfaces, air ambiant (poussière, feuilles, oiseaux, orage), mouvement (vitesse, eau)
+  S.marks = createMarks(S.scene.scene, S.world, S.map);
+  S.amb = createAmbiance(S.scene.scene, S.map, { time: S.scene.time, quality: S.scene.quality, screen: S.scene.screen,
+    broken: (k) => !!S.buildApi && S.buildApi.broken.has(k), sfx: { thunder: (d) => S.sfx && S.sfx.thunder(d) } });
+  S.motion = createMotion(S.scene.scene, S.world, S.fx);
+  S.blasts = [];
   // les bots ne réfléchissent que là où la partie tourne
   S.ai = !mirror && mode !== 'exploration' ? createAI(S.sim, S.map, S.world) : null;
+  // journal des parties (soirées de test, voir stats.html) : tenu là où la partie tourne
+  if (!mirror && mode !== 'exploration') {
+    const levels = {};
+    for (const r of roster) if (r.bot) levels[r.level] = (levels[r.level] || 0) + 1;
+    S.journal.start({ id: run, at: Date.now(), map: +QS.get('graine') || ILE, mode, teams, places: roster.length, humans: roster.filter((r) => !r.bot).length, bots: roster.filter((r) => r.bot).length, levels });
+  }
   for (const P of S.sim.S.players.values()) S.prev.set(P.id, { x: P.x, y: P.y, z: P.z, yaw: P.yaw });
   if (S.sim.S.flight) S.yaw = Math.atan2(S.sim.S.flight.ux, S.sim.S.flight.uz);
-  S.sel = 0; S.ended = false; S.reported = false; S.spect = null; S.build = null;
+  S.sel = 0; S.ended = false; S.reported = false; S.spect = null; S.build = null; S.landT = null; S.tipSeen = new Set(); S.tipUntil = 0;
   S.cnt = { jump: 0, use: 0, reload: 0, drop: 0 };
   S.netEv = []; S.tick = 0; S.lastSend = -99; S.buf = []; S.hist = []; S.seq = 0; S.predJump = 0; S.po = { x: 0, y: 0, z: 0 }; S.off = null; S.evq = [];
   const P = me();
@@ -166,24 +239,48 @@ function project(x, y, z) {
 
 // ------------------------------------------------------------------ commandes
 function me() { return S.sim ? S.sim.player(S.me) : null; }
-function onKey(code, key) {
+// Échap ferme le sac ou la carte, et rien d'autre (un clic sur l'image reprend la souris)
+function onKey(code) {
+  if (!S.sim || code !== 'Escape' || !(S.hud.bagOpen || S.hud.mapOpen)) return;
+  if (S.hud.bagOpen) { S.hud.closeBag(); S.bagLock = false; }
+  S.hud.toggleMap(false);
+  toast('Clique pour reprendre', 1.5);
+}
+// une action appuyée (ses touches : keys.js, modifiables dans les Réglages) ; saut, tir et visée sont lus par input.js
+function onAction(a) {
   if (!S.sim) return;
   const P = me();
-  if (code === 'Tab') { toggleBag(); return; }
-  if (code === 'Escape' && S.hud.bagOpen) { toggleBag(false); showScreen('pause'); return; }
-  if (key === 'm' || code === 'KeyM') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
-  if (code === 'Escape' && S.hud.mapOpen) { S.hud.toggleMap(false); return; }
-  if (key === 'h') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
+  if (a === 'sac') { toggleBag(); return; }
+  if (a === 'carte') { if (S.hud.bagOpen) toggleBag(false); S.hud.toggleMap(); if (S.hud.mapOpen) S.input.unlock(); return; }
+  if (a === 'aide') { const h = $('#hints'); h.classList.toggle('off'); try { localStorage.setItem('royale_hints', h.classList.contains('off') ? '0' : '1'); } catch (e) { /* pas de stockage */ } return; }
   if (!S.input.playing) return;
-  if ((!P || !P.alive) && code === 'Space') { nextSpectate(); return; }
-  if (key === 'e') S.cnt.use++;
-  else if (key === 'r') S.cnt.reload++;
-  else if (key === 'g') S.cnt.drop++;
-  // construction : F mur, V sol, C escalier (encore une fois pour sortir), T matériau
-  else if (key === 'f' || key === 'v' || key === 'c') { const k = { f: 'mur', v: 'sol', c: 'escalier' }[key]; S.build = S.build === k ? null : k; buildBar(); S.sfx.play('clic'); }
-  else if (key === 't') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
-  else if (/^Digit[1-5]$/.test(code)) { S.sel = +code.slice(5); S.build = null; buildBar(); }
-  else if (code === 'Digit0' || code === 'Backquote' || key === 'x' || key === '²') { S.sel = 0; S.build = null; buildBar(); }
+  if ((!P || !P.alive) && a === 'saut') { nextSpectate(); return; }
+  if (a === 'utiliser') S.cnt.use++;
+  else if (a === 'recharger') S.cnt.reload++;
+  else if (a === 'lacher') S.cnt.drop++;
+  else if (a === 'repere') sendPing();
+  // construction : mur, sol, escalier (encore une fois pour sortir), matériau
+  else if (a === 'mur' || a === 'sol' || a === 'escalier') { S.build = S.build === a ? null : a; buildBar(); S.sfx.play('clic'); }
+  else if (a === 'materiau') { S.mat = MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]; buildBar(); S.sfx.play('clic'); }
+  else if (/^objet[1-5]$/.test(a)) { S.sel = +a.slice(5); S.build = null; buildBar(); }
+  else if (a === 'pioche') { S.sel = 0; S.build = null; buildBar(); }
+  else if (a === 'prec' || a === 'suiv') onWheel(a === 'prec' ? -1 : 1);
+}
+// la touche d'une action, telle qu'elle est écrite ; kb : dans une étiquette <kbd>
+const kl = (a) => (S.keys ? S.keys.first(a) : '');
+const kb = (a) => `<kbd>${esc(kl(a))}</kbd>`;
+// rappels des touches à l'écran : <kbd data-k="action"> (sa première touche), <span data-ks="action"> (toutes)
+function paintKeys() {
+  const pad = S.keys.device === 'pad';
+  for (const el of document.querySelectorAll('#hints .kbkeys')) el.hidden = pad;
+  for (const el of document.querySelectorAll('#hints .padkeys')) el.hidden = !pad;
+  for (const el of document.querySelectorAll('[data-pad]')) el.textContent = S.keys.label('Pad' + el.dataset.pad);
+  for (const el of document.querySelectorAll('[data-k]')) el.textContent = kl(el.dataset.k);
+  for (const el of document.querySelectorAll('[data-ks]')) el.innerHTML = S.keys.labels(el.dataset.ks).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
+  const list = $('#keylist');
+  if (list) list.innerHTML = keysHtml();
+  S.hud.refreshKeys();
+  buildBar();
 }
 // le sac : la souris est libérée pour glisser les objets ; Tab pour revenir au jeu
 function toggleBag(open = !S.hud.bagOpen) {
@@ -205,8 +302,8 @@ function buildBar() {
   el.hidden = !S.build;
   if (!S.build) return;
   const P = me();
-  el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}"><kbd>${{ mur: 'F', sol: 'V', escalier: 'C' }[k]}</kbd>${l}</span>`).join('')
-    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}"><kbd>T</kbd><i></i>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
+  el.innerHTML = Object.entries(PIECES).map(([k, l]) => `<span class="${k === S.build ? 'on' : ''}">${kb(k)}${l}</span>`).join('')
+    + `<span class="mat" style="--c:${MATERIALS[S.mat].color}">${kb('materiau')}<i></i>${MATERIALS[S.mat].label} · ${P ? P.mats[S.mat] : 0}</span>`;
 }
 function onWheel(dir) {
   const P = me();
@@ -227,8 +324,8 @@ function onLock(locked) {
   showScreen('pause');
 }
 function myInput(on, ax) {
-  const inp = S.input;
-  return { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, fire: !!(on && inp.fire), aim: !!(on && inp.aim), sprint: !!(on && inp.sprint), crouch: !!(on && inp.crouch),
+  const inp = S.input, aim = on ? aimAt(me()) : null;
+  return { mx: ax.mx, mz: ax.mz, yaw: S.yaw, pitch: S.pitch, ay: aim ? aim[0] : null, ap: aim ? aim[1] : null, fire: !!(on && inp.fire), aim: !!(on && inp.aim), sprint: !!(on && inp.sprint), crouch: !!(on && inp.crouch),
     jump: S.cnt.jump, use: S.cnt.use, reload: S.cnt.reload, shoot: inp.shots, drop: S.cnt.drop, sel: S.sel, build: on ? S.build : null, mat: S.mat, mv: S.mv };
 }
 
@@ -240,8 +337,10 @@ function loop(now) {
   S.last = Math.max(S.last, now); S.t += dt;
   S.ms = S.ms * 0.95 + dt * 1000 * 0.05;
   if (S.role === 'guest') guestNet(dt);
+  if (S.input) S.input.poll(dt);
   if (!S.sim) { idleFrame(dt); return; }
   const inp = S.input, P = me();
+  aimAssist(P, dt);
   const [mx, my] = inp.takeMouse(dt);
   const scoped = isScoped(P);
   const sens = scoped ? 0.25 : inp.aim ? 0.6 : 1;
@@ -260,15 +359,21 @@ function loop(now) {
   handleEvents(events);
   // caméra
   const view = cameraFor(P, disp, dt);
-  S.actors.update(dt, S.t, view.pos, disp, scoped ? S.me : null);
+  S.actors.update(dt, S.t, view.pos, disp, scoped || S.camClose ? S.me : null, seeFrom(view.focus));
   S.fx.update(dt, S.t, S.sim, S.sim.S.storm && S.sim.S.storm.cur, view.pos);
+  ambient(dt, P, view);
   // fantôme de la pièce à construire
   if (S.build && P && P.alive && P.mode === 'sol') {
-    const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces);
+    const slot = slotFor(P.x, P.y, P.z, S.yaw, S.pitch, S.build, S.buildApi.pieces, S.world);
     S.builds.ghost(slot, S.buildApi.canPlace(slot) && P.mats[S.mat] >= COST);
   } else S.builds.ghost(null);
   S.builds.update(dt, S.buildApi.pieces);
-  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72;
+  S.drops3d.update(dt, S.t, S.sim.S);
+  // chute libre, deltaplane, tremplin : la vue s'élargit avec la vitesse, des traits de vitesse filent sur les bords
+  const fall = P && P.alive && (P.mode === 'chute' || P.mode === 'planeur') ? Math.min(1, Math.hypot(P.vx, P.vy, P.vz) / 34) : 0;
+  S.fall = (S.fall || 0) + (fall - (S.fall || 0)) * (1 - Math.exp(-4 * dt));
+  $('#speedlines').style.opacity = (S.fall * 0.85).toFixed(3);
+  const cam = S.scene.camera, fov = scoped ? 72 / 4 : inp.aim && P && P.alive && heldWeapon(P) ? 72 / (WEAPONS[heldWeapon(P).w].zoom || 1.2) : 72 + S.fall * 14;
   S.fov += (fov - S.fov) * (1 - Math.exp(-14 * dt));
   if (Math.abs(cam.fov - S.fov) > 0.01) { cam.fov = S.fov; cam.updateProjectionMatrix(); }
   S.scene.frame(dt, view, view.focus);
@@ -276,8 +381,19 @@ function loop(now) {
   const focusP = P && P.alive ? P : S.sim.player(S.spect) || P;
   if (focusP) {
     const fp = disp(focusP);
-    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms);
-    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat });
+    const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
+    const pg = pingsOf(focusP, fp, view);
+    S.hud.pings(pg);
+    S.compass.update(view.pos, view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, pg);
+    const drops = [...S.sim.S.drops.values()].filter((d) => !d.open).map((d) => ({ x: d.x, z: d.z, color: '#b77dff', big: true }));
+    S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), [...drops, ...pg.map((m) => ({ x: m.x, z: m.z, color: m.color }))]);
+    const rv = focusP.revive && S.sim.player(focusP.revive.id);
+    S.hud.player(focusP, { alive: S.sim.alive().length, build: focusP === P ? S.build : null, mat: S.mat, revive: rv ? { f: focusP.revive.t / REVIVE, name: rv.name } : null });
+    if ((S.tick3 = (S.tick3 || 0) + 1) % 5 === 0) S.hud.team(team.map((Q) => ({ id: Q.id, name: Q.name, color: Q.color, hp: Q.hp, sh: Q.sh, down: Q.down ? Q.down.hp : null, alive: Q.alive })));
+    S.hud.tags(team.filter((Q) => Q.alive && Q.mode === 'sol').map((Q) => { const d = disp(Q); return { id: Q.id, name: Q.name, color: Q.color, x: d.x, y: d.y + 2.3, z: d.z, down: !!Q.down }; }));
+    // à terre : ce qu'il reste, et le coéquipier qui relève
+    const helper = focusP.down && [...S.sim.S.players.values()].find((Q) => Q.revive && Q.revive.id === focusP.id);
+    S.hud.downed(focusP.alive && focusP.down ? { left: focusP.down.hp / DOWN_HP * BLEED, by: helper ? helper.name : null, f: helper ? helper.revive.t / REVIVE : 0 } : null);
     S.hud.storm(S.sim.S.storm, fp);
   }
   S.hud.flight(S.sim.S.phase === 'vol' && S.sim.S.flight ? flightLine() : null);
@@ -285,11 +401,15 @@ function loop(now) {
   const air = !P || !P.alive || P.mode !== 'sol';
   if (air !== S.hintsAir) { S.hintsAir = air; $('#hints').classList.toggle('air', air); }
   S.hud.frame(dt);
-  S.hud.crosshair(P ? spreadOf(P) : 0, scoped);
+  S.hud.crosshair(P ? crossGap(P) : 0, scoped);
   S.hud.spectate(P && P.alive ? null : S.sim.player(S.spect) && !S.ended ? S.sim.player(S.spect).name : null);
   if ((S.tick2 = (S.tick2 || 0) + 1) % 6 === 0) showPrompt();
+  if (S.tick2 % 30 === 0) tips(P);
   if (S.hud.bagOpen) { if (P && P.alive) S.hud.bag(P); else toggleBag(false); }
-  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP) });
+  // écho de pièce quand la tête du joueur suivi est sous un toit
+  const fp = view.focus, roof = fp ? S.world.ceiling(fp.x, fp.z, fp.y + 0.2) - fp.y : 99;
+  S.indoor = (S.indoor || 0) + ((roof < 9 ? 1 : 0) - (S.indoor || 0)) * Math.min(1, dt * 4);
+  S.sfx.update(dt, { cam: view.pos, yaw: view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, sim: S.sim, me: P, disp, storm: stormGap(focusP), surface, indoor: S.indoor });
   // qualité automatique : si l'image prend plus de 24 ms pendant 3 s, on allège
   if (S.ms > 24 && S.t > 6) { S.slow += dt; if (S.slow > 3) { S.slow = 0; const w = S.scene.lowerQuality(); if (w && DEBUG) toast('Qualité baissée : ' + w, 2); } }
   else S.slow = Math.max(0, S.slow - dt);
@@ -312,8 +432,10 @@ function hostSteps(dt, on, ax) {
   if (S.acc > DT) S.acc = 0;
   if (net() && (S.tick - S.lastSend >= 3 || (S.sim.S.phase === 'fin' && S.netEv.length))) {
     S.lastSend = S.tick;
-    // volatil quand il ne transporte pas d'événements : sauté si la connexion sature
-    H.send('all', { t: 's', run: S.run, s: snapshot(S.sim, S.snapN++ % 20 === 0 ? 'tous' : 'humains'), e: S.netEv }, { volatile: !S.netEv.length });
+    // les événements (portes, butin, constructions, tirs) partent à part, petits et garantis, juste avant l'instantané :
+    // lui, gros, est volatil (sauté si la connexion de l'hôte sature, le suivant le remplace)
+    if (S.netEv.length) H.send('all', { t: 'e', run: S.run, e: S.netEv });
+    H.send('all', { t: 's', run: S.run, s: snapshot(S.sim, S.snapN++ % 20 === 0 ? 'tous' : 'humains') }, { volatile: true });
     S.netEv = [];
   }
   return out;
@@ -367,11 +489,24 @@ function idleFrame(dt) {
 }
 function heldWeapon(P) { const it = P.sel > 0 ? P.inv[P.sel - 1] : null; return it && it.t === 'arme' ? it : null; }
 function isScoped(P) { const w = P && P.alive && heldWeapon(P); return !!(w && w.w === 'sniper' && S.input && S.input.aim && P.mode === 'sol'); }
-function spreadOf(P) {
+// écart du viseur (pixels) : la dispersion réelle du prochain tir, vue à travers l'objectif du moment
+function crossGap(P) {
   const it = heldWeapon(P);
-  if (!it) return 0.01;
-  const W = WEAPONS[it.w], moving = Math.hypot(P.vx, P.vz) > 1;
-  return (S.input.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground ? 1 : 2) + (P.bloom || 0);
+  const sp = it ? spreadOf(it.w, P, S.input.aim, S.t - (S.shotAt != null ? S.shotAt : -9) > REST) : 0.01;
+  return sp * (S.scene.canvas.clientHeight / 2) / Math.tan(S.fov * Math.PI / 360);
+}
+// où partent les tirs : de l'épaule vers ce que montre le centre de l'image. La caméra n'est pas toujours dans l'axe de
+// l'épaule (recentrée sur la tête contre un mur, relevée au-dessus du sol) : sans ça, la balle partirait à côté du viseur.
+function aimAt(P) {
+  if (!P || !P.alive || P.mode !== 'sol' || !S.cam || isScoped(P)) return null;
+  const cp = Math.cos(S.pitch), f = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
+  const T = Math.max(2, S.sim.trace(P, [S.cam.x, S.cam.y, S.cam.z], f, 450).t);
+  const tx = S.cam.x + f[0] * T, ty = S.cam.y + f[1] * T, tz = S.cam.z + f[2] * T;
+  const [ex, ey, ez] = S.sim.eye(P, true), dx = tx - ex, dy = ty - ey, dz = tz - ez, L = Math.hypot(dx, dy, dz);
+  if (L < 1.5) return null;
+  // même tour que le regard (S.yaw n'est pas ramené entre −π et π)
+  const yaw = Math.atan2(dx, dz);
+  return [S.yaw + Math.atan2(Math.sin(yaw - S.yaw), Math.cos(yaw - S.yaw)), Math.asin(clamp(dy / L, -1, 1))];
 }
 function flightLine() {
   const f = S.sim.S.flight;
@@ -384,7 +519,182 @@ function stormGap(P) {
   return st.cur.r - Math.hypot(P.x - st.cur.x, P.z - st.cur.z);
 }
 
+// ce que voit le joueur : rien entre sa tête et le point (mur, plancher) ; sert à ne pas montrer les lueurs du
+// butin et des coffres à travers les murs
+function seeFrom(f) {
+  const ox = f.x, oy = f.y + 1.5, oz = f.z;
+  return (x, y, z) => {
+    const dx = x - ox, dy = y - oy, dz = z - oz, L = Math.hypot(dx, dy, dz);
+    if (L < 1) return true;
+    return S.world.raycast(ox, oy, oz, dx / L, dy / L, dz / L, L).t >= L - 0.45;
+  };
+}
 // caméra : par-dessus l'épaule droite (au sol), loin derrière (montgolfière, chute libre), à l'œil (lunette)
+// ------------------------------------------------------------------ manette hors du jeu : écrans, sac, carte, Réglages
+// la croix (ou le stick gauche) déplace la sélection d'un bouton au plus proche dans cette direction ; A appuie, B
+// revient ; sur un curseur, gauche et droite le règlent. Dans le sac : la croix choisit une case, A prend un objet puis
+// le pose (échange), X le lâche
+let padEl = null;
+function padFocusEl(el) {
+  if (padEl) padEl.classList.remove('padfocus');
+  padEl = el || null;
+  if (!el) return;
+  el.classList.add('padfocus');
+  el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+const padList = (root) => [...root.querySelectorAll('button, a[href], input[type=range], select')].filter((e) => !e.disabled && e.getClientRects().length && !e.closest('[hidden]'));
+function padNav(root, dir) {
+  const list = padList(root);
+  if (!list.length) return;
+  const cur = list.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { padFocusEl(list.find((e) => e.id === 'go') || list[0]); return; }
+  // curseur : gauche et droite le règlent
+  if (cur.type === 'range' && (dir === 'left' || dir === 'right')) {
+    const st = +cur.step || 1, v = Math.min(+cur.max, Math.max(+cur.min, +cur.value + (dir === 'right' ? st : -st)));
+    cur.value = v; cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bs = Infinity;
+  for (const e of list) {
+    if (e === cur) continue;
+    const b = e.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+    const along = dir === 'right' ? dx : dir === 'left' ? -dx : dir === 'down' ? dy : -dy, across = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (along < 4) continue;
+    const sc = along + across * 2.5;
+    if (sc < bs) { bs = sc; best = e; }
+  }
+  if (best) padFocusEl(best);
+}
+function padMenu(ev) {
+  const V = window.DDVolume;
+  if (V && V.waiting && V.waiting()) return; // une case des Réglages attend son bouton
+  const panel = V && V.isOpen() ? document.querySelector('.ddvol') : null;
+  if (ev.nav) {
+    if (panel) padNav(panel, ev.nav);
+    else if (S.hud.bagOpen) S.hud.bagNav(ev.nav);
+    else if (S.screen) padNav($('#screen'), ev.nav);
+    return;
+  }
+  const b = ev.button, acts = ev.acts || [], A = b === 0, B = b === 1, X = b === 2, START = b === 9;
+  const press = (root) => { const el = document.activeElement; if (el && root.contains(el) && el.tagName !== 'INPUT') el.click(); else padNav(root, 'down'); };
+  if (panel) { if (A) press(panel); else if (B || START) { V.close(); padFocusEl($('#settings')); } return; }
+  if (S.hud.bagOpen) {
+    if (A) S.hud.bagPick(); else if (X) S.hud.bagDrop();
+    else if (B || START || acts.includes('sac')) toggleBag(false);
+    return;
+  }
+  if (S.hud.mapOpen) { if (B || START || acts.includes('carte')) { S.hud.toggleMap(false); S.input.lock(); } return; }
+  if (S.screen) {
+    if (A) press($('#screen'));
+    else if (START || (B && S.screen === 'pause')) { const go = $('#go'); if (go) go.click(); }
+    return;
+  }
+  // en jeu, souris libérée (Échap) : A ou Menu reprend la partie à la manette
+  if (S.sim && (A || START)) S.input.lock();
+}
+addEventListener('gamepadconnected', (e) => { if (S.loaded) toast(`Manette branchée : ${/054c|playstation|dualsense|dualshock/i.test(e.gamepad.id) ? 'PlayStation' : 'prête'}. A (ou ✕) pour jouer.`, 3); });
+addEventListener('gamepaddisconnected', () => { if (S.loaded) toast('Manette débranchée', 2.5); if (S.input && S.input.padOn) S.input.unlock(); });
+
+// aide à la visée (manette seulement, légère) : la vue ralentit quand le viseur passe sur un ennemi visible ; en visant,
+// elle glisse doucement vers lui (au plus 0,45 rad/s, moins au bord). Rien au-delà de 90 m, derrière un mur, ni sur un
+// coéquipier
+function aimAssist(P, dt) {
+  const I = S.input;
+  I.assistSlow = 1;
+  if (!I.assist || !I.padOn || S.keys.device !== 'pad' || !P || !P.alive || P.mode !== 'sol' || !heldWeapon(P) || !S.cam) return;
+  const c = S.cam, cp = Math.cos(S.pitch), fx = Math.sin(S.yaw) * cp, fy = Math.sin(S.pitch), fz = Math.cos(S.yaw) * cp, R = 0.1;
+  let best = null, ba = R;
+  for (const Q of S.sim.S.players.values()) {
+    if (Q === P || !Q.alive || Q.mode !== 'sol' || S.sim.mates(P, Q)) continue;
+    const dx = Q.x - c.x, dy = Q.y + (Q.crouch ? 0.8 : 1.15) - c.y, dz = Q.z - c.z, d = Math.hypot(dx, dy, dz);
+    if (d < 1.5 || d > 90) continue;
+    const ang = Math.acos(Math.min(1, (dx * fx + dy * fy + dz * fz) / d));
+    if (ang < ba) { ba = ang; best = { dx, dy, dz, d }; }
+  }
+  if (!best || S.world.raycast(c.x, c.y, c.z, best.dx / best.d, best.dy / best.d, best.dz / best.d, best.d).t < best.d - 1) return;
+  I.assistSlow = ba < 0.05 ? 0.55 : 0.8;
+  if (!I.aim) return;
+  const dyaw = Math.atan2(best.dx, best.dz) - S.yaw, wy = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)), wp = Math.atan2(best.dy, Math.hypot(best.dx, best.dz)) - S.pitch;
+  const L = Math.hypot(wy, wp), step = Math.min(L, 0.45 * (1 - ba / R) * dt);
+  if (L > 1e-4) { S.yaw += wy / L * step; S.pitch += wp / L * step; }
+}
+
+// ------------------------------------------------------------------ ambiance, traces, réactions de l'écran
+const camF = new THREE.Vector3(), camR = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+function ambient(dt, P, view) {
+  const tgt = P && P.alive ? P : S.sim.player(S.spect) || P;
+  camF.set(view.look.x - view.pos.x, view.look.y - view.pos.y, view.look.z - view.pos.z).normalize();
+  camR.crossVectors(camF, UP).normalize();
+  S.marks.update(dt);
+  S.motion.update(dt, S.sim, tgt, view.pos, camF);
+  S.amb.update(dt, view.pos, camR, S.sim, S.sim.S.storm && S.sim.S.storm.cur);
+  // glissades qui commencent : un frottement (le sien plus fort)
+  S.slid = S.slid || new Set();
+  for (const Q of S.sim.S.players.values()) {
+    const on = Q.alive && Q.slideT > 0;
+    if (on && !S.slid.has(Q.id)) { S.slid.add(Q.id); if (Q.id === S.me) S.sfx.play('glisse'); else S.sfx.at('glisse', Q.x, Q.y, Q.z, 0.8, 35); }
+    else if (!on) S.slid.delete(Q.id);
+  }
+  // l'écran pâlit et bat quand la vie est basse (tout à fait à terre) ; il file avec la vitesse
+  const sc = S.scene.screen, low = P && P.alive && P.mode === 'sol' ? (P.down ? 1 : P.hp < 35 ? 0.25 + 0.75 * (1 - P.hp / 35) : 0) : 0;
+  sc.low += (low - sc.low) * (1 - Math.exp(-3 * dt));
+  sc.speed = S.motion.rush * 0.8;
+  // herbe couchée : les personnages proches, et le souffle des explosions de la dernière seconde
+  if (S.scene.grass.group.visible) {
+    const f = view.focus, push = [];
+    for (const Q of S.sim.S.players.values()) {
+      if (!Q.alive || Q.mode !== 'sol' || Q.swim) continue;
+      const d = Math.abs(Q.x - f.x) + Math.abs(Q.z - f.z);
+      if (d < 40) push.push({ x: Q.x, z: Q.z, r: Q.crouch ? 1.1 : 0.85, k: 1, d });
+    }
+    for (let i = S.blasts.length - 1; i >= 0; i--) {
+      const b = S.blasts[i], age = S.t - b.t;
+      if (age > 1.2) { S.blasts.splice(i, 1); continue; }
+      push.push({ x: b.x, z: b.z, r: b.r * 1.6, k: 1 - age / 1.2, d: -1 });
+    }
+    push.sort((a, b) => a.d - b.d);
+    S.scene.grass.push(push);
+  }
+}
+// petit décor que la caméra traverse (poteaux, panneaux, troncs, bancs, haies, bornes…) : il ne la fait pas plonger
+// sur la tête du joueur chaque fois qu'il passe entre eux
+const camThin = (s) => !!s && s.key != null && s.key[0] === 'p' && (s.t === 1 ? s.r < 0.6 : s.t === 2 ? Math.min(s.hx, s.hz) < 0.45 && Math.max(s.hx, s.hz) < 1.2 : false);
+// distance libre devant une boule de rayon CAM_R qui part de (x, y, z) dans la direction (dx, dy, dz) unitaire : le plus
+// court de cinq rayons exacts (l'axe, et quatre rayons parallèles décalés de CAM_R) ; un rayon qui partirait de
+// l'intérieur d'un mur (épaule collée contre lui) ne compte pas, ni celui décalé du côté `skip` (x, z) s'il est donné
+const CAM_R = 0.22, cu = new THREE.Vector3(), cv = new THREE.Vector3(), cw = new THREE.Vector3();
+function camFree(x, y, z, dx, dy, dz, len, skip = null) {
+  const W = S.world;
+  cw.set(dx, dy, dz);
+  cu.set(Math.abs(dy) > 0.9 ? 1 : 0, Math.abs(dy) > 0.9 ? 0 : 1, 0).cross(cw).normalize();
+  cv.copy(cw).cross(cu).normalize();
+  let best = len;
+  for (let k = 0; k < 5; k++) {
+    const a = k === 1 ? CAM_R : k === 2 ? -CAM_R : 0, b = k === 3 ? CAM_R : k === 4 ? -CAM_R : 0;
+    const ex = cu.x * a + cv.x * b, ey = cu.y * a + cv.y * b, ez = cu.z * a + cv.z * b;
+    if (skip && ex * skip[0] + ez * skip[1] > CAM_R * 0.5) continue;
+    const ox = x + ex, oy = y + ey, oz = z + ez;
+    if (k && camInside(ox, oy, oz, 0)) continue;
+    // on passe à travers le petit décor : le rayon repart juste derrière lui
+    for (let t0 = 0, n = 0; n < 4 && t0 < best; n++) {
+      const h = W.raycast(ox + dx * t0, oy + dy * t0, oz + dz * t0, dx, dy, dz, best - t0);
+      if (t0 + h.t >= best) break;
+      if (!camThin(h.s)) { best = t0 + h.t; break; }
+      t0 += h.t + 2 * (h.s.t === 1 ? h.s.r : Math.max(h.s.hx, h.s.hz)) + 0.02;
+    }
+  }
+  return best;
+}
+// la caméra (boule de rayon m) touche-t-elle le sol, un mur, un meuble… (pas le petit décor, ni les escaliers) ?
+function camInside(x, y, z, m = 0.2) {
+  const W = S.world;
+  if (y < S.map.heightAt(x, z) + 0.05) return true;
+  let hit = false;
+  W.near(x, z, m + 4, (s) => { if (!hit && !camThin(s) && y >= s.y0 - m && y <= s.y1 + m && W.over(s, x, z, m)) hit = true; });
+  return hit;
+}
 function cameraFor(P, disp, dt) {
   const W = S.world;
   let target = P;
@@ -394,7 +704,9 @@ function cameraFor(P, disp, dt) {
   }
   if (!target) { const C = S.map.center; return { pos: { x: C, y: 200, z: C + 300 }, look: { x: C, y: 0, z: C }, focus: { x: C, y: 0, z: C } }; }
   const d = disp(target);
-  const yaw = target === P ? S.yaw : d.yaw, pitch = target === P ? S.pitch : clamp(target.pitch || 0, -0.6, 0.6);
+  // le recul retombe vite (il ne touche que la vue, pas la visée)
+  S.kick = (S.kick || 0) * Math.exp(-11 * dt); S.kickYaw = (S.kickYaw || 0) * Math.exp(-13 * dt);
+  const yaw = target === P ? S.yaw + S.kickYaw : d.yaw, pitch = target === P ? S.pitch + S.kick : clamp(target.pitch || 0, -0.6, 0.6);
   const cp = Math.cos(pitch), fx = Math.sin(yaw) * cp, fy = Math.sin(pitch), fz = Math.cos(yaw) * cp;
   const rx = -Math.cos(yaw), rz = Math.sin(yaw);
   let dist = S.camD, sh = SHOULDER, headY;
@@ -408,27 +720,50 @@ function cameraFor(P, disp, dt) {
   else headY = target.swim ? d.y + MOVE.swimDepth + 0.6 : d.y + (target.crouch ? MOVE.hc : MOVE.h) - 0.25;
   if (target === P && S.input.aim && heldWeapon(P)) dist = 2.1;
   if (isScoped(P) && target === P) dist = 0;
-  // distance fixe : elle ne change que pour viser (ou en l'air), jamais à cause d'un mur
+  // distance voulue : elle change pour viser (ou en l'air) ; les murs la raccourcissent plus bas
   S.camDist = dist === 0 ? 0 : S.camDist + (dist - S.camDist) * (1 - Math.exp(-12 * dt));
-  // épaule droite (même axe que les tirs) ; un mur collé à droite la fait glisser doucement vers le centre
-  const wantSide = sh ? Math.max(0, W.ray(d.x, headY, d.z, rx, 0, rz, sh, 0.2)) : 0;
-  S.camSide += (wantSide - S.camSide) * (1 - Math.exp(-8 * dt));
-  const D = S.camDist, px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide, py = headY;
+  // épaule droite (même axe que les tirs) ; un mur à droite la ramène vers le centre. Les distances sont exactes (voir
+  // camFree) : elles suivent le mur sans à-coups (mesurées par pas de 10 à 20 cm, elles sautaient d'un pas à l'autre et
+  // la caméra faisait l'essuie-glace contre les murs)
+  // (10 cm de plus que la boule : le rayon arrière décalé vers le mur ne frôle pas la façade, la moindre saillie le
+  // faisait plonger sur la tête ; mesurée aussi à hauteur du buste, sous les appuis de fenêtre, et un peu en arrière :
+  // à hauteur de tête, une fenêtre ou une porte ouverte laissaient l'épaule s'y engager)
+  let wantSide = 0;
+  if (sh) {
+    const L = sh + CAM_R + 0.1, bx = d.x - Math.sin(yaw) * 0.6, bz = d.z - Math.cos(yaw) * 0.6;
+    wantSide = Math.min(camFree(d.x, headY, d.z, rx, 0, rz, L), camFree(d.x, d.y + 0.85, d.z, rx, 0, rz, L), camFree(bx, headY, bz, rx, 0, rz, L));
+    wantSide = Math.max(0, Math.min(sh, wantSide - CAM_R - 0.1));
+  }
+  // (vers le centre tout de suite, sinon l'épaule entrerait dans le mur ; vers l'épaule en douceur)
+  S.camSide = wantSide < S.camSide ? wantSide : S.camSide + (wantSide - S.camSide) * (1 - Math.exp(-4 * dt));
+  const px = d.x + rx * S.camSide, pz = d.z + rz * S.camSide, py = headY;
+  // la caméra ne traverse ni mur, ni porte, ni plafond, ni le sol : un obstacle derrière le joueur la rapproche aussitôt,
+  // elle recule doucement quand la voie se libère
+  let D = S.camDist, free = 0;
+  if (D > 0.05) {
+    // (on regarde un peu au-delà de la caméra : la marge sert à la secousse ; pas de rayon décalé vers l'épaule, qui
+    // garde déjà ses distances : il accrochait le bord des vitrines et des portails)
+    free = camFree(px, py, pz, -fx, -fy, -fz, D + 0.6, S.camSide > 0.05 ? [rx, rz] : null);
+    const want = Math.max(0, free - CAM_R);
+    const pull = S.camPull == null ? D : S.camPull;
+    S.camPull = want < pull ? want : pull + (want - pull) * (1 - Math.exp(-5 * dt));
+    D = Math.min(D, S.camPull);
+  } else S.camPull = null;
+  // tout contre le joueur, on ne dessine pas son personnage (sinon on voit l'intérieur de sa tête) ; il disparaît sous
+  // 0,7 m et ne revient qu'au-delà de 0,95 m (un seul seuil le faisait clignoter)
+  S.camClose = target === P && S.camDist > 0 && D < (S.camClose ? 0.95 : 0.7);
   let cx = px - fx * D, cy = py - fy * D, cz = pz - fz * D;
   const wl = W.waterLevel(cx, cz);
   if (cy < wl + 0.35) cy = wl + 0.35;
   const gh = S.map.heightAt(cx, cz);
   if (cy < gh + 0.3) cy = gh + 0.3;
-  // ce qui se trouve entre la caméra et le joueur (mur, porte, arbre) est découpé par le plan proche : la caméra
-  // reste où elle est, on voit le joueur à travers
-  let near = 0.15;
-  if (D > 0.3) {
-    const vx = cx - d.x, vy = cy - py, vz = cz - d.z, L = Math.hypot(vx, vy, vz);
-    const free = W.ray(d.x, py, d.z, vx / L, vy / L, vz / L, L, 0.05);
-    if (free < L - 0.05) near = clamp(L - free + 0.25, 0.15, Math.max(0.15, D - 0.75));
-  }
-  // secousse des explosions proches
-  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); cx += (Math.random() - 0.5) * S.shake * 0.4; cy += (Math.random() - 0.5) * S.shake * 0.4; cz += (Math.random() - 0.5) * S.shake * 0.4; }
+  // plan proche court : la caméra reste dans le vide, rien n'est découpé devant elle
+  const near = 0.1;
+  // secousse des explosions proches : jamais plus que la marge libre derrière la caméra (elle n'entre pas dans un mur)
+  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 2.5); const k = Math.min(S.shake * 0.4 * Math.min(1, D / 2), Math.max(0, free - D - 0.12)); cx += (Math.random() - 0.5) * k; cy += (Math.random() - 0.5) * k; cz += (Math.random() - 0.5) * k; }
+  // dernier contrôle, après les relèvements au-dessus de l'eau et du sol : si la caméra (avec son plan proche) touche
+  // quoi que ce soit, on la ramène vers la tête jusqu'à ce qu'elle soit libre
+  for (let k = 0; k < 10 && D > 0 && camInside(cx, cy, cz, 0.2); k++) { cx += (px - cx) * 0.35; cy += (py - cy) * 0.35; cz += (pz - cz) * 0.35; S.camClose = target === P; }
   return look(cx, cy, cz, fx, fy, fz, d, near);
   function look(x, y, z, a, b, c, focus, nearP = 0.15) {
     S.cam = { x, y, z };
@@ -437,6 +772,8 @@ function cameraFor(P, disp, dt) {
 }
 function pickSpectate() {
   const P = me();
+  const mate = P && [...S.sim.S.players.values()].find((Q) => Q.alive && S.sim.mates(P, Q));
+  if (mate) return mate.id;
   const killer = P && P.hitBy != null && S.sim.player(P.hitBy);
   if (killer && killer.alive) return killer.id;
   const live = S.sim.alive();
@@ -452,11 +789,20 @@ function nextSpectate() {
 // ------------------------------------------------------------------ réseau : messages
 function onMsg(from, m) {
   if (!S.loaded || !m || typeof m !== 'object') return;
+  if (m.t === 'look') { S.looks.set(from, cleanLook(m.look)); return; }
+  if (m.t === 'skill') { if (Number.isFinite(m.s)) S.skills.set(from, Math.max(0, Math.min(1, m.s))); refreshLobby(); return; }
+  if (m.t === 'team') { S.picks.set(from, Number.isInteger(m.k) && m.k >= 0 && m.k < 30 ? m.k : -1); refreshLobby(); return; }
   if (S.role !== 'guest') {
     if (m.t === 'hi') {
+      if (m.look) S.looks.set(from, cleanLook(m.look));
+      if (Number.isInteger(m.team)) S.picks.set(from, m.team);
+      if (Number.isFinite(m.skill)) S.skills.set(from, Math.max(0, Math.min(1, m.skill)));
       // un invité arrive (ou revient) : la partie en cours et tout ce qui a changé depuis le début
       if (S.sim && !S.ended) H.send(from, { t: 'go', ...matchInfo(), full: fullState(S.sim, S.world, S.buildApi) });
-      else H.send(from, { t: 'salon' });
+      else H.send(from, { t: 'salon', picks: [...S.picks] });
+    } else if (m.t === 'repere' && S.sim) {
+      const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
+      if (P && !P.bot) S.sim.ping(P, String(m.kind), +m.x, +m.y, +m.z, m.target != null && S.sim.player(m.target) ? m.target : null, String(m.what || ''));
     } else if (m.t === 'i' && S.sim) {
       const P = S.sim.player(from); // `from` vient du Hub : seule identité fiable
       if (!P || P.bot) return;
@@ -470,11 +816,15 @@ function onMsg(from, m) {
   }
   if (from !== H.info.hostId) return; // invité : seul l'hôte fait foi
   S.gotHost = true;
-  if (m.t === 'salon') { if (!S.sim) showScreen('attente'); return; }
+  if (m.t === 'salon') {
+    if (Array.isArray(m.picks)) for (const [id, k] of m.picks) if (id !== S.me && Number.isInteger(k)) S.picks.set(id, k);
+    if (!S.sim) showScreen('attente');
+    return;
+  }
   if (m.t === 'go') {
-    if (S.sim && m.run !== S.run) { location.reload(); return; } // nouvelle partie : on repart d'une île neuve
+    if (S.sim && m.run !== S.run) resetMatch(); // nouvelle partie : l'île revient comme au départ
     if (S.sim) return;
-    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, mirror: true });
+    newMatch({ run: m.run, seed: m.seed, roster: m.roster, mode: m.mode, teams: m.teams | 0 || 1, mirror: true });
     if (m.full) {
       applyFull(S.sim, S.world, S.buildApi, m.full);
       for (const k of m.full.broken) hideBroken(k);
@@ -486,6 +836,13 @@ function onMsg(from, m) {
     return;
   }
   if (m.t === 's' && S.sim && m.run === S.run && m.s) receiveSnap(m.s, m.e || []);
+  else if (m.t === 'e' && S.sim && m.run === S.run && Array.isArray(m.e)) receiveEvents(m.e);
+  if (m.t === 'bilan' && m.run === S.run && Array.isArray(m.res)) S.bilan = m.res;
+}
+// événements arrivés à part, avant l'instantané qui les montre : le monde de la copie change tout de suite
+function receiveEvents(events) {
+  for (const e of events) mirrorEvent(S.sim, S.world, S.buildApi, e);
+  S.evq.push(...events);
 }
 function receiveSnap(s, events) {
   const now = performance.now() / 1000;
@@ -518,7 +875,7 @@ function reconcile(s, wasMode) {
 function guestNet(dt) {
   if (!S.loaded) return;
   S.hiT -= dt;
-  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi' }); }
+  if (!S.gotHost && S.hiT <= 0) { S.hiT = 1.5; H.send('host', { t: 'hi', look: S.look, team: S.picks.get(S.me), skill: S.mySkill.s }); }
   if (!S.sim || S.ended) return;
   const silent = performance.now() / 1000 - S.snapAt;
   if (silent > HOST_SILENCE) {
@@ -561,42 +918,110 @@ function hideBroken(k) {
   const rest = k.slice(2);
   if (k[0] === 'p') { S.scene.props.hide(+rest); S.scene.forest.hide(+rest); if (S.scene.lights) S.scene.lights.hide(+rest); }
   else if (k[0] === 'w') S.scene.structures.hideWall(rest);
+  else if (k[0] === 's') S.scene.structures.hideWall(k);
   else if (k[0] === 'f') S.scene.interior.hideFurn(+rest);
   else if (k[0] === 'd') S.scene.interior.hideDoor(+rest);
   else if (k[0] === 'b') S.builds.remove(+rest);
 }
+// clé « p:… » d'un feuillu : son houppier (là d'où tombent les feuilles)
+function treeOf(key) {
+  if (!key || key[0] !== 'p') return null;
+  const p = S.map.props[+key.slice(2)];
+  return p && p.kind === 'arbre' ? { x: p.x, y: S.map.heightAt(p.x, p.z) + 4.5 * (p.s || 1), z: p.z } : null;
+}
+// ce qu'il y a sous les pieds (pour le son des pas)
+function surface(Q) {
+  if (S.world.waterLevel(Q.x, Q.z) > Q.y + 0.08) return 'eau';
+  if (Q.y - S.map.heightAt(Q.x, Q.z) < 0.12) return GROUND_SURF[S.map.groundAt(Q.x, Q.z)] || 'herbe';
+  let best = null;
+  S.world.near(Q.x, Q.z, 4.5, (s) => { if (Math.abs(s.y1 - Q.y) < 0.25 && S.world.over(s, Q.x, Q.z, 0.1)) best = s; });
+  return best ? surfOf(best) : 'bois';
+}
+function surfOf(s) {
+  const r = s.ref || {};
+  if (r.part === 'pont') return 'beton';
+  if (r.part === 'quai') return 'bois';
+  if (r.prop != null) { const m = (PROPS[S.map.props[r.prop].kind] || {}).mat; return m === 'metal' ? 'metal' : m === 'pierre' ? 'gravier' : 'bois'; }
+  if (r.b != null) { const b = S.map.buildings[r.b]; return r.part === 'toit' ? 'beton' : FLOOR_SURF[b.type] || 'bois'; }
+  if (s.key && s.key[0] === 'b') { const pc = S.sim.S.build && S.sim.S.build.pieces.get(+s.key.slice(2)); return MAT_SURF[pc && pc.mat] || 'bois'; }
+  return 'beton';
+}
+// matière touchée par une balle (pour le son de l'impact)
+function impactAt(x, y, z) {
+  if (y < S.map.heightAt(x, z) + 0.3) return 'impact-sol';
+  let found = null;
+  S.world.near(x, z, 4.5, (s) => { if (!found && y >= s.y0 - 0.25 && y <= s.y1 + 0.25 && S.world.over(s, x, z, 0.25)) found = s; });
+  if (!found) return 'impact-sol';
+  const m = surfOf(found);
+  return m === 'metal' ? 'impact-metal' : m === 'bois' ? 'impact-bois' : 'impact-pierre';
+}
 function handleEvents(list) {
   const P = me();
   for (const e of list) {
+    if (S.journal.on) S.journal.event(e, S.sim);
     switch (e.e) {
       case 'feu': {
         const h = S.actors.heroOf(e.p), Q = S.sim.player(e.p);
         if (h && Q) {
           h.shot();
-          if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v); }
+          if (h.held && e.w === 'roquette') {
+            // le tube sur l'épaule : flamme à sa bouche, souffle par l'arrière
+            const yaw = e.p === S.me ? S.yaw : Q.yaw, pitch = e.p === S.me ? S.pitch : Q.pitch || 0, cp = Math.cos(pitch);
+            const dir = new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp), v = new THREE.Vector3();
+            h.held.getWorldPosition(v); v.y += ROCKET_TUBE.y;
+            S.fx.launch(e.p, v.clone().addScaledVector(dir, ROCKET_TUBE.front), v.clone().addScaledVector(dir, ROCKET_TUBE.back), dir);
+          } else if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
-        if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
+        if (Q) { S.sfx.shot(e.w, Q, e.p === S.me); S.amb.scare(Q.x, Q.z, 35); }
+        // la boussole : d'où vient le tir (pas les siens)
+        if (Q && e.p !== S.me && Q.mode === 'sol') S.compass.shot(e.p, Q.x, Q.y + 1.4, Q.z, Math.hypot(Q.x - S.cam.x, Q.z - S.cam.z), { mate: !!P && S.sim.mates(P, Q), far: e.w === 'sniper' || e.w === 'roquette' ? 420 : 220 });
+        // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
+        if (e.p === S.me) {
+          S.shotAt = S.t; const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]);
+          // manette : un petit coup à chaque tir, franc pour les armes lourdes
+          const heavy = e.w === 'roquette' || e.w === 'pompe' || e.w === 'sniper';
+          S.input.rumble(heavy ? 0.7 : 0.12, heavy ? 0.5 : 0.25, heavy ? 160 : 45);
+        }
         break;
       }
       case 'tir': {
         const h = S.actors.heroOf(e.p);
         let muzzle = null;
         if (h && h.held && e.p !== S.me) { muzzle = new THREE.Vector3(); h.held.getWorldPosition(muzzle); }
-        S.fx.shot(e.from, e.to, e.w, e.hit, muzzle);
-        if (e.hit === 1 && e.k === 0) S.sfx.at('impact', e.to[0], e.to[1], e.to[2], 0.5);
+        S.fx.shot(e.from, e.to, e.w, e.hit, muzzle, !!e.late);
+        // la trace reste sur ce qui est touché ; une balle qui finit dans l'eau y fait un petit jet
+        // (de près seulement : les combats lointains ne chassent pas les traces qu'on a sous les yeux)
+        if (e.hit === 1 && Math.hypot(e.to[0] - S.cam.x, e.to[2] - S.cam.z) < 120) S.marks.impact(e.from, e.to, e.w, e.w === 'pompe');
+        if (e.hit !== 2) S.motion.shotWater(e.from, e.to);
+        if (e.hit === 1 && e.k < 3) S.sfx.at(impactAt(e.to[0], e.to[1], e.to[2]), e.to[0], e.to[1], e.to[2], 0.7, 45);
+        if (e.p !== S.me && e.k === 0) S.sfx.whiz(e.from, e.to);
         break;
       }
       case 'degat': {
+        S.fx.hitSpark(e.x, e.y - 0.2, e.z, e.head ? 'tete' : e.sh ? 'bouclier' : 'vie', e.n > 40 ? 12 : 7);
+        // le touché sursaute, du côté opposé au tir (pas pour la tempête ni une chute)
+        if (e.cause !== 'tempete' && e.cause !== 'chute') {
+          const V = S.sim.player(e.to), A = e.by != null ? S.sim.player(e.by) : null, h = S.actors.heroOf(e.to);
+          if (V && h && h.hit) h.hit(A ? Math.sign(-(A.x - V.x) * Math.cos(V.yaw) + (A.z - V.z) * Math.sin(V.yaw)) : 0, 0.6 + e.n / 60);
+        }
         if (e.by === S.me && e.to !== S.me) {
           const Q = S.sim.player(e.to);
           S.hud.hitMarker(e.head, Q && !Q.alive);
           S.hud.damageNumber(e.x, e.y, e.z, e.n, e.head, e.sh);
           S.sfx.play(e.head ? 'tete' : e.sh ? 'bouclier' : 'touche');
+          if (e.sh && Q && Q.sh <= 0) S.sfx.play('bouclier-casse');
         }
         if (e.to === S.me) {
           const A = e.by != null ? S.sim.player(e.by) : null;
-          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null);
+          S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null, e.n);
+          if (A && A !== P) S.compass.shot(A.id, A.x, A.y + 1.4, A.z, Math.hypot(A.x - S.cam.x, A.z - S.cam.z), { hit: true });
+          S.shake = Math.max(S.shake, Math.min(0.5, 0.12 + e.n / 120));
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
+          // l'écran encaisse : couleurs qui se séparent, éclat bleu si le bouclier a pris le coup
+          const sc = S.scene.screen;
+          sc.hurt = Math.min(1, sc.hurt + (e.cause === 'tempete' ? 0.12 : 0.3 + e.n / 70));
+          if (e.sh) sc.shield = 1;
+          S.input.rumble(0.25 + e.n / 90, 0.45, 140);
         }
         break;
       }
@@ -605,16 +1030,53 @@ function handleEvents(list) {
         const icon = (id) => (S.sim.player(id) && S.sim.player(id).bot ? ' 🤖' : '');
         S.hud.feedLine(e.by != null ? `${killer}${icon(e.by)} a éliminé <b>${esc(nameOf(e.to))}</b>${icon(e.to)} ${CAUSES[e.cause] || ''}` : `<b>${esc(nameOf(e.to))}</b>${icon(e.to)} éliminé ${CAUSES[e.cause] || ''}`, e.by === S.me || e.to === S.me);
         if (e.to === S.me) {
-          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.players.size} · <kbd>Espace</kbd> : regarder un autre joueur</small>`, 5);
+          // en équipe, la place n'est connue qu'à la sortie du dernier coéquipier
+          S.hud.say(`Éliminé${e.by != null ? ' par ' + esc(nameOf(e.by)) : ''}<small>${!e.place ? `Ton équipe continue · ${kb('saut')} : suivre un autre joueur` : `${e.place}${e.place === 1 ? 'er' : 'e'} sur ${S.sim.S.teams > 1 ? new Set([...S.sim.S.players.values()].map((Q) => Q.team)).size + ' équipes' : S.sim.S.players.size} · ${kb('saut')} : regarder un autre joueur`}</small>`, 5);
           S.spect = e.by != null && S.sim.player(e.by) && S.sim.player(e.by).alive ? e.by : pickSpectate();
           S.sfx.play('elimine');
         } else if (e.by === S.me) { S.hud.say(`Tu as éliminé <b>${esc(nameOf(e.to))}</b><small>${e.left} encore en vie</small>`, 2.5); S.sfx.play('elimination'); }
         break;
       }
+      case 'abattu': {
+        S.hud.feedLine(`${e.by != null ? `<b>${esc(nameOf(e.by))}</b> a mis` : ''} <b>${esc(nameOf(e.to))}</b> à terre ${CAUSES[e.cause] || ''}`, e.to === S.me || e.by === S.me);
+        if (e.to === S.me) { S.hud.say('À terre !<small>Rampe vers tes coéquipiers : ils peuvent te relever</small>', 3); S.sfx.play('aie'); }
+        else if (e.by === S.me) { S.hud.say(`<b>${esc(nameOf(e.to))}</b> est à terre<small>Ses coéquipiers peuvent le relever</small>`, 2); S.sfx.play('elimination'); }
+        break;
+      }
+      case 'releve': {
+        const mine = P && (e.to === S.me || e.by === S.me || S.sim.mates(P, S.sim.player(e.to) || {}));
+        S.hud.feedLine(`<b>${esc(nameOf(e.by))}</b> a relevé <b>${esc(nameOf(e.to))}</b>`, mine);
+        if (e.to === S.me) { S.hud.say(`Relevé par <b>${esc(nameOf(e.by))}</b> !<small>Soigne-toi vite</small>`, 2.5); S.sfx.play('soigne'); }
+        else if (e.by === S.me) { S.hud.say(`Tu as relevé <b>${esc(nameOf(e.to))}</b>`, 2); S.sfx.play('soigne'); }
+        break;
+      }
+      case 'releve…': if (e.p === S.me) S.sfx.play('bandage'); break;
+      case 'largage': {
+        S.hud.say('Largage en approche !<small>Une caisse de butin épique descend dans le cercle (losange violet sur la carte)</small>', 3.5);
+        S.hud.feedLine('📦 Un largage descend dans le cercle');
+        S.sfx.play('largage');
+        break;
+      }
+      case 'largage-pose': S.fx.dust(e.x, e.y, e.z, { n: 14, r: 0.8, speed: 3 }); S.sfx.at('atterrit', e.x, e.y + 1, e.z, 1, 90); break;
+      case 'largage-ouvert': {
+        const d = S.sim.S.drops.get(e.id);
+        if (d) { S.fx.puff(d.x, d.gy + 1, d.z, { color: 0xb77dff, size: 0.8, grow: 3, life: 0.8, add: true, op: 0.9 }); S.sfx.at('coffre', d.x, d.gy + 0.5, d.z, 1); }
+        if (e.p !== S.me) S.hud.feedLine(`<b>${esc(nameOf(e.p))}</b> a ouvert un largage`, P && S.sim.mates(P, S.sim.player(e.p) || {}));
+        break;
+      }
+      case 'repere': { const Q = P && S.sim.player(e.p); if (Q && (e.p === S.me || S.sim.mates(P, Q))) S.sfx.play('repere'); break; }
+      case 'releve-': if (e.p === S.me) toast('Relevé interrompu : il faut rester à côté sans bouger ni tirer', 2.5); break;
       case 'boum': {
         S.fx.boom(e.x, e.y, e.z, e.r, e.kind);
         const d = Math.hypot(e.x - S.cam.x, e.y - S.cam.y, e.z - S.cam.z);
-        if (d < 30) S.shake = Math.max(S.shake, (1 - d / 30) * 1.2);
+        if (d < 30) { S.shake = Math.max(S.shake, (1 - d / 30) * 1.2); S.input.rumble(1 - d / 30, 0.6, 280); }
+        // onde de choc (l'image se déforme), herbe couchée, oiseaux qui fuient ; au sol une brûlure, dans l'eau une gerbe
+        S.scene.screen.booms.push({ x: e.x, y: e.y + 0.5, z: e.z, r: e.r, t: S.scene.now });
+        S.blasts.push({ x: e.x, z: e.z, r: e.r, t: S.t });
+        S.amb.scare(e.x, e.z, 70);
+        const wl = S.world.waterLevel(e.x, e.z);
+        if (wl > e.y - 0.8) S.motion.splash(e.x, wl, e.z, 1);
+        else if (e.kind !== 'souffle') S.marks.scorch(e.x, e.y, e.z, e.r);
         S.sfx.at(e.kind === 'souffle' ? 'souffle' : 'boum', e.x, e.y, e.z, 1);
         break;
       }
@@ -629,18 +1091,31 @@ function handleEvents(list) {
         if (c) { S.fx.puff(c.x, c.y + 0.8, c.z, { color: 0xffd060, size: 0.6, grow: 2.5, life: 0.6, add: true, op: 0.9 }); S.sfx.at(c.kind === 'coffre' ? 'coffre' : 'caisse', c.x, c.y, c.z, 1); }
         break;
       }
-      case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it), 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
+      case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it) + (e.was != null ? ' · l\'ancien (' + RARITY[e.was].label.toLowerCase() + ') est au sol' : ''), e.was != null ? 2.4 : 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
       case 'vide': if (e.p === S.me) { toast('Plus de munitions pour cette arme', 1.6); S.sfx.play('vide'); } break;
       case 'inutile': if (e.p === S.me) toast(ITEMS[e.c].heal ? 'Ta vie est déjà au maximum' : 'Ton bouclier est déjà au maximum', 1.6); break;
-      case 'recharge': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('recharge'); else if (Q) S.sfx.at('recharge', Q.x, Q.y + 1, Q.z, 0.45); break; }
-      case 'arme': if (e.p === S.me) S.sfx.play('change'); break;
+      case 'recharge': {
+        const Q = S.sim.player(e.p);
+        if (e.p === S.me && P) { const it = P.inv[P.sel - 1], W = it && WEAPONS[it.w]; S.sfx.reload(e.w, e.T || 2, null, W ? Math.max(1, Math.min(W.mag - it.mag, P.ammo[W.ammo])) : 3); }
+        else if (Q) S.sfx.reload(e.w, e.T || 2, Q);
+        break;
+      }
+      case 'arme': { const Q = S.sim.player(e.p); if (e.p === S.me) S.sfx.play('change'); else if (Q) S.sfx.at('change', Q.x, Q.y + 1, Q.z, 0.5, 18); break; }
       case 'soigne': if (e.p === S.me) S.sfx.play(ITEMS[e.c] && ITEMS[e.c].shield ? 'potion' : 'bandage'); break;
       case 'soin': if (e.p === S.me) S.sfx.play('soigne'); break;
       case 'lance': { const Q = S.sim.player(e.p), h = S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('lancer'); if (Q) S.sfx.at('lance', Q.x, Q.y + 1.4, Q.z, 0.7); break; }
       case 'tremplin': { const h = e.p != null && S.actors.heroOf(e.p); if (h && h.gesture) h.gesture('pose'); S.sfx.at('pose', e.x, e.y, e.z, 0.8); break; }
       case 'propulse': S.sfx.at('tremplin', e.x, e.y, e.z, 1); break;
       case 'saut': if (e.p === S.me) S.sfx.play('saut'); break;
-      case 'atterrit': { const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 }); if (e.p === S.me) S.sfx.play('atterrit'); break; }
+      case 'atterrit': {
+        const Q = S.sim.player(e.p); if (Q) S.fx.dust(Q.x, Q.y, Q.z, { n: 8, r: 0.35, speed: 2.2 });
+        if (e.p === S.me) {
+          S.sfx.play('atterrit'); S.landT = S.t;
+          // le rappel des touches se replie en une pastille peu après l'atterrissage (H le rouvre)
+          if (!S.hintsFolded) { S.hintsFolded = true; setTimeout(() => $('#hints').classList.add('off'), 20000); }
+        }
+        break;
+      }
       case 'tempete': if (e.state === 'fermeture' || e.k > 0) { S.hud.say('La tempête se referme !<small>Rejoins le cercle blanc</small>', 3); S.sfx.play('alerte'); } break;
       case 'fin': endMatch(e.winner); break;
       case 'construit': { const h = S.actors.heroOf(e.piece.owner); if (h && h.gesture) h.gesture('pose'); }
@@ -650,10 +1125,19 @@ function handleEvents(list) {
         S.fx.puff(e.x, e.y, e.z, { color: col, size: 0.3, grow: 1.6, life: 0.4, op: 0.8 });
         S.fx.debris(e.x, e.y, e.z, e.mat, { n: 3, spread: 0.2, power: 2.5 });
         if (e.by === S.me) { S.hud.structure(e.hp, e.max); S.sfx.play('coup-' + (e.mat || 'bois')); }
+        // ce qu'on abîme se fissure ; un arbre frappé perd des feuilles
+        const A = e.by != null ? S.sim.player(e.by) : null;
+        S.marks.hit(e.key, e.x, e.y, e.z, e.hp, e.max, A ? [A.x, A.y + 1.5, A.z] : null);
+        const tree = treeOf(e.key);
+        if (tree) S.amb.leaves(tree.x, tree.y, tree.z, 4);
         break;
       }
       case 'casse': {
         hideBroken(e.key);
+        S.marks.broken(e.key);
+        { const tree = treeOf(e.key); if (tree) S.amb.leaves(tree.x, tree.y, tree.z, 18); }
+        // tableau ou horloge tombé avec son mur : quelques éclats, le mur fait déjà le bruit
+        if (e.small) { S.fx.debris(e.x, e.y, e.z, e.mat, { n: 5, spread: 0.3, power: 2 }); break; }
         const col = { bois: 0x9a6a3a, pierre: 0x8a857c, metal: 0xaab2b8 }[e.mat] || 0x9a8a78;
         for (let i = 0; i < 4; i++) S.fx.puff(e.x + (Math.random() - 0.5) * 2, e.y + (Math.random() - 0.5) * 2, e.z + (Math.random() - 0.5) * 2, { color: col, size: 0.6, grow: 2.2, life: 0.9, op: 0.75, rise: 0.4 });
         S.fx.debris(e.x, e.y, e.z, e.mat, { n: 16, spread: 1.6, power: 4.5 });
@@ -669,13 +1153,31 @@ function handleEvents(list) {
 }
 
 // ------------------------------------------------------------------ fin de partie
+// a-t-on gagné ? (en équipe : son équipe est la dernière debout)
+function iWon(winner) {
+  const P = me();
+  return S.sim.S.teams > 1 ? !!P && P.team != null && P.team === S.sim.S.winTeam : winner === S.me;
+}
 function endMatch(winner) {
   if (S.ended) return;
   S.ended = true;
+  S.hud.downed(null);
   const res = S.sim.results(), mine = res.find((r) => r.id === S.me);
-  if (winner === S.me) { S.hud.say('Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
+  if (S.journal.on) S.journal.end(S.sim, res, 'fin');
+  if (mine && S.sim.S.mode !== 'exploration') {
+    const n = S.sim.S.teams > 1 ? new Set(res.map((r) => r.team)).size : res.length;
+    saveHist({ place: iWon(winner) ? 1 : mine.place || n, n, kills: mine.kills });
+  }
+  if (iWon(winner)) { S.hud.say(S.sim.S.teams > 1 ? 'Dernière équipe debout !<small>Ton équipe a gagné la partie</small>' : 'Dernier debout !<small>Tu as gagné la partie</small>', 0, 'win'); S.sfx.play('victoire'); }
   report(res);
-  setTimeout(() => { S.input.unlock(); showScreen('fin', { res, mine, winner }); }, 3500);
+  // l'hôte fait foi : son bilan (tirs, distance, relevés…) part chez les invités
+  if (S.role === 'host' && H.embedded) H.send('all', { t: 'bilan', run: S.run, res });
+  const run = S.run;
+  setTimeout(() => {
+    if (S.run !== run || !S.sim) return;
+    const all = S.bilan || res;
+    S.input.unlock(); showScreen('fin', { res: all, mine: all.find((r) => r.id === S.me), winner });
+  }, 3500);
 }
 function report(res) {
   if (S.reported || S.role === 'guest') return;
@@ -683,103 +1185,298 @@ function report(res) {
   if (!H.embedded) return;
   try {
     H.report({
-      id: `royale-${S.run}-${res.length}`, mode: 'Battle royale',
+      id: `royale-${S.run}-${res.length}`, mode: S.sim.S.teams > 1 ? 'Battle royale · ' + TEAM_LABEL[S.sim.S.teams].toLowerCase() : 'Battle royale',
       players: res.map((r) => ({ id: r.bot ? null : r.id, name: r.name, color: r.color, bot: r.bot, rank: r.place, score: r.kills })),
     });
   } catch (e) { console.warn(e); }
 }
 
+// ------------------------------------------------------------------ astuces : la bonne touche au bon moment
+// chacune au plus une fois par partie et trois fois en tout (ensuite, le joueur la connaît) ; une à la fois, sans rafale
+const TIP_MAX = 3;
+function tipCounts() { try { const o = JSON.parse(localStorage.getItem('royale_tips') || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+function tips(P) {
+  if (!P || !P.alive || P.mode !== 'sol' || P.down || S.sim.S.mode === 'exploration' || S.ended || S.t < (S.tipUntil || 0) + 6) return;
+  const inv = P.inv, n = inv.filter(Boolean).length, mats = P.mats.bois + P.mats.pierre + P.mats.metal, T = S.sim.S.t;
+  const heal = inv.findIndex((it) => { const I = it && it.t === 'objet' && ITEMS[it.c]; return I && (I.heal ? P.hp < I.max : I.shield && P.sh < I.maxShield); }) + 1;
+  const st = S.sim.S.storm, outside = !!(st && st.next && st.state === 'fermeture' && Math.hypot(P.x - st.next.x, P.z - st.next.z) > st.next.r);
+  const since = T - (P.hitT != null ? P.hitT : -99), landed = S.landT != null ? S.t - S.landT : -1;
+  const list = [
+    ['coffre', landed >= 0 && landed < 12, `Les coffres brillent en doré et s'entendent de près : ${kb('utiliser')} pour les ouvrir`],
+    ['arme', inv.some((it) => it && it.t === 'arme') && !P.shots, `${kb('tir')} tirer · ${kb('visee')} viser · ${kb('recharger')} recharger`],
+    ['objets', n >= 2, `${kb('objet1')} à ${kb('objet5')} : changer d'objet · ${kb('pioche')} : la pioche`],
+    ['mur', since < 1.5 && mats >= COST, `${kb('mur')} : un mur entre toi et le tireur`],
+    ['soin', heal > 0 && P.hp + P.sh < 70 && since > 4, `Soigne-toi : ${kb('objet' + heal)} puis ${kb('tir')}`],
+    ['tempete', outside, `La tempête se referme : ${kb('carte')} pour la carte, rejoins le cercle blanc`],
+    ['recolte', landed > 70 && mats < COST, `Avec la pioche (${kb('pioche')}), frappe arbres, rochers et murs : des matériaux pour construire`],
+    ['sac', n === inv.length, `Sac plein : ${kb('sac')} pour ranger, ${kb('lacher')} pour lâcher l'objet en main`],
+    ['repere', S.sim.S.teams > 1 && landed > 20, `${kb('repere')} : un repère pour ton équipe, là où tu vises`],
+  ];
+  const seen = S.tipSeen || (S.tipSeen = new Set()), counts = tipCounts();
+  const tip = list.find(([id, on]) => on && !seen.has(id) && (counts[id] || 0) < TIP_MAX);
+  if (!tip) return;
+  seen.add(tip[0]); counts[tip[0]] = (counts[tip[0]] || 0) + 1;
+  try { localStorage.setItem('royale_tips', JSON.stringify(counts)); } catch (e) { /* pas de stockage */ }
+  S.hud.tip(tip[2], 6); S.tipUntil = S.t + 6;
+}
+
 // ------------------------------------------------------------------ interactions affichées sous le viseur
 function showPrompt() {
   const P = me();
-  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', 'Espace'); return; }
-  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le planeur', '', '', 'Espace'); return; }
-  if (!P || !P.alive || P.mode !== 'sol') { S.hud.prompt(''); return; }
+  if (P && P.alive && P.mode === 'ballon') { S.hud.prompt('Sauter', '', '', kl('saut')); return; }
+  if (P && P.alive && P.mode === 'chute') { S.hud.prompt('Ouvrir le deltaplane', '', '', kl('saut')); return; }
+  if (!P || !P.alive || P.mode !== 'sol' || P.down) { S.hud.prompt(''); return; }
+  if (P.revive) { S.hud.prompt('Ne bouge pas, tu relèves', (S.sim.player(P.revive.id) || {}).name || '', '#4ade80', '…'); return; }
   const tg = S.sim.target(P);
   if (!tg) { S.hud.prompt(''); return; }
+  if (tg.kind === 'releve') { S.hud.prompt('Relever', tg.o.name, '#4ade80'); return; }
   if (tg.kind === 'porte') S.hud.prompt((tg.o.open ? 'Fermer' : 'Ouvrir') + (tg.o.kind === 'portail' ? ' le portail' : ' la porte'));
   else if (tg.kind === 'coffre') S.hud.prompt(tg.o.kind === 'coffre' ? 'Ouvrir le coffre' : 'Ouvrir la caisse de munitions');
+  else if (tg.kind === 'largage') S.hud.prompt('Ouvrir le largage', 'butin épique', '#b77dff');
   else {
     const it = tg.o.it, full = P.inv.every(Boolean) && !(it.t === 'objet' && P.inv.some((q) => q && q.t === 'objet' && q.c === it.c));
-    S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
+    // la même arme en mieux : elle remplacera l'ancienne
+    const old = it.t === 'arme' ? P.inv.filter((q) => q && q.t === 'arme' && q.w === it.w && q.r < it.r).sort((a, b) => a.r - b.r)[0] : null;
+    if (old) S.hud.prompt('Améliorer ton arme', itemLabel(it), RARITY[it.r].color);
+    else S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
   }
 }
 
 // ------------------------------------------------------------------ écrans
 const icon = (n) => `<img class="ic" src="img/icons/${n}.png" alt="">`;
 function lobbyList() {
-  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, 30) - hs.length);
+  const hs = humans(), bots = Math.max(0, clamp(S.settings.places, 2, MAX_PLACES) - hs.length);
   const rows = hs.map((p) => {
     const ready = !H.embedded || p.id === S.me || H.readyMap[p.id] === 'royale';
     return `<span class="${ready ? '' : 'wait'}"><i style="--c:${esc(p.color || '#ff4b2b')}"></i>${esc(p.name)}${p.id === S.me ? ' <em>toi</em>' : ready ? '' : ' <em>charge…</em>'}</span>`;
   }).join('');
-  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${LEVEL_LABEL[S.settings.level] || ''}</span>` : ''}</div>`;
+  let lvl = LEVEL_LABEL[S.settings.level] || '';
+  if (S.settings.level === 'auto') {
+    const mix = botMix(roomSkill()), parts = [['facile', 'faciles'], ['normal', 'normaux'], ['difficile', 'coriaces']].map(([k, l]) => [Math.round(bots * mix[k]), l]).filter(([v]) => v > 0);
+    lvl = `au niveau auto : ${parts.map(([v, l]) => `${v} ${l}`).join(', ')}`;
+  }
+  return `<div class="squad">${rows}${S.settings.mode !== 'exploration' && bots ? `<span class="bots"><i></i>${bots} bots ${lvl}</span>` : ''}</div>`;
 }
-const KEYS = `<div class="keylist"><span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</span><span><kbd>Souris</kbd> regarder · <kbd>Clic</kbd> tirer · <kbd>Clic droit</kbd> viser</span>
-  <span><kbd>Espace</kbd> sauter, ouvrir le planeur</span><span><kbd>Maj</kbd> sprinter · <kbd>Ctrl</kbd> s'accroupir</span>
-  <span><kbd>1</kbd>…<kbd>5</kbd> ou molette : objets · <kbd>X</kbd> pioche</span><span><kbd>E</kbd> ouvrir, ramasser · <kbd>R</kbd> recharger · <kbd>G</kbd> lâcher</span>
-  <span><kbd>Tab</kbd> sac (ranger ses objets) · <kbd>M</kbd> carte</span><span><kbd>F</kbd> mur · <kbd>V</kbd> sol · <kbd>C</kbd> escalier · <kbd>T</kbd> matériau</span></div>`;
+// équipes (duos, trios) : chacun clique sur une équipe ; les places libres sont prises par des bots coéquipiers
+function teamPicker() {
+  const size = S.settings.teams;
+  if (S.settings.mode === 'exploration' || size <= 1) return '';
+  const hs = humans(), label = TEAM_LABEL[size].toLowerCase(), s = size > 2 ? 's' : '';
+  if (hs.length <= 1) return `<h2>Ton équipe</h2><p class="hint">Tu joues en ${label} avec ${size - 1} bot${s} coéquipier${s} : ils sautent avec toi, te suivent et te relèvent.</p>`;
+  const K = Math.min(hs.length, Math.ceil(clamp(S.settings.places, 2, MAX_PLACES) / size)), mine = S.picks.get(S.me);
+  const cards = Array.from({ length: K }, (_, k) => {
+    const mem = hs.filter((h) => S.picks.get(h.id) === k), full = mem.length >= size && mine !== k;
+    return `<button class="teamc${mine === k ? ' on' : ''}" data-team="${k}" ${full ? 'disabled' : ''}><b>Équipe ${k + 1}</b>${mem.map((h) => `<span><i style="--c:${esc(h.color || '#888')}"></i>${esc(h.name)}${h.id === S.me ? ' <em>toi</em>' : ''}</span>`).join('')}${mem.length < size ? `<span class="free">${size - mem.length} place${size - mem.length > 1 ? 's' : ''} : bots si personne</span>` : ''}</button>`;
+  }).join('');
+  const loose = hs.filter((h) => { const k = S.picks.get(h.id); return !(Number.isInteger(k) && k >= 0 && k < K); });
+  return `<h2>Ton équipe · ${TEAM_LABEL[size]}</h2><div class="teams">${cards}</div><p class="hint">${loose.length ? `Pas encore choisi : ${loose.map((h) => esc(h.name)).join(', ')} (réparti${loose.length > 1 ? 's' : ''} au lancement). ` : ''}Les places libres sont prises par des bots coéquipiers.</p>`;
+}
+// un choix d'équipe a changé : on rafraîchit l'écran d'accueil s'il est affiché
+// ------------------------------------------------------------------ repères d'équipe
+// ce que vise le réticule : un ennemi près du rayon (avant le premier obstacle), sinon, au point visé, un largage, le
+// butin le plus rare, un coffre fermé, ou simplement l'endroit (« Ici » : depuis la montgolfière, là où l'on va se poser)
+function aimPing() {
+  const P = me();
+  if (!P || !P.alive) return null;
+  const c = S.cam, cp = Math.cos(S.pitch), d = [Math.sin(S.yaw) * cp, Math.sin(S.pitch), Math.cos(S.yaw) * cp];
+  const hit = S.world.raycast(c.x, c.y, c.z, d[0], d[1], d[2], 400), L = hit.t < 400 ? hit.t : null;
+  let foe = null, fd = Infinity;
+  for (const Q of S.sim.S.players.values()) {
+    if (Q === P || !Q.alive || Q.mode === 'ballon' || S.sim.mates(P, Q)) continue;
+    const ox = Q.x - c.x, oy = Q.y + 1 - c.y, oz = Q.z - c.z, t = ox * d[0] + oy * d[1] + oz * d[2];
+    if (t < 0 || t > 400 || (L != null && t > L + 1)) continue;
+    const off = Math.hypot(ox - d[0] * t, oy - d[1] * t, oz - d[2] * t);
+    if (off < Math.max(1.3, t * 0.025) && t < fd) { fd = t; foe = Q; }
+  }
+  if (foe) return { kind: 'ennemi', x: foe.x, y: foe.y + 1.3, z: foe.z, target: foe.id };
+  if (L == null) return null;
+  const x = c.x + d[0] * L, y = c.y + d[1] * L, z = c.z + d[2] * L, SS = S.sim.S;
+  for (const dr of (SS.drops || new Map()).values()) if (!dr.open && Math.hypot(dr.x - x, dr.z - z) < 5) return { kind: 'largage', x: dr.x, y: dr.gy + 1.6, z: dr.z, what: 'Largage' };
+  let g = null;
+  for (const it of SS.items.values()) if ((it.it.t === 'arme' || it.it.t === 'objet') && Math.hypot(it.x - x, it.z - z) < 2.5 && Math.abs(it.y - y) < 2.5 && (!g || it.it.r > g.it.r)) g = it;
+  if (g) return { kind: 'butin', x: g.x, y: g.y + 0.9, z: g.z, what: itemLabel(g.it) };
+  for (const ch of SS.chests.values()) if (!ch.open && Math.hypot(ch.x - x, ch.z - z) < 3 && Math.abs(ch.y - y) < 2.5) return { kind: 'butin', x: ch.x, y: ch.y + 1.1, z: ch.z, what: ch.kind === 'coffre' ? 'Coffre' : 'Caisse de munitions' };
+  return { kind: 'ici', x, y: y + 0.3, z };
+}
+function sendPing() {
+  const pg = aimPing();
+  if (!pg) return;
+  if (S.role === 'guest') H.send('host', { t: 'repere', ...pg });
+  else S.sim.ping(me(), pg.kind, pg.x, pg.y, pg.z, pg.target, pg.what);
+}
+// repères visibles par le joueur suivi : les siens et (en équipe) ceux de ses coéquipiers, encore frais
+const PING_LABEL = { ici: 'Ici', ennemi: 'Ennemi', butin: 'Butin', largage: 'Largage' };
+function pingsOf(F, fp, view) {
+  const SS = S.sim.S, out = [];
+  const camYaw = view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw;
+  for (const pg of SS.pings.values()) {
+    const age = SS.t - pg.t, Q = SS.players.get(pg.p);
+    if (age > PING_T || !Q || !(pg.p === F.id || (SS.teams > 1 && pg.team === F.team))) continue;
+    const color = pg.kind === 'ennemi' ? '#ff5a4a' : pg.kind === 'largage' ? '#b77dff' : pg.kind === 'butin' ? '#ffc531' : Q.color || '#ffd23f';
+    const dist = Math.round(Math.hypot(pg.x - fp.x, pg.z - fp.z));
+    out.push({ key: pg.p, x: pg.x, y: pg.y, z: pg.z, color, label: pg.what || PING_LABEL[pg.kind] || 'Ici',
+      sub: `${pg.p === F.id ? '' : Q.name + ' · '}${dist} m`, fade: Math.min(1, (PING_T - age) / 2),
+      rel: Math.atan2(pg.x - view.pos.x, pg.z - view.pos.z) - camYaw });
+  }
+  return out;
+}
+// historique des parties de ce navigateur (niveau « Auto ») ; niveau moyen des joueurs du salon
+function loadHist() { try { const h = JSON.parse(localStorage.getItem('royale_hist') || '[]'); return Array.isArray(h) ? h : []; } catch (e) { return []; } }
+function saveHist(r) {
+  const h = [r, ...loadHist()].slice(0, HIST_MAX);
+  try { localStorage.setItem('royale_hist', JSON.stringify(h)); } catch (e) { /* pas de stockage */ }
+  S.mySkill = skillOf(h);
+  if (H.embedded && S.role === 'guest') H.send('host', { t: 'skill', s: S.mySkill.s });
+}
+function roomSkill() {
+  const hs = humans();
+  const v = hs.map((h) => (h.id === S.me ? S.mySkill.s : S.skills.has(h.id) ? S.skills.get(h.id) : 0.5));
+  return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
+}
+function refreshLobby() { if (!S.sim && (S.screen === 'start' || S.screen === 'attente')) showScreen(S.screen, S.screenData); }
+// liste des commandes (écran d'accueil, pause), avec les touches choisies par le joueur
+function keysHtml() {
+  const ks = (a) => S.keys.labels(a).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
+  if (S.keys.device === 'pad') {
+    return `<div class="keylist"><span><kbd>Stick gauche</kbd> se déplacer · <kbd>Stick droit</kbd> regarder</span><span>${kb('tir')} tirer · ${kb('visee')} viser (aide à la visée légère)</span>
+  <span>${kb('saut')} sauter, ouvrir le deltaplane</span><span>${kb('accroupi')} s'accroupir · ${kb('sprint')} sprinter (un appui suffit)</span>
+  <span>${kb('prec')} ${kb('suiv')} objets · ${kb('utiliser')} ouvrir, ramasser · ${kb('recharger')} recharger</span><span>${kb('sac')} sac · ${kb('carte')} carte · <kbd>${esc(S.keys.label('Pad9'))}</kbd> pause · ${ks('repere')} repère</span>
+  <span>${kb('mur')} mur · ${kb('sol')} sol · ${kb('escalier')} escalier · ${kb('materiau')} matériau</span></div>
+  <p class="hint">Tous les boutons se changent dans ⚙️ Réglages. Croix (ou stick gauche) et A pour les menus, B pour revenir.</p>`;
+  }
+  return `<div class="keylist"><span>${ks('repere')} repère pour l'équipe</span><span>${kb('avant')}${kb('gauche')}${kb('arriere')}${kb('droite')} se déplacer</span><span><kbd>Souris</kbd> regarder · ${kb('tir')} tirer · ${kb('visee')} viser</span>
+  <span>${kb('saut')} sauter, ouvrir le deltaplane</span><span>${kb('sprint')} sprinter · ${kb('accroupi')} s'accroupir</span>
+  <span>${kb('objet1')}…${kb('objet5')} ou molette : objets · ${kb('pioche')} pioche</span><span>${kb('utiliser')} ouvrir, ramasser · ${kb('recharger')} recharger · ${kb('lacher')} lâcher</span>
+  <span>${kb('sac')} sac (ranger ses objets) · ${kb('carte')} carte</span><span>${kb('mur')} mur · ${kb('sol')} sol · ${kb('escalier')} escalier · ${kb('materiau')} matériau</span></div>
+  <p class="hint">Toutes les touches se changent dans ⚙️ Réglages.</p>`;
+}
 // modèles 3D sous licence CC BY : l'attribution doit rester visible
-const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0)</p>';
+const CREDITS = '<p class="hint credits">Modèles 3D : Quaternius, Kenney (CC0) · J-Toastie, Zsky, Danni Bittman, Jens Kull, Poly by Google (CC BY 3.0, via poly.pizza) · Textures : Poly Haven (CC0) · Sons : Free Firearm Sound Library, Kenney, SpringySpringo, BMacZero, zer0_sol, Emma_MA (CC0) · Pas : congusbongus, swuing, Eelke, EminYILDIRIM, ceberation (CC BY 3.0)</p>';
 function showScreen(kind, data) {
   const el = $('#screen');
   el.hidden = !kind;
+  S.screen = kind; S.screenData = data;
   if (!kind) return;
+  if (S.input && S.input.padOn) { S.input.padOn = false; S.input.release(); }
   const expl = S.settings.mode === 'exploration';
   const play = (label) => `<button class="btn big" id="go">${label}</button>`;
   const back = `<button class="btn ghost" id="quit">${H.embedded ? 'Retour au salon' : 'Quitter'}</button>`;
-  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris.</p>' : '';
-  const opts = `<div class="opts"><label>Sensibilité <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="${(S.input.sens / 0.0024).toFixed(1)}"></label>
-    <label>Volume <input type="range" id="vol" min="0" max="1" step="0.05" value="${S.sfx.volume}"></label></div>`;
+  const touch = matchMedia('(pointer: coarse)').matches ? '<p class="lead">Pour l\'instant, Island Rush se joue au clavier et à la souris, ou à la manette.</p>' : '';
+  const opts = '<div class="opts"><button class="btn ghost" id="settings" type="button">⚙️ Réglages</button></div>';
   const title = '<h1>Island <span>Rush</span></h1>';
-  const n = clamp(S.settings.places, 2, 30);
+  const n = clamp(S.settings.places, 2, MAX_PLACES);
   const rules = expl
-    ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', 'Portes (E), escaliers jusqu\'aux toits plats, pièces meublées.'], ['flag', 'Voyage', 'Clique sur la carte (M) pour t\'y rendre.']]
-    : [['flag', 'Saute', 'Quitte la montgolfière quand tu veux (Espace), puis plane jusqu\'au sol.'], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
-      ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', 'La pioche (X) récolte bois, pierre et métal ; F, V, C posent murs, sols et escaliers.'],
-      ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+    ? [['compass', 'Explore', 'Une ville, un bourg, des villages, un port et des lieux-dits, sans combat.'], ['structure_house', 'Entre partout', `Portes (${kl('utiliser')}), escaliers jusqu'aux toits plats, pièces meublées.`], ['flag', 'Voyage', `Clique sur la carte (${kl('carte')}) pour t'y rendre.`]]
+    : [['flag', 'Saute', `Quitte la montgolfière quand tu veux (${kl('saut')}), puis plane jusqu'au sol.`], ['pouch', 'Fouille', 'Coffres dorés, caisses de munitions et butin au sol, dans les maisons comme en pleine nature.'],
+      ['hourglass', 'Reste dans le cercle', 'La tempête se referme en sept phases et fait mal dehors.'], ['structure_house', 'Casse et construis', `La pioche (${kl('pioche')}) récolte bois, pierre et métal ; ${kl('mur')}, ${kl('sol')}, ${kl('escalier')} posent murs, sols et escaliers.`],
+      S.settings.teams > 1
+        ? ['crown_a', 'Dernière équipe debout', `${n} joueurs en ${TEAM_LABEL[S.settings.teams].toLowerCase()} : à 0 PV, on tombe à terre et un coéquipier relève (${kl('utiliser')}, 5 s sans bouger).`]
+        : ['crown_a', 'Dernier debout', `${n} joueurs sur l'île : le dernier en vie gagne.`]];
+  // son personnage et sa couleur
+  const col = S.look.color || (S.meInfo && S.meInfo.color) || PALETTE[0];
+  if (!S.portraits || S.portraits.col !== col) S.portraits = { col, img: renderPortraits(S.scene.kit, col) };
+  const lookHtml = LOOKS.length > 1 && S.portraits.img.soldat ? `<h2>Ton personnage</h2><div class="looks">${LOOKS.map((k) => `<button class="look${k === S.look.char ? ' on' : ''}" data-char="${k}"><img src="${S.portraits.img[k] || ''}" alt=""><span>${CHARACTERS[k].label}</span></button>`).join('')}</div>
+    <div class="swatches">${PALETTE.map((c) => `<button class="sw${c === col ? ' on' : ''}" data-color="${c}" style="--c:${c}" aria-label="Couleur ${c}"></button>`).join('')}</div>` : '';
   const rulesHtml = `<div class="rules">${rules.map(([i, b, t]) => `<div>${icon(i)}<span><b>${b}</b>${t}</span></div>`).join('')}</div>`;
   let html;
   if (kind === 'start') {
     html = `<p class="eyebrow">${expl ? 'Exploration' : 'Battle royale'}</p>${title}<p class="lead">${expl ? 'Promène-toi sur l\'île, entre dans chaque bâtiment.' : 'Saute, fouille, survis à la tempête : sois le dernier debout.'}</p>
-      ${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2>${KEYS}${opts}
+      ${lookHtml}${teamPicker()}${rulesHtml}${H.embedded ? lobbyList() : ''}${touch}<h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}
       <div class="row end">${back}${play(expl ? 'Explorer l\'île' : net() ? 'Lancer la partie' : 'Monter à bord')}</div>${CREDITS}`;
   } else if (kind === 'attente') {
-    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}</div>`;
+    html = `<p class="eyebrow">Battle royale</p>${title}<p class="lead"><span class="wait"><i></i>L'hôte va lancer la partie</span></p>${lookHtml}${teamPicker()}${lobbyList()}${rulesHtml}${touch}<h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}</div>`;
   } else if (kind === 'rejoint') {
-    html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? 'Tu es dans la montgolfière : saute quand tu veux (Espace).' : 'La partie a commencé.'}</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Jouer')}</div>`;
+    html = `<p class="eyebrow">C'est parti</p>${title}<p class="lead">${S.sim.S.phase === 'vol' ? `Tu es dans la montgolfière : saute quand tu veux (${kl('saut')}).` : 'La partie a commencé.'}</p><h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}${play('Jouer')}</div>`;
   } else if (kind === 'spectateur') {
-    html = `<p class="eyebrow">Partie en cours</p>${title}<p class="lead">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (<kbd>Espace</kbd> pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row end">${back}${play('Regarder')}</div>`;
+    html = `<p class="eyebrow">Partie en cours</p>${title}<p class="lead">Tu es arrivé après le départ de la montgolfière : tu regardes les autres jouer (${kb('saut')} pour changer de joueur). Tu joueras à la prochaine partie.</p>${opts}<div class="row end">${back}${play('Regarder')}</div>`;
   } else if (kind === 'perdu') {
     html = `<p class="eyebrow">Liaison perdue</p>${title}<p class="lead">L'hôte ne répond plus.</p><div class="row end">${back}</div>`;
   } else if (kind === 'pause') {
-    html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2>${KEYS}${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
+    html = `<p class="eyebrow">Pause</p><h1>En pause</h1><p class="lead">La partie continue pendant la pause.</p><h2>Commandes</h2><div id="keylist">${keysHtml()}</div>${opts}<div class="row end">${back}${play('Reprendre')}</div>`;
   } else {
     const { res, mine, winner } = data;
-    const won = winner === S.me;
-    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : ''}"><td>${r.place}</td><td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
-    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${res.length}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
-    const tags = mine ? `<div class="tags"><span>${icon('skull')}<b>${mine.kills}</b> élimination${mine.kills > 1 ? 's' : ''}</span><span>${icon('target')}<b>${mine.dealt}</b> dégâts</span><span>${icon('hourglass')}<b>${fmtTime((Date.now() - S.startedAt) / 1000)}</b></span></div>` : '';
-    const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '';
-    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? 'Dernier <span>debout</span> !' : 'Island <span>Rush</span>'}</h1>${head}${tags}
-      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th><th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
+    const won = iWon(winner), tm = S.sim.S.teams > 1, nTeams = tm ? new Set(res.map((r) => r.team)).size : res.length;
+    const rows = res.map((r) => `<tr class="${r.id === S.me ? 'me' : mine && tm && r.team === mine.team ? 'mate' : ''}"><td>${r.place}</td>${tm ? `<td>${r.team + 1}</td>` : ''}<td><i style="background:${esc(r.color || '#888')}"></i>${esc(r.name)}${r.bot ? ' 🤖' : ''}</td><td>${r.kills}</td><td>${r.dealt}</td></tr>`).join('');
+    const head = mine ? `<div class="big-num">${won ? 'Victoire' : `${mine.place}<small>e sur ${nTeams}${tm ? ' équipes' : ''}</small>`}</div>` : `<div class="big-num">${winner != null ? esc(nameOf(winner)) : 'Fin'}<small> gagne</small></div>`;
+    const tags = mine ? bilanHtml(mine, res) : '';
+    // l'hôte (ou le joueur seul) garde le journal des parties : la page de statistiques le lit
+    const wait = S.role === 'guest' ? '<p class="hint">L\'hôte peut relancer une partie.</p>' : '<p class="hint">Cette partie rejoint ton <a href="stats.html" target="_blank" rel="noopener">journal des parties</a> (statistiques, carte des atterrissages et des éliminations).</p>';
+    html = `<p class="eyebrow">Fin de partie</p><h1>${won ? (tm ? 'Dernière équipe <span>debout</span> !' : 'Dernier <span>debout</span> !') : 'Island <span>Rush</span>'}</h1>${head}${tags}
+      <h2>Classement</h2><div class="resbox"><table class="res"><thead><tr><th>#</th>${tm ? '<th>Éq.</th>' : ''}<th>Joueur</th><th>Élim.</th><th>Dégâts</th></tr></thead><tbody>${rows}</tbody></table></div>${wait}
       <div class="row end">${back}${S.role !== 'guest' ? '<button class="btn big" id="again">Rejouer</button>' : ''}</div>`;
     el.querySelector('.panel').classList.toggle('win', won);
   }
   el.querySelector('.panel').innerHTML = html;
   const go = $('#go'); if (go) go.onclick = () => { S.sfx.unlock(); if (kind === 'start') startMatch(); else S.input.lock(); };
-  // rejouer : on repart d'une île neuve (la page se recharge ; les invités suivent quand la partie part)
-  const again = $('#again'); if (again) again.onclick = () => location.reload();
+  el.querySelectorAll('.look').forEach((b) => { b.onclick = () => { setLook({ ...S.look, char: b.dataset.char }); showScreen(kind, data); }; });
+  el.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { setLook({ ...S.look, color: b.dataset.color }); showScreen(kind, data); }; });
+  el.querySelectorAll('.teamc').forEach((b) => { b.onclick = () => { const k = +b.dataset.team; S.picks.set(S.me, k); if (H.embedded) H.send('all', { t: 'team', k }); showScreen(kind, data); }; });
+  // rejouer : tout de suite, sur l'île remise à neuf (les invités suivent quand la partie part)
+  const again = $('#again'); if (again) again.onclick = () => { S.sfx.unlock(); resetMatch(); startMatch(); };
   $('#quit').onclick = quit;
-  const sens = $('#sens'); if (sens) sens.oninput = () => { S.input.sens = 0.0024 * +sens.value; saveOpts(); };
-  const vol = $('#vol'); if (vol) vol.oninput = () => { S.sfx.setVolume(+vol.value); saveOpts(); };
+  const set = $('#settings'); if (set) DDVolume.panel(set, SETTINGS);
+  if (S.keys && S.keys.device === 'pad') padFocusEl($('#go') || $('#again') || $('#quit'));
 }
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-function saveOpts() { try { localStorage.setItem('royale_opts', JSON.stringify({ sens: S.input.sens, vol: S.sfx.volume })); } catch (e) { /* pas de stockage */ } }
-function loadOpts() {
-  try { const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'); if (o.sens) S.input.sens = clamp(+o.sens, 0.0005, 0.008); if (o.vol != null) S.sfx.setVolume(clamp(+o.vol, 0, 1)); } catch (e) { /* pas de stockage */ }
+// bilan personnel : éliminations, dégâts, précision, distance, temps de survie, relevés, et qui nous a éliminés
+function bilanHtml(r, res) {
+  const time = r.out != null ? r.out : S.sim ? S.sim.S.t : (Date.now() - S.startedAt) / 1000;
+  const acc = r.shots ? Math.round(r.hits / r.shots * 100) + ' %' : '–';
+  const killer = r.by != null && res.find((q) => q.id === r.by);
+  const cards = [
+    ['skull', r.kills, `élimination${r.kills > 1 ? 's' : ''}`], ['sword', r.dealt, 'dégâts'], ['target', acc, `précision (${r.hits || 0}/${r.shots || 0} tirs)`],
+    ['hourglass', fmtTime(time), r.out != null ? 'de survie' : 'jusqu\'au bout'], ['compass', r.dist >= 1000 ? (r.dist / 1000).toFixed(1).replace('.', ',') + ' km' : (r.dist || 0) + ' m', 'parcourus'],
+  ];
+  if (S.sim && S.sim.S.teams > 1) cards.push(['hand', r.revives || 0, `coéquipier${r.revives > 1 ? 's' : ''} relevé${r.revives > 1 ? 's' : ''}`]);
+  return `<div class="bilan">${cards.map(([i, v, l]) => `<span>${icon(i)}<b>${v}</b><small>${l}</small></span>`).join('')}</div>`
+    + (killer ? `<p class="hint">Éliminé par <b>${esc(killer.name)}</b>${killer.bot ? ' 🤖' : ''} ${CAUSES[r.how] || ''} · ${killer.kills} élimination${killer.kills > 1 ? 's' : ''} dans la partie</p>` : r.how ? `<p class="hint">Éliminé ${CAUSES[r.how] || ''}</p>` : '');
 }
+// panneau Réglages (commun à tous les jeux) : la musique (montgolfière et descente) et les effets, la sensibilité, puis
+// les touches (deux par action, retenues dans ce navigateur)
+const SETTINGS = {
+  kinds: ['music', 'fx'], accent: '#3d9fd9',
+  sections: [{ title: 'Jeu', items: [{ label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +(S.input.sens / 0.0024).toFixed(1),
+    set: (v) => { S.input.sens = 0.0024 * v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) }] },
+  { title: 'Touches', hint: 'Clique sur une case puis appuie sur la touche voulue, ou clique sur la case avec le bouton de souris voulu. Suppr efface la case, Échap annule.',
+    items: [{ bind: {
+      rows: () => S.keys.ACTIONS.map(([id, label]) => [id, label, S.keys.binds[id].map((b) => (b ? S.keys.label(b) : ''))]),
+      set: (id, slot, ev) => { const lost = S.keys.set(id, slot, ev); return lost.length ? `Cette touche servait aussi à : ${lost.join(', ')}. Elle n'y sert plus.` : ''; },
+      clear: (id, slot) => S.keys.clear(id, slot),
+      reset: () => S.keys.reset(),
+    } }] },
+  { title: 'Manette', hint: 'Choisis une case (clic, ou croix puis A), puis appuie sur le bouton voulu de la manette. Suppr efface la case, Échap annule. Les sticks et Menu (pause) ne se changent pas.',
+    items: [
+      { label: 'Sensibilité', range: [0.4, 2.2, 0.1], get: () => +S.input.padSens.toFixed(1), set: (v) => { S.input.padSens = v; saveOpts(); }, format: (v) => '× ' + (+v).toFixed(1) },
+      { label: 'Aide à la visée', get: () => S.input.assist, set: (v) => { S.input.assist = !!v; saveOpts(); } },
+      { label: 'Inverser haut et bas', get: () => S.input.padInvert, set: (v) => { S.input.padInvert = !!v; saveOpts(); } },
+      { bind: {
+        pad: true,
+        rows: () => S.keys.padRows(),
+        set: (id, slot, ev) => { const lost = S.keys.padSet(id, slot, ev); return lost.length ? `Ce bouton servait aussi à : ${lost.join(', ')}. Il n'y sert plus.` : ''; },
+        clear: (id, slot) => S.keys.padClear(id, slot),
+        reset: () => S.keys.padReset(),
+      } }] }],
+};
+function saveOpts() {
+  const I = S.input;
+  try { localStorage.setItem('royale_opts', JSON.stringify({ sens: I.sens, padSens: I.padSens, assist: I.assist, padInvert: I.padInvert })); } catch (e) { /* pas de stockage */ }
+}
+function loadOpts() {
+  // l'ancien curseur « Volume » (0,8 par défaut) devient le point de départ du curseur « Effets »
+  try {
+    const o = JSON.parse(localStorage.getItem('royale_opts') || '{}'), I = S.input;
+    if (o.sens) I.sens = clamp(+o.sens, 0.0005, 0.008);
+    if (o.padSens) I.padSens = clamp(+o.padSens, 0.4, 2.2);
+    if (o.assist != null) I.assist = !!o.assist;
+    if (o.padInvert != null) I.padInvert = !!o.padInvert;
+    if (o.vol != null) DDVolume.migrate('fx', clamp(+o.vol, 0, 1) / 0.8);
+  } catch (e) { /* pas de stockage */ }
+}
+// partie quittée avant la fin : elle entre au journal comme abandonnée
+function abandon() { if (S.journal && S.journal.on && S.sim) S.journal.end(S.sim, S.sim.results(), 'abandon'); }
+addEventListener('pagehide', abandon);
 function quit() {
+  abandon();
   S.running = false;
   try { S.input && S.input.dispose(); S.actors && S.actors.dispose(); S.fx && S.fx.dispose(); S.scene && S.scene.dispose(); S.sfx && S.sfx.dispose(); } catch (e) { console.error(e); }
   if (H.embedded) H.exit(); else location.reload();

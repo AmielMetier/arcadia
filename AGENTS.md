@@ -8,11 +8,12 @@ jeux multijoueurs dans le navigateur — Duo Drift, DavidSimulator, Tête de Cal
 Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), qui lit `CHANGELOG.md`.
 **Toute modification visible par les joueurs doit donc :**
 
-1. **Monter la version** dans `hub/hub.js` : `const VERSION = '2.15';` → `'2.16'` (on reste en 2.x, +1 sur le second nombre).
+1. **Monter la version** dans `hub/hub.js` : `const VERSION = '3.0';` → `'3.1'` (le Hub est en 3.x depuis le 27 octobre 2026,
+   +1 sur le second nombre).
 2. **Ajouter une entrée en haut de `CHANGELOG.md`**, juste sous le titre, au format :
 
    ```markdown
-   ## 2.16 — 22 octobre 2026
+   ## 3.1 — 28 octobre 2026
    - **Nom du jeu** — ce qui change, écrit pour les joueurs (pas pour les développeurs).
      - détail éventuel (sous-liste indentée de deux espaces)
    ```
@@ -20,7 +21,7 @@ Les joueurs voient les nouveautés dans le Hub (bouton « ✨ Nouveautés »), q
    - En français, phrases courtes, du point de vue du joueur (« Les échanges se proposent pendant son tour »),
      pas de noms de fichiers ni de fonctions.
    - Une ligne par nouveauté ou correction ; regrouper ce qui concerne le même jeu.
-   - La date est celle du jour, en toutes lettres (`22 octobre 2026`).
+   - La date est celle du jour, en toutes lettres (`28 octobre 2026`).
 3. **Faire les deux dans le même commit** que le changement (ou le même push).
 
 Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'action GitHub
@@ -41,6 +42,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Tests à lancer avant de pousser quand on touche à DavidSimulator, Tête de Calcul, Fil Rouge, Outbreak, Convoy Storm ou Birdie Party :
   `node tools/test-rules.mjs`, `node tools/check-board.mjs`, `node tools/test-calcul.mjs`, `node tools/test-filrouge.mjs`,
   `node tools/test-outbreak.mjs`, `node tools/test-convoy.mjs`, `node tools/test-golf.mjs`.
+- Poké Duel, tournoi (`pokemon/engine/tournament.js`, `pokemon/net/`) : `node tools/test-pokemon-tournament.mjs` (draft, tableau, exemptions,
+  forfaits, finale en 2 manches) et `node tools/test-pokemon-net.mjs` (tournoi joué en réseau simulé, départ d'un joueur, départ de l'hôte).
 - Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
 - Odyssée (aventure solo façon DS, `odyssee/`) : `node tools/test-odyssee.mjs` joue 600 combats aléatoires et vérifie que toute la région
   (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage : à lancer quand on touche
@@ -51,6 +54,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   une partie (butin, combat, construction), les copies des invités et le relais d'hôte, la prédiction : à lancer quand on touche
   au moteur (`royale/engine/`). `node tools/bench-royale.mjs [joueurs] [niveau] [graine] [minutes]` fait jouer une partie entière
   entre bots (`WATCH=bot3` suit un bot) : coût d'un pas, éliminations, bots coincés, durée de la partie.
+  Parties jouées : l'hôte tient un journal local (`royale/journal.js`), lu par `royale/stats.html` ; guide des soirées de
+  test dans `docs/ISLAND-RUSH-TESTS.md`.
 - Réseau (`shared/net.js`, `shared/room.js`, `server/`) : `node tools/test-relay.mjs` et `node tools/test-net.mjs`
   (prérequis : `cd server && npm install`). Le serveur relais doit être redéployé quand `server/server.js` change.
 - Bastion Clash : le moteur (`bastion/engine/`, sans DOM) est testé par `node tools/test-bastion.mjs` ;

@@ -20,8 +20,8 @@ const BIO_BPM = { foret: -8, ville: 6, lac: -4, col: 4, usine: 10, toundra: -10 
 
 export class Sfx {
   constructor() {
-    this.ctx = null; this.muted = false;
-    try { this.muted = localStorage.getItem('convoy_mute') === '1'; } catch (e) {}
+    this.ctx = null;
+    DDVolume.legacy('convoy_mute'); // l'ancien bouton « couper le son » : les deux curseurs à 0
     this.chugT = 0;
     this.m = { mode: 'off', next: 0, step: 0, danger: 0, won: false };
   }
@@ -29,8 +29,8 @@ export class Sfx {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.7; this.master.connect(c.destination);
-    // réglages du joueur (panneau Volume) : la musique d'un côté, les bruitages et le vent de l'autre
+    this.master = c.createGain(); this.master.gain.value = 0.7; this.master.connect(c.destination);
+    // réglages du joueur (panneau Réglages, à 0 : coupé) : la musique d'un côté, les bruitages et le vent de l'autre
     this.fx = DDVolume.gain(c, 'fx'); this.fx.connect(this.master);
     this.mus = DDVolume.gain(c, 'music'); this.mus.connect(this.master);
     // un peu d'écho pour la musique et les sons lointains (loups, cloche)
@@ -51,10 +51,6 @@ export class Sfx {
     src.connect(this.windF).connect(this.windG).connect(this.fx); src.start();
     this.windSrc = src;
     this.m.next = c.currentTime + 0.2;
-  }
-  setMuted(m) {
-    this.muted = m; try { localStorage.setItem('convoy_mute', m ? '1' : '0'); } catch (e) {}
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.7, this.ctx.currentTime, 0.05);
   }
   // à chaque image : vent, rythme de la locomotive, musique (state = { mode: run|station|win|off, danger 0..1 })
   update(dt, speed, storm = 1, state = { mode: 'off' }) {
@@ -164,7 +160,7 @@ export class Sfx {
     o.start(t); lfo.start(t); o.stop(t + 2.2); lfo.stop(t + 2.2);
   }
   play(name) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || !(DDVolume.get('fx') > 0)) return;
     switch (name) {
       case 'jump': this.tone(300, 0.12, 0.08, 'triangle', 520); break;
       case 'land': this.burst(0.12, 900, 0.18, 'lowpass'); break;

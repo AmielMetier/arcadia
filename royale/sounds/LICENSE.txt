@@ -1,0 +1,25 @@
+Sons d'Island Rush — découpés, normalisés et convertis en MP3 mono (la musique en stéréo).
+Tous libres : domaine public (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/) sauf les pas marqués CC-BY.
+
+Domaine public (CC0), crédits non obligatoires mais mérités :
+  - The Free Firearm Sound Library (freefirearmsfx.com, publiée sur OpenGameArt) : tir-*, loin-*, pompe-arme, culasse-sniper
+    https://opengameart.org/content/the-free-firearm-sound-library
+    (tir-fusil-*, tir-smg-*, loin-fusil et loin-smg étaient des rafales : on n'en garde qu'un tir, raccordé en fondu à
+    la fin naturelle du dernier tir de la rafale)
+  - SpringySpringo — « gun reload sounds » : chargeur-sort, armement, pistolet-sort, pistolet-culasse
+    https://opengameart.org/content/gun-reload-sounds
+  - Brian MacIntosh (BMacZero) — « gun reload sound effects » : chargeur-entre, chargeur-clic, balle-sniper
+    https://opengameart.org/content/gun-reload-sound-effects
+  - zer0_sol — « Shotgun Reload Sound effects » : cartouche, pompe-rack
+    https://opengameart.org/content/shotgun-reload-sound-effects
+  - Kenney (www.kenney.nl) — Impact Sounds : impact-*, coup-*, bouclier-casse, pas-herbe, pas-beton, pas-bois, pas-neige ;
+    RPG Audio : tissu-*, degaine-*, ramasse-cuir, ceinture, porte-*, grince-*, pieces ; Sci-Fi Sounds : boum-*, roquette-part
+  - Emma_MA — « Determined Pursuit (epic orchestra loop) » : musique-saut
+    https://opengameart.org/content/determined-pursuit-epic-orchestra-loop
+  - Ali_6868 — « Gravel Footsteps » (Freesound), via le pack de congusbongus : pas-gravier
+
+Creative Commons Attribution 3.0 (CC-BY 3.0, https://creativecommons.org/licenses/by/3.0/) :
+  - congusbongus — « Footsteps on different surfaces » (OpenGameArt), https://opengameart.org/content/footsteps-on-different-surfaces
+    pas-metal : d'après « boots on aluminum ladder 01 » d'Eelke (Freesound)
+    pas-eau : d'après « Water Footsteps » d'EminYILDIRIM et « footstep-concrete.wav » de swuing (Freesound)
+    pas-carrelage : d'après « footstep-concrete.wav » de swuing et « Squeaky footstep.wav » de ceberation (Freesound)

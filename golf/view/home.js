@@ -7,7 +7,6 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { COURSES, HOLES } from '../engine/course.js';
 import { esc, loadSetup, saveSetup } from './hud.js';
 import { icon } from './icons.js';
-import { soundPanel } from './sound.js';
 
 const FLY = 16;                       // s de survol par trou
 const SHOWCASE = [11, 9, 4, 21, 25, 16, 14, 27, 2, 18];
@@ -57,13 +56,16 @@ function html(set, mode) {
       ${hub ? `<button class="btn ghost" id="homeQuit">${icon('back')}Retour au salon</button>` : `<button class="btn ghost" id="homeBack">${icon('back')}Écran titre</button>`}
     </section>
     <p class="now" id="homeNow" aria-live="polite"></p>
-    <div class="home-tools"><button class="ico" id="homeSound" aria-label="Son" title="Son (M)">${icon('soundOn')}</button></div>
+    <div class="home-tools"><button class="ico" id="homeSound" aria-label="Réglages" title="Réglages (M : couper le son)">${icon('gear')}</button></div>
     <p class="credit">Musique : « Sunny Side Up », Alex McCulloch (CC0)</p>
   </div>`;
 }
 
 // scene, sfx : moteurs du jeu ; hole(n) : trou n construit ; mode : voir html() ; initial : réglages de départ (ceux
 // du Hub) ; onPlay(réglages) : lancer la partie ; onChange(réglages) : l'hôte a changé un réglage ; onQuit : retour au salon
+// panneau Réglages (commun à tous les jeux) : un petit son pour entendre le niveau des effets
+export const SOUND_SETTINGS = (sfx) => ({ accent: '#5cc425', test: (k) => sfx.ui(k === 'fx' ? 'tick' : 'select'), hint: 'Touche <kbd>M</kbd> : couper ou remettre le son.' });
+
 export function createHome({ root, scene, sfx, hole: holeOf, mode = 'local', initial = null, onPlay, onChange, onQuit }) {
   const set = { ...loadSetup(), ...(initial || {}) };
   if (!COURSES[set.course]) set.course = 'campagne';
@@ -72,7 +74,8 @@ export function createHome({ root, scene, sfx, hole: holeOf, mode = 'local', ini
   let state = mode === 'local' ? 'title' : 'setup', alive = true, cur = null, loading = false, pending = null, t = 0, list = SHOWCASE, idx = 0, path = null;
   // invité : les choix de l'hôte s'affichent, sans qu'on puisse les changer
   if (mode === 'guest') for (const c of $$('.courses,.combos,.opts')) c.inert = true;
-  const snd = soundPanel(sfx, $('#homeSound'));
+  $('#homeSound').addEventListener('pointerdown', () => sfx.unlock());
+  const snd = DDVolume.panel($('#homeSound'), SOUND_SETTINGS(sfx));
 
   // ---------------------------------------------------------------- survol
   // trajectoire : on file au-dessus de l'axe du trou, en décrivant une large courbe, du départ jusqu'au green
@@ -164,7 +167,7 @@ export function createHome({ root, scene, sfx, hole: holeOf, mode = 'local', ini
   }
   function toTitle() { state = 'title'; el.dataset.state = 'title'; sfx.ui('close'); playlist(SHOWCASE); }
   function play() { if (mode === 'guest') return; sfx.unlock(); sfx.ui('confirm'); sfx.music(null); onPlay({ ...set }); }
-  function toggleMute() { sfx.unlock(); sfx.setMuted(!sfx.muted); snd.refresh(); }
+  function toggleMute() { sfx.unlock(); DDVolume.toggle(); }
 
   $('#homeStart').addEventListener('click', toSetup);
   el.addEventListener('pointerdown', (e) => { if (state === 'title' && !e.target.closest('.home-tools')) toSetup(); });
@@ -207,6 +210,6 @@ export function createHome({ root, scene, sfx, hole: holeOf, mode = 'local', ini
       const ul = $('#homeWho'); if (!ul) return;
       ul.innerHTML = players.map((p) => `<li><i style="background:${esc(p.color || '#888')}"></i><b>${esc(p.name)}</b>${p.me ? '<em>toi</em>' : ''}<small>${p.host ? 'hôte' : p.ready ? 'prêt' : 'arrive…'}</small></li>`).join('');
     },
-    dispose() { alive = false; removeEventListener('keydown', onKey); snd.dispose(); root.innerHTML = ''; },
+    dispose() { alive = false; removeEventListener('keydown', onKey); snd.close(); root.innerHTML = ''; },
   };
 }

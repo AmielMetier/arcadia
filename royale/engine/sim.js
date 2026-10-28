@@ -1,13 +1,14 @@
 // Island Rush — la partie. Simulation qui fait autorité (en solo et chez l'hôte) : joueurs et bots, commandes,
 // montgolfière, chute libre et planeur, inventaire de 5 cases, butin au sol, coffres et caisses de munitions,
 // portes, tirs (balles, plombs, roquettes, grenades), soins et boucliers, rechargement, tempête, éliminations,
-// classement. Moteur PUR à pas fixe ; tout ce qui se voit ou s'entend sort en événements (sim.takeEvents()).
+// classement ; en équipes (duos, trios) : pas de tir ami, un joueur à 0 PV tombe « à terre » et un coéquipier peut le
+// relever. Moteur PUR à pas fixe ; tout ce qui se voit ou s'entend sort en événements (sim.takeEvents()).
 // Les bots (engine/ai.js) et la construction (engine/build.js) se branchent par S.hooks.
 import { makeRng, hash } from './rng.js';
 import { CELL } from './buildings.js';
 import { newPlayer, stepPlayer, stepAir, MOVE } from './player.js';
 import { planStorm, planFlight, STORM_TIMES } from './map.js';
-import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, weaponDamage, weapon, item, ammo, mats } from './items.js';
+import { WEAPONS, ITEMS, AMMO, MAT_MAX, rollFloor, rollChest, rollAmmoBox, rollDrop, weaponDamage, weapon, item, ammo, mats, spreadOf, REST } from './items.js';
 
 export const DT = 1 / 60;
 export const HP = 100, SHIELD = 100;
@@ -15,17 +16,33 @@ export const SLOTS = 5;
 export const SHOULDER = 0.9;      // décalage à droite de l'épaule (le rayon de tir part de là, comme celui de la caméra)
 const FLIGHT_H = 165;             // altitude de la montgolfière (m)
 const FLIGHT_SPEED = 24;          // m/s
+const FALL_SAFE = 10;              // m de chute sans dégâts (au-delà, FALL_DMG par mètre)
+const FALL_DMG = 4;
+const PAD_VY = 85;                 // élan d'un tremplin (m/s, freiné par l'air : ≈ 40 m de haut)
+// Coriolis pour les balles du fusil de précision : rotation de la Terre à 46° de latitude (x vers l'est, z vers le
+// nord, y en haut), forcée ×60 pour qu'on la sente sur l'île (≈ 65 cm de dérive à droite à 300 m)
+const OMEGA = (() => { const w = 7.292e-5 * 60, lat = 46 * Math.PI / 180; return [0, w * Math.sin(lat), w * Math.cos(lat)]; })();
 const STORM_START = 30;           // s après le départ de la montgolfière
 const PICK_R = 2.1, CHEST_R = 2.5, AUTO_R = 1.4;
+// équipes : à terre, on rampe (CRAWL × la vitesse) et sa réserve (DOWN_HP) fond en BLEED s ; un coéquipier immobile à
+// moins de REVIVE_R m le relève en REVIVE s (E), avec RAISE_HP points de vie
+export const CRAWL = 0.35, DOWN_HP = 100, BLEED = 30, REVIVE = 5, REVIVE_R = 2.4, RAISE_HP = 30;
+// repères d'équipe : un par joueur, visible PING_T secondes par ses coéquipiers ; sortes : ici, ennemi, butin, largage
+export const PING_T = 12, PING_KINDS = ['ici', 'ennemi', 'butin', 'largage'];
+// largages : au début des quatre premières fermetures de la tempête, une caisse descend en parachute (DROP_H m à
+// DROP_SPEED m/s, ≈ 26 s) quelque part dans le prochain cercle ; posée, elle s'ouvre comme un coffre (engine/items.js)
+export const DROP_H = 110, DROP_SPEED = 4.2, DROP_PHASES = 4;
+export const dropY = (d, t) => d.gy + Math.max(0, DROP_H - (t - d.t0) * DROP_SPEED);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
 const emptyInput = () => ({ mx: 0, mz: 0, yaw: 0, pitch: 0, fire: false, aim: false, sprint: false, crouch: false, jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, sel: 1, build: null, place: 0, rotate: 0, edit: 0, mv: null });
 
-export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', start = null } = {}) {
+export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', start = null, teams = 1 } = {}) {
   const rng = makeRng(hash(seed * 31 + 7));
+  const TEAMS = mode !== 'exploration' && teams > 1;
   const S = {
-    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol',
+    t: 0, mode, seed, phase: mode === 'exploration' ? 'jeu' : 'vol', teams: TEAMS ? teams : 1, winTeam: null, pings: new Map(), drops: new Map(), nextDrop: 1,
     players: new Map(), items: new Map(), nextItem: 1, chests: new Map(), projectiles: [], pads: [], nextProj: 1,
     flight: null, storm: null, order: [], winner: null, events: [], hooks: {}, stormTick: 0,
   };
@@ -50,7 +67,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ joueurs
   function addPlayer(r) {
-    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, bot: !!r.bot, level: r.level || 'normal',
+    const P = { ...newPlayer(0, 0, 0), id: r.id, name: r.name, color: r.color, look: r.look || 'soldat', bot: !!r.bot, level: r.level || 'normal',
+      team: TEAMS && r.team != null ? r.team : null, down: null, revive: null,
+      // bilan de fin : tirs (et ceux qui ont touché), distance au sol, relevés, quand et par qui on a été éliminé
+      shots: 0, hits: 0, dist: 0, revives: 0, outT: null, outBy: null, outHow: null,
       hp: HP, sh: 0, alive: true, inv: [null, null, null, null, null], sel: 0, ammo: Object.fromEntries(Object.keys(AMMO).map((a) => [a, 0])),
       mats: { bois: 0, pierre: 0, metal: 0 }, cd: 0, rl: 0, use: null, bloom: 0, kills: 0, dealt: 0, place: 0, mode: 'sol', safeFall: false,
       inp: emptyInput(), last: { jump: 0, use: 0, reload: 0, shoot: 0, drop: 0, place: 0, rotate: 0, edit: 0, mv: 0 }, hitBy: null, swing: 0 };
@@ -59,6 +79,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   for (const r of roster) addPlayer(r);
   const alive = () => [...S.players.values()].filter((p) => p.alive);
+  // coéquipiers (jamais soi-même) ; équipes encore en lice
+  const mates = (a, b) => TEAMS && a !== b && a.team != null && a.team === b.team;
+  const teamOf = (P) => [...S.players.values()].filter((q) => q === P || mates(P, q));
+  const liveTeams = () => new Set(alive().map((p) => (TEAMS ? p.team : p.id))).size;
 
   // départ : la montgolfière (partie) ou la ville (exploration)
   if (S.phase === 'vol') {
@@ -103,6 +127,12 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (it.t === 'materiaux') { const room = MAT_MAX - P.mats[it.m], n = Math.min(room, it.n); P.mats[it.m] += n; return it.n - n; }
     return it.n;
   }
+  // la case de la même arme en moins bonne rareté (la moins bonne s'il y en a deux), ou −1
+  function upgradeSlot(P, it) {
+    let up = -1;
+    if (it.t === 'arme') P.inv.forEach((s, i) => { if (s && s.t === 'arme' && s.w === it.w && s.r < it.r && (up < 0 || s.r < P.inv[up].r)) up = i; });
+    return up;
+  }
   function pickUp(P, g) {
     const it = g.it;
     if (it.t === 'munitions' || it.t === 'materiaux') {
@@ -119,6 +149,16 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (!it.n) break;
       }
       if (!it.n) { S.items.delete(g.id); ev({ e: 'objet-', id: g.id }); ev({ e: 'ramasse', p: P.id, it: g.it }); return true; }
+    }
+    // la même arme dans une meilleure rareté : elle prend la place de l'ancienne, lâchée à nos pieds
+    const up = upgradeSlot(P, it);
+    if (up >= 0) {
+      const old = P.inv[up];
+      spawnItem(old, P.x + Math.sin(P.yaw) * 0.8, P.y + 0.3, P.z + Math.cos(P.yaw) * 0.8);
+      P.inv[up] = it;
+      S.items.delete(g.id); ev({ e: 'objet-', id: g.id }); ev({ e: 'ramasse', p: P.id, it, was: old.r });
+      if (P.sel - 1 === up) { P.cd = Math.max(P.cd, 0.3); P.rl = 0; P.use = null; }
+      return true;
     }
     let slot = P.inv.findIndex((s) => !s);
     if (slot < 0) {
@@ -157,12 +197,45 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     const r = makeRng(hash(seed * 977 + hash(c.id.charCodeAt(0) * 131 + +c.id.slice(1))));
     const list = c.kind === 'coffre' ? rollChest(r) : rollAmmoBox(r);
     ev({ e: 'coffre', id: c.id, p: P.id });
-    // le butin jaillit devant le coffre
-    list.forEach((it, k) => {
-      const a = (k - (list.length - 1) / 2) * 0.7;
-      const fx = c.fx || 0, fz = c.fz || 1;
-      spawnItem(it, c.x + fx * 1.1 - fz * a, c.y + 0.5, c.z + fz * 1.1 + fx * a);
-    });
+    // le butin jaillit devant le coffre, l'arme d'abord, juste en face (premier de la liste)
+    const spots = lootSpots(c, list.length);
+    list.forEach((it, k) => spawnItem(it, spots[k][0], c.y + 0.5, spots[k][1]));
+  }
+  // places du butin devant un coffre : de face, puis sur les côtés, puis un rang plus loin ; une place compte si on
+  // l'atteint depuis le coffre sans mur ni meuble entre les deux et qu'elle est à son niveau (pas sur un meuble, pas
+  // dans la pièce d'à côté). Lancé en éventail fixe, un objet sur quatre — souvent l'arme, au bout — passait derrière.
+  const LOOT_SLOTS = [[0, 1.0], [-0.65, 1.0], [0.65, 1.0], [0, 1.6], [-0.65, 1.6], [0.65, 1.6], [-1.2, 0.9], [1.2, 0.9], [-1.2, 1.6], [1.2, 1.6], [0, 2.2], [0, 0.7]];
+  function lootSpots(c, n) {
+    const fx = c.fx || 0, fz = c.fz || 1, ox = c.x + fx * 0.55, oz = c.z + fz * 0.55, oy = c.y + 0.4, out = [];
+    for (const [a, f] of LOOT_SLOTS) {
+      if (out.length >= n) break;
+      const x = c.x + fx * f - fz * a, z = c.z + fz * f + fx * a, dx = x - ox, dz = z - oz, L = Math.hypot(dx, dz) || 1;
+      if (world.raycast(ox, oy, oz, dx / L, 0, dz / L, L + 0.25).t < L + 0.25) continue;
+      if (Math.abs(world.support(x, z, c.y + 0.6, 0.05) - c.y) > 0.35) continue;
+      out.push([x, z]);
+    }
+    // coffre coincé : le reste s'empile juste devant lui
+    while (out.length < n) out.push([ox + fx * 0.15 + (out.length % 3 - 1) * 0.2 * -fz, oz + fz * 0.15 + (out.length % 3 - 1) * 0.2 * fx]);
+    return out;
+  }
+  // largage : quelque part dans le prochain cercle, sur la terre ferme ; ouvert, son butin jaillit autour
+  function spawnDrop() {
+    const c = S.storm && S.storm.next;
+    if (!c) return;
+    for (let i = 0; i < 40; i++) {
+      const a = rng.next() * Math.PI * 2, r = c.r * (0.15 + rng.next() * 0.55), x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+      if (x < 12 || z < 12 || x > map.size - 12 || z > map.size - 12 || map.waterAt(x, z) !== 0) continue;
+      const gy = world.support(x, z, 400), id = 'L' + S.nextDrop++;
+      S.drops.set(id, { id, x, z, y: gy, gy, t0: S.t, open: false, landed: false });
+      ev({ e: 'largage', id, x, z, gy, t0: S.t });
+      return;
+    }
+  }
+  function openDrop(P, d) {
+    d.open = true;
+    const list = rollDrop(makeRng(hash(seed * 911 + +d.id.slice(1))));
+    ev({ e: 'largage-ouvert', id: d.id, p: P.id });
+    list.forEach((it, k) => { const a = (k / list.length) * Math.PI * 2; spawnItem(it, d.x + Math.cos(a) * 1.5, d.gy + 0.6, d.z + Math.sin(a) * 1.5); });
   }
   // ce que le joueur peut faire avec E : coffre, objet, porte (le plus proche de son regard)
   function target(P) {
@@ -176,7 +249,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const sc = d - facing * 1.2;
       if (sc < bs) { bs = sc; best = { kind, o }; }
     };
+    for (const Q of S.players.values()) if (Q.alive && Q.down && mates(P, Q)) consider('releve', Q, REVIVE_R, 1.6);
+    if (best) return best; // relever passe avant tout le reste
     for (const c of S.chests.values()) if (!c.open) consider('coffre', c, CHEST_R, 1.6);
+    for (const d of S.drops.values()) if (d.landed && !d.open) consider('largage', d, CHEST_R + 0.6, 2);
     for (const g of S.items.values()) if (g.it.t === 'arme' || g.it.t === 'objet') consider('objet', g, PICK_R, 1.6);
     // la porte la plus proche concourt avec la même règle (un peu moins prioritaire qu'un objet)
     const d = world.doorNear(P.x, P.y, P.z, fx, fz);
@@ -194,16 +270,28 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function interact(P) {
     const tg = target(P);
     if (!tg) return;
-    if (tg.kind === 'coffre') openChest(P, tg.o);
+    if (tg.kind === 'releve') { P.revive = { id: tg.o.id, t: 0 }; P.use = null; P.rl = 0; ev({ e: 'releve…', p: P.id, to: tg.o.id }); }
+    else if (tg.kind === 'coffre') openChest(P, tg.o);
+    else if (tg.kind === 'largage') openDrop(P, tg.o);
     else if (tg.kind === 'objet') pickUp(P, tg.o);
     else setDoor(tg.o, !tg.o.open, P);
   }
 
   // ------------------------------------------------------------------ tirs
   // l'épaule : le rayon de la caméra passe par là (la caméra est derrière, sur le même axe)
-  function eye(P) {
-    const rx = -Math.cos(P.yaw), rz = Math.sin(P.yaw), h = P.crouch ? MOVE.hc : MOVE.h;
-    return [P.x + rx * SHOULDER, P.y + h - 0.25, P.z + rz * SHOULDER];
+  // solid : l'épaule s'arrête contre un mur à droite (comme la caméra), pour ne jamais tirer depuis l'autre côté du mur
+  function eye(P, solid) {
+    const rx = -Math.cos(P.yaw), rz = Math.sin(P.yaw), h = P.crouch ? MOVE.hc : MOVE.h, y = P.y + h - 0.25;
+    const side = solid ? Math.max(0, world.ray(P.x, y, P.z, rx, 0, rz, SHOULDER, 0.2)) : SHOULDER;
+    return [P.x + rx * side, y, P.z + rz * side];
+  }
+  // direction des tirs : celle du viseur envoyée par le joueur (ay, ap : depuis l'épaule vers ce que montre le centre de
+  // l'image), à défaut celle du regard ; un écart trop grand avec le regard est ignoré
+  function aimOf(P) {
+    const I = P.inp;
+    if (I.ay == null || I.ap == null) return [I.yaw, I.pitch];
+    const dy = Math.atan2(Math.sin(I.ay - I.yaw), Math.cos(I.ay - I.yaw));
+    return Math.abs(dy) < 0.6 && Math.abs(I.ap - I.pitch) < 0.6 ? [I.yaw + dy, I.ap] : [I.yaw, I.pitch];
   }
   const aimDir = (yaw, pitch) => { const c = Math.cos(pitch); return [Math.sin(yaw) * c, Math.sin(pitch), Math.cos(yaw) * c]; };
   // rayon contre un joueur : corps (cylindre) et tête (sphère) ; renvoie { t, head } ou null
@@ -248,40 +336,95 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
-    const toSh = opt.storm ? 0 : Math.min(Q.sh, n);
+    if (by && mates(by, Q)) return; // pas de tir ami
+    // entre bots, le rythme de la partie (voir ai.js) ; pas à la pioche : deux bots sans arme ne s'y attardent pas des minutes
+    if (by && by.bot && Q.bot && S.hooks.pace && opt.cause !== 'pioche') n *= S.hooks.pace();
+    if (Q.down) {
+      // à terre : les coups entament sa réserve ; à zéro, il est éliminé (par celui qui l'a mis à terre, à défaut)
+      Q.down.hp -= n;
+      if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
+      ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: false, x: Q.x, y: Q.y + 0.8, z: Q.z, cause: opt.cause || null });
+      if (Q.down.hp <= 0) eliminate(Q, by && by !== Q ? by : S.players.get(Q.down.by) || null, opt.cause || Q.down.cause);
+      return;
+    }
+    // la tempête et les chutes enlèvent de la vie, pas du bouclier
+    const toSh = opt.storm || opt.cause === 'chute' ? 0 : Math.min(Q.sh, n);
     Q.sh -= toSh; Q.hp -= n - toSh;
     if (by && by !== Q) { by.dealt += n; Q.hitBy = by.id; Q.hitT = S.t; }
     ev({ e: 'degat', to: Q.id, by: by ? by.id : null, n: Math.round(n), head: !!opt.head, sh: toSh > 0, x: Q.x, y: Q.y + 1.4, z: Q.z, cause: opt.cause || null });
-    if (Q.hp <= 0) eliminate(Q, by, opt.cause);
+    if (Q.hp <= 0) {
+      // en équipe, tant qu'un coéquipier tient debout : à terre plutôt qu'éliminé
+      if (TEAMS && teamOf(Q).some((q) => q !== Q && q.alive && !q.down)) knock(Q, by, opt.cause);
+      else eliminate(Q, by, opt.cause);
+    }
+  }
+  function knock(Q, by, cause) {
+    Q.hp = 0; Q.sh = 0; Q.use = null; Q.rl = 0; Q.revive = null; Q.sprint = false;
+    Q.down = { t: S.t, by: by && by !== Q ? by.id : null, cause: cause || null, hp: DOWN_HP };
+    ev({ e: 'abattu', to: Q.id, by: Q.down.by, cause: cause || null });
+  }
+  // une équipe dont tous les membres encore en vie sont à terre est éliminée
+  function wipe(team) {
+    if (!TEAMS || team == null) return;
+    const live = [...S.players.values()].filter((q) => q.alive && q.team === team);
+    if (!live.length || live.some((q) => !q.down)) return;
+    for (const q of live) if (q.alive) eliminate(q, S.players.get(q.down.by) || null, q.down.cause);
   }
   function shoot(P, it) {
     const W = WEAPONS[it.w];
-    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t;
-    const o = eye(P), moving = Math.hypot(P.vx, P.vz) > 1;
-    let sp = (P.inp.aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2) + P.bloom;
-    if (it.w === 'sniper' && P.inp.aim && !moving) sp = 0;
+    // les bots gardent la dispersion d'avant (×1,4, sans le premier tir précis) : leur visée a déjà sa propre erreur
+    const sp = P.bot ? spreadOf(it.w, P, P.inp.aim, false) * 1.4 : spreadOf(it.w, P, P.inp.aim, S.t - (P.shotT != null ? P.shotT : -9) > REST);
+    it.mag--; P.cd = 1 / W.rate; P.shotT = S.t; P.shots++;
+    const o = eye(P, true), [yaw, pitch] = aimOf(P);
     P.bloom = Math.min(P.bloom + W.bloom, 0.09);
     ev({ e: 'feu', p: P.id, w: it.w });
+    if (W.bullet) {
+      const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp, d = aimDir(yaw + Math.cos(a) * r, pitch + Math.sin(a) * r);
+      const v = W.bullet.speed;
+      S.projectiles.push({ id: S.nextProj++, kind: 'balle', x: o[0], y: o[1], z: o[2], vx: d[0] * v, vy: d[1] * v, vz: d[2] * v, owner: P.id, it: { ...it }, life: W.range / v + 0.3, from: [o[0], o[1], o[2]], dist: 0 });
+      return;
+    }
     if (W.rocket) {
-      const d = aimDir(P.inp.yaw + (rng.next() - 0.5) * sp, P.inp.pitch + (rng.next() - 0.5) * sp);
+      const d = aimDir(yaw + (rng.next() - 0.5) * sp, pitch + (rng.next() - 0.5) * sp);
       S.projectiles.push({ id: S.nextProj++, kind: 'roquette', x: o[0] + d[0] * 0.8, y: o[1] + d[1] * 0.8, z: o[2] + d[2] * 0.8, vx: d[0] * W.rocket.speed, vy: d[1] * W.rocket.speed, vz: d[2] * W.rocket.speed, owner: P.id, it: { ...it }, life: 6 });
       return;
     }
     const n = W.pellets || 1;
+    let touched = false;
     for (let k = 0; k < n; k++) {
       // dispersion dans un cône
       const a = rng.next() * Math.PI * 2, r = Math.sqrt(rng.next()) * sp;
-      const d = aimDir(P.inp.yaw + Math.cos(a) * r, P.inp.pitch + Math.sin(a) * r);
+      const d = aimDir(yaw + Math.cos(a) * r, pitch + Math.sin(a) * r);
       const h = trace(P, o, d, W.range);
       const to = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t];
       ev({ e: 'tir', p: P.id, w: it.w, from: o, to, hit: h.who ? 2 : h.t < W.range ? 1 : 0, k });
-      if (h.who) damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w });
+      if (h.who) { if (!mates(P, h.who)) touched = true; damage(h.who, weaponDamage(it, h.t, h.head), P, { head: h.head, cause: it.w }); }
       else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[it.r] * W.struct, P, to);
     }
+    if (touched) P.hits++;
+  }
+  // balle du fusil de précision : pesanteur et Coriolis (a = −2 Ω × v), touche ce qu'elle croise pendant le pas
+  function stepBullet(pr, dt) {
+    const W = WEAPONS[pr.it.w], owner = S.players.get(pr.owner);
+    const cx = OMEGA[1] * pr.vz - OMEGA[2] * pr.vy, cy = OMEGA[2] * pr.vx - OMEGA[0] * pr.vz, cz = OMEGA[0] * pr.vy - OMEGA[1] * pr.vx;
+    pr.vx -= 2 * cx * dt; pr.vy -= (W.bullet.g + 2 * cy) * dt; pr.vz -= 2 * cz * dt;
+    const sp = Math.hypot(pr.vx, pr.vy, pr.vz), step = sp * dt, d = [pr.vx / sp, pr.vy / sp, pr.vz / sp];
+    const h = trace(owner || null, [pr.x, pr.y, pr.z], d, step);
+    const end = () => S.projectiles.splice(S.projectiles.indexOf(pr), 1);
+    if (h.t < step) {
+      const to = [pr.x + d[0] * h.t, pr.y + d[1] * h.t, pr.z + d[2] * h.t];
+      ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to, hit: h.who ? 2 : 1, k: 0, late: true });
+      if (h.who) { if (owner && !mates(owner, h.who)) owner.hits++; damage(h.who, weaponDamage(pr.it, pr.dist + h.t, h.head), owner || null, { head: h.head, cause: pr.it.w }); }
+      else if (h.solid && S.hooks.hitSolid) S.hooks.hitSolid(h.solid, W.dmg[pr.it.r] * W.struct, owner || null, to);
+      end(); return;
+    }
+    pr.x += d[0] * step; pr.y += d[1] * step; pr.z += d[2] * step; pr.dist += step;
+    if (pr.life <= 0 || pr.y < -20) { ev({ e: 'tir', p: pr.owner, w: pr.it.w, from: pr.from, to: [pr.x, pr.y, pr.z], hit: 0, k: 0, late: true }); end(); }
   }
   function explode(x, y, z, owner, dmg, radius, struct, kind = 'boum') {
     ev({ e: 'boum', x, y, z, r: radius, kind });
     const by = S.players.get(owner);
+    let touched = false;
     for (const Q of S.players.values()) {
       if (!Q.alive || Q.mode === 'ballon') continue;
       const cy = Q.y + 0.9, dd = Math.hypot(Q.x - x, cy - y, Q.z - z);
@@ -290,8 +433,10 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const dx = (Q.x - x) / (dd || 1), dy = (cy - y) / (dd || 1), dz = (Q.z - z) / (dd || 1);
       const w = world.raycast(x - dx * 0.05, y - dy * 0.05, z - dz * 0.05, dx, dy, dz, dd);
       if (w.t < dd - 0.5) continue;
+      if (by && Q !== by && !mates(by, Q)) touched = true;
       damage(Q, dmg * (1 - 0.6 * dd / radius), by || null, { cause: kind === 'roquette' ? 'roquette' : 'grenade' });
     }
+    if (touched) by.hits++;
     if (S.hooks.blast) S.hooks.blast(x, y, z, radius, dmg * struct, by);
   }
   function blastPush(x, y, z, radius, push) {
@@ -306,7 +451,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     }
   }
   function throwItem(P, it) {
-    const I = ITEMS[it.c], o = eye(P), d = aimDir(P.inp.yaw, P.inp.pitch + 0.18);
+    const I = ITEMS[it.c], o = eye(P, true), d = aimDir(P.inp.yaw, P.inp.pitch + 0.18);
     const v = 22;
     S.projectiles.push({ id: S.nextProj++, kind: I.throw, x: o[0] + d[0] * 0.6, y: o[1] + d[1] * 0.6, z: o[2] + d[2] * 0.6, vx: d[0] * v + P.vx * 0.5, vy: d[1] * v, vz: d[2] * v + P.vz * 0.5, owner: P.id, c: it.c, life: I.fuse });
     ev({ e: 'lance', p: P.id, c: it.c });
@@ -331,6 +476,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function stepProjectiles(dt) {
     for (const pr of [...S.projectiles]) {
       pr.life -= dt;
+      if (pr.kind === 'balle') { stepBullet(pr, dt); continue; }
       const grav = pr.kind === 'roquette' ? 0 : 22;
       pr.vy -= grav * dt;
       const sp = Math.hypot(pr.vx, pr.vy, pr.vz), step = sp * dt;
@@ -363,7 +509,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       for (const Q of S.players.values()) {
         if (!Q.alive || Q.mode !== 'sol' || Q.vy > 1) continue;
         if (Math.hypot(Q.x - pad.x, Q.z - pad.z) < 1.2 && Math.abs(Q.y - pad.y) < 0.6) {
-          Object.assign(Q, { mode: 'chute', vy: 30, safeFall: true }); Q.vx *= 0.5; Q.vz *= 0.5;
+          // haut (une quarantaine de mètres) et un peu devant soi : le deltaplane s'ouvre en haut de la course et porte loin
+          Object.assign(Q, { mode: 'chute', vy: PAD_VY, safeFall: true, vx: Q.vx * 0.5 + Math.sin(Q.yaw) * 8, vz: Q.vz * 0.5 + Math.cos(Q.yaw) * 8 });
           ev({ e: 'propulse', p: Q.id, x: pad.x, y: pad.y, z: pad.z });
         }
       }
@@ -382,9 +529,16 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (mv && mv[0] !== P.last.mv) { P.last.mv = mv[0]; moveSlot(P, mv[1], mv[2]); }
     if (fired(P, 'use')) interact(P);
     if (fired(P, 'drop')) dropHeld(P);
-    // ramassage automatique des munitions et matériaux
-    for (const g of S.items.values()) {
-      if ((g.it.t === 'munitions' || g.it.t === 'materiaux') && Math.abs(g.x - P.x) < AUTO_R && Math.abs(g.z - P.z) < AUTO_R && Math.abs(g.y - P.y) < 1.4) pickUp(P, g);
+    // ramassage automatique des munitions et matériaux : une liste des tas proches (12 m), refaite trois fois par
+    // seconde, suffit à chaque pas (passer tous les objets de l'île pour chaque joueur coûtait cher à 60)
+    if ((P.nearT = (P.nearT || 0) - dt) <= 0) {
+      P.nearT = 0.33;
+      P.near = [];
+      for (const g of S.items.values()) if ((g.it.t === 'munitions' || g.it.t === 'materiaux') && Math.abs(g.x - P.x) < 12 && Math.abs(g.z - P.z) < 12) P.near.push(g.id);
+    }
+    for (const id of P.near) {
+      const g = S.items.get(id);
+      if (g && Math.abs(g.x - P.x) < AUTO_R && Math.abs(g.z - P.z) < AUTO_R && Math.abs(g.y - P.y) < 1.4) pickUp(P, g);
     }
     const it = heldItem(P);
     // les appuis ponctuels sont lus à chaque pas (sinon un R pressé avec une potion en main rechargerait plus tard)
@@ -393,7 +547,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (!it) return;
     if (it.t === 'arme') {
       const W = WEAPONS[it.w];
-      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (reload && it.mag < W.mag && P.ammo[W.ammo] > 0 && !P.rl) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       if (P.rl > 0) {
         P.rl -= dt;
         if (P.rl <= 0) { const n = Math.min(W.mag - it.mag, P.ammo[W.ammo]); it.mag += n; P.ammo[W.ammo] -= n; P.rl = 0; }
@@ -402,11 +556,11 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
       const trigger = W.auto ? P.inp.fire : shot;
       if (trigger && P.cd <= 0) {
         if (it.mag > 0) shoot(P, it);
-        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+        else if (P.ammo[W.ammo] > 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
         else if (shot) ev({ e: 'vide', p: P.id });
       }
       // chargeur vide : rechargement automatique
-      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w }); }
+      if (it.mag === 0 && P.ammo[W.ammo] > 0 && !P.rl && P.cd <= 0) { P.rl = W.reload[it.r]; ev({ e: 'recharge', p: P.id, w: it.w, T: P.rl }); }
       return;
     }
     if (it.t === 'objet') {
@@ -432,9 +586,12 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
 
   // ------------------------------------------------------------------ éliminations, fin
   function eliminate(Q, by, cause) {
-    Q.alive = false; Q.hp = 0; Q.use = null; Q.rl = 0;
+    Q.alive = false; Q.hp = 0; Q.use = null; Q.rl = 0; Q.down = null; Q.revive = null;
+    Q.outT = S.t; Q.outBy = by && by !== Q ? by.id : null; Q.outHow = cause || null;
     S.order.push(Q.id);
-    Q.place = alive().length + 1;
+    if (!TEAMS) Q.place = alive().length + 1;
+    // en équipe, la place se donne quand le dernier membre tombe (à toute l'équipe)
+    else if (!teamOf(Q).some((q) => q.alive)) { const place = liveTeams() + 1; for (const q of teamOf(Q)) q.place = place; }
     if (by && by !== Q) by.kills++;
     // tout ce qu'il portait tombe autour de lui
     const drops = [...Q.inv.filter(Boolean), ...Object.entries(Q.ammo).filter(([, n]) => n > 0).map(([a, n]) => ammo(a, n)),
@@ -445,16 +602,18 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     });
     Q.inv = [null, null, null, null, null]; for (const a in Q.ammo) Q.ammo[a] = 0; for (const m in Q.mats) Q.mats[m] = 0;
     ev({ e: 'elim', to: Q.id, by: by && by !== Q ? by.id : null, cause: cause || null, place: Q.place, left: alive().length });
+    wipe(Q.team);
     checkEnd();
   }
   function checkEnd() {
     if (S.mode === 'exploration' || S.winner || S.phase === 'fin') return;
     const live = alive();
-    if (live.length <= 1 && S.players.size > 1) {
+    if (liveTeams() <= 1 && S.players.size > 1 && (!TEAMS || new Set([...S.players.values()].map((p) => p.team)).size > 1)) {
       S.phase = 'fin';
       S.winner = live[0] ? live[0].id : S.order[S.order.length - 1];
-      if (live[0]) live[0].place = 1;
-      ev({ e: 'fin', winner: S.winner });
+      S.winTeam = TEAMS ? (S.players.get(S.winner) || {}).team ?? null : null;
+      for (const q of S.players.values()) if (TEAMS ? q.team === S.winTeam : q.id === S.winner) q.place = 1;
+      ev({ e: 'fin', winner: S.winner, team: S.winTeam });
     }
   }
   // un joueur quitte la partie (onglet fermé, retour au salon) : il est éliminé et lâche son sac
@@ -466,7 +625,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   }
   function results() {
     const list = [...S.players.values()].sort((a, b) => (a.place || 1) - (b.place || 1) || b.kills - a.kills);
-    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt) }));
+    return list.map((p) => ({ id: p.id, name: p.name, color: p.color, bot: p.bot, place: p.place || 1, kills: p.kills, dealt: Math.round(p.dealt), team: p.team,
+      shots: p.shots, hits: p.hits, dist: Math.round(p.dist), revives: p.revives, out: p.outT == null ? null : Math.round(p.outT), by: p.outBy, how: p.outHow }));
   }
 
   // ------------------------------------------------------------------ tempête
@@ -492,6 +652,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (k !== st.k) { st.k = k; ev({ e: 'tempete', k, state: st.state }); }
     st.next = C[Math.min(C.length - 1, k + 1)];
     st.dps = (STORM_TIMES[k] || STORM_TIMES[STORM_TIMES.length - 1]).dps;
+    if (S.mode === 'partie' && st.state === 'fermeture' && k < DROP_PHASES && st.dropK !== k) { st.dropK = k; spawnDrop(); }
     if (T < st.t0) return;
     // dégâts une fois par seconde, à ceux qui sont dehors (pas en l'air au-dessus de la montgolfière)
     S.stormTick += dt;
@@ -513,7 +674,7 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (P.mode !== 'ballon') continue;
         if (fired(P, 'jump') || over) jumpOut(P); else placeInBalloon(P);
       }
-      if (S.phase === 'vol' && ![...S.players.values()].some((p) => p.mode === 'ballon')) S.phase = 'jeu';
+      if (S.phase === 'vol') { let any = false; for (const p of S.players.values()) if (p.mode === 'ballon') { any = true; break; } if (!any) S.phase = 'jeu'; }
     }
     if (S.hooks.think) for (const P of S.players.values()) if (P.bot && P.alive) S.hooks.think(P, dt);
     for (const P of S.players.values()) {
@@ -524,34 +685,73 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (stepAir(P, { ...inp, jump }, world, dt)) ev({ e: 'atterrit', p: P.id });
         continue;
       }
+      if (P.down) {
+        // à terre : on rampe, rien d'autre ; la réserve fond (la tempête l'entame aussi)
+        fired(P, 'jump'); fired(P, 'use'); fired(P, 'shoot'); fired(P, 'reload'); fired(P, 'drop');
+        stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump: false, sprint: false, crouch: true, k: CRAWL }, world, dt);
+        P.pitch = inp.pitch;
+        P.down.hp -= DOWN_HP / BLEED * dt;
+        if (P.down.hp <= 0) eliminate(P, S.players.get(P.down.by) || null, P.down.cause);
+        continue;
+      }
       const jump = fired(P, 'jump');
       const slow = P.use ? 0.5 : inp.aim ? 0.7 : 1;
-      const wasAir = !P.ground;
-      stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow }, world, dt);
+      const wasAir = !P.ground, x0 = P.x, z0 = P.z;
+      stepPlayer(P, { mx: inp.mx, mz: inp.mz, yaw: inp.yaw, jump, sprint: inp.sprint && !P.use && !inp.aim, crouch: inp.crouch, k: slow, glisse: !P.bot }, world, dt);
+      P.dist += Math.hypot(P.x - x0, P.z - z0);
       P.pitch = inp.pitch;
       if (P.ground && wasAir) {
-        if (P.fall > 14 && !P.safeFall) damage(P, (P.fall - 14) * 6.5, null, { cause: 'chute' });
+        // dégâts de chute au-delà de FALL_SAFE mètres, proportionnels à la hauteur
+        const h = P.fall * P.fall / (2 * MOVE.g);
+        if (h > FALL_SAFE && !P.safeFall) damage(P, (h - FALL_SAFE) * FALL_DMG, null, { cause: 'chute' });
         P.safeFall = false; P.fall = 0;
       }
       // tombé hors de l'île ou sous la mer : on remonte au bord (sécurité)
       if (P.y < -30) { P.y = world.support(P.x, P.z, 400); P.vy = 0; }
       if (P.alive) act(P, dt);
+      if (P.revive) stepRevive(P, dt);
     }
     // un tiers de seconde de positions passées, pour viser juste malgré le décalage du réseau
     for (const P of S.players.values()) {
       if (!P.alive) continue;
       const tr = P.trail || (P.trail = []);
-      tr.push([S.t, P.x, P.y, P.z, P.crouch]);
-      if (tr.length > 24) tr.shift();
+      // (on réutilise la plus ancienne entrée : pas de nouveau tableau à chaque pas)
+      const a = tr.length >= 24 ? tr.shift() : [];
+      a[0] = S.t; a[1] = P.x; a[2] = P.y; a[3] = P.z; a[4] = P.crouch;
+      tr.push(a);
     }
     stepProjectiles(dt);
     stepStorm(dt);
+    for (const d of S.drops.values()) if (!d.landed && S.t - d.t0 >= DROP_H / DROP_SPEED) { d.landed = true; ev({ e: 'largage-pose', id: d.id, x: d.x, y: d.gy, z: d.z }); }
     if (S.hooks.step) S.hooks.step(dt);
+  }
+  // repère d'équipe (le dernier de chaque joueur compte) ; what : ce qu'il désigne (« Fusil d'assaut épique »…)
+  function ping(P, kind, x, y, z, target = null, what = '') {
+    if (!P || !P.alive || !PING_KINDS.includes(kind) || ![x, y, z].every(Number.isFinite)) return false;
+    const last = S.pings.get(P.id);
+    if (last && S.t - last.t < 0.35) return false; // pas de rafale
+    const pg = { p: P.id, team: P.team, kind, x, y, z, target: target ?? null, what: String(what || '').slice(0, 40), t: S.t };
+    S.pings.set(P.id, pg);
+    ev({ e: 'repere', ...pg });
+    return true;
+  }
+  // relever un coéquipier : rester à côté, immobile, sans tirer, REVIVE secondes
+  function stepRevive(P, dt) {
+    const Q = S.players.get(P.revive.id);
+    const moving = Math.abs(P.inp.mx) + Math.abs(P.inp.mz) > 0.1 || P.inp.fire;
+    if (!P.alive || P.down || !Q || !Q.alive || !Q.down || moving || Math.hypot(Q.x - P.x, Q.z - P.z) > REVIVE_R + 0.6) {
+      ev({ e: 'releve-', p: P.id, to: P.revive.id }); P.revive = null; return;
+    }
+    P.revive.t += dt;
+    if (P.revive.t >= REVIVE) {
+      Q.down = null; Q.hp = RAISE_HP; P.revive = null; P.revives++;
+      ev({ e: 'releve', to: Q.id, by: P.id });
+    }
   }
   function takeEvents() { const e = S.events; S.events = []; return e; }
 
   return {
-    S, step, input, takeEvents, addPlayer, results, target, eye, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave,
+    S, step, input, takeEvents, addPlayer, results, target, eye, trace, heldItem, alive, spawnItem, damage, explode, setDoor, balloonPos, leave, mates, ping,
     player: (id) => S.players.get(id),
   };
 }

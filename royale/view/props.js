@@ -13,9 +13,10 @@ const HI_D = 260;   // tuiles détaillées jusqu'à cette distance (m)
 export const CAR_COLORS = [0xe8473a, 0xf2c14e, 0x3d7fd9, 0xf4f2ea, 0x3fae6a, 0x7c5cc4, 0x6d5a4a];
 
 // ------------------------------------------------------------------ forêts
-// instances d'un objet du décor : pid (indice dans map.props) → [{ mesh, i }] ; hide(pid) le fait disparaître
+// instances d'un objet du décor : pid (indice dans map.props) → [{ mesh, i }] ; hide(pid) le fait disparaître,
+// restore() fait tout revenir (nouvelle partie sans recharger la page)
 function indexer() {
-  const where = new Map(), dead = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const where = new Map(), dead = new Set(), zero = new THREE.Matrix4().makeScale(0, 0, 0), saved = [];
   return {
     dead,
     scan(group) {
@@ -30,11 +31,16 @@ function indexer() {
       });
     },
     hide(pid) {
+      if (dead.has(pid)) return;
       dead.add(pid);
       for (const w of where.get(pid) || []) {
-        if (w.obj) w.obj.visible = false;
-        else { w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
+        if (w.obj) { w.obj.visible = false; saved.push({ obj: w.obj }); }
+        else { const m = new THREE.Matrix4(); w.mesh.getMatrixAt(w.i, m); saved.push({ mesh: w.mesh, i: w.i, m }); w.mesh.setMatrixAt(w.i, zero); w.mesh.instanceMatrix.needsUpdate = true; }
       }
+    },
+    restore() {
+      for (const w of saved) { if (w.obj) w.obj.visible = true; else { w.mesh.setMatrixAt(w.i, w.m); w.mesh.instanceMatrix.needsUpdate = true; } }
+      saved.length = 0; dead.clear();
     },
   };
 }
@@ -66,7 +72,7 @@ export function buildForest(map) {
       t.lo.visible = !(near && t.hi);
     }
   }
-  return { group, update, hide: (pid) => idx.hide(pid), dispose() { kit.dispose(); } };
+  return { group, update, hide: (pid) => idx.hide(pid), restore: () => idx.restore(), dispose() { kit.dispose(); } };
 }
 
 // ------------------------------------------------------------------ modèles Kenney
@@ -345,7 +351,7 @@ export async function buildProps(map, { base, kit: toon = null }) {
   const stone = new THREE.MeshStandardMaterial({ color: 0xb7aa92, roughness: 0.9 }); own.push(stone);
   const wood = new THREE.MeshStandardMaterial({ color: 0x9a6c42, roughness: 0.85 }); own.push(wood);
   for (const br of map.bridges) {
-    const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) + 4, rot = Math.atan2(dx, dz), cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
+    const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) + 1, rot = Math.atan2(dx, dz), cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
     const g = new THREE.Group(); g.position.set(cx, br.y, cz); g.rotation.y = rot;
     const deck = new THREE.Mesh(new THREE.BoxGeometry(br.hw * 2 + 0.6, 0.6, L).translate(0, -0.32, 0), stone);
     g.add(deck);
@@ -363,7 +369,7 @@ export async function buildProps(map, { base, kit: toon = null }) {
   }
   idx.scan(group);
   return {
-    group, lampHeads, hide: (pid) => idx.hide(pid),
+    group, lampHeads, hide: (pid) => idx.hide(pid), restore: () => idx.restore(),
     dispose() {
       for (const k of kit.values()) for (const p of k.parts) p.geo.dispose();
       for (const m of mats.values()) { m.map && m.map.dispose(); m.dispose(); }

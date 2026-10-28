@@ -1,7 +1,7 @@
 // Musique d'ambiance « lo-fi » générée en direct (WebAudio) : aucun fichier, aucun droit d'auteur.
 // Piano électrique (accords de septième), basse ronde, batterie feutrée avec swing, petites mélodies
 // pentatoniques en écho, léger souffle de vinyle. Les grilles d'accords changent toutes les 8 mesures.
-import { store, save } from './util.js';
+import { store } from './util.js';
 
 const LOOKAHEAD = 0.25;
 
@@ -34,10 +34,13 @@ export function createMusic(getCtx) {
   let mood = 'calm', wanted = 'calm', M = MOODS.calm, tone = null;
   const beat = () => 60 / M.bpm, stepLen = () => beat() / 4;
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  // volume : le réglage « Musique » du panneau du son (l'ancien curseur du jeu devient son point de départ)
-  let on = store('david_music', true);
+  // volume : le curseur « Musique » des réglages (l'ancien curseur du jeu devient son point de départ) ;
+  // à 0 la musique s'arrête (l'ancien bouton 🎵 coupé y est repris)
   const vol = 0.55;
   DDVolume.migrate('music', store('david_music_vol', vol) / vol);
+  DDVolume.legacy('david_music', ['music'], (v) => v === 'false');
+  const on = () => DDVolume.get('music') > 0;
+  let desired = false; // la page veut de la musique (accueil du Hub, partie en cours)
 
   function build() {
     ctx = getCtx(); if (!ctx) return false;
@@ -173,9 +176,10 @@ export function createMusic(getCtx) {
   }
 
   const api = {
-    get on() { return on; },
+    get on() { return on(); },
     start() {
-      if (playing || !on) return;
+      desired = true;
+      if (playing || !on()) return;
       if (!ctx && !build()) return;
       playing = true; seed = (Date.now() % 100000) + 1;
       mood = wanted; M = MOODS[mood]; prog = M.progs[Math.floor(rnd() * M.progs.length)];
@@ -184,17 +188,17 @@ export function createMusic(getCtx) {
       out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(vol, ctx.currentTime + 2.5);
       timer = setInterval(tick, 60); tick();
     },
-    stop() {
+    stop() { desired = false; api.halt(); },
+    halt() {
       if (!playing) return;
       playing = false; clearInterval(timer);
       out.gain.cancelScheduledValues(ctx.currentTime);
       out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
     },
-    toggle() { on = !on; save('david_music', on); if (on) api.start(); else api.stop(); return on; },
     get mood() { return wanted; },
     setMood(m) { if (MOODS[m]) wanted = m; },
     win() {
-      if (!on) return;
+      if (!on()) return;
       if (!ctx && !build()) return;
       const t = ctx.currentTime + 0.05;
       if (!playing) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(vol, t); }
@@ -214,5 +218,7 @@ export function createMusic(getCtx) {
       return offline.startRendering();
     },
   };
+  // curseur « Musique » à 0 : elle s'arrête ; relevé : elle reprend si la page la veut
+  DDVolume.on(() => { if (!on()) api.halt(); else if (desired && !playing) api.start(); });
   return api;
 }

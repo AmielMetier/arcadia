@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 8080;
-const PING_INTERVAL_MS = 30000;
+const PING_INTERVAL_MS = Number(process.env.RELAY_PING_MS) || 30000; // réglable pour les tests
 // Protocole 2 : trames compactes « #{en-tête}\n<données> » retransmises sans relire les données,
 // et messages volatils (instantanés d'état) sautés pour un destinataire dont la connexion n'arrive plus à suivre.
 // Protocole 3 : une place dans un salon survit aux coupures. Chaque message non volatil envoyé à un joueur porte un
@@ -26,14 +26,32 @@ const GRACE_MS = Number(process.env.RELAY_GRACE_MS) || 20000; // place gardée a
 const AWAY_MS = Number(process.env.RELAY_AWAY_MS) || 5000;    // ami déconnecté : annoncé hors ligne après ce délai
 const OUT_MAX = 4000, OUT_MAX_BYTES = 4 * 1024 * 1024; // messages gardés pour un joueur qui n'a pas encore accusé réception
 const TOMB_MS = 10 * 60000;            // on se souvient des places perdues, pour dire au joueur pourquoi la reprise échoue
+// Garde-fous : un seul client, défaillant ou malveillant, ne doit pas pouvoir faire tomber les salons des autres.
+// Les limites sont très au-dessus de ce qu'envoient les jeux (relevés dans /status : maxFrame, peakMsgs, peakBytes).
+const MAX_FRAME = Number(process.env.RELAY_MAX_FRAME) || 1024 * 1024;        // plus gros message accepté (sinon fermeture 1009)
+const RATE_MSGS = Number(process.env.RELAY_RATE_MSGS) || 1000;               // messages par seconde et par connexion, en continu
+const RATE_BYTES = Number(process.env.RELAY_RATE_BYTES) || 8 * 1024 * 1024; // octets par seconde et par connexion, en continu
+// réserve pour les rafales, en secondes : au retour d'une coupure, un navigateur renvoie d'un coup jusqu'à 3000 messages
+// (OUTBOX_MAX de net.js) ; et quand ce serveur s'est figé quelques secondes (petite instance débordée), tout ce que les
+// joueurs ont envoyé entre-temps arrive d'un bloc. Avec 4 s, un gel de 13 s suffisait à couper l'hôte pour
+// « inondation », puis à chaque reprise : les invités l'attendaient indéfiniment. Un vrai flot continu est coupé quand même.
+const BURST = Number(process.env.RELAY_BURST_S) || 15;
+const BURST_BYTES = 4;
+const LOG_FILE_MAX = 5 * 1024 * 1024;  // journal des crashs : au-delà, il passe en .1.jsonl et un nouveau commence
+const LOG_WINDOW_MS = 10 * 60000, LOG_PER_IP = 60, LOG_ALL = 600; // envois de logs acceptés par fenêtre de 10 min
+const LOGS_TOKEN = process.env.LOGS_TOKEN || ''; // lecture des logs (GET /api/logs) : fermée tant qu'il n'est pas défini
+const stats = { maxFrame: 0, peakMsgs: 0, peakBytes: 0, closedFlood: 0, closedBig: 0 };
+// Une erreur dans le traitement d'un message ou d'un minuteur est notée, sans arrêter le serveur (et tous les salons)
+const safe = (fn) => (...a) => { try { fn(...a); } catch (e) { console.error(new Date().toISOString(), e); } };
 
-const CRASH_DIR = path.resolve(__dirname, '..', 'logs', 'crash');
+const CRASH_DIR = process.env.RELAY_LOG_DIR || path.resolve(__dirname, '..', 'logs', 'crash'); // les tests écrivent ailleurs
 const JSONL_FILE = path.join(CRASH_DIR, 'crash-events.jsonl');
 const LATEST_FILE = path.join(CRASH_DIR, 'latest.json');
 
 function appendServerLog(entry) {
   try {
     fs.mkdirSync(CRASH_DIR, { recursive: true });
+    try { if (fs.statSync(JSONL_FILE).size > LOG_FILE_MAX) fs.renameSync(JSONL_FILE, JSONL_FILE.replace(/\.jsonl$/, '.1.jsonl')); } catch (e) {}
     fs.appendFileSync(JSONL_FILE, JSON.stringify(entry) + '\n', 'utf8');
     let list = [];
     if (fs.existsSync(LATEST_FILE)) {
@@ -45,19 +63,45 @@ function appendServerLog(entry) {
   } catch (e) {}
 }
 
+// Envois de logs : au plus LOG_PER_IP par adresse et LOG_ALL en tout sur 10 minutes (le disque ne se remplit pas)
+const logHits = new Map(); let logAll = [];
+function logAllowed(req) {
+  const now = Date.now(), ip = String(req.headers['x-forwarded-for'] || '') + '|' + req.socket.remoteAddress;
+  logAll = logAll.filter((t) => now - t < LOG_WINDOW_MS);
+  const mine = (logHits.get(ip) || []).filter((t) => now - t < LOG_WINDOW_MS);
+  if (mine.length >= LOG_PER_IP || logAll.length >= LOG_ALL) { logHits.set(ip, mine); return false; }
+  mine.push(now); logAll.push(now); logHits.set(ip, mine);
+  return true;
+}
+const logHitsInterval = setInterval(() => { const now = Date.now(); for (const [ip, l] of logHits) if (!l.some((t) => now - t < LOG_WINDOW_MS)) logHits.delete(ip); }, LOG_WINDOW_MS);
+function tokenOk(req) {
+  if (!LOGS_TOKEN) return false;
+  const u = new URL(req.url, 'http://relais');
+  const given = Buffer.from(String(u.searchParams.get('token') || (req.headers.authorization || '').replace(/^Bearer /, '')));
+  const want = Buffer.from(LOGS_TOKEN);
+  return given.length === want.length && crypto.timingSafeEqual(given, want);
+}
+
 // Serveur HTTP minimal (healthchecks + API de collecte des logs de crash/expulsion)
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  const route = req.url.split('?')[0];
 
-  if (req.url === '/status') {
+  if (route === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ proto: PROTO, rooms: rooms.size, sessions: sessions.size, online: people.size }));
+    res.end(JSON.stringify({ proto: PROTO, rooms: rooms.size, sessions: sessions.size, online: people.size, ...stats }));
     return;
   }
-  if (req.method === 'POST' && req.url === '/api/log') {
+  if (req.method === 'POST' && route === '/api/log') {
+    if (!logAllowed(req)) {
+      req.resume();
+      res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end('{"ok":false}');
+      return;
+    }
     let body = '';
     req.on('data', (c) => { if (body.length < 32768) body += c; });
     req.on('end', () => {
@@ -73,7 +117,13 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  if (req.method === 'GET' && req.url === '/api/logs') {
+  if (req.method === 'GET' && route === '/api/logs') {
+    // les logs contiennent codes de salon, pseudos et navigateurs : lecture réservée (LOGS_TOKEN)
+    if (!tokenOk(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end('{"ok":false}');
+      return;
+    }
     let list = [];
     try { if (fs.existsSync(LATEST_FILE)) list = JSON.parse(fs.readFileSync(LATEST_FILE, 'utf8')); } catch (e) {}
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -84,7 +134,7 @@ const server = http.createServer((req, res) => {
   res.end('Duo Drift WebSocket Relay Server OK\n');
 });
 
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, maxPayload: MAX_FRAME });
 
 /* ------------------------------------------------------------ salons */
 /**
@@ -384,8 +434,22 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('message', (raw) => {
-    ws.isAlive = true;
+  ws.on('message', safe((raw) => {
+    if (ws.flooded) return; // déjà coupée pour inondation : les messages encore en file sont ignorés
+    ws.isAlive = true; ws.lastMsg = Date.now();
+    // débit de cette connexion (seau qui se remplit à RATE_* par seconde, jusqu'à BURST secondes de réserve) :
+    // un client qui inonde le relais est coupé ; les pics seconde par seconde sont relevés pour /status
+    const now = Date.now(), len = raw.length;
+    if (ws.tokT == null) { ws.tokT = now; ws.tokN = RATE_MSGS * BURST; ws.tokB = RATE_BYTES * BURST_BYTES; }
+    const dt = (now - ws.tokT) / 1000; ws.tokT = now;
+    ws.tokN = Math.min(RATE_MSGS * BURST, ws.tokN + dt * RATE_MSGS) - 1;
+    ws.tokB = Math.min(RATE_BYTES * BURST_BYTES, ws.tokB + dt * RATE_BYTES) - len;
+    if (now - (ws.rateT || 0) >= 1000) { ws.rateT = now; ws.rateN = 0; ws.rateB = 0; }
+    ws.rateN++; ws.rateB += len;
+    if (len > stats.maxFrame) stats.maxFrame = len;
+    if (ws.rateN > stats.peakMsgs) stats.peakMsgs = ws.rateN;
+    if (ws.rateB > stats.peakBytes) stats.peakBytes = ws.rateB;
+    if (ws.tokN < 0 || ws.tokB < 0) { ws.flooded = true; stats.closedFlood++; ws.close(1008, 'flood'); return; }
     const text = typeof raw === 'string' ? raw : raw.toString();
     // trame compacte de relais : seul l'en-tête est lu, les données repartent telles quelles
     if (text.charCodeAt(0) === 35 /* # */) {
@@ -443,18 +507,21 @@ wss.on('connection', (ws) => {
       if (msg.data === undefined) return;
       relay(s, msg.to, typeof msg.except === 'string' ? msg.except : null, !!msg.v, JSON.stringify(msg.data), msg.c);
     }
-  });
+  }));
 
-  const closed = () => { dropped(ws); presenceGone(ws); };
+  const closed = safe((e) => { if (e && e.code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH') stats.closedBig++; dropped(ws); presenceGone(ws); });
   ws.on('close', closed);
   ws.on('error', closed);
 });
 
 // Ping/Pong (keep-alive toutes les 30 secondes) pour éviter les coupures des hébergeurs gratuits
-const keepAliveInterval = setInterval(() => {
+// (Une connexion muette est fermée ; « close » fait le reste : place gardée ou libérée, amis prévenus.
+// Avant la 3.2, cet endroit appelait une fonction inexistante et arrêtait tout le serveur.)
+const keepAliveInterval = setInterval(safe(() => {
   for (const ws of wss.clients) {
     if (ws.isAlive === false) {
-      if (ws.roomId) {
+      const s = ws.sess;
+      if (s) {
         appendServerLog({
           id: 'srv-timeout-' + Date.now(),
           ts: Date.now(),
@@ -464,15 +531,14 @@ const keepAliveInterval = setInterval(() => {
           severity: 'warn',
           title: 'Joueur expulsé par le serveur relais (timeout WebSocket 30 s)',
           cause: 'Aucune réponse au ping WebSocket pendant 30 s (coupure Wi-Fi/4G ou appareil mobile verrouillé).',
-          message: `Client ${ws.cid || ws.role || '?'} déconnecté du salon ${ws.roomId} après 30 s sans pong (paquets volatils sautés : ${ws.dropped || 0}).`,
+          message: `Client ${s.cid} déconnecté du salon ${s.roomId} après 30 s sans pong (paquets volatils sautés : ${ws.dropped || 0}).`,
           game: 'hub',
-          roomCode: ws.roomId,
-          role: ws.role || 'guest',
-          player: ws.cid || 'Client WebSocket',
+          roomCode: s.roomId,
+          role: s.role,
+          player: s.cid,
           diagnostics: { lastLat: ws.lastLat || null, baseLat: ws.baseLat || null, dropped: ws.dropped || 0, buffered: ws.bufferedAmount || 0 },
         });
       }
-      leaveCurrentRoom(ws);
       try {
         ws.terminate();
       } catch (e) {}
@@ -483,31 +549,33 @@ const keepAliveInterval = setInterval(() => {
       ws.ping();
     } catch (e) {}
   }
-}, PING_INTERVAL_MS);
+}), PING_INTERVAL_MS);
 
-const probeInterval = setInterval(() => {
+const probeInterval = setInterval(safe(() => {
   const now = Date.now();
   for (const ws of wss.clients) {
     if (!ws.sess || ws.readyState !== WebSocket.OPEN) continue;
     if (ws.probeAt) {
-      // plus aucune réponse : connexion morte sans avoir été fermée (wifi coupé, téléphone en veille)
-      if (now - ws.probeAt > DEAD_MS) { try { ws.terminate(); } catch (e) {} }
+      // plus aucune réponse : connexion morte sans avoir été fermée (wifi coupé, téléphone en veille). Tant que ses
+      // messages arrivent, elle vit : la réponse attend derrière ses propres envois (débit montant trop juste)
+      if (now - ws.probeAt > DEAD_MS && now - (ws.lastMsg || 0) > DEAD_MS) { try { ws.terminate(); } catch (e) {} }
       continue;
     }
     ws.probeAt = now;
     try { ws.ping(); } catch (e) {}
   }
-}, PROBE_MS);
+}), PROBE_MS);
 
-const tombInterval = setInterval(() => {
+const tombInterval = setInterval(safe(() => {
   const now = Date.now();
   for (const [sid, t] of tombs) if (t < now) tombs.delete(sid);
-}, 60000);
+}), 60000);
 
 wss.on('close', () => {
   clearInterval(keepAliveInterval);
   clearInterval(probeInterval);
   clearInterval(tombInterval);
+  clearInterval(logHitsInterval);
 });
 
 server.listen(PORT, () => {

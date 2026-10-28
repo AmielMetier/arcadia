@@ -353,7 +353,8 @@ export function buildWater(hole, { noise, envMap, refl, sun }) {
           float sd = max(dot(Rf, normalize(uSun)), 0.0);
           gl_FragColor.rgb += vec3(1.0, 0.94, 0.82) * (pow(sd, 700.0) * 9.0 + pow(sd, 48.0) * 0.18);
           // écume là où le torrent dévale une pente
-          float ny = normalize(cross(dFdx(vW), dFdy(vW))).y;
+          vec3 wcr = cross(dFdx(vW), dFdy(vW));
+          float ny = dot(wcr, wcr) > 1e-20 ? normalize(wcr).y : 1.0;
           float foam = smoothstep(0.995, 0.93, abs(ny)) * smoothstep(0.45, 0.75, wv(vW.xz * 2.3 + 11.0));
           gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.92, 0.95, 0.97), foam * 0.85);`);
     };

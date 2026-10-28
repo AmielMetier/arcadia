@@ -117,7 +117,14 @@ Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 
 
 ## Island Rush
 Battle royale en 3D (Three.js) sur une île d'un kilomètre carré, dans le style de Birdie Party : de 1 à 6 joueurs, et des
-bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin, combat, pioche et construction, tempête.
+bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, butin, combat, pioche et construction, tempête.
+
+- **Équipes** : solo, duos ou trios, complétées par des bots coéquipiers ; à 0 PV on tombe à terre et un coéquipier
+  relève (E, 5 s) ; l'équipe se choisit sur l'écran d'accueil (`royale/engine/teams.js`)
+- **Repères d'équipe** (B ou clic molette) et **largages** (une caisse de butin épique en parachute à chaque fermeture
+  de la tempête, quatre par partie)
+- **Rythme** : un « directeur » cale les combats entre bots sur les cercles de la tempête (≈ 10 min de partie) ; niveau
+  des bots « Auto » d'après les dernières parties des joueurs (`royale/engine/skill.js`)
 
 - **L'île** tirée d'une graine : relief, montagne, lac, rivière, mer ; une ville et un bourg (18 bâtiments au plus),
   quatre villages, un port, une dizaine de lieux-dits (ferme, usine, scierie, manoir, phare, refuge, carrière, camping,
@@ -146,12 +153,17 @@ bots jusqu'à 16, 24 ou 30 places. Montgolfière, chute libre et planeur, butin,
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots.
+- Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
+  (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
+  `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous
+  (client muet, message de plus d'1 Mo, inondation, rafale de reprise).
+- `?debug` dans l'adresse du Hub affiche le bouton « 📋 Logs & Crashs ».
 - Ajouter un jeu : [docs/NOUVEAU-JEU.md](docs/NOUVEAU-JEU.md).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Journal des versions : chaque modification visible par les joueurs monte `VERSION` dans `hub/hub.js` et ajoute une entrée
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **2.86** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **3.3** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

@@ -56,6 +56,7 @@ export function keyOf(ref) {
   if (ref.prop != null) return `p:${ref.prop}`;
   if (ref.door != null) return `d:${ref.door}`;
   if (ref.build != null) return `b:${ref.build}`;
+  if (ref.slab != null) return `s:${ref.b}:${ref.k}:${ref.slab}`;
   return null;
 }
 
@@ -105,19 +106,49 @@ export function buildWorld(map) {
     return d.o === 'h' ? box(d.x * CELL + u0, F, d.z * CELL - 0.07, d.x * CELL + u1, F + top, d.z * CELL + 0.07, { door: d.id })
       : box(d.x * CELL - 0.07, F, d.z * CELL + u0, d.x * CELL + 0.07, F + top, d.z * CELL + u1, { door: d.id });
   };
+  // battant ouvert : plaqué en travers du mur, du côté où il s'est ouvert (comme à l'écran, voir view/interior.js) ; on ne
+  // le traverse pas. Le rideau d'un portail, lui, s'enroule en haut
+  const openSolid = (d) => {
+    if (d.kind === 'portail') return null;
+    const b = map.buildings[d.b], F = floorY(b, d.k), top = F + 2.35 * levelH(b) / STOREY;
+    if (d.o === 'h') {
+      const s = d.swing || (d.nz ? -d.nz : 1), hx = d.x * CELL + 1.3, z0 = d.z * CELL;
+      return box(hx - 0.07, F, Math.min(z0, z0 + s * 1.4), hx + 0.07, top, Math.max(z0, z0 + s * 1.4), { door: d.id });
+    }
+    const s = d.swing || (d.nx ? -d.nx : 1), hz = d.z * CELL + 1.3, x0 = d.x * CELL;
+    return box(Math.min(x0, x0 + s * 1.4), F, hz - 0.07, Math.max(x0, x0 + s * 1.4), top, hz + 0.07, { door: d.id });
+  };
   function setDoor(id, open) {
     const d = doors.get(id);
     if (!d || d.dead || d.open === open) return d;
     d.open = open;
-    if (open && d.solid) { remove(d.solid); d.solid = null; } else if (!open) d.solid = doorSolid(d);
+    if (d.solid) remove(d.solid);
+    d.solid = open ? openSolid(d) : doorSolid(d);
     return d;
   }
   const ramp = (r) => {
     ramps.push(r); cellRange(r.x0, r.z0, r.x1, r.z1, (k) => rgrid[k].push(r));
     r.key = keyOf(r.ref);
     if (r.key) { if (!byKey.has(r.key)) byKey.set(r.key, []); byKey.get(r.key).push(r); }
+    if (r.solid) underRamp(r);
     return r;
   };
+  // un escalier a une épaisseur : sous la rampe, une dalle en pente (boîtes de 40 cm, 55 cm sous les marches), pour ne
+  // passer au travers ni par le côté ni en sautant dessous. Leur dessus reste sous la rampe (on y marche toujours) et on
+  // garde la hauteur de passage sous la volée de l'étage du dessus (empilée dans la même case). Elles partent avec la rampe
+  const RAMP_T = 0.55;
+  function underRamp(r) {
+    const alongX = !!r.dx, L = alongX ? r.x1 - r.x0 : r.z1 - r.z0, n = Math.max(2, Math.ceil(L / 0.4)), up = r.dx || r.dz;
+    const at = (f) => r.y0 + (r.y1 - r.y0) * f;
+    for (let i = 0; i < n; i++) {
+      // i compte depuis le bas de la rampe
+      const top = at(i / n) - 0.02, bottom = Math.max(r.y0 - 0.02, at((i + 1) / n) - RAMP_T);
+      if (top - r.y0 < 0.25 || top - bottom < 0.05) continue;
+      const u0 = up > 0 ? i / n : 1 - (i + 1) / n, u1 = up > 0 ? (i + 1) / n : 1 - i / n;
+      if (alongX) box(r.x0 + L * u0, bottom, r.z0, r.x0 + L * u1, top, r.z1, r.ref);
+      else box(r.x0, bottom, r.z0 + L * u0, r.x1, top, r.z0 + L * u1, r.ref);
+    }
+  }
   function removeRamp(r) {
     if (r.dead) return;
     r.dead = true;
@@ -155,11 +186,11 @@ export function buildWorld(map) {
         }
         if (e.ext) { nodes.add(e.x + ',' + e.z); nodes.add(e.o === 'h' ? (e.x + 1) + ',' + e.z : e.x + ',' + (e.z + 1)); }
       }
-      // dalle de l'étage (sauf la trémie de l'escalier), par rangées de cases
-      if (k > 0) slabRows(b, lv.hole, (x0, x1, z) => box(x0 * CELL, F - SLAB_T, z * CELL, x1 * CELL, F, (z + 1) * CELL, { b: b.id, k, part: 'dalle' }));
+      // dalle de l'étage (sauf la trémie de l'escalier), case par case : chacune se casse (sol d'en haut, plafond d'en bas)
+      if (k > 0) slabCells(b, lv.hole, (x, z) => box(x * CELL, F - SLAB_T, z * CELL, (x + 1) * CELL, F, (z + 1) * CELL, { b: b.id, k, part: 'dalle', slab: `${x},${z}` }));
       if (lv.stairs) {
         const st = lv.stairs;
-        ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' } });
+        ramp({ x0: st.x * CELL, z0: st.z * CELL, x1: (st.x + 1) * CELL, z1: (st.z + 1) * CELL, dx: st.dx, dz: st.dz, y0: F, y1: F + H, ref: { b: b.id, k, part: 'escalier' }, solid: true });
       }
     }
     // meubles (les tapis, plantes et lampes ne gênent pas), portes
@@ -172,7 +203,7 @@ export function buildWorld(map) {
       doors.set(d.id, d);
       d.cx = d.o === 'h' ? (d.x + 0.5) * CELL : d.x * CELL; d.cz = d.o === 'h' ? d.z * CELL : (d.z + 0.5) * CELL; d.y = floorY(b, d.k);
       dgrid[Math.min(GN - 1, Math.floor(d.cz / G)) * GN + Math.min(GN - 1, Math.floor(d.cx / G))].push(d);
-      d.solid = d.open ? null : doorSolid(d);
+      d.solid = d.open ? openSolid(d) : doorSolid(d);
     }
     // poteaux d'angle (les murs se rejoignent sans fente)
     const top = floorY(b, b.floors);
@@ -181,16 +212,14 @@ export function buildWorld(map) {
       box(x * CELL - WALL_T / 2, b.y, z * CELL - WALL_T / 2, x * CELL + WALL_T / 2, top, z * CELL + WALL_T / 2, { b: b.id, part: 'poteau' });
     }
     // toit
-    slabRows(b, b.roof !== 'pente' ? b.roofHatch : null, (x0, x1, z) => box(x0 * CELL, top - SLAB_T, z * CELL, x1 * CELL, top, (z + 1) * CELL, { b: b.id, part: 'toit' }));
+    slabCells(b, b.roof !== 'pente' ? b.roofHatch : null, (x, z) => box(x * CELL, top - SLAB_T, z * CELL, (x + 1) * CELL, top, (z + 1) * CELL, { b: b.id, k: b.floors, part: 'toit', slab: `${x},${z}` }));
     if (b.roof === 'pente') {
-      // deux pans qui montent vers le faîtage, le long du grand côté
-      const alongX = b.w >= b.d, half = (alongX ? Z1 - Z0 : X1 - X0) / 2, rise = half * ROOF_SLOPE;
-      if (alongX) {
-        ramp({ x0: X0, z0: Z0, x1: X1, z1: Z0 + half, dx: 0, dz: 1, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-        ramp({ x0: X0, z0: Z0 + half, x1: X1, z1: Z1, dx: 0, dz: -1, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-      } else {
-        ramp({ x0: X0, z0: Z0, x1: X0 + half, z1: Z1, dx: 1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
-        ramp({ x0: X0 + half, z0: Z0, x1: X1, z1: Z1, dx: -1, dz: 0, y0: top, y1: top + rise, ref: { b: b.id, part: 'toit' } });
+      // deux pans qui montent vers le faîtage, le long du grand côté, découpés case par case : chaque morceau a la clé de la
+      // dalle du dessous, et se casse avec elle (on entre par le toit)
+      for (const p of roofPanes(b)) {
+        const ref = { b: b.id, k: b.floors, part: 'toit', slab: `${p.x},${p.z}` };
+        if (p.alongX) ramp({ x0: p.s0, z0: p.t0, x1: p.s1, z1: p.t1, dx: 0, dz: p.dir, y0: p.y0, y1: p.y1, ref });
+        else ramp({ x0: p.t0, z0: p.s0, x1: p.t1, z1: p.s1, dx: p.dir, dz: 0, y0: p.y0, y1: p.y1, ref });
       }
     }
     // cheminées, climatiseurs, ventilations, réservoirs
@@ -209,7 +238,7 @@ export function buildWorld(map) {
   for (const br of map.bridges) {
     const dx = br.x1 - br.x0, dz = br.z1 - br.z0, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
     const cx = (br.x0 + br.x1) / 2, cz = (br.z0 + br.z1) / 2;
-    add({ t: 2, cx, cz, ux, uz, hx: L / 2 + 2, hz: br.hw, y0: br.y - 0.6, y1: br.y + 0.05, ref: { part: 'pont' } });
+    add({ t: 2, cx, cz, ux, uz, hx: L / 2 + 0.5, hz: br.hw, y0: br.y - 0.6, y1: br.y + 0.05, ref: { part: 'pont' } });
     for (const sd of [-1, 1]) add({ t: 2, cx: cx - uz * sd * (br.hw + 0.1), cz: cz + ux * sd * (br.hw + 0.1), ux, uz, hx: L / 2, hz: 0.12, y0: br.y, y1: br.y + 1.0, ref: { part: 'rambarde' } });
   }
   for (const d of map.docks) box(d.x0, -2, d.z0, d.x1, 1.2, d.z1, { part: 'quai' });
@@ -262,6 +291,13 @@ export function buildWorld(map) {
     const k = Math.min(GN - 1, Math.max(0, Math.floor(z / G))) * GN + Math.min(GN - 1, Math.max(0, Math.floor(x / G)));
     for (const r of rgrid[k]) { const y = rampY(r, x, z); if (y != null && y <= maxY && y > best) best = y; }
     return best;
+  }
+  // pente du relief (dh/dx, dh/dz) sous des pieds à la hauteur y ; null si l'on se tient sur autre chose (plancher,
+  // construction, pont, toit) : seul le terrain naturel fait glisser
+  function slope(x, z, y) {
+    const h = map.heightAt(x, z);
+    if (y - h > 0.08) return null;
+    return [(map.heightAt(x + 0.6, z) - map.heightAt(x - 0.6, z)) / 1.2, (map.heightAt(x, z + 0.6) - map.heightAt(x, z - 0.6)) / 1.2];
   }
   // plafond le plus bas au-dessus de minY en (x, z)
   function ceiling(x, z, minY, m = 0.2) {
@@ -318,9 +354,9 @@ export function buildWorld(map) {
     for (const r of rgrid[k]) { const ry = rampY(r, x, z); if (ry != null && y <= ry + m && y >= ry - 0.3 - m) return true; }
     return false;
   }
-  // distance libre le long d'un rayon (pas de 0,2 m), plafonnée à len
-  function ray(ox, oy, oz, dx, dy, dz, len, m = 0.15) {
-    for (let t = 0.2; t <= len; t += 0.2) if (solidAt(ox + dx * t, oy + dy * t, oz + dz * t, m)) return Math.max(0, t - 0.2);
+  // distance libre le long d'un rayon (pas de step, 0,2 m par défaut), plafonnée à len
+  function ray(ox, oy, oz, dx, dy, dz, len, m = 0.15, step = 0.2) {
+    for (let t = step; t <= len; t += step) if (solidAt(ox + dx * t, oy + dy * t, oz + dz * t, m)) return Math.max(0, t - step);
     return len;
   }
   // ------------------------------------------------------------------ tirs : premier obstacle exact sur un rayon
@@ -441,19 +477,27 @@ export function buildWorld(map) {
     return best;
   }
 
-  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
+  return { solids, ramps, add, remove, box, ramp, removeRamp, removeKey, byKey, support, slope, ceiling, push, solidAt, ray, raycast, waterLevel, near, over, bounds, doors, setDoor, doorNear, grid, G, GN, watch: (fn) => watchers.push(fn) };
 }
 
-// dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)
-function slabRows(b, hole, fn) {
-  for (let z = b.z0; z < b.z0 + b.d; z++) {
-    let x = b.x0;
-    while (x < b.x0 + b.w) {
-      if (hole && hole.x === x && hole.z === z) { x++; continue; }
-      let e = x;
-      while (e < b.x0 + b.w && !(hole && hole.x === e && hole.z === z)) e++;
-      fn(x, e, z);
-      x = e;
+// toit en pente : les morceaux de ses deux pans au-dessus de chaque case (x, z), sans le débord ; s le long du faîtage,
+// t en travers (de t0 à t1), dir : sens de la montée (+1 : vers les t croissants) ; y0 en bas, y1 en haut du morceau
+export function roofPanes(b) {
+  const alongX = b.w >= b.d, top = floorY(b, b.floors), out = [];
+  const T0 = (alongX ? b.z0 : b.x0) * CELL, T1 = T0 + (alongX ? b.d : b.w) * CELL, Tm = (T0 + T1) / 2;
+  slabCells(b, null, (x, z) => {
+    const s = alongX ? x : z, t = alongX ? z : x;
+    for (const dir of [1, -1]) {
+      const t0 = Math.max(t * CELL, dir > 0 ? T0 : Tm), t1 = Math.min((t + 1) * CELL, dir > 0 ? Tm : T1);
+      if (t1 - t0 < 1e-6) continue;
+      const h = (u) => top + (dir > 0 ? u - T0 : T1 - u) * ROOF_SLOPE;
+      out.push({ x, z, alongX, dir, s0: s * CELL, s1: (s + 1) * CELL, t0, t1, y0: Math.min(h(t0), h(t1)), y1: Math.max(h(t0), h(t1)) });
     }
-  }
+  });
+  return out;
+}
+// dalle d'un étage par rangées de cases contiguës (on saute la case `hole`)
+// dalles case par case (on saute la trémie)
+export function slabCells(b, hole, fn) {
+  for (let z = b.z0; z < b.z0 + b.d; z++) for (let x = b.x0; x < b.x0 + b.w; x++) if (!(hole && hole.x === x && hole.z === z)) fn(x, z);
 }

@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { RARITY, AMMO, MATERIALS, WEAPONS, ITEMS } from '../engine/items.js';
 import { tintMaterial } from './kit.js';
-import { rarityMaterial, aimFrame } from './soldier.js';
+import { rarityMaterial, aimFrame, weaponHand } from './soldier.js';
 
 const geoCache = new Map(), matCache = new Map();
 const box = (w, h, d) => { const k = `b${w},${h},${d}`; if (!geoCache.has(k)) geoCache.set(k, new THREE.BoxGeometry(w, h, d)); return geoCache.get(k); };
@@ -97,11 +97,12 @@ function fit(g, len) {
   g.computeBoundingBox(); g.computeBoundingSphere();
   return g;
 }
-function kitWeaponGeo(w) {
-  if (kitGeos.has(w)) return kitGeos.get(w);
-  const src = w === 'pioche' ? KIT.tool : KIT.weapons[w];
-  const g = src ? fit(src.hand.clone().applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
-  kitGeos.set(w, g);
+function kitWeaponGeo(w, r = 0) {
+  const key = w + (r >= 2 ? 1 : 0);
+  if (kitGeos.has(key)) return kitGeos.get(key);
+  const W = w === 'pioche' ? (KIT.tool ? { geo: KIT.tool.hand, fix: new THREE.Quaternion() } : null) : KIT.weapons[w] ? weaponHand(KIT, w, r) : null;
+  const g = W && W.geo ? fit(W.geo.clone().applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(W.fix)).applyMatrix4(aimFrame(KIT)), LEN[w]) : null;
+  kitGeos.set(key, g);
   return g;
 }
 function kitItemGeo(c) {
@@ -127,7 +128,7 @@ export function itemModel(it) {
   const g = new THREE.Group();
   if (KIT) {
     if (!it || it.t === 'arme') {
-      const geo = kitWeaponGeo(it ? it.w : 'pioche');
+      const geo = kitWeaponGeo(it ? it.w : 'pioche', it ? it.r : 0);
       if (geo) { g.add(kitMesh(geo, rarityMaterial(it ? it.r : 0))); g.userData.kit = true; return g; }
     } else if (it.t === 'objet' && ITEM_SIZE[it.c]) {
       const geo = kitItemGeo(it.c);
@@ -160,7 +161,10 @@ export function renderIcons() {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x50586a, 2.4));
   const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(-3, 4, 2); scene.add(sun);
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 50);
-  const shoot = (key, obj, view = 'cote') => {
+  // armes et pioche en silhouettes claires (la rareté se lit à la lueur de la case) ; les objets en couleurs
+  const sil = new THREE.MeshBasicMaterial({ color: 0xf4f1ea });
+  const shoot = (key, obj, view = 'cote', flat = false) => {
+    scene.overrideMaterial = flat ? sil : null;
     scene.add(obj);
     const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
     // de côté (canon vers la droite) pour les armes ; de trois quarts pour les objets
@@ -172,8 +176,9 @@ export function renderIcons() {
     out.set(key, r.domElement.toDataURL());
     scene.remove(obj);
   };
-  for (const w of Object.keys(WEAPONS)) for (let k = 0; k < RARITY.length; k++) shoot(iconKey({ t: 'arme', w, r: k }), itemModel({ t: 'arme', w, r: k }));
-  shoot('pioche', itemModel(null));
+  for (const w of Object.keys(WEAPONS)) for (let k = 0; k < RARITY.length; k++) shoot(iconKey({ t: 'arme', w, r: k }), itemModel({ t: 'arme', w, r: k }), 'cote', true);
+  shoot('pioche', itemModel(null), 'cote', true);
+  scene.overrideMaterial = null; sil.dispose();
   for (const c of Object.keys(ITEMS)) shoot(iconKey({ t: 'objet', c }), itemModel({ t: 'objet', c, n: 1, r: 0 }), 'objet');
   r.dispose(); r.forceContextLoss();
   return out;

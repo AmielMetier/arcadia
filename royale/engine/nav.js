@@ -5,12 +5,12 @@
 // construction met la grille à jour (world.watch). Moteur PUR, utilisé seulement là où la partie tourne.
 import { CELL } from './buildings.js';
 import { floorY, levelH } from './world.js';
-import { WATER } from './map.js';
+import { WATER, SLIDE } from './map.js';
 
 const MARGIN = 0.4;           // marge autour des obstacles (un peu plus que le rayon d'un joueur ; les portes passent)
 const LOW = 0.5, HIGH = 1.7;  // tranche de hauteur qui gêne (au-dessus des pieds) : la marche franchie, la tête
 const SOLID = 1, FIXED = 2, SWIM = 4, TEMP = 8, BLOCK = SOLID | FIXED | TEMP;
-const BUDGET = 24000;         // nœuds visités au plus par recherche
+const BUDGET = 24000;         // nœuds visités au plus par recherche (au-delà : chemin partiel, repris en route)
 const SQ2 = Math.SQRT2;
 const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, SQ2], [1, -1, SQ2], [-1, 1, SQ2], [-1, -1, SQ2]];
 
@@ -52,17 +52,15 @@ export function createNav(map, world, { r: R = MARGIN } = {}) {
     if (wk === WATER.MER && depth > 2.2) ground[k] = FIXED;
     else if (depth > 1.25) ground[k] = SWIM;
   }
-  // falaises : là où le terrain tombe de plus de 2,5 m par mètre, on ne passe pas (on tomberait de haut)
+  // pentes trop raides : on y glisse (player.js), les bots n'y passent pas
   const Hh = map.heights;
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const h = Hh[j * N + i];
-    for (const [di, dj] of [[1, 0], [0, 1]]) {
-      const ii = i + di, jj = j + dj;
-      if (ii >= N || jj >= N || Math.abs(Hh[jj * N + ii] - h) < 2.5 * HR) continue;
-      for (let t = 0; t <= HR; t++) {
-        const x = i * HR + di * t, z = j * HR + dj * t;
-        if (x < W && z < W) ground[z * W + x] |= FIXED;
-      }
+  for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
+    const h = Hh[j * N + i], gx = (Hh[j * N + i + 1] - h) / HR, gz = (Hh[(j + 1) * N + i] - h) / HR;
+    const gx2 = (Hh[(j + 1) * N + i + 1] - Hh[(j + 1) * N + i]) / HR, gz2 = (Hh[(j + 1) * N + i + 1] - Hh[j * N + i + 1]) / HR;
+    if (Math.max(Math.hypot(gx, gz), Math.hypot(gx2, gz2)) < SLIDE) continue;
+    for (let dz = 0; dz <= HR; dz++) for (let dx = 0; dx <= HR; dx++) {
+      const x = i * HR + dx, z = j * HR + dz;
+      if (x < W && z < W) ground[z * W + x] |= FIXED;
     }
   }
   // escaliers : la case de la rampe et la trémie au-dessus sont bouchées ; on passe par les liens
@@ -184,7 +182,15 @@ export function createNav(map, world, { r: R = MARGIN } = {}) {
   };
 
   // ------------------------------------------------------------------ A*
+  // coûts et parents dans des tableaux typés (un par nœud de l'île, créés au premier chemin) ; gen marque ceux de la
+  // recherche en cours, sans tout remettre à zéro
+  let gArr = null, parArr = null, genArr = null, gen = 0;
   let heapId = new Int32Array(4096), heapF = new Float32Array(4096), heapN = 0;
+  let px = 0, pz = 0, pL = null; // position du nœud (posInto) sans créer d'objet
+  function posInto(id) {
+    const L = layerAt(id), i = id - L.off;
+    pL = L; px = L.x0 + (i % L.w); pz = L.z0 + ((i / L.w) | 0);
+  }
   function push(id, f) {
     if (heapN >= heapId.length) { const a = new Int32Array(heapId.length * 2); a.set(heapId); heapId = a; const b = new Float32Array(heapF.length * 2); b.set(heapF); heapF = b; }
     let i = heapN++;
@@ -226,43 +232,46 @@ export function createNav(map, world, { r: R = MARGIN } = {}) {
     const hx = gp.x, hz = gp.z, hk = gp.L.k;
     // distance à plat, plus un forfait par étage à monter ou descendre (escalier et tour du palier)
     const h = (x, z, k) => { const dx = Math.abs(x - hx), dz = Math.abs(z - hz); return 1.25 * (dx + dz + (SQ2 - 2) * Math.min(dx, dz) + Math.abs(k - hk) * 12); };
-    const g = new Map(), par = new Map();
+    if (!gArr) { gArr = new Float32Array(total); parArr = new Int32Array(total); genArr = new Uint16Array(total); }
+    if (++gen > 65000) { genArr.fill(0); gen = 1; }
+    const seen = (id) => genArr[id] === gen;
+    const set = (id, v, p) => { genArr[id] = gen; gArr[id] = v; parArr[id] = p; };
     heapN = 0;
-    g.set(a, 0); par.set(a, -1);
-    const ap = posOf(a);
-    push(a, h(ap.x, ap.z, ap.L.k));
+    set(a, 0, -1);
+    posInto(a);
+    push(a, h(px, pz, pL.k));
     let best = a, bh = Infinity, n = 0, found = false;
     while (heapN && n < budget) {
       const id = pop();
       if (id === goal) { found = true; best = id; break; }
       n++;
-      const { x, z, L } = posOf(id), gi = g.get(id);
+      posInto(id);
+      const x = px, z = pz, L = pL, gi = gArr[id];
       const hi = h(x, z, L.k);
       if (hi < bh) { bh = hi; best = id; }
-      for (const [dx, dz, c] of DIRS) {
-        const nx = x + dx, nz = z + dz;
+      for (let di = 0; di < 8; di++) {
+        const D = DIRS[di], dx = D[0], dz = D[1], nx = x + dx, nz = z + dz;
         const f = flags(L, nx, nz);
         if (f & BLOCK) continue;
         // pas de coin coupé en diagonale
         if (dx && dz && (!free(L, x + dx, z) || !free(L, x, z + dz))) continue;
-        const nid = nodeOf(L, nx, nz), ng = gi + c * (f & SWIM ? 3 : 1);
-        const old = g.get(nid);
-        if (old !== undefined && old <= ng) continue;
-        g.set(nid, ng); par.set(nid, id);
+        const nid = nodeOf(L, nx, nz), ng = gi + D[2] * (f & SWIM ? 3 : 1);
+        if (seen(nid) && gArr[nid] <= ng) continue;
+        set(nid, ng, id);
         push(nid, ng + h(nx, nz, L.k));
       }
       const ln = links.get(id);
       if (ln) for (const nid of ln) {
-        const ng = gi + 7, old = g.get(nid);
-        if (old !== undefined && old <= ng) continue;
-        g.set(nid, ng); par.set(nid, id);
-        const q = posOf(nid);
-        push(nid, ng + h(q.x, q.z, q.L.k));
+        const ng = gi + 7;
+        if (seen(nid) && gArr[nid] <= ng) continue;
+        set(nid, ng, id);
+        posInto(nid);
+        push(nid, ng + h(px, pz, pL.k));
       }
     }
     // chemin (jusqu'au but, ou jusqu'au nœud le plus proche du but)
     const ids = [];
-    for (let id = best; id !== -1; id = par.get(id)) ids.push(id);
+    for (let id = best; id !== -1; id = parArr[id]) ids.push(id);
     ids.reverse();
     return { pts: smooth(ids), reached: found, n };
   }

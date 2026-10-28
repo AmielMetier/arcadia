@@ -16,6 +16,8 @@ import { createBuild, slotFor } from '../royale/engine/build.js';
 import { weapon } from '../royale/engine/items.js';
 import { newPlayer, stepPlayer } from '../royale/engine/player.js';
 import { createAI } from '../royale/engine/ai.js';
+import { makeTeams } from '../royale/engine/teams.js';
+import { skillOf, botLevels } from '../royale/engine/skill.js';
 import { snapshot, applySnapshot, mirrorEvent, fullState, applyFull, cleanInput, predictStep, MODES } from '../royale/engine/net.js';
 
 const SEEDS = +(process.argv[2] || 12);
@@ -99,6 +101,31 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const yawTo = (dx, dz) => Math.atan2(dx, dz);
   const run = (p, inp, sec) => { for (let i = 0; i < sec * 60; i++) stepPlayer(p, inp, W, 1 / 60); return p; };
   const inside = (p, b) => p.x > b.x0 * CELL && p.x < (b.x0 + b.w) * CELL && p.z > b.z0 * CELL && p.z < (b.z0 + b.d) * CELL;
+  // glissade : en sprintant, s'accroupir lance une glissade (bien plus loin qu'en marchant accroupi), qui s'arrête
+  // seule ; pas à simple course, ni pour les bots (glisse absent)
+  {
+    let sx = 0, sz = 0;
+    for (let i = 0; i < 6000 && !sx; i++) {
+      const x = 300 + ((i * 7919) % 1000), z = 300 + ((i * 104729) % 1000), y = m.heightAt(x, z);
+      if (m.groundAt(x, z) !== 2 || m.waterAt(x, z) || Math.abs(m.heightAt(x, z + 30) - y) > 0.5) continue;
+      let clear = true;
+      for (let d = 0; d <= 30 && clear; d += 1) if (W.solidAt(x, m.heightAt(x, z + d) + 1, z + d, 0.6)) clear = false;
+      if (clear) { sx = x; sz = z; }
+    }
+    const go = (sprint, glisse) => {
+      const p = newPlayer(sx, m.heightAt(sx, sz) + 0.2, sz, 0);
+      run(p, { mz: 1, yaw: 0, sprint }, 1.2);
+      const z0 = p.z;
+      run(p, { mz: 1, yaw: 0, sprint, crouch: true, glisse }, 1 / 60);
+      const started = p.slideT > 0, v0 = Math.hypot(p.vx, p.vz);
+      run(p, { mz: 1, yaw: 0, sprint, crouch: true, glisse }, 1.6);
+      return { started, v0, d: p.z - z0, over: p.slideT === 0, crouch: p.crouch };
+    };
+    const g = go(true, true), bot = go(true, false), walk = go(false, true);
+    ok(sx && g.started && g.v0 > 8.5 && g.over && g.crouch && !bot.started && !walk.started && g.d > bot.d + 2,
+      `glissade : lancée ${g.started} à ${g.v0.toFixed(1)} m/s, ${g.d.toFixed(1)} m (accroupi sans glisser : ${bot.d.toFixed(1)} m), finie ${g.over}, bot ${bot.started}, à la course ${walk.started}`);
+    console.log(`glissade : ${g.v0.toFixed(1)} m/s au départ, ${g.d.toFixed(1)} m en 1,6 s (accroupi : ${bot.d.toFixed(1)} m)`);
+  }
   let doors = 0, stairs = 0;
   for (const b of m.buildings) {
     // par la porte d'entrée (ou le portail)
@@ -157,6 +184,60 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const sw = newPlayer(m.lake.x, m.lake.level, m.lake.z, 0);
   run(sw, { mz: 1, yaw: 0 }, 1);
   ok(sw.swim && sw.y > m.lake.level - 1.6 && sw.y < m.lake.level - 1, `on ne nage pas dans le lac (${sw.y.toFixed(2)} pour un niveau de ${m.lake.level.toFixed(2)})`);
+  // suivre une route à pied, point par point ; low : plus bas atteint sous la route (on tombe d'un pont, dans l'eau)
+  const follow = (p, pts) => {
+    let low = 0, swim = false;
+    for (const q of pts) {
+      for (let f = 0; f < 360 && Math.hypot(q.x - p.x, q.z - p.z) > 1.2; f++) {
+        stepPlayer(p, { mz: 1, yaw: yawTo(q.x - p.x, q.z - p.z) }, W, 1 / 60);
+        low = Math.max(low, q.y - p.y); swim ||= p.swim;
+      }
+      if (Math.hypot(q.x - p.x, q.z - p.z) > 1.2) return { done: false, low, swim };
+    }
+    return { done: true, low, swim };
+  };
+  // ponts : on les traverse sans tomber ni buter, dans les deux sens
+  let bridgesOk = 0;
+  for (const r of m.roads) {
+    const i0 = r.pts.findIndex((q) => q.bridge);
+    if (i0 < 0) continue;
+    let i1 = i0; while (i1 + 1 < r.pts.length && r.pts[i1 + 1].bridge) i1++;
+    const pts = r.pts.slice(Math.max(0, i0 - 3), i1 + 4);
+    for (const way of [pts, [...pts].reverse()]) {
+      const p = newPlayer(way[0].x, way[0].y + 0.3, way[0].z, 0);
+      run(p, { yaw: 0 }, 0.3);
+      const res = follow(p, way.slice(1));
+      ok(res.done && !res.swim && res.low < 0.7, `pont : traversée ratée (arrivé ${res.done}, à l'eau ${res.swim}, ${res.low.toFixed(2)} m sous la route)`);
+      if (res.done && !res.swim && res.low < 0.7) bridgesOk++;
+    }
+  }
+  // pentes : un flanc de montagne à plus de 45° ne s'escalade pas (même en sautant) ; on glisse vers le bas
+  let steep = null;
+  for (let z = 8; z < m.size - 8 && !steep; z += 3) for (let x = 8; x < m.size - 8; x += 3) {
+    if (m.waterAt(x, z) || m.heightAt(x, z) < 30) continue;
+    const s = W.slope(x, z, m.heightAt(x, z));
+    if (s && Math.hypot(s[0], s[1]) > 1.1) { steep = { x, z, s }; break; }
+  }
+  ok(steep, 'aucun flanc raide sur l\'île');
+  if (steep) {
+    const cp = newPlayer(steep.x, m.heightAt(steep.x, steep.z), steep.z, 0), y0 = cp.y;
+    run(cp, { mz: 1, sprint: true, jump: true, yaw: yawTo(steep.s[0], steep.s[1]) }, 3);
+    ok(cp.y < y0 - 1, `on escalade un flanc de ${Math.round(Math.atan(Math.hypot(...steep.s)) * 180 / Math.PI)}° (${y0.toFixed(1)} → ${cp.y.toFixed(1)} m)`);
+  }
+  // par le chemin, on monte à pied jusqu'au refuge du sommet
+  const chalet = m.pois.find((q) => q.kind === 'chalet');
+  if (chalet) {
+    const dc = (q) => Math.hypot(q.x - chalet.x, q.z - chalet.z);
+    const road = m.roads.find((r) => Math.min(...r.pts.map(dc)) < 40);
+    ok(road, 'pas de chemin jusqu\'au refuge');
+    if (road) {
+      const pts = dc(road.pts[0]) < dc(road.pts[road.pts.length - 1]) ? [...road.pts].reverse() : road.pts;
+      const p = newPlayer(pts[0].x, pts[0].y + 0.3, pts[0].z, 0);
+      const res = follow(p, pts.slice(1));
+      ok(res.done && dc(p) < 40, `le chemin du refuge ne se monte pas à pied (arrêté à ${Math.round(dc(p))} m, ${p.y.toFixed(1)} m d'altitude)`);
+    }
+  }
+  console.log(`  ${bridgesOk} traversées de pont · flanc raide ${steep ? 'glissant' : '—'} · refuge du sommet ${chalet ? 'atteint par le chemin' : '—'}`);
   // 30 joueurs qui courent et sautent : coût d'un pas
   const pl = Array.from({ length: 30 }, (_, i) => newPlayer(m.center - 300 + i * 20, 40, m.center));
   t = performance.now();
@@ -205,6 +286,13 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   sim.input('a', { fire: false });
   ok(elim && elim.by === 'a' && A.kills === 1, 'A n\'élimine pas B');
   ok([...sim.S.items.values()].some((g) => g.it.t === 'arme' && g.it.w === 'pompe' && Math.hypot(g.x - Bp.x, g.z - Bp.z) < 3), 'B ne lâche pas son arme');
+  // la même arme en mieux remplace l'ancienne (lâchée au sol) au lieu de prendre une case de plus
+  A.inv = [weapon('fusil', 3), weapon('pompe', 0), weapon('smg', 1), null, null];
+  for (const g of [...sim.S.items.values()]) if (Math.hypot(g.x - A.x, g.z - A.z) < 4) sim.S.items.delete(g.id);
+  sim.spawnItem(weapon('pompe', 2), A.x + Math.sin(A.yaw) * 1, A.y + 0.2, A.z + Math.cos(A.yaw) * 1, true);
+  sim.input('a', { pitch: -0.5, use: 2, fire: false, aim: false }); sim.step(DT);
+  const old = [...sim.S.items.values()].find((g) => g.it.t === 'arme' && g.it.w === 'pompe' && Math.hypot(g.x - A.x, g.z - A.z) < 3);
+  ok(A.inv[1] && A.inv[1].w === 'pompe' && A.inv[1].r === 2 && !A.inv[3] && old && old.it.r === 0, `même arme en mieux : ${A.inv.map((q) => q ? q.w + q.r : '-').join(' ')}, au sol ${old ? old.it.w + old.it.r : 'rien'}`);
   // récolte : un arbre tombe à la pioche et donne du bois
   const ti = m.props.findIndex((p) => p.kind === 'arbre'), t = m.props[ti];
   Object.assign(A, { x: t.x - 1.6, z: t.z, y: W.support(t.x - 1.6, t.z, 400), vx: 0, vz: 0 });
@@ -240,9 +328,73 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const key = `w:${bld.id}:0:${wall.o}${wall.x},${wall.z}`, had = A.mats[bld.mat];
   for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 50, A, [0, 0, 0], true);
   ok(B.broken.has(key) && !(W.byKey.get(key) || []).length && A.mats[bld.mat] > had, 'un mur de maison ne se casse pas');
+  // un tableau (ou une horloge) tombe avec le mur où il est accroché, pas avec le voisin
+  let deco = null, dk = null;
+  for (const b of m.buildings) for (const f of b.furniture) {
+    if (deco || (f.kind !== 'cadre' && f.kind !== 'horloge')) continue;
+    const e = b.levels[f.k].walls.find((w) => (w.o === 'h' ? Math.abs(f.z - w.z * CELL) < 0.4 && f.x > w.x * CELL && f.x < (w.x + 1) * CELL
+      : Math.abs(f.x - w.x * CELL) < 0.4 && f.z > w.z * CELL && f.z < (w.z + 1) * CELL));
+    if (e) { deco = f; dk = `w:${b.id}:${f.k}:${e.o}${e.x},${e.z}`; }
+  }
+  ok(deco, 'aucun tableau accroché à un mur');
+  if (deco) {
+    const others = m.buildings[deco.b].furniture.filter((f) => f !== deco && (f.kind === 'cadre' || f.kind === 'horloge') && !B.broken.has('f:' + f.id));
+    for (let i = 0; i < 40 && !B.broken.has(dk); i++) B.hit(dk, 100, null, [deco.x, 1, deco.z], false);
+    const gone = others.filter((f) => B.broken.has('f:' + f.id)).length;
+    ok(B.broken.has(dk) && B.broken.has('f:' + deco.id) && gone <= 2, `tableau resté en l'air (${B.broken.has('f:' + deco.id)}), ${gone} autres tombés`);
+  }
+  // une porte part avec le pan de mur qui la tient
+  const db = m.buildings.find((b) => b.doors.length && !B.broken.has('d:' + b.doors[0].id)), door = db.doors[0];
+  const doorWall = `w:${db.id}:${door.k}:${door.o}${door.x},${door.z}`;
+  for (let i = 0; i < 40 && !B.broken.has(doorWall); i++) B.hit(doorWall, 100, null, [0, 0, 0], false);
+  ok(B.broken.has(doorWall) && B.broken.has('d:' + door.id) && !W.byKey.has('d:' + door.id), `porte restée debout dans le mur cassé ${doorWall}`);
+  // visée : le mur va sur le trait de grille juste devant soi, pas deux cases plus loin
+  const gx = Math.floor((spot.x + 20) / CELL), gz = Math.floor((spot.z + 20) / CELL), gy = W.support((gx + 0.5) * CELL, (gz + 0.5) * CELL, 400);
+  const ws = slotFor(gx * CELL + 3.2, gy, (gz + 0.5) * CELL, Math.PI / 2, 0, 'mur', B.pieces, W);
+  ok(ws.o === 'v' && ws.x === gx + 1 && Math.abs(ws.y0 - gy) < 0.5, `mur visé : ${JSON.stringify(ws)} au lieu du trait x = ${gx + 1}`);
+  // pas de construction dans le vide : un sol deux étages au-dessus du sol, sans rien autour, est refusé
+  ok(!B.canPlace({ kind: 'sol', x: gx + 3, z: gz + 3, y0: W.support((gx + 3.5) * CELL, (gz + 3.5) * CELL, 400) + 6.4 }), 'on construit dans le vide');
+  // un escalier construit ne se traverse ni par le côté ni par-dessous
+  Object.assign(A, { x: (gx + 0.5) * CELL, z: (gz - 0.5) * CELL, y: W.support((gx + 0.5) * CELL, (gz - 0.5) * CELL, 400), vx: 0, vz: 0 });
+  sim.input('a', { build: 'escalier', mat: 'bois', yaw: 0, pitch: -0.3, shoot: ++shots }); for (let i = 0; i < 10; i++) sim.step(DT); sim.input('a', { build: null });
+  const ramp = [...B.pieces.values()].find((p) => p.kind === 'escalier' && p !== st);
+  ok(ramp, 'escalier de l\'essai non posé');
+  if (ramp) {
+    for (let i = 0; i < 200; i++) sim.step(DT); // il durcit
+    const walk = (p, inp, sec) => { for (let i = 0; i < sec * 60; i++) stepPlayer(p, inp, W, 1 / 60); return p; };
+    const mid = (ramp.z + 0.5) * CELL, side = newPlayer((ramp.x - 0.6) * CELL, W.support((ramp.x - 0.6) * CELL, mid, ramp.y0 + 0.5), mid, Math.PI / 2);
+    walk(side, { mz: 1, yaw: side.yaw }, 1.2);
+    ok(side.x < ramp.x * CELL + 0.2, `on traverse un escalier par le côté (x ${side.x.toFixed(2)}, bord ${ramp.x * CELL})`);
+    const under = newPlayer((ramp.x + 0.5) * CELL, ramp.y0, (ramp.z + 0.85) * CELL, 0);
+    stepPlayer(under, { jump: true, yaw: 0 }, W, 1 / 60); walk(under, { yaw: 0 }, 0.8);
+    const top = W.support(under.x, under.z, ramp.y0 + 4);
+    ok(under.y < top - 0.4, `on traverse un escalier en sautant dessous (y ${under.y.toFixed(2)}, marche ${top.toFixed(2)})`);
+  }
   // coût d'un pas avec 3 joueurs et le butin de l'île
   const t0 = performance.now(); for (let i = 0; i < 300; i++) sim.step(DT);
   console.log(`  partie : saut, coffre, élimination, récolte, construction et effondrement vérifiés · ${((performance.now() - t0) / 300).toFixed(3)} ms par pas`);
+}
+// tous les coffres de l'île : l'arme sort devant le coffre, à son niveau, sans mur ni meuble entre les deux
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const sim = createSim({ map: m, world: W, seed: 7, roster: [{ id: 'a', name: 'A' }], mode: 'exploration' });
+  const A = sim.player('a');
+  let n = 0;
+  const bad = [];
+  for (const c of sim.S.chests.values()) {
+    if (c.kind !== 'coffre') continue;
+    n++;
+    const fx = c.fx || 0, fz = c.fz || 1, before = new Set(sim.S.items.keys());
+    Object.assign(A, { x: c.x + fx * 1.2, z: c.z + fz * 1.2, y: c.y, vx: 0, vz: 0, mode: 'sol', alive: true });
+    sim.input('a', { yaw: Math.atan2(-fx, -fz), pitch: -0.3, use: n });
+    for (let i = 0; i < 90 && !c.open; i++) sim.step(DT);
+    const w = [...sim.S.items.values()].find((g) => !before.has(g.id) && g.it.t === 'arme');
+    const ox = c.x + fx * 0.55, oz = c.z + fz * 0.55, L = w ? Math.hypot(w.x - ox, w.z - oz) || 1 : 0;
+    if (!c.open || !w) bad.push(`${c.id} ${c.open ? 'sans arme' : 'fermé'}`);
+    else if (L > 2.2 || Math.abs(w.y - c.y) > 0.8 || W.raycast(ox, c.y + 0.4, oz, (w.x - ox) / L, 0, (w.z - oz) / L, L).t < L - 0.05) bad.push(`${c.id} arme hors d'atteinte`);
+  }
+  ok(n > 100 && !bad.length, `coffres (${n}) : ${bad.slice(0, 5).join(', ')}`);
+  console.log(`  ${n} coffres ouverts : l'arme sort devant chacun`);
 }
 // ------------------------------------------------------------------ bots et réseau
 // Une partie de bots (et d'un joueur invité) suivie par deux copies d'invités : l'une là dès le départ, l'autre
@@ -264,6 +416,9 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     // un bot pose un mur une fois au sol
     const B0 = [...host.S.players.values()].find((p) => p.bot && p.alive && p.mode === 'sol' && p.ground);
     if (!built && B0 && step % 30 === 0) { B0.mats.bois = 60; built = !!hb.place(B0, 'mur', 'bois'); }
+    // une voiture cassée avant l'arrivée du second invité, une dalle d'étage après : les copies doivent suivre
+    if (step === 60 * 50) { const pi = m.props.findIndex((p) => p.kind === 'voiture'); if (pi >= 0) hb.hit('p:' + pi, 1e5, null, [m.props[pi].x, 1, m.props[pi].z], false); }
+    if (step === 60 * 100) { const bb = m.buildings.find((b) => b.floors > 1 && !(b.levels[1].hole && b.levels[1].hole.x === b.x0 && b.levels[1].hole.z === b.z0)); hb.hit(`s:${bb.id}:1:${bb.x0},${bb.z0}`, 1e5, null, [bb.x0 * 4 + 2, floorY(bb, 1), bb.z0 * 4 + 2], false); }
     host.step(DT);
     for (const e of host.takeEvents()) { pend.push(e); if (e.e === 'elim') kills++; }
     if (step === 60 * 70) { g2 = copy(); applyFull(g2.sim, g2.W, g2.b, wire(fullState(host, Wh, hb))); }
@@ -291,7 +446,7 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   };
   same(g1, 'invité du départ'); same(g2, 'invité arrivé en route');
   ok(built && hb.pieces.size >= 1, 'une construction pendant la partie');
-  ok(kills >= 2 && hb.broken.size > 0, `des bots qui se battent (${kills} éliminations) et cassent le décor`);
+  ok(kills >= 2 && hb.broken.size >= 2, `des bots qui se battent (${kills} éliminations), du décor cassé (${hb.broken.size})`);
   // l'hôte s'en va : la copie reprend la partie et la mène à son terme
   const G = g1.sim;
   G.S.nextItem = Math.max(G.S.nextItem, ...[...G.S.items.keys()].map((k) => k + 1));
@@ -337,6 +492,319 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
   ok(fix < 1, `prédiction de l'invité : correction maximale ${fix.toFixed(2)} m`);
   console.log(`  prédiction : correction moyenne ${(fixes / 600 * 100).toFixed(1)} cm, au pire ${(fix * 100).toFixed(0)} cm (100 ms aller, 100 ms retour)`);
+}
+// ------------------------------------------------------------------ bots contre l'hôte, balle du sniper, chutes, dalles
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  // l'hôte du salon a l'identifiant 0 : les bots doivent l'attaquer comme les autres
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, ...Array.from({ length: 11 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal' }))];
+  const sim = createSim({ map: m, world: W, seed: 7, roster, mode: 'partie' });
+  const B = createBuild(sim, m, W);
+  createAI(sim, m, W);
+  const host = sim.player(0);
+  while (sim.S.t < 140) { sim.step(DT); sim.takeEvents(); }
+  const armed = [...sim.S.players.values()].filter((P) => P.bot && P.alive && P.mode === 'sol' && P.inv.some((it) => it && it.t === 'arme' && it.mag > 0));
+  let attacked = 0, tries = 0;
+  for (const P of armed.slice(0, 4)) {
+    const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
+    const x = P.x + fx * 12, z = P.z + fz * 12, y = W.support(x, z, P.y + 1.5);
+    if (Math.abs(y - P.y) > 1.5) continue;
+    Object.assign(host, { x, y, z, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 0, alive: true });
+    tries++;
+    const t0 = sim.S.t;
+    let hurt = false;
+    while (sim.S.t < t0 + 8 && host.alive && !hurt) { sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'degat' && e.to === 0 && e.by != null) hurt = true; }
+    if (hurt) attacked++;
+  }
+  ok(tries > 0 && attacked >= Math.ceil(tries / 2), `les bots n'attaquent pas l'hôte (identifiant 0) : ${attacked}/${tries}`);
+  // balle du fusil de précision : elle vole, tombe et dérive à droite (Coriolis) ; tirée à 150 m d'altitude vers le nord
+  const shooter = armed[0] || [...sim.S.players.values()].find((P) => P.bot && P.alive);
+  sim.S.hooks.think = null;
+  sim.S.projectiles.length = 0;
+  const o = [400, 150, 400];
+  const pr = { id: 9999, kind: 'balle', x: o[0], y: o[1], z: o[2], vx: 0, vy: 0, vz: 460, owner: shooter.id, it: { t: 'arme', w: 'sniper', r: 3, mag: 0 }, life: 2, from: [...o], dist: 0 };
+  sim.S.projectiles.push(pr);
+  if (pr) {
+    let t = 0;
+    while (sim.S.projectiles.includes(pr) && pr.z < o[2] + 300) { sim.step(DT); t += DT; }
+    const drop = o[1] - pr.y, drift = o[0] - pr.x; // regard vers +z : la droite est vers −x
+    ok(t > 0.5 && t < 0.9, `vol de 300 m en ${t.toFixed(2)} s`);
+    ok(drop > 1.2 && drop < 3.5, `chute de la balle à 300 m : ${drop.toFixed(2)} m`);
+    ok(drift > 0.1 && drift < 1.5, `dérive de Coriolis à 300 m : ${drift.toFixed(2)} m vers la droite`);
+    console.log(`\nbots contre l'hôte : ${attacked}/${tries} · balle à 300 m : ${t.toFixed(2)} s, chute ${drop.toFixed(2)} m, dérive ${drift.toFixed(2)} m à droite`);
+  }
+  // une chute enlève de la vie, pas du bouclier
+  Object.assign(host, { alive: true, hp: 100, sh: 50 });
+  sim.damage(host, 20, null, { cause: 'chute' });
+  ok(host.sh === 50 && host.hp === 80, `chute : bouclier ${host.sh}, vie ${host.hp}`);
+  // une dalle d'étage se casse, et l'on passe au travers
+  const bb = m.buildings.find((b) => b.floors > 1 && b.levels[1]);
+  const cx = bb.x0 + (bb.levels[1].hole && bb.levels[1].hole.x === bb.x0 ? 1 : 0), cz = bb.z0;
+  const key = `s:${bb.id}:1:${cx},${cz}`;
+  ok(W.byKey.has(key), `dalle ${key} introuvable`);
+  const px = (cx + 0.5) * 4, pz = (cz + 0.5) * 4, F1 = floorY(bb, 1);
+  ok(Math.abs(W.support(px, pz, F1 + 0.3) - F1) < 0.05, 'on ne tient pas sur la dalle de l\'étage');
+  for (let i = 0; i < 20 && !B.broken.has(key); i++) B.hit(key, 100, null, [px, F1, pz], false);
+  ok(B.broken.has(key) && W.support(px, pz, F1 + 0.3) < F1 - 1, 'la dalle cassée tient encore');
+  // on se pose sur un toit (en pente ou plat), on le casse à la pioche et l'on tombe dans le dernier étage
+  sim.S.hooks.think = null;
+  for (const kind of ['pente', 'plat']) {
+    const rb = m.buildings.find((b) => b.roof === kind && b.w >= 3 && b.d >= 3 && b.floors <= 3 && !b.abandoned);
+    const cx = rb.x0 + 1, cz = rb.z0 + 1, rx = (cx + 0.5) * 4, rz = (cz + 0.5) * 4, top = floorY(rb, rb.floors), last = floorY(rb, rb.floors - 1);
+    const rkey = `s:${rb.id}:${rb.floors}:${cx},${cz}`, roofY = W.support(rx, rz, 400);
+    ok(roofY >= top - 0.05, `toit ${kind} : on ne tient pas dessus (${roofY.toFixed(1)} / ${top.toFixed(1)})`);
+    Object.assign(host, { x: rx, y: roofY, z: rz, vx: 0, vy: 0, vz: 0, mode: 'sol', alive: true, hp: 100, sh: 100, ground: true, sel: 0, swing: 0 });
+    let swings = 0;
+    for (let k = 0; k < 20 / DT && !B.broken.has(rkey); k++) {
+      host.inp = { ...host.inp, mx: 0, mz: 0, yaw: 0, pitch: -1.5, fire: true, sel: 0, build: null, aim: false };
+      Object.assign(host, { hp: 100, sh: 100 });
+      sim.step(DT);
+      for (const e of sim.takeEvents()) if (e.e === 'pioche' && e.p === host.id) swings++;
+    }
+    for (let k = 0; k < 2 / DT; k++) { host.inp = { ...host.inp, fire: false }; sim.step(DT); sim.takeEvents(); }
+    ok(B.broken.has(rkey), `toit ${kind} : pas cassé en ${swings} coups de pioche`);
+    ok(host.y < top - 1 && host.y >= last - 0.05, `toit ${kind} : on ne tombe pas dans le dernier étage (y ${host.y.toFixed(1)}, étage ${last.toFixed(1)})`);
+    console.log(`toit ${kind} (${rb.type}) cassé en ${swings} coups de pioche, on tombe à ${host.y.toFixed(1)} m (dernier étage à ${last.toFixed(1)} m)`);
+  }
+}
+// ------------------------------------------------------------------ un bot touché de loin pose un mur et se couvre
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, { id: 'b', name: 'Bot', color: '#888', bot: true, level: 'difficile' }];
+  const sim = createSim({ map: m, world: W, seed: 3, roster, mode: 'partie' });
+  const B = createBuild(sim, m, W); createAI(sim, m, W);
+  while (sim.S.phase === 'vol') { sim.step(DT); sim.takeEvents(); }
+  const host = sim.player(0), bot = sim.player('b');
+  // sur un terrain dégagé : le bot armé, avec du bois ; l'hôte à 15 m devant lui
+  let spot = null;
+  for (let i = 0; i < 400 && !spot; i++) {
+    const x = 300 + (i % 20) * 30, z = 300 + Math.floor(i / 20) * 30, y = W.support(x, z, 200);
+    if (y > 2 && Math.abs(W.support(x, z + 15, 200) - y) < 0.5 && !m.waterAt(x, z) && !m.waterAt(x, z + 15)) spot = { x, y, z };
+  }
+  Object.assign(bot, { x: spot.x, y: spot.y, z: spot.z, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 100, alive: true, ground: true });
+  bot.inv[0] = weapon('fusil', 2); bot.ammo.moyennes = 200; bot.mats.bois = 60;
+  Object.assign(host, { x: spot.x, y: W.support(spot.x, spot.z + 15, 200), z: spot.z + 15, vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 100, alive: true });
+  // l'hôte le touche toutes les demi-secondes (et reste en vie) : en 4 s, le bot doit s'être couvert
+  let walls = 0;
+  for (let k = 0; k < 4 / DT && !walls; k++) {
+    if (k % Math.round(0.5 / DT) === 0) sim.damage(bot, 5, host, { cause: 'fusil' });
+    Object.assign(host, { hp: 100, sh: 100 });
+    sim.step(DT);
+    for (const e of sim.takeEvents()) if (e.e === 'construit' && e.piece.owner === 'b' && e.piece.kind === 'mur') walls++;
+  }
+  ok(walls >= 1 && bot.mats.bois === 50 && B.pieces.size >= 1, `un bot touché de loin ne pose pas de mur (${walls} mur, bois ${bot.mats.bois})`);
+  console.log(`bot touché de loin : ${walls} mur posé, bois ${bot.mats.bois}`);
+}
+// ------------------------------------------------------------------ équipes : qui joue avec qui
+{
+  const H = ['a', 'b', 'c', 'd'].map((id) => ({ id }));
+  // a et c choisissent l'équipe 3, b l'équipe 0 ; d n'a rien choisi : il rejoint l'équipe la moins remplie
+  const t = makeTeams(H, new Map([['a', 3], ['c', 3], ['b', 0]]), 12, 3);
+  ok(t.humans.get('a') === t.humans.get('c') && t.humans.get('b') !== t.humans.get('a'), 'équipes choisies respectées');
+  ok(t.humans.get('d') === t.humans.get('b'), `d rejoint l'équipe la moins remplie (${t.humans.get('d')})`);
+  ok(t.bots.length === 8 && t.bots.filter((k) => k === t.humans.get('a')).length === 1 && t.bots.filter((k) => k === t.humans.get('b')).length === 1, 'les bots complètent d\'abord les équipes des joueurs');
+  const sizes = new Map(); for (const k of [...t.humans.values(), ...t.bots]) sizes.set(k, (sizes.get(k) || 0) + 1);
+  ok([...sizes.values()].every((n) => n === 3), `trios complets : ${[...sizes.values()].join(',')}`);
+  const solo = makeTeams(H, new Map(), 6, 1);
+  ok(new Set([...solo.humans.values(), ...solo.bots]).size === 6, 'en solo, chacun son équipe');
+}
+// ------------------------------------------------------------------ équipes : tir ami, à terre, relevé, élimination d'équipe
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [['a', 0], ['b', 0], ['c', 1], ['d', 1]].map(([id, team]) => ({ id, name: id.toUpperCase(), team }));
+  const sim = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  while (sim.S.phase === 'vol') { for (const id of ['a', 'b', 'c', 'd']) sim.input(id, { jump: (sim.S.t * 60) | 0 }); sim.step(DT); }
+  const P = (id) => sim.player(id), C = { x: m.center, z: m.center };
+  const put = (id, dx, dz) => { const x = C.x + dx, z = C.z + dz; Object.assign(P(id), { x, z, y: W.support(x, z, 400), vx: 0, vy: 0, vz: 0, mode: 'sol', hp: 100, sh: 0, ground: true }); };
+  put('a', 0, 0); put('b', 1.5, 0); put('c', 40, 0); put('d', 45, 0);
+  const evs = () => sim.takeEvents();
+  sim.damage(P('b'), 50, P('a'), { cause: 'fusil' });
+  ok(P('b').hp === 100, 'pas de tir ami');
+  sim.damage(P('a'), 250, P('c'), { cause: 'fusil' });
+  ok(P('a').alive && P('a').down && evs().some((e) => e.e === 'abattu' && e.to === 'a' && e.by === 'c'), 'A tombe à terre au lieu d\'être éliminé');
+  // B relève A : E à côté, immobile, 5 s
+  sim.input('b', { yaw: Math.atan2(P('a').x - P('b').x, P('a').z - P('b').z), use: 1, mx: 0, mz: 0 });
+  sim.step(DT);
+  ok(P('b').revive && P('b').revive.id === 'a', 'B commence à relever A');
+  // pendant ce temps, l'état passe par le réseau
+  const copy = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  applySnapshot(copy, snapshot(sim), 'c');
+  ok(copy.player('a').down && copy.player('b').revive && copy.player('b').revive.id === 'a', 'à terre et relevé passent par le réseau');
+  for (let i = 0; i < 5.1 / DT; i++) sim.step(DT);
+  ok(!P('a').down && P('a').hp === 30 && evs().some((e) => e.e === 'releve' && e.to === 'a' && e.by === 'b'), `A relevé avec 30 PV (${P('a').hp})`);
+  // à terre trop longtemps : éliminé, mis au crédit de celui qui l'a mis à terre ; l'équipe tient encore
+  sim.damage(P('a'), 250, P('c'), { cause: 'fusil' });
+  for (let i = 0; i < 31 / DT && P('a').alive; i++) sim.step(DT);
+  ok(!P('a').alive && P('c').kills === 1 && P('a').place === 0, `A éliminé au bout de 30 s, élimination pour C (${P('c').kills}), place en attente`);
+  // dernier debout éliminé : toute l'équipe sort, l'autre gagne
+  sim.damage(P('b'), 250, P('d'), { cause: 'fusil' });
+  ok(!P('b').alive && P('a').place === 2 && P('b').place === 2, `équipe de A et B éliminée, 2e (${P('a').place}, ${P('b').place})`);
+  ok(sim.S.phase === 'fin' && sim.S.winTeam === 1 && P('c').place === 1 && P('d').place === 1, 'l\'équipe de C et D gagne');
+  // trio : deux à terre, le troisième éliminé : les deux à terre sortent aussi
+  const r3 = [['x', 0], ['y', 0], ['z', 0], ['e', 1]].map(([id, team]) => ({ id, name: id, team }));
+  const s3 = createSim({ map: m, world: W, seed: 6, roster: r3, mode: 'partie', teams: 3 });
+  for (const id of ['x', 'y', 'z', 'e']) Object.assign(s3.player(id), { mode: 'sol', x: C.x, z: C.z, y: W.support(C.x, C.z, 400) });
+  s3.damage(s3.player('x'), 250, s3.player('e')); s3.damage(s3.player('y'), 250, s3.player('e'));
+  ok(s3.player('x').down && s3.player('y').down, 'deux membres du trio à terre');
+  s3.damage(s3.player('z'), 250, s3.player('e'));
+  ok(!s3.player('x').alive && !s3.player('y').alive && !s3.player('z').alive && s3.player('e').kills === 3 && s3.S.phase === 'fin', 'tous à terre ou éliminés : l\'équipe sort');
+}
+// ------------------------------------------------------------------ équipes : une partie en trios entre bots
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const T = makeTeams([], new Map(), 30, 3);
+  const roster = T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal', team }));
+  const sim = createSim({ map: m, world: W, seed: 8, roster, mode: 'partie', teams: 3 });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  let revives = 0, downs = 0, friendly = 0, apart = 0, checks = 0;
+  while (sim.S.phase !== 'fin' && sim.S.t < 700) {
+    sim.step(DT);
+    for (const e of sim.takeEvents()) {
+      if (e.e === 'releve') revives++;
+      else if (e.e === 'abattu') downs++;
+      else if (e.e === 'degat' && e.by != null && sim.mates(sim.player(e.by), sim.player(e.to))) friendly++;
+    }
+    // une minute après le départ : les membres d'une équipe restent proches
+    if (Math.abs(sim.S.t - 90) < DT / 2) for (let k = 0; k < 10; k++) {
+      const live = [...sim.S.players.values()].filter((p) => p.alive && p.team === k && p.mode === 'sol');
+      if (live.length < 2) continue;
+      checks++;
+      if (Math.max(...live.map((p) => Math.hypot(p.x - live[0].x, p.z - live[0].z))) > 80) apart++;
+    }
+  }
+  ok(sim.S.phase === 'fin' && sim.S.winTeam != null, 'la partie en trios va jusqu\'au bout');
+  ok(friendly === 0, `${friendly} tirs amis`);
+  ok(downs > 0 && revives > 0, `bots à terre ${downs}, relevés ${revives}`);
+  ok(apart <= Math.ceil(checks / 3), `équipes dispersées à 1:30 : ${apart}/${checks}`);
+  console.log(`trios entre bots : fin à ${Math.floor(sim.S.t / 60)}:${String(Math.floor(sim.S.t % 60)).padStart(2, '0')}, équipe ${sim.S.winTeam} · ${downs} à terre, ${revives} relevés · équipes groupées ${checks - apart}/${checks}`);
+}
+// ------------------------------------------------------------------ équipes : le joueur à terre est relevé par ses bots
+// (il saute, se pose et ne bouge plus ; ses coéquipiers ne partent pas vers la zone sans lui et viennent le relever)
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  let knocked = 0, raised = 0;
+  for (const seed of [1, 3, 5, 7]) {
+    const T = makeTeams([{ id: 'moi' }], new Map(), 30, 3);
+    const roster = [{ id: 'moi', name: 'Moi', team: T.humans.get('moi') }, ...T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal', team }))];
+    const sim = createSim({ map: m, world: W, seed, roster, mode: 'partie', teams: 3 });
+    createBuild(sim, m, W); createAI(sim, m, W);
+    const me = sim.player('moi');
+    let jump = 0;
+    const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { sim.input('moi', { jump }); sim.step(DT); sim.takeEvents(); } };
+    step(60 * 6); jump++; step(60 * 25);
+    const foe = [...sim.S.players.values()].find((q) => q.alive && !sim.mates(me, q) && q !== me);
+    sim.damage(me, 300, foe, { cause: 'fusil' });
+    if (!me.down) continue;
+    knocked++;
+    step(60 * 25);
+    if (me.alive && !me.down) raised++;
+  }
+  ok(knocked >= 3 && raised === knocked, `joueur à terre relevé par ses bots : ${raised}/${knocked}`);
+  console.log(`joueur à terre relevé par ses bots coéquipiers : ${raised}/${knocked}`);
+}
+// ------------------------------------------------------------------ repères d'équipe : réseau, bots qui y vont et qui signalent
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const T = makeTeams([{ id: 'moi' }], new Map(), 30, 2);
+  const roster = [{ id: 'moi', name: 'Moi', team: T.humans.get('moi') }, ...T.bots.map((team, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal', team }))];
+  const sim = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const me = sim.player('moi'), mate = [...sim.S.players.values()].find((q) => sim.mates(me, q));
+  let jump = 0, calls = 0;
+  // on teste les repères, pas la survie : le joueur, immobile, ne perd pas de vie
+  const step = (k) => { for (let i = 0; i < k && sim.S.phase !== 'fin'; i++) { if (me.alive) { me.hp = 100; me.sh = 100; } sim.input('moi', { jump }); sim.step(DT); for (const e of sim.takeEvents()) if (e.e === 'repere' && e.p !== 'moi') calls++; } };
+  step(60 * 6); jump++; step(60 * 30);
+  ok(!sim.ping(me, 'bidon', me.x, me.y, me.z) && !sim.ping(me, 'ici', NaN, 0, 0), 'repère invalide refusé');
+  // « Ici » à 50 m : le bot coéquipier y va
+  const a = Math.atan2(m.center - me.x, m.center - me.z), x = me.x + Math.sin(a) * 50, z = me.z + Math.cos(a) * 50;
+  ok(sim.ping(me, 'ici', x, W.support(x, z, 400), z), 'repère posé');
+  const copy = createSim({ map: m, world: W, seed: 4, roster, mode: 'partie', teams: 2 });
+  for (const e of sim.takeEvents()) mirrorEvent(copy, W, null, e);
+  ok(copy.S.pings.get('moi') && copy.S.pings.get('moi').kind === 'ici', 'le repère passe par le réseau');
+  const d0 = Math.hypot(mate.x - x, mate.z - z);
+  let best = d0;
+  // on teste le repère, pas une rencontre en chemin : le temps d'y aller, les ennemis proches ne sont plus des ennemis
+  const calm = [...sim.S.players.values()].filter((q) => q.bot && !sim.mates(me, q) && Math.hypot(q.x - mate.x, q.z - mate.z) < 120).map((q) => [q, q.team]);
+  for (const [q] of calm) q.team = me.team;
+  for (let i = 0; i < 25 && mate.alive; i++) { step(60); best = Math.min(best, Math.hypot(mate.x - x, mate.z - z)); }
+  for (const [q, t] of calm) q.team = t;
+  ok(!mate.alive || best < 12, `le bot coéquipier va au repère (${d0.toFixed(0)} m → ${best.toFixed(0)} m)`);
+  // les bots signalent les ennemis qu'ils voient au joueur de leur équipe
+  step(60 * 120);
+  ok(calls > 0, `repères posés par les bots : ${calls}`);
+  console.log(`repères : bot coéquipier ${d0.toFixed(0)} → ${best.toFixed(0)} m du repère · ${calls} ennemis signalés par les bots`);
+}
+// ------------------------------------------------------------------ largages : descente, ouverture, butin, réseau, bots
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = Array.from({ length: 30 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, bot: true, level: 'normal' }));
+  const sim = createSim({ map: m, world: W, seed: 6, roster, mode: 'partie' });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const copy = createSim({ map: m, world: W, seed: 6, roster, mode: 'partie' });
+  const spawned = [], opened = new Map();
+  let landT = null;
+  while (sim.S.phase !== 'fin' && sim.S.t < 620) {
+    sim.step(DT);
+    for (const e of sim.takeEvents()) {
+      if (e.e === 'largage') { spawned.push({ t: sim.S.t, k: sim.S.storm.k, inside: Math.hypot(e.x - sim.S.storm.next.x, e.z - sim.S.storm.next.z) < sim.S.storm.next.r }); mirrorEvent(copy, W, null, e); }
+      else if (e.e === 'largage-pose') { if (landT == null) landT = sim.S.t - spawned[0].t; mirrorEvent(copy, W, null, e); }
+      else if (e.e === 'largage-ouvert') { opened.set(e.id, e.p); mirrorEvent(copy, W, null, e); }
+    }
+  }
+  ok(spawned.length >= 3 && spawned.every((d) => d.inside), `largages : ${spawned.length}, tous dans le prochain cercle`);
+  ok(landT != null && Math.abs(landT - 110 / 4.2) < 0.5, `descente du premier largage : ${landT && landT.toFixed(1)} s`);
+  // (une partie peut finir sans qu'un bot passe près d'un largage : on en rejoue alors une seconde)
+  let opened2 = 0;
+  if (!opened.size) {
+    const W7 = buildWorld(m), s7 = createSim({ map: m, world: W7, seed: 7, roster, mode: 'partie' });
+    createBuild(s7, m, W7); createAI(s7, m, W7);
+    while (s7.S.phase !== 'fin' && s7.S.t < 620 && !opened2) { s7.step(DT); for (const e of s7.takeEvents()) if (e.e === 'largage-ouvert') opened2++; }
+  }
+  ok(opened.size + opened2 >= 1, `largages ouverts par les bots : ${opened.size}/${spawned.length}${opened.size ? '' : `, puis ${opened2} dans une seconde partie`}`);
+  const d0 = [...sim.S.drops.values()][0], c0 = copy.S.drops.get(d0.id);
+  ok(c0 && c0.landed === d0.landed && c0.open === d0.open, 'les largages passent par le réseau');
+  // ouvert par un joueur : une arme épique, une grande potion, une trousse
+  const s2 = createSim({ map: m, world: W, seed: 9, roster: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], mode: 'partie' });
+  while (s2.S.drops.size === 0 && s2.S.t < 200) { s2.step(DT); s2.takeEvents(); }
+  const d = [...s2.S.drops.values()][0];
+  while (!d.landed) { s2.step(DT); s2.takeEvents(); }
+  const A = s2.player('a');
+  Object.assign(A, { mode: 'sol', x: d.x, z: d.z - 1.8, y: d.gy, vx: 0, vz: 0, alive: true });
+  s2.input('a', { yaw: 0, use: 1 }); s2.step(DT);
+  const loot = [...s2.S.items.values()].filter((g) => Math.hypot(g.x - d.x, g.z - d.z) < 3).map((g) => g.it);
+  ok(d.open && loot.some((it) => it.t === 'arme' && it.r === 3) && loot.some((it) => it.c === 'potion') && loot.some((it) => it.c === 'soin'), `butin du largage : ${loot.map((it) => it.w || it.c || it.a || it.m).join(', ')}`);
+  ok(JSON.stringify(fullState(s2, W, { broken: new Set(), pieces: new Map() }).drops[0]).includes(d.id), 'état complet : largages compris');
+  console.log(`largages : ${spawned.length} (à ${spawned.map((x) => Math.round(x.t) + ' s').join(', ')}), descente ${landT.toFixed(1)} s, ${opened.size} ouverts par les bots`);
+}
+// ------------------------------------------------------------------ niveau « Auto » : il suit les résultats
+{
+  const fresh = skillOf([]), strong = skillOf([{ place: 1, n: 30, kills: 6 }, { place: 2, n: 45, kills: 4 }, { place: 1, n: 30, kills: 5 }]);
+  const weak = skillOf([{ place: 40, n: 45, kills: 0 }, { place: 25, n: 30, kills: 0 }, { place: 55, n: 60, kills: 1 }]);
+  ok(fresh.s === 0.5 && botLevels(40, fresh.s).every((l) => l === 'normal'), 'sans historique : des bots normaux');
+  ok(strong.s > 0.85 && weak.s < 0.2, `niveaux : fort ${strong.s.toFixed(2)}, débutant ${weak.s.toFixed(2)}`);
+  const cnt = (s) => { const L = botLevels(40, s); return ['facile', 'normal', 'difficile'].map((k) => L.filter((l) => l === k).length); };
+  const [fe, , ft] = cnt(strong.s), [we, , wt] = cnt(weak.s);
+  ok(ft >= 20 && fe === 0 && we >= 20 && wt === 0, `bots : contre un fort ${ft} coriaces, contre un débutant ${we} faciles`);
+  console.log(`niveau auto : fort ${strong.s.toFixed(2)} → ${cnt(strong.s).join('/')} · débutant ${weak.s.toFixed(2)} → ${cnt(weak.s).join('/')} (faciles/normaux/coriaces sur 40)`);
+}
+// ------------------------------------------------------------------ rythme : l'île ne se vide pas en deux minutes
+// 60 places dont un joueur qui saute tôt (5 bots au plus le suivent) : la partie doit tenir jusqu'aux derniers cercles
+{
+  const m = generateMap(ILE), W = buildWorld(m);
+  const roster = [{ id: 0, name: 'Hôte', color: '#f00' }, ...Array.from({ length: 59 }, (_, i) => ({ id: 'bot' + i, name: 'Bot' + i, color: '#888', bot: true, level: 'normal' }))];
+  const sim = createSim({ map: m, world: W, seed: 2, roster, mode: 'partie' });
+  createBuild(sim, m, W); createAI(sim, m, W);
+  const at = {}, follow = [...sim.S.players.values()].filter((P) => P.bot);
+  let jumped = false;
+  while (sim.S.t < 180) {
+    if (!jumped && sim.S.flight.t > 15) { sim.input(0, { jump: 1 }); jumped = true; }
+    sim.step(DT); sim.takeEvents();
+    for (const s of [60, 120, 180]) if (at[s] == null && sim.S.t >= s) at[s] = sim.alive().length;
+  }
+  const followers = follow.filter((P) => P.ai && P.ai.follow != null).length;
+  ok(followers <= 5, `${followers} bots suivent le joueur (5 au plus)`);
+  ok(at[60] >= 48 && at[120] >= 32 && at[180] >= 20, `rythme : ${at[60]} en vie à 1 min, ${at[120]} à 2 min, ${at[180]} à 3 min (au moins 48, 32, 20)`);
+  console.log(`rythme (60 places) : ${at[60]} en vie à 1 min, ${at[120]} à 2 min, ${at[180]} à 3 min · ${followers} bots suivent le joueur`);
 }
 console.log(fails ? `\n${fails} échec(s)` : '\nTout est bon.');
 process.exit(fails ? 1 : 0);

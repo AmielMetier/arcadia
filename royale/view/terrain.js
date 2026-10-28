@@ -5,6 +5,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { SNOW, CELL } from '../engine/map.js';
 import { grassTexture, sandTexture } from './textures.js';
+import { makeNoise } from '../engine/noise.js';
 
 const CH = 100;                 // côté d'une dalle (m)
 const LODS = [2, 4, 10, 20];    // pas du maillage selon la distance (diviseurs de CH)
@@ -16,12 +17,19 @@ const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a
 export const GROUND_COLORS = {
   grass: hex(0x5f9536), grass2: hex(0x77a443), dry: hex(0x8f9a4a), forest: hex(0x46702c), sand: hex(0xe3d3a1), wet: hex(0xb8ad83), rock: hex(0x9d978b),
   snow: hex(0xeef1f5), bed: hex(0xc6b487), yard: hex(0x6c9f3e), gravel: hex(0xb9b1a0), dirt: hex(0xa88d64),
+  // prairies fleuries (vues du ciel : des taches de couleur dans les prés)
+  buttercup: hex(0xc9c24a), lavender: hex(0x8f86b8), daisy: hex(0xd9dccb), clover: hex(0x4f8a3a),
+  hedge: hex(0x355f27),
 };
+// parcelles de la campagne (vues du ciel) : teintes de pré, de foin, de regain
+const PARCELS = [hex(0x86b04e), hex(0xb5ad60), hex(0x4f8a36), hex(0x9fb24a), hex(0x6f9c3f), hex(0xa7a05a)];
+const ihash = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
 
 // image du sol, un texel par point de la grille des hauteurs. Alpha : grain à appliquer (0 herbe, 0,5 sable, 1 roche)
 function groundImage(map) {
   const N = map.n, HR = map.hres, H = map.heights, WK = map.water, WL = map.waterLevel, E = map.inland, M = map.mountain;
-  const data = new Uint8Array(N * N * 4), C = GROUND_COLORS;
+  const data = new Uint8Array(N * N * 4), C = GROUND_COLORS, nz = makeNoise((map.seed | 0) ^ 0x6f1e);
+  const fbm = (x, z) => nz.n2(x, z) * 0.65 + nz.n2(x * 2.3 + 17, z * 2.3 - 9) * 0.35;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
     const k = j * N + i, x = i * HR, z = j * HR, h = H[k];
     let c, a = 0;
@@ -31,6 +39,25 @@ function groundImage(map) {
       // prés : deux verts et des taches d'herbe plus sèche, à grande échelle
       c = mix3(C.grass, C.grass2, ss(-0.5, 0.8, Math.sin(x * 0.021) * Math.cos(z * 0.017) + Math.sin((x + z) * 0.008)) * 0.7);
       c = mix3(c, C.dry, ss(0.35, 0.9, Math.sin(x * 0.0061 + 1.3) * Math.cos(z * 0.0073 - 0.4) + 0.4 * Math.sin((x - z) * 0.013)) * 0.45);
+      // prés fleuris et trèfle, en taches de 20 à 60 m, loin des bois et des lieux
+      const open = (1 - ss(0.1, 0.4, f)) * ss(3, 6, h);
+      if (open > 0) {
+        const fl = fbm(x / 70, z / 70), kind = nz.n2(x / 260 + 40, z / 260 - 13);
+        const flower = kind > 0.25 ? C.lavender : kind < -0.25 ? C.daisy : C.buttercup;
+        c = mix3(c, flower, ss(0.32, 0.62, fl) * 0.5 * open);
+        c = mix3(c, C.clover, ss(0.3, 0.7, -fl) * 0.35 * open);
+        // marqueterie de parcelles bordées de haies, hors montagne ; chaque domaine de 360 m a son orientation
+        const farm = open * (1 - ss(0.04, 0.2, M[k])) * ss(-0.35, 0.05, nz.n2(x / 420 - 7, z / 420 + 3));
+        if (farm > 0) {
+          const th = (ihash(Math.floor(x / 360) + 91, Math.floor(z / 360) - 37) % 1000) / 1000 * Math.PI / 2;
+          const u = x * Math.cos(th) + z * Math.sin(th), w = -x * Math.sin(th) + z * Math.cos(th);
+          const iu = Math.floor(u / 56), iw = Math.floor(w / 40), hh = ihash(iu, iw), fu = u / 56 - iu, fw = w / 40 - iw;
+          if (hh % 10 < 7) c = mix3(c, PARCELS[hh % PARCELS.length], 0.5 * farm);
+          const eu = Math.min(fu, 1 - fu) * 56, ew = Math.min(fw, 1 - fw) * 40;
+          const hedge = Math.max((hh >> 4) % 4 ? ss(1.8, 0.6, eu) : 0, (hh >> 6) % 3 ? ss(1.8, 0.6, ew) : 0);
+          c = mix3(c, C.hedge, hedge * 0.75 * farm);
+        }
+      }
       c = mix3(c, C.forest, ss(0.2, 0.6, f) * 0.8);
       const poi = map.poiAt(x, z);
       if (poi) {
@@ -47,6 +74,13 @@ function groundImage(map) {
       const sn = ss(SNOW - 6, SNOW + 2, h);
       if (sn > 0) { c = mix3(c, C.snow, sn); a = Math.max(a, sn * 0.9); }
     }
+    // relief lisible du ciel : creux plus sombres, crêtes plus claires (écart à la moyenne alentour, à 6 et 18 m)
+    if (!WK[k]) {
+      const at = (di, dj) => H[Math.min(N - 1, Math.max(0, j + dj)) * N + Math.min(N - 1, Math.max(0, i + di))];
+      const cav = (r) => (at(r, 0) + at(-r, 0) + at(0, r) + at(0, -r)) / 4 - h;
+      const cv = cav(3) * 0.6 + cav(9) * 0.4, sh = cv > 0 ? 1 - Math.min(0.2, cv * 0.09) : 1 + Math.min(0.08, -cv * 0.04);
+      c = [c[0] * sh, c[1] * sh, c[2] * sh];
+    }
     // rives : le sol s'assombrit et s'humidifie à l'approche de l'eau
     if (!WK[k]) {
       let wet = 0;
@@ -54,7 +88,7 @@ function groundImage(map) {
       if (wet) { c = mix3(c, C.wet, 0.55); a = Math.max(a, 0.5); }
     }
     const o = k * 4;
-    data[o] = c[0] * 255; data[o + 1] = c[1] * 255; data[o + 2] = c[2] * 255; data[o + 3] = a * 255;
+    data[o] = Math.min(255, c[0] * 255); data[o + 1] = Math.min(255, c[1] * 255); data[o + 2] = Math.min(255, c[2] * 255); data[o + 3] = a * 255;
   }
   const t = new THREE.DataTexture(data, N, N);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -98,6 +132,11 @@ function groundMaterial(map, ground, noise, anisotropy) {
         base = mix(base, uRock * (0.75 + 0.5 * rk), bare * (1.0 - step(0.98, kind) * 0.7));
         det = mix(det, rk * 1.6, bare);
         float macro = texture2D(uNoise, vW.xz / 210.0).b;
+        // touffes et plaques d'herbe (7 et 21 m) : le pré garde du relief vu de haut, quand le grain fin s'efface
+        float cl = texture2D(uNoise, vW.xz / 7.0).g * 0.6 + texture2D(uNoise, vW.xz / 21.0).r * 0.4;
+        float isGrass = (1.0 - smoothstep(0.15, 0.45, kind)) * (1.0 - bare);
+        base *= mix(1.0, 0.8 + 0.4 * cl, isGrass);
+        base = mix(base, base * vec3(1.1, 1.05, 0.78), isGrass * smoothstep(0.58, 0.82, cl) * 0.55);
         diffuseColor.rgb = base * clamp(0.7 + 0.32 * det, 0.6, 1.2) * (0.84 + 0.28 * macro);`);
   };
   m.customProgramCacheKey = () => 'royale-ground';

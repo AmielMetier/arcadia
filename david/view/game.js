@@ -29,11 +29,7 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
         <button class="tool" id="tstats" title="Statistiques">📊</button>
         <button class="tool" id="tcenter" title="Recentrer la caméra" hidden>⌖</button>
         <button class="tool" id="t3d" title="Vue 3D ou vue de dessus">3D</button>
-        <button class="tool" id="trend" title="Plateau en vraie 3D ou plateau classique">🧊</button>
-        <button class="tool" id="tcam" title="Caméra qui suit le pion">🎥</button>
-        <button class="tool" id="tmus" title="Musique d'ambiance">🎵</button>
-        <button class="tool" id="tsnd" title="Bruitages">🔊</button>
-        <button class="tool" id="tvol" title="Volume de la musique et des effets" aria-label="Volume">🎚️</button>
+        <button class="tool" id="tset" title="Réglages : son, plateau et caméra" aria-label="Réglages">⚙️</button>
         <button class="tool quit" id="tquit">Quitter</button>
       </div>
     </header>
@@ -86,21 +82,24 @@ export async function mountGame(root, board, { me, act, pick, start, exit, choos
   /* ---------------------------------------------------------- barre d'outils */
   const music = createMusic(audioContext);
   // le navigateur n'autorise le son qu'après un geste : la musique démarre au premier clic ou touche
-  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { if (music.on) music.start(); }, { once: true, capture: true });
-  DDVolume.panel($('#tvol'));
-  $('#tmus').onclick = () => { music.toggle(); syncTools(); };
-  const syncTools = () => {
-    $('#tmus').classList.toggle('off', !music.on); $('#tmus').title = music.on ? 'Couper la musique' : 'Mettre la musique'; $('#t3d').textContent = B.is3d() ? '3D' : '2D'; $('#tcam').classList.toggle('off', !B.follow()); $('#tsnd').textContent = sfx.on ? '🔊' : '🔇'; };
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => music.start(), { once: true, capture: true });
+  // un seul bouton de réglages : le son, puis le plateau et la caméra
+  DDVolume.panel($('#tset'), {
+    accent: '#1C5FB4',
+    sections: [{
+      title: 'Plateau et caméra',
+      items: [
+        { label: 'Plateau', options: [['3d', 'Vraie 3D'], ['css', 'Classique']], get: () => store('david_renderer', B.kind === '3d' ? '3d' : 'css'),
+          set: (v) => { save('david_renderer', v); toast(v === 'css' ? 'Plateau classique à la prochaine partie' : 'Plateau en vraie 3D à la prochaine partie'); } },
+        { label: 'Caméra qui suit le pion', get: () => B.follow(), set: (v) => { if (v !== B.follow()) B.toggleFollow(); } },
+      ],
+      hint: 'Le plateau choisi s\'affiche à la prochaine partie.',
+    }],
+  });
+  const syncTools = () => { $('#t3d').textContent = B.is3d() ? '3D' : '2D'; };
   $('#t3d').onclick = () => { B.toggle3d(); syncTools(); };
   $('#tcenter').hidden = !B.recenter;
   $('#tcenter').onclick = () => B.recenter && B.recenter();
-  $('#trend').onclick = () => {
-    const next = B.kind === '3d' ? 'css' : '3d';
-    save('david_renderer', next);
-    toast(next === 'css' ? 'Plateau classique à la prochaine partie' : 'Plateau en vraie 3D à la prochaine partie');
-  };
-  $('#tcam').onclick = () => { B.toggleFollow(); syncTools(); };
-  $('#tsnd').onclick = () => { sfx.toggle(); syncTools(); };
   $('#tquit').onclick = () => { if (!S || S.over || confirm("Quitter la partie ?\nElle est sauvegardée : l'hôte pourra la reprendre depuis l'écran de choix des pions.")) exit(); };
   $('#bMine').onclick = () => openMine();
   let statsCtl = null, heatMode = null;

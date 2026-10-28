@@ -1,0 +1,8 @@
+Armes : « Ultimate Gun Pack » de Quaternius (https://quaternius.com), publié sur OpenGameArt
+https://opengameart.org/content/low-poly-guns-pack
+Licence : Creative Commons Zero (CC0 1.0) — domaine public. https://creativecommons.org/publicdomain/zero/1.0/
+Converties d'OBJ en GLB (canon vers +z, haut +y, longueur 1, couleurs éclaircies) et renommées : -1 pour les raretés
+commune et peu commune, -2 pour les raretés rare et épique.
+  fusil-1 : AssaultRifle_1 · fusil-2 : AssaultRifle2_1 · pompe-1 : Shotgun_3 · pompe-2 : Shotgun_ShortStock
+  pistolet-1 : Pistol_5 · pistolet-2 : Pistol_1 · smg-1 : SubmachineGun_2 · smg-2 : SubmachineGun_5
+  sniper-1 : SniperRifle_2 · sniper-2 : SniperRifle_6

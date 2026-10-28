@@ -23,30 +23,44 @@ export const MAT_MAX = 999;
 // portée (m) et baisse des dégâts (début → fin, part restante), multiplicateur à la tête, auto : tir maintenu
 export const WEAPONS = {
   fusil: {
-    label: 'Fusil d\'assaut', ammo: 'moyennes', dmg: [30, 31, 33, 35], rate: 5.5, mag: 30, reload: [2.4, 2.3, 2.2, 2.1],
-    spread: [0.045, 0.011], bloom: 0.012, range: 180, falloff: [50, 180, 0.65], head: 1.5, auto: true, struct: 1, zoom: 1.4,
+    label: 'Fusil d\'assaut', ammo: 'moyennes', dmg: [30, 31, 33, 35], rate: 5.5, mag: 30, reload: [2.16, 2.07, 1.98, 1.89],
+    spread: [0.032, 0.007], bloom: 0.012, range: 180, falloff: [50, 180, 0.65], head: 1.5, auto: true, struct: 1, zoom: 1.4,
   },
   pompe: {
-    label: 'Fusil à pompe', ammo: 'cartouches', dmg: [10, 10.5, 11, 12], pellets: 10, rate: 1.05, mag: 5, reload: [4.6, 4.4, 4.2, 4.0],
-    spread: [0.11, 0.085], bloom: 0, range: 40, falloff: [7, 40, 0.25], head: 1.7, auto: false, struct: 0.6, zoom: 1.15,
+    label: 'Fusil à pompe', ammo: 'cartouches', dmg: [10, 10.5, 11, 12], pellets: 10, rate: 1.05, mag: 5, reload: [4.14, 3.96, 3.78, 3.6],
+    spread: [0.1, 0.075], bloom: 0, range: 40, falloff: [7, 40, 0.25], head: 1.7, auto: false, struct: 0.6, zoom: 1.15,
   },
   pistolet: {
-    label: 'Pistolet', ammo: 'legeres', dmg: [24, 25, 26, 27], rate: 6.5, mag: 16, reload: [1.5, 1.45, 1.4, 1.3],
-    spread: [0.035, 0.014], bloom: 0.01, range: 110, falloff: [30, 110, 0.6], head: 1.6, auto: false, struct: 0.8, zoom: 1.25,
+    label: 'Pistolet', ammo: 'legeres', dmg: [24, 25, 26, 27], rate: 6.5, mag: 16, reload: [1.35, 1.3, 1.26, 1.17],
+    spread: [0.026, 0.009], bloom: 0.01, range: 110, falloff: [30, 110, 0.6], head: 1.6, auto: false, struct: 0.8, zoom: 1.25,
   },
   smg: {
-    label: 'Pistolet-mitrailleur', ammo: 'legeres', dmg: [17, 18, 19, 20], rate: 11, mag: 30, reload: [2.2, 2.1, 2.0, 1.9],
-    spread: [0.055, 0.028], bloom: 0.009, range: 80, falloff: [20, 80, 0.55], head: 1.5, auto: true, struct: 0.7, zoom: 1.2,
+    label: 'Pistolet-mitrailleur', ammo: 'legeres', dmg: [17, 18, 19, 20], rate: 11, mag: 30, reload: [1.98, 1.89, 1.8, 1.71],
+    spread: [0.042, 0.02], bloom: 0.009, range: 80, falloff: [20, 80, 0.55], head: 1.5, auto: true, struct: 0.7, zoom: 1.2,
   },
   sniper: {
-    label: 'Fusil de précision', ammo: 'lourdes', dmg: [95, 100, 105, 110], rate: 0.35, mag: 1, reload: [3.0, 2.9, 2.8, 2.7],
-    spread: [0.12, 0], bloom: 0, range: 450, falloff: [450, 450, 1], head: 2.5, auto: false, struct: 1.4, zoom: 4,
+    label: 'Fusil de précision', ammo: 'lourdes', dmg: [95, 100, 105, 110], rate: 0.35, mag: 3, reload: [2.7, 2.61, 2.52, 2.43],
+    spread: [0.09, 0], bloom: 0, range: 450, falloff: [450, 450, 1], head: 2.5, auto: false, struct: 1.4, zoom: 4,
+    // une vraie balle : elle vole (≈ 1 s pour 450 m), tombe, et dérive à droite (Coriolis, voir sim.js)
+    bullet: { speed: 460, g: 9.81 },
   },
   roquette: {
-    label: 'Lance-roquettes', ammo: 'roquettes', dmg: [100, 105, 110, 116], rate: 0.75, mag: 1, reload: [3.2, 3.0, 2.9, 2.8],
-    spread: [0.02, 0.01], bloom: 0, range: 300, falloff: [300, 300, 1], head: 1, auto: false, struct: 4, zoom: 1.3, rocket: { speed: 55, radius: 4.5 },
+    label: 'Lance-roquettes', ammo: 'roquettes', dmg: [100, 105, 110, 116], rate: 0.75, mag: 1, reload: [2.88, 2.7, 2.61, 2.52],
+    spread: [0.014, 0.005], bloom: 0, range: 300, falloff: [300, 300, 1], head: 1, auto: false, struct: 4, zoom: 1.3, rocket: { speed: 55, radius: 4.5 },
   },
 };
+
+// dispersion d'un tir (rayon du cône, rad) : hanche ou visée, en mouvement, accroupi, en l'air, échauffement des tirs en
+// rafale ; à l'arrêt, le premier tir après une courte pause (rested) part presque droit (sauf les plombs du fusil à pompe).
+// Le même calcul sert à la simulation et à l'écart du viseur.
+export const REST = 0.3;
+export function spreadOf(w, P, aim, rested) {
+  const W = WEAPONS[w], moving = Math.hypot(P.vx, P.vz) > 1;
+  if (w === 'sniper' && aim && !moving) return 0;
+  let sp = (aim ? W.spread[1] : W.spread[0]) * (moving ? 1.5 : 1) * (P.crouch ? 0.75 : 1) * (P.ground || P.swim ? 1 : 2);
+  if (rested && !moving && !W.pellets) sp *= aim ? 0.25 : 0.6;
+  return sp + (P.bloom || 0);
+}
 
 // consommables : soins (pv jusqu'à max), bouclier, durée d'utilisation (s), pile max, rareté fixe ; grenades et objets lancés
 export const ITEMS = {
@@ -93,16 +107,24 @@ function armed(rng, rar, wt) {
 // butin au sol : rien (un quart des fois), une arme et ses munitions, un consommable ou des munitions
 export function rollFloor(rng) {
   const r = rng.next();
-  if (r < 0.25) return [];
-  if (r < 0.62) return armed(rng, RAR_FLOOR, W_FLOOR);
-  if (r < 0.86) return [item(rng.weighted(C_FLOOR))];
+  if (r < 0.18) return [];
+  if (r < 0.66) return armed(rng, RAR_FLOOR, W_FLOOR);
+  if (r < 0.88) return [item(rng.weighted(C_FLOOR))];
   return [ammo(rng.pick(Object.keys(AMMO).filter((a) => a !== 'roquettes')))];
 }
-// coffre : une arme et ses munitions, un consommable, des matériaux, parfois un second objet
+// coffre : une arme et ses munitions, toujours du bouclier (sans lui, un combat se joue en trois balles), un consommable,
+// des matériaux, parfois un second objet
+const C_SHIELD = [['potion_petite', 70], ['potion', 30]];
 export function rollChest(rng) {
-  const out = [...armed(rng, RAR_CHEST, W_CHEST), item(rng.weighted(C_CHEST)), mats(rng.pick(['bois', 'bois', 'pierre', 'metal']), 30)];
-  if (rng.chance(0.35)) out.push(item(rng.weighted(C_CHEST)));
+  const out = [...armed(rng, RAR_CHEST, W_CHEST), item(rng.weighted(C_SHIELD)), item(rng.weighted(C_CHEST)), mats(rng.pick(['bois', 'bois', 'pierre', 'metal']), 30)];
+  if (rng.chance(0.25)) out.push(item(rng.weighted(C_CHEST)));
   return out;
+}
+// largage : une arme épique et beaucoup de munitions, une grande potion de bouclier, une trousse de soin, du métal
+const W_DROP = [['fusil', 30], ['pompe', 20], ['smg', 20], ['sniper', 20], ['roquette', 10]];
+export function rollDrop(rng) {
+  const w = rng.weighted(W_DROP), A = WEAPONS[w].ammo;
+  return [weapon(w, 3), ammo(A, AMMO[A].drop * (w === 'roquette' ? 2 : 4)), item('potion'), item('soin'), mats('metal', 60)];
 }
 // caisse de munitions : deux sortes
 export function rollAmmoBox(rng) {

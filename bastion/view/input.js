@@ -161,7 +161,6 @@ window.addEventListener('keydown', (e) => {
   if (k === 'tab' && isSpectatorView()) { e.preventDefault(); cycleSpectatorFocus(); return; }
   if (k === 'm' && !e.ctrlKey && !e.metaKey) {
     const m = Sfx.toggleAll();
-    syncAudioUI();
     toast(m ? '🔇 Son coupé (M pour le remettre)' : '🔊 Son rétabli', 1400);
     return;
   }
@@ -603,46 +602,6 @@ $('#uiMapBadge').onclick = () => {
   const def = MAP_DEFS[activeMapId] || MAP_DEFS.vallee;
   toast(`🗺️ ${def.icon} ${def.name}\n⭐ Spécificité : ${def.badgeDesc}`, 4000);
 };
-// ---- Panneau Son : musique et effets séparés, coupure générale (touche M) ----
-function syncAudioUI() {
-  const st = Sfx.settings;
-  const btn = $('#btnAudio');
-  btn.textContent = st.allMuted ? '🔇' : (!st.musicOn && !st.sfxOn) ? '🔈' : '🔊';
-  btn.classList.toggle('off', st.allMuted);
-  btn.title = st.allMuted ? 'Son coupé — clique pour le remettre (M)' : 'Couper tout le son (M)';
-  $('#volMusic').value = Math.round(st.musicVol * 100);
-  $('#volSfx').value = Math.round(st.sfxVol * 100);
-  $('#tgMusic').textContent = st.musicOn ? 'ON' : 'OFF';
-  $('#tgMusic').classList.toggle('on', st.musicOn);
-  $('#tgSfx').textContent = st.sfxOn ? 'ON' : 'OFF';
-  $('#tgSfx').classList.toggle('on', st.sfxOn);
-  $('#tgAll').textContent = st.allMuted ? 'ON' : 'OFF';
-  $('#tgAll').classList.toggle('on', st.allMuted);
-}
-// Un clic sur le haut-parleur coupe / remet TOUT le son ; la flèche ouvre les réglages détaillés
-$('#btnAudio').onclick = (e) => {
-  e.stopPropagation();
-  const m = Sfx.toggleAll();
-  syncAudioUI();
-  toast(m ? '🔇 Son coupé (M ou clic pour le remettre)' : '🔊 Son rétabli', 1400);
-};
-$('#btnAudioMore').onclick = (e) => {
-  e.stopPropagation();
-  const pop = $('#audioPop');
-  pop.hidden = !pop.hidden;
-  syncAudioUI();
-};
-$('#audioPop').addEventListener('pointerdown', (e) => e.stopPropagation());
-$('#btnAudio').addEventListener('pointerdown', (e) => { e.stopPropagation(); Sfx.wake(); });
-$('#btnAudioMore').addEventListener('pointerdown', (e) => { e.stopPropagation(); Sfx.wake(); });
-window.addEventListener('pointerdown', () => { $('#audioPop').hidden = true; });
-$('#tgAll').onclick = () => { Sfx.toggleAll(); syncAudioUI(); };
-$('#tgMusic').onclick = () => { Sfx.setMusicOn(!Sfx.settings.musicOn); syncAudioUI(); };
-$('#tgSfx').onclick = () => { Sfx.setSfxOn(!Sfx.settings.sfxOn); syncAudioUI(); Sfx.click(); };
-$('#volMusic').oninput = (e) => { Sfx.setMusicVol(Number(e.target.value) / 100); if (!Sfx.settings.musicOn) Sfx.setMusicOn(true); syncAudioUI(); };
-$('#volSfx').oninput = (e) => { Sfx.setSfxVol(Number(e.target.value) / 100); if (!Sfx.settings.sfxOn) Sfx.setSfxOn(true); syncAudioUI(); };
-$('#volSfx').onchange = () => Sfx.ack('marine');
-syncAudioUI();
 window.addEventListener('pointerdown', () => Sfx.wake(), { passive: true });
 window.addEventListener('keydown', () => Sfx.wake(), { passive: true });
 

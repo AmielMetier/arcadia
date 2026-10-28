@@ -14,6 +14,7 @@ import { buildStructures } from './structures.js';
 import { buildInterior } from './interior.js';
 import { buildForest, buildProps } from './props.js';
 import { SWAY } from './trees.js';
+import { createSkyLife } from './life.js';
 import { loadKit } from './kit.js';
 
 export const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 560;
@@ -25,8 +26,13 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   canvas.className = 'gl';
   host.appendChild(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: MOBILE, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOBILE ? 1.5 : 1.5));
+  // définition interne : au plus 1,25 pixel par point d'écran et 3,4 millions de pixels (voir resize)
+  let prMax = Math.min(devicePixelRatio || 1, 1.25);
+  renderer.setPixelRatio(prMax);
   renderer.shadowMap.enabled = true;
+  // l'ombre du soleil est recalculée une image sur deux (voir frame)
+  renderer.shadowMap.autoUpdate = false;
+  let shadowTick = 0;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -67,6 +73,8 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   const decals = buildDecals(map); scene.add(decals.group);
   const roads = await buildRoads(map, { anisotropy: renderer.capabilities.getMaxAnisotropy() }); scene.add(roads.group);
   const grass = createGrass(map, terrain.ground, { mobile: MOBILE }); scene.add(grass.group);
+  // nuages bas et vols d'oiseaux (couleur des nuages : celle du ciel du moment)
+  const life = createSkyLife(map, { tint: look.cloudLit || 0xffffff }); scene.add(life.group);
   const water = buildWater(map, { noise, sunDir, sky: look }); scene.add(water.group);
   progress('Bâtiments', 0.5); await breathe();
   const structures = buildStructures(map, { time }); scene.add(structures.group);
@@ -85,12 +93,16 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
 
   // qualité : résolution, effets ; baissée automatiquement si la machine peine
   const post = MOBILE ? null : createPost(renderer);
-  const quality = { ao: !MOBILE, bloom: !MOBILE };
+  // fx : rayons de soleil et brume (coupés si la machine peine), particules d'ambiance réduites de moitié ensuite
+  const quality = { ao: !MOBILE, bloom: !MOBILE, fx: !MOBILE, ambiance: MOBILE ? 0.5 : 1 };
   function lowerQuality() {
     const pr = renderer.getPixelRatio();
-    const setPr = (v) => { renderer.setPixelRatio(v); resize(); return 'résolution ' + v.toFixed(2); };
+    const setPr = (v) => { prMax = v; resize(); return 'résolution ' + renderer.getPixelRatio().toFixed(2); };
     if (pr > 1.01) return setPr(Math.max(1, pr * 0.85));
-    for (const k of ['ao', 'bloom']) if (quality[k]) { quality[k] = false; return k; }
+    if (quality.ao) { quality.ao = false; return 'ao'; }
+    if (quality.fx) { quality.fx = false; return 'effets'; }
+    if (quality.bloom) { quality.bloom = false; return 'bloom'; }
+    if (quality.ambiance > 0.5) { quality.ambiance = 0.5; return 'ambiance'; }
     if (grass.range > 24) { grass.shrink(); return 'herbe'; }
     if (sun.castShadow && sun.shadow.mapSize.x > 1024) { sun.shadow.mapSize.set(1024, 1024); sun.shadow.map && sun.shadow.map.dispose(); sun.shadow.map = null; return 'ombres'; }
     if (pr > 0.76) return setPr(Math.max(0.75, pr * 0.85));
@@ -99,6 +111,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
 
   function resize() {
     const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
+    renderer.setPixelRatio(Math.max(0.75, Math.min(prMax, Math.sqrt(3.4e6 / (w * h)))));
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     const pr = renderer.getPixelRatio();
@@ -116,10 +129,39 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
   // repère du soleil, pour caler l'ombre sur ses texels (sinon elle scintille quand on tourne ou qu'on avance)
   const lx = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), sunDir).normalize(), ly = new THREE.Vector3().crossVectors(sunDir, lx);
   const sc = new THREE.Vector3();
+  // réactions de l'écran, réglées par la partie : coups (hurt, shield, qui retombent seuls), vie basse et vitesse
+  // (tenues à chaque image), éclair d'orage, explosions (ondes de choc, en coordonnées du monde)
+  const screen = { hurt: 0, shield: 0, low: 0, speed: 0, flash: 0, booms: [] };
+  const RAYS = { jour: 0.9, crepuscule: 1.5, soir: 0.25 }, MIST = { jour: 0.42, crepuscule: 0.6, soir: 0.5 };
+  const pfx = { sun: new THREE.Vector3(), sunCol: new THREE.Color(L.sunColor), rays: RAYS[time] ?? 0.9, mist: MIST[time] ?? 0.42,
+    mistCol: scene.fog.color.clone().lerp(new THREE.Color(L.sunColor), 0.18).multiplyScalar(1.1), waves: [], hurt: 0, shield: 0, low: 0, speed: 0, flash: 0 };
+  const sv = new THREE.Vector3(), cd = new THREE.Vector3();
+  function screenFx(dt) {
+    screen.hurt *= Math.exp(-5 * dt); screen.shield *= Math.exp(-4 * dt); screen.flash *= Math.exp(-9 * dt);
+    // soleil à l'écran : force qui s'éteint quand il sort du champ ou passe derrière
+    camera.getWorldDirection(cd);
+    sv.copy(camera.position).addScaledVector(sunDir, 1000).project(camera);
+    const facing = cd.dot(sunDir), out = Math.max(Math.abs(sv.x), Math.abs(sv.y));
+    pfx.sun.set((sv.x + 1) / 2, (sv.y + 1) / 2, facing > 0 ? Math.min(1, facing / 0.25) * Math.max(0, Math.min(1, 1 - (out - 1) / 0.6)) : 0);
+    // explosions : position et rayon à l'écran, 1,3 s d'onde puis de chaleur
+    pfx.waves.length = 0;
+    const tanH = Math.tan(camera.fov * Math.PI / 360);
+    for (let i = screen.booms.length - 1; i >= 0; i--) {
+      const b = screen.booms[i], age = (time0 - b.t) / 1.3;
+      if (age >= 1) { screen.booms.splice(i, 1); continue; }
+      sv.set(b.x, b.y, b.z);
+      const dist = sv.distanceTo(camera.position);
+      if (cd.dot(sv.clone().sub(camera.position)) <= 0 || dist > 160 || pfx.waves.length >= 4) continue;
+      sv.project(camera);
+      pfx.waves.push({ x: (sv.x + 1) / 2, y: (sv.y + 1) / 2, age, r: Math.min(0.6, (b.r * 2.2) / (dist * 2 * tanH)) });
+    }
+    Object.assign(pfx, { hurt: Math.min(1, screen.hurt), shield: Math.min(1, screen.shield), low: screen.low, speed: screen.speed, flash: screen.flash });
+  }
   // cam : { pos, look, near? } ; focus : le joueur (ombres, niveaux de détail)
   function frame(dt, cam, focus) {
     if (disposed) return;
     time0 += dt;
+    if ((shadowTick = (shadowTick + 1) % 2) === 0) renderer.shadowMap.needsUpdate = true;
     camera.position.set(cam.pos.x, cam.pos.y, cam.pos.z); camera.lookAt(cam.look.x, cam.look.y, cam.look.z);
     // plan proche : la caméra garde sa distance, ce qui se trouve entre elle et le joueur est découpé
     const near = cam.near || 0.15;
@@ -127,6 +169,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     terrain.update(camera.position.x, camera.position.z, 2);
     forest.update(camera.position.x, camera.position.z, 1);
     // l'herbe pousse autour du joueur ; inutile vue de la montgolfière ou en chute libre
+    life.update(dt, camera.position);
     grass.group.visible = camera.position.y - map.heightAt(camera.position.x, camera.position.z) < 70;
     if (grass.group.visible) grass.update(focus, 2);
     // de loin, on ne voit ni les meubles ni les petits ornements des façades
@@ -143,7 +186,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     water.update(time0);
     interior.update(dt);
     sky.userData.update(time0, { dir: 0.7, speed: 3 });
-    if (post) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.render(scene, camera, time0); }
+    if (post) { post.q.ao = quality.ao; post.q.bloom = quality.bloom; post.q.fx = quality.fx; screenFx(dt); post.render(scene, camera, time0, pfx); }
     else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
   }
 
@@ -151,7 +194,7 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     if (disposed) return;
     disposed = true;
     removeEventListener('resize', resize);
-    terrain.dispose(); decals.dispose(); roads.dispose(); grass.dispose(); lights && lights.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
+    life.dispose(); terrain.dispose(); decals.dispose(); roads.dispose(); grass.dispose(); lights && lights.dispose(); water.dispose(); structures.dispose(); interior.dispose(); forest.dispose(); props.dispose();
     scene.traverse((o) => {
       if ((o.isMesh || o.isPoints) && !o.userData.shared && !o.isInstancedMesh) { o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.dispose(); }
     });
@@ -160,5 +203,8 @@ export async function createScene(host, map, { time = 'jour', progress = () => {
     canvas.remove();
   }
 
-  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, structures, interior, props, forest, kit, lights, MOBILE };
+  // nouvelle partie sans recharger la page : tout ce qu'une partie a cassé ou ouvert revient comme au départ
+  const reset = () => { props.restore(); forest.restore(); if (lights) lights.restore(); structures.restore(); interior.restore(); };
+  return { renderer, scene, camera, canvas, quality, lowerQuality, frame, resize, dispose, reset, structures, interior, props, forest, kit, lights, grass, screen, sunDir, time, MOBILE,
+    get now() { return time0; } };
 }

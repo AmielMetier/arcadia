@@ -127,7 +127,7 @@ const KEYS = [
 ];
 const KEYS_FULL = [
   ['ZQSD / WASD', 'Se déplacer'], ['Souris', 'Viser · clic gauche : tirer'], ['Espace / Maj', 'Roulade (invulnérable)'], ['Clic droit / G', 'Lancer une grenade'],
-  ['A (Q en QWERTY)', 'Capacité de classe'], ['R', 'Recharger'], ['1 2 3 · molette', "Changer d'arme"], ['E (maintenir)', 'Relever un allié · prendre · réparer'], ['Échap · M', 'Menu · son'],
+  ['A (Q en QWERTY)', 'Capacité de classe'], ['R', 'Recharger'], ['1 2 3 · molette', "Changer d'arme"], ['E (maintenir)', 'Relever un allié · prendre · réparer'], ['Échap', 'Menu'], ['M', 'Couper ou remettre le son'],
   ['Manette', 'RT tirer, A roulade, LB grenade, Y capacité'],
 ];
 
@@ -165,7 +165,7 @@ export function briefingHtml({ role, squad, cfg, embedded, canStart, solo, myCla
     : 'La souche VIREO a tout contaminé. Traversez 6 salles en choisissant votre chemin, puis abattez la source au cœur du secteur.';
   return `<div class="panel hazard-top brief" id="briefPanel">
     <div class="head"><h1 class="logo">OUTBREAK<small>SECTEUR ZÉRO</small></h1><p class="tagline">${tag}</p></div>
-    <div class="opts-wrap"><h2>${embedded ? 'Mission' : 'Réglages'}</h2>${settings}</div>
+    <div class="opts-wrap"><h2>Mission</h2>${settings}</div>
     <div class="classes-wrap"><h2>Ta classe</h2>${classPickerHtml(myClass)}
       ${totalNotes ? `<div class="notes-found">${svg('folder')} Dossiers trouvés : ${notes} / ${totalNotes}</div>` : ''}</div>
     <div class="squad-wrap"><h2>Escouade</h2><div class="squad">${squad.map((p) => `<div class="sq" style="--c:${p.color}"><span class="dot"></span>${svg(CLASSES[p.cls]?.icon || 'helmet')}${esc(p.name)}<small>${p.bot ? 'IA' : p.me ? 'TOI' : p.ready ? 'PRÊT' : '…'}</small></div>`).join('')}</div></div>
@@ -187,11 +187,11 @@ export function fitPanel(el) {
   if (k < 1) el.style.transform = `scale(${Math.max(0.45, k)})`;
 }
 
-export function menuHtml({ muted, canQuit, solo }) {
+export function menuHtml({ canQuit, solo }) {
   return `<div class="panel hazard-top" style="width:min(640px,100%)">
     <h2>${solo ? 'Pause' : 'Menu'}</h2>
     ${keysHtml()}
-    <div class="btnrow"><button class="btn" id="btnResume">Reprendre</button><button class="btn alt" id="btnSound">${svg(muted ? 'mute' : 'sound')} ${muted ? 'Son coupé' : 'Son activé'}</button>
+    <div class="btnrow"><button class="btn" id="btnResume">Reprendre</button><button class="btn alt" id="btnSettings">${svg('settings')} Réglages</button>
     ${canQuit ? '<button class="btn alt" id="btnQuit">Quitter</button>' : ''}</div>
   </div>`;
 }

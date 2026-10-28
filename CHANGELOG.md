@@ -1,6 +1,6 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
-## 2.91 — 28 octobre 2026
+## 3.17 — 28 octobre 2026
 - **Birdie Party** — Nouveau parcours « Les Géants » : 18 trous immenses, de 600 m à plus d'un kilomètre (par 6 à 8), à travers la campagne, la mer, la montagne et le désert.
   - Un double dogleg de 1,1 km, un archipel à traverser d'île en île, une crique à porter, un torrent qui coupe deux fois la vallée, deux canyons dans le désert…
   - Sur ces trous, la balle n'est ramassée qu'à par + 5, et le survol du trou prend un peu plus son temps.
@@ -8,8 +8,7 @@
   - Les autres joueurs ne sont plus comptés comme partis pendant qu'ils rejoignent le nouvel hôte : chacun garde sa place et ses scores, l'ancien hôte compris quand il revient.
   - Chacun reçoit tout de suite l'état de la partie en arrivant, et un joueur qui n'a plus de nouvelles de l'hôte le redemande tout seul au lieu de rester bloqué.
 - **Birdie Party** — Les bots évitent mieux de poser leur balle juste devant un torrent ou un étang.
-
-## 2.90 — 27 octobre 2026
+- **Birdie Party** — Dans le menu, la barre des décors d'un parcours montre aussi la part du désert.
 - **Odyssée** — Nouveau jeu : une grande aventure Pokémon en fausse 3D, avec l'ambiance des jeux DS (prototype, les Pokémon servent de remplaçants).
   - Une région aussi grande que Kanto : 10 villes, 10 routes, un pont sur la mer, deux grottes, 8 arènes et la Ligue.
   - Choisis ton premier Pokémon chez le professeur, capture les Pokémon sauvages dans les hautes herbes et affronte 77 dresseurs, ton rival et les Champions.
@@ -18,7 +17,244 @@
   - Le ciel suit l'heure réelle : matin doré, soirée orangée, nuit bleutée avec fenêtres et lampadaires allumés.
   - Au clavier : flèches ou ZQSD pour marcher, Maj pour courir, Espace pour parler, Échap pour le menu.
 
-## 2.89 — 27 octobre 2026
+## 3.16 — 28 octobre 2026
+- **Island Rush** — Une vraie explosion : une boule de feu qui gonfle et bouillonne, passe du blanc à l'orange puis au rouge, se change en fumée noire qui monte, avec des flammes et des braises qui jaillissent autour.
+- **Island Rush** — Glissade : en sprintant, s'accroupir te fait glisser sur quelques mètres, plus vite qu'en courant, et plus loin en descente. On peut sauter en pleine glissade.
+- **Island Rush** — La fumée et les flammes ne prennent plus la teinte violette du mur de la tempête quand il est derrière elles.
+
+## 3.15 — 28 octobre 2026
+- **Island Rush** — On joue à la manette :
+  - boutons à la façon de Fortnite (A sauter, B s'accroupir, X ouvrir et recharger, Y sac, gâchettes viser et tirer, LB / RB changer d'objet, croix pour construire, Menu pause), tous modifiables dans ⚙️ Réglages ;
+  - le stick gauche fait avancer, doucement s'il est à peine poussé ; le droit fait regarder, avec sa propre sensibilité (et haut et bas inversables) ;
+  - s'accroupir et sprinter s'enclenchent d'un appui ;
+  - aide à la visée légère : la visée ralentit sur un ennemi, et en visant elle glisse doucement vers lui (elle se coupe dans les Réglages) ;
+  - les menus, le sac, la carte et les Réglages se font aussi à la manette (croix et A, B pour revenir) ;
+  - la manette vibre aux tirs, aux coups reçus et aux explosions, et les rappels à l'écran montrent ses boutons (Xbox ou PlayStation).
+- **Island Rush** — Les bots ne s'avancent plus lentement vers toi à découvert dès que tu ne les regardes plus. Ils restent discrets à l'approche, mais seulement à couvert ; une fois repérés, ils se battent pour de bon ; et ils vont voir où tu étais à allure normale.
+- **Island Rush** — Les explosions ne font plus une grosse boule : flammes qui jaillissent, braises qui retombent, puis fumée qui monte.
+- **Island Rush** — La montgolfière ne fait plus d'ombre : vue d'en haut, une demi-lune sombre mordait les plages au bord de l'eau.
+
+## 3.14 — 28 octobre 2026
+- **Poké Duel** — Cadres de PV refaits pour se lire d'un coup d'œil : le nom et le niveau, puis « PV » et la jauge, puis les PV restants sur les PV max (« 85 / 180 ») en gros chiffres. Les bandes blanches qui ressemblaient à une jauge pleine ont disparu.
+- **Poké Duel** — Nouvelle police pixel, Jersey 15, bien plus lisible : on ne confond plus 5 et S, 0 et O, ni C et O (« N.50 » se lisait « N.SO »).
+
+## 3.13 — 28 octobre 2026
+- **Poké Duel** — Les combats du tournoi se suivent enfin :
+  - les messages s'écrivent lettre par lettre et restent affichés le temps de les lire ; chaque étape attend la fin de la précédente ;
+  - la barre de PV descend à son rythme, et le tour suivant ne s'ouvre qu'une fois tout joué, chez tous les joueurs.
+- **Poké Duel** — De vraies animations de combat :
+  - lancer de Poké Ball et Pokémon qui en sort en silhouette blanche, rappel en rouge quand on change ;
+  - attaques physiques : élan et impact à la couleur du type ; attaques spéciales : projectile d'énergie ; capacités de statut : étincelles ;
+  - la cible touchée clignote, l'écran tremble sur un coup critique ou super efficace ;
+  - K.O. : le Pokémon s'enfonce sous son socle ; flèches bleues ou rouges quand une stat change, effets colorés pour brûlure, poison, paralysie…
+- **Poké Duel** — La barre de PV est remise exactement dans sa case (elle était décalée).
+- **Poké Duel** — L'arène s'adapte à la fenêtre : elle grandit sur un grand écran, se réduit sur un petit, et passe en format plus haut sur téléphone ; les menus du tournoi suivent aussi la taille de l'écran.
+
+## 3.12 — 28 octobre 2026
+- **Island Rush** — Caméra calme contre les murs :
+  - elle ne fait plus l'essuie-glace quand on longe une façade, ni quand l'épaule passe devant une fenêtre ou une vitrine ;
+  - le personnage ne clignote plus quand la caméra s'approche de lui ;
+  - un poteau, un panneau, un tronc ou un banc qui passe entre elle et toi ne la fait plus plonger sur ta tête.
+- **Island Rush** — Les fenêtres n'ont plus de vitre : on tirait déjà à travers, maintenant on voit aussi à travers.
+- **Island Rush** — L'arme d'un coffre tombe toujours devant lui, à portée de main. Avant, une fois sur quatre, elle passait derrière un mur ou sous un meuble et on croyait le coffre sans arme.
+- **Poké Duel** — Le tournoi prend le look de Pokémon Noir & Blanc :
+  - en combat, les vrais cadres de PV de la 5e génération, la fenêtre de message d'origine et une police pixel ;
+  - les attaques sont de gros boutons à la couleur de leur type, avec PP et efficacité, à côté des boutons Attaque et Pokémon, comme sur l'écran tactile de la DS ;
+  - le changement de Pokémon se fait dans les panneaux d'équipe d'origine (bleu, rouge si K.O.) ;
+  - draft, tableau, aperçu, résumé et podium passent en fenêtres pixel sobres, sans effets de verre ni néons ;
+  - badges de types et de statuts façon Noir & Blanc, en français (PAR, BRÛ, PSN…).
+- **Poké Duel** — On ne peut plus cliquer une attaque pendant l'écran « VS » : les choix s'ouvrent quand le chrono du tour démarre (le clic se perdait).
+
+## 3.11 — 28 octobre 2026
+- **Poké Duel** — Le tournoi, repris de fond en comble :
+  - un draft pour commencer : chacun garde 3 Pokémon sur 6 proposés, avec la couverture de son équipe et ses faiblesses communes sous les yeux (ou le choix conseillé) ;
+  - avant chaque match, les deux équipes face à face : tu choisis en secret ton Pokémon de tête, et des ×2 / ×½ montrent qui frappe fort contre qui. On clique « Prêt », ou le combat part tout seul au bout de 25 s ;
+  - un tableau tiré au sort, lisible : portraits, scores, matchs en direct, qualifiés d'office, forfaits. On l'ouvre à tout moment avec le bouton Tableau ;
+  - la finale se joue en 2 manches gagnantes (réglage « Finale » dans le salon) ;
+  - après chaque manche, un résumé : vainqueur, PV restants, K.O. de chaque Pokémon et Pokémon du match ;
+  - les matchs entre bots se jouent en un instant au lieu de les regarder en entier ;
+  - un vrai podium : marches 1-2-3, champion et son équipe, statistiques de chacun et Pokémon du tournoi.
+- **Poké Duel** — Plus de tournoi bloqué :
+  - le chrono du tour défile enfin, et il compte aussi pour choisir son remplaçant après un K.O. (choix automatique s'il s'écoule) ;
+  - un joueur qui quitte perd par forfait et le tournoi continue ; si c'est l'hôte, un autre joueur reprend le tournoi là où il en était ;
+  - seul l'hôte peut relancer un tournoi (un invité pouvait tout effacer d'un clic).
+- **Poké Duel** — Le tournoi change d'allure : salle de tournoi éclairée par des projecteurs en fond, écran « VS » des deux dresseurs avant chaque manche, combats dans le stade sur des socles lumineux (dorés en finale), portraits des dresseurs, trophée et confettis au podium.
+
+## 3.10 — 28 octobre 2026
+- **Island Rush** — Le lance-roquettes, repris de zéro :
+  - un vrai tube posé sur l'épaule droite, à côté de la tête (il passait devant le visage, penché vers le bas) ;
+  - au tir, flamme à la bouche, souffle et fumée par l'arrière du tube, et tout le buste encaisse le recul ;
+  - la roquette sort du tube : ogive rouge, ailettes, flamme derrière elle et longue traînée de fumée continue (avant, un simple bâton vert suivi de quelques bouffées) ;
+  - au rechargement, le tube se redresse devant lui et la main gauche y pousse la roquette suivante.
+
+## 3.9 — 28 octobre 2026
+- **Island Rush** — Un mur cassé emporte ce qu'il porte : sa porte, et les tableaux et horloges accrochés dessus (ils restaient suspendus dans le vide).
+- **Island Rush** — Plus de bandes qui scintillent dans les pièces là où les murs se rejoignent, ni de trait clair qui traversait le plancher de l'étage.
+- **Island Rush** — Des combats qui marquent :
+  - les balles laissent des impacts sur les murs, le décor et le sol, et ce qu'on abîme se fissure de plus en plus ;
+  - une explosion fait trembler l'air autour d'elle, couche l'herbe et laisse une brûlure au sol (une gerbe dans l'eau) ;
+  - touché, l'écran réagit : les couleurs se séparent, un éclat bleu passe quand le bouclier encaisse ;
+  - la vie basse fait pâlir l'image, qui bat comme un cœur.
+- **Island Rush** — Une île plus vivante :
+  - rayons de soleil entre les arbres et les maisons, brume légère au ras du sol et de la mer ;
+  - poussière et pollen dans l'air (des lucioles le soir), feuilles qui tombent des arbres, et en gerbe quand on les frappe ;
+  - des petits oiseaux picorent dans les prés et s'envolent quand on approche ou qu'on tire ;
+  - dans la tempête, pluie violette, éclairs et tonnerre.
+- **Island Rush** — Sensation de vitesse en chute libre, en deltaplane et sur les tremplins : traînées d'air, image qui file vers les bords.
+- **Island Rush** — On éclabousse en plongeant, on laisse des ronds dans l'eau en nageant, et l'herbe se couche sur son passage.
+- **Island Rush** — Sur une machine qui peine, ces effets s'allègent d'eux-mêmes.
+
+## 3.8 — 28 octobre 2026
+- **Island Rush** — Un tir, c'est une détonation : le fusil d'assaut et le pistolet-mitrailleur jouaient une petite rafale à chaque balle (de près comme de loin). Chaque tir garde maintenant sa vraie queue, avec son écho.
+- **Island Rush** — Un coffre ouvert se tait aussitôt. Son carillon ne passe plus au coffre voisin dans la seconde, et ne s'entend plus qu'à une douzaine de mètres.
+- **Island Rush** — Collisions :
+  - on ne traverse plus une porte ouverte : le battant est plaqué contre le mur, du côté où il s'est ouvert ;
+  - on ne traverse plus un escalier, construit ou de bâtiment, ni par le côté ni en sautant dessous : il a maintenant une épaisseur sous ses marches.
+- **Island Rush** — Construction plus juste :
+  - le mur se pose sur le trait de la grille juste devant toi (et non plus parfois deux cases plus loin) ;
+  - le sol et l'escalier vont sur la case que tu regardes, sous toi en regardant à tes pieds ;
+  - en visant haut, ils montent d'un étage.
+  - On ne construit plus dans le vide : une pièce doit reposer sur le sol, un bâtiment ou une autre construction.
+- **Island Rush** — La caméra ne passe plus à travers les murs : contrôle plus fin derrière toi, secousse des explosions bornée par la place disponible, et un dernier contrôle qui la ramène vers toi si elle touche quoi que ce soit.
+- **Island Rush** — Tremplins : on monte à une quarantaine de mètres, un peu vers l'avant, puis le deltaplane s'ouvre tout seul en haut. Environ 70 m parcourus d'un saut, de quoi traverser un village.
+- **Island Rush** — Dégâts de chute réduits : rien jusqu'à 10 m (8 avant), puis environ deux fois moins par mètre.
+- **Island Rush** — Armes : le fusil de précision a 3 balles par chargeur (1 avant), et toutes les armes rechargent 10 % plus vite.
+
+## 3.7 — 28 octobre 2026
+- **Island Rush** — Les personnages réagissent : un sursaut quand une balle les touche (le buste part en arrière, la tête suit), et ils plient les genoux en retombant d'un saut ou du deltaplane.
+- **Island Rush** — Un vrai coffre au trésor, en bois avec couvercle bombé et serrure dorée, remplace la caisse faite de trois blocs.
+- **Island Rush** — Son plus propre :
+  - les différentes versions d'un même bruit (pas, impacts, tirs) ont maintenant le même volume ;
+  - la culasse du pistolet ne couvre plus tout le rechargement ;
+  - pendant un combat proche, l'ambiance de nature s'efface pour qu'on entende mieux les tirs et les pas.
+- **Island Rush** — Des astuces au bon moment, avec tes touches : ouvrir les coffres en arrivant, tirer et recharger à la première arme, poser un mur quand on te tire dessus, te soigner, rejoindre la zone… Chacune revient au plus trois fois, puis disparaît. Après trois parties, le rappel des touches reste replié (H le rouvre).
+- **Island Rush** — L'interface s'adapte à l'écran : plus grande sur les grands écrans (1440p, 4K, ultra-large), plus compacte sur les petits, sans que rien ne se chevauche.
+- **Island Rush** — Journal des parties, pour les soirées de test : l'hôte garde un résumé de chaque partie dans son navigateur (rien n'est envoyé).
+  - Une page de statistiques le montre : comment et à quelle minute tombent les joueurs, armes des éliminations, carte des atterrissages et des éliminations.
+  - Le lien est sur l'écran de fin de partie, et le journal s'exporte pour le réunir avec celui des amis.
+
+## 3.6 — 28 octobre 2026
+- **Island Rush** — Une boussole en haut de l'écran : les points cardinaux défilent avec ton regard, et chaque coup de feu entendu y laisse une marque à sa direction pendant quelques secondes.
+  - Plus la marque est grande, plus le tireur est proche. Elle est rouge vif s'il te touche, bleue s'il est de ton équipe, avec ▲ ou ▼ s'il tire d'au-dessus ou d'en dessous.
+  - Un tir dans ton dos : une flèche au bord de la boussole montre de quel côté te tourner. Les repères de l'équipe y ont aussi leur losange.
+- **Island Rush** — Les bots ne mettent plus presque toutes leurs balles : comme un joueur, ils suivent leur cible avec un temps de retard. Contre quelqu'un qui bouge, un bot normal touche environ une balle sur trois (deux sur trois avant, même en zigzag). Immobile à découvert, tu restes une cible facile.
+- **Island Rush** — Les bots sont plus discrets : tant que l'ennemi qu'ils ont repéré ne les a pas vus, ils avancent accroupis, sans bruit de pas, et n'ouvrent le feu qu'à bonne portée. Ils finissent aussi accroupis l'approche des coups de feu qu'ils vont voir.
+- **Island Rush** — Les toits des maisons, granges, chalets et autres toits en pente se cassent à la pioche (cinq coups) : pose-toi sur le toit et entre par le trou. Les toits plats se cassaient déjà.
+- **Island Rush** — La même arme dans une meilleure rareté remplace directement l'ancienne, qui reste au sol, au lieu de prendre une case de plus (« Améliorer ton arme »).
+- **Island Rush** — Coffres : fini la grosse tache blanche, place à un halo doré autour du coffre, une lueur dorée au sol et des paillettes. Près d'un coffre, on l'entend : un carillon doux qui scintille, de plus en plus fort à mesure qu'on approche, même à travers un mur.
+- **Island Rush** — Saut de la montgolfière : une culbute en quittant la nacelle, puis une vraie position de chute libre, à plat ventre, bras et jambes écartés. En avançant, tu piques tête la première, et tu t'inclines dans les virages.
+- **Island Rush** — Les cases d'objets en bas de l'écran affichent tes touches (et plus toujours X, 1, 2, 3, 4, 5), mises à jour dès que tu les changes dans les Réglages.
+- **Island Rush** — Deux bots sans arme ne se battent plus à la pioche pendant des minutes.
+
+## 3.5 — 28 octobre 2026
+- **Island Rush** — Touches modifiables : dans ⚙️ Réglages, chaque action peut avoir deux touches, au clavier ou à la souris (boutons du côté compris). Ton choix est retenu dans ton navigateur, et tous les rappels à l'écran le suivent.
+  - Les touches s'affichent comme sur ton clavier (Z Q S D sur un clavier français). Une touche déjà utilisée ailleurs y est retirée, et un message le dit.
+- **Island Rush** — Armes plus précises : environ un tiers de dispersion en moins, et à l'arrêt, le premier tir après une courte pause part presque droit (sauf au fusil à pompe).
+  - Le viseur s'ouvre exactement de la dispersion réelle : avant, il paraissait plus serré qu'en vrai, surtout en visant.
+  - Les balles partent vers ce que montre le viseur, même collé à un mur, et plus jamais depuis l'autre côté d'un mur à ta droite.
+  - La précision gagnée est pour les joueurs : les bots gardent la leur.
+- **Island Rush** — Fini les attroupements de bots qui ne se tirent pas dessus : un bot qui en voit un autre à moins de 30 m l'engage (à moins de 10 m tant qu'il fouille en début de partie) et va au bout du combat au lieu de l'oublier en route. À bout de forces, il se met à couvert pour se soigner.
+  - Ils ne marchent plus en file vers la zone et ne s'entassent plus sur le même butin, le même combat ou le même largage. La partie dure toujours une dizaine de minutes.
+- **Island Rush** — Les bots ne restent plus coincés : posés sur une pente trop raide, sur le socle d'un bâtiment ou contre un obstacle, ils cherchent un autre chemin, font un détour ou redescendent au lieu de piétiner sur place jusqu'à la tempête. Partis rejoindre la zone, ils ne font plus demi-tour pour un objet.
+- **Island Rush** — La première zone n'arrive plus en pleine fouille : la tempête ne bouge qu'au bout de 3 minutes, son bord avance moins vite que toi en courant, et le premier cercle reste près du centre de l'île. Les cercles suivants vont un peu plus vite, pour une partie d'une dizaine de minutes.
+
+- **Tous les jeux en ligne** — Beaucoup moins de « Coupure chez l'hôte · on l'attend… », et le salon ne casse plus pour une micro-coupure.
+  - L'hôte qui attend son tour dans un autre onglet (Mini-Golf Party, Birdie Party…) garde une connexion bien vive : à la moindre coupure il revient aussitôt, au lieu de perdre sa place au bout de 20 secondes et de voir un invité reprendre le salon.
+  - Quand la connexion de l'hôte n'arrive plus à suivre, les images de la partie devenues trop anciennes sont sautées au lieu de s'empiler : la partie reste fluide, au lieu de prendre du retard jusqu'à ce que l'hôte se croie déconnecté.
+  - Une connexion chargée mais bien vivante n'est plus prise pour une coupure.
+  - Après un ralentissement passager du serveur, l'hôte n'est plus coupé à chaque reprise de la connexion : les invités ne l'attendent plus indéfiniment.
+  - Island Rush, Outbreak, Convoy Storm et Bastion Clash envoient les tirs, les portes, le butin et les effets à part : ils arrivent toujours, même quand une image est sautée.
+  - Un invité qui reprend le salon ne voit plus « Coupure chez l'hôte » au-dessus de sa propre partie.
+## 3.4 — 28 octobre 2026
+- **Island Rush, Birdie Party, Convoy Storm** — Plus de carrés noirs à l'écran : sur certaines cartes graphiques, des taches noires apparaissaient par endroits (ombres au pied des objets, halo des lumières, eau du golf). Ces points sont maintenant corrigés au lieu de noircir l'image.
+
+## 3.3 — 27 octobre 2026
+- **Island Rush** — L'île ne se vide plus en deux minutes : les bots se battent de plus en plus au fil des cercles de la tempête, et la partie dure jusqu'au dernier cercle (une dizaine de minutes).
+  - Ils se posent répartis sur toute l'île au lieu de s'empiler, et 5 au plus atterrissent près de toi.
+- **Island Rush** — Équipes : solo, duos ou trios, au choix dans le salon. Les places libres de ton équipe sont prises par des bots coéquipiers qui sautent avec toi, te suivent et te relèvent.
+  - À 0 PV, tu tombes à terre : tu rampes, et un coéquipier te relève en restant 5 s à côté de toi (E). Sans aide au bout de 30 s, ou si toute l'équipe est à terre, c'est l'élimination.
+  - Sur l'écran d'accueil, chacun choisit son équipe. En jeu, tes coéquipiers ont leur pseudo au-dessus de la tête, leur point sur la carte et un panneau avec leur vie.
+- **Island Rush** — Repères d'équipe : B ou le clic molette marque ce que tu vises (un ennemi, du butin, un largage, ou simplement « Ici »). Tes coéquipiers le voient 12 secondes, sur l'écran et sur la carte, même dans leur dos (le repère se colle au bord de l'écran). Depuis la montgolfière, tu montres où tu vas te poser.
+  - Tes bots coéquipiers vont où tu leur montres, s'occupent de l'ennemi que tu désignes, et te signalent ceux qu'ils voient.
+- **Island Rush** — Largages : quatre fois par partie, une caisse descend en parachute dans le cercle, annoncée et marquée d'un losange violet sur la carte. Elle contient une arme épique, une grande potion de bouclier et une trousse de soin… et les bots la veulent aussi.
+- **Island Rush** — Les bots se protègent : touchés de loin, ils posent un mur et rechargent à l'abri ; bien amochés, ils décrochent pour se soigner.
+- **Island Rush** — Chaque coffre contient un petit bouclier.
+- **Island Rush** — Niveau des bots « Auto », le nouveau réglage par défaut : il suit vos dernières parties, avec plus de bots faciles pour qui débute et plus de coriaces pour qui gagne souvent.
+- **Island Rush** — Fin de partie : un bilan (précision, distance parcourue, temps de survie, coéquipiers relevés, qui t'a éliminé), et « Rejouer » relance tout de suite, sans recharger la page, pour toi comme pour tes invités.
+- **Island Rush** — Chargement plus rapide : les personnages pèsent 1 Mo au lieu de 4.
+## 3.2 — 27 octobre 2026
+- **Poké Duel** — Les tournois comptent enfin au classement entre potes, avec leur onglet et le record de matchs gagnés.
+  - Chacun prend la place que lui donne le tableau : champion, finaliste, puis demi-finalistes et quarts de finalistes.
+- **Tous les jeux** — Correction : un joueur dont la connexion se figeait (téléphone en veille, wifi coupé) pouvait faire tomber le serveur, et avec lui tous les salons en cours.
+  - Le serveur tient aussi bon face à un appareil qui enverrait des messages géants ou en rafale.
+- **Hub** — Le bouton « 📋 Logs & Crashs » quitte l'accueil et le salon : c'était un outil de développement.
+
+## 3.1 — 27 octobre 2026
+- **Island Rush** — Les bots t'attaquent enfin : celui qui crée la partie dans le Hub leur était invisible comme cible. Ils te traitent maintenant comme n'importe quel autre joueur.
+- **Island Rush** — Les bots jouent comme des joueurs : au début, ils fouillent et se mettent du bouclier ; une fois équipés, ils vont là où ça tire et tournent vers le prochain cercle. S'ils croisent un joueur avant, ils engagent le combat.
+- **Island Rush** — Le fusil de précision tire une vraie balle : elle met du temps à arriver, tombe avec la distance (environ 2 m à 300 m) et dérive un peu à droite sous l'effet de Coriolis. Il faut viser devant et au-dessus ; les bots le font aussi.
+- **Island Rush** — On peut casser les sols et les plafonds, case par case : on passe à travers, et les meubles posés dessus tombent en morceaux.
+- **Island Rush** — Les chutes enlèvent de la vie, plus du bouclier.
+- **Island Rush** — Tirs plus percutants : prises plus pleines, coup sourd dans les graves sous chaque détonation, grondement qui roule pour les tirs lointains.
+- **Island Rush** — Échap ferme le sac ou la carte, sans rien faire d'autre.
+- **Island Rush** — La caméra ne traverse plus les murs, les portes ni les plafonds : elle se rapproche quand un obstacle passe derrière toi, puis recule doucement ; collée à un mur, elle se recentre sur ta tête.
+- **Island Rush** — Moins de ralentissements, surtout à 60 joueurs : image calculée à une définition raisonnable, ombres et personnages hors champ allégés, bots qui cherchent leur chemin bien plus vite.
+
+## 3.0 — 27 octobre 2026
+- **Hub** — Version 3.0 : Island Rush change de dimension (sons enregistrés, armes détaillées, deltaplane, île plus belle vue du ciel, jusqu'à 60 joueurs) et les affiches de Birdie Party et d'Island Rush sont refaites à partir du jeu actuel.
+- **Island Rush** — Les montagnes ne s'escaladent plus : on ralentit dans les pentes fortes et, au-delà d'environ 40°, on glisse vers le bas sans pouvoir sauter. Les chemins restent praticables à pied (le refuge du sommet se rejoint par son sentier), et une rampe construite permet toujours de grimper.
+- **Island Rush** — Les ponts sont droits et à niveau de la route : plus de marche à l'entrée, plus de virage qui sortait du tablier contre le garde-corps.
+- **Island Rush** — Les chutes ne blessent qu'au-delà d'environ 8 m, en proportion de la hauteur.
+- **Island Rush** — Plus de monde sur l'île : 30, 45 ou 60 joueurs (45 par défaut), bots compris.
+  - Un tiers des bots sautent près de l'endroit où tu te poses : ça se bat dès l'atterrissage.
+- **Island Rush** — Nouveaux sons, enregistrés sur de vraies armes : chaque arme a sa détonation, sèche de près, claquement étouffé avec écho de loin, et le son arrive en retard quand le tireur est loin.
+  - Rechargements complets (chargeur qui sort et rentre, culasse, cartouches une à une et pompe du fusil à pompe), bruit de l'arme qu'on dégaine.
+  - Les pas changent selon le sol : herbe, route, plancher, carrelage, gravier, neige, métal, eau ; on entend aussi sur quoi marchent les autres.
+  - Les balles qui frôlent sifflent, les impacts sonnent selon la matière (bois, pierre, métal), le bouclier qui casse s'entend.
+  - Écho de pièce à l'intérieur, écho du relief dehors ; vraies explosions, portes qui grincent.
+  - Musique pendant la montgolfière et la descente, qui s'efface à l'atterrissage pour laisser entendre les pas ; elle suit le curseur Musique des réglages.
+- **Island Rush** — Les combats se sentent : la vue recule à chaque tir (fort au fusil à pompe et au fusil de précision), la flamme de bouche éclaire autour, l'image tremble quand on est touché.
+  - Touches plus lisibles : marqueur qui claque (rouge à l'élimination), chiffres de dégâts plus gros qui s'écartent, arc rouge plus net du côté d'où l'on te tire dessus.
+  - À l'impact, des éclats bleus sur le bouclier, blancs sur la vie, jaunes à la tête (sans sang).
+- **Island Rush** — Nouvelles armes, bien plus détaillées : un modèle pour les raretés commune et peu commune, un plus moderne pour rare et épique (fusil d'assaut, fusil à pompe, pistolet, pistolet-mitrailleur, fusil de précision), à la couleur de leur rareté, en main comme dans le sac.
+  - Au sol, l'arme flotte en tournant au-dessus d'un socle hexagonal lumineux ; une poussière de lumière monte autour du butin rare.
+- **Island Rush** — Le planeur devient un vrai deltaplane : armature en tubes, voile aux couleurs du joueur avec chevrons, barre tenue à deux mains ; l'aile se déplie à l'ouverture, ondule, s'incline dans les virages et laisse deux traînées au bout des ailes.
+- **Island Rush** — En chute libre, la vue s'élargit avec la vitesse et des traits de vitesse filent sur les bords de l'écran.
+- **Island Rush** — Nouvelle montgolfière : enveloppe en poire à fuseaux colorés avec le nom du jeu, nacelle en osier et sacs de lest, brûleur dont la flamme rugit par moments.
+- **Island Rush** — L'île est plus riche vue du ciel : champs bordés de haies, prés fleuris, creux et crêtes mieux marqués, touffes d'herbe ; des nuages bas qu'on traverse en sautant et des vols d'oiseaux.
+- **Island Rush** — Interface plus épurée : panneaux en verre dépoli, barres de vie et de bouclier fines avec une traînée blanche quand on perd des points, cases d'objets à liseré lumineux de la couleur de rareté, armes dessinées en silhouette.
+  - Le rappel des touches se replie en une petite pastille 20 secondes après l'atterrissage (H le rouvre).
+- **Island Rush** — Choisis ton personnage sur l'écran d'accueil : soldat, combinaison ou mercenaire, et sa couleur ; le choix est gardé d'une partie à l'autre. Les bots en tirent un au hasard.
+- **Island Rush** — Les mains des personnages sont deux fois plus petites, mieux proportionnées ; les armes et les objets restent bien dans le poing.
+- **Island Rush** — Bots plus offensifs : ils entendent les coups de feu de plus loin et viennent voir, se battent davantage entre eux et fuient moins vite. Plus d'armes au sol : on se bat plus tôt.
+
+## 2.97 — 27 octobre 2026
+- **Tous les jeux** — Un seul bouton ⚙️ Réglages, le même dans chaque jeu, qui ouvre le même panneau.
+  - Le son d'abord : un curseur Musique et un curseur Effets. Pour couper le son, on glisse son curseur à 0 : les boutons 🔊, 🎵, « Couper le son » ou « Tout couper », qui faisaient doublon avec les curseurs, disparaissent.
+  - La touche M coupe le son et le remet où il était, en déplaçant ces mêmes curseurs (N pour la musique dans Duo Drift).
+  - Ensuite, les réglages propres au jeu, rangés de la même façon : graphismes de Bastion Clash, plateau et caméra qui suit de DavidSimulator, mise en scène de The Candidate, graphismes et sensibilité de Mini-Golf Party, sensibilité d'Island Rush, options et commandes de Duo Drift.
+  - Un son coupé avec l'ancien bouton reste coupé : son curseur est simplement à 0.
+- **Hub** — Le bouton 🎵 et le petit curseur de l'accueil laissent la place au même bouton ⚙️ Réglages.
+- **Outbreak, Convoy Storm, Mini-Golf Party, Island Rush** — Dans le menu de pause (et l'écran de départ d'Island Rush), un bouton Réglages remplace les boutons et curseurs du son.
+- **Cyber Kart GP** — « 🎵 Musique » et « 🎚️ Volume » ne font plus qu'un bouton, « ⚙️ Réglages ». Quand la musique ne joue pas (chargement, son à débloquer), il se borde d'orange et le panneau dit pourquoi.
+
+## 2.96 — 27 octobre 2026
+- **Mini-Golf Party** — Correction : la caméra tourne sans limite à la souris (Claude)
+
+## 2.95 — 27 octobre 2026
+- **Bastion Clash** — Les combats ne font plus ramer le jeu.
+  - Le premier gros affrontement de la partie ne fige plus l'écran une demi-seconde, et les batailles suivantes restent fluides : les tirs, explosions et étincelles coûtent environ cinq fois moins cher à afficher.
+  - Les éclairs des explosions sont devenus des halos de lumière au sol, aussi visibles qu'avant.
+- **Bastion Clash** — Le bruit des VCS qui récoltent est beaucoup plus discret : un petit tintement doux toutes les une à deux secondes au lieu d'un crépitement aigu en continu.
+
+## 2.94 — 27 octobre 2026
+- **Island Rush** — Les armes se tiennent à deux mains, épaulées dans l'axe du regard (debout, en courant, accroupi) : on les voit enfin à côté du personnage.
+  - Le pistolet se tient à deux mains, le lance-roquettes à l'épaule ; le fusil à pompe ne pointe plus vers le ciel, en main comme au sol.
+- **Island Rush** — Les coffres et le butin ne brillent plus à travers les murs, et le halo des coffres est plus discret.
+- **Island Rush** — Bots plus vigilants : ils entendent quelqu'un courir tout près d'eux et, sans arme, attaquent à la pelle un joueur qui s'approche.
+- **Birdie Party** — Le parcours, les équipes, les bots, le vent et le moment se choisissent sur l'écran d'accueil du jeu, et non plus dans le salon du Hub.
+
+## 2.93 — 27 octobre 2026
 - **Island Rush** — Refonte des graphismes : l'île garde ses arbres et son ciel, tout le reste change d'allure.
   - Les joueurs sont de vrais soldats animés (course, saut, accroupi, planeur, tir, chute), aux couleurs de chacun.
   - Les armes ont leur vrai modèle : en main, posées au sol et dans la barre d'objets (fusil d'assaut, pompe, pistolet, mitraillette, sniper, lance-roquettes, grenades, soins).
