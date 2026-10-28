@@ -28,6 +28,11 @@ kbd{font-family:var(--bung);font-size:11px;font-weight:400;background:var(--yell
 .match .st b{color:#d6b6ff}
 .match .st.closing b{color:#fff;animation:blink .6s infinite alternate}
 .match .st.out small{color:var(--red)}.match .st.out b{color:var(--red);animation:blink .35s infinite alternate}
+/* boussole : en haut au centre, les tirs entendus y laissent leur marque */
+.compass{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:clamp(160px,calc(100vw - 640px),560px);display:flex;flex-direction:column;align-items:center}
+.compass canvas{display:block;width:100%;height:44px;background:linear-gradient(180deg,rgba(14,16,22,0),rgba(14,16,22,.34) 30%,rgba(14,16,22,.34) 75%,rgba(14,16,22,0));-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.compass::before{content:'';position:absolute;top:0;left:50%;margin-left:-6px;border:6px solid transparent;border-top:7px solid var(--yellow);border-bottom:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.7))}
+.compass b{font-family:var(--bung);font-weight:400;font-size:11px;line-height:1.5;margin-top:1px;padding:0 7px;min-width:38px;text-align:center;border-radius:6px;background:var(--d-bg);border:1px solid var(--d-line)}
 .phase{position:absolute;top:66px;left:12px;font-size:12px;font-weight:700;color:var(--d-text);text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.85}
 @keyframes blink{to{opacity:.35}}
 

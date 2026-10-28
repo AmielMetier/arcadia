@@ -134,6 +134,8 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
   const inv = $('#inv'), vit = $('#vit'), ammoEl = $('#ammo'), matsEl = $('#mats'), gauge = $('#gauge');
   const mStorm = $('#mStorm');
   let invKey = '', ammoKey = '', matsKey = '';
+  // une touche en court, pour le coin d'une case (« Souris 4 » → « S4 », « Espace » → « Esp »)
+  const short = (l) => (l.length <= 3 ? l : l.includes(' ') ? l.split(' ').map((w) => (/^\d+$/.test(w) ? w : w[0])).join('').slice(0, 3) : l.slice(0, 3));
   const slotSig = (P) => P.sel + '|' + P.inv.map((s) => (s ? s.t + (s.w || s.c) + s.r + ':' + (s.mag ?? s.n) : '-')).join(',');
   function player(P, extra) {
     const hp = Math.max(0, P.hp), sh = Math.max(0, P.sh);
@@ -163,7 +165,7 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
         const count = !s ? '' : s.t === 'arme' ? `<em>${s.mag}</em>` : s.n > 1 ? `<em>${s.n}</em>` : '';
         const title = i === 0 ? 'Pioche' : s ? itemLabel(s) : 'Vide';
         return `<div class="slot${sel ? ' sel' : ''}${i === 0 ? ' tool' : s ? '' : ' empty'}" style="--r:${r ? r.color : '#4a5260'}" title="${esc(title)}">
-          <span class="k">${i === 0 ? 'X' : i}</span>${s || i === 0 ? `<img src="${itemIcon(i === 0 ? null : s)}" alt="">` : ''}${count}</div>`;
+          <span class="k">${esc(short(key(i === 0 ? 'pioche' : 'objet' + i)))}</span>${s || i === 0 ? `<img src="${itemIcon(i === 0 ? null : s)}" alt="">` : ''}${count}</div>`;
       }).join('');
       const hn = $('#heldname');
       hn.textContent = held ? itemLabel(held) : P.sel === 0 ? 'Pioche' : '';
@@ -415,6 +417,8 @@ export function createHud(map, { onTeleport, project, key = () => '' } = {}) {
     spectate(name) { const s = $('#spect'); s.hidden = !name; if (name) s.innerHTML = `Tu regardes <b>${esc(name)}</b> · <kbd>${esc(key('saut'))}</kbd> joueur suivant`; },
     // icônes rendues à partir des modèles : on redessine la barre d'objets et le sac
     setIcons(map) { rendered = map; invKey = ''; bagKey = ''; },
+    // touches changées : les cases de la barre affichent les nouvelles
+    refreshKeys() { invKey = ''; },
     get bagOpen() { return !bagEl.hidden; },
     openBag(P, move) { bagP = P; onMove = move; bagKey = ''; hoverI = -1; bagEl.hidden = false; bagRender(P); },
     closeBag() { bagEl.hidden = true; bagP = null; drag = null; for (const g of document.querySelectorAll('.dragghost')) g.remove(); },

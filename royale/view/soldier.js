@@ -158,8 +158,13 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     L: { up: model.getObjectByName('UpperArmL'), low: model.getObjectByName('LowerArmL'), end: model.getObjectByName('Index1L') },
   };
   const armsOk = !!(ARMS.R.up && ARMS.R.low && ARMS.L.up && ARMS.L.low && ARMS.L.end);
+  // les jambes (chute libre : écartées, genoux pliés ; culbute de sortie : ramenées contre le buste)
+  const LEGS = { R: { up: model.getObjectByName('UpperLegR'), low: model.getObjectByName('LowerLegR') }, L: { up: model.getObjectByName('UpperLegL'), low: model.getObjectByName('LowerLegL') } };
+  const legsOk = !!(LEGS.R.up && LEGS.R.low && LEGS.L.up && LEGS.L.low);
+  // pose de repos des jambes (droites) : en chute, on part d'elles, pas de l'animation de saut (une jambe en avant)
+  const legBones = legsOk ? [LEGS.R.up, LEGS.R.low, LEGS.L.up, LEGS.L.low] : [], legRest = legBones.map((b) => b.quaternion.clone());
   // os qu'on tourne nous-mêmes : ils reprennent la pose de l'animation avant chaque image (sinon ça s'accumule)
-  const posed = [torso, neck, upperArm, lowerArm, hand, ARMS.L.up, ARMS.L.low, ARMS.L.end].filter(Boolean);
+  const posed = [torso, neck, upperArm, lowerArm, hand, ARMS.L.up, ARMS.L.low, ARMS.L.end, LEGS.R.up, LEGS.R.low, LEGS.L.up, LEGS.L.low].filter(Boolean);
   const base = posed.map((b) => b.quaternion.clone());
   const qx = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0);
   // objets tenus qui ne viennent pas du kit : dans un support à l'échelle du monde, accroché à la main
@@ -193,6 +198,9 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
 
   let held = null, heldKind = null, heldC = null, fly = 0, swim = 0, deadT = 0, air = 0, kick = 0, aimLift = 0;
   let arm = null, use = 0, reload = 0, hold = 0, clock = 0, heldW = null;
+  // chute libre : piqué (on file devant soi), inclinaison dans les virages, culbute en quittant la nacelle (ou le tremplin)
+  let dive = 0, bank = 0, flipT = null, prevMode = 'sol';
+  const FLIP = 1.1;
   // ---------------------------------------------------------------- gestes : la main va à un point, épaule et coude suivent
   // (cinématique inverse à deux os : bras et avant-bras). Points et coude exprimés dans le repère du corps, depuis
   // l'épaule : x vers la gauche du personnage (le milieu du corps pour la main droite), y en haut, z devant.
@@ -258,6 +266,37 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     reach(T2, w, POLE_L, 0, 'L', true);
   }
   const T2 = V();
+  // tourne un os d'un angle autour d'un axe du repère du corps (x vers la gauche du personnage, y en haut, z devant)
+  const axW = V(), Z = new THREE.Vector3(0, 0, 1);
+  function turnBone(bone, axis, a) {
+    if (Math.abs(a) < 1e-4) return;
+    body.getWorldQuaternion(qb); axW.copy(axis).applyQuaternion(qb);
+    bone.parent.getWorldQuaternion(qp);
+    bone.quaternion.premultiply(qp.clone().invert().multiply(qd.setFromAxisAngle(axW, a)).multiply(qp));
+  }
+  // chute libre, bras : écartés, coudes pliés, mains à hauteur de tête (à plat ventre) ; le long du corps en piqué ;
+  // serrés contre les genoux pendant la culbute
+  const SKY = { box: V().set(-0.5, 0.2, -0.1), dive: V().set(-0.18, -0.6, -0.14), tuck: V().set(-0.1, -0.4, 0.32), pole: V().set(-0.5, -0.75, -0.35) };
+  const skyT = V(), skyP = V();
+  function skyArms(w, tuck) {
+    for (const [side, s] of [['R', 1], ['L', -1]]) {
+      const flap = Math.sin(clock * 13 + (s > 0 ? 0 : 1.7)) * 0.025;
+      skyT.copy(SKY.box).lerp(SKY.dive, dive).lerp(SKY.tuck, tuck);
+      skyT.x = skyT.x * s; skyT.z += flap;
+      skyP.copy(SKY.pole); skyP.x *= s;
+      reach(skyT, w, skyP, 0, side);
+    }
+  }
+  // chute libre, jambes : écartées et genoux pliés (pieds vers le ciel), serrées en piqué, ramenées pendant la culbute
+  function skyLegs(w, tuck) {
+    const flap = Math.sin(clock * 15) * 0.04;
+    legBones.forEach((b, i) => b.quaternion.slerp(legRest[i], w));
+    const spread = (0.3 - dive * 0.22 + flap) * w * (1 - tuck), knee = ((0.8 - dive * 0.55) * (1 - tuck) + tuck * 1.9) * w, hip = (0.12 * (1 - tuck) - tuck * 1.45) * w;
+    turnBone(LEGS.R.up, Z, -spread); turnBone(LEGS.L.up, Z, spread);
+    turnBone(LEGS.R.up, X, hip); turnBone(LEGS.L.up, X, hip);
+    turnBone(LEGS.R.low, X, knee); turnBone(LEGS.L.low, X, knee);
+  }
+  const piv = V();
   const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
   const P3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const POLE = { bas: P3(-0.6, -0.8, -0.2), haut: P3(-0.7, 0.35, 0.55), avant: P3(-0.7, -0.5, 0.45) };
@@ -313,6 +352,13 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
     const gun = heldKind === 'arme';
     fly = damp(fly, st.mode === 'chute' ? 1 : 0, 4, dt);
     swim = damp(swim, st.swim ? 1 : 0, 6, dt);
+    // chute libre : on entre en chute (nacelle, tremplin) en culbutant ; on pique en filant devant soi, on s'incline en virage
+    if (st.mode === 'chute' && prevMode !== 'chute' && st.alive !== false) flipT = 0;
+    prevMode = st.mode;
+    if (flipT != null && ((flipT += dt) > FLIP || st.mode !== 'chute')) flipT = null;
+    const ry = root.rotation.y, fwd = (st.vx || 0) * Math.sin(ry) + (st.vz || 0) * Math.cos(ry), side = -(st.vx || 0) * Math.cos(ry) + (st.vz || 0) * Math.sin(ry);
+    dive = damp(dive, st.mode === 'chute' ? clamp(fwd / 15, 0, 1) : 0, 3, dt);
+    bank = damp(bank, st.mode === 'chute' ? clamp(side / 15, -1, 1) : 0, 3, dt);
     air = !st.ground && !st.swim ? air + dt : 0;
     glider.update(dt, st.mode === 'planeur' && st.alive !== false, root.rotation.y, st.far || 0);
     if (!trailsIn && root.parent) { for (const l of glider.trails) root.parent.add(l); trailsIn = true; }
@@ -380,9 +426,20 @@ export function buildSoldier(kit, { shirt = 0xff4b2b, pants = 0x3a3f4a, skin = 0
         reach(glider.bar(1, T2), glide, POLE_UP.L, 0, 'L', true);
       }
     }
-    // chute libre : à plat ventre ; nage : penché, à la surface
-    body.rotation.x = fly * 1.2 + swim * 0.9;
-    body.position.y = fly * 0.9 + swim * 0.55;
+    const tuck = flipT != null ? Math.sin(Math.PI * Math.min(1, flipT / FLIP)) : 0;
+    if (fly > 0.01 && st.alive !== false) {
+      if (armsOk) skyArms(fly, tuck);
+      if (legsOk) skyLegs(fly, tuck);
+    }
+    // chute libre : à plat ventre (tête un peu relevée), tête en bas en piqué, roulé sur le côté en virage, culbute en
+    // avant à la sortie ; le corps tourne autour des hanches. Nage : penché, à la surface
+    const flip = flipT != null ? ease(flipT / FLIP) * Math.PI * 2 : 0;
+    body.rotation.x = fly * (1.45 + dive * 0.7) + swim * 0.9 + flip;
+    body.rotation.y = fly * bank * 0.6;
+    if (fly > 0.001 || flip) {
+      piv.set(0, 0.95, 0).applyEuler(body.rotation);
+      body.position.set(-piv.x, 0.95 - piv.y, -piv.z);
+    } else body.position.set(0, swim * 0.55, 0);
     if (held) held.visible = fly < 0.5 && swim < 0.5 && glide < 0.5 && st.alive !== false;
   }
   return {

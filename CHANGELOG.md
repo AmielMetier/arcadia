@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.6 — 28 octobre 2026
+- **Island Rush** — Une boussole en haut de l'écran : les points cardinaux défilent avec ton regard, et chaque coup de feu entendu y laisse une marque à sa direction pendant quelques secondes.
+  - Plus la marque est grande, plus le tireur est proche. Elle est rouge vif s'il te touche, bleue s'il est de ton équipe, avec ▲ ou ▼ s'il tire d'au-dessus ou d'en dessous.
+  - Un tir dans ton dos : une flèche au bord de la boussole montre de quel côté te tourner. Les repères de l'équipe y ont aussi leur losange.
+- **Island Rush** — Les bots ne mettent plus presque toutes leurs balles : comme un joueur, ils suivent leur cible avec un temps de retard. Contre quelqu'un qui bouge, un bot normal touche environ une balle sur trois (deux sur trois avant, même en zigzag). Immobile à découvert, tu restes une cible facile.
+- **Island Rush** — Les bots sont plus discrets : tant que l'ennemi qu'ils ont repéré ne les a pas vus, ils avancent accroupis, sans bruit de pas, et n'ouvrent le feu qu'à bonne portée. Ils finissent aussi accroupis l'approche des coups de feu qu'ils vont voir.
+- **Island Rush** — Les toits des maisons, granges, chalets et autres toits en pente se cassent à la pioche (cinq coups) : pose-toi sur le toit et entre par le trou. Les toits plats se cassaient déjà.
+- **Island Rush** — La même arme dans une meilleure rareté remplace directement l'ancienne, qui reste au sol, au lieu de prendre une case de plus (« Améliorer ton arme »).
+- **Island Rush** — Coffres : fini la grosse tache blanche, place à un halo doré autour du coffre, une lueur dorée au sol et des paillettes. Près d'un coffre, on l'entend : un carillon doux qui scintille, de plus en plus fort à mesure qu'on approche, même à travers un mur.
+- **Island Rush** — Saut de la montgolfière : une culbute en quittant la nacelle, puis une vraie position de chute libre, à plat ventre, bras et jambes écartés. En avançant, tu piques tête la première, et tu t'inclines dans les virages.
+- **Island Rush** — Les cases d'objets en bas de l'écran affichent tes touches (et plus toujours X, 1, 2, 3, 4, 5), mises à jour dès que tu les changes dans les Réglages.
+- **Island Rush** — Deux bots sans arme ne se battent plus à la pioche pendant des minutes.
+
 ## 3.5 — 28 octobre 2026
 - **Island Rush** — Touches modifiables : dans ⚙️ Réglages, chaque action peut avoir deux touches, au clavier ou à la souris (boutons du côté compris). Ton choix est retenu dans ton navigateur, et tous les rappels à l'écran le suivent.
   - Les touches s'affichent comme sur ton clavier (Z Q S D sur un clavier français). Une touche déjà utilisée ailleurs y est retirée, et un message le dit.

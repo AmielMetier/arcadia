@@ -125,6 +125,12 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
     if (it.t === 'materiaux') { const room = MAT_MAX - P.mats[it.m], n = Math.min(room, it.n); P.mats[it.m] += n; return it.n - n; }
     return it.n;
   }
+  // la case de la même arme en moins bonne rareté (la moins bonne s'il y en a deux), ou −1
+  function upgradeSlot(P, it) {
+    let up = -1;
+    if (it.t === 'arme') P.inv.forEach((s, i) => { if (s && s.t === 'arme' && s.w === it.w && s.r < it.r && (up < 0 || s.r < P.inv[up].r)) up = i; });
+    return up;
+  }
   function pickUp(P, g) {
     const it = g.it;
     if (it.t === 'munitions' || it.t === 'materiaux') {
@@ -141,6 +147,16 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
         if (!it.n) break;
       }
       if (!it.n) { S.items.delete(g.id); ev({ e: 'objet-', id: g.id }); ev({ e: 'ramasse', p: P.id, it: g.it }); return true; }
+    }
+    // la même arme dans une meilleure rareté : elle prend la place de l'ancienne, lâchée à nos pieds
+    const up = upgradeSlot(P, it);
+    if (up >= 0) {
+      const old = P.inv[up];
+      spawnItem(old, P.x + Math.sin(P.yaw) * 0.8, P.y + 0.3, P.z + Math.cos(P.yaw) * 0.8);
+      P.inv[up] = it;
+      S.items.delete(g.id); ev({ e: 'objet-', id: g.id }); ev({ e: 'ramasse', p: P.id, it, was: old.r });
+      if (P.sel - 1 === up) { P.cd = Math.max(P.cd, 0.3); P.rl = 0; P.use = null; }
+      return true;
     }
     let slot = P.inv.findIndex((s) => !s);
     if (slot < 0) {
@@ -305,7 +321,8 @@ export function createSim({ map, world, seed = 1, roster = [], mode = 'partie', 
   function damage(Q, n, by, opt = {}) {
     if (!Q.alive || n <= 0) return;
     if (by && mates(by, Q)) return; // pas de tir ami
-    if (by && by.bot && Q.bot && S.hooks.pace) n *= S.hooks.pace(); // entre bots, le rythme de la partie (voir ai.js)
+    // entre bots, le rythme de la partie (voir ai.js) ; pas à la pioche : deux bots sans arme ne s'y attardent pas des minutes
+    if (by && by.bot && Q.bot && S.hooks.pace && opt.cause !== 'pioche') n *= S.hooks.pace();
     if (Q.down) {
       // à terre : les coups entament sa réserve ; à zéro, il est éliminé (par celui qui l'a mis à terre, à défaut)
       Q.down.hp -= n;

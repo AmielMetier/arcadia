@@ -18,6 +18,7 @@ import { createScene } from './view/scene.js';
 import { createActors } from './view/actors.js';
 import { createFx } from './view/fx.js';
 import { createHud } from './view/hud.js';
+import { createCompass } from './view/compass.js';
 import { createBuilds } from './view/builds.js';
 import { createDrops } from './view/drops.js';
 import { createSound } from './view/sound.js';
@@ -110,6 +111,7 @@ async function boot(info) {
   progress('Carte', 0.95); await breathe();
   S.keys = createKeys();
   S.hud = createHud(S.map, { onTeleport: S.settings.mode === 'exploration' && S.role !== 'guest' ? teleport : null, project, key: kl });
+  S.compass = createCompass($('#compass'));
   // armes et objets du kit : modèles au sol et en main, icônes de l'inventaire
   setKit(S.scene.kit);
   try { S.hud.setIcons(renderIcons()); } catch (e) { console.warn('icônes', e); }
@@ -174,7 +176,7 @@ function resetMatch() {
   S.world = buildWorld(S.map);
   S.sim = null; S.ai = null; S.actors = null; S.fx = null; S.builds = null; S.buildApi = null;
   S.prev.clear(); S.bilan = null; S.ended = false; S.reported = false; S.spect = null; S.lastSnap = null; S.gotHost = S.role !== 'guest';
-  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt('');
+  S.hud.downed(null); S.hud.team([]); S.hud.tags([]); S.hud.pings([]); S.hud.prompt(''); S.compass.clear();
   $('#hud').hidden = true; $('#feed').innerHTML = '';
 }
 const matchInfo = () => ({ run: S.run, seed: S.seed, roster: S.roster, mode: S.sim.S.mode, teams: S.sim.S.teams });
@@ -253,6 +255,7 @@ function paintKeys() {
   for (const el of document.querySelectorAll('[data-ks]')) el.innerHTML = S.keys.labels(el.dataset.ks).map((l) => `<kbd>${esc(l)}</kbd>`).join(' ou ') || '<kbd>—</kbd>';
   const list = $('#keylist');
   if (list) list.innerHTML = keysHtml();
+  S.hud.refreshKeys();
   buildBar();
 }
 // le sac : la souris est libérée pour glisser les objets ; Tab pour revenir au jeu
@@ -354,6 +357,7 @@ function loop(now) {
     const team = S.sim.S.teams > 1 ? [...S.sim.S.players.values()].filter((Q) => S.sim.mates(focusP, Q)) : [];
     const pg = pingsOf(focusP, fp, view);
     S.hud.pings(pg);
+    S.compass.update(view.pos, view.look ? Math.atan2(view.look.x - view.pos.x, view.look.z - view.pos.z) : S.yaw, pg);
     const drops = [...S.sim.S.drops.values()].filter((d) => !d.open).map((d) => ({ x: d.x, z: d.z, color: '#b77dff', big: true }));
     S.hud.maps(S.t, fp, focusP === P ? S.yaw : focusP.yaw, S.ms, team.filter((Q) => Q.alive && Q.mode !== 'ballon').map((Q) => { const d = disp(Q); return { x: d.x, z: d.z, color: Q.color, down: !!Q.down }; }), [...drops, ...pg.map((m) => ({ x: m.x, z: m.z, color: m.color }))]);
     const rv = focusP.revive && S.sim.player(focusP.revive.id);
@@ -749,6 +753,8 @@ function handleEvents(list) {
           if (h.held) { const v = new THREE.Vector3(); h.held.getWorldPosition(v); S.fx.casing(v, Q.yaw, e.w); v.x += Math.sin(Q.yaw) * 0.5; v.z += Math.cos(Q.yaw) * 0.5; S.fx.muzzleFlash(v, e.w); }
         }
         if (Q) S.sfx.shot(e.w, Q, e.p === S.me);
+        // la boussole : d'où vient le tir (pas les siens)
+        if (Q && e.p !== S.me && Q.mode === 'sol') S.compass.shot(e.p, Q.x, Q.y + 1.4, Q.z, Math.hypot(Q.x - S.cam.x, Q.z - S.cam.z), { mate: !!P && S.sim.mates(P, Q), far: e.w === 'sniper' || e.w === 'roquette' ? 420 : 220 });
         // recul : la vue saute un peu vers le haut et revient, l'image tremble pour les grosses armes
         if (e.p === S.me) { S.shotAt = S.t; const k = KICK[e.w] || KICK.fusil; S.kick += k[0]; S.kickYaw += (Math.random() - 0.5) * k[1]; S.shake = Math.max(S.shake, k[2]); }
         break;
@@ -774,6 +780,7 @@ function handleEvents(list) {
         if (e.to === S.me) {
           const A = e.by != null ? S.sim.player(e.by) : null;
           S.hud.hurtFrom(A && P ? -(Math.atan2(A.x - P.x, A.z - P.z) - S.yaw) : null, e.n);
+          if (A && A !== P) S.compass.shot(A.id, A.x, A.y + 1.4, A.z, Math.hypot(A.x - S.cam.x, A.z - S.cam.z), { hit: true });
           S.shake = Math.max(S.shake, Math.min(0.5, 0.12 + e.n / 120));
           S.sfx.play(e.cause === 'tempete' ? 'tempete' : 'aie');
         }
@@ -838,7 +845,7 @@ function handleEvents(list) {
         if (c) { S.fx.puff(c.x, c.y + 0.8, c.z, { color: 0xffd060, size: 0.6, grow: 2.5, life: 0.6, add: true, op: 0.9 }); S.sfx.at(c.kind === 'coffre' ? 'coffre' : 'caisse', c.x, c.y, c.z, 1); }
         break;
       }
-      case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it), 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
+      case 'ramasse': if (e.p === S.me) { toast(itemLabel(e.it) + (e.was != null ? ' · l\'ancien (' + RARITY[e.was].label.toLowerCase() + ') est au sol' : ''), e.was != null ? 2.4 : 1.6); S.sfx.play(e.it.t === 'arme' ? 'arme' : 'ramasse'); } break;
       case 'vide': if (e.p === S.me) { toast('Plus de munitions pour cette arme', 1.6); S.sfx.play('vide'); } break;
       case 'inutile': if (e.p === S.me) toast(ITEMS[e.c].heal ? 'Ta vie est déjà au maximum' : 'Ton bouclier est déjà au maximum', 1.6); break;
       case 'recharge': {
@@ -943,7 +950,10 @@ function showPrompt() {
   else if (tg.kind === 'largage') S.hud.prompt('Ouvrir le largage', 'butin épique', '#b77dff');
   else {
     const it = tg.o.it, full = P.inv.every(Boolean) && !(it.t === 'objet' && P.inv.some((q) => q && q.t === 'objet' && q.c === it.c));
-    S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
+    // la même arme en mieux : elle remplacera l'ancienne
+    const old = it.t === 'arme' ? P.inv.filter((q) => q && q.t === 'arme' && q.w === it.w && q.r < it.r).sort((a, b) => a.r - b.r)[0] : null;
+    if (old) S.hud.prompt('Améliorer ton arme', itemLabel(it), RARITY[it.r].color);
+    else S.hud.prompt(!full ? 'Ramasser' : P.sel === 0 ? 'Sac plein : prends en main ce que tu veux échanger' : 'Échanger contre', full && P.sel === 0 ? '' : itemLabel(it), RARITY[it.r].color);
   }
 }
 
