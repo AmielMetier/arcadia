@@ -128,9 +128,10 @@ export function addStory({ W, maps, towns, routes, trainerNpc, champion }) {
   {
     const door = cavePortal(W, 212, 120);
     const rep = room('repaire', 23, 16, { floor: 'lab', music: 'hideout', wall: 'wall_mart', name: 'Repaire Éclipse', exitX: 11 });
-    const wall = (y, gap) => { for (let x = 1; x < 22; x++) if (x !== gap) rep.prop((x + y) % 3 ? 'books' : 'pc', x, y); };
+    // rangées de machines et de consoles de la Team Éclipse, qui forment un petit labyrinthe
+    const wall = (y, gap) => { for (let x = 1; x < 22; x++) if (x !== gap) rep.prop((x + y) % 4 === 0 ? 'console' : 'machine', x, y); };
     wall(12, 6); wall(8, 17); wall(4, 11);
-    rep.prop('pc', 9, 2); rep.prop('pc', 13, 2); rep.prop('tv', 11, 2); rep.prop('plant', 1, 2); rep.prop('plant', 21, 2);
+    rep.prop('console', 9, 2); rep.prop('console', 13, 2); rep.prop('machine', 10, 2); rep.prop('machine', 12, 2); rep.prop('darkpillar', 1, 2); rep.prop('darkpillar', 21, 2);
     rep.outside = { map: 'monde', x: door.x, y: door.y + 1, dir: 'down' };
     rep.warp(rep.exitX, rep.exitY, rep.outside);
     W.warp(door.x, door.y, { map: 'repaire', x: rep.exitX, y: rep.exitY, dir: 'up' });
@@ -199,9 +200,12 @@ export function addStory({ W, maps, towns, routes, trainerNpc, champion }) {
       m.townId = 'plateau'; m.outside = maps['plateau:ligue'].outside;
       maps[rooms[i]] = m;
     }
+    const DECO = ['icecrystal', 'candle', 'brazier', 'darkpillar'];
     ELITE.forEach((e, i) => {
       const m = maps[rooms[i]]; if (i) m.name = e.room;
       m.floor = e.floor;
+      // chaque salle du Conseil 4 a son décor, le long des murs
+      for (const y of [3, 7, 11, 15]) { m.prop(DECO[i], 1, y); m.prop(DECO[i], 13, y); }
       const n = trainerNpc(m, 7, 3, 'down', 'Conseil 4', e.name, e.team, { id: e.id, sight: 0, ow: e.ow, bs: e.bs, prize: 150, ai: 'smart', items: { 'hyper-potion': 2, 'full-heal': 1 }, intro: e.intro, lose: e.lose, after: 'Avance. La salle suivante t\'attend.' });
       Object.assign(n, { beatenPos: [9, 3], music: 'leader' });
       // porte du fond vers la salle suivante

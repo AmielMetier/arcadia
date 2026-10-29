@@ -1,5 +1,17 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.20 — 29 octobre 2026
+- **Odyssée** — Graphismes retravaillés partout :
+  - l'herbe a du relief et des couleurs qui varient, avec trèfles, pâquerettes, cailloux, petites touffes et buissons fleuris ; à la lisière des bois, fougères, champignons et feuilles mortes ; les arbres et les bâtiments projettent une ombre douce ;
+  - les hautes herbes sont plus épaisses, et les forêts mélangent cinq sortes d'arbres de tailles et de teintes différentes, plus sombres au cœur des bois ;
+  - l'eau devient plus foncée au large, et les rivages ont un bord de sable ondulé, de l'écume et des coins arrondis ;
+  - toits en tuiles avec faîtage, façades avec volets, jardinières fleuries, soubassement en pierre et portes avec auvent ;
+  - grottes en roche taillée avec des parois plus hautes, et des cristaux qui luisent dans la Grotte Lunaire ;
+  - le repaire de la Team Éclipse est rempli de machines et d'écrans violets, et chaque salle du Conseil 4 a son décor (glace, bougies, braseros, piliers sombres) ;
+  - la nuit est plus sombre, et les lampadaires éclairent le sol autour d'eux ;
+  - les chemins de l'île de Cendrelune sont bordés de cendre au lieu d'herbe.
+- **Odyssée** — Combats : nouveaux décors (prairie avec collines et forêt, grotte avec stalactites et cristaux, plage, volcan, arènes au dallage en perspective) et socles avec ombre et reflet. Ton Pokémon est placé un peu plus haut, moins caché par la boîte de texte.
+
 ## 3.19 — 29 octobre 2026
 - **Odyssée** — Une vraie histoire : la Team Éclipse veut fermer le cœur de Lugia, le gardien des marées, avec son Prisme Noir, et plonger la région dans une nuit éternelle.
   - Tu croises ses sbires et ses deux Admins, Nyx et Erèbe, dans le Bois Murmure, la Grotte Lunaire, au port de Port-Azur et dans la Centrale de Voltacité (l'Arène reste fermée tant qu'elle est occupée).

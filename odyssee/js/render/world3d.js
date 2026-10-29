@@ -44,6 +44,12 @@ function tex(canvasOrImg) {
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false;
   t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t;
 }
+/** bruit de valeur lissé (0..1) : grandes taches de couleur sur le sol, pour casser la répétition des tuiles */
+function vnoise(x, y, sc) {
+  const fx = x / sc, fy = y / sc, ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, w = fy - iy;
+  const s = (t) => t * t * (3 - 2 * t), a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+  return a + (b - a) * s(u) + (c - a) * s(w) + (a - b - c + d) * s(u) * s(w);
+}
 const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 /** accumulateur de géométrie (quads indexés) */
@@ -53,7 +59,9 @@ class Geo {
     // a=bas-gauche, b=bas-droite, c=haut-droite, d=haut-gauche (du point de vue de la texture)
     this.p.push(...a, ...b, ...c, ...d);
     this.uv.push(u0, v1, u1, v1, u1, v0, u0, v0);
-    for (let k = 0; k < 4; k++) this.c.push(shade, shade, shade);
+    if (typeof shade === 'number') for (let k = 0; k < 4; k++) this.c.push(shade, shade, shade);
+    else if (shade.length === 3) for (let k = 0; k < 4; k++) this.c.push(shade[0], shade[1], shade[2]);
+    else for (let k = 0; k < 4; k++) this.c.push(...shade[k]); // une teinte par coin (a, b, c, d)
     const n = this.n; this.i.push(n, n + 1, n + 2, n, n + 2, n + 3); this.n += 4;
   }
   build() {
@@ -103,6 +111,8 @@ export class WorldView {
     this.tinted = Object.values(this.mat);
     this.glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const g = x.createRadialGradient(16, 16, 1, 16, 16, 16); g.addColorStop(0, 'rgba(255,240,180,0.9)'); g.addColorStop(0.4, 'rgba(255,210,120,0.35)'); g.addColorStop(1, 'rgba(255,200,100,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return tex(c); })();
     this.matGlow = new THREE.MeshBasicMaterial({ map: this.glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.matPool = new THREE.MeshBasicMaterial({ map: this.glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 });
+    this.matCrystal = new THREE.MeshBasicMaterial({ map: this.glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: new THREE.Color(0.35, 0.6, 1), opacity: 0.7 });
     this.tint = new THREE.Color(1, 1, 1); this.night = 0;
     this.animFrame = 0; this.animT = 0;
     this.focus = new THREE.Vector3(); this.shake = 0;
@@ -122,6 +132,7 @@ export class WorldView {
     for (const a of this.actors.values()) a.dispose?.();
     this.actors.clear();
     this.map = map; this.root = new THREE.Group(); this.scene.add(this.root);
+    this.tintCache = new Map();
     this.chunks = new Map(); this.glows = new THREE.Group(); this.root.add(this.glows);
     this.decoAt = new Map(); for (const d of map.deco) this.decoAt.set(d.x + ',' + d.y, d);
     this.scene.background = new THREE.Color(map.outdoor ? '#1d4f2a' : '#0c0a10');
@@ -133,7 +144,8 @@ export class WorldView {
 
   groundCell(x, y) {
     const m = this.map, t = m.get(x, y), A = this.A.cells, v = hash(x, y);
-    const g4 = () => 'grass' + (v < 0.55 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3);
+    const v2 = hash(x * 3 + 11, y * 5 + 2);
+    const g4 = () => (v2 < 0.05 ? 'grassx' + (1 + Math.floor(v2 * 60) % 3) : 'grass' + (v < 0.4 ? 0 : v < 0.7 ? 1 : v < 0.9 ? 2 : 3));
     const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
     const grassKey = theme === 'volcanic' ? 'ash' + (v < 0.5 ? 0 : 1) : g4();
     const mask = (same) => { let k = 0; if (same(m.get(x, y - 1))) k |= 1; if (same(m.get(x + 1, y))) k |= 2; if (same(m.get(x, y + 1))) k |= 4; if (same(m.get(x - 1, y))) k |= 8; return k; };
@@ -147,14 +159,18 @@ export class WorldView {
       case T.TALL: return { c: A['tall' + (v < 0.5 ? 0 : 1)] };
       case T.DARKTALL: return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : A['forest' + (v < 0.5 ? 0 : 1)] };
-      case T.PATH: return { c: A['path' + mask(isPathish)] };
+      case T.PATH: return { c: A[(theme === 'volcanic' ? 'pathash' : 'path') + mask(isPathish)] };
       case T.PAVE: case T.DOOR: case T.BUILD: return { c: A['pave' + mask((q) => isPathish(q))] };
       case T.SAND: return { c: A['sand' + mask((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
-      case T.WATER: return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
+      case T.WATER: {
+        const k = mask((q) => q === T.WATER || q === T.BRIDGE);
+        if (k === 15) { const dd = this.waterDepth(x, y); if (dd >= 3) return { anim: this.N.cells.deep }; if (dd === 2) return { anim: this.N.cells.mid }; }
+        return { anim: this.N.cells['water' + k] };
+      }
       case T.BRIDGE: return { anim: this.N.cells.water15, bridge: A.bridge };
       case T.FLOWER: return { anim: this.N.cells['flower' + Math.floor(v * 3)] };
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
-      case T.CAVE: case T.CAVEWALL: return { c: A['cave' + (v < 0.5 ? 0 : 1)] };
+      case T.CAVE: case T.CAVEWALL: return { c: A['cave' + Math.floor(v * 4)] };
       case T.CAVEDOOR: return { c: A.cavestairs };
       case T.ASH: return { c: A['ash' + (v < 0.5 ? 0 : 1)] };
       case T.SNOW: return { c: A['snow' + (v < 0.5 ? 0 : 1)] };
@@ -165,15 +181,39 @@ export class WorldView {
     }
   }
 
+  /** distance (en tuiles, 1 à 3) jusqu'à la terre la plus proche */
+  waterDepth(x, y) {
+    const m = this.map, land = (a, b) => { const t = m.get(a, b); return t !== T.WATER && t !== T.BRIDGE; };
+    for (let r = 1; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if ((Math.abs(dx) === r || Math.abs(dy) === r) && land(x + dx, y + dy)) return r;
+    return 3;
+  }
+  /** teinte du sol à un coin de tuile : grandes taches douces + ombre des arbres et bâtiments voisins (lissée d'un coin à l'autre) */
+  cornerTint(cx, cy) {
+    const m = this.map;
+    const n = vnoise(cx, cy, 7) * 0.65 + vnoise(cx + 99, cy + 37, 3) * 0.35;
+    let k = 0.93 + n * 0.13;
+    const occ = (a, b) => { const q = m.get(a, b); return q === T.TREE || q === T.PINE || q === T.BUILD; };
+    // les quatre tuiles autour du coin ; celles du nord-ouest projettent plus d'ombre (lumière en haut à gauche)
+    const o = (occ(cx - 1, cy - 1) ? 1.2 : 0) + (occ(cx, cy - 1) ? 1 : 0) + (occ(cx - 1, cy) ? 0.7 : 0) + (occ(cx, cy) ? 0.3 : 0);
+    k *= 1 - Math.min(0.24, o * 0.075);
+    return [k * (0.98 + n * 0.05), k, k * (1.02 - n * 0.05)];
+  }
+  groundTint(x, y, t) {
+    if (!this.map.outdoor || t === T.WATER) return 1;
+    const c = (a, b) => { const kk = a + ',' + b; let v = this.tintCache.get(kk); if (!v) { v = this.cornerTint(a, b); this.tintCache.set(kk, v); } return v; };
+    // ordre des coins du quad : bas-gauche, bas-droite, haut-droite, haut-gauche
+    return [c(x, y + 1), c(x + 1, y + 1), c(x + 1, y), c(x, y)];
+  }
+
   buildChunk(ci, cj) {
     const m = this.map, A = this.A.cells, S = this.S.rects;
     const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo();
-    const glows = [];
+    const glows = []; this.crystalGlows = [];
     const x0 = ci * CH, y0 = cj * CH;
-    const wallH = 2 * Math.tan(EL), caveH = 1.25 * Math.tan(EL);
+    const wallH = 2 * Math.tan(EL), caveH = 1.6 * Math.tan(EL);
     for (let y = y0; y < Math.min(m.h, y0 + CH); y++) for (let x = x0; x < Math.min(m.w, x0 + CH); x++) {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
-      if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c);
+      if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, this.groundTint(x, y, t));
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
       if (g.bridge) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.06, g.bridge);
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
@@ -183,14 +223,21 @@ export class WorldView {
         // juste devant un petit arbre ou un rocher : un buisson bas, pour qu'on voie l'obstacle
         const r = S.bush; billboard(P, x + 0.5, y + 0.66, r.w * WPX * 1.3, r.h * HPX * 1.2, r);
       } else if (t === T.TREE || t === T.PINE) {
-        let key = t === T.PINE ? 'pine' : v < 0.7 ? 'tree' : 'tree2';
+        // forêt variée : cinq formes d'arbres, tailles et teintes un peu différentes, plus sombre au cœur des bois
+        const v3 = hash(x * 13 + 5, y * 7 + 1);
+        let key = t === T.PINE ? 'pine' : ['tree', 'tree', 'tree2', 'tree3', 'tree4', 'tree5'][Math.floor(v3 * 6)];
         if (theme === 'volcanic') key = 'deadtree';
         const r = S[key];
-        billboard(P, x + 0.5 + (v - 0.5) * 0.12, y + 0.62, r.w * WPX, r.h * HPX, r, 0, v > 0.5, 1);
+        const isTree = (q) => q === T.TREE || q === T.PINE;
+        const deep = isTree(m.get(x, y + 1)) && isTree(m.get(x - 1, y)) && isTree(m.get(x + 1, y)) && isTree(m.get(x, y - 1));
+        const sc = 0.92 + v3 * 0.16, tone = (deep ? 0.8 : 1) * (0.92 + v * 0.12);
+        billboard(P, x + 0.5 + (v - 0.5) * 0.16, y + 0.62, r.w * WPX * sc, r.h * HPX * sc, r, 0, v > 0.5, [tone * 0.97, tone, tone * 0.95]);
         flat(Sh, x - 0.15, y + 0.35, x + 1.15, y + 0.95, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
       } else if (t === T.TALL || t === T.DARKTALL) {
+        // deux rangées de touffes par case : les hautes herbes paraissent épaisses
         const r = S[t === T.DARKTALL ? 'darktuft' : v < 0.5 ? 'tuft' : 'tuft1'];
-        billboard(P, x + 0.5, y + 0.93, 1.02, r.h * HPX, r, 0, v > 0.5);
+        billboard(P, x + 0.5, y + 0.45, 1.04, r.h * HPX * 0.9, r, 0, v < 0.5, 0.88);
+        billboard(P, x + 0.5, y + 0.95, 1.04, r.h * HPX, r, 0, v > 0.5);
       } else if (t === T.FENCE) { const r = S.fence; billboard(P, x + 0.5, y + 0.55, 1.0, r.h * HPX, r); }
       else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, r.w * WPX * 1.2, r.h * HPX, r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.BUSH) { const r = S.cuttree; billboard(P, x + 0.5, y + 0.7, r.w * WPX * 1.3, r.h * HPX * 1.3, r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
@@ -204,6 +251,8 @@ export class WorldView {
         if (south || east || west || m.get(x, y - 1) !== T.CAVEWALL) box(Wl, x, y, x + 1, y + 1, caveH, A.cavewall, A.cavetop, A.cavewall, { south, east, west });
         else flat(Wl, x, y, x + 1, y + 1, caveH, A.cavetop);
       }
+      // petits détails au sol, sans effet sur le jeu : la nature n'est jamais vide
+      this.groundDetail(P, x, y, t, theme);
       // décor posé (lampadaires, panneaux, meubles…)
       const d = this.decoAt.get(x + ',' + y);
       if (d) {
@@ -221,11 +270,43 @@ export class WorldView {
     const grp = new THREE.Group();
     const add = (geo, mat, order = 0) => { const g = geo.build(); if (g) { const me = new THREE.Mesh(g, mat); me.renderOrder = order; me.frustumCulled = true; grp.add(me); } };
     add(G, this.mat.ground); add(N, this.mat.anim); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
+    for (const [gx, gz, gy] of this.crystalGlows) {
+      const me = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), this.matCrystal); me.position.set(gx, gy, gz); me.rotation.x = -0.3; grp.add(me);
+    }
     for (const [gx, gz, gy] of glows) {
       const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy, gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
+      // flaque de lumière chaude au pied du lampadaire
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.6), this.matPool); pool.rotation.x = -Math.PI / 2; pool.position.set(gx, 0.03, gz + 0.3); this.glows.add(pool);
     }
     this.root.add(grp);
     return grp;
+  }
+
+  groundDetail(P, x, y, t, theme) {
+    const m = this.map, S = this.S.rects, h = hash(x * 7 + 3, y * 11 + 9), h2 = hash(x * 5 + 1, y * 3 + 7);
+    if (this.decoAt.has(x + ',' + y) || m.warpAt(x, y)) return;
+    const flatDec = (k) => { const r = S[k], ox = 0.15 + h2 * 0.35, oy = 0.15 + (1 - h2) * 0.35; flat(P, x + ox, y + oy, x + ox + 0.5, y + oy + 0.5, 0.012, [r.u0, r.v0, r.u1, r.v1]); };
+    const stand = (k, sc = 1, fx = 0.5) => { const r = S[k]; billboard(P, x + 0.2 + h2 * 0.6, y + 0.4 + fx * 0.4, r.w * WPX * sc, r.h * HPX * sc, r, 0, h > 0.5); };
+    const isTree = (q) => q === T.TREE || q === T.PINE;
+    if (t === T.GRASS && m.outdoor) {
+      if (theme === 'volcanic') { if (h < 0.1) flatDec('d_ash'); return; }
+      // lisière des bois : fougères, champignons et feuilles mortes au pied des arbres
+      const edge = isTree(m.get(x, y - 1)) || isTree(m.get(x - 1, y)) || isTree(m.get(x + 1, y));
+      if (edge && h < 0.28) { if (h < 0.12) stand('fern', 0.9, 0.1); else if (h < 0.17) stand('mushroom', 0.9, 0.3); else flatDec('d_leaves'); return; }
+      if (h < 0.05) stand('flowerbush', 0.8);
+      else if (h < 0.16) stand('sprig', 1, 0.6);
+      else if (h < 0.21) flatDec('d_clover');
+      else if (h < 0.25) flatDec('d_daisies');
+      else if (h < 0.28) flatDec('d_pebbles');
+    } else if (t === T.SAND && h < 0.07) flatDec(h < 0.035 ? 'd_shell' : 'd_pebbles');
+    else if (t === T.PATH && h < 0.06) flatDec('d_pebbles');
+    else if (t === T.ASH && h < 0.1) flatDec('d_ash');
+    else if (t === T.CAVE && h < 0.09) flatDec('d_cave');
+    else if (t === T.CAVEWALL && m.dark && m.get(x, y + 1) === T.CAVE && h < 0.14) {
+      // cristaux qui luisent au pied des parois de la Grotte Lunaire
+      const r = S.crystal; billboard(P, x + 0.3 + h2 * 0.4, y + 1.02, r.w * WPX, r.h * HPX, r, 0, h2 > 0.5);
+      this.crystalGlows.push([x + 0.5, y + 1.05, 10 * HPX]);
+    }
   }
 
   ensureChunks(px, py) {
@@ -397,7 +478,7 @@ export class WorldView {
   /* ---------------- heure du jour ---------------- */
   setTimeOfDay(h) {
     // matin doré, journée neutre, soirée orangée, nuit bleutée
-    const keys = [[0, [0.38, 0.44, 0.72]], [4.5, [0.42, 0.46, 0.72]], [6.5, [1.0, 0.86, 0.78]], [9.5, [1, 1, 1]], [17, [1, 1, 1]], [18.5, [1.0, 0.8, 0.66]], [20, [0.55, 0.52, 0.78]], [21.5, [0.38, 0.44, 0.72]], [24, [0.38, 0.44, 0.72]]];
+    const keys = [[0, [0.27, 0.32, 0.58]], [4.5, [0.31, 0.34, 0.6]], [6.5, [1.0, 0.86, 0.78]], [9.5, [1, 1, 1]], [17, [1, 1, 1]], [18.5, [1.0, 0.8, 0.66]], [20, [0.47, 0.44, 0.7]], [21.5, [0.27, 0.32, 0.58]], [24, [0.27, 0.32, 0.58]]];
     let c = keys[0][1];
     for (let i = 1; i < keys.length; i++) if (h <= keys[i][0]) { const [a, ca] = keys[i - 1], [b, cb] = keys[i]; const u = (h - a) / (b - a); c = ca.map((v, k) => v + (cb[k] - v) * u); break; }
     this.night = h >= 20 || h < 5.5 ? 1 : h >= 18.5 ? (h - 18.5) / 1.5 : h < 6.5 ? 1 - (h - 5.5) : 0;
