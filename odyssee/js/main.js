@@ -5,7 +5,8 @@ import { buildWorld } from './world/region.js';
 import { Input } from './input.js';
 import { Sound } from './audio.js';
 import { UI, el, esc, wait } from './ui/ui.js';
-import { optionsScreen } from './ui/screens.js';
+import { optionsScreen, loadCodeScreen } from './ui/screens.js';
+import { decodeSave, saveSummary } from './core/savecode.js';
 import { Game } from './game.js';
 import { ASSETS, loadImg } from './assets.js';
 import { SPECIES } from './data/species.js';
@@ -62,19 +63,29 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<div class="logo"><div class="logo-main">ODYSSÉE</div><div class="logo-sub">Version Argent</div></div><div class="press">Appuie sur Entrée</div><div class="title-foot">Prototype · Pokémon de remplacement (sprites PokeAPI) · Flèches / ZQSD, Espace, Échap, Maj</div>`);
+    const title = el('div', 'title-scr', `<div class="logo"><div class="logo-main">ODYSSÉE</div><div class="logo-sub">Version Argent</div></div><div class="press">Appuie sur Entrée</div><div class="title-foot">Flèches / ZQSD : marcher · Espace : parler · Échap : menu · Maj : courir</div>`);
     uiRoot.appendChild(title);
     await new Promise((res) => { const pop = input.push((k) => { if (k === 'a') { pop(); sound.init(); sound.sfx('select'); res(); } }); });
     title.querySelector('.press').remove();
     const has = Game.hasSave();
     let info = null;
     if (has) { try { const s = JSON.parse(localStorage.getItem('odyssee-save-v1')); info = s; } catch (e) {} }
-    const opts = (has ? ['Continuer'] : []).concat(['Nouvelle partie', 'Options'], H && H.embedded ? ['Retour au salon'] : []);
+    const opts = (has ? ['Continuer'] : []).concat(['Nouvelle partie', 'Charger un code', 'Options'], H && H.embedded ? ['Retour au salon'] : []);
     const card = info ? el('div', 'box save-info', `<b>${esc(info.name)}</b><br>Badges : ${info.badges.filter(Boolean).length} · Pokédex : ${info.dex.caught.length}<br>Temps : ${Math.floor(info.time / 3600)}:${String(Math.floor(info.time / 60) % 60).padStart(2, '0')}`) : null;
     if (card) title.appendChild(card);
     const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'title-menu', cancel: null, parent: title });
     const pick = opts[r];
     if (pick === 'Options') { title.remove(); await optionsScreen(game); continue; }
+    if (pick === 'Charger un code') {
+      title.remove();
+      const r = await loadCodeScreen(ui, decodeSave);
+      if (!r) continue;
+      if (has && !(await ui.yesNo(`Remplacer la partie de cet appareil par celle de ${r.state.name} ? (${saveSummary(r.state)})`))) continue;
+      try { localStorage.setItem('odyssee-save-v1', JSON.stringify(r.state)); } catch (e) { await ui.say('Impossible d\'enregistrer la partie sur cet appareil.'); continue; }
+      sound.sfx('save');
+      await ui.say(`Partie de ${r.state.name} chargée ! Choisis « Continuer » pour la reprendre.`);
+      continue;
+    }
     if (pick === 'Retour au salon') { H.exit(); title.remove(); continue; }
     if (pick === 'Nouvelle partie' && has && !(await ui.yesNo('Une sauvegarde existe déjà. Commencer une nouvelle partie l\'effacera. Continuer ?'))) { title.remove(); continue; }
     title.remove();

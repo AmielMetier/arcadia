@@ -209,6 +209,71 @@ export class BattleView {
     await wait(300);
     return battle.result;
   }
+  /**
+   * combat contre un autre joueur. `duel` fournit l'échange de choix :
+   *   duel.sendAct(n, action, sum), duel.waitAct(n) → { action, sum } | { quit } | { left } | { timeout }
+   *   duel.sendSwitch(n, idx),      duel.waitSwitch(n) → { idx } | { quit } | { left } | { timeout }
+   *   duel.sendQuit(), duel.foeName
+   */
+  async runPvp(battle, duel, o = {}) {
+    this.battle = battle; this.kind = o.bg || 'grass'; this.alive = true;
+    this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
+    this.bg = this.makeBg(this.kind, o.night);
+    this.st = { shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [],
+      foe: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 }, me: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
+      trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
+    this.buildDom();
+    this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.setHud(1, null); this.setHud(0, null);
+    await this.loadSide(1); await this.loadSide(0);
+    this.st.trainer.img = await loadImg(ASSETS.trainer(battle.sides[1].trainer.bs));
+    requestAnimationFrame(this.frame);
+    this.st.trainer.visible = true;
+    await this.tween(700, (u) => { const e = ease(u); this.st.eSlide = -this.W * (1 - e); this.st.pSlide = this.W * (1 - e); });
+    await this.play(battle.start());
+    const waiting = () => this.ui.typePage(this.textBox, `En attente de ${duel.foeName}…`, { last: true });
+    const lost = async (r) => {
+      if (r.mine) { await this.play(battle.stop('lose', 'Vous abandonnez le combat...')); return; }
+      // l'adversaire a abandonné, est parti, ou ne répond plus : victoire par forfait
+      const why = r.quit ? `${duel.foeName} abandonne le combat !` : r.left ? `${duel.foeName} a quitté la partie.` : r.desync ? 'La connexion a mélangé le combat : il s\'arrête ici, sans vainqueur.' : `${duel.foeName} ne répond plus.`;
+      await this.play(battle.stop(r.desync ? 'draw' : 'win', why));
+    };
+    while (battle.state !== 'over') {
+      if (battle.state === 'switch') {
+        const n = battle.turn;
+        let mine = null;
+        if (battle.need[0]) {
+          const party = battle.sides[0].party;
+          mine = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
+          if (mine < 0 || !party[mine] || party[mine].hp <= 0) mine = party.findIndex((m) => m.hp > 0);
+        }
+        duel.sendSwitch(n, mine);
+        if (battle.need[1]) waiting();
+        const r = await duel.waitSwitch(n);
+        if (r.idx === undefined) { await lost(r); break; }
+        await this.play(battle.switchBoth(mine, r.idx));
+        continue;
+      }
+      const action = await this.chooseAction();
+      if (!action) continue;
+      if (action.type === 'forfeit') {
+        duel.sendQuit();
+        await this.play(battle.stop('lose', 'Vous abandonnez le combat...'));
+        break;
+      }
+      const n = battle.turn + 1, sum = battle.checksum();
+      duel.sendAct(n, action, sum);
+      waiting();
+      const r = await duel.waitAct(n);
+      if (!r.action) { await lost(r); break; }
+      if (r.sum !== sum) { await lost({ desync: true }); break; }
+      battle.remote = r.action;
+      await this.play(battle.playerAction(action));
+    }
+    await wait(300);
+    return battle.result;
+  }
+
   async loadSide(side) {
     const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me;
     o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny) : ASSETS.back(m.sp, m.shiny));
@@ -225,6 +290,8 @@ export class BattleView {
       this.ui.typePage(this.textBox, `Que doit faire ${monName(me)} ?`, { last: true });
       const c = await this.commandMenu();
       if (c === 0) { const mv = await this.moveMenu(); if (mv < 0) continue; return { type: 'move', idx: mv }; }
+      if (c === 1 && b.pvp) { await this.msg('Pas d\'objets dans un combat entre dresseurs !', { wait: true }); continue; }
+      if (c === 3 && b.pvp) { if (await this.ui.yesNo('Abandonner le combat ?')) return { type: 'forfeit' }; continue; }
       if (c === 1) {
         const r = await bagScreen(this.game, { battle: true }); if (!r) continue;
         const it = ITEMS[r.item];
@@ -245,7 +312,7 @@ export class BattleView {
   }
   commandMenu() {
     return new Promise((resolve) => {
-      const labels = [['ATTAQUE', 'fight'], ['SAC', 'bag'], ['POKéMON', 'mon'], ['FUITE', 'run']];
+      const labels = [['ATTAQUE', 'fight'], ['SAC', 'bag'], ['POKéMON', 'mon'], [this.battle.pvp ? 'ABANDON' : 'FUITE', 'run']];
       this.cmd.innerHTML = `<div class="cmd-grid">${labels.map(([l, c], i) => `<div class="cbtn ${c}" data-i="${i}">${l}</div>`).join('')}</div>`;
       this.cmd.classList.add('on'); this.root.classList.add('cmdon');
       let i = this.lastCmd || 0;

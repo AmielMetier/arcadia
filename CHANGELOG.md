@@ -1,5 +1,16 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.18 — 29 octobre 2026
+- **Odyssée** — On joue ensemble : chacun garde son aventure, mais tous les joueurs du salon se croisent dans la région.
+  - Les autres dresseurs marchent sur la même carte que toi, avec leur nom au-dessus de la tête (« occupé » quand ils sont en combat ou dans un menu).
+  - Parle à un joueur (Espace en face de lui) pour lui proposer un échange ou un combat ; il accepte ou refuse, et tu peux annuler en attendant (Échap).
+- **Odyssée** — Échanges de Pokémon : chacun choisit le Pokémon qu'il propose, voit celui de l'autre, et l'échange n'a lieu que si les deux acceptent.
+  - Kadabra, Machopeur, Gravalanch et Spectrum évoluent en arrivant, comme dans les vrais jeux.
+- **Odyssée** — Combats entre joueurs : combat amical avec toute ton équipe, soignée pour l'occasion, sans perte d'argent ni expérience, et sans objets.
+  - Après un K.O., chacun choisit son remplaçant ; « Abandon » remplace la fuite, et un joueur qui quitte ou ne répond plus perd par forfait.
+- **Odyssée** — Code de sauvegarde, pour reprendre sa partie sur un autre appareil : menu (Échap) → CODE, copie le code, puis sur l'autre appareil « Charger un code » sur l'écran titre. Un code incomplet ou mal recopié est refusé.
+- **Odyssée** — Le jeu n'est plus présenté comme un prototype : les Pokémon sont là pour de bon.
+
 ## 3.17 — 28 octobre 2026
 - **Birdie Party** — Nouveau parcours « Les Géants » : 18 trous immenses, de 600 m à plus d'un kilomètre (par 6 à 8), à travers la campagne, la mer, la montagne et le désert.
   - Un double dogleg de 1,1 km, un archipel à traverser d'île en île, une crique à porter, un torrent qui coupe deux fois la vallée, deux canyons dans le désert…

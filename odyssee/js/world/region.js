@@ -1,5 +1,5 @@
 // odyssee/js/world/region.js — la région d'Odyssée : 10 villes, 10 routes, 2 grottes, 8 arènes et la Ligue.
-// Les noms de lieux et de personnages sont originaux ; les Pokémon ne sont que des remplaçants du prototype.
+// Les noms de lieux et de personnages sont originaux.
 import { T } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap } from './interiors.js';

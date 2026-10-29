@@ -1,5 +1,4 @@
-// odyssee/js/assets.js — adresses des images (Pokémon de remplacement : sprites HeartGold/SoulSilver de PokeAPI)
-// Pour remplacer les Pokémon par des créatures originales, il suffit de changer ces fonctions.
+// odyssee/js/assets.js — adresses des images : sprites HeartGold/SoulSilver de PokeAPI, cris de PokeAPI
 const params = new URLSearchParams(location.search);
 const BASE = params.get('sprites') || 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites';
 const CRIES = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest';

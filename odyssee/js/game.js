@@ -7,7 +7,9 @@ import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, TYPE_FR } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, saveCodeScreen, TYPE_FR } from './ui/screens.js';
+import { encodeSave, saveSummary } from './core/savecode.js';
+import { installSocial, talkToPeer } from './net/social.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
@@ -26,7 +28,9 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.session = null; // échange ou combat en cours avec un autre joueur
     input.onFree = (k) => this.onKey(k);
+    installSocial(this);
   }
 
   /* ================= sauvegarde ================= */
@@ -55,6 +59,7 @@ export class Game {
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0 };
     this.setMap(state.map);
     this.view.setTimeOfDay(this.hour());
+    this.link.hello();
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`]); this.busy = false; }
   }
@@ -131,10 +136,11 @@ export class Game {
         else if (p.turnLock <= 0 || (tap && !this.input.dir())) this.tryStep(d);
       } else p.walking = false;
     }
-    // PNJ
+    // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
+    this.peersTick(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
-    if (this.bv.alive || this.ui.root.querySelector('.screen')) return;
+    if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags(false); return; }
     this.draw(dt);
   }
 
@@ -159,8 +165,10 @@ export class Game {
       if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX, ny + 0.56); }
       else if (v.actors.has('bang:' + n.id)) v.removeActor('bang:' + n.id);
     }
+    this.drawPeers();
     v.update(dt, px, py);
     v.render();
+    this.drawTags(true);
   }
 
   occupied(x, y, except) {
@@ -258,6 +266,8 @@ export class Game {
   async interact() {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir];
     let fx = p.x + dx, fy = p.y + dy;
+    const peer = this.peerAt(fx, fy);
+    if (peer) { this.busy = true; try { await talkToPeer(this, peer); } finally { this.busy = false; } return; }
     let n = this.npcs.find((q) => q.x === fx && q.y === fy && !q.move);
     if (!n && m.get(fx, fy) === T.BLOCK && this.view.decoAt.get(key(fx, fy))?.k === 'counter') n = this.npcs.find((q) => q.x === fx + dx && q.y === fy + dy);
     this.busy = true;
@@ -303,7 +313,7 @@ export class Game {
     const opts = [];
     if (st.flags.dex) opts.push(['POKéDEX', 'dex']);
     if (st.party.length) opts.push(['POKéMON', 'party']);
-    opts.push(['SAC', 'bag'], [st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
+    opts.push(['SAC', 'bag'], [st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = this._menuIdx || 0;
     for (;;) {
       const r = await this.ui.list({ items: opts.map(([l]) => ({ label: l })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
@@ -316,6 +326,11 @@ export class Game {
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
       else if (k === 'opt') await optionsScreen(this);
+      else if (k === 'code') {
+        // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
+        this.save(true);
+        await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
+      }
       else if (k === 'save') { if (await this.ui.yesNo('Sauvegarder la partie ?')) { this.save(); await this.ui.say(`${st.name} a sauvegardé la partie.`); } break; }
     }
     this.busy = false;
@@ -640,7 +655,7 @@ export class Game {
     st.flags.champion = true;
     this.sound.play('victory');
     await ui.say(['Félicitations !', `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`, 'Ton équipe et toi entrez au Panthéon des dresseurs.'], { speaker: 'Célestine' });
-    const s = el('div', 'screen hof-scr'); s.innerHTML = `<div class="scr-title">PANTHÉON</div><div class="hof">${st.party.map((m) => `<div class="hof-m box"><img src="${ASSETS.front(m.sp, m.shiny)}" alt=""><div>${esc(monName(m))}</div><div>N.${m.lvl}</div></div>`).join('')}</div><div class="box hof-txt">${esc(st.name)} — Maître de la Ligue · ${st.dex.caught.length} Pokémon capturés<br>Merci d'avoir joué à ce prototype d'Odyssée !</div>`;
+    const s = el('div', 'screen hof-scr'); s.innerHTML = `<div class="scr-title">PANTHÉON</div><div class="hof">${st.party.map((m) => `<div class="hof-m box"><img src="${ASSETS.front(m.sp, m.shiny)}" alt=""><div>${esc(monName(m))}</div><div>N.${m.lvl}</div></div>`).join('')}</div><div class="box hof-txt">${esc(st.name)} — Maître de la Ligue · ${st.dex.caught.length} Pokémon capturés<br>Merci d'avoir joué à Odyssée !</div>`;
     ui.root.appendChild(s);
     await new Promise((res) => { const pop = this.input.push((k) => { if (k === 'a' || k === 'b') { pop(); res(); } }); });
     s.remove();

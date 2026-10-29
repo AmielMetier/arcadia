@@ -372,4 +372,11 @@ export class WorldView {
     this.camera.lookAt(this.focus.x, 0, this.focus.z);
   }
   render() { this.renderer.render(this.scene, this.camera); }
+  /** position à l'écran (pixels CSS) d'un point de la carte, h = hauteur en pixels de sprite ; null s'il est hors champ */
+  screenPos(x, y, h = 34) {
+    const v = new THREE.Vector3(x + 0.5, h * HPX, y + 0.55).project(this.camera);
+    if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) return null;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { left: r.left + (v.x + 1) / 2 * r.width, top: r.top + (1 - v.y) / 2 * r.height };
+  }
 }

@@ -185,7 +185,7 @@ window.HUB_GAMES = [
     id: 'odyssee',
     title: 'Odyssée',
     tag: 'Aventure façon DS',
-    desc: 'Une grande aventure Pokémon en fausse 3D, comme sur DS : 10 villes, 8 arènes, captures, combats et la Ligue. Chacun joue sa partie, au clavier.',
+    desc: 'Une grande aventure Pokémon en fausse 3D, comme sur DS : 10 villes, 8 arènes, captures, combats et la Ligue. Chacun mène son aventure, mais on se croise dans la région pour échanger ses Pokémon et se défier.',
     url: 'odyssee/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5a88c8',
