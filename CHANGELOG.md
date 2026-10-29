@@ -1,5 +1,18 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.19 — 29 octobre 2026
+- **Odyssée** — Une vraie histoire : la Team Éclipse veut fermer le cœur de Lugia, le gardien des marées, avec son Prisme Noir, et plonger la région dans une nuit éternelle.
+  - Tu croises ses sbires et ses deux Admins, Nyx et Erèbe, dans le Bois Murmure, la Grotte Lunaire, au port de Port-Azur et dans la Centrale de Voltacité (l'Arène reste fermée tant qu'elle est occupée).
+  - Leur repaire se cache sur la route 6 : bats leur chef, Nocturne, et le ciel de toute la région devient violet, en plein jour, jusqu'à la fin de l'histoire.
+  - La voyante de Mirage te confie la Plume Argent : surfe depuis le Pont des Marées jusqu'au Sanctuaire, affronte une dernière fois la Team Éclipse… puis Lugia Obscur lui-même. Le Dr Lumen te donne une Master Ball pour le capturer, et le Prof. Saule peut ouvrir son cœur.
+  - La Route Victoire n'ouvre qu'une fois la nuit violette dissipée.
+- **Odyssée** — Le Conseil 4 : avant la Maître, quatre dresseurs d'élite t'attendent l'un après l'autre (Glace, Spectre, Combat, Ténèbres).
+- **Odyssée** — Les CS : Coupe (petits arbres), Flash (la Grotte Lunaire est maintenant plongée dans le noir), Surf (nager et pêcher des Pokémon sur l'eau) et Force (pousser les gros rochers).
+  - Place-toi devant l'obstacle et appuie sur Espace. Une dizaine de recoins cachés le long des routes, et un îlot dans le port, cachent des objets rares.
+- **Odyssée** — Quêtes annexes : un médaillon perdu, un échange de Pokémon, un Évoli et un Minidraco à adopter, des Pokémon à montrer et un chercheur qui récompense ton Pokédex (jusqu'à une Master Ball).
+- **Odyssée** — Sauvegarde en ligne : ta partie suit ton compte du Hub. Elle part sur le serveur à chaque sauvegarde, et tu la retrouves sur un autre appareil après y avoir importé ton compte (code de transfert du Hub), sans rien recopier. Écran titre → « Sauvegarde en ligne » pour voir où elle en est.
+- **Odyssée** — Les gardes bloquent maintenant tout le passage : on ne peut plus se faufiler à côté d'eux.
+
 ## 3.18 — 29 octobre 2026
 - **Odyssée** — On joue ensemble : chacun garde son aventure, mais tous les joueurs du salon se croisent dans la région.
   - Les autres dresseurs marchent sur la même carte que toi, avec leur nom au-dessus de la tête (« occupé » quand ils sont en combat ou dans un menu).

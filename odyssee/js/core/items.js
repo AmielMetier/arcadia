@@ -8,6 +8,7 @@ import { SPECIES } from '../data/species.js';
 export const ITEMS = {
   'poke-ball': { pocket: 'balls', price: 200, ball: 1, desc: 'Un objet semblable à une capsule, qui capture les Pokémon sauvages.' },
   'great-ball': { pocket: 'balls', price: 600, ball: 1.5, desc: 'Une Ball de bonne qualité, plus efficace que la Poké Ball.' },
+  'master-ball': { pocket: 'balls', price: 0, ball: 255, desc: 'La Ball la plus performante : elle capture à coup sûr n\'importe quel Pokémon sauvage.' },
   'ultra-ball': { pocket: 'balls', price: 1200, ball: 2, desc: 'Une Ball très performante, plus efficace que la Super Ball.' },
   potion: { pocket: 'soin', price: 300, heal: 20, desc: 'Restaure 20 PV d\'un Pokémon.' },
   'super-potion': { pocket: 'soin', price: 700, heal: 50, desc: 'Restaure 50 PV d\'un Pokémon.' },
@@ -35,9 +36,17 @@ export const ITEMS = {
   'leaf-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle porte une feuille.' },
   'moon-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est noire comme la nuit.' },
   'sun-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est rouge comme le soleil.' },
+  // objets rares : CS (utilisables sur le terrain, face à l'obstacle) et objets de quête
+  hm01: { pocket: 'cles', key: 1, cs: 'cut', name: 'CS01 Coupe', desc: 'Coupe les petits arbres qui barrent le passage. Place-toi devant et appuie sur Espace.' },
+  hm05: { pocket: 'cles', key: 1, cs: 'flash', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre.' },
+  hm03: { pocket: 'cles', key: 1, cs: 'surf', name: 'CS03 Surf', desc: 'Permet de naviguer sur l\'eau calme sur le dos d\'un Pokémon. Place-toi face à l\'eau et appuie sur Espace.' },
+  hm04: { pocket: 'cles', key: 1, cs: 'strength', name: 'CS04 Force', desc: 'Permet de pousser les gros rochers. Marche contre le rocher pour le déplacer.' },
+  'silver-wing': { pocket: 'cles', key: 1, name: 'Plume Argent', desc: 'Une plume argentée qui scintille comme la lune sur la mer. Elle ouvre le Sanctuaire des Marées.' },
+  medaillon: { pocket: 'cles', key: 1, name: 'Médaillon', icon: 'soothe-bell', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
+  'prism-shard': { pocket: 'cles', key: 1, name: 'Éclat de Prisme', icon: 'shoal-shell', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
 };
-export const itemName = (k) => ITEM_NAMES[k] || k;
-export const POCKETS = [['soin', 'Soins'], ['balls', 'Balls'], ['objets', 'Objets']];
+export const itemName = (k) => ITEMS[k]?.name || ITEM_NAMES[k] || k;
+export const POCKETS = [['soin', 'Soins'], ['balls', 'Balls'], ['objets', 'Objets'], ['cles', 'Rares']];
 
 /** l'objet peut-il servir sur ce Pokémon ? */
 export function canUseOn(item, m) {

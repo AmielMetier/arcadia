@@ -111,7 +111,7 @@ img { image-rendering: pixelated; }
 .bag-pic { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--px) * 6); }
 .bag-icon { width: calc(var(--px) * 56); height: calc(var(--px) * 56); border-radius: calc(var(--px) * 12) calc(var(--px) * 12) calc(var(--px) * 8) calc(var(--px) * 8); background: linear-gradient(#e8a858, #b86828); border: calc(var(--px) * 1.5) solid #6a3810; position: relative; }
 .bag-icon::after { content: ''; position: absolute; left: 20%; right: 20%; top: -18%; height: 30%; border: calc(var(--px) * 2) solid #6a3810; border-bottom: none; border-radius: 50% 50% 0 0; }
-.bag-icon.b1 { background: linear-gradient(#e86060, #b03030); } .bag-icon.b2 { background: linear-gradient(#70a8e8, #3868b0); }
+.bag-icon.b1 { background: linear-gradient(#e86060, #b03030); } .bag-icon.b2 { background: linear-gradient(#70a8e8, #3868b0); } .bag-icon.b3 { background: linear-gradient(#b890e0, #6a40a8); }
 .bag-pocket { font-weight: 600; }
 .bag-desc { min-height: 30%; padding: calc(var(--px) * 6) calc(var(--px) * 8); font-size: .9em; }
 .itm-big { width: calc(var(--px) * 24); height: calc(var(--px) * 24); float: left; margin-right: calc(var(--px) * 4); }
@@ -258,3 +258,10 @@ img { image-rendering: pixelated; }
 .trade-arrows { color: #fff; font-size: calc(var(--px) * 22); text-shadow: var(--px) var(--px) 0 #283850; }
 .trade-scr.swap .trade-card:first-child { transform: translateX(calc(var(--px) * 150)); opacity: .2; }
 .trade-scr.swap .trade-card:last-child { transform: translateX(calc(var(--px) * -150)); opacity: .2; }
+
+/* ---------- histoire : grottes sombres, Éclipse, Pokémon Obscurs ---------- */
+.dark-ov { position: absolute; inset: 0; pointer-events: none; display: none; }
+.dark-ov.cave { display: block; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 8%, rgba(0,0,0,.6) 12%, rgba(0,0,0,.96) 18%); }
+.dark-ov.cave.flash { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 26%, rgba(0,0,0,.45) 42%, rgba(0,0,0,.8) 64%); }
+.dark-ov.eclipse { display: block; background: radial-gradient(ellipse at 50% 45%, rgba(70,20,110,0) 35%, rgba(36,0,64,.5) 100%); }
+.shadowmon { filter: brightness(.65) sepia(1) hue-rotate(220deg) saturate(3) drop-shadow(0 0 calc(var(--px) * 2) #8a40ff); }

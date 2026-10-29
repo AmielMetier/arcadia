@@ -237,7 +237,7 @@ export class Battle {
     const st = m.status === 'slp' || m.status === 'frz' ? 2 : m.status ? 1.5 : 1;
     const a = Math.floor(((3 * max - 2 * m.hp) * S.cr * ITEMS[item].ball) / (3 * max) * st);
     let shakes = 0, caught = false;
-    if (a >= 255) { shakes = 4; caught = true; }
+    if (a >= 255 || ITEMS[item].ball >= 255) { shakes = 4; caught = true; }
     else {
       const b = Math.floor(1048560 / Math.sqrt(Math.sqrt(16711680 / Math.max(1, a))));
       while (shakes < 4 && this.r(65536) < b) shakes++;

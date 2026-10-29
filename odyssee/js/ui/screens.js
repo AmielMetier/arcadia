@@ -15,7 +15,7 @@ export const hpCol = (r) => (r > 0.5 ? '#48d058' : r > 0.2 ? '#f0c020' : '#f0483
 export function hpBar(m) { const r = m.hp / m.stats[0]; return `<div class="hp"><b>PV</b><i><u style="width:${Math.max(0, r * 100)}%;background:${hpCol(r)}"></u></i></div>`; }
 export const statusTag = (m) => (m.hp <= 0 ? '<span class="st" style="background:#c03838">K.O.</span>' : m.status ? `<span class="st" style="background:${STATUS_FR[m.status][1]}">${STATUS_FR[m.status][0]}</span>` : '');
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
-const iconImg = (m) => `<img class="ico" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
+const iconImg = (m) => `<img class="ico${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
 
 function screen(ui, cls, title) {
   const s = el('div', 'screen ' + cls);
@@ -93,7 +93,7 @@ export function summaryScreen(game, list, idx) {
       if (page === 0) body = `<table class="kv"><tr><td>N° Pokédex</td><td>${String(m.sp).padStart(3, '0')}</td></tr><tr><td>Nom</td><td>${esc(S.n)}</td></tr><tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr><tr><td>D.O.</td><td>${esc(m.ot || game.state.name)}</td></tr><tr><td>Rencontré</td><td>${esc(m.met || '—')}</td></tr><tr><td>Exp.</td><td>${m.exp.toLocaleString('fr-FR')}</td></tr></table><div class="expline"><b>EXP</b><i><u style="width:${expProgress(m) * 100}%"></u></i></div><div class="dexline">${esc(S.genus || '')}</div>`;
       else if (page === 1) body = `<table class="kv stats">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td>${k === 0 ? `${m.hp}/${m.stats[0]}` : m.stats[k]}</td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.6)}%"></u></i></td></tr>`).join('')}</table>`;
       else body = `<div class="moves">${m.moves.map((mv) => { const M = MOVES[mv.id]; return `<div class="mv" style="--tc:${TYPE_COL[M.t]}"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP ${mv.pp}/${M.pp}</span><span class="mvd">${M.c === 'status' ? 'Statut' : `Puiss. ${M.p || '—'}`} · Préc. ${M.a ?? '—'}</span></div>`; }).join('')}</div>`;
-      s.innerHTML = `<div class="sum-left box"><div class="sum-head">${esc(monName(m))}${gender(m)} <span>N.${m.lvl}</span></div><img class="sum-spr" src="${ASSETS.front(m.sp, m.shiny)}" alt="">${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div></div><div class="sum-right box"><div class="tabs">${tabs}</div>${body}</div><div class="sum-help">◀ ▶ pages · ▲ ▼ Pokémon · Échap retour</div>`;
+      s.innerHTML = `<div class="sum-left box"><div class="sum-head">${esc(monName(m))}${gender(m)} <span>N.${m.lvl}</span></div><img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="">${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div></div><div class="sum-right box"><div class="tabs">${tabs}</div>${body}</div><div class="sum-help">◀ ▶ pages · ▲ ▼ Pokémon · Échap retour</div>`;
     };
     draw();
     const pop = ui.input.push((k) => {
@@ -125,7 +125,7 @@ export function bagScreen(game, o = {}) {
     const pop = ui.input.push(async (k) => {
       if (busy) return;
       const es = entries();
-      if (k === 'left' || k === 'right') { pocket = (pocket + (k === 'left' ? 2 : 1)) % 3; i = 0; ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'left' || k === 'right') { pocket = (pocket + (k === 'left' ? POCKETS.length - 1 : 1)) % POCKETS.length; i = 0; ui.sound.sfx('blip'); draw(); return; }
       if (k === 'up') { i = (i - 1 + es.length + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
       if (k === 'down') { i = (i + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
       if (k === 'b') { ui.sound.sfx('cancel'); close(null); return; }
@@ -133,7 +133,7 @@ export function bagScreen(game, o = {}) {
       if (i === es.length) { ui.sound.sfx('cancel'); close(null); return; }
       ui.sound.sfx('select');
       const item = es[i], it = ITEMS[item];
-      const opts = o.battle ? ['Utiliser', 'Annuler'] : ['Utiliser', 'Jeter', 'Annuler'];
+      const opts = o.battle ? ['Utiliser', 'Annuler'] : it.key ? ['Utiliser', 'Annuler'] : ['Utiliser', 'Jeter', 'Annuler'];
       busy = true;
       const r = await ui.list({ items: opts.map((label) => ({ label, disabled: label === 'Utiliser' && o.battle && !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) })), cls: 'psub', cancel: opts.length - 1, parent: s });
       busy = false;
@@ -222,7 +222,7 @@ export async function shopScreen(game, stock) {
   for (;;) {
     const r = await ui.ask('Bonjour ! Que puis-je faire pour toi ?', ['Acheter', 'Vendre', 'Au revoir'], { keep: true, speaker: 'Vendeur' });
     if (r === 1) {
-      const sellable = Object.keys(st.bag).filter((k) => st.bag[k] > 0 && ITEMS[k]);
+      const sellable = Object.keys(st.bag).filter((k) => st.bag[k] > 0 && ITEMS[k] && !ITEMS[k].key && ITEMS[k].price > 0);
       if (!sellable.length) { await ui.say('Tu n\'as rien à vendre.', { keep: true }); continue; }
       const k = await ui.list({ title: 'Vendre', items: sellable.map((it) => ({ label: itemName(it), right: `× ${st.bag[it]}` })).concat([{ label: 'Annuler' }]), cls: 'shop', cancel: sellable.length });
       if (k < 0 || k >= sellable.length) continue;

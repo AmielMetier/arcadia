@@ -8,6 +8,7 @@ import { UI, el, esc, wait } from './ui/ui.js';
 import { optionsScreen, loadCodeScreen } from './ui/screens.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Game } from './game.js';
+import { Cloud } from './net/cloud.js';
 import { ASSETS, loadImg } from './assets.js';
 import { SPECIES } from './data/species.js';
 
@@ -30,7 +31,14 @@ async function boot() {
   const chars = await loadImg(ASSETS.chars);
   const view = new WorldView(renderer, chars);
   const game = new Game({ view, ui, input, sound, world });
-  window.__ody = { game, world, view, ui, sound };
+  // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
+  const cloud = game.cloud = new Cloud();
+  game.onSaved = (silent) => { if (silent) cloud.queue(game.state); };
+  const bye = () => { if (game.state && mode === 'game') { game.save(true); cloud.flush(); } };
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') bye(); });
+  addEventListener('pagehide', bye);
+  cloud.fetch();
+  window.__ody = { game, world, view, ui, sound, cloud };
 
   // rendu en basse résolution, agrandi sans lissage : chaque « pixel » du jeu fait --px pixels d'écran
   const resize = () => {
@@ -67,14 +75,30 @@ async function boot() {
     uiRoot.appendChild(title);
     await new Promise((res) => { const pop = input.push((k) => { if (k === 'a') { pop(); sound.init(); sound.sfx('select'); res(); } }); });
     title.querySelector('.press').remove();
-    const has = Game.hasSave();
+    // la sauvegarde en ligne a quelques secondes pour répondre (le serveur peut être en train de se réveiller)
+    if (cloud.on && cloud.remote === undefined) await Promise.race([cloud.fetch(), wait(2500)]);
     let info = null;
-    if (has) { try { const s = JSON.parse(localStorage.getItem('odyssee-save-v1')); info = s; } catch (e) {} }
-    const opts = (has ? ['Continuer'] : []).concat(['Nouvelle partie', 'Charger un code', 'Options'], H && H.embedded ? ['Retour au salon'] : []);
-    const card = info ? el('div', 'box save-info', `<b>${esc(info.name)}</b><br>Badges : ${info.badges.filter(Boolean).length} · Pokédex : ${info.dex.caught.length}<br>Temps : ${Math.floor(info.time / 3600)}:${String(Math.floor(info.time / 60) % 60).padStart(2, '0')}`) : null;
-    if (card) title.appendChild(card);
+    if (Game.hasSave()) { try { info = JSON.parse(localStorage.getItem('odyssee-save-v1')); } catch (e) {} }
+    const remote = cloud.remote?.state || null;
+    const newer = remote && (!info || (remote.time || 0) > (info.time || 0) + 5);
+    const has = !!info || !!remote;
+    const opts = (has ? ['Continuer'] : []).concat(['Nouvelle partie'], cloud.on ? ['Sauvegarde en ligne'] : [], ['Charger un code', 'Options'], H && H.embedded ? ['Retour au salon'] : []);
+    const line = (s) => `<b>${esc(s.name)}</b> · ${s.badges.filter(Boolean).length} badge${s.badges.filter(Boolean).length > 1 ? 's' : ''} · Pokédex ${s.dex.caught.length} · ${Math.floor(s.time / 3600)}:${String(Math.floor(s.time / 60) % 60).padStart(2, '0')}`;
+    const card = el('div', 'box save-info');
+    const fill = () => {
+      const r = cloud.remote?.state;
+      card.innerHTML = (info ? `${line(info)}<br>` : '') + (!cloud.on ? '' : cloud.unreachable ? '<small>En ligne : serveur injoignable pour l\'instant</small>' : cloud.remote === undefined ? '<small>En ligne : recherche de ta partie…</small>' : r ? `<small>En ligne : ${info && Math.abs((r.time || 0) - (info.time || 0)) < 5 ? 'à jour' : esc(saveSummary(r))}</small>` : '<small>En ligne : aucune partie pour l\'instant</small>');
+      card.style.display = card.innerHTML ? '' : 'none';
+    };
+    fill(); title.appendChild(card);
+    if (cloud.on && cloud.remote === undefined) cloud.fetch().then(fill);
     const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'title-menu', cancel: null, parent: title });
     const pick = opts[r];
+    if (pick === 'Sauvegarde en ligne') {
+      title.remove();
+      await onlineScreen(ui, cloud, info);
+      continue;
+    }
     if (pick === 'Options') { title.remove(); await optionsScreen(game); continue; }
     if (pick === 'Charger un code') {
       title.remove();
@@ -87,16 +111,40 @@ async function boot() {
       continue;
     }
     if (pick === 'Retour au salon') { H.exit(); title.remove(); continue; }
-    if (pick === 'Nouvelle partie' && has && !(await ui.yesNo('Une sauvegarde existe déjà. Commencer une nouvelle partie l\'effacera. Continuer ?'))) { title.remove(); continue; }
+    if (pick === 'Nouvelle partie' && has && !(await ui.yesNo(remote ? 'Une partie existe déjà (sur cet appareil ou en ligne). La nouvelle la remplacera à la première sauvegarde. Continuer ?' : 'Une sauvegarde existe déjà. Commencer une nouvelle partie l\'effacera. Continuer ?'))) { title.remove(); continue; }
     title.remove();
     let state;
-    if (pick === 'Continuer') state = game.load();
+    if (pick === 'Continuer') {
+      // la partie la plus avancée l'emporte : celle de cet appareil, ou celle du compte en ligne
+      let useRemote = newer && !info;
+      if (newer && info) useRemote = await ui.yesNo(`Ta partie en ligne est plus récente (${saveSummary(remote)}). La reprendre ?`);
+      if (useRemote) { try { localStorage.setItem('odyssee-save-v1', JSON.stringify(remote)); } catch (e) {} }
+      state = useRemote ? game.load(remote) : game.load();
+    }
     else state = await intro(game, ui, sound, input);
     await ui.fade(true, 300);
     mode = 'game';
     await game.start(state);
     break;
   }
+}
+
+/** écran « Sauvegarde en ligne » : état du compte, et reprise de la partie en ligne */
+async function onlineScreen(ui, cloud, info) {
+  if (cloud.remote === undefined) {
+    ui.say('Connexion au serveur… (il peut mettre jusqu\'à une minute à se réveiller)', { keep: true, noWaitLast: true });
+    await cloud.fetch(70000);
+    ui.closeDialog();
+  }
+  if (!cloud.on) { await ui.say('La sauvegarde en ligne n\'est pas encore activée sur le serveur.'); return; }
+  if (cloud.remote === undefined) { await ui.say('Le serveur ne répond pas pour l\'instant. Ta partie reste sauvegardée sur cet appareil ; réessaie plus tard.'); return; }
+  const id = cloud.fid ? `Compte ${cloud.fid.slice(0, 4)}-${cloud.fid.slice(4)}. ` : '';
+  if (!cloud.remote) { await ui.say([`${id}Aucune partie en ligne pour l'instant.`, 'Elle sera créée dès ta prochaine sauvegarde, et tu la retrouveras sur tous tes appareils où tu as importé ton compte du Hub.']); return; }
+  const r = cloud.remote.state;
+  await ui.say(`${id}Partie en ligne : ${saveSummary(r)}.`, { keep: true });
+  if (!(await ui.yesNo(info ? 'La charger sur cet appareil (elle remplace celle d\'ici) ?' : 'La charger sur cet appareil ?'))) return;
+  try { localStorage.setItem('odyssee-save-v1', JSON.stringify(r)); } catch (e) { await ui.say('Impossible d\'enregistrer la partie sur cet appareil.'); return; }
+  await ui.say(`Partie de ${r.name} chargée ! Choisis « Continuer » pour la reprendre.`);
 }
 
 /** présentation du professeur, choix du personnage et du nom */

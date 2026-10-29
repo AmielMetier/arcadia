@@ -324,6 +324,10 @@ export function buildSprites() {
   (() => { const ox = 384, oy = 48; P.rect(ox + 1, oy + 1, 14, 14, '#1a1410'); P.rect(ox + 2, oy + 2, 12, 12, '#2c2018'); for (let y = 3; y < 14; y += 3) P.rect(ox + 4, oy + y, 8, 1, '#a07848'); P.rect(ox + 4, oy + 2, 1, 12, '#a07848'); P.rect(ox + 11, oy + 2, 1, 12, '#a07848'); add('ladder', ox, oy, 16, 16); })();
   // petit palmier
   (() => { const ox = 400, oy = 0; P.rect(ox + 14, oy + 14, 4, 24, '#a87848'); for (let y = 14; y < 38; y += 3) P.rect(ox + 14, oy + y, 4, 1, '#7a5430'); for (let i = 0; i < 7; i++) { const a = -2.6 + i * 0.85; for (let t = 0; t < 13; t++) { const x = ox + 16 + Math.cos(a) * t, y = oy + 14 + Math.sin(a) * t * 0.6 + (t * t) / 28; P.p(x, y, t > 9 ? '#8ae07a' : '#3a9a4a'); P.p(x, y + 1, '#2a7a3a'); } } add('palm', ox, oy, 32, 40); })();
+  // petit arbre que l'on peut couper (CS Coupe) : plus clair et plus petit que les arbres de la forêt
+  (() => { const ox = 432, oy = 40; P.rect(ox + 7, oy + 16, 2, 8, '#7a4a28'); P.rect(ox + 8, oy + 16, 1, 8, '#a06a3a'); P.rect(ox + 5, oy + 23, 6, 1, '#4a2a14');
+    for (let y = 0; y < 18; y++) for (let x = 0; x < 16; x++) { const dx = x - 7.5, dy = y - 8.5, q = dx * dx / 56 + dy * dy / 72; if (q > 1) continue; P.p(ox + x, oy + y, q > 0.8 ? '#1f4a24' : dy < -3 && dx < 1 ? '#b4ec84' : dy < 1 ? '#7ccc5a' : '#4a9a42'); }
+    for (const [x, y] of [[5, 4], [9, 7], [6, 10], [10, 3]]) P.p(ox + x, oy + y, '#e0ffc0'); add('cuttree', ox, oy, 16, 24); })();
   // tapis de sortie et marches
   return { canvas: P.c, rects, size: SIZE };
 }

@@ -71,18 +71,22 @@ const reachable = (m, seen, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].
 // portes et téléporteurs du monde
 for (const [k, w] of W.warps) {
   const [x, y] = k.split(',').map(Number);
-  ok(seenW[at(W, x, y)] || reachable(W, seenW, x, y + 1), `porte ${k} → ${w.map} accessible`);
+  // le Sanctuaire (îlot, Surf et Plume Argent) est vérifié par test-odyssee-story.mjs
+  ok(w.need || seenW[at(W, x, y)] || reachable(W, seenW, x, y + 1), `porte ${k} → ${w.map} accessible`);
   const dst = maps[w.map]; ok(dst && walkable(dst.get(w.x, w.y)), `arrivée ${w.map} (${w.x},${w.y}) praticable`);
 }
 // PNJ, dresseurs et objets du monde : on peut se placer à côté
 for (const n of W.npcs) ok(reachable(W, seenW, n.x, n.y), `PNJ ${n.id} atteignable (${n.x},${n.y})`);
-for (const it of W.items) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} atteignable (${it.x},${it.y})`);
+// les objets cachés derrière un obstacle de CS (Coupe, Force, Surf) sont vérifiés par test-odyssee-story.mjs
+for (const it of W.items) if (!it.secret) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} atteignable (${it.x},${it.y})`);
 // intérieurs : chaque tapis ramène dehors, chaque PNJ est atteignable depuis l'entrée
 for (const [id, m] of Object.entries(maps)) {
   if (id === 'monde') continue;
   const entries = [...m.warps.keys()].map((k) => k.split(',').map(Number));
-  ok(entries.length > 0, `${id} a une sortie`);
-  const [ex, ey] = entries[0];
+  // la salle de la Maître n'a pas de sortie : on y arrive par la salle précédente du Conseil 4
+  const arrivals = Object.values(maps).flatMap((o) => [...o.warps.values()].filter((w) => w.map === id).map((w) => [w.x, w.y]));
+  ok(entries.length > 0 || arrivals.length > 0, `${id} a une entrée ou une sortie`);
+  const [ex, ey] = entries[0] || arrivals[0];
   const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true);
   for (const [x, y] of entries) ok(seen[at(m, x, y)] || reachable(m, seen, x, y), `${id} : sortie (${x},${y}) atteignable`);
   for (const n of m.npcs) ok(reachable(m, seen, n.x, n.y) || m.get(n.x, n.y + 1) === T.BLOCK && reachable(m, seen, n.x, n.y + 2), `${id} : PNJ ${n.id} atteignable`);

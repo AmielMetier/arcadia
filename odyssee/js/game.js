@@ -13,6 +13,7 @@ import { installSocial, talkToPeer } from './net/social.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
+import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 
 const SAVE_KEY = 'odyssee-save-v1';
 const WALK = 0.26, RUN = 0.135;
@@ -44,46 +45,82 @@ export class Game {
   }
   save(silent = false) {
     const s = this.state; const p = this.player;
-    s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); return true; } catch (e) { return false; }
+    s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!this.surfing;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); } catch (e) { return false; }
+    this.onSaved?.(silent);
+    return true;
   }
-  load() {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+  load(from) {
+    const s = from ? JSON.parse(JSON.stringify(from)) : JSON.parse(localStorage.getItem(SAVE_KEY));
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
     setUidBase(maxUid + 1);
     return s;
   }
 
   async start(state) {
-    this.state = state;
+    this.state = state; this.busy = false;
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0 };
+    this.surfing = false;
     this.setMap(state.map);
+    if (state.surf && this.mapObj.get(state.x, state.y) === T.WATER) await this.startSurf(false);
     this.view.setTimeOfDay(this.hour());
     this.link.hello();
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`]); this.busy = false; }
   }
-  hour() { const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  hour() { if (this.eclipseOn()) return 0.5; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  /** la nuit violette, entre la victoire contre Nocturne au repaire et le réveil de Lugia */
+  eclipseOn() { const f = this.state?.flags || {}; return !!f.eclipse && !f.lugia; }
 
   /* ================= cartes ================= */
   setMap(id) {
     const m = this.world.maps[id] || this.world.maps.monde;
     this.mapObj = m;
-    this.view.setMap(m);
     const st = this.state;
-    this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => ({ def: n, id: n.id, x: n.x, y: n.y, dir: n.dir || 'down', sprite: n.sprite, home: [n.x, n.y], timer: 1 + Math.random() * 3, move: null, step: 0 }));
+    this.applyTiles(m);
+    if (!m.outdoor || m.get(this.player.x, this.player.y) !== T.WATER) this.surfing = false;
+    if (this.strengthOn !== m.id) this.strengthOn = null;
+    this.view.eclipse = this.eclipseOn();
+    this.view.setMap(m);
+    this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => {
+      const beaten = n.beatenPos && st.flags['T:' + n.id], x = beaten ? n.beatenPos[0] : n.x, y = beaten ? n.beatenPos[1] : n.y;
+      return { def: n, id: n.id, x, y, dir: n.dir || 'down', sprite: n.sprite, home: [x, y], timer: 1 + Math.random() * 3, move: null, step: 0 };
+    });
     // le rival attend au labo tant que le premier combat n'a pas eu lieu
     if (id === 'aube:labo' && !st.flags.rival1) this.npcs.push({ def: { id: 'rival-lab', script: 'rivalLab' }, id: 'rival-lab', x: 8, y: 6, dir: 'left', sprite: 'clerk', home: [8, 6], timer: 99, move: null, step: 0 });
     this.items = m.items.filter((it) => !st.flags['I:' + it.id]).map((it) => ({ ...it }));
     for (const it of this.items) { const a = this.view.actor('item:' + it.id, { kind: 'item' }); this.view.place(a, it.x, it.y - 0.15); }
     this.gateBlock = new Set();
-    for (const g of m.gates) if (this.badgeCount() < g.badges) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
+    for (const g of m.gates) if (this.gateOn(g)) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
     this.view.setTimeOfDay(this.hour());
+    overlay(this);
+    placeLugia(this);
     this.zone = null; this.updateZone();
   }
+  /** un garde (ou un sbire) bloque-t-il encore le passage ? */
+  gateOn(g) { return this.badgeCount() < (g.badges || 0) || (!!g.until && !this.state.flags[g.until]); }
   npcVisible(n) {
-    if (n.gate) return this.badgeCount() < n.gate.badges;
+    const f = this.state.flags;
+    if (n.gate) return this.gateOn(n.gate);
+    if (n.vanish && f['T:' + n.id]) return false;
+    if (n.showIf && !f[n.showIf]) return false;
+    if (n.hideIf && f[n.hideIf]) return false;
     return true;
+  }
+  /** modifications durables du terrain (arbres coupés, rochers poussés), rejouées à chaque entrée sur la carte */
+  applyTiles(m) {
+    if (m._orig) for (const [k, v] of m._orig) { const [x, y] = k.split(',').map(Number); m.set(x, y, v); }
+    m._orig = new Map();
+    const t = this.state.tiles?.[m.id]; if (!t) return;
+    for (const [k, v] of Object.entries(t)) { const [x, y] = k.split(',').map(Number); m._orig.set(k, m.get(x, y)); m.set(x, y, v); }
+  }
+  setTile(x, y, v) {
+    const m = this.mapObj, st = this.state, k = key(x, y);
+    st.tiles = st.tiles || {}; (st.tiles[m.id] = st.tiles[m.id] || {})[k] = v;
+    if (!m._orig) m._orig = new Map();
+    if (!m._orig.has(k)) m._orig.set(k, m.get(x, y));
+    m.set(x, y, v);
+    this.view.refreshTiles([[x, y]]);
   }
   badgeCount() { return this.state.badges.filter(Boolean).length; }
   worldPos() {
@@ -94,7 +131,7 @@ export class Game {
 
   updateZone() {
     const m = this.mapObj, p = this.player;
-    const z = m.outdoor ? m.zoneAt(p.x, p.y) : { name: m.name, music: m.music };
+    const z = m.outdoor ? m.zoneAt(p.x, p.y) : (m.zones.length && m.zoneAt(p.x, p.y)) || { name: m.name, music: m.music };
     const name = z?.name || m.name;
     // bandeau du lieu : en extérieur et dans les grottes (pas en sortant d'une maison)
     if ((m.outdoor || m.floor === 'cave') && name !== this.zoneName) { this.zoneName = name; this.ui.banner(name); }
@@ -113,6 +150,7 @@ export class Game {
     this.view.update(0, this.player.x, this.player.y);
     this.save(true);
     await this.ui.fade(false, 220);
+    if (this.mapObj.dark && this.state.bag.hm05 && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`);
     this.busy = false;
   }
 
@@ -156,7 +194,13 @@ export class Game {
     const a = v.actor('player', {});
     v.setFrame(a, this.state.gender === 'f' ? 'green' : 'red', p.dir, stepFrame);
     const t = this.mapObj.get(Math.round(px), Math.round(py));
-    v.place(a, px, py, hop, isGrassEnc(t) && !p.move);
+    if (this.surfing) {
+      // sur le dos de son Pokémon, qui tangue doucement
+      const bob = Math.sin(performance.now() / 260) * 0.04;
+      if (this.surfImg) { const s = v.actors.get('surf') || v.imageActor('surf', this.surfImg, 40, 30); s.mesh.position.set(px + 0.5, -0.1 + bob, py + 0.45); s.shadow.visible = false; }
+      v.place(a, px, py, 0.3 + bob, true);
+    } else { if (v.actors.has('surf')) v.removeActor('surf'); v.place(a, px, py, hop, isGrassEnc(t) && !p.move); }
+    const lg = v.actors.get('lugia'); if (lg) lg.mesh.position.y = lg.base + Math.sin(performance.now() / 700) * 0.12;
     for (const n of this.npcs) {
       let nx = n.x, ny = n.y, sf = 0;
       if (n.move) { const u = Math.min(1, n.move.t); nx = n.move.fx + (n.x - n.move.fx) * u; ny = n.move.fy + (n.y - n.move.fy) * u; sf = u < 0.5 ? (n.step % 2 ? 1 : 2) : 0; }
@@ -185,6 +229,21 @@ export class Game {
     // sortie par le tapis
     if (m.get(p.x, p.y) === T.MAT && d === 'down') { const w = m.warpAt(p.x, p.y); if (w) { this.warp(w, 'exit'); return; } }
     const run = this.input.isDown('run');
+    if (this.surfing) {
+      const ok = !this.occupied(tx, ty) && m.in(tx, ty) && ((t === T.WATER && this.surfAt(tx, ty)) || (walkable(t) && t !== T.DOOR));
+      if (ok) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: run ? RUN : WALK * 0.9 }; p.walking = true; return; }
+      p.walking = false; if (p.bumpT <= 0) { this.sound.sfx('bump'); p.bumpT = 0.3; }
+      return;
+    }
+    // Force : pousser un rocher
+    if (t === T.BOULDER && this.strengthOn === m.id) {
+      const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
+      if (walkable(bt) && bt !== T.DOOR && bt !== T.MAT && bt !== T.CAVEDOOR && !this.occupied(bx, by) && !m.warpAt(bx, by)) {
+        this.setTile(tx, ty, m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
+        this.sound.sfx('ledge'); this.view.shake = 0.08; p.bumpT = 0.3; p.walking = false;
+        return;
+      }
+    }
     // rebords
     if ((t === T.LEDGE && d === 'down') || (t === T.LEDGE_E && d === 'right') || (t === T.LEDGE_W && d === 'left')) {
       const lx = tx + dx, ly = ty + dy;
@@ -203,15 +262,24 @@ export class Game {
   async onStep(mv) {
     const p = this.player, m = this.mapObj, t = m.get(p.x, p.y);
     if (mv.jump) this.view.shake = 0.06;
+    if (this.surfing && t !== T.WATER) this.surfing = false;
     if (isGrassEnc(t)) this.view.rustle(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
-    if (w && (t === T.DOOR || t === T.CAVEDOOR)) { await this.warp(w, t === T.CAVEDOOR ? 'exit' : 'door'); return; }
+    if (w && (t === T.DOOR || t === T.CAVEDOOR)) {
+      if (w.need && !this.state.bag[w.need]) {
+        this.busy = true;
+        await this.ui.say(['Une force mystérieuse bloque l\'entrée...', 'Il faudrait un objet lié à ce lieu pour l\'ouvrir.']);
+        await this.playerWalk('down', 1); this.busy = false; return;
+      }
+      await this.warp(w, t === T.CAVEDOOR ? 'exit' : 'door'); return;
+    }
     this.updateZone();
     if (this.state.repel > 0) { this.state.repel--; if (this.state.repel === 0) { this.busy = true; await this.ui.say('L\'effet du Repousse s\'est dissipé...'); this.busy = false; } }
     const z = this.zone;
     if (z?.trigger && await this.trigger(z.trigger)) return;
     if (await this.checkTrainers()) return;
-    // rencontres sauvages
+    // rencontres sauvages (sur l'eau, en surfant)
+    if (this.surfing) { const sz = this.surfAt(p.x, p.y); if (sz?.enc && Math.random() < 0.075) await this.wildBattle(sz.enc); return; }
     const enc = m.outdoor ? z?.enc : m.encounter;
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
@@ -279,9 +347,13 @@ export class Game {
         if (it) await this.pickItem(it);
         else {
           const o = m.objectAt(fx, fy);
+          const ft = m.get(fx, fy);
           if (o?.type === 'pc') await pcScreen(this);
           else if (o?.type === 'starter') await this.chooseStarter(o.sp);
-          else if (m.get(fx, fy) === T.WATER && m.outdoor) await this.ui.say('L\'eau est d\'un bleu profond...');
+          else if (o?.type === 'lugia') { if (!this.state.flags.lugiaCaught) { await this.ui.say('Lugia Obscur repose sur l\'autel. Ses yeux sombres s\'ouvrent lentement...'); await lugiaBattle(this); } }
+          else if (ft === T.BUSH) await this.useCut(fx, fy);
+          else if (ft === T.BOULDER) await this.useStrength();
+          else if (ft === T.WATER && m.outdoor && !this.surfing) await this.useSurf();
         }
       }
     } finally { this.busy = false; }
@@ -291,9 +363,10 @@ export class Game {
     n.dir = OPP[this.player.dir];
     const d = n.def, st = this.state;
     try {
-      if (d.trainer) { if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false); else await this.ui.say(d.trainer.after || 'Quel combat !', { speaker: d.trainer.name }); }
+      if (d.trainer) { if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false); else await this.ui.say(d.trainer.after || 'Quel combat !', { speaker: d.speaker || d.trainer.name }); }
       else if (d.role === 'nurse') await this.nurse();
       else if (d.role === 'shop') await shopScreen(this, d.stock);
+      else if (d.script && await storyTalk(this, d.script, n)) { /* géré par story.js */ }
       else if (d.script) await this.script(d.script, n);
       else if (d.text) await this.ui.say(d.text);
     } finally { this.busy = was; }
@@ -331,7 +404,19 @@ export class Game {
         this.save(true);
         await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
       }
-      else if (k === 'save') { if (await this.ui.yesNo('Sauvegarder la partie ?')) { this.save(); await this.ui.say(`${st.name} a sauvegardé la partie.`); } break; }
+      else if (k === 'save') {
+        if (await this.ui.yesNo('Sauvegarder la partie ?')) {
+          this.save();
+          if (!this.cloud?.on) await this.ui.say(`${st.name} a sauvegardé la partie.`);
+          else {
+            this.ui.say("Envoi de la sauvegarde en ligne…", { keep: true, noWaitLast: true });
+            const okOnline = await Promise.race([this.cloud.queue(st, true), wait(12000).then(() => null)]);
+            this.ui.closeDialog();
+            await this.ui.say(okOnline ? `${st.name} a sauvegardé la partie.\nElle est aussi enregistrée en ligne, sur ton compte du Hub.` : okOnline === null ? `${st.name} a sauvegardé la partie.\nLe serveur se réveille : l'envoi en ligne continue en arrière-plan.` : `${st.name} a sauvegardé la partie sur cet appareil.\nLe serveur en ligne ne répond pas : nouvel essai à la prochaine sauvegarde.`);
+          }
+        }
+        break;
+      }
     }
     this.busy = false;
   }
@@ -395,7 +480,7 @@ export class Game {
   async trainerBattle(n, spotted) {
     const d = n.def, tr = d.trainer, st = this.state;
     this.busy = true;
-    const music = d.leader != null ? 'leader' : d.champion ? 'champion' : d.rival ? 'rival' : 'trainer';
+    const music = d.music || (d.leader != null ? 'leader' : d.champion ? 'champion' : d.rival ? 'rival' : 'trainer');
     if (spotted) {
       this.musicLock = true; this.sound.play(music === 'trainer' ? 'trainer' : music);
       n.bang = true; this.sound.sfx('bang'); await wait(650); n.bang = false;
@@ -406,7 +491,7 @@ export class Game {
       p.dir = OPP[n.dir]; void dx; void dy;
     }
     this.musicLock = true; this.sound.play(music);
-    await this.ui.say(tr.intro, { speaker: tr.name });
+    await this.ui.say(tr.intro, { speaker: d.speaker || tr.name });
     const party = tr.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 8 + lvl / 2 | 0)) }));
     const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival });
     this.musicLock = false;
@@ -419,18 +504,61 @@ export class Game {
         await this.ui.say([`Avec ce badge, tu prouves ta valeur de dresseur.`, `Les gardes de la région te laisseront désormais passer.`], { speaker: tr.name });
         this.refreshGates();
       }
+      if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
+      if (d.vanish) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
+      if (d.winScript) await storyWin(this, d.winScript, n);
+      this.refreshNpcs();
       if (d.champion) await this.ending();
     }
     this.updateZone();
     this.busy = false;
     return res;
   }
-  refreshGates() {
-    // les gardes s'écartent quand on a assez de badges
+  refreshGates() { this.refreshNpcs(); }
+  /** les gardes s'écartent, les sbires vaincus s'en vont, les PNJ liés à l'histoire apparaissent ou disparaissent */
+  refreshNpcs() {
     const m = this.mapObj;
     this.gateBlock = new Set();
-    for (const g of m.gates) if (this.badgeCount() < g.badges) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
-    this.npcs = this.npcs.filter((n) => { if (n.def.gate && this.badgeCount() >= n.def.gate.badges) { this.view.removeActor('npc:' + n.id); return false; } return true; });
+    for (const g of m.gates) if (this.gateOn(g)) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
+    this.npcs = this.npcs.filter((n) => { if (n.def.id && m.npcs.includes(n.def) && !this.npcVisible(n.def)) { this.view.removeActor('npc:' + n.id); return false; } return true; });
+    overlay(this);
+  }
+
+  /* ================= CS sur le terrain ================= */
+  surfAt(x, y) { const m = this.mapObj; if (!m.outdoor || m.get(x, y) !== T.WATER) return null; return (m.surf || []).find((z) => x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) || null; }
+  async useCut(x, y) {
+    const lead = this.lead();
+    if (!this.state.bag.hm01 || !lead) { await this.ui.say('Ce petit arbre a l\'air de pouvoir être coupé...'); return; }
+    if (!(await this.ui.yesNo('Ce petit arbre peut être coupé. Utiliser Coupe ?'))) return;
+    this.sound.sfx('hit');
+    await this.ui.say(`${monName(lead)} utilise Coupe !`);
+    this.setTile(x, y, T.GRASS); this.view.rustle(x, y);
+  }
+  async useStrength() {
+    const lead = this.lead();
+    if (!this.state.bag.hm04 || !lead) { await this.ui.say('C\'est un gros rocher. Un Pokémon très costaud pourrait le pousser.'); return; }
+    if (this.strengthOn === this.mapObj.id) { await this.ui.say('Force est active : marche contre le rocher pour le pousser.'); return; }
+    if (!(await this.ui.yesNo('Un gros rocher bloque le passage. Utiliser Force ?'))) return;
+    this.strengthOn = this.mapObj.id; this.sound.sfx('ledge');
+    await this.ui.say(`${monName(lead)} utilise Force !\nIl peut désormais pousser les rochers.`);
+  }
+  async useSurf() {
+    const p = this.player, [dx, dy] = DIRS[p.dir];
+    if (!this.surfAt(p.x + dx, p.y + dy)) { await this.ui.say('L\'eau est d\'un bleu profond...'); return; }
+    if (!this.state.bag.hm03 || !this.lead()) { await this.ui.say('L\'eau est calme et d\'un bleu profond... Un Pokémon pourrait te porter dessus.'); return; }
+    if (this.occupied(p.x + dx, p.y + dy)) return;
+    if (!(await this.ui.yesNo('L\'eau est calme. Utiliser Surf ?'))) return;
+    await this.ui.say(`${monName(this.lead())} utilise Surf !`);
+    await this.startSurf(true);
+  }
+  async startSurf(walk) {
+    const lead = this.lead(); if (!lead) return;
+    const img = await loadImg(ASSETS.icon(lead.sp));
+    const c = document.createElement('canvas'); c.width = 40; c.height = 30;
+    if (img) c.getContext('2d').drawImage(img, 0, 0, 40, 30); else { const x = c.getContext('2d'); x.fillStyle = '#4a80d0'; x.beginPath(); x.ellipse(20, 22, 16, 7, 0, 0, 7); x.fill(); }
+    this.view.removeActor('surf'); this.surfImg = c;
+    this.surfing = true; this.sound.sfx('ledge');
+    if (walk) await this.playerWalk(this.player.dir, 1);
   }
 
   async checkTrainers() {
@@ -450,7 +578,7 @@ export class Game {
   /** combat générique ; o.wild (mon) ou o.trainer + o.party */
   async runBattle(o) {
     const st = this.state;
-    const kind = o.wild ? 'wild' : o.music || 'trainer';
+    const kind = o.music || (o.wild ? 'wild' : 'trainer');
     const curtain = await this.encounterIntro(kind);
     const m = this.mapObj, z = this.zone;
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg) : z?.theme === 'volcanic' ? 'volcanic' : z?.route === 'r8' || z?.town === 'azur' ? 'water' : 'grass';
@@ -572,7 +700,10 @@ export class Game {
       await ui.say(['Voilà, tes Pokémon sont en pleine forme !', 'Je suis fière de toi. Reviens quand tu veux !'], { speaker: 'Maman' });
     } else if (name === 'prof') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'ai trois Pokémon ici, sur la table. Ils n\'attendent qu\'un dresseur.', 'Approche-toi et choisis celui qui te plaît !'], { speaker: 'Prof. Saule' }); return; }
-      await ui.say(['Chaque Pokémon que tu rencontreras remplira ton Pokédex.', 'Les huit Champions d\'Arène t\'attendent aux quatre coins de la région.', 'Et au bout du chemin : la Ligue Céleste !'], { speaker: 'Prof. Saule' });
+      if (await purify(this)) return;
+      if (st.flags.lugia) { await ui.say(['On ne parle que de toi dans toute la région ! Tu as rendu le jour à Odyssée.', st.flags.lugiaCaught ? 'Et Lugia voyage avec toi... Prends-en soin.' : 'Lugia dort de nouveau en paix, au fond du Sanctuaire.'], { speaker: 'Prof. Saule' }); return; }
+      if (st.flags.eclipse) { await ui.say(['Cette nuit violette... C\'est l\'œuvre de la Team Éclipse, n\'est-ce pas ?', 'Si Lugia se réveille avec un cœur fermé, la nuit ne finira jamais. Il faut trouver le Sanctuaire des Marées !'], { speaker: 'Prof. Saule' }); return; }
+      await ui.say(['Chaque Pokémon que tu rencontreras remplira ton Pokédex.', 'Les huit Champions d\'Arène t\'attendent aux quatre coins de la région.', 'Et au bout du chemin : la Ligue Céleste !', 'Ah, et méfie-toi de la Team Éclipse. Ces gens en noir s\'intéressent beaucoup trop à Lugia.'], { speaker: 'Prof. Saule' });
     } else if (name === 'rivalLab') {
       await ui.say(st.flags.starter ? 'Hé, ne traîne pas !' : ['Yo ! Le prof m\'a fait attendre pour que tu choisisses en premier.', 'Vas-y, prends-en un. Je prendrai le meilleur des deux restants !'], { speaker: RIVAL_NAME });
     } else if (name === 'gymguide') {
@@ -611,6 +742,7 @@ export class Game {
     this.sound.sfx('item');
     st.flags.dex = true; st.bag['poke-ball'] = (st.bag['poke-ball'] || 0) + 5; st.bag.potion = (st.bag.potion || 0) + 2;
     await ui.say([`${st.name} reçoit le Pokédex, 5 Poké Balls et 2 Potions !`, 'Le Pokédex enregistre chaque Pokémon que tu vois ou captures.', 'Quand tes Pokémon sont fatigués, reviens voir ta mère ou passe au Centre Pokémon.', 'La première Arène se trouve à Sylvebourg, au nord. Bonne route !'], { speaker: 'Prof. Saule' });
+    await ui.say(['Une dernière chose... Une vieille légende raconte que Lugia, le gardien des marées, dort sous la mer, au sud.', 'Ces temps-ci, des gens en uniforme sombre posent beaucoup de questions à son sujet. Sois prudent.'], { speaker: 'Prof. Saule' });
     await ui.say('Je file ! À plus, ' + st.name + ' !', { speaker: RIVAL_NAME });
     if (rival) { await this.npcWalk(rival, 'down', 2); this.npcs = this.npcs.filter((q) => q !== rival); this.view.removeActor('npc:rival-lab'); }
     this.save(true);
@@ -618,6 +750,7 @@ export class Game {
 
   async trigger(name) {
     const st = this.state, p = this.player, ui = this.ui;
+    if (await storyTrigger(this, name)) return true;
     if (name === 'needStarter' && !st.flags.starter) {
       this.busy = true;
       await ui.say(['Hé ! Attends !', 'Les hautes herbes sont pleines de Pokémon sauvages. Sans Pokémon, c\'est bien trop dangereux !', 'Va d\'abord voir le Professeur Saule, à son labo.'], { speaker: '???' });
@@ -660,6 +793,8 @@ export class Game {
     await new Promise((res) => { const pop = this.input.push((k) => { if (k === 'a' || k === 'b') { pop(); res(); } }); });
     s.remove();
     for (const m of st.party) healFull(m);
+    const out = this.world.maps['plateau:ligue'].outside;
+    if (out) await this.warp({ map: 'monde', x: out.x, y: out.y, dir: 'down' });
     this.save(true);
   }
 }

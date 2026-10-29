@@ -2,6 +2,9 @@
 import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
 
+// attaque propre aux Pokémon Obscurs (Lugia Obscur) : n'existe dans aucun jeu officiel sous ce nom
+MOVES[10001] = { id: 10001, key: 'shadow-blast', n: 'Rafale Obscure', t: 'dark', c: 'special', p: 100, a: 100, pp: 10, pr: 0, tg: 10, m: { cat: 0, crit: 1 } };
+
 export const STAT_NAMES = ['PV', 'Attaque', 'Défense', 'Atq. Spé.', 'Déf. Spé.', 'Vitesse'];
 let UID = 1;
 export const setUidBase = (n) => { UID = Math.max(UID, n); };

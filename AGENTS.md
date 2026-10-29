@@ -52,6 +52,11 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage : à lancer quand on touche
   au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`). Les données des Pokémon (`odyssee/js/data/`) sont générées par
   `tools/odyssee-donnees.mjs` à partir des tables de PokeAPI ; les sprites sont chargés depuis PokeAPI (`odyssee/js/assets.js`) : ce sont des remplaçants.
+  Histoire (Team Éclipse, Lugia Obscur, Conseil 4, CS et recoins cachés, quêtes) : posée sur la carte par `odyssee/js/world/story.js`,
+  jouée par `odyssee/js/story.js`. `node tools/test-odyssee-story.mjs` refait toute l'aventure étape par étape (badges, CS, drapeaux)
+  et vérifie qu'on ne peut pas sauter une étape ni se faufiler à côté d'un garde : à lancer quand on touche à la carte ou à l'histoire.
+- Sauvegardes en ligne (`server/saves.js`, client `odyssee/js/net/cloud.js`) : le relais range les parties dans le dépôt GitHub,
+  branche `saves`, sous le code ami du compte Hub. Mise en route sur Render : `docs/SAUVEGARDES.md`. Test : `node tools/test-saves.mjs`.
 - Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`
   la montre en 2D. `node tools/test-royale.mjs` vérifie l'île sur plusieurs graines, le déplacement (portes, escaliers, murs, nage),
   une partie (butin, combat, construction), les copies des invités et le relais d'hôte, la prédiction : à lancer quand on touche

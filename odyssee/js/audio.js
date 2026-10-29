@@ -32,6 +32,11 @@ const THEMES = {
   rival: { key: 'G3', scale: 'harm', bpm: 168, prog: ['i', 'VII', 'VI', 'V', 'i', 'iv', 'VII', 'V'], seed: 161, style: 'battle' },
   victory: { key: 'C4', scale: 'maj', bpm: 132, prog: ['I', 'IV', 'V', 'I'], seed: 171, style: 'anthem' },
   evolution: { key: 'F3', scale: 'maj', bpm: 120, prog: ['I', 'ii', 'IV', 'V'], seed: 181, style: 'gentle' },
+  // Team Éclipse et Lugia Obscur
+  eclipse: { key: 'F3', scale: 'harm', bpm: 166, prog: ['i', 'VI', 'iv', 'V', 'i', 'VII', 'VI', 'V'], seed: 191, style: 'battle' },
+  hideout: { key: 'C3', scale: 'min', bpm: 112, prog: ['i', 'iv', 'VI', 'V', 'i', 'iv', 'VII', 'V'], seed: 195, style: 'mystery' },
+  sanctuary: { key: 'A2', scale: 'min', bpm: 78, prog: ['i', 'VI', 'III', 'VII', 'i', 'iv', 'VI', 'V'], seed: 205, style: 'mystery', soft: 1 },
+  legend: { key: 'B2', scale: 'harm', bpm: 158, prog: ['i', 'VI', 'VII', 'i', 'iv', 'VI', 'V', 'V'], seed: 201, style: 'battle', big: 1 },
 };
 const ROMAN = { I: 0, II: 1, III: 2, IV: 3, V: 4, VI: 5, VII: 6 };
 function chordOf(sym, key, scale) {

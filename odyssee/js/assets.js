@@ -2,12 +2,13 @@
 const params = new URLSearchParams(location.search);
 const BASE = params.get('sprites') || 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites';
 const CRIES = 'https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest';
+const ICONS = { medaillon: 'soothe-bell', 'prism-shard': 'shoal-shell' };
 const HG = BASE + '/pokemon/versions/generation-iv/heartgold-soulsilver';
 export const ASSETS = {
   front: (id, shiny) => `${HG}${shiny ? '/shiny' : ''}/${id}.png`,
   back: (id, shiny) => `${HG}/back${shiny ? '/shiny' : ''}/${id}.png`,
   icon: (id) => `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`,
-  item: (k) => `${BASE}/items/${k}.png`,
+  item: (k) => `${BASE}/items/${ICONS[k] || k}.png`,
   cry: (id) => (params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   trainer: (k) => `../pokemon/assets/trainers/${k}.png`,
   chars: '../pokemon/assets/graphics/chars_overworld.png',

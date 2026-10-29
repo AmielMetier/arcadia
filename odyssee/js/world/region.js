@@ -1,7 +1,8 @@
 // odyssee/js/world/region.js — la région d'Odyssée : 10 villes, 10 routes, 2 grottes, 8 arènes et la Ligue.
 // Les noms de lieux et de personnages sont originaux.
-import { T } from './tiles.js';
+import { T, walkable } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } from './mapgen.js';
+import { addStory } from './story.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap } from './interiors.js';
 
 export const STARTERS = [152, 155, 158];
@@ -45,6 +46,7 @@ const CLS = {
   Gamin: ['youngster', 'youngster', 16], Fillette: ['lass', 'lass', 16], Montagnard: ['hiker', 'hiker', 24], Marin: ['sailor', 'sailor', 24],
   'Topdresseur': ['red', 'calem', 40], 'Topdresseuse': ['cooltrainer_f', 'serena', 40], Scientifique: ['clerk', 'sycamore', 30], Pêcheur: ['sailor', 'sailor', 20],
   Insectomane: ['youngster', 'youngster', 16], Randonneuse: ['lass', 'lass', 20], Médium: ['nurse', 'agatha-gen3', 30], Karatéka: ['hiker', 'hiker', 28],
+  Sbire: ['grunt', 'galacticgrunt', 36], 'Admin Éclipse': ['nyx', 'mars', 60], 'Chef Éclipse': ['boss', 'cyrus', 120], 'Conseil 4': ['hiker', 'bruno', 150],
 };
 const LEADERS = [
   { name: 'Hector', type: 'bug', ow: 'youngster', bs: 'calem', team: [[14, 11], [167, 12], [166, 14]], intro: 'Les insectes ne crient pas : ils observent. Et toi, que vois-tu dans ce combat ?', lose: 'Tu as l\'œil vif ! Le Badge Élytre est à toi.' },
@@ -57,7 +59,7 @@ const LEADERS = [
   { name: 'Drakon', type: 'dragon', ow: 'clerk', bs: 'lance', team: [[148, 46], [148, 47], [230, 48], [149, 50]], intro: 'Les dragons ne s\'inclinent que devant la vraie force. En as-tu ?', lose: 'Les dragons te reconnaissent. Prends le Badge Écaille, le dernier.' },
 ];
 export { LEADERS };
-const CHAMPION = { name: 'Célestine', ow: 'cooltrainer_f', bs: 'cynthia', team: [[94, 52], [131, 52], [242, 51], [130, 54], [248, 55]], intro: 'Huit badges... Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
+export const CHAMPION = { name: 'Célestine', ow: 'cooltrainer_f', bs: 'cynthia', team: [[94, 52], [131, 52], [242, 51], [130, 54], [248, 55]], intro: 'Huit badges... Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
 
 let tCount = 0;
 function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
@@ -224,7 +226,7 @@ export function buildWorld() {
     npcs: [
       { id: 'marin', x: 17, y: 5, sprite: 'sailor', move: 'turn', text: ['Ahoy ! Ce ponton était le départ des ferries.', 'Depuis la tempête, plus aucun bateau ne part...'] },
       { id: 'pecheur', x: 25, y: 5, sprite: 'sailor', move: 'wander', text: ['Les Krabby pincent fort, méfie-toi en marchant sur la plage.'] },
-      { id: 'garde', x: 32, y: 18, sprite: 'sailor', dir: 'left', gate: { badges: 3, tiles: [[33, 19], [33, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut trois badges pour l\'emprunter.'] },
+      { id: 'garde', x: 31, y: 18, sprite: 'sailor', dir: 'right', gate: { badges: 3, tiles: [[33, 19], [33, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut trois badges pour l\'emprunter.'] },
     ],
   };
   buildTown(W, maps, D);
@@ -268,7 +270,7 @@ export function buildWorld() {
     ],
     npcs: [
       { id: 'jardiniere', x: 12, y: 13, sprite: 'lass', move: 'wander', text: ['Bienvenue à Floralia ! Respire ce parfum...'] },
-      { id: 'garde', x: 34, y: 18, sprite: 'sailor', dir: 'left', gate: { badges: 5, tiles: [[35, 19], [35, 20]] }, text: ['La route 6 traverse des terres sauvages.', 'Il faut cinq badges pour continuer.'] },
+      { id: 'garde', x: 33, y: 18, sprite: 'sailor', dir: 'right', gate: { badges: 5, tiles: [[35, 19], [35, 20]] }, text: ['La route 6 traverse des terres sauvages.', 'Il faut cinq badges pour continuer.'] },
     ],
   };
   buildTown(W, maps, F);
@@ -327,7 +329,7 @@ export function buildWorld() {
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'hiker', text: ['La route 10 relie Cimelune à Bourg-Aube, par le sud.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
     npcs: [
-      { id: 'garde', x: 12, y: 2, sprite: 'sailor', dir: 'down', gate: { badges: 8, tiles: [[10, 1], [11, 1]] }, text: ['Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.'] },
+      { id: 'garde', x: 12, y: 2, sprite: 'sailor', dir: 'down', gate: { badges: 8, until: 'lugia', tiles: [[10, 1], [11, 1]] }, script: 'victoireGate' },
     ],
   };
   buildTown(W, maps, I);
@@ -496,10 +498,8 @@ export function buildWorld() {
     });
     g.npc({ id: g.id + ':leader', x: 7, y: 3, dir: 'down', sprite: L.ow, leader: t.gym, trainer: { cls: t.gym === 0 || t.gym === 1 || t.gym === 6 || t.gym === 7 ? 'Champion' : 'Championne', name: L.name, team: L.team, prize: 100, bs: L.bs, ai: 'smart', items: { 'super-potion': t.gym < 4 ? 1 : 0, 'hyper-potion': t.gym >= 4 ? 2 : 0 }, intro: L.intro, lose: L.lose, sight: 0 } });
   }
-  // Ligue : la Championne
-  const league = maps['plateau:ligue'];
-  league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.bs, ai: 'smart', items: { 'full-restore': 2 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
-  league.npc({ id: 'ligue-garde', x: 5, y: 15, sprite: 'clerk', dir: 'right', text: ['Bienvenue à la Ligue Céleste.', 'La Maître t\'attend au bout du tapis. Bonne chance !'] });
+  // Ligue : Conseil 4 puis la Maître (voir story.js)
+  maps['plateau:ligue'].npc({ id: 'ligue-garde', x: 5, y: 15, sprite: 'clerk', dir: 'right', text: ['Bienvenue à la Ligue Céleste.', 'Le Conseil 4 t\'attend : quatre dresseurs d\'élite, l\'un après l\'autre.', 'Bats-les tous, et la Maître te recevra. Bonne chance !'] });
 
   // Labo : professeur, assistant
   const lab = maps['aube:labo'];
@@ -507,7 +507,28 @@ export function buildWorld() {
   lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'clerk', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs Pokémon.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
   STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp }));
 
+  addStory({ W, maps, towns, routes: { r1, r2, bois, r3a, r3b, r4, r5, r6, r7, r8, r9, r10 }, trainerNpc, champion: CHAMPION });
+  sealGates(W);
+
   return { maps, towns, routes, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
+}
+
+/** un garde bloque toute la largeur du passage : le bord irrégulier des routes ouvrait parfois une case à côté */
+function sealGates(W) {
+  for (const g of W.gates) {
+    if (g.tiles.length < 2) continue;
+    const vert = g.tiles.every(([x]) => x === g.tiles[0][0]), horiz = g.tiles.every(([, y]) => y === g.tiles[0][1]);
+    if (!vert && !horiz) continue;
+    const has = (x, y) => g.tiles.some(([a, b]) => a === x && b === y);
+    // seulement pour les gardes postés à la lisière d'une ville, là où arrive la route
+    const [gx, gy] = g.tiles[0], z = W.zones.find((q) => q.town && gx >= q.x0 && gx <= q.x1 && gy >= q.y0 && gy <= q.y1);
+    if (!z || (vert ? Math.min(Math.abs(gx - z.x0), Math.abs(gx - z.x1)) : Math.min(Math.abs(gy - z.y0), Math.abs(gy - z.y1))) > 1) continue;
+    const [dx, dy] = vert ? [0, 1] : [1, 0];
+    const lo = g.tiles.reduce((a, t) => (vert ? (t[1] < a[1] ? t : a) : (t[0] < a[0] ? t : a))), hi = g.tiles.reduce((a, t) => (vert ? (t[1] > a[1] ? t : a) : (t[0] > a[0] ? t : a)));
+    for (let k = 1; k <= 4; k++) { const x = lo[0] - dx * k, y = lo[1] - dy * k; if (!walkable(W.get(x, y)) || has(x, y)) break; g.tiles.push([x, y]); }
+    for (let k = 1; k <= 4; k++) { const x = hi[0] + dx * k, y = hi[1] + dy * k; if (!walkable(W.get(x, y)) || has(x, y)) break; g.tiles.push([x, y]); }
+    const n = W.npcs.find((q) => q.id === g.npc); if (n?.gate) n.gate.tiles = g.tiles;
+  }
 }
 
 function caveTrainers(m, list, seed) {

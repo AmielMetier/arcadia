@@ -8,6 +8,35 @@ export const EL = 55 * Math.PI / 180, FOV = 26;
 export const WPX = Math.sin(EL) / 16, HPX = Math.tan(EL) / 16; // unités monde par pixel de sprite (largeur, hauteur)
 const CH = 16;
 export const CHAR_ROWS = { red: 0, green: 1, prof: 2, nurse: 3, clerk: 4, youngster: 5, lass: 6, sailor: 7, hiker: 8, cooltrainer_f: 9 };
+// tenues de la Team Éclipse : recoloriées à partir des lignes existantes (ligne source, teintes sombre → claire)
+const RECOLOR = [
+  ['grunt', 4, ['#1c1a28', '#3e3a56', '#6e6894']], ['gruntf', 6, ['#1c1a28', '#3e3a56', '#6e6894']],
+  ['nyx', 9, ['#3a0c24', '#8a2050', '#d05a8a']], ['erebe', 7, ['#101c34', '#2a4a7a', '#5e8ac0']],
+  ['boss', 2, ['#0c0814', '#2e2050', '#6a54a0']], ['lumen', 4, ['#3a4a3a', '#7aa07a', '#c8e8c0']],
+];
+/** planche des personnages + lignes recoloriées (peau, contours et reflets conservés) */
+export function extendChars(img) {
+  const W = 288, H0 = 320, c = document.createElement('canvas'); c.width = W; c.height = H0 + RECOLOR.length * 32;
+  const x = c.getContext('2d'); if (img) x.drawImage(img, 0, 0);
+  if (!img) return c;
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  RECOLOR.forEach(([name, src, pal], k) => {
+    const d = x.getImageData(0, src * 32, W, 32), P = pal.map(hex);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2];
+      if (d.data[i + 3] < 10) continue;
+      const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      const skin = r > 150 && g > 95 && b > 60 && r > g && g > b && r - b > 40 && r - b < 150;
+      if (skin || lum < 46 || lum > 236) continue;
+      const u = Math.min(1, Math.max(0, (lum - 46) / 170)), [a, m2, z] = P;
+      const mix = u < 0.5 ? a.map((v, j) => v + (m2[j] - v) * u * 2) : m2.map((v, j) => v + (z[j] - v) * (u - 0.5) * 2);
+      d.data[i] = mix[0]; d.data[i + 1] = mix[1]; d.data[i + 2] = mix[2];
+    }
+    x.putImageData(d, 0, H0 + k * 32);
+    CHAR_ROWS[name] = 10 + k;
+  });
+  return c;
+}
 const DIR_COL = { down: 0, left: 1, right: 2, up: 3 };
 
 function tex(canvasOrImg) {
@@ -61,7 +90,7 @@ export class WorldView {
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 1, 400);
     const A = buildAtlas(), N = buildAnimAtlas(), S = buildSprites();
     this.A = A; this.N = N; this.S = S;
-    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(charsImg);
+    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); const sheet = extendChars(charsImg); this.charsH = sheet.height; this.texC = tex(sheet);
     const mk = (map, o = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...o });
     this.mat = {
       ground: mk(this.texA), anim: mk(this.texN), sprite: mk(this.texS, { alphaTest: 0.5, side: THREE.DoubleSide }),
@@ -114,7 +143,7 @@ export class WorldView {
     if (deco?.k === 'carpet') return { c: A.mat };
     const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
     switch (tt) {
-      case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: return { c: A[grassKey] };
+      case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.BOULDER: return { c: A[grassKey] };
       case T.TALL: return { c: A['tall' + (v < 0.5 ? 0 : 1)] };
       case T.DARKTALL: return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : A['forest' + (v < 0.5 ? 0 : 1)] };
@@ -149,7 +178,11 @@ export class WorldView {
       if (g.bridge) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.06, g.bridge);
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
       // décor en volume
-      if (t === T.TREE || t === T.PINE) {
+      const nb = m.get(x, y - 1);
+      if ((t === T.TREE || t === T.PINE) && (nb === T.BUSH || nb === T.BOULDER)) {
+        // juste devant un petit arbre ou un rocher : un buisson bas, pour qu'on voie l'obstacle
+        const r = S.bush; billboard(P, x + 0.5, y + 0.66, r.w * WPX * 1.3, r.h * HPX * 1.2, r);
+      } else if (t === T.TREE || t === T.PINE) {
         let key = t === T.PINE ? 'pine' : v < 0.7 ? 'tree' : 'tree2';
         if (theme === 'volcanic') key = 'deadtree';
         const r = S[key];
@@ -160,7 +193,8 @@ export class WorldView {
         billboard(P, x + 0.5, y + 0.93, 1.02, r.h * HPX, r, 0, v > 0.5);
       } else if (t === T.FENCE) { const r = S.fence; billboard(P, x + 0.5, y + 0.55, 1.0, r.h * HPX, r); }
       else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, r.w * WPX * 1.2, r.h * HPX, r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
-      else if (t === T.BUSH) { const r = S.bush; billboard(P, x + 0.5, y + 0.6, r.w * WPX * 1.2, r.h * HPX, r); }
+      else if (t === T.BUSH) { const r = S.cuttree; billboard(P, x + 0.5, y + 0.7, r.w * WPX * 1.3, r.h * HPX * 1.3, r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
+      else if (t === T.BOULDER) { const r = S.rock; billboard(P, x + 0.5, y + 0.62, r.w * WPX * 1.7, r.h * HPX * 1.6, r); flat(Sh, x - 0.05, y + 0.35, x + 1.05, y + 0.9, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.WALL) {
         // mur du fond en volume ; murs latéraux et bas réduits à une bordure sombre, comme sur DS
         if (y <= 1) { const south = m.get(x, y + 1) !== T.WALL; box(Wl, x, y, x + 1, y + 1, wallH, A[m.wallStyle] || A.wall_in, A.walltop, A.walltop, { south, east: false, west: false }); }
@@ -203,6 +237,27 @@ export class WorldView {
     }
     // les morceaux éloignés sont masqués
     for (const [kk, g] of this.chunks) { const [i, j] = kk.split(',').map(Number); g.visible = Math.abs(i - ci) <= 2 && Math.abs(j - cj) <= 2; }
+  }
+
+  /** reconstruit les morceaux de carte qui contiennent ces tuiles (arbre coupé, rocher poussé…) */
+  refreshTiles(list) {
+    const ks = new Set();
+    for (const [x, y] of list) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) ks.add(Math.floor((x + dx) / CH) + ',' + Math.floor((y + dy) / CH));
+    for (const k of ks) { const g = this.chunks.get(k); if (!g) continue; this.root.remove(g); g.traverse((o) => o.geometry?.dispose()); this.chunks.delete(k); }
+    this.lastChunk = null;
+  }
+  /** grand sprite à part (Pokémon légendaire sur la carte) : image ou canvas, pieds en bas */
+  imageActor(id, img, wPx, hPx) {
+    let a = this.actors.get(id); if (a) return a;
+    const t = tex(img), mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.4, side: THREE.DoubleSide });
+    const geo = new THREE.PlaneGeometry(wPx * WPX, hPx * HPX); geo.translate(0, hPx * HPX / 2, 0);
+    const uv = geo.attributes.uv; for (let i = 0; i < 4; i++) uv.setY(i, 1 - uv.getY(i));
+    const mesh = new THREE.Mesh(geo, mat); this.root.add(mesh);
+    const S = this.S.rects.shadow, sg = new THREE.PlaneGeometry(2.2, 1); sg.rotateX(-Math.PI / 2);
+    const su = sg.attributes.uv; for (let i = 0; i < 4; i++) su.setXY(i, i % 2 ? S.u1 : S.u0, i < 2 ? S.v0 : S.v1);
+    const shadow = new THREE.Mesh(sg, this.mat.shadow); shadow.renderOrder = 1; this.root.add(shadow);
+    a = { mesh, shadow, kind: 'image', dispose: () => { geo.dispose(); sg.dispose(); t.dispose(); mat.dispose(); this.root?.remove(mesh); this.root?.remove(shadow); } };
+    this.actors.set(id, a); return a;
   }
 
   /* ---------------- bâtiments ---------------- */
@@ -315,7 +370,7 @@ export class WorldView {
   setFrame(a, sprite, dir, step) {
     const row = CHAR_ROWS[sprite] ?? 0, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
     const k = row * 100 + col; if (a.frame === k) return; a.frame = k;
-    const u0 = col * 24 / 288, u1 = (col + 1) * 24 / 288, v0 = row * 32 / 320, v1 = (row + 1) * 32 / 320;
+    const u0 = col * 24 / 288, u1 = (col + 1) * 24 / 288, v0 = row * 32 / this.charsH, v1 = (row + 1) * 32 / this.charsH;
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
@@ -350,7 +405,8 @@ export class WorldView {
   }
   applyTint(c) {
     const indoorOrCave = !this.map?.outdoor;
-    const k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : c;
+    // l'Éclipse : nuit violette sur toute la région
+    const k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : this.eclipse ? [0.3, 0.17, 0.44] : c;
     this.tint.setRGB(k[0], k[1], k[2]);
     for (const m of this.tinted) { const base = m.userData.base; if (base) m.color.copy(base).multiply(this.tint); else m.color.copy(this.tint); }
     if (this.nightGroup) this.nightGroup.visible = !indoorOrCave && this.night > 0.5;

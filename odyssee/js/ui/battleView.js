@@ -1,4 +1,5 @@
 // odyssee/js/ui/battleView.js — scène de combat façon HeartGold/SoulSilver : décor, socles, sprites, effets, barres de PV
+import { shadowCanvas } from '../render/shadow.js';
 import { el, esc, wait } from './ui.js';
 import { SPECIES } from '../data/species.js';
 import { MOVES } from '../data/moves.js';
@@ -278,6 +279,7 @@ export class BattleView {
     const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me;
     o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny) : ASSETS.back(m.sp, m.shiny));
     o.whiteImg = null; o.darkImg = null;
+    if (o.img && m.shadow) o.img = shadowCanvas(o.img);
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
   close() { this.alive = false; this.root?.remove(); this.ui.closeDialog(); }
