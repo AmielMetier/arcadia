@@ -70,6 +70,8 @@ export function layupPoint(hole, b, reach) {
       for (const [ox, oz] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) { const t = hole.surfaceAt(x + ox, z + oz); if (t === 'water' || t === 'ob') wet++; }
       // un coup un peu court ne doit pas finir à l'eau
       for (const k of [0.84, 0.92]) { const t = hole.surfaceAt(b.x + (x - b.x) * k, b.z + (z - b.z) * k); if (t === 'water' || t === 'ob') wet += 3; }
+      // ni la balle qui roule après la chute (un torrent, un ravin juste derrière le point visé)
+      for (const m of [8, 16]) { const t = hole.surfaceAt(x + (x - b.x) / r * m, z + (z - b.z) / r * m); if (t === 'water') wet += 2; }
       // survoler le hors-limites, c'est survoler la forêt : les arbres arrêtent la balle
       for (const k of [0.4, 0.55, 0.7]) if (hole.surfaceAt(b.x + (x - b.x) * k, b.z + (z - b.z) * k) === 'ob') wet += 1.5;
       const score = r + BONUS[s] - wet * 45;

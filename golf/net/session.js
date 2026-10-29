@@ -13,13 +13,18 @@
 //                   { t:'seen', no }                            « j'ai fini de regarder le coup no »
 //                   { t:'ready', no }                           « je vois le tour no (prêt à regarder le prochain coup) »
 //                   { t:'away', on }                            page cachée / revenue
-//                   { t:'sync' }                                « renvoie-moi l'état »
+//                   { t:'sync', no, g }                         « renvoie-moi l'état » (no, g : coup et partie que j'affiche)
 //   hôte → tous :   { t:'setup', set }                          réglages choisis par l'hôte au menu (avant la partie)
 //                   { t:'menu', set }                           retour au menu (l'hôte va changer de parcours)
 //                   { t:'st', R }                               état de la partie (après chaque coup animé)
 //                   { t:'shot', ev }                            un coup vient d'être joué (paramètres + résultat)
 //                   { t:'pose', id, aim, club, back }           posture du joueur qui joue
 //                   { t:'note', text, id? }                     message à afficher (à un joueur, ou à tous)
+//                   { t:'hello' }                               « te revoilà » (après une coupure ou un changement d'hôte)
+//
+// Changement d'hôte : si l'hôte perd sa place, le salon passe à un invité, qui reprend la partie depuis le dernier état
+// reçu. Les autres le rejoignent un par un : un joueur absent du salon garde sa place GONE_MS avant d'être compté comme
+// parti, et chacun reçoit l'état dès qu'il réapparaît. Un invité qui n'entend plus rien de l'hôte redemande l'état.
 import { HOLES, buildHole, windFor, COURSES } from '../engine/course.js';
 import { simulate } from '../engine/physics.js';
 import { newRound, startHole, applyShot, holeOver, finishHole, leave, ranking, MAX_STROKES } from '../engine/rules.js';
@@ -42,6 +47,10 @@ const WIND = { calme: 0, normal: 1, fort: 1.6 };
 const hiddenNow = () => typeof document !== 'undefined' && document.hidden;
 // joueur humain qui ne joue pas : rappel, puis coup joué pour lui (plus vite si sa page est cachée)
 const TURN_HURRY_MS = 45000, TURN_MS = 60000, AWAY_TURN_MS = 20000;
+// joueur sorti du salon (coupure, changement d'hôte) : sa place est gardée ce temps-là avant qu'il ne soit compté parti
+const GONE_MS = 90000;
+// invité sans nouvelles de l'hôte pendant ce temps en pleine partie : il redemande l'état
+const QUIET_MS = 12000;
 
 // balle d'entrée de la simulation (posée sur son tee au départ)
 export function simBall(hole, b) { return { x: b.x, z: b.z, lie: b.lie, y: hole.heightAt(b.x, b.z) + (b.lie === 'tee' ? 0.04 : 0.021) }; }
@@ -50,18 +59,23 @@ export function simBall(hole, b) { return { x: b.x, z: b.z, lie: b.lie, y: hole.
 // speed : accélère les délais (tests hors navigateur)
 export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial = null, speed = 1 }) {
   let settings = { ...set0 };
-  let R = initial ? clone(initial) : null, busy = false, reported = false, ended = false;
+  let R = initial ? clone(initial) : null, busy = false, reported = false, ended = false, stopped = false;
+  let lastPub = null, lastEv = null; // dernier état diffusé, dernier coup joué (pour qui revient ou redemande)
   const timers = new Set();
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms / speed); timers.add(t); return t; };
   const send = (m, vol) => { if (!solo) bridge.send('all', m, vol ? { volatile: true } : undefined); };
   const publish = () => {
-    const s = clone(R); emit({ type: 'state', R: s }); send({ t: 'st', R: s });
+    const s = clone(R); lastPub = s; emit({ type: 'state', R: s }); send({ t: 'st', R: s });
     if (hiddenNow()) vote('ready', R.shotNo, me.id);
     watchTurn();
   };
 
   // absent : page cachée, ou connexion coupée (le salon lui garde sa place le temps qu'il revienne)
-  const absent = (id) => id !== me.id && (away.has(id) || (!solo && !!bridge.players.find((q) => q.id === id)?.away));
+  const absent = (id) => {
+    if (id === me.id || solo) return id !== me.id && away.has(id);
+    const q = bridge.players.find((p) => p.id === id);
+    return away.has(id) || !q || !!q.away;
+  };
   // qui regarde la partie : les joueurs humains encore là et présents, l'hôte compris
   const viewers = () => R.players.filter((p) => !p.bot && !p.left && (solo || p.id === me.id || bridge.players.some((q) => q.id === p.id)) && !absent(p.id)).map((p) => p.id);
   // votes : « vu » (fin de l'animation d'un coup), « prêt » (le tour est affiché) ; par numéro de coup
@@ -81,6 +95,7 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
     for (const t of timers) clearTimeout(t);
     timers.clear(); turnT = []; botWait = null; busy = false;
     votes.seen.clear(); votes.ready.clear();
+    gone.clear(); lastPub = null; lastEv = null;
   }
   function begin() {
     clear(); ended = false; reported = false;
@@ -124,7 +139,7 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
     const before = P.strokes;
     const out = applyShot(R, hole, i, { kind: res.kind, end: res.end, surf: res.surf });
     const ev = { no: R.shotNo - 1, i, pid, params, putt, from, res: { kind: res.kind, end: res.end, surf: res.surf, n: res.n, dist: res.dist }, out, strokes: P.strokes, before };
-    busy = true; stopTurn();
+    busy = true; stopTurn(); lastEv = ev;
     emit({ type: 'shot', ev });
     send({ t: 'shot', ev });
     if (hiddenNow()) vote('seen', ev.no, me.id);
@@ -180,10 +195,11 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
     }
   }
   function ready(no, id) {
+    const fresh = !(votes.ready.get(no) && votes.ready.get(no).has(id)); // (un « prêt » redit ne relance pas le compte)
     vote('ready', no, id);
     if (botWait && botWait.no === no && everyone('ready', no)) botWait.go();
     // son tour s'affiche enfin chez lui (après la carte de score et le survol) : le compte part de là
-    if (R && no === R.shotNo && R.players[R.turn]?.id === id && !busy) watchTurn();
+    if (fresh && R && no === R.shotNo && R.players[R.turn]?.id === id && !busy) watchTurn();
   }
 
   // joueur humain à son tour : rappel au bout de 45 s sans rien faire, puis coup joué pour lui à 60 s (20 s si sa page
@@ -240,11 +256,20 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
     } catch (e) { console.warn(e); }
   }
 
+  // un invité redemande où en est la partie (no, g : le coup et la partie qu'il affiche). Pas encore de partie : les
+  // réglages du menu. Un coup en cours : l'état d'avant le coup s'il ne l'a pas, puis le coup ; sinon l'état.
+  function syncTo(id, no, g) {
+    if (!R) return bridge.send(id, { t: 'setup', set: settings });
+    const st = lastPub || (lastPub = clone(R));
+    const shown = busy && lastEv && no === st.shotNo && g === st.started;
+    if (!shown) bridge.send(id, { t: 'st', R: st });
+    if (busy && lastEv) bridge.send(id, { t: 'shot', ev: lastEv });
+  }
+
   // messages des invités
   const onMsg = (from, m) => {
-    if (!m || typeof m !== 'object') return;
-    // pas encore de partie : l'invité voit les réglages du menu
-    if (m.t === 'sync') bridge.send(from, R ? { t: 'st', R: clone(R) } : { t: 'setup', set: settings });
+    if (stopped || !m || typeof m !== 'object') return;
+    if (m.t === 'sync') syncTo(from, m.no, m.g);
     else if (m.t === 'shot') shot(from, m);
     else if (m.t === 'seen') seen(m.no | 0, from);
     else if (m.t === 'ready') ready(m.no | 0, from);
@@ -256,18 +281,40 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
     }
   };
   if (!solo) bridge.on('msg', onMsg);
-  // un joueur quitte le salon : il ne joue plus
-  if (!solo) bridge.on('roster', () => {
-    if (!R || R.phase === 'over') return;
-    let changed = false;
-    for (const p of R.players) if (!p.bot && !p.left && !bridge.players.some((q) => q.id === p.id)) { leave(R, currentHole(R), p.id); changed = true; }
-    if (!changed) return recheck(); // peut-être une absence ou un retour
+  // le salon change. Qui réapparaît (retour de coupure, ou arrivée chez le nouvel hôte) est salué : il redemande l'état.
+  // Qui n'est plus dans le salon garde sa place GONE_MS (il revient peut-être, l'hôte vient peut-être de changer) ;
+  // en attendant, on ne l'attend pas et son coup part tout seul. Passé ce délai, il ne joue plus.
+  const gone = new Map();
+  const here = () => new Set(bridge.players.filter((q) => !q.away).map((q) => q.id));
+  let present = solo ? new Set() : here();
+  function drop(id) {
+    gone.delete(id);
+    if (stopped || !R || R.phase !== 'play' || bridge.players.some((q) => q.id === id)) return;
+    const p = R.players.find((q) => q.id === id);
+    if (!p || p.left) return;
+    leave(R, currentHole(R), id);
     // ceux qui restent ont peut-être déjà tout vu
     if (busy) { if (everyone('seen', R.shotNo - 1)) advance(R.shotNo - 1); return; }
     if (holeOver(R)) { busy = true; advance(R.shotNo - 1); } else { publish(); scheduleBot(); }
-  });
+  }
+  function onRoster() {
+    if (stopped) return;
+    const now = here();
+    for (const id of now) if (id !== me.id && !present.has(id)) bridge.send(id, { t: 'hello' });
+    present = now;
+    if (!R || R.phase === 'over') return;
+    for (const p of R.players) {
+      if (p.bot || p.left || p.id === me.id) continue;
+      const inRoom = bridge.players.some((q) => q.id === p.id);
+      if (inRoom && gone.has(p.id)) { const t = gone.get(p.id); clearTimeout(t); timers.delete(t); gone.delete(p.id); }
+      else if (!inRoom && !gone.has(p.id)) { const id = p.id; gone.set(id, later(() => drop(id), GONE_MS)); }
+    }
+    recheck(); // absence ou retour : on n'attend plus les absents, le compte du joueur dont c'est le tour s'adapte
+  }
+  if (!solo) bridge.on('roster', onRoster);
 
-  if (R) { busy = false; publish(); scheduleBot(); }
+  // reprise d'une partie (changement d'hôte) : les absents gardent leur place le temps de revenir
+  if (R) { busy = false; if (!solo) onRoster(); publish(); scheduleBot(); }
   return {
     get state() { return R; }, isHost: true,
     begin,
@@ -285,26 +332,54 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
       if (on && R) { ready(R.shotNo, me.id); if (busy) seen(R.shotNo - 1, me.id); }
     },
     resync() {},
-    stop() { for (const t of timers) clearTimeout(t); timers.clear(); R = null; },
+    stop() { stopped = true; for (const t of timers) clearTimeout(t); timers.clear(); R = null; },
   };
 }
 
 // ------------------------------------------------------------------ invité
 export function startClient({ bridge, me, emit }) {
   let R = null, gotState = false, gotSetup = false, lastShot = -1, alive = true, tick = 0;
-  // on redemande l'état tant qu'on ne l'a pas ; au menu, de temps en temps (au cas où le départ se serait perdu)
-  const ask = setInterval(() => { if (!gotState && (!gotSetup || ++tick % 4 === 0)) bridge.send('host', { t: 'sync' }); }, 1500);
-  bridge.send('host', { t: 'sync' });
+  // readyNo, seenNo : derniers « prêt » et « vu » envoyés (renvoyés si l'hôte a changé ou les a perdus)
+  let heard = Date.now(), asked = 0, readyNo = -1, seenNo = -1;
+  let hostId = bridge.info ? bridge.info.hostId : null;
+  const sync = () => { asked = Date.now(); bridge.send('host', { t: 'sync', no: R ? R.shotNo : -1, g: R ? R.started : 0 }); };
+  // on redemande l'état tant qu'on ne l'a pas ; au menu, de temps en temps (au cas où le départ se serait perdu) ;
+  // en pleine partie, quand l'hôte ne donne plus de nouvelles (coupure, changement d'hôte)
+  const ask = setInterval(() => {
+    if (!alive) return;
+    if (!gotState) { if (!gotSetup || ++tick % 4 === 0) sync(); return; }
+    const now = Date.now();
+    if (R && R.phase === 'play' && now - heard > QUIET_MS && now - asked > 5000) sync();
+  }, 1500);
+  sync();
+  // l'hôte a changé : on se présente au nouveau
+  bridge.on('roster', () => {
+    const h = bridge.info ? bridge.info.hostId : null;
+    if (!alive || h == null || h === hostId) return;
+    hostId = h; heard = Date.now(); sync();
+  });
   bridge.on('msg', (from, m) => {
     if (!alive || !m || typeof m !== 'object') return;
+    heard = Date.now();
     if (m.t === 'st' && m.R) {
+      // le même état qu'on affiche déjà (l'hôte le renvoie) : rien à rejouer, on redit juste où on en est
+      if (R && lastShot < R.shotNo && JSON.stringify(R) === JSON.stringify(m.R)) {
+        if (readyNo === R.shotNo) bridge.send('host', { t: 'ready', no: R.shotNo });
+        return;
+      }
+      // nouvelle partie, ou nouvel hôte reparti d'un état d'avant le dernier coup vu : les coups reprennent de là
+      if (!R || R.started !== m.R.started) lastShot = -1;
+      else if (m.R.shotNo <= lastShot) lastShot = m.R.shotNo - 1;
       gotState = true; R = m.R; emit({ type: 'state', R: m.R });
-      if (hiddenNow()) bridge.send('host', { t: 'ready', no: R.shotNo }); // page cachée : personne ne m'attend
+      if (hiddenNow()) { readyNo = R.shotNo; bridge.send('host', { t: 'ready', no: R.shotNo }); } // page cachée : personne ne m'attend
     } else if (m.t === 'shot' && m.ev) {
+      // coup déjà reçu (renvoyé par l'hôte) : si on a fini de le regarder, on le redit
+      if (m.ev.no <= lastShot) { if (seenNo >= m.ev.no) bridge.send('host', { t: 'seen', no: m.ev.no }); return; }
       lastShot = m.ev.no; emit({ type: 'shot', ev: m.ev });
-      if (hiddenNow()) bridge.send('host', { t: 'seen', no: m.ev.no });
-    } else if (m.t === 'setup' && !R && m.set && typeof m.set === 'object') { gotSetup = true; emit({ type: 'setup', set: m.set }); }
-    else if (m.t === 'menu') { R = null; gotState = false; gotSetup = true; emit({ type: 'menu', set: m.set && typeof m.set === 'object' ? m.set : {} }); }
+      if (hiddenNow()) { seenNo = m.ev.no; bridge.send('host', { t: 'seen', no: m.ev.no }); }
+    } else if (m.t === 'hello') sync();
+    else if (m.t === 'setup' && !R && m.set && typeof m.set === 'object') { gotSetup = true; emit({ type: 'setup', set: m.set }); }
+    else if (m.t === 'menu') { R = null; gotState = false; gotSetup = true; lastShot = readyNo = seenNo = -1; emit({ type: 'menu', set: m.set && typeof m.set === 'object' ? m.set : {} }); }
     else if (m.t === 'pose' && m.id !== me.id) emit({ type: 'pose', ...m });
     else if (m.t === 'note' && typeof m.text === 'string') emit({ type: 'note', text: m.text.slice(0, 120) });
   });
@@ -314,13 +389,16 @@ export function startClient({ bridge, me, emit }) {
     begin() {},
     shot: (p) => bridge.send('host', { t: 'shot', no: R ? R.shotNo : 0, ...p }),
     pose: (p) => { const now = performance.now(); if (now - lastPose < 90) return; lastPose = now; bridge.send('host', { t: 'pose', ...p }, { volatile: true }); },
-    done: (no) => bridge.send('host', { t: 'seen', no }),
-    ready: (no) => bridge.send('host', { t: 'ready', no }),
+    done: (no) => { seenNo = Math.max(seenNo, no); bridge.send('host', { t: 'seen', no }); },
+    ready: (no) => { readyNo = no; bridge.send('host', { t: 'ready', no }); },
     away(on) {
       bridge.send('host', { t: 'away', on });
-      if (on) { if (R) bridge.send('host', { t: 'ready', no: R.shotNo }); if (lastShot >= 0) bridge.send('host', { t: 'seen', no: lastShot }); }
+      if (on) {
+        if (R) { readyNo = R.shotNo; bridge.send('host', { t: 'ready', no: R.shotNo }); }
+        if (lastShot >= 0) { seenNo = Math.max(seenNo, lastShot); bridge.send('host', { t: 'seen', no: lastShot }); }
+      }
     },
-    resync: () => bridge.send('host', { t: 'sync' }),
+    resync: sync,
     stop() { alive = false; clearInterval(ask); },
   };
 }

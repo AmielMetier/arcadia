@@ -38,15 +38,18 @@ const FM = 6, SG = 6, SB = 3, STRIPE = 22; // plages des distances encodées (m)
 async function distanceMap(hole, pace) {
   const B = hole.bounds, M = 70;
   const area = { x0: B.x0 - M, z0: B.z0 - M, x1: B.x1 + M, z1: B.z1 + M };
-  const W = Math.ceil((area.x1 - area.x0) / PX), H = Math.ceil((area.z1 - area.z0) / PX);
+  // très longs trous : un peu moins fine (au plus 1,3 million de texels, 4096 de côté), sinon le calcul traîne
+  const aw = area.x1 - area.x0, ah = area.z1 - area.z0;
+  const px = Math.max(PX, Math.sqrt(aw * ah / 1.3e6), Math.max(aw, ah) / 4096);
+  const W = Math.ceil((area.x1 - area.x0) / px), H = Math.ceil((area.z1 - area.z0) / px);
   const data = new Uint8Array(W * H * 4);
   const G = hole.green, rG = Math.min(G.rx, G.rz);
   const enc = (v, r) => Math.round(255 * Math.min(1, Math.max(0, (v + r) / (2 * r))));
   for (let j = 0; j < H; j++) {
     await pace();
-    const z = area.z0 + (j + 0.5) * PX;
+    const z = area.z0 + (j + 0.5) * px;
     for (let i = 0; i < W; i++) {
-      const x = area.x0 + (i + 0.5) * PX;
+      const x = area.x0 + (i + 0.5) * px;
       const f = hole.fields(x, z), k = (j * W + i) * 4;
       data[k] = enc(f.fm, FM);
       data[k + 1] = enc((1 - f.gd) * rG, SG);

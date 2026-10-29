@@ -7,6 +7,8 @@
 // En équipes (scramble) : chaque coéquipier joue depuis la balle de l'équipe ; une fois que tous ont joué (ou dès
 // que l'un d'eux a rentré la balle), on garde la meilleure, toute l'équipe repart de là, et l'équipe compte un coup.
 export const MAX_STROKES = 10; // au-delà, la balle est ramassée
+// sur les très longs trous (par 6 et plus), on laisse un peu plus de marge : par + 5
+export const maxStrokes = (par) => Math.max(MAX_STROKES, (par | 0) + 5);
 
 // teams : [{ name, color }] ; chaque joueur porte l'indice de son équipe (team)
 export function newRound({ holes, players, seed = 1, wind = 1, teams = null }) {
@@ -87,7 +89,7 @@ function resolveTeam(R, hole, k, out) {
     p.strokes = strokes; p.played = false; p.pending = null;
     if (r.holed) { p.done = true; p.ball = { x: hole.pin.x, z: hole.pin.z, lie: 'green' }; }
     else p.ball = { ...r.ball };
-    if (!p.done && p.strokes >= MAX_STROKES) { p.done = true; p.strokes = MAX_STROKES; out.pickedUp = true; }
+    if (!p.done && p.strokes >= maxStrokes(hole.par)) { p.done = true; p.strokes = maxStrokes(hole.par); out.pickedUp = true; }
   }
   out.best = best.i; out.resolved = true; out.holed = r.holed;
   return best.i;
@@ -116,7 +118,8 @@ export function applyShot(R, hole, i, res) {
   if (res.kind === 'holed') { p.done = true; out.holed = true; p.ball = { x: hole.pin.x, z: hole.pin.z, lie: 'green' }; }
   else if (res.kind === 'water' || res.kind === 'ob') { p.strokes++; out.penalty = 1; p.ball = from; } // on rejoue du même endroit
   else p.ball = { x: res.end.x, z: res.end.z, lie: res.surf };
-  if (!p.done && p.strokes >= MAX_STROKES) { p.done = true; p.strokes = MAX_STROKES; out.pickedUp = true; }
+  const cap = maxStrokes(hole.par);
+  if (!p.done && p.strokes >= cap) { p.done = true; p.strokes = cap; out.pickedUp = true; }
   R.turn = nextPlayer(R, hole);
   return out;
 }

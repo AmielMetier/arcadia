@@ -22,6 +22,8 @@ const $ = (s) => document.querySelector(s);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const INTRO = 5.5;          // s : survol du trou
+// (un peu plus long sur les très longs trous, pour ne pas les survoler à toute allure)
+const introLen = (h) => clamp(INTRO + ((h ? h.length : 0) - 520) / 170, INTRO, 9.5);
 const CARD_T = 5;           // s : carte de score entre deux trous
 
 const hud = new HUD();
@@ -305,13 +307,13 @@ async function loadHole(R) {
   scene.setMarker(null, false); scene.setAimDots(null, null, false); scene.showGrid(false); scene.showBall(false); scene.setTee(null, false); scene.setOthers([]);
   for (const g of V.golfers.values()) g.root.visible = false;
   hud.hole(hole, 1); hud.players(stripList(), V.R.teams); hud.dist(hole.length); hud.lie('tee');
-  hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, INTRO - 0.6);
+  hud.banner(`Trou ${hole.n}`, '', `Par ${hole.par} · ${hole.length} m · ${hole.name}`, introLen(hole) - 0.6);
   sfx.holeStart();
   introCamera(0, true);
   await new Promise((r) => {
     V.introDone = r;
     if (behind()) endIntro();
-    setTimeout(() => { if (V.phase === 'intro') endIntro(); }, (INTRO + 1) * 1000);
+    setTimeout(() => { if (V.phase === 'intro') endIntro(); }, (introLen(hole) + 1) * 1000);
   });
 }
 // en retard sur la partie (page restée cachée, machine lente) : des coups attendent déjà leur tour, ou personne ne
@@ -764,8 +766,8 @@ function loop(now) {
 
   if (V.phase === 'intro') {
     V.introT += dt;
-    introCamera(clamp(V.introT / INTRO, 0, 1), false);
-    if (V.introT >= INTRO) endIntro();
+    introCamera(clamp(V.introT / introLen(V.hole), 0, 1), false);
+    if (V.introT >= introLen(V.hole)) endIntro();
   } else if (V.phase === 'aim' || V.phase === 'back' || V.phase === 'watch') {
     if (V.phase === 'aim') {
       const l = input.held('ArrowLeft') || aimHold.l, r = input.held('ArrowRight') || aimHold.r;

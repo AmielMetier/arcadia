@@ -153,7 +153,7 @@ window.HUB_GAMES = [
     id: 'golf',
     title: 'Birdie Party',
     tag: 'Golf 3D entre potes',
-    desc: 'Du golf en 3D sur trente trous, de la campagne au désert : joue avec le vent, seul ou en équipes.',
+    desc: 'Du golf en 3D sur 48 trous, de la campagne au désert, dont 18 géants de plus d\'un demi-kilomètre : joue avec le vent, seul ou en équipes.',
     url: 'golf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#5cc425',
@@ -180,6 +180,16 @@ window.HUB_GAMES = [
       { key: 'level', label: 'Niveau des bots', onlyMode: 'tournament', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
     ],
     cover: 'pokemon/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
+  {
+    id: 'odyssee',
+    title: 'Odyssée',
+    tag: 'Aventure façon DS',
+    desc: 'Une grande aventure Pokémon en fausse 3D, comme sur DS : 10 villes, 8 arènes, captures, combats et la Ligue. Chacun joue sa partie, au clavier.',
+    url: 'odyssee/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#5a88c8',
+    cover: 'odyssee/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
   {
     id: 'minigolf',

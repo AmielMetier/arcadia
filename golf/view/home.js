@@ -12,7 +12,7 @@ const FLY = 16;                       // s de survol par trou
 const SHOWCASE = [11, 9, 4, 21, 25, 16, 14, 27, 2, 18];
 const CALM = { speed: 1.5, dir: 0.6, x: Math.sin(0.6) * 1.5, z: Math.cos(0.6) * 1.5 };
 const THEMES = { campagne: 'Campagne', mer: 'Bord de mer', montagne: 'Montagne', desert: 'Désert' };
-const ORDER = ['campagne', 'mer', 'montagne', 'desert', 'aller', 'retour', 'complet', 'tour'];
+const ORDER = ['campagne', 'mer', 'montagne', 'desert', 'aller', 'retour', 'complet', 'tour', 'geant'];
 const parOf = (k) => COURSES[k].holes.reduce((t, n) => t + HOLES.find((h) => h.n === n).par, 0);
 // part de chaque décor dans un parcours : [[thème, nombre de trous], …]
 const mixOf = (k) => Object.entries(COURSES[k].holes.reduce((m, n) => { const t = HOLES.find((h) => h.n === n).theme; m[t] = (m[t] || 0) + 1; return m; }, {}));
@@ -24,19 +24,19 @@ function html(set, mode) {
   const seg = (key, label, opts) => `<div class="opt"><span class="opt-l" id="l-${key}">${label}</span><div class="seg" role="radiogroup" aria-labelledby="l-${key}" data-k="${key}">${opts.map(([v, l]) => `<button role="radio" data-v="${v}" aria-checked="${String(set[key]) === String(v)}">${l}</button>`).join('')}</div></div>`;
   const card = (k) => `<button class="course" data-v="${k}" aria-pressed="${set.course === k}">
       <img src="img/c-${k}.jpg" alt="" draggable="false"><span class="c-txt"><b>${THEMES[k]}</b><small>${COURSES[k].holes.length} trous · par ${parOf(k)}</small></span>${icon('check', 'c-ok')}</button>`;
-  const combo = (k, name) => `<button class="combo" data-v="${k}" aria-pressed="${set.course === k}"><span class="mix" aria-hidden="true">${mixOf(k).map(([t, n]) => `<i class="t-${t}" style="flex:${n}"></i>`).join('')}</span><b>${name}</b><small>${COURSES[k].holes.length} trous · par ${parOf(k)}</small></button>`;
+  const combo = (k, name, more = '', cls = '') => `<button class="combo${cls}" data-v="${k}" aria-pressed="${set.course === k}"><span class="mix" aria-hidden="true">${mixOf(k).map(([t, n]) => `<i class="t-${t}" style="flex:${n}"></i>`).join('')}</span><b>${name}</b><small>${COURSES[k].holes.length} trous · par ${parOf(k)}${more}</small></button>`;
   return `<div class="home" data-state="${hub ? 'setup' : 'title'}" data-mode="${mode}">
     <div class="home-scrim"></div>
     <header class="home-title">
       <h1 class="logo">Birdie <span>Party</span></h1>
-      <p class="tagline">Du golf en 3D entre potes · 30 trous · jusqu'à 6 joueurs</p>
+      <p class="tagline">Du golf en 3D entre potes · 48 trous · jusqu'à 6 joueurs</p>
     </header>
     <button class="press" id="homeStart"><span class="k-desk">Clique ou appuie sur <kbd>Entrée</kbd> pour jouer</span><span class="k-touch">Touche l'écran pour jouer</span></button>
     <section class="setup${mode === 'guest' ? ' ro' : ''}" aria-label="Nouvelle partie">
       <div class="setup-head"><div class="logo sm">Birdie <span>Party</span></div>${mode === 'guest' ? '<span class="who-tag">Choix de l\'hôte</span>' : ''}</div>
       <h2 class="sect">Parcours</h2>
       <div class="courses">${['campagne', 'mer', 'montagne', 'desert'].map(card).join('')}</div>
-      <div class="combos">${combo('aller', 'Aller')}${combo('retour', 'Retour')}${combo('complet', 'Grand tour')}${combo('tour', 'Les quatre')}</div>
+      <div class="combos">${combo('aller', 'Aller')}${combo('retour', 'Retour')}${combo('complet', 'Grand tour')}${combo('tour', 'Les quatre')}${combo('geant', 'Les Géants', ' · des trous de 600 m à plus d\'un kilomètre', ' giant')}</div>
       <h2 class="sect">Partie</h2>
       <div class="opts">
         ${seg('teams', 'Équipes', [['solo', 'Chacun pour soi'], ['2v2', '2 contre 2'], ['3v3', '3 contre 3']])}
