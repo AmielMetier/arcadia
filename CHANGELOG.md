@@ -1,5 +1,8 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.21 — 30 octobre 2026
+- **Mini-Golf Party** — Fini le « Connexion perdue · reconnexion… » en boucle en multijoueur. À chaque coup joué sur l'ordinateur de l'hôte (le sien ou celui d'un bot), le jeu renvoyait à l'infini l'écho de sa propre balle : des dizaines de milliers de messages en quelques secondes, et le serveur coupait l'hôte pour inondation. Les autres joueurs voyaient « Coupure chez l'hôte », puis le salon changeait d'hôte. L'hôte ignore maintenant ses propres messages.
+
 ## 3.20 — 29 octobre 2026
 - **Odyssée** — Graphismes retravaillés partout :
   - l'herbe a du relief et des couleurs qui varient, avec trèfles, pâquerettes, cailloux, petites touffes et buissons fleuris ; à la lisière des bois, fougères, champignons et feuilles mortes ; les arbres et les bâtiments projettent une ombre douce ;

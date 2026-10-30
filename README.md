@@ -164,6 +164,6 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **3.3** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **3.21** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

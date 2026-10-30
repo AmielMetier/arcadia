@@ -275,6 +275,10 @@ function simTick(dt) {
 const STREAM = { id: 0, buf: [], lastArr: 0 };   // positions reçues pendant un coup d'un autre joueur
 function onMsg(from, m, local) {
   if (!m || typeof m !== 'object') return;
+  // Le Hub renvoie aussi à l'hôte ses propres messages « à tous » (st, bs, aim). Sans ce filtre, l'hôte relayait
+  // l'écho de son propre flux de balle, qui lui revenait aussitôt, et ainsi de suite : des dizaines de milliers de
+  // messages par coup, le relais coupait l'hôte pour inondation (« Connexion perdue · reconnexion… » en boucle).
+  if (!local && NET.role !== 'guest' && K(from) === ME()) return;
   if (NET.role !== 'guest') {
     switch (m.t) {
       case 'ping': H.send(from, { t: 'pong', c: m.c, h: nowMs() }); return;
