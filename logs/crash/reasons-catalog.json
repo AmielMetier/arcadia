@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "updatedAt": "2026-10-26T21:45:00.000Z",
-  "description": "Catalogue officiel des raisons de crash d'un jeu (CRASH_*) et d'expulsion/déconnexion d'un joueur (EXP_*) pour le Game Hub et ses 11 jeux.",
+  "description": "Catalogue officiel des raisons de crash d'un jeu (CRASH_*) et d'expulsion/déconnexion d'un joueur (EXP_*) pour Arcadia et ses 11 jeux.",
   "codes": {
     "CRASH_JS_ERROR": {
       "category": "CRASH",
@@ -85,7 +85,7 @@
       "severity": "warn",
       "title": "Joueur déconnecté ou passé en IA : onglet en arrière-plan (hid=1)",
       "cause": "L'onglet du joueur n'était plus au premier plan (document.hidden = true) : le navigateur a bridé ou suspendu ses timers réseau et sa boucle de jeu.",
-      "resolution": "Garder l'onglet du Game Hub visible au premier plan pendant toute la durée de la partie multijoueur."
+      "resolution": "Garder l'onglet d'Arcadia visible au premier plan pendant toute la durée de la partie multijoueur."
     },
     "EXP_SLOW_CLIENT_OVERFLOW": {
       "category": "EXPULSION",
@@ -105,7 +105,7 @@
   "games": [
     {
       "id": "hub",
-      "title": "Game Hub (Salon & Relais)",
+      "title": "Arcadia (Salon & Relais)",
       "maxPlayers": 6,
       "engine": "DOM + WebSocket Relay (Protocole 2)",
       "crashReasons": [

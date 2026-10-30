@@ -75,7 +75,7 @@ Ce document détaille **toutes les causes techniques** pouvant provoquer :
 
 ## 3. Comment consulter et exporter les logs
 
-1. **Depuis le Game Hub** : cliquez sur **📋 Logs & Crashs** sur l'écran d'accueil ou **📋 Logs** dans la barre supérieure du salon.
+1. **Depuis Arcadia** : cliquez sur **📋 Logs & Crashs** sur l'écran d'accueil ou **📋 Logs** dans la barre supérieure du salon.
 2. **En ligne / localement** : ouvrez `/logs/` (`logs/index.html`).
 3. **Automatiquement sur disque (mode développement / serveur)** :
    - Lorsque vous lancez `node tools/serve.mjs 8000` ou `node server/server.js`, chaque crash ou expulsion capturé par `shared/logger.js` est envoyé en `POST /api/log` et inscrit automatiquement dans :

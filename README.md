@@ -1,9 +1,9 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
+# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
 
-**Jouer : https://amielmetier.github.io/duo-drift/**
+**Jouer : https://amielmetier.github.io/arcadia/**
 
 ## Duo Drift
 Course et bataille en vue de dessus, jusqu'à 5 joueurs.

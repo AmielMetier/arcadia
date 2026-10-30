@@ -10,7 +10,7 @@ import { UnrealBloomPass } from '../vendor/jsm/postprocessing/UnrealBloomPass.js
 import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from '../vendor/jsm/postprocessing/OutputPass.js';
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js';
-import { T, rng, signTex } from './textures.js';
+import { T, rng, signTex, dressPhoto } from './textures.js';
 import { kinPose, BALL_R, CUP_R } from './physics.js';
 
 const V3 = THREE.Vector3;
@@ -76,7 +76,7 @@ function makeMats(themeId) {
     redwood: std({ map: T.plank('red'), roughness: 0.55 }),
     stone: std({ map: T.stone(), roughness: 0.85 }),
     metal: std({ map: T.metal(), roughness: 0.42, metalness: 0.65 }),
-    grate: std({ map: T.grate(), emissiveMap: T.grateEm(), emissive: C('#ff5a12'), emissiveIntensity: 1.6, roughness: 0.5, metalness: 0.5 }),
+    grate: std({ map: T.grate(), emissiveMap: T.grateEm(), emissive: C('#ff6a20'), emissiveIntensity: 0.4, roughness: 0.55, metalness: 0.5 }),
     sand: std({ map: T.sand(), roughness: 1 }),
     zen: std({ map: T.zen(), roughness: 1 }),
     beach: std({ map: T.beach(), roughness: 1 }),
@@ -125,6 +125,17 @@ function makeMats(themeId) {
     logf: std({ map: T.plank('dark'), roughness: 0.85 }),
     logw: std({ map: T.wood(), color: C('#9a7a5a'), roughness: 0.9 }),
   };
+  // vraies textures photo (Poly Haven, CC0) pour les matériaux naturels : bois, pierre, roche, sable, brique, neige
+  const PHOTO = {
+    plank: ['planks'], wood: ['planks', { color: '#d8c2a0' }], hull: ['planks', { color: '#8a6a4a' }], skirtwood: ['planks', { color: '#9a7a58' }],
+    logf: ['planks', { color: '#8c6a4a' }], logw: ['bark'],
+    stone: ['stone'], stonecap: ['stone', { color: '#e6e0d6' }], stonew: ['cwall'], skirtstone: ['cwall', { color: '#c9c4bd' }],
+    rock: ['rock'], skirtrock: ['rock'], lavarock: ['rock', { color: '#6a5a52' }], redrock: ['chalk', { color: '#d98a5e' }], sandstone: ['chalk', { color: '#e8c89a' }],
+    sand: ['sand'], beach: ['sand', { color: '#fff4dc' }],
+    brick: ['brick'], skirt: ['brick', { color: '#c8b8a8' }], skirtbrick: ['brick', { color: '#c8b8a8' }],
+    snow: ['snow'], snowcap: ['snow'], snowpack: ['snow', { color: '#e4ecf6' }],
+  };
+  for (const [k, [file, o]] of Object.entries(PHOTO)) if (M[k]) dressPhoto(M[k], file, o);
   if (themeId === 'forge') { M.metal.color = C('#c8c8cc'); }
   if (themeId === 'zen') { M.stone.color = C('#d4d0c8'); }
   return M;
@@ -634,6 +645,9 @@ export class Renderer {
       const src = { moss: T.moss, desert: T.desert, snow: T.snow, candy: T.candyground }[th.ground] || T.grass;
       const t = src().clone(); t.needsUpdate = true; t.repeat.set(140, 140);
       mat = new THREE.MeshStandardMaterial({ map: t, roughness: 1, color: th.ground === 'moss' ? '#9db48a' : '#ffffff' });
+      // la photo remplace le motif dessiné une fois chargée (herbe, terre du désert, neige)
+      const ph = { grass: ['grass', '#ffffff'], moss: ['grass', '#9db48a'], desert: ['dirt', '#f0c89a'], snow: ['snow', '#ffffff'] }[th.ground || 'grass'];
+      if (ph) dressPhoto(mat, ph[0], { repeat: 140, normal: 0.5, color: ph[1], clone: true });
     }
     if (mat) { const g = new THREE.Mesh(geo, mat); g.position.y = y; g.receiveShadow = true; this.scene.add(g); this.ground = g; }
     else {   // l'espace : une nébuleuse lointaine sous les pieds
@@ -737,6 +751,16 @@ export class Renderer {
       asteroid: [mc('#6a6070')], snowball: [mc('#ffffff')], jelly: [new THREE.MeshStandardMaterial({ color: '#5ef0a0', transparent: true, opacity: 0.85, roughness: 0.15 })], cross: [std({ map: T.hazard(), vertexColors: false })], hammer: [std({ map: T.hazard(), vertexColors: false }), mc('#3a3e46', { metalness: 0.8 })], bar: [std({ map: T.hazard(), vertexColors: false })],
     }[k.look] || [mc('#888')];
     k.boxes.forEach((b, bi) => {
+      if (k.look === 'asteroid' || k.look === 'boulder') {
+        // un vrai rocher bosselé, à peine plus gros que sa boîte de collision : la balle rebondit là où on voit la roche
+        const Rk = rng(97 + (k.id || 0) * 13 + bi), geo = new THREE.IcosahedronGeometry(1, 2), pa = geo.attributes.position;
+        for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), n = 1 + (Math.sin(x * 4.1 + Rk() * 6) * Math.cos(z * 3.7 + y * 2.3)) * 0.07 + (Rk() - 0.5) * 0.08; pa.setXYZ(i, Math.sign(x) * Math.pow(Math.abs(x), 0.7) * n, Math.sign(y) * Math.pow(Math.abs(y), 0.7) * n, Math.sign(z) * Math.pow(Math.abs(z), 0.7) * n); }
+        geo.computeVertexNormals(); geo.scale(b.s[0] * 0.56, b.s[1] * 0.58, b.s[2] * 0.56);
+        const RM = this._rockMats || (this._rockMats = {}); const rm = RM[k.look] || (RM[k.look] = dressPhoto(new THREE.MeshStandardMaterial({ map: T.rock(), color: k.look === 'asteroid' ? C('#e4dcf0') : C('#e0a070'), emissive: k.look === 'asteroid' ? C('#2a1a40') : C('#000000'), roughness: 0.9, flatShading: false }), 'rock', { normal: 1 }));
+        const m = mesh(geo, rm, ...b.c); m.rotation.set(Rk() * 3, Rk() * 3, Rk() * 3);
+        if (k.look === 'asteroid') m.userData.tumble = 0.6 + Rk();
+        g.add(m); return;
+      }
       const m = mesh(new THREE.BoxGeometry(...b.s), looks[Math.min(bi, looks.length - 1)] || looks[0], ...b.c);
       if (b.yaw) m.rotation.y = b.yaw; g.add(m);
       if (k.look === 'blades') { const sail = mesh(new THREE.BoxGeometry(b.s[0] * 0.8, b.s[1] * 0.8, 0.02), looks[1], b.c[0], b.c[1], b.c[2] + 0.05); g.add(sail); }
@@ -881,20 +905,27 @@ export class Renderer {
       const g = new THREE.Group();
       const shape = new THREE.Shape(); shape.moveTo(-0.07, 0); shape.lineTo(0.07, 0); shape.lineTo(0.07, 0.82); shape.lineTo(0.2, 0.82); shape.lineTo(0, 1); shape.lineTo(-0.2, 0.82); shape.lineTo(-0.07, 0.82); shape.lineTo(-0.07, 0);
       const geo = new THREE.ShapeGeometry(shape); geo.rotateX(Math.PI / 2);
-      const mat = new THREE.ShaderMaterial({ uniforms: { pw: { value: 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      // la flèche se dessine par-dessus tout (sols lumineux, grilles, ombres) : elle reste visible partout
+      const mat = new THREE.ShaderMaterial({ uniforms: { pw: { value: 0 } }, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, side: THREE.DoubleSide,
         vertexShader: `varying float vZ; void main(){ vZ = position.z; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-        fragmentShader: `uniform float pw; varying float vZ; void main(){ vec3 a = vec3(.25,.95,.45), b = vec3(1.,.85,.2), c = vec3(1.,.25,.2); float t = vZ * pw; vec3 col = t < .5 ? mix(a,b,t*2.) : mix(b,c,(t-.5)*2.); gl_FragColor = vec4(col, .85);
+        fragmentShader: `uniform float pw; varying float vZ; void main(){ vec3 a = vec3(.25,.95,.45), b = vec3(1.,.85,.2), c = vec3(1.,.25,.2); float t = vZ * pw; vec3 col = t < .5 ? mix(a,b,t*2.) : mix(b,c,(t-.5)*2.); gl_FragColor = vec4(col, .95);
 #include <colorspace_fragment>
 }` });
-      const arrow = new THREE.Mesh(geo, mat); arrow.renderOrder = 6; g.add(arrow);
-      const dots = []; for (let i = 0; i < 7; i++) { const d = new THREE.Mesh(new THREE.CircleGeometry(0.035, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7, depthWrite: false })); d.renderOrder = 6; g.add(d); dots.push(d); }
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.21, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, depthWrite: false })); ring.renderOrder = 6; g.add(ring);
-      this.scene.add(g); this.aimObj = { g, arrow, mat, dots, ring };
+      // contour sombre sous la flèche : lisible même sur un sol clair ou lumineux
+      const oShape = new THREE.Shape(); oShape.moveTo(-0.12, 0); oShape.lineTo(0.12, 0); oShape.lineTo(0.12, 0.78); oShape.lineTo(0.3, 0.78); oShape.lineTo(0, 1.07); oShape.lineTo(-0.3, 0.78); oShape.lineTo(-0.12, 0.78); oShape.lineTo(-0.12, 0);
+      const oGeo = new THREE.ShapeGeometry(oShape); oGeo.rotateX(Math.PI / 2);
+      const outline = new THREE.Mesh(oGeo, new THREE.MeshBasicMaterial({ color: '#0a0a14', transparent: true, opacity: 0.6, depthWrite: false, depthTest: false, side: THREE.DoubleSide, toneMapped: false })); outline.renderOrder = 998; g.add(outline);
+      const arrow = new THREE.Mesh(geo, mat); arrow.renderOrder = 999; g.add(arrow);
+      const dotMat = (o) => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: o, depthWrite: false, depthTest: false, toneMapped: false });
+      const dots = []; for (let i = 0; i < 7; i++) { const d = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12).rotateX(-Math.PI / 2), dotMat(0.8)); d.renderOrder = 999; g.add(d); dots.push(d); }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.22, 32).rotateX(-Math.PI / 2), dotMat(0.7)); ring.renderOrder = 999; g.add(ring);
+      this.scene.add(g); this.aimObj = { g, arrow, outline, mat, dots, ring };
     }
     const A = this.aimObj; A.g.visible = show; if (!show) return;
     A.g.position.set(p[0], p[1] + (flip ? BALL_R - 0.02 : -BALL_R + 0.02), p[2]); A.g.rotation.set(0, yaw, flip ? Math.PI : 0);
     const len = 0.25 + power * 3.2;
     A.arrow.scale.set(1 + power * 0.6, 1, len); A.arrow.position.z = 0.22; A.arrow.visible = power > 0.005; A.mat.uniforms.pw.value = power;
+    A.outline.scale.copy(A.arrow.scale); A.outline.position.z = 0.22; A.outline.visible = A.arrow.visible;
     A.dots.forEach((d, i) => { d.position.set(0, 0, 0.3 + i * 0.32); d.visible = power < 0.005; d.material.opacity = 0.75 * (1 - i / 7); });
     A.ring.scale.setScalar(1 + Math.sin(this.time * 5) * 0.08);
   }

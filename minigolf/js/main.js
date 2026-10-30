@@ -272,7 +272,7 @@ function simTick(dt) {
 }
 
 /* ================================================================ RÉCEPTION */
-const STREAM = { id: 0, buf: [], lastArr: 0 };   // positions reçues pendant un coup d'un autre joueur
+const STREAM = { id: 0, buf: [], lastArr: 0, offs: [], delay: 0.16 };   // positions reçues pendant un coup d'un autre joueur
 function onMsg(from, m, local) {
   if (!m || typeof m !== 'object') return;
   // Le Hub renvoie aussi à l'hôte ses propres messages « à tous » (st, bs, aim). Sans ce filtre, l'hôte relayait
@@ -294,14 +294,20 @@ function onMsg(from, m, local) {
   switch (m.t) {
     case 'pong': { const now = nowMs(), rtt = now - m.c; if (rtt < NET.rtt * 1.5 || rtt < 120) { NET.rtt = Math.min(rtt, NET.rtt * 0.8 + rtt * 0.2); NET.offset = m.h + rtt / 2 - now; } break; }
     case 'st': if (m.s && m.s.n >= G.n) { G = m.s; onState(G); } break;
-    case 'bs': if ((!SIM || SIM.id !== m.i) && G.shot && m.i === G.shot.id) onStream(m); break;
+    // le flux peut arriver avant l'état qui annonce le coup : on le garde quand même (sinon la balle sautait au début)
+    case 'bs': if ((!SIM || SIM.id !== m.i) && (!G.shot || m.i === G.shot.id)) onStream(m); break;
     case 'aim': onAim(m); break;
   }
 }
 function onStream(m) {
-  if (m.i !== STREAM.id) { STREAM.id = m.i; STREAM.buf = []; STREAM.clock = null; }
+  if (m.i !== STREAM.id) { STREAM.id = m.i; STREAM.buf = []; STREAM.clock = null; STREAM.offs = []; }
   if (STREAM.buf.length && m.T <= STREAM.buf[STREAM.buf.length - 1].T) return;   // paquet en double ou en retard
-  STREAM.buf.push({ T: m.T, at: nowMs(), b: m.b });
+  // retard adaptatif : on mesure l'irrégularité d'arrivée des paquets (relais, Wi-Fi) et on garde juste assez
+  // d'avance pour toujours avoir deux positions entre lesquelles glisser, au lieu de figer puis rattraper
+  const at = nowMs(), off = at / 1000 - m.T; STREAM.offs.push(off); if (STREAM.offs.length > 40) STREAM.offs.shift();
+  const base = Math.min(...STREAM.offs), spread = STREAM.offs.reduce((a, o) => Math.max(a, o - base), 0);
+  STREAM.delay = clamp(0.07 + spread * 1.15, 0.12, 0.5);
+  STREAM.buf.push({ T: m.T, at, b: m.b });
   if (STREAM.buf.length > 240) STREAM.buf.shift();
   STREAM.lastArr = nowMs();
   for (const e of m.e || []) handleEvent({ k: e[0], b: e[1], p: [e[2], e[3], e[4]], s: e[5], m: e[6] }, true);
@@ -419,7 +425,7 @@ function updateBalls(dt) {
   if (simLive) for (const b of SIM.balls) live.set(K(b.id), { p: b.p, holed: b.holed, oob: b.oob });
   else if (G.shot && STREAM.id === G.shot.id && STREAM.buf.length) {
     // interpolation avec ~110 ms de retard
-    const buf = STREAM.buf, last = buf[buf.length - 1], DELAY = 0.14;
+    const buf = STREAM.buf, last = buf[buf.length - 1], DELAY = STREAM.delay || 0.16;
     const target = Math.min(last.T, last.T + (nowMs() - last.at) / 1000 - DELAY);
     if (STREAM.clock == null) STREAM.clock = Math.max(buf[0].T, target);
     else {
@@ -965,7 +971,13 @@ function frame() {
     const me = G.balls[ME()];
     const hw = holeNow().world;
     R.aim(myTurn() && !!me, me ? me.p : [0, 0, 0], INPUT.aiming ? aimYaw() : CAM.yaw, INPUT.aiming ? INPUT.power : 0, null, me ? gravSign(hw, me.p) < 0 : false);
-    if (!myTurn() && AIM.on && AIM.pid === G.turn && G.balls[AIM.pid] && nowMs() - AIM.at < 600) R.aim(true, G.balls[AIM.pid].p, AIM.yaw, AIM.power, null, gravSign(hw, G.balls[AIM.pid].p) < 0);
+    if (!myTurn() && AIM.on && AIM.pid === G.turn && G.balls[AIM.pid] && nowMs() - AIM.at < 600) {
+      // la visée d'un autre joueur n'arrive que 10 fois par seconde : on la fait glisser au lieu de sauter
+      const k = Math.min(1, dt * 14);
+      if (AIM.sy == null || AIM.spid !== AIM.pid) { AIM.sy = AIM.yaw; AIM.sp = AIM.power; AIM.spid = AIM.pid; }
+      AIM.sy += angDiff(AIM.yaw, AIM.sy) * k; AIM.sp += (AIM.power - AIM.sp) * k;
+      R.aim(true, G.balls[AIM.pid].p, AIM.sy, AIM.sp, null, gravSign(hw, G.balls[AIM.pid].p) < 0);
+    }
     R.update(dt, kin, fb && fb.p ? new THREE.Vector3(...fb.p) : CAM.cur);
   } else if (COURSE && HOLES.length) {
     // menu : survol lent du parcours

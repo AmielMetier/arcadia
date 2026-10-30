@@ -262,10 +262,15 @@ function cleanInput(m) {
 function receiveSnap(s, events) {
   const now = performance.now() / 1000;
   if (S.lobby || (S.last && s.run !== S.last.run)) {
-    S.lobby = false; S.endShown = false; S.snaps = []; S.evq = []; S.off = null; S.pred = null; S.hist = []; hideScreen();
+    S.lobby = false; S.endShown = false; S.snaps = []; S.evq = []; S.off = null; S.jit = null; S.idelay = null; S.pred = null; S.hist = []; hideScreen();
   }
   const o = now - s.t;
   if (S.off == null || o < S.off || Math.abs(o - S.off) > 1) S.off = o; else S.off += (o - S.off) * 0.02;
+  // retard d'affichage adaptatif : les autres joueurs ne se figent plus puis ne sautent plus quand le réseau a des à-coups
+  const J = S.jit || (S.jit = []); J.push(o); if (J.length > 60) J.shift();
+  const lo = Math.min(...J), sp = J.map((v) => v - lo).sort((x, y) => x - y)[Math.floor(J.length * 0.92)] || 0;
+  const want = clamp(0.05 + sp, INTERP, 0.35);
+  S.idelay = S.idelay == null ? want : S.idelay + (want - S.idelay) * (want > S.idelay ? 0.3 : 0.02);
   S.snaps.push(s); if (S.snaps.length > 12) S.snaps.shift();
   for (const e of events) S.evq.push({ t: s.t, e });
   S.last = s;
@@ -317,7 +322,7 @@ function predictLocal(dt) {
 function guestFrame(dt) {
   if (!S.snaps.length) return null;
   const now = performance.now() / 1000;
-  const rt = now - S.off - INTERP;
+  const rt = now - S.off - (S.idelay || INTERP);
   let a = S.snaps[0], b = S.snaps[S.snaps.length - 1];
   for (let i = 0; i < S.snaps.length - 1; i++) if (S.snaps[i].t <= rt && S.snaps[i + 1].t >= rt) { a = S.snaps[i]; b = S.snaps[i + 1]; break; }
   if (rt >= b.t) a = b;

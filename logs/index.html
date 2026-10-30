@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Logs & Diagnostic Crash / Expulsion — Game Hub</title>
+<title>Logs & Diagnostic Crash / Expulsion — Arcadia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -131,11 +131,11 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>GAME HUB · <span>LOGS &amp; CRASHS</span></h1>
+      <h1>ARCADIA · <span>LOGS &amp; CRASHS</span></h1>
       <div class="sub">Journal unifié des raisons de crash d'un jeu (<code>CRASH_*</code>) et d'expulsion/déconnexion d'un joueur (<code>EXP_*</code>)</div>
     </div>
     <div class="actions">
-      <a class="btn" href="../">← Retour au Game Hub</a>
+      <a class="btn" href="../">← Retour à Arcadia</a>
       <button class="btn yellow" id="btnExport">⬇ Exporter JSON</button>
       <button class="btn" id="btnClear">🗑 Vider le cache local</button>
     </div>
@@ -167,7 +167,7 @@
       <label>Jeu :
         <select id="fGame">
           <option value="all">Tous les jeux + Hub</option>
-          <option value="hub">Game Hub (Salon)</option>
+          <option value="hub">Arcadia (Salon)</option>
         </select>
       </label>
       <input type="search" id="fSearch" placeholder="Rechercher un joueur, code salon, erreur…" style="flex:1;min-width:200px">
@@ -191,7 +191,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // jeux du registre du Hub (hub/games.js) : un nouveau jeu apparaît ici sans rien changer
   const GAMES = window.HUB_GAMES || [];
-  const GAME_LABELS = { hub: 'Game Hub (Salon)', ...Object.fromEntries(GAMES.map((g) => [g.id, g.title])) };
+  const GAME_LABELS = { hub: 'Arcadia (Salon)', ...Object.fromEntries(GAMES.map((g) => [g.id, g.title])) };
   document.getElementById('fGame').insertAdjacentHTML('beforeend', GAMES.map((g) => `<option value="${esc(g.id)}">${esc(g.title)}</option>`).join(''));
   document.getElementById('stGames').textContent = `${GAMES.length} / ${GAMES.length} + Hub`;
   document.getElementById('tabGames').textContent = `🎮 Diagnostic par Jeu (${GAMES.length} jeux & Hub)`;

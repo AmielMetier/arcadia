@@ -1534,7 +1534,12 @@ function syncAndRenderThree3D(dt, now, shX, shY) {
 
       const isFly = !!u.flying;
       const hoverY = isFly ? (42 + Math.sin(now * 0.003 + u.id) * 3) : 0;
-      mesh.position.set(u.x, heightAt(u.x, u.y) + hoverY, u.y);
+      // position affichée lissée : la partie avance par pas (30 par seconde) et, chez un invité, chaque état reçu de
+      // l'hôte recale les unités ; sans lissage, les unités tressautaient. Un grand écart (transport, téléportation) : direct.
+      { const ud = mesh.userData; const ex = u.x - (ud.sx ?? u.x), ey = u.y - (ud.sy ?? u.y);
+        if (ud.sx == null || ex * ex + ey * ey > 90 * 90) { ud.sx = u.x; ud.sy = u.y; }
+        else { const k = 1 - Math.exp(-(dt || 0.016) * 18); ud.sx += ex * k; ud.sy += ey * k; }
+        mesh.position.set(ud.sx, heightAt(ud.sx, ud.sy) + hoverY, ud.sy); }
       if (u.boss) mesh.scale.setScalar(1.4);
       if (mesh.userData.cloakMats) {
         const op = u.cloaked ? (u.team === myTeam3D ? 0.32 : 0.5) : 1;

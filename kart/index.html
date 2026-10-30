@@ -221,7 +221,7 @@
     #mapcards { grid-template-columns: 1fr; } #chars .left { width: 94vw; }
   }
 </style>
-<!-- Pont avec le Game Hub (salon, réseau). Absent = mode solo. -->
+<!-- Pont avec Arcadia (salon, réseau). Absent = mode solo. -->
 <script src="../shared/logger.js"></script>
 <script src="../shared/bridge.js"></script>
 <script src="../shared/volume.js"></script>
@@ -267,7 +267,7 @@
 <button id="setbtn" class="hidden" title="Réglages : musique et effets (M : couper le son)" aria-label="Réglages">⚙️ Réglages</button>
 <div id="title" class="screen hidden">
   <div class="logo"><span class="l1">CYBER</span><span class="l2">KART</span><span class="gp ol">GP</span></div>
-  <div class="tag">7 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis le Game Hub</div>
+  <div class="tag">7 circuits en Grand Prix · 8 pilotes · jusqu'à 6 joueurs depuis Arcadia</div>
   <div class="start">Appuie sur <b>ENTRÉE</b> ou clique pour jouer</div>
 </div>
 
@@ -4439,7 +4439,7 @@ class Kart {
     this.fx = { lvl: 0, mt: 0, wall: 0, wallSide: 0, land: 0, hop: false, lap: false, dash: false, trick: false, trickLand: false, hit: '', star: false, box: false };
     this.vis = { lean: 0, drift: 0, squash: 0, steer: 0, wheel: 0, bob: rnd(0, 6), scale: 1 };
     for (const k of ['throttle', 'brake', 'steer', 'axis']) this.input[k] = 0; this.input.drift = this.input.back = this.input.wiggle = false;
-    this.vNormal.set(this.q.nx, this.q.ny, this.q.nz); this.netBuf.length = 0;
+    this.vNormal.set(this.q.nx, this.q.ny, this.q.nz); this.netBuf.length = 0; this.netLate = null; this.netDly = null;
     this.group.visible = true; if (this.paint) this.paint.emissiveIntensity = 0;
     this.syncVisual(0.016, 1);
   }
@@ -4663,7 +4663,18 @@ class Kart {
     if (!wasGround && this.grounded) this.fx.land = 0.4;
     if (this.immuneT <= 0 && s[8] > 0.8 && !this.fx.hitSeen) { this.fx.hit = this.hitType || 'spin'; this.fx.hitSeen = true; } if (s[8] <= 0) this.fx.hitSeen = false;
   }
-  /** Interpolation des états reçus : rendu ~110 ms dans le passé, sans saccade */
+  /** Range un état reçu : ignore les doublons (l'hôte peut renvoyer deux fois le même), mesure son retard */
+  netPush(t, s) {
+    const b = this.netBuf; if (b.length && t <= b[b.length - 1].t) return false;
+    b.push({ t, s }); if (b.length > 30) b.shift();
+    // retard d'arrivée : un pilote qui passe par l'hôte (invité → hôte → invité) arrive plus tard qu'un bot de l'hôte
+    const late = race.time - t; const L = this.netLate || (this.netLate = []); L.push(late); if (L.length > 40) L.shift();
+    const sorted = L.slice().sort((a, c) => a - c), p90 = sorted[Math.floor(sorted.length * 0.9)];
+    const want = clamp(Math.max(CFG.INTERP, p90 + 0.6 / CFG.NET_HZ), CFG.INTERP, 0.4);
+    this.netDly = this.netDly == null ? want : this.netDly + (want - this.netDly) * (want > this.netDly ? 0.25 : 0.03);
+    return true;
+  }
+  /** Interpolation des états reçus : rendu ~110 ms dans le passé (plus si la connexion est irrégulière), sans saccade */
   netInterp(t) {
     const b = this.netBuf; if (!b.length) return;
     while (b.length > 2 && b[1].t <= t) b.shift();
@@ -5573,7 +5584,7 @@ function onNetMsg(from, m) {
         hostSetLobby({}); break;
       }
       case 'loaded': loadedSet.add(from); UI.refresh(); hostCheckLoaded(); break;
-      case 'k': { const k = karts.find((q) => q.ownerId === from && q.remote); if (k && Array.isArray(m.s)) { k.netBuf.push({ t: m.T, s: m.s }); if (k.netBuf.length > 30) k.netBuf.shift(); k.trailCode = m.s[16] | 0; k.lastNet = performance.now(); } break; }
+      case 'k': { const k = karts.find((q) => q.ownerId === from && q.remote); if (k && Array.isArray(m.s)) { k.netPush(m.T, m.s); k.trailCode = m.s[16] | 0; k.lastNet = performance.now(); } break; }
       case 'use': { const k = karts.find((q) => q.ownerId === from); if (k && ITEM_NAMES[m.it]) { if (m.p) k.pos.set(m.p[0], m.p[1], m.p[2]); hostUse(k, m); } break; }
       case 'box': {
         const k = karts.find((q) => q.ownerId === from), b = boxes[m.b | 0]; if (!k || !b) break;
@@ -5609,7 +5620,9 @@ function applySnapshot(m) {
   if (!karts.length) return;
   for (const row of m.k) {
     const k = karts[row[0]]; if (!k || k === player) continue;
-    k.netBuf.push({ t: m.T, s: row.slice(1) }); if (k.netBuf.length > 30) k.netBuf.shift(); k.trailCode = row[17] | 0;
+    // row[18] : instant où le pilote a vraiment envoyé sa position (sinon on prenait l'heure du relais de l'hôte,
+    // et les autres invités saccadaient : positions répétées ou datées de travers)
+    k.netPush(row[18] ?? m.T, row.slice(1, 17)); k.trailCode = row[17] | 0;
   }
   applyEnts(m.e || []);
   const dead = new Set(m.bx || []);
@@ -5624,7 +5637,11 @@ function netTick(dt) {
   if (!NET.online || !karts.length || !['intro', 'countdown', 'race', 'finished', 'results'].includes(race.state)) return;
   netAcc += dt; if (netAcc < 1 / CFG.NET_HZ) return; netAcc = 0;
   if (NET.role === 'guest') { if (player) { const s = player.netPack(); s.push(trailCodeOf(player)); NET.toHost({ t: 'k', T: race.time, s }, true); } return; }
-  const rows = karts.map((k) => { const s = k.remote ? (k.netBuf.length ? k.netBuf[k.netBuf.length - 1].s.slice(0, 16) : k.netPack()) : k.netPack(); return [k.idx, ...s, k.remote ? k.trailCode | 0 : trailCodeOf(k)]; });
+  const rows = karts.map((k) => {
+    const lastB = k.remote && k.netBuf.length ? k.netBuf[k.netBuf.length - 1] : null;
+    const s = k.remote ? (lastB ? lastB.s.slice(0, 16) : k.netPack()) : k.netPack();
+    return [k.idx, ...s, k.remote ? k.trailCode | 0 : trailCodeOf(k), lastB ? lastB.t : race.time];
+  });
   const bx = []; boxes.forEach((b, i) => { if (!b.alive) bx.push(i); });
   NET.broadcast({ t: 'snap', T: race.time, k: rows, e: packEnts(), bx }, true); // instantané : seul le plus récent compte
 }
@@ -6509,7 +6526,7 @@ function tick(dt, render) {
   while (acc >= CFG.STEP && steps < 24) { simulate(CFG.STEP); acc -= CFG.STEP; steps++; }
   if (steps >= 24) acc = 0;
   const alpha = clamp(acc / CFG.STEP, 0, 1), renderT = race.time - CFG.INTERP;
-  for (const k of karts) if (k.remote) k.netInterp(renderT);
+  for (const k of karts) if (k.remote) k.netInterp(k.netDly != null ? race.time - k.netDly : renderT);
   if (!render) return;
   for (const k of karts) { k.syncVisual(dt, k.remote ? 1 : alpha); k.group.updateMatrixWorld(true); kartFX(k, dt); }
   const pq = player.q2;

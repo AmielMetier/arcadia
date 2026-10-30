@@ -1,7 +1,7 @@
 {
   "name": "duo-drift-relay-server",
   "version": "1.0.0",
-  "description": "Serveur relais WebSocket minimaliste et performant pour Game Hub (Duo Drift & DavidSimulator)",
+  "description": "Serveur relais WebSocket minimaliste et performant pour Arcadia (salon de jeux)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

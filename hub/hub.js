@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '3.21';
+  const VERSION = '3.22';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -159,7 +159,7 @@
     };
     ov.querySelector('#ntAgain').onclick = go;
     ov.querySelector('#ntCopy').onclick = () => {
-      const txt = 'Test de connexion Game Hub\n' + lines.join('\n');
+      const txt = 'Test de connexion Arcadia\n' + lines.join('\n');
       (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Résultat copié'), () => toast('Copie impossible : fais une capture d\'écran'));
     };
     go();

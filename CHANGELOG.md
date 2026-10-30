@@ -1,4 +1,18 @@
-# Journal des versions — Game Hub (Duo Drift, DavidSimulator)
+# Journal des versions — Arcadia
+
+## 3.22 — 31 octobre 2026
+- **Arcadia** — Le Hub a un vrai nom : Arcadia. Nouveau logo sur l'accueil et dans le salon.
+- **Mini-Golf Party** — Fini les balles qui traversent les murets : un obstacle mobile (porte coulissante, télécabine…) ne peut plus pousser la balle de l'autre côté.
+  - Une balle coincée entre deux rochers s'arrête tout de suite au lieu de trembler sur place.
+  - Collée contre un muret sur une pente, la balle part bien dans le sens de la pente.
+- **Mini-Golf Party** — La flèche de visée se voit partout, avec un contour sombre, même sur la grille lumineuse de la Station Orbitale.
+- **Mini-Golf Party** — Champ d'Astéroïdes : de vrais astéroïdes en roche à la place des cubes, et une grille au sol plus douce qui ne scintille plus.
+- **Mini-Golf Party** — Graphismes : vraies textures photo pour le gazon autour des trous, le bois, la pierre, la roche, le sable, la brique et la neige.
+- **Mini-Golf Party** — Le coup d'un autre joueur s'affiche de façon fluide, même avec une connexion irrégulière, et sa visée glisse au lieu de sauter.
+- **Cyber Kart GP** — Les karts des autres invités ne saccadent plus : leurs positions gardent l'heure où ils les ont envoyées, sans doublons, et l'affichage s'adapte à la qualité de la connexion.
+- **Island Rush** et **Convoy Storm** — Les autres joueurs ne se figent plus puis ne sautent plus quand le réseau a des à-coups.
+- **Birdie Party** — La visée et l'élan d'un autre joueur glissent en douceur.
+- **Bastion Clash** — Les unités se déplacent sans tressauter, surtout chez les invités.
 
 ## 3.21 — 30 octobre 2026
 - **Mini-Golf Party** — Fini le « Connexion perdue · reconnexion… » en boucle en multijoueur. À chaque coup joué sur l'ordinateur de l'hôte (le sien ou celui d'un bot), le jeu renvoyait à l'infini l'écho de sa propre balle : des dizaines de milliers de messages en quelques secondes, et le serveur coupait l'hôte pour inondation. Les autres joueurs voyaient « Coupure chez l'hôte », puis le salon changeait d'hôte. L'hôte ignore maintenant ses propres messages.
