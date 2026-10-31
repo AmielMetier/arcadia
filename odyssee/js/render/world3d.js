@@ -122,6 +122,38 @@ function box(G, x0, z0, x1, z1, h, front, top, side = front, o = {}) {
   if (top) G.quad([x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0], top[0], top[1], top[2], top[3], 1);
 }
 
+/** pièce de hautes herbes d'une case selon ses voisins (bords, coins, coins rentrants, sinon une des trois pleines) */
+function herbePiece(m, x, y, tt, v) {
+  const g = (dx, dy) => { const q = m.get(x + dx, y + dy); return q === tt || q === undefined; };
+  const n = g(0, -1), s = g(0, 1), w = g(-1, 0), e = g(1, 0);
+  if (!n) return !w ? 'tl' : !e ? 'tr' : 't';
+  if (!s) return !w ? 'bl' : !e ? 'br' : 'bot';
+  if (!w) return 'l';
+  if (!e) return 'r';
+  if (!g(-1, -1)) return 'in_nw';
+  if (!g(1, -1)) return 'in_ne';
+  if (!g(-1, 1)) return 'in_sw';
+  if (!g(1, 1)) return 'in_se';
+  return v < 0.5 ? 'a' : v < 0.75 ? 'b' : 'c';
+}
+/** style de façade d'un bâtiment : boutiques et salles selon leur rôle, bâtiments à part selon leur nom, maisons selon
+ *  la ville (chalets sur la neige, maisons de pêcheurs dans les ports) */
+const PORTS = new Set(['azur', 'granit', 'orage']);
+function kitStyle(b, map) {
+  if (['center', 'mart', 'gym', 'lab', 'league'].includes(b.style)) return b.style;
+  const name = b.label || b.name || '';
+  if (/Musée/.test(name)) return 'musee';
+  if (/Caserne/.test(name)) return 'base';
+  if (/Tour Mirage/.test(name)) return 'mirage';
+  if (/Phare/.test(name)) return 'phare';
+  if (/Tour de la Grue/.test(name)) return 'pagode';
+  if (/Centrale/.test(name)) return 'lab';
+  const z = map.outdoor ? map.zoneAt(b.x, b.y) : null;
+  if (z?.theme === 'snow') return 'chalet';
+  if (z?.town && PORTS.has(z.town)) return (b.x + b.y) % 3 === 0 ? 'port' : 'pecheur';
+  return b.style;
+}
+
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
@@ -194,14 +226,19 @@ export class WorldView {
       case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.CUT: return { c: A[grassKey] };
       case T.SMASH: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
-      case T.TALL: return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
-      case T.DARKTALL: return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
+      case T.TALL: case T.DARKTALL: {
+        // tileset : nappe d'herbe avec ses bords et ses coins arrondis (pièce choisie selon les voisins)
+        const hk = 'h_' + (tt === T.DARKTALL ? 'bois' : theme === 'snow' ? 'neige' : 'prairie') + '_' + herbePiece(m, x, y, tt, v);
+        if (A[hk]) return { c: A[hk] };
+        if (tt === T.DARKTALL) return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
+        return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
+      }
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : A['forest' + (v < 0.5 ? 0 : 1)] };
       case T.PATH: return { c: A['path' + edge(isPathish)] };
       case T.PAVE: case T.DOOR: case T.BUILD: return { c: A['pave' + edge((q) => isPathish(q))] };
       case T.SAND: return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
       case T.WATER: return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
-      case T.BRIDGE: return { anim: this.N.cells.water15, bridge: A.bridge };
+      case T.BRIDGE: { const ns = m.get(x - 1, y) === T.WATER || m.get(x + 1, y) === T.WATER; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
       case T.FLOWER: return { anim: this.N.cells['flower' + Math.floor(v * 3)] };
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
       case T.CAVE: case T.CAVEWALL: return { c: A['cave' + (v < 0.5 ? 0 : 1)] };
@@ -327,10 +364,11 @@ export class WorldView {
         hole.position.set(b.doorX + 0.5, holeH / 2, b.y + b.d + 0.01); g.add(hole);
         this.root.add(g); this.buildingMeshes.push(g); continue;
       }
-      const fkey = `${b.style}:${b.w}:${b.h}:${b.door}`;
-      const fr = T3('f' + fkey, () => facade(b.style, b.w, b.h, b.door, false, b.x * 7 + b.y));
-      const sd = T3(`s${b.style}:${b.d}:${b.h}`, () => sideWall(b.style, b.d, b.h));
-      const rf = T3(`r${b.style}:${b.roof}:${b.w}:${b.d}`, () => roofTex(b.roof, b.w + 1, b.d + 1, 3, b.style));
+      const ks = kitStyle(b, this.map); b.kitStyle = ks;
+      const fkey = `${ks}:${b.w}:${b.h}:${b.door}`;
+      const fr = T3('f' + fkey, () => facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y));
+      const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
+      const rf = T3(`r${ks}:${b.roof}:${b.w}:${b.d}`, () => roofTex(b.roof, b.w + 1, b.d + 1, 3, ks));
       const mFront = own(fr), mSide = own(sd), mRoof = own(rf);
       const x0 = b.x, x1 = b.x + b.w, z0 = b.y, z1 = b.y + b.d;
       // façade
@@ -372,7 +410,8 @@ export class WorldView {
       const b = g.userData.b; if (!b) continue;
       const key = g.userData.fkey;
       if (!cache.has(key)) {
-        const day = facade(b.style, b.w, b.h, b.door, false, b.x * 7 + b.y), night = facade(b.style, b.w, b.h, b.door, true, b.x * 7 + b.y);
+        const ks = b.kitStyle || b.style;
+        const day = facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y), night = facade(ks, b.w, b.h, b.door, true, b.x * 7 + b.y);
         // ne garder que les pixels qui changent (fenêtres)
         const c = document.createElement('canvas'); c.width = day.width; c.height = day.height;
         const x = c.getContext('2d'); const dd = day.getContext('2d').getImageData(0, 0, c.width, c.height), nd = night.getContext('2d').getImageData(0, 0, c.width, c.height);

@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.47 — 31 octobre 2026
+- **Odyssée** — le décor passe au nouveau tileset dessiné : herbe, chemins, sable, pavés, neige, sol des bois, grottes, eau et lave animées, ponts, rebords et escaliers.
+  - Les hautes herbes forment de vraies nappes aux bords et aux coins arrondis, dans la prairie, les bois et la neige.
+  - Les intérieurs ont leurs sols : parquet des maisons, damier rose du Centre, damier bleu de la Boutique, tapis rouge de la Ligue, sols des Arènes.
+- **Odyssée** — nouvelles façades : Centre, Boutique, Arène, Labo, Ligue, chalets enneigés à Givrebourg, maisons de pêcheurs et capitainerie dans les ports, Musée des Dragons, Caserne d'Écaille, Tour Mirage, phare et Tour de la Grue.
+
 ## 3.46 — 31 octobre 2026
 - **Odyssée** — en attendant les dessins définitifs, les personnages sont ceux de HeartGold / SoulSilver : Ethan, Lyra, Silver, les Champions, les montagnards, les marins… sur la carte comme en combat. Les portraits à côté des dialogues restent.
 - **Odyssée** — les créatures originales sont mises de côté pour l'instant : chacune est remplacée par un Pokémon proche (Germignon, Héricendre et Kaiminus au labo, Kyogre au Cap des Étoiles…).

@@ -31,6 +31,8 @@ export const ASSETS = {
   mobilier: (k) => `${IMG}mobilier/${k}.png`,
   facade: (k) => `${IMG}facades/${k}.png`,
   sol: (k) => `${IMG}sol/${k}.png`,
+  sol32: (k) => `${IMG}sol32/${k}.png`,
+  herbe: (k) => `${IMG}herbes/${k}.png`,
   title: `${IMG}title-odyssor.png`,
 };
 /** précharge une image (résout même en cas d'échec) */

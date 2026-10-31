@@ -39,8 +39,16 @@ async function loadArt() {
   for (const [k, v] of Object.entries(SPRITES.mobilier || {})) if (v[2] && !dens[k]) dens[k] = v[2];
   const kits = {}; for (const k of SPRITES.facades || []) kits[k] = ASSETS.facade(k);
   const sols = {}; for (const k of SOLS) sols[k] = ASSETS.sol(k);
-  const [S, K, L, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);
-  return { sprites: S, dens, kits: K, sols: L, chars, title };
+  // tileset global (tools/odyssee-tileset.py) : sols à 32 px et pièces des hautes herbes
+  const sol32 = {}; for (const k of SPRITES.sol32 || []) sol32[k] = ASSETS.sol32(k);
+  for (const [th, ks] of Object.entries(SPRITES.herbes || {})) for (const k of ks) sol32[`h_${th}_${k}`] = ASSETS.herbe(`${th}_${k}`);
+  // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
+  for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
+    if (!SPRITES.herbes?.[th]) continue;
+    sprites[key] = ASSETS.herbe(th + '_front'); sprites[key + '2'] = ASSETS.herbe(th + '_front2'); dens[key] = dens[key + '2'] = 2;
+  }
+  const [S, K, L, L32, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, chars, title };
 }
 
 async function boot() {
@@ -49,7 +57,7 @@ async function boot() {
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
   const world = buildWorld();
   const art = await loadArt();
-  setArt({ kits: art.kits, sols: art.sols });
+  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32 });
   const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens });
   const game = new Game({ view, ui, input, sound, world });
   window.__ody = { game, world, view, ui, sound, mon: (sp, lvl) => createMon(sp, lvl) };

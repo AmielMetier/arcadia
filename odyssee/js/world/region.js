@@ -130,7 +130,7 @@ function buildTown(W, maps, def) {
     else W.prop(k, ox + a[0], oy + a[1]);
   }
   for (const b of def.buildings) {
-    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, w: b.w, d: b.d, h: b.h, door: b.door });
+    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door });
     const id = `${def.id}:${b.id || b.kind + b.x}`;
     let inside;
     if (b.interior) inside = b.interior(id);
