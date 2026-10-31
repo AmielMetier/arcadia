@@ -21,16 +21,19 @@
       <div class="sp-txt">
         <div class="sp-meta"><span>${esc(GN[I.genre] || g.tag || '')}</span><span>⏱ ${esc(I.time || '')}</span><span>👥 ${g.minPlayers}–${g.maxPlayers} joueurs</span></div>
         <h2>${esc(g.title)}</h2><p>${esc(g.desc)}</p>
+        ${I.keys ? `<div class="sp-keys">${I.keys.slice(0, 4).map(([k, a]) => `<span><kbd>${esc(k.split(' / ')[0])}</kbd>${esc(a)}</span>`).join('')}</div>` : ''}
+        ${(I.tips || []).length ? `<p class="sp-tip"><b>Astuce</b>${esc(I.tips[0])}</p>` : ''}
         <div class="sp-cta"><button class="btn" data-play="${g.id}" type="button">▶ Jouer avec mes potes</button><button class="btn ghost" data-solo="${g.id}" type="button">Jouer seul</button></div>
       </div></article>`;
   }).join('')}</div>
     <button class="sp-nav prev" type="button" aria-label="Jeu précédent">‹</button><button class="sp-nav next" type="button" aria-label="Jeu suivant">›</button>
-    <div class="sp-dots">${feat.map((g, i) => `<button type="button" aria-label="${esc(g.title)}" data-i="${i}"${i === 0 ? ' class="on"' : ''}></button>`).join('')}</div>`;
+    <div class="sp-dots">${feat.map((g, i) => `<button type="button" aria-label="${esc(g.title)}" data-i="${i}"${i === 0 ? ' class="on"' : ''}><img src="${esc(g.cover)}" alt="" loading="lazy" decoding="async"></button>`).join('')}</div>`;
   const slides = [...spot.querySelectorAll('.sp-slide')], dots = [...spot.querySelectorAll('.sp-dots button')];
   function go(i, user) {
     idx = (i + slides.length) % slides.length;
     slides.forEach((s, k) => { s.classList.toggle('on', k === idx); s.setAttribute('aria-hidden', k !== idx); });
     dots.forEach((d, k) => d.classList.toggle('on', k === idx));
+    const od = dots[idx]; if (od && od.parentElement.scrollWidth > od.parentElement.clientWidth) od.parentElement.scrollTo({ left: od.offsetLeft - od.parentElement.clientWidth / 2 + od.offsetWidth / 2, behavior: 'smooth' });
     const nx = slides[(idx + 1) % slides.length].querySelector('img'); if (nx) nx.loading = 'eager';
     if (user) { sfx('select', 0.35); restart(); }
   }

@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.27 — 31 octobre 2026
+- **Arcadia** — Nouvelle vitrine sur l'accueil : sous l'affiche, un panneau aux couleurs du jeu avec sa description, une astuce et les boutons pour jouer, puis une rangée de mini-affiches de tous les jeux pour passer de l'un à l'autre.
+  - Elle s'ajuste à toutes les tailles d'écran, sans vide ni texte coupé.
+
 ## 3.26 — 31 octobre 2026
 - **Arcadia** — Vitrine de l'accueil : plus de bloc noir sous l'affiche, elle se prolonge en flou jusqu'aux boutons.
 

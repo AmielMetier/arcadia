@@ -462,3 +462,48 @@ body:not(:has(#play.on)) .atab{display:none}
   .sp-slide img{-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,#000 70%,transparent 100%)}
   .sp-slide::after{background:linear-gradient(180deg,transparent 0,transparent 45%,rgba(8,9,13,.35) 70%,rgba(8,9,13,.85) 100%)}
 }
+/* ===== vitrine, grands écrans : affiche en haut, panneau du jeu dessous, mini-affiches pour naviguer ===== */
+.sp-dots img{display:none}
+.sp-keys,.sp-tip{display:none}
+@media(min-width:861px){
+  .sp-slide{display:flex;flex-direction:column;background:linear-gradient(170deg,color-mix(in srgb,var(--acc) 30%,#101218) 0%,#0c0e13 70%)}
+  .sp-slide::before,.sp-slide::after{display:none}
+  .sp-slide img{flex:none;-webkit-mask-image:none;mask-image:none;border-bottom:3px solid var(--ink)}
+  .sp-txt{position:relative;flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:0;padding:18px 26px 104px;min-height:0;overflow:hidden}
+  .sp-txt p{-webkit-line-clamp:3}
+  .sp-keys{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 12px;font-weight:600;font-size:13.5px;color:#d9d2c3}
+  .sp-keys span{display:flex;align-items:center;gap:7px}
+  .sp-keys kbd{color:var(--ink)}
+  .sp-tip{display:block;margin:0 0 14px;padding:9px 12px;border-left:4px solid var(--acc);background:rgba(255,255,255,.06);border-radius:0 10px 10px 0;font-size:14px;color:#e6e0d4;-webkit-line-clamp:2}
+  .sp-tip b{font-family:Bungee,Impact,sans-serif;font-weight:400;color:var(--acc);margin-right:8px;filter:brightness(1.3)}
+  .sp-cta{margin-top:auto}
+  /* les points deviennent des mini-affiches */
+  .sp-dots{left:20px;right:20px;bottom:16px;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 2px}
+  .sp-dots::-webkit-scrollbar{display:none}
+  .sp-dots button,.sp-dots button.on{flex:0 0 auto;width:92px;height:52px;border-radius:8px;border:2px solid rgba(255,255,255,.18);background:#0b0d12;overflow:hidden;opacity:.55;transition:opacity .2s,transform .2s,border-color .2s}
+  .sp-dots button:hover{opacity:.9}
+  .sp-dots button.on{opacity:1;border-color:var(--yellow);transform:translateY(-3px);box-shadow:0 3px 0 var(--ink)}
+  .sp-dots img{display:block;width:100%;height:100%;object-fit:cover}
+  .sp-nav{top:calc((100% - 0px) * 0 + 24%)}
+}
+/* écran assez haut pour tout montrer : la description en entier */
+@media(min-width:861px) and (min-height:900px){ .sp-txt p{-webkit-line-clamp:4} }
+@media(min-width:861px){
+  .sp-keys{display:none}
+  .sp-txt>*{flex-shrink:0}
+  .sp-txt p{-webkit-line-clamp:2;margin-bottom:12px}
+  .sp-txt{padding-top:16px;justify-content:center}
+  .sp-cta{margin-top:4px}
+}
+@media(min-width:861px) and (max-height:760px){ .sp-tip{display:none} }
+/* la vitrine prend la hauteur de son contenu (affiche + panneau + mini-affiches), au moins celle de la colonne de droite ;
+   si elle est plus haute, c'est la carte des amis qui s'allonge : jamais de chevauchement, jamais de vide */
+@media(min-width:861px){
+  .hero{display:flex;flex-direction:column;height:auto}
+  .spot{flex:1;height:auto;min-height:0}
+  .sp-slides{position:relative;inset:auto;height:100%}
+  .sp-slide{position:absolute;inset:0}
+  .sp-slide.on{position:relative;inset:auto;height:100%;min-height:100%}
+  .sp-txt{flex:1 0 auto;overflow:visible}
+  .side>.friends{flex:1}
+}
