@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.29 — 31 octobre 2026
+- **Arcadia** — Vitrine de l'accueil : le fond flou sous l'affiche est complètement supprimé.
+
 ## 3.28 — 31 octobre 2026
 - **Arcadia** — Chaque mise à jour du site s'affiche tout de suite, sans garder l'ancienne version en mémoire (c'est ce qui faisait encore voir le flou sous la vitrine).
 
