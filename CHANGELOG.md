@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.26 — 31 octobre 2026
+- **Arcadia** — Vitrine de l'accueil : plus de bloc noir sous l'affiche, elle se prolonge en flou jusqu'aux boutons.
+
 ## 3.25 — 31 octobre 2026
 - **Arcadia** — Plus de grand vide sous la vitrine de l'accueil : elle descend jusqu'en bas de la colonne de ton compte et de tes amis, avec l'affiche entière en haut.
 

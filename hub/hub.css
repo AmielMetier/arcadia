@@ -457,3 +457,8 @@ body:not(:has(#play.on)) .atab{display:none}
   .sp-slide img{position:relative;height:auto;aspect-ratio:16/9;object-fit:cover}
   .sp-slide::after{background:linear-gradient(180deg,transparent 0,transparent 38%,rgba(8,9,13,.6) 60%,rgba(8,9,13,.92) 100%)}
 }
+@media(min-width:861px){
+  .sp-slide::before{inset:-40px;filter:blur(22px) brightness(.62) saturate(1.3);transform:scale(1.1)}
+  .sp-slide img{-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,#000 70%,transparent 100%)}
+  .sp-slide::after{background:linear-gradient(180deg,transparent 0,transparent 45%,rgba(8,9,13,.35) 70%,rgba(8,9,13,.85) 100%)}
+}
