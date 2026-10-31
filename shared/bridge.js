@@ -52,7 +52,30 @@
     (H.handlers[k] = H.handlers[k] || []).push(fn);
     if (k === 'init' && H.initDone) setTimeout(() => fn(H.info), 0);
   };
-  H.signalReady = () => post({ k: 'ready' });
+  // « shown » : le jeu est vraiment à l'écran (son propre écran de chargement a disparu). Le Hub retire alors
+  // l'écran de chargement commun d'Arcadia. Un jeu peut l'annoncer lui-même avec HubBridge.shown() ; sinon on le
+  // devine : prêt (signalReady) et plus aucun écran de chargement du jeu visible (#loading, #app.loading, #load).
+  let shownSent = false, readyAt = 0;
+  H.shown = () => { if (shownSent) return; shownSent = true; post({ k: 'shown' }); };
+  const loaderVisible = () => {
+    for (const el of document.querySelectorAll('#loading, #app.loading, #load')) {
+      if (!el.isConnected || el.classList.contains('hidden')) continue;
+      const r = el.getClientRects(); if (!r.length) continue;
+      const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || +cs.opacity < 0.05) continue;
+      return true;
+    }
+    return false;
+  };
+  function watchShown() {
+    let clear = 0;
+    const iv = setInterval(() => {
+      if (shownSent) return clearInterval(iv);
+      if (performance.now() - readyAt > 30000) { clearInterval(iv); H.shown(); return; }
+      clear = loaderVisible() ? 0 : clear + 1;
+      if (clear >= 3) { clearInterval(iv); requestAnimationFrame(() => requestAnimationFrame(H.shown)); }
+    }, 150);
+  }
+  H.signalReady = () => { post({ k: 'ready' }); if (!readyAt && embedded) { readyAt = performance.now(); watchShown(); } };
   H.send = (to, m, opts) => post(opts && opts.volatile ? { k: 'send', to, m, v: 1 } : { k: 'send', to, m });
   H.exit = () => post({ k: 'exit' });
   // Fin de partie : le jeu de l'hôte transmet le classement au Hub (historique et classement entre potes)

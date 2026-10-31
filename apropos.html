@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>À propos — Arcadia</title>
+<meta name="description" content="Arcadia : qui fait le site, d'où viennent les images et les sons, et ce qui est enregistré quand tu joues.">
+<meta name="theme-color" content="#16181d">
+<link rel="icon" href="assets/brand/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/icon-180.png">
+<meta property="og:title" content="À propos — Arcadia">
+<meta property="og:image" content="https://amielmetier.github.io/arcadia/assets/brand/og.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hub/hub.css">
+<style>
+  .doc{width:min(860px,100%);margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  .doc .card h2{margin-top:0}
+  .doc p,.doc li{font-weight:600;line-height:1.55;font-size:15.5px;color:#2e2b26}
+  .doc ul{padding-left:20px;margin:8px 0}
+  .doc a{color:#1C5FB4;font-weight:700}
+  .doc .lead{color:#e9e1cf;font-size:17px;font-weight:600;margin:0}
+  .doc h1{font-family:Bungee,Impact,sans-serif;font-weight:400;color:var(--paper);font-size:clamp(30px,6vw,46px);margin:6px 0 0}
+  .back{align-self:flex-start}
+  table.cr{width:100%;border-collapse:collapse;font-size:14.5px}
+  table.cr td{border-top:2px solid var(--line2);padding:8px 6px;vertical-align:top;font-weight:600}
+  table.cr td:first-child{font-weight:800;white-space:nowrap;width:1%}
+  @media(max-width:600px){ table.cr td:first-child{white-space:normal} }
+</style>
+</head>
+<body>
+<section class="screen on">
+  <header class="nav">
+    <a class="logo" href="./" aria-label="Arcadia, accueil">ARCA<span>DIA</span></a>
+    <nav class="navlinks" style="margin-right:0" aria-label="Navigation"><a href="./">Accueil</a><a href="./#jeux">Jeux</a><a href="#credits">Crédits</a><a href="#confidentialite">Confidentialité</a></nav>
+  </header>
+  <main class="doc">
+    <div><h1>À propos</h1><p class="lead">Arcadia, ce sont des jeux à plusieurs, directement dans le navigateur : un salon, un code de quatre lettres, et toute la bande joue ensemble. Gratuit, sans publicité, sans rien installer.</p></div>
+
+    <div class="card">
+      <h2>Qui fait Arcadia ?</h2>
+      <p>Un projet entre potes, lancé par <b>Amiel</b> avec <b>Nicolas</b> et <b>Gabriel</b>, et développé avec l'aide de <b>Claude</b> (Anthropic). Tout a commencé avec Duo Drift, une course en vue du ciel pour jouer à deux ; le salon a grandi jusqu'à une douzaine de jeux.</p>
+      <p>Une idée, un bug ? Écris-nous sur <a href="https://github.com/AmielMetier" target="_blank" rel="noopener">GitHub</a>. Les nouveautés de chaque version sont dans « Nouveautés », sur l'accueil.</p>
+    </div>
+
+    <div class="card" id="credits">
+      <h2>Crédits</h2>
+      <p>Les jeux, leurs règles et leurs graphismes dessinés par le code sont faits maison. Le reste vient de créateurs qui partagent leur travail librement : merci à eux.</p>
+      <table class="cr">
+        <tr><td>Textures photo</td><td><a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> — herbe, roche, bois, pierre, sable, neige (CC0). Cyber Kart GP, Mini-Golf Party.</td></tr>
+        <tr><td>Bruitages</td><td><a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> — Interface Sounds, Impact Sounds, Music Jingles (CC0) ; <a href="https://freesound.org" target="_blank" rel="noopener">Freesound</a> — public, frappes de golf, ambiances (CC0, auteurs listés avec les fichiers).</td></tr>
+        <tr><td>Musique</td><td>« Sunny Side Up » d'Alex McCulloch, sur <a href="https://opengameart.org/content/sunny-side-up" target="_blank" rel="noopener">OpenGameArt</a> (CC0), et les morceaux crédités dans chaque jeu.</td></tr>
+        <tr><td>3D</td><td><a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</td></tr>
+        <tr><td>Polices</td><td>Bungee et Chakra Petch, via Google Fonts (licence SIL OFL).</td></tr>
+        <tr><td>Données Pokémon</td><td>Tables et sprites de <a href="https://pokeapi.co" target="_blank" rel="noopener">PokeAPI</a>, utilisés dans Poké Duel et Odyssée. Pokémon est une marque de Nintendo, Creatures et GAME FREAK : Arcadia est un projet de fans, non officiel et non commercial.</td></tr>
+      </table>
+    </div>
+
+    <div class="card" id="confidentialite">
+      <h2>Confidentialité</h2>
+      <p>Arcadia ne te demande ni e-mail, ni mot de passe, ni vrai nom, et n'affiche aucune publicité.</p>
+      <ul>
+        <li><b>Dans ton navigateur</b> : ton pseudo, ta couleur, ta liste d'amis, tes réglages (volume, graphismes) et tes scores. Ils restent sur ton appareil ; effacer les données du site les supprime.</li>
+        <li><b>Sur le serveur de jeu</b> : pendant une partie, le relais transmet les messages entre les joueurs du salon (positions, coups, chat) sans les garder. Il sert aussi à montrer à tes amis que tu es en ligne (pseudo, couleur, code ami).</li>
+        <li><b>Sauvegardes d'Odyssée</b> : si tu joues à Odyssée, ta partie est rangée en ligne sous ton code ami, pour la retrouver sur un autre appareil. Rien d'autre n'y est attaché.</li>
+        <li><b>Journal des plantages</b> : quand un jeu plante, un rapport technique (jeu, message d'erreur) est noté dans ton navigateur, pour aider à corriger le bug. Il ne contient pas tes messages.</li>
+      </ul>
+      <p>Le site est hébergé par GitHub Pages et les polices viennent de Google Fonts : comme pour tout site, ces services voient ton adresse IP quand ils t'envoient les fichiers.</p>
+    </div>
+    <a class="btn yellow back" href="./">← Retour aux jeux</a>
+  </main>
+  <footer class="foot"><div class="credit">by <b>Amiel</b>, <b>Nicolas</b>, <b>Gabriel</b> and <b>Claude</b></div></footer>
+</section>
+</body>
+</html>

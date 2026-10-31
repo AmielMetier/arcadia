@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 3.23 — 31 octobre 2026
+- **Arcadia** — Nouvel accueil : les jeux d'abord.
+  - Une grande vitrine fait défiler les jeux, avec « Jouer avec mes potes » et « Jouer seul » en un clic.
+  - Les jeux se trient par catégorie (Course, Action, Stratégie, Party, Sport, Plateau, Aventure), avec la durée d'une partie, et une étiquette « Nouveau » ou « Mis à jour ».
+  - Plus de cartes noires pendant le chargement : chaque jeu affiche sa couleur et son nom en attendant son affiche.
+  - Un encadré « Comment ça marche », un pied de page et une page « À propos » (crédits, confidentialité).
+- **Arcadia** — Un seul écran de chargement pour tous les jeux : l'affiche, les commandes, une astuce et une barre de progression, puis « C'est parti ! ».
+- **Arcadia** — Le menu Arcadia, le même dans tous les jeux : un petit onglet sur le bord gauche de l'écran pour revoir les commandes, régler le son, passer en plein écran ou revenir au salon.
+- **Arcadia** — Les boutons du Hub font des petits bruits, et le lien d'Arcadia s'affiche avec une image et un titre quand on le partage (WhatsApp, Discord…). Arcadia s'installe aussi comme une appli sur téléphone.
+- **Arcadia** — L'accueil s'adapte aux téléphones et aux tablettes.
+- **Mini-Golf Party** — De vrais bruitages : la frappe, la balle qui tombe dans le trou, les rebonds, le plouf, le public, et un fond sonore (oiseaux, vagues) sur certains parcours.
+
 ## 3.22 — 31 octobre 2026
 - **Arcadia** — Le Hub a un vrai nom : Arcadia. Nouveau logo sur l'accueil et dans le salon.
 - **Mini-Golf Party** — Fini les balles qui traversent les murets : un obstacle mobile (porte coulissante, télécabine…) ne peut plus pousser la balle de l'autre côté.

@@ -221,3 +221,48 @@ window.HUB_GAMES = [
     cover: 'royale/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
 ];
+
+/* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
+   Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
+window.HUB_GAME_INFO = {
+  drift: { genre: 'course', time: '5–15 min',
+    keys: [['Flèches / ZQSD', 'Conduire'], ['Espace', 'Nitro / objet'], ['Maj', 'Frein à main'], ['Échap', 'Pause']],
+    tips: ['Le nitro se recharge en driftant.', 'Les raccourcis des villes valent le détour.', 'Le fantôme de ton meilleur tour se partage avec tes potes.'] },
+  david: { genre: 'plateau', time: '40–90 min',
+    keys: [['Clic', 'Lancer les dés, acheter'], ['Clic-glisser', 'Tourner le plateau'], ['Molette', 'Zoom']],
+    tips: ['Les gares rapportent vite en début de partie.', 'Trois maisons sur un groupe : c\'est là que les loyers explosent.', 'Le mode Express tient en 40 minutes.'] },
+  calcul: { genre: 'party', time: '5–10 min',
+    keys: [['Clavier', 'Taper la réponse'], ['Entrée', 'Valider'], ['Clic', 'Choisir une réponse']],
+    tips: ['47 × 53 = 50² − 3² = 2 491.', 'Trois bonnes réponses d\'affilée donnent un pouvoir de sabotage.', 'En mode Péril, une erreur coûte des points.'] },
+  bastion: { genre: 'strategie', time: '15–30 min',
+    keys: [['Clic gauche', 'Sélectionner'], ['Clic droit', 'Déplacer / attaquer'], ['ZQSD / flèches', 'Caméra'], ['F1 · F2', 'Ouvriers · armée']],
+    tips: ['Garde toujours des ouvriers sur les cristaux.', 'Une expansion tôt fait la différence.', 'Clic droit sur la minicarte pour envoyer tes troupes loin.'] },
+  outbreak: { genre: 'action', time: '15–30 min',
+    keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['1 2 3 · molette', 'Changer d\'arme'], ['Clic droit / G', 'Capacité']],
+    tips: ['Restez groupés : le Médecin soigne autour de lui.', 'Les barils explosent… sur les zombies aussi.', 'Fouillez les salles pour trouver les 20 dossiers.'] },
+  filrouge: { genre: 'party', time: '5–15 min',
+    keys: [['Glisser', 'Tourner la bombe'], ['Molette', 'Zoom'], ['Z/S · Q/D · A/E', 'Pivoter au clavier'], ['Clic', 'Couper, tourner, appuyer']],
+    tips: ['Décrivez exactement ce que vous voyez, sans interpréter.', 'Les règles du manuel changent à chaque partie.', 'Regardez aussi l\'extérieur de la bombe : lot, tampons, vis.'] },
+  kart: { genre: 'course', time: '10–20 min',
+    keys: [['Flèches / ZQSD', 'Conduire'], ['Maj en tournant', 'Drift (mini-turbo)'], ['E', 'Utiliser l\'objet'], ['↓ + E', 'Lancer vers l\'arrière']],
+    tips: ['Alterne Q et D pendant un drift : le mini-turbo charge deux fois plus vite.', 'Colle-toi derrière un kart pour profiter de l\'aspiration.', 'Une figure en sautant donne un petit turbo à l\'atterrissage.'] },
+  convoy: { genre: 'action', time: '15–30 min',
+    keys: [['ZQSD', 'Se déplacer'], ['E', 'Interagir'], ['Souris', 'Viser · tirer']],
+    tips: ['Le convoi ralentit en gare : profitez-en pour réparer.', 'Surveillez la pression de la chaudière.'] },
+  golf: { genre: 'sport', time: '20–45 min',
+    keys: [['Clic maintenu', 'Armer : tirer vers le bas'], ['Relâcher', 'Frapper'], ['← →', 'Viser'], ['Espace', 'Swing au clavier']],
+    tips: ['Tirer de travers donne un hook ou un slice.', 'Regarde le vent avant chaque coup long.', 'Les repères 1/3 et 2/3 de la jauge s\'affichent sur la mini-carte.'] },
+  pokemon: { genre: 'aventure', time: '15–40 min',
+    keys: [['Flèches / ZQSD', 'Marcher'], ['Espace / Entrée', 'Parler, valider'], ['B / Échap', 'Retour']],
+    tips: ['Les types comptent : l\'eau bat le feu, le feu bat la plante.', 'Pense à soigner ton équipe avant le tournoi.'] },
+  odyssee: { genre: 'aventure', time: 'Longue aventure',
+    keys: [['Flèches / ZQSD', 'Marcher'], ['Maj', 'Courir'], ['Espace', 'Parler, valider'], ['Échap', 'Menu']],
+    tips: ['Ta partie est sauvegardée en ligne avec ton compte.', 'Parle aux autres joueurs pour échanger ou combattre.', 'Les CS ouvrent des recoins cachés le long des routes.'] },
+  minigolf: { genre: 'sport', time: '10–20 min',
+    keys: [['Souris', 'Tourner la caméra, viser'], ['Clic maintenu + reculer', 'Doser la puissance'], ['Molette', 'Zoom'], ['V', 'Vue du trou']],
+    tips: ['Sur la glace, un tout petit coup suffit.', 'Les accélérateurs comptent dans ta puissance : dose moins.', 'V montre le trou avant de jouer.'] },
+  royale: { genre: 'action', time: '10–20 min',
+    keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
+    tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
+};
+window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];
