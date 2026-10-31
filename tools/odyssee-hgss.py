@@ -86,6 +86,55 @@ def nsbtx_frames(path):
         out.append(im)
     return out
 
+def narc_files(path):
+    """fichiers d'une archive NARC (DS)"""
+    b = open(path, 'rb').read(); assert b[:4] == b'NARC'
+    o = u16(b, 0xC); assert b[o:o + 4] == b'BTAF'
+    n = u32(b, o + 8); fat = [struct.unpack_from('<II', b, o + 12 + 8 * i) for i in range(n)]
+    o2 = o + u32(b, o + 4); o3 = o2 + u32(b, o2 + 4); base = o3 + 8
+    return [b[base + s:base + e] for s, e in fat]
+
+def btx_textures(b):
+    """toutes les textures d'un fichier BTX0 (formats 4, 16 et 256 couleurs), dans l'ordre de leurs numéros"""
+    T = b[u32(b, 0x10):]
+    texs = _dict(T, u16(T, 0x0E), 8); pals = dict(_dict(T, u32(T, 0x34), 4)); pdata = u32(T, 0x38); tdata = u32(T, 0x14)
+    out = []
+    num = lambda ne: int(re.search(r'(\d+)$', ne[0]).group(1)) if re.search(r'(\d+)$', ne[0]) else 0
+    for name, e in sorted(texs, key=num):
+        pe = pals.get(name + '_pl') or pals.get(name) or next(iter(pals.values()))
+        poff = u16(pe, 0) << 3
+        o = tdata + (u16(e, 0) << 3); p = u16(e, 2)
+        w = 8 << ((p >> 4) & 7); h = 8 << ((p >> 7) & 7); fmt = (p >> 10) & 7; tr = (p >> 13) & 1
+        bits = {2: 2, 3: 4, 4: 8}.get(fmt)
+        if not bits: continue
+        pal = [_bgr(u16(T, pdata + poff + 2 * i)) for i in range(1 << bits) if pdata + poff + 2 * i + 2 <= len(T)]
+        im = Image.new('RGBA', (w, h)); px = im.load(); per = 8 // bits
+        for i in range(w * h):
+            v = (T[o + i // per] >> ((i % per) * bits)) & ((1 << bits) - 1)
+            px[i % w, i // w] = (pal[v] if v < len(pal) else (0, 0, 0)) + ((0,) if (v == 0 and tr) else (255,))
+        out.append(im)
+    return out
+
+# animations de terrain de HGSS : mer, rivage, fleurs des villes (fichier, n° dans fldtanime.narc ou None)
+ANIM = {
+    'mer': ('files/data/minimum.nsbtx', None), 'rivage': ('files/data/minihamabe.nsbtx', None),
+    'vague': ('files/data/fldtanime.narc', 3), 'fleur_r': ('files/data/t3_fl_r.nsbtx', None), 'fleur_y': ('files/data/t3_fl_y.nsbtx', None),
+    'fleur_b': ('files/data/t3_fl_b.nsbtx', None), 'fleur_p': ('files/data/t3_fl_p.nsbtx', None),
+    'fleur_o': ('files/data/fldtanime.narc', 6), 'fleur_w': ('files/data/fldtanime.narc', 7), 'rocher_mer': ('files/data/fldtanime.narc', 4),
+}
+
+def extract_anim(pret):
+    os.makedirs(os.path.join(RAW, 'anim'), exist_ok=True)
+    for k, (f, i) in ANIM.items():
+        path = os.path.join(pret, f)
+        b = narc_files(path)[i] if i is not None else open(path, 'rb').read()
+        fr = btx_textures(b)
+        strip = Image.new('RGBA', (sum(x.width for x in fr), max(x.height for x in fr)))
+        x = 0
+        for im in fr: strip.alpha_composite(im, (x, 0)); x += im.width
+        strip.save(os.path.join(RAW, 'anim', k + '.png'), optimize=True)
+        print('animation', k, len(fr), 'images', fr[0].size)
+
 def mmodel_index(pret):
     idx = {}
     for l in open(os.path.join(pret, 'include', 'constants', 'mmodel.h')):
@@ -96,6 +145,7 @@ def mmodel_index(pret):
 def extract(pret, smogon):
     os.makedirs(os.path.join(RAW, 'ow'), exist_ok=True); os.makedirs(os.path.join(RAW, 'dresseurs'), exist_ok=True)
     if pret:
+        extract_anim(pret)
         idx = mmodel_index(pret)
         for cid, (mm, _) in CHARS.items():
             fr = nsbtx_frames(os.path.join(pret, 'files', 'data', 'mmodel', 'mmodel', f'mmodel_{idx[mm]:08d}.NSBTX'))
@@ -148,6 +198,15 @@ def build():
     txt = open(js).read(); meta = json.loads(txt[txt.index('{'):txt.rindex('}') + 1])
     meta['chars'] = {'w': CW, 'h': CW, 'd': 2, 'rows': {c: i for i, c in enumerate(ids)}}
     meta['dresseurs'] = dres
+    # animations de terrain : copiées telles quelles (bandes d'images de 16 ou 32 px)
+    anim = {}
+    os.makedirs(os.path.join(OUT, 'hgss'), exist_ok=True)
+    for k in ANIM:
+        p = os.path.join(RAW, 'anim', k + '.png')
+        if not os.path.exists(p): continue
+        im = Image.open(p); im.save(os.path.join(OUT, 'hgss', k + '.png'), optimize=True)
+        anim[k] = [im.height, im.width // im.height]
+    meta['hgss'] = anim
     with open(js, 'w') as f:
         f.write('// Généré par tools/odyssee-sprites.py — ne pas modifier à la main.\n')
         f.write('export const SPRITES = ' + json.dumps(meta, ensure_ascii=False, separators=(',', ':')) + ';\n')

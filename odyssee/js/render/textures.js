@@ -268,22 +268,57 @@ function shore32(water, mask, frame) {
   side(8, [0, 0, 4, 32, 4, 0, 2, 32]); side(2, [28, 0, 4, 32, 26, 0, 2, 32]);
   return c;
 }
+/** image n° f d'une bande d'animation HGSS (carrés de côté h), agrandie à 32 px */
+function hgFrame(k, f) {
+  const im = HG[k]; if (!im) return null;
+  const h = im.height, n = Math.round(im.width / h), c = canvas(C2, C2), x = c.getContext('2d');
+  x.imageSmoothingEnabled = false; x.drawImage(im, (f % n) * h, 0, h, h, 0, 0, C2, C2);
+  return c;
+}
+/** eau de HeartGold / SoulSilver : la mer animée, et sur les côtés sans voisin d'eau, le rivage (sable, écume qui
+ *  monte et redescend) tiré de l'animation de plage du jeu, tourné vers la terre */
+function hgWater(mask, f) {
+  const sea = hgFrame('mer', f); if (!sea) return null;
+  const c = canvas(C2, C2), x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.drawImage(sea, 0, 0);
+  const R = HG.rivage;
+  if (R) {
+    // bord droit de la plage du jeu : la moitié basse (sable en haut, vagues, eau) d'une image de 32 px
+    const h = R.height, n = Math.round(R.width / h), sx = (f % n) * h;
+    const piece = canvas(C2, C2), px = piece.getContext('2d'); px.imageSmoothingEnabled = false;
+    px.drawImage(R, sx, h / 2, h / 2, h / 2, 0, 0, C2, C2);
+    for (const [bit, rot] of [[1, 0], [2, 1], [4, 2], [8, 3]]) {
+      if (mask & bit) continue;
+      x.save(); x.translate(C2 / 2, C2 / 2); x.rotate(rot * Math.PI / 2); x.translate(-C2 / 2, -C2 / 2);
+      x.beginPath(); x.rect(0, 0, C2, C2 / 2); x.clip(); x.drawImage(piece, 0, 0); x.restore();
+    }
+  }
+  return c;
+}
+/** massif de fleurs de HGSS : l'herbe, et par-dessus deux fleurs qui se balancent */
+function hgFlower(k, f, grass) {
+  const fl = hgFrame(k, f >> 1); if (!fl) return null;
+  const c = canvas(C2, C2), x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  if (grass) x.drawImage(grass, 0, 0, grass.width, grass.height, 0, 0, C2, C2);
+  x.drawImage(fl, 0, 0);
+  return c;
+}
 export function buildAnimAtlas() {
-  const SIZE = 1024, cols = Math.floor(SIZE / P2), FR = 4;
+  const SIZE = 512, cols = Math.floor(SIZE / P2), FR = 8;
   const frames = [];
   const cells = {};
   const keys = [];
   const W = [0, 1, 2, 3].map((f) => SOL32['water' + f]);
-  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), W[0] && ((f) => shore32(up2(W[f] || W[0]), m, f))]);
-  const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR];
-  for (let k = 0; k < 3; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k), FL[k] && (() => up2(FL[k]))]);
-  keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 1) & 1)] || SOL32.lava0))]);
-  keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 1) & 1)] || SOL32.deep0))]);
+  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
+  const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
+  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : FL[k] && (() => up2(FL[k]))]);
+  keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
+  keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
   for (let f = 0; f < FR; f++) {
     const c = canvas(SIZE, SIZE), ctx = c.getContext('2d');
     keys.forEach(([key, draw, drawImg], i) => {
-      let t;
-      if (drawImg) t = drawImg(f); else { const P = new Pix(CELL, CELL, i * 131 + 5); draw(P, f); t = up2(P.c); }
+      let t = drawImg ? drawImg(f) : null;
+      if (!t) { const P = new Pix(CELL, CELL, i * 131 + 5); draw(P, f % 4); t = up2(P.c); }
       const cx = (i % cols) * P2, cy = Math.floor(i / cols) * P2;
       blit(ctx, t, cx, cy);
       if (f === 0) cells[key] = [(cx + 1) / SIZE, (cy + 1) / SIZE, (cx + 1 + C2) / SIZE, (cy + 1 + C2) / SIZE];
@@ -427,8 +462,8 @@ export function applySpriteImages(S, images, dens = {}) {
 
 /* ---------------- images dessinées (planches préparées par tools/odyssee-sprites.py) ---------------- */
 // kits de façade (4 × 4 tuiles de 16 px) par style, et sols d'intérieur ; chargés au démarrage, sinon dessin du code
-const KITS = {}, SOLS = {}, SOL32 = {};
-export function setArt({ kits = {}, sols = {}, sol32 = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; }
+const KITS = {}, SOLS = {}, SOL32 = {}, HG = {};
+export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; }
 const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode' };
 // position des tuiles dans un kit : [colonne, ligne]
 const KT = { wall: [0, 0], win: [1, 0], winN: [2, 0], base: [3, 0], door: [0, 1], doorN: [1, 1], lintel: [2, 1], side: [3, 1], roof: [0, 2], eave: [1, 2], ridge: [2, 2], chimney: [3, 2], signL: [0, 3], signR: [1, 3], flowers: [2, 3], lamp: [3, 3], winB: [0, 4], winBN: [1, 4] };

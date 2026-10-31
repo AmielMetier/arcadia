@@ -47,8 +47,10 @@ async function loadArt() {
     if (!SPRITES.herbes?.[th]) continue;
     sprites[key] = ASSETS.herbe(th + '_front'); sprites[key + '2'] = ASSETS.herbe(th + '_front2'); dens[key] = dens[key + '2'] = 2;
   }
-  const [S, K, L, L32, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, chars, title };
+  // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
+  const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
+  const [S, K, L, L32, HGI, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title };
 }
 
 async function boot() {
@@ -57,7 +59,7 @@ async function boot() {
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
   const world = buildWorld();
   const art = await loadArt();
-  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32 });
+  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss });
   const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens });
   const game = new Game({ view, ui, input, sound, world });
   window.__ody = { game, world, view, ui, sound, mon: (sp, lvl) => createMon(sp, lvl) };

@@ -239,7 +239,7 @@ export class WorldView {
       case T.SAND: return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
       case T.WATER: return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
       case T.BRIDGE: { const ns = m.get(x - 1, y) === T.WATER || m.get(x + 1, y) === T.WATER; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
-      case T.FLOWER: return { anim: this.N.cells['flower' + Math.floor(v * 3)] };
+      case T.FLOWER: return { anim: this.N.cells['flower' + Math.floor(v * 4)] || this.N.cells.flower0 };
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
       case T.CAVE: case T.CAVEWALL: return { c: A['cave' + (v < 0.5 ? 0 : 1)] };
       case T.CAVEDOOR: return { c: A.cavestairs };
@@ -527,7 +527,7 @@ export class WorldView {
   update(dt, fx, fy) {
     this.ensureChunks(fx, fy);
     this.animT += dt;
-    if (this.animT > 0.28) {
+    if (this.animT > 0.2) {
       this.animT = 0; this.animFrame = (this.animFrame + 1) % this.N.frames.length;
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }

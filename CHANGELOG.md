@@ -1,5 +1,9 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.48 — 31 octobre 2026
+- **Odyssée** — l'eau et les fleurs viennent maintenant de HeartGold / SoulSilver : la mer ondule comme sur DS, les rivages ont leur sable et leur écume qui monte et redescend.
+  - Les parterres fleuris sont faits de fleurs rouges, jaunes, bleues et violettes qui se balancent au vent.
+
 ## 3.47 — 31 octobre 2026
 - **Odyssée** — le décor passe au nouveau tileset dessiné : herbe, chemins, sable, pavés, neige, sol des bois, grottes, eau et lave animées, ponts, rebords et escaliers.
   - Les hautes herbes forment de vraies nappes aux bords et aux coins arrondis, dans la prairie, les bois et la neige.
