@@ -113,4 +113,33 @@ for (let g = 0; g < 300; g++) {
 }
 for (const k of ['leftovers', 'sitrus', 'lifeorb']) ok(seen.has(k), `${ITEMS[k].name} s'est déclenché en combat`);
 console.log(`✓ 300 combats entre bots avec objets, objets vus en action : ${[...seen].map((k) => ITEMS[k].name).join(', ')}`);
+// --- Méga-Évolution
+{
+  const { MEGAS } = await import('../pokemon/engine/megas.js');
+  const { canMega } = await import('../pokemon/engine/battle.js');
+  ok(Object.keys(MEGAS).length >= 25, 'des Pokémon du roster peuvent méga-évoluer');
+  ok(Object.keys(MEGAS).every((d) => getPokemonById(Number(d))), 'chaque Méga correspond à un Pokémon du roster');
+  // une seule Méga-Gemme par équipe, et seulement pour son Pokémon
+  const c = cleanItems([6, 94, 65], { 6: 'mega_10035', 94: 'mega_10038', 65: 'mega_10034' });
+  ok(c[6] === 'mega_10035' && !String(c[94]).startsWith('mega_') && !String(c[65]).startsWith('mega_'), 'une seule Méga-Gemme par équipe, et pour le bon Pokémon');
+  ok(String(suggestItems([6, 25, 143])[6]).startsWith('mega_'), 'la Méga-Gemme est conseillée au meilleur candidat');
+  const zard = mon(6, 'mega_10035'), foe = mon(143);
+  const b = createBattle({ trainerA: { id: 1, name: 'A' }, trainerB: { id: 2, name: 'B' }, teamA: [zard, mon(25)], teamB: [foe] });
+  const hp0 = b.teamA[0].hp, spa0 = b.teamA[0].stats.spa;
+  ok(canMega(b, 'A', b.teamA[0]), 'Dracaufeu peut méga-évoluer');
+  const { events } = resolveTurn(b, { type: 'move', moveId: b.teamA[0].moves[0], mega: true }, { type: 'move', moveId: b.teamB[0].moves[0] });
+  const ev = events.find((e) => e.type === 'mega');
+  ok(ev && ev.name === 'Méga-Dracaufeu Y' && events.indexOf(ev) < events.findIndex((e) => e.type === 'attack_start'), 'la Méga-Évolution a lieu avant les attaques');
+  ok(b.teamA[0].isMega && b.teamA[0].stats.spa > spa0 && b.teamA[0].spriteId === 10035, 'stats et sprite de la forme Méga');
+  ok(b.teamA[0].maxHp === mon(6).maxHp && b.teamA[0].hp <= hp0, 'les PV ne changent pas');
+  ok(!canMega(b, 'A', b.teamA[0]) && !canMega(b, 'A', b.teamA[1]), 'une seule Méga-Évolution par combat');
+  if (b.phase === 'choose') {
+    resolveTurn(b, { type: 'switch', targetIndex: 1 }, { type: 'move', moveId: b.teamB[0].moves[0] });
+    ok(b.teamA[0].isMega && b.teamA[0].name === 'Méga-Dracaufeu Y', 'elle reste Méga après un changement');
+  } else n++;
+  // le bot méga-évolue
+  const b2 = createBattle({ trainerA: { id: 1, name: 'A', bot: true }, trainerB: { id: 2, name: 'B' }, teamA: [mon(94, 'mega_10038')], teamB: [mon(143)] });
+  ok(chooseBotAction(b2, 'A', 'normal').mega === true, 'le bot méga-évolue dès qu\'il peut');
+  console.log('✓ Méga-Évolution : avant les attaques, stats et types de la forme Méga, PV gardés, une seule par combat, bots compris');
+}
 console.log(`\nOBJETS DE POKÉ DUEL : ${n} vérifications réussies`);

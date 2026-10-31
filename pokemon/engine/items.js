@@ -4,6 +4,7 @@
 
 import { MOVES } from './moves.js';
 import { getPokemonById } from './data.js';
+import { MEGAS, megasOf, megaByStone } from './megas.js';
 
 // icônes PokeAPI, rangées dans assets/items (chemin depuis la page du jeu)
 const ICON = (slug) => `assets/items/${slug}.png`;
@@ -19,7 +20,16 @@ export const ITEMS = {
   focussash:   { name: 'Ceinture Force', icon: ICON('focus-sash'),  desc: 'Une fois : à PV pleins, survit à un coup fatal avec 1 PV.' },
   expertbelt:  { name: 'Ceinture Pro',  icon: ICON('expert-belt'),  desc: 'Attaques super efficaces ×1,2.' },
 };
-export const ITEM_KEYS = Object.keys(ITEMS);
+export const ITEM_KEYS = Object.keys(ITEMS);   // objets que tout Pokémon peut tenir
+// Méga-Gemmes : une par forme Méga, utilisable seulement par son Pokémon (clé « mega_<forme> »)
+for (const [dex, list] of Object.entries(MEGAS)) for (const m of list) {
+  ITEMS[m.stone] = { name: m.stoneName, icon: m.icon, mega: { dex: Number(dex), pid: m.pid }, desc: `Permet à ce Pokémon de méga-évoluer en ${m.name} pendant le combat (une seule Méga-Évolution par combat).` };
+}
+export const isStone = (k) => !!(ITEMS[k] && ITEMS[k].mega);
+/** Objets proposés à un Pokémon : ses Méga-Gemmes d'abord, puis les objets communs */
+export const itemsFor = (dex) => [...megasOf(dex).map((m) => m.stone), ...ITEM_KEYS];
+/** Gain de puissance d'une Méga-Évolution (somme des stats hors PV) */
+const megaGain = (dex, m) => { const b = getPokemonById(dex); if (!b) return 0; const k = ['atk', 'def', 'spa', 'spd', 'spe']; return k.reduce((n, s) => n + m.stats[s] - b.stats[s], 0); };
 export const CHOICE = new Set(['choiceband', 'choicespecs', 'choicescarf']);
 
 /** Intérêt de chaque objet pour un Pokémon (plus c'est haut, mieux c'est). */
@@ -50,6 +60,12 @@ function itemScores(base) {
 export function suggestItems(ids, fixed = {}) {
   const out = {}, used = new Set();
   for (const id of ids) if (fixed[id] && ITEMS[fixed[id]] && !used.has(fixed[id])) { out[id] = fixed[id]; used.add(fixed[id]); }
+  // une Méga-Gemme pour le Pokémon de l'équipe qui gagne le plus à méga-évoluer (s'il y en a un, et si aucune n'est déjà choisie)
+  if (!Object.values(out).some(isStone)) {
+    let best = null;
+    for (const id of ids) if (!out[id]) for (const m of megasOf(id)) { const g = megaGain(id, m); if (!best || g > best.g) best = { id, m, g }; }
+    if (best) { out[best.id] = best.m.stone; used.add(best.m.stone); }
+  }
   const wants = ids.filter((id) => !out[id]).map((id) => {
     const b = getPokemonById(id);
     const sc = b ? itemScores(b) : {};
@@ -72,7 +88,10 @@ export function cleanItems(ids, items) {
   const used = new Set();
   if (items && typeof items === 'object') for (const id of ids) {
     const k = items[id];
-    if (typeof k === 'string' && ITEMS[k] && !used.has(k)) { fixed[id] = k; used.add(k); }
+    if (typeof k !== 'string' || !ITEMS[k] || used.has(k)) continue;
+    // une Méga-Gemme ne va qu'à son Pokémon, et une seule par équipe
+    if (isStone(k) && (ITEMS[k].mega.dex !== Number(id) || [...used].some(isStone))) continue;
+    fixed[id] = k; used.add(k);
   }
   return suggestItems(ids, fixed);
 }

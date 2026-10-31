@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.32 — 31 octobre 2026
+- **Poké Duel** — Les Méga-Évolutions arrivent : 29 Pokémon du tournoi peuvent méga-évoluer (31 formes, dont Dracaufeu et Mewtwo X et Y).
+  - Au draft, un badge MÉGA signale ceux qui le peuvent, et leur Méga-Gemme est proposée en tête de leurs objets (une seule par équipe).
+  - En combat, clique sur MÉGA-ÉVOLUTION (ou touche M) puis choisis ton attaque : il se transforme au début du tour, avant les attaques, avec ses nouvelles stats et ses nouveaux types. Une seule Méga-Évolution par combat.
+  - Halo arc-en-ciel, éclair blanc et nouveau sprite, comme dans les jeux. Les bots méga-évoluent aussi.
+- **Poké Duel** — La musique des combats démarre à nouveau (elle se relançait sans arrêt pendant son chargement et ne jouait jamais).
+- **Poké Duel** — Après un K.O. ou un changement de Pokémon, le menu revient sur les attaques au lieu de rester sur la liste des Pokémon.
+
 ## 3.31 — 31 octobre 2026
 - **Poké Duel** — Les objets tenus arrivent : au draft, chaque Pokémon reçoit un objet conseillé, que tu peux changer (deux Pokémon d'une équipe ne tiennent jamais le même).
   - Restes, Baie Sitrus, Baie Prine, Orbe Vie, Bandeau Choix, Lunettes Choix, Mouchoir Choix, Ceinture Force et Ceinture Pro, avec leurs vrais effets.

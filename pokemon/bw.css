@@ -796,3 +796,16 @@
 .dr-items-help p{margin:0;display:flex;gap:5px;align-items:flex-start}
 .dr-items-help img{width:20px;height:20px;image-rendering:pixelated;flex:none}
 .dr-items-help b{white-space:nowrap}
+
+/* ===== Méga-Évolution ===== */
+.fx-mega-ring{border-radius:50%;background:conic-gradient(#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);
+  -webkit-mask:radial-gradient(circle,transparent 52%,#000 54%,#000 64%,transparent 66%);mask:radial-gradient(circle,transparent 52%,#000 54%,#000 64%,transparent 66%);filter:blur(1px) drop-shadow(0 0 8px #fff)}
+.fx-mega-flash{left:0;top:0;width:100%;height:100%;background:radial-gradient(circle,#fff 30%,rgba(255,255,255,.85));z-index:9}
+.bw-mega{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 8px;padding:6px 12px;border:3px solid #222;border-radius:10px;cursor:pointer;
+  background:linear-gradient(90deg,#3a2a60,#5a3a90);color:#fff;font-family:inherit;font-weight:800;letter-spacing:1px;text-align:left}
+.bw-mega img{width:28px;height:28px;image-rendering:pixelated}
+.bw-mega small{margin-left:auto;font-weight:600;letter-spacing:0;font-size:11px;opacity:.8}
+.bw-mega:hover{filter:brightness(1.15)}
+.bw-mega.on{background:conic-gradient(from 90deg,#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);color:#111;text-shadow:0 1px 0 #fff;animation:megaPulse 1s ease-in-out infinite}
+@keyframes megaPulse{50%{box-shadow:0 0 14px 2px rgba(255,255,255,.8)}}
+.dr-mega{font-size:10px;letter-spacing:1px;vertical-align:middle;padding:1px 6px;border-radius:8px;background:conic-gradient(#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);color:#111;text-shadow:0 1px 0 #fff}

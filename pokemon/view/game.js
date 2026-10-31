@@ -21,7 +21,7 @@ function itemBadge(p) {
   const lock = CHOICE.has(p.item) && p.choiceLock && MOVES[p.choiceLock] ? ` · bloqué sur ${MOVES[p.choiceLock].name}` : '';
   return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" title="${it.name} : ${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}"><img src="${it.icon}" alt="">${it.name}</span>`;
 }
-import { STAGE_MULTS } from '../engine/battle.js';
+import { STAGE_MULTS, canMega } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
 import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
 import { sfx } from './sfx.js';
@@ -91,6 +91,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
+  let lastTurnKey = null;
+  let megaOn = false;      // bouton Méga-Évolution enclenché pour la prochaine attaque   // tour affiché : à chaque nouveau tour, le menu revient sur « Attaque »
   let displayedHp = { bottom: null, top: null };
   let shownMon = { bottom: null, top: null }; // Pokémon visible de chaque côté (null : rien sur le terrain)
   let hpAnimRaf = { bottom: null, top: null };
@@ -368,7 +370,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         }
         if (sprite) {
           sprite.classList.add('fx-hidden');
-          sprite.src = key === 'bottom' ? spriteUrls(ev.pokemonId).back : spriteUrls(ev.pokemonId).front;
+          sprite.src = key === 'bottom' ? spriteUrls(ev.spriteId || ev.pokemonId).back : spriteUrls(ev.spriteId || ev.pokemonId).front;
         }
         const talk = say(msg, 'step-switch');
         if (sprite) {
@@ -445,6 +447,23 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         const amount = ev.type === 'heal' ? ev.amount : ev.damage;
         const oldHp = displayedHp[key] !== null ? displayedHp[key] : (ev.type === 'heal' ? ev.hp - amount : ev.hp + amount);
         await animateHp(key, oldHp, ev.hp, ev.maxHp, drainMs(amount, ev.maxHp));
+
+      } else if (ev.type === 'mega') {
+        // Méga-Évolution : halo arc-en-ciel, éclair blanc, le sprite change, le cadre prend le nouveau nom et les types
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        sfx.play('levelup');
+        const talk = say(msg, 'step-status');
+        if (sprite) {
+          await fx.megaEvolve(sprite, key === 'bottom' ? spriteUrls(ev.spriteId).back : spriteUrls(ev.spriteId).front);
+          if (stale()) return;
+        }
+        const nameEl = $(key === 'bottom' ? '#nameBottom' : '#nameTop');
+        if (nameEl) nameEl.textContent = ev.name;
+        const typesEl = $(key === 'bottom' ? '#typesBottom' : '#typesTop');
+        if (typesEl && ev.types) typesEl.innerHTML = typeBadgesHtml(ev.types);
+        if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+        await talk;
 
       } else if (ev.type === 'item') {
         // l'objet entre en jeu : son icône surgit au-dessus du Pokémon
@@ -547,6 +566,10 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
     if (isForcedSwitch) {
       activeTab = 'switch';
+    } else if (b.phase === 'choose') {
+      // nouveau tour (après un K.O., un remplacement ou un changement) : on revient sur les attaques
+      const turnKey = `${b.turn}:${b.activeA}:${b.activeB}`;
+      if (turnKey !== lastTurnKey) { lastTurnKey = turnKey; activeTab = 'moves'; megaOn = false; }
     }
 
     let announcement = '';
@@ -590,7 +613,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             <div class="fighter-zone fighter-top">
               <div class="platform platform-top">
                 <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
-                <img class="poke-sprite front ${pTop.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteTop" src="${spriteUrls(pTop.id).front}" alt="${pTop.name}">
+                <img class="poke-sprite front ${pTop.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteTop" src="${spriteUrls(pTop.spriteId || pTop.id).front}" alt="${pTop.name}">
                 <div class="damage-popup-anchor" id="popupAnchorTop"></div>
               </div>
             </div>
@@ -599,7 +622,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             <div class="fighter-zone fighter-bottom">
               <div class="platform platform-bottom">
                 <img src="assets/plat_stone_enemy.png" class="plat-img" alt="">
-                <img class="poke-sprite back ${pBottom.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.id).back}" alt="${pBottom.name}">
+                <img class="poke-sprite back ${pBottom.fainted || s.intro ? 'fx-hidden' : ''}" id="spriteBottom" src="${spriteUrls(pBottom.spriteId || pBottom.id).back}" alt="${pBottom.name}">
                 <div class="damage-popup-anchor" id="popupAnchorBottom"></div>
               </div>
             </div>
@@ -649,9 +672,9 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       $('#dialogueText').textContent = announcement;
 
       const sTop = $('#spriteTop');
-      const topChanged = sTop && !sTop.src.includes(`/${pTop.id}.gif`);
+      const topChanged = sTop && !sTop.src.includes(`/${pTop.spriteId || pTop.id}.gif`);
       if (topChanged) {
-        sTop.src = spriteUrls(pTop.id).front;
+        sTop.src = spriteUrls(pTop.spriteId || pTop.id).front;
         sTop.className = `poke-sprite front ${pTop.fainted ? 'fx-hidden' : 'anim-enter'}`;
         displayedHp.top = pTop.hp;
         animateHp('top', pTop.hp, pTop.hp, pTop.maxHp);
@@ -662,9 +685,9 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       }
 
       const sBottom = $('#spriteBottom');
-      const bottomChanged = sBottom && !sBottom.src.includes(`/${pBottom.id}.gif`);
+      const bottomChanged = sBottom && !sBottom.src.includes(`/${pBottom.spriteId || pBottom.id}.gif`);
       if (bottomChanged) {
-        sBottom.src = spriteUrls(pBottom.id).back;
+        sBottom.src = spriteUrls(pBottom.spriteId || pBottom.id).back;
         sBottom.className = `poke-sprite back ${pBottom.fainted ? 'fx-hidden' : 'anim-enter'}`;
         displayedHp.bottom = pBottom.hp;
         animateHp('bottom', pBottom.hp, pBottom.hp, pBottom.maxHp);
@@ -704,6 +727,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         </div>
         <div class="bw-dash-body">
           ${activeTab === 'moves' && !isForcedSwitch ? `
+            ${mySide && canMega(b, mySide, pBottom) && !isSubmitted ? `<button class="bw-mega ${megaOn ? 'on' : ''}" id="btnMega" type="button" title="La Méga-Évolution se fait au début du tour, avant les attaques (touche M)">
+              <img src="${ITEMS[pBottom.item].icon}" alt=""><span>MÉGA-ÉVOLUTION</span><small>${megaOn ? 'activée : choisis ton attaque' : 'clique, puis choisis ton attaque'}</small></button>` : ''}
             <div class="moves-grid">
               ${pBottom.moves.map((moveId, mIdx) => {
                 const m = MOVES[moveId];
@@ -732,7 +757,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const hpCls = hpPct > 50 ? 'hp-green' : hpPct > 20 ? 'hp-yellow' : 'hp-red';
                 return `
                   <button class="bw-party ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted || notYet ? 'disabled' : ''}>
-                    <img src="${spriteUrls(p.id).icon}" alt="" class="bw-party-icon">
+                    <img src="${spriteUrls(p.spriteId || p.id).icon}" alt="" class="bw-party-icon">
                     <b class="bw-party-name">${esc(p.name)}</b>
                     <span class="bw-party-lv">N.${p.level || 50}</span>
                     <span class="bw-party-hp"><span class="bw-hp mini"><span class="hp-fill ${hpCls}" style="width:${hpPct}%"></span></span></span>
@@ -759,15 +784,19 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
             const moveObj = MOVES[moveId];
             if (moveObj && moveObj.cat === 'special') sfx.play('beam');
             else sfx.play('hit');
-            submitAction({ type: 'move', moveId });
+            submitAction(megaOn ? { type: 'move', moveId, mega: true } : { type: 'move', moveId });
+            megaOn = false;
           };
         }
+        const bMega = root.querySelector('#btnMega');
+        if (bMega) bMega.onclick = () => { megaOn = !megaOn; sfx.play(megaOn ? 'levelup' : 'switch'); renderBattle(state); };
 
         for (const btn of root.querySelectorAll('[data-switch]')) {
           btn.onclick = () => {
             const targetIndex = Number(btn.dataset.switch);
             sfx.play('switch');
             submitAction({ type: 'switch', targetIndex });
+            activeTab = 'moves';
           };
         }
       }
@@ -954,13 +983,15 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     if (mySide === 'A' ? s.submittedA : s.submittedB) return;
     if (b.phase !== 'choose' || !s.turnEndsAt) return;
     const p = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB];
+    if ((e.key === 'm' || e.key === 'M') && canMega(b, mySide, p)) { megaOn = !megaOn; sfx.play(megaOn ? 'levelup' : 'switch'); renderBattle(s); return; }
     if (['1', '2', '3', '4'].includes(e.key)) {
       const moveId = p.moves[Number(e.key) - 1];
       const curPp = p.ppMap && p.ppMap[moveId] !== undefined ? p.ppMap[moveId] : 1;
       if (moveId && curPp > 0 && !choiceBlocked(p, moveId)) {
         const moveObj = MOVES[moveId];
         sfx.play(moveObj && moveObj.cat === 'special' ? 'beam' : 'hit');
-        submitAction({ type: 'move', moveId });
+        submitAction(megaOn ? { type: 'move', moveId, mega: true } : { type: 'move', moveId });
+        megaOn = false;
       }
     }
   }

@@ -223,5 +223,28 @@ export function createFx({ inner, layer, scale }) {
     ], { duration: 1100, easing: 'ease-out' }), d);
   }
 
-  return { itemPop, center, throwBall, appear, recall, lunge, projectile, impact, sparkles, blink, shake, faint, statArrows, statusPulse, flash, wait };
+  /** Méga-Évolution : le Pokémon s'entoure d'un halo arc-en-ciel, devient une silhouette blanche qui pulse,
+      un éclair blanc remplit la scène, puis il réapparaît sous sa forme Méga. */
+  async function megaEvolve(sprite, newSrc) {
+    const c = center(sprite, 0);
+    const ring = spawn('fx-mega-ring', c.x, c.y, { width: `${c.w * 1.5}px`, height: `${c.w * 1.5}px` });
+    const r = ring.animate([{ transform: 'translate(-50%, -50%) scale(0.3) rotate(0deg)', opacity: 0 }, { transform: 'translate(-50%, -50%) scale(1) rotate(180deg)', opacity: 1, offset: 0.4 },
+      { transform: 'translate(-50%, -50%) scale(1.1) rotate(360deg)', opacity: 1, offset: 0.8 }, { transform: 'translate(-50%, -50%) scale(1.6) rotate(420deg)', opacity: 0 }], { duration: 1500, easing: 'ease-in-out' });
+    done(r, ring);
+    await sprite.animate([
+      { filter: 'none', transform: getComputedStyle(sprite).transform },
+      { filter: 'brightness(4) saturate(0)', offset: 0.35 },
+      { filter: 'brightness(1.2) saturate(1.5)', offset: 0.5 },
+      { filter: 'brightness(4) saturate(0)', offset: 0.7 },
+      { filter: 'brightness(5) saturate(0)' },
+    ], { duration: 1100, easing: 'ease-in' }).finished.catch(() => {});
+    const fl = spawn('fx-mega-flash', 0, 0);
+    done(fl.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 650 }), fl);
+    await new Promise((res) => setTimeout(res, 160));
+    if (newSrc) sprite.src = newSrc;
+    await sprite.animate([{ filter: 'brightness(5) saturate(0)' }, { filter: 'none' }], { duration: 500, easing: 'ease-out' }).finished.catch(() => {});
+    sparkles(sprite, '#ffffff', true);
+  }
+
+  return { megaEvolve, itemPop, center, throwBall, appear, recall, lunge, projectile, impact, sparkles, blink, shake, faint, statArrows, statusPulse, flash, wait };
 }

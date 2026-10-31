@@ -16,6 +16,7 @@ export const STEP = {
   faint: 800,    // le Pokémon K.O. s'enfonce
   stat: 1300,    // flèches de hausse / baisse de stat (dans la silhouette du Pokémon)
   item: 700,     // icône de l'objet tenu qui surgit
+  mega: 2100,    // Méga-Évolution (halo, éclair, nouvelle forme)
   status: 750,   // effet de statut (brûlure, poison…)
   heal: 650,     // étincelles de soin
   gap: 150,
@@ -50,6 +51,7 @@ export function eventMs(ev) {
     case 'heal': return typeMs(msg) + Math.max(STEP.heal, drainMs(ev.amount, ev.maxHp)) + READ_MS;
     case 'recoil': return typeMs(msg) + STEP.hit + drainMs(ev.damage, ev.maxHp) + READ_MS;
     case 'stat_change': return Math.max(typeMs(msg), STEP.stat) + READ_MS;
+    case 'mega': return Math.max(typeMs(msg), STEP.mega) + READ_MS;
     case 'item': return Math.max(typeMs(msg), STEP.item) + READ_MS;
     case 'status_applied': return Math.max(typeMs(msg), STEP.status) + READ_MS;
     case 'faint': return STEP.faint + sayMs(msg);

@@ -6,7 +6,8 @@
 
 import { getPokemonById, spriteUrls } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
-import { ITEMS, ITEM_KEYS, cleanItems, suggestItems } from '../engine/items.js';
+import { ITEMS, itemsFor, cleanItems, suggestItems } from '../engine/items.js';
+import { megasOf } from '../engine/megas.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon } from '../engine/types.js';
 import {
   getParticipant, currentMatch, sideOf, autoDraft, chooseLead, attackTypes, statTotal,
@@ -144,7 +145,7 @@ export function renderDraft(stage, s, ctx) {
         <span class="dr-key">${i + 1}</span>
         ${order >= 0 ? `<span class="dr-order">${order + 1}</span>` : ''}
         <div class="dr-art"><img src="${spriteUrls(dex).artwork}" alt="" loading="lazy"></div>
-        <b class="dr-name">${esc(b.name)}</b>
+        <b class="dr-name">${esc(b.name)}${megasOf(dex).length ? ' <span class="dr-mega" title="Peut méga-évoluer avec sa Méga-Gemme">MÉGA</span>' : ''}</b>
         <div class="dr-types">${b.types.map((ty) => typeChip(ty)).join('')}</div>
         <div class="dr-stats">
           ${STAT_ROWS.map(([k, l]) => `
@@ -164,7 +165,7 @@ export function renderDraft(stage, s, ctx) {
     const it = ITEMS[cur];
     if (locked) return it ? `<div class="dr-item locked" title="${esc(it.desc)}"><img src="${it.icon}" alt=""><span>${esc(it.name)}</span></div>` : '';
     return `<label class="dr-item" title="${it ? esc(it.desc) : ''}">${it ? `<img src="${it.icon}" alt="">` : ''}
-      <select data-item-for="${dex}" aria-label="Objet tenu">${ITEM_KEYS.map((k) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(ITEMS[k].name)}</option>`).join('')}</select></label>`;
+      <select data-item-for="${dex}" aria-label="Objet tenu">${itemsFor(dex).map((k) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${ITEMS[k].mega ? '✦ ' : ''}${esc(ITEMS[k].name)}</option>`).join('')}</select></label>`;
   };
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => {
     const b = sel[i] ? getPokemonById(sel[i]) : null;

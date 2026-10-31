@@ -26,12 +26,16 @@ class BattleMusicPlayer {
     const path = this.getTrackPath(trackName);
 
     if (this.audio) {
-      if (this.audio.src.includes(path) && !this.audio.paused) return;
+      // même morceau déjà lancé (même s'il est encore en train de charger, donc « en pause ») : on n'y touche pas.
+      // Avant, chaque rafraîchissement de l'écran le supprimait et le relançait : il n'avait jamais le temps de démarrer.
+      if (this.audioTrack === trackName) { if (this.audio.paused && this.audio.readyState >= 2 && !this.blocked) this.audio.play().catch(() => {}); return; }
       this.halt();
     }
 
     try {
       this.audio = new Audio(path);
+      this.audioTrack = trackName; this.blocked = false;
+      this.audio.preload = 'auto';
       // Sandstorm : version longue (≈ 2 min 30) avec une intro ; en boucle, on repart après l'intro (pas de coupure)
       const loopAt = trackName === 'sandstorm' ? 7.8 : 0;
       this.audio.loop = !loopAt;
@@ -41,9 +45,11 @@ class BattleMusicPlayer {
       }
       DDVolume.media(this.audio, 'music', this.volume);
       this.audio.play().catch(() => {
+        this.blocked = true;
         // En attente d'interaction utilisateur (navigateur autoplay policy)
         const unlock = () => {
           if (this.audio && this.musicEnabled) {
+            this.blocked = false;
             this.audio.play().catch(() => {});
           }
           window.removeEventListener('click', unlock);
@@ -63,7 +69,7 @@ class BattleMusicPlayer {
         this.audio.pause();
         this.audio.currentTime = 0;
       } catch (e) {}
-      this.audio = null;
+      this.audio = null; this.audioTrack = null;
     }
   }
 

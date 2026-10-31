@@ -6,6 +6,14 @@ import { getEffectiveness } from './types.js';
 import { MOVES } from './moves.js';
 import { turnMs } from './timing.js';
 import { ITEMS, CHOICE } from './items.js';
+import { megasOf } from './megas.js';
+const MEGA_FORM = (dex, pid) => megasOf(dex).find((f) => f.pid === pid) || null;
+
+/** Le Pokémon peut-il méga-évoluer maintenant ? (tient sa Méga-Gemme, pas encore Méga, son dresseur ne l'a pas déjà fait) */
+export function canMega(state, side, poke) {
+  const it = poke && ITEMS[poke.item];
+  return !!(it && it.mega && it.mega.dex === poke.id && !poke.isMega && !(state.megaUsed && state.megaUsed[side]) && !poke.fainted);
+}
 
 export const STAGE_MULTS = {
   '-6': 2 / 8, '-5': 2 / 7, '-4': 2 / 6, '-3': 2 / 5, '-2': 2 / 4, '-1': 2 / 3,
@@ -229,6 +237,7 @@ export function resolveTurn(state, actionA, actionB) {
         type: 'switch',
         side: 'A',
         pokemonId: pA.id,
+        spriteId: pA.spriteId || pA.id,
         name: pA.name,
         hp: pA.hp,
         maxHp: pA.maxHp,
@@ -252,6 +261,7 @@ export function resolveTurn(state, actionA, actionB) {
         type: 'switch',
         side: 'B',
         pokemonId: pB.id,
+        spriteId: pB.spriteId || pB.id,
         name: pB.name,
         hp: pB.hp,
         maxHp: pB.maxHp,
@@ -261,6 +271,22 @@ export function resolveTurn(state, actionA, actionB) {
         msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !`
       });
     }
+  }
+
+  // --- 1 bis. Méga-Évolution (avant les attaques : la nouvelle Vitesse compte dès ce tour) ---
+  for (const [side, act] of [['A', actionA], ['B', actionB]]) {
+    const poke = side === 'A' ? pA : pB;
+    if (!act || act.type !== 'move' || !act.mega || !canMega(state, side, poke)) continue;
+    const m = ITEMS[poke.item].mega, form = MEGA_FORM(poke.id, m.pid);
+    if (!form) continue;
+    state.megaUsed = { ...(state.megaUsed || {}), [side]: true };
+    const before = poke.name;
+    poke.isMega = true; poke.spriteId = form.pid; poke.baseName = before; poke.name = form.name;
+    poke.types = [...form.types];
+    poke.stats = { ...form.stats, hp: poke.stats.hp };   // les PV ne changent pas
+    const tr = getTrainer(state, side);
+    logEvent({ type: 'mega', side, pokemonId: poke.id, spriteId: form.pid, name: form.name, types: poke.types, trainer: tr.name,
+      msg: `${before} réagit à la ${ITEMS[poke.item].name} de ${tr.name} ! ${before} méga-évolue en ${form.name} !` });
   }
 
   // --- 2. Détermination de l'ordre d'attaque ---
@@ -650,6 +676,7 @@ export function forceSwitch(state, side, targetIdx) {
     type: 'switch',
     side,
     pokemonId: nextPoke.id,
+    spriteId: nextPoke.spriteId || nextPoke.id,
     name: nextPoke.name,
     hp: nextPoke.hp,
     maxHp: nextPoke.maxHp,

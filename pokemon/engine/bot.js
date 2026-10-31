@@ -4,10 +4,17 @@
 
 import { MOVES } from './moves.js';
 import { getEffectiveness } from './types.js';
-import { calculateDamage, getActivePokemon } from './battle.js';
+import { calculateDamage, getActivePokemon, canMega } from './battle.js';
 import { CHOICE } from './items.js';
 
 export function chooseBotAction(battle, side, difficulty = 'normal') {
+  const act = chooseBotActionRaw(battle, side, difficulty);
+  // Méga-Évolution dès que possible (le bot facile l'oublie une fois sur deux)
+  if (act && act.type === 'move' && canMega(battle, side, getActivePokemon(battle, side)) && (difficulty !== 'facile' || Math.random() < 0.5)) act.mega = true;
+  return act;
+}
+
+function chooseBotActionRaw(battle, side, difficulty = 'normal') {
   const myTeam = side === 'A' ? battle.teamA : battle.teamB;
   const oppTeam = side === 'A' ? battle.teamB : battle.teamA;
   const myActiveIdx = side === 'A' ? battle.activeA : battle.activeB;
