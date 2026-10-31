@@ -133,13 +133,14 @@ img { image-rendering: pixelated; }
 
 /* carte */
 .map-scr { display: flex; flex-direction: column; align-items: center; }
-.map-wrap { position: relative; height: calc(100% - var(--px) * 48); max-width: 94%; aspect-ratio: 4 / 3; }
-.mapcv { image-rendering: pixelated; width: 100%; height: 100%; display: block; border: calc(var(--px) * 2) solid #283850; border-radius: calc(var(--px) * 3); box-sizing: border-box; }
+.map-wrap { position: relative; width: 94%; max-height: calc(100% - var(--px) * 48); aspect-ratio: 440 / 280; }
+.mapcv { image-rendering: pixelated; width: 100%; height: 100%; display: block; border: calc(var(--px) * 3) solid #3a3a3a; border-radius: calc(var(--px) * 3); box-sizing: border-box; }
 .map-labels { position: absolute; inset: 0; }
 .map-town { position: absolute; width: 0; height: 0; font-size: .7em; color: #fff; text-shadow: var(--px) var(--px) 0 #000; }
 .map-town i { position: absolute; left: calc(var(--px) * -4); top: calc(var(--px) * -4); width: calc(var(--px) * 8); height: calc(var(--px) * 8); background: #a0a0a0; border: var(--px) solid #fff; box-sizing: border-box; }
 .map-town span { position: absolute; top: calc(var(--px) * 5); left: 0; transform: translateX(-50%); white-space: nowrap; }
 .map-town.seen i { background: #e84848; }
+.map-cur { position: absolute; width: calc(var(--px) * 14); height: calc(var(--px) * 14); transform: translate(-50%, -50%); border: calc(var(--px) * 2) solid #ffd040; border-radius: calc(var(--px) * 3); box-shadow: 0 0 0 var(--px) #000; animation: blink .8s steps(2) infinite; }
 .map-me { position: absolute; width: calc(var(--px) * 8); height: calc(var(--px) * 8); transform: translate(-50%, -50%); background: #ffe040; border: var(--px) solid #000; border-radius: 50%; animation: blink .5s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .2; } }
 .map-where { position: absolute; bottom: calc(var(--px) * 6); left: calc(var(--px) * 8); padding: calc(var(--px) * 2) calc(var(--px) * 10); }

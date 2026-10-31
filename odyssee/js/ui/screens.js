@@ -6,7 +6,8 @@ import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
 import { monName, expProgress, STAT_NAMES } from '../core/mon.js';
 import { ASSETS } from '../assets.js';
-import { T } from '../world/tiles.js';
+import { SPRITES } from '../data/sprites.js';
+import { T, walkable } from '../world/tiles.js';
 
 export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
 export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
@@ -188,51 +189,128 @@ export function dexScreen(game) {
 /* ================= CARTE DE LA RÉGION ================= */
 // La carte se dévoile au fil du voyage : seules les zones parcourues sont dessinées, le reste n'est qu'une étendue
 // verte ; le cadre est zoomé sur ce qu'on connaît et s'élargit à mesure qu'on avance.
+/** carte de la région, dessinée comme le Pokégear de HeartGold / SoulSilver : mer en trois bleus, côtes en falaises,
+ *  plaines et forêts, montagnes en paliers, routes blanches cerclées de gris, villes en pastilles rouges.
+ *  Un pixel = une case ; le relief est posé par blocs de 2 × 2 cases, comme les pixels doublés du DS. */
+const HG = {
+  open: [81, 186, 218], far: [66, 181, 206], deep: [57, 165, 189], foam: [139, 219, 244],
+  flat: [97, 195, 146], shadow: [81, 179, 128], cliff: [197, 145, 106],
+  top: [242, 178, 130], vhigh: [220, 162, 114], high: [195, 146, 105], low: [162, 130, 89],
+  ink: '#525252', road: '#ffffff', town: '#fa5263', townDark: '#a23047', special: '#72cb93', water: '#60b2fc',
+};
+let carteIcons = null;
+function loadCarteIcons() {
+  if (carteIcons) return carteIcons;
+  carteIcons = {};
+  for (const k of SPRITES.carte || []) { const im = new Image(); im.src = ASSETS.carte(k); carteIcons[k] = im; }
+  return carteIcons;
+}
+function drawRegion(game, cv) {
+  const W = game.world.maps.monde, ctx = cv.getContext('2d'), w = W.w, h = W.h, B = 2;
+  const bw = Math.ceil(w / B), bh = Math.ceil(h / B);
+  // nature de chaque bloc de 2 × 2 cases
+  // 0 eau, 1 plaine, 2 forêt, 3 montagne, 4 pied de montagne (sol praticable des zones volcaniques et enneigées)
+  const kind = new Uint8Array(bw * bh);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    let water = 0, walk = 0;
+    for (let dy = 0; dy < B; dy++) for (let dx = 0; dx < B; dx++) {
+      const t = W.get(bx * B + dx, by * B + dy);
+      if (t === T.WATER) water++; else if (walkable(t) || t === T.DOOR) walk++;
+    }
+    const th = W.zoneAt(bx * B, by * B)?.theme, hill = th === 'volcanic' || th === 'snow';
+    const i = by * bw + bx;
+    kind[i] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
+  }
+  // distance de chaque bloc à la nature voisine (pour la mer : à la côte ; pour la montagne : au pied)
+  const dist = (pred) => {
+    const d = new Int16Array(bw * bh).fill(99), q = [];
+    for (let i = 0; i < d.length; i++) if (pred(kind[i])) { d[i] = 0; q.push(i); }
+    for (let k = 0; k < q.length; k++) {
+      const i = q[k], x = i % bw, y = (i / bw) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue; const j = ny * bw + nx; if (d[j] > d[i] + 1) { d[j] = d[i] + 1; q.push(j); } }
+    }
+    return d;
+  };
+  const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
+  const img = ctx.createImageData(w, h);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    const i = by * bw + bx, k = kind[i];
+    let c;
+    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : HG.open;
+    else if (toLand.length && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind[(by + dy) * bw + bx + dx] === 0 && bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh)) c = HG.cliff;
+    else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
+    else if (k === 4) c = HG.low;
+    else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
+    for (let dy = 0; dy < B; dy++) for (let dx = 0; dx < B; dx++) {
+      const x = bx * B + dx, y = by * B + dy; if (x >= w || y >= h) continue;
+      const o = (y * w + x) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const I = loadCarteIcons();
+  const icon = (k, x, y) => { const im = I[k]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height + 2)); };
+  // arbres sur les forêts épaisses, montagnes sur les reliefs (une icône par carré de 22 cases, au hasard du lieu)
+  for (let y = 10; y < h - 6; y += 22) for (let x = 10; x < w - 6; x += 22) {
+    const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
+    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), k = kind[i];
+    if (k === 2 && toOpen[i] >= 4 && ((x + y - 20) / 22) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
+    else if (k === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+  }
+  // routes : un trait blanc cerclé de gris
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  const roads = (game.world.routes || []).map((r) => r.pts);
+  for (const [lw, col] of [[7, HG.ink], [4, HG.road]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = lw;
+    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 0.5, y + 0.5) : ctx.moveTo(x + 0.5, y + 0.5))); ctx.stroke(); }
+  }
+  // grottes et lieux à part (lac, jardin, forêt des torii) : icônes et pastilles vertes
+  for (const b of W.buildings) if (b.kind === 'cave') icon('grotte_m', b.x + b.w / 2, b.y + b.d);
+  const pill = (x, y, pw, ph, fill, dark) => {
+    x = Math.round(x - pw / 2); y = Math.round(y - ph / 2);
+    ctx.fillStyle = HG.ink; ctx.fillRect(x - 1, y, pw + 2, ph); ctx.fillRect(x, y - 1, pw, ph + 2);
+    ctx.fillStyle = fill; ctx.fillRect(x, y, pw, ph);
+    if (dark) { ctx.fillStyle = dark; ctx.fillRect(x, y + Math.ceil(ph * 0.55), pw, Math.floor(ph * 0.45)); }
+  };
+  for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
+  // villes : pastilles rouges (grises tant qu'on n'y est pas allé)
+  const visited = new Set(game.state.visited || []);
+  for (const t of Object.values(game.world.towns)) {
+    const big = t.gym != null || t.id === 'plateau';
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 16 : 12, big ? 12 : 9, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+  }
+  // brouillard sur ce qui n'a pas encore été exploré
+  const seen = new Set(game.state.explored || []), C = 8, cw = Math.ceil(w / C);
+  if (seen.size) {
+    ctx.fillStyle = 'rgba(28, 36, 52, 0.62)';
+    for (let y = 0; y < h; y += C) for (let x = 0; x < w; x += C) if (!seen.has(Math.floor(y / C) * cw + Math.floor(x / C))) ctx.fillRect(x, y, C, C);
+  }
+}
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
   return new Promise((resolve) => {
     const s = screen(ui, 'map-scr', 'CARTE DE LA RÉGION');
-    const B = 8, cw = Math.ceil(W.w / B), seen = new Set(st.explored || []);
     const p = game.worldPos();
-    if (!seen.size) seen.add(Math.floor(p.y / B) * cw + Math.floor(p.x / B));
-    // cadre : ce qui a été exploré, avec une marge, au moins 64 × 48 cases, aux proportions de l'écran
-    let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
-    for (const i of seen) { const cx = (i % cw) * B, cy = Math.floor(i / cw) * B; x0 = Math.min(x0, cx); y0 = Math.min(y0, cy); x1 = Math.max(x1, cx + B); y1 = Math.max(y1, cy + B); }
-    x0 -= 12; y0 -= 10; x1 += 12; y1 += 10;
-    let bw = Math.max(64, x1 - x0), bh = Math.max(48, y1 - y0);
-    if (bw / bh > 4 / 3) bh = bw * 3 / 4; else bw = bh * 4 / 3;
-    bw = Math.min(W.w, Math.ceil(bw)); bh = Math.min(W.h, Math.ceil(bh));
-    const cxm = (x0 + x1) / 2, cym = (y0 + y1) / 2;
-    const ox = Math.round(Math.max(0, Math.min(W.w - bw, cxm - bw / 2))), oy = Math.round(Math.max(0, Math.min(W.h - bh, cym - bh / 2)));
-    const wrap = el('div', 'map-wrap'); wrap.style.aspectRatio = `${bw} / ${bh}`; s.appendChild(wrap);
-    const c = el('canvas', 'mapcv'); c.width = bw; c.height = bh; wrap.appendChild(c);
-    const ctx = c.getContext('2d'), img = ctx.createImageData(bw, bh);
-    const col = (t) => {
-      switch (t) { case T.WATER: return [72, 136, 224]; case T.TREE: case T.PINE: return [52, 120, 64]; case T.PATH: case T.BRIDGE: return [232, 208, 150]; case T.PAVE: case T.BUILD: case T.DOOR: return [228, 222, 208]; case T.SAND: return [240, 226, 170]; case T.TALL: case T.DARKTALL: return [90, 170, 80]; case T.ASH: return [150, 140, 136]; case T.SNOW: return [236, 242, 250]; default: return [132, 200, 110]; }
-    };
-    const known = (x, y) => seen.has(Math.floor(y / B) * cw + Math.floor(x / B));
-    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
-      const wx = ox + x, wy = oy + y, k = (y * bw + x) * 4;
-      let rgb;
-      if (known(wx, wy)) {
-        rgb = col(W.get(wx, wy));
-        // lisière : un léger fondu vers l'inconnu
-        if (!known(wx - 3, wy) || !known(wx + 3, wy) || !known(wx, wy - 3) || !known(wx, wy + 3)) rgb = rgb.map((v, i) => (v + [70, 128, 76][i]) / 2);
-      } else { const n = ((wx * 7 + wy * 13) % 5) * 3; rgb = [62 + n, 116 + n, 70 + n]; }
-      img.data[k] = rgb[0]; img.data[k + 1] = rgb[1]; img.data[k + 2] = rgb[2]; img.data[k + 3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
+    const wrap = el('div', 'map-wrap'); wrap.style.aspectRatio = `${W.w} / ${W.h}`; s.appendChild(wrap);
+    const c = el('canvas', 'mapcv'); c.width = W.w; c.height = W.h; wrap.appendChild(c);
+    const draw = () => drawRegion(game, c);
+    draw(); Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
     const lab = el('div', 'map-labels'); wrap.appendChild(lab);
+    const me = el('div', 'map-me'); me.style.left = (p.x / W.w * 100) + '%'; me.style.top = (p.y / W.h * 100) + '%'; lab.appendChild(me);
+    // curseur : flèches gauche / droite pour passer d'une ville visitée à l'autre, comme sur le Pokégear
     const visited = new Set(st.visited || []);
-    for (const t of Object.values(towns)) {
-      if (!visited.has(t.id)) continue;   // une ville n'apparaît qu'une fois découverte
-      const tx = t.x + t.w / 2 - ox, ty = t.y + t.h / 2 - oy; if (tx < 0 || ty < 0 || tx > bw || ty > bh) continue;
-      const d = el('div', 'map-town seen', `<i></i><span>${esc(t.name)}</span>`);
-      d.style.left = (tx / bw * 100) + '%'; d.style.top = (ty / bh * 100) + '%'; lab.appendChild(d);
-    }
-    const me = el('div', 'map-me'); me.style.left = ((p.x - ox) / bw * 100) + '%'; me.style.top = ((p.y - oy) / bh * 100) + '%'; lab.appendChild(me);
-    s.appendChild(el('div', 'box map-where', esc(game.locationName())));
-    const pop = ui.input.push((k) => { if (k === 'a' || k === 'b' || k === 'map') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); } });
+    const near = () => { let best = null, bd = 1e9; for (const r of game.world.routes || []) for (const [x, y] of r.pts) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = r.name; } } return best; };
+    const here = game.mapObj === W && !W.zoneAt(p.x, p.y)?.name ? near() || game.locationName() : game.locationName();
+    const spots = [{ name: here, x: p.x, y: p.y }].concat(Object.values(towns).filter((t) => visited.has(t.id)).map((t) => ({ name: t.name, x: t.x + t.w / 2, y: t.y + t.h / 2 })));
+    const cur = el('div', 'map-cur'); lab.appendChild(cur);
+    const where = el('div', 'box map-where', ''); s.appendChild(where);
+    let k = 0;
+    const show = () => { const q = spots[k]; cur.style.left = (q.x / W.w * 100) + '%'; cur.style.top = (q.y / W.h * 100) + '%'; where.textContent = q.name; };
+    show();
+    const pop = ui.input.push((key) => {
+      if (key === 'left' || key === 'up') { k = (k + spots.length - 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
+      if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
+      if (key === 'a' || key === 'b' || key === 'map') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); }
+    });
   });
 }
 

@@ -35,6 +35,7 @@ export const ASSETS = {
   herbe: (k) => `${IMG}herbes/${k}.png`,
   hgss: (k) => `${IMG}hgss/${k}.png`,
   deco: (k) => `${IMG}deco/${k}.png`,
+  carte: (k) => `${IMG}carte/${k}.png`,
   title: `${IMG}title-odyssor.png`,
 };
 /** précharge une image (résout même en cas d'échec) */

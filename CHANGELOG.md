@@ -1,5 +1,10 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.50 — 31 octobre 2026
+- **Odyssée** — la carte de la région est redessinée comme le Pokégear de HeartGold / SoulSilver : mer en dégradé de bleus, côtes en falaises, montagnes en paliers, forêts, grottes, routes blanches et villes en pastilles rouges.
+  - Les flèches passent d'une ville visitée à l'autre et affichent son nom.
+  - Les lieux à part (lac, jardin, forêt des torii) sont marqués en vert.
+
 ## 3.49 — 31 octobre 2026
 - **Odyssée** — une histoire secondaire complète en parallèle de l'aventure : la Brume, une organisation qui vole les Pokémon et veut réveiller Groudon. Huit quêtes, à suivre dans le nouveau menu « Quêtes ».
   - Le Ponyta de Lucie (Sylvebourg, après le premier badge) : enquête auprès des habitants, poursuite dans le Bois Murmure et sa clairière cachée.

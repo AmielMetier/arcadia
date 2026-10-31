@@ -223,10 +223,33 @@ def build():
         im = Image.open(p); im.save(os.path.join(OUT, 'hgss', k + '.png'), optimize=True)
         anim[k] = [im.height, im.width // im.height]
     meta['hgss'] = anim
+    meta['carte'] = do_carte()
     with open(js, 'w') as f:
         f.write('// Généré par tools/odyssee-sprites.py — ne pas modifier à la main.\n')
         f.write('export const SPRITES = ' + json.dumps(meta, ensure_ascii=False, separators=(',', ':')) + ';\n')
     print(f'{len(ids)} personnages, {len(dres)} dessins de combat')
+
+# ------------------------------------------------------------------ carte de la région, façon Pokégear de HGSS
+# assets/graphics/hgss/carte_guide.png : le guide « Pokémon mapmaking guide HG|SS » (ripped by Pocram, Spriters Resource)
+CARTE_ICONES = {
+    'arbre_o': (630, 416, 13, 12), 'arbre_v': (646, 416, 11, 12), 'arbres_o': (610, 423, 19, 20), 'remous': (526, 424, 12, 12),
+    'puits': (646, 473, 9, 8), 'grotte': (540, 476, 19, 13), 'grotte_p': (527, 480, 10, 9), 'grotte_m': (533, 492, 16, 12),
+    'cascade': (633, 507, 14, 12), 'colline': (560, 525, 26, 19), 'montagne': (531, 533, 30, 23),
+}
+
+def do_carte():
+    import numpy as np
+    p = os.path.join(RAW, 'carte_guide.png')
+    if not os.path.exists(p): return []
+    A = np.array(Image.open(p).convert('RGB')).astype(int)
+    os.makedirs(os.path.join(OUT, 'carte'), exist_ok=True)
+    bg = A[440, 520]   # fond du panneau des objets
+    for k, (x, y, w, h) in CARTE_ICONES.items():
+        sub = A[y - 1:y + h + 1, x - 1:x + w + 1]
+        alpha = (np.abs(sub - bg).sum(2) > 30).astype(np.uint8) * 255
+        im = np.dstack([sub.astype(np.uint8), alpha])
+        Image.fromarray(im, 'RGBA').save(os.path.join(OUT, 'carte', k + '.png'), optimize=True)
+    return list(CARTE_ICONES)
 
 if __name__ == '__main__':
     pret = sys.argv[1] if len(sys.argv) > 1 else None
