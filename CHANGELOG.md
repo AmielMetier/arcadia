@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.34 — 31 octobre 2026
+- **Poké Duel** — Le bouton Méga-Évolution ne décale plus les attaques dans la colonne de droite : il se place au-dessus d'elles.
+- **Poké Duel** — Sandstorm se relance bien en combat, même si l'ancienne version du morceau était restée en mémoire, et la musique repart au premier clic ou à la première touche si le navigateur l'avait bloquée.
+
 ## 3.33 — 31 octobre 2026
 - **Poké Duel** — Les talents arrivent : chaque Pokémon a le sien, choisi parmi ses vrais talents, et les formes Méga ont leur propre talent.
   - Plus de 70 talents avec leur effet : Intimidation, Coloforce, Multiécaille, Turbo, Lévitation, Absorb Eau, Paratonnerre, Fermeté, Garde Magik, Technicien, Adaptabilité, Impudence, Statik, Peau Dure, Miroir Magik, Marque Ombre…

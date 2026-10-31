@@ -831,3 +831,8 @@
 @keyframes wxSand{to{background-position:160px 30px}}
 @keyframes wxSun{to{opacity:.6}}
 @media(prefers-reduced-motion:reduce){.bf-inner::after{animation:none!important}}
+
+/* bouton Méga au-dessus des attaques, dans la même colonne */
+.bw-movecol{display:flex;flex-direction:column;min-width:0}
+.bw-movecol .moves-grid{flex:1}
+.bw-mega{flex:none}

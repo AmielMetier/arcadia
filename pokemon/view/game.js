@@ -773,7 +773,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
           ${isSubmitted ? '<span class="action-locked">Choix envoyé. En attente…</span>' : ''}
         </div>
         <div class="bw-dash-body">
-          ${activeTab === 'moves' && !isForcedSwitch ? `
+          ${activeTab === 'moves' && !isForcedSwitch ? `<div class="bw-movecol">
             ${mySide && canMega(b, mySide, pBottom) && !isSubmitted ? `<button class="bw-mega ${megaOn ? 'on' : ''}" id="btnMega" type="button" title="La Méga-Évolution se fait au début du tour, avant les attaques (touche M)">
               <img src="${ITEMS[pBottom.item].icon}" alt=""><span>MÉGA-ÉVOLUTION</span><small>${megaOn ? 'activée : choisis ton attaque' : 'clique, puis choisis ton attaque'}</small></button>` : ''}
             <div class="moves-grid">
@@ -795,7 +795,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                     ${effTag(m)}
                   </button>`;
               }).join('')}
-            </div>
+            </div></div>
           ` : `
             <div class="switch-grid">
               ${teamBottom.map((p, pIdx) => {

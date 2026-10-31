@@ -14,9 +14,9 @@ class BattleMusicPlayer {
   get musicEnabled() { return DDVolume.get('music') > 0; }
 
   getTrackPath(trackName) {
-    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3';
-    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3';
-    return 'assets/bgm_sandstorm.mp3'; // Thème Sandstorm culte par défaut
+    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3?v=3.34';
+    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3?v=3.34';
+    return 'assets/bgm_sandstorm.mp3?v=3.34'; // Thème Sandstorm culte par défaut
   }
 
   start(trackName = 'sandstorm') {
@@ -28,12 +28,12 @@ class BattleMusicPlayer {
     if (this.audio) {
       // même morceau déjà lancé (même s'il est encore en train de charger, donc « en pause ») : on n'y touche pas.
       // Avant, chaque rafraîchissement de l'écran le supprimait et le relançait : il n'avait jamais le temps de démarrer.
-      if (this.audioTrack === trackName) { if (this.audio.paused && this.audio.readyState >= 2 && !this.blocked) this.audio.play().catch(() => {}); return; }
+      if (this.audioTrack === trackName) { if (this.audio.paused) this.audio.play().then(() => { this.blocked = false; }).catch(() => {}); return; }
       this.halt();
     }
 
     try {
-      this.audio = new Audio(path);
+      this.audio = new Audio(new URL(path, import.meta.url.replace(/view\/music\.js.*$/, '')).href);
       this.audioTrack = trackName; this.blocked = false;
       this.audio.preload = 'auto';
       // Sandstorm : version longue (≈ 2 min 30) avec une intro ; en boucle, on repart après l'intro (pas de coupure)
@@ -52,11 +52,9 @@ class BattleMusicPlayer {
             this.blocked = false;
             this.audio.play().catch(() => {});
           }
-          window.removeEventListener('click', unlock);
-          window.removeEventListener('keydown', unlock);
+          for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.removeEventListener(ev, unlock, true);
         };
-        window.addEventListener('click', unlock, { once: true });
-        window.addEventListener('keydown', unlock, { once: true });
+        for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.addEventListener(ev, unlock, true);
       });
     } catch (e) {}
   }
