@@ -332,7 +332,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     const side = sideOf(match, from);
     switch (m.t) {
       case 'draft':
-        if (submitDraft(t, from, m.picks)) {
+        if (submitDraft(t, from, m.picks, m.items)) {
           broadcast();
           if (draftComplete(t)) { clearPhase(); setTimeout(() => alive && endDraft(), 600); }
         }
@@ -436,7 +436,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
 
   const mine = (msg) => handle(me.id, msg);
   return {
-    draft: (picks) => mine({ t: 'draft', picks }),
+    draft: (picks, items) => mine({ t: 'draft', picks, items }),
     lead: (idx) => mine({ t: 'lead', idx }),
     ready: (idx) => mine({ t: 'ready', idx }),
     submitAction: (action) => mine({ t: 'action', action }),

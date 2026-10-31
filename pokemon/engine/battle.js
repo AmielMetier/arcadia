@@ -5,6 +5,7 @@
 import { getEffectiveness } from './types.js';
 import { MOVES } from './moves.js';
 import { turnMs } from './timing.js';
+import { ITEMS, CHOICE } from './items.js';
 
 export const STAGE_MULTS = {
   '-6': 2 / 8, '-5': 2 / 7, '-4': 2 / 6, '-3': 2 / 5, '-2': 2 / 4, '-1': 2 / 3,
@@ -72,6 +73,7 @@ export function getEffectiveSpeed(poke) {
   const stage = (poke.statStages && poke.statStages.spe) || 0;
   spe *= (STAGE_MULTS[stage] || 1);
   if (poke.status === 'paralysis') spe *= 0.5;
+  if (poke.item === 'choicescarf') spe *= 1.5;
   return spe;
 }
 
@@ -130,7 +132,13 @@ export function calculateDamage(attacker, defender, move) {
   const lvl = attacker.level || 50;
   const levelFactor = Math.floor((2 * lvl) / 5) + 2;
   const baseDmg = ((levelFactor * move.power * (atk / def)) / 50 + 2);
-  const totalDmg = Math.max(1, Math.floor(baseDmg * stabMult * typeMult * critMult * randomFactor));
+  // objets tenus de l'attaquant
+  let itemMult = 1;
+  if (attacker.item === 'choiceband' && isPhys) itemMult *= 1.5;
+  if (attacker.item === 'choicespecs' && !isPhys) itemMult *= 1.5;
+  if (attacker.item === 'lifeorb') itemMult *= 1.3;
+  if (attacker.item === 'expertbelt' && typeMult >= 2) itemMult *= 1.2;
+  const totalDmg = Math.max(1, Math.floor(baseDmg * stabMult * typeMult * critMult * randomFactor * itemMult));
 
   let text = '';
   if (typeMult >= 2) text = "C'est super efficace !";
@@ -170,6 +178,26 @@ function applyStatEffect(eff, attPoke, defPoke, attSide, defSide, logEvent) {
   }
 }
 
+/** Baies (une seule fois) : Sitrus sous la moitié des PV, Prine dès qu'un statut tombe. */
+function checkBerries(poke, side, logEvent) {
+  if (!poke || poke.fainted || poke.hp <= 0 || poke.itemUsed) return;
+  if (poke.item === 'sitrus' && poke.hp <= poke.maxHp / 2) {
+    poke.itemUsed = true;
+    const amount = Math.min(poke.maxHp - poke.hp, Math.floor(poke.maxHp / 4));
+    poke.hp += amount;
+    logEvent({ type: 'item', side, item: 'sitrus', msg: `${poke.name} mange sa ${ITEMS.sitrus.name} !` });
+    logEvent({ type: 'heal', side, pokemonId: poke.id, hp: poke.hp, maxHp: poke.maxHp, amount, msg: `${poke.name} récupère ${amount} PV !` });
+  } else if (poke.item === 'lum' && poke.status) {
+    poke.itemUsed = true;
+    poke.status = null; poke.sleepTurns = 0; poke.toxicTurns = 0;
+    logEvent({ type: 'item', side, item: 'lum', msg: `${poke.name} mange sa ${ITEMS.lum.name} !` });
+    logEvent({ type: 'status_cured', side, msg: `${poke.name} est guéri !` });
+  }
+}
+
+/** Remise à zéro en entrant au combat (le blocage des objets Choix tombe en changeant de Pokémon). */
+function onSwitchIn(poke) { poke.choiceLock = null; }
+
 /**
  * Résolution complète d'un tour de combat (actions des deux côtés)
  */
@@ -196,6 +224,7 @@ export function resolveTurn(state, actionA, actionB) {
       pA = state.teamA[targetIdx];
       pA.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       pA.toxicTurns = 0;
+      onSwitchIn(pA);
       logEvent({
         type: 'switch',
         side: 'A',
@@ -218,6 +247,7 @@ export function resolveTurn(state, actionA, actionB) {
       pB = state.teamB[targetIdx];
       pB.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       pB.toxicTurns = 0;
+      onSwitchIn(pB);
       logEvent({
         type: 'switch',
         side: 'B',
@@ -234,6 +264,14 @@ export function resolveTurn(state, actionA, actionB) {
   }
 
   // --- 2. Détermination de l'ordre d'attaque ---
+  // objets Choix : le Pokémon ne peut lancer que l'attaque sur laquelle il est bloqué (tant qu'elle a des PP)
+  const lockTo = (act, poke) => {
+    if (!act || act.type !== 'move' || !poke || !CHOICE.has(poke.item) || !poke.choiceLock) return act;
+    const pp = poke.ppMap ? poke.ppMap[poke.choiceLock] : 1;
+    return poke.moves.includes(poke.choiceLock) && pp > 0 ? { ...act, moveId: poke.choiceLock } : act;
+  };
+  actionA = lockTo(actionA, pA); actionB = lockTo(actionB, pB);
+
   let firstSide = 'A';
   const moveA = actionA && actionA.type === 'move' ? MOVES[actionA.moveId] : null;
   const moveB = actionB && actionB.type === 'move' ? MOVES[actionB.moveId] : null;
@@ -311,6 +349,7 @@ export function resolveTurn(state, actionA, actionB) {
     if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined) {
       attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - 1);
     }
+    if (CHOICE.has(attPoke.item) && !attPoke.choiceLock) attPoke.choiceLock = moveId;
 
     logEvent({
       type: 'attack_start',
@@ -381,6 +420,7 @@ export function resolveTurn(state, actionA, actionB) {
           status: st,
           msg: `${defPoke.name} ${stLabel} !`
         });
+        checkBerries(defPoke, defSide, logEvent);
       } else {
         logEvent({ type: 'msg', text: `Mais ${defPoke.name} a déjà un statut !` });
       }
@@ -395,6 +435,11 @@ export function resolveTurn(state, actionA, actionB) {
       return;
     }
 
+    // Ceinture Force : à PV pleins, un coup fatal laisse 1 PV (une fois)
+    let sashed = false;
+    if (defPoke.item === 'focussash' && !defPoke.itemUsed && defPoke.hp === defPoke.maxHp && res.damage >= defPoke.hp) {
+      res.damage = defPoke.hp - 1; defPoke.itemUsed = true; sashed = true;
+    }
     defPoke.hp = Math.max(0, defPoke.hp - res.damage);
 
     // Une attaque de type Feu dégèle la cible si elle était gelée
@@ -418,6 +463,8 @@ export function resolveTurn(state, actionA, actionB) {
       mult: res.mult,
       msg: res.text || null
     });
+    if (sashed) logEvent({ type: 'item', side: defSide, item: 'focussash', msg: `${defPoke.name} tient bon grâce à sa ${ITEMS.focussash.name} !` });
+    checkBerries(defPoke, defSide, logEvent);
 
     // Effet drain (Giga-Sangsue, Vampi-Poing)
     if (attMove.drain && res.damage > 0) {
@@ -451,6 +498,18 @@ export function resolveTurn(state, actionA, actionB) {
         logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` });
       }
     }
+
+    // Orbe Vie : 1/10 des PV du lanceur à chaque coup porté
+    if (attPoke.item === 'lifeorb' && res.damage > 0 && !attPoke.fainted) {
+      const cost = Math.max(1, Math.floor(attPoke.maxHp / 10));
+      attPoke.hp = Math.max(0, attPoke.hp - cost);
+      logEvent({ type: 'recoil', side: attSide, damage: cost, hp: attPoke.hp, maxHp: attPoke.maxHp, item: 'lifeorb', msg: `${attPoke.name} perd un peu de PV à cause de l'${ITEMS.lifeorb.name} !` });
+      if (attPoke.hp === 0) {
+        attPoke.fainted = true;
+        logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` });
+      }
+    }
+    checkBerries(attPoke, attSide, logEvent);
 
     // Effet de stat sur le lanceur même si le défenseur tombe K.O. (Close Combat, Draco-Météore, Surpuissance)
     if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted) {
@@ -487,6 +546,7 @@ export function resolveTurn(state, actionA, actionB) {
         if (stLabel) {
           logEvent({ type: 'status_applied', side: defSide, status: defPoke.status, msg: `${defPoke.name} ${stLabel} !` });
         }
+        checkBerries(defPoke, defSide, logEvent);
       }
     }
 
@@ -526,6 +586,14 @@ export function resolveTurn(state, actionA, actionB) {
     if (poke.hp === 0 && !poke.fainted) {
       poke.fainted = true;
       logEvent({ type: 'faint', side, pokemonId: poke.id, name: poke.name, msg: `${poke.name} est K.O. !` });
+      continue;
+    }
+    checkBerries(poke, side, logEvent);
+    // Restes : 1/16 des PV en fin de tour
+    if (poke.item === 'leftovers' && poke.hp < poke.maxHp) {
+      const amount = Math.min(poke.maxHp - poke.hp, Math.max(1, Math.floor(poke.maxHp / 16)));
+      poke.hp += amount;
+      logEvent({ type: 'heal', side, pokemonId: poke.id, hp: poke.hp, maxHp: poke.maxHp, amount, item: 'leftovers', msg: `${poke.name} récupère un peu de PV grâce aux ${ITEMS.leftovers.name} !` });
     }
   }
 
@@ -575,6 +643,7 @@ export function forceSwitch(state, side, targetIdx) {
   const nextPoke = team[targetIdx];
   nextPoke.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   nextPoke.toxicTurns = 0;
+  onSwitchIn(nextPoke);
 
   const trainer = getTrainer(state, side);
   const event = {

@@ -176,10 +176,25 @@ export function createFx({ inner, layer, scale }) {
   }
 
   /** Flèches qui montent (bleu) ou descendent (rouge) sur le Pokémon. */
+  // Comme dans les jeux : des flèches qui défilent À L'INTÉRIEUR de la silhouette du Pokémon (masque = son sprite),
+  // bleues vers le haut si la stat monte, rouges vers le bas si elle baisse, et le Pokémon s'illumine de la même couleur.
   function statArrows(sprite, up) {
     const c = center(sprite, 0);
-    const box = spawn(`fx-stat ${up ? 'up' : 'down'}`, c.x, c.y, { width: `${Math.max(80, c.w * 0.7)}px`, height: `${Math.max(90, c.h * 0.9)}px` });
-    done(box.animate([{ opacity: 0 }, { opacity: 0.85, offset: 0.2 }, { opacity: 0.85, offset: 0.75 }, { opacity: 0 }], { duration: 900 }), box);
+    const src = sprite.currentSrc || sprite.src;
+    const box = spawn(`fx-stat ${up ? 'up' : 'down'}`, c.x, c.y, {
+      width: `${c.w}px`, height: `${c.h}px`,
+      webkitMaskImage: `url("${src}")`, maskImage: `url("${src}")`,
+    });
+    const col = up ? '#4aa0ff' : '#ff4a3a';
+    const glow = sprite.animate([
+      { filter: 'none' },
+      { filter: `drop-shadow(0 0 6px ${col}) brightness(1.25)`, offset: 0.2 },
+      { filter: `drop-shadow(0 0 10px ${col}) brightness(1.35)`, offset: 0.6 },
+      { filter: 'none' },
+    ], { duration: 1300, easing: 'ease-in-out' });
+    const a = box.animate([{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 1300 });
+    done(a, box);
+    return Promise.all([a.finished, glow.finished]).catch(() => {});
   }
 
   /** Effet de statut : le Pokémon se teinte et des bulles de la couleur du statut apparaissent. */
@@ -195,5 +210,18 @@ export function createFx({ inner, layer, scale }) {
     ], { duration: 700 }).finished.catch(() => {});
   }
 
-  return { center, throwBall, appear, recall, lunge, projectile, impact, sparkles, blink, shake, faint, statArrows, statusPulse, flash, wait };
+  /** L'objet tenu entre en jeu : son icône surgit au-dessus du Pokémon, grossit puis s'efface. */
+  function itemPop(sprite, icon) {
+    const c = center(sprite, -sprite.getBoundingClientRect().height * 0.15);
+    const d = spawn('fx-item', c.x, c.y);
+    d.innerHTML = `<img src="${icon}" alt="">`;
+    done(d.animate([
+      { transform: 'translate(-50%, -20%) scale(0.4)', opacity: 0 },
+      { transform: 'translate(-50%, -90%) scale(1.25)', opacity: 1, offset: 0.3 },
+      { transform: 'translate(-50%, -100%) scale(1)', opacity: 1, offset: 0.75 },
+      { transform: 'translate(-50%, -120%) scale(1)', opacity: 0 },
+    ], { duration: 1100, easing: 'ease-out' }), d);
+  }
+
+  return { itemPop, center, throwBall, appear, recall, lunge, projectile, impact, sparkles, blink, shake, faint, statArrows, statusPulse, flash, wait };
 }

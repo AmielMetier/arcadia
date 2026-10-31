@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.31 — 31 octobre 2026
+- **Poké Duel** — Les objets tenus arrivent : au draft, chaque Pokémon reçoit un objet conseillé, que tu peux changer (deux Pokémon d'une équipe ne tiennent jamais le même).
+  - Restes, Baie Sitrus, Baie Prine, Orbe Vie, Bandeau Choix, Lunettes Choix, Mouchoir Choix, Ceinture Force et Ceinture Pro, avec leurs vrais effets.
+  - L'objet s'affiche sous le nom du Pokémon, son icône surgit quand il agit, et une baie mangée est barrée.
+  - Avec un objet Choix, les autres attaques sont grisées tant que le Pokémon reste au combat. Les bots en tiennent compte.
+- **Poké Duel** — Vraie animation quand une statistique monte ou baisse : des flèches bleues qui montent ou rouges qui descendent défilent dans la silhouette du Pokémon, qui s'illumine de la même couleur.
+- **Poké Duel** — La musique Sandstorm dure maintenant environ 2 min 30 (intro, passage étouffé), au lieu de 30 secondes en boucle.
+- **Poké Duel** — Le mode Aventure Kalos-Sud est retiré : Poké Duel devient le tournoi 3v3 (l'aventure Pokémon, c'est Odyssée). Le jeu se charge aussi plus vite.
+
 ## 3.30 — 31 octobre 2026
 - **Tous les jeux** — L'hôte peut changer d'onglet ou de fenêtre sans figer la partie : elle continue pour tout le salon (avant, tout s'arrêtait jusqu'à son retour).
 - **Birdie Party** — Fini les coupures pendant le tour de l'hôte : sa visée revenait vers lui et repartait en boucle, au point de saturer la connexion de tout le salon.

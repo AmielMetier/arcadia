@@ -14,6 +14,7 @@ import { createBattle, resolveTurn, forceSwitch } from './battle.js';
 import { chooseBotAction } from './bot.js';
 import { MOVES } from './moves.js';
 import { TYPES, getEffectiveness } from './types.js';
+import { cleanItems, suggestItems } from './items.js';
 
 export const OFFER_SIZE = 6;
 export const TEAM_SIZE = 3;
@@ -169,13 +170,14 @@ export function autoDraft(offer) {
 }
 
 /** Valide la sélection d'un dresseur. Retourne false si elle est invalide. */
-export function submitDraft(t, pid, picks) {
+export function submitDraft(t, pid, picks, items) {
   if (t.phase !== 'draft') return false;
   const p = getParticipant(t, pid);
   if (!p || p.bot || !Array.isArray(picks)) return false;
   const ids = [...new Set(picks.map(Number))];
   if (ids.length !== TEAM_SIZE || !ids.every((id) => p.offer.includes(id))) return false;
   p.team = ids;
+  p.items = cleanItems(ids, items);   // objets tenus : valides, sans doublon, complétés par les conseils
   return true;
 }
 
@@ -190,6 +192,7 @@ export function closeDraft(t, opts = {}) {
       p.team = autoDraft(p.offer);
       p.autoDrafted = true;
     }
+    if (!p.items) p.items = suggestItems(p.team);
   }
   t.phase = 'bracket';
   return resolveAutomatic(t, opts);
@@ -233,6 +236,7 @@ export function createTournament(players, options = {}) {
   participants.forEach((p, i) => {
     p.offer = offers[i];
     p.team = p.bot ? autoDraft(offers[i]) : null;
+    p.items = p.team ? suggestItems(p.team) : null;
     p.gone = false;
     p.stats = { matchW: 0, gameW: 0, gameL: 0, ko: 0, lost: 0 };
   });
@@ -439,12 +443,14 @@ export function setReady(t, side, leadIdx) {
   return true;
 }
 
-function teamFor(ids, leadIdx) {
+function teamFor(ids, leadIdx, items) {
   const order = [...ids];
   const li = leadIdx >= 0 && leadIdx < order.length ? leadIdx : 0;
   const [lead] = order.splice(li, 1);
   order.unshift(lead);
-  return order.map((id) => createActivePokemon(getPokemonById(id)));
+  const held = items || suggestItems(ids);
+  // chaque manche repart avec ses objets (baies et Ceinture Force de nouveau disponibles)
+  return order.map((id) => ({ ...createActivePokemon(getPokemonById(id)), item: held[id] || null, itemUsed: false, choiceLock: null }));
 }
 
 /** Crée le combat de la manche en cours (équipes remises à neuf, Pokémon de tête en premier). */
@@ -456,8 +462,8 @@ export function buildBattle(t, match) {
   const battle = createBattle({
     trainerA: A,
     trainerB: B,
-    teamA: teamFor(A.team, t.lead.A),
-    teamB: teamFor(B.team, t.lead.B),
+    teamA: teamFor(A.team, t.lead.A, A.items),
+    teamB: teamFor(B.team, t.lead.B, B.items),
   });
   t.phase = 'battle';
   return battle;
@@ -545,6 +551,7 @@ export function markGone(t, pid) {
   if (!p || p.gone || p.bot) return null;
   p.gone = true;
   if (!p.team) p.team = autoDraft(p.offer);
+  if (!p.items) p.items = suggestItems(p.team);
   const m = currentMatch(t);
   const side = sideOf(m, pid);
   if (m && side && m.status === 'live') {

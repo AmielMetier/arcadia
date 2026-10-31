@@ -32,7 +32,13 @@ class BattleMusicPlayer {
 
     try {
       this.audio = new Audio(path);
-      this.audio.loop = true;
+      // Sandstorm : version longue (≈ 2 min 30) avec une intro ; en boucle, on repart après l'intro (pas de coupure)
+      const loopAt = trackName === 'sandstorm' ? 7.8 : 0;
+      this.audio.loop = !loopAt;
+      if (loopAt) {
+        const a = this.audio;
+        a.addEventListener('ended', () => { if (this.audio === a && this.wanted) { a.currentTime = loopAt; a.play().catch(() => {}); } });
+      }
       DDVolume.media(this.audio, 'music', this.volume);
       this.audio.play().catch(() => {
         // En attente d'interaction utilisateur (navigateur autoplay policy)

@@ -1,11 +1,10 @@
 // pokemon/app.js
-// Point d'entrée de Poké Duel : écoute le HubBridge, lance soit l'Aventure Kalos-Sud (Menton),
-// soit le Tournoi 3v3 en Arène selon le mode choisi dans le Hub ou via le sélecteur en jeu.
+// Point d'entrée de Poké Duel : écoute le HubBridge et lance le tournoi 3v3,
+// (l'aventure Pokémon du Hub, c'est Odyssée).
 
 import { startHost } from './net/host.js';
 import { startClient } from './net/client.js';
 import { mountGame } from './view/game.js';
-import { mountAdventure } from './adventure/adventure.js';
 
 const H = window.HubBridge;
 const root = document.getElementById('app');
@@ -41,7 +40,6 @@ function boot(info = {}, forcedMode = null) {
 
   const qs = new URLSearchParams(location.search);
   const settings = H.embedded ? (info.settings || H.info.settings || {}) : {
-    mode: qs.get('mode') || 'adventure',
     timer: qs.get('timer') || 25,
     gen: qs.get('gen') || 'all',
     bots: qs.get('bots') ?? 1,
@@ -49,25 +47,7 @@ function boot(info = {}, forcedMode = null) {
     level: qs.get('level') || 'normal'
   };
 
-  const mode = forcedMode || settings.mode || 'adventure';
-
-  // --- MODE AVENTURE MULTIJOUEUR À MENTON ---
-  if (mode === 'adventure') {
-    root.className = ''; // le tournoi a son propre habillage (tz-root) : on repart d'une page neutre
-    activeInstance = mountAdventure(root, {
-      me,
-      bridge: H,
-      settings,
-      onSwitchMode: (nextMode) => boot(info, nextMode),
-      exit: () => {
-        if (H.embedded) H.exit();
-        else location.reload();
-      }
-    });
-    H.signalReady();
-    return;
-  }
-
+  // Poké Duel = le tournoi 3v3 (le mode aventure Kalos-Sud a été retiré ; l'aventure Pokémon, c'est Odyssée)
   // --- MODE TOURNOI 3V3 ARÈNE ---
   let session = null;
   let destroyed = false;
@@ -83,7 +63,6 @@ function boot(info = {}, forcedMode = null) {
     restart: call('restart'),
     submitAction: call('submitAction'),
     isHost: () => !!(session && session.isHost),
-    switchMode: (nextMode) => boot(info, nextMode),
     exit: () => {
       if (H.embedded) H.exit();
       else location.reload();

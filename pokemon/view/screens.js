@@ -6,6 +6,7 @@
 
 import { getPokemonById, spriteUrls } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
+import { ITEMS, ITEM_KEYS, cleanItems, suggestItems } from '../engine/items.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon } from '../engine/types.js';
 import {
   getParticipant, currentMatch, sideOf, autoDraft, chooseLead, attackTypes, statTotal,
@@ -156,12 +157,22 @@ export function renderDraft(stage, s, ctx) {
       </button>`;
   }).join('');
 
+  // objets tenus : ceux enregistrés, sinon tes choix complétés par les conseils (jamais deux fois le même)
+  const held = locked ? (meP.items || suggestItems(sel)) : cleanItems(sel, ctx.local.items);
+  const itemPick = (dex) => {
+    const cur = held[dex];
+    const it = ITEMS[cur];
+    if (locked) return it ? `<div class="dr-item locked" title="${esc(it.desc)}"><img src="${it.icon}" alt=""><span>${esc(it.name)}</span></div>` : '';
+    return `<label class="dr-item" title="${it ? esc(it.desc) : ''}">${it ? `<img src="${it.icon}" alt="">` : ''}
+      <select data-item-for="${dex}" aria-label="Objet tenu">${ITEM_KEYS.map((k) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(ITEMS[k].name)}</option>`).join('')}</select></label>`;
+  };
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => {
     const b = sel[i] ? getPokemonById(sel[i]) : null;
     return b
-      ? `<div class="dr-slot full"><img src="${spriteUrls(b.id).icon}" alt=""><b>${esc(b.name)}</b></div>`
+      ? `<div class="dr-slot full"><img src="${spriteUrls(b.id).icon}" alt=""><div class="dr-slot-tx"><b>${esc(b.name)}</b>${itemPick(b.id)}</div></div>`
       : `<div class="dr-slot"><span>${i + 1}</span></div>`;
   }).join('');
+  const heldDesc = sel.length ? `<div class="dr-items-help">${sel.map((d) => held[d] && ITEMS[held[d]] ? `<p><img src="${ITEMS[held[d]].icon}" alt=""><b>${esc(ITEMS[held[d]].name)}</b> ${esc(ITEMS[held[d]].desc)}</p>` : '').join('')}</div>` : '';
 
   stage.innerHTML = `
     <div class="tz-screen draft deal">
@@ -171,7 +182,7 @@ export function renderDraft(stage, s, ctx) {
           <h2 class="tz-title">${locked ? 'Équipe validée' : 'Compose ton équipe'}</h2>
           <p class="tz-sub">${locked
             ? (waiting.length ? `En attente de ${waiting.map((p) => esc(p.name)).join(', ')}…` : 'Tout le monde est prêt, tirage du tableau…')
-            : 'Garde 3 Pokémon sur les 6 proposés. Elle te suivra tout le tournoi : vise une équipe qui couvre ses faiblesses.'}</p>
+            : 'Garde 3 Pokémon sur les 6 proposés et donne un objet à chacun (un objet conseillé est déjà choisi). L\'équipe te suivra tout le tournoi.'}</p>
         </div>
         ${countdown(s, locked ? 'Fin du draft' : 'Temps restant')}
       </header>
@@ -181,6 +192,7 @@ export function renderDraft(stage, s, ctx) {
         <aside class="dr-side">
           <div class="dr-side-title">TON ÉQUIPE <span>${sel.length}/3</span></div>
           <div class="dr-slots">${slots}</div>
+          ${heldDesc}
           <div class="dr-analysis">
             <div class="dr-an-row">
               <span>Couverture</span>
@@ -210,6 +222,9 @@ export function renderDraft(stage, s, ctx) {
     ctx.rerender();
   };
   stage.querySelector('#drGo').onclick = () => ctx.submitDraft();
+  for (const sl of stage.querySelectorAll('select[data-item-for]')) {
+    sl.onchange = () => ctx.setItem(Number(sl.dataset.itemFor), sl.value);
+  }
 }
 
 // ===========================================================================

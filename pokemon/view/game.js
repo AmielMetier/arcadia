@@ -5,6 +5,22 @@
 
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
+import { ITEMS, CHOICE, cleanItems } from '../engine/items.js';
+
+/** Objet Choix : seule l'attaque bloquée reste disponible (tant qu'elle a des PP). */
+function choiceBlocked(p, moveId) {
+  if (!p || !CHOICE.has(p.item) || !p.choiceLock || p.choiceLock === moveId) return false;
+  const pp = p.ppMap ? p.ppMap[p.choiceLock] : 1;
+  return p.moves.includes(p.choiceLock) && pp > 0;
+}
+
+/** Petit badge de l'objet tenu (barré quand il a servi : baie mangée, Ceinture Force utilisée). */
+function itemBadge(p) {
+  const it = p && ITEMS[p.item];
+  if (!it) return '';
+  const lock = CHOICE.has(p.item) && p.choiceLock && MOVES[p.choiceLock] ? ` · bloqué sur ${MOVES[p.choiceLock].name}` : '';
+  return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" title="${it.name} : ${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}"><img src="${it.icon}" alt="">${it.name}</span>`;
+}
 import { STAGE_MULTS } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
 import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
@@ -46,7 +62,6 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         <span id="pokeRoundTitle">Tournoi</span>
       </div>
       <div class="poke-tools">
-        ${switchMode ? `<button class="poke-tool mode-switch-btn" id="btnSwitchAdv">MODE : <b>AVENTURE MENTON</b></button>` : ''}
         <button class="poke-tool" id="btnTree">TABLEAU</button>
         <button class="poke-tool" id="btnLog">JOURNAL</button>
         <button class="poke-tool" id="btnSet" aria-label="Réglages">RÉGLAGES</button>
@@ -98,13 +113,6 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   // --- Outils & Audio : la musique et les effets se règlent dans le panneau Réglages (à 0 : coupés) ---
   DDVolume.panel($('#btnSet'), { accent: '#ffcb05' });
   $('#btnQuit').onclick = () => { battleMusic.stop(); cleanup(); exit(); };
-  if ($('#btnSwitchAdv') && switchMode) {
-    $('#btnSwitchAdv').onclick = () => {
-      battleMusic.stop();
-      cleanup();
-      switchMode('adventure');
-    };
-  }
 
   const logDrawer = $('#pokeLogDrawer');
   const logList = $('#pokeLogList');
@@ -350,6 +358,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         if (stEl) stEl.innerHTML = statusBadge(ev.status);
         const stgEl = $(key === 'bottom' ? '#stagesBottom' : '#stagesTop');
         if (stgEl) stgEl.innerHTML = '';
+        const itEl = $(key === 'bottom' ? '#itemBottom' : '#itemTop');
+        if (itEl) itEl.innerHTML = itemBadge(teamOf(ev.side).find((p) => p.id === ev.pokemonId));
         if (ev.hp !== undefined) animateHp(key, ev.hp, ev.hp, ev.maxHp);
         const box = boxOf(ev.side);
         if (box && box.classList.contains('hud-out')) {
@@ -423,6 +433,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       } else if (ev.type === 'heal' || ev.type === 'recoil') {
         const key = keyOf(ev.side);
         const sprite = spriteOf(ev.side);
+        if (ev.item && sprite && ITEMS[ev.item]) fx.itemPop(sprite, ITEMS[ev.item].icon);
         await say(msg, 'step-status');
         if (stale()) return;
         if (ev.type === 'heal') {
@@ -435,11 +446,22 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         const oldHp = displayedHp[key] !== null ? displayedHp[key] : (ev.type === 'heal' ? ev.hp - amount : ev.hp + amount);
         await animateHp(key, oldHp, ev.hp, ev.maxHp, drainMs(amount, ev.maxHp));
 
+      } else if (ev.type === 'item') {
+        // l'objet entre en jeu : son icône surgit au-dessus du Pokémon
+        const key = keyOf(ev.side);
+        const sprite = spriteOf(ev.side);
+        const it = ITEMS[ev.item];
+        sfx.play(ev.item === 'focussash' ? 'hit' : 'heal');
+        if (sprite && it) fx.itemPop(sprite, it.icon);
+        const itEl = $(key === 'bottom' ? '#itemBottom' : '#itemTop');
+        if (itEl && ev.item !== 'leftovers') { const sp = itEl.querySelector('.sc-item'); if (sp) sp.classList.add('used'); }
+        await say(msg, 'step-status');
+
       } else if (ev.type === 'stat_change') {
         const sprite = spriteOf(ev.side);
-        if (sprite) fx.statArrows(sprite, ev.val > 0);
         sfx.play(ev.val > 0 ? 'levelup' : 'wobble');
-        await say(msg, 'step-status');
+        // le message attend la fin de l'animation : on voit bien la stat monter ou baisser
+        await Promise.all([sprite ? fx.statArrows(sprite, ev.val > 0) : null, say(msg, 'step-status')]);
 
       } else if (ev.type === 'status_applied') {
         const key = keyOf(ev.side);
@@ -561,7 +583,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 <span class="bw-status" id="statusTop">${statusBadge(pTop.status)}</span>
                 <div class="bw-hp"><div class="hp-fill ${hpClassTop}" id="hpFillTop" style="width:${hpPctTop}%"></div></div>
               </div>
-              <div class="bw-extra"><span class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</span><span class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</span></div>
+              <div class="bw-extra"><span class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</span><span id="itemTop">${itemBadge(pTop)}</span><span class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</span></div>
             </div>
 
             <!-- Zone Combat Adversaire (Haut-Droite) -->
@@ -584,7 +606,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
             <!-- Cadre du joueur (Bas-Droite), cadre Noir & Blanc -->
             <div class="hud-zone hud-bottom ${s.intro ? 'hud-out' : ''}">
-              <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
+              <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span id="itemBottom">${itemBadge(pBottom)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
               <div class="bw-box player">
                 <b class="bw-name" id="nameBottom">${esc(pBottom.name)}</b>
                 <span class="bw-lv">N.${pBottom.level || 50}</span>
@@ -613,12 +635,14 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       $('#statusTop').innerHTML = statusBadge(pTop.status);
       if ($('#stagesTop')) $('#stagesTop').innerHTML = statStagesHtml(pTop.statStages);
       $('#ballsTop').innerHTML = ballsHtml(teamTop);
+      if ($('#itemTop')) $('#itemTop').innerHTML = itemBadge(pTop);
 
       $('#nameBottom').textContent = pBottom.name;
       $('#typesBottom').innerHTML = typeBadgesHtml(pBottom.types);
       $('#statusBottom').innerHTML = statusBadge(pBottom.status);
       if ($('#stagesBottom')) $('#stagesBottom').innerHTML = statStagesHtml(pBottom.statStages);
       $('#ballsBottom').innerHTML = ballsHtml(teamBottom);
+      if ($('#itemBottom')) $('#itemBottom').innerHTML = itemBadge(pBottom);
 
       if ($('#turnTag')) $('#turnTag').textContent = `TOUR ${b.turn || 1}`;
       if ($('#hpMaxBottom')) $('#hpMaxBottom').textContent = `${pBottom.maxHp}`;
@@ -687,7 +711,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const maxPp = m.pp || 15;
                 const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
                 return `
-                  <button class="bw-move" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 ? 'disabled' : ''}
+                  <button class="bw-move ${choiceBlocked(pBottom, moveId) ? 'choice-locked' : ''}" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 || choiceBlocked(pBottom, moveId) ? 'disabled' : ''}
                     title="${esc(m.name)} · puissance ${m.power || '—'} · précision ${m.acc}%">
                     <span class="pm-key">${mIdx + 1}</span>
                     <span class="bw-move-name">${esc(m.name)}</span>
@@ -754,7 +778,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   // Écrans hors combat
   // ==========================================================================
 
-  const local = { draft: [], draftKey: null, lead: null, leadKey: null };
+  const local = { draft: [], items: {}, draftKey: null, lead: null, leadKey: null };
   const ctx = {
     me,
     local,
@@ -771,10 +795,17 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       sfx.play('switch');
       ctx.rerender();
     },
+    setItem(dex, key) {
+      // un objet déjà tenu par un autre Pokémon de l'équipe lui est retiré (il en recevra un autre conseillé)
+      for (const d of Object.keys(local.items)) if (local.items[d] === key && Number(d) !== dex) delete local.items[d];
+      local.items[dex] = key;
+      sfx.play('switch');
+      ctx.rerender();
+    },
     submitDraft() {
       if (local.draft.length !== TEAM_SIZE) return;
       sfx.play('levelup');
-      draft([...local.draft]);
+      draft([...local.draft], cleanItems(local.draft, local.items));
     },
     pickLead(idx) {
       local.lead = idx;
@@ -926,7 +957,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     if (['1', '2', '3', '4'].includes(e.key)) {
       const moveId = p.moves[Number(e.key) - 1];
       const curPp = p.ppMap && p.ppMap[moveId] !== undefined ? p.ppMap[moveId] : 1;
-      if (moveId && curPp > 0) {
+      if (moveId && curPp > 0 && !choiceBlocked(p, moveId)) {
         const moveObj = MOVES[moveId];
         sfx.play(moveObj && moveObj.cat === 'special' ? 'beam' : 'hit');
         submitAction({ type: 'move', moveId });

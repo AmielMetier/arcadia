@@ -5,6 +5,7 @@
 import { MOVES } from './moves.js';
 import { getEffectiveness } from './types.js';
 import { calculateDamage, getActivePokemon } from './battle.js';
+import { CHOICE } from './items.js';
 
 export function chooseBotAction(battle, side, difficulty = 'normal') {
   const myTeam = side === 'A' ? battle.teamA : battle.teamB;
@@ -26,6 +27,17 @@ export function chooseBotAction(battle, side, difficulty = 'normal') {
       const best = chooseBestSwitch(myTeam, myActiveIdx, oppPoke);
       if (best) return best;
     }
+  }
+
+  // --- Objet Choix : bloqué sur une attaque. Si elle ne sert plus à rien (sans effet, peu efficace), on change ---
+  if (CHOICE.has(myPoke.item) && myPoke.choiceLock && myPoke.moves.includes(myPoke.choiceLock) && (myPoke.ppMap ? myPoke.ppMap[myPoke.choiceLock] : 1) > 0) {
+    const lm = MOVES[myPoke.choiceLock];
+    const mult = lm && lm.power ? getEffectiveness(lm.type, oppPoke.types) : 1;
+    if (difficulty !== 'facile' && mult < 1) {
+      const sw = chooseBestSwitch(myTeam, myActiveIdx, oppPoke);
+      if (sw) return sw;
+    }
+    return { type: 'move', moveId: myPoke.choiceLock };
   }
 
   // --- Évaluation des 4 attaques ---
