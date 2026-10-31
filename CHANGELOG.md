@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.33 — 31 octobre 2026
+- **Poké Duel** — Les talents arrivent : chaque Pokémon a le sien, choisi parmi ses vrais talents, et les formes Méga ont leur propre talent.
+  - Plus de 70 talents avec leur effet : Intimidation, Coloforce, Multiécaille, Turbo, Lévitation, Absorb Eau, Paratonnerre, Fermeté, Garde Magik, Technicien, Adaptabilité, Impudence, Statik, Peau Dure, Miroir Magik, Marque Ombre…
+  - La météo : Crachin, Sécheresse et Sable Volant font tomber la pluie, briller le soleil ou souffler le sable pendant 5 tours (Eau et Feu plus ou moins forts, sable qui blesse), avec son effet sur l'arène. Glissade et Chlorophylle doublent la Vitesse.
+  - Au draft, le talent et son effet sont écrits sur chaque carte. En combat, il s'affiche sous le nom du Pokémon et un bandeau à son nom glisse quand il s'active, comme dans les jeux.
+  - Les bots en tiennent compte (ils n'attaquent plus en Sol un Pokémon qui lévite).
+
 ## 3.32 — 31 octobre 2026
 - **Poké Duel** — Les Méga-Évolutions arrivent : 29 Pokémon du tournoi peuvent méga-évoluer (31 formes, dont Dracaufeu et Mewtwo X et Y).
   - Au draft, un badge MÉGA signale ceux qui le peuvent, et leur Méga-Gemme est proposée en tête de leurs objets (une seule par équipe).

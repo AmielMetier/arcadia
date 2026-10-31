@@ -6,6 +6,26 @@
 import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { ITEMS, CHOICE, cleanItems } from '../engine/items.js';
+import { ABILITIES } from '../engine/abilities.js';
+
+/** Badge du talent (survol : son effet) */
+function abilityBadge(p) {
+  const a = p && ABILITIES[p.ability];
+  return a ? `<span class="sc-ability" title="${a.name} : ${a.desc}">${a.name}</span>` : '';
+}
+/** Bandeau du talent, comme dans les jeux : il glisse depuis le côté du Pokémon puis repart */
+function showAbilityBanner(key, pokeName, abilityName) {
+  const host = document.getElementById('bfInner'); if (!host) return;
+  const d = document.createElement('div');
+  d.className = `bw-ab-banner ${key}`;
+  d.innerHTML = `<small>${pokeName}</small><b>${abilityName}</b>`;
+  host.appendChild(d);
+  const from = key === 'bottom' ? '110%' : '-110%';
+  d.animate([{ transform: `translateX(${from})`, opacity: 0 }, { transform: 'none', opacity: 1, offset: 0.15 }, { transform: 'none', opacity: 1, offset: 0.85 }, { transform: `translateX(${from})`, opacity: 0 }],
+    { duration: 1700, easing: 'ease-out' }).finished.then(() => d.remove(), () => d.remove());
+}
+const WEATHER_LABEL = { rain: '🌧️ Pluie', sun: '☀️ Soleil', sand: '🌪️ Tempête de sable', wind: '🌬️ Vents violents' };
+function weatherTag(w) { return w && w.type ? `<span class="bw-weather w-${w.type}">${WEATHER_LABEL[w.type]}${w.type !== 'wind' && w.turns ? ` · ${w.turns} t.` : ''}</span>` : ''; }
 
 /** Objet Choix : seule l'attaque bloquée reste disponible (tant qu'elle a des PP). */
 function choiceBlocked(p, moveId) {
@@ -362,6 +382,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         if (stgEl) stgEl.innerHTML = '';
         const itEl = $(key === 'bottom' ? '#itemBottom' : '#itemTop');
         if (itEl) itEl.innerHTML = itemBadge(teamOf(ev.side).find((p) => p.id === ev.pokemonId));
+        const abEl = $(key === 'bottom' ? '#abilBottom' : '#abilTop');
+        if (abEl) abEl.innerHTML = abilityBadge(teamOf(ev.side).find((p) => p.id === ev.pokemonId));
         if (ev.hp !== undefined) animateHp(key, ev.hp, ev.hp, ev.maxHp);
         const box = boxOf(ev.side);
         if (box && box.classList.contains('hud-out')) {
@@ -448,6 +470,21 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         const oldHp = displayedHp[key] !== null ? displayedHp[key] : (ev.type === 'heal' ? ev.hp - amount : ev.hp + amount);
         await animateHp(key, oldHp, ev.hp, ev.maxHp, drainMs(amount, ev.maxHp));
 
+      } else if (ev.type === 'ability') {
+        // comme dans les jeux : un bandeau au nom du talent glisse depuis le côté du Pokémon
+        const key = keyOf(ev.side);
+        const a = ABILITIES[ev.ability];
+        const poke = teamOf(ev.side)[ev.side === 'A' ? b.activeA : b.activeB];
+        if (a) showAbilityBanner(key, poke ? poke.name : '', a.name);
+        if (ev.weather) { const ws = $('#weatherSlot'); if (ws) ws.innerHTML = weatherTag({ type: ev.weather, turns: ev.weather === 'wind' ? 0 : 5 }); sfx.play('switch'); }
+        const abEl = $(key === 'bottom' ? '#abilBottom' : '#abilTop');
+        if (abEl && poke) abEl.innerHTML = abilityBadge(poke);
+        await say(msg, 'step-status');
+
+      } else if (ev.type === 'weather_end') {
+        const ws = $('#weatherSlot'); if (ws) ws.innerHTML = '';
+        await say(msg, 'step-status');
+
       } else if (ev.type === 'mega') {
         // Méga-Évolution : halo arc-en-ciel, éclair blanc, le sprite change, le cadre prend le nouveau nom et les types
         const key = keyOf(ev.side);
@@ -463,6 +500,9 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         const typesEl = $(key === 'bottom' ? '#typesBottom' : '#typesTop');
         if (typesEl && ev.types) typesEl.innerHTML = typeBadgesHtml(ev.types);
         if (ev.pokemonId) sfx.playCry(ev.pokemonId);
+        const abEl2 = $(key === 'bottom' ? '#abilBottom' : '#abilTop');
+        const mp = teamOf(ev.side).find((p) => p.id === ev.pokemonId);
+        if (abEl2 && mp) abEl2.innerHTML = abilityBadge(mp);
         await talk;
 
       } else if (ev.type === 'item') {
@@ -560,6 +600,9 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     const hpClassTop = hpPctTop > 50 ? 'hp-green' : hpPctTop > 20 ? 'hp-yellow' : 'hp-red';
 
     const isSubmitted = mySide === 'A' ? s.submittedA : mySide === 'B' ? s.submittedB : false;
+    // Marque Ombre adverse : impossible de changer de Pokémon (sauf Spectre)
+    const trapped = (() => { if (!mySide) return false; const me2 = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB], foe2 = mySide === 'A' ? b.teamB[b.activeB] : b.teamA[b.activeA];
+      return !!(foe2 && !foe2.fainted && foe2.ability === 'shadow-tag' && me2 && !me2.fainted && !me2.types.includes('ghost')); })();
     const isForcedSwitch = (mySide === 'A' && b.phase === 'switch_forced_A') ||
                            (mySide === 'B' && b.phase === 'switch_forced_B') ||
                            b.phase === 'switch_forced_both';
@@ -597,6 +640,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
         <div class="arena-card deal ${s.isFinal ? 'final' : ''}" id="arenaCard">
           <div class="battlefield"><div class="bf-inner" id="bfInner">
             <div class="fx-layer" id="fxLayer"></div>
+            <div class="bw-weather-slot" id="weatherSlot">${weatherTag(b.weather)}</div>
             <!-- Cadre de l'adversaire (Haut-Gauche), cadre Noir & Blanc -->
             <div class="hud-zone hud-top ${s.intro ? 'hud-out' : ''}">
               <div class="bw-trainer-row"><span class="bw-trainer" style="--tc:${tTop.color}">${esc(tTop.name)}</span><div id="ballsTop" class="bw-balls">${ballsHtml(teamTop)}</div></div>
@@ -606,7 +650,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 <span class="bw-status" id="statusTop">${statusBadge(pTop.status)}</span>
                 <div class="bw-hp"><div class="hp-fill ${hpClassTop}" id="hpFillTop" style="width:${hpPctTop}%"></div></div>
               </div>
-              <div class="bw-extra"><span class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</span><span id="itemTop">${itemBadge(pTop)}</span><span class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</span></div>
+              <div class="bw-extra"><span class="sc-types" id="typesTop">${typeBadgesHtml(pTop.types)}</span><span id="itemTop">${itemBadge(pTop)}</span><span id="abilTop">${abilityBadge(pTop)}</span><span class="sc-stages" id="stagesTop">${statStagesHtml(pTop.statStages)}</span></div>
             </div>
 
             <!-- Zone Combat Adversaire (Haut-Droite) -->
@@ -629,7 +673,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
             <!-- Cadre du joueur (Bas-Droite), cadre Noir & Blanc -->
             <div class="hud-zone hud-bottom ${s.intro ? 'hud-out' : ''}">
-              <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span id="itemBottom">${itemBadge(pBottom)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
+              <div class="bw-extra"><span class="sc-types" id="typesBottom">${typeBadgesHtml(pBottom.types)}</span><span id="itemBottom">${itemBadge(pBottom)}</span><span id="abilBottom">${abilityBadge(pBottom)}</span><span class="sc-stages" id="stagesBottom">${statStagesHtml(pBottom.statStages)}</span></div>
               <div class="bw-box player">
                 <b class="bw-name" id="nameBottom">${esc(pBottom.name)}</b>
                 <span class="bw-lv">N.${pBottom.level || 50}</span>
@@ -659,6 +703,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       if ($('#stagesTop')) $('#stagesTop').innerHTML = statStagesHtml(pTop.statStages);
       $('#ballsTop').innerHTML = ballsHtml(teamTop);
       if ($('#itemTop')) $('#itemTop').innerHTML = itemBadge(pTop);
+      if ($('#abilTop')) $('#abilTop').innerHTML = abilityBadge(pTop);
+      if ($('#weatherSlot')) $('#weatherSlot').innerHTML = weatherTag(b.weather);
 
       $('#nameBottom').textContent = pBottom.name;
       $('#typesBottom').innerHTML = typeBadgesHtml(pBottom.types);
@@ -666,6 +712,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       if ($('#stagesBottom')) $('#stagesBottom').innerHTML = statStagesHtml(pBottom.statStages);
       $('#ballsBottom').innerHTML = ballsHtml(teamBottom);
       if ($('#itemBottom')) $('#itemBottom').innerHTML = itemBadge(pBottom);
+      if ($('#abilBottom')) $('#abilBottom').innerHTML = abilityBadge(pBottom);
 
       if ($('#turnTag')) $('#turnTag').textContent = `TOUR ${b.turn || 1}`;
       if ($('#hpMaxBottom')) $('#hpMaxBottom').textContent = `${pBottom.maxHp}`;
@@ -736,7 +783,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const maxPp = m.pp || 15;
                 const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
                 return `
-                  <button class="bw-move ${choiceBlocked(pBottom, moveId) ? 'choice-locked' : ''}" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 || choiceBlocked(pBottom, moveId) ? 'disabled' : ''}
+                  <button class="bw-move ${choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'choice-locked' : ''}" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 || choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'disabled' : ''}
                     title="${esc(m.name)} · puissance ${m.power || '—'} · précision ${m.acc}%">
                     <span class="pm-key">${mIdx + 1}</span>
                     <span class="bw-move-name">${esc(m.name)}</span>
@@ -756,7 +803,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const hpPct = Math.max(0, Math.min(100, Math.round((p.hp / p.maxHp) * 100)));
                 const hpCls = hpPct > 50 ? 'hp-green' : hpPct > 20 ? 'hp-yellow' : 'hp-red';
                 return `
-                  <button class="bw-party ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted || notYet ? 'disabled' : ''}>
+                  <button class="bw-party ${isCurrent ? 'current' : ''} ${p.fainted ? 'fainted' : ''}" data-switch="${pIdx}" ${isCurrent || p.fainted || isSubmitted || notYet || (trapped && !isForcedSwitch) ? 'disabled' : ''}>
                     <img src="${spriteUrls(p.spriteId || p.id).icon}" alt="" class="bw-party-icon">
                     <b class="bw-party-name">${esc(p.name)}</b>
                     <span class="bw-party-lv">N.${p.level || 50}</span>

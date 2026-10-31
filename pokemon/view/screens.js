@@ -8,6 +8,7 @@ import { getPokemonById, spriteUrls } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { ITEMS, itemsFor, cleanItems, suggestItems } from '../engine/items.js';
 import { megasOf } from '../engine/megas.js';
+import { ABILITIES, abilityOf } from '../engine/abilities.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon } from '../engine/types.js';
 import {
   getParticipant, currentMatch, sideOf, autoDraft, chooseLead, attackTypes, statTotal,
@@ -147,6 +148,7 @@ export function renderDraft(stage, s, ctx) {
         <div class="dr-art"><img src="${spriteUrls(dex).artwork}" alt="" loading="lazy"></div>
         <b class="dr-name">${esc(b.name)}${megasOf(dex).length ? ' <span class="dr-mega" title="Peut méga-évoluer avec sa Méga-Gemme">MÉGA</span>' : ''}</b>
         <div class="dr-types">${b.types.map((ty) => typeChip(ty)).join('')}</div>
+        ${ABILITIES[abilityOf(dex)] ? `<div class="dr-ability" title="${esc(ABILITIES[abilityOf(dex)].desc)}"><b>${esc(ABILITIES[abilityOf(dex)].name)}</b> ${esc(ABILITIES[abilityOf(dex)].desc)}</div>` : ''}
         <div class="dr-stats">
           ${STAT_ROWS.map(([k, l]) => `
             <div class="dr-stat"><span>${l}</span><i><u style="width:${Math.min(100, (b.stats[k] / 190) * 100)}%"></u></i><em>${b.stats[k]}</em></div>`).join('')}

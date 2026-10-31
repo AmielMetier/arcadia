@@ -6,6 +6,7 @@ import { MOVES } from './moves.js';
 import { getEffectiveness } from './types.js';
 import { calculateDamage, getActivePokemon, canMega } from './battle.js';
 import { CHOICE } from './items.js';
+import { absorbs, moveTypeFor } from './abilities.js';
 
 export function chooseBotAction(battle, side, difficulty = 'normal') {
   const act = chooseBotActionRaw(battle, side, difficulty);
@@ -53,6 +54,8 @@ function chooseBotActionRaw(battle, side, difficulty = 'normal') {
   for (const moveId of myPoke.moves) {
     const move = MOVES[moveId];
     if (!move) continue;
+    if (myPoke.disabled && myPoke.disabled.move === moveId) continue;   // bloquée par Corps Maudit
+    if (myPoke.ppMap && myPoke.ppMap[moveId] <= 0) continue;
 
     let score = 0;
 
@@ -76,7 +79,9 @@ function chooseBotActionRaw(battle, side, difficulty = 'normal') {
 
     // 4. Attaque offensive avec calcul de dégâts
     if (move.power > 0) {
-      const { damage, mult } = calculateDamage(myPoke, oppPoke, move);
+      const { damage, mult } = calculateDamage(myPoke, oppPoke, move, battle);
+      // le talent adverse absorbe ce type (Lévitation, Absorb Eau, Torche…) : à éviter
+      if (absorbs(oppPoke, moveTypeFor(myPoke, move), myPoke)) score -= 400;
       score += damage;
 
       // Bonus si l'attaque permet d'achever le Pokémon adverse (K.O.)
