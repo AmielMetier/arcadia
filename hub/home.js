@@ -92,6 +92,15 @@
   const click = (src, dst) => { const a = $(src), b = $(dst); if (a && b) a.onclick = () => b.click(); };
   click('#navNews', '#btnNews'); click('#footNews', '#btnNews'); click('#navBoard', '#btnBoard'); click('#footNet', '#btnNetTest');
 
+  /* ------------------------------------------------ bouton Réglages : rangé dans la barre de l'écran affiché
+     (au lieu de flotter par-dessus, où il cachait « Classement » dans le salon) */
+  const setBtn = $('#hubSet');
+  function placeSettings() {
+    const host = $('#room').classList.contains('on') ? $('#room .topbar') : $('#home .nav');
+    if (setBtn && host && setBtn.parentElement !== host) host.appendChild(setBtn);
+  }
+  document.addEventListener('hub:screen', placeSettings); placeSettings();
+
   /* ------------------------------------------------ sons des boutons du Hub */
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button, .btn, a.linkbtn'); if (!b || b.disabled || b.closest('#spot, #filters, .amenu, .gload')) return;

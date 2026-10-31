@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.24 — 31 octobre 2026
+- **Arcadia** — Le bouton Réglages ne passe plus par-dessus « Classement » dans le salon : il est rangé dans la barre du haut.
+- **Arcadia** — Tes amis sont maintenant en haut de l'accueil, juste sous ton compte.
+- **Arcadia** — L'accueil et le salon s'adaptent à toutes les tailles d'écran d'ordinateur, du petit portable au grand écran : plus de cartes par ligne sur grand écran, affiches jamais coupées dans la vitrine.
+
 ## 3.23 — 31 octobre 2026
 - **Arcadia** — Nouvel accueil : les jeux d'abord.
   - Une grande vitrine fait défiler les jeux, avec « Jouer avec mes potes » et « Jouer seul » en un clic.

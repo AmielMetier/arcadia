@@ -377,7 +377,7 @@ body:not(:has(#play.on)) .atab{display:none}
 .am-note{margin:0;font-size:12px;color:var(--muted);font-weight:600}
 
 /* ======================================================================= tailles d'écran */
-@media(max-width:1060px){ .navlinks{margin-right:140px} }
+@media(max-width:1060px){ .navlinks{margin-right:0} }
 @media(max-width:860px){
   .home{grid-template-columns:1fr}
   .below{grid-template-columns:1fr}
@@ -421,3 +421,28 @@ body:not(:has(#play.on)) .atab{display:none}
 .gl-cover{display:flex;align-items:center;background:#08090c}
 .gl-cover img{height:auto;object-fit:contain}
 @media(max-width:860px){ .gl-card{grid-template-columns:1fr} .gl-cover{aspect-ratio:16/9} }
+/* Réglages dans la barre du haut, à sa place (accueil et salon) */
+.nav .hubset,.topbar .hubset{position:static;flex:none;box-shadow:3px 3px 0 #000}
+.navlinks{margin-right:0}
+.side{display:flex;flex-direction:column;gap:22px;min-width:0}
+.below.one{grid-template-columns:1fr}
+.below.one .pitch .steps{grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:860px){ .below.one .pitch .steps{grid-template-columns:1fr} }
+/* grands écrans : on profite de la largeur */
+@media(min-width:1600px){
+  .nav,.home,.gallery,.below,.foot{width:min(1520px,100%)}
+  .home{grid-template-columns:minmax(0,1fr) 440px}
+  #shelf{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .room,.topbar{width:min(1720px,100%)}
+}
+@media(min-width:2200px){
+  .nav,.home,.gallery,.below,.foot{width:min(1880px,100%)}
+  #shelf{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .room,.topbar{width:min(2100px,100%)}
+  #games{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+/* écrans d'ordinateur peu hauts (portable 1366 × 768) : la vitrine ne mange pas tout l'écran */
+@media(min-width:861px){ .spot{aspect-ratio:16/9;min-height:0} }
+
+.side>.card{position:relative}
+.side>.card:first-child{margin-top:12px}
