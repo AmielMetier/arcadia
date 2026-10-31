@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.25 — 31 octobre 2026
+- **Arcadia** — Plus de grand vide sous la vitrine de l'accueil : elle descend jusqu'en bas de la colonne de ton compte et de tes amis, avec l'affiche entière en haut.
+
 ## 3.24 — 31 octobre 2026
 - **Arcadia** — Le bouton Réglages ne passe plus par-dessus « Classement » dans le salon : il est rangé dans la barre du haut.
 - **Arcadia** — Tes amis sont maintenant en haut de l'accueil, juste sous ton compte.

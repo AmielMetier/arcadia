@@ -16,7 +16,7 @@
   let idx = 0, timer = 0, paused = false;
   spot.innerHTML = `<div class="sp-slides">${feat.map((g, i) => {
     const I = INFO[g.id] || {};
-    return `<article class="sp-slide${i === 0 ? ' on' : ''}" style="--acc:${esc(g.accent || '#ffc531')}" aria-hidden="${i !== 0}">
+    return `<article class="sp-slide${i === 0 ? ' on' : ''}" style="--acc:${esc(g.accent || '#ffc531')};--bgimg:url('${esc(g.cover)}')" aria-hidden="${i !== 0}">
       <img src="${esc(g.cover)}" alt="" ${i < 2 ? '' : 'loading="lazy"'} decoding="async">
       <div class="sp-txt">
         <div class="sp-meta"><span>${esc(GN[I.genre] || g.tag || '')}</span><span>⏱ ${esc(I.time || '')}</span><span>👥 ${g.minPlayers}–${g.maxPlayers} joueurs</span></div>

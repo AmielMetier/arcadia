@@ -446,3 +446,14 @@ body:not(:has(#play.on)) .atab{display:none}
 
 .side>.card{position:relative}
 .side>.card:first-child{margin-top:12px}
+/* la vitrine prend toute la hauteur de la colonne compte + amis (plus de grand vide dessous) :
+   l'affiche entière en haut, un fond flou de l'affiche, le texte et les boutons en bas */
+@media(min-width:861px){
+  .home{align-items:stretch}
+  .hero{height:100%}
+  .spot{aspect-ratio:auto;flex:1;min-height:max(100%,420px);height:100%}
+  .sp-slide{background:#08090c;overflow:hidden}
+  .sp-slide::before{content:'';position:absolute;inset:-30px;background:var(--bgimg) center/cover;filter:blur(26px) brightness(.45) saturate(1.2)}
+  .sp-slide img{position:relative;height:auto;aspect-ratio:16/9;object-fit:cover}
+  .sp-slide::after{background:linear-gradient(180deg,transparent 0,transparent 38%,rgba(8,9,13,.6) 60%,rgba(8,9,13,.92) 100%)}
+}
