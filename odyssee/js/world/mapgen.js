@@ -44,7 +44,7 @@ export class GameMap {
   object(x, y, o) { this.objects.set(key(x, y), o); }
   objectAt(x, y) { return this.objects.get(key(x, y)); }
   /** décor bloquant (lampadaire, pot…) */
-  prop(k, x, y, block = true) { this.deco.push({ k, x, y }); if (block) { if (this.get(x, y) !== T.BLOCK) this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.BLOCK); } }
+  prop(k, x, y, block = true, o = {}) { this.deco.push({ k, x, y, ...o }); if (block) { if (this.get(x, y) !== T.BLOCK) this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.BLOCK); } }
   underAt(x, y) { return this.under.get(key(x, y)); }
 
   /** pose un bâtiment ; renvoie la position de la porte */

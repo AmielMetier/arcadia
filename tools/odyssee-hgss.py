@@ -27,7 +27,7 @@ CHARS = {
     'maman': ('GSMAMA', None),
     'nurse': ('PCWOMAN1', None),
     'vendeur': ('SHOPM1_2', None),
-    'garde': ('ROCKETM', 'heartgold-soulsilver/Rocket_Grunt'),
+    'garde': ('POLICEMAN', 'diamond-pearl/Policeman'),
     'hector': ('GSLEADER2', 'heartgold-soulsilver/Bugsy'),
     'basalte': ('GSLEADER14', 'heartgold-soulsilver/Brock'),
     'marine': ('GSLEADER11', 'heartgold-soulsilver/Misty'),
@@ -53,6 +53,22 @@ CHARS = {
     'habitante': ('GSWOMAN1', 'heartgold-soulsilver/Beauty'),
     'vieil_homme': ('GSOLDMAN1', 'heartgold-soulsilver/Sage'),
     'enfant': ('GSBABYBOY1', 'heartgold-soulsilver/School_Kid'),
+    # histoire secondaire : la Brume et les habitants des nouveaux lieux
+    'brume': ('ROCKETM', 'heartgold-soulsilver/Rocket_Grunt'),
+    'brume_f': ('ROCKETW', 'heartgold-soulsilver/Rocket_Grunt~F'),
+    'sylas': ('RKANBUM', 'heartgold-soulsilver/Proton'),
+    'ariane': ('RKANBUW', 'heartgold-soulsilver/Ariana'),
+    'nox': ('SAKAKI', 'heartgold-soulsilver/Giovanni'),
+    'voleur': ('THIEF', 'heartgold-soulsilver/Burglar'),
+    'pretre': ('BOZU', 'heartgold-soulsilver/Sage'),
+    'kimono': ('DANCER', 'heartgold-soulsilver/Kimono_Girl'),
+    'jardinier': ('FARMER', None),
+    'facteur': ('DELIVERY', None),
+    'capitaine': ('CAPTAIN', None),
+    'lucie': ('GIRL3', None),
+    'fillette2': ('GSGIRL2', None),
+    'dame': ('LADY', None),
+    'savant': ('DOCTOR', None),
 }
 
 # ------------------------------------------------------------------ textures NSBTX (DS)

@@ -1,5 +1,15 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.49 — 31 octobre 2026
+- **Odyssée** — une histoire secondaire complète en parallèle de l'aventure : la Brume, une organisation qui vole les Pokémon et veut réveiller Groudon. Huit quêtes, à suivre dans le nouveau menu « Quêtes ».
+  - Le Ponyta de Lucie (Sylvebourg, après le premier badge) : enquête auprès des habitants, poursuite dans le Bois Murmure et sa clairière cachée.
+  - Les eaux troubles du Lac Miroir : un nouveau lac au nord de la route 3, son hameau de Rive-Claire, trois pompes à arrêter et la Grotte des Marées à rejoindre en surfant (Mesprit, et un Lokhlass en cadeau).
+  - Les nuits blanches de Floralia : des enfants prisonniers de leurs cauchemars, le Jardin des Songes la nuit, Cresselia sur l'îlot du lac et Darkrai au fond d'un sanctuaire.
+  - Les talismans du Temple Kagura : la Forêt des Torii au bout de la route 7, ses lanternes, sa cloche et Créhelf.
+  - Le cœur du volcan : après la Ligue, le bateau de l'Embarcadère mène à l'Île du Magma. Il faut y prendre d'assaut la base de la Brume pour affronter Groudon, puis Heatran.
+  - Et aussi : le courrier perdu du facteur de Port-Azur, le dragon de pierre du Musée des Dragons et les sept Éclats d'Étoile de la fontaine (Jirachi). Créfadet attend celles et ceux qui ont vu ses deux frères.
+- **Odyssée** — nouveaux décors : fontaine, torii, lanternes, cloche, squelette de dragon, trône… et de nouveaux habitants dessinés comme dans HeartGold / SoulSilver.
+
 ## 3.48 — 31 octobre 2026
 - **Odyssée** — l'eau et les fleurs viennent maintenant de HeartGold / SoulSilver : la mer ondule comme sur DS, les rivages ont leur sable et leur écume qui monte et redescend.
   - Les parterres fleuris sont faits de fleurs rouges, jaunes, bleues et violettes qui se balancent au vent.

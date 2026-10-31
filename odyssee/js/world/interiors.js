@@ -3,7 +3,7 @@ import { T } from './tiles.js';
 import { GameMap, rng } from './mapgen.js';
 
 /** pièce vide : murs du fond (2 rangées), murs latéraux, tapis de sortie en bas */
-function room(id, w, h, o = {}) {
+export function room(id, w, h, o = {}) {
   const m = new GameMap(id, w, h, { outdoor: false, fill: T.FLOOR, floor: o.floor || 'wood', music: o.music || 'house', name: o.name, wallStyle: o.wall || 'wall_in', battleBg: o.battleBg || 'indoor' });
   for (let x = 0; x < w; x++) { m.set(x, 0, T.WALL); m.set(x, 1, T.WALL); }
   for (let y = 0; y < h; y++) { m.set(0, y, T.WALL); m.set(w - 1, y, T.WALL); }

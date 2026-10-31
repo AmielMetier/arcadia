@@ -348,6 +348,41 @@ def do_kits():
         print('kit', name, 'case', round(S), 'px,', len(tiles), 'cases')
     META['facades_v3'] = names
 
+# ------------------------------------------------------------------ décor (parties 3 et 6) : sprites à la densité des
+# tuiles du DS (16 pixels par case, chaque pixel fait 2 pixels à l'écran), comme dans HeartGold / SoulSilver
+DECO = {
+    'erable': (784, 373), 'cerisier': (759, 230), 'arbre_automne': (898, 230), 'panneau_bois': (741, 299), 'banc': (789, 302),
+    'fontaine': (826, 299), 'gargouille': (857, 296), 'pilier_ball': (876, 297), 'caisse': (768, 334), 'tonneau': (788, 334),
+    'borne': (806, 336), 'bouee': (823, 337), 'parasol': (845, 332), 'bateau': (885, 335), 'lanterne': (705, 378),
+    'torii': (743, 356), 'stele': (809, 376), 'colonne': (827, 371), 'sanctuaire': (856, 374), 'cristal': (890, 377),
+    'rocher_grand': (852, 263), 'butte': (898, 266),
+    'machine_labo': (1001, 68), 'table_balls': (1058, 77), 'livres': (1101, 77), 'lampe_phare': (1143, 68), 'telescope': (1180, 76),
+    'corde': (1211, 84), 'trone': (1000, 121), 'brasero': (1036, 126), 'statue_dragon': (1065, 121), 'console': (1105, 126),
+    'ecran_carte': (1153, 124), 'cuve': (1190, 124), 'caisses': (1214, 126), 'cloche': (1004, 176), 'coussin': (1045, 190),
+    'fossile': (1083, 183), 'squelette': (1169, 176),
+}
+DECO_SCALE = {'squelette': 0.75, 'cloche': 0.85, 'machine_labo': 0.85, 'lampe_phare': 0.85}
+
+def do_deco():
+    lab, _ = ndimage.label(ndimage.binary_closing(OPAQUE, iterations=2))
+    objs = ndimage.find_objects(lab)
+    meta = {}
+    for k, (x, y) in DECO.items():
+        # le point peut tomber dans un trou du dessin : le pixel opaque le plus proche
+        best = None
+        for r in range(0, 9):
+            ys, xs = np.nonzero(lab[y - r:y + r + 1, x - r:x + r + 1])
+            if len(ys): best = lab[y - r + ys[0], x - r + xs[0]]; break
+        if not best: print('décor introuvable :', k); continue
+        o = objs[best - 1]; b = (o[1].start, o[0].start, o[1].stop, o[0].stop)
+        a = np.array(IM.crop(b)); r, g, bb = (a[..., i].astype(int) for i in range(3))
+        a[((r > 180) & (bb > 180) & (g < 110)) | (a[..., 3] < 128), 3] = 0; a[a[..., 3] > 0, 3] = 255
+        img = Image.fromarray(a); sc = DECO_SCALE.get(k, 1.0)
+        if sc != 1.0: img = crisp(img, max(1, round(img.width * sc)), max(1, round(img.height * sc)))
+        save(img, 'deco', k + '.png'); meta[k] = [img.width, img.height, 1]
+    META['deco'] = meta
+    print('décor :', len(meta), 'éléments')
+
 def write_meta():
     js = os.path.join(ROOT, 'odyssee', 'js', 'data', 'sprites.js')
     txt = open(js).read(); meta = json.loads(txt[txt.index('{'):txt.rindex('}') + 1])
@@ -359,8 +394,9 @@ def write_meta():
         f.write('export const SPRITES = ' + json.dumps(meta, ensure_ascii=False, separators=(',', ':')) + ';\n')
 
 if __name__ == '__main__':
-    want = set(sys.argv[1:]) or {'sol', 'herbes', 'kits'}
+    want = set(sys.argv[1:]) or {'sol', 'herbes', 'kits', 'deco'}
     if 'sol' in want: do_sol()
     if 'herbes' in want: do_herbes()
     if 'kits' in want: do_kits()
+    if 'deco' in want: do_deco()
     write_meta()

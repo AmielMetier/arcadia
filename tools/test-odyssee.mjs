@@ -88,7 +88,8 @@ for (const [id, m] of Object.entries(maps)) {
   const entries = [...m.warps.keys()].map((k) => k.split(',').map(Number));
   ok(entries.length > 0, `${id} a une sortie`);
   const [ex, ey] = entries[0];
-  const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true);
+  // cartes annexes (lac, grotte des marées…) : avec toutes les capacités de terrain (Surf compris)
+  const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true, true);
   for (const [x, y] of entries) ok(seen[at(m, x, y)] || reachable(m, seen, x, y), `${id} : sortie (${x},${y}) atteignable`);
   for (const n of m.npcs) ok(reachable(m, seen, n.x, n.y) || m.get(n.x, n.y + 1) === T.BLOCK && reachable(m, seen, n.x, n.y + 2), `${id} : PNJ ${n.id} atteignable`);
   for (const it of m.items) ok(reachable(m, seen, it.x, it.y), `${id} : objet atteignable`);
@@ -110,7 +111,7 @@ for (let k = 0; k <= 8; k++) {
 }
 // îles du bateau : depuis chaque quai, sans Surf, avec les badges qui ouvrent la traversée
 const near = (seen, m, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && seen[(y + dy) * m.w + x + dx]);
-for (const [k, d] of Object.entries(docks)) ok(walkable(W.get(d.x, d.y)) && seenW[at(W, d.x, d.y)], `quai ${k} praticable et atteignable`);
+for (const [k, d] of Object.entries(docks)) ok(d.map !== 'monde' ? walkable(maps[d.map].get(d.x, d.y)) : walkable(W.get(d.x, d.y)) && seenW[at(W, d.x, d.y)], `quai ${k} praticable et atteignable`);
 const L = Object.fromEntries(legends.map((q) => [q.id, q]));
 const fromDock = (k, badges, abil = new Set()) => W.reach(docks[k].x, docks[k].y, badges, true, abil);
 { const s2 = fromDock('orage', 2); ok(near(s2, W, L.zapdos.x, L.zapdos.y) && near(s2, W, L.mew.x, L.mew.y), 'Île Orageuse : Électhor et Mew accessibles avec 2 badges');

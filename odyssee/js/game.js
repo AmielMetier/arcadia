@@ -90,15 +90,31 @@ export class Game {
     this.zone = null; this.updateZone();
   }
   npcVisible(n) {
+    if (n.when && !n.when(this.state.flags, this)) return false;   // PNJ de quête : présent selon l'avancée
     if (n.gate) return this.gateClosed(n.gate);
     return true;
   }
+  /** après une étape de quête : les PNJ qui doivent (dis)paraître sur la carte courante, les passages qui s'ouvrent */
+  refreshNpcs() {
+    const m = this.mapObj, keep = new Map(this.npcs.map((n) => [n.id, n]));
+    const next = [];
+    for (const d of m.npcs) {
+      if (!this.npcVisible(d)) continue;
+      next.push(keep.get(d.id) || { def: d, id: d.id, x: d.x, y: d.y, dir: d.dir || 'down', sprite: d.sprite, home: [d.x, d.y], timer: 1 + Math.random() * 3, move: null, step: 0 });
+    }
+    for (const n of this.npcs) if (!next.includes(n) && m.npcs.includes(n.def)) this.view.removeActor('npc:' + n.id);
+    this.npcs = next.concat(this.npcs.filter((n) => !m.npcs.includes(n.def) && !next.includes(n)));
+    this.refreshGates(); this.spawnLegends();
+  }
   /** un passage gardé est fermé tant qu'il manque des badges, ou tant qu'un drapeau d'histoire n'est pas levé */
-  gateClosed(g) { return g.flag ? !this.state.flags[g.flag] : this.badgeCount() < g.badges; }
+  gateClosed(g) { if (g.open) return !g.open(this.state.flags, this); return g.flag ? !this.state.flags[g.flag] : this.badgeCount() < g.badges; }
   badgeCount() { return this.state.badges.filter(Boolean).length; }
   worldPos() {
     if (this.mapObj.id === 'monde') return { x: this.player.x, y: this.player.y };
-    const o = this.mapObj.outside || this.state.lastOutdoor; return o ? { x: o.x, y: o.y } : { x: 0, y: 0 };
+    // carte annexe (lac, forêt…) ou intérieur d'une carte annexe : on remonte jusqu'à l'entrée sur la grande carte
+    let o = this.mapObj.outside, guard = 0;
+    while (o && o.map && o.map !== 'monde' && guard++ < 4) o = this.world.maps[o.map]?.outside || null;
+    o = o || this.state.lastOutdoor; return o ? { x: o.x, y: o.y } : { x: 0, y: 0 };
   }
   locationName() { const z = this.mapObj.outdoor ? this.mapObj.zoneAt(this.player.x, this.player.y) : null; return z?.name || this.mapObj.name || 'Odyssée'; }
 
@@ -269,17 +285,20 @@ export class Game {
     if (mv.jump) this.view.shake = 0.06;
     if (isGrassEnc(t)) this.view.rustle(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
-    if (w && (t === T.DOOR || t === T.CAVEDOOR)) { await this.warp(w, t === T.CAVEDOOR ? 'exit' : 'door'); return; }
+    if (w && (t === T.DOOR || t === T.CAVEDOOR || w.step)) { await this.warp(w, t === T.CAVEDOOR || w.step ? 'exit' : 'door'); return; }
     this.updateZone();
     if (this.state.repel > 0) { this.state.repel--; if (this.state.repel === 0) { this.busy = true; await this.ui.say('L\'effet du Repousse s\'est dissipé...'); this.busy = false; } }
     const z = this.zone;
     // Cap des Étoiles : Odyssor
     if (m.objectAt(p.x, p.y)?.type === 'odyssor') { if (await this.odyssorEvent()) return; }
+    // case de quête : un événement quand on marche dessus
+    const so = m.objectAt(p.x, p.y);
+    if (so?.onStep) { this.busy = true; let stop = false; try { stop = await so.onStep(this.api(), so); } finally { this.busy = false; } if (stop) return; }
     if (z?.trigger && await this.trigger(z.trigger)) return;
     if (await this.checkTrainers()) return;
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
     const enc = m.outdoor ? z?.enc : m.encounter;
-    if (p.surf && t === T.WATER) { const sea = m.zoneAt(p.x, p.y); if (sea?.enc && Math.random() < 0.05) await this.wildBattle(sea.enc); return; }
+    if (p.surf && t === T.WATER) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) await this.wildBattle(enc);
@@ -351,6 +370,7 @@ export class Game {
         const L = (this.legends || []).find((q) => (q.x === fx && q.y === fy) || (q.x === fx + dx && q.y === fy + dy && walkable(t)));
         if (L) await this.legendBattle(L);
         else if (it) await this.pickItem(it);
+        else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
         else if (o?.type === 'pylon') await this.pylon(o);
         else if (o?.type === 'stele') await this.stele(o);
@@ -359,7 +379,7 @@ export class Game {
         else if (t === T.BLOCK && this.view.decoAt.get(key(fx, fy))) await this.furniture(this.view.decoAt.get(key(fx, fy)).k, fx, fy);
         else if (t === T.CUT) await this.fieldObstacle('coupe', fx, fy, 'Ce petit arbre pourrait être coupé.');
         else if (t === T.SMASH) await this.fieldObstacle('eclate', fx, fy, 'Ce rocher est plein de fissures. Il pourrait être brisé.');
-        else if (t === T.WATER && m.outdoor && !p.surf) await this.trySurf(fx, fy);
+        else if (t === T.WATER && (m.outdoor || m.surf) && !p.surf) await this.trySurf(fx, fy);
       }
     } finally { this.busy = false; }
   }
@@ -371,6 +391,7 @@ export class Game {
       if (d.trainer) { if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false); else await this.ui.say(d.trainer.after || 'Quel combat !', { speaker: d.trainer.name }); }
       else if (d.role === 'nurse') await this.nurse();
       else if (d.role === 'shop') await shopScreen(this, d.stock);
+      else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
       else if (d.text) await this.ui.say(d.text);
     } finally { this.busy = was; }
@@ -396,6 +417,7 @@ export class Game {
   }
   legendReady(L) {
     const f = this.state.flags, b = this.badgeCount();
+    if (typeof L.cond === 'function') return !!L.cond(f, this);
     switch (L.cond) {
       case 'celebi': return !!f.celebiCalled;
       case 'pylons': return !!f.pylons;
@@ -413,6 +435,7 @@ export class Game {
     if (!st.flags['L:' + L.id]) st.flags['L:' + L.id] = 'met';
     const res = await this.wildBattle([[L.sp, L.lvl, L.lvl, 1]], { fixed: true, music: 'legend' });
     if (L.id === 'hooh') st.flags.hoohDone = true;
+    if (L.after) await L.after(this.api(), res);
     if (res === 'caught' || res === 'win') {
       this.legends = this.legends.filter((q) => q !== L); this.view.removeActor('legend:' + L.id);
       if (res === 'caught') st.flags['L:' + L.id] = 'caught';
@@ -467,7 +490,7 @@ export class Game {
       st.flags.passe = true; this.give('ferry-ticket'); this.sound.sfx('item');
       await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', `Tiens, voici ton Passe Marin. ${st.name} reçoit le Passe Marin !`], { speaker: sp });
     }
-    const opts = Object.entries(docks).filter(([k]) => k !== here), b = this.badgeCount();
+    const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags))), b = this.badgeCount();
     await ui.say('Où veux-tu aller ?', { keep: true, speaker: sp });
     const r = await ui.list({ title: 'Destination', items: opts.map(([, d]) => ({ label: d.name, right: b >= d.badges ? '' : `${d.badges} badges`, disabled: b < d.badges })).concat([{ label: 'Rester ici' }]), cls: 'shop', cancel: opts.length });
     if (r < 0 || r >= opts.length) { await ui.say('Bon vent, moussaillon !', { speaker: sp }); return; }
@@ -532,6 +555,7 @@ export class Game {
     if (st.party.length) opts.push(['ÉQUIPE', 'party']);
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
+    if (Object.keys(st.flags).some((k) => k.startsWith('Q:'))) opts.push(['QUÊTES', 'quests']);
     opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
@@ -545,6 +569,7 @@ export class Game {
       else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
+      else if (k === 'quests') await this.questLog();
       else if (k === 'opt') await optionsScreen(this);
       else if (k === 'save') { if (await this.ui.yesNo('Sauvegarder la partie ?')) { this.save(); await this.ui.say(`${st.name} a sauvegardé la partie.`); } break; }
     }
@@ -637,7 +662,7 @@ export class Game {
     if (res === 'win') {
       st.flags['T:' + n.id] = true;
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
-      if (d.onWin) await this.script(d.onWin, n);
+      if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
       if (d.champion) await this.ending();
     }
     this.updateZone();
@@ -872,6 +897,93 @@ export class Game {
       await ui.say(['Merci d\'avoir attendu.', 'Vos créatures sont en pleine forme !'], { keep: true, speaker: 'Infirmière' });
     }
     await ui.say('À bientôt !', { speaker: 'Infirmière' });
+  }
+
+  /* ================= quêtes ================= */
+  /** avancée d'une quête : 0 = pas commencée, n = étape en cours, 'fin' = terminée */
+  qstep(id) { return this.state.flags['Q:' + id] || 0; }
+  /** outils donnés aux scripts de quête (world/quetes.js) */
+  api() {
+    if (this._api) return this._api;
+    const g = this, ui = () => g.ui, st = () => g.state;
+    const A = this._api = {
+      game: g,
+      get st() { return g.state; },
+      get f() { return g.state.flags; },
+      get name() { return g.state.name; },
+      get e() { return g.state.gender === 'f' ? 'e' : ''; },
+      say: (t, who) => ui().say(t, who ? { speaker: who } : {}),
+      yesNo: (q, who) => ui().yesNo(q, who ? { speaker: who } : {}),
+      ask: (q, opts, who) => ui().ask(q, opts, { speaker: who, cancel: null }),
+      step: (id) => g.qstep(id),
+      /** passe la quête à l'étape n (et l'annonce dans le journal) */
+      set: async (id, n, quiet) => {
+        const was = g.qstep(id); st().flags['Q:' + id] = n;
+        const Q = (g.world.quests || {})[id];
+        if (!quiet && Q && was !== n) {
+          g.sound.sfx(n === 'fin' ? 'badge' : 'item');
+          await ui().say(n === 'fin' ? `Quête terminée : ${Q.name} !` : was ? `Journal des quêtes : « ${Q.name} » mis à jour.` : `Nouvelle quête : ${Q.name} !`, { auto: 1400 });
+        }
+        g.refreshNpcs();
+      },
+      flag: (k, v = true) => { st().flags[k] = v; g.refreshNpcs(); },
+      has: (k, n = 1) => (st().bag[k] || 0) >= n,
+      give: async (k, n = 1, quiet) => { g.give(k, n); g.sound.sfx('item'); if (!quiet) await ui().say(`${st().name} reçoit ${n > 1 ? n + ' × ' : ''}${itemName(k)} !`); },
+      take: (k, n = 1) => g.take(k, n),
+      money: async (n) => { st().money += n; g.sound.sfx('item'); await ui().say(`${st().name} reçoit ${n.toLocaleString('fr-FR')} ₽ !`); },
+      badges: () => g.badgeCount(),
+      heal: () => { for (const m of st().party) healFull(m); },
+      sfx: (k) => g.sound.sfx(k),
+      wait: (ms) => wait(ms),
+      cry: (sp) => g.sound.cry(ASSETS.cry(sp)),
+      /** combat contre un dresseur de quête ; renvoie 'win' ou 'lose' */
+      fight: async (tr) => {
+        const t = { cls: 'Dresseur', prize: 40, ai: 'smart', ...tr, bs: tr.bs || tr.ow || 'garde' };
+        if (t.intro) await ui().say(t.intro, { speaker: t.name });
+        const party = t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
+        g.musicLock = true;
+        const res = await g.runBattle({ trainer: { ...t, items: { ...(t.items || {}) } }, party, music: t.music || 'trainer', rival: true, noWhiteout: t.noWhiteout });
+        g.musicLock = false; g.updateZone();
+        if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.name });
+        return res;
+      },
+      /** rencontre d'un Pokémon (sauvage ou légendaire) */
+      wild: async (sp, lvl, o = {}) => { g.sound.cry(ASSETS.cry(sp)); return g.wildBattle([[sp, lvl, lvl, 1]], { fixed: true, music: o.music || 'legend' }); },
+      /** Pokémon offert (équipe, sinon PC) */
+      giveMon: async (sp, lvl, o = {}) => {
+        const mon = createMon(sp, lvl, { ot: o.ot || st().name, met: o.met || g.locationName(), shiny: false });
+        g.markCaught(mon.sp); g.sound.sfx('caught');
+        await ui().say(`${st().name} reçoit ${SPECIES[mon.sp].n} !`);
+        if (st().party.length < 6) st().party.push(mon); else { st().box.push(mon); await ui().say(`${SPECIES[mon.sp].n} a été envoyé dans le PC.`); }
+        return mon;
+      },
+      /** un Pokémon de l'équipe de cette espèce (ou d'une liste d'espèces) */
+      partyHas: (sps) => st().party.find((m) => [].concat(sps).includes(m.sp)),
+      warp: (to) => g.warp(to, 'door'),
+      banner: (t) => g.ui.banner(t),
+      /** fait marcher un PNJ de la carte courante, puis le fait disparaître si gone */
+      walk: async (npcId, dir, n, gone) => {
+        const q = g.npcs.find((x) => x.id === npcId || x.id.endsWith(':' + npcId)); if (!q) return;
+        await g.npcWalk(q, dir, n);
+        if (gone) { g.npcs = g.npcs.filter((x) => x !== q); g.view.removeActor('npc:' + q.id); }
+      },
+      flash: (col = '#ffffff') => ui().flash(1, col, 80),
+    };
+    return A;
+  }
+  async questLog() {
+    const Q = this.world.quests || {}, f = this.state.flags;
+    const list = Object.entries(Q).filter(([id]) => f['Q:' + id]);
+    if (!list.length) { await this.ui.say(['Ton journal des quêtes est vide.', 'Parle aux habitants : beaucoup ont besoin d\'aide.']); return; }
+    list.sort((a, b) => (f['Q:' + a[0]] === 'fin') - (f['Q:' + b[0]] === 'fin'));
+    for (;;) {
+      const r = await this.ui.list({ title: 'Quêtes', items: list.map(([id, q]) => ({ label: q.name, right: f['Q:' + id] === 'fin' ? '✔' : '…' })), cancel: -1 });
+      if (r < 0) return;
+      const [id, q] = list[r], n = f['Q:' + id];
+      const steps = typeof q.steps === 'function' ? q.steps(f, this) : q.steps;
+      const cur = n === 'fin' ? (q.end || 'Quête terminée.') : (steps[n - 1] || steps[steps.length - 1]);
+      await this.ui.say([`${q.name} — ${q.where || ''}`, cur]);
+    }
   }
 
   /* ================= histoire ================= */

@@ -34,6 +34,7 @@ export const ASSETS = {
   sol32: (k) => `${IMG}sol32/${k}.png`,
   herbe: (k) => `${IMG}herbes/${k}.png`,
   hgss: (k) => `${IMG}hgss/${k}.png`,
+  deco: (k) => `${IMG}deco/${k}.png`,
   title: `${IMG}title-odyssor.png`,
 };
 /** précharge une image (résout même en cas d'échec) */

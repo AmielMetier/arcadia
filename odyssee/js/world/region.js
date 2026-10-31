@@ -10,6 +10,7 @@ import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } f
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap, towerFloor, TOWER_UP, TOWER_DOWN } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
+import { buildQuests } from './quetes.js';
 
 export const STARTERS = NEW_STARTERS.map(R);
 export const RIVAL_NAME = 'Théo';
@@ -72,6 +73,7 @@ const CLS = {
   Insectomane: ['insectomane', 16], Randonneuse: ['randonneuse', 20], Médium: ['medium', 30], Karatéka: ['karateka', 28],
   'Garde d\'Écaille': ['garde', 36],
   // troisième valeur : portrait en combat quand le personnage n'a pas le sien
+  'Sbire de la Brume': ['brume', 32], 'Sbire': ['brume_f', 32], 'Admin de la Brume': ['sylas', 70], 'Chef de la Brume': ['nox', 120], Voleur: ['voleur', 24], Moine: ['pretre', 34, 'pretre'], 'Dame Kimono': ['kimono', 40],
   Sage: ['vieil_homme', 32, 'medium'], 'Grand Sage': ['vieil_homme', 60, 'medium'], Skieuse: ['randonneuse', 30], Alpiniste: ['montagnard', 30],
 };
 export const LEADERS = [
@@ -87,7 +89,7 @@ export const LEADERS = [
 const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 56], [1046, 57], [1035, 57], [1040, 58], [248, 58], [149, 60]], intro: 'Huit badges... Et même celui de Drakos. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
 
 let tCount = 0;
-function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
+export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
   const [ow, prize, bs] = CLS[cls] || ['gamin', 20];
   return map.npc({
     id: o.id || `${map.id}:t${tCount++}`, x, y, dir, sprite: o.ow || ow, move: 'static', onWin: o.onWin,
@@ -110,7 +112,7 @@ function routeItem(map, pts, t, side, off, item, qty = 1) {
 }
 
 /* ---------------- villes ---------------- */
-function buildTown(W, maps, def) {
+export function buildTown(W, maps, def) {
   const ox = def.x, oy = def.y;
   carveTown(W, { x: ox, y: oy, w: def.w, h: def.h, exits: def.exits, ground: def.ground });
   for (const [x0, y0, x1, y1, t] of def.roads || []) W.rect(ox + x0, oy + y0, ox + x1, oy + y1, t ?? T.PAVE);
@@ -131,7 +133,8 @@ function buildTown(W, maps, def) {
   }
   for (const b of def.buildings) {
     const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door });
-    const id = `${def.id}:${b.id || b.kind + b.x}`;
+    let id = `${def.id}:${b.id || b.kind + b.x}`;
+    if (maps[id]) id += 'y' + b.y;   // deux bâtiments dans la même colonne : chacun garde son intérieur
     let inside;
     if (b.interior) inside = b.interior(id);
     else if (b.kind === 'center') inside = centerInterior(id, 'Centre de soins');
@@ -140,7 +143,7 @@ function buildTown(W, maps, def) {
     else if (b.kind === 'lab') inside = labInterior(id);
     else if (b.kind === 'league') inside = leagueInterior(id);
     else inside = houseInterior(id, b.name || 'Maison', { w: b.kind === 'bighouse' || b.kind === 'tower' ? 11 : 9, h: b.kind === 'bighouse' || b.kind === 'tower' ? 9 : 8, bed: b.bed, extraBooks: b.kind === 'tower', kitchen: b.kitchen });
-    inside.townId = def.id; inside.outside = { map: 'monde', x: B.doorX, y: B.doorY + 1, dir: 'down' };
+    inside.townId = def.id; inside.outside = { map: W.id, x: B.doorX, y: B.doorY + 1, dir: 'down' };
     inside.warp(inside.exitX, inside.exitY, inside.outside);
     if (inside.get(inside.exitX - 1, inside.exitY) === T.MAT) inside.warp(inside.exitX - 1, inside.exitY, inside.outside);
     W.warp(B.doorX, B.doorY, { map: id, x: inside.exitX, y: inside.exitY, dir: 'up' });
@@ -824,7 +827,9 @@ export function buildWorld() {
   lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'scientifique', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs créatures.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
   STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp }));
 
-  return { maps, towns, routes, legends, docks, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
+  // histoire secondaire : la Brume, les nouveaux lieux (lac, forêt des torii, jardin, île du Magma) et leurs quêtes
+  const quests = buildQuests({ W, maps, towns, routes, legends, docks, buildTown, trainerNpc, offRoute: (id, t, side, off) => offRoute(routes.find((r) => r.id === id).pts, t, side, off) });
+  return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
 }
 
 function caveTrainers(m, list, seed) {
