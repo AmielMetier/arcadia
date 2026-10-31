@@ -29,6 +29,10 @@ const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map
 const setHubVersion = (v) => {
   if (v === hubVer) return false;
   if (!DRY) writeFileSync(HUB, hubSrc.replace(/const VERSION = '[\d.]+'/, `const VERSION = '${v}'`));
+  // même numéro dans les liens des pages (?v=…) : les navigateurs rechargent les fichiers à chaque version
+  if (!DRY) for (const page of ['index.html', 'apropos.html']) {
+    try { const f = new URL('../' + page, import.meta.url); writeFileSync(f, readFileSync(f, 'utf8').replace(/\?v=[\d.]+"/g, `?v=${v}"`)); } catch (e) {}
+  }
   console.log(`Version du Hub : ${hubVer} → ${v}`);
   return true;
 };
