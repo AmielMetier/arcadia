@@ -209,6 +209,7 @@ export class Game {
     // sur l'eau : le joueur flotte sur le dos d'une créature, entouré d'un sillage
     const bob = p.surf ? 0.04 + Math.sin(performance.now() / 260) * 0.03 : 0;
     v.place(a, px, py, hop + bob, (isGrassEnc(t) && !p.move) || p.surf);
+    v.cover(a, ...(isGrassEnc(t) && !p.surf && hop < 0.05 ? [Math.round(px), Math.round(py)] : [null]));
     if (p.surf) {
       const w = v.actor('wake', { kind: 'flat' }); if (!w.wakeSet) { const r = v.S.rects.wake; v.setSpriteRect(w, r, r.w, r.h); w.wakeSet = true; w.shadow.visible = false; }
       w.mesh.position.set(px + 0.5, 0.01 + bob * 0.3, py + 0.62); w.mesh.rotation.x = -1.1;
@@ -218,6 +219,7 @@ export class Game {
       if (n.move) { const u = Math.min(1, n.move.t); nx = n.move.fx + (n.x - n.move.fx) * u; ny = n.move.fy + (n.y - n.move.fy) * u; sf = u < 0.5 ? (n.step % 2 ? 1 : 2) : 0; }
       const na = v.actor('npc:' + n.id, {});
       v.setFrame(na, n.sprite, n.dir, sf); v.place(na, nx, ny, 0, isGrassEnc(this.mapObj.get(n.x, n.y)) && !n.move);
+      { const gx = Math.round(nx), gy = Math.round(ny); v.cover(na, ...(isGrassEnc(this.mapObj.get(gx, gy)) ? [gx, gy] : [null])); }
       if (n.bang) { const b = v.actor('bang:' + n.id, { kind: 'bang' }); b.mesh.position.set(nx + 0.5, 34 * HPX, ny + 0.56); }
       else if (v.actors.has('bang:' + n.id)) v.removeActor('bang:' + n.id);
     }

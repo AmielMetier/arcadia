@@ -1,5 +1,9 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.44 — 31 octobre 2026
+- **Odyssée** — les hautes herbes sont redessinées comme dans HeartGold / SoulSilver : un tapis de touffes bien net, sans carrés ni trous (prairie, bois, neige).
+  - Quand on se tient dans l'herbe, elle cache les jambes du personnage, et elle s'agite quand on y entre.
+
 ## 3.43 — 31 octobre 2026
 - **Odyssée** — nouvelles hautes herbes en touffes, comme sur DS : quatre variantes mélangées au hasard (prairie, bois, neige), fini les carrés d'herbe.
   - Sous l'herbe des bois, le sol est celui du sous-bois.

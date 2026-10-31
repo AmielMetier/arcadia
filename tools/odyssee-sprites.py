@@ -922,6 +922,50 @@ def write_meta():
         f.write('// Généré par tools/odyssee-sprites.py — ne pas modifier à la main.\n')
         f.write('export const SPRITES = ' + json.dumps(old, ensure_ascii=False, separators=(',', ':')) + ';\n')
 
+# ------------------------------------------------------------------ hautes herbes façon HeartGold / SoulSilver
+# Dessinées ici pixel par pixel : un tapis de 16 × 16 (deux rangées de touffes en « ʌ », comme sur DS) posé au sol,
+# et, devant un personnage qui se tient dans l'herbe, la rangée du bas de ce même tapis (ses jambes disparaissent).
+HERBE_PAL = {'': [(24, 104, 72), (40, 120, 88), (48, 144, 88), (64, 160, 96), (72, 176, 120), (88, 200, 128), (136, 224, 160)],
+             'dark': [(14, 58, 52), (22, 76, 62), (30, 92, 70), (38, 108, 78), (52, 130, 92), (68, 154, 106), (104, 188, 134)],
+             'snow': [(80, 112, 144), (104, 140, 172), (136, 172, 204), (176, 208, 230), (204, 230, 246), (232, 244, 252), (255, 255, 255)]}
+
+def herbe_band(g, y0, tufts, bend=0, W=16):
+    """une rangée de 8 pixels : fond qui s'assombrit vers le pied, touffes (x, hauteur) faites de deux brins et d'une pointe ;
+    bend décale les pointes (herbe qui s'agite)"""
+    shade = [3, 3, 3, 3, 3, 2, 2, 1]
+    for y in range(8): g[y0 + y, :] = shade[y]
+    def p(x, y, c):
+        if 0 <= y < 8: g[y0 + y, x % W] = c
+    for x0, h in tufts:
+        top = 6 - h; b = lambda t, n: bend if t >= n - 2 else 0
+        for t in range(h + 1): p(x0 - 2 + (t * 2) // (h + 1) + b(t, h + 1), 6 - t, 4 if t < h - 1 else 5)
+        for t in range(h): p(x0 + 2 - (t * 2) // h + b(t, h), 6 - t, 4 if t < h - 2 else 5)
+        p(x0 + bend, top, 6); p(x0 + bend, top + 1, 5)
+        p(x0, 6, 1); p(x0 - 1, 7, 0); p(x0, 7, 0)
+
+def do_herbe():
+    TOP, BOT = [(2, 5), (6, 4), (10, 5), (14, 4)], [(0, 4), (4, 5), (8, 4), (12, 5)]
+    # listes déjà écrites dans sprites.js (META ne contient que ce qui a été refait dans cette exécution)
+    js = os.path.join(ROOT, 'odyssee', 'js', 'data', 'sprites.js'); prev = {}
+    if os.path.exists(js): txt = open(js).read(); prev = json.loads(txt[txt.index('{'):txt.rindex('}') + 1])
+    sol = list(META.get('sol', prev.get('sol', []))); nat = dict(prev.get('nature', {})); nat.update(META.get('nature', {}))
+    for k, pal in HERBE_PAL.items():
+        P = np.array(pal, np.uint8)
+        g = np.zeros((16, 16), int); herbe_band(g, 0, TOP); herbe_band(g, 8, BOT)
+        for v in (0, 1):
+            name = (k + 'tall' if k else 'tall') + str(v); save(Image.fromarray(P[g]), 'sol', name + '.png')
+            if name not in sol: sol.append(name)
+        # devant le personnage : le tapis à partir de la 3e ligne (14 lignes : ses jambes disparaissent jusqu'aux genoux),
+        # sans le fond au-dessus des brins sur les 3 premières lignes (densité 2 : agrandi ×2)
+        for f, bend in enumerate((0, -1)):
+            b = np.zeros((16, 16), int); herbe_band(b, 0, TOP, bend); herbe_band(b, 8, BOT, bend); b = b[2:]
+            rgba = np.dstack([P[b], np.full(b.shape, 255, np.uint8)])
+            for y in range(3): rgba[y, b[y] == 3, 3] = 0
+            img = Image.fromarray(rgba).resize((32, 28), Image.NEAREST)
+            key = (k or 'grass') + 'front' + ('' if f == 0 else '2'); save(img, 'nature', key + '.png'); nat[key] = [32, 28, 2]
+    META['sol'] = sol; META['nature'] = nat
+    print('hautes herbes dessinées (prairie, bois, neige)')
+
 if __name__ == '__main__':
     want = set(sys.argv[1:]) or {'chars', 'portraits', 'crea', 'items', 'nature', 'mobilier', 'sol', 'facades', 'title'}
     only = [w[5:] for w in want if w.startswith('crea:')]
@@ -934,6 +978,7 @@ if __name__ == '__main__':
         do_nature2()
     if 'mobilier' in want: do_sheet('mobilier.png', MOBILIER, MOBILIER_SIZE, 'mobilier', 'mobilier', dens=2)
     if 'sol' in want: do_sol()
+    if 'sol' in want or 'nature' in want or 'herbe' in want: do_herbe()
     if 'facades' in want: do_facades(); do_kits()
     if 'title' in want: do_title()
     write_meta()

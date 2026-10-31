@@ -158,6 +158,7 @@ export function buildAtlas() {
   for (let v = 0; v < 4; v++) put('grass' + v, (P) => grassCell(P, PAL.grass, 0.6 + v * 0.25));
   for (let v = 0; v < 2; v++) put('tall' + v, (P) => grassCell(P, PAL.tall, 1.6));
   for (let v = 0; v < 2; v++) put('darktall' + v, (P) => grassCell(P, PAL.dark, 1.6));
+  for (let v = 0; v < 2; v++) put('snowtall' + v, (P) => grassCell(P, PAL.tall, 1.6));
   for (let v = 0; v < 2; v++) put('forest' + v, (P) => grassCell(P, PAL.dark, 1));
   for (const [k, pal, outline] of [['path', PAL.path, '#a88a58'], ['sand', PAL.sand, '#c8b070'], ['pave', PAL.pave, '#a09888']]) {
     for (let m = 0; m < 16; m++) put(k + m, (P) => { if (k === 'pave') paveCell(P, pal); else dirtCell(P, pal, k === 'path' ? 3 : 1); grassEdges(P, m, outline); });
@@ -190,7 +191,7 @@ export function buildAtlas() {
   put('shelf', (P) => { P.fill('#8a6440'); for (let y = 1; y < 16; y += 5) { P.rect(1, y, 14, 4, '#5a3e24'); for (let x = 2; x < 14; x += 3) P.rect(x, y + 1, 2, 3, ['#e05050', '#50a0e0', '#f0c040', '#60c060'][(x + y) % 4]); } });
   put('roof_flat', (P) => { P.fill('#5c6a7c'); P.speck(6, '#6c7a8c'); });
   // sols et murs d'intérieur dessinés : ils remplacent la version du code
-  for (const k of ['floor_wood', 'floor_center', 'floor_mart', 'floor_lab', 'floor_league', 'floor_gymBug', 'floor_gymRock', 'floor_gymWater', 'floor_gymElec', 'floor_gymGrass', 'floor_gymPsy', 'floor_gymFire', 'floor_gymDragon', 'wall_center', 'wall_mart', 'wall_gym', 'wall_league', 'counter', 'counterfront', 'martfront']) {
+  for (const k of ['tall0', 'tall1', 'darktall0', 'darktall1', 'snowtall0', 'snowtall1', 'floor_wood', 'floor_center', 'floor_mart', 'floor_lab', 'floor_league', 'floor_gymBug', 'floor_gymRock', 'floor_gymWater', 'floor_gymElec', 'floor_gymGrass', 'floor_gymPsy', 'floor_gymFire', 'floor_gymDragon', 'wall_center', 'wall_mart', 'wall_gym', 'wall_league', 'counter', 'counterfront', 'martfront']) {
     const img = SOLS[k]; if (!img || !cells[k]) continue;
     const [u0, v0] = cells[k], cx = Math.round(u0 * SIZE) - 1, cy = Math.round(v0 * SIZE) - 1;
     ctx.drawImage(img, 0, 0, 16, 1, cx + 1, cy, 16, 1); ctx.drawImage(img, 0, 15, 16, 1, cx + 1, cy + 17, 16, 1);

@@ -193,9 +193,9 @@ export class WorldView {
     switch (tt) {
       case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.CUT: return { c: A[grassKey] };
       case T.SMASH: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
-      case T.TALL: return { c: theme === 'snow' ? A.snow1 : A['tall' + (v < 0.5 ? 0 : 1)] };
-      // sous l'herbe sombre des bois, le sol sombre du sous-bois (il se voit entre les touffes)
-      case T.DARKTALL: return { c: A['forest' + (v < 0.5 ? 0 : 1)] };
+      // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
+      case T.TALL: return { c: A[(theme === 'snow' && A.snowtall0 ? 'snowtall' : 'tall') + (v < 0.5 ? 0 : 1)] };
+      case T.DARKTALL: return { c: A['darktall' + (v < 0.5 ? 0 : 1)] };
       case T.TREE: case T.PINE: return { c: theme === 'volcanic' ? A.ash1 : theme === 'snow' ? A.snow1 : A['forest' + (v < 0.5 ? 0 : 1)] };
       case T.PATH: return { c: A['path' + edge(isPathish)] };
       case T.PAVE: case T.DOOR: case T.BUILD: return { c: A['pave' + edge((q) => isPathish(q))] };
@@ -245,12 +245,6 @@ export class WorldView {
           billboard(P, cx, cz, SW(r), SH(r), r, 0, vb > 0.5, 1);
           flat(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
         }
-      } else if (t === T.TALL || t === T.DARKTALL) {
-        // herbe haute en tapis : la même case partout, jamais retournée, pour que les cases voisines se raccordent
-        const base = t === T.DARKTALL ? 'darktuft' : theme === 'snow' && S.snowtuft ? 'snowtuft' : 'tuft';
-        // touffes : une des variantes au hasard (fixé par la case), sinon le tapis d'herbe
-        let r = S[base]; for (let n = 3; n >= 0; n--) if (S[base + n]) { r = S[base + Math.floor(((v * 7919) % 1) * (n + 1))]; break; }
-        billboard(P, x + 0.5, y + 0.93, SW(r), SH(r), r, 0, false);
       } else if (t === T.FENCE) { const r = S.fence; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r); }
       else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.BUSH) { const r = S.bush; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); }
@@ -435,19 +429,24 @@ export class WorldView {
     a.shadow.position.set(x + 0.5, 0.02, y + 0.6);
     a.shadow.visible = !inGrass;
   }
-  /** les herbes hautes s'agitent quand on y entre */
-  rustle(x, y) {
-    const id = 'rustle:' + x + ',' + y + ':' + performance.now();
-    const a = this.actor(id, { kind: 'item' }); { const r = this.S.rects.tuft1; this.setSpriteRect(a, r, r.w, r.h); }
-    a.shadow.visible = false; a.mesh.position.set(x + 0.5, 0, y + 0.96);
-    const t0 = performance.now();
-    const step = () => {
-      const u = (performance.now() - t0) / 320;
-      if (u >= 1 || !this.actors.has(id)) { this.removeActor(id); return; }
-      a.mesh.scale.set(1.05 + Math.sin(u * 18) * 0.06, 1 + Math.sin(u * Math.PI) * 0.18, 1);
-      requestAnimationFrame(step);
-    };
-    step();
+  /** les herbes hautes s'agitent quand on y entre (les brins de devant se couchent et se relèvent) */
+  rustle(x, y) { this.rustleAt = { k: x + ',' + y, t0: performance.now() }; }
+  /** hautes herbes devant un personnage : la rangée du bas du tapis, redessinée devant lui, cache ses jambes ;
+   *  gx, gy : la case d'herbe où il se tient (null : il n'est pas dans l'herbe) */
+  cover(a, gx, gy) {
+    if (gx == null) { if (a.cover) a.cover.visible = false; return; }
+    const t = this.map.get(gx, gy), theme = this.map.outdoor ? this.map.zoneAt(gx, gy)?.theme : null;
+    const base = t === T.DARKTALL ? 'darkfront' : theme === 'snow' ? 'snowfront' : 'grassfront';
+    const rs = this.rustleAt, shake = rs && rs.k === gx + ',' + gy && performance.now() - rs.t0 < 360;
+    const key = base + (shake && Math.floor((performance.now() - rs.t0) / 90) % 2 === 0 ? '2' : '');
+    const r = this.S.rects[key]; if (!r) return;
+    if (!a.cover) {
+      const geo = new THREE.PlaneGeometry(1, 1); geo.setAttribute('anchor', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+      a.cover = new THREE.Mesh(geo, this.mat.actorSprite); this.root.add(a.cover);
+      const d = a.dispose; a.dispose = () => { d(); this.root?.remove(a.cover); geo.dispose(); };
+    }
+    if (a.coverKey !== key) { this.setSpriteRect({ mesh: a.cover }, r, r.w, r.h); a.coverKey = key; }
+    a.cover.visible = true; a.cover.position.set(gx + 0.5, 0, gy + 0.99);
   }
   /** grande créature posée sur la carte (légendaire) : son image de face, debout sur la case */
   imageActor(id, img, scale = 1) {
