@@ -12,6 +12,7 @@ import { Game } from './game.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
 import { SPRITES } from './data/sprites.js';
+import { R, ORIGINALES } from './data/remplacants.js';
 
 const H = window.HubBridge;
 const canvas = document.getElementById('gl'), uiRoot = document.getElementById('ui'), loading = document.getElementById('loading');
@@ -87,9 +88,9 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div><div class="logo-sub">La baleine des étoiles</div></div><div class="press">Appuie sur F ou Entrée</div><div class="title-foot">Prototype · créatures originales et Pokémon de remplacement · H : aide des touches</div>`);
+    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">Appuie sur F ou Entrée</div><div class="title-foot">Prototype · Pokémon et personnages de HeartGold / SoulSilver en attendant les dessins définitifs · H : aide des touches</div>`);
     uiRoot.appendChild(title);
-    const stopSea = titleSea(title.querySelector('canvas'), art.title);
+    const stopSea = titleSea(title.querySelector('canvas'), ORIGINALES ? art.title : null);
     await new Promise((res) => { const pop = input.push((k) => { if (k === 'a') { pop(); sound.init(); sound.sfx('select'); res(); } }); });
     title.querySelector('.press').remove();
     const has = Game.hasSave();
@@ -115,7 +116,7 @@ async function boot() {
 }
 
 /**
- * Écran titre : nuit sur la mer, Odyssor qui nage entre les vagues en laissant un sillage d'étoiles.
+ * Écran titre : nuit sur la mer (avec Odyssor qui nage entre les vagues quand les créatures originales sont actives).
  * Rendu en 256 × 192 agrandi sans lissage, comme sur DS.
  */
 function titleSea(cv, whale) {
@@ -148,7 +149,7 @@ function titleSea(cv, whale) {
       x.translate(Math.round(wx), Math.round(wy)); x.scale(-1, 1); x.drawImage(whale, -size / 2, 0, size, size); x.restore();
     }
     // sillage d'étoiles
-    if (Math.random() < 0.6) sparks.push({ x: wx + 30 + Math.random() * 20, y: SEA - 4 + Math.random() * 6, v: -0.2 - Math.random() * 0.4, life: 1 });
+    if (whale && Math.random() < 0.6) sparks.push({ x: wx + 30 + Math.random() * 20, y: SEA - 4 + Math.random() * 6, v: -0.2 - Math.random() * 0.4, life: 1 });
     for (const p of sparks) { p.x += 0.4; p.y += p.v; p.life -= 0.02; x.fillStyle = `rgba(200,230,255,${Math.max(0, p.life)})`; x.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
     for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life <= 0) sparks.splice(i, 1);
     // vagues (par-dessus le bas d'Odyssor)
@@ -157,7 +158,7 @@ function titleSea(cv, whale) {
       x.fillStyle = row < 2 ? '#6c8ad0' : '#3d5aa0';
       for (let k = -1; k < W / 24 + 1; k++) { const bx = ((k * 24 + ph * sp) % (W + 24)) - 12; x.fillRect(Math.round(bx), y, 8, 1); x.fillRect(Math.round(bx) + 2, y - 1, 4, 1); }
     }
-    x.fillStyle = 'rgba(160,200,255,.7)'; for (let k = 0; k < 5; k++) x.fillRect(Math.round(wx - 30 + k * 12 + Math.sin(t * 5 + k) * 2), SEA + 1, 6, 1);
+    if (whale) x.fillStyle = 'rgba(160,200,255,.7)'; if (whale) for (let k = 0; k < 5; k++) x.fillRect(Math.round(wx - 30 + k * 12 + Math.sin(t * 5 + k) * 2), SEA + 1, 6, 1);
     requestAnimationFrame(frame);
   };
   frame();
@@ -173,8 +174,8 @@ async function intro(game, ui, sound) {
   prof.src = ASSETS.portrait('saule') || ASSETS.trainer('saule');
   await wait(400); prof.classList.add('in');
   await ui.say(['Bonjour ! Bienvenue dans la région d\'Odyssée !', 'Je m\'appelle Saule. Les gens d\'ici m\'appellent le Professeur.'], { speaker: 'Prof. Saule' });
-  mon.src = ASSETS.front(1001); mon.classList.add('in'); sound.cry(ASSETS.cry(1001));
-  await ui.say(['Ce monde est peuplé de créatures étonnantes.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'une baleine céleste, Odyssor, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
+  mon.src = ASSETS.front(R(1001)); mon.classList.add('in'); sound.cry(ASSETS.cry(R(1001)));
+  await ui.say(['Ce monde est peuplé de créatures étonnantes.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'un géant des océans, Kyogre, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
   mon.classList.remove('in'); prof.classList.remove('in');
   await wait(300);
   const g = await ui.ask('Mais parle-moi un peu de toi. Es-tu un garçon ou une fille ?', ['Garçon', 'Fille'], { cancel: null, speaker: 'Prof. Saule' });

@@ -12,7 +12,7 @@ const TYPE_FX = {
   normal: ['#ffffff', '#f0f0d0'], fighting: ['#ffffff', '#f06040'], flying: ['#ffffff', '#c8d8ff'], poison: ['#b050c8', '#e090f0'], ground: ['#c8a050', '#8a6a30'],
   rock: ['#b0a080', '#706050'], bug: ['#a8c830', '#e0f080'], ghost: ['#705898', '#302040'], steel: ['#e0e0f0', '#a0a0b8'], fire: ['#ff9030', '#ffe060'],
   water: ['#58a0ff', '#c0e0ff'], grass: ['#58c040', '#b0f080'], electric: ['#ffe040', '#ffffff'], psychic: ['#ff70b0', '#ffc0e0'], ice: ['#a0e8ff', '#ffffff'],
-  dragon: ['#7050f0', '#c0a0ff'], dark: ['#403030', '#a08070'],
+  dragon: ['#7050f0', '#c0a0ff'], dark: ['#403030', '#a08070'], fairy: ['#ff9ad0', '#ffe0f0'],
 };
 const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'] };
 

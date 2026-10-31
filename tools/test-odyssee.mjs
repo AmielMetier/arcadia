@@ -10,7 +10,7 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10139
 
 // courbes d'expérience
 ok(expFor(2, 100) === 1000000 && expFor(1, 100) === 1250000 && expFor(4, 100) === 1059860 && expFor(5, 100) === 600000 && expFor(6, 100) === 1640000, 'courbes d\'expérience');
-ok(typeEff('water', ['fire', 'rock']) === 4 && typeEff('normal', ['ghost']) === 0 && typeEff('ghost', ['steel']) === 0.5, 'table des types');
+ok(typeEff('water', ['fire', 'rock']) === 4 && typeEff('normal', ['ghost']) === 0 && typeEff('ghost', ['steel']) === 1 && typeEff('dragon', ['fairy']) === 0 && typeEff('fairy', ['dragon', 'dark']) === 4, 'table des types (6e génération)');
 for (const id in SPECIES) { const s = SPECIES[id]; ok(s.n && s.t.length && s.b.every((x) => x > 0) && s.ls.length, 'espèce ' + id); for (const [, m] of s.ls) ok(MOVES[m], `attaque ${m} de ${s.n}`); }
 
 // évolution par niveau

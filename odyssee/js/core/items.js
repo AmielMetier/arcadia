@@ -35,6 +35,10 @@ export const ITEMS = {
   'leaf-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle porte une feuille.' },
   'moon-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est noire comme la nuit.' },
   'sun-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est rouge comme le soleil.' },
+  'dusk-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est sombre comme le crépuscule.' },
+  'dawn-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle scintille comme l\'aube.' },
+  'shiny-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle brille d\'un éclat aveuglant.' },
+  'ice-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est froide comme la glace.' },
   // objets rares : les capacités de terrain (on les utilise face à l'obstacle, avec F)
   'cs-coupe': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'notebook', name: 'CS01 Coupe', desc: 'Tranche les petits arbres qui barrent le chemin. Badge Pétale requis. Place-toi face à l\'arbre et appuie sur F.' },
   'cs-surf': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'une créature. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },

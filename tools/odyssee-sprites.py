@@ -967,7 +967,9 @@ def do_herbe():
     print('hautes herbes dessinées (prairie, bois, neige)')
 
 if __name__ == '__main__':
-    want = set(sys.argv[1:]) or {'chars', 'portraits', 'crea', 'items', 'nature', 'mobilier', 'sol', 'facades', 'title'}
+    # « chars » seulement sur demande : en attendant les dessins définitifs, les personnages viennent de
+    # HeartGold / SoulSilver (tools/odyssee-hgss.py)
+    want = set(sys.argv[1:]) or {'portraits', 'crea', 'items', 'nature', 'mobilier', 'sol', 'facades', 'title'}
     only = [w[5:] for w in want if w.startswith('crea:')]
     if 'chars' in want: do_chars()
     if 'portraits' in want: do_portraits()

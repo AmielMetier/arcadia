@@ -193,8 +193,8 @@ img { image-rendering: pixelated; }
 .intro-prof.in { opacity: 1; }
 .intro-mon { position: absolute; left: 64%; bottom: 36%; width: calc(var(--px) * 80); height: calc(var(--px) * 80); opacity: 0; transform: scale(.2); transition: opacity .4s, transform .4s; }
 .intro-mon.in { opacity: 1; transform: scale(1); }
-.intro-kid { position: absolute; left: 50%; bottom: 40%; width: 64px; height: 64px; background: url(img/chars.png) -64px 0; transform: translateX(-50%) scale(calc(var(--px) / 1px)); image-rendering: pixelated; opacity: 0; transition: opacity .4s; transform-origin: 50% 100%; }
-.intro-kid.in { opacity: 1; } .intro-kid.f { background-position: -64px -64px; }
+.intro-kid { position: absolute; left: 50%; bottom: 40%; width: 80px; height: 80px; background: url(img/dresseurs/player_m.png) center bottom no-repeat; transform: translateX(-50%) scale(calc(var(--px) / 1px)); image-rendering: pixelated; opacity: 0; transition: opacity .4s; transform-origin: 50% 100%; }
+.intro-kid.in { opacity: 1; } .intro-kid.f { background-image: url(img/dresseurs/player_f.png); }
 
 /* ---------- combat ---------- */
 .battle { position: absolute; inset: 0; z-index: 18; background: #000; display: flex; align-items: center; justify-content: center; font-size: calc(var(--bp) * 8.5); --px: calc(var(--bp) * 0.85); }

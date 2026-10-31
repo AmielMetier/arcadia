@@ -6,6 +6,7 @@ import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
+import { R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, TYPE_FR } from './ui/screens.js';
@@ -18,7 +19,7 @@ const SAVE_KEY = 'odyssee-save-v2';
 const WALK = 0.26, RUN = 0.135, SURF = 0.2;
 const key = (x, y) => x + ',' + y;
 // le rival prend le starter qui a l'avantage sur le tien : Plante → Feu, Feu → Eau, Eau → Plante
-const RIVAL_TEAMS = { 1001: [1004, 1005, 1006], 1004: [1007, 1008, 1009], 1007: [1001, 1002, 1003] };
+const RIVAL_TEAMS = Object.fromEntries(Object.entries({ 1001: [1004, 1005, 1006], 1004: [1007, 1008, 1009], 1007: [1001, 1002, 1003] }).map(([k, v]) => [R(+k), v.map(R)]));
 const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace et le Dragon' };
 // capacité de terrain donnée par chaque Champion après sa victoire
 const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
@@ -656,7 +657,7 @@ export class Game {
       4: ['J\'ai vu ton avenir : il est sur la mer. Prends la CS02, Surf.', 'Au sud, le Cap Mirage fait face aux îles des trois frères.', 'Méfie-toi de Drakos. Il a autrefois défié Célestine... et ne s\'en est jamais remis.'],
       5: ['Tiens, la CS03 : Éclate-Roc. Elle brise les rochers fissurés.', 'Tu en auras besoin sur la Grande Île.', 'Drakos est notre frère aîné. Il a perdu la finale de la Ligue contre Célestine, il y a dix ans.', 'Depuis, il a juré qu\'aucun Maître ne dicterait sa loi aux îles. Pyros et moi... nous l\'avons suivi.'],
       6: ['Prends la CS04 : Vol. Elle te ramènera chez toi en un instant.', 'Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
-      7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
+      7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Kyogre y passe parfois...'],
     }[g];
     if (lines) await ui.say(lines, { speaker: name });
     const gift = GYM_GIFT[g];
@@ -671,12 +672,12 @@ export class Game {
   /** le second rival : l'autre enfant de l'histoire (celui que le joueur n'a pas choisi d'incarner) */
   rivalB() {
     const f = this.state.gender === 'f';
-    return { name: f ? 'Ethan' : 'Lyra', sprite: f ? 'player_m' : 'player_f', bs: f ? 'topdresseur' : 'topdresseuse', il: f ? 'il' : 'elle', le: f ? 'le' : 'la', fils: f ? 'petit-fils' : 'petite-fille', e: f ? '' : 'e' };
+    return { name: f ? 'Ethan' : 'Lyra', sprite: f ? 'player_m' : 'player_f', bs: f ? 'player_m' : 'player_f', il: f ? 'il' : 'elle', le: f ? 'le' : 'la', fils: f ? 'petit-fils' : 'petite-fille', e: f ? '' : 'e' };
   }
   /** la troisième capsule du labo : celle que ni le joueur ni Théo n'ont prise (et ses évolutions) */
   thirdLine() {
-    const st = this.state, mine = st.flags.starter || 1001, theo = (RIVAL_TEAMS[mine] || RIVAL_TEAMS[1001])[0];
-    const s = STARTERS.find((x) => x !== mine && x !== theo) || 1007;
+    const st = this.state, mine = st.flags.starter || STARTERS[0], theo = (RIVAL_TEAMS[mine] || RIVAL_TEAMS[STARTERS[0]])[0];
+    const s = STARTERS.find((x) => x !== mine && x !== theo) || STARTERS[2];
     return [s, s + 1, s + 2];
   }
   /** appel du Prof. Saule sur le Pokématos, après certains badges */
@@ -822,7 +823,7 @@ export class Game {
     const pick = (a) => a[(x * 7 + y * 3 + this.mapObj.id.length) % a.length];
     const TV = [
       ['C\'est un film : quatre amis suivent une voie ferrée à travers la forêt.', 'Ça donne envie de partir à l\'aventure !'],
-      ['Un reportage sur les créatures de la région.', '« Les Capyousse adorent les journées ensoleillées... »'],
+      ['Un reportage sur les créatures de la région.', '« Les Germignon adorent les journées ensoleillées... »'],
       ['La météo : grand soleil sur Bourg-Aube, tempête de neige sur l\'Île Givrée.'],
     ];
     if (b >= 3 && !st.flags.rivalB4) TV.push(['Flash spécial : les Gardes d\'Écaille ferment des ports de pêche.', 'Les pêcheurs de Port-Granit protestent...']);
@@ -888,7 +889,7 @@ export class Game {
     } else if (name === 'prof') {
       if (!st.flags.metProf) {
         st.flags.metProf = true;
-        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules. Dans chacune, une créature qui n\'attend qu\'un partenaire.', 'Capyousse, de type Plante. Mèchelet, de type Feu. Et Narvi, de type Eau.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
+        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules. Dans chacune, une créature qui n\'attend qu\'un partenaire.', `${SPECIES[STARTERS[0]].n}, de type Plante. ${SPECIES[STARTERS[1]].n}, de type Feu. Et ${SPECIES[STARTERS[2]].n}, de type Eau.`, 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
         const rival = this.npcs.find((q) => q.id === 'rival-lab');
         if (rival) { rival.dir = 'up'; await ui.say('Hé ! J\'attends depuis ce matin, moi ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
         return;
@@ -898,7 +899,7 @@ export class Game {
       const B = this.rivalB(), lines = [];
       if (st.flags.rivalB3) lines.push(`${B.name} m'a raconté votre combat à Fort-Écaille. Merci, ${st.name}. Tu m'as rendu mon${B.e ? 'e' : ''} ${B.fils}.`);
       else if (st.flags.rivalB1) lines.push(`Tu as croisé ${B.name} ? ${B.il === 'il' ? 'Il' : 'Elle'} a toujours eu la tête dure... comme sa grand-mère.`);
-      if (seen) lines.push(`Tu as déjà rencontré ${seen} créature${seen > 1 ? 's' : ''} légendaire${seen > 1 ? 's' : ''}${caught ? `, et tu en as capturé ${caught}` : ''} !`, caught >= 10 ? 'Presque toutes les légendes d\'Odyssée sont dans ton équipe ou ton PC. Odyssor lui-même doit t\'observer.' : 'Les anciens disent que les légendaires ne choisissent que les dresseurs au cœur sincère.');
+      if (seen) lines.push(`Tu as déjà rencontré ${seen} créature${seen > 1 ? 's' : ''} légendaire${seen > 1 ? 's' : ''}${caught ? `, et tu en as capturé ${caught}` : ''} !`, caught >= 10 ? 'Presque toutes les légendes d\'Odyssée sont dans ton équipe ou ton PC. Kyogre lui-même doit t\'observer.' : 'Les anciens disent que les légendaires ne choisissent que les dresseurs au cœur sincère.');
       else lines.push('Chaque créature que tu rencontreras remplira ton Pokédex.', 'On raconte que des créatures légendaires dorment sur les îles de l\'Est. Le capitaine de l\'Embarcadère pourra t\'y emmener.');
       lines.push(st.badges[7] ? 'Il ne te reste que la Ligue Céleste. Je suis fier de toi.' : 'Les cinq Champions du continent t\'attendent, puis les trois frères de l\'archipel. Et au bout du chemin : la Ligue Céleste !');
       await ui.say(lines, { speaker: 'Prof. Saule' });
@@ -1021,7 +1022,7 @@ export class Game {
       if (st.flags[flag] || !st.flags.rival1 || !st.party.some((m) => m.hp > 0)) return false;
       const W = who || { name: RIVAL_NAME, sprite: 'theo', bs: 'theo' };
       this.busy = true; st.flags[flag] = true;
-      const R = RIVAL_TEAMS[st.flags.rivalSp] || RIVAL_TEAMS[1001];
+      const R = RIVAL_TEAMS[st.flags.rivalSp] || RIVAL_TEAMS[STARTERS[0]];
       // le rival arrive par le haut (ou par le côté si la place manque), jamais à travers un mur
       let dir = 'up', n = this.spawnAhead('up');
       for (const d of ['left', 'right', 'down']) { if (n >= 2) break; const k = this.spawnAhead(d); if (k > n) { n = k; dir = d; } }
@@ -1061,25 +1062,25 @@ export class Game {
       [`Stop, ${st.name}. Je suis le dernier rempart avant la Tour de Drakos.`, 'Les pêcheurs m\'ont tout raconté. Les ports fermés, les pêches confisquées...', 'Mais Drakos nous a protégés quand personne d\'autre ne le faisait.', 'Alors je vais me battre. Une dernière fois. Pour savoir lequel de nous deux a raison !'],
       ['Vas-y. Montre-lui ce que ça fait de perdre... comme moi.', 'Je quitte les Gardes. Peut-être qu\'après toi, Drakos écoutera enfin les îles.'], asB);
     if (name === 'rivalB4' && bd(7)) return rivalFight('rivalB4', () => [[1044, 54], [1016, 54], [1040, 54], [149, 55], [1046, 54], [L3[2], 57]], 'Merci. J\'avais besoin de ce combat.',
-      [`${st.name} ! Je savais que tu viendrais ici.`, 'Drakos m\'a parlé, hier soir. Il dit qu\'Odyssor passe au Cap quand quelqu\'un a eu le courage de changer les choses.', 'J\'aimerais le voir avec toi. Mais d\'abord... un vrai combat. Sans uniforme, sans camp. Juste nous deux !'],
-      ['Mon grand-père a raison : on apprend plus en perdant qu\'en gagnant.', 'Avance jusqu\'au bord de la falaise. Si Odyssor vient, c\'est pour toi.'], { ...asB, cls: 'Rival' });
+      [`${st.name} ! Je savais que tu viendrais ici.`, 'Drakos m\'a parlé, hier soir. Il dit que Kyogre passe au Cap quand quelqu\'un a eu le courage de changer les choses.', 'J\'aimerais le voir avec toi. Mais d\'abord... un vrai combat. Sans uniforme, sans camp. Juste nous deux !'],
+      ['Mon grand-père a raison : on apprend plus en perdant qu\'en gagnant.', 'Avance jusqu\'au bord de la falaise. Si Kyogre vient, c\'est pour toi.'], { ...asB, cls: 'Rival' });
     if (name === 'rival5') return rivalFight('rival5', (R) => [[1012, 50], [1035, 49], [1022, 50], [1040, 50], [1051, 51], [R[2], 54]], 'Incroyable... Tu mérites d\'aller jusqu\'au bout.', [`${st.name}... Je savais que tu viendrais.`, 'Huit badges, dont celui de Drakos. Tout le monde ne parle que de toi.', 'Mais avant la Ligue, il y a moi. Donne tout ce que tu as !'], ['Va. La Maître de la Ligue t\'attend.', 'Et bats-la, sinon c\'est moi qui m\'en chargerai !']);
     return false;
   }
 
-  /** Cap des Étoiles : Odyssor apparaît (après le badge de Drakos), on peut tenter de le capturer */
+  /** Cap des Étoiles : Odyssor (Kyogre en attendant) apparaît (après le badge de Drakos), on peut tenter de le capturer */
   async odyssorEvent() {
     const st = this.state, ui = this.ui;
     if (!st.badges[7] || st.flags.odyssor === 'caught' || st.flags.odyssorNow) return false;
     this.busy = true; st.flags.odyssorNow = true;
     try {
       this.musicLock = true; this.sound.play('mystic');
-      await ui.say(['La mer se met à scintiller...', 'Une immense silhouette constellée d\'étoiles glisse entre les vagues.', 'C\'est Odyssor, la baleine céleste !']);
-      if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent qu\'Odyssor a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
+      await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Kyogre, le géant des océans !']);
+      if (st.flags.rivalB4) await ui.say(['... Il est magnifique.', 'Les anciens disent que Kyogre a guidé les premiers marins jusqu\'aux îles, avant même la Ligue.', 'Vas-y. C\'est toi qu\'il est venu voir.'], { speaker: this.rivalB().name });
       await ui.flash(4, '#cfe4ff', 90);
       const res = await this.wildBattle([[1052, 50, 50, 1]], { fixed: true, music: 'champion' });
-      if (res === 'caught') { st.flags.odyssor = 'caught'; await ui.say(['Odyssor a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
-      else await ui.say(['Odyssor replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
+      if (res === 'caught') { st.flags.odyssor = 'caught'; await ui.say(['Kyogre a rejoint ton équipe.', 'Les marins d\'Odyssée raconteront longtemps cette nuit-là.']); }
+      else await ui.say(['Kyogre replonge et disparaît vers le large...', 'Peut-être reviendra-t-il un autre jour.']);
     } finally {
       this.musicLock = false; this.updateZone();
       setTimeout(() => { st.flags.odyssorNow = false; }, 4000);

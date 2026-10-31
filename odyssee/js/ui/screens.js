@@ -1,14 +1,15 @@
 // odyssee/js/ui/screens.js — écrans plein cadre : équipe, résumé, sac, Pokédex, carte, carte de dresseur, boutique, PC, options
 import { el, esc } from './ui.js';
 import { SPECIES } from '../data/species.js';
+import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
 import { monName, expProgress, STAT_NAMES } from '../core/mon.js';
 import { ASSETS } from '../assets.js';
 import { T } from '../world/tiles.js';
 
-export const TYPE_FR = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
-export const TYPE_COL = { normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
+export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
+export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
 export const STATUS_FR = { par: ['PAR', '#e8c020'], slp: ['SOM', '#8890a0'], psn: ['PSN', '#a050b0'], tox: ['PSN', '#7a3090'], brn: ['BRÛ', '#e86030'], frz: ['GEL', '#60c0e8'] };
 export const typeTag = (t) => `<span class="type" style="background:${TYPE_COL[t]}">${TYPE_FR[t]}</span>`;
 export const hpCol = (r) => (r > 0.5 ? '#48d058' : r > 0.2 ? '#f0c020' : '#f04838');
@@ -155,8 +156,10 @@ export function dexScreen(game) {
   const ui = game.ui, st = game.state;
   return new Promise((resolve) => {
     const s = screen(ui, 'dex-scr');
-    // les créatures d'Odyssée d'abord (numéros 001 à 052), puis les Pokémon venus d'ailleurs
-    const ids = Object.keys(SPECIES).map(Number).sort((a, b) => (a >= 1000) === (b >= 1000) ? a - b : a >= 1000 ? -1 : 1);
+    // les créatures d'Odyssée d'abord (numéros 001 à 052), puis les Pokémon venus d'ailleurs ; tant qu'elles sont
+    // remplacées par des Pokémon, seules celles déjà rencontrées (ancienne sauvegarde) restent dans la liste
+    const ids = Object.keys(SPECIES).map(Number).filter((id) => ORIGINALES || id < 1000 || st.dex.seen.includes(id))
+      .sort((a, b) => (a >= 1000) === (b >= 1000) ? a - b : a >= 1000 ? -1 : 1);
     const num = (id) => (SPECIES[id].no ? String(SPECIES[id].no).padStart(3, '0') : '#' + String(id).padStart(3, '0'));
     let i = 0;
     const seen = new Set(st.dex.seen), caught = new Set(st.dex.caught);

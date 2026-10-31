@@ -9,8 +9,9 @@ import { T } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap, towerFloor, TOWER_UP, TOWER_DOWN } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
+import { R } from '../data/remplacants.js';
 
-export const STARTERS = NEW_STARTERS;
+export const STARTERS = NEW_STARTERS.map(R);
 export const RIVAL_NAME = 'Théo';
 // ordre des arènes : Hector, Marine, Volta, Flora, Sibylle, puis les trois frères de l'archipel
 export const BADGES = [
@@ -31,7 +32,7 @@ const STOCK = {
   2: ['poke-ball', 'potion', 'super-potion', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'repel', 'escape-rope'],
   3: ['poke-ball', 'great-ball', 'potion', 'super-potion', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'repel', 'super-repel', 'escape-rope'],
   4: ['poke-ball', 'great-ball', 'super-potion', 'hyper-potion', 'full-heal', 'revive', 'super-repel', 'escape-rope', 'thunder-stone', 'moon-stone'],
-  5: ['great-ball', 'super-potion', 'hyper-potion', 'full-heal', 'revive', 'super-repel', 'escape-rope', 'leaf-stone', 'fire-stone', 'water-stone', 'sun-stone', 'ether'],
+  5: ['great-ball', 'super-potion', 'hyper-potion', 'full-heal', 'revive', 'super-repel', 'escape-rope', 'leaf-stone', 'fire-stone', 'water-stone', 'sun-stone', 'dusk-stone', 'dawn-stone', 'shiny-stone', 'ice-stone', 'ether'],
   6: ['great-ball', 'ultra-ball', 'hyper-potion', 'max-potion', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'ether', 'elixir'],
   7: ['ultra-ball', 'hyper-potion', 'max-potion', 'full-restore', 'full-heal', 'revive', 'max-repel', 'escape-rope', 'elixir'],
 };
@@ -241,11 +242,11 @@ export function buildWorld() {
         { x: 4, y: 5, sprite: 'montagnard', text: ['Ici travaillait Basalte, le meilleur mineur de la région.', 'Il est parti sur l\'Île de Granit, au sud-est, rejoindre ses deux frères.', 'On dit qu\'il garde l\'île pour le compte de l\'aîné, Drakos...'] },
         { x: 7, y: 6, sprite: 'vieil_homme', text: ['Les trois frères étaient de braves gars.', 'Puis Drakos a perdu contre Célestine, la Maître de la Ligue.', 'Il n\'a jamais digéré sa défaite. Il s\'est taillé un royaume sur les îles.'] }] },
       { kind: 'house', x: 4, y: 14, roof: 'gray', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['Les créatures Roche résistent aux attaques Normal et Feu.', 'Mais l\'Eau et la Plante les font fondre !'] }] },
-      { kind: 'house', x: 9, y: 14, roof: 'brown', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['À l\'est, la route 3 mène à la Grotte Lunaire.', 'Il y fait sombre... et les Noctaile adorent s\'y cacher.'] }] },
+      { kind: 'house', x: 9, y: 14, roof: 'brown', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['À l\'est, la route 3 mène à la Grotte Lunaire.', 'Il y fait sombre... et les Nosferapti adorent s\'y cacher.'] }] },
       { kind: 'house2', x: 20, y: 14, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'scientifique', text: ['Ta créature peut évoluer en gagnant des niveaux.', 'Certaines ont besoin d\'une pierre spéciale, vendue en boutique.'] }] },
     ],
     npcs: [
-      { id: 'montagnard', x: 20, y: 12, sprite: 'montagnard', move: 'wander', text: ['Il paraît que des Cristaupe creusent au fond de la Grotte Lunaire.', 'Leurs cristaux brillent dans le noir !'] },
+      { id: 'montagnard', x: 20, y: 12, sprite: 'montagnard', move: 'wander', text: ['Il paraît que des Onix creusent au fond de la Grotte Lunaire.', 'On les entend gronder sous la roche !'] },
     ],
   };
   buildTown(W, maps, C);
@@ -266,7 +267,7 @@ export function buildWorld() {
     ],
     npcs: [
       { id: 'marin', x: 17, y: 5, sprite: 'marin', move: 'turn', text: ['Ahoy ! Ce ponton était le départ des ferries.', 'Depuis que les îles ont fermé leurs ports, plus aucun bateau ne part...'] },
-      { id: 'pecheur', x: 25, y: 5, sprite: 'pecheur', move: 'wander', text: ['Les Galetin pincent fort, méfie-toi en marchant sur la plage.'] },
+      { id: 'pecheur', x: 25, y: 5, sprite: 'pecheur', move: 'wander', text: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.'] },
       { id: 'garde', x: 32, y: 18, sprite: 'garde', dir: 'left', gate: { badges: 2, tiles: [[33, 19], [33, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut deux badges pour l\'emprunter.'] },
     ],
   };
@@ -280,14 +281,14 @@ export function buildWorld() {
       ['sign', 11, 12, 'VOLTACITÉ\nLa ville qui ne s\'éteint jamais.'], ['sign', 17, 17, 'ARÈNE DE VOLTACITÉ\nChampionne : Volta\nL\'étincelle foudroyante.'], ['flowers', 2, 21, 7, 22], ['flowers', 11, 21, 28, 22]],
     buildings: [
       { kind: 'center', x: 3, y: 6 }, { kind: 'mart', x: 11, y: 6 },
-      { kind: 'tower', x: 17, y: 6, roof: 'gold', name: 'Centrale de Voltacité', npcs: [{ x: 5, y: 4, sprite: 'scientifique', text: ['Cette centrale alimente toute la région.', 'Les Ampoulet adorent se blottir contre les générateurs !'] }, { x: 8, y: 6, sprite: 'scientifique', text: ['Les créatures Sol ne craignent pas du tout l\'électricité.', 'Un bon atout contre l\'Arène !'] }] },
+      { kind: 'tower', x: 17, y: 6, roof: 'gold', name: 'Centrale de Voltacité', npcs: [{ x: 5, y: 4, sprite: 'scientifique', text: ['Cette centrale alimente toute la région.', 'Les Magnéti adorent se blottir contre les générateurs !'] }, { x: 8, y: 6, sprite: 'scientifique', text: ['Les créatures Sol ne craignent pas du tout l\'électricité.', 'Un bon atout contre l\'Arène !'] }] },
       { kind: 'house2', x: 23, y: 7, roof: 'gray', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['La paralysie divise la vitesse par quatre.', 'Et parfois, la créature ne peut même pas attaquer !'] }] },
       { kind: 'gym', x: 18, y: 13, roof: 'gold' },
       { kind: 'house', x: 11, y: 15, roof: 'blue', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Une Super Capsule capture mieux qu\'une Capsule.', 'Une Hyper Capsule, c\'est encore mieux !'] }] },
       { kind: 'house', x: 3, y: 15, roof: 'purple', npcs: [{ x: 2, y: 4, sprite: 'habitant', text: ['Au sud, la route 5 descend jusqu\'à Floralia.', 'Une ville couverte de fleurs, tu verras.'] }] },
     ],
     npcs: [
-      { id: 'scientifique', x: 14, y: 14, sprite: 'scientifique', move: 'wander', text: ['La nuit, les créatures qu\'on croise ne sont pas tout à fait les mêmes.', 'Les Chouillon, par exemple, sortent surtout le soir.'] },
+      { id: 'scientifique', x: 14, y: 14, sprite: 'scientifique', move: 'wander', text: ['La nuit, les créatures qu\'on croise ne sont pas tout à fait les mêmes.', 'Les Hoothoot, par exemple, sortent surtout le soir.'] },
       { id: 'garde', x: 10, y: 21, sprite: 'garde', dir: 'left', gate: { badges: 3, tiles: [[8, 21], [9, 21]] }, text: ['La route 5 est fermée aux dresseurs débutants.', 'Il faut trois badges pour passer.'] },
     ],
   };
@@ -327,7 +328,7 @@ export function buildWorld() {
       ['sign', 18, 12, 'MIRAGE\nLa ville où l\'esprit voit plus loin.'], ['sign', 11, 17, 'ARÈNE DE MIRAGE\nChampionne : Sibylle\nLe regard qui perce le voile.']],
     buildings: [
       { kind: 'center', x: 3, y: 6 }, { kind: 'mart', x: 9, y: 6 },
-      { kind: 'tower', x: 20, y: 6, roof: 'purple', name: 'Tour Mirage', npcs: [{ x: 5, y: 4, sprite: 'medium', text: ['Les attaques Psy sont puissantes... mais le type Ténèbres ne les craint pas.', 'Et les Insectes ne sont pas si fragiles face à elles.'] }, { x: 8, y: 5, sprite: 'vieil_homme', text: ['Les murs de cette tour racontent les légendes d\'Odyssée.', 'Trois oiseaux gardent les îles de l\'Est : la foudre, le feu et la glace.', 'Deux gardiens règnent sur le ciel et la mer : Ho-Oh, l\'arc-en-ciel, et Lugia, l\'argent des profondeurs.', 'Et au-dessus d\'eux, Odyssor, la baleine des étoiles, qui a guidé les premiers marins jusqu\'ici.'] }] },
+      { kind: 'tower', x: 20, y: 6, roof: 'purple', name: 'Tour Mirage', npcs: [{ x: 5, y: 4, sprite: 'medium', text: ['Les attaques Psy sont puissantes... mais le type Ténèbres ne les craint pas.', 'Et les Insectes ne sont pas si fragiles face à elles.'] }, { x: 8, y: 5, sprite: 'vieil_homme', text: ['Les murs de cette tour racontent les légendes d\'Odyssée.', 'Trois oiseaux gardent les îles de l\'Est : la foudre, le feu et la glace.', 'Deux gardiens règnent sur le ciel et la mer : Ho-Oh, l\'arc-en-ciel, et Lugia, l\'argent des profondeurs.', 'Et au-dessus d\'eux, Kyogre, le géant des océans, qui a guidé les premiers marins jusqu\'ici.'] }] },
       { kind: 'gym', x: 3, y: 13, roof: 'purple' },
       { kind: 'house', x: 19, y: 15, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'medium', text: ['Je savais que tu viendrais. Ne me demande pas comment.'] }] },
       { kind: 'house', x: 24, y: 15, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'pecheur', text: ['Au sud, la route 7 descend jusqu\'au Cap Mirage.', 'De là, on aperçoit les îles de l\'archipel.', 'Mais sans Surf, impossible de traverser.'] }] },
@@ -392,7 +393,7 @@ export function buildWorld() {
       { kind: 'gym', x: 13, y: 13, roof: 'purple' },
       { kind: 'bighouse', x: 23, y: 4, roof: 'purple', name: 'Caserne d\'Écaille', npcs: [{ x: 4, y: 4, sprite: 'garde', text: ['Nous, les Gardes d\'Écaille, servons Drakos.', 'Il a juré qu\'aucun Maître de la Ligue ne dicterait jamais sa loi aux îles.'] }, { x: 7, y: 5, sprite: 'garde', text: ['Entre nous... ça fait longtemps que je ne sais plus contre qui on se bat.'] }] },
       { kind: 'house', x: 4, y: 15, roof: 'teal', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Drakos a perdu contre Célestine, il y a dix ans, en finale de la Ligue.', 'Depuis, il refuse toute autorité. Même celle de la Ligue.'] }] },
-      { kind: 'house', x: 25, y: 15, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte qu\'Odyssor, la baleine céleste, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
+      { kind: 'house', x: 25, y: 15, roof: 'red', npcs: [{ x: 2, y: 4, sprite: 'vieil_homme', text: ['Au nord de la ville, il y a le Cap des Étoiles.', 'On raconte que Kyogre, le géant des océans, y passe quand la mer est calme...', 'Mais Drakos en interdit l\'accès.'] }] },
     ],
     npcs: [
       { id: 'garde-cap', x: 16, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, tiles: [[16, 1], [17, 1]] }, text: ['Le Cap des Étoiles est interdit.', 'Seul Drakos, ou celui qui l\'aura vaincu, peut y passer.'] },
@@ -412,7 +413,7 @@ export function buildWorld() {
     buildings: [
       { kind: 'center', x: 3, y: 5 }, { kind: 'mart', x: 14, y: 5 },
       { kind: 'house', x: 19, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace et les autres dragons.'] }] },
-      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : une baleine immense nageant entre les étoiles.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit qu\'Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
+      { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : une créature immense nageant sous la mer étoilée.', 'Kyogre. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit que Kyogre et Lugia sont les deux gardiens des eaux.'] }] },
       { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux huit badges peuvent la franchir.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],

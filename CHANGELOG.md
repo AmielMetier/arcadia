@@ -1,5 +1,11 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.46 — 31 octobre 2026
+- **Odyssée** — en attendant les dessins définitifs, les personnages sont ceux de HeartGold / SoulSilver : Ethan, Lyra, Silver, les Champions, les montagnards, les marins… sur la carte comme en combat. Les portraits à côté des dialogues restent.
+- **Odyssée** — les créatures originales sont mises de côté pour l'instant : chacune est remplacée par un Pokémon proche (Germignon, Héricendre et Kaiminus au labo, Kyogre au Cap des Étoiles…).
+- **Odyssée** — tous les Pokémon jusqu'à X / Y (721), avec le type Fée, et quatre nouvelles pierres d'évolution en boutique (Nuit, Aube, Éclat, Glace).
+- **Odyssée** — l'écran d'accueil ne montre plus que la mer et le ciel étoilé.
+
 ## 3.45 — 31 octobre 2026
 - Add files via upload (Gabe)
 
