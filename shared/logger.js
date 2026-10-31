@@ -20,7 +20,7 @@
       const qs = new URLSearchParams(location.search);
       if (qs.get('game')) return qs.get('game');
       // jeu ouvert seul (hors du Hub) : son dossier, un par entrée de hub/games.js
-      const m = /\/(bastion|calcul|convoy|david|drift|filrouge|golf|kart|minigolf|outbreak|pokemon|royale)(?:\/|$)/i.exec(location.pathname);
+      const m = /\/(bastion|calcul|convoy|david|drift|filrouge|golf|kart|minigolf|odyssee|outbreak|pokemon|royale)(?:\/|$)/i.exec(location.pathname);
       if (m) return m[1].toLowerCase();
     } catch (e) {}
     return 'hub';

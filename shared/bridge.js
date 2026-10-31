@@ -28,6 +28,46 @@
   });
   const post = (o) => { if (embedded) parent.postMessage({ dd: 'hub', ...o }, target); };
 
+  /* Onglet en arrière-plan : le navigateur arrête requestAnimationFrame. Or la plupart des jeux font avancer la
+     partie dans cette boucle : l'hôte qui change d'onglet ou de fenêtre figeait la partie de tout le salon, et un
+     invité caché ne répondait plus. Tant que la page est cachée, les rappels d'animation passent par une minuterie
+     de Worker (~30 par seconde, non bridée par le navigateur), puis reviennent à l'affichage normal au retour. */
+  if (embedded && typeof Worker !== 'undefined' && window.requestAnimationFrame) (function keepAlive() {
+    const nRAF = window.requestAnimationFrame.bind(window), nCAF = window.cancelAnimationFrame.bind(window);
+    const pend = new Map(); let seq = 0, worker = null;
+    const runQueue = () => {
+      const now = performance.now(), list = [...pend.entries()].filter(([, p]) => p.bg);
+      for (const [id] of list) pend.delete(id);
+      for (const [, p] of list) { try { p.cb(now); } catch (e) { console.error(e); } }
+    };
+    const startW = () => {
+      if (worker) return;
+      try {
+        const url = URL.createObjectURL(new Blob(['let t=setInterval(()=>postMessage(0),33);onmessage=()=>{clearInterval(t);close()}'], { type: 'text/javascript' }));
+        worker = new Worker(url); worker.onmessage = runQueue;
+      } catch (e) { worker = null; }
+    };
+    const stopW = () => { if (worker) { try { worker.postMessage(0); worker.terminate(); } catch (e) {} worker = null; } };
+    window.requestAnimationFrame = (cb) => {
+      const id = ++seq, p = { cb, bg: false, nid: 0 };
+      pend.set(id, p);
+      if (document.hidden) { p.bg = true; startW(); }
+      else p.nid = nRAF((t) => { if (pend.get(id) === p) { pend.delete(id); cb(t); } });
+      return id;
+    };
+    window.cancelAnimationFrame = (id) => { const p = pend.get(id); if (!p) return; pend.delete(id); if (p.nid) nCAF(p.nid); };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        for (const p of pend.values()) if (!p.bg) { nCAF(p.nid); p.nid = 0; p.bg = true; }
+        if (pend.size) startW();
+      } else {
+        stopW();
+        for (const [id, p] of pend) if (p.bg) { p.bg = false; p.nid = nRAF((t) => { if (pend.get(id) === p) { pend.delete(id); p.cb(t); } }); }
+      }
+    });
+    // tant que c'est caché et qu'aucun rappel n'attend, la minuterie peut s'arrêter ; elle repart au prochain rappel
+  })();
+
   // Chargement automatique du capteur de crashs et d'expulsions (shared/logger.js) dans chaque jeu du Hub
   if (!window.DDLogger && typeof document !== 'undefined') {
     try {

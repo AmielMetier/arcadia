@@ -113,7 +113,9 @@ function buildRoom(scene) {
 
 export function createScene(host, { onPick, onFocus = () => {}, onBook = () => {} }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  // résolution adaptée au PC (budget de pixels + régulateur), voir shared/perf.js
+  const perfCtl = window.DDPerf ? window.DDPerf.auto(renderer, { cap: 2, onChange: () => resize() }) : null;
+  if (!perfCtl) renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   host.appendChild(renderer.domElement);
@@ -457,6 +459,7 @@ export function createScene(host, { onPick, onFocus = () => {}, onBook = () => {
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect();
       window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey);
+      if (perfCtl) perfCtl.stop();
       renderer.dispose(); canvas.remove();
     },
   };

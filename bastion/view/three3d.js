@@ -71,7 +71,7 @@ function initThree3D() {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    threeRenderer.setPixelRatio(Math.min(gfxPreset().pixelRatio, DPR));
+    threeRenderer.setPixelRatio(window.DDPerf ? window.DDPerf.pr(gfxPreset().pixelRatio) : Math.min(gfxPreset().pixelRatio, DPR));
     threeRenderer.setSize(W, H, false);
     threeRenderer.shadowMap.enabled = gfxPreset().shadows;
     threeRenderer.shadowMap.type = THREE.PCFSoftShadowMap;

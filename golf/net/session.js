@@ -269,6 +269,9 @@ export function startHost({ bridge, solo, settings: set0 = {}, me, emit, initial
   // messages des invités
   const onMsg = (from, m) => {
     if (stopped || !m || typeof m !== 'object') return;
+    // le salon renvoie à l'hôte ses propres messages « à tous » : sans ce filtre, sa visée (pose) lui revenait, il la
+    // rediffusait, elle revenait encore… en boucle pendant tout son tour (inondation du relais, coupures chez tous)
+    if (from === me.id) return;
     if (m.t === 'sync') syncTo(from, m.no, m.g);
     else if (m.t === 'shot') shot(from, m);
     else if (m.t === 'seen') seen(m.no | 0, from);

@@ -27,7 +27,7 @@ function pc(playerOrColor) {
 function applyGfx() {
   const q = gfxPreset();
   if (threeRenderer) {
-    threeRenderer.setPixelRatio(Math.min(q.pixelRatio, window.devicePixelRatio || 1));
+    threeRenderer.setPixelRatio(window.DDPerf ? window.DDPerf.pr(q.pixelRatio) : Math.min(q.pixelRatio, window.devicePixelRatio || 1));
     threeRenderer.setSize(W, H, false);
     threeRenderer.shadowMap.enabled = q.shadows;
     if (sunLight3D) {

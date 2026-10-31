@@ -280,6 +280,20 @@
         "EXP_HOST_STOPPED_GAME : l'hôte a quitté l'île ou arrêté la partie",
         "EXP_PEER_LEFT_MIDGAME : joueur déconnecté pendant la tempête (personnage retiré ou laissé statique)"
       ]
+    },
+    {
+      "id": "odyssee",
+      "title": "Odyssée",
+      "maxPlayers": 6,
+      "engine": "Canvas 2D (fausse 3D) + HubBridge (positions, invitations, échanges, combats)",
+      "crashReasons": [
+        "Sprites PokeAPI indisponibles (réseau bloqué) : les remplaçants dessinés s'affichent",
+        "Exception dans le moteur de combat si une sauvegarde importée est corrompue"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : un joueur quitte pendant un échange ou un combat entre joueurs (forfait)",
+        "EXP_HOST_MIGRATION_RESET : changement d'hôte pendant la partie"
+      ]
     }
   ]
 }

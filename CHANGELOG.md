@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.30 — 31 octobre 2026
+- **Tous les jeux** — L'hôte peut changer d'onglet ou de fenêtre sans figer la partie : elle continue pour tout le salon (avant, tout s'arrêtait jusqu'à son retour).
+- **Birdie Party** — Fini les coupures pendant le tour de l'hôte : sa visée revenait vers lui et repartait en boucle, au point de saturer la connexion de tout le salon.
+- **DavidSimulator**, **Fil Rouge**, **Outbreak**, **Duo Drift**, **Cyber Kart GP**, **Bastion Clash** et **Mini-Golf Party** — Plus fluides sur les grands écrans et les portables à écran zoomé : l'image n'est plus calculée en résolution inutilement élevée.
+  - Dans DavidSimulator et Fil Rouge, la résolution baisse un peu toute seule si le PC peine, puis remonte dès qu'il a de la marge.
+- **Odyssée** — Ses plantages sont bien rangés sous son nom dans la page des journaux.
+
 ## 3.29 — 31 octobre 2026
 - **Arcadia** — Vitrine de l'accueil : le fond flou sous l'affiche est complètement supprimé.
 

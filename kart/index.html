@@ -223,6 +223,7 @@
 </style>
 <!-- Pont avec Arcadia (salon, réseau). Absent = mode solo. -->
 <script src="../shared/logger.js"></script>
+<script src="../shared/perf.js"></script>
 <script src="../shared/bridge.js"></script>
 <script src="../shared/volume.js"></script>
 <!-- Three.js r169 embarqué dans le dépôt (shared/vendor) + modules complémentaires (kart/vendor) -->
@@ -406,7 +407,7 @@ const nowMs = () => VCLOCK ?? performance.now();
    ============================================================================= */
 const LOWQ = QS.has('low');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
-let basePR = Math.min(window.devicePixelRatio || 1, LOWQ ? 1 : 1.6);
+let basePR = LOWQ ? Math.min(window.devicePixelRatio || 1, 1) : window.DDPerf ? window.DDPerf.pr(1.6) : Math.min(window.devicePixelRatio || 1, 1.6);   // budget de pixels sur grand écran
 renderer.setPixelRatio(basePR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;

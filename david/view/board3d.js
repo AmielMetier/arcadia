@@ -177,7 +177,8 @@ export async function mountBoard3d(host, board, { onCell } = {}) {
   host.appendChild(stage);
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
   if (!renderer.getContext()) throw new Error('WebGL indisponible');
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  // résolution adaptée au PC (budget de pixels + régulateur), voir shared/perf.js
+  const perfCtl = window.DDPerf ? window.DDPerf.auto(renderer, { cap: 2, onChange: () => fit(true) }) : (renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)), null);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; // garde les couleurs du plateau (ACES les délave)
   renderer.outputColorSpace = THREE.SRGBColorSpace;

@@ -530,7 +530,7 @@ export class Renderer {
   constructor(container) {
     this.container = container;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    r.setPixelRatio(window.DDPerf ? window.DDPerf.pr(1.75) : Math.min(window.devicePixelRatio || 1, 1.75));
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(r.domElement);
@@ -552,7 +552,7 @@ export class Renderer {
   }
   setQuality(q) {
     this.quality = q;
-    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, this.touch ? 1.3 : 1.75));
+    this.renderer.setPixelRatio(q === 'low' ? 1 : window.DDPerf ? window.DDPerf.pr(this.touch ? 1.3 : 1.75) : Math.min(window.devicePixelRatio || 1, this.touch ? 1.3 : 1.75));
     this.renderer.shadowMap.type = q === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (this.sun) { this.sun.shadow.mapSize.set(q === 'low' ? 1024 : 2048, q === 'low' ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.resize();
