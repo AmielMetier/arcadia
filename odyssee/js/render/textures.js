@@ -1,6 +1,8 @@
 // odyssee/js/render/textures.js — pixel art procédural (tuiles 16 px, sprites, façades), dessiné au chargement.
 // Tout est original : palettes et motifs inspirés de l'ambiance des jeux DS, sans reprendre de tuiles existantes.
 
+import { REGLES, kitCell } from '../data/regles.js';
+
 export const CELL = 16, PITCH = 18;
 
 /* ---------------- outils ---------------- */
@@ -465,49 +467,134 @@ export function applySpriteImages(S, images, dens = {}) {
 const KITS = {}, SOLS = {}, SOL32 = {}, HG = {};
 export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; }
 const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode' };
-// position des tuiles dans un kit : [colonne, ligne]
-const KT = { wall: [0, 0], win: [1, 0], winN: [2, 0], base: [3, 0], door: [0, 1], doorN: [1, 1], lintel: [2, 1], side: [3, 1], roof: [0, 2], eave: [1, 2], ridge: [2, 2], chimney: [3, 2], signL: [0, 3], signR: [1, 3], flowers: [2, 3], lamp: [3, 3], winB: [0, 4], winBN: [1, 4] };
-// un kit fait 4 × 4 tuiles de 16 pixels (première version) ou de 32 pixels (version 2, deux fois plus fin)
+// Les bâtiments sont assemblés à partir d'un kit de 4 × 4 cellules (docs/ODYSSEE-GRAPHISME.md) : le rôle de chaque
+// cellule (mur, fenêtre, porte, toit, rebord…) est donné par REGLES.kits ; le jeu place porte, fenêtres, linteau,
+// enseigne, lampe et jardinières, et compose le toit (faîte en haut, rebord en bas).
 const kitT = (kit) => Math.round(kit.width / 4);
-const kitTile = (ctx, kit, k, x, y) => { const [c, r] = KT[k], T = kitT(kit); ctx.drawImage(kit, c * T, r * T, T, T, x, y, T, T); };
+const HOUSE_STYLES = new Set(['house', 'house2', 'house3', 'bighouse', 'tower', 'gate', 'chalet', 'pecheur']);
+const SHOP_STYLES = new Set(['center', 'mart']);
+function kitOf(style) { const name = KIT_OF[style]; const kit = name && KITS[name]; return kit ? { kit, name, T: kitT(kit) } : null; }
+/** dessine la cellule d'un rôle ; false si le kit ne l'a pas */
+function put(ctx, K, role, x, y, flip = false) {
+  const c = kitCell(K.name, role); if (!c) return false;
+  const T = K.T;
+  if (flip) { ctx.save(); ctx.translate(x, y + T); ctx.scale(1, -1); ctx.drawImage(K.kit, c[0] * T, c[1] * T, T, T, 0, 0, T, T); ctx.restore(); }
+  else ctx.drawImage(K.kit, c[0] * T, c[1] * T, T, T, x, y, T, T);
+  return true;
+}
+const has = (K, role) => !!kitCell(K.name, role);
+/** la cellule est-elle un objet détouré (lampe, jardinière, plaque) et non un morceau de mur plein ? */
+const objCache = new Map();
+function isObject(K, role) {
+  const c = kitCell(K.name, role); if (!c) return false;
+  const key = K.name + ':' + c; if (objCache.has(key)) return objCache.get(key);
+  const cv = canvas(K.T, K.T), x = cv.getContext('2d'); x.drawImage(K.kit, c[0] * K.T, c[1] * K.T, K.T, K.T, 0, 0, K.T, K.T);
+  const d = x.getImageData(0, 0, K.T, K.T).data; let clear = 0;
+  for (let i = 3; i < d.length; i += 4) if (!d[i]) clear++;
+  const r = clear > K.T * K.T * 0.15; objCache.set(key, r); return r;
+}
+const variant = (K, k) => (REGLES.kits.variantes[K.name] || {})[k];
+/** colonnes des fenêtres : symétriques, ni sur la porte ni sur les bords (sauf façade étroite) */
+function windowCols(w, door) {
+  const out = new Set();
+  for (let i = 0; i < w; i++) if (i !== door && ((i > 0 && i < w - 1) || w <= 3)) out.add(i);
+  return out;
+}
 /** façade assemblée à partir d'un kit dessiné (null si le kit manque) */
 function kitFacade(style, w, H, door, night) {
-  const kit = KITS[KIT_OF[style]]; if (!kit) return null;
-  const T = kitT(kit), c = canvas(w * T, H * T), x = c.getContext('2d');
-  const shop = ['center', 'mart', 'gym', 'league', 'lab'].includes(style);
-  const signCols = shop ? (door + 1 < w ? [door, door + 1] : [door - 1, door]) : [];
+  const K = kitOf(style); if (!K) return null;
+  const T = K.T, c = canvas(w * T, H * T), x = c.getContext('2d');
+  const house = HOUSE_STYLES.has(style), shop = SHOP_STYLES.has(style);
+  const wins = windowCols(w, door);
+  const win = night ? 'fenetre_nuit' : 'fenetre';
   for (let j = 0; j < H; j++) for (let i = 0; i < w; i++) {
-    const X = i * T, Y = j * T, bottom = j === H - 1, off = (i - door) % 2 !== 0;
-    let k = 'wall';
-    // kit en 5 lignes : les fenêtres du rez-de-chaussée ont leur socle, celles des étages n'en ont pas
-    const tall = kit.height > kit.width;
-    if (bottom) k = i === door ? (night ? 'doorN' : 'door') : off && w > 2 ? (night ? (tall ? 'winBN' : 'winN') : (tall ? 'winB' : 'win')) : 'base';
-    else if (j === H - 2 && signCols.includes(i)) k = i === signCols[0] ? 'signL' : 'signR';
-    else if (j === H - 2 && i === door) k = 'lintel';
-    else k = (i + j) % 2 === (door + 1) % 2 ? (night ? 'winN' : 'win') : 'wall';
-    kitTile(x, kit, k, X, Y);
-    // lampe murale à côté de la porte des maisons
-    if (bottom && !shop && i === door + 1 && w >= 4) kitTile(x, kit, 'lamp', X, Y);
+    const X = i * T, Y = j * T, bottom = j === H - 1;
+    if (bottom) {
+      if (i === door) {
+        if (!house && has(K, 'embleme') && !shop) put(x, K, 'embleme', X, Y);
+        else put(x, K, night ? 'porte_nuit' : 'porte', X, Y) || put(x, K, 'porte', X, Y);
+      } else if (wins.has(i)) {
+        if (!(has(K, 'fenetre_bas') && put(x, K, 'fenetre_bas', X, Y))) put(x, K, win, X, Y);
+      } else put(x, K, 'socle', X, Y) || put(x, K, 'mur', X, Y);
+    } else if (j === H - 2 && i === door && has(K, 'linteau')) put(x, K, 'linteau', X, Y);
+    else if (wins.has(i) || (i === door && j < H - 2)) put(x, K, win, X, Y);
+    else put(x, K, 'mur', X, Y);
+  }
+  // objets posés sur la façade, au pixel près
+  const sign = has(K, 'enseigne_g') && has(K, 'enseigne_d');
+  if (sign && !house) {
+    if (variant(K, 'plaques') && isObject(K, 'enseigne_g')) {
+      // deux plaques de part et d'autre de la porte
+      if (door > 0) put(x, K, 'enseigne_g', (door - 1) * T, (H - 1) * T);
+      if (door < w - 1) put(x, K, 'enseigne_d', (door + 1) * T, (H - 1) * T);
+    } else if (H >= 2) {
+      // enseigne de deux cellules centrée sur la porte, juste au-dessus
+      const sx = door * T + (T >> 1) - T, sy = (H - 2) * T;
+      put(x, K, 'enseigne_g', sx, sy); put(x, K, 'enseigne_d', sx + T, sy);
+    }
+  }
+  if (house) {
+    // jardinières sous les fenêtres du rez-de-chaussée, lampe à droite de la porte
+    if (isObject(K, 'fleurs')) for (const i of wins) put(x, K, 'fleurs', i * T, (H - 1) * T + Math.round(T * 0.12));
+    if (isObject(K, 'lampe') && door + 1 < w) put(x, K, 'lampe', (door + 1) * T - Math.round(T * 0.3), (H - 1) * T - Math.round(T * 0.35));
+  } else if (!shop && isObject(K, 'lampe') && door > 0 && door < w - 1) {
+    put(x, K, 'lampe', (door - 1) * T + Math.round(T * 0.3), (H - 1) * T - Math.round(T * 0.35));
+    put(x, K, 'lampe', (door + 1) * T - Math.round(T * 0.3), (H - 1) * T - Math.round(T * 0.35));
   }
   return c;
 }
 function kitSide(style, d, H) {
-  const kit = KITS[KIT_OF[style]]; if (!kit) return null;
-  const T = kitT(kit), c = canvas(d * T, H * T), x = c.getContext('2d');
-  for (let j = 0; j < H; j++) for (let i = 0; i < d; i++) kitTile(x, kit, 'side', i * T, j * T);
+  const K = kitOf(style); if (!K) return null;
+  const T = K.T, c = canvas(d * T, H * T), x = c.getContext('2d');
+  for (let j = 0; j < H; j++) for (let i = 0; i < d; i++) put(x, K, 'cote', i * T, j * T) || put(x, K, 'mur', i * T, j * T);
   return c;
 }
-function kitRoof(style, color, w, d) {
-  const kit = KITS[KIT_OF[style]]; if (!kit) return null;
-  const T = kitT(kit), c = canvas(w * T, d * T), x = c.getContext('2d');
-  for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) kitTile(x, kit, j === d - 1 ? 'eave' : 'roof', i * T, j * T);
-  // les toits des maisons sont gris : on les teinte de la couleur voulue
-  if (KIT_OF[style] === 'maison' && ROOFS[color]) {
-    x.globalCompositeOperation = 'multiply'; x.fillStyle = ROOFS[color][0]; x.fillRect(0, 0, c.width, c.height);
-    x.globalCompositeOperation = 'lighter'; x.fillStyle = 'rgba(40,30,30,1)'; x.fillRect(0, 0, c.width, c.height);
-    x.globalCompositeOperation = 'source-over';
+/** couleur moyenne d'une cellule (pignons, liserés) */
+const avgCache = new Map();
+export function kitColor(style, role = 'mur', k = 0) {
+  const K = kitOf(style); if (!K) return null;
+  const key = K.name + role + k; if (avgCache.has(key)) return avgCache.get(key);
+  const c = canvas(K.T, K.T), x = c.getContext('2d'); put(x, K, role, 0, 0);
+  const d = x.getImageData(0, 0, K.T, K.T).data; let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+  const col = n ? '#' + [r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('') : null;
+  const out = col && k ? shade(col, k) : col; avgCache.set(key, out); return out;
+}
+/** toit composé : moitié haute = pan arrière, moitié basse = pan avant (faîte en haut, rebord en bas), rows rangées par pan */
+function kitRoof(style, color, w, rows) {
+  const K = kitOf(style); if (!K) return null;
+  const T = K.T, c = canvas(w * T, 2 * rows * T), x = c.getContext('2d');
+  const house = HOUSE_STYLES.has(style);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < w; i++) {
+    // pan arrière (vu en fuite) : toit simple
+    put(x, K, 'toit', i * T, j * T);
+    // pan avant
+    const Y = (rows + j) * T;
+    const role = j === rows - 1 ? 'rebord' : j === 0 && rows > 1 ? 'faite' : 'toit';
+    put(x, K, role, i * T, Y) || put(x, K, 'toit', i * T, Y);
   }
+  // cheminée des maisons, sur le pan avant
+  if (house && has(K, 'cheminee') && rows >= 3 && w >= 4) put(x, K, 'cheminee', (w - 2) * T, (rows + 1) * T - (T >> 2));
+  // les toits gris du kit « maison » prennent la couleur voulue en gardant leurs nuances
+  if (K.name === 'maison' && ROOFS[color]) recolor(x, c.width, c.height, ROOFS[color]);
   return c;
+}
+/** teinte un dessin gris : la luminosité de chaque pixel choisit sa place dans une rampe de 4 nuances de la couleur */
+function recolor(x, W, H, [base, dark, light]) {
+  const stops = [hex(dark).map((v) => v * 0.55), hex(dark), hex(base), hex(light)];
+  const img = x.getImageData(0, 0, W, H), d = img.data;
+  let lo = 255, hi = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; lo = Math.min(lo, l); hi = Math.max(hi, l); }
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    // pixels colorés (bois, brique de la cheminée) : gardés
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 28) continue;
+    const t = Math.max(0, Math.min(1, ((0.3 * r + 0.59 * g + 0.11 * b) - lo) / Math.max(1, hi - lo))) * 3;
+    const k = Math.min(2, Math.floor(t)), f = t - k;
+    for (let q = 0; q < 3; q++) d[i + q] = Math.round(stops[k][q] * (1 - f) + stops[k + 1][q] * f);
+  }
+  x.putImageData(img, 0, 0);
 }
 /** tuile de sol dessinée (intérieurs), ou null */
 export const solTile = (k) => SOLS[k] || null;
@@ -571,8 +658,8 @@ export function sideWall(style, d, H, seed = 2) {
   if (d >= 3 && H >= 2 && style.startsWith('house')) windowAt(P, ((d * 16) >> 1) - 4, 7, 8, 7, false);
   return P.c;
 }
-export function roofTex(color, w, d, seed = 3, style = null) {
-  const kitted = style && kitRoof(style, color, w, d); if (kitted) return kitted;
+export function roofTex(color, w, d, seed = 3, style = null, rows = null) {
+  const kitted = style && kitRoof(style, color, w, rows || Math.max(1, Math.round(d / 2))); if (kitted) return kitted;
   const [b, dk, l] = ROOFS[color] || ROOFS.red; const P = new Pix(w * 16, d * 16, seed);
   P.fill(b);
   for (let y = 0; y < d * 16; y += 4) { P.rect(0, y, w * 16, 1, dk); for (let x = (y / 4) % 2 ? 0 : 4; x < w * 16; x += 8) P.rect(x, y, 1, 4, dk); P.rect(0, y + 1, w * 16, 1, l); }

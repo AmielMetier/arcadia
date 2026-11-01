@@ -6,9 +6,9 @@ const key = (x, y) => x + ',' + y;
 
 export const BUILDINGS = {
   house: { w: 4, d: 3, h: 2, door: 1 }, house2: { w: 5, d: 3, h: 2, door: 2 }, bighouse: { w: 6, d: 4, h: 3, door: 2 },
-  center: { w: 5, d: 4, h: 2, door: 2, style: 'center', roof: 'red' }, mart: { w: 4, d: 4, h: 2, door: 1, style: 'mart', roof: 'blue' },
-  gym: { w: 7, d: 5, h: 2, door: 3, style: 'gym', roof: 'gray' }, lab: { w: 6, d: 4, h: 2, door: 2, style: 'lab', roof: 'teal' },
-  league: { w: 9, d: 6, h: 3, door: 4, style: 'league', roof: 'purple' }, cave: { w: 5, d: 3, h: 2, door: 2, style: 'cave', roof: 'cave' },
+  center: { w: 5, d: 4, h: 3, door: 2, style: 'center', roof: 'red' }, mart: { w: 4, d: 4, h: 3, door: 1, style: 'mart', roof: 'blue' },
+  gym: { w: 7, d: 5, h: 3, door: 3, style: 'gym', roof: 'gray' }, lab: { w: 6, d: 4, h: 3, door: 2, style: 'lab', roof: 'teal' },
+  league: { w: 9, d: 6, h: 4, door: 4, style: 'league', roof: 'purple' }, cave: { w: 5, d: 3, h: 2, door: 2, style: 'cave', roof: 'cave' },
   tower: { w: 4, d: 4, h: 3, door: 1, style: 'tower', roof: 'brown' }, gate: { w: 6, d: 3, h: 2, door: 2, style: 'house2', roof: 'gray' },
 };
 
@@ -50,7 +50,7 @@ export class GameMap {
   /** pose un bâtiment ; renvoie la position de la porte */
   building(kind, x, y, o = {}) {
     const B = { ...BUILDINGS[kind] }; for (const [k, v] of Object.entries(o)) if (v !== undefined) B[k] = v;
-    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label, name: o.name };
+    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label, name: o.name, kit: o.kit };
     for (let j = 0; j < B.d; j++) for (let i = 0; i < B.w; i++) this.set(x + i, y + j, T.BUILD);
     const dx = x + B.door, dy = y + B.d - 1;
     if (B.door >= 0) this.set(dx, dy, T.DOOR);

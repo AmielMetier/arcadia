@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier graphique — Odyssée</title>
+<style>
+  :root { --bg: #f4f1ea; --panel: #fffdf8; --ink: #23201c; --mute: #6f685d; --line: #ddd5c6; --ok: #2f8a4c; --ko: #c0392b; --warn: #b9770e; --accent: #3a6ea5; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17181b; --panel: #202226; --ink: #ece8e1; --mute: #9b968d; --line: #33363c; --ok: #5cc27e; --ko: #ef6b5b; --warn: #e2a94a; --accent: #7fb0e6; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  header nav { display: flex; gap: 12px; flex-wrap: wrap; }
+  header a, header label { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header .sum { margin-left: auto; color: var(--mute); font-size: 13px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  section { margin: 0 0 28px; }
+  h2 { font-size: 15px; margin: 0 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px; display: flex; gap: 10px; align-items: baseline; }
+  h2 small { color: var(--mute); font-weight: 400; }
+  .rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 20px; }
+  .rules div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .rules b { display: block; font-size: 12px; color: var(--mute); font-weight: 600; }
+  .pal { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
+  .pal i { width: 16px; height: 16px; border-radius: 2px; display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .grid.large { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .card.bad { border-color: var(--ko); }
+  .card .name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .meta { color: var(--mute); font-size: 12px; }
+  .card ul { margin: 0; padding-left: 16px; color: var(--ko); font-size: 12px; }
+  .stage { background-color: #7cc36a; background-image: linear-gradient(rgba(0,0,0,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.14) 1px, transparent 1px); background-size: 32px 32px; border-radius: 4px; overflow: auto; display: flex; align-items: flex-end; justify-content: center; padding: 8px 0 0; min-height: 80px; }
+  .stage.plain { background-color: #444; }
+  canvas, .stage img { image-rendering: pixelated; display: block; }
+  .stage .foot { position: relative; }
+  .stage .foot::after { content: ""; position: absolute; left: var(--fx, 0); bottom: 0; width: var(--fw, 32px); height: 32px; outline: 2px dashed rgba(255,255,255,.9); outline-offset: -2px; pointer-events: none; }
+  .ok { color: var(--ok); } .ko { color: var(--ko); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .lbl { font-size: 11px; color: var(--mute); }
+  .kit { position: relative; display: inline-block; }
+  .kit span { position: absolute; font-size: 9px; color: #fff; background: rgba(0,0,0,.55); padding: 0 2px; border-radius: 2px; pointer-events: none; }
+  .hide-ok .card:not(.bad) { display: none; }
+  p.note { color: var(--mute); margin: 0 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Atelier graphique</h1>
+  <nav>
+    <a href="#regles">Règles</a><a href="#batiments">Bâtiments</a><a href="#images">Images</a>
+    <a href="./?vitrine" target="_blank">Vitrine en jeu ↗</a>
+    <label><input type="checkbox" id="only-bad"> seulement ce qui est à revoir</label>
+  </nav>
+  <div class="sum" id="sum"></div>
+</header>
+<main>
+  <section id="regles"><h2>Règles <small>docs/ODYSSEE-GRAPHISME.md · odyssee/js/data/regles.js</small></h2><div class="rules" id="rules"></div></section>
+  <section id="batiments"><h2>Bâtiments <small>assemblés par le jeu à partir des kits, à l'échelle de l'écran (une case = 32 px)</small></h2>
+    <p class="note">Chaque bâtiment : façade de jour, façade de nuit, pan avant du toit. Dessous, le kit avec le rôle de chaque cellule.</p>
+    <div class="grid large" id="builds"></div></section>
+  <section id="images"><h2>Images <small>à l'échelle du jeu sur la grille des cases · contrôles du rapport (python3 tools/odyssee-atelier.py rapport) et de la page</small></h2><div id="fams"></div></section>
+</main>
+<script type="module" src="./js/atelier/atelier.js"></script>
+</body>
+</html>

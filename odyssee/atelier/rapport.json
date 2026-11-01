@@ -1,0 +1,2062 @@
+{
+ "sol": {
+  "ash0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 443,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ash1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 420,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bridgeEW": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 696,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bridgeEW2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 661,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bridgeNS": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 636,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bridgeNS2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 629,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "carpet": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 232,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "carpet2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 255,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "carpetL": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 483,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "carpetR": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 491,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cave0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 502,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cave1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 526,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cavepuddle": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 500,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffG": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 905,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffG2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 906,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffG3": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 884,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffGstairs": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 928,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffR": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 762,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffR2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 785,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffR3": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 800,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffRstairs": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 819,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffS": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 901,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffS2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 930,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffS3": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 897,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cliffSstairs": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 904,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "crackrock": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 674,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "crystal": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 623,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "deep0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 634,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "deep1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 631,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "dock0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 503,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "dock1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 466,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "dockEnd0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 661,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "dockEnd1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 640,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "field": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 750,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_beige": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 408,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_blue": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 476,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_blue2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 528,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_dark": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 486,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_dark2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 408,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_glyph": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 650,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_glyph2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 656,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_grate": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 762,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_grate2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 778,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_hazard": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 891,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_marble": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 382,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_marble2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 439,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_metal": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 266,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_metal2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 368,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_pink": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 390,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_pink2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 357,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_round": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 669,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_sand": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 308,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_stone": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 384,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_white": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 215,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_wood": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 765,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "floor_wood2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 670,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "flowerR": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 721,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "flowerW": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 612,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "forest0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 611,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "forest1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 665,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "grass0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 505,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "grass1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 576,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "grass2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 556,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "gravel0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 366,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "gravel1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 366,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "hole": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 625,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ice": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 659,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ladder": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 723,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "lava0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 979,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "lava1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 976,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "leaves0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 791,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "leaves1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 854,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ledge": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 665,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ledgeE": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 630,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ledgeW": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 636,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "path0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 389,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "path1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 477,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "pave0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 640,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "pave1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 643,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "sand0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 311,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "sand1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 418,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snow0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 219,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snow1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 335,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snow2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 383,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snow3": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 388,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "stairs": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 979,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "stairs2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 954,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tatami": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 621,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "water0": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 639,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "water1": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 654,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "water2": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 643,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "water3": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 642,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "waterrock": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 750,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "whirl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 807,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  }
+ },
+ "herbes": {
+  "bois_a": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 732,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "bois_b": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 616,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_bl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 440,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "bois_bot": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 720,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_br": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 437,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "bois_c": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 612,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "bois_front": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 302,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_front2": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 342,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_in_ne": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 565,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_in_nw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 573,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_in_se": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 589,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_in_sw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 595,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "bois_l": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 437,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "bois_r": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 460,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "bois_t": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 448,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "bois_tl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 313,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bois_tr": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 337,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_a": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 816,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "neige_b": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 809,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_bl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 528,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "neige_bot": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 835,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_br": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 543,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "neige_c": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 808,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_front": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 318,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_front2": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 377,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_in_ne": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 773,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "neige_in_nw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 770,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_in_se": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 805,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_in_sw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 793,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_l": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 540,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_r": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 546,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "neige_t": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 562,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "neige_tl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 333,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "neige_tr": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 388,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_a": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 794,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "prairie_b": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 830,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_bl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 549,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_bot": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 792,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_br": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 537,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_c": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 814,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_front": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 316,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_front2": {
+   "problemes": [],
+   "w": 32,
+   "h": 18,
+   "couleurs": 383,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_in_ne": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 776,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_in_nw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 757,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_in_se": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 818,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_in_sw": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 834,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_l": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 554,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_r": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 560,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "prairie_t": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 564,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_tl": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 365,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "prairie_tr": {
+   "problemes": [],
+   "w": 32,
+   "h": 32,
+   "couleurs": 401,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  }
+ },
+ "nature": {
+  "bang": {
+   "problemes": [],
+   "w": 14,
+   "h": 16,
+   "couleurs": 66,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.12
+  },
+  "bush": {
+   "problemes": [],
+   "w": 27,
+   "h": 24,
+   "couleurs": 459,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "caverock": {
+   "problemes": [],
+   "w": 32,
+   "h": 29,
+   "couleurs": 519,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "crackrock": {
+   "problemes": [],
+   "w": 32,
+   "h": 28,
+   "couleurs": 453,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cuttree": {
+   "problemes": [],
+   "w": 15,
+   "h": 32,
+   "couleurs": 149,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "darkfront": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "darkfront2": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "darktuft": {
+   "problemes": [],
+   "w": 32,
+   "h": 40,
+   "couleurs": 794,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "darktuft0": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 578,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "darktuft1": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 713,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "darktuft2": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 658,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "darktuft3": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 709,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "deadtree": {
+   "problemes": [],
+   "w": 39,
+   "h": 57,
+   "couleurs": 733,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "fence": {
+   "problemes": [],
+   "w": 32,
+   "h": 31,
+   "couleurs": 265,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "flowers_r": {
+   "problemes": [],
+   "w": 27,
+   "h": 26,
+   "couleurs": 377,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "flowers_w": {
+   "problemes": [],
+   "w": 27,
+   "h": 26,
+   "couleurs": 365,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "flowers_y": {
+   "problemes": [],
+   "w": 27,
+   "h": 26,
+   "couleurs": 366,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "grassfront": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "grassfront2": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "gymstatue": {
+   "problemes": [],
+   "w": 26,
+   "h": 55,
+   "couleurs": 962,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "itemball": {
+   "problemes": [],
+   "w": 15,
+   "h": 15,
+   "couleurs": 146,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "lamp": {
+   "problemes": [],
+   "w": 14,
+   "h": 48,
+   "couleurs": 264,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "mailbox": {
+   "problemes": [],
+   "w": 23,
+   "h": 35,
+   "couleurs": 398,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "palm": {
+   "problemes": [],
+   "w": 49,
+   "h": 56,
+   "couleurs": 1124,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "pine": {
+   "problemes": [],
+   "w": 43,
+   "h": 60,
+   "couleurs": 1289,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "pot": {
+   "problemes": [],
+   "w": 18,
+   "h": 32,
+   "couleurs": 276,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "rock": {
+   "problemes": [],
+   "w": 30,
+   "h": 28,
+   "couleurs": 519,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "sign": {
+   "problemes": [],
+   "w": 26,
+   "h": 36,
+   "couleurs": 470,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snowfront": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "snowfront2": {
+   "problemes": [
+    "pixels doublés (dessin agrandi : densité deux fois trop faible)"
+   ],
+   "w": 32,
+   "h": 28,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 1.0
+  },
+  "snowpine": {
+   "problemes": [],
+   "w": 43,
+   "h": 61,
+   "couleurs": 1294,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snowtuft": {
+   "problemes": [],
+   "w": 32,
+   "h": 40,
+   "couleurs": 1000,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snowtuft0": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 807,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snowtuft1": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 765,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "snowtuft2": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 770,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "stalag": {
+   "problemes": [],
+   "w": 26,
+   "h": 44,
+   "couleurs": 587,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "statue": {
+   "problemes": [],
+   "w": 26,
+   "h": 55,
+   "couleurs": 932,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tree": {
+   "problemes": [],
+   "w": 47,
+   "h": 48,
+   "couleurs": 1393,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tree2": {
+   "problemes": [],
+   "w": 47,
+   "h": 48,
+   "couleurs": 1163,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tree3": {
+   "problemes": [],
+   "w": 47,
+   "h": 48,
+   "couleurs": 1476,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tuft": {
+   "problemes": [],
+   "w": 32,
+   "h": 40,
+   "couleurs": 1049,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tuft0": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 668,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tuft1": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 784,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tuft2": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 810,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tuft3": {
+   "problemes": [],
+   "w": 36,
+   "h": 40,
+   "couleurs": 780,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  }
+ },
+ "facades": {
+  "arene": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.22
+  },
+  "base": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.18
+  },
+  "boutique": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.11
+  },
+  "centre": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.21
+  },
+  "chalet": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "grotte": {
+   "problemes": [
+    "2055 couleurs (48 au plus)"
+   ],
+   "w": 64,
+   "h": 64,
+   "couleurs": 2055,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "labo": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.14
+  },
+  "ligue": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.05
+  },
+  "maison": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.05
+  },
+  "mirage": {
+   "problemes": [
+    "mur ou toit qui ne se raccordent pas (gauche/droite)"
+   ],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.07
+  },
+  "musee": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "pagode": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "pecheur": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "phare": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.15
+  },
+  "port": {
+   "problemes": [],
+   "w": 64,
+   "h": 64,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.06
+  }
+ },
+ "deco": {
+  "arbre_automne": {
+   "problemes": [],
+   "w": 24,
+   "h": 31,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "banc": {
+   "problemes": [],
+   "w": 24,
+   "h": 17,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bateau": {
+   "problemes": [],
+   "w": 48,
+   "h": 21,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "borne": {
+   "problemes": [],
+   "w": 12,
+   "h": 14,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "bouee": {
+   "problemes": [],
+   "w": 12,
+   "h": 11,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "brasero": {
+   "problemes": [],
+   "w": 14,
+   "h": 30,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "butte": {
+   "problemes": [],
+   "w": 16,
+   "h": 14,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "caisse": {
+   "problemes": [],
+   "w": 14,
+   "h": 18,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "caisses": {
+   "problemes": [],
+   "w": 16,
+   "h": 29,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "cerisier": {
+   "problemes": [],
+   "w": 24,
+   "h": 34,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "cloche": {
+   "problemes": [],
+   "w": 32,
+   "h": 30,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "colonne": {
+   "problemes": [],
+   "w": 12,
+   "h": 41,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "console": {
+   "problemes": [],
+   "w": 32,
+   "h": 28,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.03
+  },
+  "corde": {
+   "problemes": [],
+   "w": 16,
+   "h": 11,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "coussin": {
+   "problemes": [],
+   "w": 16,
+   "h": 14,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cristal": {
+   "problemes": [],
+   "w": 16,
+   "h": 28,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "cuve": {
+   "problemes": [],
+   "w": 16,
+   "h": 37,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "ecran_carte": {
+   "problemes": [],
+   "w": 32,
+   "h": 27,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.08
+  },
+  "erable": {
+   "problemes": [],
+   "w": 24,
+   "h": 32,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "fontaine": {
+   "problemes": [],
+   "w": 40,
+   "h": 32,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "fossile": {
+   "problemes": [],
+   "w": 32,
+   "h": 25,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "gargouille": {
+   "problemes": [],
+   "w": 12,
+   "h": 27,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "lampe_phare": {
+   "problemes": [],
+   "w": 24,
+   "h": 32,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "lanterne": {
+   "problemes": [],
+   "w": 12,
+   "h": 26,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "livres": {
+   "problemes": [],
+   "w": 16,
+   "h": 20,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "machine_labo": {
+   "problemes": [],
+   "w": 32,
+   "h": 34,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "panneau_bois": {
+   "problemes": [],
+   "w": 16,
+   "h": 15,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "parasol": {
+   "problemes": [],
+   "w": 24,
+   "h": 26,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "pilier_ball": {
+   "problemes": [],
+   "w": 12,
+   "h": 33,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "rocher_grand": {
+   "problemes": [],
+   "w": 20,
+   "h": 19,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "sanctuaire": {
+   "problemes": [],
+   "w": 32,
+   "h": 38,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "squelette": {
+   "problemes": [],
+   "w": 64,
+   "h": 31,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.01
+  },
+  "statue_dragon": {
+   "problemes": [],
+   "w": 20,
+   "h": 39,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "stele": {
+   "problemes": [],
+   "w": 12,
+   "h": 27,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "table_balls": {
+   "problemes": [],
+   "w": 32,
+   "h": 19,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.08
+  },
+  "telescope": {
+   "problemes": [],
+   "w": 16,
+   "h": 26,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "tonneau": {
+   "problemes": [],
+   "w": 12,
+   "h": 16,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.0
+  },
+  "torii": {
+   "problemes": [],
+   "w": 48,
+   "h": 38,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.02
+  },
+  "trone": {
+   "problemes": [],
+   "w": 32,
+   "h": 39,
+   "couleurs": 48,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.09
+  }
+ },
+ "hgss": {
+  "fleur_b": {
+   "problemes": [],
+   "w": 64,
+   "h": 16,
+   "couleurs": 3,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "fleur_o": {
+   "problemes": [],
+   "w": 48,
+   "h": 16,
+   "couleurs": 6,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.22
+  },
+  "fleur_p": {
+   "problemes": [],
+   "w": 64,
+   "h": 16,
+   "couleurs": 3,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "fleur_r": {
+   "problemes": [],
+   "w": 64,
+   "h": 16,
+   "couleurs": 3,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "fleur_w": {
+   "problemes": [],
+   "w": 48,
+   "h": 16,
+   "couleurs": 6,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.22
+  },
+  "fleur_y": {
+   "problemes": [],
+   "w": 64,
+   "h": 16,
+   "couleurs": 3,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.04
+  },
+  "mer": {
+   "problemes": [],
+   "w": 128,
+   "h": 16,
+   "couleurs": 7,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.49
+  },
+  "rivage": {
+   "problemes": [],
+   "w": 256,
+   "h": 32,
+   "couleurs": 14,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.56
+  },
+  "rocher_mer": {
+   "problemes": [],
+   "w": 192,
+   "h": 32,
+   "couleurs": 11,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.34
+  },
+  "vague": {
+   "problemes": [],
+   "w": 64,
+   "h": 16,
+   "couleurs": 8,
+   "hors_palette": 0.0,
+   "blocs_2x2": 0.5
+  }
+ }
+}

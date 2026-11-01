@@ -97,6 +97,17 @@ async function boot() {
   // outil de test : démarrer directement une partie depuis la console
   window.__ody.play = async (state) => { document.querySelector('.title-scr')?.remove(); input.handlers.length = 0; ui.closeDialog(); mode = 'game'; await game.start(state); };
 
+  // atelier graphique : ?vitrine ouvre directement une ville de test avec tous les bâtiments et objets
+  if (new URLSearchParams(location.search).has('vitrine')) {
+    const { buildVitrine } = await import('./atelier/vitrine.js');
+    const m = buildVitrine(); world.maps[m.id] = m;
+    const st = game.newState('Atelier', 'm');
+    Object.assign(st.flags, { intro: true, metProf: true, starter: 155, rival1: true, dex: true, rivalSp: 155 });
+    st.party = [createMon(155, 5)]; st.map = m.id; st.x = 9; st.y = 6; st.dir = 'up'; st.repel = 99999;
+    await window.__ody.play(st);
+    return;
+  }
+
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');

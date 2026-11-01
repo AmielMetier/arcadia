@@ -2,10 +2,10 @@
 // arbres / herbes / personnages en sprites verticaux, caméra inclinée en perspective étroite, rendu basse résolution.
 import * as THREE from 'three';
 import { T } from '../world/tiles.js';
-import { buildAtlas, buildAnimAtlas, buildSprites, applySpriteImages, facade, sideWall, roofTex, roofColors, PAL } from './textures.js';
+import { buildAtlas, buildAnimAtlas, buildSprites, applySpriteImages, facade, sideWall, roofTex, roofColors, kitColor, PAL } from './textures.js';
 import { SPRITES } from '../data/sprites.js';
 
-export const EL = 55 * Math.PI / 180, FOV = 22;
+export const EL = 55 * Math.PI / 180, FOV = 13;
 
 // Une tuile fait 16 × 16 pixels à l'écran (la projection est resserrée en largeur pour que les tuiles soient carrées,
 // comme sur DS) ; un pixel de sprite vaut un pixel d'écran : WPX en largeur, HPX en hauteur (unités du monde).
@@ -140,6 +140,7 @@ function herbePiece(m, x, y, tt, v) {
  *  la ville (chalets sur la neige, maisons de pêcheurs dans les ports) */
 const PORTS = new Set(['azur', 'granit', 'orage']);
 function kitStyle(b, map) {
+  if (b.kit) return b.kit;
   if (['center', 'mart', 'gym', 'lab', 'league'].includes(b.style)) return b.style;
   const name = b.label || b.name || '';
   if (/Musée/.test(name)) return 'musee';
@@ -371,32 +372,46 @@ export class WorldView {
       const fkey = `${ks}:${b.w}:${b.h}:${b.door}`;
       const fr = T3('f' + fkey, () => facade(ks, b.w, b.h, b.door, false, b.x * 7 + b.y));
       const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
-      const rf = T3(`r${ks}:${b.roof}:${b.w}:${b.d}`, () => roofTex(b.roof, b.w + 1, b.d + 1, 3, ks));
+      // toit à deux pans, assez pentu pour qu'on voie surtout le pan avant (comme sur DS) ; toit plat pour les
+      // centres, boutiques, arènes et la Ligue
+      const flatRoof = b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
+      const rh = flatRoof ? 0.35 : Math.min(2.2, 0.55 * b.d);
+      // rangées de cellules d'un pan : sa hauteur à l'écran, en cases
+      const rows = Math.max(1, Math.round(b.d / 2 + o + rh * 0.7));
+      const rf = T3(`r${ks}:${b.roof}:${b.w}:${rows}`, () => roofTex(b.roof, b.w, b.d + 1, 3, ks, rows));
       const mFront = own(fr), mSide = own(sd), mRoof = own(rf);
       const x0 = b.x, x1 = b.x + b.w, z0 = b.y, z1 = b.y + b.d;
       // façade
       const geoF = new Geo(); geoF.quad([x0, 0, z1], [x1, 0, z1], [x1, wallH, z1], [x0, wallH, z1], 0, 0, 1, 1, 1);
       g.add(new THREE.Mesh(geoF.build(), mFront));
+      // le toit déborde de o devant la façade : il est posé assez haut pour que son bord tombe pile sur le haut de la
+      // façade à l'écran (sinon il cache le haut des fenêtres de l'étage)
+      const eY = wallH + o * Math.tan(EL);
       const geoS = new Geo();
-      geoS.quad([x1, 0, z1], [x1, 0, z0], [x1, wallH, z0], [x1, wallH, z1], 0, 0, 1, 1, 0.8);
-      geoS.quad([x0, 0, z0], [x0, 0, z1], [x0, wallH, z1], [x0, wallH, z0], 0, 0, 1, 1, 0.8);
+      geoS.quad([x1, 0, z1], [x1, 0, z0], [x1, eY, z0], [x1, eY, z1], 0, 0, 1, 1, 0.8);
+      geoS.quad([x0, 0, z0], [x0, 0, z1], [x0, eY, z1], [x0, eY, z0], 0, 0, 1, 1, 0.8);
       g.add(new THREE.Mesh(geoS.build(), mSide));
-      // toit à deux pans
-      const flatRoof = b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
-      const rh = flatRoof ? 0.35 : Math.min(0.9, 0.22 * b.d + 0.2);
-      const zm = (z0 + z1) / 2, ytop = wallH + rh;
+      const zm = (z0 + z1) / 2, ytop = eY + rh;
       const geoR = new Geo();
-      geoR.quad([x0 - o, wallH - 0.05, z1 + o], [x1 + o, wallH - 0.05, z1 + o], [x1 + o, ytop, zm], [x0 - o, ytop, zm], 0, 0.5, 1, 1, 1);
-      geoR.quad([x1 + o, wallH - 0.05, z0 - o], [x0 - o, wallH - 0.05, z0 - o], [x0 - o, ytop, zm], [x1 + o, ytop, zm], 0, 0, 1, 0.5, 0.7);
+      geoR.quad([x0 - o, eY, z1 + o], [x1 + o, eY, z1 + o], [x1 + o, ytop, zm], [x0 - o, ytop, zm], 0, 0.5, 1, 1, 1);
+      geoR.quad([x1 + o, eY, z0 - o], [x0 - o, eY, z0 - o], [x0 - o, ytop, zm], [x1 + o, ytop, zm], 0, 0, 1, 0.5, 0.7);
       g.add(new THREE.Mesh(geoR.build(), mRoof));
-      // pignons
+      // pignons et liseré : couleur du mur et du rebord du kit (la couleur du toit pour les maisons recolorées)
       const rc = roofColors[b.roof] || roofColors.red;
-      const gableMat = frontDepth(new THREE.MeshBasicMaterial({ color: new THREE.Color(rc[1]) }), zf); this.tinted.push(gableMat); gableMat.userData.ownTint = true; gableMat.userData.base = new THREE.Color(rc[1]);
+      const kitted = !!kitColor(ks);
+      const gableCol = (kitted && kitColor(ks, 'mur', -0.12)) || rc[1];
+      const eaveCol = ks === 'house' || ks === 'house2' || ks === 'bighouse' || ks === 'tower' || ks === 'gate' || !kitted ? rc[1] : kitColor(ks, 'rebord', -0.35) || rc[1];
+      const mkCol = (col) => { const m = frontDepth(new THREE.MeshBasicMaterial({ color: new THREE.Color(col) }), zf); this.tinted.push(m); m.userData.ownTint = true; m.userData.base = new THREE.Color(col); return m; };
+      const gableMat = mkCol(gableCol), eaveMat = mkCol(eaveCol);
       const gg = new THREE.BufferGeometry();
-      gg.setAttribute('position', new THREE.Float32BufferAttribute([x1 + o, wallH - 0.05, z1 + o, x1 + o, wallH - 0.05, z0 - o, x1 + o, ytop, zm, x0 - o, wallH - 0.05, z0 - o, x0 - o, wallH - 0.05, z1 + o, x0 - o, ytop, zm], 3));
+      gg.setAttribute('position', new THREE.Float32BufferAttribute([x1 + o, eY, z1 + o, x1 + o, eY, z0 - o, x1 + o, ytop, zm, x0 - o, eY, z0 - o, x0 - o, eY, z1 + o, x0 - o, ytop, zm], 3));
       g.add(new THREE.Mesh(gg, gableMat));
+      // bande de mur sous le débord du toit (cachée par le rebord, sauf de très près)
+      const band = new THREE.BufferGeometry();
+      band.setAttribute('position', new THREE.Float32BufferAttribute([x0, wallH, z1, x1, wallH, z1, x1, eY, z1, x0, wallH, z1, x1, eY, z1, x0, eY, z1], 3));
+      g.add(new THREE.Mesh(band, gableMat));
       // liseré sous le toit
-      const eave = new THREE.Mesh(new THREE.BoxGeometry(b.w + 2 * o, 0.12, 0.12), gableMat); eave.position.set((x0 + x1) / 2, wallH - 0.06, z1 + o); g.add(eave);
+      const eave = new THREE.Mesh(new THREE.BoxGeometry(b.w + 2 * o, 0.1, 0.1), eaveMat); eave.position.set((x0 + x1) / 2, eY - 0.05, z1 + o); g.add(eave);
       // ombre portée au sol devant le bâtiment
       const sh = new Geo(); const S = this.S.rects.shadow;
       flat(sh, x0 - 0.1, z1 - 0.2, x1 + 0.1, z1 + 0.45, 0.012, [S.u0, S.v0 + (S.v1 - S.v0) * 0.4, S.u1, S.v1]);
@@ -425,7 +440,7 @@ export class WorldView {
       }
       const wallH = b.h * Math.tan(EL);
       const geo = new Geo(); geo.quad([b.x, 0, b.y + b.d + 0.01], [b.x + b.w, 0, b.y + b.d + 0.01], [b.x + b.w, wallH, b.y + b.d + 0.01], [b.x, wallH, b.y + b.d + 0.01], 0, 0, 1, 1, 1);
-      this.nightGroup.add(new THREE.Mesh(geo.build(), cache.get(key)));
+      const wm = new THREE.Mesh(geo.build(), cache.get(key).clone()); g.userData.win = wm; this.nightGroup.add(wm);
     }
     this.nightGroup.visible = false;
   }
@@ -526,6 +541,24 @@ export class WorldView {
     if (this.glows) this.glows.visible = !indoorOrCave && this.night > 0.5;
   }
 
+  /** un bâtiment qui cache le joueur (marchant derrière lui) devient transparent, comme une vitre */
+  fadeBuildings(fx, fy, dt) {
+    for (const g of this.buildingMeshes || []) {
+      const b = g.userData.b; if (!b) continue;
+      // derrière le bâtiment, son toit et ses murs cachent environ h + 0,4 cases au nord de son emprise
+      const hid = fx > b.x - 1 && fx < b.x + b.w && fy < b.y - 0.5 && fy > b.y - b.h - 1.2;
+      const t = hid ? 0.45 : 1;
+      const o = g.userData.opacity ?? 1;
+      if (o === t) continue;
+      const n = o + Math.sign(t - o) * Math.min(Math.abs(t - o), dt * 4);
+      g.userData.opacity = n;
+      const mats = [];
+      g.traverse((m) => { if (m.material && m.material !== this.mat.shadow) mats.push(m.material); });
+      if (g.userData.win) mats.push(g.userData.win.material);
+      for (const m of mats) { m.transparent = n < 1; m.opacity = n; m.depthWrite = n >= 1; m.needsUpdate = true; }
+    }
+  }
+
   /* ---------------- image ---------------- */
   update(dt, fx, fy) {
     this.ensureChunks(fx, fy);
@@ -535,6 +568,7 @@ export class WorldView {
       const ctx = this.N.canvas.getContext('2d'); ctx.clearRect(0, 0, this.N.canvas.width, this.N.canvas.height); ctx.drawImage(this.N.frames[this.animFrame], 0, 0); this.texN.needsUpdate = true;
     }
     this.focus.set(fx + 0.5, 0, fy + 0.5);
+    this.fadeBuildings(fx, fy, dt);
     const d = this.dist;
     this.camera.position.set(this.focus.x, d * Math.sin(EL), this.focus.z + d * Math.cos(EL));
     if (this.shake > 0) { this.camera.position.x += (Math.random() - 0.5) * this.shake; this.camera.position.y += (Math.random() - 0.5) * this.shake; this.shake *= 0.85; if (this.shake < 0.01) this.shake = 0; }
