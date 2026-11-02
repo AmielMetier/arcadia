@@ -9,6 +9,7 @@ import { MOVES } from './data/moves.js';
 import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
+import { Hud } from './ui/hud.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, TYPE_FR } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
@@ -36,6 +37,7 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
     input.onFree = (k) => this.onKey(k);
@@ -73,6 +75,7 @@ export class Game {
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0, surf: !!state.surf };
     this.setMap(state.map);
     this.view.setTimeOfDay(this.hour());
+    this.hud?.update(true);
     this.link?.hello();
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
@@ -103,6 +106,7 @@ export class Game {
     for (const g of m.gates) if (this.gateClosed(g)) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
     this.spawnLegends();
     this.view.setTimeOfDay(this.hour());
+    this.hud?.update(true);
     this.updateOverlay();
     placeLugia(this);
     this.zone = null; this.updateZone();
@@ -252,6 +256,7 @@ export class Game {
     this.peersTick?.(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
     if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
+    this.hud?.update();
     this.draw(dt);
   }
 
@@ -414,6 +419,7 @@ export class Game {
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'hud') this.hud?.toggle();
   }
   async interact() {
     const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir], st0 = this.state;
