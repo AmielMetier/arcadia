@@ -1,12 +1,12 @@
 // odyssee/js/input.js — clavier : flèches ou ZQSD (WASD en QWERTY), F (ou Espace / Entrée) = interagir / valider,
-// Échap / Retour arrière = annuler, menu ; Maj = courir ; C = carte ; H = aide des touches
+// Échap / Retour arrière = annuler, menu ; Maj = courir ; C = carte ; U = afficher / replier le HUD ; H = aide des touches
 const MAP = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
   KeyF: 'a', Space: 'a', Enter: 'a', NumpadEnter: 'a', KeyE: 'a', KeyK: 'a',
   Escape: 'b', Backspace: 'b', KeyX: 'b', KeyL: 'b',
   ShiftLeft: 'run', ShiftRight: 'run',
-  Tab: 'menu', KeyM: 'menu', KeyC: 'map', KeyH: 'help', F1: 'help',
+  Tab: 'menu', KeyM: 'menu', KeyC: 'map', KeyU: 'hud', KeyH: 'help', F1: 'help',
 };
 export class Input {
   constructor() {
@@ -28,7 +28,7 @@ export class Input {
     addEventListener('blur', () => { this.held.clear(); this.dirOrder = []; });
   }
   /** dernière direction enfoncée encore maintenue */
-  dir() { return this.dirOrder.length ? this.dirOrder[this.dirOrder.length - 1] : null; }
+  dir() { return this.dirOrder.length ? this.dirOrder.length && this.dirOrder[this.dirOrder.length - 1] : null; }
   /** direction tapée depuis la dernière lecture (un appui très bref compte quand même) */
   takeTap() { const t = this.tap; this.tap = null; return t; }
   heldFor(k) { const t = this.held.get(k); return t ? performance.now() - t : 0; }

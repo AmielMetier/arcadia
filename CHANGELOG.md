@@ -8,6 +8,12 @@
   - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
   - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
 
+## 3.55 — 2 novembre 2026
+- **Odyssée** — un HUD en jeu montre en permanence ton équipe, ton argent, tes badges et le lieu où tu te trouves.
+  - À gauche : les six créatures de l'équipe dans leurs capsules (sprite animé, niveau, statut, barres de PV et d'EXP) ; cliquer sur une créature ouvre son résumé, et le bouton `⇅` (ou le clic droit) permet de changer l'ordre de l'équipe à la volée.
+  - En haut à droite : encadré Pokégear avec le lieu actuel, l'argent, les badges d'Arène et quatre raccourcis rapides (`ÉQUIPE`, `SAC`, `CARTE`, `SAUVER`).
+  - Appuie sur `U` (ou sur le bouton `▴`) pour replier ou réafficher le HUD quand tu veux admirer la carte.
+
 ## 3.54 — 2 novembre 2026
 - **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.
   - En parlant à un autre joueur : échanger, combattre, ou voir sa fiche (badges, Pokédex, temps de jeu et équipe).
