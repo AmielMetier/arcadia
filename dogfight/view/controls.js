@@ -65,13 +65,13 @@ export class FlightControls {
     const gp = this.getGamepadInput();
     if (gp) return gp;
 
-    // Commandes clavier (AZERTY ZQSD, QWERTY WASD et Flèches directionnelles)
+    // Commandes clavier (gauche et droite inversées)
     const pitchUp = k.has('KeyS') || k.has('ArrowDown');
     const pitchDown = k.has('KeyZ') || k.has('KeyW') || k.has('ArrowUp');
-    const rollLeft = k.has('KeyQ') || k.has('KeyA') || k.has('ArrowLeft');
-    const rollRight = k.has('KeyD') || k.has('ArrowRight');
-    const yawLeft = k.has('KeyJ');
-    const yawRight = k.has('KeyL');
+    const rollLeft = k.has('KeyD') || k.has('ArrowRight');
+    const rollRight = k.has('KeyQ') || k.has('KeyA') || k.has('ArrowLeft');
+    const yawLeft = k.has('KeyL');
+    const yawRight = k.has('KeyJ');
 
     const boost = k.has('ShiftLeft') || k.has('ShiftRight') || this.touch.boost;
     const brake = k.has('ControlLeft') || k.has('ControlRight') || k.has('KeyC') || k.has('KeyX') || this.touch.brake;
@@ -110,14 +110,14 @@ export class FlightControls {
 
       return {
         mouseAim: true,
-        aimX: lx,
+        aimX: -lx,
         aimY: ly,
         pitchUp: ly > 0.3,
         pitchDown: ly < -0.3,
-        rollLeft: lx < -0.3,
-        rollRight: lx > 0.3,
-        yawLeft: gp.buttons[14]?.pressed,
-        yawRight: gp.buttons[15]?.pressed,
+        rollLeft: lx > 0.3,
+        rollRight: lx < -0.3,
+        yawLeft: gp.buttons[15]?.pressed,
+        yawRight: gp.buttons[14]?.pressed,
         boost,
         brake,
         fire,

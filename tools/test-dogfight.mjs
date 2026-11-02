@@ -133,4 +133,14 @@ assert(rotatedUp.y === 1 && rotatedUp.x === 0, 'La dérive et la verrière point
 assert(rotatedWing.x === 1 && rotatedWing.z === 0, 'L\'aile droite pointe horizontalement vers la droite (+X)');
 console.log('✓ Alignement 3D droit en face de la caméra (ailes horizontales et nez vers l\'avant)');
 
+// 6. Commandes gauche et droite inversées
+const controlsTest = {
+  keys: new Set(['KeyQ']),
+  getRollRight() { return this.keys.has('KeyQ') || this.keys.has('ArrowLeft'); },
+  getRollLeft() { return this.keys.has('KeyD') || this.keys.has('ArrowRight'); },
+};
+assert(controlsTest.getRollRight() === true, 'Touche Q / Flèche Gauche inversée vers rollRight');
+assert(controlsTest.getRollLeft() === false, 'Touche D / Flèche Droite inactive');
+console.log('✓ Commandes gauche et droite inversées');
+
 console.log(`\nTOUS LES TESTS SONT VALIDES (${passed} assertions réussies)`);

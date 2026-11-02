@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.48 — 2 novembre 2026
+- **Dogfight 3D** — Commandes gauche et droite inversées.
+  - L'axe horizontal de virage et de roulis au clavier et à la manette est inversé.
+
 ## 3.47 — 2 novembre 2026
 - **Dogfight 3D** — Correction de l'écran noir au décollage.
   - Correction d'une erreur d'initialisation de la caméra qui interrompait le rendu lors du clic sur Décoller.
