@@ -31,7 +31,7 @@ async function pipe(bytes, stream) {
 /** Vérifie qu'un objet ressemble à une partie d'Odyssée ; renvoie un message d'erreur ou null. */
 export function checkState(s) {
   if (!s || typeof s !== 'object') return 'Ce code ne contient pas de partie.';
-  if (s.v !== 1) return 'Ce code vient d\'une autre version du jeu.';
+  if (s.v !== 2) return 'Ce code vient d\'une autre version du jeu.';
   if (typeof s.name !== 'string' || !s.name) return 'Ce code ne contient pas de partie.';
   if (!Array.isArray(s.party) || !Array.isArray(s.box) || !Array.isArray(s.badges) || s.badges.length !== 8) return 'Ce code ne contient pas de partie.';
   if (typeof s.map !== 'string' || !Number.isFinite(s.x) || !Number.isFinite(s.y)) return 'Ce code ne contient pas de partie.';

@@ -30,12 +30,12 @@ Filet de sécurité : si un push sur `main` ne touche pas `CHANGELOG.md`, l'acti
 (`tools/changelog-auto.mjs`) et monte la version. Elle est moins bien écrite qu'une entrée faite à la main :
 préférer l'écrire soi-même. Pour qu'elle soit lisible, écrire des messages de commit clairs, par exemple
 `feat(calcul): mode Éclair` ou `fix(david): la caméra qui suit ne se désactive plus`
-(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `hub`, `server`).
+(portées reconnues : `drift`, `david`, `calcul`, `bastion`, `outbreak`, `filrouge`, `kart`, `convoy`, `golf`, `minigolf`, `royale`, `odyssee`, `mollo`, `sitenoir`, `hub`, `server`).
 Ajouter `[skip changelog]` dans le message d'un commit purement technique pour qu'il n'apparaisse pas.
 
 ## Repères
 
-- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`) et tourne dans une iframe du Hub ;
+- Chaque jeu vit dans son dossier (`drift/`, `david/`, `calcul/`, `bastion/`, `outbreak/`, `filrouge/`, `kart/`, `convoy/`, `golf/`, `minigolf/`, `royale/`, `odyssee/`, `mollo/`, `sitenoir/`) et tourne dans une iframe du Hub ;
   le Hub (`index.html`, `hub/`) gère le salon, le classement entre potes et le pont `shared/bridge.js`.
 - Multijoueur : relais WebSocket (`shared/net.js`, serveur dans `server/`). `?local` dans l'adresse simule le réseau
   entre onglets du même navigateur pour tester à plusieurs.
@@ -53,25 +53,52 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   générés depuis PokeAPI dans `pokemon/engine/roster-gen.js` par `node tools/pokemon-roster.mjs` (ne pas modifier ce fichier à la main).
   Format VGC (combat en double) : moteur commun dans `battle.js` (emplacements A et C contre B et D, `resolveActions`, attaques de zone, Abri),
   bots `chooseDoublesAction`, écran `pokemon/view/doubles.js` : `node tools/test-pokemon-vgc.mjs` (le tournoi VGC en réseau est dans `test-pokemon-net.mjs`).
+  Format « 2 joueurs contre 2 » (`format: 'multi'`) : même moteur en double, un emplacement par joueur (`battle.owners`) avec ses propres Pokémon (`battle.pools`), équipes tirées au sort (`match.aIds` / `bIds`).
   Talents (`pokemon/engine/abilities.js` : un talent par Pokémon, le meilleur que le moteur sait jouer ; météo dans `battle.js`) : `node tools/test-pokemon-abilities.mjs`. Le mode aventure Kalos-Sud a été retiré
   (l'aventure Pokémon du Hub, c'est Odyssée).
 - Odyssée (`odyssee/`) : jeu à plusieurs par le Hub (`odyssee/js/net/` : positions, invitations, échanges, combats entre joueurs calculés
   à l'identique des deux côtés avec une graine commune, `odyssee/js/core/pvp.js`) et code de sauvegarde (`odyssee/js/core/savecode.js`) :
   `node tools/test-odyssee-link.mjs`, à lancer quand on touche au moteur de combat d'Odyssée (`odyssee/js/core/battle.js`).
-- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
-  `node tools/fuzz-minigolf.mjs [coups par trou]` tire au hasard sur chaque trou et compte les balles qui traversent un mur ou restent suspendues (doit afficher 0 et 0).
+- Mini-Golf Party, robustesse : `node tools/fuzz-minigolf.mjs [coups par trou]` tire au hasard sur chaque trou et compte les balles qui traversent un mur ou restent suspendues (doit afficher 0 et 0).
   Textures photo : celles de `kart/tex/` (Poly Haven, CC0), chargées par `dressPhoto` dans `minigolf/js/textures.js`.
-- Mollo ! (`mollo/`, moteur sans DOM dans `mollo/engine/`) : pantins physiques à sept points (Verlet et contraintes), muscles qui mollissent sous les coups. `node tools/test-mollo.mjs` teste les arènes, tenir debout, la marche, le saut,
+- Site Noir (`sitenoir/`, moteur sans DOM dans `sitenoir/engine/`) : horreur asymétrique à la première personne, l'hôte fait autorité. `node tools/test-sitenoir.mjs` teste la carte, le déplacement, les clés, les fusibles, le générateur, l'ascenseur, les coups, l'extraction, les copies des invités et le relais d'hôte, et des parties entières entre bots ; `node tools/bench-sitenoir.mjs [parties] [niveau|all] [enquêteurs]` mesure la durée des parties, les victoires et le coût d'un pas. `sitenoir/plan.html` montre une partie de bots vue de dessus. L'image passe par `sitenoir/view/post.js` (grain VHS côté enquêteurs seulement).
+- Mollo ! (`mollo/`, moteur sans DOM dans `mollo/engine/`) : pantins physiques à sept points (Verlet et contraintes), muscles qui mollissent sous les coups. `node tools/test-mollo.mjs` teste les six arènes et leurs pièges, les objets (tirage à chaque manche, poêle, pétard, parapluie, banane), les collisions, tenir debout, la marche, le saut,
+- Mollo ! (`mollo/`, moteur sans DOM dans `mollo/engine/`) : pantins physiques à sept points (Verlet et contraintes), muscles qui mollissent sous les coups. `node tools/test-mollo.mjs` teste les six arènes et leurs pièges, les objets (tirage à chaque manche, poêle, pétard, parapluie, banane), les collisions, le combat (visée, série de poings, garde, saisie, coup de tête), tenir debout, la marche, le saut,
   les coups, le KO, saisir / soulever / jeter, s'accrocher et se hisser, la fatigue des bras, la chute, des parties entières entre bots, l'instantané et la reprise par un nouvel hôte : à lancer quand on touche au moteur. Personnages et décors dessinés dans le code, aucun modèle externe.
-- Odyssée (aventure solo façon DS, `odyssee/`) : `node tools/test-odyssee.mjs` joue 600 combats aléatoires et vérifie que toute la région
-  (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage : à lancer quand on touche
-  au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`). Les données des Pokémon (`odyssee/js/data/`) sont générées par
-  `tools/odyssee-donnees.mjs` à partir des tables de PokeAPI ; les sprites sont chargés depuis PokeAPI (`odyssee/js/assets.js`) : ce sont des remplaçants.
-  Histoire (Team Éclipse, Lugia Obscur, Conseil 4, CS et recoins cachés, quêtes) : posée sur la carte par `odyssee/js/world/story.js`,
-  jouée par `odyssee/js/story.js`. `node tools/test-odyssee-story.mjs` refait toute l'aventure étape par étape (badges, CS, drapeaux)
-  et vérifie qu'on ne peut pas sauter une étape ni se faufiler à côté d'un garde : à lancer quand on touche à la carte ou à l'histoire.
 - Sauvegardes en ligne (`server/saves.js`, client `odyssee/js/net/cloud.js`) : le relais range les parties dans le dépôt GitHub,
   branche `saves`, sous le code ami du compte Hub. Mise en route sur Render : `docs/SAUVEGARDES.md`. Test : `node tools/test-saves.mjs`.
+- Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 72 trous (dont les 18 du Marathon, ~2 min) et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
+- Odyssée (aventure solo façon DS, `odyssee/`) : `node tools/test-odyssee.mjs` joue 600 combats aléatoires et vérifie que toute la région
+  (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage, et que la progression
+  tient (avec k badges et les capacités de terrain qu'ils débloquent, l'arène k+1 est ouverte mais pas la suivante ; Ligue à 8 badges ;
+  depuis chaque quai du bateau, les légendaires de l'île sont accessibles avec les bons badges et leurs quêtes) :
+  à lancer quand on touche au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`). Les données des Pokémon (`odyssee/js/data/`)
+  sont générées par `tools/odyssee-donnees.mjs` à partir des tables de PokeAPI (leurs sprites viennent de PokeAPI : des remplaçants) ;
+  les créatures originales sont dans `odyssee/js/data/creatures.js`. Les dessins d'origine (1024 px) sont dans `assets/graphics/`
+  (portraits : `portrait_nom.png`) ; `python3 tools/odyssee-sprites.py [chars portraits crea items nature mobilier sol facades title]`
+  les découpe et les réduit dans `odyssee/img/` et met à jour `odyssee/js/data/sprites.js`. Les planches « version 2 » (pixel art agrandi ×4
+  ou ×8, personnages en 3 × 4 cases carrées, `nature_arbres.png`, `nature_petits.png`) sont ramenées à leur vraie résolution
+  (grille retrouvée automatiquement, même au pas fractionnaire ; profils des personnages triés gauche / droite). Une case du décor
+  fait 32 pixels à l'écran : tuiles (16 px) agrandies ×2, sprites « version 2 » à densité 2 (personnages en cases de 64 × 64).
+  Le tileset global assemblé à la main (`assets/graphics/tileset.png` : sols, eau, rebords, hautes herbes en 4 × 4 pièces,
+  kits de façade) est découpé par `python3 tools/odyssee-tileset.py [sol herbes kits]` en tuiles de 32 px (`odyssee/img/sol32/`,
+  `odyssee/img/herbes/`, `odyssee/img/facades/`) ; chaque tuile y est repérée par un point de son dessin (tables `SOL`, `HERBES`, `KITS`).
+  Personnages provisoires de HeartGold / SoulSilver : `python3 tools/odyssee-hgss.py [clone pret/pokeheartgold] [clone smogon/sprites]`
+  (images brutes gardées dans `assets/graphics/hgss/`). Les créatures originales sont remplacées par des Pokémon
+  (`odyssee/js/data/remplacants.js`, `ORIGINALES = true` pour les remettre).
+  Histoire principale (la Team Éclipse, Lugia Obscur au Sanctuaire des Marées, l'Éclipse, le Conseil 4 avant Célestine, les CS Flash et Force
+  et leurs recoins cachés, les quêtes annexes) : `odyssee/js/world/story.js` (PNJ et lieux) et `odyssee/js/story.js` (scènes) ;
+  `node tools/test-odyssee-story.mjs` rejoue toute l'aventure dans l'ordre et vérifie que chaque étape est atteignable au bon moment.
+  Histoire secondaire (la Brume) et nouveaux lieux (Lac Miroir, Grotte des Marées, Jardin des Songes, Forêt des Torii et Temple Kagura,
+  Île du Magma) : `odyssee/js/world/quetes.js`. Une quête = des étapes dans `flags['Q:id']`, des PNJ qui apparaissent selon l'étape
+  (`when`), des scripts (`talk`, `use`, `onWin`, `after`) qui reçoivent les outils de `game.api()`. `node tools/test-odyssee-quetes.mjs`
+  joue toutes les quêtes de bout en bout (à lancer quand on touche aux quêtes). Animations de terrain HGSS (mer, rivages, fleurs) :
+  `odyssee/img/hgss/`, extraites par `tools/odyssee-hgss.py`, qui découpe aussi les icônes de la carte de la région (style Pokégear,
+  `assets/graphics/hgss/carte_guide.png` → `odyssee/img/carte/`).
+  Les outils de dessin (atelier graphique, vitrine, sources PixelLab, scripts de découpe des sols, kits, personnages
+  et créatures à 16 px) vivent sur la branche `atelier` du fork ; `main` ne garde que le jeu.
+  Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds
+  (shader `screenSprite` de `odyssee/js/render/world3d.js`), les bâtiments prennent la profondeur de leur façade.
 - Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`
   la montre en 2D. `node tools/test-royale.mjs` vérifie l'île sur plusieurs graines, le déplacement (portes, escaliers, murs, nage),
   une partie (butin, combat, construction), les copies des invités et le relais d'hôte, la prédiction : à lancer quand on touche

@@ -110,7 +110,9 @@ Golf en 3D (Three.js), seul ou jusqu'à 6 joueurs chacun son tour ou en équipes
 ## Mini-Golf Party
 Mini-golf en 3D (Three.js) façon Golf It, au tour par tour, seul ou jusqu'à 6 joueurs (bots facile, normal, expert).
 
-- **9 parcours de 6 trous (54 trous)** : Green Park (classique), Île aux Pirates, Jardin Zen, Forge Infernale, Canyon Express, Station Orbitale (plafonds aimantés, on joue la tête en bas), Marais Brumeux (boue, glu), Sommets Glacés (glace, tremplin, bobsleigh), Fête Foraine (trampolines, flipper) ; partie de 3, 6 ou 18 trous (3 parcours à la suite)
+- **9 parcours de 6 trous** : Green Park (classique), Île aux Pirates, Jardin Zen, Forge Infernale, Canyon Express, Station Orbitale (plafonds aimantés, on joue la tête en bas), Marais Brumeux (boue, glu), Sommets Glacés (glace, tremplin, bobsleigh), Fête Foraine (trampolines, flipper) ; partie de 3, 6 ou 18 trous (3 parcours à la suite)
+- **Le Marathon** (`minigolf/js/courses3.js`) : un parcours de 18 trous géants de 110 à 300 m (par 99), qui enchaînent les épreuves des autres parcours ; partie de 9 (aller ou retour) ou 18 trous. Sur ces très longs trous, les ombres et les lumières suivent la balle et le survol du départ remonte tout le trou
+- 72 trous en tout
 - **Physique maison** : la balle roule sur les vrais triangles du décor (pentes, dévers, loopings, tremplins), vrai trou dans lequel elle peut tomber ou dont elle peut ressortir, obstacles mobiles, sable, accélérateurs, eau et lave
 - **Contrôles** : souris (bouger = caméra, molette = zoom, clic maintenu + reculer = puissance), trackpad ou écran tactile (lance-pierre depuis la balle, un doigt = caméra, deux doigts = zoom) ; mode spectateur sur la balle du joueur qui tire, pseudos au-dessus des balles, carte de score sur le côté
 - Le joueur qui tire simule son coup chez lui et diffuse la trajectoire ; l'hôte tient les tours et les scores
@@ -140,17 +142,29 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
+## Site Noir
+
+Horreur asymétrique à la première personne (`sitenoir/`) : un monstre contre trois ou quatre enquêteurs, environ 15 minutes.
+
+- Enquêteurs : badge bleu (aile A), clé des machines (aile B), trois fusibles, générateur, ascenseur, extraction avec au moins une preuve. Monstre : les éliminer tous avant.
+- Moteur (`sitenoir/engine/`, sans DOM) : carte en grille (`map.js`), règles et réseau (`sim.js`), bots des deux camps (`bots.js`).
+- Réseau (`sitenoir/app.js`) : pas de serveur de jeu, l'hôte simule à 60 Hz via le relais du Hub. Il envoie 20 états de joueurs par seconde et le reste du monde quand il change ; l'invité anticipe son propre pas, se recale sur l'hôte et voit les autres ~100 ms en retard. Si l'hôte part, un invité reprend, et un bot remplace chaque joueur parti. `?debug` expose `__sitenoir.run(2)` ; `?autostart`, `?role=m|s`, `?seed`, `?lag=150`, `?q=bas`.
+- Image (`sitenoir/view/scene.js`, `post.js`, `textures.js`) : matériaux peints au canvas (couleur, relief, brillance), ombres de contact cuites dans les sommets, empreinte de lampe avec ombres, halo, exposition qui s'habitue au noir. Grain VHS et caméra tenue à la main pour les enquêteurs, vision de nuit pour le monstre. La définition baisse d'elle-même si la machine peine.
+- Modèles : Poly Pizza, crédits dans `sitenoir/models/LICENSE.txt`. Sons synthétisés (WebAudio).
+
 ## Mollo !
 
 Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la manche, le premier à N manches gagne la partie.
 
 - Physique (`mollo/engine/sim.js`) : sept points par corps (bassin, poitrine, tête, deux mains, deux pieds), Verlet et contraintes, à 60 Hz.
   Des muscles (ressorts vers une pose) tiennent le corps debout ; ils mollissent quand il encaisse et lâchent tout en KO. Coudes et genoux n'existent qu'à l'affichage.
-- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), saisir (les mains s'accrochent à un corps ou à un rebord),
-  soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
-- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon). Des bourrasques après 75 s.
+- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), se protéger, saisir (les mains s'accrochent à un corps ou à un rebord),
+  coup de tête en tenant quelqu'un, soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
+- Combat : les coups visent (`aimTarget`, 80° de chaque côté, 2 m ; 2,6 m pour le gros coup) ; la garde arrête les poings et s'use, le gros coup la brise, la saisie la traverse et attrape celui qui arme, le poing fait lâcher une saisie. Trois poings d'affilée éjectent.
+- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon), Les Rouleaux (rouleaux à pointes), L'Incinérateur (tapis vers des trappes qui s'ouvrent sur le feu), Le Tri Postal (quatre tapis, deux barres qui balaient). Des bourrasques après 75 s.
+- Objets (`ITEMS` dans `mollo/engine/sim.js`) : au début de chaque manche, chacun a sa chance d'apparaître (poêle 60 %, pétard 55 %, parapluie 40 %, peau de banane 60 %), avec une petite chance d'être en double. Un appui sur saisir ramasse, un autre lance.
 - Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
-  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=usine`.
+  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=four`, `?hazards=0`, `?items=0`.
 - Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
 
 ## Pour les développeurs
@@ -161,12 +175,13 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
   `node tools/test-calcul.mjs` teste le moteur de Tête de Calcul ; `node tools/test-filrouge.mjs` celui de Fil Rouge ;
   `node tools/test-outbreak.mjs` fait jouer des parties d'Outbreak par les équipiers IA ;
   `node tools/test-convoy.mjs` teste le moteur de Convoy Storm (chute, échelle, chaudière, caisses, froid, loups, gares, cartes, aiguillages et levier, voie courbe, tunnels, paysages et leurs ressources, nuit, moments forts, rôles, reprise) et le fait jouer par un pilote automatique.
-  `node tools/test-minigolf.mjs` construit les 54 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
+  `node tools/test-minigolf.mjs` construit les 72 trous de Mini-Golf Party et vérifie qu'un bot expert les termine ;
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
-  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
+  `node tools/test-sitenoir.mjs` teste le moteur de Site Noir (carte, clés, générateur, ascenseur, coups, extraction, copies des invités, relais d'hôte, parties entières entre bots).
+  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes et pièges, objets, collisions, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
   `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous

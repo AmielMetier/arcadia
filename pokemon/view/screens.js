@@ -13,7 +13,7 @@ import { ABILITIES, abilityOf } from '../engine/abilities.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon } from '../engine/types.js';
 import {
   getParticipant, currentMatch, sideOf, autoDraft, chooseLead, attackTypes, statTotal,
-  nextPlayableMatch, tournamentMvp, TEAM_SIZE, teamSizeOf, isVgc, chooseBring, VGC_BRING,
+  nextPlayableMatch, tournamentMvp, TEAM_SIZE, teamSizeOf, isVgc, chooseBring, VGC_BRING, isMulti, slotOf, ownerOf, sideInfo,
 } from '../engine/tournament.js';
 
 const TYPE_KEYS = Object.keys(TYPES);
@@ -248,7 +248,7 @@ function matchFlag(m, t) {
 
 function bracketRow(t, m, side) {
   const pid = side === 'A' ? m.a : m.b;
-  const p = pid != null ? getParticipant(t, pid) : null;
+  const p = pid != null ? sideInfo(t, m, side) : null;
   const won = m.status === 'done' && same(m.winner, pid);
   const lost = m.status === 'done' && pid != null && !won;
   const score = m.bestOf > 1 && (m.scoreA || m.scoreB) ? `<b class="br-score">${side === 'A' ? m.scoreA : m.scoreB}</b>` : (won ? '<b class="br-score win">✓</b>' : '');
@@ -360,6 +360,7 @@ export function renderPreview(stage, s, ctx) {
   const t = s.t;
   const m = currentMatch(t);
   if (!m) return;
+  if (isMulti(t)) return renderPreviewMulti(stage, s, ctx, m);
   const mySide = sideOf(m, ctx.me.id);
   const left = mySide || 'A';
   const right = left === 'A' ? 'B' : 'A';
@@ -446,6 +447,60 @@ export function renderPreview(stage, s, ctx) {
   stage.querySelector('#pvGo').onclick = () => ctx.sendReady();
 }
 
+/** 2 contre 2 entre joueurs : les deux équipes, chaque joueur choisit son Pokémon de tête parmi les siens */
+function renderPreviewMulti(stage, s, ctx, m) {
+  const t = s.t;
+  const mySlot = slotOf(m, ctx.me.id);
+  const myTeamKey = mySlot ? (mySlot === 'A' || mySlot === 'C' ? 'A' : 'B') : 'A';
+  const P = (slot) => getParticipant(t, ownerOf(m, slot));
+  const oppOf = (tk) => (tk === 'A' ? ['B', 'D'] : ['A', 'C']).flatMap((sl) => P(sl).team);
+  const key = `${m.id}:${t.gameNo}`;
+  if (ctx.local.leadKey !== key) {
+    ctx.local.leadKey = key;
+    ctx.local.lead = mySlot ? chooseLead(P(mySlot).team, oppOf(myTeamKey)) : null;
+    if (mySlot) ctx.actions.lead(ctx.local.lead);
+  }
+  const iAmReady = mySlot ? t.ready[mySlot] : false;
+  const member = (slot) => {
+    const p = P(slot), isMe = slot === mySlot, tk = slot === 'A' || slot === 'C' ? 'A' : 'B';
+    return `
+      <div class="pv-member ${isMe ? 'me' : ''}">
+        <div class="pv-col-head">${trainerAvatar(p, 'sm')}${trainerTag(p)}<span class="pv-state ${t.ready[slot] ? 'ready' : ''}">${t.ready[slot] ? 'PRÊT' : isMe ? 'À TOI' : 'réfléchit…'}</span></div>
+        <div class="pv-team">${p.team.map((dex, i) => previewCard(dex, i, oppOf(tk), { pickable: isMe, chosen: isMe && ctx.local.lead === i, suggested: false, ready: iAmReady })).join('')}</div>
+      </div>`;
+  };
+  const col = (tk) => {
+    const S = sideInfo(t, m, tk);
+    return `<section class="pv-col ${tk === myTeamKey && mySlot ? 'me' : ''}" style="--pc:${S.color}">
+      <div class="pv-team-name">${tk === myTeamKey && mySlot ? 'TON ÉQUIPE' : 'ÉQUIPE ADVERSE'} · ${esc(S.name)}</div>
+      ${(tk === 'A' ? ['A', 'C'] : ['B', 'D']).map(member).join('')}</section>`;
+  };
+  const left = myTeamKey, right = left === 'A' ? 'B' : 'A';
+  const leadName = mySlot && ctx.local.lead != null ? getPokemonById(P(mySlot).team[ctx.local.lead])?.name : '';
+  stage.innerHTML = `
+    <div class="tz-screen preview multi deal">
+      <header class="tz-head">
+        <div>
+          <div class="tz-kicker">2 CONTRE 2${m.bestOf > 1 ? ' · 2 MANCHES GAGNANTES' : ''}</div>
+          <h2 class="tz-title">${mySlot ? 'Choisis ton Pokémon de tête' : 'Présentation des équipes'}</h2>
+          <p class="tz-sub">Chaque joueur dirige un Pokémon, à côté de son coéquipier. Quand il tombe, tu envoies un des tiens.</p>
+        </div>
+        ${countdown(s, 'Combat dans')}
+      </header>
+      ${deadlineBar(s, 25)}
+      ${m.bestOf > 1 ? `<div class="pv-series">${seriesPips(m, left, sideInfo(t, m, left).color)}<span>MANCHE ${t.gameNo}</span>${seriesPips(m, right, sideInfo(t, m, right).color)}</div>` : ''}
+      <div class="pv-board">${col(left)}<div class="pv-versus">VS</div>${col(right)}</div>
+      <footer class="pv-foot">
+        ${mySlot ? (iAmReady ? `<div class="pv-wait">✓ ${esc(leadName)} est prêt. En attente des autres joueurs…</div>`
+          : `<button class="btn big yellow" id="pvGo">PRÊT · ENVOYER ${esc((leadName || '').toUpperCase())} <small>Entrée</small></button>`)
+          : '<div class="pv-wait">Le combat commence dès que les quatre dresseurs sont prêts.</div>'}
+      </footer>
+    </div>`;
+  if (!mySlot || iAmReady) return;
+  for (const btn of stage.querySelectorAll('[data-lead]')) btn.onclick = () => ctx.pickLead(Number(btn.dataset.lead));
+  stage.querySelector('#pvGo').onclick = () => ctx.sendReady();
+}
+
 function seriesPips(m, side, color) {
   const need = Math.ceil(m.bestOf / 2);
   const won = side === 'A' ? m.scoreA : m.scoreB;
@@ -462,7 +517,7 @@ export function renderSummary(stage, s, ctx) {
   const last = t.last;
   if (!m || !last) return;
   const mySide = sideOf(m, ctx.me.id);
-  const P = { A: getParticipant(t, m.a), B: getParticipant(t, m.b) };
+  const P = { A: sideInfo(t, m, 'A'), B: sideInfo(t, m, 'B') };
   const game = last.forfeit ? null : m.games[m.games.length - 1];
   const w = last.winner;
   const winner = w ? P[w] : null;

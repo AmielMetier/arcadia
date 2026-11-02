@@ -44,7 +44,7 @@ function initPpMap(moves) {
   return map;
 }
 
-export function createBattle({ trainerA, trainerB, teamA, teamB, doubles = false }) {
+export function createBattle({ trainerA, trainerB, teamA, teamB, doubles = false, pools = null, owners = null }) {
   const b = {
     trainerA: { id: trainerA.id, name: trainerA.name, color: trainerA.color || '#ff4b2b', bot: !!trainerA.bot },
     trainerB: { id: trainerB.id, name: trainerB.name, color: trainerB.color || '#2b8cff', bot: !!trainerB.bot },
@@ -76,6 +76,8 @@ export function createBattle({ trainerA, trainerB, teamA, teamB, doubles = false
   };
   // Double (VGC) : les deux premiers Pokémon de chaque équipe entrent ensemble
   if (doubles) Object.assign(b, { doubles: true, activeC: 1, activeD: 1, entry: ['A', 'B', 'C', 'D'], need: [] });
+  // 2 contre 2 entre joueurs : chaque emplacement a son dresseur et ses propres Pokémon
+  if (doubles && pools) Object.assign(b, { pools, owners, activeA: pools.A[0], activeC: pools.C[0], activeB: pools.B[0], activeD: pools.D[0] });
   return b;
 }
 
@@ -88,6 +90,10 @@ export const foeSides = (state, side) => sidesOf(state).filter((s) => teamKey(s)
 export const teamOf = (state, side) => (teamKey(side) === 'A' ? state.teamA : state.teamB);
 /** Index des Pokémon d'un dresseur actuellement sur le terrain */
 export const activeIdxOf = (state, tk) => sidesOf(state).filter((s) => teamKey(s) === tk).map((s) => state['active' + s]);
+/** Pokémon qu'un emplacement peut envoyer : en 2 contre 2 entre joueurs, chaque joueur n'a que les siens (state.pools) */
+export const poolOf = (state, side) => (state.pools && state.pools[side]) || teamOf(state, side).map((_, i) => i);
+/** Réserve d'un emplacement : ses Pokémon valides qui ne sont pas sur le terrain */
+export const benchOf = (state, side) => { const team = teamOf(state, side), on = activeIdxOf(state, teamKey(side)); return poolOf(state, side).filter((i) => team[i] && !team[i].fainted && !on.includes(i)); };
 
 export function getActivePokemon(battle, side) {
   const team = teamOf(battle, side);
@@ -433,8 +439,7 @@ export function resolveActions(state, acts) {
     const act = acts[side];
     if (!act || act.type !== 'switch') continue;
     const team = teamOf(state, side), targetIdx = act.targetIndex;
-    const taken = activeIdxOf(state, teamKey(side));
-    if (taken.includes(targetIdx) || !team[targetIdx] || team[targetIdx].fainted) continue;
+    if (!benchOf(state, side).includes(targetIdx)) continue;
     const tr = getTrainer(state, side);
     regen(P(side));
     state['active' + side] = targetIdx;
@@ -824,8 +829,7 @@ export function resolveActions(state, acts) {
     }
     // Demi-Tour, Change Éclair : après le coup, le lanceur laisse sa place (choix du remplaçant à la fin du tour)
     if (attMove.pivot && !attPoke.fainted) {
-      const team = teamOf(state, attSide), on = activeIdxOf(state, teamKey(attSide));
-      if (team.some((p, i) => !on.includes(i) && !p.fainted)) {
+      if (benchOf(state, attSide).length) {
         state.pivot[attSide] = true;
         logEvent({ type: 'msg', text: `${attPoke.name} revient vers ${getTrainer(state, attSide).name} !` });
       }
@@ -1018,13 +1022,13 @@ export function resolveActions(state, acts) {
     const pv = state.pivot || {};
     state.pivot = {};
     const need = [];
-    for (const tk of ['A', 'B']) {
-      const team = tk === 'A' ? state.teamA : state.teamB, on = activeIdxOf(state, tk);
-      let bench = team.filter((p, i) => !p.fainted && !on.includes(i)).length;
-      for (const side of SIDES.filter((x) => teamKey(x) === tk)) {
-        const p = P(side);
-        if (bench > 0 && p && (p.fainted || pv[side])) { need.push(side); bench--; }
-      }
+    const used = new Set();
+    for (const side of SIDES) {
+      const p = P(side);
+      if (!p || !(p.fainted || pv[side])) continue;
+      // une place libre se remplit s'il reste un Pokémon de réserve que l'autre emplacement ne prend pas déjà
+      const free = benchOf(state, side).filter((i) => !used.has(teamKey(side) + i));
+      if (free.length) { need.push(side); if (!state.pools) used.add(teamKey(side) + free[0]); }
     }
     state.need = need;
     if (need.length) state.phase = 'switch_forced';
@@ -1059,7 +1063,7 @@ export function forceSwitch(state, side, targetIdx) {
   if (!team[targetIdx] || team[targetIdx].fainted) return false;
   if (state.doubles && !(state.need || []).includes(side)) return false;
   const out = getActivePokemon(state, side);
-  if (activeIdxOf(state, teamKey(side)).includes(targetIdx)) return false;
+  if (!benchOf(state, side).includes(targetIdx)) return false;
   if (out && !out.fainted) leaveField(out);
   if (out) { out.rampage = null; out.confused = 0; out.charging = null; out.mustRecharge = false; if (!out.fainted && out.ability === 'regenerator') out.hp = Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)); }
 

@@ -45,7 +45,7 @@ function itemBadge(p) {
 }
 import { STAGE_MULTS, canMega } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
-import { getParticipant, currentMatch, TEAM_SIZE, teamSizeOf, isVgc, VGC_BRING } from '../engine/tournament.js';
+import { getParticipant, currentMatch, TEAM_SIZE, teamSizeOf, isVgc, VGC_BRING, isMulti, sideInfo, sideOf } from '../engine/tournament.js';
 import { createDoublesView } from './doubles.js';
 import { sfx } from './sfx.js';
 import { createFx } from './fx.js';
@@ -926,9 +926,10 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     const m = currentMatch(s.t);
     const el = $('#pokeSplash');
     if (!m || !el) return;
-    const mine = String(m.b) === String(me.id);
-    const L = getParticipant(s.t, mine ? m.b : m.a);
-    const R = getParticipant(s.t, mine ? m.a : m.b);
+    const mine = sideOf(m, me.id) === 'B';
+    const mineB = sideOf(m, me.id) === 'B';
+    const L = sideInfo(s.t, m, mineB ? 'B' : 'A');
+    const R = sideInfo(s.t, m, mineB ? 'A' : 'B');
     if (!L || !R) return;
     const sub = m.bestOf > 1 ? `MANCHE ${s.t.gameNo} · ${mine ? `${m.scoreB}-${m.scoreA}` : `${m.scoreA}-${m.scoreB}`}` : 'UNE SEULE MANCHE';
     el.innerHTML = `
@@ -950,7 +951,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
   function headerTitle(s) {
     const t = s.t;
     const badge = root.querySelector('.poke-badge');
-    if (badge) badge.textContent = isVgc(t) ? 'VGC 2v2' : 'TOURNOI 3v3';
+    if (badge) badge.textContent = isVgc(t) ? 'VGC 2v2' : isMulti(t) ? '2 CONTRE 2' : 'TOURNOI 3v3';
     const m = currentMatch(t);
     const el = $('#pokeRoundTitle');
     if (!el) return;
@@ -958,7 +959,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     else if (s.phase === 'bracket') el.textContent = 'Tableau';
     else if (s.phase === 'podium') el.textContent = 'Podium';
     else if (m) {
-      const mine = String(m.b) === String(me.id);
+      const mine = sideOf(m, me.id) === 'B';
       el.textContent = m.bestOf > 1 ? `${m.name} · ${mine ? `${m.scoreB}-${m.scoreA}` : `${m.scoreA}-${m.scoreB}`}` : m.name;
     }
   }

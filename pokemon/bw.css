@@ -920,3 +920,7 @@
   .vgc-field{min-height:380px;padding:6px}.vgc-row{gap:8px}.vgc-row.top{padding-left:0}.vgc-row.bottom{padding-right:0}
   .vgc-sprite{height:78px}.vgc-slot.mine .vgc-sprite{height:92px}.vgc-hud{padding:4px 6px}.vgc-name{font-size:13px}
 }
+/* 2 contre 2 entre joueurs : nom du dresseur au-dessus de son Pokémon */
+.vgc-owner{font-size:11px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;opacity:.7;margin-bottom:1px}
+.vgc-slot.me .vgc-hud{box-shadow:0 0 0 3px #ffcb05,0 4px 0 rgba(0,0,0,.35)}
+.vgc-slot.me .vgc-owner{opacity:1;color:#b07d00}

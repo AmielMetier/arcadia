@@ -189,7 +189,7 @@ window.HUB_GAMES = [
     icon: '🏟️', score: 'Record de matchs gagnés',
     settings: [
       { key: 'timer', label: 'Chrono par tour', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
-      { key: 'format', label: 'Format', options: [['single', '1 contre 1 (équipe de 3)'], ['vgc', 'VGC 2 contre 2 (équipe de 6, 4 par manche)']], def: 'single' },
+      { key: 'format', label: 'Format', options: [['single', '1 contre 1 (équipe de 3)'], ['vgc', 'VGC (2 Pokémon chacun)'], ['multi', '2 joueurs contre 2']], def: 'single' },
       { key: 'gen', label: 'Génération', options: [['all', 'Gens 1 à 6 (tous)'], ['classiques', 'Les iconiques'], ['kanto', 'Gen 1 (Kanto)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)'], ['sinnoh', 'Gen 4 (Sinnoh)'], ['unys', 'Gen 5 (Unys)'], ['kalos', 'Gen 6 (Kalos)']], def: 'all' },
       { key: 'final', label: 'Finale', options: [[3, '2 manches gagnantes'], [1, 'Une seule manche']], def: 3 },
       { key: 'bots', label: 'Places libres', options: [[1, 'Remplies par des bots'], [0, 'Qualifié d\'office']], def: 1 },
@@ -211,7 +211,7 @@ window.HUB_GAMES = [
     id: 'minigolf',
     title: 'Mini-Golf Party',
     tag: 'Parcours déjantés',
-    desc: 'Du mini-golf en 3D à la souris ou au doigt : 54 trous sur neuf parcours, avec loopings, plafonds aimantés, glace, boue et lave.',
+    desc: 'Du mini-golf en 3D à la souris ou au doigt : 72 trous sur dix parcours, dont le Marathon et ses 18 trous géants, avec loopings, plafonds aimantés, glace, boue et lave.',
     url: 'minigolf/',
     minPlayers: 1, maxPlayers: 6,
     accent: '#2e8b57',
@@ -240,7 +240,7 @@ window.HUB_GAMES = [
     id: 'mollo',
     title: 'Mollo !',
     tag: 'Le dernier debout gagne',
-    desc: 'Bagarre de pantins tout mous au-dessus du vide : cogne, assomme, attrape, soulève et jette tes potes depuis les toits, le chantier ou l\'usine. Tes mains s\'agrippent à tout : rattrape-toi au rebord, hisse-toi, et méfie-toi du boulet.',
+    desc: 'Bagarre de pantins tout mous au-dessus du vide : cogne, assomme, attrape, soulève et jette tes potes depuis six arènes, des toits à l\'incinérateur. Ramasse une poêle ou un pétard, rattrape-toi au rebord, hisse-toi, et méfie-toi des rouleaux à pointes.',
     url: 'mollo/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 pantins avec les bots
     accent: '#ffc531',
@@ -250,8 +250,26 @@ window.HUB_GAMES = [
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7']], def: 2 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'hazards', label: 'Pièges du décor', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'items', label: 'Objets', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
     cover: 'mollo/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
+  {
+    id: 'sitenoir',
+    title: 'Site Noir',
+    tag: 'Un monstre contre l\'équipe',
+    desc: 'Horreur à la première personne : trois ou quatre enquêteurs entrent dans un complexe abandonné avec une lampe et une batterie. Trouvez le badge, la clé, les fusibles, relancez le générateur et remontez avec une preuve. L\'un de vous peut jouer le monstre : il voit dans le noir, coupe les lumières et bloque les portes.',
+    url: 'sitenoir/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#e8a53a',
+    icon: '🔦', score: 'Record de points',
+    settings: [
+      { key: 'monster', label: 'Le monstre', options: [['random', 'Au hasard'], ['host', 'L\'hôte'], ['bot', 'Un bot']], def: 'random' },
+      { key: 'places', label: 'Enquêteurs', options: [[3, '3'], [4, '4']], def: 4 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'duree', label: 'Durée', options: [[10, '10 min'], [15, '15 min'], [20, '20 min']], def: 15 },
+    ],
+    cover: 'sitenoir/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
 ];
 
@@ -292,7 +310,7 @@ window.HUB_GAME_INFO = {
     keys: [['Flèches / ZQSD', 'Marcher'], ['Espace / Entrée', 'Parler, valider'], ['B / Échap', 'Retour']],
     tips: ['Les types comptent : l\'eau bat le feu, le feu bat la plante.', 'Pense à soigner ton équipe avant le tournoi.'] },
   odyssee: { genre: 'aventure', time: 'Longue aventure',
-    keys: [['Flèches / ZQSD', 'Marcher'], ['Maj', 'Courir'], ['Espace', 'Parler, valider'], ['Échap', 'Menu']],
+    keys: [['Flèches / ZQSD', 'Marcher'], ['Maj', 'Courir'], ['Espace', 'Parler, valider'], ['U', 'Afficher / replier le HUD'], ['Échap', 'Menu']],
     tips: ['Ta partie est sauvegardée en ligne avec ton compte.', 'Parle aux autres joueurs pour échanger ou combattre.', 'Les CS ouvrent des recoins cachés le long des routes.'] },
   minigolf: { genre: 'sport', time: '10–20 min',
     keys: [['Souris', 'Tourner la caméra, viser'], ['Clic maintenu + reculer', 'Doser la puissance'], ['Molette', 'Zoom'], ['V', 'Vue du trou']],
@@ -300,8 +318,11 @@ window.HUB_GAME_INFO = {
   royale: { genre: 'action', time: '10–20 min',
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
+  sitenoir: { genre: 'action', time: '15 min',
+    keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
+    tips: ['Courir fait du bruit : le monstre l\'entend. Accroupi, tu es presque muet.', 'Une photo prise de près l\'aveugle un instant, et compte comme preuve.', 'Sans preuve, l\'extraction ne sert à rien : passe le capteur EMF sur les traces vertes.', 'La première mise à terre pardonne : la seconde, non.'] },
   mollo: { genre: 'party', time: '5–10 min',
-    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter'], ['Échap', 'Menu']],
-    tips: ['Les coups à la tête assomment bien plus vite.', 'Assommé, il ne pèse plus rien : saisis-le, saute pour le soulever, lâche pour le jeter.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.'] },
+    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['Maj / C', 'Se protéger'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],
+    tips: ['La garde arrête les poings, le gros coup la brise, la saisie passe à travers.', 'Attrape celui qui arme un gros coup : son coup part en fumée.', 'Trois poings d\'affilée éjectent.', 'La barre sous un nom vire au rouge : il est assez sonné pour être soulevé. Saisis-le, saute, lâche au bord.', 'En tenant quelqu\'un, F donne un coup de tête.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
 };
 window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];

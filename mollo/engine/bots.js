@@ -4,9 +4,9 @@
 import { ST, PN } from './sim.js';
 
 const LV = {
-  facile: { think: 0.34, punch: 0.45, grab: 0.25, charge: 0.1, react: 0.5 },
-  normal: { think: 0.2, punch: 0.7, grab: 0.45, charge: 0.25, react: 0.8 },
-  expert: { think: 0.12, punch: 0.9, grab: 0.65, charge: 0.4, react: 1 },
+  facile: { think: 0.34, punch: 0.45, grab: 0.25, charge: 0.1, react: 0.5, guard: 0.1 },
+  normal: { think: 0.2, punch: 0.7, grab: 0.45, charge: 0.2, react: 0.8, guard: 0.35 },
+  expert: { think: 0.12, punch: 0.9, grab: 0.65, charge: 0.3, react: 1, guard: 0.6 },
 };
 const DIRS = Array.from({ length: 8 }, (_, i) => [Math.sin(i * Math.PI / 4), Math.cos(i * Math.PI / 4)]);
 
@@ -40,13 +40,14 @@ function route(A, x, y, z, tx, tz) {
 
 export function botThink(sim, b, dt) {
   const L = LV[b.level] || LV.normal, rng = sim.rng;
-  const ai = b.ai || (b.ai = { t: rng.next() * L.think, mx: 0, mz: 0, pc: 0, jc: 0, gc: 0, grab: false, punch: false, jump: false, holdP: 0, wait: 0, carryT: 0 });
-  ai.t -= dt; if (ai.wait > 0) ai.wait -= dt;
+  const ai = b.ai || (b.ai = { t: rng.next() * L.think, mx: 0, mz: 0, pc: 0, jc: 0, gc: 0, grab: false, punch: false, jump: false, holdP: 0, wait: 0, carryT: 0, guardT: 0, kickT: 0 });
+  ai.t -= dt; if (ai.wait > 0) ai.wait -= dt; if (ai.guardT > 0) ai.guardT -= dt;
   if (ai.holdP > 0) { ai.holdP -= dt; if (ai.holdP <= 0) ai.punch = false; }
   if (ai.t <= 0) { ai.t = L.think * (0.7 + rng.next() * 0.6); decide(sim, b, ai, L); }
-  b.inp = { mx: ai.mx, mz: ai.mz, jump: ai.jump, punch: ai.punch, grab: ai.grab, pc: ai.pc, jc: ai.jc, gc: ai.gc };
+  b.inp = { mx: ai.mx, mz: ai.mz, jump: ai.jump, punch: ai.punch, grab: ai.grab, guard: ai.guardT > 0, pc: ai.pc, jc: ai.jc, gc: ai.gc };
 }
 
+function closest(sim, b) { let o = null, bd = 1e9; for (const q of sim.players.values()) { if (q === b || q.st === ST.OUT) continue; const d = Math.hypot(q.p[PN.C].x - b.p[PN.C].x, q.p[PN.C].z - b.p[PN.C].z); if (d < bd) { bd = d; o = q; } } return o; }
 function go(ai, x, z) { const l = Math.hypot(x, z) || 1; ai.mx = Math.round(x / l * 100) / 100; ai.mz = Math.round(z / l * 100) / 100; }
 
 function decide(sim, b, ai, L) {
@@ -55,12 +56,21 @@ function decide(sim, b, ai, L) {
   if (b.st === ST.KO) { ai.mx = ai.mz = 0; ai.grab = false; if (rng.next() < L.react) ai.pc++; return; }
   if (sim.ph === 'count') { ai.mx = ai.mz = 0; ai.grab = false; return; }
   const holdingBox = b.grip.some((q) => q && q.box), holding = b.grip.find((q) => q && q.o);
+  // un objet en main : le pétard et la banane se lancent vite ; en tombant, on lâche tout pour s'accrocher (sauf le parapluie)
+  if (b.item) {
+    const it = b.item;
+    if (!b.grounded && it.k !== 'parapluie') { ai.gc++; ai.grab = true; return; }
+    if (it.k === 'petard' && it.fuse < 1.6) { const o = closest(sim, b); if (o) go(ai, o.p[PN.C].x - pel.x, o.p[PN.C].z - pel.z); ai.gc++; return; }
+  }
+  if (b.heldBy > 0 && rng.next() < L.react) { ai.pc++; ai.holdP = 0.04; ai.punch = true; } // tenu : on se débat
+  if (!b.grounded && ai.kickT > 0) { ai.kickT = 0; ai.pc++; ai.holdP = 0.04; ai.punch = true; return; }
   // en l'air ou accroché : les mains d'abord, puis se hisser
   if (holdingBox) { ai.grab = true; ai.jump = true; ai.mx = ai.mz = 0; return; }
   if (!b.grounded) { ai.grab = rng.next() < L.react || ai.grab; const c = A.groundAt(A.x0 / 2 + A.x1 / 2, A.z0 / 2 + A.z1 / 2, 99); void c; go(ai, (A.x0 + A.x1) / 2 - pel.x, (A.z0 + A.z1) / 2 - pel.z); return; }
   // on tient quelqu'un : on le soulève s'il est sonné, on va au bord, on lâche
   if (holding) {
     ai.grab = true; ai.carryT += L.think;
+    if (!b.lifting && holding.o.st === ST.LIVE && holding.o.dz < 0.45 && rng.next() < L.punch * 0.6) { ai.pc++; ai.holdP = 0.04; ai.punch = true; ai.mx = ai.mz = 0; return; } // trop réveillé pour être soulevé : un coup de tête
     const edge = nearestEdge(A, pel.x, b.gy, pel.z);
     go(ai, edge.x, edge.z);
     if (!b.lifting) ai.jump = true;
@@ -78,12 +88,36 @@ function decide(sim, b, ai, L) {
     if (s < ts) { ts = s; tgt = o; }
   }
   const edge = nearestEdge(A, pel.x, b.gy, pel.z);
+  // les pièges d'abord : fuir un rouleau qui arrive vers l'allée, quitter une trappe
+  for (const r of A.rollers) {
+    if (Math.abs(pel.z - r.cz) > r.hz + 0.4 || Math.abs(pel.x - r.x) > r.r + 1.6 + Math.abs(r.vx) * 0.25 * L.react) continue;
+    if (rng.next() < L.react) { go(ai, 0, -Math.sign(pel.z || 1)); return; }
+  }
+  if (b.gbox && b.gbox.door && rng.next() < L.react) { go(ai, pel.x > 0 ? 1 : -1, 0); return; }
+  // ramasser ce qui traîne à côté
+  if (!b.item && ai.wait <= 0) {
+    let best = null, bd = 2.6;
+    for (const it of sim.items) { if (it.holder || it.k === 'banane' || (it.fuse > 0 && it.fuse < 1.2)) continue; const d = Math.hypot(it.x - pel.x, it.z - pel.z); if (d < bd && Math.abs(it.y - pel.y) < 1.2) { bd = d; best = it; } }
+    if (best) { go(ai, best.x - pel.x, best.z - pel.z); if (bd < 1) { ai.gc++; ai.wait = 0.3; } return; }
+  }
+  if (b.item && tgt && (b.item.k === 'petard' || b.item.k === 'banane')) {
+    const dd = Math.hypot(tgt.p[PN.C].x - pel.x, tgt.p[PN.C].z - pel.z);
+    if (dd < 4.5) { go(ai, tgt.p[PN.C].x - pel.x, tgt.p[PN.C].z - pel.z); ai.gc++; ai.wait = 0.3; return; }
+  }
   if (!tgt) { go(ai, (A.x0 + A.x1) / 2 - pel.x, (A.z0 + A.z1) / 2 - pel.z); return; }
   ai.tgt = tgt.id;
   const tp = tgt.p[PN.C], dx = tp.x - pel.x, dz = tp.z - pel.z, d = Math.hypot(dx, dz);
   // trop près du vide : on revient d'abord, sauf pour un coup à portée
   if (edge.d < 0.7 && d > 1.2) { go(ai, -edge.x, -edge.z); return; }
-  if (d < 1.15 && Math.abs(tp.y - che.y) < 1.2) {
+  // lire l'adversaire : on attrape celui qui arme ou qui se protège, on se protège de celui qui frappe
+  const facing = (Math.sin(tgt.yaw) * -dx + Math.cos(tgt.yaw) * -dz) / (d || 1) > 0.3;
+  if (d < 1.5 && Math.abs(tp.y - che.y) < 1.2 && tgt.st === ST.LIVE && ai.wait <= 0) {
+    if ((tgt.charge > 0.1 || tgt.guard) && rng.next() < L.grab + 0.2) { go(ai, dx, dz); ai.grab = true; ai.gc++; ai.wait = 0.25; return; }
+    if (tgt.guard && rng.next() < L.charge + 0.3) { go(ai, dx, dz); ai.holdP = 0.38; ai.punch = true; ai.pc++; ai.wait = 0.7; return; }
+    if (facing && (tgt.punchT > 0 || tgt.kick > 0 || tgt.punchCd > 0.1) && b.gd > 0.3 && rng.next() < L.guard) { ai.guardT = 0.35 + rng.next() * 0.3; ai.mx = ai.mz = 0; ai.wait = ai.guardT; return; }
+  }
+  if (ai.guardT > 0) return;
+  if (d < 1.35 && Math.abs(tp.y - che.y) < 1.2) {
     go(ai, dx, dz);
     if (ai.wait > 0) return;
     if ((tgt.st === ST.KO || tgt.dz > 0.45) && rng.next() < L.grab + 0.3) { ai.grab = true; ai.wait = 0.2; return; }
@@ -96,7 +130,7 @@ function decide(sim, b, ai, L) {
   }
   // un élan pour un coup de pied sauté, de temps en temps
   if (d > 1.6 && d < 2.6 && rng.next() < L.charge * 0.25 && edge.d > 2.5) { go(ai, dx, dz); ai.jc++; ai.wait = 0.1; setKick(ai); return; }
-  if (ai.kickT > 0) { ai.kickT -= L.think; ai.pc++; ai.holdP = 0.04; ai.punch = true; ai.kickT = 0; }
+  ai.kickT = 0;
   const r = route(A, pel.x, b.gy, pel.z, tp.x, tp.z);
   if (r) go(ai, r[0] - pel.x, r[1] - pel.z);
   else if (edge.d < 2) go(ai, -edge.x, -edge.z);

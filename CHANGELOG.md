@@ -1,40 +1,116 @@
 # Journal des versions — Arcadia
 
-## 3.48 — 2 novembre 2026
-- **Dogfight 3D** — Commandes gauche et droite inversées.
-  - L'axe horizontal de virage et de roulis au clavier et à la manette est inversé.
+## 3.56 — 2 novembre 2026
+- **Site Noir** — nouveau jeu : de l'horreur à la première personne, un monstre contre trois ou quatre enquêteurs, en 15 minutes environ
+  - Enquêteurs : une lampe, une batterie, trois cases. Fouillez les meubles pour trouver le badge, la clé et les fusibles, relancez le générateur, prenez l'ascenseur et remontez avec au moins une preuve.
+  - Preuves : photographie le monstre (le flash l'aveugle un instant) ou passe le capteur EMF sur les traces.
+  - Monstre : tu vois dans le noir, les corps chauds brillent, tu entends les bruits autour du viseur, tu coupes les lumières, bloques les portes, casses les caméras et sabotes le générateur.
+  - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
+  - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
 
-## 3.47 — 2 novembre 2026
-- **Dogfight 3D** — Correction de l'écran noir au décollage.
-  - Correction d'une erreur d'initialisation de la caméra qui interrompait le rendu lors du clic sur Décoller.
+## 3.55 — 2 novembre 2026
+- **Mollo !** — Le combat est revu de fond en comble.
+  - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.
+  - Nouveau : la garde (Maj ou C). Elle arrête les poings, mais elle s'use vite.
+  - Le gros coup brise la garde, la saisie passe à travers et attrape celui qui arme, le poing fait lâcher une saisie : à toi de lire l'adversaire.
+  - Trois poings d'affilée éjectent. Assommer demande plus de travail : il fallait 4 poings, il en faut environ 9.
+  - Un gros coup dans le vide te déséquilibre, et une barre sous chaque nom montre qui est sonné.
+  - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
+  - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
+  - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
+- **Odyssée** — un HUD en jeu montre en permanence ton équipe, ton argent, tes badges et le lieu où tu te trouves.
+  - À gauche : les six créatures de l'équipe dans leurs capsules (sprite animé, niveau, statut, barres de PV et d'EXP) ; cliquer sur une créature ouvre son résumé, et le bouton `⇅` (ou le clic droit) permet de changer l'ordre de l'équipe à la volée.
+  - En haut à droite : encadré Pokégear avec le lieu actuel, l'argent, les badges d'Arène et quatre raccourcis rapides (`ÉQUIPE`, `SAC`, `CARTE`, `SAUVER`).
+  - Appuie sur `U` (ou sur le bouton `▴`) pour replier ou réafficher le HUD quand tu veux admirer la carte.
 
-## 3.46 — 2 novembre 2026
-- **Dogfight 3D** — Avion parfaitement droit en face de la caméra.
-  - L'alignement 3D du F-16 est recalibré : le nez pointe droit vers le réticule, les ailes sont horizontales et la tuyère fait face à la caméra.
-  - Initialisation instantanée de la caméra derrière l'avion dès le lancement.
+## 3.54 — 2 novembre 2026
+- **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.
+  - En parlant à un autre joueur : échanger, combattre, ou voir sa fiche (badges, Pokédex, temps de jeu et équipe).
+  - Ta propre carte dresseur montre aussi ton équipe.
 
-## 3.45 — 2 novembre 2026
-- **Dogfight 3D** — Orientation du modèle ajustée et maintien automatique du cap en ligne droite.
-  - Le modèle 3D de l'avion est tourné de 90 degrés vers la gauche avec sa tuyère et ses effets de tir synchronisés.
-  - En relâchant les touches du clavier, l'avion file tout droit à l'horizontale dans sa dernière direction sans dériver.
+## 3.53 — 2 novembre 2026
+- **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.
+  - Le Dr Lumen, menacé dans le Bois Murmure, offre la CS Flash : la Grotte Lunaire est désormais plongée dans le noir.
+  - Les admins Erèbe et Nyx pillent la Grotte Lunaire et menacent le vieux marin de Port-Azur ; à Voltacité, la Centrale est occupée et l'Arène fermée tant qu'on ne l'a pas libérée. L'ingénieur offre la CS Force pour pousser les gros rochers.
+  - Sur la route 6, le repaire de la Team Éclipse : battre le chef Nocturne plonge la région dans une nuit violette, et ouvre enfin Mirage.
+  - La voyante de Mirage confie la Plume Argentée. Au sud du Cap Mirage, sur l'Îlot des Marées, Lugia Obscur attend au fond du Sanctuaire. Capture-le (le Prof. Saule ouvrira son cœur) ou apaise-le : il retournera alors dans la Grotte des Tourbillons.
+  - Tant que dure l'Éclipse, la Route Victoire reste fermée.
+  - À la Ligue, le Conseil 4 (Frimas, Spectrel, Brutus et Ombrelle) attend avant Célestine.
+  - Dix recoins cachés le long des routes, derrière un petit arbre ou un gros rocher, et des quêtes annexes : le médaillon de Lucie, le géologue, l'échange de Bastien, l'Évoli de Floralia, le chercheur du Pokédex, les sources de Cendrelune et le Minidraco de Cimelune.
+  - Nouveaux personnages : les sbires, Nyx, Erèbe, Nocturne, le Dr Lumen et les quatre membres du Conseil.
 
-## 3.44 — 2 novembre 2026
-- **Dogfight 3D** — Pilotage 100% autonome au clavier et caméra dynamique.
-  - On peut désormais jouer entièrement au clavier sans toucher à la souris (virages coordonnés ZQSD ou flèches).
-  - La caméra de poursuite est stabilisée sur l'horizon : on voit l'avion réagir, s'incliner et pencher ses ailes dans chaque virage.
-  - L'alignement 3D du F-16 est recalibré au millimètre par un quaternion direct.
+## 3.52 — 2 novembre 2026
+- **Odyssée** — on peut jouer à plusieurs dans la nouvelle version : voir les autres joueurs se promener, échanger un Pokémon et se défier en combat.
+  - Code de sauvegarde (menu → CODE) pour reprendre sa partie sur un autre appareil, et sauvegarde en ligne sur son compte Arcadia.
+- **Arcadia** — tous les jeux du salon à jour : Mollo !, Poké Duel en double, Mini-Golf et le nouvel accueil.
+
+## 3.51 — 2 novembre 2026
+- **Odyssée** — tout le décor est redessiné en pixel art façon HeartGold / SoulSilver.
+  - Herbe, chemins, sable, pavés, neige, eau et rivages ont de vrais bords arrondis ; les hautes herbes sont en rangées de touffes.
+  - Les maisons sont plus simples, et chaque bâtiment a son style : Centre, boutique, arènes, labo, Ligue, chalets, maisons de pêcheurs, musée, phare, pagode.
+  - Nouveaux personnages : les deux héros, Théo, le professeur, maman, l'infirmière, le vendeur, le garde, les huit champions, Célestine et plusieurs dresseurs.
+  - Les 60 créatures originales sont de retour, redessinées, dont 8 nouvelles ; les Pokémon officiels restent les plus nombreux dans les hautes herbes.
+  - Écran titre : Odyssor surgit de l'océan, comme sur SoulSilver.
+  - Nouvelles icônes pour les objets du sac.
+
+## 3.50 — 31 octobre 2026
+- **Odyssée** — la carte de la région est redessinée comme le Pokégear de HeartGold / SoulSilver : mer en dégradé de bleus, côtes en falaises, montagnes en paliers, forêts, grottes, routes blanches et villes en pastilles rouges.
+  - Les flèches passent d'une ville visitée à l'autre et affichent son nom.
+  - Les lieux à part (lac, jardin, forêt des torii) sont marqués en vert.
+
+## 3.49 — 31 octobre 2026
+- **Odyssée** — une histoire secondaire complète en parallèle de l'aventure : la Brume, une organisation qui vole les Pokémon et veut réveiller Groudon. Huit quêtes, à suivre dans le nouveau menu « Quêtes ».
+  - Le Ponyta de Lucie (Sylvebourg, après le premier badge) : enquête auprès des habitants, poursuite dans le Bois Murmure et sa clairière cachée.
+  - Les eaux troubles du Lac Miroir : un nouveau lac au nord de la route 3, son hameau de Rive-Claire, trois pompes à arrêter et la Grotte des Marées à rejoindre en surfant (Mesprit, et un Lokhlass en cadeau).
+  - Les nuits blanches de Floralia : des enfants prisonniers de leurs cauchemars, le Jardin des Songes la nuit, Cresselia sur l'îlot du lac et Darkrai au fond d'un sanctuaire.
+  - Les talismans du Temple Kagura : la Forêt des Torii au bout de la route 7, ses lanternes, sa cloche et Créhelf.
+  - Le cœur du volcan : après la Ligue, le bateau de l'Embarcadère mène à l'Île du Magma. Il faut y prendre d'assaut la base de la Brume pour affronter Groudon, puis Heatran.
+  - Et aussi : le courrier perdu du facteur de Port-Azur, le dragon de pierre du Musée des Dragons et les sept Éclats d'Étoile de la fontaine (Jirachi). Créfadet attend celles et ceux qui ont vu ses deux frères.
+- **Odyssée** — nouveaux décors : fontaine, torii, lanternes, cloche, squelette de dragon, trône… et de nouveaux habitants dessinés comme dans HeartGold / SoulSilver.
+
+## 3.48 — 31 octobre 2026
+- **Odyssée** — l'eau et les fleurs viennent maintenant de HeartGold / SoulSilver : la mer ondule comme sur DS, les rivages ont leur sable et leur écume qui monte et redescend.
+  - Les parterres fleuris sont faits de fleurs rouges, jaunes, bleues et violettes qui se balancent au vent.
+
+## 3.47 — 31 octobre 2026
+- **Odyssée** — le décor passe au nouveau tileset dessiné : herbe, chemins, sable, pavés, neige, sol des bois, grottes, eau et lave animées, ponts, rebords et escaliers.
+  - Les hautes herbes forment de vraies nappes aux bords et aux coins arrondis, dans la prairie, les bois et la neige.
+  - Les intérieurs ont leurs sols : parquet des maisons, damier rose du Centre, damier bleu de la Boutique, tapis rouge de la Ligue, sols des Arènes.
+- **Odyssée** — nouvelles façades : Centre, Boutique, Arène, Labo, Ligue, chalets enneigés à Givrebourg, maisons de pêcheurs et capitainerie dans les ports, Musée des Dragons, Caserne d'Écaille, Tour Mirage, phare et Tour de la Grue.
+
+## 3.46 — 31 octobre 2026
+- **Odyssée** — en attendant les dessins définitifs, les personnages sont ceux de HeartGold / SoulSilver : Ethan, Lyra, Silver, les Champions, les montagnards, les marins… sur la carte comme en combat. Les portraits à côté des dialogues restent.
+- **Odyssée** — les créatures originales sont mises de côté pour l'instant : chacune est remplacée par un Pokémon proche (Germignon, Héricendre et Kaiminus au labo, Kyogre au Cap des Étoiles…).
+- **Odyssée** — tous les Pokémon jusqu'à X / Y (721), avec le type Fée, et quatre nouvelles pierres d'évolution en boutique (Nuit, Aube, Éclat, Glace).
+- **Odyssée** — l'écran d'accueil ne montre plus que la mer et le ciel étoilé.
+
+## 3.45 — 31 octobre 2026
+- Add files via upload (Gabe)
+
+## 3.44 — 31 octobre 2026
+- **Odyssée** — les hautes herbes sont redessinées comme dans HeartGold / SoulSilver : un tapis de touffes bien net, sans carrés ni trous (prairie, bois, neige).
+  - Quand on se tient dans l'herbe, elle cache les jambes du personnage, et elle s'agite quand on y entre.
+
+## 3.43 — 31 octobre 2026
+- **Odyssée** — nouvelles hautes herbes en touffes, comme sur DS : quatre variantes mélangées au hasard (prairie, bois, neige), fini les carrés d'herbe.
+  - Sous l'herbe des bois, le sol est celui du sous-bois.
 
 ## 3.43 — 2 novembre 2026
-- **Dogfight 3D** — Briefing des commandes avant décollage et alignement du F-16.
-  - Une fenêtre d'accueil présente clairement les commandes (visée souris, tir, postcombustion, aérofrein) avant de décoller.
-  - L'avion est désormais parfaitement droit et horizontal dès le départ, et s'incline naturellement dans le sens des virages.
+- **Mollo !** — Trois nouvelles arènes, des objets à ramasser, et on remonte enfin des rebords.
+  - Accroché à un rebord, garde la prise et saute : ton pantin se hisse jusqu'en haut.
+  - Les Rouleaux : deux rouleaux à pointes vont et viennent. Abrite-toi dans l'allée du milieu ou au bout de la dalle.
+  - L'Incinérateur : les tapis t'emmènent vers des trappes qui s'ouvrent sur le feu. Quand l'alarme sonne, sors de là.
+  - Le Tri Postal : quatre tapis en sens contraires, et deux barres qui balaient tout sur leur passage.
+  - Au début de chaque manche, des objets peuvent traîner : la poêle qui assomme, le pétard qui s'allume dès qu'on le prend, le parapluie pour planer, la peau de banane qui fait glisser.
+  - Un appui sur saisir ramasse l'objet, un autre le lance. Pièges et objets se coupent dans les réglages du salon.
+  - Les mains et les pieds ne traversent plus le décor, et le boulet repousse les corps au lieu de passer à travers.
 
 ## 3.42 — 2 novembre 2026
-- **Dogfight 3D** — Nouveau jeu : combats aériens de chasseurs F-16 au canon rotatif Vulcan au-dessus de l'île.
-  - Pilotage arcade ultra accessible à la souris ou au clavier, avec postcombustion et aérofrein.
-  - Combat pur au canon rotatif M61 Vulcan 20 mm, avec traçantes balistiques, jauge de surchauffe et point d'anticipation (Lead Indicator).
-  - Vol libre au-dessus de la grande île en 3D d'Island Rush (montagnes, vallées, cimes enneigées et océan).
-  - Jouable seul contre des bots tactiques (patrouille, courbes de chasse, esquive du relief) ou jusqu'à 6 joueurs en multijoueur.
+- **Poké Duel** — Nouveau format « 2 joueurs contre 2 », à choisir dans les réglages du salon (ligne Format).
+  - Les équipes de deux sont tirées au sort, et des bots complètent s'il manque des joueurs.
+  - Chacun drafte ses 3 Pokémon et dirige le sien sur le terrain, à côté de celui de son coéquipier. Quand il tombe, tu envoies un des tiens.
+  - Le match se joue en 2 manches gagnantes. Ton Pokémon est encadré en jaune, avec le nom de chaque dresseur au-dessus du sien.
+- **Poké Duel** — Combat en double : un tour ne peut plus se jouer deux fois de suite quand un joueur renvoie son choix.
 
 ## 3.41 — 2 novembre 2026
 - **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
@@ -208,6 +284,102 @@
   - Après un K.O., chacun choisit son remplaçant ; « Abandon » remplace la fuite, et un joueur qui quitte ou ne répond plus perd par forfait.
 - **Odyssée** — Code de sauvegarde, pour reprendre sa partie sur un autre appareil : menu (Échap) → CODE, copie le code, puis sur l'autre appareil « Charger un code » sur l'écran titre. Un code incomplet ou mal recopié est refusé.
 - **Odyssée** — Le jeu n'est plus présenté comme un prototype : les Pokémon sont là pour de bon.
+
+## 3.42 — 31 octobre 2026
+- **Odyssée** — les maisons ont de nouvelles façades à colombages redessinées : fenêtres, porte avec son auvent, applique dorée, toit de tuiles.
+  - Le rez-de-chaussée garde son socle de pierre, les étages n'en ont plus.
+
+## 3.41 — 30 octobre 2026
+- **Odyssée** — les pieds des personnages s'affichent en entier, sur les chemins comme sur les ponts.
+- **Odyssée** — un combat sauvage déclenché sur la dernière case d'herbe se joue bien dans les herbes : le joueur ne fait plus un pas de plus sur la route avant le combat.
+- **Odyssée** — on peut examiner les meubles : bibliothèque, télé, frigo, évier, horloge, tableau, étagères…
+  - Les textes changent d'une maison à l'autre, et la télé suit l'aventure.
+  - Une sieste dans ton lit, à la maison, remet ton équipe en forme.
+- **Odyssée** — chez Maman, la plante ne chevauche plus l'évier ; les meubles d'une case (bibliothèque, PC) sont posés sur leur case.
+
+## 3.40 — 30 octobre 2026
+- **Odyssée** — un second rival entre en scène au milieu de l'aventure : l'enfant que tu n'as pas choisi d'incarner (Lyra ou Ethan), petite-fille ou petit-fils du Prof. Saule.
+  - Recrue des Gardes d'Écaille de Drakos, elle ou il te défie à Mirage, à Port-Granit, devant la Tour de Drakos, puis une dernière fois au Cap des Étoiles.
+  - Elle ou il a pris la troisième capsule du labo : son équipe dépend de ton starter.
+- **Odyssée** — l'histoire s'étoffe :
+  - Le Prof. Saule t'appelle après certains badges (le bateau, la Tour de la Grue, sa famille, les îles, Drakos).
+  - De nouveaux habitants racontent les légendes d'Odyssée : les trois oiseaux, Ho-Oh et Lugia, et Odyssor, la baleine des étoiles.
+  - Le professeur suit tes rencontres avec les légendaires, et la fin réunit tes deux rivaux.
+- **Odyssée** — nouvelles herbes hautes, fleurs, barrière et statues redessinées : les herbes forment un vrai tapis, sans quadrillage.
+
+## 3.37 — 30 octobre 2026
+- **Odyssée** — le mobilier des maisons, du Centre, du labo et des arènes est redessiné en pixel art, affiché pixel pour pixel.
+- **Odyssée** — deux arbres côte à côte ne se « hachurent » plus : celui de gauche passe proprement devant celui de droite.
+
+## 3.34 — 30 octobre 2026
+- **Odyssée** — le joueur, la joueuse, Théo, les herbes, les fleurs et les arbres utilisent les dessins retouchés à la main : chaque pixel est affiché tel quel, sans ombre violette ni contour de fond.
+
+## 3.30 — 30 octobre 2026
+- **Odyssée** — nouveaux dessins : le joueur, la joueuse, Théo, les arbres, les rochers, les herbes et les fleurs sont redessinés en pixel art façon DS, vus de 3/4.
+  - Les personnages et le décor sont affichés pixel pour pixel, sans flou, à la bonne taille par rapport aux maisons.
+  - Les forêts sont serrées comme sur DS : de vrais murs d'arbres.
+  - Tous les autres personnages regardent enfin dans la bonne direction quand ils marchent sur le côté, et le mobilier est plus net.
+- **Odyssée** — nouvelle musique d'écran titre : elle commence tout doucement, puis un riff rapide monte en puissance jusqu'à l'entrée de la batterie.
+
+## 3.25 — 30 octobre 2026
+- **Odyssée** — nouveau rendu façon DS : personnages, arbres et objets sont dessinés pixel pour pixel, à taille fixe, sans plus jamais être écrasés ni étirés par la caméra. Les tuiles sont carrées comme sur DS.
+  - Les forêts sont rangées un arbre tous les deux pas, comme dans les jeux DS.
+  - Un arbre ou un personnage derrière une maison passe proprement derrière son toit.
+- **Odyssée** — la carte de la région se découvre en voyageant : au début, seul Bourg-Aube est visible, puis la carte s'agrandit avec chaque route parcourue.
+- **Odyssée** — corrections :
+  - Le personnage ne tourne plus sur lui-même quand il marche vers la gauche ou la droite.
+  - Les légendaires ne sont plus à l'envers sur la carte.
+
+## 3.24 — 30 octobre 2026
+- **Odyssée** — les arbres, les personnages et les maisons ne sont plus écrasés en bas de l'écran : tout garde la même hauteur partout, comme sur DS.
+- **Odyssée** — un bateau pour les îles de l'Est, depuis l'Embarcadère de l'Aube (à droite de la route 1).
+  - Île Orageuse avec 2 badges, Île de la Grue avec 3, Île Givrée (tout au nord, sous la neige) avec 5.
+  - Pas d'arène sur ces îles, mais des dresseurs plus forts que l'arène précédente.
+- **Odyssée** — des légendaires à capturer, chacun au bout d'une quête :
+  - Celebi dans le Bois Murmure, dès le premier badge (une vieille dame de Sylvebourg a quelque chose pour toi).
+  - Électhor sur le Pic Tonnerre (rallume les trois relais de l'Île Orageuse) et Mew à l'autel des ruines (lis les trois stèles, 4 badges).
+  - Ho-Oh au sommet de la Tour de la Grue, à Hautegrue : bats les Sages pour obtenir la Plume Arc-en-ciel. Sulfura niche dans le cratère voisin (Coupe).
+  - Raikou, Entei et Suicune s'enfuient de la tour et se cachent dans les îles (5 badges).
+  - Artikodin sur la Cime Givrée, puis Lugia au fond de la Grotte des Tourbillons.
+  - Et un secret pour le Maître de la Ligue, sur l'Île Orageuse…
+
+## 3.23 — 30 octobre 2026
+- **Odyssée** — une aventure bien plus longue : huit arènes et la Ligue.
+  - Les quatre premières arènes se font dans l'ordre, puis de nouvelles zones s'ouvrent au fil des badges : Mirage, puis la mer et l'archipel.
+  - Trois îles tenues par trois frères Champions, de plus en plus forts : Basalte (Île de Granit), Pyros (Cendrelune) et Drakos, le tyran de la Grande Île, ancien rival de la Maître Célestine.
+  - Odyssor, la baleine des étoiles, apparaît au Cap des Étoiles après le huitième badge.
+- **Odyssée** — de nouvelles créatures : Capyousse, Mèchelet et Narvi sont les nouveaux starters, et une cinquantaine de créatures originales rejoignent les Pokémon (qui restent).
+- **Odyssée** — capacités de terrain : Coupe (petits arbres), Surf (on traverse la mer sur le dos d'une créature), Éclate-Roc (rochers fissurés) et Vol (retour éclair dans une ville déjà visitée). Les Champions les donnent après leur victoire ; face à l'obstacle, appuie sur F.
+- **Odyssée** — nouvel écran titre : Odyssor nage dans la mer, sous la lune.
+- **Odyssée** — on interagit avec F ; un petit bouton gris en bas de l'écran (ou H) affiche toutes les touches, un autre ouvre le menu (Échap).
+- **Odyssée** — la partie se sauvegarde depuis le menu, et aussi automatiquement à chaque porte.
+- **Odyssée** — corrections :
+  - On ne peut plus prendre une créature au labo avant d'avoir parlé au Professeur Saule : il t'accueille dès l'entrée.
+  - Le rival Théo n'apparaît plus dans un mur et repart proprement après chaque combat ; il prend toujours le starter qui a l'avantage sur le tien.
+  - Le Sac a une poche « Objets rares » (CS, Carte) ; les objets rares ne se jettent ni ne se vendent plus.
+  - Le Pokédex commence par les créatures d'Odyssée ; les personnages ont leur portrait à côté des dialogues.
+
+## 3.22 — 30 octobre 2026
+- Add files via upload (Gabe)
+
+## 3.21 — 30 octobre 2026
+- Add files via upload (Gabe)
+
+## 3.20 — 30 octobre 2026
+- Add files via upload (Gabe)
+
+## 3.19 — 30 octobre 2026
+- Add files via upload (Gabe)
+
+## 3.18 — 29 octobre 2026
+- **Mini-Golf Party** — Nouveau parcours « Le Marathon » : 18 trous géants, de 110 à plus de 300 m chacun (par 99), qui enchaînent toutes les épreuves des autres parcours.
+  - Cinq épingles qui grimpent au col, une grande descente glacée, des sauts, trois loopings, deux tunnels aimantés, un pont suspendu, des marteaux, une spirale de 300 m qui descend vers le trou…
+  - Partie de 18 trous, ou de 9 (l'aller ou le retour). Le survol du départ remonte tout le trou, et les ombres restent nettes autour de ta balle même au bout de la carte.
+- **Mini-Golf Party** — Fini les déconnexions de l'hôte en pleine partie : quand l'hôte visait, tirait ou faisait jouer un bot, ses propres messages lui revenaient et repartaient en boucle, des milliers de fois par seconde, jusqu'à saturer sa connexion.
+  - La balle qui roule et la visée des autres passent en flux léger : si la connexion sature, une image est sautée au lieu de tout ralentir.
+  - Si l'hôte part quand même, le nouvel hôte reprend la partie à la même heure : l'intro du trou, la pause entre deux trous, le minuteur et les obstacles ne se figent plus.
+  - Un joueur parti ne fait plus attendre les autres à chaque trou, et ne marque plus 0 sur les trous qu'il n'a pas joués. S'il revient (l'ancien hôte compris), il reprend le trou en cours.
+  - Le tour d'un joueur en coupure passe au bout de 12 secondes, même en temps libre.
 
 ## 3.17 — 28 octobre 2026
 - **Birdie Party** — Nouveau parcours « Les Géants » : 18 trous immenses, de 600 m à plus d'un kilomètre (par 6 à 8), à travers la campagne, la mer, la montagne et le désert.

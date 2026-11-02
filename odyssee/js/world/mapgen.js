@@ -6,9 +6,9 @@ const key = (x, y) => x + ',' + y;
 
 export const BUILDINGS = {
   house: { w: 4, d: 3, h: 2, door: 1 }, house2: { w: 5, d: 3, h: 2, door: 2 }, bighouse: { w: 6, d: 4, h: 3, door: 2 },
-  center: { w: 5, d: 4, h: 2, door: 2, style: 'center', roof: 'red' }, mart: { w: 4, d: 4, h: 2, door: 1, style: 'mart', roof: 'blue' },
-  gym: { w: 7, d: 5, h: 2, door: 3, style: 'gym', roof: 'gray' }, lab: { w: 6, d: 4, h: 2, door: 2, style: 'lab', roof: 'teal' },
-  league: { w: 9, d: 6, h: 3, door: 4, style: 'league', roof: 'purple' }, cave: { w: 5, d: 3, h: 2, door: 2, style: 'cave', roof: 'cave' },
+  center: { w: 5, d: 4, h: 3, door: 2, style: 'center', roof: 'red' }, mart: { w: 4, d: 4, h: 3, door: 1, style: 'mart', roof: 'blue' },
+  gym: { w: 7, d: 5, h: 3, door: 3, style: 'gym', roof: 'gray' }, lab: { w: 6, d: 4, h: 3, door: 2, style: 'lab', roof: 'teal' },
+  league: { w: 9, d: 6, h: 4, door: 4, style: 'league', roof: 'purple' }, cave: { w: 5, d: 3, h: 2, door: 2, style: 'cave', roof: 'cave' },
   tower: { w: 4, d: 4, h: 3, door: 1, style: 'tower', roof: 'brown' }, gate: { w: 6, d: 3, h: 2, door: 2, style: 'house2', roof: 'gray' },
 };
 
@@ -44,13 +44,13 @@ export class GameMap {
   object(x, y, o) { this.objects.set(key(x, y), o); }
   objectAt(x, y) { return this.objects.get(key(x, y)); }
   /** décor bloquant (lampadaire, pot…) */
-  prop(k, x, y, block = true) { this.deco.push({ k, x, y }); if (block) { if (this.get(x, y) !== T.BLOCK) this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.BLOCK); } }
+  prop(k, x, y, block = true, o = {}) { this.deco.push({ k, x, y, ...o }); if (block) { if (this.get(x, y) !== T.BLOCK) this.under.set(key(x, y), this.get(x, y)); this.set(x, y, T.BLOCK); } }
   underAt(x, y) { return this.under.get(key(x, y)); }
 
   /** pose un bâtiment ; renvoie la position de la porte */
   building(kind, x, y, o = {}) {
     const B = { ...BUILDINGS[kind] }; for (const [k, v] of Object.entries(o)) if (v !== undefined) B[k] = v;
-    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label };
+    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label, name: o.name, kit: o.kit };
     for (let j = 0; j < B.d; j++) for (let i = 0; i < B.w; i++) this.set(x + i, y + j, T.BUILD);
     const dx = x + B.door, dy = y + B.d - 1;
     if (B.door >= 0) this.set(dx, dy, T.DOOR);
@@ -83,16 +83,19 @@ export class GameMap {
   }
 
   /** accessibilité depuis un point (sans tenir compte des PNJ) */
-  reach(x0, y0, passGates = true, withNpcs = false) {
+  // abil : on dispose de toutes les capacités de terrain (Coupe, Éclate-Roc, Surf)
+  reach(x0, y0, passGates = true, withNpcs = false, abil = false) {
     const seen = new Uint8Array(this.w * this.h), q = [[x0, y0]]; seen[y0 * this.w + x0] = 1;
-    const blocked = new Set(); if (!passGates) for (const g of this.gates) for (const [x, y] of g.tiles) blocked.add(key(x, y));
+    // passGates : true (tous), false (aucun) ou un nombre de badges ; abil : true (toutes les capacités) ou un Set de cases franchissables
+    const blocked = new Set(); if (passGates !== true) for (const g of this.gates) if (passGates === false || g.badges > passGates) for (const [x, y] of g.tiles) blocked.add(key(x, y));
+    const can = (t) => (abil === true ? t === T.CUT || t === T.SMASH || t === T.WATER || t === T.BOULDER : !!abil && abil.has(t));
     if (withNpcs) { for (const n of this.npcs) if (!n.gate) blocked.add(key(n.x, n.y)); for (const it of this.items) blocked.add(key(it.x, it.y)); }
     while (q.length) {
       const [x, y] = q.pop();
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = x + dx, ny = y + dy; if (!this.in(nx, ny) || seen[ny * this.w + nx]) continue;
         const t = this.get(nx, ny);
-        let ok = walkable(t) && this.height(nx, ny) === this.height(x, y);
+        let ok = (walkable(t) || can(t)) && this.height(nx, ny) === this.height(x, y);
         if (t === T.LEDGE && dy === 1 && walkable(this.get(nx, ny + 1))) { seen[ny * this.w + nx] = 1; if (!seen[(ny + 1) * this.w + nx]) { seen[(ny + 1) * this.w + nx] = 1; q.push([nx, ny + 1]); } continue; }
         if (t === T.LEDGE_E && dx === 1 && walkable(this.get(nx + 1, ny))) { if (!seen[ny * this.w + nx + 1]) { seen[ny * this.w + nx + 1] = 1; q.push([nx + 1, ny]); } continue; }
         if (t === T.LEDGE_W && dx === -1 && walkable(this.get(nx - 1, ny))) { if (!seen[ny * this.w + nx - 1]) { seen[ny * this.w + nx - 1] = 1; q.push([nx - 1, ny]); } continue; }

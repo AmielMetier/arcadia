@@ -42,6 +42,19 @@ const mv = (moveId, target) => ({ type: 'move', moveId, target });
   ok(b.phase === 'choose' && getActivePokemon(b, 'B').id === 3, 'Florizarre entre en B');
 }
 
+{ // 2 contre 2 entre joueurs : chaque emplacement ne peut envoyer que les Pokémon de son dresseur
+  const b = createBattle({ trainerA: { id: 1, name: 'A & C' }, trainerB: { id: 2, name: 'B & D' }, doubles: true,
+    teamA: [mon(150, { ability: null }), mon(6), mon(3), mon(25, { hp: 1, ability: null }), mon(9), mon(130)],
+    teamB: [mon(143, { ability: null }), mon(65), mon(94), mon(149), mon(248), mon(376)],
+    pools: { A: [0, 1, 2], C: [3, 4, 5], B: [0, 1, 2], D: [3, 4, 5] }, owners: { A: 1, C: 3, B: 2, D: 4 } });
+  ok(getActivePokemon(b, 'C').id === 25 && getActivePokemon(b, 'D').id === 149, 'chaque joueur commence avec son premier Pokémon');
+  const atk = b.teamB[0].moves.find((k) => MOVES[k].power) ;
+  resolveActions(b, { A: mv('protect'), C: null, B: mv(atk, 'C'), D: mv('protect') });
+  ok(b.phase === 'switch_forced' && b.need.includes('C'), 'Pikachu K.O. : C doit être remplacé');
+  ok(!forceSwitch(b, 'C', 1), 'C ne peut pas envoyer un Pokémon du coéquipier');
+  ok(forceSwitch(b, 'C', 4) && getActivePokemon(b, 'C').id === 9, 'C envoie un des siens');
+}
+
 // combats complets entre bots
 const ids = POKEMON_ROSTER.map((p) => p.id);
 let turnsTotal = 0, spreadSeen = 0, protectSeen = 0;
