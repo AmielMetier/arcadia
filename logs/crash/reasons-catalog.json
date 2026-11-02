@@ -294,6 +294,18 @@
         "EXP_PEER_LEFT_MIDGAME : un joueur quitte pendant un échange ou un combat entre joueurs (forfait)",
         "EXP_HOST_MIGRATION_RESET : changement d'hôte pendant la partie"
       ]
+    },
+    {
+      "id": "plouf",
+      "title": "Plouf !",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D, décor dessiné dans le code)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL sur le radeau 3D"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : joueur parti pendant une manche (retiré du radeau ; les bots continuent)"
+      ]
     }
   ]
 }

@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.35 — 2 novembre 2026
+- **Plouf !** — Nouveau jeu : un radeau dans la Baie des Anges, et le dernier au sec gagne la manche.
+  - Deux gestes : maintiens Espace pour armer ta poussée et lâche pour foncer (plus tu armes, plus tu envoies loin), ou attrape un joueur avec E pour le jeter à l'eau.
+  - Soulevé par quelqu'un ? Martèle les boutons pour te dégager.
+  - Au bord, si tu arrives doucement, tu te rattrapes en moulinant des bras ; lancé, c'est le plongeon.
+  - Les planches du bord branlent puis coulent : le radeau rétrécit jusqu'à ce qu'il ne reste qu'un baigneur.
+  - Cinq radeaux, un par manche : le Radeau de la Prom', le Ponton du Port, le Plongeoir, les Deux Radeaux et la Bouée Géante, plus grands à partir de 6 joueurs.
+  - Des pastèques à lancer sur les autres, une bouée qui te repêche une fois, et des coups de mistral qui poussent tout le monde.
+  - Tombé à l'eau, tu deviens une mouette : survole le radeau et lâche des sardines sur ceux qui restent.
+  - De 1 à 6 joueurs, et des bots (facile, moyen, difficile) jusqu'à 8 sur le radeau. Au clavier, à la souris, à la manette ou au doigt.
+
 ## 3.34 — 31 octobre 2026
 - **Poké Duel** — Le bouton Méga-Évolution ne décale plus les attaques dans la colonne de droite : il se place au-dessus d'elles.
 - **Poké Duel** — Sandstorm se relance bien en combat, même si l'ancienne version du morceau était restée en mémoire, et la musique repart au premier clic ou à la première touche si le navigateur l'avait bloquée.

@@ -219,6 +219,24 @@ window.HUB_GAMES = [
     ],
     cover: 'royale/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
+  {
+    id: 'plouf',
+    title: 'Plouf !',
+    tag: 'Le dernier au sec gagne',
+    desc: 'Sur un radeau qui coule planche par planche dans la Baie des Anges : pousse, attrape et jette tes potes à l\'eau. Tombé, tu deviens mouette et tu les bombardes de sardines.',
+    url: 'plouf/',
+    minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 sur le radeau avec les bots
+    accent: '#17c3d6',
+    icon: '🌊', score: 'Record de manches gagnées',
+    settings: [
+      { key: 'goal', label: 'Manches à gagner', options: [[2, '2'], [3, '3'], [5, '5']], def: 3 },
+      { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7']], def: 2 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'items', label: 'Pastèques et bouées', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'wind', label: 'Coups de mistral', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+    ],
+    cover: 'plouf/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
@@ -263,5 +281,8 @@ window.HUB_GAME_INFO = {
   royale: { genre: 'action', time: '10–20 min',
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
+  plouf: { genre: 'party', time: '5–10 min',
+    keys: [['ZQSD', 'Se déplacer'], ['Espace', 'Maintenir pour armer, lâcher pour pousser'], ['E', 'Attraper un joueur ou une pastèque, puis lancer'], ['Échap', 'Menu']],
+    tips: ['Plus tu armes longtemps, plus tu envoies loin… mais tu avances au ralenti.', 'Soulevé ? Martèle Espace pour te dégager.', 'Arrive doucement au bord : tu te rattrapes. Lancé, c\'est le plongeon.', 'Tombé à l\'eau, tu deviens mouette : vise avec le cercle et lâche ta sardine.'] },
 };
 window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];

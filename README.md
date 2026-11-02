@@ -1,4 +1,4 @@
-# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
+# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Plouf !
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -140,6 +140,23 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
+## Plouf !
+Jeu de bousculade en 3D (Three.js) sur un radeau dans la Baie des Anges, de 1 à 6 joueurs, complétés par des bots
+jusqu'à 8 sur le radeau. Le dernier au sec gagne la manche ; le premier à 2, 3 ou 5 manches gagne la partie.
+- **Deux actions** : Pousser (maintenir pour armer, lâcher pour foncer : plus on arme, plus on envoie loin) et Attraper
+  (un joueur ou une pastèque, qu'on lance ensuite droit devant). Soulevé, on martèle les boutons pour se dégager.
+- **Le bord** : arrivé lentement, on se rattrape en moulinant des bras ; lancé, c'est le plongeon.
+- **Cinq radeaux** (le Radeau de la Prom', le Ponton du Port, le Plongeoir, les Deux Radeaux, la Bouée Géante),
+  agrandis d'une rangée à partir de 6 joueurs ; les planches du bord branlent puis coulent, celles du centre tiennent jusqu'à 70 s.
+- **Objets et vent** : pastèques à lancer, bouée qui repêche une fois, coups de mistral annoncés ; règles maison pour les retirer.
+- **Les éliminés deviennent des mouettes** qui survolent le radeau et lâchent des sardines sur ceux qui restent.
+- Bots Facile, Moyen, Difficile (chemin de planche en planche, se placent côté terre pour pousser vers l'eau).
+- Clavier (ZQSD, Espace, E), souris, manette ou écran tactile (joystick et deux boutons).
+- Tout est dessiné dans le code (aucun modèle à charger) ; musique et sons synthétisés (WebAudio).
+- Réseau (`plouf/app.js`) : l'hôte simule à 60 Hz et envoie 20 instantanés par seconde ; l'invité prédit son propre
+  déplacement avec le même code que l'hôte (`stepPlayer`). `?lag=150` simule 150 ms d'aller-retour pour tester entre onglets ;
+  `?debug` expose `__plouf.run(2)`, qui fait avancer le jeu de 2 s image par image.
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -152,7 +169,9 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
-  `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots.
+  `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
+  `node tools/test-plouf.mjs` teste le moteur de Plouf ! (radeaux, poussée, prise et lancer, bouée, mouette, parties entières
+  entre bots, reprise par un nouvel hôte, prédiction de l'invité).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
   `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous
