@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.54 — 2 novembre 2026
+- **Mollo !** — Le combat est revu de fond en comble.
+  - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.
+  - Nouveau : la garde (Maj ou C). Elle arrête les poings, mais elle s'use vite.
+  - Le gros coup brise la garde, la saisie passe à travers et attrape celui qui arme, le poing fait lâcher une saisie : à toi de lire l'adversaire.
+  - Trois poings d'affilée éjectent. Assommer demande plus de travail : il fallait 4 poings, il en faut environ 9.
+  - Un gros coup dans le vide te déséquilibre, et une barre sous chaque nom montre qui est sonné.
+  - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
+  - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
+  - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
+
 ## 3.53 — 2 novembre 2026
 - **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.
   - Le Dr Lumen, menacé dans le Bois Murmure, offre la CS Flash : la Grotte Lunaire est désormais plongée dans le noir.

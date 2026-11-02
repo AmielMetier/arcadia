@@ -136,6 +136,22 @@ export function createScene(stage, { onLost } = {}) {
     for (const [id, it] of items) if (!seen.has(id)) { scene.remove(it.o); items.delete(id); }
   }
 
+  // ---------------------------------------------------------------- ce qu'il faut lire chez l'adversaire : la garde levée, le gros coup qui s'arme
+  const shieldGeo = new THREE.SphereGeometry(0.62, 20, 14), shieldMat = new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.3, depthWrite: false }); // une bulle : elle se lit sous tous les angles
+  const shields = new Map();
+  function drawStances(v, now) {
+    for (const p of v.players) {
+      let m = shields.get(p.id);
+      const on = !!p.pos && !!(p.fl & FL.GUARD);
+      if (on && !m) { m = new THREE.Mesh(shieldGeo, shieldMat); scene.add(m); shields.set(p.id, m); }
+      if (m) {
+        m.visible = on;
+        if (on) m.position.set(p.pos[3] + Math.sin(p.yaw) * 0.12, p.pos[4] + 0.12, p.pos[5] + Math.cos(p.yaw) * 0.12);
+      }
+      if (p.pos && (p.fl & FL.CHARGE) && Math.random() < 0.45) { const r = Math.sin(now * 40) > 0 ? 9 : 12; burst(p.pos[r], p.pos[r + 1], p.pos[r + 2], '#ffc531', 1, 0.8, 0.05, 1, 2); }
+    }
+  }
+
   function buildWorld(key, rd, hazards) {
     if (world) { scene.remove(world.group); world.geos.forEach((g) => g.dispose()); world.tex.forEach((t) => t.dispose()); world.own.forEach((m) => m.dispose()); if (world.flames.mesh) world.flames.mesh.dispose(); for (const r of world.rollers) r.R.children[1].dispose(); }
     clearItems();
@@ -305,6 +321,7 @@ export function createScene(stage, { onLost } = {}) {
         if (open > 0.5 && Math.random() < dt * 22) burst(-2.2 + Math.random() * 4.4, -1.6, -1.7 + Math.random() * 3.4, '#ffa23f', 1, 1.5, 0.05, 2.5, -2.5);
       }
       drawItems(v, now);
+      drawStances(v, now);
       pantins.draw(v.players, dt, arena);
       stepParts(dt);
       frameCam(v, dt);
@@ -314,6 +331,7 @@ export function createScene(stage, { onLost } = {}) {
       removeEventListener('resize', resize);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
       if (world) world.geos.forEach((g) => g.dispose());
+      shieldGeo.dispose(); shieldMat.dispose();
       clearItems(); Object.values(itemGeo).forEach((g) => g.dispose()); unitCone.dispose(); flameGeo.dispose(); fireTex.dispose();
       pantins.dispose(); for (const t of Object.values(textures)) t.dispose(); for (const t of Object.values(skies)) t.dispose(); windows.dispose(); cityGeo.dispose(); pmesh.geometry.dispose(); renderer.dispose();
       renderer.domElement.remove();

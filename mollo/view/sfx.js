@@ -125,6 +125,9 @@ export class Sfx {
       case 'peel': this.sweep(1500, 240, 0.28, 0.2, 'sine'); this.sweep(90, 70, 0.1, 0.2, 'triangle', 0.26); break;
       case 'pick': this.sweep(520, 880, 0.09, 0.16, 'triangle'); break;
       case 'toss': this.burst(0.16, 900, 0.16, 'bandpass', 1.4, 3); break;
+      case 'block': this.sweep(190, 120, 0.1, 0.34, 'triangle'); this.burst(0.05, 900, 0.16, 'bandpass', 1); break;
+      case 'break': this.burst(0.12, 2200, 0.34, 'bandpass', 0.7); this.sweep(420, 90, 0.26, 0.4, 'sawtooth'); break;
+      case 'catch': this.sweep(300, 760, 0.12, 0.28); this.burst(0.08, 2600, 0.16); break;
       case 'gust': this.burst(1.4, 500, 0.14, 'bandpass', 0.8, 2.5); break;
       case 'tick': this.sweep(880, 880, 0.12, 0.2, 'triangle'); break;
       case 'go': // coup de sifflet de chef de chantier

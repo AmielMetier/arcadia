@@ -48,7 +48,9 @@ const SETTINGS = {
     ['Frapper (maintenir : gros coup) · en l\'air avec de l\'élan : coup de pied sauté', '<kbd>F</kbd> ou <kbd>J</kbd>, clic gauche', 'Ⓧ'],
     ['Saisir un adversaire ou un rebord (maintenir) · lâcher : jeter', '<kbd>E</kbd> ou <kbd>K</kbd>, clic droit', 'Ⓑ'],
     ['Ramasser un objet · le lancer', 'appui sur <kbd>E</kbd>', 'Ⓑ'],
-    ['Assommé : revenir à soi · porté : se dégager', 'marteler <kbd>F</kbd>', 'Ⓧ'],
+    ['Se protéger (arrête les poings, s\'use vite)', '<kbd>Maj</kbd> ou <kbd>C</kbd>', 'Ⓨ ou LB'],
+    ['En tenant quelqu\'un : coup de tête', '<kbd>F</kbd>', 'Ⓧ'],
+    ['Assommé : revenir à soi · tenu : se dégager', 'marteler <kbd>F</kbd>', 'Ⓧ'],
     ['Pause', '<kbd>Échap</kbd>', 'Start'],
   ] }] }],
 };
@@ -203,7 +205,7 @@ function hostView(sim, f) {
   });
   return { ph: sim.ph, pt: sim.pt, rd: sim.rd, rt: sim.rt, at: sim.at, go: sim.goal, rw: sim.rw, win: sim.win, ar: sim.arena.key, hz: sim.hazards ? 1 : 0, gu: sim.gust ? 1 : 0, players, items: sim.items.map((i) => ({ id: i.id, k: i.k, x: i.x, y: i.y, z: i.z, holder: i.holder ? i.holder.id : -1, fuse: i.fuse })), me: players.find((p) => p.me) || null };
 }
-const flagsOf = (b) => (b.grip[0] ? 1 : 0) | (b.grip[1] ? 2 : 0) | (b.lifting ? FL.LIFTING : 0) | (b.charge > 0.05 ? FL.CHARGE : 0) | (b.kick > 0 ? FL.KICK : 0) | (b.grounded ? FL.GROUND : 0) | (b.liftedBy >= 0 ? FL.LIFTED : 0) | (b.heldBy > 0 ? FL.HELD : 0) | (b.grip.some((q) => q && q.box) ? FL.HANG : 0);
+const flagsOf = (b) => (b.grip[0] ? 1 : 0) | (b.grip[1] ? 2 : 0) | (b.lifting ? FL.LIFTING : 0) | (b.charge > 0.05 ? FL.CHARGE : 0) | (b.kick > 0 ? FL.KICK : 0) | (b.grounded ? FL.GROUND : 0) | (b.liftedBy >= 0 ? FL.LIFTED : 0) | (b.heldBy > 0 ? FL.HELD : 0) | (b.grip.some((q) => q && q.box) ? FL.HANG : 0) | (b.guard ? FL.GUARD : 0);
 
 function onRoster() {
   if (!S.alive) return;
@@ -262,7 +264,7 @@ function onMsg(from, m) {
 
 function cleanInput(m) {
   const n = (v, a, b) => (Number.isFinite(+v) ? clamp(+v, a, b) : 0);
-  return { mx: n(m.mx, -1, 1), mz: n(m.mz, -1, 1), jump: !!m.jump, punch: !!m.punch, grab: !!m.grab, pc: m.pc | 0, jc: m.jc | 0, gc: m.gc | 0 };
+  return { mx: n(m.mx, -1, 1), mz: n(m.mz, -1, 1), jump: !!m.jump, punch: !!m.punch, grab: !!m.grab, guard: !!m.guard, pc: m.pc | 0, jc: m.jc | 0, gc: m.gc | 0 };
 }
 
 // ------------------------------------------------------------------ invité
@@ -335,7 +337,9 @@ function fxEvent(e, v) {
     case 'ko': scene && scene.hurt(e.id); fx && fx.ko(e.x, e.y, e.z); sfx.play('ko'); hitStop(0.09); if (e.id === S.myId) hud.toast('Assommé ! Martèle les boutons', 1.8); else if (e.by === S.myId) hud.feed(`Tu assommes ${nameOf(e.id)} 💫`); break;
     case 'wake': if (e.id === S.myId) sfx.play('wake'); break;
     case 'land': fx && fx.dust(e.x, e.y, e.z, e.k); sfx.play('land', { vol: e.k }); break;
-    case 'grab': sfx.play('grab'); if (e.who === S.myId) hud.toast('On t\'attrape ! Martèle pour te dégager', 1.3); break;
+    case 'grab': sfx.play(e.caught ? 'catch' : 'grab'); if (e.caught && fx && e.x !== undefined) { fx.hit(e.x, e.y, e.z, 0.5); hitStop(0.06); } if (e.who === S.myId) hud.toast(e.caught ? 'Pris à contre-pied ! Martèle pour te dégager' : 'On t\'attrape ! Martèle pour te dégager', 1.3); else if (e.caught && e.id === S.myId) hud.toast('Bien vu !', 0.9); break;
+    case 'block': fx && fx.grip(e.x, e.y, e.z); sfx.play('block'); if (e.id === S.myId || e.by === S.myId) hitStop(0.04); break;
+    case 'break': scene && scene.hurt(e.id); fx && fx.hit(e.x, e.y, e.z, 0.8); sfx.play('break'); hitStop(0.09); if (e.id === S.myId) hud.toast('Garde brisée !', 1); break;
     case 'hold': if (e.id === S.myId) sfx.play('hold'); break;
     case 'slip': if (e.id === S.myId) { sfx.play('slip'); hud.toast('Tes mains glissent !', 1.1); } break;
     case 'climb': if (e.id === S.myId) sfx.play('climb'); break;
@@ -404,7 +408,7 @@ function step(dt) {
   stopCd -= dt;
   const blocked = S.lobby || S.endShown || S.menu;
   const raw = input.sample();
-  S.inp = blocked ? { ...raw, mx: 0, mz: 0, jump: false, punch: false, grab: false } : raw;
+  S.inp = blocked ? { ...raw, mx: 0, mz: 0, jump: false, punch: false, grab: false, guard: false } : raw;
 
   let view = null;
   if (S.role !== 'guest' && S.sim) view = hostFrame(dt);

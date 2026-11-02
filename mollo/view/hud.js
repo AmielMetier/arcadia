@@ -51,7 +51,8 @@ export class HUD {
       let t = this.tags.get(p.id);
       if (!t) { t = document.createElement('div'); t.className = 'tag'; this.labels.appendChild(t); this.tags.set(p.id, t); }
       const s = toScreen(p.pos[6], p.pos[7] + 0.68, p.pos[8]);
-      const html = `${p.me ? '▼ ' : ''}${esc(p.name)}`;
+      const st = p.st === ST.LIVE && p.dz > 0.04 ? Math.round(Math.min(1, p.dz) * 10) * 10 : 0; // le niveau de sonné : se lit d'un coup d'œil
+      const html = `${p.me ? '▼ ' : ''}${esc(p.name)}${st ? `<span class="stun${st >= 50 ? ' hot' : ''}"><i style="width:${st}%"></i></span>` : ''}`;
       if (t._h !== html) { t.innerHTML = html; t._h = html; }
       t.style.setProperty('--c', p.color);
       t.style.transform = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) translate(-50%, -100%)`;
@@ -76,8 +77,8 @@ const ITEM_LABEL = { poele: 'la poêle 🍳', petard: 'le pétard 🧨 (il s\'al
 const K = (mode, k, pad, touch) => (mode === 'touch' ? `<kbd class="t">${touch}</kbd>` : mode === 'pad' ? `<kbd class="p">${pad}</kbd>` : `<kbd>${k}</kbd>`);
 function promptFor(v, me, mode, tips) {
   if (!me || v.ph === 'over' || v.ph === 'round') return '';
-  const pu = K(mode, 'F', 'X', '👊'), gr = K(mode, 'E', 'B', '✋'), ju = K(mode, 'Espace', 'A', '⬆️');
-  const all = `${pu} <b>frappe</b> (maintiens : gros coup) · ${gr} <b>saisis</b> (maintiens pour tenir) · ${ju} <b>saute</b>`;
+  const pu = K(mode, 'F', 'X', '👊'), gr = K(mode, 'E', 'B', '✋'), ju = K(mode, 'Espace', 'A', '⬆️'), ga = K(mode, 'Maj', 'Y', '🛡️');
+  const all = `${pu} <b>frappe</b> (maintiens : gros coup) · ${ga} <b>protège-toi</b> · ${gr} <b>saisis</b> · ${ju} <b>saute</b>`;
   if (v.ph === 'count') return tips ? all : '';
   if (me.st === ST.OUT) return v.ph === 'play' ? '💨 Tu es tombé… regarde les autres se débrouiller' : '';
   if (me.st === ST.KO) return `💫 Assommé ! Martèle ${pu} ou ${ju} pour revenir à toi`;
@@ -86,8 +87,9 @@ function promptFor(v, me, mode, tips) {
   if (f & FL.LIFTED) return `😱 On te porte ! Martèle ${pu} pour lui faire lâcher prise`;
   if (f & FL.LIFTING) return `💪 Va au bord et lâche ${gr} : tu le jettes`;
   if (f & FL.HANG) return `🫳 Garde ${gr} et appuie sur ${ju} pour te hisser`;
-  if (f & FL.GRIP) return `✊ Tu le tiens : traîne-le au bord, ou ${ju} pour le soulever s'il est sonné`;
+  if (f & FL.GRIP) return `✊ Tu le tiens : ${pu} coup de tête · ${ju} soulève-le s'il est sonné · lâche ${gr} au bord`;
   if (f & FL.HELD) return `😬 On te tient ! Martèle ${pu} pour te dégager`;
+  if (f & FL.GUARD) return '🛡️ Les poings ne passent plus, mais le gros coup et la saisie, si. Et la garde s\'use !';
   if (mine) {
     if (mine.k === 'poele') return `🍳 ${pu} : coup de poêle, ça assomme vite · ${gr} : la lancer`;
     if (mine.k === 'petard') return `🧨 Ça va péter dans ${Math.ceil(mine.fuse)} s ! ${gr} : le lancer`;
@@ -99,7 +101,7 @@ function promptFor(v, me, mode, tips) {
     const near = (v.items || []).find((i) => i.holder < 0 && Math.hypot(i.x - me.pos[3], i.y - me.pos[4], i.z - me.pos[5]) < 1.25);
     if (near) return `${gr} : ramasser ${ITEM_LABEL[near.k]}`;
   }
-  if (f & FL.CHARGE) return '💥 Lâche pour frapper fort';
+  if (f & FL.CHARGE) return '💥 Lâche pour frapper fort. Attention : on peut t\'attraper !';
   if (me.dz > 0.65) return '😵 Encore un coup et tu t\'endors : éloigne-toi !';
   return tips ? all : '';
 }
@@ -128,12 +130,13 @@ export function briefingHtml({ role, squad, cfg, embedded, bots }) {
       <div><h3>Les mollassons</h3><ul class="squad">${list}</ul>${segs}</div>
       <div class="ctrl"><h3>Commandes</h3>
         <p><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> marcher · <kbd>Espace</kbd> <b>sauter</b></p>
-        <p><kbd>F</kbd> ou clic gauche <b>frapper</b> · maintiens, lâche : <b>gros coup</b> · en pleine course et en l'air : <b>coup de pied sauté</b></p>
+        <p><kbd>F</kbd> ou clic gauche <b>frapper</b>, le coup va chercher qui est devant toi : trois poings d'affilée l'éjectent · maintiens, lâche : <b>gros coup</b> · en pleine course et en l'air : <b>coup de pied sauté</b></p>
+        <p><kbd>Maj</kbd> <b>se protéger</b> : la garde arrête les poings, le gros coup la brise, la saisie passe à travers. Le poing, lui, fait lâcher une saisie</p>
         <p><kbd>E</kbd> ou clic droit, <b>maintenu</b> : tes mains s'accrochent à ce qu'elles touchent, un rebord ou un adversaire</p>
-        <p>💫 Trop de coups, surtout à la tête : assommé. Tiens-le, <kbd>Espace</kbd> pour le soulever, lâche <kbd>E</kbd> pour le jeter</p>
+        <p>💫 La barre sous son nom se remplit : assommé quand elle est pleine. Tiens-le, <kbd>F</kbd> coup de tête, <kbd>Espace</kbd> pour le soulever, lâche <kbd>E</kbd> pour le jeter</p>
         <p>🫳 Accroché à un rebord, garde <kbd>E</kbd> et appuie sur <kbd>Espace</kbd> pour te hisser. Tes bras fatiguent vite !</p>
         <p>🎁 Selon les manches, des objets traînent : <b>poêle</b>, <b>pétard</b>, <b>parapluie</b>, <b>peau de banane</b>. <kbd>E</kbd> pour ramasser, <kbd>E</kbd> pour lancer</p>
-        <p class="alt">Manette : stick, Ⓐ sauter, Ⓧ frapper, Ⓑ saisir · Au doigt : joystick à gauche, boutons à droite</p>
+        <p class="alt">Manette : stick, Ⓐ sauter, Ⓧ frapper, Ⓑ saisir, Ⓨ se protéger · Au doigt : joystick à gauche, boutons à droite</p>
       </div>
     </div>
     <div class="btns">${host ? '<button class="btn go" id="btnGo">C\'est parti !</button>' : '<p class="wait">L\'hôte va lancer la partie…</p>'}${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}</div>

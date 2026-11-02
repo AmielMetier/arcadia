@@ -50,6 +50,9 @@ kbd.t { background: transparent; box-shadow: none; font-size: 1.1em; }
 .toast { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: var(--coral); }
 .labels { position: absolute; inset: 0; }
 .tag { position: absolute; left: 0; top: 0; padding: 1px 8px; border-radius: 999px; background: var(--c); color: #fff; font: 900 13px Nunito, sans-serif; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+.tag .stun { position: absolute; left: 8px; right: 8px; bottom: -6px; height: 4px; border-radius: 3px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.tag .stun i { display: block; height: 100%; background: #ffc531; }
+.tag .stun.hot i { background: #ff3a22; }
 .tag.me { box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0, 0, 0, 0.25); }
 .grip { display: block; height: 4px; margin-top: 2px; border-radius: 2px; background: #fff; transform-origin: left; }
 .stick { position: absolute; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.4); }

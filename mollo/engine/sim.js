@@ -19,14 +19,21 @@ export const JUMP_V = 6.6;
 export const KO_T = 2.8; const KO_MASH = 0.16, DZ_DECAY = 0.12;
 const PUNCH_T = 0.17, PUNCH_CD = 0.27; export const CHARGE_T = 0.32;
 const KICK_T = 0.36;
-const P_POWER = 3.4, P_DZ = 0.24, H_POWER = 6.4, H_DZ = 0.46, K_POWER = 8.5, K_DZ = 0.62;
+const P_POWER = 2.6, P_DZ = 0.15, H_POWER = 7.5, H_DZ = 0.42, K_POWER = 8.5, K_DZ = 0.5; // poing, gros coup, coup de pied sauté
+const CHAIN_POWER = 5, CHAIN_DZ = 0.2, CHAIN_T = 0.8;  // le troisième poing d'une série éjecte
+const BUTT_POWER = 1.6, BUTT_DZ = 0.3, BUTT_CD = 0.7;  // le coup de tête, quand on tient quelqu'un
+const AIM_RANGE = 2, AIM_RANGE_BIG = 2.6, AIM_COS = 0.17; // la visée : qui est à portée, jusqu'à 80° de chaque côté
+const GUARD_DRAIN = 0.32, GUARD_REGEN = 0.45, GUARD_BLOCK = 0.3, GUARD_CD = 1.1; // la garde s'use : à tenir, et à chaque poing arrêté
+const LIFT_DZ = 0.45;                 // assez sonné pour être soulevé
+const CATCH_DZ = 0.25;                // attrapé pendant qu'il arme ou se protège : il est pris à contre-pied
+const WAKE_GRACE = 0.9;               // au réveil, un court répit : les coups poussent, mais n'assomment pas
 const GRIP_MAX = 7;                   // on se fatigue à tenir : au bout de 7 s, ça glisse
 const HOLD_MAX = 5;                   // tenir quelqu'un qui se débat
 const THROW_V = 8.5, THROW_VY = 4.2, RELEASE_V = 2.4;
 export const SUDDEN_AT = 75;          // mort subite : des bourrasques de plus en plus fortes
 export const ST = { LIVE: 0, KO: 1, OUT: 2 };
 // les drapeaux d'un joueur dans l'instantané
-export const FL = { GRIP: 3, LIFTING: 4, CHARGE: 8, KICK: 16, GROUND: 32, LIFTED: 64, HELD: 128, HANG: 256 };
+export const FL = { GRIP: 3, LIFTING: 4, CHARGE: 8, KICK: 16, GROUND: 32, LIFTED: 64, HELD: 128, HANG: 256, GUARD: 512 };
 export const BOT_NAMES = ['Gros Mou', 'Flan', 'Guimauve', 'Tofu', 'Nougat', 'Bibendum', 'Patate', 'Marsh'];
 export const BOT_ID = 1000;
 // les objets : chacun a sa chance d'apparaître au début de chaque manche (et une petite chance d'être en double)
@@ -40,9 +47,9 @@ function mk(x, y, z, r, w) { return { x, y, z, px: x, py: y, pz: z, r, w, on: nu
 function newBody({ id, name, color, bot = false, level = 'normal' }) {
   const p = []; for (let i = 0; i < 7; i++) p.push(mk(0, 1, 0, RADII[i], WEIGHT[i]));
   return { id, name: String(name || '?').slice(0, 12), color, bot: !!bot, level, p, yaw: 0, st: ST.LIVE,
-    m: 1, dip: 0, dz: 0, ko: 0, phase: 0, climb: null, grip: [null, null], gripT: 0, gripCd: 0, heldBy: 0, lifting: 0, liftedBy: -1,
+    m: 1, dip: 0, dz: 0, ko: 0, phase: 0, guard: false, gd: 1, guardCd: 0, flinch: 0, grace: 0, grabLock: 0, butt: 0, aim: -1, lunge: 0, swung: false, chainBy: -1, chainN: 0, chainT: 0, climb: null, grip: [null, null], gripT: 0, gripCd: 0, heldBy: 0, lifting: 0, liftedBy: -1,
     punchT: 0, punchH: 0, punchCd: 0, power: 1, hitDone: false, charge: 0, kick: 0, jumpCd: 0, grounded: false, gy: 0, gbox: null,
-    hitBy: -1, hitT: -99, pts: 0, kos: 0, surv: 0, order: 0, pc: 0, jc: 0, gc: 0, inp: { mx: 0, mz: 0, jump: false, punch: false, grab: false, pc: 0, jc: 0, gc: 0 }, ai: null };
+    hitBy: -1, hitT: -99, pts: 0, kos: 0, surv: 0, order: 0, pc: 0, jc: 0, gc: 0, inp: { mx: 0, mz: 0, jump: false, punch: false, grab: false, guard: false, pc: 0, jc: 0, gc: 0 }, ai: null };
 }
 // vitesse (par pas) d'un point
 const vel = (a, ax, ay, az) => { a.px -= ax; a.py -= ay; a.pz -= az; };
@@ -106,7 +113,7 @@ export class Sim {
     const pos = [[x, g + STAND, z], [x, g + STAND + TORSO, z], [x, g + STAND + TORSO + NECK, z],
       [x - c * 0.3, g + STAND + 0.1, z + s * 0.3], [x + c * 0.3, g + STAND + 0.1, z - s * 0.3], [x - c * HIP, g + 0.11, z + s * HIP], [x + c * HIP, g + 0.11, z - s * HIP]];
     pos.forEach((q, j) => { const a = b.p[j]; a.x = a.px = q[0]; a.y = a.py = q[1]; a.z = a.pz = q[2]; a.on = null; });
-    Object.assign(b, { yaw, st: ST.LIVE, m: 1, dip: 0, dz: 0, ko: 0, grip: [null, null], gripT: 0, gripCd: 0, climb: null, item: null, itemCd: 0, heldBy: 0, lifting: 0, liftedBy: -1, punchT: 0, punchCd: 0, charge: 0, kick: 0, jumpCd: 0, hitBy: -1, hitT: -99, order: 0 });
+    Object.assign(b, { yaw, st: ST.LIVE, m: 1, dip: 0, dz: 0, ko: 0, grip: [null, null], gripT: 0, gripCd: 0, climb: null, guard: false, gd: 1, guardCd: 0, flinch: 0, grace: 0, grabLock: 0, butt: 0, aim: -1, lunge: 0, swung: false, chainBy: -1, chainN: 0, chainT: 0, item: null, itemCd: 0, heldBy: 0, lifting: 0, liftedBy: -1, punchT: 0, punchCd: 0, charge: 0, kick: 0, jumpCd: 0, hitBy: -1, hitT: -99, order: 0 });
   }
   park(b) { for (const a of b.p) { a.x = a.px = 0; a.y = a.py = KILL_Y - 5; a.z = a.pz = 0; } }
 
@@ -121,7 +128,7 @@ export class Sim {
     const bs = [...this.players.values()];
     for (const b of bs) for (const q of b.p) { q.lx = q.x; q.ly = q.y; q.lz = q.z; } // d'où part chaque point, avant les muscles
     if (this.arena.alarm(this.at) && !this.alarmed) { this.alarmed = true; if (this.ph !== 'count') this.events.push({ e: 'alarm' }); } else if (!this.arena.alarm(this.at)) this.alarmed = false;
-    for (const b of bs) if (b.st !== ST.OUT) { if (b.bot) botThink(this, b, dt); this.control(b, frozen ? { ...b.inp, mx: 0, mz: 0, jump: false, punch: false, grab: false } : b.inp, dt); }
+    for (const b of bs) if (b.st !== ST.OUT) { if (b.bot) botThink(this, b, dt); this.control(b, frozen ? { ...b.inp, mx: 0, mz: 0, jump: false, punch: false, grab: false, guard: false } : b.inp, dt); }
     for (const b of bs) if (b.st !== ST.OUT) this.integrate(b);
     for (let it = 0; it < 4; it++) {
       for (const b of bs) if (b.st !== ST.OUT) this.solve(b);
@@ -152,12 +159,13 @@ export class Sim {
     if (b.punchCd > 0) b.punchCd -= dt; if (b.jumpCd > 0) b.jumpCd -= dt;
     if (b.dz > 0 && b.st === ST.LIVE) b.dz = Math.max(0, b.dz - DZ_DECAY * dt);
     if (b.dip > 0) b.dip = Math.max(0, b.dip - dt * 1.5);
+    for (const k of ['flinch', 'grace', 'grabLock', 'butt', 'guardCd']) if (b[k] > 0) b[k] -= dt;
     // KO : plus aucun muscle ; marteler raccourcit
     if (b.st === ST.KO) {
-      b.climb = null;
+      b.climb = null; b.guard = false; b.punchT = 0; b.swung = false;
       if (press || jumpPress) b.ko -= KO_MASH;
       b.ko -= dt;
-      if (b.ko <= 0) { b.st = ST.LIVE; b.dz = 0.35; b.dip = 0.65; this.events.push({ e: 'wake', id: b.id }); }
+      if (b.ko <= 0) { b.st = ST.LIVE; b.dz = 0.35; b.dip = 0.65; b.grace = WAKE_GRACE; this.events.push({ e: 'wake', id: b.id }); }
       b.m = 0;
       return;
     }
@@ -175,15 +183,22 @@ export class Sim {
     b.grounded = grounded; b.gy = g ? g.y : 0; b.gbox = grounded ? g.box : null;
     // le regard
     const il = Math.hypot(inp.mx, inp.mz);
-    if (il > 0.15 && !b.kick) { let d = Math.atan2(inp.mx, inp.mz) - b.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; b.yaw += clamp(d, -9 * dt, 9 * dt); }
+    const aimed = (b.punchT > 0 || b.kick > 0) && b.aim >= 0 ? this.players.get(b.aim) : null;
+    if (aimed && aimed.st !== ST.OUT) this.turnTo(b, aimed.p[C].x - che.x, aimed.p[C].z - che.z, 22 * dt); // le coup part vers la cible
+    else if (il > 0.15 && !b.kick) this.turnTo(b, inp.mx, inp.mz, 9 * dt);
     const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw), sx = Math.cos(b.yaw), sz = -Math.sin(b.yaw);
     // se déplacer : le tronc rejoint la vitesse voulue (celle de ce qu'il y a sous les pieds, plus la marche)
-    const carrying = b.grip.some((q) => q && q.o), slow = carrying ? 0.72 : 1, hold = b.heldBy > 0 ? 0.55 : 1;
+    const canGuard = on && grounded && !lifted && !b.heldBy && !b.grip[0] && !b.grip[1] && !b.climb && b.kick <= 0 && b.punchT <= 0 && b.flinch <= 0 && b.guardCd <= 0;
+    b.guard = !!inp.guard && canGuard && b.gd > 0;
+    if (b.guard) { b.charge = 0; b.gd -= GUARD_DRAIN * dt; if (b.gd <= 0) { b.gd = 0; b.guard = false; b.guardCd = GUARD_CD; } }
+    else b.gd = Math.min(1, b.gd + GUARD_REGEN * dt);
+    const carrying = b.grip.some((q) => q && q.o), slow = (carrying ? 0.72 : 1) * (b.guard ? 0.4 : 1) * (b.charge > 0 ? 0.55 : 1), hold = b.heldBy > 0 ? 0.42 : 1;
     const bx = b.gbox ? b.gbox.vx + (b.gbox.belt ? b.gbox.belt[0] : 0) : 0, bz = b.gbox ? b.gbox.vz + (b.gbox.belt ? b.gbox.belt[1] : 0) : 0;
-    const tx = inp.mx * SPEED * slow * hold * (0.4 + 0.6 * m) + bx, tz = inp.mz * SPEED * slow * hold * (0.4 + 0.6 * m) + bz;
+    const dash = b.punchT > 0 ? b.lunge : 0; // le coup emporte le corps vers l'avant
+    const tx = inp.mx * SPEED * slow * hold * (0.4 + 0.6 * m) + bx + fx * dash, tz = inp.mz * SPEED * slow * hold * (0.4 + 0.6 * m) + bz + fz * dash;
     const umb = !grounded && b.item && b.item.k === 'parapluie';
     if (umb) for (const q of p) if (q.y - q.py < -2.4 * DT) q.py = q.y + 2.4 * DT; // le parapluie freine la chute et permet de planer
-    const a = (grounded ? ACC * (0.25 + 0.75 * m) : AIR_ACC * (umb ? 2.5 : 1)) * dt;
+    const a = (grounded ? ACC * (0.25 + 0.75 * m) * (b.heldBy > 0 ? 0.3 : 1) : AIR_ACC * (umb ? 2.5 : 1)) * dt; // tenu, on a moins d'appuis : on se laisse pousser vers le bord
     if (grounded || il > 0.1) for (const i of [P, C]) {
       const q = p[i], vx = (q.x - q.px) / DT, vz = (q.z - q.pz) / DT;
       let dx = tx - vx, dz = tz - vz; const l = Math.hypot(dx, dz);
@@ -229,15 +244,22 @@ export class Sim {
     const p = b.p, che = p[C], hea = p[H], pel = p[P];
     // ------- frapper : un appui bref, un coup de poing ; maintenu, un gros ; en l'air et lancé, un coup de pied sauté
     const free = !b.grip[0] && !b.grip[1];
-    if (press && free) b.charge = Math.max(b.charge, 0.001);
+    if (press && free && !b.guard && b.flinch <= 0) b.charge = Math.max(b.charge, 0.001);
     if (inp.punch && free && b.charge > 0) b.charge += dt;
     if (!free) b.charge = 0;
-    if (press && !b.grounded && b.kick <= 0 && Math.hypot(pel.x - pel.px, pel.z - pel.pz) / DT > 1.5 && !b.heldBy) {
+    if (press && !b.grounded && free && b.kick <= 0 && Math.hypot(pel.x - pel.px, pel.z - pel.pz) / DT > 1.5 && !b.heldBy) {
+      const t = this.aimTarget(b, AIM_RANGE_BIG); b.aim = t ? t.id : -1;
       b.kick = KICK_T; b.power = 1; b.hitDone = false; b.charge = 0; this.events.push({ e: 'kick', id: b.id });
     }
     if (b.charge > 0 && !inp.punch) {
       const big = b.charge >= CHARGE_T;
-      if (b.punchCd <= 0) { b.punchT = PUNCH_T * (big ? 1.4 : 1); b.punchH = b.item ? (b.item.k === 'poele' ? 1 : 0) : b.punchH ? 0 : 1; b.punchCd = big ? 0.5 : PUNCH_CD; b.power = big ? 2 : 1; b.hitDone = false; this.events.push({ e: 'swing', id: b.id, k: big ? 1 : 0 }); }
+      if (b.punchCd <= 0 && b.flinch <= 0) {
+        const t = this.aimTarget(b, big ? AIM_RANGE_BIG : AIM_RANGE), d = t ? Math.hypot(t.p[C].x - che.x, t.p[C].z - che.z) : 9;
+        b.aim = t ? t.id : -1;
+        b.lunge = d < 0.7 ? 0 : t ? (big ? 5 : 2.8) : (big ? 3 : 0.8);
+        b.punchT = PUNCH_T * (big ? 1.4 : 1); b.punchH = b.item ? (b.item.k === 'poele' ? 1 : 0) : b.punchH ? 0 : 1; b.punchCd = big ? 0.6 : PUNCH_CD; b.power = big ? 2 : 1; b.hitDone = false; b.swung = true;
+        this.events.push({ e: 'swing', id: b.id, k: big ? 1 : 0 });
+      }
       b.charge = 0;
     }
     if (b.punchT > 0) b.punchT -= dt;
@@ -273,9 +295,17 @@ export class Sim {
     // soulever : tenir quelqu'un et sauter
     if (body && inp.jump && !b.lifting && b.grounded) {
       const o = body.o;
-      if (o.st === ST.KO || o.dz > 0.4 || o.dip > 0.25) { b.lifting = 1; o.liftedBy = b.id; this.events.push({ e: 'lift', id: b.id, who: o.id }); }
+      if (o.st === ST.KO || o.dz >= LIFT_DZ) { b.lifting = 1; o.liftedBy = b.id; this.events.push({ e: 'lift', id: b.id, who: o.id }); }
     }
     if (b.lifting && !body) { b.lifting = 0; }
+    // le coup de tête : on tient quelqu'un de bien réveillé, on le sonne avant de le soulever
+    if (body && press && !b.lifting && b.punchCd <= 0 && body.o.st === ST.LIVE) {
+      const o = body.o, t = o.p[H];
+      b.punchCd = BUTT_CD; b.butt = 0.14;
+      this.hurt(o, fx, 0.1, fz, BUTT_POWER, BUTT_DZ, b.id);
+      this.events.push({ e: 'hit', id: o.id, by: b.id, k: 0.4, head: 1, pan: 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
+    }
+    if (b.butt > 0 && body) pull(hea, body.o.p[H].x, body.o.p[H].y, body.o.p[H].z, 0.35);
     if (b.lifting && body) {
       const o = body.o, q = o.p, top = hea.y + 0.5;
       const k = o.st === ST.KO ? 0.3 : 0.2;
@@ -313,12 +343,16 @@ export class Sim {
           const n = this.arena.nearestGrip(S.x + fx * 0.2, S.y + (b.grounded ? 0 : 0.2), S.z + fz * 0.2, 1.05, b.grounded ? pel.y - 0.1 : -99);
           if (n) T = { x: n.x + side * sx * 0.14, y: n.y, z: n.z + side * sz * 0.14 };
         }
+        if (O && i === 0) { this.turnTo(b, O.p[C].x - che.x, O.p[C].z - che.z, 12 * dt); }
         if (T) pull(hand, T.x, T.y, T.z, 0.42);
         else pull(hand, S.x + fx * 0.6, S.y + 0.02, S.z + fz * 0.6, 0.3);
         this.tryGrip(b, i, hand);
       } else if (b.punchT > 0 && b.punchH === i) {
-        const k = b.power > 1 ? 1.0 : 0.82;
-        pull(hand, che.x + fx * k + side * sx * 0.06, che.y + 0.12, che.z + fz * k + side * sz * 0.06, 0.62);
+        const k = b.power > 1 ? 1.0 : 0.82, tg = b.aim >= 0 ? this.players.get(b.aim) : null, tp = tg && tg.st !== ST.OUT ? tg.p[b.power > 1 ? H : C] : null;
+        if (tp && Math.hypot(tp.x - che.x, tp.y - che.y, tp.z - che.z) < 1.5) pull(hand, tp.x, tp.y, tp.z, 0.62); // le poing va chercher la cible : la poitrine, la tête pour le gros coup
+        else pull(hand, che.x + fx * k + side * sx * 0.06, che.y + 0.12, che.z + fz * k + side * sz * 0.06, 0.62);
+      } else if (b.guard) { // la garde : les deux poings devant le visage
+        pull(hand, hea.x + fx * 0.3 + side * sx * 0.12, hea.y - 0.08, hea.z + fz * 0.3 + side * sz * 0.12, 0.45);
       } else if (b.charge > 0 && b.punchH !== i) { // armer : le poing en arrière
         pull(hand, che.x - fx * 0.3 + side * sx * 0.25, che.y + 0.1, che.z - fz * 0.3 + side * sz * 0.25, 0.3 * m);
       } else {
@@ -327,6 +361,19 @@ export class Sim {
       }
     }
     void jumpPress; void grabPress;
+  }
+  turnTo(b, x, z, max) { let d = Math.atan2(x, z) - b.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; b.yaw += clamp(d, -max, max); }
+  // qui ce coup vise-t-il ? le mieux placé devant soi, à portée
+  aimTarget(b, range) {
+    const c = b.p[C], fx = Math.sin(b.yaw), fz = Math.cos(b.yaw); let best = null, bs = 1e9;
+    for (const o of this.players.values()) {
+      if (o === b || o.st === ST.OUT || o.liftedBy === b.id) continue;
+      const t = o.p[C], dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz) || 1e-3;
+      if (d > range || Math.abs(t.y - c.y) > 1.5) continue;
+      const dot = (dx * fx + dz * fz) / d; if (dot < AIM_COS && d > 0.5) continue;
+      const sc = d + (1 - dot) * 1.2; if (sc < bs) { bs = sc; best = o; }
+    }
+    return best;
   }
   // la remontée : les mains grimpent jusqu'au rebord, le tronc suit, puis il bascule au-dessus de la boîte.
   // Le corps ne heurte pas cette boîte-là pendant le geste (sinon une planche fine le bloque par en dessous).
@@ -360,13 +407,17 @@ export class Sim {
   anchor(q) { if (q.box) { _a.x = q.box.x + q.lx; _a.y = q.box.y + q.ly; _a.z = q.box.z + q.lz; } else { const t = q.o.p[q.pi]; _a.x = t.x; _a.y = t.y; _a.z = t.z; } return _a; }
   tryGrip(b, i, hand) {
     if (b.gripCd > 0) return;
-    for (const o of this.players.values()) {
+    if (b.grabLock <= 0) for (const o of this.players.values()) { // sonné par un poing, on n'attrape plus personne un court instant
       if (o === b || o.st === ST.OUT) continue;
       for (const pi of [H, C, P, LH, RH]) {
         const t = o.p[pi], d = Math.hypot(t.x - hand.x, t.y - hand.y, t.z - hand.z);
         if (d < t.r + hand.r + 0.1) {
           b.grip[i] = { o, pi, d: Math.min(t.r, 0.2) }; o.heldBy++;
-          if (!b.grip[1 - i] || !b.grip[1 - i].o) this.events.push({ e: 'grab', id: b.id, who: o.id });
+          if (!b.grip[1 - i] || !b.grip[1 - i].o) {
+            const caught = o.st === ST.LIVE && (o.charge > 0.1 || o.guard); // il armait ou se protégeait : la saisie passe, et le surprend
+            if (caught) { o.charge = 0; o.guard = false; o.flinch = Math.max(o.flinch, 0.45); o.dz = Math.min(0.95, o.dz + CATCH_DZ); o.dip = Math.max(o.dip, 0.4); }
+            this.events.push({ e: 'grab', id: b.id, who: o.id, caught: caught ? 1 : 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
+          }
           return;
         }
       }
@@ -509,9 +560,9 @@ export class Sim {
     dist(p[P], p[H], TORSO + NECK, 0.2, true, 0.45);
     for (let i = 0; i < 2; i++) {
       const hand = p[LH + i], side = i ? 1 : -1, S = shoulder(b, side, _s0);
-      // bras : pas plus long que le bras ; la main tire sur la poitrine
+      // bras : pas plus long que le bras ; la main tire sur la poitrine. Sur un corps, la traction reste réciproque : sinon, deux pantins qui se tiennent s'emballent tout seuls
       const dx = hand.x - S.x, dy = hand.y - S.y, dz = hand.z - S.z, d = Math.hypot(dx, dy, dz) || 1e-5;
-      if (d > ARM) { const che = p[C], grip = b.grip[i], hw = grip ? 0.25 : hand.w, s = hw + che.w, c = (d - ARM) / d / s; hand.x -= dx * c * hw; hand.y -= dy * c * hw; hand.z -= dz * c * hw; che.x += dx * c * che.w; che.y += dy * c * che.w; che.z += dz * c * che.w; }
+      if (d > ARM) { const che = p[C], grip = b.grip[i], hw = grip && grip.box ? 0.25 : hand.w, s = hw + che.w, c = (d - ARM) / d / s; hand.x -= dx * c * hw; hand.y -= dy * c * hw; hand.z -= dz * c * hw; che.x += dx * c * che.w; che.y += dy * c * che.w; che.z += dz * c * che.w; }
       const g = b.grip[i];
       if (g) {
         if (g.box) { const A = this.anchor(g); hand.x = A.x; hand.y = A.y; hand.z = A.z; }
@@ -553,34 +604,63 @@ export class Sim {
   attacks(b, bs) {
     if (b.st !== ST.LIVE) return;
     const p = b.p;
+    if (b.swung && b.punchT <= 0) { // un gros coup dans le vide déséquilibre
+      if (!b.hitDone && b.power > 1) { b.dip = Math.max(b.dip, 0.45); b.punchCd = Math.max(b.punchCd, 0.4); }
+      b.swung = false;
+    }
     let tips = null, power = 0, dz = 0;
     if (b.kick > 0 && !b.hitDone) { tips = [p[LF], p[RF]]; power = K_POWER; dz = K_DZ; }
     else if (b.punchT > 0 && !b.hitDone) { tips = [p[LH + b.punchH]]; power = b.power > 1 ? H_POWER : P_POWER; dz = b.power > 1 ? H_DZ : P_DZ; }
     if (!tips) return;
-    const pan = b.item && b.item.k === 'poele' && b.punchT > 0 && b.kick <= 0;
+    const pan = b.item && b.item.k === 'poele' && b.punchT > 0 && b.kick <= 0, heavy = b.kick > 0 || b.power > 1;
     if (pan) { const h = tips[0]; tips = [{ x: h.x + Math.sin(b.yaw) * 0.3, y: h.y, z: h.z + Math.cos(b.yaw) * 0.3, r: 0.22 }]; power *= 1.5; dz *= 1.6; }
     for (const o of bs) {
       if (o === b || o.st === ST.OUT || o.liftedBy === b.id) continue;
-      for (const tip of tips) for (const pi of [H, C, P]) {
-        const t = o.p[pi], d = Math.hypot(t.x - tip.x, t.y - tip.y, t.z - tip.z);
-        if (d > t.r + tip.r + 0.08) continue;
-        const nx = Math.sin(b.yaw), nz = Math.cos(b.yaw), head = pi === H;
-        b.hitDone = true;
-        this.hurt(o, nx, 0.25, nz, power * (head ? 1.15 : 1), dz * (head ? 1.5 : 1), b.id);
-        vel(p[C], -nx * 0.6 * DT, 0, -nz * 0.6 * DT);
-        // frappé pendant qu'il tient quelque chose : il peut lâcher
-        this.events.push({ e: 'hit', id: o.id, by: b.id, k: b.kick > 0 ? 1 : pan ? 0.8 : b.power > 1 ? 0.7 : 0, head: head ? 1 : 0, pan: pan ? 1 : 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
+      let t = null, pi = -1, best = 1e9; // le point du corps que le coup atteint vraiment
+      for (const tip of tips) for (const k of [H, C, P]) {
+        const q = o.p[k], d = Math.hypot(q.x - tip.x, q.y - tip.y, q.z - tip.z);
+        if (d <= q.r + tip.r + 0.08 && d - q.r < best) { best = d - q.r; t = q; pi = k; }
+      }
+      if (!t) continue;
+      const nx = Math.sin(b.yaw), nz = Math.cos(b.yaw), head = pi === H, pos = { x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) };
+      b.hitDone = true;
+      // la garde : elle arrête les poings qui viennent de devant, le gros coup et le coup de pied la cassent
+      const fromFront = o.guard && -(nx * Math.sin(o.yaw) + nz * Math.cos(o.yaw)) > -0.2;
+      if (fromFront && !heavy) {
+        o.gd -= GUARD_BLOCK * (pan ? 1.8 : 1);
+        for (const q of o.p) vel(q, nx * 1.1 * DT, 0, nz * 1.1 * DT);
+        b.flinch = Math.max(b.flinch, 0.25); b.punchCd = Math.max(b.punchCd, 0.42);
+        vel(p[C], -nx * 1.2 * DT, 0, -nz * 1.2 * DT);
+        if (o.gd <= 0) { o.gd = 0; o.guard = false; o.guardCd = GUARD_CD; o.flinch = Math.max(o.flinch, 0.4); this.events.push({ e: 'break', id: o.id, by: b.id, ...pos }); }
+        else this.events.push({ e: 'block', id: o.id, by: b.id, ...pos });
         return;
       }
+      if (fromFront) { o.guard = false; o.gd = 0; o.guardCd = GUARD_CD; dz += 0.1; this.events.push({ e: 'break', id: o.id, by: b.id, ...pos }); }
+      // la série de poings : le troisième d'affilée éjecte
+      let k = heavy ? (b.kick > 0 ? 1 : 0.7) : 0;
+      if (!heavy && !pan) {
+        if (o.chainBy === b.id && this.t < o.chainT) o.chainN++; else { o.chainBy = b.id; o.chainN = 1; }
+        o.chainT = this.t + CHAIN_T;
+        if (o.chainN >= 3) { power = CHAIN_POWER; dz = CHAIN_DZ; k = 0.5; o.chainN = 0; o.chainT = 0; }
+      } else if (pan && !heavy) k = 0.8;
+      this.hurt(o, nx, heavy ? 0.3 : 0.12, nz, power * (head && heavy ? 1.1 : 1), dz * (head ? 1.25 : 1), b.id);
+      vel(p[C], -nx * 0.6 * DT, 0, -nz * 0.6 * DT);
+      this.events.push({ e: 'hit', id: o.id, by: b.id, k, head: head ? 1 : 0, pan: pan ? 1 : 0, ...pos });
+      return;
     }
   }
   hurt(o, nx, ny, nz, power, dz, by) {
     for (const t of o.p) vel(t, nx * power * DT, ny * power * DT, nz * power * DT);
     if (by >= 0) { o.hitBy = by; o.hitT = this.t; }
-    o.dip = Math.max(o.dip, 0.5 + dz * 0.6);
+    if (o.grace > 0 && o.st === ST.LIVE) dz = Math.min(dz, Math.max(0, 0.95 - o.dz)); // au réveil, on encaisse sans retomber aussitôt
+    o.dip = Math.max(o.dip, dz > 0 ? 0.12 + dz * 1.4 : 0);
     if (o.climb && o.climb.over) o.climb.t = 99; // la remontée s'arrête au pas suivant, le temps que le corps ressorte de la boîte
     if (o.st === ST.KO) { o.ko = Math.max(o.ko, 1); return; }
-    o.dz += dz; o.charge = 0;
+    o.dz += dz;
+    if (dz > 0) {
+      if (dz >= 0.3 || o.charge < 0.12) o.charge = 0; // un poing n'arrête pas un gros coup déjà bien armé
+      o.punchT = 0; o.swung = false; o.flinch = Math.max(o.flinch, dz >= 0.3 ? 0.35 : 0.2); o.grabLock = Math.max(o.grabLock, 0.35); o.guard = false;
+    }
     if (o.item && (dz >= 0.3 || o.dz >= 0.8)) this.dropItem(o);
     // le coup fait lâcher une main
     for (let i = 0; i < 2; i++) if (o.grip[i] && this.rng.next() < 0.3 + dz) { this.letGo(o, i, true); }
@@ -660,7 +740,7 @@ export class Sim {
     return {
       t: Math.round(this.t * 1000) / 1000, ph: this.ph, pt: Math.round(this.pt * 100) / 100, rd: this.rd, rt: Math.round(this.rt * 10) / 10, at: Math.round(this.at * 1000) / 1000, go: this.goal, rw: this.rw, win: this.win, ar: this.arena.key, hz: this.hazards ? 1 : 0, gu: this.gust ? 1 : 0,
       P: [...this.players.values()].map((b) => {
-        const a = [b.id, b.st, Math.round(b.yaw * 100) / 100, Math.round(b.dz * 100) / 100, (b.grip[0] ? 1 : 0) | (b.grip[1] ? 2 : 0) | (b.lifting ? 4 : 0) | (b.charge > 0.05 ? 8 : 0) | (b.kick > 0 ? 16 : 0) | (b.grounded ? 32 : 0) | (b.liftedBy >= 0 ? 64 : 0) | (b.heldBy > 0 ? 128 : 0) | (b.grip.some((q) => q && q.box) ? 256 : 0), b.pts, b.kos, b.order, Math.round(b.surv)];
+        const a = [b.id, b.st, Math.round(b.yaw * 100) / 100, Math.round(b.dz * 100) / 100, (b.grip[0] ? 1 : 0) | (b.grip[1] ? 2 : 0) | (b.lifting ? 4 : 0) | (b.charge > 0.05 ? 8 : 0) | (b.kick > 0 ? 16 : 0) | (b.grounded ? 32 : 0) | (b.liftedBy >= 0 ? 64 : 0) | (b.heldBy > 0 ? 128 : 0) | (b.grip.some((q) => q && q.box) ? 256 : 0) | (b.guard ? 512 : 0), b.pts, b.kos, b.order, Math.round(b.surv)];
         if (b.st !== ST.OUT) for (const q of b.p) a.push(cm(q.x), cm(q.y), cm(q.z));
         return a;
       }),
