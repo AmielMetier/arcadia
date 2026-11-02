@@ -862,14 +862,15 @@ export class Game {
     this.view.setJoueur(composer(b.src, b.sx, b.sy, T)); this._tenueOk = true;
   }
   /** cabine d'essayage (boutique de mode) */
-  async apparence() {
-    const ui = this.ui, sp = { speaker: 'Styliste' };
-    if (!this.view.baseDe?.('m')) { await ui.say(['Bienvenue à la boutique de mode !', 'Nos nouvelles collections arrivent très bientôt.'], sp); return; }
-    await ui.say(['Bienvenue à la boutique de mode !', 'Casquette, bonnet, t-shirt, veste, short, sandales… et toutes les couleurs que tu veux. C\'est offert pour les dresseurs !'], sp);
+  async apparence(o = {}) {
+    const ui = this.ui, sp = o.armoire ? {} : { speaker: 'Styliste' };
+    if (!this.view.baseDe?.('m')) { await ui.say(o.armoire ? 'Ton armoire. Elle est bien rangée.' : ['Bienvenue à la boutique de mode !', 'Nos nouvelles collections arrivent très bientôt.'], sp); return; }
+    if (o.armoire) await ui.say('Ton armoire ! Tu veux changer de tenue ?', sp);
+    else await ui.say(['Bienvenue à la boutique de mode !', 'Casquette, bonnet, t-shirt, veste, short, sandales… et toutes les couleurs que tu veux. C\'est offert pour les dresseurs !'], sp);
     const T = await apparenceScreen(ui, { tenue: this.state.tenue || { genre: this.state.gender || 'm' }, base: (g) => this.view.baseDe(g) });
-    if (!T) { await ui.say('Reviens quand tu veux changer de style !', sp); return; }
+    if (!T) { if (!o.armoire) await ui.say('Reviens quand tu veux changer de style !', sp); return; }
     this.state.tenue = T; this.state.gender = T.genre; this.appliquerTenue(); this.sound.sfx('levelup');
-    await ui.say('Superbe ! Ce style te va à merveille.', sp);
+    await ui.say(o.armoire ? 'Te voilà prêt' + (T.genre === 'f' ? 'e' : '') + ' pour l\'aventure !' : 'Superbe ! Ce style te va à merveille.', sp);
   }
   /** à vélo : deux fois plus vite que la course, dehors seulement */
   onBike() { return !!this.state?.velo && this.mapObj?.outdoor && !this.player?.surf; }

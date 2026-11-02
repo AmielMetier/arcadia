@@ -42,6 +42,8 @@ export function houseInterior(id, name, o = {}) {
   // avec une cuisine (frigo et évier au fond), la plante descend dans le coin pour ne pas toucher l'évier
   furn(m, 'books', 1, 2); furn(m, 'tv', 3, 2); furn(m, 'plant', o.kitchen ? 1 : w - 2, o.kitchen ? (o.h || 8) - 2 : 2);
   furn(m, 'table', 4, 4); if (o.bed) furn(m, 'bed', w - 2, 4);
+  // la chambre du joueur : une armoire pour changer de tenue
+  if (o.bed) { furn(m, 'armoire', w - 2, 2); m.object(w - 2, 2, { use: (api) => api.game.apparence({ armoire: true }) }); }
   if (o.kitchen) { furn(m, 'fridge', 5, 2); furn(m, 'kitchen', 6, 2); }
   else furn(m, w > 9 ? 'clock' : 'painting', 5, 2);
   if (o.extraBooks) furn(m, 'books', 6, 2);

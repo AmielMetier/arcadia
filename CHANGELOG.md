@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.74 — 3 novembre 2026
+- **Odyssée** — Une armoire dans ta chambre, à Bourg-Aube : change de tenue quand tu veux, sans attendre la boutique de Métropole.
+- **Odyssée** — Nouveaux dessins pour le capitaine, le facteur, la vieille dame, Nox, le voleur, Brume et une sbire de la Team Éclipse.
+
 ## 3.73 — 3 novembre 2026
 - **Odyssée** — Sur certains téléphones, les personnages restent nets (ils pouvaient s'afficher flous).
 
