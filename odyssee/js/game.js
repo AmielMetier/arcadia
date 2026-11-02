@@ -240,7 +240,7 @@ export class Game {
     const st = this.state, W = this.mapObj, B = 8, cw = Math.ceil(W.w / B), p = this.player;
     this._seen ||= new Set(st.explored);
     const add = (i) => { if (!this._seen.has(i)) { this._seen.add(i); st.explored.push(i); } };
-    const R = 9;
+    const R = 12;   // on voit un peu au-delà du chemin
     for (let y = Math.floor((p.y - R) / B); y <= Math.floor((p.y + R) / B); y++) for (let x = Math.floor((p.x - R) / B); x <= Math.floor((p.x + R) / B); x++) if (x >= 0 && y >= 0 && x < cw && y * B < W.h) add(y * cw + x);
     const t = this.zone?.town && Object.values(this.world.towns).find((q) => q.id === this.zone.town);
     if (t) for (let y = Math.floor(t.y / B); y <= Math.floor((t.y + t.h) / B); y++) for (let x = Math.floor(t.x / B); x <= Math.floor((t.x + t.w) / B); x++) add(y * cw + x);

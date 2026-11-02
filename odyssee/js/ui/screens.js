@@ -730,8 +730,10 @@ function loadCarteIcons() {
   for (const k of SPRITES.carte || []) { const im = new Image(); im.src = ASSETS.carte(k); carteIcons[k] = im; }
   return carteIcons;
 }
-function drawRegion(game, cv) {
-  const W = game.world.maps.monde, ctx = cv.getContext('2d'), w = W.w, h = W.h, B = 2;
+/** relief de la région, une case = un pixel (gardé en cache : la carte ne change pas) */
+function regionTerrain(game) {
+  if (game._regionTerrain) return game._regionTerrain;
+  const W = game.world.maps.monde, w = W.w, h = W.h, B = 2;
   const bw = Math.ceil(w / B), bh = Math.ceil(h / B);
   // nature de chaque bloc de 2 × 2 cases
   // 0 eau, 1 plaine, 2 forêt, 3 montagne, 4 pied de montagne (sol praticable des zones volcaniques et enneigées)
@@ -743,8 +745,7 @@ function drawRegion(game, cv) {
       if (t === T.WATER) water++; else if (walkable(t) || t === T.DOOR) walk++;
     }
     const th = W.zoneAt(bx * B, by * B)?.theme, hill = th === 'volcanic' || th === 'snow';
-    const i = by * bw + bx;
-    kind[i] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
+    kind[by * bw + bx] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
   }
   // distance de chaque bloc à la nature voisine (pour la mer : à la côte ; pour la montagne : au pied)
   const dist = (pred) => {
@@ -757,12 +758,13 @@ function drawRegion(game, cv) {
     return d;
   };
   const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
-  const img = ctx.createImageData(w, h);
+  const c0 = document.createElement('canvas'); c0.width = w; c0.height = h;
+  const ctx = c0.getContext('2d'), img = ctx.createImageData(w, h);
   for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
     const i = by * bw + bx, k = kind[i];
     let c;
-    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : HG.open;
-    else if (toLand.length && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind[(by + dy) * bw + bx + dx] === 0 && bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh)) c = HG.cliff;
+    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : (bx + by * 3) % 11 === 0 ? HG.foam : HG.open;
+    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh && kind[(by + dy) * bw + bx + dx] === 0)) c = HG.cliff;
     else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
     else if (k === 4) c = HG.low;
     else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
@@ -772,43 +774,82 @@ function drawRegion(game, cv) {
     }
   }
   ctx.putImageData(img, 0, 0);
+  return (game._regionTerrain = { canvas: c0, kind, bw, bh, toOpen, toFoot, B });
+}
+
+/** cadre de la carte : ce qu'on a exploré (plus une marge), jamais plus petit qu'un tiers de la région ;
+ *  il garde les proportions de la région et s'élargit à mesure qu'on avance */
+export function exploredView(game) {
+  const W = game.world.maps.monde, C = 8, cw = Math.ceil(W.w / C), seen = game.state.explored || [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of seen) { const cx = i % cw, cy = Math.floor(i / cw); x0 = Math.min(x0, cx * C); y0 = Math.min(y0, cy * C); x1 = Math.max(x1, cx * C + C); y1 = Math.max(y1, cy * C + C); }
+  const p = game.worldPos(); if (!isFinite(x0)) { x0 = p.x - 20; x1 = p.x + 20; y0 = p.y - 15; y1 = p.y + 15; }
+  const M = 14, ar = W.w / W.h;
+  x0 -= M; y0 -= M; x1 += M; y1 += M;
+  let w = Math.max(x1 - x0, W.w / 3), h = Math.max(y1 - y0, W.h / 3);
+  if (w / h > ar) h = w / ar; else w = h * ar;
+  w = Math.min(w, W.w); h = Math.min(h, W.h);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const x = Math.max(0, Math.min(W.w - w, cx - w / 2)), y = Math.max(0, Math.min(W.h - h, cy - h / 2));
+  return { x, y, w, h };
+}
+
+/** dessine la région dans le cadre v (en cases) : relief, routes, villes, et le noir de ce qui reste à découvrir */
+function drawRegion(game, cv, v) {
+  const W = game.world.maps.monde, ctx = cv.getContext('2d'), R = regionTerrain(game);
+  const s = cv.width / v.w;                    // pixels écran par case
+  const X = (x) => (x - v.x) * s, Y = (y) => (y - v.y) * s;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#07080c'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(R.canvas, v.x, v.y, v.w, v.h, 0, 0, cv.width, cv.height);
+  // icônes du Pokégear : grandeur fixe à l'écran (deux pixels par pixel d'icône quand la carte est zoomée)
+  const k = Math.max(1, Math.min(3, Math.round(s / 2.2)));
   const I = loadCarteIcons();
-  const icon = (k, x, y) => { const im = I[k]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height + 2)); };
-  // arbres sur les forêts épaisses, montagnes sur les reliefs (une icône par carré de 22 cases, au hasard du lieu)
-  for (let y = 10; y < h - 6; y += 22) for (let x = 10; x < w - 6; x += 22) {
+  const icon = (key, x, y) => { const im = I[key]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(X(x) - im.width * k / 2), Math.round(Y(y) - im.height * k + 2 * k), im.width * k, im.height * k); };
+  const { kind, bw, toOpen, toFoot, B } = R;
+  const step = Math.max(14, Math.round(22 * 2.2 / s * k));
+  for (let y = 10; y < W.h - 6; y += step) for (let x = 10; x < W.w - 6; x += step) {
     const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
-    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), k = kind[i];
-    if (k === 2 && toOpen[i] >= 4 && ((x + y - 20) / 22) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
-    else if (k === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+    if (jx < v.x - 10 || jx > v.x + v.w + 10 || jy < v.y - 10 || jy > v.y + v.h + 14) continue;
+    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), kk = kind[i];
+    if (kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
+    else if (kk === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
   }
   // routes : un trait blanc cerclé de gris
-  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const roads = (game.world.routes || []).map((r) => r.pts);
-  for (const [lw, col] of [[7, HG.ink], [4, HG.road]]) {
+  for (const [lw, col] of [[Math.max(4, s * 1.9), HG.ink], [Math.max(2, s * 1.1), HG.road]]) {
     ctx.strokeStyle = col; ctx.lineWidth = lw;
-    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 0.5, y + 0.5) : ctx.moveTo(x + 0.5, y + 0.5))); ctx.stroke(); }
+    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x + 0.5), Y(y + 0.5)) : ctx.moveTo(X(x + 0.5), Y(y + 0.5)))); ctx.stroke(); }
   }
-  // grottes et lieux à part (lac, jardin, forêt des torii) : icônes et pastilles vertes
   for (const b of W.buildings) if (b.kind === 'cave') icon('grotte_m', b.x + b.w / 2, b.y + b.d);
   const pill = (x, y, pw, ph, fill, dark) => {
-    x = Math.round(x - pw / 2); y = Math.round(y - ph / 2);
-    ctx.fillStyle = HG.ink; ctx.fillRect(x - 1, y, pw + 2, ph); ctx.fillRect(x, y - 1, pw, ph + 2);
+    pw *= k; ph *= k; x = Math.round(X(x) - pw / 2); y = Math.round(Y(y) - ph / 2);
+    ctx.fillStyle = HG.ink; ctx.fillRect(x - k, y, pw + 2 * k, ph); ctx.fillRect(x, y - k, pw, ph + 2 * k);
     ctx.fillStyle = fill; ctx.fillRect(x, y, pw, ph);
     if (dark) { ctx.fillStyle = dark; ctx.fillRect(x, y + Math.ceil(ph * 0.55), pw, Math.floor(ph * 0.45)); }
   };
   for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
-  // villes : pastilles rouges (grises tant qu'on n'y est pas allé)
   const visited = new Set(game.state.visited || []);
   for (const t of Object.values(game.world.towns)) {
     const big = t.gym != null || t.id === 'plateau';
-    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 16 : 12, big ? 12 : 9, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
   }
-  // brouillard sur ce qui n'a pas encore été exploré
-  const seen = new Set(game.state.explored || []), C = 8, cw = Math.ceil(w / C);
-  if (seen.size) {
-    ctx.fillStyle = 'rgba(28, 36, 52, 0.62)';
-    for (let y = 0; y < h; y += C) for (let x = 0; x < w; x += C) if (!seen.has(Math.floor(y / C) * cw + Math.floor(x / C))) ctx.fillRect(x, y, C, C);
-  }
+  // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
+  const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
+  const mask = document.createElement('canvas'); mask.width = cw; mask.height = ch;
+  const mx = mask.getContext('2d'), md = mx.createImageData(cw, ch);
+  for (const i of seen) if (i >= 0 && i < cw * ch) md.data[i * 4 + 3] = 255;
+  mx.putImageData(md, 0, 0);
+  const fog = document.createElement('canvas'); fog.width = cv.width; fog.height = cv.height;
+  const fx = fog.getContext('2d');
+  fx.fillStyle = '#07080c'; fx.fillRect(0, 0, fog.width, fog.height);
+  fx.globalCompositeOperation = 'destination-out';
+  fx.imageSmoothingEnabled = true;
+  fx.filter = `blur(${Math.max(2, s * 3.2)}px)`;
+  fx.drawImage(mask, X(0), Y(0), cw * C * s, ch * C * s);
+  fx.filter = 'none'; fx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(fog, 0, 0);
 }
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
@@ -865,7 +906,7 @@ export function mapScreen(game) {
       </div>
       <div class="map-stage">
         <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
-          <canvas class="mapcv" width="${W.w}" height="${W.h}"></canvas>
+          <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
@@ -894,13 +935,31 @@ export function mapScreen(game) {
     const tagEl = s.querySelector('.map-tag');
     const subEl = s.querySelector('.map-sub');
 
-    const draw = () => drawRegion(game, c);
+    // la carte est cadrée sur ce qu'on a exploré : elle se dézoome à mesure qu'on découvre la région
+    // (à l'ouverture, elle part du cadre de la dernière fois et s'élargit jusqu'au nouveau)
+    const target = exploredView(game), from = st.mapView && st.mapView.w ? st.mapView : target;
+    let view = { ...from };
+    const fit = () => { const r = c.getBoundingClientRect(); const w = Math.max(320, Math.round(r.width * (window.devicePixelRatio || 1))); if (c.width !== w) { c.width = w; c.height = Math.round(w * W.h / W.w); } };
+    const place = (node, x, y) => { node.style.left = ((x - view.x) / view.w * 100) + '%'; node.style.top = ((y - view.y) / view.h * 100) + '%'; };
+    const pinsAt = [];
+    const draw = () => { fit(); drawRegion(game, c, view); for (const [node, x, y] of pinsAt) place(node, x, y); };
     draw();
     Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+    if (Math.abs(from.w - target.w) > 0.5 || Math.abs(from.x - target.x) > 0.5 || Math.abs(from.y - target.y) > 0.5) {
+      const t0 = performance.now(), D = 1100;
+      const anim = () => {
+        if (!s.isConnected) return;
+        const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
+        for (const k of ['x', 'y', 'w', 'h']) view[k] = from[k] + (target[k] - from[k]) * e;
+        draw();
+        if (u < 1) requestAnimationFrame(anim);
+      };
+      setTimeout(() => requestAnimationFrame(anim), 250);
+    }
+    st.mapView = target;
 
     const me = el('div', 'map-me');
-    me.style.left = (p.x / W.w * 100) + '%';
-    me.style.top = (p.y / W.h * 100) + '%';
+    pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
     // Interactive town pins on the map
@@ -908,8 +967,7 @@ export function mapScreen(game) {
       if (idx === 0) return;
       const pin = el('button', 'map-pin ' + (sp.tagCls || ''));
       pin.type = 'button';
-      pin.style.left = (sp.x / W.w * 100) + '%';
-      pin.style.top = (sp.y / W.h * 100) + '%';
+      pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -922,12 +980,12 @@ export function mapScreen(game) {
 
     const cur = el('div', 'map-cur');
     lab.appendChild(cur);
+    const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
     let k = 0;
     const show = () => {
       const q = spots[k];
-      cur.style.left = (q.x / W.w * 100) + '%';
-      cur.style.top = (q.y / W.h * 100) + '%';
+      curAt[1] = q.x; curAt[2] = q.y; place(cur, q.x, q.y);
       whereEl.textContent = q.name;
       tagEl.textContent = q.tag || '';
       tagEl.className = 'map-tag ' + (q.tagCls || '');
