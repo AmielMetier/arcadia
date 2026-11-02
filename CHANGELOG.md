@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.58 — 2 novembre 2026
+- **Mystère Mystère** — les meubles du manoir sont enfin à leur place.
+  - La grande table de la salle à manger est dans le bon sens, avec ses chaises tout autour.
+  - Dans la cuisine, le plan de travail court d'un bout à l'autre et les chaises entourent la table.
+  - Le billard est aligné sous sa lampe et la cheminée du salon est adossée au mur.
+  - Les lits, tables de nuit, baignoire, bureaux et étagères sont collés aux murs et ne les traversent plus.
+  - Les fauteuils du billard et les chaises du salon de musique regardent dans le bon sens.
+
 ## 3.57 — 2 novembre 2026
 - **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
   - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.

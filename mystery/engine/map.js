@@ -83,14 +83,16 @@ export function buildMap() {
     const axis = x0 === x1 ? 'z' : 'x'; // le panneau court le long de cet axe
     M.passages.push({ id, lv, cells, x0, z0, x1, z1, x: (x0 + x1 + 1) / 2, z: (z0 + z1 + 1) / 2, y: LV_Y[L], axis, name, kind });
   };
-  // meuble : `w` × `d` cases solides centrées sur (x, z) ; w = 0 : pas de collision
+  // meuble : `w` × `d` cases solides centrées sur (x, z) ; w = 0 : pas de collision.
+  // Les modèles ont le dos vers -z (rot 0 : le meuble regarde le sud). `s` = [largeur en x, profondeur en z] une fois posé.
   const prop = (lv, m, x, z, rot = 0, opts = {}) => {
     const L = li(lv), w = opts.w ?? 0, d = opts.d ?? 0;
     if (w && d) {
       const x0 = Math.round(x - w / 2), z0 = Math.round(z - d / 2);
       for (let cz = z0; cz < z0 + d; cz++) for (let cx = x0; cx < x0 + w; cx++) { const i = idx(cx, cz); if (M.t[L][i] === T.FLOOR) { M.t[L][i] = T.PROP; if (opts.tall) M.tall[L][i] = 1; } }
     }
-    M.props.push({ m, lv, x, z, y: LV_Y[L] + (opts.up || 0), rot: rot * Math.PI / 2, h: opts.h, s: opts.s, tint: opts.tint, wall: !!opts.wall });
+    const s = opts.s && (rot % 2 ? [opts.s[1], opts.s[0]] : opts.s); // la vue l'applique avant la rotation
+    M.props.push({ m, lv, x, z, y: LV_Y[L] + (opts.up || 0), rot: rot * Math.PI / 2, h: opts.h, s, tint: opts.tint, wall: !!opts.wall });
   };
   const light = (lv, x, z, kind = 'lustre', opts = {}) => M.lights.push({ id: M.lights.length, lv, x, z, y: LV_Y[li(lv)] + (opts.h ?? CEIL - 0.05), kind, power: opts.power ?? 1, color: opts.color ?? 0xffd9a0, room: -1 });
 
@@ -173,31 +175,32 @@ export function buildMap() {
 
   // ================================================================== mobilier
   // cuisine
-  prop(0, 'kitchenStove', 6, 1.5, 0, { w: 2, d: 1, h: 0.95 });
-  prop(0, 'kitchenCabinet', 4, 1.5, 0, { w: 1, d: 1, h: 0.95 }); prop(0, 'kitchenCabinet', 8, 1.5, 0, { w: 1, d: 1, h: 0.95 });
-  prop(0, 'kitchenSink', 10, 1.5, 0, { w: 2, d: 1, h: 0.95 });
-  prop(0, 'kitchenCabinetUpper', 4, 1.25, 0, { h: 0.7, up: 1.7 }); prop(0, 'kitchenCabinetUpper', 8, 1.25, 0, { h: 0.7, up: 1.7 });
-  prop(0, 'k-table-medium-long', 7, 6, 0, { w: 4, d: 2, h: 0.8 });
-  prop(0, 'k-chair-a-wood', 5.5, 7.7, 2, { h: 0.95 }); prop(0, 'k-chair-a-wood', 8.5, 7.7, 2, { h: 0.95 });
-  prop(0, 'k-chair-a-wood', 5.5, 4.3, 0, { h: 0.95 }); prop(0, 'k-chair-a-wood', 8.5, 4.3, 0, { h: 0.95 });
-  prop(0, 'k-shelf-b-large-decorated', 11.3, 8, 1, { w: 1, d: 2, h: 2, tall: true });
+  // plan de travail continu le long du mur nord
+  for (const [m, x] of [['kitchenCabinet', 3.5], ['kitchenCabinet', 4.5], ['kitchenStove', 5.5], ['kitchenCabinet', 6.5], ['kitchenCabinet', 7.5], ['kitchenSink', 8.5], ['kitchenCabinet', 9.5], ['kitchenCabinet', 10.5]])
+    prop(0, m, x, 1.5, 0, { w: 1, d: 1, h: 0.95, s: [1, 0.95] });
+  prop(0, 'kitchenCabinetUpper', 5, 1.25, 0, { h: 0.7, up: 1.7 }); prop(0, 'kitchenCabinetUpper', 8, 1.25, 0, { h: 0.7, up: 1.7 });
+  prop(0, 'k-table-medium-long', 7, 6, 0, { w: 2, d: 2, h: 0.8 });
+  prop(0, 'k-chair-a-wood', 6.4, 7.15, 2, { h: 0.95 }); prop(0, 'k-chair-a-wood', 7.6, 7.15, 2, { h: 0.95 });
+  prop(0, 'k-chair-a-wood', 6.4, 4.85, 0, { h: 0.95 }); prop(0, 'k-chair-a-wood', 7.6, 4.85, 0, { h: 0.95 });
+  prop(0, 'bookcaseClosedDoors', 11.7, 8, 3, { w: 1, d: 2, h: 2.1, s: [0.55, 1.8], tall: true });
   prop(0, 'trashcan', 3.5, 9.4, 0, { h: 0.6 });
   // salle à manger
-  prop(0, 'tableCrossCloth', 20.5, 5, 1, { w: 8, d: 2, h: 0.82, s: [8, 2] });
-  for (const x of [17.5, 19.5, 21.5, 23.5]) { prop(0, 'chairCushion', x, 3.4, 0, { h: 1 }); prop(0, 'chairCushion', x, 6.6, 2, { h: 1 }); }
-  prop(0, 'chairCushion', 15.6, 5, 1, { h: 1 }); prop(0, 'chairCushion', 25.4, 5, 3, { h: 1 });
+  // la grande table : trois tables mises bout à bout, chaises autour
+  for (const x of [17.83, 20.5, 23.17]) prop(0, 'k-table-medium-long', x, 5, 0, x === 20.5 ? { w: 8, d: 2, h: 0.8, s: [2.67, 1.8] } : { h: 0.8, s: [2.67, 1.8] });
+  for (const x of [17.5, 19.5, 21.5, 23.5]) { prop(0, 'chairCushion', x, 3.85, 0, { h: 1 }); prop(0, 'chairCushion', x, 6.15, 2, { h: 1 }); }
+  prop(0, 'chairCushion', 16.15, 5, 1, { h: 1 }); prop(0, 'chairCushion', 24.85, 5, 3, { h: 1 });
   prop(0, 'k-cabinet-medium-decorated', 14, 1.4, 0, { w: 2, d: 1, h: 1.4 });
   prop(0, 'k-cabinet-medium-decorated', 27.5, 1.4, 0, { w: 2, d: 1, h: 1.4 });
   prop(0, 'pottedPlant', 13.6, 8.5, 0, { h: 1.3 }); prop(0, 'pottedPlant', 28.4, 8.5, 0, { h: 1.3 });
   // bibliothèque : rayonnages le long des murs et en épis
-  for (const x of [31, 33, 35, 37]) prop(0, 'bookcaseClosedWide', x + 0.5, 1.45, 0, { w: 2, d: 1, h: 2.6, tall: true });
-  for (const x of [32.5, 36.5]) { prop(0, 'bookcaseOpen', x, 5.5, 0, { w: 2, d: 1, h: 2.2, tall: true }); }
+  for (const x of [31, 33, 35, 37]) prop(0, 'bookcaseClosedWide', x + 0.5, 1.45, 0, { w: 2, d: 1, h: 2.6, s: [2, 0.8], tall: true });
+  for (const x of [32.5, 36.5]) { prop(0, 'bookcaseOpen', x, 5.5, 0, { w: 2, d: 1, h: 2.2, s: [2, 0.6], tall: true }); }
   prop(0, 'k-armchair', 31.6, 10.5, 1, { h: 1.1 }); prop(0, 'lampRoundFloor', 31.2, 12.2, 0, { h: 1.7 });
-  prop(0, 'desk', 41.5, 3, 3, { w: 2, d: 3, h: 0.8 }); prop(0, 'chairDesk', 40, 3, 1, { h: 1.1 });
+  prop(0, 'desk', 41.5, 3, 3, { w: 2, d: 3, h: 0.8 }); prop(0, 'chairDesk', 40.6, 3, 1, { h: 1.1 });
   prop(0, 'k-book-set', 41.5, 3.6, 0, { h: 0.25, up: 0.8 });
   prop(0, 'globe', 38, 9, 0, { w: 1, d: 1, h: 1.2 });
   // couloir de service
-  prop(0, 'coatRackStanding', 1.5, 13.4, 0, { h: 1.9 });
+  prop(0, 'coatRackStanding', 1.5, 11.5, 0, { h: 1.9 });
   // grand hall
   prop(0, 'rugRectangle', 20.5, 18, 1, { h: 0.02, s: [7, 5] });
   prop(0, 'grandfather', 16, 11.5, 0, { w: 1, d: 1, h: 2.4, tall: true });
@@ -205,35 +208,36 @@ export function buildMap() {
   prop(0, 'pottedPlant', 15.4, 24.3, 0, { h: 1.4 }); prop(0, 'pottedPlant', 26.6, 24.3, 0, { h: 1.4 });
   prop(0, 'benchCushion', 20.5, 12, 0, { w: 3, d: 1, h: 0.6, s: [3, 1] });
   // salon : cheminée, canapés
-  prop(0, 'fireplace', 1.5, 20.5, 1, { w: 1, d: 3, h: 2.2 });
+  prop(0, 'fireplace', 1.4, 20.5, 0, { w: 1, d: 3, h: 2.2 });
   prop(0, 'loungeSofaLong', 6, 18, 0, { w: 3, d: 1, h: 0.9, s: [3, 1.1] });
   prop(0, 'loungeSofaLong', 6, 23, 2, { w: 3, d: 1, h: 0.9, s: [3, 1.1] });
   prop(0, 'tableCoffee', 6, 20.5, 0, { w: 2, d: 1, h: 0.45 });
   prop(0, 'k-armchair-pillows', 9.6, 20.5, 3, { h: 1.1 });
   prop(0, 'rugRound', 6, 20.5, 0, { h: 0.02, s: [5, 5] });
   prop(0, 'k-lamp-standing', 10.6, 16, 0, { h: 1.8 }); prop(0, 'k-lamp-standing', 10.6, 25.5, 0, { h: 1.8 });
-  prop(0, 'bookcaseClosedDoors', 4, 26.4, 2, { w: 2, d: 1, h: 2.2, tall: true });
+  prop(0, 'bookcaseClosedDoors', 3.5, 26.7, 2, { w: 2, d: 1, h: 2.2, s: [1.8, 0.55], tall: true });
   // billard
-  prop(0, 'billard', 35, 19, 1, { w: 4, d: 2, h: 0.85 });
+  prop(0, 'billard', 35, 19, 0, { w: 4, d: 2, h: 0.85 });
   prop(0, 'stoolBar', 31, 15.5, 0, { h: 0.8 }); prop(0, 'stoolBar', 32, 15.5, 0, { h: 0.8 });
   prop(0, 'k-cabinet-small-decorated', 39.6, 17, 3, { w: 1, d: 1, h: 1 });
-  prop(0, 'loungeChair', 31, 23, 0, { h: 1 }); prop(0, 'loungeChair', 39, 23, 0, { h: 1 });
-  prop(0, 'cueRack', 30.4, 19, 1, { h: 1.7 });
+  prop(0, 'loungeChair', 31, 23.4, 2, { h: 1 }); prop(0, 'loungeChair', 39, 23.4, 2, { h: 1 });
+  prop(0, 'cueRack', 30.15, 19, 0, { h: 1.7 });
   // vestibule
   prop(0, 'rugRectangle', 20.5, 30, 0, { h: 0.02, s: [4, 6] });
   prop(0, 'coatRackStanding', 16.6, 32.6, 0, { h: 1.9 }); prop(0, 'coatRackStanding', 24.4, 32.6, 0, { h: 1.9 });
   prop(0, 'sideTableDrawers', 16.5, 27, 1, { w: 1, d: 1, h: 0.85 }); prop(0, 'sideTableDrawers', 24.5, 27, 3, { w: 1, d: 1, h: 0.85 });
   prop(0, 'frontdoor', 20.5, 33.9, 0, { h: 3 });
   // salon de musique
-  prop(0, 'piano', 4, 31, 0, { w: 3, d: 2, h: 1.1 });
-  prop(0, 'stoolBar', 4, 32.8, 0, { h: 0.55 });
-  prop(0, 'k-chair-b-wood', 9, 31, 0, { h: 1 }); prop(0, 'k-chair-b-wood', 11, 31, 0, { h: 1 }); prop(0, 'k-chair-b-wood', 9, 33, 0, { h: 1 }); prop(0, 'k-chair-b-wood', 11, 33, 0, { h: 1 });
+  prop(0, 'piano', 4, 28.75, 0, { w: 2, d: 1, h: 1.4 });
+  prop(0, 'stoolBar', 4, 30, 0, { h: 0.55 });
+  // le public regarde le piano
+  for (const [x, z] of [[9, 31], [11, 31], [9, 33], [11, 33]]) prop(0, 'k-chair-b-wood', x, z, 3, { h: 1 });
   prop(0, 'harp', 13.6, 28.6, 0, { w: 1, d: 1, h: 1.8 });
   prop(0, 'radio', 1.5, 34.4, 0, { h: 0.6 });
   // jardin d'hiver
   for (const [x, z] of [[28, 27], [33, 27], [38, 27], [43, 27], [28, 33.5], [43, 33.5], [36, 33.5]]) prop(0, 'pottedPlant', x, z, 0, { w: 1, d: 1, h: 1.6 });
   prop(0, 'fountain', 35.5, 30.5, 0, { w: 3, d: 3, h: 1.3 });
-  prop(0, 'bench', 30, 30.5, 1, { w: 1, d: 2, h: 0.55 }); prop(0, 'bench', 41, 30.5, 3, { w: 1, d: 2, h: 0.55 });
+  prop(0, 'bench', 30, 30.5, 1, { w: 1, d: 2, h: 0.5, s: [0.55, 2] }); prop(0, 'bench', 41, 30.5, 3, { w: 1, d: 2, h: 0.5, s: [0.55, 2] });
   prop(0, 'plantSmall1', 31, 33.5, 0, { h: 0.6 }); prop(0, 'plantSmall2', 40, 27.3, 0, { h: 0.6 });
 
   prop(0, 'k-rug-oval-a', 10, 32, 0, { h: 0.02, s: [3.4, 3] });
@@ -241,25 +245,25 @@ export function buildMap() {
   prop(0, 'k-rug-rectangle-stripes-a', 35, 19, 1, { h: 0.02, s: [6, 3.6] });
   prop(0, 'sideTable', 11.4, 18.5, 1, { w: 1, d: 1, h: 0.6 });
   // étage
-  prop(1, 'bedDouble', 4, 4, 0, { w: 3, d: 3, h: 1.1, s: [2.6, 3] }); prop(1, 'cabinetBedDrawerTable', 1.6, 2, 0, { h: 0.6 }); prop(1, 'cabinetBedDrawerTable', 6.4, 2, 0, { h: 0.6 });
-  prop(1, 'k-shelf-b-large-decorated', 10.5, 1.4, 0, { w: 2, d: 1, h: 2.1, tall: true });
+  prop(1, 'bedDouble', 4, 2.55, 0, { w: 3, d: 3, h: 1.1, s: [2.6, 3] }); prop(1, 'cabinetBedDrawerTable', 2.3, 1.4, 0, { h: 0.6 }); prop(1, 'cabinetBedDrawerTable', 5.7, 1.4, 0, { h: 0.6 });
+  prop(1, 'bookcaseClosedDoors', 10.5, 1.3, 0, { w: 2, d: 1, h: 2.1, s: [1.8, 0.55], tall: true });
   prop(1, 'rugRounded', 5, 7, 0, { h: 0.02, s: [3, 2] }); prop(1, 'k-armchair', 9.5, 7.5, 3, { h: 1.1 }); prop(1, 'sideTable', 9.6, 6.1, 0, { h: 0.6 });
   prop(1, 'bedDouble', 20.5, 3, 0, { w: 4, d: 3, h: 1.3, s: [3.4, 3.4] });
-  prop(1, 'cabinetBedDrawerTable', 17.6, 1.6, 0, { h: 0.65 }); prop(1, 'cabinetBedDrawerTable', 23.4, 1.6, 0, { h: 0.65 });
-  prop(1, 'k-couch-pillows', 15, 7.5, 1, { w: 1, d: 3, h: 1 }); prop(1, 'rugRectangle', 20.5, 7.5, 0, { h: 0.02, s: [5, 2.5] });
-  prop(1, 'k-lamp-table', 17.6, 1.6, 0, { h: 0.4, up: 0.65 });
-  prop(1, 'bathtub', 32, 2.5, 0, { w: 3, d: 2, h: 0.8 }); prop(1, 'toilet', 35.5, 1.6, 0, { h: 0.85 }); prop(1, 'bathroomSink', 31, 8.4, 2, { h: 1 });
+  prop(1, 'cabinetBedDrawerTable', 18.4, 1.4, 0, { h: 0.65 }); prop(1, 'cabinetBedDrawerTable', 22.6, 1.4, 0, { h: 0.65 });
+  prop(1, 'k-couch-pillows', 14.7, 7.5, 1, { w: 1, d: 3, h: 1 }); prop(1, 'rugRectangle', 20.5, 7.5, 0, { h: 0.02, s: [5, 2.5] });
+  prop(1, 'k-lamp-table', 18.4, 1.4, 0, { h: 0.4, up: 0.65 });
+  prop(1, 'bathtub', 32, 1.6, 0, { w: 3, d: 2, h: 0.8 }); prop(1, 'toilet', 35.5, 1.6, 0, { h: 0.85 }); prop(1, 'bathroomSink', 31, 9.7, 2, { h: 1 });
   prop(1, 'bathroomMirror', 36.9, 6.5, 3, { h: 1.1, up: 1.1, wall: true });
-  prop(1, 'desk', 41.5, 3, 0, { w: 3, d: 1, h: 0.8 }); prop(1, 'chairDesk', 41.5, 4.3, 2, { h: 1.1 }); prop(1, 'bookcaseClosedWide', 43.5, 7.5, 3, { w: 1, d: 2, h: 2.4, tall: true });
-  prop(1, 'k-book-set', 40.8, 2.8, 0, { h: 0.22, up: 0.8 }); prop(1, 'k-shelf-a-big', 38.6, 8.4, 1, { w: 1, d: 1, h: 1.9, tall: true });
-  prop(1, 'bedSingle', 3, 17.5, 0, { w: 2, d: 3, h: 0.9 }); prop(1, 'bedSingle', 3, 22, 0, { w: 2, d: 3, h: 0.9 });
+  prop(1, 'desk', 41.5, 1.5, 0, { w: 3, d: 1, h: 0.8 }); prop(1, 'chairDesk', 41.5, 2.4, 2, { h: 1.1 }); prop(1, 'bookcaseClosedWide', 44.6, 7.5, 3, { w: 1, d: 2, h: 2.4, s: [0.75, 2.4], tall: true });
+  prop(1, 'k-book-set', 40.8, 1.3, 0, { h: 0.22, up: 0.8 }); prop(1, 'bookcaseOpen', 38.3, 8.6, 1, { w: 1, d: 2, h: 2, s: [0.55, 1.6], tall: true });
+  prop(1, 'bedSingle', 2, 16.6, 0, { w: 2, d: 3, h: 0.9 }); prop(1, 'bedSingle', 2, 21.5, 0, { w: 2, d: 3, h: 0.9 });
   prop(1, 'bear', 8, 18, 0, { h: 0.7 }); prop(1, 'rugRound', 7, 20, 0, { h: 0.02, s: [3.5, 3.5] }); prop(1, 'cardboardBoxOpen', 10.4, 23.5, 0, { h: 0.6 });
-  prop(1, 'rockinghorse', 9, 22, 1, { h: 1 }); prop(1, 'k-table-small', 6.5, 23.6, 0, { h: 0.5 }); prop(1, 'k-rug-oval-b', 20.5, 7.6, 0, { h: 0.02, s: [3, 2] });
+  prop(1, 'rockinghorse', 9, 22, 1, { h: 1 }); prop(1, 'k-table-small', 6.5, 23.6, 0, { h: 0.5 });
   prop(1, 'k-pictureframe-standing-a', 33, 15.6, 0, { h: 1.6 });
   prop(1, 'armor', 31, 24, 0, { w: 1, d: 1, h: 2.1 }); prop(1, 'armor', 43, 24, 0, { w: 1, d: 1, h: 2.1 });
   prop(1, 'k-cabinet-medium-decorated', 41, 15.5, 0, { w: 2, d: 1, h: 1.4 });
-  prop(1, 'tableRound', 37, 20, 0, { w: 2, d: 2, h: 0.8 }); prop(1, 'chairCushion', 35.3, 20, 1, { h: 1 }); prop(1, 'chairCushion', 38.7, 20, 3, { h: 1 });
-  prop(1, 'loungeSofa', 43.2, 19.5, 3, { w: 1, d: 2, h: 0.9 });
+  prop(1, 'tableRound', 37, 20, 0, { w: 2, d: 2, h: 0.8 }); prop(1, 'chairCushion', 35.85, 20, 1, { h: 1 }); prop(1, 'chairCushion', 38.15, 20, 3, { h: 1 });
+  prop(1, 'loungeSofa', 44.55, 19.5, 3, { w: 1, d: 2, h: 0.9 });
   prop(1, 'benchCushion', 20.5, 11.5, 0, { w: 3, d: 1, h: 0.6, s: [3, 1] });
   prop(1, 'pottedPlant', 30.5, 11.5, 0, { h: 1.3 }); prop(1, 'pottedPlant', 44, 11.5, 0, { h: 1.3 });
   prop(1, 'k-lamp-standing', 1.5, 11.5, 0, { h: 1.8 });
