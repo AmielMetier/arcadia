@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.57 — 2 novembre 2026
+- **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :
+  - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges, Ho-Oh, la Team Éclipse, Lugia Obscur et Odyssor (passable à tout moment).
+  - **Introduction du Professeur Saule** : scène sobre façon DS avec le sprite du Prof. Saule qui lance une Poké Ball d'où sort un starter, sélection du personnage par cartes illustrées, carte officielle d'enregistrement du prénom avec suggestions en un clic, et apparition du voisin Théo.
+  - **Course continue (COURSE / touche R)** : bouton sur le HUD (et touche R ou Verr. Maj) pour courir en permanence sans maintenir Shift.
+  - **Décors de combat & HUD rétro 5G (*Noir 2 / Blanc 2*)** : 11 nouveaux fonds de combat en pixel-art 16-bit (prairie, mer, arène, Ligue, grotte, neige, volcan, de jour comme de nuit), socles assortis, boîtes de statut 5G biseautées avec Poké Balls d'équipe, badges de types, barres PV / EXP segmentées, boutons d'action illustrés et cartes de capacités détaillées (catégorie, type, puissance et PP).
+  - **Police d'écriture (Chakra Petch)** : chiffres nets et alignés dans tous les menus et compteurs de PV.
+
 ## 3.56 — 2 novembre 2026
 - **Site Noir** — nouveau jeu : de l'horreur à la première personne, un monstre contre trois ou quatre enquêteurs, en 15 minutes environ
   - Enquêteurs : une lampe, une batterie, trois cases. Fouillez les meubles pour trouver le badge, la clé et les fusibles, relancez le générateur, prenez l'ascenseur et remontez avec au moins une preuve.
@@ -7,7 +15,6 @@
   - Monstre : tu vois dans le noir, les corps chauds brillent, tu entends les bruits autour du viseur, tu coupes les lumières, bloques les portes, casses les caméras et sabotes le générateur.
   - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
   - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
-
 ## 3.55 — 2 novembre 2026
 - **Mollo !** — Le combat est revu de fond en comble.
   - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.

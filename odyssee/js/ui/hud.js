@@ -98,6 +98,12 @@ export class Hud {
         this.toggle();
         return;
       }
+      const runBtn = e.target.closest('[data-act="autorun"]');
+      if (runBtn && this.game.state && !this.game.busy && !this.game.bv.alive) {
+        e.stopPropagation();
+        this.game.toggleAutoRun();
+        return;
+      }
       if (!this.canInteract()) return;
       const actEl = e.target.closest('[data-act]');
       if (!actEl) return;
@@ -139,7 +145,7 @@ export class Hud {
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 
@@ -211,6 +217,9 @@ export class Hud {
         <div class="hud-bdots-row" data-act="card" title="Badges d'Arène">${badgeDots}</div>
       </div>
       <div class="hud-actions">
+        <button type="button" class="hud-btn run${g.autoRun ? ' on' : ''}" data-act="autorun" tabindex="-1" title="Course continue (Touche R)">
+          <img src="img/hud/run.png" alt="" onerror="this.style.display='none'"><span>${g.autoRun ? 'COURSE ●' : 'COURSE'}</span>
+        </button>
         <button type="button" class="hud-btn${st.party.length ? '' : ' off'}" data-act="party" tabindex="-1" title="Équipe">
           <img src="img/hud/team.png" alt=""><span>ÉQUIPE</span>
         </button>

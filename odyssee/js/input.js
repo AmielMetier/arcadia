@@ -1,11 +1,11 @@
 // odyssee/js/input.js — clavier : flèches ou ZQSD (WASD en QWERTY), F (ou Espace / Entrée) = interagir / valider,
-// Échap / Retour arrière = annuler, menu ; Maj = courir ; C = carte ; U = afficher / replier le HUD ; H = aide des touches
+// Échap / Retour arrière = annuler, menu ; Maj = courir ; R = course continue ; C = carte ; U = afficher / replier le HUD ; H = aide des touches
 const MAP = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
   KeyF: 'a', Space: 'a', Enter: 'a', NumpadEnter: 'a', KeyE: 'a', KeyK: 'a',
   Escape: 'b', Backspace: 'b', KeyX: 'b', KeyL: 'b',
-  ShiftLeft: 'run', ShiftRight: 'run',
+  ShiftLeft: 'run', ShiftRight: 'run', KeyR: 'autorun', CapsLock: 'autorun',
   Tab: 'menu', KeyM: 'menu', KeyC: 'map', KeyU: 'hud', KeyH: 'help', F1: 'help',
 };
 export class Input {
