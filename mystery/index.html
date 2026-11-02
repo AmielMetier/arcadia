@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Mystère Mystère</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Creepster&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mystery.css">
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="hud" hidden>
+  <div class="vig" id="vig"></div>
+  <div class="cross" id="cross" aria-hidden="true"><i></i></div>
+  <div class="ring" id="ring" hidden></div>
+  <div class="hitm" id="hit">✕</div>
+  <div class="top">
+    <div class="pill role" id="role" hidden></div>
+    <div class="clock" id="clock"></div>
+    <div class="pill coins" id="coins"></div>
+  </div>
+  <div class="note" id="note"></div>
+  <div class="feed" id="feed"></div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="prompt" id="prompt" hidden><kbd>E</kbd><span id="ptxt"></span></div>
+  <div class="toast" id="toast" hidden></div>
+  <div class="spec" id="spec" hidden></div>
+  <div class="card" id="card" hidden></div>
+  <div class="gunmark" id="gunmark" hidden><b>🔫</b><small></small></div>
+  <div class="board" id="board" hidden></div>
+  <div class="lockhint" id="lockHint" hidden>Clique pour prendre le contrôle de la vue</div>
+  <div class="slots" id="slots"></div>
+  <div class="stam" id="stam" hidden><i></i></div>
+  <div class="stick" id="stick" hidden><i></i></div>
+  <div class="tr"><button class="icon" id="btnSet" title="Réglages" aria-label="Réglages"></button><button class="icon" id="btnMenu" title="Menu (Échap)" aria-label="Menu">☰</button></div>
+  <div class="tbtns" id="tbtns">
+    <div class="col"><button data-a="jump" aria-label="Sauter">⤴<small>Saut</small></button><button data-a="run" aria-label="Courir">🏃<small>Courir</small></button></div>
+    <div class="col"><button data-a="draw" aria-label="Arme">🔁<small>Arme</small></button><button data-a="use" aria-label="Utiliser">✋<small>Utiliser</small></button></div>
+    <div class="col"><button data-a="bo" class="m" aria-label="Coupure">💡</button><button data-a="alt" class="m" aria-label="Lancer">🎯</button><button data-a="fire" class="big" aria-label="Frapper ou tirer">💥</button></div>
+  </div>
+</div>
+
+<div id="screen" class="screen"></div>
+
+<script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,5 +1,28 @@
 [
   {
+    "id": "log-1793648949215-89mdj",
+    "ts": 1793648949215,
+    "iso": "2026-11-02T19:49:09.215Z",
+    "code": "CRASH_JS_ERROR",
+    "category": "CRASH",
+    "severity": "critical",
+    "title": "Erreur JavaScript fatale en cours de partie",
+    "cause": "Exception non interceptée (TypeError / ReferenceError / RangeError) dans la boucle de simulation ou de rendu.",
+    "message": "Erreur JavaScript non gérée",
+    "game": "hub",
+    "roomCode": null,
+    "role": "solo",
+    "player": "Anonyme",
+    "by": null,
+    "stack": null,
+    "file": null,
+    "line": null,
+    "diagnostics": {
+      "hidden": false,
+      "url": "/index.html"
+    }
+  },
+  {
     "id": "log-1793052081368-mp-golf",
     "ts": 1793052081368,
     "iso": "2026-10-26T22:01:21.368Z",

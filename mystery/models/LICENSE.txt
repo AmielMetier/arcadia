@@ -1,0 +1,23 @@
+Modèles 3D de Mystère Mystère. Tous sont dans le domaine public (CC0 1.0,
+https://creativecommons.org/publicdomain/zero/1.0/) : utilisation libre, même commerciale, sans obligation de citer.
+On les cite quand même, avec plaisir.
+
+perso/   Personnages animés (marche, attente, coup, tir, ramasser, défaite, victoire)
+  man-suit, woman-suit, man-casual, woman-casual, man-casual-2, woman-casual-2
+  Quaternius — Ultimate Animated Character Pack (novembre 2019)
+  https://quaternius.com · https://opengameart.org/content/animated-characters-pack (aussi sur https://poly.pizza)
+  Couleurs (peau, costume, chemise, cheveux) données dans le jeu.
+
+meubles/ Mobilier
+  Kenney — Furniture Kit 2.0, https://kenney.nl/assets/furniture-kit (aussi sur https://poly.pizza) :
+    bathroomMirror, bathroomSink, bathtub, bear, bedDouble, bedSingle, bench, benchCushion, bookcaseClosedDoors,
+    bookcaseClosedWide, bookcaseOpen, cabinetBedDrawerTable, cardboardBoxClosed, cardboardBoxOpen, chairCushion, chairDesk,
+    coatRackStanding, desk, kitchenCabinet, kitchenCabinetUpper, kitchenSink, kitchenStove, lampRoundFloor, lampRoundTable,
+    loungeChair, loungeSofa, loungeSofaLong, plantSmall1, plantSmall2, pottedPlant, radio, rugRectangle, rugRound, rugRounded,
+    sideTable, sideTableDrawers, stoolBar, tableCoffee, tableCrossCloth, tableRound, toilet, trashcan
+  Kay Lousberg — KayKit Furniture Bits 1.0, https://kaylousberg.itch.io/furniture-bits : tous les fichiers k-*
+  Quaternius — Medieval Weapons Pack (dagger, le couteau) et Ultimate Platformer Pack (chest), https://quaternius.com
+
+Les fichiers ont été décompressés (meshopt) pour le chargeur du jeu, puis retaillés et recolorés dans le jeu
+(bois sombre, velours, laiton du manoir). Les autres pièces (cheminée, billard, piano, horloge, armure, tonneaux…)
+sont dessinées dans le code (mystery/view/models.js).

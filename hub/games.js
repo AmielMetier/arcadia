@@ -255,6 +255,23 @@ window.HUB_GAMES = [
     ],
     cover: 'sitenoir/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
+  {
+    id: 'mystery',
+    title: 'Mystère Mystère',
+    tag: 'Un meurtrier parmi les invités',
+    desc: 'Murder mystery à la première personne dans un manoir à trois étages : un meurtrier caché au couteau, un shérif au revolver, et des innocents qui ramassent l\'or. Passages secrets, coupures de courant, revolver qui tombe : trouve qui c\'est avant qu\'il ne soit trop tard.',
+    url: 'mystery/',
+    minPlayers: 1, maxPlayers: 6, maxWithBots: 12,
+    accent: '#ff4d5e',
+    icon: '🔪', score: 'Record de points',
+    settings: [
+      { key: 'mode', label: 'Mode', options: [['classic', 'Manches'], ['explore', 'Découverte (sans rôles)']], def: 'classic' },
+      { key: 'bots', label: 'Bots en plus', options: [[0, 'Aucun'], [2, '2'], [4, '4'], [6, '6'], [8, '8']], def: 4 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'time', label: 'Durée d\'une manche', options: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 },
+    ],
+    cover: 'mystery/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
@@ -299,6 +316,9 @@ window.HUB_GAME_INFO = {
   royale: { genre: 'action', time: '10–20 min',
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
+  mystery: { genre: 'party', time: '3–5 min la manche',
+    keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · Espace', 'Courir, sauter'], ['1 / 2 · molette', 'Ranger, sortir l\'arme'], ['Clic', 'Frapper · tirer'], ['Clic droit', 'Lancer le couteau'], ['E', 'Passage secret'], ['F', 'Couper le courant (meurtrier)'], ['Tab', 'Invités']],
+    tips: ['Le meurtrier garde son couteau caché : regarde les mains de tout le monde.', 'Le shérif qui tire sur un innocent est sonné et lâche son revolver : le premier innocent qui le ramasse devient le héros.', 'Le revolver tombé brille d\'un faisceau doré qu\'on voit à travers les murs.', 'La bibliothèque pivote, l\'armoire et le miroir aussi : E pour passer.', 'Un couteau lancé se plante dans le décor : va le reprendre, ou attends qu\'il revienne.', 'Pendant une coupure de courant, on ne voit qu\'à quelques mètres.'] },
   sitenoir: { genre: 'action', time: '15 min',
     keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
     tips: ['Courir fait du bruit : le monstre l\'entend. Accroupi, tu es presque muet.', 'Une photo prise de près l\'aveugle un instant, et compte comme preuve.', 'Sans preuve, l\'extraction ne sert à rien : passe le capteur EMF sur les traces vertes.', 'La première mise à terre pardonne : la seconde, non.'] },
