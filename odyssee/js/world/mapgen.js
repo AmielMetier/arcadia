@@ -88,7 +88,7 @@ export class GameMap {
     const seen = new Uint8Array(this.w * this.h), q = [[x0, y0]]; seen[y0 * this.w + x0] = 1;
     // passGates : true (tous), false (aucun) ou un nombre de badges ; abil : true (toutes les capacités) ou un Set de cases franchissables
     const blocked = new Set(); if (passGates !== true) for (const g of this.gates) if (passGates === false || g.badges > passGates) for (const [x, y] of g.tiles) blocked.add(key(x, y));
-    const can = (t) => (abil === true ? t === T.CUT || t === T.SMASH || t === T.WATER : !!abil && abil.has(t));
+    const can = (t) => (abil === true ? t === T.CUT || t === T.SMASH || t === T.WATER || t === T.BOULDER : !!abil && abil.has(t));
     if (withNpcs) { for (const n of this.npcs) if (!n.gate) blocked.add(key(n.x, n.y)); for (const it of this.items) blocked.add(key(it.x, it.y)); }
     while (q.length) {
       const [x, y] = q.pop();

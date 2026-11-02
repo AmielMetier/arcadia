@@ -237,7 +237,7 @@ export class WorldView {
     }
     switch (tt) {
       case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.CUT: return { c: A[grassKey] };
-      case T.SMASH: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
+      case T.SMASH: case T.BOULDER: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
       // hautes herbes : un tapis dessiné au sol, comme sur DS (les jambes de qui s'y tient sont cachées par view.cover)
       case T.TALL: case T.DARKTALL: {
         // tileset : nappe d'herbe avec ses bords et ses coins arrondis (pièce choisie selon les voisins)
@@ -336,6 +336,7 @@ export class WorldView {
       else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.BUSH) { const r = S.bush; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); }
       else if (t === T.CUT) { const r = S.cuttree; billboard(P, x + 0.5, y + 0.62, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
+      else if (t === T.BOULDER) { const r = m.outdoor ? S.rock : S.caverock || S.rock; billboard(P, x + 0.5, y + 0.62, SW(r) * 1.15, SH(r) * 1.15, r); flat(Sh, x + 0.02, y + 0.35, x + 0.98, y + 0.9, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.SMASH) { const r = S.crackrock; billboard(P, x + 0.5, y + 0.62, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.WALL) {
         // mur du fond en volume ; murs latéraux et bas réduits à une bordure sombre, comme sur DS
@@ -582,7 +583,7 @@ export class WorldView {
   }
   applyTint(c) {
     const indoorOrCave = !this.map?.outdoor;
-    const k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : c;
+    const k = indoorOrCave ? (this.map?.floor === 'cave' ? [0.82, 0.8, 0.86] : [1, 1, 1]) : this.eclipse ? [0.3, 0.17, 0.44] : c;
     this.tint.setRGB(k[0], k[1], k[2]);
     for (const m of this.tinted) { const base = m.userData.base; if (base) m.color.copy(base).multiply(this.tint); else m.color.copy(this.tint); }
     if (this.nightGroup) this.nightGroup.visible = !indoorOrCave && this.night > 0.5;

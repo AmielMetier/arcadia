@@ -5,6 +5,7 @@ export const T = {
   MAT: 20, STAIRS: 21, ASH: 22, PINE: 23, BUSH: 24, CAVEDOOR: 25, SNOW: 26, DARKTALL: 27, LEDGE_E: 28, LEDGE_W: 29,
   CUT: 30,   // petit arbre qu'on tranche avec Coupe
   SMASH: 31, // rocher fissuré qu'on brise avec Éclate-Roc
+  BOULDER: 32, // gros rocher qu'on pousse avec Force
 };
 const WALK = new Set([T.GRASS, T.PATH, T.TALL, T.SAND, T.FLOWER, T.DOOR, T.PAVE, T.BRIDGE, T.CAVE, T.FLOOR, T.MAT, T.STAIRS, T.ASH, T.CAVEDOOR, T.SNOW, T.DARKTALL]);
 export const walkable = (t) => WALK.has(t);

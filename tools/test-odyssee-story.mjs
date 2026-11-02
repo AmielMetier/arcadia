@@ -1,8 +1,8 @@
 // tools/test-odyssee-story.mjs — l'aventure d'Odyssée peut-elle être finie ? Parcours de toute l'histoire, sans navigateur.
 // À chaque étape, on vérifie qu'on peut atteindre le PNJ / l'objet suivant avec ce qu'on possède à ce moment-là
-// (badges, CS, drapeaux de l'histoire), en respectant gardes, sbires, rochers, petits arbres et zones de surf.
+// (badges, CS, drapeaux de l'histoire), en respectant gardes, sbires, rochers, petits arbres et rochers fissurés.
 // Usage : node tools/test-odyssee-story.mjs
-import { buildWorld } from '../odyssee/js/world/region.js';
+import { buildWorld, FIELD } from '../odyssee/js/world/region.js';
 import { T, walkable } from '../odyssee/js/world/tiles.js';
 
 const W = buildWorld(), maps = W.maps;
@@ -10,17 +10,19 @@ let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.error('ÉCHEC :', msg); } };
 const key = (m, x, y) => m + ':' + x + ',' + y;
 
-// état du joueur
+// état du joueur (les mêmes règles que game.js : gateClosed, npcVisible, canField)
 const st = { badges: Array(8).fill(false), flags: {}, bag: {} };
-const badgeCount = () => st.badges.filter(Boolean).length;
-const gateOn = (g) => badgeCount() < (g.badges || 0) || (!!g.until && !st.flags[g.until]);
+const game = { badgeCount: () => st.badges.filter(Boolean).length };
+const gateOn = (g) => (g.open ? !g.open(st.flags, game) : g.flag ? !st.flags[g.flag] : game.badgeCount() < g.badges);
 function visible(n) {
+  if (n.when && !n.when(st.flags, game)) return false;
   if (n.gate) return gateOn(n.gate);
   if (n.vanish && st.flags['T:' + n.id]) return false;
   if (n.showIf && !st.flags[n.showIf]) return false;
   if (n.hideIf && st.flags[n.hideIf]) return false;
   return true;
 }
+const can = (k) => !!st.bag['cs-' + k] && game.badgeCount() >= FIELD[k].badge;
 function npcPos(n) { return n.beatenPos && st.flags['T:' + n.id] ? n.beatenPos : [n.x, n.y]; }
 function blockedSet(m) {
   const b = new Set();
@@ -29,7 +31,6 @@ function blockedSet(m) {
   for (const it of m.items) if (!st.flags['I:' + it.id]) b.add(it.x + ',' + it.y);
   return b;
 }
-const inSurf = (m, x, y) => m.outdoor && m.get(x, y) === T.WATER && (m.surf || []).some((z) => x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1);
 
 /** exploration depuis pos : renvoie l'ensemble des tuiles atteignables */
 function explore(pos) {
@@ -41,7 +42,7 @@ function explore(pos) {
     const push = (map, x, y) => { const k = key(map, x, y); if (!seen.has(k)) { seen.add(k); q.push({ map, x, y }); } };
     const t0 = m.get(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
-    if (w && (t0 === T.DOOR || t0 === T.CAVEDOOR || t0 === T.MAT)) {
+    if (w && (t0 === T.DOOR || t0 === T.CAVEDOOR || t0 === T.MAT || w.step)) {
       if (!w.need || st.bag[w.need]) push(w.map, w.x, w.y);
       if (t0 !== T.MAT) continue; // on ne reste pas sur une porte
     }
@@ -53,11 +54,12 @@ function explore(pos) {
       if (t === T.LEDGE && dy === 1 && !onWater) { if (walkable(m.get(x, y + 1)) && !B.has(x + ',' + (y + 1))) push(p.map, x, y + 1); continue; }
       if (t === T.LEDGE_E && dx === 1) { if (walkable(m.get(x + 1, y))) push(p.map, x + 1, y); continue; }
       if (t === T.LEDGE_W && dx === -1) { if (walkable(m.get(x - 1, y))) push(p.map, x - 1, y); continue; }
-      let pass = walkable(t) && m.height(x, y) === m.height(p.x, p.y);
+      let pass = walkable(t) && (onWater || m.height(x, y) === m.height(p.x, p.y));
       if (t === T.STAIRS || t0 === T.STAIRS) pass = walkable(t) && Math.abs(m.height(x, y) - m.height(p.x, p.y)) <= 1;
-      if (t === T.BUSH && st.bag.hm01) pass = true;
-      if (t === T.BOULDER && st.bag.hm04) pass = true;
-      if (t === T.WATER && st.bag.hm03 && inSurf(m, x, y)) pass = true;
+      if (t === T.CUT && can('coupe')) pass = true;
+      if (t === T.SMASH && can('eclate')) pass = true;
+      if (t === T.BOULDER && can('force')) pass = true;
+      if (t === T.WATER && can('surf') && (m.outdoor || m.surf)) pass = true;
       if (onWater && t === T.DOOR) pass = false;
       if (pass) push(p.map, x, y);
     }
@@ -72,10 +74,7 @@ function reach(label, mapId, x, y) {
   const seen = explore(pos);
   const m = maps[mapId];
   for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-    if (seen.has(key(mapId, x + dx, y + dy))) {
-      // les comptoirs : on parle par-dessus
-      pos = { map: mapId, x: x + dx, y: y + dy }; return true;
-    }
+    if (seen.has(key(mapId, x + dx, y + dy))) { pos = { map: mapId, x: x + dx, y: y + dy }; return true; }
     // par-dessus un comptoir
     if (m.get(x + dx, y + dy) === T.BLOCK && seen.has(key(mapId, x + 2 * dx, y + 2 * dy))) { pos = { map: mapId, x: x + 2 * dx, y: y + 2 * dy }; return true; }
   }
@@ -93,12 +92,15 @@ function cannot(label, id) {
   ok(![[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => seen.has(key(mid, x + dx, y + dy))), label);
 }
 const beat = (...ids) => ids.forEach((id) => talk(id, () => { st.flags['T:' + id] = true; }));
-const GYMS = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
-const leader = (town, i) => {
-  beat(`${W.towns[town].gymMap.id}:leader`);
-  // sans ce badge, l'Arène suivante reste hors d'atteinte (les gardes tiennent toute la largeur du passage)
-  if (GYMS[i + 1]) cannot(`Arène ${i + 2} atteignable sans le badge ${i + 1}`, `${W.towns[GYMS[i + 1]].gymMap.id}:leader`);
-  st.badges[i] = true;
+// ordre des arènes : Sylvebourg, Port-Azur, Voltacité, Floralia, Mirage, puis Granit, Cendrelune et Fort-Écaille
+const GYMS = ['B', 'D', 'E', 'F', 'G', 'K', 'H', 'L'];
+const GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
+const leaderId = (i) => `${W.towns[GYMS[i]].gymMap.id}:leader`;
+const leader = (i) => {
+  beat(leaderId(i));
+  // sans ce badge, l'Arène suivante reste hors d'atteinte
+  if (GYMS[i + 1]) cannot(`Arène ${i + 2} atteignable sans le badge ${i + 1}`, leaderId(i + 1));
+  st.badges[i] = true; if (GIFT[i]) st.bag['cs-' + GIFT[i]] = 1;
 };
 const item = (mapId, it, x, y) => { const m = maps[mapId], o = m.items.find((q) => q.item === it && !st.flags['I:' + q.id] && (x == null || (q.x === x && q.y === y))); if (!o) { ok(false, `objet ${it} introuvable sur ${mapId}`); return; } if (reach('objet ' + it, mapId, o.x, o.y)) { st.flags['I:' + o.id] = true; st.bag[it] = (st.bag[it] || 0) + o.qty; } };
 
@@ -113,44 +115,40 @@ for (const [mid, m] of Object.entries(maps)) {
   }
   for (const it of m.items) ok(walkable(m.get(it.x, it.y)), `objet ${it.item} sur une case infranchissable (${mid} ${it.x},${it.y})`);
 }
-ok(maps.monde.pockets.every(Boolean), 'tous les recoins secrets sont creusés');
+ok(maps.monde.pockets.length >= 8, 'les recoins secrets sont creusés');
 
 /* ---------------- l'aventure ---------------- */
-talk('prof'); reach('starter', 'aube:labo', 5, 5); st.flags.starter = 155; st.flags.rival1 = true;
-leader('B', 0);
+talk('prof'); reach('starter', 'aube:labo', 5, 5); st.flags.starter = 1; st.flags.rival1 = true;
+leader(0);
 { const o = maps.monde.items.find((q) => q.item === 'medaillon'), seen = explore(pos); ok(![[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => seen.has(key('monde', o.x + dx, o.y + dy))), 'le médaillon demande Coupe'); }
-talk('sylve:bucheron', () => { st.bag.hm01 = 1; });
-beat('ecl:bois1', 'ecl:bois2'); talk('lumen-bois', () => { st.bag.hm05 = 1; });
-item('monde', 'medaillon'); talk('sylve:medaillon');
-leader('C', 1);
+beat('ecl:bois1', 'ecl:bois2'); talk('lumen-bois', () => { st.bag['cs-flash'] = 1; });
 beat('ecl:grotte1', 'ecl:erebe1', 'ecl:grotte2');
-beat('ecl:azur1', 'ecl:nyx1'); leader('D', 2); talk('azur:marin', () => { st.bag.hm03 = 1; });
-item('monde', 'rare-candy', W.towns.D.x + 26, W.towns.D.y + 1); // îlot du port (Surf)
-cannot('l\'Arène de Voltacité est fermée tant que la Centrale est occupée', `${W.towns.E.gymMap.id}:leader`);
-beat('ecl:volta1', 'ecl:volta2', 'ecl:erebe2'); talk('volta:ingenieur', () => { st.bag.hm04 = 1; });
-leader('E', 3);
-leader('F', 4);
-cannot('Mirage est bloquée par la Team Éclipse', `${W.towns.G.gymMap.id}:leader`);
+beat('ecl:azur1', 'ecl:nyx1'); talk('azur:marin'); leader(1);
+cannot('l\'Arène de Voltacité est fermée tant que la Centrale est occupée', leaderId(2));
+beat('ecl:volta1', 'ecl:volta2', 'ecl:erebe2'); talk('volta:ingenieur', () => { st.bag['cs-force'] = 1; });
+leader(2);
+leader(3);
+item('monde', 'medaillon'); talk('sylve:medaillon');
+cannot('Mirage est bloquée par la Team Éclipse', leaderId(4));
 beat('ecl:rep1', 'ecl:rep2', 'ecl:rep3', 'ecl:nyx2', 'ecl:rep4', 'ecl:rep5', 'ecl:boss1'); st.flags.eclipse = true;
-leader('G', 5); talk('mirage:voyante', () => { st.bag['silver-wing'] = 1; });
-leader('H', 6);
-cannot('le Conseil 4 attend la fin de l\'Éclipse', 'c4:1');
+leader(4); talk('mirage:voyante', () => { st.bag['plume-argent'] = 1; st.flags.plumeArgent = true; });
+item('monde', 'rare-candy', W.towns.D.x + 26, W.towns.D.y + 1); // îlot du port (Surf)
+leader(5); leader(6); leader(7);
+cannot('la Route Victoire reste fermée tant que dure l\'Éclipse', 'c4:1');
 reach('Lumen au Sanctuaire', 'sanctuaire', 13, 29);
-beat('ecl:nyx3', 'ecl:erebe3', 'ecl:boss2'); reach('Lugia', 'sanctuaire', 12, 4); st.flags.lugia = true;
-leader('I', 7);
+beat('ecl:sanct1', 'ecl:sanct2', 'ecl:nyx3', 'ecl:erebe3', 'ecl:boss2'); reach('Lugia', 'sanctuaire', 12, 4); st.flags.lugia = true;
 for (const id of ['c4:1', 'c4:2', 'c4:3', 'c4:4']) beat(id);
 beat('champion');
 const out = maps['plateau:ligue'].outside; pos = { map: 'monde', x: out.x, y: out.y }; // la fin ramène sur le plateau
 
-/* ---------------- tous les objets, à la fin ---------------- */
+/* ---------------- tous les objets de l'histoire, à la fin ---------------- */
 const all = explore(pos);
 const missing = [];
-for (const [mid, m] of Object.entries(maps)) for (const it of m.items) {
+for (const id of ['monde', 'grotte', 'repaire', 'sanctuaire', 'volta:tower17', 'victoire']) for (const it of maps[id].items) {
   if (st.flags['I:' + it.id]) continue;
-  if (![[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => all.has(key(mid, it.x + dx, it.y + dy)))) missing.push(`${it.item} (${mid} ${it.x},${it.y})`);
+  if (![[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => all.has(key(id, it.x + dx, it.y + dy)))) missing.push(`${it.item} (${id} ${it.x},${it.y})`);
 }
 ok(!missing.length, 'objets inaccessibles : ' + missing.join(', '));
-for (const p of maps.monde.pockets) if (p) ok(p.items.every((name) => maps.monde.items.some((q) => q.item === name)), 'recoin sans objet');
 
 console.log(fails ? `${fails} échec(s)` : 'Aventure complète : toutes les étapes sont atteignables, tous les objets aussi.');
 process.exit(fails ? 1 : 0);

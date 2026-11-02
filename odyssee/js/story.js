@@ -1,19 +1,29 @@
 // odyssee/js/story.js — les scènes de l'histoire : la Team Éclipse, l'Éclipse, Lugia Obscur, les cadeaux et les quêtes.
 // Les PNJ et les lieux sont posés par world/story.js ; ici on joue leurs dialogues et leurs combats.
 import { T } from './world/tiles.js';
+import { LUGIA_ALTAR } from './world/story.js';
+import { FIELD } from './world/region.js';
 import { createMon, monName, healFull } from './core/mon.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
-import { itemName } from './core/items.js';
+import { ITEMS, itemName } from './core/items.js';
 import { partyScreen } from './ui/screens.js';
 import { ASSETS, loadImg } from './assets.js';
-import { el, wait } from './ui/ui.js';
+import { el } from './ui/ui.js';
 import { shadowCanvas } from './render/shadow.js';
 
 const say = (g, lines, who) => g.ui.say(lines, who ? { speaker: who } : undefined);
 const val = (v, st) => (typeof v === 'function' ? v(st) : v);
-const give = (g, item, qty = 1) => { const b = g.state.bag; b[item] = (b[item] || 0) + qty; };
-const LUGIA = 249, SHADOW_MOVE = 10001;
+const LUGIA = 249, SHADOW_MOVE = 10001, AEROBLAST = 177;
+
+/** reçoit un objet : message adapté (objet rare, CS, quantité) */
+async function receive(g, item, qty = 1) {
+  const st = g.state;
+  g.give(item, qty); g.sound.sfx('item');
+  const d = ITEMS[item], cs = d?.field && FIELD[d.field];
+  if (cs) await g.ui.say(`${st.name} reçoit la ${cs.cs} ${cs.name} !\nElle est rangée dans les Objets rares du Sac.`);
+  else await g.ui.say(`${st.name} reçoit ${qty > 1 ? qty + ' × ' : ''}${itemName(item)} !${d?.key ? '\nVous rangez l\'objet dans les Objets rares.' : ''}`);
+}
 
 /** reçoit un Pokémon (équipe, ou PC si elle est pleine) */
 async function receiveMon(g, mon, from) {
@@ -36,9 +46,10 @@ export async function storyTalk(g, name, n) {
       if (f[q.flag]) { await say(g, val(q.done, st), q.who); return true; }
       if (q.need && !q.need(st)) { await say(g, val(q.pre, st), q.who); return true; }
       await say(g, val(q.give, st), q.who);
-      give(g, q.item); f[q.flag] = true; g.sound.sfx('item');
-      await g.ui.say(`${st.name} reçoit ${itemName(q.item)} !\nVous rangez l'objet dans la poche Rares.`);
+      f[q.flag] = true; if (q.set) f[q.set] = true;
+      await receive(g, q.item, q.qty || 1);
       await say(g, val(q.got, st), q.who);
+      g.refreshNpcs();
       return true;
     }
     case 'show': {
@@ -49,7 +60,7 @@ export async function storyTalk(g, name, n) {
       const i = await partyScreen(g, { mode: 'pick', prompt: 'Quel Pokémon montrer ?', filter: (m) => (q.test(m) ? null : 'Pas celui-là') });
       if (i < 0) return true;
       await say(g, q.thanks, q.who);
-      for (const [it, k] of q.reward) { give(g, it, k); g.sound.sfx('item'); await g.ui.say(`${st.name} reçoit ${k > 1 ? k + ' × ' : ''}${itemName(it)} !`); }
+      for (const [it, k] of q.reward) await receive(g, it, k);
       f[q.flag] = true;
       return true;
     }
@@ -60,7 +71,7 @@ export async function storyTalk(g, name, n) {
       await g.ui.say(`${st.name} rend le ${itemName(q.item)}.`);
       g.take(q.item); f[q.flag] = true;
       await say(g, q.thanks, q.who);
-      for (const [it, k] of q.reward) { give(g, it, k); g.sound.sfx('item'); await g.ui.say(`${st.name} reçoit ${k > 1 ? k + ' × ' : ''}${itemName(it)} !`); }
+      for (const [it, k] of q.reward) await receive(g, it, k);
       return true;
     }
     case 'trade': {
@@ -98,27 +109,28 @@ export async function storyTalk(g, name, n) {
       const [need, it, k] = next;
       if (n0 < need) { await say(g, [`J'étudie les Pokédex des dresseurs de passage. Le tien compte ${n0} Pokémon capturés.`, `Reviens quand tu en auras ${need} : je te donnerai ${k > 1 ? k + ' × ' : ''}${itemName(it)}.`], q.who); return true; }
       await say(g, [`${n0} Pokémon capturés ! Ça, c'est du beau travail.`, 'Voici ta récompense, comme promis.'], q.who);
-      give(g, it, k); f['dex' + need] = true; g.sound.sfx('item');
-      await g.ui.say(`${st.name} reçoit ${k > 1 ? k + ' × ' : ''}${itemName(it)} !`);
+      f['dex' + need] = true;
+      await receive(g, it, k);
       return true;
     }
     case 'lumenBois': {
       const who = 'Dr Lumen';
       if (!f['T:ecl:bois1'] || !f['T:ecl:bois2']) { await say(g, ['Au secours ! Ces gens en uniforme sombre veulent mes recherches !', 'Ils se disent de la « Team Éclipse »... Je t\'en prie, chasse-les !'], who); return true; }
       if (!f.giftFlash) {
-        await say(g, ['Merci, tu m\'as sauvé la mise ! Je suis le Dr Lumen. J\'étudie les Plumes Argent.', 'Ces plumes, c\'est Lugia, le gardien des marées, qui les laisse derrière lui. Il dort quelque part sous la mer, au sud.', 'La Team Éclipse prépare un « Prisme Noir », un appareil capable de fermer le cœur d\'un Pokémon. Si elle s\'en sert sur Lugia...', 'Ils parlaient aussi de la Grotte Lunaire. Elle est plongée dans le noir : prends ceci, ça t\'aidera.'], who);
-        give(g, 'hm05'); f.giftFlash = true; g.sound.sfx('item');
-        await g.ui.say(`${st.name} reçoit ${itemName('hm05')} !`);
+        await say(g, ['Merci, tu m\'as sauvé la mise ! Je suis le Dr Lumen. J\'étudie les Plumes Argentées.', 'Ces plumes, c\'est Lugia, le gardien des marées, qui les laisse derrière lui.', 'La Team Éclipse prépare un « Prisme Noir », un appareil capable de fermer le cœur d\'un Pokémon. Si elle s\'en sert sur Lugia...', 'Ils parlaient aussi de la Grotte Lunaire. Elle est plongée dans le noir : prends ceci, ça t\'aidera.'], who);
+        f.giftFlash = true;
+        await receive(g, 'cs-flash');
         await say(g, ['Avec Flash, ton Pokémon éclairera les grottes sombres tout seul.', 'Fais attention à toi. Et si tu croises encore la Team Éclipse... méfie-toi.'], who);
+        g.updateOverlay();
         return true;
       }
-      await say(g, ['Les Plumes Argent brillent comme la lune sur la mer...', 'Je vais continuer mes recherches. On se reverra, j\'en suis sûr !'], who);
+      await say(g, ['Les Plumes Argentées brillent comme la lune sur la mer...', 'Je vais continuer mes recherches. On se reverra, j\'en suis sûr !'], who);
       return true;
     }
     case 'lumenSanct': return lumenSanct(g, true);
     case 'victoireGate': {
       if (g.badgeCount() < 8) await say(g, 'Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.', 'Garde');
-      else await say(g, ['Huit badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Pont des Marées.'], 'Garde');
+      else await say(g, ['Huit badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.'], 'Garde');
       return true;
     }
   }
@@ -137,8 +149,8 @@ async function lumenSanct(g, talked) {
   g.busy = true;
   const n = g.npcs.find((q) => q.id === 'lumen-sanct'); if (n) n.dir = 'left';
   await say(g, [`${st.name} ! Toi aussi, tu as trouvé le chemin du Sanctuaire !`, 'La Team Éclipse est au fond, près de l\'autel. Le Prisme Noir a fermé le cœur de Lugia : c\'est devenu un Pokémon Obscur.', 'Si Lugia se réveille, il faudra le calmer. Le capturer, c\'est la seule façon de le libérer du Prisme.', 'Prends cette Master Ball. Elle capture n\'importe quel Pokémon, à coup sûr. Ne la gaspille pas !'], who);
-  give(g, 'master-ball'); f.giftMaster = true; g.sound.sfx('item');
-  await g.ui.say(`${st.name} reçoit une ${itemName('master-ball')} !`);
+  f.giftMaster = true;
+  await receive(g, 'master-ball');
   g.busy = false;
   return true;
 }
@@ -151,10 +163,11 @@ export async function storyWin(g, name) {
   if (name === 'boss1') {
     await say(g, ['Le Prisme Noir est en route pour le Sanctuaire des Marées. Lugia y dort.', 'Quand son cœur sera fermé, il m\'obéira. Et la nuit ne finira plus jamais.', 'Regarde... Ça commence déjà.'], 'Nocturne');
     st.flags.eclipse = true;
-    g.sound.sfx('encounter'); await ui.flash(2, '#40206a', 160);
-    g.view.eclipse = true; g.view.setTimeOfDay(g.hour());
+    g.sound.sfx('bang'); await ui.flash(2, '#40206a', 160);
+    g.setEclipse();
     await ui.say(['Un grondement sourd fait trembler le repaire...', 'Dehors, le ciel s\'éteint d\'un coup : une nuit violette recouvre toute la région !']);
     await ui.say(['Les sbires qui gardaient l\'entrée de Mirage ont dû filer.', 'Il faut trouver où se cache ce Sanctuaire des Marées.']);
+    g.save(true);
     return;
   }
   if (name === 'boss2') {
@@ -173,36 +186,40 @@ export function shadowLugia() {
 }
 
 async function lugiaWakes(g) {
-  const st = g.state, ui = g.ui;
-  g.view.shake = 0.5; g.sound.sfx('encounter');
+  const ui = g.ui;
+  g.view.shake = 0.5; g.sound.sfx('bang');
   await ui.flash(3, '#6020a0', 120);
   g.sound.cry(ASSETS.cry(LUGIA));
   await ui.say(['Un cri immense résonne dans tout le Sanctuaire !', 'Les eaux de l\'autel bouillonnent... Lugia Obscur ouvre les yeux !']);
   await lugiaBattle(g);
 }
 
-/** combat contre Lugia Obscur (au réveil, ou en lui parlant plus tard s'il n'a pas été capturé) */
+/** combat contre Lugia Obscur (au réveil, ou en lui parlant plus tard s'il est toujours sur l'autel) */
 export async function lugiaBattle(g) {
   const st = g.state, ui = g.ui;
   if (!g.lead()) return;
+  if (!(await ui.yesNo('Lugia Obscur te fixe de ses yeux sombres.\nL\'affronter ?'))) return;
   const res = await g.runBattle({ wild: shadowLugia(), music: 'legend' });
   if (res === 'caught') {
-    st.flags.lugiaCaught = true;
-    g.setTile(12, 4, T.CAVE); g.view.removeActor('lugia');
+    st.flags['L:lugia'] = 'caught'; st.flags.lugiaCaught = true;
+    g.setTile(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE); g.view.removeActor('lugia');
     await ui.say(['Le Prisme Noir se brise en mille éclats !', 'Lugia est libéré de son emprise... mais son cœur reste encore fermé. Le Prof. Saule saura peut-être l\'ouvrir.']);
-    give(g, 'prism-shard');
+    g.give('prism-shard');
   } else if (res === 'win') {
-    await ui.say(['Lugia Obscur s\'effondre sur l\'autel... Le Prisme Noir vole en éclats.', 'Épuisé, il replonge dans un profond sommeil. Il est toujours là, sur l\'autel.']);
+    st.flags['L:lugia'] = st.flags['L:lugia'] || 'met';
+    g.setTile(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE); g.view.removeActor('lugia');
+    await ui.say(['Lugia Obscur s\'effondre sur l\'autel... Le Prisme Noir vole en éclats.', 'Libéré, Lugia déploie ses ailes et s\'envole vers le nord, au-dessus de la mer.', 'Il doit retourner dormir dans la Grotte des Tourbillons, sous l\'Île Givrée...']);
+    g.give('prism-shard');
   } else if (res === 'lose') return;
-  else { await ui.say('Lugia Obscur te fixe de ses yeux sombres, toujours sur l\'autel...'); }
-  if (!st.flags.lugia && res !== 'run' && res !== 'lose') await endEclipse(g);
+  else { await ui.say('Lugia Obscur reste sur l\'autel, les yeux fixés sur toi...'); return; }
+  if (!st.flags.lugia) await endEclipse(g);
 }
 
 async function endEclipse(g) {
   const st = g.state, ui = g.ui;
   st.flags.lugia = true;
   await ui.flash(2, '#fff0c0', 160);
-  g.view.eclipse = false; g.view.setTimeOfDay(g.hour());
+  g.setEclipse();
   await ui.say(['Une lueur dorée traverse les fissures de la grotte...', 'La nuit violette se déchire : le jour revient sur toute la région !', 'La Team Éclipse est vaincue. La Route Victoire va rouvrir.']);
   g.refreshNpcs();
   g.save(true);
@@ -210,13 +227,16 @@ async function endEclipse(g) {
 
 /** sprite de Lugia Obscur posé sur l'autel */
 export async function placeLugia(g) {
-  if (g.mapObj.id !== 'sanctuaire' || g.state.flags.lugiaCaught) return;
+  const f = g.state.flags;
+  if (g.mapObj.id !== LUGIA_ALTAR.map || f.lugiaCaught || f.lugia) {
+    // Lugia n'est plus sur l'autel : la case redevient praticable
+    if (g.mapObj.id === LUGIA_ALTAR.map && g.mapObj.get(LUGIA_ALTAR.x, LUGIA_ALTAR.y) === T.BLOCK) g.mapObj.set(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE);
+    return;
+  }
   const img = await loadImg(ASSETS.front(LUGIA));
-  if (g.mapObj.id !== 'sanctuaire') return;
-  const c = shadowCanvas(img, 80, 80);
-  const a = g.view.imageActor('lugia', c, 110, 110);
-  a.mesh.position.set(12.5, 0.2, 4.6); a.shadow.position.set(12.5, 0.02, 4.7);
-  a.base = 0.2;
+  if (g.mapObj.id !== LUGIA_ALTAR.map || !img) return;
+  const a = g.view.imageActor('lugia', shadowCanvas(img), 0.55);
+  g.view.place(a, LUGIA_ALTAR.x, LUGIA_ALTAR.y - 0.1);
 }
 
 /** le Prof. Saule ouvre le cœur d'un Pokémon Obscur */
@@ -228,7 +248,7 @@ export async function purify(g) {
   if (!(await g.ui.yesNo(`Ouvrir le cœur de ${monName(m)} ?`))) return true;
   g.sound.sfx('evolve'); await g.ui.flash(3, '#ffffff', 120);
   m.shadow = false;
-  for (const mv of m.moves) if (mv.id === SHADOW_MOVE) { mv.id = 177; mv.pp = MOVES[177].pp; }
+  for (const mv of m.moves) if (mv.id === SHADOW_MOVE) { mv.id = AEROBLAST; mv.pp = MOVES[AEROBLAST].pp; }
   healFull(m);
   g.sound.cry(ASSETS.cry(m.sp)); g.sound.sfx('levelup');
   await g.ui.say([`Le cœur de ${monName(m)} s'est ouvert !`, `${monName(m)} oublie Rafale Obscure... et apprend Aéroblast !`]);
@@ -240,7 +260,6 @@ export async function purify(g) {
 export function overlay(g) {
   let ov = g._ov;
   if (!ov) { ov = g._ov = el('div', 'dark-ov'); g.ui.root.prepend(ov); }
-  const m = g.mapObj, dark = !!m?.dark, flash = !!g.state?.bag?.hm05;
-  ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + (g.view.eclipse && m?.outdoor ? ' eclipse' : '');
+  const m = g.mapObj, dark = !!m?.dark, flash = g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;
+  ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + (g.eclipseOn() && m?.outdoor ? ' eclipse' : '');
 }
-export { wait };

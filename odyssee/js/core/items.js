@@ -43,6 +43,10 @@ export const ITEMS = {
   'cs-coupe': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'notebook', name: 'CS01 Coupe', desc: 'Tranche les petits arbres qui barrent le chemin. Badge Pétale requis. Place-toi face à l\'arbre et appuie sur F.' },
   'cs-surf': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'une créature. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
   'cs-eclate': { pocket: 'cles', price: 0, key: true, field: 'eclate', icon: 'notebook', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
+  'cs-flash': { pocket: 'cles', price: 0, key: true, field: 'flash', icon: 'notebook', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre. Badge Élytre requis.' },
+  'cs-force': { pocket: 'cles', price: 0, key: true, field: 'force', icon: 'notebook', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
+  medaillon: { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Médaillon', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
+  'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'shoal-shell', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
   'cs-vol': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Braise requis.' },
   // objets de quête des légendaires
   'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Balle GS', desc: 'Une capsule dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },

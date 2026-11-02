@@ -16,6 +16,7 @@ import { HPX } from './render/world3d.js';
 import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
+import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
@@ -76,7 +77,11 @@ export class Game {
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
   }
-  hour() { const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  hour() { if (this.eclipseOn()) return 0.5; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  /** la nuit violette, entre la victoire contre Nocturne au repaire et le réveil de Lugia */
+  eclipseOn() { const f = this.state?.flags || {}; return !!f.eclipse && !f.lugia; }
+  setEclipse() { this.view.eclipse = this.eclipseOn(); this.view.setTimeOfDay(this.hour()); this.updateOverlay(); this.refreshNpcs(); }
+  updateOverlay() { overlay(this); }
 
   /* ================= cartes ================= */
   setMap(id) {
@@ -84,9 +89,12 @@ export class Game {
     this.mapObj = m;
     // arbres coupés, rochers brisés : la carte garde la trace de ce qu'on a dégagé
     for (const k of this.state.cleared[m.id] || []) { const [x, y] = k.split(',').map(Number); if (m.get(x, y) === T.CUT || m.get(x, y) === T.SMASH) m.set(x, y, m.outdoor ? T.GRASS : T.CAVE); }
+    this.applyTiles(m);   // rochers poussés avec Force, autel du Sanctuaire
+    if (this.strengthOn !== m.id) this.strengthOn = null;
+    this.view.eclipse = this.eclipseOn();
     this.view.setMap(m);
     const st = this.state;
-    this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => ({ def: n, id: n.id, x: n.x, y: n.y, dir: n.dir || 'down', sprite: n.sprite, home: [n.x, n.y], timer: 1 + Math.random() * 3, move: null, step: 0 }));
+    this.npcs = m.npcs.filter((n) => this.npcVisible(n)).map((n) => this.npcState(n));
     // le rival attend au labo tant que le premier combat n'a pas eu lieu
     if (id === 'aube:labo' && !st.flags.rival1) this.npcs.push({ def: { id: 'rival-lab', script: 'rivalLab' }, id: 'rival-lab', x: 8, y: 6, dir: 'left', sprite: 'theo', home: [8, 6], timer: 99, move: null, step: 0 });
     this.items = m.items.filter((it) => !st.flags['I:' + it.id]).map((it) => ({ ...it }));
@@ -95,12 +103,38 @@ export class Game {
     for (const g of m.gates) if (this.gateClosed(g)) for (const [x, y] of g.tiles) this.gateBlock.add(key(x, y));
     this.spawnLegends();
     this.view.setTimeOfDay(this.hour());
+    this.updateOverlay();
+    placeLugia(this);
     this.zone = null; this.updateZone();
   }
+  /** PNJ tel qu'il se tient sur la carte (un membre du Conseil 4 battu s'est écarté) */
+  npcState(n) {
+    const beaten = n.beatenPos && this.state.flags['T:' + n.id], x = beaten ? n.beatenPos[0] : n.x, y = beaten ? n.beatenPos[1] : n.y;
+    return { def: n, id: n.id, x, y, dir: n.dir || 'down', sprite: n.sprite, home: [x, y], timer: 1 + Math.random() * 3, move: null, step: 0 };
+  }
   npcVisible(n) {
-    if (n.when && !n.when(this.state.flags, this)) return false;   // PNJ de quête : présent selon l'avancée
+    const f = this.state.flags;
+    if (n.when && !n.when(f, this)) return false;   // PNJ de quête : présent selon l'avancée
     if (n.gate) return this.gateClosed(n.gate);
+    if (n.vanish && f['T:' + n.id]) return false;    // sbire de la Team Éclipse battu : il s'en va
+    if (n.showIf && !f[n.showIf]) return false;
+    if (n.hideIf && f[n.hideIf]) return false;
     return true;
+  }
+  /** modifications durables du terrain (rochers poussés), rejouées à chaque entrée sur la carte */
+  applyTiles(m) {
+    if (m._orig) for (const [k, v] of m._orig) { const [x, y] = k.split(',').map(Number); m.set(x, y, v); }
+    m._orig = new Map();
+    const t = this.state.tiles?.[m.id]; if (!t) return;
+    for (const [k, v] of Object.entries(t)) { const [x, y] = k.split(',').map(Number); m._orig.set(k, m.get(x, y)); m.set(x, y, v); }
+  }
+  setTile(x, y, v) {
+    const m = this.mapObj, st = this.state, k = key(x, y);
+    st.tiles = st.tiles || {}; (st.tiles[m.id] = st.tiles[m.id] || {})[k] = v;
+    if (!m._orig) m._orig = new Map();
+    if (!m._orig.has(k)) m._orig.set(k, m.get(x, y));
+    m.set(x, y, v);
+    this.view.rebuildAt(x, y);
   }
   /** après une étape de quête : les PNJ qui doivent (dis)paraître sur la carte courante, les passages qui s'ouvrent */
   refreshNpcs() {
@@ -108,11 +142,11 @@ export class Game {
     const next = [];
     for (const d of m.npcs) {
       if (!this.npcVisible(d)) continue;
-      next.push(keep.get(d.id) || { def: d, id: d.id, x: d.x, y: d.y, dir: d.dir || 'down', sprite: d.sprite, home: [d.x, d.y], timer: 1 + Math.random() * 3, move: null, step: 0 });
+      next.push(keep.get(d.id) || this.npcState(d));
     }
     for (const n of this.npcs) if (!next.includes(n) && m.npcs.includes(n.def)) this.view.removeActor('npc:' + n.id);
     this.npcs = next.concat(this.npcs.filter((n) => !m.npcs.includes(n.def) && !next.includes(n)));
-    this.refreshGates(); this.spawnLegends();
+    this.refreshGates(); this.spawnLegends(); this.updateOverlay();
   }
   /** un passage gardé est fermé tant qu'il manque des badges, ou tant qu'un drapeau d'histoire n'est pas levé */
   gateClosed(g) { if (g.open) return !g.open(this.state.flags, this); return g.flag ? !this.state.flags[g.flag] : this.badgeCount() < g.badges; }
@@ -139,7 +173,7 @@ export class Game {
   }
   updateZone() {
     const m = this.mapObj, p = this.player;
-    const z = m.outdoor ? m.zoneAt(p.x, p.y) : { name: m.name, music: m.music };
+    const z = m.outdoor ? m.zoneAt(p.x, p.y) : (m.zones.length && m.zoneAt(p.x, p.y)) || { name: m.name, music: m.music };
     const name = z?.name || m.name;
     // bandeau du lieu : en extérieur et dans les grottes (pas en sortant d'une maison)
     if ((m.outdoor || m.floor === 'cave') && name !== this.zoneName) { this.zoneName = name; this.ui.banner(name); }
@@ -159,6 +193,7 @@ export class Game {
     this.view.update(0, this.player.x, this.player.y);
     this.save(true);
     await this.ui.fade(false, 220);
+    if (this.mapObj.dark && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
     await this.onEnterMap();
     this.busy = false;
   }
@@ -275,6 +310,15 @@ export class Game {
       if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.3, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
       p.walking = false; if (p.bumpT <= 0) { this.sound.sfx('bump'); p.bumpT = 0.3; } return;
     }
+    // Force : pousser un rocher
+    if (t === T.BOULDER && this.strengthOn === m.id) {
+      const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
+      if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by)) {
+        this.setTile(tx, ty, m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
+        this.sound.sfx('ledge'); this.view.shake = 0.08; p.bumpT = 0.3; p.walking = false;
+        return;
+      }
+    }
     // rebords
     if ((t === T.LEDGE && d === 'down') || (t === T.LEDGE_E && d === 'right') || (t === T.LEDGE_W && d === 'left')) {
       const lx = tx + dx, ly = ty + dy;
@@ -295,7 +339,14 @@ export class Game {
     if (mv.jump) this.view.shake = 0.06;
     if (isGrassEnc(t)) this.view.rustle(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
-    if (w && (t === T.DOOR || t === T.CAVEDOOR || w.step)) { await this.warp(w, t === T.CAVEDOOR || w.step ? 'exit' : 'door'); return; }
+    if (w && (t === T.DOOR || t === T.CAVEDOOR || w.step)) {
+      if (w.need && !this.state.bag[w.need]) {
+        this.busy = true;
+        await this.ui.say(['Une force mystérieuse bloque l\'entrée...', 'Il faudrait un objet lié à ce lieu pour l\'ouvrir.']);
+        await this.playerWalk('down', 1); this.busy = false; return;
+      }
+      await this.warp(w, t === T.CAVEDOOR || w.step ? 'exit' : 'door'); return;
+    }
     this.updateZone();
     if (this.state.repel > 0) { this.state.repel--; if (this.state.repel === 0) { this.busy = true; await this.ui.say('L\'effet du Repousse s\'est dissipé...'); this.busy = false; } }
     const z = this.zone;
@@ -365,7 +416,7 @@ export class Game {
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
   }
   async interact() {
-    const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir];
+    const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir], st0 = this.state;
     let fx = p.x + dx, fy = p.y + dy;
     let n = this.npcs.find((q) => q.x === fx && q.y === fy && !q.move);
     if (!n && m.get(fx, fy) === T.BLOCK && this.view.decoAt.get(key(fx, fy))?.k === 'counter') n = this.npcs.find((q) => q.x === fx + dx && q.y === fy + dy);
@@ -384,6 +435,7 @@ export class Game {
         else if (it) await this.pickItem(it);
         else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
+        else if (o?.type === 'lugia') { if (!st0.flags.lugia && !st0.flags.lugiaCaught) await lugiaBattle(this); }
         else if (o?.type === 'pylon') await this.pylon(o);
         else if (o?.type === 'stele') await this.stele(o);
         else if (o?.type === 'shrine') await this.shrine();
@@ -391,6 +443,7 @@ export class Game {
         else if (t === T.BLOCK && this.view.decoAt.get(key(fx, fy))) await this.furniture(this.view.decoAt.get(key(fx, fy)).k, fx, fy);
         else if (t === T.CUT) await this.fieldObstacle('coupe', fx, fy, 'Ce petit arbre pourrait être coupé.');
         else if (t === T.SMASH) await this.fieldObstacle('eclate', fx, fy, 'Ce rocher est plein de fissures. Il pourrait être brisé.');
+        else if (t === T.BOULDER) await this.useForce();
         else if (t === T.WATER && (m.outdoor || m.surf) && !p.surf) await this.trySurf(fx, fy);
       }
     } finally { this.busy = false; }
@@ -531,6 +584,17 @@ export class Game {
     (st.cleared[m.id] ||= []).push(key(x, y));
     this.view.rebuildAt(x, y);
     this.view.update(0, this.player.x, this.player.y);
+  }
+  /** Force : une fois activée sur la carte, on pousse les rochers en marchant contre eux */
+  async useForce() {
+    const look = 'C\'est un gros rocher. Un Pokémon très costaud pourrait le pousser.';
+    if (!this.hasField('force')) { await this.ui.say(look); return; }
+    if (!this.canField('force')) { await this.ui.say([look, `Il faut le ${BADGES[FIELD.force.badge - 1].name} pour utiliser Force hors combat.`]); return; }
+    if (this.strengthOn === this.mapObj.id) { await this.ui.say('Force est active : marche contre le rocher pour le pousser.'); return; }
+    if (!(await this.ui.yesNo(`${look}\nUtiliser Force ?`))) return;
+    const mon = this.fieldUser();
+    this.strengthOn = this.mapObj.id; this.sound.cry(ASSETS.cry(mon.sp)); this.sound.sfx('ledge');
+    await this.ui.say(`${monName(mon)} utilise Force !\nIl peut désormais pousser les rochers.`);
   }
   async trySurf(x, y) {
     const st = this.state;
@@ -692,6 +756,10 @@ export class Game {
       st.flags['T:' + n.id] = true;
       if (d.leader != null) await this.badgeScene(d.leader, tr.name);
       if (typeof d.onWin === 'function') await d.onWin(this.api(), n); else if (d.onWin) await this.script(d.onWin, n);
+      if (d.beatenPos) { await this.npcWalk(n, 'right', d.beatenPos[0] - n.x); n.dir = 'down'; n.home = [n.x, n.y]; }
+      if (d.vanish) { await this.ui.fade(true, 200); this.npcs = this.npcs.filter((q) => q !== n); this.view.removeActor('npc:' + n.id); await this.ui.fade(false, 200); }
+      if (d.winScript) await storyWin(this, d.winScript, n);
+      if (d.beatenPos || d.vanish || d.winScript) this.refreshNpcs();
       if (d.champion) await this.ending();
     }
     this.updateZone();
@@ -741,7 +809,7 @@ export class Game {
       1: ['Allô, ' + st.name + ' ? Deux badges, déjà ! Bravo.', 'Écoute : le capitaine de l\'Embarcadère de l\'Aube, à l\'est de la route 1, emmène les dresseurs aguerris vers les îles de l\'Est.', 'On dit qu\'Électhor, l\'oiseau de foudre, dérègle les orages de l\'Île Orageuse. Ça mérite un coup d\'œil !'],
       2: ['Trois badges ! Le capitaine peut maintenant t\'emmener à l\'Île de la Grue.', 'Là-bas se dresse la Tour de la Grue. La légende dit que Ho-Oh, l\'oiseau arc-en-ciel, s\'y posait autrefois.', 'La doyenne de Hautegrue connaît cette histoire mieux que personne.'],
       3: ['Quatre badges... Tu vas bientôt passer à Mirage.', 'Au fait, ' + st.name + ', je ne t\'en ai jamais parlé : j\'ai un' + (B.e ? 'e ' : ' ') + B.fils + ', ' + B.name + '.', B.name + ' a grandi à Port-Granit, sur les îles. Le lendemain de ton départ, ' + B.il + ' est passé' + B.e + ' au labo et a pris la troisième capsule.', 'Depuis, ' + B.il + ' ne répond plus à mes appels. On dit qu\'' + B.il + ' s\'est engagé' + B.e + ' chez les Gardes d\'Écaille de Drakos...', 'Si tu ' + B.le + ' croises, dis-lui que son grand-père pense à ' + (B.e ? 'elle' : 'lui') + '.'],
-      4: ['Cinq badges ! Avec Surf, tu peux rejoindre l\'archipel des trois frères, au sud du Cap Mirage.', 'Et le capitaine t\'emmènera aussi à l\'Île Givrée, tout au nord. Artikodin y vivrait... et plus profond encore, Lugia.'],
+      4: this.eclipseOn() ? ['Cinq badges ! Et Surf, en plus. Écoute bien, ' + st.name + '.', 'Cette nuit violette ne finira pas toute seule. Si la Team Éclipse a vraiment fermé le cœur de Lugia...', 'La voyante de Mirage connaît les légendes de la mer. Elle saura où dort Lugia. Va la voir avant de partir pour l\'archipel !'] : ['Cinq badges ! Avec Surf, tu peux rejoindre l\'archipel des trois frères, au sud du Cap Mirage.', 'Et le capitaine t\'emmènera aussi à l\'Île Givrée, tout au nord. Artikodin y vivrait... et plus profond encore, Lugia.'],
       7: ['Tu as battu Drakos ?! Toute la région en parle.', st.flags.rivalB3 ? B.name + ' m\'a appelé. Pour la première fois depuis des mois. ' + (B.e ? 'Elle' : 'Il') + ' a quitté les Gardes d\'Écaille.' : 'J\'espère que mon' + (B.e ? 'e ' : ' ') + B.fils + ' va bien, là-bas...', 'Il ne te reste plus que la Ligue. Mais avant, va donc voir le Cap des Étoiles, au nord de Fort-Écaille.'],
     };
     const c = calls[g]; if (!c) return;
@@ -1018,6 +1086,7 @@ export class Game {
   /* ================= histoire ================= */
   async script(name, n) {
     const st = this.state, ui = this.ui;
+    if (await storyTalk(this, name, n)) return;   // histoire principale et quêtes annexes (story.js)
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });
@@ -1036,6 +1105,8 @@ export class Game {
         return;
       }
       if (!st.flags.starter) { await ui.say('Les trois capsules sont sur la table. Approche-toi et choisis !', { speaker: 'Prof. Saule' }); return; }
+      if (await purify(this)) return;
+      if (this.eclipseOn()) { await ui.say(['Cette nuit violette... C\'est l\'œuvre de la Team Éclipse, n\'est-ce pas ?', 'Si Lugia se réveille avec un cœur fermé, la nuit ne finira jamais.', 'La voyante de Mirage connaît les vieilles légendes de la mer. Va la voir !'], { speaker: 'Prof. Saule' }); return; }
       const LEG = (this.world.legends || []).map((L) => L.id), seen = LEG.filter((k) => st.flags['L:' + k]).length, caught = LEG.filter((k) => st.flags['L:' + k] === 'caught').length;
       const B = this.rivalB(), lines = [];
       if (st.flags.rivalB3) lines.push(`${B.name} m'a raconté votre combat à Fort-Écaille. Merci, ${st.name}. Tu m'as rendu mon${B.e ? 'e' : ''} ${B.fils}.`);
@@ -1086,6 +1157,7 @@ export class Game {
       this.refreshGates();
     } else if (name === 'ermite') {
       const sp = 'Ermite', f = st.flags;
+      if (st.flags.eclipse && !st.flags.lugia) { await ui.say(['Les courants de la grotte se sont tus... Lugia n\'est plus là.', 'Je l\'ai senti partir vers le sud, vers un vieux sanctuaire au large du Cap Mirage.', 'Quelque chose l\'appelle. Quelque chose de mauvais.'], { speaker: sp }); return; }
       if (f.plumeArgent) { await ui.say(f['L:lugia'] === 'caught' ? 'Lugia... Tu l\'as vu de tes propres yeux. Moi, j\'ai attendu toute ma vie.' : ['La Grotte des Tourbillons est à l\'est du village.', 'Avec la Plume Argentée, les courants te laisseront passer jusqu\'à Lugia.'], { speaker: sp }); return; }
       if (f['L:articuno']) {
         f.plumeArgent = true; this.give('plume-argent'); this.sound.sfx('item');
@@ -1153,6 +1225,7 @@ export class Game {
 
   async trigger(name) {
     const st = this.state, p = this.player, ui = this.ui;
+    if (await storyTrigger(this, name)) return true;
     if (name === 'needStarter' && !st.flags.starter) {
       this.busy = true;
       await ui.say(['Hé ! Attends !', 'Les hautes herbes sont pleines de créatures sauvages. Sans créature à toi, c\'est bien trop dangereux !', 'Va d\'abord voir le Professeur Saule, à son labo.'], { speaker: '???' });
@@ -1235,7 +1308,7 @@ export class Game {
     st.flags.champion = true;
     this.sound.play('victory');
     const B = this.rivalB();
-    await ui.say(['Félicitations !', `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`, 'Drakos m\'a fait passer un message, tu sais. « Le vieux Drakos attend sa revanche. »', st.flags.rivalB3 ? `Et ${B.name} m'a écrit aussi. ${B.il === 'il' ? 'Il' : 'Elle'} veut ouvrir une arène à Port-Granit, ouverte à tous.` : 'Drakos a rouvert les ports de l\'archipel.', 'Grâce à toi, les îles et le continent se reparlent.', 'Ton équipe et toi entrez au Panthéon des dresseurs.'], { speaker: 'Célestine' });
+    await ui.say(['Félicitations !', `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`, 'Drakos m\'a fait passer un message, tu sais. « Le vieux Drakos attend sa revanche. »', st.flags.rivalB3 ? `Et ${B.name} m'a écrit aussi. ${B.il === 'il' ? 'Il' : 'Elle'} veut ouvrir une arène à Port-Granit, ouverte à tous.` : 'Drakos a rouvert les ports de l\'archipel.', 'Grâce à toi, les îles et le continent se reparlent.', 'Et sans toi, la nuit de la Team Éclipse recouvrirait encore la région. Lugia veille de nouveau sur les marées.', 'Ton équipe et toi entrez au Panthéon des dresseurs.'], { speaker: 'Célestine' });
     await ui.say([`Bravo, ${st.name}. Tu as tenu ta promesse.`, 'Mais la prochaine fois, c\'est moi qui serai Maître !'], { speaker: RIVAL_NAME });
     if (st.flags.rivalB4) await ui.say(['Félicitations. Je suis venu' + B.e + ' avec mon grand-père pour voir ça.', 'On se reverra sur les îles. Elles t\'attendront toujours.'], { speaker: B.name });
     const s = el('div', 'screen hof-scr'); s.innerHTML = `<div class="scr-title">PANTHÉON</div><div class="hof">${st.party.map((m) => `<div class="hof-m box"><img src="${ASSETS.front(m.sp, m.shiny)}" alt=""><div>${esc(monName(m))}</div><div>N.${m.lvl}</div></div>`).join('')}</div><div class="box hof-txt">${esc(st.name)} — Maître de la Ligue · ${st.dex.caught.length} créatures capturées<br>Merci d'avoir joué à ce prototype d'Odyssée !</div>`;

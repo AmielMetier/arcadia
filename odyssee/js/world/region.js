@@ -11,6 +11,7 @@ import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, 
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
+import { addStory } from './story.js';
 
 export const STARTERS = NEW_STARTERS.map(R);
 export const RIVAL_NAME = 'Théo';
@@ -27,6 +28,9 @@ export const FIELD = {
   surf: { name: 'Surf', cs: 'CS02', badge: 5, desc: 'Permet de traverser l\'eau sur le dos d\'une créature.' },
   eclate: { name: 'Éclate-Roc', cs: 'CS03', badge: 6, desc: 'Brise les rochers fissurés.' },
   vol: { name: 'Vol', cs: 'CS04', badge: 7, desc: 'Ramène en un instant dans une ville déjà visitée.' },
+  // données par l'histoire (la Team Éclipse) : Flash par le Dr Lumen, Force par l'ingénieur de la Centrale
+  flash: { name: 'Flash', cs: 'CS05', badge: 1, desc: 'Éclaire les grottes plongées dans le noir.' },
+  force: { name: 'Force', cs: 'CS06', badge: 3, desc: 'Pousse les gros rochers qui barrent certains chemins.' },
 };
 const STOCK = {
   1: ['poke-ball', 'potion', 'antidote', 'paralyze-heal', 'awakening', 'repel'],
@@ -271,7 +275,7 @@ export function buildWorld() {
     npcs: [
       { id: 'marin', x: 17, y: 5, sprite: 'marin', move: 'turn', text: ['Ahoy ! Ce ponton était le départ des ferries.', 'Depuis que les îles ont fermé leurs ports, plus aucun bateau ne part...'] },
       { id: 'pecheur', x: 25, y: 5, sprite: 'pecheur', move: 'wander', text: ['Les Racaillou se cachent parmi les galets, méfie-toi en marchant sur la plage.'] },
-      { id: 'garde', x: 32, y: 18, sprite: 'garde', dir: 'left', gate: { badges: 2, tiles: [[33, 19], [33, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut deux badges pour l\'emprunter.'] },
+      { id: 'garde', x: 34, y: 18, sprite: 'garde', dir: 'down', gate: { badges: 2, tiles: [[33, 19], [33, 20]] }, text: ['La route 4 longe une côte escarpée.', 'Il faut deux badges pour l\'emprunter.'] },
     ],
   };
   buildTown(W, maps, D);
@@ -829,6 +833,9 @@ export function buildWorld() {
 
   // histoire secondaire : la Brume, les nouveaux lieux (lac, forêt des torii, jardin, île du Magma) et leurs quêtes
   const quests = buildQuests({ W, maps, towns, routes, legends, docks, buildTown, trainerNpc, offRoute: (id, t, side, off) => offRoute(routes.find((r) => r.id === id).pts, t, side, off) });
+  // histoire principale : la Team Éclipse, Lugia Obscur, le Conseil 4, Flash et Force, les quêtes annexes
+  addStory({ W, maps, towns, routes: { r1, r2, bois, r3a, r3b, r4, r5, r6, r7, r10 }, legends, trainerNpc });
+  { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
   return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
 }
 
