@@ -297,3 +297,7 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .dark-ov.cave.flash { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 26%, rgba(0,0,0,.45) 42%, rgba(0,0,0,.8) 64%); }
 .dark-ov.eclipse { display: block; background: radial-gradient(ellipse at 50% 45%, rgba(70,20,110,0) 35%, rgba(36,0,64,.5) 100%); }
 .shadowmon { filter: brightness(.65) sepia(1) hue-rotate(220deg) saturate(3) drop-shadow(0 0 calc(var(--px) * 2) #8a40ff); }
+/* fiche dresseur : l'équipe (la sienne, ou celle d'un autre joueur) */
+.tc-team { display: flex; gap: calc(var(--px) * 4); justify-content: center; margin-top: calc(var(--px) * 6); padding-top: calc(var(--px) * 5); border-top: var(--px) dashed #c8b88a; }
+.tc-mon { display: flex; flex-direction: column; align-items: center; font-size: .8em; color: #504030; }
+.tc-mon img { width: calc(var(--px) * 32); height: calc(var(--px) * 32); image-rendering: pixelated; object-fit: contain; }

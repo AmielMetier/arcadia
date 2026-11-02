@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.54 — 2 novembre 2026
+- **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.
+  - En parlant à un autre joueur : échanger, combattre, ou voir sa fiche (badges, Pokédex, temps de jeu et équipe).
+  - Ta propre carte dresseur montre aussi ton équipe.
+
 ## 3.53 — 2 novembre 2026
 - **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.
   - Le Dr Lumen, menacé dans le Bois Murmure, offre la CS Flash : la Grotte Lunaire est désormais plongée dans le noir.
