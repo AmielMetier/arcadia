@@ -3,14 +3,16 @@ window.HUB_GAMES = [
   {
     id: 'dogfight',
     title: 'Dogfight 3D',
-    tag: 'Bataille aérienne en F-16',
-    desc: 'Prends les commandes d\'un chasseur F-16 au-dessus de l\'île, vise au canon rotatif Vulcan et abats tes adversaires en plein vol.',
+    tag: 'Bataille aérienne',
+    desc: 'Choisis ton F-16 ou ton F-22, vise au canon et au missile, et abats tes adversaires au-dessus de la vraie île d\'Island Rush.',
     url: 'dogfight/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
     accent: '#2563eb',
     icon: '✈️', score: 'Éliminations',
     settings: [
-      { key: 'kills', label: 'Éliminations pour gagner', options: [[5, '5 victoires'], [8, '8 victoires'], [15, '15 victoires']], def: 8 },
+      { key: 'mode', label: 'Mode', options: [['chacun', 'Chacun pour soi'], ['equipes', 'Équipes']], def: 'chacun' },
+      { key: 'kills', label: 'Éliminations pour gagner', options: [[5, '5'], [8, '8'], [15, '15']], def: 8 },
+      { key: 'time', label: 'Durée', options: [[300, '5 min'], [480, '8 min'], [600, '10 min']], def: 300 },
       { key: 'bots', label: 'Pilotes IA (Bots)', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']], def: 3 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'As du ciel (Difficile)']], def: 'normal' },
     ],
@@ -277,8 +279,8 @@ window.HUB_GAMES = [
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
   dogfight: { genre: 'action', time: '5–10 min',
-    keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
-    tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },
+    keys: [['Souris', 'Viser, l\'avion suit'], ['ZQSD / flèches', 'Piloter soi-même'], ['Espace / clic', 'Canon'], ['E / clic droit', 'Missile'], ['F', 'Leurres'], ['Maj', 'Postcombustion'], ['C', 'Aérofrein']],
+    tips: ['Place le réticule blanc sur le cercle vert : c\'est là que les balles rencontrent la cible.', 'Monter et serrer les virages coûte de la vitesse : garde de l\'énergie.', 'Un nuage te cache des missiles et des bots.'] },
   drift: { genre: 'course', time: '5–15 min',
     keys: [['Flèches / ZQSD', 'Conduire'], ['Espace', 'Nitro / objet'], ['Maj', 'Frein à main'], ['Échap', 'Pause']],
     tips: ['Le nitro se recharge en driftant.', 'Les raccourcis des villes valent le détour.', 'Le fantôme de ton meilleur tour se partage avec tes potes.'] },

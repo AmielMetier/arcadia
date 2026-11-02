@@ -1,207 +1,121 @@
-// Système sonore WebAudio pour Dogfight 3D :
-// Réacteur à turbine, rugissement de la postcombustion, mitrailleuse rotative Vulcan (BRRRRT) et explosions.
+// Sons de Dogfight 3D, synthétisés avec WebAudio : réacteur, canon, explosions, et alarmes.
+// Tout ce qui vient d'un autre avion est placé dans l'espace : volume selon la distance, gauche ou droite selon la caméra.
 
 export class DogfightAudio {
   constructor() {
-    this.ctx = null;
-    this.fxGain = null;
-    this.engineGain = null;
-    this.engineOsc = null;
-    this.engineFilter = null;
-    this.unlocked = false;
-    this.vulcanLoop = null;
+    this.ctx = null; this.unlocked = false;
+    this.cam = { x: 0, y: 0, z: 0, rx: 1, ry: 0, rz: 0 };
+    this.alarmT = { ground: 0, missile: 0, lock: 0 };
   }
 
   unlock() {
-    if (this.unlocked && this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume();
-      return;
-    }
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
-
-    if (window.DDVolume) {
-      this.fxGain = window.DDVolume.gain(this.ctx, 'fx');
-    } else {
-      this.fxGain = this.ctx.createGain();
-      this.fxGain.gain.value = 0.8;
-    }
-    this.fxGain.connect(this.ctx.destination);
-
-    // Démarrage du réacteur en boucle
-    this.startEngineLoop();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.fx = window.DDVolume ? window.DDVolume.gain(this.ctx, 'fx') : this.ctx.createGain();
+    if (!window.DDVolume) this.fx.gain.value = 0.8;
+    this.fx.connect(this.ctx.destination);
+    const len = this.ctx.sampleRate * 2, buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = buf;
+    this.startEngine();
+    this.startGun();
     this.unlocked = true;
   }
 
-  startEngineLoop() {
-    const c = this.ctx;
-    const t = c.currentTime;
-
-    // 1. Souffle d'air (bruit blanc filtré passe-bande)
-    const len = c.sampleRate * 2;
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-
-    const noiseSrc = c.createBufferSource();
-    noiseSrc.buffer = buf;
-    noiseSrc.loop = true;
-
-    this.engineFilter = c.createBiquadFilter();
-    this.engineFilter.type = 'bandpass';
-    this.engineFilter.frequency.setValueAtTime(320, t);
-    this.engineFilter.Q.setValueAtTime(1.8, t);
-
-    this.engineGain = c.createGain();
-    this.engineGain.gain.setValueAtTime(0.22, t);
-
-    noiseSrc.connect(this.engineFilter).connect(this.engineGain).connect(this.fxGain);
-    noiseSrc.start();
-
-    // 2. Sifflement de turbine réacteur (haute fréquence)
-    this.engineOsc = c.createOscillator();
-    this.engineOsc.type = 'triangle';
-    this.engineOsc.frequency.setValueAtTime(420, t);
-
-    const oscGain = c.createGain();
-    oscGain.gain.setValueAtTime(0.06, t);
-
-    this.engineOsc.connect(oscGain).connect(this.engineGain);
-    this.engineOsc.start();
+  startEngine() {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    this.engF = c.createBiquadFilter(); this.engF.type = 'bandpass'; this.engF.frequency.value = 320; this.engF.Q.value = 1.8;
+    this.engG = c.createGain(); this.engG.gain.value = 0;
+    src.connect(this.engF).connect(this.engG).connect(this.fx); src.start();
+    this.turb = c.createOscillator(); this.turb.type = 'triangle'; this.turb.frequency.value = 420;
+    const g = c.createGain(); g.gain.value = 0.06;
+    this.turb.connect(g).connect(this.engG); this.turb.start();
   }
 
-  // Modifie le son du réacteur selon la vitesse et la postcombustion
-  updateEngine(speed, boosting, braking) {
-    if (!this.unlocked || !this.ctx || !this.engineFilter) return;
-    const c = this.ctx;
-    const t = c.currentTime;
-
-    // Fréquence du filtre selon la vitesse
-    const targetFreq = boosting ? 650 : braking ? 220 : 380 + (speed / 200) * 180;
-    this.engineFilter.frequency.setTargetAtTime(targetFreq, t, 0.15);
-
-    // Sifflement de turbine
-    const turbineFreq = boosting ? 880 : 350 + (speed / 200) * 280;
-    this.engineOsc.frequency.setTargetAtTime(turbineFreq, t, 0.15);
-
-    // Volume du réacteur
-    const targetVol = boosting ? 0.42 : braking ? 0.14 : 0.24;
-    this.engineGain.gain.setTargetAtTime(targetVol, t, 0.12);
+  // Canon en boucle : plus de cinquante oscillateurs par seconde en moins, et un vrai BRRRT
+  startGun() {
+    const c = this.ctx, saw = c.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = 95;
+    const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 900; nf.Q.value = 0.7;
+    const am = c.createGain(); am.gain.value = 0.5;
+    const lfo = c.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 25;
+    const depth = c.createGain(); depth.gain.value = 0.5; lfo.connect(depth).connect(am.gain);
+    this.gunG = c.createGain(); this.gunG.gain.value = 0;
+    const sg = c.createGain(); sg.gain.value = 0.3;
+    saw.connect(sg).connect(am); src.connect(nf).connect(am); am.connect(this.gunG).connect(this.fx);
+    saw.start(); src.start(); lfo.start();
   }
 
-  // Tir de canon rotatif Vulcan M61 (BRRRR-D-D-D-T)
-  playVulcanShot() {
-    if (!this.unlocked || !this.ctx) return;
-    const c = this.ctx;
-    const t = c.currentTime;
+  setListener(pos, right) { this.cam.x = pos.x; this.cam.y = pos.y; this.cam.z = pos.z; this.cam.rx = right.x; this.cam.ry = right.y; this.cam.rz = right.z; }
 
-    // Détonation courte et claquante
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(140, t);
-    osc.frequency.exponentialRampToValueAtTime(35, t + 0.05);
-
-    gain.gain.setValueAtTime(0.35, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-    osc.connect(gain).connect(this.fxGain);
-    osc.start(t);
-    osc.stop(t + 0.05);
+  // Sortie placée dans l'espace, ou null si c'est trop loin pour s'entendre
+  spatial(x, y, z, reach = 1500, vol = 1) {
+    if (!this.ctx) return null;
+    const dx = x - this.cam.x, dy = y - this.cam.y, dz = z - this.cam.z, d = Math.hypot(dx, dy, dz), g = vol * Math.min(1, 90 / Math.max(90, d)) * (1 - Math.min(1, d / reach));
+    if (g < 0.01) return null;
+    const c = this.ctx, gain = c.createGain(); gain.gain.value = g;
+    if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = d > 1 ? Math.max(-1, Math.min(1, (dx * this.cam.rx + dy * this.cam.ry + dz * this.cam.rz) / d)) : 0; gain.connect(p).connect(this.fx); }
+    else gain.connect(this.fx);
+    return gain;
   }
 
-  // Impact sur avion adverse (bruit d'impact métallique crunch)
-  playHit() {
-    if (!this.unlocked || !this.ctx) return;
-    const c = this.ctx;
-    const t = c.currentTime;
+  updateEngine(speed, boosting, braking, alive) {
+    if (!this.unlocked) return;
+    const t = this.ctx.currentTime;
+    this.engF.frequency.setTargetAtTime(boosting ? 650 : braking ? 220 : 300 + (speed / 200) * 220, t, 0.15);
+    this.turb.frequency.setTargetAtTime(boosting ? 880 : 320 + (speed / 200) * 300, t, 0.15);
+    this.engG.gain.setTargetAtTime(!alive ? 0 : boosting ? 0.42 : braking ? 0.14 : 0.24, t, 0.12);
+  }
+  setFiring(on) { if (this.unlocked) this.gunG.gain.setTargetAtTime(on ? 0.34 : 0, this.ctx.currentTime, 0.012); }
+  silence() { if (!this.unlocked) return; const t = this.ctx.currentTime; this.engG.gain.setTargetAtTime(0, t, 0.2); this.gunG.gain.setTargetAtTime(0, t, 0.02); }
 
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(320, t);
-    osc.frequency.exponentialRampToValueAtTime(70, t + 0.07);
-
-    gain.gain.setValueAtTime(0.45, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.07);
-
-    osc.connect(gain).connect(this.fxGain);
-    osc.start(t);
-    osc.stop(t + 0.07);
+  tone(out, type, f0, f1, dur, vol) {
+    const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.008, t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
+  }
+  burst(out, dur, vol, f0 = 600, f1 = 80) {
+    const c = this.ctx, t = c.currentTime, s = c.createBufferSource(); s.buffer = this.noise; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(f0, t); f.frequency.linearRampToValueAtTime(f1, t + dur);
+    const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.008, t + dur);
+    s.connect(f).connect(g).connect(out); s.start(t, Math.random()); s.stop(t + dur + 0.02);
   }
 
-  // Alarme de surchauffe
-  playOverheat() {
-    if (!this.unlocked || !this.ctx) return;
-    const c = this.ctx;
-    const t = c.currentTime;
+  // Le canon d'un autre avion : quelques claquements, au loin
+  otherGun(x, y, z) { const o = this.spatial(x, y, z, 1100, 0.5); if (o) this.tone(o, 'sawtooth', 130, 40, 0.05, 0.3); }
+  // Mon tir touche
+  hitConfirm() { if (this.unlocked) this.tone(this.fx, 'triangle', 1500, 900, 0.05, 0.16); }
+  // On me touche : impact sec dans la carlingue
+  hitMe() { if (!this.unlocked) return; this.tone(this.fx, 'square', 240, 60, 0.09, 0.42); this.burst(this.fx, 0.1, 0.4, 2600, 500); }
+  // Un autre avion est touché
+  hitOther(x, y, z) { const o = this.spatial(x, y, z, 900, 0.5); if (o) this.tone(o, 'triangle', 320, 70, 0.07, 0.4); }
+  explosion(x, y, z, big = true) {
+    if (!this.unlocked) return;
+    const o = this.spatial(x, y, z, 3200, big ? 1.5 : 0.8); if (!o) return;
+    this.tone(o, 'sine', 110, 18, big ? 0.7 : 0.35, 0.85); this.burst(o, big ? 0.7 : 0.35, 0.7);
+  }
+  missileLaunch(x, y, z) { const o = this.spatial(x, y, z, 1500, 1.1); if (o) this.burst(o, 0.8, 0.5, 1800, 300); }
+  overheat() { if (this.unlocked) { this.tone(this.fx, 'sine', 800, 800, 0.08, 0.25); setTimeout(() => this.unlocked && this.tone(this.fx, 'sine', 600, 600, 0.1, 0.25), 90); } }
+  flare() { if (this.unlocked) this.burst(this.fx, 0.25, 0.3, 3000, 900); }
+  start() { if (this.unlocked) this.tone(this.fx, 'triangle', 660, 990, 0.25, 0.3); }
+  count() { if (this.unlocked) this.tone(this.fx, 'sine', 520, 520, 0.12, 0.25); }
+  win() { if (!this.unlocked) return; [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.unlocked && this.tone(this.fx, 'triangle', f, f, 0.22, 0.28), i * 130)); }
+  lose() { if (!this.unlocked) return; [392, 330, 262].forEach((f, i) => setTimeout(() => this.unlocked && this.tone(this.fx, 'triangle', f, f, 0.3, 0.25), i * 180)); }
 
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, t);
-    osc.frequency.setValueAtTime(600, t + 0.08);
-
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.16);
-
-    osc.connect(gain).connect(this.fxGain);
-    osc.start(t);
-    osc.stop(t + 0.16);
+  // Alarmes en bips réguliers
+  alarms(dt, { ground, missile, lock, locked }) {
+    if (!this.unlocked) return;
+    const A = this.alarmT;
+    A.ground -= dt; A.missile -= dt; A.lock -= dt;
+    if (ground && A.ground <= 0) { A.ground = 0.42; this.tone(this.fx, 'square', 760, 760, 0.14, 0.14); }
+    if (missile && A.missile <= 0) { A.missile = 0.2; this.tone(this.fx, 'sawtooth', 1250, 1250, 0.09, 0.14); }
+    if (locked && A.lock <= 0) { A.lock = 0.1; this.tone(this.fx, 'sine', 1400, 1400, 0.07, 0.1); }
+    else if (lock > 0 && !locked && A.lock <= 0) { A.lock = 0.32 - lock * 0.18; this.tone(this.fx, 'sine', 700 + lock * 500, 700 + lock * 500, 0.05, 0.08); }
   }
 
-  // Explosion d'un avion en vol (KABOOM)
-  playExplosion() {
-    if (!this.unlocked || !this.ctx) return;
-    const c = this.ctx;
-    const t = c.currentTime;
-
-    // Détonation très grave
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(110, t);
-    osc.frequency.exponentialRampToValueAtTime(18, t + 0.6);
-
-    gain.gain.setValueAtTime(0.85, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
-
-    osc.connect(gain).connect(this.fxGain);
-    osc.start(t);
-    osc.stop(t + 0.6);
-
-    // Souffle de débris
-    this.playNoise(t, 0.55, 0.7);
-  }
-
-  playNoise(startTime, duration, vol = 0.5) {
-    const c = this.ctx;
-    const bufferSize = Math.floor(c.sampleRate * duration);
-    const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
-    const noise = c.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = c.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(600, startTime);
-    filter.frequency.linearRampToValueAtTime(80, startTime + duration);
-
-    const gain = c.createGain();
-    gain.gain.setValueAtTime(vol, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-
-    noise.connect(filter).connect(gain).connect(this.fxGain);
-    noise.start(startTime);
-    noise.stop(startTime + duration);
-  }
+  dispose() { this.unlocked = false; if (this.ctx) { try { this.ctx.close(); } catch (e) { /* déjà fermé */ } this.ctx = null; } }
 }

@@ -1,6 +1,17 @@
 # Journal des versions — Arcadia
 
 ## 3.63 — 2 novembre 2026
+- **Dogfight 3D** — Refonte complète : le combat se déroule au-dessus de la vraie île d'Island Rush.
+  - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
+  - Choisis ton avion au hangar : le F-16, vif et mordant, ou le F-22, rapide et plus discret face aux missiles.
+  - Nouveau pilotage : vise à la souris et l'avion suit, ou pilote toi-même en ZQSD. Loopings et tonneaux sont possibles, et la vitesse se gère : monter ou serrer un virage coûte de l'énergie.
+  - Commandes souples : l'avion a de l'inertie, une tape sur le clavier corrige finement et un appui long tire à fond. La visée au trackpad est lissée.
+  - Canon qui chauffe, missiles à accrocher, leurres, et dégâts localisés sur le moteur, les ailes et la queue.
+  - Interface de vol façon simulateur : vitesse et altitude, étiquettes avec distance, point où viser, radar rond avec la carte de l'île, flèches vers les ennemis hors champ, alertes de relief et de missile, tableau des scores sur Tab.
+  - Sons placés dans l'espace et alarmes dans le cockpit.
+  - Nouveau mode Équipes, nouvelle durée de partie, et un vrai écran de fin avec Rejouer.
+  - À plusieurs, ton avion répond sans attendre le réseau et les autres se déplacent sans à-coups. La partie continue si l'hôte part ou change d'onglet, et un bot reprend l'avion des absents.
+  - L'hôte a enfin son avion, et les bots ne fuient plus vers le plafond. Le manche tactile fonctionne sur téléphone.
 - **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
   - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.
   - **Couverture exhaustive de toutes les quêtes du jeu (18 quêtes)** :
