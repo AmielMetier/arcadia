@@ -745,7 +745,39 @@ export const SQL_QUESTIONS = [
     ref: 'SELECT montant FROM ordres ORDER BY montant DESC LIMIT 1 OFFSET 1',
     tip: 'On trie du plus gros au plus petit, on saute le premier (OFFSET 1) et on en garde un (LIMIT 1).',
   },
+  ...tradeJour({
+    id: 'sql_tj_gain', level: 1, title: 'Le gain par trader',
+    prompt: 'Affiche chaque trader (nom) et la somme de ses P&L (pnl), table trade_jour.',
+    ref: 'SELECT nom, SUM(pnl) FROM trade_jour GROUP BY nom',
+    expected: [[['Dupont', 8000], ['Gekko', 11000000], ['Warren', -250000]], [['Alma', -400], ['Bruno', 900]], [['Chloé', 0], ['David', 75], ['Emma', -30]]],
+    tip: 'GROUP BY fait une ligne par trader, et SUM additionne ses P&L.',
+  }),
+  ...tradeJour({
+    id: 'sql_tj_perte', level: 1, title: 'La perte totale',
+    prompt: 'Affiche la perte totale de la table trade_jour : la somme des pnl négatifs. Une seule valeur.',
+    ref: 'SELECT SUM(pnl) FROM trade_jour WHERE pnl < 0',
+    expected: [[[-252000]], [[-1000]], [[-130]]],
+    tip: 'WHERE garde les lignes négatives, puis SUM les additionne. MIN donnerait seulement la plus grosse perte.',
+  }),
+  ...tradeJour({
+    id: 'sql_tj_doublons', level: 2, title: 'Les noms en doublon',
+    prompt: 'Affiche les noms présents plusieurs fois dans la table trade_jour (chaque nom une seule fois).',
+    ref: 'SELECT nom FROM trade_jour GROUP BY nom HAVING COUNT(*) > 1',
+    expected: [[['Dupont'], ['Gekko']], [['Alma'], ['Bruno']], [['Chloé'], ['David'], ['Emma']]],
+    tip: 'On regroupe par nom, puis HAVING garde les groupes de plus d\'une ligne. WHERE ne peut pas filtrer sur COUNT.',
+  }),
 ];
+
+// Épreuves SQL sur la table du jour (nom, pnl) : mêmes trois bases, un énoncé différent
+function tradeJour({ id, level, title, prompt, ref, expected, tip }) {
+  const bases = [
+    [['Dupont', 10000], ['Dupont', -2000], ['Gekko', 5000000], ['Warren', -250000], ['Gekko', 6000000]],
+    [['Alma', 200], ['Alma', -600], ['Bruno', 1300], ['Bruno', -400]],
+    [['Chloé', 50], ['Chloé', -50], ['David', 100], ['David', -25], ['Emma', -55], ['Emma', 25]],
+  ];
+  const tests = bases.map((rows, k) => [[[{ name: 'trade_jour', cols: ['nom TEXT', 'pnl INTEGER'], rows }]], expected[k]]);
+  return [{ id, level, lang: 'sql', ordered: false, title, prompt, starter: `-- ${prompt}\nSELECT `, tests, ref, tip }];
+}
 
 
 // « Que va afficher ce programme Java ? » : la bonne réponse est la sortie réelle (programme exécuté avec java à la génération).

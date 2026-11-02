@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.60 — 2 novembre 2026
+- **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.
+  - Produits financiers, mathématiques financières, économie et marchés : options, obligations, swaps, grecques, Itô, Vasicek, VaR, BCE, QE, courbe des taux. Les chiffres d'actualité sont datés.
+  - Nouvelle rubrique Informatique : C++, programmation objet, SQL, VBA, Excel, Access et débogage. Elle sort aussi aux postes Trading, Quant et Risques.
+  - Certaines questions montrent désormais du code à lire ou à compléter, en VBA, C++, SQL ou avec une formule Excel.
+  - Trois nouvelles épreuves SQL : le gain par trader, la perte totale et les noms en doublon.
+
 ## 3.59 — 2 novembre 2026
 - **Odyssée** — interfaces 5G (*Noir 2 / Blanc 2*) pour l'Équipe, le Sac et la Carte, limite de niveau d'Arène et restrictions d'échanges :
   - **Limite de niveau d'Arène (Level Cap)** : vos créatures ne peuvent plus dépasser le niveau maximal du Champion de l'Arène suivante moins 1 (N.13 avant Hector, N.21 avant Marine, N.28 avant Volta, N.33 avant Flora, N.38 avant Sibylle, N.43 avant Basalte, N.48 avant Pyros, N.55 avant Drakos, puis N.100). L'expérience s'arrête au plafond et les Super Bonbons indiquent la limite.
