@@ -158,7 +158,9 @@ export class UI {
     // bouton Échap : ouvre le menu (ou revient en arrière), utile à la souris ou au doigt
     const escBtn = el('button', 'keyhint', '<b>Échap</b> Menu'); escBtn.type = 'button'; escBtn.tabIndex = -1;
     escBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('b'); });
-    bar.append(btn, escBtn);
+    const hudBtn = el('button', 'keyhint', '<b>U</b> HUD'); hudBtn.type = 'button'; hudBtn.tabIndex = -1;
+    hudBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('hud'); });
+    bar.append(btn, escBtn, hudBtn);
     const panel = el('div', 'keypanel box', `<div class="list-title">Commandes</div><table class="kv">
       <tr><td>Se déplacer</td><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
       <tr><td>Courir</td><td><kbd>Maj</kbd> maintenue</td></tr>
@@ -166,8 +168,9 @@ export class UI {
       <tr><td>Annuler, revenir</td><td><kbd>Échap</kbd> (ou <kbd>Retour arrière</kbd>)</td></tr>
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
       <tr><td>Carte de la région</td><td><kbd>C</kbd></td></tr>
+      <tr><td>Afficher / replier le HUD</td><td><kbd>U</kbd> (ou clic sur ▴ / ▾)</td></tr>
       <tr><td>Capacités de terrain</td><td>face à un petit arbre, un rocher fissuré ou à l'eau : <kbd>F</kbd></td></tr>
-      <tr><td>Sauvegarder</td><td><kbd>Échap</kbd> → SAUVER (la partie se sauve aussi à chaque porte)</td></tr>
+      <tr><td>Sauvegarder</td><td><kbd>Échap</kbd> → SAUVER (ou bouton SAUVER du HUD)</td></tr>
       <tr><td>Afficher / cacher cette aide</td><td><kbd>H</kbd></td></tr></table><div class="hint">Appuie sur H, F ou Échap pour fermer</div>`);
     this.root.appendChild(panel);
     const toggle = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); this.input.helpOpen = on; this.sound.sfx(on ? 'select' : 'cancel'); };

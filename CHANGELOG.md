@@ -10,6 +10,10 @@
   - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
   - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
   - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
+- **Odyssée** — un HUD en jeu montre en permanence ton équipe, ton argent, tes badges et le lieu où tu te trouves.
+  - À gauche : les six créatures de l'équipe dans leurs capsules (sprite animé, niveau, statut, barres de PV et d'EXP) ; cliquer sur une créature ouvre son résumé, et le bouton `⇅` (ou le clic droit) permet de changer l'ordre de l'équipe à la volée.
+  - En haut à droite : encadré Pokégear avec le lieu actuel, l'argent, les badges d'Arène et quatre raccourcis rapides (`ÉQUIPE`, `SAC`, `CARTE`, `SAUVER`).
+  - Appuie sur `U` (ou sur le bouton `▴`) pour replier ou réafficher le HUD quand tu veux admirer la carte.
 
 ## 3.54 — 2 novembre 2026
 - **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.

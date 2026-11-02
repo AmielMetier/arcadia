@@ -274,7 +274,7 @@ window.HUB_GAME_INFO = {
     keys: [['Flèches / ZQSD', 'Marcher'], ['Espace / Entrée', 'Parler, valider'], ['B / Échap', 'Retour']],
     tips: ['Les types comptent : l\'eau bat le feu, le feu bat la plante.', 'Pense à soigner ton équipe avant le tournoi.'] },
   odyssee: { genre: 'aventure', time: 'Longue aventure',
-    keys: [['Flèches / ZQSD', 'Marcher'], ['Maj', 'Courir'], ['Espace', 'Parler, valider'], ['Échap', 'Menu']],
+    keys: [['Flèches / ZQSD', 'Marcher'], ['Maj', 'Courir'], ['Espace', 'Parler, valider'], ['U', 'Afficher / replier le HUD'], ['Échap', 'Menu']],
     tips: ['Ta partie est sauvegardée en ligne avec ton compte.', 'Parle aux autres joueurs pour échanger ou combattre.', 'Les CS ouvrent des recoins cachés le long des routes.'] },
   minigolf: { genre: 'sport', time: '10–20 min',
     keys: [['Souris', 'Tourner la caméra, viser'], ['Clic maintenu + reculer', 'Doser la puissance'], ['Molette', 'Zoom'], ['V', 'Vue du trou']],
