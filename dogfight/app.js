@@ -19,6 +19,9 @@ class DogfightApp {
     this.btnSet = document.getElementById('btnSet');
     this.btnExit = document.getElementById('btnExit');
     this.loadingOverlay = document.getElementById('loadingOverlay');
+    this.briefingModal = document.getElementById('briefingModal');
+    this.btnStart = document.getElementById('btnStart');
+    this.briefingDismissed = false;
 
     this.audio = new DogfightAudio();
     this.controls = new FlightControls({
@@ -104,10 +107,11 @@ class DogfightApp {
     this.resizeHud();
     window.addEventListener('resize', () => this.resizeHud());
 
-    // 3. Masquer l'écran de chargement
+    // 3. Masquer l'écran de chargement et afficher le briefing
     if (this.loadingOverlay) {
       this.loadingOverlay.classList.add('hidden');
     }
+    this.showBriefing();
 
     if (H && H.embedded) {
       H.on('init', (info) => this.boot(info));
@@ -130,6 +134,31 @@ class DogfightApp {
         },
       });
     }
+  }
+
+  showBriefing() {
+    if (!this.briefingModal) return;
+    this.briefingModal.classList.remove('hidden');
+
+    const onStart = () => {
+      if (this.briefingDismissed) return;
+      this.briefingDismissed = true;
+      this.briefingModal.classList.add('hidden');
+      this.audio.unlock();
+      if (this.controls) this.controls.triggerGesture();
+    };
+
+    if (this.btnStart) {
+      this.btnStart.addEventListener('click', onStart);
+    }
+
+    const onKey = (e) => {
+      if (e.code === 'Enter' || e.code === 'Space') {
+        onStart();
+        window.removeEventListener('keydown', onKey);
+      }
+    };
+    window.addEventListener('keydown', onKey);
   }
 
   resizeHud() {
@@ -263,6 +292,10 @@ class DogfightApp {
   }
 
   update(dt) {
+    if (!this.briefingDismissed) {
+      return;
+    }
+
     const myInput = this.controls.getInput();
 
     if (this.role === 'host' || this.role === 'solo') {

@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.43 — 2 novembre 2026
+- **Dogfight 3D** — Briefing des commandes avant décollage et alignement du F-16.
+  - Une fenêtre d'accueil présente clairement les commandes (visée souris, tir, postcombustion, aérofrein) avant de décoller.
+  - L'avion est désormais parfaitement droit et horizontal dès le départ, et s'incline naturellement dans le sens des virages.
+
 ## 3.42 — 2 novembre 2026
 - **Dogfight 3D** — Nouveau jeu : combats aériens de chasseurs F-16 au canon rotatif Vulcan au-dessus de l'île.
   - Pilotage arcade ultra accessible à la souris ou au clavier, avec postcombustion et aérofrein.

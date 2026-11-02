@@ -90,17 +90,20 @@ export class FxManager {
     const fx = plane.forwardX || 0;
     const fy = plane.forwardY || 0;
     const fz = plane.forwardZ || 1;
+    const ux = plane.upX || 0;
+    const uy = plane.upY || 1;
+    const uz = plane.upZ || 0;
 
     const tips = [
       {
-        x: plane.x - rx * 4.85 - fx * 1.5,
-        y: plane.y - ry * 4.85 - fy * 1.5,
-        z: plane.z - rz * 4.85 - fz * 1.5,
+        x: plane.x - rx * 4.77 - ux * 1.58 - fx * 3.45,
+        y: plane.y - ry * 4.77 - uy * 1.58 - fy * 3.45,
+        z: plane.z - rz * 4.77 - uz * 1.58 - fz * 3.45,
       },
       {
-        x: plane.x + rx * 4.85 - fx * 1.5,
-        y: plane.y + ry * 4.85 - fy * 1.5,
-        z: plane.z + rz * 4.85 - fz * 1.5,
+        x: plane.x + rx * 4.77 - ux * 1.58 - fx * 3.45,
+        y: plane.y + ry * 4.77 - uy * 1.58 - fy * 3.45,
+        z: plane.z + rz * 4.77 - uz * 1.58 - fz * 3.45,
       },
     ];
 

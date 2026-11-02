@@ -18,16 +18,28 @@ export function preloadF16Model() {
       (gltf) => {
         const root = gltf.scene;
 
-        // Alignement géométrique précis du F-16 :
-        // Le modèle source a le nez sur +X, les ailes sur Y, la hauteur sur Z.
-        // On le réoriente vers le repère standard Three.js (Avance = +Z, Haut = +Y, Droite = +X)
+        // Alignement géométrique précis du F-16 GLB :
+        // Le modèle source a :
+        // - l'axe longitudinal (moteur -> nez) sur [0.986, 0, 0.165] (incliné de 9.5°)
+        // - l'axe vertical (ventre -> cockpit/dérive) sur [0.165, 0, -0.986] (dorsal = -Z)
+        // - l'axe d'envergure (aile gauche -> aile droite) sur [0, 1, 0]
+        // On applique la rotation orthogonale exacte pour aligner :
+        // - Nez strictement vers +Z (direction de vol)
+        // - Cockpit et dérive strictement vers +Y (vers le ciel)
+        // - Aile droite vers +X (droite)
         const pivot = new THREE.Group();
-        root.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
+        const rotMat = new THREE.Matrix4().set(
+          0.0, 1.0, 0.0, 0,
+          0.165113, 0.0, -0.986275, 0,
+          0.986275, 0.0, 0.165113, 0,
+          0, 0, 0, 1
+        );
+        root.quaternion.setFromRotationMatrix(rotMat);
 
-        // Échelle à taille réelle (~15 mètres de long) et centrage
-        const scale = 0.105;
+        // Échelle à taille réelle (~15.0 mètres de long) et centrage parfait sur le pivot
+        const scale = 0.1016;
         root.scale.set(scale, scale, scale);
-        root.position.set(0, -0.4, -2.6);
+        root.position.set(0, -1.488, -2.368);
 
         // Activer les ombres et masquer le train d'atterrissage déployé (avion en vol)
         root.traverse((child) => {
@@ -104,7 +116,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
     blending: THREE.AdditiveBlending,
   });
   const flameMesh = new THREE.Mesh(flameGeo, flameMat);
-  flameMesh.position.set(0, 0.1, -7.4);
+  flameMesh.position.set(0, 0.0, -7.5);
   flameMesh.visible = false;
   container.add(flameMesh);
 
@@ -119,7 +131,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
     blending: THREE.AdditiveBlending,
   });
   const outerFlameMesh = new THREE.Mesh(outerFlameGeo, outerFlameMat);
-  outerFlameMesh.position.set(0, 0.1, -7.4);
+  outerFlameMesh.position.set(0, 0.0, -7.5);
   outerFlameMesh.visible = false;
   container.add(outerFlameMesh);
 
@@ -132,7 +144,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
     blending: THREE.AdditiveBlending,
   });
   const flashMesh = new THREE.Mesh(flashGeo, flashMat);
-  flashMesh.position.set(-0.85, 0.25, 4.2);
+  flashMesh.position.set(-0.46, 0.10, 3.58);
   flashMesh.visible = false;
   container.add(flashMesh);
 
@@ -176,7 +188,7 @@ function colorizeModel(model, color) {
   const beaconGeo = new THREE.BoxGeometry(0.18, 0.22, 0.6);
   const beaconMat = new THREE.MeshBasicMaterial({ color: color });
   const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-  beacon.position.set(0, 3.2, -4.6);
+  beacon.position.set(0, 1.08, -7.41);
   model.add(beacon);
 }
 

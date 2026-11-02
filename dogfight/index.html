@@ -21,6 +21,69 @@
     <div class="load-status" id="loadStatus">Génération de l'île en cours…</div>
     <div class="spinner"></div>
   </div>
+
+  <div id="briefingModal" class="hidden">
+    <div class="briefing-backdrop"></div>
+    <div class="briefing-card">
+      <div class="briefing-badge">✈️ BRIEFING DE VOL</div>
+      <h1 class="briefing-title">DOGFIGHT <span>3D</span></h1>
+      <p class="briefing-sub">Combats aériens au canon rotatif Vulcan M61 au-dessus de l'île</p>
+
+      <div class="controls-grid">
+        <div class="control-box">
+          <div class="control-icon">🖱️</div>
+          <div class="control-desc">
+            <strong>Visée & Direction</strong>
+            <span>Déplacez la souris : le chasseur s'oriente et incline ses ailes dans le virage.</span>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <div class="control-icon">💥</div>
+          <div class="control-desc">
+            <strong>Canon M61 Vulcan</strong>
+            <span><kbd>Clic gauche</kbd> ou <kbd>Espace</kbd> : visez le réticule rouge d'anticipation.</span>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <div class="control-icon">⚡</div>
+          <div class="control-desc">
+            <strong>Postcombustion (Boost)</strong>
+            <span>Maintenez <kbd>Maj (Shift)</kbd> pour accélérer jusqu'à 750 km/h.</span>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <div class="control-icon">🛑</div>
+          <div class="control-desc">
+            <strong>Aérofrein</strong>
+            <span><kbd>Ctrl</kbd> ou <kbd>C</kbd> pour freiner et resserrer votre boucle.</span>
+          </div>
+        </div>
+
+        <div class="control-box">
+          <div class="control-icon">⌨️</div>
+          <div class="control-desc">
+            <strong>Tangage & Roulis clavier</strong>
+            <span><kbd>Z</kbd> piquer, <kbd>S</kbd> cabrer, <kbd>Q</kbd> / <kbd>D</kbd> roulis manuel.</span>
+          </div>
+        </div>
+
+        <div class="control-box tip-box">
+          <div class="control-icon">🎯</div>
+          <div class="control-desc">
+            <strong>Astuce de combat</strong>
+            <span>Tirez par courtes rafales pour éviter la surchauffe du canon rotatif !</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnStart" class="btn-launch" type="button">
+        🚀 DÉCOLLER ! (Entrée)
+      </button>
+    </div>
+  </div>
 </div>
 
 <script src="../shared/bridge.js"></script>

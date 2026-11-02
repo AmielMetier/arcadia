@@ -89,8 +89,8 @@ export class FlightModel {
       if (input.pitchUp) this.pitch += PITCH_SPEED * dt;
       if (input.pitchDown) this.pitch -= PITCH_SPEED * dt;
 
-      if (input.rollLeft) this.roll += ROLL_SPEED * dt;
-      if (input.rollRight) this.roll -= ROLL_SPEED * dt;
+      if (input.rollLeft) this.roll -= ROLL_SPEED * dt;
+      if (input.rollRight) this.roll += ROLL_SPEED * dt;
 
       if (input.yawLeft) this.yaw += YAW_SPEED * dt;
       if (input.yawRight) this.yaw -= YAW_SPEED * dt;
@@ -164,7 +164,7 @@ export class FlightModel {
     this.yaw += targetYawRate * dt;
 
     // Inclinaison automatique des ailes (bank) dans le sens du virage
-    const targetRoll = -aimDeltaX * (Math.PI * 0.55);
+    const targetRoll = aimDeltaX * (Math.PI * 0.55);
     const rollDiff = targetRoll - this.roll;
     this.roll += Math.sign(rollDiff) * Math.min(Math.abs(rollDiff), ROLL_SPEED * dt);
   }
