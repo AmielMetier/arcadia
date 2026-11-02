@@ -64,7 +64,7 @@ class DogfightApp {
                   ['Tirer au canon M61 Vulcan', '<kbd>Espace</kbd> ou <kbd>Clic gauche</kbd>', 'Bouton A / Gâchette'],
                   ['Postcombustion (Boost)', '<kbd>Maj</kbd> (Shift)', 'R1 / Gâchette haute'],
                   ['Aérofrein', '<kbd>Ctrl</kbd> ou <kbd>C</kbd> / <kbd>X</kbd>', 'L1'],
-                  ['Visée Souris (Optionnelle)', 'Déplacer la souris', 'Visée libre'],
+                  ['Vol en ligne droite', 'Relâcher les touches', 'Centrer le stick'],
                 ],
               },
             ],

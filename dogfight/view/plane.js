@@ -81,6 +81,8 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const container = new THREE.Group();
 
   let bodyGroup = new THREE.Group();
+  // Rotation de 90 degrés vers la gauche du modèle 3D
+  bodyGroup.rotation.y = -Math.PI / 2;
   container.add(bodyGroup);
 
   // 1. Si le modèle réaliste f-16.glb est déjà disponible, on le clone
@@ -104,7 +106,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
     });
   }
 
-  // 2. Flamme de postcombustion (Afterburner)
+  // 2. Flamme de postcombustion (Afterburner) solidaire du modèle
   const flameGeo = new THREE.ConeGeometry(0.55, 4.2, 16);
   flameGeo.rotateX(-Math.PI / 2);
   flameGeo.translate(0, 0, -2.1);
@@ -117,7 +119,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const flameMesh = new THREE.Mesh(flameGeo, flameMat);
   flameMesh.position.set(0, 0.0, -7.5);
   flameMesh.visible = false;
-  container.add(flameMesh);
+  bodyGroup.add(flameMesh);
 
   // Enveloppe extérieure orange thermique
   const outerFlameGeo = new THREE.ConeGeometry(0.85, 5.8, 16);
@@ -132,7 +134,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const outerFlameMesh = new THREE.Mesh(outerFlameGeo, outerFlameMat);
   outerFlameMesh.position.set(0, 0.0, -7.5);
   outerFlameMesh.visible = false;
-  container.add(outerFlameMesh);
+  bodyGroup.add(outerFlameMesh);
 
   // 3. Flash lumineux du canon rotatif Vulcan M61
   const flashGeo = new THREE.SphereGeometry(0.45, 8, 8);
@@ -145,7 +147,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const flashMesh = new THREE.Mesh(flashGeo, flashMat);
   flashMesh.position.set(-0.46, 0.10, 3.58);
   flashMesh.visible = false;
-  container.add(flashMesh);
+  bodyGroup.add(flashMesh);
 
   return {
     root: container,

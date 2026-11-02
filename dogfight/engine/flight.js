@@ -86,8 +86,16 @@ export class FlightModel {
       this.applyMouseAim(input.aimX, input.aimY, dt);
     } else {
       // Commandes manuelles (virage coordonné au clavier pour un pilotage 100% réactif)
-      if (input.pitchUp) this.pitch += PITCH_SPEED * dt;
-      if (input.pitchDown) this.pitch -= PITCH_SPEED * dt;
+      if (input.pitchUp) {
+        this.pitch += PITCH_SPEED * dt;
+      } else if (input.pitchDown) {
+        this.pitch -= PITCH_SPEED * dt;
+      } else {
+        // Auto-stabilisation douce de l'assiette quand aucune touche de tangage n'est pressée (vol à plat tout droit)
+        if (Math.abs(this.pitch) > 0.005) {
+          this.pitch -= Math.sign(this.pitch) * Math.min(Math.abs(this.pitch), 1.6 * dt);
+        }
+      }
 
       if (input.rollLeft) {
         const maxBank = Math.PI * 0.45;

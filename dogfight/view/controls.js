@@ -77,43 +77,7 @@ export class FlightControls {
     const brake = k.has('ControlLeft') || k.has('ControlRight') || k.has('KeyC') || k.has('KeyX') || this.touch.brake;
     const fire = this.mouse.firing || k.has('Space') || k.has('KeyF') || k.has('Enter') || this.touch.fire;
 
-    // Si le joueur manœuvre au clavier, le clavier est prioritaire absolu
-    const hasKeySteer = pitchUp || pitchDown || rollLeft || rollRight || yawLeft || yawRight;
-    if (hasKeySteer) {
-      return {
-        mouseAim: false,
-        aimX: 0,
-        aimY: 0,
-        pitchUp,
-        pitchDown,
-        rollLeft,
-        rollRight,
-        yawLeft,
-        yawRight,
-        boost,
-        brake,
-        fire,
-      };
-    }
-
-    // Si la souris bouge de manière significative, visée souris
-    if (this.mouse.active && Math.hypot(this.mouse.x, this.mouse.y) > 0.05) {
-      return {
-        mouseAim: true,
-        aimX: this.mouse.x,
-        aimY: this.mouse.y,
-        pitchUp: false,
-        pitchDown: false,
-        rollLeft: false,
-        rollRight: false,
-        yawLeft: false,
-        yawRight: false,
-        boost,
-        brake,
-        fire,
-      };
-    }
-
+    // Pilotage 100% autonome au clavier : le relâchement des touches stabilise l'avion en ligne droite
     return {
       mouseAim: false,
       aimX: 0,

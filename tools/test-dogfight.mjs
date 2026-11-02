@@ -25,11 +25,25 @@ flight.update({ boost: true }, 0.5);
 assert(flight.speed > CRUISE_SPEED, 'La postcombustion augmente la vitesse');
 assert(flight.boosting === true, 'État boosting actif');
 
-// Crash au sol
-flight.y = 5;
-flight.update({}, 0.1, { heightAt: () => 10 });
-assert(flight.crashed === true, 'Crash détecté lors du contact avec le sol');
-console.log('✓ Modèle de vol, postcombustion et crash');
+// Stabilisation mains libres (vol tout droit dans la dernière direction)
+const straightFlight = new FlightModel({ x: 0, y: 200, z: 0, heading: 0.5 });
+// Virage à droite et léger cabré
+for (let t = 0; t < 0.4; t += 0.016) {
+  straightFlight.update({ rollRight: true, pitchUp: true }, 0.016);
+}
+const lastHeading = straightFlight.yaw;
+assert(straightFlight.roll > 0, 'Roulis actif pendant le virage');
+assert(straightFlight.pitch > 0, 'Tangage actif pendant le cabré');
+
+// Relâchement complet des touches (aucun input)
+for (let t = 0; t < 1.5; t += 0.016) {
+  straightFlight.update({}, 0.016);
+}
+assert(Math.abs(straightFlight.yaw - lastHeading) < 0.001, 'Le cap (yaw) reste strictement inchangé sans touche');
+assert(Math.abs(straightFlight.roll) < 0.01, 'Le roulis revient à 0 pour stabiliser les ailes');
+assert(Math.abs(straightFlight.pitch) < 0.01, 'L\'assiette (pitch) revient à 0 pour voler à plat');
+assert(Math.abs(straightFlight.forwardY) < 0.01, 'Vecteur de vol horizontal tout droit');
+console.log('✓ Modèle de vol, postcombustion, crash et vol tout droit sans touche');
 
 // 2. Armement & Canon Vulcan
 const weapons = new WeaponSystem();

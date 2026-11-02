@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.45 — 2 novembre 2026
+- **Dogfight 3D** — Orientation du modèle ajustée et maintien automatique du cap en ligne droite.
+  - Le modèle 3D de l'avion est tourné de 90 degrés vers la gauche avec sa tuyère et ses effets de tir synchronisés.
+  - En relâchant les touches du clavier, l'avion file tout droit à l'horizontale dans sa dernière direction sans dériver.
+
 ## 3.44 — 2 novembre 2026
 - **Dogfight 3D** — Pilotage 100% autonome au clavier et caméra dynamique.
   - On peut désormais jouer entièrement au clavier sans toucher à la souris (virages coordonnés ZQSD ou flèches).
