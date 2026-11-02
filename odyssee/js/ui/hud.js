@@ -6,7 +6,8 @@ import { el, esc } from './ui.js';
 import { ASSETS } from '../assets.js';
 import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
-import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen } from './screens.js';
+import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen } from './screens.js';
+import { getTrackedQuest } from '../core/questsData.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -124,6 +125,9 @@ export class Hud {
       } else if (act === 'map') {
         g.busy = true; g.sound.sfx('select');
         try { await mapScreen(g); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'quests') {
+        g.busy = true; g.sound.sfx('select');
+        try { await questsScreen(g); } finally { g.busy = false; this.update(true); }
       }
     });
   }
@@ -136,12 +140,13 @@ export class Hud {
     }
     this.root.style.display = '';
     const loc = g.locationName();
+    const tracked = getTrackedQuest(g);
     const bCount = g.badgeCount();
     const badgesKey = st.badges.map((b) => (b ? '1' : '0')).join('');
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${st.trackedQuest || ''};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 
@@ -214,6 +219,16 @@ export class Hud {
           </div>
         </div>
         <div class="hud-bdots-row" data-act="card" title="Badges d'Arène">${badgeDots}</div>
+        ${tracked ? `
+          <div class="hud-quest-card" data-act="quests" title="Objectif suivi : cliquer pour ouvrir le Journal (Touche Q)">
+            <div class="hud-qc-head">
+              <span class="hud-qc-star">★ SUIVIE</span>
+              <span class="hud-qc-loc">📍 ${esc(tracked.destination)}</span>
+            </div>
+            <div class="hud-qc-name">${esc(tracked.name)}</div>
+            <div class="hud-qc-step">${esc(tracked.stepDesc)}</div>
+          </div>
+        ` : ''}
       </div>
       <div class="hud-actions">
         <button type="button" class="hud-btn run${g.autoRun ? ' on' : ''}" data-act="autorun" tabindex="-1" title="Course continue (Touche R)">
@@ -227,6 +242,9 @@ export class Hud {
         </button>
         <button type="button" class="hud-btn" data-act="map" tabindex="-1" title="Carte (Touche C)">
           <img src="img/hud/map.png" alt=""><span>CARTE</span>
+        </button>
+        <button type="button" class="hud-btn" data-act="quests" tabindex="-1" title="Journal des Quêtes (Touche Q)">
+          <img src="img/hud/quest.png" alt="" onerror="this.src='img/items/notebook.png'"><span>QUÊTES</span>
         </button>
       </div>
     `;
