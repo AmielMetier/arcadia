@@ -1,0 +1,10 @@
+Modèles 3D de Dogfight 3D. Leurs textures ont été réencodées en WebP (1024 px au plus) par tools/glb-webp.py ; la géométrie n'a pas changé.
+
+f-16.glb — F-16 Fighting Falcon, par bohmerang, publié sur Sketchfab.
+  Licence : Creative Commons Attribution - Pas d'utilisation commerciale - Partage dans les mêmes conditions 4.0
+  (CC BY-NC-SA 4.0, https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr). Modifié : textures compressées.
+  Cette licence interdit tout usage commercial du modèle.
+
+f-22.glb — F-22 Raptor, ajouté au projet par TahitoaSenis.
+  Licence : NON CONFIRMÉE. L'origine et les conditions de ce modèle restent à vérifier auprès de TahitoaSenis.
+  À remplacer si elles ne permettent pas de le distribuer ici.

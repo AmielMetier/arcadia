@@ -25,8 +25,30 @@
   - 22 nouvelles requêtes d'habitants dans toute la région, et deux combats après la Ligue : la revanche de Drakos et un dernier duel contre Théo.
 - **Odyssée Test** — Nouveau dans le Hub : on choisit un lieu et une équipe prête pour essayer les nouveautés, sans toucher à sa partie. Un éditeur permet de peindre le terrain, poser du décor, des habitants, des panneaux et des maisons, puis d'exporter ses retouches.
 - **Odyssée** — Corrections : un combat entre joueurs pouvait se désynchroniser en fin de tour ; deux filles nommées Lucie à Sylvebourg (le médaillon est maintenant celui de Margaux).
+- **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
+  - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.
+  - Meurtrier : ton couteau reste caché tant que tu ne le sors pas. Frappe de près, lance-le de loin (il se plante dans le décor : va le reprendre, ou attends qu'il revienne), et coupe le courant avec F ou C.
+  - Shérif : un revolver, une balle toutes les trois secondes. Si tu abats un innocent, tu es sonné et tu lâches ton arme.
+  - Le revolver tombé brille d'un faisceau doré qu'on voit à travers les murs : le premier innocent qui marche dessus devient le héros.
+  - Innocents : ramassez les pièces d'or, survivez jusqu'à l'aube, et méfiez-vous de celui qui sort un couteau.
+  - Le manoir a trois étages et 24 pièces, du grand hall et sa galerie jusqu'à la crypte. Il y a aussi un escalier dérobé et trois passages secrets (la bibliothèque pivotante, l'armoire et le miroir) : E pour passer.
+  - De vrais personnages animés à ta couleur, l'arme visible dans la main de chacun, des meubles placés au millimètre, des lustres et une petite valse de boîte à musique.
+  - Un mode « Sans souris » pour jouer tout au clavier (Réglages → Commandes) : ZQSD pour marcher, les flèches pour orienter la vue, et maintien de G pour jauger la force du lancer de couteau.
+  - Des bots facile, moyen ou difficile complètent la table. Un mode Découverte permet de visiter le manoir sans rôles.
+  - Les manches s'enchaînent et les points s'additionnent d'une manche à l'autre.
 
 ## 3.63 — 2 novembre 2026
+- **Dogfight 3D** — Refonte complète : le combat se déroule au-dessus de la vraie île d'Island Rush.
+  - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
+  - Choisis ton avion au hangar : le F-16, vif et mordant, ou le F-22, rapide et plus discret face aux missiles.
+  - Nouveau pilotage : vise à la souris et l'avion suit, ou pilote toi-même en ZQSD. Loopings et tonneaux sont possibles, et la vitesse se gère : monter ou serrer un virage coûte de l'énergie.
+  - Commandes souples : l'avion a de l'inertie, une tape sur le clavier corrige finement et un appui long tire à fond. La visée au trackpad est lissée.
+  - Canon qui chauffe, missiles à accrocher, leurres, et dégâts localisés sur le moteur, les ailes et la queue.
+  - Interface de vol façon simulateur : vitesse et altitude, étiquettes avec distance, point où viser, radar rond avec la carte de l'île, flèches vers les ennemis hors champ, alertes de relief et de missile, tableau des scores sur Tab.
+  - Sons placés dans l'espace et alarmes dans le cockpit.
+  - Nouveau mode Équipes, nouvelle durée de partie, et un vrai écran de fin avec Rejouer.
+  - À plusieurs, ton avion répond sans attendre le réseau et les autres se déplacent sans à-coups. La partie continue si l'hôte part ou change d'onglet, et un bot reprend l'avion des absents.
+  - L'hôte a enfin son avion, et les bots ne fuient plus vers le plafond. Le manche tactile fonctionne sur téléphone.
 - **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
   - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.
   - **Couverture exhaustive de toutes les quêtes du jeu (18 quêtes)** :
