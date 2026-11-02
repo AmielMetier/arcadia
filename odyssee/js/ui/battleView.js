@@ -246,7 +246,7 @@ export class BattleView {
     if (ballsEl) ballsEl.innerHTML = this.renderPartyBalls(side);
     const st = h.querySelector('.bh-st'); const S = m.hp > 0 && m.status ? STATUS_FR[m.status] : null; st.textContent = S ? S[0] : ''; st.style.background = S ? S[1] : 'transparent'; st.style.display = S ? '' : 'none';
     this.setHp(side, hp, m.stats[0]);
-    if (side === 0) { h.querySelector('.bh-exp u').style.width = expProgress(m) * 100 + '%'; }
+    if (side === 0) { h.querySelector('.bh-exp u').style.width = expProgress(m, this.game.levelCap()) * 100 + '%'; }
     if (side === 1) h.querySelector('.bh-caught').classList.toggle('on', this.game.state.dex.caught.includes(m.sp) && this.battle.wild);
   }
   setHp(side, hp, max) {
@@ -372,7 +372,7 @@ export class BattleView {
     o.whiteImg = null; o.darkImg = null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
-  close() { this.alive = false; this.root?.remove(); this.ui.closeDialog(); }
+  close() { this.alive = false; this.root?.remove(); this.ui.closeDialog(); this.game.input.clearDirs?.(); }
 
   /* ---------------- choix du joueur ---------------- */
   async chooseAction() {
@@ -386,9 +386,9 @@ export class BattleView {
       if (c === 3 && b.pvp) { if (await this.ui.yesNo('Abandonner le combat ?')) return { type: 'forfeit' }; continue; }
       if (c === 1) {
         const r = await bagScreen(this.game, { battle: true }); if (!r) continue;
-        const it = ITEMS[r.item];
+        const it = ITEMS[r.item], cap = this.game.levelCap();
         if (it.ball) { if (this.game.state.party.length >= 6 && this.game.state.box.length >= 300) { await this.msg('Plus de place dans le PC !', { wait: true }); continue; } return { type: 'item', item: r.item }; }
-        const target = await partyScreen(this.game, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m) ? null : 'Pas d\'effet') });
+        const target = await partyScreen(this.game, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
         if (target < 0) continue;
         let moveIdx = -1;
         if (it.pp) { const m = this.game.state.party[target]; moveIdx = await this.ui.list({ title: 'Quelle attaque ?', items: m.moves.map((x) => ({ label: MOVES[x.id].n, right: `${x.pp}/${MOVES[x.id].pp}` })), cls: 'psub', cancel: -1 }); if (moveIdx < 0) continue; }

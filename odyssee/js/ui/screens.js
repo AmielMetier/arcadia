@@ -4,7 +4,8 @@ import { SPECIES } from '../data/species.js';
 import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
-import { monName, expProgress, STAT_NAMES } from '../core/mon.js';
+import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS } from '../core/mon.js';
+import { BADGES, LEADERS } from '../world/region.js';
 import { ASSETS } from '../assets.js';
 import { SPRITES } from '../data/sprites.js';
 import { T, walkable } from '../world/tiles.js';
@@ -26,31 +27,144 @@ function screen(ui, cls, title) {
   return s;
 }
 
-/* ================= ÉQUIPE ================= */
+/* ================= ÉQUIPE (Style 5G Noir 2 / Blanc 2) ================= */
 /**
  * o.mode : 'menu' | 'pick' | 'battle' ; o.prompt ; o.filter(m) → texte d'interdiction ou null
  * renvoie l'index choisi (-1 si annulé)
  */
 export function partyScreen(game, o = {}) {
   const ui = game.ui, party = game.state.party;
+  const cap = game.levelCap ? game.levelCap() : levelCap(game.state?.badges);
+  const nextGymIdx = (game.state?.badges || []).findIndex((b) => !b);
+  const nextLeader = nextGymIdx >= 0 ? LEADERS[nextGymIdx] : null;
   return new Promise((resolve) => {
     const s = screen(ui, 'party-scr');
+    const hdr = el('div', 'scr-bar');
+    hdr.innerHTML = `
+      <div class="scr-bar-left">
+        <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+        <span class="scr-bar-title">ÉQUIPE POKÉMON</span>
+        <span class="scr-bar-sub">${party.length} / 6</span>
+      </div>
+      <div class="scr-bar-right">
+        <span class="scr-cap-badge" title="${nextLeader ? `Prochaine Arène : ${nextLeader.name} (max N.${cap + 1})` : 'Toutes les Arènes vaincues'}">
+          NIV. MAX AUTORISÉ : <b>N.${cap}</b>${nextLeader ? ` <i>(${esc(nextLeader.name)})</i>` : ''}
+        </span>
+      </div>`;
+    s.appendChild(hdr);
+
     const grid = el('div', 'pgrid'); s.appendChild(grid);
-    const help = el('div', 'box phelp'); s.appendChild(help);
-    const cancel = el('div', 'pcancel', 'RETOUR'); s.appendChild(cancel);
-    let i = Math.min(o.start || 0, party.length - 1), swapFrom = -1, busy = false;
+    const foot = el('div', 'pfoot');
+    const help = el('div', 'box phelp');
+    const cancel = el('button', 'pcancel', 'RETOUR ✕');
+    cancel.type = 'button';
+    foot.append(help, cancel);
+    s.appendChild(foot);
+
+    let i = Math.min(o.start || 0, Math.max(0, party.length - 1)), swapFrom = -1, busy = false;
+
+    const triggerSlot = async (idx) => {
+      if (busy) return;
+      const n = party.length;
+      if (idx === n) {
+        if (swapFrom >= 0) { swapFrom = -1; ui.sound.sfx('cancel'); draw(); return; }
+        ui.sound.sfx('cancel'); close(-1); return;
+      }
+      if (idx < 0 || idx >= n) return;
+      i = idx;
+      draw();
+      ui.sound.sfx('select');
+      if (swapFrom >= 0) {
+        if (swapFrom !== i) {
+          [party[swapFrom], party[i]] = [party[i], party[swapFrom]];
+          game.save?.(true);
+        }
+        swapFrom = -1;
+        draw();
+        return;
+      }
+      const why = o.filter ? o.filter(party[i], i) : null;
+      if (o.mode === 'pick') {
+        if (why) { ui.sound.sfx('bump'); return; }
+        close(i);
+        return;
+      }
+      busy = true;
+      const opts = o.mode === 'battle' ? ['Envoyer', 'Résumé', 'Annuler'] : ['Résumé', 'Déplacer', 'Annuler'];
+      const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'psub', cancel: opts.length - 1, parent: s });
+      busy = false;
+      const pick = opts[r];
+      if (pick === 'Résumé') { busy = true; i = await summaryScreen(game, party, i); busy = false; }
+      else if (pick === 'Déplacer') swapFrom = i;
+      else if (pick === 'Envoyer') { if (why) { ui.sound.sfx('bump'); await ui.say(why); } else { close(i); return; } }
+      draw();
+    };
+
     const draw = () => {
       grid.innerHTML = '';
       party.forEach((m, k) => {
-        const c = el('div', 'pslot' + (k === 0 ? ' lead' : '') + (m.hp <= 0 ? ' ko' : '') + (k === i ? ' on' : '') + (k === swapFrom ? ' swap' : ''));
+        const isKo = m.hp <= 0;
+        const isCapped = m.lvl >= cap;
+        const r = Math.max(0, Math.min(1, m.hp / m.stats[0]));
+        const expPct = Math.max(0, Math.min(100, expProgress(m, cap) * 100)).toFixed(1);
         const why = o.filter ? o.filter(m, k) : null;
-        c.innerHTML = `${iconImg(m)}<div class="pn">${esc(monName(m))}${gender(m)}</div><div class="pl">N.${m.lvl}</div>${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div>${why ? `<div class="pwhy">${esc(why)}</div>` : ''}`;
+        const spTypes = SPECIES[m.sp]?.t || ['normal'];
+        const typesHtml = spTypes.map((t) => `<span class="pslot-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+        const c = el('div', 'pslot' + (k === 0 ? ' lead' : '') + (isKo ? ' ko' : '') + (k === i ? ' on' : '') + (k === swapFrom ? ' swap' : '') + (why ? ' blocked' : ''));
+        c.dataset.idx = k;
+        c.innerHTML = `
+          <div class="pslot-left">
+            <span class="pslot-idx">${k === 0 ? '★ 1' : '#' + (k + 1)}</span>
+            <div class="pslot-pedestal">
+              <img class="pslot-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+            </div>
+          </div>
+          <div class="pslot-main">
+            <div class="pslot-top">
+              <span class="pn">${esc(monName(m))}${gender(m)}</span>
+              <div class="pslot-tags">
+                ${statusTag(m)}
+                <span class="pl${isCapped ? ' capped' : ''}">N.${m.lvl}${isCapped ? ' <i>MAX</i>' : ''}</span>
+              </div>
+            </div>
+            <div class="pslot-types">${typesHtml}</div>
+            <div class="pslot-hp-row">
+              <div class="hp"><b>PV</b><i><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></i></div>
+              <span class="phpn">${m.hp} / ${m.stats[0]}</span>
+            </div>
+            <div class="pslot-bot-row">
+              <div class="pexp"><b>EXP</b><i><u style="width:${expPct}%"></u></i></div>
+              ${why ? `<span class="pwhy">${esc(why)}</span>` : ''}
+            </div>
+          </div>`;
+        c.addEventListener('mouseenter', () => {
+          if (!busy && i !== k) { i = k; ui.sound.sfx('blip'); draw(); }
+        });
+        c.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerSlot(k);
+        });
         grid.appendChild(c);
       });
-      for (let k = party.length; k < 6; k++) grid.appendChild(el('div', 'pslot empty'));
+      for (let k = party.length; k < 6; k++) {
+        const emp = el('div', 'pslot empty');
+        emp.innerHTML = `<span class="pslot-empty-lbl">EMPLACEMENT VIDE #${k + 1}</span>`;
+        grid.appendChild(emp);
+      }
       cancel.classList.toggle('on', i === party.length);
-      help.textContent = swapFrom >= 0 ? 'Avec quelle créature échanger sa place ?' : o.prompt || 'Choisis une créature.';
+      help.textContent = swapFrom >= 0
+        ? `Échanger la place de ${monName(party[swapFrom])} avec quel Pokémon ?`
+        : o.prompt || 'Sélectionne un Pokémon (Clic ou Entrée · Échap pour quitter).';
     };
+
+    cancel.addEventListener('mouseenter', () => {
+      if (!busy && i !== party.length) { i = party.length; ui.sound.sfx('blip'); draw(); }
+    });
+    cancel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerSlot(party.length);
+    });
+
     draw();
     const close = (v) => { pop(); s.remove(); resolve(v); };
     const pop = ui.input.push(async (k) => {
@@ -61,84 +175,157 @@ export function partyScreen(game, o = {}) {
       else if (k === 'left') i = i === n ? n - 1 : i % 2 ? i - 1 : i;
       else if (k === 'right') i = i !== n && i % 2 === 0 && i + 1 < n ? i + 1 : i;
       else if (k === 'b') { if (swapFrom >= 0) { swapFrom = -1; draw(); return; } ui.sound.sfx('cancel'); close(-1); return; }
-      else if (k === 'a') {
-        if (i === n) { ui.sound.sfx('cancel'); close(-1); return; }
-        ui.sound.sfx('select');
-        if (swapFrom >= 0) { if (swapFrom !== i) { [party[swapFrom], party[i]] = [party[i], party[swapFrom]]; } swapFrom = -1; draw(); return; }
-        const why = o.filter ? o.filter(party[i], i) : null;
-        if (o.mode === 'pick') { if (why) { ui.sound.sfx('bump'); return; } close(i); return; }
-        busy = true;
-        const opts = o.mode === 'battle' ? ['Envoyer', 'Résumé', 'Annuler'] : ['Résumé', 'Déplacer', 'Annuler'];
-        const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'psub', cancel: opts.length - 1, parent: s });
-        busy = false;
-        const pick = opts[r];
-        if (pick === 'Résumé') { busy = true; i = await summaryScreen(game, party, i); busy = false; }
-        else if (pick === 'Déplacer') swapFrom = i;
-        else if (pick === 'Envoyer') { if (why) { ui.sound.sfx('bump'); await ui.say(why); } else { close(i); return; } }
-        draw(); return;
-      } else return;
-      ui.sound.sfx('blip'); draw();
-    });
-  });
-}
-
-/* ================= RÉSUMÉ ================= */
-export function summaryScreen(game, list, idx) {
-  const ui = game.ui;
-  return new Promise((resolve) => {
-    const s = screen(ui, 'sum-scr');
-    let page = 0;
-    const draw = () => {
-      const m = list[idx], S = SPECIES[m.sp];
-      const tabs = ['INFOS', 'STATS', 'ATTAQUES'].map((t, k) => `<span class="${k === page ? 'on' : ''}">${t}</span>`).join('');
-      let body = '';
-      if (page === 0) body = `<table class="kv"><tr><td>N° Pokédex</td><td>${String(m.sp).padStart(3, '0')}</td></tr><tr><td>Nom</td><td>${esc(S.n)}</td></tr><tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr><tr><td>D.O.</td><td>${esc(m.ot || game.state.name)}</td></tr><tr><td>Rencontré</td><td>${esc(m.met || '—')}</td></tr><tr><td>Exp.</td><td>${m.exp.toLocaleString('fr-FR')}</td></tr></table><div class="expline"><b>EXP</b><i><u style="width:${expProgress(m) * 100}%"></u></i></div><div class="dexline">${esc(S.genus || '')}</div>`;
-      else if (page === 1) body = `<table class="kv stats">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td>${k === 0 ? `${m.hp}/${m.stats[0]}` : m.stats[k]}</td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.6)}%"></u></i></td></tr>`).join('')}</table>`;
-      else body = `<div class="moves">${m.moves.map((mv) => { const M = MOVES[mv.id]; return `<div class="mv" style="--tc:${TYPE_COL[M.t]}"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP ${mv.pp}/${M.pp}</span><span class="mvd">${M.c === 'status' ? 'Statut' : `Puiss. ${M.p || '—'}`} · Préc. ${M.a ?? '—'}</span></div>`; }).join('')}</div>`;
-      s.innerHTML = `<div class="sum-left box"><div class="sum-head">${esc(monName(m))}${gender(m)} <span>N.${m.lvl}</span></div><img class="sum-spr" src="${ASSETS.front(m.sp, m.shiny)}" alt="">${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div></div><div class="sum-right box"><div class="tabs">${tabs}</div>${body}</div><div class="sum-help">◀ ▶ pages · ▲ ▼ créature · Échap retour</div>`;
-    };
-    draw();
-    const pop = ui.input.push((k) => {
-      if (k === 'left') page = (page + 2) % 3; else if (k === 'right') page = (page + 1) % 3;
-      else if (k === 'up') idx = (idx - 1 + list.length) % list.length; else if (k === 'down') idx = (idx + 1) % list.length;
-      else if (k === 'b' || k === 'a') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(idx); return; }
+      else if (k === 'a') { await triggerSlot(i); return; }
       else return;
       ui.sound.sfx('blip'); draw();
     });
   });
 }
 
-/* ================= SAC ================= */
+/* ================= RÉSUMÉ (Style 5G Noir 2 / Blanc 2) ================= */
+export function summaryScreen(game, list, idx) {
+  const ui = game.ui;
+  const cap = game.levelCap ? game.levelCap() : levelCap(game.state?.badges);
+  return new Promise((resolve) => {
+    const s = screen(ui, 'sum-scr');
+    let page = 0;
+    const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(idx); };
+    const draw = () => {
+      const m = list[idx], S = SPECIES[m.sp];
+      const isCapped = m.lvl >= cap;
+      const tabs = [
+        ['INFOS DRESSEUR', 'Aperçu'],
+        ['STATISTIQUES', 'Capacités'],
+        ['ATTAQUES CONNUES', `${m.moves.length}/4`],
+      ].map(([t, sub], k) => `<button type="button" class="sum-tab ${k === page ? 'on' : ''}" data-tab="${k}"><b>${t}</b><small>${sub}</small></button>`).join('');
+      let body = '';
+      if (page === 0) {
+        body = `
+          <table class="kv sum-kv">
+            <tr><td>N° Pokédex</td><td>#${String(S.no || m.sp).padStart(3, '0')}</td></tr>
+            <tr><td>Espèce</td><td>${esc(S.n)}</td></tr>
+            <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
+            <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
+            <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
+            <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
+            <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
+          </table>
+          <div class="expline"><b>EXP</b><i><u style="width:${(expProgress(m, cap) * 100).toFixed(1)}%"></u></i></div>
+          <div class="dexline">${esc(S.genus ? S.genus + ' — ' + (S.dex || '') : S.dex || '')}</div>`;
+      } else if (page === 1) {
+        body = `<table class="kv stats sum-kv">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td></tr>`).join('')}</table>`;
+      } else {
+        body = `<div class="moves">${m.moves.map((mv) => {
+          const M = MOVES[mv.id];
+          return `<div class="mv" style="--tc:${TYPE_COL[M.t]}">
+            <div class="mv-top"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP <b>${mv.pp}</b>/${M.pp}</span></div>
+            <div class="mvd">${M.c === 'status' ? 'Catégorie : Statut' : `Puissance : ${M.p || '—'}`} · Précision : ${M.a ?? '—'}%</div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+      s.innerHTML = `
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+            <span class="scr-bar-title">RÉSUMÉ POKÉMON</span>
+            <span class="scr-bar-sub">${idx + 1} / ${list.length}</span>
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-nav-btn" data-act="prev" title="Pokémon précédent (▲)">▲ PRÉC.</button>
+            <button type="button" class="scr-nav-btn" data-act="next" title="Pokémon suivant (▼)">▼ SUIV.</button>
+            <button type="button" class="scr-close-btn" data-act="close">RETOUR ✕</button>
+          </div>
+        </div>
+        <div class="sum-body">
+          <div class="sum-left">
+            <div class="sum-head">
+              <span class="sum-name">${esc(monName(m))}${gender(m)}</span>
+              <span class="sum-lvl">N.${m.lvl}</span>
+            </div>
+            <div class="sum-stage">
+              <img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="">
+            </div>
+            <div class="sum-types-row">${S.t.map(typeTag).join(' ')} ${statusTag(m)}</div>
+            ${hpBar(m)}
+            <div class="phpn">${m.hp} / ${m.stats[0]} PV</div>
+          </div>
+          <div class="sum-right">
+            <div class="tabs">${tabs}</div>
+            <div class="sum-content">${body}</div>
+          </div>
+        </div>
+        <div class="sum-help">◀ ▶ Changer d'onglet · ▲ ▼ Changer de Pokémon · Clic ou Échap pour fermer</div>`;
+
+      s.querySelectorAll('[data-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          page = +btn.dataset.tab;
+          ui.sound.sfx('blip');
+          draw();
+        });
+      });
+      s.querySelector('[data-act="prev"]')?.addEventListener('click', () => {
+        idx = (idx - 1 + list.length) % list.length;
+        ui.sound.sfx('blip');
+        draw();
+      });
+      s.querySelector('[data-act="next"]')?.addEventListener('click', () => {
+        idx = (idx + 1) % list.length;
+        ui.sound.sfx('blip');
+        draw();
+      });
+      s.querySelector('[data-act="close"]')?.addEventListener('click', close);
+    };
+    draw();
+    const pop = ui.input.push((k) => {
+      if (k === 'left') page = (page + 2) % 3;
+      else if (k === 'right') page = (page + 1) % 3;
+      else if (k === 'up') idx = (idx - 1 + list.length) % list.length;
+      else if (k === 'down') idx = (idx + 1) % list.length;
+      else if (k === 'b' || k === 'a') { close(); return; }
+      else return;
+      ui.sound.sfx('blip'); draw();
+    });
+  });
+}
+
+/* ================= SAC (Style 5G Noir 2 / Blanc 2) ================= */
+const POCKET_DESC = [
+  'Potions, rappels et remèdes pour restaurer les PV et le statut.',
+  'Poké Balls pour capturer les créatures sauvages.',
+  'Pierres d\'évolution, Repousses, Super Bonbons et objets utiles.',
+  'Capsules Secrètes (CS), Carte et reliques précieuses.',
+];
 /** renvoie { item } choisi pour « Utiliser », ou null */
 export function bagScreen(game, o = {}) {
   const ui = game.ui, bag = game.state.bag;
   return new Promise((resolve) => {
     const s = screen(ui, 'bag-scr');
     let pocket = o.pocket || 0, i = 0, busy = false;
-    const entries = () => Object.keys(bag).filter((k) => ITEMS[k] && ITEMS[k].pocket === POCKETS[pocket][0] && bag[k] > 0).sort((a, b) => Object.keys(ITEMS).indexOf(a) - Object.keys(ITEMS).indexOf(b));
-    const draw = () => {
-      const es = entries(); if (i > es.length) i = es.length;
-      const sel = es[i];
-      s.innerHTML = `<div class="bag-left"><div class="bag-pic box"><div class="bag-icon b${pocket}"></div><div class="bag-pocket">◀ ${POCKETS[pocket][1]} ▶</div></div><div class="box bag-desc">${sel ? `<img class="itm-big" src="${ASSETS.item(sel)}" alt="">` + esc(ITEMS[sel].desc) : 'Fermer le Sac.'}</div></div><div class="box bag-list"><div class="list-items">${es.map((k, n) => `<div class="list-row ${n === i ? 'on' : ''}"><span class="cur">▶</span><img class="itm" src="${ASSETS.item(k)}" alt=""><span class="lbl">${esc(itemName(k))}</span><span class="rgt">× ${bag[k]}</span></div>`).join('')}<div class="list-row ${i === es.length ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">FERMER</span></div></div></div>`;
-      s.querySelector('.list-row.on')?.scrollIntoView({ block: 'nearest' });
-    };
-    draw();
+    const entriesFor = (p) => Object.keys(bag).filter((k) => ITEMS[k] && ITEMS[k].pocket === POCKETS[p][0] && bag[k] > 0).sort((a, b) => Object.keys(ITEMS).indexOf(a) - Object.keys(ITEMS).indexOf(b));
+    const entries = () => entriesFor(pocket);
+
     const close = (v) => { pop(); s.remove(); resolve(v); };
-    const pop = ui.input.push(async (k) => {
+
+    const triggerRow = async (idx) => {
       if (busy) return;
       const es = entries();
-      if (k === 'left' || k === 'right') { pocket = (pocket + (k === 'left' ? POCKETS.length - 1 : 1)) % POCKETS.length; i = 0; ui.sound.sfx('blip'); draw(); return; }
-      if (k === 'up') { i = (i - 1 + es.length + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
-      if (k === 'down') { i = (i + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
-      if (k === 'b') { ui.sound.sfx('cancel'); close(null); return; }
-      if (k !== 'a') return;
-      if (i === es.length) { ui.sound.sfx('cancel'); close(null); return; }
+      if (idx === es.length) { ui.sound.sfx('cancel'); close(null); return; }
+      if (idx < 0 || idx > es.length) return;
+      i = idx;
+      draw();
       ui.sound.sfx('select');
       const item = es[i], it = ITEMS[item];
-      // les objets rares ne se jettent pas ; seuls ceux qui ont un usage hors combat s'utilisent
       const opts = o.battle ? ['Utiliser', 'Annuler'] : it.key ? ['Utiliser', 'Annuler'] : ['Utiliser', 'Jeter', 'Annuler'];
       busy = true;
-      const r = await ui.list({ items: opts.map((label) => ({ label, disabled: label === 'Utiliser' && (o.battle ? !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) : it.key && !it.field && item !== 'town-map') })), cls: 'psub', cancel: opts.length - 1, parent: s });
+      const r = await ui.list({
+        items: opts.map((label) => ({
+          label,
+          disabled: label === 'Utiliser' && (o.battle ? !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) : it.key && !it.field && item !== 'town-map'),
+        })),
+        cls: 'psub',
+        cancel: opts.length - 1,
+        parent: s,
+      });
       busy = false;
       if (opts[r] === 'Utiliser') { close({ item }); return; }
       if (opts[r] === 'Jeter') {
@@ -148,6 +335,109 @@ export function bagScreen(game, o = {}) {
         busy = false;
       }
       draw();
+    };
+
+    const draw = () => {
+      const es = entries();
+      if (i > es.length) i = es.length;
+      const sel = es[i];
+      const tabsHtml = POCKETS.map(([, label], idx) => {
+        const cnt = entriesFor(idx).length;
+        return `<button type="button" class="bag-tab ${idx === pocket ? 'on' : ''}" data-pocket="${idx}">
+          <span class="bag-tab-dot b${idx}"></span>
+          <span class="bag-tab-lbl">${esc(label)}</span>
+          <span class="bag-tab-cnt">${cnt}</span>
+        </button>`;
+      }).join('');
+
+      s.innerHTML = `
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/bag.png" alt="">
+            <span class="scr-bar-title">SAC D'OBJETS</span>
+            <span class="scr-bar-sub">${esc(POCKETS[pocket][1].toUpperCase())}</span>
+          </div>
+          <div class="scr-bar-right">
+            <span class="scr-money-pill"><img src="img/hud/coin.png" alt=""> ${(game.state?.money || 0).toLocaleString('fr-FR')} ₽</span>
+            <button type="button" class="scr-close-btn" data-act="close">FERMER ✕</button>
+          </div>
+        </div>
+        <div class="bag-tabs">${tabsHtml}</div>
+        <div class="bag-body">
+          <div class="bag-left">
+            <div class="bag-pic">
+              <div class="bag-icon-stage">
+                <div class="bag-icon b${pocket}"></div>
+              </div>
+              <div class="bag-pocket-title">◀ ${esc(POCKETS[pocket][1])} ▶</div>
+              <div class="bag-pocket-sub">${esc(POCKET_DESC[pocket] || '')}</div>
+            </div>
+            <div class="bag-desc">
+              ${sel ? `
+                <div class="bag-desc-top">
+                  <div class="itm-big-wrap"><img class="itm-big" src="${ASSETS.item(sel)}" alt=""></div>
+                  <div class="bag-desc-meta">
+                    <div class="bag-desc-name">${esc(itemName(sel))}</div>
+                    <div class="bag-desc-qty">${ITEMS[sel].key ? 'Objet rare' : `En sac : × ${bag[sel]}`}</div>
+                  </div>
+                </div>
+                <div class="bag-desc-txt">${esc(ITEMS[sel].desc)}</div>
+              ` : `
+                <div class="bag-desc-empty">Fermer le Sac et revenir à l'aventure.</div>
+              `}
+            </div>
+          </div>
+          <div class="bag-list">
+            <div class="list-items">
+              ${es.length === 0 ? `<div class="bag-empty-msg">Cette poche est vide pour le moment.</div>` : ''}
+              ${es.map((k, n) => `
+                <div class="list-row bag-row ${n === i ? 'on' : ''}" data-row="${n}">
+                  <span class="cur">▶</span>
+                  <img class="itm" src="${ASSETS.item(k)}" alt="">
+                  <span class="lbl">${esc(itemName(k))}</span>
+                  <span class="rgt">${ITEMS[k].key ? 'CLÉ' : '× ' + bag[k]}</span>
+                </div>`).join('')}
+              <div class="list-row bag-row bag-close-row ${i === es.length ? 'on' : ''}" data-row="${es.length}">
+                <span class="cur">▶</span>
+                <span class="lbl">FERMER LE SAC</span>
+                <span class="rgt">Échap</span>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      s.querySelector('.list-row.on')?.scrollIntoView({ block: 'nearest' });
+      s.querySelector('[data-act="close"]')?.addEventListener('click', () => { ui.sound.sfx('cancel'); close(null); });
+      s.querySelectorAll('[data-pocket]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (busy) return;
+          pocket = +btn.dataset.pocket;
+          i = 0;
+          ui.sound.sfx('blip');
+          draw();
+        });
+      });
+      s.querySelectorAll('[data-row]').forEach((row) => {
+        const idx = +row.dataset.row;
+        row.addEventListener('mouseenter', () => {
+          if (!busy && i !== idx) { i = idx; ui.sound.sfx('blip'); draw(); }
+        });
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerRow(idx);
+        });
+      });
+    };
+    draw();
+    const pop = ui.input.push(async (k) => {
+      if (busy) return;
+      const es = entries();
+      if (k === 'left' || k === 'right') { pocket = (pocket + (k === 'left' ? POCKETS.length - 1 : 1)) % POCKETS.length; i = 0; ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'up') { i = (i - 1 + es.length + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'down') { i = (i + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'b') { ui.sound.sfx('cancel'); close(null); return; }
+      if (k !== 'a') return;
+      await triggerRow(i);
     });
   });
 }
@@ -287,29 +577,146 @@ function drawRegion(game, cv) {
 }
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
+  const allTowns = Object.values(towns);
+  const visited = new Set(st.visited || []);
   return new Promise((resolve) => {
-    const s = screen(ui, 'map-scr', 'CARTE DE LA RÉGION');
+    const s = screen(ui, 'map-scr');
     const p = game.worldPos();
-    const wrap = el('div', 'map-wrap'); wrap.style.aspectRatio = `${W.w} / ${W.h}`; s.appendChild(wrap);
-    const c = el('canvas', 'mapcv'); c.width = W.w; c.height = W.h; wrap.appendChild(c);
-    const draw = () => drawRegion(game, c);
-    draw(); Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
-    const lab = el('div', 'map-labels'); wrap.appendChild(lab);
-    const me = el('div', 'map-me'); me.style.left = (p.x / W.w * 100) + '%'; me.style.top = (p.y / W.h * 100) + '%'; lab.appendChild(me);
-    // curseur : flèches gauche / droite pour passer d'une ville visitée à l'autre, comme sur le Pokégear
-    const visited = new Set(st.visited || []);
     const near = () => { let best = null, bd = 1e9; for (const r of game.world.routes || []) for (const [x, y] of r.pts) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = r.name; } } return best; };
     const here = game.mapObj === W && !W.zoneAt(p.x, p.y)?.name ? near() || game.locationName() : game.locationName();
-    const spots = [{ name: here, x: p.x, y: p.y }].concat(Object.values(towns).filter((t) => visited.has(t.id)).map((t) => ({ name: t.name, x: t.x + t.w / 2, y: t.y + t.h / 2 })));
-    const cur = el('div', 'map-cur'); lab.appendChild(cur);
-    const where = el('div', 'box map-where', ''); s.appendChild(where);
+
+    const spots = [{
+      name: here,
+      x: p.x,
+      y: p.y,
+      sub: 'Position actuelle du dresseur',
+      tag: 'VOUS ÊTES ICI',
+      tagCls: 'here',
+    }].concat(
+      allTowns.filter((t) => visited.has(t.id)).map((t) => {
+        const gIdx = t.gym;
+        const hasGym = gIdx != null && LEADERS[gIdx];
+        const gotBadge = hasGym && st.badges?.[gIdx];
+        const leader = hasGym ? LEADERS[gIdx] : null;
+        const badge = hasGym ? BADGES[gIdx] : null;
+        const capLvl = hasGym ? GYM_CAPS[gIdx] : null;
+        return {
+          id: t.id,
+          name: t.name,
+          x: t.x + t.w / 2,
+          y: t.y + t.h / 2,
+          sub: hasGym
+            ? `Arène #${gIdx + 1} : ${leader.name} (${TYPE_FR[leader.type] || leader.type}) · ${gotBadge ? badge.name + ' obtenu ✓' : `Limite av. Arène : N.${capLvl}`}`
+            : t.id === 'plateau'
+              ? 'Siège du Conseil des 4 et du Maître de la Ligue'
+              : 'Ville visitée · Centre Pokémon disponible',
+          tag: hasGym ? (gotBadge ? 'BADGE OBTENU ✓' : `ARÈNE #${gIdx + 1} (CAP N.${capLvl})`) : t.id === 'plateau' ? 'LIGUE POKÉMON' : 'VILLE VISITÉE',
+          tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : 'town',
+        };
+      })
+    );
+
+    s.innerHTML = `
+      <div class="scr-bar">
+        <div class="scr-bar-left">
+          <img class="scr-bar-ico" src="img/hud/map.png" alt="">
+          <span class="scr-bar-title">CARTE DE LA RÉGION D'ODYSSÉE</span>
+          <span class="scr-bar-sub">${visited.size} / ${allTowns.length} VILLES</span>
+        </div>
+        <div class="scr-bar-right">
+          <span class="scr-cap-badge">NIV. MAX ACTUEL : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
+          <button type="button" class="scr-close-btn" data-act="close">FERMER ✕</button>
+        </div>
+      </div>
+      <div class="map-stage">
+        <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
+          <canvas class="mapcv" width="${W.w}" height="${W.h}"></canvas>
+          <div class="map-labels"></div>
+          <div class="map-corner tl"></div><div class="map-corner tr"></div>
+          <div class="map-corner bl"></div><div class="map-corner br"></div>
+        </div>
+      </div>
+      <div class="map-footer">
+        <button type="button" class="map-nav-btn" data-act="prev" title="Lieu précédent (◀)">◀</button>
+        <div class="map-info">
+          <div class="map-info-top">
+            <span class="map-where"></span>
+            <span class="map-tag"></span>
+          </div>
+          <div class="map-sub"></div>
+        </div>
+        <button type="button" class="map-nav-btn" data-act="next" title="Lieu suivant (▶)">▶</button>
+        <div class="map-legend">
+          <span><i class="lg-dot me"></i> Vous</span>
+          <span><i class="lg-dot town"></i> Ville</span>
+          <span><i class="lg-dot gym"></i> Arène</span>
+        </div>
+      </div>`;
+
+    const c = s.querySelector('.mapcv');
+    const lab = s.querySelector('.map-labels');
+    const whereEl = s.querySelector('.map-where');
+    const tagEl = s.querySelector('.map-tag');
+    const subEl = s.querySelector('.map-sub');
+
+    const draw = () => drawRegion(game, c);
+    draw();
+    Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+
+    const me = el('div', 'map-me');
+    me.style.left = (p.x / W.w * 100) + '%';
+    me.style.top = (p.y / W.h * 100) + '%';
+    lab.appendChild(me);
+
+    // Interactive town pins on the map
+    spots.forEach((sp, idx) => {
+      if (idx === 0) return;
+      const pin = el('button', 'map-pin ' + (sp.tagCls || ''));
+      pin.type = 'button';
+      pin.style.left = (sp.x / W.w * 100) + '%';
+      pin.style.top = (sp.y / W.h * 100) + '%';
+      pin.title = sp.name;
+      pin.addEventListener('click', (e) => {
+        e.stopPropagation();
+        k = idx;
+        ui.sound.sfx('blip');
+        show();
+      });
+      lab.appendChild(pin);
+    });
+
+    const cur = el('div', 'map-cur');
+    lab.appendChild(cur);
+
     let k = 0;
-    const show = () => { const q = spots[k]; cur.style.left = (q.x / W.w * 100) + '%'; cur.style.top = (q.y / W.h * 100) + '%'; where.textContent = q.name; };
+    const show = () => {
+      const q = spots[k];
+      cur.style.left = (q.x / W.w * 100) + '%';
+      cur.style.top = (q.y / W.h * 100) + '%';
+      whereEl.textContent = q.name;
+      tagEl.textContent = q.tag || '';
+      tagEl.className = 'map-tag ' + (q.tagCls || '');
+      subEl.textContent = q.sub || '';
+    };
     show();
+
+    const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); };
+    s.querySelector('[data-act="close"]')?.addEventListener('click', close);
+    s.querySelector('[data-act="prev"]')?.addEventListener('click', () => {
+      k = (k + spots.length - 1) % spots.length;
+      ui.sound.sfx('blip');
+      show();
+    });
+    s.querySelector('[data-act="next"]')?.addEventListener('click', () => {
+      k = (k + 1) % spots.length;
+      ui.sound.sfx('blip');
+      show();
+    });
+
     const pop = ui.input.push((key) => {
       if (key === 'left' || key === 'up') { k = (k + spots.length - 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
       if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
-      if (key === 'a' || key === 'b' || key === 'map') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); }
+      if (key === 'a' || key === 'b' || key === 'map') close();
     });
   });
 }

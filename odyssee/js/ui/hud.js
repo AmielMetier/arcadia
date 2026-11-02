@@ -158,7 +158,7 @@ export class Hud {
           const isKo = m.hp <= 0;
           const isSwap = k === this.swapFrom;
           const r = Math.max(0, Math.min(1, m.hp / m.stats[0]));
-          const expPct = Math.max(0, Math.min(100, expProgress(m) * 100)).toFixed(1);
+          const expPct = Math.max(0, Math.min(100, expProgress(m, g.levelCap()) * 100)).toFixed(1);
           const cls =
             'hud-slot' +
             (isLead ? ' lead' : '') +
@@ -208,6 +208,9 @@ export class Hud {
           <div class="hud-stat-item">
             <img class="hud-stat-ico" src="img/hud/trophy.png" alt="">
             <span class="hud-badge-cnt">${bCount}/8</span>
+          </div>
+          <div class="hud-stat-item hud-cap-pill" title="Niveau max autorisé avant la prochaine Arène">
+            <span>MAX N.${g.levelCap()}</span>
           </div>
         </div>
         <div class="hud-bdots-row" data-act="card" title="Badges d'Arène">${badgeDots}</div>

@@ -42,6 +42,7 @@ export class Battle {
     this.result = null;
     this.ev = [];
     this.turn = 0;
+    this.cap = o.cap || 100;
     this.dex = o.dex || null; // { seen: Set } facultatif
     this.prizeMoney = 0;
     this.levelUps = new Set();
@@ -595,9 +596,13 @@ export class Battle {
       const idx = party.indexOf(m);
       gainEffort(m, foe.sp);
       if (m.lvl >= 100) continue;
+      if (m.lvl >= this.cap) {
+        this.say(`${monName(m)} a atteint la limite de niveau actuelle (N.${this.cap}) !`);
+        continue;
+      }
       const amount = Math.max(1, base);
       const lv0 = m.lvl, p0 = this.expFrac(m);
-      const steps = gainExp(m, amount);
+      const steps = gainExp(m, amount, this.cap);
       this.say(`${monName(m)} gagne ${amount} points d'Exp. !`);
       this.ev.push({ t: 'exp', idx, from: p0, lv0, to: this.expFrac(m), lv: m.lvl, active: idx === this.sides[0].active });
       for (const st of steps) {
@@ -607,9 +612,12 @@ export class Battle {
         for (const id of st.learned) { this.ev.push({ t: 'sfx', k: 'learn' }); this.say(`${monName(m)} apprend ${MOVES[id].n} !`); }
         for (const id of st.ask) this.ev.push({ t: 'ask-learn', idx, move: id });
       }
+      if (m.lvl >= this.cap && steps.length) {
+        this.say(`${monName(m)} atteint la limite de niveau actuelle (N.${this.cap}) !`);
+      }
     }
   }
-  expFrac(m) { return expProgress(m); }
+  expFrac(m) { return expProgress(m, this.cap); }
 
   winBattle() {
     const t = this.sides[1].trainer;

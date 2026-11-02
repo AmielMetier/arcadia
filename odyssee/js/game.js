@@ -1,7 +1,7 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
 // Surf, Éclate-Roc, Vol), menus, histoire (les huit arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
-import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase } from './core/mon.js';
+import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js';
 import { SPECIES } from './data/species.js';
@@ -157,6 +157,7 @@ export class Game {
   /** un passage gardé est fermé tant qu'il manque des badges, ou tant qu'un drapeau d'histoire n'est pas levé */
   gateClosed(g) { if (g.open) return !g.open(this.state.flags, this); return g.flag ? !this.state.flags[g.flag] : this.badgeCount() < g.badges; }
   badgeCount() { return this.state.badges.filter(Boolean).length; }
+  levelCap() { return levelCap(this.state?.badges); }
   worldPos() {
     if (this.mapObj.id === 'monde') return { x: this.player.x, y: this.player.y };
     // carte annexe (lac, forêt…) ou intérieur d'une carte annexe : on remonte jusqu'à l'entrée sur la grande carte
@@ -704,12 +705,13 @@ export class Game {
         await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue;
       }
       if (!st.party.length) { await this.ui.say('Tu n\'as encore aucune créature.'); continue; }
-      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m) ? null : 'Pas d\'effet') });
+      const cap = this.levelCap();
+      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
       if (target < 0) continue;
       const m = st.party[target];
       if (it.stone) { this.take(r.item); await this.evolveScene(m, itemEvolution(m, r.item)); return true; }
       if (it.candy) {
-        this.take(r.item); const steps = useCandy(m); this.sound.sfx('levelup');
+        this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
         for (const s of steps) { for (const id of s.learned) await this.ui.say(`${monName(m)} apprend ${MOVES[id].n} !`); for (const id of s.ask) await this.askLearn(m, id); }
         const to = levelEvolution(m); if (to) await this.evolveScene(m, to);
@@ -864,7 +866,7 @@ export class Game {
     const curtain = await this.encounterIntro(kind);
     const m = this.mapObj, z = this.zone;
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : z?.town === 'azur' || z?.town === 'granit' || z?.name === 'Cap des Étoiles' ? 'water' : 'grass';
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer } });
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap() });
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
     curtain.remove();

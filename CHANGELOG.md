@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.59 — 2 novembre 2026
+- **Odyssée** — interfaces 5G (*Noir 2 / Blanc 2*) pour l'Équipe, le Sac et la Carte, limite de niveau d'Arène et restrictions d'échanges :
+  - **Limite de niveau d'Arène (Level Cap)** : vos créatures ne peuvent plus dépasser le niveau maximal du Champion de l'Arène suivante moins 1 (N.13 avant Hector, N.21 avant Marine, N.28 avant Volta, N.33 avant Flora, N.38 avant Sibylle, N.43 avant Basalte, N.48 avant Pyros, N.55 avant Drakos, puis N.100). L'expérience s'arrête au plafond et les Super Bonbons indiquent la limite.
+  - **Échanges entre joueurs encadrés** : les échanges nécessitent désormais d'avoir décroché le 4e Badge (Badge Pétale de Floralia), et il est interdit de proposer ou recevoir un Pokémon dont le niveau dépasse la limite actuelle de l'un des deux dresseurs.
+  - **Correction du pas involontaire** : le personnage n'avance plus tout seul d'un pas en quittant un combat si les flèches du menu ont été pressées.
+  - **Écrans Équipe & Résumé 5G** : 6 capsules tactiles biseautées avec types, genre, PV numériques, barres d'EXP et de PV segmentées, badge du Pokémon de tête, vue détaillée du Résumé avec onglets interactifs et raccourcis précédent / suivant.
+  - **Écran Sac 5G** : 4 poches illustrées avec compteurs d'objets (Soins, Balls, Objets, Objets rares), aperçu graphique grand format, descriptifs complets et sélection fluide au clic ou au clavier.
+  - **Écran Carte de la région 5G** : atlas Pokégear façon C-Gear avec balises de villes cliquables, suivi de l'avancée des Arènes / Badges et rappel de la limite de niveau active.
+
 ## 3.58 — 2 novembre 2026
 - **Site Noir** — on comprend quoi faire, on entend tout, et le monstre fait enfin peur.
   - On sait toujours quoi faire : l'objectif, une flèche qui suit les couloirs et la distance à pied s'affichent en haut de l'écran, les étapes aussi. Des bandes de couleur au sol et des panneaux mènent au badge, à la clé, au générateur et à l'ascenseur, et les meubles à fouiller accrochent un reflet.
