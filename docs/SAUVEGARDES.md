@@ -34,3 +34,15 @@ Corps en `text/plain` contenant du JSON (pas de requête préalable CORS) :
 | `POST /save/odyssee/put` | `{ key, code, meta }` | `{ ok, fid, updated, saved \| queued }` |
 
 Test : `node tools/test-saves.mjs` (fausse API GitHub, aucun jeton réel).
+
+
+## Comptes Arcadia (identifiant + mot de passe)
+
+Le même jeton GitHub sert aux comptes (`server/accounts.js`) : rien de plus à configurer, il suffit que Render ait redéployé le relais.
+Vérification : `https://duo-drift-relay.onrender.com/account/status` doit répondre `{"ok":true,"on":true}`.
+
+- Les comptes sont rangés dans la branche `saves`, dossier `accounts/`, un fichier par compte dont le nom est une empreinte de l'identifiant.
+- Le mot de passe ne quitte jamais le navigateur (`hub/account.js`) : il en tire une clé d'accès (dont le serveur ne garde qu'une empreinte scrypt)
+  et une clé de chiffrement AES-GCM qui reste dans le navigateur. Le fichier ne contient que du chiffré : ni pseudo, ni amis, ni clé ami lisibles.
+- 8 mauvais mots de passe en 10 minutes pour un même identifiant et une même adresse : on attend.
+- Mot de passe oublié = compte perdu (personne ne peut déchiffrer). Test : `node tools/test-accounts.mjs`.

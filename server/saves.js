@@ -159,4 +159,4 @@ function handle(req, res, route) {
   return true;
 }
 
-module.exports = { handle, fidOf, _state: { files, pending } };
+module.exports = { handle, fidOf, readFile, queueWrite, ensureBranch, enabled: () => !!TOKEN, _state: { files, pending } };

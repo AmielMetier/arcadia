@@ -19,9 +19,9 @@ button{font:inherit;color:inherit}
 .tag{color:#c9c0ad;font-weight:600;margin:10px 0 0;font-size:16px}
 h2{font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:22px;margin:0 0 12px}
 .lbl{display:block;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;margin:14px 0 6px;color:var(--muted)}
-input[type=text]{width:100%;font:inherit;font-size:18px;font-weight:700;padding:10px 12px;border:3px solid var(--ink);
+input[type=text],input[type=password]{width:100%;font:inherit;font-size:18px;font-weight:700;padding:10px 12px;border:3px solid var(--ink);
   border-radius:10px;background:#fff;color:var(--ink);outline:none}
-input[type=text]:focus{box-shadow:0 0 0 3px var(--yellow)}
+input[type=text]:focus,input[type=password]:focus{box-shadow:0 0 0 3px var(--yellow)}
 .btn{font-family:Bungee,Impact,sans-serif;font-size:16px;letter-spacing:.5px;background:var(--red);color:#fff;
   border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);border-radius:11px;padding:11px 16px;cursor:pointer;
   transition:transform .06s,box-shadow .06s;white-space:nowrap}
@@ -293,7 +293,8 @@ span.addf{border-style:dashed;color:var(--muted);cursor:default}
 .filters button.on{background:var(--yellow);color:var(--ink);border-color:var(--ink)}
 .game .cv{position:relative;background:linear-gradient(135deg,var(--acc,#2b8cff),#0b0d12 130%)}
 .game .cv .ph{position:absolute;inset:0;display:grid;place-items:center;font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:clamp(18px,2.2vw,26px);color:rgba(255,255,255,.9);text-shadow:0 3px 0 rgba(0,0,0,.35);text-align:center;padding:10px}
-.game .cv img{position:relative;opacity:0;transition:opacity .35s ease,transform .3s ease}
+.game .cv img{position:relative;transition:opacity .35s ease,transform .3s ease}
+.game .cv img[onload]:not(.in){opacity:0}
 .game .cv img.in{opacity:1}
 .game.pick{cursor:pointer}
 .game.pick:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 #000}
@@ -504,3 +505,4 @@ body:not(:has(#play.on)) .atab{display:none}
   .sp-txt{flex:1 0 auto;overflow:visible}
   .side>.friends{flex:1}
 }
+#pwBox{margin-top:12px}.ntov .nt input{margin-bottom:8px}

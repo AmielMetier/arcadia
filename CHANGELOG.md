@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.61 — 2 novembre 2026
+- **Arcadia** — Les images des jeux s'affichent de nouveau dans la liste des jeux et dans le salon.
+- **Arcadia** — Les comptes ont maintenant un mot de passe.
+  - À la création, tu choisis un mot de passe : ton compte (pseudo, couleur, code ami, amis) est sauvegardé en ligne et tu peux t'y connecter sur n'importe quel appareil avec « J'ai déjà un compte : me connecter ».
+  - Tout est chiffré dans ton navigateur avant de partir : le serveur ne reçoit jamais ton mot de passe et ne peut pas lire ton profil. Attention, un mot de passe oublié ne peut pas être récupéré.
+  - Tu as déjà un compte ? Ouvre « Modifier » puis « 🔐 Protéger mon compte par mot de passe ».
+  - Chaque changement (pseudo, couleur, amis) est sauvegardé tout seul.
+
 ## 3.60 — 2 novembre 2026
 - **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.
   - Produits financiers, mathématiques financières, économie et marchés : options, obligations, swaps, grecques, Itô, Vasicek, VaR, BCE, QE, courbe des taux. Les chiffres d'actualité sont datés.

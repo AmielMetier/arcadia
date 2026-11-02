@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '3.60';
+  const VERSION = '3.61';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -36,7 +36,7 @@
   function gameCard(g, { el = 'div', cls = '', attrs = '', extra = '' } = {}) {
     const bots = g.bots || (g.settings || []).some((s) => s.key === 'bots');
     return `<${el} class="game${cls}" ${attrs}>
-      <span class="cv"><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async"></span>
+      <span class="cv" style="--acc:${esc(g.accent || '#2b8cff')}"><b class="ph">${esc(g.title)}</b><img src="${esc(g.cover)}" alt="${esc(g.title)}" width="960" height="540" loading="lazy" decoding="async" onload="this.classList.add('in')" onerror="this.remove()"></span>
       <span class="tx"><span class="ds">${esc(g.desc)}</span>
         <span class="meta"><span class="chip">👥 ${g.minPlayers} à ${g.maxPlayers} joueurs</span>${bots ? '<span class="chip">🤖 Bots</span>' : ''}</span>${extra}</span></${el}>`;
   }
@@ -48,7 +48,7 @@
     const box = $('#swatches'); box.innerHTML = '';
     for (const c of DDProfile.PALETTE) {
       const b = document.createElement('button'); b.className = 'sw' + (c === me.color ? ' sel' : ''); b.style.background = c;
-      b.setAttribute('aria-label', 'Couleur ' + c); b.onclick = () => { me.color = c; DDProfile.save(me); FR.setMe(profile()); renderSwatches(); renderAccount(); };
+      b.setAttribute('aria-label', 'Couleur ' + c); b.onclick = () => { me.color = c; DDProfile.save(me); FR.setMe(profile()); renderSwatches(); renderAccount(); scheduleSync(); };
       box.appendChild(b);
     }
   }
@@ -68,19 +68,60 @@
   function renderAccount() {
     $('#acct').hidden = !registered; $('#regHead').hidden = registered; $('#regActions').hidden = registered; $('#playActions').hidden = !registered;
     $('#profileEdit').hidden = registered && !editing; $('#acctTools').hidden = !registered;
+    const sess = HubAccount.session();
+    $('#pwBox').hidden = registered; $('#btnCloud').hidden = !!sess;
+    $('#acctSub').textContent = sess ? `Compte en ligne · ${sess.user}` : 'Compte enregistré sur ce navigateur';
     $('#acctName').textContent = DDRoom.cleanName(me.name); $('#acctDot').style.background = me.color;
     $('#btnProfile').textContent = editing ? 'OK' : 'Modifier'; $('#btnProfile').setAttribute('aria-expanded', String(editing));
   }
-  function register() {
-    const n = me.name.trim();
+  // profil emporté par le compte en ligne (chiffré avant de partir) : pseudo, couleur, classement, code ami et amis
+  const snapshot = () => ({ v: 1, n: me.name, c: me.color, u: me.uid, fr: FR.backup() });
+  function applySnapshot(d) {
+    if (!d || !d.fr || !FR.restore(d.fr)) return false;
+    DDProfile.set('dd_name', String(d.n || '').slice(0, 12));
+    if (DDProfile.PALETTE.includes(d.c)) DDProfile.set('dd_color', d.c);
+    if (/^[a-z0-9]{6,16}$/.test(String(d.u))) DDProfile.set('dd_uid', d.u);
+    DDProfile.set(ACCT_K, Date.now());
+    return true;
+  }
+  let syncTimer = null, lastSync = '';
+  function scheduleSync() {
+    if (!HubAccount.session()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      const d = snapshot(), k = JSON.stringify(d);
+      if (k === lastSync) return;
+      HubAccount.save(d).then(() => { lastSync = k; }, () => {});
+    }, 3000);
+  }
+  FR.on('change', scheduleSync);
+  const ACCT_ERR = { taken: 'Ce pseudo est déjà pris en ligne : choisis-en un autre, ou connecte-toi.', auth: 'Identifiant ou mot de passe incorrect.',
+    wait: 'Trop d\'essais : réessaie dans quelques minutes.', user: 'Identifiant : 3 à 20 lettres ou chiffres.', decrypt: 'Impossible de déchiffrer ce compte.',
+    off: 'Les comptes en ligne ne sont pas encore disponibles sur le serveur.', net: 'Serveur injoignable : vérifie ta connexion et réessaie.' };
+  const acctErr = (e) => ACCT_ERR[e && e.code] || 'Le serveur n\'a pas répondu, réessaie.';
+  async function register() {
+    const n = me.name.trim(), pass = $('#pass').value;
     if (n.length < 2) { $('#regErr').textContent = 'Choisis un pseudo (2 caractères au moins).'; $('#name').focus(); return; }
+    const user = HubAccount.normUser(n);
+    if (!user) { $('#regErr').textContent = 'Pour le compte en ligne, ton pseudo doit avoir 3 lettres ou chiffres au moins.'; $('#name').focus(); return; }
+    if (pass.length < 6) { $('#regErr').textContent = 'Choisis un mot de passe de 6 caractères au moins.'; $('#pass').focus(); return; }
+    $('#btnRegister').disabled = true; $('#regErr').textContent = 'Création du compte… (le serveur peut mettre 30 s à se réveiller)';
+    DDProfile.save(me);
+    try { await HubAccount.create(user, pass, snapshot()); lastSync = JSON.stringify(snapshot()); }
+    catch (e) {
+      $('#btnRegister').disabled = false;
+      if (!['off', 'net'].includes(e.code) || !confirm(acctErr(e) + "\n\nCréer le compte seulement sur ce navigateur pour l'instant ? (tu pourras le protéger par mot de passe plus tard)")) { $('#regErr').textContent = acctErr(e); return; }
+    }
+    $('#btnRegister').disabled = false; $('#regErr').textContent = ''; $('#pass').value = '';
     registered = true; DDProfile.set(ACCT_K, Date.now()); DDProfile.save(me);
     renderAccount(); FR.start(profile()); renderFriends();
-    toast(`Bienvenue ${DDRoom.cleanName(n)} ! Ton compte est enregistré dans ce navigateur.`, 3500);
+    toast(HubAccount.session() ? `Bienvenue ${DDRoom.cleanName(n)} ! Ton compte est sauvegardé en ligne : identifiant « ${HubAccount.session().user} ».` : `Bienvenue ${DDRoom.cleanName(n)} ! Ton compte est enregistré dans ce navigateur.`, 4500);
     if ($('#joinCode').value.length === 4) $('#btnJoin').click(); // arrivé par un lien d'invitation
   }
   $('#btnRegister').onclick = register;
-  $('#name').addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (!registered) register(); else if (editing) $('#btnProfile').click(); });
+  $('#name').addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (!registered) $('#pass').focus(); else if (editing) $('#btnProfile').click(); });
+  $('#pass').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !registered) register(); });
+  $('#name').addEventListener('change', scheduleSync);
   $('#btnProfile').onclick = () => { editing = !editing; renderAccount(); if (editing) $('#name').focus(); };
   const b64 = {
     enc: (t) => btoa(String.fromCharCode(...new TextEncoder().encode(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
@@ -105,6 +146,24 @@
       .then(() => toast('Code de transfert copié'), () => { ov.querySelector('textarea').select(); toast('Sélectionne le code et copie-le'); });
   };
   $('#btnRestore').onclick = () => {
+    const ov = dialog('Me connecter', `<p class="nthint">Ton identifiant (ton pseudo à la création du compte) et ton mot de passe : tu retrouves ton pseudo, ta couleur, ton code ami, tes amis et tes sauvegardes.</p>
+      <label class="lbl" for="lgUser">Identifiant</label><input type="text" id="lgUser" maxlength="20" autocomplete="username" spellcheck="false">
+      <label class="lbl" for="lgPass">Mot de passe</label><input type="password" id="lgPass" maxlength="64" autocomplete="current-password">
+      <div class="err" id="lgErr"></div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px"><button class="linkbtn" id="lgCode" type="button">J'ai un code de transfert</button><button class="btn" id="lgGo">Me connecter</button></div>`);
+    const u = ov.querySelector('#lgUser'), pw = ov.querySelector('#lgPass'), err = ov.querySelector('#lgErr'), go = ov.querySelector('#lgGo');
+    u.focus();
+    const doLogin = async () => {
+      if (!HubAccount.normUser(u.value)) { err.textContent = ACCT_ERR.user; return; }
+      go.disabled = true; err.textContent = 'Connexion… (le serveur peut mettre 30 s à se réveiller)';
+      try { const d = await HubAccount.login(u.value, pw.value); if (!applySnapshot(d)) throw Object.assign(new Error('decrypt'), { code: 'decrypt' }); location.reload(); }
+      catch (e) { go.disabled = false; err.textContent = acctErr(e); }
+    };
+    go.onclick = doLogin;
+    pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    ov.querySelector('#lgCode').onclick = () => { ov.remove(); openTransferRestore(); };
+  };
+  function openTransferRestore() {
     const ov = dialog("J'ai déjà un compte", `<p class="nthint">Sur ton autre appareil, ouvre « Modifier », puis « 📲 Mon compte sur un autre appareil », copie le code et colle-le ici.</p>
       <textarea class="xfer" rows="4" aria-label="Code de transfert" placeholder="GH1.…"></textarea><div class="err" id="xErr"></div>
       <div class="row" style="justify-content:flex-end"><button class="btn" id="xGo">Récupérer mon compte</button></div>`);
@@ -119,9 +178,30 @@
       DDProfile.set(ACCT_K, Date.now());
       location.reload();
     };
+  }
+  // compte de ce navigateur seulement : le protéger par un mot de passe (il part en ligne, chiffré)
+  $('#btnCloud').onclick = () => {
+    const ov = dialog('Protéger mon compte', `<p class="nthint">Ton compte sera sauvegardé en ligne, chiffré avec ton mot de passe. Tu pourras t'y connecter sur n'importe quel appareil. Attention : un mot de passe oublié ne peut pas être récupéré.</p>
+      <label class="lbl" for="cuUser">Identifiant</label><input type="text" id="cuUser" maxlength="20" spellcheck="false" autocomplete="username" value="${esc(HubAccount.normUser(me.name))}">
+      <label class="lbl" for="cuPass">Mot de passe</label><input type="password" id="cuPass" maxlength="64" autocomplete="new-password" placeholder="6 caractères au moins">
+      <label class="lbl" for="cuPass2">Encore une fois</label><input type="password" id="cuPass2" maxlength="64" autocomplete="new-password">
+      <div class="err" id="cuErr"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="cuGo">Protéger mon compte</button></div>`);
+    const err = ov.querySelector('#cuErr'), go = ov.querySelector('#cuGo');
+    go.onclick = async () => {
+      const user = ov.querySelector('#cuUser').value, p1 = ov.querySelector('#cuPass').value, p2 = ov.querySelector('#cuPass2').value;
+      if (!HubAccount.normUser(user)) { err.textContent = ACCT_ERR.user; return; }
+      if (p1.length < 6) { err.textContent = 'Choisis un mot de passe de 6 caractères au moins.'; return; }
+      if (p1 !== p2) { err.textContent = 'Les deux mots de passe ne sont pas pareils.'; return; }
+      go.disabled = true; err.textContent = 'Envoi… (le serveur peut mettre 30 s à se réveiller)';
+      try { await HubAccount.create(user, p1, snapshot()); lastSync = JSON.stringify(snapshot()); ov.remove(); renderAccount(); toast(`Compte protégé : identifiant « ${HubAccount.session().user} »`, 4000); }
+      catch (e) { go.disabled = false; err.textContent = acctErr(e); }
+    };
   };
   $('#btnLogout').onclick = () => {
-    if (!confirm("Se déconnecter de ce navigateur ?\n\nSans ton code de transfert (📲), ce compte et ta liste d'amis seront perdus ici.")) return;
+    const online = HubAccount.session();
+    if (!confirm(online ? `Se déconnecter de ce navigateur ?\n\nTu pourras te reconnecter avec ton identifiant « ${online.user} » et ton mot de passe.` : "Se déconnecter de ce navigateur ?\n\nSans ton code de transfert (📲), ce compte et ta liste d'amis seront perdus ici.")) return;
+    HubAccount.logout();
     if (room) room.leave();
     FR.forget(); DDProfile.set(ACCT_K, null); DDProfile.set('dd_name', ''); DDProfile.set('dd_uid', null);
     location.reload();
