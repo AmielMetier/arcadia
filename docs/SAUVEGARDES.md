@@ -13,12 +13,12 @@ variables d'environnement. Le jeton n'est jamais envoyé aux navigateurs.
 ## Mise en route (une seule fois)
 
 1. **Jeton GitHub** : github.com → Settings → Developer settings → Personal access tokens → *Fine-grained tokens* → *Generate new token*.
-   - *Repository access* : **Only select repositories** → `AmielMetier/duo-drift`.
+   - *Repository access* : **Only select repositories** → `AmielMetier/arcadia`.
    - *Permissions* → *Repository permissions* → **Contents : Read and write** (rien d'autre).
    - Choisis une date d'expiration (il faudra le renouveler à cette date).
 2. **Render** : service du relais (`duo-drift-relay`) → *Environment* → *Add Environment Variable* :
    - `GITHUB_TOKEN` = le jeton (`github_pat_…`) ;
-   - facultatif : `SAVES_REPO` (par défaut `AmielMetier/duo-drift`), `SAVES_BRANCH` (par défaut `saves`).
+   - facultatif : `SAVES_REPO` (par défaut `AmielMetier/arcadia`), `SAVES_BRANCH` (par défaut `saves`).
 3. Enregistre : Render redéploie le relais. Vérifie : `https://duo-drift-relay.onrender.com/save/status` doit répondre `{"ok":true,"on":true}`.
 
 Tant que `GITHUB_TOKEN` n'est pas défini, le jeu garde la sauvegarde sur l'appareil (et le code de sauvegarde) comme avant.

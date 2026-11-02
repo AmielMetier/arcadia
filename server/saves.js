@@ -8,7 +8,7 @@
 //
 // Configuration (variables d'environnement sur Render) :
 //   GITHUB_TOKEN   jeton GitHub (fine-grained) avec « Contents : Read and write » sur le dépôt — obligatoire
-//   SAVES_REPO     dépôt, par défaut AmielMetier/duo-drift
+//   SAVES_REPO     dépôt, par défaut AmielMetier/arcadia
 //   SAVES_BRANCH   branche, par défaut saves (créée automatiquement si elle n'existe pas)
 //   SAVES_API      adresse de l'API (tests), par défaut https://api.github.com
 //
@@ -19,7 +19,7 @@
 const crypto = require('crypto');
 
 const TOKEN = process.env.GITHUB_TOKEN || '';
-const REPO = process.env.SAVES_REPO || 'AmielMetier/duo-drift';
+const REPO = process.env.SAVES_REPO || 'AmielMetier/arcadia';
 const BRANCH = process.env.SAVES_BRANCH || 'saves';
 const API = (process.env.SAVES_API || 'https://api.github.com').replace(/\/$/, '');
 const GAMES = new Set(['odyssee']);
