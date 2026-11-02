@@ -224,7 +224,7 @@ window.HUB_GAMES = [
     id: 'mollo',
     title: 'Mollo !',
     tag: 'Le dernier debout gagne',
-    desc: 'Bagarre de pantins tout mous au-dessus du vide : cogne, assomme, attrape, soulève et jette tes potes depuis les toits, le chantier ou l\'usine. Tes mains s\'agrippent à tout : rattrape-toi au rebord, hisse-toi, et méfie-toi du boulet.',
+    desc: 'Bagarre de pantins tout mous au-dessus du vide : cogne, assomme, attrape, soulève et jette tes potes depuis six arènes, des toits à l\'incinérateur. Ramasse une poêle ou un pétard, rattrape-toi au rebord, hisse-toi, et méfie-toi des rouleaux à pointes.',
     url: 'mollo/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 pantins avec les bots
     accent: '#ffc531',
@@ -234,6 +234,7 @@ window.HUB_GAMES = [
       { key: 'bots', label: 'Bots', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7']], def: 2 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
       { key: 'hazards', label: 'Pièges du décor', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
+      { key: 'items', label: 'Objets', group: 'Règles maison', options: [[1, 'Oui'], [0, 'Non']], def: 1 },
     ],
     cover: 'mollo/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
@@ -282,7 +283,7 @@ window.HUB_GAME_INFO = {
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
   mollo: { genre: 'party', time: '5–10 min',
-    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter'], ['Échap', 'Menu']],
-    tips: ['Les coups à la tête assomment bien plus vite.', 'Assommé, il ne pèse plus rien : saisis-le, saute pour le soulever, lâche pour le jeter.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.'] },
+    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],
+    tips: ['Les coups à la tête assomment bien plus vite.', 'Assommé, il ne pèse plus rien : saisis-le, saute pour le soulever, lâche pour le jeter.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
 };
 window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];

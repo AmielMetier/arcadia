@@ -5,8 +5,10 @@
   - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.
   - Frappe, arme un gros coup ou place un coup de pied sauté. Les coups à la tête assomment plus vite.
   - Tes mains s'agrippent à tout : attrape un adversaire, traîne-le, soulève-le s'il est sonné et jette-le dans le vide.
-  - En tombant, rattrape-toi à un rebord et hisse-toi. Mais tes bras fatiguent vite.
-  - Trois arènes : les toits et leur planche, le chantier et son boulet, l'usine et ses tapis qui mènent au vide sous un pilon.
+  - En tombant, rattrape-toi à un rebord, garde la prise et saute pour te hisser. Mais tes bras fatiguent vite.
+  - Six arènes : les toits et leur planche, le chantier et son boulet, l'usine et son pilon, les rouleaux à pointes, l'incinérateur et ses trappes, le tri postal et ses tapis.
+  - Des objets peuvent traîner au début de chaque manche : la poêle qui assomme, le pétard qui s'allume dès qu'on le prend, le parapluie pour planer, la peau de banane qui fait glisser.
+  - Pièges et objets se coupent dans les réglages du salon.
   - Jusqu'à 6 joueurs et 8 pantins avec les bots, sur ordinateur, téléphone ou manette.
 
 ## 3.40 — 2 novembre 2026

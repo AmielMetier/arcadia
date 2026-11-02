@@ -47,6 +47,7 @@ export function botThink(sim, b, dt) {
   b.inp = { mx: ai.mx, mz: ai.mz, jump: ai.jump, punch: ai.punch, grab: ai.grab, pc: ai.pc, jc: ai.jc, gc: ai.gc };
 }
 
+function closest(sim, b) { let o = null, bd = 1e9; for (const q of sim.players.values()) { if (q === b || q.st === ST.OUT) continue; const d = Math.hypot(q.p[PN.C].x - b.p[PN.C].x, q.p[PN.C].z - b.p[PN.C].z); if (d < bd) { bd = d; o = q; } } return o; }
 function go(ai, x, z) { const l = Math.hypot(x, z) || 1; ai.mx = Math.round(x / l * 100) / 100; ai.mz = Math.round(z / l * 100) / 100; }
 
 function decide(sim, b, ai, L) {
@@ -55,6 +56,12 @@ function decide(sim, b, ai, L) {
   if (b.st === ST.KO) { ai.mx = ai.mz = 0; ai.grab = false; if (rng.next() < L.react) ai.pc++; return; }
   if (sim.ph === 'count') { ai.mx = ai.mz = 0; ai.grab = false; return; }
   const holdingBox = b.grip.some((q) => q && q.box), holding = b.grip.find((q) => q && q.o);
+  // un objet en main : le pétard et la banane se lancent vite ; en tombant, on lâche tout pour s'accrocher (sauf le parapluie)
+  if (b.item) {
+    const it = b.item;
+    if (!b.grounded && it.k !== 'parapluie') { ai.gc++; ai.grab = true; return; }
+    if (it.k === 'petard' && it.fuse < 1.6) { const o = closest(sim, b); if (o) go(ai, o.p[PN.C].x - pel.x, o.p[PN.C].z - pel.z); ai.gc++; return; }
+  }
   // en l'air ou accroché : les mains d'abord, puis se hisser
   if (holdingBox) { ai.grab = true; ai.jump = true; ai.mx = ai.mz = 0; return; }
   if (!b.grounded) { ai.grab = rng.next() < L.react || ai.grab; const c = A.groundAt(A.x0 / 2 + A.x1 / 2, A.z0 / 2 + A.z1 / 2, 99); void c; go(ai, (A.x0 + A.x1) / 2 - pel.x, (A.z0 + A.z1) / 2 - pel.z); return; }
@@ -78,6 +85,22 @@ function decide(sim, b, ai, L) {
     if (s < ts) { ts = s; tgt = o; }
   }
   const edge = nearestEdge(A, pel.x, b.gy, pel.z);
+  // les pièges d'abord : fuir un rouleau qui arrive vers l'allée, quitter une trappe
+  for (const r of A.rollers) {
+    if (Math.abs(pel.z - r.cz) > r.hz + 0.4 || Math.abs(pel.x - r.x) > r.r + 1.6 + Math.abs(r.vx) * 0.25 * L.react) continue;
+    if (rng.next() < L.react) { go(ai, 0, -Math.sign(pel.z || 1)); return; }
+  }
+  if (b.gbox && b.gbox.door && rng.next() < L.react) { go(ai, pel.x > 0 ? 1 : -1, 0); return; }
+  // ramasser ce qui traîne à côté
+  if (!b.item && ai.wait <= 0) {
+    let best = null, bd = 2.6;
+    for (const it of sim.items) { if (it.holder || it.k === 'banane' || (it.fuse > 0 && it.fuse < 1.2)) continue; const d = Math.hypot(it.x - pel.x, it.z - pel.z); if (d < bd && Math.abs(it.y - pel.y) < 1.2) { bd = d; best = it; } }
+    if (best) { go(ai, best.x - pel.x, best.z - pel.z); if (bd < 1) { ai.gc++; ai.wait = 0.3; } return; }
+  }
+  if (b.item && tgt && (b.item.k === 'petard' || b.item.k === 'banane')) {
+    const dd = Math.hypot(tgt.p[PN.C].x - pel.x, tgt.p[PN.C].z - pel.z);
+    if (dd < 4.5) { go(ai, tgt.p[PN.C].x - pel.x, tgt.p[PN.C].z - pel.z); ai.gc++; ai.wait = 0.3; return; }
+  }
   if (!tgt) { go(ai, (A.x0 + A.x1) / 2 - pel.x, (A.z0 + A.z1) / 2 - pel.z); return; }
   ai.tgt = tgt.id;
   const tp = tgt.p[PN.C], dx = tp.x - pel.x, dz = tp.z - pel.z, d = Math.hypot(dx, dz);

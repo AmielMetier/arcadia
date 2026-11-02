@@ -148,9 +148,10 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
   Des muscles (ressorts vers une pose) tiennent le corps debout ; ils mollissent quand il encaisse et lâchent tout en KO. Coudes et genoux n'existent qu'à l'affichage.
 - Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), saisir (les mains s'accrochent à un corps ou à un rebord),
   soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
-- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon). Des bourrasques après 75 s.
+- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon), Les Rouleaux (rouleaux à pointes), L'Incinérateur (tapis vers des trappes qui s'ouvrent sur le feu), Le Tri Postal (quatre tapis, deux barres qui balaient). Des bourrasques après 75 s.
+- Objets (`ITEMS` dans `mollo/engine/sim.js`) : au début de chaque manche, chacun a sa chance d'apparaître (poêle 60 %, pétard 55 %, parapluie 40 %, peau de banane 60 %), avec une petite chance d'être en double. Un appui sur saisir ramasse, un autre lance.
 - Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
-  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=usine`.
+  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=four`, `?hazards=0`, `?items=0`.
 - Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
 
 ## Pour les développeurs
@@ -166,7 +167,7 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
-  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
+  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes et pièges, objets, collisions, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
   `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous

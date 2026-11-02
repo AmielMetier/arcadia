@@ -81,10 +81,13 @@ export class Pantins {
   knee(id, i, cur) { // lissé : un genou ne saute jamais d'un côté à l'autre d'une image à la suivante
     const key = id * 4 + i; let k = this.knees.get(key);
     if (!k) { k = cur.clone(); this.knees.set(key, k); }
-    k.lerp(cur, 0.55); return k;
+    k.lerp(cur, 0.55);
+    if (this.arena) { const g = this.arena.groundAt(k.x, k.z, k.y + 0.3); if (g && k.y < g.y + 0.09) k.y = g.y + 0.09; } // jamais sous le sol
+    return k;
   }
 
-  draw(players, dt) {
+  draw(players, dt, arena) {
+    this.arena = arena;
     this.t += dt; this.cyl.count = this.ball.count = this.face.count = 0;
     const seen = new Set();
     players.forEach((p, k) => {
