@@ -72,6 +72,7 @@ export class HUD {
   clearTags() { for (const t of this.tags.values()) t.remove(); this.tags.clear(); this.sig = ''; }
 }
 
+const ITEM_LABEL = { poele: 'la poêle 🍳', petard: 'le pétard 🧨 (il s\'allume !)', parapluie: 'le parapluie ☂️', banane: 'la peau de banane 🍌' };
 const K = (mode, k, pad, touch) => (mode === 'touch' ? `<kbd class="t">${touch}</kbd>` : mode === 'pad' ? `<kbd class="p">${pad}</kbd>` : `<kbd>${k}</kbd>`);
 function promptFor(v, me, mode, tips) {
   if (!me || v.ph === 'over' || v.ph === 'round') return '';
@@ -81,12 +82,23 @@ function promptFor(v, me, mode, tips) {
   if (me.st === ST.OUT) return v.ph === 'play' ? '💨 Tu es tombé… regarde les autres se débrouiller' : '';
   if (me.st === ST.KO) return `💫 Assommé ! Martèle ${pu} ou ${ju} pour revenir à toi`;
   const f = me.fl;
+  const mine = (v.items || []).find((i) => i.holder === me.id);
   if (f & FL.LIFTED) return `😱 On te porte ! Martèle ${pu} pour lui faire lâcher prise`;
   if (f & FL.LIFTING) return `💪 Va au bord et lâche ${gr} : tu le jettes`;
-  if (f & FL.HANG) return `🫳 Garde ${gr} et maintiens ${ju} pour te hisser`;
+  if (f & FL.HANG) return `🫳 Garde ${gr} et appuie sur ${ju} pour te hisser`;
   if (f & FL.GRIP) return `✊ Tu le tiens : traîne-le au bord, ou ${ju} pour le soulever s'il est sonné`;
   if (f & FL.HELD) return `😬 On te tient ! Martèle ${pu} pour te dégager`;
+  if (mine) {
+    if (mine.k === 'poele') return `🍳 ${pu} : coup de poêle, ça assomme vite · ${gr} : la lancer`;
+    if (mine.k === 'petard') return `🧨 Ça va péter dans ${Math.ceil(mine.fuse)} s ! ${gr} : le lancer`;
+    if (mine.k === 'parapluie') return f & FL.GROUND ? `☂️ Saute dans le vide : tu planes · ${gr} : le lancer` : `☂️ Tu planes : dirige-toi vers un sol · ${gr} : le lâcher pour t'accrocher`;
+    return `🍌 ${gr} : jette la peau par terre, et qu'ils glissent dessus`;
+  }
   if (!(f & FL.GROUND)) return `✋ Maintiens ${gr} pour attraper un rebord`;
+  if (me.pos) {
+    const near = (v.items || []).find((i) => i.holder < 0 && Math.hypot(i.x - me.pos[3], i.y - me.pos[4], i.z - me.pos[5]) < 1.25);
+    if (near) return `${gr} : ramasser ${ITEM_LABEL[near.k]}`;
+  }
   if (f & FL.CHARGE) return '💥 Lâche pour frapper fort';
   if (me.dz > 0.65) return '😵 Encore un coup et tu t\'endors : éloigne-toi !';
   return tips ? all : '';
@@ -98,6 +110,7 @@ const SEGS = [
   ['bots', 'Bots', [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7']]],
   ['level', 'Niveau des bots', [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']]],
   ['hazards', 'Pièges du décor', [[1, 'Oui'], [0, 'Non']]],
+  ['items', 'Objets', [[1, 'Oui'], [0, 'Non']]],
 ];
 const LEVEL = { facile: 'Facile', normal: 'Moyen', expert: 'Difficile' };
 
@@ -107,18 +120,19 @@ export function briefingHtml({ role, squad, cfg, embedded, bots }) {
     + (bots > 0 ? `<li class="bot"><i></i>${bots} bot${bots > 1 ? 's' : ''} <small>(${LEVEL[cfg.level] || 'Moyen'})</small></li>` : '');
   const segs = !embedded && host ? `<div class="segs">${SEGS.map(([k, label, opts]) => `<div class="seg"><span>${label}</span><div>${opts.map(([v, t]) =>
     `<button data-k="${k}" data-v="${v}" class="${String(cfg[k]) === String(v) ? 'sel' : ''}">${t}</button>`).join('')}</div></div>`).join('')}</div>`
-    : `<p class="rules">Premier à <b>${cfg.goal}</b> manche${cfg.goal > 1 ? 's' : ''} · ${cfg.hazards ? 'avec les pièges du décor' : 'sans pièges'}</p>`;
+    : `<p class="rules">Premier à <b>${cfg.goal}</b> manche${cfg.goal > 1 ? 's' : ''} · ${cfg.hazards ? 'avec les pièges du décor' : 'sans pièges'} · ${cfg.items ? 'avec les objets' : 'sans objets'}</p>`;
   return `<div class="brief">
     <h1 class="logo">MOLLO<span>!</span></h1>
     <p class="sub">Des pantins tout mous, du vide tout autour. Cogne, attrape, porte, jette : le dernier debout gagne la manche.</p>
     <div class="cols">
-      <div><h3>Sur le toit</h3><ul class="squad">${list}</ul>${segs}</div>
+      <div><h3>Les mollassons</h3><ul class="squad">${list}</ul>${segs}</div>
       <div class="ctrl"><h3>Commandes</h3>
         <p><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> marcher · <kbd>Espace</kbd> <b>sauter</b></p>
         <p><kbd>F</kbd> ou clic gauche <b>frapper</b> · maintiens, lâche : <b>gros coup</b> · en pleine course et en l'air : <b>coup de pied sauté</b></p>
         <p><kbd>E</kbd> ou clic droit, <b>maintenu</b> : tes mains s'accrochent à ce qu'elles touchent, un rebord ou un adversaire</p>
         <p>💫 Trop de coups, surtout à la tête : assommé. Tiens-le, <kbd>Espace</kbd> pour le soulever, lâche <kbd>E</kbd> pour le jeter</p>
-        <p>🫳 Accroché à un rebord, garde <kbd>E</kbd> et maintiens <kbd>Espace</kbd> pour te hisser. Tes bras fatiguent vite !</p>
+        <p>🫳 Accroché à un rebord, garde <kbd>E</kbd> et appuie sur <kbd>Espace</kbd> pour te hisser. Tes bras fatiguent vite !</p>
+        <p>🎁 Selon les manches, des objets traînent : <b>poêle</b>, <b>pétard</b>, <b>parapluie</b>, <b>peau de banane</b>. <kbd>E</kbd> pour ramasser, <kbd>E</kbd> pour lancer</p>
         <p class="alt">Manette : stick, Ⓐ sauter, Ⓧ frapper, Ⓑ saisir · Au doigt : joystick à gauche, boutons à droite</p>
       </div>
     </div>

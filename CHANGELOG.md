@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 3.43 — 2 novembre 2026
+- **Mollo !** — Trois nouvelles arènes, des objets à ramasser, et on remonte enfin des rebords.
+  - Accroché à un rebord, garde la prise et saute : ton pantin se hisse jusqu'en haut.
+  - Les Rouleaux : deux rouleaux à pointes vont et viennent. Abrite-toi dans l'allée du milieu ou au bout de la dalle.
+  - L'Incinérateur : les tapis t'emmènent vers des trappes qui s'ouvrent sur le feu. Quand l'alarme sonne, sors de là.
+  - Le Tri Postal : quatre tapis en sens contraires, et deux barres qui balaient tout sur leur passage.
+  - Au début de chaque manche, des objets peuvent traîner : la poêle qui assomme, le pétard qui s'allume dès qu'on le prend, le parapluie pour planer, la peau de banane qui fait glisser.
+  - Un appui sur saisir ramasse l'objet, un autre le lance. Pièges et objets se coupent dans les réglages du salon.
+  - Les mains et les pieds ne traversent plus le décor, et le boulet repousse les corps au lieu de passer à travers.
+
 ## 3.42 — 2 novembre 2026
 - **Poké Duel** — Nouveau format « 2 joueurs contre 2 », à choisir dans les réglages du salon (ligne Format).
   - Les équipes de deux sont tirées au sort, et des bots complètent s'il manque des joueurs.

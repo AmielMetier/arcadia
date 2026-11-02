@@ -2,7 +2,7 @@
 // L'hôte fait tourner la physique à 60 Hz et diffuse l'état 20 fois par seconde ; les invités envoient leurs commandes (30 Hz)
 // et affichent tous les corps ~100 ms en retard, interpolés entre deux états. Pas de prédiction : un pantin physique ne se rejoue pas à bas prix.
 // ?lag=150 simule 150 ms d'aller-retour sur chaque message.
-import { Sim, DT, ST, FL } from './engine/sim.js';
+import { Sim, DT, ST, FL, ITEM_KEYS } from './engine/sim.js';
 import { ARENAS } from './engine/arena.js';
 import { createScene } from './view/scene.js';
 import { Input } from './input.js';
@@ -47,6 +47,7 @@ const SETTINGS = {
     ['Sauter · se hisser · soulever', '<kbd>Espace</kbd>', 'Ⓐ'],
     ['Frapper (maintenir : gros coup) · en l\'air avec de l\'élan : coup de pied sauté', '<kbd>F</kbd> ou <kbd>J</kbd>, clic gauche', 'Ⓧ'],
     ['Saisir un adversaire ou un rebord (maintenir) · lâcher : jeter', '<kbd>E</kbd> ou <kbd>K</kbd>, clic droit', 'Ⓑ'],
+    ['Ramasser un objet · le lancer', 'appui sur <kbd>E</kbd>', 'Ⓑ'],
     ['Assommé : revenir à soi · porté : se dégager', 'marteler <kbd>F</kbd>', 'Ⓧ'],
     ['Pause', '<kbd>Échap</kbd>', 'Start'],
   ] }] }],
@@ -81,6 +82,7 @@ function readCfg(settings = {}) {
     bots: clamp(num(src.bots, H.embedded ? 1 : 3) | 0, 0, MAX_BODIES - 1),
     level: LEVELS.includes(src.level) ? src.level : 'normal',
     hazards: num(src.hazards, 1) ? 1 : 0,
+    items: num(src.items, 1) ? 1 : 0,
   };
 }
 function localProfile() {
@@ -141,7 +143,7 @@ function hideScreen() { screenEl.hidden = true; screenEl.innerHTML = ''; S.menu 
 function startRun() {
   if (S.role === 'guest') return;
   const dbg = QS.has('debug'), seed = dbg && QS.get('seed') ? +QS.get('seed') : (Math.random() * 2 ** 31) | 0;
-  const sim = new Sim({ seed, goal: S.cfg.goal, hazards: !!S.cfg.hazards });
+  const sim = new Sim({ seed, goal: S.cfg.goal, hazards: !!S.cfg.hazards, items: !!S.cfg.items });
   for (const p of squad()) if (p.ready) sim.addPlayer({ id: p.id, name: p.name, color: p.color });
   sim.addBots(Math.max(botCount(), sim.players.size < 2 ? 1 : 0), S.cfg.level); // seul, au moins un adversaire
   sim.start();
@@ -199,7 +201,7 @@ function hostView(sim, f) {
     }
     return { id: b.id, name: b.name, color: b.color, bot: b.bot, me: b.id === S.myId, st: b.st, yaw: b.yaw, dz: b.dz, fl: flagsOf(b), pts: b.pts, kos: b.kos, order: b.order, surv: b.surv, pos };
   });
-  return { ph: sim.ph, pt: sim.pt, rd: sim.rd, rt: sim.rt, at: sim.at, go: sim.goal, rw: sim.rw, win: sim.win, ar: sim.arena.key, hz: sim.hazards ? 1 : 0, gu: sim.gust ? 1 : 0, players, me: players.find((p) => p.me) || null };
+  return { ph: sim.ph, pt: sim.pt, rd: sim.rd, rt: sim.rt, at: sim.at, go: sim.goal, rw: sim.rw, win: sim.win, ar: sim.arena.key, hz: sim.hazards ? 1 : 0, gu: sim.gust ? 1 : 0, players, items: sim.items.map((i) => ({ id: i.id, k: i.k, x: i.x, y: i.y, z: i.z, holder: i.holder ? i.holder.id : -1, fuse: i.fuse })), me: players.find((p) => p.me) || null };
 }
 const flagsOf = (b) => (b.grip[0] ? 1 : 0) | (b.grip[1] ? 2 : 0) | (b.lifting ? FL.LIFTING : 0) | (b.charge > 0.05 ? FL.CHARGE : 0) | (b.kick > 0 ? FL.KICK : 0) | (b.grounded ? FL.GROUND : 0) | (b.liftedBy >= 0 ? FL.LIFTED : 0) | (b.heldBy > 0 ? FL.HELD : 0) | (b.grip.some((q) => q && q.box) ? FL.HANG : 0);
 
@@ -307,7 +309,11 @@ function guestView(a, b, f) {
     }
     return { id: rb[0], name, color, bot: !!bot, me: rb[0] === S.myId, st: rb[1], yaw: lerpA(ra[2], rb[2]), dz: rb[3], fl: rb[4], pts: rb[5], kos: rb[6], order: rb[7], surv: rb[8], pos };
   });
-  return { ph: b.ph, pt: b.pt, rd: b.rd, rt: b.rt, at: a.at + (b.at - a.at) * f, go: b.go, rw: b.rw, win: b.win, ar: b.ar, hz: b.hz, gu: b.gu, players, me: players.find((p) => p.me) || null };
+  return { ph: b.ph, pt: b.pt, rd: b.rd, rt: b.rt, at: a.at + (b.at - a.at) * f, go: b.go, rw: b.rw, win: b.win, ar: b.ar, hz: b.hz, gu: b.gu, players, items: guestItems(a, b, f), me: players.find((p) => p.me) || null };
+}
+function guestItems(a, b, f) {
+  const from = new Map((a.I || []).map((r) => [r[0], r]));
+  return (b.I || []).map((r) => { const q = from.get(r[0]) || r; return { id: r[0], k: ITEM_KEYS[r[1]], x: (q[2] + (r[2] - q[2]) * f) / 100, y: (q[3] + (r[3] - q[3]) * f) / 100, z: (q[4] + (r[4] - q[4]) * f) / 100, holder: r[5], fuse: r[6] / 10 }; });
 }
 
 // ------------------------------------------------------------------ effets, sons, annonces
@@ -325,7 +331,7 @@ function fxEvent(e, v) {
     case 'swing': sfx.play('swing', { k: e.k }); break;
     case 'kick': sfx.play('swing', { k: 1 }); break;
     case 'jump': if (e.id === S.myId) sfx.play('jump'); break;
-    case 'hit': scene && scene.hurt(e.id); fx && fx.hit(e.x, e.y, e.z, e.k); sfx.play(e.head ? 'head' : 'hit', { vol: 0.55 + e.k * 0.5 }); if (mine || e.k > 0.5) hitStop(0.03 + e.k * 0.06); break;
+    case 'hit': scene && scene.hurt(e.id); fx && fx.hit(e.x, e.y, e.z, e.k); sfx.play(e.pan ? 'pan' : e.head ? 'head' : 'hit', { vol: 0.55 + e.k * 0.5 }); if (mine || e.k > 0.5) hitStop(0.03 + e.k * 0.06); break;
     case 'ko': scene && scene.hurt(e.id); fx && fx.ko(e.x, e.y, e.z); sfx.play('ko'); hitStop(0.09); if (e.id === S.myId) hud.toast('Assommé ! Martèle les boutons', 1.8); else if (e.by === S.myId) hud.feed(`Tu assommes ${nameOf(e.id)} 💫`); break;
     case 'wake': if (e.id === S.myId) sfx.play('wake'); break;
     case 'land': fx && fx.dust(e.x, e.y, e.z, e.k); sfx.play('land', { vol: e.k }); break;
@@ -335,8 +341,15 @@ function fxEvent(e, v) {
     case 'climb': if (e.id === S.myId) sfx.play('climb'); break;
     case 'lift': sfx.play('lift'); if (e.who === S.myId) hud.toast('On te soulève ! Martèle pour te dégager', 1.4); break;
     case 'throw': sfx.play('throw'); hud.feed(`${nameOf(e.id)} jette ${nameOf(e.who)} 💪`); break;
-    case 'ball': scene && scene.hurt(e.id); fx && fx.clang(e.x, e.y, e.z); sfx.play('clang'); hitStop(0.08); hud.feed(`Le boulet écrase ${nameOf(e.id)} 🏗️`); break;
+    case 'ball': scene && scene.hurt(e.id); fx && fx.clang(e.x, e.y, e.z); sfx.play('clang'); hitStop(0.08); hud.feed(`${v.ar === 'tri' ? 'La barre balaie' : 'Le boulet écrase'} ${nameOf(e.id)} ${v.ar === 'tri' ? '📦' : '🏗️'}`); break;
     case 'crush': scene && scene.hurt(e.id); fx && fx.clang(e.x, e.y, e.z); sfx.play('crush'); hitStop(0.08); hud.feed(`Le pilon aplatit ${nameOf(e.id)} 🔨`); break;
+    case 'spike': scene && scene.hurt(e.id); fx && fx.spike(e.x, e.y, e.z); sfx.play('spike'); hitStop(0.08); hud.feed(`Le rouleau pique ${nameOf(e.id)} 🦔`); break;
+    case 'burn': fx && fx.burn(e.x, e.y, e.z); sfx.play('burn'); hud.feed(`${nameOf(e.id)} finit au four 🔥`); break;
+    case 'alarm': sfx.play('alarm'); hud.banner('Les trappes s\'ouvrent !<small>Sors de là</small>', 1.5, 'warn'); break;
+    case 'boom': fx && fx.boom(e.x, e.y, e.z); sfx.play('boom'); hitStop(0.1); break;
+    case 'peel': scene && scene.hurt(e.id); fx && fx.peel(e.x, e.y, e.z); sfx.play('peel'); hud.feed(`${nameOf(e.id)} glisse sur une peau de banane 🍌`); break;
+    case 'pick': if (e.id === S.myId) sfx.play('pick'); break;
+    case 'toss': sfx.play('toss'); break;
     case 'sudden': hud.banner('Le vent se lève !<small>Cramponne-toi</small>', 2, 'warn'); sfx.play('gust'); break;
     case 'gust': sfx.play('gust'); break;
     case 'out':
