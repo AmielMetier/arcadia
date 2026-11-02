@@ -29,6 +29,10 @@ export const ST = { LIVE: 0, KO: 1, OUT: 2 };
 export const FL = { GRIP: 3, LIFTING: 4, CHARGE: 8, KICK: 16, GROUND: 32, LIFTED: 64, HELD: 128, HANG: 256 };
 export const BOT_NAMES = ['Gros Mou', 'Flan', 'Guimauve', 'Tofu', 'Nougat', 'Bibendum', 'Patate', 'Marsh'];
 export const BOT_ID = 1000;
+// les objets : chacun a sa chance d'apparaître au début de chaque manche (et une petite chance d'être en double)
+export const ITEMS = { poele: { p: 0.6, r: 0.17 }, petard: { p: 0.55, r: 0.15 }, parapluie: { p: 0.4, r: 0.15 }, banane: { p: 0.6, r: 0.12 } };
+export const ITEM_KEYS = Object.keys(ITEMS);
+export const FUSE_T = 3.4;
 export const COLORS = ['#ff9f1c', '#2ec4b6', '#e71d36', '#7b2ff7', '#8ac926', '#ff70a6', '#3a86ff', '#ffd23f'];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -36,7 +40,7 @@ function mk(x, y, z, r, w) { return { x, y, z, px: x, py: y, pz: z, r, w, on: nu
 function newBody({ id, name, color, bot = false, level = 'normal' }) {
   const p = []; for (let i = 0; i < 7; i++) p.push(mk(0, 1, 0, RADII[i], WEIGHT[i]));
   return { id, name: String(name || '?').slice(0, 12), color, bot: !!bot, level, p, yaw: 0, st: ST.LIVE,
-    m: 1, dip: 0, dz: 0, ko: 0, phase: 0, vault: 0, vx: 0, vz: 0, grip: [null, null], gripT: 0, gripCd: 0, heldBy: 0, lifting: 0, liftedBy: -1,
+    m: 1, dip: 0, dz: 0, ko: 0, phase: 0, climb: null, grip: [null, null], gripT: 0, gripCd: 0, heldBy: 0, lifting: 0, liftedBy: -1,
     punchT: 0, punchH: 0, punchCd: 0, power: 1, hitDone: false, charge: 0, kick: 0, jumpCd: 0, grounded: false, gy: 0, gbox: null,
     hitBy: -1, hitT: -99, pts: 0, kos: 0, surv: 0, order: 0, pc: 0, jc: 0, gc: 0, inp: { mx: 0, mz: 0, jump: false, punch: false, grab: false, pc: 0, jc: 0, gc: 0 }, ai: null };
 }
@@ -61,9 +65,9 @@ export function shoulder(b, side, o = _o) { const c = b.p[C], cs = Math.cos(b.ya
 const _o = { x: 0, y: 0, z: 0 };
 
 export class Sim {
-  constructor({ seed = 1, goal = 3, hazards = true } = {}) {
+  constructor({ seed = 1, goal = 3, hazards = true, items = true } = {}) {
     this.seed = seed >>> 0; this.rng = makeRng(this.seed);
-    this.goal = clamp(goal | 0 || 3, 1, 9); this.hazards = !!hazards;
+    this.goal = clamp(goal | 0 || 3, 1, 9); this.hazards = !!hazards; this.useItems = !!items; this.items = []; this.itemId = 0;
     this.players = new Map(); this.t = 0; this.at = 0; this.ph = 'wait'; this.pt = 0; this.rd = 0; this.rt = 0; this.rw = -1; this.win = -1; this.order = 0;
     this.arena = new Arena('toits'); this.lastKey = ''; this.gust = null; this.gustT = 0; this.events = [];
   }
@@ -76,7 +80,7 @@ export class Sim {
   }
   removePlayer(id) {
     const b = this.players.get(id); if (!b) return;
-    this.releaseAll(b);
+    this.releaseAll(b); this.dropItem(b);
     for (const o of this.players.values()) { for (let i = 0; i < 2; i++) if (o.grip[i] && o.grip[i].o === b) o.grip[i] = null; if (o.liftedBy === id) o.liftedBy = -1; }
     this.players.delete(id);
   }
@@ -90,8 +94,9 @@ export class Sim {
     const keys = ARENA_KEYS.filter((k) => k !== this.lastKey);
     const k = key || (this.rd === 0 ? 'toits' : this.rng.pick(keys));
     this.lastKey = k; this.rd++; this.arena = new Arena(k); this.at = 0; this.rt = 0; this.ph = 'count'; this.pt = 3; this.order = 0; this.rw = -1; this.gust = null; this.gustT = 8;
-    if (!this.hazards) { this.arena.balls = []; for (const b of this.arena.boxes) if (b.crush) { b.move = null; b.y = 40; b.by = 40; } }
+    if (!this.hazards) this.arena.disableHazards();
     [...this.players.values()].forEach((b, i) => this.place(b, i));
+    this.items = []; if (this.useItems) this.spawnItems();
     this.events.push({ e: 'round', rd: this.rd, ar: k });
   }
   place(b, i) {
@@ -101,7 +106,7 @@ export class Sim {
     const pos = [[x, g + STAND, z], [x, g + STAND + TORSO, z], [x, g + STAND + TORSO + NECK, z],
       [x - c * 0.3, g + STAND + 0.1, z + s * 0.3], [x + c * 0.3, g + STAND + 0.1, z - s * 0.3], [x - c * HIP, g + 0.11, z + s * HIP], [x + c * HIP, g + 0.11, z - s * HIP]];
     pos.forEach((q, j) => { const a = b.p[j]; a.x = a.px = q[0]; a.y = a.py = q[1]; a.z = a.pz = q[2]; a.on = null; });
-    Object.assign(b, { yaw, st: ST.LIVE, m: 1, dip: 0, dz: 0, ko: 0, grip: [null, null], gripT: 0, gripCd: 0, vault: 0, heldBy: 0, lifting: 0, liftedBy: -1, punchT: 0, punchCd: 0, charge: 0, kick: 0, jumpCd: 0, hitBy: -1, hitT: -99, order: 0 });
+    Object.assign(b, { yaw, st: ST.LIVE, m: 1, dip: 0, dz: 0, ko: 0, grip: [null, null], gripT: 0, gripCd: 0, climb: null, item: null, itemCd: 0, heldBy: 0, lifting: 0, liftedBy: -1, punchT: 0, punchCd: 0, charge: 0, kick: 0, jumpCd: 0, hitBy: -1, hitT: -99, order: 0 });
   }
   park(b) { for (const a of b.p) { a.x = a.px = 0; a.y = a.py = KILL_Y - 5; a.z = a.pz = 0; } }
 
@@ -114,6 +119,8 @@ export class Sim {
     const live = this.ph === 'play';
     if (live) { this.rt += dt; this.stepGust(dt); }
     const bs = [...this.players.values()];
+    for (const b of bs) for (const q of b.p) { q.lx = q.x; q.ly = q.y; q.lz = q.z; } // d'où part chaque point, avant les muscles
+    if (this.arena.alarm(this.at) && !this.alarmed) { this.alarmed = true; if (this.ph !== 'count') this.events.push({ e: 'alarm' }); } else if (!this.arena.alarm(this.at)) this.alarmed = false;
     for (const b of bs) if (b.st !== ST.OUT) { if (b.bot) botThink(this, b, dt); this.control(b, frozen ? { ...b.inp, mx: 0, mz: 0, jump: false, punch: false, grab: false } : b.inp, dt); }
     for (const b of bs) if (b.st !== ST.OUT) this.integrate(b);
     for (let it = 0; it < 4; it++) {
@@ -121,7 +128,9 @@ export class Sim {
       this.solveBodies(bs);
       for (const b of bs) if (b.st !== ST.OUT) this.collideWorld(b);
     }
+    for (const b of bs) if (b.st !== ST.OUT) for (let i = 0; i < 7; i++) { const q = b.p[i]; if ((i < LH || i > RH || !b.grip[i - LH]) && this.arena.sweep(q, q.lx, q.ly, q.lz, b.climb ? b.climb.box : null)) this.arena.collide(q, 0.3, b.climb ? b.climb.box : null); else if (i >= LH && (i > RH || !b.grip[i - LH])) this.arena.collide(q, 0.3, b.climb ? b.climb.box : null); } // les mains et les pieds, une fois encore : dans un coin, ils ressortent d'une boîte pour entrer dans l'autre
     for (const b of bs) if (b.st !== ST.OUT) { this.attacks(b, bs); this.hazardsOn(b, dt); this.checkOut(b, live); }
+    this.stepItems(dt, bs);
     if (live) this.checkRound();
     else if (this.ph === 'round') { this.pt -= dt; if (this.pt <= 0) { if (this.win >= 0) { this.ph = 'over'; this.events.push({ e: 'over', id: this.win }); } else this.startRound(); } }
   }
@@ -137,13 +146,15 @@ export class Sim {
   // ------------------------------------------------------------------ les muscles : ce que veut le corps
   control(b, inp, dt) {
     const p = b.p, pel = p[P], che = p[C], hea = p[H];
-    const press = (inp.pc | 0) !== b.pc, jumpPress = (inp.jc | 0) !== b.jc, grabPress = (inp.gc | 0) !== b.gc;
+    const on = this.ph !== 'count'; // pendant le compte à rebours, les appuis ne comptent pas
+    const press = on && (inp.pc | 0) !== b.pc, jumpPress = on && (inp.jc | 0) !== b.jc, grabPress = on && (inp.gc | 0) !== b.gc;
     b.pc = inp.pc | 0; b.jc = inp.jc | 0; b.gc = inp.gc | 0;
     if (b.punchCd > 0) b.punchCd -= dt; if (b.jumpCd > 0) b.jumpCd -= dt;
     if (b.dz > 0 && b.st === ST.LIVE) b.dz = Math.max(0, b.dz - DZ_DECAY * dt);
     if (b.dip > 0) b.dip = Math.max(0, b.dip - dt * 1.5);
     // KO : plus aucun muscle ; marteler raccourcit
     if (b.st === ST.KO) {
+      b.climb = null;
       if (press || jumpPress) b.ko -= KO_MASH;
       b.ko -= dt;
       if (b.ko <= 0) { b.st = ST.LIVE; b.dz = 0.35; b.dip = 0.65; this.events.push({ e: 'wake', id: b.id }); }
@@ -158,7 +169,7 @@ export class Sim {
     const g = this.arena.groundAt(pel.x, pel.z, pel.y + 0.1);
     const footOn = p[LF].on || p[RF].on;
     const h = g ? pel.y - g.y : 99;
-    const grounded = !!g && !lifted && h < STAND + 0.3 && (footOn || h < STAND + 0.1 || h < 0.6);
+    const grounded = !!g && !lifted && h < STAND + 0.3 && (!!footOn || h < STAND + 0.1 || h < 0.6);
     if (!grounded) b.fallV = Math.max(b.fallV || 0, (pel.py - pel.y) / DT);
     else { if (!b.grounded && b.fallV > 4.5) this.events.push({ e: 'land', id: b.id, k: Math.min(1, b.fallV / 12), x: +pel.x.toFixed(2), y: +g.y.toFixed(2), z: +pel.z.toFixed(2) }); b.fallV = 0; }
     b.grounded = grounded; b.gy = g ? g.y : 0; b.gbox = grounded ? g.box : null;
@@ -170,7 +181,9 @@ export class Sim {
     const carrying = b.grip.some((q) => q && q.o), slow = carrying ? 0.72 : 1, hold = b.heldBy > 0 ? 0.55 : 1;
     const bx = b.gbox ? b.gbox.vx + (b.gbox.belt ? b.gbox.belt[0] : 0) : 0, bz = b.gbox ? b.gbox.vz + (b.gbox.belt ? b.gbox.belt[1] : 0) : 0;
     const tx = inp.mx * SPEED * slow * hold * (0.4 + 0.6 * m) + bx, tz = inp.mz * SPEED * slow * hold * (0.4 + 0.6 * m) + bz;
-    const a = (grounded ? ACC * (0.25 + 0.75 * m) : AIR_ACC) * dt;
+    const umb = !grounded && b.item && b.item.k === 'parapluie';
+    if (umb) for (const q of p) if (q.y - q.py < -2.4 * DT) q.py = q.y + 2.4 * DT; // le parapluie freine la chute et permet de planer
+    const a = (grounded ? ACC * (0.25 + 0.75 * m) : AIR_ACC * (umb ? 2.5 : 1)) * dt;
     if (grounded || il > 0.1) for (const i of [P, C]) {
       const q = p[i], vx = (q.x - q.px) / DT, vz = (q.z - q.pz) / DT;
       let dx = tx - vx, dz = tz - vz; const l = Math.hypot(dx, dz);
@@ -206,11 +219,6 @@ export class Sim {
         pull(p[i], X, g.y + 0.11 + up * 0.24 * moving, Z, 0.42 * m);
       }
     } else if (!b.kick) for (const [i, side] of [[LF, -1], [RF, 1]]) pull(p[i], pel.x + side * sx * HIP - fx * 0.1, pel.y - LEG * 0.82, pel.z + side * sz * HIP - fz * 0.1, 0.08 * m);
-    if (b.vault > 0) {
-      b.vault -= dt;
-      for (const t of [P, C, H]) { const u = p[t]; u.px = u.x - b.vx * 3.2 * DT; u.pz = u.z - b.vz * 3.2 * DT; if (u.y - u.py < 1.6 * DT) u.py = u.y - 1.6 * DT; }
-      for (const t of [LF, RF]) pull(p[t], pel.x, pel.y - 0.3, pel.z, 0.45, 0);
-    }
     // les mains : pendent en balançant, frappent, ou se tendent pour agripper
     this.arms(b, inp, press, jumpPress, grabPress, dt, m, fx, fz, sx, sz, speed);
     // mort subite : la bourrasque
@@ -229,7 +237,7 @@ export class Sim {
     }
     if (b.charge > 0 && !inp.punch) {
       const big = b.charge >= CHARGE_T;
-      if (b.punchCd <= 0) { b.punchT = PUNCH_T * (big ? 1.4 : 1); b.punchH = b.punchH ? 0 : 1; b.punchCd = big ? 0.5 : PUNCH_CD; b.power = big ? 2 : 1; b.hitDone = false; this.events.push({ e: 'swing', id: b.id, k: big ? 1 : 0 }); }
+      if (b.punchCd <= 0) { b.punchT = PUNCH_T * (big ? 1.4 : 1); b.punchH = b.item ? (b.item.k === 'poele' ? 1 : 0) : b.punchH ? 0 : 1; b.punchCd = big ? 0.5 : PUNCH_CD; b.power = big ? 2 : 1; b.hitDone = false; this.events.push({ e: 'swing', id: b.id, k: big ? 1 : 0 }); }
       b.charge = 0;
     }
     if (b.punchT > 0) b.punchT -= dt;
@@ -241,27 +249,27 @@ export class Sim {
       if (b.kick <= 0) b.dip = Math.max(b.dip, 0.5);
     }
     // ------- agripper
-    const want = inp.grab && m > 0.3;
+    if (b.itemCd > 0) b.itemCd -= dt;
+    if (grabPress && b.item) { this.throwItem(b); b.itemCd = 0.3; }
+    else if (grabPress && !b.item && b.itemCd <= 0) this.tryPick(b);
+    const want = inp.grab && m > 0.3 && !b.item && b.itemCd <= 0;
     if (!want) { for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i); }
     if (b.gripCd > 0) b.gripCd -= dt;
     b.gripT = b.grip[0] || b.grip[1] ? b.gripT + dt : 0;
-    if (b.gripT > (b.grip.some((q) => q && q.box) ? GRIP_MAX : HOLD_MAX)) { for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i, true); b.gripT = 0; b.gripCd = 0.6; }
+    if (!b.climb && b.gripT > (b.grip.some((q) => q && q.box) ? GRIP_MAX : HOLD_MAX)) { for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i, true); b.gripT = 0; b.gripCd = 0.6; }
     const holdingBox = b.grip.some((q) => q && q.box);
     const body = b.grip.find((q) => q && q.o);
-    // se hisser : tenir une boîte et sauter ; les bras tirent jusqu'à ce que le bassin passe le rebord, puis on bascule par-dessus
-    if (holdingBox && inp.jump) {
-      const q = b.grip.find((x) => x && x.box), A = { ...this.anchor(q) };
-      const rx = (A.x - q.box.x) / q.box.hx, rz = (A.z - q.box.z) / q.box.hz;
-      const ix = Math.abs(rx) >= Math.abs(rz) ? -Math.sign(rx) : 0, iz = ix ? 0 : -Math.sign(rz);
-      const up = clamp((A.y + 0.42 - pel.y) * 7, 0, 3.4) + (q.box.vy || 0);
-      for (const t of [P, C, H]) { p[t].py = p[t].y - up * DT; }
-      if (pel.y > A.y + 0.3) {
-        b.vault = 0.38; b.vx = ix; b.vz = iz; // la bascule : les jambes se replient pour ne pas rester coincées contre le mur
-        for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i);
-        b.gripCd = 0.7;
-        this.events.push({ e: 'climb', id: b.id });
+    // se hisser : accroché, un appui sur saut (ou pousser vers le rebord en pendant) lance la remontée, qui va au bout tant qu'on tient
+    if (holdingBox && !b.climb) {
+      const q = b.grip.find((x) => x && x.box).box;
+      const toX = q.x - pel.x, toZ = q.z - pel.z, tl = Math.hypot(toX, toZ) || 1;
+      const pushing = !b.grounded && Math.hypot(inp.mx, inp.mz) > 0.3 && (inp.mx * toX + inp.mz * toZ) / tl > 0.3;
+      if (jumpPress || inp.jump || pushing) {
+        b.climb = { box: q, t: 0, over: false };
+        for (let i = 0; i < 2; i++) if (b.grip[i] && b.grip[i].box !== q) this.letGo(b, i); // l'autre main, accrochée ailleurs, retiendrait le corps
       }
     }
+    if (b.climb) this.climbStep(b, dt);
     // soulever : tenir quelqu'un et sauter
     if (body && inp.jump && !b.lifting && b.grounded) {
       const o = body.o;
@@ -275,11 +283,16 @@ export class Sim {
       for (const t of q) { t.py = t.y - (t.y - t.py) * 0.5; }
     }
     // ------- chaque main
-    const reachS = _s0;
+    const reachS = _s0, it = b.item;
     for (let i = 0; i < 2; i++) {
       const hand = p[LH + i], side = i ? 1 : -1, S = shoulder(b, side, reachS);
       if (b.grip[i]) { // la main tenue ne fait rien d'autre ; en portant à bout de bras, elle monte
         if (b.lifting) pull(hand, hea.x + side * sx * 0.2, hea.y + 0.42, hea.z + side * sz * 0.2, 0.4);
+        continue;
+      }
+      if (it && i === 1 && !(b.punchT > 0 && b.punchH === 1)) { // l'objet dans la main droite ; le parapluie se lève en tombant
+        if (it.k === 'parapluie' && !b.grounded) pull(hand, hea.x + fx * 0.06, hea.y + 0.34, hea.z + fz * 0.06, 0.5);
+        else pull(hand, che.x + fx * 0.42 + sx * 0.22, che.y + 0.02, che.z + fz * 0.42 + sz * 0.22, 0.35);
         continue;
       }
       if (want) {
@@ -314,6 +327,35 @@ export class Sim {
       }
     }
     void jumpPress; void grabPress;
+  }
+  // la remontée : les mains grimpent jusqu'au rebord, le tronc suit, puis il bascule au-dessus de la boîte.
+  // Le corps ne heurte pas cette boîte-là pendant le geste (sinon une planche fine le bloque par en dessous).
+  climbStep(b, dt) {
+    const c = b.climb, B = c.box, p = b.p, pel = p[P], top = B.y + B.hy;
+    c.t += dt;
+    if (!c.over && !b.grip.some((q) => q && q.box === B)) { b.climb = null; return; } // lâché, ou frappé : c'est fini
+    if (c.t > 3) { b.climb = null; for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i, true); return; }
+    if (!c.over) {
+      for (const q of b.grip) if (q && q.box === B) q.ly = Math.min(B.hy + 0.02, q.ly + 3 * dt);
+      const up = clamp((top + 0.42 - pel.y) * 7, 0.6, 3.6) + B.vy;
+      for (const t of [P, C, H]) p[t].py = p[t].y - up * DT;
+      for (const t of [LF, RF]) pull(p[t], pel.x, pel.y - 0.45, pel.z, 0.25, 0);
+      if (pel.y > top + 0.28) {
+        c.over = true; c.t = 2.45; // la bascule dure au plus 0,55 s
+        for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i);
+        b.gripCd = 0.7;
+        this.events.push({ e: 'climb', id: b.id });
+      }
+      return;
+    }
+    // la bascule : vers un point du dessus, un peu à l'intérieur du rebord
+    const mx = Math.min(0.45, B.hx * 0.6), mz = Math.min(0.45, B.hz * 0.6);
+    const gx = clamp(pel.x, B.x - B.hx + mx, B.x + B.hx - mx), gz = clamp(pel.z, B.z - B.hz + mz, B.z + B.hz - mz);
+    const dx = gx - pel.x, dz = gz - pel.z, d = Math.hypot(dx, dz);
+    const v = Math.min(3.4, d / DT), vx = B.vx + (d > 1e-4 ? dx / d * v : 0), vz = B.vz + (d > 1e-4 ? dz / d * v : 0);
+    for (const t of [P, C, H]) { const u = p[t]; u.px = u.x - vx * DT; u.pz = u.z - vz * DT; u.py = u.y - Math.max(u.y - u.py, (top + 0.5 - pel.y) * 4 * DT, 0.4 * DT); }
+    for (const t of [LF, RF]) pull(p[t], pel.x, pel.y - 0.35, pel.z, 0.45, 0);
+    if (d < 0.05) b.climb = null;
   }
   anchor(q) { if (q.box) { _a.x = q.box.x + q.lx; _a.y = q.box.y + q.ly; _a.z = q.box.z + q.lz; } else { const t = q.o.p[q.pi]; _a.x = t.x; _a.y = t.y; _a.z = t.z; } return _a; }
   tryGrip(b, i, hand) {
@@ -355,6 +397,101 @@ export class Sim {
     b.lifting = 0;
   }
   releaseAll(b) { for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i, true); b.lifting = 0; }
+
+  // ------------------------------------------------------------------ les objets
+  spawnItems() {
+    const A = this.arena, rng = this.rng;
+    const free = () => {
+      for (let t = 0; t < 40; t++) {
+        const x = A.x0 + rng.next() * (A.x1 - A.x0), z = A.z0 + rng.next() * (A.z1 - A.z0), g = A.groundAt(x, z, 2);
+        if (!g || g.box.move || g.box.belt || g.box.crush || g.y > 0.2) continue;
+        if (A.rollers.some((r) => Math.abs(z - r.cz) < r.hz + 0.3)) continue;
+        if (A.boxes.some((b) => b !== g.box && Math.abs(x - b.x) < b.hx + 0.3 && Math.abs(z - b.z) < b.hz + 0.3 && b.y - b.hy < g.y + 1 && b.y + b.hy > g.y)) continue;
+        return { x, y: g.y + 0.4, z };
+      }
+      return null;
+    };
+    for (const k of ITEM_KEYS) for (const chance of [ITEMS[k].p, ITEMS[k].p / 3]) {
+      if (rng.next() >= chance) continue;
+      const q = free(); if (q) this.items.push(this.newItem(k, q.x, q.y, q.z));
+    }
+  }
+  newItem(k, x, y, z) { return { id: ++this.itemId, k, x, y, z, px: x, py: y, pz: z, lx: x, ly: y, lz: z, r: ITEMS[k].r, holder: null, fuse: 0, thrower: -1, tt: 99, hit: true }; }
+  tryPick(b) {
+    if (!this.items.length) return false;
+    const c = b.p[C]; let best = null, bd = 1.25;
+    for (const it of this.items) { if (it.holder) continue; const d = Math.hypot(it.x - c.x, it.y - c.y, it.z - c.z); if (d < bd) { bd = d; best = it; } }
+    if (!best) return false;
+    for (const o of this.players.values()) if (o !== b && o.st !== ST.OUT && Math.hypot(o.p[C].x - c.x, o.p[C].y - c.y, o.p[C].z - c.z) < bd * 0.7) return false; // un adversaire plus près : c'est lui qu'on attrape
+    best.holder = b; b.item = best; for (let i = 0; i < 2; i++) if (b.grip[i]) this.letGo(b, i);
+    if (best.k === 'petard' && best.fuse <= 0) best.fuse = FUSE_T;
+    this.events.push({ e: 'pick', id: b.id, k: best.k });
+    return true;
+  }
+  dropItem(b) { const it = b.item; if (!it) return; it.holder = null; b.item = null; it.px = it.x; it.py = it.y; it.pz = it.z; it.thrower = b.id; it.tt = 0; it.hit = true; }
+  throwItem(b) {
+    const it = b.item; if (!it) return;
+    const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw), v = it.k === 'banane' ? 7 : 10;
+    it.holder = null; b.item = null;
+    it.x = b.p[C].x + fx * 0.5; it.y = b.p[C].y + 0.15; it.z = b.p[C].z + fz * 0.5;
+    it.px = it.x - fx * v * DT; it.py = it.y - 3.4 * DT; it.pz = it.z - fz * v * DT; it.lx = it.x; it.ly = it.y; it.lz = it.z;
+    it.thrower = b.id; it.tt = 0; it.hit = false;
+    this.events.push({ e: 'toss', id: b.id, k: it.k });
+  }
+  stepItems(dt, bs) {
+    for (const it of [...this.items]) {
+      it.tt += dt;
+      if (it.fuse > 0) { it.fuse -= dt; if (it.fuse <= 0) { this.explode(it, bs); continue; } }
+      if (it.holder) { const h = it.holder.p[RH]; it.x = it.px = it.lx = h.x; it.y = it.py = it.ly = h.y; it.z = it.pz = it.lz = h.z; continue; }
+      const vx = (it.x - it.px) * 0.996, vy = (it.y - it.py) * 0.996, vz = (it.z - it.pz) * 0.996;
+      it.px = it.x; it.py = it.y; it.pz = it.z; it.lx = it.x; it.ly = it.y; it.lz = it.z;
+      it.x += clamp(vx, -0.34, 0.34); it.y += clamp(vy, -0.34, 0.34) - G * DT * DT; it.z += clamp(vz, -0.34, 0.34);
+      this.arena.rollerPush(it); this.arena.ballPush(it);
+      if (this.arena.collide(it, 0.22)) it.hit = true;
+      if (this.arena.sweep(it, it.lx, it.ly, it.lz)) { it.hit = true; this.arena.collide(it, 0.22); }
+      if (it.y < KILL_Y || this.arena.inFire(it.x, it.y, it.z)) { this.items.splice(this.items.indexOf(it), 1); continue; }
+      const sp = Math.hypot(it.x - it.px, it.y - it.py, it.z - it.pz) / DT;
+      // lancé, il cogne le premier qu'il touche
+      if (!it.hit && sp > 3.5) for (const o of bs) {
+        if (o.st === ST.OUT || o.id === it.thrower) continue;
+        const t = [o.p[H], o.p[C], o.p[P]].find((q) => Math.hypot(q.x - it.x, q.y - it.y, q.z - it.z) < q.r + it.r + 0.06);
+        if (!t) continue;
+        it.hit = true;
+        const n = sp || 1;
+        this.hurt(o, (it.x - it.px) / DT / n, 0.2, (it.z - it.pz) / DT / n, it.k === 'poele' ? 5.5 : 3.2, it.k === 'poele' ? 0.42 : 0.18, it.thrower);
+        this.events.push({ e: 'hit', id: o.id, by: it.thrower, k: it.k === 'poele' ? 0.7 : 0.2, head: 0, pan: it.k === 'poele' ? 1 : 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
+        break;
+      }
+      // la peau de banane
+      if (it.k === 'banane' && sp < 2.5 && this.ph !== 'count') for (const o of bs) {
+        if (o.st !== ST.LIVE || !o.grounded || (o.id === it.thrower && it.tt < 1.2)) continue;
+        const v = Math.hypot(o.p[P].x - o.p[P].px, o.p[P].z - o.p[P].pz) / DT;
+        if (v < 0.8 || ![o.p[LF], o.p[RF]].some((q) => Math.hypot(q.x - it.x, q.z - it.z) < 0.36 && Math.abs(q.y - it.y) < 0.4)) continue;
+        const fx = (o.p[P].x - o.p[P].px) / DT / v, fz = (o.p[P].z - o.p[P].pz) / DT / v;
+        this.hurt(o, 0, 0, 0, 0, 0.3, it.thrower);
+        o.dip = 1; o.m = 0;
+        for (const q of [o.p[LF], o.p[RF]]) vel(q, fx * 7 * DT, 2.5 * DT, fz * 7 * DT); // les pieds partent devant, le corps s'étale
+        for (const q of [o.p[C], o.p[H]]) vel(q, -fx * 2.5 * DT, 0, -fz * 2.5 * DT);
+        this.items.splice(this.items.indexOf(it), 1);
+        this.events.push({ e: 'peel', id: o.id, x: +it.x.toFixed(2), y: +it.y.toFixed(2), z: +it.z.toFixed(2) });
+        break;
+      }
+    }
+  }
+  explode(it, bs) {
+    const holder = it.holder;
+    if (holder) holder.item = null;
+    this.items.splice(this.items.indexOf(it), 1);
+    this.events.push({ e: 'boom', x: +it.x.toFixed(2), y: +it.y.toFixed(2), z: +it.z.toFixed(2) });
+    for (const o of bs) {
+      if (o.st === ST.OUT) continue;
+      const c = o.p[C], dx = c.x - it.x, dy = c.y - it.y, dz = c.z - it.z, d = Math.hypot(dx, dy, dz);
+      if (d > 3.2) continue;
+      const f = 1 - d / 3.2, n = d || 1;
+      this.hurt(o, dx / n, Math.max(0.45, dy / n), dz / n, 4 + 10 * f, 0.15 + 0.85 * f, o === holder ? -1 : it.thrower);
+    }
+    for (const q of this.items) if (!q.holder) { const dx = q.x - it.x, dz = q.z - it.z, d = Math.hypot(dx, dz) || 1; if (d < 3.2) { q.px -= dx / d * 3 * DT; q.pz -= dz / d * 3 * DT; q.py -= 3 * DT; } }
+  }
 
   // ------------------------------------------------------------------ la physique
   integrate(b) {
@@ -405,9 +542,9 @@ export class Sim {
     for (let i = 0; i < 7; i++) {
       const q = b.p[i];
       if (i >= LH && i <= RH && b.grip[i - LH]) continue;
-      if (b.vault > 0 && i >= LF) continue;
       const fr = i === LF || i === RF ? (b.m > 0.3 ? 0.08 : 0.3) : 0.3;
-      const on = this.arena.collide(q, fr);
+      this.arena.rollerPush(q); this.arena.ballPush(q);
+      const on = this.arena.collide(q, fr, b.climb ? b.climb.box : null);
       if (on) q.on = on;
     }
   }
@@ -420,6 +557,8 @@ export class Sim {
     if (b.kick > 0 && !b.hitDone) { tips = [p[LF], p[RF]]; power = K_POWER; dz = K_DZ; }
     else if (b.punchT > 0 && !b.hitDone) { tips = [p[LH + b.punchH]]; power = b.power > 1 ? H_POWER : P_POWER; dz = b.power > 1 ? H_DZ : P_DZ; }
     if (!tips) return;
+    const pan = b.item && b.item.k === 'poele' && b.punchT > 0 && b.kick <= 0;
+    if (pan) { const h = tips[0]; tips = [{ x: h.x + Math.sin(b.yaw) * 0.3, y: h.y, z: h.z + Math.cos(b.yaw) * 0.3, r: 0.22 }]; power *= 1.5; dz *= 1.6; }
     for (const o of bs) {
       if (o === b || o.st === ST.OUT || o.liftedBy === b.id) continue;
       for (const tip of tips) for (const pi of [H, C, P]) {
@@ -430,7 +569,7 @@ export class Sim {
         this.hurt(o, nx, 0.25, nz, power * (head ? 1.15 : 1), dz * (head ? 1.5 : 1), b.id);
         vel(p[C], -nx * 0.6 * DT, 0, -nz * 0.6 * DT);
         // frappé pendant qu'il tient quelque chose : il peut lâcher
-        this.events.push({ e: 'hit', id: o.id, by: b.id, k: b.kick > 0 ? 1 : b.power > 1 ? 0.7 : 0, head: head ? 1 : 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
+        this.events.push({ e: 'hit', id: o.id, by: b.id, k: b.kick > 0 ? 1 : pan ? 0.8 : b.power > 1 ? 0.7 : 0, head: head ? 1 : 0, pan: pan ? 1 : 0, x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) });
         return;
       }
     }
@@ -439,20 +578,32 @@ export class Sim {
     for (const t of o.p) vel(t, nx * power * DT, ny * power * DT, nz * power * DT);
     if (by >= 0) { o.hitBy = by; o.hitT = this.t; }
     o.dip = Math.max(o.dip, 0.5 + dz * 0.6);
+    if (o.climb && o.climb.over) o.climb.t = 99; // la remontée s'arrête au pas suivant, le temps que le corps ressorte de la boîte
     if (o.st === ST.KO) { o.ko = Math.max(o.ko, 1); return; }
     o.dz += dz; o.charge = 0;
+    if (o.item && (dz >= 0.3 || o.dz >= 0.8)) this.dropItem(o);
     // le coup fait lâcher une main
     for (let i = 0; i < 2; i++) if (o.grip[i] && this.rng.next() < 0.3 + dz) { this.letGo(o, i, true); }
     if (o.dz >= 1) {
-      o.st = ST.KO; o.ko = KO_T; o.dz = 1; this.releaseAll(o);
+      o.st = ST.KO; o.ko = KO_T; o.dz = 1; this.releaseAll(o); if (o.climb) o.climb.t = 99; this.dropItem(o);
       this.events.push({ e: 'ko', id: o.id, by, x: +o.p[H].x.toFixed(2), y: +o.p[H].y.toFixed(2), z: +o.p[H].z.toFixed(2) });
     }
   }
   hazardsOn(b, dt) {
     const A = this.arena, c = b.p[C];
+    if (this.ph === 'count') return;
+    for (const r of A.rollers) {
+      if ((b.ballCd || 0) > 0 || Math.abs(c.z - r.cz) > r.hz + 0.3) continue;
+      const near = b.p.some((q) => Math.hypot(q.x - r.x, q.y - r.cy) < r.r + q.r + 0.12);
+      if (!near) continue;
+      b.ballCd = 0.75;
+      const dir = c.x - r.x >= 0 ? 1 : -1;
+      this.hurt(b, dir, 0.55, 0, 6 + Math.abs(r.vx), 0.55, -1);
+      this.events.push({ e: 'spike', id: b.id, x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2) });
+    }
     for (const q of A.balls) {
       const dx = c.x - q.x, dy = c.y - q.y, dz = c.z - q.z, d = Math.hypot(dx, dy, dz);
-      if (d < q.r + 0.42 && (b.ballCd || 0) <= 0) {
+      if (d < q.r + 0.34 && (b.ballCd || 0) <= 0) {
         b.ballCd = 0.8;
         const v = Math.hypot(q.vx, q.vz) || 1;
         this.hurt(b, q.vx / v, 0.35, q.vz / v, 5 + v * 1.1, 0.45, -1);
@@ -461,6 +612,11 @@ export class Sim {
     }
     if (b.ballCd > 0) b.ballCd -= dt;
     for (const q of A.boxes) {
+      if (q.knock && (b.ballCd || 0) <= 0 && Math.abs(q.vx) > 0.8 && Math.abs(c.z - q.z) < q.hz + 0.2 && Math.abs(c.x - q.x) < q.hx + 0.42 && (c.x - q.x) * q.vx > 0 && c.y < q.y + q.hy + 0.2) { // la barre qui balaie
+        b.ballCd = 0.7;
+        this.hurt(b, Math.sign(q.vx), 0.3, 0, 3.5 + Math.abs(q.vx), 0.35, -1);
+        this.events.push({ e: 'ball', id: b.id, x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2) });
+      }
       if (!q.crush || q.vy >= -1) continue;
       const bot = q.y - q.hy;
       if (Math.abs(c.x - q.x) < q.hx && Math.abs(c.z - q.z) < q.hz && bot < b.p[H].y + 0.3 && bot > c.y - 0.5 && (b.ballCd || 0) <= 0) {
@@ -472,8 +628,11 @@ export class Sim {
     }
   }
   checkOut(b, live) {
-    if (b.p[P].y > KILL_Y) return;
-    this.releaseAll(b);
+    const burnt = this.arena.burn.length && this.arena.inFire(b.p[P].x, b.p[P].y, b.p[P].z);
+    if (b.p[P].y > KILL_Y && !burnt) return;
+    if (burnt) this.events.push({ e: 'burn', id: b.id, x: +b.p[P].x.toFixed(2), y: +b.p[P].y.toFixed(2), z: +b.p[P].z.toFixed(2) });
+    this.dropItem(b);
+    this.releaseAll(b); b.climb = null;
     for (const o of this.players.values()) for (let i = 0; i < 2; i++) if (o.grip[i] && o.grip[i].o === b) this.letGo(o, i, true);
     b.st = ST.OUT; b.heldBy = 0; b.liftedBy = -1;
     if (live) {
@@ -506,14 +665,16 @@ export class Sim {
         return a;
       }),
       N: [...this.players.values()].map((b) => [b.id, b.name, b.color, b.bot ? 1 : 0, b.level]),
+      I: this.items.map((i) => [i.id, ITEM_KEYS.indexOf(i.k), Math.round(i.x * 100), Math.round(i.y * 100), Math.round(i.z * 100), i.holder ? i.holder.id : -1, Math.round(i.fuse * 10)]),
+      it: this.useItems ? 1 : 0,
     };
   }
   // nouvel hôte : la partie reprend du dernier état reçu (positions gardées, prises relâchées)
   static restore(s) {
-    const sim = new Sim({ seed: (Math.random() * 2 ** 31) | 0, goal: s.go, hazards: !!s.hz });
+    const sim = new Sim({ seed: (Math.random() * 2 ** 31) | 0, goal: s.go, hazards: !!s.hz, items: !!s.it });
     sim.t = s.t; sim.ph = s.ph; sim.pt = s.pt; sim.rd = s.rd; sim.rt = s.rt; sim.at = s.at; sim.rw = s.rw; sim.win = s.win;
     sim.arena = new Arena(s.ar); sim.lastKey = s.ar; sim.gustT = 3;
-    if (!sim.hazards) { sim.arena.balls = []; for (const b of sim.arena.boxes) if (b.crush) { b.move = null; b.y = 40; b.by = 40; } }
+    if (!sim.hazards) sim.arena.disableHazards();
     const names = new Map(s.N.map(([id, n, c, bo, l]) => [id, { name: n, color: c, bot: !!bo, level: l }]));
     for (const r of s.P) {
       const nm = names.get(r[0]) || {};
@@ -524,6 +685,7 @@ export class Sim {
       else for (let i = 0; i < 7; i++) { const q = b.p[i]; q.x = q.px = r[9 + i * 3] / 100; q.y = q.py = r[10 + i * 3] / 100; q.z = q.pz = r[11 + i * 3] / 100; }
       sim.players.set(b.id, b);
     }
+    for (const r of s.I || []) { const it = sim.newItem(ITEM_KEYS[r[1]], r[2] / 100, r[3] / 100, r[4] / 100); it.id = r[0]; it.fuse = r[6] / 10; sim.items.push(it); sim.itemId = Math.max(sim.itemId, it.id); } // repris en main : ils retombent par terre
     return sim;
   }
 }

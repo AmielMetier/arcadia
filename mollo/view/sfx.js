@@ -117,6 +117,14 @@ export class Sfx {
       case 'fall': this.sweep(1500, 240, 1.1, 0.13, 'sine'); this.sweep(90, 40, 0.3, 0.32, 'sine', 1.05); this.burst(0.2, 350, 0.18, 'lowpass', 0.8, 0.6, 1.05); break;
       case 'clang': this.sweep(520, 300, 0.5, 0.2, 'square'); this.sweep(790, 410, 0.4, 0.12, 'square'); this.burst(0.15, 2600, 0.3, 'bandpass', 0.8); this.sweep(110, 40, 0.28, 0.5); break;
       case 'crush': this.burst(0.35, 300, 0.6, 'lowpass', 1, 0.5); this.sweep(90, 28, 0.4, 0.7); this.burst(0.08, 3000, 0.22, 'bandpass', 1); break;
+      case 'boom': this.burst(0.7, 240, 0.85, 'lowpass', 0.7, 0.4); this.sweep(160, 26, 0.6, 0.9); this.burst(0.12, 3200, 0.3, 'bandpass', 0.7); break;
+      case 'pan': this.sweep(1250, 780, 0.5, 0.2, 'triangle'); this.sweep(1880, 1400, 0.34, 0.11, 'triangle'); this.sweep(150, 50, 0.14, 0.5); break;
+      case 'spike': this.burst(0.09, 3600, 0.36, 'bandpass', 2); this.sweep(240, 60, 0.2, 0.44, 'sawtooth'); break;
+      case 'burn': this.burst(1.1, 1500, 0.34, 'bandpass', 0.5, 0.4); this.sweep(240, 60, 0.5, 0.26, 'sawtooth'); break;
+      case 'alarm': [0, 0.34, 0.68].forEach((d) => { this.sweep(660, 880, 0.26, 0.17, 'square', d); }); break;
+      case 'peel': this.sweep(1500, 240, 0.28, 0.2, 'sine'); this.sweep(90, 70, 0.1, 0.2, 'triangle', 0.26); break;
+      case 'pick': this.sweep(520, 880, 0.09, 0.16, 'triangle'); break;
+      case 'toss': this.burst(0.16, 900, 0.16, 'bandpass', 1.4, 3); break;
       case 'gust': this.burst(1.4, 500, 0.14, 'bandpass', 0.8, 2.5); break;
       case 'tick': this.sweep(880, 880, 0.12, 0.2, 'triangle'); break;
       case 'go': // coup de sifflet de chef de chantier

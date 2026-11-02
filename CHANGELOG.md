@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.53 — 2 novembre 2026
+- **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.
+  - Le Dr Lumen, menacé dans le Bois Murmure, offre la CS Flash : la Grotte Lunaire est désormais plongée dans le noir.
+  - Les admins Erèbe et Nyx pillent la Grotte Lunaire et menacent le vieux marin de Port-Azur ; à Voltacité, la Centrale est occupée et l'Arène fermée tant qu'on ne l'a pas libérée. L'ingénieur offre la CS Force pour pousser les gros rochers.
+  - Sur la route 6, le repaire de la Team Éclipse : battre le chef Nocturne plonge la région dans une nuit violette, et ouvre enfin Mirage.
+  - La voyante de Mirage confie la Plume Argentée. Au sud du Cap Mirage, sur l'Îlot des Marées, Lugia Obscur attend au fond du Sanctuaire. Capture-le (le Prof. Saule ouvrira son cœur) ou apaise-le : il retournera alors dans la Grotte des Tourbillons.
+  - Tant que dure l'Éclipse, la Route Victoire reste fermée.
+  - À la Ligue, le Conseil 4 (Frimas, Spectrel, Brutus et Ombrelle) attend avant Célestine.
+  - Dix recoins cachés le long des routes, derrière un petit arbre ou un gros rocher, et des quêtes annexes : le médaillon de Lucie, le géologue, l'échange de Bastien, l'Évoli de Floralia, le chercheur du Pokédex, les sources de Cendrelune et le Minidraco de Cimelune.
+  - Nouveaux personnages : les sbires, Nyx, Erèbe, Nocturne, le Dr Lumen et les quatre membres du Conseil.
+
 ## 3.52 — 2 novembre 2026
 - **Odyssée** — on peut jouer à plusieurs dans la nouvelle version : voir les autres joueurs se promener, échanger un Pokémon et se défier en combat.
   - Code de sauvegarde (menu → CODE) pour reprendre sa partie sur un autre appareil, et sauvegarde en ligne sur son compte Arcadia.
@@ -55,6 +66,16 @@
 ## 3.43 — 31 octobre 2026
 - **Odyssée** — nouvelles hautes herbes en touffes, comme sur DS : quatre variantes mélangées au hasard (prairie, bois, neige), fini les carrés d'herbe.
   - Sous l'herbe des bois, le sol est celui du sous-bois.
+
+## 3.43 — 2 novembre 2026
+- **Mollo !** — Trois nouvelles arènes, des objets à ramasser, et on remonte enfin des rebords.
+  - Accroché à un rebord, garde la prise et saute : ton pantin se hisse jusqu'en haut.
+  - Les Rouleaux : deux rouleaux à pointes vont et viennent. Abrite-toi dans l'allée du milieu ou au bout de la dalle.
+  - L'Incinérateur : les tapis t'emmènent vers des trappes qui s'ouvrent sur le feu. Quand l'alarme sonne, sors de là.
+  - Le Tri Postal : quatre tapis en sens contraires, et deux barres qui balaient tout sur leur passage.
+  - Au début de chaque manche, des objets peuvent traîner : la poêle qui assomme, le pétard qui s'allume dès qu'on le prend, le parapluie pour planer, la peau de banane qui fait glisser.
+  - Un appui sur saisir ramasse l'objet, un autre le lance. Pièges et objets se coupent dans les réglages du salon.
+  - Les mains et les pieds ne traversent plus le décor, et le boulet repousse les corps au lieu de passer à travers.
 
 ## 3.42 — 2 novembre 2026
 - **Poké Duel** — Nouveau format « 2 joueurs contre 2 », à choisir dans les réglages du salon (ligne Format).

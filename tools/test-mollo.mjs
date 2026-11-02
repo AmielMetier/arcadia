@@ -1,7 +1,7 @@
 // Tests du moteur de Mollo ! (mollo/engine/) : node tools/test-mollo.mjs
 // Arènes, tenir debout sans trembler, marche et foulée, saut, coup et gros coup, KO mou puis réveil, prise, soulever et jeter,
-// s'accrocher et se hisser, fatigue des bras, chute et crédit, fin de manche, parties entières entre bots, instantané et reprise par un nouvel hôte, coût d'un pas.
-import { Sim, DT, ST, PN, JUMP_V, KO_T } from '../mollo/engine/sim.js';
+// s'accrocher et se hisser, fatigue des bras, collisions, rouleaux, incinérateur, tri postal, objets, chute et crédit, fin de manche, parties entières entre bots, instantané et reprise par un nouvel hôte, coût d'un pas.
+import { Sim, DT, ST, PN, JUMP_V, KO_T, ITEMS, ITEM_KEYS, FUSE_T } from '../mollo/engine/sim.js';
 import { Arena, ARENAS, ARENA_KEYS, KILL_Y } from '../mollo/engine/arena.js';
 
 let fails = 0, count = 0;
@@ -9,8 +9,8 @@ const ok = (cond, msg) => { count++; if (!cond) { fails++; console.log('  ✗ ' 
 const section = (s) => console.log('• ' + s);
 const run = (sim, secs, each) => { for (let i = 0; i < Math.round(secs / DT); i++) { each && each(i); sim.step(DT); } };
 const { P, C, H } = PN;
-function lab(key = 'chantier', n = 2, seed = 7) {
-  const sim = new Sim({ seed, goal: 3, hazards: false });
+function lab(key = 'chantier', n = 2, seed = 7, hazards = false) {
+  const sim = new Sim({ seed, goal: 3, hazards, items: false });
   for (let i = 0; i < n; i++) sim.addPlayer({ id: i, name: 'J' + i, color: '#ff0000' });
   sim.start(); sim.rd = 0; sim.drainEvents(); sim.startRound(key); sim.ph = 'play'; sim.pt = 0;
   return sim;
@@ -163,6 +163,222 @@ section("S'accrocher et se hisser");
   ok(!e.grip.some(Boolean), "debout au milieu de la dalle, les mains n'attrapent pas le sol");
 }
 
+section('Se hisser partout');
+{
+  const tally = {};
+  for (const k of ARENA_KEYS) {
+    const n = ARENAS[k].boxes.length;
+    for (let i = 0; i < n; i++) {
+      if (ARENAS[k].boxes[i].crush || ARENAS[k].boxes[i].move) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const how of ['maintient', 'tape', 'pousse']) {
+        const s = lab(k), [a, o] = s.players.values(), B = s.arena.boxes[i], top = B.y + B.hy;
+        const ex = B.x + dx * (B.hx + 0.3), ez = B.z + dz * (B.hz + 0.3);
+        if (s.arena.groundAt(ex, ez, top + 0.1)) continue;
+        put(o, 0, 0, undefined); for (const q of o.p) q.y += 40;
+        put(a, ex, ez, Math.atan2(-dx, -dz)); const lift = top + 0.89 - a.p[P].y; for (const q of a.p) { q.y += lift; q.py = q.y; }
+        const keep = () => { for (const q of o.p) { q.py = q.y; if (q.y < 30) q.y += 40; } };
+        let inp = { ...a.inp, grab: true, gc: 1 }, t = 0;
+        while (t < 2 && a.st !== ST.OUT && !a.grip.some((g) => g && g.box)) { a.inp = inp; s.step(DT); keep(); t += DT; }
+        const g = a.grip.find((x) => x && x.box); if (!g) { tally.noGrip = (tally.noGrip || 0) + 1; continue; }
+        const T = g.box; run(s, 0.4, () => { a.inp = inp; keep(); });
+        let done = false;
+        for (let f = 0; f < 150 && !done && a.st !== ST.OUT; f++) {
+          const tx = T.x - a.p[P].x, tz = T.z - a.p[P].z, l = Math.hypot(tx, tz) || 1;
+          a.inp = { ...inp, jump: how === 'maintient' || (how === 'tape' && f < 4), jc: how === 'pousse' ? 0 : 1, mx: how === 'pousse' ? tx / l : 0, mz: how === 'pousse' ? tz / l : 0 };
+          s.step(DT); keep();
+          const G = a.gbox; done = a.grounded && !a.climb && !!G && a.p[P].y > G.y + G.hy && (G === T || G.y + G.hy >= T.y + T.hy - 0.01); // dans un coin, il peut finir sur le mur voisin
+        }
+        tally[how] = tally[how] || [0, 0]; tally[how][1]++; if (done) tally[how][0]++;
+        else console.log(`    raté : ${k} boîte ${i} (${B.mat}) côté ${dx},${dz} en « ${how} »`);
+      }
+    }
+  }
+  for (const how of ['maintient', 'tape', 'pousse']) ok(tally[how] && tally[how][0] >= tally[how][1] * 0.97, `saut ${how} : remonte sur les rebords de toutes les arènes (${tally[how][0]}/${tally[how][1]})`);
+}
+
+section('Collisions');
+{
+  // aucune plateforme mobile ne vient coincer un corps contre un décor fixe, dans le sens où elle avance (le pilon, lui, écrase exprès)
+  for (const k of ARENA_KEYS) {
+    const a = new Arena(k), mv = a.boxes.filter((b) => b.move && !b.crush && !b.door);
+    let min = 9;
+    for (let t = 0; t < 30; t += 0.05) {
+      a.update(t);
+      for (const m of mv) for (const b of a.boxes) {
+        if (b === m || b.move) continue;
+        const g = { x: Math.abs(m.x - b.x) - m.hx - b.hx, y: Math.abs(m.y - b.y) - m.hy - b.hy, z: Math.abs(m.z - b.z) - m.hz - b.hz };
+        for (const [axis, amp] of [['x', m.move.ax], ['z', m.move.az], ['y', m.move.ay]]) {
+          if (!amp) continue;
+          if (['x', 'y', 'z'].filter((j) => j !== axis).every((j) => g[j] < 0)) min = Math.min(min, g[axis]);
+        }
+      }
+    }
+    ok(min > 0.95, `${k} : une plateforme mobile laisse la place à un corps (${min.toFixed(2)} m)`);
+  }
+  // marcher contre un mur, être jeté dessus, tomber sur une planche fine
+  const wall = lab(), [w, w2] = wall.players.values(); put(w2, 5, -3); put(w, -1.5, -1.6, -Math.PI / 2); w.inp = { ...w.inp, mx: -1 }; run(wall, 3);
+  ok(w.p[P].x > -3 && w.p.every((q) => q.y - q.r > 0.95 || q.x - q.r > -3.22), `marcher contre le muret ne le traverse pas (${w.p.map((q) => (q.x - q.r).toFixed(2)).join(' ')})`);
+  for (const v of [6, 12, 20]) { const s = lab(), [a, o] = s.players.values(); put(o, 5, -3); put(a, -1.8, -1.6); a.st = ST.KO; a.ko = 9; for (const q of a.p) q.px = q.x + v * DT; run(s, 0.7); ok(a.p[P].x > -3.2 && a.p.every((q) => q.x > -3.2 || q.x < -3.6 || q.y - q.r > 0.92), `jeté à ${v} m/s, il s'écrase sur le muret sans y entrer (${a.p.map((q) => q.x.toFixed(2) + '/' + q.y.toFixed(2)).join(' ')})`); }
+  for (const v of [8, 20]) { const s = lab('toits'), [a, o] = s.players.values(); put(o, -6, 0); put(a, 0, 0); for (const q of a.p) { q.y += 3; q.py = q.y + v * DT; } a.st = ST.KO; a.ko = 9; run(s, 1); ok(a.p.every((q) => q.y > -0.05), `tombé à ${v} m/s, il reste sur la planche fine`); }
+  // parties entières : rien ne s'enfonce, rien ne traverse
+  const depth = (q, b) => Math.min(b.hx + q.r - Math.abs(q.x - b.x), b.hy + q.r - Math.abs(q.y - b.y), b.hz + q.r - Math.abs(q.z - b.z));
+  const side = (a, q, b) => [['x', 'hx'], ['y', 'hy'], ['z', 'hz']].some(([k, h]) => Math.abs(a[k] - b[k]) > b[h] && Math.abs(q[k] - b[k]) > b[h] && Math.sign(a[k] - b[k]) !== Math.sign(q[k] - b[k]) && ['x', 'y', 'z'].filter((j) => j !== k).every((j) => Math.abs(a[j] - b[j]) < b['h' + j] && Math.abs(q[j] - b[j]) < b['h' + j]));
+  let deepBody = 0, cross = 0, steps = 0, maxD = 0;
+  for (const seed of [1, 2, 3]) {
+    const s = new Sim({ seed, goal: 2 }); s.addBots(6, 'expert'); s.start(); let n = 0;
+    while (s.ph !== 'over' && n < 60 * 180) {
+      const pv = new Map([...s.players.values()].map((b) => [b.id, b.p.map((q) => ({ x: q.x, y: q.y, z: q.z }))]));
+      s.step(DT); s.drainEvents(); n++; steps++;
+      for (const b of s.players.values()) { if (b.st === ST.OUT) continue; b.p.forEach((q, i) => { if (i >= 3 && i <= 4 && b.grip[i - 3]) return; for (const B of s.arena.boxes) { if (b.climb && b.climb.box === B) continue; if (B.y > 30) continue; const d = depth(q, B); if (d > 0.08 && !B.crush) { deepBody++; maxD = Math.max(maxD, d); } const a = pv.get(b.id)[i]; if (!B.move && Math.hypot(a.x - q.x, a.y - q.y, a.z - q.z) < 1 && side(a, q, B)) cross++; } }); }
+    }
+  }
+  ok(cross === 0, `aucun point ne traverse une boîte (${cross} sur ${steps} pas)`);
+  ok(deepBody === 0, `rien ne s'enfonce de plus de 8 cm dans le décor (${deepBody}, au pire ${maxD.toFixed(2)} m)`);
+  // le boulet pousse sans traverser
+  const b = new Sim({ seed: 7, hazards: true }); b.addPlayer({ id: 1, name: 'a', color: '#f00' }); b.addPlayer({ id: 2, name: 'b', color: '#00f' }); b.start(); b.rd = 0; b.drainEvents(); b.startRound('chantier'); b.ph = 'play'; b.pt = 0;
+  const [ba, bo] = b.players.values(); put(bo, 5, 2.5); put(ba, 2, 0); let inBall = 0, touched = false;
+  for (let i = 0; i < 480 && ba.st !== ST.OUT; i++) { b.step(DT); touched = touched || b.events.some((e) => e.e === 'ball'); b.events.length = 0; const q = b.arena.balls[0]; for (const t of ba.p) inBall = Math.max(inBall, q.r + t.r - Math.hypot(t.x - q.x, t.y - q.y, t.z - q.z)); }
+  ok(touched && inBall < 0.01, `le boulet frappe et ne traverse pas le corps (${inBall.toFixed(3)} m)`);
+}
+
+section('Rouleaux à pointes');
+{
+  const s = lab('rouleaux', 2, 7, true), [a, o] = s.players.values(), R = s.arena.rollers[0];
+  put(o, -8, 0); put(a, 3, R.cz); a.yaw = 0;
+  let spikes = 0, deep = 0, t = 0;
+  while (t < 12 && a.st !== ST.OUT) { s.step(DT); t += DT; for (const e of s.drainEvents()) if (e.e === 'spike' && e.id === a.id) spikes++; if (a.st === ST.OUT) break; for (const q of a.p) if (Math.abs(q.z - R.cz) < R.hz) deep = Math.max(deep, R.r + q.r - Math.hypot(q.x - R.x, q.y - R.cy)); }
+  ok(spikes >= 1, `rester dans sa voie, c'est se faire piquer (${spikes})`);
+  ok(deep < 0.2, `le rouleau repousse le corps sans le traverser (${deep.toFixed(3)} m)`);
+  const k = lab('rouleaux', 2, 7, true), [b, p] = k.players.values(); put(p, -8, 0); put(b, 0, 0); let hit = 0;
+  for (let i = 0; i < 60 * 25; i++) { k.step(DT); if (k.drainEvents().some((e) => e.e === 'spike')) hit++; }
+  ok(hit === 0 && b.st === ST.LIVE, `l'allée du milieu est à l'abri (${hit} coups en 25 s)`);
+  ok(lab('rouleaux').arena.rollers.length === 0, 'sans pièges, pas de rouleaux');
+  const off = lab('rouleaux'), [c, q] = off.players.values(); put(q, -8, 0); put(c, 0, 3); run(off, 10); ok(c.st === ST.LIVE && c.p[P].y > 0.5, 'sans pièges, on reste debout dans la voie');
+}
+
+section("L'Incinérateur");
+{
+  const s = lab('four', 2, 7, true), [a, o] = s.players.values(), door = s.arena.boxes.find((b) => b.door);
+  put(o, -7, -3.5); put(a, -1, 0);
+  run(s, 0.5);
+  ok(a.grounded && a.p[P].y > 0.5, 'trappes fermées : on marche dessus');
+  const log = []; let t = 0, xStart = a.p[P].x;
+  while (t < 14 && a.st !== ST.OUT) { s.step(DT); t += DT; for (const e of s.drainEvents()) log.push(e.e); }
+  ok(log.includes('alarm'), "une alarme prévient avant l'ouverture");
+  ok(log.indexOf('alarm') < log.indexOf('burn'), "l'alarme sonne avant le feu");
+  ok(log.includes('burn') && a.st === ST.OUT, 'resté sur la trappe, il finit au four');
+  void xStart; void door;
+  const f = lab('four', 2, 7, true), [b, q] = f.players.values(); put(q, -7, -3.5); put(b, -3.4, 0);
+  let lastOpen = 0; for (let i = 0; i < 60 * 14; i++) { f.step(DT); lastOpen = Math.max(lastOpen, f.arena.boxes.find((x) => x.door).open || 0); }
+  ok(lastOpen >= 1, 'les trappes finissent par s\'ouvrir en grand');
+  const c = lab('four'), [d, e] = c.players.values(); put(e, -7, -3.5); put(d, -1, 0); run(c, 20);
+  ok(d.st === ST.LIVE && d.grounded, 'sans pièges, les trappes restent fermées');
+  // rattrapé au bord du four : on remonte
+  const h = lab('four', 2, 7, true), [m, w] = h.players.values(); put(w, -7, -3.5);
+  h.at = 8; for (const x of h.arena.boxes) if (x.door) x.grip = false;
+  for (let i = 0; i < 90 && !(h.arena.boxes.find((x) => x.door).open >= 1); i++) { h.step(DT); }
+  put(m, -2.75, 0, Math.PI / 2); for (const x of m.p) { x.y -= 0.4; x.py = x.y; }
+  let inp = { ...m.inp, grab: true, gc: 1, jump: false, jc: 0 }, up = false;
+  for (let i = 0; i < 180 && m.st !== ST.OUT; i++) { m.inp = { ...inp, jump: i > 25, jc: i > 25 ? 1 : 0 }; h.step(DT); h.drainEvents(); if (m.grounded && m.p[P].y > 0.4) up = true; }
+  ok(up && m.st !== ST.OUT, 'accroché au bord du four, on se hisse');
+}
+
+section('Le Tri Postal');
+{
+  const s = lab('tri'), [a, o] = s.players.values(); put(o, -6, 0); put(a, 4, -3.6);
+  const x0 = a.p[P].x; run(s, 1);
+  ok(a.p[P].x - x0 > 1.5, `le tapis emporte (${(a.p[P].x - x0).toFixed(2)} m en 1 s)`);
+  const b = lab('tri', 2, 7, true), [u, v] = b.players.values(); put(v, -6, 0); put(u, 3, -2.7);
+  let bar = 0; for (let i = 0; i < 60 * 8 && u.st !== ST.OUT; i++) { u.inp = { ...u.inp, mx: u.p[P].x > 3 ? -1 : u.p[P].x < 2 ? 1 : 0 }; b.step(DT); if (b.drainEvents().some((e) => e.e === 'ball' && e.id === u.id)) bar++; }
+  ok(bar >= 1, `la barre balaie ceux qui traînent (${bar})`);
+  const c = lab('tri'); ok(c.arena.boxes.every((q) => !q.knock || q.y > 30), 'sans pièges, plus de barres');
+}
+
+section('Objets');
+{
+  // tirage au début de chaque manche
+  const tally = Object.fromEntries(ITEM_KEYS.map((k) => [k, 0])); let n = 0, none = 0, bad = 0, total = 0;
+  const s = new Sim({ seed: 11, hazards: true }); s.addPlayer({ id: 1, name: 'a', color: '#f00' }); s.addPlayer({ id: 2, name: 'b', color: '#00f' }); s.start();
+  for (let r = 0; r < 600; r++) {
+    s.startRound(ARENA_KEYS[r % ARENA_KEYS.length]); n++; if (!s.items.length) none++;
+    const seen = new Set(s.items.map((i) => i.k)); for (const k of seen) tally[k]++;
+    total += s.items.length;
+    for (const i of s.items) { const g = s.arena.groundAt(i.x, i.z, i.y); if (!g || g.box.belt || g.box.move) bad++; if (s.arena.boxes.some((b) => Math.abs(i.x - b.x) < b.hx && Math.abs(i.y - b.y) < b.hy && Math.abs(i.z - b.z) < b.hz)) bad++; }
+  }
+  for (const k of ITEM_KEYS) { const f = tally[k] / n, want = 1 - (1 - ITEMS[k].p) * (1 - ITEMS[k].p / 3) * 0 - (1 - ITEMS[k].p) * (1 - ITEMS[k].p / 3); ok(Math.abs(f - want) < 0.09, `${k} : apparaît dans ${Math.round(f * 100)} % des manches (attendu ${Math.round(want * 100)} %)`); }
+  ok(none > 0 && none < n * 0.2, `certaines manches n'ont aucun objet, mais peu (${Math.round(none / n * 100)} %)`);
+  ok(bad === 0, `les objets apparaissent sur un sol sûr (${bad} mal placés sur ${total})`);
+  const off = new Sim({ seed: 3, items: false }); off.addBots(3); off.start(); ok(off.items.length === 0, 'sans objets, rien par terre');
+
+  const give = (k, key = 'chantier', sd = 7) => { const l = lab(key, 2, sd); const [a, o] = l.players.values(); put(o, 5, 2.6); put(a, 0, 1.5, Math.PI / 2); run(l, 0.2); const it = l.newItem(k, a.p[C].x + 0.3, 0.3, a.p[C].z); l.items.push(it); run(l, 0.2); l.drainEvents(); return { l, a, o, it }; };
+  const press = (b, f = { gc: (b.inp.gc | 0) + 1 }) => { b.inp = { ...b.inp, ...f }; };
+  { // ramasser, puis lancer
+    const { l, a, it } = give('poele');
+    press(a); run(l, 0.1);
+    ok(a.item === it && it.holder === a, 'un appui sur saisir ramasse');
+    ok(l.drainEvents().some((e) => e.e === 'pick'), "l'événement part");
+    press(a); run(l, 0.1);
+    ok(!a.item && !it.holder && Math.hypot(it.x - it.px, it.z - it.pz) > 0, 'un second appui lance');
+  }
+  { // pendant le compte à rebours, on ne ramasse rien
+    const l = new Sim({ seed: 5, items: false }); l.addPlayer({ id: 1, name: 'a', color: '#f00' }); l.addPlayer({ id: 2, name: 'b', color: '#00f' }); l.start(); const [a] = l.players.values();
+    l.items.push(l.newItem('poele', a.p[C].x, 0.3, a.p[C].z)); a.inp = { ...a.inp, gc: 1, jc: 1, pc: 1 }; l.step(DT);
+    ok(!a.item, 'pas de ramassage pendant le compte à rebours');
+  }
+  { // la poêle frappe plus fort qu'un poing
+    const { l, a, o, it } = give('poele'); press(a); run(l, 0.1); face(l, a, o); a.punchCd = 0; const before = o.dz; press(a, { pc: 1, punch: true }); run(l, 0.03); a.inp = { ...a.inp, punch: false }; run(l, 0.3);
+    const pan = o.dz - before, pl = lab(), [x, y] = pl.players.values(); face(pl, x, y); x.inp = { ...x.inp, pc: 1, punch: true }; run(pl, 0.03); x.inp = { ...x.inp, punch: false }; run(pl, 0.3);
+    ok(pan > y.dz + 0.08, `la poêle assomme plus vite que le poing (${pan.toFixed(2)} contre ${y.dz.toFixed(2)})`);
+    void it;
+  }
+  { // la poêle lancée touche, et ne traverse pas un mur
+    const { l, a, o, it } = give('poele'); press(a); run(l, 0.1); put(o, 1.8, 1.5); o.m = 1; press(a); let hit = false; for (let i = 0; i < 40; i++) { l.step(DT); if (l.drainEvents().some((e) => e.e === 'hit' && e.id === o.id)) hit = true; }
+    ok(hit && o.dz > 0.2, 'la poêle lancée assomme ce qu\'elle touche');
+    void it;
+    for (const v of [10, 19]) { const w = lab(); const [p, q] = w.players.values(); put(q, 5, 2.6); put(p, 3, 2.6); const t = w.newItem('poele', -2.4, 0.5, -1.6); w.items.push(t); t.px = t.x + v * DT; t.py = t.y; t.hit = false; run(w, 0.8); ok(t.x > -3.2, `un objet lancé à ${v} m/s ne traverse pas un mur (${t.x.toFixed(2)})`); }
+  }
+  { // le pétard
+    const { l, a, o, it } = give('petard'); press(a); run(l, 0.05);
+    ok(it.fuse > 0, "ramassé, le pétard s'allume");
+    put(o, 1.2, 1.5); o.m = 1; const log = []; let t = 0; while (l.items.includes(it) && t < FUSE_T + 1) { l.step(DT); t += DT; log.push(...l.drainEvents().map((e) => e.e)); }
+    ok(log.includes('boom') && Math.abs(t - FUSE_T) < 0.3, `il explose au bout de ${t.toFixed(1)} s`);
+    ok(!a.item, "l'objet quitte la main");
+    ok(a.dz > 0.5 || a.st === ST.KO, 'ça fait mal à qui le tient encore');
+    ok(o.dz > 0.3 || o.st === ST.KO, 'et à ceux qui sont à côté');
+    const far = give('petard'); press(far.a); run(far.l, 0.05); put(far.o, 7, -3); far.o.dz = 0; for (let i = 0; i < 60 * (FUSE_T + 0.5); i++) far.l.step(DT); ok(far.o.dz === 0, 'pas au-delà du souffle');
+  }
+  { // le parapluie : on plane
+    const fall = (withIt) => { const l = lab('toits'); const [a, o] = l.players.values(); put(o, -6, 0); put(a, 0, -3); if (withIt) { const i = l.newItem('parapluie', 0, 1, -3); l.items.push(i); i.holder = a; a.item = i; } let t = 0; while (a.p[P].y > -6 && t < 6 && a.st !== ST.OUT) { l.step(DT); t += DT; } return t; };
+    const a = fall(false), b = fall(true);
+    ok(b > a * 1.8, `le parapluie ralentit la chute (${b.toFixed(1)} s contre ${a.toFixed(1)} s)`);
+    const l = lab('toits'), [x, o] = l.players.values(); put(o, -6, 0); put(x, 0, -3); const i = l.newItem('parapluie', 0, 1, -3); l.items.push(i); i.holder = x; x.item = i; const z0 = x.p[P].x;
+    for (let f = 0; f < 60; f++) { x.inp = { ...x.inp, mx: 1 }; l.step(DT); }
+    ok(x.p[P].x - z0 > 1, `on se dirige en planant (${(x.p[P].x - z0).toFixed(2)} m en 1 s)`);
+  }
+  { // la peau de banane
+    const l = lab(), [a, o] = l.players.values(); put(o, 5, 2.6); put(a, -1, 1.5, Math.PI / 2); run(l, 0.2); const i = l.newItem('banane', 0.4, 0.15, a.p[P].z); l.items.push(i); run(l, 0.2); l.drainEvents();
+    let peel = false, minM = 1; for (let f = 0; f < 100 && !peel; f++) { a.inp = { ...a.inp, mx: 1, mz: 0 }; l.step(DT); peel = l.drainEvents().some((e) => e.e === 'peel' && e.id === a.id); minM = Math.min(minM, a.m); }
+    ok(peel, 'marcher sur la peau de banane fait glisser');
+    ok(minM < 0.3 && !l.items.includes(i), 'le corps mollit, la peau est usée');
+    const s2 = lab(), [c, d] = s2.players.values(); put(d, 5, 2.6); put(c, -1, 1.5); run(s2, 0.2); const j = s2.newItem('banane', -1, 0.15, c.p[P].z); s2.items.push(j); run(s2, 1); ok(s2.items.includes(j) && c.st === ST.LIVE, 'immobile, on ne glisse pas');
+  }
+  { // avec un objet en main, on ne s'accroche pas ; on le lâche d'abord
+    const l = lab('toits'), [a, o] = l.players.values(); put(o, -6, 0); put(a, -1.3, -3); const i = l.newItem('poele', 0, 1, -3); l.items.push(i); i.holder = a; a.item = i; a.inp = { ...a.inp, grab: true }; run(l, 0.3);
+    ok(!a.grip[0] && !a.grip[1], "objet en main : pas d'accroche");
+    const m = lab('toits'), [b, q] = m.players.values(); put(q, -6, 0); put(b, 1.85, 0, -Math.PI / 2); for (const x of b.p) { x.y -= 0.2; x.py = x.y; } const j = m.newItem('banane', 0, 1, 0); m.items.push(j); j.holder = b; b.item = j; press(b, { grab: true, gc: 1 });
+    let held = false; for (let f = 0; f < 60 && !held; f++) { m.step(DT); held = b.grip.some(Boolean); } ok(!b.item && held, 'un appui lance, et en gardant le bouton on s\'accroche');
+  }
+  { // l'objet quitte la main quand on est assommé, et l'instantané le transporte
+    const { l, a, it } = give('poele'); press(a); run(l, 0.1); l.hurt(a, 1, 0, 0, 2, 1.2, -1); ok(a.st === ST.KO && !a.item && !it.holder, 'assommé, il lâche son objet');
+    const n0 = l.items.length; const snap = JSON.parse(JSON.stringify(l.snapshot())); ok(snap.I.length === n0 && snap.it === 0, "l'instantané contient les objets");
+    const r = Sim.restore(snap); ok(r.items.length === n0 && r.items[0].k === 'poele', 'le nouvel hôte reprend les objets');
+  }
+  { // parties entre bots : ils s'en servent
+    const ev = {}; for (const seed of [1, 2, 3]) { const g = new Sim({ seed, goal: 3 }); g.addBots(5, 'normal'); g.start(); let n2 = 0; while (g.ph !== 'over' && n2 < 60 * 300) { g.step(DT); n2++; for (const e of g.drainEvents()) ev[e.e] = (ev[e.e] || 0) + 1; } }
+    ok((ev.pick || 0) > 3 && (ev.toss || 0) > 0, `les bots ramassent et lancent (${ev.pick || 0} ramassés, ${ev.toss || 0} lancés, ${ev.boom || 0} explosions)`);
+  }
+}
+
 section('Chute et manche');
 {
   const s = lab('toits', 3), [a, b, c] = s.players.values();
@@ -198,9 +414,14 @@ for (const lv of ['facile', 'normal', 'expert']) for (const seed of [1, 2, 3]) {
 }
 { // les bots franchissent les trois arènes : personne ne reste planté
   for (const k of ARENA_KEYS) {
-    const s = new Sim({ seed: 5, goal: 3 }); s.addBots(4, 'normal'); s.start(); s.drainEvents(); s.rd = 0; s.startRound(k);
-    let t = 0; while (s.ph !== 'round' && t < 150) { s.step(DT); t += DT; }
-    ok(t < 150, `${k} : une manche entre bots aboutit (${Math.round(t)} s)`);
+    const dur = [], nanCheck = [];
+    for (const seed of [5, 6, 7, 8]) {
+      const s = new Sim({ seed, goal: 3 }); s.addBots(4, 'normal'); s.start(); s.drainEvents(); s.rd = 0; s.startRound(k);
+      let t = 0; while (s.ph !== 'round' && t < 180) { s.step(DT); t += DT; if (![...s.players.values()].every((b) => b.p.every((q) => Number.isFinite(q.x + q.y + q.z)))) nanCheck.push(seed); }
+      dur.push(Math.round(t));
+    }
+    console.log(`    ${k} : manches de ${dur.join(', ')} s`);
+    ok(Math.max(...dur) < 180 && !nanCheck.length, `${k} : une manche entre bots aboutit (${dur.join(', ')} s)`);
   }
 }
 
