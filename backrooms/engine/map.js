@@ -171,8 +171,8 @@ export function createBackroomsMap(seed = 42) {
       const nearSpawn = Math.hypot(x - sx, z - sz) < 7;
       const v = zone(x, z);
       let state = 'on';
-      if (!nearSpawn && v < 0.3) state = 'off';
-      else if (!nearSpawn && (v < 0.38 || rnd() < 0.05)) state = 'flicker';
+      if (!nearSpawn && v < 0.4) state = 'off';
+      else if (!nearSpawn && (v < 0.5 || rnd() < 0.08)) state = 'flicker';
       lights.push({
         x: (x + 0.5) * CELL_SIZE,
         y: WALL_HEIGHT - 0.02,

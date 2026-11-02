@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.67 — 3 novembre 2026
+- **The Backrooms** — un mode « Sans souris » et des couloirs plus sombres.
+  - Un mode « Sans souris », comme dans Mystère Mystère, se choisit dans le menu pause : ZQSD pour marcher, les flèches pour regarder, Entrée pour jouer et Échap pour mettre en pause.
+  - Le jeu se met en pause tant que tu n'as pas pris le contrôle : l'entité ne bouge plus pendant ce temps.
+  - Entrée relance une partie depuis l'écran de fin.
+  - Les néons éclairent moins, la brume est plus épaisse et les zones plongées dans le noir sont plus nombreuses : la lampe torche devient précieuse.
+
 ## 3.66 — 2 novembre 2026
 - **The Backrooms** — le Level 0 devient immense, lent et filmé au vieux caméscope.
   - Le dédale fait maintenant 160 mètres de côté : des milliers de couloirs, de cloisons percées, de piliers et quelques grandes salles vides.

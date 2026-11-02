@@ -16,39 +16,70 @@ let hud = null;
 let stepDist = 0;
 
 // Gestion des touches du clavier
+// Mode sans souris (comme Mystère Mystère) : ZQSD pour marcher, les flèches tournent la vue, Échap ou P met en pause.
+const TURN = 2.2; // vitesse de la vue aux flèches (rad/s)
+const TILT = 1.4;
 const keys = {};
 let mouseDx = 0;
 let mouseDy = 0;
 let isPointerLocked = false;
 let toggleFlashlightRequested = false;
+let kbMode = false;
+let paused = true; // la partie attend qu'on prenne le contrôle
+try {
+  kbMode = localStorage.getItem('backrooms_kb') === '1';
+} catch (e) {}
+
+function setPaused(on) {
+  paused = on;
+  if (on) for (const k in keys) keys[k] = false;
+  if (hud) hud.showPause(on, kbMode);
+}
+
+function play() {
+  if (sfx) sfx.unlock();
+  if (kbMode) setPaused(false);
+  else stageEl.requestPointerLock?.();
+}
+
+function setKbMode(on) {
+  kbMode = on;
+  try {
+    localStorage.setItem('backrooms_kb', on ? '1' : '0');
+  } catch (e) {}
+  if (on && document.pointerLockElement) document.exitPointerLock();
+  if (hud) hud.showPause(paused, kbMode);
+}
 
 window.addEventListener('keydown', (e) => {
-  keys[e.code] = true;
-  if (e.code === 'KeyF') {
-    toggleFlashlightRequested = true;
-  }
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   if (sfx) sfx.unlock();
+  if (paused) {
+    if (kbMode && (e.code === 'Enter' || e.code === 'Space')) play();
+    return;
+  }
+  keys[e.code] = true;
+  if (e.code === 'KeyF' && !e.repeat) toggleFlashlightRequested = true;
+  if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
 
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
 });
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+});
 
 // Pointer Lock pour la visée à la souris
-stageEl.addEventListener('click', () => {
-  if (sfx) sfx.unlock();
-  if (!isPointerLocked) {
-    stageEl.requestPointerLock?.();
-  }
-});
+stageEl.addEventListener('click', play);
 
 document.addEventListener('pointerlockchange', () => {
   isPointerLocked = document.pointerLockElement === stageEl;
-  if (hud) hud.setPromptVisible(!isPointerLocked);
+  if (!kbMode) setPaused(!isPointerLocked);
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (isPointerLocked) {
+  if (isPointerLocked && !kbMode) {
     mouseDx += e.movementX || 0;
     mouseDy += e.movementY || 0;
   }
@@ -74,11 +105,11 @@ function initGame(settings = {}) {
     sfx = new BackroomsSfx();
   }
   if (!hud) {
-    hud = new BackroomsHUD(hudEl);
+    hud = new BackroomsHUD(hudEl, { play, setKbMode });
   }
 
   stepDist = 0;
-  hud.setPromptVisible(!isPointerLocked);
+  setPaused(kbMode ? paused : !isPointerLocked);
 }
 
 // Boucle principale d'animation et de simulation
@@ -93,14 +124,17 @@ function loop(currentTime) {
   accumulator += delta;
 
   if (!sim) return;
+  // en pause, le monde est figé : on redessine seulement
+  if (paused) accumulator = 0;
 
-  // Lecture des entrées utilisateur
+  // Lecture des entrées utilisateur (en mode sans souris, les flèches tournent la vue)
+  const arrows = !kbMode;
   let mx = 0;
   let my = 0;
-  if (keys['KeyW'] || keys['KeyZ'] || keys['ArrowUp']) my += 1;
-  if (keys['KeyS'] || keys['ArrowDown']) my -= 1;
-  if (keys['KeyA'] || keys['KeyQ'] || keys['ArrowLeft']) mx -= 1;
-  if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+  if (keys['KeyW'] || keys['KeyZ'] || (arrows && keys['ArrowUp'])) my += 1;
+  if (keys['KeyS'] || (arrows && keys['ArrowDown'])) my -= 1;
+  if (keys['KeyA'] || keys['KeyQ'] || (arrows && keys['ArrowLeft'])) mx -= 1;
+  if (keys['KeyD'] || (arrows && keys['ArrowRight'])) mx += 1;
 
   const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'];
 
@@ -108,6 +142,10 @@ function loop(currentTime) {
   const sens = 0.0022;
   let newYaw = sim.player.yaw - mouseDx * sens;
   let newPitch = Math.max(-1.3, Math.min(1.3, sim.player.pitch - mouseDy * sens));
+  if (kbMode && !paused) {
+    newYaw -= ((keys['ArrowRight'] ? 1 : 0) - (keys['ArrowLeft'] ? 1 : 0)) * TURN * delta;
+    newPitch = Math.max(-1.3, Math.min(1.3, newPitch + ((keys['ArrowUp'] ? 1 : 0) - (keys['ArrowDown'] ? 1 : 0)) * TILT * delta));
+  }
   mouseDx = 0;
   mouseDy = 0;
 
@@ -152,7 +190,11 @@ function loop(currentTime) {
       } else if (ev.type === 'jumpscare') {
         if (sfx) sfx.jumpscare();
         if (hud) hud.showJumpscare();
-      } else if (ev.type === 'dead') {
+      } else if (ev.type === 'dead' || ev.type === 'win') {
+        // rendre le curseur pour le bouton Rejouer (Entrée marche aussi)
+        if (document.pointerLockElement) document.exitPointerLock();
+      }
+      if (ev.type === 'dead') {
         if (hud) hud.showEnd(sim, () => initGame());
         if (H && H.embedded) {
           H.report({

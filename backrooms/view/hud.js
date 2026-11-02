@@ -2,8 +2,9 @@
 import { ENTITY_IMG } from './scene.js';
 
 export class BackroomsHUD {
-  constructor(container) {
+  constructor(container, actions = {}) {
     this.el = container;
+    this.actions = actions;
     this.el.innerHTML = `
       <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""></div>
 
@@ -32,10 +33,16 @@ export class BackroomsHUD {
       <div class="objective-banner" id="objBanner"></div>
       <div class="toast" id="toast" hidden></div>
 
-      <!-- Message pour verrouiller le curseur -->
+      <!-- Pause : prendre le contrôle et choisir ses commandes -->
       <div class="click-prompt" id="clickPrompt">
-        Clique sur l'écran pour prendre le contrôle
-        <small>ZQSD marcher · Maj courir · F lampe</small>
+        <div class="pause-title">II PAUSE</div>
+        <div class="pause-go" id="pauseGo"></div>
+        <div class="ctrl-choice">
+          <span>COMMANDES</span>
+          <button data-kb="0">SOURIS</button>
+          <button data-kb="1">SANS SOURIS</button>
+        </div>
+        <small id="pauseKeys"></small>
       </div>
 
       <!-- Écran de Fin (Mort ou Victoire) -->
@@ -50,6 +57,14 @@ export class BackroomsHUD {
     `;
 
     this.$ = (s) => this.el.querySelector(s);
+    this.$('#clickPrompt').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-kb]');
+      if (b) this.actions.setKbMode?.(b.dataset.kb === '1');
+      else this.actions.play?.();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter' && !this.$('#endScreen').hidden) this.$('#btnRestart').click();
+    });
     const img = this.$('#scareImg');
     img.onerror = () => img.remove();
     img.src = ENTITY_IMG;
@@ -163,8 +178,13 @@ export class BackroomsHUD {
     };
   }
 
-  setPromptVisible(visible) {
+  showPause(visible, kb) {
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
+    this.$('#pauseGo').textContent = kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
+    this.$('#pauseKeys').textContent = kb
+      ? 'ZQSD marcher · Flèches regarder · Maj courir · F lampe · Échap pause'
+      : 'ZQSD marcher · Souris regarder · Maj courir · F lampe · Échap pause';
+    for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }
 

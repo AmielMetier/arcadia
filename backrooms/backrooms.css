@@ -199,7 +199,21 @@ html, body {
   pointer-events: auto;
   cursor: pointer;
 }
-.click-prompt small { display: block; font-size: 22px; opacity: 0.75; margin-top: 4px; }
+.click-prompt small { display: block; font-size: 20px; opacity: 0.75; margin-top: 10px; }
+.pause-title { font-size: 40px; margin-bottom: 4px; }
+.pause-go { font-size: 26px; margin-bottom: 14px; animation: recBlink 1.4s steps(1) infinite; }
+.ctrl-choice { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 22px; }
+.ctrl-choice button {
+  font-family: inherit;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: #f2f0e6;
+  background: transparent;
+  border: 2px solid rgba(242, 240, 230, 0.5);
+  padding: 2px 12px;
+  cursor: pointer;
+}
+.ctrl-choice button.on { background: #f2f0e6; color: #000; border-color: #f2f0e6; }
 
 /* Écran de fin */
 .end-screen {

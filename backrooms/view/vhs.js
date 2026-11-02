@@ -63,7 +63,7 @@ void main() {
   // étalonnage délavé : noirs relevés, couleurs ternes, teinte jaune-vert du vieux caméscope
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(lum), col, 0.72);
-  col = col * vec3(1.02, 1.0, 0.82) + vec3(0.035, 0.032, 0.02);
+  col = col * vec3(1.02, 1.0, 0.82) + vec3(0.018, 0.016, 0.01);
 
   // lignes de balayage, grain, bande claire
   col *= 0.9 + 0.1 * sin(vUv.y * uRes.y * 1.7);
@@ -90,7 +90,7 @@ export function createVhsFilter(renderer) {
       tDiffuse: { value: target.texture },
       uTime: { value: 0 },
       uDanger: { value: 0 },
-      uExposure: { value: 1.0 },
+      uExposure: { value: 0.85 },
       uRes: { value: new THREE.Vector2(1, 1) },
     },
     vertexShader,

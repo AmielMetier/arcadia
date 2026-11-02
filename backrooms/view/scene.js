@@ -12,12 +12,12 @@ const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
 export const ENTITY_IMG = new URL('../img/entite.png', import.meta.url).href;
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
-const AMBIENT = 0.035; // lumière minimale dans les zones mortes
+const AMBIENT = 0.015; // lumière minimale dans les zones mortes
 
 export function createBackroomsScene(container, map) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#1a160b');
-  scene.fog = new THREE.FogExp2('#2a2412', 0.04);
+  scene.background = new THREE.Color('#0d0b06');
+  scene.fog = new THREE.FogExp2('#14110a', 0.05);
 
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map.spawn.x, 1.6, map.spawn.z);
@@ -64,7 +64,7 @@ export function createBackroomsScene(container, map) {
     live.set(base);
     for (const f of flickers) if (f.k > 0) addLight(live, f.l, f.k);
     for (let i = 0; i < W * H; i++) {
-      const v = Math.min(1, AMBIENT + live[i] * 0.5); // stocké à moitié : jusqu'à 2 de lumière
+      const v = Math.min(1, AMBIENT + live[i] * 0.36); // stocké à moitié : jusqu'à 2 de lumière
       bakeData[i * 4] = Math.round(v * 255);
     }
     bakeTex.needsUpdate = true;
@@ -119,7 +119,7 @@ export function createBackroomsScene(container, map) {
   wallsMesh.instanceMatrix.needsUpdate = true;
   scene.add(wallsMesh);
 
-  scene.add(new THREE.AmbientLight('#fff3c4', 0.12));
+  scene.add(new THREE.AmbientLight('#fff3c4', 0.05));
 
   // 4. Néons au plafond (les morts sont gris, ceux qui grésillent clignotent)
   const ON = new THREE.Color('#fffbe2');
@@ -136,7 +136,7 @@ export function createBackroomsScene(container, map) {
   scene.add(fixtures);
 
   // 5. Lampe torche du joueur (attachée à la caméra)
-  const flashLight = new THREE.SpotLight('#fff1d0', 16, 26, Math.PI / 6.5, 0.45, 1.5);
+  const flashLight = new THREE.SpotLight('#fff1d0', 20, 24, Math.PI / 6.5, 0.45, 1.5);
   flashLight.position.set(0.15, -0.12, 0);
   camera.add(flashLight);
   const flashTarget = new THREE.Object3D();
