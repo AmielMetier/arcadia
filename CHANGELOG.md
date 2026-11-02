@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.57 — 2 novembre 2026
+## 3.58 — 2 novembre 2026
 - **Site Noir** — on comprend quoi faire, on entend tout, et le monstre fait enfin peur.
   - On sait toujours quoi faire : l'objectif, une flèche qui suit les couloirs et la distance à pied s'affichent en haut de l'écran, les étapes aussi. Des bandes de couleur au sol et des panneaux mènent au badge, à la clé, au générateur et à l'ascenseur, et les meubles à fouiller accrochent un reflet.
   - De vrais sons : les pas changent selon le sol (gravier, moquette, béton, métal, marches), la course s'entend, la lampe claque à l'allumage et à l'extinction, les fonds varient selon l'endroit, et des bruits lointains viennent de partout. Derrière un mur, tout est étouffé.
@@ -9,6 +9,14 @@
   - Au départ, chacun a déjà son appareil photo, et une seule table propose capteur, kit caméras et piles. Ce que tu trouves en fouillant va directement dans ton sac.
   - Les menus ont le même style que ceux des autres jeux, et l'escalier a de vraies marches, correctement éclairées.
 
+## 3.57 — 2 novembre 2026
+- **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :
+  - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges, Ho-Oh, la Team Éclipse, Lugia Obscur et Odyssor (passable à tout moment).
+  - **Introduction du Professeur Saule** : scène sobre façon DS avec le sprite du Prof. Saule qui lance une Poké Ball d'où sort un starter, sélection du personnage par cartes illustrées, carte officielle d'enregistrement du prénom avec suggestions en un clic, et apparition du voisin Théo.
+  - **Course continue (COURSE / touche R)** : bouton sur le HUD (et touche R ou Verr. Maj) pour courir en permanence sans maintenir Shift.
+  - **Décors de combat & HUD rétro 5G (*Noir 2 / Blanc 2*)** : 11 nouveaux fonds de combat en pixel-art 16-bit (prairie, mer, arène, Ligue, grotte, neige, volcan, de jour comme de nuit), socles assortis, boîtes de statut 5G biseautées avec Poké Balls d'équipe, badges de types, barres PV / EXP segmentées, boutons d'action illustrés et cartes de capacités détaillées (catégorie, type, puissance et PP).
+  - **Police d'écriture (Chakra Petch)** : chiffres nets et alignés dans tous les menus et compteurs de PV.
+
 ## 3.56 — 2 novembre 2026
 - **Site Noir** — nouveau jeu : de l'horreur à la première personne, un monstre contre trois ou quatre enquêteurs, en 15 minutes environ
   - Enquêteurs : une lampe, une batterie, trois cases. Fouillez les meubles pour trouver le badge, la clé et les fusibles, relancez le générateur, prenez l'ascenseur et remontez avec au moins une preuve.
@@ -16,8 +24,16 @@
   - Monstre : tu vois dans le noir, les corps chauds brillent, tu entends les bruits autour du viseur, tu coupes les lumières, bloques les portes, casses les caméras et sabotes le générateur.
   - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
   - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
-
 ## 3.55 — 2 novembre 2026
+- **Mollo !** — Le combat est revu de fond en comble.
+  - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.
+  - Nouveau : la garde (Maj ou C). Elle arrête les poings, mais elle s'use vite.
+  - Le gros coup brise la garde, la saisie passe à travers et attrape celui qui arme, le poing fait lâcher une saisie : à toi de lire l'adversaire.
+  - Trois poings d'affilée éjectent. Assommer demande plus de travail : il fallait 4 poings, il en faut environ 9.
+  - Un gros coup dans le vide te déséquilibre, et une barre sous chaque nom montre qui est sonné.
+  - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
+  - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
+  - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
 - **Odyssée** — un HUD en jeu montre en permanence ton équipe, ton argent, tes badges et le lieu où tu te trouves.
   - À gauche : les six créatures de l'équipe dans leurs capsules (sprite animé, niveau, statut, barres de PV et d'EXP) ; cliquer sur une créature ouvre son résumé, et le bouton `⇅` (ou le clic droit) permet de changer l'ordre de l'équipe à la volée.
   - En haut à droite : encadré Pokégear avec le lieu actuel, l'argent, les badges d'Arène et quatre raccourcis rapides (`ÉQUIPE`, `SAC`, `CARTE`, `SAUVER`).

@@ -97,6 +97,62 @@ section('Coups');
   ok(v1 > v0 * 1.3, `le gros coup porte plus (${v1.toFixed(1)} contre ${v0.toFixed(1)} m/s)`);
 }
 
+section('Visée et série de poings');
+{
+  const jab = (x) => { x.inp = { ...x.inp, pc: (x.inp.pc | 0) + 1, punch: false }; };
+  // le coup va chercher la cible, même mal orienté ou un peu loin
+  for (const [d, ang] of [[0.7, 0], [1.1, 40], [1.4, 60], [1.6, 20]]) {
+    const s = lab(), [a, b] = s.players.values(); const A = ang * Math.PI / 180;
+    put(a, 0, 1.5, Math.PI / 2); put(b, d * Math.cos(A), 1.5 + d * Math.sin(A), -Math.PI / 2); run(s, 0.25); s.drainEvents();
+    jab(a); let hit = false; run(s, 0.35, () => { hit = hit || s.events.some((e) => e.e === 'hit'); });
+    ok(hit, `à ${d} m et ${ang}° de côté, le poing touche`);
+  }
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5, Math.PI / 2); put(b, -1, 1.5, Math.PI / 2); run(s, 0.25); s.drainEvents(); jab(a); let hit = false; run(s, 0.35, () => { hit = hit || s.events.some((e) => e.e === 'hit'); }); ok(!hit, 'celui qui est dans le dos reste à l\'abri'); }
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5, Math.PI / 2); put(b, 3, 1.5, -Math.PI / 2); run(s, 0.25); s.drainEvents(); jab(a); let hit = false; run(s, 0.35, () => { hit = hit || s.events.some((e) => e.e === 'hit'); }); ok(!hit, 'à 3 m, le poing frappe dans le vide'); }
+  // un poing compte pour la poitrine, le KO demande du travail
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); const x0 = b.p[C].x; jab(a); let head = -1; run(s, 0.3, () => { for (const e of s.events) if (e.e === 'hit') head = e.head; }); s.drainEvents(); ok(head === 0, 'un poing frappe la poitrine'); ok(b.dz < 0.2 && b.p[C].x - x0 < 0.7, `un poing seul n'envoie pas loin (${(b.p[C].x - x0).toFixed(2)} m, sonné ${b.dz.toFixed(2)})`); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); let t = 0, n = 0; while (b.st !== ST.KO && t < 8) { if (n++ % 18 === 0) jab(a); const dx = b.p[C].x - a.p[P].x; a.inp = { ...a.inp, mx: dx > 0.85 ? 1 : 0 }; s.step(DT); t += DT; s.drainEvents(); } ok(t > 2 && t < 6, `assommer aux poings demande ${t.toFixed(1)} s`); }
+  // trois poings d'affilée éjectent
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); let k = []; let n = 0; const x0 = b.p[C].x; for (let i = 0; i < 70; i++) { if (n++ % 18 === 0 && k.length < 3) jab(a); const dx = b.p[C].x - a.p[P].x; a.inp = { ...a.inp, mx: dx > 0.85 ? 1 : 0 }; s.step(DT); for (const e of s.drainEvents()) if (e.e === 'hit') k.push(e.k); } ok(k.length === 3 && k[0] === 0 && k[1] === 0 && k[2] > 0, `la série finit par un coup plus fort (${k.join(', ')})`); ok(b.p[C].x - x0 > 1, `il part en arrière (${(b.p[C].x - x0).toFixed(2)} m)`); }
+  // encaisser interrompt, sauf un gros coup déjà bien armé
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); b.inp = { ...b.inp, pc: 1, punch: true }; run(s, 0.2); jab(a); run(s, 0.2); ok(b.charge > 0, 'un poing n\'arrête pas un gros coup bien armé'); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); a.inp = { ...a.inp, pc: 1, punch: true }; run(s, 0.42); a.inp = { ...a.inp, punch: false }; run(s, 0.3); ok(b.flinch >= 0 && b.dz > 0.3, 'le gros coup sonne pour de bon'); }
+  // un gros coup dans le vide déséquilibre
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5, Math.PI / 2); put(b, -5, 1.5); run(s, 0.25); a.inp = { ...a.inp, pc: 1, punch: true }; run(s, 0.42); a.inp = { ...a.inp, punch: false }; let dip = 0; run(s, 0.4, () => { dip = Math.max(dip, a.dip); }); ok(dip > 0.3, `un gros coup manqué déséquilibre (${dip.toFixed(2)})`); }
+  // au réveil, un répit
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); b.st = ST.KO; b.ko = 0.01; run(s, 0.05); ok(b.st === ST.LIVE && b.grace > 0, 'au réveil, un répit'); b.dz = 0.9; s.hurt(b, 1, 0, 0, 3, 0.5, a.id); ok(b.st === ST.LIVE, 'on ne se fait pas rassommer aussitôt'); }
+}
+
+section('Garde');
+{
+  const jab = (x) => { x.inp = { ...x.inp, pc: (x.inp.pc | 0) + 1, punch: false }; };
+  const up = (s, b) => { b.inp = { ...b.inp, guard: true }; run(s, 0.05); };
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); up(s, b); ok(b.guard, 'la garde se lève'); jab(a); const log = []; run(s, 0.3, () => { log.push(...s.events.map((e) => e.e)); }); ok(log.includes('block') && !log.includes('hit'), 'elle arrête un poing de face'); ok(b.dz === 0, 'et il ne sonne pas'); ok(a.flinch > 0 || a.punchCd > 0, 'celui qui tape dans la garde perd le rythme'); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); b.yaw = Math.PI / 2; run(s, 0.25); s.drainEvents(); up(s, b); jab(a); const log = []; run(s, 0.3, () => { log.push(...s.events.map((e) => e.e)); }); ok(log.includes('hit'), 'par-derrière, la garde ne sert à rien'); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); up(s, b); a.inp = { ...a.inp, pc: 1, punch: true }; run(s, 0.42); a.inp = { ...a.inp, punch: false }; const log = []; run(s, 0.35, () => { log.push(...s.events.map((e) => e.e)); }); ok(log.includes('break'), 'le gros coup brise la garde'); ok(b.dz > 0.3 && !b.guard && b.guardCd > 0, `et sonne (${b.dz.toFixed(2)})`); }
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5, Math.PI / 2); put(b, 5, 1.5); run(s, 0.25); a.inp = { ...a.inp, guard: true }; let t = 0; while (a.guard || t < 0.1) { s.step(DT); t += DT; if (t > 6) break; } ok(t > 2 && t < 4, `la garde s'use toute seule (${t.toFixed(1)} s)`); ok(a.guardCd > 0, 'puis il faut attendre'); }
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5); put(b, 5, 1.5); run(s, 0.25); const x = a.p[P].z; a.inp = { ...a.inp, guard: true, mz: 1 }; run(s, 1); const g = a.p[P].z - x, u = lab(), [c, d] = u.players.values(); put(c, 0, 0); put(d, 5, 1.5); run(u, 0.25); const y = c.p[P].z; c.inp = { ...c.inp, mz: 1 }; run(u, 1); ok(g < (c.p[P].z - y) * 0.55, `en garde, on avance moins vite (${g.toFixed(2)} contre ${(c.p[P].z - y).toFixed(2)} m)`); }
+  { const s = lab(), [a, b] = s.players.values(); put(a, 0, 1.5); put(b, 5, 1.5); run(s, 0.25); a.inp = { ...a.inp, guard: true, pc: 1, punch: true }; run(s, 0.5); ok(a.guard && a.charge === 0, 'on ne frappe pas et on ne se protège pas en même temps'); }
+}
+
+section('Saisir contre le reste');
+{
+  const jab = (x) => { x.inp = { ...x.inp, pc: (x.inp.pc | 0) + 1, punch: false }; };
+  const grab = (a) => { a.inp = { ...a.inp, grab: true, gc: (a.inp.gc | 0) + 1 }; };
+  // la saisie passe la garde et attrape celui qui arme
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); b.inp = { ...b.inp, guard: true }; run(s, 0.1); grab(a); const log = []; run(s, 0.3, () => { log.push(...s.events); }); const g = log.find((e) => e.e === 'grab'); ok(g && g.caught === 1, 'la saisie passe la garde'); ok(!b.guard && b.dz > 0.15, 'et le prend à contre-pied'); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); s.drainEvents(); b.inp = { ...b.inp, pc: 1, punch: true }; run(s, 0.2); grab(a); const log = []; run(s, 0.3, () => { log.push(...s.events); }); const g = log.find((e) => e.e === 'grab'); ok(g && g.caught === 1 && b.charge === 0, 'celui qui arme se fait attraper, et son coup part en fumée'); }
+  // le poing fait lâcher
+  { let freed = 0; for (let k = 0; k < 10; k++) { const s = lab('chantier', 2, 20 + k), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); grab(a); run(s, 0.3); let t = 0; for (let n = 0; t < 1.5 && a.grip.some((q) => q && q.o); n++) { if (n % 8 === 0) jab(b); s.step(DT); t += DT; } if (!a.grip.some((q) => q && q.o)) freed++; } ok(freed >= 6, `marteler le poing fait lâcher (${freed} fois sur 10 en 1,5 s)`); }
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); jab(b); run(s, 0.12); ok(a.grabLock > 0, 'juste après un poing, on ne peut plus attraper'); grab(a); run(s, 0.1); ok(!a.grip.some((q) => q && q.o), 'la saisie est interrompue'); }
+  // le coup de tête, puis soulever
+  { const s = lab(), [a, b] = s.players.values(); face(s, a, b); run(s, 0.25); grab(a); run(s, 0.4); a.inp = { ...a.inp, jump: true }; run(s, 0.2); ok(!a.lifting, 'trop réveillé pour être soulevé'); a.inp = { ...a.inp, jump: false }; run(s, 0.05); s.drainEvents(); const d0 = b.dz; jab(a); const log = []; run(s, 0.1, () => { log.push(...s.events); }); ok(log.some((e) => e.e === 'hit' && e.head === 1) && b.dz > d0 + 0.2, `en le tenant, un coup de tête (${b.dz.toFixed(2)})`); ok(a.grip.some((q) => q && q.o), 'sans le lâcher'); run(s, 0.75); jab(a); run(s, 0.1); a.inp = { ...a.inp, jump: true }; run(s, 0.2); ok(a.lifting === 1, 'bien sonné, il décolle'); }
+  // deux pantins qui se tiennent ne s'emballent pas
+  { const s = lab(), [a, b] = s.players.values(); put(a, -2, 1.5, Math.PI / 2); put(b, -1.2, 1.5, -Math.PI / 2); run(s, 0.25); grab(a); run(s, 0.5); const x = a.p[P].x; let dr = 0; run(s, 5, () => { dr = Math.max(dr, Math.abs(a.p[P].x - x)); }); ok(dr < 1 && a.st === ST.LIVE && b.st === ST.LIVE, `sans commande, le couple ne part pas tout seul (${dr.toFixed(2)} m en 5 s)`); }
+  // on peut pousser et tirer
+  for (const dir of [1, -1]) { const s = lab(), [a, b] = s.players.values(); put(a, -2, 1.5, Math.PI / 2); put(b, -1.2, 1.5, -Math.PI / 2); run(s, 0.25); grab(a); run(s, 0.5); const x = b.p[P].x; a.inp = { ...a.inp, mx: dir }; run(s, 1.5); ok((b.p[P].x - x) * dir > 1, `tenu, il se laisse ${dir > 0 ? 'pousser' : 'tirer'} (${(b.p[P].x - x).toFixed(2)} m en 1,5 s)`); }
+}
+
 section('KO mou, puis réveil');
 {
   const s = lab(), [a, b] = s.players.values();
@@ -229,7 +285,7 @@ section('Collisions');
     while (s.ph !== 'over' && n < 60 * 180) {
       const pv = new Map([...s.players.values()].map((b) => [b.id, b.p.map((q) => ({ x: q.x, y: q.y, z: q.z }))]));
       s.step(DT); s.drainEvents(); n++; steps++;
-      for (const b of s.players.values()) { if (b.st === ST.OUT) continue; b.p.forEach((q, i) => { if (i >= 3 && i <= 4 && b.grip[i - 3]) return; for (const B of s.arena.boxes) { if (b.climb && b.climb.box === B) continue; if (B.y > 30) continue; const d = depth(q, B); if (d > 0.08 && !B.crush) { deepBody++; maxD = Math.max(maxD, d); } const a = pv.get(b.id)[i]; if (!B.move && Math.hypot(a.x - q.x, a.y - q.y, a.z - q.z) < 1 && side(a, q, B)) cross++; } }); }
+      for (const b of s.players.values()) { if (b.st === ST.OUT) continue; b.p.forEach((q, i) => { if (i >= 3 && i <= 4 && b.grip[i - 3]) return; for (const B of s.arena.boxes) { if (b.climb && b.climb.box === B) continue; if (B.door) continue; /* une trappe qui se referme sur un corps qui tombe : le choc dure un pas */ if (B.y > 30) continue; const d = depth(q, B); if (d > 0.08 && !B.crush) { deepBody++; maxD = Math.max(maxD, d); } const a = pv.get(b.id)[i]; if (!B.move && Math.hypot(a.x - q.x, a.y - q.y, a.z - q.z) < 1 && side(a, q, B)) cross++; } }); }
     }
   }
   ok(cross === 0, `aucun point ne traverse une boîte (${cross} sur ${steps} pas)`);

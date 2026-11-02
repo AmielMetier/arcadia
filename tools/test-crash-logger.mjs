@@ -3,7 +3,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,7 +55,7 @@ for (const line of lines) {
 
 // 5. Chaque jeu du registre (hub/games.js) est reconnu par le capteur quand il est ouvert seul, et décrit dans le catalogue
 globalThis.window = {};
-await import(path.join(ROOT, 'hub/games.js'));
+await import(pathToFileURL(path.join(ROOT, 'hub/games.js')).href);
 const ids = window.HUB_GAMES.map((g) => g.id);
 const loggerSrc = fs.readFileSync(path.join(ROOT, 'shared/logger.js'), 'utf8');
 const pathRe = /\/\(([a-z|]+)\)\(\?:\\\/\|\$\)/.exec(loggerSrc);

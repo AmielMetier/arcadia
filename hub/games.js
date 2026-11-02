@@ -1,6 +1,22 @@
 /* Registre des jeux du Hub. Ajouter un jeu = ajouter une entrée ici et un dossier avec son index.html. */
 window.HUB_GAMES = [
   {
+    id: 'dogfight',
+    title: 'Dogfight 3D',
+    tag: 'Bataille aérienne en F-16',
+    desc: 'Prends les commandes d\'un chasseur F-16 au-dessus de l\'île, vise au canon rotatif Vulcan et abats tes adversaires en plein vol.',
+    url: 'dogfight/',
+    minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
+    accent: '#2563eb',
+    icon: '✈️', score: 'Éliminations',
+    settings: [
+      { key: 'kills', label: 'Éliminations pour gagner', options: [[5, '5 victoires'], [8, '8 victoires'], [15, '15 victoires']], def: 8 },
+      { key: 'bots', label: 'Pilotes IA (Bots)', options: [[0, 'Aucun'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']], def: 3 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'As du ciel (Difficile)']], def: 'normal' },
+    ],
+    cover: 'dogfight/img/affiche.jpg',
+  },
+  {
     id: 'drift',
     title: 'Duo Drift',
     tag: 'Course & bataille',
@@ -260,6 +276,9 @@ window.HUB_GAMES = [
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
+  dogfight: { genre: 'action', time: '5–10 min',
+    keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
+    tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },
   drift: { genre: 'course', time: '5–15 min',
     keys: [['Flèches / ZQSD', 'Conduire'], ['Espace', 'Nitro / objet'], ['Maj', 'Frein à main'], ['Échap', 'Pause']],
     tips: ['Le nitro se recharge en driftant.', 'Les raccourcis des villes valent le détour.', 'Le fantôme de ton meilleur tour se partage avec tes potes.'] },
@@ -303,7 +322,7 @@ window.HUB_GAME_INFO = {
     keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile · hurlement du monstre'], ['T', 'Écrans des caméras'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
     tips: ['Courir fait du bruit : le monstre l\'entend. Accroupi, tu es presque muet.', 'Une photo prise de près l\'aveugle un instant, et compte comme preuve.', 'Sans preuve, l\'extraction ne sert à rien : passe le capteur EMF sur les traces vertes.', 'La première mise à terre pardonne : la seconde, non.'] },
   mollo: { genre: 'party', time: '5–10 min',
-    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],
-    tips: ['Les coups à la tête assomment bien plus vite.', 'Assommé, il ne pèse plus rien : saisis-le, saute pour le soulever, lâche pour le jeter.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
+    keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['Maj / C', 'Se protéger'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],
+    tips: ['La garde arrête les poings, le gros coup la brise, la saisie passe à travers.', 'Attrape celui qui arme un gros coup : son coup part en fumée.', 'Trois poings d\'affilée éjectent.', 'La barre sous un nom vire au rouge : il est assez sonné pour être soulevé. Saisis-le, saute, lâche au bord.', 'En tenant quelqu\'un, F donne un coup de tête.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
 };
 window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];

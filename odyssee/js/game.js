@@ -37,6 +37,8 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.autoRun = false;
+    try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
@@ -308,7 +310,7 @@ export class Game {
     const tx = p.x + dx, ty = p.y + dy, t = m.get(tx, ty);
     // sortie par le tapis
     if (m.get(p.x, p.y) === T.MAT && d === 'down') { const w = m.warpAt(p.x, p.y); if (w) { this.warp(w, 'exit'); return; } }
-    const run = this.input.isDown('run');
+    const run = this.autoRun ? !this.input.isDown('run') : this.input.isDown('run');
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
       if (m.in(tx, ty) && t === T.WATER && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: SURF }; p.walking = true; return; }
@@ -414,7 +416,17 @@ export class Game {
   }
 
   /* ================= touches ================= */
+  toggleAutoRun() {
+    this.autoRun = !this.autoRun;
+    try { localStorage.setItem('odyssee-autorun', this.autoRun ? '1' : '0'); } catch (e) {}
+    this.sound.sfx(this.autoRun ? 'select' : 'cancel');
+    this.hud?.update(true);
+    this.ui.toast(this.autoRun ? 'Course continue activée !' : 'Course continue désactivée', 1300);
+  }
   async onKey(k) {
+    if (!this.state) return;
+    if (k === 'hud') { this.hud?.toggle(); return; }
+    if (k === 'autorun') { if (!this.busy && !this.bv.alive) this.toggleAutoRun(); return; }
     if (this.busy || !this.state || this.player.move) return;
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();

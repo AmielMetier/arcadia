@@ -78,7 +78,7 @@ async function boot() {
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') bye(); });
   addEventListener('pagehide', bye);
   cloud.fetch();
-  window.__ody = { game, world, view, ui, sound, cloud, mon: (sp, lvl) => createMon(sp, lvl) };
+  window.__ody = { game, world, view, ui, sound, cloud, mon: (sp, lvl) => createMon(sp, lvl), playIntroVideo: () => playIntroVideo(ui, input, sound), testIntro: () => intro(game, ui, sound) };
 
   // rendu en basse résolution, agrandi sans lissage : chaque « pixel » du jeu fait --px pixels d'écran
   const resize = () => {
@@ -154,7 +154,7 @@ async function boot() {
       if (useRemote) { try { localStorage.setItem(Game.SAVE_KEY, JSON.stringify(remote)); } catch (e) {} }
       state = useRemote ? game.load(remote) : game.load();
     }
-    else state = await intro(game, ui, sound);
+    else { await playIntroVideo(ui, input, sound); state = await intro(game, ui, sound); }
     await ui.fade(true, 300);
     mode = 'game';
     await game.start(state);
@@ -238,8 +238,252 @@ async function onlineScreen(ui, cloud, info) {
   await ui.say(`Partie de ${r.name} chargée ! Choisis « Continuer » pour la reprendre.`);
 }
 
+/** cinématique d'ouverture (30 s) lancée au début d'une nouvelle partie, avant le Prof. Saule */
+async function playIntroVideo(ui, input, sound) {
+  sound.play(null);
+  await ui.fade(true, 250);
+  const s = el('div', 'screen cine-scr', '<video class="cine-vid" src="img/intro.mp4" playsinline preload="auto"></video><button type="button" class="cine-skip">Passer la cinématique (Entrée / Échap)</button>');
+  uiRoot.appendChild(s);
+  const vid = s.querySelector('.cine-vid'), skipBtn = s.querySelector('.cine-skip');
+  vid.volume = Math.max(0, Math.min(1, sound.vol ?? 0.7));
+  await ui.fade(false, 300);
+  await new Promise((res) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      pop();
+      try { vid.pause(); } catch (e) {}
+      res();
+    };
+    const pop = input.push((k) => {
+      if (k === 'a' || k === 'b' || k === 'menu') { sound.sfx('select'); finish(); }
+    });
+    skipBtn.addEventListener('click', (e) => { e.stopPropagation(); sound.sfx('select'); finish(); });
+    vid.addEventListener('ended', finish, { once: true });
+    vid.addEventListener('error', finish, { once: true });
+    const p = vid.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        vid.muted = true;
+        vid.play().catch(finish);
+      });
+    }
+  });
+  await ui.fade(true, 300);
+  s.remove();
+  await ui.fade(false, 250);
+}
+
 /** présentation du professeur, choix du personnage et du nom */
+function chooseGenderCard(ui, input, sound, parent) {
+  return new Promise((resolve) => {
+    const wrap = el('div', 'intro-cards', `
+      <div class="intro-card on" data-g="m">
+        <span class="intro-card-tag">DRESSEUR INTRÉPIDE</span>
+        <div class="intro-card-art">
+          <img src="img/dresseurs/player_m.png" alt="Garçon">
+          <div class="intro-card-spr m"></div>
+        </div>
+        <div class="intro-card-title">Garçon</div>
+        <div class="intro-card-sub">Prêt à braver les vents et les arènes de l'archipel</div>
+      </div>
+      <div class="intro-card" data-g="f">
+        <span class="intro-card-tag">EXPLORATRICE CÉLESTE</span>
+        <div class="intro-card-art">
+          <img src="img/dresseurs/player_f.png" alt="Fille">
+          <div class="intro-card-spr f"></div>
+        </div>
+        <div class="intro-card-title">Fille</div>
+        <div class="intro-card-sub">Guidée par les étoiles et le chant des océans</div>
+      </div>
+    `);
+    parent.appendChild(wrap);
+    const cards = [...wrap.querySelectorAll('.intro-card')];
+    let idx = 0;
+    const sync = () => cards.forEach((c, k) => c.classList.toggle('on', k === idx));
+    const finish = (g) => {
+      pop();
+      sound.sfx('select');
+      wrap.remove();
+      ui.closeDialog();
+      resolve(g);
+    };
+    cards.forEach((c, k) => {
+      c.addEventListener('pointerenter', () => { if (idx !== k) { idx = k; sound.sfx('blip'); sync(); } });
+      c.addEventListener('click', (e) => { e.stopPropagation(); idx = k; sync(); finish(c.dataset.g); });
+    });
+    const pop = input.push((k) => {
+      if (k === 'left' || k === 'up' || k === 'right' || k === 'down') {
+        idx = idx === 0 ? 1 : 0;
+        sound.sfx('blip');
+        sync();
+      } else if (k === 'a') {
+        finish(cards[idx].dataset.g);
+      }
+    });
+  });
+}
+
+function chooseTrainerName(ui, input, sound, gender, parent) {
+  return new Promise((resolve) => {
+    const def = gender === 'f' ? 'Lyra' : 'Ethan';
+    const presets = gender === 'f'
+      ? ['Lyra', 'Céleste', 'Aurore', 'Marina', 'Luna', 'Iris']
+      : ['Ethan', 'Sacha', 'Léo', 'Orion', 'Marin', 'Solal'];
+    const spr = gender === 'f' ? 'img/dresseurs/player_f.png' : 'img/dresseurs/player_m.png';
+    const card = el('div', 'intro-idcard', `
+      <div class="intro-id-left">
+        <img src="${spr}" alt="">
+        <div class="intro-id-badge">BOURG-AUBE · LIGUE D'ODYSSÉE</div>
+      </div>
+      <div class="intro-id-right">
+        <div class="intro-id-head">Carte d'enregistrement · Quel est ton prénom ?</div>
+        <input class="intro-id-in" maxlength="10" spellcheck="false" autocomplete="off" value="${esc(def)}">
+        <div class="intro-id-chips">
+          ${presets.map((p) => `<button type="button" class="intro-id-chip" data-name="${esc(p)}">${esc(p)}</button>`).join('')}
+        </div>
+        <div class="intro-id-foot">
+          <span class="intro-id-hint">Tape ton prénom (max 10 lettres) ou choisis une suggestion</span>
+          <button type="button" class="intro-id-ok">Valider ▸</button>
+        </div>
+      </div>
+    `);
+    parent.appendChild(card);
+    const inp = card.querySelector('.intro-id-in');
+    const okBtn = card.querySelector('.intro-id-ok');
+    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+    const pop = input.push(() => {});
+    const submit = () => {
+      const v = inp.value.trim() || def;
+      pop();
+      card.remove();
+      sound.sfx('select');
+      resolve(v);
+    };
+    card.querySelectorAll('.intro-id-chip').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sound.sfx('blip');
+        inp.value = btn.dataset.name;
+        inp.focus();
+      });
+    });
+    okBtn.addEventListener('click', (e) => { e.stopPropagation(); submit(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      e.stopPropagation();
+    });
+  });
+}
+
 async function intro(game, ui, sound) {
+  const input = ui.input;
+  sound.play('lab');
+  const sparksHtml = Array.from({ length: 26 }, (_, i) => {
+    const left = (i * 37) % 100, bottom = (i * 19) % 75, delay = ((i * 0.43) % 5.2).toFixed(2), dur = (4.2 + (i % 4) * 0.7).toFixed(2);
+    return `<i class="intro-spark" style="left:${left}%;bottom:${bottom}%;animation-delay:${delay}s;animation-duration:${dur}s"></i>`;
+  }).join('');
+
+  const starterSp = R(1001);
+  const s = el('div', 'screen intro-scr', `
+    <div class="intro-bg"></div>
+    <div class="intro-beam"></div>
+    <div class="intro-sparks">${sparksHtml}</div>
+    <div class="intro-header"><i class="intro-header-dot"></i><span class="intro-chap">LABORATOIRE DE BOURG-AUBE · PROF. SAULE</span></div>
+    <div class="intro-stage">
+      <div class="intro-pedestal"></div>
+      <div class="intro-subped"></div>
+      <img class="intro-prof" src="${ASSETS.portrait('saule') || ASSETS.trainer('saule')}" alt="">
+      <img class="intro-ball" src="${ASSETS.item('poke-ball')}" alt="">
+      <div class="intro-burst"></div>
+      <img class="intro-starter" src="${ASSETS.front(starterSp)}" alt="">
+      <img class="intro-hero" alt="">
+      <div class="intro-rival-box">
+        <div class="intro-rival-ped"></div>
+        <img class="intro-rival" src="${ASSETS.trainer('theo')}" alt="">
+        <span class="intro-rival-tag">Théo · Voisin</span>
+      </div>
+    </div>
+  `);
+  uiRoot.appendChild(s);
+  const chap = s.querySelector('.intro-chap'), prof = s.querySelector('.intro-prof'), ped = s.querySelector('.intro-pedestal');
+  const subped = s.querySelector('.intro-subped'), ball = s.querySelector('.intro-ball'), burst = s.querySelector('.intro-burst');
+  const starter = s.querySelector('.intro-starter'), hero = s.querySelector('.intro-hero'), rivalBox = s.querySelector('.intro-rival-box');
+
+  await wait(350);
+  prof.classList.add('in');
+  await ui.say([
+    'Bonjour ! Bienvenue dans la région d\'Odyssée !',
+    'Je m\'appelle Saule. Depuis mon laboratoire de Bourg-Aube, j\'étudie les liens qui unissent les humains et les créatures de cet archipel.'
+  ], { speaker: 'Prof. Saule' });
+
+  chap.textContent = 'LES CRÉATURES D\'ODYSSÉE';
+  prof.classList.add('side');
+  ped.classList.add('side');
+  subped.classList.add('in');
+  ball.classList.add('toss');
+  sound.sfx('select');
+  await wait(440);
+  ball.classList.add('open');
+  burst.classList.add('go');
+  await ui.flash(1, '#ffffff', 60);
+  starter.classList.add('in');
+  sound.cry(ASSETS.cry(starterSp));
+  await ui.say([
+    'Ce monde est peuplé de créatures étonnantes !',
+    'Certains les adoptent comme fidèles compagnons de route, d\'autres les entraînent pour disputer des combats passionnants à travers les huit Arènes.'
+  ], { speaker: 'Prof. Saule' });
+
+  starter.classList.add('recall');
+  await wait(240);
+  starter.classList.remove('in', 'recall');
+  ball.classList.remove('toss', 'open');
+  burst.classList.remove('go');
+  subped.classList.remove('in');
+  prof.classList.remove('in', 'side');
+  ped.classList.remove('side');
+  ped.style.opacity = '0';
+  await wait(280);
+
+  chap.textContent = 'CHOISIS TON APPARENCE DE DRESSEUR';
+  ui.say('Mais parle-moi un peu de toi... Qui es-tu ?', { speaker: 'Prof. Saule', keep: true, noWaitLast: true });
+  const gender = await chooseGenderCard(ui, input, sound, s);
+
+  chap.textContent = 'INSCRIPTION À LA LIGUE D\'ODYSSÉE';
+  const name = await chooseTrainerName(ui, input, sound, gender, s);
+
+  chap.textContent = `${name.toUpperCase()} & THÉO · DÉPART À BOURG-AUBE`;
+  ped.style.opacity = '1';
+  hero.src = gender === 'f' ? 'img/dresseurs/player_f.png' : 'img/dresseurs/player_m.png';
+  hero.classList.add('in');
+  await ui.say([`${name} ! Voilà un prénom qui résonnera bientôt dans toutes les Arènes de la région !`], { speaker: 'Prof. Saule' });
+
+  hero.classList.add('left');
+  ped.classList.add('side');
+  rivalBox.classList.add('in');
+  sound.sfx('select');
+  await ui.say([
+    'Ton voisin et ami d\'enfance, Théo, est déjà en route vers mon laboratoire à Bourg-Aube pour choisir son premier partenaire !',
+  ], { speaker: 'Prof. Saule' });
+
+  rivalBox.classList.remove('in');
+  hero.classList.remove('left');
+  ped.classList.remove('side');
+  await ui.say([
+    `Alors, ${name}, prêt${gender === 'f' ? 'e' : ''} à vivre ta propre aventure ? Ton Odyssée commence maintenant !`
+  ], { speaker: 'Prof. Saule' });
+
+  sound.sfx('exit');
+  hero.classList.add('shrink');
+  await wait(550);
+  s.classList.add('out');
+  await wait(480);
+  s.remove();
+  return game.newState(name, gender);
+}
+
+async function _legacyIntro(game, ui, sound) {
   sound.play('lab');
   const s = el('div', 'screen intro-scr', '<div class="intro-stage"><img class="intro-prof" alt=""><img class="intro-mon" alt=""><div class="intro-kid"></div></div>');
   uiRoot.appendChild(s);

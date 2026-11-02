@@ -159,8 +159,9 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
 
 - Physique (`mollo/engine/sim.js`) : sept points par corps (bassin, poitrine, tête, deux mains, deux pieds), Verlet et contraintes, à 60 Hz.
   Des muscles (ressorts vers une pose) tiennent le corps debout ; ils mollissent quand il encaisse et lâchent tout en KO. Coudes et genoux n'existent qu'à l'affichage.
-- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), saisir (les mains s'accrochent à un corps ou à un rebord),
-  soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
+- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), se protéger, saisir (les mains s'accrochent à un corps ou à un rebord),
+  coup de tête en tenant quelqu'un, soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
+- Combat : les coups visent (`aimTarget`, 80° de chaque côté, 2 m ; 2,6 m pour le gros coup) ; la garde arrête les poings et s'use, le gros coup la brise, la saisie la traverse et attrape celui qui arme, le poing fait lâcher une saisie. Trois poings d'affilée éjectent.
 - Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon), Les Rouleaux (rouleaux à pointes), L'Incinérateur (tapis vers des trappes qui s'ouvrent sur le feu), Le Tri Postal (quatre tapis, deux barres qui balaient). Des bourrasques après 75 s.
 - Objets (`ITEMS` dans `mollo/engine/sim.js`) : au début de chaque manche, chacun a sa chance d'apparaître (poêle 60 %, pétard 55 %, parapluie 40 %, peau de banane 60 %), avec une petite chance d'être en double. Un appui sur saisir ramasse, un autre lance.
 - Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
