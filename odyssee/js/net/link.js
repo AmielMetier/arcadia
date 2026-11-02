@@ -15,6 +15,7 @@ export class Link {
     this.waiters = [];       // attentes de messages de session
     this.inbox = [];         // messages de session arrivés avant qu'on les attende
     this.onRequest = null;   // (from, msg) → appelé à la réception d'une invitation
+    this.onCard = null;      // () → fiche dresseur envoyée à qui la demande
     this.lastSent = '';
     this.lastSentAt = 0;
     this.me = null;          // () → { map, x, y, dir, run, busy, name, gender } ou null (pas encore en jeu)
@@ -68,6 +69,7 @@ export class Link {
     }
     if (m.t === 'hello') { this.lastSent = ''; return; }
     if (m.t === 'bye') { this.drop(from); return; }
+    if (m.t === 'card?') { const c = this.onCard?.(); this.send(from, { t: 'card', rid: m.rid, card: c }); return; }
     if (m.t === 'req') {
       if (this.onRequest) this.onRequest(from, m);
       else this.send(from, { t: 'rep', rid: m.rid, ok: false, why: 'busy' });
