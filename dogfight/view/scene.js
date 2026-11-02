@@ -170,7 +170,6 @@ export class DogfightScene {
     if (this.volumetric) this.volumetric.dispose();
     this.noise.dispose(); this.env.dispose();
     this.renderer.dispose();
-    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
   }
 }
