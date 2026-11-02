@@ -211,7 +211,7 @@ async function intro(game, ui, sound) {
   await wait(400); prof.classList.add('in');
   await ui.say(['Bonjour ! Bienvenue dans la région d\'Odyssée !', 'Je m\'appelle Saule. Les gens d\'ici m\'appellent le Professeur.'], { speaker: 'Prof. Saule' });
   mon.src = ASSETS.front(R(1001)); mon.classList.add('in'); sound.cry(ASSETS.cry(R(1001)));
-  await ui.say(['Ce monde est peuplé de créatures étonnantes.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'un géant des océans, Kyogre, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
+  await ui.say(['Ce monde est peuplé de créatures étonnantes.', 'Certains les adoptent comme compagnons, d\'autres les entraînent pour le combat.', 'Et les marins racontent qu\'un géant des océans, Odyssor, guide ceux qui partent à l\'aventure...'], { speaker: 'Prof. Saule' });
   mon.classList.remove('in'); prof.classList.remove('in');
   await wait(300);
   const g = await ui.ask('Mais parle-moi un peu de toi. Es-tu un garçon ou une fille ?', ['Garçon', 'Fille'], { cancel: null, speaker: 'Prof. Saule' });

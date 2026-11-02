@@ -1,7 +1,7 @@
 // odyssee/js/data/remplacants.js — en attendant que les créatures originales soient redessinées, chacune est jouée par
 // un Pokémon de rôle proche (même type, même rang dans sa famille). Les données et les images des créatures restent
 // dans le dépôt (creatures.js, img/crea/) : passer ORIGINALES à true les fait revenir partout.
-export const ORIGINALES = false;
+export const ORIGINALES = true;
 
 export const REMPLACANTS = {
   1001: 152, 1002: 153, 1003: 154, // Germignon, Macronium, Méganium
@@ -32,6 +32,10 @@ export const REMPLACANTS = {
   1049: 147, 1050: 148, 1051: 149, // Minidraco, Draco, Dracolosse
   1052: 382, // Kyogre
 };
+
+/** Pokémon sauvage : la région reste peuplée surtout de Pokémon officiels ; une créature originale des hautes
+ *  herbes laisse sa place à son équivalent officiel trois fois sur cinq */
+export const SAUVAGE = (sp) => (sp > 1000 && REMPLACANTS[sp] && Math.random() < 0.6 ? REMPLACANTS[sp] : sp);
 
 /** espèce réellement jouée pour un numéro d'espèce (une créature originale → son remplaçant) */
 export const R = (sp) => (!ORIGINALES && REMPLACANTS[sp]) || sp;
