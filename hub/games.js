@@ -300,7 +300,7 @@ window.HUB_GAME_INFO = {
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
   sitenoir: { genre: 'action', time: '15 min',
-    keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
+    keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile · hurlement du monstre'], ['T', 'Écrans des caméras'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
     tips: ['Courir fait du bruit : le monstre l\'entend. Accroupi, tu es presque muet.', 'Une photo prise de près l\'aveugle un instant, et compte comme preuve.', 'Sans preuve, l\'extraction ne sert à rien : passe le capteur EMF sur les traces vertes.', 'La première mise à terre pardonne : la seconde, non.'] },
   mollo: { genre: 'party', time: '5–10 min',
     keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],

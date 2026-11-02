@@ -28,6 +28,7 @@ export class Input {
       else if (k === 'KeyF') this.c.tc++;
       else if (k === 'KeyR') this.c.rc++;
       else if (k === 'KeyG') this.c.dc++;
+      else if (k === 'KeyT') hooks.screens && hooks.screens();
       else if (k === 'KeyC') this.crouchLatch = !this.crouchLatch;
       else if (k === 'Digit1' || k === 'Numpad1') { this.sel = 0; this.c.a1++; }
       else if (k === 'Digit2' || k === 'Numpad2') { this.sel = 1; this.c.a2++; }

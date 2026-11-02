@@ -7,7 +7,7 @@ import { makeSurface, setTextureSize, softSprite, doorTexture, torchCookie, deca
 import { createPost } from './post.js';
 import { makeRng } from '../engine/rng.js';
 import { mergeGeometries } from '../../shared/vendor/three/BufferGeometryUtils.js';
-import { T, Z, W, H, CEIL, DEEP, DOOR_H, floorAt, zoneAt, hasLOS } from '../engine/map.js';
+import { T, Z, W, H, CEIL, DEEP, DOOR_H, zoneAt, hasLOS, Nav } from '../engine/map.js';
 
 const CHUNK = 16;
 const LIGHT_POOL = 5;
@@ -16,7 +16,7 @@ const LPOW = { urgence: 7, rouge: 7, ambre: 8, neon: 10, projecteur: 420 };
 const LDIST = { urgence: 8, rouge: 7, ambre: 9, neon: 9, projecteur: 34 };
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const clampN = (v, a, b) => (v < a ? a : v > b ? b : v);
-const EYE = 1.62, EYE_CROUCH = 0.95, EYE_DOWN = 0.35, EYE_M = 2.15;
+const EYE = 1.62, EYE_CROUCH = 0.95, EYE_DOWN = 0.35, EYE_M = 2.15, HEAD_SHRINK = 0.05;
 
 export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -73,6 +73,9 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     for (const r of M.ramps) if (cx >= r.x0 && cx < r.x1 && cz >= r.z0 && cz < r.z1) return DEEP * (x - r.x0) / (r.x1 - r.x0);
     return M.floor[cz * W + cx];
   };
+  const inRamp = (x, z) => M.ramps.some((q) => x >= q.x0 && x < q.x1 && z >= q.z0 && z < q.z1);
+  // la pente regardée de face : vers le haut pour le plafond renversé, sinon la lumière la rate
+  const SLOPE_L = Math.hypot(4 / 7, 1), SLOPE_NX = (4 / 7) / SLOPE_L, SLOPE_NY = 1 / SLOPE_L;
   const isOpen = (x, z) => x >= 0 && z >= 0 && x < W && z < H && (M.t[z * W + x] === T.FLOOR || M.t[z * W + x] === T.PROP);
   // ombre de contact, cuite dans les sommets : combien de murs autour de ce coin ?
   const wallCell = (a, b) => a < 0 || b < 0 || a >= W || b >= H || M.t[b * W + a] === T.WALL;
@@ -83,9 +86,10 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     const i = z * W + x, zn = M.zone[i], out = zn === Z.OUTPOST || zn === Z.PAD, cab = zn === Z.CABINE, letter = zoneMat(zn), S = 1 / 2;
     const h00 = cellH(x, z, x, z), h10 = cellH(x, z, x + 1, z), h01 = cellH(x, z, x, z + 1), h11 = cellH(x, z, x + 1, z + 1);
     if (!cab) {
-      const fl = out ? 'ground' : `floor${letter}`, Sf = out ? 1 / 6 : letter === 'S' ? 1 / 3 : S, u0 = x * Sf, v0 = z * Sf;
-      quad(fl, x, z, [x, h01, z + 1], [x + 1, h11, z + 1], [x + 1, h10, z], [x, h00, z], 0, 1, 0, u0, v0 + Sf, u0 + Sf, v0, out ? [1, 1, 1, 1] : [aoFlat(x, z + 1, 1), aoFlat(x + 1, z + 1, 1), aoFlat(x + 1, z, 1), aoFlat(x, z, 1)]);
-      if (!out) quad(`ceil${letter}`, x, z, [x, h00 + CEIL, z], [x + 1, h10 + CEIL, z], [x + 1, h11 + CEIL, z + 1], [x, h01 + CEIL, z + 1], 0, -1, 0, u0, v0, u0 + Sf, v0 + Sf, [aoFlat(x, z, 1), aoFlat(x + 1, z, 1), aoFlat(x + 1, z + 1, 1), aoFlat(x, z + 1, 1)]);
+      const ramped = inRamp(x, z); // les marches se dessinent à part
+      const fl = out ? 'ground' : `floor${letter}`, Sf = out ? 1 / 6 : letter === 'S' ? 1 / 3 : S, u0 = x * Sf, v0 = (z + (ramped ? 0.5 : 0)) * Sf;
+      if (!ramped) quad(fl, x, z, [x, h01, z + 1], [x + 1, h11, z + 1], [x + 1, h10, z], [x, h00, z], 0, 1, 0, u0, v0 + Sf, u0 + Sf, v0, out ? [1, 1, 1, 1] : [aoFlat(x, z + 1, 1), aoFlat(x + 1, z + 1, 1), aoFlat(x + 1, z, 1), aoFlat(x, z, 1)]);
+      if (!out) quad(`ceil${letter}`, x, z, [x, h00 + CEIL, z], [x + 1, h10 + CEIL, z], [x + 1, h11 + CEIL, z + 1], [x, h01 + CEIL, z + 1], ramped ? -SLOPE_NX : 0, ramped ? -SLOPE_NY : -1, 0, u0, v0, u0 + Sf, v0 + Sf, [aoFlat(x, z, 1), aoFlat(x + 1, z, 1), aoFlat(x + 1, z + 1, 1), aoFlat(x, z + 1, 1)]);
     }
     // murs : hauteur du bâtiment vu de dehors, tout le puits dans la cabine
     const wn = out ? 'outer' : `wall${letter}`;
@@ -111,6 +115,18 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     if (solid(x, z + 1)) wall(x, z + 1, x + 1, z + 1, h01, h11, 0, -1, x);
     if (solid(x - 1, z)) wall(x, z, x, z + 1, h00, h01, 1, 0, z);
     if (solid(x + 1, z)) wall(x + 1, z + 1, x + 1, z, h11, h10, -1, 0, z);
+  }
+  // les escaliers : de vraies marches au-dessus de la pente sur laquelle on marche, chacune avec son nez clair et son pied sombre
+  for (const r of M.ramps) {
+    const N = 24, tw = (r.x1 - r.x0) / N, Sf = 1 / 3;
+    for (let i = 0; i < N; i++) {
+      const x0 = r.x0 + i * tw, x1 = x0 + tw, y = DEEP * i / N, y1 = DEEP * (i + 1) / N, cell = Math.floor(x0);
+      for (let z = r.z0; z < r.z1; z++) {
+        const v0 = (z + 0.5) * Sf, k0 = z === r.z0 ? 0.6 : 1, k1 = z === r.z1 - 1 ? 0.6 : 1;
+        quad('floorS', cell, z, [x0, y, z + 1], [x1, y, z + 1], [x1, y, z], [x0, y, z], 0, 1, 0, x0 * Sf, v0 + Sf, x1 * Sf, v0, [0.62 * k1, 1.25 * k1, 1.25 * k0, 0.62 * k0]);
+        quad('floorS', cell, z, [x1, y1, z + 1], [x1, y1, z], [x1, y, z], [x1, y, z + 1], 1, 0, 0, v0 + Sf, y1 * Sf, v0, y * Sf, [0.4, 0.4, 0.8, 0.8]);
+      }
+    }
   }
   const worldGroup = new THREE.Group(); scene.add(worldGroup);
   for (const q of buckets.values()) {
@@ -169,6 +185,80 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
   // panneaux lumineux au-dessus du sas : c'est par là qu'on ressort
   const exitTex = exitSign(), exitMat = new THREE.MeshBasicMaterial({ map: exitTex });
   for (const d of M.doors) if (d.kind === 'sas' && d.key === null) { const e = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.27), exitMat); e.position.set(d.x, d.y + 2.72, d.z - 0.52); e.rotation.y = Math.PI; scene.add(e); }
+
+  // ---------------------------------------------------------------- signalétique : bandes peintes au sol, panneaux sur les murs
+  {
+    const nav = new Nav(M), walk = (i) => M.t[i] === T.FLOOR;
+    const cellClear = (x, z) => { const i = z * W + x; return x >= 0 && z >= 0 && x < W && z < H && M.t[i] === T.FLOOR; };
+    const legClear = (a, b) => { const dx = Math.sign(b[0] - a[0]), dz = Math.sign(b[1] - a[1]); let x = a[0], z = a[1]; while (x !== b[0] || z !== b[1]) { x += dx; z += dz; if (!cellClear(x, z)) return false; } return true; };
+    const byColor = new Map();
+    // deux jambes droites de préférence à un escalier de petites cases, comme le ferait un peintre
+    const straighten = (cells) => {
+      const out = [cells[0]];
+      let i = 0;
+      while (i < cells.length - 1) {
+        let best = null, bj = i + 1;
+        for (let j = cells.length - 1; j > i; j--) {
+          const a = cells[i], b = cells[j], c1 = [b[0], a[1]], c2 = [a[0], b[1]];
+          if (a[0] === b[0] || a[1] === b[1]) { if (legClear(a, b)) { best = [b]; bj = j; break; } }
+          else if (legClear(a, c1) && legClear(c1, b)) { best = [c1, b]; bj = j; break; }
+          else if (legClear(a, c2) && legClear(c2, b)) { best = [c2, b]; bj = j; break; }
+        }
+        out.push(...(best || [cells[i + 1]]));
+        i = bj;
+      }
+      return out;
+    };
+    for (const r of M.routes) {
+      const path = nav.find(r.a[0], r.a[1], r.b[0], r.b[1], walk);
+      if (!path) continue;
+      const q = byColor.get(r.color) || byColor.set(r.color, { p: [], i: [] }).get(r.color);
+      const pts = straighten(path.map((i) => [i % W, Math.floor(i / W)]));
+      const tri = (a, b, c) => { const o = q.p.length / 3; q.p.push(...a, ...b, ...c); q.i.push(o, o + 1, o + 2); };
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const ax = pts[k][0] + 0.5, az = pts[k][1] + 0.5, bx = pts[k + 1][0] + 0.5, bz = pts[k + 1][1] + 0.5, len = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz, nz = ux, W2 = 0.075;
+        for (let s = 0; s < len; s += 0.5) {
+          const e = Math.min(len, s + 0.5), x0 = ax + ux * s, z0 = az + uz * s, x1 = ax + ux * e, z1 = az + uz * e;
+          if (inRamp(Math.floor(x0), Math.floor(z0)) || inRamp(Math.floor(x1), Math.floor(z1))) continue;
+          const y = M.floor[Math.floor(z0) * W + Math.floor(x0)] + 0.012;
+          tri([x0 + nx * W2, y, z0 + nz * W2], [x1 + nx * W2, y, z1 + nz * W2], [x1 - nx * W2, y, z1 - nz * W2]);
+          tri([x0 + nx * W2, y, z0 + nz * W2], [x1 - nx * W2, y, z1 - nz * W2], [x0 - nx * W2, y, z0 - nz * W2]);
+          // tous les trois mètres, une pointe de flèche dans le sens de la marche
+          if (s % 3 === 1.5) { const tx = x0 + ux * 0.42, tz = z0 + uz * 0.42; tri([x0 + nx * 0.26, y, z0 + nz * 0.26], [tx, y, tz], [x0 - nx * 0.26, y, z0 - nz * 0.26]); }
+        }
+      }
+    }
+    for (const [color, q] of byColor) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(q.p, 3)); g.setIndex(q.i); g.computeVertexNormals();
+      const line = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.75, emissive: color, emissiveIntensity: 0.1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      line.receiveShadow = true; line.matrixAutoUpdate = false; scene.add(line);
+    }
+    const signTexture = (g) => {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 192;
+      const x = c.getContext('2d');
+      x.fillStyle = '#14161a'; x.fillRect(0, 0, 512, 192);
+      x.fillStyle = g.color; x.fillRect(0, 0, 512, 14); x.fillRect(0, 178, 512, 14);
+      x.fillStyle = g.color; x.textBaseline = 'middle';
+      const tw = g.arrow ? 356 : 476;
+      x.font = '900 62px "Arial Black", Impact, sans-serif'; x.textAlign = 'left'; x.fillText(g.text, 18, 74, tw);
+      x.fillStyle = '#d8d2c0'; x.font = '700 29px Arial, sans-serif'; x.fillText(g.sub, 20, 140, tw);
+      if (g.arrow) { x.fillStyle = g.color; x.font = '900 132px Arial, sans-serif'; x.textAlign = 'center'; x.fillText(g.arrow, 438, 100); }
+      // les années : rouille et griffures
+      const r = makeRng(Math.round(g.x * 13 + g.z * 7));
+      x.globalAlpha = 0.25; x.fillStyle = '#000';
+      for (let i = 0; i < 90; i++) x.fillRect(r.next() * 512, r.next() * 192, r.next() * 26, 1 + r.next() * 2);
+      x.globalAlpha = 1;
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = aniso;
+      return tex;
+    };
+    for (const g of M.signs) {
+      const tex = signTexture(g), fy = M.floor[Math.floor(g.z + g.nz * 0.5) * W + Math.floor(g.x + g.nx * 0.5)];
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 0.58), new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.16, roughness: 0.6 }));
+      m.position.set(g.x + g.nx * 0.02, g.y ?? fy + 1.75, g.z + g.nz * 0.02); m.rotation.y = Math.atan2(g.nx, g.nz); m.receiveShadow = true;
+      scene.add(m);
+    }
+  }
 
   // ---------------------------------------------------------------- cabine de l'ascenseur
   const cabin = new THREE.Group(); scene.add(cabin);
@@ -241,7 +331,6 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     const FLOORS = { [Z.A]: [[DECAL.paper, 0.05], [DECAL.sheet, 0.035], [DECAL.boots, 0.012], [DECAL.debris, 0.02], [DECAL.splat, 0.006], [DECAL.cable, 0.008]], [Z.B]: [[DECAL.sheet, 0.03], [DECAL.splat, 0.03], [DECAL.drag, 0.018], [DECAL.debris, 0.03], [DECAL.boots, 0.018]], [Z.SOUS]: [[DECAL.oil, 0.05], [DECAL.drag, 0.012], [DECAL.splat, 0.012], [DECAL.debris, 0.03], [DECAL.cable, 0.022], [DECAL.boots, 0.012]], [Z.OUTPOST]: [[DECAL.boots, 0.008], [DECAL.oil, 0.012], [DECAL.debris, 0.012]] };
     const WALLS = { [Z.A]: [[DECAL.notice, 0.022], [DECAL.soot, 0.03], [DECAL.hand, 0.004]], [Z.B]: [[DECAL.warn, 0.018], [DECAL.soot, 0.035], [DECAL.hand, 0.022]], [Z.SOUS]: [[DECAL.warn, 0.03], [DECAL.soot, 0.05], [DECAL.hand, 0.008]] };
     const DIRS = [[0, -1, 0], [0, 1, Math.PI], [-1, 0, Math.PI / 2], [1, 0, -Math.PI / 2]];
-    const inRamp = (x, z) => M.ramps.some((q) => x >= q.x0 && x < q.x1 && z >= q.z0 && z < q.z1);
     for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
       const i = z * W + x;
       if (M.t[i] !== T.FLOOR || M.doorAt[i] >= 0 || inRamp(x, z)) continue;
@@ -307,7 +396,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       for (const part of fr.parts) { const im = new THREE.InstancedMesh(part.geo, part.mat, segs.length); segs.forEach((s, i) => { pos.set(s.x, 0, s.z); q.setFromAxisAngle(up, s.rot); mx.compose(pos, q, one).multiply(part.mtx); im.setMatrixAt(i, mx); }); im.computeBoundingSphere(); scene.add(im); }
     }
     // lampe en main
-    torchHand = inHandLook(models.mesh('flashlight', 0.62));
+    torchHand = inHandLook(models.mesh('flashlight', 0.62), 0.035);
     torchHand.position.set(-0.26, -0.27, -0.5); torchHand.rotation.y = Math.PI / 2;
     const glove = new THREE.MeshBasicMaterial({ color: 0x151310 }), sleeve = new THREE.MeshBasicMaterial({ color: 0x1f1a0d });
     const fist = new THREE.Mesh(new THREE.SphereGeometry(0.047, 10, 8), glove); fist.scale.set(1.1, 0.95, 1.25); fist.position.set(-0.262, -0.285, -0.44);
@@ -316,15 +405,23 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     torchHand.userData.arm = [fist, fore];
     // griffes du monstre
     claws = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: 0x0b0c10, roughness: 0.5, emissive: 0x220b0b, emissiveIntensity: 0.6 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2b1512, roughness: 0.42, emissive: 0x2a0806, emissiveIntensity: 0.7 });
+    const bone = new THREE.MeshStandardMaterial({ color: 0xd9cfb6, roughness: 0.35, emissive: 0x40281a, emissiveIntensity: 0.7 });
+    const blood = new THREE.MeshBasicMaterial({ color: 0x4a0503 });
     for (const s of [-1, 1]) {
       const arm = new THREE.Group();
-      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, 0.8, 7), dark); fore.rotation.x = Math.PI / 2 - 0.5; fore.position.set(0, -0.05, 0.1); arm.add(fore);
-      for (const f of [-1, 0, 1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.34, 5), dark); c.rotation.x = -Math.PI / 2 + 0.3; c.position.set(f * 0.04, 0.17, -0.42); c.rotation.z = -f * 0.25; arm.add(c); }
+      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.062, 0.9, 7), dark); fore.rotation.x = Math.PI / 2 - 0.5; fore.position.set(0, -0.08, 0.14); arm.add(fore);
+      const palm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), dark); palm.scale.set(1.1, 0.5, 1.35); palm.position.set(0, 0.12, -0.3); arm.add(palm);
+      for (const f of [-1.5, -0.5, 0.5, 1.5]) {
+        const spread = -f * 0.13, x0 = f * 0.036;
+        const phal = new THREE.Mesh(new THREE.ConeGeometry(0.019, 0.26, 6), dark); phal.rotation.set(-Math.PI / 2 + 0.3, 0, spread); phal.position.set(x0, 0.17, -0.45); arm.add(phal);
+        const talon = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.3, 5), bone); talon.rotation.set(-Math.PI / 2 - 0.42, 0, spread * 1.3); talon.position.set(x0 * 1.45, 0.17, -0.66); arm.add(talon);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0145, 0.1, 5), blood); tip.rotation.copy(talon.rotation); tip.position.set(x0 * 1.45, 0.205, -0.59); arm.add(tip);
+      }
       arm.position.set(s * 0.33, -0.34, -0.5); arm.userData.s = s;
       claws.add(arm);
     }
-    claws.visible = false; hand.add(claws);
+    claws.scale.setScalar(1.22); claws.visible = false; hand.add(claws);
   });
 
   // ---------------------------------------------------------------- personnages
@@ -338,9 +435,9 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     // la vraie hauteur se lit sur le squelette (les boîtes des maillages animés sont fausses)
     let top = 0, minY = 1e9; const v = new THREE.Vector3();
     model.traverse((o) => { if (o.isBone) { o.getWorldPosition(v); if (v.y > top) top = v.y; if (v.y < minY) minY = v.y; a.bones[o.name] = o; } });
-    const h = top - minY || 1, k = (isM ? 2.45 : 1.72) / h;
+    const h = top - minY || 1, k = (isM ? 2.8 : 1.72) / h;
     model.scale.multiplyScalar(k);
-    if (isM) model.scale.x *= 0.82, model.scale.z *= 0.85;
+    if (isM) model.scale.x *= 0.76, model.scale.z *= 0.8;
     root.add(model);
     model.traverse((o) => {
       if (!o.isMesh) return;
@@ -348,7 +445,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       o.castShadow = true; o.frustumCulled = false;
       const m = o.material.clone();
       if (m.metalness !== undefined) { m.metalness = 0; m.roughness = 0.75; }
-      if (isM) { m.color = new THREE.Color(0x07080b); m.map = null; m.roughness = 0.35; }
+      if (isM) { m.color = new THREE.Color(0x1d1815); m.map = null; m.roughness = 0.3; }
       else { m.color = new THREE.Color(0xffffff).lerp(new THREE.Color(p.color), 0.35); }
       m.emissive = new THREE.Color(0xff3a10); m.emissiveIntensity = 0;
       grime(m, isM ? 0.5 : 0.8);
@@ -357,17 +454,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     a.mixer = new THREE.AnimationMixer(model);
     for (const c of models.anim(src)) { const n = c.name.split('|').pop().toLowerCase(); a.clips[n] = a.mixer.clipAction(c); }
     if (isM) {
-      // deux yeux pâles, seule chose qu'on voit de lui dans le noir
-      const head = a.bones.Head;
-      if (head) {
-        const eyeM = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, fog: false });
-        const scale = 1 / (Math.abs(head.getWorldScale(v).x) * k || 1);
-        for (const s of [-1, 1]) {
-          const e = new THREE.Mesh(new THREE.SphereGeometry(0.024 * scale, 8, 6), eyeM);
-          e.position.set(s * 0.042 * scale, 0.07 * scale, 0.095 * scale); head.add(e);
-          const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xcfe0ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); g.scale.setScalar(0.05 * scale); e.add(g);
-        }
-      }
+      buildMonsterBody(a);
     }
     // aura de chaleur vue par le monstre
     a.heat = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff5a22, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
@@ -375,6 +462,44 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     // faisceau de sa lampe
     if (!isM) { a.beam = new THREE.Mesh(beamGeo, beamMat); a.beam.position.y = 1.32; a.beam.visible = false; root.add(a.beam); }
     return a;
+  }
+  // Le corps est un humain étiré et sombre : tout ce qui fait peur s'accroche au squelette. Un visage pâle qu'on ne découvre qu'à la lampe,
+  // des orbites noires, une bouche trop grande, une colonne qui perce le dos, des griffes qui traînent presque par terre.
+  function buildMonsterBody(a) {
+    const v = new THREE.Vector3();
+    // chaque groupe travaille en mètres, quelle que soit l'échelle du squelette
+    const onBone = (name, k = 1) => { const b = a.bones[name]; if (!b) return null; const g = new THREE.Group(); g.scale.setScalar(k / (Math.abs(b.getWorldScale(v).x) || 1)); b.add(g); return g; };
+    const pale = new THREE.MeshStandardMaterial({ color: 0xa39a88, roughness: 0.46 }), hole = new THREE.MeshBasicMaterial({ color: 0x010101 }), toothM = new THREE.MeshStandardMaterial({ color: 0xcfc6a8, roughness: 0.4 }), boneM = new THREE.MeshStandardMaterial({ color: 0x8d8371, roughness: 0.42 }), clawM = new THREE.MeshStandardMaterial({ color: 0x12100e, roughness: 0.18 });
+    grime(pale, 0.9);
+    // la tête du modèle s'efface (l'os est réduit à presque rien) : ce crâne prend sa place
+    const head = onBone('Head', 1.55 / HEAD_SHRINK);
+    if (head) {
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 12), pale); skull.scale.set(0.86, 1.5, 0.96); skull.position.set(0, 0.1, 0.03); head.add(skull);
+      const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), pale); jaw.scale.set(0.82, 0.9, 0.86); jaw.position.set(0, -0.075, 0.055); head.add(jaw);
+      for (const s of [-1, 1]) {
+        const sock = new THREE.Mesh(new THREE.SphereGeometry(0.031, 9, 7), hole); sock.scale.set(1, 1.4, 0.55); sock.position.set(s * 0.04, 0.125, 0.112); head.add(sock);
+        // des yeux minuscules au fond des orbites, seule chose qu'on voit de lui dans le noir
+        const e = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffd9c2, fog: false })); e.position.set(s * 0.04, 0.122, 0.13); head.add(e);
+        const g = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff5a3a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); g.scale.setScalar(0.04); e.add(g);
+      }
+      const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), hole); mouth.scale.set(0.84, 1.45, 0.34); mouth.position.set(0, -0.03, 0.112); head.add(mouth);
+      for (let i = -3; i <= 3; i++) for (const up of [1, -1]) {
+        const t = new THREE.Mesh(new THREE.ConeGeometry(0.0055, 0.03, 4), toothM); t.rotation.x = up > 0 ? Math.PI : 0;
+        t.position.set(i * 0.0118, -0.03 + up * (0.066 - Math.abs(i) * 0.009), 0.125 - Math.abs(i) * 0.003); head.add(t);
+      }
+      a.face = skull;
+    }
+    // la colonne qui perce le dos
+    for (const [n, count] of [['Spine', 2], ['Spine1', 2], ['Spine2', 3], ['Neck', 1]]) {
+      const g = onBone(n); if (!g) continue;
+      for (let i = 0; i < count; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.13 + (i % 2) * 0.05, 5), boneM); c.rotation.x = -1.3; c.position.set(0, i * 0.07, -0.135); g.add(c); }
+    }
+    // griffes : le long du dernier os de la main
+    for (const n of ['LeftHand', 'RightHand']) {
+      const g = onBone(n); if (!g) continue;
+      for (const f of [-1.5, -0.5, 0.5, 1.5]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.36, 5), clawM); c.position.set(f * 0.026, 0.2, 0.012); c.rotation.z = -f * 0.08; g.add(c); }
+    }
+    a.tilt = 0; a.tiltTo = 0.2; a.turn = 0; a.turnTo = 0; a.tw = 1; a.hitch = 0;
   }
   function playClip(a, name, once = false, speed = 1) {
     const c = a.clips[name]; if (!c || a.cur === c) { if (c) c.timeScale = speed; return; }
@@ -396,10 +521,22 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       else if (p.stun > 0 || p.stunned) playClip(a, 'idle', false, 0.2);
       else if (p.moving) playClip(a, p.run ? 'run' : 'walk', false, p.run ? 1.05 : 1.25);
       else playClip(a, 'idle', false, 1);
-      a.mixer && a.mixer.update(dt);
-      // bras démesurés : après l'animation, on étire les os
-      for (const n of ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm']) if (a.bones[n]) a.bones[n].scale.set(1, 1.28, 1);
-      if (a.bones.Head) a.bones.Head.scale.set(0.85, 1.05, 0.85);
+      // il bouge par à-coups : le mouvement cale un instant, puis repart trop vite
+      if ((a.hitch -= dt) < -0.5 - Math.random() * 1.4) a.hitch = 0.06 + Math.random() * 0.13;
+      a.mixer && a.mixer.update(a.hitch > 0 ? 0 : dt * 1.1);
+      // bras démesurés et corps voûté : après l'animation, on étire et on plie les os
+      for (const n of ['LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm']) if (a.bones[n]) a.bones[n].scale.set(0.84, 1.26, 0.84);
+      if (a.bones.LeftLeg) a.bones.LeftLeg.scale.set(0.74, 1, 0.74);
+      if (a.bones.RightLeg) a.bones.RightLeg.scale.set(0.74, 1, 0.74);
+      if (a.bones.LeftUpLeg) a.bones.LeftUpLeg.scale.set(0.76, 1, 0.76);
+      if (a.bones.RightUpLeg) a.bones.RightUpLeg.scale.set(0.76, 1, 0.76);
+      if (a.bones.Spine1) a.bones.Spine1.rotateX(0.3);
+      if (a.bones.Spine2) a.bones.Spine2.rotateX(0.34);
+      if (a.bones.Neck) a.bones.Neck.rotateX(-0.42);
+      // la tête : elle penche, se fige, puis casse d'un coup vers un autre angle
+      if ((a.tw -= dt) <= 0) { a.tw = 0.5 + Math.random() * 2.6; a.tiltTo = (Math.random() - 0.5) * 1.05; a.turnTo = (Math.random() - 0.5) * 0.7; }
+      const snap = Math.min(1, dt * 26); a.tilt += (a.tiltTo - a.tilt) * snap; a.turn += (a.turnTo - a.turn) * snap;
+      if (a.bones.Head) { a.bones.Head.scale.setScalar(HEAD_SHRINK); a.bones.Head.rotateZ(a.tilt); a.bones.Head.rotateY(a.turn); a.bones.Head.rotateX(-0.2); }
     } else {
       if (p.st === 'dead') playClip(a, 'death', true, 1);
       else if (p.st === 'down') playClip(a, 'death', true, 1.5);
@@ -410,16 +547,18 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       if (a.beam) { a.beam.visible = p.st === 'ok' && p.torch && view.vision !== 'm'; a.beam.rotation.x = -p.pitch; }
     }
     const hot = view.vision === 'm' && !a.isM && p.st !== 'dead' && p.hide < 0;
-    for (const m of a.mats) m.emissiveIntensity = hot ? 0.62 : 0;
-    if (a.heat) a.heat.material.opacity = hot ? 0.34 : 0;
+    // pour lui, ils brûlent, et leur cœur bat
+    const beat = 0.8 + Math.sin(time * 5.4 + p.id) * 0.25;
+    for (const m of a.mats) m.emissiveIntensity = hot ? 1.5 * beat : 0;
+    if (a.heat) a.heat.material.opacity = hot ? 0.55 * beat : 0;
   };
 
   // ---------------------------------------------------------------- objet en main
   // collé à la lampe, un objet tenu serait grillé : il garde une teinte sombre fixe, et le voyant de sa propre lampe
-  function inHandLook(o) {
+  function inHandLook(o, k = 0.085) {
     o.traverse((m) => {
       if (!m.isMesh || m.material.isMeshBasicMaterial) return;
-      const old = m.material, c = (old.color ? old.color.clone() : new THREE.Color(0x888888)).multiplyScalar(0.085);
+      const old = m.material, c = (old.color ? old.color.clone() : new THREE.Color(0x888888)).multiplyScalar(k);
       m.material = new THREE.MeshBasicMaterial({ color: c, map: old.map || null });
     });
     return o;
@@ -431,9 +570,8 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     if (claws) claws.visible = role === 'm';
     if (!kind) return;
     let o;
-    if (kind === 'photo') { o = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.09, 0.06), new THREE.MeshStandardMaterial({ color: 0x23252a, roughness: 0.5 })); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.033, 0.05, 14), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.3 })); l.rotation.x = Math.PI / 2; l.position.z = -0.05; const f = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.02, 0.01), new THREE.MeshBasicMaterial({ color: 0xffffff })); f.position.set(0.04, 0.03, -0.035); o.add(b, l, f); }
+    if (kind === 'photo') { o = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.08, 0.045), new THREE.MeshBasicMaterial({ color: 0x1a1b1e })); const top = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.016, 0.045), new THREE.MeshBasicMaterial({ color: 0x3a3b3e })); top.position.y = 0.048; const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 0.048), new THREE.MeshBasicMaterial({ color: 0x18282e })); scr.position.set(-0.018, -0.003, 0.0235); const led = new THREE.Mesh(new THREE.PlaneGeometry(0.008, 0.008), new THREE.MeshBasicMaterial({ color: 0xc73a2a })); led.position.set(0.045, 0.02, 0.0235); const f = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: 0x8b8b8b })); f.position.set(0.04, 0.062, 0); o.add(b, top, scr, led, f); o.rotation.set(0.08, 0.1, 0); }
     else if (kind === 'emf') { o = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.03), new THREE.MeshStandardMaterial({ color: 0x2c2f22, roughness: 0.6 })); o.add(b); o.userData.leds = [0, 1, 2, 3, 4].map((i) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.016, 0.006), new THREE.MeshBasicMaterial({ color: 0x223322 })); l.position.set(0, -0.05 + i * 0.026, 0.017); o.add(l); return l; }); o.rotation.x = -0.9; }
-    else if (kind === 'tablet') { o = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.012), new THREE.MeshStandardMaterial({ color: 0x15171b })); const s = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.13), new THREE.MeshBasicMaterial({ color: 0x264a58 })); s.position.z = 0.007; o.add(b, s); o.rotation.x = -0.7; }
     else if (kind === 'cams') { o = models.mesh('seccam', 0.55); o.rotation.y = Math.PI; }
     else if (kind === 'pile') o = models.mesh('battery', 0.8);
     else if (kind === 'bleu') { o = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.004), new THREE.MeshBasicMaterial({ color: 0x2d7ff0 })); o.rotation.x = -0.6; }
@@ -442,7 +580,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     else return;
     inHandLook(o);
     o.userData.kind = kind;
-    o.position.set(0.25, -0.22, -0.48);
+    o.position.set(0.27, -0.25, -0.5);
     inHand = o; hand.add(o);
   }
 
@@ -451,7 +589,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     default: new THREE.BoxGeometry(0.16, 0.08, 0.1),
     preuve: new THREE.BoxGeometry(0.24, 0.03, 0.17),
   };
-  const ITEM_COL = { bleu: 0x2d7ff0, orange: 0xf08a1d, fuse: 0xe2bd46, pile: 0x71d65d, preuve: 0xf4efe0, photo: 0x9aa0a8, emf: 0x9cc25a, cams: 0x8aa3b8, tablet: 0x5a8ca8 };
+  const ITEM_COL = { bleu: 0x2d7ff0, orange: 0xf08a1d, fuse: 0xe2bd46, pile: 0x71d65d, preuve: 0xf4efe0, photo: 0x9aa0a8, emf: 0x9cc25a, cams: 0x8aa3b8 };
   function itemMesh(it) {
     const g = new THREE.Group();
     const name = it.k === 'pile' ? 'battery' : it.k === 'orange' ? 'key' : it.k === 'cams' ? 'seccam' : null;
@@ -469,13 +607,16 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     for (const o of list) { seen.add(o.id); let m = map.get(o.id); if (!m) { m = make(o); map.set(o.id, m); } keep && keep(o, m); }
     for (const [id, m] of map) if (!seen.has(id)) { scene.remove(m); map.delete(id); }
   }
+  // un meuble pas encore fouillé accroche un petit reflet quand on s'en approche
+  const glintMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffd488, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glints = M.caches.map((c) => { const s = new THREE.Sprite(glintMat.clone()); s.position.set(c.x, c.y + 0.95, c.z); s.scale.setScalar(0.3); s.visible = false; scene.add(s); return s; });
   const traceMat = new THREE.MeshBasicMaterial({ map: softSprite('rgba(120,255,150,.95)', 'rgba(60,255,120,0)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const traceGeo = new THREE.PlaneGeometry(1.5, 1.5); traceGeo.rotateX(-Math.PI / 2);
 
   // ---------------------------------------------------------------- image
-  let wasCctv = false, time = 0, shake = 0, flashT = 0, eye = EYE, bob = 0, punch = 0, eyeExp = 1, fov = 72, lagX = 0, lagY = 0, prevYaw = null, prevPitch = 0, slowT = 0;
+  let wasCctv = false, time = 0, shake = 0, flashT = 0, eye = EYE, bob = 0, punch = 0, eyeExp = 1, fov = 72, lagX = 0, lagY = 0, prevYaw = null, prevPitch = 0, slowT = 0, dread = 0, spike = 0, jump = 0;
   const torchDir = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3();
-  const draw = (vhs, exposure) => { if (post) post.render(scene, camera, { time, vhs, exposure }); else { renderer.toneMappingExposure = exposure; renderer.render(scene, camera); } };
+  const draw = (vhs, exposure, tear = 0, hunt = 0) => { if (post) post.render(scene, camera, { time, vhs, exposure, tear, hunt }); else { renderer.toneMappingExposure = exposure; renderer.render(scene, camera); } };
   const ve = new THREE.Vector3(), dir = new THREE.Vector3(), nearL = [];
   const lightStrength = { v: 1 };
   function frame(view, dt) {
@@ -499,7 +640,16 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     syncSet(R.camMeshes, w.cams, (c) => { const m = models.mesh('seccam', 1); m.position.set(c.x, c.y - 0.1, c.z); m.rotation.y = c.yaw + Math.PI; const led = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff2a18 })); led.position.set(0, 0.22, 0); m.add(led); scene.add(m); return m; });
     syncSet(R.traceMeshes, w.traces, (t) => { const m = new THREE.Mesh(traceGeo, traceMat.clone()); m.position.set(t.x, t.y + 0.03, t.z); m.rotation.y = t.id; scene.add(m); return m; }, (t, m) => { m.material.opacity = t.done ? 0.1 : view.emf ? 0.95 : 0.42 + Math.sin(time * 2 + t.id) * 0.1; });
 
+    for (let i = 0; i < glints.length; i++) {
+      const s = glints[i], c = M.caches[i];
+      if (view.vision === 'm' || w.caches[i].done || !me || Math.abs(c.y - me.y) > 2.5) { s.visible = false; continue; }
+      const d = Math.hypot(c.x - me.x, c.z - me.z);
+      s.visible = d < 8;
+      if (s.visible) s.material.opacity = (1 - d / 8) * (0.42 + Math.sin(time * 2.4 + i * 1.7) * 0.18);
+    }
+
     for (const p of players) updateActor(p, dt, view);
+    const mon = players.find((p) => p.role === 'm' && !p.spectator);
 
     // caméra
     const cctv = view.camMode === 'cctv' ? view.cctv : null;
@@ -511,18 +661,28 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       eye += (target - eye) * Math.min(1, dt * 9);
       bob += dt * (me.moving ? (me.run ? 12.5 : 8.5) : 0);
       const isM = me.role === 'm';
-      const by = me.moving ? Math.sin(bob) * (isM ? 0.05 : me.run ? 0.04 : 0.024) : 0, bx = me.moving ? Math.cos(bob * 0.5) * (me.run ? 0.024 : 0.013) : 0;
+      const by = (me.moving ? Math.sin(bob) * (isM ? 0.075 : me.run ? 0.04 : 0.024) : 0) + (isM ? Math.sin(time * 1.9) * 0.022 : 0), bx = me.moving ? Math.cos(bob * 0.5) * (me.run ? 0.024 : 0.013) : 0;
       shake = Math.max(0, shake - dt * 3);
       const shk = shake * shake * 0.09;
-      // l'enquêteur tient sa caméra à la main : ça respire, et davantage quand il est essoufflé. Le monstre, lui, ne tremble pas.
-      const puff = isM ? 0 : 1 + (1 - (me.stam ?? 100) / 100) * 2.4 + (me.hide >= 0 ? 1 : 0);
+      // l'enquêteur tient sa caméra à la main : ça respire, et davantage quand il est essoufflé. Le monstre, lui, souffle lourdement.
+      const puff = isM ? 1.7 : 1 + (1 - (me.stam ?? 100) / 100) * 2.4 + (me.hide >= 0 ? 1 : 0);
       const swP = (Math.sin(time * 0.83) * 0.0034 + Math.sin(time * 2.11 + 1) * 0.0012) * puff, swY = (Math.sin(time * 0.57 + 2) * 0.0036 + Math.sin(time * 1.73) * 0.0011) * puff, swR = Math.sin(time * 0.43 + 4) * 0.0042 * puff + (me.moving && !isM ? Math.cos(bob * 0.5) * (me.run ? 0.011 : 0.0055) : 0);
       camera.position.set(me.x + Math.cos(me.yaw) * bx, me.y + eye + by + (Math.random() - 0.5) * shk, me.z - Math.sin(me.yaw) * bx);
       camera.rotation.set(me.pitch + swP + (Math.random() - 0.5) * shk * 0.5, me.yaw + swY + (Math.random() - 0.5) * shk * 0.5, swR + (me.st === 'down' ? 0.55 : 0), 'YXZ');
-      const wantFov = isM ? 78 : me.run && me.moving ? 77 : 72;
+      const wantFov = jump > 0 ? 50 : isM ? (me.run && me.moving ? 96 : 88) : me.run && me.moving ? 77 : 72;
       fov += (wantFov - fov) * Math.min(1, dt * 5);
       if (Math.abs(camera.fov - fov) > 0.02) { camera.fov = fov; camera.updateProjectionMatrix(); }
       if (me.hide >= 0) camera.position.y = me.y + 1.55;
+      // la mise à terre : la vue est arrachée vers son visage, à quelques dizaines de centimètres
+      jump = Math.max(0, jump - dt);
+      const ma = jump > 0 && mon ? R.actors.get(mon.id) : null;
+      if (ma && ma.bones.Head) {
+        ma.bones.Head.getWorldPosition(ve);
+        const fx = -Math.sin(mon.yaw), fz = -Math.cos(mon.yaw);
+        dir.set(ve.x + fx * 0.72, ve.y - 0.02, ve.z + fz * 0.72);
+        camera.position.lerp(dir, clamp01(1.25 - jump * 0.1)).add(dir.set(Math.random() - 0.5, Math.random() - 0.5, 0).multiplyScalar(0.018));
+        camera.lookAt(ve);
+      }
     }
     camera.updateMatrixWorld();
 
@@ -540,29 +700,34 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       hand.position.set((me.moving ? Math.cos(bob * 0.5) * 0.01 : 0) + lagX * 0.5, (me.moving ? Math.abs(Math.sin(bob)) * 0.012 : Math.sin(time) * 0.003) - (me.run ? 0.05 : 0) - lagY * 0.5, 0);
       hand.rotation.set(lagY * 0.8, lagX * 0.8, 0);
       if (torchHand) { torchHand.visible = me.role !== 'm'; }
-      if (claws) { claws.visible = me.role === 'm'; for (const a of claws.children) { const s = a.userData.s, sw = punch; a.rotation.z = s * sw * 0.2; a.rotation.y = -s * sw * 1.3; a.position.z = -0.5 - sw * 0.2; a.position.x = s * (0.33 - sw * 0.25); a.position.y = -0.34 + sw * 0.12 + Math.sin(time * 2 + s) * 0.006; } }
+      if (claws) { claws.visible = me.role === 'm'; for (const a of claws.children) { const s = a.userData.s, sw = punch, step = me.moving ? Math.sin(bob * 0.5 + (s > 0 ? 0 : Math.PI)) : 0; a.rotation.x = step * 0.12 + Math.sin(time * 1.9) * 0.03; a.rotation.z = s * sw * 0.2; a.rotation.y = -s * sw * 1.3; a.position.z = -0.5 - sw * 0.2 + step * 0.05; a.position.x = s * (0.36 - sw * 0.25); a.position.y = -0.3 + sw * 0.14 + Math.sin(time * 1.9 + s) * 0.012; } }
       if (inHand && inHand.userData.leds) inHand.userData.leds.forEach((l, i) => l.material.color.setHex(i < (view.emfLevel || 0) ? (i > 2 ? 0xff3a18 : 0x7dff5a) : 0x1a2a1a));
     }
 
     // vision
     const vision = cctv ? 'cctv' : view.vision;
     const zn = me ? zoneAt(M, me.x, me.z) : Z.A, outside = !cctv && (zn === Z.OUTPOST || zn === Z.PAD);
-    const fogK = vision === 'm' ? 0.022 : vision === 'cctv' ? 0.035 : outside ? 0.032 : 0.075;
+    const fogK = vision === 'm' ? 0.035 : vision === 'cctv' ? 0.035 : outside ? 0.032 : 0.075;
     scene.fog.density += (fogK - scene.fog.density) * Math.min(1, dt * 2);
-    scene.fog.color.setHex(vision === 'm' ? 0x08061a : outside ? 0x060a12 : 0x020408);
+    scene.fog.color.setHex(vision === 'm' ? 0x090204 : outside ? 0x060a12 : 0x020408);
     scene.background.copy(scene.fog.color);
-    const amb = vision === 'm' ? 0.75 : vision === 'cctv' ? 1.1 : outside ? 0.3 : 0.03;
+    const amb = vision === 'm' ? 1.5 : vision === 'cctv' ? 1.1 : outside ? 0.3 : 0.03;
     ambient.intensity += (amb - ambient.intensity) * (vision === 'cctv' || wasCctv ? 1 : Math.min(1, dt * 3));
     if (vision === 'cctv' || wasCctv) scene.fog.density = fogK;
     wasCctv = vision === 'cctv';
-    ambient.color.setHex(vision === 'm' ? 0x7a7fd8 : vision === 'cctv' ? 0xb8d8c0 : 0x8fa4c8);
+    ambient.color.setHex(vision === 'm' ? 0xc9b0a8 : vision === 'cctv' ? 0xb8d8c0 : 0x8fa4c8);
 
     // lampes de secours : les plus proches, éteintes dans une zone coupée (le courant revenu les renforce)
     const cx = camera.position.x, cz = camera.position.z;
     nearL.length = 0;
     for (const g of glows) {
       const l = g.l, dark = w.dark && w.dark[l.zone] > 0;
-      const k = dark ? 0 : flick(l, time) * (w.genOn && l.kind !== 'projecteur' ? 1.5 : 1);
+      let k = dark ? 0 : flick(l, time) * (w.genOn && l.kind !== 'projecteur' ? 1.5 : 1);
+      // sa présence fait mourir les lampes : elles crépitent, puis s'éteignent quand il passe dessous
+      if (k > 0 && mon && !mon.wake && vision !== 'm' && l.kind !== 'projecteur') {
+        const dm = Math.hypot(l.x - mon.x, l.z - mon.z);
+        if (dm < 9 && Math.abs(l.y - mon.y) < 5) k *= dm < 3 ? 0.04 : Math.sin(time * 37 + l.phase) * Math.sin(time * 11 + l.phase * 3) > (dm - 3) / 7 - 0.25 ? 0.12 : 0.7;
+      }
       g.k = k;
       g.s.material.opacity = 0.5 * k; g.fix.material.color.setHex(LCOL[l.kind]).multiplyScalar(Math.max(0.05, k));
       const d = Math.hypot(l.x - cx, l.z - cz) + Math.abs(l.y - camera.position.y) * 2;
@@ -574,9 +739,15 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       if (!n) { pl.intensity = 0; return; }
       const l = n.g.l;
       pl.position.set(l.x, l.y - 0.15, l.z); pl.color.setHex(LCOL[l.kind]); pl.distance = LDIST[l.kind];
-      pl.intensity = LPOW[l.kind] * n.g.k * (vision === 'm' ? 0.35 : 1);
+      pl.intensity = (l.power ?? LPOW[l.kind]) * n.g.k * (vision === 'm' ? 0.35 : 1);
     });
     for (const s of puffs) s.material.opacity = 0.05 * (w.dark && w.dark[s.userData.l.zone] ? 0 : 1);
+
+    // il approche : on le sent avant de le voir
+    let dreadWant = 0;
+    if (mon && !mon.wake && vision !== 'm' && Math.abs(mon.y - camera.position.y) < 5) dreadWant = clamp01(1 - Math.hypot(mon.x - cx, mon.z - cz) / 14);
+    dread += (dreadWant - dread) * Math.min(1, dt * 2.2);
+    spike = Math.max(0, spike - dt * 1.1);
 
     // ma lampe
     const seeTorch = me && me.st === 'ok' && me.torch && me.role !== 'm' && !cctv && vision !== 'm';
@@ -589,7 +760,12 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       const sx = -Math.sin(me.yaw), sz = -Math.cos(me.yaw);
       for (let r = 0.2; r < 3; r += 0.2) { const i = Math.floor(me.z + sz * r) * W + Math.floor(me.x + sx * r); if (M.t[i] !== T.FLOOR) { d = r; break; } }
       tk *= clamp01(d * d / 7 + 0.05);
+      // et elle se met à faiblir quand il est tout près
+      const fear = Math.max(dread, spike);
+      if (fear > 0.12 && Math.sin(time * 29) * Math.sin(time * 13.3 + 1) > 1 - fear * 0.72) tk *= 0.18;
     }
+    // sous son nez, la lampe éclaire son visage de plein fouet
+    if (jump > 0 && view.vision !== 'm') tk = 34 * (Math.sin(time * 41) > -0.5 ? 1 : 0.3);
     torch.intensity = tk;
     torch.color.setHex(me && me.batt < 25 ? 0xffc48a : 0xfff1d6);
     camera.getWorldDirection(dir);
@@ -598,6 +774,7 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     right.crossVectors(dir, camera.up).normalize();
     torch.position.copy(camera.position).addScaledVector(right, -0.18).addScaledVector(dir, 0.12); torch.position.y -= 0.24;
     torch.target.position.copy(torch.position).addScaledVector(torchDir, 8);
+    if (jump > 0) { torch.position.copy(camera.position); torch.target.position.copy(camera.position).addScaledVector(dir, 8); }
     ownBeam.visible = tk > 0;
     if (tk > 0) { ownBeam.position.copy(torch.position); ownBeam.lookAt(torch.target.position); }
     renderer.shadowMap.autoUpdate = tk > 0;
@@ -631,7 +808,8 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
     // si la machine peine, on baisse la définition plutôt que les images par seconde
     if (dt > 1 / 26) slowT += dt; else slowT = Math.max(0, slowT - dt * 0.5);
     if (slowT > 4 && pixel > 0.62) { slowT = 0; pixel = Math.max(0.6, pixel * 0.85); renderer.setPixelRatio(pixel); resize(); if (pixel < 0.75 && post) post.setBloom(false); }
-    draw(vision === 'm' ? 0 : vision === 'cctv' ? 1.7 : 1, eyeExp);
+    const tear = vision === 'm' ? 0 : clamp01(Math.max(dread * dread * 0.6, jump > 0 ? 0.4 : spike));
+    draw(vision === 'm' ? 0 : vision === 'cctv' ? 1.7 : 1 + tear * 0.8, eyeExp, tear, vision === 'm' ? 1 : 0);
   }
 
   return {
@@ -641,6 +819,8 @@ export function createScene(stage, { map: M, quality = 'normal', onLost } = {}) 
       hurt() { shake = 1; },
       shake(v) { shake = Math.max(shake, v); },
       swing() { punch = 1; },
+      dread(v) { spike = Math.max(spike, v); },
+      jump(sec = 1.5) { jump = sec; shake = 1; spike = 1; },
     },
     setQuality(q) { pixel = Math.min(devicePixelRatio || 1, q === 'haut' ? 1.5 : q === 'bas' ? 0.8 : 1.15); renderer.setPixelRatio(pixel); resize(); },
     domElement: renderer.domElement,

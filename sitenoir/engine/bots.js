@@ -221,13 +221,11 @@ function chooseGoal(sim, p) {
     return { x: s[0], z: s[1], tag, act: dist(p, it) < 1.9 ? () => { stop(p); p.botTarget = { kind: 'item', id: it.id }; p.inp.yaw = angTo(p, it.x, it.z); press(p.inp, 'uc'); } : null };
   };
 
-  // 1. s'équiper à l'avant-poste : chacun un outil (EMF d'abord, puis l'appareil photo)
-  const tool = p.inv.find((s) => s && (s.k === 'emf' || s.k === 'photo'));
-  if (!tool && !a.equipped) {
+  // 1. s'équiper à la table de l'avant-poste : l'appareil photo est déjà dans le sac, la moitié de l'équipe prend un capteur
+  if (!a.equipped) {
     const hasEmf = team.filter((q) => q.inv.some((s) => s && s.k === 'emf')).length;
-    const want = hasEmf <= team.findIndex((q) => q === p) / 2 ? 'emf' : 'photo';
-    const c = w.items.find((it) => it.stock && it.k === want) || w.items.find((it) => it.stock && (it.k === 'emf' || it.k === 'photo'));
-    if (c && zoneAt(M, p.x, p.z) === Z.OUTPOST) return nearHand(c, 'equip');
+    const c = w.items.find((it) => it.stock && it.k === 'emf');
+    if (c && zoneAt(M, p.x, p.z) === Z.OUTPOST && !p.inv.some((s) => s && s.k === 'emf') && hasEmf <= team.findIndex((q) => q === p) / 2) return nearHand(c, 'equip');
     a.equipped = true;
   }
   // 2. relever un équipier à terre
@@ -422,6 +420,7 @@ function monsterBot(sim, p, dt) {
     }
     // pouvoirs : noir et porte bloquée pendant la poursuite
     if (d < 16 && p.cd.lights <= 0 && !w.dark[zoneAt(M, p.x, p.z)] && los) press(inp, 'a1');
+    if (d < 11 && d > 4 && p.cd.roar <= 0 && los) press(inp, 'rc');
     if (d > 3 && d < 12 && p.cd.jam <= 0 && los) {
       const dr = M.doors.find((o) => o.kind !== 'lift' && !(o.kind === 'sas' && o.key === null) && Math.hypot(o.x - tg.x, o.z - tg.z) < 3.2 && Math.hypot(o.x - p.x, o.z - p.z) < 7 && !o.cells.some((i) => sim.overlapsCell(tg, i)));
       if (dr) { const ya = inp.yaw; p.yaw = angTo(p, dr.x, dr.z); inp.yaw = p.yaw; press(inp, 'a2'); a.yawBack = ya; }
