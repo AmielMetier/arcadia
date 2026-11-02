@@ -212,7 +212,7 @@ export class Hud {
           </div>
           <div class="hud-stat-item">
             <img class="hud-stat-ico" src="img/hud/trophy.png" alt="">
-            <span class="hud-badge-cnt">${bCount}/8</span>
+            <span class="hud-badge-cnt">${bCount}/${BADGES.length}</span>
           </div>
           <div class="hud-stat-item hud-cap-pill" title="Niveau max autorisé avant la prochaine Arène">
             <span>MAX N.${g.levelCap()}</span>

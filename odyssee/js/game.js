@@ -19,6 +19,8 @@ import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
 import { syncJournal } from './core/questsData.js';
+import { QUIZ } from './world/arenes.js';
+import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
@@ -56,7 +58,7 @@ export class Game {
   static hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
   newState(name, gender) {
     return {
-      v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(8).fill(false), flags: {},
+      v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(BADGES.length).fill(false), flags: {},
       party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [] }, time: 0, visited: ['aube'], repel: 0,
       cleared: {}, surf: false, explored: [], journal: {},
       lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start,
@@ -75,6 +77,7 @@ export class Game {
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
     setUidBase(maxUid + 1);
     // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
+    while (s.badges.length < BADGES.length) s.badges.push(false);   // anciennes parties : 8 badges → 15
     for (const m of s.party.concat(s.box)) ensureNature(m);
     return s;
   }
@@ -268,7 +271,7 @@ export class Game {
     this.view.update(0, this.player.x, this.player.y);
     this.save(true);
     await this.ui.fade(false, 220);
-    if (this.mapObj.dark && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
+    if (this.mapObj.dark && this.mapObj.dark !== 'arene' && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
     await this.onEnterMap();
     this.busy = false;
   }
@@ -277,6 +280,7 @@ export class Game {
     const st = this.state;
     // lieux visités (et visités la nuit) : certaines requêtes des habitants en dépendent
     st.flags['V:' + this.mapObj.id] = true;
+    if (this.mapObj.gymLock != null) st.flags['IN:' + this.mapObj.id] = !st.badges[this.mapObj.gymLock];
     { const h = this.hour(); if (h >= 20 || h < 5) st.flags['VN:' + this.mapObj.id] = true; }
     // au labo, le professeur accueille le joueur avant qu'il ne touche aux capsules
     // Tour de la Grue : trois bêtes s'enfuient à l'arrivée du joueur
@@ -389,16 +393,21 @@ export class Game {
     p.dir = d;
     const tx = p.x + dx, ty = p.y + dy, t = m.get(tx, ty);
     // sortie par le tapis
-    if (m.get(p.x, p.y) === T.MAT && d === 'down') { const w = m.warpAt(p.x, p.y); if (w) { this.warp(w, 'exit'); return; } }
+    if (m.get(p.x, p.y) === T.MAT && d === 'down') {
+      const w = m.warpAt(p.x, p.y);
+      // arène : on n'en ressort pas avant d'avoir affronté le Champion (une défaite ramène au Centre de soins)
+      if (w && m.gymLock != null && !this.state.badges[m.gymLock] && this.state.flags['IN:' + m.id]) { this.gymLocked(); return; }
+      if (w) { this.warp(w, 'exit'); return; }
+    }
     const run = this.autoRun ? !this.input.isDown('run') : this.input.isDown('run');
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
       if (m.in(tx, ty) && t === T.WATER && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: SURF }; p.walking = true; return; }
-      if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.3, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
+      if (m.in(tx, ty) && walkable(t) && t !== T.DOOR && t !== T.BRIDGE && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.3, jump: true, land: true }; p.walking = true; this.sound.sfx('ledge'); return; }
       p.walking = false; if (p.bumpT <= 0) { this.sound.sfx('bump'); p.bumpT = 0.3; } return;
     }
     // Force : pousser un rocher
-    if (t === T.BOULDER && this.strengthOn === m.id) {
+    if (t === T.BOULDER && (this.strengthOn === m.id || m.pushFree)) {
       const bx = tx + dx, by = ty + dy, bt = m.get(bx, by);
       if (walkable(bt) && ![T.DOOR, T.MAT, T.CAVEDOOR, T.STAIRS].includes(bt) && !this.occupied(bx, by) && !m.warpAt(bx, by)) {
         this.setTile(tx, ty, m.outdoor ? T.GRASS : T.CAVE); this.setTile(bx, by, T.BOULDER);
@@ -424,6 +433,11 @@ export class Game {
   async onStep(mv) {
     const p = this.player, m = this.mapObj, t = m.get(p.x, p.y);
     if (mv.jump) this.view.shake = 0.06;
+    // arènes à énigmes : glace ou sable qui glisse, flèches et souffles qui poussent, dalles, téléporteurs
+    const mo = m.objectAt(p.x, p.y);
+    if (!mv.slid && (mo?.type === 'glace' || mo?.type === 'fleche')) { this.busy = true; try { await this.glisse(mo.type === 'fleche' ? mo.dir : p.dir); } finally { this.busy = false; } return this.onStep({ slid: true }); }
+    if (mo?.type === 'dalle') this.dalle(mo);
+    if (mo?.type === 'tp' && !mv.slid) { this.busy = true; try { await this.teleporte(mo); } finally { this.busy = false; } return this.onStep({ slid: true }); }
     if (isGrassEnc(t)) this.view.rustle(p.x, p.y);
     const w = m.warpAt(p.x, p.y);
     if (w && (t === T.DOOR || t === T.CAVEDOOR || w.step)) {
@@ -451,6 +465,58 @@ export class Game {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) await this.wildBattle(enc);
     }
+  }
+
+  /** glisse sur la glace (ou le sable des dunes) jusqu'à un obstacle ; les flèches changent la direction */
+  async glisse(dir) {
+    const p = this.player, m = this.mapObj;
+    for (let guard = 0; guard < 300; guard++) {
+      const o = m.objectAt(p.x, p.y);
+      if (o?.type === 'fleche') dir = o.dir; else if (o?.type !== 'glace') break;
+      const [dx, dy] = DIRS[dir], tx = p.x + dx, ty = p.y + dy;
+      if (!walkable(m.get(tx, ty)) || this.occupied(tx, ty)) break;
+      p.dir = dir; p.walking = o?.type === 'fleche';
+      p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: 0.1, scripted: true }; while (p.move) await wait(16);
+    }
+    p.walking = false;
+  }
+  /** dalle : lève les barrières d'une couleur et baisse celles de l'autre (l'état est gardé avec la carte) */
+  dalle(o) {
+    const m = this.mapObj, st = this.state, k = 'B:' + m.id, up = o.g;
+    if (st.flags[k] === up) return;
+    st.flags[k] = up; this.sound.sfx('select'); this.view.shake = 0.05;
+    for (const [x, y, g] of m.barriers || []) { const raise = g === up; if (this.player.x === x && this.player.y === y) continue; this.setTile(x, y, raise ? (g === 'r' ? T.BARRIER_R : T.BARRIER_B) : T.FLOOR); }
+  }
+  /** téléporteur : on réapparaît sur l'autre dalle */
+  async teleporte(o) {
+    const p = this.player;
+    this.sound.sfx('exit');
+    await this.ui.fade(true, 140);
+    p.x = o.to[0]; p.y = o.to[1]; p.dir = o.dir || p.dir; p.move = null;
+    this.view.update(0, p.x, p.y); this.resetFollower?.();
+    await this.ui.fade(false, 140);
+  }
+  /** gardien du savoir (arène Feu) : une bonne réponse et il s'écarte ; une mauvaise, et il faut le battre */
+  async savoir(n) {
+    const ui = this.ui, q = QUIZ[(n.def.quiz || 0) % QUIZ.length], sp = { speaker: 'Gardien du savoir' };
+    await ui.say('Halte ! Seuls ceux qui connaissent le feu passent. Réponds à ma question.', { ...sp, keep: true });
+    const k = await ui.list({ title: q.q, items: q.choix.map((label) => ({ label })), cls: 'shop quiz', cancel: null });
+    if (k !== q.bonne) {
+      this.sound.sfx('bump'); await ui.say(`Faux ! C'était « ${q.choix[q.bonne]} ». Prouve ta valeur au combat, alors !`, sp);
+      const lvl = Math.max(20, this.levelCap() - 4), team = [[58, lvl], [126, lvl + 1]];
+      const res = await this.api().fight({ cls: 'Gardien', name: 'du savoir', team, ow: 'scientifique', bs: 'scientifique', prize: 30, lose: 'Bien joué. Tu peux passer.' });
+      if (res !== 'win') return;
+    } else { this.sound.sfx('select'); await ui.say('Exact ! Passe, dresseur.', sp); }
+    this.state.flags['QZ:' + n.id] = true; this.refreshNpcs();
+  }
+  /** tables du Casino et terminaux de la Bourse (objets des intérieurs de Métropole) */
+  casino(quoi) { return casinoScreen(this, quoi); }
+  bourse() { return bourseScreen(this); }
+  /** l'arène est fermée derrière nous : le guide le rappelle */
+  async gymLocked() {
+    this.busy = true;
+    await this.ui.say(['Le guide : « Les portes de l\'arène restent closes tant que tu n\'as pas affronté le Champion ! »', 'Gagne ton badge… ou retourne au Centre de soins après une défaite.']);
+    this.busy = false;
   }
 
   /* ================= PNJ ================= */
@@ -1184,6 +1250,11 @@ export class Game {
   async script(name, n) {
     const st = this.state, ui = this.ui;
     if (await storyTalk(this, name, n)) return;   // histoire principale et quêtes annexes (story.js)
+    if (name === 'savoir') return this.savoir(n);
+    // Métropole : le comptoir du Casino, Pierre à la Bourse, la styliste de la boutique de mode
+    if (name === 'casino') return casinoScreen(this);
+    if (name === 'pierre') return entretienPierre(this);
+    if (name === 'apparence') return this.apparence?.() ?? ui.say(['Bienvenue à la boutique de mode !', 'Nos nouvelles collections arrivent très bientôt.'], { speaker: 'Styliste' });
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });
@@ -1210,7 +1281,7 @@ export class Game {
       else if (st.flags.rivalB1) lines.push(`Tu as croisé ${B.name} ? ${B.il === 'il' ? 'Il' : 'Elle'} a toujours eu la tête dure... comme sa grand-mère.`);
       if (seen) lines.push(`Tu as déjà rencontré ${seen} créature${seen > 1 ? 's' : ''} légendaire${seen > 1 ? 's' : ''}${caught ? `, et tu en as capturé ${caught}` : ''} !`, caught >= 10 ? 'Presque toutes les légendes d\'Odyssée sont dans ton équipe ou ton PC. Odyssor lui-même doit t\'observer.' : 'Les anciens disent que les légendaires ne choisissent que les dresseurs au cœur sincère.');
       else lines.push('Chaque créature que tu rencontreras remplira ton Pokédex.', 'On raconte que des créatures légendaires dorment sur les îles de l\'Est. Le capitaine de l\'Embarcadère pourra t\'y emmener.');
-      lines.push(st.badges[7] ? 'Il ne te reste que la Ligue Céleste. Je suis fier de toi.' : 'Les cinq Champions du continent t\'attendent, puis les trois frères de l\'archipel. Et au bout du chemin : la Ligue Céleste !');
+      lines.push(this.badgeCount() >= 15 ? 'Il ne te reste que la Ligue Céleste. Je suis fier de toi.' : st.badges[7] ? 'Les trois frères sont tombés ! Au-delà du Pont de l\'Austral, au sud de Bourg-Aube, sept Champions t\'attendent dans les Terres du Sud.' : 'Les cinq Champions du continent t\'attendent, puis les trois frères de l\'archipel, et enfin les sept Champions des Terres du Sud. Et au bout du chemin : la Ligue Céleste !');
       await ui.say(lines, { speaker: 'Prof. Saule' });
     } else if (name === 'rivalLab') {
       if (st.flags.starter) { await ui.say('Hé, ne traîne pas !', { speaker: RIVAL_NAME }); return; }
@@ -1384,7 +1455,7 @@ export class Game {
     if (name === 'rivalB4' && bd(7)) return rivalFight('rivalB4', () => [[1044, 54], [1016, 54], [1040, 54], [149, 55], [1046, 54], [L3[2], 57]], 'Merci. J\'avais besoin de ce combat.',
       [`${st.name} ! Je savais que tu viendrais ici.`, 'Drakos m\'a parlé, hier soir. Il dit que Odyssor passe au Cap quand quelqu\'un a eu le courage de changer les choses.', 'J\'aimerais le voir avec toi. Mais d\'abord... un vrai combat. Sans uniforme, sans camp. Juste nous deux !'],
       ['Mon grand-père a raison : on apprend plus en perdant qu\'en gagnant.', 'Avance jusqu\'au bord de la falaise. Si Odyssor vient, c\'est pour toi.'], { ...asB, cls: 'Rival' });
-    if (name === 'rival5') return rivalFight('rival5', (R) => [[1012, 50], [1035, 49], [1022, 50], [1040, 50], [1051, 51], [R[2], 54]], 'Incroyable... Tu mérites d\'aller jusqu\'au bout.', [`${st.name}... Je savais que tu viendrais.`, 'Huit badges, dont celui de Drakos. Tout le monde ne parle que de toi.', 'Mais avant la Ligue, il y a moi. Donne tout ce que tu as !'], ['Va. La Maître de la Ligue t\'attend.', 'Et bats-la, sinon c\'est moi qui m\'en chargerai !']);
+    if (name === 'rival5') return rivalFight('rival5', (R) => [[1012, 72], [1035, 71], [1022, 72], [1040, 72], [1051, 73], [R[2], 76]], 'Incroyable... Tu mérites d\'aller jusqu\'au bout.', [`${st.name}... Je savais que tu viendrais.`, 'Quinze badges, dont celui de Drakos et les sept du Sud. Tout le monde ne parle que de toi.', 'Mais avant la Ligue, il y a moi. Donne tout ce que tu as !'], ['Va. La Maître de la Ligue t\'attend.', 'Et bats-la, sinon c\'est moi qui m\'en chargerai !']);
     return false;
   }
 

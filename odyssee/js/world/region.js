@@ -15,6 +15,8 @@ import { addStory } from './story.js';
 import { enrichirTout, equipeDeType } from './rencontres.js';
 import { addHabitants } from './habitants.js';
 import { applyRetouches } from './retouches.js';
+import { buildArena } from './arenes.js';
+import { buildSud, BADGES_SUD, LEADERS_SUD, GYM_TRAINERS_SUD } from './sud.js';
 
 // trois capsules sur la table du labo, une par type ; dans chacune, trois partenaires au choix :
 // la créature originale d'Odyssée, le Pokémon de Rouge / Bleu et celui d'Or / Argent (avec leurs évolutions)
@@ -39,6 +41,8 @@ export const BADGES = [
   { name: 'Badge Volt', type: 'electric', color: '#f0d030' }, { name: 'Badge Pétale', type: 'grass', color: '#58c060' },
   { name: 'Badge Mirage', type: 'psychic', color: '#e070c0' }, { name: 'Badge Granit', type: 'rock', color: '#b89c6c' },
   { name: 'Badge Braise', type: 'fire', color: '#f07030' }, { name: 'Badge Écaille', type: 'dragon', color: '#7a68e0' },
+  // les sept arènes des Terres du Sud (après les trois frères)
+  ...BADGES_SUD,
 ];
 // capacités de terrain : obtenues auprès d'un Champion, utilisables avec le badge indiqué
 export const FIELD = {
@@ -98,6 +102,7 @@ const CLS = {
   'Garde d\'Écaille': ['garde', 36],
   // troisième valeur : portrait en combat quand le personnage n'a pas le sien
   'Sbire de la Brume': ['brume', 32], 'Sbire': ['brume_f', 32], 'Admin de la Brume': ['sylas', 70], 'Chef de la Brume': ['nox', 120], Voleur: ['voleur', 24], Moine: ['pretre', 34, 'pretre'], 'Dame Kimono': ['kimono', 40],
+  'Homme d\'affaires': ['topdresseur', 50], 'Femme d\'affaires': ['topdresseuse', 50], Pilote: ['marin', 44], Ninja: ['voleur', 44], Ouvrier: ['montagnard', 40],
   Sage: ['vieil_homme', 32, 'medium'], 'Grand Sage': ['vieil_homme', 60, 'medium'], Skieuse: ['randonneuse', 30], Alpiniste: ['montagnard', 30],
 };
 export const LEADERS = [
@@ -109,8 +114,9 @@ export const LEADERS = [
   { name: 'Basalte', type: 'rock', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]], intro: 'Mon frère aîné m\'a confié cette île. Pour aller plus loin, il faudra passer à travers la roche !', lose: 'Tu as fendu le roc... Le Badge Granit est à toi. Drakos ne va pas aimer ça.' },
   { name: 'Pyros', type: 'fire', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]], intro: 'Le volcan gronde et mon cœur aussi ! Personne ne passe sur la Grande Île sans brûler un peu !', lose: 'Quelle flamme... Le Badge Braise te va bien. Va. Drakos t\'attend.' },
   { name: 'Drakos', type: 'dragon', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]], intro: 'Dix ans que personne n\'a franchi cette porte. Célestine t\'envoie ? Peu importe. Ici, c\'est moi qui règne !', lose: '... Les dragons te reconnaissent. Prends le Badge Écaille. Le dernier.' },
+  ...LEADERS_SUD,
 ];
-const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 56], [1046, 57], [1035, 57], [1040, 58], [248, 58], [149, 60]], intro: 'Huit badges... Et même celui de Drakos. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
+const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 78], [1046, 79], [1035, 79], [1040, 80], [248, 80], [149, 82]], intro: 'Quinze badges... Les douze du continent, et même celui de Drakos. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
 
 let tCount = 0;
 export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
@@ -156,14 +162,14 @@ export function buildTown(W, maps, def) {
     else W.prop(k, ox + a[0], oy + a[1]);
   }
   for (const b of def.buildings) {
-    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door });
+    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door, kit: b.kit, flat: b.flat });
     let id = `${def.id}:${b.id || b.kind + b.x}`;
     if (maps[id]) id += 'y' + b.y;   // deux bâtiments dans la même colonne : chacun garde son intérieur
     let inside;
     if (b.interior) inside = b.interior(id);
     else if (b.kind === 'center') inside = centerInterior(id, 'Centre de soins');
     else if (b.kind === 'mart') inside = martInterior(id, 'Boutique', STOCK[def.stock || 1]);
-    else if (b.kind === 'gym') inside = gymInterior(id, LEADERS[def.gym].type, 'Arène de ' + def.name);
+    else if (b.kind === 'gym') { const ar = buildArena(id, def.gym, LEADERS[def.gym].type, 'Arène de ' + def.name); inside = ar.map; def.gymArena = ar; }
     else if (b.kind === 'lab') inside = labInterior(id);
     else if (b.kind === 'league') inside = leagueInterior(id);
     else inside = houseInterior(id, b.name || 'Maison', { w: b.kind === 'bighouse' || b.kind === 'tower' ? 11 : 9, h: b.kind === 'bighouse' || b.kind === 'tower' ? 9 : 8, bed: b.bed, extraBooks: b.kind === 'tower', kitchen: b.kitchen });
@@ -216,7 +222,7 @@ function gymGuard(W, def, badges, text) {
    ====================================================================== */
 export function buildWorld() {
   tCount = 0;
-  const W = new GameMap('monde', 440, 280, { outdoor: true, fill: T.TREE, name: 'Odyssée' });
+  const W = new GameMap('monde', 440, 520, { outdoor: true, fill: T.TREE, name: 'Odyssée' });   // le nord (jusqu'à 280) et les Terres du Sud
   const maps = { monde: W };
   const towns = {};
 
@@ -457,11 +463,11 @@ export function buildWorld() {
       { kind: 'center', x: 3, y: 5 }, { kind: 'mart', x: 14, y: 5 },
       { kind: 'house', x: 19, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace et les autres dragons.'] }] },
       { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : une créature immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit que Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
-      { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux huit badges peuvent la franchir.'] }] },
+      { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux quinze badges peuvent la franchir : les douze du continent et ceux des trois frères.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
     npcs: [
-      { id: 'garde', x: 12, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, tiles: [[9, 1], [10, 1], [11, 1], [12, 1]] }, text: ['Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.'] },
+      { id: 'garde', x: 12, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 15, tiles: [[9, 1], [10, 1], [11, 1], [12, 1]] }, text: ['Halte ! La Route Victoire est réservée aux dresseurs aux quinze badges.', 'Les douze Champions du continent et les trois frères de l\'archipel. Les sept derniers t\'attendent dans les Terres du Sud, au-delà du Pont de l\'Austral.'] },
     ],
   };
   buildTown(W, maps, I);
@@ -833,6 +839,9 @@ export function buildWorld() {
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
+  /* ======================== TERRES DU SUD ======================== */
+  buildSud({ W, maps, towns, R, routeTrainer, routeItem, buildTown, ENC, ledges });
+
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [
     [['Insectomane', 'Lucas', [[1017, 9], [10, 10]]], ['Insectomane', 'Basile', [[1018, 10], [1020, 10]]]],
@@ -843,6 +852,7 @@ export function buildWorld() {
     [['Montagnard', 'Marcel', [[1026, 38], [74, 38]]], ['Montagnard', 'Henri', [[95, 39], [1028, 39]]], ['Garde d\'Écaille', 'Gwen', [[1027, 40]]]],
     [['Karatéka', 'Akira', [[1041, 43], [58, 43]]], ['Topdresseur', 'Blaise', [[78, 44], [1005, 44]]], ['Garde d\'Écaille', 'Ignace', [[1042, 45], [218, 44]]]],
     [['Garde d\'Écaille', 'Kael', [[1049, 47], [1050, 48]]], ['Topdresseuse', 'Wyrna', [[148, 49], [1044, 49]]], ['Garde d\'Écaille', 'Ivar', [[147, 48], [1050, 49], [1025, 49]]]],
+    ...GYM_TRAINERS_SUD,
   ];
   // quatrième dresseur des arènes qui n'en avaient que deux ou trois
   const GYM_EXTRA = [
@@ -851,10 +861,12 @@ export function buildWorld() {
   ];
   for (const t of Object.values(towns)) {
     if (t.gym == null) continue;
-    const g = t.gymMap, L2 = LEADERS[t.gym];
-    g.npc({ id: g.id + ':guide', x: 9, y: 17, sprite: 'habitant', dir: 'down', script: 'gymguide', gym: t.gym });
-    // les dresseurs se tiennent sur le côté de l'allée centrale (colonne 7) : ils ne bloquent jamais le passage
-    const spots = [[5, 15, 'right'], [10, 10, 'left'], [4, 7, 'right'], [10, 11, 'left']];
+    const g = t.gymMap, L2 = LEADERS[t.gym], ar = t.gymArena;
+    g.npc({ id: g.id + ':guide', x: ar.guide[0], y: ar.guide[1], sprite: 'habitant', dir: 'left', script: 'gymguide', gym: t.gym });
+    // les dresseurs se tiennent à côté du parcours de l'énigme, tournés vers lui : ils ne bloquent jamais le passage
+    const spots = ar.spots;
+    // arène Feu : des gardiens du savoir posent une question avant de s'écarter
+    ar.quiz.forEach(([x, y], k) => g.npc({ id: `${g.id}:savoir${k}`, x, y, sprite: 'scientifique', dir: 'down', script: 'savoir', quiz: k + t.gym, hideIf: `QZ:${g.id}:savoir${k}` }));
     // quatre dresseurs par arène ; chacun garde ses Pokémon et en ajoute un ou deux du type de l'arène, pris dans
     // les six générations (un Pokémon différent d'une arène à l'autre, toujours le même pour une arène donnée)
     const list = gymTrainers[t.gym].slice();
@@ -864,8 +876,8 @@ export function buildWorld() {
       const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
       const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
     });
-    const fem = ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
-    g.npc({ id: g.id + ':leader', x: 7, y: 3, dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: 'smart', items: { 'super-potion': t.gym < 3 ? 1 : 0, 'hyper-potion': t.gym >= 3 ? 2 : 0, 'full-restore': t.gym === 7 ? 1 : 0 }, intro: L2.intro, lose: L2.lose, sight: 0 } });
+    const fem = L2.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
+    g.npc({ id: g.id + ':leader', x: ar.leader[0], y: ar.leader[1], dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: 'smart', items: { 'super-potion': t.gym < 3 ? 1 : 0, 'hyper-potion': t.gym >= 3 ? 2 : 0, 'full-restore': t.gym === 7 ? 1 : 0 }, intro: L2.intro, lose: L2.lose, sight: 0 } });
   }
   // Ligue : la Maître
   const league = maps['plateau:ligue'];

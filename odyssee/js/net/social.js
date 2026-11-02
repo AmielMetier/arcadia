@@ -144,7 +144,7 @@ async function showCard(game, peer) {
   // données venues d'un autre joueur : on ne garde que ce qu'on sait afficher
   const card = {
     name: String(c.name || peer.name).slice(0, 12), id: (c.id | 0) % 100000, gender: c.gender === 'f' ? 'f' : 'm', dex: c.dex | 0, seen: c.seen | 0, time: +c.time || 0, champion: !!c.champion,
-    badges: Array.isArray(c.badges) ? c.badges.slice(0, 8).map(Boolean) : [],
+    badges: Array.isArray(c.badges) ? c.badges.slice(0, 15).map(Boolean) : [],
     team: Array.isArray(c.team) ? c.team.slice(0, 6).filter((q) => SPECIES[q?.sp]).map((q) => ({ sp: q.sp, lvl: Math.max(1, Math.min(100, q.lvl | 0)), nick: q.nick ? String(q.nick).slice(0, 12) : null })) : [],
   };
   game.ui.sound.sfx('select');

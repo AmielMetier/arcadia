@@ -272,7 +272,7 @@ async function beloteTable(game) {
 /** marché de la partie : créé au premier passage, rattrapé selon le temps de jeu écoulé */
 export function marche(game) {
   const st = game.state;
-  if (!st.bourse) st.bourse = B.nouveauMarche((st.id || 1) * 97 + 13);
+  if (!st.bourse) { st.bourse = B.nouveauMarche((st.id || 1) * 97 + 13); for (let i = 0; i < 60; i++) B.seance(st.bourse); }   // un marché qui a déjà vécu
   const m = st.bourse, now = (st.time || 0) * 1000;   // temps de jeu (secondes → ms)
   if (m.vu != null && now > m.vu) B.rattraper(m, now - m.vu);
   m.vu = now;
@@ -312,9 +312,10 @@ export async function bourseScreen(game) {
     if (k === 'b') break;
     const id = ids[i], a = B.ACTIF[id];
     const info = id === B.INDICE.id ? 'Un panier des dix actions de la cote, pondéré par leur taille (1/10e de point d\'indice).' : `${a.desc || a.unite ? (a.desc || 'Cours pour ' + a.unite) : ''}${a.secteur ? ' Secteur : ' + B.SECTEURS[a.secteur] + '.' : ''}`;
-    if (!m.embauche) { await ui.say([`${nom(id)} : ${info}`, 'Pour acheter, il faut un compte. Va voir Pierre, au dernier étage.']); continue; }
     const pos = m.positions[id]?.qte || 0, px = B.prixDe(m, id);
-    const c = await ui.list({ title: `${nom(id)} — ${fr(px, 2)} ₽${pos ? ` (tu en as ${pos})` : ''}`, items: [{ label: 'Acheter' }, { label: 'Vendre', disabled: !pos }, { label: 'Retour' }], cls: 'shop', cancel: 2, parent: T.s });
+    const c = await ui.list({ title: `${nom(id)} — ${fr(px, 2)} ₽${pos ? ` (tu en as ${pos})` : ''}`, items: [{ label: 'Acheter', disabled: !m.embauche }, { label: 'Vendre', disabled: !pos || !m.embauche }, { label: 'Pricer : dérivés sur ce titre' }, { label: 'Fiche' }, { label: 'Retour' }], cls: 'shop', cancel: 4, parent: T.s });
+    if (c === 3) { await ui.say([`${nom(id)} : ${info}`, ...(m.embauche ? [] : ['Pour acheter et vendre, il faut un compte : va voir Pierre, au fond de la Bourse.'])]); continue; }
+    if (c === 2) { await ui.list({ title: `Pricer — ${nom(id)}`, items: pricer(m, id).map(([label, right]) => ({ label, right })), cls: 'shop quiz', cancel: 0, parent: T.s }); continue; }
     if (c === 0) {
       const max = Math.min(99, Math.floor(st.money / (px * 1.002)));
       if (!max) { await ui.say('Pas assez de Pokédollars.'); continue; }
@@ -331,6 +332,23 @@ export async function bourseScreen(game) {
   clearInterval(tick); T.close();
 }
 
+/** prix théoriques des produits dérivés sur un titre (6 mois, à la monnaie) : de quoi s'entraîner avant l'entretien */
+function pricer(m, id) {
+  const T = 0.5, r = B.R_PD;
+  if (id === B.INDICE.id) { const S = B.prixDe(m, id), sig = 0.18; return [['Future 6 mois (tracker)', fr(B.forward(S, r, T, 0.02), 2) + ' ₽'], ['Call européen ATM', fr(B.blackScholes('call', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Put européen ATM', fr(B.blackScholes('put', S, S, T, r, sig, 0.02), 2) + ' ₽'], ['Call asiatique ATM', fr(B.asiatique('call', S, S, T, r, sig, 0.02, 6, 2000), 2) + ' ₽'], ['Retour', '']]; }
+  const a = B.ACTIF[id], S = m.prix[id];
+  if (a.fx) return [['Change à terme 6 mois', fr(B.changeATerme(S, r, B.R_PE, T), 4) + ' ₽'], ['Change à terme 1 an', fr(B.changeATerme(S, r, B.R_PE, 1), 4) + ' ₽'], ['Points de swap 1 an', fr(B.pointsSwap(S, r, B.R_PE, 1), 4) + ' ₽'], ['Taux de swap ₽ 5 ans', fr(B.tauxSwap(r, 5) * 100, 3) + ' %'], ['Call € ATM 6 mois (vol ' + Math.round(a.vol * 100) + ' %)', fr(B.blackScholes('call', S, S, T, r, a.vol, B.R_PE), 4) + ' ₽'], ['Retour', '']];
+  const sig = B.volDe(a), q = a.q || 0, u = a.u || 0, y = a.y || 0, L = [];
+  L.push([a.matiere ? 'Future 6 mois (stockage, rendement)' : 'Forward 6 mois (dividende)', fr(B.forward(S, r, T, q, u, y), 2) + ' ₽']);
+  L.push([`Call européen ATM (vol ${Math.round(sig * 100)} %)`, fr(B.blackScholes('call', S, S, T, r, sig, q), 2) + ' ₽']);
+  L.push(['Put européen ATM', fr(B.blackScholes('put', S, S, T, r, sig, q), 2) + ' ₽']);
+  L.push(['Put américain ATM (arbre)', fr(B.americaine('put', S, S, T, r, sig, q, 120), 2) + ' ₽']);
+  L.push(['Call asiatique ATM (Monte-Carlo)', fr(B.asiatique('call', S, S, T, r, sig, q, 6, 2000), 2) + ' ₽']);
+  L.push(['Delta du call', fr(B.delta('call', S, S, T, r, sig, q), 3)]);
+  if (a.lambda) L.push(['CDS 5 ans (récup. 40 %)', fr(B.primeCDS(a.lambda) * 1e4, 0) + ' pb/an'], ['Survie à 5 ans', fr(B.survie(a.lambda, 5) * 100, 1) + ' %']);
+  L.push(['Retour', '']);
+  return L;
+}
 /** Pierre, l'analyste : entretien de huit questions (forwards, change, swaps, CDS, options, corrélations) */
 export async function entretienPierre(game) {
   const ui = game.ui, st = game.state, m = marche(game), sp = { speaker: 'Pierre' };

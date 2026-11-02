@@ -131,8 +131,8 @@ export async function storyTalk(g, name, n) {
     case 'mission': return mission(g, d.mission);
     case 'lumenSanct': return lumenSanct(g, true);
     case 'victoireGate': {
-      if (g.badgeCount() < 8) await say(g, 'Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.', 'Garde');
-      else await say(g, ['Huit badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.'], 'Garde');
+      if (g.badgeCount() < 15) await say(g, 'Halte ! La Route Victoire est réservée aux dresseurs aux quinze badges.', 'Garde');
+      else await say(g, ['Quinze badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.'], 'Garde');
       return true;
     }
   }
@@ -314,6 +314,6 @@ export async function purify(g) {
 export function overlay(g) {
   let ov = g._ov;
   if (!ov) { ov = g._ov = el('div', 'dark-ov'); g.ui.root.prepend(ov); }
-  const m = g.mapObj, dark = !!m?.dark, flash = g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;
+  const m = g.mapObj, dark = !!m?.dark, flash = m?.dark !== 'arene' && g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;   // l'arène Ténèbres reste dans le noir
   ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + (g.eclipseOn() && m?.outdoor ? ' eclipse' : '');
 }

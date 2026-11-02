@@ -34,7 +34,7 @@ const QUESTS = [
     notes: [
       [(f) => f.starter, (f) => `Le Prof. Saule m'a confié ${sp(f.starter)} et un Pokédex. Mon rêve : devenir Maître de la Ligue Céleste.`],
       ...BADGES.map((b, i) => [(f, g) => g.state.badges[i], (f, g) => `${LEADERS[i].name} m'a remis le ${b.name}${gymTown(g, i) ? ' à ' + gymTown(g, i) : ''}.`]),
-      [(f, g) => g.state.badges.every(Boolean), 'Huit badges en poche. La Ligue Céleste m\'attend.'],
+      [(f, g) => g.state.badges.every(Boolean), 'Quinze badges en poche. La Ligue Céleste m\'attend.'],
       ...ELITE.map((e) => [(f) => f['T:' + e.id], `${e.name}, du Conseil 4, s'est incliné${e.name === 'Ombrelle' ? 'e' : ''}.`]),
       [(f) => f.champion, 'Célestine s\'est inclinée. Je suis le nouveau Maître de la Ligue Céleste !'],
     ] },

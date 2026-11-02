@@ -11,7 +11,7 @@ const ok = (c, msg) => { if (!c) { fails++; console.error('ÉCHEC :', msg); } };
 const key = (m, x, y) => m + ':' + x + ',' + y;
 
 // état du joueur (les mêmes règles que game.js : gateClosed, npcVisible, canField)
-const st = { badges: Array(8).fill(false), flags: {}, bag: {} };
+const st = { badges: Array(15).fill(false), flags: {}, bag: {} };
 const game = { badgeCount: () => st.badges.filter(Boolean).length };
 const gateOn = (g) => (g.open ? !g.open(st.flags, game) : g.flag ? !st.flags[g.flag] : game.badgeCount() < g.badges);
 function visible(n) {
@@ -60,7 +60,7 @@ function explore(pos) {
       if (t === T.SMASH && can('eclate')) pass = true;
       if (t === T.BOULDER && can('force')) pass = true;
       if (t === T.WATER && can('surf') && (m.outdoor || m.surf)) pass = true;
-      if (onWater && t === T.DOOR) pass = false;
+      if (onWater && (t === T.DOOR || t === T.BRIDGE)) pass = false;   // on passe sous les ponts, on n'y monte pas
       if (pass) push(p.map, x, y);
     }
   }
@@ -73,6 +73,8 @@ const findNpc = (id) => { for (const [mid, m] of Object.entries(maps)) { const n
 function reach(label, mapId, x, y) {
   const seen = explore(pos);
   const m = maps[mapId];
+  // arène à énigmes (glace, téléporteurs, dalles…) : son solveur est vérifié par test-odyssee-arenes ; il suffit d'y entrer
+  if (m.gymLock != null && seen.has(key(mapId, m.exitX, m.exitY - 1))) { pos = { map: mapId, x: m.exitX, y: m.exitY - 1 }; return true; }
   for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
     if (seen.has(key(mapId, x + dx, y + dy))) { pos = { map: mapId, x: x + dx, y: y + dy }; return true; }
     // par-dessus un comptoir
@@ -93,7 +95,7 @@ function cannot(label, id) {
 }
 const beat = (...ids) => ids.forEach((id) => talk(id, () => { st.flags['T:' + id] = true; }));
 // ordre des arènes : Sylvebourg, Port-Azur, Voltacité, Floralia, Mirage, puis Granit, Cendrelune et Fort-Écaille
-const GYMS = ['B', 'D', 'E', 'F', 'G', 'K', 'H', 'L'];
+const GYMS = ['B', 'D', 'E', 'F', 'G', 'K', 'H', 'L', 'SM', 'SP', 'SN', 'SD', 'SF', 'SR', 'SO'];   // + les sept arènes des Terres du Sud
 const GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
 const leaderId = (i) => `${W.towns[GYMS[i]].gymMap.id}:leader`;
 const leader = (i) => {
@@ -137,6 +139,8 @@ leader(5); leader(6); leader(7);
 cannot('la Route Victoire reste fermée tant que dure l\'Éclipse', 'c4:1');
 reach('Lumen au Sanctuaire', 'sanctuaire', 13, 29);
 beat('ecl:sanct1', 'ecl:sanct2', 'ecl:nyx3', 'ecl:erebe3', 'ecl:boss2'); reach('Lugia', 'sanctuaire', 12, 4); st.flags.lugia = true;
+// les Terres du Sud : Métropole, Port-Lisière, Marais-Noir, Dunes d'Ocre, Forge-Acier, Rosebrume, Ombreval
+for (let i = 8; i < 15; i++) leader(i);
 for (const id of ['c4:1', 'c4:2', 'c4:3', 'c4:4']) beat(id);
 beat('champion');
 const out = maps['plateau:ligue'].outside; pos = { map: 'monde', x: out.x, y: out.y }; // la fin ramène sur le plateau

@@ -255,6 +255,30 @@ export function buildAtlas() {
   // transitions des sols à 16 px : une pièce par combinaison de coins (le terrain du bas est transparent)
   for (const j of SOL16_JEUX) for (let m = 1; m < 16; m++) { const im = SOL32[`s16_${j}_${m}`]; if (im) putImg(`w_${j}_${m}`, up2(im)); }
   for (const k of ['hautes_herbes0', 'hautes_herbes1']) if (SOL32['s16_' + k]) putImg(k, up2(SOL32['s16_' + k]));
+  // arènes à énigmes : glace, sable glissant, flèches, souffles, courants, dalles, téléporteurs, socles et barrières
+  putImg('gl_ice', SOL32.ice ? up2(SOL32.ice) : (() => { const P = new Pix(CELL, CELL, 41); P.fill('#cfeaf8'); P.speck(10, '#ffffff'); P.speck(6, '#a8d4ec'); for (let i = 0; i < 3; i++) { const x = P.ri(12), y = P.ri(12); P.rect(x, y, 4, 1, '#ffffff'); } return up2(P.c); })());
+  putImg('gl_sable', SOL32.sand0 ? up2(SOL32.sand0) : (() => { const P = new Pix(CELL, CELL, 43); dirtCell(P, PAL.sand, 2); return up2(P.c); })());
+  for (const [g, c1, c2] of [['r', '#e04848', '#ff9a8a'], ['b', '#3a6ae0', '#9ab8ff']]) {
+    putImg('dec_dalle_' + g, decal16((P) => { P.rect(3, 3, 10, 10, '#2c2c34'); P.rect(4, 4, 8, 8, c1); P.rect(5, 5, 6, 2, c2); P.rect(4, 11, 8, 1, shade(c1, -0.35)); }));
+    putImg('dec_socle_' + g, decal16((P) => { P.rect(1, 6, 14, 5, '#3a3a44'); P.rect(2, 7, 12, 3, shade(c1, -0.45)); P.rect(2, 7, 12, 1, c1); }));
+    put('barr_' + g, (P) => { P.fill(c1); for (let y = 2; y < 16; y += 5) P.rect(0, y, 16, 2, shade(c1, -0.3)); P.rect(0, 0, 16, 1, c2); P.rect(7, 0, 2, 16, shade(c1, 0.25)); });
+    put('barr_' + g + '_top', (P) => { P.fill(c2); P.rect(1, 1, 14, 14, c1); });
+  }
+  putImg('dec_tp', decal16((P) => { P.rect(2, 2, 12, 12, '#4a3a7a'); P.rect(3, 3, 10, 10, '#8a6ae0'); P.rect(5, 5, 6, 6, '#c8b8ff'); P.rect(7, 7, 2, 2, '#ffffff'); P.p(3, 3, '#4a3a7a'); P.p(12, 3, '#4a3a7a'); P.p(3, 12, '#4a3a7a'); P.p(12, 12, '#4a3a7a'); }));
+  const chevron = (P, col, dark) => { for (let k = 0; k < 2; k++) for (let i = 0; i < 5; i++) { P.p(3 + i, 9 - i + k * 4, col); P.p(12 - i, 9 - i + k * 4, col); P.p(3 + i, 10 - i + k * 4, dark); P.p(12 - i, 10 - i + k * 4, dark); } };
+  for (const [kind, col, dark] of [['fleche', '#f6d040', '#a07a10'], ['vent', '#e8f6ff', '#8ab8d8'], ['courant', '#ffffff', '#5aa0e0']]) {
+    const up = decal16((P) => chevron(P, col, dark));
+    putImg(`dec_${kind}_up`, up);
+    for (const [d, rot] of [['right', 1], ['down', 2], ['left', 3]]) { const c = canvas(C2, C2), x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.translate(C2 / 2, C2 / 2); x.rotate(rot * Math.PI / 2); x.drawImage(up, -C2 / 2, -C2 / 2); putImg(`dec_${kind}_${d}`, c); }
+  }
+  // chaussées de Métropole : asphalte, avec la ligne pointillée du milieu sur le bord commun des deux voies
+  const asph = (P) => { P.fill('#5a5c64'); P.speck(18, '#64666e'); P.speck(10, '#4e5058'); };
+  put('asph', asph);
+  put('asph_n', (P) => { asph(P); P.rect(2, 0, 5, 1, '#f0e8c0'); P.rect(10, 0, 5, 1, '#f0e8c0'); });
+  put('asph_s', (P) => { asph(P); P.rect(2, 15, 5, 1, '#f0e8c0'); P.rect(10, 15, 5, 1, '#f0e8c0'); });
+  put('asph_w', (P) => { asph(P); P.rect(0, 2, 1, 5, '#f0e8c0'); P.rect(0, 10, 1, 5, '#f0e8c0'); });
+  put('asph_e', (P) => { asph(P); P.rect(15, 2, 1, 5, '#f0e8c0'); P.rect(15, 10, 1, 5, '#f0e8c0'); });
+  put('asph_x', (P) => { asph(P); for (let x = 1; x < 16; x += 4) P.rect(x, 2, 2, 12, '#e8e8e8'); });   // passage piéton
   // petits détails posés sur l'herbe (touffes, trèfles, cailloux, pâquerettes, feuilles, champignons) : dessinés à 32 px
   DETAILS.forEach((k, i) => putImg('dec_' + k, detailDecal(k, i * 7919 + 13)));
   // grottes en relief (tools/odyssee-relief.py) : une rangée par biome, sols / faces de paroi / dessus des gradins
@@ -288,6 +312,8 @@ export function tameGreens(cv) {
   }
   x.putImageData(im, 0, 0);
 }
+/** décalque transparent dessiné à 16 px, agrandi ×2 */
+function decal16(draw) { const P = new Pix(CELL, CELL, 7); P.x.clearRect(0, 0, CELL, CELL); draw(P); return up2(P.c); }
 /** détails de l'herbe, à pleine résolution (32 px par case), fond transparent */
 export const DETAILS = ['touffe', 'touffe2', 'trefle', 'cailloux', 'paquerettes', 'boutons', 'feuilles', 'champignons', 'touffe3', 'brindilles'];
 function detailDecal(kind, seed) {
@@ -692,7 +718,32 @@ function windowAt(P, x, y, w, h, night) {
   P.rect(x + (w >> 1), y, 1, h, '#ffffff');
 }
 /** façade avant d'un bâtiment de w tuiles de large et H tuiles de haut (murs) */
+/** gratte-ciel de Métropole : quatre allures (béton, verre bleu, brique sombre, verre fumé) ; un étage tous les 8 pixels */
+const GC = [
+  { mur: '#b8bcc4', bande: '#8e939c', vitre: '#6f9ccc', reflet: '#a8cdf0', nuit: '#ffe08a' },
+  { mur: '#5c7a9c', bande: '#3f5874', vitre: '#89b8e6', reflet: '#c8e4ff', nuit: '#fff0b0' },
+  { mur: '#8a5a4a', bande: '#64402f', vitre: '#4f6e8c', reflet: '#8ab0d0', nuit: '#ffd070' },
+  { mur: '#3c4250', bande: '#2a2e38', vitre: '#4a6c8a', reflet: '#7fa6c8', nuit: '#ffe8a0' },
+];
+function grattecielFace(style, w, H, door, night, seed, side = false) {
+  const g = GC[+style.slice(2) % GC.length], W = w * 16, Hp = H * 16, P = new Pix(W, Hp, seed * 13 + w);
+  P.fill(g.mur);
+  // étages : une bande, puis une rangée de fenêtres ; la nuit, certaines sont allumées
+  for (let y = 0; y < Hp - 16; y += 8) {
+    P.rect(0, y, W, 1, g.bande);
+    for (let x = 2; x < W - 3; x += 6) {
+      const on = night && P.r() < 0.55;
+      P.rect(x, y + 2, 4, 4, on ? g.nuit : g.vitre); if (!on) P.p(x, y + 2, g.reflet);
+    }
+  }
+  // rez-de-chaussée : un hall vitré (la porte au milieu, s'il y en a une)
+  P.rect(0, Hp - 16, W, 16, g.bande); P.rect(1, Hp - 14, W - 2, 12, night ? '#ffe8b0' : '#9cc4e8'); for (let x = 4; x < W; x += 8) P.rect(x, Hp - 14, 1, 12, g.bande);
+  if (!side && door >= 0) { const dx = door * 16; P.rect(dx + 2, Hp - 15, 12, 15, '#3a4250'); P.rect(dx + 3, Hp - 14, 10, 14, night ? '#fff0c0' : '#bfe0ff'); P.rect(dx + 8, Hp - 14, 1, 14, '#3a4250'); }
+  P.rect(0, 0, W, 2, g.bande);
+  return P.c;
+}
 export function facade(style, w, H, door, night = false, seed = 1) {
+  if (style && style.startsWith('gc')) return grattecielFace(style, w, H, door, night, seed);
   const kitted = kitFacade(style, w, H, door, night); if (kitted) return kitted;
   const W = w * 16, Hp = H * 16; const P = new Pix(W, Hp, seed);
   const wallCol = { house: '#f4e8cc', house2: '#e8eef4', house3: '#f6dcc8', center: '#fbf6f0', mart: '#f6f9fc', gym: '#c8ccd8', lab: '#f0f4f4', league: '#d8d0f0', cave: '#5a4836', tower: '#e0d8c8' }[style] || '#f4e8cc';
@@ -732,6 +783,7 @@ export function facade(style, w, H, door, night = false, seed = 1) {
   return P.c;
 }
 export function sideWall(style, d, H, seed = 2) {
+  if (style && style.startsWith('gc')) return grattecielFace(style, d, H, -1, false, seed, true);
   const kitted = kitSide(style, d, H); if (kitted) return kitted;
   const P = new Pix(d * 16, H * 16, seed);
   const base = { center: '#efe6dc', mart: '#e6ecf2', gym: '#b0b4c2', league: '#c2b8e0', lab: '#e0e6e6' }[style] || '#e6d8b8';

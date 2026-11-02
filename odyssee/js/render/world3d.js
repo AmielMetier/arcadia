@@ -45,6 +45,7 @@ function frontDepth(mat, zFront) {
   mat.customProgramCacheKey = () => 'frontDepth';
   return mat;
 }
+const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle']);
 const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace', 'rug']);
 function screenSprite(mat) {
   mat.onBeforeCompile = (sh) => {
@@ -73,7 +74,8 @@ const CH = 16;
 export const CHAR_ROWS = { ...((SPRITES.chars && SPRITES.chars.rows) || {}) };
 // taille d'une case de la planche des personnages (32 × 32 depuis la version 2 de la bible)
 const CW = SPRITES.chars?.w || 24, CHH = SPRITES.chars?.h || 32, CD = SPRITES.chars?.d || 1;
-const CHAR_ALIAS = { red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
+// personnages des Terres du Sud en attendant leur dessin : un sosie proche
+const CHAR_ALIAS = { margot: 'topdresseuse', aurele: 'marin', morgane: 'medium', gaspard: 'montagnard', ferdinand: 'montagnard', lilas: 'fillette', corbin: 'topdresseur', pierre: 'topdresseur', croupier: 'vendeur', red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
 const DIR_COL = { down: 0, left: 1, right: 2, up: 3 };
 
 function tex(canvasOrImg) {
@@ -301,6 +303,12 @@ export class WorldView {
     const tt = groundOf(t);
     const deco = this.decoAt.get(x + ',' + y);
     if (deco?.k === 'carpet') return { c: A.mat };
+    if (deco?.k === 'glace') return { c: A.gl_ice };
+    if (deco?.k === 'asph') return { c: A['asph' + (deco.v ? '_' + deco.v : '')] || A.asph };
+    if (deco?.k === 'sable') return { c: A.gl_sable };
+    if (deco?.k === 'eau') return { anim: this.N.cells.water15 };
+    if (t === T.LAVA) return { anim: this.N.cells.lava };
+    if (t === T.BARRIER_R || t === T.BARRIER_B) return { c: A['floor_' + m.floor] || A.floor_wood };
     const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
     if (SOL16 && m.outdoor) {
       if (tt === T.PATH || tt === T.PAVE || tt === T.DOOR || tt === T.BUILD || tt === T.SAND) return { c: A[grassKey] };
@@ -348,6 +356,7 @@ export class WorldView {
     let t = m.get(x, y); if (t === T.SIGN || t === T.BLOCK) t = m.underAt(x, y) ?? T.GRASS;
     const th = m.zoneAt(x, y)?.theme;
     if (t === T.PATH) return th === 'snow' ? 'neige' : th === 'volcanic' ? 'cendre' : 'chemin';
+    if (t === T.PAVE && this.decoAt.get(x + ',' + y)?.k === 'asph') return 'asph';   // chaussée : son propre jeu (pas de raccord)
     if (t === T.PAVE || t === T.DOOR || t === T.BUILD) return th === 'snow' ? 'neige' : 'pave';
     if (t === T.SAND) return 'sable';
     if (t === T.DARKTALL) return 'herbes_bois';
@@ -470,8 +479,14 @@ export class WorldView {
           else flat(Wl, x, y, x + 1, y + 1, caveH, A.cavetop);
         }
       }
+      else if (t === T.BARRIER_R || t === T.BARRIER_B) {
+        const g = t === T.BARRIER_R ? 'r' : 'b';
+        box(Wl, x + 0.08, y + 0.35, x + 0.92, y + 0.9, 0.62 * Math.tan(EL), A['barr_' + g], A['barr_' + g + '_top'], A['barr_' + g]);
+      }
       // décor posé (lampadaires, panneaux, meubles…)
       const d = this.decoAt.get(x + ',' + y);
+      // décalques des arènes au sol : flèches, souffles, courants, dalles, téléporteurs, socles des barrières
+      if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
           box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), A[d.front] || A.counterfront, A.counter, A.counter, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
@@ -554,7 +569,7 @@ export class WorldView {
       const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
       // toit à deux pans, assez pentu pour qu'on voie surtout le pan avant (comme sur DS) ; toit plat pour les
       // centres, boutiques, arènes et la Ligue
-      const flatRoof = b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
+      const flatRoof = b.flat || b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
       const rh = flatRoof ? 0.35 : Math.min(2.2, 0.55 * b.d);
       // rangées de cellules d'un pan : sa hauteur à l'écran, en cases
       const rows = Math.max(1, Math.round(b.d / 2 + o + rh * 0.7));

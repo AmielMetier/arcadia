@@ -35,13 +35,13 @@ const GRUNT = {
   boss2: [[197, 43], [215, 43], [94, 44], [110, 43], [229, 45]],                                // Sanctuaire
 };
 export const ELITE = [
-  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 51], [91, 51], [221, 52], [124, 52], [131, 53]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
+  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 73], [91, 73], [221, 74], [124, 74], [131, 75]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
     intro: 'Bienvenue au Conseil 4. Je suis Frimas. Mon cœur s\'est figé il y a bien longtemps... Le tien tiendra-t-il face au froid ?', lose: 'Ta flamme a fait fondre ma glace. Passe, la salle suivante t\'attend.' },
-  { id: 'c4:2', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 52], [200, 52], [1023, 53], [94, 54]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
+  { id: 'c4:2', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 74], [200, 74], [1023, 75], [94, 76]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
     intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
-  { id: 'c4:3', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 53], [106, 53], [107, 53], [1033, 54], [68, 55]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
+  { id: 'c4:3', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 75], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
     intro: 'Je suis Brutus ! J\'ai entraîné mes muscles et ceux de mes Pokémon chaque jour de ma vie. Hoo ! Hah !', lose: 'Ma force n\'a pas suffi... Va. Tu le mérites.' },
-  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', team: [[197, 54], [198, 54], [215, 55], [229, 55], [248, 56]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
+  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', team: [[197, 76], [198, 76], [215, 77], [229, 77], [248, 78]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
     intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Tu es fort, et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
 ];
 
@@ -335,7 +335,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
       got: ['Le Cap Mirage est au bout de la route 7, au sud de la ville.'], done: (st) => (st.flags.lugia ? ['Le jour est revenu... Je savais que tu y arriverais.'] : ['Le Sanctuaire t\'attend, au sud du Cap Mirage...']) } });
     // la Route Victoire reste fermée tant que dure l'Éclipse
     const vg = W.npcs.find((n) => n.id === 'cime:garde');
-    if (vg) { vg.script = 'victoireGate'; vg.gate.open = (f, g) => g.badgeCount() >= 8 && (!f.eclipse || !!f.lugia); W.gates.find((q) => q.npc === vg.id).open = vg.gate.open; }
+    if (vg) { vg.script = 'victoireGate'; vg.gate.open = (f, g) => g.badgeCount() >= 15 && (!f.eclipse || !!f.lugia); W.gates.find((q) => q.npc === vg.id).open = vg.gate.open; }
   }
 }
 

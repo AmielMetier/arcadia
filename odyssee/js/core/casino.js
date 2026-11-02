@@ -47,7 +47,7 @@ export function donneBJ(r, mise) {
   const j = [sabot.pop(), sabot.pop()], c = [sabot.pop(), sabot.pop()];
   return { sabot, joueur: j, croupier: c, mise, fini: false, double: false, resultat: null };
 }
-export function tirerBJ(p) { p.joueur.push(p.sabot.pop()); if (totalBJ(p.joueur).t > 21) finirBJ(p); return p; }
+export function tirerBJ(p) { p.joueur.push(p.sabot.pop()); if (totalBJ(p.joueur).t >= 21) finirBJ(p); return p; }   // à 21, on reste d'office
 export function doublerBJ(p) { p.mise *= 2; p.double = true; p.joueur.push(p.sabot.pop()); return finirBJ(p); }
 /** le croupier tire jusqu'à 17 (il reste sur 17, même souple), puis on compare ; gain net en jetons (mise rendue comprise) */
 export function finirBJ(p) {

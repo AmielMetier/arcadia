@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 3.66 — 3 novembre 2026
+- **Odyssée** — La région double de taille : au sud de Bourg-Aube, le Pont de l'Austral mène aux Terres du Sud, ouvertes après les huit premiers badges.
+  - Sept nouvelles villes à arène et huit routes, avec une trentaine de nouveaux dresseurs, des marais traversés de passerelles et un désert de sable.
+  - Douze arènes sur le continent et les trois frères de l'archipel : il faut maintenant quinze badges pour la Ligue (le Conseil 4 et la Maître sont plus forts).
+  - Toutes les arènes deviennent des énigmes comme dans HeartGold / SoulSilver : labyrinthes, fausses haies, murs invisibles, arène plongée dans le noir, sable et glace qui glissent, tapis roulants, souffles et courants, dalles qui lèvent les barrières rouges ou bleues, téléporteurs, rochers à pousser, lave et gardiens du savoir.
+  - Une fois entré dans une arène, on n'en ressort qu'après avoir affronté le Champion (ou après une défaite).
+- **Odyssée** — Métropole, la mégapole aux gratte-ciel (avenues, passages piétons, fenêtres qui s'allument la nuit).
+  - Le Casino : machine à sous, blackjack, poker fermé à cinq cartes, roulette et belote à quatre ; jetons achetés en Pokédollars et lots à gagner.
+  - La Bourse : actions de la Sylphe, de Devon et d'autres sociétés, l'indice S&P Odyssée 500, le Pokéeuro, les Baies et les Poké Balls ; les nouvelles font bouger les cours (concurrents en sens inverse, certains titres sans réaction).
+  - Un pricer donne le prix des produits dérivés de chaque titre : forwards et futures, change à terme et swaps, CDS, options européennes, américaines et asiatiques.
+  - Pierre, l'analyste en costume, fait passer un entretien de huit questions : réussis-le pour ouvrir un compte et investir tes Pokédollars.
+
 ## 3.65 — 2 novembre 2026
 - **Odyssée** — Un grand coup de pinceau sur la région.
   - Tous les personnages sont redessinés en haute définition d'après leurs anciens modèles : l'infirmière, la maman, le professeur, les Champions, les dresseurs… fini les gros pixels.

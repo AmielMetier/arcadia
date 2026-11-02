@@ -116,7 +116,8 @@ export function healFull(m) {
 export const movesAtLevel = (sp, L) => SPECIES[sp].ls.filter(([l]) => l === L).map(([, id]) => id);
 
 /** Niveau max autorisé avant chaque Arène (niveau max du Champion - 1) */
-export const GYM_CAPS = [13, 21, 28, 33, 38, 43, 48, 55];
+// les cinq arènes du nord, les trois frères, puis les sept arènes des Terres du Sud
+export const GYM_CAPS = [13, 21, 28, 33, 38, 43, 48, 55, 59, 62, 65, 68, 71, 74, 76];
 export function levelCap(badges) {
   if (!Array.isArray(badges)) return 100;
   for (let i = 0; i < GYM_CAPS.length; i++) if (!badges[i]) return GYM_CAPS[i];
