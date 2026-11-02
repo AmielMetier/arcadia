@@ -3,7 +3,7 @@
 // anticipe son propre pas avec le même movePlayer, se recale sur l'hôte en rejouant ce que l'hôte n'a pas encore vu, et affiche les autres ~100 ms en retard.
 // ?debug expose __sitenoir.run(sec) ; ?autostart, ?role=m|s, ?seed, ?level, ?duree, ?lag=150 (aller-retour simulé).
 import { Sim, DT, FUSES, emptyInput, movePlayer, interactTarget, applyRow, rowOf } from './engine/sim.js';
-import { buildMap, Z, ZONE_NAMES, zoneAt, DEEP } from './engine/map.js';
+import { buildMap, Z, T, W, ZONE_NAMES, zoneAt, DEEP, Nav, hasLOS } from './engine/map.js';
 import { createScene } from './view/scene.js';
 import { Input } from './input.js';
 import { Sfx } from './view/sfx.js';
@@ -26,13 +26,14 @@ const S = {
   // côté invité
   w: null, sheets: new Map(), snaps: [], off: null, pred: null, pending: [], errX: 0, errZ: 0, lastRows: null,
   // vue
-  rp: new Map(), cctv: -1, mapOpen: false, specI: 0, prevFc: 0, prevUc: 0, roleShown: false, steps: new Map(), genWork: 0, emf: 0, cam: null,
+  rp: new Map(), cctv: -1, mapOpen: false, specI: 0, prevFc: 0, prevUc: 0, roleShown: false, steps: new Map(), genWork: 0, emf: 0, cam: null, chase: 0, sightCd: 0, guideT: 0, guideWp: null, guideDist: 0,
 };
 const send = (to, m, o) => { if (LAG) setTimeout(() => H.send(to, m, o), LAG / 2); else H.send(to, m, o); };
 
 // ------------------------------------------------------------------ montage
 const hud = new HUD();
 const sfx = new Sfx();
+sfx.occluded = (x, y, z) => { const L = sfx.L, w = S.w; return !w || Math.abs((y ?? L.y) - L.y) > 3.4 || !hasLOS(M, w.doors, L.x, L.z, x, z); };
 let scene = null;
 try { scene = createScene($('#stage'), { map: M, quality: QS.get('q') || 'normal', onLost: () => hud.toast('Affichage 3D interrompu : recharge la page', 6) }); }
 catch (e) { console.error(e); }
@@ -43,6 +44,7 @@ const input = new Input($('#stage'), {
   unlock: () => sfx.unlock(),
   enter: () => { const b = $('#btnGo') || $('#btnAgain'); if (b) b.click(); },
   map: (on) => { S.mapOpen = on; },
+  screens: () => { if (S.cctv >= 0) closeCctv(); else if (S.view?.real?.st === 'ok' && S.view.real.role === 's' && S.view.real.hide < 0 && S.view.real.inv?.some((s) => s?.k === 'cams')) openCctv(); },
   cam: (d) => switchCam(d),
 });
 input.bindTouch($('#tbtns'));
@@ -56,8 +58,8 @@ const SETTINGS = {
     ['Utiliser (maintenir : fouiller, réparer, relever)', '<kbd>E</kbd> ou clic droit', 'Ⓐ'],
     ['Objet tenu · griffes', 'clic gauche', 'gâchette droite'],
     ['Case · pouvoir du monstre', '<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>', 'flèches'],
-    ['Lampe · changer la pile · lâcher', '<kbd>F</kbd> · <kbd>R</kbd> · <kbd>G</kbd>', 'Ⓨ · Ⓧ'],
-    ['Plan', '<kbd>Tab</kbd>', ''],
+    ['Lampe · changer la pile (monstre : hurlement) · lâcher', '<kbd>F</kbd> · <kbd>R</kbd> · <kbd>G</kbd>', 'Ⓨ · Ⓧ'],
+    ['Écrans des caméras · plan', '<kbd>T</kbd> · <kbd>Tab</kbd>', ''],
     ['Pause', '<kbd>Échap</kbd>', 'Start'],
   ] }] }],
 };
@@ -171,7 +173,7 @@ function startRun() {
   while (sim.players.filter((p) => p.role === 's').length < S.cfg.places) { const name = BOT_NAMES[(free + bi) % BOT_NAMES.length]; sim.addPlayer({ id: nid++, name, color: PALETTE[(humans.length + bi) % PALETTE.length], bot: true }); bi++; }
   const mh = humans.find((p) => p.id === mid);
   sim.addPlayer(mh ? { id: mh.id, name: mh.name, color: '#c9271c', role: 'm' } : { id: nid++, name: 'Le monstre', color: '#c9271c', bot: true, role: 'm' });
-  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; S.tick = 0; S.lastW = -999; S.sentOver = false; S.rp.clear(); S.steps.clear(); S.cctv = -1; S.roleShown = false; S.overT = 0;
+  S.sim = sim; S.runId = Date.now(); S.lobby = false; S.endShown = false; S.reported = false; S.netEv = []; S.acc = 0; S.tick = 0; S.lastW = -999; S.sentOver = false; S.rp.clear(); S.steps.clear(); S.cctv = -1; S.roleShown = false; S.overT = 0; S.sightCd = 0; S.chase = 0;
   S.w = sim.w;
   hideScreen();
   if (H.embedded) send('all', { t: 'go', run: S.runId });
@@ -385,7 +387,7 @@ function buildView(list, w) {
   return { w, players: list, me, real, mine, vision, target, camMode, cctv, emf: !!emfOn, emfLevel, yawFor: real ? real.yaw : 0 };
 }
 function openCctv() {
-  if (!S.w.cams.length) { hud.toast('Aucune caméra posée : prends-en dans la caisse de l\'avant-poste', 3); return; }
+  if (!S.w.cams.length) { hud.toast('Aucune caméra posée : clic gauche avec le kit pour en poser une', 3); return; }
   S.cctv = 0; sfx.play('click');
 }
 function closeCctv() { if (S.cctv < 0) return; S.cctv = -1; sfx.play('click'); document.body.classList.remove('cctv-on'); }
@@ -406,8 +408,8 @@ function fxEvent(e, v) {
     case 'locker': sfx.play('locker', { ...pos, range: 14 }); break;
     case 'bang': sfx.play('bang', { ...pos, range: 30 }); fx && me && Math.hypot(e.x - me.x, e.z - me.z) < 3 && fx.shake(0.5); break;
     case 'found':
-      if (e.by !== undefined) { if (e.id === meId) { sfx.play('scare'); hud.hurt(1); fx && fx.hurt(); hud.banner('Il t\'a trouvé.', 2, 'warn'); } else hud.feed(`${nameOf(e.by)} sort ${nameOf(e.id)} d'un casier`); }
-      else { if (e.empty) { if (e.id === meId) { sfx.play('empty', { ...pos }); hud.toast('Rien ici'); } } else { sfx.play('found', { ...pos, range: 12 }); if (e.id === meId) hud.toast(`Trouvé : ${e.what}`, 3.5); else hud.feed(`${nameOf(e.id)} trouve : ${esc(e.what)}`); } }
+      if (e.by !== undefined) { if (e.id === meId) { sfx.play('scare'); hud.hurt(1); fx && fx.jump(); hud.banner('Il t\'a trouvé.', 2, 'warn'); } else hud.feed(`${nameOf(e.by)} sort ${nameOf(e.id)} d'un casier`); }
+      else { if (e.empty) { if (e.id === meId) { sfx.play('empty', { ...pos }); hud.toast('Rien ici'); } } else { sfx.play('found', { ...pos, range: 12 }); if (e.id === meId) hud.toast(`Trouvé : ${e.what}${e.taken ? ', dans ton sac' : '. Sac plein : il reste sur le meuble'}`, 3.5); else hud.feed(`${nameOf(e.id)} trouve : ${esc(e.what)}`); } }
       break;
     case 'deny': sfx.play('deny', { ...pos, range: 10 }); break;
     case 'unlock': sfx.play('unlock', { ...pos, range: 20 }); hud.feed(`${nameOf(e.by)} ouvre : ${esc(M.doors[e.id].name)}`); break;
@@ -420,7 +422,7 @@ function fxEvent(e, v) {
     case 'swing': sfx.play('swing', { ...pos, range: 12 }); if (e.id === meId) fx && fx.swing(); break;
     case 'flash': fx && fx.flash(e.x, e.y, e.z); sfx.play('flash', { ...pos, range: 26 }); if (e.id === meId) hud.flash(0.45); break;
     case 'stun': sfx.play('stun', { ...pos, range: 30 }); if (isM) { hud.flash(1); hud.toast('Aveuglé !', 2); } else hud.feed(`${nameOf(e.by)} aveugle le monstre`); break;
-    case 'cam': sfx.play('cam', { ...pos, range: 10 }); if (e.id === meId) hud.toast('Caméra posée : regarde-la sur la tablette ou aux écrans de l\'avant-poste', 3); break;
+    case 'cam': sfx.play('cam', { ...pos, range: 10 }); if (e.id === meId) hud.toast('Caméra posée : T pour regarder les écrans', 3); break;
     case 'camdead': sfx.play('camdead', { ...pos, range: 20 }); if (!isM) hud.feed('Une caméra vient de lâcher'); if (S.cctv >= 0) closeCctv(); break;
     case 'reload': if (e.id === meId) sfx.play('reload'); break;
     case 'proof': if (e.id === meId) { sfx.play('proof'); hud.toast(e.kind === 'photo' ? 'Preuve : photo du monstre' : e.kind === 'trace' ? 'Preuve : trace relevée' : 'Preuve : son enregistré', 3.5); } else hud.feed(`${nameOf(e.id)} a une preuve`); break;
@@ -429,15 +431,23 @@ function fxEvent(e, v) {
     case 'jam': sfx.play('bang', { ...pos, vol: 0.6, range: 22 }); if (isM) hud.toast('Porte bloquée'); break;
     case 'down':
       sfx.play('down', { ...pos, range: 30 });
-      if (e.id === meId) { hud.hurt(1); sfx.play('scare'); fx && fx.hurt(); hud.banner('À terre', 2.4, 'warn'); } else if (isM && e.by === meId) { hud.toast('Il est à terre. Tu es repu pour un moment.', 3.5); hud.feed(`${nameOf(e.id)} est à terre`); } else hud.feed(`${nameOf(e.id)} est à terre`);
+      if (e.id === meId) { hud.hurt(1); sfx.play('scare'); fx && fx.jump(); hud.banner('À terre', 2.4, 'warn'); } else if (isM && e.by === meId) { hud.toast('Il est à terre. Tu es repu pour un moment.', 3.5); hud.feed(`${nameOf(e.id)} est à terre`); } else hud.feed(`${nameOf(e.id)} est à terre`);
       break;
     case 'hit': sfx.play('hit', { ...pos, range: 20 }); if (e.id === meId) { hud.hurt(0.8); fx && fx.hurt(); hud.toast('Cours !', 1.2); } break;
     case 'dead':
       sfx.play('growl', { ...pos, range: 40 });
       if (e.id === meId) { hud.banner('Tu es mort<small>Tu peux regarder les autres finir</small>', 3.4, 'warn'); closeCctv(); } else hud.feed(`${nameOf(e.id)} est mort`);
       break;
-    case 'wake': sfx.play('wake'); if (isM) hud.banner('La cage est ouverte', 2.2, 'warn'); else hud.banner('Quelque chose vient de sortir', 3, 'warn'); break;
-    case 'torch': if (e.id === meId) sfx.play('torch'); else sfx.play('torch', { ...pos, vol: 0.5, range: 10 }); break;
+    case 'wake': sfx.play('wake'); if (isM) hud.banner('Les portes s\'ouvrent', 2.2, 'warn'); else hud.banner('Quelque chose vient de sortir', 3, 'warn'); break;
+    case 'torch': if (e.id === meId) sfx.play('torch', { on: e.on }); else sfx.play('torch', { ...pos, on: e.on, vol: 0.5, range: 10 }); break;
+    case 'roar': {
+      sfx.play('roar', { ...pos, range: 70 });
+      if (e.id === meId) { fx && fx.shake(0.45); break; }
+      const d = me ? Math.hypot(e.x - me.x, e.z - me.z) : 99;
+      if (d < 22 && fx) { fx.shake(d < 13 ? 0.9 : 0.4); fx.dread(d < 13 ? 1 : 0.5); }
+      if (d < 13 && !isM) hud.toast('Ce cri te coupe le souffle', 2.4);
+      break;
+    }
     case 'extract': sfx.play('extract'); if (e.id === meId) hud.banner('Tu es sorti<small>Tu peux regarder les autres finir</small>', 3, 'good'); else hud.feed(`${nameOf(e.id)} est sorti`); break;
     case 'genwork': sfx.play('genwork', { x: e.x, z: e.z, y: DEEP, range: 30 }); break;
     case 'gen': sfx.play('gen'); hud.banner(isM ? 'Ils ont relancé le courant<small>Empêche-les de remonter</small>' : 'Le courant revient<small>Appelez l\'ascenseur</small>', 3.4, isM ? 'warn' : 'good'); break;
@@ -485,7 +495,7 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   step(dt);
 }
-// appuis qui ne regardent que ce joueur : ouvrir les écrans, la tablette, changer de vue
+// appuis qui ne regardent que ce joueur : ouvrir les écrans, changer de vue
 function localPress(raw, v) {
   const fc = raw.fc !== S.prevFc, uc = raw.uc !== S.prevUc;
   S.prevFc = raw.fc; S.prevUc = raw.uc;
@@ -494,7 +504,7 @@ function localPress(raw, v) {
   if (S.cctv >= 0) { if (uc) closeCctv(); else if (fc) switchCam(1); return; }
   if (uc && v.target && v.target.kind === 'monitor') { openCctv(); return; }
   const r = v.real;
-  if (fc && r && r.st === 'ok' && r.role === 's' && r.hide < 0 && r.inv[r.sel]?.k === 'tablet') openCctv();
+  if (fc && r && r.st === 'ok' && r.role === 's' && r.hide < 0 && r.inv[r.sel]?.k === 'cams' && r.inv[r.sel].n <= 0) openCctv();
 }
 function step(dt) {
   const blocked = S.lobby || S.endShown || (S.menu && S.role === 'solo');
@@ -533,8 +543,57 @@ function step(dt) {
   S.genWork = Math.max(0, S.genWork - dt);
   if (view.players.some((p) => p.work && p.role === 's' && Math.hypot(p.x - M.generator.x, p.z - M.generator.z) < 4) || view.w.gen !== S.lastGen) S.genWork = 0.6;
   S.lastGen = view.w.gen;
-  sfx.update(dt, { drone: view.w.ph === 'over' ? 0.2 : 0.8, fear, emf: view.emfLevel, gen: { x: M.generator.x, y: DEEP, z: M.generator.z, on: view.w.genOn, work: S.genWork > 0, k: view.w.gen / 100 } });
-  hud.update(view, dt, { goal: goalOf(M, view.w, real && !real.spectator ? real : view.me, teamProofs(view)), input, real: real && !real.spectator ? real : null, cctv: view.cctv, mapOpen: S.mapOpen, M });
+  const listener = hear || real, awake = monster && !monster.wake;
+  // à vue, la musique de chasse monte ; et la première fois qu'on l'aperçoit, un coup de cordes
+  let chaseWant = 0;
+  if (real && real.role === 's' && monster && awake && (real.st === 'ok' || real.st === 'down') && Math.abs(monster.y - real.y) < 3.5) {
+    const d = Math.hypot(monster.x - real.x, monster.z - real.z), los = d < 30 && hasLOS(M, view.w.doors, real.x, real.z, monster.x, monster.z);
+    chaseWant = los && d < 16 ? 1 : d < 8 ? 0.6 : 0;
+    S.sightCd = Math.max(0, S.sightCd - dt);
+    if (los && d < 17 && S.sightCd <= 0 && view.camMode === 'fps') {
+      const a = Math.atan2(-(monster.x - real.x), -(monster.z - real.z)), da = Math.abs(Math.atan2(Math.sin(a - real.yaw), Math.cos(a - real.yaw)));
+      if (da < 0.65) { S.sightCd = 30; sfx.play('sting'); if (scene) { scene.fx.dread(0.8); scene.fx.shake(0.35); } }
+    }
+  } else if (real && real.role === 'm') {
+    for (const p of view.players) if (p.role === 's' && p.st === 'ok' && p.hide < 0 && Math.abs(p.y - real.y) < 3.5 && Math.hypot(p.x - real.x, p.z - real.z) < 12 && hasLOS(M, view.w.doors, real.x, real.z, p.x, p.z)) { chaseWant = 0.8; break; }
+  }
+  S.chase += (chaseWant - S.chase) * Math.min(1, dt * (chaseWant > S.chase ? 1.4 : 0.35));
+  const zone = listener ? zoneAt(M, listener.x, listener.z) : Z.A;
+  sfx.update(dt, {
+    drone: view.w.ph === 'over' ? 0.2 : 0.8, fear, emf: view.emfLevel, chase: S.chase,
+    place: zone === Z.OUTPOST || zone === Z.PAD ? 'dehors' : zone === Z.SOUS || zone === Z.CABINE ? 'soussol' : 'batiment',
+    pant: real && real.role === 's' && real.st === 'ok' ? clamp(1 - real.stam / 38, 0, 1) : 0,
+    hum: nearLamp(view, listener),
+    monster: monster && (real?.role === 'm' || awake) ? { x: monster.x, y: monster.y, z: monster.z, self: real?.role === 'm' } : null,
+    gen: { x: M.generator.x, y: DEEP, z: M.generator.z, on: view.w.genOn, work: S.genWork > 0, k: view.w.gen / 100 },
+  });
+  const who = real && !real.spectator ? real : view.me, goal = goalOf(M, view.w, who, teamProofs(view), view.players);
+  hud.update(view, dt, { goal, guide: who && who.st === 'ok' ? guideTo(view, who, goal, dt) : null, input, real: real && !real.spectator ? real : null, cctv: view.cctv, mapOpen: S.mapOpen, M });
+}
+// la lampe de secours la plus proche grésille
+function nearLamp(v, L) {
+  if (!L) return null;
+  let best = null, bd = 7;
+  for (const l of M.lights) { if (l.kind === 'projecteur' || (v.w.dark && v.w.dark[l.zone] > 0) || Math.abs(l.y - L.y) > 4) continue; const d = Math.hypot(l.x - L.x, l.z - L.z); if (d < bd) { bd = d; best = l; } }
+  return best && { x: best.x, y: best.y, z: best.z, k: 1 + (best.flick || 0) * 2 };
+}
+// La flèche suit les couloirs : on cherche le chemin à pied jusqu'à l'objectif, et on vise le point le plus lointain de ce chemin qu'on peut voir.
+const nav = new Nav(M);
+function guideTo(v, me, goal, dt) {
+  if (!goal.at) { S.guideWp = null; return null; }
+  S.guideT -= dt;
+  if (S.guideT <= 0 || !S.guideWp) {
+    S.guideT = 0.35;
+    const w = v.w, goalCell = Math.floor(goal.at.z) * W + Math.floor(goal.at.x);
+    const pass = (i) => { if (i === goalCell) return true; if (M.t[i] !== T.FLOOR) return false; const d = M.doorAt[i]; return d < 0 || !M.doors[d].key || w.doors[d].unlocked; };
+    const path = nav.find(me.x, me.z, goal.at.x, goal.at.z, pass);
+    if (path) {
+      let wp = path[path.length - 1];
+      for (let k = Math.min(path.length - 1, 14); k >= 0; k--) { const x = path[k] % W + 0.5, z = Math.floor(path[k] / W) + 0.5; if (k === 0 || hasLOS(M, w.doors, me.x, me.z, x, z)) { wp = path[k]; break; } }
+      S.guideWp = { x: wp % W + 0.5, z: Math.floor(wp / W) + 0.5 }; S.guideDist = path.length;
+    } else { S.guideWp = { x: goal.at.x, z: goal.at.z }; S.guideDist = Math.hypot(goal.at.x - me.x, goal.at.z - me.z); }
+  }
+  return { ang: Math.atan2(S.guideWp.x - me.x, -(S.guideWp.z - me.z)) + me.yaw, dist: S.guideDist };
 }
 const teamProofs = (v) => v.w.banked + v.players.reduce((a, p) => a + (p.role === 's' && !p.spectator && p.st !== 'dead' && p.st !== 'out' ? p.proofs || 0 : 0), 0) + v.w.items.reduce((a, it) => a + (it.k === 'preuve' ? it.n : 0), 0);
 function footsteps(v, dt) {
@@ -546,11 +605,17 @@ function footsteps(v, dt) {
     const stride = p.role === 'm' ? 2 : p.run ? 2.1 : 1.6;
     if (s.a >= stride) {
       s.a = 0;
-      const self = v.real && p.id === v.real.id, zone = zoneAt(M, p.x, p.z);
-      if (p.role === 'm') sfx.play('mstep', { x: p.x, y: p.y, z: p.z, range: self ? 8 : 24, vol: self ? 0.25 : 1 });
-      else if (!p.crouch || self) sfx.play('step', { x: p.x, y: p.y, z: p.z, range: 16, vol: self ? 0.55 : p.run ? 1 : 0.7, soft: zone === Z.A, hard: zone === Z.B || zone === Z.SOUS });
+      const self = v.real && p.id === v.real.id, y = self ? undefined : p.y;
+      if (p.role === 'm') sfx.play('mstep', { x: p.x, y, z: p.z, range: self ? 8 : 26, vol: self ? 0.4 : 1 });
+      else if (!p.crouch || self) sfx.play('step', { x: p.x, y, z: p.z, range: p.run ? 22 : 15, vol: self ? 0.7 : p.run ? 1 : 0.8, surf: surfaceAt(p), run: p.run, crouch: p.crouch });
     }
   }
+}
+// la matière sous les pieds
+function surfaceAt(p) {
+  if (M.ramps.some((r) => p.x >= r.x0 && p.x < r.x1 && p.z >= r.z0 && p.z < r.z1)) return 'escalier';
+  const z = zoneAt(M, p.x, p.z);
+  return z === Z.OUTPOST || z === Z.PAD ? 'gravier' : z === Z.A ? 'sourd' : z === Z.SOUS || z === Z.CABINE ? 'metal' : 'beton';
 }
 // avant le lancement : un plan fixe sur la grille, le temps que l'hôte décide
 const LOBBY_V = () => ({ w: lobbyWorld, players: [], me: { id: -1, x: 26, y: 0, z: 58, yaw: 0, pitch: -0.02, role: 's', st: 'ok', hide: -1, crouch: false, moving: false, torch: false }, real: null, mine: false, vision: 's', camMode: 'fps', cctv: null });
@@ -558,5 +623,5 @@ const lobbyWorld = (() => { const s = new Sim({ seed: 1, map: M }); s.w.items = 
 function idleFrame(dt) {
   if (scene) scene.frame(LOBBY_V(), dt);
   sfx.listener(26, 1.5, 58, 0);
-  sfx.update(dt, { drone: S.lobby ? 0.45 : 0, fear: 0, emf: 0 });
+  sfx.update(dt, { drone: S.lobby ? 0.45 : 0, fear: 0, emf: 0, place: 'dehors' });
 }

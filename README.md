@@ -150,7 +150,8 @@ Horreur asymétrique à la première personne (`sitenoir/`) : un monstre contre 
 - Moteur (`sitenoir/engine/`, sans DOM) : carte en grille (`map.js`), règles et réseau (`sim.js`), bots des deux camps (`bots.js`).
 - Réseau (`sitenoir/app.js`) : pas de serveur de jeu, l'hôte simule à 60 Hz via le relais du Hub. Il envoie 20 états de joueurs par seconde et le reste du monde quand il change ; l'invité anticipe son propre pas, se recale sur l'hôte et voit les autres ~100 ms en retard. Si l'hôte part, un invité reprend, et un bot remplace chaque joueur parti. `?debug` expose `__sitenoir.run(2)` ; `?autostart`, `?role=m|s`, `?seed`, `?lag=150`, `?q=bas`.
 - Image (`sitenoir/view/scene.js`, `post.js`, `textures.js`) : matériaux peints au canvas (couleur, relief, brillance), ombres de contact cuites dans les sommets, empreinte de lampe avec ombres, halo, exposition qui s'habitue au noir. Grain VHS et caméra tenue à la main pour les enquêteurs, vision de nuit pour le monstre. La définition baisse d'elle-même si la machine peine.
-- Modèles : Poly Pizza, crédits dans `sitenoir/models/LICENSE.txt`. Sons synthétisés (WebAudio).
+- Modèles : Poly Pizza, crédits dans `sitenoir/models/LICENSE.txt`. Sons : enregistrements CC0 (`sitenoir/sounds/`, crédits dans `LICENSE.txt`), placés dans l'espace par `view/sfx.js` avec des sons synthétisés en repli.
+- Guidage : `goalOf` (`view/hud.js`) déduit l'objectif de l'état de la partie, la flèche suit un chemin à pied, les bandes et panneaux viennent de `M.routes` et `M.signs` (`engine/map.js`).
 
 ## Mollo !
 

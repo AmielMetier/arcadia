@@ -1,6 +1,13 @@
 # Journal des versions — Arcadia
 
 ## 3.58 — 2 novembre 2026
+- **Site Noir** — on comprend quoi faire, on entend tout, et le monstre fait enfin peur.
+  - On sait toujours quoi faire : l'objectif, une flèche qui suit les couloirs et la distance à pied s'affichent en haut de l'écran, les étapes aussi. Des bandes de couleur au sol et des panneaux mènent au badge, à la clé, au générateur et à l'ascenseur, et les meubles à fouiller accrochent un reflet.
+  - De vrais sons : les pas changent selon le sol (gravier, moquette, béton, métal, marches), la course s'entend, la lampe claque à l'allumage et à l'extinction, les fonds varient selon l'endroit, et des bruits lointains viennent de partout. Derrière un mur, tout est étouffé.
+  - Le monstre fait peur : un long visage pâle qu'on découvre à la lampe, des gestes saccadés. Quand il approche, les lampes meurent, l'image se déchire, et il te saute au visage quand il te met à terre.
+  - Jouer le monstre : une vue rouge et noire, des griffes, les corps qui brûlent, un hurlement (R) qui coupe le souffle. Tu peux marcher dans le labo avant que les portes s'ouvrent, et le jeu dit pourquoi tu es à l'arrêt.
+  - Au départ, chacun a déjà son appareil photo, et une seule table propose capteur, kit caméras et piles. Ce que tu trouves en fouillant va directement dans ton sac.
+  - Les menus ont le même style que ceux des autres jeux, et l'escalier a de vraies marches, correctement éclairées.
 - **Odyssée** — retrait du bouton SAUVER sur le HUD en jeu : la partie est désormais sauvegardée automatiquement après chaque combat, discussion, soin ou changement de lieu (ainsi qu'à la fermeture de l'onglet), laissant 4 boutons d'action rapides (COURSE, ÉQUIPE, SAC, CARTE) sur le Pokégear.
 
 ## 3.57 — 2 novembre 2026

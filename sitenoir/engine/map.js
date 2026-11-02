@@ -46,7 +46,7 @@ export function buildMap() {
   };
   const light = (x, z, kind = 'urgence', opts = {}) => {
     const i = idx(Math.floor(x), Math.floor(z)), y = floor[i] + (opts.h ?? CEIL - 0.1);
-    M.lights.push({ id: M.lights.length, x, z, y, zone: zone[i], kind, flick: opts.flick ?? 0.25, phase: M.lights.length * 1.7 });
+    M.lights.push({ id: M.lights.length, x, z, y, zone: zone[i], kind, flick: opts.flick ?? 0.25, phase: M.lights.length * 1.7, power: opts.power });
   };
 
   // ------------------------------------------------------------------ dehors
@@ -114,10 +114,8 @@ export function buildMap() {
   M.liftCall = { x: 57.5, z: 42.5, y: DEEP };
   M.liftGo = { x: 61.5, z: 44.6 };
   M.monitor = { x: 32, z: 49.5, y: 0 };
-  M.crates = [
-    { k: 'photo', n: 3, x: 9.5, z: 49.5 }, { k: 'emf', n: 3, x: 12, z: 49.5 }, { k: 'cams', n: 3, x: 14.5, z: 49.5 },
-    { k: 'tablet', n: 2, x: 17, z: 49.5 }, { k: 'pile', n: 4, x: 7, z: 49.5 },
-  ];
+  // la table de matériel, juste à droite du sas : l'appareil photo est déjà dans le sac
+  M.crates = [{ k: 'emf', n: 3, x: 26.1, z: 48.5 }, { k: 'cams', n: 3, x: 27, z: 48.5 }, { k: 'pile', n: 4, x: 27.9, z: 48.5 }];
   M.padCenter = { x: 59.5, z: 54 };
   // places possibles : la graine choisit
   M.spots = {
@@ -173,10 +171,9 @@ export function buildMap() {
   // palier de l'ascenseur
   prop('crate', 53, 41, 0); prop('crate', 54.2, 41.5, 0); prop('oildrum', 67.5, 41.5, 0, { size: 1 }); prop('storageshelf', 64, 35.5, 0, { w: 2, d: 1 });
   locker(52, 37, 1); locker(52, 38, 1); locker(68, 37, 3); locker(68, 38, 3);
-  // avant-poste : caisses de matériel, table des écrans, projecteurs
-  for (const c of M.crates) prop('scificrate', c.x, c.z - 0.9, 0, { size: 0.9, w: 1, d: 1 });
-  prop('foldtable', 32, 48.6, 0, { w: 4, d: 1, size: 3.6 }); prop('computer', 31, 48.6, 0, { w: 0, up: 0.75, size: 0.8 }); prop('computer', 33, 48.6, 0, { w: 0, up: 0.75, size: 0.8 });
-  prop('crate', 44, 50, 0); prop('crate', 45.2, 50.4, 0); prop('oildrum', 46, 52, 0, { size: 1 }); prop('gastank', 6, 60, 0, { size: 1.1 }); prop('crate', 40, 60, 0);
+  // avant-poste : table de matériel, table des écrans, projecteurs
+  prop('foldtable', 27, 48.5, 1, { w: 4, d: 1, size: 3.6 });
+  prop('foldtable', 32, 48.6, 1, { w: 4, d: 1, size: 3.6 }); prop('computer', 31.3, 48.6, 0, { w: 0, up: 0.75, size: 0.8 }); prop('computer', 32.7, 48.6, 0, { w: 0, up: 0.75, size: 0.8 });
   prop('spotlight', 12, 58, 2, { w: 0, size: 1.3 }); prop('spotlight', 34, 58, 2, { w: 0, size: 1.3 }); prop('spotlight', 60, 60, 2, { w: 0, size: 1.3 });
 
   // ------------------------------------------------------------------ lumières de secours
@@ -186,11 +183,38 @@ export function buildMap() {
   for (const x of [12, 26, 38]) { light(x, 21.5, 'rouge', { flick: 0.7 }); light(x, 3.5, 'rouge', { flick: 0.7 }); }
   light(7.5, 12, 'rouge', { flick: 0.7 }); light(42.5, 12, 'rouge', { flick: 0.7 });
   light(14.5, 11, 'rouge', { flick: 0.85 }); light(24.5, 9, 'rouge', { flick: 0.85 }); light(24.5, 16, 'rouge', { flick: 0.85 }); light(35.5, 12, 'rouge', { flick: 0.85 });
-  light(48, 13, 'ambre', { flick: 0.4, h: -0.9 }); light(48, 36, 'ambre', { flick: 0.4, h: -0.9 });
+  light(48, 13, 'ambre', { flick: 0.4, h: 1.2, power: 4 }); light(48, 36, 'ambre', { flick: 0.4, h: 1.2, power: 4 });
   light(57, 12, 'ambre', { flick: 0.4 }); light(66, 12, 'ambre', { flick: 0.4 }); light(62, 18, 'ambre', { flick: 0.5 });
   light(61.5, 27, 'ambre', { flick: 0.75 }); light(57, 39, 'ambre', { flick: 0.5 }); light(65, 39, 'ambre', { flick: 0.5 });
   light(60, 45.5, 'neon', { flick: 0.2, h: 2.7 });
-  for (const [x, z] of [[12, 58], [34, 58], [60, 60], [24, 49], [60, 49]]) light(x, z, 'projecteur', { flick: 0, h: 4.5 });
+  for (const [x, z, power] of [[12, 58], [34, 58], [60, 60], [24, 50.5, 90], [60, 49]]) light(x, z, 'projecteur', { flick: 0, h: 4.5, power });
+
+  // ------------------------------------------------------------------ signalétique : des bandes peintes au sol et des panneaux aux carrefours
+  // Chaque bande relie deux points par le chemin le plus court : on la suit à la lampe.
+  M.routes = [
+    { color: 0x2d7ff0, a: [23, 46], b: [41.5, 24.5] },   // bleu : de l'accueil au sas de l'aile B
+    { color: 0xf08a1d, a: [42, 22], b: [43.5, 13] },     // orange : du sas à la salle des machines
+    { color: 0xf08a1d, a: [40, 36], b: [43.5, 36] },     // orange : l'escalier de service, côté aile A
+    { color: 0xe2bd46, a: [52.5, 13], b: [62, 12.2] },   // jaune : du bas de l'escalier au générateur
+    { color: 0x3fd07a, a: [62, 13], b: [58, 41.5] },     // vert : du générateur à l'ascenseur, par le tunnel
+    { color: 0x3fd07a, a: [52.5, 36], b: [57, 41.5] },   // vert : de l'autre escalier à l'ascenseur
+  ];
+  // x, z : un point du mur ; nx, nz : vers où il regarde
+  M.signs = [
+    { x: 19, z: 48, nx: 0, nz: 1, text: 'ENTRÉE', sub: 'AILE A · BUREAUX', arrow: '→', color: '#d8d2c0' },
+    { x: 27, z: 48, nx: 0, nz: 1, y: 1.75, text: 'MATÉRIEL', sub: 'CAPTEUR · CAMÉRAS · PILES', color: '#e8a53a' },
+    { x: 32, z: 48, nx: 0, nz: 1, y: 1.75, text: 'ÉCRANS', sub: 'CAMÉRAS POSÉES', color: '#79c6ff' },
+    { x: 19.5, z: 39, nx: 0, nz: 1, text: 'AILE B', sub: 'SAS · BADGE BLEU', arrow: '→', color: '#2d7ff0' },
+    { x: 28, z: 38, nx: 0, nz: -1, text: 'AILE B', sub: 'SAS · BADGE BLEU', arrow: '→', color: '#2d7ff0' },
+    { x: 18, z: 38, nx: 0, nz: -1, text: 'AILE B', sub: 'SAS · BADGE BLEU', arrow: '←', color: '#2d7ff0' },
+    { x: 44, z: 31, nx: -1, nz: 0, text: 'AILE B', sub: 'SAS · BADGE BLEU', arrow: '↑', color: '#2d7ff0' },
+    { x: 44, z: 33.8, nx: -1, nz: 0, y: 1.05, text: 'SOUS-SOL', sub: 'ESCALIER · CLÉ ORANGE', arrow: '→', color: '#f08a1d' },
+    { x: 44, z: 15, nx: -1, nz: 0, text: 'MACHINES', sub: 'ESCALIER · CLÉ ORANGE', arrow: '→', color: '#f08a1d' },
+    { x: 52, z: 15.5, nx: 1, nz: 0, y: DEEP + 1.75, text: 'GÉNÉRATEUR', sub: 'FUSIBLES · RÉPARATION', arrow: '→', color: '#e2bd46' },
+    { x: 58, z: 22, nx: 0, nz: -1, y: DEEP + 1.75, text: 'ASCENSEUR', sub: 'PAR LE TUNNEL', arrow: '→', color: '#3fd07a' },
+    { x: 56, z: 35, nx: 0, nz: 1, y: DEEP + 1.75, text: 'ASCENSEUR', sub: 'APPEL', arrow: '↓', color: '#3fd07a' },
+    { x: 55, z: 43, nx: 0, nz: -1, y: DEEP + 1.75, text: 'ASCENSEUR', sub: 'APPEL', arrow: '→', color: '#3fd07a' },
+  ];
 
   M.zoneRooms = {}; for (const r of M.rooms) (M.zoneRooms[r.zone] ||= []).push(r);
   return M;
