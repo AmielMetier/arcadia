@@ -258,7 +258,7 @@ export class WorldView {
     if (art.sprites) applySpriteImages(S, art.sprites, art.dens);
     this.A = A; this.N = N; this.S = S;
     this.charRows = charsImg ? Math.round(charsImg.height / CHH) : 10;
-    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(charsImg);
+    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(this.packChars());
     const mk = (map, o = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...o });
     this.mat = {
       ground: mk(this.texA), anim: mk(this.texN), sprite: screenSprite(mk(this.texS, { alphaTest: 0.5, side: THREE.DoubleSide })),
@@ -688,8 +688,9 @@ export class WorldView {
   setFrame(a, sprite, dir, step) {
     const row = CHAR_ROWS[sprite] ?? CHAR_ROWS[CHAR_ALIAS[sprite]] ?? 0, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
     const k = row * 100 + col; if (a.frame === k) return; a.frame = k;
-    const H = this.charRows * CHH;
-    const u0 = col * CW / (12 * CW), u1 = (col + 1) * CW / (12 * CW), v0 = row * CHH / H, v1 = (row + 1) * CHH / H;
+    // la planche est rangée en deux colonnes (texture moins haute : les téléphones plafonnent souvent à 4096 px)
+    const half = this.charHalf, blk = row >= half ? 1 : 0, pr = row - blk * half;
+    const u0 = (blk * 12 + col) / 24, u1 = (blk * 12 + col + 1) / 24, v0 = pr / half, v1 = (pr + 1) / half;
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
@@ -732,11 +733,27 @@ export class WorldView {
     this.root.add(mesh); this.root.add(shadow); this.actors.set(id, a);
     return a;
   }
+  /** planche des personnages pour la carte graphique : les rangées en deux colonnes côte à côte */
+  packChars() {
+    const L = this.charsCanvas; if (!L) { this.charHalf = Math.ceil(this.charRows / 2); return L; }
+    const half = this.charHalf = Math.ceil(this.charRows / 2);
+    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * 2; c.height = half * CHH;
+    const x = c.getContext('2d'); x.drawImage(L, 0, 0, L.width, half * CHH, 0, 0, L.width, half * CHH);
+    x.drawImage(L, 0, half * CHH, L.width, L.height - half * CHH, L.width, 0, L.width, L.height - half * CHH);
+    return c;
+  }
+  /** recopie une rangée de la planche dans la texture */
+  packRow(r) {
+    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = r >= half ? 1 : 0, x = c.getContext('2d');
+    x.clearRect(blk * L.width, (r - blk * half) * CHH, L.width, CHH);
+    x.drawImage(L, 0, r * CHH, L.width, CHH, blk * L.width, (r - blk * half) * CHH, L.width, CHH);
+    this.texC.needsUpdate = true;
+  }
   /** pose la rangée composée du joueur (768 × 64) dans la planche des personnages */
   setJoueur(row) {
     const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS.joueur * CHH;
     x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y);
-    this.texC.needsUpdate = true;
+    this.packRow(CHAR_ROWS.joueur);
   }
   /** rangée d'un autre joueur pour sa tenue (code court) : composée une fois, gardée tant qu'elle sert ; null si plus de place */
   pairSprite(code, composer) {
@@ -747,7 +764,7 @@ export class WorldView {
     if (slot < 0) { let old = null; for (const [k, e] of P) if (!old || e.t < old[1].t) old = [k, e]; if (performance.now() - old[1].t < 4000) return null; slot = old[1].i; P.delete(old[0]); }
     const row = composer(); if (!row) return null;
     const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS['pair' + slot] * CHH;
-    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y); this.texC.needsUpdate = true;
+    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y); this.packRow(CHAR_ROWS['pair' + slot]);
     const e = { i: slot, key: 'pair' + slot, t: performance.now() }; P.set(code, e); return e.key;
   }
   /** le modèle de base d'un genre (pour composer une tenue) */

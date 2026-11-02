@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.73 — 3 novembre 2026
+- **Odyssée** — Sur certains téléphones, les personnages restent nets (ils pouvaient s'afficher flous).
+
 ## 3.72 — 3 novembre 2026
 - **Odyssée** — À plusieurs, les autres joueurs apparaissent avec la tenue qu'ils se sont choisie.
 
