@@ -124,7 +124,7 @@ export class FxManager {
       for (const p of planes) {
         if (!p.alive) continue;
         if (p.load > 9) { for (const s of [-1, 1]) this.puff(p.x + p.lx * s * 4.7 - p.fx * 2, p.y + p.ly * s * 4.7 - p.fy * 2, p.z + p.lz * s * 4.7 - p.fz * 2, 0.35, 1.4, 0.45, 0.95, 0.96, 0.98, 0.42); }
-        if (p.health < p.maxHp * 0.45 || p.dE > 0.3) { const k = p.health < p.maxHp * 0.25 ? 0.12 : 0.4; this.puff(p.x - p.fx * 7.5, p.y - p.fy * 7.5, p.z - p.fz * 7.5, 1.1, 4, 1.3, k, k, k + 0.01, 0.55, 0, 2, 0); }
+        if (p.health < p.maxHp * 0.45 || p.dE > 0.3) { const k = p.health < p.maxHp * 0.25 ? 0.12 : 0.4; this.puff(p.x - p.fx * 7.5 - p.ux * 0.9, p.y - p.fy * 7.5 - p.uy * 0.9, p.z - p.fz * 7.5 - p.uz * 0.9, 1.1, 4, 1.3, k, k, k + 0.01, 0.55, 0, 2, 0); }
       }
     }
 

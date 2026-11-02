@@ -1,6 +1,6 @@
 // Tests du moteur de Dogfight 3D : node tools/test-dogfight.mjs
 import { generateMap, ILE } from '../royale/engine/map.js';
-import { createFlight, stepFlight, computeAxes, bankOf, TYPES, ZONE_MAX, CENTER, CEILING } from '../dogfight/engine/flight.js';
+import { createFlight, stepFlight, computeAxes, bankOf, keyRamp, keyCurve, KEY_ATTACK, TYPES, ZONE_MAX, CENTER, CEILING } from '../dogfight/engine/flight.js';
 import { computeLead, BULLET_SPEED, BULLET_GRAVITY, FIRE_RATE, stepGun, hitZone } from '../dogfight/engine/weapons.js';
 import { createWorld } from '../dogfight/engine/world.js';
 import { createGame, startCountdown, stepGame, drainEvents, DT, snapRows, worldOf, restoreGame, replaceByBot, applyRow, ranking, addPlayer } from '../dogfight/engine/rules.js';
@@ -66,6 +66,40 @@ const map = generateMap(ILE), world = createWorld(map);
   run(h, { p: 1 }, 0.4); run(h2, { p: 1 }, 0.4);
   assert(h.fy > h2.fy, 'dérive touchée : l\'avion tire moins fort');
   console.log('✓ Vol : looping, tonneau, énergie, instructeur, limites, dégâts');
+}
+
+// ----- 1 bis. Douceur des commandes
+{
+  // une touche maintenue `hold` secondes, puis lâchée : angle parcouru, plus gros à-coup d'une image à l'autre
+  const press = (axis, hold, after = 1, attack = KEY_ATTACK.pitch) => {
+    const s = createFlight({ x: 800, y: 600, z: 800 }), aim = { ax: s.fx, ay: s.fy, az: s.fz };
+    let stick = 0, prev = 0, jerk = 0, angle = 0, stopT = null;
+    for (let t = 0; t < hold + after; t += DT) {
+      stick = keyRamp(stick, t < hold ? 1 : 0, DT, attack);
+      if (stick !== 0) { aim.ax = s.fx; aim.ay = s.fy; aim.az = s.fz; }   // comme en jeu : le point visé suit le nez pendant l'appui
+      const a = { qx: s.qx, qy: s.qy, qz: s.qz, qw: s.qw };
+      stepFlight(s, { p: 0, r: 0, y: 0, ...aim, [axis]: keyCurve(stick) }, DT);
+      const rate = deg(2 * Math.acos(Math.min(1, Math.abs(a.qx * s.qx + a.qy * s.qy + a.qz * s.qz + a.qw * s.qw)))) / DT;
+      jerk = Math.max(jerk, Math.abs(rate - prev)); prev = rate;
+      if (t < hold) angle += rate * DT;
+      if (t >= hold && stopT === null && rate < 8) stopT = t - hold;
+    }
+    return { jerk, angle, stopT, s };
+  };
+  const tap = press('p', 0.1), hold = press('p', 1), rollHold = press('r', 1, 1, KEY_ATTACK.roll), rollTap = press('r', 0.1, 1, KEY_ATTACK.roll);
+  assert(tap.angle < 3, `une tape de 100 ms ne bouge le nez que de quelques degrés (${tap.angle.toFixed(1)}°)`);
+  assert(rollTap.angle < 6, `une tape de 100 ms n'incline que de quelques degrés (${rollTap.angle.toFixed(1)}°)`);
+  assert(hold.angle > 45, `un appui d'une seconde tire franchement (${hold.angle.toFixed(0)}°)`);
+  assert(hold.jerk < 8 && rollHold.jerk < 14, `pas d'à-coup d'une image à l'autre (${hold.jerk.toFixed(1)} et ${rollHold.jerk.toFixed(1)} °/s)`);
+  assert(hold.stopT !== null && hold.stopT < 0.7, `l'avion se calme après le relâchement (${hold.stopT} s)`);
+  assert(keyRamp(0.5, -1, DT, KEY_ATTACK.roll) < 0.5 && keyRamp(0.001, 0, DT, KEY_ATTACK.roll) === 0, 'manche virtuel : il revient par zéro et s\'y arrête');
+  // le point visé tenu fixe : pas d'oscillation une fois arrivé
+  const w = createFlight({ x: 800, y: 600, z: 800 }), c = 25 / 57.3, a = { ax: Math.sin(c), ay: 0.05, az: Math.cos(c) };
+  run(w, a, 2);
+  let flips = 0, last = 0, wander = 0;
+  for (let t = 0; t < 2; t += DT) { stepFlight(w, a, DT); if (Math.abs(w.wp) > 0.02 && Math.sign(w.wp) !== Math.sign(last)) flips++; if (Math.abs(w.wp) > 0.02) last = w.wp; wander = Math.max(wander, Math.acos(Math.min(1, (w.fx * a.ax + w.fy * a.ay + w.fz * a.az) / Math.hypot(a.ax, a.ay, a.az)))); }
+  assert(flips <= 1 && deg(wander) < 1.5, `visée stable, sans oscillation (${flips} inversions, ${deg(wander).toFixed(2)}°)`);
+  console.log(`✓ Douceur : tape ${tap.angle.toFixed(1)}°, à-coup max ${rollHold.jerk.toFixed(1)} °/s, calme en ${hold.stopT.toFixed(2)} s`);
 }
 
 // ----- 2. Armes
@@ -176,6 +210,7 @@ function play(n, lvl, sec, settings = {}) {
   const size = JSON.stringify(rows).length;
   assert(size < 500, `instantané de 3 avions compact (${size} o)`);
   const copy = applyRow({ ...g.planes[2] }, rows[2]);
+  assert(Math.abs(copy.wr - g.planes[2].wr) < 0.01 && Math.abs(copy.wp - g.planes[2].wp) < 0.01, 'réseau : l\'inertie de l\'avion voyage avec l\'instantané');
   assert(Math.hypot(copy.x - g.planes[2].x, copy.y - g.planes[2].y) < 0.2 && copy.fx * g.planes[2].fx + copy.fy * g.planes[2].fy + copy.fz * g.planes[2].fz > 0.999, 'une ligne reconstruit l\'avion');
   // le nouvel hôte reprend depuis du JSON (plus aucune méthode), et la boucle continue
   const r = restoreGame(JSON.parse(JSON.stringify(w)), JSON.parse(JSON.stringify(rows)), world);

@@ -152,6 +152,7 @@ function bindScreens() {
   $('#btnStart').addEventListener('click', () => {
     sfx.unlock();
     if (S.role === 'guest') { S.ready = !S.ready; sendPick(); updateHangar(); return; }
+    controls.lock();   // la souris ou le trackpad ne bute plus sur le bord de l'écran dès le décollage
     launch();
   });
   $('#btnReplay').addEventListener('click', () => { if (S.role !== 'guest') { newGame(); broadcastWorld(true); hideEnd(); showHangar(); } });

@@ -202,14 +202,14 @@ const d1 = (v) => Math.round(v * 10) / 10;
 
 // Ligne compacte d'un avion, envoyée vingt fois par seconde
 export function snapRows(g) {
-  return g.planes.map((p) => [p.id, d1(p.x), d1(p.y), d1(p.z), q4(p.qx), q4(p.qy), q4(p.qz), q4(p.qw), d1(p.speed), Math.round(p.health), flagsOf(p), p.ack, Math.round(p.ab * 100), Math.round(p.heat * 100), Math.round(p.lockT * 100), p.lockId, Math.round(p.load)]);
+  return g.planes.map((p) => [p.id, d1(p.x), d1(p.y), d1(p.z), q4(p.qx), q4(p.qy), q4(p.qz), q4(p.qw), d1(p.speed), Math.round(p.health), flagsOf(p), p.ack, Math.round(p.ab * 100), Math.round(p.heat * 100), Math.round(p.lockT * 100), p.lockId, Math.round(p.load), Math.round(p.wp * 100), Math.round(p.wr * 100), Math.round(p.wy * 100)]);
 }
 const flagsOf = (p) => (p.alive ? 1 : 0) | (p.boosting ? 2 : 0) | (p.braking ? 4 : 0) | (p.firing ? 8 : 0) | (p.over ? 16 : 0) | (p.warn ? 32 : 0) | (p.inv > 0 ? 64 : 0) | (p.abOut ? 128 : 0);
 
 export function applyRow(p, r) {
   p.x = r[1]; p.y = r[2]; p.z = r[3]; p.qx = r[4] / 1e4; p.qy = r[5] / 1e4; p.qz = r[6] / 1e4; p.qw = r[7] / 1e4; p.speed = r[8]; p.health = r[9];
   const f = r[10]; p.alive = !!(f & 1); p.boosting = !!(f & 2); p.braking = !!(f & 4); p.firing = !!(f & 8); p.over = !!(f & 16); p.warn = !!(f & 32); p.inv = f & 64 ? 1 : 0; p.abOut = !!(f & 128);
-  p.ack = r[11]; p.ab = r[12] / 100; p.heat = r[13] / 100; p.lockT = r[14] / 100; p.lockId = r[15]; p.load = r[16];
+  p.ack = r[11]; p.ab = r[12] / 100; p.heat = r[13] / 100; p.lockT = r[14] / 100; p.lockId = r[15]; p.load = r[16]; p.wp = (r[17] || 0) / 100; p.wr = (r[18] || 0) / 100; p.wy = (r[19] || 0) / 100;
   const n = 1 / (Math.hypot(p.qx, p.qy, p.qz, p.qw) || 1); p.qx *= n; p.qy *= n; p.qz *= n; p.qw *= n;
   return computeAxes(p);
 }

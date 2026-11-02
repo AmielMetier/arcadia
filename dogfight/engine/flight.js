@@ -22,14 +22,27 @@ const BRAKE_DRAG = 30;
 const AB_DRAIN = 1 / 9;    // la postcombustion tient 9 s
 const AB_FILL = 1 / 16;    // et se recharge en 16 s
 const AB_RESTART = 0.2;    // une fois vide, elle repart à 20 %
+const LAG_PITCH = 0.13, LAG_ROLL = 0.1, LAG_YAW = 0.18;   // inertie de l'avion : temps de réponse de chaque axe (s)
+const KEY_RELEASE = 0.22;  // une touche lâchée retombe à zéro en ce temps (s)
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
+// Touche enfoncée (-1, 0 ou 1) vers une commande progressive : une tape corrige finement, un appui long tire à fond.
+// `state` garde la position du manche ; le résultat suit une courbe douce au début de la course.
+export const KEY_ATTACK = { pitch: 0.5, roll: 0.34, yaw: 0.45 };
+export function keyRamp(state, key, dt, attack) {
+  const step = key !== 0 && key * state >= 0 ? dt / attack : dt / KEY_RELEASE;
+  const want = key === 0 || key * state >= 0 ? key : 0;
+  const next = state < want ? Math.min(want, state + step) : Math.max(want, state - step);
+  return next;
+}
+export const keyCurve = (v) => Math.sign(v) * Math.abs(v) ** 1.35;
+
 // Crée l'état de vol, nez vers `heading` (radians autour de l'axe vertical)
 export function createFlight({ x = 0, y = 200, z = 0, heading = 0, type = 'f16' } = {}) {
   const T = TYPES[type] || TYPES.f16;
-  const s = { type: TYPES[type] ? type : 'f16', x, y, z, qx: 0, qy: Math.sin(heading / 2), qz: 0, qw: Math.cos(heading / 2), speed: T.cruise, ab: 1, abOut: false, boosting: false, braking: false, load: 0, dE: 0, dL: 0, dR: 0, dT: 0 };
+  const s = { type: TYPES[type] ? type : 'f16', x, y, z, qx: 0, qy: Math.sin(heading / 2), qz: 0, qw: Math.cos(heading / 2), speed: T.cruise, ab: 1, abOut: false, boosting: false, braking: false, load: 0, wp: 0, wr: 0, wy: 0, dE: 0, dL: 0, dR: 0, dT: 0 };
   return computeAxes(s);
 }
 
@@ -61,15 +74,15 @@ export function instructor(s, ax, ay, az) {
   const dr = -(ax * s.lx + ay * s.ly + az * s.lz), du = ax * s.ux + ay * s.uy + az * s.uz, df = ax * s.fx + ay * s.fy + az * s.fz;
   const err = Math.acos(clamp(df, -1, 1));
   const verticality = 1 - smooth(0.75, 0.95, Math.abs(s.fy));
-  const level = clamp(-bankOf(s) * 2.4, -1, 1) * verticality;
-  const t = smooth(0.05, 0.28, err);
+  const level = clamp(-bankOf(s) * 1.5, -0.42, 0.42) * verticality;
+  const t = smooth(0.08, 0.38, err);
   // loin de la cible : on incline vers elle puis on tire ; près d'elle : petites corrections, ailes à plat
   const rollErr = Math.atan2(dr, du < 0 && err < 0.35 ? -du : du);
-  const r = clamp(rollErr * 3, -1, 1) * t + level * (1 - t);
+  const r = clamp(rollErr * 2.6, -1, 1) * t + level * (1 - t);
   let p;
-  if (err < 0.35) p = clamp(du * 9, -1, 1);
+  if (err < 0.35) p = clamp(du * 5, -1, 1);
   else p = Math.abs(rollErr) < 0.7 ? 1 : 0.25;
-  const y = clamp(dr * 7, -1, 1) * (1 - t * 0.7);
+  const y = clamp(dr * 5, -1, 1) * (1 - t * 0.7);
   return { p, r, y };
 }
 
@@ -96,17 +109,22 @@ export function stepFlight(s, inp, dt) {
   } else if (!inp.free && rc !== 0) {
     // virage coordonné : l'inclinaison s'arrête vers 80°, et l'avion tire tout seul dans le virage
     const bank = bankOf(s), abs = Math.abs(bank);
-    if (rc * bank > 0 && abs > 1.25 && abs < 2.4) rc = Math.sign(rc) * Math.max(-1, Math.min(1, (1.35 - abs) * 3));
+    if (rc * bank > 0 && abs < 2.4) rc = Math.sign(rc) * Math.min(Math.abs(rc), (1.35 - abs) * 2.2);   // ralentit en approchant de la limite, sans cran
     if (pc === 0 && abs < 1.65) pc = 0.8 * Math.sin(abs);
   }
 
   // 3. Efficacité des gouvernes selon la vitesse, et dégâts
   const v = s.speed;
   const auth = clamp((v - 38) / 52, 0.2, 1) * clamp(1.25 - (v - 140) / 260, 0.72, 1);
-  const wPitch = pc * T.pitch * auth * (1 - 0.45 * s.dT);
-  const wRoll = (rc * T.roll * auth + (s.dL - s.dR) * 0.28) * (1 - 0.3 * Math.max(s.dL, s.dR));
-  const wYaw = yc * T.yaw * auth;
-  rotate(s, -wPitch, -wYaw, wRoll, dt);
+  const wantPitch = pc * T.pitch * auth * (1 - 0.45 * s.dT);
+  const wantRoll = (rc * T.roll * auth + (s.dL - s.dR) * 0.28) * (1 - 0.3 * Math.max(s.dL, s.dR));
+  const wantYaw = yc * T.yaw * auth;
+  // l'avion a de l'inertie : la vitesse de rotation rejoint la commande, elle ne saute jamais d'un coup
+  s.wp += (wantPitch - s.wp) * (1 - Math.exp(-dt / LAG_PITCH));
+  s.wr += (wantRoll - s.wr) * (1 - Math.exp(-dt / LAG_ROLL));
+  s.wy += (wantYaw - s.wy) * (1 - Math.exp(-dt / LAG_YAW));
+  const wPitch = s.wp;
+  rotate(s, -wPitch, -s.wy, s.wr, dt);
 
   // 4. Décrochage : trop lent, le nez tombe
   if (v < STALL) {

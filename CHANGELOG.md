@@ -5,6 +5,7 @@
   - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
   - Choisis ton avion au hangar : le F-16, vif et mordant, ou le F-22, rapide et plus discret face aux missiles.
   - Nouveau pilotage : vise à la souris et l'avion suit, ou pilote toi-même en ZQSD. Loopings et tonneaux sont possibles, et la vitesse se gère : monter ou serrer un virage coûte de l'énergie.
+  - Commandes souples : l'avion a de l'inertie, une tape sur le clavier corrige finement et un appui long tire à fond. La visée au trackpad est lissée.
   - Canon qui chauffe, missiles à accrocher, leurres, et dégâts localisés sur le moteur, les ailes et la queue.
   - Interface de vol façon simulateur : vitesse et altitude, étiquettes avec distance, point où viser, radar rond avec la carte de l'île, flèches vers les ennemis hors champ, alertes de relief et de missile, tableau des scores sur Tab.
   - Sons placés dans l'espace et alarmes dans le cockpit.

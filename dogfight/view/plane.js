@@ -4,9 +4,10 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 
 // fins et tips : sommet des dérives et bouts d'ailes, relevés sur les modèles
+// nozzles : centre de chaque tuyère, un peu à l'intérieur pour que la flamme en sorte, et demi-largeur, demi-hauteur de son ouverture
 const FILES = {
-  f16: { url: 'f-16.glb', len: 15.09, fins: [[0, 2.47, -6.9]], tip: [4.66, -0.66, -2.4], nozzles: [[0, 0.1, -7.2]] },
-  f22: { url: 'f-22.glb', len: 18.99, fins: [[2.93, 1.93, -5.55], [-2.93, 1.93, -5.55]], tip: [6.7, -1.18, -3.7], nozzles: [[0.8, -0.1, -8.6], [-0.8, -0.1, -8.6]] },
+  f16: { url: 'f-16.glb', len: 15.09, fins: [[0, 2.47, -6.9]], tip: [4.66, -0.66, -2.4], nozzles: [[0, -0.7, -6.85, 0.34, 0.34]] },
+  f22: { url: 'f-22.glb', len: 18.99, fins: [[2.93, 1.93, -5.55], [-2.93, 1.93, -5.55]], tip: [6.7, -1.18, -3.7], nozzles: [[0.65, -1.1, -6.85, 0.42, 0.14], [-0.65, -1.1, -6.85, 0.42, 0.14]] },
 };
 const FAR_LOD = 480;   // au-delà : modèle simple
 const templates = {};
@@ -51,10 +52,23 @@ function farModel() {
   return new THREE.Mesh(farGeo, farMat);
 }
 
-const flameGeoA = (() => { const g = new THREE.ConeGeometry(0.34, 2.1, 14); g.rotateX(-Math.PI / 2); g.translate(0, 0, -1.05); return g; })();
-const flameGeoB = (() => { const g = new THREE.ConeGeometry(0.46, 3.3, 14); g.rotateX(-Math.PI / 2); g.translate(0, 0, -1.65); return g; })();
-const flameA = new THREE.MeshBasicMaterial({ color: 0xfff0ea, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-const flameB = new THREE.MeshBasicMaterial({ color: 0xff8f86, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+// La flamme : des cônes sans fond qui s'estompent vers le bout et sur les bords, et une lueur au fond de la tuyère.
+// Le rayon vaut 1 : chaque tuyère les met à l'échelle de son ouverture.
+const flameCone = (r, len) => { const g = new THREE.ConeGeometry(r, len, 18, 3, true); g.rotateX(-Math.PI / 2); g.translate(0, 0, -len / 2); return g; };
+const flameGeoA = flameCone(0.72, 2.2), flameGeoB = flameCone(1, 3.8);
+const glowGeo = new THREE.CircleGeometry(1, 20); glowGeo.rotateY(Math.PI);
+const FLAME_VERTEX = 'varying vec2 vU; varying float vF; void main(){ vU=uv; vec4 mv=modelViewMatrix*vec4(position,1.); vF=abs(dot(normalize(normalMatrix*normal),normalize(-mv.xyz))); gl_Position=projectionMatrix*mv; }';
+const flameMat = (core, tip, gain) => new THREE.ShaderMaterial({
+  uniforms: { uCore: { value: new THREE.Color(core) }, uTip: { value: new THREE.Color(tip) }, uGain: { value: gain } },
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, vertexShader: FLAME_VERTEX,
+  fragmentShader: 'varying vec2 vU; varying float vF; uniform vec3 uCore,uTip; uniform float uGain; void main(){ float t=vU.y; float k=pow(1.-t,1.4)*pow(vF,.6)*(.86+.14*cos(t*26.))*uGain; gl_FragColor=vec4(mix(uCore,uTip,sqrt(t)),k); }',
+});
+const flameA = flameMat(0xfff0d8, 0xffa060, 1.15);
+const flameB = flameMat(0xffc090, 0xff5a3c, 0.75);
+const glowMat = new THREE.ShaderMaterial({
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, vertexShader: 'varying vec2 vU; void main(){ vU=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: 'varying vec2 vU; void main(){ float r=length(vU-.5)*2.; gl_FragColor=vec4(mix(vec3(1.,.92,.78),vec3(1.,.42,.2),r),smoothstep(1.,.35,r)*.95); }',
+});
 const flashGeo = new THREE.SphereGeometry(0.28, 6, 6);
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xffea70, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 const finGeo = new THREE.BoxGeometry(0.1, 0.2, 1);
@@ -76,8 +90,8 @@ export function buildPlane(type, color) {
   for (const s of [-1, 1]) { const tip = new THREE.Mesh(tipGeo, accent); tip.position.set(s * def.tip[0], def.tip[1], def.tip[2]); near.add(tip); }
 
   const flames = def.nozzles.map((n) => {
-    const flame = new THREE.Group(); flame.position.set(n[0], n[1], n[2]); flame.visible = false;
-    flame.add(new THREE.Mesh(flameGeoA, flameA), new THREE.Mesh(flameGeoB, flameB));
+    const flame = new THREE.Group(); flame.position.set(n[0], n[1], n[2]); flame.scale.set(n[3], n[4], 1); flame.visible = false;
+    flame.add(new THREE.Mesh(flameGeoA, flameA), new THREE.Mesh(flameGeoB, flameB), new THREE.Mesh(glowGeo, glowMat));
     root.add(flame);
     return flame;
   });

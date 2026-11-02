@@ -1,8 +1,10 @@
 // Commandes de Dogfight 3D : souris (l'instructeur suit le point visé), clavier (commandes directes), manette, tactile.
 // Le clavier et la souris marchent ensemble : tant qu'on appuie, on pilote soi-même ; en lâchant, l'avion garde son cap et remet les ailes à plat.
-import { ZONE_MAX, CENTER, CEILING } from '../engine/flight.js';
+import { ZONE_MAX, CENTER, CEILING, KEY_ATTACK, keyRamp, keyCurve } from '../engine/flight.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const AIM_LAG = 0.07;      // lissage du point visé : efface les à-coups d'un trackpad (s)
+const MAX_DELTA = 220;     // un écart plus grand en un seul événement est un raté du verrou de souris (px)
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab', 'ShiftLeft', 'ShiftRight']);
 
 export class FlightControls {
@@ -11,7 +13,8 @@ export class FlightControls {
     this.keys = new Set();
     this.firing = false;
     this.mslPulse = false; this.flarePulse = false;
-    this.yaw = 0; this.pitch = 0; this.mouseUsed = 0; this.dirty = false;
+    this.yaw = 0; this.pitch = 0; this.sYaw = 0; this.sPitch = 0; this.mouseUsed = 0; this.dirty = false;
+    this.stickP = 0; this.stickR = 0; this.stickY = 0;
     this.sens = 1; this.invert = false; this.assist = true;
     this.enabled = false;
     this.onFirstGesture = onFirstGesture; this.gesture = false;
@@ -35,7 +38,7 @@ export class FlightControls {
     on(window, 'blur', () => this.release());
     on(window, 'mousemove', (e) => {
       if (!this.enabled) return;
-      const k = 0.0019 * this.sens, dx = e.movementX || 0, dy = e.movementY || 0;
+      const k = 0.0019 * this.sens, dx = clamp(e.movementX || 0, -MAX_DELTA, MAX_DELTA), dy = clamp(e.movementY || 0, -MAX_DELTA, MAX_DELTA);
       if (!dx && !dy) return;
       this.yaw -= dx * k;
       this.pitch = clamp(this.pitch - dy * k * (this.invert ? -1 : 1), -1.45, 1.45);
@@ -72,12 +75,12 @@ export class FlightControls {
   triggerGesture() { if (!this.gesture) { this.gesture = true; if (this.onFirstGesture) this.onFirstGesture(); } }
   lock() { try { const r = this.surface.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* la souris marche aussi sans verrou */ } }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
-  release() { this.keys.clear(); this.firing = false; this.btn.fire = this.btn.boost = this.btn.brake = false; this.stick.id = null; this.stick.dx = this.stick.dy = 0; }
+  release() { this.stickP = this.stickR = this.stickY = 0; this.keys.clear(); this.firing = false; this.btn.fire = this.btn.boost = this.btn.brake = false; this.stick.id = null; this.stick.dx = this.stick.dy = 0; }
   setEnabled(v) { if (this.enabled === v) return; this.enabled = v; this.release(); this.dirty = false; if (!v) this.unlock(); }
   get scoreboard() { return this.keys.has('Tab'); }
 
-  aimFrom(fx, fy, fz) { this.yaw = Math.atan2(fx, fz); this.pitch = Math.asin(clamp(fy, -1, 1)); this.dirty = false; }
-  aim() { const c = Math.cos(this.pitch); return { x: c * Math.sin(this.yaw), y: Math.sin(this.pitch), z: c * Math.cos(this.yaw) }; }
+  aimFrom(fx, fy, fz) { this.yaw = this.sYaw = Math.atan2(fx, fz); this.pitch = this.sPitch = Math.asin(clamp(fy, -1, 1)); this.dirty = false; }
+  aim() { const c = Math.cos(this.sPitch); return { x: c * Math.sin(this.sYaw), y: Math.sin(this.sPitch), z: c * Math.cos(this.sYaw) }; }
 
   pollPad(dt) {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [], gp = [...pads].find((p) => p && p.connected);
@@ -95,10 +98,15 @@ export class FlightControls {
     const out = { p: 0, r: 0, y: 0, boost: false, brake: false, fire: false, msl: false, flare: false, free: false, ax: 0, ay: 0, az: 1 };
     const k = this.keys, has = (...c) => c.some((x) => k.has(x));
     if (!this.enabled) { if (me) { const a = this.aim(); out.ax = a.x; out.ay = a.y; out.az = a.z; } return out; }
-    let pitch = (has('KeyS', 'ArrowDown') ? 1 : 0) - (has('KeyZ', 'KeyW', 'ArrowUp') ? 1 : 0);
-    if (this.invert) pitch = -pitch;
-    let roll = (has('KeyD', 'ArrowRight') ? 1 : 0) - (has('KeyQ', 'KeyA', 'ArrowLeft') ? 1 : 0);
-    let yaw = (k.has('KeyL') ? 1 : 0) - (k.has('KeyJ') ? 1 : 0);
+    let keyP = (has('KeyS', 'ArrowDown') ? 1 : 0) - (has('KeyZ', 'KeyW', 'ArrowUp') ? 1 : 0);
+    if (this.invert) keyP = -keyP;
+    const keyR = (has('KeyD', 'ArrowRight') ? 1 : 0) - (has('KeyQ', 'KeyA', 'ArrowLeft') ? 1 : 0);
+    const keyY = (k.has('KeyL') ? 1 : 0) - (k.has('KeyJ') ? 1 : 0);
+    // le clavier pousse un manche virtuel : une tape corrige, un appui long tire à fond
+    this.stickP = keyRamp(this.stickP, keyP, dt, KEY_ATTACK.pitch);
+    this.stickR = keyRamp(this.stickR, keyR, dt, KEY_ATTACK.roll);
+    this.stickY = keyRamp(this.stickY, keyY, dt, KEY_ATTACK.yaw);
+    let pitch = keyCurve(this.stickP), roll = keyCurve(this.stickR), yaw = keyCurve(this.stickY);
     out.boost = has('ShiftLeft', 'ShiftRight') || this.btn.boost;
     out.brake = has('KeyC', 'KeyX') || this.btn.brake;
     out.fire = this.firing || k.has('Space') || this.btn.fire;
@@ -113,6 +121,8 @@ export class FlightControls {
       const direct = pitch !== 0 || roll !== 0 || yaw !== 0, forced = Math.hypot(me.x - CENTER, me.z - CENTER) > ZONE_MAX || me.y > CEILING;
       if (direct || forced || (!this.assist && !this.dirty)) this.aimFrom(me.fx, me.fy, me.fz);
     }
+    const smooth = 1 - Math.exp(-dt / AIM_LAG);
+    this.sYaw += (this.yaw - this.sYaw) * smooth; this.sPitch += (this.pitch - this.sPitch) * smooth;
     const a = this.aim(); out.ax = a.x; out.ay = a.y; out.az = a.z;
     // sans aide au vol, tant que la souris ne vise rien, l'avion garde son attitude : pas de remise à plat
     if (!this.assist && !this.dirty) { out.ax = 0; out.ay = 0; out.az = 0; }

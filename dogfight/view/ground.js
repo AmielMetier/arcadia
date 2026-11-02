@@ -76,12 +76,12 @@ vec3 farLand(vec2 w){ vec2 rg=floor(w/2600.); float th=hs(rg)*1.57,ca=cos(th),sa
   float fw=max(fwidth(u.x)/cell.x,fwidth(u.y)/cell.y); float e=min(min(fr.x,1.-fr.x)*cell.x,min(fr.y,1.-fr.y)*cell.y); c=mix(c,lin(vec3(.2,.26,.15)),(1.-smoothstep(1.5,3.5,e))*step(.35,hs(id*1.3))*(1.-smoothstep(.02,.1,fw))); c=mix(c,avg,smoothstep(.2,.9,fw));
   float fo=fb(w/1500.+.3); c=mix(c,lin(vec3(.15,.22,.13))*(.75+.5*texture2D(uN,w*.021).r),smoothstep(.54,.57,fo)); float vil=smoothstep(.72,.75,fb(w/640.+.7)); c=mix(c,lin(vec3(.58,.5,.44)),vil*.65); return c; }
 void main(){
-  float lm=uTex>.5?0.:landMask(vW.xz); vec3 c=uTex>.5?texture2D(uMap,vU).rgb:uDeep; bool wat=uTex<.5?lm<.5:c.b>c.g*1.02;
+  float lm=uTex>.5?0.:landMask(vW.xz); vec3 c=uTex>.5?texture2D(uMap,vU).rgb:uDeep; float wm=uTex<.5?1.-smoothstep(.35,.65,lm):smoothstep(1.,1.07,c.b/max(c.g,.001));
   vec3 V=normalize(uCam-vW); float d=length(uCam-vW);
   if(uTex<.5&&lm>0.) c=mix(c,farLand(vW.xz),lm);
-  if(!wat&&uTex>.5) c*=.86+.28*texture2D(uN,vW.xz*.021).r;
-  if(wat){ vec2 p=vW.xz*.012; float n1=texture2D(uN,p).r-.5,n2=texture2D(uN,p*3.1+.3).r-.5; vec3 N=normalize(vec3((n1+n2*.5)*.09,1.,(n2+n1*.4)*.09)); float fr=pow(1.-max(dot(N,V),0.),3.5);
-    vec3 R=reflect(-V,N); vec3 skyc=mix(uHaze,vec3(.13,.3,.55),smoothstep(0.,.5,R.y)); c=mix(c,skyc,.12+.8*fr); c+=vec3(1.,.93,.8)*pow(max(dot(R,uSun),0.),260.)*1.6; }
+  if(uTex>.5) c*=mix(.86+.28*texture2D(uN,vW.xz*.021).r,1.,wm);
+  if(wm>0.){ vec2 p=vW.xz*.012; float n1=texture2D(uN,p).r-.5,n2=texture2D(uN,p*3.1+.3).r-.5; vec3 N=normalize(vec3((n1+n2*.5)*.09,1.,(n2+n1*.4)*.09)); float fr=pow(1.-max(dot(N,V),0.),3.5);
+    vec3 R=reflect(-V,N); vec3 skyc=mix(uHaze,vec3(.13,.3,.55),smoothstep(0.,.5,R.y)); c=mix(c,skyc,(.12+.8*fr)*wm); c+=vec3(1.,.93,.8)*pow(max(dot(R,uSun),0.),260.)*1.6*wm; }
   float f=1.-exp(-pow(d*uFogD,1.45)); float sa=pow(max(dot(-V,uSun),0.),6.); vec3 h=mix(uHaze,vec3(1.,.93,.84),sa*.4); c=mix(c,h,f);
   gl_FragColor=vec4(c,1.);
   #include <tonemapping_fragment>
@@ -146,8 +146,15 @@ export function buildGround(scene, map, sun, noiseTex, anisotropy = 8) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
   const island = new THREE.Mesh(geo, islandMat);
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2).translate(800, -0.4, 800), seaMat);
+  // la mer de décor s'arrête au bord de la carte, à la même hauteur et de la même couleur que l'eau de l'île :
+  // si elle passait dessous, les deux surfaces se disputeraient chaque pixel et le rivage scintillerait
+  const [dr, dg, db] = canvas.getContext('2d').getImageData(1, 1, 1, 1).data;
+  shared.uDeep.value.setRGB(dr / 255, dg / 255, db / 255, THREE.SRGBColorSpace);
+  const E = (n - 1) * STEP * 2, IN = 8, OUT = 20000, A = -OUT, B = E + OUT;
+  const seaPos = [[A, B, A, IN], [A, B, E - IN, B], [A, IN, IN, E - IN], [E - IN, B, IN, E - IN]].flatMap(([x0, x1, z0, z1]) => [x0, 0, z0, x0, 0, z1, x1, 0, z0, x1, 0, z0, x0, 0, z1, x1, 0, z1]);
+  const seaGeo = new THREE.BufferGeometry(); seaGeo.setAttribute('position', new THREE.Float32BufferAttribute(seaPos, 3));
+  const sea = new THREE.Mesh(seaGeo, seaMat);
   const buildings = buildBuildings(map), trees = buildTrees(map);
   scene.add(island, sea, buildings, trees);
-  return { canvas, trees, update(camPos) { shared.uCam.value.copy(camPos); }, dispose() { geo.dispose(); islandMat.dispose(); seaMat.dispose(); tex.dispose(); buildings.geometry.dispose(); buildings.material.dispose(); } };
+  return { canvas, trees, update(camPos) { shared.uCam.value.copy(camPos); }, dispose() { geo.dispose(); seaGeo.dispose(); islandMat.dispose(); seaMat.dispose(); tex.dispose(); buildings.geometry.dispose(); buildings.material.dispose(); } };
 }
