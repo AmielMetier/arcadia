@@ -42,6 +42,7 @@ function boot(info = {}, forcedMode = null) {
   const settings = H.embedded ? (info.settings || H.info.settings || {}) : {
     timer: qs.get('timer') || 25,
     gen: qs.get('gen') || 'all',
+    format: qs.get('format') || 'single',
     bots: qs.get('bots') ?? 1,
     final: qs.get('final') ?? 3,
     level: qs.get('level') || 'normal'

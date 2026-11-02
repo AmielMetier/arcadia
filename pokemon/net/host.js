@@ -8,8 +8,12 @@ import {
   openPreview, setReady, buildBattle, recordGame, koCredits, markGone, isOver, currentMatch,
   getParticipant, sideOf, placeOf,
 } from '../engine/tournament.js';
-import { resolveTurn, forceSwitch, estimateTurnDuration } from '../engine/battle.js';
-import { chooseBotAction, chooseBestSwitch } from '../engine/bot.js';
+import { resolveTurn, resolveActions, forceSwitch, estimateTurnDuration, runEntry, sidesOf, teamKey } from '../engine/battle.js';
+import { chooseBotAction, chooseBestSwitch, chooseDoublesAction, chooseDoublesSwitch } from '../engine/bot.js';
+
+// Combat en double (VGC) : un joueur (A ou B) commande deux emplacements (A et C, ou B et D)
+const slotsOf = (b, side) => sidesOf(b).filter((s) => teamKey(s) === side);
+const botPair = (b, side, level) => ({ type: 'pair', acts: Object.fromEntries(slotsOf(b, side).map((s) => [s, chooseDoublesAction(b, s, level)])) });
 
 const DRAFT_SECS = 50;
 const REVEAL_SECS = 8;     // premier affichage de l'arbre après le draft
@@ -119,6 +123,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       gen: settings.gen || 'all',
       bots: settings.bots !== undefined ? Number(settings.bots) : 1,
       finalBestOf: settings.final !== undefined ? Number(settings.final) : 3,
+      format: settings.format || 'single',
     });
     setDeadline(DRAFT_SECS, endDraft);
     broadcast();
@@ -165,9 +170,9 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     battle = buildBattle(t, m);
     credits = [];
     pending = { A: null, B: null };
-    const introEvents = ['A', 'B'].map((side) => {
-      const p = side === 'A' ? battle.teamA[0] : battle.teamB[0];
-      const tr = side === 'A' ? battle.trainerA : battle.trainerB;
+    const introEvents = sidesOf(battle).map((side) => {
+      const p = battle.teamA && (teamKey(side) === 'A' ? battle.teamA : battle.teamB)[battle['active' + side]];
+      const tr = teamKey(side) === 'A' ? battle.trainerA : battle.trainerB;
       return {
         type: 'switch', side, pokemonId: p.id, name: p.name, hp: p.hp, maxHp: p.maxHp,
         types: p.types, status: null, trainer: tr.name, msg: `${tr.name} envoie ${p.name} !`,
@@ -178,6 +183,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     broadcast();
     after(SPLASH_MS, () => {
       intro = false;
+      introEvents.push(...runEntry(battle));   // Intimidation, météo… dès l'arrivée sur le terrain
       broadcast(introEvents);
       after(estimateTurnDuration(introEvents), startTurn);
     });
@@ -192,12 +198,12 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     for (const side of ['A', 'B']) {
       const tr = side === 'A' ? b.trainerA : b.trainerB;
       if (tr.bot) after(900 + Math.random() * 1000, () => {
-        if (battle === b && b.phase === 'choose' && !pending[side]) submit(side, chooseBotAction(b, side, difficulty));
+        if (battle === b && b.phase === 'choose' && !pending[side]) submit(side, b.doubles ? botPair(b, side, difficulty) : chooseBotAction(b, side, difficulty));
       });
     }
     turnTimer = setTimeout(() => {
       if (!alive || battle !== b || b.phase !== 'choose') return;
-      for (const side of ['A', 'B']) if (!pending[side]) pending[side] = chooseBotAction(b, side, 'facile');
+      for (const side of ['A', 'B']) if (!pending[side]) pending[side] = b.doubles ? botPair(b, side, 'facile') : chooseBotAction(b, side, 'facile');
       resolve();
     }, timerSecs * 1000);
     broadcast();
@@ -207,6 +213,16 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     const b = battle;
     if (!b || t.phase !== 'battle' || !action) return;
 
+    // Double : remplacement d'un emplacement (action.slot) après un K.O. ou un Demi-Tour
+    if (b.doubles && b.phase === 'switch_forced') {
+      const slot = action.slot || (b.need || []).find((s) => teamKey(s) === side);
+      if (action.type !== 'switch' || !slot || teamKey(slot) !== side || !b.need.includes(slot)) return;
+      const ev = forceSwitch(b, slot, action.targetIndex);
+      if (!ev) return;
+      if (b.phase === 'choose') { clearTurn(); const evs = [ev, ...runEntry(b)]; broadcast(evs); after(estimateTurnDuration(evs), startTurn); }
+      else broadcast([ev]);
+      return;
+    }
     // Remplacement après un K.O.
     if (b.phase.startsWith('switch_forced')) {
       const needs = b.phase === 'switch_forced_both' || b.phase === `switch_forced_${side}`;
@@ -215,8 +231,9 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       if (!ev) return;
       if (b.phase === 'choose') {
         clearTurn();
-        broadcast([ev]);
-        after(estimateTurnDuration([ev]), startTurn);
+        const evs = [ev, ...runEntry(b)];
+        broadcast(evs);
+        after(estimateTurnDuration(evs), startTurn);
       } else {
         broadcast([ev]);
       }
@@ -224,7 +241,13 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     }
 
     if (b.phase !== 'choose' || pending[side]) return;
-    if (action.type !== 'move' && action.type !== 'switch') return;
+    if (b.doubles) {
+      // une action par emplacement du joueur ; ce qui manque est choisi pour lui
+      if (action.type !== 'pair' || !action.acts) return;
+      const acts = {};
+      for (const s of slotsOf(b, side)) { const a = action.acts[s]; acts[s] = a && (a.type === 'move' || a.type === 'switch') ? a : chooseDoublesAction(b, s, 'facile'); }
+      action = { type: 'pair', acts };
+    } else if (action.type !== 'move' && action.type !== 'switch') return;
     pending[side] = action;
     broadcast();
     if (pending.A && pending.B) {
@@ -240,7 +263,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     const actB = pending.B;
     pending = { A: null, B: null };
     clearTurn();
-    const { state, events } = resolveTurn(b, actA, actB);
+    const { state, events } = b.doubles ? resolveActions(b, { ...(actA && actA.acts), ...(actB && actB.acts) }) : resolveTurn(b, actA, actB);
     battle = state;
     credits.push(...koCredits(battle, events));
     broadcast(events);
@@ -255,6 +278,24 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
   function forcedSwitches() {
     const b = battle;
     if (!b || !b.phase.startsWith('switch_forced')) return;
+    if (b.doubles) {
+      // bots : remplaçants tout de suite ; humains : chrono, puis choix automatique
+      let humanWaits = false;
+      for (const slot of [...b.need]) {
+        const tr = teamKey(slot) === 'A' ? b.trainerA : b.trainerB;
+        if (tr.bot) after(700 + Math.random() * 500, () => { if (battle !== b || !b.need.includes(slot)) return; const sw = chooseDoublesSwitch(b, slot); if (sw) submit(teamKey(slot), { ...sw, slot }); });
+        else humanWaits = true;
+      }
+      if (!humanWaits) return;
+      clearTurn();
+      turnEndsAt = Date.now() + timerSecs * 1000;
+      turnTimer = setTimeout(() => {
+        if (!alive || battle !== b || b.phase !== 'switch_forced') return;
+        for (const slot of [...b.need]) { const sw = chooseDoublesSwitch(b, slot); if (sw) submit(teamKey(slot), { ...sw, slot }); }
+      }, timerSecs * 1000);
+      broadcast();
+      return;
+    }
     const sides = b.phase === 'switch_forced_both' ? ['A', 'B'] : [b.phase.slice(-1)];
     let humanWaits = false;
     for (const side of sides) {
@@ -338,11 +379,11 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
         }
         break;
       case 'lead':
-        if (t.phase === 'preview' && side && !t.ready[side]) leadPick[side] = Number(m.idx);
+        if (t.phase === 'preview' && side && !t.ready[side]) leadPick[side] = Array.isArray(m.idx) ? m.idx.map(Number) : Number(m.idx);
         break;
       case 'ready':
         if (t.phase === 'preview' && side && !t.ready[side]) {
-          if (m.idx != null) leadPick[side] = Number(m.idx);
+          if (m.idx != null) leadPick[side] = Array.isArray(m.idx) ? m.idx.map(Number) : Number(m.idx);
           setReady(t, side, null);
           broadcast();
           if (t.ready.A && t.ready.B) { clearPhase(); setTimeout(() => alive && startGame(), 700); }

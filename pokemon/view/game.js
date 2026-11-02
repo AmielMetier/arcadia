@@ -3,15 +3,16 @@
 // selon l'état diffusé par l'hôte. L'arène de combat (sprites Showdown animés, barres de PV progressives,
 // paliers de stats, PP réels, journal, déroulement séquentiel des tours) vit ici ; les autres écrans dans screens.js.
 
-import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
+import { spriteUrls, POKEBALL_SPRITE, isLegendary } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { ITEMS, CHOICE, cleanItems } from '../engine/items.js';
 import { ABILITIES } from '../engine/abilities.js';
 
 /** Badge du talent (survol : son effet) */
+import { describeMove, tipText, tipAttr, installTips } from './tips.js';
 function abilityBadge(p) {
   const a = p && ABILITIES[p.ability];
-  return a ? `<span class="sc-ability" title="${a.name} : ${a.desc}">${a.name}</span>` : '';
+  return a ? `<span class="sc-ability" ${tipAttr(tipText(a.name, a.desc))}>${a.name}</span>` : '';
 }
 /** Bandeau du talent, comme dans les jeux : il glisse depuis le côté du Pokémon puis repart */
 function showAbilityBanner(key, pokeName, abilityName) {
@@ -24,11 +25,12 @@ function showAbilityBanner(key, pokeName, abilityName) {
   d.animate([{ transform: `translateX(${from})`, opacity: 0 }, { transform: 'none', opacity: 1, offset: 0.15 }, { transform: 'none', opacity: 1, offset: 0.85 }, { transform: `translateX(${from})`, opacity: 0 }],
     { duration: 1700, easing: 'ease-out' }).finished.then(() => d.remove(), () => d.remove());
 }
-const WEATHER_LABEL = { rain: '🌧️ Pluie', sun: '☀️ Soleil', sand: '🌪️ Tempête de sable', wind: '🌬️ Vents violents' };
+const WEATHER_LABEL = { rain: '🌧️ Pluie', sun: '☀️ Soleil', sand: '🌪️ Tempête de sable', wind: '🌬️ Vents violents', hail: '🌨️ Grêle' };
 function weatherTag(w) { return w && w.type ? `<span class="bw-weather w-${w.type}">${WEATHER_LABEL[w.type]}${w.type !== 'wind' && w.turns ? ` · ${w.turns} t.` : ''}</span>` : ''; }
 
 /** Objet Choix : seule l'attaque bloquée reste disponible (tant qu'elle a des PP). */
 function choiceBlocked(p, moveId) {
+  const lk = p && (p.rampage || p.charging); if (lk && lk.move !== moveId) return true;   // Colère, Lance-Soleil en charge   // Colère : même attaque jusqu'au bout
   if (!p || !CHOICE.has(p.item) || !p.choiceLock || p.choiceLock === moveId) return false;
   const pp = p.ppMap ? p.ppMap[p.choiceLock] : 1;
   return p.moves.includes(p.choiceLock) && pp > 0;
@@ -39,11 +41,12 @@ function itemBadge(p) {
   const it = p && ITEMS[p.item];
   if (!it) return '';
   const lock = CHOICE.has(p.item) && p.choiceLock && MOVES[p.choiceLock] ? ` · bloqué sur ${MOVES[p.choiceLock].name}` : '';
-  return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" title="${it.name} : ${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}"><img src="${it.icon}" alt="">${it.name}</span>`;
+  return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" ${tipAttr(tipText(it.name, `${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}`))}><img src="${it.icon}" alt="">${it.name}</span>`;
 }
 import { STAGE_MULTS, canMega } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
-import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
+import { getParticipant, currentMatch, TEAM_SIZE, teamSizeOf, isVgc, VGC_BRING } from '../engine/tournament.js';
+import { createDoublesView } from './doubles.js';
 import { sfx } from './sfx.js';
 import { createFx } from './fx.js';
 import { eventMs, drainMs, damageText, typeMs, TYPE_MS } from '../engine/timing.js';
@@ -71,6 +74,7 @@ const STAT_SHORT = {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, submitAction, isHost, switchMode, exit }) {
+  installTips();
   root.className = 'poke-root tz-root';
   root.innerHTML = `
     <div class="tz-backdrop" aria-hidden="true"><i class="beam b1"></i><i class="beam b2"></i><i class="beam b3"></i></div>
@@ -108,6 +112,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   const $ = (s) => root.querySelector(s);
   const stage = $('#pokeStage');
+  // combat en double (VGC) : écran à part
+  const vgc = createDoublesView({ stage, me, submitAction, sfx, now: () => Date.now() + clockOff });
 
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
@@ -602,6 +608,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     const isSubmitted = mySide === 'A' ? s.submittedA : mySide === 'B' ? s.submittedB : false;
     // Marque Ombre adverse : impossible de changer de Pokémon (sauf Spectre)
     const trapped = (() => { if (!mySide) return false; const me2 = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB], foe2 = mySide === 'A' ? b.teamB[b.activeB] : b.teamA[b.activeA];
+      if (me2 && (me2.rampage || me2.charging)) return true;
       return !!(foe2 && !foe2.fainted && foe2.ability === 'shadow-tag' && me2 && !me2.fainted && !me2.types.includes('ghost')); })();
     const isForcedSwitch = (mySide === 'A' && b.phase === 'switch_forced_A') ||
                            (mySide === 'B' && b.phase === 'switch_forced_B') ||
@@ -617,7 +624,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
     let announcement = '';
     if (isForcedSwitch) {
-      announcement = 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
+      announcement = pBottom && !pBottom.fainted ? `${pBottom.name} revient : choisissez le Pokémon qui prend le relais !` : 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
     } else if (b.phase === 'switch_forced_A' || b.phase === 'switch_forced_B') {
       announcement = "En attente du Pokémon de l'adversaire...";
     } else if (isSubmitted) {
@@ -759,7 +766,11 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const aliveCount = teamBottom.filter(p => !p.fainted).length;
       // Pas encore de chrono (écran VS, envoi des Pokémon) : les choix ne sont pas encore ouverts
       const notYet = !s.turnEndsAt;
-      dash.innerHTML = isSpectator ? `
+      // L'adversaire choisit son remplaçant : pas d'attaques à l'écran, juste l'attente
+      const foeChoosing = !isSpectator && !isForcedSwitch && String(b.phase).startsWith('switch_forced');
+      dash.innerHTML = foeChoosing ? `
+        <div class="bw-foe-wait"><span class="bw-foe-ball"></span><b>${esc(tTop.name)} choisit son Pokémon…</b><small>Tu pourras attaquer dès qu'il sera sur le terrain.</small></div>
+      ` : isSpectator ? `
         <div class="bw-spect">
           <span class="bw-live">EN DIRECT</span>
           <span><b>${esc(tBottom.name)}</b> contre <b>${esc(tTop.name)}</b></span>
@@ -784,7 +795,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
                 return `
                   <button class="bw-move ${choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'choice-locked' : ''}" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 || choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'disabled' : ''}
-                    title="${esc(m.name)} · puissance ${m.power || '—'} · précision ${m.acc}%">
+                    ${tipAttr(describeMove(m))}>
                     <span class="pm-key">${mIdx + 1}</span>
                     <span class="bw-move-name">${esc(m.name)}</span>
                     <span class="bw-move-meta">
@@ -866,8 +877,12 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     toggleDraft(dex) {
       const i = local.draft.indexOf(dex);
       if (i >= 0) local.draft.splice(i, 1);
-      else if (local.draft.length < TEAM_SIZE) local.draft.push(dex);
-      else { local.draft.shift(); local.draft.push(dex); }
+      else {
+        // un seul légendaire : choisir un autre légendaire remplace le premier
+        if (isLegendary(dex)) { const j = local.draft.findIndex(isLegendary); if (j >= 0) local.draft.splice(j, 1); }
+        if (local.draft.length < teamSizeOf(state && state.t)) local.draft.push(dex);
+        else { local.draft.shift(); local.draft.push(dex); }
+      }
       sfx.play('switch');
       ctx.rerender();
     },
@@ -879,17 +894,27 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       ctx.rerender();
     },
     submitDraft() {
-      if (local.draft.length !== TEAM_SIZE) return;
+      if (local.draft.length !== teamSizeOf(state && state.t)) return;
       sfx.play('levelup');
       draft([...local.draft], cleanItems(local.draft, local.items));
     },
     pickLead(idx) {
-      local.lead = idx;
-      lead(idx);
+      if (state && isVgc(state.t)) {
+        // VGC : on compose la liste des 4 dans l'ordre ; un Pokémon déjà choisi se retire
+        const cur = Array.isArray(local.lead) ? [...local.lead] : [];
+        const j = cur.indexOf(idx);
+        if (j >= 0) cur.splice(j, 1); else if (cur.length < VGC_BRING) cur.push(idx);
+        local.lead = cur;
+        if (cur.length === VGC_BRING) lead(cur);
+      } else {
+        local.lead = idx;
+        lead(idx);
+      }
       sfx.play('switch');
       ctx.rerender();
     },
     sendReady() {
+      if (state && isVgc(state.t) && !(Array.isArray(local.lead) && local.lead.length === VGC_BRING)) return;
       sfx.play('hit');
       ready(local.lead);
     },
@@ -924,6 +949,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   function headerTitle(s) {
     const t = s.t;
+    const badge = root.querySelector('.poke-badge');
+    if (badge) badge.textContent = isVgc(t) ? 'VGC 2v2' : 'TOURNOI 3v3';
     const m = currentMatch(t);
     const el = $('#pokeRoundTitle');
     if (!el) return;
@@ -982,7 +1009,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const fill = $('#timerFill');
       const txt = $('#timerText');
       if (fill && txt) {
-        if (!state.turnEndsAt || isResolvingTurn) {
+        if (!state.turnEndsAt || isResolvingTurn || vgc.isResolving()) {
           fill.style.width = '100%';
           txt.textContent = '—';
           fill.parentElement.classList.remove('urgent');
@@ -1005,7 +1032,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     if (s.phase === 'draft') {
       const meP = getParticipant(s.t, me.id);
       if (!meP || meP.team) return;
-      const n = Number(e.key);
+      const n = e.key === '0' ? 10 : Number(e.key);
       if (n >= 1 && n <= meP.offer.length) ctx.toggleDraft(meP.offer[n - 1]);
       else if (e.key === 'Enter') ctx.submitDraft();
       return;
@@ -1015,7 +1042,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const side = m && (String(m.a) === String(me.id) ? 'A' : String(m.b) === String(me.id) ? 'B' : null);
       if (!side || s.t.ready[side]) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= TEAM_SIZE) ctx.pickLead(n - 1);
+      if (n >= 1 && n <= teamSizeOf(s.t)) ctx.pickLead(n - 1);
       else if (e.key === 'Enter') ctx.sendReady();
       return;
     }
@@ -1023,7 +1050,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       if (e.key === 'Enter') { const b = $('#smGo'); if (b && !b.disabled) b.click(); }
       return;
     }
-    if (s.phase !== 'battle' || !s.battle || isResolvingTurn) return;
+    if (s.phase !== 'battle' || !s.battle || isResolvingTurn || s.battle.doubles) return;
     const b = s.battle;
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     if (!mySide) return;
@@ -1060,7 +1087,13 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       state = s;
       music(s);
 
-      if (s.phase === 'battle') {
+      if (s.phase === 'battle' && s.battle && s.battle.doubles) {
+        if (lastPhase && lastPhase !== 'battle') showSplash(s);
+        headerTitle(s);
+        if (battleMusic.musicEnabled) battleMusic.start(s.isFinal ? 'cynthia' : 'sandstorm');
+        vgc.update(s);
+        lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
+      } else if (s.phase === 'battle') {
         if (lastPhase && lastPhase !== 'battle') showSplash(s);
         if (s.evSeq > lastEvSeq && s.events && s.events.length) evQueue.push(s);
         lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
@@ -1072,6 +1105,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       } else {
         if (lastPhase === 'battle') {
           // On quitte l'arène : on coupe une animation en cours et on remet l'arène à zéro
+          vgc.reset(); vgc.syncSeq(s.evSeq);
           animGen++;
           isResolvingTurn = false;
           evQueue.length = 0;

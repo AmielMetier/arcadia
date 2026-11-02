@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.35 — 2 novembre 2026
+## 3.41 — 2 novembre 2026
 - **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
   - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.
   - Frappe, arme un gros coup ou place un coup de pied sauté. Les coups à la tête assomment plus vite.
@@ -8,6 +8,49 @@
   - En tombant, rattrape-toi à un rebord et hisse-toi. Mais tes bras fatiguent vite.
   - Trois arènes : les toits et leur planche, le chantier et son boulet, l'usine et ses tapis qui mènent au vide sous un pilon.
   - Jusqu'à 6 joueurs et 8 pantins avec les bots, sur ordinateur, téléphone ou manette.
+
+## 3.40 — 2 novembre 2026
+- **Poké Duel** — Nouveau format VGC, en 2 contre 2 : à choisir dans les réglages du salon (« Format »).
+  - Au draft, tu gardes 6 Pokémon sur 12. Avant chaque manche, tu en choisis 4 dans l'ordre : les 2 premiers commencent sur le terrain, les 2 autres attendent en réserve.
+  - En combat, chacun de tes deux Pokémon choisit son action, puis sa cible.
+  - Les attaques de zone touchent les deux adversaires (Éboulement, Éclat Magique, Blizzard…), ou même ton allié (Séisme, Surf), avec des dégâts ×0,75.
+  - Chaque Pokémon a Abri en plus de ses attaques : il bloque tout pendant un tour, mais rate de plus en plus si on l'enchaîne.
+  - Intimidation baisse l'Attaque des deux adversaires. Un Pokémon K.O. est remplacé tant qu'il en reste en réserve.
+  - Les bots savent jouer en double : ils visent la bonne cible, utilisent les attaques de zone sans trop blesser leur allié, et sortent Abri au bon moment.
+
+## 3.39 — 2 novembre 2026
+- **Poké Duel** — Au draft, 12 Pokémon sont proposés au lieu de 6, et une équipe ne peut avoir qu'un seul légendaire (marqué LÉGENDAIRE sur sa carte).
+- **Poké Duel** — Passe la souris sur une attaque, un talent ou un objet pour voir ce qu'il fait : type, catégorie, puissance, précision et effets.
+- **Poké Duel** — Quand l'adversaire choisit son remplaçant, tes attaques ne s'affichent plus : un écran d'attente les remplace jusqu'à son arrivée.
+
+## 3.38 — 2 novembre 2026
+- **Poké Duel** — L'effet de la météo s'affiche : « Le soleil renforce l'attaque ! » ou « La pluie affaiblit l'attaque... » apparaît quand une attaque Feu ou Eau est boostée (×1,5) ou affaiblie (×0,5).
+
+## 3.37 — 2 novembre 2026
+- **Poké Duel** — 320 nouveaux Pokémon : toutes les évolutions finales de la 1re à la 6e génération, légendaires compris (381 Pokémon en tout).
+  - Chacun a ses vraies stats, 4 attaques choisies dans ce qu'il peut apprendre (attaques de son type, couverture, boost ou soin) et son meilleur talent.
+  - 107 nouvelles attaques (Mégacorne, Casse-Brique, Poing Ombre, Fracass'Tête, Tranch'Air…) et une trentaine de nouveaux talents : Farceur, Protéen, Contestation, Garde Mystik, Déclic Tactique, Aura Féérique, Aura Ténébreuse, Toison Épaisse, Amour Filial, Lentiteintée, Sérénité, Absentéisme, Début Calme…
+  - La grêle arrive avec Alerte Neige : elle blesse tout le monde sauf les Glace, et Blizzard touche à coup sûr.
+  - Toutes les Méga-Évolutions de la 6G : 21 nouvelles, dont Méga-Kangourex, Méga-Mysdibule, Méga-Altaria, Méga-Latios, Méga-Lockpin et Méga-Diancie.
+  - Nouveau choix de génération dans les réglages du tournoi : toutes, les iconiques, Kanto, Johto et Hoenn, Sinnoh, Unys ou Kalos.
+- **Poké Duel** — Les coups critiques sont plus rares : 1 chance sur 24 au lieu de 1 sur 16, comme dans les jeux récents.
+
+## 3.36 — 2 novembre 2026
+- **Poké Duel** — Toutes les attaques ont maintenant leur vrai effet :
+  - Ultralaser oblige à se recharger au tour suivant ; Lance-Soleil prend un tour pour absorber la lumière, sauf au soleil.
+  - Coup Bas échoue si l'adversaire ne prépare pas une attaque.
+  - Choc Psy frappe la Défense, pas la Défense Spéciale.
+  - Fatal-Foudre et Vent Violent touchent à coup sûr sous la pluie ; Vent Violent (30 %) et Vibraqua (20 %) peuvent rendre confus.
+  - Éco-Sphère, Telluriforce, Bourdon, Luminocanon et Exploforce peuvent baisser la Défense Spéciale ; Pouvoir Lunaire l'Attaque Spéciale ; Câlinerie l'Attaque ; Poing Météore peut monter l'Attaque du lanceur.
+
+## 3.35 — 2 novembre 2026
+- **Poké Duel** — La musique de combat se lance enfin : Sandstorm (et le thème de la finale) démarrent dès l'arrivée en combat, sans qu'il faille cliquer.
+- **Poké Duel** — Intimidation, Sécheresse, Crachin, Sable Volant et les autres talents d'arrivée s'activent dès que le Pokémon apparaît sur le terrain, avant que tu choisisses ton attaque.
+- **Poké Duel** — Des attaques qui ne faisaient rien de spécial ont maintenant leur vrai effet :
+  - Colère frappe 2 ou 3 tours d'affilée (impossible de changer d'attaque ou de Pokémon), puis le lanceur devient confus.
+  - Demi-Tour et Change-Éclair : après le coup, ton Pokémon revient et tu choisis celui qui prend le relais.
+  - Atterrissage échoue si le Pokémon a déjà tous ses PV.
+- **Poké Duel** — Méga-Évolution : la nouvelle Vitesse compte bien dès le tour de l'évolution (vérifié par un test).
 
 ## 3.34 — 31 octobre 2026
 - **Poké Duel** — Le bouton Méga-Évolution ne décale plus les attaques dans la colonne de droite : il se place au-dessus d'elles.

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { ABILITIES, abilityOf } from '../pokemon/engine/abilities.js';
 import { POKEMON_ROSTER, getPokemonById, createActivePokemon } from '../pokemon/engine/data.js';
-import { createBattle, resolveTurn, forceSwitch, calculateDamage, getEffectiveSpeed } from '../pokemon/engine/battle.js';
+import { createBattle, resolveTurn, forceSwitch, calculateDamage, getEffectiveSpeed, runEntry } from '../pokemon/engine/battle.js';
 import { chooseBotAction, chooseBestSwitch } from '../pokemon/engine/bot.js';
 import { suggestItems } from '../pokemon/engine/items.js';
 import { MEGAS } from '../pokemon/engine/megas.js';
@@ -24,10 +24,29 @@ for (const list of Object.values(MEGAS)) for (const m of list) ok(!abilityOf(m.p
 console.log(`✓ ${POKEMON_ROSTER.length} Pokémon, chacun avec un talent qui a un effet en combat`);
 
 // --- effets
-{ // Intimidation à l'arrivée
+{ // Intimidation dès l'arrivée sur le terrain (avant le premier choix), puis au remplaçant après un K.O.
   const b = battle([mon(130, { ability: 'intimidate' })], [mon(143, { ability: 'thick-fat' })]);
+  ok(runEntry(b).some((e) => e.ability === 'intimidate') && b.teamB[0].statStages.atk === -1, 'Intimidation dès l\'arrivée');
   resolveTurn(b, pass, pass);
-  ok(b.teamB[0].statStages.atk === -1, 'Intimidation baisse l\'Attaque adverse');
+  ok(b.teamB[0].statStages.atk === -1, 'Intimidation ne rejoue pas au tour suivant');
+}
+{ // Colère : 2-3 tours, puis confusion ; Demi-Tour : choix du remplaçant
+  const b = battle([mon(149, { ability: null })], [mon(143, { ability: null, hp: 9999, maxHp: 9999 })]);
+  b.teamA[0].moves[0] = 'outrage'; b.teamA[0].ppMap.outrage = 10;
+  let n2 = 0; resolveTurn(b, move('outrage'), pass);
+  while (b.teamA[0].rampage && n2++ < 5) resolveTurn(b, move(b.teamA[0].moves[1]), pass);
+  ok(n2 >= 1 && n2 <= 2 && b.teamA[0].confused > 0, 'Colère : 2 ou 3 tours puis confusion');
+  const c = battle([mon(149, { ability: null }), mon(6, { ability: null })], [mon(143, { ability: null })]);
+  c.teamA[0].moves[0] = 'u_turn'; c.teamA[0].ppMap.u_turn = 20;
+  resolveTurn(c, move('u_turn'), pass);
+  ok(c.phase === 'switch_forced_A' && chooseBotAction(c, 'A').targetIndex === 1, 'Demi-Tour : le lanceur laisse sa place');
+}
+{ // Méga-Évolution : la nouvelle Vitesse compte dès le tour de l'évolution
+  const f = MEGAS[65][0], a = mon(65, { item: f.stone, ability: null }), d = mon(65, { ability: null });
+  d.stats = { ...d.stats, spe: Math.round((a.stats.spe + f.stats.spe) / 2) };
+  const b = battle([a], [d]);
+  const { events } = resolveTurn(b, { type: 'move', moveId: a.moves[0], mega: true }, move(d.moves[0]));
+  ok(events.find((e) => e.type === 'attack_start').side === 'A', 'Méga : plus rapide dès ce tour');
 }
 { // Sécheresse : soleil, Feu ×1,5
   const b = battle([mon(383, { ability: 'drought' })], [mon(143, { ability: null })]);
@@ -87,7 +106,26 @@ console.log(`✓ ${POKEMON_ROSTER.length} Pokémon, chacun avec un talent qui a 
   const k = mon(62, { ability: 'swift-swim' });
   ok(getEffectiveSpeed(k, { weather: { type: 'rain' }, teamA: [k], teamB: [], activeA: 0, activeB: 0 }) === getEffectiveSpeed(k) * 2, 'Glissade : Vitesse ×2 sous la pluie');
 }
-console.log('✓ effets : Intimidation, Sécheresse et météo, Lévitation, Absorb Eau, Coloforce, Multiécaille, Turbo, Fermeté, Garde Magik, Corps Sain, Glissade');
+{ // Garde Mystik, Contestation, Farceur, Déclic Tactique, grêle
+  const n1 = battle([mon(6, { ability: null })], [mon(292, { ability: 'wonder-guard' })]);
+  ok(calculateDamage(n1.teamA[0], n1.teamB[0], MOVES.surf, n1).damage === 0 && calculateDamage(n1.teamA[0], n1.teamB[0], MOVES.flamethrower, n1).damage > 0, 'Garde Mystik : seules les attaques super efficaces');
+  const c = battle([mon(143, { ability: null })], [mon(687, { ability: 'contrary' })]);
+  c.teamA[0].moves[0] = 'growl'; c.teamA[0].ppMap.growl = 40;
+  resolveTurn(c, move('growl'), pass);
+  ok(c.teamB[0].statStages.atk === 1, 'Contestation : Rugissement monte l\'Attaque');
+  const pr = battle([mon(143, { ability: 'prankster' })], [mon(101 > 0 ? 65 : 65, { ability: null })]);
+  pr.teamA[0].moves[0] = 'thunder_wave'; pr.teamA[0].ppMap.thunder_wave = 20;
+  const { events } = resolveTurn(pr, move('thunder_wave'), move(pr.teamB[0].moves[0]));
+  ok(events.find((e) => e.type === 'attack_start').side === 'A', 'Farceur : statut en priorité');
+  const ae = battle([mon(681, { ability: 'stance-change' })], [mon(143, { ability: null, hp: 9999, maxHp: 9999 })]);
+  const def0 = ae.teamA[0].stats.def;
+  resolveTurn(ae, move(ae.teamA[0].moves.find((k) => MOVES[k].power)), pass);
+  ok(ae.teamA[0].blade && ae.teamA[0].stats.atk === def0, 'Déclic Tactique : Forme Assaut');
+  const h = battle([mon(460, { ability: 'snow-warning' })], [mon(143, { ability: null })]);
+  runEntry(h); const hp = h.teamB[0].hp; resolveTurn(h, pass, pass);
+  ok(h.weather.type === 'hail' && h.teamB[0].hp < hp, 'Alerte Neige : la grêle blesse');
+}
+console.log('✓ effets : Intimidation, Sécheresse et météo, Lévitation, Absorb Eau, Coloforce, Multiécaille, Turbo, Fermeté, Garde Magik, Corps Sain, Glissade, Garde Mystik, Contestation, Farceur, Déclic Tactique, Alerte Neige');
 
 // --- combats complets entre bots
 const ids = POKEMON_ROSTER.map((p) => p.id), seen = new Set();

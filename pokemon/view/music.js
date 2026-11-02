@@ -14,61 +14,47 @@ class BattleMusicPlayer {
   get musicEnabled() { return DDVolume.get('music') > 0; }
 
   getTrackPath(trackName) {
-    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3?v=3.34';
-    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3?v=3.34';
-    return 'assets/bgm_sandstorm.mp3?v=3.34'; // Thème Sandstorm culte par défaut
+    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3?v=3.35';
+    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3?v=3.35';
+    return 'assets/bgm_sandstorm.mp3?v=3.35'; // Thème Sandstorm culte par défaut
+  }
+
+  // Un seul lecteur <audio> pour toute la partie : une fois débloqué par un clic, il le reste
+  // (Safari et Chrome refusent de lancer un NOUVEAU lecteur sans clic : c'est ce qui coupait Sandstorm au début du combat).
+  player() {
+    if (this.audio) return this.audio;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.addEventListener('ended', () => {
+      if (!this.wanted || this.audio !== a) return;
+      a.currentTime = this.audioTrack === 'sandstorm' ? 7.8 : 0;   // Sandstorm : on repart après l'intro
+      a.play().catch(() => {});
+    });
+    DDVolume.media(a, 'music', this.volume);
+    this.audio = a;
+    const unlock = () => { if (this.wanted && this.musicEnabled && a.paused && a.src) a.play().catch(() => {}); };
+    for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.addEventListener(ev, unlock, true);
+    return a;
   }
 
   start(trackName = 'sandstorm') {
     this.wanted = true;
     this.currentTrack = trackName;
     if (!this.musicEnabled) return;
-    const path = this.getTrackPath(trackName);
-
-    if (this.audio) {
-      // même morceau déjà lancé (même s'il est encore en train de charger, donc « en pause ») : on n'y touche pas.
-      // Avant, chaque rafraîchissement de l'écran le supprimait et le relançait : il n'avait jamais le temps de démarrer.
-      if (this.audioTrack === trackName) { if (this.audio.paused) this.audio.play().then(() => { this.blocked = false; }).catch(() => {}); return; }
-      this.halt();
+    const a = this.player();
+    if (this.audioTrack !== trackName) {
+      this.audioTrack = trackName;
+      a.src = new URL(this.getTrackPath(trackName), import.meta.url.replace(/view\/music\.js.*$/, '')).href;
+      a.currentTime = 0;
     }
-
-    try {
-      this.audio = new Audio(new URL(path, import.meta.url.replace(/view\/music\.js.*$/, '')).href);
-      this.audioTrack = trackName; this.blocked = false;
-      this.audio.preload = 'auto';
-      // Sandstorm : version longue (≈ 2 min 30) avec une intro ; en boucle, on repart après l'intro (pas de coupure)
-      const loopAt = trackName === 'sandstorm' ? 7.8 : 0;
-      this.audio.loop = !loopAt;
-      if (loopAt) {
-        const a = this.audio;
-        a.addEventListener('ended', () => { if (this.audio === a && this.wanted) { a.currentTime = loopAt; a.play().catch(() => {}); } });
-      }
-      DDVolume.media(this.audio, 'music', this.volume);
-      this.audio.play().catch(() => {
-        this.blocked = true;
-        // En attente d'interaction utilisateur (navigateur autoplay policy)
-        const unlock = () => {
-          if (this.audio && this.musicEnabled) {
-            this.blocked = false;
-            this.audio.play().catch(() => {});
-          }
-          for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.removeEventListener(ev, unlock, true);
-        };
-        for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.addEventListener(ev, unlock, true);
-      });
-    } catch (e) {}
+    if (a.paused) a.play().catch(() => {});
   }
 
   stop() { this.wanted = false; this.halt(); }
 
   halt() {
-    if (this.audio) {
-      try {
-        this.audio.pause();
-        this.audio.currentTime = 0;
-      } catch (e) {}
-      this.audio = null; this.audioTrack = null;
-    }
+    if (this.audio) { try { this.audio.pause(); } catch (e) {} }
+    this.audioTrack = null;
   }
 
   isPlaying() {
