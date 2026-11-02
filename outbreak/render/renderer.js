@@ -18,7 +18,7 @@ export class Renderer {
   }
 
   resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = window.DDPerf ? window.DDPerf.pr(2) : Math.min(2, window.devicePixelRatio || 1);   // budget de pixels sur grand écran
     const W = window.innerWidth, H = window.innerHeight;
     if (W !== this.W || H !== this.H || dpr !== this.dpr) {
       this.W = W; this.H = H; this.dpr = dpr;

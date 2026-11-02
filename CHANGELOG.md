@@ -1,4 +1,4 @@
-# Journal des versions — Game Hub (Duo Drift, DavidSimulator)
+# Journal des versions — Arcadia
 
 ## 3.51 — 2 novembre 2026
 - **Odyssée** — tout le décor est redessiné en pixel art façon HeartGold / SoulSilver.
@@ -50,6 +50,186 @@
 ## 3.43 — 31 octobre 2026
 - **Odyssée** — nouvelles hautes herbes en touffes, comme sur DS : quatre variantes mélangées au hasard (prairie, bois, neige), fini les carrés d'herbe.
   - Sous l'herbe des bois, le sol est celui du sous-bois.
+
+## 3.42 — 2 novembre 2026
+- **Poké Duel** — Nouveau format « 2 joueurs contre 2 », à choisir dans les réglages du salon (ligne Format).
+  - Les équipes de deux sont tirées au sort, et des bots complètent s'il manque des joueurs.
+  - Chacun drafte ses 3 Pokémon et dirige le sien sur le terrain, à côté de celui de son coéquipier. Quand il tombe, tu envoies un des tiens.
+  - Le match se joue en 2 manches gagnantes. Ton Pokémon est encadré en jaune, avec le nom de chaque dresseur au-dessus du sien.
+- **Poké Duel** — Combat en double : un tour ne peut plus se jouer deux fois de suite quand un joueur renvoie son choix.
+
+## 3.41 — 2 novembre 2026
+- **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
+  - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.
+  - Frappe, arme un gros coup ou place un coup de pied sauté. Les coups à la tête assomment plus vite.
+  - Tes mains s'agrippent à tout : attrape un adversaire, traîne-le, soulève-le s'il est sonné et jette-le dans le vide.
+  - En tombant, rattrape-toi à un rebord et hisse-toi. Mais tes bras fatiguent vite.
+  - Trois arènes : les toits et leur planche, le chantier et son boulet, l'usine et ses tapis qui mènent au vide sous un pilon.
+  - Jusqu'à 6 joueurs et 8 pantins avec les bots, sur ordinateur, téléphone ou manette.
+
+## 3.40 — 2 novembre 2026
+- **Poké Duel** — Nouveau format VGC, en 2 contre 2 : à choisir dans les réglages du salon (« Format »).
+  - Au draft, tu gardes 6 Pokémon sur 12. Avant chaque manche, tu en choisis 4 dans l'ordre : les 2 premiers commencent sur le terrain, les 2 autres attendent en réserve.
+  - En combat, chacun de tes deux Pokémon choisit son action, puis sa cible.
+  - Les attaques de zone touchent les deux adversaires (Éboulement, Éclat Magique, Blizzard…), ou même ton allié (Séisme, Surf), avec des dégâts ×0,75.
+  - Chaque Pokémon a Abri en plus de ses attaques : il bloque tout pendant un tour, mais rate de plus en plus si on l'enchaîne.
+  - Intimidation baisse l'Attaque des deux adversaires. Un Pokémon K.O. est remplacé tant qu'il en reste en réserve.
+  - Les bots savent jouer en double : ils visent la bonne cible, utilisent les attaques de zone sans trop blesser leur allié, et sortent Abri au bon moment.
+
+## 3.39 — 2 novembre 2026
+- **Poké Duel** — Au draft, 12 Pokémon sont proposés au lieu de 6, et une équipe ne peut avoir qu'un seul légendaire (marqué LÉGENDAIRE sur sa carte).
+- **Poké Duel** — Passe la souris sur une attaque, un talent ou un objet pour voir ce qu'il fait : type, catégorie, puissance, précision et effets.
+- **Poké Duel** — Quand l'adversaire choisit son remplaçant, tes attaques ne s'affichent plus : un écran d'attente les remplace jusqu'à son arrivée.
+
+## 3.38 — 2 novembre 2026
+- **Poké Duel** — L'effet de la météo s'affiche : « Le soleil renforce l'attaque ! » ou « La pluie affaiblit l'attaque... » apparaît quand une attaque Feu ou Eau est boostée (×1,5) ou affaiblie (×0,5).
+
+## 3.37 — 2 novembre 2026
+- **Poké Duel** — 320 nouveaux Pokémon : toutes les évolutions finales de la 1re à la 6e génération, légendaires compris (381 Pokémon en tout).
+  - Chacun a ses vraies stats, 4 attaques choisies dans ce qu'il peut apprendre (attaques de son type, couverture, boost ou soin) et son meilleur talent.
+  - 107 nouvelles attaques (Mégacorne, Casse-Brique, Poing Ombre, Fracass'Tête, Tranch'Air…) et une trentaine de nouveaux talents : Farceur, Protéen, Contestation, Garde Mystik, Déclic Tactique, Aura Féérique, Aura Ténébreuse, Toison Épaisse, Amour Filial, Lentiteintée, Sérénité, Absentéisme, Début Calme…
+  - La grêle arrive avec Alerte Neige : elle blesse tout le monde sauf les Glace, et Blizzard touche à coup sûr.
+  - Toutes les Méga-Évolutions de la 6G : 21 nouvelles, dont Méga-Kangourex, Méga-Mysdibule, Méga-Altaria, Méga-Latios, Méga-Lockpin et Méga-Diancie.
+  - Nouveau choix de génération dans les réglages du tournoi : toutes, les iconiques, Kanto, Johto et Hoenn, Sinnoh, Unys ou Kalos.
+- **Poké Duel** — Les coups critiques sont plus rares : 1 chance sur 24 au lieu de 1 sur 16, comme dans les jeux récents.
+
+## 3.36 — 2 novembre 2026
+- **Poké Duel** — Toutes les attaques ont maintenant leur vrai effet :
+  - Ultralaser oblige à se recharger au tour suivant ; Lance-Soleil prend un tour pour absorber la lumière, sauf au soleil.
+  - Coup Bas échoue si l'adversaire ne prépare pas une attaque.
+  - Choc Psy frappe la Défense, pas la Défense Spéciale.
+  - Fatal-Foudre et Vent Violent touchent à coup sûr sous la pluie ; Vent Violent (30 %) et Vibraqua (20 %) peuvent rendre confus.
+  - Éco-Sphère, Telluriforce, Bourdon, Luminocanon et Exploforce peuvent baisser la Défense Spéciale ; Pouvoir Lunaire l'Attaque Spéciale ; Câlinerie l'Attaque ; Poing Météore peut monter l'Attaque du lanceur.
+
+## 3.35 — 2 novembre 2026
+- **Poké Duel** — La musique de combat se lance enfin : Sandstorm (et le thème de la finale) démarrent dès l'arrivée en combat, sans qu'il faille cliquer.
+- **Poké Duel** — Intimidation, Sécheresse, Crachin, Sable Volant et les autres talents d'arrivée s'activent dès que le Pokémon apparaît sur le terrain, avant que tu choisisses ton attaque.
+- **Poké Duel** — Des attaques qui ne faisaient rien de spécial ont maintenant leur vrai effet :
+  - Colère frappe 2 ou 3 tours d'affilée (impossible de changer d'attaque ou de Pokémon), puis le lanceur devient confus.
+  - Demi-Tour et Change-Éclair : après le coup, ton Pokémon revient et tu choisis celui qui prend le relais.
+  - Atterrissage échoue si le Pokémon a déjà tous ses PV.
+- **Poké Duel** — Méga-Évolution : la nouvelle Vitesse compte bien dès le tour de l'évolution (vérifié par un test).
+
+## 3.34 — 31 octobre 2026
+- **Poké Duel** — Le bouton Méga-Évolution ne décale plus les attaques dans la colonne de droite : il se place au-dessus d'elles.
+- **Poké Duel** — Sandstorm se relance bien en combat, même si l'ancienne version du morceau était restée en mémoire, et la musique repart au premier clic ou à la première touche si le navigateur l'avait bloquée.
+
+## 3.33 — 31 octobre 2026
+- **Poké Duel** — Les talents arrivent : chaque Pokémon a le sien, choisi parmi ses vrais talents, et les formes Méga ont leur propre talent.
+  - Plus de 70 talents avec leur effet : Intimidation, Coloforce, Multiécaille, Turbo, Lévitation, Absorb Eau, Paratonnerre, Fermeté, Garde Magik, Technicien, Adaptabilité, Impudence, Statik, Peau Dure, Miroir Magik, Marque Ombre…
+  - La météo : Crachin, Sécheresse et Sable Volant font tomber la pluie, briller le soleil ou souffler le sable pendant 5 tours (Eau et Feu plus ou moins forts, sable qui blesse), avec son effet sur l'arène. Glissade et Chlorophylle doublent la Vitesse.
+  - Au draft, le talent et son effet sont écrits sur chaque carte. En combat, il s'affiche sous le nom du Pokémon et un bandeau à son nom glisse quand il s'active, comme dans les jeux.
+  - Les bots en tiennent compte (ils n'attaquent plus en Sol un Pokémon qui lévite).
+
+## 3.32 — 31 octobre 2026
+- **Poké Duel** — Les Méga-Évolutions arrivent : 29 Pokémon du tournoi peuvent méga-évoluer (31 formes, dont Dracaufeu et Mewtwo X et Y).
+  - Au draft, un badge MÉGA signale ceux qui le peuvent, et leur Méga-Gemme est proposée en tête de leurs objets (une seule par équipe).
+  - En combat, clique sur MÉGA-ÉVOLUTION (ou touche M) puis choisis ton attaque : il se transforme au début du tour, avant les attaques, avec ses nouvelles stats et ses nouveaux types. Une seule Méga-Évolution par combat.
+  - Halo arc-en-ciel, éclair blanc et nouveau sprite, comme dans les jeux. Les bots méga-évoluent aussi.
+- **Poké Duel** — La musique des combats démarre à nouveau (elle se relançait sans arrêt pendant son chargement et ne jouait jamais).
+- **Poké Duel** — Après un K.O. ou un changement de Pokémon, le menu revient sur les attaques au lieu de rester sur la liste des Pokémon.
+
+## 3.31 — 31 octobre 2026
+- **Poké Duel** — Les objets tenus arrivent : au draft, chaque Pokémon reçoit un objet conseillé, que tu peux changer (deux Pokémon d'une équipe ne tiennent jamais le même).
+  - Restes, Baie Sitrus, Baie Prine, Orbe Vie, Bandeau Choix, Lunettes Choix, Mouchoir Choix, Ceinture Force et Ceinture Pro, avec leurs vrais effets.
+  - L'objet s'affiche sous le nom du Pokémon, son icône surgit quand il agit, et une baie mangée est barrée.
+  - Avec un objet Choix, les autres attaques sont grisées tant que le Pokémon reste au combat. Les bots en tiennent compte.
+- **Poké Duel** — Vraie animation quand une statistique monte ou baisse : des flèches bleues qui montent ou rouges qui descendent défilent dans la silhouette du Pokémon, qui s'illumine de la même couleur.
+- **Poké Duel** — La musique Sandstorm dure maintenant environ 2 min 30 (intro, passage étouffé), au lieu de 30 secondes en boucle.
+- **Poké Duel** — Le mode Aventure Kalos-Sud est retiré : Poké Duel devient le tournoi 3v3 (l'aventure Pokémon, c'est Odyssée). Le jeu se charge aussi plus vite.
+
+## 3.30 — 31 octobre 2026
+- **Tous les jeux** — L'hôte peut changer d'onglet ou de fenêtre sans figer la partie : elle continue pour tout le salon (avant, tout s'arrêtait jusqu'à son retour).
+- **Birdie Party** — Fini les coupures pendant le tour de l'hôte : sa visée revenait vers lui et repartait en boucle, au point de saturer la connexion de tout le salon.
+- **DavidSimulator**, **Fil Rouge**, **Outbreak**, **Duo Drift**, **Cyber Kart GP**, **Bastion Clash** et **Mini-Golf Party** — Plus fluides sur les grands écrans et les portables à écran zoomé : l'image n'est plus calculée en résolution inutilement élevée.
+  - Dans DavidSimulator et Fil Rouge, la résolution baisse un peu toute seule si le PC peine, puis remonte dès qu'il a de la marge.
+- **Odyssée** — Ses plantages sont bien rangés sous son nom dans la page des journaux.
+
+## 3.29 — 31 octobre 2026
+- **Arcadia** — Vitrine de l'accueil : le fond flou sous l'affiche est complètement supprimé.
+
+## 3.28 — 31 octobre 2026
+- **Arcadia** — Chaque mise à jour du site s'affiche tout de suite, sans garder l'ancienne version en mémoire (c'est ce qui faisait encore voir le flou sous la vitrine).
+
+## 3.27 — 31 octobre 2026
+- **Arcadia** — Nouvelle vitrine sur l'accueil : sous l'affiche, un panneau aux couleurs du jeu avec sa description, une astuce et les boutons pour jouer, puis une rangée de mini-affiches de tous les jeux pour passer de l'un à l'autre.
+  - Elle s'ajuste à toutes les tailles d'écran, sans vide ni texte coupé.
+
+## 3.26 — 31 octobre 2026
+- **Arcadia** — Vitrine de l'accueil : plus de bloc noir sous l'affiche, elle se prolonge en flou jusqu'aux boutons.
+
+## 3.25 — 31 octobre 2026
+- **Arcadia** — Plus de grand vide sous la vitrine de l'accueil : elle descend jusqu'en bas de la colonne de ton compte et de tes amis, avec l'affiche entière en haut.
+
+## 3.24 — 31 octobre 2026
+- **Arcadia** — Le bouton Réglages ne passe plus par-dessus « Classement » dans le salon : il est rangé dans la barre du haut.
+- **Arcadia** — Tes amis sont maintenant en haut de l'accueil, juste sous ton compte.
+- **Arcadia** — L'accueil et le salon s'adaptent à toutes les tailles d'écran d'ordinateur, du petit portable au grand écran : plus de cartes par ligne sur grand écran, affiches jamais coupées dans la vitrine.
+
+## 3.23 — 31 octobre 2026
+- **Arcadia** — Nouvel accueil : les jeux d'abord.
+  - Une grande vitrine fait défiler les jeux, avec « Jouer avec mes potes » et « Jouer seul » en un clic.
+  - Les jeux se trient par catégorie (Course, Action, Stratégie, Party, Sport, Plateau, Aventure), avec la durée d'une partie, et une étiquette « Nouveau » ou « Mis à jour ».
+  - Plus de cartes noires pendant le chargement : chaque jeu affiche sa couleur et son nom en attendant son affiche.
+  - Un encadré « Comment ça marche », un pied de page et une page « À propos » (crédits, confidentialité).
+- **Arcadia** — Un seul écran de chargement pour tous les jeux : l'affiche, les commandes, une astuce et une barre de progression, puis « C'est parti ! ».
+- **Arcadia** — Le menu Arcadia, le même dans tous les jeux : un petit onglet sur le bord gauche de l'écran pour revoir les commandes, régler le son, passer en plein écran ou revenir au salon.
+- **Arcadia** — Les boutons du Hub font des petits bruits, et le lien d'Arcadia s'affiche avec une image et un titre quand on le partage (WhatsApp, Discord…). Arcadia s'installe aussi comme une appli sur téléphone.
+- **Arcadia** — L'accueil s'adapte aux téléphones et aux tablettes.
+- **Mini-Golf Party** — De vrais bruitages : la frappe, la balle qui tombe dans le trou, les rebonds, le plouf, le public, et un fond sonore (oiseaux, vagues) sur certains parcours.
+
+## 3.22 — 31 octobre 2026
+- **Arcadia** — Le Hub a un vrai nom : Arcadia. Nouveau logo sur l'accueil et dans le salon.
+- **Mini-Golf Party** — Fini les balles qui traversent les murets : un obstacle mobile (porte coulissante, télécabine…) ne peut plus pousser la balle de l'autre côté.
+  - Une balle coincée entre deux rochers s'arrête tout de suite au lieu de trembler sur place.
+  - Collée contre un muret sur une pente, la balle part bien dans le sens de la pente.
+- **Mini-Golf Party** — La flèche de visée se voit partout, avec un contour sombre, même sur la grille lumineuse de la Station Orbitale.
+- **Mini-Golf Party** — Champ d'Astéroïdes : de vrais astéroïdes en roche à la place des cubes, et une grille au sol plus douce qui ne scintille plus.
+- **Mini-Golf Party** — Graphismes : vraies textures photo pour le gazon autour des trous, le bois, la pierre, la roche, le sable, la brique et la neige.
+- **Mini-Golf Party** — Le coup d'un autre joueur s'affiche de façon fluide, même avec une connexion irrégulière, et sa visée glisse au lieu de sauter.
+- **Cyber Kart GP** — Les karts des autres invités ne saccadent plus : leurs positions gardent l'heure où ils les ont envoyées, sans doublons, et l'affichage s'adapte à la qualité de la connexion.
+- **Island Rush** et **Convoy Storm** — Les autres joueurs ne se figent plus puis ne sautent plus quand le réseau a des à-coups.
+- **Birdie Party** — La visée et l'élan d'un autre joueur glissent en douceur.
+- **Bastion Clash** — Les unités se déplacent sans tressauter, surtout chez les invités.
+
+## 3.21 — 30 octobre 2026
+- **Mini-Golf Party** — Fini le « Connexion perdue · reconnexion… » en boucle en multijoueur. À chaque coup joué sur l'ordinateur de l'hôte (le sien ou celui d'un bot), le jeu renvoyait à l'infini l'écho de sa propre balle : des dizaines de milliers de messages en quelques secondes, et le serveur coupait l'hôte pour inondation. Les autres joueurs voyaient « Coupure chez l'hôte », puis le salon changeait d'hôte. L'hôte ignore maintenant ses propres messages.
+
+## 3.20 — 29 octobre 2026
+- **Odyssée** — Graphismes retravaillés partout :
+  - l'herbe a du relief et des couleurs qui varient, avec trèfles, pâquerettes, cailloux, petites touffes et buissons fleuris ; à la lisière des bois, fougères, champignons et feuilles mortes ; les arbres et les bâtiments projettent une ombre douce ;
+  - les hautes herbes sont plus épaisses, et les forêts mélangent cinq sortes d'arbres de tailles et de teintes différentes, plus sombres au cœur des bois ;
+  - l'eau devient plus foncée au large, et les rivages ont un bord de sable ondulé, de l'écume et des coins arrondis ;
+  - toits en tuiles avec faîtage, façades avec volets, jardinières fleuries, soubassement en pierre et portes avec auvent ;
+  - grottes en roche taillée avec des parois plus hautes, et des cristaux qui luisent dans la Grotte Lunaire ;
+  - le repaire de la Team Éclipse est rempli de machines et d'écrans violets, et chaque salle du Conseil 4 a son décor (glace, bougies, braseros, piliers sombres) ;
+  - la nuit est plus sombre, et les lampadaires éclairent le sol autour d'eux ;
+  - les chemins de l'île de Cendrelune sont bordés de cendre au lieu d'herbe.
+- **Odyssée** — Combats : nouveaux décors (prairie avec collines et forêt, grotte avec stalactites et cristaux, plage, volcan, arènes au dallage en perspective) et socles avec ombre et reflet. Ton Pokémon est placé un peu plus haut, moins caché par la boîte de texte.
+
+## 3.19 — 29 octobre 2026
+- **Odyssée** — Une vraie histoire : la Team Éclipse veut fermer le cœur de Lugia, le gardien des marées, avec son Prisme Noir, et plonger la région dans une nuit éternelle.
+  - Tu croises ses sbires et ses deux Admins, Nyx et Erèbe, dans le Bois Murmure, la Grotte Lunaire, au port de Port-Azur et dans la Centrale de Voltacité (l'Arène reste fermée tant qu'elle est occupée).
+  - Leur repaire se cache sur la route 6 : bats leur chef, Nocturne, et le ciel de toute la région devient violet, en plein jour, jusqu'à la fin de l'histoire.
+  - La voyante de Mirage te confie la Plume Argent : surfe depuis le Pont des Marées jusqu'au Sanctuaire, affronte une dernière fois la Team Éclipse… puis Lugia Obscur lui-même. Le Dr Lumen te donne une Master Ball pour le capturer, et le Prof. Saule peut ouvrir son cœur.
+  - La Route Victoire n'ouvre qu'une fois la nuit violette dissipée.
+- **Odyssée** — Le Conseil 4 : avant la Maître, quatre dresseurs d'élite t'attendent l'un après l'autre (Glace, Spectre, Combat, Ténèbres).
+- **Odyssée** — Les CS : Coupe (petits arbres), Flash (la Grotte Lunaire est maintenant plongée dans le noir), Surf (nager et pêcher des Pokémon sur l'eau) et Force (pousser les gros rochers).
+  - Place-toi devant l'obstacle et appuie sur Espace. Une dizaine de recoins cachés le long des routes, et un îlot dans le port, cachent des objets rares.
+- **Odyssée** — Quêtes annexes : un médaillon perdu, un échange de Pokémon, un Évoli et un Minidraco à adopter, des Pokémon à montrer et un chercheur qui récompense ton Pokédex (jusqu'à une Master Ball).
+- **Odyssée** — Sauvegarde en ligne : ta partie suit ton compte du Hub. Elle part sur le serveur à chaque sauvegarde, et tu la retrouves sur un autre appareil après y avoir importé ton compte (code de transfert du Hub), sans rien recopier. Écran titre → « Sauvegarde en ligne » pour voir où elle en est.
+- **Odyssée** — Les gardes bloquent maintenant tout le passage : on ne peut plus se faufiler à côté d'eux.
+
+## 3.18 — 29 octobre 2026
+- **Odyssée** — On joue ensemble : chacun garde son aventure, mais tous les joueurs du salon se croisent dans la région.
+  - Les autres dresseurs marchent sur la même carte que toi, avec leur nom au-dessus de la tête (« occupé » quand ils sont en combat ou dans un menu).
+  - Parle à un joueur (Espace en face de lui) pour lui proposer un échange ou un combat ; il accepte ou refuse, et tu peux annuler en attendant (Échap).
+- **Odyssée** — Échanges de Pokémon : chacun choisit le Pokémon qu'il propose, voit celui de l'autre, et l'échange n'a lieu que si les deux acceptent.
+  - Kadabra, Machopeur, Gravalanch et Spectrum évoluent en arrivant, comme dans les vrais jeux.
+- **Odyssée** — Combats entre joueurs : combat amical avec toute ton équipe, soignée pour l'occasion, sans perte d'argent ni expérience, et sans objets.
+  - Après un K.O., chacun choisit son remplaçant ; « Abandon » remplace la fuite, et un joueur qui quitte ou ne répond plus perd par forfait.
+- **Odyssée** — Code de sauvegarde, pour reprendre sa partie sur un autre appareil : menu (Échap) → CODE, copie le code, puis sur l'autre appareil « Charger un code » sur l'écran titre. Un code incomplet ou mal recopié est refusé.
+- **Odyssée** — Le jeu n'est plus présenté comme un prototype : les Pokémon sont là pour de bon.
 
 ## 3.42 — 31 octobre 2026
 - **Odyssée** — les maisons ont de nouvelles façades à colombages redessinées : fenêtres, porte avec son auvent, applique dorée, toit de tuiles.

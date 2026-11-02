@@ -1,6 +1,6 @@
-# 📋 Logs & Diagnostic Crash / Expulsion — Game Hub
+# 📋 Logs & Diagnostic Crash / Expulsion — Arcadia
 
-Ce dossier centralise les **journaux de crashs (`CRASH_*`)** et les **raisons d'expulsion ou de déconnexion d'un joueur (`EXP_*`)** pour le **Game Hub** et l'ensemble des **11 jeux** intégrés.
+Ce dossier centralise les **journaux de crashs (`CRASH_*`)** et les **raisons d'expulsion ou de déconnexion d'un joueur (`EXP_*`)** pour **Arcadia** et l'ensemble des **11 jeux** intégrés.
 
 ---
 

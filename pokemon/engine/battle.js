@@ -2,9 +2,24 @@
 // Moteur de combat Pokémon 3v3 & Duel : calcul des dégâts, statuts (sommeil, dégel, toxik),
 // peur (flinch), paliers de statistiques, PP réels, switchs et résolution séquentielle de tour.
 
-import { getEffectiveness } from './types.js';
+import { getEffectiveness, TYPE_FR } from './types.js';
 import { MOVES } from './moves.js';
 import { turnMs } from './timing.js';
+import { ITEMS, CHOICE } from './items.js';
+import { megasOf } from './megas.js';
+const MEGA_FORM = (dex, pid) => megasOf(dex).find((f) => f.pid === pid) || null;
+import { ABILITIES, abilityOf, ab, weatherOf, moveTypeFor, attackerPower, attackStatMod, defenseStatMod, defenderDamageMod,
+  weatherPower, speedMod, blocksStatus, absorbs, isContact, hasSecondary } from './abilities.js';
+const MOVE_ID = new Map(Object.entries(MOVES).map(([k, v]) => [v, k]));
+const AN = (k) => (ABILITIES[k] ? ABILITIES[k].name : k);
+const WEATHER_TXT = { rain: ['Il commence à pleuvoir !', 'La pluie s\'arrête.'], sun: ['Le soleil brille fort !', 'Le soleil redevient normal.'],
+  sand: ['Une tempête de sable se lève !', 'La tempête de sable se calme.'], wind: ['Des vents violents se lèvent !', 'Les vents se calment.'], hail: ['Il commence à grêler !', 'La grêle s\'arrête.'] };
+
+/** Le Pokémon peut-il méga-évoluer maintenant ? (tient sa Méga-Gemme, pas encore Méga, son dresseur ne l'a pas déjà fait) */
+export function canMega(state, side, poke) {
+  const it = poke && ITEMS[poke.item];
+  return !!(it && it.mega && it.mega.dex === poke.id && !poke.isMega && !(state.megaUsed && state.megaUsed[teamKey(side)]) && !poke.fainted);
+}
 
 export const STAGE_MULTS = {
   '-6': 2 / 8, '-5': 2 / 7, '-4': 2 / 6, '-3': 2 / 5, '-2': 2 / 4, '-1': 2 / 3,
@@ -29,8 +44,8 @@ function initPpMap(moves) {
   return map;
 }
 
-export function createBattle({ trainerA, trainerB, teamA, teamB }) {
-  return {
+export function createBattle({ trainerA, trainerB, teamA, teamB, doubles = false, pools = null, owners = null }) {
+  const b = {
     trainerA: { id: trainerA.id, name: trainerA.name, color: trainerA.color || '#ff4b2b', bot: !!trainerA.bot },
     trainerB: { id: trainerB.id, name: trainerB.name, color: trainerB.color || '#2b8cff', bot: !!trainerB.bot },
     teamA: teamA.map(p => ({
@@ -38,15 +53,19 @@ export function createBattle({ trainerA, trainerB, teamA, teamB }) {
       statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(p.statStages || {}) },
       ppMap: p.ppMap ? { ...p.ppMap } : initPpMap(p.moves),
       sleepTurns: p.sleepTurns || 0,
-      toxicTurns: p.toxicTurns || 0
+      toxicTurns: p.toxicTurns || 0,
+      ability: p.ability !== undefined ? p.ability : abilityOf(p.id)
     })),
     teamB: teamB.map(p => ({
       ...p,
       statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(p.statStages || {}) },
       ppMap: p.ppMap ? { ...p.ppMap } : initPpMap(p.moves),
       sleepTurns: p.sleepTurns || 0,
-      toxicTurns: p.toxicTurns || 0
+      toxicTurns: p.toxicTurns || 0,
+      ability: p.ability !== undefined ? p.ability : abilityOf(p.id)
     })),
+    weather: null,          // { type: 'rain' | 'sun' | 'sand' | 'wind', turns }
+    entry: ['A', 'B'],      // talents d'arrivée (Intimidation, météo…) à jouer au début du prochain tour
     activeA: 0,
     activeB: 0,
     turn: 1,
@@ -55,23 +74,44 @@ export function createBattle({ trainerA, trainerB, teamA, teamB }) {
     log: [],
     history: []
   };
+  // Double (VGC) : les deux premiers Pokémon de chaque équipe entrent ensemble
+  if (doubles) Object.assign(b, { doubles: true, activeC: 1, activeD: 1, entry: ['A', 'B', 'C', 'D'], need: [] });
+  // 2 contre 2 entre joueurs : chaque emplacement a son dresseur et ses propres Pokémon
+  if (doubles && pools) Object.assign(b, { pools, owners, activeA: pools.A[0], activeC: pools.C[0], activeB: pools.B[0], activeD: pools.D[0] });
+  return b;
 }
 
+// Emplacements sur le terrain. En simple : A (dresseur A) et B (dresseur B).
+// En double (VGC) : A et C pour le dresseur A, B et D pour le dresseur B.
+export const teamKey = (side) => (side === 'A' || side === 'C' ? 'A' : 'B');
+export const sidesOf = (state) => (state && state.doubles ? ['A', 'C', 'B', 'D'] : ['A', 'B']);
+export const allySide = (side) => ({ A: 'C', C: 'A', B: 'D', D: 'B' }[side]);
+export const foeSides = (state, side) => sidesOf(state).filter((s) => teamKey(s) !== teamKey(side));
+export const teamOf = (state, side) => (teamKey(side) === 'A' ? state.teamA : state.teamB);
+/** Index des Pokémon d'un dresseur actuellement sur le terrain */
+export const activeIdxOf = (state, tk) => sidesOf(state).filter((s) => teamKey(s) === tk).map((s) => state['active' + s]);
+/** Pokémon qu'un emplacement peut envoyer : en 2 contre 2 entre joueurs, chaque joueur n'a que les siens (state.pools) */
+export const poolOf = (state, side) => (state.pools && state.pools[side]) || teamOf(state, side).map((_, i) => i);
+/** Réserve d'un emplacement : ses Pokémon valides qui ne sont pas sur le terrain */
+export const benchOf = (state, side) => { const team = teamOf(state, side), on = activeIdxOf(state, teamKey(side)); return poolOf(state, side).filter((i) => team[i] && !team[i].fainted && !on.includes(i)); };
+
 export function getActivePokemon(battle, side) {
-  const team = side === 'A' ? battle.teamA : battle.teamB;
-  const idx = side === 'A' ? battle.activeA : battle.activeB;
-  return team[idx];
+  const team = teamOf(battle, side);
+  const idx = battle['active' + side];
+  return idx == null ? null : team[idx];
 }
 
 export function getTrainer(battle, side) {
-  return side === 'A' ? battle.trainerA : battle.trainerB;
+  return teamKey(side) === 'A' ? battle.trainerA : battle.trainerB;
 }
 
-export function getEffectiveSpeed(poke) {
+export function getEffectiveSpeed(poke, state) {
   let spe = poke.stats.spe;
   const stage = (poke.statStages && poke.statStages.spe) || 0;
   spe *= (STAGE_MULTS[stage] || 1);
-  if (poke.status === 'paralysis') spe *= 0.5;
+  if (poke.status === 'paralysis' && poke.ability !== 'quick-feet') spe *= 0.5;
+  spe *= speedMod(poke, state ? weatherOf(state) : null);
+  if (poke.item === 'choicescarf') spe *= 1.5;
   return spe;
 }
 
@@ -85,43 +125,59 @@ export function getEffectiveStat(poke, statName) {
 /**
  * Calcul des dégâts selon la formule standard Pokémon
  */
-export function calculateDamage(attacker, defender, move) {
+export function calculateDamage(attacker, defender, move, state) {
   if (!move || move.cat === 'status' || !move.power || move.power === 0) {
     return { damage: 0, mult: 1, crit: false, text: '' };
   }
+  const moveId = MOVE_ID.get(move) || '';
+  const weather = state ? weatherOf(state) : null;
+  const wAtt = attacker.ability === 'mega-sol' ? 'sun' : weather;   // Méga-Soleil : ses attaques comme au soleil
+  const mType = moveTypeFor(attacker, move);
 
   const isPhys = move.cat === 'physical';
-  let atk = getEffectiveStat(attacker, isPhys ? 'atk' : 'spa');
-  let def = getEffectiveStat(defender, isPhys ? 'def' : 'spd');
+  const aKey = isPhys ? 'atk' : 'spa', dKey = move.defStat || (isPhys ? 'def' : 'spd');
+  // Inconscient : ignore les changements de stats de l'adversaire
+  let atk = (ab(defender, attacker) === 'unaware' ? attacker.stats[aKey] : getEffectiveStat(attacker, aKey)) * attackStatMod(attacker, isPhys, wAtt);
+  let def = (attacker.ability === 'unaware' ? defender.stats[dKey] : getEffectiveStat(defender, dKey)) * defenseStatMod(defender, isPhys, weather, attacker);
 
-  // Si brûlé et attaque physique : 50% de dégâts
-  if (isPhys && attacker.status === 'burn') {
+  // Si brûlé et attaque physique : 50% de dégâts (sauf Cran)
+  if (isPhys && attacker.status === 'burn' && attacker.ability !== 'guts') {
     atk *= 0.5;
   }
 
-  // Coup critique (6.25% de base, 12.5% si high-crit)
-  const critRate = move.crit === 2 ? 0.125 : 0.0625;
-  const isCrit = Math.random() < critRate;
-  const critMult = isCrit ? 1.5 : 1.0;
+  // Coup critique (1 sur 24 de base, 12,5 % si taux élevé ; Chanceux monte d'un cran ; Coque Armure l'empêche)
+  const critStage = (move.crit === 2 ? 1 : 0) + (attacker.ability === 'super-luck' ? 1 : 0);
+  const critRate = [1 / 24, 0.125, 0.5][Math.min(2, critStage)];   // 1 sur 24 comme dans les jeux récents
+  const isCrit = ab(defender, attacker) !== 'shell-armor' && Math.random() < critRate;
+  const critMult = isCrit ? (attacker.ability === 'sniper' ? 2.25 : 1.5) : 1.0;
 
   // En cas de coup critique, ignorer les baisses d'attaque du lanceur et les hausses de défense de la cible
   if (isCrit) {
     const atkStage = (attacker.statStages && attacker.statStages[isPhys ? 'atk' : 'spa']) || 0;
-    const defStage = (defender.statStages && defender.statStages[isPhys ? 'def' : 'spd']) || 0;
+    const defStage = (defender.statStages && defender.statStages[move.defStat || (isPhys ? 'def' : 'spd')]) || 0;
     if (atkStage < 0) atk = attacker.stats[isPhys ? 'atk' : 'spa'] * (isPhys && attacker.status === 'burn' ? 0.5 : 1);
-    if (defStage > 0) def = defender.stats[isPhys ? 'def' : 'spd'];
+    if (defStage > 0) def = defender.stats[move.defStat || (isPhys ? 'def' : 'spd')];
   }
 
-  // STAB (Same-Type Attack Bonus)
-  const isStab = attacker.types.includes(move.type);
-  const stabMult = isStab ? 1.5 : 1.0;
+  // STAB (Same-Type Attack Bonus ; ×2 avec Adaptabilité)
+  const isStab = attacker.types.includes(mType);
+  const stabMult = isStab ? (attacker.ability === 'adaptability' ? 2 : 1.5) : 1.0;
 
-  // Efficacité des types
-  const typeMult = getEffectiveness(move.type, defender.types);
+  // Efficacité des types (vents violents : le type Vol n'a plus de faiblesse)
+  let typeMult = getEffectiveness(mType, defender.types);
+  if (weather === 'wind' && defender.types.includes('flying') && getEffectiveness(mType, ['flying']) > 1) typeMult /= 2;
 
+  // Querelleur : Normal et Combat touchent les Spectre
+  if (typeMult === 0 && attacker.ability === 'scrappy' && (mType === 'normal' || mType === 'fighting') && defender.types.includes('ghost'))
+    typeMult = getEffectiveness(mType, defender.types.filter((t) => t !== 'ghost'));
   if (typeMult === 0) {
     return { damage: 0, mult: 0, crit: false, text: "Ça n'affecte pas le Pokémon adverse..." };
   }
+  // Garde Mystik : seules les attaques super efficaces le touchent
+  if (ab(defender, attacker) === 'wonder-guard' && typeMult < 2) {
+    return { damage: 0, mult: 0, crit: false, text: `${defender.name} est protégé par Garde Mystik !` };
+  }
+  if (attacker.ability === 'tinted-lens' && typeMult < 1) typeMult *= 2;   // Lentiteintée
 
   // Variation aléatoire entre 0.85 et 1.00
   const randomFactor = 0.85 + Math.random() * 0.15;
@@ -130,12 +186,29 @@ export function calculateDamage(attacker, defender, move) {
   const lvl = attacker.level || 50;
   const levelFactor = Math.floor((2 * lvl) / 5) + 2;
   const baseDmg = ((levelFactor * move.power * (atk / def)) / 50 + 2);
-  const totalDmg = Math.max(1, Math.floor(baseDmg * stabMult * typeMult * critMult * randomFactor));
+  // objets tenus de l'attaquant
+  let itemMult = 1;
+  if (attacker.item === 'choiceband' && isPhys) itemMult *= 1.5;
+  if (attacker.item === 'choicespecs' && !isPhys) itemMult *= 1.5;
+  if (attacker.item === 'lifeorb') itemMult *= 1.3;
+  if (attacker.item === 'expertbelt' && typeMult >= 2) itemMult *= 1.2;
+  // talents (puissance, défenseur) et météo
+  // Aura Féérique / Aura Ténébreuse (pour tout le combat ; Aura Inversée les retourne)
+  let aura = 1;
+  if (state) {
+    const act = [getActivePokemon(state, 'A'), getActivePokemon(state, 'B')].filter((p) => p && !p.fainted).map((p) => p.ability);
+    if ((mType === 'fairy' && act.includes('fairy-aura')) || (mType === 'dark' && act.includes('dark-aura'))) aura = act.includes('aura-break') ? 0.75 : 4 / 3;
+  }
+  const abilMult = aura * attackerPower(attacker, moveId, move, weather) * defenderDamageMod(defender, mType, typeMult, attacker) * weatherPower(mType, wAtt);
+  const totalDmg = Math.max(1, Math.floor(baseDmg * stabMult * typeMult * critMult * randomFactor * itemMult * abilMult));
 
   let text = '';
   if (typeMult >= 2) text = "C'est super efficace !";
   else if (typeMult <= 0.5) text = "Ce n'est pas très efficace...";
   if (isCrit) text = (text ? text + ' ' : '') + 'Coup critique !';
+  // la météo se voit : « Le soleil renforce l'attaque ! », « La pluie affaiblit l'attaque… »
+  const wp = weatherPower(mType, wAtt);
+  if (wp !== 1) text = (text ? text + ' ' : '') + `${wAtt === 'sun' ? 'Le soleil' : 'La pluie'} ${wp > 1 ? 'renforce' : 'affaiblit'} l'attaque${wp > 1 ? ' !' : '...'}`;
 
   return { damage: totalDmg, mult: typeMult, crit: isCrit, text };
 }
@@ -146,7 +219,17 @@ function applyStatEffect(eff, attPoke, defPoke, attSide, defSide, logEvent) {
   if (!targetPoke || targetPoke.fainted) return;
   if (!targetPoke.statStages) targetPoke.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
-  const statChanges = eff.stats ? Object.entries(eff.stats) : [[eff.stat, eff.val]];
+  let statChanges = eff.stats ? Object.entries(eff.stats) : [[eff.stat, eff.val]];
+  // Contestation : les changements s'inversent ; Simple : ils doublent
+  if (targetPoke.ability === 'contrary') statChanges = statChanges.map(([k, v]) => [k, -v]);
+  if (targetPoke.ability === 'simple') statChanges = statChanges.map(([k, v]) => [k, v * 2]);
+  const byFoe = eff.target !== 'self' && targetPoke !== attPoke;
+  // Corps Sain : l'adversaire ne peut pas baisser ses statistiques
+  if (byFoe && ab(targetPoke, attPoke) === 'clear-body' && statChanges.some(([, d]) => d < 0)) {
+    logEvent({ type: 'ability', side: targetSide, ability: 'clear-body', msg: `${AN('clear-body')} de ${targetPoke.name} empêche la baisse de ses statistiques !` });
+    return;
+  }
+  let lowered = false;
   for (const [stName, delta] of statChanges) {
     const oldVal = targetPoke.statStages[stName] || 0;
     const newVal = Math.max(-6, Math.min(6, oldVal + delta));
@@ -166,14 +249,151 @@ function applyStatEffect(eff, attPoke, defPoke, attSide, defSide, logEvent) {
         val: delta,
         msg: `${label} de ${targetPoke.name} ${upDown}`
       });
+      if (delta < 0) lowered = true;
+    }
+  }
+  // Battant : une baisse infligée par l'adversaire fait monter l'Att. Spé. de deux crans
+  if (byFoe && lowered && targetPoke.ability === 'competitive') {
+    logEvent({ type: 'ability', side: targetSide, ability: 'competitive', msg: `${AN('competitive')} de ${targetPoke.name} s'active !` });
+    applyStatEffect({ target: 'self', stat: 'spa', val: 2 }, targetPoke, null, targetSide, null, logEvent);
+  }
+}
+
+/** Le talent fait monter (ou baisser) une stat de son porteur */
+function selfStat(poke, side, stat, val, logEvent) {
+  applyStatEffect({ target: 'self', stat, val }, poke, null, side, null, logEvent);
+}
+
+/** Dégâts indirects (statut, contrecoup, sable, Peau Dure…) : Garde Magik les annule. Renvoie true si le Pokémon est K.O. */
+function indirect(poke, side, dmg, msg, logEvent, extra = {}) {
+  if (!poke || poke.fainted || dmg <= 0 || poke.ability === 'magic-guard') return false;
+  poke.hp = Math.max(0, poke.hp - dmg);
+  logEvent({ type: 'recoil', side, damage: dmg, hp: poke.hp, maxHp: poke.maxHp, msg, ...extra });
+  if (poke.hp === 0) { poke.fainted = true; logEvent({ type: 'faint', side, pokemonId: poke.id, name: poke.name, msg: `${poke.name} est K.O. !` }); return true; }
+  return false;
+}
+
+/** Peut-on infliger ce statut ? (types immunisés, talents, statut déjà présent) */
+function statusAllowed(state, poke, st, moveType) {
+  if (!poke || poke.fainted || poke.status) return false;
+  const t = poke.types;
+  if (st === 'burn' && t.includes('fire')) return false;
+  if (st === 'paralysis' && (t.includes('electric') || (moveType === 'electric' && t.includes('ground')))) return false;
+  if ((st === 'poison' || st === 'toxic') && (t.includes('poison') || t.includes('steel'))) return false;
+  if (st === 'freeze' && t.includes('ice')) return false;
+  if (blocksStatus(poke, st, weatherOf(state))) return false;
+  return true;
+}
+const STATUS_TXT = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', toxic: 'est gravement empoisonné', sleep: "s'endort", freeze: 'est gelé' };
+
+/** Pose un statut et déclenche ce qui en dépend (Baie Prine, Synchro) */
+function inflict(state, poke, side, st, logEvent, from) {
+  poke.status = st;
+  if (st === 'sleep') poke.sleepTurns = poke.ability === 'early-bird' ? 1 : 1 + Math.floor(Math.random() * 2);
+  if (st === 'toxic') poke.toxicTurns = 1;
+  logEvent({ type: 'status_applied', side, status: st, msg: `${poke.name} ${STATUS_TXT[st] || "souffre d'un statut"} !` });
+  // Synchro : brûlure, paralysie ou poison renvoyés à l'adversaire qui les a infligés
+  if (from && poke.ability === 'synchronize' && ['burn', 'paralysis', 'poison', 'toxic'].includes(st) && statusAllowed(state, from.poke, st)) {
+    logEvent({ type: 'ability', side, ability: 'synchronize', msg: `${AN('synchronize')} de ${poke.name} s'active !` });
+    inflict(state, from.poke, from.side, st, logEvent, null);
+  }
+  checkBerries(poke, side, logEvent, state);
+}
+
+/** Talents qui jouent à l'arrivée au combat (Intimidation, météo, Calque, Ciel Gris) */
+function onEntry(state, side, logEvent) {
+  const poke = getActivePokemon(state, side);
+  const foeList = foeSides(state, side).map((s) => [s, getActivePokemon(state, s)]).filter(([, p]) => p && !p.fainted);
+  const [foeSide, foe] = foeList[0] || [null, null];
+  if (!poke || poke.fainted) return;
+  let a = poke.ability;
+  if (a === 'trace' && foe && foe.ability && !['trace', 'drizzle', 'drought', 'sand-stream', 'delta-stream', 'snow-warning', 'stance-change', 'wonder-guard', 'multitype'].includes(foe.ability)) {
+    poke.ability = foe.ability; a = poke.ability;
+    logEvent({ type: 'ability', side, ability: 'trace', msg: `${poke.name} copie le talent ${AN(a)} de ${foe.name} !` });
+  }
+  if (a === 'slow-start') { poke.slowStart = 5; logEvent({ type: 'ability', side, ability: a, msg: `${poke.name} a du mal à démarrer (${AN(a)}) !` }); }
+  if (a === 'truant') poke.loafing = false;
+  if (a === 'download' && foe && !foe.fainted) {
+    const st = getEffectiveStat(foe, 'def') < getEffectiveStat(foe, 'spd') ? 'atk' : 'spa';
+    logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} de ${poke.name} s'active !` });
+    selfStat(poke, side, st, 1, logEvent);
+  }
+  if (['fairy-aura', 'dark-aura', 'aura-break', 'turboblaze', 'teravolt', 'cloud-nine'].includes(a)) logEvent({ type: 'ability', side, ability: a, msg: `${poke.name} a le talent ${AN(a)} !` });
+  const weatherOn = { drizzle: 'rain', drought: 'sun', 'sand-stream': 'sand', 'delta-stream': 'wind', 'snow-warning': 'hail' }[a];
+  if (weatherOn) {
+    state.weather = { type: weatherOn, turns: weatherOn === 'wind' ? 99 : 5, by: side };
+    logEvent({ type: 'ability', side, ability: a, weather: weatherOn, msg: `${AN(a)} de ${poke.name} : ${WEATHER_TXT[weatherOn][0]}` });
+  }
+  if (a === 'air-lock') logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} de ${poke.name} : la météo n'a plus d'effet !` });
+  if (a === 'unnerve' || a === 'pressure' || a === 'mold-breaker') logEvent({ type: 'ability', side, ability: a, msg: `${poke.name} a le talent ${AN(a)} !` });
+  if (a === 'intimidate' && foeList.length) {
+    logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} de ${poke.name} effraie ${foeList.map(([, f]) => f.name).join(' et ')} !` });
+    for (const [fs, f] of foeList) {
+      if (['inner-focus', 'clear-body'].includes(f.ability)) logEvent({ type: 'msg', text: `${f.name} n'est pas impressionné (${AN(f.ability)}) !` });
+      else applyStatEffect({ target: 'opponent', stat: 'atk', val: -1 }, poke, f, side, fs, logEvent);
     }
   }
 }
+
+/** Talents d'arrivée en attente (début de combat, remplaçant), joués tout de suite, le plus rapide d'abord. */
+export function runEntry(state) {
+  const events = [];
+  const logEvent = (e) => { events.push(e); if (state.history) { const t = e.msg || e.text; if (t) state.history.push({ turn: state.turn, text: t, type: e.type }); } };
+  if (state.entry && state.entry.length && !String(state.phase).startsWith('switch_forced')) {
+    const q = [...new Set(state.entry)]; state.entry = [];
+    q.sort((x, y) => getEffectiveSpeed(getActivePokemon(state, y), state) - getEffectiveSpeed(getActivePokemon(state, x), state));
+    for (const side of q) onEntry(state, side, logEvent);
+  }
+  return events;
+}
+
+/** Baies (une seule fois) : Sitrus sous la moitié des PV, Prine dès qu'un statut tombe. */
+function checkBerries(poke, side, logEvent, state) {
+  if (!poke || poke.fainted || poke.hp <= 0 || poke.itemUsed) return;
+  // Tension : l'adversaire empêche de manger les baies
+  if (state && foeSides(state, side).some((fs) => { const f = getActivePokemon(state, fs); return f && !f.fainted && f.ability === 'unnerve'; }) && (poke.item === 'sitrus' || poke.item === 'lum')) return;
+  if (poke.item === 'sitrus' && poke.hp <= poke.maxHp / 2) {
+    poke.itemUsed = true;
+    const amount = Math.min(poke.maxHp - poke.hp, Math.floor(poke.maxHp / 4));
+    poke.hp += amount;
+    logEvent({ type: 'item', side, item: 'sitrus', msg: `${poke.name} mange sa ${ITEMS.sitrus.name} !` });
+    logEvent({ type: 'heal', side, pokemonId: poke.id, hp: poke.hp, maxHp: poke.maxHp, amount, msg: `${poke.name} récupère ${amount} PV !` });
+  } else if (poke.item === 'lum' && poke.status) {
+    poke.itemUsed = true;
+    poke.status = null; poke.sleepTurns = 0; poke.toxicTurns = 0;
+    logEvent({ type: 'item', side, item: 'lum', msg: `${poke.name} mange sa ${ITEMS.lum.name} !` });
+    logEvent({ type: 'status_cured', side, msg: `${poke.name} est guéri !` });
+  }
+}
+
+/** Remise à zéro en entrant au combat (le blocage des objets Choix tombe en changeant de Pokémon). */
+/** Le Pokémon quitte le terrain : Médic Nature soigne son statut, Déclic Tactique le remet en Forme Parade. */
+function leaveField(poke) {
+  if (poke.fainted) return;
+  if (poke.ability === 'natural-cure' && poke.status) { poke.status = null; poke.sleepTurns = 0; poke.toxicTurns = 0; }
+  if (poke.blade) stance(poke, false);
+  poke.slowStart = 0;
+}
+function stance(poke, blade) {
+  const s = poke.stats;
+  poke.stats = { ...s, atk: s.def, def: s.atk, spa: s.spd, spd: s.spa };
+  poke.blade = blade;
+}
+function onSwitchIn(poke) { poke.choiceLock = null; }
 
 /**
  * Résolution complète d'un tour de combat (actions des deux côtés)
  */
 export function resolveTurn(state, actionA, actionB) {
+  return resolveActions(state, { A: actionA, B: actionB });
+}
+
+/**
+ * Résolution d'un tour, en simple ({ A, B }) comme en double ({ A, C, B, D }).
+ * Une action d'attaque peut viser un emplacement (target : 'B', 'D'…) ; les attaques de zone touchent plusieurs cibles.
+ */
+export function resolveActions(state, acts) {
+  acts = { ...acts };
   const events = [];
   const logEvent = (e) => {
     events.push(e);
@@ -182,99 +402,144 @@ export function resolveTurn(state, actionA, actionB) {
       if (txt) state.history.push({ turn: state.turn, text: txt, type: e.type });
     }
   };
-
-  let pA = getActivePokemon(state, 'A');
-  let pB = getActivePokemon(state, 'B');
+  const SIDES = sidesOf(state);
+  const P = (s) => getActivePokemon(state, s);
+  const alive = (s) => { const p = P(s); return !!(p && !p.fainted); };
   const tA = getTrainer(state, 'A');
   const tB = getTrainer(state, 'B');
 
-  // --- 1. Gestion des Switchs volontaires (priorité absolue) ---
-  if (actionA && actionA.type === 'switch') {
-    const targetIdx = actionA.targetIndex;
-    if (targetIdx !== state.activeA && state.teamA[targetIdx] && !state.teamA[targetIdx].fainted) {
-      state.activeA = targetIdx;
-      pA = state.teamA[targetIdx];
-      pA.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-      pA.toxicTurns = 0;
-      logEvent({
-        type: 'switch',
-        side: 'A',
-        pokemonId: pA.id,
-        name: pA.name,
-        hp: pA.hp,
-        maxHp: pA.maxHp,
-        types: pA.types,
-        status: pA.status || null,
-        trainer: tA.name,
-        msg: `${tA.name} rappelle son Pokémon et envoie ${pA.name} !`
-      });
-    }
+  // --- 0. Talents d'arrivée en attente (début de combat, remplaçant après un K.O.), le plus rapide d'abord ---
+  if (state.entry && state.entry.length) {
+    const q = [...new Set(state.entry)]; state.entry = [];
+    q.sort((x, y) => getEffectiveSpeed(P(y), state) - getEffectiveSpeed(P(x), state));
+    for (const side of q) onEntry(state, side, logEvent);
   }
 
-  if (actionB && actionB.type === 'switch') {
-    const targetIdx = actionB.targetIndex;
-    if (targetIdx !== state.activeB && state.teamB[targetIdx] && !state.teamB[targetIdx].fainted) {
-      state.activeB = targetIdx;
-      pB = state.teamB[targetIdx];
-      pB.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-      pB.toxicTurns = 0;
-      logEvent({
-        type: 'switch',
-        side: 'B',
-        pokemonId: pB.id,
-        name: pB.name,
-        hp: pB.hp,
-        maxHp: pB.maxHp,
-        types: pB.types,
-        status: pB.status || null,
-        trainer: tB.name,
-        msg: `${tB.name} rappelle son Pokémon et envoie ${pB.name} !`
-      });
+  // Marque Ombre : l'adversaire ne peut pas changer de Pokémon (sauf les Spectre)
+  for (const side of SIDES) {
+    const act = acts[side];
+    if (!act || act.type !== 'switch') continue;
+    const me = P(side);
+    const tagger = foeSides(state, side).find((fs) => { const f = P(fs); return f && !f.fainted && f.ability === 'shadow-tag'; });
+    if (tagger && me && !me.fainted && !me.types.includes('ghost')) {
+      logEvent({ type: 'ability', side: tagger, ability: 'shadow-tag', msg: `${me.name} ne peut pas quitter le combat (${AN('shadow-tag')} de ${P(tagger).name}) !` });
+      acts[side] = null;
     }
+  }
+  // Régé-Force : en quittant le combat, le Pokémon récupère un tiers de ses PV
+  const regen = (poke) => { if (poke) leaveField(poke); if (poke) { poke.confused = 0; poke.rampage = null; poke.charging = null; poke.mustRecharge = false; poke.protectChain = 0; } if (poke && !poke.fainted && poke.ability === 'regenerator' && poke.hp < poke.maxHp) poke.hp = Math.min(poke.maxHp, poke.hp + Math.floor(poke.maxHp / 3)); };
+
+  // --- 1. Gestion des Switchs volontaires (priorité absolue) ---
+  // Colère : le Pokémon enchaîne la même attaque 2 ou 3 tours, sans pouvoir changer (+ Lance-Soleil en charge)
+  for (const side of SIDES) {
+    const poke = P(side), lk = poke && !poke.fainted && (poke.rampage || poke.charging);
+    if (lk) acts[side] = { type: 'move', moveId: lk.move, target: acts[side] && acts[side].target };
+  }
+  for (const side of SIDES) {
+    const act = acts[side];
+    if (!act || act.type !== 'switch') continue;
+    const team = teamOf(state, side), targetIdx = act.targetIndex;
+    if (!benchOf(state, side).includes(targetIdx)) continue;
+    const tr = getTrainer(state, side);
+    regen(P(side));
+    state['active' + side] = targetIdx;
+    const np = team[targetIdx];
+    np.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    np.toxicTurns = 0;
+    onSwitchIn(np);
+    logEvent({ type: 'switch', side, pokemonId: np.id, spriteId: np.spriteId || np.id, name: np.name, hp: np.hp, maxHp: np.maxHp,
+      types: np.types, status: np.status || null, trainer: tr.name, msg: `${tr.name} rappelle son Pokémon et envoie ${np.name} !` });
+    onEntry(state, side, logEvent);
+  }
+
+  // --- 1 bis. Méga-Évolution (avant les attaques : la nouvelle Vitesse compte dès ce tour) ---
+  for (const side of SIDES) {
+    const act = acts[side], poke = P(side);
+    if (!act || act.type !== 'move' || !act.mega || !canMega(state, side, poke)) continue;
+    const m = ITEMS[poke.item].mega, form = MEGA_FORM(poke.id, m.pid);
+    if (!form) continue;
+    state.megaUsed = { ...(state.megaUsed || {}), [teamKey(side)]: true };
+    const before = poke.name;
+    poke.isMega = true; poke.spriteId = form.pid; poke.baseName = before; poke.name = form.name;
+    poke.types = [...form.types];
+    poke.stats = { ...form.stats, hp: poke.stats.hp };   // les PV ne changent pas
+    const tr = getTrainer(state, side);
+    logEvent({ type: 'mega', side, pokemonId: poke.id, spriteId: form.pid, name: form.name, types: poke.types, trainer: tr.name,
+      msg: `${before} réagit à la ${ITEMS[poke.item].name} de ${tr.name} ! ${before} méga-évolue en ${form.name} !` });
+    const megaAb = abilityOf(form.pid);
+    if (megaAb) poke.ability = megaAb;   // la forme Méga a son propre talent
+    onEntry(state, side, logEvent);
   }
 
   // --- 2. Détermination de l'ordre d'attaque ---
-  let firstSide = 'A';
-  const moveA = actionA && actionA.type === 'move' ? MOVES[actionA.moveId] : null;
-  const moveB = actionB && actionB.type === 'move' ? MOVES[actionB.moveId] : null;
-
-  if (moveA && moveB) {
-    const prioA = moveA.priority || 0;
-    const prioB = moveB.priority || 0;
-    if (prioA !== prioB) {
-      firstSide = prioA > prioB ? 'A' : 'B';
-    } else {
-      const spdA = getEffectiveSpeed(pA);
-      const spdB = getEffectiveSpeed(pB);
-      if (spdA !== spdB) {
-        firstSide = spdA > spdB ? 'A' : 'B';
-      } else {
-        firstSide = Math.random() < 0.5 ? 'A' : 'B';
-      }
-    }
-  } else if (!moveA && moveB) {
-    firstSide = 'B';
-  } else {
-    firstSide = 'A';
+  // objets Choix : le Pokémon ne peut lancer que l'attaque sur laquelle il est bloqué (tant qu'elle a des PP)
+  for (const side of SIDES) {
+    const act = acts[side], poke = P(side);
+    if (!act || act.type !== 'move' || !poke || !CHOICE.has(poke.item) || !poke.choiceLock) continue;
+    const pp = poke.ppMap ? poke.ppMap[poke.choiceLock] : 1;
+    if (poke.moves.includes(poke.choiceLock) && pp > 0) acts[side] = { ...act, moveId: poke.choiceLock };
   }
-
-  const secondSide = firstSide === 'A' ? 'B' : 'A';
-  const flinched = { A: false, B: false };
+  state.pivot = {};
+  // Farceur : attaques de statut en priorité ; Ailes Bourrasque : attaques Vol en priorité
+  const prio = (m, p) => (m.priority || 0) + (p.ability === 'prankster' && m.cat === 'status' ? 1 : 0) + (p.ability === 'gale-wings' && m.type === 'flying' ? 1 : 0);
+  const order = SIDES.filter((s) => acts[s] && acts[s].type === 'move' && MOVES[acts[s].moveId] && alive(s))
+    .map((s) => ({ s, pr: prio(MOVES[acts[s].moveId], P(s)), sp: getEffectiveSpeed(P(s), state), r: Math.random() }))
+    .sort((x, y) => y.pr - x.pr || y.sp - x.sp || x.r - y.r)
+    .map((o) => o.s);
+  const flinched = {};
+  const moved = new Set();
+  let passed = false;   // l'attaque a passé les vérifications du lanceur (sommeil, peur, PP…) : les autres cibles d'une attaque de zone peuvent être touchées
 
   // --- 3. Exécution d'une attaque ---
-  function executeMove(attSide, defSide, isFirstMover) {
+  function executeMove(attSide, defSide, isFirstMover, extra = false, spreadMult = 1) {
     const attPoke = getActivePokemon(state, attSide);
     const defPoke = getActivePokemon(state, defSide);
-    const attAction = attSide === 'A' ? actionA : actionB;
+    const attAction = acts[attSide];
     const moveId = attAction && attAction.type === 'move' ? attAction.moveId : null;
     const attMove = moveId ? MOVES[moveId] : null;
 
-    if (!attMove || attPoke.fainted || defPoke.fainted) return;
+    if (!attMove || !attPoke || !defPoke || attPoke.fainted || defPoke.fainted) return;
 
+    if (!extra) {   // vérifications du lanceur : une seule fois, même pour une attaque de zone
+    attPoke.movesLast = !isFirstMover;   // Analyste
+    // Absentéisme : un tour sur deux
+    if (attPoke.ability === 'truant') {
+      if (attPoke.loafing) { attPoke.loafing = false; logEvent({ type: 'ability', side: attSide, ability: 'truant', msg: `${attPoke.name} paresse...` }); return; }
+      attPoke.loafing = true;
+    }
+    // Ultralaser : un tour de recharge
+    if (attPoke.mustRecharge) {
+      attPoke.mustRecharge = false;
+      logEvent({ type: 'msg', text: `${attPoke.name} doit se recharger !` });
+      return;
+    }
     // Vérifier si apeuré (flinch) par la première attaque
     if (flinched[attSide]) {
       logEvent({ type: 'msg', text: `${attPoke.name} a peur et ne peut pas attaquer !` });
+      if (attPoke.ability === 'steadfast') selfStat(attPoke, attSide, 'spe', 1, logEvent);
       return;
+    }
+    // Attaque bloquée par Corps Maudit
+    if (attPoke.disabled && attPoke.disabled.move === moveId && attPoke.disabled.turns > 0) {
+      logEvent({ type: 'msg', text: `${attPoke.name} ne peut pas utiliser ${attMove.name}, elle est bloquée !` });
+      return;
+    }
+
+    // Confusion (après Colère) : 1 chance sur 3 de se blesser
+    if (attPoke.confused > 0) {
+      attPoke.confused--;
+      if (attPoke.confused === 0) logEvent({ type: 'msg', text: `${attPoke.name} n'est plus confus !` });
+      else {
+        logEvent({ type: 'msg', text: `${attPoke.name} est confus...` });
+        if (Math.random() < 1 / 3) {
+          const dmg = Math.max(1, Math.floor(((22 * 40 * getEffectiveStat(attPoke, 'atk') / getEffectiveStat(attPoke, 'def')) / 50 + 2) * (0.85 + Math.random() * 0.15)));
+          attPoke.hp = Math.max(0, attPoke.hp - dmg);
+          logEvent({ type: 'recoil', side: attSide, damage: dmg, hp: attPoke.hp, maxHp: attPoke.maxHp, msg: `Il se blesse dans sa confusion !` });
+          if (attPoke.hp === 0) { attPoke.fainted = true; logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` }); }
+          attPoke.rampage = null;
+          return;
+        }
+      }
     }
 
     // Gestion du Sommeil (1 à 3 tours)
@@ -308,9 +573,19 @@ export function resolveTurn(state, actionA, actionB) {
     }
 
     // Décrémenter les PP
-    if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined) {
-      attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - 1);
+    if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined && !attPoke.charging) {
+      // Pression : une attaque qui vise ce Pokémon coûte 2 PP
+      const cost = defPoke.ability === 'pressure' && !(attMove.effect && attMove.effect.target === 'self' && attMove.cat === 'status') ? 2 : 1;
+      attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - cost);
     }
+    if (CHOICE.has(attPoke.item) && !attPoke.choiceLock) attPoke.choiceLock = moveId;
+    // Lance-Soleil : un tour pour absorber la lumière (sauf au soleil)
+    if (attMove.charge && !attPoke.charging && weatherOf(state) !== 'sun' && attPoke.ability !== 'mega-sol') {
+      attPoke.charging = { move: moveId };
+      logEvent({ type: 'msg', text: `${attPoke.name} absorbe la lumière !` });
+      return;
+    }
+    attPoke.charging = null;
 
     logEvent({
       type: 'attack_start',
@@ -323,21 +598,57 @@ export function resolveTurn(state, actionA, actionB) {
       msg: `${attPoke.name} utilise ${attMove.name} !`
     });
 
+    // Coup Bas : échoue si la cible ne prépare pas une attaque (ou a déjà attaqué)
+    if (attMove.sucker) {
+      const foeAct = acts[defSide], fm = foeAct && foeAct.type === 'move' ? MOVES[foeAct.moveId] : null;
+      if (!isFirstMover || !fm || fm.cat === 'status') { logEvent({ type: 'msg', text: `Mais cela échoue !` }); return; }
+    }
     // Trempette
     if (moveId === 'splash') {
       logEvent({ type: 'msg', text: `Mais rien ne se passe !` });
       return;
     }
 
-    // Test de précision
+    // Protéen : prend le type de l'attaque ; Déclic Tactique : Forme Assaut pour attaquer
+    if (attPoke.ability === 'protean') {
+      const t = moveTypeFor(attPoke, attMove);
+      if (attPoke.types.length !== 1 || attPoke.types[0] !== t) { attPoke.types = [t]; logEvent({ type: 'ability', side: attSide, ability: 'protean', msg: `${attPoke.name} devient de type ${TYPE_FR[t] || t} (${AN('protean')}) !` }); }
+    }
+    if (attPoke.ability === 'stance-change' && !!attMove.power !== !!attPoke.blade) {
+      stance(attPoke, !!attMove.power);
+      logEvent({ type: 'ability', side: attSide, ability: 'stance-change', msg: attPoke.blade ? `${attPoke.name} passe en Forme Assaut !` : `${attPoke.name} passe en Forme Parade !` });
+    }
+    // Abri : réussit à coup sûr la première fois, de moins en moins s'il est enchaîné
+    if (attMove.effect && attMove.effect.type === 'protect') {
+      const chain = attPoke.protectChain || 0;
+      if (Math.random() < 1 / Math.pow(3, chain)) {
+        attPoke.protected = true; attPoke.protectChain = chain + 1;
+        logEvent({ type: 'msg', text: `${attPoke.name} se protège !` });
+      } else { attPoke.protectChain = 0; logEvent({ type: 'msg', text: 'Mais cela échoue !' }); }
+      passed = false;
+      return;
+    }
+    attPoke.protectChain = 0;
+    }
+    passed = true;
+    // la cible s'est protégée avec Abri
+    if (defPoke.protected && defSide !== attSide && !(attMove.cat === 'status' && attMove.effect && attMove.effect.target === 'self') && !(attMove.effect && attMove.effect.type === 'heal')) {
+      logEvent({ type: 'msg', text: `${defPoke.name} se protège !` });
+      return;
+    }
+    // Test de précision (Annule Garde : touche à coup sûr, dans les deux sens)
     const acc = attMove.acc || 100;
-    if (acc < 100 && Math.random() * 100 > acc) {
+    const sure = attPoke.ability === 'no-guard' || defPoke.ability === 'no-guard' || (attMove.rainSure && weatherOf(state) === 'rain') || (moveId === 'blizzard' && weatherOf(state) === 'hail');
+    let acc2 = acc * (attPoke.ability === 'compound-eyes' ? 1.3 : attPoke.ability === 'victory-star' ? 1.1 : 1);
+    if (attMove.cat === 'status' && ab(defPoke, attPoke) === 'wonder-skin' && attMove.effect && attMove.effect.target !== 'self' && attMove.effect.type !== 'heal') acc2 = Math.min(acc2, 50);   // Fatal-Foudre, Vent Violent : sûrs sous la pluie
+    if (!sure && acc2 < 100 && Math.random() * 100 > acc2) {
       logEvent({ type: 'msg', text: `Mais l'attaque de ${attPoke.name} a échoué !` });
       return;
     }
 
     // Gestion du soin (Recover, Roost, etc.)
     if (attMove.effect && attMove.effect.type === 'heal') {
+      if (attPoke.hp >= attPoke.maxHp) { logEvent({ type: 'msg', text: `Mais ${attPoke.name} a déjà tous ses PV !` }); return; }
       const healAmount = Math.floor(attPoke.maxHp * attMove.effect.val);
       attPoke.hp = Math.min(attPoke.maxHp, attPoke.hp + healAmount);
       logEvent({
@@ -352,49 +663,75 @@ export function resolveTurn(state, actionA, actionB) {
       return;
     }
 
+    // Talents qui absorbent ou annulent une attaque de leur type (Lévitation, Torche, Absorb Eau, Paratonnerre…)
+    const mType = moveTypeFor(attPoke, attMove);
+    const targetsFoe = !(attMove.cat === 'status' && attMove.effect && attMove.effect.target === 'self');
+    if (targetsFoe) {
+      const abs = absorbs(defPoke, mType, attPoke);
+      if (abs) {
+        const nm = AN(defPoke.ability);
+        if (abs.heal) {
+          const amount = Math.min(defPoke.maxHp - defPoke.hp, Math.floor(defPoke.maxHp / 4));
+          defPoke.hp += amount;
+          logEvent({ type: 'ability', side: defSide, ability: defPoke.ability, msg: `${nm} de ${defPoke.name} absorbe l'attaque !` });
+          if (amount > 0) logEvent({ type: 'heal', side: defSide, pokemonId: defPoke.id, hp: defPoke.hp, maxHp: defPoke.maxHp, amount, msg: `${defPoke.name} récupère ${amount} PV !` });
+        } else if (abs.boost) {
+          logEvent({ type: 'ability', side: defSide, ability: defPoke.ability, msg: `${nm} de ${defPoke.name} attire l'attaque !` });
+          selfStat(defPoke, defSide, abs.boost[0], abs.boost[1], logEvent);
+        } else if (abs.flashFire) {
+          defPoke.flashFire = true;
+          logEvent({ type: 'ability', side: defSide, ability: 'flash-fire', msg: `${nm} de ${defPoke.name} s'active : ses attaques Feu sont plus puissantes !` });
+        } else {
+          logEvent({ type: 'ability', side: defSide, ability: defPoke.ability, msg: `${defPoke.name} ne craint rien grâce à ${nm} !` });
+        }
+        return;
+      }
+    }
+
+    // Miroir Magik : les attaques de statut sont renvoyées à l'envoyeur
+    let tgtPoke = defPoke, tgtSide = defSide, srcPoke = attPoke, srcSide = attSide;
+    if (attMove.cat === 'status' && targetsFoe && ab(defPoke, attPoke) === 'magic-bounce') {
+      logEvent({ type: 'ability', side: defSide, ability: 'magic-bounce', msg: `${defPoke.name} renvoie ${attMove.name} grâce à ${AN('magic-bounce')} !` });
+      tgtPoke = attPoke; tgtSide = attSide; srcPoke = defPoke; srcSide = defSide;
+    }
+
     // Gestion des boosts/baisses de stats purs (Danse Lames, Danse Draco, Rugissement...)
     if (attMove.cat === 'status' && attMove.effect && attMove.effect.type === 'stat') {
-      applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
+      applyStatEffect(attMove.effect, srcPoke, tgtPoke, srcSide, tgtSide, logEvent);
       return;
     }
 
     // Gestion des statuts purs (Cage-Éclair, Feu Follet, Toxik, Spore, Hypnose)
     if (attMove.cat === 'status' && attMove.effect && attMove.effect.type === 'status') {
       const st = attMove.effect.status;
-      // Immunités naturelles de type aux statuts
-      const immune =
-        (st === 'burn' && defPoke.types.includes('fire')) ||
-        (st === 'paralysis' && (defPoke.types.includes('electric') || (attMove.type === 'electric' && defPoke.types.includes('ground')))) ||
-        ((st === 'poison' || st === 'toxic') && (defPoke.types.includes('poison') || defPoke.types.includes('steel'))) ||
-        (st === 'sleep' && attMove.type === 'grass' && defPoke.types.includes('grass'));
-
-      if (immune) {
-        logEvent({ type: 'msg', text: `Ça n'affecte pas ${defPoke.name}...` });
-      } else if (!defPoke.status) {
-        defPoke.status = st;
-        if (st === 'sleep') defPoke.sleepTurns = 1 + Math.floor(Math.random() * 2); // 1 à 2 tours
-        if (st === 'toxic') defPoke.toxicTurns = 1;
-        const stLabel = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', toxic: 'est gravement empoisonné', sleep: "s'endort" }[st] || "souffre d'un statut";
-        logEvent({
-          type: 'status_applied',
-          side: defSide,
-          status: st,
-          msg: `${defPoke.name} ${stLabel} !`
-        });
+      const grassSleep = st === 'sleep' && attMove.type === 'grass' && tgtPoke.types.includes('grass');
+      if (tgtPoke.status) {
+        logEvent({ type: 'msg', text: `Mais ${tgtPoke.name} a déjà un statut !` });
+      } else if (grassSleep || !statusAllowed(state, tgtPoke, st, attMove.type)) {
+        logEvent({ type: 'msg', text: `Ça n'affecte pas ${tgtPoke.name}...` });
       } else {
-        logEvent({ type: 'msg', text: `Mais ${defPoke.name} a déjà un statut !` });
+        inflict(state, tgtPoke, tgtSide, st, logEvent, { poke: srcPoke, side: srcSide });
       }
       return;
     }
 
     // Calcul des dégâts
-    const res = calculateDamage(attPoke, defPoke, attMove);
+    const res = calculateDamage(attPoke, defPoke, attMove, state);
+    if (spreadMult !== 1 && res.damage > 0) res.damage = Math.max(1, Math.floor(res.damage * spreadMult));   // attaque de zone : ×0,75
+    const sheer = attPoke.ability === 'sheer-force' && hasSecondary(attMove);   // Sans Limite : pas d'effet secondaire
 
     if (res.mult === 0) {
       logEvent({ type: 'msg', text: res.text });
       return;
     }
 
+    // Ceinture Force : à PV pleins, un coup fatal laisse 1 PV (une fois)
+    let sashed = false, sturdied = false;
+    if (ab(defPoke, attPoke) === 'sturdy' && defPoke.hp === defPoke.maxHp && res.damage >= defPoke.hp) {
+      res.damage = defPoke.hp - 1; sturdied = true;   // Fermeté : survit à un coup fatal à PV pleins
+    } else if (defPoke.item === 'focussash' && !defPoke.itemUsed && defPoke.hp === defPoke.maxHp && res.damage >= defPoke.hp) {
+      res.damage = defPoke.hp - 1; defPoke.itemUsed = true; sashed = true;
+    }
     defPoke.hp = Math.max(0, defPoke.hp - res.damage);
 
     // Une attaque de type Feu dégèle la cible si elle était gelée
@@ -418,9 +755,14 @@ export function resolveTurn(state, actionA, actionB) {
       mult: res.mult,
       msg: res.text || null
     });
+    if (sashed) logEvent({ type: 'item', side: defSide, item: 'focussash', msg: `${defPoke.name} tient bon grâce à sa ${ITEMS.focussash.name} !` });
+    if (sturdied) logEvent({ type: 'ability', side: defSide, ability: 'sturdy', msg: `${defPoke.name} tient bon grâce à ${AN('sturdy')} !` });
+    checkBerries(defPoke, defSide, logEvent, state);
 
     // Effet drain (Giga-Sangsue, Vampi-Poing)
-    if (attMove.drain && res.damage > 0) {
+    if (attMove.drain && res.damage > 0 && ab(defPoke, attPoke) === 'liquid-ooze') {
+      indirect(attPoke, attSide, Math.max(1, Math.floor(res.damage * attMove.drain)), `${attPoke.name} aspire le ${AN('liquid-ooze')} de ${defPoke.name} !`, logEvent);
+    } else if (attMove.drain && res.damage > 0) {
       const drainAmount = Math.max(1, Math.floor(res.damage * attMove.drain));
       attPoke.hp = Math.min(attPoke.maxHp, attPoke.hp + drainAmount);
       logEvent({
@@ -434,88 +776,179 @@ export function resolveTurn(state, actionA, actionB) {
       });
     }
 
-    // Effet contrecoup (Boutefeu, Rapace, Éclair Fou)
-    if (attMove.recoil && res.damage > 0) {
+    // Effet contrecoup (Boutefeu, Rapace, Éclair Fou) — Tête de Roc : aucun contrecoup ; Garde Magik non plus
+    if (attMove.recoil && res.damage > 0 && attPoke.ability !== 'rock-head') {
       const recoilDmg = Math.max(1, Math.floor(res.damage * attMove.recoil));
-      attPoke.hp = Math.max(0, attPoke.hp - recoilDmg);
-      logEvent({
-        type: 'recoil',
-        side: attSide,
-        damage: recoilDmg,
-        hp: attPoke.hp,
-        maxHp: attPoke.maxHp,
-        msg: `${attPoke.name} subit ${recoilDmg} PV de contrecoup !`
-      });
-      if (attPoke.hp === 0) {
-        attPoke.fainted = true;
-        logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` });
+      indirect(attPoke, attSide, recoilDmg, `${attPoke.name} subit ${recoilDmg} PV de contrecoup !`, logEvent);
+    }
+
+    // Orbe Vie : 1/10 des PV du lanceur à chaque coup porté (pas avec Sans Limite ni Garde Magik)
+    if (attPoke.item === 'lifeorb' && res.damage > 0 && !attPoke.fainted && !sheer) {
+      const cost = Math.max(1, Math.floor(attPoke.maxHp / 10));
+      indirect(attPoke, attSide, cost, `${attPoke.name} perd un peu de PV à cause de l'${ITEMS.lifeorb.name} !`, logEvent, { item: 'lifeorb' });
+    }
+    checkBerries(attPoke, attSide, logEvent, state);
+
+    // Talents de la cible au contact (Peau Dure, Statik, Point Poison, Corps Ardent, Pose Spore)
+    const contact = isContact(moveId, attMove);
+    const dA = ab(defPoke, attPoke);
+    if (contact && res.damage > 0 && !attPoke.fainted) {
+      if (attPoke.ability === 'poison-touch' && !defPoke.fainted && !defPoke.status && Math.random() < 0.3 && statusAllowed(state, defPoke, 'poison')) {
+        logEvent({ type: 'ability', side: attSide, ability: 'poison-touch', msg: `${AN('poison-touch')} de ${attPoke.name} s'active !` });
+        inflict(state, defPoke, defSide, 'poison', logEvent, null);
       }
+      if (dA === 'rough-skin' || dA === 'iron-barbs') indirect(attPoke, attSide, Math.max(1, Math.floor(attPoke.maxHp / 8)), `${attPoke.name} se blesse sur ${AN(dA)} de ${defPoke.name} !`, logEvent);
+      const cst = { static: 'paralysis', 'poison-point': 'poison', 'flame-body': 'burn' }[dA]
+        || (dA === 'effect-spore' ? ['sleep', 'paralysis', 'poison'][Math.floor(Math.random() * 3)] : null);
+      if (cst && !attPoke.fainted && Math.random() < 0.3 && statusAllowed(state, attPoke, cst)) {
+        logEvent({ type: 'ability', side: defSide, ability: dA, msg: `${AN(dA)} de ${defPoke.name} s'active !` });
+        inflict(state, attPoke, attSide, cst, logEvent, null);
+      }
+    }
+    // Corps Maudit : 30 % de chances de bloquer l'attaque reçue pendant 3 tours
+    if (dA === 'cursed-body' && res.damage > 0 && !attPoke.fainted && !attPoke.disabled && Math.random() < 0.3) {
+      attPoke.disabled = { move: moveId, turns: 3 };
+      logEvent({ type: 'ability', side: defSide, ability: dA, msg: `${AN(dA)} de ${defPoke.name} bloque ${attMove.name} de ${attPoke.name} !` });
     }
 
     // Effet de stat sur le lanceur même si le défenseur tombe K.O. (Close Combat, Draco-Météore, Surpuissance)
-    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted) {
+    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted
+      && (!attMove.effect.chance || (!sheer && Math.random() * 100 < attMove.effect.chance))) {   // Poing Météore : 20 %
       applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
     }
 
+    if (attMove.recharge && res.damage > 0) attPoke.mustRecharge = true;
+    // Colère : 2 ou 3 tours d'affilée, puis le lanceur est épuisé et confus
+    if (attMove.rampage && !attPoke.fainted) {
+      if (!attPoke.rampage) attPoke.rampage = { move: moveId, left: Math.random() < 0.5 ? 2 : 1 };
+      else if (--attPoke.rampage.left <= 0) {
+        attPoke.rampage = null;
+        attPoke.confused = 2 + Math.floor(Math.random() * 4);
+        logEvent({ type: 'msg', text: `${attPoke.name} est épuisé et devient confus !` });
+      }
+    }
+    // Demi-Tour, Change Éclair : après le coup, le lanceur laisse sa place (choix du remplaçant à la fin du tour)
+    if (attMove.pivot && !attPoke.fainted) {
+      if (benchOf(state, attSide).length) {
+        state.pivot[attSide] = true;
+        logEvent({ type: 'msg', text: `${attPoke.name} revient vers ${getTrainer(state, attSide).name} !` });
+      }
+    }
+
+    // Colérique : un coup critique reçu monte l'Attaque au maximum
+    if (res.crit && defPoke.hp > 0 && defPoke.ability === 'anger-point') {
+      logEvent({ type: 'ability', side: defSide, ability: 'anger-point', msg: `${AN('anger-point')} de ${defPoke.name} : son Attaque monte au maximum !` });
+      selfStat(defPoke, defSide, 'atk', 12, logEvent);
+    }
     // K.O. du défenseur
     if (defPoke.hp === 0) {
       defPoke.fainted = true;
+      if (defPoke.ability === 'aftermath' && contact && !attPoke.fainted) indirect(attPoke, attSide, Math.max(1, Math.floor(attPoke.maxHp / 4)), `${AN('aftermath')} de ${defPoke.name} blesse ${attPoke.name} !`, logEvent);
       logEvent({ type: 'faint', side: defSide, pokemonId: defPoke.id, name: defPoke.name, msg: `${defPoke.name} est K.O. !` });
+      // Impudence : l'Attaque monte après chaque K.O.
+      if (attPoke.ability === 'moxie' && !attPoke.fainted) { logEvent({ type: 'ability', side: attSide, ability: 'moxie', msg: `${AN('moxie')} de ${attPoke.name} s'active !` }); selfStat(attPoke, attSide, 'atk', 1, logEvent); }
       return;
     }
 
+    // Talents de la cible touchée : Cœur Noble (Ténèbres → Attaque +1), Armurouillée (physique → Déf −1, Vit +2)
+    if (res.damage > 0) {
+      if (defPoke.ability === 'justified' && mType === 'dark') { logEvent({ type: 'ability', side: defSide, ability: 'justified', msg: `${AN('justified')} de ${defPoke.name} s'active !` }); selfStat(defPoke, defSide, 'atk', 1, logEvent); }
+      if (defPoke.ability === 'weak-armor' && attMove.cat === 'physical') { logEvent({ type: 'ability', side: defSide, ability: 'weak-armor', msg: `${AN('weak-armor')} de ${defPoke.name} s'active !` }); selfStat(defPoke, defSide, 'def', -1, logEvent); selfStat(defPoke, defSide, 'spe', 2, logEvent); }
+    }
+
     // Effet secondaire de baisse de stat sur la cible (Psyko, Ball'Ombre, Mâchouille, Piétinement, Écume)
-    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'opponent') {
-      const chance = attMove.effect.chance || 100;
+    const sg = attPoke.ability === 'serene-grace' ? 2 : 1, dust = ab(defPoke, attPoke) === 'shield-dust';   // Sérénité, Écran Poudre
+    if (!sheer && attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'opponent' && !(dust && (attMove.effect.chance || 100) < 100)) {
+      const chance = (attMove.effect.chance || 100) * sg;
       if (Math.random() * 100 < chance) {
         applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
       }
     }
 
     // Effet secondaire de statut (ex: Brûlure sur Lance-Flammes 10%, Paralysie sur Tonnerre 10%)
-    if (attMove.effect && attMove.effect.type === 'status' && !defPoke.status) {
+    if (!sheer && attMove.effect && attMove.effect.type === 'status' && !defPoke.status) {
       const st = attMove.effect.status;
-      const immune =
-        (st === 'burn' && defPoke.types.includes('fire')) ||
-        (st === 'paralysis' && defPoke.types.includes('electric')) ||
-        (st === 'freeze' && defPoke.types.includes('ice')) ||
-        (st === 'poison' && (defPoke.types.includes('poison') || defPoke.types.includes('steel')));
-
-      if (!immune && Math.random() * 100 < (attMove.effect.chance || 10)) {
-        defPoke.status = st;
-        const stLabel = { paralysis: 'est paralysé', burn: 'est brûlé', poison: 'est empoisonné', freeze: 'est gelé' }[defPoke.status];
-        if (stLabel) {
-          logEvent({ type: 'status_applied', side: defSide, status: defPoke.status, msg: `${defPoke.name} ${stLabel} !` });
-        }
+      if (!dust && statusAllowed(state, defPoke, st, attMove.type) && Math.random() * 100 < (attMove.effect.chance || 10) * sg) {
+        inflict(state, defPoke, defSide, st, logEvent, { poke: attPoke, side: attSide });
       }
     }
 
-    // Effet secondaire de Peur (Flinch) si l'attaquant agit en premier
-    if (isFirstMover && attMove.flinch && Math.random() * 100 < attMove.flinch) {
+    // Effet secondaire de Peur (Flinch) si l'attaquant agit en premier (Attention : jamais peur)
+    const flinch = attMove.flinch || (attPoke.ability === 'stench' ? 10 : 0);   // Puanteur
+    if (!sheer && !dust && isFirstMover && flinch && defPoke.ability !== 'inner-focus' && Math.random() * 100 < flinch * sg) {
       flinched[defSide] = true;
+    }
+    // Confusion (Vibraqua 20 %, Vent Violent 30 %)
+    if (!sheer && !dust && attMove.confuse && !defPoke.fainted && !defPoke.confused && defPoke.ability !== 'own-tempo' && Math.random() * 100 < attMove.confuse * sg) {
+      defPoke.confused = 2 + Math.floor(Math.random() * 4);
+      logEvent({ type: 'msg', text: `${defPoke.name} devient confus !` });
     }
   }
 
-  // Exécution premier attaquant
-  executeMove(firstSide, secondSide, true);
+  // Exécution dans l'ordre : cible choisie (ou l'autre adversaire si elle est tombée), attaques de zone sur toutes les cibles
+  for (const side of order) {
+    if (!alive(side)) { moved.add(side); continue; }
+    const act = acts[side], mv = MOVES[act.moveId];
+    const foes = foeSides(state, side).filter(alive);
+    let targets;
+    if (!state.doubles) targets = [foeSides(state, side)[0]];
+    else if (mv.spread === 'foes') targets = foes;
+    else if (mv.spread === 'all') targets = [...foes, allySide(side)].filter(alive);
+    else {
+      const selfMove = mv.cat === 'status' && mv.effect && (mv.effect.target === 'self' || mv.effect.type === 'heal' || mv.effect.type === 'protect');
+      let t = act.target && alive(act.target) && (teamKey(act.target) !== teamKey(side) || act.target !== side) ? act.target : null;
+      if (!t && !selfMove) t = foes[Math.floor(Math.random() * foes.length)] || null;
+      if (selfMove) t = t || foes[0] || side;
+      targets = t ? [t] : [];
+    }
+    if (!targets.length) { logEvent({ type: 'msg', text: `${P(side).name} n'a plus de cible !` }); moved.add(side); continue; }
+    const spread = targets.length > 1 ? 0.75 : 1;
+    passed = false;
+    executeMove(side, targets[0], !moved.has(targets[0]), false, spread);
+    if (passed) for (const t of targets.slice(1)) executeMove(side, t, !moved.has(t), true, spread);
+    moved.add(side);
+  }
 
-  // Exécution second attaquant si encore en vie
-  executeMove(secondSide, firstSide, false);
-
-  // --- 4. Dégâts de statut de fin de tour (Brûlure, Poison, Toxik progressif) ---
-  for (const side of ['A', 'B']) {
+  // --- 4. Fin de tour : météo, statuts, objets, talents ---
+  const weather = weatherOf(state);
+  const heal = (poke, side, amount, msg, extra = {}) => {
+    amount = Math.min(poke.maxHp - poke.hp, amount);
+    if (amount <= 0) return;
+    poke.hp += amount;
+    logEvent({ type: 'heal', side, pokemonId: poke.id, hp: poke.hp, maxHp: poke.maxHp, amount, msg, ...extra });
+  };
+  for (const side of SIDES) {
     const poke = getActivePokemon(state, side);
+    if (poke) poke.protected = false;   // Abri ne dure qu'un tour
     if (!poke || poke.fainted) continue;
+    const a = poke.ability, guard = a === 'magic-guard';
 
-    if (poke.status === 'burn') {
+    // météo
+    if (weather === 'sand' && !poke.types.some((t) => ['rock', 'ground', 'steel'].includes(t)) && !['sand-force', 'sand-veil', 'overcoat'].includes(a)) {
+      if (indirect(poke, side, Math.max(1, Math.floor(poke.maxHp / 16)), `La tempête de sable frappe ${poke.name} !`, logEvent)) continue;
+    }
+    if (weather === 'hail' && !poke.types.includes('ice') && !['ice-body', 'snow-cloak', 'overcoat'].includes(a)) {
+      if (indirect(poke, side, Math.max(1, Math.floor(poke.maxHp / 16)), `La grêle frappe ${poke.name} !`, logEvent)) continue;
+    }
+    if (weather === 'hail' && a === 'ice-body') heal(poke, side, Math.max(1, Math.floor(poke.maxHp / 16)), `${AN(a)} : ${poke.name} récupère des PV sous la grêle !`);
+    if (weather === 'rain' && a === 'dry-skin') heal(poke, side, Math.max(1, Math.floor(poke.maxHp / 8)), `${AN(a)} : la pluie soigne ${poke.name} !`);
+    if (weather === 'sun' && a === 'dry-skin') { if (indirect(poke, side, Math.max(1, Math.floor(poke.maxHp / 8)), `${AN(a)} : ${poke.name} souffre du soleil !`, logEvent)) continue; }
+    if (weather === 'rain' && a === 'rain-dish') heal(poke, side, Math.max(1, Math.floor(poke.maxHp / 16)), `${AN(a)} : ${poke.name} récupère des PV sous la pluie !`);
+    if (weather === 'rain' && a === 'hydration' && poke.status) { poke.status = null; poke.sleepTurns = 0; logEvent({ type: 'status_cured', side, msg: `${AN(a)} : la pluie soigne ${poke.name} !` }); }
+    if (weather === 'sun' && a === 'solar-power') { if (indirect(poke, side, Math.max(1, Math.floor(poke.maxHp / 8)), `${AN(a)} : ${poke.name} souffre du soleil !`, logEvent)) continue; }
+
+    // statuts (Garde Magik : rien ; Soin Poison : le poison soigne)
+    if (poke.status === 'burn' && !guard) {
       const burnDmg = Math.max(1, Math.floor(poke.maxHp / 16));
       poke.hp = Math.max(0, poke.hp - burnDmg);
       logEvent({ type: 'status_damage', side, damage: burnDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre de sa brûlure (-${burnDmg} PV) !` });
-    } else if (poke.status === 'poison') {
+    } else if ((poke.status === 'poison' || poke.status === 'toxic') && a === 'poison-heal') {
+      heal(poke, side, Math.max(1, Math.floor(poke.maxHp / 8)), `${AN(a)} : le poison soigne ${poke.name} !`);
+    } else if (poke.status === 'poison' && !guard) {
       const poisonDmg = Math.max(1, Math.floor(poke.maxHp / 8));
       poke.hp = Math.max(0, poke.hp - poisonDmg);
       logEvent({ type: 'status_damage', side, damage: poisonDmg, hp: poke.hp, maxHp: poke.maxHp, msg: `${poke.name} souffre du poison (-${poisonDmg} PV) !` });
-    } else if (poke.status === 'toxic') {
+    } else if (poke.status === 'toxic' && !guard) {
       poke.toxicTurns = (poke.toxicTurns || 1);
       const toxicDmg = Math.max(1, Math.floor((poke.maxHp * poke.toxicTurns) / 16));
       poke.toxicTurns = Math.min(15, poke.toxicTurns + 1);
@@ -526,6 +959,47 @@ export function resolveTurn(state, actionA, actionB) {
     if (poke.hp === 0 && !poke.fainted) {
       poke.fainted = true;
       logEvent({ type: 'faint', side, pokemonId: poke.id, name: poke.name, msg: `${poke.name} est K.O. !` });
+      continue;
+    }
+    checkBerries(poke, side, logEvent, state);
+    // Restes : 1/16 des PV en fin de tour
+    if (poke.item === 'leftovers' && poke.hp < poke.maxHp) {
+      heal(poke, side, Math.max(1, Math.floor(poke.maxHp / 16)), `${poke.name} récupère un peu de PV grâce aux ${ITEMS.leftovers.name} !`, { item: 'leftovers' });
+    }
+    // Récolte : une baie mangée repousse une fois sur deux (toujours au soleil)
+    if (a === 'harvest' && poke.itemUsed && (poke.item === 'sitrus' || poke.item === 'lum') && (weather === 'sun' || Math.random() < 0.5)) {
+      poke.itemUsed = false;
+      logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} : la ${ITEMS[poke.item].name} de ${poke.name} repousse !` });
+      checkBerries(poke, side, logEvent, state);
+    }
+    // Mue : 1 chance sur 3 de guérir
+    if (a === 'shed-skin' && poke.status && Math.random() < 1 / 3) { poke.status = null; poke.sleepTurns = 0; logEvent({ type: 'status_cured', side, msg: `${AN(a)} : ${poke.name} guérit de son statut !` }); }
+    // Mauvais Rêve : l'adversaire endormi perd des PV
+    if (a === 'bad-dreams') for (const fs of foeSides(state, side)) { const foeP = getActivePokemon(state, fs); if (foeP && !foeP.fainted && foeP.status === 'sleep') indirect(foeP, fs, Math.max(1, Math.floor(foeP.maxHp / 8)), `${foeP.name} fait un cauchemar (${AN(a)}) !`, logEvent); }
+    // Début Calme : un tour de moins
+    if (a === 'slow-start' && poke.slowStart > 0 && --poke.slowStart === 0) logEvent({ type: 'ability', side, ability: a, msg: `${poke.name} a enfin trouvé son rythme !` });
+    // Lunatique : une stat monte beaucoup, une autre baisse
+    if (a === 'moody') {
+      const ks = ['atk', 'def', 'spa', 'spd', 'spe'], up = ks.filter((k) => (poke.statStages[k] || 0) < 6);
+      if (up.length) {
+        const u = up[Math.floor(Math.random() * up.length)], dn = ks.filter((k) => k !== u && (poke.statStages[k] || 0) > -6);
+        logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} de ${poke.name} s'active !` });
+        selfStat(poke, side, u, 2, logEvent);
+        if (dn.length) selfStat(poke, side, dn[Math.floor(Math.random() * dn.length)], -1, logEvent);
+      }
+    }
+    // Turbo : la Vitesse monte à chaque tour
+    if (a === 'speed-boost' && (poke.statStages.spe || 0) < 6) { logEvent({ type: 'ability', side, ability: a, msg: `${AN(a)} de ${poke.name} s'active !` }); selfStat(poke, side, 'spe', 1, logEvent); }
+    // attaque bloquée par Corps Maudit : un tour de moins
+    if (poke.disabled) { poke.disabled.turns--; if (poke.disabled.turns <= 0) { poke.disabled = null; logEvent({ type: 'msg', text: `L'attaque de ${poke.name} n'est plus bloquée.` }); } }
+  }
+  // la météo s'arrête au bout de 5 tours (les vents violents durent tant que leur Pokémon est au combat)
+  if (state.weather) {
+    const w = state.weather;
+    const holder = getActivePokemon(state, w.by);
+    if (w.type === 'wind' ? !(holder && !holder.fainted && holder.ability === 'delta-stream') : --w.turns <= 0) {
+      logEvent({ type: 'weather_end', weather: w.type, msg: WEATHER_TXT[w.type][1] });
+      state.weather = null;
     }
   }
 
@@ -543,14 +1017,33 @@ export function resolveTurn(state, actionA, actionB) {
       trainerName: winTrainer.name,
       msg: state.winner === 'tie' ? 'Match nul épique !' : `Victoire éclatante de ${winTrainer.name} !`
     });
+  } else if (state.doubles) {
+    // Double : chaque emplacement K.O. (ou Demi-Tour) est remplacé tant qu'il reste des Pokémon sur le banc
+    const pv = state.pivot || {};
+    state.pivot = {};
+    const need = [];
+    const used = new Set();
+    for (const side of SIDES) {
+      const p = P(side);
+      if (!p || !(p.fainted || pv[side])) continue;
+      // une place libre se remplit s'il reste un Pokémon de réserve que l'autre emplacement ne prend pas déjà
+      const free = benchOf(state, side).filter((i) => !used.has(teamKey(side) + i));
+      if (free.length) { need.push(side); if (!state.pools) used.add(teamKey(side) + free[0]); }
+    }
+    state.need = need;
+    if (need.length) state.phase = 'switch_forced';
+    else { state.phase = 'choose'; state.turn++; }
   } else {
     const curA = getActivePokemon(state, 'A');
     const curB = getActivePokemon(state, 'B');
-    if (curA.fainted && curB.fainted) {
+    const pv = state.pivot || {};
+    const needA = curA.fainted || (pv.A && !curA.fainted), needB = curB.fainted || (pv.B && !curB.fainted);
+    state.pivot = {};
+    if (needA && needB) {
       state.phase = 'switch_forced_both';
-    } else if (curA.fainted) {
+    } else if (needA) {
       state.phase = 'switch_forced_A';
-    } else if (curB.fainted) {
+    } else if (needB) {
       state.phase = 'switch_forced_B';
     } else {
       state.phase = 'choose';
@@ -566,21 +1059,28 @@ export function resolveTurn(state, actionA, actionB) {
  * Switch forcé après qu'un Pokémon soit tombé K.O.
  */
 export function forceSwitch(state, side, targetIdx) {
-  const team = side === 'A' ? state.teamA : state.teamB;
+  const team = teamOf(state, side);
   if (!team[targetIdx] || team[targetIdx].fainted) return false;
+  if (state.doubles && !(state.need || []).includes(side)) return false;
+  const out = getActivePokemon(state, side);
+  if (!benchOf(state, side).includes(targetIdx)) return false;
+  if (out && !out.fainted) leaveField(out);
+  if (out) { out.rampage = null; out.confused = 0; out.charging = null; out.mustRecharge = false; if (!out.fainted && out.ability === 'regenerator') out.hp = Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)); }
 
-  if (side === 'A') state.activeA = targetIdx;
-  else state.activeB = targetIdx;
+  state['active' + side] = targetIdx;
 
   const nextPoke = team[targetIdx];
   nextPoke.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   nextPoke.toxicTurns = 0;
+  onSwitchIn(nextPoke);
+  state.entry = [...(state.entry || []), side];   // son talent d'arrivée joue au début du prochain tour
 
   const trainer = getTrainer(state, side);
   const event = {
     type: 'switch',
     side,
     pokemonId: nextPoke.id,
+    spriteId: nextPoke.spriteId || nextPoke.id,
     name: nextPoke.name,
     hp: nextPoke.hp,
     maxHp: nextPoke.maxHp,
@@ -595,7 +1095,10 @@ export function forceSwitch(state, side, targetIdx) {
   }
 
   // Mise à jour de la phase
-  if (state.phase === 'switch_forced_both') {
+  if (state.doubles) {
+    state.need = (state.need || []).filter((x) => x !== side);
+    if (!state.need.length) { state.phase = 'choose'; state.turn++; }
+  } else if (state.phase === 'switch_forced_both') {
     state.phase = side === 'A' ? 'switch_forced_B' : 'switch_forced_A';
   } else {
     state.phase = 'choose';

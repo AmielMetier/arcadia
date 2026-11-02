@@ -6,10 +6,14 @@
 import {
   createTournament, submitDraft, draftComplete, closeDraft, resolveAutomatic, nextPlayableMatch,
   openPreview, setReady, buildBattle, recordGame, koCredits, markGone, isOver, currentMatch,
-  getParticipant, sideOf, placeOf,
+  getParticipant, sideOf, placeOf, isMulti, slotOf, allReady,
 } from '../engine/tournament.js';
-import { resolveTurn, forceSwitch, estimateTurnDuration } from '../engine/battle.js';
-import { chooseBotAction, chooseBestSwitch } from '../engine/bot.js';
+import { resolveTurn, resolveActions, forceSwitch, estimateTurnDuration, runEntry, sidesOf, teamKey, getActivePokemon } from '../engine/battle.js';
+import { chooseBotAction, chooseBestSwitch, chooseDoublesAction, chooseDoublesSwitch } from '../engine/bot.js';
+
+// Combat en double (VGC) : un joueur (A ou B) commande deux emplacements (A et C, ou B et D)
+const slotsOf = (b, side) => sidesOf(b).filter((s) => teamKey(s) === side);
+const aliveSlots = (b) => sidesOf(b).filter((s) => { const p = getActivePokemon(b, s); return p && !p.fainted; });
 
 const DRAFT_SECS = 50;
 const REVEAL_SECS = 8;     // premier affichage de l'arbre après le draft
@@ -27,6 +31,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
   let battle = null;       // combat en cours
   let credits = [];        // K.O. de la manche en cours
   let pending = { A: null, B: null };
+  let slotPending = {};    // combat en double : action de chaque emplacement (A, C, B, D)
   let leadPick = { A: null, B: null }; // choix de tête des humains, gardés secrets jusqu'à l'envoi
   let cont = { A: false, B: false };   // « Continuer » sur le résumé
   let deadline = 0;        // fin de la phase en cours (draft, arbre, aperçu, résumé)
@@ -76,8 +81,9 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       deadline,
       turnEndsAt,
       timerSecs,
-      submittedA: !!pending.A,
-      submittedB: !!pending.B,
+      submittedA: battle && battle.doubles ? slotsOf(battle, 'A').every((x) => slotPending[x] || !aliveSlots(battle).includes(x)) && Object.keys(slotPending).length > 0 : !!pending.A,
+      submittedB: battle && battle.doubles ? slotsOf(battle, 'B').every((x) => slotPending[x] || !aliveSlots(battle).includes(x)) && Object.keys(slotPending).length > 0 : !!pending.B,
+      submittedSlots: Object.fromEntries(Object.keys(slotPending).map((k) => [k, true])),
       cont,
       events,
       evSeq,
@@ -119,6 +125,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       gen: settings.gen || 'all',
       bots: settings.bots !== undefined ? Number(settings.bots) : 1,
       finalBestOf: settings.final !== undefined ? Number(settings.final) : 3,
+      format: settings.format || 'single',
     });
     setDeadline(DRAFT_SECS, endDraft);
     broadcast();
@@ -160,14 +167,13 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     if (!m || t.phase !== 'preview') return;
     clearPhase();
     deadline = 0;
-    if (leadPick.A != null) t.lead.A = leadPick.A;
-    if (leadPick.B != null) t.lead.B = leadPick.B;
+    for (const k of Object.keys(leadPick)) if (leadPick[k] != null && k in t.lead) t.lead[k] = leadPick[k];
     battle = buildBattle(t, m);
     credits = [];
     pending = { A: null, B: null };
-    const introEvents = ['A', 'B'].map((side) => {
-      const p = side === 'A' ? battle.teamA[0] : battle.teamB[0];
-      const tr = side === 'A' ? battle.trainerA : battle.trainerB;
+    const introEvents = sidesOf(battle).map((side) => {
+      const p = battle.teamA && (teamKey(side) === 'A' ? battle.teamA : battle.teamB)[battle['active' + side]];
+      const tr = teamKey(side) === 'A' ? battle.trainerA : battle.trainerB;
       return {
         type: 'switch', side, pokemonId: p.id, name: p.name, hp: p.hp, maxHp: p.maxHp,
         types: p.types, status: null, trainer: tr.name, msg: `${tr.name} envoie ${p.name} !`,
@@ -178,6 +184,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     broadcast();
     after(SPLASH_MS, () => {
       intro = false;
+      introEvents.push(...runEntry(battle));   // Intimidation, météo… dès l'arrivée sur le terrain
       broadcast(introEvents);
       after(estimateTurnDuration(introEvents), startTurn);
     });
@@ -189,6 +196,20 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     pending = { A: null, B: null };
     turnEndsAt = Date.now() + timerSecs * 1000;
     const b = battle;
+    if (b.doubles) {
+      // chaque emplacement joue pour lui : les bots (et les joueurs partis) choisissent seuls
+      slotPending = {};
+      for (const slot of aliveSlots(b)) if (botSlot(b, slot)) after(900 + Math.random() * 1000, () => {
+        if (battle === b && b.phase === 'choose' && !slotPending[slot]) setSlot(b, slot, chooseDoublesAction(b, slot, difficulty));
+      });
+      turnTimer = setTimeout(() => {
+        if (!alive || battle !== b || b.phase !== 'choose') return;
+        for (const slot of aliveSlots(b)) if (!slotPending[slot]) slotPending[slot] = chooseDoublesAction(b, slot, 'facile');
+        resolve();
+      }, timerSecs * 1000);
+      broadcast();
+      return;
+    }
     for (const side of ['A', 'B']) {
       const tr = side === 'A' ? b.trainerA : b.trainerB;
       if (tr.bot) after(900 + Math.random() * 1000, () => {
@@ -203,10 +224,39 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     broadcast();
   }
 
-  function submit(side, action) {
+  /** Emplacement joué par l'ordinateur : dresseur bot, ou joueur parti (2 contre 2) */
+  function botSlot(b, slot) {
+    if (b.owners) { const P = getParticipant(t, b.owners[slot]); return !P || P.bot || P.gone; }
+    return !!(teamKey(slot) === 'A' ? b.trainerA : b.trainerB).bot;
+  }
+  /** Emplacements qu'un joueur commande : les deux de son camp (VGC), ou le sien seul (2 contre 2) */
+  function slotsFor(b, side, from) {
+    if (b.owners) return sidesOf(b).filter((s) => same(b.owners[s], from));
+    return slotsOf(b, side);
+  }
+  function setSlot(b, slot, act) {
+    if (!act || slotPending[slot]) return;
+    slotPending[slot] = act;
+    broadcast();
+    if (aliveSlots(b).every((s) => slotPending[s])) { clearTurn(); after(350, resolve); }
+  }
+
+  function submit(side, action, from = me.id) {
     const b = battle;
     if (!b || t.phase !== 'battle' || !action) return;
 
+    // Double : remplacement d'un emplacement (action.slot) après un K.O. ou un Demi-Tour
+    if (b.doubles && b.phase === 'switch_forced') {
+      const mine = slotsFor(b, side, from).concat(b.owners ? [] : []);
+      const slot = action.slot || (b.need || []).find((s) => mine.includes(s));
+      const allowed = action.byHost ? teamKey(slot) === side : mine.includes(slot);
+      if (action.type !== 'switch' || !slot || !allowed || !b.need.includes(slot)) return;
+      const ev = forceSwitch(b, slot, action.targetIndex);
+      if (!ev) return;
+      if (b.phase === 'choose') { clearTurn(); const evs = [ev, ...runEntry(b)]; broadcast(evs); after(estimateTurnDuration(evs), startTurn); }
+      else broadcast([ev]);
+      return;
+    }
     // Remplacement après un K.O.
     if (b.phase.startsWith('switch_forced')) {
       const needs = b.phase === 'switch_forced_both' || b.phase === `switch_forced_${side}`;
@@ -215,14 +265,30 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       if (!ev) return;
       if (b.phase === 'choose') {
         clearTurn();
-        broadcast([ev]);
-        after(estimateTurnDuration([ev]), startTurn);
+        const evs = [ev, ...runEntry(b)];
+        broadcast(evs);
+        after(estimateTurnDuration(evs), startTurn);
       } else {
         broadcast([ev]);
       }
       return;
     }
 
+    if (b.doubles) {
+      // une action par emplacement commandé par ce joueur ; ce qui manque est choisi pour lui
+      if (b.phase !== 'choose' || action.type !== 'pair' || !action.acts) return;
+      let added = false;
+      for (const s of slotsFor(b, side, from)) {
+        if (slotPending[s] || !aliveSlots(b).includes(s)) continue;
+        const a = action.acts[s];
+        slotPending[s] = a && (a.type === 'move' || a.type === 'switch') ? a : chooseDoublesAction(b, s, 'facile');
+        added = true;
+      }
+      if (!added) return;   // déjà choisi : on ne relance pas le tour une deuxième fois
+      broadcast();
+      if (aliveSlots(b).every((s) => slotPending[s])) { clearTurn(); after(350, resolve); }
+      return;
+    }
     if (b.phase !== 'choose' || pending[side]) return;
     if (action.type !== 'move' && action.type !== 'switch') return;
     pending[side] = action;
@@ -236,11 +302,13 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
   function resolve() {
     const b = battle;
     if (!b || b.phase !== 'choose') return;
+    if (b.doubles && !Object.keys(slotPending).length) return;   // tour déjà joué
     const actA = pending.A;
     const actB = pending.B;
     pending = { A: null, B: null };
     clearTurn();
-    const { state, events } = resolveTurn(b, actA, actB);
+    const sp = slotPending; slotPending = {};
+    const { state, events } = b.doubles ? resolveActions(b, sp) : resolveTurn(b, actA, actB);
     battle = state;
     credits.push(...koCredits(battle, events));
     broadcast(events);
@@ -255,6 +323,23 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
   function forcedSwitches() {
     const b = battle;
     if (!b || !b.phase.startsWith('switch_forced')) return;
+    if (b.doubles) {
+      // bots : remplaçants tout de suite ; humains : chrono, puis choix automatique
+      let humanWaits = false;
+      for (const slot of [...b.need]) {
+        if (botSlot(b, slot)) after(700 + Math.random() * 500, () => { if (battle !== b || !b.need.includes(slot)) return; const sw = chooseDoublesSwitch(b, slot); if (sw) submit(teamKey(slot), { ...sw, slot, byHost: true }); });
+        else humanWaits = true;
+      }
+      if (!humanWaits) return;
+      clearTurn();
+      turnEndsAt = Date.now() + timerSecs * 1000;
+      turnTimer = setTimeout(() => {
+        if (!alive || battle !== b || b.phase !== 'switch_forced') return;
+        for (const slot of [...b.need]) { const sw = chooseDoublesSwitch(b, slot); if (sw) submit(teamKey(slot), { ...sw, slot, byHost: true }); }
+      }, timerSecs * 1000);
+      broadcast();
+      return;
+    }
     const sides = b.phase === 'switch_forced_both' ? ['A', 'B'] : [b.phase.slice(-1)];
     let humanWaits = false;
     for (const side of sides) {
@@ -332,24 +417,26 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     const side = sideOf(match, from);
     switch (m.t) {
       case 'draft':
-        if (submitDraft(t, from, m.picks)) {
+        if (submitDraft(t, from, m.picks, m.items)) {
           broadcast();
           if (draftComplete(t)) { clearPhase(); setTimeout(() => alive && endDraft(), 600); }
         }
         break;
       case 'lead':
-        if (t.phase === 'preview' && side && !t.ready[side]) leadPick[side] = Number(m.idx);
+        { const key = isMulti(t) ? slotOf(match, from) : side;
+          if (t.phase === 'preview' && key && !t.ready[key]) leadPick[key] = Array.isArray(m.idx) ? m.idx.map(Number) : Number(m.idx); }
         break;
       case 'ready':
-        if (t.phase === 'preview' && side && !t.ready[side]) {
-          if (m.idx != null) leadPick[side] = Number(m.idx);
-          setReady(t, side, null);
-          broadcast();
-          if (t.ready.A && t.ready.B) { clearPhase(); setTimeout(() => alive && startGame(), 700); }
-        }
+        { const key = isMulti(t) ? slotOf(match, from) : side;
+          if (t.phase === 'preview' && key && !t.ready[key]) {
+            if (m.idx != null) leadPick[key] = Array.isArray(m.idx) ? m.idx.map(Number) : Number(m.idx);
+            setReady(t, key, null);
+            broadcast();
+            if (allReady(t)) { clearPhase(); setTimeout(() => alive && startGame(), 700); }
+          } }
         break;
       case 'action':
-        if (side) submit(side, m.action);
+        if (side) submit(side, m.action, from);
         break;
       case 'continue':
         if (t.phase === 'summary' && side && !cont[side]) {
@@ -436,7 +523,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
 
   const mine = (msg) => handle(me.id, msg);
   return {
-    draft: (picks) => mine({ t: 'draft', picks }),
+    draft: (picks, items) => mine({ t: 'draft', picks, items }),
     lead: (idx) => mine({ t: 'lead', idx }),
     ready: (idx) => mine({ t: 'ready', idx }),
     submitAction: (action) => mine({ t: 'action', action }),

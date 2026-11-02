@@ -67,15 +67,21 @@ export const T = {
     }
     g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 4; g.strokeRect(0, 0, w, h);
   }),
+  // grille de la station : 8 cases par motif (au lieu de 16) et des bords doux, pour qu'elle ne scintille plus au loin
   grate: () => canvasTex('grate', 512, 512, (g, w, h, r) => {
-    g.fillStyle = '#1b1414'; g.fillRect(0, 0, w, h);
-    const n = 16;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const gr = g.createRadialGradient(x * w / n + 16, y * h / n + 16, 1, x * w / n + 16, y * h / n + 16, 16); gr.addColorStop(0, '#ff7a1c'); gr.addColorStop(1, '#3a0d04'); g.fillStyle = gr; g.fillRect(x * w / n + 5, y * h / n + 5, w / n - 10, h / n - 10); }
-    g.strokeStyle = '#6b6f78'; g.lineWidth = 7; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * w / n, 0); g.lineTo(i * w / n, h); g.stroke(); g.beginPath(); g.moveTo(0, i * h / n); g.lineTo(w, i * h / n); g.stroke(); }
+    g.fillStyle = '#23252b'; g.fillRect(0, 0, w, h);
+    const n = 8, c = w / n;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const gr = g.createRadialGradient(x * c + c / 2, y * c + c / 2, 2, x * c + c / 2, y * c + c / 2, c * 0.6);
+      gr.addColorStop(0, '#8a3a18'); gr.addColorStop(1, '#22100c'); g.fillStyle = gr; roundRect(g, x * c + 9, y * c + 9, c - 18, c - 18, 8); g.fill();
+    }
+    noise(g, w, h, r, 9000, (r) => `rgba(255,255,255,${r() * 0.05})`, 1.2);
+    g.strokeStyle = '#4d525c'; g.lineWidth = 10; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * c, 0); g.lineTo(i * c, h); g.stroke(); g.beginPath(); g.moveTo(0, i * c); g.lineTo(w, i * c); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 2; for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * c - 4, 0); g.lineTo(i * c - 4, h); g.stroke(); }
   }),
   grateEm: () => canvasTex('grateEm', 256, 256, (g, w, h) => {
-    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const n = 16;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { g.fillStyle = '#ff5a10'; g.fillRect(x * w / n + 4, y * h / n + 4, w / n - 8, h / n - 8); }
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); const n = 8, c = w / n;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const gr = g.createRadialGradient(x * c + c / 2, y * c + c / 2, 1, x * c + c / 2, y * c + c / 2, c * 0.45); gr.addColorStop(0, '#ff7a28'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(x * c, y * c, c, c); }
   }),
   sand: () => canvasTex('sand', 512, 512, (g, w, h, r) => {
     g.fillStyle = '#e6cf98'; g.fillRect(0, 0, w, h);
@@ -263,4 +269,39 @@ export function signTex(n, name, par, colors) {
     g.font = '700 44px "Kalam", sans-serif'; g.fillText(name, w / 2, 240);
     g.font = '700 36px "Kalam", sans-serif'; g.fillText('par ' + par, w / 2, 288);
   });
+}
+
+/* -------- textures photo (Poly Haven, CC0) --------
+   Les mêmes fichiers que Cyber Kart GP (kart/tex, voir kart/tex/LISEZMOI.md). On commence avec la texture dessinée,
+   et on la remplace dès que la photo est chargée : si un fichier manque, rien ne change à l'écran. */
+const PHOTO_DIR = new URL('../../kart/tex/', import.meta.url).href;
+const photoCache = new Map();
+function loadPhoto(file, data) {
+  if (photoCache.has(file)) return photoCache.get(file);
+  const p = new Promise((res) => {
+    new THREE.TextureLoader().load(PHOTO_DIR + file, (t) => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+      t.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+      res(t);
+    }, undefined, () => res(null));
+  });
+  photoCache.set(file, p); return p;
+}
+/**
+ * Habille un matériau avec une photo : name = fichier de kart/tex sans extension.
+ * o.repeat : nombre de motifs par unité de texture ; o.normal : relief (0 = sans) ; o.clone : copie à part (répétition propre)
+ */
+export function dressPhoto(mat, name, o = {}) {
+  const rep = o.repeat ?? 1, wantN = o.normal ?? 0.7;
+  loadPhoto(name + '.jpg').then((t) => {
+    if (!t) return;
+    const tex = rep !== 1 || o.clone ? t.clone() : t; if (tex !== t) { tex.repeat.set(rep, rep); tex.needsUpdate = true; }
+    mat.map = tex; if (o.color) mat.color.set(o.color); mat.needsUpdate = true;
+  });
+  if (wantN > 0) loadPhoto(name + '_n.jpg', true).then((t) => {
+    if (!t) return;
+    const tex = rep !== 1 || o.clone ? t.clone() : t; if (tex !== t) { tex.repeat.set(rep, rep); tex.needsUpdate = true; }
+    mat.normalMap = tex; mat.normalScale = new THREE.Vector2(wantN, wantN); mat.needsUpdate = true;
+  });
+  return mat;
 }

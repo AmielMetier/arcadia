@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
+const saves = require('./saves');
 
 const PORT = process.env.PORT || 8080;
 const PING_INTERVAL_MS = Number(process.env.RELAY_PING_MS) || 30000; // réglable pour les tests
@@ -89,6 +90,7 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   const route = req.url.split('?')[0];
+  if (saves.handle(req, res, route)) return;
 
   if (route === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });

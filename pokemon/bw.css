@@ -709,21 +709,23 @@
 .fx-spark { width: 10px; height: 10px; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 .fx-stat {
   transform: translate(-50%, -50%);
-  -webkit-mask: linear-gradient(transparent, #000 25%, #000 75%, transparent);
-  mask: linear-gradient(transparent, #000 25%, #000 75%, transparent);
-  background-size: 28px 28px;
-  mix-blend-mode: screen;
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  background-size: 32px 26px;
+  image-rendering: pixelated;
 }
+/* chevrons pleins sur un voile de couleur, qui défilent vite (comme dans Noir & Blanc) */
 .fx-stat.up {
-  background-image: linear-gradient(135deg, transparent 0 35%, #58a8ff 35% 50%, transparent 50%), linear-gradient(225deg, transparent 0 35%, #58a8ff 35% 50%, transparent 50%);
-  animation: fxRise 0.45s linear infinite;
+  background-color: rgba(60, 140, 255, 0.45);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='26'%3E%3Cpath d='M4 20 L16 8 L28 20' fill='none' stroke='%23e6f4ff' stroke-width='5' stroke-linecap='square'/%3E%3C/svg%3E");
+  animation: fxRise 0.32s linear infinite;
 }
 .fx-stat.down {
-  background-image: linear-gradient(45deg, transparent 0 35%, #ff5848 35% 50%, transparent 50%), linear-gradient(315deg, transparent 0 35%, #ff5848 35% 50%, transparent 50%);
-  animation: fxFall 0.45s linear infinite;
+  background-color: rgba(255, 70, 50, 0.45);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='26'%3E%3Cpath d='M4 6 L16 18 L28 6' fill='none' stroke='%23ffe4de' stroke-width='5' stroke-linecap='square'/%3E%3C/svg%3E");
+  animation: fxFall 0.32s linear infinite;
 }
-@keyframes fxRise { from { background-position: 0 0, 0 0; } to { background-position: 0 -28px, 0 -28px; } }
-@keyframes fxFall { from { background-position: 0 0, 0 0; } to { background-position: 0 28px, 0 28px; } }
+@keyframes fxRise { from { background-position: 0 0; } to { background-position: 0 -26px; } }
+@keyframes fxFall { from { background-position: 0 0; } to { background-position: 0 26px; } }
 .tz-root .damage-popup { z-index: 9; }
 @media (max-width: 760px) {
   .tz-root .poke-brand { min-width: 0; flex-shrink: 1; }
@@ -777,3 +779,148 @@
 }
 .tz-root .bw-hpnum b { margin-right: 4px; }
 .tz-root .bw-hpnum #hpMaxBottom { margin-left: 4px; }
+
+/* ===== objets tenus ===== */
+.sc-item{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;background:rgba(255,255,255,.88);color:#222;border:1px solid rgba(0,0,0,.35);border-radius:10px;padding:0 6px 0 2px;margin-left:4px;vertical-align:middle;white-space:nowrap}
+.sc-item img{width:20px;height:20px;image-rendering:pixelated}
+.sc-item.used{opacity:.45;text-decoration:line-through}
+.fx-item{width:40px;height:40px;pointer-events:none}
+.fx-item img{width:40px;height:40px;image-rendering:pixelated;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.bw-move.choice-locked{opacity:.35;filter:grayscale(.8)}
+.dr-slot-tx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.dr-item{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700}
+.dr-item img{width:24px;height:24px;image-rendering:pixelated;flex:none}
+.dr-item select{flex:1;min-width:0;font:inherit;font-size:12px;padding:2px 4px;border:2px solid #222;border-radius:6px;background:#fff;cursor:pointer}
+.dr-item.locked span{opacity:.8}
+.dr-items-help{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:11.5px;line-height:1.3}
+.dr-items-help p{margin:0;display:flex;gap:5px;align-items:flex-start}
+.dr-items-help img{width:20px;height:20px;image-rendering:pixelated;flex:none}
+.dr-items-help b{white-space:nowrap}
+
+/* ===== Méga-Évolution ===== */
+.fx-mega-ring{border-radius:50%;background:conic-gradient(#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);
+  -webkit-mask:radial-gradient(circle,transparent 52%,#000 54%,#000 64%,transparent 66%);mask:radial-gradient(circle,transparent 52%,#000 54%,#000 64%,transparent 66%);filter:blur(1px) drop-shadow(0 0 8px #fff)}
+.fx-mega-flash{left:0;top:0;width:100%;height:100%;background:radial-gradient(circle,#fff 30%,rgba(255,255,255,.85));z-index:9}
+.bw-mega{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 8px;padding:6px 12px;border:3px solid #222;border-radius:10px;cursor:pointer;
+  background:linear-gradient(90deg,#3a2a60,#5a3a90);color:#fff;font-family:inherit;font-weight:800;letter-spacing:1px;text-align:left}
+.bw-mega img{width:28px;height:28px;image-rendering:pixelated}
+.bw-mega small{margin-left:auto;font-weight:600;letter-spacing:0;font-size:11px;opacity:.8}
+.bw-mega:hover{filter:brightness(1.15)}
+.bw-mega.on{background:conic-gradient(from 90deg,#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);color:#111;text-shadow:0 1px 0 #fff;animation:megaPulse 1s ease-in-out infinite}
+@keyframes megaPulse{50%{box-shadow:0 0 14px 2px rgba(255,255,255,.8)}}
+.dr-mega{font-size:10px;letter-spacing:1px;vertical-align:middle;padding:1px 6px;border-radius:8px;background:conic-gradient(#ff5050,#ffb030,#fff050,#50ff80,#50c8ff,#a070ff,#ff50c0,#ff5050);color:#111;text-shadow:0 1px 0 #fff}
+
+/* ===== talents et météo ===== */
+.sc-ability{display:inline-flex;align-items:center;font-size:11px;font-weight:700;background:rgba(40,30,70,.85);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:1px 7px;margin-left:4px;vertical-align:middle;white-space:nowrap}
+.bw-ab-banner{position:absolute;z-index:9;display:flex;flex-direction:column;gap:0;padding:6px 18px;min-width:180px;background:linear-gradient(90deg,#2c2050,#4a3a8a);color:#fff;border:3px solid #fff;box-shadow:0 4px 0 rgba(0,0,0,.4);pointer-events:none}
+.bw-ab-banner small{font-size:11px;opacity:.85;font-weight:700}
+.bw-ab-banner b{font-size:18px;letter-spacing:.5px}
+.bw-ab-banner.top{left:0;top:30%;border-left:0;border-radius:0 12px 12px 0}
+.bw-ab-banner.bottom{right:0;top:52%;border-right:0;border-radius:12px 0 0 12px;text-align:right}
+.bw-weather-slot{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:7;pointer-events:none}
+.bw-weather{display:inline-block;font-size:12px;font-weight:800;padding:3px 10px;border-radius:12px;border:2px solid rgba(0,0,0,.4);background:rgba(255,255,255,.9);color:#222}
+.bw-weather.w-sun{background:#ffd34d}.bw-weather.w-rain{background:#7ab8ff}.bw-weather.w-sand{background:#e0c080}.bw-weather.w-wind{background:#bfe0e8}
+.dr-ability{font-size:11px;line-height:1.3;margin:4px 0 2px;opacity:.92;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dr-ability b{color:#ffd34d}
+/* ambiance météo sur l'arène */
+.bf-inner:has(.w-rain)::after,.bf-inner:has(.w-sun)::after,.bf-inner:has(.w-sand)::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none}
+.bf-inner:has(.w-rain)::after{background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(180,210,255,.35) 14px 15px,transparent 15px 34px);background-size:120px 120px;animation:wxRain .35s linear infinite;background-color:rgba(30,50,90,.18)}
+.bf-inner:has(.w-sun)::after{background:radial-gradient(circle at 85% 0%,rgba(255,230,140,.55),transparent 55%);mix-blend-mode:screen;animation:wxSun 3s ease-in-out infinite alternate}
+.bf-inner:has(.w-sand)::after{background:repeating-linear-gradient(170deg,transparent 0 10px,rgba(210,170,100,.28) 10px 12px,transparent 12px 26px);background-size:160px 160px;background-color:rgba(190,150,80,.18);animation:wxSand .5s linear infinite}
+@keyframes wxRain{to{background-position:-40px 120px}}
+@keyframes wxSand{to{background-position:160px 30px}}
+@keyframes wxSun{to{opacity:.6}}
+@media(prefers-reduced-motion:reduce){.bf-inner::after{animation:none!important}}
+
+/* bouton Méga au-dessus des attaques, dans la même colonne */
+.bw-movecol{display:flex;flex-direction:column;min-width:0}
+.bw-movecol .moves-grid{flex:1}
+.bw-mega{flex:none}
+/* grêle */
+.bw-weather.w-hail{background:#d8f0ff}
+.bf-inner:has(.w-hail)::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.85) 0 2px,transparent 3px) 0 0/38px 38px,radial-gradient(circle,rgba(255,255,255,.7) 0 1.5px,transparent 2.5px) 19px 13px/46px 46px;background-color:rgba(160,200,230,.16);animation:wxHail .45s linear infinite}
+@keyframes wxHail{to{background-position:-12px 38px,7px 59px}}
+/* bulles d'aide (attaques, talents, objets) */
+.pd-tip{position:fixed;z-index:9999;max-width:290px;padding:9px 12px;border:2px solid #222;border-radius:10px;background:#fbf7ec;color:#1d1d1d;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);font:600 13px/1.4 'Chakra Petch',system-ui,sans-serif;pointer-events:none;display:flex;flex-direction:column;gap:3px}
+.pd-tip[hidden]{display:none}
+.pd-tip b{font-size:14.5px}
+.pd-tip small{font-size:11.5px;color:#5c574c;font-weight:700}
+/* l'adversaire choisit son remplaçant */
+.bw-foe-wait{min-height:168px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;color:#f3eee0}
+.bw-foe-wait b{font-size:18px}.bw-foe-wait small{opacity:.75;font-weight:600}
+.bw-foe-ball{width:34px;height:34px;border-radius:50%;border:3px solid #222;background:linear-gradient(#e33 0 46%,#222 46% 54%,#fff 54%);animation:foeBall 1s ease-in-out infinite}
+@keyframes foeBall{0%,100%{transform:rotate(-18deg)}50%{transform:rotate(18deg)}}
+
+/* ================= Combat en double (VGC) ================= */
+.vgc-arena{display:flex;flex-direction:column;gap:8px;width:min(1180px,100%);margin:0 auto;padding:6px}
+.vgc-field{position:relative;min-height:440px;border:2px solid #111;border-radius:8px;overflow:hidden;
+  background:#1b2440 url('assets/arena_stadium.jpg') center 68%/cover no-repeat;display:grid;grid-template-rows:auto 1fr 1fr auto;padding:10px 14px}
+.vgc-arena.final .vgc-field{box-shadow:inset 0 0 0 3px #ffd848}
+.vgc-weather{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:5}
+.vgc-trainer{display:flex;align-items:center;gap:8px;color:#fff;font-weight:800;text-shadow:0 2px 0 #000;font-size:15px}
+.vgc-trainer.top{justify-content:flex-end}.vgc-trainer.bottom{justify-content:flex-start}
+.vgc-balls{display:inline-flex;gap:4px}.vgc-balls i{width:12px;height:12px;border-radius:50%;border:2px solid #111;background:linear-gradient(#e33 0 45%,#111 45% 55%,#fff 55%)}
+.vgc-balls i.ko{filter:grayscale(1);opacity:.45}
+.vgc-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:end}
+.vgc-row.top{padding-left:22%}.vgc-row.bottom{padding-right:22%}
+.vgc-slot{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;transition:opacity .4s,filter .4s}
+.vgc-slot.foe{flex-direction:column}
+.vgc-slot.mine{flex-direction:column-reverse}
+.vgc-sprite{height:112px;max-width:100%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 6px 4px rgba(0,0,0,.45))}
+.vgc-slot.mine .vgc-sprite{height:132px}
+.vgc-slot.fainted .vgc-sprite{opacity:0;transform:translateY(30px);transition:all .6s}
+.vgc-slot.fainted .vgc-hud{opacity:.45;filter:grayscale(1)}
+.vgc-slot.empty{visibility:hidden}
+.vgc-hud{width:min(250px,100%);background:#f8f4e8;border:3px solid #222;border-radius:10px;padding:5px 9px;color:#1d1d1d;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.vgc-hud-top{display:flex;align-items:center;gap:6px}.vgc-name{font-size:15px;font-weight:800;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vgc-lv{font-size:11px;font-weight:800;opacity:.7}
+.vgc-hp{height:9px;border-radius:6px;background:#3b3b3b;border:2px solid #222;overflow:hidden;margin:3px 0}
+.vgc-hp .hp-fill{display:block;height:100%;transition:width .6s ease}
+.vgc-hud-bot{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800}
+.vgc-hpnum{flex:1}.vgc-ab{background:#e6ddc6;border-radius:6px;padding:0 5px;cursor:help}.vgc-it img{width:20px;height:20px;vertical-align:middle;cursor:help}
+.vgc-stages{display:flex;flex-wrap:wrap;gap:3px}.vgc-stages i{font-style:normal;font-size:10.5px;font-weight:800;padding:0 4px;border-radius:5px}
+.vgc-stages i.up{background:#bfeab2}.vgc-stages i.down{background:#f2b6b0}
+.vgc-pop{position:absolute;left:50%;top:40%;z-index:6;pointer-events:none}
+.vgc-popnum{position:absolute;transform:translateX(-50%);white-space:nowrap;font:900 20px/1 'Chakra Petch',sans-serif;color:#fff;text-shadow:0 2px 0 #000,0 0 6px #000;animation:vgcPop 1.2s ease-out forwards}
+.vgc-popnum.crit{color:#ffde4a;font-size:24px}.vgc-popnum.super{color:#ff9a6a}.vgc-popnum.heal{color:#8fff7a}
+.vgc-popnum.up{color:#9fe58f;font-size:15px}.vgc-popnum.down{color:#ff9b8e;font-size:15px}
+.vgc-popnum.ability{background:#2b2f3a;border:2px solid #ffd34d;border-radius:8px;padding:3px 8px;font-size:14px;color:#ffd34d}
+.vgc-popnum.item{font-size:14px;color:#ffe9a8}
+@keyframes vgcPop{from{opacity:1;margin-top:0}to{opacity:0;margin-top:-46px}}
+.vgc-slot.attack .vgc-sprite{animation:vgcLunge .5s ease}
+.vgc-slot.foe.attack .vgc-sprite{animation-name:vgcLungeDown}
+@keyframes vgcLunge{40%{transform:translateY(-22px) scale(1.06)}}
+@keyframes vgcLungeDown{40%{transform:translateY(22px) scale(1.06)}}
+.vgc-slot.hurt .vgc-sprite{animation:vgcHurt .5s steps(2) }
+@keyframes vgcHurt{0%,50%{opacity:.2;transform:translateX(-6px)}25%,75%{opacity:1;transform:translateX(6px)}}
+.vgc-slot.enter .vgc-sprite{animation:vgcEnter .6s ease-out}
+@keyframes vgcEnter{from{transform:scale(.2);opacity:0}to{transform:none;opacity:1}}
+.vgc-slot.mega .vgc-sprite{animation:vgcMega .9s ease}
+@keyframes vgcMega{30%{filter:brightness(4) drop-shadow(0 0 18px #ff8cf0)}}
+.vgc-msg{min-height:44px;background:#21262f;border:3px solid #111;border-radius:8px;color:#f3eee0;font-weight:700;font-size:16px;padding:9px 14px}
+.vgc-dash{background:#2a303b;border:3px solid #111;border-radius:8px;padding:10px;color:#f3eee0;display:flex;flex-direction:column;gap:8px}
+.vgc-ask{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700}
+.vgc-step{background:#ffcb05;color:#222;border-radius:6px;padding:1px 8px;font-weight:900}
+.vgc-back{margin-left:auto;background:#444b58;color:#fff;border:2px solid #111;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer}
+.vgc-tabs{display:flex;gap:6px}.vgc-tabs button{flex:1;padding:7px;border:2px solid #111;border-radius:8px;background:#3a414e;color:#fff;font-weight:800;cursor:pointer}
+.vgc-tabs button.on{background:#c94b3a}.vgc-tabs button:disabled{opacity:.4;cursor:not-allowed}
+.vgc-moves{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.vgc-move{min-height:58px}
+.vgc-zone{font-size:10.5px;font-weight:800;background:rgba(0,0,0,.35);border-radius:5px;padding:1px 5px}
+.vgc-targets,.vgc-bench{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.vgc-target,.vgc-mon{display:flex;align-items:center;gap:8px;padding:8px 10px;border:3px solid #111;border-radius:10px;background:#f8f4e8;color:#1d1d1d;font-weight:800;cursor:pointer;text-align:left}
+.vgc-target:hover,.vgc-mon:hover:not(:disabled){background:#fff3c4}
+.vgc-target img,.vgc-mon img{width:40px;height:40px;image-rendering:pixelated}
+.vgc-mon{flex-wrap:wrap}.vgc-mon b{flex:1}.vgc-mon small{font-size:11px;opacity:.75;width:100%}
+.vgc-mon:disabled{opacity:.4;cursor:not-allowed}
+.vgc-mini{display:block;width:100%;height:6px;background:#3b3b3b;border-radius:4px;overflow:hidden}.vgc-mini .hp-fill{display:block;height:100%}
+.vgc-wait{display:flex;align-items:center;gap:10px;justify-content:center;min-height:90px;font-weight:700;font-size:16px}
+@media (max-width:760px){
+  .vgc-field{min-height:380px;padding:6px}.vgc-row{gap:8px}.vgc-row.top{padding-left:0}.vgc-row.bottom{padding-right:0}
+  .vgc-sprite{height:78px}.vgc-slot.mine .vgc-sprite{height:92px}.vgc-hud{padding:4px 6px}.vgc-name{font-size:13px}
+}
+/* 2 contre 2 entre joueurs : nom du dresseur au-dessus de son Pokémon */
+.vgc-owner{font-size:11px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;opacity:.7;margin-bottom:1px}
+.vgc-slot.me .vgc-hud{box-shadow:0 0 0 3px #ffcb05,0 4px 0 rgba(0,0,0,.35)}
+.vgc-slot.me .vgc-owner{opacity:1;color:#b07d00}

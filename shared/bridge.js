@@ -28,6 +28,46 @@
   });
   const post = (o) => { if (embedded) parent.postMessage({ dd: 'hub', ...o }, target); };
 
+  /* Onglet en arrière-plan : le navigateur arrête requestAnimationFrame. Or la plupart des jeux font avancer la
+     partie dans cette boucle : l'hôte qui change d'onglet ou de fenêtre figeait la partie de tout le salon, et un
+     invité caché ne répondait plus. Tant que la page est cachée, les rappels d'animation passent par une minuterie
+     de Worker (~30 par seconde, non bridée par le navigateur), puis reviennent à l'affichage normal au retour. */
+  if (embedded && typeof Worker !== 'undefined' && window.requestAnimationFrame) (function keepAlive() {
+    const nRAF = window.requestAnimationFrame.bind(window), nCAF = window.cancelAnimationFrame.bind(window);
+    const pend = new Map(); let seq = 0, worker = null;
+    const runQueue = () => {
+      const now = performance.now(), list = [...pend.entries()].filter(([, p]) => p.bg);
+      for (const [id] of list) pend.delete(id);
+      for (const [, p] of list) { try { p.cb(now); } catch (e) { console.error(e); } }
+    };
+    const startW = () => {
+      if (worker) return;
+      try {
+        const url = URL.createObjectURL(new Blob(['let t=setInterval(()=>postMessage(0),33);onmessage=()=>{clearInterval(t);close()}'], { type: 'text/javascript' }));
+        worker = new Worker(url); worker.onmessage = runQueue;
+      } catch (e) { worker = null; }
+    };
+    const stopW = () => { if (worker) { try { worker.postMessage(0); worker.terminate(); } catch (e) {} worker = null; } };
+    window.requestAnimationFrame = (cb) => {
+      const id = ++seq, p = { cb, bg: false, nid: 0 };
+      pend.set(id, p);
+      if (document.hidden) { p.bg = true; startW(); }
+      else p.nid = nRAF((t) => { if (pend.get(id) === p) { pend.delete(id); cb(t); } });
+      return id;
+    };
+    window.cancelAnimationFrame = (id) => { const p = pend.get(id); if (!p) return; pend.delete(id); if (p.nid) nCAF(p.nid); };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        for (const p of pend.values()) if (!p.bg) { nCAF(p.nid); p.nid = 0; p.bg = true; }
+        if (pend.size) startW();
+      } else {
+        stopW();
+        for (const [id, p] of pend) if (p.bg) { p.bg = false; p.nid = nRAF((t) => { if (pend.get(id) === p) { pend.delete(id); p.cb(t); } }); }
+      }
+    });
+    // tant que c'est caché et qu'aucun rappel n'attend, la minuterie peut s'arrêter ; elle repart au prochain rappel
+  })();
+
   // Chargement automatique du capteur de crashs et d'expulsions (shared/logger.js) dans chaque jeu du Hub
   if (!window.DDLogger && typeof document !== 'undefined') {
     try {
@@ -52,7 +92,30 @@
     (H.handlers[k] = H.handlers[k] || []).push(fn);
     if (k === 'init' && H.initDone) setTimeout(() => fn(H.info), 0);
   };
-  H.signalReady = () => post({ k: 'ready' });
+  // « shown » : le jeu est vraiment à l'écran (son propre écran de chargement a disparu). Le Hub retire alors
+  // l'écran de chargement commun d'Arcadia. Un jeu peut l'annoncer lui-même avec HubBridge.shown() ; sinon on le
+  // devine : prêt (signalReady) et plus aucun écran de chargement du jeu visible (#loading, #app.loading, #load).
+  let shownSent = false, readyAt = 0;
+  H.shown = () => { if (shownSent) return; shownSent = true; post({ k: 'shown' }); };
+  const loaderVisible = () => {
+    for (const el of document.querySelectorAll('#loading, #app.loading, #load')) {
+      if (!el.isConnected || el.classList.contains('hidden')) continue;
+      const r = el.getClientRects(); if (!r.length) continue;
+      const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || +cs.opacity < 0.05) continue;
+      return true;
+    }
+    return false;
+  };
+  function watchShown() {
+    let clear = 0;
+    const iv = setInterval(() => {
+      if (shownSent) return clearInterval(iv);
+      if (performance.now() - readyAt > 30000) { clearInterval(iv); H.shown(); return; }
+      clear = loaderVisible() ? 0 : clear + 1;
+      if (clear >= 3) { clearInterval(iv); requestAnimationFrame(() => requestAnimationFrame(H.shown)); }
+    }, 150);
+  }
+  H.signalReady = () => { post({ k: 'ready' }); if (!readyAt && embedded) { readyAt = performance.now(); watchShown(); } };
   H.send = (to, m, opts) => post(opts && opts.volatile ? { k: 'send', to, m, v: 1 } : { k: 'send', to, m });
   H.exit = () => post({ k: 'exit' });
   // Fin de partie : le jeu de l'hôte transmet le classement au Hub (historique et classement entre potes)

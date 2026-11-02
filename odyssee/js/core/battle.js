@@ -50,6 +50,8 @@ export class Battle {
   get foe() { return this.sides[1].party[this.sides[1].active]; }
   act(i) { return this.sides[i].party[this.sides[i].active]; }
   r(n) { return Math.floor(this.rng() * n); }
+  /** égalité de vitesse : tirage au sort de qui agit en premier (redéfini pour les combats entre joueurs) */
+  tie() { return this.rng() < 0.5 ? -1 : 1; }
   say(text) { this.ev.push({ t: 'msg', text }); }
   nm(i) { const m = this.act(i); return i === 1 ? (this.wild ? `${monName(m)} sauvage` : `${monName(m)} ennemi`) : monName(m); }
   Nm(i) { const s = this.nm(i); return s[0].toUpperCase() + s.slice(1); }
@@ -174,7 +176,7 @@ export class Battle {
     }
     const movers = acts.filter((x) => !x.done);
     const prio = (x) => (x.a.type === 'move' ? MOVES[x.a.id].pr : 0);
-    movers.sort((p, q) => prio(q) - prio(p) || this.stat(q.i, 5) - this.stat(p.i, 5) || (this.rng() < 0.5 ? -1 : 1));
+    movers.sort((p, q) => prio(q) - prio(p) || this.stat(q.i, 5) - this.stat(p.i, 5) || this.tie(p, q));
     movers.forEach((x, n) => { x.first = n === 0 && movers.length === 2; });
     for (const x of movers) {
       if (this.state === 'over') return;
@@ -235,7 +237,7 @@ export class Battle {
     const st = m.status === 'slp' || m.status === 'frz' ? 2 : m.status ? 1.5 : 1;
     const a = Math.floor(((3 * max - 2 * m.hp) * S.cr * ITEMS[item].ball) / (3 * max) * st);
     let shakes = 0, caught = false;
-    if (a >= 255) { shakes = 4; caught = true; }
+    if (a >= 255 || ITEMS[item].ball >= 255) { shakes = 4; caught = true; }
     else {
       const b = Math.floor(1048560 / Math.sqrt(Math.sqrt(16711680 / Math.max(1, a))));
       while (shakes < 4 && this.r(65536) < b) shakes++;

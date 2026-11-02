@@ -428,6 +428,7 @@ body.in-hub #menu .menu-actions{visibility:hidden}
 
 <script src="../shared/net.js"></script>
 <script src="../shared/logger.js"></script>
+<script src="../shared/perf.js"></script>
 <script src="../shared/bridge.js"></script>
 <script src="../shared/volume.js"></script>
 <script>
@@ -440,7 +441,7 @@ const cvs = $('#game'), ctx = cvs.getContext('2d');
 const lightCv = document.createElement('canvas'), lightG = lightCv.getContext('2d');
 let W = 0, H = 0, DPR = 1, LS = 0.5;
 function resize(){
-  DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  DPR = window.DDPerf ? window.DDPerf.pr(2) : Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;   // budget de pixels sur grand écran
   cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
   LS = DPR*0.5; lightCv.width = Math.max(1, Math.round(W*LS)); lightCv.height = Math.max(1, Math.round(H*LS));
 }

@@ -13,6 +13,9 @@ import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, p
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
+import { saveCodeScreen } from './ui/screens.js';
+import { encodeSave, saveSummary } from './core/savecode.js';
+import { installSocial, talkToPeer } from './net/social.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
@@ -32,6 +35,8 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.session = null; // échange ou combat en cours avec un autre joueur
+    installSocial(this);
     input.onFree = (k) => this.onKey(k);
     ui.faceOf = (speaker) => (FACES[speaker] ? ASSETS.portrait(FACES[speaker]) : null);
   }
@@ -49,10 +54,12 @@ export class Game {
   save(silent = false) {
     const s = this.state; const p = this.player;
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); return true; } catch (e) { return false; }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); } catch (e) { return false; }
+    this.onSaved?.(silent);
+    return true;
   }
-  load() {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+  load(from) {
+    const s = from ? JSON.parse(JSON.stringify(from)) : JSON.parse(localStorage.getItem(SAVE_KEY));
     s.cleared ||= {}; s.explored ||= [];
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
     setUidBase(maxUid + 1);
@@ -65,6 +72,7 @@ export class Game {
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0, surf: !!state.surf };
     this.setMap(state.map);
     this.view.setTimeOfDay(this.hour());
+    this.link?.hello();
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
   }
@@ -204,10 +212,11 @@ export class Game {
       } else p.walking = false;
     }
     this.stepGap = stepped;
-    // PNJ
+    // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
+    this.peersTick?.(dt);
     // la carte n'est pas redessinée sous un combat ou un écran plein cadre
-    if (this.bv.alive || this.ui.root.querySelector('.screen')) return;
+    if (this.bv.alive || this.ui.root.querySelector('.screen')) { this.drawTags?.(false); return; }
     this.draw(dt);
   }
 
@@ -227,6 +236,7 @@ export class Game {
     const bob = p.surf ? 0.04 + Math.sin(performance.now() / 260) * 0.03 : 0;
     v.place(a, px, py, hop + bob, (isGrassEnc(t) && !p.move) || p.surf);
     v.cover(a, ...(isGrassEnc(t) && !p.surf && hop < 0.05 ? [Math.round(px), Math.round(py)] : [null]));
+    this.drawPeers?.(); this.drawTags?.(true);
     if (p.surf) {
       const w = v.actor('wake', { kind: 'flat' }); if (!w.wakeSet) { const r = v.S.rects.wake; v.setSpriteRect(w, r, r.w, r.h); w.wakeSet = true; w.shadow.visible = false; }
       w.mesh.position.set(px + 0.5, 0.01 + bob * 0.3, py + 0.62); w.mesh.rotation.x = -1.1;
@@ -359,6 +369,8 @@ export class Game {
     let fx = p.x + dx, fy = p.y + dy;
     let n = this.npcs.find((q) => q.x === fx && q.y === fy && !q.move);
     if (!n && m.get(fx, fy) === T.BLOCK && this.view.decoAt.get(key(fx, fy))?.k === 'counter') n = this.npcs.find((q) => q.x === fx + dx && q.y === fy + dy);
+    const peer = !n && this.peerAt?.(fx, fy);
+    if (peer) { this.busy = true; try { await talkToPeer(this, peer); } finally { this.busy = false; } return; }
     this.busy = true;
     try {
       if (n) await this.talk(n);
@@ -556,7 +568,7 @@ export class Game {
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
     if (Object.keys(st.flags).some((k) => k.startsWith('Q:'))) opts.push(['QUÊTES', 'quests']);
-    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
+    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
       const r = await this.ui.list({ items: opts.map(([l]) => ({ label: l })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
@@ -571,7 +583,24 @@ export class Game {
       else if (k === 'map') await mapScreen(this);
       else if (k === 'quests') await this.questLog();
       else if (k === 'opt') await optionsScreen(this);
-      else if (k === 'save') { if (await this.ui.yesNo('Sauvegarder la partie ?')) { this.save(); await this.ui.say(`${st.name} a sauvegardé la partie.`); } break; }
+      else if (k === 'code') {
+        // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
+        this.save(true);
+        await saveCodeScreen(this.ui, await encodeSave(this.state), saveSummary(this.state));
+      }
+      else if (k === 'save') {
+        if (await this.ui.yesNo('Sauvegarder la partie ?')) {
+          this.save();
+          if (!this.cloud?.on) await this.ui.say(`${st.name} a sauvegardé la partie.`);
+          else {
+            this.ui.say('Envoi de la sauvegarde en ligne…', { keep: true, noWaitLast: true });
+            const okOnline = await Promise.race([this.cloud.queue(st, true), wait(12000).then(() => null)]);
+            this.ui.closeDialog();
+            await this.ui.say(okOnline ? `${st.name} a sauvegardé la partie.\nElle est aussi enregistrée en ligne, sur ton compte du Hub.` : okOnline === null ? `${st.name} a sauvegardé la partie.\nLe serveur se réveille : l'envoi en ligne continue en arrière-plan.` : `${st.name} a sauvegardé la partie sur cet appareil.\nLe serveur en ligne ne répond pas pour l'instant.`);
+          }
+        }
+        break;
+      }
     }
     this.busy = false;
   }

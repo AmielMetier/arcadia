@@ -14,51 +14,47 @@ class BattleMusicPlayer {
   get musicEnabled() { return DDVolume.get('music') > 0; }
 
   getTrackPath(trackName) {
-    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3';
-    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3';
-    return 'assets/bgm_sandstorm.mp3'; // Thème Sandstorm culte par défaut
+    if (trackName === 'cynthia') return 'assets/bgm_cynthia.mp3?v=3.35';
+    if (trackName === 'trainer') return 'assets/bgm_trainer.mp3?v=3.35';
+    return 'assets/bgm_sandstorm.mp3?v=3.35'; // Thème Sandstorm culte par défaut
+  }
+
+  // Un seul lecteur <audio> pour toute la partie : une fois débloqué par un clic, il le reste
+  // (Safari et Chrome refusent de lancer un NOUVEAU lecteur sans clic : c'est ce qui coupait Sandstorm au début du combat).
+  player() {
+    if (this.audio) return this.audio;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.addEventListener('ended', () => {
+      if (!this.wanted || this.audio !== a) return;
+      a.currentTime = this.audioTrack === 'sandstorm' ? 7.8 : 0;   // Sandstorm : on repart après l'intro
+      a.play().catch(() => {});
+    });
+    DDVolume.media(a, 'music', this.volume);
+    this.audio = a;
+    const unlock = () => { if (this.wanted && this.musicEnabled && a.paused && a.src) a.play().catch(() => {}); };
+    for (const ev of ['pointerdown', 'click', 'keydown', 'touchend']) window.addEventListener(ev, unlock, true);
+    return a;
   }
 
   start(trackName = 'sandstorm') {
     this.wanted = true;
     this.currentTrack = trackName;
     if (!this.musicEnabled) return;
-    const path = this.getTrackPath(trackName);
-
-    if (this.audio) {
-      if (this.audio.src.includes(path) && !this.audio.paused) return;
-      this.halt();
+    const a = this.player();
+    if (this.audioTrack !== trackName) {
+      this.audioTrack = trackName;
+      a.src = new URL(this.getTrackPath(trackName), import.meta.url.replace(/view\/music\.js.*$/, '')).href;
+      a.currentTime = 0;
     }
-
-    try {
-      this.audio = new Audio(path);
-      this.audio.loop = true;
-      DDVolume.media(this.audio, 'music', this.volume);
-      this.audio.play().catch(() => {
-        // En attente d'interaction utilisateur (navigateur autoplay policy)
-        const unlock = () => {
-          if (this.audio && this.musicEnabled) {
-            this.audio.play().catch(() => {});
-          }
-          window.removeEventListener('click', unlock);
-          window.removeEventListener('keydown', unlock);
-        };
-        window.addEventListener('click', unlock, { once: true });
-        window.addEventListener('keydown', unlock, { once: true });
-      });
-    } catch (e) {}
+    if (a.paused) a.play().catch(() => {});
   }
 
   stop() { this.wanted = false; this.halt(); }
 
   halt() {
-    if (this.audio) {
-      try {
-        this.audio.pause();
-        this.audio.currentTime = 0;
-      } catch (e) {}
-      this.audio = null;
-    }
+    if (this.audio) { try { this.audio.pause(); } catch (e) {} }
+    this.audioTrack = null;
   }
 
   isPlaying() {

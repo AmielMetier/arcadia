@@ -379,7 +379,7 @@ function setTurn() {
   const R = V.R, hole = V.hole;
   const i = R.turn, P = R.players[i];
   if (!P) return;
-  V.cur = P; V.mine = P.id === V.me.id && !P.bot;
+  V.cur = P; V.mine = P.id === V.me.id && !P.bot; V.netAim = null; V.smAim = null;
   V.ball = { ...P.ball }; V.ball.y = simBall(hole, V.ball).y;
   V.putt = clubReach(hole, V.ball, PUTTER);
   V.club = suggestClub(hole, V.ball);
@@ -447,12 +447,11 @@ function refreshShotHud() {
 function onPose(e) {
   if (!V.cur || e.id !== V.cur.id || V.mine || V.phase !== 'watch') return;
   const clubChanged = e.club !== V.club;
-  V.aim = +e.aim || 0; V.club = clamp(e.club | 0, 0, PUTTER);
+  // la visée d'un autre joueur arrive par à-coups (10 fois par seconde, via l'hôte) : on la vise, puis on y glisse à chaque image
+  V.netAim = +e.aim || 0; V.netBack = clamp(+e.back || 0, 0, MAX_POWER); V.club = clamp(e.club | 0, 0, PUTTER);
+  if (clubChanged || V.smAim == null) { V.aim = V.netAim; V.smBack = V.netBack; placeGolfer(); golferOf(V.cur).setBack(V.smBack); hud.gauge(V.smBack, true, MAX_POWER); V.dirty = true; }
   if (clubChanged) { refreshShotHud(); scene.showGrid(V.club === PUTTER); }
-  placeGolfer();
-  golferOf(V.cur).setBack(clamp(+e.back || 0, 0, MAX_POWER));
-  hud.gauge(+e.back || 0, true, MAX_POWER);
-  V.dirty = true;
+  V.smAim = true;
 }
 
 // ------------------------------------------------------------------ swing local
@@ -476,7 +475,7 @@ function release({ power, curve }) {
 function playShot(ev) {
   V.busy = true;
   const hole = V.hole, P = V.R.players[ev.i];
-  V.cur = P; V.mine = P.id === V.me.id && !P.bot;
+  V.cur = P; V.mine = P.id === V.me.id && !P.bot; V.netAim = null; V.smAim = null;
   const from = simBall(hole, ev.from);
   V.ball = { ...ev.from, y: from.y };
   V.club = ev.params.club; V.aim = ev.params.aim;
@@ -775,6 +774,14 @@ function loop(now) {
         const rate = (V.club === PUTTER ? 0.22 : 0.55) * (input.held('ShiftLeft') || input.held('ShiftRight') ? 0.3 : 1);
         V.aim += (l ? 1 : -1) * rate * dt; V.dirty = true; placeGolfer();
         V.poseT += dt; if (V.poseT > 0.1) { V.poseT = 0; sendPose(); }
+      }
+    }
+    if (V.phase === 'watch' && !V.mine && V.netAim != null && V.cur) {
+      const k = 1 - Math.exp(-dt * 14), da = V.netAim - V.aim, db = V.netBack - (V.smBack || 0);
+      if (Math.abs(da) > 1e-4 || Math.abs(db) > 1e-3) {
+        V.aim += da * k; V.smBack = (V.smBack || 0) + db * k;
+        placeGolfer(); golferOf(V.cur).setBack(V.smBack); hud.gauge(V.smBack, true, MAX_POWER);
+        V.prevT = (V.prevT || 0) + dt; if (V.prevT > 0.08 || Math.abs(da) < 0.002) { V.prevT = 0; V.dirty = true; }
       }
     }
     if (V.dirty) {

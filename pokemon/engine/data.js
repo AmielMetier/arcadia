@@ -2,6 +2,8 @@
 // Base de données des Pokémon jouables (Gens 1 à 3 cultes + favoris universels)
 // Chaque Pokémon dispose de ses stats niveau 50 équilibrées, de ses types et de 4 attaques signatures.
 
+import { ROSTER_GEN } from './roster-gen.js';
+
 export const POKEMON_ROSTER = [
   // ===================== GEN 1 (KANTO) =====================
   {
@@ -387,6 +389,9 @@ export const POKEMON_ROSTER = [
     cleanMoves: ['earthquake', 'outrage', 'stone_edge', 'swords_dance']
   }
 ];
+// Pokémon des Gens 1 à 6 ajoutés (générés depuis PokeAPI par tools/pokemon-roster.mjs)
+for (const p of ROSTER_GEN) if (!POKEMON_ROSTER.some((q) => q.id === p.id)) POKEMON_ROSTER.push(p);
+
 
 export function getPokemonById(id) {
   return POKEMON_ROSTER.find(p => p.id === id);
@@ -425,6 +430,10 @@ export function getRandomTeam(count = 3, genFilter = 'all', excludeIds = []) {
 
   return team;
 }
+
+// Légendaires et fabuleux : un seul par équipe au draft
+const HAND_LEGENDS = new Set([144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 716, 717, 718, 719, 720, 721]);
+export const isLegendary = (id) => HAND_LEGENDS.has(Number(id)) || !!(getPokemonById(Number(id)) || {}).legendary;
 
 export function createActivePokemon(base) {
   return {

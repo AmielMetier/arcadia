@@ -4,12 +4,16 @@
 // Pokémon de tête) vivent dans ctx.local pour survivre à ces redessins.
 // Les compte à rebours ([data-deadline]) sont animés par game.js.
 
-import { getPokemonById, spriteUrls } from '../engine/data.js';
+import { describeMove, tipText, tipAttr } from './tips.js';
+import { getPokemonById, spriteUrls, isLegendary } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
+import { ITEMS, itemsFor, cleanItems, suggestItems } from '../engine/items.js';
+import { megasOf } from '../engine/megas.js';
+import { ABILITIES, abilityOf } from '../engine/abilities.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon } from '../engine/types.js';
 import {
   getParticipant, currentMatch, sideOf, autoDraft, chooseLead, attackTypes, statTotal,
-  nextPlayableMatch, tournamentMvp, TEAM_SIZE,
+  nextPlayableMatch, tournamentMvp, TEAM_SIZE, teamSizeOf, isVgc, chooseBring, VGC_BRING, isMulti, slotOf, ownerOf, sideInfo,
 } from '../engine/tournament.js';
 
 const TYPE_KEYS = Object.keys(TYPES);
@@ -143,25 +147,37 @@ export function renderDraft(stage, s, ctx) {
         <span class="dr-key">${i + 1}</span>
         ${order >= 0 ? `<span class="dr-order">${order + 1}</span>` : ''}
         <div class="dr-art"><img src="${spriteUrls(dex).artwork}" alt="" loading="lazy"></div>
-        <b class="dr-name">${esc(b.name)}</b>
+        <b class="dr-name">${esc(b.name)}${megasOf(dex).length ? ' <span class="dr-mega" title="Peut méga-évoluer avec sa Méga-Gemme">MÉGA</span>' : ''}${isLegendary(dex) ? ' <span class="dr-legend" title="Un seul légendaire par équipe">LÉGENDAIRE</span>' : ''}</b>
         <div class="dr-types">${b.types.map((ty) => typeChip(ty)).join('')}</div>
+        ${ABILITIES[abilityOf(dex)] ? `<div class="dr-ability" ${tipAttr(tipText(ABILITIES[abilityOf(dex)].name, ABILITIES[abilityOf(dex)].desc))}><b>${esc(ABILITIES[abilityOf(dex)].name)}</b> ${esc(ABILITIES[abilityOf(dex)].desc)}</div>` : ''}
         <div class="dr-stats">
           ${STAT_ROWS.map(([k, l]) => `
             <div class="dr-stat"><span>${l}</span><i><u style="width:${Math.min(100, (b.stats[k] / 190) * 100)}%"></u></i><em>${b.stats[k]}</em></div>`).join('')}
           <div class="dr-total">Total <b>${statTotal(b)}</b></div>
         </div>
         <div class="dr-moves">
-          ${moves.map((m) => `<span class="dr-move" style="--tc:${TYPES[m.type].color}" title="${esc(m.name)} · ${m.power || '—'} de puissance">${esc(m.name)}<em>${m.power || (m.cat === 'status' ? 'STA' : '—')}</em></span>`).join('')}
+          ${moves.map((m) => `<span class="dr-move" style="--tc:${TYPES[m.type].color}" ${tipAttr(describeMove(m))}>${esc(m.name)}<em>${m.power || (m.cat === 'status' ? 'STA' : '—')}</em></span>`).join('')}
         </div>
       </button>`;
   }).join('');
 
-  const slots = Array.from({ length: TEAM_SIZE }, (_, i) => {
+  // objets tenus : ceux enregistrés, sinon tes choix complétés par les conseils (jamais deux fois le même)
+  const held = locked ? (meP.items || suggestItems(sel)) : cleanItems(sel, ctx.local.items);
+  const itemPick = (dex) => {
+    const cur = held[dex];
+    const it = ITEMS[cur];
+    if (locked) return it ? `<div class="dr-item locked" title="${esc(it.desc)}"><img src="${it.icon}" alt=""><span>${esc(it.name)}</span></div>` : '';
+    return `<label class="dr-item" title="${it ? esc(it.desc) : ''}">${it ? `<img src="${it.icon}" alt="">` : ''}
+      <select data-item-for="${dex}" aria-label="Objet tenu">${itemsFor(dex).map((k) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${ITEMS[k].mega ? '✦ ' : ''}${esc(ITEMS[k].name)}</option>`).join('')}</select></label>`;
+  };
+  const size = teamSizeOf(s.t);
+  const slots = Array.from({ length: size }, (_, i) => {
     const b = sel[i] ? getPokemonById(sel[i]) : null;
     return b
-      ? `<div class="dr-slot full"><img src="${spriteUrls(b.id).icon}" alt=""><b>${esc(b.name)}</b></div>`
+      ? `<div class="dr-slot full"><img src="${spriteUrls(b.id).icon}" alt=""><div class="dr-slot-tx"><b>${esc(b.name)}</b>${itemPick(b.id)}</div></div>`
       : `<div class="dr-slot"><span>${i + 1}</span></div>`;
   }).join('');
+  const heldDesc = sel.length ? `<div class="dr-items-help">${sel.map((d) => held[d] && ITEMS[held[d]] ? `<p><img src="${ITEMS[held[d]].icon}" alt=""><b>${esc(ITEMS[held[d]].name)}</b> ${esc(ITEMS[held[d]].desc)}</p>` : '').join('')}</div>` : '';
 
   stage.innerHTML = `
     <div class="tz-screen draft deal">
@@ -171,7 +187,7 @@ export function renderDraft(stage, s, ctx) {
           <h2 class="tz-title">${locked ? 'Équipe validée' : 'Compose ton équipe'}</h2>
           <p class="tz-sub">${locked
             ? (waiting.length ? `En attente de ${waiting.map((p) => esc(p.name)).join(', ')}…` : 'Tout le monde est prêt, tirage du tableau…')
-            : 'Garde 3 Pokémon sur les 6 proposés. Elle te suivra tout le tournoi : vise une équipe qui couvre ses faiblesses.'}</p>
+            : `Garde ${size} Pokémon sur les 12 proposés (un seul légendaire) et donne un objet à chacun (un objet conseillé est déjà choisi). L'équipe te suivra tout le tournoi.${isVgc(s.t) ? ' Format VGC : avant chaque manche, tu en choisis 4, dont 2 qui commencent ensemble.' : ''}`}</p>
         </div>
         ${countdown(s, locked ? 'Fin du draft' : 'Temps restant')}
       </header>
@@ -179,8 +195,9 @@ export function renderDraft(stage, s, ctx) {
       <div class="dr-layout">
         <div class="dr-grid ${locked ? 'locked' : ''}">${cards}</div>
         <aside class="dr-side">
-          <div class="dr-side-title">TON ÉQUIPE <span>${sel.length}/3</span></div>
+          <div class="dr-side-title">TON ÉQUIPE <span>${sel.length}/${size}</span></div>
           <div class="dr-slots">${slots}</div>
+          ${heldDesc}
           <div class="dr-analysis">
             <div class="dr-an-row">
               <span>Couverture</span>
@@ -193,8 +210,8 @@ export function renderDraft(stage, s, ctx) {
           </div>
           ${locked ? '<div class="dr-locked">✓ Équipe enregistrée</div>' : `
             <button class="btn ghost dr-auto" id="drAuto">CHOIX CONSEILLÉ</button>
-            <button class="btn big yellow dr-go" id="drGo" ${sel.length === TEAM_SIZE ? '' : 'disabled'}>VALIDER <small>Entrée</small></button>`}
-          <p class="dr-hint">${locked ? '' : 'Touches 1 à 6 pour choisir'}</p>
+            <button class="btn big yellow dr-go" id="drGo" ${sel.length === size ? '' : 'disabled'}>VALIDER <small>Entrée</small></button>`}
+          <p class="dr-hint">${locked ? '' : 'Touches 1 à 9 et 0 pour choisir'}</p>
         </aside>
       </div>
       ${statusRow}
@@ -205,11 +222,14 @@ export function renderDraft(stage, s, ctx) {
     btn.onclick = () => ctx.toggleDraft(Number(btn.dataset.dex));
   }
   stage.querySelector('#drAuto').onclick = () => {
-    ctx.local.draft = autoDraft(meP.offer);
+    ctx.local.draft = autoDraft(meP.offer, size);
     ctx.sfx.play('switch');
     ctx.rerender();
   };
   stage.querySelector('#drGo').onclick = () => ctx.submitDraft();
+  for (const sl of stage.querySelectorAll('select[data-item-for]')) {
+    sl.onchange = () => ctx.setItem(Number(sl.dataset.itemFor), sl.value);
+  }
 }
 
 // ===========================================================================
@@ -228,7 +248,7 @@ function matchFlag(m, t) {
 
 function bracketRow(t, m, side) {
   const pid = side === 'A' ? m.a : m.b;
-  const p = pid != null ? getParticipant(t, pid) : null;
+  const p = pid != null ? sideInfo(t, m, side) : null;
   const won = m.status === 'done' && same(m.winner, pid);
   const lost = m.status === 'done' && pid != null && !won;
   const score = m.bestOf > 1 && (m.scoreA || m.scoreB) ? `<b class="br-score">${side === 'A' ? m.scoreA : m.scoreB}</b>` : (won ? '<b class="br-score win">✓</b>' : '');
@@ -316,14 +336,14 @@ export function renderBracket(stage, s, ctx) {
 // APERÇU DES ÉQUIPES ET CHOIX DU POKÉMON DE TÊTE
 // ===========================================================================
 
-function previewCard(dex, idx, oppTeam, { pickable, chosen, suggested, ready }) {
+function previewCard(dex, idx, oppTeam, { pickable, chosen, suggested, ready, badge }) {
   const b = getPokemonById(dex);
   if (!b) return '';
   return `
     <button class="pv-card ${chosen ? 'chosen' : ''} ${pickable ? 'pickable' : ''}" data-lead="${idx}" ${pickable && !ready ? '' : 'disabled'}
       style="--c1:${TYPES[b.types[0]].color}">
       ${pickable ? `<span class="pv-key">${idx + 1}</span>` : ''}
-      ${chosen ? '<span class="pv-lead">EN TÊTE</span>' : suggested && pickable ? '<span class="pv-sugg">CONSEILLÉ</span>' : ''}
+      ${chosen ? `<span class="pv-lead">${badge || 'EN TÊTE'}</span>` : suggested && pickable ? '<span class="pv-sugg">CONSEILLÉ</span>' : ''}
       <img class="pv-sprite" src="${spriteUrls(dex).front}" alt="" loading="lazy">
       <div class="pv-info">
         <b>${esc(b.name)}</b>
@@ -340,6 +360,7 @@ export function renderPreview(stage, s, ctx) {
   const t = s.t;
   const m = currentMatch(t);
   if (!m) return;
+  if (isMulti(t)) return renderPreviewMulti(stage, s, ctx, m);
   const mySide = sideOf(m, ctx.me.id);
   const left = mySide || 'A';
   const right = left === 'A' ? 'B' : 'A';
@@ -347,12 +368,16 @@ export function renderPreview(stage, s, ctx) {
   const team = { A: P.A.team, B: P.B.team };
 
   const key = `${m.id}:${t.gameNo}`;
+  const vgc = isVgc(t);
+  const pickFn = vgc ? chooseBring : chooseLead;
   if (ctx.local.leadKey !== key) {
     ctx.local.leadKey = key;
-    ctx.local.lead = mySide ? chooseLead(team[mySide], team[mySide === 'A' ? 'B' : 'A']) : null;
+    ctx.local.lead = mySide ? pickFn(team[mySide], team[mySide === 'A' ? 'B' : 'A']) : null;
     if (mySide) ctx.actions.lead(ctx.local.lead);
   }
-  const suggested = mySide ? chooseLead(team[mySide], team[mySide === 'A' ? 'B' : 'A']) : -1;
+  const suggested = vgc ? -1 : (mySide ? chooseLead(team[mySide], team[mySide === 'A' ? 'B' : 'A']) : -1);
+  // VGC : ordre des 4 Pokémon amenés (les 2 premiers commencent)
+  const order = (i) => (vgc && Array.isArray(ctx.local.lead) ? ctx.local.lead.indexOf(i) : -1);
   const iAmReady = mySide ? t.ready[mySide] : false;
 
   const column = (side) => {
@@ -369,7 +394,8 @@ export function renderPreview(stage, s, ctx) {
         <div class="pv-team">
           ${team[side].map((dex, i) => previewCard(dex, i, team[side === 'A' ? 'B' : 'A'], {
             pickable: isMe,
-            chosen: isMe && ctx.local.lead === i,
+            chosen: isMe && (vgc ? order(i) >= 0 : ctx.local.lead === i),
+            badge: vgc && isMe && order(i) >= 0 ? (order(i) < 2 ? `${order(i) + 1} · SUR LE TERRAIN` : `${order(i) + 1} · RÉSERVE`) : null,
             suggested: i === suggested,
             ready: iAmReady,
           })).join('')}
@@ -381,15 +407,18 @@ export function renderPreview(stage, s, ctx) {
     ? `<div class="pv-series">${seriesPips(m, left, P[left].color)}<span>MANCHE ${t.gameNo}</span>${seriesPips(m, right, P[right].color)}</div>`
     : '';
 
-  const leadName = mySide && ctx.local.lead != null ? getPokemonById(team[mySide][ctx.local.lead])?.name : '';
+  const leadName = !mySide || ctx.local.lead == null ? ''
+    : vgc ? (Array.isArray(ctx.local.lead) ? ctx.local.lead.slice(0, 2).map((i) => getPokemonById(team[mySide][i])?.name).join(' et ') : '')
+    : getPokemonById(team[mySide][ctx.local.lead])?.name;
+  const bringOk = !vgc || (Array.isArray(ctx.local.lead) && ctx.local.lead.length === VGC_BRING);
   stage.innerHTML = `
     <div class="tz-screen preview deal">
       <header class="tz-head">
         <div>
           <div class="tz-kicker">${esc(m.name.toUpperCase())}${m.bestOf > 1 ? ' · 2 MANCHES GAGNANTES' : ''}</div>
-          <h2 class="tz-title">${mySide ? 'Choisis ton Pokémon de tête' : 'Présentation des équipes'}</h2>
+          <h2 class="tz-title">${mySide ? (vgc ? 'Choisis tes 4 Pokémon' : 'Choisis ton Pokémon de tête') : 'Présentation des équipes'}</h2>
           <p class="tz-sub">${mySide
-            ? 'Il sera envoyé en premier. Ton adversaire ne le découvrira qu\'au lancement du combat.'
+            ? (vgc ? 'Clique-les dans l\'ordre : les 2 premiers commencent sur le terrain, les 2 autres attendent en réserve. Ton adversaire ne les découvrira qu\'au combat.' : 'Il sera envoyé en premier. Ton adversaire ne le découvrira qu\'au lancement du combat.')
             : 'Les dresseurs choisissent en secret le Pokémon qu\'ils enverront en premier.'}</p>
         </div>
         ${countdown(s, 'Combat dans')}
@@ -405,8 +434,8 @@ export function renderPreview(stage, s, ctx) {
         ${mySide
           ? (iAmReady
             ? `<div class="pv-wait">✓ ${esc(leadName)} est prêt. ${t.ready[mySide === 'A' ? 'B' : 'A'] ? 'Lancement…' : 'En attente de l\'adversaire…'}</div>`
-            : `<button class="btn big yellow" id="pvGo">PRÊT · ENVOYER ${esc((leadName || '').toUpperCase())} <small>Entrée</small></button>
-               <p class="pv-hint">Touches 1 à 3 pour changer de tête · les ×2 montrent qui frappe fort contre qui</p>`)
+            : `<button class="btn big yellow" id="pvGo" ${bringOk ? '' : 'disabled'}>${bringOk ? `PRÊT · ENVOYER ${esc((leadName || '').toUpperCase())}` : `CHOISIS ENCORE ${VGC_BRING - (ctx.local.lead || []).length}`} <small>Entrée</small></button>
+               <p class="pv-hint">${vgc ? 'Clique un Pokémon choisi pour le retirer' : 'Touches 1 à 3 pour changer de tête'} · les ×2 montrent qui frappe fort contre qui</p>`)
           : '<div class="pv-wait">Le combat commence dès que les deux dresseurs sont prêts.</div>'}
       </footer>
     </div>`;
@@ -415,6 +444,60 @@ export function renderPreview(stage, s, ctx) {
   for (const btn of stage.querySelectorAll('[data-lead]')) {
     btn.onclick = () => ctx.pickLead(Number(btn.dataset.lead));
   }
+  stage.querySelector('#pvGo').onclick = () => ctx.sendReady();
+}
+
+/** 2 contre 2 entre joueurs : les deux équipes, chaque joueur choisit son Pokémon de tête parmi les siens */
+function renderPreviewMulti(stage, s, ctx, m) {
+  const t = s.t;
+  const mySlot = slotOf(m, ctx.me.id);
+  const myTeamKey = mySlot ? (mySlot === 'A' || mySlot === 'C' ? 'A' : 'B') : 'A';
+  const P = (slot) => getParticipant(t, ownerOf(m, slot));
+  const oppOf = (tk) => (tk === 'A' ? ['B', 'D'] : ['A', 'C']).flatMap((sl) => P(sl).team);
+  const key = `${m.id}:${t.gameNo}`;
+  if (ctx.local.leadKey !== key) {
+    ctx.local.leadKey = key;
+    ctx.local.lead = mySlot ? chooseLead(P(mySlot).team, oppOf(myTeamKey)) : null;
+    if (mySlot) ctx.actions.lead(ctx.local.lead);
+  }
+  const iAmReady = mySlot ? t.ready[mySlot] : false;
+  const member = (slot) => {
+    const p = P(slot), isMe = slot === mySlot, tk = slot === 'A' || slot === 'C' ? 'A' : 'B';
+    return `
+      <div class="pv-member ${isMe ? 'me' : ''}">
+        <div class="pv-col-head">${trainerAvatar(p, 'sm')}${trainerTag(p)}<span class="pv-state ${t.ready[slot] ? 'ready' : ''}">${t.ready[slot] ? 'PRÊT' : isMe ? 'À TOI' : 'réfléchit…'}</span></div>
+        <div class="pv-team">${p.team.map((dex, i) => previewCard(dex, i, oppOf(tk), { pickable: isMe, chosen: isMe && ctx.local.lead === i, suggested: false, ready: iAmReady })).join('')}</div>
+      </div>`;
+  };
+  const col = (tk) => {
+    const S = sideInfo(t, m, tk);
+    return `<section class="pv-col ${tk === myTeamKey && mySlot ? 'me' : ''}" style="--pc:${S.color}">
+      <div class="pv-team-name">${tk === myTeamKey && mySlot ? 'TON ÉQUIPE' : 'ÉQUIPE ADVERSE'} · ${esc(S.name)}</div>
+      ${(tk === 'A' ? ['A', 'C'] : ['B', 'D']).map(member).join('')}</section>`;
+  };
+  const left = myTeamKey, right = left === 'A' ? 'B' : 'A';
+  const leadName = mySlot && ctx.local.lead != null ? getPokemonById(P(mySlot).team[ctx.local.lead])?.name : '';
+  stage.innerHTML = `
+    <div class="tz-screen preview multi deal">
+      <header class="tz-head">
+        <div>
+          <div class="tz-kicker">2 CONTRE 2${m.bestOf > 1 ? ' · 2 MANCHES GAGNANTES' : ''}</div>
+          <h2 class="tz-title">${mySlot ? 'Choisis ton Pokémon de tête' : 'Présentation des équipes'}</h2>
+          <p class="tz-sub">Chaque joueur dirige un Pokémon, à côté de son coéquipier. Quand il tombe, tu envoies un des tiens.</p>
+        </div>
+        ${countdown(s, 'Combat dans')}
+      </header>
+      ${deadlineBar(s, 25)}
+      ${m.bestOf > 1 ? `<div class="pv-series">${seriesPips(m, left, sideInfo(t, m, left).color)}<span>MANCHE ${t.gameNo}</span>${seriesPips(m, right, sideInfo(t, m, right).color)}</div>` : ''}
+      <div class="pv-board">${col(left)}<div class="pv-versus">VS</div>${col(right)}</div>
+      <footer class="pv-foot">
+        ${mySlot ? (iAmReady ? `<div class="pv-wait">✓ ${esc(leadName)} est prêt. En attente des autres joueurs…</div>`
+          : `<button class="btn big yellow" id="pvGo">PRÊT · ENVOYER ${esc((leadName || '').toUpperCase())} <small>Entrée</small></button>`)
+          : '<div class="pv-wait">Le combat commence dès que les quatre dresseurs sont prêts.</div>'}
+      </footer>
+    </div>`;
+  if (!mySlot || iAmReady) return;
+  for (const btn of stage.querySelectorAll('[data-lead]')) btn.onclick = () => ctx.pickLead(Number(btn.dataset.lead));
   stage.querySelector('#pvGo').onclick = () => ctx.sendReady();
 }
 
@@ -434,7 +517,7 @@ export function renderSummary(stage, s, ctx) {
   const last = t.last;
   if (!m || !last) return;
   const mySide = sideOf(m, ctx.me.id);
-  const P = { A: getParticipant(t, m.a), B: getParticipant(t, m.b) };
+  const P = { A: sideInfo(t, m, 'A'), B: sideInfo(t, m, 'B') };
   const game = last.forfeit ? null : m.games[m.games.length - 1];
   const w = last.winner;
   const winner = w ? P[w] : null;

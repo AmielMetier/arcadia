@@ -1,4 +1,4 @@
-# Ajouter un jeu au Game Hub
+# Ajouter un jeu à Arcadia
 
 Ce guide explique comment un jeu s'intègre au Hub, à partir de l'exemple de **Tête de Calcul** (`calcul/`).
 Il complète [ARCHITECTURE.md](ARCHITECTURE.md).

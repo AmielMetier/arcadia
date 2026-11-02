@@ -1,0 +1,16 @@
+{
+  "name": "Arcadia — jeux en ligne entre potes",
+  "short_name": "Arcadia",
+  "description": "13 jeux multijoueurs dans le navigateur, sans rien installer.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16181d",
+  "theme_color": "#16181d",
+  "lang": "fr",
+  "icons": [
+    { "src": "assets/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -218,7 +218,7 @@ function newMatch({ run, seed, roster, mode, teams = 1, mirror = false }) {
   if (S.sim.S.flight) S.yaw = Math.atan2(S.sim.S.flight.ux, S.sim.S.flight.uz);
   S.sel = 0; S.ended = false; S.reported = false; S.spect = null; S.build = null; S.landT = null; S.tipSeen = new Set(); S.tipUntil = 0;
   S.cnt = { jump: 0, use: 0, reload: 0, drop: 0 };
-  S.netEv = []; S.tick = 0; S.lastSend = -99; S.buf = []; S.hist = []; S.seq = 0; S.predJump = 0; S.po = { x: 0, y: 0, z: 0 }; S.off = null; S.evq = [];
+  S.netEv = []; S.tick = 0; S.lastSend = -99; S.buf = []; S.hist = []; S.seq = 0; S.predJump = 0; S.po = { x: 0, y: 0, z: 0 }; S.off = null; S.jit = null; S.idelay = null; S.evq = [];
   const P = me();
   if (P) { P.netInit = true; P.last = { ...P.last, jump: 0, use: 0, reload: 0, drop: 0, shoot: S.input.shots }; }
   $('#hud').hidden = false;
@@ -350,7 +350,7 @@ function loop(now) {
   const ax = on ? inp.axes() : { mx: 0, mz: 0 };
   const events = S.role === 'guest' ? guestSteps(dt, on, ax) : hostSteps(dt, on, ax);
   const a = S.acc / DT;
-  const rt = S.role === 'guest' && S.off != null ? performance.now() / 1000 - S.off - INTERP : 0;
+  const rt = S.role === 'guest' && S.off != null ? performance.now() / 1000 - S.off - (S.idelay || INTERP) : 0;
   const disp = (Q) => {
     if (S.role === 'guest' && Q.id !== S.me) return remotePos(Q, rt);
     const pr = S.prev.get(Q.id) || Q, po = Q.id === S.me ? S.po : null;
@@ -476,6 +476,8 @@ function remotePos(Q, rt) {
   for (let i = 0; i < b.length - 1; i++) if (b[i].t <= rt && b[i + 1].t >= rt) { A = b[i]; B = b[i + 1]; break; }
   const pa = A.P.get(Q.id), pb = B.P.get(Q.id);
   if (!pa || !pb) return { x: Q.x, y: Q.y, z: Q.z, yaw: Q.yaw };
+  // instantané suivant en retard : on prolonge un court instant la course du joueur au lieu de le figer
+  if (A === B && rt > A.t && pa[4] != null) { const e = Math.min(rt - A.t, 0.15); return { x: pa[0] + pa[4] * e, y: pa[1] + Math.max(-2, pa[5]) * e, z: pa[2] + pa[6] * e, yaw: pa[3] }; }
   const f = A === B ? 0 : clamp((rt - A.t) / (B.t - A.t), 0, 1);
   let dy = pb[3] - pa[3]; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
   return { x: pa[0] + (pb[0] - pa[0]) * f, y: pa[1] + (pb[1] - pa[1]) * f, z: pa[2] + (pb[2] - pa[2]) * f, yaw: pa[3] + dy * f };
@@ -848,12 +850,18 @@ function receiveSnap(s, events) {
   const now = performance.now() / 1000;
   const o = now - s.t;
   if (S.off == null || o < S.off || Math.abs(o - S.off) > 1) S.off = o; else S.off += (o - S.off) * 0.02;
+  // retard d'affichage adaptatif : assez pour toujours avoir l'instantané suivant en main malgré les à-coups
+  // du réseau (sinon les autres joueurs se figeaient puis sautaient), sans ajouter de retard inutile
+  const J = S.jit || (S.jit = []); J.push(o); if (J.length > 60) J.shift();
+  const lo = Math.min(...J), sp = J.map((v) => v - lo).sort((a, b) => a - b)[Math.floor(J.length * 0.92)] || 0;
+  const want = clamp(0.05 + sp, INTERP, 0.35);
+  S.idelay = S.idelay == null ? want : S.idelay + (want - S.idelay) * (want > S.idelay ? 0.3 : 0.02);
   S.snapAt = now; S.lastSnap = s;
   // le monde de la copie d'abord (portes, butin, constructions), puis l'état des joueurs
   for (const e of events) mirrorEvent(S.sim, S.world, S.buildApi, e);
   const meP = me(), wasMode = meP && meP.mode;
   applySnapshot(S.sim, s, S.me);
-  S.buf.push({ t: s.t, P: new Map(s.P.map((r) => [r[0], [r[1], r[2], r[3], r[4]]])) });
+  S.buf.push({ t: s.t, P: new Map(s.P.map((r) => [r[0], [r[1], r[2], r[3], r[4], r[6], r[7], r[8]]])) });
   if (S.buf.length > 12) S.buf.shift();
   reconcile(s, wasMode);
   S.evq.push(...events);

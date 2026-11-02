@@ -226,6 +226,7 @@ const VS0 = [0, 0, 0];
 /** Applique un contact : n normale unitaire (vers la balle), depth pénétration, vs vitesse de surface */
 function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
   const M = MAT_ARR[mi];
+  b.touch = true;
   b.p[0] += nx * depth; b.p[1] += ny * depth; b.p[2] += nz * depth;
   const gs = b.gs || 1, up = ny * gs;
   const isFloor = M.kind === 'floor' || up > 0.7;
@@ -259,8 +260,31 @@ function contact(b, nx, ny, nz, depth, mi, vs, ev, t, prm) {
   }
 }
 
+/** Vrai si le segment a→b traverse un triangle du décor fixe (un muret, un sol) */
+function segBlocked(mesh, a, b) {
+  const V = mesh.V, seen = new Set(), steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / CELL) + 1);
+  for (let i = 0; i <= steps; i++) {
+    const u = i / steps, list = mesh.query(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u);
+    if (!list) continue;
+    for (const t of list) {
+      if (seen.has(t)) continue; seen.add(t);
+      const o = t * 9;
+      const ux = V[o + 3] - V[o], uy = V[o + 4] - V[o + 1], uz = V[o + 5] - V[o + 2], vx = V[o + 6] - V[o], vy = V[o + 7] - V[o + 1], vz = V[o + 8] - V[o + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const da = (a[0] - V[o]) * nx + (a[1] - V[o + 1]) * ny + (a[2] - V[o + 2]) * nz, db = (b[0] - V[o]) * nx + (b[1] - V[o + 1]) * ny + (b[2] - V[o + 2]) * nz;
+      if (da * db > 0) continue;
+      const s = da / (da - db || 1e-12), px = a[0] + (b[0] - a[0]) * s - V[o], py = a[1] + (b[1] - a[1]) * s - V[o + 1], pz = a[2] + (b[2] - a[2]) * s - V[o + 2];
+      const uu = ux * ux + uy * uy + uz * uz, vv = vx * vx + vy * vy + vz * vz, uv = ux * vx + uy * vy + uz * vz, wu = px * ux + py * uy + pz * uz, wv = px * vx + py * vy + pz * vz;
+      const den = uv * uv - uu * vv; if (Math.abs(den) < 1e-12) continue;
+      const s1 = (uv * wv - vv * wu) / den, t1 = (uv * wu - uu * wv) / den;
+      if (s1 >= 0 && t1 >= 0 && s1 + t1 <= 1) return true;
+    }
+  }
+  return false;
+}
+
 /** Contact avec une boîte orientée d'un obstacle mobile */
-function kinContact(b, k, pose, poseN, h, ev, t) {
+function kinContact(b, k, pose, poseN, h, ev, t, w) {
   const R = pose.R;
   for (const box of k.boxes) {
     // centre de la balle dans le repère de la boîte
@@ -272,11 +296,22 @@ function kinContact(b, k, pose, poseN, h, ev, t) {
     const qx = Math.max(-hx, Math.min(hx, lx)), qy = Math.max(-hy, Math.min(hy, ly)), qz = Math.max(-hz, Math.min(hz, lz));
     let nx = lx - qx, ny = ly - qy, nz = lz - qz, d = Math.hypot(nx, ny, nz), depth;
     if (d > BALL_R) continue;
-    if (d < 1e-6) {   // centre à l'intérieur : sortie par la face la plus proche
-      const ex = hx - Math.abs(lx), ey = hy - Math.abs(ly), ez = hz - Math.abs(lz);
-      if (ex <= ey && ex <= ez) { nx = Math.sign(lx) || 1; ny = 0; nz = 0; depth = ex + BALL_R; }
-      else if (ey <= ez) { nx = 0; ny = Math.sign(ly) || 1; nz = 0; depth = ey + BALL_R; }
-      else { nx = 0; ny = 0; nz = Math.sign(lz) || 1; depth = ez + BALL_R; }
+    if (d < 1e-6) {
+      // centre à l'intérieur (la balle a été écrasée contre un muret) : on la fait sortir par la face la plus
+      // proche qui ne la fait pas passer à travers le décor fixe ; le dessus de l'obstacle en dernier recours
+      const cands = [[1, 0, 0, hx - lx], [-1, 0, 0, hx + lx], [0, 0, 1, hz - lz], [0, 0, -1, hz + lz], [0, 1, 0, hy - ly], [0, -1, 0, hy + ly]];
+      cands.sort((a, c) => a[3] - c[3]);
+      let pick = null;
+      for (const c of cands) {
+        let ux = c[0], uy = c[1], uz = c[2];
+        if (box.R) { const Q = box.R; const x = Q[0] * ux + Q[1] * uy + Q[2] * uz, y = Q[3] * ux + Q[4] * uy + Q[5] * uz, z = Q[6] * ux + Q[7] * uy + Q[8] * uz; ux = x; uy = y; uz = z; }
+        const wx = R[0] * ux + R[1] * uy + R[2] * uz, wy = R[3] * ux + R[4] * uy + R[5] * uz, wz = R[6] * ux + R[7] * uy + R[8] * uz;
+        const L = c[3] + BALL_R;
+        if (!w || !segBlocked(w.mesh, b.p, [b.p[0] + wx * L, b.p[1] + wy * L, b.p[2] + wz * L])) { pick = c; break; }
+        if (c[1] === 1) pick = pick || c;
+      }
+      pick = pick || cands.find((c) => c[1] === 1);
+      nx = pick[0]; ny = pick[1]; nz = pick[2]; depth = pick[3] + BALL_R;
     } else { nx /= d; ny /= d; nz /= d; depth = BALL_R - d; }
     // normale et point de contact en monde
     if (box.R) { const Q = box.R; const x = Q[0] * nx + Q[1] * ny + Q[2] * nz, y = Q[3] * nx + Q[4] * ny + Q[5] * nz, z = Q[6] * nx + Q[7] * ny + Q[8] * nz; nx = x; ny = y; nz = z; }
@@ -344,13 +379,23 @@ function subStep(w, b, t, h, ev) {
   v[1] -= GRAV * h * gs;
   const drag = 1 - 0.015 * h; v[0] *= drag; v[1] *= drag; v[2] *= drag;
   p[0] += v[0] * h; p[1] += v[1] * h; p[2] += v[2] * h;
-  b.grounded = false; b._gd = -1; b.gprm = null;
+  b.grounded = false; b.touch = false; b._gd = -1; b.gprm = null;
 
+  // --- obstacles mobiles --- (avant le décor fixe : si un obstacle coince la balle contre un muret,
+  // c'est le muret qui a le dernier mot et la balle ne peut plus être poussée à travers)
+  if (w.kin.length) {
+    for (const k of w.kin) {
+      const pv = k.pose.pivot, dx = p[0] - pv[0], dy = p[1] - pv[1], dz = p[2] - pv[2], rr = k.r + BALL_R + 0.1;
+      if (dx * dx + dy * dy + dz * dz > rr * rr) continue;
+      const pose = kinPose(k, t), poseN = kinPose(k, t + 0.004);
+      kinContact(b, k, pose, poseN, 0.004, ev, t, w);
+    }
+  }
   // --- maillage statique ---
   const mesh = w.mesh, V = mesh.V, cup = w.cup;
   const list = mesh.query(p[0], p[1], p[2]);
   if (list) {
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < 3; pass++) {
       let any = false;
       for (let i = 0; i < list.length; i++) {
         const tI = list[i], o = tI * 9;
@@ -374,15 +419,6 @@ function subStep(w, b, t, h, ev) {
         any = true;
       }
       if (!any) break;
-    }
-  }
-  // --- obstacles mobiles ---
-  if (w.kin.length) {
-    for (const k of w.kin) {
-      const pv = k.pose.pivot, dx = p[0] - pv[0], dy = p[1] - pv[1], dz = p[2] - pv[2], rr = k.r + BALL_R + 0.1;
-      if (dx * dx + dy * dy + dz * dz > rr * rr) continue;
-      const pose = kinPose(k, t), poseN = kinPose(k, t + 0.004);
-      kinContact(b, k, pose, poseN, 0.004, ev, t);
     }
   }
   // --- trou ---
@@ -483,6 +519,8 @@ export function tick(w, balls, t, ev, opts) {
     const vs = b.grounded ? b.gvs : VS0;
     const rs = Math.hypot(b.v[0] - vs[0], b.v[1] - vs[1], b.v[2] - vs[2]);
     if (b.grounded && rs < 0.07 && vs === VS0) { b.rest += TICK; if (b.rest > 0.3) { b.awake = false; b.v[0] = b.v[1] = b.v[2] = 0; continue; } }
+    // coincée entre deux parois de rocher (aucun sol sous elle) : elle ne vibre plus 30 s sur place
+    else if (!b.grounded && b.touch && rs < 0.12 && vs === VS0) { b.rest += TICK; if (b.rest > 0.8) { b.awake = false; b.v[0] = b.v[1] = b.v[2] = 0; continue; } }
     else b.rest = 0;
     if (b.t > 30) { b.awake = false; b.v[0] = b.v[1] = b.v[2] = 0; continue; }   // sécurité
     moving = true;
@@ -504,14 +542,16 @@ export function shotVelocity(w, ball, yaw, power) {
 /** Normale du sol sous un point (null si la balle n'est pas posée) */
 export function groundNormal(w, p) {
   const list = w.mesh.query(p[0], p[1], p[2]); if (!list) return null;
+  // on ne garde que les surfaces qui portent la balle : collée contre un muret, c'est quand même le sol qui compte
+  const gs = gravSign(w, p);
   let best = null, bd = BALL_R * 1.3;
   for (const tI of list) {
     closestOnTri(w.mesh.V, tI * 9, p[0], p[1], p[2], _c);
     const d = Math.hypot(p[0] - _c[0], p[1] - _c[1], p[2] - _c[2]);
-    if (d < bd && d > 1e-6) { bd = d; best = [(p[0] - _c[0]) / d, (p[1] - _c[1]) / d, (p[2] - _c[2]) / d]; }
+    if (d >= bd || d <= 1e-6 || (p[1] - _c[1]) / d * gs <= 0.3) continue;
+    bd = d; best = [(p[0] - _c[0]) / d, (p[1] - _c[1]) / d, (p[2] - _c[2]) / d];
   }
-  const gs = gravSign(w, p);
-  return best && best[1] * gs > 0.3 ? best : null;
+  return best;
 }
 
 /** Frappe la balle */

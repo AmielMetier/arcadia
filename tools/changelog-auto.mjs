@@ -29,6 +29,10 @@ const cmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map
 const setHubVersion = (v) => {
   if (v === hubVer) return false;
   if (!DRY) writeFileSync(HUB, hubSrc.replace(/const VERSION = '[\d.]+'/, `const VERSION = '${v}'`));
+  // même numéro dans les liens des pages (?v=…) : les navigateurs rechargent les fichiers à chaque version
+  if (!DRY) for (const page of ['index.html', 'apropos.html']) {
+    try { const f = new URL('../' + page, import.meta.url); writeFileSync(f, readFileSync(f, 'utf8').replace(/\?v=[\d.]+"/g, `?v=${v}"`)); } catch (e) {}
+  }
   console.log(`Version du Hub : ${hubVer} → ${v}`);
   return true;
 };
@@ -52,7 +56,7 @@ const commits = raw.split(END).map((c) => c.trim()).filter(Boolean).map((c) => {
 
 const GAMES = {
   drift: 'Duo Drift', david: 'DavidSimulator', monopoly: 'DavidSimulator', calcul: 'Tête de Calcul',
-  bastion: 'Bastion Clash', outbreak: 'Outbreak', filrouge: 'Fil Rouge', kart: 'Cyber Kart GP', convoy: 'Convoy Storm', golf: 'Birdie Party', minigolf: 'Mini-Golf Party', royale: 'Island Rush', hub: 'Hub', shared: 'Hub', server: 'Serveur', relay: 'Serveur',
+  bastion: 'Bastion Clash', outbreak: 'Outbreak', filrouge: 'Fil Rouge', kart: 'Cyber Kart GP', convoy: 'Convoy Storm', golf: 'Birdie Party', minigolf: 'Mini-Golf Party', royale: 'Island Rush', mollo: 'Mollo !', hub: 'Hub', shared: 'Hub', server: 'Serveur', relay: 'Serveur',
 };
 const NOT_FOR_PLAYERS = /^(\.github\/|docs\/|tools\/|AGENTS\.md$|CLAUDE\.md$|GEMINI\.md$|README\.md$)/;
 const TYPES = { feat: 'nouveau', fix: 'correction', perf: 'plus rapide', revert: 'retour en arrière' };

@@ -1,9 +1,9 @@
-# Game Hub — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party et Island Rush
+# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Mollo !
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
 
-**Jouer : https://amielmetier.github.io/duo-drift/**
+**Jouer : https://amielmetier.github.io/arcadia/**
 
 ## Duo Drift
 Course et bataille en vue de dessus, jusqu'à 5 joueurs.
@@ -142,6 +142,19 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
+## Mollo !
+
+Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la manche, le premier à N manches gagne la partie.
+
+- Physique (`mollo/engine/sim.js`) : sept points par corps (bassin, poitrine, tête, deux mains, deux pieds), Verlet et contraintes, à 60 Hz.
+  Des muscles (ressorts vers une pose) tiennent le corps debout ; ils mollissent quand il encaisse et lâchent tout en KO. Coudes et genoux n'existent qu'à l'affichage.
+- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), saisir (les mains s'accrochent à un corps ou à un rebord),
+  soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
+- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon). Des bourrasques après 75 s.
+- Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
+  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=usine`.
+- Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
+
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
 - `?local` dans l'adresse : réseau simulé entre onglets du même navigateur, pratique pour tester à plusieurs.
@@ -154,7 +167,8 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
   `node tools/test-golf.mjs` teste le moteur de Birdie Party (distances des clubs, vent, surfaces, eau, putts, règles d'une partie) et fait jouer les 18 trous par les bots ;
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
-  `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots.
+  `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
+  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
   `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous
@@ -166,6 +180,6 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
   en haut de `CHANGELOG.md` (consignes pour les assistants de code dans [AGENTS.md](AGENTS.md)). Si un push l'oublie,
   l'action `.github/workflows/changelog.yml` rédige l'entrée à partir des commits.
 
-Version actuelle : **3.3** — voir le [journal des versions](CHANGELOG.md).
+Version actuelle : **3.21** — voir le [journal des versions](CHANGELOG.md).
 
 by Amiel, Nicolas, Gabriel and Claude

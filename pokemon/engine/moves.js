@@ -1,6 +1,8 @@
 // pokemon/engine/moves.js
 // Liste des attaques cultes avec types, catégories, puissances et effets
 
+import { MOVES_GEN } from './roster-gen.js';
+
 export const MOVES = {
   // --- NORMAL ---
   tackle: { name: 'Charge', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
@@ -9,7 +11,7 @@ export const MOVES = {
   growl: { name: 'Rugissement', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'opponent', stat: 'atk', val: -1 }, pp: 40 },
   tail_whip: { name: 'Mimi-Queue', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'opponent', stat: 'def', val: -1 }, pp: 30 },
   body_slam: { name: 'Plaquage', type: 'normal', cat: 'physical', power: 85, acc: 100, pp: 15, effect: { type: 'status', status: 'paralysis', chance: 30 } },
-  hyper_beam: { name: 'Ultralaser', type: 'normal', cat: 'special', power: 150, acc: 90, pp: 5 },
+  hyper_beam: { name: 'Ultralaser', type: 'normal', cat: 'special', power: 150, acc: 90, pp: 5, recharge: true },
   quick_attack: { name: 'Vive-Attaque', type: 'normal', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
   slash: { name: 'Tranche', type: 'normal', cat: 'physical', power: 70, acc: 100, crit: 2, pp: 20 },
   swords_dance: { name: 'Danse Lames', type: 'normal', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 2 }, pp: 20 },
@@ -27,7 +29,7 @@ export const MOVES = {
   // --- EAU ---
   water_gun: { name: 'Pistolet à O', type: 'water', cat: 'special', power: 40, acc: 100, pp: 25 },
   bubble: { name: 'Écume', type: 'water', cat: 'special', power: 40, acc: 100, pp: 30, effect: { type: 'stat', target: 'opponent', stat: 'spe', val: -1, chance: 10 } },
-  water_pulse: { name: 'Vibraqua', type: 'water', cat: 'special', power: 60, acc: 100, pp: 20 },
+  water_pulse: { name: 'Vibraqua', type: 'water', cat: 'special', power: 60, acc: 100, pp: 20, confuse: 20 },
   surf: { name: 'Surf', type: 'water', cat: 'special', power: 90, acc: 100, pp: 15 },
   hydro_pump: { name: 'Hydrocanon', type: 'water', cat: 'special', power: 110, acc: 80, pp: 5 },
   waterfall: { name: 'Cascade', type: 'water', cat: 'physical', power: 80, acc: 100, flinch: 20, pp: 15 },
@@ -37,8 +39,8 @@ export const MOVES = {
   // --- PLANTE ---
   vine_whip: { name: 'Fouet Lianes', type: 'grass', cat: 'physical', power: 45, acc: 100, pp: 25 },
   razor_leaf: { name: 'Tranch\'Herbe', type: 'grass', cat: 'physical', power: 55, acc: 95, crit: 2, pp: 25 },
-  energy_ball: { name: 'Éco-Sphère', type: 'grass', cat: 'special', power: 90, acc: 100, pp: 10 },
-  solar_beam: { name: 'Lance-Soleil', type: 'grass', cat: 'special', power: 120, acc: 100, pp: 10 },
+  energy_ball: { name: 'Éco-Sphère', type: 'grass', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
+  solar_beam: { name: 'Lance-Soleil', type: 'grass', cat: 'special', power: 120, acc: 100, pp: 10, charge: true },
   giga_drain: { name: 'Giga-Sangsue', type: 'grass', cat: 'special', power: 75, acc: 100, pp: 10, drain: 0.5 },
   leaf_blade: { name: 'Lame Feuille', type: 'grass', cat: 'physical', power: 90, acc: 100, crit: 2, pp: 15 },
   seed_bomb: { name: 'Canon Graine', type: 'grass', cat: 'physical', power: 80, acc: 100, pp: 15 },
@@ -47,10 +49,10 @@ export const MOVES = {
   // --- ÉLECTRIK ---
   thundershock: { name: 'Éclair', type: 'electric', cat: 'special', power: 40, acc: 100, pp: 30, effect: { type: 'status', status: 'paralysis', chance: 10 } },
   thunderbolt: { name: 'Tonnerre', type: 'electric', cat: 'special', power: 90, acc: 100, pp: 15, effect: { type: 'status', status: 'paralysis', chance: 10 } },
-  thunder: { name: 'Fatal-Foudre', type: 'electric', cat: 'special', power: 110, acc: 70, pp: 10, effect: { type: 'status', status: 'paralysis', chance: 30 } },
+  thunder: { name: 'Fatal-Foudre', type: 'electric', cat: 'special', power: 110, acc: 70, pp: 10, effect: { type: 'status', status: 'paralysis', chance: 30 }, rainSure: true },
   wild_charge: { name: 'Éclair Fou', type: 'electric', cat: 'physical', power: 90, acc: 100, recoil: 0.25, pp: 15 },
   thunder_wave: { name: 'Cage-Éclair', type: 'electric', cat: 'status', power: 0, acc: 90, effect: { type: 'status', status: 'paralysis', chance: 100 }, pp: 20 },
-  volt_switch: { name: 'Change-Éclair', type: 'electric', cat: 'special', power: 70, acc: 100, pp: 20 },
+  volt_switch: { name: 'Change-Éclair', type: 'electric', cat: 'special', power: 70, acc: 100, pp: 20, pivot: true },
 
   // --- GLACE ---
   ice_beam: { name: 'Laser Glace', type: 'ice', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'status', status: 'freeze', chance: 10 } },
@@ -61,14 +63,14 @@ export const MOVES = {
   // --- COMBAT ---
   close_combat: { name: 'Close Combat', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'def', val: -1, stats: { def: -1, spd: -1 } } },
   superpower: { name: 'Surpuissance', type: 'fighting', cat: 'physical', power: 120, acc: 100, pp: 5, effect: { type: 'stat', target: 'self', stat: 'atk', val: -1, stats: { atk: -1, def: -1 } } },
-  focus_blast: { name: 'Exploforce', type: 'fighting', cat: 'special', power: 120, acc: 70, pp: 5 },
+  focus_blast: { name: 'Exploforce', type: 'fighting', cat: 'special', power: 120, acc: 70, pp: 5, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
   aura_sphere: { name: 'Aurasphère', type: 'fighting', cat: 'special', power: 80, acc: 100, pp: 20 },
   drain_punch: { name: 'Vampi-Poing', type: 'fighting', cat: 'physical', power: 75, acc: 100, drain: 0.5, pp: 10 },
   mach_punch: { name: 'Mach Punch', type: 'fighting', cat: 'physical', power: 40, acc: 100, priority: 1, pp: 30 },
 
   // --- SOL ---
   earthquake: { name: 'Séisme', type: 'ground', cat: 'physical', power: 100, acc: 100, pp: 10 },
-  earth_power: { name: 'Telluriforce', type: 'ground', cat: 'special', power: 90, acc: 100, pp: 10 },
+  earth_power: { name: 'Telluriforce', type: 'ground', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
   bulldoze: { name: 'Piétinement', type: 'ground', cat: 'physical', power: 60, acc: 100, pp: 20, effect: { type: 'stat', target: 'opponent', stat: 'spe', val: -1, chance: 100 } },
 
   // --- VOL ---
@@ -76,13 +78,13 @@ export const MOVES = {
   gust: { name: 'Tornade', type: 'flying', cat: 'special', power: 40, acc: 100, pp: 35 },
   brave_bird: { name: 'Rapace', type: 'flying', cat: 'physical', power: 120, acc: 100, recoil: 0.33, pp: 15 },
   air_slash: { name: 'Lame d\'Air', type: 'flying', cat: 'special', power: 75, acc: 95, pp: 15, flinch: 30 },
-  hurricane: { name: 'Vent Violent', type: 'flying', cat: 'special', power: 110, acc: 70, pp: 10 },
+  hurricane: { name: 'Vent Violent', type: 'flying', cat: 'special', power: 110, acc: 70, pp: 10, confuse: 30, rainSure: true },
   roost: { name: 'Atterrissage', type: 'flying', cat: 'status', power: 0, acc: 100, effect: { type: 'heal', val: 0.5 }, pp: 10 },
 
   // --- PSY ---
   psybeam: { name: 'Rafale Psy', type: 'psychic', cat: 'special', power: 65, acc: 100, pp: 20 },
   psychic: { name: 'Psyko', type: 'psychic', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
-  psyshock: { name: 'Choc Psy', type: 'psychic', cat: 'special', power: 80, acc: 100, pp: 10 },
+  psyshock: { name: 'Choc Psy', type: 'psychic', cat: 'special', power: 80, acc: 100, pp: 10, defStat: 'def' },
   zen_headbutt: { name: 'Psykoud\'Boul', type: 'psychic', cat: 'physical', power: 80, acc: 90, pp: 15, flinch: 20 },
   calm_mind: { name: 'Plénitude', type: 'psychic', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 1, stats: { spa: 1, spd: 1 } }, pp: 20 },
   hypnosis: { name: 'Hypnose', type: 'psychic', cat: 'status', power: 0, acc: 60, effect: { type: 'status', status: 'sleep', chance: 100 }, pp: 20 },
@@ -102,26 +104,26 @@ export const MOVES = {
   dragon_pulse: { name: 'Dracochoc', type: 'dragon', cat: 'special', power: 85, acc: 100, pp: 10 },
   draco_meteor: { name: 'Draco-Météore', type: 'dragon', cat: 'special', power: 130, acc: 90, pp: 5, effect: { type: 'stat', target: 'self', stat: 'spa', val: -2 } },
   dragon_claw: { name: 'Dracogriffe', type: 'dragon', cat: 'physical', power: 80, acc: 100, pp: 15 },
-  outrage: { name: 'Colère', type: 'dragon', cat: 'physical', power: 120, acc: 100, pp: 10 },
+  outrage: { name: 'Colère', type: 'dragon', cat: 'physical', power: 120, acc: 100, pp: 10, rampage: true },
   dragon_dance: { name: 'Danse Draco', type: 'dragon', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1, stats: { atk: 1, spe: 1 } }, pp: 20 },
 
   // --- TÉNÈBRES ---
   bite: { name: 'Morsure', type: 'dark', cat: 'physical', power: 60, acc: 100, flinch: 30, pp: 25 },
   dark_pulse: { name: 'Vibrobscur', type: 'dark', cat: 'special', power: 80, acc: 100, flinch: 20, pp: 15 },
   crunch: { name: 'Mâchouille', type: 'dark', cat: 'physical', power: 80, acc: 100, pp: 15, effect: { type: 'stat', target: 'opponent', stat: 'def', val: -1, chance: 20 } },
-  sucker_punch: { name: 'Coup Bas', type: 'dark', cat: 'physical', power: 70, acc: 100, priority: 1, pp: 5 },
+  sucker_punch: { name: 'Coup Bas', type: 'dark', cat: 'physical', power: 70, acc: 100, priority: 1, pp: 5, sucker: true },
   nasty_plot: { name: 'Machination', type: 'dark', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'spa', val: 2 }, pp: 20 },
 
   // --- ACIER ---
   iron_head: { name: 'Tête de Fer', type: 'steel', cat: 'physical', power: 80, acc: 100, flinch: 30, pp: 15 },
-  flash_cannon: { name: 'Luminocanon', type: 'steel', cat: 'special', power: 80, acc: 100, pp: 10 },
-  meteor_mash: { name: 'Poing Météore', type: 'steel', cat: 'physical', power: 90, acc: 90, pp: 10 },
+  flash_cannon: { name: 'Luminocanon', type: 'steel', cat: 'special', power: 80, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
+  meteor_mash: { name: 'Poing Météore', type: 'steel', cat: 'physical', power: 90, acc: 90, pp: 10, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1, chance: 20 } },
 
   // --- INSECTE ---
   bug_bite: { name: 'Piqûre', type: 'bug', cat: 'physical', power: 60, acc: 100, pp: 20 },
   x_scissor: { name: 'Plaie-Croix', type: 'bug', cat: 'physical', power: 80, acc: 100, pp: 15 },
-  bug_buzz: { name: 'Bourdon', type: 'bug', cat: 'special', power: 90, acc: 100, pp: 10 },
-  u_turn: { name: 'Demi-Tour', type: 'bug', cat: 'physical', power: 70, acc: 100, pp: 20 },
+  bug_buzz: { name: 'Bourdon', type: 'bug', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'spd', val: -1, chance: 10 } },
+  u_turn: { name: 'Demi-Tour', type: 'bug', cat: 'physical', power: 70, acc: 100, pp: 20, pivot: true },
 
   // --- POISON ---
   sludge_bomb: { name: 'Bomb-Beurk', type: 'poison', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'status', status: 'poison', chance: 30 } },
@@ -130,7 +132,20 @@ export const MOVES = {
 
   // --- FÉE ---
   fairy_wind: { name: 'Vent Féérique', type: 'fairy', cat: 'special', power: 40, acc: 100, pp: 30 },
-  moonblast: { name: 'Pouvoir Lunaire', type: 'fairy', cat: 'special', power: 95, acc: 100, pp: 15 },
-  play_rough: { name: 'Câlinerie', type: 'fairy', cat: 'physical', power: 90, acc: 90, pp: 10 },
+  moonblast: { name: 'Pouvoir Lunaire', type: 'fairy', cat: 'special', power: 95, acc: 100, pp: 15, effect: { type: 'stat', target: 'opponent', stat: 'spa', val: -1, chance: 30 } },
+  play_rough: { name: 'Câlinerie', type: 'fairy', cat: 'physical', power: 90, acc: 90, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'atk', val: -1, chance: 10 } },
   dazzling_gleam: { name: 'Éclat Magique', type: 'fairy', cat: 'special', power: 80, acc: 100, pp: 20 },
 };
+
+// attaques des Pokémon ajoutés (générées depuis PokeAPI) ; celles faites main restent prioritaires
+for (const [k, m] of Object.entries(MOVES_GEN)) if (!MOVES[k]) MOVES[k] = m;
+
+// Combat en double (VGC) : attaques qui touchent les deux adversaires, ou tous les autres Pokémon (allié compris),
+// avec des dégâts ×0,75 quand elles touchent plusieurs cibles (cibles d'après PokeAPI)
+const SPREAD_FOES = ['growl', 'tail_whip', 'bubble', 'razor_leaf', 'blizzard', 'rock_slide', 'dazzling_gleam', 'swift', 'twister', 'air_cutter',
+  'incinerate', 'hyper_voice', 'disarming_voice', 'lands_wrath', 'heat_wave', 'muddy_water', 'icy_wind', 'snarl', 'electroweb', 'eruption', 'water_spout'];
+const SPREAD_ALL = ['surf', 'earthquake', 'bulldoze', 'petal_blizzard', 'boomburst', 'discharge', 'lava_plume', 'sludge_wave', 'explosion'];
+for (const k of SPREAD_FOES) if (MOVES[k]) MOVES[k].spread = 'foes';
+for (const k of SPREAD_ALL) if (MOVES[k]) MOVES[k].spread = 'all';
+// Abri : en double, chaque Pokémon l'a en plus de ses 4 attaques
+MOVES.protect = { name: 'Abri', type: 'normal', cat: 'status', power: 0, acc: 100, priority: 4, pp: 10, effect: { type: 'protect', target: 'self' } };

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "updatedAt": "2026-10-26T21:45:00.000Z",
-  "description": "Catalogue officiel des raisons de crash d'un jeu (CRASH_*) et d'expulsion/déconnexion d'un joueur (EXP_*) pour le Game Hub et ses 11 jeux.",
+  "description": "Catalogue officiel des raisons de crash d'un jeu (CRASH_*) et d'expulsion/déconnexion d'un joueur (EXP_*) pour Arcadia et ses 11 jeux.",
   "codes": {
     "CRASH_JS_ERROR": {
       "category": "CRASH",
@@ -85,7 +85,7 @@
       "severity": "warn",
       "title": "Joueur déconnecté ou passé en IA : onglet en arrière-plan (hid=1)",
       "cause": "L'onglet du joueur n'était plus au premier plan (document.hidden = true) : le navigateur a bridé ou suspendu ses timers réseau et sa boucle de jeu.",
-      "resolution": "Garder l'onglet du Game Hub visible au premier plan pendant toute la durée de la partie multijoueur."
+      "resolution": "Garder l'onglet d'Arcadia visible au premier plan pendant toute la durée de la partie multijoueur."
     },
     "EXP_SLOW_CLIENT_OVERFLOW": {
       "category": "EXPULSION",
@@ -105,7 +105,7 @@
   "games": [
     {
       "id": "hub",
-      "title": "Game Hub (Salon & Relais)",
+      "title": "Arcadia (Salon & Relais)",
       "maxPlayers": 6,
       "engine": "DOM + WebSocket Relay (Protocole 2)",
       "crashReasons": [
@@ -279,6 +279,32 @@
       "expulsionReasons": [
         "EXP_HOST_STOPPED_GAME : l'hôte a quitté l'île ou arrêté la partie",
         "EXP_PEER_LEFT_MIDGAME : joueur déconnecté pendant la tempête (personnage retiré ou laissé statique)"
+      ]
+    },
+    {
+      "id": "odyssee",
+      "title": "Odyssée",
+      "maxPlayers": 6,
+      "engine": "Canvas 2D (fausse 3D) + HubBridge (positions, invitations, échanges, combats)",
+      "crashReasons": [
+        "Sprites PokeAPI indisponibles (réseau bloqué) : les remplaçants dessinés s'affichent",
+        "Exception dans le moteur de combat si une sauvegarde importée est corrompue"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : un joueur quitte pendant un échange ou un combat entre joueurs (forfait)",
+        "EXP_HOST_MIGRATION_RESET : changement d'hôte pendant la partie"
+      ]
+    },
+    {
+      "id": "mollo",
+      "title": "Mollo !",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D, décor dessiné dans le code)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL pendant la bagarre"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : joueur parti pendant une manche (son pantin disparaît ; les bots continuent)"
       ]
     }
   ]

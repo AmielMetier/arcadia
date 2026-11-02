@@ -23,7 +23,7 @@ export function startClient({ bridge, onState, onError }) {
   setTimeout(() => { if (alive && !state) send({ t: 'sync' }); }, 1500);
 
   return {
-    draft: (picks) => send({ t: 'draft', picks }),
+    draft: (picks, items) => send({ t: 'draft', picks, items }),
     lead: (idx) => send({ t: 'lead', idx }),
     ready: (idx) => send({ t: 'ready', idx }),
     submitAction: (action) => send({ t: 'action', action }),
