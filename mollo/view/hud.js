@@ -1,22 +1,19 @@
-// Plouf ! — interface par-dessus la 3D : tableau des manches, étiquettes des joueurs, annonces, fil des chutes,
+// Mollo ! — interface par-dessus la 3D : tableau des manches, étiquettes des joueurs, annonces, fil des chutes,
 // rappel des commandes, joystick tactile ; et les écrans (accueil, pause, fin de partie) en HTML.
-import { ST } from '../engine/sim.js';
-import { SHAPES } from '../engine/arena.js';
+import { ST, FL } from '../engine/sim.js';
+import { ARENAS } from '../engine/arena.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const $ = (s) => document.querySelector(s);
-const ARROWS = ['⬇️', '↘️', '➡️', '↗️', '⬆️', '↖️', '⬅️', '↙️']; // sens du vent : angle (0 = vers le bas de l'écran, +z)
 
 export class HUD {
   constructor() {
     this.root = $('#hud'); this.score = $('#score'); this.round = $('#round'); this.labels = $('#labels');
     this.bannerEl = $('#banner'); this.feedEl = $('#feed'); this.promptEl = $('#prompt'); this.toastEl = $('#toast');
-    this.windEl = $('#wind'); this.stickEl = $('#stick');
+    this.gustEl = $('#gust'); this.stickEl = $('#stick');
     this.sig = ''; this.tags = new Map(); this.bannerT = 0; this.toastT = 0;
   }
   show(on) { this.root.hidden = !on; }
-
-  // annonce au centre de l'écran (cls : big, win, warn)
   banner(html, dur = 1.6, cls = '') {
     const b = this.bannerEl;
     b.innerHTML = html; b.className = 'banner ' + cls; b.hidden = false;
@@ -34,46 +31,36 @@ export class HUD {
   update(v, dt, { toScreen, input, myId, tips }) {
     if ((this.bannerT -= dt) <= 0 && !this.bannerEl.hidden) { this.bannerEl.classList.remove('in'); if (this.bannerT < -0.4) this.bannerEl.hidden = true; }
     if ((this.toastT -= dt) <= 0) this.toastEl.hidden = true;
-    // tableau des manches : une pastille par manche gagnée
-    const sig = v.players.map((p) => `${p.id}:${p.pts}:${p.st === ST.GULL || p.order ? 1 : 0}:${p.st === ST.DOWN ? 'k' : p.st === ST.HANG ? 'h' : ''}:${p.name}`).join('|') + '/' + v.go;
+    const sig = v.players.map((p) => `${p.id}:${p.pts}:${p.st}:${p.name}`).join('|') + '/' + v.go;
     if (sig !== this.sig) {
       this.sig = sig;
       const lead = Math.max(0, ...v.players.map((p) => p.pts));
       this.score.innerHTML = v.players.map((p) => {
-        const out = v.ph !== 'count' && (p.st === ST.GULL || p.order > 0);
+        const out = p.st === ST.OUT;
         const dots = Array.from({ length: v.go }, (_, i) => `<i class="${i < p.pts ? 'on' : ''}"></i>`).join('');
-        return `<div class="chip ${out ? 'out' : ''} ${p.me ? 'me' : ''}" style="--c:${esc(p.color)}"><b>${p.pts === lead && lead > 0 ? '👑 ' : ''}${esc(p.name)}</b><span class="dots">${dots}</span>${out ? '<em>🐦</em>' : p.st === ST.DOWN ? '<em>💫</em>' : p.st === ST.HANG ? '<em>🫳</em>' : ''}</div>`;
+        return `<div class="chip ${out ? 'out' : ''} ${p.me ? 'me' : ''}" style="--c:${esc(p.color)}"><b>${p.pts === lead && lead > 0 ? '👑 ' : ''}${esc(p.name)}</b><span class="dots">${dots}</span>${out ? '<em>💨</em>' : p.st === ST.KO ? '<em>💫</em>' : ''}</div>`;
       }).join('');
     }
-    const standing = v.players.filter((p) => p.st !== ST.GULL && !(p.st === ST.FALL && !p.buoy)).length;
-    this.round.innerHTML = v.rd ? `<b>Manche ${v.rd}</b><span>${esc(SHAPES[v.sh]?.name || '')}</span>${v.ph === 'play' ? `<span class="n">${standing} au sec</span>` : ''}` : '';
-    // vent : flèche qui reste affichée pendant le coup de mistral
-    if (v.wind || v.windWarn) {
-      this.windEl.hidden = false;
-      this.windEl.innerHTML = `${ARROWS[Math.round(((v.windA % (Math.PI * 2)) + Math.PI * 2) / (Math.PI / 4)) % 8]} ${v.windWarn ? 'Mistral !' : 'Ça souffle !'}`;
-      this.windEl.className = 'wind' + (v.windWarn ? ' warn' : '');
-    } else this.windEl.hidden = true;
-    // étiquettes au-dessus des têtes
+    const standing = v.players.filter((p) => p.st !== ST.OUT).length;
+    this.round.innerHTML = v.rd ? `<b>Manche ${v.rd}</b><span>${esc(ARENAS[v.ar]?.name || '')}</span>${v.ph === 'play' ? `<span class="n">${standing} encore là</span>` : ''}` : '';
+    if (v.gu) { this.gustEl.hidden = false; this.gustEl.textContent = 'Ça souffle !'; this.gustEl.className = 'gust warn'; } else this.gustEl.hidden = true;
     const seen = new Set();
     for (const p of v.players) {
-      if (p.st === ST.FALL && p.y < -0.6) continue;
+      if (!p.pos || p.pos[7] < -6) continue;
       seen.add(p.id);
       let t = this.tags.get(p.id);
       if (!t) { t = document.createElement('div'); t.className = 'tag'; this.labels.appendChild(t); this.tags.set(p.id, t); }
-      const gull = p.st === ST.GULL, y = gull ? p.y + 0.8 : p.st === ST.HELD ? p.y + 1 : Math.max(p.y, -0.4) + 2;
-      const s = toScreen(p.x, y, p.z);
-      const html = `${p.me ? '▼ ' : ''}${esc(p.name)}${p.buoy ? ' 🛟' : ''}`;
+      const s = toScreen(p.pos[6], p.pos[7] + 0.68, p.pos[8]);
+      const html = `${p.me ? '▼ ' : ''}${esc(p.name)}`;
       if (t._h !== html) { t.innerHTML = html; t._h = html; }
       t.style.setProperty('--c', p.color);
       t.style.transform = `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) translate(-50%, -100%)`;
-      t.classList.toggle('me', !!p.me); t.classList.toggle('gull', gull);
+      t.classList.toggle('me', !!p.me);
     }
     for (const [id, t] of this.tags) if (!seen.has(id)) { t.remove(); this.tags.delete(id); }
-    // rappel de ce qu'on peut faire, selon ce qui nous arrive
     const me = v.players.find((p) => p.id === myId);
     this.promptEl.innerHTML = promptFor(v, me, input.mode, tips);
     this.promptEl.hidden = !this.promptEl.innerHTML;
-    // joystick tactile
     const st = input.stick();
     if (st) {
       this.stickEl.hidden = false;
@@ -82,34 +69,27 @@ export class HUD {
       this.stickEl.firstElementChild.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
     } else this.stickEl.hidden = true;
   }
-
   clearTags() { for (const t of this.tags.values()) t.remove(); this.tags.clear(); this.sig = ''; }
 }
 
 const K = (mode, k, pad, touch) => (mode === 'touch' ? `<kbd class="t">${touch}</kbd>` : mode === 'pad' ? `<kbd class="p">${pad}</kbd>` : `<kbd>${k}</kbd>`);
 function promptFor(v, me, mode, tips) {
-  if (!me || v.ph === 'over') return '';
-  const push = K(mode, 'Espace', 'A', '👊'), grab = K(mode, 'E', 'X', '✋');
-  if (v.ph === 'count') return tips ? `Tape ${push} pour un coup de poing, maintiens pour <b>pousser</b> fort · ${grab} pour <b>attraper</b> et lancer` : '';
-  switch (me.st) {
-    case ST.GULL:
-      if (v.ph !== 'play') return '';
-      return me.cd > 0 ? '🐦 Tu es une mouette… la prochaine sardine arrive' : `🐦 Tu es une mouette : ${push} lâche une sardine sur ceux qui restent`;
-    case ST.HELD: return me.lift ? `😱 On te soulève ! Martèle ${push} pour te dégager` : `✊ On te tient par le bras ! Martèle ${push} et tire de l'autre côté`;
-    case ST.DOWN: return `💫 KO ! Martèle ${push} pour te relever`;
-    case ST.HANG: return `🫳 Suspendu ! Pousse vers le radeau et martèle ${push} pour remonter`;
-    case ST.BOB: return '🛟 La bouée te sauve : retour sur le radeau !';
-    case ST.FALL: return '';
-    case ST.AIR: return '';
-  }
-  if (me.ck === 2 && me.lift) return `💪 ${grab} : jette-le… vers l'eau, de préférence !`;
-  if (me.ck === 2) return `✊ Tu le tiens : traîne-le au bord, ou ${grab} pour le jeter`;
-  if (me.ck === 1) return `🍉 ${grab} : lance la pastèque droit devant`;
-  if (me.tee) return '😬 Tu vacilles au bord !';
-  if (me.dz > 0.6) return '😵 Tu titubes… encore un coup et tu es KO. Recule !';
-  if (me.chg > 0) return me.chgK >= 1 ? '💥 Chargé à bloc : lâche !' : 'Ça charge… lâche pour foncer';
-  if (tips) return `Tape ${push} : coup de poing · maintiens-le pour <b>pousser</b> fort · ${grab} <b>attraper</b> / lancer`;
-  return '';
+  if (!me || v.ph === 'over' || v.ph === 'round') return '';
+  const pu = K(mode, 'F', 'X', '👊'), gr = K(mode, 'E', 'B', '✋'), ju = K(mode, 'Espace', 'A', '⬆️');
+  const all = `${pu} <b>frappe</b> (maintiens : gros coup) · ${gr} <b>saisis</b> (maintiens pour tenir) · ${ju} <b>saute</b>`;
+  if (v.ph === 'count') return tips ? all : '';
+  if (me.st === ST.OUT) return v.ph === 'play' ? '💨 Tu es tombé… regarde les autres se débrouiller' : '';
+  if (me.st === ST.KO) return `💫 Assommé ! Martèle ${pu} ou ${ju} pour revenir à toi`;
+  const f = me.fl;
+  if (f & FL.LIFTED) return `😱 On te porte ! Martèle ${pu} pour lui faire lâcher prise`;
+  if (f & FL.LIFTING) return `💪 Va au bord et lâche ${gr} : tu le jettes`;
+  if (f & FL.HANG) return `🫳 Garde ${gr} et maintiens ${ju} pour te hisser`;
+  if (f & FL.GRIP) return `✊ Tu le tiens : traîne-le au bord, ou ${ju} pour le soulever s'il est sonné`;
+  if (f & FL.HELD) return `😬 On te tient ! Martèle ${pu} pour te dégager`;
+  if (!(f & FL.GROUND)) return `✋ Maintiens ${gr} pour attraper un rebord`;
+  if (f & FL.CHARGE) return '💥 Lâche pour frapper fort';
+  if (me.dz > 0.65) return '😵 Encore un coup et tu t\'endors : éloigne-toi !';
+  return tips ? all : '';
 }
 
 // ------------------------------------------------------------------ écrans
@@ -117,8 +97,7 @@ const SEGS = [
   ['goal', 'Manches à gagner', [[2, '2'], [3, '3'], [5, '5']]],
   ['bots', 'Bots', [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7']]],
   ['level', 'Niveau des bots', [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']]],
-  ['items', 'Pastèques et bouées', [[1, 'Oui'], [0, 'Non']]],
-  ['wind', 'Coups de mistral', [[1, 'Oui'], [0, 'Non']]],
+  ['hazards', 'Pièges du décor', [[1, 'Oui'], [0, 'Non']]],
 ];
 const LEVEL = { facile: 'Facile', normal: 'Moyen', expert: 'Difficile' };
 
@@ -128,19 +107,19 @@ export function briefingHtml({ role, squad, cfg, embedded, bots }) {
     + (bots > 0 ? `<li class="bot"><i></i>${bots} bot${bots > 1 ? 's' : ''} <small>(${LEVEL[cfg.level] || 'Moyen'})</small></li>` : '');
   const segs = !embedded && host ? `<div class="segs">${SEGS.map(([k, label, opts]) => `<div class="seg"><span>${label}</span><div>${opts.map(([v, t]) =>
     `<button data-k="${k}" data-v="${v}" class="${String(cfg[k]) === String(v) ? 'sel' : ''}">${t}</button>`).join('')}</div></div>`).join('')}</div>`
-    : `<p class="rules">Premier à <b>${cfg.goal}</b> manche${cfg.goal > 1 ? 's' : ''} · ${cfg.items ? 'pastèques et bouées' : 'sans objets'} · ${cfg.wind ? 'mistral' : 'sans vent'}</p>`;
+    : `<p class="rules">Premier à <b>${cfg.goal}</b> manche${cfg.goal > 1 ? 's' : ''} · ${cfg.hazards ? 'avec les pièges du décor' : 'sans pièges'}</p>`;
   return `<div class="brief">
-    <h1 class="logo">PLOUF<span>!</span></h1>
-    <p class="sub">Le dernier au sec gagne la manche. Pousse, attrape, jette… et méfie-toi des planches qui coulent.</p>
+    <h1 class="logo">MOLLO<span>!</span></h1>
+    <p class="sub">Des pantins tout mous, du vide tout autour. Cogne, attrape, porte, jette : le dernier debout gagne la manche.</p>
     <div class="cols">
-      <div><h3>Sur le radeau</h3><ul class="squad">${list}</ul>${segs}</div>
+      <div><h3>Sur le toit</h3><ul class="squad">${list}</ul>${segs}</div>
       <div class="ctrl"><h3>Commandes</h3>
-        <p><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</p>
-        <p><kbd>Espace</kbd> tape : <b>coup de poing</b> · maintiens, lâche : <b>grosse poussée</b> · trois coups et l'autre est KO</p>
-        <p><kbd>E</kbd> <b>attraper</b> : debout on le tient par le bras et on le traîne, KO on le soulève · <kbd>E</kbd> encore pour <b>lancer</b></p>
-        <p>🫳 au bord sans élan, tu te rattrapes d'une main : pousse vers le radeau et martèle pour remonter… gare aux coups de pied</p>
-        <p>🛟 la bouée te repêche une fois · 🐦 tombé, tu deviens mouette et tu bombardes de sardines</p>
-        <p class="alt">Manette : stick, Ⓐ pousser, Ⓧ attraper · Au doigt : joystick à gauche, boutons à droite</p>
+        <p><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> marcher · <kbd>Espace</kbd> <b>sauter</b></p>
+        <p><kbd>F</kbd> ou clic gauche <b>frapper</b> · maintiens, lâche : <b>gros coup</b> · en pleine course et en l'air : <b>coup de pied sauté</b></p>
+        <p><kbd>E</kbd> ou clic droit, <b>maintenu</b> : tes mains s'accrochent à ce qu'elles touchent, un rebord ou un adversaire</p>
+        <p>💫 Trop de coups, surtout à la tête : assommé. Tiens-le, <kbd>Espace</kbd> pour le soulever, lâche <kbd>E</kbd> pour le jeter</p>
+        <p>🫳 Accroché à un rebord, garde <kbd>E</kbd> et maintiens <kbd>Espace</kbd> pour te hisser. Tes bras fatiguent vite !</p>
+        <p class="alt">Manette : stick, Ⓐ sauter, Ⓧ frapper, Ⓑ saisir · Au doigt : joystick à gauche, boutons à droite</p>
       </div>
     </div>
     <div class="btns">${host ? '<button class="btn go" id="btnGo">C\'est parti !</button>' : '<p class="wait">L\'hôte va lancer la partie…</p>'}${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}</div>
@@ -154,8 +133,8 @@ export function endHtml({ ranking, canReplay, embedded, reason }) {
     <h1 class="logo small">${reason === 'host' ? 'Partie interrompue' : `${esc(ranking[0]?.name || '')} gagne !`}</h1>
     ${reason === 'host' ? '<p class="sub">La liaison avec l\'hôte a été perdue.</p>' : ''}
     <div class="podium">${order.map((i) => { const p = pod[i]; return `<div class="pl p${i + 1}" style="--c:${esc(p.color)}"><b>${esc(p.name)}</b><span>${p.pts} manche${p.pts > 1 ? 's' : ''}</span><div class="step">${i + 1}</div></div>`; }).join('')}</div>
-    <table class="stats"><thead><tr><th></th><th>Joueur</th><th>Manches</th><th>Envoyés à l'eau</th><th>Au sec</th></tr></thead><tbody>
-      ${ranking.map((p, k) => `<tr class="${p.me ? 'me' : ''}"><td>${k + 1}</td><td><i style="--c:${esc(p.color)}"></i>${esc(p.name)}${p.bot ? ' <small>bot</small>' : ''}</td><td>${p.pts}</td><td>${p.ko2}</td><td>${Math.round(p.surv)} s</td></tr>`).join('')}
+    <table class="stats"><thead><tr><th></th><th>Joueur</th><th>Manches</th><th>Jetés dans le vide</th><th>Tenu debout</th></tr></thead><tbody>
+      ${ranking.map((p, k) => `<tr class="${p.me ? 'me' : ''}"><td>${k + 1}</td><td><i style="--c:${esc(p.color)}"></i>${esc(p.name)}${p.bot ? ' <small>bot</small>' : ''}</td><td>${p.pts}</td><td>${p.kos}</td><td>${Math.round(p.surv)} s</td></tr>`).join('')}
     </tbody></table>
     <div class="btns">${canReplay ? '<button class="btn go" id="btnAgain">Rejouer</button>' : '<p class="wait">L\'hôte peut relancer une partie.</p>'}${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}</div>
   </div>`;

@@ -296,15 +296,15 @@
       ]
     },
     {
-      "id": "plouf",
-      "title": "Plouf !",
+      "id": "mollo",
+      "title": "Mollo !",
       "maxPlayers": 6,
       "engine": "Three.js (WebGL 3D, décor dessiné dans le code)",
       "crashReasons": [
-        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL sur le radeau 3D"
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL pendant la bagarre"
       ],
       "expulsionReasons": [
-        "EXP_PEER_LEFT_MIDGAME : joueur parti pendant une manche (retiré du radeau ; les bots continuent)"
+        "EXP_PEER_LEFT_MIDGAME : joueur parti pendant une manche (son pantin disparaît ; les bots continuent)"
       ]
     }
   ]

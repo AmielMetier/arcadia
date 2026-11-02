@@ -1,4 +1,4 @@
-# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Plouf !
+# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Mollo !
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -140,31 +140,18 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
-## Plouf !
-Bagarre molle en 3D (Three.js) sur un radeau dans la Baie des Anges, de 1 à 6 joueurs, complétés par des bots
-jusqu'à 8 sur le radeau. Le dernier au sec gagne la manche ; le premier à 2, 3 ou 5 manches gagne la partie.
-- **Deux boutons** : taper Espace donne un coup de poing (jab), le maintenir arme une poussée (plus on arme, plus on envoie
-  loin). Les coups étourdissent ; au troisième on tombe KO, à plat sur les planches (marteler raccourcit le temps au sol).
-  E attrape : un joueur debout se tient par le bras et se traîne (il résiste avec son stick et martèle pour se dégager),
-  un joueur KO se soulève au-dessus de la tête ; E encore pour lancer (loin si soulevé, court si traîné). Jeté sur les
-  planches, on s'étale.
-- **Le bord** : arrivé sans élan (moins de 5,2 m/s, pas en pleine ruée), on se rattrape d'une main et on reste suspendu
-  (7 s au plus) ; pousser vers le radeau et marteler fait remonter en une seconde ; un coup donné au suspendu lui fait
-  lâcher prise. Lancé ou en ruée, c'est le plongeon.
-- **Cinq radeaux** (le Radeau de la Prom', le Ponton du Port, le Plongeoir, les Deux Radeaux, la Bouée Géante),
-  agrandis d'une rangée à partir de 6 joueurs ; les planches du bord branlent puis coulent, celles du centre tiennent jusqu'à 70 s.
-- **Objets et vent** : pastèques à lancer, bouée qui repêche une fois, coups de mistral annoncés ; règles maison pour les retirer.
-- **Les éliminés deviennent des mouettes** qui survolent le radeau et lâchent des sardines sur ceux qui restent.
-- Bots Facile, Moyen, Difficile (chemin de planche en planche, se placent côté terre pour pousser vers l'eau).
-- Clavier (ZQSD, Espace, E), souris, manette ou écran tactile (joystick et deux boutons).
-- Les baigneurs sont le « Beach Character » animé de Quaternius (CC0), recoloré par joueur, rendus mous par-dessus
-  les clips (buste qui penche dans l'élan, tête en retard, bras qui moulinent au bord, corps qui pend quand on est
-  soulevé ou suspendu) ; palmiers, matelas, canot de Quaternius (CC0), tonneaux, caisses, barque, voilier et poste de
-  secours de Kenney (CC0), bouée de Poly by Google et parasol de S. Paul Michael (CC-BY 3.0), planches et sable de Poly
-  Haven (CC0) : `plouf/models/LICENSE.txt`. Musique et sons synthétisés (WebAudio).
-- Réseau (`plouf/app.js`) : l'hôte simule à 60 Hz et envoie 20 instantanés par seconde ; l'invité prédit son propre
-  déplacement avec le même code que l'hôte (`stepPlayer`). `?lag=150` simule 150 ms d'aller-retour pour tester entre onglets ;
-  `?debug` expose `__plouf.run(2)`, qui fait avancer le jeu de 2 s image par image.
+## Mollo !
+
+Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la manche, le premier à N manches gagne la partie.
+
+- Physique (`mollo/engine/sim.js`) : sept points par corps (bassin, poitrine, tête, deux mains, deux pieds), Verlet et contraintes, à 60 Hz.
+  Des muscles (ressorts vers une pose) tiennent le corps debout ; ils mollissent quand il encaisse et lâchent tout en KO. Coudes et genoux n'existent qu'à l'affichage.
+- Gestes : marcher, sauter, frapper (maintenu : gros coup ; en l'air avec de l'élan : coup de pied sauté), saisir (les mains s'accrochent à un corps ou à un rebord),
+  soulever un adversaire sonné et le jeter, se hisser. Tenir fatigue : 7 s à un rebord, 5 s sur un corps.
+- Arènes (`mollo/engine/arena.js`) : Les Toits, Le Chantier (boulet), L'Usine à Pâte (tapis, pilon). Des bourrasques après 75 s.
+- Réseau (`mollo/app.js`) : l'hôte simule et envoie 20 instantanés par seconde ; l'invité envoie ses commandes et affiche tous les corps ~100 ms en retard, sans prédiction.
+  `?debug` expose `__mollo.run(2)`, qui fait avancer le jeu de 2 s image par image ; `?autostart`, `?seed`, `?arene=usine`.
+- Graphismes : personnages et décors dessinés dans le code (`mollo/view/pantin.js`, `scene.js`), textures au canvas. Musique et sons synthétisés (WebAudio).
 
 ## Pour les développeurs
 - Site statique (GitHub Pages), sans étape de build.
@@ -179,8 +166,7 @@ jusqu'à 8 sur le radeau. Le dernier au sec gagne la manche ; le premier à 2, 3
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
-  `node tools/test-plouf.mjs` teste le moteur de Plouf ! (radeaux, poussée, prise et lancer, bouée, mouette, parties entières
-  entre bots, reprise par un nouvel hôte, prédiction de l'invité).
+  `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement
   `LOGS_TOKEN` (`?token=…` ou `Authorization: Bearer …`) ; `node tools/test-relay.mjs` couvre aussi les garde-fous
