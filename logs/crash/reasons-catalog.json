@@ -319,6 +319,32 @@
         "EXP_PEER_LEFT_MIDGAME : pilote déconnecté en plein vol",
         "EXP_HOST_STOPPED_GAME : arrêt de la mission par l'hôte"
       ]
+    },
+    {
+      "id": "odysseetest",
+      "title": "Odyssée Test",
+      "maxPlayers": 6,
+      "engine": "Le moteur d'Odyssée (Three.js, fausse 3D façon DS) + labo et éditeur de carte",
+      "crashReasons": [
+        "Retouche de carte illisible dans le navigateur : elle est ignorée (l'éditeur peut tout effacer)",
+        "Sprites PokeAPI indisponibles (réseau bloqué) : les remplaçants dessinés s'affichent"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : un joueur quitte pendant un échange ou un combat entre joueurs (forfait)"
+      ]
+    },
+    {
+      "id": "sitenoir",
+      "title": "Site Noir",
+      "maxPlayers": 5,
+      "engine": "Three.js (horreur asymétrique à la première personne, l'hôte fait autorité)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL dans le site"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a quitté la partie",
+        "EXP_PEER_LEFT_MIDGAME : un joueur quitte en pleine partie"
+      ]
     }
   ]
 }
