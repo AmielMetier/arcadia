@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.37 — 2 novembre 2026
+- **Poké Duel** — 320 nouveaux Pokémon : toutes les évolutions finales de la 1re à la 6e génération, légendaires compris (381 Pokémon en tout).
+  - Chacun a ses vraies stats, 4 attaques choisies dans ce qu'il peut apprendre (attaques de son type, couverture, boost ou soin) et son meilleur talent.
+  - 107 nouvelles attaques (Mégacorne, Casse-Brique, Poing Ombre, Fracass'Tête, Tranch'Air…) et une trentaine de nouveaux talents : Farceur, Protéen, Contestation, Garde Mystik, Déclic Tactique, Aura Féérique, Aura Ténébreuse, Toison Épaisse, Amour Filial, Lentiteintée, Sérénité, Absentéisme, Début Calme…
+  - La grêle arrive avec Alerte Neige : elle blesse tout le monde sauf les Glace, et Blizzard touche à coup sûr.
+  - Toutes les Méga-Évolutions de la 6G : 21 nouvelles, dont Méga-Kangourex, Méga-Mysdibule, Méga-Altaria, Méga-Latios, Méga-Lockpin et Méga-Diancie.
+  - Nouveau choix de génération dans les réglages du tournoi : toutes, les iconiques, Kanto, Johto et Hoenn, Sinnoh, Unys ou Kalos.
+- **Poké Duel** — Les coups critiques sont plus rares : 1 chance sur 24 au lieu de 1 sur 16, comme dans les jeux récents.
+
 ## 3.36 — 2 novembre 2026
 - **Poké Duel** — Toutes les attaques ont maintenant leur vrai effet :
   - Ultralaser oblige à se recharger au tour suivant ; Lance-Soleil prend un tour pour absorber la lumière, sauf au soleil.

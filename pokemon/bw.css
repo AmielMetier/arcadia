@@ -836,3 +836,7 @@
 .bw-movecol{display:flex;flex-direction:column;min-width:0}
 .bw-movecol .moves-grid{flex:1}
 .bw-mega{flex:none}
+/* grêle */
+.bw-weather.w-hail{background:#d8f0ff}
+.bf-inner:has(.w-hail)::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.85) 0 2px,transparent 3px) 0 0/38px 38px,radial-gradient(circle,rgba(255,255,255,.7) 0 1.5px,transparent 2.5px) 19px 13px/46px 46px;background-color:rgba(160,200,230,.16);animation:wxHail .45s linear infinite}
+@keyframes wxHail{to{background-position:-12px 38px,7px 59px}}

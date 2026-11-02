@@ -1,6 +1,8 @@
 // pokemon/engine/moves.js
 // Liste des attaques cultes avec types, catégories, puissances et effets
 
+import { MOVES_GEN } from './roster-gen.js';
+
 export const MOVES = {
   // --- NORMAL ---
   tackle: { name: 'Charge', type: 'normal', cat: 'physical', power: 40, acc: 100, pp: 35 },
@@ -134,3 +136,6 @@ export const MOVES = {
   play_rough: { name: 'Câlinerie', type: 'fairy', cat: 'physical', power: 90, acc: 90, pp: 10, effect: { type: 'stat', target: 'opponent', stat: 'atk', val: -1, chance: 10 } },
   dazzling_gleam: { name: 'Éclat Magique', type: 'fairy', cat: 'special', power: 80, acc: 100, pp: 20 },
 };
+
+// attaques des Pokémon ajoutés (générées depuis PokeAPI) ; celles faites main restent prioritaires
+for (const [k, m] of Object.entries(MOVES_GEN)) if (!MOVES[k]) MOVES[k] = m;

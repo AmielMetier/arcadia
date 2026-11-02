@@ -3,6 +3,8 @@
 // Un Pokémon méga-évolue s'il tient sa Méga-Gemme ; une seule Méga-Évolution par dresseur et par combat.
 // Les PV ne changent pas ; types et autres stats deviennent ceux de la forme Méga. pid = forme PokeAPI (sprites).
 
+import { MEGAS_GEN } from './roster-gen.js';
+
 export const MEGAS = {
  "3": [
   {
@@ -646,6 +648,8 @@ export const MEGAS = {
   }
  ]
 };
+// Méga-Évolutions des Pokémon ajoutés (générées depuis PokeAPI)
+for (const [dex, list] of Object.entries(MEGAS_GEN)) MEGAS[dex] = [...(MEGAS[dex] || []), ...list.filter((f) => !(MEGAS[dex] || []).some((g) => g.pid === f.pid))];
 
 /** Formes Méga d'un Pokémon (tableau vide s'il n'en a pas) */
 export const megasOf = (dex) => MEGAS[dex] || [];

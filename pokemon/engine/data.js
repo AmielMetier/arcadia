@@ -2,6 +2,8 @@
 // Base de données des Pokémon jouables (Gens 1 à 3 cultes + favoris universels)
 // Chaque Pokémon dispose de ses stats niveau 50 équilibrées, de ses types et de 4 attaques signatures.
 
+import { ROSTER_GEN } from './roster-gen.js';
+
 export const POKEMON_ROSTER = [
   // ===================== GEN 1 (KANTO) =====================
   {
@@ -387,6 +389,9 @@ export const POKEMON_ROSTER = [
     cleanMoves: ['earthquake', 'outrage', 'stone_edge', 'swords_dance']
   }
 ];
+// Pokémon des Gens 1 à 6 ajoutés (générés depuis PokeAPI par tools/pokemon-roster.mjs)
+for (const p of ROSTER_GEN) if (!POKEMON_ROSTER.some((q) => q.id === p.id)) POKEMON_ROSTER.push(p);
+
 
 export function getPokemonById(id) {
   return POKEMON_ROSTER.find(p => p.id === id);

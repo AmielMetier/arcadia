@@ -106,7 +106,26 @@ console.log(`✓ ${POKEMON_ROSTER.length} Pokémon, chacun avec un talent qui a 
   const k = mon(62, { ability: 'swift-swim' });
   ok(getEffectiveSpeed(k, { weather: { type: 'rain' }, teamA: [k], teamB: [], activeA: 0, activeB: 0 }) === getEffectiveSpeed(k) * 2, 'Glissade : Vitesse ×2 sous la pluie');
 }
-console.log('✓ effets : Intimidation, Sécheresse et météo, Lévitation, Absorb Eau, Coloforce, Multiécaille, Turbo, Fermeté, Garde Magik, Corps Sain, Glissade');
+{ // Garde Mystik, Contestation, Farceur, Déclic Tactique, grêle
+  const n1 = battle([mon(6, { ability: null })], [mon(292, { ability: 'wonder-guard' })]);
+  ok(calculateDamage(n1.teamA[0], n1.teamB[0], MOVES.surf, n1).damage === 0 && calculateDamage(n1.teamA[0], n1.teamB[0], MOVES.flamethrower, n1).damage > 0, 'Garde Mystik : seules les attaques super efficaces');
+  const c = battle([mon(143, { ability: null })], [mon(687, { ability: 'contrary' })]);
+  c.teamA[0].moves[0] = 'growl'; c.teamA[0].ppMap.growl = 40;
+  resolveTurn(c, move('growl'), pass);
+  ok(c.teamB[0].statStages.atk === 1, 'Contestation : Rugissement monte l\'Attaque');
+  const pr = battle([mon(143, { ability: 'prankster' })], [mon(101 > 0 ? 65 : 65, { ability: null })]);
+  pr.teamA[0].moves[0] = 'thunder_wave'; pr.teamA[0].ppMap.thunder_wave = 20;
+  const { events } = resolveTurn(pr, move('thunder_wave'), move(pr.teamB[0].moves[0]));
+  ok(events.find((e) => e.type === 'attack_start').side === 'A', 'Farceur : statut en priorité');
+  const ae = battle([mon(681, { ability: 'stance-change' })], [mon(143, { ability: null, hp: 9999, maxHp: 9999 })]);
+  const def0 = ae.teamA[0].stats.def;
+  resolveTurn(ae, move(ae.teamA[0].moves.find((k) => MOVES[k].power)), pass);
+  ok(ae.teamA[0].blade && ae.teamA[0].stats.atk === def0, 'Déclic Tactique : Forme Assaut');
+  const h = battle([mon(460, { ability: 'snow-warning' })], [mon(143, { ability: null })]);
+  runEntry(h); const hp = h.teamB[0].hp; resolveTurn(h, pass, pass);
+  ok(h.weather.type === 'hail' && h.teamB[0].hp < hp, 'Alerte Neige : la grêle blesse');
+}
+console.log('✓ effets : Intimidation, Sécheresse et météo, Lévitation, Absorb Eau, Coloforce, Multiécaille, Turbo, Fermeté, Garde Magik, Corps Sain, Glissade, Garde Mystik, Contestation, Farceur, Déclic Tactique, Alerte Neige');
 
 // --- combats complets entre bots
 const ids = POKEMON_ROSTER.map((p) => p.id), seen = new Set();

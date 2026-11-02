@@ -173,7 +173,7 @@ window.HUB_GAMES = [
     icon: '🏟️', score: 'Record de matchs gagnés',
     settings: [
       { key: 'timer', label: 'Chrono par tour', options: [[15, '15 s (Blitz)'], [25, '25 s (Normal)'], [40, '40 s (Stratégique)']], def: 25 },
-      { key: 'gen', label: 'Génération', options: [['all', 'Gens 1 à 3 (Iconiques)'], ['kanto', 'Gen 1 (Kanto 151)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)']], def: 'all' },
+      { key: 'gen', label: 'Génération', options: [['all', 'Gens 1 à 6 (tous)'], ['classiques', 'Les iconiques'], ['kanto', 'Gen 1 (Kanto)'], ['hoenn', 'Gen 2 & 3 (Johto & Hoenn)'], ['sinnoh', 'Gen 4 (Sinnoh)'], ['unys', 'Gen 5 (Unys)'], ['kalos', 'Gen 6 (Kalos)']], def: 'all' },
       { key: 'final', label: 'Finale', options: [[3, '2 manches gagnantes'], [1, 'Une seule manche']], def: 3 },
       { key: 'bots', label: 'Places libres', options: [[1, 'Remplies par des bots'], [0, 'Qualifié d\'office']], def: 1 },
       { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },

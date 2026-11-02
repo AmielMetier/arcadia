@@ -83,6 +83,10 @@ function roundName(matchesInRound) {
 function poolFor(gen) {
   if (gen === 'kanto') return POKEMON_ROSTER.filter((p) => p.gen === 1);
   if (gen === 'hoenn') return POKEMON_ROSTER.filter((p) => p.gen === 2 || p.gen === 3);
+  if (gen === 'sinnoh') return POKEMON_ROSTER.filter((p) => p.gen === 4);
+  if (gen === 'unys') return POKEMON_ROSTER.filter((p) => p.gen === 5);
+  if (gen === 'kalos') return POKEMON_ROSTER.filter((p) => p.gen === 6);
+  if (gen === 'classiques') return POKEMON_ROSTER.filter((p) => !p.extra);   // les 61 iconiques d'avant
   return [...POKEMON_ROSTER];
 }
 

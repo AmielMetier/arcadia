@@ -24,7 +24,7 @@ function showAbilityBanner(key, pokeName, abilityName) {
   d.animate([{ transform: `translateX(${from})`, opacity: 0 }, { transform: 'none', opacity: 1, offset: 0.15 }, { transform: 'none', opacity: 1, offset: 0.85 }, { transform: `translateX(${from})`, opacity: 0 }],
     { duration: 1700, easing: 'ease-out' }).finished.then(() => d.remove(), () => d.remove());
 }
-const WEATHER_LABEL = { rain: '🌧️ Pluie', sun: '☀️ Soleil', sand: '🌪️ Tempête de sable', wind: '🌬️ Vents violents' };
+const WEATHER_LABEL = { rain: '🌧️ Pluie', sun: '☀️ Soleil', sand: '🌪️ Tempête de sable', wind: '🌬️ Vents violents', hail: '🌨️ Grêle' };
 function weatherTag(w) { return w && w.type ? `<span class="bw-weather w-${w.type}">${WEATHER_LABEL[w.type]}${w.type !== 'wind' && w.turns ? ` · ${w.turns} t.` : ''}</span>` : ''; }
 
 /** Objet Choix : seule l'attaque bloquée reste disponible (tant qu'elle a des PP). */

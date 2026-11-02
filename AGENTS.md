@@ -49,6 +49,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Poké Duel, tournoi (`pokemon/engine/tournament.js`, `pokemon/net/`) : `node tools/test-pokemon-tournament.mjs` (draft, tableau, exemptions,
   forfaits, finale en 2 manches) et `node tools/test-pokemon-net.mjs` (tournoi joué en réseau simulé, départ d'un joueur, départ de l'hôte).
   Objets tenus (`pokemon/engine/items.js`) et Méga-Évolutions (`pokemon/engine/megas.js`) : `node tools/test-pokemon-items.mjs`.
+  Roster : 61 Pokémon faits main (`pokemon/engine/data.js`) + toutes les évolutions finales des Gens 1 à 6, leurs attaques, talents et Méga-Évolutions
+  générés depuis PokeAPI dans `pokemon/engine/roster-gen.js` par `node tools/pokemon-roster.mjs` (ne pas modifier ce fichier à la main).
   Talents (`pokemon/engine/abilities.js` : un talent par Pokémon, le meilleur que le moteur sait jouer ; météo dans `battle.js`) : `node tools/test-pokemon-abilities.mjs`. Le mode aventure Kalos-Sud a été retiré
   (l'aventure Pokémon du Hub, c'est Odyssée).
 - Odyssée (`odyssee/`) : jeu à plusieurs par le Hub (`odyssee/js/net/` : positions, invitations, échanges, combats entre joueurs calculés
