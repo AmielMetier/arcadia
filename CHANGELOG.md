@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.68 — 3 novembre 2026
+- **The Backrooms** — l'entité est plus nette et bien centrée sur son visage.
+  - Sa photo est plus nette, et l'image du jeu un peu moins floue.
+  - Quand elle t'attrape, son visage arrive pile au centre de l'écran.
+  - Sa tête est maintenant dans l'axe de l'entité : quand elle fonce sur toi, c'est son visage qui te fait face.
+
 ## 3.67 — 3 novembre 2026
 - **The Backrooms** — un mode « Sans souris » et des couloirs plus sombres.
   - Un mode « Sans souris », comme dans Mystère Mystère, se choisit dans le menu pause : ZQSD pour marcher, les flèches pour regarder, Entrée pour jouer et Échap pour mettre en pause.

@@ -4,7 +4,7 @@
 // Plus l'entité est proche (uDanger), plus l'image se déchire.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
-const LINES = 400; // hauteur de rendu de la scène, en pixels
+const LINES = 480; // hauteur de rendu de la scène, en pixels
 
 const vertexShader = `
 varying vec2 vUv;
@@ -53,7 +53,7 @@ void main() {
   col.g = grab(uv).g;
   col.b = grab(uv - vec2(ca * 1.4, 0.0)).b;
   vec3 blur = (grab(uv + vec2(0.0035, 0.0)) + grab(uv - vec2(0.0035, 0.0)) + grab(uv + vec2(0.007, 0.0)) + grab(uv - vec2(0.007, 0.0))) * 0.25;
-  col = mix(col, blur, 0.35);
+  col = mix(col, blur, 0.25);
   // halo des néons
   col += max(blur - vec3(0.9), 0.0) * 0.5;
 

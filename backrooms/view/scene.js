@@ -9,7 +9,7 @@ import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 
 const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
-export const ENTITY_IMG = new URL('../img/entite.png', import.meta.url).href;
+export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
 const AMBIENT = 0.015; // lumière minimale dans les zones mortes
@@ -269,11 +269,13 @@ export function createBackroomsScene(container, map) {
   monsterGroup.add(face);
   new THREE.TextureLoader().load(ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     const h = 2.15;
     const w = Math.min(2.3, (h * t.image.width) / t.image.height);
     const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: '#e6dccb' });
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     plane.position.y = h / 2 + 0.25; // elle flotte au-dessus de la moquette
+    plane.position.x = (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
     face.add(plane);
     face.visible = true;
     shadow.visible = false;

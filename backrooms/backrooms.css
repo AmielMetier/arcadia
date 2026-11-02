@@ -163,9 +163,16 @@ html, body {
   justify-content: center;
   overflow: hidden;
 }
+/* le visage (à 60 % de la largeur et 21 % de la hauteur de l'image) arrive au centre de l'écran */
 .jumpscare-overlay img {
-  height: 135%;
-  filter: contrast(1.6) saturate(0.4) sepia(0.4) hue-rotate(-20deg) brightness(0.9);
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  height: 190vh;
+  max-width: none;
+  transform: translate(-60%, -21%);
+  transform-origin: 60% 21%;
+  filter: contrast(1.35) saturate(0.55) sepia(0.3) hue-rotate(-20deg) brightness(0.92);
 }
 .jumpscare-overlay.flash { animation: scareFlash 1.4s forwards; }
 .jumpscare-overlay.flash img { animation: scareShake 0.06s infinite, scareZoom 1.4s ease-out forwards; }
@@ -176,13 +183,13 @@ html, body {
   100% { opacity: 0; }
 }
 @keyframes scareShake {
-  0% { transform: translate(-8px, 4px); }
-  50% { transform: translate(8px, -6px); }
-  100% { transform: translate(-4px, 8px); }
+  0% { translate: -8px 4px; }
+  50% { translate: 8px -6px; }
+  100% { translate: -4px 8px; }
 }
 @keyframes scareZoom {
-  from { scale: 0.7; }
-  to { scale: 1.25; }
+  from { scale: 0.55; }
+  to { scale: 1.1; }
 }
 
 /* Prompt pour cliquer */
