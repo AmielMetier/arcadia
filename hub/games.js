@@ -223,7 +223,7 @@ window.HUB_GAMES = [
     id: 'plouf',
     title: 'Plouf !',
     tag: 'Le dernier au sec gagne',
-    desc: 'Sur un radeau qui coule planche par planche dans la Baie des Anges : pousse, attrape et jette tes potes à l\'eau. Tombé, tu deviens mouette et tu les bombardes de sardines.',
+    desc: 'Bagarre molle sur un radeau qui coule planche par planche dans la Baie des Anges : cogne, mets KO, soulève et jette tes potes à l\'eau, rattrape-toi au bord d\'une main. Tombé, tu deviens mouette et tu les bombardes de sardines.',
     url: 'plouf/',
     minPlayers: 1, maxPlayers: 6, maxWithBots: 8, // 6 joueurs au plus, et jusqu'à 8 sur le radeau avec les bots
     accent: '#17c3d6',
@@ -282,7 +282,7 @@ window.HUB_GAME_INFO = {
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
   plouf: { genre: 'party', time: '5–10 min',
-    keys: [['ZQSD', 'Se déplacer'], ['Espace', 'Maintenir pour armer, lâcher pour pousser'], ['E', 'Attraper un joueur ou une pastèque, puis lancer'], ['Échap', 'Menu']],
-    tips: ['Plus tu armes longtemps, plus tu envoies loin… mais tu avances au ralenti.', 'Soulevé ? Martèle Espace pour te dégager.', 'Arrive doucement au bord : tu te rattrapes. Lancé, c\'est le plongeon.', 'Tombé à l\'eau, tu deviens mouette : vise avec le cercle et lâche ta sardine.'] },
+    keys: [['ZQSD', 'Se déplacer'], ['Espace', 'Tape : coup de poing · maintiens, lâche : grosse poussée'], ['E', 'Attraper (debout : le tenir, KO : le soulever), puis lancer'], ['Échap', 'Menu']],
+    tips: ['Trois coups de poing et l\'autre est KO : soulève-le et jette-le à l\'eau.', 'Plus tu armes longtemps, plus tu envoies loin… mais tu avances au ralenti.', 'Tenu par le bras ? Martèle Espace et tire de l\'autre côté.', 'Au bord sans élan, tu te rattrapes d\'une main : pousse vers le radeau et martèle pour remonter.', 'Quelqu\'un pend au bord ? Un coup de poing sur les doigts…', 'Tombé à l\'eau, tu deviens mouette : vise avec le cercle et lâche ta sardine.'] },
 };
 window.HUB_GENRES = [['all', 'Tous'], ['course', 'Course'], ['action', 'Action'], ['strategie', 'Stratégie'], ['party', 'Party'], ['sport', 'Sport'], ['plateau', 'Plateau'], ['aventure', 'Aventure']];

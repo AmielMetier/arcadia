@@ -1,10 +1,12 @@
 # Journal des versions — Arcadia
 
 ## 3.35 — 2 novembre 2026
-- **Plouf !** — Nouveau jeu : un radeau dans la Baie des Anges, et le dernier au sec gagne la manche.
-  - Deux gestes : maintiens Espace pour armer ta poussée et lâche pour foncer (plus tu armes, plus tu envoies loin), ou attrape un joueur avec E pour le jeter à l'eau.
-  - Soulevé par quelqu'un ? Martèle les boutons pour te dégager.
-  - Au bord, si tu arrives doucement, tu te rattrapes en moulinant des bras ; lancé, c'est le plongeon.
+- **Plouf !** — Nouveau jeu : une bagarre molle sur un radeau dans la Baie des Anges, et le dernier au sec gagne la manche.
+  - Tape Espace pour un coup de poing, maintiens-le pour armer une grosse poussée et lâche pour foncer : plus tu armes, plus tu envoies loin.
+  - Les coups étourdissent : on titube, et au troisième on tombe KO, à plat sur les planches (martèle pour te relever plus vite).
+  - E attrape : un joueur debout, tu le tiens par le bras et tu le traînes (il résiste et martèle pour se dégager) ; un joueur KO, tu le soulèves au-dessus de la tête. E encore pour le lancer.
+  - Au bord sans élan, tu te rattrapes d'une main et tu restes suspendu : pousse vers le radeau et martèle pour remonter… à moins qu'on ne vienne te marcher sur les doigts. Lancé ou en pleine ruée, c'est le plongeon direct.
+  - Des baigneurs animés aux maillots de ta couleur, qui penchent dans l'élan, battent des bras au bord et s'étalent quand ils sont KO ; la plage et la Promenade au fond, palmiers, parasols, poste de secours, bateaux qui dérivent, et un radeau en vraies planches posé sur des tonneaux.
   - Les planches du bord branlent puis coulent : le radeau rétrécit jusqu'à ce qu'il ne reste qu'un baigneur.
   - Cinq radeaux, un par manche : le Radeau de la Prom', le Ponton du Port, le Plongeoir, les Deux Radeaux et la Bouée Géante, plus grands à partir de 6 joueurs.
   - Des pastèques à lancer sur les autres, une bouée qui te repêche une fois, et des coups de mistral qui poussent tout le monde.

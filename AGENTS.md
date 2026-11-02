@@ -57,9 +57,9 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
 - Mini-Golf Party : `node tools/test-minigolf.mjs` construit les 54 trous et vérifie qu'un bot expert les termine (à lancer quand on touche aux trous ou à la physique).
   `node tools/fuzz-minigolf.mjs [coups par trou]` tire au hasard sur chaque trou et compte les balles qui traversent un mur ou restent suspendues (doit afficher 0 et 0).
   Textures photo : celles de `kart/tex/` (Poly Haven, CC0), chargées par `dressPhoto` dans `minigolf/js/textures.js`.
-- Plouf ! (`plouf/`, moteur sans DOM dans `plouf/engine/`) : `node tools/test-plouf.mjs` teste les radeaux, la poussée, la prise et le lancer,
-  la bouée, la mouette, des parties entières entre bots (durée des manches), la reprise par un nouvel hôte et la prédiction de l'invité :
-  à lancer quand on touche au moteur. `?lag=150` simule de la latence entre deux onglets, `?debug` expose `__plouf.run(secondes)`.
+- Plouf ! (`plouf/`, moteur sans DOM dans `plouf/engine/`) : `node tools/test-plouf.mjs` teste les radeaux, le jab et la poussée armée, le KO,
+  la prise (traîner, soulever) et le lancer, l'accroche au bord et le coup de pied, la bouée, la mouette, des parties entières entre bots (durée des
+  manches), la reprise par un nouvel hôte et la prédiction de l'invité : à lancer quand on touche au moteur. Modèles et licences : `plouf/models/LICENSE.txt`. `?lag=150` simule de la latence entre deux onglets, `?debug` expose `__plouf.run(secondes)`.
 - Odyssée (aventure solo façon DS, `odyssee/`) : `node tools/test-odyssee.mjs` joue 600 combats aléatoires et vérifie que toute la région
   (portes, grottes, PNJ, objets, arènes) est accessible depuis Bourg-Aube sans qu'un PNJ ne bloque le passage : à lancer quand on touche
   au moteur (`odyssee/js/core/`) ou à la carte (`odyssee/js/world/`). Les données des Pokémon (`odyssee/js/data/`) sont générées par

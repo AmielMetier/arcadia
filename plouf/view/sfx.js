@@ -116,6 +116,11 @@ export class Sfx {
       case 'whoosh': this.burst(0.22, 500 + (o.k || 0) * 900, 0.18 + (o.k || 0) * 0.15, 'bandpass', 1.4, 3); break;
       case 'hit': this.sweep(160, 45, 0.18, 0.6 * v); this.burst(0.08, 1800, 0.35 * v, 'bandpass', 0.8); break;
       case 'bump': this.sweep(120, 60, 0.1, 0.25 * v); break;
+      case 'jab': this.burst(0.12, 900, 0.14, 'bandpass', 1.5, 2.5); break;
+      case 'ko': this.sweep(220, 40, 0.35, 0.5); this.burst(0.3, 300, 0.4, 'lowpass'); [12, 7, 3].forEach((n, i) => this.sweep(N(72 + n), N(70 + n), 0.18, 0.12, 'triangle', 0.1 + i * 0.12)); break;
+      case 'hang': this.burst(0.12, 1600, 0.2, 'bandpass', 1.2, 0.6); this.sweep(260, 180, 0.12, 0.2); break;
+      case 'climb': this.burst(0.2, 700, 0.18, 'lowpass'); this.sweep(200, 420, 0.18, 0.15, 'triangle'); break;
+      case 'stomp': this.sweep(140, 50, 0.14, 0.45); this.burst(0.1, 1200, 0.25, 'bandpass', 0.9); break;
       case 'grab': this.sweep(300, 520, 0.08, 0.2); this.burst(0.05, 3000, 0.08); break;
       case 'miss': this.burst(0.12, 900, 0.07, 'bandpass', 2, 0.6); break;
       case 'throw': this.burst(0.3, 400, 0.22, 'bandpass', 1.2, 4); break;

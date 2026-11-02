@@ -141,18 +141,27 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
 ## Plouf !
-Jeu de bousculade en 3D (Three.js) sur un radeau dans la Baie des Anges, de 1 à 6 joueurs, complétés par des bots
+Bagarre molle en 3D (Three.js) sur un radeau dans la Baie des Anges, de 1 à 6 joueurs, complétés par des bots
 jusqu'à 8 sur le radeau. Le dernier au sec gagne la manche ; le premier à 2, 3 ou 5 manches gagne la partie.
-- **Deux actions** : Pousser (maintenir pour armer, lâcher pour foncer : plus on arme, plus on envoie loin) et Attraper
-  (un joueur ou une pastèque, qu'on lance ensuite droit devant). Soulevé, on martèle les boutons pour se dégager.
-- **Le bord** : arrivé lentement, on se rattrape en moulinant des bras ; lancé, c'est le plongeon.
+- **Deux boutons** : taper Espace donne un coup de poing (jab), le maintenir arme une poussée (plus on arme, plus on envoie
+  loin). Les coups étourdissent ; au troisième on tombe KO, à plat sur les planches (marteler raccourcit le temps au sol).
+  E attrape : un joueur debout se tient par le bras et se traîne (il résiste avec son stick et martèle pour se dégager),
+  un joueur KO se soulève au-dessus de la tête ; E encore pour lancer (loin si soulevé, court si traîné). Jeté sur les
+  planches, on s'étale.
+- **Le bord** : arrivé sans élan (moins de 5,2 m/s, pas en pleine ruée), on se rattrape d'une main et on reste suspendu
+  (7 s au plus) ; pousser vers le radeau et marteler fait remonter en une seconde ; un coup donné au suspendu lui fait
+  lâcher prise. Lancé ou en ruée, c'est le plongeon.
 - **Cinq radeaux** (le Radeau de la Prom', le Ponton du Port, le Plongeoir, les Deux Radeaux, la Bouée Géante),
   agrandis d'une rangée à partir de 6 joueurs ; les planches du bord branlent puis coulent, celles du centre tiennent jusqu'à 70 s.
 - **Objets et vent** : pastèques à lancer, bouée qui repêche une fois, coups de mistral annoncés ; règles maison pour les retirer.
 - **Les éliminés deviennent des mouettes** qui survolent le radeau et lâchent des sardines sur ceux qui restent.
 - Bots Facile, Moyen, Difficile (chemin de planche en planche, se placent côté terre pour pousser vers l'eau).
 - Clavier (ZQSD, Espace, E), souris, manette ou écran tactile (joystick et deux boutons).
-- Tout est dessiné dans le code (aucun modèle à charger) ; musique et sons synthétisés (WebAudio).
+- Les baigneurs sont le « Beach Character » animé de Quaternius (CC0), recoloré par joueur, rendus mous par-dessus
+  les clips (buste qui penche dans l'élan, tête en retard, bras qui moulinent au bord, corps qui pend quand on est
+  soulevé ou suspendu) ; palmiers, matelas, canot de Quaternius (CC0), tonneaux, caisses, barque, voilier et poste de
+  secours de Kenney (CC0), bouée de Poly by Google et parasol de S. Paul Michael (CC-BY 3.0), planches et sable de Poly
+  Haven (CC0) : `plouf/models/LICENSE.txt`. Musique et sons synthétisés (WebAudio).
 - Réseau (`plouf/app.js`) : l'hôte simule à 60 Hz et envoie 20 instantanés par seconde ; l'invité prédit son propre
   déplacement avec le même code que l'hôte (`stepPlayer`). `?lag=150` simule 150 ms d'aller-retour pour tester entre onglets ;
   `?debug` expose `__plouf.run(2)`, qui fait avancer le jeu de 2 s image par image.

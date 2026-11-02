@@ -47,8 +47,9 @@ const SETTINGS = {
   test: () => sfx.play('plop'),
   sections: [{ title: 'Commandes', items: [{ keys: [
     ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou flèches', 'stick gauche'],
-    ['Pousser (maintenir pour armer)', '<kbd>Espace</kbd> ou clic gauche', 'Ⓐ'],
-    ['Attraper, lancer', '<kbd>E</kbd> ou clic droit', 'Ⓧ'],
+    ['Coup de poing (tape) · poussée (maintenir pour armer)', '<kbd>Espace</kbd> ou clic gauche', 'Ⓐ'],
+    ['Attraper (tenir, soulever un KO), lancer', '<kbd>E</kbd> ou clic droit', 'Ⓧ'],
+    ['Suspendu au bord : remonter', 'pousser vers le radeau + marteler', 'stick + Ⓐ'],
     ['Mouette : lâcher une sardine', '<kbd>Espace</kbd>', 'Ⓐ'],
     ['Pause', '<kbd>Échap</kbd>', 'Start'],
   ] }] }],
@@ -109,7 +110,8 @@ function boot(info) {
   if (H.embedded) H.signalReady();       // après on('msg') : sinon les premiers messages de l'hôte se perdent
   if (!scene) { showNoGL(); if (H.shown) H.shown(); return; }
   showBriefing();
-  if (H.shown) H.shown();                // l'écran de chargement commun d'Arcadia peut s'effacer
+  // l'écran de chargement commun d'Arcadia s'efface quand les modèles sont là (8 s au plus)
+  if (H.shown) Promise.race([scene.ready, new Promise((r) => setTimeout(r, 8000))]).then(() => H.shown());
   if (S.role === 'guest') send('host', { t: 'hi' });
   raf = requestAnimationFrame(loop);
   // ?debug : __plouf.run(2) fait avancer le jeu de 2 s image par image (même quand l'onglet est caché)
@@ -282,7 +284,7 @@ function reconcile(s) {
   const ctx = ctxFor(s);
   for (const h of S.hist) stepPlayer(np, h, h.dt, ctx, null);
   // petit écart (une bourrade arrivée en retard, un choc) : on le résorbe en douceur au lieu de téléporter
-  if (old && old.st === np.st && np.st === ST.RUN && Math.hypot(old.x - np.x, old.z - np.z) < 4) { np.ox = old.x - np.x; np.oz = old.z - np.z; }
+  if (old && old.st === np.st && (np.st === ST.RUN || np.st === ST.DOWN) && Math.hypot(old.x - np.x, old.z - np.z) < 4) { np.ox = old.x - np.x; np.oz = old.z - np.z; }
   S.pred = np;
 }
 
@@ -325,11 +327,11 @@ function buildView(a, b, f) {
     let x = lerp(ra[1], rb[1]), z = lerp(ra[2], rb[2]), y = lerp(ra[3], rb[3]), yaw = lerpA(ra[7], rb[7]);
     const me = q.id === S.myId;
     let o = q;
-    if (me && S.role === 'guest' && S.pred && (S.pred.st === ST.RUN || S.pred.st === ST.AIR || S.pred.st === ST.GULL)) {
-      const P = S.pred; x = P.x + P.ox; z = P.z + P.oz; y = P.y; yaw = P.yaw; o = { ...q, vx: P.vx, vz: P.vz, chg: P.chg, lun: P.lun, stun: P.stun, tee: P.tee, st: P.st, cd: P.cd };
+    if (me && S.role === 'guest' && S.pred && [ST.RUN, ST.AIR, ST.GULL, ST.DOWN, ST.HANG].includes(S.pred.st)) {
+      const P = S.pred; x = P.x + P.ox; z = P.z + P.oz; y = P.y; yaw = P.yaw; o = { ...q, vx: P.vx, vz: P.vz, chg: P.chg, lun: P.lun, stun: P.stun, tee: P.tee, st: P.st, cd: P.cd, lk: P.lk, dz: P.dz, ko: P.ko, cl: P.cl, hg: P.hg, thr: P.thr };
     }
-    return { id: q.id, name, color, bot: !!bot, me, x, y, z, yaw, vx: o.vx, vz: o.vz, st: o.st, chg: o.chg, chgK: Math.min(1, o.chg / CHARGE_MAX), lun: o.lun, stun: o.stun,
-      tee: o.tee, cd: o.cd, ck: q.ck, buoy: q.buoy, pts: q.pts, ko: q.ko, order: q.order, surv: q.surv, alive: b.ph === 'play' };
+    return { id: q.id, name, color, bot: !!bot, me, x, y, z, yaw, vx: o.vx, vz: o.vz, st: o.st, chg: o.chg, chgK: Math.min(1, o.chg / CHARGE_MAX), lun: o.lun, lk: o.lk, stun: o.stun,
+      tee: o.tee, cd: o.cd, dz: o.dz, ko: o.ko, cl: o.cl, hg: o.hg, thr: o.thr, lift: q.lift, ck: q.ck, buoy: q.buoy, pts: q.pts, ko2: q.ko2, order: q.order, surv: q.surv, alive: b.ph === 'play' };
   });
   const oa = new Map(a.O.map((o) => [o[0], o]));
   const objs = b.O.map((o) => { const p = oa.get(o[0]); const same = p && p[5] === o[5]; return { id: o[0], k: o[1], x: same ? lerp(p[2], o[2]) : o[2], z: same ? lerp(p[3], o[3]) : o[3], y: same ? lerp(p[4], o[4]) : o[4], st: o[5] }; });
@@ -351,7 +353,13 @@ function fxEvent(e, v) {
     case 'round': S.rounds++; S.count = 0; hud.banner(`Manche ${e.rd}<small>${esc(SHAPES[e.sh]?.name || '')}</small>`, 2.2); sfx.play('round'); break;
     case 'go': hud.banner('PLOUF !', 0.9, 'big win'); sfx.play('go'); break;
     case 'lunge': if (e.id !== S.myId || S.role !== 'guest') sfx.play('whoosh', { k: e.k }); break;
-    case 'hit': fx && fx.hit(e.x, e.z, e.k); sfx.play('hit', { vol: 0.6 + e.k * 0.5 }); break;
+    case 'jab': if (e.id !== S.myId || S.role !== 'guest') sfx.play('jab'); break;
+    case 'hit': scene && scene.hurt(e.id); if (e.jab) { fx && fx.jab(e.x, e.z); sfx.play('hit', { vol: 0.45 }); } else { fx && fx.hit(e.x, e.z, e.k); sfx.play('hit', { vol: 0.6 + e.k * 0.5 }); } break;
+    case 'ko': fx && fx.ko(e.x, e.z); sfx.play('ko'); if (e.id === S.myId) hud.toast('KO ! Martèle les boutons pour te relever', 1.8); else if (e.by === S.myId) hud.feed(`Tu mets ${nameOf(e.id)} KO 💫`); break;
+    case 'getup': break;
+    case 'hang': fx && fx.hang(e.x, e.z); sfx.play('hang'); if (e.id === S.myId) hud.toast('Tu te rattrapes ! Pousse vers le radeau et martèle pour remonter', 2.2); break;
+    case 'climb': sfx.play('climb'); break;
+    case 'stomp': fx && fx.hit(e.x, e.z, 0.3); sfx.play('stomp'); hud.feed(`${nameOf(e.by)} marche sur les doigts de ${nameOf(e.id)} 🦶`); break;
     case 'bump': if (bumpT <= 0) { bumpT = 0.15; fx && fx.bump(e.x, e.z); sfx.play('bump'); } break;
     case 'fall': fx && fx.splash(e.x, e.z, 1); sfx.play('plouf'); break;
     case 'out': {
@@ -361,7 +369,7 @@ function fxEvent(e, v) {
     }
     case 'bob': sfx.play('bob'); if (e.id === S.myId) hud.toast('La bouée te sauve !', 1.6); break;
     case 'rebound': break;
-    case 'grab': sfx.play('grab'); if (e.who === S.myId) hud.toast('On te soulève ! Martèle Espace', 1.5); break;
+    case 'grab': sfx.play('grab'); if (e.who === S.myId) hud.toast(e.lift ? 'On te soulève ! Martèle Espace' : 'On te tient par le bras ! Martèle Espace et tire', 1.5); break;
     case 'miss': if (e.id === S.myId) sfx.play('miss'); break;
     case 'throw': sfx.play('throw'); break;
     case 'escape': sfx.play('grab'); break;
@@ -391,7 +399,7 @@ function showEnd(reason) {
   if (S.endShown) return;
   S.endShown = true;
   const v = S.view; if (!v && reason !== 'host') return;
-  const ranking = v ? [...v.players].sort((a, b) => b.pts - a.pts || b.ko - a.ko || b.surv - a.surv) : [];
+  const ranking = v ? [...v.players].sort((a, b) => b.pts - a.pts || b.ko2 - a.ko2 || b.surv - a.surv) : [];
   screenEl.className = 'screen dim'; screenEl.hidden = false;
   screenEl.innerHTML = endHtml({ ranking, canReplay: S.role !== 'guest' && reason !== 'host', embedded: H.embedded, reason });
   hud.show(false);
@@ -455,5 +463,6 @@ function step(dt) {
   if (scene) scene.frame(view, dt);
   hud.update(view, dt, { toScreen: scene ? scene.toScreen : () => ({ x: 0, y: 0 }), input, myId: S.myId, tips: S.rounds <= 2 && view.rt < 14 });
   const standing = view.players.filter((p) => p.st !== ST.GULL && !(p.st === ST.FALL && !p.buoy)).length;
+  if (view.me && view.me.st === ST.DOWN && input.mode !== 'touch') { /* à plat : rien à afficher de plus, l'invite le dit */ }
   sfx.update(dt, { wind: view.wind ? 1 : 0, music: view.ph === 'play' ? 'play' : view.ph === 'over' ? 'off' : 'calm', tense: clamp(1 - (standing - 2) / 4, 0, 1) });
 }

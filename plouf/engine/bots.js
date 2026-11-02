@@ -7,7 +7,7 @@ const LV = {
   // rest : souffle entre deux attaques (s) ; care : chance de voir le danger ; aggro : attirance pour ceux qui sont au bord
   facile: { think: 0.42, err: 1.0, care: 0.55, charge: [0.05, 0.3], aggro: 0.45, grab: 0.12, reach: 1.45, aim: 1.4, rest: 2.0 },
   normal: { think: 0.24, err: 0.5, care: 0.85, charge: [0.15, 0.55], aggro: 0.7, grab: 0.25, reach: 1.6, aim: 0.8, rest: 1.3 },
-  expert: { think: 0.13, err: 0.18, care: 1, charge: [0.3, 0.8], aggro: 0.9, grab: 0.4, reach: 1.7, aim: 0.35, rest: 0.55 },
+  expert: { think: 0.13, err: 0.18, care: 1, charge: [0.3, 0.8], aggro: 0.7, grab: 0.4, reach: 1.7, aim: 0.35, rest: 1.3 },
 };
 const DIRS = Array.from({ length: 16 }, (_, i) => [Math.sin(i * Math.PI / 8), Math.cos(i * Math.PI / 8)]);
 
@@ -92,7 +92,9 @@ function facing(p, x, z) { const [nx, nz] = norm(x, z); return Math.sin(p.yaw) *
 
 function decide(sim, p, ai, L) {
   const A = sim.arena, rng = sim.rng;
-  if (p.st === ST.HELD) { ai.pc++; return; }          // on gigote pour se dégager
+  if (p.st === ST.HELD) { ai.pc++; if (!p.lift) { const w = water(A, p.x, p.z); steer(ai, -w.x, -w.z); } return; } // on gigote pour se dégager, et on tire vers l'intérieur
+  if (p.st === ST.DOWN) { ai.pc++; ai.mx = ai.mz = 0; return; }         // à plat : on martèle pour se relever
+  if (p.st === ST.HANG) { const h = p.hg; if (h) { steer(ai, -h.nx, -h.nz); if (rng.next() < L.care) ai.pc++; } return; } // suspendu : on se hisse
   if (p.st === ST.GULL) { gull(sim, p, ai, L); return; }
   if (p.st !== ST.RUN || sim.ph === 'count') { ai.mx = ai.mz = 0; ai.rest = L.rest * (1 + rng.next()); return; } // au départ, on souffle un peu
   if (ai.push) { // en train d'armer : on garde la cible en ligne de mire
@@ -120,9 +122,12 @@ function decide(sim, p, ai, L) {
   // cibles : les adversaires debout, de préférence près du bord
   let tgt = null, ts = Infinity;
   for (const q of sim.players.values()) {
-    if (q === p || q.st !== ST.RUN) continue;
+    if (q === p || (q.st !== ST.RUN && q.st !== ST.DOWN && q.st !== ST.HANG)) continue;
     const d = Math.hypot(q.x - p.x, q.z - p.z), qw = water(A, q.x, q.z);
-    const s = d - (3.6 - Math.min(3.6, qw.d)) * 1.2 * L.aggro + (q.id === ai.tgt ? -0.8 : 0) + rng.next() * L.err;
+    let s = d - (3.6 - Math.min(3.6, qw.d)) * 1.2 * L.aggro + (q.id === ai.tgt ? -0.8 : 0) + rng.next() * L.err;
+    if (q.st === ST.DOWN) s -= 1.5 * L.aggro;                 // à plat : facile à soulever et à jeter
+    if (q.st === ST.HANG) s += d < 3.5 ? -2.5 : 4;            // suspendu tout près : un coup de pied et c'est réglé
+    if (q.dz > 0.5) s -= 0.6;                                 // déjà étourdi : encore un coup
     if (s < ts) { ts = s; tgt = q; }
   }
 
@@ -152,18 +157,28 @@ function decide(sim, p, ai, L) {
   }
 
   if (!tgt) { if (!goTo(ai, A, p, refuge(A, p.x, p.z))) ai.mx = ai.mz = 0; return; }
+  if (p.dz > 0.65 && rng.next() < L.care && goTo(ai, A, p, refuge(A, p.x, p.z))) return;
   ai.tgt = tgt.id;
   const qw = water(A, tgt.x, tgt.z);
   const dx = tgt.x - p.x, dz = tgt.z - p.z, d = Math.hypot(dx, dz);
   const lined = qw.d < 3.6 ? facingVec(dx, dz, qw.x, qw.z) : 1; // la cible est-elle entre moi et l'eau ?
 
-  // 5. tout près d'un adversaire au bord : on l'attrape pour le jeter
+  // 5a. un suspendu : on s'approche du bord et on lui tape sur les doigts (un jab)
+  if (tgt.st === ST.HANG) {
+    const h = tgt.hg, gx = h ? h.ax - h.nx * 0.25 : tgt.x, gz = h ? h.az - h.nz * 0.25 : tgt.z;
+    if (d < 0.95 && facing(p, dx, dz) > 0.5) { ai.hold = 0.04; ai.pc++; ai.push = true; ai.chg = 0; steer(ai, dx, dz); return; }
+    if (!goTo(ai, A, p, { x: gx, z: gz })) steer(ai, dx, dz);
+    return;
+  }
+  // 5b. un adversaire à plat tout près : on le soulève (puis on va le jeter à l'eau)
+  if (tgt.st === ST.DOWN) { if (d < 1.2) { if (rng.next() < L.grab + 0.25) { steer(ai, dx, dz); ai.gc++; ai.rest = L.rest * 0.5; } return; } if (goTo(ai, A, p, tgt)) return; }
+  // 5c. tout près d'un adversaire au bord : on l'attrape pour le traîner à l'eau
   if (ai.rest <= 0 && d < 1.0 && qw.d < 1.6 && rng.next() < L.grab && facing(p, dx, dz) > 0.5) { ai.gc++; ai.rest = L.rest; return; }
 
   // 6. bien placé (et reposé) : on arme et on pousse
   if (ai.rest <= 0 && d < L.reach && (lined > 0.55 || qw.d < 1) && facing(p, dx, dz) > 0.6) {
     const [lo, hi] = L.charge;
-    ai.hold = lo + rng.next() * (hi - lo) * (d < 1 ? 0.5 : 1);
+    ai.hold = tgt.dz > 0.55 && rng.next() < 0.7 ? 0.04 : lo + rng.next() * (hi - lo) * (d < 1 ? 0.5 : 1);
     ai.pc++; ai.push = true; ai.chg = 0;
     steer(ai, dx, dz);
     return;

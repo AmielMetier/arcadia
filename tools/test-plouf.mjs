@@ -1,7 +1,7 @@
 // Tests du moteur de Plouf ! (plouf/engine/) : node tools/test-plouf.mjs
-// Arènes, poussée armée, prise et lancer, chute et bouée, mouette et sardine, fin de manche, parties entières entre bots,
+// Arènes, jab et poussée armée, KO, prise (traîner, soulever) et lancer, accroche au bord et coup de pied, chute et bouée, mouette et sardine, fin de manche, parties entières entre bots,
 // instantané et reprise par un nouvel hôte, et prédiction d'un invité (stepPlayer rejoué à partir de l'état de l'hôte).
-import { Sim, DT, ST, R, stepPlayer, playerFromRow, CHARGE_MAX, BOT_ID } from '../plouf/engine/sim.js';
+import { Sim, DT, ST, R, stepPlayer, playerFromRow, CHARGE_MAX, BOT_ID, HANG_V, KO_T } from '../plouf/engine/sim.js';
 import { Arena, SHAPES, SHAPE_KEYS, T } from '../plouf/engine/arena.js';
 
 let fails = 0, count = 0;
@@ -16,7 +16,7 @@ function lab(n = 2, shape = 'radeau') {
   sim.start(); sim.arena = new Arena(shape); sim.ph = 'play'; sim.rt = 0;
   return sim;
 }
-const put = (p, x, z, yaw) => Object.assign(p, { x, z, yaw, vx: 0, vz: 0, y: 0, st: ST.RUN, stun: 0, chg: 0, lun: 0, cd: 0 });
+const put = (p, x, z, yaw) => Object.assign(p, { x, z, yaw, vx: 0, vz: 0, y: 0, st: ST.RUN, stun: 0, chg: 0, lun: 0, cd: 0, dz: 0, ko: 0, hg: null, cl: 0, thr: 0 });
 
 section('Arènes');
 for (const k of SHAPE_KEYS) {
@@ -57,9 +57,10 @@ section('Pousser');
   // petite tape : appui et lâcher au même instant
   a.inp = { ...idle, pc: 1, push: false };
   sim.step(DT);
-  ok(a.lun > 0 && a.cd > 0 && a.vx > 8, 'une tape lance une ruée');
+  ok(a.lun > 0 && a.cd > 0 && a.lk < 0 && a.vx > 4, 'une tape lance un jab (petit coup de poing)');
   run(sim, 0.2);
-  ok(b.stun > 0 || b.vx > 3, 'la ruée bouscule celui qui est devant');
+  ok(b.stun > 0 || b.vx > 2, 'le jab bouscule celui qui est devant');
+  ok(b.dz > 0.3 && b.st === ST.RUN, 'un jab étourdit sans mettre à plat');
   const small = Math.abs(b.x - (-0.1));
   // poussée armée à fond
   const s2 = lab(2), [c, d] = [...s2.players.values()];
@@ -71,7 +72,8 @@ section('Pousser');
   c.inp = { ...idle, pc: 1, push: false };
   run(s2, 0.25);
   const big = Math.abs(d.x - (-0.1));
-  ok(big > small * 1.3, `armer pousse plus loin (${big.toFixed(2)} m contre ${small.toFixed(2)} m)`);
+  ok(big > small * 1.3, `armer pousse plus loin qu'un jab (${big.toFixed(2)} m contre ${small.toFixed(2)} m)`);
+  ok(d.st === ST.DOWN || d.dz > 0.9, 'une poussée à fond met à plat (KO)');
   ok(d.hitBy === c.id, 'le coup est attribué à celui qui pousse');
   // une poussée armée du centre vers le bord : à l'eau
   const s3 = lab(2), [e, f] = [...s3.players.values()], A = s3.arena;
@@ -79,13 +81,24 @@ section('Pousser');
   e.inp = { ...idle, pc: 1, push: true }; run(s3, CHARGE_MAX);
   e.inp = { ...idle, pc: 1, push: false }; run(s3, 2.5);
   ok(f.st === ST.GULL, 'poussé fort près du bord, on tombe à l\'eau et on devient mouette');
-  ok(e.ko === 1, 'celui qui a poussé compte un adversaire tombé');
+  ok(e.ko2 === 1, 'celui qui a poussé compte un adversaire tombé');
   ok(s3.ph === 'round' && s3.rw === e.id && e.pts === 1, 'le dernier au sec gagne la manche');
   // pas de ruée quand on porte quelque chose, ni pendant le temps de recharge
   const s4 = lab(2), [g] = [...s4.players.values()];
   put(g, 0, 0, 0); g.ck = 1; g.cid = 99; g.inp = { ...idle, pc: 1 };
   stepPlayer(g, g.inp, DT, s4.ctx(), null);
   ok(g.lun === 0 && g.chg === 0, 'on ne pousse pas en portant');
+  // trois jabs de suite : KO
+  const s5 = lab(2), [h1, h2] = [...s5.players.values()];
+  put(h1, -1.2, 0, Math.PI / 2); put(h2, -0.2, 0, 0);
+  let kos = 0, koEv = false;
+  for (let i = 0; i < 3; i++) { put(h1, h2.x - 1.0, h2.z, Math.PI / 2); h1.cd = 0; h1.inp = { ...idle, pc: i + 1 }; run(s5, 0.5, () => { koEv = koEv || s5.events.some((e) => e.e === 'ko'); }); h2.vx = h2.vz = 0; if (h2.st === ST.DOWN) kos++; }
+  ok(kos > 0 && koEv, 'trois jabs de suite mettent à plat');
+  ok(h2.ko > 0 && h2.ko <= KO_T, `à plat, on reste au sol ${KO_T} s au plus`);
+  const koBefore = h2.ko; let k2 = 0; run(s5, 0.3, (i) => { if (i % 6 === 0) h2.inp = { ...idle, pc: ++k2 + 50 }; });
+  ok(h2.ko < koBefore - 0.3 - 0.2, 'martelez les boutons : on se relève plus vite');
+  let t = 0; while (h2.st === ST.DOWN && t < 3) { s5.step(DT); t += DT; }
+  ok(h2.st === ST.RUN && h2.dz < 0.5, 'puis on se relève, encore un peu sonné');
 }
 
 section('Attraper et lancer');
@@ -93,11 +106,26 @@ section('Attraper et lancer');
   const sim = lab(2), [a, b] = [...sim.players.values()], A = sim.arena;
   put(a, A.x0 + 3, 0, -Math.PI / 2); put(b, A.x0 + 2.2, 0, 0);
   a.inp = { ...idle, gc: 1 }; sim.step(DT);
-  ok(a.ck === 2 && b.st === ST.HELD && b.by === a.id, 'on attrape le joueur devant soi');
-  run(sim, 0.1);
-  ok(Math.abs(b.y - 1.15) < 1e-6, 'il est porté au-dessus de la tête');
-  a.inp = { ...idle, gc: 2 }; run(sim, 2);
-  ok(b.st === ST.GULL || b.st === ST.FALL, 'lancé vers le large, il tombe à l\'eau');
+  ok(a.ck === 2 && b.st === ST.HELD && b.by === a.id && !a.lift, 'on attrape le joueur debout devant soi : on le tient par le bras');
+  run(sim, 0.3);
+  ok(b.y === 0 && Math.abs(Math.hypot(b.x - a.x, b.z - a.z) - 0.72) < 0.15, 'il est traîné au bout du bras, au sol');
+  // on recule vers le bord en le traînant : il passe à l'eau
+  a.inp = { ...idle, gc: 1, mx: -1, mz: 0 };
+  run(sim, 2.5);
+  ok(b.st === ST.GULL || b.st === ST.FALL, 'traîné jusqu\'au bord, il passe à l\'eau');
+  ok(b.hitBy === a.id || a.ko2 === 1, 'et c\'est compté pour celui qui le traînait');
+  // un joueur à plat se soulève au-dessus de la tête et se jette loin
+  const sL = lab(2), [la, lb] = [...sL.players.values()], AL = sL.arena;
+  put(la, AL.x0 + 3.2, 0, -Math.PI / 2); put(lb, AL.x0 + 2.4, 0, 0); lb.st = ST.DOWN; lb.ko = 3;
+  la.inp = { ...idle, gc: 1 }; sL.step(DT);
+  ok(la.ck === 2 && la.lift === 1 && lb.st === ST.HELD && Math.abs(lb.y - 1.15) < 1e-6, 'un joueur à plat se soulève au-dessus de la tête');
+  la.inp = { ...idle, gc: 2 }; run(sL, 2);
+  ok(lb.st === ST.GULL || lb.st === ST.FALL, 'lancé vers le large, il tombe à l\'eau');
+  // jeté sur les planches, on s'étale
+  const sT = lab(2), [ta, tb] = [...sT.players.values()];
+  put(ta, -4.6, 0, Math.PI / 2); put(tb, -3.8, 0, 0); tb.st = ST.DOWN; tb.ko = 3;
+  ta.inp = { ...idle, gc: 1 }; sT.step(DT); ta.inp = { ...idle, gc: 2 }; run(sT, 1.5);
+  ok(tb.st === ST.DOWN && tb.x > 0, 'jeté sur les planches, on retombe à plat plus loin');
   // se dégager en gigotant
   const s2 = lab(2), [c, d] = [...s2.players.values()];
   put(c, 0, 0, Math.PI / 2); put(d, 0.8, 0, 0);
@@ -124,6 +152,40 @@ section('Attraper et lancer');
   i1.inp = { ...idle, gc: 1 }; s5.step(DT);
   i3.inp = { ...idle, pc: 1 }; run(s5, 0.3);
   ok(i1.ck === 0 && i2.st !== ST.HELD, 'bousculé, on lâche celui qu\'on porte');
+}
+
+section('Accroche au bord et coup de pied');
+{
+  // on marche vers le bord : on se rattrape d'une main et on reste suspendu
+  const sim = lab(2), [a, b] = [...sim.players.values()], A = sim.arena;
+  put(a, A.x0 + 1.0, 0, -Math.PI / 2); put(b, 2, 2, 0);
+  a.inp = { ...idle, mx: -1, mz: 0 };
+  let t = 0; while (a.st === ST.RUN && t < 3) { sim.step(DT); t += DT; }
+  ok(a.st === ST.HANG && a.hg && a.hg.nx === -1, `arrivé au bord en marchant (${Math.hypot(a.vx, a.vz).toFixed(1)} < ${HANG_V} m/s), on se rattrape d'une main`);
+  ok(a.x < A.x0 && a.y < 0, 'le corps pend juste au-delà du bord');
+  // sans rien faire, on finit par lâcher
+  a.inp = { ...idle }; run(sim, 7.5);
+  ok(a.st === ST.GULL || a.st === ST.FALL, 'au bout de 7 s suspendu, on lâche');
+  // on remonte en poussant vers le radeau et en appuyant
+  const s2 = lab(2), [c, d] = [...s2.players.values()];
+  put(c, A.x0 + 1.0, 0, -Math.PI / 2); put(d, 2, 2, 0);
+  c.inp = { ...idle, mx: -1 }; t = 0; while (c.st === ST.RUN && t < 3) { s2.step(DT); t += DT; }
+  c.inp = { ...idle, mx: 1 }; let k = 0, climbed = false, tc = 0;
+  while (c.st === ST.HANG && tc < 3) { if (Math.round(tc * 60) % 10 === 0) c.inp = { ...idle, mx: 1, pc: ++k }; s2.step(DT); tc += DT; climbed = climbed || s2.events.some((e) => e.e === 'climb'); }
+  run(s2, 1);
+  ok(climbed && tc < 1 && c.st === ST.RUN && s2.arena.support(c.x, c.z), `en poussant vers le radeau et en martelant, on remonte en ${tc.toFixed(2)} s`);
+  // un coup de pied sur les doigts
+  const s3 = lab(2), [e, f] = [...s3.players.values()];
+  put(e, A.x0 + 1.0, 0, -Math.PI / 2); put(f, A.x0 + 0.85, 0, -Math.PI / 2);
+  e.inp = { ...idle, mx: -1 }; t = 0; while (e.st === ST.RUN && t < 3) { s3.step(DT); t += DT; }
+  e.inp = { ...idle }; put(f, A.x0 + 0.85, 0, -Math.PI / 2);
+  f.inp = { ...idle, pc: 1 }; let stomp = false; run(s3, 0.6, () => { stomp = stomp || s3.events.some((x) => x.e === 'stomp'); });
+  ok(stomp && (e.st === ST.FALL || e.st === ST.GULL) && e.hitBy === f.id, 'un jab donné à un suspendu lui fait lâcher prise, à son compte');
+  // en pleine ruée, pas d'accroche : plongeon
+  const s4 = lab(2), [g] = [...s4.players.values()];
+  put(g, A.x0 + 1.2, 0, -Math.PI / 2);
+  g.inp = { ...idle, pc: 1, push: true }; run(s4, CHARGE_MAX); g.inp = { ...idle, pc: 1 }; run(s4, 0.6);
+  ok(g.st === ST.FALL || g.st === ST.GULL, 'en pleine ruée vers le bord, c\'est le plongeon');
 }
 
 section('Bouée, mouette et sardine');
@@ -168,7 +230,8 @@ for (const level of ['facile', 'normal', 'expert']) {
   }
   const avg = lens.reduce((a, b) => a + b, 0) / lens.length;
   console.log(`  ${level} : ${lens.length} manches, ${avg.toFixed(0)} s en moyenne (de ${Math.round(Math.min(...lens))} à ${Math.round(Math.max(...lens))} s)`);
-  ok(avg > 20 && avg < 80, `${level} : une manche dure entre 20 et 80 s en moyenne`);
+  const lo = level === 'expert' ? 12 : 20; // les experts enchaînent KO, soulevé, jeté : c'est voulu, ça va vite
+  ok(avg > lo && avg < 80, `${level} : une manche dure entre ${lo} et 80 s en moyenne`);
 }
 {
   // un joueur immobile au centre et 5 bots : les bots viennent le chercher

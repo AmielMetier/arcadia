@@ -35,14 +35,14 @@ export class HUD {
     if ((this.bannerT -= dt) <= 0 && !this.bannerEl.hidden) { this.bannerEl.classList.remove('in'); if (this.bannerT < -0.4) this.bannerEl.hidden = true; }
     if ((this.toastT -= dt) <= 0) this.toastEl.hidden = true;
     // tableau des manches : une pastille par manche gagnée
-    const sig = v.players.map((p) => `${p.id}:${p.pts}:${p.st === ST.GULL || p.order ? 1 : 0}:${p.name}`).join('|') + '/' + v.go;
+    const sig = v.players.map((p) => `${p.id}:${p.pts}:${p.st === ST.GULL || p.order ? 1 : 0}:${p.st === ST.DOWN ? 'k' : p.st === ST.HANG ? 'h' : ''}:${p.name}`).join('|') + '/' + v.go;
     if (sig !== this.sig) {
       this.sig = sig;
       const lead = Math.max(0, ...v.players.map((p) => p.pts));
       this.score.innerHTML = v.players.map((p) => {
         const out = v.ph !== 'count' && (p.st === ST.GULL || p.order > 0);
         const dots = Array.from({ length: v.go }, (_, i) => `<i class="${i < p.pts ? 'on' : ''}"></i>`).join('');
-        return `<div class="chip ${out ? 'out' : ''} ${p.me ? 'me' : ''}" style="--c:${esc(p.color)}"><b>${p.pts === lead && lead > 0 ? '👑 ' : ''}${esc(p.name)}</b><span class="dots">${dots}</span>${out ? '<em>🐦</em>' : ''}</div>`;
+        return `<div class="chip ${out ? 'out' : ''} ${p.me ? 'me' : ''}" style="--c:${esc(p.color)}"><b>${p.pts === lead && lead > 0 ? '👑 ' : ''}${esc(p.name)}</b><span class="dots">${dots}</span>${out ? '<em>🐦</em>' : p.st === ST.DOWN ? '<em>💫</em>' : p.st === ST.HANG ? '<em>🫳</em>' : ''}</div>`;
       }).join('');
     }
     const standing = v.players.filter((p) => p.st !== ST.GULL && !(p.st === ST.FALL && !p.buoy)).length;
@@ -90,21 +90,25 @@ const K = (mode, k, pad, touch) => (mode === 'touch' ? `<kbd class="t">${touch}<
 function promptFor(v, me, mode, tips) {
   if (!me || v.ph === 'over') return '';
   const push = K(mode, 'Espace', 'A', '👊'), grab = K(mode, 'E', 'X', '✋');
-  if (v.ph === 'count') return tips ? `Maintiens ${push} pour armer, lâche pour <b>pousser</b> · ${grab} pour <b>attraper</b> et lancer` : '';
+  if (v.ph === 'count') return tips ? `Tape ${push} pour un coup de poing, maintiens pour <b>pousser</b> fort · ${grab} pour <b>attraper</b> et lancer` : '';
   switch (me.st) {
     case ST.GULL:
       if (v.ph !== 'play') return '';
       return me.cd > 0 ? '🐦 Tu es une mouette… la prochaine sardine arrive' : `🐦 Tu es une mouette : ${push} lâche une sardine sur ceux qui restent`;
-    case ST.HELD: return `😱 On te soulève ! Martèle ${push} pour te dégager`;
+    case ST.HELD: return me.lift ? `😱 On te soulève ! Martèle ${push} pour te dégager` : `✊ On te tient par le bras ! Martèle ${push} et tire de l'autre côté`;
+    case ST.DOWN: return `💫 KO ! Martèle ${push} pour te relever`;
+    case ST.HANG: return `🫳 Suspendu ! Pousse vers le radeau et martèle ${push} pour remonter`;
     case ST.BOB: return '🛟 La bouée te sauve : retour sur le radeau !';
     case ST.FALL: return '';
     case ST.AIR: return '';
   }
-  if (me.ck === 2) return `💪 ${grab} : jette-le… vers l'eau, de préférence !`;
+  if (me.ck === 2 && me.lift) return `💪 ${grab} : jette-le… vers l'eau, de préférence !`;
+  if (me.ck === 2) return `✊ Tu le tiens : traîne-le au bord, ou ${grab} pour le jeter`;
   if (me.ck === 1) return `🍉 ${grab} : lance la pastèque droit devant`;
   if (me.tee) return '😬 Tu vacilles au bord !';
+  if (me.dz > 0.6) return '😵 Tu titubes… encore un coup et tu es KO. Recule !';
   if (me.chg > 0) return me.chgK >= 1 ? '💥 Chargé à bloc : lâche !' : 'Ça charge… lâche pour foncer';
-  if (tips) return `Maintiens ${push} pour armer, lâche pour <b>pousser</b> · ${grab} <b>attraper</b> / lancer`;
+  if (tips) return `Tape ${push} : coup de poing · maintiens-le pour <b>pousser</b> fort · ${grab} <b>attraper</b> / lancer`;
   return '';
 }
 
@@ -132,8 +136,9 @@ export function briefingHtml({ role, squad, cfg, embedded, bots }) {
       <div><h3>Sur le radeau</h3><ul class="squad">${list}</ul>${segs}</div>
       <div class="ctrl"><h3>Commandes</h3>
         <p><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer</p>
-        <p><kbd>Espace</kbd> maintenir pour armer, lâcher pour <b>pousser</b></p>
-        <p><kbd>E</kbd> <b>attraper</b> un joueur ou une pastèque, puis <b>lancer</b></p>
+        <p><kbd>Espace</kbd> tape : <b>coup de poing</b> · maintiens, lâche : <b>grosse poussée</b> · trois coups et l'autre est KO</p>
+        <p><kbd>E</kbd> <b>attraper</b> : debout on le tient par le bras et on le traîne, KO on le soulève · <kbd>E</kbd> encore pour <b>lancer</b></p>
+        <p>🫳 au bord sans élan, tu te rattrapes d'une main : pousse vers le radeau et martèle pour remonter… gare aux coups de pied</p>
         <p>🛟 la bouée te repêche une fois · 🐦 tombé, tu deviens mouette et tu bombardes de sardines</p>
         <p class="alt">Manette : stick, Ⓐ pousser, Ⓧ attraper · Au doigt : joystick à gauche, boutons à droite</p>
       </div>
@@ -150,7 +155,7 @@ export function endHtml({ ranking, canReplay, embedded, reason }) {
     ${reason === 'host' ? '<p class="sub">La liaison avec l\'hôte a été perdue.</p>' : ''}
     <div class="podium">${order.map((i) => { const p = pod[i]; return `<div class="pl p${i + 1}" style="--c:${esc(p.color)}"><b>${esc(p.name)}</b><span>${p.pts} manche${p.pts > 1 ? 's' : ''}</span><div class="step">${i + 1}</div></div>`; }).join('')}</div>
     <table class="stats"><thead><tr><th></th><th>Joueur</th><th>Manches</th><th>Envoyés à l'eau</th><th>Au sec</th></tr></thead><tbody>
-      ${ranking.map((p, k) => `<tr class="${p.me ? 'me' : ''}"><td>${k + 1}</td><td><i style="--c:${esc(p.color)}"></i>${esc(p.name)}${p.bot ? ' <small>bot</small>' : ''}</td><td>${p.pts}</td><td>${p.ko}</td><td>${Math.round(p.surv)} s</td></tr>`).join('')}
+      ${ranking.map((p, k) => `<tr class="${p.me ? 'me' : ''}"><td>${k + 1}</td><td><i style="--c:${esc(p.color)}"></i>${esc(p.name)}${p.bot ? ' <small>bot</small>' : ''}</td><td>${p.pts}</td><td>${p.ko2}</td><td>${Math.round(p.surv)} s</td></tr>`).join('')}
     </tbody></table>
     <div class="btns">${canReplay ? '<button class="btn go" id="btnAgain">Rejouer</button>' : '<p class="wait">L\'hôte peut relancer une partie.</p>'}${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}</div>
   </div>`;
