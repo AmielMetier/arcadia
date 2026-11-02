@@ -1,5 +1,14 @@
 # Journal des versions — Game Hub (Duo Drift, DavidSimulator)
 
+## 3.51 — 2 novembre 2026
+- **Odyssée** — tout le décor est redessiné en pixel art façon HeartGold / SoulSilver.
+  - Herbe, chemins, sable, pavés, neige, eau et rivages ont de vrais bords arrondis ; les hautes herbes sont en rangées de touffes.
+  - Les maisons sont plus simples, et chaque bâtiment a son style : Centre, boutique, arènes, labo, Ligue, chalets, maisons de pêcheurs, musée, phare, pagode.
+  - Nouveaux personnages : les deux héros, Théo, le professeur, maman, l'infirmière, le vendeur, le garde, les huit champions, Célestine et plusieurs dresseurs.
+  - Les 60 créatures originales sont de retour, redessinées, dont 8 nouvelles ; les Pokémon officiels restent les plus nombreux dans les hautes herbes.
+  - Écran titre : Odyssor surgit de l'océan, comme sur SoulSilver.
+  - Nouvelles icônes pour les objets du sac.
+
 ## 3.50 — 31 octobre 2026
 - **Odyssée** — la carte de la région est redessinée comme le Pokégear de HeartGold / SoulSilver : mer en dégradé de bleus, côtes en falaises, montagnes en paliers, forêts, grottes, routes blanches et villes en pastilles rouges.
   - Les flèches passent d'une ville visitée à l'autre et affichent son nom.
