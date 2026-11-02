@@ -777,7 +777,7 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .hud-bdot.got { background: radial-gradient(circle at 35% 35%, #fff 0 18%, var(--bc, #ffd048) 22% 100%); box-shadow: 0 0 calc(var(--px) * 2) var(--bc, #ffd048); border-color: #fff; }
 
 /* Boutons d'accès rapide illustrés (COURSE, ÉQUIPE, SAC, CARTE, SAUVER) */
-.hud-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: calc(var(--px) * 1.6); }
+.hud-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--px) * 1.6); }
 .hud-btn { font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--px) * 1);
   background: linear-gradient(180deg, #2c446c 0%, #1a2b48 100%);
   border: calc(var(--px) * 1.1) solid #0e1828; border-radius: calc(var(--px) * 3.5);

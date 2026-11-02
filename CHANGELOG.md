@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.58 — 2 novembre 2026
+- **Odyssée** — retrait du bouton SAUVER sur le HUD en jeu : la partie est désormais sauvegardée automatiquement après chaque combat, discussion, soin ou changement de lieu (ainsi qu'à la fermeture de l'onglet), laissant 4 boutons d'action rapides (COURSE, ÉQUIPE, SAC, CARTE) sur le Pokégear.
+
 ## 3.57 — 2 novembre 2026
 - **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :
   - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges, Ho-Oh, la Team Éclipse, Lugia Obscur et Odyssor (passable à tout moment).
