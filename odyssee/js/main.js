@@ -116,9 +116,9 @@ async function boot() {
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
-    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">Appuie sur F ou Entrée</div><div class="title-foot">Prototype · Pokémon et personnages de HeartGold / SoulSilver en attendant les dessins définitifs · H : aide des touches</div>`);
+    const title = el('div', 'title-scr', `<canvas class="title-cv" width="256" height="192"></canvas><div class="logo"><div class="logo-main">ODYSSÉE</div></div><div class="press">Appuie sur F ou Entrée</div><div class="title-foot">H : aide des touches</div>`);
     uiRoot.appendChild(title);
-    const stopSea = titleSea(title.querySelector('canvas'), ORIGINALES ? art.title : null);
+    const stopSea = titleSea(title.querySelector('canvas'), art.title);
     await new Promise((res) => { const pop = input.push((k) => { if (k === 'a') { pop(); sound.init(); sound.sfx('select'); res(); } }); });
     title.querySelector('.press').remove();
     const has = Game.hasSave();
@@ -161,24 +161,25 @@ function titleSea(cv, whale) {
     x.fillStyle = g; x.fillRect(0, 0, W, SEA);
     for (const s of stars) { const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.3 + s.p)); x.fillStyle = `rgba(255,255,240,${a})`; x.fillRect(s.x, s.y, 1, 1); }
     // lune et son reflet
-    x.fillStyle = '#fff6d8'; x.beginPath(); x.arc(206, 30, 11, 0, 7); x.fill(); x.fillStyle = '#24306a'; x.beginPath(); x.arc(211, 27, 9, 0, 7); x.fill();
+    x.fillStyle = '#fff6d8'; x.beginPath(); x.arc(36, 26, 11, 0, 7); x.fill(); x.fillStyle = '#24306a'; x.beginPath(); x.arc(41, 23, 9, 0, 7); x.fill();
     // îles au loin
     x.fillStyle = '#1c2348'; x.beginPath(); x.moveTo(0, SEA); x.lineTo(18, SEA - 9); x.lineTo(40, SEA - 4); x.lineTo(62, SEA); x.fill();
     x.beginPath(); x.moveTo(150, SEA); x.lineTo(170, SEA - 13); x.lineTo(182, SEA - 8); x.lineTo(200, SEA); x.fill();
     // mer
     const s = x.createLinearGradient(0, SEA, 0, Hh); s.addColorStop(0, '#2a3c7a'); s.addColorStop(1, '#0e1838');
     x.fillStyle = s; x.fillRect(0, SEA, W, Hh - SEA);
-    x.fillStyle = 'rgba(255,246,216,.55)'; for (let y = SEA + 3; y < Hh; y += 4) { const w = 10 - (y - SEA) / 10; x.fillRect(206 - w + Math.sin(t * 2 + y) * 2, y, w * 2, 1); }
-    // Odyssor : il nage d'est en ouest, monte et replonge
-    const period = 18, u = ((t / period) % 1), wx = W + 60 - u * (W + 140), bob = Math.sin(t * 1.6) * 3 - 6 + Math.sin(u * Math.PI) * -10;
-    const size = 92, wy = SEA - size * 0.62 + bob;
+    x.fillStyle = 'rgba(255,246,216,.55)'; for (let y = SEA + 3; y < Hh; y += 4) { const w = 10 - (y - SEA) / 10; x.fillRect(36 - w + Math.sin(t * 2 + y) * 2, y, w * 2, 1); }
+    // Odyssor sort de l'eau au milieu de la scène, comme Lugia sur l'écran titre de SoulSilver : il monte lentement,
+    // se balance, et l'eau ruisselle de ses ailes ; la mer passe devant le bas de son corps
+    const rise = Math.min(1, t / 3), ease = 1 - (1 - rise) ** 3;
+    const bob = Math.sin(t * 1.1) * 2.5, wx = 132, wy = Math.round(SEA - 100 + (1 - ease) * 70 + bob);
     if (whale) {
-      x.save(); x.beginPath(); x.rect(0, 0, W, SEA + 6 + bob * 0.2); x.clip();
-      x.translate(Math.round(wx), Math.round(wy)); x.scale(-1, 1); x.drawImage(whale, -size / 2, 0, size, size); x.restore();
+      x.save(); x.beginPath(); x.rect(0, 0, W, SEA + 3); x.clip();
+      x.drawImage(whale, Math.round(wx - 80), wy); x.restore();
+      // gouttes qui tombent des ailes
+      if (Math.random() < 0.8) sparks.push({ x: wx - 62 + Math.random() * 124, y: wy + 30 + Math.random() * 40, v: 0.6 + Math.random() * 0.6, life: 1, drop: true });
     }
-    // sillage d'étoiles
-    if (whale && Math.random() < 0.6) sparks.push({ x: wx + 30 + Math.random() * 20, y: SEA - 4 + Math.random() * 6, v: -0.2 - Math.random() * 0.4, life: 1 });
-    for (const p of sparks) { p.x += 0.4; p.y += p.v; p.life -= 0.02; x.fillStyle = `rgba(200,230,255,${Math.max(0, p.life)})`; x.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); }
+    for (const p of sparks) { p.y += p.v; p.v += 0.05; p.life -= 0.018; if (p.y > SEA + 2) p.life = 0; x.fillStyle = `rgba(210,235,255,${Math.max(0, p.life)})`; x.fillRect(Math.round(p.x), Math.round(p.y), 1, 2); }
     for (let i = sparks.length - 1; i >= 0; i--) if (sparks[i].life <= 0) sparks.splice(i, 1);
     // vagues (par-dessus le bas d'Odyssor)
     for (let row = 0; row < 7; row++) {
@@ -186,7 +187,14 @@ function titleSea(cv, whale) {
       x.fillStyle = row < 2 ? '#6c8ad0' : '#3d5aa0';
       for (let k = -1; k < W / 24 + 1; k++) { const bx = ((k * 24 + ph * sp) % (W + 24)) - 12; x.fillRect(Math.round(bx), y, 8, 1); x.fillRect(Math.round(bx) + 2, y - 1, 4, 1); }
     }
-    if (whale) x.fillStyle = 'rgba(160,200,255,.7)'; if (whale) for (let k = 0; k < 5; k++) x.fillRect(Math.round(wx - 30 + k * 12 + Math.sin(t * 5 + k) * 2), SEA + 1, 6, 1);
+    // écume et remous autour du corps, à la surface
+    if (whale) {
+      for (let k = 0; k < 9; k++) {
+        const fx = wx - 34 + k * 8 + Math.sin(t * 4 + k * 1.7) * 2, fy = SEA + 1 + ((k % 3) === 1 ? 1 : 0);
+        x.fillStyle = k % 2 ? 'rgba(235,245,255,.9)' : 'rgba(170,205,255,.8)'; x.fillRect(Math.round(fx), fy, 6, 1); x.fillRect(Math.round(fx) + 1, fy - 1, 3, 1);
+      }
+      x.fillStyle = 'rgba(150,190,255,.35)'; for (let r = 0; r < 3; r++) { const rr = ((t * 14 + r * 12) % 36); x.fillRect(Math.round(wx - 40 - rr), SEA + 4 + r * 3, 10, 1); x.fillRect(Math.round(wx + 30 + rr), SEA + 4 + r * 3, 10, 1); }
+    }
     requestAnimationFrame(frame);
   };
   frame();

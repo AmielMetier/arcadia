@@ -231,6 +231,10 @@ img { image-rendering: pixelated; }
 /* écran titre : la mer d'Odyssor en fond */
 .title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; z-index: -1; }
 .title-scr .logo, .title-scr .press, .title-scr .title-menu, .title-scr .title-foot, .title-scr .save-info { position: relative; }
+/* comme sur SoulSilver : le titre en haut, la créature au centre, l'invite sur la mer */
+.title-scr .logo { position: absolute; top: calc(var(--px) * 2); transform: none; }
+.title-scr .logo-main { font-size: calc(var(--px) * 34); }
+.title-scr .press { position: absolute; bottom: calc(var(--px) * 30); }
 .title-scr .save-info { position: absolute; }
 .title-scr .title-foot { position: absolute; }
 
