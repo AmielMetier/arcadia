@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.70 — 3 novembre 2026
+- **Mystère Mystère** — des manches mieux rythmées et plus de tension à la fin.
+  - Le meurtrier joué par un bot se fond plus longtemps dans la foule avant de frapper : fini les manches pliées en dix secondes.
+  - Il ne panique plus quand le shérif passe arme au poing près de lui alors que personne ne le soupçonne.
+  - « Plus que deux survivants… » puis « Dernier survivant ! » : une annonce et un battement de cœur quand il ne reste presque plus personne.
+  - L'annonce du début de manche attend que ta carte de rôle ait disparu au lieu de s'afficher par-dessus.
+
 ## 3.69 — 3 novembre 2026
 - **Dogfight 3D** — de vrais combats contre les bots, un radar et un écran de fin.
   - Les bots se battent enfin pour de bon : ils te prennent en chasse, visent, tirent et esquivent au lieu de tourner en rond au plafond.
