@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.61 — 2 novembre 2026
+## 3.62 — 2 novembre 2026
 - **Dogfight 3D** — Refonte complète : le combat se déroule au-dessus de la vraie île d'Island Rush.
   - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
   - Choisis ton avion au hangar : le F-16, vif et mordant, ou le F-22, rapide et plus discret face aux missiles.
@@ -11,6 +11,15 @@
   - Nouveau mode Équipes, nouvelle durée de partie, et un vrai écran de fin avec Rejouer.
   - À plusieurs, ton avion répond sans attendre le réseau et les autres se déplacent sans à-coups. La partie continue si l'hôte part ou change d'onglet, et un bot reprend l'avion des absents.
   - L'hôte a enfin son avion, et les bots ne fuient plus vers le plafond. Le manche tactile fonctionne sur téléphone.
+
+## 3.61 — 2 novembre 2026
+- **Arcadia** — Les images des jeux s'affichent de nouveau dans la liste des jeux et dans le salon.
+- **Arcadia** — Les comptes ont maintenant un mot de passe.
+  - À la création, tu choisis un mot de passe : ton compte (pseudo, couleur, code ami, amis) est sauvegardé en ligne et tu peux t'y connecter sur n'importe quel appareil avec « J'ai déjà un compte : me connecter ».
+  - Tout est chiffré dans ton navigateur avant de partir : le serveur ne reçoit jamais ton mot de passe et ne peut pas lire ton profil. Attention, un mot de passe oublié ne peut pas être récupéré.
+  - Tu as déjà un compte ? Ouvre « Modifier » puis « 🔐 Protéger mon compte par mot de passe ».
+  - Chaque changement (pseudo, couleur, amis) est sauvegardé tout seul.
+
 ## 3.60 — 2 novembre 2026
 - **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.
   - Produits financiers, mathématiques financières, économie et marchés : options, obligations, swaps, grecques, Itô, Vasicek, VaR, BCE, QE, courbe des taux. Les chiffres d'actualité sont datés.
