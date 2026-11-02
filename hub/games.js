@@ -309,7 +309,7 @@ window.HUB_GAMES = [
 window.HUB_GAME_INFO = {
   backrooms: { genre: 'action', time: '5–10 min',
     keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['F', 'Allumer / Éteindre la lampe torche'], ['Échap', 'Pause · choisir Souris ou Sans souris (flèches pour regarder)']],
-    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.', 'Suis les barres de SIGNAL du caméscope pour trouver les 5 cassettes, puis la porte EXIT.', 'L'eau d'amande rend tout ton souffle.'] },
+    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.', 'Suis les barres de SIGNAL du caméscope pour trouver les 5 cassettes, puis la porte EXIT.', 'L'eau d'amande rend tout ton souffle.', 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles dans le noir.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein (virage plus serré)'], ['Tab', 'Classement']],
     tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },

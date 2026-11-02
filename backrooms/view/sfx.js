@@ -318,6 +318,50 @@ export class BackroomsSfx {
     hi.stop(t + 0.75);
   }
 
+  // Clic des piles (ou lampe à plat : clic sec et grésillement qui meurt)
+  battery(empty = false) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const freqs = empty ? [900, 420] : [1200, 1600, 2100];
+    freqs.forEach((f, i) => {
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(f, t + i * 0.07);
+      if (empty) osc.frequency.exponentialRampToValueAtTime(f * 0.4, t + i * 0.07 + 0.3);
+      g.gain.setValueAtTime(0.06, t + i * 0.07);
+      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + (empty ? 0.3 : 0.06));
+      osc.connect(g);
+      g.connect(c.destination);
+      osc.start(t + i * 0.07);
+      osc.stop(t + i * 0.07 + 0.32);
+    });
+  }
+
+  // Pas lourds de l'entité, spatialisés, plus forts quand elle est près
+  monsterStep(danger, pan) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(75, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.18);
+    g.gain.setValueAtTime(0.5 * danger, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(g);
+    if (c.createStereoPanner) {
+      const p = c.createStereoPanner();
+      p.pan.setValueAtTime(pan, t);
+      g.connect(p);
+      p.connect(c.destination);
+    } else g.connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.22);
+  }
+
   // Victoire
   win() {
     if (!this.unlocked || !this.ctx) return;

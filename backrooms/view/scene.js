@@ -222,6 +222,27 @@ export function createBackroomsScene(container, map) {
     bottleMeshes.push({ b, g });
   }
 
+  // 8b. Piles (deux bâtons cuivrés couchés par terre)
+  const batteryMeshes = [];
+  const cellMat = baked(new THREE.MeshLambertMaterial({ color: '#1d1d1d' }));
+  const capCopper = baked(new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#5a3a08', emissiveIntensity: 0.6 }));
+  for (const b of map.batteries || []) {
+    const g = new THREE.Group();
+    for (let i = 0; i < 2; i++) {
+      const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.2, 10), cellMat);
+      cell.rotation.z = Math.PI / 2;
+      cell.position.set(0, 0.045, i * 0.1 - 0.05);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.07, 10), capCopper);
+      top.rotation.z = Math.PI / 2;
+      top.position.set(0.07, 0.045, i * 0.1 - 0.05);
+      g.add(cell, top);
+    }
+    g.position.set(b.x - 0.3, 0, b.z + 0.35);
+    g.rotation.y = b.id * 2.3;
+    scene.add(g);
+    batteryMeshes.push({ b, g });
+  }
+
   // 9. Porte de sortie : plaquée contre un mur voisin de la case de sortie, avec son panneau EXIT
   const exitGroup = new THREE.Group();
   const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]].find(([dx, dz]) => map.isWall(map.exit.gx + dx, map.exit.gz + dz));
@@ -336,6 +357,9 @@ export function createBackroomsScene(container, map) {
       }
 
       flashLight.visible = P.flashlight;
+      // pile faible : la lampe faiblit et clignote
+      const bat = P.battery ?? 100;
+      flashLight.intensity = 20 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
 
       // 2. L'entité fait face au joueur et tressaute quand elle le traque
       if (sim.hasMonster) {
@@ -360,6 +384,7 @@ export function createBackroomsScene(container, map) {
         }
       }
       for (const bm of bottleMeshes) bm.g.visible = !bm.b.taken;
+      for (const bm of batteryMeshes) bm.g.visible = !bm.b.taken;
 
       // 4. Sortie : rouge verrouillée, verte ouverte
       const open = P.cassettesCollected >= 5;

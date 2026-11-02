@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.71 — 3 novembre 2026
+- **The Backrooms** — une lampe qui s'épuise, des pas qui te poursuivent et des commandes tactiles.
+  - La batterie du caméscope est maintenant celle de ta lampe torche : elle se vide quand la lampe est allumée, faiblit, clignote, puis s'éteint.
+  - Des piles traînent dans le dédale, surtout dans les zones sombres : ramasse-les pour recharger ta lampe.
+  - Quand l'entité te traque, tu entends ses pas lourds se rapprocher, à gauche ou à droite.
+  - Le jeu se joue au téléphone : glisse à gauche pour marcher, à droite pour regarder, avec des boutons Courir et Lampe.
+
 ## 3.70 — 3 novembre 2026
 - **Mystère Mystère** — des manches mieux rythmées et plus de tension à la fin.
   - Le meurtrier joué par un bot se fond plus longtemps dans la foule avant de frapper : fini les manches pliées en dix secondes.

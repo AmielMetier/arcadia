@@ -70,6 +70,7 @@ html, body {
   height: 8px;
   background: currentColor;
 }
+.battery.low { color: #ff3b3b; animation: recBlink 0.8s steps(1) infinite; }
 .battery i {
   position: absolute;
   inset: 2px;
@@ -261,6 +262,55 @@ html, body {
   text-shadow: inherit;
 }
 .btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
+
+/* Commandes tactiles */
+.touch-btns { display: none; }
+body.touch .touch-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: fixed;
+  right: 22px;
+  bottom: 130px;
+  z-index: 30;
+}
+.touch-btns button {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 2px solid rgba(242, 240, 230, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+  color: #f2f0e6;
+  font: 26px/1 sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.touch-btns button small { font: 13px 'VT323', monospace; letter-spacing: 1px; }
+.touch-btns button.on { background: rgba(242, 240, 230, 0.35); }
+.touch-stick {
+  position: fixed;
+  z-index: 30;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  border: 2px solid rgba(242, 240, 230, 0.4);
+  pointer-events: none;
+}
+.touch-stick i {
+  position: absolute;
+  left: 38px;
+  top: 38px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(242, 240, 230, 0.45);
+}
+body.touch .click-prompt .ctrl-choice { display: none; }
+#stage { touch-action: none; }
 
 @media (max-width: 700px) {
   .cam { font-size: 22px; }

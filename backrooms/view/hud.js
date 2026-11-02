@@ -87,7 +87,10 @@ export class BackroomsHUD {
     const s = String(totalSec % 60).padStart(2, '0');
     this.$('#vhsTimer').textContent = `${h}:${m}:${s}`;
     // la batterie se vide doucement (purement décorative)
-    this.$('#battery').style.setProperty('--b', Math.max(0.12, 1 - time / 900).toFixed(3));
+    // la batterie du caméscope, c'est la pile de la lampe
+    const bat = P.battery ?? 100;
+    this.$('#battery').style.setProperty('--b', Math.max(0.04, bat / 100).toFixed(3));
+    this.$('#battery').classList.toggle('low', bat < 20);
 
     // 2. Cassettes
     if (P.cassettesCollected !== this.lastCount) {
@@ -180,7 +183,8 @@ export class BackroomsHUD {
 
   showPause(visible, kb) {
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
-    this.$('#pauseGo').textContent = kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
+    const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
+    this.$('#pauseGo').textContent = tactile ? "TOUCHE L'ÉCRAN POUR JOUER" : kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
     this.$('#pauseKeys').textContent = kb
       ? 'ZQSD marcher · Flèches regarder · Maj courir · F lampe · Échap pause'
       : 'ZQSD marcher · Souris regarder · Maj courir · F lampe · Échap pause';

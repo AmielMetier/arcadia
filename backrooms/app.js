@@ -14,6 +14,7 @@ let scene = null;
 let sfx = null;
 let hud = null;
 let stepDist = 0;
+let monsterStepT = 0;
 
 // Gestion des touches du clavier
 // Mode sans souris (comme Mystère Mystère) : ZQSD pour marcher, les flèches tournent la vue, Échap ou P met en pause.
@@ -38,7 +39,9 @@ function setPaused(on) {
 
 function play() {
   if (sfx) sfx.unlock();
-  if (kbMode) setPaused(false);
+  const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
+  if (tactile) document.body.classList.add('touch');
+  if (kbMode || tactile) setPaused(false);
   else stageEl.requestPointerLock?.();
 }
 
@@ -70,8 +73,80 @@ window.addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
 });
 
+// Tactile : glisser à gauche pour marcher (joystick), à droite pour regarder ; boutons Courir et Lampe
+const touch = { move: null, look: null, run: false };
+const touchBtns = document.createElement('div');
+touchBtns.className = 'touch-btns';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="lamp">🔦<small>Lampe</small></button>';
+document.body.appendChild(touchBtns);
+const stick = document.createElement('div');
+stick.className = 'touch-stick';
+stick.hidden = true;
+stick.innerHTML = '<i></i>';
+document.body.appendChild(stick);
+for (const b of touchBtns.querySelectorAll('button')) {
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (b.dataset.t === 'run') touch.run = true;
+    else toggleFlashlightRequested = true;
+    b.classList.add('on');
+  });
+  const up = () => {
+    if (b.dataset.t === 'run') touch.run = false;
+    b.classList.remove('on');
+  };
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointerleave', up);
+  b.addEventListener('pointercancel', up);
+}
+stageEl.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  document.body.classList.add('touch');
+  if (sfx) sfx.unlock();
+  if (paused) setPaused(false);
+  if (e.clientX < innerWidth * 0.45 && !touch.move) {
+    touch.move = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY };
+    stick.hidden = false;
+    stick.style.left = e.clientX + 'px';
+    stick.style.top = e.clientY + 'px';
+  } else if (!touch.look) touch.look = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  try { stageEl.setPointerCapture(e.pointerId); } catch (err) {}
+});
+stageEl.addEventListener('pointermove', (e) => {
+  const m = touch.move;
+  const l = touch.look;
+  if (m && m.id === e.pointerId) {
+    m.x = e.clientX;
+    m.y = e.clientY;
+    const dx = m.x - m.ox;
+    const dy = m.y - m.oy;
+    const d = Math.min(1, Math.hypot(dx, dy) / 60) * 60;
+    const a = Math.atan2(dy, dx);
+    stick.firstChild.style.transform = `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px)`;
+  }
+  if (l && l.id === e.pointerId) {
+    mouseDx += (e.clientX - l.x) * 2.2;
+    mouseDy += (e.clientY - l.y) * 2.2;
+    l.x = e.clientX;
+    l.y = e.clientY;
+  }
+});
+const touchEnd = (e) => {
+  if (touch.move && touch.move.id === e.pointerId) {
+    touch.move = null;
+    stick.hidden = true;
+    stick.firstChild.style.transform = '';
+  }
+  if (touch.look && touch.look.id === e.pointerId) touch.look = null;
+};
+window.addEventListener('pointerup', touchEnd);
+window.addEventListener('pointercancel', touchEnd);
+
 // Pointer Lock pour la visée à la souris
-stageEl.addEventListener('click', play);
+stageEl.addEventListener('click', () => {
+  if (!document.body.classList.contains('touch')) play();
+});
 
 document.addEventListener('pointerlockchange', () => {
   isPointerLocked = document.pointerLockElement === stageEl;
@@ -79,7 +154,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (isPointerLocked && !kbMode) {
+  if (isPointerLocked && !kbMode && !touch.look) {
     mouseDx += e.movementX || 0;
     mouseDy += e.movementY || 0;
   }
@@ -136,7 +211,17 @@ function loop(currentTime) {
   if (keys['KeyA'] || keys['KeyQ'] || (arrows && keys['ArrowLeft'])) mx -= 1;
   if (keys['KeyD'] || (arrows && keys['ArrowRight'])) mx += 1;
 
-  const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'];
+  if (touch.move && !paused) {
+    const dx = touch.move.x - touch.move.ox;
+    const dy = touch.move.y - touch.move.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > 10) {
+      const k = Math.min(1, d / 60);
+      mx = (dx / d) * k;
+      my = (-dy / d) * k;
+    }
+  }
+  const run = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || touch.run;
 
   // Sensibilité de rotation de la souris
   const sens = 0.0022;
@@ -185,6 +270,12 @@ function loop(currentTime) {
       } else if (ev.type === 'bottle') {
         if (sfx) sfx.bottle();
         if (hud) hud.toast("Eau d'amande : endurance au maximum");
+      } else if (ev.type === 'battery') {
+        if (sfx) sfx.battery();
+        if (hud) hud.toast('Piles : lampe rechargée');
+      } else if (ev.type === 'batteryEmpty') {
+        if (sfx) sfx.battery(true);
+        if (hud) hud.toast('Plus de pile… trouve-en dans le noir');
       } else if (ev.type === 'spotted') {
         if (sfx) sfx.spotted();
       } else if (ev.type === 'jumpscare') {
@@ -219,9 +310,16 @@ function loop(currentTime) {
     accumulator -= DT;
   }
 
-  // Mise à jour du son continu de l'entité
+  // Mise à jour du son continu de l'entité, et ses pas lourds quand elle te traque
   if (sfx && sim.hasMonster && sim.state === 'playing') {
     sfx.updateMonsterSound(sim.monster.danger, sim.monster.pan);
+    if (!paused && sim.monster.mode === 'chase' && sim.monster.danger > 0.05) {
+      monsterStepT -= delta;
+      if (monsterStepT <= 0) {
+        monsterStepT = 0.42;
+        sfx.monsterStep(sim.monster.danger, sim.monster.pan);
+      }
+    }
   }
 
   // Rendu graphique et HUD

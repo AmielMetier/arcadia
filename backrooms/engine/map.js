@@ -217,6 +217,16 @@ export function createBackroomsMap(seed = 42) {
     busy.add(k);
     bottles.push({ id: bottles.length, ...cellPos(c), taken: false });
   }
+  // piles pour la lampe torche, de préférence dans les zones sombres
+  const batteries = [];
+  const darkCell = (c) => !lights.some((l) => l.state === 'on' && Math.abs(l.gx - c.x) <= 2 && Math.abs(l.gz - c.z) <= 2);
+  for (let i = 0; i < 400 && batteries.length < 8; i++) {
+    const c = pick(walkable);
+    const k = c.z * W + c.x;
+    if (busy.has(k) || D(c) < 10 || (i < 300 && !darkCell(c))) continue;
+    busy.add(k);
+    batteries.push({ id: batteries.length, ...cellPos(c), taken: false });
+  }
 
   // 11. Point de départ de l'entité : loin du joueur, mais pas forcément au bout de la carte
   const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || far[0];
@@ -232,6 +242,7 @@ export function createBackroomsMap(seed = 42) {
     lights,
     props,
     bottles,
+    batteries,
     dist,
     monsterSpawn: cellPos(monsterCell),
     isWall(gx, gz) {

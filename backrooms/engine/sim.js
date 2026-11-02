@@ -11,7 +11,9 @@ export const MONSTER_PATROL_SPEED = 1.5;
 export const MONSTER_CHASE_SPEED = 2.75;
 export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
-export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entité ne le perde
+export const LOSE_TRACK_T = 4;
+export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
+export const BATTERY_PACK = 60; // % rendus par une pile ramassée // secondes sans voir le joueur avant que l'entité ne le perde
 
 export class BackroomsSim {
   constructor({ map, difficulty = 'normal', seed = 42 } = {}) {
@@ -35,6 +37,7 @@ export class BackroomsSim {
       cassettesCollected: 0,
       collectedIds: new Set(),
       bottles: 0,
+      battery: 100, // pile de la lampe torche (0 à 100)
       signal: 0, // 0 à 1 : force du signal de la cassette la plus proche (affiché par la caméra)
       moving: false,
     };
@@ -140,8 +143,19 @@ export class BackroomsSim {
     if (input.yaw !== undefined) this.player.yaw = input.yaw;
     if (input.pitch !== undefined) this.player.pitch = input.pitch;
     if (input.toggleFlashlight) {
-      this.player.flashlight = !this.player.flashlight;
-      this.emit({ type: 'flashlight', on: this.player.flashlight });
+      if (!this.player.flashlight && this.player.battery <= 0) this.emit({ type: 'batteryEmpty' });
+      else {
+        this.player.flashlight = !this.player.flashlight;
+        this.emit({ type: 'flashlight', on: this.player.flashlight });
+      }
+    }
+    // la lampe vide la pile ; à plat, elle s'éteint
+    if (this.player.flashlight) {
+      this.player.battery = Math.max(0, this.player.battery - BATTERY_DRAIN * DT);
+      if (this.player.battery <= 0) {
+        this.player.flashlight = false;
+        this.emit({ type: 'batteryEmpty' });
+      }
     }
 
     // 2. Endurance et course
@@ -208,6 +222,15 @@ export class BackroomsSim {
         this.player.bottles++;
         this.player.stamina = 100;
         this.emit({ type: 'bottle', id: b.id });
+      }
+    }
+
+    // 4b'. Piles : rechargent la lampe
+    for (const b of this.map.batteries || []) {
+      if (!b.taken && Math.hypot(b.x - this.player.x, b.z - this.player.z) < 1.1) {
+        b.taken = true;
+        this.player.battery = Math.min(100, this.player.battery + BATTERY_PACK);
+        this.emit({ type: 'battery', id: b.id });
       }
     }
 

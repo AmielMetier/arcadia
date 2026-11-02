@@ -169,4 +169,22 @@ test("l'entité perd le joueur quand elle ne le voit plus pendant quelques secon
   assert.notEqual(sim.monster.mode, 'chase');
 });
 
+test("lampe torche : la pile se vide, la lampe s'éteint, une pile la recharge", () => {
+  const m = createBackroomsMap(5);
+  const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
+  assert.ok(m.batteries.length >= 6, 'des piles dans le dédale');
+  for (let i = 0; i < 60 * 300; i++) sim.step({});
+  assert.equal(sim.player.battery, 0);
+  assert.equal(sim.player.flashlight, false, "la lampe s'éteint à plat");
+  sim.step({ toggleFlashlight: true });
+  assert.equal(sim.player.flashlight, false, 'impossible de la rallumer sans pile');
+  const b = m.batteries[0];
+  sim.player.x = b.x;
+  sim.player.z = b.z;
+  sim.step({});
+  assert.ok(sim.player.battery > 50, 'la pile recharge la lampe');
+  sim.step({ toggleFlashlight: true });
+  assert.equal(sim.player.flashlight, true);
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);
