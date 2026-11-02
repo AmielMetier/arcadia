@@ -14,6 +14,8 @@ const BW = BASE + '/pokemon/versions/generation-v/black-white';
 const gen = (id) => (id <= 493 ? HG : BW);
 const IMG = new URL('../img/', import.meta.url).href;
 const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portraits || []), DRESSEURS = new Set(SPRITES.dresseurs || []);
+// champions dont le portrait de combat n'est pas encore dessiné : un dresseur qui leur ressemble
+const SOSIES = { margot: 'topdresseuse', aurele: 'marin', morgane: 'medium', gaspard: 'montagnard', ferdinand: 'montagnard', lilas: 'fillette', corbin: 'topdresseur', pierre: 'topdresseur', croupier: 'garde' };
 const orig = (id) => id >= 1000 && SPECIES[id];
 
 export const ASSETS = {
@@ -24,7 +26,7 @@ export const ASSETS = {
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
   cry: (id) => (orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   // dresseur en combat : dessins HeartGold / SoulSilver (provisoires), sinon nos portraits, sinon ceux de Poké Duel
-  trainer: (k) => (DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
+  trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES[k] ? ASSETS.trainer(SOSIES[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
   portrait: (k) => (PORTRAITS.has(k) ? `${IMG}portraits/${k}-l.png` : null),
   chars: `${IMG}chars.png`,
   suiveurs: `${IMG}suiveurs.png`,

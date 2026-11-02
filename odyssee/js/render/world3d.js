@@ -75,7 +75,7 @@ export const CHAR_ROWS = { ...((SPRITES.chars && SPRITES.chars.rows) || {}) };
 // taille d'une case de la planche des personnages (32 × 32 depuis la version 2 de la bible)
 const CW = SPRITES.chars?.w || 24, CHH = SPRITES.chars?.h || 32, CD = SPRITES.chars?.d || 1;
 // personnages des Terres du Sud en attendant leur dessin : un sosie proche
-const CHAR_ALIAS = { morgane: 'medium', gaspard: 'montagnard', ferdinand: 'montagnard', lilas: 'fillette', corbin: 'topdresseur', croupier: 'vendeur', red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
+const CHAR_ALIAS = { red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
 const DIR_COL = { down: 0, left: 1, right: 2, up: 3 };
 
 function tex(canvasOrImg) {

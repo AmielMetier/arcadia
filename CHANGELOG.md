@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.70 — 3 novembre 2026
+- **Odyssée** — Les sept Champions des Terres du Sud ont leur propre dessin : Margot, Aurèle, Morgane, Gaspard, Ferdinand, Lilas et Corbin, ainsi que le croupier du Casino.
+- **Odyssée** — Margot et Aurèle ont leur portrait de combat ; les autres Champions du Sud ne s'affichent plus en image cassée pendant le combat.
+
 ## 3.69 — 3 novembre 2026
 - **Odyssée** — Crée ton personnage au début de l'aventure : garçon ou fille, couleur de peau et de cheveux, casquette ou bonnet, pull, t-shirt, veste ou chemise, pantalon ou short, baskets ou sandales, sac à dos ou sacoche, et la couleur de chaque vêtement.
 - **Odyssée** — La boutique de mode de Métropole ouvre : sa cabine d'essayage permet de changer de style quand on veut.
