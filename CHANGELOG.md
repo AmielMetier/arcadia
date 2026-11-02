@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.71 — 3 novembre 2026
+- **Odyssée** — Portraits de combat pour Morgane, Gaspard, Ferdinand, Lilas et Corbin, et un nouveau portrait de Théo qui lui ressemble enfin (cheveux bleus et écharpe rouge).
+
 ## 3.70 — 3 novembre 2026
 - **Odyssée** — Les sept Champions des Terres du Sud ont leur propre dessin : Margot, Aurèle, Morgane, Gaspard, Ferdinand, Lilas et Corbin, ainsi que le croupier du Casino.
 - **Odyssée** — Margot et Aurèle ont leur portrait de combat ; les autres Champions du Sud ne s'affichent plus en image cassée pendant le combat.

@@ -15,7 +15,7 @@ const gen = (id) => (id <= 493 ? HG : BW);
 const IMG = new URL('../img/', import.meta.url).href;
 const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portraits || []), DRESSEURS = new Set(SPRITES.dresseurs || []);
 // champions dont le portrait de combat n'est pas encore dessiné : un dresseur qui leur ressemble
-const SOSIES = { margot: 'topdresseuse', aurele: 'marin', morgane: 'medium', gaspard: 'montagnard', ferdinand: 'montagnard', lilas: 'fillette', corbin: 'topdresseur', pierre: 'topdresseur', croupier: 'garde' };
+const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
 const orig = (id) => id >= 1000 && SPECIES[id];
 
 export const ASSETS = {
