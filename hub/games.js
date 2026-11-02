@@ -288,11 +288,28 @@ window.HUB_GAMES = [
     ],
     cover: 'mystery/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
+  {
+    id: 'backrooms',
+    title: 'The Backrooms',
+    tag: 'Survie & Horreur',
+    desc: 'Échappe-toi du dédale infini des Backrooms : trouve les 5 cassettes VHS pour déverrouiller la sortie avant que l\'entité ne te rattrape.',
+    url: 'backrooms/',
+    minPlayers: 1, maxPlayers: 6, maxWithBots: 6,
+    accent: '#eab308',
+    icon: '🚪', score: 'Cassettes trouvées',
+    settings: [
+      { key: 'difficulty', label: 'Difficulté de l\'entité', options: [['normal', 'Normale'], ['hard', 'Rapide & Agressive'], ['peaceful', 'Exploration (Sans monstre)']], def: 'normal' },
+    ],
+    cover: 'backrooms/img/affiche.jpg',
+  },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
+  backrooms: { genre: 'action', time: '5–10 min',
+    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['F', 'Allumer / Éteindre la lampe torche']],
+    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Gère ton endurance : ne cours que pour distancer le monstre.', 'Rassemble les 5 cassettes VHS pour déverrouiller la porte de SORTIE EXIT.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
     tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },

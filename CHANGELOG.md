@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.65 — 2 novembre 2026
+- **The Backrooms** — nouveau jeu : échappe-toi du dédale jaune infini du Level 0.
+  - Un dédale oppressant de pièces et couloirs au papier peint jaune moisi, moquette humide et néons qui grésillent.
+  - Une entité sombre rôde dans les couloirs : son bourdonnement strident et glitché devient de plus en plus fort et violent quand elle s'approche de toi.
+  - Trouve les 5 cassettes VHS cachées dans les recoins du dédale pour déverrouiller la porte de SORTIE (EXIT) et t'enfuir.
+  - Lampe torche (F), course avec gestion de l'endurance (Shift), et filtre vidéo VHS d'époque avec glitchs de proximité.
+
 ## 3.64 — 2 novembre 2026
 - **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
   - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.
