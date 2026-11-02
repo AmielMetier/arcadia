@@ -1,4 +1,4 @@
-# Arcadia — Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Mollo !
+# Arcadia — Dogfight 3D, Duo Drift, DavidSimulator, Bastion Clash, Tête de Calcul, Fil Rouge, Outbreak, Cyber Kart GP, Convoy Storm, Birdie Party, Mini-Golf Party, Island Rush et Mollo !
 
 Des jeux en ligne entre potes, directement dans le navigateur, sans rien installer. On crée un salon,
 on partage le code, et l'hôte choisit le jeu. Le salon reste ouvert d'un jeu à l'autre.
@@ -14,6 +14,10 @@ Course et bataille en vue de dessus, jusqu'à 5 joueurs.
 - **Progression** : niveaux, pièces, garage à débloquer, défis du jour, succès, médailles contre-la-montre, fantômes à partager, rivalités
 - **Fin de course** : replay au ralenti, photo-finish, podium animé, finale du Grand Prix
 - Clavier ou manette, bots, chat, émotes
+
+## Dogfight 3D
+Combat aérien au-dessus de la vraie île d'Island Rush, jusqu'à 6 pilotes (bots possibles), chacun pour soi ou en équipes.
+F-16 ou F-22, visée à la souris ou pilotage en ZQSD, manette et tactile, canon, missiles et leurres.
 
 ## DavidSimulator
 Le Monopoly classique transposé à Nice, de Saint-Roch à la Promenade des Anglais, jusqu'à 6 joueurs (bots possibles).
