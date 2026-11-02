@@ -11,6 +11,7 @@ import { optionsScreen, loadCodeScreen } from './ui/screens.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
+import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
 import { SPRITES } from './data/sprites.js';
@@ -460,8 +461,17 @@ async function intro(game, ui, sound) {
   ui.say('Mais parle-moi un peu de toi... Qui es-tu ?', { speaker: 'Prof. Saule', keep: true, noWaitLast: true });
   const gender = await chooseGenderCard(ui, input, sound, s);
 
+  // l'apparence : casquette ou bonnet, haut, bas, chaussures, sac, couleurs (si le modèle de base est dessiné)
+  let tenue = null;
+  if (game.view.baseDe?.(gender)) {
+    chap.textContent = 'TA TENUE DE DRESSEUR';
+    s.style.visibility = 'hidden';
+    tenue = await apparenceScreen(ui, { premiere: true, tenue: { genre: gender }, base: (g) => game.view.baseDe(g) });
+    s.style.visibility = '';
+  }
+
   chap.textContent = 'INSCRIPTION À LA LIGUE D\'ODYSSÉE';
-  const name = await chooseTrainerName(ui, input, sound, gender, s);
+  const name = await chooseTrainerName(ui, input, sound, tenue?.genre || gender, s);
 
   chap.textContent = `${name.toUpperCase()} & THÉO · DÉPART À BOURG-AUBE`;
   ped.style.opacity = '1';
@@ -490,7 +500,8 @@ async function intro(game, ui, sound) {
   s.classList.add('out');
   await wait(480);
   s.remove();
-  return game.newState(name, gender);
+  const st = game.newState(name, tenue?.genre || gender); if (tenue) st.tenue = tenue;
+  return st;
 }
 
 async function _legacyIntro(game, ui, sound) {

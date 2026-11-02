@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.68 — 3 novembre 2026
+- **Odyssée** — Cinq nouveaux dresseurs sur les routes du nord (Route 1, Route 3, Route 7 et Route 10).
+- **Odyssée** — La carte de la région montre le Pont de l'Austral qui relie Bourg-Aube aux Terres du Sud.
+
 ## 3.67 — 3 novembre 2026
 - **Odyssée** — Un vélo ! À Voltacité, Lucien t'en assemble un si tu lui rapportes deux pièces. Touche V pour monter dessus ou en descendre (dehors), on roule deux fois plus vite qu'en courant.
 - **Odyssée** — Le permis bateau : le capitaine de l'Embarcadère de l'Aube ne fait plus embarquer sans lui. Examen à la Capitainerie de Port-Azur (quatre questions puis une épreuve pratique), dès deux badges.

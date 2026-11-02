@@ -236,6 +236,14 @@ export class WorldView {
       for (const [sp, r] of Object.entries(SPRITES.suiveurs.rows)) CHAR_ROWS['poke:' + sp] = base + r;
       charsImg = c;
     }
+    // une rangée de plus, tout en bas : l'apparence du joueur, composée selon sa tenue (render/tenue.js)
+    if (charsImg) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + CHH;
+      c.getContext('2d').drawImage(charsImg, 0, 0);
+      CHAR_ROWS.joueur = Math.round(charsImg.height / CHH);
+      charsImg = c;
+    }
+    this.charsCanvas = charsImg;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 1, 400);
     const A = buildAtlas(), N = buildAnimAtlas(), S = buildSprites();
@@ -716,6 +724,14 @@ export class WorldView {
     this.root.add(mesh); this.root.add(shadow); this.actors.set(id, a);
     return a;
   }
+  /** pose la rangée composée du joueur (768 × 64) dans la planche des personnages */
+  setJoueur(row) {
+    const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS.joueur * CHH;
+    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y);
+    this.texC.needsUpdate = true;
+  }
+  /** le modèle de base d'un genre (pour composer une tenue) */
+  baseDe(genre) { const r = CHAR_ROWS['base_' + genre]; return r == null ? null : { src: this.charsCanvas, sx: 0, sy: r * CHH }; }
   removeActor(id) { const a = this.actors.get(id); if (a) { a.dispose(); this.actors.delete(id); } }
   /** position à l'écran (pixels de la page) d'un point de la carte, à h pixels au-dessus du sol (noms des autres joueurs) */
   screenPos(x, y, h = 34) {

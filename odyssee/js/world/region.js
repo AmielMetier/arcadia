@@ -503,6 +503,7 @@ export function buildWorld() {
   routeTrainer(W, r1, 0.35, 1, 4, 'Gamin', 'Léo', [[1013, 4], [1010, 4]], { intro: 'Hé ! Toi aussi tu viens d\'avoir ta première créature ?' });
   routeTrainer(W, r1, 0.62, -1, 4, 'Fillette', 'Inès', [[161, 5]], { intro: 'Mon Fouinette est le plus mignon de la route !' });
   routeTrainer(W, r1, 0.82, 1, 3, 'Gamin', 'Malo', [[1010, 5], [19, 5], [1017, 4]]);
+  routeTrainer(W, r1, 0.5, 1, 5, 'Fillette', 'Mila', [[1013, 4], [16, 4]]);
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const r2 = R('r2', 'Route 2', [[34.5, 138], [34.5, 120], [37.5, 104], [52.5, 96.5], [75.5, 94.5], [99.5, 92.5]], { w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, taperEnd: false }, 'r2');
@@ -524,6 +525,8 @@ export function buildWorld() {
   routeTrainer(W, r3a, 0.35, 1, 3, 'Montagnard', 'Gaston', [[1026, 11], [74, 12], [66, 12]]);
   routeTrainer(W, r3a, 0.7, -1, 3, 'Fillette', 'Lise', [[1039, 12], [35, 11]]);
   routeItem(W, r3a, 0.55, 1, 4, 'burn-heal');
+  routeTrainer(W, r3a, 0.15, -1, 3, 'Gamin', 'Joris', [[1024, 11], [21, 11]]);
+  routeTrainer(W, r3a, 0.88, 1, 3, 'Randonneuse', 'Célia', [[1026, 12], [1039, 12]]);
   const r3b = R('r3e', 'Route 3', [[173.5, 41.5], [178, 41.5], [182, 34.5], [187, 33.5]], { w: 8, grass: 0.6, trees: 0.03, taperStart: false }, 'r3');
   routeTrainer(W, r3b, 0.6, -1, 3, 'Randonneuse', 'Maëlle', [[1034, 13], [27, 13]]);
 
@@ -556,6 +559,7 @@ export function buildWorld() {
   routeTrainer(W, r7, 0.25, 1, 4, 'Médium', 'Ophélie', [[1023, 28], [97, 29]]);
   routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 29], [107, 29], [106, 30]]);
   routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 31], [1012, 31], [1040, 30]]);
+  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Gaël', [[1029, 28], [118, 29]]);
   routeItem(W, r7, 0.4, -1, 5, 'fire-stone');
   // Cap Mirage : plage, ponton et le rival qui attend
   W.rect(282, 185, 301, 188, T.SAND);
@@ -596,6 +600,7 @@ export function buildWorld() {
   routeTrainer(W, r10, 0.2, 1, 4, 'Topdresseur', 'Victor', [[1035, 36], [128, 36], [1014, 36]]);
   routeTrainer(W, r10, 0.45, -1, 4, 'Karatéka', 'Ryu', [[68, 37], [1033, 37]]);
   routeTrainer(W, r10, 0.7, 1, 4, 'Topdresseuse', 'Léa', [[241, 37], [1040, 37], [1037, 37]]);
+  routeTrainer(W, r10, 0.9, -1, 4, 'Médium', 'Sixtine', [[1023, 37], [94, 38]]);
   routeItem(W, r10, 0.35, -1, 5, 'ultra-ball', 3); routeItem(W, r10, 0.85, 1, 5, 'sun-stone');
 
 
@@ -841,7 +846,7 @@ export function buildWorld() {
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
   /* ======================== TERRES DU SUD ======================== */
-  buildSud({ W, maps, towns, R, routeTrainer, routeItem, buildTown, ENC, ledges });
+  buildSud({ W, maps, towns, routes, R, routeTrainer, routeItem, buildTown, ENC, ledges });
 
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [

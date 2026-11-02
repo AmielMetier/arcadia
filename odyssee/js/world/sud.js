@@ -102,6 +102,7 @@ export function buildSud(ctx) {
   W.gates.push({ npc: 'sud:garde-pont', badges: 8, tiles: [[99, 256], [100, 256]] });
   W.sign(98, 254, 'PONT DE L\'AUSTRAL\nTerres du Sud — Métropole', 'sign');
   W.zone(96, 254, 103, 293, { name: 'Pont de l\'Austral', music: 'route2', prio: 1 });
+  ctx.routes?.push({ id: 'pont', name: 'Pont de l\'Austral', pts: [[99.5, 252], [99.5, 294]] });   // tracé sur la carte (C)
 
   const r13 = R('r13', 'Route 13', [[99.5, 294], [99.5, 300], [99.5, 307]], { w: 9, grass: 0.4, trees: 0.03, taperStart: false }, 'r13');
   // la rive sud du détroit reste boisée : on n'y accoste pas en surfant (seul le pont y mène)
