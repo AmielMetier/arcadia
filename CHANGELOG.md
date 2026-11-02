@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 3.64 — 2 novembre 2026
+- **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
+  - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.
+  - Meurtrier : ton couteau reste caché tant que tu ne le sors pas. Frappe de près, lance-le de loin (il se plante dans le décor : va le reprendre, ou attends qu'il revienne), et coupe le courant avec F ou C.
+  - Shérif : un revolver, une balle toutes les trois secondes. Si tu abats un innocent, tu es sonné et tu lâches ton arme.
+  - Le revolver tombé brille d'un faisceau doré qu'on voit à travers les murs : le premier innocent qui marche dessus devient le héros.
+  - Innocents : ramassez les pièces d'or, survivez jusqu'à l'aube, et méfiez-vous de celui qui sort un couteau.
+  - Le manoir a trois étages et 24 pièces, du grand hall et sa galerie jusqu'à la crypte. Il y a aussi un escalier dérobé et trois passages secrets (la bibliothèque pivotante, l'armoire et le miroir) : E pour passer.
+  - De vrais personnages animés à ta couleur, l'arme visible dans la main de chacun, des meubles placés au millimètre, des lustres et une petite valse de boîte à musique.
+  - Un mode « Sans souris » pour jouer tout au clavier (Réglages → Commandes) : ZQSD pour marcher, les flèches pour orienter la vue, et maintien de G pour jauger la force du lancer de couteau.
+  - Des bots facile, moyen ou difficile complètent la table. Un mode Découverte permet de visiter le manoir sans rôles.
+  - Les manches s'enchaînent et les points s'additionnent d'une manche à l'autre.
+
 ## 3.63 — 2 novembre 2026
 - **Dogfight 3D** — Refonte complète : le combat se déroule au-dessus de la vraie île d'Island Rush.
   - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
