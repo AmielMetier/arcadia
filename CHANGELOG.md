@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.47 — 2 novembre 2026
+- **Dogfight 3D** — Correction de l'écran noir au décollage.
+  - Correction d'une erreur d'initialisation de la caméra qui interrompait le rendu lors du clic sur Décoller.
+
 ## 3.46 — 2 novembre 2026
 - **Dogfight 3D** — Avion parfaitement droit en face de la caméra.
   - L'alignement 3D du F-16 est recalibré : le nez pointe droit vers le réticule, les ailes sont horizontales et la tuyère fait face à la caméra.

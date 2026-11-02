@@ -407,12 +407,12 @@ export class DogfightScene {
     const targetCamY = myPlane.flight.y - myPlane.flight.forwardY * distBehind + myPlane.flight.upY * heightAbove;
     const targetCamZ = myPlane.flight.z - myPlane.flight.forwardZ * distBehind + myPlane.flight.upZ * heightAbove;
 
+    const lerpPos = Math.min(1.0, 7.5 * dt);
     if (!this.cameraInitialized) {
       this.cameraInitialized = true;
       this.camera.position.set(targetCamX, targetCamY, targetCamZ);
     } else {
       // Amortissement de la position caméra : léger retard naturel
-      const lerpPos = Math.min(1.0, 7.5 * dt);
       this.camera.position.x += (targetCamX - this.camera.position.x) * lerpPos;
       this.camera.position.y += (targetCamY - this.camera.position.y) * lerpPos;
       this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpPos;
