@@ -1,6 +1,4 @@
-/* The Backrooms - Styles esthétiques Level 0 & VHS */
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=VT323&display=swap');
-
+/* The Backrooms - Styles Level 0 : incrustations de caméscope VHS (le filtre d'image est dans view/vhs.js) */
 * {
   box-sizing: border-box;
   user-select: none;
@@ -20,232 +18,171 @@ html, body {
 
 #stage {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   z-index: 1;
 }
+#stage canvas { display: block; }
+[hidden] { display: none !important; }
 
 #hud {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
   z-index: 10;
-}
-
-/* Filtre de balayage VHS (Scanlines) */
-.vhs-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: repeating-linear-gradient(
-    rgba(0, 0, 0, 0) 0px,
-    rgba(0, 0, 0, 0) 2px,
-    rgba(0, 0, 0, 0.22) 3px,
-    rgba(0, 0, 0, 0.22) 4px
-  );
-  pointer-events: none;
-  z-index: 5;
-}
-
-/* Effet de distorsion / Glitch quand le monstre approche */
-.glitch-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255, 0, 50, 0.12) 0%, rgba(200, 0, 0, 0.35) 90%);
-  mix-blend-mode: color-dodge;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  pointer-events: none;
-  z-index: 6;
-}
-
-/* Flash de Jumpscare */
-.jumpscare-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #ff0015;
-  z-index: 20;
-}
-.jumpscare-overlay.flash {
-  animation: scareFlash 0.8s forwards;
-}
-@keyframes scareFlash {
-  0% { opacity: 0.95; filter: invert(1); }
-  25% { opacity: 0.8; filter: invert(0); }
-  50% { opacity: 0.9; }
-  100% { opacity: 0; }
-}
-
-/* Éléments vintage VHS */
-.vhs-rec {
-  position: absolute;
-  top: 24px;
-  left: 32px;
   font-family: 'VT323', monospace;
-  font-size: 26px;
-  color: #ef4444;
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  color: #f2f0e6;
+  text-shadow: 2px 0 0 rgba(255, 0, 60, 0.45), -2px 0 0 rgba(0, 200, 255, 0.35), 0 0 6px rgba(0, 0, 0, 0.6);
   letter-spacing: 2px;
 }
-.rec-dot {
-  display: inline-block;
-  animation: recBlink 1.2s infinite;
+
+/* Incrustations aux quatre coins */
+.cam {
+  position: absolute;
+  font-size: 30px;
+  line-height: 1.05;
 }
+.cam-tl { top: 34px; left: 48px; }
+.cam-tr { top: 34px; right: 48px; text-align: right; }
+.cam-bl { bottom: 34px; left: 48px; }
+.cam-br { bottom: 34px; right: 48px; text-align: right; }
+
+.vhs-rec { color: #ff3b3b; }
+.rec-dot { display: inline-block; animation: recBlink 1.2s steps(1) infinite; }
 @keyframes recBlink {
-  0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+.vhs-play { font-size: 24px; opacity: 0.85; }
 
-.vhs-play {
+.battery {
+  display: inline-block;
+  position: relative;
+  width: 54px;
+  height: 22px;
+  border: 3px solid currentColor;
+  margin-bottom: 6px;
+}
+.battery::after {
+  content: '';
   position: absolute;
-  top: 56px;
-  left: 32px;
-  font-family: 'VT323', monospace;
-  font-size: 24px;
-  color: #22c55e;
-  text-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
-  letter-spacing: 2px;
+  right: -9px;
+  top: 4px;
+  width: 5px;
+  height: 8px;
+  background: currentColor;
+}
+.battery i {
+  position: absolute;
+  inset: 2px;
+  right: auto;
+  width: calc((100% - 4px) * var(--b, 1));
+  background: currentColor;
 }
 
-/* Réticule central */
+.tape-date { font-size: 26px; margin-bottom: 6px; }
+.stamina { display: flex; align-items: center; gap: 10px; font-size: 22px; }
+.stamina-track { width: 160px; height: 12px; border: 2px solid currentColor; padding: 1px; }
+.stamina-bar { height: 100%; width: 100%; background: currentColor; }
+.stamina-bar.low { background: #ff3b3b; animation: recBlink 0.5s steps(1) infinite; }
+
+.tapes i {
+  display: inline-block;
+  width: 22px;
+  height: 14px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  opacity: 0.4;
+}
+.tapes i.on { background: #ffcf3a; border-color: #ffcf3a; opacity: 1; }
+.tapes b { font-weight: normal; margin-left: 6px; }
+.signal { font-size: 24px; }
+#signalBars { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
+#signalBars i { width: 7px; background: currentColor; opacity: 0.25; }
+#signalBars i.on { opacity: 1; }
+.flash-indicator { font-size: 20px; opacity: 0.8; }
+
+/* Coins du viseur */
+.corner {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 0 solid rgba(242, 240, 230, 0.75);
+}
+.c1 { top: 16px; left: 22px; border-top-width: 3px; border-left-width: 3px; }
+.c2 { top: 16px; right: 22px; border-top-width: 3px; border-right-width: 3px; }
+.c3 { bottom: 16px; left: 22px; border-bottom-width: 3px; border-left-width: 3px; }
+.c4 { bottom: 16px; right: 22px; border-bottom-width: 3px; border-right-width: 3px; }
+
 .crosshair {
   position: absolute;
   top: 50%;
   left: 50%;
+  width: 18px;
+  height: 18px;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.65);
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  background:
+    linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+  opacity: 0.5;
 }
 
-/* Boîte de cassettes VHS */
-.cassette-counter {
-  position: absolute;
-  top: 24px;
-  right: 32px;
-  background: rgba(18, 16, 12, 0.85);
-  border: 2px solid #ca8a04;
-  border-radius: 8px;
-  padding: 12px 18px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.cassette-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: #facc15;
-}
-.cassette-icons {
-  display: flex;
-  gap: 8px;
-}
-.cas-slot {
-  font-size: 22px;
-  opacity: 0.25;
-  filter: grayscale(1);
-  transition: all 0.3s ease;
-}
-.cas-slot.found {
-  opacity: 1;
-  filter: grayscale(0) drop-shadow(0 0 6px #eab308);
-  transform: scale(1.15);
-}
-.cassette-count {
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-}
-
-/* Jauge d'endurance */
-.stamina-box {
-  position: absolute;
-  bottom: 32px;
-  left: 32px;
-  width: 240px;
-  background: rgba(20, 18, 14, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stamina-bar {
-  height: 12px;
-  background: #22c55e;
-  border-radius: 4px;
-  transition: width 0.05s linear, background 0.3s ease;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-}
-.stamina-label {
-  font-size: 11px;
-  letter-spacing: 1px;
-  color: #bbb;
-  text-align: right;
-}
-
-/* Bannière d'objectif */
+/* Objectif et messages */
 .objective-banner {
   position: absolute;
-  bottom: 36px;
+  top: 18%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(18, 16, 12, 0.88);
-  border: 1px solid rgba(234, 179, 8, 0.5);
-  border-radius: 6px;
-  padding: 10px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fde047;
-  letter-spacing: 0.5px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  font-size: 28px;
   text-align: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
-  transition: all 0.3s ease;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px 14px;
+  transition: opacity 1s ease;
 }
-.objective-banner.unlocked {
-  background: rgba(20, 83, 45, 0.95);
-  border-color: #4ade80;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  animation: pulseUnlock 1s infinite alternate;
-}
-@keyframes pulseUnlock {
-  from { transform: translateX(-50%) scale(1); box-shadow: 0 0 12px #22c55e; }
-  to { transform: translateX(-50%) scale(1.03); box-shadow: 0 0 24px #4ade80; }
+.objective-banner.hide { opacity: 0; }
+.objective-banner.unlocked { color: #7dffa0; }
+.toast {
+  position: absolute;
+  top: 62%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 26px;
+  color: #bfe3ff;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 12px;
 }
 
-/* Indicateur de lampe */
-.flash-indicator {
+/* Jumpscare : le visage de l'entité plein écran */
+.jumpscare-overlay {
   position: absolute;
-  bottom: 36px;
-  right: 32px;
-  background: rgba(18, 16, 12, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e2e8f0;
+  inset: 0;
+  background: #000;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+.jumpscare-overlay img {
+  height: 135%;
+  filter: contrast(1.6) saturate(0.4) sepia(0.4) hue-rotate(-20deg) brightness(0.9);
+}
+.jumpscare-overlay.flash { animation: scareFlash 1.4s forwards; }
+.jumpscare-overlay.flash img { animation: scareShake 0.06s infinite, scareZoom 1.4s ease-out forwards; }
+@keyframes scareFlash {
+  0% { background: #ff0015; }
+  8% { background: #000; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes scareShake {
+  0% { transform: translate(-8px, 4px); }
+  50% { transform: translate(8px, -6px); }
+  100% { transform: translate(-4px, 8px); }
+}
+@keyframes scareZoom {
+  from { scale: 0.7; }
+  to { scale: 1.25; }
 }
 
 /* Prompt pour cliquer */
@@ -254,25 +191,20 @@ html, body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.85);
-  border: 2px solid #ca8a04;
-  border-radius: 8px;
-  padding: 16px 28px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #facc15;
-  box-shadow: 0 0 30px rgba(202, 138, 4, 0.4);
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(242, 240, 230, 0.7);
+  padding: 14px 26px;
+  font-size: 30px;
+  text-align: center;
   pointer-events: auto;
   cursor: pointer;
 }
+.click-prompt small { display: block; font-size: 22px; opacity: 0.75; margin-top: 4px; }
 
 /* Écran de fin */
 .end-screen {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background: rgba(6, 5, 4, 0.92);
   display: flex;
   align-items: center;
@@ -281,46 +213,38 @@ html, body {
   z-index: 50;
 }
 .end-card {
-  background: #14120f;
-  border: 2px solid #332d20;
-  border-radius: 12px;
-  padding: 36px 48px;
+  border: 2px solid rgba(242, 240, 230, 0.4);
+  padding: 32px 44px;
   text-align: center;
-  max-width: 480px;
-  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.9);
+  max-width: 520px;
+  margin: 16px;
+  background: rgba(0, 0, 0, 0.6);
 }
 .end-card h1 {
-  font-size: 42px;
-  margin: 0 0 12px 0;
-  letter-spacing: 2px;
+  font-size: 56px;
+  font-weight: normal;
+  margin: 0 0 8px;
+  letter-spacing: 4px;
 }
-.end-card p {
-  font-size: 16px;
-  color: #d1d5db;
-  margin-bottom: 20px;
-}
-.end-stats {
-  font-size: 15px;
-  color: #fbbf24;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 24px;
-}
+.end-card p { font-size: 24px; margin: 0 0 18px; opacity: 0.85; }
+.end-stats { font-size: 24px; color: #ffcf3a; margin-bottom: 24px; }
 .btn-restart {
-  background: #eab308;
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  padding: 12px 32px;
+  background: transparent;
+  color: #f2f0e6;
+  border: 2px solid currentColor;
+  padding: 8px 34px;
   font-family: inherit;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 30px;
+  letter-spacing: 3px;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.1s ease;
+  text-shadow: inherit;
 }
-.btn-restart:hover {
-  background: #facc15;
-  transform: scale(1.04);
+.btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
+
+@media (max-width: 700px) {
+  .cam { font-size: 22px; }
+  .cam-tl, .cam-bl { left: 22px; }
+  .cam-tr, .cam-br { right: 22px; }
+  .stamina-track { width: 90px; }
+  .objective-banner { font-size: 20px; }
 }

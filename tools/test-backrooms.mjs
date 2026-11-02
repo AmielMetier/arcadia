@@ -19,9 +19,9 @@ function test(name, fn) {
 const map = createBackroomsMap(42);
 
 test('génération de la carte : dimensions, sols, murs et pièces', () => {
-  assert.equal(map.W, 28);
-  assert.equal(map.H, 28);
-  assert.ok(map.walkable.length > 200, 'au moins 200 cases praticables');
+  assert.equal(map.W, 64);
+  assert.equal(map.H, 64);
+  assert.ok(map.walkable.length > 1500, 'au moins 1500 cases praticables');
   assert.equal(map.isWall(map.spawn.gx, map.spawn.gz), false, 'le spawn est sur du sol');
   assert.equal(map.isWall(map.exit.gx, map.exit.gz), false, 'la sortie est sur du sol');
 });
@@ -131,6 +131,42 @@ test('l\'entité : calcul du danger sonore selon la distance et course-poursuite
   assert.equal(sim.state, 'dead', 'le joueur meurt attrapé par le monstre');
   const events = sim.drainEvents();
   assert.ok(events.some((e) => e.type === 'jumpscare'), 'jumpscare déclenché à la mort');
+});
+
+test('grande carte : générée sans erreur pour 200 graines, sortie loin du départ', () => {
+  for (let sd = 0; sd < 200; sd++) {
+    const m = createBackroomsMap(sd);
+    const exitD = m.dist[m.exit.gz * m.W + m.exit.gx];
+    assert.ok(exitD > 40, `graine ${sd} : la sortie est à ${exitD} cases du départ`);
+    for (const c of m.cassettes) assert.ok(m.dist[c.gz * m.W + c.gx] > 0, `graine ${sd} : cassette ${c.id} atteignable`);
+    assert.ok(m.lights.some((l) => l.state === 'off'), `graine ${sd} : il y a des zones sombres`);
+  }
+});
+
+test("eau d'amande : remplit l'endurance", () => {
+  const m = createBackroomsMap(7);
+  const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
+  sim.player.stamina = 10;
+  const b = m.bottles[0];
+  sim.player.x = b.x;
+  sim.player.z = b.z;
+  sim.step();
+  assert.equal(b.taken, true);
+  assert.equal(sim.player.stamina, 100);
+  assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
+});
+
+test("l'entité perd le joueur quand elle ne le voit plus pendant quelques secondes", () => {
+  const m = createBackroomsMap(11);
+  const sim = new BackroomsSim({ map: m });
+  sim.monster.mode = 'chase';
+  for (let i = 0; i < 60 * 6 && sim.monster.mode === 'chase'; i++) {
+    // on la garde loin, hors de vue, pour tester la perte de vue seule
+    sim.monster.x = m.monsterSpawn.x;
+    sim.monster.z = m.monsterSpawn.z;
+    sim.step({ my: 0 });
+  }
+  assert.notEqual(sim.monster.mode, 'chase');
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

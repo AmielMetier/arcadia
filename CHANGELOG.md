@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 3.66 — 2 novembre 2026
+- **The Backrooms** — le Level 0 devient immense, lent et filmé au vieux caméscope.
+  - Le dédale fait maintenant 160 mètres de côté : des milliers de couloirs, de cloisons percées, de piliers et quelques grandes salles vides.
+  - On avance plus lentement, et l'entité aussi. La course reste possible, mais le souffle s'épuise vite.
+  - Tout est filmé comme une vieille cassette VHS : image floue et bombée, couleurs qui bavent, lignes, grain, bande de tracking. L'image se déchire quand l'entité approche.
+  - L'entité a désormais un visage : une silhouette plate qui te fixe toujours, tremble quand elle te traque et surgit plein écran quand elle t'attrape.
+  - Des zones entières ont leurs néons morts ou qui grésillent : sans lampe torche, on n'y voit presque rien.
+  - Vraies textures de moquette, de papier peint et de faux plafond, et des meubles de bureau abandonnés le long des murs.
+  - Le caméscope capte le signal des cassettes : plus tu t'en approches, plus les barres montent. Une fois les 5 cassettes trouvées, il guide vers la sortie.
+  - Des bouteilles d'eau d'amande traînent par terre : une gorgée et ton souffle revient.
+  - L'entité te perd si tu casses sa ligne de vue assez longtemps, mais elle rôde de plus en plus près de toi.
+
 ## 3.65 — 2 novembre 2026
 - **The Backrooms** — nouveau jeu : échappe-toi du dédale jaune infini du Level 0.
   - Un dédale oppressant de pièces et couloirs au papier peint jaune moisi, moquette humide et néons qui grésillent.

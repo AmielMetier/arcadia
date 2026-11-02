@@ -309,7 +309,7 @@ window.HUB_GAMES = [
 window.HUB_GAME_INFO = {
   backrooms: { genre: 'action', time: '5–10 min',
     keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['F', 'Allumer / Éteindre la lampe torche']],
-    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Gère ton endurance : ne cours que pour distancer le monstre.', 'Rassemble les 5 cassettes VHS pour déverrouiller la porte de SORTIE EXIT.'] },
+    tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.', 'Suis les barres de SIGNAL du caméscope pour trouver les 5 cassettes, puis la porte EXIT.', 'L'eau d'amande rend tout ton souffle.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
     tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },

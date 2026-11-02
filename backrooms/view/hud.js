@@ -1,52 +1,41 @@
-// The Backrooms - Interface utilisateur (HUD), filtre VHS et alertes
+// The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
+import { ENTITY_IMG } from './scene.js';
 
 export class BackroomsHUD {
   constructor(container) {
     this.el = container;
     this.el.innerHTML = `
-      <div class="vhs-overlay" id="vhsOverlay"></div>
-      <div class="glitch-overlay" id="glitchOverlay"></div>
-      <div class="jumpscare-overlay" id="jumpscareOverlay" hidden></div>
+      <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""></div>
 
-      <!-- Informations VHS en haut à gauche -->
-      <div class="vhs-rec">
-        <span class="rec-dot">●</span> REC <span id="vhsTimer">00:00:00</span>
+      <!-- Incrustations du caméscope -->
+      <div class="cam cam-tl">
+        <div class="vhs-rec"><span class="rec-dot">●</span> REC</div>
+        <div class="vhs-play">PLAY ▶ SP</div>
       </div>
-      <div class="vhs-play">PLAY ▶ SP</div>
+      <div class="cam cam-tr">
+        <div class="battery" id="battery"><i></i></div>
+        <div id="vhsTimer">00:00:00</div>
+      </div>
+      <div class="cam cam-bl">
+        <div class="tape-date" id="tapeDate"></div>
+        <div class="stamina"><span>SOUFFLE</span><div class="stamina-track"><div class="stamina-bar" id="staminaBar"></div></div></div>
+      </div>
+      <div class="cam cam-br">
+        <div class="tapes"><span id="cassetteIcons"></span> <b id="cassetteText">0/5</b></div>
+        <div class="signal"><span id="signalLabel">SIGNAL</span> <span id="signalBars"></span></div>
+        <div class="flash-indicator" id="flashStatus">[F] LAMPE ON</div>
+      </div>
 
-      <!-- Viseur central discret -->
+      <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
       <div class="crosshair"></div>
 
-      <!-- Compteur de cassettes VHS -->
-      <div class="cassette-counter" id="cassetteBox">
-        <div class="cassette-title">CASSETTES VHS</div>
-        <div class="cassette-icons" id="cassetteIcons">
-          <span class="cas-slot">📼</span>
-          <span class="cas-slot">📼</span>
-          <span class="cas-slot">📼</span>
-          <span class="cas-slot">📼</span>
-          <span class="cas-slot">📼</span>
-        </div>
-        <div class="cassette-count" id="cassetteText">0 / 5</div>
-      </div>
-
-      <!-- Jauge d'endurance -->
-      <div class="stamina-box">
-        <div class="stamina-bar" id="staminaBar" style="width: 100%;"></div>
-        <div class="stamina-label">ENDURANCE (SHIFT)</div>
-      </div>
-
-      <!-- Bannière d'objectif -->
-      <div class="objective-banner" id="objBanner">
-        Trouve les 5 cassettes VHS pour déverrouiller la porte de Sortie (EXIT)
-      </div>
-
-      <!-- Lampe torche -->
-      <div class="flash-indicator" id="flashStatus">[F] LAMPE : ON</div>
+      <div class="objective-banner" id="objBanner"></div>
+      <div class="toast" id="toast" hidden></div>
 
       <!-- Message pour verrouiller le curseur -->
       <div class="click-prompt" id="clickPrompt">
         Clique sur l'écran pour prendre le contrôle
+        <small>ZQSD marcher · Maj courir · F lampe</small>
       </div>
 
       <!-- Écran de Fin (Mort ou Victoire) -->
@@ -61,68 +50,87 @@ export class BackroomsHUD {
     `;
 
     this.$ = (s) => this.el.querySelector(s);
+    const img = this.$('#scareImg');
+    img.onerror = () => img.remove();
+    img.src = ENTITY_IMG;
+
+    // date du caméscope, figée en 1996 comme une vieille cassette retrouvée
+    const d = new Date();
+    this.$('#tapeDate').textContent = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.1996`;
+    this.bannerT = 9;
+    this.lastCount = -1;
+    this.toastT = 0;
   }
 
-  update(sim, time) {
-    // 1. Minuteur VHS
+  update(sim, time, dt = 1 / 60) {
+    const P = sim.player;
+
+    // 1. Compteur de bande
     const totalSec = Math.floor(time);
-    const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+    const m = String(Math.floor(totalSec / 60) % 60).padStart(2, '0');
     const s = String(totalSec % 60).padStart(2, '0');
-    const ms = String(Math.floor((time % 1) * 100)).padStart(2, '0');
-    this.$('#vhsTimer').textContent = `00:${m}:${s}.${ms}`;
+    this.$('#vhsTimer').textContent = `${h}:${m}:${s}`;
+    // la batterie se vide doucement (purement décorative)
+    this.$('#battery').style.setProperty('--b', Math.max(0.12, 1 - time / 900).toFixed(3));
 
-    // 2. Compteur de cassettes
-    this.$('#cassetteText').textContent = `${sim.player.cassettesCollected} / 5`;
-    const slots = this.$('#cassetteIcons').querySelectorAll('.cas-slot');
-    slots.forEach((slot, idx) => {
-      if (idx < sim.player.cassettesCollected) {
-        slot.classList.add('found');
+    // 2. Cassettes
+    if (P.cassettesCollected !== this.lastCount) {
+      this.lastCount = P.cassettesCollected;
+      this.$('#cassetteIcons').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < P.cassettesCollected ? 'on' : ''}"></i>`).join('');
+      this.$('#cassetteText').textContent = `${P.cassettesCollected}/5`;
+      this.bannerT = 6;
+      const banner = this.$('#objBanner');
+      if (P.cassettesCollected >= 5) {
+        banner.textContent = 'LA SORTIE EST OUVERTE : SUIS LE SIGNAL JUSQU\'À LA PORTE EXIT';
+        banner.classList.add('unlocked');
       } else {
-        slot.classList.remove('found');
+        banner.textContent = P.cassettesCollected === 0
+          ? 'RETROUVE LES 5 CASSETTES VHS · LE SIGNAL MONTE QUAND TU T\'EN APPROCHES'
+          : `CASSETTE ${P.cassettesCollected}/5 RÉCUPÉRÉE`;
+        banner.classList.remove('unlocked');
       }
-    });
+    }
+    this.bannerT -= dt;
+    this.$('#objBanner').classList.toggle('hide', this.bannerT <= 0);
 
-    // 3. Jauge d'endurance
+    // 3. Signal de la cassette (ou de la sortie) la plus proche
+    const bars = Math.round(P.signal * 5);
+    const flick = P.signal > 0 && Math.random() < 0.08 ? Math.max(0, bars - 1) : bars;
+    this.$('#signalBars').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < flick ? 'on' : ''}" style="height:${6 + i * 3}px"></i>`).join('');
+    this.$('#signalLabel').textContent = P.cassettesCollected >= 5 ? 'SORTIE' : 'SIGNAL';
+
+    // 4. Souffle (endurance)
     const stamBar = this.$('#staminaBar');
-    stamBar.style.width = `${sim.player.stamina}%`;
-    if (sim.player.stamina < 20) {
-      stamBar.style.background = '#ef4444'; // rouge critique
-    } else if (sim.player.stamina < 50) {
-      stamBar.style.background = '#f59e0b'; // orange
-    } else {
-      stamBar.style.background = '#22c55e'; // vert
-    }
+    stamBar.style.width = `${P.stamina}%`;
+    stamBar.classList.toggle('low', P.stamina < 25);
 
-    // 4. Lampe torche
-    this.$('#flashStatus').textContent = `[F] LAMPE : ${sim.player.flashlight ? 'ON' : 'OFF'}`;
+    // 5. Lampe torche
+    this.$('#flashStatus').textContent = `[F] LAMPE ${P.flashlight ? 'ON' : 'OFF'}`;
 
-    // 5. Objectif
-    const banner = this.$('#objBanner');
-    if (sim.player.cassettesCollected >= 5) {
-      banner.textContent = '🚪 LA SORTIE EST DÉVERROUILLÉE ! FUIS VERS LE NÉON EXIT VERT !';
-      banner.classList.add('unlocked');
-    } else {
-      banner.textContent = `Trouve les 5 cassettes VHS (${sim.player.cassettesCollected}/5) pour déverrouiller la porte de Sortie (EXIT)`;
-      banner.classList.remove('unlocked');
+    // 6. Message passager
+    if (this.toastT > 0) {
+      this.toastT -= dt;
+      if (this.toastT <= 0) this.$('#toast').hidden = true;
     }
+  }
 
-    // 6. Effet de distorsion / glitch VHS selon la proximité du monstre
-    const glitch = this.$('#glitchOverlay');
-    if (sim.monster.danger > 0.05) {
-      glitch.style.opacity = Math.min(0.85, sim.monster.danger * 0.9);
-      glitch.style.transform = `scale(${1 + (Math.random() - 0.5) * sim.monster.danger * 0.08})`;
-    } else {
-      glitch.style.opacity = 0;
-    }
+  toast(text) {
+    const t = this.$('#toast');
+    t.textContent = text;
+    t.hidden = false;
+    this.toastT = 2.5;
   }
 
   showJumpscare() {
     const j = this.$('#jumpscareOverlay');
     j.hidden = false;
+    j.classList.remove('flash');
+    void j.offsetWidth;
     j.classList.add('flash');
     setTimeout(() => {
       j.hidden = true;
-    }, 900);
+    }, 1400);
   }
 
   showEnd(sim, onRestart) {
@@ -131,22 +139,26 @@ export class BackroomsHUD {
     const sub = this.$('#endSubtitle');
     const stats = this.$('#endStats');
 
-    end.hidden = false;
+    // laisser le jumpscare à l'écran avant la carte de fin
+    setTimeout(() => {
+      end.hidden = false;
+    }, sim.state === 'dead' ? 1300 : 300);
 
     if (sim.state === 'won') {
       title.textContent = "TU T'ES ÉCHAPPÉ !";
       title.style.color = '#22c55e';
       sub.textContent = 'Tu as réussi à survivre aux Backrooms et à trouver la sortie.';
-      stats.textContent = `Temps d'évasion : ${sim.time.toFixed(1)} secondes · 5/5 cassettes récupérées`;
+      stats.textContent = `Temps d'évasion : ${formatTime(sim.time)} · 5/5 cassettes récupérées`;
     } else {
       title.textContent = 'TU AS PÉRI';
       title.style.color = '#ef4444';
       sub.textContent = "L'entité t'a rattrapé dans les couloirs infinis...";
-      stats.textContent = `Cassettes trouvées : ${sim.player.cassettesCollected}/5 · Survécu pendant ${sim.time.toFixed(1)} s`;
+      stats.textContent = `Cassettes trouvées : ${sim.player.cassettesCollected}/5 · Survécu pendant ${formatTime(sim.time)}`;
     }
 
     this.$('#btnRestart').onclick = () => {
       end.hidden = true;
+      this.lastCount = -1;
       if (onRestart) onRestart();
     };
   }
@@ -154,4 +166,9 @@ export class BackroomsHUD {
   setPromptVisible(visible) {
     this.$('#clickPrompt').style.display = visible ? 'block' : 'none';
   }
+}
+
+function formatTime(t) {
+  const s = Math.floor(t);
+  return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }

@@ -1,8 +1,10 @@
 // The Backrooms (Level 0) - Génération de la carte du dédale
-// Grille de cases, pièces interconnectées, 5 cassettes VHS et 1 porte de sortie.
+// Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
+// quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 porte de sortie.
 
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
-export const WALL_HEIGHT = 3.2; // hauteur sous plafond
+export const WALL_HEIGHT = 3.0; // hauteur sous plafond
+export const MAP_SIZE = 64;
 
 export const T = {
   EMPTY: 0,
@@ -11,170 +13,213 @@ export const T = {
   EXIT: 3,
 };
 
+// meubles abandonnés (modèles Kenney du manoir) : nom, hauteur en m, rayon de collision
+export const PROP_KINDS = [
+  { m: 'cardboardBoxClosed', h: 0.55, r: 0.35 },
+  { m: 'cardboardBoxOpen', h: 0.5, r: 0.35 },
+  { m: 'chairDesk', h: 1.0, r: 0.3 },
+  { m: 'trashcan', h: 0.55, r: 0.22 },
+  { m: 'desk', h: 0.8, r: 0.6 },
+  { m: 'sideTableDrawers', h: 0.75, r: 0.35 },
+  { m: 'bookcaseClosedDoors', h: 1.9, r: 0.5 },
+];
+
 export function createBackroomsMap(seed = 42) {
-  const W = 28;
-  const H = 28;
+  const W = MAP_SIZE;
+  const H = MAP_SIZE;
   const grid = new Uint8Array(W * H);
-  
-  // Remplir de murs au départ
-  grid.fill(T.WALL);
 
-  // Générateur pseudo-aléatoire simple pour reproductibilité
-  let s = (seed * 9301 + 49297) % 233280;
+  // Générateur pseudo-aléatoire (mulberry32) pour une carte reproductible à partir de la graine
+  let s = (seed >>> 0) || 1;
   const rnd = () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
+  const inside = (x, z) => x > 0 && x < W - 1 && z > 0 && z < H - 1;
   const get = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
   const set = (x, z, val) => {
-    if (x >= 0 && x < W && z >= 0 && z < H) grid[z * W + x] = val;
+    if (inside(x, z)) grid[z * W + x] = val;
   };
 
-  // Creuser un réseau de pièces typique des Backrooms Level 0
-  const rooms = [];
-  const roomCount = 18;
+  // 1. Tout est sol, entouré d'un mur d'enceinte
+  for (let z = 0; z < H; z++) {
+    for (let x = 0; x < W; x++) {
+      grid[z * W + x] = inside(x, z) ? T.FLOOR : T.WALL;
+    }
+  }
 
-  for (let i = 0; i < roomCount; i++) {
-    const rw = 3 + Math.floor(rnd() * 4); // 3 à 6 cases
-    const rh = 3 + Math.floor(rnd() * 4);
-    const rx = 2 + Math.floor(rnd() * (W - rw - 4));
-    const rz = 2 + Math.floor(rnd() * (H - rh - 4));
+  // 2. Grandes salles vides : on n'y pose aucune cloison (les « halls » du Level 0)
+  const halls = [];
+  for (let i = 0; i < 4; i++) {
+    const w = 6 + Math.floor(rnd() * 7);
+    const h = 6 + Math.floor(rnd() * 7);
+    halls.push({ x: 2 + Math.floor(rnd() * (W - w - 4)), z: 2 + Math.floor(rnd() * (H - h - 4)), w, h });
+  }
+  const inHall = (x, z) => halls.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
 
-    rooms.push({ x: rx, z: rz, w: rw, h: rh, cx: rx + Math.floor(rw / 2), cz: rz + Math.floor(rh / 2) });
-
-    for (let z = rz; z < rz + rh; z++) {
-      for (let x = rx; x < rx + rw; x++) {
-        set(x, z, T.FLOOR);
+  // 3. Quadrillage de cloisons tous les 4 cases : chaque pan de mur existe ou non, avec souvent une ouverture
+  const STEP = 4;
+  for (let gz = 0; gz < H; gz += STEP) {
+    for (let gx = 0; gx < W; gx += STEP) {
+      // pilier au croisement
+      if (rnd() < 0.55 && !inHall(gx, gz)) set(gx, gz, T.WALL);
+      // pan horizontal vers l'est, puis pan vertical vers le sud
+      for (const [dx, dz] of [[1, 0], [0, 1]]) {
+        if (rnd() > 0.72) continue;
+        const gap = rnd() < 0.6 ? 1 + Math.floor(rnd() * (STEP - 1)) : -1; // case laissée ouverte
+        for (let k = 0; k <= STEP; k++) {
+          const x = gx + dx * k;
+          const z = gz + dz * k;
+          if (k === gap || inHall(x, z)) continue;
+          set(x, z, T.WALL);
+        }
       }
     }
-    // Occasionnellement ajouter un pilier/colonne centrale typique
-    if (rw >= 4 && rh >= 4 && rnd() < 0.6) {
-      set(rx + Math.floor(rw / 2), rz + Math.floor(rh / 2), T.WALL);
-    }
   }
 
-  // Relier les pièces par des couloirs labyrinthiques
-  for (let i = 0; i < rooms.length - 1; i++) {
-    const r1 = rooms[i];
-    const r2 = rooms[i + 1];
-
-    let cx = r1.cx;
-    let cz = r1.cz;
-
-    while (cx !== r2.cx) {
-      set(cx, cz, T.FLOOR);
-      cx += cx < r2.cx ? 1 : -1;
-    }
-    while (cz !== r2.cz) {
-      set(cx, cz, T.FLOOR);
-      cz += cz < r2.cz ? 1 : -1;
-    }
+  // 4. Quelques piliers isolés au milieu des cases pour casser les lignes de vue
+  for (let i = 0; i < 90; i++) {
+    const x = 2 + Math.floor(rnd() * (W - 4));
+    const z = 2 + Math.floor(rnd() * (H - 4));
+    if (x % STEP && z % STEP && !inHall(x, z)) set(x, z, T.WALL);
   }
 
-  // Ajouter des boucles supplémentaires pour créer un vrai dédale
-  for (let k = 0; k < 12; k++) {
-    const rA = rooms[Math.floor(rnd() * rooms.length)];
-    const rB = rooms[Math.floor(rnd() * rooms.length)];
-    let cx = rA.cx;
-    let cz = rA.cz;
-    while (cx !== rB.cx) {
-      set(cx, cz, T.FLOOR);
-      cx += cx < rB.cx ? 1 : -1;
+  // 5. Point de départ près du centre, sur une case libre reliée à la plus grande partie du dédale
+  let floorCount = 0;
+  for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR) floorCount++;
+  let sx = W >> 1;
+  let sz = H >> 1;
+  let dist = null;
+  for (let r = 0; r < 400; r++) {
+    if (get(sx, sz) === T.FLOOR) {
+      dist = bfs(grid, W, H, sx, sz);
+      let reach = 0;
+      for (let i = 0; i < W * H; i++) if (dist[i] >= 0) reach++;
+      if (reach > floorCount * 0.5) break;
     }
-    while (cz !== rB.cz) {
-      set(cx, cz, T.FLOOR);
-      cz += cz < rB.cz ? 1 : -1;
-    }
+    const spread = 4 + (r >> 4);
+    sx = Math.min(W - 2, Math.max(1, (W >> 1) + Math.floor(rnd() * (spread * 2 + 1)) - spread));
+    sz = Math.min(H - 2, Math.max(1, (H >> 1) + Math.floor(rnd() * (spread * 2 + 1)) - spread));
   }
 
-  // Lister toutes les cases praticables
+  // 6. Parcours en largeur depuis le départ : les poches inaccessibles deviennent des murs, on garde les distances
+  for (let i = 0; i < W * H; i++) {
+    if (grid[i] === T.FLOOR && dist[i] < 0) grid[i] = T.WALL;
+  }
+
   const walkable = [];
   for (let z = 1; z < H - 1; z++) {
     for (let x = 1; x < W - 1; x++) {
-      if (grid[z * W + x] === T.FLOOR) {
-        walkable.push({ x, z });
-      }
+      if (grid[z * W + x] === T.FLOOR) walkable.push({ x, z });
+    }
+  }
+  const D = (c) => dist[c.z * W + c.x];
+  const cellPos = (c) => ({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE, gx: c.x, gz: c.z });
+
+  const spawn = cellPos({ x: sx, z: sz });
+
+  // 7. La sortie : l'une des cases les plus éloignées (en marche) du départ
+  const far = walkable.filter((c) => D(c) > 0).sort((a, b) => D(b) - D(a));
+  const exitCell = far[Math.floor(rnd() * Math.min(20, far.length))];
+  const exit = cellPos(exitCell);
+
+  // 8. Les 5 cassettes : une par secteur autour du départ, loin du départ, de la sortie et entre elles
+  const cassettes = [];
+  const taken = [exitCell];
+  const maxD = D(far[0]) || 1;
+  for (let i = 0; i < 5; i++) {
+    const a0 = (i / 5) * Math.PI * 2;
+    const a1 = ((i + 1) / 5) * Math.PI * 2;
+    const ok = (c, minD) => {
+      let a = Math.atan2(c.z - sz, c.x - sx);
+      if (a < 0) a += Math.PI * 2;
+      return a >= a0 && a < a1 && D(c) > maxD * minD && taken.every((t) => Math.hypot(t.x - c.x, t.z - c.z) > 10);
+    };
+    let candidates = walkable.filter((c) => ok(c, 0.35));
+    if (!candidates.length) candidates = walkable.filter((c) => ok(c, 0.1));
+    if (!candidates.length) candidates = walkable.filter((c) => D(c) > 6 && taken.every((t) => t !== c));
+    const chosen = pick(candidates);
+    taken.push(chosen);
+    cassettes.push({ id: i, ...cellPos(chosen), name: `Cassette VHS #${i + 1}`, collected: false });
+  }
+
+  // 9. Éclairage : un néon par case paire. Un bruit à basse fréquence découpe des zones où les néons sont morts
+  // ou grésillent. Le départ et ses alentours restent éclairés.
+  const ZONE = 8;
+  const zw = Math.ceil(W / ZONE) + 1;
+  const zoneVal = Array.from({ length: zw * zw }, () => rnd());
+  const zone = (x, z) => {
+    // interpolation bilinéaire du bruit de zone
+    const fx = x / ZONE;
+    const fz = z / ZONE;
+    const ix = Math.floor(fx);
+    const iz = Math.floor(fz);
+    const tx = fx - ix;
+    const tz = fz - iz;
+    const v = (a, b) => zoneVal[Math.min(zw - 1, b) * zw + Math.min(zw - 1, a)];
+    return (v(ix, iz) * (1 - tx) + v(ix + 1, iz) * tx) * (1 - tz) + (v(ix, iz + 1) * (1 - tx) + v(ix + 1, iz + 1) * tx) * tz;
+  };
+  const lights = [];
+  for (let z = 1; z < H - 1; z += 2) {
+    for (let x = 1; x < W - 1; x += 2) {
+      if (grid[z * W + x] !== T.FLOOR) continue;
+      const nearSpawn = Math.hypot(x - sx, z - sz) < 7;
+      const v = zone(x, z);
+      let state = 'on';
+      if (!nearSpawn && v < 0.3) state = 'off';
+      else if (!nearSpawn && (v < 0.38 || rnd() < 0.05)) state = 'flicker';
+      lights.push({
+        x: (x + 0.5) * CELL_SIZE,
+        y: WALL_HEIGHT - 0.02,
+        z: (z + 0.5) * CELL_SIZE,
+        gx: x,
+        gz: z,
+        state,
+        flicker: state === 'flicker',
+      });
     }
   }
 
-  // Choisir le point de spawn du joueur (dans la première pièce garantie praticable)
-  set(rooms[0].cx, rooms[0].cz, T.FLOOR);
-  const spawn = {
-    x: (rooms[0].cx + 0.5) * CELL_SIZE,
-    z: (rooms[0].cz + 0.5) * CELL_SIZE,
-    gx: rooms[0].cx,
-    gz: rooms[0].cz,
-  };
-
-  // Choisir l'emplacement de la porte de Sortie (dans la dernière pièce garantie praticable)
-  const farRoom = rooms[rooms.length - 1];
-  set(farRoom.cx, farRoom.cz, T.FLOOR);
-  const exit = {
-    x: (farRoom.cx + 0.5) * CELL_SIZE,
-    z: (farRoom.cz + 0.5) * CELL_SIZE,
-    gx: farRoom.cx,
-    gz: farRoom.cz,
-  };
-
-  // Placer 5 cassettes VHS réparties dans les différents recoins du dédale
-  const cassettes = [];
-  const quadrants = [
-    { minX: 2, maxX: Math.floor(W / 2), minZ: 2, maxZ: Math.floor(H / 2) },
-    { minX: Math.floor(W / 2), maxX: W - 2, minZ: 2, maxZ: Math.floor(H / 2) },
-    { minX: 2, maxX: Math.floor(W / 2), minZ: Math.floor(H / 2), maxZ: H - 2 },
-    { minX: Math.floor(W / 2), maxX: W - 2, minZ: Math.floor(H / 2), maxZ: H - 2 },
-    { minX: Math.floor(W / 3), maxX: Math.floor((2 * W) / 3), minZ: Math.floor(H / 3), maxZ: Math.floor((2 * H) / 3) },
-  ];
-
-  for (let i = 0; i < 5; i++) {
-    const q = quadrants[i];
-    const candidates = walkable.filter(
-      (c) =>
-        c.x >= q.minX &&
-        c.x <= q.maxX &&
-        c.z >= q.minZ &&
-        c.z <= q.maxZ &&
-        Math.hypot(c.x - rooms[0].cx, c.z - rooms[0].cz) > 4
-    );
-
-    const chosen = candidates.length > 0 ? candidates[Math.floor(rnd() * candidates.length)] : walkable[Math.floor(rnd() * walkable.length)];
-    cassettes.push({
-      id: i,
-      gx: chosen.x,
-      gz: chosen.z,
-      x: (chosen.x + 0.5) * CELL_SIZE,
-      z: (chosen.z + 0.5) * CELL_SIZE,
-      name: `Cassette VHS #${i + 1}`,
-      collected: false,
+  // 10. Meubles abandonnés le long des murs et bouteilles d'eau d'amande (elles rendent l'endurance)
+  const props = [];
+  const nearWall = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
+  const busy = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...cassettes.map((c) => c.gz * W + c.gx)]);
+  for (let i = 0; i < 160; i++) {
+    const c = pick(walkable);
+    const k = c.z * W + c.x;
+    const wall = nearWall(c);
+    if (busy.has(k) || !wall || Math.hypot(c.x - sx, c.z - sz) < 3) continue;
+    busy.add(k);
+    const kind = pick(PROP_KINDS);
+    // collé au mur, dos au mur (les modèles ont le dos vers -z)
+    const off = CELL_SIZE / 2 - kind.r - 0.12;
+    const rot = Math.atan2(-wall[0], -wall[1]);
+    props.push({
+      m: kind.m,
+      h: kind.h,
+      r: kind.r,
+      x: (c.x + 0.5) * CELL_SIZE + wall[0] * off + (rnd() - 0.5) * 0.3,
+      z: (c.z + 0.5) * CELL_SIZE + wall[1] * off + (rnd() - 0.5) * 0.3,
+      rot: rot + (kind.m === 'chairDesk' ? (rnd() - 0.5) * 2 : (rnd() - 0.5) * 0.25),
+      tipped: kind.m === 'chairDesk' && rnd() < 0.3,
     });
   }
-
-  // Point de départ du monstre / entité (très éloigné du joueur au départ)
-  let bestDist = 0;
-  let monsterSpawn = walkable[0];
-  for (const c of walkable) {
-    const d = Math.hypot(c.x - rooms[0].cx, c.z - rooms[0].cz);
-    if (d > bestDist) {
-      bestDist = d;
-      monsterSpawn = c;
-    }
+  const bottles = [];
+  for (let i = 0; i < 40 && bottles.length < 9; i++) {
+    const c = pick(walkable);
+    const k = c.z * W + c.x;
+    if (busy.has(k) || D(c) < 8) continue;
+    busy.add(k);
+    bottles.push({ id: bottles.length, ...cellPos(c), taken: false });
   }
 
-  // Emplacement des néons / lumières au plafond
-  const lights = [];
-  for (let z = 2; z < H - 2; z += 3) {
-    for (let x = 2; x < W - 2; x += 3) {
-      if (grid[z * W + x] === T.FLOOR) {
-        lights.push({
-          x: (x + 0.5) * CELL_SIZE,
-          y: WALL_HEIGHT - 0.2,
-          z: (z + 0.5) * CELL_SIZE,
-          flicker: rnd() < 0.2, // 20% des néons grésillent/scintillent
-        });
-      }
-    }
-  }
+  // 11. Point de départ de l'entité : loin du joueur, mais pas forcément au bout de la carte
+  const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || far[0];
 
   return {
     W,
@@ -185,12 +230,10 @@ export function createBackroomsMap(seed = 42) {
     exit,
     cassettes,
     lights,
-    monsterSpawn: {
-      x: (monsterSpawn.x + 0.5) * CELL_SIZE,
-      z: (monsterSpawn.z + 0.5) * CELL_SIZE,
-      gx: monsterSpawn.x,
-      gz: monsterSpawn.z,
-    },
+    props,
+    bottles,
+    dist,
+    monsterSpawn: cellPos(monsterCell),
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
       return grid[gz * W + gx] === T.WALL;
@@ -201,4 +244,29 @@ export function createBackroomsMap(seed = 42) {
       return !this.isWall(gx, gz);
     },
   };
+}
+
+// distances en cases depuis (sx, sz), -1 si inaccessible
+function bfs(grid, W, H, sx, sz) {
+  const dist = new Int32Array(W * H).fill(-1);
+  const queue = new Int32Array(W * H);
+  let head = 0;
+  let tail = 0;
+  dist[sz * W + sx] = 0;
+  queue[tail++] = sz * W + sx;
+  while (head < tail) {
+    const k = queue[head++];
+    const x = k % W;
+    const z = (k - x) / W;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const nz = z + dz;
+      if (nx < 0 || nx >= W || nz < 0 || nz >= H) continue;
+      const nk = nz * W + nx;
+      if (dist[nk] >= 0 || grid[nk] === T.WALL) continue;
+      dist[nk] = dist[k] + 1;
+      queue[tail++] = nk;
+    }
+  }
+  return dist;
 }

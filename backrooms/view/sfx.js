@@ -266,6 +266,58 @@ export class BackroomsSfx {
     osc.stop(t + 0.75);
   }
 
+  // Gorgée d'eau d'amande
+  bottle() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      const t0 = t + i * 0.13;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, t0);
+      osc.frequency.exponentialRampToValueAtTime(180, t0 + 0.1);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.12, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.11);
+      osc.connect(g);
+      g.connect(c.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.12);
+    }
+  }
+
+  // L'entité vient de repérer le joueur : coup sourd et grincement
+  spotted() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const low = c.createOscillator();
+    const lg = c.createGain();
+    low.type = 'sine';
+    low.frequency.setValueAtTime(70, t);
+    low.frequency.exponentialRampToValueAtTime(32, t + 0.9);
+    lg.gain.setValueAtTime(0.45, t);
+    lg.gain.exponentialRampToValueAtTime(0.001, t + 1);
+    low.connect(lg);
+    lg.connect(c.destination);
+    low.start(t);
+    low.stop(t + 1.05);
+    const hi = c.createOscillator();
+    const hg = c.createGain();
+    hi.type = 'sawtooth';
+    hi.frequency.setValueAtTime(1900, t);
+    hi.frequency.linearRampToValueAtTime(2300, t + 0.6);
+    hg.gain.setValueAtTime(0.0001, t);
+    hg.gain.linearRampToValueAtTime(0.05, t + 0.05);
+    hg.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    hi.connect(hg);
+    hg.connect(c.destination);
+    hi.start(t);
+    hi.stop(t + 0.75);
+  }
+
   // Victoire
   win() {
     if (!this.unlocked || !this.ctx) return;

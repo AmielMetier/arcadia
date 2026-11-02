@@ -4,10 +4,14 @@ import { findPath, hasLineOfSight } from './nav.js';
 
 export const DT = 1 / 60;
 export const PLAYER_RADIUS = 0.38;
-export const WALK_SPEED = 3.6;
-export const SPRINT_SPEED = 6.2;
-export const MONSTER_PATROL_SPEED = 2.8;
-export const MONSTER_CHASE_SPEED = 5.2;
+// On avance lentement dans les Backrooms : la carte est immense et chaque pas compte
+export const WALK_SPEED = 2.1;
+export const SPRINT_SPEED = 3.7;
+export const MONSTER_PATROL_SPEED = 1.5;
+export const MONSTER_CHASE_SPEED = 2.75;
+export const STAMINA_DRAIN = 15; // par seconde de course
+export const STAMINA_REGEN = 9;
+export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entité ne le perde
 
 export class BackroomsSim {
   constructor({ map, difficulty = 'normal', seed = 42 } = {}) {
@@ -30,6 +34,9 @@ export class BackroomsSim {
       flashlight: true,
       cassettesCollected: 0,
       collectedIds: new Set(),
+      bottles: 0,
+      signal: 0, // 0 à 1 : force du signal de la cassette la plus proche (affiché par la caméra)
+      moving: false,
     };
 
     // Entité / PNJ
@@ -50,11 +57,12 @@ export class BackroomsSim {
       danger: 0, // 0.0 à 1.0 (intensité du bourdonnement)
       pan: 0, // -1.0 (gauche) à +1.0 (droite)
       hasLineOfSight: false,
+      unseenT: 0,
     };
 
     // Ajuster vitesse selon la difficulté
     if (difficulty === 'hard') {
-      this.monsterChaseSpeed = MONSTER_CHASE_SPEED * 1.15;
+      this.monsterChaseSpeed = MONSTER_CHASE_SPEED * 1.2;
     } else {
       this.monsterChaseSpeed = MONSTER_CHASE_SPEED;
     }
@@ -115,6 +123,11 @@ export class BackroomsSim {
         }
       }
     }
+    // meubles abandonnés (cercles)
+    for (const pr of this.map.props || []) {
+      const rr = radius + pr.r;
+      if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
+    }
     return false;
   }
 
@@ -135,10 +148,10 @@ export class BackroomsSim {
     const wantRun = !!input.run && (input.mx !== 0 || input.my !== 0);
     if (wantRun && this.player.stamina > 5) {
       this.player.running = true;
-      this.player.stamina = Math.max(0, this.player.stamina - DT * 22);
+      this.player.stamina = Math.max(0, this.player.stamina - DT * STAMINA_DRAIN);
     } else {
       this.player.running = false;
-      this.player.stamina = Math.min(100, this.player.stamina + DT * 14);
+      this.player.stamina = Math.min(100, this.player.stamina + DT * STAMINA_REGEN);
     }
 
     // 3. Déplacement du joueur
@@ -146,9 +159,10 @@ export class BackroomsSim {
     const mx = input.mx || 0;
     const my = input.my || 0;
 
+    this.player.moving = mx !== 0 || my !== 0;
     if (mx !== 0 || my !== 0) {
       const len = Math.hypot(mx, my) || 1;
-      const nர்களின்X = mx / len;
+      const normX = mx / len;
       const normY = my / len;
 
       // Calculer le vecteur monde basé sur yaw
@@ -157,8 +171,8 @@ export class BackroomsSim {
       const rightX = Math.cos(this.player.yaw);
       const rightZ = -Math.sin(this.player.yaw);
 
-      const moveX = (forwardX * normY + rightX * nர்களின்X) * speed * DT;
-      const moveZ = (forwardZ * normY + rightZ * nர்களின்X) * speed * DT;
+      const moveX = (forwardX * normY + rightX * normX) * speed * DT;
+      const moveZ = (forwardZ * normY + rightZ * normX) * speed * DT;
 
       const pos = this.moveWithCollisions(this.player.x, this.player.z, moveX, moveZ);
       this.player.x = pos.x;
@@ -186,6 +200,24 @@ export class BackroomsSim {
         }
       }
     }
+
+    // 4b. Eau d'amande : remplit l'endurance
+    for (const b of this.map.bottles || []) {
+      if (!b.taken && Math.hypot(b.x - this.player.x, b.z - this.player.z) < 1.1) {
+        b.taken = true;
+        this.player.bottles++;
+        this.player.stamina = 100;
+        this.emit({ type: 'bottle', id: b.id });
+      }
+    }
+
+    // 4c. Signal de la cassette la plus proche (à vol d'oiseau, 0 au-delà de 45 m)
+    let best = Infinity;
+    for (const cas of this.map.cassettes) {
+      if (!cas.collected) best = Math.min(best, Math.hypot(cas.x - this.player.x, cas.z - this.player.z));
+    }
+    if (this.player.cassettesCollected >= 5) best = Math.hypot(this.map.exit.x - this.player.x, this.map.exit.z - this.player.z);
+    this.player.signal = best === Infinity ? 0 : Math.max(0, 1 - best / 45);
 
     // 5. Condition de Victoire : Atteindre la sortie après avoir les 5 cassettes
     if (this.player.cassettesCollected >= 5) {
@@ -240,19 +272,28 @@ export class BackroomsSim {
     // - Vue directe jusqu'à 20 mètres
     // - Bruit si le joueur court jusqu'à 14 mètres
     // - Présence rapprochée (< 6 mètres)
-    const canSee = M.hasLineOfSight && dist < 22;
-    const canHear = P.running && dist < 14;
-    const isNearby = dist < 6.5;
+    // - Vue directe jusqu'à 24 mètres (moins si la lampe est éteinte)
+    // - Bruit de course jusqu'à 12 mètres
+    // - Présence rapprochée (< 4 mètres)
+    const sight = P.flashlight ? 24 : 15;
+    const canSee = M.hasLineOfSight && dist < sight;
+    const canHear = P.running && dist < 12;
+    const isNearby = dist < 4;
 
     if (canSee || canHear || isNearby) {
+      if (M.mode !== 'chase') this.emit({ type: 'spotted' });
       M.mode = 'chase';
+      M.unseenT = 0;
       M.lastSeenX = P.x;
       M.lastSeenZ = P.z;
       M.speed = this.monsterChaseSpeed;
-    } else if (M.mode === 'chase' && dist > 26) {
-      // Le joueur a réussi à semer le monstre
-      M.mode = 'search';
-      M.speed = MONSTER_PATROL_SPEED * 1.2;
+    } else if (M.mode === 'chase') {
+      // Hors de vue : au bout de quelques secondes, le joueur l'a semé
+      M.unseenT += DT;
+      if (M.unseenT > LOSE_TRACK_T) {
+        M.mode = 'search';
+        M.speed = MONSTER_PATROL_SPEED * 1.3;
+      }
     }
 
     // Recalcul de trajectoire
@@ -265,7 +306,10 @@ export class BackroomsSim {
 
       if (M.mode === 'patrol') {
         if (!M.targetWander || Math.hypot(M.x - M.targetWander.x, M.z - M.targetWander.z) < 1.5) {
-          const randCell = this.map.walkable[Math.floor(Math.random() * this.map.walkable.length)];
+          // L'entité rôde : une fois sur deux, elle choisit un point non loin du joueur
+          const near = Math.random() < 0.5 ? this.map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28) : [];
+          const pool = near.length ? near : this.map.walkable;
+          const randCell = pool[Math.floor(Math.random() * pool.length)];
           M.targetWander = {
             x: (randCell.x + 0.5) * CELL_SIZE,
             z: (randCell.z + 0.5) * CELL_SIZE,

@@ -65,6 +65,7 @@ function initGame(settings = {}) {
     scene = createBackroomsScene(stageEl, map);
   } else {
     // Nettoyer ancienne scène si restart
+    scene.dispose();
     stageEl.innerHTML = '';
     scene = createBackroomsScene(stageEl, map);
   }
@@ -129,7 +130,7 @@ function loop(currentTime) {
     if (sim.state === 'playing') {
       const moved = Math.hypot(sim.player.x - oldX, sim.player.z - oldZ);
       stepDist += moved;
-      const stepInterval = sim.player.running ? 1.7 : 1.35;
+      const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
         if (sfx) sfx.step();
@@ -143,6 +144,11 @@ function loop(currentTime) {
         if (sfx) sfx.cassette();
       } else if (ev.type === 'exitUnlocked') {
         if (sfx) sfx.exitUnlocked();
+      } else if (ev.type === 'bottle') {
+        if (sfx) sfx.bottle();
+        if (hud) hud.toast("Eau d'amande : endurance au maximum");
+      } else if (ev.type === 'spotted') {
+        if (sfx) sfx.spotted();
       } else if (ev.type === 'jumpscare') {
         if (sfx) sfx.jumpscare();
         if (hud) hud.showJumpscare();
@@ -181,8 +187,13 @@ function loop(currentTime) {
     scene.render(sim, currentTime / 1000);
   }
   if (hud) {
-    hud.update(sim, sim.time);
+    hud.update(sim, sim.time, delta);
   }
+}
+
+// ?debug : accès à la partie depuis la console (tests)
+if (/[?&]debug(&|=|$)/.test(location.search)) {
+  window.__br = { get sim() { return sim; }, get scene() { return scene; }, keys, frame: (t) => loop(t) };
 }
 
 // Initialisation HubBridge ou Solo
