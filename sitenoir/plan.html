@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Noir : plan</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0d10; color: #e8e6df; font: 600 13px/1.35 system-ui, sans-serif; display: flex; flex-wrap: wrap; gap: 12px; padding: 10px; box-sizing: border-box; }
+  canvas { background: #000; border-radius: 8px; max-width: 100%; height: auto; }
+  aside { flex: 1 1 240px; min-width: 240px; max-width: 420px; }
+  h1 { font-size: 18px; margin: 0 0 6px; color: #e6483d; letter-spacing: 1px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; }
+  button { font: inherit; color: inherit; background: #23272e; border: 1px solid #3a4048; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+  button.on { background: #e6483d; border-color: #e6483d; color: #fff; }
+  #st { white-space: pre-wrap; background: #14171b; border-radius: 8px; padding: 8px; }
+  #log { height: 230px; overflow: auto; background: #14171b; border-radius: 8px; padding: 8px; margin-top: 8px; font-weight: 500; }
+  #log div { border-bottom: 1px solid #1f2329; padding: 1px 0; }
+  .lg i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin: 0 3px 0 8px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="912" height="768"></canvas>
+<aside>
+  <h1>SITE NOIR · plan</h1>
+  <div class="row" id="speeds"></div>
+  <div class="row"><button id="again">Nouvelle partie</button><button id="lvl"></button></div>
+  <div id="st"></div>
+  <div class="lg"><i style="background:#2d4f3a"></i>Avant-poste<i style="background:#3d3a2c"></i>Aile A<i style="background:#352a3e"></i>Aile B<i style="background:#23343f"></i>Sous-sol<i style="background:#4a4a22"></i>Extraction</div>
+  <div id="log"></div>
+</aside>
+<script type="module">
+// Le complexe vu de dessus, avec une partie entre bots en direct : pour voir la carte et régler le rythme (?seed=12&level=expert&speed=8).
+import { Sim, DT, ITEMS } from './engine/sim.js';
+import { T, Z, W, H, ZONE_NAMES, zoneAt } from './engine/map.js';
+const QS = new URLSearchParams(location.search), $ = (s) => document.querySelector(s);
+const c = $('#c'), g = c.getContext('2d'), S = 12;
+const ZC = { 0: '#000', [Z.OUTPOST]: '#2d4f3a', [Z.A]: '#3d3a2c', [Z.B]: '#352a3e', [Z.SOUS]: '#23343f', [Z.CABINE]: '#555', [Z.PAD]: '#4a4a22' };
+const LV = ['facile', 'normal', 'expert'];
+let level = LV.includes(QS.get('level')) ? QS.get('level') : 'normal', speed = +QS.get('speed') || 8, seed = +QS.get('seed') || (Math.random() * 1e6) | 0, sim, logN = 0;
+const log = (m) => { const el = $('#log'), d = document.createElement('div'); d.textContent = `${clock(sim.w.t)}  ${m}`; el.prepend(d); };
+const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const NAMES = ['Ana', 'Bilal', 'Chloé', 'Dario'];
+function start() {
+  sim = new Sim({ seed, level, duration: +QS.get('duree') || undefined });
+  NAMES.forEach((name, i) => sim.addPlayer({ id: i + 1, name, color: ['#4ea8ff', '#ffc531', '#5cd67f', '#ff7ab8'][i], bot: true }));
+  sim.addPlayer({ id: 9, name: 'Le monstre', color: '#ff2a2a', bot: true, role: 'm' });
+  $('#log').innerHTML = '';
+  $('#lvl').textContent = `Bots : ${level}`;
+  log(`Graine ${seed}`);
+}
+const who = (id) => sim.byId.get(id)?.name ?? '?';
+function onEvent(e) {
+  switch (e.e) {
+    case 'unlock': log(`🔓 ${who(e.by)} ouvre ${sim.M.doors[e.id].name}`); break;
+    case 'proof': log(`🧾 ${who(e.id)} : preuve (${e.kind})`); break;
+    case 'down': log(`🩸 ${who(e.id)} est à terre`); break;
+    case 'dead': log(`💀 ${who(e.id)} est mort`); break;
+    case 'revive': log(`🤝 ${who(e.by)} relève ${who(e.id)}`); break;
+    case 'gen': log('⚡ Générateur relancé'); break;
+    case 'lift': if (e.k === 'call') log('🛗 Ascenseur appelé'); else if (e.k === 'up') log('🛗 La cabine monte'); break;
+    case 'extract': log(`🚁 ${who(e.id)} est extrait`); break;
+    case 'stun': log(`📸 ${who(e.by)} sonne le monstre`); break;
+    case 'wake': log('👁️ Le monstre sort de sa cage'); break;
+    case 'dark': log(`🌑 Noir : ${ZONE_NAMES[e.zone]}`); break;
+    case 'jam': log(`🔒 Porte bloquée : ${sim.M.doors[e.id].name}`); break;
+    case 'over': log(e.win === 's' ? '🏁 Les enquêteurs gagnent' : '🏁 Le monstre gagne'); break;
+    case 'part': log(`⚙️ ${who(e.id)} : pièce trouvée`); break;
+    case 'found': log(`🗃️ ${who(e.id)} trouve : ${e.what}`); break;
+  }
+}
+function draw() {
+  const { M, w } = sim;
+  g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+    const i = z * W + x, t = M.t[i];
+    if (t === T.WALL) continue;
+    g.fillStyle = t === T.FENCE ? '#555' : ZC[M.zone[i]] || '#222';
+    g.fillRect(x * S, z * S, S, S);
+    if (t === T.PROP) { g.fillStyle = 'rgba(255,255,255,.17)'; g.fillRect(x * S + 1, z * S + 1, S - 2, S - 2); }
+  }
+  for (const r of M.ramps) { g.fillStyle = 'rgba(120,190,255,.16)'; g.fillRect(r.x0 * S, r.z0 * S, (r.x1 - r.x0) * S, (r.z1 - r.z0) * S); }
+  const px = (x) => x * S;
+  g.font = '700 10px system-ui'; g.fillStyle = 'rgba(255,255,255,.55)'; g.textAlign = 'center';
+  for (const r of M.rooms) g.fillText(r.name, px(r.cx), px(r.cz));
+  for (const l of M.lights) { const off = w.dark[l.zone]; g.fillStyle = off ? '#222' : l.kind === 'rouge' ? '#f33' : l.kind === 'ambre' ? '#fa3' : l.kind === 'projecteur' ? '#fff' : '#f85'; g.fillRect(px(l.x) - 1, px(l.z) - 1, 3, 3); }
+  for (const l of M.lockers) { g.fillStyle = '#6d8'; g.fillRect(px(l.x) - 3, px(l.z) - 3, 6, 6); }
+  M.doors.forEach((d, i) => {
+    const st = w.doors[i];
+    g.fillStyle = st.jam > 0 ? '#f0f' : st.open ? 'rgba(120,255,120,.35)' : d.key && !st.unlocked ? (d.key === 'bleu' ? '#39f' : '#f90') : '#ddd';
+    for (const c2 of d.cells) g.fillRect((c2 % W) * S + 1, ((c2 / W) | 0) * S + 1, S - 2, S - 2);
+  });
+  for (const t of w.traces) { g.strokeStyle = t.done ? '#444' : '#7f6'; g.beginPath(); g.arc(px(t.x), px(t.z), 5, 0, 7); g.stroke(); }
+  g.font = '12px system-ui';
+  for (const it of w.items) { g.fillText(it.k === 'preuve' ? '🧾' : ITEMS[it.k]?.icon || '📦', px(it.x), px(it.z) + 4); }
+  for (const cam of w.cams) { g.fillText('🎥', px(cam.x), px(cam.z) + 4); }
+  g.font = '700 11px system-ui';
+  for (const p of sim.players) {
+    if (p.st === 'out') continue;
+    const x = px(p.x), z = px(p.z), m = p.role === 'm';
+    if (p.st === 'ok' && p.torch) { g.fillStyle = 'rgba(255,240,180,.16)'; g.beginPath(); g.moveTo(x, z); g.arc(x, z, 70, -p.yaw - Math.PI / 2 - 0.35, -p.yaw - Math.PI / 2 + 0.35); g.fill(); }
+    if (p.ai?.path && p.st === 'ok') { g.strokeStyle = p.color + '55'; g.beginPath(); g.moveTo(x, z); for (let k = p.ai.pi; k < p.ai.path.length; k++) g.lineTo((p.ai.path[k] % W + 0.5) * S, (((p.ai.path[k] / W) | 0) + 0.5) * S); g.stroke(); }
+    g.globalAlpha = p.st === 'dead' ? 0.4 : 1;
+    g.fillStyle = p.color; g.beginPath(); g.arc(x, z, m ? 7 : 5, 0, 7); g.fill();
+    if (p.st === 'down') { g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); g.lineWidth = 1; }
+    g.fillStyle = '#fff'; g.fillText(p.st === 'dead' ? '💀' : p.name[0], x, z + (m ? 18 : 15));
+    g.globalAlpha = 1;
+  }
+  const L = w.lift;
+  $('#st').textContent = `Temps ${clock(w.t)} · reste ${clock(Math.max(0, w.tl))}\nGénérateur ${Math.floor(w.gen)} %${w.parts !== undefined ? ` · pièces ${w.parts}/${w.partsNeed}` : ''}\nAscenseur : ${w.genOn ? L.state === 'moving' ? 'en route' : L.at === 'top' ? 'en haut' : 'en bas' : 'sans courant'}\nPreuves de l'équipe : ${sim.teamProofs()} (extraites : ${w.banked})\nBlocages de bots : ${sim.botStuck || 0}\n\n` +
+    sim.players.map((p) => `${p.name.padEnd(11)} ${p.role === 'm' ? (p.wake > 0 ? `en cage ${Math.ceil(p.wake)} s` : p.ai?.tag || '') : `${p.st === 'ok' ? `${Math.round(p.hp)} PV` : p.st} ${p.inv.filter(Boolean).map((s) => ITEMS[s.k].icon).join('')} ${p.proofs ? '🧾' + p.proofs : ''} ${p.st === 'ok' ? p.ai?.tag || '' : ''}`}`).join('\n') +
+    (w.ph === 'over' ? `\n\n${w.win === 's' ? 'LES ENQUÊTEURS GAGNENT' : 'LE MONSTRE GAGNE'} en ${clock(w.t)}` : '');
+}
+let last = performance.now(), acc = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  acc += Math.min(0.1, (now - last) / 1000) * speed; last = now;
+  let n = 0;
+  while (acc >= DT && n++ < 2000) { acc -= DT; sim.step(DT); sim.drainEvents().forEach(onEvent); }
+  draw();
+}
+for (const v of [1, 4, 8, 16, 32]) { const b = document.createElement('button'); b.textContent = `×${v}`; b.className = v === speed ? 'on' : ''; b.onclick = () => { speed = v; document.querySelectorAll('#speeds button').forEach((q) => q.classList.remove('on')); b.classList.add('on'); }; $('#speeds').append(b); }
+$('#again').onclick = () => { seed = (Math.random() * 1e6) | 0; start(); };
+$('#lvl').onclick = () => { level = LV[(LV.indexOf(level) + 1) % 3]; start(); };
+start();
+window.__plan = { get sim() { return sim; }, draw };
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

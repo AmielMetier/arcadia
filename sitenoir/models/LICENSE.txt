@@ -1,0 +1,39 @@
+Modèles 3D de Site Noir, téléchargés sur Poly Pizza (https://poly.pizza).
+
+Domaine public (CC0)
+  animhuman    Quaternius        https://poly.pizza/m/c3Ibh9I3udk
+  desk         Quaternius        https://poly.pizza/m/V86Go2rlnq
+  chair        Quaternius        https://poly.pizza/m/UfKvrZBK6C
+  bunk         Quaternius        https://poly.pizza/m/XpysaEDXJQ
+  shelftall    Quaternius        https://poly.pizza/m/TDgvIuorcX
+  crate        Quaternius        https://poly.pizza/m/3VGWnZPXmG
+  fence        Quaternius        https://poly.pizza/m/qWKhREFj7H
+  keycard      Quaternius        https://poly.pizza/m/EDvCEBvs8k
+  key          Quaternius        https://poly.pizza/m/bg6e1lfNsO
+  lightceiling Quaternius        https://poly.pizza/m/S3HkX8iTl2
+  pipes        Quaternius        https://poly.pizza/m/GB6AFkoiZb
+  watertank    Quaternius        https://poly.pizza/m/xgsh3kWbAM
+  couch        Quaternius        https://poly.pizza/m/ZOPP3KzNIk
+  gastank      Quaternius        https://poly.pizza/m/RoCvKBGkoC
+  bed          Kenney            https://poly.pizza/m/sn8az3odMR
+  spotlight    iPoly3D           https://poly.pizza/m/eaQqgLn0oJ
+
+Creative Commons Attribution 3.0 (CC-BY 3.0), https://creativecommons.org/licenses/by/3.0/
+  hazmat       Charlie           https://poly.pizza/m/y2ygMH3VYx
+  generator    KolosStudios      https://poly.pizza/m/K58RQ63qR5
+  locker       J-Toastie         https://poly.pizza/m/aGmZ4jQD2y
+  seccam       J-Toastie         https://poly.pizza/m/a6J7IDufQP
+  filecabinet  J-Toastie         https://poly.pizza/m/9732ObD3OY
+  labdesk      Colonel Cthulu    https://poly.pizza/m/6KxaD6I6I48
+  computer     Poly by Google    https://poly.pizza/m/2EHvZLax4Y3
+  metaldoor    dook              https://poly.pizza/m/H3BYbNwq8a
+  vending      dook              https://poly.pizza/m/yNG4vqWVq0
+  storageshelf Jarlan Perez      https://poly.pizza/m/6gKdASmfB9U
+  scificrate   Nick Slough       https://poly.pizza/m/l6YIg14bt6
+  flashlight   Bruno Oliveira    https://poly.pizza/m/8t1DZLLvofk
+  battery      Bruno Oliveira    https://poly.pizza/m/9gnjbN0VUUn
+  oildrum      Zsky              https://poly.pizza/m/TLsXd9efLC
+  labequip     matt bower        https://poly.pizza/m/fSWYfMERNak
+  foldtable    S. Paul Michael   https://poly.pizza/m/96Vhd1riedz
+
+Modèles retaillés et assombris dans le jeu (matériaux, saleté, éclairage).

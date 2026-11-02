@@ -142,6 +142,16 @@ bots jusqu'à 30, 45 ou 60 places. Montgolfière, chute libre et deltaplane, but
 - `royale/carte.html` : aperçu 2D de l'île (plans des bâtiments étage par étage, tempête, trajet de la montgolfière)
 - Modèles 3D de [Kenney](https://kenney.nl) (CC0) dans `royale/models/` ; arbres, terrain, eau et ciel repris de Birdie Party
 
+## Site Noir
+
+Horreur asymétrique à la première personne (`sitenoir/`) : un monstre contre trois ou quatre enquêteurs, environ 15 minutes.
+
+- Enquêteurs : badge bleu (aile A), clé des machines (aile B), trois fusibles, générateur, ascenseur, extraction avec au moins une preuve. Monstre : les éliminer tous avant.
+- Moteur (`sitenoir/engine/`, sans DOM) : carte en grille (`map.js`), règles et réseau (`sim.js`), bots des deux camps (`bots.js`).
+- Réseau (`sitenoir/app.js`) : pas de serveur de jeu, l'hôte simule à 60 Hz via le relais du Hub. Il envoie 20 états de joueurs par seconde et le reste du monde quand il change ; l'invité anticipe son propre pas, se recale sur l'hôte et voit les autres ~100 ms en retard. Si l'hôte part, un invité reprend, et un bot remplace chaque joueur parti. `?debug` expose `__sitenoir.run(2)` ; `?autostart`, `?role=m|s`, `?seed`, `?lag=150`, `?q=bas`.
+- Image (`sitenoir/view/scene.js`, `post.js`, `textures.js`) : matériaux peints au canvas (couleur, relief, brillance), ombres de contact cuites dans les sommets, empreinte de lampe avec ombres, halo, exposition qui s'habitue au noir. Grain VHS et caméra tenue à la main pour les enquêteurs, vision de nuit pour le monstre. La définition baisse d'elle-même si la machine peine.
+- Modèles : Poly Pizza, crédits dans `sitenoir/models/LICENSE.txt`. Sons synthétisés (WebAudio).
+
 ## Mollo !
 
 Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la manche, le premier à N manches gagne la partie.
@@ -169,6 +179,7 @@ Bagarre de pantins mous au-dessus du vide (`mollo/`). Le dernier debout gagne la
   `node tools/test-bastion.mjs` teste le moteur de Bastion Clash ; `node tools/bench-bastion.mjs` mesure ses performances avec 4 bots ;
   `node tools/test-royale.mjs` teste l'île d'Island Rush (plusieurs graines), le déplacement, une partie, le réseau et la prédiction ;
   `node tools/bench-royale.mjs` y fait jouer une partie entière entre bots ;
+  `node tools/test-sitenoir.mjs` teste le moteur de Site Noir (carte, clés, générateur, ascenseur, coups, extraction, copies des invités, relais d'hôte, parties entières entre bots).
   `node tools/test-mollo.mjs` teste le moteur de Mollo ! (arènes et pièges, objets, collisions, marche, coups, KO, prises, rebords, parties entières entre bots, reprise d'hôte).
 - Serveur relais (`server/server.js`, à redéployer quand il change) : `/status` donne les salons et les pics de trafic
   (`maxFrame`, `peakMsgs`, `peakBytes`) ; la lecture des logs (`GET /api/logs`) demande la variable d'environnement

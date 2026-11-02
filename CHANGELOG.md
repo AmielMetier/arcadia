@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.56 — 2 novembre 2026
+- **Site Noir** — nouveau jeu : de l'horreur à la première personne, un monstre contre trois ou quatre enquêteurs, en 15 minutes environ
+  - Enquêteurs : une lampe, une batterie, trois cases. Fouillez les meubles pour trouver le badge, la clé et les fusibles, relancez le générateur, prenez l'ascenseur et remontez avec au moins une preuve.
+  - Preuves : photographie le monstre (le flash l'aveugle un instant) ou passe le capteur EMF sur les traces.
+  - Monstre : tu vois dans le noir, les corps chauds brillent, tu entends les bruits autour du viseur, tu coupes les lumières, bloques les portes, casses les caméras et sabotes le générateur.
+  - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
+  - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
+
 ## 3.54 — 2 novembre 2026
 - **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.
   - En parlant à un autre joueur : échanger, combattre, ou voir sa fiche (badges, Pokédex, temps de jeu et équipe).

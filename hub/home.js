@@ -10,7 +10,7 @@
 
   /* ------------------------------------------------ vitrine */
   // ordre de la vitrine : les plus spectaculaires d'abord
-  const ORDER = ['royale', 'mollo', 'kart', 'minigolf', 'bastion', 'odyssee', 'golf', 'david', 'outbreak', 'filrouge', 'drift', 'convoy', 'calcul', 'pokemon'];
+  const ORDER = ['royale', 'sitenoir', 'mollo', 'kart', 'minigolf', 'bastion', 'odyssee', 'golf', 'david', 'outbreak', 'filrouge', 'drift', 'convoy', 'calcul', 'pokemon'];
   const feat = ORDER.map((id) => GAMES.find((g) => g.id === id)).filter(Boolean);
   const spot = $('#spot');
   let idx = 0, timer = 0, paused = false;
