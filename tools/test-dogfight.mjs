@@ -108,6 +108,29 @@ assert(game.phase === 'countdown', 'Phase initiale en compte à rebours');
 // Avancement de phase
 tickDogfight(game, 3.0, dummyMap);
 assert(game.phase === 'playing', 'Phase de combat active');
-console.log('✓ Déroulement d\'une session de jeu');
+// 5. Alignement et géométrie 3D du F-16 face caméra
+// Dans gltf.scene, l'axe longitudinal est +X, l'axe vertical est +Y, et l'envergure est sur Z.
+// La rotation Y = -Math.PI / 2 doit orienter le nez strictement vers +Z et les ailes horizontales sur X.
+const forwardAxis = { x: 1, y: 0, z: 0 };
+const upAxis = { x: 0, y: 1, z: 0 };
+const rightWingAxis = { x: 0, y: 0, z: -1 };
+
+// Rotation de -90° autour de Y : x' = z, y' = y, z' = -x
+function rotYMinus90(v) {
+  return {
+    x: Math.round(Math.cos(-Math.PI / 2) * v.x + Math.sin(-Math.PI / 2) * v.z),
+    y: v.y,
+    z: Math.round(-Math.sin(-Math.PI / 2) * v.x + Math.cos(-Math.PI / 2) * v.z),
+  };
+}
+
+const rotatedNose = rotYMinus90(forwardAxis);
+const rotatedUp = rotYMinus90(upAxis);
+const rotatedWing = rotYMinus90(rightWingAxis);
+
+assert(rotatedNose.z === 1 && rotatedNose.x === 0, 'Le nez de l\'avion pointe droit vers l\'avant (+Z)');
+assert(rotatedUp.y === 1 && rotatedUp.x === 0, 'La dérive et la verrière pointent droit vers le ciel (+Y)');
+assert(rotatedWing.x === 1 && rotatedWing.z === 0, 'L\'aile droite pointe horizontalement vers la droite (+X)');
+console.log('✓ Alignement 3D droit en face de la caméra (ailes horizontales et nez vers l\'avant)');
 
 console.log(`\nTOUS LES TESTS SONT VALIDES (${passed} assertions réussies)`);

@@ -18,27 +18,22 @@ export function preloadF16Model() {
       (gltf) => {
         const root = gltf.scene;
 
-        // Alignement géométrique précis du F-16 GLB :
-        // Le modèle source a :
-        // - l'axe longitudinal (moteur -> nez) sur [0.986, 0, 0.165] (incliné de 9.5°)
-        // - l'axe vertical (ventre -> cockpit/dérive) sur [0.165, 0, -0.986] (dorsal = -Z)
-        // - l'axe d'envergure (aile gauche -> aile droite) sur [0, 1, 0]
-        // On applique la rotation orthogonale exacte pour aligner :
-        // - Nez strictement vers +Z (direction de vol)
+        // Alignement géométrique exact du F-16 GLB :
+        // Le modèle Three.js issu de Sketchfab a son axe longitudinal (moteur -> nez) sur +X,
+        // son axe vertical (ventre -> cockpit/dérive) vers +Y,
+        // et son envergure d'ailes sur l'axe Z (aile droite vers -Z, aile gauche vers +Z).
+        // Une simple rotation de -90° autour de l'axe vertical Y aligne l'avion parfaitement droit :
+        // - Nez strictement vers +Z (devant, en face de la caméra et droit vers le réticule)
         // - Cockpit et dérive strictement vers +Y (vers le ciel)
-        // - Aile droite vers +X (droite)
+        // - Aile droite vers +X (droite) et aile gauche vers -X (gauche)
+        // - Tuyère d'échappement vers -Z (vers la caméra de poursuite)
         const pivot = new THREE.Group();
+        root.rotation.set(0, -Math.PI / 2, 0);
 
-        // Quaternion de rotation 3D directe exacte (det = +1.0) :
-        // - Axe longitudinal moteur -> nez strictement vers +Z (0, 0, 1)
-        // - Axe vertical cockpit/dérive vers le haut vers +Y (0, 1, 0)
-        // - Envergure aile droite vers +X (1, 0, 0) et aile gauche vers -X (-1, 0, 0)
-        root.quaternion.set(0.45686063, -0.45686063, 0.53970198, 0.53970198);
-
-        // Échelle à taille réelle (longueur exacte de 15.0 mètres) et centrage parfait
-        const scale = 0.101587;
+        // Échelle à taille réelle (longueur exacte de 15.0 mètres) et centrage parfait sur le pivot
+        const scale = 15.0 / 150.91997;
         root.scale.set(scale, scale, scale);
-        root.position.set(0, -1.488175, -2.367608);
+        root.position.set(0, -0.69854, -2.57771);
 
         // Activer les ombres et masquer le train d'atterrissage déployé (avion en vol)
         root.traverse((child) => {
@@ -81,8 +76,6 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const container = new THREE.Group();
 
   let bodyGroup = new THREE.Group();
-  // Rotation de 90 degrés vers la gauche du modèle 3D
-  bodyGroup.rotation.y = -Math.PI / 2;
   container.add(bodyGroup);
 
   // 1. Si le modèle réaliste f-16.glb est déjà disponible, on le clone
@@ -106,7 +99,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
     });
   }
 
-  // 2. Flamme de postcombustion (Afterburner) solidaire du modèle
+  // 2. Flamme de postcombustion (Afterburner)
   const flameGeo = new THREE.ConeGeometry(0.55, 4.2, 16);
   flameGeo.rotateX(-Math.PI / 2);
   flameGeo.translate(0, 0, -2.1);
@@ -119,7 +112,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const flameMesh = new THREE.Mesh(flameGeo, flameMat);
   flameMesh.position.set(0, 0.0, -7.5);
   flameMesh.visible = false;
-  bodyGroup.add(flameMesh);
+  container.add(flameMesh);
 
   // Enveloppe extérieure orange thermique
   const outerFlameGeo = new THREE.ConeGeometry(0.85, 5.8, 16);
@@ -134,7 +127,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const outerFlameMesh = new THREE.Mesh(outerFlameGeo, outerFlameMat);
   outerFlameMesh.position.set(0, 0.0, -7.5);
   outerFlameMesh.visible = false;
-  bodyGroup.add(outerFlameMesh);
+  container.add(outerFlameMesh);
 
   // 3. Flash lumineux du canon rotatif Vulcan M61
   const flashGeo = new THREE.SphereGeometry(0.45, 8, 8);
@@ -147,7 +140,7 @@ export function buildF16Model({ color = 0x2563eb, camo = 'grey' } = {}) {
   const flashMesh = new THREE.Mesh(flashGeo, flashMat);
   flashMesh.position.set(-0.46, 0.10, 3.58);
   flashMesh.visible = false;
-  bodyGroup.add(flashMesh);
+  container.add(flashMesh);
 
   return {
     root: container,
@@ -189,7 +182,7 @@ function colorizeModel(model, color) {
   const beaconGeo = new THREE.BoxGeometry(0.18, 0.22, 0.6);
   const beaconMat = new THREE.MeshBasicMaterial({ color: color });
   const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-  beacon.position.set(0, 1.08, -7.41);
+  beacon.position.set(0, 2.62, -6.8);
   model.add(beacon);
 }
 

@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.46 — 2 novembre 2026
+- **Dogfight 3D** — Avion parfaitement droit en face de la caméra.
+  - L'alignement 3D du F-16 est recalibré : le nez pointe droit vers le réticule, les ailes sont horizontales et la tuyère fait face à la caméra.
+  - Initialisation instantanée de la caméra derrière l'avion dès le lancement.
+
 ## 3.45 — 2 novembre 2026
 - **Dogfight 3D** — Orientation du modèle ajustée et maintien automatique du cap en ligne droite.
   - Le modèle 3D de l'avion est tourné de 90 degrés vers la gauche avec sa tuyère et ses effets de tir synchronisés.

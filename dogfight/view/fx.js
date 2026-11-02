@@ -63,11 +63,11 @@ export class FxManager {
       opacity: 0.75,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    // Position légèrement en arrière du moteur
+    // Position légèrement en arrière de la tuyère moteur
     mesh.position.set(
-      plane.x - plane.forwardX * 4.5,
-      plane.y - plane.forwardY * 4.5,
-      plane.z - plane.forwardZ * 4.5
+      plane.x - plane.forwardX * 7.6,
+      plane.y - plane.forwardY * 7.6,
+      plane.z - plane.forwardZ * 7.6
     );
 
     this.particleGroup.add(mesh);
@@ -96,14 +96,14 @@ export class FxManager {
 
     const tips = [
       {
-        x: plane.x - rx * 4.77 - ux * 1.58 - fx * 3.45,
-        y: plane.y - ry * 4.77 - uy * 1.58 - fy * 3.45,
-        z: plane.z - rz * 4.77 - uz * 1.58 - fz * 3.45,
+        x: plane.x - rx * 4.67 - ux * 0.15 - fx * 1.8,
+        y: plane.y - ry * 4.67 - uy * 0.15 - fy * 1.8,
+        z: plane.z - rz * 4.67 - uz * 0.15 - fz * 1.8,
       },
       {
-        x: plane.x + rx * 4.77 - ux * 1.58 - fx * 3.45,
-        y: plane.y + ry * 4.77 - uy * 1.58 - fy * 3.45,
-        z: plane.z + rz * 4.77 - uz * 1.58 - fz * 3.45,
+        x: plane.x + rx * 4.67 - ux * 0.15 - fx * 1.8,
+        y: plane.y + ry * 4.67 - uy * 0.15 - fy * 1.8,
+        z: plane.z + rz * 4.67 - uz * 0.15 - fz * 1.8,
       },
     ];
 
