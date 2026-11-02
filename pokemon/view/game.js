@@ -45,7 +45,8 @@ function itemBadge(p) {
 }
 import { STAGE_MULTS, canMega } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
-import { getParticipant, currentMatch, TEAM_SIZE } from '../engine/tournament.js';
+import { getParticipant, currentMatch, TEAM_SIZE, teamSizeOf, isVgc, VGC_BRING } from '../engine/tournament.js';
+import { createDoublesView } from './doubles.js';
 import { sfx } from './sfx.js';
 import { createFx } from './fx.js';
 import { eventMs, drainMs, damageText, typeMs, TYPE_MS } from '../engine/timing.js';
@@ -111,6 +112,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   const $ = (s) => root.querySelector(s);
   const stage = $('#pokeStage');
+  // combat en double (VGC) : écran à part
+  const vgc = createDoublesView({ stage, me, submitAction, sfx, now: () => Date.now() + clockOff });
 
   let state = null;
   let activeTab = 'moves'; // 'moves' | 'switch'
@@ -877,7 +880,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       else {
         // un seul légendaire : choisir un autre légendaire remplace le premier
         if (isLegendary(dex)) { const j = local.draft.findIndex(isLegendary); if (j >= 0) local.draft.splice(j, 1); }
-        if (local.draft.length < TEAM_SIZE) local.draft.push(dex);
+        if (local.draft.length < teamSizeOf(state && state.t)) local.draft.push(dex);
         else { local.draft.shift(); local.draft.push(dex); }
       }
       sfx.play('switch');
@@ -891,17 +894,27 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       ctx.rerender();
     },
     submitDraft() {
-      if (local.draft.length !== TEAM_SIZE) return;
+      if (local.draft.length !== teamSizeOf(state && state.t)) return;
       sfx.play('levelup');
       draft([...local.draft], cleanItems(local.draft, local.items));
     },
     pickLead(idx) {
-      local.lead = idx;
-      lead(idx);
+      if (state && isVgc(state.t)) {
+        // VGC : on compose la liste des 4 dans l'ordre ; un Pokémon déjà choisi se retire
+        const cur = Array.isArray(local.lead) ? [...local.lead] : [];
+        const j = cur.indexOf(idx);
+        if (j >= 0) cur.splice(j, 1); else if (cur.length < VGC_BRING) cur.push(idx);
+        local.lead = cur;
+        if (cur.length === VGC_BRING) lead(cur);
+      } else {
+        local.lead = idx;
+        lead(idx);
+      }
       sfx.play('switch');
       ctx.rerender();
     },
     sendReady() {
+      if (state && isVgc(state.t) && !(Array.isArray(local.lead) && local.lead.length === VGC_BRING)) return;
       sfx.play('hit');
       ready(local.lead);
     },
@@ -936,6 +949,8 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
   function headerTitle(s) {
     const t = s.t;
+    const badge = root.querySelector('.poke-badge');
+    if (badge) badge.textContent = isVgc(t) ? 'VGC 2v2' : 'TOURNOI 3v3';
     const m = currentMatch(t);
     const el = $('#pokeRoundTitle');
     if (!el) return;
@@ -994,7 +1009,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const fill = $('#timerFill');
       const txt = $('#timerText');
       if (fill && txt) {
-        if (!state.turnEndsAt || isResolvingTurn) {
+        if (!state.turnEndsAt || isResolvingTurn || vgc.isResolving()) {
           fill.style.width = '100%';
           txt.textContent = '—';
           fill.parentElement.classList.remove('urgent');
@@ -1027,7 +1042,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const side = m && (String(m.a) === String(me.id) ? 'A' : String(m.b) === String(me.id) ? 'B' : null);
       if (!side || s.t.ready[side]) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= TEAM_SIZE) ctx.pickLead(n - 1);
+      if (n >= 1 && n <= teamSizeOf(s.t)) ctx.pickLead(n - 1);
       else if (e.key === 'Enter') ctx.sendReady();
       return;
     }
@@ -1035,7 +1050,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       if (e.key === 'Enter') { const b = $('#smGo'); if (b && !b.disabled) b.click(); }
       return;
     }
-    if (s.phase !== 'battle' || !s.battle || isResolvingTurn) return;
+    if (s.phase !== 'battle' || !s.battle || isResolvingTurn || s.battle.doubles) return;
     const b = s.battle;
     const mySide = String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null;
     if (!mySide) return;
@@ -1072,7 +1087,13 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       state = s;
       music(s);
 
-      if (s.phase === 'battle') {
+      if (s.phase === 'battle' && s.battle && s.battle.doubles) {
+        if (lastPhase && lastPhase !== 'battle') showSplash(s);
+        headerTitle(s);
+        if (battleMusic.musicEnabled) battleMusic.start(s.isFinal ? 'cynthia' : 'sandstorm');
+        vgc.update(s);
+        lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
+      } else if (s.phase === 'battle') {
         if (lastPhase && lastPhase !== 'battle') showSplash(s);
         if (s.evSeq > lastEvSeq && s.events && s.events.length) evQueue.push(s);
         lastEvSeq = Math.max(lastEvSeq, s.evSeq || 0);
@@ -1084,6 +1105,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       } else {
         if (lastPhase === 'battle') {
           // On quitte l'arène : on coupe une animation en cours et on remet l'arène à zéro
+          vgc.reset(); vgc.syncSeq(s.evSeq);
           animGen++;
           isResolvingTurn = false;
           evQueue.length = 0;

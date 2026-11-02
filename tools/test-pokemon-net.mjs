@@ -6,7 +6,8 @@
 
 import { startHost } from '../pokemon/net/host.js';
 import { startClient } from '../pokemon/net/client.js';
-import { autoDraft, getParticipant, currentMatch, sideOf } from '../pokemon/engine/tournament.js';
+import { autoDraft, getParticipant, currentMatch, sideOf, teamSizeOf, isVgc } from '../pokemon/engine/tournament.js';
+import { sidesOf, teamKey, getActivePokemon, foeSides } from '../pokemon/engine/battle.js';
 
 // Le temps passe 40 fois plus vite (chronos, animations, réflexion des bots)
 const realSetTimeout = globalThis.setTimeout;
@@ -67,9 +68,28 @@ function autoPlayer(me, session) {
     const side = sideOf(m, me.id);
     if (s.phase === 'draft' && meP && !meP.team && !meP._sent) {
       meP._sent = true;
-      session().draft(autoDraft(meP.offer));
+      session().draft(autoDraft(meP.offer, teamSizeOf(t)));
     } else if (s.phase === 'preview' && side && !t.ready[side]) {
-      session().ready(Math.floor(Math.random() * 3));
+      session().ready(isVgc(t) ? [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, 4) : Math.floor(Math.random() * 3));
+    } else if (s.phase === 'battle' && side && s.battle && s.battle.doubles) {
+      // double : un remplaçant par emplacement vide, sinon une attaque et une cible au hasard pour chacun de ses Pokémon
+      const b = s.battle;
+      if (b.phase === 'switch_forced') {
+        const slot = (b.need || []).find((x) => teamKey(x) === side);
+        if (!slot) return;
+        const team = side === 'A' ? b.teamA : b.teamB, on = sidesOf(b).filter((x) => teamKey(x) === side).map((x) => b['active' + x]);
+        const idx = team.findIndex((p, i) => !on.includes(i) && !p.fainted);
+        if (idx >= 0) session().submitAction({ type: 'switch', targetIndex: idx, slot });
+      } else if (b.phase === 'choose' && !(side === 'A' ? s.submittedA : s.submittedB)) {
+        const acts = {};
+        for (const x of sidesOf(b).filter((y) => teamKey(y) === side)) {
+          const p = getActivePokemon(b, x);
+          if (!p || p.fainted) continue;
+          const foes = foeSides(b, x).filter((f) => { const q = getActivePokemon(b, f); return q && !q.fainted; });
+          acts[x] = { type: 'move', moveId: p.moves[Math.floor(Math.random() * p.moves.length)], target: foes[Math.floor(Math.random() * foes.length)] };
+        }
+        session().submitAction({ type: 'pair', acts });
+      }
     } else if (s.phase === 'battle' && side && s.battle) {
       const b = s.battle;
       const team = side === 'A' ? b.teamA : b.teamB;
@@ -183,6 +203,23 @@ console.log('--- L\'hôte quitte : un invité reprend le tournoi ---');
   ok(g2.log.last.phase === 'podium', 'le second invité suit le nouvel hôte');
   g1.session.destroy();
   console.log(`✓ Tournoi repris et terminé · champion : ${getParticipant(t, t.champion).name}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('--- Tournoi VGC (combat en double) à 3 joueurs ---');
+{
+  const room = makeRoom(P);
+  const vgc = { ...settings, format: 'vgc' };
+  const host = spawn(room, P[0], vgc);
+  const g1 = spawn(room, P[1], vgc);
+  const g2 = spawn(room, P[2], vgc);
+  await until(() => host.log.last && host.log.last.phase === 'podium', 90000, 'podium VGC');
+  await until(() => g1.log.last && g1.log.last.phase === 'podium' && g2.log.last.phase === 'podium', 3000, 'podium VGC invités');
+  const t = host.log.last.t;
+  ok(t.format === 'vgc' && t.participants.every((p) => p.team && p.team.length === 6), 'équipes de 6 en VGC');
+  ok(t.rounds.flat().some((m) => m.games.some((g) => g.teamA.length === 4)), 'chaque manche se joue à 4 Pokémon');
+  host.session.destroy(); g1.session.destroy(); g2.session.destroy();
+  console.log(`✓ Tournoi VGC terminé · champion : ${getParticipant(t, t.champion).name}`);
 }
 
 console.log('\nRÉSEAU DU TOURNOI POKÉ DUEL : TOUS LES TESTS SONT AU VERT');

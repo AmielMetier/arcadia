@@ -10,8 +10,8 @@
 // Les équipes sont stockées en numéros de Pokédex ; les Pokémon de combat sont recréés à neuf à chaque manche.
 
 import { POKEMON_ROSTER, getPokemonById, createActivePokemon, isLegendary } from './data.js';
-import { createBattle, resolveTurn, forceSwitch } from './battle.js';
-import { chooseBotAction } from './bot.js';
+import { createBattle, resolveTurn, resolveActions, forceSwitch, sidesOf, teamKey, getActivePokemon } from './battle.js';
+import { chooseBotAction, chooseDoublesAction, chooseDoublesSwitch } from './bot.js';
 import { MOVES } from './moves.js';
 import { TYPES, getEffectiveness } from './types.js';
 import { cleanItems, suggestItems } from './items.js';
@@ -19,6 +19,11 @@ import { cleanItems, suggestItems } from './items.js';
 export const OFFER_SIZE = 12;
 export const MAX_LEGENDS = 1;   // un seul légendaire par équipe
 export const TEAM_SIZE = 3;
+// Format VGC (combat en double) : équipe de 6 au draft, 4 amenés à chaque manche, 2 sur le terrain
+export const VGC_TEAM = 6;
+export const VGC_BRING = 4;
+export const isVgc = (t) => !!t && t.format === 'vgc';
+export const teamSizeOf = (t) => (isVgc(t) ? VGC_TEAM : TEAM_SIZE);
 
 export const BOT_TRAINERS = [
   { id: 901, name: 'Red', title: 'Légende', color: '#ff4b2b' },
@@ -160,7 +165,22 @@ export function rateTeam(ids) {
 }
 
 /** Choisit les 3 meilleurs Pokémon d'une offre (pour les bots et les retardataires). */
-export function autoDraft(offer) {
+export function autoDraft(offer, size = TEAM_SIZE) {
+  if (size > TEAM_SIZE) {
+    // équipe de 6 : on part du meilleur trio, puis on ajoute un à un le Pokémon qui améliore le plus l'équipe
+    const team = autoDraft(offer, TEAM_SIZE);
+    while (team.length < size) {
+      let bestId = null, bestSc = -Infinity;
+      for (const id of offer) {
+        if (team.includes(id) || (isLegendary(id) && team.some(isLegendary))) continue;
+        const sc = rateTeam([...team, id]);
+        if (sc > bestSc) { bestSc = sc; bestId = id; }
+      }
+      if (bestId == null) break;
+      team.push(bestId);
+    }
+    return team;
+  }
   let best = null;
   let bestScore = -Infinity;
   for (let i = 0; i < offer.length; i++) {
@@ -182,7 +202,7 @@ export function submitDraft(t, pid, picks, items) {
   const p = getParticipant(t, pid);
   if (!p || p.bot || !Array.isArray(picks)) return false;
   const ids = [...new Set(picks.map(Number))];
-  if (ids.length !== TEAM_SIZE || !ids.every((id) => p.offer.includes(id))) return false;
+  if (ids.length !== teamSizeOf(t) || !ids.every((id) => p.offer.includes(id))) return false;
   if (ids.filter(isLegendary).length > MAX_LEGENDS) return false;
   p.team = ids;
   p.items = cleanItems(ids, items);   // objets tenus : valides, sans doublon, complétés par les conseils
@@ -190,14 +210,14 @@ export function submitDraft(t, pid, picks, items) {
 }
 
 export function draftComplete(t) {
-  return t.participants.every((p) => Array.isArray(p.team) && p.team.length === TEAM_SIZE);
+  return t.participants.every((p) => Array.isArray(p.team) && p.team.length === teamSizeOf(t));
 }
 
 /** Fin du draft : complète les équipes manquantes, puis règle exemptions, forfaits et matchs de bots. */
 export function closeDraft(t, opts = {}) {
   for (const p of t.participants) {
-    if (!p.team || p.team.length !== TEAM_SIZE) {
-      p.team = autoDraft(p.offer);
+    if (!p.team || p.team.length !== teamSizeOf(t)) {
+      p.team = autoDraft(p.offer, teamSizeOf(t));
       p.autoDrafted = true;
     }
     if (!p.items) p.items = suggestItems(p.team);
@@ -219,6 +239,8 @@ export function createTournament(players, options = {}) {
   const gen = options.gen || 'all';
   const botsAllowed = options.bots === undefined ? true : !!Number(options.bots);
   const finalBestOf = Number(options.finalBestOf) === 1 ? 1 : 3;
+  const format = options.format === 'vgc' ? 'vgc' : 'single';
+  const size0 = format === 'vgc' ? VGC_TEAM : TEAM_SIZE;
   const n = Math.max(1, players.length);
 
   // Taille de l'arbre. Sans bots, les places vides deviennent des exemptions (qualifié d'office).
@@ -243,7 +265,7 @@ export function createTournament(players, options = {}) {
   const offers = makeOffers(participants.length, gen, rng);
   participants.forEach((p, i) => {
     p.offer = offers[i];
-    p.team = p.bot ? autoDraft(offers[i]) : null;
+    p.team = p.bot ? autoDraft(offers[i], size0) : null;
     p.items = p.team ? suggestItems(p.team) : null;
     p.gone = false;
     p.stats = { matchW: 0, gameW: 0, gameL: 0, ko: 0, lost: 0 };
@@ -298,6 +320,7 @@ export function createTournament(players, options = {}) {
   return {
     v: 2,
     gen,
+    format,
     size,
     finalBestOf,
     participants,
@@ -432,12 +455,30 @@ export function openPreview(t, match) {
   t.ready = { A: false, B: false };
   const A = getParticipant(t, match.a);
   const B = getParticipant(t, match.b);
-  if (A.bot) { t.lead.A = chooseLead(A.team, B.team); t.ready.A = true; }
-  if (B.bot) { t.lead.B = chooseLead(B.team, A.team); t.ready.B = true; }
+  const pick = isVgc(t) ? chooseBring : chooseLead;
+  if (A.bot) { t.lead.A = pick(A.team, B.team); t.ready.A = true; }
+  if (B.bot) { t.lead.B = pick(B.team, A.team); t.ready.B = true; }
 }
+
+/** VGC : les 4 Pokémon à amener (les 2 premiers commencent), choisis face à l'équipe adverse. */
+export function chooseBring(teamIds, oppIds) {
+  const opp = oppIds.map(getPokemonById).filter(Boolean);
+  const sc = teamIds.map((id, idx) => {
+    const me = getPokemonById(id);
+    if (!me) return { idx, score: -99 };
+    const mt = attackTypes(me);
+    let score = me.stats.spe / 40 + statTotal(me) / 120;
+    for (const o of opp) score += Math.max(1, ...mt.map((ty) => getEffectiveness(ty, o.types))) - Math.max(...o.types.map((ty) => getEffectiveness(ty, me.types)));
+    return { idx, score };
+  }).sort((a, b) => b.score - a.score);
+  return sc.slice(0, VGC_BRING).map((x) => x.idx);
+}
+/** VGC : un choix valide = 4 index différents de l'équipe de 6 */
+export const validBring = (v) => Array.isArray(v) && v.length === VGC_BRING && new Set(v).size === VGC_BRING && v.every((i) => Number.isInteger(i) && i >= 0 && i < VGC_TEAM);
 
 export function setLead(t, side, idx) {
   if (t.phase !== 'preview' || !['A', 'B'].includes(side)) return false;
+  if (isVgc(t)) { const v = Array.isArray(idx) ? idx.map(Number) : null; if (!validBring(v)) return false; t.lead[side] = v; return true; }
   const i = Number(idx);
   if (!(i >= 0 && i < TEAM_SIZE)) return false;
   t.lead[side] = i;
@@ -465,6 +506,19 @@ function teamFor(ids, leadIdx, items) {
 export function buildBattle(t, match) {
   const A = getParticipant(t, match.a);
   const B = getParticipant(t, match.b);
+  if (isVgc(t)) {
+    if (!validBring(t.lead.A)) t.lead.A = chooseBring(A.team, B.team);
+    if (!validBring(t.lead.B)) t.lead.B = chooseBring(B.team, A.team);
+    // les 4 Pokémon amenés, dans l'ordre choisi (les 2 premiers sur le terrain), avec Abri en plus de leurs attaques
+    const bring = (P, order) => order.map((i) => P.team[i]).map((id) => {
+      const p = { ...createActivePokemon(getPokemonById(id)), item: (P.items || suggestItems(P.team))[id] || null, itemUsed: false, choiceLock: null };
+      p.moves = [...p.moves, 'protect'];
+      return p;
+    });
+    const battle = createBattle({ trainerA: A, trainerB: B, teamA: bring(A, t.lead.A), teamB: bring(B, t.lead.B), doubles: true });
+    t.phase = 'battle';
+    return battle;
+  }
   if (t.lead.A == null) t.lead.A = chooseLead(A.team, B.team);
   if (t.lead.B == null) t.lead.B = chooseLead(B.team, A.team);
   const battle = createBattle({
@@ -485,9 +539,9 @@ export function koCredits(battle, events) {
   const out = [];
   for (const ev of events || []) {
     if (ev.type !== 'faint') continue;
-    const scorer = ev.side === 'A' ? 'B' : 'A';
-    const team = scorer === 'A' ? battle.teamA : battle.teamB;
-    const act = team[scorer === 'A' ? battle.activeA : battle.activeB];
+    const scorer = teamKey(ev.side) === 'A' ? 'B' : 'A';
+    const act = sidesOf(battle).filter((s) => teamKey(s) === scorer).map((s) => getActivePokemon(battle, s)).find((p) => p && !p.fainted)
+      || getActivePokemon(battle, scorer);
     out.push({ side: scorer, dex: act ? act.id : null });
   }
   return out;
@@ -558,7 +612,7 @@ export function markGone(t, pid) {
   const p = getParticipant(t, pid);
   if (!p || p.gone || p.bot) return null;
   p.gone = true;
-  if (!p.team) p.team = autoDraft(p.offer);
+  if (!p.team) p.team = autoDraft(p.offer, teamSizeOf(t));
   if (!p.items) p.items = suggestItems(p.team);
   const m = currentMatch(t);
   const side = sideOf(m, pid);
@@ -582,6 +636,14 @@ export function simulateBattle(battle, difficulty = 'normal', maxTurns = 150) {
   const credits = [];
   let guard = 0;
   while (battle.phase !== 'over' && guard++ < maxTurns) {
+    if (battle.doubles) {
+      if (battle.phase === 'switch_forced') { for (const s of [...battle.need]) { const sw = chooseDoublesSwitch(battle, s); if (sw) forceSwitch(battle, s, sw.targetIndex); else battle.need = battle.need.filter((x) => x !== s); } if (!battle.need.length && battle.phase === 'switch_forced') battle.phase = 'choose'; continue; }
+      const acts = {};
+      for (const s of sidesOf(battle)) acts[s] = chooseDoublesAction(battle, s, difficulty);
+      const { events } = resolveActions(battle, acts);
+      credits.push(...koCredits(battle, events));
+      continue;
+    }
     if (battle.phase === 'choose') {
       const actA = chooseBotAction(battle, 'A', difficulty);
       const actB = chooseBotAction(battle, 'B', difficulty);

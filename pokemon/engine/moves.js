@@ -139,3 +139,13 @@ export const MOVES = {
 
 // attaques des Pokémon ajoutés (générées depuis PokeAPI) ; celles faites main restent prioritaires
 for (const [k, m] of Object.entries(MOVES_GEN)) if (!MOVES[k]) MOVES[k] = m;
+
+// Combat en double (VGC) : attaques qui touchent les deux adversaires, ou tous les autres Pokémon (allié compris),
+// avec des dégâts ×0,75 quand elles touchent plusieurs cibles (cibles d'après PokeAPI)
+const SPREAD_FOES = ['growl', 'tail_whip', 'bubble', 'razor_leaf', 'blizzard', 'rock_slide', 'dazzling_gleam', 'swift', 'twister', 'air_cutter',
+  'incinerate', 'hyper_voice', 'disarming_voice', 'lands_wrath', 'heat_wave', 'muddy_water', 'icy_wind', 'snarl', 'electroweb', 'eruption', 'water_spout'];
+const SPREAD_ALL = ['surf', 'earthquake', 'bulldoze', 'petal_blizzard', 'boomburst', 'discharge', 'lava_plume', 'sludge_wave', 'explosion'];
+for (const k of SPREAD_FOES) if (MOVES[k]) MOVES[k].spread = 'foes';
+for (const k of SPREAD_ALL) if (MOVES[k]) MOVES[k].spread = 'all';
+// Abri : en double, chaque Pokémon l'a en plus de ses 4 attaques
+MOVES.protect = { name: 'Abri', type: 'normal', cat: 'status', power: 0, acc: 100, priority: 4, pp: 10, effect: { type: 'protect', target: 'self' } };

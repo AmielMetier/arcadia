@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.40 — 2 novembre 2026
+- **Poké Duel** — Nouveau format VGC, en 2 contre 2 : à choisir dans les réglages du salon (« Format »).
+  - Au draft, tu gardes 6 Pokémon sur 12. Avant chaque manche, tu en choisis 4 dans l'ordre : les 2 premiers commencent sur le terrain, les 2 autres attendent en réserve.
+  - En combat, chacun de tes deux Pokémon choisit son action, puis sa cible.
+  - Les attaques de zone touchent les deux adversaires (Éboulement, Éclat Magique, Blizzard…), ou même ton allié (Séisme, Surf), avec des dégâts ×0,75.
+  - Chaque Pokémon a Abri en plus de ses attaques : il bloque tout pendant un tour, mais rate de plus en plus si on l'enchaîne.
+  - Intimidation baisse l'Attaque des deux adversaires. Un Pokémon K.O. est remplacé tant qu'il en reste en réserve.
+  - Les bots savent jouer en double : ils visent la bonne cible, utilisent les attaques de zone sans trop blesser leur allié, et sortent Abri au bon moment.
+
 ## 3.39 — 2 novembre 2026
 - **Poké Duel** — Au draft, 12 Pokémon sont proposés au lieu de 6, et une équipe ne peut avoir qu'un seul légendaire (marqué LÉGENDAIRE sur sa carte).
 - **Poké Duel** — Passe la souris sur une attaque, un talent ou un objet pour voir ce qu'il fait : type, catégorie, puissance, précision et effets.

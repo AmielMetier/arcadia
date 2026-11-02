@@ -422,7 +422,8 @@ export const ab = (poke, attacker) => (!poke ? null : attacker && attacker !== p
 export function weatherOf(state) {
   const w = state && state.weather;
   if (!w || !w.type) return null;
-  const act = [state.teamA && state.teamA[state.activeA], state.teamB && state.teamB[state.activeB]];
+  const act = [state.teamA && state.teamA[state.activeA], state.teamB && state.teamB[state.activeB],
+    state.doubles && state.teamA[state.activeC], state.doubles && state.teamB[state.activeD]];
   if (act.some((p) => p && !p.fainted && (p.ability === 'air-lock' || p.ability === 'cloud-nine'))) return null;
   return w.type;
 }
