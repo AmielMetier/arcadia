@@ -12,6 +12,7 @@ import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
+import { enrichirTout, equipeDeType } from './rencontres.js';
 
 export const STARTERS = NEW_STARTERS.map(R);
 export const RIVAL_NAME = 'Théo';
@@ -68,6 +69,8 @@ const ENC = {
   est: [[1029, 30, 36, 20], [1031, 30, 36, 20], [72, 30, 36, 20], [1033, 32, 36, 10], [1045, 32, 36, 8], [120, 30, 35, 10], [1007, 32, 35, 3], [131, 35, 38, 2]],
   r10: [[1014, 33, 37, 10], [1035, 33, 37, 10], [1037, 33, 37, 10], [1040, 34, 37, 5], [22, 33, 37, 15], [85, 33, 37, 10], [128, 34, 37, 10], [241, 34, 37, 10], [203, 33, 37, 10], [20, 33, 36, 10]],
 };
+// plus de diversité : chaque zone reçoit aussi tous les Pokémon des lieux équivalents des jeux officiels (Rouge à X / Y)
+enrichirTout(ENC);
 
 /* ---------------- dresseurs ---------------- */
 // classe → apparence sur la carte et portrait en combat, prime de base
@@ -808,14 +811,25 @@ export function buildWorld() {
     [['Karatéka', 'Akira', [[1041, 43], [58, 43]]], ['Topdresseur', 'Blaise', [[78, 44], [1005, 44]]], ['Garde d\'Écaille', 'Ignace', [[1042, 45], [218, 44]]]],
     [['Garde d\'Écaille', 'Kael', [[1049, 47], [1050, 48]]], ['Topdresseuse', 'Wyrna', [[148, 49], [1044, 49]]], ['Garde d\'Écaille', 'Ivar', [[147, 48], [1050, 49], [1025, 49]]]],
   ];
+  // quatrième dresseur des arènes qui n'en avaient que deux ou trois
+  const GYM_EXTRA = [
+    ['Gamin', 'Théodore', [[1017, 10]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
+    ['Médium', 'Isaure', [[1039, 34]]], ['Montagnard', 'Roch', [[1026, 39]]], ['Karatéka', 'Kazuo', [[1041, 44]]], ['Topdresseur', 'Siegfried', [[1049, 48]]],
+  ];
   for (const t of Object.values(towns)) {
     if (t.gym == null) continue;
     const g = t.gymMap, L2 = LEADERS[t.gym];
     g.npc({ id: g.id + ':guide', x: 9, y: 17, sprite: 'habitant', dir: 'down', script: 'gymguide', gym: t.gym });
     // les dresseurs se tiennent sur le côté de l'allée centrale (colonne 7) : ils ne bloquent jamais le passage
     const spots = [[5, 15, 'right'], [10, 10, 'left'], [4, 7, 'right'], [10, 11, 'left']];
-    gymTrainers[t.gym].forEach(([cls, name, team], i) => {
-      const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team, { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
+    // quatre dresseurs par arène ; chacun garde ses Pokémon et en ajoute un ou deux du type de l'arène, pris dans
+    // les six générations (un Pokémon différent d'une arène à l'autre, toujours le même pour une arène donnée)
+    const list = gymTrainers[t.gym].slice();
+    const extra = GYM_EXTRA[t.gym]; if (list.length < 4 && extra) list.push(extra);
+    list.forEach(([cls, name, team], i) => {
+      const lvl = Math.max(...team.map((m) => m[1]));
+      const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
+      const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
     });
     const fem = ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
     g.npc({ id: g.id + ':leader', x: 7, y: 3, dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: 'smart', items: { 'super-potion': t.gym < 3 ? 1 : 0, 'hyper-potion': t.gym >= 3 ? 2 : 0, 'full-restore': t.gym === 7 ? 1 : 0 }, intro: L2.intro, lose: L2.lose, sight: 0 } });

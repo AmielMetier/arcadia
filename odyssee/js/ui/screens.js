@@ -4,7 +4,7 @@ import { SPECIES } from '../data/species.js';
 import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
-import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS } from '../core/mon.js';
+import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS, NATURES, natureName, natureEffect, refreshStats } from '../core/mon.js';
 import { BADGES, LEADERS } from '../world/region.js';
 import { ASSETS } from '../assets.js';
 import { SPRITES } from '../data/sprites.js';
@@ -438,13 +438,17 @@ export function summaryScreen(game, list, idx) {
             <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
             <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
+            <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
           </table>
           <div class="expline"><b>EXP</b><i><u style="width:${(expProgress(m, cap) * 100).toFixed(1)}%"></u></i></div>
           <div class="dexline">${esc(S.genus ? S.genus + ' — ' + (S.dex || '') : S.dex || '')}</div>`;
       } else if (page === 1) {
-        body = `<table class="kv stats sum-kv">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td></tr>`).join('')}</table>`;
+        // stats avec la nature (▲ +10 % en rouge, ▼ −10 % en bleu), les IV (0 à 31) et les EV (252 max, 510 en tout)
+        const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
+        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
+          <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
       } else {
         body = `<div class="moves">${m.moves.map((mv) => {
           const M = MOVES[mv.id];
@@ -1029,6 +1033,27 @@ export async function pcScreen(game) {
       const m = st.party.splice(k, 1)[0]; st.box.push(m);
       await ui.say(`${monName(m)} a été déposé dans la boîte.`, { keep: true });
     } else break;
+  }
+  ui.closeDialog();
+}
+
+/* ================= PC DES NATURES (Centre de soins) ================= */
+export async function naturePcScreen(game) {
+  const ui = game.ui, st = game.state;
+  ui.sound.sfx('pc');
+  await ui.say([`${st.name} allume le PC des Natures.`, 'Ce PC règle le caractère d\'un Pokémon : une stat monte de 10 %, une autre baisse de 10 %.'], { keep: true });
+  for (;;) {
+    if (!st.party.length) { await ui.say('Tu n\'as encore aucune créature.', { keep: true }); break; }
+    ui.closeDialog();
+    const k = await partyScreen(game, { mode: 'pick', prompt: 'Changer la nature de quel Pokémon ?' });
+    if (k < 0) break;
+    const m = st.party[k];
+    const label = (n) => { const ne = natureEffect(n); return ne ? `+${STAT_NAMES[ne[0]]} −${STAT_NAMES[ne[1]]}` : 'neutre'; };
+    const n = await ui.list({ title: `${monName(m)} : ${natureName(m.nat ?? 0)}`, items: NATURES.map((name, i) => ({ label: name + (i === m.nat ? ' ✓' : ''), right: label(i) })).concat([{ label: 'Annuler' }]), cls: 'shop natures', cancel: NATURES.length, start: m.nat ?? 0 });
+    if (n < 0 || n >= NATURES.length || n === m.nat) continue;
+    if (!(await ui.yesNo(`${monName(m)} devient ${natureName(n)} (${label(n)}) ?`, { keep: true }))) continue;
+    m.nat = n; refreshStats(m, true); ui.sound.sfx('levelup');
+    await ui.say(`${monName(m)} est maintenant de nature ${natureName(n)} !`, { keep: true });
   }
   ui.closeDialog();
 }

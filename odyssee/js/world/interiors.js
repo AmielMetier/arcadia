@@ -21,6 +21,8 @@ export function centerInterior(id, name) {
   m.npc({ id: id + ':infirmiere', x: 6, y: 3, sprite: 'nurse', role: 'nurse' });
   furn(m, 'healer', 8, 2); m.set(9, 2, T.BLOCK);
   furn(m, 'pc', 11, 2); m.object(11, 2, { type: 'pc' });
+  // PC des Natures : on y change la nature d'un Pokémon de l'équipe
+  furn(m, 'pc', 2, 2); m.object(2, 2, { type: 'naturepc' });
   furn(m, 'plant', 1, 2); furn(m, 'plant', 1, 8);
   furn(m, 'bench', 1, 6); m.set(2, 6, T.BLOCK); furn(m, 'bench', 10, 6); m.set(11, 6, T.BLOCK);
   furn(m, 'vase', 11, 8);

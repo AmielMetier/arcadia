@@ -2,11 +2,35 @@
 import { SPECIES } from '../data/species.js';
 import { R } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
+import { EFFORT } from '../data/rencontres.js';
 
 // attaque propre aux Pokémon Obscurs (Lugia Obscur) : n'existe dans aucun jeu officiel sous ce nom
 MOVES[10001] = { id: 10001, key: 'shadow-blast', n: 'Rafale Obscure', t: 'dark', c: 'special', p: 100, a: 100, pp: 10, pr: 0, tg: 10, m: { cat: 0, crit: 1 } };
 
 export const STAT_NAMES = ['PV', 'Attaque', 'Défense', 'Atq. Spé.', 'Déf. Spé.', 'Vitesse'];
+
+/* ---------------- natures ---------------- */
+// 25 natures, dans l'ordre des jeux : ligne = stat augmentée de 10 %, colonne = stat baissée de 10 %
+// (Attaque, Défense, Vitesse, Atq. Spé., Déf. Spé.) ; les cinq de la diagonale sont neutres
+export const NATURES = ['Hardi', 'Solo', 'Brave', 'Rigide', 'Mauvais', 'Assuré', 'Docile', 'Relax', 'Malin', 'Lâche',
+  'Timide', 'Pressé', 'Sérieux', 'Jovial', 'Naïf', 'Modeste', 'Doux', 'Discret', 'Pudique', 'Foufou',
+  'Calme', 'Gentil', 'Malpoli', 'Prudent', 'Bizarre'];
+const NAT_STAT = [1, 2, 5, 3, 4];   // ordre des natures → indice de stat du jeu
+/** stats [augmentée, baissée] d'une nature (indices de STAT_NAMES), ou null si elle est neutre */
+export function natureEffect(n) {
+  const up = NAT_STAT[Math.floor(n / 5)], down = NAT_STAT[n % 5];
+  return up === down ? null : [up, down];
+}
+export function natureName(n) { return NATURES[n] ?? NATURES[0]; }
+/** nature d'un Pokémon d'une ancienne sauvegarde : toujours la même pour un même Pokémon */
+export const legacyNature = (m) => ((m.uid || 1) * 7 + (m.sp || 0) * 3) % 25;
+/** les Pokémon d'avant les natures en reçoivent une ; renvoie true si quelque chose a changé */
+export function ensureNature(m) {
+  if (m.nat != null) return false;
+  m.nat = legacyNature(m); m.ev ||= [0, 0, 0, 0, 0, 0];
+  refreshStats(m, true);
+  return true;
+}
 let UID = 1;
 export const setUidBase = (n) => { UID = Math.max(UID, n); };
 
@@ -33,10 +57,12 @@ export function expFor(g, L) {
 }
 
 export function calcStats(m) {
-  const b = SPECIES[m.sp].b, L = m.lvl, iv = m.iv, ev = m.ev || [0, 0, 0, 0, 0, 0];
+  const b = SPECIES[m.sp].b, L = m.lvl, iv = m.iv, ev = m.ev || [0, 0, 0, 0, 0, 0], ne = m.nat != null ? natureEffect(m.nat) : null;
   return b.map((B, i) => {
     const core = Math.floor((2 * B + iv[i] + Math.floor(ev[i] / 4)) * L / 100);
-    return i === 0 ? (m.sp === 292 ? 1 : core + L + 10) : core + 5;
+    if (i === 0) return m.sp === 292 ? 1 : core + L + 10;
+    const x = core + 5;
+    return ne && ne[0] === i ? Math.floor(x * 1.1) : ne && ne[1] === i ? Math.floor(x * 0.9) : x;
   });
 }
 
@@ -64,6 +90,7 @@ export function createMon(sp, lvl, o = {}) {
     uid: UID++, sp, lvl, exp: expFor(S.g, lvl),
     iv: o.iv || Array.from({ length: 6 }, () => Math.floor(r() * 32)),
     ev: [0, 0, 0, 0, 0, 0],
+    nat: o.nat ?? Math.floor(r() * 25),
     moves: o.moves ? o.moves.map((id) => ({ id, pp: MOVES[id].pp })) : defaultMoves(sp, lvl),
     status: null, slp: 0, tox: 0,
     gender: S.gr < 0 ? null : (r() * 8 < S.gr ? 'f' : 'm'),
@@ -80,7 +107,7 @@ export const species = (m) => SPECIES[m.sp];
 export const isFainted = (m) => m.hp <= 0;
 
 export function healFull(m) {
-  m.stats || refreshStats(m);
+  refreshStats(m, true);
   m.hp = m.stats[0]; m.status = null; m.slp = 0; m.tox = 0;
   for (const mv of m.moves) mv.pp = MOVES[mv.id].pp;
 }
@@ -152,9 +179,21 @@ export function evolve(m, to) {
   return { learned, ask };
 }
 
-/** gain d'effort simplifié : +1 dans la meilleure stat de base de l'adversaire (plafond 252 / 510) */
+/** points d'effort que donne un Pokémon vaincu : ceux des jeux officiels ; pour une créature originale, 1 à 3 points
+ *  dans sa meilleure stat de base (selon son rang dans sa famille) */
+export function effortYield(sp) {
+  const e = EFFORT[sp]; if (e) return [...e].map(Number);
+  const b = SPECIES[sp].b; let k = 0; for (let i = 1; i < 6; i++) if (b[i] > b[k]) k = i;
+  const y = [0, 0, 0, 0, 0, 0]; y[k] = b.reduce((a, x) => a + x, 0) >= 480 ? 3 : b.reduce((a, x) => a + x, 0) >= 380 ? 2 : 1; return y;
+}
+/** gain d'effort (plafonds des jeux : 252 par stat, 510 en tout) ; renvoie les points gagnés */
 export function gainEffort(m, foeSp) {
-  const b = SPECIES[foeSp].b; let k = 0; for (let i = 1; i < 6; i++) if (b[i] > b[k]) k = i;
-  const tot = m.ev.reduce((a, x) => a + x, 0); if (tot >= 510 || m.ev[k] >= 252) return;
-  m.ev[k] += Math.min(2, 252 - m.ev[k], 510 - tot);
+  m.ev ||= [0, 0, 0, 0, 0, 0];
+  const y = effortYield(foeSp); let got = 0;
+  for (let k = 0; k < 6; k++) {
+    if (!y[k]) continue;
+    const tot = m.ev.reduce((a, x) => a + x, 0), add = Math.max(0, Math.min(y[k], 252 - m.ev[k], 510 - tot));
+    m.ev[k] += add; got += add;
+  }
+  return got;   // les stats suivent au prochain niveau ou au prochain soin (comme dans les jeux)
 }

@@ -1,7 +1,7 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
 // Surf, Éclate-Roc, Vol), menus, histoire (les huit arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
-import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap } from './core/mon.js';
+import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js';
 import { SPECIES } from './data/species.js';
@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
@@ -68,6 +68,8 @@ export class Game {
     s.cleared ||= {}; s.explored ||= [];
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
     setUidBase(maxUid + 1);
+    // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
+    for (const m of s.party.concat(s.box)) ensureNature(m);
     return s;
   }
 
@@ -455,6 +457,7 @@ export class Game {
         else if (it) await this.pickItem(it);
         else if (o?.use) await o.use(this.api(), o, fx, fy);
         else if (o?.type === 'pc') await pcScreen(this);
+        else if (o?.type === 'naturepc') await naturePcScreen(this);
         else if (o?.type === 'lugia') { if (!st0.flags.lugia && !st0.flags.lugiaCaught) await lugiaBattle(this); }
         else if (o?.type === 'pylon') await this.pylon(o);
         else if (o?.type === 'stele') await this.stele(o);

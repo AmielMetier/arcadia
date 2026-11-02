@@ -1968,6 +1968,16 @@ img { image-rendering: pixelated; }
 .mbtn .mpw { color: #ced8ec; font-weight: 600; }
 .mbtn .mpp { font-weight: 700; color: #ffe058; font-variant-numeric: tabular-nums; }
 .mbtn .mpp.zero { color: #ff5858; }
+/* dégâts prévus sur le Pokémon d'en face (% de ses PV max) : petite étiquette en haut à droite de la carte */
+.mbtn .mdmg {
+  position: absolute; right: calc(var(--bp) * 13); top: calc(var(--bp) * 1.4);
+  font-size: 0.56em; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 0 calc(var(--bp) * 1.4); background: #080a10cc; color: #e8f0ff;
+  border: calc(var(--bp) * 0.5) solid #080a10; text-shadow: none; pointer-events: none;
+}
+.mbtn .mdmg.maybe { color: #ffd060; }
+.mbtn .mdmg.ko { color: #ff6a58; }
+.mbtn .mdmg.none { color: #8890a0; }
 
 /* écran titre : la mer d'Odyssor en fond */
 .title-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; z-index: -1; }
@@ -2638,3 +2648,12 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 }
 .qft-label { font-weight: 700; color: #ffd858; }
 .qft-val { color: #ffffff; font-weight: 600; }
+
+/* résumé : natures, IV et EV */
+.sum-stats .sth td { font-size: 0.7em; color: #8aa0be; padding-bottom: 0; }
+.sum-stats td.nat-up { color: #ff6a58; }
+.sum-stats td.nat-down { color: #6aa8ff; }
+.sum-stats td.iv, .sum-stats td.evv { font-variant-numeric: tabular-nums; text-align: right; color: #ced8ec; font-size: 0.85em; }
+.sum-stats td.iv.max { color: #ffe058; }
+.sum-natline { margin-top: 0.6em; font-size: 0.72em; color: #ced8ec; }
+.nat-fx { color: #8aa0be; }
