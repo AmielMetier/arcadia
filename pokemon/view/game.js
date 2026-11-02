@@ -29,6 +29,7 @@ function weatherTag(w) { return w && w.type ? `<span class="bw-weather w-${w.typ
 
 /** Objet Choix : seule l'attaque bloquée reste disponible (tant qu'elle a des PP). */
 function choiceBlocked(p, moveId) {
+  if (p && p.rampage && p.rampage.move !== moveId) return true;   // Colère : même attaque jusqu'au bout
   if (!p || !CHOICE.has(p.item) || !p.choiceLock || p.choiceLock === moveId) return false;
   const pp = p.ppMap ? p.ppMap[p.choiceLock] : 1;
   return p.moves.includes(p.choiceLock) && pp > 0;
@@ -602,6 +603,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     const isSubmitted = mySide === 'A' ? s.submittedA : mySide === 'B' ? s.submittedB : false;
     // Marque Ombre adverse : impossible de changer de Pokémon (sauf Spectre)
     const trapped = (() => { if (!mySide) return false; const me2 = mySide === 'A' ? b.teamA[b.activeA] : b.teamB[b.activeB], foe2 = mySide === 'A' ? b.teamB[b.activeB] : b.teamA[b.activeA];
+      if (me2 && me2.rampage) return true;
       return !!(foe2 && !foe2.fainted && foe2.ability === 'shadow-tag' && me2 && !me2.fainted && !me2.types.includes('ghost')); })();
     const isForcedSwitch = (mySide === 'A' && b.phase === 'switch_forced_A') ||
                            (mySide === 'B' && b.phase === 'switch_forced_B') ||
@@ -617,7 +619,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
 
     let announcement = '';
     if (isForcedSwitch) {
-      announcement = 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
+      announcement = pBottom && !pBottom.fainted ? `${pBottom.name} revient : choisissez le Pokémon qui prend le relais !` : 'Votre Pokémon est K.O. ! Choisissez un remplaçant !';
     } else if (b.phase === 'switch_forced_A' || b.phase === 'switch_forced_B') {
       announcement = "En attente du Pokémon de l'adversaire...";
     } else if (isSubmitted) {

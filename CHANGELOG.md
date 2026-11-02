@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.35 — 2 novembre 2026
+- **Poké Duel** — La musique de combat se lance enfin : Sandstorm (et le thème de la finale) démarrent dès l'arrivée en combat, sans qu'il faille cliquer.
+- **Poké Duel** — Intimidation, Sécheresse, Crachin, Sable Volant et les autres talents d'arrivée s'activent dès que le Pokémon apparaît sur le terrain, avant que tu choisisses ton attaque.
+- **Poké Duel** — Des attaques qui ne faisaient rien de spécial ont maintenant leur vrai effet :
+  - Colère frappe 2 ou 3 tours d'affilée (impossible de changer d'attaque ou de Pokémon), puis le lanceur devient confus.
+  - Demi-Tour et Change-Éclair : après le coup, ton Pokémon revient et tu choisis celui qui prend le relais.
+  - Atterrissage échoue si le Pokémon a déjà tous ses PV.
+- **Poké Duel** — Méga-Évolution : la nouvelle Vitesse compte bien dès le tour de l'évolution (vérifié par un test).
+
 ## 3.34 — 31 octobre 2026
 - **Poké Duel** — Le bouton Méga-Évolution ne décale plus les attaques dans la colonne de droite : il se place au-dessus d'elles.
 - **Poké Duel** — Sandstorm se relance bien en combat, même si l'ancienne version du morceau était restée en mémoire, et la musique repart au premier clic ou à la première touche si le navigateur l'avait bloquée.

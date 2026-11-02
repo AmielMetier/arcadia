@@ -50,7 +50,7 @@ export const MOVES = {
   thunder: { name: 'Fatal-Foudre', type: 'electric', cat: 'special', power: 110, acc: 70, pp: 10, effect: { type: 'status', status: 'paralysis', chance: 30 } },
   wild_charge: { name: 'Éclair Fou', type: 'electric', cat: 'physical', power: 90, acc: 100, recoil: 0.25, pp: 15 },
   thunder_wave: { name: 'Cage-Éclair', type: 'electric', cat: 'status', power: 0, acc: 90, effect: { type: 'status', status: 'paralysis', chance: 100 }, pp: 20 },
-  volt_switch: { name: 'Change-Éclair', type: 'electric', cat: 'special', power: 70, acc: 100, pp: 20 },
+  volt_switch: { name: 'Change-Éclair', type: 'electric', cat: 'special', power: 70, acc: 100, pp: 20, pivot: true },
 
   // --- GLACE ---
   ice_beam: { name: 'Laser Glace', type: 'ice', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'status', status: 'freeze', chance: 10 } },
@@ -102,7 +102,7 @@ export const MOVES = {
   dragon_pulse: { name: 'Dracochoc', type: 'dragon', cat: 'special', power: 85, acc: 100, pp: 10 },
   draco_meteor: { name: 'Draco-Météore', type: 'dragon', cat: 'special', power: 130, acc: 90, pp: 5, effect: { type: 'stat', target: 'self', stat: 'spa', val: -2 } },
   dragon_claw: { name: 'Dracogriffe', type: 'dragon', cat: 'physical', power: 80, acc: 100, pp: 15 },
-  outrage: { name: 'Colère', type: 'dragon', cat: 'physical', power: 120, acc: 100, pp: 10 },
+  outrage: { name: 'Colère', type: 'dragon', cat: 'physical', power: 120, acc: 100, pp: 10, rampage: true },
   dragon_dance: { name: 'Danse Draco', type: 'dragon', cat: 'status', power: 0, acc: 100, effect: { type: 'stat', target: 'self', stat: 'atk', val: 1, stats: { atk: 1, spe: 1 } }, pp: 20 },
 
   // --- TÉNÈBRES ---
@@ -121,7 +121,7 @@ export const MOVES = {
   bug_bite: { name: 'Piqûre', type: 'bug', cat: 'physical', power: 60, acc: 100, pp: 20 },
   x_scissor: { name: 'Plaie-Croix', type: 'bug', cat: 'physical', power: 80, acc: 100, pp: 15 },
   bug_buzz: { name: 'Bourdon', type: 'bug', cat: 'special', power: 90, acc: 100, pp: 10 },
-  u_turn: { name: 'Demi-Tour', type: 'bug', cat: 'physical', power: 70, acc: 100, pp: 20 },
+  u_turn: { name: 'Demi-Tour', type: 'bug', cat: 'physical', power: 70, acc: 100, pp: 20, pivot: true },
 
   // --- POISON ---
   sludge_bomb: { name: 'Bomb-Beurk', type: 'poison', cat: 'special', power: 90, acc: 100, pp: 10, effect: { type: 'status', status: 'poison', chance: 30 } },

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { ABILITIES, abilityOf } from '../pokemon/engine/abilities.js';
 import { POKEMON_ROSTER, getPokemonById, createActivePokemon } from '../pokemon/engine/data.js';
-import { createBattle, resolveTurn, forceSwitch, calculateDamage, getEffectiveSpeed } from '../pokemon/engine/battle.js';
+import { createBattle, resolveTurn, forceSwitch, calculateDamage, getEffectiveSpeed, runEntry } from '../pokemon/engine/battle.js';
 import { chooseBotAction, chooseBestSwitch } from '../pokemon/engine/bot.js';
 import { suggestItems } from '../pokemon/engine/items.js';
 import { MEGAS } from '../pokemon/engine/megas.js';
@@ -24,10 +24,29 @@ for (const list of Object.values(MEGAS)) for (const m of list) ok(!abilityOf(m.p
 console.log(`✓ ${POKEMON_ROSTER.length} Pokémon, chacun avec un talent qui a un effet en combat`);
 
 // --- effets
-{ // Intimidation à l'arrivée
+{ // Intimidation dès l'arrivée sur le terrain (avant le premier choix), puis au remplaçant après un K.O.
   const b = battle([mon(130, { ability: 'intimidate' })], [mon(143, { ability: 'thick-fat' })]);
+  ok(runEntry(b).some((e) => e.ability === 'intimidate') && b.teamB[0].statStages.atk === -1, 'Intimidation dès l\'arrivée');
   resolveTurn(b, pass, pass);
-  ok(b.teamB[0].statStages.atk === -1, 'Intimidation baisse l\'Attaque adverse');
+  ok(b.teamB[0].statStages.atk === -1, 'Intimidation ne rejoue pas au tour suivant');
+}
+{ // Colère : 2-3 tours, puis confusion ; Demi-Tour : choix du remplaçant
+  const b = battle([mon(149, { ability: null })], [mon(143, { ability: null, hp: 9999, maxHp: 9999 })]);
+  b.teamA[0].moves[0] = 'outrage'; b.teamA[0].ppMap.outrage = 10;
+  let n2 = 0; resolveTurn(b, move('outrage'), pass);
+  while (b.teamA[0].rampage && n2++ < 5) resolveTurn(b, move(b.teamA[0].moves[1]), pass);
+  ok(n2 >= 1 && n2 <= 2 && b.teamA[0].confused > 0, 'Colère : 2 ou 3 tours puis confusion');
+  const c = battle([mon(149, { ability: null }), mon(6, { ability: null })], [mon(143, { ability: null })]);
+  c.teamA[0].moves[0] = 'u_turn'; c.teamA[0].ppMap.u_turn = 20;
+  resolveTurn(c, move('u_turn'), pass);
+  ok(c.phase === 'switch_forced_A' && chooseBotAction(c, 'A').targetIndex === 1, 'Demi-Tour : le lanceur laisse sa place');
+}
+{ // Méga-Évolution : la nouvelle Vitesse compte dès le tour de l'évolution
+  const f = MEGAS[65][0], a = mon(65, { item: f.stone, ability: null }), d = mon(65, { ability: null });
+  d.stats = { ...d.stats, spe: Math.round((a.stats.spe + f.stats.spe) / 2) };
+  const b = battle([a], [d]);
+  const { events } = resolveTurn(b, { type: 'move', moveId: a.moves[0], mega: true }, move(d.moves[0]));
+  ok(events.find((e) => e.type === 'attack_start').side === 'A', 'Méga : plus rapide dès ce tour');
 }
 { // Sécheresse : soleil, Feu ×1,5
   const b = battle([mon(383, { ability: 'drought' })], [mon(143, { ability: null })]);

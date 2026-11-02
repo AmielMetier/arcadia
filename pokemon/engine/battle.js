@@ -282,6 +282,18 @@ function onEntry(state, side, logEvent) {
   }
 }
 
+/** Talents d'arrivée en attente (début de combat, remplaçant), joués tout de suite, le plus rapide d'abord. */
+export function runEntry(state) {
+  const events = [];
+  const logEvent = (e) => { events.push(e); if (state.history) { const t = e.msg || e.text; if (t) state.history.push({ turn: state.turn, text: t, type: e.type }); } };
+  if (state.entry && state.entry.length && !String(state.phase).startsWith('switch_forced')) {
+    const q = [...new Set(state.entry)]; state.entry = [];
+    q.sort((x, y) => getEffectiveSpeed(getActivePokemon(state, y), state) - getEffectiveSpeed(getActivePokemon(state, x), state));
+    for (const side of q) onEntry(state, side, logEvent);
+  }
+  return events;
+}
+
 /** Baies (une seule fois) : Sitrus sous la moitié des PV, Prine dès qu'un statut tombe. */
 function checkBerries(poke, side, logEvent, state) {
   if (!poke || poke.fainted || poke.hp <= 0 || poke.itemUsed) return;
@@ -339,9 +351,12 @@ export function resolveTurn(state, actionA, actionB) {
     }
   }
   // Régé-Force : en quittant le combat, le Pokémon récupère un tiers de ses PV
-  const regen = (poke) => { if (poke && !poke.fainted && poke.ability === 'regenerator' && poke.hp < poke.maxHp) poke.hp = Math.min(poke.maxHp, poke.hp + Math.floor(poke.maxHp / 3)); };
+  const regen = (poke) => { if (poke) { poke.confused = 0; poke.rampage = null; } if (poke && !poke.fainted && poke.ability === 'regenerator' && poke.hp < poke.maxHp) poke.hp = Math.min(poke.maxHp, poke.hp + Math.floor(poke.maxHp / 3)); };
 
   // --- 1. Gestion des Switchs volontaires (priorité absolue) ---
+  // Colère : le Pokémon enchaîne la même attaque 2 ou 3 tours, sans pouvoir changer
+  const rampTo = (act, poke) => (poke && !poke.fainted && poke.rampage && poke.ppMap ? { type: 'move', moveId: poke.rampage.move } : act);
+  actionA = rampTo(actionA, pA); actionB = rampTo(actionB, pB);
   if (actionA && actionA.type === 'switch') {
     const targetIdx = actionA.targetIndex;
     if (targetIdx !== state.activeA && state.teamA[targetIdx] && !state.teamA[targetIdx].fainted) {
@@ -421,6 +436,7 @@ export function resolveTurn(state, actionA, actionB) {
     return poke.moves.includes(poke.choiceLock) && pp > 0 ? { ...act, moveId: poke.choiceLock } : act;
   };
   actionA = lockTo(actionA, pA); actionB = lockTo(actionB, pB);
+  state.pivot = {};
 
   let firstSide = 'A';
   const moveA = actionA && actionA.type === 'move' ? MOVES[actionA.moveId] : null;
@@ -469,6 +485,23 @@ export function resolveTurn(state, actionA, actionB) {
     if (attPoke.disabled && attPoke.disabled.move === moveId && attPoke.disabled.turns > 0) {
       logEvent({ type: 'msg', text: `${attPoke.name} ne peut pas utiliser ${attMove.name}, elle est bloquée !` });
       return;
+    }
+
+    // Confusion (après Colère) : 1 chance sur 3 de se blesser
+    if (attPoke.confused > 0) {
+      attPoke.confused--;
+      if (attPoke.confused === 0) logEvent({ type: 'msg', text: `${attPoke.name} n'est plus confus !` });
+      else {
+        logEvent({ type: 'msg', text: `${attPoke.name} est confus...` });
+        if (Math.random() < 1 / 3) {
+          const dmg = Math.max(1, Math.floor(((22 * 40 * getEffectiveStat(attPoke, 'atk') / getEffectiveStat(attPoke, 'def')) / 50 + 2) * (0.85 + Math.random() * 0.15)));
+          attPoke.hp = Math.max(0, attPoke.hp - dmg);
+          logEvent({ type: 'recoil', side: attSide, damage: dmg, hp: attPoke.hp, maxHp: attPoke.maxHp, msg: `Il se blesse dans sa confusion !` });
+          if (attPoke.hp === 0) { attPoke.fainted = true; logEvent({ type: 'faint', side: attSide, pokemonId: attPoke.id, name: attPoke.name, msg: `${attPoke.name} est K.O. !` }); }
+          attPoke.rampage = null;
+          return;
+        }
+      }
     }
 
     // Gestion du Sommeil (1 à 3 tours)
@@ -536,6 +569,7 @@ export function resolveTurn(state, actionA, actionB) {
 
     // Gestion du soin (Recover, Roost, etc.)
     if (attMove.effect && attMove.effect.type === 'heal') {
+      if (attPoke.hp >= attPoke.maxHp) { logEvent({ type: 'msg', text: `Mais ${attPoke.name} a déjà tous ses PV !` }); return; }
       const healAmount = Math.floor(attPoke.maxHp * attMove.effect.val);
       attPoke.hp = Math.min(attPoke.maxHp, attPoke.hp + healAmount);
       logEvent({
@@ -696,6 +730,24 @@ export function resolveTurn(state, actionA, actionB) {
       applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
     }
 
+    // Colère : 2 ou 3 tours d'affilée, puis le lanceur est épuisé et confus
+    if (attMove.rampage && !attPoke.fainted) {
+      if (!attPoke.rampage) attPoke.rampage = { move: moveId, left: Math.random() < 0.5 ? 2 : 1 };
+      else if (--attPoke.rampage.left <= 0) {
+        attPoke.rampage = null;
+        attPoke.confused = 2 + Math.floor(Math.random() * 4);
+        logEvent({ type: 'msg', text: `${attPoke.name} est épuisé et devient confus !` });
+      }
+    }
+    // Demi-Tour, Change Éclair : après le coup, le lanceur laisse sa place (choix du remplaçant à la fin du tour)
+    if (attMove.pivot && !attPoke.fainted) {
+      const team = attSide === 'A' ? state.teamA : state.teamB, cur = attSide === 'A' ? state.activeA : state.activeB;
+      if (team.some((p, i) => i !== cur && !p.fainted)) {
+        state.pivot[attSide] = true;
+        logEvent({ type: 'msg', text: `${attPoke.name} revient vers ${getTrainer(state, attSide).name} !` });
+      }
+    }
+
     // K.O. du défenseur
     if (defPoke.hp === 0) {
       defPoke.fainted = true;
@@ -827,11 +879,14 @@ export function resolveTurn(state, actionA, actionB) {
   } else {
     const curA = getActivePokemon(state, 'A');
     const curB = getActivePokemon(state, 'B');
-    if (curA.fainted && curB.fainted) {
+    const pv = state.pivot || {};
+    const needA = curA.fainted || (pv.A && !curA.fainted), needB = curB.fainted || (pv.B && !curB.fainted);
+    state.pivot = {};
+    if (needA && needB) {
       state.phase = 'switch_forced_both';
-    } else if (curA.fainted) {
+    } else if (needA) {
       state.phase = 'switch_forced_A';
-    } else if (curB.fainted) {
+    } else if (needB) {
       state.phase = 'switch_forced_B';
     } else {
       state.phase = 'choose';
@@ -849,6 +904,9 @@ export function resolveTurn(state, actionA, actionB) {
 export function forceSwitch(state, side, targetIdx) {
   const team = side === 'A' ? state.teamA : state.teamB;
   if (!team[targetIdx] || team[targetIdx].fainted) return false;
+  const out = team[side === 'A' ? state.activeA : state.activeB];
+  if (out === team[targetIdx]) return false;
+  if (out) { out.rampage = null; out.confused = 0; if (!out.fainted && out.ability === 'regenerator') out.hp = Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)); }
 
   if (side === 'A') state.activeA = targetIdx;
   else state.activeB = targetIdx;

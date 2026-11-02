@@ -8,7 +8,7 @@ import {
   openPreview, setReady, buildBattle, recordGame, koCredits, markGone, isOver, currentMatch,
   getParticipant, sideOf, placeOf,
 } from '../engine/tournament.js';
-import { resolveTurn, forceSwitch, estimateTurnDuration } from '../engine/battle.js';
+import { resolveTurn, forceSwitch, estimateTurnDuration, runEntry } from '../engine/battle.js';
 import { chooseBotAction, chooseBestSwitch } from '../engine/bot.js';
 
 const DRAFT_SECS = 50;
@@ -178,6 +178,7 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
     broadcast();
     after(SPLASH_MS, () => {
       intro = false;
+      introEvents.push(...runEntry(battle));   // Intimidation, météo… dès l'arrivée sur le terrain
       broadcast(introEvents);
       after(estimateTurnDuration(introEvents), startTurn);
     });
@@ -215,8 +216,9 @@ export function startHost({ bridge, solo, settings, me, onState, resume = null }
       if (!ev) return;
       if (b.phase === 'choose') {
         clearTurn();
-        broadcast([ev]);
-        after(estimateTurnDuration([ev]), startTurn);
+        const evs = [ev, ...runEntry(b)];
+        broadcast(evs);
+        after(estimateTurnDuration(evs), startTurn);
       } else {
         broadcast([ev]);
       }

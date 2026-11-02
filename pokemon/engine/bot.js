@@ -22,7 +22,8 @@ function chooseBotActionRaw(battle, side, difficulty = 'normal') {
   const myPoke = myTeam[myActiveIdx];
   const oppPoke = getActivePokemon(battle, side === 'A' ? 'B' : 'A');
 
-  if (!myPoke || myPoke.fainted) {
+  const forced = battle.phase === 'switch_forced_both' || battle.phase === `switch_forced_${side}`;   // K.O. ou Demi-Tour / Change Éclair
+  if (!myPoke || myPoke.fainted || forced) {
     // Switch forcé
     return chooseBestSwitch(myTeam, myActiveIdx, oppPoke);
   }
