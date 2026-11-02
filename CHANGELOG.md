@@ -1,5 +1,14 @@
 # Journal des versions — Arcadia
 
+## 3.41 — 2 novembre 2026
+- **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
+  - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.
+  - Frappe, arme un gros coup ou place un coup de pied sauté. Les coups à la tête assomment plus vite.
+  - Tes mains s'agrippent à tout : attrape un adversaire, traîne-le, soulève-le s'il est sonné et jette-le dans le vide.
+  - En tombant, rattrape-toi à un rebord et hisse-toi. Mais tes bras fatiguent vite.
+  - Trois arènes : les toits et leur planche, le chantier et son boulet, l'usine et ses tapis qui mènent au vide sous un pilon.
+  - Jusqu'à 6 joueurs et 8 pantins avec les bots, sur ordinateur, téléphone ou manette.
+
 ## 3.40 — 2 novembre 2026
 - **Poké Duel** — Nouveau format VGC, en 2 contre 2 : à choisir dans les réglages du salon (« Format »).
   - Au draft, tu gardes 6 Pokémon sur 12. Avant chaque manche, tu en choisis 4 dans l'ordre : les 2 premiers commencent sur le terrain, les 2 autres attendent en réserve.
