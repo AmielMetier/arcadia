@@ -4,7 +4,7 @@
 
 import { MOVES } from './moves.js';
 import { getEffectiveness } from './types.js';
-import { calculateDamage, getActivePokemon, canMega, foeSides, allySide, teamOf, teamKey, activeIdxOf } from './battle.js';
+import { calculateDamage, getActivePokemon, canMega, foeSides, allySide, teamOf, teamKey, activeIdxOf, benchOf } from './battle.js';
 import { CHOICE } from './items.js';
 import { absorbs, moveTypeFor } from './abilities.js';
 
@@ -191,9 +191,9 @@ export function chooseDoublesAction(battle, side, difficulty = 'normal') {
 
 /** Remplaçant pour un emplacement vide (double) : le Pokémon du banc qui craint le moins les adversaires. */
 export function chooseDoublesSwitch(battle, side) {
-  const team = teamOf(battle, side), on = activeIdxOf(battle, teamKey(side));
+  const team = teamOf(battle, side);
   const foes = foeSides(battle, side).map((s) => getActivePokemon(battle, s)).filter((p) => p && !p.fainted);
-  const cands = team.map((p, i) => ({ p, i })).filter(({ p, i }) => !p.fainted && !on.includes(i));
+  const cands = benchOf(battle, side).map((i) => ({ p: team[i], i }));
   if (!cands.length) return null;
   const risk = (p) => foes.reduce((n, f) => n + Math.max(...f.types.map((t) => getEffectiveness(t, p.types))), 0);
   cands.sort((a, b) => risk(a.p) - risk(b.p) || b.p.hp / b.p.maxHp - a.p.hp / a.p.maxHp);

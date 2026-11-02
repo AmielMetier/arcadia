@@ -6,7 +6,7 @@
 
 import { startHost } from '../pokemon/net/host.js';
 import { startClient } from '../pokemon/net/client.js';
-import { autoDraft, getParticipant, currentMatch, sideOf, teamSizeOf, isVgc } from '../pokemon/engine/tournament.js';
+import { autoDraft, getParticipant, currentMatch, sideOf, teamSizeOf, isVgc, isMulti, slotOf } from '../pokemon/engine/tournament.js';
 import { sidesOf, teamKey, getActivePokemon, foeSides } from '../pokemon/engine/battle.js';
 
 // Le temps passe 40 fois plus vite (chronos, animations, réflexion des bots)
@@ -69,20 +69,24 @@ function autoPlayer(me, session) {
     if (s.phase === 'draft' && meP && !meP.team && !meP._sent) {
       meP._sent = true;
       session().draft(autoDraft(meP.offer, teamSizeOf(t)));
-    } else if (s.phase === 'preview' && side && !t.ready[side]) {
+    } else if (s.phase === 'preview' && isMulti(t) && slotOf(m, me.id) && !t.ready[slotOf(m, me.id)]) {
+      session().ready(Math.floor(Math.random() * 3));
+    } else if (s.phase === 'preview' && !isMulti(t) && side && !t.ready[side]) {
       session().ready(isVgc(t) ? [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, 4) : Math.floor(Math.random() * 3));
     } else if (s.phase === 'battle' && side && s.battle && s.battle.doubles) {
       // double : un remplaçant par emplacement vide, sinon une attaque et une cible au hasard pour chacun de ses Pokémon
       const b = s.battle;
+      const mine = b.owners ? sidesOf(b).filter((x) => String(b.owners[x]) === String(me.id)) : sidesOf(b).filter((y) => teamKey(y) === side);
       if (b.phase === 'switch_forced') {
-        const slot = (b.need || []).find((x) => teamKey(x) === side);
+        const slot = (b.need || []).find((x) => mine.includes(x));
         if (!slot) return;
         const team = side === 'A' ? b.teamA : b.teamB, on = sidesOf(b).filter((x) => teamKey(x) === side).map((x) => b['active' + x]);
-        const idx = team.findIndex((p, i) => !on.includes(i) && !p.fainted);
+        const pool = b.pools ? b.pools[slot] : team.map((_, i) => i);
+        const idx = team.findIndex((p, i) => pool.includes(i) && !on.includes(i) && !p.fainted);
         if (idx >= 0) session().submitAction({ type: 'switch', targetIndex: idx, slot });
-      } else if (b.phase === 'choose' && !(side === 'A' ? s.submittedA : s.submittedB)) {
+      } else if (b.phase === 'choose' && !mine.every((x) => (s.submittedSlots || {})[x])) {
         const acts = {};
-        for (const x of sidesOf(b).filter((y) => teamKey(y) === side)) {
+        for (const x of mine) {
           const p = getActivePokemon(b, x);
           if (!p || p.fainted) continue;
           const foes = foeSides(b, x).filter((f) => { const q = getActivePokemon(b, f); return q && !q.fainted; });
@@ -220,6 +224,24 @@ console.log('--- Tournoi VGC (combat en double) à 3 joueurs ---');
   ok(t.rounds.flat().some((m) => m.games.some((g) => g.teamA.length === 4)), 'chaque manche se joue à 4 Pokémon');
   host.session.destroy(); g1.session.destroy(); g2.session.destroy();
   console.log(`✓ Tournoi VGC terminé · champion : ${getParticipant(t, t.champion).name}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log('--- 2 contre 2 entre joueurs (4 joueurs, puis 3 joueurs + 1 bot) ---');
+for (const n of [4, 3]) {
+  const P4 = [...P, { id: 4, name: 'Léa', color: '#a466c9' }].slice(0, n);
+  const room = makeRoom(P4);
+  const st = { ...settings, format: 'multi' };
+  const host = spawn(room, P4[0], st);
+  const guests = P4.slice(1).map((p) => spawn(room, p, st));
+  await until(() => host.log.last && host.log.last.phase === 'podium', 90000, `podium 2 contre 2 (${n} joueurs)`);
+  const t = host.log.last.t, m = t.rounds[0][0];
+  ok(t.format === 'multi' && t.participants.length === 4 && m.aIds.length === 2 && m.bIds.length === 2, 'deux équipes de deux');
+  ok(t.participants.filter((p) => p.bot).length === 4 - n, `${4 - n} bot pour compléter`);
+  ok(m.games.length >= 2 && m.games.every((g) => g.teamA.length === 6), 'chaque joueur amène ses 3 Pokémon');
+  ok(guests.every((g) => g.log.states.includes('battle')), 'tous les joueurs ont vu le combat');
+  host.session.destroy(); guests.forEach((g) => g.session.destroy());
+  console.log(`✓ 2 contre 2 à ${n} joueurs · ${m.scoreA}-${m.scoreB} · gagnants : ${(m.winner === m.a ? m.aIds : m.bIds).map((id) => getParticipant(t, id).name).join(' & ')}`);
 }
 
 console.log('\nRÉSEAU DU TOURNOI POKÉ DUEL : TOUS LES TESTS SONT AU VERT');

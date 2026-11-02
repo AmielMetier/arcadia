@@ -23,6 +23,27 @@ export const TEAM_SIZE = 3;
 export const VGC_TEAM = 6;
 export const VGC_BRING = 4;
 export const isVgc = (t) => !!t && t.format === 'vgc';
+// 2 contre 2 entre joueurs : deux équipes de 2 dresseurs tirées au sort, chacun son Pokémon sur le terrain
+export const isMulti = (t) => !!t && t.format === 'multi';
+export const isDoubles = (t) => isVgc(t) || isMulti(t);
+const MULTI_SLOTS = ['A', 'C', 'B', 'D'];   // aIds[0], aIds[1], bIds[0], bIds[1]
+/** Emplacement d'un joueur dans un match à 2 contre 2 (A, C, B ou D), ou null */
+export function slotOf(match, pid) {
+  if (!match || !match.aIds) return null;
+  const all = [...match.aIds, ...match.bIds];
+  const i = all.findIndex((x) => same(x, pid));
+  return i >= 0 ? MULTI_SLOTS[i] : null;
+}
+/** Dresseur d'un emplacement (2 contre 2) */
+export const ownerOf = (match, slot) => (match && match.aIds ? [...match.aIds, ...match.bIds][MULTI_SLOTS.indexOf(slot)] : null);
+/** Un camp vu comme un dresseur : en 2 contre 2, les deux noms réunis (« Amiel & Nico ») */
+export function sideInfo(t, m, side) {
+  const ids = m && (side === 'A' ? m.aIds : m.bIds);
+  const cap = getParticipant(t, side === 'A' ? m.a : m.b);
+  if (!ids || !cap) return cap;
+  const ps = ids.map((id) => getParticipant(t, id)).filter(Boolean);
+  return { ...cap, name: ps.map((p) => p.name).join(' & '), bot: ps.every((p) => p.bot), members: ps };
+}
 export const teamSizeOf = (t) => (isVgc(t) ? VGC_TEAM : TEAM_SIZE);
 
 export const BOT_TRAINERS = [
@@ -71,8 +92,8 @@ export function currentMatch(t) {
 /** Côté ('A' | 'B') d'un dresseur dans un match, ou null s'il n'y joue pas. */
 export function sideOf(match, pid) {
   if (!match) return null;
-  if (same(match.a, pid)) return 'A';
-  if (same(match.b, pid)) return 'B';
+  if (same(match.a, pid) || (match.aIds && match.aIds.some((x) => same(x, pid)))) return 'A';
+  if (same(match.b, pid) || (match.bIds && match.bIds.some((x) => same(x, pid)))) return 'B';
   return null;
 }
 
@@ -239,24 +260,25 @@ export function createTournament(players, options = {}) {
   const gen = options.gen || 'all';
   const botsAllowed = options.bots === undefined ? true : !!Number(options.bots);
   const finalBestOf = Number(options.finalBestOf) === 1 ? 1 : 3;
-  const format = options.format === 'vgc' ? 'vgc' : 'single';
+  const format = options.format === 'vgc' ? 'vgc' : options.format === 'multi' ? 'multi' : 'single';
   const size0 = format === 'vgc' ? VGC_TEAM : TEAM_SIZE;
   const n = Math.max(1, players.length);
 
   // Taille de l'arbre. Sans bots, les places vides deviennent des exemptions (qualifié d'office).
   let size;
-  if (n >= 5) size = 8;
+  if (format === 'multi') size = 4;   // 2 contre 2 : quatre dresseurs (bots si besoin), un seul match
+  else if (n >= 5) size = 8;
   else if (n >= 3) size = 4;
   else size = botsAllowed ? 4 : 2; // en solo sans bots, il faut quand même un adversaire : un bot
 
-  const humans = shuffle(players, rng).map((p) => ({
+  const humans = shuffle(players, rng).slice(0, format === 'multi' ? 4 : undefined).map((p) => ({
     id: p.id,
     name: p.name || 'Dresseur',
     color: p.color || '#ff4b2b',
     bot: false,
   }));
 
-  const needBots = n === 1 ? size - 1 : (botsAllowed ? size - humans.length : 0);
+  const needBots = format === 'multi' ? size - humans.length : n === 1 ? size - 1 : (botsAllowed ? size - humans.length : 0);
   const bots = shuffle(BOT_TRAINERS, rng).slice(0, Math.max(0, needBots)).map((b) => ({
     id: b.id, name: b.name, title: b.title, color: b.color, bot: true,
   }));
@@ -290,9 +312,16 @@ export function createTournament(players, options = {}) {
   pairs = shuffle(pairs, rng);
 
   const rounds = [];
-  let count = k;
+  if (format === 'multi') {
+    // équipes tirées au sort : les deux premiers contre les deux suivants
+    const ids = shuffle(participants.map((p) => p.id), rng);
+    rounds.push([{ id: 'r0m0', r: 0, i: 0, name: 'Combat en équipe', bestOf: finalBestOf, a: ids[0], b: ids[2], aIds: [ids[0], ids[1]], bIds: [ids[2], ids[3]],
+      scoreA: 0, scoreB: 0, games: [], winner: null, status: 'pending', how: null }]);
+    pairs = [];
+  }
+  let count = format === 'multi' ? 0 : k;
   let r = 0;
-  for (;;) {
+  for (; count > 0;) {
     const name = roundName(count);
     const round = [];
     for (let i = 0; i < count; i++) {
@@ -394,10 +423,11 @@ export function resolveAutomatic(t, opts = {}) {
         progressed = true;
         continue;
       }
-      const A = getParticipant(t, m.a);
-      const B = getParticipant(t, m.b);
-      if (A.gone || B.gone) {
-        finishMatch(t, m, A.gone && !B.gone ? m.b : m.a, 'forfeit');
+      const A = sideInfo(t, m, 'A');
+      const B = sideInfo(t, m, 'B');
+      const goneA = m.aIds ? A.members.every((p) => p.gone) : A.gone, goneB = m.bIds ? B.members.every((p) => p.gone) : B.gone;
+      if (goneA || goneB) {
+        finishMatch(t, m, goneA && !goneB ? m.b : m.a, 'forfeit');
         done.push(m.id);
         progressed = true;
         continue;
@@ -455,10 +485,24 @@ export function openPreview(t, match) {
   t.ready = { A: false, B: false };
   const A = getParticipant(t, match.a);
   const B = getParticipant(t, match.b);
+  if (isMulti(t)) {
+    // chacun choisit son Pokémon de tête parmi les siens ; les bots (et les joueurs partis) choisissent tout de suite
+    t.lead = { A: null, C: null, B: null, D: null };
+    t.ready = { A: false, C: false, B: false, D: false };
+    const opp = (slot) => (teamKey2(slot) === 'A' ? match.bIds : match.aIds).flatMap((id) => getParticipant(t, id).team);
+    for (const slot of MULTI_SLOTS) {
+      const P = getParticipant(t, ownerOf(match, slot));
+      if (P.bot || P.gone) { t.lead[slot] = chooseLead(P.team, opp(slot)); t.ready[slot] = true; }
+    }
+    return;
+  }
   const pick = isVgc(t) ? chooseBring : chooseLead;
   if (A.bot) { t.lead.A = pick(A.team, B.team); t.ready.A = true; }
   if (B.bot) { t.lead.B = pick(B.team, A.team); t.ready.B = true; }
 }
+const teamKey2 = (slot) => (slot === 'A' || slot === 'C' ? 'A' : 'B');
+/** Tous les dresseurs du match ont-ils validé ? */
+export const allReady = (t) => Object.values(t.ready || {}).every(Boolean);
 
 /** VGC : les 4 Pokémon à amener (les 2 premiers commencent), choisis face à l'équipe adverse. */
 export function chooseBring(teamIds, oppIds) {
@@ -477,7 +521,8 @@ export function chooseBring(teamIds, oppIds) {
 export const validBring = (v) => Array.isArray(v) && v.length === VGC_BRING && new Set(v).size === VGC_BRING && v.every((i) => Number.isInteger(i) && i >= 0 && i < VGC_TEAM);
 
 export function setLead(t, side, idx) {
-  if (t.phase !== 'preview' || !['A', 'B'].includes(side)) return false;
+  if (t.phase !== 'preview' || !(side in (t.ready || {}))) return false;
+  if (isMulti(t)) { const i = Number(idx); if (!(i >= 0 && i < TEAM_SIZE)) return false; t.lead[side] = i; return true; }
   if (isVgc(t)) { const v = Array.isArray(idx) ? idx.map(Number) : null; if (!validBring(v)) return false; t.lead[side] = v; return true; }
   const i = Number(idx);
   if (!(i >= 0 && i < TEAM_SIZE)) return false;
@@ -486,7 +531,7 @@ export function setLead(t, side, idx) {
 }
 
 export function setReady(t, side, leadIdx) {
-  if (t.phase !== 'preview' || !['A', 'B'].includes(side)) return false;
+  if (t.phase !== 'preview' || !(side in (t.ready || {}))) return false;
   if (leadIdx != null) setLead(t, side, leadIdx);
   t.ready[side] = true;
   return true;
@@ -506,6 +551,26 @@ function teamFor(ids, leadIdx, items) {
 export function buildBattle(t, match) {
   const A = getParticipant(t, match.a);
   const B = getParticipant(t, match.b);
+  if (isMulti(t)) {
+    // chaque dresseur amène ses 3 Pokémon, tête en premier ; emplacement A/C pour l'équipe A, B/D pour l'équipe B
+    const ids = [...match.aIds, ...match.bIds];
+    const mons = {};
+    for (const [k, slot] of MULTI_SLOTS.entries()) {
+      const P = getParticipant(t, ids[k]);
+      const opp = (teamKey2(slot) === 'A' ? match.bIds : match.aIds).flatMap((id) => getParticipant(t, id).team);
+      const li = t.lead[slot] != null ? t.lead[slot] : chooseLead(P.team, opp);
+      mons[slot] = teamFor(P.team, li, P.items);
+    }
+    const SA = sideInfo(t, match, 'A'), SB = sideInfo(t, match, 'B');
+    const battle = createBattle({
+      trainerA: { id: SA.id, name: SA.name, color: SA.color, bot: SA.bot }, trainerB: { id: SB.id, name: SB.name, color: SB.color, bot: SB.bot },
+      teamA: [...mons.A, ...mons.C], teamB: [...mons.B, ...mons.D], doubles: true,
+      pools: { A: [0, 1, 2], C: [3, 4, 5], B: [0, 1, 2], D: [3, 4, 5] },
+      owners: { A: ids[0], C: ids[1], B: ids[2], D: ids[3] },
+    });
+    t.phase = 'battle';
+    return battle;
+  }
   if (isVgc(t)) {
     if (!validBring(t.lead.A)) t.lead.A = chooseBring(A.team, B.team);
     if (!validBring(t.lead.B)) t.lead.B = chooseBring(B.team, A.team);
@@ -579,11 +644,15 @@ export function recordGame(t, match, battle, credits = []) {
   if (winner) {
     if (winner === 'A') match.scoreA++;
     else match.scoreB++;
-    (winner === 'A' ? A : B).stats.gameW++;
-    (winner === 'A' ? B : A).stats.gameL++;
+    const wIds = match.aIds ? (winner === 'A' ? match.aIds : match.bIds) : [winner === 'A' ? match.a : match.b];
+    const lIds = match.aIds ? (winner === 'A' ? match.bIds : match.aIds) : [winner === 'A' ? match.b : match.a];
+    for (const id of wIds) getParticipant(t, id).stats.gameW++;
+    for (const id of lIds) getParticipant(t, id).stats.gameL++;
   }
-  for (const [side, P, team] of [['A', A, battle.teamA], ['B', B, battle.teamB]]) {
-    for (const p of team) {
+  for (const [side, P0, team] of [['A', A, battle.teamA], ['B', B, battle.teamB]]) {
+    for (const [i, p] of team.entries()) {
+      // 2 contre 2 : les 3 premiers Pokémon sont à l'un, les 3 suivants à l'autre
+      const P = match.aIds ? getParticipant(t, (side === 'A' ? match.aIds : match.bIds)[i < TEAM_SIZE ? 0 : 1]) : P0;
       const s = monStat(t, P.id, p.id);
       s.games++;
       if (p.fainted) { s.fainted++; P.stats.lost++; }
@@ -616,6 +685,8 @@ export function markGone(t, pid) {
   if (!p.items) p.items = suggestItems(p.team);
   const m = currentMatch(t);
   const side = sideOf(m, pid);
+  // 2 contre 2 : tant qu'un coéquipier reste, un bot prend la place du joueur parti
+  if (m && m.aIds && (side === 'A' ? m.aIds : m.bIds).some((id) => !getParticipant(t, id).gone && !getParticipant(t, id).bot)) return null;
   if (m && side && m.status === 'live') {
     finishMatch(t, m, side === 'A' ? m.b : m.a, 'forfeit');
     t.last = {
@@ -688,6 +759,7 @@ export function simulateMatch(t, match, difficulty = 'normal') {
 
 /** Place de chaque dresseur : 1 champion, 2 finaliste, 3 demi-finalistes, 5 quart-finalistes. */
 export function placeOf(t, pid) {
+  if (isMulti(t)) { const m = t.rounds[0][0]; return m.winner == null ? 2 : sideOf(m, pid) === (same(m.winner, m.a) ? 'A' : 'B') ? 1 : 2; }
   if (same(t.champion, pid)) return 1;
   const R = t.rounds.length;
   let last = 0;
