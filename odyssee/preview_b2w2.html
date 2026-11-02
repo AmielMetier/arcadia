@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Preview Pixel-Art Pokémon B2W2 UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="odyssee.css">
+<style>
+  :root { --px: 3px; }
+  body {
+    background: #06090e;
+    color: #fff;
+    padding: 24px;
+    margin: 0;
+    font-family: 'Chakra Petch', 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+    overflow-y: auto;
+  }
+  .preview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .preview-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #00f0ff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 2px solid #14283c;
+    padding-bottom: 6px;
+  }
+  .preview-box {
+    position: relative;
+    width: 960px;
+    height: 540px;
+    background: #0a0e16;
+    border: 2px solid #20344c;
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 1. START MENU (PAUSE AVEC X - SANS SAUVER) -->
+  <div class="preview-section">
+    <div class="preview-title">1. MENU PAUSE (TOUCHE X) — OPTION SAUVEGARDER RETIRÉE & STYLE PIXEL ART</div>
+    <div class="preview-box" style="height: 360px; background: url('img/battle/bg_grass.png') center/cover;">
+      <div class="list startmenu" style="display: flex;">
+        <div class="list-title">MENU</div>
+        <div class="list-items">
+          <div class="list-row on"><span class="cur">▶</span><span class="lbl">POKéDEX</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">ÉQUIPE</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">SAC</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">RED</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">CARTE</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">CODE</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">OPTIONS</span></div>
+          <div class="list-row"><span class="cur">▶</span><span class="lbl">FERMER</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ÉCRAN D'ÉQUIPE PIXEL-ART AUTHENTIQUE -->
+  <div class="preview-section">
+    <div class="preview-title">2. ÉCRAN D'ÉQUIPE — PIXEL-ART 16-BIT / 5G AUTHENTIQUE (COINS CRANTÉS, OMBLAGE 1-BIT, SOCLE ISOMÉTRIQUE)</div>
+    <div class="preview-box" style="height: 620px;">
+      <div class="screen party-scr" style="position: relative; width: 100%; height: 100%;">
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+            <span class="scr-bar-title">ÉQUIPE POKÉMON</span>
+            <span class="scr-bar-sub">5 / 6</span>
+          </div>
+          <div class="scr-bar-right">
+            <span class="scr-cap-badge">NIV. MAX AUTORISÉ : <b>N.21</b> <i>(Marine)</i></span>
+          </div>
+        </div>
+
+        <div class="party-b2w2">
+          <!-- Lead Card -->
+          <div class="pcol-lead">
+            <div class="pslot-lead-card on" data-idx="0">
+              <div class="pslot-lead-top">
+                <div class="pslot-lead-badge-row">
+                  <span class="pslot-star-tag">★ 1 LEADER</span>
+                  <div class="pslot-socket">
+                    <img class="pslot-ball-ico" src="img/battle/poke_ball_32.png" alt="">
+                  </div>
+                </div>
+                <div class="pslot-lead-lvl-row">
+                  <span class="pl">Lv. 18</span>
+                </div>
+              </div>
+              <div class="pslot-lead-pedestal">
+                <div class="pslot-ped-ring"></div>
+                <img class="pslot-lead-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png" alt="">
+              </div>
+              <div class="pslot-lead-info">
+                <div class="pslot-lead-name-row">
+                  <span class="pn">Bulbizarre</span>
+                  <span class="g m">♂</span>
+                </div>
+                <div class="pslot-types">
+                  <span class="pslot-type" style="--tc:#78c850">PLANTE</span>
+                  <span class="pslot-type" style="--tc:#a040a0">POISON</span>
+                </div>
+                <div class="pslot-hp-box">
+                  <div class="hp-b2w2">
+                    <span class="hp-tag">HP</span>
+                    <div class="hp-track"><u style="width:100%;background:#20d860"></u></div>
+                  </div>
+                  <div class="phpn">48 / 48</div>
+                </div>
+                <div class="pexp-b2w2">
+                  <span class="pexp-tag">EXP</span>
+                  <div class="pexp-track"><u style="width:35%"></u></div>
+                  <span class="pexp-val">35%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Slots -->
+          <div class="pcol-subs">
+            <!-- Slot 2 -->
+            <div class="pslot-sub" data-idx="1">
+              <div class="pslot-sub-left">
+                <div class="pslot-socket">
+                  <img class="pslot-ball-ico" src="img/battle/poke_ball_32.png" alt="">
+                </div>
+                <span class="pslot-sub-num">#2</span>
+                <div class="pslot-sub-ped">
+                  <img class="pslot-sub-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png" alt="">
+                </div>
+              </div>
+              <div class="pslot-sub-mid">
+                <div class="pslot-sub-top">
+                  <span class="pn">Salamèche</span>
+                  <span class="g m">♂</span>
+                </div>
+                <div class="pslot-sub-mid-row">
+                  <div class="pslot-types"><span class="pslot-type" style="--tc:#f08030">FEU</span></div>
+                  <div class="pslot-sub-tags"><span class="pl">Lv. 17</span></div>
+                </div>
+              </div>
+              <div class="pslot-sub-right">
+                <div class="hp-b2w2">
+                  <span class="hp-tag">HP</span>
+                  <div class="hp-track"><u style="width:88%;background:#20d860"></u></div>
+                </div>
+                <div class="phpn">38 / 42</div>
+                <div class="pexp-b2w2">
+                  <span class="pexp-tag">EXP</span>
+                  <div class="pexp-track"><u style="width:62%"></u></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot 3 -->
+            <div class="pslot-sub" data-idx="2">
+              <div class="pslot-sub-left">
+                <div class="pslot-socket">
+                  <img class="pslot-ball-ico" src="img/battle/great_ball_32.png" alt="">
+                </div>
+                <span class="pslot-sub-num">#3</span>
+                <div class="pslot-sub-ped">
+                  <img class="pslot-sub-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png" alt="">
+                </div>
+              </div>
+              <div class="pslot-sub-mid">
+                <div class="pslot-sub-top">
+                  <span class="pn">Carapuce</span>
+                  <span class="g f">♀</span>
+                </div>
+                <div class="pslot-sub-mid-row">
+                  <div class="pslot-types"><span class="pslot-type" style="--tc:#6890f0">EAU</span></div>
+                  <div class="pslot-sub-tags"><span class="pl">Lv. 16</span></div>
+                </div>
+              </div>
+              <div class="pslot-sub-right">
+                <div class="hp-b2w2">
+                  <span class="hp-tag">HP</span>
+                  <div class="hp-track"><u style="width:100%;background:#20d860"></u></div>
+                </div>
+                <div class="phpn">44 / 44</div>
+                <div class="pexp-b2w2">
+                  <span class="pexp-tag">EXP</span>
+                  <div class="pexp-track"><u style="width:80%"></u></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot 4 -->
+            <div class="pslot-sub" data-idx="3">
+              <div class="pslot-sub-left">
+                <div class="pslot-socket">
+                  <img class="pslot-ball-ico" src="img/battle/ultra_ball_32.png" alt="">
+                </div>
+                <span class="pslot-sub-num">#4</span>
+                <div class="pslot-sub-ped">
+                  <img class="pslot-sub-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png" alt="">
+                </div>
+              </div>
+              <div class="pslot-sub-mid">
+                <div class="pslot-sub-top">
+                  <span class="pn">Pikachu</span>
+                  <span class="g m">♂</span>
+                </div>
+                <div class="pslot-sub-mid-row">
+                  <div class="pslot-types"><span class="pslot-type" style="--tc:#f8d030">ÉLECTRIK</span></div>
+                  <div class="pslot-sub-tags"><span class="pl">Lv. 19</span></div>
+                </div>
+              </div>
+              <div class="pslot-sub-right">
+                <div class="hp-b2w2">
+                  <span class="hp-tag">HP</span>
+                  <div class="hp-track"><u style="width:92%;background:#20d860"></u></div>
+                </div>
+                <div class="phpn">35 / 38</div>
+                <div class="pexp-b2w2">
+                  <span class="pexp-tag">EXP</span>
+                  <div class="pexp-track"><u style="width:15%"></u></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot 5 (K.O.) -->
+            <div class="pslot-sub ko" data-idx="4">
+              <div class="pslot-sub-left">
+                <div class="pslot-socket">
+                  <img class="pslot-ball-ico" src="img/battle/poke_ball_32.png" alt="">
+                </div>
+                <span class="pslot-sub-num">#5</span>
+                <div class="pslot-sub-ped">
+                  <img class="pslot-sub-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/16.png" alt="">
+                </div>
+              </div>
+              <div class="pslot-sub-mid">
+                <div class="pslot-sub-top">
+                  <span class="pn">Roucool</span>
+                  <span class="g f">♀</span>
+                </div>
+                <div class="pslot-sub-mid-row">
+                  <div class="pslot-types"><span class="pslot-type" style="--tc:#a8a878">NORMAL</span><span class="pslot-type" style="--tc:#a890f0">VOL</span></div>
+                  <div class="pslot-sub-tags"><span class="st" style="background:#c03838">K.O.</span><span class="pl">Lv. 15</span></div>
+                </div>
+              </div>
+              <div class="pslot-sub-right">
+                <div class="hp-b2w2">
+                  <span class="hp-tag">HP</span>
+                  <div class="hp-track"><u style="width:0%;background:#e03030"></u></div>
+                </div>
+                <div class="phpn">0 / 40</div>
+                <div class="pexp-b2w2">
+                  <span class="pexp-tag">EXP</span>
+                  <div class="pexp-track"><u style="width:0%"></u></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot 6 (Empty) -->
+            <div class="pslot-sub empty">
+              <div class="pslot-sub-left">
+                <div class="pslot-socket empty"></div>
+                <span class="pslot-sub-num">#6</span>
+              </div>
+              <div class="pslot-empty-lbl">EMPLACEMENT DISPONIBLE #6</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pfoot">
+          <div class="box phelp">Sélectionne un Pokémon (Clic ou Entrée · Échap pour quitter).</div>
+          <button type="button" class="pcancel">RETOUR ✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. ÉCRAN DE RÉSUMÉ PIXEL-ART -->
+  <div class="preview-section">
+    <div class="preview-title">3. ÉCRAN DE RÉSUMÉ — STYLE PIXEL-ART CARTOUCHE DS</div>
+    <div class="preview-box" style="height: 540px;">
+      <div class="screen sum-scr" style="position: relative; width: 100%; height: 100%; padding: calc(var(--px) * 6);">
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+            <span class="scr-bar-title">RÉSUMÉ POKÉMON</span>
+            <span class="scr-bar-sub">1 / 5</span>
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-nav-btn">▲ PRÉC.</button>
+            <button type="button" class="scr-nav-btn">▼ SUIV.</button>
+            <button type="button" class="scr-close-btn">RETOUR ✕</button>
+          </div>
+        </div>
+        <div class="sum-body">
+          <div class="sum-left">
+            <div class="sum-head">
+              <span class="sum-name">Bulbizarre <span class="g m">♂</span></span>
+              <span class="sum-lvl">N.18</span>
+            </div>
+            <div class="sum-stage">
+              <img class="sum-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png" alt="">
+            </div>
+            <div class="sum-types-row">
+              <span class="type" style="background:#78c850">PLANTE</span>
+              <span class="type" style="background:#a040a0">POISON</span>
+            </div>
+            <div class="hp-b2w2">
+              <span class="hp-tag">HP</span>
+              <div class="hp-track"><u style="width:100%;background:#20d860"></u></div>
+            </div>
+            <div class="phpn">48 / 48 PV</div>
+          </div>
+          <div class="sum-right">
+            <div class="tabs">
+              <button type="button" class="sum-tab"><b>INFOS DRESSEUR</b><small>Aperçu</small></button>
+              <button type="button" class="sum-tab"><b>STATISTIQUES</b><small>Capacités</small></button>
+              <button type="button" class="sum-tab on"><b>ATTAQUES CONNUES</b><small>4/4</small></button>
+            </div>
+            <div class="sum-content">
+              <div class="moves">
+                <div class="mv" style="--tc:#78c850">
+                  <div class="mv-top"><span class="mvn">Fouet Lianes</span><span class="type" style="background:#78c850">PLANTE</span><span class="mvpp">PP <b>25</b>/25</span></div>
+                  <div class="mvd">Puissance : 45 · Précision : 100%</div>
+                </div>
+                <div class="mv" style="--tc:#a8a878">
+                  <div class="mv-top"><span class="mvn">Charge</span><span class="type" style="background:#a8a878">NORMAL</span><span class="mvpp">PP <b>35</b>/35</span></div>
+                  <div class="mvd">Puissance : 40 · Précision : 100%</div>
+                </div>
+                <div class="mv" style="--tc:#a040a0">
+                  <div class="mv-top"><span class="mvn">Poudre Dodo</span><span class="type" style="background:#a040a0">POISON</span><span class="mvpp">PP <b>15</b>/15</span></div>
+                  <div class="mvd">Catégorie : Statut · Précision : 75%</div>
+                </div>
+                <div class="mv" style="--tc:#78c850">
+                  <div class="mv-top"><span class="mvn">Canon Graine</span><span class="type" style="background:#78c850">PLANTE</span><span class="mvpp">PP <b>15</b>/15</span></div>
+                  <div class="mvd">Puissance : 80 · Précision : 100%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sum-help">◀ ▶ Changer d'onglet · ▲ ▼ Changer de Pokémon · Clic ou Échap pour fermer</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. BOÎTE DE DIALOGUE PIXEL-ART -->
+  <div class="preview-section">
+    <div class="preview-title">4. BOÎTE DE DIALOGUE — OBSIDIENNE PIXEL-ART (SANS ARRONDIS LISSES VECTORIELS NI FLOU)</div>
+    <div class="preview-box" style="height: 250px; background: url('img/battle/bg_grass.png') center/cover; padding-top: 30px; box-sizing: border-box;">
+      <div class="dlg has-face" style="display: block; position: relative; bottom: auto; left: auto; right: auto; margin: 20px auto 0;">
+        <span class="dlg-name">Prof. Saule</span>
+        <img class="dlg-face" src="img/portraits/saule.png" alt="">
+        <div class="dlg-txt">Bienvenue dans l'archipel d'Odyssée, jeune dresseur !
+Chaque recoin de ces îles abrite des créatures légendaires prêtes à se joindre à ton équipe.
+Prends ces Poké Balls et pars à l'aventure !</div>
+        <div class="dlg-arrow">▼</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. ENREGISTREMENT POKÉDEX PIXEL-ART -->
+  <div class="preview-section">
+    <div class="preview-title">5. ENREGISTREMENT POKÉDEX — PIXEL-ART RETRO (COINS BISEAUTÉS 1-BIT, SANS FLOU)</div>
+    <div class="preview-box" style="height: 480px; display: flex; align-items: center; justify-content: center; background: #080c14;">
+      <div class="pdx-shell" style="margin: 0 auto;">
+        <div class="pdx-topbar">
+          <div class="pdx-lights">
+            <div class="pdx-lens"></div>
+            <div class="pdx-light red"></div>
+            <div class="pdx-light yellow"></div>
+            <div class="pdx-light green"></div>
+          </div>
+          <div class="pdx-header-lbl">
+            <span class="pdx-header-sub">POKÉDEX D'ODYSSÉE</span>
+            <span class="pdx-header-title">NOUVELLE ENTRÉE DÉTECTÉE</span>
+          </div>
+        </div>
+        <div class="pdx-body">
+          <div class="pdx-left-col">
+            <div class="pdx-num-banner">
+              <span class="pdx-num-digital">N° 025</span>
+              <span class="pdx-stamp">✓ ENREGISTRÉ</span>
+            </div>
+            <div class="pdx-holo-frame">
+              <div class="pdx-pedestal"></div>
+              <img class="pdx-mon-spr" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png" alt="">
+            </div>
+            <div class="pdx-sensor-bar">SIGNAL BIO-ACOUSTIQUE IDENTIFIÉ</div>
+          </div>
+          <div class="pdx-right-col">
+            <div class="pdx-name-card">
+              <div class="pdx-name-main">
+                <span class="pdx-name-txt">Pikachu</span>
+                <span class="g m">♂</span>
+              </div>
+              <span class="pdx-genus-tag">Pokémon Souris</span>
+            </div>
+            <div class="pdx-specs-row">
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">TYPE(S)</span>
+                <div class="pdx-types"><span class="pdx-type-badge" style="--tc:#f8d030">ÉLECTRIK</span></div>
+              </div>
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">TAILLE</span>
+                <span class="pdx-spec-val"><b>0.4</b> m</span>
+              </div>
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">POIDS</span>
+                <span class="pdx-spec-val"><b>6.0</b> kg</span>
+              </div>
+            </div>
+            <div class="pdx-desc-card">
+              <div class="pdx-desc-bar">
+                <span class="pdx-desc-title">RAPPORT DU POKÉDEX</span>
+                <span class="pdx-desc-cur">■</span>
+              </div>
+              <div class="pdx-desc-viewport">
+                <div class="pdx-desc-txt">Pikachu a de petites poches pleines d'électricité sur ses joues. S'il se sent menacé, il laisse s'échapper des décharges électriques.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pdx-footbar">
+          <span class="pdx-status-msg">✓ Données de Pikachu inscrites dans le Pokédex !</span>
+          <button type="button" class="pdx-btn-next ready">CONTINUER ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

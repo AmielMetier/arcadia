@@ -7,6 +7,10 @@
   - Tout est chiffré dans ton navigateur avant de partir : le serveur ne reçoit jamais ton mot de passe et ne peut pas lire ton profil. Attention, un mot de passe oublié ne peut pas être récupéré.
   - Tu as déjà un compte ? Ouvre « Modifier » puis « 🔐 Protéger mon compte par mot de passe ».
   - Chaque changement (pseudo, couleur, amis) est sauvegardé tout seul.
+- **Odyssée** — Refonte Pixel-Art rétro DS (5G) des menus et suppression de l'option Sauvegarder du menu X :
+  - **Menu Pause (Touche X)** : retrait définitif de l'option « Sauvegarder » devenue inutile grâce à la sauvegarde automatique continue de chaque progression. Boîtier DS biseauté sombre avec curseur flèche rouge pixel-art « ▶ ».
+  - **Écran d'Équipe 100% Pixel-Art Rétro DS** : élimination complète de l'aspect « vectoriel/Figma/IA » (fin des arrondis lisses, des halos radiaux flous et des ombres gaussiennes). Adoption de découpes en escalier / biseaux crantés, ombrage 1-bit solide franc, alvéoles de Poké Balls octogonales biseautées, socle de combat isométrique pixel-art à anneau cyan étincelant pour le Pokémon de tête, jauges de PV à cartouche or « HP » et blocs de pixels à double surbrillance, et curseur dynamique « ▶ » rouge clignotant pointant vers le Pokémon sélectionné.
+  - **Écran de Résumé et Pokédex Pixel-Art** : onglets façon cartouches DS avec biseaux à 45°, cartouches de capacités rectangulaires avec liseré de type solide et compteurs de PP rétro, alcôve de présentation avec socle isométrique et écran Pokédex aux diodes franches.
 
 ## 3.60 — 2 novembre 2026
 - **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.

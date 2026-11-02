@@ -651,7 +651,7 @@ export class Game {
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
     if (Object.keys(st.flags).some((k) => k.startsWith('Q:'))) opts.push(['QUÊTES', 'quests']);
-    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
+    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
       const r = await this.ui.list({ items: opts.map(([l]) => ({ label: l })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
