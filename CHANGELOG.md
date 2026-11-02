@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.59 — 2 novembre 2026
+- **Mystère Mystère** — un mode « Sans souris » pour jouer tout au clavier (Réglages → Commandes).
+  - Z Q S D pour marcher, les flèches tournent la vue.
+  - F pour frapper ou tirer, C pour couper le courant.
+  - Pour lancer le couteau, tiens G : une jauge se remplit, plus tu tiens, plus il part loin et vite.
+  - Le banc de la galerie ne bloque plus la porte de la chambre du maître.
+
 ## 3.58 — 2 novembre 2026
 - **Mystère Mystère** — les meubles du manoir sont enfin à leur place.
   - La grande table de la salle à manger est dans le bon sens, avec ses chaises tout autour.

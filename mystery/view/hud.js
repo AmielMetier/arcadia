@@ -8,7 +8,7 @@ const mmss = (t) => { const s = Math.max(0, Math.ceil(t)); return `${Math.floor(
 export const ROLE_ICON = { m: '🔪', s: '⭐', i: '🛡️', h: '🦸', x: '🧭' };
 export const ROLE_COLOR = { m: '#ff4d5e', s: '#4da3ff', i: '#3ddc84', h: '#ffc531', x: '#c58bff' };
 const ROLE_GOAL = {
-  m: ['Élimine tout le monde', 'Couteau caché (1), sorti (2 ou clic). Clic : frapper · clic droit : lancer · F : couper le courant.'],
+  m: ['Élimine tout le monde', 'Couteau caché (1), sorti (2 ou clic). Clic : frapper · clic droit : lancer · F : couper le courant. Sans souris : F frapper · tenir G lancer · C couper le courant.'],
   s: ['Abats le meurtrier', 'Clic pour sortir le revolver, clic pour tirer. Toucher un innocent te sonne et te fait lâcher l\'arme.'],
   i: ['Survis jusqu\'à l\'aube', 'Ramasse les pièces, ouvre l\'œil, fuis le couteau. Si le revolver tombe, cours le prendre !'],
   h: ['Abats le meurtrier', 'Tu as ramassé le revolver : à toi de jouer les héros.'],
@@ -20,7 +20,7 @@ export class HUD {
   constructor() {
     this.root = $('#hud');
     this.el = {};
-    for (const id of ['banner', 'toast', 'feed', 'prompt', 'ptxt', 'clock', 'role', 'coins', 'slots', 'stam', 'gunmark', 'spec', 'card', 'vig', 'board', 'lockHint', 'cross', 'ring', 'note', 'stick', 'hit']) this.el[id] = $(`#${id}`);
+    for (const id of ['banner', 'toast', 'feed', 'prompt', 'ptxt', 'clock', 'role', 'coins', 'slots', 'stam', 'gunmark', 'spec', 'card', 'vig', 'board', 'lockHint', 'cross', 'ring', 'note', 'stick', 'hit', 'charge']) this.el[id] = $(`#${id}`);
     this.bannerT = 0; this.toastT = 0; this.cardT = 0; this.sigSlots = ''; this.sigBoard = ''; this.hitT = 0; this.lastTick = -1;
   }
   show(on) { this.root.hidden = !on; }
@@ -72,7 +72,7 @@ export class HUD {
     if (alive && w.ph !== 'over') {
       const has = o.weapon;
       const cdk = role === 'm' ? Math.max(o.cd.stab / CD.stab, 0) : o.cd.gun / CD.gun;
-      const sig = [role, has, r.held, o.hasKnife, Math.ceil(o.cd.bo), w.mode, o.ws].join('|');
+      const sig = [role, has, r.held, o.hasKnife, Math.ceil(o.cd.bo), w.mode, o.ws, o.kb].join('|');
       if (sig !== this.sigSlots) {
         this.sigSlots = sig;
         let h = `<div class="slot ${!r.held ? 'on' : ''}"><kbd>1</kbd><b>✋</b><small>Mains vides</small></div>`;
@@ -80,7 +80,7 @@ export class HUD {
           h += `<div class="slot ${r.held === 'knife' ? 'on' : ''}"><kbd>2</kbd><b>🔪</b><small>Couteau</small></div><div class="slot ${r.held === 'gun' ? 'on' : ''}"><kbd>3</kbd><b>🔫</b><small>Revolver</small></div>`;
         } else if (role === 'm') {
           h += `<div class="slot ${r.held === 'knife' ? 'on' : ''} ${o.hasKnife ? '' : 'off'}"><kbd>2</kbd><b>🔪</b><small>${o.hasKnife ? 'Couteau' : 'Lancé…'}</small></div>`;
-          h += `<div class="slot pw ${o.cd.bo > 0 ? 'off' : 'rdy'}"><kbd>F</kbd><b>💡</b><small>${o.cd.bo > 0 ? `Coupure · ${Math.ceil(o.cd.bo)} s` : 'Coupure'}</small></div>`;
+          h += `<div class="slot pw ${o.cd.bo > 0 ? 'off' : 'rdy'}"><kbd>${o.kb ? 'C' : 'F'}</kbd><b>💡</b><small>${o.cd.bo > 0 ? `Coupure · ${Math.ceil(o.cd.bo)} s` : 'Coupure'}</small></div>`;
         } else if (has) h += `<div class="slot ${r.held === 'gun' ? 'on' : ''}"><kbd>2</kbd><b>🔫</b><small>Revolver</small></div>`;
         e.slots.innerHTML = h;
       }
@@ -90,7 +90,10 @@ export class HUD {
       e.stam.hidden = (o.stam ?? 100) >= 99;
       e.stam.style.setProperty('--k', ((o.stam ?? 100) / 100).toFixed(3));
       e.cross.hidden = false;
-    } else { e.slots.hidden = true; e.ring.hidden = true; e.stam.hidden = true; e.cross.hidden = !mine; }
+      // jauge du lancer (G tenu, mode sans souris)
+      e.charge.hidden = o.charge == null;
+      if (o.charge != null) e.charge.style.setProperty('--k', o.charge.toFixed(3));
+    } else { e.slots.hidden = true; e.ring.hidden = true; e.stam.hidden = true; e.charge.hidden = true; e.cross.hidden = !mine; }
     e.cross.classList.toggle('armed', !!(r && r.held));
     // invite
     if (o.prompt) { e.prompt.hidden = false; e.ptxt.innerHTML = o.prompt; } else e.prompt.hidden = true;
@@ -139,7 +142,7 @@ export function briefingHtml({ host, squad, cfg, embedded, bots, total }) {
     </div>
     ${cfg.mode !== 'explore' && total < 3 ? '<p class="warn">Il faut au moins trois invités : des bots compléteront la table.</p>' : ''}
     <div class="btns">${host ? '<button class="btn go" id="btnGo">Lancer la manche</button>' : ''}${embedded ? '<button class="btn" id="btnExit">Retour au salon</button>' : ''}</div>
-    <p class="keys"><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter · <kbd>1</kbd>/<kbd>2</kbd> ou molette : ranger, sortir l'arme · <kbd>Clic</kbd> frapper, tirer · <kbd>Clic droit</kbd> lancer · <kbd>E</kbd> passages secrets · <kbd>Tab</kbd> invités</p>
+    <p class="keys"><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se déplacer · <kbd>Maj</kbd> courir · <kbd>Espace</kbd> sauter · <kbd>1</kbd>/<kbd>2</kbd> ou molette : ranger, sortir l'arme · <kbd>Clic</kbd> frapper, tirer · <kbd>Clic droit</kbd> lancer · <kbd>E</kbd> passages secrets · <kbd>Tab</kbd> invités · pas de souris ? Réglages → Sans souris</p>
   </div>`;
 }
 export function menuHtml({ solo }) {

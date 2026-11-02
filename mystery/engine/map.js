@@ -264,7 +264,7 @@ export function buildMap() {
   prop(1, 'k-cabinet-medium-decorated', 41, 15.5, 0, { w: 2, d: 1, h: 1.4 });
   prop(1, 'tableRound', 37, 20, 0, { w: 2, d: 2, h: 0.8 }); prop(1, 'chairCushion', 35.85, 20, 1, { h: 1 }); prop(1, 'chairCushion', 38.15, 20, 3, { h: 1 });
   prop(1, 'loungeSofa', 44.55, 19.5, 3, { w: 1, d: 2, h: 0.9 });
-  prop(1, 'benchCushion', 20.5, 11.5, 0, { w: 3, d: 1, h: 0.6, s: [3, 1] });
+  prop(1, 'benchCushion', 25.5, 11.5, 0, { w: 3, d: 1, h: 0.6, s: [3, 1] }); // à côté de la porte de la chambre, pas devant
   prop(1, 'pottedPlant', 30.5, 11.5, 0, { h: 1.3 }); prop(1, 'pottedPlant', 44, 11.5, 0, { h: 1.3 });
   prop(1, 'k-lamp-standing', 1.5, 11.5, 0, { h: 1.8 });
 

@@ -76,6 +76,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 0.4em; margin: 0 0.08e
 .slot.pw.rdy { border-color: rgba(255, 77, 94, 0.7); }
 .stam { position: absolute; bottom: 96px; left: 50%; transform: translateX(-50%); width: 180px; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
 .stam i { display: block; height: 100%; width: calc(var(--k, 1) * 100%); background: linear-gradient(90deg, #7cf2ff, #3ddc84); }
+/* jauge du lancer du couteau (G tenu, sans souris) : sous le viseur */
+.charge { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); width: 120px; height: 8px; border-radius: 5px; background: rgba(255, 255, 255, 0.16); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
+.charge i { display: block; height: 100%; border-radius: 5px; width: calc(var(--k, 0) * 100%); background: linear-gradient(90deg, var(--gold), #ff4d5e); }
+.charge small { position: absolute; top: 11px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--cream); text-shadow: 0 1px 2px #000; }
 .gunmark { position: absolute; left: 0; top: 0; margin: -26px 0 0 -26px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 197, 49, 0.92); color: #2a1a00; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 22px rgba(255, 197, 49, 0.8); }
 .gunmark b { font-size: 22px; line-height: 1; font-weight: 400; } .gunmark small { font-size: 11px; font-weight: 700; }
 .gunmark.edge { opacity: 0.85; transform-origin: center; }

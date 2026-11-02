@@ -62,7 +62,8 @@ const SETTINGS = {
   test: (k) => sfx.play(k === 'music' ? 'role-i' : 'coin'),
   sections: [
     { title: 'Jeu', items: [
-      { label: 'Sensibilité de la souris', get: () => input.sens, set: (v) => input.setSens(v), range: [0.3, 3, 0.05], format: (v) => `${Math.round(v * 100)} %` },
+      { label: 'Commandes', get: () => (input.kb ? 'kb' : 'mouse'), set: (v) => input.setKb(v === 'kb'), options: [['mouse', 'Souris'], ['kb', 'Sans souris']] },
+      { label: 'Sensibilité de la vue', get: () => input.sens, set: (v) => input.setSens(v), range: [0.3, 3, 0.05], format: (v) => `${Math.round(v * 100)} %` },
       { label: 'Qualité de l\'image', get: () => S.quality || 'normal', set: (v) => { S.quality = v; try { localStorage.setItem('mystery_q', v); } catch (e) {} scene && scene.setQuality(v); }, options: [['bas', 'Rapide'], ['normal', 'Normale'], ['haut', 'Fine']] },
     ] },
     { title: 'Commandes', items: [{ keys: [
@@ -74,6 +75,13 @@ const SETTINGS = {
       ['Couper le courant (meurtrier)', '<kbd>F</kbd>', 'Ⓑ'],
       ['Invités', '<kbd>Tab</kbd>', ''],
       ['Pause', '<kbd>Échap</kbd>', 'Start'],
+    ] }] },
+    { title: 'Sans souris', items: [{ keys: [
+      ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>'],
+      ['Tourner la vue', '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd>'],
+      ['Frapper · tirer', '<kbd>F</kbd>'],
+      ['Lancer le couteau', 'tenir <kbd>G</kbd> : plus longtemps, plus fort'],
+      ['Couper le courant (meurtrier)', '<kbd>C</kbd>'],
     ] }] },
   ],
 };
@@ -298,7 +306,7 @@ function newRun(run) {
 }
 function cleanInput(m) {
   const n = (v, a, b) => (Number.isFinite(+v) ? clamp(+v, a, b) : 0);
-  return { mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), yaw: n(m.yaw, -1e4, 1e4), pitch: n(m.pitch, -1.5, 1.5), run: !!m.run, jump: !!m.jump, draw: !!m.draw, ws: m.ws ? 1 : 0, fc: m.fc | 0, sc: m.sc | 0, uc: m.uc | 0, bc: m.bc | 0, q: m.q | 0 };
+  return { mx: n(m.mx, -1, 1), my: n(m.my, -1, 1), yaw: n(m.yaw, -1e4, 1e4), pitch: n(m.pitch, -1.5, 1.5), run: !!m.run, jump: !!m.jump, draw: !!m.draw, ws: m.ws ? 1 : 0, fc: m.fc | 0, sc: m.sc | 0, uc: m.uc | 0, bc: m.bc | 0, q: m.q | 0, tp: m.tp === undefined ? 1 : n(m.tp, 0.3, 1) };
 }
 
 // ------------------------------------------------------------------ invité
@@ -543,7 +551,8 @@ function step(dt) {
 }
 function hudInfo(v) {
   const priv = v.priv, real = v.real, w = v.w;
-  const o = { role: priv && real && !real.spec ? priv.role : null, coins: priv ? priv.coins : 0, cd: priv ? priv.cd : { stab: 0, gun: 0, bo: 0 }, hasKnife: priv ? priv.hasKnife : false, weapon: priv ? (priv.hasGun || priv.hasKnife) : false, stam: priv ? priv.stam : 100, stun: priv ? priv.stun : false, ws: input.ws, board: S.board, stick: input.stick(), lockHint: !QS.has('debug') && !input.locked && !input.free && !S.lobby && !S.endShown && !S.menu };
+  const o = { role: priv && real && !real.spec ? priv.role : null, coins: priv ? priv.coins : 0, cd: priv ? priv.cd : { stab: 0, gun: 0, bo: 0 }, hasKnife: priv ? priv.hasKnife : false, weapon: priv ? (priv.hasGun || priv.hasKnife) : false, stam: priv ? priv.stam : 100, stun: priv ? priv.stun : false, ws: input.ws, board: S.board, stick: input.stick(), lockHint: !QS.has('debug') && !input.locked && !input.free && !S.lobby && !S.endShown && !S.menu, kb: input.kb };
+  if (real && real.held === 'knife' && v.mine) o.charge = input.charge();
   // invite : passage secret, couteau planté
   if (real && !real.dead && v.mine && w.ph !== 'over') {
     for (const ps of M.passages) if (ps.lv === real.lv && Math.hypot(ps.x - real.x, ps.z - real.z) < 2.1) { o.prompt = `${w.pass[ps.id] ? 'Refermer' : 'Ouvrir'} ${esc(ps.name)}`; break; }

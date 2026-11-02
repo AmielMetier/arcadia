@@ -20,7 +20,8 @@ export const ROLE = { m: 'Meurtrier', s: 'Shérif', i: 'Innocent', h: 'Héros', 
 export const FL = { MOVE: 1, RUN: 2, AIR: 4, DRAWN: 8, KNIFE: 16, GUN: 32, ATK: 64, SHOT: 128, THROW: 256, DEAD: 512, STUN: 1024, FROZEN: 2048, SPEC: 4096 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-export const emptyInput = () => ({ mx: 0, my: 0, yaw: 0, pitch: 0, run: false, jump: false, draw: false, ws: 0, fc: 0, sc: 0, uc: 0, bc: 0, q: 0 });
+// tp : force du lancer (0,3 à 1), réglée en tenant G en mode sans souris
+export const emptyInput = () => ({ mx: 0, my: 0, yaw: 0, pitch: 0, run: false, jump: false, draw: false, ws: 0, fc: 0, sc: 0, uc: 0, bc: 0, q: 0, tp: 1 });
 export const alive = (p) => p.st === 'ok';
 const aimDir = (yaw, pitch) => [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 
@@ -225,8 +226,8 @@ export class Sim {
   throwKnife(p) {
     if (p.cd.throw > 0 || p.cd.stab > 0.4 || !p.hasKnife) return;
     p.cd.throw = CD.throw; p.throwT = 0.45; p.hasKnife = false; p.drawn = false;
-    const [dx, dy, dz] = aimDir(p.yaw, p.pitch);
-    const k = { id: this.w.nid++, owner: p.id, x: p.x + dx * 0.5, y: p.y + EYE - 0.1 + dy * 0.5, z: p.z + dz * 0.5, vx: dx * KNIFE_V, vy: dy * KNIFE_V + 1, vz: dz * KNIFE_V, fly: true, ret: KNIFE_RET, life: 0, yaw: p.yaw };
+    const [dx, dy, dz] = aimDir(p.yaw, p.pitch), v = KNIFE_V * Math.min(1, Math.max(0.3, p.inp.tp ?? 1));
+    const k = { id: this.w.nid++, owner: p.id, x: p.x + dx * 0.5, y: p.y + EYE - 0.1 + dy * 0.5, z: p.z + dz * 0.5, vx: dx * v, vy: dy * v + 1, vz: dz * v, fly: true, ret: KNIFE_RET, life: 0, yaw: p.yaw };
     if (p.role === 'x') { p.hasKnife = true; k.owner = -1; }
     this.w.knives.push(k); this.dirty = true;
     this.emit({ e: 'throw', id: p.id, x: k.x, y: k.y, z: k.z });
