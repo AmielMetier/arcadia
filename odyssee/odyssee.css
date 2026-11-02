@@ -2665,3 +2665,14 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .starter-trio img { width: calc(var(--px) * 64); height: calc(var(--px) * 64); image-rendering: pixelated; }
 .starter-trio figcaption { font-size: 0.8em; font-weight: 700; }
 .starter-trio figcaption small { display: block; font-weight: 400; opacity: 0.75; font-size: 0.8em; }
+
+/* journal des quêtes : le carnet (phrases de rappel, sans indice) */
+.qdiary { margin-top: calc(var(--px) * 4); display: flex; flex-direction: column; gap: calc(var(--px) * 2.5); overflow-y: auto; min-height: 0; }
+.qdiary p {
+  margin: 0; padding: calc(var(--px) * 2.5) calc(var(--px) * 4); line-height: 1.35; font-size: 0.86em; color: #a8b8d0;
+  background: #121a26; border-left: calc(var(--px) * 1.5) solid #34465e;
+}
+.qdiary p.last { color: #fff; background: #1a2638; border-left-color: #ffe058; }
+.qempty { padding: calc(var(--px) * 8); color: #8aa0be; text-align: center; font-size: 0.85em; line-height: 1.4; }
+.qcat-tag.qcat-legend { background: #a040c8; }
+.qcat-tag.qcat-npc { background: #3c8c44; }

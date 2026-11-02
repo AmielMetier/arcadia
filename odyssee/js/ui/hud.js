@@ -146,7 +146,7 @@ export class Hud {
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${st.trackedQuest || ''};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 
@@ -223,10 +223,10 @@ export class Hud {
           <div class="hud-quest-card" data-act="quests" title="Objectif suivi : cliquer pour ouvrir le Journal (Touche Q)">
             <div class="hud-qc-head">
               <span class="hud-qc-star">★ SUIVIE</span>
-              <span class="hud-qc-loc">📍 ${esc(tracked.destination)}</span>
+              <span class="hud-qc-loc">${esc(tracked.since || '')}</span>
             </div>
             <div class="hud-qc-name">${esc(tracked.name)}</div>
-            <div class="hud-qc-step">${esc(tracked.stepDesc)}</div>
+            <div class="hud-qc-step">${esc(tracked.note || '')}</div>
           </div>
         ` : ''}
       </div>

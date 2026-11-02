@@ -289,8 +289,9 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
   /* ======================== quêtes annexes ======================== */
   {
     const { A, B, C, D, E, F, G, H, I } = towns;
-    tn(B, 26, 14, { id: 'medaillon', sprite: 'lucie', dir: 'down', move: 'turn', script: 'deliver', deliver: {
-      item: 'medaillon', flag: 'qMedaillon', who: 'Lucie', reward: [['rare-candy', 1], ['super-potion', 3]],
+    // (Margaux, pas Lucie : Lucie est déjà la fille au Ponyta de Sylvebourg, dans l'histoire de la Brume)
+    tn(B, 26, 14, { id: 'medaillon', sprite: 'fillette2', dir: 'down', move: 'turn', script: 'deliver', deliver: {
+      item: 'medaillon', flag: 'qMedaillon', who: 'Margaux', reward: [['rare-candy', 1], ['super-potion', 3]],
       ask: ['Snif... J\'ai perdu le médaillon de ma grand-mère en jouant dans le Bois Murmure.', 'Il est sûrement tombé derrière un petit arbre... Je n\'arrive pas à passer !'],
       thanks: ['Mon médaillon ! Tu l\'as retrouvé ! Merci, merci, merci !', 'Tiens, c\'est tout ce que j\'ai. Grand-mère dit que ça rend les Pokémon plus forts.'], done: ['Je ne le quitterai plus jamais !'] } });
     tn(C, 8, 13, { id: 'geologue', sprite: 'montagnard', dir: 'down', script: 'show', show: {

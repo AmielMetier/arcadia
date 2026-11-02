@@ -1,494 +1,270 @@
-// odyssee/js/core/questsData.js — Moteur et registre complet des quêtes d'Odyssée :
-// - Quêtes principales (La Ligue Céleste, L'Ombre de l'Éclipse & Lugia Obscur)
-// - Grandes aventures secondaires (Ponyta de Lucie, Lac Miroir, Courrier perdu, etc.)
-// - Missions et requêtes des habitants (Médaillon, Spécimen Magicarpe, Géologue, etc.)
-// - Système de suivi d'objectif actif ("en suivre une") avec calcul précis du "Où aller"
-
+// odyssee/js/core/questsData.js — le journal des quêtes : un carnet de voyage, pas un guide.
+// Chaque quête acceptée y laisse de courtes phrases qui rappellent ce qu'on nous a demandé et ce qui s'est passé,
+// jamais où aller ni quoi faire ensuite. Le journal retient aussi quand la quête a été acceptée (en temps de jeu),
+// pour qu'on se souvienne d'une promesse faite deux heures plus tôt.
+//
+// Une entrée : { id, cat, name, giver, started(f, g), done(f, g), notes: [[condition(f, g), phrase], …] }
+// Les phrases dont la condition est vraie s'affichent dans l'ordre ; la dernière est la plus récente.
+import { SPECIES } from '../data/species.js';
 import { BADGES, LEADERS } from '../world/region.js';
+import { ELITE } from '../world/story.js';
+import { MISSIONS } from '../world/habitants.js';
 
 export const QUEST_CATEGORIES = {
-  main: { id: 'main', label: 'Histoire Principale', badge: 'PRINCIPALE', color: '#f8d030' },
-  side: { id: 'side', label: 'Aventures & Mystères', badge: 'AVENTURE', color: '#00f0ff' },
-  npc:  { id: 'npc',  label: 'Missions des Habitants', badge: 'HABITANTS', color: '#78c850' },
+  main: { id: 'main', label: 'Histoire', badge: 'HISTOIRE', color: '#f8d030' },
+  side: { id: 'side', label: 'Aventures', badge: 'AVENTURE', color: '#00f0ff' },
+  legend: { id: 'legend', label: 'Légendes', badge: 'LÉGENDE', color: '#e070ff' },
+  npc: { id: 'npc', label: 'Habitants', badge: 'HABITANT', color: '#78c850' },
 };
 
-/**
- * Informations enrichies pour chaque quête du jeu
- */
-const QUEST_METADATA = {
-  // --- 1. HISTOIRE PRINCIPALE ---
-  ligue: {
-    id: 'ligue',
-    cat: 'main',
-    name: 'La Ligue Céleste',
-    giver: 'Professeur Saule',
-    icon: 'trophy',
-    desc: 'Le voyage initiatique à travers la région d\'Odyssée : conquérir les 8 Badges d\'Arène et défier la Ligue Céleste.',
-    reward: 'Titre de Maître de la Ligue & Badge Céleste',
-  },
-  eclipse: {
-    id: 'eclipse',
-    cat: 'main',
-    name: 'L\'Ombre de la Team Éclipse',
-    giver: 'Voyante de Mirage',
-    icon: 'dark-gem',
-    desc: 'La Team Éclipse vole l\'énergie de la région pour refermer le cœur de Lugia et plonger le monde dans une nuit éternelle.',
-    reward: 'Apaisement de Lugia Obscur & Rétablissement du jour',
-  },
+const step = (f, id) => f['Q:' + id] || 0;
+const atLeast = (id, n) => (f) => { const s = step(f, id); return s === 'fin' || (typeof s === 'number' && s >= n); };
+const fin = (id) => (f) => step(f, id) === 'fin';
+const sp = (n) => SPECIES[n]?.n || '?';
+const gymTown = (g, i) => Object.values(g.world?.towns || {}).find((t) => t.gym === i)?.name || '';
+const rivalB = (g) => (g.rivalB ? g.rivalB() : { name: 'Lyra', il: 'elle', e: 'e', fils: 'petite-fille' });
 
-  // --- 2. GRANDES AVENTURES SECONDAIRES (world/quetes.js) ---
-  ponyta: {
-    id: 'ponyta',
-    cat: 'side',
-    name: 'Le Ponyta de Lucie',
-    giver: 'Lucie (Sylvebourg)',
-    icon: 'heart',
-    reward: 'Accès au Bois Murmure & Insigne de la Brume',
-    dests: [
-      { where: 'Sylvebourg', hint: 'Interroge les 3 villageois : le boulanger, l\'enfant et la grand-mère.' },
-      { where: 'Bois Murmure (Sud)', hint: 'Poursuis le voleur en noir dans le sentier boisé au sud.' },
-      { where: 'Clairière de la Brume', hint: 'Trouve le passage secret à l\'est du Bois Murmure et libère Ponyta de sa cage.' },
-      { where: 'Sylvebourg', hint: 'Rends visite à Lucie dans sa maison pour lui ramener son Ponyta.' },
-    ],
-  },
-  lac: {
-    id: 'lac',
-    cat: 'side',
-    name: 'Les eaux troubles du Lac Miroir',
-    giver: 'Gaston (Rive-Claire)',
-    icon: 'water',
-    reward: 'Lokhlass offert par Gaston & Mesprit apaisé',
-    dests: [
-      { where: 'Lac Miroir (Rive-Claire)', hint: 'Désactive les 3 pompes polluantes installées autour du lac.' },
-      { where: 'Rive Nord du Lac', hint: 'Affronte l\'Admin Sylas qui supervise les opérations de la Brume.' },
-      { where: 'Grotte des Marées (Surf)', hint: 'Traverse le lac en surfant jusqu\'à la caverne centrale.' },
-      { where: 'Fond de la Grotte', hint: 'Explore les tréfonds de la grotte et rencontre le légendaire Mesprit.' },
-      { where: 'Rive-Claire', hint: 'Retourne raconter tes exploits à Gaston dans sa cabane.' },
-    ],
-  },
-  courrier: {
-    id: 'courrier',
-    cat: 'side',
-    name: 'Le courrier perdu',
-    giver: 'Facteur de Port-Azur',
-    icon: 'air-mail',
-    reward: 'Boîte aux lettres & Récompenses de gratitude',
-    dests: [
-      { where: 'Région d\'Odyssée', hint: 'Remets les 4 lettres : Lucie à Sylvebourg, Gaston à Rive-Claire, le Jardinier du Jardin des Songes et le Grand Prêtre de Kagura.' },
-      { where: 'Port-Azur (Quais)', hint: 'Reviens voir le facteur près des bateaux pour lui rendre sa sacoche.' },
-    ],
-  },
-  songes: {
-    id: 'songes',
-    cat: 'side',
-    name: 'Les nuits blanches de Floralia',
-    giver: 'Hélène (Floralia)',
-    icon: 'lunar-wing',
-    reward: 'Sommeil paisible des enfants & Rencontre de Darkrai',
-    dests: [
-      { where: 'Jardin des Songes (Route 6)', hint: 'Consulte le jardinier au sud de la Route 6 sur l\'origine des cauchemars.' },
-      { where: 'Îlot du Lac Miroir', hint: 'Surfe jusqu\'à l\'îlot secret et obtiens la Plume Lune auprès de Cresselia.' },
-      { where: 'Floralia', hint: 'Apporte la Plume Lune à Hélène pour apaiser les enfants tourmentés.' },
-      { where: 'Jardin des Songes (Nuit)', hint: 'Surveille le Jardin des Songes en pleine nuit (entre 20h et 5h du matin).' },
-      { where: 'Forêt des Torii (Route 7)', hint: 'Poursuis Ariane jusqu\'au Temple Kagura au bout de la Forêt des Torii.' },
-      { where: 'Sanctuaire de Kagura', hint: 'Affronte le spectre cauchemardesque Darkrai dans le sanctuaire interdit.' },
-      { where: 'Floralia', hint: 'Retourne rassurer Hélène : les cauchemars ont pris fin.' },
-    ],
-  },
-  kagura: {
-    id: 'kagura',
-    cat: 'side',
-    name: 'Les talismans du Temple Kagura',
-    giver: 'Sakura (Mirage)',
-    icon: 'spell-tag',
-    reward: 'Éveil de la cloche sacrée & Rencontre d\'Uxie (Créhelf)',
-    dests: [
-      { where: 'Forêt des Torii (Route 7)', hint: 'Retrouve les 3 talismans dérobés et vaincs les sbires de la Brume.' },
-      { where: 'Sommet du Temple Kagura', hint: 'Remets les talismans au Grand Prêtre au dernier étage de la tour.' },
-      { where: 'Cour est du Temple', hint: 'Fais sonner la grande Cloche sacrée pour réveiller la bénédiction d\'Uxie.' },
-    ],
-  },
-  voeu: {
-    id: 'voeu',
-    cat: 'side',
-    name: 'Le vœu de la fontaine',
-    giver: 'Fontaine aux Étoiles',
-    icon: 'star-piece',
-    reward: 'Rencontre du Pokémon Vœu Jirachi',
-    dests: [
-      { where: 'Jardin des Songes', hint: 'Découvre 7 éclats d\'étoile cachés dans les zones secrètes et jette-les dans l\'eau.' },
-      { where: 'Banc du Jardin des Songes', hint: 'Le Pokémon étoile Jirachi s\'est posé sur le banc du jardin, va lui parler !' },
-    ],
-  },
-  fossile: {
-    id: 'fossile',
-    cat: 'side',
-    name: 'Le dragon de pierre',
-    giver: 'Savant du Musée des Dragons',
-    icon: 'old-amber',
-    reward: 'Ptéra antique réanimé',
-    dests: [
-      { where: 'Grotte des Marées (Lac Miroir)', hint: 'Cherche dans les recoins inondés de la caverne pour dénicher un Vieil Ambre.' },
-      { where: 'Musée des Dragons (Fort-Écaille)', hint: 'Confie le Vieil Ambre au scientifique pour redonner vie à l\'ancien souverain des cieux.' },
-    ],
-  },
-  magma: {
-    id: 'magma',
-    cat: 'side',
-    name: 'Le cœur du volcan',
-    giver: 'L\'Ancien de Fumerolle',
-    icon: 'red-orb',
-    reward: 'Dissolution de la Brume & Master Ball suprême',
-    dests: [
-      { where: 'Base de la Brume (Fumerolle)', hint: 'Infiltre le quartier général secret de la Brume au nord du village volcanique.' },
-      { where: 'Caverne du Magma', hint: 'Poursuis le Chef Nox dans les profondeurs ardentes de la caverne.' },
-      { where: 'Cœur du Magma', hint: 'Groudon s\'est réveillé dans la lave ! Affronte le Titan des Terres.' },
-      { where: 'Fumerolle', hint: 'Rejoins l\'Ancien du village pour sceller l\'Orbe Rouge et recevoir la Master Ball.' },
-    ],
-  },
+/* ======================================================================
+   Le registre
+   ====================================================================== */
+const QUESTS = [
+  /* ---------- l'histoire ---------- */
+  { id: 'ligue', cat: 'main', name: 'Le voyage du dresseur', giver: 'Prof. Saule',
+    started: (f) => !!f.starter, done: (f) => !!f.champion,
+    notes: [
+      [(f) => f.starter, (f) => `Le Prof. Saule m'a confié ${sp(f.starter)} et un Pokédex. Mon rêve : devenir Maître de la Ligue Céleste.`],
+      ...BADGES.map((b, i) => [(f, g) => g.state.badges[i], (f, g) => `${LEADERS[i].name} m'a remis le ${b.name}${gymTown(g, i) ? ' à ' + gymTown(g, i) : ''}.`]),
+      [(f, g) => g.state.badges.every(Boolean), 'Huit badges en poche. La Ligue Céleste m\'attend.'],
+      ...ELITE.map((e) => [(f) => f['T:' + e.id], `${e.name}, du Conseil 4, s'est incliné${e.name === 'Ombrelle' ? 'e' : ''}.`]),
+      [(f) => f.champion, 'Célestine s\'est inclinée. Je suis le nouveau Maître de la Ligue Céleste !'],
+    ] },
+  { id: 'eclipse', cat: 'main', name: 'L\'ombre de la Team Éclipse', giver: 'Dr Lumen',
+    started: (f) => !!(f['T:ecl:bois1'] || f['T:ecl:bois2'] || f.giftFlash), done: (f) => !!f.lugia,
+    notes: [
+      [(f) => f['T:ecl:bois1'] || f['T:ecl:bois2'] || f.giftFlash, 'Dans le Bois Murmure, des sbires de la Team Éclipse menaçaient le Dr Lumen, un savant qui étudie les Plumes Argentées.'],
+      [(f) => f.giftFlash, 'Le Dr Lumen m\'a parlé d\'un « Prisme Noir », capable de fermer le cœur d\'un Pokémon.'],
+      [(f) => f['T:ecl:erebe1'], 'Erèbe, un Admin de la Team Éclipse, pillait les Pierres Lune de la Grotte Lunaire.'],
+      [(f) => f['T:ecl:nyx1'], 'Nyx, une autre Admin, harcelait un vieux marin de Port-Azur au sujet du gardien des mers.'],
+      [(f) => f['T:ecl:erebe2'], 'J\'ai chassé la Team Éclipse de la Centrale de Voltacité. Elle volait l\'électricité de la région pour son Prisme.'],
+      [(f) => f.eclipse, 'J\'ai battu Nocturne, le chef de la Team Éclipse, dans son repaire. Mais une nuit violette est tombée sur toute la région.'],
+      [(f) => f.giftPlume, 'La voyante de Mirage m\'a confié la Plume Argentée, qui ouvre le Sanctuaire des Marées.'],
+      [(f) => f.giftMaster, 'Au Sanctuaire des Marées, le Dr Lumen m\'a donné une Master Ball.'],
+      [(f) => f['T:ecl:boss2'], 'Nocturne est vaincu, mais Lugia s\'est réveillé, le cœur fermé par le Prisme Noir.'],
+      [(f) => f.lugia, (f) => (f.lugiaCaught ? 'J\'ai capturé Lugia et brisé le Prisme Noir. Le jour est revenu.' : 'Lugia est libéré du Prisme Noir et s\'est envolé. Le jour est revenu.')],
+      [(f) => f.lugiaCaught && f.lugia, 'Le Prof. Saule saura peut-être ouvrir le cœur de Lugia.'],
+    ] },
+  { id: 'freres', cat: 'main', name: 'Les trois frères de l\'archipel', giver: 'Gardes d\'Écaille',
+    started: (f, g) => !!(f.granitDock || g.state.badges[5]), done: (f, g) => !!g.state.badges[7],
+    notes: [
+      [(f, g) => f.granitDock || g.state.badges[5], 'Sur l\'Île de Granit, on m\'a prévenu : sur l\'archipel, ce n\'est pas la Ligue qui fait la loi, c\'est Drakos.'],
+      [(f, g) => g.state.badges[5], 'Basalte, le plus jeune des trois frères, m\'a remis le Badge Granit.'],
+      [(f, g) => g.state.badges[6], 'Pyros, le frère du milieu, m\'a remis le Badge Braise.'],
+      [(f, g) => g.state.badges[7], 'Drakos, l\'aîné, est tombé. Il a promis de rouvrir les ports de l\'archipel.'],
+    ] },
+  { id: 'theo', cat: 'main', name: 'Théo, mon rival', giver: 'Théo',
+    started: (f) => !!f.rival1, done: (f) => !!f.mTheo,
+    notes: [
+      [(f) => f.rival1, (f, g) => `Théo a pris ${sp(g.rivalLine ? g.rivalLine()[0] : 0)} au labo, juste après moi, et m'a défié sur-le-champ.`],
+      [(f) => f.rival2, 'Théo m\'a rattrapé sur la route 2. Lui aussi a son premier badge.'],
+      [(f) => f.rival3, 'Théo m\'attendait à Floralia, sa « ville porte-bonheur ».'],
+      [(f) => f.rival4, 'Au Cap Mirage, Théo a voulu vérifier que j\'étais prêt pour les îles.'],
+      [(f) => f.rival5, 'Sur la route 9, Théo m\'a donné tout ce qu\'il avait avant la Ligue.'],
+      [(f) => f.mTheo, 'J\'ai battu Théo une dernière fois, à Bourg-Aube. Il part découvrir une autre région.'],
+    ] },
+  { id: 'rivalB', cat: 'main', name: (g) => `${rivalB(g).name}, de l'archipel`, giver: 'Prof. Saule',
+    started: (f) => !!f.rivalB1, done: (f) => !!f.rivalB4,
+    notes: [
+      [(f) => f.rivalB1, (f, g) => { const B = rivalB(g); return `${B.name}, ${B.e ? 'la' : 'le'} ${B.fils} du Prof. Saule, est devenu${B.e} Garde d'Écaille. ${B.e ? 'Elle' : 'Il'} voulait voir ce que je valais.`; }],
+      [(f) => f.rivalB2, (f, g) => `À Port-Granit, ${rivalB(g).name} a commencé à douter de Drakos.`],
+      [(f) => f.rivalB3, (f, g) => `${rivalB(g).name} a quitté les Gardes d'Écaille après notre combat devant la Tour de Drakos.`],
+      [(f) => f.rivalB4, (f, g) => `Au Cap des Étoiles, ${rivalB(g).name} et moi nous sommes battus sans uniforme ni camp.`],
+    ] },
 
-  // --- 3. REQUÊTES DES HABITANTS (world/story.js) ---
-  qMedaillon: {
-    id: 'qMedaillon',
-    cat: 'npc',
-    name: 'Le médaillon de Lucie',
-    giver: 'Lucie (Sylvebourg)',
-    icon: 'gift',
-    reward: '1 Super Bonbon & 3 Super Potions',
-    where: 'Bois Murmure (Route 2)',
-    desc: 'Lucie a égaré le médaillon précieux de sa grand-mère derrière un arbuste touffu.',
-    dest: 'Bois Murmure — Utiliser la CS01 Coupe pour trancher l\'arbuste et récupérer le médaillon.',
-  },
-  qMagicarpe: {
-    id: 'qMagicarpe',
-    cat: 'npc',
-    name: 'Le spécimen du pêcheur',
-    giver: 'Pêcheur (Port-Azur)',
-    icon: 'water',
-    reward: '2 Super Bonbons',
-    where: 'Port-Azur (Ponton)',
-    desc: 'Le vieux pêcheur du ponton souhaite admirer un beau Magicarpe aux écailles luisantes.',
-    dest: 'Port-Azur — Capturer un Magicarpe (en surfant ou pêchant) et le lui présenter.',
-  },
-  qRoche: {
-    id: 'qRoche',
-    cat: 'npc',
-    name: 'L\'observation géologique',
-    giver: 'Géologue (Bourg-Granit)',
-    icon: 'rock',
-    reward: '4 Super Balls',
-    where: 'Bourg-Granit',
-    desc: 'Un passionné de minéraux veut examiner la carapace protectrice d\'un Pokémon de type Roche.',
-    dest: 'Grotte Lunaire — Attraper un Pokémon Roche (comme Racaillou) et le montrer au géologue.',
-  },
-  qEchange: {
-    id: 'qEchange',
-    cat: 'npc',
-    name: 'L\'échange de Bastien',
-    giver: 'Bastien (Voltacité)',
-    icon: 'team',
-    reward: 'Magnéti "Boulon" de niveau 18',
-    where: 'Voltacité (Maison)',
-    desc: 'Bastien cherche un Roucool et offre en échange son fidèle Magnéti.',
-    dest: 'Voltacité — Capturer un Roucool sur les premières routes et procéder à l\'échange.',
-  },
-  giftEvoli: {
-    id: 'giftEvoli',
-    cat: 'npc',
-    name: 'L\'adoption d\'Évoli',
-    giver: 'Éleveuse (Floralia)',
-    icon: 'heart',
-    reward: 'Évoli de niveau 20',
-    where: 'Floralia (Grande maison)',
-    desc: 'Une éleveuse attentionnée cherche un dresseur aimant pour adopter un bébé Évoli.',
-    dest: 'Floralia — Visiter la grande demeure bourgeoise et accepter de prendre soin d\'Évoli.',
-  },
-  dexpert: {
-    id: 'dexpert',
-    cat: 'npc',
-    name: 'Les recherches du Chercheur',
-    giver: 'Savant Pokédex (Mirage)',
-    icon: 'dex',
-    reward: '5 Hyper Balls, 3 Super Bonbons & 1 Master Ball',
-    where: 'Mirage',
-    desc: 'Un chercheur récompense les dresseurs qui enrichissent leur Pokédex aux paliers 25, 50 et 80 espèces capturées.',
-    dest: 'Région d\'Odyssée — Capturer de nouvelles espèces et lui rendre visite à Mirage.',
-  },
-  qNiveau: {
-    id: 'qNiveau',
-    cat: 'npc',
-    name: 'L\'épreuve des Sources',
-    giver: 'Vétéran (Cendrelune)',
-    icon: 'fire',
-    reward: '2 Guérisons',
-    where: 'Cendrelune (Sources chaudes)',
-    desc: 'L\'accès aux sources chaudes nécessite d\'avoir entraîné un Pokémon valeureux de niveau 40 ou plus.',
-    dest: 'Cendrelune — Présenter une créature de niveau 40+ au vétéran qui garde le bassin.',
-  },
-  giftMinidraco: {
-    id: 'giftMinidraco',
-    cat: 'npc',
-    name: 'L\'héritage du clan des Dragons',
-    giver: 'Ancien du clan (Cimelune)',
-    icon: 'dragon',
-    reward: 'Minidraco de niveau 30',
-    where: 'Cimelune',
-    desc: 'L\'Ancien transmet l\'héritage draconique aux seuls dresseurs ayant conquis le Badge Écaille.',
-    dest: 'Cimelune — Vaincre le Champion Drakos puis aller parler à l\'Ancien dans sa hutte.',
-  },
-};
+  /* ---------- les aventures (histoire de la Brume et nouveaux lieux) ---------- */
+  { id: 'ponyta', cat: 'side', name: 'Le Ponyta de Lucie', giver: 'Lucie', started: atLeast('ponyta', 1), done: fin('ponyta'),
+    notes: [
+      [atLeast('ponyta', 1), 'Lucie, à Sylvebourg, s\'est fait voler son Ponyta par un individu vêtu de noir. Je lui ai promis de le retrouver.'],
+      [atLeast('ponyta', 2), 'Les habitants de Sylvebourg ont vu le voleur filer vers le Bois Murmure.'],
+      [atLeast('ponyta', 3), 'J\'ai rattrapé le voleur : un sbire d\'une bande qui se fait appeler « la Brume ».'],
+      [atLeast('ponyta', 4), 'J\'ai délivré Ponyta de sa cage.'],
+      [fin('ponyta'), 'Lucie a retrouvé son Ponyta. Mais qui est cette « Brume » ?'],
+    ] },
+  { id: 'lac', cat: 'side', name: 'Les eaux troubles du Lac Miroir', giver: 'Gaston', started: atLeast('lac', 1), done: fin('lac'),
+    notes: [
+      [atLeast('lac', 1), 'Gaston, à Rive-Claire, s\'inquiète : les pompes de la Brume troublent l\'eau du Lac Miroir.'],
+      [atLeast('lac', 2), 'J\'ai arrêté les trois pompes de la Brume.'],
+      [atLeast('lac', 3), 'J\'ai battu Sylas, un admin de la Brume. Il s\'est enfui.'],
+      [atLeast('lac', 4), 'J\'ai rattrapé Sylas dans la Grotte des Marées. Quelque chose s\'éveille au fond de l\'eau.'],
+      [atLeast('lac', 5), 'J\'ai rencontré la gardienne du lac.'],
+      [fin('lac'), 'Le Lac Miroir a retrouvé son eau claire. Gaston m\'a confié son Lokhlass.'],
+    ] },
+  { id: 'courrier', cat: 'side', name: 'Le courrier perdu', giver: 'Le facteur', started: atLeast('courrier', 1), done: fin('courrier'),
+    notes: [
+      [atLeast('courrier', 1), 'Le facteur de Port-Azur m\'a confié quatre lettres qu\'il n\'arrivait pas à distribuer.'],
+      [atLeast('courrier', 2), 'Les quatre lettres sont arrivées à leurs destinataires.'],
+      [fin('courrier'), 'Le facteur m\'a remercié pour ma tournée.'],
+    ] },
+  { id: 'songes', cat: 'side', name: 'Les nuits blanches de Floralia', giver: 'Hélène', started: atLeast('songes', 1), done: fin('songes'),
+    notes: [
+      [atLeast('songes', 1), 'Hélène, à Floralia, s\'inquiète : les enfants de la ville font des cauchemars toutes les nuits.'],
+      [atLeast('songes', 2), 'Le jardinier du Jardin des Songes m\'a parlé d\'une créature qui chasse les cauchemars.'],
+      [atLeast('songes', 3), 'J\'ai trouvé une Plume Lune sur l\'îlot du Lac Miroir.'],
+      [atLeast('songes', 4), 'Hélène a reçu la Plume Lune. Mais les cauchemars continuent.'],
+      [atLeast('songes', 5), 'Une nuit, au jardin, j\'ai surpris Ariane, de la Brume, avec un étrange projecteur.'],
+      [atLeast('songes', 6), 'J\'ai rattrapé Ariane au Temple Kagura. Darkrai rôde dans le sanctuaire.'],
+      [atLeast('songes', 7), 'Darkrai s\'est apaisé.'],
+      [fin('songes'), 'Les enfants de Floralia dorment de nouveau sur leurs deux oreilles.'],
+    ] },
+  { id: 'kagura', cat: 'side', name: 'Les talismans du Temple Kagura', giver: 'Dame Hana', started: atLeast('kagura', 1), done: fin('kagura'),
+    notes: [
+      [atLeast('kagura', 1), 'Dame Hana, à Mirage, m\'a parlé de trois talismans volés au Temple Kagura.'],
+      [atLeast('kagura', 2), 'J\'ai retrouvé les trois talismans.'],
+      [atLeast('kagura', 3), 'Le Grand Prêtre du temple a reçu les talismans.'],
+      [fin('kagura'), 'La cloche du Temple Kagura chante de nouveau. La Brume, elle, a emporté l\'Orbe Rouge.'],
+    ] },
+  { id: 'voeu', cat: 'side', name: 'Le vœu de la fontaine', giver: 'La fontaine', started: atLeast('voeu', 1), done: fin('voeu'),
+    notes: [
+      [atLeast('voeu', 1), 'La fontaine du Jardin des Songes réclame sept Éclats d\'Étoile.'],
+      [atLeast('voeu', 2), 'Les sept Éclats d\'Étoile sont dans la fontaine. Une petite étoile s\'est posée sur un banc.'],
+      [fin('voeu'), 'J\'ai rencontré Jirachi.'],
+    ] },
+  { id: 'magma', cat: 'side', name: 'Le cœur du volcan', giver: 'L\'Ancien de Fumerolle', started: atLeast('magma', 1), done: fin('magma'),
+    notes: [
+      [atLeast('magma', 1), 'L\'Ancien de Fumerolle m\'a appris que la Brume s\'est installée sur l\'Île du Magma, avec l\'Orbe Rouge.'],
+      [atLeast('magma', 2), 'J\'ai battu Sylas dans la base de la Brume. Nox, leur chef, s\'est enfui.'],
+      [atLeast('magma', 3), 'J\'ai rattrapé Nox dans la Caverne du Magma. Groudon s\'est réveillé.'],
+      [atLeast('magma', 4), 'Le volcan s\'est apaisé.'],
+      [fin('magma'), 'La Brume est dissoute. L\'Ancien m\'a remis sa Master Ball.'],
+    ] },
+  { id: 'fossile', cat: 'side', name: 'Le dragon de pierre', giver: 'Le savant du musée', started: atLeast('fossile', 1), done: fin('fossile'),
+    notes: [
+      [atLeast('fossile', 1), 'Le savant du Musée des Dragons rêve de ranimer un Pokémon d\'avant l\'histoire.'],
+      [fin('fossile'), 'Le savant a ranimé un Ptéra à partir du Vieil Ambre.'],
+    ] },
 
-/**
- * Calcule l'état en temps réel de la Quête Principale de la Ligue
- */
-function resolveLigueQuest(game) {
-  const st = game.state;
-  const badges = st.badges || [];
-  const bCount = badges.filter(Boolean).length;
+  /* ---------- les légendes ---------- */
+  { id: 'celebi', cat: 'legend', name: 'La Balle GS', giver: 'Une vieille dame', started: (f) => !!f.gsGiven, done: (f) => !!f['L:celebi'],
+    notes: [
+      [(f) => f.gsGiven, 'Une vieille dame de Sylvebourg m\'a confié la Balle GS, trouvée près d\'un vieil autel du Bois Murmure.'],
+      [(f) => f.celebiCalled, 'J\'ai posé la Balle GS sur l\'autel.'],
+      [(f) => f['L:celebi'], 'Celebi, le gardien de la forêt, est apparu.'],
+    ] },
+  { id: 'orage', cat: 'legend', name: 'Les relais de l\'Île Orageuse', giver: 'Le gardien du phare', started: (f) => !!f.orageQuest, done: (f) => !!f['L:zapdos'],
+    notes: [
+      [(f) => f.orageQuest, 'Le gardien du phare de Port-Orage m\'a demandé de rallumer les trois relais de l\'île.'],
+      [(f) => [1, 2, 3].some((k) => f['P:' + k]) && !f.pylons, (f) => `J'ai rallumé ${[1, 2, 3].filter((k) => f['P:' + k]).length} relais sur 3.`],
+      [(f) => f.pylons, 'Les trois relais sont rallumés. Le Pic Tonnerre s\'est couvert d\'éclairs.'],
+      [(f) => f['L:zapdos'], 'J\'ai affronté Électhor, l\'oiseau de foudre.'],
+    ] },
+  { id: 'mew', cat: 'legend', name: 'Les stèles des ruines', giver: 'Les stèles', started: (f) => !!(f['S:1'] || f['S:2'] || f['S:3']), done: (f) => !!f['L:mew'],
+    notes: [
+      [(f) => f['S:1'] || f['S:2'] || f['S:3'], 'Une stèle de la Côte des Ruines parle d\'une créature minuscule, rose comme l\'aube.'],
+      [(f) => f['S:1'] && f['S:2'] && f['S:3'], 'J\'ai lu les trois stèles.'],
+      [(f) => f['L:mew'], 'Mew a dansé sur l\'autel.'],
+    ] },
+  { id: 'hooh', cat: 'legend', name: 'La Plume Arc-en-ciel', giver: 'Doyenne Amaya', started: (f) => !!f.grueQuest, done: (f) => !!f['L:hooh'],
+    notes: [
+      [(f) => f.grueQuest, 'La doyenne de Hautegrue m\'a raconté la légende de Ho-Oh et de la Plume Arc-en-ciel.'],
+      [(f) => f.plume, 'Le Grand Sage Hoël m\'a confié la Plume Arc-en-ciel.'],
+      [(f) => f['L:hooh'], 'Ho-Oh s\'est posé sur la Tour de la Grue.'],
+    ] },
+  { id: 'betes', cat: 'legend', name: 'Les trois bêtes', giver: 'La Tour de la Grue', started: (f) => !!f.beasts, done: (f) => !!(f['L:raikou'] && f['L:entei'] && f['L:suicune']),
+    notes: [
+      [(f) => f.beasts, 'À la Tour de la Grue, Raikou, Entei et Suicune se sont enfuis devant moi et se sont dispersés dans les îles.'],
+      [(f) => f['L:raikou'], 'J\'ai croisé Raikou.'], [(f) => f['L:entei'], 'J\'ai croisé Entei.'], [(f) => f['L:suicune'], 'J\'ai croisé Suicune.'],
+    ] },
+  { id: 'ermite', cat: 'legend', name: 'Le gardien des mers', giver: 'L\'Ermite', started: (f) => !!f.ermite, done: (f) => f['L:lugia'] === 'caught' || (!!f['L:lugia'] && !!f.lugia),
+    notes: [
+      [(f) => f.ermite, 'L\'Ermite de Givrebourg m\'a parlé de Lugia, qui dort sous l\'Île Givrée.'],
+      [(f) => f['L:articuno'], 'J\'ai affronté Artikodin sur la Cime Givrée.'],
+      [(f) => f.plumeArgent, 'J\'ai la Plume Argentée.'],
+      [(f) => f['L:lugia'], 'J\'ai revu Lugia, apaisé.'],
+    ] },
+  { id: 'odyssor', cat: 'legend', name: 'Le géant des océans', giver: 'Drakos', started: (f, g) => !!g.state.badges[7], done: (f) => !!f.odyssorMet,
+    notes: [
+      [(f, g) => g.state.badges[7], 'Drakos m\'a ouvert le Cap des Étoiles, où passe parfois Odyssor, le géant des océans.'],
+      [(f) => f.odyssorMet, (f) => (f.odyssor === 'caught' ? 'Odyssor a rejoint mon équipe.' : 'J\'ai vu Odyssor glisser entre les vagues.')],
+    ] },
 
-  const stepsDef = [
-    { name: 'Choisir son premier Pokémon', where: 'Bourg-Aube (Labo Saule)', hint: 'Rends-toi au laboratoire du Professeur Saule au sud-est pour choisir ton partenaire.' },
-    { name: 'Vaincre Hector (Badge Roche/Insecte)', where: 'Bourg-Granit (Route 1)', hint: 'Traverse la Route 1 vers le nord et bats Hector dans l\'Arène de Bourg-Granit.' },
-    { name: 'Vaincre Marine (Badge Eau)', where: 'Rive-Claire (Route 2)', hint: 'Franchis la Route 2 et la Grotte Lunaire vers l\'est pour défier Marine à Rive-Claire.' },
-    { name: 'Vaincre Volta (Badge Volt)', where: 'Voltacité (Route 4)', hint: 'Chasse la Team Éclipse de la Centrale électrique au nord, puis bats Volta dans son Arène.' },
-    { name: 'Vaincre Flora (Badge Pétale)', where: 'Floralia (Route 5)', hint: 'Suis la Route 5 vers l\'est jusqu\'à Floralia pour triompher de l\'Arène de Flora.' },
-    { name: 'Vaincre Sibylle (Badge Mirage)', where: 'Mirage (Route 6)', hint: 'Traverse le Repaire de l\'Éclipse sur la Route 6 et rejoins Sibylle à l\'Arène de Mirage.' },
-    { name: 'Vaincre Basalte (Badge Rocaille)', where: 'Fort-Écaille (Route 7)', hint: 'Prends la Route 7 vers le sud-est jusqu\'à Fort-Écaille pour défier Basalte.' },
-    { name: 'Vaincre Pyros (Badge Volcan)', where: 'Cendrelune (Route 8)', hint: 'Gravis la Route 8 à flanc de cratère jusqu\'à Cendrelune pour défier Pyros.' },
-    { name: 'Vaincre Drakos (Badge Écaille)', where: 'Cimelune (Route 9)', hint: 'Monte au sommet de la Route 9 et triomphe du clan des dragons de Drakos.' },
-    { name: 'Triompher de la Ligue Céleste', where: 'Plateau Céleste (Nord)', hint: 'Franchis la Route Victoire au nord de Cimelune. Bats le Conseil 4 et la Maître Célestine !' },
-  ];
+  /* ---------- les habitants ---------- */
+  { id: 'qMedaillon', cat: 'npc', name: 'Le médaillon de Margaux', giver: 'Margaux', started: (f) => !!f['A:qMedaillon'], done: (f) => !!f.qMedaillon,
+    notes: [[(f) => f['A:qMedaillon'], 'Margaux, à Sylvebourg, a perdu le médaillon de sa grand-mère dans le Bois Murmure.'], [(f) => f.qMedaillon, 'J\'ai rendu son médaillon à Margaux.']] },
+  { id: 'qMagicarpe', cat: 'npc', name: 'Le spécimen du pêcheur', giver: 'Un pêcheur', started: (f) => !!f['A:qMagicarpe'], done: (f) => !!f.qMagicarpe,
+    notes: [[(f) => f['A:qMagicarpe'], 'Un pêcheur de Port-Azur voudrait voir un Magicarpe.'], [(f) => f.qMagicarpe, 'Le pêcheur a admiré mon Magicarpe.']] },
+  { id: 'qRoche', cat: 'npc', name: 'L\'observation géologique', giver: 'Un géologue', started: (f) => !!f['A:qRoche'], done: (f) => !!f.qRoche,
+    notes: [[(f) => f['A:qRoche'], 'Un géologue de Pierrefort collectionne les observations de Pokémon Roche.'], [(f) => f.qRoche, 'Le géologue a observé mon Pokémon Roche.']] },
+  { id: 'qEchange', cat: 'npc', name: 'L\'échange de Bastien', giver: 'Bastien', started: (f) => !!f['A:qEchange'], done: (f) => !!f.qEchange,
+    notes: [[(f) => f['A:qEchange'], 'Bastien, à Voltacité, voudrait échanger son Magnéti, Boulon, contre un Roucool.'], [(f) => f.qEchange, 'J\'ai échangé un Roucool contre Boulon.']] },
+  { id: 'qNiveau', cat: 'npc', name: 'Les sources chaudes', giver: 'Un vétéran', started: (f) => !!f['A:qNiveau'], done: (f) => !!f.qNiveau,
+    notes: [[(f) => f['A:qNiveau'], 'Le vétéran des sources chaudes de Cendrelune n\'accepte que les Pokémon aguerris.'], [(f) => f.qNiveau, 'Le vétéran a salué mon Pokémon.']] },
+  { id: 'dexpert', cat: 'npc', name: 'Les recherches du chercheur', giver: 'Un chercheur', started: (f) => !!(f['A:dexpert'] || f.dex25), done: (f) => !!f.dex80,
+    notes: [[(f) => f['A:dexpert'] || f.dex25, 'Un chercheur de Mirage récompense les dresseurs qui remplissent leur Pokédex.'], [(f) => f.dex25, 'Il a vu 25 Pokémon dans mon Pokédex.'], [(f) => f.dex50, 'Puis 50.'], [(f) => f.dex80, 'Puis 80. Il n\'a plus rien à m\'apprendre.']] },
+  ...MISSIONS.map((M) => ({ id: M.id, cat: M.cat || 'npc', name: M.journal.name, giver: M.who,
+    started: (f) => !!f['A:' + M.id], done: (f) => !!f[M.id],
+    notes: [[(f) => f['A:' + M.id], M.journal.start], [(f) => f[M.id], M.journal.end]] })),
+];
 
-  const hasStarter = !!(st.flags?.starter || (st.party && st.party.length) || bCount > 0);
-  const isChampion = !!(st.flags?.champion || st.flags?.ligue);
-
-  let curIdx = 0;
-  if (!hasStarter) curIdx = 0;
-  else if (bCount < 8) curIdx = bCount + 1;
-  else if (!isChampion) curIdx = 9;
-  else curIdx = 10;
-
-  const done = isChampion;
-  const currentStep = curIdx < stepsDef.length ? stepsDef[curIdx] : null;
-
-  return {
-    ...QUEST_METADATA.ligue,
-    status: done ? 'done' : 'active',
-    statusLabel: done ? 'Terminée' : 'En cours',
-    step: done ? stepsDef.length : curIdx + 1,
-    totalSteps: stepsDef.length,
-    destination: done ? 'Plateau Céleste (Ligue Céleste)' : currentStep.where,
-    direction: done ? 'Tu as conquis le titre suprême de Maître d\'Odyssée !' : currentStep.hint,
-    stepDesc: done ? 'Tu es le Maître incontesté de la Ligue Céleste !' : currentStep.name,
-    steps: stepsDef.map((s, idx) => ({
-      index: idx + 1,
-      desc: s.name,
-      destination: s.where,
-      done: idx < curIdx || done,
-      current: idx === curIdx && !done,
-    })),
-    endText: 'Tu as triomphé du Conseil 4 et de Célestine. Ton nom est gravé au Panthéon de la Ligue Céleste !',
-  };
+/* ======================================================================
+   Lecture du journal
+   ====================================================================== */
+const txt = (v, f, g) => (typeof v === 'function' ? v(f, g) : v);
+/** temps de jeu écoulé depuis t, en clair (« 2 h 05 », « 12 min ») */
+export function since(game, t) {
+  if (t == null || t < 0) return 'il y a longtemps';
+  const s = Math.max(0, (game.state.time || 0) - t), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+  return h ? `il y a ${h} h ${String(m).padStart(2, '0')} de jeu` : m ? `il y a ${m} min de jeu` : 'à l\'instant';
 }
 
-/**
- * Calcule l'état en temps réel de la Quête de la Team Éclipse
- */
-function resolveEclipseQuest(game) {
-  const st = game.state;
-  const f = st.flags || {};
-  const isDone = !!f.lugia;
-
-  const stepsDef = [
-    { name: 'Pillage de la Grotte Lunaire', where: 'Grotte Lunaire (Route 2)', hint: 'Des sbires de la Team Éclipse pillent les Pierres Lune. Chasse Erèbe dans la grotte.' },
-    { name: 'Interrogatoire à Port-Azur', where: 'Port-Azur (Pontons)', hint: 'Nyx tente d\'extorquer les secrets de Lugia à un vieux marin. Déloge-la des quais.' },
-    { name: 'Sabotage de la Centrale', where: 'Centrale de Voltacité', hint: 'Erèbe détourne l\'électricité pour le Prisme Noir. Rétablis le courant dans la tour dorée.' },
-    { name: 'Infiltration du Repaire secret', where: 'Route 6 (Repaire Éclipse)', hint: 'Infiltre le laboratoire secret au milieu de la Route 6 et défais le Chef Nocturne.' },
-    { name: 'Purification au Sanctuaire des Marées', where: 'Sanctuaire des Marées (Sud Mirage)', hint: 'La nuit éternelle est tombée ! Obtiens la Plume Argentée auprès de la Voyante de Mirage et surfe vers l\'îlot du Sanctuaire pour sauver Lugia Obscur !' },
-  ];
-
-  let curIdx = 0;
-  if (!f['T:ecl:erebe1']) curIdx = 0;
-  else if (!f['T:ecl:nyx1']) curIdx = 1;
-  else if (!f['T:ecl:erebe2']) curIdx = 2;
-  else if (!f.eclipse) curIdx = 3;
-  else if (!f.lugia) curIdx = 4;
-  else curIdx = 5;
-
-  const currentStep = curIdx < stepsDef.length ? stepsDef[curIdx] : null;
-
-  return {
-    ...QUEST_METADATA.eclipse,
-    status: isDone ? 'done' : 'active',
-    statusLabel: isDone ? 'Terminée' : 'En cours',
-    step: isDone ? stepsDef.length : curIdx + 1,
-    totalSteps: stepsDef.length,
-    destination: isDone ? 'Sanctuaire des Marées' : currentStep.where,
-    direction: isDone ? 'Lugia a été libéré de l\'emprise du Prisme Noir et la Team Éclipse est anéantie.' : currentStep.hint,
-    stepDesc: isDone ? 'La Team Éclipse a été mise en déroute et Lugia a retrouvé sa sérénité.' : currentStep.name,
-    steps: stepsDef.map((s, idx) => ({
-      index: idx + 1,
-      desc: s.name,
-      destination: s.where,
-      done: idx < curIdx || isDone,
-      current: idx === curIdx && !isDone,
-    })),
-    endText: 'Le soleil brille à nouveau sur toute la région d\'Odyssée !',
-  };
-}
-
-/**
- * Résout une quête secondaire de quetes.js
- */
-function resolveSideQuest(id, worldQuest, game) {
-  const meta = QUEST_METADATA[id] || {};
-  const f = game.state.flags || {};
-  const rawState = f['Q:' + id];
-  const isDone = rawState === 'fin';
-  const isActive = rawState && rawState !== 'fin';
-  const isUnmet = !rawState;
-
-  const rawSteps = (typeof worldQuest.steps === 'function' ? worldQuest.steps(f, game) : worldQuest.steps) || (meta.dests ? meta.dests.map((d) => d.hint) : []);
-  const totalSteps = Math.max(1, rawSteps.length);
-  const n = typeof rawState === 'number' ? Math.max(1, Math.min(rawState, totalSteps)) : 1;
-  const curIdx = isDone ? totalSteps - 1 : n - 1;
-
-  const dests = meta.dests || [];
-  const curDest = dests[curIdx] || dests[dests.length - 1] || { where: worldQuest.where || 'Odyssée', hint: 'Consulte ton journal de quêtes.' };
-
-  const currentDesc = isDone
-    ? (worldQuest.end || meta.end || 'Quête terminée.')
-    : (rawSteps[curIdx] || rawSteps[0] || 'Objectif en cours.');
-
-  const stepsList = rawSteps.map((txt, idx) => ({
-    index: idx + 1,
-    desc: txt,
-    destination: dests[idx]?.where || worldQuest.where || 'Odyssée',
-    done: idx < curIdx || isDone,
-    current: idx === curIdx && !isDone,
-  }));
-
-  return {
-    id,
-    cat: 'side',
-    name: worldQuest.name || meta.name || id,
-    giver: meta.giver || 'Habitant',
-    where: worldQuest.where || meta.where || 'Région d\'Odyssée',
-    desc: meta.desc || rawSteps[0] || '',
-    icon: meta.icon || 'notebook',
-    status: isDone ? 'done' : isActive ? 'active' : 'unmet',
-    statusLabel: isDone ? 'Terminée' : isActive ? 'En cours' : 'À découvrir',
-    step: isDone ? totalSteps : n,
-    totalSteps,
-    destination: isDone ? (worldQuest.where || 'Odyssée') : curDest.where,
-    direction: isDone ? (worldQuest.end || 'Quête terminée avec succès.') : curDest.hint,
-    stepDesc: currentDesc,
-    steps: stepsList,
-    reward: meta.reward || 'Objets précieux & Reconnaissance',
-    endText: worldQuest.end || meta.end || 'Quête menée à bien.',
-  };
-}
-
-/**
- * Résout une mission d'habitant de story.js
- */
-function resolveNpcQuest(id, game) {
-  const meta = QUEST_METADATA[id];
-  const f = game.state.flags || {};
-  const isDone = !!f[id];
-
-  return {
-    id,
-    cat: 'npc',
-    name: meta.name,
-    giver: meta.giver,
-    where: meta.where,
-    desc: meta.desc,
-    icon: meta.icon || 'gift',
-    status: isDone ? 'done' : 'active',
-    statusLabel: isDone ? 'Terminée' : 'En cours',
-    step: isDone ? 1 : 1,
-    totalSteps: 1,
-    destination: meta.where,
-    direction: isDone ? 'Mission accomplie auprès de l\'habitant.' : meta.dest,
-    stepDesc: isDone ? 'Mission accomplie !' : meta.desc,
-    steps: [
-      {
-        index: 1,
-        desc: meta.desc,
-        destination: meta.where,
-        done: isDone,
-        current: !isDone,
-      },
-    ],
-    reward: meta.reward,
-    endText: 'Le donneur de quête a reçu ce qu\'il demandait et t\'a chaleureusement remercié !',
-  };
-}
-
-/**
- * Renvoie la liste complète ordonnée de toutes les quêtes du jeu
- */
+/** toutes les quêtes acceptées (en cours et terminées), les plus récentes d'abord */
 export function getAllQuests(game) {
-  const list = [];
-  const trackedId = game.state?.trackedQuest;
-
-  // 1. Quêtes Principales
-  list.push(resolveLigueQuest(game));
-  list.push(resolveEclipseQuest(game));
-
-  // 2. Grandes Aventures (world/quetes.js)
-  const WQ = game.world?.quests || {};
-  const sideIds = ['ponyta', 'lac', 'courrier', 'songes', 'kagura', 'voeu', 'fossile', 'magma'];
-  for (const id of sideIds) {
-    const q = WQ[id] || {
-      id,
-      name: QUEST_METADATA[id]?.name || id,
-      where: QUEST_METADATA[id]?.dests?.[0]?.where,
-      steps: QUEST_METADATA[id]?.dests?.map((d) => d.hint) || [],
-    };
-    list.push(resolveSideQuest(id, q, game));
+  const st = game.state || {}, f = st.flags || {}, J = st.journal || {};
+  const out = [];
+  for (const Q of QUESTS) {
+    let started = false, done = false;
+    try { started = !!Q.started(f, game); done = started && !!Q.done(f, game); } catch (e) { continue; }
+    if (!started) continue;
+    const notes = [];
+    for (const [cond, t] of Q.notes) { try { if (cond(f, game)) notes.push(txt(t, f, game)); } catch (e) { /* drapeau absent */ } }
+    const j = J[Q.id] || {};
+    out.push({
+      id: Q.id, cat: Q.cat, name: txt(Q.name, f, game), giver: Q.giver, status: done ? 'done' : 'active',
+      notes, note: notes[notes.length - 1] || '', since: since(game, j.t), at: j.t ?? -1, doneAt: j.d ?? null,
+      isTracked: st.trackedQuest === Q.id,
+      // compatibilité avec l'ancien écran et le HUD
+      stepDesc: notes[notes.length - 1] || '', destination: '',
+    });
   }
-
-  // 3. Missions d'habitants (story.js)
-  const npcIds = ['qMedaillon', 'qMagicarpe', 'qRoche', 'qEchange', 'giftEvoli', 'dexpert', 'qNiveau', 'giftMinidraco'];
-  for (const id of npcIds) {
-    if (QUEST_METADATA[id]) {
-      list.push(resolveNpcQuest(id, game));
-    }
-  }
-
-  // Marquage de la quête suivie
-  for (const q of list) {
-    q.isTracked = trackedId ? q.id === trackedId : q.id === 'ligue';
-  }
-
-  return list;
+  out.sort((a, b) => (a.status === b.status ? (b.at - a.at) : a.status === 'active' ? -1 : 1));
+  return out;
 }
 
-/**
- * Renvoie la quête actuellement suivie par le joueur
- */
+/** la quête suivie (affichée dans le HUD) : celle choisie, sinon la plus récente en cours */
 export function getTrackedQuest(game) {
-  const all = getAllQuests(game);
-  const trackedId = game.state?.trackedQuest;
-  if (trackedId) {
-    const found = all.find((q) => q.id === trackedId);
-    if (found) return found;
-  }
-  // Par défaut, suivre la Ligue Céleste si active
-  return all.find((q) => q.id === 'ligue' && q.status === 'active') || all[0];
+  const all = getAllQuests(game).filter((q) => q.status === 'active');
+  const id = game.state?.trackedQuest;
+  return (id && all.find((q) => q.id === id)) || null;
 }
-
-/**
- * Active ou désactive le suivi d'une quête
- */
 export function setTrackedQuest(game, questId) {
   if (!game.state) return;
-  if (game.state.trackedQuest === questId) {
-    game.state.trackedQuest = null;
-  } else {
-    game.state.trackedQuest = questId;
-  }
+  game.state.trackedQuest = game.state.trackedQuest === questId ? null : questId;
   game.save?.(true);
 }
+
+/** note dans le journal l'heure (en temps de jeu) où chaque quête est acceptée, puis terminée ;
+ *  renvoie les quêtes qui viennent d'apparaître (pour l'annoncer au joueur) */
+export function syncJournal(game) {
+  const st = game.state; if (!st) return [];
+  const legacy = !st.journal; st.journal ||= {};
+  const fresh = [], f = st.flags || {};
+  for (const Q of QUESTS) {
+    let started = false, done = false;
+    try { started = !!Q.started(f, game); done = started && !!Q.done(f, game); } catch (e) { continue; }
+    if (!started) continue;
+    let j = st.journal[Q.id];
+    if (!j) { j = st.journal[Q.id] = { t: legacy ? -1 : Math.round(st.time || 0) }; if (!legacy) fresh.push({ id: Q.id, name: txt(Q.name, f, game), done }); }
+    if (done && j.d == null) j.d = Math.round(st.time || 0);
+  }
+  return fresh;
+}
+
+export const QUEST_COUNT = QUESTS.length;

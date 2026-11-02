@@ -13,6 +13,7 @@ import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
 import { enrichirTout, equipeDeType } from './rencontres.js';
+import { addHabitants } from './habitants.js';
 
 // trois capsules sur la table du labo, une par type ; dans chacune, trois partenaires au choix :
 // la créature originale d'Odyssée, le Pokémon de Rouge / Bleu et celui d'Or / Argent (avec leurs évolutions)
@@ -864,6 +865,8 @@ export function buildWorld() {
   const quests = buildQuests({ W, maps, towns, routes, legends, docks, buildTown, trainerNpc, offRoute: (id, t, side, off) => offRoute(routes.find((r) => r.id === id).pts, t, side, off) });
   // histoire principale : la Team Éclipse, Lugia Obscur, le Conseil 4, Flash et Force, les quêtes annexes
   addStory({ W, maps, towns, routes: { r1, r2, bois, r3a, r3b, r4, r5, r6, r7, r10 }, legends, trainerNpc });
+  // la vie des villes : les requêtes des habitants (et les deux combats d'après la Ligue)
+  addHabitants({ W, maps, towns, routes });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
   return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
 }

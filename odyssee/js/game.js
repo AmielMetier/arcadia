@@ -18,6 +18,7 @@ import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
 import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, overlay } from './story.js';
+import { syncJournal } from './core/questsData.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
@@ -57,7 +58,7 @@ export class Game {
     return {
       v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(8).fill(false), flags: {},
       party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [] }, time: 0, visited: ['aube'], repel: 0,
-      cleared: {}, surf: false, explored: [],
+      cleared: {}, surf: false, explored: [], journal: {},
       lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start,
     };
   }
@@ -274,6 +275,9 @@ export class Game {
   /** petites scènes à l'entrée d'une carte */
   async onEnterMap() {
     const st = this.state;
+    // lieux visités (et visités la nuit) : certaines requêtes des habitants en dépendent
+    st.flags['V:' + this.mapObj.id] = true;
+    { const h = this.hour(); if (h >= 20 || h < 5) st.flags['VN:' + this.mapObj.id] = true; }
     // au labo, le professeur accueille le joueur avant qu'il ne touche aux capsules
     // Tour de la Grue : trois bêtes s'enfuient à l'arrivée du joueur
     if (this.mapObj.id === 'grue:tour' && !st.flags.beasts) {
@@ -322,6 +326,12 @@ export class Game {
     }
     this.stepGap = stepped;
     this.followTick(dt);
+    // journal des quêtes : on note quand une quête est acceptée (une nouvelle entrée s'annonce en bas de l'écran)
+    this._jT = (this._jT || 0) + dt;
+    if (this._jT > 1.2) {
+      this._jT = 0;
+      for (const q of syncJournal(this)) if (!q.done) this.ui.toast(`📖 Journal : « ${q.name} »`, 2200);
+    }
     // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
     this.peersTick?.(dt);
@@ -883,6 +893,10 @@ export class Game {
     this.refreshGates();
     await this.profCall(g);
   }
+  /** les trois partenaires de la lignée de Théo */
+  rivalLine() { return RIVAL_TEAMS[this.state.flags.rivalSp] || RIVAL_TEAMS[STARTERS[0]]; }
+  /** dresseurs d'une route de la grande carte (requêtes des habitants : « bats-les tous ») */
+  missionTrainers(route) { return this.world.maps.monde.missionTrainers?.[route] || []; }
   /** le second rival : l'autre enfant de l'histoire (celui que le joueur n'a pas choisi d'incarner) */
   rivalB() {
     const f = this.state.gender === 'f';
@@ -1239,7 +1253,7 @@ export class Game {
       await ui.say(['Ton cœur et celui de tes créatures battent ensemble.', 'Cette plume t\'appartient désormais.', `${st.name} reçoit la Plume Arc-en-ciel et 5 Super Balls !`, 'Monte sur le toit. Le novice te laissera passer.'], { speaker: 'Grand Sage Hoël' });
       this.refreshGates();
     } else if (name === 'ermite') {
-      const sp = 'Ermite', f = st.flags;
+      const sp = 'Ermite', f = st.flags; f.ermite = true;
       if (st.flags.eclipse && !st.flags.lugia) { await ui.say(['Les courants de la grotte se sont tus... Lugia n\'est plus là.', 'Je l\'ai senti partir vers le sud, vers un vieux sanctuaire au large du Cap Mirage.', 'Quelque chose l\'appelle. Quelque chose de mauvais.'], { speaker: sp }); return; }
       if (f.plumeArgent) { await ui.say(f['L:lugia'] === 'caught' ? 'Lugia... Tu l\'as vu de tes propres yeux. Moi, j\'ai attendu toute ma vie.' : ['La Grotte des Tourbillons est à l\'est du village.', 'Avec la Plume Argentée, les courants te laisseront passer jusqu\'à Lugia.'], { speaker: sp }); return; }
       if (f['L:articuno']) {
@@ -1378,7 +1392,7 @@ export class Game {
   async odyssorEvent() {
     const st = this.state, ui = this.ui;
     if (!st.badges[7] || st.flags.odyssor === 'caught' || st.flags.odyssorNow) return false;
-    this.busy = true; st.flags.odyssorNow = true;
+    this.busy = true; st.flags.odyssorNow = true; st.flags.odyssorMet = true;
     try {
       this.musicLock = true; this.sound.play('mystic');
       await ui.say(['La mer se met à scintiller...', 'Une immense silhouette bleue glisse entre les vagues.', 'C\'est Odyssor, le géant des océans !']);

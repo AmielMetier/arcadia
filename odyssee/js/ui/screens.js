@@ -9,7 +9,7 @@ import { BADGES, LEADERS } from '../world/region.js';
 import { ASSETS } from '../assets.js';
 import { SPRITES } from '../data/sprites.js';
 import { T, walkable } from '../world/tiles.js';
-import { getAllQuests, setTrackedQuest, getTrackedQuest, QUEST_CATEGORIES } from '../core/questsData.js';
+import { getAllQuests, setTrackedQuest, syncJournal } from '../core/questsData.js';
 
 export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
 export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
@@ -1209,240 +1209,94 @@ export function loadCodeScreen(ui, check) {
   });
 }
 
-/* ================= JOURNAL DES QUÊTES (Style 5G Noir 2 / Blanc 2) ================= */
+/* ================= JOURNAL DES QUÊTES (carnet de voyage, style Noir 2 / Blanc 2) ================= */
+// Pas d'indice ni de destination : chaque quête acceptée rappelle en quelques phrases ce qu'on nous a demandé et ce qui
+// s'est passé depuis, avec le temps de jeu écoulé depuis qu'on l'a acceptée.
 export function questsScreen(game) {
   const ui = game.ui;
   return new Promise((resolve) => {
     const s = screen(ui, 'quests-scr');
-    let currentTab = 'active'; // 'active' | 'done' | 'all'
-    let selectedIdx = 0;
-
+    let tab = 'active', sel = 0;
+    const CAT = { main: 'HISTOIRE', side: 'AVENTURE', legend: 'LÉGENDE', npc: 'HABITANT' };
+    const lists = () => {
+      const all = getAllQuests(game);
+      const act = all.filter((q) => q.status !== 'done'), done = all.filter((q) => q.status === 'done');
+      return { all, act, done, shown: tab === 'active' ? act : tab === 'done' ? done : all };
+    };
     const render = () => {
-      const allQuests = getAllQuests(game);
-      const activeCount = allQuests.filter((q) => q.status !== 'done').length;
-      const doneCount = allQuests.filter((q) => q.status === 'done').length;
-      const allCount = allQuests.length;
-
-      let filtered = allQuests;
-      if (currentTab === 'active') {
-        filtered = allQuests.filter((q) => q.status !== 'done');
-        if (!filtered.length) filtered = allQuests;
-      } else if (currentTab === 'done') {
-        filtered = allQuests.filter((q) => q.status === 'done');
-      }
-
-      if (selectedIdx >= filtered.length) {
-        selectedIdx = Math.max(0, filtered.length - 1);
-      }
-
-      const selQuest = filtered[selectedIdx] || allQuests[0];
-      const tracked = getTrackedQuest(game);
-
+      const { all, act, done, shown } = lists();
+      if (sel >= shown.length) sel = Math.max(0, shown.length - 1);
+      const q = shown[sel];
       s.innerHTML = `
         <div class="scr-bar">
           <div class="scr-bar-left">
             <img class="scr-bar-ico" src="img/items/notebook.png" alt="">
             <span class="scr-bar-title">JOURNAL DES QUÊTES</span>
-            <span class="scr-bar-sub">${activeCount} actives · ${doneCount} terminées</span>
+            <span class="scr-bar-sub">${act.length} en cours · ${done.length} terminée${done.length > 1 ? 's' : ''}</span>
           </div>
           <div class="quests-tabs">
-            <button type="button" class="qtab${currentTab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${activeCount})</button>
-            <button type="button" class="qtab${currentTab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${doneCount})</button>
-            <button type="button" class="qtab${currentTab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${allCount})</button>
+            <button type="button" class="qtab${tab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${act.length})</button>
+            <button type="button" class="qtab${tab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${done.length})</button>
+            <button type="button" class="qtab${tab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${all.length})</button>
           </div>
-          <div class="scr-bar-right">
-            <button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button>
-          </div>
+          <div class="scr-bar-right"><button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button></div>
         </div>
-
         <div class="quests-body">
-          <!-- Colonne gauche: Liste des quêtes -->
           <div class="qcol-list">
-            <div class="qlist-head">
-              <span>MISSIONS D'ODYSSÉE</span>
-              <span class="qlist-cnt">${filtered.length} quête${filtered.length > 1 ? 's' : ''}</span>
-            </div>
+            <div class="qlist-head"><span>CARNET DE VOYAGE</span><span class="qlist-cnt">${shown.length} quête${shown.length > 1 ? 's' : ''}</span></div>
             <div class="qlist-scroll">
-              ${filtered.length === 0 ? '<div style="padding:15px;color:#8aa0be;font-size:13px;text-align:center;">Aucune quête dans cette catégorie.</div>' : ''}
-              ${filtered.map((q, idx) => `
-                <div class="qcard ${q.status}${idx === selectedIdx ? ' on' : ''}${q.isTracked ? ' tracked' : ''}" data-idx="${idx}">
+              ${shown.length ? '' : `<div class="qempty">${tab === 'done' ? 'Aucune quête terminée pour l\'instant.' : 'Aucune quête en cours. Parle aux habitants : ils ont souvent quelque chose à demander.'}</div>`}
+              ${shown.map((x, i) => `
+                <div class="qcard ${x.status}${i === sel ? ' on' : ''}${x.isTracked ? ' tracked' : ''}" data-idx="${i}">
                   <span class="cur">▶</span>
-                  <div class="qcard-top">
-                    <span class="qcat-tag qcat-${q.cat}">${esc(q.cat === 'main' ? 'PRINCIPALE' : q.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${q.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}
-                  </div>
-                  <div class="qcard-name">${esc(q.name)}</div>
-                  <div class="qcard-sub">
-                    <span class="qcard-step">${q.status === 'done' ? '✔ Terminée' : `Étape ${q.step}/${q.totalSteps}`}</span>
-                    <span class="qcard-loc">📍 ${esc(q.where)}</span>
-                  </div>
-                </div>
-              `).join('')}
+                  <div class="qcard-top"><span class="qcat-tag qcat-${x.cat}">${CAT[x.cat] || ''}</span>${x.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}</div>
+                  <div class="qcard-name">${esc(x.name)}</div>
+                  <div class="qcard-sub"><span class="qcard-step">${x.status === 'done' ? '✔ Terminée' : 'En cours'}</span><span class="qcard-loc">${esc(x.since)}</span></div>
+                </div>`).join('')}
             </div>
           </div>
-
-          <!-- Colonne droite: Fiche détaillée -->
           <div class="qcol-detail">
-            ${selQuest ? `
+            ${q ? `
               <div class="qdet-head">
                 <div class="qdet-head-left">
                   <div class="qdet-title-row">
-                    <span class="qcat-tag qcat-${selQuest.cat}">${esc(selQuest.cat === 'main' ? 'QUÊTE PRINCIPALE' : selQuest.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${selQuest.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
-                    ${selQuest.isTracked ? '<span class="qtracked-tag">★ QUÊTE ACTUELLEMENT SUIVIE</span>' : ''}
+                    <span class="qcat-tag qcat-${q.cat}">${CAT[q.cat] || ''}</span>
+                    ${q.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
                   </div>
-                  <div class="qdet-title">${esc(selQuest.name)}</div>
-                  <div class="qdet-giver">Donneur : <b>${esc(selQuest.giver)}</b> · 📍 <i>${esc(selQuest.where)}</i></div>
+                  <div class="qdet-title">${esc(q.name)}</div>
+                  <div class="qdet-giver">${esc(q.giver)} · acceptée ${esc(q.since)}</div>
                 </div>
-                ${selQuest.status !== 'done' ? `
-                  <button type="button" class="qbtn-track${selQuest.isTracked ? ' tracked' : ''}" data-act="track">
-                    ${selQuest.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE CETTE QUÊTE'}
-                  </button>
-                ` : ''}
+                ${q.status !== 'done' ? `<button type="button" class="qbtn-track${q.isTracked ? ' tracked' : ''}" data-act="track">${q.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE'}</button>` : ''}
               </div>
-
-              <!-- Grand Boîtier OÙ ALLER -->
-              <div class="qbox-destination">
-                <div class="qdest-head">
-                  <span class="qdest-pin">📍</span>
-                  <span>OÙ ALLER / PROCHAINE DESTINATION :</span>
-                </div>
-                <div class="qdest-place">${esc(selQuest.destination)}</div>
-                <div class="qdest-hint">${esc(selQuest.direction)}</div>
-              </div>
-
-              <!-- Étapes de la quête -->
-              <div class="qsteps-box">
-                <div class="qsteps-title">ÉTAPES DE LA QUÊTE (${selQuest.step} / ${selQuest.totalSteps})</div>
-                ${selQuest.steps.map((st) => `
-                  <div class="qstep-item${st.done ? ' done' : ''}${st.current ? ' current' : ''}">
-                    <div class="qstep-mark">${st.done ? '☑' : st.current ? '▶' : '◻'}</div>
-                    <div class="qstep-body">
-                      <div class="qstep-txt">${esc(st.desc)}</div>
-                      <div class="qstep-loc">📍 Destination : ${esc(st.destination)}</div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-
-              <!-- Récompenses -->
-              <div class="qreward-box">
-                <span class="qreward-ico">🎁</span>
-                <div><b>RÉCOMPENSE :</b> ${esc(selQuest.reward)}</div>
-              </div>
-            ` : '<div style="padding:30px;color:#8aa0be;text-align:center;">Sélectionne une quête dans la liste de gauche.</div>'}
+              <div class="qdiary">
+                ${q.notes.map((n, i) => `<p class="${i === q.notes.length - 1 ? 'last' : ''}">${esc(n)}</p>`).join('')}
+              </div>` : '<div class="qempty">Le carnet est encore vierge.</div>'}
           </div>
         </div>
-
         <div class="quests-foot">
           <div class="quests-foot-keys">
-            <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
-            <span><kbd>◄</kbd><kbd>►</kbd> Changer d'onglet</span>
-            <span><kbd>ESPACE</kbd> / <kbd>ENTRÉE</kbd> Suivre la quête</span>
-            <span><kbd>X</kbd> / <kbd>ÉCHAP</kbd> Fermer</span>
+            <span><kbd>▲</kbd><kbd>▼</kbd> Choisir</span><span><kbd>◄</kbd><kbd>►</kbd> Onglet</span>
+            <span><kbd>ESPACE</kbd> Suivre dans le HUD</span><span><kbd>ÉCHAP</kbd> Fermer</span>
           </div>
-          <div class="quests-foot-tracked">
-            <span class="qft-label">OBJECTIF SUIVI :</span>
-            <span class="qft-val">${tracked ? `★ ${esc(tracked.name)} (📍 ${esc(tracked.destination)})` : 'Aucun'}</span>
-          </div>
-        </div>
-      `;
-
-      // Clics sur les cartes
-      s.querySelectorAll('.qcard').forEach((card) => {
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = +card.dataset.idx;
-          if (selectedIdx !== idx) {
-            selectedIdx = idx;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clics sur les onglets
-      s.querySelectorAll('.qtab').forEach((tab) => {
-        tab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const t = tab.dataset.tab;
-          if (currentTab !== t) {
-            currentTab = t;
-            selectedIdx = 0;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clic bouton Suivre
-      const trackBtn = s.querySelector('[data-act="track"]');
-      if (trackBtn && selQuest) {
-        trackBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        });
-      }
-
-      // Bouton fermeture
-      const closeBtn = s.querySelector('[data-act="close"]');
-      if (closeBtn) {
-        closeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeScreen();
-        });
-      }
+        </div>`;
+      s.querySelectorAll('.qcard').forEach((c) => c.addEventListener('click', (e) => { e.stopPropagation(); sel = +c.dataset.idx; ui.sound.sfx('blip'); render(); }));
+      s.querySelectorAll('.qtab').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); tab = b.dataset.tab; sel = 0; ui.sound.sfx('blip'); render(); }));
+      s.querySelector('[data-act="track"]')?.addEventListener('click', (e) => { e.stopPropagation(); if (q) { setTrackedQuest(game, q.id); ui.sound.sfx('select'); game.hud?.update(true); render(); } });
+      s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => { e.stopPropagation(); close(); });
     };
-
-    const closeScreen = () => {
-      pop();
-      s.remove();
-      ui.sound.sfx('cancel');
-      resolve();
-    };
-
+    const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); };
     const pop = ui.input.push((k) => {
-      const allQuests = getAllQuests(game);
-      let filtered = allQuests;
-      if (currentTab === 'active') filtered = allQuests.filter((q) => q.status === 'active');
-      else if (currentTab === 'done') filtered = allQuests.filter((q) => q.status === 'done');
-      if (!filtered.length) filtered = allQuests;
-
-      if (k === 'up') {
-        selectedIdx = (selectedIdx - 1 + filtered.length) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'down') {
-        selectedIdx = (selectedIdx + 1) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'left') {
-        currentTab = currentTab === 'all' ? 'done' : currentTab === 'done' ? 'active' : 'all';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'right') {
-        currentTab = currentTab === 'active' ? 'done' : currentTab === 'done' ? 'all' : 'active';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'a') {
-        const selQuest = filtered[selectedIdx];
-        if (selQuest && selQuest.status !== 'done') {
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        }
-      } else if (k === 'b') {
-        closeScreen();
-      }
+      const { shown } = lists();
+      if (k === 'up' && shown.length) sel = (sel - 1 + shown.length) % shown.length;
+      else if (k === 'down' && shown.length) sel = (sel + 1) % shown.length;
+      else if (k === 'left') { tab = tab === 'all' ? 'done' : tab === 'done' ? 'active' : 'all'; sel = 0; }
+      else if (k === 'right') { tab = tab === 'active' ? 'done' : tab === 'done' ? 'all' : 'active'; sel = 0; }
+      else if (k === 'a') { const q = shown[sel]; if (!q || q.status === 'done') return; setTrackedQuest(game, q.id); game.hud?.update(true); ui.sound.sfx('select'); render(); return; }
+      else if (k === 'b' || k === 'quests') { close(); return; }
+      else return;
+      ui.sound.sfx('blip'); render();
     });
-
+    syncJournal(game);
     render();
   });
 }
-
