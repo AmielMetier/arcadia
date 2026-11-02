@@ -53,7 +53,12 @@ export function partyScreen(game, o = {}) {
       </div>`;
     s.appendChild(hdr);
 
-    const grid = el('div', 'pgrid'); s.appendChild(grid);
+    const layout = el('div', 'party-b2w2');
+    const colLead = el('div', 'pcol-lead');
+    const colSubs = el('div', 'pcol-subs');
+    layout.append(colLead, colSubs);
+    s.appendChild(layout);
+
     const foot = el('div', 'pfoot');
     const help = el('div', 'box phelp');
     const cancel = el('button', 'pcancel', 'RETOUR ✕');
@@ -101,56 +106,122 @@ export function partyScreen(game, o = {}) {
     };
 
     const draw = () => {
-      grid.innerHTML = '';
+      colLead.innerHTML = '';
+      colSubs.innerHTML = '';
+
       party.forEach((m, k) => {
         const isKo = m.hp <= 0;
         const isCapped = m.lvl >= cap;
         const r = Math.max(0, Math.min(1, m.hp / m.stats[0]));
-        const expPct = Math.max(0, Math.min(100, expProgress(m, cap) * 100)).toFixed(1);
+        const rawExp = expProgress(m, cap);
+        const expPct = isNaN(rawExp) || rawExp == null ? '0' : Math.max(0, Math.min(100, rawExp * 100)).toFixed(0);
         const why = o.filter ? o.filter(m, k) : null;
         const spTypes = SPECIES[m.sp]?.t || ['normal'];
         const typesHtml = spTypes.map((t) => `<span class="pslot-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
-        const c = el('div', 'pslot' + (k === 0 ? ' lead' : '') + (isKo ? ' ko' : '') + (k === i ? ' on' : '') + (k === swapFrom ? ' swap' : '') + (why ? ' blocked' : ''));
-        c.dataset.idx = k;
-        c.innerHTML = `
-          <div class="pslot-left">
-            <span class="pslot-idx">${k === 0 ? '★ 1' : '#' + (k + 1)}</span>
-            <div class="pslot-pedestal">
-              <img class="pslot-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
-            </div>
-          </div>
-          <div class="pslot-main">
-            <div class="pslot-top">
-              <span class="pn">${esc(monName(m))}${gender(m)}</span>
-              <div class="pslot-tags">
+        const ballKey = (m.ball || 'poke-ball').replace('-', '_');
+
+        if (k === 0) {
+          // LEAD SLOT (Grand format gauche)
+          const c = el('div', 'pslot-lead-card' + (isKo ? ' ko' : '') + (k === i ? ' on' : '') + (k === swapFrom ? ' swap' : '') + (why ? ' blocked' : ''));
+          c.dataset.idx = 0;
+          c.innerHTML = `
+            <div class="pslot-lead-top">
+              <div class="pslot-lead-badge-row">
+                <span class="pslot-star-tag">★ 1 LEADER</span>
+                <div class="pslot-socket">
+                  <img class="pslot-ball-ico" src="img/battle/${ballKey}_32.png" onerror="this.src='img/battle/poke_ball_32.png'" alt="">
+                </div>
+              </div>
+              <div class="pslot-lead-lvl-row">
                 ${statusTag(m)}
-                <span class="pl${isCapped ? ' capped' : ''}">N.${m.lvl}${isCapped ? ' <i>MAX</i>' : ''}</span>
+                <span class="pl${isCapped ? ' capped' : ''}">Lv. ${m.lvl}${isCapped ? ' <i>MAX</i>' : ''}</span>
               </div>
             </div>
-            <div class="pslot-types">${typesHtml}</div>
-            <div class="pslot-hp-row">
-              <div class="hp"><b>PV</b><i><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></i></div>
-              <span class="phpn">${m.hp} / ${m.stats[0]}</span>
+            <div class="pslot-lead-pedestal">
+              <div class="pslot-ped-ring"></div>
+              <img class="pslot-lead-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
             </div>
-            <div class="pslot-bot-row">
-              <div class="pexp"><b>EXP</b><i><u style="width:${expPct}%"></u></i></div>
-              ${why ? `<span class="pwhy">${esc(why)}</span>` : ''}
+            <div class="pslot-lead-info">
+              <div class="pslot-lead-name-row">
+                <span class="pn">${esc(monName(m))}</span>
+                ${gender(m)}
+              </div>
+              <div class="pslot-types">${typesHtml}</div>
+              <div class="pslot-hp-box">
+                <div class="hp-b2w2">
+                  <span class="hp-tag">HP</span>
+                  <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
+                </div>
+                <div class="phpn">${m.hp} / ${m.stats[0]}</div>
+              </div>
+              <div class="pexp-b2w2">
+                <span class="pexp-tag">EXP</span>
+                <div class="pexp-track"><u style="width:${expPct}%"></u></div>
+                <span class="pexp-val">${expPct}%</span>
+              </div>
+              ${why ? `<div class="pwhy">${esc(why)}</div>` : ''}
+            </div>`;
+          c.addEventListener('mouseenter', () => { if (!busy && i !== 0) { i = 0; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(0); });
+          colLead.appendChild(c);
+        } else {
+          // SLOTS SECONDAIRES 1..5 (Fentes biseautées B2W2 droite)
+          const c = el('div', 'pslot-sub' + (isKo ? ' ko' : '') + (k === i ? ' on' : '') + (k === swapFrom ? ' swap' : '') + (why ? ' blocked' : ''));
+          c.dataset.idx = k;
+          c.innerHTML = `
+            <div class="pslot-sub-left">
+              <div class="pslot-socket">
+                <img class="pslot-ball-ico" src="img/battle/${ballKey}_32.png" onerror="this.src='img/battle/poke_ball_32.png'" alt="">
+              </div>
+              <span class="pslot-sub-num">#${k + 1}</span>
+              <div class="pslot-sub-ped">
+                <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+              </div>
             </div>
-          </div>`;
-        c.addEventListener('mouseenter', () => {
-          if (!busy && i !== k) { i = k; ui.sound.sfx('blip'); draw(); }
-        });
-        c.addEventListener('click', (e) => {
-          e.stopPropagation();
-          triggerSlot(k);
-        });
-        grid.appendChild(c);
+            <div class="pslot-sub-mid">
+              <div class="pslot-sub-top">
+                <span class="pn">${esc(monName(m))}</span>
+                ${gender(m)}
+              </div>
+              <div class="pslot-sub-mid-row">
+                <div class="pslot-types">${typesHtml}</div>
+                <div class="pslot-sub-tags">
+                  ${statusTag(m)}
+                  <span class="pl${isCapped ? ' capped' : ''}">Lv. ${m.lvl}</span>
+                </div>
+              </div>
+              ${why ? `<div class="pwhy">${esc(why)}</div>` : ''}
+            </div>
+            <div class="pslot-sub-right">
+              <div class="hp-b2w2">
+                <span class="hp-tag">HP</span>
+                <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
+              </div>
+              <div class="phpn">${m.hp} / ${m.stats[0]}</div>
+              <div class="pexp-b2w2">
+                <span class="pexp-tag">EXP</span>
+                <div class="pexp-track"><u style="width:${expPct}%"></u></div>
+              </div>
+            </div>`;
+          c.addEventListener('mouseenter', () => { if (!busy && i !== k) { i = k; ui.sound.sfx('blip'); draw(); } });
+          c.addEventListener('click', (e) => { e.stopPropagation(); triggerSlot(k); });
+          colSubs.appendChild(c);
+        }
       });
-      for (let k = party.length; k < 6; k++) {
-        const emp = el('div', 'pslot empty');
-        emp.innerHTML = `<span class="pslot-empty-lbl">EMPLACEMENT VIDE #${k + 1}</span>`;
-        grid.appendChild(emp);
+
+      // Emplacements libres (au maximum 5 fentes secondaires)
+      const startEmpty = Math.max(1, party.length);
+      for (let k = startEmpty; k < 6; k++) {
+        const emp = el('div', 'pslot-sub empty');
+        emp.innerHTML = `
+          <div class="pslot-sub-left">
+            <div class="pslot-socket empty"></div>
+            <span class="pslot-sub-num">#${k + 1}</span>
+          </div>
+          <div class="pslot-empty-lbl">EMPLACEMENT DISPONIBLE #${k + 1}</div>`;
+        colSubs.appendChild(emp);
       }
+
       cancel.classList.toggle('on', i === party.length);
       help.textContent = swapFrom >= 0
         ? `Échanger la place de ${monName(party[swapFrom])} avec quel Pokémon ?`
@@ -170,14 +241,173 @@ export function partyScreen(game, o = {}) {
     const pop = ui.input.push(async (k) => {
       if (busy) return;
       const n = party.length;
-      if (k === 'up') i = i === n ? n - 1 : i - 2 >= 0 ? i - 2 : n;
-      else if (k === 'down') i = i === n ? 0 : i + 2 < n ? i + 2 : n;
-      else if (k === 'left') i = i === n ? n - 1 : i % 2 ? i - 1 : i;
-      else if (k === 'right') i = i !== n && i % 2 === 0 && i + 1 < n ? i + 1 : i;
-      else if (k === 'b') { if (swapFrom >= 0) { swapFrom = -1; draw(); return; } ui.sound.sfx('cancel'); close(-1); return; }
-      else if (k === 'a') { await triggerSlot(i); return; }
-      else return;
+      if (k === 'up') {
+        if (i === n) i = n > 1 ? n - 1 : 0;
+        else if (i === 0) i = n;
+        else if (i === 1) i = 0;
+        else i--;
+      } else if (k === 'down') {
+        if (i === n) i = 0;
+        else if (i === 0) i = n > 1 ? 1 : n;
+        else if (i === n - 1) i = n;
+        else i++;
+      } else if (k === 'left') {
+        if (i > 0 && i < n) i = 0;
+      } else if (k === 'right') {
+        if (i === 0 && n > 1) i = 1;
+      } else if (k === 'b') {
+        if (swapFrom >= 0) { swapFrom = -1; draw(); return; }
+        ui.sound.sfx('cancel'); close(-1); return;
+      } else if (k === 'a') {
+        await triggerSlot(i); return;
+      } else return;
       ui.sound.sfx('blip'); draw();
+    });
+  });
+}
+
+/* ================= ENREGISTREMENT POKÉDEX (Style 5G Noir 2 / Blanc 2) ================= */
+export function pokedexRegisterScene(game, mon) {
+  const ui = game.ui, sound = game.sound;
+  const sp = mon.sp;
+  const def = SPECIES[sp] || { n: 'Pokémon Inconnu', t: ['normal'], genus: 'Pokémon Mystère', h: 10, w: 100, dex: 'Données non répertoriées.' };
+  const pdxNum = `N° ${String(sp).padStart(3, '0')}`;
+  const hVal = (def.h != null ? (def.h / 10).toFixed(1) : '1.0');
+  const wVal = (def.w != null ? (def.w / 10).toFixed(1) : '10.0');
+  const typesHtml = (def.t || ['normal']).map((t) => `<span class="pdx-type-badge" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+  const genderTag = mon.gender === 'm' ? '<span class="g m">♂</span>' : mon.gender === 'f' ? '<span class="g f">♀</span>' : '';
+
+  return new Promise((resolve) => {
+    const s = screen(ui, 'pokedex-reg-scr');
+    s.innerHTML = `
+      <div class="pdx-shell">
+        <div class="pdx-topbar">
+          <div class="pdx-lights">
+            <span class="pdx-light blue pulse"></span>
+            <span class="pdx-light red"></span>
+            <span class="pdx-light yellow"></span>
+            <span class="pdx-light green"></span>
+          </div>
+          <div class="pdx-title-zone">
+            <span class="pdx-badge">POKÉDEX D'ODYSSÉE</span>
+            <span class="pdx-header-txt">NOUVELLE ENTRÉE DÉTECTÉE</span>
+          </div>
+          <div class="pdx-decor-grid"></div>
+        </div>
+
+        <div class="pdx-body">
+          <div class="pdx-left-col">
+            <div class="pdx-num-banner">
+              <span class="pdx-num-digital">${pdxNum}</span>
+              <span class="pdx-stamp">✓ ENREGISTRÉ</span>
+            </div>
+            <div class="pdx-holo-frame">
+              <div class="pdx-holo-lines"></div>
+              <div class="pdx-scanner-beam"></div>
+              <div class="pdx-pedestal"></div>
+              <img class="pdx-mon-spr" src="${ASSETS.front(sp, mon.shiny)}" alt="${esc(def.n)}">
+            </div>
+            <div class="pdx-sensor-bar">
+              <i class="pdx-wave-icon"></i>
+              <span>SIGNAL BIO-ACOUSTIQUE IDENTIFIÉ</span>
+            </div>
+          </div>
+
+          <div class="pdx-right-col">
+            <div class="pdx-name-card">
+              <div class="pdx-name-main">
+                <span class="pdx-name-txt">${esc(def.n)}</span>
+                ${genderTag}
+              </div>
+              <span class="pdx-genus-tag">${esc(def.genus || 'Pokémon')}</span>
+            </div>
+
+            <div class="pdx-specs-row">
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">TYPE(S)</span>
+                <div class="pdx-types">${typesHtml}</div>
+              </div>
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">TAILLE</span>
+                <span class="pdx-spec-val"><b>${hVal}</b> m</span>
+              </div>
+              <div class="pdx-spec-cell">
+                <span class="pdx-spec-lbl">POIDS</span>
+                <span class="pdx-spec-val"><b>${wVal}</b> kg</span>
+              </div>
+            </div>
+
+            <div class="pdx-desc-card">
+              <div class="pdx-desc-bar">
+                <span class="pdx-desc-title">RAPPORT DU POKÉDEX</span>
+                <span class="pdx-desc-cur">■</span>
+              </div>
+              <div class="pdx-desc-viewport">
+                <p class="pdx-desc-txt"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pdx-footbar">
+          <span class="pdx-status-msg">✓ Données de ${esc(def.n)} inscrites dans le Pokédex !</span>
+          <button class="pdx-btn-next ready" type="button">CONTINUER ▶</button>
+        </div>
+      </div>
+    `;
+
+    const descTxtEl = s.querySelector('.pdx-desc-txt');
+    const nextBtn = s.querySelector('.pdx-btn-next');
+    const fullDesc = def.dex || 'Aucune description disponible pour ce spécimen dans la base régionale.';
+
+    let charIdx = 0, textTimer = null, typingDone = false;
+    const typeSpeed = 18;
+
+    const finishTyping = () => {
+      if (typingDone) return;
+      typingDone = true;
+      if (textTimer) clearInterval(textTimer);
+      descTxtEl.textContent = fullDesc;
+      nextBtn.classList.add('ready');
+    };
+
+    sound.sfx('select');
+    setTimeout(() => {
+      sound.cry(ASSETS.cry(sp));
+    }, 250);
+
+    textTimer = setInterval(() => {
+      if (charIdx < fullDesc.length) {
+        charIdx++;
+        descTxtEl.textContent = fullDesc.slice(0, charIdx);
+        if (charIdx % 4 === 0) sound.sfx('blip');
+      } else {
+        finishTyping();
+      }
+    }, typeSpeed);
+
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      if (!typingDone) { finishTyping(); return; }
+      closed = true;
+      sound.sfx('select');
+      pop();
+      s.remove();
+      resolve();
+    };
+
+    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    s.addEventListener('click', () => {
+      if (!typingDone) finishTyping();
+      else close();
+    });
+
+    const pop = ui.input.push((k) => {
+      if (k === 'a' || k === 'b' || k === 'start') {
+        if (!typingDone) finishTyping();
+        else close();
+      }
     });
   });
 }

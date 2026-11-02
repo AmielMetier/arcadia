@@ -395,7 +395,7 @@ async function intro(game, ui, sound) {
       <div class="intro-pedestal"></div>
       <div class="intro-subped"></div>
       <img class="intro-prof" src="${ASSETS.portrait('saule') || ASSETS.trainer('saule')}" alt="">
-      <img class="intro-ball" src="${ASSETS.item('poke-ball')}" alt="">
+      <img class="intro-ball" src="img/battle/poke_ball_48.png" alt="">
       <div class="intro-burst"></div>
       <img class="intro-starter" src="${ASSETS.front(starterSp)}" alt="">
       <img class="intro-hero" alt="">
@@ -425,6 +425,7 @@ async function intro(game, ui, sound) {
   ball.classList.add('toss');
   sound.sfx('select');
   await wait(440);
+  ball.src = 'img/battle/poke_ball_open.png';
   ball.classList.add('open');
   burst.classList.add('go');
   await ui.flash(1, '#ffffff', 60);
@@ -438,6 +439,7 @@ async function intro(game, ui, sound) {
   starter.classList.add('recall');
   await wait(240);
   starter.classList.remove('in', 'recall');
+  ball.src = 'img/battle/poke_ball_48.png';
   ball.classList.remove('toss', 'open');
   burst.classList.remove('go');
   subped.classList.remove('in');

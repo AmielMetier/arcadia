@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, TYPE_FR } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
@@ -877,8 +877,10 @@ export class Game {
       const mon = foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
       const isNew = !st.dex.caught.includes(mon.sp);
       this.markCaught(mon.sp);
-      if (isNew) await this.bv.msg(`Les données de ${SPECIES[mon.sp].n} ont été ajoutées au Pokédex !`, { wait: true });
       this.bv.close();
+      if (isNew) {
+        await pokedexRegisterScene(this, mon);
+      }
       if (await this.ui.yesNo(`Donner un surnom à ${SPECIES[mon.sp].n} ?`)) { const nick = await this.ui.nameEntry(`Surnom de ${SPECIES[mon.sp].n}`, SPECIES[mon.sp].n); if (nick && nick !== SPECIES[mon.sp].n) mon.nick = nick; }
       mon.status = mon.status === 'frz' ? null : mon.status;
       if (st.party.length < 6) st.party.push(mon);

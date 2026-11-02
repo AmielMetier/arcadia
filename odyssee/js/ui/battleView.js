@@ -16,6 +16,14 @@ const TYPE_FX = {
   dragon: ['#7050f0', '#c0a0ff'], dark: ['#403030', '#a08070'], fairy: ['#ff9ad0', '#ffe0f0'],
 };
 const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'] };
+const BALL_SPRITE_PATHS = {
+  'poke-ball': 'img/battle/poke_ball_32.png',
+  'great-ball': 'img/battle/great_ball_32.png',
+  'ultra-ball': 'img/battle/ultra_ball_32.png',
+  'open': 'img/battle/poke_ball_open.png',
+  'tilt-l': 'img/battle/poke_ball_tilt_l.png',
+  'tilt-r': 'img/battle/poke_ball_tilt_r.png',
+};
 
 function tinted(img, color) {
   if (!img) return null;
@@ -91,14 +99,17 @@ export class BattleView {
       volcanic: 'volcanic',
     };
     const platKey = platMap[kind] || (this.battle?.wild ? 'tallgrass' : 'grass');
-    const [bgImg, platE, platP] = await Promise.all([
+    const ballPromises = Object.entries(BALL_SPRITE_PATHS).map(async ([k, p]) => [k, await loadImg(p)]);
+    const [bgImg, platE, platP, ...ballEntries] = await Promise.all([
       loadImg(`img/battle/${bgKey}.png`),
       loadImg(`img/battle/plat_${platKey}_e.png`),
       loadImg(`img/battle/plat_${platKey}_p.png`),
+      ...ballPromises,
     ]);
     this.bgImg = bgImg;
     this.platE = platE;
     this.platP = platP;
+    this.ballImgs = Object.fromEntries(ballEntries);
   }
 
   /* ---------------- boucle d'animation ---------------- */
@@ -165,12 +176,36 @@ export class BattleView {
     requestAnimationFrame(this.frame);
   };
   drawBall(x, b) {
-    const [top, bot] = BALL_COL[b.item] || BALL_COL['poke-ball'];
-    x.save(); x.translate(Math.round(b.x), Math.round(b.y)); x.rotate(b.rot || 0);
-    x.fillStyle = '#202020'; x.beginPath(); x.arc(0, 0, 5.5, 0, 7); x.fill();
-    x.fillStyle = top; x.beginPath(); x.arc(0, 0, 4.5, Math.PI, 0); x.fill();
-    x.fillStyle = bot; x.beginPath(); x.arc(0, 0, 4.5, 0, Math.PI); x.fill();
-    x.fillStyle = '#202020'; x.fillRect(-5, -0.5, 10, 1.5); x.fillStyle = '#fff'; x.fillRect(-1, -1, 2, 2);
+    const itemKey = b.item || 'poke-ball';
+    const imgKey = b.state ? b.state : itemKey;
+    const img = this.ballImgs?.[imgKey] || this.ballImgs?.[itemKey] || this.ballImgs?.['poke-ball'];
+    if (b.groundY != null && b.groundY > b.y) {
+      const dist = Math.max(0, b.groundY - b.y);
+      const alpha = Math.max(0.12, 0.45 - dist * 0.0035);
+      const rx = Math.max(3, 8 - dist * 0.05);
+      const ry = Math.max(1.5, rx * 0.4);
+      x.save();
+      x.fillStyle = `rgba(0,0,0,${alpha})`;
+      x.beginPath();
+      x.ellipse(Math.round(b.x), Math.round(b.groundY), rx, ry, 0, 0, Math.PI * 2);
+      x.fill();
+      x.restore();
+    }
+    x.save();
+    x.translate(Math.round(b.x), Math.round(b.y));
+    if (b.rot) x.rotate(b.rot);
+    const size = 18;
+    if (img) {
+      x.imageSmoothingEnabled = false;
+      x.drawImage(img, Math.round(-size / 2), Math.round(-size / 2), size, size);
+    } else {
+      const [top, bot] = BALL_COL[itemKey] || BALL_COL['poke-ball'];
+      x.fillStyle = '#181e28'; x.beginPath(); x.arc(0, 0, 5.5, 0, 7); x.fill();
+      x.fillStyle = top; x.beginPath(); x.arc(0, 0, 4.5, Math.PI, 0); x.fill();
+      x.fillStyle = bot; x.beginPath(); x.arc(0, 0, 4.5, 0, Math.PI); x.fill();
+      x.fillStyle = '#181e28'; x.fillRect(-5, -0.6, 10, 1.2);
+      x.fillStyle = '#fff'; x.fillRect(-1.2, -1.2, 2.4, 2.4);
+    }
     x.restore();
   }
   ePos() { return { x: Math.round(this.W * 0.71), y: 86 }; }
@@ -542,12 +577,14 @@ export class BattleView {
     if (side === 1 && this.st.trainer.visible) { await this.tween(350, (u) => { this.st.trainer.dx = 130 * ease(u); }); this.st.trainer.visible = false; this.st.trainer.dx = 0; }
     // la Ball part et s'ouvre dans un éclair blanc
     const target = side === 1 ? this.ePos() : this.pPos(), tx = target.x, ty = target.y - 18;
-    const ball = { x: side === 1 ? tx : -10, y: side === 1 ? ty - 30 : 120, item: m.ball || 'poke-ball', rot: 0 };
+    const ball = { x: side === 1 ? tx : -10, y: side === 1 ? ty - 30 : 120, groundY: target.y, item: m.ball || 'poke-ball', rot: 0, state: null };
     this.st.balls.push(ball); this.sound.sfx('throw');
     const x0 = ball.x, y0 = ball.y;
     await this.tween(side === 1 ? 250 : 450, (u) => { ball.x = x0 + (tx - x0) * u; ball.y = y0 + (ty - y0) * u - Math.sin(u * Math.PI) * 40; ball.rot = u * 10; });
-    this.st.balls = this.st.balls.filter((q) => q !== ball);
+    ball.state = 'open';
     this.sound.sfx('poof'); this.burst(tx, ty, ['#ffffff', '#fff6a0', '#a0e0ff'], 18, { speed: 2.2 });
+    await wait(40);
+    this.st.balls = this.st.balls.filter((q) => q !== ball);
     o.visible = true; o.white = 1; o.scale = 0.1;
     await this.tween(260, (u) => { o.scale = 0.1 + 0.9 * ease(u); });
     this.sound.cry(ASSETS.cry(m.sp));
@@ -643,28 +680,127 @@ export class BattleView {
     box.remove();
   }
   async animBall(e) {
-    const ep = this.ePos(), tx = ep.x, ty = ep.y - 34;
-    const ball = { x: 10, y: 150, item: e.item, rot: 0 }; this.st.balls.push(ball);
+    const ep = this.ePos(), tx = ep.x, ty = ep.y - 28;
+    const startX = 14, startY = 156;
+    const ball = { x: startX, y: startY, groundY: ep.y + 4, item: e.item || 'poke-ball', rot: 0, state: null };
+    this.st.balls.push(ball);
     this.sound.sfx('throw');
-    await this.tween(520, (u) => { ball.x = 10 + (tx - 10) * u; ball.y = 150 + (ty - 150) * u - Math.sin(u * Math.PI) * 70; ball.rot = u * 14; });
-    if (e.blocked) { await this.tween(300, (u) => { ball.x = tx + 60 * u; ball.y = ty - 30 * u; }); this.st.balls = []; return; }
-    // le Pokémon est aspiré dans la Ball
-    const o = this.st.foe; this.sound.sfx('poof'); this.burst(tx, ty + 8, ['#ffffff', '#ffe0f0'], 16, { speed: 1.6 });
-    o.white = 1; await this.tween(300, (u) => { o.scale = 1 - u; }); o.visible = false;
-    await this.tween(380, (u) => { ball.y = ty + (ep.y - 8 - ty) * Math.min(1, u * 1.4) - (u > 0.7 ? Math.sin((u - 0.7) / 0.3 * Math.PI) * 6 : 0); });
-    for (let i = 0; i < e.shakes; i++) {
-      await wait(380); this.sound.sfx('shake');
-      await this.tween(300, (u) => { ball.rot = Math.sin(u * Math.PI * 2) * 0.5; ball.x = tx + Math.sin(u * Math.PI * 2) * 2; });
+
+    // 1. Trajectoire parabolique aérienne avec rotation et traînée d'étincelles
+    let lastSpark = 0;
+    await this.tween(560, (u) => {
+      ball.x = startX + (tx - startX) * u;
+      ball.y = startY + (ty - startY) * u - Math.sin(u * Math.PI) * 85;
+      ball.rot = u * 16;
+      if (performance.now() - lastSpark > 40) {
+        lastSpark = performance.now();
+        this.st.parts.push({
+          x: ball.x, y: ball.y,
+          vx: (Math.random() - 0.5) * 0.8,
+          vy: (Math.random() - 0.5) * 0.8 + 0.3,
+          r: 1.5, c: u > 0.5 ? '#ffe080' : '#ffffff', life: 0.28, max: 0.28, shape: 'ring'
+        });
+      }
+    });
+
+    if (e.blocked) {
+      this.sound.sfx('bump');
+      await this.tween(300, (u) => { ball.x = tx + 70 * u; ball.y = ty - 25 * u + 40 * u * u; ball.rot += 0.2; });
+      this.st.balls = [];
+      return;
     }
-    await wait(400);
+
+    // 2. Arrivée au zénith : la Poké Ball s'ouvre !
+    ball.state = 'open';
+    ball.rot = 0;
+    this.sound.sfx('poof');
+
+    // Cône d'aspiration et flash d'énergie blanche/rouge
+    const o = this.st.foe;
+    o.white = 1;
+    this.burst(tx, ty + 6, ['#ffffff', '#ff9090', '#ffe0a0'], 18, { speed: 2.2, r: 2.2 });
+
+    // Faisceau d'aspiration qui absorbe le Pokémon
+    await this.tween(320, (u) => {
+      o.scale = Math.max(0.01, 1 - u);
+      o.dy = -(u * 18);
+      if (Math.random() < 0.4) {
+        this.st.parts.push({
+          x: tx + (Math.random() - 0.5) * 20,
+          y: ty + 12 - u * 10,
+          vx: (tx - (tx + (Math.random() - 0.5) * 20)) * 0.1,
+          vy: (ty - (ty + 12)) * 0.1,
+          r: 2, c: '#ff5555', life: 0.2, max: 0.2
+        });
+      }
+    });
+    o.visible = false;
+    o.dy = 0;
+    o.scale = 1;
+
+    // La Ball se referme
+    ball.state = null;
+    await wait(60);
+
+    // 3. Chute au sol avec double rebond réaliste
+    const floorY = ep.y - 2;
+    const fallStartY = ball.y;
+    await this.tween(240, (u) => {
+      ball.y = fallStartY + (floorY - fallStartY) * (u * u);
+    });
+    this.sound.sfx('bump');
+    this.burst(ball.x, floorY + 6, ['rgba(0,0,0,0.3)', '#c0b090'], 6, { speed: 0.8, up: 0.5, r: 1.2 });
+    
+    // Premier rebond
+    await this.tween(160, (u) => {
+      ball.y = floorY - Math.sin(u * Math.PI) * 12;
+    });
+    this.sound.sfx('bump');
+    
+    // Deuxième petit rebond
+    await this.tween(110, (u) => {
+      ball.y = floorY - Math.sin(u * Math.PI) * 4;
+    });
+    ball.y = floorY;
+
+    // 4. Secousses avec les sprites d'inclinaison gauche/droite
+    for (let i = 0; i < e.shakes; i++) {
+      await wait(360);
+      this.sound.sfx('shake');
+      ball.state = 'tilt-l';
+      ball.x = tx - 3;
+      await wait(140);
+      ball.state = 'tilt-r';
+      ball.x = tx + 3;
+      await wait(140);
+      ball.state = null;
+      ball.x = tx;
+      this.st.parts.push({ x: tx, y: floorY + 6, vx: -0.6, vy: -0.2, r: 1.2, c: '#a09080', life: 0.25, max: 0.25 });
+      this.st.parts.push({ x: tx, y: floorY + 6, vx: 0.6, vy: -0.2, r: 1.2, c: '#a09080', life: 0.25, max: 0.25 });
+    }
+
+    await wait(420);
+
+    // 5. Résultat
     if (e.caught) {
-      this.sound.sfx('shake'); this.burst(ball.x, ball.y - 4, ['#ffe060', '#ffffff'], 10, { speed: 1, up: 0.8, r: 1.5 });
-      this.sound.sfx('caught'); await wait(500);
+      this.sound.sfx('shake');
+      this.burst(ball.x, ball.y - 4, ['#ffe040', '#ffffff', '#ffd020'], 16, { speed: 1.6, up: 1.2, r: 2 });
+      this.st.parts.push({ x: ball.x, y: ball.y - 2, vx: 0, vy: 0, r: 6, grow: 1.4, shape: 'ring', c: '#ffe040', life: 0.45, max: 0.45 });
+      this.sound.sfx('caught');
+      await wait(600);
       this.setHud(1, null);
     } else {
-      this.sound.sfx('poof'); this.burst(ball.x, ball.y, ['#ffffff', '#fff6a0'], 18, { speed: 2 });
-      this.st.balls = []; o.visible = true; o.white = 1;
-      await this.tween(260, (u) => { o.scale = u; }); await this.tween(200, (u) => { o.white = 1 - u; }); o.white = 0;
+      this.sound.sfx('poof');
+      ball.state = 'open';
+      this.burst(ball.x, ball.y, ['#ffffff', '#fff6a0', '#ff9090'], 20, { speed: 2.2 });
+      await wait(80);
+      this.st.balls = [];
+      o.visible = true;
+      o.white = 1;
+      o.scale = 0.2;
+      await this.tween(240, (u) => { o.scale = 0.2 + 0.8 * ease(u); });
+      await this.tween(200, (u) => { o.white = 1 - u; });
+      o.white = 0;
     }
     this.st.balls = this.st.balls.filter((q) => q !== ball || e.caught);
   }
