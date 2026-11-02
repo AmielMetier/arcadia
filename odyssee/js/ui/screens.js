@@ -1069,17 +1069,19 @@ export function optionsScreen(game) {
     const rows = () => [
       ['Vitesse du texte', speeds[ui.textSpeed]],
       ['Volume', '■'.repeat(Math.round(snd.vol * 10)) + '□'.repeat(10 - Math.round(snd.vol * 10))],
+      ['Pokémon qui suit', game.followOff ? 'Non' : 'Oui'],
       ['Retour', ''],
     ];
     const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys"><b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj (maintenue) : courir · C : carte</div>'; };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'up') i = (i + 2) % 3; else if (k === 'down') i = (i + 1) % 3;
-      else if (k === 'left' || k === 'right') {
+      if (k === 'up') i = (i + 3) % 4; else if (k === 'down') i = (i + 1) % 4;
+      else if (k === 'left' || k === 'right' || (k === 'a' && i === 2)) {
         const d = k === 'left' ? -1 : 1;
         if (i === 0) { ui.textSpeed = (ui.textSpeed + d + 4) % 4; try { localStorage.setItem('odyssee-textspeed', ui.textSpeed); } catch (e) {} }
         if (i === 1) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
-      } else if (k === 'b' || (k === 'a' && i === 2)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
+        if (i === 2) { game.followOff = !game.followOff; try { localStorage.setItem('odyssee-suiveur', game.followOff ? '0' : '1'); } catch (e) {} }
+      } else if (k === 'b' || (k === 'a' && i === 3)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
       else return;
       ui.sound.sfx('blip'); draw();
     });

@@ -2657,3 +2657,11 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .sum-stats td.iv.max { color: #ffe058; }
 .sum-natline { margin-top: 0.6em; font-size: 0.72em; color: #ced8ec; }
 .nat-fx { color: #8aa0be; }
+
+/* labo : trois partenaires dans la capsule d'un type */
+.starter-trio { display: flex; gap: calc(var(--px) * 6); top: 12%; }
+.starter-trio figure { margin: 0; text-align: center; opacity: 0.55; transition: opacity 0.15s, transform 0.15s; }
+.starter-trio figure.on { opacity: 1; transform: translateY(calc(var(--px) * -3)); }
+.starter-trio img { width: calc(var(--px) * 64); height: calc(var(--px) * 64); image-rendering: pixelated; }
+.starter-trio figcaption { font-size: 0.8em; font-weight: 700; }
+.starter-trio figcaption small { display: block; font-weight: 400; opacity: 0.75; font-size: 0.8em; }

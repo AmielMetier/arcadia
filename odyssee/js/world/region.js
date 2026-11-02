@@ -14,7 +14,22 @@ import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
 import { enrichirTout, equipeDeType } from './rencontres.js';
 
-export const STARTERS = NEW_STARTERS.map(R);
+// trois capsules sur la table du labo, une par type ; dans chacune, trois partenaires au choix :
+// la créature originale d'Odyssée, le Pokémon de Rouge / Bleu et celui d'Or / Argent (avec leurs évolutions)
+export const STARTER_CHOICES = [
+  { type: 'grass', lines: [[NEW_STARTERS[0], NEW_STARTERS[0] + 1, NEW_STARTERS[0] + 2], [1, 2, 3], [152, 153, 154]] },
+  { type: 'fire', lines: [[NEW_STARTERS[1], NEW_STARTERS[1] + 1, NEW_STARTERS[1] + 2], [4, 5, 6], [155, 156, 157]] },
+  { type: 'water', lines: [[NEW_STARTERS[2], NEW_STARTERS[2] + 1, NEW_STARTERS[2] + 2], [7, 8, 9], [158, 159, 160]] },
+].map((c) => ({ ...c, lines: c.lines.map((l) => l.map(R)) }));
+/** les trois capsules (repérées par le premier partenaire de chacune) */
+export const STARTERS = STARTER_CHOICES.map((c) => c.lines[0][0]);
+/** toutes les lignées de partenaires de départ (pour le Pokémon qui suit le dresseur) */
+export const STARTER_LINES = STARTER_CHOICES.flatMap((c) => c.lines);
+/** type et rang (0 original, 1 Rouge / Bleu, 2 Or / Argent) d'un partenaire de départ */
+export function starterSlot(sp) {
+  for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) if (STARTER_CHOICES[t].lines[k].includes(sp)) return { t, k };
+  return null;
+}
 export const RIVAL_NAME = 'Théo';
 // ordre des arènes : Hector, Marine, Volta, Flora, Sibylle, puis les trois frères de l'archipel
 export const BADGES = [
@@ -843,7 +858,7 @@ export function buildWorld() {
   const lab = maps['aube:labo'];
   lab.npc({ id: 'prof', x: 6, y: 3, sprite: 'saule', dir: 'down', script: 'prof' });
   lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'scientifique', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs créatures.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
-  STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp }));
+  STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp, cap: i }));
 
   // histoire secondaire : la Brume, les nouveaux lieux (lac, forêt des torii, jardin, île du Magma) et leurs quêtes
   const quests = buildQuests({ W, maps, towns, routes, legends, docks, buildTown, trainerNpc, offRoute: (id, t, side, off) => offRoute(routes.find((r) => r.id === id).pts, t, side, off) });

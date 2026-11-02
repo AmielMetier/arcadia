@@ -161,6 +161,14 @@ function kitStyle(b, map) {
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
+    // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
+    if (charsImg && art.suiveurs && SPRITES.suiveurs) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
+      const x = c.getContext('2d'); x.drawImage(charsImg, 0, 0); x.drawImage(art.suiveurs, 0, charsImg.height);
+      const base = Math.round(charsImg.height / CHH);
+      for (const [sp, r] of Object.entries(SPRITES.suiveurs.rows)) CHAR_ROWS['poke:' + sp] = base + r;
+      charsImg = c;
+    }
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 1, 400);
     const A = buildAtlas(), N = buildAnimAtlas(), S = buildSprites();

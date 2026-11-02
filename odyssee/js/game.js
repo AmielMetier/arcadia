@@ -7,13 +7,13 @@ import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js'
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { SAUVAGE, R } from './data/remplacants.js';
-import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
+import { STARTERS, STARTER_CHOICES, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
-import { HPX } from './render/world3d.js';
+import { HPX, CHAR_ROWS } from './render/world3d.js';
 import { saveCodeScreen } from './ui/screens.js';
 import { encodeSave, saveSummary } from './core/savecode.js';
 import { installSocial, talkToPeer } from './net/social.js';
@@ -23,8 +23,11 @@ import { storyTalk, storyTrigger, storyWin, lugiaBattle, placeLugia, purify, ove
 const SAVE_KEY = 'odyssee-save-v2';
 const WALK = 0.26, RUN = 0.135, SURF = 0.2;
 const key = (x, y) => x + ',' + y;
-// le rival prend le starter qui a l'avantage sur le tien : Plante → Feu, Feu → Eau, Eau → Plante
-const RIVAL_TEAMS = Object.fromEntries(Object.entries({ 1001: [1004, 1005, 1006], 1004: [1007, 1008, 1009], 1007: [1001, 1002, 1003] }).map(([k, v]) => [R(+k), v.map(R)]));
+// le rival prend le partenaire qui a l'avantage sur le tien (Plante → Feu, Feu → Eau, Eau → Plante), de la même
+// lignée que le tien : l'original d'Odyssée, celui de Rouge / Bleu ou celui d'Or / Argent
+const RIVAL_TEAMS = {};
+for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) RIVAL_TEAMS[STARTER_CHOICES[t].lines[k][0]] = STARTER_CHOICES[(t + 1) % 3].lines[k];
+void R;
 const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace et le Dragon' };
 // capacité de terrain donnée par chaque Champion après sa victoire
 const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
@@ -39,6 +42,8 @@ export class Game {
     this.bv = new BattleView(this);
     this.autoRun = false;
     try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
+    this.followOff = false;   // le Pokémon de tête suit le dresseur (option)
+    try { this.followOff = localStorage.getItem('odyssee-suiveur') === '0'; } catch (e) {}
     this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
@@ -114,6 +119,66 @@ export class Game {
     this.updateOverlay();
     placeLugia(this);
     this.zone = null; this.updateZone();
+    this.resetFollower();
+  }
+
+  /* ================= Pokémon qui suit (comme dans HeartGold / SoulSilver) ================= */
+  /** espèce du Pokémon de tête s'il a un sprite pour suivre (partenaires de départ et leurs évolutions) */
+  followerSp() {
+    if (this.followOff || !this.state) return null;
+    const m = this.state.party[0];
+    return m && m.hp > 0 && CHAR_ROWS['poke:' + m.sp] != null ? m.sp : null;
+  }
+  /** après un changement de carte : il se pose derrière le dresseur (ou reste dans sa Ball jusqu'au premier pas) */
+  resetFollower() {
+    const p = this.player, m = this.mapObj, [dx, dy] = DIRS[p.dir] || [0, 1], bx = p.x - dx, by = p.y - dy, t = m.get(bx, by);
+    const ok = m.in(bx, by) && walkable(t) && ![T.DOOR, T.MAT, T.CAVEDOOR].includes(t) && !this.occupied(bx, by) && m.height(bx, by) === m.height(p.x, p.y);
+    this.fol = { x: ok ? bx : p.x, y: ok ? by : p.y, dir: p.dir, move: null, step: 0, hidden: !ok || !!p.surf };
+    this._folMv = p.move;
+  }
+  /** il marche sur la case que le dresseur vient de quitter */
+  followTick(dt) {
+    const p = this.player; if (!this.fol) this.resetFollower();
+    const f = this.fol;
+    if (p.move && p.move !== this._folMv) {
+      this._folMv = p.move;
+      const fx = p.move.fx, fy = p.move.fy;
+      if (p.surf || p.move.land) { f.hidden = true; f.move = null; f.x = p.move.tx; f.y = p.move.ty; }
+      else if (f.hidden) { f.hidden = false; f.x = fx; f.y = fy; f.move = null; f.dir = p.dir; }
+      else if (f.x !== fx || f.y !== fy) {
+        const ddx = fx - f.x, ddy = fy - f.y;
+        f.dir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
+        f.move = { fx: f.x, fy: f.y, tx: fx, ty: fy, t: 0, dur: p.move.dur, jump: Math.abs(ddx) + Math.abs(ddy) > 1 };
+        f.x = fx; f.y = fy;
+      }
+    }
+    if (f.move) { f.move.t += dt / f.move.dur; if (f.move.t >= 1) { f.move = null; f.step++; } }
+  }
+  drawFollower(v) {
+    const f = this.fol, sp = this.followerSp();
+    if (!f || f.hidden || !sp) { if (v.actors.has('follower')) v.removeActor('follower'); return; }
+    let x = f.x, y = f.y, hop = 0, sf = 0;
+    if (f.move) { const u = Math.min(1, f.move.t); x = f.move.fx + (f.move.tx - f.move.fx) * u; y = f.move.fy + (f.move.ty - f.move.fy) * u; sf = u < 0.5 ? (f.step % 2 ? 1 : 2) : 0; if (f.move.jump) hop = Math.sin(u * Math.PI) * 0.45; }
+    else sf = Math.floor(performance.now() / 420) % 2 ? 1 : 0;   // il piétine sur place, comme dans HGSS
+    const a = v.actor('follower', {});
+    v.setFrame(a, 'poke:' + sp, f.dir, sf);
+    const t = this.mapObj.get(Math.round(x), Math.round(y)), grass = isGrassEnc(t) && !f.move;
+    v.place(a, x, y, hop, grass);
+    v.cover(a, ...(isGrassEnc(t) && hop < 0.05 ? [Math.round(x), Math.round(y)] : [null]));
+  }
+  /** parler à son Pokémon */
+  async talkFollower() {
+    const m = this.state.party[0], name = monName(m), h = this.hour(), ui = this.ui;
+    this.sound.cry(ASSETS.cry(m.sp));
+    const lines = [
+      `${name} a l'air content de marcher à tes côtés.`, `${name} renifle l'air. Il sent quelque chose d'intéressant...`,
+      `${name} te regarde droit dans les yeux. Il a confiance en toi.`, `${name} sautille sur place !`,
+      m.hp < m.stats[0] / 2 ? `${name} a l'air fatigué... Un petit tour au Centre de soins ?` : `${name} déborde d'énergie !`,
+      h >= 20 || h < 6 ? `${name} bâille. Il commence à se faire tard.` : `${name} profite du soleil.`,
+      this.mapObj.outdoor ? `${name} contemple le paysage.` : `${name} explore la pièce du regard.`,
+    ];
+    if (this.fol) this.fol.dir = OPP[this.player.dir];
+    await ui.say(lines[Math.floor(Math.random() * lines.length)]);
   }
   /** PNJ tel qu'il se tient sur la carte (un membre du Conseil 4 battu s'est écarté) */
   npcState(n) {
@@ -256,6 +321,7 @@ export class Game {
       } else p.walking = false;
     }
     this.stepGap = stepped;
+    this.followTick(dt);
     // PNJ et autres joueurs
     for (const n of this.npcs) this.npcTick(n, dt);
     this.peersTick?.(dt);
@@ -281,6 +347,7 @@ export class Game {
     const bob = p.surf ? 0.04 + Math.sin(performance.now() / 260) * 0.03 : 0;
     v.place(a, px, py, hop + bob, (isGrassEnc(t) && !p.move) || p.surf);
     v.cover(a, ...(isGrassEnc(t) && !p.surf && hop < 0.05 ? [Math.round(px), Math.round(py)] : [null]));
+    this.drawFollower(v);
     this.drawPeers?.(); this.drawTags?.(true);
     if (p.surf) {
       const w = v.actor('wake', { kind: 'flat' }); if (!w.wakeSet) { const r = v.S.rects.wake; v.setSpriteRect(w, r, r.w, r.h); w.wakeSet = true; w.shadow.visible = false; }
@@ -442,6 +509,7 @@ export class Game {
     let fx = p.x + dx, fy = p.y + dy;
     let n = this.npcs.find((q) => q.x === fx && q.y === fy && !q.move);
     if (!n && m.get(fx, fy) === T.BLOCK && this.view.decoAt.get(key(fx, fy))?.k === 'counter') n = this.npcs.find((q) => q.x === fx + dx && q.y === fy + dy);
+    if (!n && this.fol && !this.fol.hidden && !this.fol.move && this.fol.x === fx && this.fol.y === fy && this.followerSp()) { this.busy = true; try { await this.talkFollower(); } finally { this.busy = false; } return; }
     const peer = !n && this.peerAt?.(fx, fy);
     if (peer) { this.busy = true; try { await talkToPeer(this, peer); } finally { this.busy = false; } return; }
     this.busy = true;
@@ -462,7 +530,7 @@ export class Game {
         else if (o?.type === 'pylon') await this.pylon(o);
         else if (o?.type === 'stele') await this.stele(o);
         else if (o?.type === 'shrine') await this.shrine();
-        else if (o?.type === 'starter') await this.chooseStarter(o.sp);
+        else if (o?.type === 'starter') await this.chooseStarter(o.sp, o.cap);
         else if (t === T.BLOCK && this.view.decoAt.get(key(fx, fy))) await this.furniture(this.view.decoAt.get(key(fx, fy)).k, fx, fy);
         else if (t === T.CUT) await this.fieldObstacle('coupe', fx, fy, 'Ce petit arbre pourrait être coupé.');
         else if (t === T.SMASH) await this.fieldObstacle('eclate', fx, fy, 'Ce rocher est plein de fissures. Il pourrait être brisé.');
@@ -822,9 +890,8 @@ export class Game {
   }
   /** la troisième capsule du labo : celle que ni le joueur ni Théo n'ont prise (et ses évolutions) */
   thirdLine() {
-    const st = this.state, mine = st.flags.starter || STARTERS[0], theo = (RIVAL_TEAMS[mine] || RIVAL_TEAMS[STARTERS[0]])[0];
-    const s = STARTERS.find((x) => x !== mine && x !== theo) || STARTERS[2];
-    return [s, s + 1, s + 2];
+    const slot = starterSlot(this.state.flags.starter) || { t: 0, k: 0 };
+    return STARTER_CHOICES[(slot.t + 2) % 3].lines[slot.k];
   }
   /** appel du Prof. Saule sur le Pokématos, après certains badges */
   async profCall(g) {
@@ -1115,7 +1182,7 @@ export class Game {
     } else if (name === 'prof') {
       if (!st.flags.metProf) {
         st.flags.metProf = true;
-        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules. Dans chacune, une créature qui n\'attend qu\'un partenaire.', `${SPECIES[STARTERS[0]].n}, de type Plante. ${SPECIES[STARTERS[1]].n}, de type Feu. Et ${SPECIES[STARTERS[2]].n}, de type Eau.`, 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
+        await ui.say([`Ah, ${st.name} ! Te voilà enfin.`, 'J\'étudie les créatures d\'Odyssée depuis trente ans. Et aujourd\'hui, j\'ai besoin de jeunes dresseurs pour m\'aider.', 'Sur la table, il y a trois capsules : Plante, Feu et Eau.', 'Dans chacune, trois créatures attendent un partenaire : une d\'ici, d\'Odyssée, et deux venues de régions lointaines, Kanto et Johto.', 'Approche-toi de la table et choisis celle qui te plaît !'], { speaker: 'Prof. Saule' });
         const rival = this.npcs.find((q) => q.id === 'rival-lab');
         if (rival) { rival.dir = 'up'; await ui.say('Hé ! J\'attends depuis ce matin, moi ! Allez, choisis vite, je prendrai après toi.', { speaker: RIVAL_NAME }); rival.dir = 'left'; }
         return;
@@ -1190,14 +1257,23 @@ export class Game {
     }
   }
 
-  async chooseStarter(sp) {
+  async chooseStarter(sp, cap) {
     const st = this.state, ui = this.ui;
     if (st.flags.starter) { await ui.say('C\'est une capsule vide.'); return; }
     // on n'ouvre pas les capsules du professeur sans lui avoir parlé
     if (!st.flags.metProf) { await ui.say('Il y a une créature dans cette capsule... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
+    // la capsule d'un type : trois partenaires au choix
+    const C = STARTER_CHOICES[cap ?? Math.max(0, STARTERS.indexOf(sp))], picks = C.lines.map((l) => l[0]);
+    const ORIG = ['Odyssée', 'Kanto', 'Johto'];
+    const pic = el('div', 'box starter-pic starter-trio', picks.map((p, k) => `<figure data-k="${k}"><img src="${ASSETS.front(p)}" alt=""><figcaption>${esc(SPECIES[p].n)}<small>${ORIG[k]}</small></figcaption></figure>`).join(''));
+    ui.root.appendChild(pic);
+    const mark = (k) => pic.querySelectorAll('figure').forEach((f, j) => f.classList.toggle('on', j === k));
+    mark(0);
+    await ui.say(`Une capsule de type ${TYPE_FR[C.type]}. Trois créatures te regardent...`, { keep: true, speaker: 'Prof. Saule' });
+    const k = await ui.list({ title: `Capsule ${TYPE_FR[C.type]}`, items: picks.map((p, j) => ({ label: SPECIES[p].n, right: ORIG[j] })).concat([{ label: 'Refermer' }]), cls: 'shop', cancel: picks.length, onMove: (j) => { if (j < picks.length) { mark(j); this.sound.cry(ASSETS.cry(picks[j])); } } });
+    if (k < 0 || k >= picks.length) { pic.remove(); ui.closeDialog(); return; }
+    sp = picks[k]; mark(k);
     const S = SPECIES[sp];
-    const pic = el('div', 'box starter-pic', `<img src="${ASSETS.front(sp)}" alt="">`); ui.root.appendChild(pic);
-    this.sound.cry(ASSETS.cry(sp));
     const ok = await ui.yesNo(`Tu veux ${S.n}, la créature de type ${TYPE_FR[S.t[0]]} ?`, { speaker: 'Prof. Saule' });
     pic.remove();
     if (!ok) return;

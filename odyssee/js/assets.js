@@ -27,6 +27,7 @@ export const ASSETS = {
   trainer: (k) => (DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
   portrait: (k) => (PORTRAITS.has(k) ? `${IMG}portraits/${k}-l.png` : null),
   chars: `${IMG}chars.png`,
+  suiveurs: `${IMG}suiveurs.png`,
   nature: (k) => `${IMG}nature/${k}.png`,
   mobilier: (k) => `${IMG}mobilier/${k}.png`,
   facade: (k) => `${IMG}facades/${k}.png`,
