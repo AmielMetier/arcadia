@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.62 — 2 novembre 2026
+- **Odyssée** — Remplacement et correction intégrale des sprites de Poké Balls :
+  - **Correction du sprite de Poké Ball classique** : restauration de l'authentique sprite officiel pixel-art rouge et blanc (dôme rouge éclatant, ceinture équatoriale noire nette avec bouton central blanc, base blanche immaculée). Remplacement du sprite ray-tracé et correction de l'écrasement accidentel qui faisait afficher l'icône de l'Hyper Ball (Ultra Ball) dans l'inventaire du Sac et les menus.
+  - **Écran d'Équipe et Sockets** : toutes les alvéoles de l'équipe affichent désormais les vraies Poké Balls rétro 5G éclatantes sans confusion possible avec les Hyper Balls ou Super Balls.
+  - **Sprites de terrain et combat** : restauration du sprite de Poké Ball de terrain `itemball.png` en vraie résolution 15x15, sprites de combat 32x32 et 48x48 pixel-art pour l'intro du Professeur Saule, frames d'ouverture et d'inclinaison de secousse nettes au pixel près, et ajout de la Master Ball officielle (`master-ball.png` et `master_ball_32.png`).
+
 ## 3.61 — 2 novembre 2026
 - **Arcadia** — Les images des jeux s'affichent de nouveau dans la liste des jeux et dans le salon.
 - **Arcadia** — Les comptes ont maintenant un mot de passe.
