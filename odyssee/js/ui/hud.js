@@ -124,10 +124,6 @@ export class Hud {
       } else if (act === 'map') {
         g.busy = true; g.sound.sfx('select');
         try { await mapScreen(g); } finally { g.busy = false; this.update(true); }
-      } else if (act === 'save') {
-        g.save(false);
-        if (g.cloud?.on) g.cloud.queue(g.state, true);
-        g.ui.toast('Partie sauvegardée !', 1500);
       }
     });
   }
@@ -193,7 +189,7 @@ export class Hud {
         .join('') + (this.swapFrom >= 0 ? `<div class="hud-swap-hint">Avec qui échanger ${esc(monName(st.party[this.swapFrom]))} ?</div>` : '');
     }
 
-    // 2. Capsule Pokégear en haut à droite (avec icônes pixel-art coin.png, trophy.png, team.png, bag.png, map.png, save.png)
+    // 2. Capsule Pokégear en haut à droite (avec icônes pixel-art coin.png, trophy.png, run.png, team.png, bag.png, map.png)
     const badgeDots = BADGES.map(
       (b, k) => `<i class="hud-bdot${st.badges[k] ? ' got' : ''}" style="--bc:${b.color}" title="${esc(b.name)}"></i>`
     ).join('');
@@ -228,9 +224,6 @@ export class Hud {
         </button>
         <button type="button" class="hud-btn" data-act="map" tabindex="-1" title="Carte (Touche C)">
           <img src="img/hud/map.png" alt=""><span>CARTE</span>
-        </button>
-        <button type="button" class="hud-btn save" data-act="save" tabindex="-1" title="Sauvegarder la partie">
-          <img src="img/hud/save.png" alt=""><span>SAUVER</span>
         </button>
       </div>
     `;

@@ -8,6 +8,7 @@
   - Jouer le monstre : une vue rouge et noire, des griffes, les corps qui brûlent, un hurlement (R) qui coupe le souffle. Tu peux marcher dans le labo avant que les portes s'ouvrent, et le jeu dit pourquoi tu es à l'arrêt.
   - Au départ, chacun a déjà son appareil photo, et une seule table propose capteur, kit caméras et piles. Ce que tu trouves en fouillant va directement dans ton sac.
   - Les menus ont le même style que ceux des autres jeux, et l'escalier a de vraies marches, correctement éclairées.
+- **Odyssée** — retrait du bouton SAUVER sur le HUD en jeu : la partie est désormais sauvegardée automatiquement après chaque combat, discussion, soin ou changement de lieu (ainsi qu'à la fermeture de l'onglet), laissant 4 boutons d'action rapides (COURSE, ÉQUIPE, SAC, CARTE) sur le Pokégear.
 
 ## 3.57 — 2 novembre 2026
 - **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :

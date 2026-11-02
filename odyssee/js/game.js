@@ -477,7 +477,7 @@ export class Game {
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
       else if (d.text) await this.ui.say(d.text);
-    } finally { this.busy = was; }
+    } finally { this.save(true); this.busy = was; }
   }
   async pickItem(it) {
     this.sound.sfx('item');
@@ -889,6 +889,7 @@ export class Game {
     else if (result === 'lose') await this.whiteout();
     this.sound.current = null;
     this.updateZone();
+    this.save(true);
     return result;
   }
 
