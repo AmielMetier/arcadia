@@ -3,15 +3,16 @@
 // selon l'état diffusé par l'hôte. L'arène de combat (sprites Showdown animés, barres de PV progressives,
 // paliers de stats, PP réels, journal, déroulement séquentiel des tours) vit ici ; les autres écrans dans screens.js.
 
-import { spriteUrls, POKEBALL_SPRITE } from '../engine/data.js';
+import { spriteUrls, POKEBALL_SPRITE, isLegendary } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { ITEMS, CHOICE, cleanItems } from '../engine/items.js';
 import { ABILITIES } from '../engine/abilities.js';
 
 /** Badge du talent (survol : son effet) */
+import { describeMove, tipText, tipAttr, installTips } from './tips.js';
 function abilityBadge(p) {
   const a = p && ABILITIES[p.ability];
-  return a ? `<span class="sc-ability" title="${a.name} : ${a.desc}">${a.name}</span>` : '';
+  return a ? `<span class="sc-ability" ${tipAttr(tipText(a.name, a.desc))}>${a.name}</span>` : '';
 }
 /** Bandeau du talent, comme dans les jeux : il glisse depuis le côté du Pokémon puis repart */
 function showAbilityBanner(key, pokeName, abilityName) {
@@ -40,7 +41,7 @@ function itemBadge(p) {
   const it = p && ITEMS[p.item];
   if (!it) return '';
   const lock = CHOICE.has(p.item) && p.choiceLock && MOVES[p.choiceLock] ? ` · bloqué sur ${MOVES[p.choiceLock].name}` : '';
-  return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" title="${it.name} : ${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}"><img src="${it.icon}" alt="">${it.name}</span>`;
+  return `<span class="sc-item ${p.itemUsed ? 'used' : ''}" ${tipAttr(tipText(it.name, `${it.desc}${p.itemUsed ? ' (déjà utilisé)' : ''}${lock}`))}><img src="${it.icon}" alt="">${it.name}</span>`;
 }
 import { STAGE_MULTS, canMega } from '../engine/battle.js';
 import { TYPES, getEffectiveness, getShowdownTypeIcon, getCategoryIcon } from '../engine/types.js';
@@ -72,6 +73,7 @@ const STAT_SHORT = {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, submitAction, isHost, switchMode, exit }) {
+  installTips();
   root.className = 'poke-root tz-root';
   root.innerHTML = `
     <div class="tz-backdrop" aria-hidden="true"><i class="beam b1"></i><i class="beam b2"></i><i class="beam b3"></i></div>
@@ -761,7 +763,11 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
       const aliveCount = teamBottom.filter(p => !p.fainted).length;
       // Pas encore de chrono (écran VS, envoi des Pokémon) : les choix ne sont pas encore ouverts
       const notYet = !s.turnEndsAt;
-      dash.innerHTML = isSpectator ? `
+      // L'adversaire choisit son remplaçant : pas d'attaques à l'écran, juste l'attente
+      const foeChoosing = !isSpectator && !isForcedSwitch && String(b.phase).startsWith('switch_forced');
+      dash.innerHTML = foeChoosing ? `
+        <div class="bw-foe-wait"><span class="bw-foe-ball"></span><b>${esc(tTop.name)} choisit son Pokémon…</b><small>Tu pourras attaquer dès qu'il sera sur le terrain.</small></div>
+      ` : isSpectator ? `
         <div class="bw-spect">
           <span class="bw-live">EN DIRECT</span>
           <span><b>${esc(tBottom.name)}</b> contre <b>${esc(tTop.name)}</b></span>
@@ -786,7 +792,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
                 const curPp = pBottom.ppMap && pBottom.ppMap[moveId] !== undefined ? pBottom.ppMap[moveId] : maxPp;
                 return `
                   <button class="bw-move ${choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'choice-locked' : ''}" data-move="${moveId}" style="--tc:${TYPES[m.type].color}" ${isSubmitted || notYet || curPp <= 0 || choiceBlocked(pBottom, moveId) || (pBottom.disabled && pBottom.disabled.move === moveId) ? 'disabled' : ''}
-                    title="${esc(m.name)} · puissance ${m.power || '—'} · précision ${m.acc}%">
+                    ${tipAttr(describeMove(m))}>
                     <span class="pm-key">${mIdx + 1}</span>
                     <span class="bw-move-name">${esc(m.name)}</span>
                     <span class="bw-move-meta">
@@ -868,8 +874,12 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     toggleDraft(dex) {
       const i = local.draft.indexOf(dex);
       if (i >= 0) local.draft.splice(i, 1);
-      else if (local.draft.length < TEAM_SIZE) local.draft.push(dex);
-      else { local.draft.shift(); local.draft.push(dex); }
+      else {
+        // un seul légendaire : choisir un autre légendaire remplace le premier
+        if (isLegendary(dex)) { const j = local.draft.findIndex(isLegendary); if (j >= 0) local.draft.splice(j, 1); }
+        if (local.draft.length < TEAM_SIZE) local.draft.push(dex);
+        else { local.draft.shift(); local.draft.push(dex); }
+      }
       sfx.play('switch');
       ctx.rerender();
     },
@@ -1007,7 +1017,7 @@ export function mountGame(root, { me, draft, lead, ready, cont, skip, restart, s
     if (s.phase === 'draft') {
       const meP = getParticipant(s.t, me.id);
       if (!meP || meP.team) return;
-      const n = Number(e.key);
+      const n = e.key === '0' ? 10 : Number(e.key);
       if (n >= 1 && n <= meP.offer.length) ctx.toggleDraft(meP.offer[n - 1]);
       else if (e.key === 'Enter') ctx.submitDraft();
       return;

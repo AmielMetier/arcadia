@@ -4,7 +4,8 @@
 // Pokémon de tête) vivent dans ctx.local pour survivre à ces redessins.
 // Les compte à rebours ([data-deadline]) sont animés par game.js.
 
-import { getPokemonById, spriteUrls } from '../engine/data.js';
+import { describeMove, tipText, tipAttr } from './tips.js';
+import { getPokemonById, spriteUrls, isLegendary } from '../engine/data.js';
 import { MOVES } from '../engine/moves.js';
 import { ITEMS, itemsFor, cleanItems, suggestItems } from '../engine/items.js';
 import { megasOf } from '../engine/megas.js';
@@ -146,16 +147,16 @@ export function renderDraft(stage, s, ctx) {
         <span class="dr-key">${i + 1}</span>
         ${order >= 0 ? `<span class="dr-order">${order + 1}</span>` : ''}
         <div class="dr-art"><img src="${spriteUrls(dex).artwork}" alt="" loading="lazy"></div>
-        <b class="dr-name">${esc(b.name)}${megasOf(dex).length ? ' <span class="dr-mega" title="Peut méga-évoluer avec sa Méga-Gemme">MÉGA</span>' : ''}</b>
+        <b class="dr-name">${esc(b.name)}${megasOf(dex).length ? ' <span class="dr-mega" title="Peut méga-évoluer avec sa Méga-Gemme">MÉGA</span>' : ''}${isLegendary(dex) ? ' <span class="dr-legend" title="Un seul légendaire par équipe">LÉGENDAIRE</span>' : ''}</b>
         <div class="dr-types">${b.types.map((ty) => typeChip(ty)).join('')}</div>
-        ${ABILITIES[abilityOf(dex)] ? `<div class="dr-ability" title="${esc(ABILITIES[abilityOf(dex)].desc)}"><b>${esc(ABILITIES[abilityOf(dex)].name)}</b> ${esc(ABILITIES[abilityOf(dex)].desc)}</div>` : ''}
+        ${ABILITIES[abilityOf(dex)] ? `<div class="dr-ability" ${tipAttr(tipText(ABILITIES[abilityOf(dex)].name, ABILITIES[abilityOf(dex)].desc))}><b>${esc(ABILITIES[abilityOf(dex)].name)}</b> ${esc(ABILITIES[abilityOf(dex)].desc)}</div>` : ''}
         <div class="dr-stats">
           ${STAT_ROWS.map(([k, l]) => `
             <div class="dr-stat"><span>${l}</span><i><u style="width:${Math.min(100, (b.stats[k] / 190) * 100)}%"></u></i><em>${b.stats[k]}</em></div>`).join('')}
           <div class="dr-total">Total <b>${statTotal(b)}</b></div>
         </div>
         <div class="dr-moves">
-          ${moves.map((m) => `<span class="dr-move" style="--tc:${TYPES[m.type].color}" title="${esc(m.name)} · ${m.power || '—'} de puissance">${esc(m.name)}<em>${m.power || (m.cat === 'status' ? 'STA' : '—')}</em></span>`).join('')}
+          ${moves.map((m) => `<span class="dr-move" style="--tc:${TYPES[m.type].color}" ${tipAttr(describeMove(m))}>${esc(m.name)}<em>${m.power || (m.cat === 'status' ? 'STA' : '—')}</em></span>`).join('')}
         </div>
       </button>`;
   }).join('');
@@ -185,7 +186,7 @@ export function renderDraft(stage, s, ctx) {
           <h2 class="tz-title">${locked ? 'Équipe validée' : 'Compose ton équipe'}</h2>
           <p class="tz-sub">${locked
             ? (waiting.length ? `En attente de ${waiting.map((p) => esc(p.name)).join(', ')}…` : 'Tout le monde est prêt, tirage du tableau…')
-            : 'Garde 3 Pokémon sur les 6 proposés et donne un objet à chacun (un objet conseillé est déjà choisi). L\'équipe te suivra tout le tournoi.'}</p>
+            : 'Garde 3 Pokémon sur les 12 proposés (un seul légendaire) et donne un objet à chacun (un objet conseillé est déjà choisi). L\'équipe te suivra tout le tournoi.'}</p>
         </div>
         ${countdown(s, locked ? 'Fin du draft' : 'Temps restant')}
       </header>
@@ -209,7 +210,7 @@ export function renderDraft(stage, s, ctx) {
           ${locked ? '<div class="dr-locked">✓ Équipe enregistrée</div>' : `
             <button class="btn ghost dr-auto" id="drAuto">CHOIX CONSEILLÉ</button>
             <button class="btn big yellow dr-go" id="drGo" ${sel.length === TEAM_SIZE ? '' : 'disabled'}>VALIDER <small>Entrée</small></button>`}
-          <p class="dr-hint">${locked ? '' : 'Touches 1 à 6 pour choisir'}</p>
+          <p class="dr-hint">${locked ? '' : 'Touches 1 à 9 et 0 pour choisir'}</p>
         </aside>
       </div>
       ${statusRow}

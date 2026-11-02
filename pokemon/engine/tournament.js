@@ -9,14 +9,15 @@
 // L'état est un objet JSON simple (diffusé tel quel aux invités, et repris si l'hôte change).
 // Les équipes sont stockées en numéros de Pokédex ; les Pokémon de combat sont recréés à neuf à chaque manche.
 
-import { POKEMON_ROSTER, getPokemonById, createActivePokemon } from './data.js';
+import { POKEMON_ROSTER, getPokemonById, createActivePokemon, isLegendary } from './data.js';
 import { createBattle, resolveTurn, forceSwitch } from './battle.js';
 import { chooseBotAction } from './bot.js';
 import { MOVES } from './moves.js';
 import { TYPES, getEffectiveness } from './types.js';
 import { cleanItems, suggestItems } from './items.js';
 
-export const OFFER_SIZE = 6;
+export const OFFER_SIZE = 12;
+export const MAX_LEGENDS = 1;   // un seul légendaire par équipe
 export const TEAM_SIZE = 3;
 
 export const BOT_TRAINERS = [
@@ -107,7 +108,7 @@ export function statTotal(base) {
 // ---------------------------------------------------------------------------
 
 /**
- * Prépare `count` offres de 6 Pokémon. Une offre ne contient jamais deux fois le même Pokémon,
+ * Prépare `count` offres de 12 Pokémon (2 légendaires au plus). Une offre ne contient jamais deux fois le même Pokémon,
  * ni plus de deux Pokémon du même type principal ; les offres se recoupent le moins possible.
  */
 export function makeOffers(count, gen = 'all', rng = Math.random) {
@@ -122,7 +123,8 @@ export function makeOffers(count, gen = 'all', rng = Math.random) {
       while (offer.length < OFFER_SIZE && i < bag.length) {
         const base = bag[i];
         const t0 = base.types[0];
-        if (offer.includes(base.id) || (strict && (typeCount[t0] || 0) >= 2)) { i++; continue; }
+        const legends = offer.filter(isLegendary).length;   // pas plus de 2 légendaires proposés (on n'en garde qu'un)
+        if (offer.includes(base.id) || (strict && ((typeCount[t0] || 0) >= 2 || (isLegendary(base.id) && legends >= 2)))) { i++; continue; }
         offer.push(base.id);
         typeCount[t0] = (typeCount[t0] || 0) + 1;
         bag.splice(i, 1);
@@ -165,6 +167,7 @@ export function autoDraft(offer) {
     for (let j = i + 1; j < offer.length; j++) {
       for (let k = j + 1; k < offer.length; k++) {
         const trio = [offer[i], offer[j], offer[k]];
+        if (trio.filter(isLegendary).length > MAX_LEGENDS) continue;
         const sc = rateTeam(trio);
         if (sc > bestScore) { bestScore = sc; best = trio; }
       }
@@ -180,6 +183,7 @@ export function submitDraft(t, pid, picks, items) {
   if (!p || p.bot || !Array.isArray(picks)) return false;
   const ids = [...new Set(picks.map(Number))];
   if (ids.length !== TEAM_SIZE || !ids.every((id) => p.offer.includes(id))) return false;
+  if (ids.filter(isLegendary).length > MAX_LEGENDS) return false;
   p.team = ids;
   p.items = cleanItems(ids, items);   // objets tenus : valides, sans doublon, complétés par les conseils
   return true;

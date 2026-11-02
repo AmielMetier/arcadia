@@ -840,3 +840,14 @@
 .bw-weather.w-hail{background:#d8f0ff}
 .bf-inner:has(.w-hail)::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.85) 0 2px,transparent 3px) 0 0/38px 38px,radial-gradient(circle,rgba(255,255,255,.7) 0 1.5px,transparent 2.5px) 19px 13px/46px 46px;background-color:rgba(160,200,230,.16);animation:wxHail .45s linear infinite}
 @keyframes wxHail{to{background-position:-12px 38px,7px 59px}}
+/* bulles d'aide (attaques, talents, objets) */
+.pd-tip{position:fixed;z-index:9999;max-width:290px;padding:9px 12px;border:2px solid #222;border-radius:10px;background:#fbf7ec;color:#1d1d1d;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);font:600 13px/1.4 'Chakra Petch',system-ui,sans-serif;pointer-events:none;display:flex;flex-direction:column;gap:3px}
+.pd-tip[hidden]{display:none}
+.pd-tip b{font-size:14.5px}
+.pd-tip small{font-size:11.5px;color:#5c574c;font-weight:700}
+/* l'adversaire choisit son remplaçant */
+.bw-foe-wait{min-height:168px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;color:#f3eee0}
+.bw-foe-wait b{font-size:18px}.bw-foe-wait small{opacity:.75;font-weight:600}
+.bw-foe-ball{width:34px;height:34px;border-radius:50%;border:3px solid #222;background:linear-gradient(#e33 0 46%,#222 46% 54%,#fff 54%);animation:foeBall 1s ease-in-out infinite}
+@keyframes foeBall{0%,100%{transform:rotate(-18deg)}50%{transform:rotate(18deg)}}

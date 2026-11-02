@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.39 — 2 novembre 2026
+- **Poké Duel** — Au draft, 12 Pokémon sont proposés au lieu de 6, et une équipe ne peut avoir qu'un seul légendaire (marqué LÉGENDAIRE sur sa carte).
+- **Poké Duel** — Passe la souris sur une attaque, un talent ou un objet pour voir ce qu'il fait : type, catégorie, puissance, précision et effets.
+- **Poké Duel** — Quand l'adversaire choisit son remplaçant, tes attaques ne s'affichent plus : un écran d'attente les remplace jusqu'à son arrivée.
+
 ## 3.38 — 2 novembre 2026
 - **Poké Duel** — L'effet de la météo s'affiche : « Le soleil renforce l'attaque ! » ou « La pluie affaiblit l'attaque... » apparaît quand une attaque Feu ou Eau est boostée (×1,5) ou affaiblie (×0,5).
 
