@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.54 — 2 novembre 2026
+## 3.55 — 2 novembre 2026
 - **Mollo !** — Le combat est revu de fond en comble.
   - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.
   - Nouveau : la garde (Maj ou C). Elle arrête les poings, mais elle s'use vite.
@@ -10,6 +10,11 @@
   - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
   - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
   - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
+
+## 3.54 — 2 novembre 2026
+- **Odyssée** — le jeu à plusieurs ne plante plus dès qu'un autre joueur arrive sur la même carte : on se voit marcher, avec son nom au-dessus de la tête.
+  - En parlant à un autre joueur : échanger, combattre, ou voir sa fiche (badges, Pokédex, temps de jeu et équipe).
+  - Ta propre carte dresseur montre aussi ton équipe.
 
 ## 3.53 — 2 novembre 2026
 - **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.

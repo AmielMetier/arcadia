@@ -7,7 +7,8 @@ import { monName } from '../core/mon.js';
 import { SPECIES } from '../data/species.js';
 import { ASSETS, loadImg } from '../assets.js';
 import { isGrassEnc } from '../world/tiles.js';
-import { partyScreen, TYPE_FR } from '../ui/screens.js';
+import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js';
+import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
 
 const WALK = 0.26, RUN = 0.135;
@@ -29,6 +30,8 @@ export function installSocial(game) {
     };
   };
   link.onRequest = (from, m) => onRequest(game, from, m);
+  // fiche demandée par un autre joueur : réponse automatique, sans interrompre la partie
+  link.onCard = () => (game.state ? trainerCard(game.state) : null);
 
   /* ---------------- affichage ---------------- */
   game.peersTick = (dt) => {
@@ -88,7 +91,8 @@ export function installSocial(game) {
 export async function talkToPeer(game, peer) {
   const ui = game.ui, link = game.link, st = game.state;
   if (peer.busy) { await ui.say(`${peer.name} est occupé${peer.gender === 'f' ? 'e' : ''} pour le moment.`); return; }
-  const c = await ui.ask(`${peer.name} est là. Que veux-tu faire ?`, ['Échanger', 'Combattre', 'Rien'], { speaker: peer.name });
+  const c = await ui.ask(`${peer.name} est là. Que veux-tu faire ?`, ['Échanger', 'Combattre', 'Sa fiche', 'Rien'], { speaker: peer.name });
+  if (c === 2) { await showCard(game, peer); return; }
   if (c !== 0 && c !== 1) return;
   if (!st.party.length) { await ui.say('Il te faut d\'abord un Pokémon !'); return; }
   const kind = c === 0 ? 'trade' : 'battle';
@@ -115,6 +119,23 @@ export async function talkToPeer(game, peer) {
     if (kind === 'trade') await tradeSession(game, peer.id, peer.name, rid);
     else await battleSession(game, peer.id, peer.name, peer.gender, rid, true);
   } finally { game.session = null; }
+}
+
+/** fiche dresseur d'un autre joueur : badges, Pokédex, temps de jeu, équipe */
+async function showCard(game, peer) {
+  const rid = newId();
+  game.link.send(peer.id, { t: 'card?', rid });
+  const r = await game.link.wait(peer.id, (m) => m.t === 'card' && m.rid === rid, 8000);
+  if (r.t !== 'card' || !r.card) { await game.ui.say(r.t === 'left' ? `${peer.name} a quitté la partie.` : `${peer.name} ne répond pas.`); return; }
+  const c = r.card;
+  // données venues d'un autre joueur : on ne garde que ce qu'on sait afficher
+  const card = {
+    name: String(c.name || peer.name).slice(0, 12), id: (c.id | 0) % 100000, gender: c.gender === 'f' ? 'f' : 'm', dex: c.dex | 0, seen: c.seen | 0, time: +c.time || 0, champion: !!c.champion,
+    badges: Array.isArray(c.badges) ? c.badges.slice(0, 8).map(Boolean) : [],
+    team: Array.isArray(c.team) ? c.team.slice(0, 6).filter((q) => SPECIES[q?.sp]).map((q) => ({ sp: q.sp, lvl: Math.max(1, Math.min(100, q.lvl | 0)), nick: q.nick ? String(q.nick).slice(0, 12) : null })) : [],
+  };
+  game.ui.sound.sfx('select');
+  await cardScreen(game, BADGES, card);
 }
 
 /** invitation reçue */

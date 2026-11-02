@@ -571,6 +571,13 @@ export class WorldView {
     return a;
   }
   removeActor(id) { const a = this.actors.get(id); if (a) { a.dispose(); this.actors.delete(id); } }
+  /** position à l'écran (pixels de la page) d'un point de la carte, à h pixels au-dessus du sol (noms des autres joueurs) */
+  screenPos(x, y, h = 34) {
+    const v = new THREE.Vector3(x + 0.5, h * HPX, y + 0.55).project(this.camera);
+    if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) return null;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { left: r.left + (v.x + 1) / 2 * r.width, top: r.top + (1 - v.y) / 2 * r.height };
+  }
 
   /* ---------------- heure du jour ---------------- */
   setTimeOfDay(h) {
