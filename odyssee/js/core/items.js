@@ -53,6 +53,34 @@ export const ITEMS = {
   'ferry-ticket': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Passe Marin', desc: 'Le passe du bateau de l\'Embarcadère de l\'Aube. Les îles s\'ouvrent au fil des badges.' },
   'plume-arc': { pocket: 'cles', price: 0, key: true, icon: 'rainbow-wing', name: 'Plume Arc-en-ciel', desc: 'Une plume qui brille de sept couleurs. Elle appelle Ho-Oh au sommet de la Tour de la Grue.' },
   'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle apaise les courants de la Grotte des Tourbillons.' },
+  // --- OBJETS DE COMBAT & OBJETS TENUS (Held Items) ---
+  leftovers: { pocket: 'objets', price: 4000, hold: 'leftovers', name: 'Restes', desc: "Objet à tenir. Restaure 1/16 des PV max du porteur à la fin de chaque tour." },
+  'sitrus-berry': { pocket: 'soin', price: 250, hold: 'sitrus-berry', name: 'Baie Sitrus', desc: "Objet à tenir. Restaure 25% des PV quand le porteur passe sous la moitié de ses PV." },
+  'lum-berry': { pocket: 'soin', price: 350, hold: 'lum-berry', name: 'Baie Prun', desc: "Objet à tenir. Guérit automatiquement toute altération de statut (brûlure, paralysie, sommeil...)." },
+  'life-orb': { pocket: 'objets', price: 5000, hold: 'life-orb', name: 'Orbe Vie', desc: "Objet à tenir. Augmente la puissance des attaques de 30%, mais coûte 10% des PV max par coup réussi." },
+  'choice-band': { pocket: 'objets', price: 6000, hold: 'choice-band', name: 'Bandeau Choix', desc: "Objet à tenir. Augmente l'Attaque de 50%, mais bloque sur la première capacité utilisée." },
+  'choice-specs': { pocket: 'objets', price: 6000, hold: 'choice-specs', name: 'Lunettes Choix', desc: "Objet à tenir. Augmente l'Atq. Spé. de 50%, mais bloque sur la première capacité utilisée." },
+  'choice-scarf': { pocket: 'objets', price: 6000, hold: 'choice-scarf', name: 'Mouchoir Choix', desc: "Objet à tenir. Augmente la Vitesse de 50%, mais bloque sur la première capacité utilisée." },
+  eviolite: { pocket: 'objets', price: 4500, hold: 'eviolite', name: 'Évoluroc', desc: "Objet à tenir. Augmente la Défense et Déf. Spé. de 50% si le Pokémon peut encore évoluer." },
+  'focus-sash': { pocket: 'objets', price: 3500, hold: 'focus-sash', name: 'Ceinture Force', desc: "Objet à tenir. Permet de résister à un coup mortel à 1 PV si les PV étaient au max." },
+  'rocky-helmet': { pocket: 'objets', price: 4000, hold: 'rocky-helmet', name: 'Casque Brut', desc: "Objet à tenir. Blesse l'attaquant de 1/6 de ses PV max lors de chaque contact direct." },
+  'heart-scale': { pocket: 'objets', price: 1000, name: 'Écaille Cœur', desc: "Une jolie écaille marine en forme de cœur. Le Maître des Capacités en raffole." },
+  charcoal: { pocket: 'objets', price: 2000, hold: 'charcoal', name: 'Charbon', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Feu." },
+  'mystic-water': { pocket: 'objets', price: 2000, hold: 'mystic-water', name: 'Eau Mystique', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Eau." },
+  'miracle-seed': { pocket: 'objets', price: 2000, hold: 'miracle-seed', name: 'Graine Miracle', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Plante." },
+  magnet: { pocket: 'objets', price: 2000, hold: 'magnet', name: 'Aimant', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Électrik." },
+  'black-glasses': { pocket: 'objets', price: 2000, hold: 'black-glasses', name: 'Lunettes Noires', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Ténèbres." },
+  'hard-stone': { pocket: 'objets', price: 2000, hold: 'hard-stone', name: 'Pierre Dure', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Roche." },
+  'soft-sand': { pocket: 'objets', price: 2000, hold: 'soft-sand', name: 'Sable Doux', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Sol." },
+  'sharp-beak': { pocket: 'objets', price: 2000, hold: 'sharp-beak', name: 'Bec Pointu', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Vol." },
+  'black-belt': { pocket: 'objets', price: 2000, hold: 'black-belt', name: 'Ceinture Noire', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Combat." },
+  'poison-barb': { pocket: 'objets', price: 2000, hold: 'poison-barb', name: 'Pic Venin', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Poison." },
+  'twisted-spoon': { pocket: 'objets', price: 2000, hold: 'twisted-spoon', name: 'Cuillère Tordue', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Psy." },
+  'silver-powder': { pocket: 'objets', price: 2000, hold: 'silver-powder', name: 'Poudre Argentée', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Insecte." },
+  'dragon-fang': { pocket: 'objets', price: 2000, hold: 'dragon-fang', name: 'Croc Dragon', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Dragon." },
+  'never-melt-ice': { pocket: 'objets', price: 2000, hold: 'never-melt-ice', name: 'Glace Éternelle', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Glace." },
+  'metal-coat': { pocket: 'objets', price: 2000, hold: 'metal-coat', name: 'Peau Métal', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Acier." },
+  'silk-scarf': { pocket: 'objets', price: 2000, hold: 'silk-scarf', name: 'Mouchoir Soie', desc: "Objet à tenir. Augmente de 20% la puissance des attaques de type Normal." },
   'town-map': { pocket: 'cles', price: 0, key: true, name: 'Carte', desc: 'La carte de la région d\'Odyssée. On peut aussi l\'ouvrir avec la touche C.' },
 };
 export const itemName = (k) => ITEMS[k]?.name || ITEM_NAMES[k] || k;
@@ -90,3 +118,23 @@ export function useCandy(m, maxLvl = 100) {
   return gainExp(m, Math.max(1, need), maxLvl);
 }
 export { healFull };
+
+/** Équipe un objet tenu sur un Pokémon */
+export function giveHeldItem(m, item, bag) {
+  if (!m || !item || !bag || !bag[item]) return null;
+  const oldItem = m.item;
+  m.item = item;
+  bag[item]--;
+  if (bag[item] <= 0) delete bag[item];
+  if (oldItem) bag[oldItem] = (bag[oldItem] || 0) + 1;
+  return oldItem;
+}
+
+/** Retire l'objet tenu par un Pokémon et le remet dans le sac */
+export function takeHeldItem(m, bag) {
+  if (!m || !m.item) return null;
+  const item = m.item;
+  m.item = null;
+  if (bag) bag[item] = (bag[item] || 0) + 1;
+  return item;
+}

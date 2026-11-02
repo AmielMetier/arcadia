@@ -33,6 +33,7 @@ const THEMES = {
   snow: { key: 'F3', scale: 'min', bpm: 100, prog: ['i', 'VI', 'III', 'VII', 'i', 'iv', 'VI', 'V'], seed: 144, style: 'mystery' },
   island: { key: 'A3', scale: 'maj', bpm: 124, prog: ['I', 'IV', 'V', 'vi', 'I', 'IV', 'ii', 'V'], seed: 91, style: 'march' },
   champion: { key: 'C3', scale: 'harm', bpm: 176, prog: ['i', 'VI', 'VII', 'III', 'iv', 'VI', 'V', 'V'], seed: 151, style: 'battle', big: 1 },
+  gymTension: { key: 'E3', scale: 'harm', bpm: 184, prog: ['i', 'iv', 'VI', 'V', 'i', 'VII', 'iv', 'V'], seed: 212, style: 'battle', big: 1 },
   rival: { key: 'G3', scale: 'harm', bpm: 168, prog: ['i', 'VII', 'VI', 'V', 'i', 'iv', 'VII', 'V'], seed: 161, style: 'battle' },
   victory: { key: 'C4', scale: 'maj', bpm: 132, prog: ['I', 'IV', 'V', 'I'], seed: 171, style: 'anthem' },
   evolution: { key: 'F3', scale: 'maj', bpm: 120, prog: ['I', 'ii', 'IV', 'V'], seed: 181, style: 'gentle' },
