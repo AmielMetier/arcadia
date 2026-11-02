@@ -407,7 +407,7 @@ export const NON_CONTACT = new Set(['earthquake', 'bulldoze', 'rock_throw', 'sto
 export const BITE = new Set(['bite', 'crunch']);
 export const PULSE = new Set(['water_pulse', 'dark_pulse', 'aura_sphere', 'dragon_pulse']);
 export const isContact = (moveId, move) => !!move && move.cat === 'physical' && !NON_CONTACT.has(moveId);
-export const hasSecondary = (move) => !!move && (!!move.flinch || (move.effect && move.effect.chance && move.effect.target !== 'self') || (move.effect && move.effect.type === 'status' && move.cat !== 'status'));
+export const hasSecondary = (move) => !!move && (!!move.flinch || !!move.confuse || (move.effect && move.effect.chance && move.cat !== 'status') || (move.effect && move.effect.chance && move.effect.target !== 'self') || (move.effect && move.effect.type === 'status' && move.cat !== 'status'));
 const PINCH = { overgrow: 'grass', blaze: 'fire', torrent: 'water', swarm: 'bug' };
 const SKIN = { pixilate: 'fairy', aerilate: 'flying', dragonize: 'dragon' };
 

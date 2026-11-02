@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.36 — 2 novembre 2026
+- **Poké Duel** — Toutes les attaques ont maintenant leur vrai effet :
+  - Ultralaser oblige à se recharger au tour suivant ; Lance-Soleil prend un tour pour absorber la lumière, sauf au soleil.
+  - Coup Bas échoue si l'adversaire ne prépare pas une attaque.
+  - Choc Psy frappe la Défense, pas la Défense Spéciale.
+  - Fatal-Foudre et Vent Violent touchent à coup sûr sous la pluie ; Vent Violent (30 %) et Vibraqua (20 %) peuvent rendre confus.
+  - Éco-Sphère, Telluriforce, Bourdon, Luminocanon et Exploforce peuvent baisser la Défense Spéciale ; Pouvoir Lunaire l'Attaque Spéciale ; Câlinerie l'Attaque ; Poing Météore peut monter l'Attaque du lanceur.
+
 ## 3.35 — 2 novembre 2026
 - **Poké Duel** — La musique de combat se lance enfin : Sandstorm (et le thème de la finale) démarrent dès l'arrivée en combat, sans qu'il faille cliquer.
 - **Poké Duel** — Intimidation, Sécheresse, Crachin, Sable Volant et les autres talents d'arrivée s'activent dès que le Pokémon apparaît sur le terrain, avant que tu choisisses ton attaque.

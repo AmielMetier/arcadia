@@ -117,7 +117,7 @@ export function calculateDamage(attacker, defender, move, state) {
 
   const isPhys = move.cat === 'physical';
   let atk = getEffectiveStat(attacker, isPhys ? 'atk' : 'spa') * attackStatMod(attacker, isPhys, wAtt);
-  let def = getEffectiveStat(defender, isPhys ? 'def' : 'spd') * defenseStatMod(defender, isPhys, weather, attacker);
+  let def = getEffectiveStat(defender, move.defStat || (isPhys ? 'def' : 'spd')) * defenseStatMod(defender, isPhys, weather, attacker);
 
   // Si brûlé et attaque physique : 50% de dégâts (sauf Cran)
   if (isPhys && attacker.status === 'burn' && attacker.ability !== 'guts') {
@@ -133,9 +133,9 @@ export function calculateDamage(attacker, defender, move, state) {
   // En cas de coup critique, ignorer les baisses d'attaque du lanceur et les hausses de défense de la cible
   if (isCrit) {
     const atkStage = (attacker.statStages && attacker.statStages[isPhys ? 'atk' : 'spa']) || 0;
-    const defStage = (defender.statStages && defender.statStages[isPhys ? 'def' : 'spd']) || 0;
+    const defStage = (defender.statStages && defender.statStages[move.defStat || (isPhys ? 'def' : 'spd')]) || 0;
     if (atkStage < 0) atk = attacker.stats[isPhys ? 'atk' : 'spa'] * (isPhys && attacker.status === 'burn' ? 0.5 : 1);
-    if (defStage > 0) def = defender.stats[isPhys ? 'def' : 'spd'];
+    if (defStage > 0) def = defender.stats[move.defStat || (isPhys ? 'def' : 'spd')];
   }
 
   // STAB (Same-Type Attack Bonus ; ×2 avec Adaptabilité)
@@ -351,11 +351,11 @@ export function resolveTurn(state, actionA, actionB) {
     }
   }
   // Régé-Force : en quittant le combat, le Pokémon récupère un tiers de ses PV
-  const regen = (poke) => { if (poke) { poke.confused = 0; poke.rampage = null; } if (poke && !poke.fainted && poke.ability === 'regenerator' && poke.hp < poke.maxHp) poke.hp = Math.min(poke.maxHp, poke.hp + Math.floor(poke.maxHp / 3)); };
+  const regen = (poke) => { if (poke) { poke.confused = 0; poke.rampage = null; poke.charging = null; poke.mustRecharge = false; } if (poke && !poke.fainted && poke.ability === 'regenerator' && poke.hp < poke.maxHp) poke.hp = Math.min(poke.maxHp, poke.hp + Math.floor(poke.maxHp / 3)); };
 
   // --- 1. Gestion des Switchs volontaires (priorité absolue) ---
   // Colère : le Pokémon enchaîne la même attaque 2 ou 3 tours, sans pouvoir changer
-  const rampTo = (act, poke) => (poke && !poke.fainted && poke.rampage && poke.ppMap ? { type: 'move', moveId: poke.rampage.move } : act);
+  const rampTo = (act, poke) => { const lk = poke && !poke.fainted && (poke.rampage || poke.charging); return lk ? { type: 'move', moveId: lk.move } : act; };   // + Lance-Soleil en charge
   actionA = rampTo(actionA, pA); actionB = rampTo(actionB, pB);
   if (actionA && actionA.type === 'switch') {
     const targetIdx = actionA.targetIndex;
@@ -475,6 +475,12 @@ export function resolveTurn(state, actionA, actionB) {
 
     if (!attMove || attPoke.fainted || defPoke.fainted) return;
 
+    // Ultralaser : un tour de recharge
+    if (attPoke.mustRecharge) {
+      attPoke.mustRecharge = false;
+      logEvent({ type: 'msg', text: `${attPoke.name} doit se recharger !` });
+      return;
+    }
     // Vérifier si apeuré (flinch) par la première attaque
     if (flinched[attSide]) {
       logEvent({ type: 'msg', text: `${attPoke.name} a peur et ne peut pas attaquer !` });
@@ -535,12 +541,19 @@ export function resolveTurn(state, actionA, actionB) {
     }
 
     // Décrémenter les PP
-    if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined) {
+    if (attPoke.ppMap && attPoke.ppMap[moveId] !== undefined && !attPoke.charging) {
       // Pression : une attaque qui vise ce Pokémon coûte 2 PP
       const cost = defPoke.ability === 'pressure' && !(attMove.effect && attMove.effect.target === 'self' && attMove.cat === 'status') ? 2 : 1;
       attPoke.ppMap[moveId] = Math.max(0, attPoke.ppMap[moveId] - cost);
     }
     if (CHOICE.has(attPoke.item) && !attPoke.choiceLock) attPoke.choiceLock = moveId;
+    // Lance-Soleil : un tour pour absorber la lumière (sauf au soleil)
+    if (attMove.charge && !attPoke.charging && weatherOf(state) !== 'sun' && attPoke.ability !== 'mega-sol') {
+      attPoke.charging = { move: moveId };
+      logEvent({ type: 'msg', text: `${attPoke.name} absorbe la lumière !` });
+      return;
+    }
+    attPoke.charging = null;
 
     logEvent({
       type: 'attack_start',
@@ -553,6 +566,11 @@ export function resolveTurn(state, actionA, actionB) {
       msg: `${attPoke.name} utilise ${attMove.name} !`
     });
 
+    // Coup Bas : échoue si la cible ne prépare pas une attaque (ou a déjà attaqué)
+    if (attMove.sucker) {
+      const foeAct = defSide === 'A' ? actionA : actionB, fm = foeAct && foeAct.type === 'move' ? MOVES[foeAct.moveId] : null;
+      if (!isFirstMover || !fm || fm.cat === 'status') { logEvent({ type: 'msg', text: `Mais cela échoue !` }); return; }
+    }
     // Trempette
     if (moveId === 'splash') {
       logEvent({ type: 'msg', text: `Mais rien ne se passe !` });
@@ -561,7 +579,7 @@ export function resolveTurn(state, actionA, actionB) {
 
     // Test de précision (Annule Garde : touche à coup sûr, dans les deux sens)
     const acc = attMove.acc || 100;
-    const sure = attPoke.ability === 'no-guard' || defPoke.ability === 'no-guard';
+    const sure = attPoke.ability === 'no-guard' || defPoke.ability === 'no-guard' || (attMove.rainSure && weatherOf(state) === 'rain');   // Fatal-Foudre, Vent Violent : sûrs sous la pluie
     if (!sure && acc < 100 && Math.random() * 100 > acc) {
       logEvent({ type: 'msg', text: `Mais l'attaque de ${attPoke.name} a échoué !` });
       return;
@@ -726,10 +744,12 @@ export function resolveTurn(state, actionA, actionB) {
     }
 
     // Effet de stat sur le lanceur même si le défenseur tombe K.O. (Close Combat, Draco-Météore, Surpuissance)
-    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted) {
+    if (attMove.effect && attMove.effect.type === 'stat' && attMove.effect.target === 'self' && !attPoke.fainted
+      && (!attMove.effect.chance || (!sheer && Math.random() * 100 < attMove.effect.chance))) {   // Poing Météore : 20 %
       applyStatEffect(attMove.effect, attPoke, defPoke, attSide, defSide, logEvent);
     }
 
+    if (attMove.recharge && res.damage > 0) attPoke.mustRecharge = true;
     // Colère : 2 ou 3 tours d'affilée, puis le lanceur est épuisé et confus
     if (attMove.rampage && !attPoke.fainted) {
       if (!attPoke.rampage) attPoke.rampage = { move: moveId, left: Math.random() < 0.5 ? 2 : 1 };
@@ -782,6 +802,11 @@ export function resolveTurn(state, actionA, actionB) {
     // Effet secondaire de Peur (Flinch) si l'attaquant agit en premier (Attention : jamais peur)
     if (!sheer && isFirstMover && attMove.flinch && defPoke.ability !== 'inner-focus' && Math.random() * 100 < attMove.flinch) {
       flinched[defSide] = true;
+    }
+    // Confusion (Vibraqua 20 %, Vent Violent 30 %)
+    if (!sheer && attMove.confuse && !defPoke.fainted && !defPoke.confused && Math.random() * 100 < attMove.confuse) {
+      defPoke.confused = 2 + Math.floor(Math.random() * 4);
+      logEvent({ type: 'msg', text: `${defPoke.name} devient confus !` });
     }
   }
 
@@ -906,7 +931,7 @@ export function forceSwitch(state, side, targetIdx) {
   if (!team[targetIdx] || team[targetIdx].fainted) return false;
   const out = team[side === 'A' ? state.activeA : state.activeB];
   if (out === team[targetIdx]) return false;
-  if (out) { out.rampage = null; out.confused = 0; if (!out.fainted && out.ability === 'regenerator') out.hp = Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)); }
+  if (out) { out.rampage = null; out.confused = 0; out.charging = null; out.mustRecharge = false; if (!out.fainted && out.ability === 'regenerator') out.hp = Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)); }
 
   if (side === 'A') state.activeA = targetIdx;
   else state.activeB = targetIdx;
