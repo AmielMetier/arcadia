@@ -345,6 +345,19 @@
         "EXP_HOST_STOPPED_GAME : l'hôte a quitté la partie",
         "EXP_PEER_LEFT_MIDGAME : un joueur quitte en pleine partie"
       ]
+    },
+    {
+      "id": "mystery",
+      "title": "Mystère Mystère",
+      "maxPlayers": 12,
+      "engine": "Three.js (murder mystery à la première personne, l'hôte fait autorité)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL dans le manoir"
+      ],
+      "expulsionReasons": [
+        "EXP_HOST_STOPPED_GAME : l'hôte a quitté la partie",
+        "EXP_PEER_LEFT_MIDGAME : un joueur quitte en pleine manche"
+      ]
     }
   ]
 }
