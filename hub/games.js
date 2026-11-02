@@ -238,6 +238,23 @@ window.HUB_GAMES = [
     ],
     cover: 'mollo/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
   },
+  {
+    id: 'sitenoir',
+    title: 'Site Noir',
+    tag: 'Un monstre contre l\'équipe',
+    desc: 'Horreur à la première personne : trois ou quatre enquêteurs entrent dans un complexe abandonné avec une lampe et une batterie. Trouvez le badge, la clé, les fusibles, relancez le générateur et remontez avec une preuve. L\'un de vous peut jouer le monstre : il voit dans le noir, coupe les lumières et bloque les portes.',
+    url: 'sitenoir/',
+    minPlayers: 1, maxPlayers: 6,
+    accent: '#e8a53a',
+    icon: '🔦', score: 'Record de points',
+    settings: [
+      { key: 'monster', label: 'Le monstre', options: [['random', 'Au hasard'], ['host', 'L\'hôte'], ['bot', 'Un bot']], def: 'random' },
+      { key: 'places', label: 'Enquêteurs', options: [[3, '3'], [4, '4']], def: 4 },
+      { key: 'level', label: 'Niveau des bots', options: [['facile', 'Facile'], ['normal', 'Moyen'], ['expert', 'Difficile']], def: 'normal' },
+      { key: 'duree', label: 'Durée', options: [[10, '10 min'], [15, '15 min'], [20, '20 min']], def: 15 },
+    ],
+    cover: 'sitenoir/img/affiche.jpg', // affiche 960 × 540 : vraie image du jeu, grand titre et bandeau
+  },
 ];
 
 /* Fiche de présentation de chaque jeu : catégorie, durée d'une partie, commandes et astuces.
@@ -282,6 +299,9 @@ window.HUB_GAME_INFO = {
   royale: { genre: 'action', time: '10–20 min',
     keys: [['ZQSD', 'Se déplacer'], ['Souris', 'Viser · clic pour tirer'], ['Espace', 'Sauter'], ['1–5 · molette', 'Objets'], ['B / clic molette', 'Repère d\'équipe']],
     tips: ['Ouvre le planeur assez tôt pour choisir où te poser.', 'Construis un mur avant de soigner.', 'La tempête se referme : garde un œil sur la carte.'] },
+  sitenoir: { genre: 'action', time: '15 min',
+    keys: [['ZQSD + souris', 'Se déplacer, regarder'], ['Maj · C', 'Courir, s\'accroupir'], ['E (maintenir)', 'Ouvrir, fouiller, réparer, relever'], ['Clic', 'Objet tenu · griffes du monstre'], ['F · R', 'Lampe, changer la pile'], ['1 2 3', 'Cases · pouvoirs du monstre'], ['Tab', 'Plan'], ['Échap', 'Menu']],
+    tips: ['Courir fait du bruit : le monstre l\'entend. Accroupi, tu es presque muet.', 'Une photo prise de près l\'aveugle un instant, et compte comme preuve.', 'Sans preuve, l\'extraction ne sert à rien : passe le capteur EMF sur les traces vertes.', 'La première mise à terre pardonne : la seconde, non.'] },
   mollo: { genre: 'party', time: '5–10 min',
     keys: [['ZQSD', 'Marcher'], ['Espace', 'Sauter · se hisser · soulever'], ['F / clic gauche', 'Frapper · maintiens : gros coup'], ['Maj / C', 'Se protéger'], ['E / clic droit', 'Saisir (maintenu) · lâcher : jeter · ramasser ou lancer un objet'], ['Échap', 'Menu']],
     tips: ['La garde arrête les poings, le gros coup la brise, la saisie passe à travers.', 'Attrape celui qui arme un gros coup : son coup part en fumée.', 'Trois poings d\'affilée éjectent.', 'La barre sous un nom vire au rouge : il est assez sonné pour être soulevé. Saisis-le, saute, lâche au bord.', 'En tenant quelqu\'un, F donne un coup de tête.', 'En tombant, garde E : tes mains attrapent le rebord.', 'Accroché, maintiens Espace pour te hisser. Tes bras lâchent au bout de 7 secondes.', 'En pleine course, saute et frappe : coup de pied sauté.', 'Marteler réveille plus vite.', 'Un pétard ramassé s\'allume aussitôt : lance-le vite.', 'Avec le parapluie, on plane au-dessus du vide.', 'Quand l\'alarme sonne à l\'incinérateur, quitte les trappes.'] },
