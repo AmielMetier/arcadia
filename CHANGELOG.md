@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.44 — 2 novembre 2026
+- **Dogfight 3D** — Pilotage 100% autonome au clavier et caméra dynamique.
+  - On peut désormais jouer entièrement au clavier sans toucher à la souris (virages coordonnés ZQSD ou flèches).
+  - La caméra de poursuite est stabilisée sur l'horizon : on voit l'avion réagir, s'incliner et pencher ses ailes dans chaque virage.
+  - L'alignement 3D du F-16 est recalibré au millimètre par un quaternion direct.
+
 ## 3.43 — 2 novembre 2026
 - **Dogfight 3D** — Briefing des commandes avant décollage et alignement du F-16.
   - Une fenêtre d'accueil présente clairement les commandes (visée souris, tir, postcombustion, aérofrein) avant de décoller.

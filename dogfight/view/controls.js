@@ -65,19 +65,38 @@ export class FlightControls {
     const gp = this.getGamepadInput();
     if (gp) return gp;
 
-    // Commandes clavier
+    // Commandes clavier (AZERTY ZQSD, QWERTY WASD et Flèches directionnelles)
     const pitchUp = k.has('KeyS') || k.has('ArrowDown');
-    const pitchDown = k.has('KeyW') || k.has('KeyZ') || k.has('ArrowUp');
-    const rollLeft = k.has('KeyA') || k.has('KeyQ') || k.has('ArrowLeft');
+    const pitchDown = k.has('KeyZ') || k.has('KeyW') || k.has('ArrowUp');
+    const rollLeft = k.has('KeyQ') || k.has('KeyA') || k.has('ArrowLeft');
     const rollRight = k.has('KeyD') || k.has('ArrowRight');
-    const yawLeft = k.has('KeyA') || k.has('KeyJ');
-    const yawRight = k.has('KeyE') || k.has('KeyL');
+    const yawLeft = k.has('KeyJ');
+    const yawRight = k.has('KeyL');
 
     const boost = k.has('ShiftLeft') || k.has('ShiftRight') || this.touch.boost;
-    const brake = k.has('ControlLeft') || k.has('ControlRight') || k.has('KeyC') || this.touch.brake;
+    const brake = k.has('ControlLeft') || k.has('ControlRight') || k.has('KeyC') || k.has('KeyX') || this.touch.brake;
     const fire = this.mouse.firing || k.has('Space') || k.has('KeyF') || k.has('Enter') || this.touch.fire;
 
-    // Si la souris bouge de manière significative, visée souris prioritaire
+    // Si le joueur manœuvre au clavier, le clavier est prioritaire absolu
+    const hasKeySteer = pitchUp || pitchDown || rollLeft || rollRight || yawLeft || yawRight;
+    if (hasKeySteer) {
+      return {
+        mouseAim: false,
+        aimX: 0,
+        aimY: 0,
+        pitchUp,
+        pitchDown,
+        rollLeft,
+        rollRight,
+        yawLeft,
+        yawRight,
+        boost,
+        brake,
+        fire,
+      };
+    }
+
+    // Si la souris bouge de manière significative, visée souris
     if (this.mouse.active && Math.hypot(this.mouse.x, this.mouse.y) > 0.05) {
       return {
         mouseAim: true,

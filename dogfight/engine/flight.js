@@ -85,20 +85,27 @@ export class FlightModel {
     if (input.mouseAim) {
       this.applyMouseAim(input.aimX, input.aimY, dt);
     } else {
-      // Commandes manuelles (tangage, roulis, lacet)
+      // Commandes manuelles (virage coordonné au clavier pour un pilotage 100% réactif)
       if (input.pitchUp) this.pitch += PITCH_SPEED * dt;
       if (input.pitchDown) this.pitch -= PITCH_SPEED * dt;
 
-      if (input.rollLeft) this.roll -= ROLL_SPEED * dt;
-      if (input.rollRight) this.roll += ROLL_SPEED * dt;
-
-      if (input.yawLeft) this.yaw += YAW_SPEED * dt;
-      if (input.yawRight) this.yaw -= YAW_SPEED * dt;
-
-      // Auto-stabilisation douce du roulis quand aucune touche de roulis n'est pressée
-      if (!input.rollLeft && !input.rollRight && Math.abs(this.roll) > 0.01) {
-        this.roll -= Math.sign(this.roll) * Math.min(Math.abs(this.roll), 1.2 * dt);
+      if (input.rollLeft) {
+        const maxBank = Math.PI * 0.45;
+        if (this.roll > -maxBank) this.roll -= ROLL_SPEED * dt;
+        this.yaw -= YAW_SPEED * 1.8 * dt;
+      } else if (input.rollRight) {
+        const maxBank = Math.PI * 0.45;
+        if (this.roll < maxBank) this.roll += ROLL_SPEED * dt;
+        this.yaw += YAW_SPEED * 1.8 * dt;
+      } else {
+        // Auto-stabilisation douce du roulis quand aucune touche de virage n'est pressée
+        if (Math.abs(this.roll) > 0.005) {
+          this.roll -= Math.sign(this.roll) * Math.min(Math.abs(this.roll), 2.2 * dt);
+        }
       }
+
+      if (input.yawLeft) this.yaw -= YAW_SPEED * dt;
+      if (input.yawRight) this.yaw += YAW_SPEED * dt;
     }
 
     // Limiter le tangage pour éviter la singularité

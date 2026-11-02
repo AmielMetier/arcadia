@@ -259,7 +259,7 @@ window.HUB_GAMES = [
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
   dogfight: { genre: 'action', time: '5–10 min',
-    keys: [['Souris', 'Viser & manœuvrer'], ['Clic gauche / Espace', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
+    keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein']],
     tips: ['Anticipe le déplacement adverse : tire dans le réticule rouge d\'anticipation.', 'Surveille la surchauffe du canon : tire par courtes rafales.', 'Prends de l\'altitude pour plonger sur tes cibles avec un avantage de vitesse.'] },
   drift: { genre: 'course', time: '5–15 min',
     keys: [['Flèches / ZQSD', 'Conduire'], ['Espace', 'Nitro / objet'], ['Maj', 'Frein à main'], ['Échap', 'Pause']],

@@ -394,35 +394,43 @@ export class DogfightScene {
     }
   }
 
-  // Caméra de poursuite dynamique (Chase Cam) derrière le joueur avec lissage fluide
+  // Caméra de poursuite dynamique (Chase Cam) derrière le joueur avec lissage fluide et stabilisation d'horizon
   updateCamera(myPlane, dt) {
     if (!myPlane || !myPlane.alive) return;
 
     // Position idéale : 14.5 m derrière, 3.6 m au-dessus
-    const distBehind = 14.5;
+    // Lors du boost, la caméra recule légèrement pour donner l'impression d'accélération
+    const distBehind = myPlane.flight.boosting ? 16.5 : (myPlane.flight.braking ? 13.0 : 14.5);
     const heightAbove = 3.6;
 
     const targetCamX = myPlane.flight.x - myPlane.flight.forwardX * distBehind + myPlane.flight.upX * heightAbove;
     const targetCamY = myPlane.flight.y - myPlane.flight.forwardY * distBehind + myPlane.flight.upY * heightAbove;
     const targetCamZ = myPlane.flight.z - myPlane.flight.forwardZ * distBehind + myPlane.flight.upZ * heightAbove;
 
-    const lerpFactor = Math.min(1.0, 16.0 * dt);
-    this.camera.position.x += (targetCamX - this.camera.position.x) * lerpFactor;
-    this.camera.position.y += (targetCamY - this.camera.position.y) * lerpFactor;
-    this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpFactor;
+    // Amortissement de la position caméra : léger retard naturel
+    const lerpPos = Math.min(1.0, 7.5 * dt);
+    this.camera.position.x += (targetCamX - this.camera.position.x) * lerpPos;
+    this.camera.position.y += (targetCamY - this.camera.position.y) * lerpPos;
+    this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpPos;
 
-    // Point de visée en avant de l'avion
-    const lookAtX = myPlane.flight.x + myPlane.flight.forwardX * 50;
-    const lookAtY = myPlane.flight.y + myPlane.flight.forwardY * 50;
-    const lookAtZ = myPlane.flight.z + myPlane.flight.forwardZ * 50;
+    // Point de visée devant l'avion
+    const lookAtX = myPlane.flight.x + myPlane.flight.forwardX * 45;
+    const lookAtY = myPlane.flight.y + myPlane.flight.forwardY * 45;
+    const lookAtZ = myPlane.flight.z + myPlane.flight.forwardZ * 45;
     this.camera.lookAt(lookAtX, lookAtY, lookAtZ);
 
-    // Orientation de roulis de la caméra calquée sur l'avion
-    this.camera.up.set(myPlane.flight.upX, myPlane.flight.upY, myPlane.flight.upZ);
+    // Orientation de roulis de la caméra : STABILISÉE SUR L'HORIZON !
+    // Au lieu de figer la caméra sur le roulis de l'avion (ce qui donnait l'illusion d'une image fixe),
+    // la caméra garde l'horizon et suit seulement 28% de l'inclinaison.
+    // Le joueur voit ainsi directement l'avion s'incliner, virer et réagir en 3D !
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const planeUp = new THREE.Vector3(myPlane.flight.upX, myPlane.flight.upY, myPlane.flight.upZ);
+    const desiredCamUp = worldUp.clone().lerp(planeUp, 0.28).normalize();
+    this.camera.up.lerp(desiredCamUp, Math.min(1.0, 8.0 * dt));
 
     // FOV dynamique lors de la postcombustion (effet de vitesse)
     const targetFov = myPlane.flight.boosting ? 84 : 72;
-    this.camera.fov += (targetFov - this.camera.fov) * lerpFactor;
+    this.camera.fov += (targetFov - this.camera.fov) * lerpPos;
     this.camera.updateProjectionMatrix();
   }
 

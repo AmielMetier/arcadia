@@ -59,12 +59,12 @@ class DogfightApp {
             items: [
               {
                 keys: [
-                  ['Visée & Direction', 'Déplacer la souris', 'Stick gauche'],
-                  ['Tirer au canon M61 Vulcan', '<kbd>Clic gauche</kbd> ou <kbd>Espace</kbd>', 'Bouton A / Gâchette'],
+                  ['Virer & Incliner (Clavier)', '<kbd>Q</kbd> / <kbd>D</kbd> ou <kbd>←</kbd> / <kbd>→</kbd>', 'Stick gauche (X)'],
+                  ['Tangage (Clavier)', '<kbd>Z</kbd> (pique) / <kbd>S</kbd> (cabre) ou <kbd>↑</kbd> / <kbd>↓</kbd>', 'Stick gauche (Y)'],
+                  ['Tirer au canon M61 Vulcan', '<kbd>Espace</kbd> ou <kbd>Clic gauche</kbd>', 'Bouton A / Gâchette'],
                   ['Postcombustion (Boost)', '<kbd>Maj</kbd> (Shift)', 'R1 / Gâchette haute'],
-                  ['Aérofrein', '<kbd>Ctrl</kbd> ou <kbd>C</kbd>', 'L1'],
-                  ['Tangage manuel', '<kbd>Z</kbd> (pique) / <kbd>S</kbd> (cabre)', 'Haut / Bas'],
-                  ['Roulis manuel', '<kbd>Q</kbd> / <kbd>D</kbd>', 'Gauche / Droite'],
+                  ['Aérofrein', '<kbd>Ctrl</kbd> ou <kbd>C</kbd> / <kbd>X</kbd>', 'L1'],
+                  ['Visée Souris (Optionnelle)', 'Déplacer la souris', 'Visée libre'],
                 ],
               },
             ],

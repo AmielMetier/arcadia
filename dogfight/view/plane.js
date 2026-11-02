@@ -28,18 +28,17 @@ export function preloadF16Model() {
         // - Cockpit et dérive strictement vers +Y (vers le ciel)
         // - Aile droite vers +X (droite)
         const pivot = new THREE.Group();
-        const rotMat = new THREE.Matrix4().set(
-          0.0, 1.0, 0.0, 0,
-          0.165113, 0.0, -0.986275, 0,
-          0.986275, 0.0, 0.165113, 0,
-          0, 0, 0, 1
-        );
-        root.quaternion.setFromRotationMatrix(rotMat);
 
-        // Échelle à taille réelle (~15.0 mètres de long) et centrage parfait sur le pivot
-        const scale = 0.1016;
+        // Quaternion de rotation 3D directe exacte (det = +1.0) :
+        // - Axe longitudinal moteur -> nez strictement vers +Z (0, 0, 1)
+        // - Axe vertical cockpit/dérive vers le haut vers +Y (0, 1, 0)
+        // - Envergure aile droite vers +X (1, 0, 0) et aile gauche vers -X (-1, 0, 0)
+        root.quaternion.set(0.45686063, -0.45686063, 0.53970198, 0.53970198);
+
+        // Échelle à taille réelle (longueur exacte de 15.0 mètres) et centrage parfait
+        const scale = 0.101587;
         root.scale.set(scale, scale, scale);
-        root.position.set(0, -1.488, -2.368);
+        root.position.set(0, -1.488175, -2.367608);
 
         // Activer les ombres et masquer le train d'atterrissage déployé (avion en vol)
         root.traverse((child) => {
