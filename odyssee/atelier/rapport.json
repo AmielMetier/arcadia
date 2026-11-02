@@ -1608,9 +1608,9 @@
    "problemes": [],
    "w": 64,
    "h": 64,
-   "couleurs": 48,
+   "couleurs": 37,
    "hors_palette": 0.0,
-   "blocs_2x2": 0.05
+   "blocs_2x2": 0.15
   },
   "mirage": {
    "problemes": [

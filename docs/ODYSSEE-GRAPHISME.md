@@ -90,6 +90,18 @@ Pour un générateur (Retro Diffusion, PixelLab…), décrire le style plutôt q
 « top-down RPG, DS pixel art, 16 px tiles, 3/4 view, light from top-left, dark colored outlines, limited palette,
 transparent background », et imposer la palette `odyssee/atelier/palette.png` quand l'outil le permet.
 
+**PixelLab (essai du 2 novembre 2026, sources dans `assets/graphics/pixellab/`).** Ce qui marche :
+- *Kit de façade* : « Create Image (Pro) » sur une toile de **16 × 16** (10 générations, 64 propositions), avec l'ancien
+  kit en référence et les 16 pièces numérotées dans l'ordre de la grille : chaque proposition est une pièce, et on
+  obtient 4 kits complets (jour, usé, lierre, nuit). Enlever le fond gris des objets et fusionner les couleurs presque
+  identiques (le générateur en laisse des centaines). Une toile plus grande (64 × 64) donne des pièces trop fines,
+  que la réduction à 16 px délave.
+- *Personnages* : « create_character » en mode v3, taille 32 (2 générations, 8 directions), puis la marche
+  `walking-4-frames` direction par direction (1 génération chacune ; la droite est le miroir de la gauche). Debout =
+  image 0 de la marche, pas = images 1 et 3 ; vérifier chaque image (une peut être tournée ou perdre un détail).
+- Les images ne se téléchargent pas depuis l'espace de travail de Claude : elles passent par l'atelier de PixelLab
+  (`join … --as sheet`), dont l'aperçu porte un bandeau de 18 px et un fond `#1f252c` à retirer.
+
 ## 5. Outils
 
 ```

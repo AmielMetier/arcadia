@@ -33,7 +33,7 @@ export const REGLES = {
     "cellules": ["mur", "fenetre", "fenetre_nuit", "socle", "porte", "porte_nuit", "linteau", "cote", "toit", "rebord", "faite", "cheminee", "enseigne_g", "enseigne_d", "fleurs", "lampe"],
     "grille": [["mur", "fenetre", "fenetre_nuit", "socle"], ["porte", "porte_nuit", "linteau", "cote"], ["toit", "rebord", "faite", "cheminee"], ["enseigne_g", "enseigne_d", "fleurs", "lampe"]],
     "variantes": {
-      "maison":   { "socle": "mur", "rebord": "toit" },
+      "maison":   { "faite": "toit" },
       "chalet":   {},
       "pecheur":  { "socle": "mur", "linteau": null, "cote": "mur", "faite": "toit", "cheminee": null },
       "centre":   { "socle": "mur", "porte": [1, 1], "porte_nuit": [2, 1], "fenetre_bas": [0, 1], "linteau": null, "cote": [3, 1], "faite": "toit", "cheminee": [3, 2], "toit_lucarne": [2, 2], "toit_plat": true },
