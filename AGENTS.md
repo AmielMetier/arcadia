@@ -113,6 +113,12 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   ses retouches exportées se collent dans `odyssee/js/world/retouches.js`, appliquées à la fin de `buildWorld`.
   Les outils de dessin (atelier graphique, vitrine, sources PixelLab, scripts de découpe des sols, kits, personnages
   et créatures à 16 px) vivent sur la branche `atelier` du fork ; `main` ne garde que le jeu.
+  Personnages à 64 px (PixelLab, d'après les anciens modèles) : planches de marche dans `assets/graphics/persos64/`,
+  importées dans `odyssee/img/chars.png` par `python3 tools/odyssee-persos64.py [noms]` ; portraits de combat 64 × 80 dans
+  `odyssee/img/dresseurs/` (sources dans `assets/graphics/portraits-combat/`). Grottes en relief (gradins calculés au rendu,
+  `caveTiers` de `world3d.js`) : roches et sols par biome dans `odyssee/img/relief.png`, faits par `python3 tools/odyssee-relief.py`.
+  Métropole : Bourse (`odyssee/js/core/bourse.js`, pricers et entretien de Pierre) et Casino (`odyssee/js/core/casino.js`),
+  écrans dans `odyssee/js/ui/metropole.js` : `node tools/test-odyssee-casino.mjs`.
   Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds
   (shader `screenSprite` de `odyssee/js/render/world3d.js`), les bâtiments prennent la profondeur de leur façade.
 - Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`

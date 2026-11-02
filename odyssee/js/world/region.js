@@ -5,7 +5,7 @@
 // À l'est, trois îles desservies par le bateau de l'Embarcadère de l'Aube (2, 3 et 5 badges), avec les quêtes des
 // légendaires (renvoyées dans `legends`, les quais dans `docks`).
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
-import { T } from './tiles.js';
+import { T, DIRS, walkable } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap, towerFloor, TOWER_UP, TOWER_DOWN } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
@@ -176,6 +176,7 @@ export function buildTown(W, maps, def) {
     // chemin depuis la porte jusqu'à la route la plus proche
     for (let y = B.doorY + 1; y < B.doorY + 8; y++) { const t = W.get(B.doorX, y); if (t === T.PAVE || t === T.PATH) break; if (t === T.TREE || t === T.BUILD || t === T.WATER) break; W.set(B.doorX, y, T.PATH); }
     maps[id] = inside;
+    if (b.kind === 'house' || b.kind === 'house2' || b.kind === 'bighouse') mailbox(W, B, b, def);
     for (const more of b.more ? b.more(inside, id) : []) maps[more.id] = more;   // étages supplémentaires
     if (b.kind === 'center') { def.centerId = id; def.centerDoor = [B.doorX, B.doorY + 1]; }
     if (b.id === 'maison') def.homeDoor = [B.doorX, B.doorY + 1];   // Vol ramène devant la maison à Bourg-Aube (pas de Centre)
@@ -187,6 +188,21 @@ export function buildTown(W, maps, def) {
     if (gate) W.gates.push({ npc: npc.id, ...gate });
   }
   W.zone(ox, oy, ox + def.w - 1, oy + def.h - 1, { name: def.name, music: def.music || 'town', town: def.id, theme: def.theme });
+}
+/** boîte aux lettres devant chaque maison : on y lit qui habite là (nom de famille, et un mot sur les habitants) */
+const FAMILLES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefèvre', 'Michel', 'Garcia', 'David', 'Bertrand', 'Roux', 'Vincent', 'Fournier', 'Morel', 'Girard', 'André', 'Mercier', 'Dupont', 'Lambert', 'Bonnet', 'François', 'Legrand', 'Garnier', 'Faure', 'Rousseau', 'Blanc', 'Guérin', 'Muller', 'Henry', 'Roussel', 'Perrin', 'Morin', 'Mathieu', 'Clément', 'Gauthier', 'Dumont', 'Fontaine', 'Chevalier', 'Robin', 'Masson', 'Marchand', 'Duval', 'Denis', 'Lemoine', 'Picard', 'Renard', 'Arnaud', 'Barbier', 'Brun', 'Colin', 'Lucas', 'Aubert', 'Caron'];
+const HABITANT = { insectomane: 'Un passionné d\'insectes vit ici.', habitante: 'Une habitante du coin.', habitant: 'Un habitant du coin.', vieil_homme: 'Un vieux monsieur, qui reçoit beaucoup de lettres.', montagnard: 'Un randonneur : la boîte déborde de cartes de randonnée.', randonneuse: 'Une randonneuse, souvent en vadrouille.', pecheur: 'Un pêcheur. Ça sent un peu le poisson…', marin: 'Un marin, rarement à terre.', gamin: 'Une famille avec un petit dresseur.', fillette: 'Une famille avec une petite fille.', enfant: 'Une famille avec des enfants.', scientifique: 'Un chercheur : des revues scientifiques dépassent de la boîte.', medium: 'Une médium. La boîte est… étrangement froide.', karateka: 'Un karatéka. La boîte est cabossée.', topdresseur: 'Un dresseur aguerri.', topdresseuse: 'Une dresseuse aguerrie.', dame: 'Une vieille dame très coquette.', jardinier: 'Un jardinier : des graines dans le courrier.', kimono: 'Une danseuse en kimono.', savant: 'Un savant distrait.', maman: 'Ta famille.' };
+function mailbox(W, B, b, def) {
+  const h = (B.x * 73856093) ^ (B.y * 19349663);
+  const fam = b.id === 'maison' ? null : FAMILLES[Math.abs(h) % FAMILLES.length];
+  const who = (b.npcs || []).map((n) => HABITANT[n.sprite]).find(Boolean);
+  const text = b.mailboxText || (b.id === 'maison' ? 'BOÎTE AUX LETTRES\nC\'est chez toi ! Une lettre de Maman y attend parfois.'
+    : b.name && /^Maison (de|d')/.test(b.name) ? `BOÎTE AUX LETTRES\n${b.name.replace(/^Maison /, 'Famille ')}.`
+      : `BOÎTE AUX LETTRES\nFamille ${fam}.${who ? '\n' + who : ''}`);
+  for (const dx of [B.w - B.door <= 1 ? -1 : 1, -1, 1]) {
+    const x = B.doorX + dx, y = B.doorY + 1, t = W.get(x, y);
+    if ((t === T.GRASS || t === T.FLOWER) && !W.npcs.some((n) => n.x === x && n.y === y) && !W.signs.has(x + ',' + y)) { W.sign(x, y, text, 'mailbox'); return; }
+  }
 }
 /** garde posté devant la porte de l'arène d'une île (on peut y arriver par la mer de plusieurs côtés) */
 function gymGuard(W, def, badges, text) {
@@ -223,7 +239,7 @@ export function buildWorld() {
     id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 30, h: 22, exits: [['n', 14], ['e', 10]],
     roads: [[14, 2, 15, 18, T.PATH], [4, 10, 29, 11, T.PATH], [14, 18, 20, 19, T.PATH]],
     deco: [['flowers', 9, 3, 11, 5], ['flowers', 25, 13, 26, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
-      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 16, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9], ['mailbox', 8, 6], ['mailbox', 19, 6]],
+      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 16, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
     buildings: [
       { kind: 'house', x: 4, y: 4, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
       { kind: 'house', x: 20, y: 4, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
@@ -869,9 +885,55 @@ export function buildWorld() {
   // la vie des villes : les requêtes des habitants (et les deux combats d'après la Ligue)
   addHabitants({ W, maps, towns, routes });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
+  // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
+  fenceRoutes(W, legends);
   // retouches faites dans l'éditeur de la version test et intégrées au jeu (world/retouches.js)
   applyRetouches(maps);
   return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
+}
+
+/** barrières de bois brunes le long des chemins des routes, par tronçons, comme sur DS. Une case ne reçoit une barrière
+ *  que si ses voisins praticables restent reliés entre eux sans elle (aucun passage coupé, aucun recoin isolé) ; jamais
+ *  devant une porte, un panneau, un PNJ, un objet ou dans le champ de vision d'un dresseur. */
+function fenceRoutes(W, legends = []) {
+  const busy = new Set();
+  for (const l of legends) if (l.map === 'monde') for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) busy.add((l.x + i) + ',' + (l.y + j));
+  for (const n of W.npcs) {
+    busy.add(n.x + ',' + n.y);
+    const sight = n.trainer?.sight || 0, [dx, dy] = DIRS[n.dir] || [0, 0];
+    for (let k = 1; k <= sight + 1; k++) busy.add((n.x + dx * k) + ',' + (n.y + dy * k));
+  }
+  for (const it of W.items) busy.add(it.x + ',' + it.y);
+  for (const k of W.warps.keys()) busy.add(k);
+  for (const k of W.signs.keys()) busy.add(k);
+  const free = (x, y) => walkable(W.get(x, y));
+  const simple = (x, y) => {
+    // les voisins praticables (4 directions) restent-ils reliés par le carré 3 × 3 privé de la case ?
+    const ring = [];
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && free(x + i, y + j)) ring.push(i + ',' + j);
+    const four = ['0,-1', '1,0', '0,1', '-1,0'].filter((k) => ring.includes(k));
+    if (four.length <= 1) return four.length === 1;
+    const seen = new Set([four[0]]), q = [four[0]];
+    while (q.length) {
+      const [i, j] = q.pop().split(',').map(Number);
+      for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { const k = a + ',' + b; if ((a || b) && Math.abs(a) <= 1 && Math.abs(b) <= 1 && ring.includes(k) && !seen.has(k)) { seen.add(k); q.push(k); } }
+    }
+    return four.every((k) => seen.has(k));
+  };
+  let run = 0;
+  for (let y = 1; y < W.h - 1; y++) for (let x = 1; x < W.w - 1; x++) {
+    if (W.get(x, y) !== T.GRASS || busy.has(x + ',' + y)) { run = 0; continue; }
+    const z = W.zoneAt(x, y); if (!z || z.town || z.sea || z.trigger) { run = 0; continue; }
+    // le long d'un chemin horizontal (au-dessus ou au-dessous) ou vertical (à gauche ou à droite)
+    const along = (W.get(x, y - 1) === T.PATH || W.get(x, y + 1) === T.PATH) && W.get(x - 1, y) !== T.PATH && W.get(x + 1, y) !== T.PATH;
+    const alongV = (W.get(x - 1, y) === T.PATH || W.get(x + 1, y) === T.PATH) && W.get(x, y - 1) !== T.PATH && W.get(x, y + 1) !== T.PATH;
+    if (!along && !alongV) { run = 0; continue; }
+    // tronçons : environ un mètre de barrière sur trois, choisis par blocs de 6 cases
+    const blk = rng(((x / 6) | 0) * 7349 + ((y / 6) | 0) * 1931 + 11)();
+    if (blk > 0.33) { run = 0; continue; }
+    if (!simple(x, y)) { run = 0; continue; }
+    W.set(x, y, T.FENCE); run++;
+  }
 }
 
 function caveTrainers(m, list, seed) {

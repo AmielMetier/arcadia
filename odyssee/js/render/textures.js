@@ -255,8 +255,68 @@ export function buildAtlas() {
   // transitions des sols à 16 px : une pièce par combinaison de coins (le terrain du bas est transparent)
   for (const j of SOL16_JEUX) for (let m = 1; m < 16; m++) { const im = SOL32[`s16_${j}_${m}`]; if (im) putImg(`w_${j}_${m}`, up2(im)); }
   for (const k of ['hautes_herbes0', 'hautes_herbes1']) if (SOL32['s16_' + k]) putImg(k, up2(SOL32['s16_' + k]));
+  // petits détails posés sur l'herbe (touffes, trèfles, cailloux, pâquerettes, feuilles, champignons) : dessinés à 32 px
+  DETAILS.forEach((k, i) => putImg('dec_' + k, detailDecal(k, i * 7919 + 13)));
+  // grottes en relief (tools/odyssee-relief.py) : une rangée par biome, sols / faces de paroi / dessus des gradins
+  if (ART.relief) RELIEF.biomes.forEach((b, j) => RELIEF.cols.forEach((k, i) => {
+    const c = canvas(C2, C2); c.getContext('2d').drawImage(ART.relief, i * 32, j * 32, 32, 32, 0, 0, C2, C2);
+    putImg(`r${k[0]}_${b}_${k.slice(1)}`, c);
+  }));
+  tameGreens(atlas);
   return { canvas: atlas, cells, size: SIZE };
 }
+/** verts du sol adoucis : l'herbe à 16 px est très saturée (vert fluo) ; on la ramène vers le vert tendre des jeux DS.
+ *  Une table de couleurs (les tuiles en ont peu) évite de refaire le calcul pour chaque pixel. */
+export function tameGreens(cv) {
+  const x = cv.getContext('2d'), im = x.getImageData(0, 0, cv.width, cv.height), d = im.data, lut = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+    let o = lut.get(key);
+    if (o === undefined) {
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn;
+      let h = 0; if (c) h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4; h = ((h / 6) + 1) % 1;
+      const sa = mx ? c / mx : 0;
+      if (h > 0.21 && h < 0.42 && sa > 0.32 && mx > 0.25) {
+        const H = h + (0.31 - h) * 0.45, S = sa * 0.7, V = Math.min(1, mx * 1.04);
+        const f = (n) => { const k = (n + H * 6) % 6; return V - V * S * Math.max(0, Math.min(k, 4 - k, 1)); };
+        o = (Math.round(f(5) * 255) << 16) | (Math.round(f(3) * 255) << 8) | Math.round(f(1) * 255);
+      } else o = key;
+      lut.set(key, o);
+    }
+    d[i] = o >> 16 & 255; d[i + 1] = o >> 8 & 255; d[i + 2] = o & 255;
+  }
+  x.putImageData(im, 0, 0);
+}
+/** détails de l'herbe, à pleine résolution (32 px par case), fond transparent */
+export const DETAILS = ['touffe', 'touffe2', 'trefle', 'cailloux', 'paquerettes', 'boutons', 'feuilles', 'champignons', 'touffe3', 'brindilles'];
+function detailDecal(kind, seed) {
+  // dessiné à 16 px puis agrandi ×2, comme les sols
+  const c = canvas(CELL, CELL), x = c.getContext('2d'), r = rng(seed);
+  const p = (px, py, col) => { if (px < 0 || py < 0 || px >= CELL || py >= CELL) return; x.fillStyle = col; x.fillRect(px | 0, py | 0, 1, 1); };
+  const G = ['#2f7a2a', '#3d8f2c', '#56a83a', '#78c050', '#9fd870'];
+  const tuft = (cx, cy, n = 3) => {
+    // brins en éventail : pied sombre, pointe claire
+    for (let k = 0; k < n; k++) {
+      const dx = (k - (n - 1) / 2) * 1.6, len = 3 + Math.floor(r() * 3);
+      for (let j = 0; j < len; j++) p(cx + dx * (j / len) * 1.4, cy - j, G[Math.min(4, Math.floor(j * 4 / len))]);
+    }
+    p(cx - 1, cy + 1, G[0]); p(cx, cy + 1, G[0]); p(cx + 1, cy + 1, G[0]);
+  };
+  const spots = (n, f) => { for (let i = 0; i < n; i++) f(2 + Math.floor(r() * 12), 4 + Math.floor(r() * 10)); };
+  if (kind === 'touffe') spots(1, (a, b) => tuft(a, b, 3));
+  else if (kind === 'touffe2') spots(2, (a, b) => tuft(a, b, 2));
+  else if (kind === 'touffe3') spots(1, (a, b) => { tuft(a, b, 4); tuft(a + 3, b + 2, 3); });
+  else if (kind === 'trefle') spots(1, (a, b) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) { p(a + dx * 2, b + dy * 2, G[3]); p(a + dx * 2 + 1, b + dy * 2, G[2]); p(a + dx * 2, b + dy * 2 + 1, G[2]); p(a + dx * 2 + 1, b + dy * 2 + 1, G[1]); } p(a, b + 2, G[0]); });
+  else if (kind === 'cailloux') spots(2, (a, b) => { const w = 2 + Math.floor(r() * 2); for (let i = 0; i < w; i++) { p(a + i, b, '#c8c4b8'); p(a + i, b + 1, '#9c978a'); } p(a, b - 1, '#e4e0d6'); p(a + w, b + 1, '#3d8f2c'); p(a - 1, b + 1, '#3d8f2c'); });
+  else if (kind === 'paquerettes') spots(3, (a, b) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) p(a + dx, b + dy, '#ffffff'); p(a, b, '#f4d040'); p(a, b + 2, G[1]); });
+  else if (kind === 'boutons') spots(3, (a, b) => { const col = ['#f6d24a', '#f08aa0', '#9cc8ff'][Math.floor(r() * 3)]; p(a, b, col); p(a + 1, b, col); p(a, b - 1, col); p(a, b + 1, G[1]); p(a, b + 2, G[0]); });
+  else if (kind === 'feuilles') spots(3, (a, b) => { const col = ['#c88a3a', '#b8642c', '#d8a848'][Math.floor(r() * 3)]; p(a, b, col); p(a + 1, b, col); p(a + 1, b - 1, col); p(a, b + 1, '#7a4a20'); });
+  else if (kind === 'champignons') spots(1, (a, b) => { p(a - 1, b - 1, '#d84a3a'); p(a, b - 1, '#e86050'); p(a + 1, b - 1, '#d84a3a'); p(a, b - 2, '#f08070'); p(a, b - 1, '#ffffff'); p(a, b, '#f0e6d0'); p(a, b + 1, '#3d8f2c'); });
+  else if (kind === 'brindilles') spots(1, (a, b) => { for (let i = 0; i < 5; i++) p(a + i, b - (i >> 1), i % 2 ? '#8a6a40' : '#6e5230'); p(a + 2, b + 1, '#5a4228'); });
+  return up2(c);
+}
+export const RELIEF = { biomes: ['terre', 'montagne', 'mer', 'magma', 'glace', 'lune'], cols: ['s0', 's1', 's2', 's3', 'w0', 'w1', 'w2', 't0', 't1', 'r0'] };
 export const HERBE_PIECES = ['a', 'b', 'c', 't', 'tl', 'tr', 'l', 'r', 'bot', 'bl', 'br', 'in_nw', 'in_ne', 'in_sw', 'in_se'];
 
 /* ---------------- atlas animé (eau, fleurs) ---------------- */
@@ -319,7 +379,10 @@ export function buildAnimAtlas() {
   for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
   const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
-  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : FL[k] && (() => up2(FL[k]))]);
+  // massifs de fleurs : les fleurs dessinées de HeartGold / SoulSilver (32 px, qui se balancent) posées sur l'herbe du jeu ;
+  // à défaut, les petites fleurs à 16 px ou celles du tileset
+  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : FL[k] && (() => up2(FL[k]))]);
+  for (const [k, hk] of [[4, 'fleur_o'], [5, 'fleur_w']]) if (HG[hk]) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), (f) => hgFlower(hk, f, SOL32.grass0)]);
   keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
   keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
   for (let f = 0; f < FR; f++) {
@@ -333,6 +396,7 @@ export function buildAnimAtlas() {
     });
     frames.push(c);
   }
+  for (const fr of frames) tameGreens(fr);
   const live = canvas(SIZE, SIZE); live.getContext('2d').drawImage(frames[0], 0, 0);
   return { canvas: live, frames, cells, size: SIZE };
 }
@@ -470,8 +534,8 @@ export function applySpriteImages(S, images, dens = {}) {
 
 /* ---------------- images dessinées (planches préparées par tools/odyssee-sprites.py) ---------------- */
 // kits de façade (4 × 4 tuiles de 16 px) par style, et sols d'intérieur ; chargés au démarrage, sinon dessin du code
-const KITS = {}, SOLS = {}, SOL32 = {}, HG = {};
-export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
+const KITS = {}, SOLS = {}, SOL32 = {}, HG = {}, ART = {};
+export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = null } = {}) { ART.relief = relief; Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
   // sols à 16 px (PixelLab) : ils prennent la place des tuiles du tileset (agrandies ×2 comme les autres)
   const s = (k) => SOL32['s16_' + k];
   if (s('chemin_0')) {

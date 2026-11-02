@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 3.65 — 2 novembre 2026
+- **Odyssée** — Un grand coup de pinceau sur la région.
+  - Tous les personnages sont redessinés en haute définition d'après leurs anciens modèles : l'infirmière, la maman, le professeur, les Champions, les dresseurs… fini les gros pixels.
+  - Nouveaux portraits de combat pour les Champions, Célestine, le Conseil 4, la Team Éclipse et la Brume.
+  - Le professeur Saule apparaît en grand et net dans l'introduction.
+  - Les grottes sont en relief : les parois montent en gradins de roche, avec des couleurs selon le lieu (grotte marine bleutée, caverne du magma rougeâtre, montagne grise…).
+  - Les entrées de grottes deviennent de vraies falaises en escalier, coiffées d'herbe ou de neige.
+  - L'herbe est d'un vert plus doux, parsemée de touffes, trèfles, cailloux, pâquerettes, feuilles et champignons ; les massifs de fleurs retrouvent leurs belles fleurs qui se balancent.
+  - Des petites barrières de bois brun bordent les chemins des routes.
+  - Les statues des arènes sont redessinées : une sculpture de pierre sur un vrai socle.
+  - Chaque maison a sa boîte aux lettres : on y lit le nom de la famille qui habite là.
+
 ## 3.64 — 2 novembre 2026
 - **Odyssée** — Les herbes, les grottes et la mer accueillent tous les Pokémon qu'on y croise dans les jeux, de Rouge à X / Y : plus de 40 espèces dès la route 1.
   - Chaque arène compte quatre dresseurs, avec des Pokémon de son type venus des six générations.
