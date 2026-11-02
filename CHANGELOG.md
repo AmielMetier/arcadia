@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.62 — 2 novembre 2026
+## 3.63 — 2 novembre 2026
 - **Dogfight 3D** — Refonte complète : le combat se déroule au-dessus de la vraie île d'Island Rush.
   - Champs, relief, routes, bâtiments et arbres vus du ciel, sous de vrais cumulus. En qualité Élevé, les nuages sont volumétriques.
   - Choisis ton avion au hangar : le F-16, vif et mordant, ou le F-22, rapide et plus discret face aux missiles.
@@ -13,6 +13,12 @@
   - À plusieurs, ton avion répond sans attendre le réseau et les autres se déplacent sans à-coups. La partie continue si l'hôte part ou change d'onglet, et un bot reprend l'avion des absents.
   - L'hôte a enfin son avion, et les bots ne fuient plus vers le plafond. Le manche tactile fonctionne sur téléphone.
 
+## 3.62 — 2 novembre 2026
+- **Odyssée** — Remplacement et correction intégrale des sprites de Poké Balls :
+  - **Correction du sprite de Poké Ball classique** : restauration de l'authentique sprite officiel pixel-art rouge et blanc (dôme rouge éclatant, ceinture équatoriale noire nette avec bouton central blanc, base blanche immaculée). Remplacement du sprite ray-tracé et correction de l'écrasement accidentel qui faisait afficher l'icône de l'Hyper Ball (Ultra Ball) dans l'inventaire du Sac et les menus.
+  - **Écran d'Équipe et Sockets** : toutes les alvéoles de l'équipe affichent désormais les vraies Poké Balls rétro 5G éclatantes sans confusion possible avec les Hyper Balls ou Super Balls.
+  - **Sprites de terrain et combat** : restauration du sprite de Poké Ball de terrain `itemball.png` en vraie résolution 15x15, sprites de combat 32x32 et 48x48 pixel-art pour l'intro du Professeur Saule, frames d'ouverture et d'inclinaison de secousse nettes au pixel près, et ajout de la Master Ball officielle (`master-ball.png` et `master_ball_32.png`).
+
 ## 3.61 — 2 novembre 2026
 - **Arcadia** — Les images des jeux s'affichent de nouveau dans la liste des jeux et dans le salon.
 - **Arcadia** — Les comptes ont maintenant un mot de passe.
@@ -20,6 +26,10 @@
   - Tout est chiffré dans ton navigateur avant de partir : le serveur ne reçoit jamais ton mot de passe et ne peut pas lire ton profil. Attention, un mot de passe oublié ne peut pas être récupéré.
   - Tu as déjà un compte ? Ouvre « Modifier » puis « 🔐 Protéger mon compte par mot de passe ».
   - Chaque changement (pseudo, couleur, amis) est sauvegardé tout seul.
+- **Odyssée** — Refonte Pixel-Art rétro DS (5G) des menus et suppression de l'option Sauvegarder du menu X :
+  - **Menu Pause (Touche X)** : retrait définitif de l'option « Sauvegarder » devenue inutile grâce à la sauvegarde automatique continue de chaque progression. Boîtier DS biseauté sombre avec curseur flèche rouge pixel-art « ▶ ».
+  - **Écran d'Équipe 100% Pixel-Art Rétro DS** : élimination complète de l'aspect « vectoriel/Figma/IA » (fin des arrondis lisses, des halos radiaux flous et des ombres gaussiennes). Adoption de découpes en escalier / biseaux crantés, ombrage 1-bit solide franc, alvéoles de Poké Balls octogonales biseautées, socle de combat isométrique pixel-art à anneau cyan étincelant pour le Pokémon de tête, jauges de PV à cartouche or « HP » et blocs de pixels à double surbrillance, et curseur dynamique « ▶ » rouge clignotant pointant vers le Pokémon sélectionné.
+  - **Écran de Résumé et Pokédex Pixel-Art** : onglets façon cartouches DS avec biseaux à 45°, cartouches de capacités rectangulaires avec liseré de type solide et compteurs de PP rétro, alcôve de présentation avec socle isométrique et écran Pokédex aux diodes franches.
 
 ## 3.60 — 2 novembre 2026
 - **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.
