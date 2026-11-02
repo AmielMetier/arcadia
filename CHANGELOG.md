@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.52 — 2 novembre 2026
+- **Odyssée** — on peut jouer à plusieurs dans la nouvelle version : voir les autres joueurs se promener, échanger un Pokémon et se défier en combat.
+  - Code de sauvegarde (menu → CODE) pour reprendre sa partie sur un autre appareil, et sauvegarde en ligne sur son compte Arcadia.
+- **Arcadia** — tous les jeux du salon à jour : Mollo !, Poké Duel en double, Mini-Golf et le nouvel accueil.
+
 ## 3.51 — 2 novembre 2026
 - **Odyssée** — tout le décor est redessiné en pixel art façon HeartGold / SoulSilver.
   - Herbe, chemins, sable, pavés, neige, eau et rivages ont de vrais bords arrondis ; les hautes herbes sont en rangées de touffes.
