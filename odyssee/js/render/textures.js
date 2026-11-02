@@ -1,6 +1,7 @@
 // odyssee/js/render/textures.js — pixel art procédural (tuiles 16 px, sprites, façades), dessiné au chargement.
 // Tout est original : palettes et motifs inspirés de l'ambiance des jeux DS, sans reprendre de tuiles existantes.
 
+import { SOL16_JEUX } from '../data/sol16.js';
 import { REGLES, kitCell } from '../data/regles.js';
 
 export const CELL = 16, PITCH = 18;
@@ -251,6 +252,9 @@ export function buildAtlas() {
   for (const theme of ['prairie', 'bois', 'neige']) for (const k of HERBE_PIECES) {
     const pc = herbeImg(theme, k); if (pc) putImg(`h_${theme}_${k}`, onGround(HERBE_GROUND[theme], pc));
   }
+  // transitions des sols à 16 px : une pièce par combinaison de coins (le terrain du bas est transparent)
+  for (const j of SOL16_JEUX) for (let m = 1; m < 16; m++) { const im = SOL32[`s16_${j}_${m}`]; if (im) putImg(`w_${j}_${m}`, up2(im)); }
+  for (const k of ['hautes_herbes0', 'hautes_herbes1']) if (SOL32['s16_' + k]) putImg(k, up2(SOL32['s16_' + k]));
   return { canvas: atlas, cells, size: SIZE };
 }
 export const HERBE_PIECES = ['a', 'b', 'c', 't', 'tl', 'tr', 'l', 'r', 'bot', 'bl', 'br', 'in_nw', 'in_ne', 'in_sw', 'in_se'];
@@ -311,9 +315,11 @@ export function buildAnimAtlas() {
   const cells = {};
   const keys = [];
   const W = [0, 1, 2, 3].map((f) => SOL32['water' + f]);
-  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
+  const E16 = [0, 1, 2, 3].map((f) => SOL32['s16_eau' + f]);
+  for (let m = 0; m < 16; m++) keys.push(['water' + m, (P, f) => waterCell(P, m, f), E16[0] ? ((f) => up2(E16[(f >> 1) % 4])) : HG.mer ? ((f) => hgWater(m, f)) : W[0] && ((f) => shore32(up2(W[f % 4] || W[0]), m, f))]);
   const FL = [SOL32.flowerR, SOL32.flowerW, SOL32.flowerR, SOL32.flowerW], HGF = ['fleur_r', 'fleur_y', 'fleur_b', 'fleur_p'];
-  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : FL[k] && (() => up2(FL[k]))]);
+  const F16 = ['fleur_r', 'fleur_y', 'fleur_w', 'fleur_p'].map((k) => SOL32['s16_' + k]);
+  for (let k = 0; k < 4; k++) keys.push(['flower' + k, (P, f) => flowerCell(P, f >> 1, k % 3), F16[k] ? ((f) => { const c = up2(F16[k]); if ((f >> 2) & 1) { const x = c.getContext('2d'), t = canvas(C2, C2); t.getContext('2d').drawImage(c, 0, 0); x.clearRect(0, 0, C2, C2); x.drawImage(t, 0, 0, C2, C2, 0, -1, C2, C2); x.drawImage(t, 0, C2 - 1, C2, 1, 0, C2 - 1, C2, 1); } return c; }) : HG[HGF[k]] ? ((f) => hgFlower(HGF[k], f, SOL32.grass0)) : FL[k] && (() => up2(FL[k]))]);
   keys.push(['lava', (P, f) => { P.fill('#e85a20'); for (let i = 0; i < 6; i++) { const x = (i * 5 + f * 3) % 16, y = (i * 7 + f) % 16; P.rect(x, y, 3, 1, '#ffb040'); P.p(x + 1, y + 1, '#ffe080'); } P.speck(5, '#b83a10'); }, SOL32.lava0 && ((f) => up2(SOL32['lava' + ((f >> 2) & 1)] || SOL32.lava0))]);
   keys.push(['deep', (P, f) => { const w = PAL.water; P.fill(w[4]); for (let k = 0; k < 3; k++) { const y = (k * 5 + 2) % 16, x0 = (k * 6 + f * 2) % 16; for (let i = 0; i < 3; i++) P.p((x0 + i) % 16, y, w[1]); } }, SOL32.deep0 && ((f) => up2(SOL32['deep' + ((f >> 2) & 1)] || SOL32.deep0))]);
   for (let f = 0; f < FR; f++) {
@@ -465,7 +471,19 @@ export function applySpriteImages(S, images, dens = {}) {
 /* ---------------- images dessinées (planches préparées par tools/odyssee-sprites.py) ---------------- */
 // kits de façade (4 × 4 tuiles de 16 px) par style, et sols d'intérieur ; chargés au démarrage, sinon dessin du code
 const KITS = {}, SOLS = {}, SOL32 = {}, HG = {};
-export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; }
+export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {} } = {}) { Object.assign(KITS, kits); Object.assign(SOLS, sols); for (const [k, v] of Object.entries(sol32)) if (v) SOL32[k] = v; for (const [k, v] of Object.entries(hgss)) if (v) HG[k] = v; 
+  // sols à 16 px (PixelLab) : ils prennent la place des tuiles du tileset (agrandies ×2 comme les autres)
+  const s = (k) => SOL32['s16_' + k];
+  if (s('chemin_0')) {
+    const alias = { grass0: 'chemin_0', grass1: 'sable_0', grass2: 'pave_0', forest0: 'berge_15', forest1: 'chemin_0', path0: 'chemin_15', sand0: 'sable_15', pave0: 'pave_15',
+      snow0: 'neige_0', snow1: 'herbes_neige_0', ash0: 'cendre_0', ash1: 'cendre_0', ledge: 'rebord', bridgeNS: 'pont_ns', bridgeEW: 'pont_eo', stairs: 'escalier',
+      cliffR: 'falaise', cave0: 'grotte', cave1: 'grotte', lava0: 'lave', deep0: 'profond' };
+    for (const [k, v] of Object.entries(alias)) if (s(v)) SOL32[k] = s(v);
+    SOL32.lava1 = null; SOL32.deep1 = null; SOL16 = true;
+  }
+}
+/** les sols à 16 px sont-ils là (pièces de transition posées sur la grille décalée) ? */
+export let SOL16 = false;
 const KIT_OF = { house: 'maison', house2: 'maison', house3: 'maison', bighouse: 'maison', tower: 'maison', gate: 'maison', center: 'centre', mart: 'boutique', gym: 'arene', lab: 'labo', league: 'ligue', chalet: 'chalet', pecheur: 'pecheur', port: 'port', musee: 'musee', base: 'base', mirage: 'mirage', phare: 'phare', pagode: 'pagode' };
 // Les bâtiments sont assemblés à partir d'un kit de 4 × 4 cellules (docs/ODYSSEE-GRAPHISME.md) : le rôle de chaque
 // cellule (mur, fenêtre, porte, toit, rebord…) est donné par REGLES.kits ; le jeu place porte, fenêtres, linteau,

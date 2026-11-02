@@ -32,6 +32,7 @@ export const ASSETS = {
   facade: (k) => `${IMG}facades/${k}.png`,
   sol: (k) => `${IMG}sol/${k}.png`,
   sol32: (k) => `${IMG}sol32/${k}.png`,
+  sol16: (k) => `${IMG}sol16/${k}.png`,
   herbe: (k) => `${IMG}herbes/${k}.png`,
   hgss: (k) => `${IMG}hgss/${k}.png`,
   deco: (k) => `${IMG}deco/${k}.png`,

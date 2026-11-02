@@ -12,6 +12,7 @@ import { Game } from './game.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
 import { SPRITES } from './data/sprites.js';
+import { SOL16_FICHIERS } from './data/sol16.js';
 import { R, ORIGINALES } from './data/remplacants.js';
 
 const H = window.HubBridge;
@@ -44,11 +45,15 @@ async function loadArt() {
   // tileset global (tools/odyssee-tileset.py) : sols à 32 px et pièces des hautes herbes
   const sol32 = {}; for (const k of SPRITES.sol32 || []) sol32[k] = ASSETS.sol32(k);
   for (const [th, ks] of Object.entries(SPRITES.herbes || {})) for (const k of ks) sol32[`h_${th}_${k}`] = ASSETS.herbe(`${th}_${k}`);
+  // sols à 16 px (PixelLab) : ils remplacent ceux du tileset
+  for (const k of SOL16_FICHIERS) sol32['s16_' + k] = ASSETS.sol16(k);
   // devant un personnage dans l'herbe : le bas de la nappe du tileset (et l'image de l'herbe qui bouge)
   for (const [th, key] of [['prairie', 'grassfront'], ['bois', 'darkfront'], ['neige', 'snowfront']]) {
     if (!SPRITES.herbes?.[th]) continue;
     sprites[key] = ASSETS.herbe(th + '_front'); sprites[key + '2'] = ASSETS.herbe(th + '_front2'); dens[key] = dens[key + '2'] = 2;
   }
+  // devant un personnage dans les hautes herbes à 16 px : le bas de la tuile
+  sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
   const [S, K, L, L32, HGI, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);

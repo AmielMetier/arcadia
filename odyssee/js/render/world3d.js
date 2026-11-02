@@ -2,7 +2,7 @@
 // arbres / herbes / personnages en sprites verticaux, caméra inclinée en perspective étroite, rendu basse résolution.
 import * as THREE from 'three';
 import { T } from '../world/tiles.js';
-import { buildAtlas, buildAnimAtlas, buildSprites, applySpriteImages, facade, sideWall, roofTex, roofColors, kitColor, PAL } from './textures.js';
+import { buildAtlas, buildAnimAtlas, buildSprites, applySpriteImages, facade, sideWall, roofTex, roofColors, kitColor, PAL, SOL16 } from './textures.js';
 import { SPRITES } from '../data/sprites.js';
 
 export const EL = 55 * Math.PI / 180, FOV = 13;
@@ -178,6 +178,8 @@ export class WorldView {
       flatSprite: new THREE.MeshBasicMaterial({ map: this.texS, alphaTest: 0.5, side: THREE.DoubleSide }),
       shadow: mk(this.texS, { transparent: true, depthWrite: false }),
       walls: mk(this.texA),
+      // pièces de transition des sols (terrain du bas transparent)
+      overlay: mk(this.texA, { alphaTest: 0.5 }),
     };
     this.tinted = Object.values(this.mat);
     this.glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const g = x.createRadialGradient(16, 16, 1, 16, 16, 16); g.addColorStop(0, 'rgba(255,240,180,0.9)'); g.addColorStop(0.4, 'rgba(255,210,120,0.35)'); g.addColorStop(1, 'rgba(255,200,100,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return tex(c); })();
@@ -226,6 +228,13 @@ export class WorldView {
     const deco = this.decoAt.get(x + ',' + y);
     if (deco?.k === 'carpet') return { c: A.mat };
     const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
+    if (SOL16 && m.outdoor) {
+      if (tt === T.PATH || tt === T.PAVE || tt === T.DOOR || tt === T.BUILD || tt === T.SAND) return { c: A[grassKey] };
+      if (tt === T.WATER) return { anim: this.N.cells.water15 };
+      if (tt === T.DARKTALL && A.w_herbes_bois_15) return { c: A[grassKey] };
+      if (tt === T.TALL && theme === 'snow' && A.w_herbes_neige_15) return { c: A[grassKey] };
+      if (tt === T.TALL && A.hautes_herbes0) return { c: A['hautes_herbes' + (v < 0.5 ? 0 : 1)] };
+    }
     switch (tt) {
       case T.GRASS: case T.FENCE: case T.ROCK: case T.BUSH: case T.CUT: return { c: A[grassKey] };
       case T.SMASH: return { c: m.outdoor ? A[grassKey] : A['cave' + (v < 0.5 ? 0 : 1)] };
@@ -253,6 +262,43 @@ export class WorldView {
       case T.MAT: return { c: A.mat };
       case T.FLOOR: case T.WALL: return { c: A['floor_' + m.floor] || A.floor_wood };
       default: return { c: A[grassKey] };
+    }
+  }
+
+  /** jeu de transitions (sols à 16 px) auquel appartient une case : chemin, sable, pavés, herbes de la forêt ou de la neige */
+  wangOf(x, y) {
+    const m = this.map; if (x < 0 || y < 0 || x >= m.w || y >= m.h) return null;
+    let t = m.get(x, y); if (t === T.SIGN || t === T.BLOCK) t = m.underAt(x, y) ?? T.GRASS;
+    const th = m.zoneAt(x, y)?.theme;
+    if (t === T.PATH) return th === 'snow' ? 'neige' : th === 'volcanic' ? 'cendre' : 'chemin';
+    if (t === T.PAVE || t === T.DOOR || t === T.BUILD) return th === 'snow' ? 'neige' : 'pave';
+    if (t === T.SAND) return 'sable';
+    if (t === T.DARKTALL) return 'herbes_bois';
+    if (t === T.TALL && th === 'snow') return 'herbes_neige';
+    return null;
+  }
+  /** pièces de transition d'un morceau de carte : une pièce centrée sur chaque coin de case, ses quatre coins pris
+   *  aux quatre cases qui se touchent là (grille décalée d'une demi-case, comme les jeux de tuiles Wang) */
+  wangChunk(O, x0, y0) {
+    const m = this.map, A = this.A.cells;
+    const water = (x, y) => { const q = m.get(Math.max(0, Math.min(m.w - 1, x)), Math.max(0, Math.min(m.h - 1, y))); return q === T.WATER || q === T.BRIDGE; };
+    const ORDER = ['herbes_neige', 'herbes_bois', 'sable', 'pave', 'neige', 'cendre', 'chemin'];
+    const xe = x0 + CH >= m.w ? m.w + 1 : x0 + CH, ye = y0 + CH >= m.h ? m.h + 1 : y0 + CH;
+    for (let y = y0; y < ye; y++) for (let x = x0; x < xe; x++) {
+      const cs = [[x - 1, y - 1], [x, y - 1], [x - 1, y], [x, y]];
+      // rivages : la terre (sable ou herbe) par-dessus l'eau animée
+      const wm = cs.map(([a, b]) => (water(a, b) ? 0 : 1)), wmask = wm[0] << 3 | wm[1] << 2 | wm[2] << 1 | wm[3];
+      if (wmask && wmask !== 15) {
+        const sandy = cs.some(([a, b]) => this.wangOf(a, b) === 'sable');
+        const k = A[(sandy ? 'w_rivage_' : 'w_berge_') + wmask];
+        if (k) flat(O, x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0.002, k);
+      }
+      const ws = cs.map(([a, b]) => this.wangOf(a, b));
+      const present = ORDER.filter((j) => ws.includes(j));
+      for (const j of present) {
+        const mk = ws.map((w) => (w === j ? 1 : 0)), mask = mk[0] << 3 | mk[1] << 2 | mk[2] << 1 | mk[3];
+        const k = A[`w_${j}_${mask}`]; if (k) flat(O, x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0.003 + ORDER.indexOf(j) * 0.0004, k);
+      }
     }
   }
 
@@ -319,9 +365,11 @@ export class WorldView {
         }
       }
     }
+    const O = new Geo();
+    if (SOL16 && m.outdoor) this.wangChunk(O, x0, y0);
     const grp = new THREE.Group();
     const add = (geo, mat, order = 0) => { const g = geo.build(); if (g) { const me = new THREE.Mesh(g, mat); me.renderOrder = order; me.frustumCulled = false; grp.add(me); } };
-    add(G, this.mat.ground); add(N, this.mat.anim); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
+    add(G, this.mat.ground); add(N, this.mat.anim); add(O, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
     for (const [gx, gz, gy] of glows) {
       const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy, gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
     }
