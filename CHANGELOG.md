@@ -9,6 +9,15 @@
   - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
 
 ## 3.55 — 2 novembre 2026
+- **Mollo !** — Le combat est revu de fond en comble.
+  - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.
+  - Nouveau : la garde (Maj ou C). Elle arrête les poings, mais elle s'use vite.
+  - Le gros coup brise la garde, la saisie passe à travers et attrape celui qui arme, le poing fait lâcher une saisie : à toi de lire l'adversaire.
+  - Trois poings d'affilée éjectent. Assommer demande plus de travail : il fallait 4 poings, il en faut environ 9.
+  - Un gros coup dans le vide te déséquilibre, et une barre sous chaque nom montre qui est sonné.
+  - Quand tu tiens quelqu'un, F donne un coup de tête : il faut le sonner avant de pouvoir le soulever.
+  - Correction : deux pantins qui se tenaient s'emballaient tout seuls et tombaient ensemble.
+  - Les bots se protègent, attrapent ceux qui arment et placent enfin des coups de pied sautés.
 - **Odyssée** — un HUD en jeu montre en permanence ton équipe, ton argent, tes badges et le lieu où tu te trouves.
   - À gauche : les six créatures de l'équipe dans leurs capsules (sprite animé, niveau, statut, barres de PV et d'EXP) ; cliquer sur une créature ouvre son résumé, et le bouton `⇅` (ou le clic droit) permet de changer l'ordre de l'équipe à la volée.
   - En haut à droite : encadré Pokégear avec le lieu actuel, l'argent, les badges d'Arène et quatre raccourcis rapides (`ÉQUIPE`, `SAC`, `CARTE`, `SAUVER`).

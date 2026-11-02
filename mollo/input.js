@@ -1,5 +1,5 @@
 // Mollo ! — clavier (touches physiques : ZQSD sur AZERTY = WASD sur QWERTY), souris, tactile et manette.
-// Trois gestes, tous maintenus : Sauter (se hisser, soulever), Frapper (maintenu : gros coup), Saisir (les mains restent fermées tant qu'on tient).
+// Quatre gestes, tous maintenus : Sauter (se hisser, soulever), Frapper (maintenu : gros coup), Saisir (les mains restent fermées tant qu'on tient), Se protéger.
 // Les appuis sont comptés (pc, jc, gc) : un appui très bref ou un paquet perdu ne fait pas rater l'action.
 // La caméra regarde vers le nord (-z) : le haut de l'écran est -z, la droite +x.
 // Chaque écouteur passe par listen() : dispose() les retire tous.
@@ -8,13 +8,13 @@ export class Input {
   constructor(root, hooks = {}) {
     this.keys = new Set();
     this.pc = 0; this.jc = 0; this.gc = 0;
-    this.mouse = { punch: false, grab: false }; this.btn = { punch: false, grab: false, jump: false }; this.pad = { punch: false, grab: false, jump: false };
+    this.mouse = { punch: false, grab: false }; this.btn = { punch: false, grab: false, jump: false, guard: false }; this.pad = { punch: false, grab: false, jump: false, guard: false };
     this.padPrev = []; this.touch = { move: null };
     this.mode = 'keys';
     this.off = [];
     const listen = (t, type, fn, o) => { t.addEventListener(type, fn, o); this.off.push(() => t.removeEventListener(type, fn, o)); };
     this.listen = listen;
-    this.PUNCH = ['KeyF', 'KeyJ']; this.GRAB = ['KeyE', 'KeyK', 'KeyR']; this.JUMP = ['Space'];
+    this.PUNCH = ['KeyF', 'KeyJ']; this.GRAB = ['KeyE', 'KeyK', 'KeyR']; this.JUMP = ['Space']; this.GUARD = ['ShiftLeft', 'ShiftRight', 'KeyC', 'KeyL'];
 
     listen(window, 'keydown', (e) => {
       if (e.target.closest?.('input,textarea')) return;
@@ -31,7 +31,7 @@ export class Input {
       else if (k === 'Enter') hooks.enter && hooks.enter();
     });
     listen(window, 'keyup', (e) => this.keys.delete(e.code));
-    listen(window, 'blur', () => { this.keys.clear(); this.mouse.punch = this.mouse.grab = false; this.btn.punch = this.btn.grab = this.btn.jump = false; this.touch.move = null; });
+    listen(window, 'blur', () => { this.keys.clear(); this.mouse.punch = this.mouse.grab = false; this.btn.punch = this.btn.grab = this.btn.jump = this.btn.guard = false; this.touch.move = null; });
     listen(root, 'contextmenu', (e) => e.preventDefault());
     listen(root, 'pointerdown', (e) => {
       hooks.unlock && hooks.unlock();
@@ -59,7 +59,7 @@ export class Input {
       const a = b.dataset.a;
       this.listen(b, 'pointerdown', (e) => {
         e.preventDefault(); this.mode = 'touch'; document.body.classList.add('touch');
-        this.btn[a] = true; if (a === 'punch') this.pc++; else if (a === 'jump') this.jc++; else this.gc++;
+        this.btn[a] = true; if (a === 'punch') this.pc++; else if (a === 'jump') this.jc++; else if (a === 'grab') this.gc++;
         b.classList.add('on');
       });
       const up = () => { this.btn[a] = false; b.classList.remove('on'); };
@@ -70,18 +70,18 @@ export class Input {
   pollPad() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     const gp = [...pads].find((p) => p && p.connected);
-    if (!gp) { this.pad.punch = this.pad.grab = this.pad.jump = false; return null; }
+    if (!gp) { this.pad.punch = this.pad.grab = this.pad.jump = this.pad.guard = false; return null; }
     const b = (i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
     const edge = (i) => b(i) && !this.padPrev[i];
     const dz = (v) => (Math.abs(v) < 0.2 ? 0 : v);
     const lx = dz(gp.axes[0] || 0), ly = dz(gp.axes[1] || 0);
     if (lx || ly || gp.buttons.some((x) => x.pressed)) this.mode = 'pad';
-    // A : sauter · X ou gâchette droite : frapper · B ou gâchette gauche : saisir · Start : menu
+    // A : sauter · X ou gâchette droite : frapper · B ou gâchette gauche : saisir · Y ou bouton de tranche : se protéger · Start : menu
     if (edge(0)) this.jc++;
     if (edge(2) || edge(7)) this.pc++;
     if (edge(1) || edge(6)) this.gc++;
     if (edge(9) && this.onMenu) this.onMenu();
-    this.pad.jump = b(0); this.pad.punch = b(2) || b(7); this.pad.grab = b(1) || b(6);
+    this.pad.jump = b(0); this.pad.punch = b(2) || b(7); this.pad.grab = b(1) || b(6); this.pad.guard = b(3) || b(4) || b(5);
     this.padPrev = gp.buttons.map((x, i) => b(i));
     return { lx, ly };
   }
@@ -98,6 +98,7 @@ export class Input {
     const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
     return { mx: Math.round(mx * 100) / 100, mz: Math.round(mz * 100) / 100,
       jump: any(this.JUMP) || this.btn.jump || this.pad.jump, punch: any(this.PUNCH) || this.mouse.punch || this.btn.punch || this.pad.punch, grab: any(this.GRAB) || this.mouse.grab || this.btn.grab || this.pad.grab,
+      guard: any(this.GUARD) || this.btn.guard || this.pad.guard,
       pc: this.pc, jc: this.jc, gc: this.gc };
   }
 
