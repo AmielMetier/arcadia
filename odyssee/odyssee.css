@@ -2743,7 +2743,7 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .appar { flex: 1; display: flex; gap: calc(var(--px) * 8); align-items: center; justify-content: center; }
 .appar-prev { display: grid; grid-template-columns: repeat(2, auto); gap: calc(var(--px) * 3); background: rgba(255,255,255,.18); border-radius: calc(var(--px) * 6); padding: calc(var(--px) * 6); }
 .appar-prev canvas { width: calc(var(--px) * 64); height: calc(var(--px) * 64); image-rendering: pixelated; background: radial-gradient(#8fd08a, #5aa860); border-radius: calc(var(--px) * 4); }
-.appar-opts { min-width: calc(var(--px) * 150); font-size: calc(var(--px) * 8); }
+.appar-opts { min-width: calc(var(--px) * 150); font-size: calc(var(--px) * 8); max-height: 78%; overflow-y: auto; }
 .appar-opts .list-row { display: flex; } .appar-opts .rgt { margin-left: auto; white-space: nowrap; }
 .pastille { display: inline-block; width: calc(var(--px) * 7); height: calc(var(--px) * 7); border-radius: 50%; border: 1px solid #2228; vertical-align: middle; margin-right: calc(var(--px) * 2); }
 .appar-aide { text-align: center; color: #fff; text-shadow: var(--px) var(--px) 0 #283850; font-size: calc(var(--px) * 7); }

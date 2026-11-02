@@ -42,6 +42,15 @@ export function apparenceScreen(ui, o = {}) {
       }
     };
     recompose(); draw();
+    // au doigt ou à la souris : toucher une ligne la choisit, toucher ◀ ou ▶ change la valeur
+    opts.addEventListener('click', (e) => {
+      const row = e.target.closest('.list-row'); if (!row) return;
+      const k = [...opts.children].indexOf(row), R = rows();
+      if (k === R.length) { ui.sound.sfx('select'); close(T); return; }
+      i = k; const r = row.querySelector('.rgt').getBoundingClientRect();
+      if (e.clientX >= r.left) { const l = R[i], [n, L] = valeur(l), d = e.clientX < r.left + r.width / 2 ? -1 : 1; T[l[0]] = L[(n + d + L.length) % L.length][0]; recompose(); }
+      ui.sound.sfx('blip'); draw();
+    });
     const anim = setInterval(() => { t++; draw(); }, 420);
     const close = (v) => { clearInterval(anim); pop(); s.remove(); resolve(v); };
     const pop = ui.input.push((k) => {

@@ -51,6 +51,12 @@ function retoucher(px, W, dir, T) {
     top = Math.min(top, y); bot = Math.max(bot, y);
   }
   if (bot < 0) return { top: 0, cx: W / 2 };
+  // pixels égarés : du « haut » sous la taille (reflets des chaussures), du « bas » au-dessus du buste (élastique des cheveux)
+  if (zones.haut && zones.bas) {
+    const my = (L) => L.reduce((t, [, y]) => t + y, 0) / L.length, mh = my(zones.haut), mb = my(zones.bas);
+    const tri = (k, ok) => { const keep = [], out = zones.autre = zones.autre || []; for (const q of zones[k]) (ok(q[1]) ? keep : out).push(q); for (const q of out) if (cls[q[1] * W + q[0]] === k) cls[q[1] * W + q[0]] = 'autre'; zones[k] = keep; };
+    tri('haut', (y) => y < mb - 1); tri('bas', (y) => y > mh);
+  }
   const box = (L) => { if (!L || !L.length) return null; let x0 = W, x1 = 0, y0 = W, y1 = 0, sx = 0; for (const [x, y] of L) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); sx += x; } return { x0, x1, y0, y1, cx: sx / L.length }; };
   const bH = box(zones.haut), bB = box(zones.bas);
   const meanV = (L) => { let s = 0; for (const [x, y] of L) { const o = at(x, y); s += rgbHsv(px[o], px[o + 1], px[o + 2])[2]; } return s / L.length || 1; };
@@ -76,10 +82,17 @@ function retoucher(px, W, dir, T) {
   if (zones.haut) {
     const mv = meanV(zones.haut), H = bH.y1 - bH.y0 + 1;
     // largeur du buste à la taille (dernière rangée du haut) : au-delà, ce sont les bras
-    let tl = W, tr = 0; for (const [x, y] of zones.haut) if (y >= bH.y1 - 1) { tl = Math.min(tl, x); tr = Math.max(tr, x); }
-    const face = dir === 'down' || dir === 'up';
+    // dans chaque rangée, la plage de « haut » qui contient le milieu est le buste ; les autres plages sont les bras
+    const face = dir === 'down' || dir === 'up', coude = bH.y0 + Math.round(H * 0.4);
+    const buste = new Set();
+    if (face) for (let y = bH.y0; y <= bH.y1; y++) {
+      const enHaut = (x) => cls[y * W + x] === 'haut' || cls[y * W + x] === 'blanc' && dir === 'down';
+      let a = cx, b = cx; if (!enHaut(cx)) continue;
+      while (a > 0 && enHaut(a - 1)) a--; while (b < W - 1 && enHaut(b + 1)) b++;
+      for (let x = a; x <= b; x++) buste.add(y * W + x);
+    }
     for (const [x, y] of zones.haut) {
-      const bras = face && (x < tl || x > tr), coude = bH.y0 + Math.round(H * 0.42);
+      const bras = face && !buste.has(y * W + x);
       if (T.haut === 'tshirt' && bras && y > coude) { vers(x, y, T.peau, mv * 0.95); continue; }
       let c = T.hautC;
       if (dir === 'down' && T.haut === 'veste' && Math.abs(x - cx) <= 1 && y < bH.y1) c = '#f4f4ee';   // veste ouverte sur un t-shirt blanc
@@ -101,7 +114,12 @@ function retoucher(px, W, dir, T) {
       else vers(x, y, T.chaussuresC, mv);
     }
   }
-  return { top, bot, cx, bH };
+  // haut de la tête et ligne du front (première rangée de peau du visage)
+  let front = null; for (const [x, y] of zones.peau || []) if (y < top + 22 && (front == null || y < front)) front = y;
+  // le crâne : première rangée assez large (une couette qui dépasse ne compte pas) ; le cou : début du haut
+  let crane = top; for (let y = top; y < W; y++) { let n = 0; for (let x = 0; x < W; x++) if (px[at(x, y) + 3] >= 128) n++; if (n >= 7) { crane = y; break; } }
+  const cou = bH ? bH.y0 : crane + 18;
+  return { top, bot, cx, bH, cls, front, crane, cou };
 }
 const x0b = (x) => x;
 const shadeHex = (hex, k) => '#' + shadeOf(hex, k).map((v) => v.toString(16).padStart(2, '0')).join('');
@@ -113,23 +131,71 @@ function dessin(ctx) {
     rect(x, y, w, h, rgb) { ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; ctx.fillRect(x, y, w, h); },
   };
 }
-/** chapeau calé sur le haut de la tête : casquette (visière vers l'avant) ou bonnet (revers et pompon) */
-function chapeau(D, info, dir, T, hw) {
+/**
+ * chapeau posé sur les cheveux : les cheveux du haut du crâne prennent la couleur du chapeau (avec leurs ombres),
+ * la silhouette s'épaissit d'un pixel, puis la visière (casquette) ou le revers et le pompon (bonnet)
+ */
+function chapeau(px, W, info, dir, T) {
   if (T.chapeau === 'aucun') return;
-  const c = shadeOf(T.chapeauC, 0), dk = shadeOf(T.chapeauC, -0.35), lt = shadeOf(T.chapeauC, 0.35), ol = [26, 22, 30];
-  const y0 = info.top - 1, cx = info.hx, half = Math.max(5, Math.round(hw / 2) + 1);
-  const dome = (h) => { for (let j = 0; j < h; j++) { const w = Math.round(half * Math.sqrt(1 - ((h - 1 - j) / h) ** 2)) + (j > 1 ? 1 : 0); D.rect(cx - w, y0 + j, 2 * w + 1, 1, j === 0 ? lt : c); D.p(cx - w - 1, y0 + j, ol); D.p(cx + w + 1, y0 + j, ol); } D.rect(cx - Math.round(half * 0.6), y0 - 1, Math.round(half * 1.2) + 1, 1, ol); };
-  if (T.chapeau === 'casquette') {
-    dome(5);
-    D.rect(cx - half, y0 + 4, 2 * half + 1, 1, dk);
-    if (dir === 'down') { D.rect(cx - half + 1, y0 + 5, 2 * half - 1, 2, dk); D.rect(cx - half + 1, y0 + 7, 2 * half - 1, 1, ol); }
-    else if (dir === 'left') { D.rect(cx - half - 4, y0 + 4, 6, 2, dk); D.rect(cx - half - 4, y0 + 6, 6, 1, ol); }
-    else if (dir === 'right') { D.rect(cx + half - 1, y0 + 4, 6, 2, dk); D.rect(cx + half - 1, y0 + 6, 6, 1, ol); }
-    else D.rect(cx - 2, y0 + 3, 5, 2, ol);   // l'arrière : la petite ouverture réglable
+  const at = (x, y) => (y * W + x) * 4, op = (x, y) => x >= 0 && y >= 0 && x < W && y < W && px[at(x, y) + 3] > 128;
+  const set = (x, y, rgb) => { if (x < 0 || y < 0 || x >= W || y >= W) return; const o = at(x, y); px[o] = rgb[0]; px[o + 1] = rgb[1]; px[o + 2] = rgb[2]; px[o + 3] = 255; };
+  const ol = [30, 24, 34], c = shadeOf(T.chapeauC, 0), dk = shadeOf(T.chapeauC, -0.32), dk2 = shadeOf(T.chapeauC, -0.5), lt = shadeOf(T.chapeauC, 0.3);
+  const top = info.crane, bonnet = T.chapeau === 'bonnet';
+  // le chapeau descend jusqu'au front : un peu moins de la moitié de la hauteur de la tête
+  const base = top + Math.max(5, Math.round((info.cou - top) * (bonnet ? 0.4 : 0.36)));
+  const front = dir === 'up' ? W : base;
+  const rows = [];
+  for (let y = top; y <= base; y++) {
+    let a = -1, b = -1; for (let x = 0; x < W; x++) if (op(x, y)) { if (a < 0) a = x; b = x; }
+    rows.push([y, a, b]);
+  }
+  // largeur de la tête à la base du chapeau (les mèches au-dessus ne comptent pas)
+  let L = W, R = 0; for (const [y, a, b] of rows) if (a >= 0 && y >= base - 2) { L = Math.min(L, a); R = Math.max(R, b); }
+  if (R <= L) return;
+  const cxh = (L + R) / 2, hw = (R - L) / 2 + 0.5, H = base - top + (bonnet ? 1 : 0);
+  // les mèches qui dépassent disparaissent sous le chapeau
+  for (let y = Math.max(0, info.top - 1); y <= base; y++) for (let x = Math.max(0, L - 3); x <= Math.min(W - 1, R + 3); x++) {
+    const k = info.cls[y * W + x]; if (k === 'peau' && y > front) continue;
+    if (y < base - 1 && op(x, y)) px[at(x, y) + 3] = 0;
+  }
+  // le dôme : une demi-ellipse posée sur la tête, ombrée (lumière en haut à gauche)
+  const y0 = base - H;
+  for (let y = y0; y <= base; y++) {
+    const t = (base - y) / (H + 0.5), w = hw * Math.sqrt(Math.max(0, 1 - t * t));
+    const a = Math.round(cxh - w), b = Math.round(cxh + w);
+    for (let x = a; x <= b; x++) {
+      const k = info.cls[y * W + x]; if (k === 'peau' && y > front && x > a && x < b) continue;
+      const sh = (x - cxh) / hw;
+      set(x, y, x === a || x === b ? ol : y - y0 <= 1 && sh < 0.3 ? lt : sh > 0.45 ? dk : c);
+    }
+    if (y === y0) for (let x = a; x <= b; x++) set(x, y - 1, ol);
+  }
+  const Li = Math.round(cxh - hw), Ri = Math.round(cxh + hw);
+  L = Li; R = Ri;
+  const top2 = y0;
+  if (bonnet) {
+    // revers côtelé sur deux rangées, un peu plus large que la tête
+    for (const y of [base - 1, base]) for (let x = L - 1; x <= R + 1; x++) set(x, y, x === L - 1 || x === R + 1 ? ol : (x + y) % 2 ? dk : c);
+    for (let x = L - 1; x <= R + 1; x++) set(x, base + 1, ol);
+    // pompon : une petite boule ronde sur le dessus
+    const px0 = Math.round(cxh), py0 = top2 - 3;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const d = Math.hypot(dx, dy); if (d > 2.6) continue;
+      set(px0 + dx, py0 + dy, d > 1.7 ? ol : dx + dy < -1 ? [250, 250, 250] : dx + dy > 1 ? shadeOf('#e8e8f0', -0.25) : [232, 232, 240]);
+    }
   } else {
-    dome(6);
-    D.rect(cx - half - 1, y0 + 5, 2 * half + 3, 2, lt); D.rect(cx - half - 1, y0 + 7, 2 * half + 3, 1, dk);
-    D.rect(cx - 1, y0 - 3, 3, 3, lt); D.p(cx, y0 - 3, [255, 255, 255]);
+    // bande à la base, puis la visière
+    for (let x = L; x <= R; x++) if (op(x, base)) set(x, base, x === L || x === R ? ol : dk);
+    if (dir === 'down') {
+      for (let x = L + 1; x <= R - 1; x++) { set(x, base + 1, dk2); }
+      set(L, base + 1, ol); set(R, base + 1, ol); for (let x = L + 1; x <= R - 1; x++) set(x, base + 2, ol);
+    } else if (dir === 'left' || dir === 'right') {
+      const s = dir === 'left' ? -1 : 1, x0 = s < 0 ? L : R;
+      for (let k = 0; k <= 5; k++) { const x = x0 + s * k; set(x, base, k === 5 ? ol : dk); set(x, base + 1, ol); set(x, base - 1, k >= 1 ? ol : dk); }
+    } else {
+      const m = Math.round(cxh); for (let x = m - 2; x <= m + 2; x++) set(x, base - 1, ol);   // l'arrière : la petite ouverture réglable
+      set(m - 1, base, ol); set(m, base, ol); set(m + 1, base, ol);
+    }
   }
 }
 /** sac à dos (gros rectangle dans le dos, bretelles devant) ou sacoche en bandoulière */
@@ -166,13 +232,14 @@ export function composer(src, sx, sy, T, doc = typeof document !== 'undefined' ?
     x.drawImage(src, sx + i * W, sy, W, W, 0, 0, W, W);
     const im = x.getImageData(0, 0, W, W);
     const info = retoucher(im.data, W, dir, T);
+    chapeau(im.data, W, info, dir, T);
     x.putImageData(im, 0, 0);
     // tête : centre et largeur sur les premières rangées
     let sxx = 0, n = 0, l = W, r = 0;
     for (let y = info.top; y < info.top + 8; y++) for (let k = 0; k < W; k++) if (im.data[(y * W + k) * 4 + 3] > 128) { sxx += k; n++; l = Math.min(l, k); r = Math.max(r, k); }
     info.hx = n ? Math.round(sxx / n) : W >> 1;
     const D = dessin(x);
-    if (dir === 'up') { chapeau(D, info, dir, T, r - l); sac(D, info, dir, T); } else { sac(D, info, dir, T); chapeau(D, info, dir, T, r - l); }
+    sac(D, info, dir, T);
     ctx.drawImage(c, i * W, 0);
   }
   return out;

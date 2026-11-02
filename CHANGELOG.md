@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.69 — 3 novembre 2026
+- **Odyssée** — Crée ton personnage au début de l'aventure : garçon ou fille, couleur de peau et de cheveux, casquette ou bonnet, pull, t-shirt, veste ou chemise, pantalon ou short, baskets ou sandales, sac à dos ou sacoche, et la couleur de chaque vêtement.
+- **Odyssée** — La boutique de mode de Métropole ouvre : sa cabine d'essayage permet de changer de style quand on veut.
+- **Odyssée** — Nouveaux dessins pour Pierre, Margot, Aurèle, le vieux jardinier, Lucie, la fillette au médaillon, Brume et les sbires de la Team Éclipse.
+
 ## 3.68 — 3 novembre 2026
 - **Odyssée** — Cinq nouveaux dresseurs sur les routes du nord (Route 1, Route 3, Route 7 et Route 10).
 - **Odyssée** — La carte de la région montre le Pont de l'Austral qui relie Bourg-Aube aux Terres du Sud.
