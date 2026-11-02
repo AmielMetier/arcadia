@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Dogfight 3D : Bataille Aérienne</title>
+  <link rel="stylesheet" href="dogfight.css">
+</head>
+<body>
+<div id="app">
+  <div id="stage"></div>
+  <canvas id="hudCanvas"></canvas>
+
+  <div class="top-bar">
+    <button class="icon-btn" id="btnSet" title="Réglages" aria-label="Réglages"></button>
+    <button class="icon-btn" id="btnExit" title="Quitter" aria-label="Quitter">✕</button>
+  </div>
+
+  <div id="loadingOverlay">
+    <div class="load-title">DOGFIGHT <span>3D</span></div>
+    <div class="load-status" id="loadStatus">Génération de l'île en cours…</div>
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<script src="../shared/bridge.js"></script>
+<script src="../shared/volume.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

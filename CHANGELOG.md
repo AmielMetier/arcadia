@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.42 — 2 novembre 2026
+- **Dogfight 3D** — Nouveau jeu : combats aériens de chasseurs F-16 au canon rotatif Vulcan au-dessus de l'île.
+  - Pilotage arcade ultra accessible à la souris ou au clavier, avec postcombustion et aérofrein.
+  - Combat pur au canon rotatif M61 Vulcan 20 mm, avec traçantes balistiques, jauge de surchauffe et point d'anticipation (Lead Indicator).
+  - Vol libre au-dessus de la grande île en 3D d'Island Rush (montagnes, vallées, cimes enneigées et océan).
+  - Jouable seul contre des bots tactiques (patrouille, courbes de chasse, esquive du relief) ou jusqu'à 6 joueurs en multijoueur.
+
 ## 3.41 — 2 novembre 2026
 - **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
   - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.
