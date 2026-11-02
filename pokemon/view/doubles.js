@@ -8,7 +8,7 @@ import { TYPES } from '../engine/types.js';
 import { spriteUrls } from '../engine/data.js';
 import { ITEMS, CHOICE } from '../engine/items.js';
 import { ABILITIES } from '../engine/abilities.js';
-import { canMega, sidesOf, teamKey, getActivePokemon, activeIdxOf, foeSides } from '../engine/battle.js';
+import { canMega, sidesOf, teamKey, getActivePokemon, activeIdxOf, foeSides, benchOf } from '../engine/battle.js';
 import { eventMs, damageText } from '../engine/timing.js';
 import { describeMove, tipAttr, tipText } from './tips.js';
 
@@ -39,7 +39,15 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
   let turnKey = null;
 
   const $ = (sel) => stage.querySelector(sel);
-  const mySideOf = (b) => (String(b.trainerA.id) === String(me.id) ? 'A' : String(b.trainerB.id) === String(me.id) ? 'B' : null);
+  const same = (x, y) => String(x) === String(y);
+  // mon camp : en 2 contre 2 entre joueurs, celui de mon emplacement ; sinon celui de mon dresseur
+  const mySideOf = (b) => {
+    if (b.owners) { const sl = sidesOf(b).find((x) => same(b.owners[x], me.id)); return sl ? teamKey(sl) : null; }
+    return same(b.trainerA.id, me.id) ? 'A' : same(b.trainerB.id, me.id) ? 'B' : null;
+  };
+  /** Emplacements que je commande : les deux de mon camp (VGC), ou le mien seul (2 contre 2) */
+  const mySlots = (b) => (b.owners ? sidesOf(b).filter((x) => same(b.owners[x], me.id)) : slotsOf(b, mySideOf(b)));
+  let ownerName = () => '';
   const myTeam = (b) => mySideOf(b) || 'A';
   const slotsOf = (b, tk) => sidesOf(b).filter((s) => teamKey(s) === tk);
 
@@ -52,8 +60,9 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
     const stages = Object.entries(p.statStages || {}).filter(([, v]) => v).map(([k, v]) => `<i class="${v > 0 ? 'up' : 'down'}">${STAT[k]} ${v > 0 ? '+' : ''}${v}</i>`).join('');
     const sprite = mine ? spriteUrls(p.spriteId || p.id).back : spriteUrls(p.spriteId || p.id).front;
     return `
-      <div class="vgc-slot ${mine ? 'mine' : 'foe'} ${p.fainted ? 'fainted' : ''}" data-side="${side}">
+      <div class="vgc-slot ${mine ? 'mine' : 'foe'} ${p.fainted ? 'fainted' : ''} ${b.owners && same(b.owners[side], me.id) ? 'me' : ''}" data-side="${side}">
         <div class="vgc-hud">
+          ${b.owners ? `<div class="vgc-owner">${esc(ownerName(b.owners[side]))}${same(b.owners[side], me.id) ? ' (toi)' : ''}</div>` : ''}
           <div class="vgc-hud-top"><b class="vgc-name">${esc(p.name)}</b><span class="vgc-lv">N.${p.level || 50}</span>
             <span class="vgc-st">${p.status ? `<span class="status-badge status-${p.status}">${STATUS[p.status]}</span>` : ''}</span></div>
           <div class="vgc-hp"><span class="hp-fill ${hpCls(pct)}" style="width:${pct}%"></span></div>
@@ -97,10 +106,12 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
     return `<div class="dash-timer"><div class="dt-fill" id="timerFill" style="width:${w}%"></div><span class="dt-text" id="timerText">${s.turnEndsAt ? `${Math.ceil(leftMs / 1000)} s` : '—'}</span></div>`;
   }
 
-  function benchHtml(b, tk, exclude, attr) {
-    const team = tk === 'A' ? b.teamA : b.teamB, on = activeIdxOf(b, tk);
+  function benchHtml(b, slot, exclude, attr) {
+    const tk = teamKey(slot), team = tk === 'A' ? b.teamA : b.teamB, on = activeIdxOf(b, tk);
+    const pool = b.pools ? b.pools[slot] : team.map((_, i) => i), bench = benchOf(b, slot);
     return `<div class="vgc-bench">${team.map((p, i) => {
-      const off = p.fainted || on.includes(i) || exclude.includes(i);
+      if (!pool.includes(i)) return '';
+      const off = !bench.includes(i) || exclude.includes(i);
       const pct = Math.round((p.hp / p.maxHp) * 100);
       return `<button class="vgc-mon" ${attr}="${i}" ${off ? 'disabled' : ''}>
         <img src="${spriteUrls(p.spriteId || p.id).icon}" alt=""><b>${esc(p.name)}</b>
@@ -128,23 +139,24 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
 
     // remplacements (K.O., Demi-Tour)
     if (b.phase === 'switch_forced') {
-      const mine = (b.need || []).filter((x) => teamKey(x) === my);
+      const mine = (b.need || []).filter((x) => mySlots(b).includes(x));
       if (!mine.length) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait"><span class="bw-foe-ball"></span> L'adversaire choisit son remplaçant…</div>`; return; }
       const slot = mine[0], out = getActivePokemon(b, slot);
       dash.innerHTML = `${timerHtml(s)}
         <div class="vgc-ask"><b>${out && !out.fainted ? `${esc(out.name)} revient` : `${esc(out ? out.name : 'Ton Pokémon')} est K.O.`}</b> : qui prend sa place ?</div>
-        ${benchHtml(b, my, [], 'data-repl')}`;
+        ${benchHtml(b, slot, [], 'data-repl')}`;
       for (const btn of dash.querySelectorAll('[data-repl]')) btn.onclick = () => { sfx.play('switch'); submitAction({ type: 'switch', targetIndex: Number(btn.dataset.repl), slot }); dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">Remplaçant envoyé…</div>`; };
       return;
     }
     if (b.phase !== 'choose') { dash.innerHTML = ''; return; }
-    if (submitted) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">✓ Actions envoyées. En attente de l'adversaire…</div>`; return; }
+    if (b.owners ? mySlots(b).every((x) => (s.submittedSlots || {})[x] || !getActivePokemon(b, x) || getActivePokemon(b, x).fainted) : submitted) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">✓ Actions envoyées. En attente de l'adversaire…</div>`; return; }
     if (!s.turnEndsAt) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">Les Pokémon entrent sur le terrain…</div>`; return; }
 
     // nouveau tour : on repart du premier Pokémon
     const key = `${b.turn}:${sidesOf(b).map((x) => b['active' + x]).join(',')}`;
     if (key !== turnKey) { turnKey = key; plan = {}; step = 0; pending = null; megaSlot = null; tab = 'moves'; }
-    const slots = slotsOf(b, my).filter((x) => { const p = getActivePokemon(b, x); return p && !p.fainted; });
+    const slots = mySlots(b).filter((x) => { const p = getActivePokemon(b, x); return p && !p.fainted; });
+    if (!slots.length) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">Ton Pokémon est K.O. : ton coéquipier continue le combat.</div>`; return; }
     if (step >= slots.length) { dash.innerHTML = `${timerHtml(s)}<div class="vgc-wait">Envoi…</div>`; return; }
     const slot = slots[step], p = getActivePokemon(b, slot);
     const foes = foeSides(b, slot).filter((x) => { const f = getActivePokemon(b, x); return f && !f.fainted; });
@@ -169,7 +181,7 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
       }).join('')}</div>`;
     } else {
       const taken = Object.values(plan).filter((a) => a && a.type === 'switch').map((a) => a.targetIndex);
-      body = benchHtml(b, my, taken, 'data-sw');
+      body = benchHtml(b, slot, taken, 'data-sw');
     }
     const trapped = !!(p.rampage || p.charging) || foes.some((x) => getActivePokemon(b, x).ability === 'shadow-tag') && !p.types.includes('ghost');
     dash.innerHTML = `${timerHtml(s)}${head}
@@ -313,6 +325,8 @@ export function createDoublesView({ stage, me, submitAction, sfx, now }) {
   return {
     update(s) {
       state = s;
+      // nom du dresseur d'un emplacement (2 contre 2)
+      ownerName = (id) => { const p = s.t && s.t.participants ? s.t.participants.find((q) => same(q.id, id)) : null; return p ? p.name : ''; };
       if (s.evSeq > lastSeq && s.events && s.events.length) queue.push(s);
       lastSeq = Math.max(lastSeq, s.evSeq || 0);
       if (resolving) return;

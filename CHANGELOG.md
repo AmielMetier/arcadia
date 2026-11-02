@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.42 — 2 novembre 2026
+- **Poké Duel** — Nouveau format « 2 joueurs contre 2 », à choisir dans les réglages du salon (ligne Format).
+  - Les équipes de deux sont tirées au sort, et des bots complètent s'il manque des joueurs.
+  - Chacun drafte ses 3 Pokémon et dirige le sien sur le terrain, à côté de celui de son coéquipier. Quand il tombe, tu envoies un des tiens.
+  - Le match se joue en 2 manches gagnantes. Ton Pokémon est encadré en jaune, avec le nom de chaque dresseur au-dessus du sien.
+- **Poké Duel** — Combat en double : un tour ne peut plus se jouer deux fois de suite quand un joueur renvoie son choix.
+
 ## 3.41 — 2 novembre 2026
 - **Mollo !** — Nouveau jeu : une bagarre de pantins tout mous au-dessus du vide, et le dernier debout gagne la manche.
   - Ce sont de vrais corps physiques : ils titubent, s'effondrent quand on les assomme et retombent comme des sacs.

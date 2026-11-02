@@ -449,3 +449,7 @@
 @media (min-width: 1200px) { .dr-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .dr-legend { display: inline-block; vertical-align: middle; margin-left: 4px; padding: 1px 6px; border-radius: 6px; font-size: 10px; letter-spacing: .5px;
   background: linear-gradient(90deg, #f7d354, #ffb03a); color: #3a2600; border: 2px solid #222; }
+/* aperçu du 2 contre 2 */
+.preview.multi .pv-member + .pv-member { margin-top: 10px; padding-top: 10px; border-top: 2px dashed rgba(255,255,255,.15); }
+.preview.multi .pv-team-name { font-weight: 900; letter-spacing: .5px; font-size: 13px; margin-bottom: 6px; opacity: .85; }
+.preview.multi .pv-member.me .pv-col-head { color: #ffcb05; }
