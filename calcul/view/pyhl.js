@@ -40,7 +40,7 @@ export function highlightSql(code) {
   return out + esc(code.slice(last));
 }
 // Java : mots-clés, chaînes, nombres, commentaires
-const JKW = new Set('abstract boolean break case catch char class double else extends final for if implements import instanceof int interface long new null private protected public return static String super this throw throws try void while true false'.split(' '));
+const JKW = new Set('virtual friend delete const double abstract boolean break case catch char class double else extends final for if implements import instanceof int interface long new null private protected public return static String super this throw throws try void while true false'.split(' '));
 const JTOK = /(\/\/[^\n]*)|("(?:\\.|[^"\\\n])*"?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
 export function highlightJava(code) {
   let out = '', last = 0, m;
@@ -53,4 +53,24 @@ export function highlightJava(code) {
   }
   return out + esc(code.slice(last));
 }
-export const highlightCode = (code, lang) => (lang === 'sql' ? highlightSql(code) : lang === 'java' ? highlightJava(code) : highlightPy(code));
+// VBA : mots-clés (sans tenir compte de la casse), chaînes, nombres, commentaires
+const VKW = new Set('and as byref byval case dim do each else end for function if in loop mod new next not on or paramarray select set step sub then to until wend while'.split(' '));
+const VTOK = /('[^\n]*)|("(?:""|[^"\n])*"?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+export function highlightVba(code) {
+  let out = '', last = 0, m;
+  VTOK.lastIndex = 0;
+  while ((m = VTOK.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const [t, com, str, num, word] = m;
+    out += com ? `<i class="hc">${esc(t)}</i>` : str ? `<i class="hs">${esc(t)}</i>` : num ? `<i class="hn">${esc(t)}</i>` : word && VKW.has(word.toLowerCase()) ? `<i class="hk">${esc(t)}</i>` : esc(t);
+    last = m.index + t.length;
+  }
+  return out + esc(code.slice(last));
+}
+// Excel : seule la ligne de formule est colorée (fonctions et chaînes), les données restent en clair
+export function highlightExcel(code) {
+  return code.split('\n').map((l) => (l.startsWith('=')
+    ? esc(l).replace(/(&quot;.*?&quot;|&#39;.*?&#39;)|([A-ZÉ.]{2,})(?=\()/g, (t, str, fn) => (str ? `<i class="hs">${t}</i>` : `<i class="hb">${fn}</i>`))
+    : esc(l))).join('\n');
+}
+export const highlightCode = (code, lang) => (lang === 'sql' ? highlightSql(code) : lang === 'java' || lang === 'cpp' ? highlightJava(code) : lang === 'vba' ? highlightVba(code) : lang === 'excel' ? highlightExcel(code) : highlightPy(code));
