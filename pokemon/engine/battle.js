@@ -187,6 +187,9 @@ export function calculateDamage(attacker, defender, move, state) {
   if (typeMult >= 2) text = "C'est super efficace !";
   else if (typeMult <= 0.5) text = "Ce n'est pas très efficace...";
   if (isCrit) text = (text ? text + ' ' : '') + 'Coup critique !';
+  // la météo se voit : « Le soleil renforce l'attaque ! », « La pluie affaiblit l'attaque… »
+  const wp = weatherPower(mType, wAtt);
+  if (wp !== 1) text = (text ? text + ' ' : '') + `${wAtt === 'sun' ? 'Le soleil' : 'La pluie'} ${wp > 1 ? 'renforce' : 'affaiblit'} l'attaque${wp > 1 ? ' !' : '...'}`;
 
   return { damage: totalDmg, mult: typeMult, crit: isCrit, text };
 }

@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.38 — 2 novembre 2026
+- **Poké Duel** — L'effet de la météo s'affiche : « Le soleil renforce l'attaque ! » ou « La pluie affaiblit l'attaque... » apparaît quand une attaque Feu ou Eau est boostée (×1,5) ou affaiblie (×0,5).
+
 ## 3.37 — 2 novembre 2026
 - **Poké Duel** — 320 nouveaux Pokémon : toutes les évolutions finales de la 1re à la 6e génération, légendaires compris (381 Pokémon en tout).
   - Chacun a ses vraies stats, 4 attaques choisies dans ce qu'il peut apprendre (attaques de son type, couverture, boost ou soin) et son meilleur talent.
