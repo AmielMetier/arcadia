@@ -8,7 +8,6 @@ import { SPECIES } from '../data/species.js';
 export const ITEMS = {
   'poke-ball': { pocket: 'balls', price: 200, ball: 1, desc: 'Un objet semblable à une capsule, qui capture les Pokémon sauvages.' },
   'great-ball': { pocket: 'balls', price: 600, ball: 1.5, desc: 'Une Ball de bonne qualité, plus efficace que la Poké Ball.' },
-  'master-ball': { pocket: 'balls', price: 0, ball: 255, desc: 'La Ball la plus performante : elle capture à coup sûr n\'importe quel Pokémon sauvage.' },
   'ultra-ball': { pocket: 'balls', price: 1200, ball: 2, desc: 'Une Ball très performante, plus efficace que la Super Ball.' },
   potion: { pocket: 'soin', price: 300, heal: 20, desc: 'Restaure 20 PV d\'un Pokémon.' },
   'super-potion': { pocket: 'soin', price: 700, heal: 50, desc: 'Restaure 50 PV d\'un Pokémon.' },
@@ -36,17 +35,28 @@ export const ITEMS = {
   'leaf-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle porte une feuille.' },
   'moon-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est noire comme la nuit.' },
   'sun-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est rouge comme le soleil.' },
-  // objets rares : CS (utilisables sur le terrain, face à l'obstacle) et objets de quête
-  hm01: { pocket: 'cles', key: 1, cs: 'cut', name: 'CS01 Coupe', desc: 'Coupe les petits arbres qui barrent le passage. Place-toi devant et appuie sur Espace.' },
-  hm05: { pocket: 'cles', key: 1, cs: 'flash', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre.' },
-  hm03: { pocket: 'cles', key: 1, cs: 'surf', name: 'CS03 Surf', desc: 'Permet de naviguer sur l\'eau calme sur le dos d\'un Pokémon. Place-toi face à l\'eau et appuie sur Espace.' },
-  hm04: { pocket: 'cles', key: 1, cs: 'strength', name: 'CS04 Force', desc: 'Permet de pousser les gros rochers. Marche contre le rocher pour le déplacer.' },
-  'silver-wing': { pocket: 'cles', key: 1, name: 'Plume Argent', desc: 'Une plume argentée qui scintille comme la lune sur la mer. Elle ouvre le Sanctuaire des Marées.' },
-  medaillon: { pocket: 'cles', key: 1, name: 'Médaillon', icon: 'soothe-bell', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
-  'prism-shard': { pocket: 'cles', key: 1, name: 'Éclat de Prisme', icon: 'shoal-shell', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
+  'dusk-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est sombre comme le crépuscule.' },
+  'dawn-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle scintille comme l\'aube.' },
+  'shiny-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle brille d\'un éclat aveuglant.' },
+  'ice-stone': { pocket: 'objets', price: 2100, stone: 1, desc: 'Une pierre qui fait évoluer certains Pokémon. Elle est froide comme la glace.' },
+  // objets rares : les capacités de terrain (on les utilise face à l'obstacle, avec F)
+  'cs-coupe': { pocket: 'cles', price: 0, key: true, field: 'coupe', icon: 'notebook', name: 'CS01 Coupe', desc: 'Tranche les petits arbres qui barrent le chemin. Badge Pétale requis. Place-toi face à l\'arbre et appuie sur F.' },
+  'cs-surf': { pocket: 'cles', price: 0, key: true, field: 'surf', icon: 'notebook', name: 'CS02 Surf', desc: 'Traverse l\'eau sur le dos d\'une créature. Badge Mirage requis. Place-toi face à l\'eau et appuie sur F.' },
+  'cs-eclate': { pocket: 'cles', price: 0, key: true, field: 'eclate', icon: 'notebook', name: 'CS03 Éclate-Roc', desc: 'Brise les rochers fissurés. Badge Granit requis. Place-toi face au rocher et appuie sur F.' },
+  'cs-flash': { pocket: 'cles', price: 0, key: true, field: 'flash', icon: 'notebook', name: 'CS05 Flash', desc: 'Éclaire les grottes plongées dans le noir. Elle agit toute seule dès que tu entres dans une grotte sombre. Badge Élytre requis.' },
+  'cs-force': { pocket: 'cles', price: 0, key: true, field: 'force', icon: 'notebook', name: 'CS06 Force', desc: 'Pousse les gros rochers. Place-toi face au rocher, appuie sur F, puis marche contre lui. Badge Volt requis.' },
+  medaillon: { pocket: 'cles', price: 0, key: true, icon: 'soothe-bell', name: 'Médaillon', desc: 'Un médaillon gravé d\'une petite fleur. Quelqu\'un de Sylvebourg doit le chercher partout.' },
+  'prism-shard': { pocket: 'cles', price: 0, key: true, icon: 'shoal-shell', name: 'Éclat de Prisme', desc: 'Un fragment noir du Prisme de la Team Éclipse. Il est glacé au toucher.' },
+  'cs-vol': { pocket: 'cles', price: 0, key: true, field: 'vol', icon: 'notebook', name: 'CS04 Vol', desc: 'Ramène en un instant dans une ville déjà visitée (depuis le menu, ou en utilisant cet objet). Badge Braise requis.' },
+  // objets de quête des légendaires
+  'gs-ball': { pocket: 'cles', price: 0, key: true, icon: 'gift', name: 'Balle GS', desc: 'Une capsule dorée gravée des lettres G et S. Elle semble attirée par l\'autel du Bois Murmure.' },
+  'ferry-ticket': { pocket: 'cles', price: 0, key: true, icon: 'letter', name: 'Passe Marin', desc: 'Le passe du bateau de l\'Embarcadère de l\'Aube. Les îles s\'ouvrent au fil des badges.' },
+  'plume-arc': { pocket: 'cles', price: 0, key: true, icon: 'rainbow-wing', name: 'Plume Arc-en-ciel', desc: 'Une plume qui brille de sept couleurs. Elle appelle Ho-Oh au sommet de la Tour de la Grue.' },
+  'plume-argent': { pocket: 'cles', price: 0, key: true, icon: 'silver-wing', name: 'Plume Argentée', desc: 'Une plume d\'argent, douce comme l\'écume. Elle apaise les courants de la Grotte des Tourbillons.' },
+  'town-map': { pocket: 'cles', price: 0, key: true, name: 'Carte', desc: 'La carte de la région d\'Odyssée. On peut aussi l\'ouvrir avec la touche C.' },
 };
 export const itemName = (k) => ITEMS[k]?.name || ITEM_NAMES[k] || k;
-export const POCKETS = [['soin', 'Soins'], ['balls', 'Balls'], ['objets', 'Objets'], ['cles', 'Rares']];
+export const POCKETS = [['soin', 'Soins'], ['balls', 'Balls'], ['objets', 'Objets'], ['cles', 'Objets rares']];
 
 /** l'objet peut-il servir sur ce Pokémon ? */
 export function canUseOn(item, m) {

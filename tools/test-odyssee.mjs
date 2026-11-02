@@ -10,7 +10,7 @@ function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 10139
 
 // courbes d'expérience
 ok(expFor(2, 100) === 1000000 && expFor(1, 100) === 1250000 && expFor(4, 100) === 1059860 && expFor(5, 100) === 600000 && expFor(6, 100) === 1640000, 'courbes d\'expérience');
-ok(typeEff('water', ['fire', 'rock']) === 4 && typeEff('normal', ['ghost']) === 0 && typeEff('ghost', ['steel']) === 0.5, 'table des types');
+ok(typeEff('water', ['fire', 'rock']) === 4 && typeEff('normal', ['ghost']) === 0 && typeEff('ghost', ['steel']) === 1 && typeEff('dragon', ['fairy']) === 0 && typeEff('fairy', ['dragon', 'dark']) === 4, 'table des types (6e génération)');
 for (const id in SPECIES) { const s = SPECIES[id]; ok(s.n && s.t.length && s.b.every((x) => x > 0) && s.ls.length, 'espèce ' + id); for (const [, m] of s.ls) ok(MOVES[m], `attaque ${m} de ${s.n}`); }
 
 // évolution par niveau
@@ -50,47 +50,85 @@ console.log('fins de combat', ends, 'tours moyens', (turns / 600).toFixed(1));
 // ---------------- la région : tout est atteignable depuis Bourg-Aube ----------------
 const { buildWorld } = await import('../odyssee/js/world/region.js');
 const { T, walkable } = await import('../odyssee/js/world/tiles.js');
-const { maps, towns } = buildWorld();
+const { maps, towns, legends, docks } = buildWorld();
 const W = maps.monde;
 // exploration à travers les grottes : chaque sortie de grotte relance l'exploration du monde
-const seenW = new Uint8Array(W.w * W.h);
-const seeds = [[towns.A.x + 5, towns.A.y + 7]], doneCaves = new Set();
-while (seeds.length) {
-  const [sx, sy] = seeds.pop(); if (seenW[sy * W.w + sx]) continue;
-  const r = W.reach(sx, sy, true, true); for (let i = 0; i < r.length; i++) if (r[i]) seenW[i] = 1;
-  for (const [k, w] of W.warps) {
-    const [x, y] = k.split(',').map(Number); const cave = maps[w.map];
-    if (!cave || cave.floor !== 'cave' || doneCaves.has(w.map) || !(seenW[(y + 1) * W.w + x])) continue;
-    doneCaves.add(w.map);
-    const cr = cave.reach(w.x, w.y, true, true);
-    for (const [ck, cw] of cave.warps) { const [cx, cy] = ck.split(',').map(Number); if (cr[(cy - 1) * cave.w + cx] || cr[cy * cave.w + cx]) seeds.push([cw.x, cw.y]); }
+// gates : true ou nombre de badges ; abil : true (Coupe, Surf, Éclate-Roc) ou Set des cases franchissables
+function explore(gates, abil) {
+  const seenW = new Uint8Array(W.w * W.h);
+  const seeds = [[towns.A.x + 5, towns.A.y + 7]], doneCaves = new Set();
+  while (seeds.length) {
+    const [sx, sy] = seeds.pop(); if (seenW[sy * W.w + sx]) continue;
+    const r = W.reach(sx, sy, gates, true, abil); for (let i = 0; i < r.length; i++) if (r[i]) seenW[i] = 1;
+    for (const [k, w] of W.warps) {
+      const [x, y] = k.split(',').map(Number); const cave = maps[w.map];
+      if (!cave || cave.floor !== 'cave' || doneCaves.has(w.map) || !(seenW[(y + 1) * W.w + x])) continue;
+      doneCaves.add(w.map);
+      const cr = cave.reach(w.x, w.y, gates, true, abil);
+      for (const [ck, cw] of cave.warps) { const [cx, cy] = ck.split(',').map(Number); if (cr[(cy - 1) * cave.w + cx] || cr[cy * cave.w + cx]) seeds.push([cw.x, cw.y]); }
+    }
   }
+  return seenW;
 }
+const seenW = explore(true, true);
 const at = (m, x, y) => y * m.w + x;
 const reachable = (m, seen, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && seen[at(m, x + dx, y + dy)]);
 // portes et téléporteurs du monde
 for (const [k, w] of W.warps) {
   const [x, y] = k.split(',').map(Number);
-  // le Sanctuaire (îlot, Surf et Plume Argent) est vérifié par test-odyssee-story.mjs
-  ok(w.need || seenW[at(W, x, y)] || reachable(W, seenW, x, y + 1), `porte ${k} → ${w.map} accessible`);
+  ok(seenW[at(W, x, y)] || reachable(W, seenW, x, y + 1), `porte ${k} → ${w.map} accessible`);
   const dst = maps[w.map]; ok(dst && walkable(dst.get(w.x, w.y)), `arrivée ${w.map} (${w.x},${w.y}) praticable`);
 }
 // PNJ, dresseurs et objets du monde : on peut se placer à côté
 for (const n of W.npcs) ok(reachable(W, seenW, n.x, n.y), `PNJ ${n.id} atteignable (${n.x},${n.y})`);
-// les objets cachés derrière un obstacle de CS (Coupe, Force, Surf) sont vérifiés par test-odyssee-story.mjs
-for (const it of W.items) if (!it.secret) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} atteignable (${it.x},${it.y})`);
+for (const it of W.items) ok(reachable(W, seenW, it.x, it.y), `objet ${it.item} atteignable (${it.x},${it.y})`);
 // intérieurs : chaque tapis ramène dehors, chaque PNJ est atteignable depuis l'entrée
 for (const [id, m] of Object.entries(maps)) {
   if (id === 'monde') continue;
   const entries = [...m.warps.keys()].map((k) => k.split(',').map(Number));
-  // la salle de la Maître n'a pas de sortie : on y arrive par la salle précédente du Conseil 4
-  const arrivals = Object.values(maps).flatMap((o) => [...o.warps.values()].filter((w) => w.map === id).map((w) => [w.x, w.y]));
-  ok(entries.length > 0 || arrivals.length > 0, `${id} a une entrée ou une sortie`);
-  const [ex, ey] = entries[0] || arrivals[0];
-  const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true);
+  ok(entries.length > 0, `${id} a une sortie`);
+  const [ex, ey] = entries[0];
+  // cartes annexes (lac, grotte des marées…) : avec toutes les capacités de terrain (Surf compris)
+  const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true, true);
   for (const [x, y] of entries) ok(seen[at(m, x, y)] || reachable(m, seen, x, y), `${id} : sortie (${x},${y}) atteignable`);
   for (const n of m.npcs) ok(reachable(m, seen, n.x, n.y) || m.get(n.x, n.y + 1) === T.BLOCK && reachable(m, seen, n.x, n.y + 2), `${id} : PNJ ${n.id} atteignable`);
   for (const it of m.items) ok(reachable(m, seen, it.x, it.y), `${id} : objet atteignable`);
+}
+// progression : avec k badges (et les capacités de terrain qu'ils débloquent), l'arène k est accessible, pas l'arène k+1 ;
+// la Ligue n'est accessible qu'avec les huit badges
+const { FIELD } = await import('../odyssee/js/world/region.js');
+const FIELD_T = { coupe: T.CUT, surf: T.WATER, eclate: T.SMASH };
+const gymDoor = (g) => Object.values(towns).find((t) => t.gym === g).gymDoor;
+const leagueDoor = [...W.warps].find(([, w]) => w.map === 'plateau:ligue')[0].split(',').map(Number);
+const doorOpen = (seen, [x, y]) => !!seen[at(W, x, y + 1)];
+for (let k = 0; k <= 8; k++) {
+  const abil = new Set(Object.entries(FIELD).filter(([f, d]) => d.badge <= k && FIELD_T[f] != null).map(([f]) => FIELD_T[f]));
+  const seen = explore(k, abil);
+  if (k < 8) ok(doorOpen(seen, gymDoor(k)), `avec ${k} badge(s), l'arène ${k + 1} est accessible`);
+  if (k < 7) ok(!doorOpen(seen, gymDoor(k + 1)), `avec ${k} badge(s), l'arène ${k + 2} est encore fermée`);
+  ok(doorOpen(seen, leagueDoor) === (k === 8), `Ligue ${k === 8 ? 'ouverte' : 'fermée'} avec ${k} badge(s)`);
+  ok(!!seen[at(W, 212, 202)] === (k === 8), `Cap des Étoiles ${k === 8 ? 'ouvert' : 'fermé'} avec ${k} badge(s)`);
+}
+// îles du bateau : depuis chaque quai, sans Surf, avec les badges qui ouvrent la traversée
+const near = (seen, m, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && seen[(y + dy) * m.w + x + dx]);
+for (const [k, d] of Object.entries(docks)) ok(d.map !== 'monde' ? walkable(maps[d.map].get(d.x, d.y)) : walkable(W.get(d.x, d.y)) && seenW[at(W, d.x, d.y)], `quai ${k} praticable et atteignable`);
+const L = Object.fromEntries(legends.map((q) => [q.id, q]));
+const fromDock = (k, badges, abil = new Set()) => W.reach(docks[k].x, docks[k].y, badges, true, abil);
+{ const s2 = fromDock('orage', 2); ok(near(s2, W, L.zapdos.x, L.zapdos.y) && near(s2, W, L.mew.x, L.mew.y), 'Île Orageuse : Électhor et Mew accessibles avec 2 badges');
+  ok(!near(s2, W, L.mewtwo.x, L.mewtwo.y), 'Île Orageuse : le sanctuaire de Mewtwo reste scellé');
+  const s1 = fromDock('orage', 1); ok(!near(s1, W, L.zapdos.x, L.zapdos.y), 'Île Orageuse : Pic Tonnerre fermé tant que les relais sont coupés'); }
+{ const s3 = fromDock('grue', 3), door = [...W.warps].find(([, w]) => w.map === 'grue:tour')[0].split(',').map(Number);
+  ok(near(s3, W, door[0], door[1] + 1), 'Île de la Grue : la tour est accessible avec 3 badges');
+  ok(!near(s3, W, L.moltres.x, L.moltres.y), 'Île de la Grue : le cratère de Sulfura demande Coupe');
+  ok(near(fromDock('grue', 4, new Set([T.CUT])), W, L.moltres.x, L.moltres.y), 'Île de la Grue : Sulfura accessible avec Coupe'); }
+{ const s5 = fromDock('givre', 5, new Set([T.CUT, T.WATER])); ok(near(s5, W, L.articuno.x, L.articuno.y), 'Île Givrée : Artikodin accessible avec 5 badges'); }
+// chaque légendaire se tient sur une case libre qu'on peut approcher
+for (const q of legends) {
+  const m = maps[q.map]; ok(m && walkable(m.get(q.x, q.y)), `légendaire ${q.id} sur une case praticable`);
+  const e = [...m.warps.keys()][0].split(',').map(Number);
+  const seen = q.map === 'monde' ? seenW : m.reach(e[0], m.get(e[0], e[1]) === T.CAVEDOOR && m.get(e[0], e[1] - 1) === T.CAVE ? e[1] - 1 : e[1], true, true, true);
+  ok(near(seen, m, q.x, q.y), `légendaire ${q.id} atteignable`);
+  ok(SPECIES[q.sp] && q.lvl > 0, `légendaire ${q.id} valide`);
 }
 // les huit Champions et la Maître existent
 const leaders = Object.values(maps).flatMap((m) => m.npcs.filter((n) => n.leader != null));

@@ -15,7 +15,7 @@ console.log('--- Code de sauvegarde ---');
 {
   const party = [createMon(152, 12), createMon(16, 8)];
   const box = Array.from({ length: 120 }, (_, i) => createMon(ids[i % ids.length], 5 + (i % 40)));
-  const state = { v: 1, name: 'Amiel', gender: 'm', id: 1234, money: 4200, badges: [true, true, false, false, false, false, false, false], flags: { intro: true, starter: 152 },
+  const state = { v: 2, name: 'Amiel', gender: 'm', id: 1234, money: 4200, badges: [true, true, false, false, false, false, false, false], flags: { intro: true, starter: 152 },
     party, box, bag: { potion: 3, 'poke-ball': 7 }, dex: { seen: [152, 16], caught: [152, 16] }, time: 5432, visited: ['aube'], repel: 0, lastCenter: { map: 'aube:maison', x: 4, y: 5 }, map: 'monde', x: 160, y: 120, dir: 'down' };
   const code = await encodeSave(state);
   ok(code.startsWith('ODY1.'), 'préfixe');

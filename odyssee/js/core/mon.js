@@ -1,5 +1,6 @@
 // odyssee/js/core/mon.js — créatures : création, statistiques, expérience, attaques, évolution (sans DOM)
 import { SPECIES } from '../data/species.js';
+import { R } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 
 // attaque propre aux Pokémon Obscurs (Lugia Obscur) : n'existe dans aucun jeu officiel sous ce nom
@@ -56,6 +57,7 @@ export function defaultMoves(sp, lvl) {
 }
 
 export function createMon(sp, lvl, o = {}) {
+  sp = R(sp); // créature originale → son Pokémon remplaçant (data/remplacants.js)
   const r = o.rng || Math.random;
   const S = SPECIES[sp];
   const m = {

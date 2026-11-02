@@ -135,7 +135,8 @@ export class PvpBattle extends Battle {
     const parts = [];
     for (const i of [this.canon, 1 - this.canon]) {
       const s = this.sides[i];
-      parts.push(s.active, ...s.party.map((m) => `${m.hp}${m.status || ''}`), s.v.st.join(''));
+      // le poison grave redevient un poison simple pour son dresseur à la fin du combat : on les compte pareil
+      parts.push(s.active, ...s.party.map((m) => `${m.hp}${(m.status === 'tox' ? 'psn' : m.status) || ''}`), s.v.st.join(''));
     }
     parts.push(this.turn);
     let h = 0x811c9dc5;

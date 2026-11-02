@@ -1,21 +1,23 @@
 // odyssee/js/ui/screens.js — écrans plein cadre : équipe, résumé, sac, Pokédex, carte, carte de dresseur, boutique, PC, options
 import { el, esc } from './ui.js';
 import { SPECIES } from '../data/species.js';
+import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
 import { monName, expProgress, STAT_NAMES } from '../core/mon.js';
 import { ASSETS } from '../assets.js';
-import { T } from '../world/tiles.js';
+import { SPRITES } from '../data/sprites.js';
+import { T, walkable } from '../world/tiles.js';
 
-export const TYPE_FR = { normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
-export const TYPE_COL = { normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
+export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
+export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
 export const STATUS_FR = { par: ['PAR', '#e8c020'], slp: ['SOM', '#8890a0'], psn: ['PSN', '#a050b0'], tox: ['PSN', '#7a3090'], brn: ['BRÛ', '#e86030'], frz: ['GEL', '#60c0e8'] };
 export const typeTag = (t) => `<span class="type" style="background:${TYPE_COL[t]}">${TYPE_FR[t]}</span>`;
 export const hpCol = (r) => (r > 0.5 ? '#48d058' : r > 0.2 ? '#f0c020' : '#f04838');
 export function hpBar(m) { const r = m.hp / m.stats[0]; return `<div class="hp"><b>PV</b><i><u style="width:${Math.max(0, r * 100)}%;background:${hpCol(r)}"></u></i></div>`; }
 export const statusTag = (m) => (m.hp <= 0 ? '<span class="st" style="background:#c03838">K.O.</span>' : m.status ? `<span class="st" style="background:${STATUS_FR[m.status][1]}">${STATUS_FR[m.status][0]}</span>` : '');
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
-const iconImg = (m) => `<img class="ico${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
+const iconImg = (m) => `<img class="ico" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
 
 function screen(ui, cls, title) {
   const s = el('div', 'screen ' + cls);
@@ -47,7 +49,7 @@ export function partyScreen(game, o = {}) {
       });
       for (let k = party.length; k < 6; k++) grid.appendChild(el('div', 'pslot empty'));
       cancel.classList.toggle('on', i === party.length);
-      help.textContent = swapFrom >= 0 ? 'Avec quel Pokémon échanger sa place ?' : o.prompt || 'Choisis un Pokémon.';
+      help.textContent = swapFrom >= 0 ? 'Avec quelle créature échanger sa place ?' : o.prompt || 'Choisis une créature.';
     };
     draw();
     const close = (v) => { pop(); s.remove(); resolve(v); };
@@ -93,7 +95,7 @@ export function summaryScreen(game, list, idx) {
       if (page === 0) body = `<table class="kv"><tr><td>N° Pokédex</td><td>${String(m.sp).padStart(3, '0')}</td></tr><tr><td>Nom</td><td>${esc(S.n)}</td></tr><tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr><tr><td>D.O.</td><td>${esc(m.ot || game.state.name)}</td></tr><tr><td>Rencontré</td><td>${esc(m.met || '—')}</td></tr><tr><td>Exp.</td><td>${m.exp.toLocaleString('fr-FR')}</td></tr></table><div class="expline"><b>EXP</b><i><u style="width:${expProgress(m) * 100}%"></u></i></div><div class="dexline">${esc(S.genus || '')}</div>`;
       else if (page === 1) body = `<table class="kv stats">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td>${k === 0 ? `${m.hp}/${m.stats[0]}` : m.stats[k]}</td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.6)}%"></u></i></td></tr>`).join('')}</table>`;
       else body = `<div class="moves">${m.moves.map((mv) => { const M = MOVES[mv.id]; return `<div class="mv" style="--tc:${TYPE_COL[M.t]}"><span class="mvn">${esc(M.n)}</span>${typeTag(M.t)}<span class="mvpp">PP ${mv.pp}/${M.pp}</span><span class="mvd">${M.c === 'status' ? 'Statut' : `Puiss. ${M.p || '—'}`} · Préc. ${M.a ?? '—'}</span></div>`; }).join('')}</div>`;
-      s.innerHTML = `<div class="sum-left box"><div class="sum-head">${esc(monName(m))}${gender(m)} <span>N.${m.lvl}</span></div><img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="">${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div></div><div class="sum-right box"><div class="tabs">${tabs}</div>${body}</div><div class="sum-help">◀ ▶ pages · ▲ ▼ Pokémon · Échap retour</div>`;
+      s.innerHTML = `<div class="sum-left box"><div class="sum-head">${esc(monName(m))}${gender(m)} <span>N.${m.lvl}</span></div><img class="sum-spr" src="${ASSETS.front(m.sp, m.shiny)}" alt="">${statusTag(m)}${hpBar(m)}<div class="phpn">${m.hp}/${m.stats[0]}</div></div><div class="sum-right box"><div class="tabs">${tabs}</div>${body}</div><div class="sum-help">◀ ▶ pages · ▲ ▼ créature · Échap retour</div>`;
     };
     draw();
     const pop = ui.input.push((k) => {
@@ -133,9 +135,10 @@ export function bagScreen(game, o = {}) {
       if (i === es.length) { ui.sound.sfx('cancel'); close(null); return; }
       ui.sound.sfx('select');
       const item = es[i], it = ITEMS[item];
+      // les objets rares ne se jettent pas ; seuls ceux qui ont un usage hors combat s'utilisent
       const opts = o.battle ? ['Utiliser', 'Annuler'] : it.key ? ['Utiliser', 'Annuler'] : ['Utiliser', 'Jeter', 'Annuler'];
       busy = true;
-      const r = await ui.list({ items: opts.map((label) => ({ label, disabled: label === 'Utiliser' && o.battle && !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) })), cls: 'psub', cancel: opts.length - 1, parent: s });
+      const r = await ui.list({ items: opts.map((label) => ({ label, disabled: label === 'Utiliser' && (o.battle ? !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) : it.key && !it.field && item !== 'town-map') })), cls: 'psub', cancel: opts.length - 1, parent: s });
       busy = false;
       if (opts[r] === 'Utiliser') { close({ item }); return; }
       if (opts[r] === 'Jeter') {
@@ -154,19 +157,23 @@ export function dexScreen(game) {
   const ui = game.ui, st = game.state;
   return new Promise((resolve) => {
     const s = screen(ui, 'dex-scr');
-    const ids = Object.keys(SPECIES).map(Number);
+    // les créatures d'Odyssée d'abord (numéros 001 à 052), puis les Pokémon venus d'ailleurs ; tant qu'elles sont
+    // remplacées par des Pokémon, seules celles déjà rencontrées (ancienne sauvegarde) restent dans la liste
+    const ids = Object.keys(SPECIES).map(Number).filter((id) => ORIGINALES || id < 1000 || st.dex.seen.includes(id))
+      .sort((a, b) => (a >= 1000) === (b >= 1000) ? a - b : a >= 1000 ? -1 : 1);
+    const num = (id) => (SPECIES[id].no ? String(SPECIES[id].no).padStart(3, '0') : '#' + String(id).padStart(3, '0'));
     let i = 0;
     const seen = new Set(st.dex.seen), caught = new Set(st.dex.caught);
     s.innerHTML = `<div class="dex-left box"><img class="dex-spr" alt=""><div class="dex-info"></div></div><div class="dex-right box"><div class="dex-count">Vus : ${seen.size} · Capturés : ${caught.size}</div><div class="list-items dex-list"></div></div>`;
     const list = s.querySelector('.dex-list'), spr = s.querySelector('.dex-spr'), info = s.querySelector('.dex-info');
-    list.innerHTML = ids.map((id) => `<div class="list-row" data-i="${id}"><span class="cur">▶</span><span class="dexn">${String(id).padStart(3, '0')}</span><span class="lbl">${seen.has(id) ? esc(SPECIES[id].n) : '-----'}</span>${caught.has(id) ? '<span class="ball-mini"></span>' : ''}</div>`).join('');
+    list.innerHTML = ids.map((id) => `<div class="list-row" data-i="${id}"><span class="cur">▶</span><span class="dexn">${num(id)}</span><span class="lbl">${seen.has(id) ? esc(SPECIES[id].n) : '-----'}</span>${caught.has(id) ? '<span class="ball-mini"></span>' : ''}</div>`).join('');
     const rows = [...list.children];
     const draw = () => {
       rows.forEach((r, k) => r.classList.toggle('on', k === i)); rows[i].scrollIntoView({ block: 'nearest' });
       const id = ids[i], S = SPECIES[id];
       if (seen.has(id)) { spr.src = ASSETS.front(id); spr.style.visibility = ''; spr.classList.toggle('shadowed', !caught.has(id)); }
       else spr.style.visibility = 'hidden';
-      info.innerHTML = caught.has(id) ? `<div class="dex-name">${String(id).padStart(3, '0')} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>` : seen.has(id) ? `<div class="dex-name">${String(id).padStart(3, '0')} ${esc(S.n)}</div><p>Capture ce Pokémon pour en savoir plus.</p>` : '<p>Pokémon inconnu.</p>';
+      info.innerHTML = caught.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><div>${esc(S.genus || '')}</div><div>${S.t.map(typeTag).join(' ')}</div><div>Taille ${(S.h / 10).toLocaleString('fr-FR')} m · Poids ${(S.w / 10).toLocaleString('fr-FR')} kg</div><p>${esc(S.dex)}</p>` : seen.has(id) ? `<div class="dex-name">${num(id)} ${esc(S.n)}</div><p>Capture cette créature pour en savoir plus.</p>` : '<p>Créature inconnue.</p>';
     };
     draw();
     const pop = ui.input.push((k) => {
@@ -180,28 +187,130 @@ export function dexScreen(game) {
 }
 
 /* ================= CARTE DE LA RÉGION ================= */
+// La carte se dévoile au fil du voyage : seules les zones parcourues sont dessinées, le reste n'est qu'une étendue
+// verte ; le cadre est zoomé sur ce qu'on connaît et s'élargit à mesure qu'on avance.
+/** carte de la région, dessinée comme le Pokégear de HeartGold / SoulSilver : mer en trois bleus, côtes en falaises,
+ *  plaines et forêts, montagnes en paliers, routes blanches cerclées de gris, villes en pastilles rouges.
+ *  Un pixel = une case ; le relief est posé par blocs de 2 × 2 cases, comme les pixels doublés du DS. */
+const HG = {
+  open: [81, 186, 218], far: [66, 181, 206], deep: [57, 165, 189], foam: [139, 219, 244],
+  flat: [97, 195, 146], shadow: [81, 179, 128], cliff: [197, 145, 106],
+  top: [242, 178, 130], vhigh: [220, 162, 114], high: [195, 146, 105], low: [162, 130, 89],
+  ink: '#525252', road: '#ffffff', town: '#fa5263', townDark: '#a23047', special: '#72cb93', water: '#60b2fc',
+};
+let carteIcons = null;
+function loadCarteIcons() {
+  if (carteIcons) return carteIcons;
+  carteIcons = {};
+  for (const k of SPRITES.carte || []) { const im = new Image(); im.src = ASSETS.carte(k); carteIcons[k] = im; }
+  return carteIcons;
+}
+function drawRegion(game, cv) {
+  const W = game.world.maps.monde, ctx = cv.getContext('2d'), w = W.w, h = W.h, B = 2;
+  const bw = Math.ceil(w / B), bh = Math.ceil(h / B);
+  // nature de chaque bloc de 2 × 2 cases
+  // 0 eau, 1 plaine, 2 forêt, 3 montagne, 4 pied de montagne (sol praticable des zones volcaniques et enneigées)
+  const kind = new Uint8Array(bw * bh);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    let water = 0, walk = 0;
+    for (let dy = 0; dy < B; dy++) for (let dx = 0; dx < B; dx++) {
+      const t = W.get(bx * B + dx, by * B + dy);
+      if (t === T.WATER) water++; else if (walkable(t) || t === T.DOOR) walk++;
+    }
+    const th = W.zoneAt(bx * B, by * B)?.theme, hill = th === 'volcanic' || th === 'snow';
+    const i = by * bw + bx;
+    kind[i] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
+  }
+  // distance de chaque bloc à la nature voisine (pour la mer : à la côte ; pour la montagne : au pied)
+  const dist = (pred) => {
+    const d = new Int16Array(bw * bh).fill(99), q = [];
+    for (let i = 0; i < d.length; i++) if (pred(kind[i])) { d[i] = 0; q.push(i); }
+    for (let k = 0; k < q.length; k++) {
+      const i = q[k], x = i % bw, y = (i / bw) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue; const j = ny * bw + nx; if (d[j] > d[i] + 1) { d[j] = d[i] + 1; q.push(j); } }
+    }
+    return d;
+  };
+  const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
+  const img = ctx.createImageData(w, h);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    const i = by * bw + bx, k = kind[i];
+    let c;
+    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : HG.open;
+    else if (toLand.length && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind[(by + dy) * bw + bx + dx] === 0 && bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh)) c = HG.cliff;
+    else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
+    else if (k === 4) c = HG.low;
+    else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
+    for (let dy = 0; dy < B; dy++) for (let dx = 0; dx < B; dx++) {
+      const x = bx * B + dx, y = by * B + dy; if (x >= w || y >= h) continue;
+      const o = (y * w + x) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const I = loadCarteIcons();
+  const icon = (k, x, y) => { const im = I[k]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height + 2)); };
+  // arbres sur les forêts épaisses, montagnes sur les reliefs (une icône par carré de 22 cases, au hasard du lieu)
+  for (let y = 10; y < h - 6; y += 22) for (let x = 10; x < w - 6; x += 22) {
+    const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
+    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), k = kind[i];
+    if (k === 2 && toOpen[i] >= 4 && ((x + y - 20) / 22) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
+    else if (k === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+  }
+  // routes : un trait blanc cerclé de gris
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  const roads = (game.world.routes || []).map((r) => r.pts);
+  for (const [lw, col] of [[7, HG.ink], [4, HG.road]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = lw;
+    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 0.5, y + 0.5) : ctx.moveTo(x + 0.5, y + 0.5))); ctx.stroke(); }
+  }
+  // grottes et lieux à part (lac, jardin, forêt des torii) : icônes et pastilles vertes
+  for (const b of W.buildings) if (b.kind === 'cave') icon('grotte_m', b.x + b.w / 2, b.y + b.d);
+  const pill = (x, y, pw, ph, fill, dark) => {
+    x = Math.round(x - pw / 2); y = Math.round(y - ph / 2);
+    ctx.fillStyle = HG.ink; ctx.fillRect(x - 1, y, pw + 2, ph); ctx.fillRect(x, y - 1, pw, ph + 2);
+    ctx.fillStyle = fill; ctx.fillRect(x, y, pw, ph);
+    if (dark) { ctx.fillStyle = dark; ctx.fillRect(x, y + Math.ceil(ph * 0.55), pw, Math.floor(ph * 0.45)); }
+  };
+  for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
+  // villes : pastilles rouges (grises tant qu'on n'y est pas allé)
+  const visited = new Set(game.state.visited || []);
+  for (const t of Object.values(game.world.towns)) {
+    const big = t.gym != null || t.id === 'plateau';
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 16 : 12, big ? 12 : 9, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+  }
+  // brouillard sur ce qui n'a pas encore été exploré
+  const seen = new Set(game.state.explored || []), C = 8, cw = Math.ceil(w / C);
+  if (seen.size) {
+    ctx.fillStyle = 'rgba(28, 36, 52, 0.62)';
+    for (let y = 0; y < h; y += C) for (let x = 0; x < w; x += C) if (!seen.has(Math.floor(y / C) * cw + Math.floor(x / C))) ctx.fillRect(x, y, C, C);
+  }
+}
 export function mapScreen(game) {
-  const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns;
+  const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
   return new Promise((resolve) => {
     const s = screen(ui, 'map-scr', 'CARTE DE LA RÉGION');
-    const wrap = el('div', 'map-wrap'); s.appendChild(wrap);
-    const c = el('canvas', 'mapcv'); c.width = W.w; c.height = W.h; wrap.appendChild(c);
-    const ctx = c.getContext('2d'), img = ctx.createImageData(W.w, W.h);
-    const col = (t) => {
-      switch (t) { case T.WATER: return [72, 136, 224]; case T.TREE: case T.PINE: return [52, 120, 64]; case T.PATH: case T.BRIDGE: return [232, 208, 150]; case T.PAVE: case T.BUILD: case T.DOOR: return [228, 222, 208]; case T.SAND: return [240, 226, 170]; case T.TALL: case T.DARKTALL: return [90, 170, 80]; case T.ASH: return [150, 140, 136]; default: return [132, 200, 110]; }
-    };
-    for (let y = 0; y < W.h; y++) for (let x = 0; x < W.w; x++) { const [r, g, b] = col(W.get(x, y)), k = (y * W.w + x) * 4; img.data[k] = r; img.data[k + 1] = g; img.data[k + 2] = b; img.data[k + 3] = 255; }
-    ctx.putImageData(img, 0, 0);
-    const lab = el('div', 'map-labels'); wrap.appendChild(lab);
-    const visited = new Set(game.state.visited || []);
-    for (const t of Object.values(towns)) {
-      const d = el('div', 'map-town' + (visited.has(t.id) ? ' seen' : ''), `<i></i><span>${visited.has(t.id) ? esc(t.name) : '???'}</span>`);
-      d.style.left = ((t.x + t.w / 2) / W.w * 100) + '%'; d.style.top = ((t.y + t.h / 2) / W.h * 100) + '%'; lab.appendChild(d);
-    }
     const p = game.worldPos();
+    const wrap = el('div', 'map-wrap'); wrap.style.aspectRatio = `${W.w} / ${W.h}`; s.appendChild(wrap);
+    const c = el('canvas', 'mapcv'); c.width = W.w; c.height = W.h; wrap.appendChild(c);
+    const draw = () => drawRegion(game, c);
+    draw(); Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+    const lab = el('div', 'map-labels'); wrap.appendChild(lab);
     const me = el('div', 'map-me'); me.style.left = (p.x / W.w * 100) + '%'; me.style.top = (p.y / W.h * 100) + '%'; lab.appendChild(me);
-    s.appendChild(el('div', 'box map-where', esc(game.locationName())));
-    const pop = ui.input.push((k) => { if (k === 'a' || k === 'b' || k === 'map') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); } });
+    // curseur : flèches gauche / droite pour passer d'une ville visitée à l'autre, comme sur le Pokégear
+    const visited = new Set(st.visited || []);
+    const near = () => { let best = null, bd = 1e9; for (const r of game.world.routes || []) for (const [x, y] of r.pts) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = r.name; } } return best; };
+    const here = game.mapObj === W && !W.zoneAt(p.x, p.y)?.name ? near() || game.locationName() : game.locationName();
+    const spots = [{ name: here, x: p.x, y: p.y }].concat(Object.values(towns).filter((t) => visited.has(t.id)).map((t) => ({ name: t.name, x: t.x + t.w / 2, y: t.y + t.h / 2 })));
+    const cur = el('div', 'map-cur'); lab.appendChild(cur);
+    const where = el('div', 'box map-where', ''); s.appendChild(where);
+    let k = 0;
+    const show = () => { const q = spots[k]; cur.style.left = (q.x / W.w * 100) + '%'; cur.style.top = (q.y / W.h * 100) + '%'; where.textContent = q.name; };
+    show();
+    const pop = ui.input.push((key) => {
+      if (key === 'left' || key === 'up') { k = (k + spots.length - 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
+      if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
+      if (key === 'a' || key === 'b' || key === 'map') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); }
+    });
   });
 }
 
@@ -257,22 +366,22 @@ export async function shopScreen(game, stock) {
 export async function pcScreen(game) {
   const ui = game.ui, st = game.state;
   ui.sound.sfx('pc');
-  await ui.say(`${st.name} allume le PC.\nAccès au système de stockage des Pokémon.`, { keep: true });
+  await ui.say(`${st.name} allume le PC.\nAccès au système de stockage des créatures.`, { keep: true });
   for (;;) {
-    const r = await ui.ask('Que veux-tu faire ?', ['Retirer un Pokémon', 'Déposer un Pokémon', 'Éteindre'], { keep: true });
+    const r = await ui.ask('Que veux-tu faire ?', ['Retirer une créature', 'Déposer une créature', 'Éteindre'], { keep: true });
     if (r === 0) {
-      if (!st.box.length) { await ui.say('Il n\'y a aucun Pokémon dans la boîte.', { keep: true }); continue; }
+      if (!st.box.length) { await ui.say('Il n\'y a aucune créature dans la boîte.', { keep: true }); continue; }
       if (st.party.length >= 6) { await ui.say('Ton équipe est complète !', { keep: true }); continue; }
       const k = await ui.list({ title: `Boîte (${st.box.length})`, items: st.box.map((m) => ({ label: monName(m), right: `N.${m.lvl}` })).concat([{ label: 'Annuler' }]), cls: 'shop pcbox', cancel: st.box.length });
       if (k < 0 || k >= st.box.length) continue;
       const m = st.box.splice(k, 1)[0]; st.party.push(m);
       await ui.say(`${monName(m)} a rejoint ton équipe.`, { keep: true });
     } else if (r === 1) {
-      if (st.party.length <= 1) { await ui.say('C\'est ton dernier Pokémon !', { keep: true }); continue; }
+      if (st.party.length <= 1) { await ui.say('C\'est ta dernière créature !', { keep: true }); continue; }
       ui.closeDialog();
-      const k = await partyScreen(game, { mode: 'pick', prompt: 'Quel Pokémon déposer ?' });
+      const k = await partyScreen(game, { mode: 'pick', prompt: 'Quelle créature déposer ?' });
       if (k < 0) continue;
-      if (st.party.filter((m, j) => j !== k && m.hp > 0).length === 0) { await ui.say('Il te faut au moins un Pokémon en forme dans ton équipe !', { keep: true }); continue; }
+      if (st.party.filter((m, j) => j !== k && m.hp > 0).length === 0) { await ui.say('Il te faut au moins une créature en forme dans ton équipe !', { keep: true }); continue; }
       const m = st.party.splice(k, 1)[0]; st.box.push(m);
       await ui.say(`${monName(m)} a été déposé dans la boîte.`, { keep: true });
     } else break;

@@ -6,8 +6,8 @@
 //   (cd /tmp/pokeapi && git sparse-checkout set data/v2/csv)
 //   node tools/odyssee-donnees.mjs /tmp/pokeapi/data/v2/csv
 //
-// Règles de la 4e génération (HeartGold / SoulSilver) : types sans Fée, Acier qui résiste à Spectre et Ténèbres,
-// statistiques et types d'avant la 6e génération, attaques apprises par niveau dans HGSS.
+// Les 721 Pokémon jusqu'à X / Y, avec les règles de la 6e génération : type Fée, types, statistiques et attaques de X / Y.
+// Attaques apprises par niveau : celles de HeartGold / SoulSilver jusqu'au n° 493, celles de X / Y au-delà.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +15,7 @@ import path from 'node:path';
 const CSV = process.argv[2];
 if (!CSV) { console.error('usage : node tools/odyssee-donnees.mjs <dossier csv de PokeAPI>'); process.exit(1); }
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'odyssee', 'js', 'data');
-const MAX_SPECIES = 251, VG = 10 /* heartgold-soulsilver */, FR = 5;
+const MAX_SPECIES = 721, GEN = 6, VG = 10 /* heartgold-soulsilver */, VG_XY = 15 /* x-y */, FR = 5, MAX_MOVE = 621;
 
 function parseCSV(file) {
   const txt = fs.readFileSync(path.join(CSV, file + '.csv'), 'utf8');
@@ -45,16 +45,16 @@ for (const s of parseCSV('pokemon_species')) {
 }
 for (const p of parseCSV('pokemon')) { const id = +p.id; if (species[id]) { species[id].xp = +p.base_experience; species[id].h = +p.height; species[id].w = +p.weight; } }
 for (const st of parseCSV('pokemon_stats')) { const sp = species[+st.pokemon_id]; if (sp && STAT[st.stat_id] != null) sp.b[STAT[st.stat_id]] = +st.base_stat; }
-// statistiques d'avant la 6e génération
+// statistiques de X / Y (les changements des générations suivantes sont annulés)
 const statsPast = {};
 for (const st of parseCSV('pokemon_stats_past')) {
-  const id = +st.pokemon_id, g = +st.generation_id; if (!species[id] || g < 4 || STAT[st.stat_id] == null) continue;
+  const id = +st.pokemon_id, g = +st.generation_id; if (!species[id] || g < GEN || STAT[st.stat_id] == null) continue;
   (statsPast[id] ||= {})[st.stat_id] = statsPast[id][st.stat_id] && statsPast[id][st.stat_id].g <= g ? statsPast[id][st.stat_id] : { g, v: +st.base_stat };
 }
 for (const [id, m] of Object.entries(statsPast)) for (const [sid, o] of Object.entries(m)) species[id].b[STAT[sid]] = o.v;
 const typesNow = {}, typesPast = {};
 for (const t of parseCSV('pokemon_types')) { const id = +t.pokemon_id; if (species[id]) (typesNow[id] ||= [])[+t.slot - 1] = TYPES[t.type_id]; }
-for (const t of parseCSV('pokemon_types_past')) { const id = +t.pokemon_id; if (species[id] && +t.generation_id >= 4) (typesPast[id] ||= [])[+t.slot - 1] = TYPES[t.type_id]; }
+for (const t of parseCSV('pokemon_types_past')) { const id = +t.pokemon_id; if (species[id] && +t.generation_id >= GEN) (typesPast[id] ||= [])[+t.slot - 1] = TYPES[t.type_id]; }
 for (const id in species) species[id].t = (typesPast[id] || typesNow[id]).filter(Boolean);
 for (const n of parseCSV('pokemon_species_names')) { const sp = species[+n.pokemon_species_id]; if (sp && +n.local_language_id === FR) { sp.n = n.name; sp.genus = n.genus; } }
 // textes du Pokédex en français (X / Y)
@@ -71,6 +71,7 @@ const items = {}; for (const it of parseCSV('items')) items[it.id] = it.identifi
 const itemFR = {}; for (const n of parseCSV('item_names')) if (+n.local_language_id === FR) itemFR[items[n.item_id]] = n.name;
 
 /* ---------------- évolutions ---------------- */
+const ITEM_KEYS = ['poke-ball', 'great-ball', 'ultra-ball', 'potion', 'super-potion', 'hyper-potion', 'max-potion', 'full-restore', 'revive', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'full-heal', 'escape-rope', 'repel', 'super-repel', 'max-repel', 'rare-candy', 'fire-stone', 'water-stone', 'thunder-stone', 'leaf-stone', 'moon-stone', 'sun-stone', 'dusk-stone', 'dawn-stone', 'shiny-stone', 'ice-stone', 'oran-berry', 'ether', 'elixir'];
 // niveau : tel quel ; échange → niveau 38 ; bonheur → niveau 22 ; pierre → objet ; autres → niveau 30
 for (const e of parseCSV('pokemon_evolution')) {
   const to = +e.evolved_species_id; if (!species[to] || !species[to].from) continue;
@@ -79,14 +80,22 @@ for (const e of parseCSV('pokemon_evolution')) {
   const trig = +e.evolution_trigger_id;
   let ev;
   if (trig === 1 && e.minimum_level) ev = { to, lvl: +e.minimum_level };
-  else if (trig === 3 && e.trigger_item_id) ev = { to, item: items[e.trigger_item_id] };
+  else if (trig === 3 && e.trigger_item_id) ev = ITEM_KEYS.includes(items[e.trigger_item_id]) ? { to, item: items[e.trigger_item_id] } : { to, lvl: 36 };
   else if (trig === 2) ev = { to, lvl: 38 };
-  else if (trig === 1 && e.minimum_happiness) ev = { to, lvl: 22 };
+  else if (trig === 1 && e.minimum_happiness) ev = { to, lvl: 22, happy: 1 };
   else ev = { to, lvl: 30 };
   from.ev.push(ev);
 }
 // Évoli : une pierre par évolution ; Mentali / Noctali (bonheur jour / nuit) passent par Pierre Soleil / Pierre Lune ici
-const evo = species[133]; if (evo) evo.ev = [{ to: 134, item: 'water-stone' }, { to: 135, item: 'thunder-stone' }, { to: 136, item: 'fire-stone' }, { to: 196, item: 'sun-stone' }, { to: 197, item: 'moon-stone' }];
+// bonheur → niveau 22, mais toujours au moins 10 niveaux après l'évolution précédente (Nosferalto ne devient pas
+// Nostenfer dans la foulée)
+for (const sp of Object.values(species)) for (const ev of sp.ev) {
+  if (!ev.happy) continue; delete ev.happy;
+  const prev = sp.from && species[sp.from]?.ev.find((x) => x.to === sp.id);
+  if (prev?.lvl) ev.lvl = Math.max(22, prev.lvl + 10);
+}
+// Phyllali / Givrali (lieu) : Pierre Plante / Pierre Glace ; Nymphali : Pierre Éclat
+const evo = species[133]; if (evo) evo.ev = [{ to: 134, item: 'water-stone' }, { to: 135, item: 'thunder-stone' }, { to: 136, item: 'fire-stone' }, { to: 196, item: 'sun-stone' }, { to: 197, item: 'moon-stone' }, { to: 470, item: 'leaf-stone' }, { to: 471, item: 'ice-stone' }, { to: 700, item: 'shiny-stone' }];
 // Tygnon / Kicklee / Kapoera : selon les stats en vrai, ici au hasard du niveau
 if (species[236]) species[236].ev = [{ to: 106, lvl: 20 }];
 
@@ -95,7 +104,7 @@ const moveNames = {}; for (const n of parseCSV('move_names')) if (+n.local_langu
 const meta = {}; for (const m of parseCSV('move_meta')) meta[m.move_id] = m;
 const statCh = {}; for (const s of parseCSV('move_meta_stat_changes')) (statCh[s.move_id] ||= []).push([+s.stat_id, +s.change]);
 const changelog = {};
-for (const c of parseCSV('move_changelog')) { const vg = +c.changed_in_version_group_id; if (vg > VG && (!changelog[c.move_id] || +changelog[c.move_id].changed_in_version_group_id > vg)) changelog[c.move_id] = c; }
+for (const c of parseCSV('move_changelog')) { const vg = +c.changed_in_version_group_id; if (vg > VG_XY && (!changelog[c.move_id] || +changelog[c.move_id].changed_in_version_group_id > vg)) changelog[c.move_id] = c; }
 const CLASS = { 1: 'status', 2: 'physical', 3: 'special' };
 const AIL = { 1: 'par', 2: 'slp', 3: 'frz', 4: 'brn', 5: 'psn', 6: 'conf', 8: 'trap', 18: 'seed' };
 // attaques à effet unique gérées par le moteur
@@ -105,12 +114,11 @@ const FIELD = new Set(['haze', 'reflect', 'light-screen', 'mist', 'safeguard', '
 const CHARGE = new Set(['solar-beam', 'razor-wind', 'sky-attack', 'skull-bash', 'fly', 'dig', 'dive', 'bounce']);
 const moves = {}, allMoves = {};
 for (const m of parseCSV('moves')) {
-  const id = +m.id; if (id > 467) continue;
+  const id = +m.id; if (id > MAX_MOVE) continue;
   const mt = meta[id] || {}, ch = changelog[id] || {};
   const pick = (k) => (ch[k] !== undefined && ch[k] !== '' ? +ch[k] : num(m[k]));
   const cat = num(mt.meta_category_id);
   const o = { id, key: m.identifier, n: moveNames[id] || m.identifier, t: TYPES[ch.type_id || m.type_id], c: CLASS[m.damage_class_id], p: pick('power') || 0, a: pick('accuracy'), pp: pick('pp'), pr: pick('priority') || 0, tg: +m.target_id };
-  if (TYPES[m.type_id] === 'fairy') o.t = 'normal';
   const x = {};
   if (cat != null) x.cat = cat;
   if (+mt.meta_ailment_id > 0 && AIL[mt.meta_ailment_id]) { x.ail = AIL[mt.meta_ailment_id]; x.ailc = +mt.ailment_chance || (o.c === 'status' ? 100 : 0); }
@@ -139,8 +147,8 @@ for (const m of parseCSV('moves')) {
 /* ---------------- attaques apprises (HGSS, par niveau) ---------------- */
 const tmp = {};
 for (const pm of parseCSV('pokemon_moves')) {
-  if (+pm.version_group_id !== VG || +pm.pokemon_move_method_id !== 1) continue;
   const id = +pm.pokemon_id; if (!species[id]) continue;
+  if (+pm.version_group_id !== (id <= 493 ? VG : VG_XY) || +pm.pokemon_move_method_id !== 1) continue;
   const mv = +pm.move_id; if (!moves[mv]) continue;
   (tmp[id] ||= []).push([+pm.level, mv]);
 }
@@ -155,18 +163,17 @@ usedMoves.add(165); // Lutte
 const outMoves = {}; for (const id of [...usedMoves].sort((a, b) => a - b)) if (moves[id] || allMoves[id]) outMoves[id] = moves[id] || allMoves[id];
 outMoves[165] = { ...allMoves[165], m: { ...(allMoves[165].m || {}), u: 'struggle' } };
 
-/* ---------------- table des types (4e génération) ---------------- */
-const TYPE_LIST = Object.entries(TYPES).filter(([id]) => +id <= 17).map(([, t]) => t);
+/* ---------------- table des types (6e génération) ---------------- */
+const TYPE_LIST = Object.entries(TYPES).filter(([id]) => +id <= 18).map(([, t]) => t);
 const chart = {};
 for (const e of parseCSV('type_efficacy')) {
   const a = TYPES[e.damage_type_id], d = TYPES[e.target_type_id];
   if (!TYPE_LIST.includes(a) || !TYPE_LIST.includes(d)) continue;
   if (+e.damage_factor !== 100) (chart[a] ||= {})[d] = +e.damage_factor / 100;
 }
-for (const e of parseCSV('type_efficacy_past')) { if (+e.generation_id < 4) continue; const a = TYPES[e.damage_type_id], d = TYPES[e.target_type_id]; (chart[a] ||= {})[d] = +e.damage_factor / 100; }
+for (const e of parseCSV('type_efficacy_past')) { if (+e.generation_id < GEN) continue; const a = TYPES[e.damage_type_id], d = TYPES[e.target_type_id]; (chart[a] ||= {})[d] = +e.damage_factor / 100; }
 
 /* ---------------- objets ---------------- */
-const ITEM_KEYS = ['poke-ball', 'great-ball', 'ultra-ball', 'potion', 'super-potion', 'hyper-potion', 'max-potion', 'full-restore', 'revive', 'antidote', 'paralyze-heal', 'awakening', 'burn-heal', 'ice-heal', 'full-heal', 'escape-rope', 'repel', 'super-repel', 'max-repel', 'rare-candy', 'fire-stone', 'water-stone', 'thunder-stone', 'leaf-stone', 'moon-stone', 'sun-stone', 'oran-berry', 'ether', 'elixir'];
 const itemNames = Object.fromEntries(ITEM_KEYS.map((k) => [k, itemFR[k] || k]));
 
 /* ---------------- écriture ---------------- */
@@ -177,7 +184,8 @@ for (const id of Object.keys(species).map(Number).sort((a, b) => a - b)) {
   const s = species[id];
   spOut[id] = { n: s.n, k: s.key, t: s.t, b: s.b, cr: s.cr, xp: s.xp, g: s.g, gr: s.gr, ls: s.ls, ...(s.ev.length ? { ev: s.ev } : {}), ...(s.leg ? { leg: 1 } : {}), genus: s.genus, h: s.h, w: s.w, dex: s.dex };
 }
-fs.writeFileSync(path.join(OUT, 'species.js'), banner + 'export const SPECIES = ' + JSON.stringify(spOut).replace(/\},"/g, '},\n"') + ';\n');
+// les créatures originales (data/creatures.js, écrites à la main) rejoignent la table des espèces
+fs.writeFileSync(path.join(OUT, 'species.js'), banner + "import { CREATURES } from './creatures.js';\n" + 'export const SPECIES = ' + JSON.stringify(spOut).replace(/\},"/g, '},\n"') + ';\nObject.assign(SPECIES, CREATURES);\n');
 fs.writeFileSync(path.join(OUT, 'moves.js'), banner + 'export const MOVES = ' + JSON.stringify(outMoves).replace(/\},"/g, '},\n"') + ';\n');
 fs.writeFileSync(path.join(OUT, 'types.js'), banner + 'export const TYPE_LIST = ' + JSON.stringify(TYPE_LIST) + ';\nexport const TYPE_CHART = ' + JSON.stringify(chart) + ';\nexport const ITEM_NAMES = ' + JSON.stringify(itemNames, null, 0) + ';\n');
 console.log('espèces', Object.keys(spOut).length, '· attaques', Object.keys(outMoves).length, '· sans attaque gérée', Object.values(spOut).filter((s) => s.ls.length === 1 && s.ls[0][1] === 33).map((s) => s.n).join(', '));
