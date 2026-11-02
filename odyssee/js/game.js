@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
@@ -432,6 +432,7 @@ export class Game {
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
     else if (k === 'hud') this.hud?.toggle();
   }
   async interact() {
@@ -650,7 +651,7 @@ export class Game {
     if (st.party.length) opts.push(['ÉQUIPE', 'party']);
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
-    if (Object.keys(st.flags).some((k) => k.startsWith('Q:'))) opts.push(['QUÊTES', 'quests']);
+    opts.push(['QUÊTES', 'quests']);
     opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
@@ -664,7 +665,7 @@ export class Game {
       else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
-      else if (k === 'quests') await this.questLog();
+      else if (k === 'quests') await questsScreen(this);
       else if (k === 'opt') await optionsScreen(this);
       else if (k === 'code') {
         // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
@@ -1092,18 +1093,7 @@ export class Game {
     return A;
   }
   async questLog() {
-    const Q = this.world.quests || {}, f = this.state.flags;
-    const list = Object.entries(Q).filter(([id]) => f['Q:' + id]);
-    if (!list.length) { await this.ui.say(['Ton journal des quêtes est vide.', 'Parle aux habitants : beaucoup ont besoin d\'aide.']); return; }
-    list.sort((a, b) => (f['Q:' + a[0]] === 'fin') - (f['Q:' + b[0]] === 'fin'));
-    for (;;) {
-      const r = await this.ui.list({ title: 'Quêtes', items: list.map(([id, q]) => ({ label: q.name, right: f['Q:' + id] === 'fin' ? '✔' : '…' })), cancel: -1 });
-      if (r < 0) return;
-      const [id, q] = list[r], n = f['Q:' + id];
-      const steps = typeof q.steps === 'function' ? q.steps(f, this) : q.steps;
-      const cur = n === 'fin' ? (q.end || 'Quête terminée.') : (steps[n - 1] || steps[steps.length - 1]);
-      await this.ui.say([`${q.name} — ${q.where || ''}`, cur]);
-    }
+    return questsScreen(this);
   }
 
   /* ================= histoire ================= */

@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.63 — 2 novembre 2026
+- **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
+  - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.
+  - **Couverture exhaustive de toutes les quêtes du jeu (18 quêtes)** :
+    - *Histoire Principale* : La Ligue Céleste (progression dynamique des 8 Badges d'Arène jusqu'au Plateau Céleste) et L'Ombre de la Team Éclipse (démantèlement des bases et apaisement de Lugia Obscur).
+    - *Grandes Aventures de l'Archipel (8 quêtes)* : Le Ponyta de Lucie, Les eaux troubles du Lac Miroir, Le courrier perdu, Les nuits blanches de Floralia, Les talismans du Temple Kagura, Le vœu de la fontaine, Le dragon de pierre, et Le cœur du volcan.
+    - *Missions des Habitants (8 requêtes)* : Le médaillon de Lucie, Le spécimen du pêcheur, L'observation géologique, L'échange de Bastien, L'adoption d'Évoli, Les recherches du Pokédex, L'épreuve des Sources, et L'héritage du clan des Dragons.
+  - **Où aller & Indications précises** : grand boîtier doré « 📍 OÙ ALLER / PROCHAINE DESTINATION » affichant en temps réel la destination exacte, le PNJ à rencontrer, les prérequis CS (Coupe, Surf, Force) et les conseils de route pour chaque étape.
+  - **Suivi d'objectif interactif (« En suivre une »)** : bouton `[★ SUIVRE CETTE QUÊTE]` permettant d'épingler n'importe quelle mission active. L'objectif suivi est mis en évidence dans le journal et s'affiche en temps réel dans une capsule dédiée du Pokégear sur le HUD en jeu (`📍 Lieu · Titre · Objectif en cours`).
+  - **Design 100% Rétro Pixel-Art Nintendo DS (5G Noir 2 / Blanc 2)** : onglets de filtrage crantés (`EN COURS`, `TERMINÉES`, `TOUTES`), étiquettes de catégorie stylisées (`PRINCIPALE`, `AVENTURE`, `HABITANT`), liste à défilement avec curseur `▶`, coches de progression d'étapes (`☑` terminée, `▶` en cours, `◻` à venir), boîte de récompense et bandeau d'aide rétro.
+
 ## 3.62 — 2 novembre 2026
 - **Odyssée** — Remplacement et correction intégrale des sprites de Poké Balls :
   - **Correction du sprite de Poké Ball classique** : restauration de l'authentique sprite officiel pixel-art rouge et blanc (dôme rouge éclatant, ceinture équatoriale noire nette avec bouton central blanc, base blanche immaculée). Remplacement du sprite ray-tracé et correction de l'écrasement accidentel qui faisait afficher l'icône de l'Hyper Ball (Ultra Ball) dans l'inventaire du Sac et les menus.
