@@ -814,10 +814,10 @@ export const TIER_LABEL = { 1: 'Premier tour', 2: 'Desk', 3: 'Comité final' };
 // Modules par métier : ils orientent les rubriques tirées (poids par rubrique) et le poste annoncé par Pierre Chartier
 export const MODULES = {
   gen: { label: 'Généraliste', job: 'Analyste', post: 'un poste d\'analyste', weights: null },
-  trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10, Stats: 5 } },
+  trading: { label: 'Trading', job: 'Trader', post: 'un poste de trader', weights: { Marchés: 30, Dérivés: 30, Calcul: 20, Probas: 10, Macro: 10, Stats: 5, Informatique: 6 } },
   ma: { label: 'M&A / Corporate', job: 'Analyste M&A', post: 'un poste en fusions-acquisitions', weights: { Corporate: 45, Taux: 15, Calcul: 20, Marchés: 10, Macro: 10 } },
-  quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 30, Logique: 15, Calcul: 15, Dérivés: 15, Estimation: 5, Stats: 12, Maths: 12 } },
-  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Risques: 35, Taux: 20, Marchés: 15, Probas: 15, Stats: 10, Dérivés: 10, Macro: 5 } },
+  quant: { label: 'Quant', job: 'Quant', post: 'un poste de quant', weights: { Probas: 30, Logique: 15, Calcul: 15, Dérivés: 15, Estimation: 5, Stats: 12, Maths: 12, Informatique: 8 } },
+  risk: { label: 'Risques', job: 'Risk manager', post: 'un poste en gestion des risques', weights: { Risques: 35, Taux: 20, Marchés: 15, Probas: 15, Stats: 10, Dérivés: 10, Macro: 5, Informatique: 6 } },
 };
 // Trois tours de même longueur (un tiers de la partie chacun) ; facile s'arrête au desk, difficile commence au desk
 export function chartierTier(d, i, len) {
@@ -947,11 +947,11 @@ function chartier(r, d, i = 0, len = 10, module = 'gen') {
   // les choix sont mélangés à chaque tirage : la bonne réponse n'a pas de place fixe
   const choices = r.shuffle([q.good, ...q.wrong]);
   const longest = Math.max(...choices.map((c) => c.length));
-  return { ...dedup,
-    kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip),
-    time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0),
-    answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip,
-  };
+  const time = CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (longest > 28 ? 4 : 0);
+  const asked = { answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip };
+  // question avec du code à lire : du temps en plus, selon sa longueur
+  if (q.snippet) return { ...dedup, kind: 'code-read', text: q.text, ...head(q.cat), snippet: q.snippet, lang: q.lang, time: time + Math.min(30, 8 + q.snippet.split('\n').length * 3), ...asked };
+  return { ...dedup, kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text, q.tip), time, ...asked };
 }
 
 // L'épreuve de code : une fonction Python à écrire, vérifiée par des tests cachés (les deux premiers servent d'exemples)
@@ -965,7 +965,7 @@ function demoPick(r, tier, head) {
   if (q.type === 'multi') { const choices = r.shuffle([...q.good, ...q.wrong]); return { kind: 'chartier-multi', input: 'multi', text: q.text, ...head(q.cat), choices, answer: q.good.map((g) => choices.indexOf(g)).sort((a, b) => a - b), show: q.good.join(' · '), tip: q.tip, schema: schemaFor(q.text), time: CH_TIME[tier] + 8 + choices.length * 2 }; }
   if (q.type === 'num') return { kind: 'chartier-num', text: q.text, ...head(q.cat), schema: schemaFor(q.text), time: CH_TIME[tier] + UNIT_TIME + 6, eq: false, answer: q.answer, tol: q.tol, tolMode: q.tolMode, traps: q.traps, unit: q.unit, show: fmt(q.answer) + (q.unit ? ' ' + q.unit : ''), tip: q.tip };
   const choices = r.shuffle([q.good, ...q.wrong]);
-  return { kind: 'chartier', text: q.text, ...head(q.cat), schema: schemaFor(q.text), time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + 4, answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip };
+  return { kind: q.snippet ? 'code-read' : 'chartier', text: q.text, ...head(q.cat), snippet: q.snippet, lang: q.lang, schema: q.snippet ? null : schemaFor(q.text), time: CH_TIME[tier] + Math.min(10, Math.floor(q.text.length / 22)) + (q.snippet ? 30 : 4), answer: choices.indexOf(q.good), choices, trap: choices.indexOf(q.trap), show: q.good, tip: q.tip };
 }
 
 // L'épreuve de code : écrire une fonction Python, corriger un bug, ou écrire une requête SQL (plus souvent hors quant)
