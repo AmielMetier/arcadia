@@ -1,216 +1,141 @@
-// Modèle de vol arcade pour les chasseurs F-16 dans Dogfight 3D.
-// Accessible, nerveux et réactif : tangage, roulis, lacet, postcombustion et aérofrein.
+// Modèle de vol de Dogfight 3D : orientation en quaternion (loopings et tonneaux possibles), énergie,
+// postcombustion limitée, décrochage, et « instructeur » qui amène l'avion vers un point visé.
+// Moteur pur : aucun DOM, aucun réseau. Les invités rejouent cette même fonction pour prédire leur avion.
+// Repère de l'avion : +Z le nez, +Y le dos, +X l'aile gauche du pilote.
 
-export const MIN_SPEED = 65;      // Vitesse minimale (aérofrein)
-export const CRUISE_SPEED = 125;  // Vitesse normale de croisière
-export const BOOST_SPEED = 210;   // Vitesse avec postcombustion (Afterburner)
-export const ACCEL = 90;          // Accélération (m/s²)
-export const DECEL = 70;          // Décélération (m/s²)
+export const TYPES = {
+  f16: { name: 'F-16', full: 'F-16 Fighting Falcon', cruise: 125, boost: 208, pitch: 1.75, roll: 3.5, yaw: 0.55, hp: 100, gun: 3.4, missiles: 4, flares: 6, sig: 1, blurb: 'Agile et nerveux : le meilleur roulis et le canon qui frappe le plus fort.' },
+  f22: { name: 'F-22', full: 'F-22 Raptor', cruise: 130, boost: 228, pitch: 1.5, roll: 2.7, yaw: 0.45, hp: 125, gun: 3, missiles: 4, flares: 6, sig: 0.6, blurb: 'Plus rapide et plus solide, moins vif, et plus long à accrocher pour les missiles.' },
+};
+export const TYPE_IDS = Object.keys(TYPES);
 
-export const PITCH_SPEED = 1.85;  // Vitesse de tangage (rad/s)
-export const ROLL_SPEED = 3.4;    // Vitesse de roulis (rad/s)
-export const YAW_SPEED = 0.95;    // Vitesse de lacet (rad/s)
+export const CENTER = 800;      // centre de l'île
+export const ZONE_WARN = 1900;  // au-delà : alerte « retour dans la zone »
+export const ZONE_MAX = 2400;   // au-delà : l'instructeur ramène l'avion
+export const CEILING = 1200;    // plafond : au-dessus, l'instructeur redescend
 
-export class FlightModel {
-  constructor({
-    x = 0,
-    y = 150,
-    z = 0,
-    heading = 0, // orientation initiale sur le plan XZ (rad)
-  } = {}) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
+const G = 12;              // gravité de jeu (un peu forte : monter coûte vraiment de la vitesse)
+const BOOST_THRUST = 48;   // poussée en postcombustion (m/s²)
+const INDUCED = 0.00035;   // traînée des virages serrés
+const STALL = 50;          // sous cette vitesse, le nez tombe
+const BRAKE_DRAG = 30;
+const AB_DRAIN = 1 / 9;    // la postcombustion tient 9 s
+const AB_FILL = 1 / 16;    // et se recharge en 16 s
+const AB_RESTART = 0.2;    // une fois vide, elle repart à 20 %
 
-    this.vx = Math.sin(heading) * CRUISE_SPEED;
-    this.vy = 0;
-    this.vz = Math.cos(heading) * CRUISE_SPEED;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
-    this.speed = CRUISE_SPEED;
-    this.targetSpeed = CRUISE_SPEED;
-
-    // Angles d'Euler
-    this.pitch = 0; // -PI/2 (plongée) à +PI/2 (montée)
-    this.yaw = heading; // rotation autour de l'axe Y
-    this.roll = 0; // inclinaison des ailes
-
-    // Vecteur avant unitaire (Forward)
-    this.forwardX = Math.sin(heading);
-    this.forwardY = 0;
-    this.forwardZ = Math.cos(heading);
-
-    // Vecteur haut unitaire (Up)
-    this.upX = 0;
-    this.upY = 1;
-    this.upZ = 0;
-
-    // Vecteur droite unitaire (Right)
-    this.rightX = Math.cos(heading);
-    this.rightY = 0;
-    this.rightZ = -Math.sin(heading);
-
-    this.boosting = false;
-    this.braking = false;
-    this.gForce = 1.0;
-    this.overG = false;
-    this.crashed = false;
-  }
-
-  // Met à jour la position et l'orientation en fonction des commandes
-  update(input, dt, map = null) {
-    if (this.crashed) return;
-
-    // 1. Accélération & vitesse cible
-    if (input.boost) {
-      this.targetSpeed = BOOST_SPEED;
-      this.boosting = true;
-      this.braking = false;
-    } else if (input.brake) {
-      this.targetSpeed = MIN_SPEED;
-      this.braking = true;
-      this.boosting = false;
-    } else {
-      this.targetSpeed = CRUISE_SPEED;
-      this.boosting = false;
-      this.braking = false;
-    }
-
-    if (this.speed < this.targetSpeed) {
-      this.speed = Math.min(this.targetSpeed, this.speed + ACCEL * dt);
-    } else if (this.speed > this.targetSpeed) {
-      this.speed = Math.max(this.targetSpeed, this.speed - DECEL * dt);
-    }
-
-    // 2. Gestion de la visée souris (Mouse Aim) ou commandes directes
-    if (input.mouseAim) {
-      this.applyMouseAim(input.aimX, input.aimY, dt);
-    } else {
-      // Commandes manuelles (virage coordonné au clavier pour un pilotage 100% réactif)
-      if (input.pitchUp) {
-        this.pitch += PITCH_SPEED * dt;
-      } else if (input.pitchDown) {
-        this.pitch -= PITCH_SPEED * dt;
-      } else {
-        // Auto-stabilisation douce de l'assiette quand aucune touche de tangage n'est pressée (vol à plat tout droit)
-        if (Math.abs(this.pitch) > 0.005) {
-          this.pitch -= Math.sign(this.pitch) * Math.min(Math.abs(this.pitch), 1.6 * dt);
-        }
-      }
-
-      if (input.rollLeft) {
-        const maxBank = Math.PI * 0.45;
-        if (this.roll > -maxBank) this.roll -= ROLL_SPEED * dt;
-        this.yaw -= YAW_SPEED * 1.8 * dt;
-      } else if (input.rollRight) {
-        const maxBank = Math.PI * 0.45;
-        if (this.roll < maxBank) this.roll += ROLL_SPEED * dt;
-        this.yaw += YAW_SPEED * 1.8 * dt;
-      } else {
-        // Auto-stabilisation douce du roulis quand aucune touche de virage n'est pressée
-        if (Math.abs(this.roll) > 0.005) {
-          this.roll -= Math.sign(this.roll) * Math.min(Math.abs(this.roll), 2.2 * dt);
-        }
-      }
-
-      if (input.yawLeft) this.yaw -= YAW_SPEED * dt;
-      if (input.yawRight) this.yaw += YAW_SPEED * dt;
-    }
-
-    // Limiter le tangage pour éviter la singularité
-    const maxPitch = Math.PI * 0.48;
-    this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
-
-    // Normalisation des angles
-    this.yaw = normalizeAngle(this.yaw);
-    this.roll = normalizeAngle(this.roll);
-
-    // 3. Calcul des vecteurs directionnels à partir des angles
-    this.computeVectors();
-
-    // 4. Déplacement le long du vecteur avant
-    this.vx = this.forwardX * this.speed;
-    this.vy = this.forwardY * this.speed;
-    this.vz = this.forwardZ * this.speed;
-
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
-    this.z += this.vz * dt;
-
-    // 5. Calcul des G subis (accélération angulaire)
-    const angularSpeed = Math.hypot(
-      (input.pitchUp || input.pitchDown ? PITCH_SPEED : 0),
-      (input.rollLeft || input.rollRight ? ROLL_SPEED * 0.5 : 0)
-    );
-    this.gForce = 1.0 + (angularSpeed * this.speed) / 50;
-    this.overG = this.gForce > 3.8;
-
-    // 6. Détection de crash contre le sol ou la mer
-    if (map) {
-      const groundH = Math.max(0, map.heightAt(this.x, this.z));
-      if (this.y <= groundH + 3.0) {
-        this.crashed = true;
-        this.y = groundH;
-      }
-    } else {
-      if (this.y <= 0) {
-        this.crashed = true;
-        this.y = 0;
-      }
-    }
-
-    // Plafond d'altitude max
-    if (this.y > 650) {
-      this.y = 650;
-      this.vy = Math.min(0, this.vy);
-    }
-  }
-
-  // Visée intuitive à la souris : aligne l'avion vers le curseur et incline les ailes dans le virage
-  applyMouseAim(aimDeltaX, aimDeltaY, dt) {
-    // aimDeltaX et aimDeltaY sont normalisés entre -1 et 1
-    const targetPitch = -aimDeltaY * (Math.PI * 0.42);
-    const targetYawRate = aimDeltaX * 1.5;
-
-    // Tangage vers la cible
-    const pitchDiff = targetPitch - this.pitch;
-    this.pitch += Math.sign(pitchDiff) * Math.min(Math.abs(pitchDiff), PITCH_SPEED * dt);
-
-    // Lacet
-    this.yaw += targetYawRate * dt;
-
-    // Inclinaison automatique des ailes (bank) dans le sens du virage
-    const targetRoll = aimDeltaX * (Math.PI * 0.55);
-    const rollDiff = targetRoll - this.roll;
-    this.roll += Math.sign(rollDiff) * Math.min(Math.abs(rollDiff), ROLL_SPEED * dt);
-  }
-
-  computeVectors() {
-    const cp = Math.cos(this.pitch);
-    const sp = Math.sin(this.pitch);
-    const cy = Math.cos(this.yaw);
-    const sy = Math.sin(this.yaw);
-    const cr = Math.cos(this.roll);
-    const sr = Math.sin(this.roll);
-
-    // Forward vector
-    this.forwardX = cp * sy;
-    this.forwardY = sp;
-    this.forwardZ = cp * cy;
-
-    // Right vector (avec roulis)
-    this.rightX = cy * cr + sy * sp * sr;
-    this.rightY = -cp * sr;
-    this.rightZ = -sy * cr + cy * sp * sr;
-
-    // Up vector = Forward x Right
-    this.upX = this.forwardY * this.rightZ - this.forwardZ * this.rightY;
-    this.upY = this.forwardZ * this.rightX - this.forwardX * this.rightZ;
-    this.upZ = this.forwardX * this.rightY - this.forwardY * this.rightX;
-  }
+// Crée l'état de vol, nez vers `heading` (radians autour de l'axe vertical)
+export function createFlight({ x = 0, y = 200, z = 0, heading = 0, type = 'f16' } = {}) {
+  const T = TYPES[type] || TYPES.f16;
+  const s = { type: TYPES[type] ? type : 'f16', x, y, z, qx: 0, qy: Math.sin(heading / 2), qz: 0, qw: Math.cos(heading / 2), speed: T.cruise, ab: 1, abOut: false, boosting: false, braking: false, load: 0, dE: 0, dL: 0, dR: 0, dT: 0 };
+  return computeAxes(s);
 }
 
-function normalizeAngle(a) {
-  while (a > Math.PI) a -= Math.PI * 2;
-  while (a < -Math.PI) a += Math.PI * 2;
-  return a;
+// Recalcule les axes à partir du quaternion
+export function computeAxes(s) {
+  const { qx: x, qy: y, qz: z, qw: w } = s;
+  s.fx = 2 * (x * z + w * y); s.fy = 2 * (y * z - w * x); s.fz = 1 - 2 * (x * x + y * y);
+  s.ux = 2 * (x * y - w * z); s.uy = 1 - 2 * (x * x + z * z); s.uz = 2 * (y * z + w * x);
+  s.lx = 1 - 2 * (y * y + z * z); s.ly = 2 * (x * y + w * z); s.lz = 2 * (x * z - w * y);
+  return s;
+}
+
+// Rotation de l'avion dans son propre repère (rad/s)
+function rotate(s, wx, wy, wz, dt) {
+  const { qx, qy, qz, qw } = s, h = dt * 0.5;
+  s.qx += h * (qw * wx + qy * wz - qz * wy);
+  s.qy += h * (qw * wy + qz * wx - qx * wz);
+  s.qz += h * (qw * wz + qx * wy - qy * wx);
+  s.qw += h * (-qx * wx - qy * wy - qz * wz);
+  const n = 1 / Math.hypot(s.qx, s.qy, s.qz, s.qw);
+  s.qx *= n; s.qy *= n; s.qz *= n; s.qw *= n;
+}
+
+// Inclinaison (positive : aile droite basse)
+export const bankOf = (s) => Math.atan2(s.ly, s.uy);
+
+// L'instructeur : commandes pour amener le nez vers la direction (ax, ay, az), ailes à plat une fois aligné
+export function instructor(s, ax, ay, az) {
+  const dr = -(ax * s.lx + ay * s.ly + az * s.lz), du = ax * s.ux + ay * s.uy + az * s.uz, df = ax * s.fx + ay * s.fy + az * s.fz;
+  const err = Math.acos(clamp(df, -1, 1));
+  const verticality = 1 - smooth(0.75, 0.95, Math.abs(s.fy));
+  const level = clamp(-bankOf(s) * 2.4, -1, 1) * verticality;
+  const t = smooth(0.05, 0.28, err);
+  // loin de la cible : on incline vers elle puis on tire ; près d'elle : petites corrections, ailes à plat
+  const rollErr = Math.atan2(dr, du < 0 && err < 0.35 ? -du : du);
+  const r = clamp(rollErr * 3, -1, 1) * t + level * (1 - t);
+  let p;
+  if (err < 0.35) p = clamp(du * 9, -1, 1);
+  else p = Math.abs(rollErr) < 0.7 ? 1 : 0.25;
+  const y = clamp(dr * 7, -1, 1) * (1 - t * 0.7);
+  return { p, r, y };
+}
+
+// Un pas de vol. inp : p, r, y (commandes directes, -1 à 1), ax, ay, az (point visé), boost, brake, free (roulis libre), lim (force du tirage)
+export function stepFlight(s, inp, dt) {
+  const T = TYPES[s.type] || TYPES.f16;
+  computeAxes(s);
+
+  // 1. Hors de la zone : l'instructeur reprend la main
+  const dcx = CENTER - s.x, dcz = CENTER - s.z, dist = Math.hypot(dcx, dcz);
+  let forced = null;
+  if (dist > ZONE_MAX) { forced = { x: dcx / dist * 0.97, y: 0.24 * (s.y < 200 ? 1 : 0), z: dcz / dist * 0.97 }; }
+  else if (s.y > CEILING) { forced = { x: s.fx * 0.85, y: -0.5, z: s.fz * 0.85 }; }
+
+  // 2. Commandes : directes si le joueur appuie, instructeur sinon
+  let pc = forced ? 0 : inp.p || 0, rc = forced ? 0 : inp.r || 0, yc = forced ? 0 : inp.y || 0;
+  const direct = pc !== 0 || rc !== 0 || yc !== 0;
+  if (!direct) {
+    const a = forced || (inp.ax !== undefined ? { x: inp.ax, y: inp.ay, z: inp.az } : null);
+    if (a && (a.x || a.y || a.z)) {
+      const n = Math.hypot(a.x, a.y, a.z), c = instructor(s, a.x / n, a.y / n, a.z / n);
+      pc = c.p * (inp.lim || 1); rc = c.r; yc = c.y;
+    }
+  } else if (!inp.free && rc !== 0) {
+    // virage coordonné : l'inclinaison s'arrête vers 80°, et l'avion tire tout seul dans le virage
+    const bank = bankOf(s), abs = Math.abs(bank);
+    if (rc * bank > 0 && abs > 1.25 && abs < 2.4) rc = Math.sign(rc) * Math.max(-1, Math.min(1, (1.35 - abs) * 3));
+    if (pc === 0 && abs < 1.65) pc = 0.8 * Math.sin(abs);
+  }
+
+  // 3. Efficacité des gouvernes selon la vitesse, et dégâts
+  const v = s.speed;
+  const auth = clamp((v - 38) / 52, 0.2, 1) * clamp(1.25 - (v - 140) / 260, 0.72, 1);
+  const wPitch = pc * T.pitch * auth * (1 - 0.45 * s.dT);
+  const wRoll = (rc * T.roll * auth + (s.dL - s.dR) * 0.28) * (1 - 0.3 * Math.max(s.dL, s.dR));
+  const wYaw = yc * T.yaw * auth;
+  rotate(s, -wPitch, -wYaw, wRoll, dt);
+
+  // 4. Décrochage : trop lent, le nez tombe
+  if (v < STALL) {
+    const k = (STALL - v) / STALL;
+    computeAxes(s);
+    rotate(s, s.uy * 1.8 * k, 0, 0, dt);
+  }
+  computeAxes(s);
+
+  // 5. Énergie
+  const wantBoost = !!inp.boost && !s.abOut && !forced && s.dE < 0.75;
+  s.boosting = wantBoost;
+  s.braking = !!inp.brake && !wantBoost;
+  if (wantBoost) { s.ab -= AB_DRAIN * dt; if (s.ab <= 0) { s.ab = 0; s.abOut = true; s.boosting = false; } }
+  else { s.ab = Math.min(1, s.ab + AB_FILL * dt); if (s.abOut && s.ab >= AB_RESTART) s.abOut = false; }
+  const k = BOOST_THRUST / (T.boost * T.boost);
+  let thrust = s.boosting ? BOOST_THRUST : k * T.cruise * T.cruise;
+  thrust *= 1 - 0.5 * s.dE;
+  if (s.braking) thrust *= 0.25;
+  const wp = Math.abs(wPitch), turn = wp * s.speed;
+  let a = thrust - k * s.speed * s.speed - G * s.fy - INDUCED * turn * turn;
+  if (s.braking && s.speed > 72) a -= BRAKE_DRAG;
+  s.speed = clamp(s.speed + a * dt, 30, T.boost * 1.5);
+  s.load += (turn / 9.81 - s.load) * Math.min(1, dt * 8);
+
+  // 6. Déplacement (un avion décroché s'enfonce)
+  const sink = v < STALL ? (STALL - v) * 0.9 : 0;
+  s.x += s.fx * s.speed * dt;
+  s.y += s.fy * s.speed * dt - sink * dt;
+  s.z += s.fz * s.speed * dt;
+  return s;
 }
