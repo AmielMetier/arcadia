@@ -42,7 +42,57 @@ class DogfightApp {
     this.lastInputSend = 0;
 
     this.setupUI();
+    this.setupEndScreen();
     this.init();
+  }
+
+  // Écran de fin : podium, classement et « Rejouer » (Entrée)
+  setupEndScreen() {
+    const el = document.createElement('div');
+    el.id = 'endScreen';
+    el.className = 'end-screen hidden';
+    el.innerHTML = `<div class="end-card"><div class="end-badge">FIN DU COMBAT</div><h1 id="endTitle"></h1>
+      <table class="end-table"><tbody id="endRows"></tbody></table>
+      <button class="end-btn" id="btnAgain">🔁 REJOUER (Entrée)</button><div class="end-wait" id="endWait">En attente de l'hôte…</div></div>`;
+    document.getElementById('app').appendChild(el);
+    this.endScreen = el;
+    el.querySelector('#btnAgain').addEventListener('click', () => this.restart());
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (this.hud) this.hud.showBoard = true;
+      }
+      if (e.code === 'Enter' && !this.endScreen.classList.contains('hidden')) this.restart();
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Tab' && this.hud) this.hud.showBoard = false;
+    });
+  }
+
+  showEndScreen() {
+    const st = this.gameState;
+    if (!st || !this.endScreen) return;
+    const ranking = [...st.planes].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    const me = st.planes.find((p) => p.id === this.myId);
+    const won = st.winner && st.winner.id === this.myId;
+    this.endScreen.querySelector('#endTitle').textContent = won ? '🏆 VICTOIRE !' : `${(st.winner && st.winner.name) || ranking[0].name} remporte le ciel`;
+    this.endScreen.querySelector('#endRows').innerHTML = ranking.map((p, i) => `<tr class="${p.id === this.myId ? 'me' : ''}">
+      <td>${['🥇', '🥈', '🥉'][i] || i + 1}</td><td><i style="background:${p.color}"></i>${escapeHtml(p.name)}${p.bot ? ' <small>IA</small>' : ''}</td>
+      <td><b>${p.kills}</b> élim.</td><td>${p.deaths} morts</td></tr>`).join('');
+    const canRestart = this.role !== 'guest';
+    this.endScreen.querySelector('#btnAgain').hidden = !canRestart;
+    this.endScreen.querySelector('#endWait').hidden = canRestart;
+    this.endScreen.classList.remove('hidden');
+    if (me) this.audio.updateEngine(0, false, true);
+  }
+
+  // Nouvelle manche avec les mêmes pilotes (l'hôte la diffuse aux invités)
+  restart() {
+    if (this.role === 'guest' || !this.gameState || this.gameState.phase !== 'game_over') return;
+    this.gameState = createDogfightGame({ settings: this.settings, players: this.players, map: this.map });
+    this.reported = false;
+    this.endScreen.classList.add('hidden');
+    if (this.scene) this.scene.cameraInitialized = false;
   }
 
   setupUI() {
@@ -236,7 +286,10 @@ class DogfightApp {
       const plane = this.gameState.planes.find((p) => p.id === from);
       if (plane) plane.input = m.input;
     } else if (m.t === 'st' && this.role === 'guest') {
+      const wasOver = this.gameState && this.gameState.phase === 'game_over';
       this.gameState = m.s;
+      if (wasOver && m.s.phase !== 'game_over') this.endScreen.classList.add('hidden');
+      if (!wasOver && m.s.phase === 'game_over') this.showEndScreen();
       if (this.gameState && this.gameState.events) {
         this.processAudioAndHudEvents(this.gameState.events);
       }
@@ -256,6 +309,8 @@ class DogfightApp {
         if (ev.ownerId === this.myId) {
           this.audio.playVulcanShot();
         }
+      } else if (ev.type === 'game_over') {
+        if (this.role !== 'guest') this.showEndScreen();
       } else if (ev.type === 'hit') {
         if (ev.targetId !== this.myId) {
           this.hud.triggerHitMarker();
@@ -378,8 +433,12 @@ class DogfightApp {
 
     // Rendu HUD 2D
     const myPlane = this.gameState.planes.find((p) => p.id === this.myId);
-    this.hud.render(myPlane, this.gameState.planes, this.scene.camera, dt);
+    this.hud.render(myPlane, this.gameState.planes, this.scene.camera, dt, this.gameState);
   }
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 function start() {

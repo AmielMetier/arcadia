@@ -116,38 +116,36 @@ export class DogfightScene {
     sunDisc.lookAt(800, 0, 800);
     this.scene.add(sunDisc);
 
-    // Bancs de nuages cumulus volumétriques à haute altitude
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.95,
+    // Cumulus : des paquets de sprites doux (texture dessinée au canvas), plus clairs en haut, gris dessous
+    const cloudTex = makeCloudTexture();
+    const cloudMats = [0.62, 0.78, 0.92, 1.0].map((k) => new THREE.SpriteMaterial({
+      map: cloudTex,
+      color: new THREE.Color(k, k, Math.min(1, k * 1.04)),
       transparent: true,
-      opacity: 0.62,
-    });
-
-    const cloudCount = 18;
-    for (let c = 0; c < cloudCount; c++) {
-      const cluster = new THREE.Group();
-      const numPuffs = 4 + Math.floor(Math.random() * 3);
-      for (let p = 0; p < numPuffs; p++) {
-        const r = 55 + Math.random() * 65;
-        const puffGeo = new THREE.SphereGeometry(r, 8, 8);
-        puffGeo.scale(1.8 + Math.random() * 0.5, 0.45 + Math.random() * 0.25, 1.2 + Math.random() * 0.4);
-        const puff = new THREE.Mesh(puffGeo, cloudMat);
-        puff.position.set(
-          (Math.random() - 0.5) * 160,
-          (Math.random() - 0.5) * 35,
-          (Math.random() - 0.5) * 140
-        );
-        cluster.add(puff);
+      depthWrite: false,
+      opacity: 0.85,
+      fog: true,
+    }));
+    this.clouds = new THREE.Group();
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let c = 0; c < 46; c++) {
+      const cx = -900 + rnd() * 3400;
+      const cz = -900 + rnd() * 3400;
+      const cy = 300 + rnd() * 260;
+      const size = 60 + rnd() * 90;
+      const puffs = 6 + Math.floor(rnd() * 7);
+      for (let i = 0; i < puffs; i++) {
+        const dy = (rnd() - 0.3) * size * 0.45;
+        const level = Math.max(0, Math.min(3, Math.floor(((dy / (size * 0.45)) + 0.5) * 4)));
+        const sp = new THREE.Sprite(cloudMats[level]);
+        const k = size * (0.9 + rnd() * 0.9);
+        sp.scale.set(k * 1.6, k, 1);
+        sp.position.set(cx + (rnd() - 0.5) * size * 2.6, cy + dy, cz + (rnd() - 0.5) * size * 1.8);
+        this.clouds.add(sp);
       }
-
-      cluster.position.set(
-        150 + Math.random() * 1300,
-        320 + Math.random() * 150,
-        150 + Math.random() * 1300
-      );
-      this.scene.add(cluster);
     }
+    this.scene.add(this.clouds);
   }
 
   // Océan avec reflets spéculaires et lagon côtier turquoise
@@ -207,22 +205,22 @@ export class DogfightScene {
       const h = map.heightAt(x, z);
       pos.setY(i, h);
 
-      // Gradient d'altitude : sable, verdure, forêt, roche alpine, calottes neigeuses
-      let r = 0.32, g = 0.56, b = 0.24;
-
-      if (h < 1.8) {
-        // Sable doré du rivage
-        r = 0.90; g = 0.84; b = 0.62;
-      } else if (h < 14) {
-        // Plaines et prairies côtières
-        r = 0.38; g = 0.62; b = 0.26;
-      } else if (h > 68) {
-        // Neige éternelle sur les cimes
-        r = 0.96; g = 0.97; b = 0.99;
-      } else if (h > 36) {
-        // Roches et parois de granit
-        r = 0.48; g = 0.46; b = 0.44;
-      }
+      // Dégradé d'altitude fondu : sable, prairie, forêt, roche, neige, avec la pente et un peu de bruit
+      const e = 6;
+      const slope = Math.min(1, (Math.abs(map.heightAt(x + e, z) - map.heightAt(x - e, z)) + Math.abs(map.heightAt(x, z + e) - map.heightAt(x, z - e))) / (2 * e) / 0.9);
+      const n = Math.sin(x * 0.043) * Math.cos(z * 0.037) * 0.5 + Math.sin(x * 0.11 + z * 0.09) * 0.25;
+      const mix = (c1, c2, t) => { t = Math.max(0, Math.min(1, t)); return [c1[0] + (c2[0] - c1[0]) * t, c1[1] + (c2[1] - c1[1]) * t, c1[2] + (c2[2] - c1[2]) * t]; };
+      const SAND = [0.86, 0.79, 0.58];
+      const GRASS = [0.36 + n * 0.04, 0.58 + n * 0.05, 0.25];
+      const FOREST = [0.2, 0.4, 0.18];
+      const ROCK = [0.47, 0.45, 0.42];
+      const SNOW = [0.95, 0.96, 0.98];
+      let c = mix(SAND, GRASS, (h - 1.2) / 3);
+      c = mix(c, FOREST, (h - 14 + n * 6) / 14);
+      c = mix(c, ROCK, Math.max((h - 34 + n * 8) / 12, (slope - 0.45) / 0.3));
+      c = mix(c, SNOW, (h - 66 + n * 6) / 8);
+      if (h < 0.6) c = mix(c, [0.55, 0.62, 0.55], 0.6); // fonds sous l'eau peu profonde
+      let r = c[0], g = c[1], b = c[2];
 
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
@@ -467,4 +465,28 @@ export class DogfightScene {
     this.fx.update(dt, state.planes);
     this.renderer.render(this.scene, this.camera);
   }
+}
+
+// Texture de cumulus : plusieurs disques flous superposés
+function makeCloudTexture() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  let seed = 3;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 22; i++) {
+    const x = S * (0.25 + rnd() * 0.5);
+    const y = S * (0.3 + rnd() * 0.4);
+    const r = S * (0.12 + rnd() * 0.16);
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.25)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, S, S);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }

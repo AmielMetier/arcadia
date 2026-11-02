@@ -2,7 +2,9 @@
 import { FlightModel, CRUISE_SPEED, BOOST_SPEED } from '../dogfight/engine/flight.js';
 import { WeaponSystem, computeLeadPosition, BULLET_SPEED } from '../dogfight/engine/weapons.js';
 import { computeBotFlightInput } from '../dogfight/engine/ai.js';
-import { createDogfightGame, tickDogfight } from '../dogfight/engine/rules.js';
+import { createDogfightGame, tickDogfight, BOT_DAMAGE } from '../dogfight/engine/rules.js';
+import { BOT_LEVELS } from '../dogfight/engine/ai.js';
+import { generateMap, ILE } from '../royale/engine/map.js';
 
 let passed = 0;
 function assert(cond, msg) {
@@ -142,5 +144,38 @@ const controlsTest = {
 assert(controlsTest.getRollRight() === true, 'Touche Q / Flèche Gauche inversée vers rollRight');
 assert(controlsTest.getRollLeft() === false, 'Touche D / Flèche Droite inactive');
 console.log('✓ Commandes gauche et droite inversées');
+
+// 7. Les bots se battent vraiment (ils ne tournent plus en rond côte à côte au plafond)
+{
+  const map = generateMap(ILE);
+  const players = [0, 1, 2, 3].map((i) => ({ id: 'b' + i, name: 'B' + i, bot: true, botLevel: 'normal' }));
+  const st = createDogfightGame({ settings: { kills: 99, time: 200 }, players, map });
+  let crashes = 0;
+  for (let t = 0; t < 120 * 60; t++) {
+    for (const p of st.planes) if (p.alive) p.input = computeBotFlightInput(p, st.planes, map, 1 / 60);
+    tickDogfight(st, 1 / 60, map);
+    crashes += st.events.filter((e) => e.type === 'crash').length;
+  }
+  const kills = st.planes.reduce((a, p) => a + p.kills, 0);
+  assert(kills >= 4, `Les bots s'abattent entre eux en 2 minutes (${kills} éliminations)`);
+  assert(crashes <= 2, `Les bots évitent le relief (${crashes} crashs)`);
+  assert(st.planes.every((p) => p.y < 640), 'Les bots ne restent pas collés au plafond');
+  console.log(`✓ Combat entre bots : ${kills} éliminations en 2 minutes, ${crashes} crash`);
+}
+
+// 8. Niveaux des bots
+assert(BOT_LEVELS.facile.aimNoise > BOT_LEVELS.normal.aimNoise && BOT_LEVELS.normal.aimNoise > BOT_LEVELS.expert.aimNoise, 'Les bots faciles visent moins bien');
+assert(BOT_DAMAGE.facile < BOT_DAMAGE.normal && BOT_DAMAGE.normal <= BOT_DAMAGE.expert, 'Les bots faciles font moins mal aux joueurs');
+{
+  const st = createDogfightGame({ settings: { kills: 5 }, players: [{ id: 'h', name: 'H' }, { id: 'b', name: 'B', bot: true, botLevel: 'facile' }] });
+  st.phase = 'playing';
+  const [h, b] = st.planes;
+  h.invulnerableTimer = 0;
+  h.flight.x = h.x = 500; h.flight.y = h.y = 300; h.flight.z = h.z = 500;
+  b.weapons.bullets.push({ x: 500, y: 300, z: 490, vx: 0, vy: 0, vz: 600, age: 0, ownerId: 'b' });
+  tickDogfight(st, 1 / 60);
+  assert(h.health < 100 && h.health > 100 - 7, 'Une balle de bot facile retire moins de 7 points à un joueur');
+}
+console.log('✓ Niveaux des bots (visée et dégâts)');
 
 console.log(`\nTOUS LES TESTS SONT VALIDES (${passed} assertions réussies)`);

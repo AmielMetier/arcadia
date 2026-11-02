@@ -97,14 +97,16 @@ export class FlightModel {
         }
       }
 
+      // plus on vole lentement, plus le virage est serré (l'aérofrein sert à ça)
+      const turnK = Math.max(0.8, Math.min(1.5, CRUISE_SPEED / Math.max(1, this.speed)));
       if (input.rollLeft) {
         const maxBank = Math.PI * 0.45;
         if (this.roll > -maxBank) this.roll -= ROLL_SPEED * dt;
-        this.yaw -= YAW_SPEED * 1.8 * dt;
+        this.yaw -= YAW_SPEED * 1.8 * turnK * dt;
       } else if (input.rollRight) {
         const maxBank = Math.PI * 0.45;
         if (this.roll < maxBank) this.roll += ROLL_SPEED * dt;
-        this.yaw += YAW_SPEED * 1.8 * dt;
+        this.yaw += YAW_SPEED * 1.8 * turnK * dt;
       } else {
         // Auto-stabilisation douce du roulis quand aucune touche de virage n'est pressée
         if (Math.abs(this.roll) > 0.005) {

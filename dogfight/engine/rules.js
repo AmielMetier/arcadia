@@ -198,8 +198,13 @@ export function tickDogfight(state, dt, map = null) {
   }
 }
 
+// Les balles des bots font moins mal aux joueurs humains en facile et en moyen
+export const BOT_DAMAGE = { facile: 0.4, normal: 0.7, expert: 1 };
+
 function applyDamage(state, victim, shooterId, dmg) {
   if (!victim.alive || victim.invulnerableTimer > 0) return;
+  const shooter = state.planes.find((p) => p.id === shooterId);
+  if (shooter && shooter.bot && !victim.bot) dmg *= BOT_DAMAGE[shooter.botLevel] ?? 1;
 
   victim.health -= dmg;
 

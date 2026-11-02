@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 3.69 — 3 novembre 2026
+- **Dogfight 3D** — de vrais combats contre les bots, un radar et un écran de fin.
+  - Les bots se battent enfin pour de bon : ils te prennent en chasse, visent, tirent et esquivent au lieu de tourner en rond au plafond.
+  - Le niveau des bots compte maintenant : en Facile ils visent mal et font moins mal, l'As du ciel part en tonneau dès qu'il est touché.
+  - L'aérofrein resserre vraiment le virage : freine pour gagner l'angle dans un duel tournoyant.
+  - Un radar en bas à droite, des flèches au bord de l'écran vers les ennemis hors champ et un losange de couleur au-dessus de ceux qu'on voit.
+  - Chrono de la partie, compte à rebours au départ, écran rouge quand tu encaisses et compte à rebours de réapparition.
+  - Tab affiche le classement. En fin de partie, un podium avec les éliminations de chacun et un bouton Rejouer (ou Entrée).
+  - De vrais nuages doux à la place des boules grises, et un relief aux couleurs fondues.
+
 ## 3.68 — 3 novembre 2026
 - **The Backrooms** — l'entité est plus nette et bien centrée sur son visage.
   - Sa photo est plus nette, et l'image du jeu un peu moins floue.

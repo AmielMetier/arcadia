@@ -322,3 +322,48 @@ html, body {
 .btn-launch:active {
   transform: translateY(1px);
 }
+
+/* Écran de fin de combat */
+.end-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 8, 20, 0.72);
+  backdrop-filter: blur(4px);
+}
+.end-screen.hidden { display: none; }
+.end-card {
+  width: min(460px, calc(100% - 32px));
+  padding: 26px 28px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #0f1d3a, #0a1428);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color: #e2e8f0;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+}
+.end-badge { display: inline-block; font-size: 11px; letter-spacing: 2px; font-weight: 800; color: #93c5fd; border: 1px solid rgba(147, 197, 253, 0.4); border-radius: 99px; padding: 4px 12px; }
+.end-card h1 { margin: 12px 0 16px; font-size: 26px; }
+.end-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 18px; }
+.end-table td { padding: 7px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: left; }
+.end-table td:first-child { width: 34px; text-align: center; }
+.end-table td i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+.end-table small { color: #94a3b8; }
+.end-table tr.me td { color: #fde047; font-weight: 700; }
+.end-btn {
+  font: 800 16px system-ui, sans-serif;
+  color: #fff;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 28px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
+}
+.end-btn:hover { filter: brightness(1.1); }
+.end-wait { color: #94a3b8; font-size: 14px; }
+[hidden] { display: none !important; }
