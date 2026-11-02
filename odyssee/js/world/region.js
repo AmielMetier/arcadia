@@ -17,6 +17,7 @@ import { addHabitants } from './habitants.js';
 import { applyRetouches } from './retouches.js';
 import { buildArena } from './arenes.js';
 import { buildSud, BADGES_SUD, LEADERS_SUD, GYM_TRAINERS_SUD } from './sud.js';
+import { addVehicules } from './vehicules.js';
 
 // trois capsules sur la table du labo, une par type ; dans chacune, trois partenaires au choix :
 // la créature originale d'Odyssée, le Pokémon de Rouge / Bleu et celui d'Or / Argent (avec leurs évolutions)
@@ -896,6 +897,8 @@ export function buildWorld() {
   addStory({ W, maps, towns, routes: { r1, r2, bois, r3a, r3b, r4, r5, r6, r7, r10 }, legends, trainerNpc });
   // la vie des villes : les requêtes des habitants (et les deux combats d'après la Ligue)
   addHabitants({ W, maps, towns, routes });
+  // quêtes du vélo (Voltacité) et du permis bateau (Port-Azur)
+  addVehicules({ W, maps, towns });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
   // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
   fenceRoutes(W, legends);

@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.67 — 3 novembre 2026
+- **Odyssée** — Un vélo ! À Voltacité, Lucien t'en assemble un si tu lui rapportes deux pièces. Touche V pour monter dessus ou en descendre (dehors), on roule deux fois plus vite qu'en courant.
+- **Odyssée** — Le permis bateau : le capitaine de l'Embarcadère de l'Aube ne fait plus embarquer sans lui. Examen à la Capitainerie de Port-Azur (quatre questions puis une épreuve pratique), dès deux badges.
+
 ## 3.66 — 3 novembre 2026
 - **Odyssée** — La région double de taille : au sud de Bourg-Aube, le Pont de l'Austral mène aux Terres du Sud, ouvertes après les huit premiers badges.
   - Sept nouvelles villes à arène et huit routes, avec une trentaine de nouveaux dresseurs, des marais traversés de passerelles et un désert de sable.

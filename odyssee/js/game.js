@@ -24,7 +24,7 @@ import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
-const WALK = 0.26, RUN = 0.135, SURF = 0.2;
+const WALK = 0.26, RUN = 0.135, SURF = 0.2, VELO = 0.085;
 const key = (x, y) => x + ',' + y;
 // le rival prend le partenaire qui a l'avantage sur le tien (Plante → Feu, Feu → Eau, Eau → Plante), de la même
 // lignée que le tien : l'original d'Odyssée, celui de Rouge / Bleu ou celui d'Or / Argent
@@ -355,7 +355,14 @@ export class Game {
       stepFrame = p.surf ? 0 : u < 0.5 ? (p.step % 2 ? 1 : 2) : 0;
     } else if (p.bumpT > 0) stepFrame = p.bumpT > 0.15 ? (p.step % 2 ? 1 : 2) : 0;
     const a = v.actor('player', {});
+    const bike = this.onBike();
+    if (bike) { stepFrame = 0; hop += 6 * HPX; }   // assis sur la selle
     v.setFrame(a, this.state.gender === 'f' ? 'player_f' : 'player_m', p.dir, stepFrame);
+    if (bike) {
+      const b = v.actor('velo', { kind: 'item' }), k = 'velo_' + { down: 's', up: 'n', left: 'w', right: 'e' }[p.dir], r = v.S.rects[k];
+      if (r && b.veloKey !== k) { v.setSpriteRect(b, r, r.w, r.h); b.veloKey = k; b.shadow.visible = false; }
+      b.mesh.position.set(px + 0.5, hop - 6 * HPX, py + (p.dir === 'up' ? 0.62 : 0.6));
+    } else if (v.actors.has('velo')) v.removeActor('velo');
     const t = this.mapObj.get(Math.round(px), Math.round(py));
     // sur l'eau : le joueur flotte sur le dos d'une créature, entouré d'un sillage
     const bob = p.surf ? 0.04 + Math.sin(performance.now() / 260) * 0.03 : 0;
@@ -421,7 +428,7 @@ export class Game {
       if (walkable(m.get(lx, ly)) && !this.occupied(lx, ly)) { p.move = { fx: p.x, fy: p.y, tx: lx, ty: ly, t: 0, dur: 0.42, jump: true }; p.walking = true; this.sound.sfx('ledge'); return; }
     }
     if (m.in(tx, ty) && walkable(t) && !this.occupied(tx, ty) && m.height(tx, ty) === m.height(p.x, p.y)) {
-      p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: run ? RUN : WALK }; p.walking = true;
+      p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: this.onBike() ? VELO : run ? RUN : WALK }; p.walking = true;
       return;
     }
     if (this.gateBlock.has(key(tx, ty))) { const g = m.gates.find((q) => q.tiles.some(([x, y]) => x === tx && y === ty)); if (g) { const n = this.npcs.find((q) => q.id === g.npc); if (n) { this.talk(n); return; } } }
@@ -577,6 +584,7 @@ export class Game {
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'velo') { this.busy = true; try { await this.toggleVelo(); } finally { this.busy = false; } }
     else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
     else if (k === 'hud') this.hud?.toggle();
   }
@@ -718,6 +726,12 @@ export class Game {
   /** bateau de l'Embarcadère : chaque île s'ouvre avec un nombre de badges */
   async ferry(n) {
     const st = this.state, ui = this.ui, docks = this.world.docks, here = n.def.dock, sp = 'Capitaine';
+    // sans permis bateau, on ne monte pas à bord : l'examen se passe à la Capitainerie de Port-Azur
+    if (!st.bag['permis-bateau']) {
+      await ui.say(['Ahoy, moussaillon ! Tu veux voir les îles de l\'Est ?', 'Pas sans ton permis bateau ! La Capitainerie de Port-Azur fait passer l\'examen.', 'Reviens avec, et je te fais embarquer.'], { speaker: sp });
+      if (!st.flags['Q:permis']) { st.flags['Q:permis'] = 1; this.refreshNpcs(); }
+      return;
+    }
     if (!st.flags.passe) {
       st.flags.passe = true; this.give('ferry-ticket'); this.sound.sfx('item');
       await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', `Tiens, voici ton Passe Marin. ${st.name} reçoit le Passe Marin !`], { speaker: sp });
@@ -835,6 +849,15 @@ export class Game {
     }
     this.busy = false;
   }
+  /** à vélo : deux fois plus vite que la course, dehors seulement */
+  onBike() { return !!this.state?.velo && this.mapObj?.outdoor && !this.player?.surf; }
+  async toggleVelo() {
+    const st = this.state;
+    if (!st.bag.velo) return false;
+    if (!st.velo && (!this.mapObj.outdoor || this.player.surf)) { await this.ui.say('Pas de vélo ici ! On ne roule que dehors.'); return false; }
+    st.velo = !st.velo; this.sound.sfx(st.velo ? 'select' : 'cancel');
+    return true;
+  }
   /** sac hors combat ; renvoie true si l'objet utilisé ferme le menu (Corde Sortie, Vol…) */
   async fieldBag() {
     for (;;) {
@@ -842,6 +865,7 @@ export class Game {
       const it = ITEMS[r.item], st = this.state;
       if (it.ball) { await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue; }
       if (r.item === 'town-map') { await mapScreen(this); continue; }
+      if (r.item === 'velo') { if (await this.toggleVelo()) return true; continue; }
       if (it.field) {
         if (it.field === 'vol' && this.canField('vol') && this.mapObj.outdoor && !this.player.surf) { if (await this.fly()) return true; continue; }
         await this.ui.say([`${FIELD[it.field].name} : ${FIELD[it.field].desc}`, this.canField(it.field) ? 'Place-toi face à l\'obstacle et appuie sur F pour l\'utiliser.' : `Il faut le ${BADGES[FIELD[it.field].badge - 1].name} pour l'utiliser hors combat.`]);

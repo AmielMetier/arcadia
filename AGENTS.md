@@ -127,6 +127,7 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   Terres du Sud (`odyssee/js/world/sud.js`, sous la mer du Sud, Pont de l'Austral à 8 badges) : sept villes à arène dont Métropole ; 15 badges en tout.
   Arènes à énigmes (`odyssee/js/world/arenes.js`) : chaque énigme est tirée d'une graine et vérifiée par un solveur
   (aller jusqu'au Champion et revenir) ; `node tools/test-odyssee-arenes.mjs [type]` les résout toutes (le type affiché en caractères).
+  Quêtes du vélo et du permis bateau (`odyssee/js/world/vehicules.js`) : `node tools/test-odyssee-vehicules.mjs`.
   Métropole : Bourse (`odyssee/js/core/bourse.js`, pricers et entretien de Pierre) et Casino (`odyssee/js/core/casino.js`),
   écrans dans `odyssee/js/ui/metropole.js` : `node tools/test-odyssee-casino.mjs`.
   Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds

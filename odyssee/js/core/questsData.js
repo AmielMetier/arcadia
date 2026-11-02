@@ -28,6 +28,21 @@ const rivalB = (g) => (g.rivalB ? g.rivalB() : { name: 'Lyra', il: 'elle', e: 'e
    Le registre
    ====================================================================== */
 const QUESTS = [
+  /* ---------- les voyages : le vélo et le permis bateau ---------- */
+  { id: 'velo', cat: 'npc', name: 'Le vélo de Lucien', giver: 'Lucien',
+    started: (f) => !!f['Q:velo'], done: (f) => f['Q:velo'] === 'fin',
+    notes: [
+      [(f) => f['Q:velo'], 'À Voltacité, Lucien m\'a promis un vélo s\'il récupérait deux pièces : une chambre à air et un dérailleur.'],
+      [(f) => f.velo_chambre, 'Yves, le marin, m\'a donné la chambre à air.'],
+      [(f) => f.velo_derailleur, 'Les mineurs m\'ont forgé un dérailleur.'],
+      [(f) => f['Q:velo'] === 'fin', 'Lucien a assemblé mon vélo. Je file sur les routes !'],
+    ] },
+  { id: 'permis', cat: 'npc', name: 'Le permis bateau', giver: 'Capitaine',
+    started: (f) => !!f['Q:permis'], done: (f) => f['Q:permis'] === 'fin',
+    notes: [
+      [(f) => f['Q:permis'], 'Le capitaine de l\'Embarcadère de l\'Aube ne fait embarquer que les titulaires du permis bateau.'],
+      [(f) => f['Q:permis'] === 'fin', 'J\'ai réussi l\'examen de la Capitainerie : j\'ai mon permis bateau.'],
+    ] },
   /* ---------- l'histoire ---------- */
   { id: 'ligue', cat: 'main', name: 'Le voyage du dresseur', giver: 'Prof. Saule',
     started: (f) => !!f.starter, done: (f) => !!f.champion,
