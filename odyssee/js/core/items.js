@@ -59,14 +59,14 @@ export const itemName = (k) => ITEMS[k]?.name || ITEM_NAMES[k] || k;
 export const POCKETS = [['soin', 'Soins'], ['balls', 'Balls'], ['objets', 'Objets'], ['cles', 'Objets rares']];
 
 /** l'objet peut-il servir sur ce Pokémon ? */
-export function canUseOn(item, m) {
+export function canUseOn(item, m, maxLvl = 100) {
   const it = ITEMS[item]; if (!it) return false;
   if (it.revive) return m.hp <= 0;
   if (m.hp <= 0) return false;
   if (it.heal && m.hp < m.stats[0]) return true;
   if (it.cure && m.status && (it.cure === 'all' || it.cure.includes(m.status))) return true;
   if (it.pp || it.ppAll) return m.moves.some((x) => x.pp < MOVES[x.id].pp);
-  if (it.candy) return m.lvl < 100;
+  if (it.candy) return m.lvl < Math.min(100, maxLvl || 100);
   if (it.stone) return !!itemEvolution(m, item);
   return false;
 }
@@ -85,8 +85,8 @@ export function applyItem(item, m, moveIdx = -1) {
 }
 
 /** Super Bonbon : passe au niveau suivant, renvoie les étapes de gainExp */
-export function useCandy(m) {
+export function useCandy(m, maxLvl = 100) {
   const need = expFor(SPECIES[m.sp].g, m.lvl + 1) - m.exp;
-  return gainExp(m, Math.max(1, need));
+  return gainExp(m, Math.max(1, need), maxLvl);
 }
 export { healFull };

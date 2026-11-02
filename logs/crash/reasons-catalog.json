@@ -306,6 +306,19 @@
       "expulsionReasons": [
         "EXP_PEER_LEFT_MIDGAME : joueur parti pendant une manche (son pantin disparaît ; les bots continuent)"
       ]
+    },
+    {
+      "id": "dogfight",
+      "title": "Dogfight 3D",
+      "maxPlayers": 6,
+      "engine": "Three.js (WebGL 3D F-16 Dogfight)",
+      "crashReasons": [
+        "CRASH_WEBGL_CONTEXT_LOST : perte de contexte WebGL sur la scène aérienne"
+      ],
+      "expulsionReasons": [
+        "EXP_PEER_LEFT_MIDGAME : pilote déconnecté en plein vol",
+        "EXP_HOST_STOPPED_GAME : arrêt de la mission par l'hôte"
+      ]
     }
   ]
 }

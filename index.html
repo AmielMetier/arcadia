@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="hub/hub.css?v=3.59">
+<link rel="stylesheet" href="hub/hub.css?v=3.64">
 </head>
 <body>
 
@@ -48,20 +48,22 @@
     <div class="side">
     <div class="card">
       <div class="badge">En ligne · jusqu'à 6</div>
-      <div class="acct" id="acct" hidden><span class="dot" id="acctDot"></span><div><b id="acctName"></b><small>Compte enregistré sur ce navigateur</small></div>
+      <div class="acct" id="acct" hidden><span class="dot" id="acctDot"></span><div><b id="acctName"></b><small id="acctSub">Compte enregistré sur ce navigateur</small></div>
         <button class="btn small ghost" id="btnProfile" aria-expanded="false" aria-controls="profileEdit">Modifier</button></div>
-      <div id="regHead" hidden><h2>Crée ton compte</h2><p class="sethint">Un pseudo, une couleur, et c'est parti : ton compte reste enregistré dans ce navigateur, avec tes amis.</p></div>
+      <div id="regHead" hidden><h2>Crée ton compte</h2><p class="sethint">Un pseudo, une couleur et un mot de passe : ton compte est sauvegardé en ligne, chiffré, et te suit sur tous tes appareils avec tes amis.</p></div>
       <div id="profileEdit">
         <label class="lbl" for="name">Ton pseudo</label>
         <input type="text" id="name" maxlength="12" autocomplete="nickname" spellcheck="false" placeholder="Pilote">
         <div class="lbl">Ta couleur</div>
         <div class="swatches" id="swatches"></div>
-        <div class="acctools" id="acctTools" hidden><button class="linkbtn" id="btnTransfer" type="button">📲 Mon compte sur un autre appareil</button><button class="linkbtn" id="btnLogout" type="button">Se déconnecter</button></div>
+        <div id="pwBox" hidden><label class="lbl" for="pass">Ton mot de passe</label>
+          <input type="password" id="pass" maxlength="64" autocomplete="new-password" placeholder="6 caractères au moins"></div>
+        <div class="acctools" id="acctTools" hidden><button class="linkbtn" id="btnCloud" type="button">🔐 Protéger mon compte par mot de passe</button><button class="linkbtn" id="btnTransfer" type="button">📲 Code de transfert</button><button class="linkbtn" id="btnLogout" type="button">Se déconnecter</button></div>
       </div>
       <div id="regActions" hidden>
         <div class="err" id="regErr"></div>
         <button class="btn block big" id="btnRegister">Créer mon compte</button>
-        <button class="linkbtn" id="btnRestore" type="button">J'ai déjà un compte sur un autre appareil</button>
+        <button class="linkbtn" id="btnRestore" type="button">J'ai déjà un compte : me connecter</button>
       </div>
       <div id="playActions">
         <div style="height:18px"></div>
@@ -134,19 +136,20 @@
 <!-- JEU -->
 <section class="screen" id="play"></section>
 
-<script src="shared/logger.js?v=3.59"></script>
-<script src="shared/net.js?v=3.59"></script>
-<script src="shared/room.js?v=3.59"></script>
-<script src="shared/profile.js?v=3.59"></script>
-<script src="shared/results.js?v=3.59"></script>
-<script src="shared/volume.js?v=3.59"></script>
-<script src="shared/uisfx.js?v=3.59"></script>
-<script src="hub/nettest.js?v=3.59"></script>
-<script src="hub/games.js?v=3.59"></script>
-<script src="hub/friends.js?v=3.59"></script>
-<script src="hub/hub.js?v=3.59"></script>
-<script src="hub/home.js?v=3.59"></script>
-<script src="hub/ingame.js?v=3.59"></script>
-<script type="module" src="hub/music.js?v=3.59"></script>
+<script src="shared/logger.js?v=3.64"></script>
+<script src="shared/net.js?v=3.64"></script>
+<script src="shared/room.js?v=3.64"></script>
+<script src="shared/profile.js?v=3.64"></script>
+<script src="shared/results.js?v=3.64"></script>
+<script src="shared/volume.js?v=3.64"></script>
+<script src="shared/uisfx.js?v=3.64"></script>
+<script src="hub/nettest.js?v=3.64"></script>
+<script src="hub/games.js?v=3.64"></script>
+<script src="hub/account.js?v=3.64"></script>
+<script src="hub/friends.js?v=3.64"></script>
+<script src="hub/hub.js?v=3.64"></script>
+<script src="hub/home.js?v=3.64"></script>
+<script src="hub/ingame.js?v=3.64"></script>
+<script type="module" src="hub/music.js?v=3.64"></script>
 </body>
 </html>

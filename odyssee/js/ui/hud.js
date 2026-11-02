@@ -6,7 +6,8 @@ import { el, esc } from './ui.js';
 import { ASSETS } from '../assets.js';
 import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
-import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen } from './screens.js';
+import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen } from './screens.js';
+import { getTrackedQuest } from '../core/questsData.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
 
@@ -98,6 +99,12 @@ export class Hud {
         this.toggle();
         return;
       }
+      const runBtn = e.target.closest('[data-act="autorun"]');
+      if (runBtn && this.game.state && !this.game.busy && !this.game.bv.alive) {
+        e.stopPropagation();
+        this.game.toggleAutoRun();
+        return;
+      }
       if (!this.canInteract()) return;
       const actEl = e.target.closest('[data-act]');
       if (!actEl) return;
@@ -118,10 +125,9 @@ export class Hud {
       } else if (act === 'map') {
         g.busy = true; g.sound.sfx('select');
         try { await mapScreen(g); } finally { g.busy = false; this.update(true); }
-      } else if (act === 'save') {
-        g.save(false);
-        if (g.cloud?.on) g.cloud.queue(g.state, true);
-        g.ui.toast('Partie sauvegardée !', 1500);
+      } else if (act === 'quests') {
+        g.busy = true; g.sound.sfx('select');
+        try { await questsScreen(g); } finally { g.busy = false; this.update(true); }
       }
     });
   }
@@ -134,12 +140,13 @@ export class Hud {
     }
     this.root.style.display = '';
     const loc = g.locationName();
+    const tracked = getTrackedQuest(g);
     const bCount = g.badgeCount();
     const badgesKey = st.badges.map((b) => (b ? '1' : '0')).join('');
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0};${this.swapFrom};${loc};${st.money};${badgesKey};${st.trackedQuest || ''};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 
@@ -156,7 +163,7 @@ export class Hud {
           const isKo = m.hp <= 0;
           const isSwap = k === this.swapFrom;
           const r = Math.max(0, Math.min(1, m.hp / m.stats[0]));
-          const expPct = Math.max(0, Math.min(100, expProgress(m) * 100)).toFixed(1);
+          const expPct = Math.max(0, Math.min(100, expProgress(m, g.levelCap()) * 100)).toFixed(1);
           const cls =
             'hud-slot' +
             (isLead ? ' lead' : '') +
@@ -187,7 +194,7 @@ export class Hud {
         .join('') + (this.swapFrom >= 0 ? `<div class="hud-swap-hint">Avec qui échanger ${esc(monName(st.party[this.swapFrom]))} ?</div>` : '');
     }
 
-    // 2. Capsule Pokégear en haut à droite (avec icônes pixel-art coin.png, trophy.png, team.png, bag.png, map.png, save.png)
+    // 2. Capsule Pokégear en haut à droite (avec icônes pixel-art coin.png, trophy.png, run.png, team.png, bag.png, map.png)
     const badgeDots = BADGES.map(
       (b, k) => `<i class="hud-bdot${st.badges[k] ? ' got' : ''}" style="--bc:${b.color}" title="${esc(b.name)}"></i>`
     ).join('');
@@ -207,10 +214,26 @@ export class Hud {
             <img class="hud-stat-ico" src="img/hud/trophy.png" alt="">
             <span class="hud-badge-cnt">${bCount}/8</span>
           </div>
+          <div class="hud-stat-item hud-cap-pill" title="Niveau max autorisé avant la prochaine Arène">
+            <span>MAX N.${g.levelCap()}</span>
+          </div>
         </div>
         <div class="hud-bdots-row" data-act="card" title="Badges d'Arène">${badgeDots}</div>
+        ${tracked ? `
+          <div class="hud-quest-card" data-act="quests" title="Objectif suivi : cliquer pour ouvrir le Journal (Touche Q)">
+            <div class="hud-qc-head">
+              <span class="hud-qc-star">★ SUIVIE</span>
+              <span class="hud-qc-loc">📍 ${esc(tracked.destination)}</span>
+            </div>
+            <div class="hud-qc-name">${esc(tracked.name)}</div>
+            <div class="hud-qc-step">${esc(tracked.stepDesc)}</div>
+          </div>
+        ` : ''}
       </div>
       <div class="hud-actions">
+        <button type="button" class="hud-btn run${g.autoRun ? ' on' : ''}" data-act="autorun" tabindex="-1" title="Course continue (Touche R)">
+          <img src="img/hud/run.png" alt="" onerror="this.style.display='none'"><span>${g.autoRun ? 'COURSE ●' : 'COURSE'}</span>
+        </button>
         <button type="button" class="hud-btn${st.party.length ? '' : ' off'}" data-act="party" tabindex="-1" title="Équipe">
           <img src="img/hud/team.png" alt=""><span>ÉQUIPE</span>
         </button>
@@ -220,8 +243,8 @@ export class Hud {
         <button type="button" class="hud-btn" data-act="map" tabindex="-1" title="Carte (Touche C)">
           <img src="img/hud/map.png" alt=""><span>CARTE</span>
         </button>
-        <button type="button" class="hud-btn save" data-act="save" tabindex="-1" title="Sauvegarder la partie">
-          <img src="img/hud/save.png" alt=""><span>SAUVER</span>
+        <button type="button" class="hud-btn" data-act="quests" tabindex="-1" title="Journal des Quêtes (Touche Q)">
+          <img src="img/hud/quest.png" alt="" onerror="this.src='img/items/notebook.png'"><span>QUÊTES</span>
         </button>
       </div>
     `;

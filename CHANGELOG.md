@@ -1,31 +1,85 @@
 # Journal des versions — Arcadia
 
-## 3.59 — 2 novembre 2026
-- **Mystère Mystère** — un mode « Sans souris » pour jouer tout au clavier (Réglages → Commandes).
-  - Z Q S D pour marcher, les flèches tournent la vue.
-  - F pour frapper ou tirer, C pour couper le courant.
-  - Pour lancer le couteau, tiens G : une jauge se remplit, plus tu tiens, plus il part loin et vite.
-  - Le banc de la galerie ne bloque plus la porte de la chambre du maître.
-
-## 3.58 — 2 novembre 2026
-- **Mystère Mystère** — les meubles du manoir sont enfin à leur place.
-  - La grande table de la salle à manger est dans le bon sens, avec ses chaises tout autour.
-  - Dans la cuisine, le plan de travail court d'un bout à l'autre et les chaises entourent la table.
-  - Le billard est aligné sous sa lampe et la cheminée du salon est adossée au mur.
-  - Les lits, tables de nuit, baignoire, bureaux et étagères sont collés aux murs et ne les traversent plus.
-  - Les fauteuils du billard et les chaises du salon de musique regardent dans le bon sens.
-
-## 3.57 — 2 novembre 2026
+## 3.64 — 2 novembre 2026
 - **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
   - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.
-  - Meurtrier : ton couteau reste caché tant que tu ne le sors pas. Frappe de près, lance-le de loin (il se plante dans le décor : va le reprendre, ou attends qu'il revienne), et coupe le courant avec F.
+  - Meurtrier : ton couteau reste caché tant que tu ne le sors pas. Frappe de près, lance-le de loin (il se plante dans le décor : va le reprendre, ou attends qu'il revienne), et coupe le courant avec F ou C.
   - Shérif : un revolver, une balle toutes les trois secondes. Si tu abats un innocent, tu es sonné et tu lâches ton arme.
   - Le revolver tombé brille d'un faisceau doré qu'on voit à travers les murs : le premier innocent qui marche dessus devient le héros.
   - Innocents : ramassez les pièces d'or, survivez jusqu'à l'aube, et méfiez-vous de celui qui sort un couteau.
   - Le manoir a trois étages et 24 pièces, du grand hall et sa galerie jusqu'à la crypte. Il y a aussi un escalier dérobé et trois passages secrets (la bibliothèque pivotante, l'armoire et le miroir) : E pour passer.
-  - De vrais personnages animés à ta couleur, l'arme visible dans la main de chacun, des meubles, des lustres et une petite valse de boîte à musique.
+  - De vrais personnages animés à ta couleur, l'arme visible dans la main de chacun, des meubles placés au millimètre, des lustres et une petite valse de boîte à musique.
+  - Un mode « Sans souris » pour jouer tout au clavier (Réglages → Commandes) : ZQSD pour marcher, les flèches pour orienter la vue, et maintien de G pour jauger la force du lancer de couteau.
   - Des bots facile, moyen ou difficile complètent la table. Un mode Découverte permet de visiter le manoir sans rôles.
   - Les manches s'enchaînent et les points s'additionnent d'une manche à l'autre.
+
+## 3.63 — 2 novembre 2026
+- **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
+  - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.
+  - **Couverture exhaustive de toutes les quêtes du jeu (18 quêtes)** :
+    - *Histoire Principale* : La Ligue Céleste (progression dynamique des 8 Badges d'Arène jusqu'au Plateau Céleste) et L'Ombre de la Team Éclipse (démantèlement des bases et apaisement de Lugia Obscur).
+    - *Grandes Aventures de l'Archipel (8 quêtes)* : Le Ponyta de Lucie, Les eaux troubles du Lac Miroir, Le courrier perdu, Les nuits blanches de Floralia, Les talismans du Temple Kagura, Le vœu de la fontaine, Le dragon de pierre, et Le cœur du volcan.
+    - *Missions des Habitants (8 requêtes)* : Le médaillon de Lucie, Le spécimen du pêcheur, L'observation géologique, L'échange de Bastien, L'adoption d'Évoli, Les recherches du Pokédex, L'épreuve des Sources, et L'héritage du clan des Dragons.
+  - **Où aller & Indications précises** : grand boîtier doré « 📍 OÙ ALLER / PROCHAINE DESTINATION » affichant en temps réel la destination exacte, le PNJ à rencontrer, les prérequis CS (Coupe, Surf, Force) et les conseils de route pour chaque étape.
+  - **Suivi d'objectif interactif (« En suivre une »)** : bouton `[★ SUIVRE CETTE QUÊTE]` permettant d'épingler n'importe quelle mission active. L'objectif suivi est mis en évidence dans le journal et s'affiche en temps réel dans une capsule dédiée du Pokégear sur le HUD en jeu (`📍 Lieu · Titre · Objectif en cours`).
+  - **Design 100% Rétro Pixel-Art Nintendo DS (5G Noir 2 / Blanc 2)** : onglets de filtrage crantés (`EN COURS`, `TERMINÉES`, `TOUTES`), étiquettes de catégorie stylisées (`PRINCIPALE`, `AVENTURE`, `HABITANT`), liste à défilement avec curseur `▶`, coches de progression d'étapes (`☑` terminée, `▶` en cours, `◻` à venir), boîte de récompense et bandeau d'aide rétro.
+
+## 3.62 — 2 novembre 2026
+- **Odyssée** — Remplacement et correction intégrale des sprites de Poké Balls :
+  - **Correction du sprite de Poké Ball classique** : restauration de l'authentique sprite officiel pixel-art rouge et blanc (dôme rouge éclatant, ceinture équatoriale noire nette avec bouton central blanc, base blanche immaculée). Remplacement du sprite ray-tracé et correction de l'écrasement accidentel qui faisait afficher l'icône de l'Hyper Ball (Ultra Ball) dans l'inventaire du Sac et les menus.
+  - **Écran d'Équipe et Sockets** : toutes les alvéoles de l'équipe affichent désormais les vraies Poké Balls rétro 5G éclatantes sans confusion possible avec les Hyper Balls ou Super Balls.
+  - **Sprites de terrain et combat** : restauration du sprite de Poké Ball de terrain `itemball.png` en vraie résolution 15x15, sprites de combat 32x32 et 48x48 pixel-art pour l'intro du Professeur Saule, frames d'ouverture et d'inclinaison de secousse nettes au pixel près, et ajout de la Master Ball officielle (`master-ball.png` et `master_ball_32.png`).
+
+## 3.61 — 2 novembre 2026
+- **Arcadia** — Les images des jeux s'affichent de nouveau dans la liste des jeux et dans le salon.
+- **Arcadia** — Les comptes ont maintenant un mot de passe.
+  - À la création, tu choisis un mot de passe : ton compte (pseudo, couleur, code ami, amis) est sauvegardé en ligne et tu peux t'y connecter sur n'importe quel appareil avec « J'ai déjà un compte : me connecter ».
+  - Tout est chiffré dans ton navigateur avant de partir : le serveur ne reçoit jamais ton mot de passe et ne peut pas lire ton profil. Attention, un mot de passe oublié ne peut pas être récupéré.
+  - Tu as déjà un compte ? Ouvre « Modifier » puis « 🔐 Protéger mon compte par mot de passe ».
+  - Chaque changement (pseudo, couleur, amis) est sauvegardé tout seul.
+- **Odyssée** — Refonte Pixel-Art rétro DS (5G) des menus et suppression de l'option Sauvegarder du menu X :
+  - **Menu Pause (Touche X)** : retrait définitif de l'option « Sauvegarder » devenue inutile grâce à la sauvegarde automatique continue de chaque progression. Boîtier DS biseauté sombre avec curseur flèche rouge pixel-art « ▶ ».
+  - **Écran d'Équipe 100% Pixel-Art Rétro DS** : élimination complète de l'aspect « vectoriel/Figma/IA » (fin des arrondis lisses, des halos radiaux flous et des ombres gaussiennes). Adoption de découpes en escalier / biseaux crantés, ombrage 1-bit solide franc, alvéoles de Poké Balls octogonales biseautées, socle de combat isométrique pixel-art à anneau cyan étincelant pour le Pokémon de tête, jauges de PV à cartouche or « HP » et blocs de pixels à double surbrillance, et curseur dynamique « ▶ » rouge clignotant pointant vers le Pokémon sélectionné.
+  - **Écran de Résumé et Pokédex Pixel-Art** : onglets façon cartouches DS avec biseaux à 45°, cartouches de capacités rectangulaires avec liseré de type solide et compteurs de PP rétro, alcôve de présentation avec socle isométrique et écran Pokédex aux diodes franches.
+
+## 3.60 — 2 novembre 2026
+- **The Candidate** — 141 nouvelles questions d'entretien en finance de marché, avec leur explication.
+  - Produits financiers, mathématiques financières, économie et marchés : options, obligations, swaps, grecques, Itô, Vasicek, VaR, BCE, QE, courbe des taux. Les chiffres d'actualité sont datés.
+  - Nouvelle rubrique Informatique : C++, programmation objet, SQL, VBA, Excel, Access et débogage. Elle sort aussi aux postes Trading, Quant et Risques.
+  - Certaines questions montrent désormais du code à lire ou à compléter, en VBA, C++, SQL ou avec une formule Excel.
+  - Trois nouvelles épreuves SQL : le gain par trader, la perte totale et les noms en doublon.
+- **Odyssée** — Refonte complète style Pokémon *Noir 2 / Blanc 2* (5G) pour l'Équipe, l'Enregistrement Pokédex, le Lancer de Poké Ball et les Boîtes de dialogue :
+  - **Écran d'Équipe B2W2 authentique** : structure asymétrique fidèle à la Nintendo DS. Le Pokémon de tête (Lead) bénéficie d'une grande colonne dédiée à gauche avec socle holographique 5G, ornement doré ★ 1, alvéole circulaire avec véritable Poké Ball pixel-art haute définition (Poké Ball, Super Ball ou Hyper Ball selon celle utilisée), badges de types rectangulaires biseautés 5G, jauge de PV avec label or `HP` et chiffres précis, et barre fine cyan `EXP`. Les slots 2 à 6 sont empilés à droite sous forme de fentes métalliques biseautées avec coins coupés, réceptacle Poké Ball circulaire, et surbrillance cyan électrique en sélection.
+  - **Scène d'Enregistrement dans le Pokédex lors d'une capture** : à chaque nouvelle créature capturée, un écran cinématique plein format s'ouvre façon Pokédex d'Unys 5G avec diodes (bleue pulsante, rouge, jaune, verte), numéro digital cyan (`N° 025`), balayage holographique par scanner laser vertical cyan, retentissement du cri authentique de la créature, caractéristiques complètes (catégorie, types, taille en mètres, poids en kilogrammes), et dactylographie rétroéclairée du rapport de description Pokédex avec curseur clignotant.
+  - **Animation de lancer et qualité des Poké Balls** : remplacement du dessin canvas mathématique de 5.5px par de véritables sprites pixel-art 32x32 et 48x48 détaillés (`poke_ball_32.png`, `great_ball_32.png`, `ultra_ball_32.png`, `poke_ball_open.png`, et frames d'inclinaison gauche/droite `poke_ball_tilt_l/r.png`). Nouvelle animation de capture complète : trajectoire parabolique aérienne avec traînée d'étincelles, ouverture de la ball au zénith avec cône de lumière et aspiration d'énergie du Pokémon, chute au sol avec double rebond réaliste, secousses avec alternance des sprites d'inclinaison gauche/droite, puis explosion d'étoiles dorées 5G et cliquetis de verrouillage. Utilisation du sprite haute définition 48x48 dans l'introduction du Professeur Saule.
+  - **Boîtes de dialogue 5G (*Noir 2 / Blanc 2*)** : adieu au cadre papier blanc générique. Les dialogues adoptent désormais un boîtier obsidienne sombre biseauté aux 4 coins avec micro-scanlines horizontales, double liseré métallique cyan et or, cartouche de nom de l'interlocuteur façon plaque métallique en relief avec filet cyan électrique supérieur, texte immaculé `#f6faff` parfaitement lisible, curseur chevron rougeoyant `▼` animé d'un battement vertical, et cadre technologique intégré pour le portrait du personnage.
+
+## 3.59 — 2 novembre 2026
+- **Odyssée** — interfaces 5G (*Noir 2 / Blanc 2*) pour l'Équipe, le Sac et la Carte, limite de niveau d'Arène et restrictions d'échanges :
+  - **Limite de niveau d'Arène (Level Cap)** : vos créatures ne peuvent plus dépasser le niveau maximal du Champion de l'Arène suivante moins 1 (N.13 avant Hector, N.21 avant Marine, N.28 avant Volta, N.33 avant Flora, N.38 avant Sibylle, N.43 avant Basalte, N.48 avant Pyros, N.55 avant Drakos, puis N.100). L'expérience s'arrête au plafond et les Super Bonbons indiquent la limite.
+  - **Échanges entre joueurs encadrés** : les échanges nécessitent désormais d'avoir décroché le 4e Badge (Badge Pétale de Floralia), et il est interdit de proposer ou recevoir un Pokémon dont le niveau dépasse la limite actuelle de l'un des deux dresseurs.
+  - **Correction du pas involontaire** : le personnage n'avance plus tout seul d'un pas en quittant un combat si les flèches du menu ont été pressées.
+  - **Écrans Équipe & Résumé 5G** : 6 capsules tactiles biseautées avec types, genre, PV numériques, barres d'EXP et de PV segmentées, badge du Pokémon de tête, vue détaillée du Résumé avec onglets interactifs et raccourcis précédent / suivant.
+  - **Écran Sac 5G** : 4 poches illustrées avec compteurs d'objets (Soins, Balls, Objets, Objets rares), aperçu graphique grand format, descriptifs complets et sélection fluide au clic ou au clavier.
+  - **Écran Carte de la région 5G** : atlas Pokégear façon C-Gear avec balises de villes cliquables, suivi de l'avancée des Arènes / Badges et rappel de la limite de niveau active.
+
+## 3.58 — 2 novembre 2026
+- **Site Noir** — on comprend quoi faire, on entend tout, et le monstre fait enfin peur.
+  - On sait toujours quoi faire : l'objectif, une flèche qui suit les couloirs et la distance à pied s'affichent en haut de l'écran, les étapes aussi. Des bandes de couleur au sol et des panneaux mènent au badge, à la clé, au générateur et à l'ascenseur, et les meubles à fouiller accrochent un reflet.
+  - De vrais sons : les pas changent selon le sol (gravier, moquette, béton, métal, marches), la course s'entend, la lampe claque à l'allumage et à l'extinction, les fonds varient selon l'endroit, et des bruits lointains viennent de partout. Derrière un mur, tout est étouffé.
+  - Le monstre fait peur : un long visage pâle qu'on découvre à la lampe, des gestes saccadés. Quand il approche, les lampes meurent, l'image se déchire, et il te saute au visage quand il te met à terre.
+  - Jouer le monstre : une vue rouge et noire, des griffes, les corps qui brûlent, un hurlement (R) qui coupe le souffle. Tu peux marcher dans le labo avant que les portes s'ouvrent, et le jeu dit pourquoi tu es à l'arrêt.
+  - Au départ, chacun a déjà son appareil photo, et une seule table propose capteur, kit caméras et piles. Ce que tu trouves en fouillant va directement dans ton sac.
+  - Les menus ont le même style que ceux des autres jeux, et l'escalier a de vraies marches, correctement éclairées.
+- **Odyssée** — retrait du bouton SAUVER sur le HUD en jeu : la partie est désormais sauvegardée automatiquement après chaque combat, discussion, soin ou changement de lieu (ainsi qu'à la fermeture de l'onglet), laissant 4 boutons d'action rapides (COURSE, ÉQUIPE, SAC, CARTE) sur le Pokégear.
+
+## 3.57 — 2 novembre 2026
+- **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :
+  - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges, Ho-Oh, la Team Éclipse, Lugia Obscur et Odyssor (passable à tout moment).
+  - **Introduction du Professeur Saule** : scène sobre façon DS avec le sprite du Prof. Saule qui lance une Poké Ball d'où sort un starter, sélection du personnage par cartes illustrées, carte officielle d'enregistrement du prénom avec suggestions en un clic, et apparition du voisin Théo.
+  - **Course continue (COURSE / touche R)** : bouton sur le HUD (et touche R ou Verr. Maj) pour courir en permanence sans maintenir Shift.
+  - **Décors de combat & HUD rétro 5G (*Noir 2 / Blanc 2*)** : 11 nouveaux fonds de combat en pixel-art 16-bit (prairie, mer, arène, Ligue, grotte, neige, volcan, de jour comme de nuit), socles assortis, boîtes de statut 5G biseautées avec Poké Balls d'équipe, badges de types, barres PV / EXP segmentées, boutons d'action illustrés et cartes de capacités détaillées (catégorie, type, puissance et PP).
+  - **Police d'écriture (Chakra Petch)** : chiffres nets et alignés dans tous les menus et compteurs de PV.
 
 ## 3.56 — 2 novembre 2026
 - **Site Noir** — nouveau jeu : de l'horreur à la première personne, un monstre contre trois ou quatre enquêteurs, en 15 minutes environ
@@ -34,7 +88,6 @@
   - Monstre : tu vois dans le noir, les corps chauds brillent, tu entends les bruits autour du viseur, tu coupes les lumières, bloques les portes, casses les caméras et sabotes le générateur.
   - L'hôte choisit qui joue le monstre : un joueur, au hasard ou un bot. Les places libres sont prises par des bots, et un bot remplace celui qui part.
   - Côté enquêteurs, l'image a le grain d'une vieille cassette vidéo.
-
 ## 3.55 — 2 novembre 2026
 - **Mollo !** — Le combat est revu de fond en comble.
   - Tes coups vont chercher celui qui est devant toi : fini les poings dans le vide à quelques degrés près.

@@ -88,15 +88,26 @@ export function healFull(m) {
 /** attaques apprises en passant au niveau L */
 export const movesAtLevel = (sp, L) => SPECIES[sp].ls.filter(([l]) => l === L).map(([, id]) => id);
 
+/** Niveau max autorisé avant chaque Arène (niveau max du Champion - 1) */
+export const GYM_CAPS = [13, 21, 28, 33, 38, 43, 48, 55];
+export function levelCap(badges) {
+  if (!Array.isArray(badges)) return 100;
+  for (let i = 0; i < GYM_CAPS.length; i++) if (!badges[i]) return GYM_CAPS[i];
+  return 100;
+}
+
 /**
  * Ajoute de l'expérience. Renvoie les étapes : [{ lvl, stats avant/après, learn: [ids] }]
  * Les attaques sont apprises seules s'il reste une place ; sinon elles sont renvoyées dans `ask`.
  */
-export function gainExp(m, amount) {
-  const S = SPECIES[m.sp], steps = [];
-  if (m.lvl >= 100) return steps;
+export function gainExp(m, amount, maxLvl = 100) {
+  const S = SPECIES[m.sp], steps = [], cap = Math.min(100, maxLvl || 100);
+  if (m.lvl >= cap) {
+    m.exp = Math.min(m.exp, expFor(S.g, cap));
+    return steps;
+  }
   m.exp += amount;
-  while (m.lvl < 100 && m.exp >= expFor(S.g, m.lvl + 1)) {
+  while (m.lvl < cap && m.exp >= expFor(S.g, m.lvl + 1)) {
     const before = m.stats.slice();
     m.lvl++;
     refreshStats(m, true);
@@ -108,13 +119,14 @@ export function gainExp(m, amount) {
     }
     steps.push(st);
   }
-  if (m.lvl >= 100) m.exp = expFor(S.g, 100);
+  if (m.lvl >= cap) m.exp = expFor(S.g, cap);
   return steps;
 }
 
-export function expProgress(m) {
+export function expProgress(m, maxLvl = 100) {
+  if (m.lvl >= 100 || m.lvl >= maxLvl) return 1;
   const g = SPECIES[m.sp].g, a = expFor(g, m.lvl), b = expFor(g, m.lvl + 1);
-  return m.lvl >= 100 ? 1 : Math.max(0, Math.min(1, (m.exp - a) / (b - a)));
+  return Math.max(0, Math.min(1, (m.exp - a) / (b - a)));
 }
 
 /** évolution par niveau possible ? renvoie l'espèce cible */

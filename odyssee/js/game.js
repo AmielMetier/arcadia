@@ -1,7 +1,7 @@
 // odyssee/js/game.js — le jeu : déplacements sur la grille, PNJ, dresseurs, rencontres, capacités de terrain (Coupe,
 // Surf, Éclate-Roc, Vol), menus, histoire (les huit arènes et l'archipel des trois frères), sauvegarde
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
-import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase } from './core/mon.js';
+import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap } from './core/mon.js';
 import { Battle } from './core/battle.js';
 import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js';
 import { SPECIES } from './data/species.js';
@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, TYPE_FR } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX } from './render/world3d.js';
@@ -37,6 +37,8 @@ export class Game {
     Object.assign(this, { view, ui, input, sound, world });
     this.busy = false; this.player = null; this.npcs = []; this.items = [];
     this.bv = new BattleView(this);
+    this.autoRun = false;
+    try { this.autoRun = localStorage.getItem('odyssee-autorun') === '1'; } catch (e) {}
     this.hud = new Hud(this);
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
@@ -155,6 +157,7 @@ export class Game {
   /** un passage gardé est fermé tant qu'il manque des badges, ou tant qu'un drapeau d'histoire n'est pas levé */
   gateClosed(g) { if (g.open) return !g.open(this.state.flags, this); return g.flag ? !this.state.flags[g.flag] : this.badgeCount() < g.badges; }
   badgeCount() { return this.state.badges.filter(Boolean).length; }
+  levelCap() { return levelCap(this.state?.badges); }
   worldPos() {
     if (this.mapObj.id === 'monde') return { x: this.player.x, y: this.player.y };
     // carte annexe (lac, forêt…) ou intérieur d'une carte annexe : on remonte jusqu'à l'entrée sur la grande carte
@@ -308,7 +311,7 @@ export class Game {
     const tx = p.x + dx, ty = p.y + dy, t = m.get(tx, ty);
     // sortie par le tapis
     if (m.get(p.x, p.y) === T.MAT && d === 'down') { const w = m.warpAt(p.x, p.y); if (w) { this.warp(w, 'exit'); return; } }
-    const run = this.input.isDown('run');
+    const run = this.autoRun ? !this.input.isDown('run') : this.input.isDown('run');
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
       if (m.in(tx, ty) && t === T.WATER && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: SURF }; p.walking = true; return; }
@@ -414,11 +417,22 @@ export class Game {
   }
 
   /* ================= touches ================= */
+  toggleAutoRun() {
+    this.autoRun = !this.autoRun;
+    try { localStorage.setItem('odyssee-autorun', this.autoRun ? '1' : '0'); } catch (e) {}
+    this.sound.sfx(this.autoRun ? 'select' : 'cancel');
+    this.hud?.update(true);
+    this.ui.toast(this.autoRun ? 'Course continue activée !' : 'Course continue désactivée', 1300);
+  }
   async onKey(k) {
+    if (!this.state) return;
+    if (k === 'hud') { this.hud?.toggle(); return; }
+    if (k === 'autorun') { if (!this.busy && !this.bv.alive) this.toggleAutoRun(); return; }
     if (this.busy || !this.state || this.player.move) return;
     if (k === 'a') await this.interact();
     else if (k === 'b' || k === 'menu') await this.startMenu();
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
+    else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
     else if (k === 'hud') this.hud?.toggle();
   }
   async interact() {
@@ -465,7 +479,7 @@ export class Game {
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
       else if (d.text) await this.ui.say(d.text);
-    } finally { this.busy = was; }
+    } finally { this.save(true); this.busy = was; }
   }
   async pickItem(it) {
     this.sound.sfx('item');
@@ -637,8 +651,8 @@ export class Game {
     if (st.party.length) opts.push(['ÉQUIPE', 'party']);
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
-    if (Object.keys(st.flags).some((k) => k.startsWith('Q:'))) opts.push(['QUÊTES', 'quests']);
-    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['SAUVER', 'save'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
+    opts.push(['QUÊTES', 'quests']);
+    opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
       const r = await this.ui.list({ items: opts.map(([l]) => ({ label: l })), cls: 'startmenu', cancel: -1, start: idx, onMove: (i) => { this._menuIdx = i; } });
@@ -651,7 +665,7 @@ export class Game {
       else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
-      else if (k === 'quests') await this.questLog();
+      else if (k === 'quests') await questsScreen(this);
       else if (k === 'opt') await optionsScreen(this);
       else if (k === 'code') {
         // le code reprend la partie telle qu'elle est maintenant : on sauvegarde d'abord
@@ -692,12 +706,13 @@ export class Game {
         await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue;
       }
       if (!st.party.length) { await this.ui.say('Tu n\'as encore aucune créature.'); continue; }
-      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m) ? null : 'Pas d\'effet') });
+      const cap = this.levelCap();
+      const target = await partyScreen(this, { mode: 'pick', prompt: `Utiliser ${itemName(r.item)} sur quelle créature ?`, filter: (m) => (canUseOn(r.item, m, cap) ? null : it.candy && m.lvl >= cap && m.lvl < 100 ? `Niv. max (${cap})` : 'Pas d\'effet') });
       if (target < 0) continue;
       const m = st.party[target];
       if (it.stone) { this.take(r.item); await this.evolveScene(m, itemEvolution(m, r.item)); return true; }
       if (it.candy) {
-        this.take(r.item); const steps = useCandy(m); this.sound.sfx('levelup');
+        this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
         for (const s of steps) { for (const id of s.learned) await this.ui.say(`${monName(m)} apprend ${MOVES[id].n} !`); for (const id of s.ask) await this.askLearn(m, id); }
         const to = levelEvolution(m); if (to) await this.evolveScene(m, to);
@@ -852,7 +867,7 @@ export class Game {
     const curtain = await this.encounterIntro(kind);
     const m = this.mapObj, z = this.zone;
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : z?.town === 'azur' || z?.town === 'granit' || z?.name === 'Cap des Étoiles' ? 'water' : 'grass';
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer } });
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap() });
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
     curtain.remove();
@@ -863,8 +878,10 @@ export class Game {
       const mon = foeMons[0]; mon.ot = st.name; mon.met = this.locationName();
       const isNew = !st.dex.caught.includes(mon.sp);
       this.markCaught(mon.sp);
-      if (isNew) await this.bv.msg(`Les données de ${SPECIES[mon.sp].n} ont été ajoutées au Pokédex !`, { wait: true });
       this.bv.close();
+      if (isNew) {
+        await pokedexRegisterScene(this, mon);
+      }
       if (await this.ui.yesNo(`Donner un surnom à ${SPECIES[mon.sp].n} ?`)) { const nick = await this.ui.nameEntry(`Surnom de ${SPECIES[mon.sp].n}`, SPECIES[mon.sp].n); if (nick && nick !== SPECIES[mon.sp].n) mon.nick = nick; }
       mon.status = mon.status === 'frz' ? null : mon.status;
       if (st.party.length < 6) st.party.push(mon);
@@ -877,6 +894,7 @@ export class Game {
     else if (result === 'lose') await this.whiteout();
     this.sound.current = null;
     this.updateZone();
+    this.save(true);
     return result;
   }
 
@@ -1075,18 +1093,7 @@ export class Game {
     return A;
   }
   async questLog() {
-    const Q = this.world.quests || {}, f = this.state.flags;
-    const list = Object.entries(Q).filter(([id]) => f['Q:' + id]);
-    if (!list.length) { await this.ui.say(['Ton journal des quêtes est vide.', 'Parle aux habitants : beaucoup ont besoin d\'aide.']); return; }
-    list.sort((a, b) => (f['Q:' + a[0]] === 'fin') - (f['Q:' + b[0]] === 'fin'));
-    for (;;) {
-      const r = await this.ui.list({ title: 'Quêtes', items: list.map(([id, q]) => ({ label: q.name, right: f['Q:' + id] === 'fin' ? '✔' : '…' })), cancel: -1 });
-      if (r < 0) return;
-      const [id, q] = list[r], n = f['Q:' + id];
-      const steps = typeof q.steps === 'function' ? q.steps(f, this) : q.steps;
-      const cur = n === 'fin' ? (q.end || 'Quête terminée.') : (steps[n - 1] || steps[steps.length - 1]);
-      await this.ui.say([`${q.name} — ${q.where || ''}`, cur]);
-    }
+    return questsScreen(this);
   }
 
   /* ================= histoire ================= */

@@ -1,19 +1,19 @@
 // Site Noir : l'interface par-dessus la 3D. Enquêteur : santé, souffle, lampe, cases, objectif, équipe. Monstre : énergie, griffes et pouvoirs, bruits autour du viseur.
 // Et les écrans en HTML : accueil (choix du rôle), carte du rôle, pause, fin de partie.
-import { ITEMS, FUSES, CD } from '../engine/sim.js';
+import { ITEMS, FUSES, CD, WAKE_T } from '../engine/sim.js';
 import { T, Z, W, H, ZONE_NAMES, zoneAt } from '../engine/map.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const $ = (s) => document.querySelector(s);
 const mmss = (t) => { const s = Math.max(0, Math.ceil(t)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-const POWERS = [['lights', '1', '💡', 'Coupure', 'Éteint la zone où tu es'], ['jam', '2', '🔒', 'Blocage', 'Ferme et bloque la porte devant toi'], ['cam', '3', '📵', 'Casse-caméra', 'Détruit la caméra devant toi']];
+const POWERS = [['lights', '1', '💡', 'Coupure', 'Éteint la zone où tu es'], ['jam', '2', '🔒', 'Blocage', 'Ferme et bloque la porte devant toi'], ['cam', '3', '📵', 'Casse-caméra', 'Détruit la caméra devant toi'], ['roar', 'R', '😱', 'Hurlement', 'Coupe le souffle de ceux qui sont tout près']];
 
 export class HUD {
   constructor() {
     this.root = $('#hud');
     this.el = {};
-    for (const id of ['banner', 'toast', 'feed', 'prompt', 'ptxt', 'ring', 'team', 'clock', 'goal', 'goal2', 'bars', 'slots', 'stick', 'flash', 'hurt', 'locker', 'cctv', 'cctvLabel', 'map', 'pings', 'hint', 'lockHint', 'spec', 'scan', 'card']) this.el[id] = $(`#${id}`);
-    this.bannerT = 0; this.toastT = 0; this.flashT = 0; this.hurtT = 0; this.pingL = []; this.sigTeam = ''; this.sigSlots = ''; this.sigGoal = ''; this.cardT = 0;
+    for (const id of ['banner', 'toast', 'feed', 'prompt', 'ptxt', 'ring', 'team', 'clock', 'goal', 'goal2', 'guide', 'gArrow', 'gDist', 'steps', 'bars', 'slots', 'stick', 'flash', 'hurt', 'locker', 'cctv', 'cctvLabel', 'map', 'pings', 'hint', 'lockHint', 'spec', 'scan', 'card']) this.el[id] = $(`#${id}`);
+    this.bannerT = 0; this.toastT = 0; this.flashT = 0; this.hurtT = 0; this.pingL = []; this.sigTeam = ''; this.sigSlots = ''; this.sigGoal = ''; this.sigSteps = ''; this.cardT = 0;
     this.mapCtx = this.el.map.getContext('2d');
     this.mapBase = null;
   }
@@ -37,7 +37,7 @@ export class HUD {
   roleCard(role) { this.el.card.innerHTML = roleCardHtml(role); this.el.card.hidden = false; this.cardT = 9; }
   hideCard() { this.el.card.hidden = true; this.cardT = 0; }
 
-  update(v, dt, { goal, input, real, cctv, mapOpen, M }) {
+  update(v, dt, { goal, guide, input, real, cctv, mapOpen, M }) {
     const e = this.el, me = real, w = v.w, isM = me && me.role === 'm';
     this.root.dataset.role = isM ? 'm' : 's';
     if ((this.bannerT -= dt) <= 0 && !e.banner.hidden) { e.banner.classList.remove('in'); if (this.bannerT < -0.4) e.banner.hidden = true; }
@@ -63,6 +63,13 @@ export class HUD {
     e.clock.textContent = mmss(w.tl); e.clock.classList.toggle('warn', w.tl < 60);
     const gs = goal.a + '\n' + goal.b;
     if (gs !== this.sigGoal) { this.sigGoal = gs; e.goal.textContent = goal.a; e.goal2.textContent = goal.b; e.goal2.hidden = !goal.b; }
+    // la flèche : par où marcher pour rejoindre l'objectif (elle suit les couloirs, pas la ligne droite)
+    const showGuide = !!guide && !cctv && guide.dist >= 2;
+    e.guide.hidden = !showGuide;
+    if (showGuide) { e.gArrow.style.transform = `rotate(${guide.ang.toFixed(2)}rad)`; const t = `${Math.round(guide.dist)} m`; if (t !== e.gDist._t) { e.gDist.textContent = t; e.gDist._t = t; } }
+    // où on en est, en une ligne
+    const stepsHtml = !isM && real ? stepsOf(M, w).map((st) => `<span class="${st.done ? 'done' : st.now ? 'now' : ''}">${st.done ? '✓ ' : ''}${st.t}</span>`).join('') : '';
+    if (stepsHtml !== this.sigSteps) { this.sigSteps = stepsHtml; e.steps.innerHTML = stepsHtml; }
 
     // barres
     if (me && me.st !== 'dead' && me.st !== 'out' && !me.spectator) {
@@ -140,10 +147,10 @@ export class HUD {
 
     // plan
     e.map.hidden = !mapOpen;
-    if (mapOpen) this.drawMap(M, v, me);
+    if (mapOpen) this.drawMap(M, v, me || v.me, goal);
   }
 
-  drawMap(M, v, me) {
+  drawMap(M, v, me, goal) {
     const c = this.el.map, g = this.mapCtx, S = 9;
     const w = v.w;
     if (!this.mapBase) {
@@ -162,11 +169,13 @@ export class HUD {
       g.fillStyle = st.jam > 0 ? '#c040ff' : key ? (d.key === 'bleu' ? '#2d7ff0' : '#f08a1d') : st.open ? '#2fd46a' : '#d8d2c0';
       g.fillRect((d.x - (d.axis === 'x' ? d.cells.length / 2 : 0.3)) * S, (d.z - (d.axis === 'x' ? 0.3 : d.cells.length / 2)) * S, (d.axis === 'x' ? d.cells.length : 0.6) * S, (d.axis === 'x' ? 0.6 : d.cells.length) * S);
     });
-    const mark = (x, z, t) => { g.font = '16px sans-serif'; g.textAlign = 'center'; g.fillText(t, x * S, z * S + 6); };
+    const mark = (x, z, t) => { g.font = '16px sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(t, x * S, z * S + 6); };
     mark(M.generator.x, M.generator.z, w.genOn ? '⚡' : '🔧');
     mark(M.liftCall.x, M.liftCall.z, '🛗');
     if (me.role === 's') { mark(M.padCenter.x, M.padCenter.z, '🚁'); for (const cam of w.cams) mark(cam.x, cam.z, '🎥'); }
     if (me.role === 'm') for (const p of this.pingL) { g.strokeStyle = `rgba(255,70,50,${Math.min(1, p.t)})`; g.lineWidth = 2; g.beginPath(); g.arc(p.x * S, p.z * S, (4 - p.t) * 6 + 3, 0, 7); g.stroke(); }
+    // l'objectif : un cercle qui bat
+    if (goal && goal.at) { const k = (performance.now() / 700) % 1; g.strokeStyle = `rgba(255,176,46,${1 - k})`; g.lineWidth = 3; g.beginPath(); g.arc(goal.at.x * S, goal.at.z * S, 8 + k * 22, 0, 7); g.stroke(); g.fillStyle = '#ffb02e'; g.beginPath(); g.arc(goal.at.x * S, goal.at.z * S, 6, 0, 7); g.fill(); }
     for (const p of v.players) {
       if (p.spectator || p.st === 'dead' || p.st === 'out') continue;
       const self = p.id === me.id;
@@ -181,30 +190,66 @@ export class HUD {
 const bar = (ico, name, v, cls, low) => `<div class="bar ${cls} ${low ? 'low' : ''}" title="${name}"><span>${ico}</span><u><i style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%"></i></u></div>`;
 
 // ------------------------------------------------------------------ objectif affiché, selon l'avancement
-export function goalOf(M, w, me, teamProofs) {
+// Ce qui compte, c'est l'état de la partie et ce que l'équipe a en poche, jamais le temps écoulé. `at` : où aller.
+const keyDoors = (M, k) => M.doors.filter((d) => d.key === k);
+const nearest = (list, me) => { let best = null, bd = 1e9; for (const o of list) { const d = Math.hypot(o.x - me.x, o.z - me.z); if (d < bd) { bd = d; best = o; } } return best; };
+const openCache = (M, w, me, zone) => nearest(M.caches.filter((c) => !w.caches[c.id].done && (zone === undefined || c.zone === zone)), me);
+export function stepsOf(M, w) {
+  const blue = keyDoors(M, 'bleu').some((d) => w.doors[d.id].unlocked), orange = keyDoors(M, 'orange').some((d) => w.doors[d.id].unlocked);
+  const list = [{ t: 'Badge', done: blue }, { t: 'Clé', done: orange }, { t: `Fusibles ${w.parts}/${FUSES}`, done: w.parts >= FUSES }, { t: 'Générateur', done: w.genOn }, { t: 'Ascenseur', done: w.lift.calls > 0 }, { t: 'Sortie', done: false }];
+  const now = list.find((x) => !x.done); if (now) now.now = true;
+  return list;
+}
+export function goalOf(M, w, me, teamProofs, players = []) {
   if (!me) return { a: '', b: '' };
-  const pct = Math.floor(w.gen);
+  const pct = Math.floor(w.gen), panel = M.generator.panel, call = { x: M.liftCall.x, z: M.liftCall.z };
   if (me.role === 'm') {
-    if (me.wake > 0) return { a: `En cage : tu sors dans ${Math.ceil(me.wake)} s`, b: 'Personne ne sait que tu es là' };
-    if (me.st === 'ok' && me.stun > 0) return { a: 'Aveuglé !', b: '' };
-    if (w.genOn) return { a: 'Le courant est revenu : ils remontent', b: 'Attrape-les dans le hall de l\'ascenseur' };
-    return { a: 'Chasse-les : écoute, le bruit s\'affiche autour du viseur', b: w.parts >= FUSES ? `Générateur à ${pct} % : va le saboter` : `Fusibles branchés : ${w.parts}/${FUSES}` };
+    if (me.wake > 0) return { a: `Enfermé dans le labo : les portes s'ouvrent dans ${Math.ceil(me.wake)} s`, b: 'Marche, repère les lieux. Personne ne sait que tu es là.' };
+    if (me.st === 'ok' && (me.stun > 0 || me.stunned)) return { a: 'Aveuglé : tu ne peux plus bouger', b: 'Ça ne dure qu\'un instant' };
+    if (me.stall > 0) return { a: 'Tu reprends ton souffle', b: '' };
+    const sated = me.sated > 0 ? `Repu : griffes rangées encore ${Math.ceil(me.sated)} s. Coupe, bloque, hurle, suis-les.` : '';
+    if (w.genOn) return { a: 'Le courant est revenu : ils vont remonter', b: sated || 'Attrape-les dans le hall de l\'ascenseur', at: call };
+    if (w.parts >= FUSES) return { a: `Générateur à ${pct} % : va le saboter`, b: sated || 'E maintenu sur le panneau', at: panel };
+    return { a: 'Chasse-les : leurs bruits s\'affichent autour du viseur', b: sated || `Fusibles branchés : ${w.parts}/${FUSES}` };
   }
   if (me.st === 'dead') return { a: 'Tu es mort', b: 'Regarde les autres finir' };
   if (me.st === 'out') return { a: 'Tu es sorti du site', b: '' };
   if (me.st === 'down') return { a: me.downs >= 2 ? `À terre : il te reste ${Math.ceil(me.downT)} s` : `À terre : tu te relèves dans ${Math.ceil(me.downT)} s`, b: me.downs >= 2 ? 'Un équipier peut te relever' : 'Rampe à l\'abri' };
-  const blue = M.doors.findIndex((d) => d.key === 'bleu'), orange = M.doors.findIndex((d) => d.key === 'orange');
-  const proofs = teamProofs ? `Preuves de l'équipe : ${teamProofs}` : 'Aucune preuve : photographie, ou scanne une trace au capteur EMF';
-  if (w.t < 25) return { a: 'Équipe-toi dans les caisses, puis passe le sas', b: 'Appareil photo, capteur EMF, caméras, tablette, piles' };
-  if (!w.doors[blue].unlocked) return { a: 'Aile A : fouille les meubles, trouve le badge bleu', b: proofs };
-  if (!w.doors[orange].unlocked) return { a: 'Aile B : fouille les meubles, trouve la clé des machines', b: proofs };
-  if (w.parts < FUSES) return { a: `Trouve des fusibles et branche-les au générateur : ${w.parts}/${FUSES}`, b: proofs };
-  if (!w.genOn) return { a: `Répare le générateur : ${pct} %`, b: 'Ça fait du bruit. Il va venir.' };
+  const team = players.filter((p) => p.role === 's' && !p.spectator && p.inv && (p.st === 'ok' || p.st === 'down'));
+  const mine = (k) => (me.inv || []).find((s) => s && s.k === k);
+  const carrier = (k) => team.find((p) => p.id !== me.id && p.inv.some((s) => s && s.k === k));
+  const onGround = (k) => nearest(w.items.filter((it) => it.k === k && !it.gone), me);
+  const proofs = teamProofs ? `Preuves de l'équipe : ${teamProofs}` : 'Il vous faudra au moins une preuve : photo du monstre, ou trace au capteur';
+  const zone = zoneAt(M, me.x, me.z);
+  // une clé : qui l'a, où elle traîne, où la chercher
+  const keyStep = (k, name, doorName, cacheZone, where) => {
+    const door = nearest(keyDoors(M, k), me);
+    if (mine(k)) return { a: `${name} en poche : ouvre ${doorName}`, b: 'Approche et appuie sur E', at: door };
+    const who = carrier(k);
+    if (who) return { a: `${who.name} a ${name.toLowerCase()} : retrouve-le à ${doorName}`, b: proofs, at: door };
+    const it = onGround(k);
+    if (it) return { a: `${name} est par terre : ramasse-le`, b: proofs, at: it };
+    return { a: `${where} : fouille les meubles, ${name.toLowerCase()} est dans l'un d'eux`, b: 'E maintenu sur ce qui brille à la lampe', at: openCache(M, w, me, cacheZone) };
+  };
+  const sasDoors = (k) => keyDoors(M, k).some((d) => w.doors[d.id].unlocked);
+  if (!sasDoors('bleu')) {
+    if (zone === Z.OUTPOST) return { a: 'Passe le sas, droit devant : l\'aile A commence là', b: 'Sur la table à droite du sas : capteur EMF, kit caméras, piles', at: M.doors.find((d) => d.kind === 'sas' && !d.key) };
+    return keyStep('bleu', 'Le badge bleu', 'un sas de l\'aile B', Z.A, 'Aile A');
+  }
+  if (!sasDoors('orange')) return keyStep('orange', 'La clé des machines', 'la porte du sous-sol', Z.B, 'Aile B');
+  if (w.parts < FUSES) {
+    if (mine('fuse')) return { a: `Branche ton fusible au générateur : ${w.parts}/${FUSES}`, b: 'Suis la bande jaune au sous-sol', at: panel };
+    const it = onGround('fuse');
+    if (it) return { a: `Un fusible est par terre : ramasse-le (${w.parts}/${FUSES})`, b: proofs, at: it };
+    const who = carrier('fuse');
+    return { a: `Fouille les meubles pour trouver des fusibles : ${w.parts}/${FUSES}`, b: who ? `${who.name} en porte un jusqu'au générateur` : proofs, at: openCache(M, w, me) };
+  }
+  if (!w.genOn) return { a: `Répare le générateur : ${pct} %`, b: 'E maintenu sur le panneau. Ça fait du bruit : il va venir.', at: panel };
   const L = w.lift;
-  if (L.state === 'idle' && L.at === 'top' && L.calls === 0) return { a: 'Appelle l\'ascenseur depuis le hall du sous-sol', b: proofs };
-  if (L.state === 'moving' && L.dir < 0) return { a: 'L\'ascenseur descend : tiens bon', b: proofs };
-  if (zoneAt(M, me.x, me.z) === Z.OUTPOST || L.at === 'top' && me.y > -1) return { a: 'Cours à la zone d\'extraction', b: teamProofs ? proofs : 'Il vous faut au moins une preuve' };
-  return { a: 'Monte dans l\'ascenseur et remonte', b: proofs };
+  if (me.y > -1 && (zone === Z.OUTPOST || zone === Z.PAD || zone === Z.CABINE)) return { a: 'Cours à la zone d\'extraction', b: teamProofs ? proofs : 'Il vous faut au moins une preuve', at: M.padCenter };
+  if (L.state === 'idle' && L.at === 'top' && L.calls === 0) return { a: 'Appelle l\'ascenseur depuis le palier du sous-sol', b: 'Suis la bande verte', at: call };
+  if (L.state === 'moving' && L.dir < 0 || L.at === 'top') return { a: 'L\'ascenseur descend : tiens bon', b: proofs, at: call };
+  return { a: 'Monte dans la cabine et appuie sur le bouton', b: proofs, at: M.liftGo };
 }
 
 // ------------------------------------------------------------------ écrans
@@ -213,21 +258,21 @@ const KEYS_S = [
   ['Utiliser (maintenir pour fouiller, réparer, relever)', '<kbd>E</kbd> ou clic droit'],
   ['Objet tenu', 'clic gauche · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> changer · <kbd>G</kbd> lâcher'],
   ['Lampe · pile', '<kbd>F</kbd> · <kbd>R</kbd>'],
-  ['Plan', '<kbd>Tab</kbd>'],
+  ['Écrans des caméras · plan', '<kbd>T</kbd> · <kbd>Tab</kbd>'],
 ];
 const KEYS_M = [
   ['Avancer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Maj</kbd> foncer'],
   ['Griffes', 'clic gauche'],
   ['Portes, casiers, sabotage, achever', '<kbd>E</kbd> ou clic droit'],
-  ['Pouvoirs', '<kbd>1</kbd> coupure · <kbd>2</kbd> blocage · <kbd>3</kbd> caméra'],
+  ['Pouvoirs', '<kbd>1</kbd> coupure · <kbd>2</kbd> blocage · <kbd>3</kbd> caméra · <kbd>R</kbd> hurlement'],
   ['Plan', '<kbd>Tab</kbd>'],
 ];
 export const settingsKeys = (touch) => [...KEYS_S.map(([a, b]) => [`Enquêteur · ${a}`, b]), ...KEYS_M.map(([a, b]) => [`Monstre · ${a}`, b])];
 function roleCardHtml(role) {
   const m = role === 'm';
   return `<h3>${m ? 'Tu es le monstre' : 'Tu es enquêteur'}</h3><p>${m
-    ? 'Personne ne doit remonter. Tu vois dans le noir, et les corps chauds brillent. Tu ne peux ni entrer dans l\'avant-poste ni prendre l\'ascenseur.'
-    : 'Trouve le badge, la clé, les fusibles. Relance le générateur, prends l\'ascenseur, et remonte avec au moins une preuve.'}</p>${(m ? KEYS_M : KEYS_S).map(([a, b]) => `<div class="k"><span>${a}</span><span>${b}</span></div>`).join('')}`;
+    ? 'Personne ne doit remonter. Tu vois dans le noir et les corps chauds brûlent. Les portes du labo s\'ouvrent bientôt. Tu ne peux ni entrer dans l\'avant-poste ni prendre l\'ascenseur.'
+    : 'L\'objectif et la flèche, en haut de l\'écran, te disent toujours quoi faire. Les bandes au sol et les panneaux mènent aux étapes suivantes.'}</p>${(m ? KEYS_M : KEYS_S).map(([a, b]) => `<div class="k"><span>${a}</span><span>${b}</span></div>`).join('')}`;
 }
 const seg = (k, label, opts, cur) => `<div class="seg"><span>${label}</span><div>${opts.map(([v, t]) => `<button data-k="${k}" data-v="${esc(v)}" class="${String(cur) === String(v) ? 'sel' : ''}">${esc(t)}</button>`).join('')}</div></div>`;
 export function briefingHtml({ role, squad, cfg, embedded, investigators }) {
@@ -241,10 +286,10 @@ export function briefingHtml({ role, squad, cfg, embedded, investigators }) {
   const cur = alone && cfg.monster === 'host' ? (me ? me.id : 0) : cfg.monster;
   return `<div class="brief">
     <h1 class="logo">SITE <span>NOIR</span></h1>
-    <p class="sub">Une équipe entre dans un complexe abandonné pour en ramener une preuve. Quelque chose y est enfermé, et il se réveille dans une minute et demie.</p>
+    <p class="sub">Une équipe entre dans un complexe abandonné pour en ramener une preuve. Quelque chose y est enfermé, et les portes de sa cage s'ouvrent ${WAKE_T >= 60 ? 'dans à peine plus d\'une minute' : 'bientôt'}.</p>
     <div class="cols">
       <div>
-        <h3>Équipe</h3>
+        <h3>L'équipe</h3>
         <ul class="squad">${squad.map((p) => `<li class="${p.ready ? '' : 'wait'}" style="--c:${esc(p.color)}"><i></i>${esc(p.name)}${p.me ? ' <small>(toi)</small>' : ''}${p.ready ? '' : ' <small>arrive…</small>'}</li>`).join('')}${investigators > 0 ? `<li class="bot"><i></i>${investigators} enquêteur${investigators > 1 ? 's' : ''} bot${investigators > 1 ? 's' : ''}</li>` : ''}</ul>
         ${host ? `<div class="segs">
           ${seg('monster', alone ? 'Ton camp' : 'Le monstre', monsterOpts, cur)}
@@ -254,14 +299,21 @@ export function briefingHtml({ role, squad, cfg, embedded, investigators }) {
         </div>` : '<p class="wait">Les rôles tombent au lancement. L\'hôte choisit le monstre.</p>'}
       </div>
       <div class="rules">
-        <h3>Enquêteurs</h3>
-        <p>Badge, clé, trois fusibles, générateur, ascenseur : remontez avec au moins une preuve. Une lampe, une batterie, trois cases.</p>
-        <h3>Monstre</h3>
-        <p>Il voit dans le noir, coupe les lumières, bloque les portes, casse les caméras. Il gagne si personne ne sort.</p>
+        <h3>Pour sortir</h3>
+        <ol class="flow">
+          <li>Aile A : fouille les meubles, trouve le badge bleu</li>
+          <li>Aile B : trouve la clé des machines</li>
+          <li>Rapporte trois fusibles au générateur et répare-le</li>
+          <li>Appelle l'ascenseur et remonte avec au moins une preuve</li>
+        </ol>
+        <h3>Le monstre</h3>
+        <p>Il voit dans le noir, coupe les lumières, bloque les portes et hurle. Il gagne si personne ne sort.</p>
+        <h3>Commandes</h3>
+        <div class="keys">${KEYS_S.slice(0, 4).map(([a, b]) => `<div class="k"><span>${a}</span><span>${b}</span></div>`).join('')}</div>
       </div>
     </div>
     <div class="btns">
-      ${host ? '<button class="btn go" id="btnGo">Entrer</button>' : '<p class="wait">En attente de l\'hôte…</p>'}
+      ${host ? '<button class="btn go" id="btnGo">C\'est parti !</button>' : '<p class="wait">En attente de l\'hôte…</p>'}
       ${embedded ? '<button class="btn ghost" id="btnExit">Retour au salon</button>' : ''}
     </div>
   </div>`;

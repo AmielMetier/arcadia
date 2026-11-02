@@ -768,6 +768,28 @@ t('Java : lire du code, choix distincts, et des questions qui sortent en partie'
   assert.equal(CHARTIER_QUESTIONS.filter((q) => q.cat === 'Java').length, 12);
 });
 
+t('Préparation aux entretiens : rubrique Informatique et QCM avec du code à lire', () => {
+  const info = CHARTIER_QUESTIONS.filter((q) => q.cat === 'Informatique'), snips = CHARTIER_QUESTIONS.filter((q) => q.snippet);
+  assert.ok(info.length >= 70, `questions d'informatique : ${info.length}`);
+  assert.deepEqual([...new Set(snips.map((q) => q.lang))].sort(), ['cpp', 'excel', 'sql', 'vba']);
+  for (const q of snips) assert.ok(q.text && !q.text.includes('⟦') && !q.snippet.includes('⏎') && !q.snippet.includes('⟦'), q.text);
+  assert.equal(new Set(CHARTIER_QUESTIONS.map((q) => q.text + (q.snippet || ''))).size, CHARTIER_QUESTIONS.length, 'pas deux fois la même question');
+  let code = 0, risk = 0;
+  for (let i = 0; i < 8000; i++) {
+    const q = makeQuestion(i * 6151 + 7, i % 15, 'chartier', 'normal', 0, 15);
+    if (q.rubric === 'Informatique' && q.snippet) {
+      code++;
+      assert.ok(q.kind === 'code-read' && q.input === 'choice' && q.lang && q.choices[q.answer] === q.show && q.trap >= 0, q.text);
+      assert.ok(q.time > 20 && q.time <= 70, `${q.text} : ${q.time} s`);
+      assert.ok(check(q, String(q.answer)).ok);
+    }
+    if (makeQuestion(i * 6151 + 7, i % 15, 'chartier', 'normal', 0, 15, 'risk').rubric === 'Informatique') risk++;
+  }
+  assert.ok(code > 5, `QCM avec du code tirés : ${code}`);
+  assert.ok(risk > 5, `informatique au poste Risques : ${risk}`);
+  for (const id of ['sql_tj_gain', 'sql_tj_perte', 'sql_tj_doublons']) assert.ok(SQL_QUESTIONS.find((q) => q.id === id), id);
+});
+
 t('The Candidate : règles maison (vies, jokers, code, coupe, sabotage)', () => {
   const players = [0, 1, 2, 3].map((id) => ({ id, name: 'P' + id }));
   const def = createGame({ players, cfg: { mode: 'chartier', len: 15 }, seed: 1, now: 0 });

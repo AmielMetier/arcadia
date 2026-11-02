@@ -9,20 +9,19 @@ import { updateBots } from './bots.js';
 export const DT = 1 / 60;
 export const SPEED = { walk: 3.0, run: 4.7, crouch: 1.5, crawl: 0.55, mWalk: 3.8, mSprint: 5.9 };
 export const R_BODY = 0.3;
-export const WAKE_T = 90;          // le monstre reste en cage au début
+export const WAKE_T = 75;          // le monstre reste enfermé dans le labo Alpha au début : il peut y marcher, ses portes sont bloquées
 export const SLOTS = 3;            // cases libres en plus de la lampe
 export const MAX_CAMS = 4;
-export const CD = { atk: 1.5, lights: 40, jam: 18, cam: 8, smash: 35 };
-export const LIGHTS_OFF_T = 25, JAM_T = 10, BLEED_T = 45, RECOVER_T = 35, REVIVE_T = 4, FINISH_T = 1.4, CACHE_T = 4, SMASH_T = 2.5, SMASH_LOSS = 15, FUSES = 3, SCAN_T = 3, AUDIO_T = 4, STUN_T = 1.7, STUN_IMMUNE = 18;
-export const SATED_T = 70, HIT_DMG = 34;   // après une mise à terre, le monstre ne peut plus frapper pendant un moment
+export const CD = { atk: 1.5, lights: 40, jam: 18, cam: 8, smash: 35, roar: 22 };
+export const LIGHTS_OFF_T = 25, JAM_T = 10, BLEED_T = 45, RECOVER_T = 35, REVIVE_T = 4, FINISH_T = 1.4, CACHE_T = 3, SMASH_T = 2.5, SMASH_LOSS = 15, FUSES = 3, SCAN_T = 3, AUDIO_T = 4, STUN_T = 1.7, STUN_IMMUNE = 18;
+export const SATED_T = 65, HIT_DMG = 34, ROAR_R = 13;   // après une mise à terre, le monstre ne peut plus frapper pendant un moment
 export const GEN_T = 170;          // secondes pour un seul enquêteur
 export const LIFT = { firstDown: 40, down: 12, up: 7, go: 3 };
 export const REACH = 2.2;
 export const ITEMS = {
   photo: { name: 'Appareil photo', icon: '📷', n: 6, use: 'Photographier : une preuve et un éclair qui sonne le monstre' },
   emf: { name: 'Capteur EMF', icon: '📡', n: 1, use: 'Maintiens le clic sur une trace ou près du monstre pour l\'enregistrer' },
-  cams: { name: 'Caméras', icon: '🎥', n: 2, use: 'Pose une caméra sur le mur devant toi' },
-  tablet: { name: 'Tablette', icon: '📱', n: 1, use: 'Regarde les caméras posées' },
+  cams: { name: 'Kit caméras', icon: '🎥', n: 2, keep: true, use: 'Clic : pose une caméra · T : regarde les écrans' },
   pile: { name: 'Pile', icon: '🔋', n: 1, use: 'Recharge ta lampe', max: 3 },
   fuse: { name: 'Fusible', icon: '🔌', n: 1, use: 'À brancher sur le générateur', max: 3 },
   bleu: { name: 'Badge bleu', icon: '🟦', n: 1, use: 'Ouvre le sas de l\'aile B' },
@@ -65,7 +64,7 @@ export function speedOf(p, run) {
   // touché : l'adrénaline donne une seconde et demie pour décrocher
   return (run && p.stam > 0.5 ? SPEED.run : SPEED.walk) * (p.mul || 1) * (p.inv0 > 0 ? 1.35 : 1);
 }
-export function canMove(p) { return (p.st === 'ok' || p.st === 'down') && p.hide < 0 && !(p.stun > 0) && !(p.wake > 0) && !(p.stall > 0); }
+export function canMove(p) { return (p.st === 'ok' || p.st === 'down') && p.hide < 0 && !(p.stun > 0) && !(p.stall > 0); }
 export function movePlayer(M, w, p, inp, dt) {
   p.yaw = inp.yaw; p.pitch = inp.pitch;
   p.crouch = !!inp.crouch && p.role !== 'm' && p.st === 'ok';
@@ -186,7 +185,7 @@ export class Sim {
   spawnWorld() {
     const { M, w, rng } = this;
     const item = (k, x, z, n, stock) => { const it = { id: w.nid++, k, x, z, y: floorAt(M, x, z, DEEP) + (M.t[Math.floor(z) * W + Math.floor(x)] === T.PROP ? 0.95 : 0.03), n: n ?? ITEMS[k].n }; if (stock) it.stock = 1; w.items.push(it); return it; };
-    for (const c of M.crates) { const it = item(c.k, c.x, c.z, c.n, true); it.y = 0.9; }
+    for (const c of M.crates) { const it = item(c.k, c.x, c.z, c.n, true); it.y = 0.8; }
     const pickAt = (list) => { const [x, z] = rng.pick(list); return [x + 0.5, z + 0.5]; };
     // dans les meubles : le badge en aile A, la clé en aile B, un fusible par zone et un de secours en aile B
     const inZone = (z) => rng.shuffle(M.caches.filter((c) => c.zone === z));
@@ -194,7 +193,7 @@ export class Sim {
     w.caches[a[0].id].loot = 'bleu'; w.caches[b[0].id].loot = 'orange';
     w.caches[a[1].id].loot = 'fuse'; w.caches[b[1].id].loot = 'fuse'; w.caches[b[2].id].loot = 'fuse'; w.caches[u[0].id].loot = 'fuse';
     for (const c of [a[2], b[3], u[1]]) w.caches[c.id].loot = 'pile';
-    for (const [x, z] of rng.shuffle([...M.spots.pile]).slice(0, 9)) item('pile', x + 0.5, z + 0.5);
+    for (const [x, z] of rng.shuffle([...M.spots.pile]).slice(0, 6)) item('pile', x + 0.5, z + 0.5);
     // traces : au moins une par zone, et cinq en tout
     const byZone = {};
     for (const s of M.spots.trace) (byZone[s[2]] ||= []).push(s);
@@ -209,12 +208,16 @@ export class Sim {
       id, name, color, bot, role, level: level || this.level, spectator,
       x: role === 'm' ? M.spawns.monster.x : sp[0] + 0.5, z: role === 'm' ? M.spawns.monster.z : sp[1] + 0.5, y: 0,
       yaw: role === 'm' ? Math.PI / 2 : 0, pitch: 0, hp: 100, stam: 100, batt: 100, torch: role === 's', crouch: false, run: false, moving: false,
-      st: spectator ? 'dead' : 'ok', hide: -1, inv: [null, null, null], sel: 0, proofs: 0, audio: false, kills: 0, downT: 0, inv0: 0,
-      energy: 1, sated: 0, stun: 0, immune: 0, slow: 0, stall: 0, atkT: 0, wake: role === 'm' ? WAKE_T : 0, cd: { atk: 0, lights: 0, jam: 0, cam: 0, smash: 0 }, hold: null, holdFrac: 0, scan: 0, scanTrace: 0, audioT: 0, flashCd: 0, stepAcc: 0, inp: emptyInput(), prevC: emptyInput(), ack: 0, escaped: false,
+      st: spectator ? 'dead' : 'ok', hide: -1, inv: [role === 's' ? { k: 'photo', n: ITEMS.photo.n } : null, null, null], sel: 0, proofs: 0, audio: false, kills: 0, downT: 0, inv0: 0,
+      energy: 1, sated: 0, stun: 0, immune: 0, slow: 0, stall: 0, atkT: 0, wake: role === 'm' ? WAKE_T : 0, cd: { atk: 0, lights: 0, jam: 0, cam: 0, smash: 0, roar: 0 }, hold: null, holdFrac: 0, scan: 0, scanTrace: 0, audioT: 0, flashCd: 0, stepAcc: 0, inp: emptyInput(), prevC: emptyInput(), ack: 0, escaped: false,
     };
     p.y = floorAt(M, p.x, p.z, this.w.lift.y);
     p.inp.yaw = p.yaw;
-    if (role === 'm') this.w.monster = id;
+    if (role === 'm') {
+      this.w.monster = id;
+      // au tout début, les portes de sa pièce restent bloquées tant qu'il n'est pas réveillé
+      if (this.w.t < 1) M.doors.forEach((d, i) => { if (d.name === 'Labo Alpha') this.w.doors[i].jam = WAKE_T; });
+    }
     this.players.push(p); this.byId.set(id, p);
     this.dirty = true;
     return p;
@@ -296,8 +299,8 @@ export class Sim {
         const l = M.lockers[tg.id], q = this.players.find((o) => o.hide === l.id);
         this.emit({ e: 'bang', x: l.x, z: l.z, y: l.y });
         this.noise(l.x, l.z, 12, p.id);
-        if (q) { q.hide = -1; q.x = l.fx; q.z = l.fz; this.knockDown(q, p); p.stall = 0.8; this.emit({ e: 'found', id: q.id, by: p.id }); }
-        else p.stall = 1.4;
+        if (q) { q.hide = -1; q.x = l.fx; q.z = l.fz; this.knockDown(q, p); p.stall = 0.6; this.emit({ e: 'found', id: q.id, by: p.id }); }
+        else p.stall = 0.7;
         break;
       }
       case 'door': {
@@ -344,13 +347,14 @@ export class Sim {
         }
       }
     } else if (s.k === 'cams') {
+      if (s.n <= 0) return; // le kit vide reste : il ouvre aussi les écrans
       if (w.cams.length >= MAX_CAMS) { this.emit({ e: 'info', id: p.id, msg: `${MAX_CAMS} caméras au plus` }); return; }
       // sur le mur devant soi, à moins de 2 m ; sinon au sol
       const sx = -Math.sin(p.yaw), sz = -Math.cos(p.yaw);
       let cx = p.x + sx * 0.5, cz = p.z + sz * 0.5, wall = false;
       for (let d = 0.2; d <= 2; d += 0.1) { const x = p.x + sx * d, z = p.z + sz * d, i = Math.floor(z) * W + Math.floor(x); if (M.t[i] === T.WALL) { wall = true; cx = p.x + sx * (d - 0.15); cz = p.z + sz * (d - 0.15); break; } }
       w.cams.push({ id: w.nid++, x: +cx.toFixed(2), z: +cz.toFixed(2), y: +(p.y + (wall ? 2.3 : 0.25)).toFixed(2), yaw: +(p.yaw + Math.PI).toFixed(3), wall, by: p.id });
-      s.n--; if (s.n <= 0) p.inv[p.sel] = null;
+      s.n--;
       this.touch();
       this.emit({ e: 'cam', id: p.id, x: cx, z: cz, y: p.y });
     } else if (s.k === 'pile') this.reload(p);
@@ -395,13 +399,19 @@ export class Sim {
       if (!best) { this.emit({ e: 'info', id: p.id, msg: 'Aucune caméra à portée' }); return; }
       w.cams = w.cams.filter((c) => c !== best); p.cd.cam = CD.cam; this.touch();
       this.emit({ e: 'camdead', id: best.id, x: best.x, y: best.y, z: best.z });
+    } else if (which === 'roar' && p.cd.roar <= 0) {
+      // le hurlement glace ceux qui sont tout près : souffle coupé, lampe qui vacille chez eux
+      p.cd.roar = CD.roar;
+      for (const q of this.players) if (q.role === 's' && q.st === 'ok' && Math.abs(q.y - p.y) < 3 && Math.hypot(q.x - p.x, q.z - p.z) < ROAR_R) q.stam = Math.max(0, q.stam - 30);
+      this.touch();
+      this.emit({ e: 'roar', x: p.x, y: p.y, z: p.z, id: p.id });
     }
   }
 
   // ---------------------------------------------------------------- coups
   knockDown(q, by) {
     q.hp = 0; q.st = 'down'; q.downs = (q.downs || 0) + 1; q.downT = q.downs >= 2 ? BLEED_T : RECOVER_T; q.run = false; q.hold = null; q.holdFrac = 0; q.torch = false;
-    if (by) { by.stall = 2.5; by.sated = SATED_T; } // il savoure, et les enquêteurs ont un répit
+    if (by) { by.stall = 1.8; by.sated = SATED_T; } // il savoure, et les enquêteurs ont un répit
     this.touch();
     this.emit({ e: 'down', id: q.id, by: by ? by.id : -1, x: q.x, z: q.z, y: q.y });
     this.checkEnd();
@@ -447,7 +457,7 @@ export class Sim {
     // appuis (compteurs : un appui très bref ou un paquet perdu ne se perd pas)
     if ((inp.sel | 0) !== p.sel && inp.sel >= 0 && inp.sel < SLOTS) { p.sel = inp.sel | 0; this.touch(); }
     if (inp.tc !== pc.tc && p.role === 's' && p.st === 'ok' && p.hide < 0) { if (p.batt > 0) p.torch = !p.torch; this.emit({ e: 'torch', id: p.id, on: p.torch, x: p.x, z: p.z, y: p.y }); }
-    if (inp.rc !== pc.rc && p.role === 's' && p.st === 'ok') this.reload(p);
+    if (inp.rc !== pc.rc && p.st === 'ok') { if (p.role === 's') this.reload(p); else this.ability(p, 'roar'); }
     if (inp.dc !== pc.dc && p.role === 's' && p.st === 'ok') this.dropSlot(p, p.sel);
     if (inp.uc !== pc.uc && p.st === 'ok') this.usePress(p);
     if (inp.fc !== pc.fc && p.st === 'ok') this.firePress(p);
@@ -560,9 +570,11 @@ export class Sim {
       if (tg.kind === 'cache') {
         const c = M.caches[tg.id], st = w.caches[tg.id];
         st.done = true; this.touch();
-        const it = st.loot && this.dropItem(st.loot, 1, c.x, c.z);
-        if (it) it.y = c.y + 1;
-        this.emit({ e: 'found', id: p.id, what: st.loot ? ITEMS[st.loot].name : '', k: st.loot, x: c.x, z: c.z, y: c.y, empty: !st.loot });
+        // ce qu'on trouve va droit dans le sac s'il y a de la place, sinon ça reste sur le meuble
+        const k = st.loot, def = k && ITEMS[k], room = k && (p.inv.includes(null) || (def.max && p.inv.some((s) => s && s.k === k && s.n < def.max)));
+        if (room) this.giveItem(p, k, 1);
+        else if (k) { const it = this.dropItem(k, 1, c.x, c.z); it.y = c.y + 1; }
+        this.emit({ e: 'found', id: p.id, what: k ? def.name : '', k, x: c.x, z: c.z, y: c.y, empty: !k, taken: !!room });
         return;
       }
       if (tg.kind === 'smash') { w.gen = Math.max(0, w.gen - SMASH_LOSS); p.cd.smash = CD.smash; this.touch(); this.emit({ e: 'smash', x: M.generator.x, z: M.generator.z, gen: w.gen }); this.noise(M.generator.x, M.generator.z, 30, -1); return; }

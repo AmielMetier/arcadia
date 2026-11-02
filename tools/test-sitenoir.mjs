@@ -146,8 +146,16 @@ section('objets et portes à clé');
   s.inp.use = false; run(sim, 0.1); s.inp.use = true; run(sim, 2); ok(!sim.w.caches[cb.id].done, 'lâcher recommence la fouille');
   run(sim, 2.2); s.inp.use = false; s.botTarget = null;
   ok(sim.w.caches[cb.id].done, 'meuble fouillé');
-  const b = sim.w.items.find((i) => i.k === 'bleu');
-  ok(!!b, 'le badge apparaît');
+  ok(s.inv.some((q) => q && q.k === 'bleu') && !sim.w.items.some((i) => i.k === 'bleu'), 'le badge trouvé va droit dans le sac');
+  ok(s.inv[0] && s.inv[0].k === 'photo', 'on part avec l\'appareil photo');
+  // sac plein : il reste sur le meuble, et on peut l'y prendre
+  s.inv = [{ k: 'photo', n: 6 }, { k: 'pile', n: 1 }, { k: 'emf', n: 1 }];
+  const cb2 = M.caches.find((c) => sim.w.caches[c.id].loot === 'orange');
+  s.botTarget = { kind: 'cache', id: cb2.id }; place(s, cb2.x, cb2.z + 1); s.y = cb2.y; s.inp.use = true; run(sim, 3.2); s.inp.use = false; s.botTarget = null;
+  ok(sim.w.items.some((i) => i.k === 'orange') && !s.inv.some((q) => q && q.k === 'orange'), 'sac plein : la clé reste sur le meuble');
+  sim.w.items = sim.w.items.filter((i) => i.k !== 'orange');
+  const b = sim.dropItem('bleu', 1, s.x, s.z - 0.5);
+  s.inv = [{ k: 'photo', n: 6 }, null, null];
   look(s, b.x, b.z);
   tg = interactTarget(M, sim.w, sim.players, s);
   ok(tg && tg.kind === 'item', 'on voit le badge : ' + JSON.stringify(tg));
@@ -176,7 +184,7 @@ section('objets et portes à clé');
   s.inp.uc = 7; sim.step(DT);
   ok(crate.n === n0 - 1, 'pas deux fois le même outil');
   // inventaire plein : échange avec la case tenue
-  s.inv = [{ k: 'photo', n: 6 }, { k: 'cams', n: 2 }, { k: 'tablet', n: 1 }]; s.sel = 1; s.inp.sel = 1;
+  s.inv = [{ k: 'photo', n: 6 }, { k: 'cams', n: 2 }, { k: 'emf', n: 1 }]; s.sel = 1; s.inp.sel = 1;
   const pile = sim.dropItem('pile', 1, s.x, s.z - 0.5);
   look(s, pile.x, pile.z);
   s.inp.uc = 8; sim.step(DT);
@@ -416,9 +424,40 @@ section('sabotages');
   const c = new Sim({ seed: 3 }); const cm = c.addPlayer({ id: 1, name: 'M', color: '#111111', role: 'm' }); c.addPlayer({ id: 2, name: 'S', color: '#222222' });
   const x0 = cm.x; cm.inp.my = 1; cm.inp.a1 = 1; cm.inp.fc = 1;
   run(c, 5);
-  ok(cm.x === x0 && cm.z === c.M.spawns.monster.z, 'en cage : immobile');
-  ok(!Object.keys(c.w.dark).length && cm.atkT <= 0, 'en cage : pas de pouvoir');
   ok(Math.abs(cm.wake - (WAKE_T - 5)) < 0.1, 'le compte à rebours tourne');
+  ok(cm.x !== x0, 'enfermé : le monstre peut marcher dans sa pièce');
+  ok(!Object.keys(c.w.dark).length && cm.atkT <= 0, 'enfermé : pas de pouvoir');
+  const alpha = c.M.doors.filter((d) => d.name === 'Labo Alpha');
+  ok(alpha.length && alpha.every((d) => c.w.doors[d.id].jam > 0 && !c.w.doors[d.id].open), 'enfermé : ses portes sont bloquées');
+  cm.inp.my = 1; run(c, 12); const zn = zoneAt(c.M, cm.x, cm.z); ok(cm.x >= 10 && cm.x <= 19 && cm.z >= 6 && cm.z <= 19 && zn === Z.B, 'enfermé : il ne sort pas de la pièce');
+  run(c, WAKE_T);
+  ok(cm.wake === 0 && alpha.every((d) => !(c.w.doors[d.id].jam > 0)), 'réveillé : les portes se débloquent');
+}
+
+section('hurlement, kit caméras, table de matériel');
+{
+  const { sim, s, m } = newGame();
+  place(m, 30, 25); m.y = 0; place(s, 35, 25); s.y = 0; s.stam = 100;
+  m.inp.rc = 1; sim.step(DT);
+  ok(m.cd.roar > 0 && s.stam <= 70.5, 'le hurlement coupe le souffle tout près');
+  ok(sim.drainEvents().some((e) => e.e === 'roar'), 'tout le monde l\'entend');
+  const stam = s.stam; m.inp.rc = 2; sim.step(DT); ok(s.stam >= stam, 'puis il faut attendre');
+  s.inv = [{ k: 'cams', n: 1 }, null, null]; s.sel = 0; s.inp.sel = 0; place(s, 30, 25); s.inp.fc = (s.inp.fc | 0) + 1; sim.step(DT);
+  ok(sim.w.cams.length === 1 && s.inv[0] && s.inv[0].n === 0, 'le kit vide reste dans le sac : il ouvre les écrans');
+  s.inp.fc++; sim.step(DT); ok(sim.w.cams.length === 1, 'plus de caméra à poser');
+  const stock = sim.w.items.filter((i) => i.stock);
+  ok(stock.length === 3 && stock.every((i) => M.t[Math.floor(i.z) * M.W + Math.floor(i.x)] === T.PROP), 'trois objets sur la table de matériel, et rien d\'autre');
+  ok(!ITEMS.tablet, 'la tablette fait partie du kit');
+}
+
+section('signalétique');
+{
+  const nav = new Nav(M), walk = (i) => M.t[i] === T.FLOOR;
+  for (const r of M.routes) ok(nav.find(r.a[0], r.a[1], r.b[0], r.b[1], walk), `la bande ${r.a} → ${r.b} suit un chemin`);
+  for (const g of M.signs) {
+    const cx = Math.floor(g.x + g.nx * 0.5), cz = Math.floor(g.z + g.nz * 0.5), bx = Math.floor(g.x - g.nx * 0.5), bz = Math.floor(g.z - g.nz * 0.5);
+    ok(M.t[cz * M.W + cx] !== T.WALL && M.t[bz * M.W + bx] !== T.FLOOR, `panneau ${g.text} (${g.x}, ${g.z}) posé sur un mur, face à un passage`);
+  }
 }
 
 section('générateur saboté, soin');

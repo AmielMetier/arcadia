@@ -1,0 +1,16 @@
+Sons de Site Noir : découpés, normalisés et convertis en MP3 mono. Tous en domaine public (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/).
+
+Liminal Games, Free Horror SFX vol. 1 et 2 (https://liminal-space-dev.itch.io/free-horror-sfx-sounds)
+  pas-beton, pas-sourd, pas-metal, pas-escalier, pas-gravier, pas-monstre, fond-dehors, grondement, grince, porte
+  (l'auteur demande de ne pas redistribuer le pack lui-même : seuls ces extraits sont ici, ils ne servent qu'à ce jeu)
+
+OpenGameArt (https://opengameart.org)
+  fond-batiment : « Abandoned passages » de congusbongus, /content/abandoned-passages-horror-ambience-loop
+  fond-sous-sol : « Dripping water loop » d'Independent.nu, /content/dripping-water-loop
+  fond-chasse : « Cage of the Cryptid » de Joth, /content/ambience-pack-1-sci-fi-horror
+  coeur : « Heartbeat » d'Independent.nu, /content/heartbeat-single-sound
+  souffle : « Ghost breath » de qubodup, /content/ghost-breath
+  gemit : « Ghost Monster Voice » de qubodup, /content/ghost-monster-voice-moaning-growling
+  lampe-on : « 7 mechanical clicks and buzzes » de qubodup, /content/7-mechanical-clicks-and-buzzes
+  lampe-off, metal : « Metal Interactions » de qubodup, /content/metal-interactions
+  grogne, hurlement, cri, enfants : « Monster or beast sounds » de pauliuw, /content/monster-or-beast-sounds

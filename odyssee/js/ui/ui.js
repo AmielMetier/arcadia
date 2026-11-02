@@ -160,10 +160,12 @@ export class UI {
     escBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('b'); });
     const hudBtn = el('button', 'keyhint', '<b>U</b> HUD'); hudBtn.type = 'button'; hudBtn.tabIndex = -1;
     hudBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('hud'); });
-    bar.append(btn, escBtn, hudBtn);
+    const runBtn = el('button', 'keyhint', '<b>R</b> Course'); runBtn.type = 'button'; runBtn.tabIndex = -1;
+    runBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('autorun'); });
+    bar.append(btn, escBtn, hudBtn, runBtn);
     const panel = el('div', 'keypanel box', `<div class="list-title">Commandes</div><table class="kv">
       <tr><td>Se déplacer</td><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
-      <tr><td>Courir</td><td><kbd>Maj</kbd> maintenue</td></tr>
+      <tr><td>Courir / Course continue</td><td><kbd>Maj</kbd> maintenue · <kbd>R</kbd> (ou bouton COURSE) pour courir en continu</td></tr>
       <tr><td>Parler, interagir, valider</td><td><kbd>F</kbd> (ou <kbd>Espace</kbd>, <kbd>Entrée</kbd>)</td></tr>
       <tr><td>Annuler, revenir</td><td><kbd>Échap</kbd> (ou <kbd>Retour arrière</kbd>)</td></tr>
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
