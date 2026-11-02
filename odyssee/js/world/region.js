@@ -14,6 +14,7 @@ import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
 import { enrichirTout, equipeDeType } from './rencontres.js';
 import { addHabitants } from './habitants.js';
+import { applyRetouches } from './retouches.js';
 
 // trois capsules sur la table du labo, une par type ; dans chacune, trois partenaires au choix :
 // la créature originale d'Odyssée, le Pokémon de Rouge / Bleu et celui d'Or / Argent (avec leurs évolutions)
@@ -868,6 +869,8 @@ export function buildWorld() {
   // la vie des villes : les requêtes des habitants (et les deux combats d'après la Ligue)
   addHabitants({ W, maps, towns, routes });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
+  // retouches faites dans l'éditeur de la version test et intégrées au jeu (world/retouches.js)
+  applyRetouches(maps);
   return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
 }
 

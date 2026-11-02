@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 3.64 — 2 novembre 2026
+- **Odyssée** — Les herbes, les grottes et la mer accueillent tous les Pokémon qu'on y croise dans les jeux, de Rouge à X / Y : plus de 40 espèces dès la route 1.
+  - Chaque arène compte quatre dresseurs, avec des Pokémon de son type venus des six générations.
+- **Odyssée** — Natures, EV et IV comme dans les jeux : visibles dans le résumé de chaque Pokémon.
+  - Chaque Centre de soins a un PC des Natures pour changer celle d'un Pokémon.
+  - En combat, chaque attaque montre les dégâts prévus en % des PV du Pokémon d'en face.
+- **Odyssée** — Au labo, trois partenaires par capsule : celui d'Odyssée, celui de Kanto et celui de Johto. Théo prend toujours celui qui a l'avantage, de la même famille que le tien.
+- **Odyssée** — Le Pokémon de tête marche derrière toi, comme dans HeartGold / SoulSilver (les partenaires de départ et leurs évolutions). Parle-lui ! Une option permet de le ranger.
+- **Odyssée** — La carte se cadre sur ce que tu as exploré et s'élargit à mesure que tu avances ; le reste de la région est dans le noir.
+- **Odyssée** — Un vrai journal de quêtes : de courtes phrases qui rappellent ce qu'on t'a demandé et ce qui s'est passé, avec le temps de jeu depuis que tu as accepté. Plus d'indice ni de destination.
+  - 22 nouvelles requêtes d'habitants dans toute la région, et deux combats après la Ligue : la revanche de Drakos et un dernier duel contre Théo.
+- **Odyssée Test** — Nouveau dans le Hub : on choisit un lieu et une équipe prête pour essayer les nouveautés, sans toucher à sa partie. Un éditeur permet de peindre le terrain, poser du décor, des habitants, des panneaux et des maisons, puis d'exporter ses retouches.
+- **Odyssée** — Corrections : un combat entre joueurs pouvait se désynchroniser en fin de tour ; deux filles nommées Lucie à Sylvebourg (le médaillon est maintenant celui de Margaux).
+
 ## 3.63 — 2 novembre 2026
 - **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
   - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.

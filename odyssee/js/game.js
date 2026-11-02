@@ -90,7 +90,7 @@ export class Game {
     await this.ui.fade(false, 400);
     if (!state.flags.intro) { state.flags.intro = true; this.busy = true; await this.ui.say(['Une douce lumière filtre à travers les rideaux...', `Aujourd'hui, ${state.name}, ton aventure commence !`, 'Appuie sur H à tout moment pour revoir les touches.']); this.busy = false; }
   }
-  hour() { if (this.eclipseOn()) return 0.5; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
+  hour() { if (this.eclipseOn()) return 0.5; if (this.hourOverride != null) return this.hourOverride; const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
   /** la nuit violette, entre la victoire contre Nocturne au repaire et le réveil de Lugia */
   eclipseOn() { const f = this.state?.flags || {}; return !!f.eclipse && !f.lugia; }
   setEclipse() { this.view.eclipse = this.eclipseOn(); this.view.setTimeOfDay(this.hour()); this.updateOverlay(); this.refreshNpcs(); }
@@ -445,8 +445,8 @@ export class Game {
     if (z?.trigger && await this.trigger(z.trigger)) return;
     if (await this.checkTrainers()) return;
     // rencontres sauvages : hautes herbes, grottes, et la mer de l'archipel quand on surfe
-    const enc = m.outdoor ? z?.enc : m.encounter;
-    if (p.surf && t === T.WATER) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
+    const enc = this.noEnc ? null : m.outdoor ? z?.enc : m.encounter;   // noEnc : version test, rencontres coupées
+    if (p.surf && t === T.WATER && !this.noEnc) { const sea = m.zoneAt(p.x, p.y), enc = sea?.surfEnc || sea?.enc || m.surfEnc; if (enc && Math.random() < 0.05) await this.wildBattle(enc); return; }
     if (enc && (isGrassEnc(t) || (!m.outdoor && t === T.CAVE))) {
       const rate = isGrassEnc(t) ? (t === T.DARKTALL ? 0.12 : 0.1) : 0.065;
       if (Math.random() < rate) await this.wildBattle(enc);

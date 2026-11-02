@@ -97,6 +97,20 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   joue toutes les quêtes de bout en bout (à lancer quand on touche aux quêtes). Animations de terrain HGSS (mer, rivages, fleurs) :
   `odyssee/img/hgss/`, extraites par `tools/odyssee-hgss.py`, qui découpe aussi les icônes de la carte de la région (style Pokégear,
   `assets/graphics/hgss/carte_guide.png` → `odyssee/img/carte/`).
+  Rencontres : chaque zone reçoit aussi tous les Pokémon des lieux équivalents des jeux officiels (Rouge à X / Y), générés
+  par `node tools/odyssee-rencontres.mjs <csv PokeAPI>` dans `odyssee/js/data/rencontres.js` (avec les points d'effort EV) ;
+  le mélange avec les tables faites main se fait dans `odyssee/js/world/rencontres.js` (aussi : équipes à thème des arènes).
+  Natures, EV et IV : `odyssee/js/core/mon.js` ; dégâts prévus en % : `Battle.damagePreview` (ne touche pas au générateur
+  aléatoire, pour les combats en réseau). Partenaires de départ (3 par capsule) : `STARTER_CHOICES` de `world/region.js`.
+  Pokémon qui suit le dresseur : `followTick` / `drawFollower` de `game.js`, sprites `odyssee/img/suiveurs.png`
+  (`python3 tools/odyssee-suiveurs.py [clone pret/pokeheartgold]`, empilés sous `chars.png` au chargement).
+  Journal des quêtes (`odyssee/js/core/questsData.js`) : un carnet de phrases de rappel, sans indice ni destination ;
+  chaque quête y est un `started` / `done` / `notes` lu sur les drapeaux. Requêtes des habitants : `odyssee/js/world/habitants.js`
+  (`show`, `bring`, `check`, `relay`, `duel`, jouées par `mission()` de `js/story.js`, acceptées = drapeau `A:id`) ;
+  `node tools/test-odyssee-habitants.mjs` les joue toutes, `node tools/test-odyssee-journal-quetes.mjs` teste le journal.
+  Odyssée Test (`odyssee/test/`, jeu `odysseetest` du Hub) : le vrai jeu avec `window.ODYSSEE_TEST`, un labo pour choisir
+  lieu et équipe (`odyssee/js/labo/labo.js`, rien n'est sauvegardé) et un éditeur de carte (`odyssee/js/labo/editeur.js`) ;
+  ses retouches exportées se collent dans `odyssee/js/world/retouches.js`, appliquées à la fin de `buildWorld`.
   Les outils de dessin (atelier graphique, vitrine, sources PixelLab, scripts de découpe des sols, kits, personnages
   et créatures à 16 px) vivent sur la branche `atelier` du fork ; `main` ne garde que le jeu.
   Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds

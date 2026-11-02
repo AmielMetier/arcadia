@@ -1969,11 +1969,11 @@ img { image-rendering: pixelated; }
 .mbtn .mpp { font-weight: 700; color: #ffe058; font-variant-numeric: tabular-nums; }
 .mbtn .mpp.zero { color: #ff5858; }
 /* dégâts prévus sur le Pokémon d'en face (% de ses PV max) : petite étiquette en haut à droite de la carte */
+/* (à la place de la puissance, dans le rail du bas : la puissance reste dans l'infobulle) */
 .mbtn .mdmg {
-  position: absolute; right: calc(var(--bp) * 13); top: calc(var(--bp) * 1.4);
-  font-size: 0.56em; font-weight: 700; font-variant-numeric: tabular-nums;
-  padding: 0 calc(var(--bp) * 1.4); background: #080a10cc; color: #e8f0ff;
-  border: calc(var(--bp) * 0.5) solid #080a10; text-shadow: none; pointer-events: none;
+  font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 0 calc(var(--bp) * 1.4); background: #080a10; color: #e8f0ff;
+  border: calc(var(--bp) * 0.5) solid #34465e; text-shadow: none;
 }
 .mbtn .mdmg.maybe { color: #ffd060; }
 .mbtn .mdmg.ko { color: #ff6a58; }

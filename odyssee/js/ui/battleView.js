@@ -493,7 +493,7 @@ export class BattleView {
         // dégâts prévus sur le Pokémon d'en face, en % de ses PV (sans coup critique)
         const dp = this.battle.damagePreview ? this.battle.damagePreview(0, 1, x.id) : null;
         const dmgTxt = !dp ? '' : dp.eff === 0 ? '<span class="mdmg none">Aucun effet</span>'
-          : `<span class="mdmg${dp.sure ? ' ko' : dp.ko ? ' maybe' : ''}" title="Dégâts prévus sur ${esc(monName(this.battle.foe))} (sans coup critique)">${dp.lo === dp.hi ? dp.lo : `${dp.lo}–${dp.hi}`} %${dp.eff > 1 ? ' ▲' : dp.eff < 1 ? ' ▼' : ''}</span>`;
+          : `<span class="mdmg${dp.sure ? ' ko' : dp.ko ? ' maybe' : ''}" title="Dégâts prévus sur ${esc(monName(this.battle.foe))} (sans coup critique) · puissance ${M.p || '—'}">${Math.round(dp.lo) === Math.round(dp.hi) ? Math.round(dp.lo) : `${Math.round(dp.lo)}–${Math.round(dp.hi)}`} %${dp.eff > 1 ? ' ▲' : dp.eff < 1 ? ' ▼' : ''}</span>`;
         return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
           <div class="mbtn-top">
             <span class="mn">${esc(M.n)}</span>
@@ -501,10 +501,9 @@ export class BattleView {
           </div>
           <div class="mbtn-bot">
             <span class="mt">${TYPE_FR[M.t]}</span>
-            <span class="mpw">${pwTxt}</span>
+            ${dmgTxt || `<span class="mpw">${pwTxt}</span>`}
             <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
           </div>
-          ${dmgTxt}
         </div>`;
       }).join('')}</div>`;
       this.cmd.classList.add('on', 'moves'); this.root.classList.add('cmdon');
