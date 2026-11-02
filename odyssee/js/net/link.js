@@ -61,7 +61,7 @@ export class Link {
       const prev = this.others.get(String(from));
       this.others.set(String(from), {
         id: from, name: String(m.name || info?.name || 'Dresseur').slice(0, 12), color: info?.color || '#5a88c8',
-        gender: m.gender === 'f' ? 'f' : 'm', map: m.map, x: m.x, y: m.y, dir: m.dir || 'down', run: !!m.run, busy: !!m.busy, t: Date.now(),
+        gender: m.gender === 'f' ? 'f' : 'm', tn: typeof m.tn === 'string' && m.tn.length < 20 ? m.tn : '', map: m.map, x: m.x, y: m.y, dir: m.dir || 'down', run: !!m.run, busy: !!m.busy, t: Date.now(),
         // position affichée (interpolée) : on la garde d'un message à l'autre sur la même carte
         dx: prev && prev.map === m.map ? prev.dx : m.x, dy: prev && prev.map === m.map ? prev.dy : m.y, step: prev?.step || 0,
       });

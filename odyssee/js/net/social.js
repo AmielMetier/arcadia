@@ -10,6 +10,7 @@ import { isGrassEnc } from '../world/tiles.js';
 import { partyScreen, cardScreen, trainerCard, TYPE_FR } from '../ui/screens.js';
 import { BADGES } from '../world/region.js';
 import { el, esc, wait } from '../ui/ui.js';
+import { tenueCode, tenueDecode, composer } from '../render/tenue.js';
 
 const WALK = 0.26, RUN = 0.135;
 const trainerSprite = (gender) => (gender === 'f' ? 'serena' : 'calem');
@@ -26,7 +27,7 @@ export function installSocial(game) {
     return {
       map: game.mapObj.id, x: p.move ? p.move.tx : p.x, y: p.move ? p.move.ty : p.y, dir: p.dir,
       run: game.input.isDown('run'), busy: !!(game.busy || !game.input.free || game.bv.alive || game.session),
-      name: st.name, gender: st.gender,
+      name: st.name, gender: st.gender, tn: st.tenue ? tenueCode(st.tenue) : undefined,
     };
   };
   link.onRequest = (from, m) => onRequest(game, from, m);
@@ -55,7 +56,11 @@ export function installSocial(game) {
       if (o.map !== mapId) continue;
       const id = 'peer:' + o.id; seen.add(id);
       const a = v.actor(id, {});
-      v.setFrame(a, o.gender === 'f' ? 'green' : 'red', o.dir, o.walking ? (o.step % 2 ? 1 : 2) : 0);
+      // sa tenue, composée sur le modèle de base (sinon le dresseur ou la dresseuse par défaut)
+      let spr = o.gender === 'f' ? 'green' : 'red';
+      const T = o.tn && tenueDecode(o.tn), b = T && v.baseDe?.(T.genre);
+      if (b) spr = v.pairSprite(o.tn, () => composer(b.src, b.sx, b.sy, T)) || (T.genre === 'f' ? 'green' : 'red');
+      v.setFrame(a, spr, o.dir, o.walking ? (o.step % 2 ? 1 : 2) : 0);
       v.place(a, o.dx, o.dy, 0, isGrassEnc(game.mapObj.get(Math.round(o.dx), Math.round(o.dy))) && !o.walking);
     }
     for (const id of [...v.actors.keys()]) if (id.startsWith('peer:') && !seen.has(id)) v.removeActor(id);

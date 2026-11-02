@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.72 — 3 novembre 2026
+- **Odyssée** — À plusieurs, les autres joueurs apparaissent avec la tenue qu'ils se sont choisie.
+
 ## 3.71 — 3 novembre 2026
 - **Odyssée** — Portraits de combat pour Morgane, Gaspard, Ferdinand, Lilas et Corbin, et un nouveau portrait de Théo qui lui ressemble enfin (cheveux bleus et écharpe rouge).
 

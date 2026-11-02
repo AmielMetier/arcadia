@@ -75,6 +75,7 @@ export const CHAR_ROWS = { ...((SPRITES.chars && SPRITES.chars.rows) || {}) };
 // taille d'une case de la planche des personnages (32 × 32 depuis la version 2 de la bible)
 const CW = SPRITES.chars?.w || 24, CHH = SPRITES.chars?.h || 32, CD = SPRITES.chars?.d || 1;
 // personnages des Terres du Sud en attendant leur dessin : un sosie proche
+const PAIRS = 6;   // tenues d'autres joueurs affichables en même temps
 const CHAR_ALIAS = { red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
 const DIR_COL = { down: 0, left: 1, right: 2, up: 3 };
 
@@ -241,6 +242,13 @@ export class WorldView {
       const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + CHH;
       c.getContext('2d').drawImage(charsImg, 0, 0);
       CHAR_ROWS.joueur = Math.round(charsImg.height / CHH);
+      charsImg = c;
+    }
+    // et quelques rangées pour les tenues des autres joueurs
+    if (charsImg) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + CHH * PAIRS;
+      c.getContext('2d').drawImage(charsImg, 0, 0);
+      for (let i = 0; i < PAIRS; i++) CHAR_ROWS['pair' + i] = Math.round(charsImg.height / CHH) + i;
       charsImg = c;
     }
     this.charsCanvas = charsImg;
@@ -729,6 +737,18 @@ export class WorldView {
     const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS.joueur * CHH;
     x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y);
     this.texC.needsUpdate = true;
+  }
+  /** rangée d'un autre joueur pour sa tenue (code court) : composée une fois, gardée tant qu'elle sert ; null si plus de place */
+  pairSprite(code, composer) {
+    const P = this.pairs || (this.pairs = new Map());
+    if (P.has(code)) { const e = P.get(code); e.t = performance.now(); return e.key; }
+    let slot = -1;
+    for (let i = 0; i < PAIRS; i++) if (![...P.values()].some((e) => e.i === i)) { slot = i; break; }
+    if (slot < 0) { let old = null; for (const [k, e] of P) if (!old || e.t < old[1].t) old = [k, e]; if (performance.now() - old[1].t < 4000) return null; slot = old[1].i; P.delete(old[0]); }
+    const row = composer(); if (!row) return null;
+    const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS['pair' + slot] * CHH;
+    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y); this.texC.needsUpdate = true;
+    const e = { i: slot, key: 'pair' + slot, t: performance.now() }; P.set(code, e); return e.key;
   }
   /** le modèle de base d'un genre (pour composer une tenue) */
   baseDe(genre) { const r = CHAR_ROWS['base_' + genre]; return r == null ? null : { src: this.charsCanvas, sx: 0, sy: r * CHH }; }

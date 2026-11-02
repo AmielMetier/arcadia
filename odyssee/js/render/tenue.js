@@ -18,6 +18,17 @@ export const COULEURS = [['#d83a3a', 'Rouge'], ['#f08a2a', 'Orange'], ['#f0d040'
   ['#8a4ad0', 'Violet'], ['#e070a8', 'Rose'], ['#f4f4f0', 'Blanc'], ['#8c8c94', 'Gris'], ['#2a2a30', 'Noir'], ['#8a5a32', 'Marron'], ['#c8b088', 'Beige']];
 export const TENUE_DEFAUT = { genre: 'm', peau: '#f6d2b4', cheveux: '#5a3a22', chapeau: 'casquette', chapeauC: '#d83a3a', haut: 'veste', hautC: '#3a6ad8', bas: 'pantalon', basC: '#283c78', chaussures: 'baskets', chaussuresC: '#d83a3a', sac: 'dos', sacC: '#f0d040' };
 
+/** tenue → code court (pour l'envoyer aux autres joueurs), et retour ; un code invalide donne null */
+const CHAMPS = ['genre', 'peau', 'cheveux', 'chapeau', 'chapeauC', 'haut', 'hautC', 'bas', 'basC', 'chaussures', 'chaussuresC', 'sac', 'sacC'];
+const choix = (k) => (k.endsWith('C') ? COULEURS : TENUE[k]).map(([v]) => v);
+export function tenueCode(T) { if (!T) return ''; return CHAMPS.map((k) => Math.max(0, choix(k).indexOf(T[k])).toString(36)).join(''); }
+export function tenueDecode(code) {
+  if (typeof code !== 'string' || code.length !== CHAMPS.length) return null;
+  const T = {};
+  for (let i = 0; i < CHAMPS.length; i++) { const L = choix(CHAMPS[i]), n = parseInt(code[i], 36); if (!(n >= 0 && n < L.length)) return null; T[CHAMPS[i]] = L[n]; }
+  return T;
+}
+
 /* ---------------- couleurs ---------------- */
 const hexRgb = (h) => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
 function rgbHsv(r, g, b) {
