@@ -69,10 +69,8 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   joue toutes les quêtes de bout en bout (à lancer quand on touche aux quêtes). Animations de terrain HGSS (mer, rivages, fleurs) :
   `odyssee/img/hgss/`, extraites par `tools/odyssee-hgss.py`, qui découpe aussi les icônes de la carte de la région (style Pokégear,
   `assets/graphics/hgss/carte_guide.png` → `odyssee/img/carte/`).
-  Règles graphiques (taille, densité, ancrage, palette, kits de façade) : `docs/ODYSSEE-GRAPHISME.md` et
-  `odyssee/js/data/regles.js` ; atelier `odyssee/atelier.html` (chaque image à l'échelle, ce qui est à revoir) et vitrine
-  `odyssee/?vitrine` (ville de test avec tous les bâtiments et objets) ; `python3 tools/odyssee-atelier.py` remet les kits et
-  les objets du tileset aux règles, calcule la palette, écrit le rapport et normalise un nouveau dessin.
+  Les outils de dessin (atelier graphique, vitrine, sources PixelLab, scripts de découpe des sols, kits, personnages
+  et créatures à 16 px) vivent sur la branche `atelier` du fork ; `main` ne garde que le jeu.
   Rendu : les sprites sont dessinés à l'écran pixel pour pixel, ancrés à leurs pieds
   (shader `screenSprite` de `odyssee/js/render/world3d.js`), les bâtiments prennent la profondeur de leur façade.
 - Island Rush (battle royale, `royale/`) : l'île vient d'une graine (`royale/engine/map.js`, île officielle `ILE`), `royale/carte.html`
