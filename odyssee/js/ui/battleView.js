@@ -164,6 +164,15 @@ export class BattleView {
       x.fillStyle = p.c;
       if (p.shape === 'ring') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.ellipse(p.x, p.y, p.r, p.r * 0.6, 0, 0, 7); x.stroke(); }
       else if (p.shape === 'bolt') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.moveTo(p.x, p.y); for (let k = 1; k < 5; k++) x.lineTo(p.x + (Math.random() - 0.5) * 10, p.y + k * 7); x.stroke(); }
+      else if (p.shape === 'tornado') {
+        x.save();
+        x.strokeStyle = p.c;
+        x.lineWidth = p.lw || 2;
+        x.beginPath();
+        x.ellipse(p.x, p.y, Math.max(1, p.r), Math.max(1, p.r * 0.32), p.tilt || 0, 0, Math.PI * 2);
+        x.stroke();
+        x.restore();
+      }
       else if (p.shape === 'leaf') { x.save(); x.translate(p.x, p.y); x.rotate(p.a || 0); x.fillRect(-3, -1, 6, 3); x.restore(); }
       else x.fillRect(Math.round(p.x - p.r), Math.round(p.y - p.r), Math.max(1, Math.round(p.r * 2)), Math.max(1, Math.round(p.r * 2)));
       x.globalAlpha = 1;
@@ -173,7 +182,20 @@ export class BattleView {
     if (s.wipe > 0) { x.fillStyle = '#000'; const h = BH / 2 * s.wipe; x.fillRect(0, 0, W, h); x.fillRect(0, BH - h, W, h); }
     // mise à jour des particules
     const dt = 1 / 60;
-    for (const p of s.parts) { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.vy += (p.g || 0); p.life -= dt; if (p.grow) p.r += p.grow; if (p.a != null) p.a += 0.2; }
+    for (const p of s.parts) {
+      if (p.spiral) {
+        p.spiralAngle = (p.spiralAngle || 0) + (p.spiralSpd || 0.2);
+        p.spiralR = (p.spiralR || 0) + (p.spiralRGrow || 0);
+        p.x = p.cx + Math.cos(p.spiralAngle) * p.spiralR;
+      } else {
+        p.x += p.vx * dt * 60;
+      }
+      p.y += p.vy * dt * 60;
+      p.vy += (p.g || 0);
+      p.life -= dt;
+      if (p.grow) p.r += p.grow;
+      if (p.a != null) p.a += (p.va != null ? p.va : 0.2);
+    }
     s.parts = s.parts.filter((p) => p.life > 0);
     requestAnimationFrame(this.frame);
   };
@@ -774,6 +796,10 @@ export class BattleView {
     const M = MOVES[moveId], fx = TYPE_FX[type] || TYPE_FX.normal, from = this.sprCenter(side), to = this.sprCenter(1 - side);
     const o = side === 1 ? this.st.foe : this.st.me, dir = side === 1 ? -1 : 1;
     const selfMove = M.tg === 7 || M.c === 'status' && (M.m?.st?.every(([, c]) => c > 0) || M.m?.heal);
+    if (moveId === 10001 || M?.key === 'shadow-blast' || M?.n === 'Rafale Obscure') {
+      await this.animShadowBlast(side, from, to);
+      return;
+    }
     if (M.c === 'physical') {
       await this.tween(130, (u) => { o.dx = dir * 14 * Math.sin(u * Math.PI / 2); o.dy = -dir * 6 * Math.sin(u * Math.PI / 2); });
       this.burst(to.x, to.y, fx, 16, { speed: 2.4, r: 2 });
@@ -800,6 +826,144 @@ export class BattleView {
       this.burst(c.x, c.y, fx, 10, { speed: 1, r: 1.5, up: 0.6 });
       await wait(180);
     }
+  }
+  async animShadowBlast(side, from, to) {
+    const o = side === 1 ? this.st.foe : this.st.me;
+    const targetO = side === 1 ? this.st.me : this.st.foe;
+    const shadowCols = ['#1a052e', '#4a148c', '#7b1fa2', '#00e5ff', '#ffffff'];
+
+    // 1. Charge des ténèbres & élévation de Lugia Obscur
+    this.sound.sfx('throw');
+    await this.tween(320, (u) => {
+      o.dy = -16 * ease(u);
+      o.white = 0.45 * u;
+      if (Math.random() < 0.75) {
+        const ang = Math.random() * Math.PI * 2, dist = 24 + Math.random() * 18;
+        const c = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: from.x + Math.cos(ang) * dist,
+          y: (from.y - 14) + Math.sin(ang) * dist,
+          vx: -Math.cos(ang) * 1.9,
+          vy: -Math.sin(ang) * 1.9,
+          r: 1.5 + Math.random() * 1.5,
+          c,
+          life: 0.32,
+          max: 0.32,
+        });
+      }
+    });
+
+    await wait(60);
+
+    // 2. Traînée obscure / projectile fonçant vers la cible
+    this.sound.sfx('throw');
+    await this.tween(150, (u) => {
+      const bx = from.x + (to.x - from.x) * u;
+      const by = (from.y - 14) + (to.y - (from.y - 14)) * u;
+      for (let k = 0; k < 3; k++) {
+        this.st.parts.push({
+          x: bx + (Math.random() - 0.5) * 6,
+          y: by + (Math.random() - 0.5) * 6,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          r: 2 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.24,
+          max: 0.24,
+          shape: Math.random() < 0.35 ? 'bolt' : null,
+        });
+      }
+    });
+
+    // 3. Déploiement de la Tornade Obscure (Cyclone tourbillonnant)
+    const tornadoDur = 700;
+    const startTornado = performance.now();
+    let lastRing = 0;
+
+    this.shakeScreen(3, 680);
+
+    await this.tween(tornadoDur, (u) => {
+      const elapsed = performance.now() - startTornado;
+      targetO.dx = Math.sin(u * 30) * 2.5;
+
+      // Anneaux de vortex ascendants et s'évasant
+      if (elapsed - lastRing > 60) {
+        lastRing = elapsed;
+        const ringCol = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 4,
+          y: to.y + 14,
+          vx: 0,
+          vy: -2.4 - Math.random() * 0.8,
+          r: 6,
+          grow: 0.72,
+          tilt: (Math.random() - 0.5) * 0.25,
+          lw: 2.2,
+          shape: 'tornado',
+          c: ringCol,
+          life: 0.55,
+          max: 0.55,
+        });
+      }
+
+      // Éclats tourbillonnants en spirale ascendante
+      for (let s = 0; s < 3; s++) {
+        const spd = (0.24 + Math.random() * 0.16) * (Math.random() < 0.5 ? 1 : -1);
+        this.st.parts.push({
+          cx: to.x,
+          x: to.x,
+          y: to.y + 12 + (Math.random() - 0.5) * 8,
+          spiral: true,
+          spiralAngle: Math.random() * Math.PI * 2,
+          spiralR: 4 + Math.random() * 6,
+          spiralRGrow: 0.38 + Math.random() * 0.22,
+          spiralSpd: spd,
+          vx: 0,
+          vy: -2.2 - Math.random() * 1.5,
+          r: 1.5 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.48,
+          max: 0.48,
+        });
+      }
+
+      // Éclairs cyan et violets
+      if (Math.random() < 0.35) {
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 18,
+          y: to.y - 18 + (Math.random() - 0.5) * 20,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: -1.2,
+          r: 3,
+          c: Math.random() < 0.5 ? '#00e5ff' : '#e040fb',
+          shape: 'bolt',
+          life: 0.22,
+          max: 0.22,
+        });
+      }
+    });
+
+    targetO.dx = 0;
+
+    // 4. Cataclysme : Flash, déflagration & ondes de choc
+    this.sound.sfx('hitstrong');
+    this.tween(240, (u) => { this.st.screenFlash = 0.85 * (1 - u); });
+
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 8, grow: 3.5, shape: 'ring', c: '#ffffff', life: 0.36, max: 0.36 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 14, grow: 2.8, shape: 'ring', c: '#00e5ff', life: 0.42, max: 0.42 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 20, grow: 2.2, shape: 'ring', c: '#7b1fa2', life: 0.48, max: 0.48 });
+
+    this.burst(to.x, to.y - 4, shadowCols, 38, { speed: 3.4, r: 2.6 });
+    await this.shakeScreen(7, 500);
+
+    // 5. Atterrissage de Lugia Obscur
+    await this.tween(220, (u) => {
+      o.dy = -16 * (1 - ease(u));
+      o.white = 0.45 * (1 - u);
+    });
+    o.dy = 0;
+    o.white = 0;
+    await wait(80);
   }
   async animHit(side, eff, crit) {
     const o = side === 1 ? this.st.foe : this.st.me;
