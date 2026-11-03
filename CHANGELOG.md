@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.79 — 3 novembre 2026
+- **Arcadia** — À plusieurs, le bouton « C'est parti ! » de l'écran de chargement attend que tous les joueurs du salon aient fini de charger le jeu : plus de départ en décalé.
+  - En attendant, l'écran montre combien de joueurs sont prêts (« En attente… 2/4 ») et chez qui ça charge encore.
+  - Au bout d'une minute, on peut partir quand même, pour ne pas rester bloqué par un joueur dont le jeu ne charge pas.
+
 ## 3.78 — 3 novembre 2026
 - **Dogfight 3D** — trois nouveaux modes, des combats bien plus vivants et des récompenses
   - **Domination** : deux équipes se disputent trois zones au-dessus des villages de l'île. Pour capturer, il faut voler bas, sous le plafond de la zone : on s'expose. Chaque zone tenue rapporte un point par seconde, chaque élimination aussi.
