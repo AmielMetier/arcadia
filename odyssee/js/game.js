@@ -1318,7 +1318,10 @@ export class Game {
     const kind = o.wild ? o.music || 'wild' : o.music || 'trainer';
     const curtain = await this.encounterIntro(kind, !!o.wild);
     const m = this.mapObj, z = this.zone;
-    const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : z?.town === 'azur' || z?.town === 'granit' || z?.name === 'Cap des Étoiles' ? 'water' : 'grass';
+    const isVillage = z?.town === 'aube' || z?.town === 'sylve' || z?.theme === 'village';
+    const isCity = !!z?.town || z?.name?.includes('Cité') || z?.name?.includes('Port-');
+    const gymKind = (m.arene === 'rock' || m.arene === 'ground' || m.arene === 'fire' || m.arene === 'fighting') ? 'gym_rock' : 'gym';
+    const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg === 'gym' ? gymKind : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : isVillage ? 'village' : isCity ? 'city' : 'grass';
     const weather = o.weather || this.getMapWeather();
     const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: weather !== 'none' ? weather : undefined });
     const foeMons = o.wild ? [o.wild] : o.party;

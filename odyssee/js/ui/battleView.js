@@ -47,7 +47,7 @@ export class BattleView {
       grad(0, BH, '#3a2e26', '#6a5440');
       x.fillStyle = '#2a201a'; for (let i = 0; i < 9; i++) { const bx = (i * 53) % W, bw = 40 + (i * 17) % 30; x.beginPath(); x.moveTo(bx, 0); x.lineTo(bx + bw / 2, 30 + (i * 13) % 25); x.lineTo(bx + bw, 0); x.fill(); }
       stripes(110, BH, 'rgba(0,0,0,0.12)', 5);
-    } else if (kind === 'indoor' || kind === 'gym' || kind === 'league') {
+    } else if (kind === 'indoor' || kind === 'gym' || kind === 'gym_rock' || kind === 'league' || kind === 'city' || kind === 'village') {
       const [a, b, f1, f2] = kind === 'league' ? ['#3a2c60', '#6a54a0', '#8a78c0', '#b0a0e0'] : kind === 'gym' ? ['#505868', '#8890a8', '#b8c0d0', '#e0e4ee'] : ['#c8b090', '#e0d0b0', '#e8dcc4', '#f6eee0'];
       grad(0, 80, a, b); grad(80, BH, f1, f2);
       x.fillStyle = 'rgba(255,255,255,0.18)'; for (let i = 0; i < W; i += 24) x.fillRect(i, 80, 1, BH - 80);
@@ -75,7 +75,7 @@ export class BattleView {
     return c;
   }
   drawPlatform(x, cx, cy, rx, ry, kind) {
-    const cols = kind === 'cave' ? ['#4a3a2c', '#8a7258', '#a08a6c'] : kind === 'indoor' || kind === 'gym' || kind === 'league' ? ['#9098a8', '#d8dce8', '#f2f4f8'] : kind === 'water' ? ['#c0a060', '#f0dca0', '#fbecc0'] : kind === 'volcanic' ? ['#5a5250', '#8a8280', '#a8a09c'] : kind === 'snow' ? ['#a0b4cc', '#dce8f4', '#ffffff'] : ['#3c8a3c', '#6cc458', '#90dc78'];
+    const cols = kind === 'cave' || kind === 'gym_rock' ? ['#4a3a2c', '#8a7258', '#a08a6c'] : kind === 'indoor' || kind === 'gym' || kind === 'league' || kind === 'city' ? ['#9098a8', '#d8dce8', '#f2f4f8'] : kind === 'water' ? ['#c0a060', '#f0dca0', '#fbecc0'] : kind === 'volcanic' ? ['#5a5250', '#8a8280', '#a8a09c'] : kind === 'snow' ? ['#a0b4cc', '#dce8f4', '#ffffff'] : ['#3c8a3c', '#6cc458', '#90dc78'];
     x.fillStyle = cols[0]; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 7); x.fill();
     x.fillStyle = cols[1]; x.beginPath(); x.ellipse(cx, cy - 2, rx - 3, ry - 3, 0, 0, 7); x.fill();
     x.fillStyle = cols[2]; x.beginPath(); x.ellipse(cx - rx * 0.15, cy - 4, rx * 0.55, ry * 0.4, 0, 0, 7); x.fill();
@@ -84,8 +84,11 @@ export class BattleView {
     const bgMap = {
       cave: 'bg_cave',
       gym: 'bg_gym',
+      gym_rock: 'bg_gym_rock',
       league: 'bg_league',
       indoor: 'bg_indoor',
+      city: 'bg_city',
+      village: 'bg_village',
       water: night ? 'bg_water_night' : 'bg_water',
       snow: night ? 'bg_snow_night' : 'bg_snow',
       volcanic: 'bg_volcanic',
@@ -94,8 +97,11 @@ export class BattleView {
     const platMap = {
       cave: 'cave',
       gym: 'stone',
+      gym_rock: 'cave',
       league: 'stone',
       indoor: 'stone',
+      city: 'stone',
+      village: 'grass',
       water: 'water',
       snow: 'snow',
       volcanic: 'volcanic',
