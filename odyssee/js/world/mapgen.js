@@ -50,7 +50,7 @@ export class GameMap {
   /** pose un bâtiment ; renvoie la position de la porte */
   building(kind, x, y, o = {}) {
     const B = { ...BUILDINGS[kind] }; for (const [k, v] of Object.entries(o)) if (v !== undefined) B[k] = v;
-    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label, name: o.name, kit: o.kit };
+    const b = { kind, x, y, w: B.w, d: B.d, h: B.h, door: B.door, style: B.style || (kind === 'house2' ? 'house2' : 'house'), roof: B.roof || 'red', id: o.id, label: o.label, name: o.name, kit: o.kit, flat: o.flat };
     for (let j = 0; j < B.d; j++) for (let i = 0; i < B.w; i++) this.set(x + i, y + j, T.BUILD);
     const dx = x + B.door, dy = y + B.d - 1;
     if (B.door >= 0) this.set(dx, dy, T.DOOR);
@@ -96,6 +96,7 @@ export class GameMap {
         const nx = x + dx, ny = y + dy; if (!this.in(nx, ny) || seen[ny * this.w + nx]) continue;
         const t = this.get(nx, ny);
         let ok = (walkable(t) || can(t)) && this.height(nx, ny) === this.height(x, y);
+        if (t === T.BRIDGE && this.get(x, y) === T.WATER) ok = false;   // en surf, on passe sous les ponts sans y monter
         if (t === T.LEDGE && dy === 1 && walkable(this.get(nx, ny + 1))) { seen[ny * this.w + nx] = 1; if (!seen[(ny + 1) * this.w + nx]) { seen[(ny + 1) * this.w + nx] = 1; q.push([nx, ny + 1]); } continue; }
         if (t === T.LEDGE_E && dx === 1 && walkable(this.get(nx + 1, ny))) { if (!seen[ny * this.w + nx + 1]) { seen[ny * this.w + nx + 1] = 1; q.push([nx + 1, ny]); } continue; }
         if (t === T.LEDGE_W && dx === -1 && walkable(this.get(nx - 1, ny))) { if (!seen[ny * this.w + nx - 1]) { seen[ny * this.w + nx - 1] = 1; q.push([nx - 1, ny]); } continue; }

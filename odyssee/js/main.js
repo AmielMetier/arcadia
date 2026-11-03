@@ -11,6 +11,7 @@ import { optionsScreen, loadCodeScreen } from './ui/screens.js';
 import { decodeSave, saveSummary } from './core/savecode.js';
 import { Cloud } from './net/cloud.js';
 import { Game } from './game.js';
+import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
 import { SPRITES } from './data/sprites.js';
@@ -58,8 +59,8 @@ async function loadArt() {
   sprites.grassfront = ASSETS.sol16('hautes_herbes_front'); sprites.grassfront2 = ASSETS.sol16('hautes_herbes_front2'); dens.grassfront = dens.grassfront2 = 1;
   // animations de terrain de HeartGold / SoulSilver (mer, rivages, fleurs)
   const hg = {}; for (const k of Object.keys(SPRITES.hgss || {})) hg[k] = ASSETS.hgss(k);
-  const [S, K, L, L32, HGI, chars, title] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title)]);
-  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title };
+  const [S, K, L, L32, HGI, chars, title, suiveurs, relief] = await Promise.all([loadAll(sprites), loadAll(kits), loadAll(sols), loadAll(sol32), loadAll(hg), loadImg(ASSETS.chars), loadImg(ASSETS.title), SPRITES.suiveurs ? loadImg(ASSETS.suiveurs) : null, loadImg(ASSETS.relief).catch(() => null)]);
+  return { sprites: S, dens, kits: K, sols: L, sol32: L32, hgss: HGI, chars, title, suiveurs, relief };
 }
 
 async function boot() {
@@ -68,8 +69,8 @@ async function boot() {
   const input = new Input(), sound = new Sound(), ui = new UI(uiRoot, input, sound);
   const world = buildWorld();
   const art = await loadArt();
-  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss });
-  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens });
+  setArt({ kits: art.kits, sols: art.sols, sol32: art.sol32, hgss: art.hgss, relief: art.relief });
+  const view = new WorldView(renderer, art.chars, { sprites: art.sprites, dens: art.dens, suiveurs: art.suiveurs });
   const game = new Game({ view, ui, input, sound, world });
   // sauvegarde en ligne (compte du Hub) : chaque sauvegarde part aussi sur le serveur, regroupée
   const cloud = game.cloud = new Cloud();
@@ -111,6 +112,7 @@ async function boot() {
   // outil de test : démarrer directement une partie depuis la console
   window.__ody.play = async (state) => { document.querySelector('.title-scr')?.remove(); input.handlers.length = 0; ui.closeDialog(); mode = 'game'; await game.start(state); };
 
+  // version test (odyssee/test/) : on choisit un lieu et une équipe, et on y apparaît ; rien n'est sauvegardé
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');
@@ -450,7 +452,17 @@ async function intro(game, ui, sound) {
 
   chap.textContent = 'CHOISIS TON APPARENCE DE DRESSEUR';
   ui.say('Mais parle-moi un peu de toi... Qui es-tu ?', { speaker: 'Prof. Saule', keep: true, noWaitLast: true });
-  const gender = await chooseGenderCard(ui, input, sound, s);
+  let gender = await chooseGenderCard(ui, input, sound, s);
+
+  // l'apparence : casquette ou bonnet, haut, bas, chaussures, sac, couleurs (si le modèle de base est dessiné)
+  let tenue = null;
+  if (game.view.baseDe?.(gender)) {
+    chap.textContent = 'TA TENUE DE DRESSEUR';
+    s.style.visibility = 'hidden';
+    tenue = await apparenceScreen(ui, { premiere: true, tenue: { genre: gender }, base: (g) => game.view.baseDe(g) });
+    s.style.visibility = '';
+    if (tenue?.genre) gender = tenue.genre;
+  }
 
   chap.textContent = 'INSCRIPTION À LA LIGUE D\'ODYSSÉE';
   const name = await chooseTrainerName(ui, input, sound, gender, s);
@@ -482,7 +494,8 @@ async function intro(game, ui, sound) {
   s.classList.add('out');
   await wait(480);
   s.remove();
-  return game.newState(name, gender);
+  const st = game.newState(name, gender); if (tenue) st.tenue = tenue;
+  return st;
 }
 
 async function _legacyIntro(game, ui, sound) {
