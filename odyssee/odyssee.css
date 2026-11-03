@@ -18,10 +18,32 @@ img { image-rendering: pixelated; }
   left: calc(var(--px) * 8);
   right: calc(var(--px) * 8);
   bottom: calc(var(--px) * 6);
-  min-height: calc(var(--px) * 44);
+  min-height: calc(var(--px) * 48);
   max-width: calc(var(--px) * 470);
   margin: 0 auto;
-  padding: calc(var(--px) * 7) calc(var(--px) * 14);
+  padding: calc(var(--px) * 8) calc(var(--px) * 14);
+  color: #f6faff;
+  font-size: calc(var(--px) * 10);
+  text-shadow: calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+/* Le fond et le biseau sont sur ::before pour que .dlg-name (top: -12px) et .dlg-face ne soient JAMAIS coupés par le clip-path */
+.dlg:not(.btext) {
+  overflow: visible !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  clip-path: none !important;
+}
+.dlg:not(.btext)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 calc(var(--px) * 1), transparent calc(var(--px) * 1) calc(var(--px) * 2)),
     linear-gradient(180deg, #182436 0%, #101824 60%, #080e16 100%) !important;
@@ -41,15 +63,13 @@ img { image-rendering: pixelated; }
     inset calc(var(--px) * 1) calc(var(--px) * 1) 0 #4a709c,
     inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #050a10,
     calc(var(--px) * 3) calc(var(--px) * 3) 0 #000 !important;
-  color: #f6faff;
-  font-size: calc(var(--px) * 10);
-  text-shadow: calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
-  line-height: 1.35;
 }
+
 .dlg-name {
   position: absolute;
-  top: calc(var(--px) * -11);
-  left: calc(var(--px) * 14);
+  top: calc(var(--px) * -12);
+  left: calc(var(--px) * 12);
+  z-index: 5;
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 calc(var(--px) * 0.8), transparent calc(var(--px) * 0.8) calc(var(--px) * 2)),
     linear-gradient(180deg, #223854 0%, #142234 100%);
@@ -57,7 +77,7 @@ img { image-rendering: pixelated; }
   font-weight: 800;
   font-size: calc(var(--px) * 8);
   letter-spacing: 0.04em;
-  padding: calc(var(--px) * 1.2) calc(var(--px) * 7);
+  padding: calc(var(--px) * 1.5) calc(var(--px) * 8);
   border: calc(var(--px) * 1.2) solid #00e0ff;
   border-radius: 0;
   clip-path: polygon(
@@ -72,11 +92,20 @@ img { image-rendering: pixelated; }
     inset calc(var(--px) * 0.8) calc(var(--px) * 0.8) 0 #80f0ff,
     calc(var(--px) * 2) calc(var(--px) * 2) 0 #000;
   text-shadow: calc(var(--px) * 0.8) calc(var(--px) * 0.8) 0 #000;
+  white-space: nowrap;
 }
+
+.dlg.has-face .dlg-name {
+  left: calc(var(--px) * 8);
+}
+
 .dlg-txt {
   white-space: pre-wrap;
   min-height: 2.5em;
+  position: relative;
+  z-index: 2;
 }
+
 .dlg-arrow {
   position: absolute;
   right: calc(var(--px) * 10);
@@ -85,27 +114,37 @@ img { image-rendering: pixelated; }
   font-size: calc(var(--px) * 8);
   text-shadow: var(--px) 0 0 #000, 0 var(--px) 0 #000;
   animation: dlgBob 0.6s steps(2) infinite;
+  z-index: 3;
 }
 @keyframes dlgBob { 50% { transform: translateY(calc(var(--px) * 2)); } }
+
 .dlg.has-face {
-  padding-left: calc(var(--px) * 60);
+  padding-left: calc(var(--px) * 64);
+  min-height: calc(var(--px) * 52);
 }
+
+/* Portrait pixel art de l'interlocuteur dans la boîte de dialogue (façon DS / Noir 2 Blanc 2) */
 .dlg .dlg-face {
   position: absolute;
-  left: calc(var(--px) * 6);
+  left: calc(var(--px) * 8);
   top: 50%;
   transform: translateY(-50%);
-  width: calc(var(--px) * 44);
-  height: calc(var(--px) * 44);
+  width: calc(var(--px) * 48);
+  height: calc(var(--px) * 48);
   border-radius: 0;
-  background: #0c1420;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 calc(var(--px) * 0.8), transparent calc(var(--px) * 0.8) calc(var(--px) * 2)),
+    radial-gradient(circle at center, #1c2e46 0%, #0c1420 100%);
   border: calc(var(--px) * 1.2) solid #000;
+  outline: calc(var(--px) * 1) solid #00e0ff;
   box-shadow:
-    inset calc(var(--px) * 1) calc(var(--px) * 1) 0 #385880,
+    inset calc(var(--px) * 1) calc(var(--px) * 1) 0 rgba(255, 255, 255, 0.35),
     inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #050a10,
-    calc(var(--px) * 1.5) calc(var(--px) * 1.5) 0 #000;
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 #000;
   object-fit: contain;
+  object-position: center center;
   image-rendering: pixelated;
+  z-index: 4;
 }
 
 /* ---------- listes ---------- */
@@ -2089,8 +2128,6 @@ img { image-rendering: pixelated; }
 .keypanel .hint { margin-top: calc(var(--px) * 4); text-align: center; }
 kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; text-align: center; padding: 0 calc(var(--px) * 1.5); margin: 0 1px; border-radius: calc(var(--px) * 1.5); background: #eef1f6; border: var(--px) solid #8898b0; border-bottom-width: calc(var(--px) * 2); text-shadow: none; color: var(--ink); }
 
-/* portrait de l'interlocuteur à côté de la boîte de dialogue */
-.dlg-face { position: absolute; z-index: 34; left: calc(var(--px) * 10); bottom: calc(var(--px) * 46); width: calc(var(--px) * 64); height: calc(var(--px) * 64); pointer-events: none; image-rendering: pixelated; filter: drop-shadow(var(--px) var(--px) 0 rgba(0,0,0,.35)); }
 .surf-ride { position: absolute; }
 
 /* ---------- jeu à plusieurs (autres joueurs, échanges) et code de sauvegarde ---------- */
