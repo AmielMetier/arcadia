@@ -30,7 +30,7 @@ export class BackroomsHUD {
         <div class="flash-indicator" id="flashStatus">[F] LAMPE ON</div>
       </div>
 
-      <!-- Inventaire : trois cases pour les piles et l'eau d'amande -->
+      <!-- Inventaire : la case 1 est réservée à la lampe torche, les cases 2 et 3 aux piles et à l'eau d'amande -->
       <div class="inv" id="inv">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}"><b>${i + 1}</b><span></span></button>`).join('')}</div>
 
       <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
@@ -176,10 +176,19 @@ export class BackroomsHUD {
     // 4b. Inventaire
     const inv = P.inv || [];
     const key = inv.join(',');
-    if (key !== this.invKey) {
-      this.invKey = key;
+    const slotsKey = `${key}|${P.hasLamp ? 1 : 0}${P.flashlight ? 1 : 0}`;
+    if (slotsKey !== this.invKey) {
+      this.invKey = slotsKey;
       this.$('#inv').querySelectorAll('.slot').forEach((b, i) => {
-        const k = inv[i];
+        if (i === 0) {
+          // case de la lampe : vide tant qu'on ne l'a pas prise sur la table
+          b.classList.toggle('full', !!P.hasLamp);
+          b.classList.toggle('lamp-on', !!P.flashlight);
+          b.classList.add('lamp-slot');
+          b.querySelector('span').innerHTML = P.hasLamp ? `<i class="ico-lamp"></i>${P.flashlight ? 'ON' : 'OFF'}` : 'LAMPE';
+          return;
+        }
+        const k = inv[i - 1];
         b.classList.toggle('full', !!k);
         b.querySelector('span').innerHTML = k === 'battery' ? '<i class="ico-bat"></i>PILE' : k === 'bottle' ? '<i class="ico-bot"></i>AMANDE' : '';
       });
@@ -267,8 +276,8 @@ export class BackroomsHUD {
     const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
     this.$('#pauseGo').textContent = tactile ? "TOUCHE L'ÉCRAN POUR JOUER" : kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
     this.$('#pauseKeys').textContent = kb
-      ? 'ZQSD marcher · Flèches regarder · Maj courir · F lampe · Échap pause'
-      : 'ZQSD marcher · Souris regarder · Maj courir · F lampe · Échap pause';
+      ? 'ZQSD marcher · Flèches regarder · Maj courir · F ou 1 lampe · 2 3 objets · Échap pause'
+      : 'ZQSD marcher · Souris regarder · Maj courir · F ou 1 lampe · 2 3 objets · Échap pause';
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

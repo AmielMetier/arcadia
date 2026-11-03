@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.77 — 3 novembre 2026
+- **The Backrooms** — la lampe torche a sa case dans l'inventaire.
+  - La case 1 est réservée à la lampe : elle s'y range quand tu la prends sur la table, et la touche 1 (ou F) l'allume et l'éteint.
+  - Il reste deux cases pour les piles et l'eau d'amande, utilisées avec 2 et 3.
+
 ## 3.76 — 3 novembre 2026
 - **The Backrooms** — une table de lampes torches au départ.
   - Au début de la partie, personne n'a de lampe : une table posée juste à côté du départ en porte une par joueur, à prendre en passant.

@@ -332,6 +332,10 @@ html, body {
 .inv .slot span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 /* pile : un bâton noir à bout cuivré ; eau d'amande : une bouteille blanche */
 .ico-bat { width: 30px; height: 12px; background: linear-gradient(90deg, #222 72%, #c98a2b 72%); border: 1px solid #f2f0e6; }
+.ico-lamp { width: 30px; height: 12px; background: linear-gradient(90deg, #1c1d20 70%, #b8bcc2 70%); border: 1px solid #f2f0e6; border-radius: 2px 5px 5px 2px; }
+.inv .slot.lamp-slot:not(.full) span { opacity: 0.35; }
+.inv .slot.lamp-on { border-color: #ffcf3a; box-shadow: 0 0 10px rgba(255, 207, 58, 0.35); }
+.inv .slot.lamp-on .ico-lamp { background: linear-gradient(90deg, #1c1d20 70%, #fff3c8 70%); }
 .ico-bot { width: 12px; height: 26px; background: #efe8d6; border-radius: 3px 3px 4px 4px; box-shadow: inset 0 -9px #c9b48a; }
 
 /* Bouton Réglages (panneau commun aux jeux) */

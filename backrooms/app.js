@@ -40,7 +40,7 @@ let mouseDx = 0;
 let mouseDy = 0;
 let isPointerLocked = false;
 let toggleFlashlightRequested = false;
-let useRequested = null; // case de l'inventaire à utiliser (touches 1, 2, 3)
+let useRequested = null; // objet à utiliser (touches 2 et 3 ; la touche 1, c'est la lampe)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 try {
@@ -84,8 +84,9 @@ window.addEventListener('keydown', (e) => {
   }
   keys[e.code] = true;
   if (e.code === 'KeyF' && !e.repeat) toggleFlashlightRequested = true;
+  // case 1 : la lampe torche (comme F) ; cases 2 et 3 : les objets
   const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
-  if (slot >= 0 && !e.repeat) useRequested = slot % 3;
+  if (slot >= 0 && !e.repeat) useSlot(slot % 3);
   if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
 
@@ -184,6 +185,12 @@ document.addEventListener('mousemove', (e) => {
   }
 });
 
+// Une case de l'inventaire : la 1re allume ou éteint la lampe, les deux autres utilisent un objet
+function useSlot(i) {
+  if (i === 0) toggleFlashlightRequested = true;
+  else useRequested = i - 1;
+}
+
 let lastSettings = {};
 // Nouvelle partie (solo ou hôte) : l'hôte l'annonce aux invités, qui construisent la même carte avec la même graine
 function initGame(settings = lastSettings) {
@@ -223,7 +230,7 @@ function startRun({ seed, difficulty, players, run, level }) {
     sfx = new BackroomsSfx();
   }
   if (!hud) {
-    hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => (useRequested = i) });
+    hud = new BackroomsHUD(hudEl, { play, setKbMode, use: useSlot });
   }
 
   stepDist = 0;
@@ -320,7 +327,7 @@ function handleEvent(ev, me) {
       if (hud) hud.toast(ev.kind === 'bottle' ? "Eau d'amande dans l'inventaire" : "Piles dans l'inventaire");
       break;
     case 'invFull':
-      if (mine && hud) hud.toast('Inventaire plein : utilise un objet (1, 2, 3)');
+      if (mine && hud) hud.toast('Inventaire plein : utilise un objet (2 ou 3)');
       break;
     case 'useless':
       if (mine && hud) hud.toast(ev.kind === 'bottle' ? 'Tu as déjà tout ton souffle' : 'La lampe est déjà chargée');
@@ -557,16 +564,16 @@ if (window.DDVolume && btnSet) {
         ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou flèches'],
         ['Regarder', 'souris'],
         ['Courir', '<kbd>Maj</kbd>'],
-        ['Lampe torche', '<kbd>F</kbd>'],
-        ['Utiliser un objet', '<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>'],
+        ['Lampe torche (case 1)', '<kbd>F</kbd> ou <kbd>1</kbd>'],
+        ['Utiliser un objet', '<kbd>2</kbd> <kbd>3</kbd>'],
         ['Pause', '<kbd>Échap</kbd>'],
       ] }] },
       { title: 'Sans souris', items: [{ keys: [
         ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>'],
         ['Tourner la vue', '<kbd>←</kbd><kbd>→</kbd>'],
         ['Lever, baisser les yeux', '<kbd>↑</kbd><kbd>↓</kbd>'],
-        ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>F</kbd>'],
-        ['Utiliser un objet', '<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>'],
+        ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>F</kbd> ou <kbd>1</kbd>'],
+        ['Utiliser un objet', '<kbd>2</kbd> <kbd>3</kbd>'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],
@@ -576,7 +583,7 @@ if (window.DDVolume && btnSet) {
 // Initialisation HubBridge ou Solo
 function boot(info) {
   if (!sfx) sfx = new BackroomsSfx();
-  if (!hud) hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => (useRequested = i) });
+  if (!hud) hud = new BackroomsHUD(hudEl, { play, setKbMode, use: useSlot });
   if (H && H.embedded) {
     NET.role = info.role === 'host' ? 'host' : info.role === 'guest' ? 'guest' : 'solo';
     NET.myId = info.myId;

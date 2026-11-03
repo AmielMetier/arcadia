@@ -181,26 +181,26 @@ test("eau d'amande : remplit l'endurance", () => {
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
 });
 
-test('inventaire : trois cases, la quatrième trouvaille reste par terre', () => {
+test("inventaire : la case 1 pour la lampe, deux cases d'objets, la troisième trouvaille reste par terre", () => {
   const m = createBackroomsMap(9);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
-  const objs = [...m.bottles.slice(0, 2), ...m.batteries.slice(0, 2)];
+  const objs = [m.bottles[0], m.batteries[0], m.batteries[1]];
   for (const o of objs) {
     sim.player.x = o.x;
     sim.player.z = o.z;
     sim.step({});
   }
-  assert.equal(sim.player.inv.length, 3);
-  assert.equal(objs[3].taken, false, 'la 4e reste au sol');
+  assert.equal(sim.player.inv.length, 2);
+  assert.equal(objs[2].taken, false, 'la 3e reste au sol');
   assert.ok(sim.drainEvents().some((e) => e.type === 'invFull'));
   sim.player.x = m.spawn.x;
   sim.player.z = m.spawn.z;
   sim.player.stamina = 100;
   sim.step({ use: 0 });
-  assert.equal(sim.player.inv.length, 3, "inutile : l'objet est gardé");
+  assert.equal(sim.player.inv.length, 2, "inutile : l'objet est gardé");
   sim.player.battery = 10;
-  sim.step({ use: 2 });
-  assert.equal(sim.player.inv.length, 2);
+  sim.step({ use: 1 });
+  assert.equal(sim.player.inv.length, 1);
   assert.ok(sim.player.battery > 60);
 });
 
