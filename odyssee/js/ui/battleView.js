@@ -443,8 +443,7 @@ export class BattleView {
 
   async loadSide(side) {
     const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me;
-    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny) : ASSETS.back(m.sp, m.shiny));
-    if (o.img && m.shadow) o.img = shadowCanvas(o.img);   // Pokémon Obscur (Lugia du Sanctuaire)
+    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny, m.shadow) : ASSETS.back(m.sp, m.shiny, m.shadow));   // Pokémon Obscur (Lugia du Sanctuaire)
     o.whiteImg = null; o.darkImg = null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }

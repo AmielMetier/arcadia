@@ -21,7 +21,7 @@ export const hpCol = (r) => (r > 0.5 ? '#48d058' : r > 0.2 ? '#f0c020' : '#f0483
 export function hpBar(m) { const r = m.hp / m.stats[0]; return `<div class="hp"><b>PV</b><i><u style="width:${Math.max(0, r * 100)}%;background:${hpCol(r)}"></u></i></div>`; }
 export const statusTag = (m) => (m.hp <= 0 ? '<span class="st" style="background:#c03838">K.O.</span>' : m.status ? `<span class="st" style="background:${STATUS_FR[m.status][1]}">${STATUS_FR[m.status][0]}</span>` : '');
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
-const iconImg = (m) => `<img class="ico" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
+const iconImg = (m) => `<img class="ico${m?.shadow ? ' shadowmon' : ''}" src="${ASSETS.icon(m.sp, m?.shadow)}" alt="" onerror="this.src='${ASSETS.front(m.sp, false, m?.shadow)}';this.classList.add('fallback')">`;
 
 function screen(ui, cls, title) {
   const s = el('div', 'screen ' + cls);
@@ -142,7 +142,7 @@ export function partyScreen(game, o = {}) {
             </div>
             <div class="pslot-lead-pedestal">
               <div class="pslot-ped-ring"></div>
-              <img class="pslot-lead-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+              <img class="pslot-lead-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
             </div>
             <div class="pslot-lead-info">
               <div class="pslot-lead-name-row">
@@ -178,7 +178,7 @@ export function partyScreen(game, o = {}) {
               </div>
               <span class="pslot-sub-num">#${k + 1}</span>
               <div class="pslot-sub-ped">
-                <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+                <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
               </div>
             </div>
             <div class="pslot-sub-mid">
@@ -480,7 +480,7 @@ export function summaryScreen(game, list, idx) {
               <span class="sum-lvl">N.${m.lvl}</span>
             </div>
             <div class="sum-stage">
-              <img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="">
+              <img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="">
             </div>
             <div class="sum-types-row">${S.t.map(typeTag).join(' ')} ${statusTag(m)}</div>
             ${hpBar(m)}
@@ -1433,7 +1433,7 @@ function renderPCPokemonPreview(m) {
         <span class="pc-prev-lvl">N.${m.lvl}</span>
       </div>
       <div class="pc-prev-art">
-        <img class="pc-prev-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+        <img class="pc-prev-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
       </div>
       <div class="pc-prev-types">
         ${(S.t || ['normal']).map(typeTag).join(' ')}
