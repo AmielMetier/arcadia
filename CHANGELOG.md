@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.92 — 3 novembre 2026
+- **The Backrooms** — la partie commence de nouveau au Level 0, dans le dédale aux murs jaunes (elle démarrait par erreur dans l'entrepôt du Level 1).
+
 ## 3.91 — 3 novembre 2026
 - **Odyssée** — Objets d'exploration et capacités de terrain :
   - Remplacement définitif des CS classiques par trois Objets Rares d'exploration dédiés :

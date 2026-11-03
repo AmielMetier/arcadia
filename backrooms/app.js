@@ -214,7 +214,7 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Joueur' })) : [{ id: 0, name: 'Joueur' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 1 });
+  startRun({ seed, difficulty, players, run: NET.run, level: 0 });
   if (NET.role === 'host') send('all', goMessage());
 }
 
