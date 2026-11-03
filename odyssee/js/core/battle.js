@@ -54,6 +54,8 @@ export class Battle {
   get me() { return this.sides[0].party[this.sides[0].active]; }
   get foe() { return this.sides[1].party[this.sides[1].active]; }
   act(i) { return this.sides[i].party[this.sides[i].active]; }
+  /** crans de stats des deux Pokémon au combat, à cet instant (pour l'affichage : Atq +2, Vit −1…) */
+  stages() { return this.sides.map((x) => x.v.st.slice()); }
   /** identifiant du talent du Pokémon actif d'un camp */
   ab(i) { const m = this.act(i); return m && !isFainted(m) ? getAbility(m)?.id : null; }
   /** efficacité d'un type contre le Pokémon actif d'un camp (Querelleur : Normal et Combat touchent les Spectres) */
@@ -766,7 +768,7 @@ export class Battle {
       this.ev.push({ t: 'hit', side: d, eff: this.fixedDamage(i, d, mv) != null ? 1 : eff, crit });
       this.hp(d, -dmg);
       tv.dmgTaken = { amount: dmg, c: mv.c };
-      total += dmg; if (crit) { critAny = true; this.say('Coup critique !'); if (tAb?.id === 'anger-point' && !isFainted(T)) { this.say(`Colérique de ${this.nm(d)} monte son Attaque au maximum !`); this.sides[d].v.st[1] = 6; this.ev.push({ t: 'stat', side: d, up: true }); } }
+      total += dmg; if (crit) { critAny = true; this.say('Coup critique !'); if (tAb?.id === 'anger-point' && !isFainted(T)) { this.say(`Colérique de ${this.nm(d)} monte son Attaque au maximum !`); this.sides[d].v.st[1] = 6; this.ev.push({ t: 'stat', side: d, up: true, all: this.stages() }); } }
     }
     if (this.fixedDamage(i, d, mv) == null) {
       if (eff > 1) this.say('C\'est super efficace !');
@@ -876,9 +878,9 @@ export class Battle {
         this.hp(i, m.stats[0]); this.say(`${this.Nm(i)} s'endort et récupère ses PV !`); return true;
       case 'belly-drum':
         if (m.hp <= m.stats[0] / 2) { this.say('Mais cela échoue !'); return true; }
-        this.hp(i, -Math.floor(m.stats[0] / 2)); v.st[1] = 6; this.ev.push({ t: 'stat', side: i, up: true }); this.say(`${this.Nm(i)} sacrifie des PV et monte son Attaque au maximum !`); return true;
+        this.hp(i, -Math.floor(m.stats[0] / 2)); v.st[1] = 6; this.ev.push({ t: 'stat', side: i, up: true, all: this.stages() }); this.say(`${this.Nm(i)} sacrifie des PV et monte son Attaque au maximum !`); return true;
       case 'pain-split': { const avg = Math.floor((m.hp + T.hp) / 2); this.hp(i, avg - m.hp); this.hp(d, avg - T.hp); this.say('Les deux créatures partagent leur douleur !'); return true; }
-      case 'haze': for (const s of this.sides) s.v.st = [0, 0, 0, 0, 0, 0, 0, 0]; this.say('Les changements de stats sont annulés !'); return true;
+      case 'haze': for (const s of this.sides) s.v.st = [0, 0, 0, 0, 0, 0, 0, 0]; this.ev.push({ t: 'stat', side: -1, all: this.stages() }); this.say('Les changements de stats sont annulés !'); return true;
       case 'reflect': case 'light-screen': {
         const k = u === 'reflect' ? 'reflect' : 'light', scr = this.sides[i].screens;
         if (scr[k]) { this.say('Mais cela échoue !'); return true; }
@@ -964,7 +966,7 @@ export class Battle {
     v.st[s] = Math.max(-6, Math.min(6, v.st[s] + c));
     const name = STAGE_NAMES[s];
     if (v.st[s] === before) { if (!secondary) this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(i)} ne peut plus ${c > 0 ? 'augmenter' : 'baisser'} !`); return false; }
-    this.ev.push({ t: 'stat', side: i, up: c > 0 });
+    this.ev.push({ t: 'stat', side: i, up: c > 0, all: this.stages() });
     const amt = Math.abs(c) >= 2 ? (c > 0 ? 'beaucoup ' : 'beaucoup ') : '';
     this.say(`${name[0].toUpperCase() + name.slice(1)} de ${this.nm(i)} ${c > 0 ? 'augmente' : 'baisse'}${amt ? ' ' + amt.trim() : ''} !`);
     if (byFoe && c < 0 && (id === 'defiant' || id === 'competitive') && !this._defiant) { this._defiant = true; this.say(`${getAbility(this.act(i)).name} de ${this.nm(i)} s'active !`); this.boost(i, id === 'defiant' ? 2 : 4, 2, true); this._defiant = false; }
