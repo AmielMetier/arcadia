@@ -6,6 +6,7 @@
   - Un inventaire de trois cases : les piles et l'eau d'amande se ramassent et s'utilisent quand tu veux avec 1, 2 ou 3 (ou en touchant la case au téléphone).
   - Les murs sont tirés au hasard à chaque partie : couloirs, cloisons et recoins ne sont jamais au même endroit.
   - Rejouer garde la difficulté choisie.
+- **Arcadia** — la liste des jeux de l'accueil se charge de nouveau (une faute dans la fiche de The Backrooms la bloquait depuis la 3.66).
 
 ## 3.72 — 3 novembre 2026
 - **The Backrooms** — un bouton ⚙ Réglages, comme dans les autres jeux.
