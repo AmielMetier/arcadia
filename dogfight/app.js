@@ -653,7 +653,7 @@ function present(view, dt) {
   // la zone survolée, et de combien il faut descendre pour la capturer
   const zone = aliveNow && view.zones ? view.zones.find((z) => Math.hypot(me.x - z.x, me.z - z.z) < z.r) : null;
   const zoneHigh = zone ? me.y - world.obstacleAt(me.x, me.z) - ZONE_CEIL : 0;
-  hud.render(view, me, cam, aim, dt, { terrain, inCloud: world.inCloud(cam.position.x, cam.position.y, cam.position.z), scoreboard: controls.scoreboard, zone, zoneHigh });
+  hud.render(view, me, cam, aim, dt, { terrain, inCloud: world.inCloud(cam.position.x, cam.position.y, cam.position.z), scoreboard: controls.scoreboard, zone, zoneHigh, mouseStick: controls.mouseStick, mouseHint: view.ph === 'play' && controls.mouseHint });
 }
 // L'alerte de relief regarde devant : collines et toits compris
 function lowTerrain(p) {

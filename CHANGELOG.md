@@ -15,6 +15,8 @@
 - **Dogfight 3D** — Escorte refaite : le transport (un C-17 ou un A400M) suit un vrai trajet d'île en île, au ras de l'eau, entre les montagnes et à travers les nuages, puis se pose sur la piste.
   - Trois trajets par carte, selon la durée de la partie (5, 8 ou 10 minutes).
   - Les assaillants n'ont que 5 vies chacun : s'ils tombent tous, les défenseurs gagnent aussi.
+- **Dogfight 3D** — La souris ne s'échappe plus en vol : le curseur disparaît et on peut tourner sans fin. Si elle se libère (Échap, changement de fenêtre), un message le rappelle et un clic la reprend, sans tirer.
+  - Là où le navigateur refuse de la capturer, la souris devient un manche : écarte le curseur du centre de l'écran pour tourner, même s'il sort de la fenêtre. Un repère montre où il est.
 - **Dogfight 3D** — De vrais sons : réacteur et postcombustion enregistrés, canon, départ de missile, explosions, leurres, et le transport qu'on entend venir de loin.
 
 ## 3.83 — 3 novembre 2026

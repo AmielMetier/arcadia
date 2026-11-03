@@ -99,6 +99,7 @@ export class CockpitHUD {
       if (view.zones) this.drawZoneMarks(view, me, camera);
       if (me.alive) {
         this.drawReticles(view, me, camera, aim);
+        if (opts.mouseStick) this.drawMouseStick(opts.mouseStick);
         this.drawOffscreen(view, me, camera);
         this.drawTelemetry(me);
         this.drawGauges(me);
@@ -110,6 +111,7 @@ export class CockpitHUD {
     }
     this.drawFeed();
     this.drawCenterMessages(view, me);
+    if (opts.mouseHint) this.text(opts.mouseHint, W / 2, H * 0.62, '#fff', '700 16px system-ui,sans-serif', 'center');
     if (opts.scoreboard) this.drawScoreboard(view);
   }
 
@@ -186,6 +188,17 @@ export class CockpitHUD {
       const a = project(me.x + aim.x * 900, me.y + aim.y * 900, me.z + aim.z * 900, camera, W, H);
       if (a.front) { c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.4; c.beginPath(); c.arc(a.x, a.y, 5, 0, 6.283); c.stroke(); }
     }
+  }
+
+  // Manche souris (quand le navigateur refuse de capturer la souris) : le repère du curseur, relié au centre
+  drawMouseStick(m) {
+    const c = this.ctx, cx = this.W / 2, cy = this.H / 2, h = Math.min(this.W, this.H) / 2, x = cx + m.x * h, y = cy + m.y * h;
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1.2;
+    c.beginPath(); c.arc(cx, cy, m.dead * h, 0, 6.283); c.stroke();
+    if (Math.hypot(m.x, m.y) > m.dead) { c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); }
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 1.8; c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 3;
+    c.beginPath(); c.arc(x, y, 6, 0, 6.283); c.stroke();
+    c.shadowBlur = 0;
   }
 
   // Flèches au bord de l'écran vers les ennemis hors champ
