@@ -12,6 +12,8 @@ import { createVhsFilter } from './vhs.js';
 
 const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
 export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
+// L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (15 par seconde, 23 par rangée) jouée en boucle
+const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=1', import.meta.url).href, frames: 149, cols: 23, rows: 7, fps: 15, aspect: 176 / 288 };
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
 const AMBIENT = 0.015; // lumière minimale dans les zones mortes
@@ -760,31 +762,39 @@ export function createBackroomsScene(container, floors) {
   const face = new THREE.Group();
   const faceGlitch = { value: 1 };
   const faceTime = { value: 0 };
+  // au Level 1, l'image de la planche affichée : décalage et taille dans la texture (xy, zw)
+  const faceFrame = { value: new THREE.Vector4(0, 0, 1, 1) };
+  const anim = L1 ? ENTITY_ANIM : null;
   face.visible = false;
   monsterGroup.add(face);
-  new THREE.TextureLoader().load(ENTITY_IMG, (t) => {
+  new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const h = 2.15;
-    const w = Math.min(2.3, (h * t.image.width) / t.image.height);
-    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: '#e6dccb' });
+    const h = anim ? 1.95 : 2.15;
+    const w = anim ? h * anim.aspect : Math.min(2.3, (h * t.image.width) / t.image.height);
+    if (anim) faceFrame.value.set(0, 0, 1 / anim.cols, 1 / anim.rows);
+    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? '#ffffff' : '#e6dccb' });
     // brouillage de l'image : bandes décalées, couleurs qui bavent, neige et lignes manquantes (uGlitch de 0 à 1)
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uGlitch = faceGlitch;
       sh.uniforms.uGTime = faceTime;
+      sh.uniforms.uFrame = faceFrame;
       sh.fragmentShader = `uniform float uGlitch;
 uniform float uGTime;
+uniform vec4 uFrame;
 float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 ` + sh.fragmentShader.replace('#include <map_fragment>', `
   vec2 guv = vMapUv;
+  vec2 gpad = 0.5 / (vec2(textureSize(map, 0)) * uFrame.zw); // sans déborder sur l'image voisine de la planche
   float gt = floor(uGTime * 15.0);
   float gb = floor(guv.y * 30.0);
   guv.x += step(1.0 - uGlitch * 0.6, ghash(vec2(gb, gt))) * (ghash(vec2(gb, gt + 7.0)) - 0.5) * 0.4 * uGlitch;
   guv.x += (ghash(vec2(floor(guv.y * 220.0), gt)) - 0.5) * 0.025 * uGlitch;
   float gca = 0.03 * uGlitch;
-  vec4 gc = texture2D(map, guv);
-  gc.r = texture2D(map, guv + vec2(gca, 0.0)).r;
-  gc.b = texture2D(map, guv - vec2(gca, 0.0)).b;
+  #define GUV(u) (uFrame.xy + clamp(u, gpad, 1.0 - gpad) * uFrame.zw)
+  vec4 gc = texture2D(map, GUV(guv));
+  gc.r = texture2D(map, GUV(guv + vec2(gca, 0.0))).r;
+  gc.b = texture2D(map, GUV(guv - vec2(gca, 0.0))).b;
   gc.rgb = mix(gc.rgb, vec3(ghash(guv * 420.0 + uGTime)), uGlitch * 0.4);
   if (ghash(vec2(gb * 3.1, floor(uGTime * 20.0))) < uGlitch * 0.2) gc.a = 0.0;
   diffuseColor *= gc;
@@ -792,7 +802,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
     };
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     plane.position.y = h / 2 + 0.25; // elle flotte au-dessus de la moquette
-    plane.position.x = (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
+    plane.position.x = anim ? 0 : (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
+    if (anim) plane.position.y = h / 2 + 0.02; // lui marche par terre
     face.add(plane);
     face.visible = true;
     shadow.visible = false;
@@ -875,6 +886,12 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);
         faceGlitch.value = g;
         faceTime.value = time;
+        if (anim) {
+          const f = Math.floor(time * anim.fps) % anim.frames;
+          // la planche se lit de haut en bas, la texture de bas en haut
+          faceFrame.value.x = (f % anim.cols) / anim.cols;
+          faceFrame.value.y = 1 - (Math.floor(f / anim.cols) + 1) / anim.rows;
+        }
         const j = (chase ? 0.12 : 0.04) * g;
         const my = -(M.floor || 0) * FLOOR_DY;
         monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);

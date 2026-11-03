@@ -1,6 +1,8 @@
 // The Backrooms - Synthétiseur audio WebAudio spatialisé
 // Bourdonnement strident et glitché qui s'amplifie à l'approche de l'entité
 
+const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
+
 export class BackroomsSfx {
   constructor() {
     this.ctx = null;
@@ -117,14 +119,38 @@ export class BackroomsSfx {
     hum2.start();
   }
 
-  // Mettre à jour le bourdonnement strident de l'entité à chaque frame
-  updateMonsterSound(danger, pan) {
+  // La voix de l'entité du Level 1 : la bande-son de sa vidéo, jouée en boucle sans fin. Chargée une seule fois,
+  // au premier besoin ; elle passe par le même panoramique que le bourdonnement.
+  initVoice() {
+    const c = this.ctx;
+    this.voiceGain = c.createGain();
+    this.voiceGain.gain.setValueAtTime(0.0001, c.currentTime);
+    this.voiceGain.connect(this.monsterPanner || this.out);
+    fetch(VOICE)
+      .then((r) => r.arrayBuffer())
+      .then((b) => c.decodeAudioData(b))
+      .then((buf) => {
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        src.connect(this.voiceGain);
+        src.start();
+      })
+      .catch(() => {});
+  }
+
+  // Mettre à jour le bourdonnement strident de l'entité à chaque frame ; voice : c'est la voix du Level 1 qu'on
+  // entend à la place du bourdonnement
+  updateMonsterSound(danger, pan, voice = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
+    if (voice && !this.voiceGain) this.initVoice();
+    // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
+    if (this.voiceGain) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(danger, 0.8) * 1.3 : 0.0001, t, 0.1);
 
     // Danger va de 0.0 (silencieux) à 1.0 (très proche, assourdissant)
-    const targetVol = Math.max(0.0001, danger * 0.45);
+    const targetVol = voice ? 0.0001 : Math.max(0.0001, danger * 0.45);
     this.monsterGain.gain.setTargetAtTime(targetVol, t, 0.08);
 
     // Ajuster le panoramique stéréo (-1 à 1)
@@ -235,6 +261,7 @@ export class BackroomsSfx {
     if (this.monsterGain) {
       this.monsterGain.gain.setValueAtTime(0.0001, t);
     }
+    if (this.voiceGain) this.voiceGain.gain.setValueAtTime(0.0001, t);
 
     // Cri strident distordu immédiat
     const osc = c.createOscillator();

@@ -583,7 +583,7 @@ function loop(currentTime) {
 
   // Mise à jour du son continu de l'entité, et ses pas lourds quand elle te traque
   if (sfx && sim.hasMonster && sim.state === 'playing') {
-    sfx.updateMonsterSound(sim.monster.danger, sim.monster.pan);
+    sfx.updateMonsterSound(sim.monster.danger, sim.monster.pan, sim.level === 1);
     if (!paused && sim.monster.mode === 'chase' && sim.monster.danger > 0.05) {
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
@@ -591,7 +591,7 @@ function loop(currentTime) {
         sfx.monsterStep(sim.monster.danger, sim.monster.pan);
       }
     }
-  }
+  } else if (sfx) sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
 
   // Rendu graphique et HUD
   if (scene) {

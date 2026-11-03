@@ -1,5 +1,10 @@
 # Journal des versions — Arcadia
 
+## 3.82 — 3 novembre 2026
+- **The Backrooms** — une nouvelle entité rôde dans l'entrepôt du Level 1.
+  - Après l'ascenseur, ce n'est plus la même créature qui te traque : une silhouette qui gesticule en boucle, avec sa propre voix.
+  - On l'entend en permanence au loin, de plus en plus fort à mesure qu'elle se rapproche, à gauche ou à droite selon où elle se trouve.
+
 ## 3.81 — 3 novembre 2026
 - **The Backrooms** — le Level 0 sur deux étages, et un faux ascenseur.
   - Un faux pas dans un trou ne te bloque plus : tu tombes à l'étage du dessous, juste en dessous, sonné un instant. La corde n'est plus utile.
