@@ -42,7 +42,7 @@ const key = (x, y) => x + ',' + y;
 const RIVAL_TEAMS = {};
 for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) RIVAL_TEAMS[STARTER_TABLE[t].lines[k][0]] = STARTER_TABLE[(t + 1) % 3].lines[k];
 void R;
-const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace et le Dragon' };
+const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace, le Dragon et la Fée', normal: 'le Combat', flying: 'l\'Électrik, la Glace et la Roche', poison: 'le Sol et le Psy', ground: 'l\'Eau, la Plante et la Glace', steel: 'le Feu, le Combat et le Sol', fairy: 'le Poison et l\'Acier', dark: 'le Combat, l\'Insecte et la Fée' };
 // capacité de terrain donnée par chaque Champion après sa victoire
 const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
 // portrait affiché à côté de la boîte de dialogue 5G, selon qui parle
@@ -51,8 +51,9 @@ const FACES = {
   'Prof. Saule': 'saule', 'Professeur Saule': 'saule', 'Saule': 'saule',
   [RIVAL_NAME]: 'theo', 'Théo': 'theo', 'Theo': 'theo', 'Rival': 'theo',
   // Famille & PNJ récurrents
-  'Maman': 'habitante', 'Mère de Théo': 'habitante', 'Infirmière': 'topdresseuse',
-  'Vendeur': 'topdresseur', 'Garde': 'garde', 'Capitaine': 'marin', 'Capitaine Corentin': 'marin',
+  'Maman': 'maman', 'Mère de Théo': 'habitante', 'Infirmière': 'nurse',
+  'Vendeur': 'vendeur', 'Garde': 'garde', 'Capitaine': 'capitaine', 'Capitaine Corentin': 'capitaine',
+  'Architecte': 'topdresseur', 'Pierre': 'pierre', 'Croupier': 'croupier', 'Facteur': 'facteur',
   'Gardien du phare': 'scientifique', 'Ermite': 'montagnard', 'Styliste': 'topdresseuse',
   'Gardien du savoir': 'scientifique', 'Inspectrice Morvan': 'topdresseuse', 'Morvan': 'topdresseuse',
   // Champions du Continent
@@ -119,6 +120,23 @@ export class Game {
     this.session = null; // échange ou combat en cours avec un autre joueur
     installSocial(this);
     input.onFree = (k) => this.onKey(k);
+    // visage d'un personnage : son portrait peint s'il en a un, sinon le haut de son dessin de la carte (de face)
+    const bustes = new Map();
+    const visage = (k) => {
+      if (!k) return null;
+      const p = ASSETS.portrait(k); if (p) return p;
+      if (bustes.has(k)) return bustes.get(k);
+      const row = CHAR_ROWS[k], src = this.view?.charsCanvas; if (row == null || !src) return null;
+      const c = document.createElement('canvas'); c.width = c.height = 40;
+      const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+      // le haut du personnage : première rangée dessinée de l'image de face, immobile
+      const f = src.getContext('2d').getImageData(64, row * 64, 64, 64).data;
+      let top = 0; for (let y = 0; y < 64 && !top; y++) for (let i = 0; i < 64; i++) if (f[(y * 64 + i) * 4 + 3] > 100) { top = Math.max(0, y - 2); break; }
+      x.drawImage(src, 64 + 12, row * 64 + top, 40, 40, 0, 0, 40, 40);
+      const big = document.createElement('canvas'); big.width = big.height = 160;
+      const bx = big.getContext('2d'); bx.imageSmoothingEnabled = false; bx.drawImage(c, 0, 0, 160, 160);
+      const url = big.toDataURL(); bustes.set(k, url); return url;
+    };
     ui.faceOf = (who, o = {}) => {
       if (!who && !o?.face) return null;
       if (o?.face) {
@@ -128,19 +146,19 @@ export class Game {
       }
       const s = String(who || '').trim();
       if (!s) return null;
-      if (FACES[s]) { const p = ASSETS.portrait(FACES[s]); if (p) return p; }
+      if (FACES[s]) { const p = visage(FACES[s]); if (p) return p; }
       const low = s.toLowerCase();
-      if (FACES[low]) { const p = ASSETS.portrait(FACES[low]); if (p) return p; }
-      if (TRAINER_NAME_TO_SPRITE[low]) { const p = ASSETS.portrait(TRAINER_NAME_TO_SPRITE[low]); if (p) return p; }
-      if (CLASS_TO_SPRITE[low]) { const p = ASSETS.portrait(CLASS_TO_SPRITE[low]); if (p) return p; }
+      if (FACES[low]) { const p = visage(FACES[low]); if (p) return p; }
+      if (TRAINER_NAME_TO_SPRITE[low]) { const p = visage(TRAINER_NAME_TO_SPRITE[low]); if (p) return p; }
+      if (CLASS_TO_SPRITE[low]) { const p = visage(CLASS_TO_SPRITE[low]); if (p) return p; }
       const words = s.split(/\s+/);
       for (const w of words) {
         const wLow = w.toLowerCase();
-        if (FACES[w]) { const p = ASSETS.portrait(FACES[w]); if (p) return p; }
-        if (TRAINER_NAME_TO_SPRITE[wLow]) { const p = ASSETS.portrait(TRAINER_NAME_TO_SPRITE[wLow]); if (p) return p; }
-        if (CLASS_TO_SPRITE[wLow]) { const p = ASSETS.portrait(CLASS_TO_SPRITE[wLow]); if (p) return p; }
+        if (FACES[w]) { const p = visage(FACES[w]); if (p) return p; }
+        if (TRAINER_NAME_TO_SPRITE[wLow]) { const p = visage(TRAINER_NAME_TO_SPRITE[wLow]); if (p) return p; }
+        if (CLASS_TO_SPRITE[wLow]) { const p = visage(CLASS_TO_SPRITE[wLow]); if (p) return p; }
       }
-      return ASSETS.portrait(low);
+      return visage(low);
     };
   }
 
@@ -360,6 +378,7 @@ export class Game {
     this.busy = true;
     this.sound.sfx(sfx);
     await this.ui.doorTransition(true, 240);
+    const from = this.mapObj.id;
     if (this.mapObj.id === 'monde' && to.map !== 'monde') this.state.lastOutdoor = { x: this.player.x, y: this.player.y + 1, map: 'monde' };
     this.player.x = to.x; this.player.y = to.y; this.player.dir = to.dir || this.player.dir; this.player.move = null; this.player.surf = false;
     this.setMap(to.map);
@@ -367,15 +386,19 @@ export class Game {
     this.save(true);
     await this.ui.doorTransition(false, 240);
     if (this.mapObj.dark && this.mapObj.dark !== 'arene' && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
-    await this.onEnterMap();
+    await this.onEnterMap(from);
     this.busy = false;
   }
   /** petites scènes à l'entrée d'une carte */
-  async onEnterMap() {
+  async onEnterMap(from = null) {
     const st = this.state;
     // lieux visités (et visités la nuit) : certaines requêtes des habitants en dépendent
     st.flags['V:' + this.mapObj.id] = true;
-    if (this.mapObj.gymLock != null) st.flags['IN:' + this.mapObj.id] = !st.badges[this.mapObj.gymLock];
+    // arène : en arrivant de dehors, le guide accueille le Dresseur et lui demande s'il est prêt (les portes se ferment alors)
+    if (this.mapObj.gymLock != null && from !== this.mapObj.id) {
+      st.flags['IN:' + this.mapObj.id] = false;
+      if (!st.badges[this.mapObj.gymLock] && !this.libre) { await this.gymWelcome(); return; }
+    }
     if (this.mapObj.id === 'domaine' && st.domaine) await arrivees(this);   // des Pokémon dont l'habitat est prêt viennent s'installer
     { const h = this.hour(); if (h >= 20 || h < 5) st.flags['VN:' + this.mapObj.id] = true; }
     // au labo, le professeur accueille le joueur avant qu'il ne touche aux capsules
@@ -566,7 +589,7 @@ export class Game {
       await this.warp(w, t === T.CAVEDOOR || w.step ? 'exit' : 'door'); return;
     }
     this.updateZone();
-    if (this.state.repel > 0) { this.state.repel--; if (this.state.repel === 0) { this.busy = true; await this.ui.say('L\'effet du Repousse s\'est dissipé...'); this.busy = false; } }
+    if (this.state.repel > 0) { this.state.repel--; if (this.state.repel === 0) { this.busy = true; try { await this.repelFini(); } finally { this.busy = false; } } }
     const z = this.zone;
     // Cap des Étoiles : Odyssor
     if (m.objectAt(p.x, p.y)?.type === 'odyssor') { if (await this.odyssorEvent()) return; }
@@ -629,6 +652,23 @@ export class Game {
   /** tables du Casino et terminaux de la Bourse (objets des intérieurs de Métropole) */
   casino(quoi) { return casinoScreen(this, quoi); }
   bourse() { return bourseScreen(this); }
+  /** accueil d'une arène : le guide présente le Champion et demande si l'on est prêt ; oui = enfermé jusqu'à la victoire ou
+   *  la défaite, non = on ressort pour se préparer */
+  async gymWelcome() {
+    const m = this.mapObj, st = this.state, ui = this.ui, L = LEADERS[m.gymLock];
+    const g = this.npcs.find((n) => n.def.script === 'gymguide');
+    if (g) { const dx = this.player.x - g.x, dy = this.player.y - g.y; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
+    await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des créatures de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
+      'Mais attention : une fois le défi lancé, les portes se ferment derrière toi.', 'Tu ne pourras ressortir qu\'après avoir battu le Champion… ou avoir perdu.'], { speaker: 'Guide' });
+    if (await ui.yesNo('Es-tu prêt à relever le défi ?')) {
+      st.flags['IN:' + m.id] = true; this.sound.sfx('door');
+      await ui.say(['Voilà l\'esprit ! Les portes se referment derrière toi.', 'Bonne chance !'], { speaker: 'Guide' });
+      return;
+    }
+    await ui.say(['Pas de souci. Soigne ton équipe, remplis ton sac…', 'Et reviens quand tu seras prêt !'], { speaker: 'Guide' });
+    const w = m.exitX != null ? m.warpAt(m.exitX, m.exitY) : null;
+    if (w) await this.warp(w, 'exit');
+  }
   /** l'arène est fermée derrière nous : le guide le rappelle */
   async gymLocked() {
     this.busy = true;
@@ -764,10 +804,13 @@ export class Game {
     try {
       if (d.trainer) {
         if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false);
-        else await this.ui.say(d.trainer.after || 'Quel combat !', {
-          speaker: d.trainer.cls ? `${d.trainer.cls} ${d.trainer.name}` : d.trainer.name,
-          face: d.trainer.bs || d.trainer.ow || n.sprite
-        });
+        else {
+          await this.ui.say(d.trainer.after || 'Quel combat !', {
+            speaker: d.trainer.cls ? `${d.trainer.cls} ${d.trainer.name}` : d.trainer.name,
+            face: d.trainer.bs || d.trainer.ow || n.sprite
+          });
+          if (d.leader != null) await this.retourEntreeArene();
+        }
       }
       else if (d.role === 'nurse') await this.nurse();
       else if (d.role === 'shop') await shopScreen(this, d.stock);
@@ -1028,6 +1071,16 @@ export class Game {
     st.velo = !st.velo; this.sound.sfx(st.velo ? 'select' : 'cancel');
     return true;
   }
+  /** fin d'un Repousse : on propose d'en utiliser un autre tout de suite (le même s'il en reste, sinon un autre) */
+  async repelFini() {
+    const st = this.state, ui = this.ui;
+    await ui.say('L\'effet du Repousse s\'est dissipé...');
+    const order = [st.lastRepel, 'repel', 'super-repel', 'max-repel'].filter(Boolean);
+    const k = order.find((id) => st.bag[id] > 0); if (!k) return;
+    if (!(await ui.yesNo(`Utiliser un autre ${itemName(k)} ?\n(il t'en reste ${st.bag[k]})`))) return;
+    st.repel = ITEMS[k].repel; st.lastRepel = k; this.take(k); this.sound.sfx('item');
+    await ui.say(`${st.name} utilise ${itemName(k)}.\nLes créatures sauvages faibles fuiront pendant ${st.repel} pas.`);
+  }
   /** sac hors combat ; renvoie true si l'objet utilisé ferme le menu (Corde Sortie, Vol…) */
   async fieldBag() {
     for (;;) {
@@ -1041,7 +1094,11 @@ export class Game {
         await this.ui.say([`${FIELD[it.field].name} : ${FIELD[it.field].desc}`, this.canField(it.field) ? 'Place-toi face à l\'obstacle et appuie sur F pour l\'utiliser.' : `Il faut le ${BADGES[FIELD[it.field].badge - 1].name} pour l'utiliser hors combat.`]);
         continue;
       }
-      if (it.repel) { st.repel = it.repel; this.take(r.item); this.sound.sfx('item'); await this.ui.say(`${st.name} utilise ${itemName(r.item)}.\nLes créatures sauvages faibles fuiront pendant ${it.repel} pas.`); return true; }
+      // Repousses : on peut en utiliser plusieurs d'affilée, les pas s'additionnent (le sac reste ouvert)
+      if (it.repel) {
+        st.repel = Math.min(9999, (st.repel || 0) + it.repel); st.lastRepel = r.item; this.take(r.item); this.sound.sfx('item');
+        await this.ui.say(`${st.name} utilise ${itemName(r.item)}.\nLes créatures sauvages faibles fuiront pendant ${st.repel} pas.`); continue;
+      }
       if (r.item === 'escape-rope') {
         if (this.mapObj.floor === 'cave' && st.lastOutdoor) { this.take(r.item); await this.ui.say(`${st.name} utilise la Corde Sortie !`); await this.warp({ map: 'monde', x: st.lastOutdoor.x, y: st.lastOutdoor.y, dir: 'down' }, 'exit'); return true; }
         await this.ui.say('Ce n\'est pas le moment d\'utiliser ça !'); continue;
@@ -1201,6 +1258,7 @@ export class Game {
       if (d.winScript) await storyWin(this, d.winScript, n);
       if (d.beatenPos || d.vanish || d.winScript) this.refreshNpcs();
       if (d.champion) await this.ending();
+      if (d.leader != null) await this.retourEntreeArene();
       // battu, il retourne à sa place pour ne pas boucher le passage (couloirs des arènes)
       if (n.back && !d.beatenPos && !d.vanish && this.npcs.includes(n)) { const B = n.back; await this.npcWalk(n, OPP[B.dir], B.steps); n.dir = B.dir; }
     }
@@ -1208,6 +1266,12 @@ export class Game {
     this.updateZone();
     this.busy = false;
     return res;
+  }
+  /** après le Champion : un raccourci jusqu'à la sortie de l'arène, pour ne pas refaire l'énigme à l'envers */
+  async retourEntreeArene() {
+    const m = this.mapObj; if (m.gymLock == null || m.exitX == null) return;
+    if (!(await this.ui.yesNo('Retourner directement à l\'entrée de l\'arène ?'))) return;
+    await this.warp({ map: m.id, x: m.exitX, y: m.exitY - 1, dir: 'down' }, 'select');
   }
   async badgeScene(g, name) {
     const st = this.state, ui = this.ui;
