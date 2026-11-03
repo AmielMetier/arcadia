@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 3.81 — 3 novembre 2026
+- **Odyssée** — Le frigo de la maison cache une petite annonce : un très grand terrain à acheter juste derrière chez toi. On y entre par la porte du jardin, au fond de la chambre.
+  - Avec l'architecte, bâtis ton propre coin : chemins, pavés, fleurs, hautes herbes (avec des Pokémon sauvages), bassins, ponts, arbres, clôtures, lampadaires, bancs, fontaine, statues…
+  - Construis des maisons, ton Centre de soins, ta boutique, et invite des habitants à s'installer.
+  - Tout se pose en marchant sur ton terrain, au clavier ou d'un clic ; ce que tu retires est remboursé à moitié.
+- **Odyssée** — La casquette et le bonnet de la création du personnage sont redessinés.
+- **Odyssée** — Décor façon HeartGold / SoulSilver : nouvelles hautes herbes, nouveaux rebords, herbe plus douce et chemins de terre arrondis.
+  - Les barrières des routes ne s'enfoncent plus dans les hautes herbes et ne se croisent plus.
+  - Les boîtes aux lettres sont posées sur le côté des maisons.
+  - Les statues des villes sont redessinées, bien droites sur leur socle.
+- **Odyssée** — Le Pokémon qui te suit est un peu plus petit. Au labo, chaque capsule propose deux partenaires : celui de Kanto et celui de Johto.
+- **Odyssée** — Maj fait toujours courir, même avec la course continue.
+- **Odyssée** — Dans les arènes, un dresseur battu retourne à sa place : il ne bouche plus le couloir.
+- **Odyssée** — Si un combat se passe mal au lancement, on revient à la carte au lieu de rester devant un écran noir.
 ## 3.80 — 3 novembre 2026
 - **Arcadia** — Les menus se pilotent à la manette (Xbox, PlayStation, Switch…), dans le Hub comme dans tous les jeux.
   - La croix ou le stick gauche passe d'un bouton à l'autre, A valide, B revient en arrière, et gauche / droite règle les volumes.
