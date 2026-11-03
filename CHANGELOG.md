@@ -1,17 +1,7 @@
 # Journal des versions — Arcadia
 
-## 3.95 — 3 novembre 2026
-- **The Backrooms** — plus sombre, plus vrai, et on entend son propre souffle.
-  - Les couloirs sont plus sombres : davantage de néons morts ou qui grésillent, et un vrai noir loin des lampes. La lampe torche devient indispensable.
-  - Quand tu sprintes, tu entends ton souffle s'emballer ; il reste haletant le temps de reprendre ton endurance, et s'accélère quand l'entité approche.
-  - De vrais objets abandonnés, photographiés : cartons, chaises d'école et chaises en plastique renversées, bureaux métalliques, vieilles télés cathodiques, sacs poubelle, panneaux « sol glissant ».
-  - Sur les murs : prises électriques, détecteurs incendie, boîtiers électriques et horloges arrêtées ; au plafond, des grilles d'aération.
-  - Dans l'entrepôt du Level 1 : caisses en bois, bidons rouges, bouteilles de gaz, caisses en plastique, diables et sacs poubelle entre les étagères.
-
-## 3.94 — 3 novembre 2026
-- **The Backrooms** — plus de table au départ : chacun commence avec sa lampe torche déjà allumée, dans la case 1 de l'inventaire.
-
 ## 3.93 — 3 novembre 2026
+- **The Backrooms** — la partie commence de nouveau au Level 0, dans le dédale aux murs jaunes (elle démarrait par erreur dans l'entrepôt du Level 1).
 - **The Backrooms** — un rendu beaucoup plus réaliste, comme dans les films.
   - Les néons éclairent comme de vrais pavés lumineux : des flaques de lumière rondes sur la moquette, et les murs projettent leur ombre dans les couloirs voisins.
   - Ombres au pied des murs et dans les coins, murs plus sombres vers le sol, plus clairs sous le plafond.
@@ -21,9 +11,33 @@
   - Nouveau papier peint jaune pâle à fines rayures et chevrons, avec sa plinthe ; moquette détrempée par plaques, humidité qui remonte au pied des murs, auréoles d'eau au plafond et sur les murs.
   - Le grésillement des néons monte sous les lampes et s'éteint dans les zones mortes ; un souffle sourd remplit le silence.
   - Pas étouffés sur la moquette, secs et claquants sur le béton de l'entrepôt.
+- **The Backrooms** — plus de table au départ : chacun commence avec sa lampe torche déjà allumée, dans la case 1 de l'inventaire.
+- **The Backrooms** — plus sombre, plus vrai, et on entend son propre souffle.
+  - Les couloirs sont plus sombres : davantage de néons morts ou qui grésillent, et un vrai noir loin des lampes. La lampe torche devient indispensable.
+  - Quand tu sprintes, tu entends ton souffle s'emballer ; il reste haletant le temps de reprendre ton endurance, et s'accélère quand l'entité approche.
+  - De vrais objets abandonnés, photographiés : cartons, chaises d'école et chaises en plastique renversées, bureaux métalliques, vieilles télés cathodiques, sacs poubelle, panneaux « sol glissant ».
+  - Sur les murs : prises électriques, détecteurs incendie, boîtiers électriques et horloges arrêtées ; au plafond, des grilles d'aération.
+  - Dans l'entrepôt du Level 1 : caisses en bois, bidons rouges, bouteilles de gaz, caisses en plastique, diables et sacs poubelle entre les étagères.
 
 ## 3.92 — 3 novembre 2026
-- **The Backrooms** — la partie commence de nouveau au Level 0, dans le dédale aux murs jaunes (elle démarrait par erreur dans l'entrepôt du Level 1).
+- **Odyssée** — Intégration scénarisée de l'obtention des Objets Rares d'exploration :
+  - **Sécateur Sylvestre (Coupe)** :
+    - Obtenu à **Floralia** auprès de la Championne **Flora** lors de la victoire pour le **Badge Pétale** (Arène 4).
+    - Dialogue solennel de Flora transmettant l'outil d'or et d'émeraude pour débloquer la Route 6 vers Mirage en taillant les ronces sans abîmer les racines.
+    - PNJ de Floralia (maison de l'arboriste) et serre de la Résidence Floralia contextualisant l'importance du Sécateur Sylvestre.
+  - **Harnais Flottant d'Écume (Surf)** :
+    - Obtenu à **Mirage** auprès de la Championne **Sibylle** lors de la victoire pour le **Badge Mirage** (Arène 5).
+    - Sibylle transmet la selle nautique après avoir eu la vision du voyage maritime du dresseur vers le Sanctuaire des Marées et les îles des trois frères.
+    - PNJ du Cap Mirage (marin et pêcheur) validant la traversée des flots vers l'Île de Granit et l'archipel.
+  - **Sifflet Céleste (Vol)** :
+    - Obtenu au sommet de la **Tour de la Grue** (village de **Hautegrue**, sanctuaire sacré des oiseaux célestes et de Ho-Oh, accessible dès 3 badges).
+    - Confié solennellement par le **Grand Sage Hoël** (3e étage de la tour) en même temps que la Plume Arc-en-ciel pour appeler les grands oiseaux des cieux et voyager entre les villes visitées.
+    - Dialogues synchronisés du novice de la tour, de la Doyenne Amaya et du journal de quêtes.
+    - Dialogue adaptatif et remise de secours auprès de Pyros (Arène 7, Cendrelune) pour garantir la complétion si Hautegrue n'a pas encore été explorée.
+    - Utilisation de Vol harmonisée dès l'obtention du Badge Mirage (Badge 5) ou supérieur.
+  - **Messages d'objets B2W2** :
+    - Distinction rigoureuse entre Objets Rares (`Poche Objets Rares`) et Capacités Secrètes (`Poche CT & CS`).
+    - Harmonisation complète de la syntaxe officielle Pokémon Noir 2 / Blanc 2 pour tous les dons d'objets scénarisés.
 
 ## 3.91 — 3 novembre 2026
 - **Odyssée** — Objets d'exploration et capacités de terrain :
