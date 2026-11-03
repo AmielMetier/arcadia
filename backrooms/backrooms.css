@@ -173,6 +173,10 @@ html, body {
   text-align: center;
 }
 .fade.on { opacity: 1; }
+.fade-bar { width: min(360px, 70vw); height: 12px; margin: 22px auto 0; border: 2px solid #f2f0e6; padding: 2px; }
+.fade-bar i { display: block; height: 100%; width: 0; background: #f2f0e6; transition: width 0.15s linear; }
+/* la pause passe toujours au-dessus du fondu */
+.click-prompt { z-index: 40; }
 .fade b { display: block; font-weight: normal; font-size: 54px; letter-spacing: 6px; color: #f2f0e6; }
 .fade span { font-size: 24px; opacity: 0.75; }
 .toast {

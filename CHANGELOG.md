@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.75 — 3 novembre 2026
+- **The Backrooms** — l'ascenseur ne reste plus bloqué sur « L'ascenseur descend… ».
+  - Une pause pendant la descente figeait le trajet, et l'écran de pause restait caché sous le noir : la descente va maintenant toujours jusqu'au bout.
+  - Une barre de chargement montre l'avancée du trajet jusqu'à l'étage suivant.
+  - L'écran de pause s'affiche toujours au premier plan.
+
 ## 3.74 — 3 novembre 2026
 - **The Backrooms** — le Level 1, l'ascenseur et le jeu à plusieurs.
   - On joue maintenant à plusieurs : les cassettes et les fusibles comptent pour toute l'équipe, et on voit les autres avancer avec leur lampe.

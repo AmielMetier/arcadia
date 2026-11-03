@@ -1,5 +1,6 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
 import { ENTITY_IMG } from './scene.js';
+import { DEPART_T } from '../engine/sim.js';
 
 export class BackroomsHUD {
   constructor(container, actions = {}) {
@@ -39,7 +40,7 @@ export class BackroomsHUD {
       <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
       <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span></div>
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
-      <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span></div></div>
+      <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
@@ -130,6 +131,17 @@ export class BackroomsHUD {
     this.bannerT -= dt;
     this.$('#objBanner').classList.toggle('hide', this.bannerT <= 0);
     this.$('#blackoutTag').hidden = !(sim.blackout > 0);
+
+    // 2a. Trajet en ascenseur : barre de chargement ; à l'arrivée, la carte de l'étage (même si l'annonce s'est perdue)
+    if (this.fadeRide) {
+      const k = sim.departT > 0 ? 1 - sim.departT / DEPART_T : 1;
+      this.$('#fadeBar').style.width = `${Math.round(k * 100)}%`;
+      if (!(sim.departT > 0)) {
+        this.fadeRide = false;
+        if (sim.state === 'playing') this.fade(`LEVEL ${sim.level}`, sim.level === 1 ? 'Le sous-sol industriel' : '', 2.2);
+        else this.$('#fade').classList.remove('on');
+      }
+    }
 
     // 2b. Spectateur : dans l'ascenseur ou attrapé, on regarde ceux qui sont encore dehors
     const spec = P.status !== 'alive' && sim.state === 'playing';
@@ -229,8 +241,11 @@ export class BackroomsHUD {
   }
 
   // Fondu au noir : l'ascenseur descend, puis la carte de l'étage
-  fade(title, sub = '', hold = 0) {
+  fade(title, sub = '', hold = 0, ride = false) {
     const f = this.$('#fade');
+    this.fadeRide = ride;
+    this.$('#fadeBarBox').hidden = !ride;
+    if (ride) this.$('#fadeBar').style.width = '0%';
     this.$('#fadeTitle').textContent = title;
     this.$('#fadeSub').textContent = sub;
     f.classList.add('on');

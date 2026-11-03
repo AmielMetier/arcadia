@@ -356,7 +356,7 @@ function handleEvent(ev, me) {
       break;
     case 'depart':
       if (sfx) { sfx.ding(); setTimeout(() => sfx && sfx.elevator(DEPART_T + 1.5), 400); }
-      if (hud) setTimeout(() => hud && hud.fade(ev.level === 0 ? "L'ASCENSEUR DESCEND…" : 'LE MONTE-CHARGE REMONTE…'), 700);
+      if (hud) setTimeout(() => hud && sim.departT > 0 && hud.fade(ev.level === 0 ? "L'ASCENSEUR DESCEND…" : 'LE MONTE-CHARGE REMONTE…', '', 0, true), 700);
       break;
     case 'level':
       // nouvel étage : nouvelle scène
@@ -406,8 +406,9 @@ function loop(currentTime) {
   accumulator += delta;
 
   if (!sim) return;
-  // en pause, le monde est figé (seul) ; à plusieurs, il continue sans toi
-  if (paused && !multi()) accumulator = 0;
+  // en pause, le monde est figé (seul) ; à plusieurs, il continue sans toi. Le trajet en ascenseur, lui, va
+  // toujours jusqu'au bout : sinon une pause pendant la descente laissait l'écran noir pour toujours
+  if (paused && !multi() && !(sim.departT > 0)) accumulator = 0;
 
   // Lecture des entrées utilisateur (en mode sans souris, les flèches tournent la vue)
   const arrows = !kbMode;
