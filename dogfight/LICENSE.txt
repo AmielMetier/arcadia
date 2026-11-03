@@ -12,7 +12,19 @@ f-22.glb — F-22 Raptor, ajouté au projet par TahitoaSenis.
   Licence : NON CONFIRMÉE. L'origine et les conditions de ce modèle restent à vérifier auprès de TahitoaSenis.
   À remplacer si elles ne permettent pas de le distribuer ici.
 
-Rafale, Su-35, F/A-18, A-10, C-17 et A400M : dessinés dans le code (view/models.js), sans fichier extérieur.
+avions/*.glb — Rafale, Su-35, F/A-18, A-10, C-17 et A400M, tirés de modèles STL publiés sur Thingiverse : remis d'aplomb,
+mis à leur vraie longueur, allégés (moins de triangles), lissés et convertis en GLB par tools/avions-dogfight.mjs ; le jeu
+les peint et ajoute les hélices de l'A400M.
+  rafale.glb — « Dassault Rafale B for microarmor », par Captain_Ahab_62, https://www.thingiverse.com/thing:3541882.
+    Licence Creative Commons Attribution 4.0 (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/deed.fr). Modifié.
+  su35.glb — « Sukhoi Su-35 Flanker-E Jet Fighter », par HappyBattleSheep, https://www.thingiverse.com/thing:6720826. CC BY 4.0. Modifié.
+  f18.glb — « F-18e », par pershing1945, https://www.thingiverse.com/thing:6995299.
+    Licence Creative Commons Attribution - Partage dans les mêmes conditions 4.0
+    (CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/deed.fr). Modifié.
+  a10.glb — « A-10 thunderbolt », par pershing1945, https://www.thingiverse.com/thing:6890524. CC BY-SA 4.0. Modifié.
+  c17.glb — « C-17 Globemaster III », par pershing1945, https://www.thingiverse.com/thing:7425371. CC BY-SA 4.0. Modifié.
+  a400m.glb — « A400M », par pershing1945, https://www.thingiverse.com/thing:7010535. CC BY-SA 4.0. Modifié.
+  f18.glb, a10.glb, c17.glb et a400m.glb, tirés de modèles sous CC BY-SA 4.0, sont diffusés sous cette même licence.
 
 RELIEF (relief/*.bin)
 Tiré du modèle numérique de surface Copernicus GLO-30 par tools/relief-dogfight.py (rééchantillonné, fond de mer ajouté).

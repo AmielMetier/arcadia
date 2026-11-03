@@ -16,11 +16,13 @@
 - **Dogfight 3D** — Quatre nouveaux chasseurs : Rafale, Su-35, F/A-18 et A-10. Chaque avion a sa capacité, prête toutes les 25 secondes (touche R, bouton Y à la manette) :
   - F-16 Surcharge (canon sans surchauffe et plus rapide), F-22 Furtivité (impossible à accrocher, invisible au radar), Rafale Salve (deux missiles d'un coup), Su-35 Cobra (cabré brutal qui fait passer le poursuivant devant), F/A-18 Brouilleur (les missiles autour de toi décrochent), A-10 Brrrt (canon à dégâts doublés).
   - Le roulis libre passe sur V.
+  - Ce sont de vrais modèles 3D détaillés (verrière, tuyères, lignes de panneaux), peints : gris bleuté pour le Rafale, camouflage bleu pour le Su-35, deux tons de gris pour le F/A-18 et l'A-10. La couleur de l'escadron est sur les dérives et les bouts d'ailes.
 - **Dogfight 3D** — Missiles et leurres à volonté, avec un temps de recharge : 12 secondes pour le missile, 9 pour les leurres.
   - Un missile fait 70 de dégâts et demande toujours d'accrocher la cible. Un leurre fait décrocher un missile 7 fois sur 10.
   - Sous 50 m du sol, personne ne peut t'accrocher : le rase-mottes devient une vraie défense.
   - En bas à droite, quatre cases montrent canon, missile, leurres et capacité, avec leur recharge. Tout est prêt à chaque réapparition.
 - **Dogfight 3D** — Escorte refaite : le transport (un C-17 ou un A400M) suit un vrai trajet d'île en île, au ras de l'eau, entre les montagnes et à travers les nuages, puis se pose sur la piste.
+  - Le C-17 et l'A400M sont de vrais modèles 3D, avec leur bandeau de vitres, une bande de la dérive à la couleur du camp, et les huit pales des hélices de l'A400M qui tournent.
   - Trois trajets par carte, selon la durée de la partie (5, 8 ou 10 minutes).
   - Les assaillants n'ont que 5 vies chacun : s'ils tombent tous, les défenseurs gagnent aussi.
 - **Dogfight 3D** — La souris ne s'échappe plus en vol : le curseur disparaît et on peut tourner sans fin. Si elle se libère (Échap, changement de fenêtre), un message le rappelle et un clic la reprend, sans tirer.
