@@ -7,7 +7,7 @@ import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js'
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { SAUVAGE, R } from './data/remplacants.js';
-import { STARTERS, STARTER_CHOICES, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
+import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
@@ -26,12 +26,13 @@ import { composer } from './render/tenue.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
+const SUIVEUR = 0.75;   // taille du Pokémon qui suit (1 = celle de son dessin)
 const WALK = 0.26, RUN = 0.135, SURF = 0.2, VELO = 0.085;
 const key = (x, y) => x + ',' + y;
 // le rival prend le partenaire qui a l'avantage sur le tien (Plante → Feu, Feu → Eau, Eau → Plante), de la même
 // lignée que le tien : l'original d'Odyssée, celui de Rouge / Bleu ou celui d'Or / Argent
 const RIVAL_TEAMS = {};
-for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) RIVAL_TEAMS[STARTER_CHOICES[t].lines[k][0]] = STARTER_CHOICES[(t + 1) % 3].lines[k];
+for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) RIVAL_TEAMS[STARTER_TABLE[t].lines[k][0]] = STARTER_TABLE[(t + 1) % 3].lines[k];
 void R;
 const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace et le Dragon' };
 // capacité de terrain donnée par chaque Champion après sa victoire
@@ -168,6 +169,7 @@ export class Game {
     if (f.move) { const u = Math.min(1, f.move.t); x = f.move.fx + (f.move.tx - f.move.fx) * u; y = f.move.fy + (f.move.ty - f.move.fy) * u; sf = u < 0.5 ? (f.step % 2 ? 1 : 2) : 0; if (f.move.jump) hop = Math.sin(u * Math.PI) * 0.45; }
     else sf = Math.floor(performance.now() / 420) % 2 ? 1 : 0;   // il piétine sur place, comme dans HGSS
     const a = v.actor('follower', {});
+    a.mesh.scale.setScalar(SUIVEUR);   // un peu plus petit que le dresseur
     v.setFrame(a, 'poke:' + sp, f.dir, sf);
     const t = this.mapObj.get(Math.round(x), Math.round(y)), grass = isGrassEnc(t) && !f.move;
     v.place(a, x, y, hop, grass);
@@ -409,7 +411,7 @@ export class Game {
       if (w && m.gymLock != null && !this.state.badges[m.gymLock] && this.state.flags['IN:' + m.id]) { this.gymLocked(); return; }
       if (w) { this.warp(w, 'exit'); return; }
     }
-    const run = this.autoRun ? !this.input.isDown('run') : this.input.isDown('run');
+    const run = this.autoRun || this.input.isDown('run');   // Maj fait toujours courir, même en course continue
     // en surf : on glisse sur l'eau, et on descend sur la berge
     if (p.surf) {
       if (m.in(tx, ty) && t === T.WATER && !this.occupied(tx, ty)) { p.move = { fx: p.x, fy: p.y, tx, ty, t: 0, dur: SURF }; p.walking = true; return; }
@@ -970,7 +972,7 @@ export class Game {
       // le dresseur s'approche
       const p = this.player;
       const steps = Math.abs(p.x - n.x) + Math.abs(p.y - n.y) - 1;
-      if (steps > 0) await this.npcWalk(n, n.dir, steps);
+      if (steps > 0) { n.back = { steps, dir: n.dir }; await this.npcWalk(n, n.dir, steps); }
       p.dir = OPP[n.dir];
     }
     this.musicLock = true; this.sound.play(music);
@@ -987,7 +989,10 @@ export class Game {
       if (d.winScript) await storyWin(this, d.winScript, n);
       if (d.beatenPos || d.vanish || d.winScript) this.refreshNpcs();
       if (d.champion) await this.ending();
+      // battu, il retourne à sa place pour ne pas boucher le passage (couloirs des arènes)
+      if (n.back && !d.beatenPos && !d.vanish && this.npcs.includes(n)) { const B = n.back; await this.npcWalk(n, OPP[B.dir], B.steps); n.dir = B.dir; }
     }
+    n.back = null;
     this.updateZone();
     this.busy = false;
     return res;
@@ -1029,7 +1034,7 @@ export class Game {
   /** la troisième capsule du labo : celle que ni le joueur ni Théo n'ont prise (et ses évolutions) */
   thirdLine() {
     const slot = starterSlot(this.state.flags.starter) || { t: 0, k: 0 };
-    return STARTER_CHOICES[(slot.t + 2) % 3].lines[slot.k];
+    return STARTER_TABLE[(slot.t + 2) % 3].lines[slot.k];
   }
   /** appel du Prof. Saule sur le Pokématos, après certains badges */
   async profCall(g) {
@@ -1083,8 +1088,19 @@ export class Game {
     return 'none';
   }
 
-  /** combat générique ; o.wild (créature) ou o.trainer + o.party */
+  /** combat générique ; o.wild (créature) ou o.trainer + o.party. Si quelque chose casse, on ne reste jamais devant un écran noir. */
   async runBattle(o) {
+    try { return await this.runBattleSafe(o); } catch (e) {
+      console.error('combat interrompu', e);
+      document.querySelectorAll('.wipe').forEach((c) => c.remove());
+      try { this.bv.close(); } catch { /* déjà fermé */ }
+      this.sound.stopMusic?.(0.1); this.sound.current = null; this.musicLock = false;
+      await this.ui.say('Le combat a été interrompu. Réessaie !');
+      this.updateZone();
+      return 'flee';
+    }
+  }
+  async runBattleSafe(o) {
     const st = this.state;
     const kind = o.wild ? o.music || 'wild' : o.music || 'trainer';
     const curtain = await this.encounterIntro(kind);
@@ -1421,14 +1437,14 @@ export class Game {
     if (st.flags.starter) { await ui.say('C\'est une capsule vide.'); return; }
     // on n'ouvre pas les capsules du professeur sans lui avoir parlé
     if (!st.flags.metProf) { await ui.say('Il y a une créature dans cette capsule... Mieux vaut d\'abord parler au Professeur Saule.'); return; }
-    // la capsule d'un type : trois partenaires au choix
+    // la capsule d'un type : deux partenaires au choix
     const C = STARTER_CHOICES[cap ?? Math.max(0, STARTERS.indexOf(sp))], picks = C.lines.map((l) => l[0]);
-    const ORIG = ['Odyssée', 'Kanto', 'Johto'];
+    const ORIG = ['Kanto', 'Johto'];
     const pic = el('div', 'box starter-pic starter-trio', picks.map((p, k) => `<figure data-k="${k}"><img src="${ASSETS.front(p)}" alt=""><figcaption>${esc(SPECIES[p].n)}<small>${ORIG[k]}</small></figcaption></figure>`).join(''));
     ui.root.appendChild(pic);
     const mark = (k) => pic.querySelectorAll('figure').forEach((f, j) => f.classList.toggle('on', j === k));
     mark(0);
-    await ui.say(`Une capsule de type ${TYPE_FR[C.type]}. Trois créatures te regardent...`, { keep: true, speaker: 'Prof. Saule' });
+    await ui.say(`Une capsule de type ${TYPE_FR[C.type]}. Deux créatures te regardent...`, { keep: true, speaker: 'Prof. Saule' });
     const k = await ui.list({ title: `Capsule ${TYPE_FR[C.type]}`, items: picks.map((p, j) => ({ label: SPECIES[p].n, right: ORIG[j] })).concat([{ label: 'Refermer' }]), cls: 'shop', cancel: picks.length, onMove: (j) => { if (j < picks.length) { mark(j); this.sound.cry(ASSETS.cry(picks[j])); } } });
     if (k < 0 || k >= picks.length) { pic.remove(); ui.closeDialog(); return; }
     sp = picks[k]; mark(k);
