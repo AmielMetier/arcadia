@@ -781,5 +781,80 @@ Nos regards se sont croisés et mes créatures ont tout donné, mais ton équipe
     </div>
   </div>
 
+  <!-- 9. TRANSITIONS ANIMÉES (BÂTIMENT ET COMBAT 5G) -->
+  <div class="preview-section">
+    <div class="preview-title">9. TRANSITIONS ANIMÉES — ENTRÉE DE BÂTIMENT (IRIS DS) &amp; COMBAT SAUVAGE (LAMES 5G)</div>
+    <div class="preview-box" id="transitionBox" style="height: 320px; position: relative; overflow: hidden; background: url('img/battle/bg_grass.png') center/cover; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;">
+      <div style="font-size: 16px; font-weight: 700; color: #fff; text-shadow: 2px 2px 0 #000; text-align: center; z-index: 10;">
+        Testez les nouvelles animations cinématographiques en un clic :
+      </div>
+      <div style="display: flex; gap: 12px; z-index: 10; flex-wrap: wrap; justify-content: center;">
+        <button type="button" class="action-btn" onclick="playDoorDemo()" style="background: #2a5888; color: #fff; border: 2px solid #68a0e0; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #102038;">
+          🚪 Entrée de Bâtiment (Iris DS)
+        </button>
+        <button type="button" class="action-btn" onclick="playWildBattleDemo()" style="background: #0d2838; color: #00f0ff; border: 2px solid #00f0ff; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #041018;">
+          ⚡ Rencontre Sauvage (Lames Cyan 5G)
+        </button>
+        <button type="button" class="action-btn" onclick="playTrainerBattleDemo()" style="background: #382808; color: #ffe058; border: 2px solid #ffe058; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #181002;">
+          ⚔️ Rencontre Dresseur (Lames Or 5G)
+        </button>
+      </div>
+      <div id="demoFlash" style="position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 61;"></div>
+      <div id="demoIris" class="door-iris" style="position: absolute; inset: 0; z-index: 60;"></div>
+    </div>
+  </div>
+
+  <script>
+    async function playDoorDemo() {
+      const iris = document.getElementById('demoIris');
+      iris.style.transition = 'clip-path 260ms cubic-bezier(0.4, 0, 0.2, 1)';
+      iris.classList.add('closed');
+      await new Promise(r => setTimeout(r, 400));
+      iris.classList.remove('closed');
+    }
+
+    async function playWildBattleDemo(isTrainer = false) {
+      const box = document.getElementById('transitionBox');
+      const flash = document.getElementById('demoFlash');
+      
+      // Triple flash 5G
+      flash.style.transition = 'none';
+      flash.style.background = '#ffffff';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 70));
+      flash.style.background = '#060a12';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 60));
+      flash.style.background = '#ffffff';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 80));
+      flash.style.opacity = '0';
+
+      // Shards
+      const wrap = document.createElement('div');
+      wrap.className = `battle-wipe ${isTrainer ? 'trainer' : 'wild'}`;
+      wrap.style.position = 'absolute';
+      const numShards = 10;
+      for (let i = 0; i < numShards; i++) {
+        const s = document.createElement('div');
+        s.className = `bw-shard ${i % 2 === 0 ? 'left' : 'right'}`;
+        s.style.top = `${(i * 100) / numShards}%`;
+        s.style.height = `${(100 / numShards) + 0.5}%`;
+        s.style.transitionDelay = `${i * 22}ms`;
+        wrap.appendChild(s);
+      }
+      box.appendChild(wrap);
+      void wrap.offsetHeight;
+      wrap.classList.add('on');
+      await new Promise(r => setTimeout(r, 22 * numShards + 300));
+      wrap.classList.add('opening');
+      await new Promise(r => setTimeout(r, 300));
+      wrap.remove();
+    }
+
+    function playTrainerBattleDemo() {
+      playWildBattleDemo(true);
+    }
+  </script>
 </body>
 </html>
