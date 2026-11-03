@@ -43,7 +43,7 @@ export class BackroomsHUD {
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
       <!-- Ce que tu peux faire ici : ramasser, poser l'échelle, lancer ta corde, grimper -->
-      <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="climb" id="climbBar" hidden><i></i></div></div>
+      <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="climb" id="climbBar" hidden><i></i></div><div class="beam" id="beamBar" hidden><b></b><i></i></div></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
       <div class="click-prompt" id="clickPrompt">
@@ -214,6 +214,7 @@ export class BackroomsHUD {
     const NAME = { bottle: "L'EAU D'AMANDE", battery: 'LES PILES', ladder: "L'ÉCHELLE" };
     let text = '';
     let climb = -1;
+    let beam = null;
     if (P.status === 'alive' && sim.state === 'playing' && !(sim.departT > 0)) {
       const N = sim.map.niche;
       if (P.trapped >= 0) {
@@ -223,10 +224,17 @@ export class BackroomsHUD {
         text = rope ? 'MAINTIENS Z POUR GRIMPER À LA CORDE' : alone ? "PERSONNE POUR T'AIDER · MAINTIENS Z POUR GRIMPER (LENTEMENT)" : "TU ES COINCÉ AU FOND · SIFFLE (T) POUR QU'UN COLLÈGUE TE LANCE SA CORDE";
         if (!rope && !alone) climb = -1;
       } else {
+        if (P.onBeam) {
+          // barre d'équilibre : le repère penche avec toi, Q et D le ramènent au milieu
+          text = "ÉQUILIBRE · Z POUR AVANCER, Q / D POUR TE REDRESSER";
+          beam = P.tilt || 0;
+        }
         const fallen = sim.players.find((q) => q !== P && q.status === 'alive' && q.trapped >= 0 && sim.ropes[q.trapped] === undefined && Math.hypot(sim.map.pits[q.trapped].x - P.x, sim.map.pits[q.trapped].z - P.z) < 2.4);
         const it = sim.nearItem(P);
         const sel = P.inv[P.sel - 1];
-        if (fallen) text = `[R] LANCER TA CORDE À ${fallen.name.toUpperCase()}`;
+        if (beam !== null) {
+          // rien d'autre sur l'arête
+        } else if (fallen) text = `[R] LANCER TA CORDE À ${fallen.name.toUpperCase()}`;
         else if (!P.hasLamp && sim.table && Math.hypot(sim.table.x - P.x, sim.table.z - P.z) < 1.7) text = '[F] PRENDRE UNE LAMPE TORCHE';
         else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = "[E] POSER L'ÉCHELLE SOUS LA CASSETTE";
         else if (it) text = P.inv.includes(null) ? `[F] RAMASSER ${NAME[it.kind]}` : `[F] ÉCHANGER ${NAME[sel || 'bottle']} (CASE ${P.sel + 1}) CONTRE ${NAME[it.kind]}`;
@@ -237,6 +245,12 @@ export class BackroomsHUD {
     el.hidden = !text;
     if (text) this.$('#promptText').textContent = text;
     this.$('#climbBar').hidden = climb < 0;
+    this.$('#beamBar').hidden = beam === null;
+    if (beam !== null) {
+      const mark = this.$('#beamBar i');
+      mark.style.left = `${50 + beam * 50}%`;
+      mark.classList.toggle('danger', Math.abs(beam) > 0.6);
+    }
     if (climb >= 0) this.$('#climbBar i').style.width = `${Math.round(climb * 100)}%`;
   }
 

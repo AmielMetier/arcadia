@@ -27,6 +27,13 @@ export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : l
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const CLIMB_T = 1.2; // secondes à grimper à la corde (Z maintenu)
 export const SOLO_CLIMB_T = 7; // sans personne pour lancer une corde, on finit par s'en sortir, bien plus lentement
+// Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
+// corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
+export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
+export const BEAM_UNSTABLE = 4; // plus on penche, plus on penche
+export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant)
+export const BEAM_FIX = 4.5; // force de Q / D
+export const BEAM_DAMP = 2.5;
 export const CLIMB_LOCK = 0.7; // secondes d'immobilité en sortant d'un trou (Z encore enfoncé ne fait pas retomber)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
@@ -66,6 +73,9 @@ function newPlayer(id, name, map, i) {
     trapped: -1, // numéro du trou où le joueur est tombé (-1 : non)
     climbT: 0, // avancée de la remontée à la corde
     lockT: 0, // immobile un instant en sortant d'un trou
+    onBeam: false, // sur une arête entre deux trous
+    tilt: 0, // équilibre (-1 à 1)
+    tiltV: 0,
     onLadder: false, // en haut de l'échelle (la caméra monte)
     whistleCd: 0,
     heat: 0, // coups de sifflet récents : trop, et l'entité vient
@@ -318,6 +328,73 @@ export class BackroomsSim {
     return best;
   }
 
+  // l'hôte (ou le joueur seul) tient son équilibre ; s'il le perd, il tombe
+  balanceSide(P, mx, my) {
+    P.moving = mx !== 0 || my !== 0;
+    const side = this.balance(P, mx);
+    if (side) this.beamFall(P, side);
+    return side;
+  }
+
+  // Barre d'équilibre : renvoie le côté de la chute (-1 gauche, 1 droite) ou 0
+  balance(P, mx) {
+    const C = CELL_SIZE;
+    P.onBeam = P.trapped < 0 && this.map.pitAt && this.map.pitAt(Math.floor(P.x / C), Math.floor(P.z / C)) >= 0;
+    if (!P.onBeam) {
+      P.tilt *= Math.max(0, 1 - DT * 5);
+      P.tiltV = 0;
+      return 0;
+    }
+    const noise = (Math.random() - 0.5) * BEAM_NOISE[P.moving ? 1 : 0];
+    P.tiltV += (P.tilt * BEAM_UNSTABLE + noise + mx * BEAM_FIX) * DT;
+    P.tiltV *= 1 - DT * BEAM_DAMP;
+    P.tilt = Math.max(-1, Math.min(1, P.tilt + P.tiltV * DT));
+    return Math.abs(P.tilt) >= 1 ? Math.sign(P.tilt) : 0;
+  }
+
+  // Sur l'arête : seulement tout droit (Q et D servent à l'équilibre), lentement, et le pas suit l'arête la plus proche
+  beamStep(P, my) {
+    const C = CELL_SIZE;
+    const fx = -Math.sin(P.yaw);
+    const fz = -Math.cos(P.yaw);
+    const v = my * WALK_SPEED * BEAM_SPEED * DT;
+    let dx = fx * v;
+    let dz = fz * v;
+    // les arêtes sont sur les bords des cases : on y est ramené en douceur, dans le sens de la marche
+    const pull = 1.6 * DT;
+    if (Math.abs(fx) > Math.abs(fz)) {
+      const t = Math.round(P.z / C) * C - P.z;
+      if (Math.abs(t) < 0.4) dz += Math.sign(t) * Math.min(Math.abs(t), pull);
+    } else {
+      const t = Math.round(P.x / C) * C - P.x;
+      if (Math.abs(t) < 0.4) dx += Math.sign(t) * Math.min(Math.abs(t), pull);
+    }
+    return this.moveWithCollisions(P.x, P.z, dx, dz);
+  }
+
+  // Perdre l'équilibre : on bascule dans le trou du côté où l'on penche
+  beamFall(P, side) {
+    const rx = Math.cos(P.yaw);
+    const rz = -Math.sin(P.yaw);
+    P.tilt = 0;
+    P.tiltV = 0;
+    for (const d of [0.9, 0.6, 1.3]) {
+      const x = P.x + rx * side * d;
+      const z = P.z + rz * side * d;
+      const id = this.map.pitAt(Math.floor(x / CELL_SIZE), Math.floor(z / CELL_SIZE));
+      if (id < 0) continue;
+      const pit = this.map.pits[id];
+      P.trapped = id;
+      P.climbT = 0;
+      P.x = pit.x;
+      P.z = pit.z;
+      P.running = false;
+      P.onBeam = false;
+      this.emit({ type: 'fall', id: P.id, name: P.name, balance: true });
+      return;
+    }
+  }
+
   // Seul au fond, on peut remonter sans corde s'il n'y a plus personne dehors pour en lancer une
   canClimbAlone(P) {
     return !this.players.some((q) => q !== P && q.status === 'alive' && q.trapped < 0);
@@ -450,7 +527,7 @@ export class BackroomsSim {
     // 2. Endurance et course
     const mx = input.mx || 0;
     const my = input.my || 0;
-    const wantRun = !!input.run && (mx !== 0 || my !== 0);
+    const wantRun = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam;
     if (wantRun && P.stamina > 5) {
       P.running = true;
       P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
@@ -463,6 +540,8 @@ export class BackroomsSim {
     const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
+    // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
+    if (input.beamFall && P.trapped < 0) this.beamFall(P, Math.sign(input.beamFall));
     if (P.trapped >= 0) {
       // au fond d'un trou : on ne remonte qu'à la corde (Z maintenu), ou très lentement si l'on est seul
       P.moving = false;
@@ -487,8 +566,22 @@ export class BackroomsSim {
       P.lockT = Math.max(0, P.lockT - DT);
       P.moving = false;
     } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8)) {
+      // un invité se déplace chez lui (et tient son équilibre chez lui) : l'hôte prend sa position et son inclinaison
       P.x = pos.x;
       P.z = pos.z;
+      if (Number.isFinite(input.tilt)) P.tilt = Math.max(-1, Math.min(1, input.tilt));
+      P.onBeam = this.map.pitAt(Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE)) >= 0;
+    } else if (input.remote) {
+      // invité sans position ce pas-ci : il reste où il est
+    } else if (this.balanceSide(P, mx, my) !== 0) {
+      // perdu l'équilibre : c'est fait dans balanceSide
+    } else if (P.onBeam) {
+      P.moving = my !== 0;
+      if (my !== 0) {
+        const b = this.beamStep(P, my);
+        P.x = b.x;
+        P.z = b.z;
+      }
     } else if (P.moving) {
       const len = Math.hypot(mx, my) || 1;
       const normX = mx / len;
@@ -576,7 +669,32 @@ export class BackroomsSim {
       if (input.yaw !== undefined) P.yaw = input.yaw;
       if (input.pitch !== undefined) P.pitch = input.pitch;
       P.lockT = Math.max(0, P.lockT - DT);
-      return;
+      return 0;
+    }
+    {
+      if (input.yaw !== undefined) P.yaw = input.yaw;
+      if (input.pitch !== undefined) P.pitch = input.pitch;
+      const mx0 = input.mx || 0;
+      const my0 = input.my || 0;
+      P.moving = mx0 !== 0 || my0 !== 0;
+      const side = this.balance(P, mx0);
+      if (side) {
+        // l'hôte fera tomber ; en attendant, on ne bouge plus
+        P.tilt = 0;
+        P.tiltV = 0;
+        return side;
+      }
+      if (P.onBeam) {
+        P.running = false;
+        P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+        P.moving = my0 !== 0;
+        if (my0 !== 0) {
+          const b = this.beamStep(P, my0);
+          P.x = b.x;
+          P.z = b.z;
+        }
+        return 0;
+      }
     }
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
@@ -633,7 +751,7 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0, r2(P.lockT)]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0],
       k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.items, 'taken'), '', bits(this.lamps, 'taken')],
       // objets posés par des joueurs (échanges), cordes lancées, échelle posée
@@ -655,7 +773,7 @@ export class BackroomsSim {
     this.departT = snap.dp;
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder, lockT] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder, lockT, tilt, onBeam] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -685,6 +803,10 @@ export class BackroomsSim {
       P.climbT = climbT || 0;
       P.onLadder = !!onLadder;
       if (lockT > 0 && !(P.lockT > 0)) P.lockT = lockT;
+      if (!mine) {
+        P.tilt = tilt || 0;
+        P.onBeam = !!onBeam;
+      }
       P.battery = bat;
       P.inv = (inv || ',').split(',').map((k) => k || null);
       P.signal = signal;

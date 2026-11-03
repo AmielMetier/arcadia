@@ -713,7 +713,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       camera.rotation.order = 'YXZ';
       camera.rotation.y = P.yaw;
       camera.rotation.x = P.pitch;
-      camera.rotation.z = P.moving ? Math.sin(bob) * 0.006 : 0;
+      camera.rotation.z = (P.moving ? Math.sin(bob) * 0.006 : 0) - (P.tilt || 0) * 0.5; // on tangue sur l'arête
 
       // tremblement quand l'entité est tout près
       const danger = sim.hasMonster ? sim.monster.danger : 0;
@@ -816,7 +816,8 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         a.g.visible = show;
         if (!show) continue;
         a.g.position.set(Q.x, Q.trapped >= 0 ? -PIT_DEPTH + Q.climbT * (PIT_DEPTH - 0.3) : Q.onLadder ? 1.0 : Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0, Q.z);
-        a.g.rotation.y = Q.yaw;
+        a.g.rotation.set(0, Q.yaw, 0);
+        a.g.rotateZ(-(Q.tilt || 0) * 0.6);
         a.beam.visible = Q.flashlight;
       }
 

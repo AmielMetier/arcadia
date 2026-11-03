@@ -353,6 +353,10 @@ html, body {
   white-space: nowrap;
 }
 .prompt .climb { width: 220px; height: 8px; margin: 6px auto 0; border: 1px solid #f2f0e6; }
+.prompt .beam { position: relative; width: 260px; height: 12px; margin: 8px auto 0; border: 1px solid #f2f0e6; background: linear-gradient(90deg, rgba(255, 59, 59, 0.45), transparent 25%, transparent 75%, rgba(255, 59, 59, 0.45)); }
+.prompt .beam b { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: rgba(242, 240, 230, 0.6); }
+.prompt .beam i { position: absolute; top: -4px; width: 10px; height: 18px; margin-left: -5px; background: #ffcf3a; }
+.prompt .beam i.danger { background: #ff3b3b; }
 .prompt .climb i { display: block; height: 100%; width: 0; background: #ffcf3a; }
 .ico-bot { width: 12px; height: 26px; background: #efe8d6; border-radius: 3px 3px 4px 4px; box-shadow: inset 0 -9px #c9b48a; }
 

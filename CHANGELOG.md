@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.80 — 3 novembre 2026
+- **The Backrooms** — un parcours de trous qui tourne, et une vraie barre d'équilibre.
+  - Le couloir piégé ne va plus tout droit : il prend un ou plusieurs virages obligatoires (en L, en S, en zigzag).
+  - Sur une arête entre deux trous, on n'avance que tout droit et plus lentement, sans pouvoir courir. Le corps tangue (la caméra penche) : Q et D servent à se redresser. Trop penché, on bascule dans le trou de ce côté.
+  - Une jauge d'équilibre s'affiche quand on est sur une arête.
+
 ## 3.79 — 3 novembre 2026
 - **The Backrooms** — les trous gardent une cassette, et on n'y retombe plus en sortant.
   - Les trous ne sont plus dans de grandes salles qu'on pouvait contourner : une des cassettes est enfermée dans une petite pièce, au bout d'un couloir étroit au sol creusé de trous. On passe sur l'arête du milieu, sans autre chemin possible.

@@ -715,4 +715,90 @@ test("réseau : chute, corde, échelle posée et objets échangés arrivent chez
   assert.ok(guest.map.niche.ladder);
 });
 
+// hasard reproductible pour les tests d'équilibre
+const withSeed = (seed, fn) => {
+  const orig = Math.random;
+  let s = seed;
+  Math.random = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
+  try {
+    return fn();
+  } finally {
+    Math.random = orig;
+  }
+};
+// un joueur posé sur l'arête entre les deux premiers trous du couloir, face à la suite
+const onBeam = (sd) => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+  const [p0, p1] = sim.map.pits;
+  const P = sim.player;
+  // deux trous voisins : l'arête est sur leur bord commun
+  P.x = p0.gx === p1.gx ? Math.round(p0.x / CELL_SIZE) * CELL_SIZE : (p0.x + p1.x) / 2;
+  P.z = p0.gz === p1.gz ? Math.round(p0.z / CELL_SIZE) * CELL_SIZE : (p0.z + p1.z) / 2;
+  return { sim, P };
+};
+
+test("couloir piégé : il tourne, impossible de le traverser tout droit", () => {
+  for (const sd of [1, 4, 8, 15, 23, 42, 77]) {
+    const m = createBackroomsMap(sd);
+    const xs = new Set(m.pits.map((p) => p.gx));
+    const zs = new Set(m.pits.map((p) => p.gz));
+    assert.ok(xs.size > 2 && zs.size > 2, `graine ${sd} : au moins un virage`);
+  }
+});
+
+test("barre d'équilibre : sans rien faire on bascule dans le trou du côté où l'on penche ; avec Q / D on tient", () => {
+  for (const sd of [1, 4, 8]) {
+    const { sim, P } = onBeam(sd);
+    sim.step();
+    assert.ok(P.onBeam, `graine ${sd} : sur l'arête`);
+    assert.equal(P.trapped, -1);
+    // sans rien faire : on tombe en quelques secondes
+    let t = 0;
+    withSeed(sd, () => {
+      while (P.trapped < 0 && t < 20) {
+        sim.step();
+        t += DT;
+      }
+    });
+    assert.ok(P.trapped >= 0 && t > 0.5 && t < 15, `graine ${sd} : tombé au bout de ${t.toFixed(1)} s`);
+    assert.ok(sim.drainEvents().some((e) => e.type === 'fall' && e.balance));
+    // en corrigeant : on tient
+    const b = onBeam(sd);
+    withSeed(sd + 7, () => {
+      for (let i = 0; i < 60 * 20; i++) b.sim.step({ mx: Math.abs(b.P.tilt) > 0.12 ? -Math.sign(b.P.tilt) : 0 });
+    });
+    assert.equal(b.P.trapped, -1, `graine ${sd} : tenu 20 s en corrigeant`);
+  }
+});
+
+test("barre d'équilibre : on n'y avance que tout droit et lentement, Q / D ne font pas de pas de côté", () => {
+  const { sim, P } = onBeam(4);
+  sim.step();
+  const x0 = P.x;
+  const z0 = P.z;
+  P.tilt = 0;
+  withSeed(3, () => sim.step({ mx: 1 }));
+  assert.ok(Math.hypot(P.x - x0, P.z - z0) < 1e-6, 'Q / D : pas de déplacement');
+  assert.ok(P.tiltV > 0, 'D penche à droite');
+  // pas de course sur l'arête
+  P.tilt = 0;
+  P.tiltV = 0;
+  withSeed(5, () => sim.step({ my: 1, run: true }));
+  assert.equal(P.running, false);
+});
+
+test("réseau : un invité qui perd l'équilibre chez lui tombe chez l'hôte, et l'inclinaison se voit", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const [p0, p1] = host.map.pits;
+  const g = host.players[1];
+  g.x = p0.gx === p1.gx ? Math.round(p0.x / CELL_SIZE) * CELL_SIZE : (p0.x + p1.x) / 2;
+  g.z = p0.gz === p1.gz ? Math.round(p0.z / CELL_SIZE) * CELL_SIZE : (p0.z + p1.z) / 2;
+  host.step({}, { 2: { remote: true, pos: { x: g.x, z: g.z }, tilt: 0.7 } });
+  assert.equal(g.tilt, 0.7);
+  assert.ok(g.onBeam);
+  host.step({}, { 2: { remote: true, beamFall: 1 } });
+  assert.ok(g.trapped >= 0, "l'invité est tombé");
+});
+
 console.log(`\n${count} tests réussis pour The Backrooms !`);

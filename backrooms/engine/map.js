@@ -249,39 +249,67 @@ export function createBackroomsMap(seed = 42) {
   }
 
   // 8a. Le couloir piégé : autour d'une cassette, une pièce de 3 × 3 cases fermée de murs, et un seul accès, un
-  // couloir de 2 cases de large et 4 de long au sol creusé de trous. On vérifie qu'on ne peut pas la contourner et que
-  // tout le reste du dédale reste accessible ; sinon on essaie une autre cassette ou un autre côté.
+  // couloir de trous qui tourne. Il avance par blocs de 2 × 2 trous : on le traverse sur les arêtes (entre deux
+  // trous), qui suivent ses virages. On vérifie qu'on ne peut pas le contourner et que tout le reste du dédale reste
+  // accessible ; sinon on essaie un autre tracé, un autre côté ou une autre cassette.
   const reachAll = (blockPits) => {
     const g = blockPits ? grid.map((v, i) => (pitGrid[i] >= 0 ? T.WALL : v)) : grid;
     return bfs(g, W, H, sx, sz);
   };
-  const vaultTry = (cas, [dx, dz]) => {
-    const px = -dz;
-    const pz = dx; // perpendiculaire
+  // tracés possibles (en blocs de 2 cases) : d = tout droit depuis la pièce, t = de côté ; toujours au moins un virage
+  const SHAPES = [['d', 't', 't', 'd'], ['d', 't', 't', 'd', 'd'], ['d', 'd', 't', 't', 'd'], ['d', 't', 'd', 't'], ['d', 't', 't', 't', 'd'], ['d', 't', 'd', 'd', 't']];
+  const vaultTry = (cas, [dx, dz], shape, side) => {
     const cx = cas.gx;
     const cz = cas.gz;
+    const tx = -dz * side;
+    const tz = dx * side; // de côté
     const writes = new Map(); // case -> nouvelle valeur
-    const pitCells = [];
     const put = (x, z, v) => writes.set(z * W + x, v);
+    const room = new Set();
     for (let a = -2; a <= 2; a++) {
       for (let b = -2; b <= 2; b++) {
         const ring = Math.max(Math.abs(a), Math.abs(b)) === 2;
         put(cx + a, cz + b, ring ? T.WALL : T.FLOOR);
+        room.add((cz + b) * W + cx + a);
       }
     }
-    // couloir : il part du mur de la pièce (distance 2) et s'en éloigne de 4 cases ; murs de chaque côté
-    for (let k = 2; k <= 5; k++) {
-      for (const l of [0, 1]) {
-        const x = cx + dx * k + px * l;
-        const z = cz + dz * k + pz * l;
-        put(x, z, T.FLOOR);
-        pitCells.push([x, z]);
+    // premier bloc : collé à la pièce, il remplace deux cases de son mur
+    let bx = dx > 0 ? cx + 2 : dx < 0 ? cx - 3 : cx;
+    let bz = dz > 0 ? cz + 2 : dz < 0 ? cz - 3 : cz;
+    const corridor = new Set();
+    let last = [dx, dz];
+    shape.forEach((step, i) => {
+      const [sx2, sz2] = step === 'd' ? [dx, dz] : [tx, tz];
+      if (i > 0) {
+        bx += sx2 * 2;
+        bz += sz2 * 2;
       }
-      put(cx + dx * k - px, cz + dz * k - pz, T.WALL);
-      put(cx + dx * k + px * 2, cz + dz * k + pz * 2, T.WALL);
+      last = [sx2, sz2];
+      for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) corridor.add((bz + oz) * W + bx + ox);
+    });
+    // la sortie : les deux cases au-delà du dernier bloc
+    const [lx, lz] = last;
+    const exits = lx > 0 ? [[bx + 2, bz], [bx + 2, bz + 1]] : lx < 0 ? [[bx - 1, bz], [bx - 1, bz + 1]] : lz > 0 ? [[bx, bz + 2], [bx + 1, bz + 2]] : [[bx, bz - 1], [bx + 1, bz - 1]];
+    const exitSet = new Set(exits.map(([x, z]) => z * W + x));
+    // le couloir ne passe pas dans la pièce (sauf par son mur d'entrée)
+    for (const k of corridor) {
+      const x = k % W;
+      const z = (k - x) / W;
+      if (Math.max(Math.abs(x - cx), Math.abs(z - cz)) < 2) return false;
     }
-    // l'entrée du couloir donne sur le dédale
-    for (const l of [0, 1]) put(cx + dx * 6 + px * l, cz + dz * 6 + pz * l, T.FLOOR);
+    for (const k of corridor) writes.set(k, T.FLOOR);
+    for (const k of exitSet) writes.set(k, T.FLOOR);
+    // des murs tout autour du couloir : on n'y entre que par ses deux bouts
+    for (const k of corridor) {
+      const x = k % W;
+      const z = (k - x) / W;
+      for (let oz = -1; oz <= 1; oz++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const n = (z + oz) * W + x + ox;
+          if (!corridor.has(n) && !exitSet.has(n) && !(room.has(n) && writes.get(n) === T.FLOOR)) writes.set(n, T.WALL);
+        }
+      }
+    }
     // rien d'important ne doit être écrasé
     const keep = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...cassettes.filter((c) => c !== cas).map((c) => c.gz * W + c.gx)]);
     if (elevator) keep.add(elevator.gz * W + elevator.gx);
@@ -294,21 +322,20 @@ export function createBackroomsMap(seed = 42) {
     }
     const saved = new Map([...writes.keys()].map((k) => [k, grid[k]]));
     for (const [k, v] of writes) grid[k] = v;
-    const ids = pitCells.map(([x, z]) => {
-      pitGrid[z * W + x] = pits.length + pitCells.indexOf(pitCells.find((q) => q[0] === x && q[1] === z));
-      return z * W + x;
-    });
+    for (const k of corridor) pitGrid[k] = 0;
     const open = reachAll(false);
     const shut = reachAll(true);
     const others = [exitCell, ...cassettes.filter((c) => c !== cas).map((c) => ({ x: c.gx, z: c.gz }))];
     const ok = open[cas.gz * W + cas.gx] >= 0 && shut[cas.gz * W + cas.gx] < 0 && others.every((c) => shut[c.z * W + c.x] >= 0);
+    for (const k of corridor) pitGrid[k] = -1;
     if (!ok) {
       for (const [k, v] of saved) grid[k] = v;
-      for (const k of ids) pitGrid[k] = -1;
       return false;
     }
-    for (const [x, z] of pitCells) {
-      pitGrid[z * W + x] = pits.length;
+    for (const k of corridor) {
+      const x = k % W;
+      const z = (k - x) / W;
+      pitGrid[k] = pits.length;
       pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
     }
     cas.vault = true;
@@ -317,7 +344,9 @@ export function createBackroomsMap(seed = 42) {
   const byFar = [...cassettes].sort((a, b) => D({ x: b.gx, z: b.gz }) - D({ x: a.gx, z: a.gz }));
   vaultLoop: for (const cas of byFar) {
     for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5)) {
-      if (vaultTry(cas, d)) break vaultLoop;
+      for (const shape of [...SHAPES].sort(() => rnd() - 0.5)) {
+        for (const side of rnd() < 0.5 ? [1, -1] : [-1, 1]) if (vaultTry(cas, d, shape, side)) break vaultLoop;
+      }
     }
   }
   // le dédale a changé : distances, cases libres (sans les trous) et cassette au centre de sa pièce
