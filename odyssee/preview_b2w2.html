@@ -1138,41 +1138,41 @@ Nos regards se sont croisés et mes créatures ont tout donné, mais ton équipe
       </div>
 
       <!-- COMMANDE ATTAQUES OUVERTE AVEC BANDEAU EXPLICATIF -->
-      <div class="bcmd moves on" style="display: block; position: absolute; left: calc(var(--bp) * 3.5); right: calc(var(--bp) * 3.5); bottom: calc(var(--bp) * 3); height: calc(var(--bp) * 58);">
+      <div class="bcmd moves on" style="display: block; position: absolute; left: calc(var(--bp) * 3.5); right: calc(var(--bp) * 3.5); bottom: calc(var(--bp) * 3); height: calc(var(--bp) * 45);">
+        <div class="mv-desc-banner">
+          <div class="mv-desc-head">
+            <span class="mv-desc-name" id="prevMvName">Charge</span>
+            <span class="mv-desc-type" id="prevMvType" style="background:#a8a878;">NORMAL</span>
+            <span class="mv-desc-cat" id="prevMvCat"><img src="img/battle/cat_physical.png" alt=""><span>Physique</span></span>
+            <span class="mv-desc-pow" id="prevMvPow">Puis. 50</span>
+            <span class="mv-desc-acc" id="prevMvAcc">Préc. 100%</span>
+            <span class="mv-desc-pp" id="prevMvPp">PP 35/35</span>
+          </div>
+          <div class="mv-desc-text" id="prevMvText">Le lanceur charge l'ennemi de tout son corps dans un impact physique direct.</div>
+        </div>
         <div class="mv-layout">
-          <div class="mv-desc-banner">
-            <div class="mv-desc-head">
-              <span class="mv-desc-type" id="prevMvType" style="background:#a8a878;">NORMAL</span>
-              <span class="mv-desc-cat" id="prevMvCat"><img src="img/battle/cat_physical.png" alt=""><span>Physique</span></span>
-              <span class="mv-desc-pow" id="prevMvPow">Puis. 50</span>
-              <span class="mv-desc-acc" id="prevMvAcc">Préc. 100%</span>
+          <div class="mv-grid">
+            <div class="mbtn sel" onclick="prevSelectMv(0)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Charge</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 35/35</span></div>
             </div>
-            <div class="mv-desc-text" id="prevMvText">Le lanceur charge l'ennemi de tout son corps dans un impact physique direct.</div>
-          </div>
-          <div class="mv-main">
-            <div class="mv-grid">
-              <div class="mbtn sel" onclick="prevSelectMv(0)" style="--tc:#a8a878">
-                <div class="mbtn-top"><span class="mn">Charge</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
-                <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 35/35</span></div>
-              </div>
-              <div class="mbtn" onclick="prevSelectMv(1)" style="--tc:#a8a878">
-                <div class="mbtn-top"><span class="mn">Armure</span><div class="mbtn-top-right"><img class="mcat" src="img/battle/cat_status.png" alt="stat"></div></div>
-                <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Statut</span></div><span class="mpp">PP 30/30</span></div>
-              </div>
-              <div class="mbtn" onclick="prevSelectMv(2)" style="--tc:#b8a038">
-                <div class="mbtn-top"><span class="mn">Jet-Pierres</span><div class="mbtn-top-right"><span class="bm-eff eff-super">SUPER EFF.</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
-                <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">ROCHE</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 15/15</span></div>
-              </div>
-              <div class="mbtn" onclick="prevSelectMv(3)" style="--tc:#a8a878">
-                <div class="mbtn-top"><span class="mn">Force Poigne</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
-                <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 55</span></div><span class="mpp">PP 30/30</span></div>
-              </div>
+            <div class="mbtn" onclick="prevSelectMv(1)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Armure</span><div class="mbtn-top-right"><img class="mcat" src="img/battle/cat_status.png" alt="stat"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Statut</span></div><span class="mpp">PP 30/30</span></div>
             </div>
-            <button type="button" class="mv-back-btn" onclick="prevSelectMv(4)" title="Retour">
-              <span class="mv-back-ico">✕</span>
-              <span class="mv-back-lbl">RETOUR</span>
-            </button>
+            <div class="mbtn" onclick="prevSelectMv(2)" style="--tc:#b8a038">
+              <div class="mbtn-top"><span class="mn">Jet-Pierres</span><div class="mbtn-top-right"><span class="bm-eff eff-super">SUPER EFF.</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">ROCHE</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 15/15</span></div>
+            </div>
+            <div class="mbtn" onclick="prevSelectMv(3)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Force Poigne</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 55</span></div><span class="mpp">PP 30/30</span></div>
+            </div>
           </div>
+          <button type="button" class="mv-back-btn" onclick="prevSelectMv(4)" title="Retour">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1270,22 +1270,28 @@ Nos regards se sont croisés et mes créatures ont tout donné, mais ton équipe
     const backBtn = document.querySelector('.bcmd.moves .mv-back-btn');
     btns.forEach((b, k) => b.classList.toggle('sel', k === idx));
     if (backBtn) backBtn.classList.toggle('sel', idx === 4);
+    const n = document.getElementById('prevMvName');
     const t = document.getElementById('prevMvType');
     const c = document.getElementById('prevMvCat');
     const p = document.getElementById('prevMvPow');
     const a = document.getElementById('prevMvAcc');
+    const pp = document.getElementById('prevMvPp');
     const txt = document.getElementById('prevMvText');
     if (idx === 4) {
+      if (n) n.textContent = 'RETOUR ✕';
       if (t) t.style.display = 'none';
       if (c) c.style.display = 'none';
       if (p) p.style.display = 'none';
       if (a) a.style.display = 'none';
-      if (txt) txt.textContent = d.desc;
+      if (pp) pp.style.display = 'none';
+      if (txt) txt.textContent = 'Annuler et revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
     } else {
+      if (n) { n.style.display = 'inline-block'; n.textContent = d.n; }
       if (t) { t.style.display = 'inline-block'; t.textContent = d.t; t.style.background = d.color; }
       if (c) { c.style.display = 'inline-flex'; c.innerHTML = '<img src="' + d.catIcon + '" alt=""><span>' + d.c + '</span>'; }
       if (p) { p.style.display = 'inline-block'; p.textContent = d.p; }
       if (a) { a.style.display = 'inline-block'; a.textContent = d.a; }
+      if (pp) { pp.style.display = 'inline-block'; pp.textContent = 'PP ' + (idx === 0 ? '35/35' : idx === 1 ? '30/30' : idx === 2 ? '15/15' : '30/30'); }
       if (txt) txt.textContent = d.desc;
     }
   }

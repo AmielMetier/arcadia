@@ -528,17 +528,19 @@ export class BattleView {
       const foeMon = this.battle.foe;
       const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
       const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
-      this.cmd.innerHTML = `<div class="mv-layout">
+      this.cmd.innerHTML = `
         <div class="mv-desc-banner">
           <div class="mv-desc-head">
+            <span class="mv-desc-name"></span>
             <span class="mv-desc-type"></span>
             <span class="mv-desc-cat"></span>
             <span class="mv-desc-pow"></span>
             <span class="mv-desc-acc"></span>
+            <span class="mv-desc-pp"></span>
           </div>
           <div class="mv-desc-text"></div>
         </div>
-        <div class="mv-main">
+        <div class="mv-layout">
           <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
             const x = m.moves[k];
             if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
@@ -579,31 +581,38 @@ export class BattleView {
             <span class="mv-back-ico">✕</span>
             <span class="mv-back-lbl">RETOUR</span>
           </button>
-        </div>
-      </div>`;
+        </div>`;
       this.cmd.classList.add('on', 'moves');
       this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMove || 0; if (!m.moves[i]) i = 0;
       const btns = [...this.cmd.querySelectorAll('.mbtn')];
       const backBtn = this.cmd.querySelector('.mv-back-btn');
+      const descName = this.cmd.querySelector('.mv-desc-name');
       const descType = this.cmd.querySelector('.mv-desc-type');
       const descCat = this.cmd.querySelector('.mv-desc-cat');
       const descPow = this.cmd.querySelector('.mv-desc-pow');
       const descAcc = this.cmd.querySelector('.mv-desc-acc');
+      const descPp = this.cmd.querySelector('.mv-desc-pp');
       const descText = this.cmd.querySelector('.mv-desc-text');
       const show = () => {
         btns.forEach((b, k) => b.classList.toggle('sel', k === i));
         backBtn?.classList.toggle('sel', i === 4);
         if (i === 4) {
+          if (descName) descName.textContent = 'RETOUR ✕';
           if (descType) descType.style.display = 'none';
           if (descCat) descCat.style.display = 'none';
           if (descPow) descPow.style.display = 'none';
           if (descAcc) descAcc.style.display = 'none';
-          if (descText) descText.textContent = '✕ Retour : Revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
+          if (descPp) descPp.style.display = 'none';
+          if (descText) descText.textContent = 'Annuler et revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
         } else {
           const x = m.moves[i];
           if (x) {
             const M = MOVES[x.id];
+            if (descName) {
+              descName.style.display = 'inline-block';
+              descName.textContent = M.n;
+            }
             if (descType) {
               descType.style.display = 'inline-block';
               descType.textContent = TYPE_FR[M.t];
@@ -615,19 +624,25 @@ export class BattleView {
             }
             if (descPow) {
               descPow.style.display = 'inline-block';
-              descPow.textContent = M.p ? `Puis. ${M.p}` : 'Puis. —';
+              descPow.textContent = M.p ? `Puis. ${M.p}` : 'Statut';
             }
             if (descAcc) {
               descAcc.style.display = 'inline-block';
               descAcc.textContent = M.a ? `Préc. ${M.a}%` : 'Préc. —';
             }
+            if (descPp) {
+              descPp.style.display = 'inline-block';
+              descPp.textContent = `PP ${x.pp}/${M.pp}`;
+            }
             if (descText) descText.textContent = moveDesc(M);
           } else {
+            if (descName) descName.textContent = 'Emplacement vide';
             if (descType) descType.style.display = 'none';
             if (descCat) descCat.style.display = 'none';
             if (descPow) descPow.style.display = 'none';
             if (descAcc) descAcc.style.display = 'none';
-            if (descText) descText.textContent = 'Emplacement vide.';
+            if (descPp) descPp.style.display = 'none';
+            if (descText) descText.textContent = 'Aucune capacité apprise sur cet emplacement.';
           }
         }
       };
