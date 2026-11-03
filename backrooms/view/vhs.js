@@ -1,7 +1,9 @@
 // The Backrooms - Filtre « vieille caméra » (caméscope VHS)
 // La scène est rendue en basse définition dans une texture, puis repassée à l'écran avec : objectif bombé, bavure des
 // couleurs, flou horizontal, lignes de balayage, grain, bande de tracking qui défile, vignette et teinte délavée.
-// Plus l'entité est proche (uDanger), plus l'image se déchire.
+// Les néons, plus forts que le blanc, bavent autour d'eux (halo flouté en quart de définition). L'exposition suit la
+// lumière (le caméscope pousse son gain dans le noir : l'image s'éclaircit et grésille). Plus l'entité est proche
+// (uDanger), plus l'image se déchire.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const LINES = 480; // hauteur de rendu de la scène, en pixels
@@ -15,6 +17,7 @@ void main() {
 
 const fragmentShader = `
 uniform sampler2D tDiffuse;
+uniform sampler2D tBloom;
 uniform float uTime;
 uniform float uDanger;
 uniform float uExposure;
@@ -53,21 +56,22 @@ void main() {
   col.g = grab(uv).g;
   col.b = grab(uv - vec2(ca * 1.4, 0.0)).b;
   vec3 blur = (grab(uv + vec2(0.0035, 0.0)) + grab(uv - vec2(0.0035, 0.0)) + grab(uv + vec2(0.007, 0.0)) + grab(uv - vec2(0.007, 0.0))) * 0.25;
-  col = mix(col, blur, 0.25);
-  // halo des néons
-  col += max(blur - vec3(0.9), 0.0) * 0.5;
+  col = mix(col, blur, 0.15);
+  // halo des néons et des lumières vives
+  col += texture2D(tBloom, uv).rgb * 0.9;
 
   col = aces(col * uExposure);
   col = pow(col, vec3(1.0 / 2.2));
 
   // étalonnage délavé : noirs relevés, couleurs ternes, teinte jaune-vert du vieux caméscope
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(lum), col, 0.72);
+  col = mix(vec3(lum), col, 0.82);
   col = col * vec3(1.02, 1.0, 0.82) + vec3(0.018, 0.016, 0.01);
 
   // lignes de balayage, grain, bande claire
   col *= 0.9 + 0.1 * sin(vUv.y * uRes.y * 1.7);
-  col += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * (0.075 + uDanger * 0.18);
+  float gain = clamp((uExposure - 1.0) * 0.06, 0.0, 0.08); // gain poussé dans le noir : plus de grain
+  col += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * (0.06 + gain + uDanger * 0.18);
   col += band * 0.05;
   // parasites blancs épars
   if (hash(vec2(floor(vUv.x * 160.0), floor(vUv.y * 120.0) + floor(uTime * 20.0))) > 0.9993 - uDanger * 0.004) col += 0.5;
@@ -78,6 +82,31 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// Halo : on garde ce qui dépasse le blanc, en quart de définition, puis on le floute (horizontal, vertical, deux fois)
+const brightShader = `
+uniform sampler2D tDiffuse;
+uniform vec2 uTexel;
+varying vec2 vUv;
+void main() {
+  vec3 c = vec3(0.0);
+  c += texture2D(tDiffuse, vUv + uTexel * vec2(-1.0, -1.0)).rgb;
+  c += texture2D(tDiffuse, vUv + uTexel * vec2(1.0, -1.0)).rgb;
+  c += texture2D(tDiffuse, vUv + uTexel * vec2(-1.0, 1.0)).rgb;
+  c += texture2D(tDiffuse, vUv + uTexel * vec2(1.0, 1.0)).rgb;
+  c *= 0.25;
+  gl_FragColor = vec4(max(c - vec3(1.0), 0.0), 1.0);
+}`;
+const blurShader = `
+uniform sampler2D tDiffuse;
+uniform vec2 uDir;
+varying vec2 vUv;
+void main() {
+  vec3 c = texture2D(tDiffuse, vUv).rgb * 0.227;
+  c += (texture2D(tDiffuse, vUv + uDir * 1.385).rgb + texture2D(tDiffuse, vUv - uDir * 1.385).rgb) * 0.316;
+  c += (texture2D(tDiffuse, vUv + uDir * 3.231).rgb + texture2D(tDiffuse, vUv - uDir * 3.231).rgb) * 0.070;
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
 export function createVhsFilter(renderer) {
   const target = new THREE.WebGLRenderTarget(4, 4, {
     type: THREE.HalfFloatType,
@@ -85,12 +114,18 @@ export function createVhsFilter(renderer) {
     magFilter: THREE.LinearFilter,
     depthBuffer: true,
   });
+  const half = () => new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
+  const bloomA = half();
+  const bloomB = half();
+  const bright = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: target.texture }, uTexel: { value: new THREE.Vector2() } }, vertexShader, fragmentShader: brightShader, depthTest: false, depthWrite: false });
+  const blurMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader, fragmentShader: blurShader, depthTest: false, depthWrite: false });
   const material = new THREE.ShaderMaterial({
     uniforms: {
       tDiffuse: { value: target.texture },
+      tBloom: { value: bloomA.texture },
       uTime: { value: 0 },
       uDanger: { value: 0 },
-      uExposure: { value: 0.85 },
+      uExposure: { value: 1.2 },
       uRes: { value: new THREE.Vector2(1, 1) },
     },
     vertexShader,
@@ -108,14 +143,38 @@ export function createVhsFilter(renderer) {
     uniforms: material.uniforms,
     setSize(w, h) {
       const lines = Math.min(LINES, h);
-      target.setSize(Math.max(1, Math.round((lines * w) / h)), lines);
+      const tw = Math.max(1, Math.round((lines * w) / h));
+      target.setSize(tw, lines);
+      bloomA.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
+      bloomB.setSize(Math.max(1, tw >> 2), Math.max(1, lines >> 2));
+      bright.uniforms.uTexel.value.set(1 / tw, 1 / lines);
       material.uniforms.uRes.value.set(w, h);
     },
-    render(scene, camera, time, danger) {
+    // exposure : l'exposition voulue par la caméra (1 en pleine lumière, plus haut dans le noir)
+    render(scene, camera, time, danger, exposure = 1.2) {
       material.uniforms.uTime.value = time;
       material.uniforms.uDanger.value = danger;
+      material.uniforms.uExposure.value = exposure;
       renderer.setRenderTarget(target);
       renderer.render(scene, camera);
+      // halo des lumières vives
+      quad.material = bright;
+      renderer.setRenderTarget(bloomA);
+      renderer.render(post, cam);
+      quad.material = blurMat;
+      const bw = bloomA.width;
+      const bh = bloomA.height;
+      for (let i = 0; i < 2; i++) {
+        blurMat.uniforms.tDiffuse.value = bloomA.texture;
+        blurMat.uniforms.uDir.value.set((1 + i) / bw, 0);
+        renderer.setRenderTarget(bloomB);
+        renderer.render(post, cam);
+        blurMat.uniforms.tDiffuse.value = bloomB.texture;
+        blurMat.uniforms.uDir.value.set(0, (1 + i) / bh);
+        renderer.setRenderTarget(bloomA);
+        renderer.render(post, cam);
+      }
+      quad.material = material;
       renderer.setRenderTarget(null);
       renderer.render(post, cam);
     },

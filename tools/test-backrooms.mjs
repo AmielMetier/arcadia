@@ -561,32 +561,19 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   assert.equal(guest.players.length, 1);
 });
 
-test('départ : une table avec une lampe par joueur, chacun prend la sienne', () => {
+test('départ : pas de table, chacun a déjà sa lampe allumée dans la case 1', () => {
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   for (const sd of [3, 14, 15, 92, 653]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
-    assert.ok(sim.table, `graine ${sd} : une table au départ`);
-    assert.equal(sim.lamps.length, 3, 'autant de lampes que de joueurs');
-    assert.ok(sim.players.every((p) => !p.hasLamp && !p.flashlight), 'personne ne part avec sa lampe');
-    assert.ok(!sim.players.some((p) => sim.isColliding(p.x, p.z, 0.38)), 'personne ne naît dans la table');
-    const gx = Math.floor(sim.table.x / CELL_SIZE);
-    const gz = Math.floor(sim.table.z / CELL_SIZE);
-    assert.ok(sim.map.dist[gz * sim.map.W + gx] >= 0, 'la table est accessible');
-    // sans lampe, F ne fait rien
+    assert.equal(sim.table, null, `graine ${sd} : pas de table au départ`);
+    assert.equal(sim.lamps.length, 0);
+    assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde part équipé, lampe allumée');
+    // la touche 1 éteint et rallume sa lampe
     sim.step({ toggleFlashlight: true });
-    assert.ok(sim.drainEvents().some((e) => e.type === 'noLamp'));
-    // chacun s'approche de la table et prend une lampe avec F ; il n'y en a pas pour un quatrième
-    for (const P of sim.players) {
-      P.x = sim.table.x + 1.2;
-      P.z = sim.table.z;
-    }
-    sim.step();
-    assert.ok(sim.players.every((p) => !p.hasLamp), 'on la prend avec F, pas en passant');
-    sim.step({ pick: true }, { 2: { pick: true }, 3: { pick: true } });
-    assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde est équipé et la lampe est allumée');
-    assert.ok(sim.lamps.every((l) => l.taken));
-    // on ne traverse pas la table
-    assert.ok(sim.isColliding(sim.table.x, sim.table.z, 0.38));
+    assert.equal(sim.player.flashlight, false);
+    assert.ok(!sim.drainEvents().some((e) => e.type === 'noLamp'));
+    sim.step({ toggleFlashlight: true });
+    assert.equal(sim.player.flashlight, true);
   }
 });
 

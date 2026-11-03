@@ -42,55 +42,65 @@ function noise(ctx, w, h, amount) {
   ctx.putImageData(d, 0, 0);
 }
 
-// Papier peint jaune à rayures et petits losanges, plinthe sombre en bas (une face de mur = 2,5 m × 3 m)
+// Papier peint jaune pâle des films : fines rayures verticales et motif en chevrons à peine visible, un peu jauni,
+// cloqué par l'humidité, avec sa plinthe (une face de mur = 2,5 m × 3 m)
 function drawWallpaper(ctx, S, grime) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#cbb45a';
+  ctx.fillStyle = '#d4c37a';
   ctx.fillRect(0, 0, S, S);
-  const band = S / 10;
-  for (let x = 0; x < S; x += band) {
-    ctx.fillStyle = '#c2aa4c';
-    ctx.fillRect(x, 0, band * 0.42, S);
-    ctx.fillStyle = 'rgba(120, 100, 30, 0.25)';
-    ctx.fillRect(x + band * 0.42, 0, 2, S);
-    // losanges du motif
-    ctx.fillStyle = 'rgba(150, 128, 45, 0.45)';
-    for (let y = band * 0.3; y < S; y += band * 0.6) {
-      const cx = x + band * 0.72;
+  const band = S / 16; // 16 lés de rayures par face
+  for (let i = 0; i < 16; i++) {
+    const x = i * band;
+    ctx.fillStyle = 'rgba(150, 128, 52, 0.16)';
+    ctx.fillRect(x, 0, band * 0.5, S);
+    ctx.fillStyle = 'rgba(110, 92, 36, 0.22)';
+    ctx.fillRect(x, 0, 1.2, S);
+    ctx.fillRect(x + band * 0.5, 0, 1, S);
+    // chevrons pointés vers le haut, au milieu de la rayure claire
+    ctx.strokeStyle = 'rgba(140, 118, 46, 0.32)';
+    ctx.lineWidth = 1.4;
+    const cx = x + band * 0.75;
+    for (let y = (i % 2) * 9; y < S; y += 18) {
       ctx.beginPath();
-      ctx.moveTo(cx, y - 5);
-      ctx.lineTo(cx + 4, y);
-      ctx.lineTo(cx, y + 5);
-      ctx.lineTo(cx - 4, y);
-      ctx.fill();
+      ctx.moveTo(cx - 6, y + 5);
+      ctx.lineTo(cx, y);
+      ctx.lineTo(cx + 6, y + 5);
+      ctx.stroke();
     }
   }
+  // le papier jauni, plus clair au milieu des lés
   if (grime) {
     ctx.globalCompositeOperation = 'soft-light';
-    ctx.drawImage(grime, 0, 0, S, S);
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.55;
     ctx.drawImage(grime, 0, 0, S, S);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  // coulures d'humidité depuis le plafond
-  for (let i = 0; i < 5; i++) {
+  // coulures depuis le plafond
+  for (let i = 0; i < 3; i++) {
     const x = Math.random() * S;
-    const len = S * (0.15 + Math.random() * 0.4);
+    const len = S * (0.1 + Math.random() * 0.3);
     const g = ctx.createLinearGradient(0, 0, 0, len);
-    g.addColorStop(0, 'rgba(95, 75, 25, 0.35)');
-    g.addColorStop(1, 'rgba(95, 75, 25, 0)');
+    g.addColorStop(0, 'rgba(105, 82, 30, 0.28)');
+    g.addColorStop(1, 'rgba(105, 82, 30, 0)');
     ctx.fillStyle = g;
-    ctx.fillRect(x, 0, 6 + Math.random() * 18, len);
+    ctx.fillRect(x, 0, 3 + Math.random() * 10, len);
   }
-  // plinthe
-  ctx.fillStyle = '#5a4a28';
+  // salissures au ras de la plinthe
+  const dirt = ctx.createLinearGradient(0, S * 0.82, 0, S * 0.955);
+  dirt.addColorStop(0, 'rgba(90, 70, 30, 0)');
+  dirt.addColorStop(1, 'rgba(90, 70, 30, 0.3)');
+  ctx.fillStyle = dirt;
+  ctx.fillRect(0, S * 0.82, S, S * 0.14);
+  // plinthe en vinyle brun, éraflée
+  ctx.fillStyle = '#6b5a35';
   ctx.fillRect(0, S * 0.955, S, S * 0.045);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(0, S * 0.952, S, 3);
-  noise(ctx, S, S, 14);
+  ctx.fillStyle = 'rgba(255,240,200,0.12)';
+  ctx.fillRect(0, S * 0.955, S, 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, S * 0.951, S, 2);
+  noise(ctx, S, S, 10);
 }
 
 // Moquette humide jaunâtre : la photo est recolorée, sinon une trame de bruit
@@ -372,5 +382,59 @@ export function createBackroomsTextures(level = 0) {
   lctx.fillText("D'AMANDE", 64, 46);
   const label = tex(labelCanvas);
 
-  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, ready };
+  // Pavé lumineux encastré (diffuseur prismatique dans son cadre) ; au Level 1, un tube nu sous sa réglette
+  const [lampCanvas, pctx] = canvas(128, 64);
+  pctx.fillStyle = '#3a3a36';
+  pctx.fillRect(0, 0, 128, 64);
+  pctx.fillStyle = '#ffffff';
+  pctx.fillRect(5, 5, 118, 54);
+  pctx.fillStyle = 'rgba(160, 150, 120, 0.35)';
+  for (let x = 5; x < 123; x += 3) pctx.fillRect(x, 5, 1, 54);
+  for (let y = 5; y < 59; y += 3) pctx.fillRect(5, y, 118, 1);
+  pctx.fillStyle = 'rgba(60, 58, 50, 0.6)';
+  pctx.fillRect(5, 30, 118, 3); // la barre du milieu
+  const lamp = tex(lampCanvas);
+  lamp.wrapS = lamp.wrapT = THREE.ClampToEdgeWrapping;
+
+  // Prise électrique : plaque jaunie, deux trous ronds
+  const [outCanvas, octx] = canvas(64, 96);
+  octx.fillStyle = '#e4dcc4';
+  octx.fillRect(0, 0, 64, 96);
+  octx.strokeStyle = 'rgba(80, 70, 50, 0.5)';
+  octx.lineWidth = 3;
+  octx.strokeRect(2, 2, 60, 92);
+  octx.fillStyle = '#d6ccb0';
+  octx.beginPath();
+  octx.arc(32, 48, 17, 0, Math.PI * 2);
+  octx.fill();
+  octx.fillStyle = '#1c1a16';
+  for (const x of [25, 39]) {
+    octx.beginPath();
+    octx.arc(x, 48, 3.2, 0, Math.PI * 2);
+    octx.fill();
+  }
+  octx.fillStyle = '#8a8270';
+  octx.fillRect(30, 12, 4, 4);
+  octx.fillRect(30, 80, 4, 4);
+  noise(octx, 64, 96, 10);
+  const outlet = tex(outCanvas);
+  outlet.wrapS = outlet.wrapT = THREE.ClampToEdgeWrapping;
+
+  // Grille d'aération du faux plafond : lames grises et poussière noire entre elles
+  const [ventCanvas, vtctx] = canvas(128);
+  vtctx.fillStyle = '#c9c4b2';
+  vtctx.fillRect(0, 0, 128, 128);
+  vtctx.fillStyle = '#9b9584';
+  vtctx.fillRect(6, 6, 116, 116);
+  for (let y = 12; y < 118; y += 9) {
+    vtctx.fillStyle = '#26241e';
+    vtctx.fillRect(12, y, 104, 4);
+    vtctx.fillStyle = '#d5d0bf';
+    vtctx.fillRect(12, y + 4, 104, 2);
+  }
+  noise(vtctx, 128, 128, 16);
+  const vent = tex(ventCanvas);
+  vent.wrapS = vent.wrapT = THREE.ClampToEdgeWrapping;
+
+  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, ready };
 }

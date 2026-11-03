@@ -1,5 +1,24 @@
 # Journal des versions — Arcadia
 
+## 3.93 — 3 novembre 2026
+- **The Backrooms** — la partie commence de nouveau au Level 0, dans le dédale aux murs jaunes (elle démarrait par erreur dans l'entrepôt du Level 1).
+- **The Backrooms** — un rendu beaucoup plus réaliste, comme dans les films.
+  - Les néons éclairent comme de vrais pavés lumineux : des flaques de lumière rondes sur la moquette, et les murs projettent leur ombre dans les couloirs voisins.
+  - Ombres au pied des murs et dans les coins, murs plus sombres vers le sol, plus clairs sous le plafond.
+  - Les néons saturent l'image du caméscope et bavent autour d'eux.
+  - Le caméscope règle son exposition tout seul : en entrant dans le noir, l'image s'éclaircit peu à peu et devient plus granuleuse.
+  - La caméra est tenue à la main : elle bouge légèrement, même à l'arrêt, et tremble davantage en courant.
+  - Nouveau papier peint jaune pâle à fines rayures et chevrons, avec sa plinthe ; moquette détrempée par plaques, humidité qui remonte au pied des murs, auréoles d'eau au plafond et sur les murs.
+  - Le grésillement des néons monte sous les lampes et s'éteint dans les zones mortes ; un souffle sourd remplit le silence.
+  - Pas étouffés sur la moquette, secs et claquants sur le béton de l'entrepôt.
+- **The Backrooms** — plus de table au départ : chacun commence avec sa lampe torche déjà allumée, dans la case 1 de l'inventaire.
+- **The Backrooms** — plus sombre, plus vrai, et on entend son propre souffle.
+  - Les couloirs sont plus sombres : davantage de néons morts ou qui grésillent, et un vrai noir loin des lampes. La lampe torche devient indispensable.
+  - Quand tu sprintes, tu entends ton souffle s'emballer ; il reste haletant le temps de reprendre ton endurance, et s'accélère quand l'entité approche.
+  - De vrais objets abandonnés, photographiés : cartons, chaises d'école et chaises en plastique renversées, bureaux métalliques, vieilles télés cathodiques, sacs poubelle, panneaux « sol glissant ».
+  - Sur les murs : prises électriques, détecteurs incendie, boîtiers électriques et horloges arrêtées ; au plafond, des grilles d'aération.
+  - Dans l'entrepôt du Level 1 : caisses en bois, bidons rouges, bouteilles de gaz, caisses en plastique, diables et sacs poubelle entre les étagères.
+
 ## 3.92 — 3 novembre 2026
 - **Odyssée** — Intégration scénarisée de l'obtention des Objets Rares d'exploration :
   - **Sécateur Sylvestre (Coupe)** :

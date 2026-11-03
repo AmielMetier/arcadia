@@ -214,7 +214,7 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Joueur' })) : [{ id: 0, name: 'Joueur' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 1 });
+  startRun({ seed, difficulty, players, run: NET.run, level: 0 });
   if (NET.role === 'host') send('all', goMessage());
 }
 
@@ -369,7 +369,7 @@ function handleEvent(ev, me) {
       break;
     case 'stairs':
       if (ev.id !== me) break;
-      if (sfx) sfx.step();
+      if (sfx) sfx.step(sim.level === 1);
       if (hud) hud.toast(ev.up ? "Tu remontes à l'étage du haut" : "Tu descends à l'étage du bas");
       break;
     case 'whistle':
@@ -559,7 +559,7 @@ function loop(currentTime) {
       const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
-        if (sfx) sfx.step();
+        if (sfx) sfx.step(sim.level === 1);
       }
     }
 
@@ -596,6 +596,16 @@ function loop(currentTime) {
   // Rendu graphique et HUD
   if (scene) {
     scene.render(sim, currentTime / 1000);
+    if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
+    if (sfx) {
+      // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
+      const P = sim.player;
+      const tired = 1 - P.stamina / 100;
+      const run = P.running && P.moving ? 0.45 + tired * 0.55 : 0;
+      const pant = tired > 0.2 ? ((tired - 0.2) / 0.8) * 0.85 : 0;
+      const fear = sim.hasMonster ? sim.monster.danger * 0.35 : 0;
+      sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused ? Math.max(run, pant, fear) : 0);
+    }
   }
   if (hud) {
     hud.update(sim, sim.time, delta);
