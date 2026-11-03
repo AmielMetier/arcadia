@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.66 — 3 novembre 2026
+## 3.78 — 3 novembre 2026
 - **Dogfight 3D** — trois nouveaux modes, des combats bien plus vivants et des récompenses
   - **Domination** : deux équipes se disputent trois zones au-dessus des villages de l'île. Pour capturer, il faut voler bas, sous le plafond de la zone : on s'expose. Chaque zone tenue rapporte un point par seconde, chaque élimination aussi.
   - **Duel** : un contre un, face à face. Le gagnant reste en piste, le perdant passe derrière ceux qui attendent et regarde la manche. Après 90 secondes, le moins abîmé l'emporte. Le premier à l'objectif est le roi du ciel.
@@ -12,12 +12,84 @@
   - La flamme de la postcombustion monte et retombe en douceur, l'éclair et les traçantes partent de la vraie bouche du canon, et le dessous des nuages paraît moins plat.
   - En qualité Auto, après une partie bien fluide, le jeu essaie les nuages volumétriques au décollage suivant, et revient en arrière si l'image rame.
 
+## 3.77 — 3 novembre 2026
+- **Odyssée** — En combat, les attaques n'affichent plus les dégâts prévus en % : à toi de juger, comme dans les jeux.
+- **Odyssée** — Le journal des nouveautés ne dévoile plus l'histoire : les noms, les rebondissements et les lieux secrets restent à découvrir en jouant.
+
+## 3.76 — 3 novembre 2026
+- **Odyssée** — Tous les personnages de l'aventure ont maintenant leur nouveau dessin.
+
+## 3.75 — 3 novembre 2026
+- **Odyssée** — Une armoire dans ta chambre, à Bourg-Aube : change de tenue quand tu veux, sans attendre la boutique de Métropole.
+- **Odyssée** — Nouveaux dessins pour le capitaine, le facteur, la vieille dame, le voleur et d'autres personnages de l'aventure.
+
+## 3.74 — 3 novembre 2026
+- **Odyssée** — Sur certains téléphones, les personnages restent nets (ils pouvaient s'afficher flous).
+
+## 3.73 — 3 novembre 2026
+- **Odyssée** — À plusieurs, les autres joueurs apparaissent avec la tenue qu'ils se sont choisie.
+
+## 3.72 — 3 novembre 2026
+- **Odyssée** — Portraits de combat pour Morgane, Gaspard, Ferdinand, Lilas et Corbin, et un nouveau portrait de Théo qui lui ressemble enfin (cheveux bleus et écharpe rouge).
+
+## 3.71 — 3 novembre 2026
+- **Odyssée** — Les sept Champions des Terres du Sud ont leur propre dessin : Margot, Aurèle, Morgane, Gaspard, Ferdinand, Lilas et Corbin, ainsi que le croupier du Casino.
+- **Odyssée** — Margot et Aurèle ont leur portrait de combat ; les autres Champions du Sud ne s'affichent plus en image cassée pendant le combat.
+
+## 3.70 — 3 novembre 2026
+- **Odyssée** — Crée ton personnage au début de l'aventure : garçon ou fille, couleur de peau et de cheveux, casquette ou bonnet, pull, t-shirt, veste ou chemise, pantalon ou short, baskets ou sandales, sac à dos ou sacoche, et la couleur de chaque vêtement.
+- **Odyssée** — La boutique de mode de Métropole ouvre : sa cabine d'essayage permet de changer de style quand on veut.
+- **Odyssée** — Nouveaux dessins pour Pierre, Margot, Aurèle, le vieux jardinier, Lucie et d'autres personnages de l'aventure.
+
+## 3.69 — 3 novembre 2026
+- **Odyssée** — Cinq nouveaux dresseurs sur les routes du nord (Route 1, Route 3, Route 7 et Route 10).
+- **Odyssée** — La carte de la région montre le Pont de l'Austral qui relie Bourg-Aube aux Terres du Sud.
+
+## 3.68 — 3 novembre 2026
+- **Odyssée** — Un vélo ! À Voltacité, Lucien t'en assemble un si tu lui rapportes deux pièces. Touche V pour monter dessus ou en descendre (dehors), on roule deux fois plus vite qu'en courant.
+- **Odyssée** — Le permis bateau : le capitaine de l'Embarcadère de l'Aube ne fait plus embarquer sans lui. Examen à la Capitainerie de Port-Azur (quatre questions puis une épreuve pratique), dès deux badges.
+
+## 3.67 — 3 novembre 2026
+- **Odyssée** — La région double de taille : au sud de Bourg-Aube, le Pont de l'Austral mène aux Terres du Sud, ouvertes après les huit premiers badges.
+  - Sept nouvelles villes à arène et huit routes, avec une trentaine de nouveaux dresseurs, des marais traversés de passerelles et un désert de sable.
+  - Douze arènes sur le continent et les trois frères de l'archipel : il faut maintenant quinze badges pour la Ligue, où l'on t'attend de pied ferme.
+  - Toutes les arènes deviennent des énigmes comme dans HeartGold / SoulSilver : labyrinthes, fausses haies, murs invisibles, arène plongée dans le noir, sable et glace qui glissent, tapis roulants, souffles et courants, dalles qui lèvent les barrières rouges ou bleues, téléporteurs, rochers à pousser, lave et gardiens du savoir.
+  - Une fois entré dans une arène, on n'en ressort qu'après avoir affronté le Champion (ou après une défaite).
+- **Odyssée** — Métropole, la mégapole aux gratte-ciel (avenues, passages piétons, fenêtres qui s'allument la nuit).
+  - Le Casino : machine à sous, blackjack, poker fermé à cinq cartes, roulette et belote à quatre ; jetons achetés en Pokédollars et lots à gagner.
+  - La Bourse : actions de la Sylphe, de Devon et d'autres sociétés, l'indice S&P Odyssée 500, le Pokéeuro, les Baies et les Poké Balls ; les nouvelles font bouger les cours (concurrents en sens inverse, certains titres sans réaction).
+  - Un pricer donne le prix des produits dérivés de chaque titre : forwards et futures, change à terme et swaps, CDS, options européennes, américaines et asiatiques.
+  - Pierre, l'analyste en costume, fait passer un entretien de huit questions : réussis-le pour ouvrir un compte et investir tes Pokédollars.
+
+## 3.66 — 2 novembre 2026
+- **Odyssée** — Un grand coup de pinceau sur la région.
+  - Tous les personnages sont redessinés en haute définition d'après leurs anciens modèles : l'infirmière, la maman, le professeur, les Champions, les dresseurs… fini les gros pixels.
+  - Nouveaux portraits de combat pour les Champions et les grands adversaires de l'aventure.
+  - Le professeur Saule apparaît en grand et net dans l'introduction.
+  - Les grottes sont en relief : les parois montent en gradins de roche, avec des couleurs selon le lieu (grotte marine bleutée, caverne du magma rougeâtre, montagne grise…).
+  - Les entrées de grottes deviennent de vraies falaises en escalier, coiffées d'herbe ou de neige.
+  - L'herbe est d'un vert plus doux, parsemée de touffes, trèfles, cailloux, pâquerettes, feuilles et champignons ; les massifs de fleurs retrouvent leurs belles fleurs qui se balancent.
+  - Des petites barrières de bois brun bordent les chemins des routes.
+  - Les statues des arènes sont redessinées : une sculpture de pierre sur un vrai socle.
+  - Chaque maison a sa boîte aux lettres : on y lit le nom de la famille qui habite là.
 ## 3.65 — 2 novembre 2026
 - **Arcadia** — L'écran de chargement des jeux, avec son bouton « C'est parti ! », est de retour.
 - **Arcadia** — Le menu Arcadia revient dans tous les jeux, maintenant sur le bord droit de l'écran : commandes, son, plein écran et retour au salon.
 - **Arcadia** — Les boutons « Jouer avec mes potes » et « Jouer seul » de l'accueil lancent de nouveau le jeu.
 
 ## 3.64 — 2 novembre 2026
+- **Odyssée** — Les herbes, les grottes et la mer accueillent tous les Pokémon qu'on y croise dans les jeux, de Rouge à X / Y : plus de 40 espèces dès la route 1.
+  - Chaque arène compte quatre dresseurs, avec des Pokémon de son type venus des six générations.
+- **Odyssée** — Natures, EV et IV comme dans les jeux : visibles dans le résumé de chaque Pokémon.
+  - Chaque Centre de soins a un PC des Natures pour changer celle d'un Pokémon.
+  - En combat, chaque attaque montre les dégâts prévus en % des PV du Pokémon d'en face.
+- **Odyssée** — Au labo, trois partenaires par capsule : celui d'Odyssée, celui de Kanto et celui de Johto. Théo prend toujours celui qui a l'avantage, de la même famille que le tien.
+- **Odyssée** — Le Pokémon de tête marche derrière toi, comme dans HeartGold / SoulSilver (les partenaires de départ et leurs évolutions). Parle-lui ! Une option permet de le ranger.
+- **Odyssée** — La carte se cadre sur ce que tu as exploré et s'élargit à mesure que tu avances ; le reste de la région est dans le noir.
+- **Odyssée** — Un vrai journal de quêtes : de courtes phrases qui rappellent ce qu'on t'a demandé et ce qui s'est passé, avec le temps de jeu depuis que tu as accepté. Plus d'indice ni de destination.
+  - 22 nouvelles requêtes d'habitants dans toute la région, et quelques surprises après la Ligue.
+- **Odyssée Test** — Nouveau dans le Hub : on choisit un lieu et une équipe prête pour essayer les nouveautés, sans toucher à sa partie. Un éditeur permet de peindre le terrain, poser du décor, des habitants, des panneaux et des maisons, puis d'exporter ses retouches.
+- **Odyssée** — Corrections : un combat entre joueurs pouvait se désynchroniser en fin de tour ; deux filles nommées Lucie à Sylvebourg (le médaillon est maintenant celui de Margaux).
 - **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
   - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.
   - Meurtrier : ton couteau reste caché tant que tu ne le sors pas. Frappe de près, lance-le de loin (il se plante dans le décor : va le reprendre, ou attends qu'il revienne), et coupe le courant avec F ou C.
@@ -45,8 +117,8 @@
 - **Odyssée** — Nouveau menu et écran complet du Journal des Quêtes, système de suivi d'objectif et localisation :
   - **Menu Quêtes dédié (Touche X / Q / J)** : accès immédiat au Journal des Quêtes depuis le menu Pause (inséré à côté du Sac et de la Carte), via le raccourci clavier `Q` ou `J`, et depuis le dock tactile du Pokégear en jeu avec sa nouvelle icône pixel-art de carnet de notes.
   - **Couverture exhaustive de toutes les quêtes du jeu (18 quêtes)** :
-    - *Histoire Principale* : La Ligue Céleste (progression dynamique des 8 Badges d'Arène jusqu'au Plateau Céleste) et L'Ombre de la Team Éclipse (démantèlement des bases et apaisement de Lugia Obscur).
-    - *Grandes Aventures de l'Archipel (8 quêtes)* : Le Ponyta de Lucie, Les eaux troubles du Lac Miroir, Le courrier perdu, Les nuits blanches de Floralia, Les talismans du Temple Kagura, Le vœu de la fontaine, Le dragon de pierre, et Le cœur du volcan.
+    - *Histoire Principale* : la quête des Badges et le fil rouge de l'aventure, à découvrir en jouant.
+    - *Grandes Aventures de l'Archipel (8 quêtes)* : huit histoires à découvrir dans toute la région.
     - *Missions des Habitants (8 requêtes)* : Le médaillon de Lucie, Le spécimen du pêcheur, L'observation géologique, L'échange de Bastien, L'adoption d'Évoli, Les recherches du Pokédex, L'épreuve des Sources, et L'héritage du clan des Dragons.
   - **Où aller & Indications précises** : grand boîtier doré « 📍 OÙ ALLER / PROCHAINE DESTINATION » affichant en temps réel la destination exacte, le PNJ à rencontrer, les prérequis CS (Coupe, Surf, Force) et les conseils de route pour chaque étape.
   - **Suivi d'objectif interactif (« En suivre une »)** : bouton `[★ SUIVRE CETTE QUÊTE]` permettant d'épingler n'importe quelle mission active. L'objectif suivi est mis en évidence dans le journal et s'affiche en temps réel dans une capsule dédiée du Pokégear sur le HUD en jeu (`📍 Lieu · Titre · Objectif en cours`).
@@ -103,7 +175,7 @@
 
 ## 3.57 — 2 novembre 2026
 - **Odyssée** — cinématique d'ouverture, nouvelle scène d'introduction du Professeur Saule, course continue et refonte rétro 5G des combats :
-  - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges, Ho-Oh, la Team Éclipse, Lugia Obscur et Odyssor (passable à tout moment).
+  - **Cinématique d'ouverture (32 s)** : au lancement d'une nouvelle partie, une cinématique animée et doublée en français présente Bourg-Aube, la quête des huit Badges et les légendes de la région (passable à tout moment).
   - **Introduction du Professeur Saule** : scène sobre façon DS avec le sprite du Prof. Saule qui lance une Poké Ball d'où sort un starter, sélection du personnage par cartes illustrées, carte officielle d'enregistrement du prénom avec suggestions en un clic, et apparition du voisin Théo.
   - **Course continue (COURSE / touche R)** : bouton sur le HUD (et touche R ou Verr. Maj) pour courir en permanence sans maintenir Shift.
   - **Décors de combat & HUD rétro 5G (*Noir 2 / Blanc 2*)** : 11 nouveaux fonds de combat en pixel-art 16-bit (prairie, mer, arène, Ligue, grotte, neige, volcan, de jour comme de nuit), socles assortis, boîtes de statut 5G biseautées avec Poké Balls d'équipe, badges de types, barres PV / EXP segmentées, boutons d'action illustrés et cartes de capacités détaillées (catégorie, type, puissance et PP).
@@ -137,15 +209,11 @@
   - Ta propre carte dresseur montre aussi ton équipe.
 
 ## 3.53 — 2 novembre 2026
-- **Odyssée** — la Team Éclipse devient le fil rouge de l'aventure, du Bois Murmure jusqu'au Sanctuaire des Marées.
-  - Le Dr Lumen, menacé dans le Bois Murmure, offre la CS Flash : la Grotte Lunaire est désormais plongée dans le noir.
-  - Les admins Erèbe et Nyx pillent la Grotte Lunaire et menacent le vieux marin de Port-Azur ; à Voltacité, la Centrale est occupée et l'Arène fermée tant qu'on ne l'a pas libérée. L'ingénieur offre la CS Force pour pousser les gros rochers.
-  - Sur la route 6, le repaire de la Team Éclipse : battre le chef Nocturne plonge la région dans une nuit violette, et ouvre enfin Mirage.
-  - La voyante de Mirage confie la Plume Argentée. Au sud du Cap Mirage, sur l'Îlot des Marées, Lugia Obscur attend au fond du Sanctuaire. Capture-le (le Prof. Saule ouvrira son cœur) ou apaise-le : il retournera alors dans la Grotte des Tourbillons.
-  - Tant que dure l'Éclipse, la Route Victoire reste fermée.
-  - À la Ligue, le Conseil 4 (Frimas, Spectrel, Brutus et Ombrelle) attend avant Célestine.
+- **Odyssée** — l'histoire principale devient le fil rouge de l'aventure, d'un bout à l'autre de la région.
+  - Deux nouvelles CS : Flash éclaire les grottes plongées dans le noir, Force pousse les gros rochers.
+  - Certains lieux restent fermés tant que l'histoire n'a pas avancé.
   - Dix recoins cachés le long des routes, derrière un petit arbre ou un gros rocher, et des quêtes annexes : le médaillon de Lucie, le géologue, l'échange de Bastien, l'Évoli de Floralia, le chercheur du Pokédex, les sources de Cendrelune et le Minidraco de Cimelune.
-  - Nouveaux personnages : les sbires, Nyx, Erèbe, Nocturne, le Dr Lumen et les quatre membres du Conseil.
+  - De nouveaux personnages à rencontrer en chemin.
 
 ## 3.52 — 2 novembre 2026
 - **Odyssée** — on peut jouer à plusieurs dans la nouvelle version : voir les autres joueurs se promener, échanger un Pokémon et se défier en combat.
@@ -156,7 +224,7 @@
 - **Odyssée** — tout le décor est redessiné en pixel art façon HeartGold / SoulSilver.
   - Herbe, chemins, sable, pavés, neige, eau et rivages ont de vrais bords arrondis ; les hautes herbes sont en rangées de touffes.
   - Les maisons sont plus simples, et chaque bâtiment a son style : Centre, boutique, arènes, labo, Ligue, chalets, maisons de pêcheurs, musée, phare, pagode.
-  - Nouveaux personnages : les deux héros, Théo, le professeur, maman, l'infirmière, le vendeur, le garde, les huit champions, Célestine et plusieurs dresseurs.
+  - Nouveaux personnages : les deux héros, Théo, le professeur, maman, l'infirmière, le vendeur, le garde, les huit champions et plusieurs dresseurs.
   - Les 60 créatures originales sont de retour, redessinées, dont 8 nouvelles ; les Pokémon officiels restent les plus nombreux dans les hautes herbes.
   - Écran titre : Odyssor surgit de l'océan, comme sur SoulSilver.
   - Nouvelles icônes pour les objets du sac.
@@ -167,13 +235,13 @@
   - Les lieux à part (lac, jardin, forêt des torii) sont marqués en vert.
 
 ## 3.49 — 31 octobre 2026
-- **Odyssée** — une histoire secondaire complète en parallèle de l'aventure : la Brume, une organisation qui vole les Pokémon et veut réveiller Groudon. Huit quêtes, à suivre dans le nouveau menu « Quêtes ».
-  - Le Ponyta de Lucie (Sylvebourg, après le premier badge) : enquête auprès des habitants, poursuite dans le Bois Murmure et sa clairière cachée.
-  - Les eaux troubles du Lac Miroir : un nouveau lac au nord de la route 3, son hameau de Rive-Claire, trois pompes à arrêter et la Grotte des Marées à rejoindre en surfant (Mesprit, et un Lokhlass en cadeau).
-  - Les nuits blanches de Floralia : des enfants prisonniers de leurs cauchemars, le Jardin des Songes la nuit, Cresselia sur l'îlot du lac et Darkrai au fond d'un sanctuaire.
-  - Les talismans du Temple Kagura : la Forêt des Torii au bout de la route 7, ses lanternes, sa cloche et Créhelf.
-  - Le cœur du volcan : après la Ligue, le bateau de l'Embarcadère mène à l'Île du Magma. Il faut y prendre d'assaut la base de la Brume pour affronter Groudon, puis Heatran.
-  - Et aussi : le courrier perdu du facteur de Port-Azur, le dragon de pierre du Musée des Dragons et les sept Éclats d'Étoile de la fontaine (Jirachi). Créfadet attend celles et ceux qui ont vu ses deux frères.
+- **Odyssée** — une histoire secondaire complète en parallèle de l'aventure : une mystérieuse organisation rôde dans la région. Huit quêtes, à suivre dans le nouveau menu « Quêtes ».
+  - Le Ponyta de Lucie, à Sylvebourg, après le premier badge.
+  - Les eaux troubles du Lac Miroir : un nouveau lac au nord de la route 3 et son hameau de Rive-Claire.
+  - Les nuits blanches de Floralia : des enfants qui ne dorment plus, et un jardin qui ne s'ouvre que la nuit.
+  - Les talismans du Temple Kagura : la Forêt des Torii au bout de la route 7, ses lanternes et sa cloche.
+  - Le cœur du volcan : une aventure qui attend après la Ligue.
+  - Et aussi : le courrier perdu du facteur de Port-Azur, le dragon de pierre du Musée des Dragons et le vœu de la fontaine.
 - **Odyssée** — nouveaux décors : fontaine, torii, lanternes, cloche, squelette de dragon, trône… et de nouveaux habitants dessinés comme dans HeartGold / SoulSilver.
 
 ## 3.48 — 31 octobre 2026
@@ -364,18 +432,15 @@
   - l'eau devient plus foncée au large, et les rivages ont un bord de sable ondulé, de l'écume et des coins arrondis ;
   - toits en tuiles avec faîtage, façades avec volets, jardinières fleuries, soubassement en pierre et portes avec auvent ;
   - grottes en roche taillée avec des parois plus hautes, et des cristaux qui luisent dans la Grotte Lunaire ;
-  - le repaire de la Team Éclipse est rempli de machines et d'écrans violets, et chaque salle du Conseil 4 a son décor (glace, bougies, braseros, piliers sombres) ;
+  - les lieux importants de l'aventure ont chacun leur décor ;
   - la nuit est plus sombre, et les lampadaires éclairent le sol autour d'eux ;
   - les chemins de l'île de Cendrelune sont bordés de cendre au lieu d'herbe.
 - **Odyssée** — Combats : nouveaux décors (prairie avec collines et forêt, grotte avec stalactites et cristaux, plage, volcan, arènes au dallage en perspective) et socles avec ombre et reflet. Ton Pokémon est placé un peu plus haut, moins caché par la boîte de texte.
 
 ## 3.19 — 29 octobre 2026
-- **Odyssée** — Une vraie histoire : la Team Éclipse veut fermer le cœur de Lugia, le gardien des marées, avec son Prisme Noir, et plonger la région dans une nuit éternelle.
-  - Tu croises ses sbires et ses deux Admins, Nyx et Erèbe, dans le Bois Murmure, la Grotte Lunaire, au port de Port-Azur et dans la Centrale de Voltacité (l'Arène reste fermée tant qu'elle est occupée).
-  - Leur repaire se cache sur la route 6 : bats leur chef, Nocturne, et le ciel de toute la région devient violet, en plein jour, jusqu'à la fin de l'histoire.
-  - La voyante de Mirage te confie la Plume Argent : surfe depuis le Pont des Marées jusqu'au Sanctuaire, affronte une dernière fois la Team Éclipse… puis Lugia Obscur lui-même. Le Dr Lumen te donne une Master Ball pour le capturer, et le Prof. Saule peut ouvrir son cœur.
-  - La Route Victoire n'ouvre qu'une fois la nuit violette dissipée.
-- **Odyssée** — Le Conseil 4 : avant la Maître, quatre dresseurs d'élite t'attendent l'un après l'autre (Glace, Spectre, Combat, Ténèbres).
+- **Odyssée** — Une vraie histoire : une menace plane sur la région, à toi de la découvrir au fil des routes et des villes.
+  - Certains lieux restent fermés tant que l'histoire n'a pas avancé.
+- **Odyssée** — À la Ligue, des dresseurs d'élite t'attendent avant le dernier combat.
 - **Odyssée** — Les CS : Coupe (petits arbres), Flash (la Grotte Lunaire est maintenant plongée dans le noir), Surf (nager et pêcher des Pokémon sur l'eau) et Force (pousser les gros rochers).
   - Place-toi devant l'obstacle et appuie sur Espace. Une dizaine de recoins cachés le long des routes, et un îlot dans le port, cachent des objets rares.
 - **Odyssée** — Quêtes annexes : un médaillon perdu, un échange de Pokémon, un Évoli et un Minidraco à adopter, des Pokémon à montrer et un chercheur qui récompense ton Pokédex (jusqu'à une Master Ball).
@@ -406,13 +471,11 @@
 - **Odyssée** — chez Maman, la plante ne chevauche plus l'évier ; les meubles d'une case (bibliothèque, PC) sont posés sur leur case.
 
 ## 3.40 — 30 octobre 2026
-- **Odyssée** — un second rival entre en scène au milieu de l'aventure : l'enfant que tu n'as pas choisi d'incarner (Lyra ou Ethan), petite-fille ou petit-fils du Prof. Saule.
-  - Recrue des Gardes d'Écaille de Drakos, elle ou il te défie à Mirage, à Port-Granit, devant la Tour de Drakos, puis une dernière fois au Cap des Étoiles.
-  - Elle ou il a pris la troisième capsule du labo : son équipe dépend de ton starter.
+- **Odyssée** — un second rival entre en scène au milieu de l'aventure, et son équipe dépend de ton starter.
 - **Odyssée** — l'histoire s'étoffe :
-  - Le Prof. Saule t'appelle après certains badges (le bateau, la Tour de la Grue, sa famille, les îles, Drakos).
-  - De nouveaux habitants racontent les légendes d'Odyssée : les trois oiseaux, Ho-Oh et Lugia, et Odyssor, la baleine des étoiles.
-  - Le professeur suit tes rencontres avec les légendaires, et la fin réunit tes deux rivaux.
+  - Le Prof. Saule t'appelle après certains badges.
+  - De nouveaux habitants racontent les légendes d'Odyssée.
+  - Le professeur suit tes rencontres avec les légendaires.
 - **Odyssée** — nouvelles herbes hautes, fleurs, barrière et statues redessinées : les herbes forment un vrai tapis, sans quadrillage.
 
 ## 3.37 — 30 octobre 2026
@@ -443,19 +506,13 @@
 - **Odyssée** — un bateau pour les îles de l'Est, depuis l'Embarcadère de l'Aube (à droite de la route 1).
   - Île Orageuse avec 2 badges, Île de la Grue avec 3, Île Givrée (tout au nord, sous la neige) avec 5.
   - Pas d'arène sur ces îles, mais des dresseurs plus forts que l'arène précédente.
-- **Odyssée** — des légendaires à capturer, chacun au bout d'une quête :
-  - Celebi dans le Bois Murmure, dès le premier badge (une vieille dame de Sylvebourg a quelque chose pour toi).
-  - Électhor sur le Pic Tonnerre (rallume les trois relais de l'Île Orageuse) et Mew à l'autel des ruines (lis les trois stèles, 4 badges).
-  - Ho-Oh au sommet de la Tour de la Grue, à Hautegrue : bats les Sages pour obtenir la Plume Arc-en-ciel. Sulfura niche dans le cratère voisin (Coupe).
-  - Raikou, Entei et Suicune s'enfuient de la tour et se cachent dans les îles (5 badges).
-  - Artikodin sur la Cime Givrée, puis Lugia au fond de la Grotte des Tourbillons.
-  - Et un secret pour le Maître de la Ligue, sur l'Île Orageuse…
+- **Odyssée** — des légendaires à capturer, chacun au bout d'une quête : écoute bien les habitants des villes et des îles.
 
 ## 3.23 — 30 octobre 2026
 - **Odyssée** — une aventure bien plus longue : huit arènes et la Ligue.
   - Les quatre premières arènes se font dans l'ordre, puis de nouvelles zones s'ouvrent au fil des badges : Mirage, puis la mer et l'archipel.
-  - Trois îles tenues par trois frères Champions, de plus en plus forts : Basalte (Île de Granit), Pyros (Cendrelune) et Drakos, le tyran de la Grande Île, ancien rival de la Maître Célestine.
-  - Odyssor, la baleine des étoiles, apparaît au Cap des Étoiles après le huitième badge.
+  - Trois îles tenues par trois frères Champions, de plus en plus forts : Basalte (Île de Granit), Pyros (Cendrelune) et Drakos (la Grande Île).
+  - Une légende attend au Cap des Étoiles…
 - **Odyssée** — de nouvelles créatures : Capyousse, Mèchelet et Narvi sont les nouveaux starters, et une cinquantaine de créatures originales rejoignent les Pokémon (qui restent).
 - **Odyssée** — capacités de terrain : Coupe (petits arbres), Surf (on traverse la mer sur le dos d'une créature), Éclate-Roc (rochers fissurés) et Vol (retour éclair dans une ville déjà visitée). Les Champions les donnent après leur victoire ; face à l'obstacle, appuie sur F.
 - **Odyssée** — nouvel écran titre : Odyssor nage dans la mer, sous la lune.

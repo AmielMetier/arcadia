@@ -5,12 +5,12 @@ import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
 import { ITEMS, itemName, POCKETS, canUseOn, giveHeldItem, takeHeldItem } from '../core/items.js';
 import { getAbility, abilityName } from '../data/abilities.js';
-import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS } from '../core/mon.js';
+import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS, NATURES, natureName, natureEffect, refreshStats } from '../core/mon.js';
 import { BADGES, LEADERS } from '../world/region.js';
 import { ASSETS } from '../assets.js';
 import { SPRITES } from '../data/sprites.js';
 import { T, walkable } from '../world/tiles.js';
-import { getAllQuests, setTrackedQuest, getTrackedQuest, QUEST_CATEGORIES } from '../core/questsData.js';
+import { getAllQuests, setTrackedQuest, syncJournal } from '../core/questsData.js';
 
 export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
 export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
@@ -439,13 +439,17 @@ export function summaryScreen(game, list, idx) {
             <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
             <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
+            <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
           </table>
           <div class="expline"><b>EXP</b><i><u style="width:${(expProgress(m, cap) * 100).toFixed(1)}%"></u></i></div>
           <div class="dexline">${esc(S.genus ? S.genus + ' — ' + (S.dex || '') : S.dex || '')}</div>`;
       } else if (page === 1) {
-        body = `<table class="kv stats sum-kv">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td></tr>`).join('')}</table>`;
+        // stats avec la nature (▲ +10 % en rouge, ▼ −10 % en bleu), les IV (0 à 31) et les EV (252 max, 510 en tout)
+        const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
+        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
+          <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
       } else {
         body = `<div class="moves">${m.moves.map((mv) => {
           const M = MOVES[mv.id];
@@ -727,8 +731,10 @@ function loadCarteIcons() {
   for (const k of SPRITES.carte || []) { const im = new Image(); im.src = ASSETS.carte(k); carteIcons[k] = im; }
   return carteIcons;
 }
-function drawRegion(game, cv) {
-  const W = game.world.maps.monde, ctx = cv.getContext('2d'), w = W.w, h = W.h, B = 2;
+/** relief de la région, une case = un pixel (gardé en cache : la carte ne change pas) */
+function regionTerrain(game) {
+  if (game._regionTerrain) return game._regionTerrain;
+  const W = game.world.maps.monde, w = W.w, h = W.h, B = 2;
   const bw = Math.ceil(w / B), bh = Math.ceil(h / B);
   // nature de chaque bloc de 2 × 2 cases
   // 0 eau, 1 plaine, 2 forêt, 3 montagne, 4 pied de montagne (sol praticable des zones volcaniques et enneigées)
@@ -740,8 +746,7 @@ function drawRegion(game, cv) {
       if (t === T.WATER) water++; else if (walkable(t) || t === T.DOOR) walk++;
     }
     const th = W.zoneAt(bx * B, by * B)?.theme, hill = th === 'volcanic' || th === 'snow';
-    const i = by * bw + bx;
-    kind[i] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
+    kind[by * bw + bx] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
   }
   // distance de chaque bloc à la nature voisine (pour la mer : à la côte ; pour la montagne : au pied)
   const dist = (pred) => {
@@ -754,12 +759,13 @@ function drawRegion(game, cv) {
     return d;
   };
   const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
-  const img = ctx.createImageData(w, h);
+  const c0 = document.createElement('canvas'); c0.width = w; c0.height = h;
+  const ctx = c0.getContext('2d'), img = ctx.createImageData(w, h);
   for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
     const i = by * bw + bx, k = kind[i];
     let c;
-    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : HG.open;
-    else if (toLand.length && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind[(by + dy) * bw + bx + dx] === 0 && bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh)) c = HG.cliff;
+    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : (bx + by * 3) % 11 === 0 ? HG.foam : HG.open;
+    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh && kind[(by + dy) * bw + bx + dx] === 0)) c = HG.cliff;
     else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
     else if (k === 4) c = HG.low;
     else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
@@ -769,43 +775,82 @@ function drawRegion(game, cv) {
     }
   }
   ctx.putImageData(img, 0, 0);
+  return (game._regionTerrain = { canvas: c0, kind, bw, bh, toOpen, toFoot, B });
+}
+
+/** cadre de la carte : ce qu'on a exploré (plus une marge), jamais plus petit qu'un tiers de la région ;
+ *  il garde les proportions de la région et s'élargit à mesure qu'on avance */
+export function exploredView(game) {
+  const W = game.world.maps.monde, C = 8, cw = Math.ceil(W.w / C), seen = game.state.explored || [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of seen) { const cx = i % cw, cy = Math.floor(i / cw); x0 = Math.min(x0, cx * C); y0 = Math.min(y0, cy * C); x1 = Math.max(x1, cx * C + C); y1 = Math.max(y1, cy * C + C); }
+  const p = game.worldPos(); if (!isFinite(x0)) { x0 = p.x - 20; x1 = p.x + 20; y0 = p.y - 15; y1 = p.y + 15; }
+  const M = 14, ar = W.w / W.h;
+  x0 -= M; y0 -= M; x1 += M; y1 += M;
+  let w = Math.max(x1 - x0, W.w / 3), h = Math.max(y1 - y0, W.h / 3);
+  if (w / h > ar) h = w / ar; else w = h * ar;
+  w = Math.min(w, W.w); h = Math.min(h, W.h);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const x = Math.max(0, Math.min(W.w - w, cx - w / 2)), y = Math.max(0, Math.min(W.h - h, cy - h / 2));
+  return { x, y, w, h };
+}
+
+/** dessine la région dans le cadre v (en cases) : relief, routes, villes, et le noir de ce qui reste à découvrir */
+function drawRegion(game, cv, v) {
+  const W = game.world.maps.monde, ctx = cv.getContext('2d'), R = regionTerrain(game);
+  const s = cv.width / v.w;                    // pixels écran par case
+  const X = (x) => (x - v.x) * s, Y = (y) => (y - v.y) * s;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#07080c'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(R.canvas, v.x, v.y, v.w, v.h, 0, 0, cv.width, cv.height);
+  // icônes du Pokégear : grandeur fixe à l'écran (deux pixels par pixel d'icône quand la carte est zoomée)
+  const k = Math.max(1, Math.min(3, Math.round(s / 2.2)));
   const I = loadCarteIcons();
-  const icon = (k, x, y) => { const im = I[k]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height + 2)); };
-  // arbres sur les forêts épaisses, montagnes sur les reliefs (une icône par carré de 22 cases, au hasard du lieu)
-  for (let y = 10; y < h - 6; y += 22) for (let x = 10; x < w - 6; x += 22) {
+  const icon = (key, x, y) => { const im = I[key]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(X(x) - im.width * k / 2), Math.round(Y(y) - im.height * k + 2 * k), im.width * k, im.height * k); };
+  const { kind, bw, toOpen, toFoot, B } = R;
+  const step = Math.max(14, Math.round(22 * 2.2 / s * k));
+  for (let y = 10; y < W.h - 6; y += step) for (let x = 10; x < W.w - 6; x += step) {
     const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
-    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), k = kind[i];
-    if (k === 2 && toOpen[i] >= 4 && ((x + y - 20) / 22) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
-    else if (k === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+    if (jx < v.x - 10 || jx > v.x + v.w + 10 || jy < v.y - 10 || jy > v.y + v.h + 14) continue;
+    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), kk = kind[i];
+    if (kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
+    else if (kk === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
   }
   // routes : un trait blanc cerclé de gris
-  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const roads = (game.world.routes || []).map((r) => r.pts);
-  for (const [lw, col] of [[7, HG.ink], [4, HG.road]]) {
+  for (const [lw, col] of [[Math.max(4, s * 1.9), HG.ink], [Math.max(2, s * 1.1), HG.road]]) {
     ctx.strokeStyle = col; ctx.lineWidth = lw;
-    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 0.5, y + 0.5) : ctx.moveTo(x + 0.5, y + 0.5))); ctx.stroke(); }
+    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x + 0.5), Y(y + 0.5)) : ctx.moveTo(X(x + 0.5), Y(y + 0.5)))); ctx.stroke(); }
   }
-  // grottes et lieux à part (lac, jardin, forêt des torii) : icônes et pastilles vertes
   for (const b of W.buildings) if (b.kind === 'cave') icon('grotte_m', b.x + b.w / 2, b.y + b.d);
   const pill = (x, y, pw, ph, fill, dark) => {
-    x = Math.round(x - pw / 2); y = Math.round(y - ph / 2);
-    ctx.fillStyle = HG.ink; ctx.fillRect(x - 1, y, pw + 2, ph); ctx.fillRect(x, y - 1, pw, ph + 2);
+    pw *= k; ph *= k; x = Math.round(X(x) - pw / 2); y = Math.round(Y(y) - ph / 2);
+    ctx.fillStyle = HG.ink; ctx.fillRect(x - k, y, pw + 2 * k, ph); ctx.fillRect(x, y - k, pw, ph + 2 * k);
     ctx.fillStyle = fill; ctx.fillRect(x, y, pw, ph);
     if (dark) { ctx.fillStyle = dark; ctx.fillRect(x, y + Math.ceil(ph * 0.55), pw, Math.floor(ph * 0.45)); }
   };
   for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
-  // villes : pastilles rouges (grises tant qu'on n'y est pas allé)
   const visited = new Set(game.state.visited || []);
   for (const t of Object.values(game.world.towns)) {
     const big = t.gym != null || t.id === 'plateau';
-    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 16 : 12, big ? 12 : 9, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
   }
-  // brouillard sur ce qui n'a pas encore été exploré
-  const seen = new Set(game.state.explored || []), C = 8, cw = Math.ceil(w / C);
-  if (seen.size) {
-    ctx.fillStyle = 'rgba(28, 36, 52, 0.62)';
-    for (let y = 0; y < h; y += C) for (let x = 0; x < w; x += C) if (!seen.has(Math.floor(y / C) * cw + Math.floor(x / C))) ctx.fillRect(x, y, C, C);
-  }
+  // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
+  const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
+  const mask = document.createElement('canvas'); mask.width = cw; mask.height = ch;
+  const mx = mask.getContext('2d'), md = mx.createImageData(cw, ch);
+  for (const i of seen) if (i >= 0 && i < cw * ch) md.data[i * 4 + 3] = 255;
+  mx.putImageData(md, 0, 0);
+  const fog = document.createElement('canvas'); fog.width = cv.width; fog.height = cv.height;
+  const fx = fog.getContext('2d');
+  fx.fillStyle = '#07080c'; fx.fillRect(0, 0, fog.width, fog.height);
+  fx.globalCompositeOperation = 'destination-out';
+  fx.imageSmoothingEnabled = true;
+  fx.filter = `blur(${Math.max(2, s * 3.2)}px)`;
+  fx.drawImage(mask, X(0), Y(0), cw * C * s, ch * C * s);
+  fx.filter = 'none'; fx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(fog, 0, 0);
 }
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
@@ -862,7 +907,7 @@ export function mapScreen(game) {
       </div>
       <div class="map-stage">
         <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
-          <canvas class="mapcv" width="${W.w}" height="${W.h}"></canvas>
+          <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
@@ -891,13 +936,31 @@ export function mapScreen(game) {
     const tagEl = s.querySelector('.map-tag');
     const subEl = s.querySelector('.map-sub');
 
-    const draw = () => drawRegion(game, c);
+    // la carte est cadrée sur ce qu'on a exploré : elle se dézoome à mesure qu'on découvre la région
+    // (à l'ouverture, elle part du cadre de la dernière fois et s'élargit jusqu'au nouveau)
+    const target = exploredView(game), from = st.mapView && st.mapView.w ? st.mapView : target;
+    let view = { ...from };
+    const fit = () => { const r = c.getBoundingClientRect(); const w = Math.max(320, Math.round(r.width * (window.devicePixelRatio || 1))); if (c.width !== w) { c.width = w; c.height = Math.round(w * W.h / W.w); } };
+    const place = (node, x, y) => { node.style.left = ((x - view.x) / view.w * 100) + '%'; node.style.top = ((y - view.y) / view.h * 100) + '%'; };
+    const pinsAt = [];
+    const draw = () => { fit(); drawRegion(game, c, view); for (const [node, x, y] of pinsAt) place(node, x, y); };
     draw();
     Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+    if (Math.abs(from.w - target.w) > 0.5 || Math.abs(from.x - target.x) > 0.5 || Math.abs(from.y - target.y) > 0.5) {
+      const t0 = performance.now(), D = 1100;
+      const anim = () => {
+        if (!s.isConnected) return;
+        const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
+        for (const k of ['x', 'y', 'w', 'h']) view[k] = from[k] + (target[k] - from[k]) * e;
+        draw();
+        if (u < 1) requestAnimationFrame(anim);
+      };
+      setTimeout(() => requestAnimationFrame(anim), 250);
+    }
+    st.mapView = target;
 
     const me = el('div', 'map-me');
-    me.style.left = (p.x / W.w * 100) + '%';
-    me.style.top = (p.y / W.h * 100) + '%';
+    pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
     // Interactive town pins on the map
@@ -905,8 +968,7 @@ export function mapScreen(game) {
       if (idx === 0) return;
       const pin = el('button', 'map-pin ' + (sp.tagCls || ''));
       pin.type = 'button';
-      pin.style.left = (sp.x / W.w * 100) + '%';
-      pin.style.top = (sp.y / W.h * 100) + '%';
+      pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -919,12 +981,12 @@ export function mapScreen(game) {
 
     const cur = el('div', 'map-cur');
     lab.appendChild(cur);
+    const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
     let k = 0;
     const show = () => {
       const q = spots[k];
-      cur.style.left = (q.x / W.w * 100) + '%';
-      cur.style.top = (q.y / W.h * 100) + '%';
+      curAt[1] = q.x; curAt[2] = q.y; place(cur, q.x, q.y);
       whereEl.textContent = q.name;
       tagEl.textContent = q.tag || '';
       tagEl.className = 'map-tag ' + (q.tagCls || '');
@@ -1699,6 +1761,27 @@ export async function moveRelearnerScreen(game) {
   await ui.say('Maître des Capacités : « Que la force et la sagesse accompagnent ton équipe ! À bientôt. »');
 }
 
+/* ================= PC DES NATURES (Centre de soins) ================= */
+export async function naturePcScreen(game) {
+  const ui = game.ui, st = game.state;
+  ui.sound.sfx('pc');
+  await ui.say([`${st.name} allume le PC des Natures.`, 'Ce PC règle le caractère d\'un Pokémon : une stat monte de 10 %, une autre baisse de 10 %.'], { keep: true });
+  for (;;) {
+    if (!st.party.length) { await ui.say('Tu n\'as encore aucune créature.', { keep: true }); break; }
+    ui.closeDialog();
+    const k = await partyScreen(game, { mode: 'pick', prompt: 'Changer la nature de quel Pokémon ?' });
+    if (k < 0) break;
+    const m = st.party[k];
+    const label = (n) => { const ne = natureEffect(n); return ne ? `+${STAT_NAMES[ne[0]]} −${STAT_NAMES[ne[1]]}` : 'neutre'; };
+    const n = await ui.list({ title: `${monName(m)} : ${natureName(m.nat ?? 0)}`, items: NATURES.map((name, i) => ({ label: name + (i === m.nat ? ' ✓' : ''), right: label(i) })).concat([{ label: 'Annuler' }]), cls: 'shop natures', cancel: NATURES.length, start: m.nat ?? 0 });
+    if (n < 0 || n >= NATURES.length || n === m.nat) continue;
+    if (!(await ui.yesNo(`${monName(m)} devient ${natureName(n)} (${label(n)}) ?`, { keep: true }))) continue;
+    m.nat = n; refreshStats(m, true); ui.sound.sfx('levelup');
+    await ui.say(`${monName(m)} est maintenant de nature ${natureName(n)} !`, { keep: true });
+  }
+  ui.closeDialog();
+}
+
 /* ================= OPTIONS ================= */
 export function optionsScreen(game) {
   const ui = game.ui, snd = game.sound;
@@ -1710,17 +1793,19 @@ export function optionsScreen(game) {
     const rows = () => [
       ['Vitesse du texte', speeds[ui.textSpeed]],
       ['Volume', '■'.repeat(Math.round(snd.vol * 10)) + '□'.repeat(10 - Math.round(snd.vol * 10))],
+      ['Pokémon qui suit', game.followOff ? 'Non' : 'Oui'],
       ['Retour', ''],
     ];
     const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys"><b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj (maintenue) : courir · C : carte</div>'; };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'up') i = (i + 2) % 3; else if (k === 'down') i = (i + 1) % 3;
-      else if (k === 'left' || k === 'right') {
+      if (k === 'up') i = (i + 3) % 4; else if (k === 'down') i = (i + 1) % 4;
+      else if (k === 'left' || k === 'right' || (k === 'a' && i === 2)) {
         const d = k === 'left' ? -1 : 1;
         if (i === 0) { ui.textSpeed = (ui.textSpeed + d + 4) % 4; try { localStorage.setItem('odyssee-textspeed', ui.textSpeed); } catch (e) {} }
         if (i === 1) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
-      } else if (k === 'b' || (k === 'a' && i === 2)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
+        if (i === 2) { game.followOff = !game.followOff; try { localStorage.setItem('odyssee-suiveur', game.followOff ? '0' : '1'); } catch (e) {} }
+      } else if (k === 'b' || (k === 'a' && i === 3)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
       else return;
       ui.sound.sfx('blip'); draw();
     });
@@ -1790,240 +1875,94 @@ export function loadCodeScreen(ui, check) {
   });
 }
 
-/* ================= JOURNAL DES QUÊTES (Style 5G Noir 2 / Blanc 2) ================= */
+/* ================= JOURNAL DES QUÊTES (carnet de voyage, style Noir 2 / Blanc 2) ================= */
+// Pas d'indice ni de destination : chaque quête acceptée rappelle en quelques phrases ce qu'on nous a demandé et ce qui
+// s'est passé depuis, avec le temps de jeu écoulé depuis qu'on l'a acceptée.
 export function questsScreen(game) {
   const ui = game.ui;
   return new Promise((resolve) => {
     const s = screen(ui, 'quests-scr');
-    let currentTab = 'active'; // 'active' | 'done' | 'all'
-    let selectedIdx = 0;
-
+    let tab = 'active', sel = 0;
+    const CAT = { main: 'HISTOIRE', side: 'AVENTURE', legend: 'LÉGENDE', npc: 'HABITANT' };
+    const lists = () => {
+      const all = getAllQuests(game);
+      const act = all.filter((q) => q.status !== 'done'), done = all.filter((q) => q.status === 'done');
+      return { all, act, done, shown: tab === 'active' ? act : tab === 'done' ? done : all };
+    };
     const render = () => {
-      const allQuests = getAllQuests(game);
-      const activeCount = allQuests.filter((q) => q.status !== 'done').length;
-      const doneCount = allQuests.filter((q) => q.status === 'done').length;
-      const allCount = allQuests.length;
-
-      let filtered = allQuests;
-      if (currentTab === 'active') {
-        filtered = allQuests.filter((q) => q.status !== 'done');
-        if (!filtered.length) filtered = allQuests;
-      } else if (currentTab === 'done') {
-        filtered = allQuests.filter((q) => q.status === 'done');
-      }
-
-      if (selectedIdx >= filtered.length) {
-        selectedIdx = Math.max(0, filtered.length - 1);
-      }
-
-      const selQuest = filtered[selectedIdx] || allQuests[0];
-      const tracked = getTrackedQuest(game);
-
+      const { all, act, done, shown } = lists();
+      if (sel >= shown.length) sel = Math.max(0, shown.length - 1);
+      const q = shown[sel];
       s.innerHTML = `
         <div class="scr-bar">
           <div class="scr-bar-left">
             <img class="scr-bar-ico" src="img/items/notebook.png" alt="">
             <span class="scr-bar-title">JOURNAL DES QUÊTES</span>
-            <span class="scr-bar-sub">${activeCount} actives · ${doneCount} terminées</span>
+            <span class="scr-bar-sub">${act.length} en cours · ${done.length} terminée${done.length > 1 ? 's' : ''}</span>
           </div>
           <div class="quests-tabs">
-            <button type="button" class="qtab${currentTab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${activeCount})</button>
-            <button type="button" class="qtab${currentTab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${doneCount})</button>
-            <button type="button" class="qtab${currentTab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${allCount})</button>
+            <button type="button" class="qtab${tab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${act.length})</button>
+            <button type="button" class="qtab${tab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${done.length})</button>
+            <button type="button" class="qtab${tab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${all.length})</button>
           </div>
-          <div class="scr-bar-right">
-            <button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button>
-          </div>
+          <div class="scr-bar-right"><button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button></div>
         </div>
-
         <div class="quests-body">
-          <!-- Colonne gauche: Liste des quêtes -->
           <div class="qcol-list">
-            <div class="qlist-head">
-              <span>MISSIONS D'ODYSSÉE</span>
-              <span class="qlist-cnt">${filtered.length} quête${filtered.length > 1 ? 's' : ''}</span>
-            </div>
+            <div class="qlist-head"><span>CARNET DE VOYAGE</span><span class="qlist-cnt">${shown.length} quête${shown.length > 1 ? 's' : ''}</span></div>
             <div class="qlist-scroll">
-              ${filtered.length === 0 ? '<div style="padding:15px;color:#8aa0be;font-size:13px;text-align:center;">Aucune quête dans cette catégorie.</div>' : ''}
-              ${filtered.map((q, idx) => `
-                <div class="qcard ${q.status}${idx === selectedIdx ? ' on' : ''}${q.isTracked ? ' tracked' : ''}" data-idx="${idx}">
+              ${shown.length ? '' : `<div class="qempty">${tab === 'done' ? 'Aucune quête terminée pour l\'instant.' : 'Aucune quête en cours. Parle aux habitants : ils ont souvent quelque chose à demander.'}</div>`}
+              ${shown.map((x, i) => `
+                <div class="qcard ${x.status}${i === sel ? ' on' : ''}${x.isTracked ? ' tracked' : ''}" data-idx="${i}">
                   <span class="cur">▶</span>
-                  <div class="qcard-top">
-                    <span class="qcat-tag qcat-${q.cat}">${esc(q.cat === 'main' ? 'PRINCIPALE' : q.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${q.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}
-                  </div>
-                  <div class="qcard-name">${esc(q.name)}</div>
-                  <div class="qcard-sub">
-                    <span class="qcard-step">${q.status === 'done' ? '✔ Terminée' : `Étape ${q.step}/${q.totalSteps}`}</span>
-                    <span class="qcard-loc">📍 ${esc(q.where)}</span>
-                  </div>
-                </div>
-              `).join('')}
+                  <div class="qcard-top"><span class="qcat-tag qcat-${x.cat}">${CAT[x.cat] || ''}</span>${x.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}</div>
+                  <div class="qcard-name">${esc(x.name)}</div>
+                  <div class="qcard-sub"><span class="qcard-step">${x.status === 'done' ? '✔ Terminée' : 'En cours'}</span><span class="qcard-loc">${esc(x.since)}</span></div>
+                </div>`).join('')}
             </div>
           </div>
-
-          <!-- Colonne droite: Fiche détaillée -->
           <div class="qcol-detail">
-            ${selQuest ? `
+            ${q ? `
               <div class="qdet-head">
                 <div class="qdet-head-left">
                   <div class="qdet-title-row">
-                    <span class="qcat-tag qcat-${selQuest.cat}">${esc(selQuest.cat === 'main' ? 'QUÊTE PRINCIPALE' : selQuest.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${selQuest.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
-                    ${selQuest.isTracked ? '<span class="qtracked-tag">★ QUÊTE ACTUELLEMENT SUIVIE</span>' : ''}
+                    <span class="qcat-tag qcat-${q.cat}">${CAT[q.cat] || ''}</span>
+                    ${q.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
                   </div>
-                  <div class="qdet-title">${esc(selQuest.name)}</div>
-                  <div class="qdet-giver">Donneur : <b>${esc(selQuest.giver)}</b> · 📍 <i>${esc(selQuest.where)}</i></div>
+                  <div class="qdet-title">${esc(q.name)}</div>
+                  <div class="qdet-giver">${esc(q.giver)} · acceptée ${esc(q.since)}</div>
                 </div>
-                ${selQuest.status !== 'done' ? `
-                  <button type="button" class="qbtn-track${selQuest.isTracked ? ' tracked' : ''}" data-act="track">
-                    ${selQuest.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE CETTE QUÊTE'}
-                  </button>
-                ` : ''}
+                ${q.status !== 'done' ? `<button type="button" class="qbtn-track${q.isTracked ? ' tracked' : ''}" data-act="track">${q.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE'}</button>` : ''}
               </div>
-
-              <!-- Grand Boîtier OÙ ALLER -->
-              <div class="qbox-destination">
-                <div class="qdest-head">
-                  <span class="qdest-pin">📍</span>
-                  <span>OÙ ALLER / PROCHAINE DESTINATION :</span>
-                </div>
-                <div class="qdest-place">${esc(selQuest.destination)}</div>
-                <div class="qdest-hint">${esc(selQuest.direction)}</div>
-              </div>
-
-              <!-- Étapes de la quête -->
-              <div class="qsteps-box">
-                <div class="qsteps-title">ÉTAPES DE LA QUÊTE (${selQuest.step} / ${selQuest.totalSteps})</div>
-                ${selQuest.steps.map((st) => `
-                  <div class="qstep-item${st.done ? ' done' : ''}${st.current ? ' current' : ''}">
-                    <div class="qstep-mark">${st.done ? '☑' : st.current ? '▶' : '◻'}</div>
-                    <div class="qstep-body">
-                      <div class="qstep-txt">${esc(st.desc)}</div>
-                      <div class="qstep-loc">📍 Destination : ${esc(st.destination)}</div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-
-              <!-- Récompenses -->
-              <div class="qreward-box">
-                <span class="qreward-ico">🎁</span>
-                <div><b>RÉCOMPENSE :</b> ${esc(selQuest.reward)}</div>
-              </div>
-            ` : '<div style="padding:30px;color:#8aa0be;text-align:center;">Sélectionne une quête dans la liste de gauche.</div>'}
+              <div class="qdiary">
+                ${q.notes.map((n, i) => `<p class="${i === q.notes.length - 1 ? 'last' : ''}">${esc(n)}</p>`).join('')}
+              </div>` : '<div class="qempty">Le carnet est encore vierge.</div>'}
           </div>
         </div>
-
         <div class="quests-foot">
           <div class="quests-foot-keys">
-            <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
-            <span><kbd>◄</kbd><kbd>►</kbd> Changer d'onglet</span>
-            <span><kbd>ESPACE</kbd> / <kbd>ENTRÉE</kbd> Suivre la quête</span>
-            <span><kbd>X</kbd> / <kbd>ÉCHAP</kbd> Fermer</span>
+            <span><kbd>▲</kbd><kbd>▼</kbd> Choisir</span><span><kbd>◄</kbd><kbd>►</kbd> Onglet</span>
+            <span><kbd>ESPACE</kbd> Suivre dans le HUD</span><span><kbd>ÉCHAP</kbd> Fermer</span>
           </div>
-          <div class="quests-foot-tracked">
-            <span class="qft-label">OBJECTIF SUIVI :</span>
-            <span class="qft-val">${tracked ? `★ ${esc(tracked.name)} (📍 ${esc(tracked.destination)})` : 'Aucun'}</span>
-          </div>
-        </div>
-      `;
-
-      // Clics sur les cartes
-      s.querySelectorAll('.qcard').forEach((card) => {
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = +card.dataset.idx;
-          if (selectedIdx !== idx) {
-            selectedIdx = idx;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clics sur les onglets
-      s.querySelectorAll('.qtab').forEach((tab) => {
-        tab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const t = tab.dataset.tab;
-          if (currentTab !== t) {
-            currentTab = t;
-            selectedIdx = 0;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clic bouton Suivre
-      const trackBtn = s.querySelector('[data-act="track"]');
-      if (trackBtn && selQuest) {
-        trackBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        });
-      }
-
-      // Bouton fermeture
-      const closeBtn = s.querySelector('[data-act="close"]');
-      if (closeBtn) {
-        closeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeScreen();
-        });
-      }
+        </div>`;
+      s.querySelectorAll('.qcard').forEach((c) => c.addEventListener('click', (e) => { e.stopPropagation(); sel = +c.dataset.idx; ui.sound.sfx('blip'); render(); }));
+      s.querySelectorAll('.qtab').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); tab = b.dataset.tab; sel = 0; ui.sound.sfx('blip'); render(); }));
+      s.querySelector('[data-act="track"]')?.addEventListener('click', (e) => { e.stopPropagation(); if (q) { setTrackedQuest(game, q.id); ui.sound.sfx('select'); game.hud?.update(true); render(); } });
+      s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => { e.stopPropagation(); close(); });
     };
-
-    const closeScreen = () => {
-      pop();
-      s.remove();
-      ui.sound.sfx('cancel');
-      resolve();
-    };
-
+    const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); };
     const pop = ui.input.push((k) => {
-      const allQuests = getAllQuests(game);
-      let filtered = allQuests;
-      if (currentTab === 'active') filtered = allQuests.filter((q) => q.status === 'active');
-      else if (currentTab === 'done') filtered = allQuests.filter((q) => q.status === 'done');
-      if (!filtered.length) filtered = allQuests;
-
-      if (k === 'up') {
-        selectedIdx = (selectedIdx - 1 + filtered.length) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'down') {
-        selectedIdx = (selectedIdx + 1) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'left') {
-        currentTab = currentTab === 'all' ? 'done' : currentTab === 'done' ? 'active' : 'all';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'right') {
-        currentTab = currentTab === 'active' ? 'done' : currentTab === 'done' ? 'all' : 'active';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'a') {
-        const selQuest = filtered[selectedIdx];
-        if (selQuest && selQuest.status !== 'done') {
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        }
-      } else if (k === 'b') {
-        closeScreen();
-      }
+      const { shown } = lists();
+      if (k === 'up' && shown.length) sel = (sel - 1 + shown.length) % shown.length;
+      else if (k === 'down' && shown.length) sel = (sel + 1) % shown.length;
+      else if (k === 'left') { tab = tab === 'all' ? 'done' : tab === 'done' ? 'active' : 'all'; sel = 0; }
+      else if (k === 'right') { tab = tab === 'active' ? 'done' : tab === 'done' ? 'all' : 'active'; sel = 0; }
+      else if (k === 'a') { const q = shown[sel]; if (!q || q.status === 'done') return; setTrackedQuest(game, q.id); game.hud?.update(true); ui.sound.sfx('select'); render(); return; }
+      else if (k === 'b' || k === 'quests') { close(); return; }
+      else return;
+      ui.sound.sfx('blip'); render();
     });
-
+    syncJournal(game);
     render();
   });
 }
-

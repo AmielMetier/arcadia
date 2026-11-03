@@ -250,6 +250,26 @@ export class Battle {
     }
     return { type: 'move', id: m.moves[pick.k].id, slot: pick.k };
   }
+  /** dégâts possibles d'une attaque du côté a sur le côté d, en % des PV max de la cible (sans coup critique),
+   *  sans toucher au générateur aléatoire (les combats en réseau restent identiques des deux côtés) */
+  damagePreview(a, d, moveId) {
+    const mv = MOVES[moveId], T = this.act(d); if (!mv || !T || !T.stats) return null;
+    if (mv.c === 'status' && !mv.m?.u) return null;
+    const u = mv.m?.u, max = T.stats[0];
+    const pct = (lo, hi) => ({ lo: Math.max(0, Math.floor(lo * 1000 / max) / 10), hi: Math.min(999, Math.ceil(hi * 1000 / max) / 10), lo0: lo, hi0: hi, ko: hi >= T.hp, sure: lo >= T.hp });
+    const type = this.moveType(a, mv), eff = typeEff(type, SPECIES[T.sp].t);
+    if (eff === 0) return { lo: 0, hi: 0, eff: 0 };
+    const m = this.act(a);
+    const fixed = u === 'dragon-rage' ? 40 : u === 'sonic-boom' ? 20 : u === 'seismic-toss' || u === 'night-shade' ? m.lvl : u === 'super-fang' ? Math.max(1, Math.floor(T.hp / 2)) : u === 'endeavor' ? Math.max(0, T.hp - m.hp) : null;
+    if (u === 'psywave') return { ...pct(Math.floor(m.lvl * 0.5), Math.floor(m.lvl * 1.5)), eff: 1 };
+    if (u === 'counter' || u === 'mirror-coat' || u === 'splash' || mv.m?.cat === 9) return null;
+    if (fixed != null) return { ...pct(fixed, fixed), eff: 1 };
+    let p = u === 'magnitude' ? 70 : u === 'present' ? 40 : this.movePower(a, d, mv);
+    if (!p) return null;
+    const x = mv.m || {}, hits = x.h0 ? [x.h0, x.h1 || x.h0] : [1, 1];
+    const lo = this.damageCore(a, d, mv, p, type, false, 0.85) * hits[0], hi = this.damageCore(a, d, mv, p, type, false, 1) * hits[1];
+    return { ...pct(lo, hi), eff };
+  }
   estimate(a, d, mv) {
     const p = this.movePower(a, d, mv); if (!p) return mv.m?.u ? this.act(d).stats[0] * 0.2 : 0;
     const t = this.moveType(a, mv);
@@ -737,8 +757,10 @@ export class Battle {
     return true;
   }
 
+  /** ordre des effets de fin de tour (brûlure, poison, Vampigraine, piège) : redéfini pour les combats entre joueurs */
+  eotOrder() { return [0, 1]; }
   endOfTurn() {
-    for (const i of [0, 1]) {
+    for (const i of this.eotOrder()) {
       const m = this.act(i), v = this.sides[i].v;
       v.protect = false;
       if (isFainted(m)) continue;

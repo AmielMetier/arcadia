@@ -7,6 +7,7 @@ import { T, walkable } from './tiles.js';
 import { GameMap, carveRoute, along, nearestWalkable, rng } from './mapgen.js';
 import { room, caveMap } from './interiors.js';
 import { ITEMS } from '../core/items.js';
+import { enrichirTout } from './rencontres.js';
 
 /* ---------------- objets de quête ---------------- */
 Object.assign(ITEMS, {
@@ -31,6 +32,7 @@ const ENC = {
   magma: [[322, 52, 56, 18], [218, 52, 56, 15], [240, 52, 55, 8], [126, 55, 58, 5], [324, 53, 57, 10], [75, 53, 57, 10], [228, 52, 56, 10], [631, 54, 57, 8], [636, 55, 57, 3], [667, 53, 56, 8]],
   caverne: [[219, 58, 62, 15], [323, 60, 63, 10], [229, 58, 62, 10], [75, 58, 61, 15], [76, 61, 64, 5], [112, 60, 63, 8], [554, 58, 61, 10], [327, 58, 61, 6], [632, 60, 62, 6]],
 };
+enrichirTout(ENC);
 
 const key = (x, y) => x + ',' + y;
 const night = (g) => { const h = g.hour(); return h >= 20 || h < 5; };

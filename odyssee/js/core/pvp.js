@@ -55,6 +55,8 @@ export class PvpBattle extends Battle {
     this.need = [false, false]; // qui doit envoyer un Pokémon après un K.O.
   }
 
+  /** fin de tour dans le même ordre sur les deux écrans : d'abord le côté de celui qui a lancé le défi */
+  eotOrder() { return [this.canon, 1 - this.canon]; }
   /** même tirage des deux côtés : on désigne le premier par son côté « canonique » */
   tie(p) {
     const first = this.rng() < 0.5 ? this.canon : 1 - this.canon;

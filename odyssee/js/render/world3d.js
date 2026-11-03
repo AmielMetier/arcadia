@@ -45,6 +45,7 @@ function frontDepth(mat, zFront) {
   mat.customProgramCacheKey = () => 'frontDepth';
   return mat;
 }
+const DECALS = new Set(['fleche', 'vent', 'courant', 'dalle', 'tp', 'socle']);
 const WIDE_DECO = new Set(['healer', 'sofa', 'bench', 'startertable', 'fireplace', 'rug']);
 function screenSprite(mat) {
   mat.onBeforeCompile = (sh) => {
@@ -73,6 +74,8 @@ const CH = 16;
 export const CHAR_ROWS = { ...((SPRITES.chars && SPRITES.chars.rows) || {}) };
 // taille d'une case de la planche des personnages (32 × 32 depuis la version 2 de la bible)
 const CW = SPRITES.chars?.w || 24, CHH = SPRITES.chars?.h || 32, CD = SPRITES.chars?.d || 1;
+// personnages des Terres du Sud en attendant leur dessin : un sosie proche
+const PAIRS = 6;   // tenues d'autres joueurs affichables en même temps
 const CHAR_ALIAS = { red: 'player_m', green: 'player_f', prof: 'scientifique', clerk: 'vendeur', youngster: 'gamin', lass: 'habitante', sailor: 'marin', hiker: 'montagnard', cooltrainer_f: 'habitante' };
 const DIR_COL = { down: 0, left: 1, right: 2, up: 3 };
 
@@ -82,6 +85,71 @@ function tex(canvasOrImg) {
   t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t;
 }
 const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+/** reliefs des grottes : hauteur à l'écran (en cases) du haut de chaque gradin, la première marche est la plus haute */
+const RLEVEL = [0, 0.9, 1.4, 1.8].map((h) => h * Math.tan(EL)), RPX = (k) => (RLEVEL[k + 1] - RLEVEL[k]) / Math.tan(EL);
+/** gradin de chaque case de roche : distance (en cases) au sol praticable le plus proche, plafonnée à 3 */
+function caveTiers(m) {
+  const n = m.w * m.h, d = new Uint8Array(n).fill(255), q = [];
+  for (let i = 0; i < n; i++) if (m.t[i] !== T.CAVEWALL) { d[i] = 0; q.push(i); }
+  for (let h = 0; h < q.length; h++) {
+    const i = q[h], x = i % m.w, y = (i / m.w) | 0;
+    for (const [a, b] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (a < 0 || b < 0 || a >= m.w || b >= m.h) continue;
+      const j = b * m.w + a; if (d[j] === 255) { d[j] = d[i] + 1; q.push(j); }
+    }
+  }
+  // une paroi ne monte pas vers la caméra : une case de roche ne dépasse pas le nombre de cases de roche au-dessus d'elle
+  // (sinon le dessus d'un gradin cacherait les pieds de qui marche juste au nord)
+  for (let x = 0; x < m.w; x++) {
+    let run = 3; // le bord de la carte compte comme de la roche
+    for (let y = 0; y < m.h; y++) {
+      const i = y * m.w + x;
+      if (m.t[i] !== T.CAVEWALL) { run = 0; continue; }
+      d[i] = Math.min(3, d[i] === 255 ? 3 : d[i], run); run++;
+    }
+  }
+  return d;
+}
+/** roche et sol d'une grotte selon le lieu : grottes marines, magma, glace, montagne, sinon terre */
+export function caveBiome(m) {
+  const id = m.id || '', nm = (m.name || '').toLowerCase();
+  if (m.biome) return m.biome;
+  if (/marees|maree|tourbillon|sanctuaire/.test(id) || /marée|tourbillon/.test(nm)) return 'mer';
+  if (/magma/.test(id) || /magma|volcan/.test(nm)) return 'magma';
+  if (/givr|glace|neige/.test(id + nm)) return 'glace';
+  if (/victoire|mont/.test(id + nm)) return 'montagne';
+  return 'terre';
+}
+/** clé de tuile de relief : sol ('s', variantes pondérées) */
+function reliefKey(A, b, kind, v) {
+  const i = v < 0.42 ? 0 : v < 0.8 ? 1 : v < 0.93 ? 2 : 3, k = `r${kind}_${b}_${i}`;
+  return A[k] ? k : A[`r${kind}_${b}_0`] ? `r${kind}_${b}_0` : null;
+}
+
+/** bloc de roche (monticule des entrées de grottes) : faces sud / est / ouest découpées en cases de roche de la hauteur
+ *  d'un gradin, dessus en roche ; y0 → y1 : bas et haut du bloc */
+function rockBox(G, A, bio, x0, z0, x1, z1, y0, y1, seed, topCell = null) {
+  const H = (y1 - y0) / Math.tan(EL), rows = Math.max(1, Math.round(H / 0.65)), dh = (y1 - y0) / rows;
+  const cell = (i, j, k) => { const c = A[`rw_${bio}_${Math.floor(hash(i * 7 + seed, j * 13 + k) * 3)}`] || A[`rw_${bio}_0`]; return [c[0], c[1], c[2], c[1] + (c[3] - c[1]) * Math.min(1, dh / Math.tan(EL))]; };
+  for (let j = 0; j < rows; j++) {
+    const ya = y0 + j * dh, yb = ya + dh, sh = 0.82 + 0.06 * j + 0.04 * seed;
+    for (let x = x0; x < x1 - 1e-6; x += 1) {
+      const xe = Math.min(x1, x + 1), c = cell(Math.floor(x * 2), j, 1), cu = c[0] + (c[2] - c[0]) * (xe - x);
+      G.quad([x, ya, z1], [xe, ya, z1], [xe, yb, z1], [x, yb, z1], c[0], c[1], cu, c[3], sh);
+    }
+    for (let z = z0; z < z1 - 1e-6; z += 1) {
+      const ze = Math.min(z1, z + 1), c = cell(Math.floor(z * 2), j, 2), cu = c[0] + (c[2] - c[0]) * (ze - z);
+      G.quad([x1, ya, ze], [x1, ya, z], [x1, yb, z], [x1, yb, ze], c[0], c[1], cu, c[3], 0.66);
+      G.quad([x0, ya, z], [x0, ya, ze], [x0, yb, ze], [x0, yb, z], c[0], c[1], cu, c[3], 0.66);
+    }
+  }
+  const t = topCell || A[`rt_${bio}_0`];
+  for (let z = z0; z < z1 - 1e-6; z += 1) for (let x = x0; x < x1 - 1e-6; x += 1) {
+    const xe = Math.min(x1, x + 1), ze = Math.min(z1, z + 1);
+    flat(G, x, z, xe, ze, y1, [t[0], t[1], t[0] + (t[2] - t[0]) * (xe - x), t[1] + (t[3] - t[1]) * (ze - z)], 0.95 + 0.03 * seed);
+  }
+}
 
 /** accumulateur de géométrie (quads indexés) */
 class Geo {
@@ -161,13 +229,36 @@ function kitStyle(b, map) {
 export class WorldView {
   constructor(renderer, charsImg, art = {}) {
     this.renderer = renderer;
+    // Pokémon qui suivent le dresseur (img/suiveurs.png) : leurs lignes s'ajoutent sous celles des personnages
+    if (charsImg && art.suiveurs && SPRITES.suiveurs) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + art.suiveurs.height;
+      const x = c.getContext('2d'); x.drawImage(charsImg, 0, 0); x.drawImage(art.suiveurs, 0, charsImg.height);
+      const base = Math.round(charsImg.height / CHH);
+      for (const [sp, r] of Object.entries(SPRITES.suiveurs.rows)) CHAR_ROWS['poke:' + sp] = base + r;
+      charsImg = c;
+    }
+    // une rangée de plus, tout en bas : l'apparence du joueur, composée selon sa tenue (render/tenue.js)
+    if (charsImg) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + CHH;
+      c.getContext('2d').drawImage(charsImg, 0, 0);
+      CHAR_ROWS.joueur = Math.round(charsImg.height / CHH);
+      charsImg = c;
+    }
+    // et quelques rangées pour les tenues des autres joueurs
+    if (charsImg) {
+      const c = document.createElement('canvas'); c.width = charsImg.width; c.height = charsImg.height + CHH * PAIRS;
+      c.getContext('2d').drawImage(charsImg, 0, 0);
+      for (let i = 0; i < PAIRS; i++) CHAR_ROWS['pair' + i] = Math.round(charsImg.height / CHH) + i;
+      charsImg = c;
+    }
+    this.charsCanvas = charsImg;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 1, 400);
     const A = buildAtlas(), N = buildAnimAtlas(), S = buildSprites();
     if (art.sprites) applySpriteImages(S, art.sprites, art.dens);
     this.A = A; this.N = N; this.S = S;
     this.charRows = charsImg ? Math.round(charsImg.height / CHH) : 10;
-    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(charsImg);
+    this.texA = tex(A.canvas); this.texN = tex(N.canvas); this.texS = tex(S.canvas); this.texC = tex(this.packChars());
     const mk = (map, o = {}) => new THREE.MeshBasicMaterial({ map, vertexColors: true, ...o });
     this.mat = {
       ground: mk(this.texA), anim: mk(this.texN), sprite: screenSprite(mk(this.texS, { alphaTest: 0.5, side: THREE.DoubleSide })),
@@ -208,6 +299,7 @@ export class WorldView {
     this.map = map; this.root = new THREE.Group(); this.scene.add(this.root);
     this.chunks = new Map(); this.glows = new THREE.Group(); this.root.add(this.glows);
     this.decoAt = new Map(); for (const d of map.deco) this.decoAt.set(d.x + ',' + d.y, d);
+    this.tiers = map.outdoor ? null : caveTiers(map); this.biome = caveBiome(map);
     this.scene.background = new THREE.Color(map.outdoor ? '#1d4f2a' : '#0c0a10');
     if (map.id === 'monde') this.scene.background = new THREE.Color('#1d4f2a');
     this.buildBuildings();
@@ -227,6 +319,12 @@ export class WorldView {
     const tt = groundOf(t);
     const deco = this.decoAt.get(x + ',' + y);
     if (deco?.k === 'carpet') return { c: A.mat };
+    if (deco?.k === 'glace') return { c: A.gl_ice };
+    if (deco?.k === 'asph') return { c: A['asph' + (deco.v ? '_' + deco.v : '')] || A.asph };
+    if (deco?.k === 'sable') return { c: A.gl_sable };
+    if (deco?.k === 'eau') return { anim: this.N.cells.water15 };
+    if (t === T.LAVA) return { anim: this.N.cells.lava };
+    if (t === T.BARRIER_R || t === T.BARRIER_B) return { c: A['floor_' + m.floor] || A.floor_wood };
     const isPathish = (q) => [T.PATH, T.PAVE, T.SAND, T.BUILD, T.DOOR, T.BRIDGE, T.SIGN, T.BLOCK, T.MAT].includes(q);
     if (SOL16 && m.outdoor) {
       if (tt === T.PATH || tt === T.PAVE || tt === T.DOOR || tt === T.BUILD || tt === T.SAND) return { c: A[grassKey] };
@@ -252,9 +350,12 @@ export class WorldView {
       case T.SAND: return { c: A['sand' + edge((q) => q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.PINE)] };
       case T.WATER: return { anim: this.N.cells['water' + mask((q) => q === T.WATER || q === T.BRIDGE)] };
       case T.BRIDGE: { const ns = m.get(x - 1, y) === T.WATER || m.get(x + 1, y) === T.WATER; return { anim: this.N.cells.water15, bridge: ns ? A.bridge : A.bridgeEW || A.bridge }; }
-      case T.FLOWER: return { anim: this.N.cells['flower' + Math.floor(v * 4)] || this.N.cells.flower0 };
+      // une couleur par massif (par carré de 3 × 3 cases), avec parfois une fleur d'une autre couleur
+      case T.FLOWER: { const nf = this.N.cells.flower5 ? 6 : 4, pv = hash(Math.floor(x / 3) + 101, Math.floor(y / 3) + 37), k = v < 0.85 ? Math.floor(pv * nf) : Math.floor(v * 97) % nf; return { anim: this.N.cells['flower' + k] || this.N.cells.flower0 }; }
       case T.LEDGE: return { c: A.ledge }; case T.LEDGE_E: return { c: A.ledgeE }; case T.LEDGE_W: return { c: A.ledgeW };
-      case T.CAVE: case T.CAVEWALL: return { c: A['cave' + (v < 0.5 ? 0 : 1)] };
+      case T.CAVEWALL: if (this.tiers && A[`rt_${this.biome}_0`] && !this.tierAt(x, y)) return { c: A[`rt_${this.biome}_${v < 0.7 ? 0 : 1}`], shade: 0.95 };
+      // falls through
+      case T.CAVE: { const k = reliefKey(A, this.biome, 's', v); return { c: k ? A[k] : A['cave' + (v < 0.5 ? 0 : 1)] }; }
       case T.CAVEDOOR: return { c: A.cavestairs };
       case T.ASH: return { c: A['ash' + (v < 0.5 ? 0 : 1)] };
       case T.SNOW: return { c: A['snow' + (v < 0.5 ? 0 : 1)] };
@@ -271,6 +372,7 @@ export class WorldView {
     let t = m.get(x, y); if (t === T.SIGN || t === T.BLOCK) t = m.underAt(x, y) ?? T.GRASS;
     const th = m.zoneAt(x, y)?.theme;
     if (t === T.PATH) return th === 'snow' ? 'neige' : th === 'volcanic' ? 'cendre' : 'chemin';
+    if (t === T.PAVE && this.decoAt.get(x + ',' + y)?.k === 'asph') return 'asph';   // chaussée : son propre jeu (pas de raccord)
     if (t === T.PAVE || t === T.DOOR || t === T.BUILD) return th === 'snow' ? 'neige' : 'pave';
     if (t === T.SAND) return 'sable';
     if (t === T.DARKTALL) return 'herbes_bois';
@@ -302,17 +404,56 @@ export class WorldView {
     }
   }
 
+  /** paroi de grotte en gradins (comme HeartGold / SoulSilver) : chaque case de roche monte d'un gradin par case
+   *  qui l'éloigne du sol praticable (trois au plus) ; une face de roche par gradin là où le voisin est plus bas */
+  reliefCell(G, x, y) {
+    const m = this.map, A = this.A.cells, b = this.biome, tier = this.tierAt(x, y), h = Math.max(RLEVEL[tier], 0.006);
+    // face : le haut de la tuile de roche, sur la hauteur du gradin (un pixel de tuile = un pixel d'écran)
+    const face = (k, i) => { const c = A[`rw_${b}_${Math.floor(hash(x * 3 + k, y * 5 + i) * 3)}`] || A[`rw_${b}_0`]; return [c[0], c[1], c[2], c[1] + (c[3] - c[1]) * RPX(i)]; };
+    let edge = false;
+    for (const [dx, dy, side] of [[0, 1, 's'], [1, 0, 'e'], [-1, 0, 'w']]) {
+      const hn = m.get(x + dx, y + dy) === T.CAVEWALL ? this.tierAt(x + dx, y + dy) : 0;
+      if (side === 's' && hn < tier) edge = true;
+      for (let k = hn; k < tier; k++) {
+        const c = face(side.charCodeAt(0), k), y0 = RLEVEL[k], y1 = RLEVEL[k + 1];
+        if (side === 's') G.quad([x, y0, y + 1], [x + 1, y0, y + 1], [x + 1, y1, y + 1], [x, y1, y + 1], c[0], c[1], c[2], c[3], 0.86 + k * 0.05);
+        else if (side === 'e') G.quad([x + 1, y0, y + 1], [x + 1, y0, y], [x + 1, y1, y], [x + 1, y1, y + 1], c[0], c[1], c[2], c[3], 0.7);
+        else G.quad([x, y0, y], [x, y0, y + 1], [x, y1, y + 1], [x, y1, y], c[0], c[1], c[2], c[3], 0.7);
+      }
+    }
+    // dessus : liseré clair au bord d'une paroi, roche rugueuse ailleurs ; plus c'est haut, plus c'est sombre (le fond de la grotte)
+    if (!tier) return;   // gradin zéro : roche au ras du sol, dessinée avec le sol
+    const top = (edge && A[`rr_${b}_0`]) || A[`rt_${b}_${hash(x + 11, y + 13) < 0.7 ? 0 : 1}`] || A[`rt_${b}_0`];
+    flat(G, x, y, x + 1, y + 1, h, top, 1.04 - tier * 0.12);
+  }
+  /** détail posé sur une case d'herbe (ou rien) : selon la zone (forêt, neige, cendre) et un tirage fixe par case */
+  detailAt(x, y) {
+    const v = hash(x * 3 + 17, y * 5 + 29); if (v > 0.24) return null;
+    const m = this.map, th = m.zoneAt(x, y)?.theme;
+    if (th === 'snow' || th === 'volcanic') return null;
+    // pas sur une case qui touche un chemin, une maison ou l'eau (les bords y sont déjà dessinés)
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = m.get(x + dx, y + dy); if (q !== T.GRASS && q !== T.TALL && q !== T.TREE && q !== T.FLOWER && q !== T.FENCE) return null; }
+    const L = th === 'forest' ? ['touffe', 'feuilles', 'champignons', 'brindilles', 'touffe3', 'trefle'] : ['touffe', 'touffe2', 'trefle', 'cailloux', 'paquerettes', 'boutons', 'touffe3', 'touffe', 'trefle', 'brindilles'];
+    return L[Math.floor(hash(x + 503, y + 211) * L.length)];
+  }
+  tierAt(x, y) { const m = this.map; if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 3; return this.tiers[y * m.w + x] || 0; }
+
   buildChunk(ci, cj) {
     const m = this.map, A = this.A.cells, S = this.S.rects;
-    const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo();
+    const G = new Geo(), N = new Geo(), P = new Geo(), Wl = new Geo(), Sh = new Geo(), O0 = new Geo();
     const glows = [];
     const x0 = ci * CH, y0 = cj * CH;
     const wallH = 2 * Math.tan(EL), caveH = 1.25 * Math.tan(EL);
     for (let y = y0; y < Math.min(m.h, y0 + CH); y++) for (let x = x0; x < Math.min(m.w, x0 + CH); x++) {
       const t = m.get(x, y), g = this.groundCell(x, y), v = hash(x + 7, y + 3);
-      if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c);
+      if (g.c) flat(G, x, y, x + 1, y + 1, 0, g.c, g.shade);
       if (g.anim) flat(N, x, y, x + 1, y + 1, 0, g.anim);
       if (g.bridge) flat(G, x - 0.02, y, x + 1.02, y + 1, 0.012, g.bridge);
+      // détails de l'herbe (touffes, trèfles, cailloux, fleurettes…) : une case d'herbe sur six environ, jamais deux
+      // fois le même détail côte à côte ; des feuilles mortes et des champignons en forêt
+      if (m.outdoor && (t === T.GRASS || t === T.FENCE) && this.detailAt(x, y)) {
+        const k = this.detailAt(x, y); if (A['dec_' + k]) flat(O0, x, y, x + 1, y + 1, 0.004, A['dec_' + k]);
+      }
       const zone = m.outdoor ? m.zoneAt(x, y) : null, theme = zone?.theme;
       // décor en volume
       if (t === T.TREE || t === T.PINE) {
@@ -332,7 +473,11 @@ export class WorldView {
           billboard(P, cx, cz, SW(r), SH(r), r, 0, vb > 0.5, 1);
           flat(Sh, cx - 0.75, cz - 0.3, cx + 0.75, cz + 0.3, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]);
         }
-      } else if (t === T.FENCE) { const r = S.fence; billboard(P, x + 0.5, y + 0.55, SW(r), SH(r), r); }
+      } else if (t === T.FENCE) {
+        // barrière : de face (rangée horizontale) ou vue dans l'axe (colonne nord-sud, le long d'un chemin vertical)
+        const vert = S.fence_v && m.get(x - 1, y) !== T.FENCE && m.get(x + 1, y) !== T.FENCE && (m.get(x, y - 1) === T.FENCE || m.get(x, y + 1) === T.FENCE || m.get(x - 1, y) === T.PATH || m.get(x + 1, y) === T.PATH);
+        const r = vert ? (m.get(x, y - 1) === T.FENCE ? S.fence_v : S.fence_v0 || S.fence_v) : S.fence; billboard(P, x + 0.5, y + (vert ? 0.75 : 0.6), SW(r), SH(r), r);
+      }
       else if (t === T.ROCK) { const r = S.rock; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
       else if (t === T.BUSH) { const r = S.bush; billboard(P, x + 0.5, y + 0.6, SW(r), SH(r), r); }
       else if (t === T.CUT) { const r = S.cuttree; billboard(P, x + 0.5, y + 0.62, SW(r), SH(r), r); flat(Sh, x + 0.05, y + 0.4, x + 0.95, y + 0.85, 0.015, [S.shadow.u0, S.shadow.v0, S.shadow.u1, S.shadow.v1]); }
@@ -343,12 +488,21 @@ export class WorldView {
         if (y <= 1) { const south = m.get(x, y + 1) !== T.WALL; box(Wl, x, y, x + 1, y + 1, wallH, A[m.wallStyle] || A.wall_in, A.walltop, A.walltop, { south, east: false, west: false }); }
         else flat(Wl, x, y, x + 1, y + 1, 0.01, A.walltop);
       } else if (t === T.CAVEWALL) {
-        const south = m.get(x, y + 1) !== T.CAVEWALL, east = m.get(x + 1, y) !== T.CAVEWALL, west = m.get(x - 1, y) !== T.CAVEWALL;
-        if (south || east || west || m.get(x, y - 1) !== T.CAVEWALL) box(Wl, x, y, x + 1, y + 1, caveH, A.cavewall, A.cavetop, A.cavewall, { south, east, west });
-        else flat(Wl, x, y, x + 1, y + 1, caveH, A.cavetop);
+        if (this.tiers && A['rw_' + this.biome + '_0']) this.reliefCell(Wl, x, y);
+        else {
+          const south = m.get(x, y + 1) !== T.CAVEWALL, east = m.get(x + 1, y) !== T.CAVEWALL, west = m.get(x - 1, y) !== T.CAVEWALL;
+          if (south || east || west || m.get(x, y - 1) !== T.CAVEWALL) box(Wl, x, y, x + 1, y + 1, caveH, A.cavewall, A.cavetop, A.cavewall, { south, east, west });
+          else flat(Wl, x, y, x + 1, y + 1, caveH, A.cavetop);
+        }
+      }
+      else if (t === T.BARRIER_R || t === T.BARRIER_B) {
+        const g = t === T.BARRIER_R ? 'r' : 'b';
+        box(Wl, x + 0.08, y + 0.35, x + 0.92, y + 0.9, 0.62 * Math.tan(EL), A['barr_' + g], A['barr_' + g + '_top'], A['barr_' + g]);
       }
       // décor posé (lampadaires, panneaux, meubles…)
       const d = this.decoAt.get(x + ',' + y);
+      // décalques des arènes au sol : flèches, souffles, courants, dalles, téléporteurs, socles des barrières
+      if (d && DECALS.has(d.k)) { const k = 'dec_' + d.k + (d.dir ? '_' + d.dir : d.g ? '_' + d.g : ''); if (A[k]) flat(O0, x, y, x + 1, y + 1, 0.005, A[k]); }
       if (d) {
         if (d.k === 'counter') {
           box(Wl, x, y + 0.1, x + 1, y + 1, 0.75 * Math.tan(EL), A[d.front] || A.counterfront, A.counter, A.counter, { east: m.get(x + 1, y) !== T.BLOCK, west: m.get(x - 1, y) !== T.BLOCK });
@@ -370,7 +524,7 @@ export class WorldView {
     if (SOL16 && m.outdoor) this.wangChunk(O, x0, y0);
     const grp = new THREE.Group();
     const add = (geo, mat, order = 0) => { const g = geo.build(); if (g) { const me = new THREE.Mesh(g, mat); me.renderOrder = order; me.frustumCulled = false; grp.add(me); } };
-    add(G, this.mat.ground); add(N, this.mat.anim); add(O, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
+    add(G, this.mat.ground); add(N, this.mat.anim); add(O, this.mat.overlay); add(O0, this.mat.overlay); add(Sh, this.mat.shadow, 1); add(P, this.mat.sprite); add(Wl, this.mat.walls);
     for (const [gx, gz, gy] of glows) {
       const me = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), this.matGlow); me.position.set(gx, gy, gz + 0.05); me.rotation.x = -0.3; me.userData.lampGlow = true; this.glows.add(me);
     }
@@ -408,8 +562,16 @@ export class WorldView {
       if (b.kind === 'cave') {
         // monticule rocheux avec une ouverture sombre
         const geo = new Geo(), A = this.A.cells;
-        const h = 1.6 * Math.tan(EL);
-        box(geo, b.x, b.y, b.x + b.w, b.y + b.d, h, A.cliffplain, A.cliff, A.cliffplain);
+        const th = this.map.zoneAt?.(b.x, b.y)?.theme, bio = th === 'snow' ? 'glace' : th === 'volcanic' ? 'magma' : th === 'beach' || th === 'sea' ? 'mer' : 'montagne';
+        if (A[`rw_${bio}_0`]) {
+          // monticule en gradins de roche (comme les entrées de grottes de HeartGold / SoulSilver) : trois marches en retrait
+          // dessus des marches : le sol du coin (herbe, neige, cendre), comme les falaises herbues des jeux DS
+          const top = th === 'snow' ? A.snow0 : th === 'volcanic' ? A.ash0 : A.grass1 || A.grass0;
+          const T1 = 1.3 * Math.tan(EL), T2 = 2.1 * Math.tan(EL), T3 = 2.8 * Math.tan(EL);
+          rockBox(geo, A, bio, b.x - 0.35, b.y + 0.5, b.x + b.w + 0.35, b.y + b.d, 0, T1, 1, top);
+          rockBox(geo, A, bio, b.x + 0.15, b.y + 0.1, b.x + b.w - 0.15, b.y + b.d - 0.5, T1, T2, 2, top);
+          rockBox(geo, A, bio, b.x + 0.8, b.y - 0.2, b.x + b.w - 0.8, b.y + b.d - 1.0, T2, T3, 3, top);
+        } else box(geo, b.x, b.y, b.x + b.w, b.y + b.d, 1.6 * Math.tan(EL), A.cliffplain, A.cliff, A.cliffplain);
         const cm = frontDepth(new THREE.MeshBasicMaterial({ map: this.texA, vertexColors: true }), zf); this.tinted.push(cm); cm.color.copy(this.tint);
         const mesh = new THREE.Mesh(geo.build(), cm); g.add(mesh);
         const holeW = 1.6, holeH = 1.15 * Math.tan(EL);
@@ -423,7 +585,7 @@ export class WorldView {
       const sd = T3(`s${ks}:${b.d}:${b.h}`, () => sideWall(ks, b.d, b.h));
       // toit à deux pans, assez pentu pour qu'on voie surtout le pan avant (comme sur DS) ; toit plat pour les
       // centres, boutiques, arènes et la Ligue
-      const flatRoof = b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
+      const flatRoof = b.flat || b.style === 'center' || b.style === 'mart' || b.style === 'gym' || b.style === 'league';
       const rh = flatRoof ? 0.35 : Math.min(2.2, 0.55 * b.d);
       // rangées de cellules d'un pan : sa hauteur à l'écran, en cases
       const rows = Math.max(1, Math.round(b.d / 2 + o + rh * 0.7));
@@ -526,8 +688,9 @@ export class WorldView {
   setFrame(a, sprite, dir, step) {
     const row = CHAR_ROWS[sprite] ?? CHAR_ROWS[CHAR_ALIAS[sprite]] ?? 0, col = DIR_COL[dir] * 3 + (step === 0 ? 1 : step === 1 ? 0 : 2);
     const k = row * 100 + col; if (a.frame === k) return; a.frame = k;
-    const H = this.charRows * CHH;
-    const u0 = col * CW / (12 * CW), u1 = (col + 1) * CW / (12 * CW), v0 = row * CHH / H, v1 = (row + 1) * CHH / H;
+    // la planche est rangée en deux colonnes (texture moins haute : les téléphones plafonnent souvent à 4096 px)
+    const half = this.charHalf, blk = row >= half ? 1 : 0, pr = row - blk * half;
+    const u0 = (blk * 12 + col) / 24, u1 = (blk * 12 + col + 1) / 24, v0 = pr / half, v1 = (pr + 1) / half;
     const uv = a.mesh.geometry.attributes.uv; uv.setXY(0, u0, v0); uv.setXY(1, u1, v0); uv.setXY(2, u0, v1); uv.setXY(3, u1, v1); uv.needsUpdate = true;
   }
   place(a, x, y, hop = 0, inGrass = false) {
@@ -570,6 +733,42 @@ export class WorldView {
     this.root.add(mesh); this.root.add(shadow); this.actors.set(id, a);
     return a;
   }
+  /** planche des personnages pour la carte graphique : les rangées en deux colonnes côte à côte */
+  packChars() {
+    const L = this.charsCanvas; if (!L) { this.charHalf = Math.ceil(this.charRows / 2); return L; }
+    const half = this.charHalf = Math.ceil(this.charRows / 2);
+    const c = this.charsPacked = document.createElement('canvas'); c.width = L.width * 2; c.height = half * CHH;
+    const x = c.getContext('2d'); x.drawImage(L, 0, 0, L.width, half * CHH, 0, 0, L.width, half * CHH);
+    x.drawImage(L, 0, half * CHH, L.width, L.height - half * CHH, L.width, 0, L.width, L.height - half * CHH);
+    return c;
+  }
+  /** recopie une rangée de la planche dans la texture */
+  packRow(r) {
+    const L = this.charsCanvas, c = this.charsPacked, half = this.charHalf, blk = r >= half ? 1 : 0, x = c.getContext('2d');
+    x.clearRect(blk * L.width, (r - blk * half) * CHH, L.width, CHH);
+    x.drawImage(L, 0, r * CHH, L.width, CHH, blk * L.width, (r - blk * half) * CHH, L.width, CHH);
+    this.texC.needsUpdate = true;
+  }
+  /** pose la rangée composée du joueur (768 × 64) dans la planche des personnages */
+  setJoueur(row) {
+    const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS.joueur * CHH;
+    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y);
+    this.packRow(CHAR_ROWS.joueur);
+  }
+  /** rangée d'un autre joueur pour sa tenue (code court) : composée une fois, gardée tant qu'elle sert ; null si plus de place */
+  pairSprite(code, composer) {
+    const P = this.pairs || (this.pairs = new Map());
+    if (P.has(code)) { const e = P.get(code); e.t = performance.now(); return e.key; }
+    let slot = -1;
+    for (let i = 0; i < PAIRS; i++) if (![...P.values()].some((e) => e.i === i)) { slot = i; break; }
+    if (slot < 0) { let old = null; for (const [k, e] of P) if (!old || e.t < old[1].t) old = [k, e]; if (performance.now() - old[1].t < 4000) return null; slot = old[1].i; P.delete(old[0]); }
+    const row = composer(); if (!row) return null;
+    const c = this.charsCanvas, x = c.getContext('2d'), y = CHAR_ROWS['pair' + slot] * CHH;
+    x.clearRect(0, y, c.width, CHH); x.drawImage(row, 0, y); this.packRow(CHAR_ROWS['pair' + slot]);
+    const e = { i: slot, key: 'pair' + slot, t: performance.now() }; P.set(code, e); return e.key;
+  }
+  /** le modèle de base d'un genre (pour composer une tenue) */
+  baseDe(genre) { const r = CHAR_ROWS['base_' + genre]; return r == null ? null : { src: this.charsCanvas, sx: 0, sy: r * CHH }; }
   removeActor(id) { const a = this.actors.get(id); if (a) { a.dispose(); this.actors.delete(id); } }
   /** position à l'écran (pixels de la page) d'un point de la carte, à h pixels au-dessus du sol (noms des autres joueurs) */
   screenPos(x, y, h = 34) {

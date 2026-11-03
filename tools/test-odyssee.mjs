@@ -91,6 +91,7 @@ for (const [id, m] of Object.entries(maps)) {
   // cartes annexes (lac, grotte des marées…) : avec toutes les capacités de terrain (Surf compris)
   const seen = m.reach(ex, m.get(ex, ey) === T.CAVEDOOR ? ey - 1 : ey, true, true, true);
   for (const [x, y] of entries) ok(seen[at(m, x, y)] || reachable(m, seen, x, y), `${id} : sortie (${x},${y}) atteignable`);
+  if (m.gymLock != null) continue;   // arènes à énigmes : vérifiées par tools/test-odyssee-arenes.mjs
   for (const n of m.npcs) ok(reachable(m, seen, n.x, n.y) || m.get(n.x, n.y + 1) === T.BLOCK && reachable(m, seen, n.x, n.y + 2), `${id} : PNJ ${n.id} atteignable`);
   for (const it of m.items) ok(reachable(m, seen, it.x, it.y), `${id} : objet atteignable`);
 }
@@ -101,13 +102,14 @@ const FIELD_T = { coupe: T.CUT, surf: T.WATER, eclate: T.SMASH };
 const gymDoor = (g) => Object.values(towns).find((t) => t.gym === g).gymDoor;
 const leagueDoor = [...W.warps].find(([, w]) => w.map === 'plateau:ligue')[0].split(',').map(Number);
 const doorOpen = (seen, [x, y]) => !!seen[at(W, x, y + 1)];
-for (let k = 0; k <= 8; k++) {
+const NB = 15;   // cinq arènes au nord, les trois frères, sept arènes dans les Terres du Sud
+for (let k = 0; k <= NB; k++) {
   const abil = new Set(Object.entries(FIELD).filter(([f, d]) => d.badge <= k && FIELD_T[f] != null).map(([f]) => FIELD_T[f]));
   const seen = explore(k, abil);
-  if (k < 8) ok(doorOpen(seen, gymDoor(k)), `avec ${k} badge(s), l'arène ${k + 1} est accessible`);
-  if (k < 7) ok(!doorOpen(seen, gymDoor(k + 1)), `avec ${k} badge(s), l'arène ${k + 2} est encore fermée`);
-  ok(doorOpen(seen, leagueDoor) === (k === 8), `Ligue ${k === 8 ? 'ouverte' : 'fermée'} avec ${k} badge(s)`);
-  ok(!!seen[at(W, 212, 202)] === (k === 8), `Cap des Étoiles ${k === 8 ? 'ouvert' : 'fermé'} avec ${k} badge(s)`);
+  if (k < NB) ok(doorOpen(seen, gymDoor(k)), `avec ${k} badge(s), l'arène ${k + 1} est accessible`);
+  if (k < NB - 1) ok(!doorOpen(seen, gymDoor(k + 1)), `avec ${k} badge(s), l'arène ${k + 2} est encore fermée`);
+  ok(doorOpen(seen, leagueDoor) === (k === NB), `Ligue ${k === NB ? 'ouverte' : 'fermée'} avec ${k} badge(s)`);
+  ok(!!seen[at(W, 212, 202)] === (k >= 8), `Cap des Étoiles ${k >= 8 ? 'ouvert' : 'fermé'} avec ${k} badge(s)`);
 }
 // îles du bateau : depuis chaque quai, sans Surf, avec les badges qui ouvrent la traversée
 const near = (seen, m, x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => m.in(x + dx, y + dy) && seen[(y + dy) * m.w + x + dx]);
@@ -130,9 +132,9 @@ for (const q of legends) {
   ok(near(seen, m, q.x, q.y), `légendaire ${q.id} atteignable`);
   ok(SPECIES[q.sp] && q.lvl > 0, `légendaire ${q.id} valide`);
 }
-// les huit Champions et la Maître existent
+// les quinze Champions et la Maître existent
 const leaders = Object.values(maps).flatMap((m) => m.npcs.filter((n) => n.leader != null));
-ok(leaders.length === 8, '8 Champions');
+ok(leaders.length === NB, `${NB} Champions`);
 ok(Object.values(maps).some((m) => m.npcs.some((n) => n.champion)), 'Maître de la Ligue');
 // équipes et rencontres valides
 for (const m of Object.values(maps)) for (const n of m.npcs) if (n.trainer) for (const [sp, l] of n.trainer.team) ok(SPECIES[sp] && l >= 2 && l <= 100, `équipe de ${n.trainer.name}`);
