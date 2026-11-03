@@ -9,6 +9,10 @@
   - L'air est plus clair : les montagnes se voient de loin.
   - L'île d'Island Rush baigne dans la même mer que le reste de la carte, sans carré d'eau plus clair autour d'elle.
   - Chaque carte a sa base aérienne, avec sa piste et ses hangars tournés vers elle.
+- **Dogfight 3D** — Des nuages refaits : de gros amas de cumulus serrés, des tours qui montent au-delà de 2 000 m et, sur les cartes aux plus hauts sommets, une mer de nuages posée sur l'eau au pied des montagnes.
+  - En qualité Moyen et Élevé, les nuages ont un vrai volume : on les contourne, on passe dessous, on s'y cache. Le soleil éclaire leurs bourgeons, leur dessous est gris et bosselé.
+  - Les nuages font de l'ombre sur le sol et sur la mer.
+  - D'autres amas ferment l'horizon, très loin autour de la zone.
 - **Dogfight 3D** — Quatre nouveaux chasseurs : Rafale, Su-35, F/A-18 et A-10. Chaque avion a sa capacité, prête toutes les 25 secondes (touche R, bouton Y à la manette) :
   - F-16 Surcharge (canon sans surchauffe et plus rapide), F-22 Furtivité (impossible à accrocher, invisible au radar), Rafale Salve (deux missiles d'un coup), Su-35 Cobra (cabré brutal qui fait passer le poursuivant devant), F/A-18 Brouilleur (les missiles autour de toi décrochent), A-10 Brrrt (canon à dégâts doublés).
   - Le roulis libre passe sur V.

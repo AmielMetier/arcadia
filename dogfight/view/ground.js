@@ -4,7 +4,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GR, CELL, STOREY, WATER } from '../../royale/engine/map.js';
 import { terrainImage, drawMap } from '../../royale/view/maprender.js';
-import { HAZE, FOG_DENSITY, noiseData, hash } from './sky.js';
+import { HAZE, FOG_DENSITY, noiseData, hash, cloudShadow, CLOUD_SHADOW } from './sky.js';
 
 const TEX = 2048;
 const FIELD_PALETTE = [0x8d9150, 0xa79c5f, 0x6e7e45, 0xb6a86c, 0x7b8a4d, 0x97864f, 0x5e7040, 0xab905a, 0x7f7f4c].map((h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255]);
@@ -68,12 +68,14 @@ export function paintIsland(map, sun) {
 
 // l'île peinte, et son eau qui ondule et reflète le ciel
 const GROUND_FRAGMENT = `varying vec2 vU; varying vec3 vW; uniform sampler2D uMap, uN; uniform vec3 uSun, uHaze, uCam; uniform float uFogD;
+${CLOUD_SHADOW}
 void main(){
   vec3 c=texture2D(uMap,vU).rgb; float wm=smoothstep(1.,1.07,c.b/max(c.g,.001));
   vec3 V=normalize(uCam-vW); float d=length(uCam-vW);
   c*=mix(.86+.28*texture2D(uN,vW.xz*.021).r,1.,wm);
   if(wm>0.){ vec2 p=vW.xz*.012; float n1=texture2D(uN,p).r-.5,n2=texture2D(uN,p*3.1+.3).r-.5; vec3 N=normalize(vec3((n1+n2*.5)*.09,1.,(n2+n1*.4)*.09)); float fr=pow(1.-max(dot(N,V),0.),3.5);
     vec3 R=reflect(-V,N); vec3 skyc=mix(uHaze,vec3(.13,.3,.55),smoothstep(0.,.5,R.y)); c=mix(c,skyc,(.12+.8*fr)*wm); c+=vec3(1.,.93,.8)*pow(max(dot(R,uSun),0.),260.)*1.6*wm; }
+  c*=cloudShade(vW);
   float f=1.-exp(-pow(d*uFogD,1.45)); float sa=pow(max(dot(-V,uSun),0.),6.); vec3 h=mix(uHaze,vec3(1.,.93,.84),sa*.4); c=mix(c,h,f);
   gl_FragColor=vec4(c,1.);
   #include <tonemapping_fragment>
@@ -117,7 +119,7 @@ function buildTrees(map, kit) {
 export function buildGround(scene, map, sun, noiseTex, anisotropy = 8, kit) {
   const canvas = paintIsland(map, sun);
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = anisotropy; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
-  const shared = { uMap: { value: tex }, uN: { value: noiseTex }, uSun: { value: sun }, uHaze: { value: HAZE }, uCam: { value: new THREE.Vector3() }, uFogD: { value: FOG_DENSITY } };
+  const shared = { uMap: { value: tex }, uN: { value: noiseTex }, uSun: { value: sun }, uHaze: { value: HAZE }, uCam: { value: new THREE.Vector3() }, uFogD: { value: FOG_DENSITY }, ...cloudShadow };
   const islandMat = new THREE.ShaderMaterial({ uniforms: shared, fog: false, vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT });
 
   // relief : une grille régulière, les lacs et rivières à plat à leur niveau ; la mer est celle de l'archipel (archipel.js),

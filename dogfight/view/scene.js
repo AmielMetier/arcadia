@@ -3,16 +3,18 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { buildGround } from './ground.js';
 import { buildArchipelago } from './archipel.js';
 import { buildDecor } from './decor.js';
-import { buildSky, buildClouds, buildVolumetric, noiseTexture, HAZE, FOG_DENSITY, SUN } from './sky.js';
+import { buildSky, buildClouds, noiseTexture, HAZE, FOG_DENSITY, SUN } from './sky.js';
+import { buildVolumetric } from './clouds.js';
 import { buildPlane, loadPlanes, makeEnvironment, planeLength } from './plane.js';
 import { FxManager } from './fx.js';
 import { createTreeKit } from '../../golf/view/trees.js';
 import { ZONE_CEIL } from '../engine/modes.js';
 
+// vol : les nuages en volume (définition de la marche, pas au plus, pas vers le soleil) ; sinon des bouffées
 const QUALITY = {
-  bas: { pr: 1, clouds: 0.33, trees: 0.5, vol: false },
-  moyen: { pr: 1.5, clouds: 1, trees: 1, vol: false },
-  eleve: { pr: 1.5, clouds: 0, trees: 1, vol: true },
+  bas: { pr: 1, clouds: 0.33, trees: 0.5, vol: null },
+  moyen: { pr: 1.5, clouds: 1, trees: 1, vol: { scale: 0.3, steps: 110, light: 4 } },
+  eleve: { pr: 1.5, clouds: 1, trees: 1, vol: { scale: 0.45, steps: 150, light: 6 } },
 };
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), basis = new THREE.Matrix4();
 const worldUp = new THREE.Vector3(0, 1, 0);
@@ -77,20 +79,18 @@ export class DogfightScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.prCap));
     this.ground.trees.setDensity(Q.trees); this.archi.forest.setDensity(Q.trees); this.archi.setDetail(this.quality !== 'bas');
     if (Q.vol) {
-      try { if (!this.volumetric) this.volumetric = buildVolumetric(this.renderer, this.world.clouds); } catch (e) { console.warn('Nuages volumétriques indisponibles :', e); this.volumetric = null; return this.setQuality('moyen'); }
-      this.clouds.setDensity(1); this.clouds.setOnlyLow(true);
-    } else {
-      this.clouds.setOnlyLow(false);
-      this.clouds.setDensity(Q.clouds);
-    }
+      try { if (!this.volumetric) this.volumetric = buildVolumetric(this.renderer, this.scene, this.world); } catch (e) { console.warn('Nuages en volume indisponibles :', e); this.volumetric = null; return this.setQuality('bas'); }
+      this.volumetric.setOptions(Q.vol); this.volumetric.setActive(true);
+    } else if (this.volumetric) this.volumetric.setActive(false);
+    this.clouds.setVisible(!Q.vol); this.clouds.setDensity(Q.clouds);
     this.resize();
     return this.quality;
   }
 
   // Qualité automatique : un cran plus bas, puis une image moins définie. Rend ce qui a changé, ou null
   lowerQuality() {
-    if (this.quality === 'eleve') { this.setQuality('moyen'); return 'nuages en bouffées'; }
-    if (this.quality === 'moyen') { this.setQuality('bas'); return 'moins de nuages et d\'arbres'; }
+    if (this.quality === 'eleve') { this.setQuality('moyen'); return 'nuages moins fins'; }
+    if (this.quality === 'moyen') { this.setQuality('bas'); return 'nuages en bouffées, moins d\'arbres'; }
     if (this.prCap > 0.75) { this.prCap = 0.75; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 0.75)); this.resize(); return 'image moins définie'; }
     return null;
   }
@@ -190,9 +190,8 @@ export class DogfightScene {
     const t = this.fx.time, dt = Math.min(0.1, t - this.lastDraw); this.lastDraw = t;
     this.ground.update(this.camera.position); this.archi.update(this.camera.position, t); this.decor.update(dt);
     this.clouds.update(this.camera.position);
-    if (this.volumetric) this.volumetric.pre(this.camera);
+    if (this.volumetric) this.volumetric.pre(this.camera, t);
     this.renderer.render(this.scene, this.camera);
-    if (this.volumetric) this.volumetric.post();
   }
 
   dispose() {

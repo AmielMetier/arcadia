@@ -61,7 +61,7 @@ function setupPanel() {
   window.DDVolume.panel(btn, {
     accent: '#2563eb', kinds: ['fx'], test: () => sfx.hitConfirm(),
     sections: [
-      { title: 'Image', items: [{ label: 'Qualité', get: () => pref.quality, set: (v) => { pref.quality = v; store.set('quality', v); applyPrefs(); }, options: [['auto', 'Auto'], ['bas', 'Bas'], ['moyen', 'Moyen'], ['eleve', 'Élevé']] }], hint: 'Élevé : de vrais nuages volumétriques, à réserver à une bonne carte graphique. Auto l\'essaie quand la machine suit, et baisse d\'un cran si l\'image rame.' },
+      { title: 'Image', items: [{ label: 'Qualité', get: () => pref.quality, set: (v) => { pref.quality = v; store.set('quality', v); applyPrefs(); }, options: [['auto', 'Auto'], ['bas', 'Bas'], ['moyen', 'Moyen'], ['eleve', 'Élevé']] }], hint: 'Moyen et Élevé : de vrais nuages en volume, plus fins en Élevé (à réserver à une bonne carte graphique). Bas : des nuages en bouffées, pour les petites machines. Auto baisse d\'un cran si l\'image rame.' },
       { title: 'Pilotage', items: [
         { label: 'Aide au vol', get: () => pref.assist, set: (v) => { pref.assist = v; store.set('assist', v); applyPrefs(); } },
         { label: 'Inverser le tangage', get: () => pref.invert, set: (v) => { pref.invert = v; store.set('invert', v); applyPrefs(); } },

@@ -9,7 +9,7 @@
 // L'île d'Island Rush garde son propre rendu (ground.js) : on n'y dessine rien.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { buildArchipel, heightAt, runwayLocal, PLATFORM, fbm } from '../engine/archipel.js';
-import { HAZE, FOG_DENSITY } from './sky.js';
+import { HAZE, FOG_DENSITY, cloudShadow, CLOUD_SHADOW } from './sky.js';
 import { plantForest } from './forest.js';
 import { loadPlaces, buildPlaces } from './osm.js';
 
@@ -21,7 +21,8 @@ const TEXTURES = { herbe: 'herbe', roche: 'roche', falaise: 'falaise', plage: 'p
 const COMMON = `uniform sampler2D uN; uniform vec3 uSun, uHaze, uCam; uniform float uFogD;
 float fb(vec2 p){ return texture2D(uN,p).r*.6+texture2D(uN,p*2.3+.17).r*.3+texture2D(uN,p*5.1+.41).r*.1; }
 vec3 lin(vec3 c){ return pow(c,vec3(2.2)); }
-vec3 fog(vec3 c, vec3 V, float d){ float f=1.-exp(-pow(d*uFogD,1.45)); float sa=pow(max(dot(-V,uSun),0.),6.); return mix(c,mix(uHaze,vec3(1.,.93,.84),sa*.4),f); }`;
+vec3 fog(vec3 c, vec3 V, float d){ float f=1.-exp(-pow(d*uFogD,1.45)); float sa=pow(max(dot(-V,uSun),0.),6.); return mix(c,mix(uHaze,vec3(1.,.93,.84),sa*.4),f); }
+${CLOUD_SHADOW}`;
 
 const TERRAIN_VERTEX = `varying vec3 vW; varying vec3 vN; void main(){ vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vN=normal; gl_Position=projectionMatrix*viewMatrix*w; }`;
 const TERRAIN_FRAGMENT = `varying vec3 vW; varying vec3 vN;
@@ -118,6 +119,7 @@ void main(){
   vec3 N0=normalize(vN), Ld=mix(vec3(.3,.3,.27),vec3(.46,.52,.62),Nd.y*.5+.5)*ao+sunC*max(dot(Nd,uSun),0.)*1.15*mix(1.,ao,.6);
   vec3 L0=mix(vec3(.3,.3,.27),vec3(.46,.52,.62),N0.y*.5+.5)+sunC*max(dot(N0,uSun),0.)*1.15;
   c*=mix(L,1.4*clamp(Ld/L0,.45,1.6)*mix(1.,.6+.4*sh,uRelit),uSatK);
+  c*=mix(1.,cloudShade(vW),sh);   // l'ombre des nuages (déjà là si la montagne fait de l'ombre)
   vec3 V=normalize(uCam-vW);
   // les lacs : une eau sombre qui reflète le ciel
   vec2 st=(w-uArea.xy)/uArea.z; float lk=texture2D(uLake,st).r*step(0.,st.x)*step(0.,st.y)*step(st.x,1.)*step(st.y,1.);
@@ -140,7 +142,7 @@ void main(){
   vec2 p=vW.xz*.012; float t=uTime*.012; float n1=texture2D(uN,p+vec2(t,t*.6)).r-.5,n2=texture2D(uN,p*3.1+.3-vec2(t*1.7,t)).r-.5;
   vec3 Nw=normalize(vec3((n1+n2*.5)*.09,1.,(n2+n1*.4)*.09)); float fr=pow(1.-max(dot(Nw,V),0.),3.5);
   vec3 R=reflect(-V,Nw); vec3 sky=mix(uHaze,vec3(.13,.3,.55),smoothstep(0.,.5,R.y));
-  c=mix(c,sky,.12+.8*fr); c+=vec3(1.,.93,.8)*pow(max(dot(R,uSun),0.),260.)*1.6;
+  float cs=cloudShade(vW); c*=mix(1.,cs,.8); c=mix(c,sky,.12+.8*fr); c+=vec3(1.,.93,.8)*pow(max(dot(R,uSun),0.),260.)*1.6*smoothstep(.6,1.,cs);
   float foam=(1.-smoothstep(.0,.07,dep+(texture2D(uN,vW.xz*.03+uTime*.006).r-.5)*.06))*smoothstep(.35,.7,texture2D(uN,vW.xz*.05-uTime*.01).r)*step(.001,dep);
   c=mix(c,vec3(.86,.9,.92),foam*.75);
   gl_FragColor=vec4(fog(c,V,d),1.);
@@ -316,7 +318,7 @@ export function buildArchipelago(scene, { sun, deep, noiseTex, anisotropy = 8, k
   const lake = byteTexture(lakeData, A.n);
   const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]), blank = byteTexture(new Uint8Array([255]), 1);
   const none = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat); none.needsUpdate = true;
-  const shared = { uN: { value: noiseTex }, uSun: { value: sun }, uHaze: { value: HAZE }, uCam: { value: new THREE.Vector3() }, uFogD: { value: FOG_DENSITY } };
+  const shared = { uN: { value: noiseTex }, uSun: { value: sun }, uHaze: { value: HAZE }, uCam: { value: new THREE.Vector3() }, uFogD: { value: FOG_DENSITY }, ...cloudShadow };
   const terrainUniforms = (G, macro, shade) => ({
     ...shared, uGrass: { value: tex.herbe }, uRock: { value: tex.roche }, uCliff: { value: tex.falaise }, uSand: { value: tex.plage }, uSnow: { value: tex.neige },
     uGrassN: { value: tex.herbeN }, uRockN: { value: tex.rocheN }, uCliffN: { value: tex.falaiseN }, uLake: { value: lake }, uMacro: { value: macro }, uShade: { value: shade },

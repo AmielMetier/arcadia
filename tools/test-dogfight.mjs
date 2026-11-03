@@ -2,7 +2,7 @@
 import { generateMap, ILE } from '../royale/engine/map.js';
 import { createFlight, stepFlight, computeAxes, bankOf, keyRamp, keyCurve, KEY_ATTACK, TYPES, TYPE_IDS, ZONE_MAX, ZONE_WARN, ZONE, zoneDist, CENTER, CEILING, COBRA_TIME } from '../dogfight/engine/flight.js';
 import { computeLead, BULLET_SPEED, BULLET_GRAVITY, FIRE_RATE, stepGun, hitZone, stepLock, MISSILE_COOLDOWN, FLARE_COOLDOWN, MISSILE_DAMAGE, LOW_HIDE } from '../dogfight/engine/weapons.js';
-import { createWorld, CLOUD_BASE } from '../dogfight/engine/world.js';
+import { createWorld, cloudTop } from '../dogfight/engine/world.js';
 import { createGame, startCountdown, stepGame, drainEvents, DT, snapRows, worldOf, restoreGame, replaceByBot, applyRow, ranking, addPlayer } from '../dogfight/engine/rules.js';
 import { botInput, LEVELS } from '../dogfight/engine/ai.js';
 import { ZONE_CEIL, CAPTURE_TIME, KILL_POINTS, ROUND_TIME, ATTACK_LIVES, getRoute } from '../dogfight/engine/modes.js';
@@ -133,8 +133,12 @@ const world = createWorld(map);
   assert(world.obstacleAt(40000, 40000) === 0, 'au-delà de la carte, c\'est la mer');
   const b = map.buildings[0], cx = (b.x0 + b.w / 2) * 4, cz = (b.z0 + b.d / 2) * 4;
   assert(world.obstacleAt(cx, cz) > world.groundAt(cx, cz) + 2, 'les toits comptent comme obstacle');
-  const c = world.clouds.find((q) => q.base === undefined);
-  assert(world.inCloud(c.x, CLOUD_BASE + 5, c.z) && !world.inCloud(c.x, 300, c.z), 'on sait si un avion est dans un nuage');
+  const c = world.clouds.find((q) => !q.bank && !q.far), far = world.clouds.find((q) => q.far);
+  // les dômes d'un amas se chevauchent : au-dessus de c, le plus haut d'entre eux fait le sommet (0.85 : le cœur où l'on est caché)
+  const over = world.clouds.filter((q) => !q.far).map((q) => [q, ((q.x - c.x) ** 2 + (q.z - c.z) ** 2) / (q.R * q.R * 0.85 * 0.85)]).filter(([, d2]) => d2 < 1);
+  const top = Math.max(...over.map(([q, d2]) => cloudTop(q, d2))), low = Math.min(...over.map(([q]) => q.base));
+  assert(world.inCloud(c.x, c.base + 20, c.z) && !world.inCloud(c.x, low - 60, c.z) && !world.inCloud(c.x, top + 5, c.z), 'on sait si un avion est dans un nuage');
+  assert(far && !world.inCloud(far.x, far.base + 20, far.z) && world.clouds.some((q) => !q.far && q.base + q.H > 1400), 'des nuages à l\'horizon (décor seulement), et des tours qui montent haut');
   // les quatre cartes : un vrai relief, l'île d'Island Rush en mer, une piste plate, des navires, un banc de nuages bas
   const PEAKS = { eoliennes: [550, 650], teno: [1300, 1420], kauai: [1200, 1350], lofoten: [950, 1080] };
   for (const id of MAP_IDS) {
@@ -153,7 +157,7 @@ const world = createWorld(map);
     const pa = A.structures.find((q) => q.kind === 'porteavions');
     assert(w.obstacleAt(pa.x, pa.z) > 20 && w.groundAt(pa.x, pa.z) === 0, `${A.name} : le porte-avions est un obstacle en pleine mer`);
     assert(A.structures.filter((q) => q.kind !== 'hangar' && q.kind !== 'tour').every((q) => heightAt(A, q.x, q.z) < -5), `${A.name} : les navires flottent`);
-    const low = w.clouds.find((q) => q.base !== undefined);
+    const low = w.clouds.find((q) => q.bank);
     assert(low && w.inCloud(low.x, A.bank.y, low.z), `${A.name} : le banc de nuages bas cache le transport`);
   }
   let lakes = 0; const L = useMap('lofoten'); for (let k = 0; k < L.lake.length; k++) if (L.lake[k] === 2) lakes++;
