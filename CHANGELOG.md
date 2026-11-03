@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.75 — 3 novembre 2026
+- **Odyssée** — Tous les personnages ont maintenant leur nouveau dessin : Nocturne et ses admins Nyx et Érèbe, le Conseil 4 (Frimas, Spectrel, Brutus et Ombrelle), Lumen et le savant.
+
 ## 3.74 — 3 novembre 2026
 - **Odyssée** — Une armoire dans ta chambre, à Bourg-Aube : change de tenue quand tu veux, sans attendre la boutique de Métropole.
 - **Odyssée** — Nouveaux dessins pour le capitaine, le facteur, la vieille dame, Nox, le voleur, Brume et une sbire de la Team Éclipse.
