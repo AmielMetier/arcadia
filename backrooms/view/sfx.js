@@ -147,7 +147,7 @@ export class BackroomsSfx {
     const t = c.currentTime;
     if (voice && !this.voiceGain) this.initVoice();
     // toujours un murmure au loin, de plus en plus fort à mesure qu'elle approche
-    if (this.voiceGain) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(danger, 0.8) * 1.3 : 0.0001, t, 0.1);
+    if (this.voiceGain && !(t < this.scareUntil)) this.voiceGain.gain.setTargetAtTime(voice ? 0.04 + Math.pow(danger, 0.8) * 1.3 : 0.0001, t, 0.1);
 
     // Danger va de 0.0 (silencieux) à 1.0 (très proche, assourdissant)
     const targetVol = voice ? 0.0001 : Math.max(0.0001, danger * 0.45);
@@ -252,10 +252,21 @@ export class BackroomsSfx {
   }
 
   // Jumpscare / cri violent lors de la capture
-  jumpscare() {
+  jumpscare(level = 0) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
+
+    // Level 1 : sa voix à plein volume, collée à l'oreille, puis le silence
+    if (level === 1 && this.voiceGain) {
+      if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
+      if (this.monsterPanner) this.monsterPanner.pan.setValueAtTime(0, t);
+      this.voiceGain.gain.cancelScheduledValues(t);
+      this.voiceGain.gain.setValueAtTime(2.2, t);
+      this.scareUntil = t + 1.6;
+      this.voiceGain.gain.setTargetAtTime(0.0001, t + 1.2, 0.15);
+      return;
+    }
 
     // Coupe le son de traque continu
     if (this.monsterGain) {

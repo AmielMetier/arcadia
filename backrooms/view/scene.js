@@ -13,7 +13,7 @@ import { createVhsFilter } from './vhs.js';
 const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
 export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (15 par seconde, 23 par rangée) jouée en boucle
-const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=1', import.meta.url).href, frames: 149, cols: 23, rows: 7, fps: 15, aspect: 176 / 288 };
+export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=1', import.meta.url).href, frames: 149, cols: 23, rows: 7, fps: 15, aspect: 176 / 288 };
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
 const AMBIENT = 0.015; // lumière minimale dans les zones mortes
@@ -770,7 +770,7 @@ export function createBackroomsScene(container, floors) {
   new THREE.TextureLoader().load(anim ? anim.url : ENTITY_IMG, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const h = anim ? 1.95 : 2.15;
+    const h = anim ? 2.8 : 2.15; // au Level 1, il est immense (le plafond de l'entrepôt est à 4,2 m)
     const w = anim ? h * anim.aspect : Math.min(2.3, (h * t.image.width) / t.image.height);
     if (anim) faceFrame.value.set(0, 0, 1 / anim.cols, 1 / anim.rows);
     const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? '#ffffff' : '#e6dccb' });

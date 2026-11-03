@@ -1,5 +1,5 @@
 // The Backrooms - Interface façon caméscope (REC, signal, bande), jumpscare et écran de fin
-import { ENTITY_IMG } from './scene.js';
+import { ENTITY_IMG, ENTITY_ANIM } from './scene.js';
 import { DEPART_T } from '../engine/sim.js';
 
 export class BackroomsHUD {
@@ -7,7 +7,7 @@ export class BackroomsHUD {
     this.el = container;
     this.actions = actions;
     this.el.innerHTML = `
-      <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""></div>
+      <div class="jumpscare-overlay" id="jumpscareOverlay" hidden><img id="scareImg" alt=""><div class="scare-anim" id="scareAnim" hidden></div></div>
 
       <!-- Incrustations du caméscope -->
       <div class="cam cam-tl">
@@ -88,6 +88,12 @@ export class BackroomsHUD {
     const img = this.$('#scareImg');
     img.onerror = () => img.remove();
     img.src = ENTITY_IMG;
+    // celle du Level 1 : sa vidéo, qui continue de gesticuler en plein écran
+    const A = ENTITY_ANIM;
+    const anim = this.$('#scareAnim');
+    anim.style.backgroundImage = `url("${A.url}")`;
+    anim.style.backgroundSize = `${A.cols * 100}% ${A.rows * 100}%`;
+    anim.style.aspectRatio = String(A.aspect);
 
     // date du caméscope, figée en 1996 comme une vieille cassette retrouvée
     const d = new Date();
@@ -257,8 +263,25 @@ export class BackroomsHUD {
     this.toastT = 2.5;
   }
 
-  showJumpscare() {
+  // level : le screamer est celui de l'entité du level en cours
+  showJumpscare(level = 0) {
     const j = this.$('#jumpscareOverlay');
+    const A = ENTITY_ANIM;
+    const anim = this.$('#scareAnim');
+    const img = this.$('#scareImg');
+    anim.hidden = level !== 1;
+    if (img) img.hidden = level === 1;
+    clearInterval(this.scareTimer);
+    if (level === 1) {
+      let f = 0;
+      const show = () => {
+        anim.style.backgroundPosition = `${((f % A.cols) / (A.cols - 1)) * 100}% ${(Math.floor(f / A.cols) / (A.rows - 1)) * 100}%`;
+        f = (f + 1) % A.frames;
+      };
+      show();
+      this.scareTimer = setInterval(show, 1000 / A.fps);
+      setTimeout(() => clearInterval(this.scareTimer), 1500);
+    }
     j.hidden = false;
     j.classList.remove('flash');
     void j.offsetWidth;

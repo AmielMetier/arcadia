@@ -212,7 +212,20 @@ html, body {
   transform-origin: 60% 21%;
   filter: contrast(1.35) saturate(0.55) sepia(0.3) hue-rotate(-20deg) brightness(0.92);
 }
+/* celle du Level 1 : sa vidéo, la tête (au milieu, 13 % du haut) au centre de l'écran */
+.jumpscare-overlay .scare-anim {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  height: 260vh;
+  transform: translate(-50%, -13%);
+  transform-origin: 50% 13%;
+  background-repeat: no-repeat;
+  filter: contrast(1.3) saturate(0.7) brightness(0.95);
+}
+.jumpscare-overlay .scare-anim[hidden] { display: none; }
 .jumpscare-overlay.flash { animation: scareFlash 1.4s forwards; }
+.jumpscare-overlay.flash .scare-anim,
 .jumpscare-overlay.flash img { animation: scareShake 0.06s infinite, scareZoom 1.4s ease-out forwards; }
 @keyframes scareFlash {
   0% { background: #ff0015; }

@@ -1,5 +1,9 @@
 # Journal des versions — Arcadia
 
+## 3.83 — 3 novembre 2026
+- **The Backrooms** — l'entité du Level 1 est bien plus grande, et chaque level a son propre screamer.
+  - Au Level 1, quand elle t'attrape, c'est elle qui surgit en plein écran en gesticulant, avec sa voix à fond.
+
 ## 3.82 — 3 novembre 2026
 - **The Backrooms** — une nouvelle entité rôde dans l'entrepôt du Level 1.
   - Après l'ascenseur, ce n'est plus la même créature qui te traque : une silhouette qui gesticule en boucle, avec sa propre voix.

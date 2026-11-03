@@ -440,8 +440,8 @@ function handleEvent(ev, me) {
       break;
     case 'jumpscare':
       if (ev.id !== me) break;
-      if (sfx) sfx.jumpscare();
-      if (hud) hud.showJumpscare();
+      if (sfx) sfx.jumpscare(sim.level);
+      if (hud) hud.showJumpscare(sim.level);
       break;
     case 'dead':
       if (ev.id !== me && hud) hud.toast(`${ev.name} s'est fait attraper…`);
