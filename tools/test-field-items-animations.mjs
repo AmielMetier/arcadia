@@ -52,10 +52,10 @@ const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
 const hubJs = readFileSync(join(root, 'hub/hub.js'), 'utf8');
 const indexHtml = readFileSync(join(root, 'index.html'), 'utf8');
 
-if (!changelog.includes('## 3.91 — 3 novembre 2026')) throw new Error('Version 3.91 manquante dans CHANGELOG.md');
-if (!hubJs.includes("const VERSION = '3.91';")) throw new Error('Version 3.91 manquante dans hub.js');
-if (!indexHtml.includes('?v=3.91')) throw new Error('?v=3.91 manquant dans index.html');
-console.log('  ✓ Version 3.91 synchronisée dans CHANGELOG.md, hub.js et index.html');
+if (!changelog.includes('## 3.92 — 3 novembre 2026')) throw new Error('Version 3.92 manquante dans CHANGELOG.md');
+if (!hubJs.includes("const VERSION = '3.92';")) throw new Error('Version 3.92 manquante dans hub.js');
+if (!indexHtml.includes('?v=3.92')) throw new Error('?v=3.92 manquant dans index.html');
+console.log('  ✓ Version 3.92 synchronisée dans CHANGELOG.md, hub.js et index.html');
 
 console.log('\n===========================================');
 console.log('TOUS LES TESTS DES CAPACITÉS & PIXEL ART PASSENT AVEC SUCCÈS !');

@@ -145,12 +145,15 @@ export function itemPluralName(k, qty = 1) {
  * Conforme à la syntaxe officielle Pokémon Noir 2 / Blanc 2 (B2W2)
  */
 export function formatFindItem(playerName, itemKey, qty = 1, csInfo = null) {
-  const cs = csInfo || (ITEMS[itemKey]?.field && ITEMS[itemKey].name ? {
+  const isActualCS = (csInfo && typeof csInfo.cs === 'string' && csInfo.cs.startsWith('CS')) ||
+                     (typeof itemKey === 'string' && itemKey.startsWith('cs-')) ||
+                     (ITEMS[itemKey]?.name && ITEMS[itemKey].name.startsWith('CS'));
+  const cs = csInfo || (isActualCS && ITEMS[itemKey]?.field && ITEMS[itemKey].name ? {
     cs: ITEMS[itemKey].name.split(' ')[0],
     name: ITEMS[itemKey].name.split(' ').slice(1).join(' ')
   } : null);
 
-  if (cs && cs.cs && cs.name) {
+  if (cs && cs.cs && cs.name && isActualCS) {
     return `${playerName} trouve la ${cs.cs} ${cs.name} !\n${playerName} met la ${cs.cs} dans la Poche CT & CS.`;
   }
   if (typeof itemKey === 'string' && itemKey.startsWith('ct-')) {
@@ -171,12 +174,15 @@ export function formatFindItem(playerName, itemKey, qty = 1, csInfo = null) {
  * Conforme à la syntaxe officielle Pokémon Noir 2 / Blanc 2 (B2W2)
  */
 export function formatObtainItem(playerName, itemKey, qty = 1, csInfo = null) {
-  const cs = csInfo || (ITEMS[itemKey]?.field && ITEMS[itemKey].name ? {
+  const isActualCS = (csInfo && typeof csInfo.cs === 'string' && csInfo.cs.startsWith('CS')) ||
+                     (typeof itemKey === 'string' && itemKey.startsWith('cs-')) ||
+                     (ITEMS[itemKey]?.name && ITEMS[itemKey].name.startsWith('CS'));
+  const cs = csInfo || (isActualCS && ITEMS[itemKey]?.field && ITEMS[itemKey].name ? {
     cs: ITEMS[itemKey].name.split(' ')[0],
     name: ITEMS[itemKey].name.split(' ').slice(1).join(' ')
   } : null);
 
-  if (cs && cs.cs && cs.name) {
+  if (cs && cs.cs && cs.name && isActualCS) {
     return `${playerName} obtient la ${cs.cs} ${cs.name} !\n${playerName} met la ${cs.cs} dans la Poche CT & CS.`;
   }
   if (typeof itemKey === 'string' && itemKey.startsWith('ct-')) {

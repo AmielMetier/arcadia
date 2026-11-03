@@ -1,5 +1,25 @@
 # Journal des versions — Arcadia
 
+## 3.92 — 3 novembre 2026
+- **Odyssée** — Intégration scénarisée de l'obtention des Objets Rares d'exploration :
+  - **Sécateur Sylvestre (Coupe)** :
+    - Obtenu à **Floralia** auprès de la Championne **Flora** lors de la victoire pour le **Badge Pétale** (Arène 4).
+    - Dialogue solennel de Flora transmettant l'outil d'or et d'émeraude pour débloquer la Route 6 vers Mirage en taillant les ronces sans abîmer les racines.
+    - PNJ de Floralia (maison de l'arboriste) et serre de la Résidence Floralia contextualisant l'importance du Sécateur Sylvestre.
+  - **Harnais Flottant d'Écume (Surf)** :
+    - Obtenu à **Mirage** auprès de la Championne **Sibylle** lors de la victoire pour le **Badge Mirage** (Arène 5).
+    - Sibylle transmet la selle nautique après avoir eu la vision du voyage maritime du dresseur vers le Sanctuaire des Marées et les îles des trois frères.
+    - PNJ du Cap Mirage (marin et pêcheur) validant la traversée des flots vers l'Île de Granit et l'archipel.
+  - **Sifflet Céleste (Vol)** :
+    - Obtenu au sommet de la **Tour de la Grue** (village de **Hautegrue**, sanctuaire sacré des oiseaux célestes et de Ho-Oh, accessible dès 3 badges).
+    - Confié solennellement par le **Grand Sage Hoël** (3e étage de la tour) en même temps que la Plume Arc-en-ciel pour appeler les grands oiseaux des cieux et voyager entre les villes visitées.
+    - Dialogues synchronisés du novice de la tour, de la Doyenne Amaya et du journal de quêtes.
+    - Dialogue adaptatif et remise de secours auprès de Pyros (Arène 7, Cendrelune) pour garantir la complétion si Hautegrue n'a pas encore été explorée.
+    - Utilisation de Vol harmonisée dès l'obtention du Badge Mirage (Badge 5) ou supérieur.
+  - **Messages d'objets B2W2** :
+    - Distinction rigoureuse entre Objets Rares (`Poche Objets Rares`) et Capacités Secrètes (`Poche CT & CS`).
+    - Harmonisation complète de la syntaxe officielle Pokémon Noir 2 / Blanc 2 pour tous les dons d'objets scénarisés.
+
 ## 3.91 — 3 novembre 2026
 - **Odyssée** — Objets d'exploration et capacités de terrain :
   - Remplacement définitif des CS classiques par trois Objets Rares d'exploration dédiés :

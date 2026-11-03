@@ -52,7 +52,7 @@ export const FIELD = {
   coupe: { name: 'Coupe', item: 'secateur-sylvestre', itemName: 'Sécateur Sylvestre', cs: 'Sécateur Sylvestre', badge: 4, desc: 'Tranche les petits arbres et arbustes épineux qui barrent le chemin.' },
   surf: { name: 'Surf', item: 'harnais-flottant', itemName: 'Harnais Flottant', cs: 'Harnais Flottant', badge: 5, desc: 'Selle nautique étanche permettant de naviguer et glisser sur l\'eau.' },
   eclate: { name: 'Éclate-Roc', cs: 'CS03', badge: 6, desc: 'Brise les rochers fissurés.' },
-  vol: { name: 'Vol', item: 'sifflet-celeste', itemName: 'Sifflet Céleste', cs: 'Sifflet Céleste', badge: 7, desc: 'Sifflet appelant un oiseau pour voyager en un instant vers une ville déjà visitée.' },
+  vol: { name: 'Vol', item: 'sifflet-celeste', itemName: 'Sifflet Céleste', cs: 'Sifflet Céleste', badge: 5, desc: 'Sifflet appelant un oiseau pour voyager en un instant vers une ville déjà visitée.' },
   // données par l'histoire (la Team Éclipse) : Flash par le Dr Lumen, Force par l'ingénieur de la Centrale
   flash: { name: 'Flash', cs: 'CS05', badge: 1, desc: 'Éclaire les grottes plongées dans le noir.' },
   force: { name: 'Force', cs: 'CS06', badge: 3, desc: 'Pousse les gros rochers qui barrent certains chemins.' },
@@ -361,7 +361,7 @@ export function buildWorld() {
     buildings: [
       { kind: 'center', x: 3, y: 5 }, { kind: 'mart', x: 9, y: 5 },
       { kind: 'bighouse', x: 21, y: 5, roof: 'purple', name: 'Résidence Floralia', npcs: [{ x: 3, y: 4, sprite: 'habitante', text: ['Les attaques de statut ne font pas de dégâts, mais elles changent tout.', 'Un adversaire endormi, c\'est un adversaire inoffensif !'] }, { x: 7, y: 5, sprite: 'scientifique', text: ['J\'ai vu un dresseur aux cheveux bleus foncer vers l\'Arène.', 'Il avait l\'air pressé de te battre...'] }] },
-      { kind: 'house2', x: 27, y: 6, roof: 'green', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['Les petits arbres à l\'est bloquent la route de Mirage.', 'Flora sait comment les couper... mais elle ne l\'apprend qu\'aux dresseurs qui la battent !'] }] },
+      { kind: 'house2', x: 27, y: 6, roof: 'green', npcs: [{ x: 2, y: 4, sprite: 'gamin', text: ['Les buissons épineux à l\'est bloquent la Route 6 vers Mirage.', 'Flora, notre Championne, conserve le précieux Sécateur Sylvestre.', 'Elle ne le confie qu\'aux dresseurs qui remportent le Badge Pétale !'] }] },
       { kind: 'gym', x: 21, y: 14, roof: 'green' },
       { kind: 'house', x: 4, y: 16, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'habitante', text: ['Ta créature la plus en forme combat en premier.', 'Change l\'ordre de ton équipe dans le menu Équipe !'] }] },
       { kind: 'house', x: 9, y: 16, roof: 'orange', npcs: [{ x: 2, y: 4, sprite: 'habitant', text: ['Mirage, à l\'est, est une ville étrange.', 'On dit que ses habitants lisent dans les pensées.'] }] },
@@ -570,7 +570,7 @@ export function buildWorld() {
   W.rect(282, 185, 301, 188, T.SAND);
   W.zone(282, 183, 301, 188, { name: 'Cap Mirage', music: 'route', trigger: 'rival4' });
   W.sign(296, 185, 'CAP MIRAGE\nAu sud-est : Île de Granit. Au sud : Cendrelune.\nTraversée à la nage : Surf requis.');
-  W.npc({ id: 'cap:pecheur', x: 286, y: 186, sprite: 'pecheur', dir: 'down', text: ['Les trois îles que tu vois là-bas, ce sont les îles des trois frères.', 'Granit, la plus proche. Puis Cendrelune, le volcan. Et la Grande Île, tout au fond.', 'Drakos, l\'aîné, règne sur les trois depuis Fort-Écaille.'] });
+  W.npc({ id: 'cap:pecheur', x: 286, y: 186, sprite: 'pecheur', dir: 'down', text: ['Les trois îles que tu vois là-bas, ce sont les îles des trois frères : Granit, Cendrelune et la Grande Île.', 'Avec le Harnais Flottant d\'Écume et le Badge Mirage de Sibylle, tu peux braver les vagues vers le Sanctuaire des Marées et les îles !', 'Drakos règne sur l\'archipel depuis Fort-Écaille.'] });
 
   // Grande Île : route 11 (de la plage est à Fort-Écaille, par une passe rocheuse) et forêt d'Écaille au sud
   const r11 = R('r11', 'Route 11', [[256.5, 238.5], [247, 240.5], [239, 233.5], [233, 224], [229, 218.5]], { w: 10, grass: 0.8, trees: 0.06, rocks: 0.05, taperEnd: false }, 'ecaille');
@@ -715,7 +715,7 @@ export function buildWorld() {
     sage(f2, 5, 5, 'right', 'Hilaire', [[1030, 32], [1040, 31]], 'Ho-Oh ne se montre qu\'aux cœurs sincères.');
     sage(f2, 8, 8, 'left', 'Isidore', [[164, 32], [1016, 32]], 'Plus haut, l\'air devient sacré.');
     trainerNpc(f3, 6, 4, 'down', 'Grand Sage', 'Hoël', [[1040, 34], [1030, 34], [1023, 35], [1016, 36]], { sight: 0, ai: 'smart', onWin: 'grandSage', intro: 'Tu viens chercher la Plume Arc-en-ciel ? Montre-moi le lien qui t\'unit à tes créatures !', lose: 'Ce lien... il est réel.', after: 'Va sur le toit. Ho-Oh t\'attend peut-être.' });
-    const n = f3.npc({ id: id + ':novice', x: 10, y: 3, dir: 'down', sprite: 'medium', gate: { badges: 3, flag: 'plume', tiles: [[10, 2], [11, 3]] }, text: ['Le toit est réservé à qui porte la Plume Arc-en-ciel.', 'Seul le Grand Sage peut te la confier.'] });
+    const n = f3.npc({ id: id + ':novice', x: 10, y: 3, dir: 'down', sprite: 'medium', gate: { badges: 3, flag: 'plume', tiles: [[10, 2], [11, 3]] }, text: ['Le toit est réservé à qui porte la Plume Arc-en-ciel.', 'Le Grand Sage Hoël veille au sommet sur la plume et sur le Sifflet Céleste sacré.'] });
     f3.gates.push({ npc: n.id, badges: 3, flag: 'plume', tiles: [[10, 2], [11, 3]] });
     legends.push({ id: 'hooh', sp: 250, lvl: 40, map: roof.id, x: 6, y: 6, cond: 'plume', intro: ['La Plume Arc-en-ciel se met à briller...', 'Un arc-en-ciel déchire les nuages. Ho-Oh se pose sur la tour !'] });
     return [f2, f3, roof];

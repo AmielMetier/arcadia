@@ -1258,7 +1258,18 @@ export class Game {
       if (r.item === 'town-map') { await mapScreen(this); continue; }
       if (r.item === 'velo') { if (await this.toggleVelo()) return true; continue; }
       if (it.field) {
-        if (it.field === 'vol' && this.canField('vol') && this.mapObj.outdoor && !this.player.surf) { if (await this.fly()) return true; continue; }
+        if (it.field === 'vol') {
+          if (this.canField('vol')) {
+            if (this.player.surf || !this.mapObj.outdoor) {
+              await this.ui.say('On ne peut pas s\'envoler d\'ici.');
+              continue;
+            }
+            if (await this.fly()) return true;
+            continue;
+          }
+          await this.ui.say([`${FIELD.vol.itemName} : ${FIELD.vol.desc}`, `Il faut le ${BADGES[FIELD.vol.badge - 1].name} pour l'utiliser hors combat.`]);
+          continue;
+        }
         await this.ui.say([`${FIELD[it.field].name} : ${FIELD[it.field].desc}`, this.canField(it.field) ? 'Place-toi face à l\'obstacle et appuie sur F pour l\'utiliser.' : `Il faut le ${BADGES[FIELD[it.field].badge - 1].name} pour l'utiliser hors combat.`]);
         continue;
       }
@@ -1450,10 +1461,21 @@ export class Game {
       0: ['Avec ce badge, tu prouves ta valeur de dresseur.', 'Le garde au nord de la ville te laissera passer vers le Bois Murmure.'],
       1: ['La route 4, à l\'est, t\'est désormais ouverte.', 'Voltacité t\'attend au bout de la côte.'],
       2: ['Le garde de la route 5 te laissera passer.', 'Floralia et sa Championne sont au sud-ouest.'],
-      3: ['Et prends aussi ceci : le Sécateur Sylvestre !', 'Avec mon badge, tu peux trancher les petits arbres et buissons qui barrent la route de Mirage, à l\'est.'],
-      4: ['J\'ai vu ton avenir : il est sur la mer. Prends ce Harnais Flottant !', 'Au sud, le Cap Mirage fait face aux îles des trois frères.', 'Méfie-toi de Drakos. Il a autrefois défié Célestine... et ne s\'en est jamais remis.'],
+      3: [
+        'Et prends aussi ceci : le Sécateur Sylvestre !',
+        'Ciselé par les maîtres arboristes de Floralia, il tranche net les ronces et buissons épineux.',
+        'Avec mon Badge Pétale, tu peux désormais ouvrir le passage de la Route 6 vers Mirage, à l\'est. Prends bien soin de nos forêts !'
+      ],
+      4: [
+        'J\'ai vu ton avenir : ta destinée t\'attend au-delà des flots. Prends ce Harnais Flottant !',
+        'Cette selle nautique profilée épouse la surface des eaux et te permettra de surfer sur la mer.',
+        'Au sud, le Cap Mirage fait face au Sanctuaire des Marées et aux îles des trois frères.',
+        'Méfie-toi de Drakos. Il a autrefois défié Célestine... et ne s\'en est jamais remis.'
+      ],
       5: ['Tiens, la CS03 : Éclate-Roc. Elle brise les rochers fissurés.', 'Tu en auras besoin sur la Grande Île.', 'Drakos est notre frère aîné. Il a perdu la finale de la Ligue contre Célestine, il y a dix ans.', 'Depuis, il a juré qu\'aucun Maître ne dicterait sa loi aux îles. Pyros et moi... nous l\'avons suivi.'],
-      6: ['Prends ce Sifflet Céleste ! Il appellera un oiseau pour te ramener chez toi en un instant.', 'Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
+      6: this.hasField('vol')
+        ? ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Je vois que tu portes déjà le Sifflet Céleste des Sages de Hautegrue ! Les vents te porteront sans peine jusqu\'à lui.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.']
+        : ['Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Tiens, prends ce Sifflet Céleste qu\'un pèlerin de la Tour de la Grue m\'a confié. Il appellera un oiseau pour te transporter d\'une ville à l\'autre en un instant !', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
       7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
     }[g];
     if (lines) await ui.say(lines, { speaker: name });
@@ -1864,7 +1886,7 @@ export class Game {
     } else if (name === 'doyenne') {
       const sp = 'Doyenne Amaya', f = st.flags;
       if (f['L:hooh'] === 'caught') { await ui.say(['Ho-Oh t\'a choisi... Après tant d\'années.', 'Les trois bêtes errent toujours dans les îles. Raikou sur l\'Île Orageuse, Entei sur le Chemin du Brasier, Suicune près de Givrebourg.', 'Elles ne se laisseront approcher que par un dresseur aguerri (5 badges).'], { speaker: sp }); return; }
-      if (f.plume) { await ui.say(['La Plume Arc-en-ciel ! Le Grand Sage t\'a jugé digne.', 'Monte sur le toit de la tour. Si Ho-Oh le veut, il descendra vers toi.'], { speaker: sp }); return; }
+      if (f.plume) { await ui.say(['La Plume Arc-en-ciel et le Sifflet Céleste ! Le Grand Sage t\'a jugé digne de la lignée des gardiens du ciel.', 'Monte sur le toit de la tour. Si Ho-Oh le veut, il descendra vers toi. Et le chant de ton sifflet appellera les oiseaux du ciel où que tu sois.'], { speaker: sp }); return; }
       if (!f.grueQuest) {
         f.grueQuest = true;
         await ui.say(['Tu viens du continent ? Assieds-toi, que je te raconte.', 'Autrefois, deux tours se dressaient ici. L\'une a brûlé, et trois créatures ont péri dans les flammes.', 'Ho-Oh, l\'oiseau arc-en-ciel, les a ramenées à la vie : ce sont Raikou, Entei et Suicune.', 'Depuis, Ho-Oh ne se pose plus que sur la Tour de la Grue... et seulement devant celui qui porte la Plume Arc-en-ciel.', 'La plume est gardée par le Grand Sage, au sommet de la tour. Gagne le respect des Sages, et peut-être te la confiera-t-il.'], { speaker: sp });
@@ -1874,8 +1896,16 @@ export class Game {
     } else if (name === 'grandSage') {
       if (st.flags.plume) return;
       st.flags.plume = true; this.give('plume-arc'); this.give('great-ball', 5); this.sound.sfx('item');
-      await ui.say(['Ton cœur et celui de tes créatures battent ensemble.', 'Cette plume t\'appartient désormais.'], { speaker: 'Grand Sage Hoël' });
+      const hadVol = this.hasField('vol');
+      if (!hadVol) this.give('sifflet-celeste');
+      await ui.say([
+        'Ton cœur et celui de tes créatures battent à l\'unisson.',
+        'Cette Plume Arc-en-ciel t\'appartient désormais pour éveiller Ho-Oh sur le toit de la tour.',
+        'Et reçois également ce trésor des cieux : le Sifflet Céleste !',
+        'Sculpté dans le bois sacré de la tour et orné d\'un ruban céleste, son chant appelle les grands oiseaux du ciel pour te transporter d\'une ville à l\'autre en un instant.'
+      ], { speaker: 'Grand Sage Hoël' });
       await ui.say(formatObtainItem(st.name, 'plume-arc', 1));
+      if (!hadVol) await ui.say(formatObtainItem(st.name, 'sifflet-celeste', 1));
       await ui.say(formatObtainItem(st.name, 'great-ball', 5));
       await ui.say('Monte sur le toit. Le novice te laissera passer.', { speaker: 'Grand Sage Hoël' });
       this.refreshGates();
