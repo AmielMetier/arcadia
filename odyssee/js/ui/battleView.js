@@ -289,15 +289,24 @@ export class BattleView {
   setHud(side, m, hp) {
     if (m && hp == null) hp = m.hp;
     const h = side === 1 ? this.hud.foe : this.hud.me; if (!m) { h.style.visibility = 'hidden'; return; }
-    if (side === 1) this.game.markSeen(m.sp);
+    if (side === 1 && !this.seenInBattle?.has(m.uid || m.sp)) {
+      this.seenInBattle?.add(m.uid || m.sp);
+      this.game.markSeen(m.sp);
+    }
     h.style.visibility = '';
     const g = m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '';
     h.querySelector('.bh-name').innerHTML = esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
     const typesEl = h.querySelector('.bh-types');
     if (typesEl) {
-      const spTypes = SPECIES[m.sp]?.t || ['normal'];
-      typesEl.innerHTML = spTypes.map((t) => `<span class="bh-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+      const isKnown = side === 0 || this.game.isSpeciesKnown(m.sp);
+      if (isKnown) {
+        const spTypes = SPECIES[m.sp]?.t || ['normal'];
+        typesEl.innerHTML = spTypes.map((t) => `<span class="bh-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+      } else {
+        const count = this.game.seenCount(m.sp);
+        typesEl.innerHTML = `<span class="bh-type unknown" title="Type inconnu (vu ${count}/3 - capturez-le pour révéler)">???</span>`;
+      }
     }
     const ballsEl = h.querySelector('.bh-balls');
     if (ballsEl) ballsEl.innerHTML = this.renderPartyBalls(side);
@@ -319,6 +328,7 @@ export class BattleView {
   /* ---------------- lancement ---------------- */
   async run(battle, o = {}) {
     this.battle = battle; this.kind = o.bg || 'grass'; this.alive = true;
+    this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
     this.bg = this.makeBg(this.kind, o.night);
     this.st = { shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [],
@@ -509,7 +519,8 @@ export class BattleView {
     return new Promise((resolve) => {
       const m = this.battle.me;
       const foeMon = this.battle.foe;
-      const foeTypes = foeMon ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
+      const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
+      const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
       this.cmd.innerHTML = `<div class="mv-layout">
         <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
           const x = m.moves[k];
@@ -518,12 +529,17 @@ export class BattleView {
           const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
           const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
           let effBadge = '';
-          if (foeTypes && (M.p || M.c !== 'status')) {
-            const eff = typeEff(M.t, foeTypes);
-            if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
-            else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
-            else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
-            else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+          if (foeMon && (M.p || M.c !== 'status')) {
+            if (foeKnown && foeTypes) {
+              const eff = typeEff(M.t, foeTypes);
+              if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+              else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+              else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+              else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+            } else {
+              const count = this.game.seenCount(foeMon.sp);
+              effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+            }
           }
           return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
             <div class="mbtn-top">

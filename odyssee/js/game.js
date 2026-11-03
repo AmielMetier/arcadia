@@ -135,7 +135,7 @@ export class Game {
   newState(name, gender) {
     return {
       v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(BADGES.length).fill(false), flags: {},
-      party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [] }, time: 0, visited: ['aube'], repel: 0,
+      party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [], seenCount: {} }, time: 0, visited: ['aube'], repel: 0,
       cleared: {}, surf: false, explored: [], journal: {},
       lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start,
     };
@@ -150,6 +150,8 @@ export class Game {
   load(from) {
     const s = from ? JSON.parse(JSON.stringify(from)) : JSON.parse(localStorage.getItem(SAVE_KEY));
     s.cleared ||= {}; s.explored ||= [];
+    s.dex ||= { seen: [], caught: [], seenCount: {} };
+    s.dex.seenCount ||= {};
     let maxUid = 0; for (const m of s.party.concat(s.box)) maxUid = Math.max(maxUid, m.uid || 0);
     setUidBase(maxUid + 1);
     // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
@@ -1006,8 +1008,35 @@ export class Game {
   give(item, n = 1) { this.state.bag[item] = (this.state.bag[item] || 0) + n; }
 
   /* ================= combats ================= */
-  markSeen(sp) { if (!this.state.dex.seen.includes(sp)) this.state.dex.seen.push(sp); }
-  markCaught(sp) { this.markSeen(sp); if (!this.state.dex.caught.includes(sp)) this.state.dex.caught.push(sp); }
+  seenCount(sp) {
+    if (!sp) return 0;
+    const dex = this.state?.dex;
+    if (!dex) return 0;
+    if (dex.seenCount && dex.seenCount[sp] != null) return dex.seenCount[sp];
+    return dex.seen?.includes(sp) ? 1 : 0;
+  }
+  isSpeciesKnown(sp) {
+    if (!sp) return false;
+    const dex = this.state?.dex;
+    if (!dex) return false;
+    if (dex.caught?.includes(sp)) return true;
+    for (const m of (this.state.party || []).concat(this.state.box || [])) {
+      if (m && m.sp === sp) return true;
+    }
+    return this.seenCount(sp) >= 3;
+  }
+  markSeen(sp) {
+    if (!sp) return;
+    const dex = this.state.dex;
+    dex.seenCount ||= {};
+    dex.seenCount[sp] = (dex.seenCount[sp] || 0) + 1;
+    if (!dex.seen.includes(sp)) dex.seen.push(sp);
+  }
+  markCaught(sp) {
+    this.markSeen(sp);
+    const dex = this.state.dex;
+    if (!dex.caught.includes(sp)) dex.caught.push(sp);
+  }
   lead() { return this.state.party.find((m) => m.hp > 0); }
 
   async encounterIntro(kind) {
