@@ -286,6 +286,8 @@ export function createBackroomsScene(container, map) {
   monsterGroup.add(shadow);
 
   const face = new THREE.Group();
+  const faceGlitch = { value: 1 };
+  const faceTime = { value: 0 };
   face.visible = false;
   monsterGroup.add(face);
   new THREE.TextureLoader().load(ENTITY_IMG, (t) => {
@@ -294,6 +296,28 @@ export function createBackroomsScene(container, map) {
     const h = 2.15;
     const w = Math.min(2.3, (h * t.image.width) / t.image.height);
     const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: '#e6dccb' });
+    // brouillage de l'image : bandes décalées, couleurs qui bavent, neige et lignes manquantes (uGlitch de 0 à 1)
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uGlitch = faceGlitch;
+      sh.uniforms.uGTime = faceTime;
+      sh.fragmentShader = `uniform float uGlitch;
+uniform float uGTime;
+float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+` + sh.fragmentShader.replace('#include <map_fragment>', `
+  vec2 guv = vMapUv;
+  float gt = floor(uGTime * 15.0);
+  float gb = floor(guv.y * 30.0);
+  guv.x += step(1.0 - uGlitch * 0.6, ghash(vec2(gb, gt))) * (ghash(vec2(gb, gt + 7.0)) - 0.5) * 0.4 * uGlitch;
+  guv.x += (ghash(vec2(floor(guv.y * 220.0), gt)) - 0.5) * 0.025 * uGlitch;
+  float gca = 0.03 * uGlitch;
+  vec4 gc = texture2D(map, guv);
+  gc.r = texture2D(map, guv + vec2(gca, 0.0)).r;
+  gc.b = texture2D(map, guv - vec2(gca, 0.0)).b;
+  gc.rgb = mix(gc.rgb, vec3(ghash(guv * 420.0 + uGTime)), uGlitch * 0.4);
+  if (ghash(vec2(gb * 3.1, floor(uGTime * 20.0))) < uGlitch * 0.2) gc.a = 0.0;
+  diffuseColor *= gc;
+`);
+    };
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     plane.position.y = h / 2 + 0.25; // elle flotte au-dessus de la moquette
     plane.position.x = (0.5 - 0.6) * w; // la tête (à 60 % de la largeur de la photo) dans l'axe de l'entité
@@ -350,8 +374,9 @@ export function createBackroomsScene(container, map) {
 
       // tremblement quand l'entité est tout près
       const danger = sim.hasMonster ? sim.monster.danger : 0;
+      const calm = 1 - THREE.MathUtils.smoothstep(danger, 0.72, 0.92);
       if (danger > 0.3) {
-        const shake = (danger - 0.3) * 0.035;
+        const shake = (danger - 0.3) * 0.035 * calm;
         camera.rotation.z += (Math.random() - 0.5) * shake;
         camera.position.y += (Math.random() - 0.5) * shake;
       }
@@ -366,10 +391,14 @@ export function createBackroomsScene(container, map) {
         const M = sim.monster;
         monsterGroup.visible = true;
         const chase = M.mode === 'chase';
-        const j = chase ? 0.05 : 0.015;
+        // plus elle est proche, moins elle est brouillée : nette à moins de 2,5 m
+        const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);
+        faceGlitch.value = g;
+        faceTime.value = time;
+        const j = (chase ? 0.12 : 0.04) * g;
         monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03, M.z + (Math.random() - 0.5) * j);
         monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
-        face.scale.set(1 + (chase ? (Math.random() - 0.5) * 0.04 : 0), 1 + (chase ? Math.sin(time * 18) * 0.02 : 0), 1);
+        face.scale.set(1 + (Math.random() - 0.5) * 0.08 * g, 1 + Math.sin(time * 18) * 0.04 * g, 1);
         monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
       } else {
         monsterGroup.visible = false;
@@ -413,7 +442,7 @@ export function createBackroomsScene(container, map) {
         }
       }
 
-      vhs.render(scene, camera, time, danger);
+      vhs.render(scene, camera, time, danger * calm);
     },
   };
 }

@@ -27,6 +27,9 @@ export class BackroomsHUD {
         <div class="flash-indicator" id="flashStatus">[F] LAMPE ON</div>
       </div>
 
+      <!-- Inventaire : trois cases pour les piles et l'eau d'amande -->
+      <div class="inv" id="inv">${[0, 1, 2].map((i) => `<button class="slot" data-slot="${i}"><b>${i + 1}</b><span></span></button>`).join('')}</div>
+
       <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
       <div class="crosshair"></div>
 
@@ -57,6 +60,14 @@ export class BackroomsHUD {
     `;
 
     this.$ = (s) => this.el.querySelector(s);
+    this.invKey = '';
+    this.$('#inv').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('.slot');
+      if (!b) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.actions.use?.(+b.dataset.slot);
+    });
     this.$('#clickPrompt').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-kb]');
       if (b) this.actions.setKbMode?.(b.dataset.kb === '1');
@@ -122,6 +133,18 @@ export class BackroomsHUD {
     const stamBar = this.$('#staminaBar');
     stamBar.style.width = `${P.stamina}%`;
     stamBar.classList.toggle('low', P.stamina < 25);
+
+    // 4b. Inventaire
+    const inv = P.inv || [];
+    const key = inv.join(',');
+    if (key !== this.invKey) {
+      this.invKey = key;
+      this.$('#inv').querySelectorAll('.slot').forEach((b, i) => {
+        const k = inv[i];
+        b.classList.toggle('full', !!k);
+        b.querySelector('span').innerHTML = k === 'battery' ? '<i class="ico-bat"></i>PILE' : k === 'bottle' ? '<i class="ico-bot"></i>AMANDE' : '';
+      });
+    }
 
     // 5. Lampe torche
     this.$('#flashStatus').textContent = `[F] LAMPE ${P.flashlight ? 'ON' : 'OFF'}`;

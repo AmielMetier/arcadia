@@ -62,31 +62,61 @@ export function createBackroomsMap(seed = 42) {
   }
   const inHall = (x, z) => halls.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
 
-  // 3. Quadrillage de cloisons tous les 4 cases : chaque pan de mur existe ou non, avec souvent une ouverture
-  const STEP = 4;
-  for (let gz = 0; gz < H; gz += STEP) {
-    for (let gx = 0; gx < W; gx += STEP) {
+  // 3. Quadrillage irrégulier de cloisons : les lignes tombent tous les 3 à 6 cases, à des places tirées au hasard,
+  // et chaque pan de mur existe ou non, avec souvent une ouverture. D'une partie à l'autre, rien n'est au même endroit.
+  const lines = (n) => {
+    const out = [];
+    for (let v = Math.floor(rnd() * 3); v < n; v += 3 + Math.floor(rnd() * 4)) out.push(v);
+    if (out[out.length - 1] !== n - 1) out.push(n - 1);
+    return out;
+  };
+  const xs = lines(W);
+  const zs = lines(H);
+  const density = 0.62 + rnd() * 0.16; // certaines parties plus ouvertes, d'autres plus labyrinthiques
+  for (let j = 0; j < zs.length; j++) {
+    for (let i = 0; i < xs.length; i++) {
+      const gx = xs[i];
+      const gz = zs[j];
       // pilier au croisement
       if (rnd() < 0.55 && !inHall(gx, gz)) set(gx, gz, T.WALL);
-      // pan horizontal vers l'est, puis pan vertical vers le sud
-      for (const [dx, dz] of [[1, 0], [0, 1]]) {
-        if (rnd() > 0.72) continue;
-        const gap = rnd() < 0.6 ? 1 + Math.floor(rnd() * (STEP - 1)) : -1; // case laissée ouverte
-        for (let k = 0; k <= STEP; k++) {
+      // pan vers l'est (jusqu'à la ligne suivante), puis pan vers le sud
+      for (const [dx, dz, len] of [[1, 0, (xs[i + 1] ?? W) - gx], [0, 1, (zs[j + 1] ?? H) - gz]]) {
+        if (rnd() > density) continue;
+        const gaps = new Set();
+        if (rnd() < 0.65) gaps.add(1 + Math.floor(rnd() * Math.max(1, len - 1))); // case laissée ouverte
+        if (len > 4 && rnd() < 0.4) gaps.add(1 + Math.floor(rnd() * (len - 1)));
+        for (let k = 0; k <= len; k++) {
           const x = gx + dx * k;
           const z = gz + dz * k;
-          if (k === gap || inHall(x, z)) continue;
+          if (gaps.has(k) || inHall(x, z)) continue;
           set(x, z, T.WALL);
         }
       }
     }
   }
+  const onLine = (x, z) => xs.includes(x) || zs.includes(z);
 
-  // 4. Quelques piliers isolés au milieu des cases pour casser les lignes de vue
+  // 4. Cloisons libres en L, hors du quadrillage, et piliers isolés pour casser les lignes de vue
+  for (let i = 0; i < 26; i++) {
+    let x = 2 + Math.floor(rnd() * (W - 4));
+    let z = 2 + Math.floor(rnd() * (H - 4));
+    let [dx, dz] = pick([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+    const len = 2 + Math.floor(rnd() * 4);
+    for (let k = 0; k < len * 2; k++) {
+      if (k === len) {
+        if (rnd() < 0.5) break;
+        [dx, dz] = [dz, -dx]; // le pan tourne d'un quart
+      }
+      if (!inside(x, z) || inHall(x, z) || onLine(x, z)) break;
+      set(x, z, T.WALL);
+      x += dx;
+      z += dz;
+    }
+  }
   for (let i = 0; i < 90; i++) {
     const x = 2 + Math.floor(rnd() * (W - 4));
     const z = 2 + Math.floor(rnd() * (H - 4));
-    if (x % STEP && z % STEP && !inHall(x, z)) set(x, z, T.WALL);
+    if (!onLine(x, z) && !inHall(x, z)) set(x, z, T.WALL);
   }
 
   // 5. Point de départ près du centre, sur une case libre reliée à la plus grande partie du dédale

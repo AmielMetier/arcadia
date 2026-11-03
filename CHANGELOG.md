@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.73 — 3 novembre 2026
+- **The Backrooms** — un inventaire, une entité qui se dévoile et un dédale différent à chaque partie.
+  - De loin, l'entité n'est qu'une image brouillée et pleine de parasites ; plus elle s'approche, plus elle devient nette, jusqu'à apparaître parfaitement tout près.
+  - Un inventaire de trois cases : les piles et l'eau d'amande se ramassent et s'utilisent quand tu veux avec 1, 2 ou 3 (ou en touchant la case au téléphone).
+  - Les murs sont tirés au hasard à chaque partie : couloirs, cloisons et recoins ne sont jamais au même endroit.
+  - Rejouer garde la difficulté choisie.
+
 ## 3.72 — 3 novembre 2026
 - **The Backrooms** — un bouton ⚙ Réglages, comme dans les autres jeux.
   - On y choisit ses commandes : Souris, ou Sans souris (ZQSD pour marcher, les flèches tournent la vue et font lever ou baisser les yeux).

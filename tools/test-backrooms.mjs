@@ -152,8 +152,43 @@ test("eau d'amande : remplit l'endurance", () => {
   sim.player.z = b.z;
   sim.step();
   assert.equal(b.taken, true);
+  assert.deepEqual(sim.player.inv, ['bottle'], "la bouteille va dans l'inventaire");
+  assert.ok(sim.player.stamina < 100, "elle ne se boit pas toute seule");
+  sim.step({ use: 0 });
   assert.equal(sim.player.stamina, 100);
+  assert.equal(sim.player.inv.length, 0);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
+});
+
+test('inventaire : trois cases, la quatrième trouvaille reste par terre', () => {
+  const m = createBackroomsMap(9);
+  const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
+  const objs = [...m.bottles.slice(0, 2), ...m.batteries.slice(0, 2)];
+  for (const o of objs) {
+    sim.player.x = o.x;
+    sim.player.z = o.z;
+    sim.step({});
+  }
+  assert.equal(sim.player.inv.length, 3);
+  assert.equal(objs[3].taken, false, 'la 4e reste au sol');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'invFull'));
+  sim.player.x = m.spawn.x;
+  sim.player.z = m.spawn.z;
+  sim.player.stamina = 100;
+  sim.step({ use: 0 });
+  assert.equal(sim.player.inv.length, 3, "inutile : l'objet est gardé");
+  sim.player.battery = 10;
+  sim.step({ use: 2 });
+  assert.equal(sim.player.inv.length, 2);
+  assert.ok(sim.player.battery > 60);
+});
+
+test('murs : chaque graine donne un dédale différent', () => {
+  const a = createBackroomsMap(1);
+  const b = createBackroomsMap(2);
+  let diff = 0;
+  for (let i = 0; i < a.grid.length; i++) if (a.grid[i] !== b.grid[i]) diff++;
+  assert.ok(diff > a.grid.length * 0.1, `${diff} cases différentes`);
 });
 
 test("l'entité perd le joueur quand elle ne le voit plus pendant quelques secondes", () => {
@@ -182,6 +217,7 @@ test("lampe torche : la pile se vide, la lampe s'éteint, une pile la recharge",
   sim.player.x = b.x;
   sim.player.z = b.z;
   sim.step({});
+  sim.step({ use: 0 });
   assert.ok(sim.player.battery > 50, 'la pile recharge la lampe');
   sim.step({ toggleFlashlight: true });
   assert.equal(sim.player.flashlight, true);

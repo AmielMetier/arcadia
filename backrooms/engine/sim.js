@@ -13,7 +13,8 @@ export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
 export const LOSE_TRACK_T = 4;
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
-export const BATTERY_PACK = 60; // % rendus par une pile ramassée // secondes sans voir le joueur avant que l'entité ne le perde
+export const BATTERY_PACK = 60; // % rendus par une pile utilisée
+export const INV_SIZE = 3; // cases de l'inventaire (piles et eau d'amande) // secondes sans voir le joueur avant que l'entité ne le perde
 
 export class BackroomsSim {
   constructor({ map, difficulty = 'normal', seed = 42 } = {}) {
@@ -38,6 +39,7 @@ export class BackroomsSim {
       collectedIds: new Set(),
       bottles: 0,
       battery: 100, // pile de la lampe torche (0 à 100)
+      inv: [], // inventaire : 'battery' ou 'bottle', INV_SIZE cases au plus
       signal: 0, // 0 à 1 : force du signal de la cassette la plus proche (affiché par la caméra)
       moving: false,
     };
@@ -135,6 +137,23 @@ export class BackroomsSim {
   }
 
   // Pas de simulation
+  // Boire l'eau d'amande (souffle au maximum) ou changer la pile de la lampe
+  useItem(i) {
+    const P = this.player;
+    const kind = P.inv[i];
+    if (!kind) return;
+    if (kind === 'bottle') {
+      if (P.stamina >= 100) return this.emit({ type: 'useless', kind });
+      P.stamina = 100;
+      P.bottles++;
+    } else {
+      if (P.battery >= 100) return this.emit({ type: 'useless', kind });
+      P.battery = Math.min(100, P.battery + BATTERY_PACK);
+    }
+    P.inv.splice(i, 1);
+    this.emit({ type: kind, used: true });
+  }
+
   step(input = {}) {
     if (this.state !== 'playing') return;
     this.time += DT;
@@ -149,6 +168,9 @@ export class BackroomsSim {
         this.emit({ type: 'flashlight', on: this.player.flashlight });
       }
     }
+    // utiliser une case de l'inventaire (0, 1 ou 2)
+    if (input.use !== undefined && input.use !== null) this.useItem(input.use);
+
     // la lampe vide la pile ; à plat, elle s'éteint
     if (this.player.flashlight) {
       this.player.battery = Math.max(0, this.player.battery - BATTERY_DRAIN * DT);
@@ -215,24 +237,21 @@ export class BackroomsSim {
       }
     }
 
-    // 4b. Eau d'amande : remplit l'endurance
-    for (const b of this.map.bottles || []) {
-      if (!b.taken && Math.hypot(b.x - this.player.x, b.z - this.player.z) < 1.1) {
-        b.taken = true;
-        this.player.bottles++;
-        this.player.stamina = 100;
-        this.emit({ type: 'bottle', id: b.id });
+    // 4b. Eau d'amande et piles : ramassées dans l'inventaire s'il reste une case
+    let near = null;
+    for (const [kind, list] of [['bottle', this.map.bottles], ['battery', this.map.batteries]]) {
+      for (const b of list || []) {
+        if (b.taken || Math.hypot(b.x - this.player.x, b.z - this.player.z) >= 1.1) continue;
+        if (this.player.inv.length < INV_SIZE) {
+          b.taken = true;
+          this.player.inv.push(kind);
+          this.emit({ type: 'pickup', kind, id: b.id });
+        } else near = kind + b.id;
       }
     }
-
-    // 4b'. Piles : rechargent la lampe
-    for (const b of this.map.batteries || []) {
-      if (!b.taken && Math.hypot(b.x - this.player.x, b.z - this.player.z) < 1.1) {
-        b.taken = true;
-        this.player.battery = Math.min(100, this.player.battery + BATTERY_PACK);
-        this.emit({ type: 'battery', id: b.id });
-      }
-    }
+    // inventaire plein : on le dit une fois par objet approché
+    if (near && near !== this.fullNear) this.emit({ type: 'invFull' });
+    this.fullNear = near;
 
     // 4c. Signal de la cassette la plus proche (à vol d'oiseau, 0 au-delà de 45 m)
     let best = Infinity;

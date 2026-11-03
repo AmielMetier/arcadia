@@ -263,6 +263,40 @@ html, body {
 }
 .btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
 
+/* Inventaire : trois cases en bas au centre */
+.inv {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 12;
+  pointer-events: auto;
+}
+.inv .slot {
+  position: relative;
+  width: 74px;
+  height: 58px;
+  border: 2px solid rgba(242, 240, 230, 0.45);
+  background: rgba(0, 0, 0, 0.3);
+  color: #f2f0e6;
+  font: 16px 'VT323', monospace;
+  letter-spacing: 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 4px;
+  touch-action: none;
+}
+.inv .slot.full { border-color: #f2f0e6; background: rgba(0, 0, 0, 0.45); }
+.inv .slot b { position: absolute; top: 2px; left: 5px; font-weight: normal; opacity: 0.7; }
+.inv .slot span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* pile : un bâton noir à bout cuivré ; eau d'amande : une bouteille blanche */
+.ico-bat { width: 30px; height: 12px; background: linear-gradient(90deg, #222 72%, #c98a2b 72%); border: 1px solid #f2f0e6; }
+.ico-bot { width: 12px; height: 26px; background: #efe8d6; border-radius: 3px 3px 4px 4px; box-shadow: inset 0 -9px #c9b48a; }
+
 /* Bouton Réglages (panneau commun aux jeux) */
 .icon-btn {
   position: fixed;
@@ -336,6 +370,8 @@ body.touch .click-prompt .ctrl-choice { display: none; }
   .cam { font-size: 22px; }
   .cam-tl, .cam-bl { left: 22px; }
   .cam-tr, .cam-br { right: 22px; }
+  .inv { bottom: 92px; }
+  .inv .slot { width: 60px; height: 50px; }
   .stamina-track { width: 90px; }
   .objective-banner { font-size: 20px; }
 }

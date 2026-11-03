@@ -25,6 +25,7 @@ let mouseDx = 0;
 let mouseDy = 0;
 let isPointerLocked = false;
 let toggleFlashlightRequested = false;
+let useRequested = null; // case de l'inventaire à utiliser (touches 1, 2, 3)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 try {
@@ -64,6 +65,8 @@ window.addEventListener('keydown', (e) => {
   }
   keys[e.code] = true;
   if (e.code === 'KeyF' && !e.repeat) toggleFlashlightRequested = true;
+  const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+  if (slot >= 0 && !e.repeat) useRequested = slot % 3;
   if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
 
@@ -161,7 +164,9 @@ document.addEventListener('mousemove', (e) => {
   }
 });
 
-function initGame(settings = {}) {
+let lastSettings = {};
+function initGame(settings = lastSettings) {
+  lastSettings = settings;
   const seed = Math.floor(Math.random() * 100000);
   const difficulty = settings.difficulty || 'normal';
 
@@ -181,7 +186,7 @@ function initGame(settings = {}) {
     sfx = new BackroomsSfx();
   }
   if (!hud) {
-    hud = new BackroomsHUD(hudEl, { play, setKbMode });
+    hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => (useRequested = i) });
   }
 
   stepDist = 0;
@@ -247,8 +252,10 @@ function loop(currentTime) {
       pitch: newPitch,
       run,
       toggleFlashlight: toggleFlashlightRequested,
+      use: useRequested,
     });
     toggleFlashlightRequested = false;
+    useRequested = null;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
@@ -268,12 +275,19 @@ function loop(currentTime) {
         if (sfx) sfx.cassette();
       } else if (ev.type === 'exitUnlocked') {
         if (sfx) sfx.exitUnlocked();
+      } else if (ev.type === 'pickup') {
+        if (sfx) sfx.battery();
+        if (hud) hud.toast(ev.kind === 'bottle' ? "Eau d'amande dans l'inventaire" : "Piles dans l'inventaire");
+      } else if (ev.type === 'invFull') {
+        if (hud) hud.toast('Inventaire plein : utilise un objet (1, 2, 3)');
+      } else if (ev.type === 'useless') {
+        if (hud) hud.toast(ev.kind === 'bottle' ? 'Tu as déjà tout ton souffle' : 'La lampe est déjà chargée');
       } else if (ev.type === 'bottle') {
         if (sfx) sfx.bottle();
         if (hud) hud.toast("Eau d'amande : endurance au maximum");
       } else if (ev.type === 'battery') {
         if (sfx) sfx.battery();
-        if (hud) hud.toast('Piles : lampe rechargée');
+        if (hud) hud.toast('Pile changée : lampe rechargée');
       } else if (ev.type === 'batteryEmpty') {
         if (sfx) sfx.battery(true);
         if (hud) hud.toast('Plus de pile… trouve-en dans le noir');
@@ -359,6 +373,7 @@ if (window.DDVolume && btnSet) {
         ['Regarder', 'souris'],
         ['Courir', '<kbd>Maj</kbd>'],
         ['Lampe torche', '<kbd>F</kbd>'],
+        ['Utiliser un objet', '<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>'],
         ['Pause', '<kbd>Échap</kbd>'],
       ] }] },
       { title: 'Sans souris', items: [{ keys: [
@@ -366,6 +381,7 @@ if (window.DDVolume && btnSet) {
         ['Tourner la vue', '<kbd>←</kbd><kbd>→</kbd>'],
         ['Lever, baisser les yeux', '<kbd>↑</kbd><kbd>↓</kbd>'],
         ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>F</kbd>'],
+        ['Utiliser un objet', '<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],
