@@ -41,7 +41,7 @@ const key = (x, y) => x + ',' + y;
 const RIVAL_TEAMS = {};
 for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) RIVAL_TEAMS[STARTER_TABLE[t].lines[k][0]] = STARTER_TABLE[(t + 1) % 3].lines[k];
 void R;
-const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace et le Dragon' };
+const GYM_HINTS = { bug: 'le Feu, le Vol et la Roche', rock: 'l\'Eau, la Plante, le Combat et le Sol', water: 'l\'Électrik et la Plante', electric: 'le Sol', grass: 'le Feu, la Glace, le Vol, le Poison et l\'Insecte', psychic: 'l\'Insecte et les Ténèbres', fire: 'l\'Eau, la Roche et le Sol', dragon: 'la Glace, le Dragon et la Fée', normal: 'le Combat', flying: 'l\'Électrik, la Glace et la Roche', poison: 'le Sol et le Psy', ground: 'l\'Eau, la Plante et la Glace', steel: 'le Feu, le Combat et le Sol', fairy: 'le Poison et l\'Acier', dark: 'le Combat, l\'Insecte et la Fée' };
 // capacité de terrain donnée par chaque Champion après sa victoire
 const GYM_GIFT = { 3: 'coupe', 4: 'surf', 5: 'eclate', 6: 'vol' };
 // portrait affiché à côté de la boîte de dialogue 5G, selon qui parle
@@ -377,6 +377,7 @@ export class Game {
     this.busy = true;
     this.sound.sfx(sfx);
     await this.ui.doorTransition(true, 240);
+    const from = this.mapObj.id;
     if (this.mapObj.id === 'monde' && to.map !== 'monde') this.state.lastOutdoor = { x: this.player.x, y: this.player.y + 1, map: 'monde' };
     this.player.x = to.x; this.player.y = to.y; this.player.dir = to.dir || this.player.dir; this.player.move = null; this.player.surf = false;
     this.setMap(to.map);
@@ -384,15 +385,19 @@ export class Game {
     this.save(true);
     await this.ui.doorTransition(false, 240);
     if (this.mapObj.dark && this.mapObj.dark !== 'arene' && this.canField('flash') && this.lead()) await this.ui.say(`${monName(this.lead())} utilise Flash !\nLa grotte s'éclaire.`, { auto: 900 });
-    await this.onEnterMap();
+    await this.onEnterMap(from);
     this.busy = false;
   }
   /** petites scènes à l'entrée d'une carte */
-  async onEnterMap() {
+  async onEnterMap(from = null) {
     const st = this.state;
     // lieux visités (et visités la nuit) : certaines requêtes des habitants en dépendent
     st.flags['V:' + this.mapObj.id] = true;
-    if (this.mapObj.gymLock != null) st.flags['IN:' + this.mapObj.id] = !st.badges[this.mapObj.gymLock];
+    // arène : en arrivant de dehors, le guide accueille le Dresseur et lui demande s'il est prêt (les portes se ferment alors)
+    if (this.mapObj.gymLock != null && from !== this.mapObj.id) {
+      st.flags['IN:' + this.mapObj.id] = false;
+      if (!st.badges[this.mapObj.gymLock] && !this.libre) { await this.gymWelcome(); return; }
+    }
     if (this.mapObj.id === 'domaine' && st.domaine) await arrivees(this);   // des Pokémon dont l'habitat est prêt viennent s'installer
     { const h = this.hour(); if (h >= 20 || h < 5) st.flags['VN:' + this.mapObj.id] = true; }
     // au labo, le professeur accueille le joueur avant qu'il ne touche aux capsules
@@ -646,6 +651,23 @@ export class Game {
   /** tables du Casino et terminaux de la Bourse (objets des intérieurs de Métropole) */
   casino(quoi) { return casinoScreen(this, quoi); }
   bourse() { return bourseScreen(this); }
+  /** accueil d'une arène : le guide présente le Champion et demande si l'on est prêt ; oui = enfermé jusqu'à la victoire ou
+   *  la défaite, non = on ressort pour se préparer */
+  async gymWelcome() {
+    const m = this.mapObj, st = this.state, ui = this.ui, L = LEADERS[m.gymLock];
+    const g = this.npcs.find((n) => n.def.script === 'gymguide');
+    if (g) { const dx = this.player.x - g.x, dy = this.player.y - g.y; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down'); }
+    await ui.say([`Yo, futur Maître ! Bienvenue dans l'Arène de ${L.name} !`, `${L.name} utilise des créatures de type ${TYPE_FR[L.type]}. Mise sur ${GYM_HINTS[L.type]} !`,
+      'Mais attention : une fois le défi lancé, les portes se ferment derrière toi.', 'Tu ne pourras ressortir qu\'après avoir battu le Champion… ou avoir perdu.'], { speaker: 'Guide' });
+    if (await ui.yesNo('Es-tu prêt à relever le défi ?')) {
+      st.flags['IN:' + m.id] = true; this.sound.sfx('door');
+      await ui.say(['Voilà l\'esprit ! Les portes se referment derrière toi.', 'Bonne chance !'], { speaker: 'Guide' });
+      return;
+    }
+    await ui.say(['Pas de souci. Soigne ton équipe, remplis ton sac…', 'Et reviens quand tu seras prêt !'], { speaker: 'Guide' });
+    const w = m.exitX != null ? m.warpAt(m.exitX, m.exitY) : null;
+    if (w) await this.warp(w, 'exit');
+  }
   /** l'arène est fermée derrière nous : le guide le rappelle */
   async gymLocked() {
     this.busy = true;
