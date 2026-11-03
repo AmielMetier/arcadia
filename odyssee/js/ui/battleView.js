@@ -8,6 +8,7 @@ import { ITEMS, canUseOn, itemName } from '../core/items.js';
 import { ASSETS, loadImg } from '../assets.js';
 import { TYPE_COL, TYPE_FR, STATUS_FR, hpCol, partyScreen, bagScreen } from './screens.js';
 import { typeEff } from '../core/battle.js';
+import { moveDesc } from '../data/moveDescriptions.js';
 
 const BH = 192;
 const TYPE_FX = {
@@ -163,6 +164,15 @@ export class BattleView {
       x.fillStyle = p.c;
       if (p.shape === 'ring') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.ellipse(p.x, p.y, p.r, p.r * 0.6, 0, 0, 7); x.stroke(); }
       else if (p.shape === 'bolt') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.moveTo(p.x, p.y); for (let k = 1; k < 5; k++) x.lineTo(p.x + (Math.random() - 0.5) * 10, p.y + k * 7); x.stroke(); }
+      else if (p.shape === 'tornado') {
+        x.save();
+        x.strokeStyle = p.c;
+        x.lineWidth = p.lw || 2;
+        x.beginPath();
+        x.ellipse(p.x, p.y, Math.max(1, p.r), Math.max(1, p.r * 0.32), p.tilt || 0, 0, Math.PI * 2);
+        x.stroke();
+        x.restore();
+      }
       else if (p.shape === 'leaf') { x.save(); x.translate(p.x, p.y); x.rotate(p.a || 0); x.fillRect(-3, -1, 6, 3); x.restore(); }
       else x.fillRect(Math.round(p.x - p.r), Math.round(p.y - p.r), Math.max(1, Math.round(p.r * 2)), Math.max(1, Math.round(p.r * 2)));
       x.globalAlpha = 1;
@@ -172,7 +182,20 @@ export class BattleView {
     if (s.wipe > 0) { x.fillStyle = '#000'; const h = BH / 2 * s.wipe; x.fillRect(0, 0, W, h); x.fillRect(0, BH - h, W, h); }
     // mise à jour des particules
     const dt = 1 / 60;
-    for (const p of s.parts) { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.vy += (p.g || 0); p.life -= dt; if (p.grow) p.r += p.grow; if (p.a != null) p.a += 0.2; }
+    for (const p of s.parts) {
+      if (p.spiral) {
+        p.spiralAngle = (p.spiralAngle || 0) + (p.spiralSpd || 0.2);
+        p.spiralR = (p.spiralR || 0) + (p.spiralRGrow || 0);
+        p.x = p.cx + Math.cos(p.spiralAngle) * p.spiralR;
+      } else {
+        p.x += p.vx * dt * 60;
+      }
+      p.y += p.vy * dt * 60;
+      p.vy += (p.g || 0);
+      p.life -= dt;
+      if (p.grow) p.r += p.grow;
+      if (p.a != null) p.a += (p.va != null ? p.va : 0.2);
+    }
     s.parts = s.parts.filter((p) => p.life > 0);
     requestAnimationFrame(this.frame);
   };
@@ -410,7 +433,7 @@ export class BattleView {
         let mine = null;
         if (battle.need[0]) {
           const party = battle.sides[0].party;
-          mine = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
+          mine = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
           if (mine < 0 || !party[mine] || party[mine].hp <= 0) mine = party.findIndex((m) => m.hp > 0);
         }
         duel.sendSwitch(n, mine);
@@ -442,8 +465,7 @@ export class BattleView {
 
   async loadSide(side) {
     const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me;
-    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny) : ASSETS.back(m.sp, m.shiny));
-    if (o.img && m.shadow) o.img = shadowCanvas(o.img);   // Pokémon Obscur (Lugia du Sanctuaire)
+    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny, m.shadow) : ASSETS.back(m.sp, m.shiny, m.shadow));   // Pokémon Obscur (Lugia du Sanctuaire)
     o.whiteImg = null; o.darkImg = null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
@@ -474,7 +496,14 @@ export class BattleView {
         if (k < 0) continue;
         return { type: 'switch', idx: k };
       }
-      if (c === 3) return { type: 'run' };
+      if (c === 3) {
+        if (!b.wild) {
+          this.sound.sfx('bump');
+          await this.msg('Impossible de fuir un combat de Dresseur !', { wait: true });
+          continue;
+        }
+        return { type: 'run' };
+      }
     }
   }
   commandMenu() {
@@ -527,56 +556,123 @@ export class BattleView {
       const foeMon = this.battle.foe;
       const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
       const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
-      this.cmd.innerHTML = `<div class="mv-layout">
-        <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
-          const x = m.moves[k];
-          if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
-          const M = MOVES[x.id];
-          const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
-          const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
-          let effBadge = '';
-          if (foeMon && (M.p || M.c !== 'status')) {
-            if (foeKnown && foeTypes) {
-              const eff = typeEff(M.t, foeTypes);
-              if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
-              else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
-              else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
-              else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
-            } else {
-              const count = this.game.seenCount(foeMon.sp);
-              effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+      this.cmd.innerHTML = `
+        <div class="mv-desc-banner">
+          <div class="mv-desc-head">
+            <span class="mv-desc-name"></span>
+            <span class="mv-desc-type"></span>
+            <span class="mv-desc-cat"></span>
+            <span class="mv-desc-pow"></span>
+            <span class="mv-desc-acc"></span>
+            <span class="mv-desc-pp"></span>
+          </div>
+          <div class="mv-desc-text"></div>
+        </div>
+        <div class="mv-layout">
+          <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
+            const x = m.moves[k];
+            if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
+            const M = MOVES[x.id];
+            const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
+            const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
+            let effBadge = '';
+            if (foeMon && (M.p || M.c !== 'status')) {
+              if (foeKnown && foeTypes) {
+                const eff = typeEff(M.t, foeTypes);
+                if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+                else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+                else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+                else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+              } else {
+                const count = this.game.seenCount(foeMon.sp);
+                effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+              }
             }
-          }
-          return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
-            <div class="mbtn-top">
-              <span class="mn">${esc(M.n)}</span>
-              <div class="mbtn-top-right">
-                ${effBadge}
-                <img class="mcat" src="${catIcon}" alt="${M.c}">
+            return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
+              <div class="mbtn-top">
+                <span class="mn">${esc(M.n)}</span>
+                <div class="mbtn-top-right">
+                  ${effBadge}
+                  <img class="mcat" src="${catIcon}" alt="${M.c}">
+                </div>
               </div>
-            </div>
-            <div class="mbtn-bot">
-              <div class="mbtn-bot-left">
-                <span class="mt">${TYPE_FR[M.t]}</span>
-                <span class="mpw">${pwTxt}</span>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">${TYPE_FR[M.t]}</span>
+                  <span class="mpw">${pwTxt}</span>
+                </div>
+                <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
               </div>
-              <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
-            </div>
-          </div>`;
-        }).join('')}</div>
-        <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
-          <span class="mv-back-ico">✕</span>
-          <span class="mv-back-lbl">RETOUR</span>
-        </button>
-      </div>`;
+            </div>`;
+          }).join('')}</div>
+          <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
+        </div>`;
       this.cmd.classList.add('on', 'moves');
       this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMove || 0; if (!m.moves[i]) i = 0;
       const btns = [...this.cmd.querySelectorAll('.mbtn')];
       const backBtn = this.cmd.querySelector('.mv-back-btn');
+      const descName = this.cmd.querySelector('.mv-desc-name');
+      const descType = this.cmd.querySelector('.mv-desc-type');
+      const descCat = this.cmd.querySelector('.mv-desc-cat');
+      const descPow = this.cmd.querySelector('.mv-desc-pow');
+      const descAcc = this.cmd.querySelector('.mv-desc-acc');
+      const descPp = this.cmd.querySelector('.mv-desc-pp');
+      const descText = this.cmd.querySelector('.mv-desc-text');
       const show = () => {
         btns.forEach((b, k) => b.classList.toggle('sel', k === i));
         backBtn?.classList.toggle('sel', i === 4);
+        if (i === 4) {
+          if (descName) descName.textContent = 'RETOUR ✕';
+          if (descType) descType.style.display = 'none';
+          if (descCat) descCat.style.display = 'none';
+          if (descPow) descPow.style.display = 'none';
+          if (descAcc) descAcc.style.display = 'none';
+          if (descPp) descPp.style.display = 'none';
+          if (descText) descText.textContent = 'Annuler et revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
+        } else {
+          const x = m.moves[i];
+          if (x) {
+            const M = MOVES[x.id];
+            if (descName) {
+              descName.style.display = 'inline-block';
+              descName.textContent = M.n;
+            }
+            if (descType) {
+              descType.style.display = 'inline-block';
+              descType.textContent = TYPE_FR[M.t];
+              descType.style.background = TYPE_COL[M.t];
+            }
+            if (descCat) {
+              descCat.style.display = 'inline-flex';
+              descCat.innerHTML = `<img src="img/battle/cat_${M.c || 'physical'}.png" alt=""><span>${M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique'}</span>`;
+            }
+            if (descPow) {
+              descPow.style.display = 'inline-block';
+              descPow.textContent = M.p ? `Puis. ${M.p}` : 'Statut';
+            }
+            if (descAcc) {
+              descAcc.style.display = 'inline-block';
+              descAcc.textContent = M.a ? `Préc. ${M.a}%` : 'Préc. —';
+            }
+            if (descPp) {
+              descPp.style.display = 'inline-block';
+              descPp.textContent = `PP ${x.pp}/${M.pp}`;
+            }
+            if (descText) descText.textContent = moveDesc(M);
+          } else {
+            if (descName) descName.textContent = 'Emplacement vide';
+            if (descType) descType.style.display = 'none';
+            if (descCat) descCat.style.display = 'none';
+            if (descPow) descPow.style.display = 'none';
+            if (descAcc) descAcc.style.display = 'none';
+            if (descPp) descPp.style.display = 'none';
+            if (descText) descText.textContent = 'Aucune capacité apprise sur cet emplacement.';
+          }
+        }
       };
       show();
       let done = false;
@@ -637,7 +733,7 @@ export class BattleView {
   }
   async forcedSwitch() {
     const b = this.battle;
-    const k = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
+    const k = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
     if (k < 0) return;
     await this.play(b.playerSwitch(k));
   }
@@ -707,6 +803,10 @@ export class BattleView {
     const M = MOVES[moveId], fx = TYPE_FX[type] || TYPE_FX.normal, from = this.sprCenter(side), to = this.sprCenter(1 - side);
     const o = side === 1 ? this.st.foe : this.st.me, dir = side === 1 ? -1 : 1;
     const selfMove = M.tg === 7 || M.c === 'status' && (M.m?.st?.every(([, c]) => c > 0) || M.m?.heal);
+    if (moveId === 10001 || M?.key === 'shadow-blast' || M?.n === 'Rafale Obscure') {
+      await this.animShadowBlast(side, from, to);
+      return;
+    }
     if (M.c === 'physical') {
       await this.tween(130, (u) => { o.dx = dir * 14 * Math.sin(u * Math.PI / 2); o.dy = -dir * 6 * Math.sin(u * Math.PI / 2); });
       this.burst(to.x, to.y, fx, 16, { speed: 2.4, r: 2 });
@@ -733,6 +833,144 @@ export class BattleView {
       this.burst(c.x, c.y, fx, 10, { speed: 1, r: 1.5, up: 0.6 });
       await wait(180);
     }
+  }
+  async animShadowBlast(side, from, to) {
+    const o = side === 1 ? this.st.foe : this.st.me;
+    const targetO = side === 1 ? this.st.me : this.st.foe;
+    const shadowCols = ['#1a052e', '#4a148c', '#7b1fa2', '#00e5ff', '#ffffff'];
+
+    // 1. Charge des ténèbres & élévation de Lugia Obscur
+    this.sound.sfx('throw');
+    await this.tween(320, (u) => {
+      o.dy = -16 * ease(u);
+      o.white = 0.45 * u;
+      if (Math.random() < 0.75) {
+        const ang = Math.random() * Math.PI * 2, dist = 24 + Math.random() * 18;
+        const c = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: from.x + Math.cos(ang) * dist,
+          y: (from.y - 14) + Math.sin(ang) * dist,
+          vx: -Math.cos(ang) * 1.9,
+          vy: -Math.sin(ang) * 1.9,
+          r: 1.5 + Math.random() * 1.5,
+          c,
+          life: 0.32,
+          max: 0.32,
+        });
+      }
+    });
+
+    await wait(60);
+
+    // 2. Traînée obscure / projectile fonçant vers la cible
+    this.sound.sfx('throw');
+    await this.tween(150, (u) => {
+      const bx = from.x + (to.x - from.x) * u;
+      const by = (from.y - 14) + (to.y - (from.y - 14)) * u;
+      for (let k = 0; k < 3; k++) {
+        this.st.parts.push({
+          x: bx + (Math.random() - 0.5) * 6,
+          y: by + (Math.random() - 0.5) * 6,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          r: 2 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.24,
+          max: 0.24,
+          shape: Math.random() < 0.35 ? 'bolt' : null,
+        });
+      }
+    });
+
+    // 3. Déploiement de la Tornade Obscure (Cyclone tourbillonnant)
+    const tornadoDur = 700;
+    const startTornado = performance.now();
+    let lastRing = 0;
+
+    this.shakeScreen(3, 680);
+
+    await this.tween(tornadoDur, (u) => {
+      const elapsed = performance.now() - startTornado;
+      targetO.dx = Math.sin(u * 30) * 2.5;
+
+      // Anneaux de vortex ascendants et s'évasant
+      if (elapsed - lastRing > 60) {
+        lastRing = elapsed;
+        const ringCol = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 4,
+          y: to.y + 14,
+          vx: 0,
+          vy: -2.4 - Math.random() * 0.8,
+          r: 6,
+          grow: 0.72,
+          tilt: (Math.random() - 0.5) * 0.25,
+          lw: 2.2,
+          shape: 'tornado',
+          c: ringCol,
+          life: 0.55,
+          max: 0.55,
+        });
+      }
+
+      // Éclats tourbillonnants en spirale ascendante
+      for (let s = 0; s < 3; s++) {
+        const spd = (0.24 + Math.random() * 0.16) * (Math.random() < 0.5 ? 1 : -1);
+        this.st.parts.push({
+          cx: to.x,
+          x: to.x,
+          y: to.y + 12 + (Math.random() - 0.5) * 8,
+          spiral: true,
+          spiralAngle: Math.random() * Math.PI * 2,
+          spiralR: 4 + Math.random() * 6,
+          spiralRGrow: 0.38 + Math.random() * 0.22,
+          spiralSpd: spd,
+          vx: 0,
+          vy: -2.2 - Math.random() * 1.5,
+          r: 1.5 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.48,
+          max: 0.48,
+        });
+      }
+
+      // Éclairs cyan et violets
+      if (Math.random() < 0.35) {
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 18,
+          y: to.y - 18 + (Math.random() - 0.5) * 20,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: -1.2,
+          r: 3,
+          c: Math.random() < 0.5 ? '#00e5ff' : '#e040fb',
+          shape: 'bolt',
+          life: 0.22,
+          max: 0.22,
+        });
+      }
+    });
+
+    targetO.dx = 0;
+
+    // 4. Cataclysme : Flash, déflagration & ondes de choc
+    this.sound.sfx('hitstrong');
+    this.tween(240, (u) => { this.st.screenFlash = 0.85 * (1 - u); });
+
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 8, grow: 3.5, shape: 'ring', c: '#ffffff', life: 0.36, max: 0.36 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 14, grow: 2.8, shape: 'ring', c: '#00e5ff', life: 0.42, max: 0.42 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 20, grow: 2.2, shape: 'ring', c: '#7b1fa2', life: 0.48, max: 0.48 });
+
+    this.burst(to.x, to.y - 4, shadowCols, 38, { speed: 3.4, r: 2.6 });
+    await this.shakeScreen(7, 500);
+
+    // 5. Atterrissage de Lugia Obscur
+    await this.tween(220, (u) => {
+      o.dy = -16 * (1 - ease(u));
+      o.white = 0.45 * (1 - u);
+    });
+    o.dy = 0;
+    o.white = 0;
+    await wait(80);
   }
   async animHit(side, eff, crit) {
     const o = side === 1 ? this.st.foe : this.st.me;

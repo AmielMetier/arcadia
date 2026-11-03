@@ -11,6 +11,7 @@ import { partyScreen } from './ui/screens.js';
 import { ASSETS, loadImg } from './assets.js';
 import { el } from './ui/ui.js';
 import { shadowCanvas } from './render/shadow.js';
+import { playLugiaCinematic } from './ui/cinematic.js';
 
 const say = (g, lines, who) => g.ui.say(lines, who ? { speaker: who } : undefined);
 const val = (v, st) => (typeof v === 'function' ? v(st) : v);
@@ -245,6 +246,7 @@ async function lugiaWakes(g) {
   await ui.flash(3, '#6020a0', 120);
   g.sound.cry(ASSETS.cry(LUGIA));
   await ui.say(['Un cri immense résonne dans tout le Sanctuaire !', 'Les eaux de l\'autel bouillonnent... Lugia Obscur ouvre les yeux !']);
+  await playLugiaCinematic(g);
   await lugiaBattle(g);
 }
 
@@ -252,6 +254,9 @@ async function lugiaWakes(g) {
 export async function lugiaBattle(g) {
   const st = g.state, ui = g.ui;
   if (!g.lead()) return;
+  if (!st.flags.seenLugiaCinematic) {
+    await playLugiaCinematic(g);
+  }
   if (!(await ui.yesNo('Lugia Obscur te fixe de ses yeux sombres.\nL\'affronter ?'))) return;
   const res = await g.runBattle({ wild: shadowLugia(), music: 'legend' });
   if (res === 'caught') {
@@ -287,9 +292,9 @@ export async function placeLugia(g) {
     if (g.mapObj.id === LUGIA_ALTAR.map && g.mapObj.get(LUGIA_ALTAR.x, LUGIA_ALTAR.y) === T.BLOCK) g.mapObj.set(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE);
     return;
   }
-  const img = await loadImg(ASSETS.front(LUGIA));
+  const img = await loadImg(ASSETS.front(LUGIA, false, true));
   if (g.mapObj.id !== LUGIA_ALTAR.map || !img) return;
-  const a = g.view.imageActor('lugia', shadowCanvas(img), 0.55);
+  const a = g.view.imageActor('lugia', img, 0.55);
   g.view.place(a, LUGIA_ALTAR.x, LUGIA_ALTAR.y - 0.1);
 }
 

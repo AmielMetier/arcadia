@@ -19,9 +19,12 @@ const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
 const orig = (id) => id >= 1000 && SPECIES[id];
 
 export const ASSETS = {
-  front: (id, shiny) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
-  back: (id, shiny) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
-  icon: (id) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
+  front: (id, shiny, shadow) => (shadow ? ${IMG}crea/-shadow-f.png : orig(id) ? ${IMG}crea/-f.png : ${gen(id)}/.png),
+  back: (id, shiny, shadow) => (shadow ? ${IMG}crea/-shadow-b.png : orig(id) ? ${IMG}crea/-b.png : ${gen(id)}/back/.png),
+  icon: (id, shadow) => (shadow ? ${IMG}crea/-shadow-i.png : orig(id) ? ${IMG}crea/-i.png : ${BASE}/pokemon/versions/generation-vii/icons/.png),
+  shadowFront: (id) => ${IMG}crea/-shadow-f.png,
+  shadowBack: (id) => ${IMG}crea/-shadow-b.png,
+  shadowIcon: (id) => ${IMG}crea/-shadow-i.png,
   item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png` : `${BASE}/items/${ic}.png`; },
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
   cry: (id) => (orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),

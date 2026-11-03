@@ -24,6 +24,7 @@ import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { preparerDomaine, frigo, architecte, recolter, allerDomaine, resident, arrivees } from './ui/domaine.js';
 import { composer } from './render/tenue.js';
+import { buildRivalParty, getRivalItems } from './world/rival.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
 const SAVE_KEY = 'odyssee-save-v2';
@@ -1054,7 +1055,16 @@ export class Game {
       if (it.candy) {
         this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
-        for (const s of steps) { for (const id of s.learned) await this.ui.say(`${monName(m)} apprend ${MOVES[id].n} !`); for (const id of s.ask) await this.askLearn(m, id); }
+        for (const s of steps) { for (const id of s.learned) {
+          const M = MOVES[id];
+          const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+          const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
+          const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
+          await this.ui.say([
+            `${monName(m)} apprend ${M.n} !`,
+            `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
+          ]);
+        } for (const id of s.ask) await this.askLearn(m, id); }
         const to = levelEvolution(m, this.hour()); if (to) await this.evolveScene(m, to);
         continue;
       }
@@ -1162,7 +1172,24 @@ export class Game {
       speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name,
       face: tr.bs || tr.ow || n.sprite
     });
-    const party = tr.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 8 + lvl / 2 | 0)), shiny: false }));
+    const isBoss = d.leader != null || d.champion;
+    const leaderDefaultItem = (sp, lvl) => {
+      const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
+      const type = S.t[0] || 'normal';
+      const typeBoosters = { fire: 'charcoal', water: 'mystic-water', grass: 'miracle-seed', electric: 'magnet', dark: 'black-glasses', rock: 'hard-stone', ground: 'soft-sand', flying: 'sharp-beak', fighting: 'black-belt', poison: 'poison-barb', psychic: 'twisted-spoon', bug: 'silver-powder', dragon: 'dragon-fang', ice: 'never-melt-ice', steel: 'metal-coat', normal: 'silk-scarf' };
+      if (lvl >= 65) return 'life-orb';
+      if (S.ev && S.ev.length) return 'eviolite';
+      return typeBoosters[type] || 'sitrus-berry';
+    };
+    const party = tr.team.map((entry) => {
+      const [sp, lvl, heldItem, customMoves] = Array.isArray(entry) ? entry : [entry.sp, entry.lvl, entry.item, entry.moves];
+      return createMon(sp, lvl, {
+        iv: Array(6).fill(isBoss ? 31 : Math.min(31, 8 + lvl / 2 | 0)),
+        item: heldItem || (isBoss ? leaderDefaultItem(sp, lvl) : null),
+        moves: customMoves || null,
+        shiny: false
+      });
+    });
     const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival });
     this.musicLock = false;
     if (res === 'win') {
@@ -1382,7 +1409,16 @@ export class Game {
       const res = evolve(m, to); this.markCaught(to);
       this.sound.cry(ASSETS.cry(to)); this.sound.sfx('levelup');
       await ui.say(`Félicitations ! Votre ${oldName} a évolué en ${SPECIES[to].n} !`);
-      for (const id of res.learned) await ui.say(`${monName(m)} apprend ${MOVES[id].n} !`);
+      for (const id of res.learned) {
+        const M = MOVES[id];
+        const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+        const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
+        const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
+        await ui.say([
+          `${monName(m)} apprend ${M.n} !`,
+          `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
+        ]);
+      }
       for (const id of res.ask) await this.askLearn(m, id);
     }
     alive = false; s.remove(); this.sound.current = null; this.updateZone();
@@ -1486,9 +1522,11 @@ export class Game {
       fight: async (tr) => {
         const t = { cls: 'Dresseur', prize: 40, ai: 'smart', ...tr, bs: tr.bs || tr.ow || 'garde' };
         if (t.intro) await ui().say(t.intro, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
-        const party = t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
+        const isRival = t.cls === 'Rival' || t.name === RIVAL_NAME || t.rival;
+        const party = isRival ? buildRivalParty(g, t.team) : t.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 10 + lvl / 2 | 0)), shiny: false }));
         g.musicLock = true;
-        const res = await g.runBattle({ trainer: { ...t, items: { ...(t.items || {}) } }, party, music: t.music || 'trainer', rival: true, noWhiteout: t.noWhiteout });
+        const items = isRival ? getRivalItems(g) : { ...(t.items || {}) };
+        const res = await g.runBattle({ trainer: { ...t, items }, party, music: t.music || (isRival ? 'rival' : 'trainer'), rival: isRival, noWhiteout: t.noWhiteout });
         g.musicLock = false; g.updateZone();
         if (res === 'win' && t.after) await ui().say(t.after, { speaker: t.cls ? `${t.cls} ${t.name}` : t.name, face: t.bs || t.ow });
         return res;
@@ -1652,7 +1690,7 @@ export class Game {
     await ui.say(['Alors je prends celle-là !', `${SPECIES[rs].n} ! Elle a une tête de gagnante, comme moi.`], { speaker: RIVAL_NAME });
     if (rival) rival.dir = 'left';
     await ui.say(['Hé, ' + st.name + ' ! On a nos créatures, alors...', 'On se fait un petit combat ? Allez !'], { speaker: RIVAL_NAME });
-    const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'normal', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: [createMon(rs, 5, { shiny: false })], music: 'rival', rival: true, noWhiteout: true });
+    const res = await this.runBattle({ trainer: { cls: 'Rival', name: RIVAL_NAME, prize: 30, bs: 'theo', ai: 'smart', friendly: true, lose: 'Quoi ?! J\'aurais dû choisir l\'autre !' }, party: buildRivalParty(this, [[rs, 5]]), music: 'rival', rival: true, noWhiteout: true });
     for (const m of st.party) healFull(m);
     st.flags.rival1 = true;
     await ui.say(res === 'win' ? 'Pfff... Bon, c\'était juste un échauffement !' : 'Ha ha ! Je suis trop fort ! Mais t\'inquiète, tu t\'améliores déjà.', { speaker: RIVAL_NAME });
@@ -1702,8 +1740,8 @@ export class Game {
       if (n > 1) await this.npcWalk(rival, OPP[dir], n - 1);
       rival.dir = OPP[dir];
       await ui.say(lines, { speaker: W.name });
-      const party = team(R).map(([s, l]) => createMon(s, l, { iv: Array(6).fill(22), shiny: false }));
-      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: 'smart', items: { [st.badges[4] ? 'hyper-potion' : 'super-potion']: 1 }, lose: lvlText }, party, music: 'rival', rival: true });
+      const party = buildRivalParty(this, team(R));
+      const res = await this.runBattle({ trainer: { cls: W.cls || 'Rival', name: W.name, prize: 40, bs: W.bs, ai: 'smart', items: getRivalItems(this), lose: lvlText }, party, music: 'rival', rival: true });
       this.musicLock = false;
       if (res !== 'lose') {
         await ui.say(after, { speaker: W.name });
