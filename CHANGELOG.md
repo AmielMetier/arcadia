@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 3.78 — 3 novembre 2026
+- **Dogfight 3D** — trois nouveaux modes, des combats bien plus vivants et des récompenses
+  - **Domination** : deux équipes se disputent trois zones au-dessus des villages de l'île. Pour capturer, il faut voler bas, sous le plafond de la zone : on s'expose. Chaque zone tenue rapporte un point par seconde, chaque élimination aussi.
+  - **Duel** : un contre un, face à face. Le gagnant reste en piste, le perdant passe derrière ceux qui attendent et regarde la manche. Après 90 secondes, le moins abîmé l'emporte. Le premier à l'objectif est le roi du ciel.
+  - **Escorte** : un gros transport fait le tour de l'île. Une équipe le protège jusqu'à la fin du temps, l'autre doit l'abattre avant.
+  - Les bots tirent enfin vraiment : ils cassent les poursuites sans fin et s'évitent mieux. Les parties comptent près de deux fois plus d'éliminations, et le niveau Facile n'est plus inoffensif.
+  - Le canon frappe plus fort et touche un peu plus facilement, et un avion touché reste pilotable plus longtemps.
+  - Nouvelles annonces en vol : premier sang, doublé, triplé, série, revanche sur celui qui t'a abattu, aide quand tu as bien touché la cible d'un autre.
+  - En fin de partie, des titres pour chacun : Inarrêtable, Œil de lynx, As du missile, Ailier en or, Increvable, Maître des lieux, Chasseur de gros, Garde du corps.
+  - La flamme de la postcombustion monte et retombe en douceur, l'éclair et les traçantes partent de la vraie bouche du canon, et le dessous des nuages paraît moins plat.
+  - En qualité Auto, après une partie bien fluide, le jeu essaie les nuages volumétriques au décollage suivant, et revient en arrière si l'image rame.
+
 ## 3.77 — 3 novembre 2026
 - **Odyssée** — En combat, les attaques n'affichent plus les dégâts prévus en % : à toi de juger, comme dans les jeux.
 - **Odyssée** — Le journal des nouveautés ne dévoile plus l'histoire : les noms, les rebondissements et les lieux secrets restent à découvrir en jouant.
