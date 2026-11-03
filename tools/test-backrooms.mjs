@@ -229,6 +229,8 @@ test("lampe torche : la pile se vide, la lampe s'éteint, une pile la recharge",
   const m = createBackroomsMap(5);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
   assert.ok(m.batteries.length >= 6, 'des piles dans le dédale');
+  sim.player.hasLamp = true;
+  sim.player.flashlight = true;
   for (let i = 0; i < 60 * 300; i++) sim.step({});
   assert.equal(sim.player.battery, 0);
   assert.equal(sim.player.flashlight, false, "la lampe s'éteint à plat");
@@ -437,6 +439,50 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   host.removePlayer(1);
   wire();
   assert.equal(guest.players.length, 1);
+});
+
+test('départ : une table avec une lampe par joueur, chacun prend la sienne', () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
+  for (const sd of [3, 14, 15, 92, 653]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
+    assert.ok(sim.table, `graine ${sd} : une table au départ`);
+    assert.equal(sim.lamps.length, 3, 'autant de lampes que de joueurs');
+    assert.ok(sim.players.every((p) => !p.hasLamp && !p.flashlight), 'personne ne part avec sa lampe');
+    assert.ok(!sim.players.some((p) => sim.isColliding(p.x, p.z, 0.38)), 'personne ne naît dans la table');
+    const gx = Math.floor(sim.table.x / CELL_SIZE);
+    const gz = Math.floor(sim.table.z / CELL_SIZE);
+    assert.ok(sim.map.dist[gz * sim.map.W + gx] >= 0, 'la table est accessible');
+    // sans lampe, F ne fait rien
+    sim.step({ toggleFlashlight: true });
+    assert.ok(sim.drainEvents().some((e) => e.type === 'noLamp'));
+    // chacun s'approche de la table et prend une lampe ; il n'y en a pas pour un quatrième
+    for (const P of sim.players) {
+      P.x = sim.table.x + 1.2;
+      P.z = sim.table.z;
+    }
+    sim.step();
+    assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde est équipé et la lampe est allumée');
+    assert.ok(sim.lamps.every((l) => l.taken));
+    // on ne traverse pas la table
+    assert.ok(sim.isColliding(sim.table.x, sim.table.z, 0.38));
+  }
+});
+
+test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 8, players, localId: 1 });
+  const [a, b] = sim.players;
+  a.status = 'dead'; // attrapé avant d'avoir pris sa lampe
+  sim.cassettes = 5;
+  b.x = sim.map.elevator.x;
+  b.z = sim.map.elevator.z;
+  sim.step();
+  run(sim, DEPART_T + 0.2);
+  assert.equal(sim.level, 1);
+  const a1 = sim.players.find((p) => p.id === 1);
+  assert.equal(a1.status, 'alive');
+  assert.ok(a1.hasLamp && a1.flashlight);
+  assert.equal(sim.table, null, "plus de table à l'étage suivant");
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

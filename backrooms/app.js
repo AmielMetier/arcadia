@@ -335,6 +335,14 @@ function handleEvent(ev, me) {
       if (sfx) sfx.battery();
       if (hud) hud.toast('Pile changée : lampe rechargée');
       break;
+    case 'lamp':
+      if (ev.id !== me) break;
+      if (sfx) sfx.battery();
+      if (hud) hud.toast('Lampe torche en main · [F] pour l\'allumer ou l\'éteindre');
+      break;
+    case 'noLamp':
+      if (ev.id === me && hud) hud.toast('Pas de lampe : prends-en une sur la table du départ');
+      break;
     case 'batteryEmpty':
       if (!mine) break;
       if (sfx) sfx.battery(true);

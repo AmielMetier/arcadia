@@ -5,6 +5,8 @@
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
 // Qui entre dans l'ascenseur ouvert devient spectateur ; il part quand plus personne n'est dehors. Plus il y a de
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
+// Au tout début, personne n'a de lampe : une table au départ en porte une par joueur. Un joueur attrapé regarde les
+// autres jusqu'à la fin de l'étage ; si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, createBackroomsMap } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { findPath, hasLineOfSight } from './nav.js';
@@ -49,7 +51,8 @@ function newPlayer(id, name, map, i) {
     pitch: 0,
     stamina: 100, // 0 à 100
     running: false,
-    flashlight: true,
+    flashlight: false,
+    hasLamp: false, // lampe torche prise sur la table du départ
     bottles: 0,
     battery: 100, // pile de la lampe torche (0 à 100)
     inv: [], // inventaire : 'battery' ou 'bottle', INV_SIZE cases au plus
@@ -93,8 +96,40 @@ export class BackroomsSim {
         P.found = old.found;
         P.yaw = old.yaw;
       }
+      // à partir du Level 1, tout le monde a sa lampe (ceux qui étaient tombés en reçoivent une)
+      if (level > 0) {
+        P.hasLamp = true;
+        P.flashlight = !old || old.flashlight || old.status !== 'alive';
+      }
       return P;
     });
+    // Level 0 : la table des lampes torches, posée dans une case libre à côté du départ
+    this.table = null;
+    this.lamps = [];
+    if (level === 0) {
+      const { gx, gz } = this.map.spawn;
+      const free = (x, z) => !this.map.isWall(x, z) && !(this.map.props || []).some((p) => Math.hypot(p.x - (x + 0.5) * CELL_SIZE, p.z - (z + 0.5) * CELL_SIZE) < 1.4);
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+      const d = dirs.find(([dx, dz]) => free(gx + dx, gz + dz) && free(gx + 2 * dx, gz + 2 * dz)) || dirs.find(([dx, dz]) => free(gx + dx, gz + dz));
+      if (d) {
+        const tx = (gx + d[0] + 0.5) * CELL_SIZE;
+        const tz = (gz + d[1] + 0.5) * CELL_SIZE;
+        // la table regarde le départ ; les lampes sont alignées sur sa longueur
+        const rot = Math.atan2(d[0], d[1]) + Math.PI / 2;
+        this.table = { x: tx, z: tz, r: 0.62, rot };
+        const n = this.roster.length;
+        for (let i = 0; i < n; i++) {
+          const o = n > 1 ? (i / (n - 1) - 0.5) * 1.1 : 0;
+          this.lamps.push({ id: i, x: tx + Math.cos(rot) * o, z: tz - Math.sin(rot) * o, taken: false });
+        }
+      } else {
+        // pas de place (très rare) : chacun part avec sa lampe
+        for (const P of this.players) {
+          P.hasLamp = true;
+          P.flashlight = true;
+        }
+      }
+    }
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
     this.powered = false; // panneau du monte-charge réalimenté
@@ -192,7 +227,9 @@ export class BackroomsSim {
         if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
       }
     }
-    // caisses et meubles abandonnés (cercles)
+    // table des lampes, caisses et meubles abandonnés (cercles)
+    const T0 = this.table;
+    if (T0 && (T0.x - x) ** 2 + (T0.z - z) ** 2 < (radius + T0.r) ** 2) return true;
     for (const pr of this.map.props || []) {
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
@@ -261,7 +298,8 @@ export class BackroomsSim {
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
     if (input.toggleFlashlight) {
-      if (!P.flashlight && P.battery <= 0) this.emit({ type: 'batteryEmpty', id: P.id });
+      if (!P.hasLamp) this.emit({ type: 'noLamp', id: P.id });
+      else if (!P.flashlight && P.battery <= 0) this.emit({ type: 'batteryEmpty', id: P.id });
       else {
         P.flashlight = !P.flashlight;
         this.emit({ type: 'flashlight', on: P.flashlight, id: P.id });
@@ -308,6 +346,17 @@ export class BackroomsSim {
       const pos = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT);
       P.x = pos.x;
       P.z = pos.z;
+    }
+
+    // 3b. Prendre une lampe sur la table du départ (une par joueur)
+    if (!P.hasLamp && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
+      const lamp = this.lamps.find((l) => !l.taken);
+      if (lamp) {
+        lamp.taken = true;
+        P.hasLamp = true;
+        P.flashlight = true;
+        this.emit({ type: 'lamp', id: P.id, lamp: lamp.id });
+      }
     }
 
     // 4. Objectifs : cassettes (Level 0) ou fusibles (Level 1), pour toute l'équipe
@@ -404,6 +453,11 @@ export class BackroomsSim {
     this.players.push(P);
   }
 
+  // l'objectif à suivre pour un joueur sans lampe : la table du départ
+  get needLamp() {
+    return !!this.table && !this.player.hasLamp && this.player.status === 'alive';
+  }
+
   // Un joueur s'en va : il disparaît de la partie ; s'il était le dernier dehors, l'ascenseur part
   removePlayer(id) {
     this.roster = this.roster.filter((r) => r.id !== id);
@@ -425,9 +479,9 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0],
-      k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.bottles, 'taken'), bits(this.map.batteries, 'taken')],
+      k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.bottles, 'taken'), bits(this.map.batteries, 'taken'), bits(this.lamps, 'taken')],
     };
   }
 
@@ -443,7 +497,7 @@ export class BackroomsSim {
     this.departT = snap.dp;
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -466,6 +520,7 @@ export class BackroomsSim {
       }
       P.status = status;
       P.flashlight = !!fl;
+      P.hasLamp = !!lamp;
       P.battery = bat;
       P.inv = inv ? inv.split(',') : [];
       P.signal = signal;
@@ -482,6 +537,11 @@ export class BackroomsSim {
     set(this.map.fuses, 'taken', snap.k[1]);
     set(this.map.bottles, 'taken', snap.k[2]);
     set(this.map.batteries, 'taken', snap.k[3]);
+    // la table compte autant de lampes que de joueurs chez l'hôte
+    if (snap.k[4] !== undefined && this.table) {
+      while (this.lamps.length < snap.k[4].length) this.lamps.push({ ...this.lamps[0], id: this.lamps.length, taken: false });
+      set(this.lamps, 'taken', snap.k[4]);
+    }
     if (this.hasMonster) this.senseMonster();
   }
 

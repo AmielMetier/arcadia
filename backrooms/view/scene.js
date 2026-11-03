@@ -411,6 +411,56 @@ export function createBackroomsScene(container, map) {
   exitLight.position.set(map.exit.x, 2.4, map.exit.z);
   scene.add(exitLight);
   let doorOpen = 0;
+
+  // 9c. Table des lampes torches au départ (construite au premier rendu : c'est le moteur qui la place)
+  let tableBuilt = false;
+  const lampMeshes = [];
+  const buildTable = (sim) => {
+    tableBuilt = true;
+    const T0 = sim.table;
+    if (!T0) return;
+    const g = new THREE.Group();
+    g.position.set(T0.x, 0, T0.z);
+    g.rotation.y = T0.rot;
+    const wood = baked(new THREE.MeshLambertMaterial({ color: '#5b4128' }));
+    const top = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.75), wood);
+    top.position.y = 0.76;
+    g.add(top);
+    for (const [lx, lz] of [[-0.78, -0.31], [0.78, -0.31], [-0.78, 0.31], [0.78, 0.31]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.74, 0.06), wood);
+      leg.position.set(lx, 0.37, lz);
+      g.add(leg);
+    }
+    // une petite lumière chaude au-dessus pour qu'on la repère tout de suite
+    const glow = new THREE.PointLight('#ffd9a0', 2.2, 5, 1.6);
+    glow.position.set(0, 1.6, 0);
+    g.add(glow);
+    scene.add(g);
+    // les lampes, couchées en travers de la table
+    const body = new THREE.MeshLambertMaterial({ color: '#1c1d20' });
+    const ring = new THREE.MeshLambertMaterial({ color: '#b8bcc2' });
+    const lens = new THREE.MeshBasicMaterial({ color: '#fff3c8' });
+    const addLamp = (l) => {
+      const m = new THREE.Group();
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 10), body);
+      const h = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.04, 0.08, 12), ring);
+      h.position.y = 0.16;
+      const le = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), lens);
+      le.position.y = 0.201;
+      le.rotation.x = -Math.PI / 2;
+      m.add(b, h, le);
+      m.rotation.x = Math.PI / 2; // couchée en travers de la table
+      m.position.y = 0.83;
+      const wrap = new THREE.Group();
+      wrap.position.set(l.x, 0, l.z);
+      wrap.rotation.y = T0.rot + (l.id % 2 ? 0.25 : -0.2);
+      wrap.add(m);
+      scene.add(wrap);
+      lampMeshes.push({ l, m: wrap });
+    };
+    for (const l of sim.lamps) addLamp(l);
+    buildTable.addLamp = addLamp;
+  };
   let lit = true;
   let powerFlick = 0;
   const setPower = (v) => {
@@ -545,6 +595,10 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       lastTime = time;
       // la caméra suit le joueur de cet écran, ou celui qu'il regarde quand il est spectateur
       const P = sim.viewPlayer(sim.spectate || 0);
+      if (!tableBuilt && sim.level === map.level) buildTable(sim);
+      // une lampe de plus si un joueur arrive en cours de partie
+      if (buildTable.addLamp && sim.lamps.length > lampMeshes.length) for (const l of sim.lamps.slice(lampMeshes.length)) buildTable.addLamp(l);
+      for (const lm of lampMeshes) lm.m.visible = !lm.l.taken;
 
       // 0. Coupure de courant : les néons meurent d'un coup, puis reviennent en grésillant
       const want = !(sim.blackout > 0);

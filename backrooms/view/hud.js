@@ -128,6 +128,15 @@ export class BackroomsHUD {
       else if (L1) banner.textContent = got === 0 ? 'LEVEL 1 · TROUVE LES 3 FUSIBLES DANS LES ALLÉES' : `FUSIBLE ${got}/3 RÉCUPÉRÉ`;
       else banner.textContent = got === 0 ? "RETROUVE LES 5 CASSETTES VHS · LE SIGNAL MONTE QUAND TU T'EN APPROCHES" : `CASSETTE ${got}/5 RÉCUPÉRÉE`;
     }
+    // au départ : d'abord prendre sa lampe sur la table
+    if (sim.needLamp) {
+      this.$('#objBanner').textContent = 'PRENDS TA LAMPE TORCHE SUR LA TABLE, JUSTE À CÔTÉ';
+      this.bannerT = Math.max(this.bannerT, 1);
+      this.wasNeedLamp = true;
+    } else if (this.wasNeedLamp) {
+      this.wasNeedLamp = false;
+      this.lastCount = -1; // revenir à l'objectif de l'étage
+    }
     this.bannerT -= dt;
     this.$('#objBanner').classList.toggle('hide', this.bannerT <= 0);
     this.$('#blackoutTag').hidden = !(sim.blackout > 0);
@@ -177,7 +186,7 @@ export class BackroomsHUD {
     }
 
     // 5. Lampe torche
-    this.$('#flashStatus').textContent = `[F] LAMPE ${P.flashlight ? 'ON' : 'OFF'}`;
+    this.$('#flashStatus').textContent = P.hasLamp ? `[F] LAMPE ${P.flashlight ? 'ON' : 'OFF'}` : 'PAS DE LAMPE';
 
     // 6. Message passager
     if (this.toastT > 0) {
