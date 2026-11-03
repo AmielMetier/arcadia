@@ -934,7 +934,7 @@ export class Game {
   }
 
   /* ================= capacités de terrain ================= */
-  hasField(k) { return !!this.state.bag['cs-' + k]; }
+  hasField(k) { const f = FIELD[k]; return !!(this.state.bag['cs-' + k] || (f?.item && this.state.bag[f.item])); }
   canField(k) { return this.hasField(k) && this.badgeCount() >= FIELD[k].badge; }
   /** la créature de l'équipe qui utilise la capacité (la première en forme) */
   fieldUser() { return this.state.party.find((m) => m.hp > 0) || this.state.party[0]; }
@@ -945,7 +945,7 @@ export class Game {
     if (!(await this.ui.yesNo(`${look}\nUtiliser ${F.name} ?`))) return;
     const mon = this.fieldUser();
     this.sound.cry(ASSETS.cry(mon.sp));
-    await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 });
+    if (k === 'coupe') { await this.ui.say(`${st.name} utilise le Sécateur Sylvestre pour trancher le buisson !`, { auto: 600 }); } else { await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 }); }
     this.sound.sfx(k === 'coupe' ? 'hitweak' : 'hitstrong'); await this.ui.flash(1, '#ffffff', 60);
     const m = this.mapObj;
     m.set(x, y, m.outdoor ? T.GRASS : T.CAVE);
@@ -968,10 +968,9 @@ export class Game {
     const st = this.state;
     if (!this.canField('surf')) { await this.ui.say(this.hasField('surf') ? ['L\'eau est d\'un bleu profond...', 'Il faut le Badge Mirage pour surfer.'] : 'L\'eau est d\'un bleu profond...'); return; }
     if (!st.party.some((m) => m.hp > 0)) return;
-    if (!(await this.ui.yesNo('L\'eau est d\'un bleu profond...\nUtiliser Surf ?'))) return;
-    const mon = this.fieldUser();
-    this.sound.cry(ASSETS.cry(mon.sp));
-    await this.ui.say(`${st.name} monte sur le dos de ${monName(mon)} !`, { auto: 500 });
+    if (!(await this.ui.yesNo('L\'eau est d\'un bleu profond...\nUtiliser le Harnais Flottant ?'))) return;
+    this.sound.sfx('bump');
+    await this.ui.say(`${st.name} déploie le Harnais Flottant et glisse sur l\'eau !`, { auto: 600 });
     const p = this.player;
     p.surf = true; p.move = { fx: p.x, fy: p.y, tx: x, ty: y, t: 0, dur: 0.3, jump: true, scripted: true };
     while (p.move) await wait(16);
@@ -984,7 +983,8 @@ export class Game {
     if (k < 0 || k >= towns.length) return false;
     const t = towns[k], mon = this.fieldUser();
     this.sound.cry(ASSETS.cry(mon.sp));
-    await this.ui.say(`${monName(mon)} utilise Vol !`, { auto: 500 });
+    this.sound.sfx('item');
+    await this.ui.say(`${st.name} souffle dans le Sifflet Céleste !\nUn grand oiseau descend des nuages et vous emporte.`, { auto: 700 });
     const [x, y] = t.centerDoor || t.homeDoor;
     await this.warp({ map: 'monde', x, y, dir: 'down' }, 'exit');
     return true;
@@ -1282,17 +1282,18 @@ export class Game {
       0: ['Avec ce badge, tu prouves ta valeur de dresseur.', 'Le garde au nord de la ville te laissera passer vers le Bois Murmure.'],
       1: ['La route 4, à l\'est, t\'est désormais ouverte.', 'Voltacité t\'attend au bout de la côte.'],
       2: ['Le garde de la route 5 te laissera passer.', 'Floralia et sa Championne sont au sud-ouest.'],
-      3: ['Et prends aussi ceci : la CS01, Coupe !', 'Avec mon badge, tu peux trancher les petits arbres qui barrent la route de Mirage, à l\'est.'],
-      4: ['J\'ai vu ton avenir : il est sur la mer. Prends la CS02, Surf.', 'Au sud, le Cap Mirage fait face aux îles des trois frères.', 'Méfie-toi de Drakos. Il a autrefois défié Célestine... et ne s\'en est jamais remis.'],
+      3: ['Et prends aussi ceci : le Sécateur Sylvestre !', 'Avec mon badge, tu peux trancher les petits arbres et buissons qui barrent la route de Mirage, à l\'est.'],
+      4: ['J\'ai vu ton avenir : il est sur la mer. Prends ce Harnais Flottant !', 'Au sud, le Cap Mirage fait face aux îles des trois frères.', 'Méfie-toi de Drakos. Il a autrefois défié Célestine... et ne s\'en est jamais remis.'],
       5: ['Tiens, la CS03 : Éclate-Roc. Elle brise les rochers fissurés.', 'Tu en auras besoin sur la Grande Île.', 'Drakos est notre frère aîné. Il a perdu la finale de la Ligue contre Célestine, il y a dix ans.', 'Depuis, il a juré qu\'aucun Maître ne dicterait sa loi aux îles. Pyros et moi... nous l\'avons suivi.'],
-      6: ['Prends la CS04 : Vol. Elle te ramènera chez toi en un instant.', 'Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
+      6: ['Prends ce Sifflet Céleste ! Il appellera un oiseau pour te ramener chez toi en un instant.', 'Drakos t\'attend à Fort-Écaille, sur la Grande Île, à l\'ouest.', 'Mon frère a besoin qu\'on le batte. Peut-être qu\'il ouvrira enfin les yeux.'],
       7: ['...Tu te bats comme Célestine. Avec tes créatures, pas contre elles.', 'Les îles resteront libres. Mais j\'arrête de prélever les pêches et de fermer les ports.', 'Va à la Ligue. Et dis à Célestine que le vieux Drakos attend sa revanche.', 'Ah, et le Cap des Étoiles, au nord de la ville, t\'est ouvert. Odyssor y passe parfois...'],
     }[g];
     if (lines) await ui.say(lines, { speaker: name });
     const gift = GYM_GIFT[g];
     if (gift && !this.hasField(gift)) {
-      this.give('cs-' + gift); this.sound.sfx('item');
-      await ui.say(formatObtainItem(st.name, 'cs-' + gift, 1, FIELD[gift]));
+      const itk = FIELD[gift]?.item || ('cs-' + gift);
+      this.give(itk); this.sound.sfx('item');
+      await ui.say(formatObtainItem(st.name, itk, 1, FIELD[gift]));
     }
     if (g === 7) { st.flags.drakos = true; this.give('town-map'); }
     this.refreshGates();

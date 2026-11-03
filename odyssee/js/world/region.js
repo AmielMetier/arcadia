@@ -49,10 +49,10 @@ export const BADGES = [
 ];
 // capacités de terrain : obtenues auprès d'un Champion, utilisables avec le badge indiqué
 export const FIELD = {
-  coupe: { name: 'Coupe', cs: 'CS01', badge: 4, desc: 'Tranche les petits arbres qui barrent le chemin.' },
-  surf: { name: 'Surf', cs: 'CS02', badge: 5, desc: 'Permet de traverser l\'eau sur le dos d\'une créature.' },
+  coupe: { name: 'Coupe', item: 'secateur-sylvestre', itemName: 'Sécateur Sylvestre', cs: 'Sécateur Sylvestre', badge: 4, desc: 'Tranche les petits arbres et arbustes épineux qui barrent le chemin.' },
+  surf: { name: 'Surf', item: 'harnais-flottant', itemName: 'Harnais Flottant', cs: 'Harnais Flottant', badge: 5, desc: 'Selle nautique étanche permettant de naviguer et glisser sur l\'eau.' },
   eclate: { name: 'Éclate-Roc', cs: 'CS03', badge: 6, desc: 'Brise les rochers fissurés.' },
-  vol: { name: 'Vol', cs: 'CS04', badge: 7, desc: 'Ramène en un instant dans une ville déjà visitée.' },
+  vol: { name: 'Vol', item: 'sifflet-celeste', itemName: 'Sifflet Céleste', cs: 'Sifflet Céleste', badge: 7, desc: 'Sifflet appelant un oiseau pour voyager en un instant vers une ville déjà visitée.' },
   // données par l'histoire (la Team Éclipse) : Flash par le Dr Lumen, Force par l'ingénieur de la Centrale
   flash: { name: 'Flash', cs: 'CS05', badge: 1, desc: 'Éclaire les grottes plongées dans le noir.' },
   force: { name: 'Force', cs: 'CS06', badge: 3, desc: 'Pousse les gros rochers qui barrent certains chemins.' },
