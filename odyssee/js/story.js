@@ -6,11 +6,12 @@ import { FIELD } from './world/region.js';
 import { createMon, monName, healFull } from './core/mon.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
-import { ITEMS, itemName } from './core/items.js';
+import { ITEMS, itemName, formatObtainItem } from './core/items.js';
 import { partyScreen } from './ui/screens.js';
 import { ASSETS, loadImg } from './assets.js';
 import { el } from './ui/ui.js';
 import { shadowCanvas } from './render/shadow.js';
+import { playLugiaCinematic } from './ui/cinematic.js';
 
 const say = (g, lines, who) => g.ui.say(lines, who ? { speaker: who } : undefined);
 const val = (v, st) => (typeof v === 'function' ? v(st) : v);
@@ -44,7 +45,7 @@ export async function storyTalk(g, name, n) {
     case 'gift': {
       const q = d.gift;
       if (f[q.flag]) { await say(g, val(q.done, st), q.who); return true; }
-      if (q.need && !q.need(st)) { await say(g, val(q.pre, st), q.who); return true; }
+      if (q.need && !q.need(st)) { await say(g, val(q.pre, st), q.who); f['A:' + q.flag] = true; return true; }
       await say(g, val(q.give, st), q.who);
       f[q.flag] = true; if (q.set) f[q.set] = true;
       await receive(g, q.item, q.qty || 1);
@@ -55,7 +56,7 @@ export async function storyTalk(g, name, n) {
     case 'show': {
       const q = d.show;
       if (f[q.flag]) { await say(g, q.done, q.who); return true; }
-      await say(g, q.ask, q.who);
+      await say(g, q.ask, q.who); f['A:' + q.flag] = true;
       if (!st.party.some(q.test)) return true;
       const i = await partyScreen(g, { mode: 'pick', prompt: 'Quel Pokémon montrer ?', filter: (m) => (q.test(m) ? null : 'Pas celui-là') });
       if (i < 0) return true;
@@ -67,6 +68,7 @@ export async function storyTalk(g, name, n) {
     case 'deliver': {
       const q = d.deliver;
       if (f[q.flag]) { await say(g, q.done, q.who); return true; }
+      f['A:' + q.flag] = true;
       if (!st.bag[q.item]) { await say(g, q.ask, q.who); return true; }
       await g.ui.say(`${st.name} rend le ${itemName(q.item)}.`);
       g.take(q.item); f[q.flag] = true;
@@ -77,7 +79,7 @@ export async function storyTalk(g, name, n) {
     case 'trade': {
       const q = d.trade, want = SPECIES[q.want].n, got = SPECIES[q.give].n;
       if (f[q.flag]) { await say(g, q.done, q.who); return true; }
-      await say(g, q.ask, q.who);
+      await say(g, q.ask, q.who); f['A:' + q.flag] = true;
       if (!st.party.some((m) => m.sp === q.want)) { await say(g, `Reviens quand tu auras un ${want} dans ton équipe !`, q.who); return true; }
       if (!(await g.ui.yesNo(`Échanger un ${want} contre ${q.nick} (${got}) ?`))) return true;
       const i = await partyScreen(g, { mode: 'pick', prompt: `Quel ${want} échanger ?`, filter: (m) => (m.sp === q.want ? null : 'Pas celui-là') });
@@ -103,7 +105,7 @@ export async function storyTalk(g, name, n) {
       return true;
     }
     case 'dexq': {
-      const q = d.dexq, n0 = st.dex.caught.length;
+      const q = d.dexq, n0 = st.dex.caught.length; f['A:dexpert'] = true;
       const next = q.tiers.find(([k]) => !f['dex' + k]);
       if (!next) { await say(g, ['Ton Pokédex est impressionnant. Tu n\'as plus besoin de moi !', 'Le Prof. Saule doit être fier de toi.'], q.who); return true; }
       const [need, it, k] = next;
@@ -127,14 +129,67 @@ export async function storyTalk(g, name, n) {
       await say(g, ['Les Plumes Argentées brillent comme la lune sur la mer...', 'Je vais continuer mes recherches. On se reverra, j\'en suis sûr !'], who);
       return true;
     }
+    case 'mission': return mission(g, d.mission);
     case 'lumenSanct': return lumenSanct(g, true);
     case 'victoireGate': {
-      if (g.badgeCount() < 8) await say(g, 'Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.', 'Garde');
-      else await say(g, ['Huit badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.'], 'Garde');
+      if (g.badgeCount() < 15) await say(g, 'Halte ! La Route Victoire est réservée aux dresseurs aux quinze badges.', 'Garde');
+      else await say(g, ['Quinze badges... Mais je ne peux pas te laisser passer.', 'Tant que la nuit violette recouvre la région, la Ligue a fermé la Route Victoire.', 'Il paraît que tout vient du Sanctuaire des Marées, sur un îlot au sud du Cap Mirage.'], 'Garde');
       return true;
     }
   }
   return false;
+}
+
+/* ======================================================================
+   Requêtes des habitants (world/habitants.js)
+   ====================================================================== */
+async function mission(g, q) {
+  const st = g.state, f = st.flags, A = 'A:' + q.id, who = q.role === 'receiver' ? q.to.who : q.who;
+  const lines = (v) => (typeof v === 'function' ? v(st, g) : v);
+  const reward = async (list) => { for (const [it, k] of list || []) await receive(g, it, k); };
+  // destinataire d'un objet à porter : c'est lui qui termine la quête
+  if (q.role === 'receiver') {
+    const R = q.to;
+    if (f[q.id]) { await say(g, lines(R.done), who); return true; }
+    if (!st.bag[q.item]) { await say(g, lines(R.idle), who); return true; }
+    await g.ui.say(`${st.name} donne : ${itemName(q.item)}.`);
+    g.take(q.item, st.bag[q.item]); f[q.id] = true;
+    await say(g, lines(R.thanks), who); await reward(R.reward);
+    return true;
+  }
+  if (f[q.id]) { await say(g, lines(q.done), who); return true; }
+  const first = !f[A];
+  if (q.kind === 'relay') {
+    if (!first) { await say(g, lines(q.wait), who); return true; }
+    await say(g, lines(q.ask), who); f[A] = true;
+    await receive(g, q.item, 1);
+    return true;
+  }
+  if (q.kind === 'duel') {
+    await say(g, lines(first ? q.ask : q.again), who); f[A] = true;
+    if (!g.lead()) return true;
+    if (!(await g.ui.yesNo('Accepter le combat ?'))) return true;
+    const d = q.duel, team = typeof d.team === 'function' ? d.team(st, g) : d.team;
+    const res = await g.api().fight({ ...d, team, ai: 'smart', items: { 'full-restore': 2 }, intro: null, lose: q.lose, noWhiteout: true, music: d.music || 'champion' });
+    if (res === 'win') { f[q.id] = true; await say(g, lines(q.thanks), who); await reward(q.reward); }
+    else await say(g, 'Reviens quand tu veux. Je serai là.', who);
+    return true;
+  }
+  // show, bring, check : la demande (en entier la première fois, en bref ensuite), puis la vérification
+  await say(g, lines(first || !q.again ? q.ask : q.again), who); f[A] = true;
+  let ok = false;
+  if (q.kind === 'show') {
+    if (!st.party.some((m) => q.test(m, st))) return true;
+    const i = await (g.pickParty || partyScreen)(g, { mode: 'pick', prompt: 'Quel Pokémon montrer ?', filter: (m) => (q.test(m, st) ? null : 'Pas celui-là') });
+    ok = i >= 0;
+  } else if (q.kind === 'bring') {
+    const n = q.qty || 1;
+    if ((st.bag[q.item] || 0) >= n) { await g.ui.say(`${st.name} donne : ${n > 1 ? n + ' × ' : ''}${itemName(q.item)}.`); g.take(q.item, n); ok = true; }
+  } else if (q.kind === 'check') ok = !!q.test(st, g);
+  if (!ok) return true;
+  f[q.id] = true;
+  await say(g, lines(q.thanks), who); await reward(q.reward);
+  return true;
 }
 
 /** zones déclencheuses propres à l'histoire */
@@ -191,6 +246,7 @@ async function lugiaWakes(g) {
   await ui.flash(3, '#6020a0', 120);
   g.sound.cry(ASSETS.cry(LUGIA));
   await ui.say(['Un cri immense résonne dans tout le Sanctuaire !', 'Les eaux de l\'autel bouillonnent... Lugia Obscur ouvre les yeux !']);
+  await playLugiaCinematic(g);
   await lugiaBattle(g);
 }
 
@@ -198,6 +254,9 @@ async function lugiaWakes(g) {
 export async function lugiaBattle(g) {
   const st = g.state, ui = g.ui;
   if (!g.lead()) return;
+  if (!st.flags.seenLugiaCinematic) {
+    await playLugiaCinematic(g);
+  }
   if (!(await ui.yesNo('Lugia Obscur te fixe de ses yeux sombres.\nL\'affronter ?'))) return;
   const res = await g.runBattle({ wild: shadowLugia(), music: 'legend' });
   if (res === 'caught') {
@@ -233,9 +292,9 @@ export async function placeLugia(g) {
     if (g.mapObj.id === LUGIA_ALTAR.map && g.mapObj.get(LUGIA_ALTAR.x, LUGIA_ALTAR.y) === T.BLOCK) g.mapObj.set(LUGIA_ALTAR.x, LUGIA_ALTAR.y, T.CAVE);
     return;
   }
-  const img = await loadImg(ASSETS.front(LUGIA));
+  const img = await loadImg(ASSETS.front(LUGIA, false, true));
   if (g.mapObj.id !== LUGIA_ALTAR.map || !img) return;
-  const a = g.view.imageActor('lugia', shadowCanvas(img), 0.55);
+  const a = g.view.imageActor('lugia', img, 0.55);
   g.view.place(a, LUGIA_ALTAR.x, LUGIA_ALTAR.y - 0.1);
 }
 
@@ -260,6 +319,6 @@ export async function purify(g) {
 export function overlay(g) {
   let ov = g._ov;
   if (!ov) { ov = g._ov = el('div', 'dark-ov'); g.ui.root.prepend(ov); }
-  const m = g.mapObj, dark = !!m?.dark, flash = g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;
+  const m = g.mapObj, dark = !!m?.dark, flash = m?.dark !== 'arene' && g.hasField('flash') && g.badgeCount() >= FIELD.flash.badge;   // l'arène Ténèbres reste dans le noir
   ov.className = 'dark-ov' + (dark ? (flash ? ' cave flash' : ' cave') : '') + (g.eclipseOn() && m?.outdoor ? ' eclipse' : '');
 }

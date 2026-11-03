@@ -35,13 +35,13 @@ const GRUNT = {
   boss2: [[197, 43], [215, 43], [94, 44], [110, 43], [229, 45]],                                // Sanctuaire
 };
 export const ELITE = [
-  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'pryce', team: [[87, 51], [91, 51], [221, 52], [124, 52], [131, 53]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
+  { id: 'c4:1', name: 'Frimas', ow: 'frimas', bs: 'frimas', team: [[87, 73], [91, 73], [221, 74], [124, 74], [131, 75]], room: 'Salle de Glace', floor: 'gymWater', deco: 'statue',
     intro: 'Bienvenue au Conseil 4. Je suis Frimas. Mon cœur s\'est figé il y a bien longtemps... Le tien tiendra-t-il face au froid ?', lose: 'Ta flamme a fait fondre ma glace. Passe, la salle suivante t\'attend.' },
-  { id: 'c4:2', name: 'Spectrel', ow: 'spectrel', bs: 'morty', team: [[93, 52], [200, 52], [1023, 53], [94, 54]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
+  { id: 'c4:2', name: 'Spectrel', ow: 'spectrel', bs: 'spectrel', team: [[93, 74], [200, 74], [1023, 75], [94, 76]], room: 'Salle des Ombres', floor: 'gymPsy', deco: 'gymstatue',
     intro: 'Chut... Les esprits me murmurent ton nom depuis que tu es entré. Ils ont hâte de jouer avec toi.', lose: 'Les esprits se taisent... Tu les as impressionnés.' },
-  { id: 'c4:3', name: 'Brutus', ow: 'brutus', bs: 'bruno', team: [[237, 53], [106, 53], [107, 53], [1033, 54], [68, 55]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
+  { id: 'c4:3', name: 'Brutus', ow: 'brutus', bs: 'brutus', team: [[237, 75], [106, 75], [107, 75], [1033, 76], [68, 77]], room: 'Salle du Poing', floor: 'gymRock', deco: 'statue',
     intro: 'Je suis Brutus ! J\'ai entraîné mes muscles et ceux de mes Pokémon chaque jour de ma vie. Hoo ! Hah !', lose: 'Ma force n\'a pas suffi... Va. Tu le mérites.' },
-  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'karen', team: [[197, 54], [198, 54], [215, 55], [229, 55], [248, 56]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
+  { id: 'c4:4', name: 'Ombrelle', ow: 'ombrelle', bs: 'ombrelle', team: [[197, 76], [198, 76], [215, 77], [229, 77], [248, 78]], room: 'Salle de la Nuit', floor: 'gymDragon', deco: 'gymstatue',
     intro: 'Je suis Ombrelle, la dernière du Conseil 4. Les gentils Pokémon, les méchants Pokémon... Seuls les dresseurs comptent. Montre-moi ce que tu vaux.', lose: 'Tu es fort, et tu aimes tes Pokémon. C\'est ce qui fait un vrai dresseur. Célestine t\'attend.' },
 ];
 
@@ -73,7 +73,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
   const grunt = (map, x, y, dir, id, team, o = {}) => {
     const [a, b] = o.exact ? [x, y] : free(map, x, y, false);
     return Object.assign(trainerNpc(map, a, b, dir, 'Sbire', 'de la Team Éclipse', team, {
-      id, sight: o.sight ?? 3, ow: o.f ? 'eclipse_f' : 'eclipse_m', bs: o.f ? 'galacticgruntf' : 'galacticgrunt', prize: 40 + team[0][1] * 2,
+      id, sight: o.sight ?? 3, ow: o.f ? 'eclipse_f' : 'eclipse_m', bs: o.f ? 'eclipse_f' : 'eclipse_m', prize: 40 + team[0][1] * 2,
       intro: o.intro || 'Hé ! La Team Éclipse est occupée ici. Dégage, ou je te fais tâter de mes Pokémon !',
       lose: o.lose || 'Gnn... Pas possible !', after: o.after || 'La Team Éclipse ne se laissera pas faire...',
     }), { vanish: o.vanish ?? true, music: 'eclipse' });
@@ -81,7 +81,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
   const admin = (map, x, y, dir, id, who, team, o) => {
     const [a, b] = free(map, x, y, false);
     return Object.assign(trainerNpc(map, a, b, dir, 'Admin Éclipse', who === 'nyx' ? 'Nyx' : 'Erèbe', team, {
-      id, sight: o.sight ?? 3, ow: who, bs: who === 'nyx' ? 'mars' : 'saturn', prize: 70, ai: 'smart', items: { 'super-potion': 1, 'hyper-potion': team[0][1] > 30 ? 1 : 0 }, intro: o.intro, lose: o.lose, after: o.after || '...',
+      id, sight: o.sight ?? 3, ow: who, bs: who === 'nyx' ? 'nyx' : 'erebe', prize: 70, ai: 'smart', items: { 'super-potion': 1, 'hyper-potion': team[0][1] > 30 ? 1 : 0 }, intro: o.intro, lose: o.lose, after: o.after || '...',
     }), { vanish: true, music: 'eclipse', winScript: o.win });
   };
   const spot = (pts, t, side, off) => { const p = along(pts, t); return free(W, Math.round(p.x + p.nx * side * off), Math.round(p.y + p.ny * side * off)); };
@@ -180,7 +180,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
     grunt(rep, 8, 6, 'right', 'ecl:rep5', GRUNT.l, { exact: 1, f: 1, sight: 3, vanish: false });
     admin(rep, 19, 10, 'left', 'ecl:nyx2', 'nyx', GRUNT.nyx2, { sight: 2,
       intro: 'Toi, ici ?! Tu es vraiment collant. Le Chef est en train d\'achever le Prisme Noir. Je ne te laisserai pas le déranger !', lose: 'Non, non, NON ! ... Bon, vas-y. De toute façon, il est trop tard.' });
-    const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 1, ow: 'nocturne', bs: 'cyrus', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
+    const boss = trainerNpc(rep, 11, 3, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss1, { id: 'ecl:boss1', sight: 1, ow: 'nocturne', bs: 'nocturne', prize: 120, ai: 'smart', items: { 'hyper-potion': 2 },
       intro: 'Je suis Nocturne, chef de la Team Éclipse. Le jour rend les gens faibles et bruyants. Sous une nuit éternelle, tout serait enfin calme... Le Prisme Noir fermera le cœur de Lugia, et Lugia obéira. Toi, tu n\'es qu\'un grain de sable.',
       lose: 'Impressionnant. Mais il est trop tard : le Prisme Noir est déjà au Sanctuaire des Marées.', after: '...' });
     Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss1' });
@@ -226,7 +226,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
     grunt(s, 16, 20, 'left', 'ecl:sanct2', GRUNT.n, { exact: 1, f: 1, sight: 4, intro: 'Tu entends ? C\'est Lugia qui gronde sous nos pieds...' });
     admin(s, 11, 14, 'right', 'ecl:nyx3', 'nyx', GRUNT.nyx3, { sight: 2, intro: 'Encore toi ! Tu ne comprends donc rien ? Quand Lugia ouvrira les yeux, plus rien ne pourra l\'arrêter !', lose: 'Ce gamin... c\'est un vrai cauchemar.' });
     admin(s, 13, 12, 'left', 'ecl:erebe3', 'erebe', GRUNT.erebe3, { sight: 2, intro: 'Tu es arrivé jusqu\'ici. Alors je vais devoir être sérieux.', lose: 'Je... Peut-être que la nuit éternelle n\'était pas une si bonne idée.' });
-    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'cyrus', prize: 200, ai: 'smart', items: { 'hyper-potion': 2, 'full-restore': 1 },
+    const boss = trainerNpc(s, 12, 8, 'down', 'Chef Éclipse', 'Nocturne', GRUNT.boss2, { id: 'ecl:boss2', sight: 2, ow: 'nocturne', bs: 'nocturne', prize: 200, ai: 'smart', items: { 'hyper-potion': 2, 'full-restore': 1 },
       intro: 'Te voilà enfin. Regarde. Lugia dort encore, mais le Prisme Noir a déjà refermé son cœur. Dans un instant, il se réveillera, et il m\'obéira. Rien ne peut plus empêcher l\'Éclipse.',
       lose: 'Impossible... Battu par un enfant, ici, au moment de mon triomphe...', after: '...' });
     Object.assign(boss, { vanish: true, music: 'eclipse', winScript: 'boss2' });
@@ -289,8 +289,9 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
   /* ======================== quêtes annexes ======================== */
   {
     const { A, B, C, D, E, F, G, H, I } = towns;
-    tn(B, 26, 14, { id: 'medaillon', sprite: 'lucie', dir: 'down', move: 'turn', script: 'deliver', deliver: {
-      item: 'medaillon', flag: 'qMedaillon', who: 'Lucie', reward: [['rare-candy', 1], ['super-potion', 3]],
+    // (Margaux, pas Lucie : Lucie est déjà la fille au Ponyta de Sylvebourg, dans l'histoire de la Brume)
+    tn(B, 26, 14, { id: 'medaillon', sprite: 'fillette2', dir: 'down', move: 'turn', script: 'deliver', deliver: {
+      item: 'medaillon', flag: 'qMedaillon', who: 'Margaux', reward: [['rare-candy', 1], ['super-potion', 3]],
       ask: ['Snif... J\'ai perdu le médaillon de ma grand-mère en jouant dans le Bois Murmure.', 'Il est sûrement tombé derrière un petit arbre... Je n\'arrive pas à passer !'],
       thanks: ['Mon médaillon ! Tu l\'as retrouvé ! Merci, merci, merci !', 'Tiens, c\'est tout ce que j\'ai. Grand-mère dit que ça rend les Pokémon plus forts.'], done: ['Je ne le quitterai plus jamais !'] } });
     tn(C, 8, 13, { id: 'geologue', sprite: 'montagnard', dir: 'down', script: 'show', show: {
@@ -334,7 +335,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
       got: ['Le Cap Mirage est au bout de la route 7, au sud de la ville.'], done: (st) => (st.flags.lugia ? ['Le jour est revenu... Je savais que tu y arriverais.'] : ['Le Sanctuaire t\'attend, au sud du Cap Mirage...']) } });
     // la Route Victoire reste fermée tant que dure l'Éclipse
     const vg = W.npcs.find((n) => n.id === 'cime:garde');
-    if (vg) { vg.script = 'victoireGate'; vg.gate.open = (f, g) => g.badgeCount() >= 8 && (!f.eclipse || !!f.lugia); W.gates.find((q) => q.npc === vg.id).open = vg.gate.open; }
+    if (vg) { vg.script = 'victoireGate'; vg.gate.open = (f, g) => g.badgeCount() >= 15 && (!f.eclipse || !!f.lugia); W.gates.find((q) => q.npc === vg.id).open = vg.gate.open; }
   }
 }
 

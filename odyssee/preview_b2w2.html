@@ -355,14 +355,21 @@
 
   <!-- 4. BOÎTE DE DIALOGUE PIXEL-ART -->
   <div class="preview-section">
-    <div class="preview-title">4. BOÎTE DE DIALOGUE — OBSIDIENNE PIXEL-ART (SANS ARRONDIS LISSES VECTORIELS NI FLOU)</div>
-    <div class="preview-box" style="height: 250px; background: url('img/battle/bg_grass.png') center/cover; padding-top: 30px; box-sizing: border-box;">
-      <div class="dlg has-face" style="display: block; position: relative; bottom: auto; left: auto; right: auto; margin: 20px auto 0;">
+    <div class="preview-title">4. BOÎTE DE DIALOGUE — 5G RETRO PIXEL-ART AVEC PORTRAIT D'INTERLOCUTEUR (SANS COUPURE DU NOM)</div>
+    <div class="preview-box" style="min-height: 340px; background: url('img/battle/bg_grass.png') center/cover; padding: 25px 20px; box-sizing: border-box;">
+      <div class="dlg has-face" style="display: block; position: relative; bottom: auto; left: auto; right: auto; margin: 20px auto 35px;">
         <span class="dlg-name">Prof. Saule</span>
         <img class="dlg-face" src="img/portraits/saule.png" alt="">
         <div class="dlg-txt">Bienvenue dans l'archipel d'Odyssée, jeune dresseur !
 Chaque recoin de ces îles abrite des créatures légendaires prêtes à se joindre à ton équipe.
 Prends ces Poké Balls et pars à l'aventure !</div>
+        <div class="dlg-arrow">▼</div>
+      </div>
+      <div class="dlg has-face" style="display: block; position: relative; bottom: auto; left: auto; right: auto; margin: 20px auto 0;">
+        <span class="dlg-name">Gamin Léo</span>
+        <img class="dlg-face" src="img/portraits/gamin-l.png" alt="">
+        <div class="dlg-txt">Tu es vraiment fort !
+Nos regards se sont croisés et mes créatures ont tout donné, mais ton équipe est impressionnante !</div>
         <div class="dlg-arrow">▼</div>
       </div>
     </div>
@@ -677,6 +684,689 @@ Prends ces Poké Balls et pars à l'aventure !</div>
       </div>
     </div>
   </div>
+
+  <!-- 8. COMBAT B2W2 — MASQUAGE CONDITIONNEL DES TYPES ET DE L'EFFICACITÉ -->
+  <div class="preview-section">
+    <div class="preview-title">8. COMBAT 5G — MASQUAGE CONDITIONNEL DU TYPE ET DE L'EFFICACITÉ (VU &lt; 3 FOIS &amp; NON CAPTURÉ)</div>
+    <div class="preview-box" style="height: 380px; background: url('img/battle/bg_grass.png') center/cover; display: flex; flex-direction: column; justify-content: space-between; padding: 16px;">
+      <!-- HUD adverse inconnu -->
+      <div style="position: relative; height: 100px;">
+        <div class="bhud foe" style="position: absolute; left: 20px; top: 10px; visibility: visible;">
+          <div class="bh-head">
+            <div class="bh-balls"><span class="bh-wild-tag">SAUVAGE</span></div>
+            <div class="bh-types">
+              <span class="bh-type unknown" title="Type inconnu (vu 1/3 - capturez-le pour révéler)">???</span>
+            </div>
+          </div>
+          <div class="bh-top"><span class="bh-name">Créature Inconnue</span><span class="bh-lv">N.12</span></div>
+          <div class="bh-mid"><span class="bh-st" style="display:none"></span><div class="bh-hp"><b>PV</b><i><u style="width:100%; background:#20d860"></u></i></div></div>
+          <div class="bh-caught"></div>
+        </div>
+      </div>
+
+      <!-- Menu des attaques avec indicateurs ??? masqués -->
+      <div class="bcmd on moves" style="position: relative; right: auto; bottom: auto; width: 100%; height: 130px; display: block;">
+        <div class="mv-layout">
+          <div class="mv-grid">
+            <div class="mbtn sel" style="--tc:#a8a878">
+              <div class="mbtn-top">
+                <span class="mn">Charge</span>
+                <div class="mbtn-top-right">
+                  <span class="bm-eff eff-unk" title="Efficacité inconnue (vu 1/3)">???</span>
+                  <img class="mcat" src="img/battle/cat_physical.png" alt="physical">
+                </div>
+              </div>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">NORMAL</span>
+                  <span class="mpw">Puis. 50</span>
+                </div>
+                <span class="mpp">PP 35/35</span>
+              </div>
+            </div>
+            <div class="mbtn" style="--tc:#a8a878">
+              <div class="mbtn-top">
+                <span class="mn">Armure</span>
+                <div class="mbtn-top-right">
+                  <img class="mcat" src="img/battle/cat_status.png" alt="status">
+                </div>
+              </div>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">NORMAL</span>
+                  <span class="mpw">Statut</span>
+                </div>
+                <span class="mpp">PP 30/30</span>
+              </div>
+            </div>
+            <div class="mbtn" style="--tc:#b8a038">
+              <div class="mbtn-top">
+                <span class="mn">Jet-Pierres</span>
+                <div class="mbtn-top-right">
+                  <span class="bm-eff eff-unk" title="Efficacité inconnue (vu 1/3)">???</span>
+                  <img class="mcat" src="img/battle/cat_physical.png" alt="physical">
+                </div>
+              </div>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">ROCHE</span>
+                  <span class="mpw">Puis. 50</span>
+                </div>
+                <span class="mpp">PP 15/15</span>
+              </div>
+            </div>
+            <div class="mbtn" style="--tc:#c03028">
+              <div class="mbtn-top">
+                <span class="mn">Force Poigne</span>
+                <div class="mbtn-top-right">
+                  <span class="bm-eff eff-unk" title="Efficacité inconnue (vu 1/3)">???</span>
+                  <img class="mcat" src="img/battle/cat_physical.png" alt="physical">
+                </div>
+              </div>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">COMBAT</span>
+                  <span class="mpw">Puis. 55</span>
+                </div>
+                <span class="mpp">PP 30/30</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. TRANSITIONS ANIMÉES (BÂTIMENT ET COMBAT 5G) -->
+  <div class="preview-section">
+    <div class="preview-title">9. TRANSITIONS ANIMÉES — ENTRÉE DE BÂTIMENT (IRIS DS) &amp; COMBAT SAUVAGE (LAMES 5G)</div>
+    <div class="preview-box" id="transitionBox" style="height: 320px; position: relative; overflow: hidden; background: url('img/battle/bg_grass.png') center/cover; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;">
+      <div style="font-size: 16px; font-weight: 700; color: #fff; text-shadow: 2px 2px 0 #000; text-align: center; z-index: 10;">
+        Testez les nouvelles animations cinématographiques en un clic :
+      </div>
+      <div style="display: flex; gap: 12px; z-index: 10; flex-wrap: wrap; justify-content: center;">
+        <button type="button" class="action-btn" onclick="playDoorDemo()" style="background: #2a5888; color: #fff; border: 2px solid #68a0e0; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #102038;">
+          🚪 Entrée de Bâtiment (Iris DS)
+        </button>
+        <button type="button" class="action-btn" onclick="playWildBattleDemo()" style="background: #0d2838; color: #00f0ff; border: 2px solid #00f0ff; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #041018;">
+          ⚡ Rencontre Sauvage (Lames Cyan 5G)
+        </button>
+        <button type="button" class="action-btn" onclick="playTrainerBattleDemo()" style="background: #382808; color: #ffe058; border: 2px solid #ffe058; padding: 10px 18px; font-weight: 700; font-family: inherit; font-size: 14px; cursor: pointer; box-shadow: 0 4px 0 #181002;">
+          ⚔️ Rencontre Dresseur (Lames Or 5G)
+        </button>
+      </div>
+      <div id="demoFlash" style="position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 61;"></div>
+      <div id="demoIris" class="door-iris" style="position: absolute; inset: 0; z-index: 60;"></div>
+    </div>
+  </div>
+
+  <script>
+    async function playDoorDemo() {
+      const iris = document.getElementById('demoIris');
+      iris.style.transition = 'clip-path 260ms cubic-bezier(0.4, 0, 0.2, 1)';
+      iris.classList.add('closed');
+      await new Promise(r => setTimeout(r, 400));
+      iris.classList.remove('closed');
+    }
+
+    async function playWildBattleDemo(isTrainer = false) {
+      const box = document.getElementById('transitionBox');
+      const flash = document.getElementById('demoFlash');
+      
+      // Triple flash 5G
+      flash.style.transition = 'none';
+      flash.style.background = '#ffffff';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 70));
+      flash.style.background = '#060a12';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 60));
+      flash.style.background = '#ffffff';
+      flash.style.opacity = '1';
+      await new Promise(r => setTimeout(r, 80));
+      flash.style.opacity = '0';
+
+      // Shards
+      const wrap = document.createElement('div');
+      wrap.className = `battle-wipe ${isTrainer ? 'trainer' : 'wild'}`;
+      wrap.style.position = 'absolute';
+      const numShards = 10;
+      for (let i = 0; i < numShards; i++) {
+        const s = document.createElement('div');
+        s.className = `bw-shard ${i % 2 === 0 ? 'left' : 'right'}`;
+        s.style.top = `${(i * 100) / numShards}%`;
+        s.style.height = `${(100 / numShards) + 0.5}%`;
+        s.style.transitionDelay = `${i * 22}ms`;
+        wrap.appendChild(s);
+      }
+      box.appendChild(wrap);
+      void wrap.offsetHeight;
+      wrap.classList.add('on');
+      await new Promise(r => setTimeout(r, 22 * numShards + 300));
+      wrap.classList.add('opening');
+      await new Promise(r => setTimeout(r, 300));
+      wrap.remove();
+    }
+
+    function playTrainerBattleDemo() {
+      playWildBattleDemo(true);
+    }
+  </script>
+
+    <!-- 10. SAC D'OBJETS B2W2 (PROPOSITION 1 VALIDÉE — SAC SUR PIÉDESTAL & ARC GLISSANT ANIMÉ) -->
+  <div class="preview-section">
+    <div class="preview-title">10. SAC D'OBJETS B2W2 (PROPOSITION 1 OFFICIELLE) — SAC SUR PIÉDESTAL, ARC GLISSANT ANIMÉ &amp; DOUBLE PANNEAU</div>
+    <div class="preview-box" style="height: 520px; position: relative; padding: 0; overflow: hidden;">
+      <div class="bag-scr b2w2-bag" id="previewBag">
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/bag.png" alt="">
+            <span class="scr-bar-title">SAC D'OBJETS</span>
+            <span class="scr-bar-sub b2w2-pocket-name" id="prevPocketSub">OBJETS</span>
+          </div>
+          <div class="scr-bar-right">
+            <span class="scr-money-pill"><img src="img/hud/coin.png" alt=""> 24 850 ₽</span>
+            <button type="button" class="scr-close-btn" onclick="prevBagCloseDemo()">FERMER ✕</button>
+          </div>
+        </div>
+        <div class="b2w2-bag-body">
+          <!-- PANNEAU GAUCHE : SAC DE BAROUDEUR SUR SOCLE & ARC DE POCHES GLISSANT (CONCEPT 1) -->
+          <div class="b2w2-bag-left" id="prevBagLeft">
+            <div class="b2w2-backpack-stage" id="prevBackpackStage">
+              <div class="b2w2-backpack-beams"></div>
+              <img class="b2w2-backpack-img" id="prevBackpackImg" src="img/bag/backpack_objets.jpg" alt="Sac de Baroudeur Unys">
+              <!-- ARC EN CROISSANT DES 6 POCHES B2W2 -->
+              <div class="b2w2-arc-wrap">
+                <img class="b2w2-arc-img" src="img/bag/pocket_arc.png" alt="Arc des 6 poches">
+                <!-- CURSEUR LUMINEUX GLISSANT LE LONG DE LA COURBE -->
+                <div class="b2w2-arc-glider" id="prevGlider" style="left:40.2%; top:11.6%; --glider-col:#00e0ff;">
+                  <span class="glider-ring"></span>
+                  <span class="glider-dot"></span>
+                </div>
+                <!-- 6 ZONES INTERACTIVES CLIQUABLES -->
+                <button type="button" class="b2w2-arc-node on" data-pocket="0" onclick="prevBagSetPocket(0)" style="left:40.2%; top:11.6%;" title="Poche Objets"><span class="arc-node-halo"></span></button>
+                <button type="button" class="b2w2-arc-node" data-pocket="1" onclick="prevBagSetPocket(1)" style="left:62.1%; top:25.2%;" title="Poche Soins"><span class="arc-node-halo"></span></button>
+                <button type="button" class="b2w2-arc-node" data-pocket="2" onclick="prevBagSetPocket(2)" style="left:70.9%; top:40.1%;" title="Poche Poké Balls"><span class="arc-node-halo"></span></button>
+                <button type="button" class="b2w2-arc-node" data-pocket="3" onclick="prevBagSetPocket(3)" style="left:70.5%; top:54.8%;" title="Poche CT &amp; CS"><span class="arc-node-halo"></span></button>
+                <button type="button" class="b2w2-arc-node" data-pocket="4" onclick="prevBagSetPocket(4)" style="left:59.1%; top:74.4%;" title="Poche Baies"><span class="arc-node-halo"></span></button>
+                <button type="button" class="b2w2-arc-node" data-pocket="5" onclick="prevBagSetPocket(5)" style="left:34.2%; top:87.8%;" title="Poche Objets Rares"><span class="arc-node-halo"></span></button>
+              </div>
+            </div>
+            <!-- BANDEAU D'ÉTAT DE LA POCHE -->
+            <div class="b2w2-pocket-status">
+              <div class="b2w2-pocket-badge" id="prevPocketBadge" style="color:#00e0ff;">◀ OBJETS ▶</div>
+              <div class="b2w2-pocket-sub" id="prevPocketSubDesc">Pierres, Bonbons et Objets tenus</div>
+            </div>
+          </div>
+          <!-- PANNEAU DROIT : LISTE DES OBJETS DE LA POCHE -->
+          <div class="b2w2-bag-right">
+            <div class="b2w2-list-header">
+              <div class="b2w2-list-title">
+                <span class="b2w2-pocket-tag" id="prevPocketTag" style="color:#00e0ff;">POCHE OBJETS</span>
+                <span class="b2w2-pocket-items-cnt" id="prevPocketCount">6 objets</span>
+              </div>
+              <div class="b2w2-list-hint">
+                <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
+                <span><kbd>◀</kbd><kbd>▶</kbd> Poches</span>
+              </div>
+            </div>
+            <div class="b2w2-items-viewport">
+              <div class="b2w2-items-list" id="prevItemsList">
+                <!-- Dynamique -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- BANDEAU INFÉRIEUR : INSPECTEUR D'OBJET & GRILLE 2X2 DE BOUTONS TACTILES -->
+        <div class="b2w2-bag-inspector">
+          <div class="b2w2-insp-left">
+            <div class="b2w2-insp-frame">
+              <img class="b2w2-insp-img" id="prevInspImg" src="img/items/rare-candy.png" alt="">
+            </div>
+          </div>
+          <div class="b2w2-insp-mid">
+            <div class="b2w2-insp-topline">
+              <span class="b2w2-insp-name" id="prevInspName">Super Bonbon</span>
+              <span class="b2w2-insp-cat" id="prevInspCat" style="color:#00e0ff;">[Objets]</span>
+              <span class="b2w2-insp-qty" id="prevInspQty">Quantité : × 5</span>
+            </div>
+            <div class="b2w2-insp-desc" id="prevInspDesc">Friandise énergisante faisant instantanément monter d'un niveau.</div>
+          </div>
+          <!-- GRILLE 2X2 DE BOUTONS TACTILES DS (CONCEPT 1) -->
+          <div class="b2w2-btn-grid">
+            <button type="button" class="b2w2-touch-btn b2w2-btn-use" id="prevBtnUse" title="Utiliser (Entrée / A)">
+              <span class="touch-btn-lbl">UTILISER</span>
+            </button>
+            <button type="button" class="b2w2-touch-btn b2w2-btn-give" id="prevBtnGive" title="Donner à un Pokémon (D)">
+              <span class="touch-btn-lbl">DONNER</span>
+            </button>
+            <button type="button" class="b2w2-touch-btn b2w2-btn-toss" id="prevBtnToss" title="Jeter une quantité (J)">
+              <span class="touch-btn-lbl">JETER</span>
+            </button>
+            <button type="button" class="b2w2-touch-btn b2w2-btn-back" id="prevBtnBack" onclick="prevBagCloseDemo()" title="Fermer le sac (Échap / B)">
+              <span class="touch-btn-lbl">RETOUR</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Données de démonstration du Sac B2W2 Concept 1 (6 poches officielles)
+    const prevBagData = {
+      0: [
+        { id: 'rare-candy', name: 'Super Bonbon', qty: 5, desc: "Friandise énergisante faisant instantanément monter d'un niveau.", icon: 'img/items/rare-candy.png' },
+        { id: 'fire-stone', name: 'Pierre Feu', qty: 2, desc: "Pierre chaude et rougeoyante capable de faire évoluer certains Pokémon.", icon: 'img/items/fire-stone.png' },
+        { id: 'water-stone', name: 'Pierre Eau', qty: 3, desc: "Pierre bleutée imprégnée d'une onde pure pour l'évolution.", icon: 'img/items/water-stone.png' },
+        { id: 'repel', name: 'Repousse', qty: 9, desc: "Éloigne les créatures sauvages plus faibles pendant 100 pas.", icon: 'img/items/repel.png' },
+        { id: 'eviolite', name: 'Évoluroc', qty: 1, desc: "Objet à tenir. Augmente de 50% la Défense et Déf. Spé. d'un Pokémon non évolué.", icon: 'img/items/rare-candy.png', held: true },
+        { id: 'leftovers', name: 'Restes', qty: 2, desc: "Objet à tenir. Restaure 1/16 des PV max à chaque fin de tour.", icon: 'img/items/gift.png', held: true },
+      ],
+      1: [
+        { id: 'potion', name: 'Potion', qty: 15, desc: "Restaure 20 PV d'une créature alliée.", icon: 'img/items/potion.png' },
+        { id: 'super-potion', name: 'Super Potion', qty: 7, desc: "Restaure 50 PV d'une créature alliée.", icon: 'img/items/super-potion.png' },
+        { id: 'hyper-potion', name: 'Hyper Potion', qty: 4, desc: "Restaure 200 PV d'une créature alliée.", icon: 'img/items/hyper-potion.png' },
+        { id: 'revive', name: 'Rappel', qty: 6, desc: "Ranime une créature K.O. avec 50% de ses PV.", icon: 'img/items/revive.png' },
+        { id: 'full-heal', name: 'Total Soin', qty: 3, desc: "Guérit toutes les altérations de statut d'un Pokémon.", icon: 'img/items/full-heal.png' },
+      ],
+      2: [
+        { id: 'poke-ball', name: 'Poké Ball', qty: 25, desc: "Capsule basique servant à capturer les créatures sauvages.", icon: 'img/items/poke-ball.png' },
+        { id: 'great-ball', name: 'Super Ball', qty: 14, desc: "Ball de qualité supérieure avec un taux de réussite plus élevé.", icon: 'img/items/great-ball.png' },
+        { id: 'ultra-ball', name: 'Ultra Ball', qty: 8, desc: "Excellente Ball offrant un taux de capture remarquable.", icon: 'img/items/ultra-ball.png' },
+        { id: 'master-ball', name: 'Master Ball', qty: 1, desc: "La Ball suprême qui capture à coup sûr n'importe quelle créature !", icon: 'img/items/master-ball.png' },
+      ],
+      3: [
+        { id: 'cs-coupe', name: 'CS01 Coupe', qty: 1, desc: "Capsule Secrète permettant de couper les petits arbustes gênants.", icon: 'img/items/letter.png', key: true },
+        { id: 'cs-surf', name: 'CS02 Surf', qty: 1, desc: "Permet de voguer sur l'eau sur le dos d'une créature alliée.", icon: 'img/items/letter.png', key: true },
+        { id: 'cs-vol', name: 'CS04 Vol', qty: 1, desc: "Ramène en un éclair vers n'importe quelle bourgade déjà visitée.", icon: 'img/items/letter.png', key: true },
+      ],
+      4: [
+        { id: 'oran-berry', name: 'Baie Oran', qty: 12, desc: "Baie restaurant 10 PV lorsqu'elle est consommée ou tenue par un Pokémon.", icon: 'img/items/oran-berry.png', held: true },
+        { id: 'sitrus-berry', name: 'Baie Sitrus', qty: 5, desc: "Restaure 25% des PV lorsque les PV tombent sous 50%.", icon: 'img/items/oran-berry.png', held: true },
+        { id: 'lum-berry', name: 'Baie Prun', qty: 3, desc: "Guérit instantanément toute altération de statut au combat.", icon: 'img/items/oran-berry.png', held: true },
+      ],
+      5: [
+        { id: 'town-map', name: 'Carte Régionale', qty: 1, desc: "Carte détaillée de l'archipel d'Odyssée indiquant villes et routes.", icon: 'img/items/town-map.png', key: true },
+        { id: 'velo', name: 'Bicyclette', qty: 1, desc: "Vélo pliable ultra-rapide pour se déplacer à toute vitesse.", icon: 'img/items/bag.png', key: true },
+        { id: 'gs-ball', name: 'Balle GS', qty: 1, desc: "Capsule dorée mystérieuse liée à l'autel de la forêt de Céleste.", icon: 'img/items/gift.png', key: true },
+      ]
+    };
+
+    const prevPocketCfg = [
+      { id: 'objets', label: 'Objets', sub: 'Pierres, Bonbons et Objets tenus', color: '#00e0ff', glow: 'rgba(0, 224, 255, 0.45)', bg: 'img/bag/backpack_objets.jpg', arcX: 40.2, arcY: 11.6 },
+      { id: 'soin', label: 'Soins', sub: 'Médicaments, Potions et Guérisons', color: '#34d870', glow: 'rgba(52, 216, 112, 0.45)', bg: 'img/bag/backpack_soin.jpg', arcX: 62.1, arcY: 25.2 },
+      { id: 'balls', label: 'Poké Balls', sub: 'Capsules de capture de créatures', color: '#ff4c4c', glow: 'rgba(255, 76, 76, 0.45)', bg: 'img/bag/backpack_balls.jpg', arcX: 70.9, arcY: 40.1 },
+      { id: 'ct', label: 'CT & CS', sub: 'Capsules Techniques et Secrètes', color: '#b966ff', glow: 'rgba(185, 102, 255, 0.45)', bg: 'img/bag/backpack_ct.jpg', arcX: 70.5, arcY: 54.8 },
+      { id: 'baies', label: 'Baies', sub: 'Baies naturelles et remèdes doux', color: '#ff77a8', glow: 'rgba(255, 119, 168, 0.45)', bg: 'img/bag/backpack_baies.jpg', arcX: 59.1, arcY: 74.4 },
+      { id: 'cles', label: 'Objets Rares', sub: 'Objets précieux, Carte et Bicyclette', color: '#ffe058', glow: 'rgba(255, 224, 88, 0.45)', bg: 'img/bag/backpack_cles.jpg', arcX: 34.2, arcY: 87.8 },
+    ];
+
+    let prevActiveP = 0;
+    let prevActiveI = 0;
+
+    function prevBagSetPocket(p) {
+      const count = prevPocketCfg.length;
+      prevActiveP = (p % count + count) % count;
+      prevActiveI = 0;
+      prevBagUpdateUI();
+    }
+
+    function prevBagChangePocket(dir) {
+      prevBagSetPocket(prevActiveP + dir);
+    }
+
+    function prevBagSelectItem(idx) {
+      prevActiveI = idx;
+      prevBagUpdateInspector();
+      const listEl = document.getElementById('prevItemsList');
+      listEl.querySelectorAll('.b2w2-item-row').forEach((r, k) => {
+        r.classList.toggle('on', k === prevActiveI);
+        const cur = r.querySelector('.cur');
+        if (cur) cur.textContent = k === prevActiveI ? '▶' : '';
+      });
+    }
+
+    function prevBagUpdateUI() {
+      const cfg = prevPocketCfg[prevActiveP];
+
+      // 1. Déplacement physique fluide du curseur glider le long de l'arc incurvé
+      const glider = document.getElementById('prevGlider');
+      glider.style.left = cfg.arcX + '%';
+      glider.style.top = cfg.arcY + '%';
+      glider.style.setProperty('--glider-col', cfg.color);
+
+      // 2. Nœuds de l'arc
+      document.querySelectorAll('#prevBagLeft .b2w2-arc-node').forEach((node) => {
+        const p = +node.dataset.pocket;
+        node.classList.toggle('on', p === prevActiveP);
+      });
+
+      // 3. Sac HD correspondant avec rétro-éclairage coloré
+      document.getElementById('prevBackpackImg').src = cfg.bg;
+      document.getElementById('prevBackpackStage').style.setProperty('--stage-glow', cfg.glow);
+
+      // 4. Badges et sous-titres
+      document.getElementById('prevPocketSub').textContent = cfg.label.toUpperCase();
+      document.getElementById('prevPocketTag').textContent = 'POCHE ' + cfg.label.toUpperCase();
+      document.getElementById('prevPocketTag').style.color = cfg.color;
+
+      const badge = document.getElementById('prevPocketBadge');
+      badge.textContent = `◀ ${cfg.label.toUpperCase()} ▶`;
+      badge.style.color = cfg.color;
+      badge.style.textShadow = `0 0 10px ${cfg.color}`;
+
+      document.getElementById('prevPocketSubDesc').textContent = cfg.sub;
+
+      // 5. Render items list
+      const items = prevBagData[prevActiveP] || [];
+      document.getElementById('prevPocketCount').textContent = `${items.length} objet${items.length > 1 ? 's' : ''}`;
+
+      const listEl = document.getElementById('prevItemsList');
+      listEl.innerHTML = items.map((it, n) => {
+        const heldTag = it.held ? '<span class="b2w2-held-tag">TENU</span>' : '';
+        const qtyTxt = it.key ? 'CLÉ' : `× ${it.qty}`;
+        return `
+          <div class="list-row b2w2-item-row ${n === prevActiveI ? 'on' : ''}" onclick="prevBagSelectItem(${n})">
+            <span class="cur">${n === prevActiveI ? '▶' : ''}</span>
+            <div class="b2w2-item-ico-wrap">
+              <img class="b2w2-item-ico" src="${it.icon}" alt="">
+            </div>
+            <span class="b2w2-item-name">${it.name}</span>
+            ${heldTag}
+            <span class="b2w2-item-qty">${qtyTxt}</span>
+          </div>`;
+      }).join('') + `
+        <div class="list-row b2w2-item-row b2w2-close-row ${prevActiveI === items.length ? 'on' : ''}" onclick="prevBagSelectItem(${items.length})">
+          <span class="cur">${prevActiveI === items.length ? '▶' : ''}</span>
+          <span class="b2w2-item-name" style="color:#ff9898;">FERMER LE SAC</span>
+          <span class="b2w2-item-qty" style="color:#98a8c0;">Échap / B</span>
+        </div>`;
+
+      prevBagUpdateInspector();
+    }
+
+    function prevBagUpdateInspector() {
+      const cfg = prevPocketCfg[prevActiveP];
+      const items = prevBagData[prevActiveP] || [];
+      const it = items[prevActiveI];
+      if (it) {
+        document.getElementById('prevInspImg').src = it.icon;
+        document.getElementById('prevInspImg').style.display = '';
+        document.getElementById('prevInspName').textContent = it.name;
+        document.getElementById('prevInspCat').textContent = `[${cfg.label}]`;
+        document.getElementById('prevInspCat').style.color = cfg.color;
+        document.getElementById('prevInspQty').textContent = it.key ? 'Objet Unique Rare' : `Quantité : × ${it.qty}`;
+        document.getElementById('prevInspDesc').textContent = it.desc;
+      } else {
+        document.getElementById('prevInspImg').style.display = 'none';
+        document.getElementById('prevInspName').textContent = 'Fermer le Sac';
+        document.getElementById('prevInspCat').textContent = '';
+        document.getElementById('prevInspQty').textContent = '';
+        document.getElementById('prevInspDesc').textContent = "Revenir à l'aventure sans utiliser d'objet.";
+      }
+    }
+
+    
+    let prevToastTimer = null;
+    function prevBagNotify(action, msg, color = '#00e0ff') {
+      const t = document.getElementById('prevBagToast');
+      if (!t) return;
+      clearTimeout(prevToastTimer);
+      t.style.display = 'block';
+      t.style.borderColor = color;
+      t.innerHTML = `<span style="color:${color}; margin-right:6px;">[${action}]</span> ${msg}`;
+      prevToastTimer = setTimeout(() => { t.style.display = 'none'; }, 2400);
+    }
+
+    function prevBagUseItem() {
+      const items = prevBagData[prevActiveP] || [];
+      const it = items[prevActiveI];
+      if (!it) {
+        prevBagCloseDemo();
+        return;
+      }
+      if (it.held) {
+        prevBagNotify('DONNER / TENIR', `${it.name} est un objet tenu. Confie-le avec DONNER !`, '#ff77a8');
+        return;
+      }
+      prevBagNotify('UTILISER', `Tu as utilisé 1× ${it.name} ! Effet appliqué à l'équipe.`, '#34d870');
+    }
+
+    function prevBagGiveItem() {
+      const items = prevBagData[prevActiveP] || [];
+      const it = items[prevActiveI];
+      if (!it || it.key) {
+        prevBagNotify('IMPOSSIBLE', `Cet objet rare ne peut pas être tenu.`, '#ff5858');
+        return;
+      }
+      prevBagNotify('DONNER', `1× ${it.name} a été équipé sur Bulbizarre !`, '#38b8e8');
+    }
+
+    function prevBagTossItem() {
+      const items = prevBagData[prevActiveP] || [];
+      const it = items[prevActiveI];
+      if (!it || it.key) {
+        prevBagNotify('IMPOSSIBLE', `Tu ne peux pas jeter un objet rare !`, '#ff5858');
+        return;
+      }
+      prevBagNotify('JETER', `1× ${it.name} a été jeté du sac.`, '#e85858');
+    }
+
+    function prevBagCloseDemo() {
+      prevBagNotify('RETOUR', `Fermeture du sac (simulation).`, '#98a8c0');
+    }
+
+    function _oldClose() {
+      alert("Fermeture du sac (simulation). Dans le jeu, cela revient à l'aventure !");
+    }
+
+    // Support de la molette sur le panneau gauche
+    document.getElementById('prevBagLeft')?.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY > 15) prevBagChangePocket(1);
+      else if (e.deltaY < -15) prevBagChangePocket(-1);
+    }, { passive: false });
+
+    // Initialisation immédiate du Sac B2W2 Concept 1
+    prevBagUpdateUI();
+  </script>
+
+  <!-- 9. SÉLECTION D'ATTAQUE EN COMBAT — BANDEAU EXPLICATIF DE CAPACITÉ DYNAMIQUE -->
+  <div class="preview-section">
+    <div class="preview-title">9. SÉLECTION DE CAPACITÉ EN COMBAT — BANDEAU TACTIQUE D'EXPLICATION (5G PIXEL ART)</div>
+    <div class="preview-box" style="height: 320px; background: url('img/battle/bg_grass.png') center/cover; position: relative;">
+      <!-- HUD JOUEUR (adapté au combat) -->
+      <div class="bhud me" style="position: absolute; right: 0; bottom: calc(var(--bp) * 62); width: calc(var(--bp) * 154); height: calc(var(--bp) * 52); padding: calc(var(--bp) * 3.8) calc(var(--bp) * 5) calc(var(--bp) * 3.5) calc(var(--bp) * 15); background: url(img/battle/hud_me_5g.png) right top / 100% 100% no-repeat;">
+        <div class="bh-head"><div class="bh-balls"><span class="bh-ball" style="background:url(img/battle/ball_ok.png) center/contain no-repeat;"></span><span class="bh-ball" style="background:url(img/battle/ball_ok.png) center/contain no-repeat;"></span><span class="bh-ball" style="background:url(img/battle/ball_ok.png) center/contain no-repeat;"></span></div><div class="bh-types"><span class="type" style="background:#78c850">PLANTE</span><span class="type" style="background:#a040a0">POISON</span></div></div>
+        <div class="bh-mid"><span class="bh-name">Bulbizarre</span><span class="bh-lv">N.15</span><div class="bh-hp"><b>PV</b><i><u style="width:78%;background:#48d058"></u></i></div></div>
+        <div class="bh-bot"><span class="bh-hp-txt">39 / 50</span><div class="bh-exp-bar"><b>EXP</b><i><u style="width:65%;"></u></i></div></div>
+      </div>
+
+      <!-- COMMANDE ATTAQUES OUVERTE AVEC BANDEAU EXPLICATIF -->
+      <div class="bcmd moves on" style="display: block; position: absolute; left: calc(var(--bp) * 3.5); right: calc(var(--bp) * 3.5); bottom: calc(var(--bp) * 3); height: calc(var(--bp) * 45);">
+        <div class="mv-desc-banner">
+          <div class="mv-desc-head">
+            <span class="mv-desc-name" id="prevMvName">Charge</span>
+            <span class="mv-desc-type" id="prevMvType" style="background:#a8a878;">NORMAL</span>
+            <span class="mv-desc-cat" id="prevMvCat"><img src="img/battle/cat_physical.png" alt=""><span>Physique</span></span>
+            <span class="mv-desc-pow" id="prevMvPow">Puis. 50</span>
+            <span class="mv-desc-acc" id="prevMvAcc">Préc. 100%</span>
+            <span class="mv-desc-pp" id="prevMvPp">PP 35/35</span>
+          </div>
+          <div class="mv-desc-text" id="prevMvText">Le lanceur charge l'ennemi de tout son corps dans un impact physique direct.</div>
+        </div>
+        <div class="mv-layout">
+          <div class="mv-grid">
+            <div class="mbtn sel" onclick="prevSelectMv(0)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Charge</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 35/35</span></div>
+            </div>
+            <div class="mbtn" onclick="prevSelectMv(1)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Armure</span><div class="mbtn-top-right"><img class="mcat" src="img/battle/cat_status.png" alt="stat"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Statut</span></div><span class="mpp">PP 30/30</span></div>
+            </div>
+            <div class="mbtn" onclick="prevSelectMv(2)" style="--tc:#b8a038">
+              <div class="mbtn-top"><span class="mn">Jet-Pierres</span><div class="mbtn-top-right"><span class="bm-eff eff-super">SUPER EFF.</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">ROCHE</span><span class="mpw">Puis. 50</span></div><span class="mpp">PP 15/15</span></div>
+            </div>
+            <div class="mbtn" onclick="prevSelectMv(3)" style="--tc:#a8a878">
+              <div class="mbtn-top"><span class="mn">Force Poigne</span><div class="mbtn-top-right"><span class="bm-eff eff-norm">EFFICACE</span><img class="mcat" src="img/battle/cat_physical.png" alt="phys"></div></div>
+              <div class="mbtn-bot"><div class="mbtn-bot-left"><span class="mt">NORMAL</span><span class="mpw">Puis. 55</span></div><span class="mpp">PP 30/30</span></div>
+            </div>
+          </div>
+          <button type="button" class="mv-back-btn" onclick="prevSelectMv(4)" title="Retour">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. ÉCRAN D'APPRENTISSAGE DE CAPACITÉ — REMPLACEMENT AVEC ENCADRÉS EXPLICATIFS -->
+  <div class="preview-section">
+    <div class="preview-title">10. APPRENTISSAGE D'UNE CAPACITÉ (4 ATTAQUES MAXIMUM) — INTERFACE B2W2 ET COMPARATEUR</div>
+    <div class="preview-box" style="height: 480px; position: relative;">
+      <div class="learn-move-scr" style="position: absolute; inset: 0;">
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+            <span class="scr-bar-title">APPRENTISSAGE D'UNE CAPACITÉ</span>
+            <span class="scr-bar-sub">Rocbot (N.18)</span>
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-close-btn">ABANDONNER ✕</button>
+          </div>
+        </div>
+        <div class="lm-body">
+          <div class="lm-new-card">
+            <div class="lm-card-label">NOUVELLE CAPACITÉ À APPRENDRE</div>
+            <div class="lm-move-row new" style="--tc:#b8b8d0">
+              <div class="lm-move-main">
+                <span class="lm-move-name">Pistolet-Poing</span>
+                <span class="lm-type" style="background:#b8b8d0">ACIER</span>
+                <span class="lm-cat"><img src="img/battle/cat_physical.png" alt=""><span>Physique</span></span>
+              </div>
+              <div class="lm-move-stats">
+                <span class="lm-stat-pw">Puissance : 40</span>
+                <span class="lm-stat-acc">Précision : 100%</span>
+                <span class="lm-stat-pp">PP : <b>30</b>/30</span>
+              </div>
+            </div>
+            <div class="lm-desc-box new">
+              <div class="lm-desc-tag">EFFET :</div>
+              <div class="lm-desc-content">Attaque prioritaire (+1). Frappe comme un éclair d'acier avant que l'ennemi ne puisse réagir.</div>
+            </div>
+          </div>
+          <div class="lm-current-section">
+            <div class="lm-section-title">
+              <span>Sélectionne la capacité à oublier :</span>
+              <span class="lm-instruct">Clique sur une capacité pour comparer son effet et choisir</span>
+            </div>
+            <div class="lm-moves-grid">
+              <div class="lm-cur-move sel" onclick="prevSelectLearn(0)" style="--tc:#a8a878">
+                <div class="lm-cm-header"><span class="lm-cm-num">1</span><span class="lm-cm-name">Charge</span><span class="lm-type" style="background:#a8a878">NORMAL</span></div>
+                <div class="lm-cm-stats"><span class="lm-cat"><img src="img/battle/cat_physical.png" alt=""></span><span class="lm-stat-pw">Puis. 50</span><span class="lm-stat-pp">PP 35/35</span></div>
+              </div>
+              <div class="lm-cur-move" onclick="prevSelectLearn(1)" style="--tc:#a8a878">
+                <div class="lm-cm-header"><span class="lm-cm-num">2</span><span class="lm-cm-name">Armure</span><span class="lm-type" style="background:#a8a878">NORMAL</span></div>
+                <div class="lm-cm-stats"><span class="lm-cat"><img src="img/battle/cat_status.png" alt=""></span><span class="lm-stat-pw">Statut</span><span class="lm-stat-pp">PP 30/30</span></div>
+              </div>
+              <div class="lm-cur-move" onclick="prevSelectLearn(2)" style="--tc:#b8a038">
+                <div class="lm-cm-header"><span class="lm-cm-num">3</span><span class="lm-cm-name">Jet-Pierres</span><span class="lm-type" style="background:#b8a038">ROCHE</span></div>
+                <div class="lm-cm-stats"><span class="lm-cat"><img src="img/battle/cat_physical.png" alt=""></span><span class="lm-stat-pw">Puis. 50</span><span class="lm-stat-pp">PP 15/15</span></div>
+              </div>
+              <div class="lm-cur-move" onclick="prevSelectLearn(3)" style="--tc:#a8a878">
+                <div class="lm-cm-header"><span class="lm-cm-num">4</span><span class="lm-cm-name">Force Poigne</span><span class="lm-type" style="background:#a8a878">NORMAL</span></div>
+                <div class="lm-cm-stats"><span class="lm-cat"><img src="img/battle/cat_physical.png" alt=""></span><span class="lm-stat-pw">Puis. 55</span><span class="lm-stat-pp">PP 30/30</span></div>
+              </div>
+              <div class="lm-cur-move abandon" onclick="prevSelectLearn(4)">
+                <span class="lm-abandon-ico">✕</span>
+                <span class="lm-abandon-txt">Conserver les attaques actuelles</span>
+              </div>
+            </div>
+            <div class="lm-comparison-box">
+              <div class="lm-comp-head">
+                <span class="lm-comp-tag" id="prevLearnTag">CAPACITÉ ACTUELLE SÉLECTIONNÉE (1/4) :</span>
+                <span class="lm-comp-name" id="prevLearnName">Charge</span>
+                <span class="lm-comp-acc" id="prevLearnAcc">Précision : 100%</span>
+              </div>
+              <div class="lm-comp-desc" id="prevLearnDesc">Le lanceur charge l'ennemi de tout son corps dans un impact physique direct.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+<script>
+  const PREV_MOVES_DATA = [
+    { n: 'Charge', t: 'NORMAL', c: 'Physique', catIcon: 'img/battle/cat_physical.png', color: '#a8a878', p: 'Puis. 50', a: 'Préc. 100%', desc: "Le lanceur charge l'ennemi de tout son corps dans un impact physique direct." },
+    { n: 'Armure', t: 'NORMAL', c: 'Statut', catIcon: 'img/battle/cat_status.png', color: '#a8a878', p: 'Statut', a: 'Préc. —', desc: "Durcit les muscles ou la carapace pour augmenter la Défense du lanceur (+1)." },
+    { n: 'Jet-Pierres', t: 'ROCHE', c: 'Physique', catIcon: 'img/battle/cat_physical.png', color: '#b8a038', p: 'Puis. 50', a: 'Préc. 90%', desc: "Jette des cailloux sur l'ennemi pour lui infliger des dégâts physiques." },
+    { n: 'Force Poigne', t: 'NORMAL', c: 'Physique', catIcon: 'img/battle/cat_physical.png', color: '#a8a878', p: 'Puis. 55', a: 'Préc. 100%', desc: "Serre violemment l'ennemi entre deux puissantes pinces pour lui infliger des dégâts." },
+    { n: 'Retour', t: '', c: '', p: '', a: '', desc: "✕ Retour : Revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite)." }
+  ];
+
+  function prevSelectMv(idx) {
+    const d = PREV_MOVES_DATA[idx];
+    const btns = document.querySelectorAll('.bcmd.moves .mbtn');
+    const backBtn = document.querySelector('.bcmd.moves .mv-back-btn');
+    btns.forEach((b, k) => b.classList.toggle('sel', k === idx));
+    if (backBtn) backBtn.classList.toggle('sel', idx === 4);
+    const n = document.getElementById('prevMvName');
+    const t = document.getElementById('prevMvType');
+    const c = document.getElementById('prevMvCat');
+    const p = document.getElementById('prevMvPow');
+    const a = document.getElementById('prevMvAcc');
+    const pp = document.getElementById('prevMvPp');
+    const txt = document.getElementById('prevMvText');
+    if (idx === 4) {
+      if (n) n.textContent = 'RETOUR ✕';
+      if (t) t.style.display = 'none';
+      if (c) c.style.display = 'none';
+      if (p) p.style.display = 'none';
+      if (a) a.style.display = 'none';
+      if (pp) pp.style.display = 'none';
+      if (txt) txt.textContent = 'Annuler et revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
+    } else {
+      if (n) { n.style.display = 'inline-block'; n.textContent = d.n; }
+      if (t) { t.style.display = 'inline-block'; t.textContent = d.t; t.style.background = d.color; }
+      if (c) { c.style.display = 'inline-flex'; c.innerHTML = '<img src="' + d.catIcon + '" alt=""><span>' + d.c + '</span>'; }
+      if (p) { p.style.display = 'inline-block'; p.textContent = d.p; }
+      if (a) { a.style.display = 'inline-block'; a.textContent = d.a; }
+      if (pp) { pp.style.display = 'inline-block'; pp.textContent = 'PP ' + (idx === 0 ? '35/35' : idx === 1 ? '30/30' : idx === 2 ? '15/15' : '30/30'); }
+      if (txt) txt.textContent = d.desc;
+    }
+  }
+
+  function prevSelectLearn(idx) {
+    const rows = document.querySelectorAll('.lm-moves-grid .lm-cur-move');
+    rows.forEach((r, k) => r.classList.toggle('sel', k === idx));
+    const tag = document.getElementById('prevLearnTag');
+    const name = document.getElementById('prevLearnName');
+    const acc = document.getElementById('prevLearnAcc');
+    const desc = document.getElementById('prevLearnDesc');
+    if (idx === 4) {
+      if (tag) tag.textContent = 'OPTION :';
+      if (name) name.textContent = 'Abandonner';
+      if (acc) acc.textContent = '';
+      if (desc) desc.textContent = "Conserver les 4 capacités actuelles et abandonner l'apprentissage de Pistolet-Poing.";
+    } else {
+      const d = PREV_MOVES_DATA[idx];
+      if (tag) tag.textContent = 'CAPACITÉ ACTUELLE SÉLECTIONNÉE (' + (idx + 1) + '/4) :';
+      if (name) name.textContent = d.n;
+      if (acc) acc.textContent = 'Précision : ' + (d.a.replace('Préc. ', '') || '—');
+      if (desc) desc.textContent = d.desc;
+    }
+  }
+</script>
 
 </body>
 </html>

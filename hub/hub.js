@@ -1,7 +1,7 @@
 /* Hub : profil, salon commun et lancement des jeux dans une iframe.
    Le salon (DDRoom) vit ici pendant toute la session : changer de jeu ne coupe pas la connexion. */
 (function () {
-  const VERSION = '3.84';
+  const VERSION = '3.85';
   const $ = (s) => document.querySelector(s);
   const ORIGIN = location.origin === 'null' ? '*' : location.origin;
   const GAMES = window.HUB_GAMES;
@@ -40,7 +40,7 @@
       <span class="tx"><span class="ds">${esc(g.desc)}</span>
         <span class="meta"><span class="chip">👥 ${g.minPlayers} à ${g.maxPlayers} joueurs</span>${bots ? '<span class="chip">🤖 Bots</span>' : ''}</span>${extra}</span></${el}>`;
   }
-  $('#shelf').innerHTML = GAMES.map((g) => gameCard(g)).join('');
+  $('#shelf').innerHTML = GAMES.map((g) => gameCard(g, { attrs: `data-g="${g.id}"` })).join('');
   $('#shelfCount').textContent = GAMES.length + ' jeux';
   $('#name').value = me.name;
   $('#name').addEventListener('input', (e) => { me.name = e.target.value.slice(0, 12); DDProfile.save(me); FR.setMe(profile()); renderAccount(); if (room) room.updateMe(me); });
@@ -359,7 +359,17 @@
     renderNet(); pubState(); renderFriends();
   }
   // Rejoindre un salon par son code, depuis la liste d'amis ou une invitation
-  function joinCode(code) {
+// Pour l'accueil (hub/home.js) : lancer un jeu en un clic, depuis la vitrine ou une carte
+  window.HubUI = {
+    gameCard,
+    isRegistered: () => registered,
+    play(id, solo) {
+      if (!registered) { $('#name').focus(); $('#name').scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('Crée d\'abord ton compte : un pseudo, une couleur et un mot de passe.'); return; }
+      if (gameDef(id)) pick.game = id;
+      (solo ? $('#btnSolo') : $('#btnHost')).click();
+    },
+  };
+    function joinCode(code) {
     if (room && room.code === code) { showScreen(frame ? 'play' : 'room'); return; }
     goHome();
     $('#joinCode').value = code;
@@ -372,7 +382,7 @@
     $('#chatLog').innerHTML = '';
     room = DDRoom.create({
       joined() { busy(false); $('#btnHost').textContent = 'Créer un salon'; $('#btnJoin').textContent = 'Rejoindre'; showScreen(frame ? 'play' : 'room'); renderRoom(); },
-      update() { renderRoom(); syncFrame(); postRoster(); },
+      update() { renderRoom(); syncFrame(); postRoster(); if (window.HubInGame) window.HubInGame.refresh(); },
       chat(c) { appendChat(c); },
       game(from, m) { if (frame && frame.loaded) frame.el.contentWindow.postMessage({ dd: 'hub', k: 'msg', from, m }, ORIGIN); },
       error(msg) { if ($('#home').classList.contains('on')) goHome(msg); else toast(msg, 4000); },
@@ -648,6 +658,11 @@ const watchdog = setTimeout(() => {
       }
     }, 15000);
     frame = { game: g.id, n: g.n, el, loaded: false, role, watchdog };
+    // écran de chargement commun (avec « Démarrer ») et menu Arcadia à droite : plein écran, son, quitter
+    // « C'est parti ! » seulement quand tous les joueurs du salon ont chargé le jeu (pas de départ désynchronisé)
+    const loading = () => { if (!room || !frame) return null; const ps = room.players; const ok = ps.filter((p) => room.ready[p.id] === frame.game);
+      return { done: ok.length, total: ps.length, waiting: ps.filter((p) => room.ready[p.id] !== frame.game).map((p) => DDRoom.cleanName(p.name)) }; };
+    if (window.HubInGame) window.HubInGame.open(def, { players: room.players.length, loading, exit: leaveGame, vol: () => el.contentWindow.DDVolume, focus: () => { try { el.contentWindow.focus(); } catch (e) {} } });
     el.addEventListener('load', () => { try { el.contentWindow.focus(); } catch (e) {} });
     showScreen('play');
     renderRoom(); pubState();
@@ -657,6 +672,7 @@ const watchdog = setTimeout(() => {
     if (!frame) return;
     clearTimeout(frame.watchdog);
     frame.el.remove(); frame = null; $('#play').innerHTML = '';
+    if (window.HubInGame) window.HubInGame.close();
     if (room) room.setReady(null);
     if (toRoom && room) { showScreen('room'); renderRoom(); }
   }
@@ -685,18 +701,22 @@ const watchdog = setTimeout(() => {
       case 'send': room.sendGame(d.to, d.m, !!d.v); break;
       case 'result': recordResult(frame.game, d.r); break;
       case 'log': if (window.DDLogger && d.entry) window.DDLogger.receiveFromChild(d.entry); break;
-      case 'exit':
-        if (room.isHost) {
-          if (window.DDLogger && room.players.length > 1) {
-            window.DDLogger.logExpulsion('EXP_HOST_STOPPED_GAME', `L'hôte a quitté "${frame.game}" : fermeture de la partie pour les ${room.players.length} joueurs du salon.`, {
-              game: frame.game, roomCode: room.code,
-            });
-          }
-          room.setGame(null);
-        } else { leftGame = frame.n; closeFrame(true); }
-        break;
+      case 'shown': if (window.HubInGame) window.HubInGame.shown(); break;
+      case 'exit': leaveGame(); break;
     }
   });
+  // Quitter le jeu : l'hôte ferme la partie pour tout le salon, un invité revient seul au salon
+  function leaveGame() {
+    if (!frame || !room) return;
+    if (room.isHost) {
+      if (window.DDLogger && room.players.length > 1) {
+        window.DDLogger.logExpulsion('EXP_HOST_STOPPED_GAME', `L'hôte a quitté "${frame.game}" : fermeture de la partie pour les ${room.players.length} joueurs du salon.`, {
+          game: frame.game, roomCode: room.code,
+        });
+      }
+      room.setGame(null);
+    } else { leftGame = frame.n; closeFrame(true); }
+  }
 
   addEventListener('pagehide', () => { try { if (room) room.leave(); } catch (e) {} });
   if (joinParam) $('#name').focus();

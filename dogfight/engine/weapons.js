@@ -1,177 +1,194 @@
-// Gestionnaire de canon rotatif M61 Vulcan 20 mm pour Dogfight 3D.
-// Physique des balles traçantes, surchauffe du canon et calcul du point d'anticipation (Lead).
+// Armement de Dogfight 3D : canon rotatif, balles (qui héritent de la vitesse du tireur), surchauffe,
+// missiles à accrochage (un toutes les 12 s, sans limite de stock), leurres (toutes les 9 s), et point d'anticipation.
+// Un avion caché ne s'accroche pas : dans un nuage, en rase-mottes, furtif, ou près d'un brouilleur ennemi.
+// Moteur pur : la cadence de tir ne dépend plus des images par seconde.
+import { TYPES } from './flight.js';
 
-export const BULLET_SPEED = 780;     // m/s
-export const BULLET_LIFETIME = 1.6;  // Portée max ~1200 m
-export const FIRE_RATE = 0.04;       // 25 tirs par seconde
-export const DAMAGE_PER_BULLET = 7;  // Dégâts par balle
-export const HIT_RADIUS = 3.5;       // Rayon d'impact de l'avion cible (m)
+export const BULLET_SPEED = 780;     // m/s, en plus de la vitesse du tireur
+export const BULLET_LIFETIME = 1.6;
+export const FIRE_RATE = 25;         // tirs par seconde
+export const HIT_RADIUS = 5;
+export const BULLET_GRAVITY = 4.9;
 
-export const HEAT_PER_SHOT = 0.035;  // Montée de température par tir
-export const COOL_RATE = 0.45;       // Refroidissement par seconde
-export const OVERHEAT_LOCK = 2.0;    // Temps de blocage si surchauffe (s)
+export const HEAT_PER_SHOT = 0.035;
+export const COOL_RATE = 0.45;
+export const OVERHEAT_LOCK = 2;
 
-export class WeaponSystem {
-  constructor() {
-    this.bullets = [];
-    this.heat = 0.0; // 0.0 (froid) à 1.0 (surchauffe)
-    this.overheated = false;
-    this.overheatTimer = 0;
-    this.fireTimer = 0;
+export const LOCK_TIME = 1.3;        // s pour accrocher un F-16
+export const LOCK_CONE = 0.92;       // cos(23°)
+export const LOCK_RANGE = 1400;
+export const MISSILE_SPEED = 345;
+export const MISSILE_ACCEL = 170;
+export const MISSILE_TURN = 1.5;     // rad/s
+export const MISSILE_LIFE = 7;
+export const MISSILE_DAMAGE = 70;    // un F-16 neuf garde 30 % : il faut finir au canon
+export const MISSILE_FUSE = 14;
+export const MISSILE_COOLDOWN = 12;
+export const FLARE_COOLDOWN = 9;
+export const LOW_HIDE = 50;          // en dessous (au-dessus du sol ou de l'eau), les radars ne voient plus l'avion
+export const JAM_RADIUS = 1100;      // portée du brouilleur du F/A-18
+export const FLARE_TIME = 0.7;
+export const FLARE_BREAK = 0.7;      // chance qu'un leurre fasse décrocher un missile
+
+const abOf = (p) => (TYPES[p.type] || TYPES.f16).ab;
+export const abActive = (p, id) => p.abT > 0 && abOf(p) === id;
+
+// Caché aux radars ? Furtif, rase-mottes, ou dans un nuage
+export function hidden(t, world) {
+  if (abActive(t, 'stealth')) return true;
+  if (!world) return false;
+  return t.y - world.obstacleAt(t.x, t.z) < LOW_HIDE || world.inCloud(t.x, t.y, t.z);
+}
+// Un brouilleur ennemi actif tout près de ce point ?
+export function jammed(planes, x, y, z, team, self) {
+  for (const q of planes) {
+    if (!q.alive || q.id === self || !abActive(q, 'jam') || (team && q.team === team)) continue;
+    if ((q.x - x) ** 2 + (q.y - y) ** 2 + (q.z - z) ** 2 < JAM_RADIUS * JAM_RADIUS) return true;
   }
+  return false;
+}
 
-  update(fireInput, plane, dt, targets = [], onHit = null) {
-    const events = [];
+// Point à viser pour toucher (position, vitesse) en tenant compte de sa propre vitesse et de la chute de la balle.
+// L'axe du canon doit passer par le point rendu.
+export function computeLead(sx, sy, sz, svx, svy, svz, tx, ty, tz, tvx, tvy, tvz) {
+  const rvx = tvx - svx, rvy = tvy - svy, rvz = tvz - svz;
+  let px = tx, py = ty, pz = tz, t = 0;
+  for (let i = 0; i < 3; i++) {
+    t = Math.hypot(px - sx, py - sy, pz - sz) / BULLET_SPEED;
+    px = tx + rvx * t; py = ty + rvy * t; pz = tz + rvz * t;
+  }
+  return { x: px, y: py + 0.5 * BULLET_GRAVITY * t * t, z: pz, t, dist: Math.hypot(tx - sx, ty - sy, tz - sz) };
+}
 
-    // 1. Refroidissement du canon
-    if (this.overheated) {
-      this.overheatTimer -= dt;
-      this.heat = Math.max(0, this.overheatTimer / OVERHEAT_LOCK);
-      if (this.overheatTimer <= 0) {
-        this.overheated = false;
-        this.heat = 0;
-      }
-    } else {
-      this.heat = Math.max(0, this.heat - COOL_RATE * dt);
-    }
+const inSeg = (x1, y1, z1, x2, y2, z2, cx, cy, cz, r) => {
+  const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1, len = dx * dx + dy * dy + dz * dz;
+  let t = len ? ((cx - x1) * dx + (cy - y1) * dy + (cz - z1) * dz) / len : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const px = x1 + t * dx, py = y1 + t * dy, pz = z1 + t * dz, q = (cx - px) ** 2 + (cy - py) ** 2 + (cz - pz) ** 2;
+  return q <= r * r ? { x: px, y: py, z: pz } : null;
+};
 
-    if (this.fireTimer > 0) {
-      this.fireTimer -= dt;
-    }
+// Où la balle a-t-elle frappé ? Dans le repère de l'avion : moteur, queue, aile gauche, aile droite ou corps
+export function hitZone(p, x, y, z) {
+  const rx = x - p.x, ry = y - p.y, rz = z - p.z, along = rx * p.fx + ry * p.fy + rz * p.fz, side = rx * p.lx + ry * p.ly + rz * p.lz;
+  if (Math.abs(side) > 1.5) return side > 0 ? 'L' : 'R';
+  if (along < -2.4) return Math.abs(side) < 0.8 && Math.abs(ry) < 0.8 ? 'E' : 'T';
+  return 'C';
+}
 
-    // 2. Tir
-    if (fireInput && !this.overheated && this.fireTimer <= 0 && !plane.crashed) {
-      this.fireTimer = FIRE_RATE;
-      this.heat += HEAT_PER_SHOT;
-
-      if (this.heat >= 1.0) {
-        this.heat = 1.0;
-        this.overheated = true;
-        this.overheatTimer = OVERHEAT_LOCK;
-        events.push({ type: 'overheat', x: plane.x, y: plane.y, z: plane.z });
-      }
-
-      // Départ de balle depuis le nez de l'avion (décalage M61 Vulcan)
-      const muzzleOffset = 3.2;
-      const spread = (Math.random() - 0.5) * 0.008;
-
-      const bullet = {
-        x: plane.x + plane.forwardX * muzzleOffset,
-        y: plane.y + plane.forwardY * muzzleOffset,
-        z: plane.z + plane.forwardZ * muzzleOffset,
-        vx: (plane.forwardX + plane.rightX * spread) * (BULLET_SPEED + plane.speed),
-        vy: (plane.forwardY + plane.upY * spread) * (BULLET_SPEED + plane.speed),
-        vz: (plane.forwardZ + plane.rightZ * spread) * (BULLET_SPEED + plane.speed),
-        age: 0,
-        ownerId: plane.id,
-        expired: false,
-      };
-
-      this.bullets.push(bullet);
-      events.push({
-        type: 'fire',
-        x: bullet.x,
-        y: bullet.y,
-        z: bullet.z,
-        ownerId: plane.id,
-      });
-    }
-
-    // 3. Déplacement des balles et détection d'impact 3D
-    for (let i = this.bullets.length - 1; i >= 0; i--) {
-      const b = this.bullets[i];
-      b.age += dt;
-
-      if (b.age >= BULLET_LIFETIME) {
-        this.bullets.splice(i, 1);
-        continue;
-      }
-
-      // Gravité légère sur les balles
-      b.vy -= 9.81 * 0.5 * dt;
-
-      const nextX = b.x + b.vx * dt;
-      const nextY = b.y + b.vy * dt;
-      const nextZ = b.z + b.vz * dt;
-
-      // Test de collision contre les cibles vivantes
-      let hitTarget = null;
-      for (const target of targets) {
-        if (!target.alive || target.id === b.ownerId) continue;
-
-        // Distance du segment de trajectoire au centre de la cible
-        const hit = segmentIntersectsSphere(
-          b.x, b.y, b.z,
-          nextX, nextY, nextZ,
-          target.x, target.y, target.z,
-          HIT_RADIUS
-        );
-
-        if (hit) {
-          hitTarget = target;
-          break;
-        }
-      }
-
-      if (hitTarget) {
-        this.bullets.splice(i, 1);
-        events.push({
-          type: 'hit',
-          x: nextX,
-          y: nextY,
-          z: nextZ,
-          targetId: hitTarget.id,
-          damage: DAMAGE_PER_BULLET,
-        });
-        if (onHit) {
-          onHit(hitTarget, b.ownerId, DAMAGE_PER_BULLET);
-        }
-      } else {
-        b.x = nextX;
-        b.y = nextY;
-        b.z = nextZ;
-      }
-    }
-
-    return events;
+// Un pas d'armement pour un avion : tir, surchauffe. Ajoute les balles dans `bullets`.
+export function stepGun(p, fire, dt, bullets, events) {
+  if (p.over) { p.overT -= dt; p.heat = Math.max(0, p.overT / OVERHEAT_LOCK); if (p.overT <= 0) { p.over = false; p.heat = 0; } }
+  else p.heat = Math.max(0, p.heat - COOL_RATE * dt);
+  p.firing = false;
+  // Surcharge (F-16) : plus vite et sans chauffer ; Brrrt (A-10) : deux fois plus fort, sans chauffer
+  const surge = abActive(p, 'surge'), brrrt = abActive(p, 'brrrt');
+  p.fireAcc = Math.min(p.fireAcc + dt * FIRE_RATE * (surge ? 1.3 : 1), 2);
+  if (!fire || p.over) { p.fireAcc = Math.min(p.fireAcc, 1); return; }
+  const T = TYPES[p.type] || TYPES.f16, dmg = T.gun * (brrrt ? 2 : 1);
+  while (p.fireAcc >= 1) {
+    p.fireAcc -= 1;
+    p.firing = true;
+    if (!surge && !brrrt) p.heat += HEAT_PER_SHOT;
+    p.shots = (p.shots || 0) + 1;
+    if (p.heat >= 1) { p.heat = 1; p.over = true; p.overT = OVERHEAT_LOCK; events.push({ e: 'hot', id: p.id }); p.fireAcc = 0; }
+    const sx = (Math.random() - 0.5) * 0.008, sy = (Math.random() - 0.5) * 0.008;
+    const dx = p.fx + p.lx * sx + p.ux * sy, dy = p.fy + p.ly * sx + p.uy * sy, dz = p.fz + p.lz * sx + p.uz * sy;
+    const b = { x: p.x + p.fx * 3.2, y: p.y + p.fy * 3.2, z: p.z + p.fz * 3.2, vx: dx * BULLET_SPEED + p.fx * p.speed, vy: dy * BULLET_SPEED + p.fy * p.speed, vz: dz * BULLET_SPEED + p.fz * p.speed, age: 0, by: p.id, team: p.team, dmg };
+    bullets.push(b);
+    if (p.over) break;
   }
 }
 
-// Calcule le point d'anticipation (Lead Indicator) pour toucher une cible en mouvement
-export function computeLeadPosition(shooterPos, bulletSpeed, targetPos, targetVel) {
-  const dx = targetPos.x - shooterPos.x;
-  const dy = targetPos.y - shooterPos.y;
-  const dz = targetPos.z - shooterPos.z;
-  const dist = Math.hypot(dx, dy, dz);
-
-  const timeToTarget = dist / bulletSpeed;
-
-  return {
-    x: targetPos.x + targetVel.x * timeToTarget,
-    y: targetPos.y + targetVel.y * timeToTarget,
-    z: targetPos.z + targetVel.z * timeToTarget,
-    dist,
-    time: timeToTarget,
-  };
+// Avance les balles ; onHit(cible, zone, balle, point) ; le relief et les toits les arrêtent
+export function stepBullets(bullets, planes, world, dt, onHit, events) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.age += dt;
+    if (b.age >= BULLET_LIFETIME) { bullets.splice(i, 1); continue; }
+    b.vy -= BULLET_GRAVITY * dt;
+    const nx = b.x + b.vx * dt, ny = b.y + b.vy * dt, nz = b.z + b.vz * dt;
+    let hit = null, at = null;
+    for (const t of planes) {
+      if (!t.alive || t.id === b.by || t.inv > 0 || (b.team && b.team === t.team)) continue;
+      at = inSeg(b.x, b.y, b.z, nx, ny, nz, t.x, t.y, t.z, t.hitR || HIT_RADIUS);
+      if (at) { hit = t; break; }
+    }
+    if (hit) { bullets.splice(i, 1); onHit(hit, hitZone(hit, at.x, at.y, at.z), b, at); continue; }
+    if (world && ny < 130 && ny <= world.obstacleAt(nx, nz)) {
+      if (events && b.age > 0.02 && Math.random() < 0.3) events.push({ e: 'dust', x: Math.round(nx), y: Math.round(ny), z: Math.round(nz) });
+      bullets.splice(i, 1); continue;
+    }
+    b.x = nx; b.y = ny; b.z = nz;
+  }
 }
 
-function segmentIntersectsSphere(x1, y1, z1, x2, y2, z2, cx, cy, cz, radius) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dz = z2 - z1;
-  const lenSq = dx * dx + dy * dy + dz * dz;
-
-  if (lenSq === 0) {
-    return Math.hypot(cx - x1, cy - y1, cz - z1) <= radius;
+// L'accrochage : un ennemi dans le cône, visible des radars, assez longtemps
+export function stepLock(p, planes, world, dt) {
+  let best = null, bestDot = LOCK_CONE;
+  if (!jammed(planes, p.x, p.y, p.z, p.team, p.id)) for (const t of planes) {
+    if (!t.alive || t.id === p.id || (p.team && p.team === t.team)) continue;
+    const dx = t.x - p.x, dy = t.y - p.y, dz = t.z - p.z, d = Math.hypot(dx, dy, dz);
+    if (d < 120 || d > LOCK_RANGE) continue;
+    const dot = (dx * p.fx + dy * p.fy + dz * p.fz) / d;
+    if (dot > bestDot && !hidden(t, world)) { bestDot = dot; best = t; }
   }
+  if (!best) { p.lockT = Math.max(0, p.lockT - dt * 2); if (p.lockT === 0) p.lockId = null; return; }
+  if (best.id !== p.lockId) { p.lockId = best.id; p.lockT = 0; }
+  const sig = (TYPES[best.type] || TYPES.f16).sig;
+  p.lockT = Math.min(1, p.lockT + dt / (LOCK_TIME / sig));
+}
 
-  let t = ((cx - x1) * dx + (cy - y1) * dy + (cz - z1) * dz) / lenSq;
-  t = Math.max(0, Math.min(1, t));
+// Un missile part de sous l'aile (side : -1 gauche, 1 droite, 0 sous le ventre) vers la cible
+export function fireMissile(p, target, missiles, events, side = 0) {
+  const o = side * 2.4, m = { id: p.nextM = (p.nextM || 0) + 1, key: `${p.id}:${p.nextM}`, by: p.id, team: p.team, target, x: p.x - p.ux * 1.2 + p.lx * o, y: p.y - p.uy * 1.2 + p.ly * o, z: p.z - p.uz * 1.2 + p.lz * o, vx: p.fx * (p.speed + 30), vy: p.fy * (p.speed + 30), vz: p.fz * (p.speed + 30), speed: p.speed + 30, age: 0 };
+  missiles.push(m);
+  events.push({ e: 'mfire', id: p.id, target, x: Math.round(m.x), y: Math.round(m.y), z: Math.round(m.z) });
+  return m;
+}
+export function launchMissile(p, missiles, events) {
+  if (p.msCd > 0 || p.lockT < 1 || p.lockId === null) return false;
+  p.msCd = MISSILE_COOLDOWN;
+  fireMissile(p, p.lockId, missiles, events, p.nextM % 2 ? 1 : -1);
+  p.lockT = 0;
+  return true;
+}
 
-  const px = x1 + t * dx;
-  const py = y1 + t * dy;
-  const pz = z1 + t * dz;
-
-  const distSq = (cx - px) ** 2 + (cy - py) ** 2 + (cz - pz) ** 2;
-  return distSq <= radius * radius;
+// Avance les missiles : guidage, leurres, nuages, explosion de proximité
+export function stepMissiles(missiles, planes, world, dt, onBlast, events) {
+  for (const p of planes) p.warn = false;
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    const m = missiles[i];
+    m.age += dt;
+    m.speed = Math.min(MISSILE_SPEED, m.speed + MISSILE_ACCEL * dt);
+    const t = m.target !== null ? planes.find((q) => q.id === m.target) : null;
+    if (m.target !== null && (!t || !t.alive)) m.target = null;
+    if (t && t.alive) {
+      // un leurre lâché pendant le vol peut faire perdre la cible ; un brouilleur ou la furtivité la font perdre à coup sûr ;
+      // un nuage ou le rase-mottes, si la cible y reste assez longtemps
+      const lose = () => { m.target = null; events.push({ e: 'mlost', id: t.id }); };
+      if (t.flT > 0 && !m.seenFlare) { m.seenFlare = true; if (Math.random() < FLARE_BREAK) lose(); }
+      if (t.flT <= 0) m.seenFlare = false;
+      if (m.target !== null && (abActive(t, 'stealth') || jammed(planes, m.x, m.y, m.z, m.team, m.by))) lose();
+      else if (m.target !== null && hidden(t, world)) { m.blind = (m.blind || 0) + dt; if (m.blind > 0.7) lose(); } else m.blind = 0;
+    }
+    let dirX = m.vx, dirY = m.vy, dirZ = m.vz, n = Math.hypot(dirX, dirY, dirZ) || 1;
+    dirX /= n; dirY /= n; dirZ /= n;
+    if (m.target !== null && t) {
+      t.warn = true;
+      const tt = Math.hypot(t.x - m.x, t.y - m.y, t.z - m.z) / m.speed;
+      const ax = t.x + t.fx * t.speed * tt - m.x, ay = t.y + t.fy * t.speed * tt - m.y, az = t.z + t.fz * t.speed * tt - m.z, an = Math.hypot(ax, ay, az) || 1;
+      const k = Math.min(1, MISSILE_TURN * dt / Math.max(0.001, Math.acos(Math.min(1, (ax * dirX + ay * dirY + az * dirZ) / an))));
+      dirX += (ax / an - dirX) * k; dirY += (ay / an - dirY) * k; dirZ += (az / an - dirZ) * k;
+      n = Math.hypot(dirX, dirY, dirZ) || 1; dirX /= n; dirY /= n; dirZ /= n;
+    }
+    m.vx = dirX * m.speed; m.vy = dirY * m.speed; m.vz = dirZ * m.speed;
+    m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt;
+    let boom = m.age >= MISSILE_LIFE || (world && m.y <= world.obstacleAt(m.x, m.z));
+    for (const q of planes) {
+      if (!q.alive || q.id === m.by || (m.team && m.team === q.team)) continue;
+      if (Math.hypot(q.x - m.x, q.y - m.y, q.z - m.z) < MISSILE_FUSE && (q.id === m.target || m.age > 0.5)) { if (q.inv <= 0) onBlast(q, m); boom = true; break; }
+    }
+    if (boom) { events.push({ e: 'mboom', x: Math.round(m.x), y: Math.round(m.y), z: Math.round(m.z) }); missiles.splice(i, 1); }
+  }
 }

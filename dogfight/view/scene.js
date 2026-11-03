@@ -1,492 +1,206 @@
-// Scène 3D Dogfight : rendu Three.js, île 3D Island Rush, base aérienne militaire, végétation instanciée,
-// nuages volumétriques, océan avec reflets spéculaires et caméra de poursuite dynamique.
+// Scène de Dogfight 3D : rend l'archipel et la vraie île d'Island Rush, le décor, le ciel, les avions et les effets, et gère la caméra de poursuite et la qualité.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { buildF16Model } from './plane.js';
+import { buildGround } from './ground.js';
+import { buildArchipelago } from './archipel.js';
+import { buildDecor } from './decor.js';
+import { buildSky, buildClouds, noiseTexture, HAZE, FOG_DENSITY, SUN } from './sky.js';
+import { buildVolumetric } from './clouds.js';
+import { buildPlane, loadPlanes, makeEnvironment, planeLength } from './plane.js';
 import { FxManager } from './fx.js';
+import { createTreeKit } from '../../golf/view/trees.js';
+import { ZONE_CEIL } from '../engine/modes.js';
+
+// vol : les nuages en volume (définition de la marche, pas au plus, pas vers le soleil) ; sinon des bouffées
+const QUALITY = {
+  bas: { pr: 1, clouds: 0.33, trees: 0.5, vol: null },
+  moyen: { pr: 1.5, clouds: 1, trees: 1, vol: { scale: 0.3, steps: 110, light: 4 } },
+  eleve: { pr: 1.5, clouds: 1, trees: 1, vol: { scale: 0.45, steps: 150, light: 6 } },
+};
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), basis = new THREE.Matrix4();
+const worldUp = new THREE.Vector3(0, 1, 0);
+const ZONE_COLORS = [[0.92, 0.93, 0.95], [0.31, 0.55, 1], [1, 0.35, 0.3]];
+const ZONE_DEPTH = 60;   // la colonne s'enfonce sous le sol : le relief n'est pas plat sous une zone
 
 export class DogfightScene {
-  constructor(container, map) {
-    this.container = container;
-    this.map = map;
-
-    // 1. Moteur de rendu WebGL
+  constructor(container, world) {
+    this.container = container; this.world = world;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    this.renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
+    this.renderer.setSize(container.clientWidth || innerWidth, container.clientHeight || innerHeight);
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
-    // 2. Scène & Caméra
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x82b8e8); // Ciel azur
-    this.scene.fog = new THREE.FogExp2(0x9cc8ed, 0.00032); // Brume atmosphérique douce
+    this.scene.fog = new THREE.FogExp2(HAZE, FOG_DENSITY);
+    this.camera = new THREE.PerspectiveCamera(66, (container.clientWidth || innerWidth) / (container.clientHeight || innerHeight), 0.5, 24000);
+    this.scene.add(new THREE.HemisphereLight(0xcfe0f2, 0x5f6650, 1.05));
+    const sun = new THREE.DirectionalLight(0xfff0dc, 2.4); sun.position.copy(SUN); this.scene.add(sun);
 
-    this.camera = new THREE.PerspectiveCamera(
-      72,
-      this.renderer.domElement.clientWidth / this.renderer.domElement.clientHeight,
-      0.5,
-      7000
-    );
+    this.noise = noiseTexture();
+    this.sky = buildSky(this.scene, this.noise, () => this.camera);
+    const aniso = this.renderer.capabilities.getMaxAnisotropy();
+    this.treeKit = createTreeKit();   // les arbres de Birdie Party
+    this.ground = buildGround(this.scene, world.map, SUN, this.noise, aniso, this.treeKit);
+    this.archi = buildArchipelago(this.scene, { sun: SUN, deep: this.ground.deep, noiseTex: this.noise, anisotropy: aniso, kit: this.treeKit, renderer: this.renderer, island: world.map });
+    this.clouds = buildClouds(this.scene, world.clouds);
+    this.env = makeEnvironment(this.renderer, this.sky);
+    this.decor = buildDecor(this.scene, this.env);
+    this.lastDraw = 0;
+    this.volumetric = null;
+    this.ready = loadPlanes(this.env);
+    this.fx = new FxManager(this.scene, this.camera);
 
-    // 3. Éclairage solaire et hémisphérique
-    const hemiLight = new THREE.HemisphereLight(0xdff0ff, 0x3d5a80, 0.7);
-    this.scene.add(hemiLight);
+    this.planes = new Map();
+    this.camOffset = new THREE.Vector3(0, 6, -19);
+    this.camUp = new THREE.Vector3(0, 1, 0);
+    this.camInit = false;
+    this.shake = 0; this.orbit = 0;
+    this.preview = null; this.previewType = null;
+    this.quality = 'moyen'; this.prCap = 1.5;
+    this.zones = new Map();
 
-    const sun = new THREE.DirectionalLight(0xfff3e0, 2.1);
-    sun.position.set(-450, 850, -550).normalize();
-    this.scene.add(sun);
-    this.sunDir = sun.position.clone();
-
-    // 4. Construction de l'univers 3D (relief, base militaire, végétation, ciel, mer)
-    this.buildSkyDome();
-    this.buildOcean();
-    this.buildTerrain(map);
-    this.buildAirbase(map);
-    this.buildVegetation(map);
-
-    // 5. Gestionnaire d'effets visuels (traçantes Vulcan, fumée, explosions, condensation)
-    this.fx = new FxManager(this.scene);
-
-    // 6. Dictionnaire des modèles de chasseurs 3D
-    this.planeModels = new Map();
-
-    window.addEventListener('resize', () => this.onResize());
+    this.onResize = () => this.resize();
+    window.addEventListener('resize', this.onResize);
   }
 
-  onResize() {
-    const w = this.container.clientWidth || window.innerWidth;
-    const h = this.container.clientHeight || window.innerHeight;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+  resize() {
+    const w = this.container.clientWidth || innerWidth, h = this.container.clientHeight || innerHeight;
+    this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    if (this.volumetric) this.volumetric.resize();
   }
 
-  // Construit le dôme céleste avec dégradé d'altitude, disque solaire et nuages
-  buildSkyDome() {
-    const radius = 5500;
-    const skyGeo = new THREE.SphereGeometry(radius, 24, 16);
-    const pos = skyGeo.attributes.position;
-    const count = pos.count;
-    const colors = new Float32Array(count * 3);
+  setQuality(q) {
+    const Q = QUALITY[q] || QUALITY.moyen;
+    this.quality = QUALITY[q] ? q : 'moyen';
+    this.prCap = Q.pr;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.prCap));
+    this.ground.trees.setDensity(Q.trees); this.archi.forest.setDensity(Q.trees); this.archi.setDetail(this.quality !== 'bas');
+    if (Q.vol) {
+      try { if (!this.volumetric) this.volumetric = buildVolumetric(this.renderer, this.scene, this.world); } catch (e) { console.warn('Nuages en volume indisponibles :', e); this.volumetric = null; return this.setQuality('bas'); }
+      this.volumetric.setOptions(Q.vol); this.volumetric.setActive(true);
+    } else if (this.volumetric) this.volumetric.setActive(false);
+    this.clouds.setVisible(!Q.vol); this.clouds.setDensity(Q.clouds);
+    this.resize();
+    return this.quality;
+  }
 
-    const cZenith = new THREE.Color(0x133868);   // Bleu nuit aérospatial
-    const cMid = new THREE.Color(0x3b82f6);      // Bleu ciel pur
-    const cHorizon = new THREE.Color(0x99ccf0);  // Azur brumeux horizon
-    const cNadir = new THREE.Color(0x0e243f);    // Profondeurs sous la mer
+  // Qualité automatique : un cran plus bas, puis une image moins définie. Rend ce qui a changé, ou null
+  lowerQuality() {
+    if (this.quality === 'eleve') { this.setQuality('moyen'); return 'nuages moins fins'; }
+    if (this.quality === 'moyen') { this.setQuality('bas'); return 'nuages en bouffées, moins d\'arbres'; }
+    if (this.prCap > 0.75) { this.prCap = 0.75; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 0.75)); this.resize(); return 'image moins définie'; }
+    return null;
+  }
 
-    for (let i = 0; i < count; i++) {
-      const y = pos.getY(i) / radius;
-      let c = new THREE.Color();
-      if (y > 0.4) {
-        c.lerpColors(cMid, cZenith, (y - 0.4) / 0.6);
-      } else if (y >= 0) {
-        c.lerpColors(cHorizon, cMid, y / 0.4);
-      } else {
-        c.lerpColors(cHorizon, cNadir, -y);
+  // Domination : une colonne translucide par zone, dont le haut marque le plafond de capture, à la couleur de son camp
+  syncZones(zones) {
+    if (!zones) { if (this.zones.size) { for (const m of this.zones.values()) { this.scene.remove(m); m.geometry.dispose(); m.material.dispose(); } this.zones.clear(); } return; }
+    for (const z of zones) {
+      let m = this.zones.get(z.id);
+      if (!m) {
+        const h = ZONE_CEIL + ZONE_DEPTH;
+        m = new THREE.Mesh(new THREE.CylinderGeometry(z.r, z.r, h, 72, 1, true), new THREE.ShaderMaterial({
+          transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uC: { value: new THREE.Vector3() }, uA: { value: 1 } },
+          vertexShader: 'varying float vH; void main(){ vH=uv.y; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+          fragmentShader: 'varying float vH; uniform vec3 uC; uniform float uA; void main(){ float a=.03+.2*vH*vH+smoothstep(.975,.995,vH)*.75; gl_FragColor=vec4(uC,a*uA); }',
+        }));
+        m.position.set(z.x, z.y - ZONE_DEPTH + h / 2, z.z); m.renderOrder = 4; this.scene.add(m); this.zones.set(z.id, m);
       }
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
+      const c = ZONE_COLORS[z.own] || ZONE_COLORS[0];
+      m.material.uniforms.uC.value.set(c[0], c[1], c[2]);
     }
+  }
 
-    skyGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const skyMat = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      side: THREE.BackSide,
-      depthWrite: false,
-    });
-    const skyDome = new THREE.Mesh(skyGeo, skyMat);
-    skyDome.position.set(800, 0, 800);
-    this.scene.add(skyDome);
-
-    // Disque solaire éclatant
-    const sunGeo = new THREE.CircleGeometry(180, 16);
-    const sunMat = new THREE.MeshBasicMaterial({
-      color: 0xfffae0,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const sunDisc = new THREE.Mesh(sunGeo, sunMat);
-    const sunPos = this.sunDir.clone().multiplyScalar(4600).add(new THREE.Vector3(800, 0, 800));
-    sunDisc.position.copy(sunPos);
-    sunDisc.lookAt(800, 0, 800);
-    this.scene.add(sunDisc);
-
-    // Cumulus : des paquets de sprites doux (texture dessinée au canvas), plus clairs en haut, gris dessous
-    const cloudTex = makeCloudTexture();
-    const cloudMats = [0.62, 0.78, 0.92, 1.0].map((k) => new THREE.SpriteMaterial({
-      map: cloudTex,
-      color: new THREE.Color(k, k, Math.min(1, k * 1.04)),
-      transparent: true,
-      depthWrite: false,
-      opacity: 0.85,
-      fog: true,
-    }));
-    this.clouds = new THREE.Group();
-    let seed = 7;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let c = 0; c < 46; c++) {
-      const cx = -900 + rnd() * 3400;
-      const cz = -900 + rnd() * 3400;
-      const cy = 300 + rnd() * 260;
-      const size = 60 + rnd() * 90;
-      const puffs = 6 + Math.floor(rnd() * 7);
-      for (let i = 0; i < puffs; i++) {
-        const dy = (rnd() - 0.3) * size * 0.45;
-        const level = Math.max(0, Math.min(3, Math.floor(((dy / (size * 0.45)) + 0.5) * 4)));
-        const sp = new THREE.Sprite(cloudMats[level]);
-        const k = size * (0.9 + rnd() * 0.9);
-        sp.scale.set(k * 1.6, k, 1);
-        sp.position.set(cx + (rnd() - 0.5) * size * 2.6, cy + dy, cz + (rnd() - 0.5) * size * 1.8);
-        this.clouds.add(sp);
+  syncPlanes(list, dt = 0.016) {
+    const ids = new Set(list.map((p) => p.id));
+    for (const [id, m] of this.planes) if (!ids.has(id)) { this.scene.remove(m.root); m.dispose(); this.planes.delete(id); }
+    for (const p of list) {
+      let m = this.planes.get(p.id);
+      const col = p.tagColor || p.color;
+      if (!m || m.type !== p.type || m.col !== col || (p.type === 'cargo' && m.model !== p.model)) {
+        if (m) { this.scene.remove(m.root); m.dispose(); }
+        m = buildPlane(p.type, col, p.model); m.col = col; this.scene.add(m.root); this.planes.set(p.id, m);
       }
-    }
-    this.scene.add(this.clouds);
-  }
-
-  // Océan avec reflets spéculaires et lagon côtier turquoise
-  buildOcean() {
-    const waterGeo = new THREE.PlaneGeometry(16000, 16000);
-    waterGeo.rotateX(-Math.PI / 2);
-    waterGeo.translate(800, 0, 800);
-
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x0f3e6d,
-      roughness: 0.16,
-      metalness: 0.8,
-      transparent: true,
-      opacity: 0.9,
-    });
-
-    const ocean = new THREE.Mesh(waterGeo, waterMat);
-    this.scene.add(ocean);
-
-    // Lagon turquoise translucide entourant les côtes de l'île
-    const lagoonGeo = new THREE.PlaneGeometry(1750, 1750);
-    lagoonGeo.rotateX(-Math.PI / 2);
-    lagoonGeo.translate(800, 0.35, 800);
-
-    const lagoonMat = new THREE.MeshStandardMaterial({
-      color: 0x14b8a6,
-      roughness: 0.25,
-      metalness: 0.5,
-      transparent: true,
-      opacity: 0.32,
-    });
-
-    const lagoon = new THREE.Mesh(lagoonGeo, lagoonMat);
-    this.scene.add(lagoon);
-  }
-
-  // Relief 3D de l'île avec textures de pente et d'altitude (plages, vallées, falaises, sommets)
-  buildTerrain(map) {
-    if (!map) return;
-
-    const N = map.n; // 800
-    const size = map.size; // 1600 m
-
-    const step = 4;
-    const gridPoints = Math.floor(N / step);
-    const geo = new THREE.PlaneGeometry(size, size, gridPoints - 1, gridPoints - 1);
-    geo.rotateX(-Math.PI / 2);
-    geo.translate(size / 2, 0, size / 2);
-
-    const pos = geo.attributes.position;
-    const count = pos.count;
-    const colors = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const h = map.heightAt(x, z);
-      pos.setY(i, h);
-
-      // Dégradé d'altitude fondu : sable, prairie, forêt, roche, neige, avec la pente et un peu de bruit
-      const e = 6;
-      const slope = Math.min(1, (Math.abs(map.heightAt(x + e, z) - map.heightAt(x - e, z)) + Math.abs(map.heightAt(x, z + e) - map.heightAt(x, z - e))) / (2 * e) / 0.9);
-      const n = Math.sin(x * 0.043) * Math.cos(z * 0.037) * 0.5 + Math.sin(x * 0.11 + z * 0.09) * 0.25;
-      const mix = (c1, c2, t) => { t = Math.max(0, Math.min(1, t)); return [c1[0] + (c2[0] - c1[0]) * t, c1[1] + (c2[1] - c1[1]) * t, c1[2] + (c2[2] - c1[2]) * t]; };
-      const SAND = [0.86, 0.79, 0.58];
-      const GRASS = [0.36 + n * 0.04, 0.58 + n * 0.05, 0.25];
-      const FOREST = [0.2, 0.4, 0.18];
-      const ROCK = [0.47, 0.45, 0.42];
-      const SNOW = [0.95, 0.96, 0.98];
-      let c = mix(SAND, GRASS, (h - 1.2) / 3);
-      c = mix(c, FOREST, (h - 14 + n * 6) / 14);
-      c = mix(c, ROCK, Math.max((h - 34 + n * 8) / 12, (slope - 0.45) / 0.3));
-      c = mix(c, SNOW, (h - 66 + n * 6) / 8);
-      if (h < 0.6) c = mix(c, [0.55, 0.62, 0.55], 0.6); // fonds sous l'eau peu profonde
-      let r = c[0], g = c[1], b = c[2];
-
-      colors[i * 3] = r;
-      colors[i * 3 + 1] = g;
-      colors[i * 3 + 2] = b;
-    }
-
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.computeVertexNormals();
-
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.82,
-      metalness: 0.08,
-    });
-
-    const terrainMesh = new THREE.Mesh(geo, mat);
-    terrainMesh.receiveShadow = true;
-    this.scene.add(terrainMesh);
-  }
-
-  // Base militaire avec piste d'atterrissage asphaltée, marquages blancs, hangars et tour de contrôle
-  buildAirbase(map) {
-    const baseGroup = new THREE.Group();
-    const runwayY = 7.3;
-
-    // 1. Piste en asphalte sombre (longueur 380m, largeur 34m)
-    const rwGeo = new THREE.PlaneGeometry(380, 34);
-    rwGeo.rotateX(-Math.PI / 2);
-    const rwMat = new THREE.MeshStandardMaterial({
-      color: 0x222629,
-      roughness: 0.9,
-      metalness: 0.1,
-    });
-    const runway = new THREE.Mesh(rwGeo, rwMat);
-    runway.position.set(700, runwayY, 800);
-    baseGroup.add(runway);
-
-    // 2. Marquages blancs pointillés au centre de la piste
-    const dashCount = 14;
-    const dashMat = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
-    for (let i = 0; i < dashCount; i++) {
-      const dashGeo = new THREE.PlaneGeometry(14, 1.8);
-      dashGeo.rotateX(-Math.PI / 2);
-      const dash = new THREE.Mesh(dashGeo, dashMat);
-      dash.position.set(530 + i * 26, runwayY + 0.05, 800);
-      baseGroup.add(dash);
-    }
-
-    // 3. Deux grands hangars d'aviation
-    const hangarMat = new THREE.MeshStandardMaterial({
-      color: 0x5a6572,
-      roughness: 0.65,
-      metalness: 0.4,
-    });
-    for (let h = 0; h < 2; h++) {
-      const hGeo = new THREE.CylinderGeometry(14, 14, 45, 16, 1, false, 0, Math.PI);
-      hGeo.rotateZ(Math.PI / 2);
-      const hangar = new THREE.Mesh(hGeo, hangarMat);
-      hangar.position.set(650 + h * 60, runwayY, 760);
-      baseGroup.add(hangar);
-    }
-
-    // 4. Tour de contrôle avec antenne radar
-    const towerMat = new THREE.MeshStandardMaterial({ color: 0x8a929a, roughness: 0.5 });
-    const towerBaseGeo = new THREE.CylinderGeometry(4.5, 6, 26, 8);
-    const towerBase = new THREE.Mesh(towerBaseGeo, towerMat);
-    towerBase.position.set(560, runwayY + 13, 760);
-    baseGroup.add(towerBase);
-
-    // Vigie vitrée
-    const cabGeo = new THREE.CylinderGeometry(7, 5.5, 6, 8);
-    const cabMat = new THREE.MeshStandardMaterial({
-      color: 0x1e3a5f,
-      roughness: 0.1,
-      metalness: 0.8,
-    });
-    const cab = new THREE.Mesh(cabGeo, cabMat);
-    cab.position.set(560, runwayY + 28, 760);
-    baseGroup.add(cab);
-
-    // Balise rouge clignotante au sommet
-    const beaconGeo = new THREE.SphereGeometry(0.8, 8, 8);
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0022 });
-    this.controlBeacon = new THREE.Mesh(beaconGeo, beaconMat);
-    this.controlBeacon.position.set(560, runwayY + 32, 760);
-    baseGroup.add(this.controlBeacon);
-
-    this.scene.add(baseGroup);
-  }
-
-  // Végétation instanciée (pins et sapins alpins répartis sur les versants de l'île)
-  buildVegetation(map) {
-    if (!map) return;
-
-    // Géométrie d'un conifère stylisé low-poly (un tronc + 2 cônes)
-    const treeGeo = new THREE.ConeGeometry(3.2, 8.5, 5);
-    treeGeo.translate(0, 5, 0);
-    const treeMat = new THREE.MeshStandardMaterial({
-      color: 0x1f4728, // Vert forêt profond
-      roughness: 0.85,
-      metalness: 0.05,
-    });
-
-    const maxTrees = 450;
-    const instancedTrees = new THREE.InstancedMesh(treeGeo, treeMat, maxTrees);
-    const dummy = new THREE.Object3D();
-    let placed = 0;
-
-    // Échantillonnage déterministe pour peupler les zones vertes
-    for (let i = 0; i < 900 && placed < maxTrees; i++) {
-      const rx = 200 + ((i * 137.5) % 1200);
-      const rz = 200 + ((i * 249.3) % 1200);
-      const h = map.heightAt(rx, rz);
-
-      // On plante des arbres uniquement sur les prairies et collines (3m à 38m)
-      // et loin de la piste d'atterrissage
-      const distToRunway = Math.hypot(rx - 700, rz - 800);
-      if (h > 2.5 && h < 38 && distToRunway > 80) {
-        dummy.position.set(rx, h, rz);
-        const scale = 0.75 + ((i % 5) * 0.12);
-        dummy.scale.set(scale, scale * (0.9 + Math.random() * 0.2), scale);
-        dummy.rotation.y = (i * 0.7);
-        dummy.updateMatrix();
-        instancedTrees.setMatrixAt(placed, dummy.matrix);
-        placed++;
-      }
-    }
-
-    instancedTrees.count = placed;
-    instancedTrees.instanceMatrix.needsUpdate = true;
-    instancedTrees.receiveShadow = true;
-    this.scene.add(instancedTrees);
-  }
-
-  // Synchronise les modèles 3D d'avions avec l'état de jeu
-  syncPlanes(planes) {
-    const currentIds = new Set(planes.map((p) => p.id));
-    for (const [id, model] of this.planeModels.entries()) {
-      if (!currentIds.has(id)) {
-        this.scene.remove(model.root);
-        this.planeModels.delete(id);
-      }
-    }
-
-    for (const p of planes) {
-      let model = this.planeModels.get(p.id);
-      if (!model) {
-        const hexColor = parseInt(p.color.replace('#', '0x'), 16) || 0x2563eb;
-        model = buildF16Model({ color: hexColor });
-        this.scene.add(model.root);
-        this.planeModels.set(p.id, model);
-      }
-
-      model.root.visible = p.alive;
-      if (p.alive) {
-        model.root.position.set(p.flight.x, p.flight.y, p.flight.z);
-
-        // Orientation 3D de l'avion à partir des vecteurs tri-orthonormés
-        const rotMat = new THREE.Matrix4().makeBasis(
-          new THREE.Vector3(p.flight.rightX, p.flight.rightY, p.flight.rightZ),
-          new THREE.Vector3(p.flight.upX, p.flight.upY, p.flight.upZ),
-          new THREE.Vector3(p.flight.forwardX, p.flight.forwardY, p.flight.forwardZ)
-        );
-        model.root.quaternion.setFromRotationMatrix(rotMat);
-
-        // Flamme de postcombustion (Afterburner)
-        model.setBoosting(p.flight.boosting);
-      }
+      m.root.visible = p.alive && (p.inv <= 0 || Math.floor(this.fx.time * 10) % 2 === 0 || !p.alive);
+      if (!p.alive) continue;
+      m.root.position.set(p.x, p.y, p.z);
+      m.root.quaternion.set(p.qx, p.qy, p.qz, p.qw);
+      m.setBoost(p.boosting, dt);
     }
   }
+  firing(p, dt) { const m = this.planes.get(p.id); if (m) m.setFiring(p.firing, dt); }
 
-  // Caméra de poursuite dynamique (Chase Cam) derrière le joueur avec lissage fluide et stabilisation d'horizon
-  updateCamera(myPlane, dt) {
-    if (!myPlane || !myPlane.alive) return;
-
-    // Position idéale : 14.5 m derrière, 3.6 m au-dessus
-    // Lors du boost, la caméra recule légèrement pour donner l'impression d'accélération
-    const distBehind = myPlane.flight.boosting ? 16.5 : (myPlane.flight.braking ? 13.0 : 14.5);
-    const heightAbove = 3.6;
-
-    const targetCamX = myPlane.flight.x - myPlane.flight.forwardX * distBehind + myPlane.flight.upX * heightAbove;
-    const targetCamY = myPlane.flight.y - myPlane.flight.forwardY * distBehind + myPlane.flight.upY * heightAbove;
-    const targetCamZ = myPlane.flight.z - myPlane.flight.forwardZ * distBehind + myPlane.flight.upZ * heightAbove;
-
-    const lerpPos = Math.min(1.0, 7.5 * dt);
-    if (!this.cameraInitialized) {
-      this.cameraInitialized = true;
-      this.camera.position.set(targetCamX, targetCamY, targetCamZ);
-    } else {
-      // Amortissement de la position caméra : léger retard naturel
-      this.camera.position.x += (targetCamX - this.camera.position.x) * lerpPos;
-      this.camera.position.y += (targetCamY - this.camera.position.y) * lerpPos;
-      this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpPos;
-    }
-
-    // Point de visée devant l'avion
-    const lookAtX = myPlane.flight.x + myPlane.flight.forwardX * 45;
-    const lookAtY = myPlane.flight.y + myPlane.flight.forwardY * 45;
-    const lookAtZ = myPlane.flight.z + myPlane.flight.forwardZ * 45;
-    this.camera.lookAt(lookAtX, lookAtY, lookAtZ);
-
-    // Orientation de roulis de la caméra : STABILISÉE SUR L'HORIZON !
-    // Au lieu de figer la caméra sur le roulis de l'avion (ce qui donnait l'illusion d'une image fixe),
-    // la caméra garde l'horizon et suit seulement 28% de l'inclinaison.
-    // Le joueur voit ainsi directement l'avion s'incliner, virer et réagir en 3D !
-    const worldUp = new THREE.Vector3(0, 1, 0);
-    const planeUp = new THREE.Vector3(myPlane.flight.upX, myPlane.flight.upY, myPlane.flight.upZ);
-    const desiredCamUp = worldUp.clone().lerp(planeUp, 0.28).normalize();
-    this.camera.up.lerp(desiredCamUp, Math.min(1.0, 8.0 * dt));
-
-    // FOV dynamique lors de la postcombustion (effet de vitesse)
-    const targetFov = myPlane.flight.boosting ? 84 : 72;
-    this.camera.fov += (targetFov - this.camera.fov) * lerpPos;
-    this.camera.updateProjectionMatrix();
+  // Caméra de poursuite. La position suit l'avion sans retard ; seul l'angle autour de lui est amorti.
+  updateCamera(me, aim, dt, boostAmt) {
+    const fwd = v1.set(me.fx, me.fy, me.fz);
+    const dir = aim ? v2.set(aim.x, aim.y, aim.z).lerp(fwd, 0.18).normalize() : v2.copy(fwd);
+    const dist = (me.type === 'f22' ? 25 : 22) + boostAmt * 3, height = 6;
+    const planeUp = v3.set(me.ux, me.uy, me.uz);
+    const vert = Math.abs(fwd.y);
+    const upW = 0.3 + 0.7 * THREE.MathUtils.smoothstep(vert, 0.6, 0.95);
+    const up = new THREE.Vector3().copy(worldUp).lerp(planeUp, upW).normalize();
+    this.camUp.lerp(up, Math.min(1, 7 * dt)).normalize();
+    const want = dir.clone().multiplyScalar(-dist).addScaledVector(this.camUp, height);
+    if (!this.camInit) { this.camOffset.copy(want); this.camInit = true; }
+    else this.camOffset.lerp(want, Math.min(1, 6 * dt));
+    this.camera.position.set(me.x, me.y, me.z).add(this.camOffset);
+    if (this.shake > 0) { this.shake = Math.max(0, this.shake - dt * 2.2); const s = this.shake * 0.5; this.camera.position.x += (Math.random() - 0.5) * s; this.camera.position.y += (Math.random() - 0.5) * s; this.camera.position.z += (Math.random() - 0.5) * s; }
+    this.camera.up.copy(this.camUp);
+    this.camera.lookAt(me.x + dir.x * 120 - this.camUp.x * 7, me.y + dir.y * 120 - this.camUp.y * 7, me.z + dir.z * 120 - this.camUp.z * 7);
+    const fov = 66 + boostAmt * 8;
+    if (Math.abs(this.camera.fov - fov) > 0.05) { this.camera.fov += (fov - this.camera.fov) * Math.min(1, 5 * dt); this.camera.updateProjectionMatrix(); }
+    // évite de passer sous le sol
+    const g = this.world.obstacleAt(this.camera.position.x, this.camera.position.z) + 1.5;
+    if (this.camera.position.y < g) this.camera.position.y = g;
   }
 
-  render(state, myPlaneId, dt) {
-    if (!state) return;
+  // À la mort : on regarde son tueur, ou l'épave
+  watch(x, y, z, dt) {
+    this.orbit += dt * 0.35;
+    const r = 60;
+    this.camera.position.lerp(v1.set(x + Math.cos(this.orbit) * r, Math.max(y + 22, this.world.obstacleAt(x, z) + 8), z + Math.sin(this.orbit) * r), Math.min(1, 3 * dt));
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(x, y, z);
+    this.camInit = false;
+  }
 
-    this.syncPlanes(state.planes);
-
-    const myPlane = state.planes.find((p) => p.id === myPlaneId);
-    this.updateCamera(myPlane, dt);
-
-    // Balise clignotante de la base aérienne
-    if (this.controlBeacon) {
-      this.controlBeacon.visible = Math.sin(Date.now() * 0.006) > 0;
+  // Au hangar : l'avion choisi tourne au-dessus de l'île
+  showPreview(type, color, dt) {
+    if (this.previewType !== type) {
+      if (this.preview) { this.scene.remove(this.preview.root); this.preview.dispose(); }
+      this.preview = buildPlane(type, color); this.previewType = type; this.scene.add(this.preview.root);
+      const { root } = this.preview; root.position.set(870, 215, 1050);
     }
+    this.preview.root.visible = true;
+    this.orbit += dt * 0.28;
+    const r = 24 * Math.max(1, planeLength(type) / 16), { position: p } = this.preview.root;
+    this.preview.root.rotation.set(0, -0.9 + Math.sin(this.orbit * 0.7) * 0.08, Math.sin(this.orbit * 0.9) * 0.1);
+    this.camera.position.set(p.x + Math.cos(this.orbit) * r, p.y + 6.5 + Math.sin(this.orbit * 0.6) * 2, p.z + Math.sin(this.orbit) * r);
+    this.camera.up.set(0, 1, 0); this.camera.lookAt(p.x, p.y + 0.4, p.z);
+    if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
+    this.camInit = false;
+  }
+  hidePreview() { if (this.preview) this.preview.root.visible = false; if (this.camera.fov === 50) { this.camera.fov = 66; this.camera.updateProjectionMatrix(); } }
 
-    // Traitement des événements visuels (explosions, flashes de canon)
-    if (state.events && state.events.length > 0) {
-      for (const ev of state.events) {
-        if (ev.type === 'kill' || ev.type === 'crash') {
-          this.fx.createExplosion(ev.x, ev.y, ev.z);
-        } else if (ev.type === 'fire') {
-          const model = this.planeModels.get(ev.ownerId);
-          if (model) model.triggerMuzzleFlash();
-        }
-      }
-    }
-
-    this.fx.update(dt, state.planes);
+  draw() {
+    this.camera.updateMatrixWorld();
+    const t = this.fx.time, dt = Math.min(0.1, t - this.lastDraw); this.lastDraw = t;
+    this.ground.update(this.camera.position); this.archi.update(this.camera.position, t); this.decor.update(dt);
+    this.clouds.update(this.camera.position);
+    if (this.volumetric) this.volumetric.pre(this.camera, t);
     this.renderer.render(this.scene, this.camera);
   }
-}
 
-// Texture de cumulus : plusieurs disques flous superposés
-function makeCloudTexture() {
-  const S = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d');
-  let seed = 3;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 22; i++) {
-    const x = S * (0.25 + rnd() * 0.5);
-    const y = S * (0.3 + rnd() * 0.4);
-    const r = S * (0.12 + rnd() * 0.16);
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, 'rgba(255,255,255,0.55)');
-    grad.addColorStop(0.6, 'rgba(255,255,255,0.25)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, S, S);
+  dispose() {
+    window.removeEventListener('resize', this.onResize);
+    for (const m of this.planes.values()) m.dispose();
+    this.fx.dispose(); this.ground.dispose(); this.archi.dispose(); this.treeKit.dispose(); this.decor.dispose(); this.clouds.dispose();
+    if (this.volumetric) this.volumetric.dispose();
+    this.noise.dispose(); this.env.dispose();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
   }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }

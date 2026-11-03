@@ -7,6 +7,8 @@ import { monName, expProgress } from '../core/mon.js';
 import { ITEMS, canUseOn, itemName } from '../core/items.js';
 import { ASSETS, loadImg } from '../assets.js';
 import { TYPE_COL, TYPE_FR, STATUS_FR, hpCol, partyScreen, bagScreen } from './screens.js';
+import { typeEff } from '../core/battle.js';
+import { moveDesc } from '../data/moveDescriptions.js';
 
 const BH = 192;
 const TYPE_FX = {
@@ -15,7 +17,7 @@ const TYPE_FX = {
   water: ['#58a0ff', '#c0e0ff'], grass: ['#58c040', '#b0f080'], electric: ['#ffe040', '#ffffff'], psychic: ['#ff70b0', '#ffc0e0'], ice: ['#a0e8ff', '#ffffff'],
   dragon: ['#7050f0', '#c0a0ff'], dark: ['#403030', '#a08070'], fairy: ['#ff9ad0', '#ffe0f0'],
 };
-const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'] };
+const BALL_COL = { 'poke-ball': ['#e83838', '#f4f4f4'], 'great-ball': ['#3870e8', '#f4f4f4'], 'ultra-ball': ['#303030', '#f0c830'], 'master-ball': ['#8a3ac8', '#f4f4f4'], 'gs-ball': ['#d8a830', '#c8c8d0'] };
 const BALL_SPRITE_PATHS = {
   'poke-ball': 'img/battle/poke_ball_32.png',
   'great-ball': 'img/battle/great_ball_32.png',
@@ -45,7 +47,7 @@ export class BattleView {
       grad(0, BH, '#3a2e26', '#6a5440');
       x.fillStyle = '#2a201a'; for (let i = 0; i < 9; i++) { const bx = (i * 53) % W, bw = 40 + (i * 17) % 30; x.beginPath(); x.moveTo(bx, 0); x.lineTo(bx + bw / 2, 30 + (i * 13) % 25); x.lineTo(bx + bw, 0); x.fill(); }
       stripes(110, BH, 'rgba(0,0,0,0.12)', 5);
-    } else if (kind === 'indoor' || kind === 'gym' || kind === 'league') {
+    } else if (kind === 'indoor' || kind === 'gym' || kind === 'gym_rock' || kind === 'league' || kind === 'city' || kind === 'village') {
       const [a, b, f1, f2] = kind === 'league' ? ['#3a2c60', '#6a54a0', '#8a78c0', '#b0a0e0'] : kind === 'gym' ? ['#505868', '#8890a8', '#b8c0d0', '#e0e4ee'] : ['#c8b090', '#e0d0b0', '#e8dcc4', '#f6eee0'];
       grad(0, 80, a, b); grad(80, BH, f1, f2);
       x.fillStyle = 'rgba(255,255,255,0.18)'; for (let i = 0; i < W; i += 24) x.fillRect(i, 80, 1, BH - 80);
@@ -73,7 +75,7 @@ export class BattleView {
     return c;
   }
   drawPlatform(x, cx, cy, rx, ry, kind) {
-    const cols = kind === 'cave' ? ['#4a3a2c', '#8a7258', '#a08a6c'] : kind === 'indoor' || kind === 'gym' || kind === 'league' ? ['#9098a8', '#d8dce8', '#f2f4f8'] : kind === 'water' ? ['#c0a060', '#f0dca0', '#fbecc0'] : kind === 'volcanic' ? ['#5a5250', '#8a8280', '#a8a09c'] : kind === 'snow' ? ['#a0b4cc', '#dce8f4', '#ffffff'] : ['#3c8a3c', '#6cc458', '#90dc78'];
+    const cols = kind === 'cave' || kind === 'gym_rock' ? ['#4a3a2c', '#8a7258', '#a08a6c'] : kind === 'indoor' || kind === 'gym' || kind === 'league' || kind === 'city' ? ['#9098a8', '#d8dce8', '#f2f4f8'] : kind === 'water' ? ['#c0a060', '#f0dca0', '#fbecc0'] : kind === 'volcanic' ? ['#5a5250', '#8a8280', '#a8a09c'] : kind === 'snow' ? ['#a0b4cc', '#dce8f4', '#ffffff'] : ['#3c8a3c', '#6cc458', '#90dc78'];
     x.fillStyle = cols[0]; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 7); x.fill();
     x.fillStyle = cols[1]; x.beginPath(); x.ellipse(cx, cy - 2, rx - 3, ry - 3, 0, 0, 7); x.fill();
     x.fillStyle = cols[2]; x.beginPath(); x.ellipse(cx - rx * 0.15, cy - 4, rx * 0.55, ry * 0.4, 0, 0, 7); x.fill();
@@ -82,8 +84,11 @@ export class BattleView {
     const bgMap = {
       cave: 'bg_cave',
       gym: 'bg_gym',
+      gym_rock: 'bg_gym_rock',
       league: 'bg_league',
       indoor: 'bg_indoor',
+      city: 'bg_city',
+      village: 'bg_village',
       water: night ? 'bg_water_night' : 'bg_water',
       snow: night ? 'bg_snow_night' : 'bg_snow',
       volcanic: 'bg_volcanic',
@@ -92,8 +97,11 @@ export class BattleView {
     const platMap = {
       cave: 'cave',
       gym: 'stone',
+      gym_rock: 'cave',
       league: 'stone',
       indoor: 'stone',
+      city: 'stone',
+      village: 'grass',
       water: 'water',
       snow: 'snow',
       volcanic: 'volcanic',
@@ -162,6 +170,15 @@ export class BattleView {
       x.fillStyle = p.c;
       if (p.shape === 'ring') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.ellipse(p.x, p.y, p.r, p.r * 0.6, 0, 0, 7); x.stroke(); }
       else if (p.shape === 'bolt') { x.strokeStyle = p.c; x.lineWidth = 2; x.beginPath(); x.moveTo(p.x, p.y); for (let k = 1; k < 5; k++) x.lineTo(p.x + (Math.random() - 0.5) * 10, p.y + k * 7); x.stroke(); }
+      else if (p.shape === 'tornado') {
+        x.save();
+        x.strokeStyle = p.c;
+        x.lineWidth = p.lw || 2;
+        x.beginPath();
+        x.ellipse(p.x, p.y, Math.max(1, p.r), Math.max(1, p.r * 0.32), p.tilt || 0, 0, Math.PI * 2);
+        x.stroke();
+        x.restore();
+      }
       else if (p.shape === 'leaf') { x.save(); x.translate(p.x, p.y); x.rotate(p.a || 0); x.fillRect(-3, -1, 6, 3); x.restore(); }
       else x.fillRect(Math.round(p.x - p.r), Math.round(p.y - p.r), Math.max(1, Math.round(p.r * 2)), Math.max(1, Math.round(p.r * 2)));
       x.globalAlpha = 1;
@@ -171,14 +188,30 @@ export class BattleView {
     if (s.wipe > 0) { x.fillStyle = '#000'; const h = BH / 2 * s.wipe; x.fillRect(0, 0, W, h); x.fillRect(0, BH - h, W, h); }
     // mise à jour des particules
     const dt = 1 / 60;
-    for (const p of s.parts) { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.vy += (p.g || 0); p.life -= dt; if (p.grow) p.r += p.grow; if (p.a != null) p.a += 0.2; }
+    for (const p of s.parts) {
+      if (p.spiral) {
+        p.spiralAngle = (p.spiralAngle || 0) + (p.spiralSpd || 0.2);
+        p.spiralR = (p.spiralR || 0) + (p.spiralRGrow || 0);
+        p.x = p.cx + Math.cos(p.spiralAngle) * p.spiralR;
+      } else {
+        p.x += p.vx * dt * 60;
+      }
+      p.y += p.vy * dt * 60;
+      p.vy += (p.g || 0);
+      p.life -= dt;
+      if (p.grow) p.r += p.grow;
+      if (p.a != null) p.a += (p.va != null ? p.va : 0.2);
+    }
     s.parts = s.parts.filter((p) => p.life > 0);
     requestAnimationFrame(this.frame);
   };
   drawBall(x, b) {
     const itemKey = b.item || 'poke-ball';
-    const imgKey = b.state ? b.state : itemKey;
-    const img = this.ballImgs?.[imgKey] || this.ballImgs?.[itemKey] || this.ballImgs?.['poke-ball'];
+    // les images inclinée / ouverte n'existent que pour la Poké Ball : les autres Balls gardent leur dessin, penché
+    const propre = itemKey === 'poke-ball';
+    const imgKey = b.state && propre ? b.state : itemKey;
+    const img = this.ballImgs?.[imgKey] || this.ballImgs?.[itemKey] || null;
+    const penche = !propre && (b.state === 'tilt-l' ? -0.45 : b.state === 'tilt-r' ? 0.45 : 0);
     if (b.groundY != null && b.groundY > b.y) {
       const dist = Math.max(0, b.groundY - b.y);
       const alpha = Math.max(0.12, 0.45 - dist * 0.0035);
@@ -193,7 +226,7 @@ export class BattleView {
     }
     x.save();
     x.translate(Math.round(b.x), Math.round(b.y));
-    if (b.rot) x.rotate(b.rot);
+    if (b.rot || penche) x.rotate((b.rot || 0) + penche);
     const size = 18;
     if (img) {
       x.imageSmoothingEnabled = false;
@@ -247,11 +280,32 @@ export class BattleView {
           <div class="bh-hpn"></div>
         </div>
       </div>
+      <div class="battle-weather-badge" style="display:none"></div>
       <div class="dlg box btext"><div class="dlg-name" style="display:none"></div><div class="dlg-txt"></div><div class="dlg-arrow">▼</div></div>
       <div class="bcmd"></div>`);
     this.game.ui.root.appendChild(r);
     this.hud = { foe: r.querySelector('.bhud.foe'), me: r.querySelector('.bhud.me') };
     this.textBox = r.querySelector('.btext'); this.cmd = r.querySelector('.bcmd');
+    this.weatherBadge = r.querySelector('.battle-weather-badge');
+  }
+  updateWeather(w) {
+    if (!this.weatherBadge) this.weatherBadge = this.root?.querySelector('.battle-weather-badge');
+    if (!this.weatherBadge) return;
+    if (!w || w === 'none') {
+      this.weatherBadge.style.display = 'none';
+      this.weatherBadge.className = 'battle-weather-badge';
+      return;
+    }
+    const W_INFO = {
+      rain: { icon: '🌧️', label: 'Pluie' },
+      sun: { icon: '☀️', label: 'Zénith' },
+      sandstorm: { icon: '🌪️', label: 'Sable' },
+      hail: { icon: '❄️', label: 'Grêle' },
+    };
+    const info = W_INFO[w] || { icon: '⛅', label: w };
+    this.weatherBadge.innerHTML = `<span class="bwb-icon">${info.icon}</span><span class="bwb-label">${info.label}</span>`;
+    this.weatherBadge.className = `battle-weather-badge ${w}`;
+    this.weatherBadge.style.display = 'flex';
   }
   renderPartyBalls(side) {
     const party = this.battle?.sides?.[side]?.party || [];
@@ -267,15 +321,24 @@ export class BattleView {
   setHud(side, m, hp) {
     if (m && hp == null) hp = m.hp;
     const h = side === 1 ? this.hud.foe : this.hud.me; if (!m) { h.style.visibility = 'hidden'; return; }
-    if (side === 1) this.game.markSeen(m.sp);
+    if (side === 1 && !this.seenInBattle?.has(m.uid || m.sp)) {
+      this.seenInBattle?.add(m.uid || m.sp);
+      this.game.markSeen(m.sp);
+    }
     h.style.visibility = '';
     const g = m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '';
     h.querySelector('.bh-name').innerHTML = esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
     const typesEl = h.querySelector('.bh-types');
     if (typesEl) {
-      const spTypes = SPECIES[m.sp]?.t || ['normal'];
-      typesEl.innerHTML = spTypes.map((t) => `<span class="bh-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+      const isKnown = side === 0 || this.game.isSpeciesKnown(m.sp);
+      if (isKnown) {
+        const spTypes = SPECIES[m.sp]?.t || ['normal'];
+        typesEl.innerHTML = spTypes.map((t) => `<span class="bh-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('');
+      } else {
+        const count = this.game.seenCount(m.sp);
+        typesEl.innerHTML = `<span class="bh-type unknown" title="Type inconnu (vu ${count}/3 - capturez-le pour révéler)">???</span>`;
+      }
     }
     const ballsEl = h.querySelector('.bh-balls');
     if (ballsEl) ballsEl.innerHTML = this.renderPartyBalls(side);
@@ -297,6 +360,7 @@ export class BattleView {
   /* ---------------- lancement ---------------- */
   async run(battle, o = {}) {
     this.battle = battle; this.kind = o.bg || 'grass'; this.alive = true;
+    this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
     this.bg = this.makeBg(this.kind, o.night);
     this.st = { shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [],
@@ -304,6 +368,7 @@ export class BattleView {
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(battle.weather);
     this.setHud(1, null); this.setHud(0, null);
     // images
     const foeSide = battle.sides[1];
@@ -314,6 +379,9 @@ export class BattleView {
     ]);
     if (foeSide.trainer) this.st.trainer.img = await loadImg(ASSETS.trainer(foeSide.trainer.bs));
     requestAnimationFrame(this.frame);
+    // Ouverture cinématographique du rideau de combat
+    if (o.curtain?.open) o.curtain.open();
+    else if (o.curtain?.remove) o.curtain.remove();
     // intro : les socles glissent en place
     this.st.screenFlash = 0;
     if (battle.wild) { this.st.foe.visible = true; this.st.foe.dark = true; }
@@ -347,6 +415,7 @@ export class BattleView {
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(battle.weather);
     this.setHud(1, null); this.setHud(0, null);
     await Promise.all([
       this.loadBattleDecor(this.kind, o.night),
@@ -370,7 +439,7 @@ export class BattleView {
         let mine = null;
         if (battle.need[0]) {
           const party = battle.sides[0].party;
-          mine = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
+          mine = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
           if (mine < 0 || !party[mine] || party[mine].hp <= 0) mine = party.findIndex((m) => m.hp > 0);
         }
         duel.sendSwitch(n, mine);
@@ -402,8 +471,7 @@ export class BattleView {
 
   async loadSide(side) {
     const m = this.battle.act(side), o = side === 1 ? this.st.foe : this.st.me;
-    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny) : ASSETS.back(m.sp, m.shiny));
-    if (o.img && m.shadow) o.img = shadowCanvas(o.img);   // Pokémon Obscur (Lugia du Sanctuaire)
+    o.img = await loadImg(side === 1 ? ASSETS.front(m.sp, m.shiny, m.shadow) : ASSETS.back(m.sp, m.shiny, m.shadow));   // Pokémon Obscur (Lugia du Sanctuaire)
     o.whiteImg = null; o.darkImg = null;
     if (!o.img) { const c = document.createElement('canvas'); c.width = c.height = 80; const x = c.getContext('2d'); x.fillStyle = TYPE_COL[SPECIES[m.sp].t[0]]; x.beginPath(); x.arc(40, 50, 24, 0, 7); x.fill(); x.fillStyle = '#fff'; x.font = '20px sans-serif'; x.fillText('?', 34, 58); o.img = c; }
   }
@@ -434,7 +502,14 @@ export class BattleView {
         if (k < 0) continue;
         return { type: 'switch', idx: k };
       }
-      if (c === 3) return { type: 'run' };
+      if (c === 3) {
+        if (!b.wild) {
+          this.sound.sfx('bump');
+          await this.msg('Impossible de fuir un combat de Dresseur !', { wait: true });
+          continue;
+        }
+        return { type: 'run' };
+      }
     }
   }
   commandMenu() {
@@ -484,60 +559,187 @@ export class BattleView {
   moveMenu() {
     return new Promise((resolve) => {
       const m = this.battle.me;
-      this.cmd.innerHTML = `<div class="mv-grid">${[0, 1, 2, 3].map((k) => {
-        const x = m.moves[k];
-        if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
-        const M = MOVES[x.id];
-        const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
-        const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
-        return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
-          <div class="mbtn-top">
-            <span class="mn">${esc(M.n)}</span>
-            <img class="mcat" src="${catIcon}" alt="${M.c}">
+      const foeMon = this.battle.foe;
+      const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
+      const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
+      this.cmd.innerHTML = `
+        <div class="mv-desc-banner">
+          <div class="mv-desc-head">
+            <span class="mv-desc-name"></span>
+            <span class="mv-desc-type"></span>
+            <span class="mv-desc-cat"></span>
+            <span class="mv-desc-pow"></span>
+            <span class="mv-desc-acc"></span>
+            <span class="mv-desc-pp"></span>
           </div>
-          <div class="mbtn-bot">
-            <span class="mt">${TYPE_FR[M.t]}</span>
-            <span class="mpw">${pwTxt}</span>
-            <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
-          </div>
+          <div class="mv-desc-text"></div>
+        </div>
+        <div class="mv-layout">
+          <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
+            const x = m.moves[k];
+            if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
+            const M = MOVES[x.id];
+            const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
+            const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
+            let effBadge = '';
+            if (foeMon && (M.p || M.c !== 'status')) {
+              if (foeKnown && foeTypes) {
+                const eff = typeEff(M.t, foeTypes);
+                if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+                else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+                else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+                else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+              } else {
+                const count = this.game.seenCount(foeMon.sp);
+                effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+              }
+            }
+            return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
+              <div class="mbtn-top">
+                <span class="mn">${esc(M.n)}</span>
+                <div class="mbtn-top-right">
+                  ${effBadge}
+                  <img class="mcat" src="${catIcon}" alt="${M.c}">
+                </div>
+              </div>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">${TYPE_FR[M.t]}</span>
+                  <span class="mpw">${pwTxt}</span>
+                </div>
+                <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
+              </div>
+            </div>`;
+          }).join('')}</div>
+          <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
         </div>`;
-      }).join('')}</div>`;
-      this.cmd.classList.add('on', 'moves'); this.root.classList.add('cmdon');
+      this.cmd.classList.add('on', 'moves');
+      this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMove || 0; if (!m.moves[i]) i = 0;
       const btns = [...this.cmd.querySelectorAll('.mbtn')];
-      const show = () => btns.forEach((b, k) => b.classList.toggle('sel', k === i));
+      const backBtn = this.cmd.querySelector('.mv-back-btn');
+      const descName = this.cmd.querySelector('.mv-desc-name');
+      const descType = this.cmd.querySelector('.mv-desc-type');
+      const descCat = this.cmd.querySelector('.mv-desc-cat');
+      const descPow = this.cmd.querySelector('.mv-desc-pow');
+      const descAcc = this.cmd.querySelector('.mv-desc-acc');
+      const descPp = this.cmd.querySelector('.mv-desc-pp');
+      const descText = this.cmd.querySelector('.mv-desc-text');
+      const show = () => {
+        btns.forEach((b, k) => b.classList.toggle('sel', k === i));
+        backBtn?.classList.toggle('sel', i === 4);
+        if (i === 4) {
+          if (descName) descName.textContent = 'RETOUR ✕';
+          if (descType) descType.style.display = 'none';
+          if (descCat) descCat.style.display = 'none';
+          if (descPow) descPow.style.display = 'none';
+          if (descAcc) descAcc.style.display = 'none';
+          if (descPp) descPp.style.display = 'none';
+          if (descText) descText.textContent = 'Annuler et revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
+        } else {
+          const x = m.moves[i];
+          if (x) {
+            const M = MOVES[x.id];
+            if (descName) {
+              descName.style.display = 'inline-block';
+              descName.textContent = M.n;
+            }
+            if (descType) {
+              descType.style.display = 'inline-block';
+              descType.textContent = TYPE_FR[M.t];
+              descType.style.background = TYPE_COL[M.t];
+            }
+            if (descCat) {
+              descCat.style.display = 'inline-flex';
+              descCat.innerHTML = `<img src="img/battle/cat_${M.c || 'physical'}.png" alt=""><span>${M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique'}</span>`;
+            }
+            if (descPow) {
+              descPow.style.display = 'inline-block';
+              descPow.textContent = M.p ? `Puis. ${M.p}` : 'Statut';
+            }
+            if (descAcc) {
+              descAcc.style.display = 'inline-block';
+              descAcc.textContent = M.a ? `Préc. ${M.a}%` : 'Préc. —';
+            }
+            if (descPp) {
+              descPp.style.display = 'inline-block';
+              descPp.textContent = `PP ${x.pp}/${M.pp}`;
+            }
+            if (descText) descText.textContent = moveDesc(M);
+          } else {
+            if (descName) descName.textContent = 'Emplacement vide';
+            if (descType) descType.style.display = 'none';
+            if (descCat) descCat.style.display = 'none';
+            if (descPow) descPow.style.display = 'none';
+            if (descAcc) descAcc.style.display = 'none';
+            if (descPp) descPp.style.display = 'none';
+            if (descText) descText.textContent = 'Aucune capacité apprise sur cet emplacement.';
+          }
+        }
+      };
       show();
       let done = false;
-      const confirmMove = (idx) => {
+      const closeMenu = (idx) => {
         if (done) return;
+        done = true;
+        pop();
+        this.cmd.classList.remove('on', 'moves');
+        this.root.classList.remove('cmdon', 'moves-open');
+        if (idx >= 0) {
+          this.lastMove = idx;
+          this.sound.sfx('select');
+        } else {
+          this.sound.sfx('cancel');
+        }
+        resolve(idx);
+      };
+      const confirmMove = (idx) => {
         const x = m.moves[idx];
         if (!x) return;
         if (x.pp <= 0 && this.battle.usableMoves(0).length) { this.sound.sfx('bump'); return; }
-        done = true;
-        pop();
-        this.cmd.classList.remove('on', 'moves'); this.root.classList.remove('cmdon');
-        this.lastMove = idx;
-        this.sound.sfx('select');
-        resolve(idx);
+        closeMenu(idx);
       };
       btns.forEach((b, idx) => {
         if (!m.moves[idx]) return;
         b.addEventListener('pointerenter', () => { if (i !== idx) { i = idx; this.sound.sfx('blip'); show(); } });
         b.addEventListener('click', (e) => { e.stopPropagation(); i = idx; show(); confirmMove(idx); });
       });
+      backBtn?.addEventListener('pointerenter', () => { if (i !== 4) { i = 4; this.sound.sfx('blip'); show(); } });
+      backBtn?.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(-1); });
+
       const pop = this.ui.input.push((k) => {
         let j = i;
-        if (k === 'up' || k === 'down') j = i ^ 2; else if (k === 'left' || k === 'right') j = i ^ 1;
-        else if (k === 'a') { confirmMove(i); return; }
-        else if (k === 'b') { if (done) return; done = true; pop(); this.cmd.classList.remove('on', 'moves'); this.root.classList.remove('cmdon'); this.sound.sfx('cancel'); resolve(-1); return; }
-        else return;
-        if (m.moves[j]) { i = j; this.sound.sfx('blip'); show(); }
+        if (k === 'up') {
+          if (i === 4) j = 1;
+          else if (i >= 2) j = i - 2;
+        } else if (k === 'down') {
+          if (i === 4) j = 3;
+          else if (i <= 1) j = i + 2;
+        } else if (k === 'left') {
+          if (i === 4) j = 1;
+          else if (i % 2 === 1) j = i - 1;
+        } else if (k === 'right') {
+          if (i % 2 === 0) j = i + 1;
+          else if (i === 1 || i === 3) j = 4;
+        } else if (k === 'a') {
+          if (i === 4) { closeMenu(-1); return; }
+          confirmMove(i);
+          return;
+        } else if (k === 'b') {
+          closeMenu(-1);
+          return;
+        } else return;
+
+        if (j === 4 || m.moves[j]) { i = j; this.sound.sfx('blip'); show(); }
       });
     });
   }
   async forcedSwitch() {
     const b = this.battle;
-    const k = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
+    const k = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
     if (k < 0) return;
     await this.play(b.playerSwitch(k));
   }
@@ -554,6 +756,13 @@ export class BattleView {
         case 'hp': await this.animHp(e.side, e.from, e.hp, e.status); break;
         case 'status': { const m = this.battle.act(e.side); this.setHud(e.side, m); if (e.status) { this.sound.sfx('status'); const c = this.sprCenter(e.side); this.burst(c.x, c.y, [STATUS_FR[e.status]?.[1] || '#fff', '#ffffff'], 12, { r: 2 }); await wait(250); } break; }
         case 'stat': await this.animStat(e.side, e.up); break;
+        case 'weather': this.updateWeather(e.weather); break;
+        case 'gym-tension': {
+          this.sound.play('gymTension');
+          this.st.screenFlash = 0.6;
+          await wait(180);
+          break;
+        }
         case 'anim': await this.animStatus(e.side, e.k); break;
         case 'faint': await this.animFaint(e.side); break;
         case 'exp': if (e.active) await this.animExp(e); break;
@@ -600,6 +809,10 @@ export class BattleView {
     const M = MOVES[moveId], fx = TYPE_FX[type] || TYPE_FX.normal, from = this.sprCenter(side), to = this.sprCenter(1 - side);
     const o = side === 1 ? this.st.foe : this.st.me, dir = side === 1 ? -1 : 1;
     const selfMove = M.tg === 7 || M.c === 'status' && (M.m?.st?.every(([, c]) => c > 0) || M.m?.heal);
+    if (moveId === 10001 || M?.key === 'shadow-blast' || M?.n === 'Rafale Obscure') {
+      await this.animShadowBlast(side, from, to);
+      return;
+    }
     if (M.c === 'physical') {
       await this.tween(130, (u) => { o.dx = dir * 14 * Math.sin(u * Math.PI / 2); o.dy = -dir * 6 * Math.sin(u * Math.PI / 2); });
       this.burst(to.x, to.y, fx, 16, { speed: 2.4, r: 2 });
@@ -626,6 +839,144 @@ export class BattleView {
       this.burst(c.x, c.y, fx, 10, { speed: 1, r: 1.5, up: 0.6 });
       await wait(180);
     }
+  }
+  async animShadowBlast(side, from, to) {
+    const o = side === 1 ? this.st.foe : this.st.me;
+    const targetO = side === 1 ? this.st.me : this.st.foe;
+    const shadowCols = ['#1a052e', '#4a148c', '#7b1fa2', '#00e5ff', '#ffffff'];
+
+    // 1. Charge des ténèbres & élévation de Lugia Obscur
+    this.sound.sfx('throw');
+    await this.tween(320, (u) => {
+      o.dy = -16 * ease(u);
+      o.white = 0.45 * u;
+      if (Math.random() < 0.75) {
+        const ang = Math.random() * Math.PI * 2, dist = 24 + Math.random() * 18;
+        const c = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: from.x + Math.cos(ang) * dist,
+          y: (from.y - 14) + Math.sin(ang) * dist,
+          vx: -Math.cos(ang) * 1.9,
+          vy: -Math.sin(ang) * 1.9,
+          r: 1.5 + Math.random() * 1.5,
+          c,
+          life: 0.32,
+          max: 0.32,
+        });
+      }
+    });
+
+    await wait(60);
+
+    // 2. Traînée obscure / projectile fonçant vers la cible
+    this.sound.sfx('throw');
+    await this.tween(150, (u) => {
+      const bx = from.x + (to.x - from.x) * u;
+      const by = (from.y - 14) + (to.y - (from.y - 14)) * u;
+      for (let k = 0; k < 3; k++) {
+        this.st.parts.push({
+          x: bx + (Math.random() - 0.5) * 6,
+          y: by + (Math.random() - 0.5) * 6,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          r: 2 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.24,
+          max: 0.24,
+          shape: Math.random() < 0.35 ? 'bolt' : null,
+        });
+      }
+    });
+
+    // 3. Déploiement de la Tornade Obscure (Cyclone tourbillonnant)
+    const tornadoDur = 700;
+    const startTornado = performance.now();
+    let lastRing = 0;
+
+    this.shakeScreen(3, 680);
+
+    await this.tween(tornadoDur, (u) => {
+      const elapsed = performance.now() - startTornado;
+      targetO.dx = Math.sin(u * 30) * 2.5;
+
+      // Anneaux de vortex ascendants et s'évasant
+      if (elapsed - lastRing > 60) {
+        lastRing = elapsed;
+        const ringCol = shadowCols[Math.floor(Math.random() * shadowCols.length)];
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 4,
+          y: to.y + 14,
+          vx: 0,
+          vy: -2.4 - Math.random() * 0.8,
+          r: 6,
+          grow: 0.72,
+          tilt: (Math.random() - 0.5) * 0.25,
+          lw: 2.2,
+          shape: 'tornado',
+          c: ringCol,
+          life: 0.55,
+          max: 0.55,
+        });
+      }
+
+      // Éclats tourbillonnants en spirale ascendante
+      for (let s = 0; s < 3; s++) {
+        const spd = (0.24 + Math.random() * 0.16) * (Math.random() < 0.5 ? 1 : -1);
+        this.st.parts.push({
+          cx: to.x,
+          x: to.x,
+          y: to.y + 12 + (Math.random() - 0.5) * 8,
+          spiral: true,
+          spiralAngle: Math.random() * Math.PI * 2,
+          spiralR: 4 + Math.random() * 6,
+          spiralRGrow: 0.38 + Math.random() * 0.22,
+          spiralSpd: spd,
+          vx: 0,
+          vy: -2.2 - Math.random() * 1.5,
+          r: 1.5 + Math.random() * 2,
+          c: shadowCols[Math.floor(Math.random() * shadowCols.length)],
+          life: 0.48,
+          max: 0.48,
+        });
+      }
+
+      // Éclairs cyan et violets
+      if (Math.random() < 0.35) {
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 18,
+          y: to.y - 18 + (Math.random() - 0.5) * 20,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: -1.2,
+          r: 3,
+          c: Math.random() < 0.5 ? '#00e5ff' : '#e040fb',
+          shape: 'bolt',
+          life: 0.22,
+          max: 0.22,
+        });
+      }
+    });
+
+    targetO.dx = 0;
+
+    // 4. Cataclysme : Flash, déflagration & ondes de choc
+    this.sound.sfx('hitstrong');
+    this.tween(240, (u) => { this.st.screenFlash = 0.85 * (1 - u); });
+
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 8, grow: 3.5, shape: 'ring', c: '#ffffff', life: 0.36, max: 0.36 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 14, grow: 2.8, shape: 'ring', c: '#00e5ff', life: 0.42, max: 0.42 });
+    this.st.parts.push({ x: to.x, y: to.y - 4, vx: 0, vy: 0, r: 20, grow: 2.2, shape: 'ring', c: '#7b1fa2', life: 0.48, max: 0.48 });
+
+    this.burst(to.x, to.y - 4, shadowCols, 38, { speed: 3.4, r: 2.6 });
+    await this.shakeScreen(7, 500);
+
+    // 5. Atterrissage de Lugia Obscur
+    await this.tween(220, (u) => {
+      o.dy = -16 * (1 - ease(u));
+      o.white = 0.45 * (1 - u);
+    });
+    o.dy = 0;
+    o.white = 0;
+    await wait(80);
   }
   async animHit(side, eff, crit) {
     const o = side === 1 ? this.st.foe : this.st.me;

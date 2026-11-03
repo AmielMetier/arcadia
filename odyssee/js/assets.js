@@ -14,19 +14,32 @@ const BW = BASE + '/pokemon/versions/generation-v/black-white';
 const gen = (id) => (id <= 493 ? HG : BW);
 const IMG = new URL('../img/', import.meta.url).href;
 const ITEMS = new Set(SPRITES.items || []), PORTRAITS = new Set(SPRITES.portraits || []), DRESSEURS = new Set(SPRITES.dresseurs || []);
+// champions dont le portrait de combat n'est pas encore dessiné : un dresseur qui leur ressemble
+const SOSIES = { pierre: 'topdresseur', croupier: 'garde' };
 const orig = (id) => id >= 1000 && SPECIES[id];
 
 export const ASSETS = {
-  front: (id, shiny) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-f${shiny ? 's' : ''}.png` : `${gen(id)}${shiny ? '/shiny' : ''}/${id}.png`),
-  back: (id, shiny) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-b${shiny ? 's' : ''}.png` : `${gen(id)}/back${shiny ? '/shiny' : ''}/${id}.png`),
-  icon: (id) => (orig(id) ? `${IMG}crea/${SPECIES[id].k}-i.png` : `${BASE}/pokemon/versions/generation-vii/icons/${id}.png`),
+  front: (id, shiny, shadow) => (shadow ? ${IMG}crea/-shadow-f.png : orig(id) ? ${IMG}crea/-f.png : ${gen(id)}/.png),
+  back: (id, shiny, shadow) => (shadow ? ${IMG}crea/-shadow-b.png : orig(id) ? ${IMG}crea/-b.png : ${gen(id)}/back/.png),
+  icon: (id, shadow) => (shadow ? ${IMG}crea/-shadow-i.png : orig(id) ? ${IMG}crea/-i.png : ${BASE}/pokemon/versions/generation-vii/icons/.png),
+  shadowFront: (id) => ${IMG}crea/-shadow-f.png,
+  shadowBack: (id) => ${IMG}crea/-shadow-b.png,
+  shadowIcon: (id) => ${IMG}crea/-shadow-i.png,
   item: (k) => { const ic = ITEM_DEFS[k]?.icon || k; return ITEMS.has(ic) ? `${IMG}items/${ic}.png` : `${BASE}/items/${ic}.png`; },
   // cri : enregistrement PokeAPI pour un Pokémon, cri synthétisé (« synth:id ») pour une créature originale
   cry: (id) => (orig(id) ? 'synth:' + id : params.has('sprites') ? null : `${CRIES}/${id}.ogg`),
   // dresseur en combat : dessins HeartGold / SoulSilver (provisoires), sinon nos portraits, sinon ceux de Poké Duel
-  trainer: (k) => (DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
-  portrait: (k) => (PORTRAITS.has(k) ? `${IMG}portraits/${k}-l.png` : null),
+  trainer: (k) => (!DRESSEURS.has(k) && !PORTRAITS.has(k) && SOSIES[k] ? ASSETS.trainer(SOSIES[k]) : DRESSEURS.has(k) ? `${IMG}dresseurs/${k}.png` : PORTRAITS.has(k) ? `${IMG}portraits/${k}.png` : `../pokemon/assets/trainers/${k}.png`),
+  portrait: (k) => {
+    if (!k) return null;
+    if (PORTRAITS.has(k)) return `${IMG}portraits/${k}-l.png`;
+    if (DRESSEURS.has(k)) return `${IMG}dresseurs/${k}.png`;
+    if (SOSIES[k] && (PORTRAITS.has(SOSIES[k]) || DRESSEURS.has(SOSIES[k]))) return ASSETS.portrait(SOSIES[k]);
+    return null;
+  },
   chars: `${IMG}chars.png`,
+  suiveurs: `${IMG}suiveurs.png`,
+  relief: `${IMG}relief.png`,
   nature: (k) => `${IMG}nature/${k}.png`,
   mobilier: (k) => `${IMG}mobilier/${k}.png`,
   facade: (k) => `${IMG}facades/${k}.png`,
@@ -41,7 +54,12 @@ export const ASSETS = {
 };
 /** précharge une image (résout même en cas d'échec) */
 export function loadImg(src) {
-  return new Promise((res) => { if (!src) { res(null); return; } const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  // une image qui tarde (réseau lent) ne bloque jamais l'écran plus de 8 s : on continue sans elle
+  return new Promise((res) => {
+    if (!src) { res(null); return; }
+    const im = new Image(); let done = false; const fin = (v) => { if (!done) { done = true; res(v); } };
+    im.crossOrigin = 'anonymous'; im.onload = () => fin(im); im.onerror = () => fin(null); im.src = src; setTimeout(() => fin(im.complete && im.naturalWidth ? im : null), 8000);
+  });
 }
 /** précharge un lot d'images { clé: adresse } → { clé: image } */
 export async function loadAll(map) {

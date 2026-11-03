@@ -29,11 +29,19 @@ export class UI {
     }
     const nm = this.dlg.querySelector('.dlg-name'); nm.textContent = o.speaker || ''; nm.style.display = o.speaker ? '' : 'none';
     this.dlg.classList.toggle('battle', !!o.battle);
-    // portrait de celui qui parle (hors combat), à gauche de la boîte
-    const src = !o.battle && o.speaker && this.faceOf ? this.faceOf(o.speaker) : null;
+    // portrait de celui qui parle (hors combat), dans la boîte sous le nom
+    const src = !o.battle && this.faceOf ? this.faceOf(o.speaker || o.face, o) : (!o.battle && o.face ? o.face : null);
     let face = this.dlg.querySelector('.dlg-face');
-    if (src) { if (!face) { face = el('img', 'dlg-face'); face.alt = ''; this.dlg.appendChild(face); } if (face.getAttribute('src') !== src) face.src = src; }
-    else if (face) face.remove();
+    if (src) {
+      if (!face) {
+        face = el('img', 'dlg-face');
+        face.alt = '';
+        this.dlg.appendChild(face);
+      }
+      if (face.getAttribute('src') !== src) face.src = src;
+    } else if (face) {
+      face.remove();
+    }
     this.dlg.classList.toggle('has-face', !!src);
     return this.dlg;
   }
@@ -140,9 +148,66 @@ export class UI {
     this.fadeEl.style.opacity = black ? 1 : 0;
     return wait(ms + 20);
   }
+  /**
+   * Transition de porte / bâtiment façon Pokémon DS : un cercle transparent au milieu d'un écran noir se referme
+   * (closing), puis se rouvre une fois la nouvelle carte en place. Hors transition, rien n'est affiché.
+   */
+  async doorTransition(closing, ms = 240) {
+    if (!this.doorEl) {
+      this.doorEl = el('div', 'door-iris'); this.doorEl.appendChild(this.doorHole = el('div', 'door-hole'));
+      this.root.appendChild(this.doorEl);
+    }
+    const d = this.doorEl, h = this.doorHole, OUVERT = '170vmax';
+    d.classList.add('on');
+    h.style.transition = 'none';
+    h.style.width = h.style.height = closing ? OUVERT : '0px';
+    void h.offsetWidth;
+    h.style.transition = `width ${ms}ms cubic-bezier(0.4, 0, 0.2, 1), height ${ms}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+    h.style.width = h.style.height = closing ? '0px' : OUVERT;
+    await wait(ms + 30);
+    if (!closing) d.classList.remove('on');   // ouvert : plus rien à l'écran
+  }
   async flash(times = 3, color = '#fff', ms = 90) {
     this.flashEl.style.background = color;
     for (let i = 0; i < times; i++) { this.flashEl.style.opacity = 1; await wait(ms); this.flashEl.style.opacity = 0; await wait(ms); }
+  }
+  /** Flash stroboscopique de combat 5G (blanc / noir / blanc) */
+  async battleFlash() {
+    this.flashEl.style.transition = 'none';
+    this.flashEl.style.background = '#ffffff';
+    this.flashEl.style.opacity = '1';
+    await wait(70);
+    this.flashEl.style.background = '#060a12';
+    this.flashEl.style.opacity = '1';
+    await wait(60);
+    this.flashEl.style.background = '#ffffff';
+    this.flashEl.style.opacity = '1';
+    await wait(80);
+    this.flashEl.style.opacity = '0';
+  }
+  /** Transition d'écran de combat 5G à lames horizontales biseautées alternées */
+  async battleWipe(opts = {}) {
+    const isWild = opts.wild ?? true;
+    const wrap = el('div', `battle-wipe ${isWild ? 'wild' : 'trainer'}`);
+    const numShards = 10;
+    for (let i = 0; i < numShards; i++) {
+      const shard = el('div', `bw-shard ${i % 2 === 0 ? 'left' : 'right'}`);
+      shard.style.top = `${(i * 100) / numShards}%`;
+      shard.style.height = `${(100 / numShards) + 0.5}%`;
+      shard.style.transitionDelay = `${i * 22}ms`;
+      wrap.appendChild(shard);
+    }
+    this.root.appendChild(wrap);
+    void wrap.offsetHeight;
+    wrap.classList.add('on');
+    await wait(22 * numShards + 220);
+
+    wrap.open = async () => {
+      wrap.classList.add('opening');
+      await wait(280);
+      wrap.remove();
+    };
+    return wrap;
   }
   /** bandeau du nom du lieu (en haut à gauche, comme sur DS) */
   banner(name) {
@@ -162,10 +227,11 @@ export class UI {
     hudBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('hud'); });
     const runBtn = el('button', 'keyhint', '<b>R</b> Course'); runBtn.type = 'button'; runBtn.tabIndex = -1;
     runBtn.addEventListener('click', () => { if (!this.input.helpOpen) this.input.emit('autorun'); });
+    this.keyRunBtn = runBtn;
     bar.append(btn, escBtn, hudBtn, runBtn);
     const panel = el('div', 'keypanel box', `<div class="list-title">Commandes</div><table class="kv">
       <tr><td>Se déplacer</td><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
-      <tr><td>Courir / Course continue</td><td><kbd>Maj</kbd> maintenue · <kbd>R</kbd> (ou bouton COURSE) pour courir en continu</td></tr>
+      <tr><td>Courir / Vitesse</td><td><kbd>Maj</kbd> maintenue · <kbd>R</kbd> (ou bouton COURSE) pour alterner Marche / Rapide (1.7×) / Turbo (2.5×) · Maj pour sprint</td></tr>
       <tr><td>Parler, interagir, valider</td><td><kbd>F</kbd> (ou <kbd>Espace</kbd>, <kbd>Entrée</kbd>)</td></tr>
       <tr><td>Annuler, revenir</td><td><kbd>Échap</kbd> (ou <kbd>Retour arrière</kbd>)</td></tr>
       <tr><td>Menu (équipe, sac, sauvegarde…)</td><td><kbd>Échap</kbd>, <kbd>Tab</kbd> ou <kbd>M</kbd></td></tr>
@@ -179,6 +245,21 @@ export class UI {
     btn.addEventListener('click', toggle);
     this.input.onHelp = toggle;
   }
+  updateRunKeyHint(autoRun, runSpeed) {
+    if (!this.keyRunBtn) return;
+    if (!autoRun) {
+      this.keyRunBtn.innerHTML = '<b>R</b> Course';
+      this.keyRunBtn.classList.remove('active', 'turbo');
+    } else if (runSpeed === 2) {
+      this.keyRunBtn.innerHTML = '<b>R</b> Turbo ⚡';
+      this.keyRunBtn.classList.add('active', 'turbo');
+    } else {
+      this.keyRunBtn.innerHTML = '<b>R</b> Course 1.7×';
+      this.keyRunBtn.classList.add('active');
+      this.keyRunBtn.classList.remove('turbo');
+    }
+  }
+
   toast(text, ms = 1600) {
     const t = el('div', 'toast box', esc(text)); this.root.appendChild(t);
     setTimeout(() => t.remove(), ms);

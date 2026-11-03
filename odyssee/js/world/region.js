@@ -5,15 +5,38 @@
 // À l'est, trois îles desservies par le bateau de l'Embarcadère de l'Aube (2, 3 et 5 badges), avec les quêtes des
 // légendaires (renvoyées dans `legends`, les quais dans `docks`).
 // Noms de lieux et personnages originaux ; les créatures du jeu côtoient les Pokémon du prototype.
-import { T } from './tiles.js';
+import { T, DIRS, walkable, isGrassEnc } from './tiles.js';
 import { GameMap, carveRoute, carveTown, ledges, along, nearestWalkable, rng } from './mapgen.js';
 import { centerInterior, martInterior, houseInterior, labInterior, gymInterior, leagueInterior, caveMap, towerFloor, TOWER_UP, TOWER_DOWN } from './interiors.js';
 import { NEW_STARTERS } from '../data/creatures.js';
 import { R } from '../data/remplacants.js';
 import { buildQuests } from './quetes.js';
 import { addStory } from './story.js';
+import { enrichirTout, equipeDeType } from './rencontres.js';
+import { addHabitants } from './habitants.js';
+import { applyRetouches } from './retouches.js';
+import { buildArena } from './arenes.js';
+import { buildSud, BADGES_SUD, LEADERS_SUD, GYM_TRAINERS_SUD } from './sud.js';
+import { addVehicules } from './vehicules.js';
 
-export const STARTERS = NEW_STARTERS.map(R);
+// toutes les lignées connues : la créature d'Odyssée (plus proposée, mais les parties déjà commencées avec elle restent valables),
+// le Pokémon de Rouge / Bleu et celui d'Or / Argent, avec leurs évolutions
+export const STARTER_TABLE = [
+  { type: 'grass', lines: [[NEW_STARTERS[0], NEW_STARTERS[0] + 1, NEW_STARTERS[0] + 2], [1, 2, 3], [152, 153, 154]] },
+  { type: 'fire', lines: [[NEW_STARTERS[1], NEW_STARTERS[1] + 1, NEW_STARTERS[1] + 2], [4, 5, 6], [155, 156, 157]] },
+  { type: 'water', lines: [[NEW_STARTERS[2], NEW_STARTERS[2] + 1, NEW_STARTERS[2] + 2], [7, 8, 9], [158, 159, 160]] },
+].map((c) => ({ ...c, lines: c.lines.map((l) => l.map(R)) }));
+// au labo, trois capsules, une par type ; dans chacune, deux partenaires au choix : celui de Rouge / Bleu et celui d'Or / Argent
+export const STARTER_CHOICES = STARTER_TABLE.map((c) => ({ ...c, lines: c.lines.slice(1) }));
+/** les trois capsules (repérées par le premier partenaire de chacune) */
+export const STARTERS = STARTER_CHOICES.map((c) => c.lines[0][0]);
+/** toutes les lignées de partenaires de départ (pour le Pokémon qui suit le dresseur) */
+export const STARTER_LINES = STARTER_TABLE.flatMap((c) => c.lines);
+/** type et rang (0 original, 1 Rouge / Bleu, 2 Or / Argent) d'un partenaire de départ, dans STARTER_TABLE */
+export function starterSlot(sp) {
+  for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) if (STARTER_TABLE[t].lines[k].includes(sp)) return { t, k };
+  return null;
+}
 export const RIVAL_NAME = 'Théo';
 // ordre des arènes : Hector, Marine, Volta, Flora, Sibylle, puis les trois frères de l'archipel
 export const BADGES = [
@@ -21,6 +44,8 @@ export const BADGES = [
   { name: 'Badge Volt', type: 'electric', color: '#f0d030' }, { name: 'Badge Pétale', type: 'grass', color: '#58c060' },
   { name: 'Badge Mirage', type: 'psychic', color: '#e070c0' }, { name: 'Badge Granit', type: 'rock', color: '#b89c6c' },
   { name: 'Badge Braise', type: 'fire', color: '#f07030' }, { name: 'Badge Écaille', type: 'dragon', color: '#7a68e0' },
+  // les sept arènes des Terres du Sud (après les trois frères)
+  ...BADGES_SUD,
 ];
 // capacités de terrain : obtenues auprès d'un Champion, utilisables avec le badge indiqué
 export const FIELD = {
@@ -68,6 +93,8 @@ const ENC = {
   est: [[1029, 30, 36, 20], [1031, 30, 36, 20], [72, 30, 36, 20], [1033, 32, 36, 10], [1045, 32, 36, 8], [120, 30, 35, 10], [1007, 32, 35, 3], [131, 35, 38, 2]],
   r10: [[1014, 33, 37, 10], [1035, 33, 37, 10], [1037, 33, 37, 10], [1040, 34, 37, 5], [22, 33, 37, 15], [85, 33, 37, 10], [128, 34, 37, 10], [241, 34, 37, 10], [203, 33, 37, 10], [20, 33, 36, 10]],
 };
+// plus de diversité : chaque zone reçoit aussi tous les Pokémon des lieux équivalents des jeux officiels (Rouge à X / Y)
+enrichirTout(ENC);
 
 /* ---------------- dresseurs ---------------- */
 // classe → apparence sur la carte et portrait en combat, prime de base
@@ -78,6 +105,7 @@ const CLS = {
   'Garde d\'Écaille': ['garde', 36],
   // troisième valeur : portrait en combat quand le personnage n'a pas le sien
   'Sbire de la Brume': ['brume', 32], 'Sbire': ['brume_f', 32], 'Admin de la Brume': ['sylas', 70], 'Chef de la Brume': ['nox', 120], Voleur: ['voleur', 24], Moine: ['pretre', 34, 'pretre'], 'Dame Kimono': ['kimono', 40],
+  'Homme d\'affaires': ['topdresseur', 50], 'Femme d\'affaires': ['topdresseuse', 50], Pilote: ['marin', 44], Ninja: ['voleur', 44], Ouvrier: ['montagnard', 40],
   Sage: ['vieil_homme', 32, 'medium'], 'Grand Sage': ['vieil_homme', 60, 'medium'], Skieuse: ['randonneuse', 30], Alpiniste: ['montagnard', 30],
 };
 export const LEADERS = [
@@ -89,8 +117,9 @@ export const LEADERS = [
   { name: 'Basalte', type: 'rock', ow: 'basalte', team: [[1026, 40], [111, 41], [1028, 42], [95, 42], [1027, 44]], intro: 'Mon frère aîné m\'a confié cette île. Pour aller plus loin, il faudra passer à travers la roche !', lose: 'Tu as fendu le roc... Le Badge Granit est à toi. Drakos ne va pas aimer ça.' },
   { name: 'Pyros', type: 'fire', ow: 'pyros', team: [[1041, 45], [78, 46], [1005, 46], [126, 47], [1042, 49]], intro: 'Le volcan gronde et mon cœur aussi ! Personne ne passe sur la Grande Île sans brûler un peu !', lose: 'Quelle flamme... Le Badge Braise te va bien. Va. Drakos t\'attend.' },
   { name: 'Drakos', type: 'dragon', ow: 'drakos', team: [[1049, 50], [1044, 52], [148, 52], [1050, 53], [149, 54], [1051, 56]], intro: 'Dix ans que personne n\'a franchi cette porte. Célestine t\'envoie ? Peu importe. Ici, c\'est moi qui règne !', lose: '... Les dragons te reconnaissent. Prends le Badge Écaille. Le dernier.' },
+  ...LEADERS_SUD,
 ];
-const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 56], [1046, 57], [1035, 57], [1040, 58], [248, 58], [149, 60]], intro: 'Huit badges... Et même celui de Drakos. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
+const CHAMPION = { name: 'Célestine', ow: 'celestine', team: [[1016, 78], [1046, 79], [1035, 79], [1040, 80], [248, 80], [149, 82]], intro: 'Quinze badges... Les douze du continent, et même celui de Drakos. Tu as parcouru toute la région pour arriver jusqu\'ici. Alors montre-moi tout ce que tu as appris !', lose: 'Magnifique. Tu es le nouveau Maître de la Ligue Céleste !' };
 
 let tCount = 0;
 export function trainerNpc(map, x, y, dir, cls, name, team, o = {}) {
@@ -136,14 +165,14 @@ export function buildTown(W, maps, def) {
     else W.prop(k, ox + a[0], oy + a[1]);
   }
   for (const b of def.buildings) {
-    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door });
+    const B = W.building(b.kind, ox + b.x, oy + b.y, { roof: b.roof, style: b.style, label: b.label, name: b.name, w: b.w, d: b.d, h: b.h, door: b.door, kit: b.kit, flat: b.flat });
     let id = `${def.id}:${b.id || b.kind + b.x}`;
     if (maps[id]) id += 'y' + b.y;   // deux bâtiments dans la même colonne : chacun garde son intérieur
     let inside;
     if (b.interior) inside = b.interior(id);
     else if (b.kind === 'center') inside = centerInterior(id, 'Centre de soins');
     else if (b.kind === 'mart') inside = martInterior(id, 'Boutique', STOCK[def.stock || 1]);
-    else if (b.kind === 'gym') inside = gymInterior(id, LEADERS[def.gym].type, 'Arène de ' + def.name);
+    else if (b.kind === 'gym') { const ar = buildArena(id, def.gym, LEADERS[def.gym].type, 'Arène de ' + def.name); inside = ar.map; def.gymArena = ar; }
     else if (b.kind === 'lab') inside = labInterior(id);
     else if (b.kind === 'league') inside = leagueInterior(id);
     else inside = houseInterior(id, b.name || 'Maison', { w: b.kind === 'bighouse' || b.kind === 'tower' ? 11 : 9, h: b.kind === 'bighouse' || b.kind === 'tower' ? 9 : 8, bed: b.bed, extraBooks: b.kind === 'tower', kitchen: b.kitchen });
@@ -156,6 +185,7 @@ export function buildTown(W, maps, def) {
     // chemin depuis la porte jusqu'à la route la plus proche
     for (let y = B.doorY + 1; y < B.doorY + 8; y++) { const t = W.get(B.doorX, y); if (t === T.PAVE || t === T.PATH) break; if (t === T.TREE || t === T.BUILD || t === T.WATER) break; W.set(B.doorX, y, T.PATH); }
     maps[id] = inside;
+    if (b.kind === 'house' || b.kind === 'house2' || b.kind === 'bighouse') mailbox(W, B, b, def);
     for (const more of b.more ? b.more(inside, id) : []) maps[more.id] = more;   // étages supplémentaires
     if (b.kind === 'center') { def.centerId = id; def.centerDoor = [B.doorX, B.doorY + 1]; }
     if (b.id === 'maison') def.homeDoor = [B.doorX, B.doorY + 1];   // Vol ramène devant la maison à Bourg-Aube (pas de Centre)
@@ -167,6 +197,24 @@ export function buildTown(W, maps, def) {
     if (gate) W.gates.push({ npc: npc.id, ...gate });
   }
   W.zone(ox, oy, ox + def.w - 1, oy + def.h - 1, { name: def.name, music: def.music || 'town', town: def.id, theme: def.theme });
+}
+/** boîte aux lettres devant chaque maison : on y lit qui habite là (nom de famille, et un mot sur les habitants) */
+const FAMILLES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefèvre', 'Michel', 'Garcia', 'David', 'Bertrand', 'Roux', 'Vincent', 'Fournier', 'Morel', 'Girard', 'André', 'Mercier', 'Dupont', 'Lambert', 'Bonnet', 'François', 'Legrand', 'Garnier', 'Faure', 'Rousseau', 'Blanc', 'Guérin', 'Muller', 'Henry', 'Roussel', 'Perrin', 'Morin', 'Mathieu', 'Clément', 'Gauthier', 'Dumont', 'Fontaine', 'Chevalier', 'Robin', 'Masson', 'Marchand', 'Duval', 'Denis', 'Lemoine', 'Picard', 'Renard', 'Arnaud', 'Barbier', 'Brun', 'Colin', 'Lucas', 'Aubert', 'Caron'];
+const HABITANT = { insectomane: 'Un passionné d\'insectes vit ici.', habitante: 'Une habitante du coin.', habitant: 'Un habitant du coin.', vieil_homme: 'Un vieux monsieur, qui reçoit beaucoup de lettres.', montagnard: 'Un randonneur : la boîte déborde de cartes de randonnée.', randonneuse: 'Une randonneuse, souvent en vadrouille.', pecheur: 'Un pêcheur. Ça sent un peu le poisson…', marin: 'Un marin, rarement à terre.', gamin: 'Une famille avec un petit dresseur.', fillette: 'Une famille avec une petite fille.', enfant: 'Une famille avec des enfants.', scientifique: 'Un chercheur : des revues scientifiques dépassent de la boîte.', medium: 'Une médium. La boîte est… étrangement froide.', karateka: 'Un karatéka. La boîte est cabossée.', topdresseur: 'Un dresseur aguerri.', topdresseuse: 'Une dresseuse aguerrie.', dame: 'Une vieille dame très coquette.', jardinier: 'Un jardinier : des graines dans le courrier.', kimono: 'Une danseuse en kimono.', savant: 'Un savant distrait.', maman: 'Ta famille.' };
+function mailbox(W, B, b, def) {
+  const h = (B.x * 73856093) ^ (B.y * 19349663);
+  const fam = b.id === 'maison' ? null : FAMILLES[Math.abs(h) % FAMILLES.length];
+  const who = (b.npcs || []).map((n) => HABITANT[n.sprite]).find(Boolean);
+  const text = b.mailboxText || (b.id === 'maison' ? 'BOÎTE AUX LETTRES\nC\'est chez toi ! Une lettre de Maman y attend parfois.'
+    : b.name && /^Maison (de|d')/.test(b.name) ? `BOÎTE AUX LETTRES\n${b.name.replace(/^Maison /, 'Famille ')}.`
+      : `BOÎTE AUX LETTRES\nFamille ${fam}.${who ? '\n' + who : ''}`);
+  // sur le côté de la maison, contre le mur de la façade (à droite si possible, sinon à gauche), sinon près de la porte
+  const libre = (x, y) => { const t = W.get(x, y); return (t === T.GRASS || t === T.FLOWER) && !W.npcs.some((n) => n.x === x && n.y === y) && !W.signs.has(x + ',' + y); };
+  for (const [x, y] of [[B.x + B.w, B.doorY], [B.x - 1, B.doorY], [B.x + B.w, B.doorY - 1], [B.x - 1, B.doorY - 1]]) if (libre(x, y)) { W.sign(x, y, text, 'mailbox'); return; }
+  for (const dx of [B.w - B.door <= 1 ? -1 : 1, -1, 1]) {
+    const x = B.doorX + dx, y = B.doorY + 1;
+    if (libre(x, y)) { W.sign(x, y, text, 'mailbox'); return; }
+  }
 }
 /** garde posté devant la porte de l'arène d'une île (on peut y arriver par la mer de plusieurs côtés) */
 function gymGuard(W, def, badges, text) {
@@ -180,7 +228,7 @@ function gymGuard(W, def, badges, text) {
    ====================================================================== */
 export function buildWorld() {
   tCount = 0;
-  const W = new GameMap('monde', 440, 280, { outdoor: true, fill: T.TREE, name: 'Odyssée' });
+  const W = new GameMap('monde', 440, 520, { outdoor: true, fill: T.TREE, name: 'Odyssée' });   // le nord (jusqu'à 280) et les Terres du Sud
   const maps = { monde: W };
   const towns = {};
 
@@ -203,7 +251,7 @@ export function buildWorld() {
     id: 'aube', name: 'Bourg-Aube', x: 20, y: 238, w: 30, h: 22, exits: [['n', 14], ['e', 10]],
     roads: [[14, 2, 15, 18, T.PATH], [4, 10, 29, 11, T.PATH], [14, 18, 20, 19, T.PATH]],
     deco: [['flowers', 9, 3, 11, 5], ['flowers', 25, 13, 26, 17], ['water', 6, 15, 3.2, 2.2], ['fence', 2, 8, 4, 8], ['fence', 24, 8, 27, 8],
-      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 16, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9], ['mailbox', 8, 6], ['mailbox', 19, 6]],
+      ['sign', 12, 8, 'BOURG-AUBE\nLà où chaque aventure commence.'], ['sign', 16, 17, 'LABORATOIRE\nProf. Saule'], ['lamp', 13, 9], ['lamp', 16, 9]],
     buildings: [
       { kind: 'house', x: 4, y: 4, roof: 'red', id: 'maison', name: 'Maison', bed: true, kitchen: true, npcs: [{ id: 'maman', x: 5, y: 4, sprite: 'maman', dir: 'down', script: 'mom' }] },
       { kind: 'house', x: 20, y: 4, roof: 'blue', id: 'rival', name: 'Maison de Théo', npcs: [{ x: 3, y: 4, sprite: 'habitante', dir: 'right', script: 'rivalMom' }] },
@@ -421,11 +469,11 @@ export function buildWorld() {
       { kind: 'center', x: 3, y: 5 }, { kind: 'mart', x: 14, y: 5 },
       { kind: 'house', x: 19, y: 6, roof: 'purple', npcs: [{ x: 4, y: 4, sprite: 'scientifique', text: ['Les dragons ne craignent presque rien...', 'sauf la Glace et les autres dragons.'] }] },
       { kind: 'bighouse', x: 13, y: 11, roof: 'purple', name: 'Musée des Dragons', npcs: [{ x: 5, y: 4, sprite: 'vieil_homme', text: ['Drakos a grandi en écoutant les histoires de ce musée.', 'Il rêvait de devenir Maître. Célestine l\'a battu en finale.', 'Depuis, il règne sur l\'archipel, loin de la Ligue.'] }, { x: 8, y: 5, sprite: 'scientifique', text: ['Regarde cette fresque : une créature immense nageant sous la mer étoilée.', 'Odyssor. Les anciens disaient qu\'il apparaît au Cap des Étoiles quand les îles et le continent se réconcilient.', 'À côté, un oiseau d\'argent plonge dans la mer : Lugia. On dit que Odyssor et Lugia sont les deux gardiens des eaux.'] }] },
-      { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux huit badges peuvent la franchir.'] }] },
+      { kind: 'house', x: 3, y: 13, roof: 'teal', npcs: [{ x: 2, y: 4, sprite: 'habitante', text: ['Au nord, la Route Victoire mène au Plateau Céleste.', 'Seuls les dresseurs aux quinze badges peuvent la franchir : les douze du continent et ceux des trois frères.'] }] },
       { kind: 'house', x: 22, y: 13, roof: 'red', npcs: [{ x: 4, y: 4, sprite: 'montagnard', text: ['La route 10 relie Cimelune à Bourg-Aube, par l\'ouest.', 'Ça rappelle des souvenirs, hein ?'] }] },
     ],
     npcs: [
-      { id: 'garde', x: 12, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 8, tiles: [[9, 1], [10, 1], [11, 1], [12, 1]] }, text: ['Halte ! La Route Victoire est réservée aux dresseurs aux huit badges.'] },
+      { id: 'garde', x: 12, y: 2, sprite: 'garde', dir: 'down', gate: { badges: 15, tiles: [[9, 1], [10, 1], [11, 1], [12, 1]] }, text: ['Halte ! La Route Victoire est réservée aux dresseurs aux quinze badges.', 'Les douze Champions du continent et les trois frères de l\'archipel. Les sept derniers t\'attendent dans les Terres du Sud, au-delà du Pont de l\'Austral.'] },
     ],
   };
   buildTown(W, maps, I);
@@ -460,6 +508,7 @@ export function buildWorld() {
   routeTrainer(W, r1, 0.35, 1, 4, 'Gamin', 'Léo', [[1013, 4], [1010, 4]], { intro: 'Hé ! Toi aussi tu viens d\'avoir ta première créature ?' });
   routeTrainer(W, r1, 0.62, -1, 4, 'Fillette', 'Inès', [[161, 5]], { intro: 'Mon Fouinette est le plus mignon de la route !' });
   routeTrainer(W, r1, 0.82, 1, 3, 'Gamin', 'Malo', [[1010, 5], [19, 5], [1017, 4]]);
+  routeTrainer(W, r1, 0.5, 1, 5, 'Fillette', 'Mila', [[1013, 4], [16, 4]]);
   routeItem(W, r1, 0.5, -1, 5, 'potion'); routeItem(W, r1, 0.9, 1, 5, 'poke-ball', 2);
 
   const r2 = R('r2', 'Route 2', [[34.5, 138], [34.5, 120], [37.5, 104], [52.5, 96.5], [75.5, 94.5], [99.5, 92.5]], { w: 11, grass: 0.7, trees: 0.05, flowers: 0.03, taperEnd: false }, 'r2');
@@ -481,6 +530,8 @@ export function buildWorld() {
   routeTrainer(W, r3a, 0.35, 1, 3, 'Montagnard', 'Gaston', [[1026, 11], [74, 12], [66, 12]]);
   routeTrainer(W, r3a, 0.7, -1, 3, 'Fillette', 'Lise', [[1039, 12], [35, 11]]);
   routeItem(W, r3a, 0.55, 1, 4, 'burn-heal');
+  routeTrainer(W, r3a, 0.15, -1, 3, 'Gamin', 'Joris', [[1024, 11], [21, 11]]);
+  routeTrainer(W, r3a, 0.88, 1, 3, 'Randonneuse', 'Célia', [[1026, 12], [1039, 12]]);
   const r3b = R('r3e', 'Route 3', [[173.5, 41.5], [178, 41.5], [182, 34.5], [187, 33.5]], { w: 8, grass: 0.6, trees: 0.03, taperStart: false }, 'r3');
   routeTrainer(W, r3b, 0.6, -1, 3, 'Randonneuse', 'Maëlle', [[1034, 13], [27, 13]]);
 
@@ -513,6 +564,7 @@ export function buildWorld() {
   routeTrainer(W, r7, 0.25, 1, 4, 'Médium', 'Ophélie', [[1023, 28], [97, 29]]);
   routeTrainer(W, r7, 0.55, -1, 4, 'Karatéka', 'Bruno', [[1033, 29], [107, 29], [106, 30]]);
   routeTrainer(W, r7, 0.8, 1, 4, 'Topdresseuse', 'Lou', [[78, 31], [1012, 31], [1040, 30]]);
+  routeTrainer(W, r7, 0.4, 1, 3, 'Pêcheur', 'Gaël', [[1029, 28], [118, 29]]);
   routeItem(W, r7, 0.4, -1, 5, 'fire-stone');
   // Cap Mirage : plage, ponton et le rival qui attend
   W.rect(282, 185, 301, 188, T.SAND);
@@ -553,6 +605,7 @@ export function buildWorld() {
   routeTrainer(W, r10, 0.2, 1, 4, 'Topdresseur', 'Victor', [[1035, 36], [128, 36], [1014, 36]]);
   routeTrainer(W, r10, 0.45, -1, 4, 'Karatéka', 'Ryu', [[68, 37], [1033, 37]]);
   routeTrainer(W, r10, 0.7, 1, 4, 'Topdresseuse', 'Léa', [[241, 37], [1040, 37], [1037, 37]]);
+  routeTrainer(W, r10, 0.9, -1, 4, 'Médium', 'Sixtine', [[1023, 37], [94, 38]]);
   routeItem(W, r10, 0.35, -1, 5, 'ultra-ball', 3); routeItem(W, r10, 0.85, 1, 5, 'sun-stone');
 
 
@@ -797,6 +850,9 @@ export function buildWorld() {
   caveItems(victoire, ['full-restore', 'max-repel', 'rare-candy', 'ultra-ball', 'revive', 'max-potion'], 43);
   smashOnPath(victoire, { x: 50, y: 34 }, 3, 991);
 
+  /* ======================== TERRES DU SUD ======================== */
+  buildSud({ W, maps, towns, routes, R, routeTrainer, routeItem, buildTown, ENC, ledges });
+
   /* ======================== ARÈNES ======================== */
   const gymTrainers = [
     [['Insectomane', 'Lucas', [[1017, 9], [10, 10]]], ['Insectomane', 'Basile', [[1018, 10], [1020, 10]]]],
@@ -807,36 +863,112 @@ export function buildWorld() {
     [['Montagnard', 'Marcel', [[1026, 38], [74, 38]]], ['Montagnard', 'Henri', [[95, 39], [1028, 39]]], ['Garde d\'Écaille', 'Gwen', [[1027, 40]]]],
     [['Karatéka', 'Akira', [[1041, 43], [58, 43]]], ['Topdresseur', 'Blaise', [[78, 44], [1005, 44]]], ['Garde d\'Écaille', 'Ignace', [[1042, 45], [218, 44]]]],
     [['Garde d\'Écaille', 'Kael', [[1049, 47], [1050, 48]]], ['Topdresseuse', 'Wyrna', [[148, 49], [1044, 49]]], ['Garde d\'Écaille', 'Ivar', [[147, 48], [1050, 49], [1025, 49]]]],
+    ...GYM_TRAINERS_SUD,
+  ];
+  // quatrième dresseur des arènes qui n'en avaient que deux ou trois
+  const GYM_EXTRA = [
+    ['Gamin', 'Théodore', [[1017, 10]]], ['Pêcheur', 'Gilles', [[1029, 18]]], ['Scientifique', 'Volt', [[1034, 24]]], ['Fillette', 'Capucine', [[1021, 29]]],
+    ['Médium', 'Isaure', [[1039, 34]]], ['Montagnard', 'Roch', [[1026, 39]]], ['Karatéka', 'Kazuo', [[1041, 44]]], ['Topdresseur', 'Siegfried', [[1049, 48]]],
   ];
   for (const t of Object.values(towns)) {
     if (t.gym == null) continue;
-    const g = t.gymMap, L2 = LEADERS[t.gym];
-    g.npc({ id: g.id + ':guide', x: 9, y: 17, sprite: 'habitant', dir: 'down', script: 'gymguide', gym: t.gym });
-    // les dresseurs se tiennent sur le côté de l'allée centrale (colonne 7) : ils ne bloquent jamais le passage
-    const spots = [[5, 15, 'right'], [10, 10, 'left'], [4, 7, 'right'], [10, 11, 'left']];
-    gymTrainers[t.gym].forEach(([cls, name, team], i) => {
-      const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team, { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
+    const g = t.gymMap, L2 = LEADERS[t.gym], ar = t.gymArena;
+    g.npc({ id: g.id + ':guide', x: ar.guide[0], y: ar.guide[1], sprite: 'habitant', dir: 'left', script: 'gymguide', gym: t.gym });
+    // les dresseurs se tiennent à côté du parcours de l'énigme, tournés vers lui : ils ne bloquent jamais le passage
+    const spots = ar.spots;
+    // arène Feu : des gardiens du savoir posent une question avant de s'écarter
+    ar.quiz.forEach(([x, y], k) => g.npc({ id: `${g.id}:savoir${k}`, x, y, sprite: 'scientifique', dir: 'down', script: 'savoir', quiz: k + t.gym, hideIf: `QZ:${g.id}:savoir${k}` }));
+    // quatre dresseurs par arène ; chacun garde ses Pokémon et en ajoute un ou deux du type de l'arène, pris dans
+    // les six générations (un Pokémon différent d'une arène à l'autre, toujours le même pour une arène donnée)
+    const list = gymTrainers[t.gym].slice();
+    const extra = GYM_EXTRA[t.gym]; if (list.length < 4 && extra) list.push(extra);
+    list.forEach(([cls, name, team], i) => {
+      const lvl = Math.max(...team.map((m) => m[1]));
+      const more = equipeDeType(L2.type, lvl, team.length >= 3 ? 1 : 2, t.gym * 31 + i * 7 + 3).filter(([sp]) => !team.some((m) => m[0] === sp));
+      const [x, y, dir] = spots[i]; trainerNpc(g, x, y, dir, cls, name, team.concat(more).slice(0, 4), { sight: 3, intro: 'Tu veux défier notre Champion ? Passe d\'abord par moi !', after: 'Notre Champion est bien plus fort que moi.' });
     });
-    const fem = ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
-    g.npc({ id: g.id + ':leader', x: 7, y: 3, dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: 'smart', items: { 'super-potion': t.gym < 3 ? 1 : 0, 'hyper-potion': t.gym >= 3 ? 2 : 0, 'full-restore': t.gym === 7 ? 1 : 0 }, intro: L2.intro, lose: L2.lose, sight: 0 } });
+    const fem = L2.fem || ['Marine', 'Volta', 'Flora', 'Sibylle'].includes(L2.name);
+    g.npc({ id: g.id + ':leader', x: ar.leader[0], y: ar.leader[1], dir: 'down', sprite: L2.ow, leader: t.gym, trainer: { cls: fem ? 'Championne' : 'Champion', name: L2.name, team: L2.team, prize: 100, bs: L2.ow, ai: 'smart', items: { 'potion': t.gym === 0 ? 1 : 0, 'super-potion': (t.gym < 3 ? 2 : 0), 'hyper-potion': (t.gym >= 3 ? 2 : 0), 'full-restore': (t.gym >= 6 ? 2 : (t.gym >= 4 ? 1 : 0)) }, intro: L2.intro, lose: L2.lose, sight: 0 } });
   }
   // Ligue : la Maître
   const league = maps['plateau:ligue'];
-  league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.ow, ai: 'smart', items: { 'full-restore': 2 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
+  league.npc({ id: 'champion', x: 7, y: 3, dir: 'down', sprite: CHAMPION.ow, champion: true, trainer: { cls: 'Maître', name: CHAMPION.name, team: CHAMPION.team, prize: 200, bs: CHAMPION.ow, ai: 'smart', items: { 'full-restore': 3 }, intro: CHAMPION.intro, lose: CHAMPION.lose, sight: 0 } });
   league.npc({ id: 'ligue-garde', x: 5, y: 15, sprite: 'garde', dir: 'right', text: ['Bienvenue à la Ligue Céleste.', 'La Maître t\'attend au bout du tapis. Bonne chance !'] });
 
   // Labo : professeur, assistant
   const lab = maps['aube:labo'];
   lab.npc({ id: 'prof', x: 6, y: 3, sprite: 'saule', dir: 'down', script: 'prof' });
   lab.npc({ id: 'assistant', x: 10, y: 7, sprite: 'scientifique', move: 'wander', text: ['Le professeur étudie le lien entre les dresseurs et leurs créatures.', 'Il dit que c\'est en voyageant qu\'on le comprend le mieux.'] });
-  STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp }));
+  STARTERS.forEach((sp, i) => lab.object(5 + i, 5, { type: 'starter', sp, cap: i }));
 
   // histoire secondaire : la Brume, les nouveaux lieux (lac, forêt des torii, jardin, île du Magma) et leurs quêtes
   const quests = buildQuests({ W, maps, towns, routes, legends, docks, buildTown, trainerNpc, offRoute: (id, t, side, off) => offRoute(routes.find((r) => r.id === id).pts, t, side, off) });
   // histoire principale : la Team Éclipse, Lugia Obscur, le Conseil 4, Flash et Force, les quêtes annexes
   addStory({ W, maps, towns, routes: { r1, r2, bois, r3a, r3b, r4, r5, r6, r7, r10 }, legends, trainerNpc });
+  // la vie des villes : les requêtes des habitants (et les deux combats d'après la Ligue)
+  addHabitants({ W, maps, towns, routes });
+  // quêtes du vélo (Voltacité) et du permis bateau (Port-Azur)
+  addVehicules({ W, maps, towns });
   { const tz = W.zones.filter((z) => z.town || z.trigger), sz = W.zones.filter((z) => z.sea), rz = W.zones.filter((z) => !z.town && !z.trigger && !z.sea); W.zones = [...sz, ...rz, ...tz]; }
+  // petites barrières de bois le long des chemins des routes (jamais là où elles couperaient un passage)
+  fenceRoutes(W, legends);
+  // retouches faites dans l'éditeur de la version test et intégrées au jeu (world/retouches.js)
+  applyRetouches(maps);
   return { maps, towns, routes, legends, docks, quests, start: { map: 'aube:maison', x: 4, y: 6, dir: 'up' } };
+}
+
+/** barrières de bois brunes le long des chemins des routes, par tronçons, comme sur DS. Une case ne reçoit une barrière
+ *  que si ses voisins praticables restent reliés entre eux sans elle (aucun passage coupé, aucun recoin isolé) ; jamais
+ *  devant une porte, un panneau, un PNJ, un objet ou dans le champ de vision d'un dresseur. */
+function fenceRoutes(W, legends = []) {
+  const busy = new Set();
+  for (const l of legends) if (l.map === 'monde') for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) busy.add((l.x + i) + ',' + (l.y + j));
+  for (const n of W.npcs) {
+    busy.add(n.x + ',' + n.y);
+    const sight = n.trainer?.sight || 0, [dx, dy] = DIRS[n.dir] || [0, 0];
+    for (let k = 1; k <= sight + 1; k++) busy.add((n.x + dx * k) + ',' + (n.y + dy * k));
+  }
+  for (const it of W.items) busy.add(it.x + ',' + it.y);
+  for (const k of W.warps.keys()) busy.add(k);
+  for (const k of W.signs.keys()) busy.add(k);
+  const free = (x, y) => walkable(W.get(x, y));
+  const simple = (x, y) => {
+    // les voisins praticables (4 directions) restent-ils reliés par le carré 3 × 3 privé de la case ?
+    const ring = [];
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && free(x + i, y + j)) ring.push(i + ',' + j);
+    const four = ['0,-1', '1,0', '0,1', '-1,0'].filter((k) => ring.includes(k));
+    if (four.length <= 1) return four.length === 1;
+    const seen = new Set([four[0]]), q = [four[0]];
+    while (q.length) {
+      const [i, j] = q.pop().split(',').map(Number);
+      for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { const k = a + ',' + b; if ((a || b) && Math.abs(a) <= 1 && Math.abs(b) <= 1 && ring.includes(k) && !seen.has(k)) { seen.add(k); q.push(k); } }
+    }
+    return four.every((k) => seen.has(k));
+  };
+  let run = 0; const sensBarr = new Map();
+  for (let y = 1; y < W.h - 1; y++) for (let x = 1; x < W.w - 1; x++) {
+    if (W.get(x, y) !== T.GRASS || busy.has(x + ',' + y)) { run = 0; continue; }
+    const z = W.zoneAt(x, y); if (!z || z.town || z.sea || z.trigger) { run = 0; continue; }
+    // le long d'un chemin horizontal (au-dessus ou au-dessous) ou vertical (à gauche ou à droite)
+    const along = (W.get(x, y - 1) === T.PATH || W.get(x, y + 1) === T.PATH) && W.get(x - 1, y) !== T.PATH && W.get(x + 1, y) !== T.PATH;
+    const alongV = (W.get(x - 1, y) === T.PATH || W.get(x + 1, y) === T.PATH) && W.get(x, y - 1) !== T.PATH && W.get(x, y + 1) !== T.PATH;
+    // seulement le long des chemins horizontaux : de face, une barrière verticale ne serait qu'un piquet
+    if (!along) { run = 0; continue; }
+    // tronçons : environ un mètre de barrière sur trois, choisis par blocs de 6 cases
+    const blk = rng(((x / 6) | 0) * 7349 + ((y / 6) | 0) * 1931 + 11)();
+    if (blk > 0.33) { run = 0; continue; }
+    if (!simple(x, y)) { run = 0; continue; }
+    // pas contre les hautes herbes ni les rebords, et deux barrières ne se croisent jamais (une seule direction par tronçon)
+    const sens = along ? 'h' : 'v';
+    let gene = false;
+    for (let j = -1; j <= 1 && !gene; j++) for (let i = -1; i <= 1; i++) {
+      const t = W.get(x + i, y + j);
+      if (isGrassEnc(t) || t === T.LEDGE || t === T.LEDGE_E || t === T.LEDGE_W) { gene = true; break; }
+      if (t === T.FENCE && sensBarr.get((x + i) + ',' + (y + j)) !== sens) { gene = true; break; }
+    }
+    if (gene) { run = 0; continue; }
+    W.set(x, y, T.FENCE); sensBarr.set(x + ',' + y, sens); run++;
+  }
 }
 
 function caveTrainers(m, list, seed) {

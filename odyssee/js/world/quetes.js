@@ -7,6 +7,7 @@ import { T, walkable } from './tiles.js';
 import { GameMap, carveRoute, along, nearestWalkable, rng } from './mapgen.js';
 import { room, caveMap } from './interiors.js';
 import { ITEMS } from '../core/items.js';
+import { enrichirTout } from './rencontres.js';
 
 /* ---------------- objets de quête ---------------- */
 Object.assign(ITEMS, {
@@ -31,6 +32,7 @@ const ENC = {
   magma: [[322, 52, 56, 18], [218, 52, 56, 15], [240, 52, 55, 8], [126, 55, 58, 5], [324, 53, 57, 10], [75, 53, 57, 10], [228, 52, 56, 10], [631, 54, 57, 8], [636, 55, 57, 3], [667, 53, 56, 8]],
   caverne: [[219, 58, 62, 15], [323, 60, 63, 10], [229, 58, 62, 10], [75, 58, 61, 15], [76, 61, 64, 5], [112, 60, 63, 8], [554, 58, 61, 10], [327, 58, 61, 6], [632, 60, 62, 6]],
 };
+enrichirTout(ENC);
 
 const key = (x, y) => x + ',' + y;
 const night = (g) => { const h = g.hour(); return h >= 20 || h < 5; };
@@ -594,7 +596,7 @@ export function buildQuests(ctx) {
     if (A.step('kagura') !== 3) { await A.say(A.step('kagura') === 'fin' ? 'La cloche vibre doucement au vent.' : 'Une grande cloche de bronze. Sans ses talismans, elle reste muette.'); return; }
     A.sfx('badge'); A.flash('#fff4c0');
     await A.say(['Tu accroches les talismans et tu tires la corde...', 'DOOONG... Le son roule dans toute la forêt.', 'Près de l\'étang du temple, quelque chose remue...']);
-    await A.give('ultra-ball', 5, true); await A.say(`${A.name} reçoit 5 Hyper Balls du Grand Prêtre !`);
+    await A.give('ultra-ball', 5);
     await A.set('kagura', 'fin');
   }
   legend({ id: 'uxie', sp: 480, lvl: 45, map: 'torii', x: 11 + 22, y: 4, cond: (f) => done(f, 'kagura'), intro: ['Une créature jaune médite au bord de l\'étang, les yeux clos.', 'Créhelf, le gardien du savoir.'] });

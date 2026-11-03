@@ -3,13 +3,15 @@ import { el, esc } from './ui.js';
 import { SPECIES } from '../data/species.js';
 import { ORIGINALES } from '../data/remplacants.js';
 import { MOVES } from '../data/moves.js';
-import { ITEMS, itemName, POCKETS, canUseOn } from '../core/items.js';
-import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS } from '../core/mon.js';
+import { moveDesc } from '../data/moveDescriptions.js';
+import { ITEMS, itemName, POCKETS, canUseOn, giveHeldItem, takeHeldItem } from '../core/items.js';
+import { getAbility, abilityName } from '../data/abilities.js';
+import { monName, expProgress, STAT_NAMES, levelCap, GYM_CAPS, NATURES, natureName, natureEffect, refreshStats } from '../core/mon.js';
 import { BADGES, LEADERS } from '../world/region.js';
 import { ASSETS } from '../assets.js';
 import { SPRITES } from '../data/sprites.js';
 import { T, walkable } from '../world/tiles.js';
-import { getAllQuests, setTrackedQuest, getTrackedQuest, QUEST_CATEGORIES } from '../core/questsData.js';
+import { getAllQuests, setTrackedQuest, syncJournal } from '../core/questsData.js';
 
 export const TYPE_FR = { fairy: 'Fée', normal: 'Normal', fighting: 'Combat', flying: 'Vol', poison: 'Poison', ground: 'Sol', rock: 'Roche', bug: 'Insecte', ghost: 'Spectre', steel: 'Acier', fire: 'Feu', water: 'Eau', grass: 'Plante', electric: 'Électrik', psychic: 'Psy', ice: 'Glace', dragon: 'Dragon', dark: 'Ténèbres' };
 export const TYPE_COL = { fairy: '#ee99ac', normal: '#a8a878', fighting: '#c03028', flying: '#a890f0', poison: '#a040a0', ground: '#e0c068', rock: '#b8a038', bug: '#a8b820', ghost: '#705898', steel: '#b8b8d0', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', psychic: '#f85888', ice: '#98d8d8', dragon: '#7038f8', dark: '#705848' };
@@ -19,7 +21,7 @@ export const hpCol = (r) => (r > 0.5 ? '#48d058' : r > 0.2 ? '#f0c020' : '#f0483
 export function hpBar(m) { const r = m.hp / m.stats[0]; return `<div class="hp"><b>PV</b><i><u style="width:${Math.max(0, r * 100)}%;background:${hpCol(r)}"></u></i></div>`; }
 export const statusTag = (m) => (m.hp <= 0 ? '<span class="st" style="background:#c03838">K.O.</span>' : m.status ? `<span class="st" style="background:${STATUS_FR[m.status][1]}">${STATUS_FR[m.status][0]}</span>` : '');
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
-const iconImg = (m) => `<img class="ico" src="${ASSETS.icon(m.sp)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}';this.classList.add('fallback')">`;
+const iconImg = (m) => `<img class="ico${m?.shadow ? ' shadowmon' : ''}" src="${ASSETS.icon(m.sp, m?.shadow)}" alt="" onerror="this.src='${ASSETS.front(m.sp, false, m?.shadow)}';this.classList.add('fallback')">`;
 
 function screen(ui, cls, title) {
   const s = el('div', 'screen ' + cls);
@@ -91,13 +93,32 @@ export function partyScreen(game, o = {}) {
       }
       const why = o.filter ? o.filter(party[i], i) : null;
       if (o.mode === 'pick') {
-        if (why) { ui.sound.sfx('bump'); return; }
-        close(i);
+        busy = true;
+        const chooseLabel = o.pickLabel || 'Choisir';
+        const opts = why ? ['Résumé', 'Annuler'] : [chooseLabel, 'Résumé', 'Annuler'];
+        const r = await ui.list({
+          title: why ? `${monName(party[i])} (${why})` : monName(party[i]),
+          items: opts.map((label) => ({ label })),
+          cls: 'psub',
+          cancel: opts.length - 1,
+          parent: s,
+        });
+        busy = false;
+        const pick = opts[r];
+        if (pick === 'Résumé') {
+          busy = true;
+          i = await summaryScreen(game, party, i);
+          busy = false;
+        } else if (pick === chooseLabel) {
+          close(i);
+          return;
+        }
+        draw();
         return;
       }
       busy = true;
       const opts = o.mode === 'battle' ? ['Envoyer', 'Résumé', 'Annuler'] : ['Résumé', 'Déplacer', 'Annuler'];
-      const r = await ui.list({ items: opts.map((label) => ({ label })), cls: 'psub', cancel: opts.length - 1, parent: s });
+      const r = await ui.list({ title: monName(party[i]), items: opts.map((label) => ({ label })), cls: 'psub', cancel: opts.length - 1, parent: s });
       busy = false;
       const pick = opts[r];
       if (pick === 'Résumé') { busy = true; i = await summaryScreen(game, party, i); busy = false; }
@@ -140,7 +161,7 @@ export function partyScreen(game, o = {}) {
             </div>
             <div class="pslot-lead-pedestal">
               <div class="pslot-ped-ring"></div>
-              <img class="pslot-lead-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+              <img class="pslot-lead-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
             </div>
             <div class="pslot-lead-info">
               <div class="pslot-lead-name-row">
@@ -176,7 +197,7 @@ export function partyScreen(game, o = {}) {
               </div>
               <span class="pslot-sub-num">#${k + 1}</span>
               <div class="pslot-sub-ped">
-                <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+                <img class="pslot-sub-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
               </div>
             </div>
             <div class="pslot-sub-mid">
@@ -438,13 +459,17 @@ export function summaryScreen(game, list, idx) {
             <tr><td>Type</td><td>${S.t.map(typeTag).join(' ')}</td></tr>
             <tr><td>Dresseur Orig.</td><td>${esc(m.ot || game.state.name)}</td></tr>
             <tr><td>Rencontré à</td><td>${esc(m.met || '—')}</td></tr>
+            <tr><td>Nature</td><td>${esc(natureName(m.nat ?? 0))}${(() => { const ne = natureEffect(m.nat ?? 0); return ne ? ` <small class="nat-fx">(+${STAT_NAMES[ne[0]]} / −${STAT_NAMES[ne[1]]})</small>` : ' <small class="nat-fx">(neutre)</small>'; })()}</td></tr>
             <tr><td>Points Exp.</td><td>${m.exp.toLocaleString('fr-FR')} pts</td></tr>
             <tr><td>Limite Arène</td><td>N.${cap} ${isCapped ? '<span class="sum-cap-tag">ATTEINTE</span>' : ''}</td></tr>
           </table>
           <div class="expline"><b>EXP</b><i><u style="width:${(expProgress(m, cap) * 100).toFixed(1)}%"></u></i></div>
           <div class="dexline">${esc(S.genus ? S.genus + ' — ' + (S.dex || '') : S.dex || '')}</div>`;
       } else if (page === 1) {
-        body = `<table class="kv stats sum-kv">${STAT_NAMES.map((n, k) => `<tr><td>${n}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td></tr>`).join('')}</table>`;
+        // stats avec la nature (▲ +10 % en rouge, ▼ −10 % en bleu), les IV (0 à 31) et les EV (252 max, 510 en tout)
+        const ne = natureEffect(m.nat ?? 0), ev = m.ev || [0, 0, 0, 0, 0, 0], evTot = ev.reduce((a, x) => a + x, 0);
+        body = `<table class="kv stats sum-kv sum-stats"><tr class="sth"><td></td><td>Stat</td><td></td><td>IV</td><td>EV</td></tr>${STAT_NAMES.map((n, k) => `<tr><td class="${ne && ne[0] === k ? 'nat-up' : ne && ne[1] === k ? 'nat-down' : ''}">${n}${ne && ne[0] === k ? ' ▲' : ne && ne[1] === k ? ' ▼' : ''}</td><td><b>${k === 0 ? `${m.hp} / ${m.stats[0]}` : m.stats[k]}</b></td><td><i class="sbar"><u style="width:${Math.min(100, S.b[k] / 1.5)}%"></u></i></td><td class="iv${m.iv[k] === 31 ? ' max' : ''}">${m.iv[k]}</td><td class="evv">${ev[k]}</td></tr>`).join('')}</table>
+          <div class="sum-natline">Nature <b>${esc(natureName(m.nat ?? 0))}</b> · EV ${evTot} / 510 · Les EV s'ajoutent aux stats au niveau suivant ou au Centre.</div>`;
       } else {
         body = `<div class="moves">${m.moves.map((mv) => {
           const M = MOVES[mv.id];
@@ -474,7 +499,7 @@ export function summaryScreen(game, list, idx) {
               <span class="sum-lvl">N.${m.lvl}</span>
             </div>
             <div class="sum-stage">
-              <img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny)}" alt="">
+              <img class="sum-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="">
             </div>
             <div class="sum-types-row">${S.t.map(typeTag).join(' ')} ${statusTag(m)}</div>
             ${hpBar(m)}
@@ -526,16 +551,326 @@ const POCKET_DESC = [
   'Pierres d\'évolution, Repousses, Super Bonbons et objets utiles.',
   'Capsules Secrètes (CS), Carte et reliques précieuses.',
 ];
-/** renvoie { item } choisi pour « Utiliser », ou null */
+/** renvoie { item } choisi pour « Utiliser », ou null — Style B2W2 (Proposition 1 : Dual Panel & Roue Animée) */
 export function bagScreen(game, o = {}) {
-  const ui = game.ui, bag = game.state.bag;
+  const ui = game.ui, bag = game.state.bag, st = game.state;
   return new Promise((resolve) => {
-    const s = screen(ui, 'bag-scr');
-    let pocket = o.pocket || 0, i = 0, busy = false;
-    const entriesFor = (p) => Object.keys(bag).filter((k) => ITEMS[k] && ITEMS[k].pocket === POCKETS[p][0] && bag[k] > 0).sort((a, b) => Object.keys(ITEMS).indexOf(a) - Object.keys(ITEMS).indexOf(b));
-    const entries = () => entriesFor(pocket);
+    const s = screen(ui, 'bag-scr b2w2-bag');
+    let i = 0, busy = false;
 
+    // Poches officielles B2W2 Concept 1 avec arc sci-fi, arrière-plans réactifs et coordonnées exactes sur l'arc
+    const POCKET_CFG = [
+      { id: 'objets', label: 'Objets', sub: 'Pierres, Bonbons et Objets tenus', color: '#00e0ff', glow: 'rgba(0, 224, 255, 0.45)', bg: 'img/bag/backpack_objets.jpg', icon: 'img/bag/icon_objets.png', arcX: 40.2, arcY: 11.6 },
+      { id: 'soin', label: 'Soins', sub: 'Médicaments, Potions et Guérisons', color: '#34d870', glow: 'rgba(52, 216, 112, 0.45)', bg: 'img/bag/backpack_soin.jpg', icon: 'img/bag/icon_soin.png', arcX: 62.1, arcY: 25.2 },
+      { id: 'balls', label: 'Poké Balls', sub: 'Capsules de capture de créatures', color: '#ff4c4c', glow: 'rgba(255, 76, 76, 0.45)', bg: 'img/bag/backpack_balls.jpg', icon: 'img/bag/icon_balls.png', arcX: 70.9, arcY: 40.1 },
+      { id: 'ct', label: 'CT & CS', sub: 'Capsules Techniques et Secrètes', color: '#b966ff', glow: 'rgba(185, 102, 255, 0.45)', bg: 'img/bag/backpack_ct.jpg', icon: 'img/bag/icon_ct.png', arcX: 70.5, arcY: 54.8 },
+      { id: 'baies', label: 'Baies', sub: 'Baies naturelles et remèdes doux', color: '#ff77a8', glow: 'rgba(255, 119, 168, 0.45)', bg: 'img/bag/backpack_baies.jpg', icon: 'img/bag/icon_baies.png', arcX: 59.1, arcY: 74.4 },
+      { id: 'cles', label: 'Objets Rares', sub: 'Objets précieux, Carte et Bicyclette', color: '#ffe058', glow: 'rgba(255, 224, 88, 0.45)', bg: 'img/bag/backpack_cles.jpg', icon: 'img/bag/icon_cles.png', arcX: 34.2, arcY: 87.8 },
+    ];
+
+    let pocket = 0;
+    if (typeof o.pocket === 'number') pocket = (o.pocket % POCKET_CFG.length + POCKET_CFG.length) % POCKET_CFG.length;
+    else if (typeof o.pocket === 'string') {
+      const idx = POCKET_CFG.findIndex((p) => p.id === o.pocket);
+      if (idx >= 0) pocket = idx;
+    }
+
+    const itemPocketId = (k) => {
+      const it = ITEMS[k];
+      if (!it) return 'objets';
+      if (it.pocket === 'baies' || k.includes('berry') || k.includes('baie')) return 'baies';
+      if (it.pocket === 'ct' || k.startsWith('cs-') || k.startsWith('ct-')) return 'ct';
+      if (it.pocket === 'balls') return 'balls';
+      if (it.pocket === 'soin') return 'soin';
+      if (it.pocket === 'cles' || it.key) return 'cles';
+      return 'objets';
+    };
+
+    const entriesFor = (p) => {
+      const target = POCKET_CFG[p].id;
+      return Object.keys(bag)
+        .filter((k) => ITEMS[k] && itemPocketId(k) === target && bag[k] > 0)
+        .sort((a, b) => Object.keys(ITEMS).indexOf(a) - Object.keys(ITEMS).indexOf(b));
+    };
+
+    const entries = () => entriesFor(pocket);
     const close = (v) => { pop(); s.remove(); resolve(v); };
+
+    s.innerHTML = `
+      <div class="scr-bar">
+        <div class="scr-bar-left">
+          <img class="scr-bar-ico" src="img/hud/bag.png" alt="">
+          <span class="scr-bar-title">${o.battle ? 'SAC DE COMBAT' : "SAC D'OBJETS"}</span>
+          <span class="scr-bar-sub b2w2-pocket-name">OBJETS</span>
+        </div>
+        <div class="scr-bar-right">
+          <span class="scr-money-pill"><img src="img/hud/coin.png" alt=""> ${(st?.money || 0).toLocaleString('fr-FR')} ₽</span>
+          <button type="button" class="scr-close-btn" data-act="back">FERMER ✕</button>
+        </div>
+      </div>
+      <div class="b2w2-bag-body">
+        <!-- PANNEAU GAUCHE : SAC SUR SOCLE & ARC DE POCHES GLISSANT (CONCEPT 1) -->
+        <div class="b2w2-bag-left">
+          <div class="b2w2-backpack-stage">
+            <div class="b2w2-backpack-beams"></div>
+            <img class="b2w2-backpack-img" src="${POCKET_CFG[pocket].bg}" alt="Sac d'Unys">
+            <!-- ARC INCURVÉ DES 6 POCHES B2W2 -->
+            <div class="b2w2-arc-wrap">
+              <img class="b2w2-arc-img" src="img/bag/pocket_arc.png" alt="Arc des 6 poches">
+              <!-- CURSEUR LUMINEUX GLISSANT LE LONG DE LA COURBE -->
+              <div class="b2w2-arc-glider" style="left:${POCKET_CFG[pocket].arcX}%; top:${POCKET_CFG[pocket].arcY}%; --glider-col:${POCKET_CFG[pocket].color};">
+                <span class="glider-ring"></span>
+                <span class="glider-dot"></span>
+              </div>
+              <!-- 6 ZONES INTERACTIVES CLIQUABLES -->
+              ${POCKET_CFG.map((cfg, idx) => `
+                <button type="button" class="b2w2-arc-node ${idx === pocket ? 'on' : ''}" data-pocket="${idx}" style="left:${cfg.arcX}%; top:${cfg.arcY}%;" title="Poche ${cfg.label}">
+                  <span class="arc-node-halo"></span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <!-- BANDEAU D'ÉTAT DE LA POCHE -->
+          <div class="b2w2-pocket-status">
+            <div class="b2w2-pocket-badge" style="color:${POCKET_CFG[pocket].color};">◀ ${POCKET_CFG[pocket].label.toUpperCase()} ▶</div>
+            <div class="b2w2-pocket-sub">${POCKET_CFG[pocket].sub}</div>
+          </div>
+        </div>
+        <!-- PANNEAU DROIT : LISTE DES OBJETS DE LA POCHE -->
+        <div class="b2w2-bag-right">
+          <div class="b2w2-list-header">
+            <div class="b2w2-list-title">
+              <span class="b2w2-pocket-tag" style="color:${POCKET_CFG[pocket].color};">POCHE ${POCKET_CFG[pocket].label.toUpperCase()}</span>
+              <span class="b2w2-pocket-items-cnt">0 objet</span>
+            </div>
+            <div class="b2w2-list-hint">
+              <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
+              <span><kbd>◀</kbd><kbd>▶</kbd> Poches</span>
+            </div>
+          </div>
+          <div class="b2w2-items-viewport">
+            <div class="b2w2-items-list"></div>
+          </div>
+        </div>
+      </div>
+      <!-- BANDEAU INFÉRIEUR : INSPECTEUR D'OBJET & GRILLE 2X2 DE BOUTONS TACTILES -->
+      <div class="b2w2-bag-inspector">
+        <div class="b2w2-insp-left">
+          <div class="b2w2-insp-frame">
+            <img class="b2w2-insp-img" src="img/items/potion.png" alt="">
+          </div>
+        </div>
+        <div class="b2w2-insp-mid">
+          <div class="b2w2-insp-topline">
+            <span class="b2w2-insp-name">---</span>
+            <span class="b2w2-insp-cat"></span>
+            <span class="b2w2-insp-qty">---</span>
+          </div>
+          <div class="b2w2-insp-desc">---</div>
+        </div>
+        <!-- GRILLE 2X2 DE BOUTONS TACTILES DS (CONCEPT 1) -->
+        <div class="b2w2-btn-grid">
+          <button type="button" class="b2w2-touch-btn b2w2-btn-use" data-act="use" title="Utiliser (Entrée / A)">
+            <span class="touch-btn-lbl">UTILISER</span>
+          </button>
+          <button type="button" class="b2w2-touch-btn b2w2-btn-give" data-act="give" title="Donner à un Pokémon (D)">
+            <span class="touch-btn-lbl">DONNER</span>
+          </button>
+          <button type="button" class="b2w2-touch-btn b2w2-btn-toss" data-act="toss" title="Jeter une quantité (J)">
+            <span class="touch-btn-lbl">JETER</span>
+          </button>
+          <button type="button" class="b2w2-touch-btn b2w2-btn-back" data-act="back" title="Fermer le sac (Échap / B)">
+            <span class="touch-btn-lbl">RETOUR</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Références DOM
+    const scrBarSub = s.querySelector('.b2w2-pocket-name');
+    const backpackStage = s.querySelector('.b2w2-backpack-stage');
+    const backpackImg = s.querySelector('.b2w2-backpack-img');
+    const glider = s.querySelector('.b2w2-arc-glider');
+    const arcNodes = [...s.querySelectorAll('.b2w2-arc-node')];
+    const pocketBadge = s.querySelector('.b2w2-pocket-badge');
+    const pocketSub = s.querySelector('.b2w2-pocket-sub');
+    const pocketTag = s.querySelector('.b2w2-pocket-tag');
+    const pocketItemsCnt = s.querySelector('.b2w2-pocket-items-cnt');
+    const itemsListEl = s.querySelector('.b2w2-items-list');
+    const inspSpriteEl = s.querySelector('.b2w2-insp-img');
+    const inspNameEl = s.querySelector('.b2w2-insp-name');
+    const inspCatEl = s.querySelector('.b2w2-insp-cat');
+    const inspQtyEl = s.querySelector('.b2w2-insp-qty');
+    const inspDescEl = s.querySelector('.b2w2-insp-desc');
+    const useBtn = s.querySelector('.b2w2-btn-use');
+    const giveBtn = s.querySelector('.b2w2-btn-give');
+    const tossBtn = s.querySelector('.b2w2-btn-toss');
+    const backBtn = s.querySelector('.b2w2-btn-back');
+    const leftPanel = s.querySelector('.b2w2-bag-left');
+
+    const updateCounts = () => {
+      const es = entries();
+      pocketItemsCnt.textContent = `${es.length} objet${es.length > 1 ? 's' : ''}`;
+    };
+
+    const updatePocket = () => {
+      const cfg = POCKET_CFG[pocket];
+      // 1. Déplacement physique fluide du curseur glider le long de l'arc incurvé
+      glider.style.left = `${cfg.arcX}%`;
+      glider.style.top = `${cfg.arcY}%`;
+      glider.style.setProperty('--glider-col', cfg.color);
+
+      // 2. Nœuds de l'arc
+      arcNodes.forEach((node) => {
+        const p = +node.dataset.pocket;
+        node.classList.toggle('on', p === pocket);
+      });
+
+      // 3. Sac HD correspondant avec rétro-éclairage coloré
+      backpackImg.src = cfg.bg;
+      backpackStage.style.setProperty('--stage-glow', cfg.glow);
+
+      // 4. Badges et sous-titres
+      pocketBadge.textContent = `◀ ${cfg.label.toUpperCase()} ▶`;
+      pocketBadge.style.color = cfg.color;
+      pocketBadge.style.textShadow = `0 0 calc(var(--px) * 3) ${cfg.color}`;
+      pocketSub.textContent = cfg.sub;
+
+      // 5. En-têtes
+      scrBarSub.textContent = cfg.label.toUpperCase();
+      pocketTag.textContent = `POCHE ${cfg.label.toUpperCase()}`;
+      pocketTag.style.color = cfg.color;
+      updateCounts();
+    };
+
+    const updateInspector = () => {
+      const es = entries();
+      if (i > es.length) i = es.length;
+      const sel = es[i];
+      if (sel) {
+        const it = ITEMS[sel];
+        inspSpriteEl.src = ASSETS.item(sel);
+        inspSpriteEl.style.display = '';
+        inspNameEl.textContent = itemName(sel);
+        inspCatEl.textContent = `[${POCKET_CFG[pocket].label}]`;
+        inspCatEl.style.color = POCKET_CFG[pocket].color;
+        inspQtyEl.textContent = it.key ? 'Objet Unique Rare' : `Quantité : × ${bag[sel]}`;
+        inspDescEl.textContent = it.desc || '';
+
+        const canUse = o.battle
+          ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
+          : (!it.key || it.field || sel === 'town-map' || sel === 'velo');
+        useBtn.disabled = !canUse;
+        useBtn.classList.toggle('disabled', !canUse);
+
+        const canGive = !o.battle && !it.key;
+        giveBtn.disabled = !canGive;
+        giveBtn.classList.toggle('disabled', !canGive);
+
+        const canToss = !o.battle && !it.key;
+        tossBtn.disabled = !canToss;
+        tossBtn.classList.toggle('disabled', !canToss);
+      } else {
+        // Ligne de fermeture sélectionnée
+        inspSpriteEl.style.display = 'none';
+        inspNameEl.textContent = 'Fermer le Sac';
+        inspCatEl.textContent = '';
+        inspQtyEl.textContent = '';
+        inspDescEl.textContent = "Revenir à l'aventure sans utiliser d'objet.";
+        useBtn.disabled = false;
+        useBtn.classList.remove('disabled');
+        giveBtn.disabled = true;
+        giveBtn.classList.add('disabled');
+        tossBtn.disabled = true;
+        tossBtn.classList.add('disabled');
+      }
+    };
+
+    const renderList = () => {
+      const es = entries();
+      updateCounts();
+      if (i > es.length) i = es.length;
+
+      if (es.length === 0) {
+        itemsListEl.innerHTML = `
+          <div class="b2w2-empty-msg">Cette poche est vide pour le moment.</div>
+          <div class="list-row b2w2-item-row b2w2-close-row on" data-row="0">
+            <span class="cur">▶</span>
+            <span class="b2w2-item-name" style="color:#ff9898;">FERMER LE SAC</span>
+            <span class="b2w2-item-qty" style="color:#98a8c0;">Échap / B</span>
+          </div>`;
+        i = 0;
+      } else {
+        itemsListEl.innerHTML = es.map((k, n) => {
+          const it = ITEMS[k];
+          const heldTag = it.hold ? `<span class="b2w2-held-tag">TENU</span>` : '';
+          return `<div class="list-row b2w2-item-row ${n === i ? 'on' : ''}" data-row="${n}">
+            <span class="cur">${n === i ? '▶' : ''}</span>
+            <div class="b2w2-item-ico-wrap">
+              <img class="b2w2-item-ico" src="${ASSETS.item(k)}" alt="">
+            </div>
+            <span class="b2w2-item-name">${esc(itemName(k))}</span>
+            ${heldTag}
+            <span class="b2w2-item-qty">${it.key ? 'CLÉ' : '× ' + bag[k]}</span>
+          </div>`;
+        }).join('') +
+        `<div class="list-row b2w2-item-row b2w2-close-row ${i === es.length ? 'on' : ''}" data-row="${es.length}">
+          <span class="cur">${i === es.length ? '▶' : ''}</span>
+          <span class="b2w2-item-name" style="color:#ff9898;">FERMER LE SAC</span>
+          <span class="b2w2-item-qty" style="color:#98a8c0;">Échap / B</span>
+        </div>`;
+      }
+
+      // Liaisons événements sur les lignes de la liste
+      itemsListEl.querySelectorAll('[data-row]').forEach((row) => {
+        const idx = +row.dataset.row;
+        row.addEventListener('mouseenter', () => {
+          if (!busy && i !== idx) {
+            i = idx;
+            itemsListEl.querySelectorAll('.b2w2-item-row').forEach((r, k) => {
+              r.classList.toggle('on', k === i);
+              const cur = r.querySelector('.cur');
+              if (cur) cur.textContent = k === i ? '▶' : '';
+            });
+            ui.sound.sfx('blip');
+            updateInspector();
+          }
+        });
+        row.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerRow(idx);
+        });
+      });
+
+      itemsListEl.querySelector('.b2w2-item-row.on')?.scrollIntoView({ block: 'nearest' });
+    };
+
+    const changePocket = (newP) => {
+      if (busy) return;
+      const count = POCKET_CFG.length;
+      const target = (newP % count + count) % count;
+      if (target === pocket) return;
+      pocket = target;
+      i = 0;
+      ui.sound.sfx('blip');
+      updatePocket();
+      renderList();
+      updateInspector();
+    };
+
+    const changeItem = (newI) => {
+      const es = entries();
+      const max = es.length;
+      i = (newI + max + 1) % (max + 1);
+      ui.sound.sfx('blip');
+      itemsListEl.querySelectorAll('.b2w2-item-row').forEach((r, k) => {
+        r.classList.toggle('on', k === i);
+        const cur = r.querySelector('.cur');
+        if (cur) cur.textContent = k === i ? '▶' : '';
+      });
+      itemsListEl.querySelector('.b2w2-item-row.on')?.scrollIntoView({ block: 'nearest' });
+      updateInspector();
+    };
 
     const triggerRow = async (idx) => {
       if (busy) return;
@@ -543,135 +878,134 @@ export function bagScreen(game, o = {}) {
       if (idx === es.length) { ui.sound.sfx('cancel'); close(null); return; }
       if (idx < 0 || idx > es.length) return;
       i = idx;
-      draw();
-      ui.sound.sfx('select');
+      updateInspector();
+
       const item = es[i], it = ITEMS[item];
-      const opts = o.battle ? ['Utiliser', 'Annuler'] : it.key ? ['Utiliser', 'Annuler'] : ['Utiliser', 'Jeter', 'Annuler'];
-      busy = true;
-      const r = await ui.list({
-        items: opts.map((label) => ({
-          label,
-          disabled: label === 'Utiliser' && (o.battle ? !(it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll) : it.key && !it.field && item !== 'town-map'),
-        })),
-        cls: 'psub',
-        cancel: opts.length - 1,
-        parent: s,
-      });
-      busy = false;
-      if (opts[r] === 'Utiliser') { close({ item }); return; }
-      if (opts[r] === 'Jeter') {
-        busy = true;
-        const q = await ui.quantity(bag[item]);
-        if (q && await ui.yesNo(`Jeter ${q} ${itemName(item)} ?`)) { bag[item] -= q; if (bag[item] <= 0) delete bag[item]; }
-        busy = false;
+      const canUse = o.battle
+        ? (it.heal || it.cure || it.revive || it.ball || it.pp || it.ppAll)
+        : (!it.key || it.field || item === 'town-map' || item === 'velo');
+
+      if (!canUse) {
+        ui.sound.sfx('bump');
+        return;
       }
-      draw();
+      ui.sound.sfx('select');
+      close({ item });
     };
 
-    const draw = () => {
+    const handleGive = async () => {
+      if (busy || o.battle) return;
       const es = entries();
-      if (i > es.length) i = es.length;
-      const sel = es[i];
-      const tabsHtml = POCKETS.map(([, label], idx) => {
-        const cnt = entriesFor(idx).length;
-        return `<button type="button" class="bag-tab ${idx === pocket ? 'on' : ''}" data-pocket="${idx}">
-          <span class="bag-tab-dot b${idx}"></span>
-          <span class="bag-tab-lbl">${esc(label)}</span>
-          <span class="bag-tab-cnt">${cnt}</span>
-        </button>`;
-      }).join('');
-
-      s.innerHTML = `
-        <div class="scr-bar">
-          <div class="scr-bar-left">
-            <img class="scr-bar-ico" src="img/hud/bag.png" alt="">
-            <span class="scr-bar-title">SAC D'OBJETS</span>
-            <span class="scr-bar-sub">${esc(POCKETS[pocket][1].toUpperCase())}</span>
-          </div>
-          <div class="scr-bar-right">
-            <span class="scr-money-pill"><img src="img/hud/coin.png" alt=""> ${(game.state?.money || 0).toLocaleString('fr-FR')} ₽</span>
-            <button type="button" class="scr-close-btn" data-act="close">FERMER ✕</button>
-          </div>
-        </div>
-        <div class="bag-tabs">${tabsHtml}</div>
-        <div class="bag-body">
-          <div class="bag-left">
-            <div class="bag-pic">
-              <div class="bag-icon-stage">
-                <div class="bag-icon b${pocket}"></div>
-              </div>
-              <div class="bag-pocket-title">◀ ${esc(POCKETS[pocket][1])} ▶</div>
-              <div class="bag-pocket-sub">${esc(POCKET_DESC[pocket] || '')}</div>
-            </div>
-            <div class="bag-desc">
-              ${sel ? `
-                <div class="bag-desc-top">
-                  <div class="itm-big-wrap"><img class="itm-big" src="${ASSETS.item(sel)}" alt=""></div>
-                  <div class="bag-desc-meta">
-                    <div class="bag-desc-name">${esc(itemName(sel))}</div>
-                    <div class="bag-desc-qty">${ITEMS[sel].key ? 'Objet rare' : `En sac : × ${bag[sel]}`}</div>
-                  </div>
-                </div>
-                <div class="bag-desc-txt">${esc(ITEMS[sel].desc)}</div>
-              ` : `
-                <div class="bag-desc-empty">Fermer le Sac et revenir à l'aventure.</div>
-              `}
-            </div>
-          </div>
-          <div class="bag-list">
-            <div class="list-items">
-              ${es.length === 0 ? `<div class="bag-empty-msg">Cette poche est vide pour le moment.</div>` : ''}
-              ${es.map((k, n) => `
-                <div class="list-row bag-row ${n === i ? 'on' : ''}" data-row="${n}">
-                  <span class="cur">▶</span>
-                  <img class="itm" src="${ASSETS.item(k)}" alt="">
-                  <span class="lbl">${esc(itemName(k))}</span>
-                  <span class="rgt">${ITEMS[k].key ? 'CLÉ' : '× ' + bag[k]}</span>
-                </div>`).join('')}
-              <div class="list-row bag-row bag-close-row ${i === es.length ? 'on' : ''}" data-row="${es.length}">
-                <span class="cur">▶</span>
-                <span class="lbl">FERMER LE SAC</span>
-                <span class="rgt">Échap</span>
-              </div>
-            </div>
-          </div>
-        </div>`;
-
-      s.querySelector('.list-row.on')?.scrollIntoView({ block: 'nearest' });
-      s.querySelector('[data-act="close"]')?.addEventListener('click', () => { ui.sound.sfx('cancel'); close(null); });
-      s.querySelectorAll('[data-pocket]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          if (busy) return;
-          pocket = +btn.dataset.pocket;
-          i = 0;
-          ui.sound.sfx('blip');
-          draw();
-        });
-      });
-      s.querySelectorAll('[data-row]').forEach((row) => {
-        const idx = +row.dataset.row;
-        row.addEventListener('mouseenter', () => {
-          if (!busy && i !== idx) { i = idx; ui.sound.sfx('blip'); draw(); }
-        });
-        row.addEventListener('click', (e) => {
-          e.stopPropagation();
-          triggerRow(idx);
-        });
-      });
+      if (i >= es.length) return;
+      const item = es[i];
+      if (!item) return;
+      const it = ITEMS[item];
+      if (it.key) {
+        ui.sound.sfx('bump');
+        await ui.say("Cet objet rare ne peut pas être tenu.");
+        return;
+      }
+      if (!st.party || !st.party.length) {
+        ui.sound.sfx('bump');
+        await ui.say("Tu n'as aucune créature dans ton équipe !");
+        return;
+      }
+      busy = true;
+      ui.sound.sfx('select');
+      const targetIdx = await partyScreen(game, { mode: 'pick' });
+      busy = false;
+      if (targetIdx >= 0 && st.party[targetIdx]) {
+        const m = st.party[targetIdx];
+        const old = giveHeldItem(m, item, bag);
+        ui.sound.sfx('item');
+        if (old) {
+          await ui.say([
+            `${monName(m)} prend ${itemName(item)}.`,
+            `L'ancien objet (${itemName(old)}) a été replacé dans le sac.`
+          ]);
+        } else {
+          await ui.say(`${monName(m)} tient désormais ${itemName(item)} !`);
+        }
+        renderList();
+        updateInspector();
+      }
     };
-    draw();
+
+    const handleToss = async () => {
+      if (busy || o.battle) return;
+      const es = entries();
+      if (i >= es.length) return;
+      const item = es[i];
+      if (!item || ITEMS[item]?.key) return;
+      busy = true;
+      const q = await ui.quantity(bag[item]);
+      if (q && await ui.yesNo(`Jeter ${q} ${itemName(item)} ?`)) {
+        bag[item] -= q;
+        if (bag[item] <= 0) delete bag[item];
+        ui.sound.sfx('item');
+      }
+      busy = false;
+      renderList();
+      updateInspector();
+    };
+
+    // Initialisation
+    updatePocket();
+    renderList();
+    updateInspector();
+
+    // Clic sur les nœuds de l'arc
+    arcNodes.forEach((node) => {
+      node.addEventListener('click', () => {
+        const p = +node.dataset.pocket;
+        changePocket(p);
+      });
+    });
+
+    // Molette de souris sur le panneau gauche pour faire glisser l'arc
+    leftPanel?.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (busy) return;
+      if (e.deltaY > 15) changePocket(pocket + 1);
+      else if (e.deltaY < -15) changePocket(pocket - 1);
+    }, { passive: false });
+
+    // Clics sur les 4 boutons tactiles DS
+    useBtn?.addEventListener('click', () => {
+      const es = entries();
+      if (i >= es.length) { ui.sound.sfx('cancel'); close(null); return; }
+      const item = es[i], it = ITEMS[item];
+      // Si c'est un objet purement tenu (ex: baies de tenue, restes, orbe vie), rediriger naturellement vers Donner
+      if (it && it.hold && !it.heal && !it.candy && !it.stone && !it.field) {
+        handleGive();
+      } else {
+        triggerRow(i);
+      }
+    });
+    giveBtn?.addEventListener('click', handleGive);
+    tossBtn?.addEventListener('click', handleToss);
+    backBtn?.addEventListener('click', () => { ui.sound.sfx('cancel'); close(null); });
+    s.querySelector('.scr-close-btn')?.addEventListener('click', () => { ui.sound.sfx('cancel'); close(null); });
+
+    // Contrôles Clavier / Manette
     const pop = ui.input.push(async (k) => {
       if (busy) return;
-      const es = entries();
-      if (k === 'left' || k === 'right') { pocket = (pocket + (k === 'left' ? POCKETS.length - 1 : 1)) % POCKETS.length; i = 0; ui.sound.sfx('blip'); draw(); return; }
-      if (k === 'up') { i = (i - 1 + es.length + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
-      if (k === 'down') { i = (i + 1) % (es.length + 1); ui.sound.sfx('blip'); draw(); return; }
+      if (k === 'left') { changePocket(pocket - 1); return; }
+      if (k === 'right') { changePocket(pocket + 1); return; }
+      if (k === 'up') { changeItem(i - 1); return; }
+      if (k === 'down') { changeItem(i + 1); return; }
       if (k === 'b') { ui.sound.sfx('cancel'); close(null); return; }
-      if (k !== 'a') return;
-      await triggerRow(i);
+      if (k === 'd' || k === 'g') { await handleGive(); return; }
+      if (k === 'j' || k === 'x') { await handleToss(); return; }
+      if (k === 'a') {
+        const es = entries();
+        if (i === es.length) { ui.sound.sfx('cancel'); close(null); return; }
+        await triggerRow(i);
+      }
     });
   });
 }
+
 
 /* ================= POKÉDEX ================= */
 export function dexScreen(game) {
@@ -726,8 +1060,10 @@ function loadCarteIcons() {
   for (const k of SPRITES.carte || []) { const im = new Image(); im.src = ASSETS.carte(k); carteIcons[k] = im; }
   return carteIcons;
 }
-function drawRegion(game, cv) {
-  const W = game.world.maps.monde, ctx = cv.getContext('2d'), w = W.w, h = W.h, B = 2;
+/** relief de la région, une case = un pixel (gardé en cache : la carte ne change pas) */
+function regionTerrain(game) {
+  if (game._regionTerrain) return game._regionTerrain;
+  const W = game.world.maps.monde, w = W.w, h = W.h, B = 2;
   const bw = Math.ceil(w / B), bh = Math.ceil(h / B);
   // nature de chaque bloc de 2 × 2 cases
   // 0 eau, 1 plaine, 2 forêt, 3 montagne, 4 pied de montagne (sol praticable des zones volcaniques et enneigées)
@@ -739,8 +1075,7 @@ function drawRegion(game, cv) {
       if (t === T.WATER) water++; else if (walkable(t) || t === T.DOOR) walk++;
     }
     const th = W.zoneAt(bx * B, by * B)?.theme, hill = th === 'volcanic' || th === 'snow';
-    const i = by * bw + bx;
-    kind[i] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
+    kind[by * bw + bx] = water >= 2 ? 0 : walk ? (hill ? 4 : 1) : hill ? 3 : 2;
   }
   // distance de chaque bloc à la nature voisine (pour la mer : à la côte ; pour la montagne : au pied)
   const dist = (pred) => {
@@ -753,12 +1088,13 @@ function drawRegion(game, cv) {
     return d;
   };
   const toLand = dist((k) => k !== 0), toFoot = dist((k) => k !== 3), toOpen = dist((k) => k === 1 || k === 4 || k === 0);
-  const img = ctx.createImageData(w, h);
+  const c0 = document.createElement('canvas'); c0.width = w; c0.height = h;
+  const ctx = c0.getContext('2d'), img = ctx.createImageData(w, h);
   for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
     const i = by * bw + bx, k = kind[i];
     let c;
-    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : HG.open;
-    else if (toLand.length && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind[(by + dy) * bw + bx + dx] === 0 && bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh)) c = HG.cliff;
+    if (k === 0) c = toLand[i] <= 1 ? HG.deep : toLand[i] <= 3 ? HG.far : (bx + by * 3) % 11 === 0 ? HG.foam : HG.open;
+    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => bx + dx >= 0 && by + dy >= 0 && bx + dx < bw && by + dy < bh && kind[(by + dy) * bw + bx + dx] === 0)) c = HG.cliff;
     else if (k === 3) { const d = toFoot[i]; c = d <= 1 ? HG.low : d <= 2 ? HG.high : d <= 4 ? HG.vhigh : HG.top; }
     else if (k === 4) c = HG.low;
     else c = k === 2 && toOpen[i] >= 2 ? HG.shadow : HG.flat;
@@ -768,43 +1104,82 @@ function drawRegion(game, cv) {
     }
   }
   ctx.putImageData(img, 0, 0);
+  return (game._regionTerrain = { canvas: c0, kind, bw, bh, toOpen, toFoot, B });
+}
+
+/** cadre de la carte : ce qu'on a exploré (plus une marge), jamais plus petit qu'un tiers de la région ;
+ *  il garde les proportions de la région et s'élargit à mesure qu'on avance */
+export function exploredView(game) {
+  const W = game.world.maps.monde, C = 8, cw = Math.ceil(W.w / C), seen = game.state.explored || [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of seen) { const cx = i % cw, cy = Math.floor(i / cw); x0 = Math.min(x0, cx * C); y0 = Math.min(y0, cy * C); x1 = Math.max(x1, cx * C + C); y1 = Math.max(y1, cy * C + C); }
+  const p = game.worldPos(); if (!isFinite(x0)) { x0 = p.x - 20; x1 = p.x + 20; y0 = p.y - 15; y1 = p.y + 15; }
+  const M = 14, ar = W.w / W.h;
+  x0 -= M; y0 -= M; x1 += M; y1 += M;
+  let w = Math.max(x1 - x0, W.w / 3), h = Math.max(y1 - y0, W.h / 3);
+  if (w / h > ar) h = w / ar; else w = h * ar;
+  w = Math.min(w, W.w); h = Math.min(h, W.h);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const x = Math.max(0, Math.min(W.w - w, cx - w / 2)), y = Math.max(0, Math.min(W.h - h, cy - h / 2));
+  return { x, y, w, h };
+}
+
+/** dessine la région dans le cadre v (en cases) : relief, routes, villes, et le noir de ce qui reste à découvrir */
+function drawRegion(game, cv, v) {
+  const W = game.world.maps.monde, ctx = cv.getContext('2d'), R = regionTerrain(game);
+  const s = cv.width / v.w;                    // pixels écran par case
+  const X = (x) => (x - v.x) * s, Y = (y) => (y - v.y) * s;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#07080c'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(R.canvas, v.x, v.y, v.w, v.h, 0, 0, cv.width, cv.height);
+  // icônes du Pokégear : grandeur fixe à l'écran (deux pixels par pixel d'icône quand la carte est zoomée)
+  const k = Math.max(1, Math.min(3, Math.round(s / 2.2)));
   const I = loadCarteIcons();
-  const icon = (k, x, y) => { const im = I[k]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(x - im.width / 2), Math.round(y - im.height + 2)); };
-  // arbres sur les forêts épaisses, montagnes sur les reliefs (une icône par carré de 22 cases, au hasard du lieu)
-  for (let y = 10; y < h - 6; y += 22) for (let x = 10; x < w - 6; x += 22) {
+  const icon = (key, x, y) => { const im = I[key]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(X(x) - im.width * k / 2), Math.round(Y(y) - im.height * k + 2 * k), im.width * k, im.height * k); };
+  const { kind, bw, toOpen, toFoot, B } = R;
+  const step = Math.max(14, Math.round(22 * 2.2 / s * k));
+  for (let y = 10; y < W.h - 6; y += step) for (let x = 10; x < W.w - 6; x += step) {
     const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
-    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), k = kind[i];
-    if (k === 2 && toOpen[i] >= 4 && ((x + y - 20) / 22) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
-    else if (k === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
+    if (jx < v.x - 10 || jx > v.x + v.w + 10 || jy < v.y - 10 || jy > v.y + v.h + 14) continue;
+    const i = Math.floor(jy / B) * bw + Math.floor(jx / B), kk = kind[i];
+    if (kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
+    else if (kk === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
   }
   // routes : un trait blanc cerclé de gris
-  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const roads = (game.world.routes || []).map((r) => r.pts);
-  for (const [lw, col] of [[7, HG.ink], [4, HG.road]]) {
+  for (const [lw, col] of [[Math.max(4, s * 1.9), HG.ink], [Math.max(2, s * 1.1), HG.road]]) {
     ctx.strokeStyle = col; ctx.lineWidth = lw;
-    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + 0.5, y + 0.5) : ctx.moveTo(x + 0.5, y + 0.5))); ctx.stroke(); }
+    for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x + 0.5), Y(y + 0.5)) : ctx.moveTo(X(x + 0.5), Y(y + 0.5)))); ctx.stroke(); }
   }
-  // grottes et lieux à part (lac, jardin, forêt des torii) : icônes et pastilles vertes
   for (const b of W.buildings) if (b.kind === 'cave') icon('grotte_m', b.x + b.w / 2, b.y + b.d);
   const pill = (x, y, pw, ph, fill, dark) => {
-    x = Math.round(x - pw / 2); y = Math.round(y - ph / 2);
-    ctx.fillStyle = HG.ink; ctx.fillRect(x - 1, y, pw + 2, ph); ctx.fillRect(x, y - 1, pw, ph + 2);
+    pw *= k; ph *= k; x = Math.round(X(x) - pw / 2); y = Math.round(Y(y) - ph / 2);
+    ctx.fillStyle = HG.ink; ctx.fillRect(x - k, y, pw + 2 * k, ph); ctx.fillRect(x, y - k, pw, ph + 2 * k);
     ctx.fillStyle = fill; ctx.fillRect(x, y, pw, ph);
     if (dark) { ctx.fillStyle = dark; ctx.fillRect(x, y + Math.ceil(ph * 0.55), pw, Math.floor(ph * 0.45)); }
   };
   for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
-  // villes : pastilles rouges (grises tant qu'on n'y est pas allé)
   const visited = new Set(game.state.visited || []);
   for (const t of Object.values(game.world.towns)) {
     const big = t.gym != null || t.id === 'plateau';
-    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 16 : 12, big ? 12 : 9, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
   }
-  // brouillard sur ce qui n'a pas encore été exploré
-  const seen = new Set(game.state.explored || []), C = 8, cw = Math.ceil(w / C);
-  if (seen.size) {
-    ctx.fillStyle = 'rgba(28, 36, 52, 0.62)';
-    for (let y = 0; y < h; y += C) for (let x = 0; x < w; x += C) if (!seen.has(Math.floor(y / C) * cw + Math.floor(x / C))) ctx.fillRect(x, y, C, C);
-  }
+  // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
+  const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
+  const mask = document.createElement('canvas'); mask.width = cw; mask.height = ch;
+  const mx = mask.getContext('2d'), md = mx.createImageData(cw, ch);
+  for (const i of seen) if (i >= 0 && i < cw * ch) md.data[i * 4 + 3] = 255;
+  mx.putImageData(md, 0, 0);
+  const fog = document.createElement('canvas'); fog.width = cv.width; fog.height = cv.height;
+  const fx = fog.getContext('2d');
+  fx.fillStyle = '#07080c'; fx.fillRect(0, 0, fog.width, fog.height);
+  fx.globalCompositeOperation = 'destination-out';
+  fx.imageSmoothingEnabled = true;
+  fx.filter = `blur(${Math.max(2, s * 3.2)}px)`;
+  fx.drawImage(mask, X(0), Y(0), cw * C * s, ch * C * s);
+  fx.filter = 'none'; fx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(fog, 0, 0);
 }
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
@@ -861,7 +1236,7 @@ export function mapScreen(game) {
       </div>
       <div class="map-stage">
         <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
-          <canvas class="mapcv" width="${W.w}" height="${W.h}"></canvas>
+          <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
@@ -890,13 +1265,31 @@ export function mapScreen(game) {
     const tagEl = s.querySelector('.map-tag');
     const subEl = s.querySelector('.map-sub');
 
-    const draw = () => drawRegion(game, c);
+    // la carte est cadrée sur ce qu'on a exploré : elle se dézoome à mesure qu'on découvre la région
+    // (à l'ouverture, elle part du cadre de la dernière fois et s'élargit jusqu'au nouveau)
+    const target = exploredView(game), from = st.mapView && st.mapView.w ? st.mapView : target;
+    let view = { ...from };
+    const fit = () => { const r = c.getBoundingClientRect(); const w = Math.max(320, Math.round(r.width * (window.devicePixelRatio || 1))); if (c.width !== w) { c.width = w; c.height = Math.round(w * W.h / W.w); } };
+    const place = (node, x, y) => { node.style.left = ((x - view.x) / view.w * 100) + '%'; node.style.top = ((y - view.y) / view.h * 100) + '%'; };
+    const pinsAt = [];
+    const draw = () => { fit(); drawRegion(game, c, view); for (const [node, x, y] of pinsAt) place(node, x, y); };
     draw();
     Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+    if (Math.abs(from.w - target.w) > 0.5 || Math.abs(from.x - target.x) > 0.5 || Math.abs(from.y - target.y) > 0.5) {
+      const t0 = performance.now(), D = 1100;
+      const anim = () => {
+        if (!s.isConnected) return;
+        const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
+        for (const k of ['x', 'y', 'w', 'h']) view[k] = from[k] + (target[k] - from[k]) * e;
+        draw();
+        if (u < 1) requestAnimationFrame(anim);
+      };
+      setTimeout(() => requestAnimationFrame(anim), 250);
+    }
+    st.mapView = target;
 
     const me = el('div', 'map-me');
-    me.style.left = (p.x / W.w * 100) + '%';
-    me.style.top = (p.y / W.h * 100) + '%';
+    pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
     // Interactive town pins on the map
@@ -904,8 +1297,7 @@ export function mapScreen(game) {
       if (idx === 0) return;
       const pin = el('button', 'map-pin ' + (sp.tagCls || ''));
       pin.type = 'button';
-      pin.style.left = (sp.x / W.w * 100) + '%';
-      pin.style.top = (sp.y / W.h * 100) + '%';
+      pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -918,12 +1310,12 @@ export function mapScreen(game) {
 
     const cur = el('div', 'map-cur');
     lab.appendChild(cur);
+    const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
     let k = 0;
     const show = () => {
       const q = spots[k];
-      cur.style.left = (q.x / W.w * 100) + '%';
-      cur.style.top = (q.y / W.h * 100) + '%';
+      curAt[1] = q.x; curAt[2] = q.y; place(cur, q.x, q.y);
       whereEl.textContent = q.name;
       tagEl.textContent = q.tag || '';
       tagEl.className = 'map-tag ' + (q.tagCls || '');
@@ -1006,29 +1398,715 @@ export async function shopScreen(game, stock) {
   await ui.say('Reviens quand tu veux !');
 }
 
-/* ================= PC ================= */
+/* ================= BOÎTE PC FAÇON 5G (NOIR 2 / BLANC 2) ================= */
+const BOX_THEMES = [
+  { name: 'Prairie', bg: '#2b5832', grad: 'linear-gradient(135deg, #1b3820, #356b3e)' },
+  { name: 'Forêt', bg: '#1c3e24', grad: 'linear-gradient(135deg, #102516, #2a5a35)' },
+  { name: 'Océan', bg: '#1e446e', grad: 'linear-gradient(135deg, #122842, #29609c)' },
+  { name: 'Cité', bg: '#3a4456', grad: 'linear-gradient(135deg, #222834, #4e5c74)' },
+  { name: 'Désert', bg: '#6b542c', grad: 'linear-gradient(135deg, #42341b, #8e703a)' },
+  { name: 'Volcan', bg: '#6e2b24', grad: 'linear-gradient(135deg, #441a16, #943a30)' },
+  { name: 'Neige', bg: '#34576a', grad: 'linear-gradient(135deg, #1e333e, #4a7d99)' },
+  { name: 'Cosmos', bg: '#342354', grad: 'linear-gradient(135deg, #1e1432, #523784)' },
+];
+
+function ensureBoxSlots(boxList) {
+  const occupied = new Set();
+  for (const m of boxList) {
+    if (m && m.box != null && m.slot != null && m.box >= 0 && m.box < 8 && m.slot >= 0 && m.slot < 30) {
+      const k = `${m.box}:${m.slot}`;
+      if (!occupied.has(k)) { occupied.add(k); continue; }
+    }
+    if (m) { m.box = null; m.slot = null; }
+  }
+  let b = 0, s = 0;
+  for (const m of boxList) {
+    if (!m || m.box != null) continue;
+    while (occupied.has(`${b}:${s}`)) {
+      s++;
+      if (s >= 30) { s = 0; b = (b + 1) % 8; }
+    }
+    m.box = b; m.slot = s;
+    occupied.add(`${b}:${s}`);
+    s++;
+    if (s >= 30) { s = 0; b = (b + 1) % 8; }
+  }
+}
+
+function renderPCPokemonPreview(m) {
+  if (!m) {
+    return `<div class="pc-preview-empty">
+      <div class="pc-empty-icon">?</div>
+      <div class="pc-empty-text">Sélectionnez une créature</div>
+    </div>`;
+  }
+  const S = SPECIES[m.sp] || {};
+  const abilityKey = getAbility(m);
+  const abilityTxt = abilityName(abilityKey);
+  const itName = m.item ? (ITEMS[m.item]?.name || m.item) : 'Aucun';
+  const rHp = m.hp / m.stats[0];
+  return `
+    <div class="pc-prev-card">
+      <div class="pc-prev-head">
+        <span class="pc-prev-name">${esc(monName(m))}${gender(m)}</span>
+        <span class="pc-prev-lvl">N.${m.lvl}</span>
+      </div>
+      <div class="pc-prev-art">
+        <img class="pc-prev-spr${m.shadow ? ' shadowmon' : ''}" src="${ASSETS.front(m.sp, m.shiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp, m.shadow)}'">
+      </div>
+      <div class="pc-prev-types">
+        ${(S.t || ['normal']).map(typeTag).join(' ')}
+        ${statusTag(m)}
+      </div>
+      <div class="pc-prev-hp">
+        <b>PV</b>
+        <i><u style="width:${Math.max(0, rHp * 100)}%;background:${hpCol(rHp)}"></u></i>
+        <span>${m.hp}/${m.stats[0]}</span>
+      </div>
+      <div class="pc-prev-info">
+        <div class="pc-info-row"><b>Talent :</b> <span class="pc-val-ability">${esc(abilityTxt)}</span></div>
+        <div class="pc-info-row"><b>Objet :</b> <span class="pc-val-item">${esc(itName)}</span></div>
+      </div>
+      <div class="pc-prev-stats">
+        <div class="pc-st-col"><span>ATT</span><b>${m.stats[1]}</b></div>
+        <div class="pc-st-col"><span>DÉF</span><b>${m.stats[2]}</b></div>
+        <div class="pc-st-col"><span>SPA</span><b>${m.stats[3]}</b></div>
+        <div class="pc-st-col"><span>SPD</span><b>${m.stats[4]}</b></div>
+        <div class="pc-st-col"><span>VIT</span><b>${m.stats[5]}</b></div>
+      </div>
+      <div class="pc-prev-moves">
+        ${m.moves.map((x) => {
+          const M = MOVES[x.id];
+          if (!M) return '';
+          return `<div class="pc-prev-mv" style="--tc:${TYPE_COL[M.t]}">
+            <span class="pc-mv-type">${TYPE_FR[M.t]}</span>
+            <span class="pc-mv-name">${esc(M.n)}</span>
+            <span class="pc-mv-pp">${x.pp}/${M.pp}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 export async function pcScreen(game) {
   const ui = game.ui, st = game.state;
   ui.sound.sfx('pc');
-  await ui.say(`${st.name} allume le PC.\nAccès au système de stockage des créatures.`, { keep: true });
-  for (;;) {
-    const r = await ui.ask('Que veux-tu faire ?', ['Retirer une créature', 'Déposer une créature', 'Éteindre'], { keep: true });
-    if (r === 0) {
-      if (!st.box.length) { await ui.say('Il n\'y a aucune créature dans la boîte.', { keep: true }); continue; }
-      if (st.party.length >= 6) { await ui.say('Ton équipe est complète !', { keep: true }); continue; }
-      const k = await ui.list({ title: `Boîte (${st.box.length})`, items: st.box.map((m) => ({ label: monName(m), right: `N.${m.lvl}` })).concat([{ label: 'Annuler' }]), cls: 'shop pcbox', cancel: st.box.length });
-      if (k < 0 || k >= st.box.length) continue;
-      const m = st.box.splice(k, 1)[0]; st.party.push(m);
-      await ui.say(`${monName(m)} a rejoint ton équipe.`, { keep: true });
-    } else if (r === 1) {
-      if (st.party.length <= 1) { await ui.say('C\'est ta dernière créature !', { keep: true }); continue; }
+  if (!st.box) st.box = [];
+  ensureBoxSlots(st.box);
+
+  return new Promise((resolve) => {
+    const s = screen(ui, 'pc-storage-scr');
+    let curBox = 0;
+    let selArea = 'grid'; // 'grid' | 'party'
+    let selSlot = 0; // 0..29 pour grid, 0..5 pour party
+    let inHand = null; // { from: 'grid'|'party', box: number, slot: number, mon: Object }
+    let busy = false;
+
+    const getMonAt = (area, slot) => {
+      if (area === 'grid') return st.box.find((m) => m.box === curBox && m.slot === slot);
+      return st.party[slot];
+    };
+
+    const closePC = () => {
+      if (inHand) {
+        // Reposer le Pokémon en main à son emplacement d'origine
+        if (inHand.from === 'grid') {
+          inHand.mon.box = inHand.box; inHand.mon.slot = inHand.slot;
+          if (!st.box.includes(inHand.mon)) st.box.push(inHand.mon);
+        } else if (inHand.from === 'party') {
+          if (!st.party.includes(inHand.mon)) st.party.splice(inHand.slot, 0, inHand.mon);
+        }
+        inHand = null;
+      }
+      pop(); s.remove(); ui.sound.sfx('pc'); game.save(true); resolve();
+    };
+
+    const doDropOrSwap = (targetArea, targetSlot) => {
+      if (!inHand) return;
+      const targetMon = getMonAt(targetArea, targetSlot);
+
+      // Si le Pokémon venait de l'équipe et va dans la boîte, vérifier qu'il reste au moins 1 Pokémon valide dans l'équipe
+      if (inHand.from === 'party' && targetArea === 'grid' && (!targetMon || targetMon.hp <= 0)) {
+        const remainingAlive = st.party.filter((m) => m !== inHand.mon && m.hp > 0).length;
+        if (remainingAlive === 0 && (!targetMon || targetMon.hp <= 0)) {
+          ui.sound.sfx('bump');
+          return;
+        }
+      }
+
+      // Retirer inHand de son conteneur d'origine
+      if (inHand.from === 'grid') {
+        const idx = st.box.indexOf(inHand.mon);
+        if (idx >= 0) st.box.splice(idx, 1);
+      } else {
+        const idx = st.party.indexOf(inHand.mon);
+        if (idx >= 0) st.party.splice(idx, 1);
+      }
+
+      // Placer la cible
+      if (!targetMon) {
+        // Case vide
+        if (targetArea === 'grid') {
+          inHand.mon.box = curBox; inHand.mon.slot = targetSlot;
+          st.box.push(inHand.mon);
+        } else {
+          st.party.splice(targetSlot, 0, inHand.mon);
+        }
+        inHand = null;
+        ui.sound.sfx('pc');
+      } else {
+        // Échange
+        if (targetArea === 'grid') {
+          const tIdx = st.box.indexOf(targetMon);
+          if (tIdx >= 0) st.box.splice(tIdx, 1);
+          inHand.mon.box = curBox; inHand.mon.slot = targetSlot;
+          st.box.push(inHand.mon);
+
+          if (inHand.from === 'grid') {
+            targetMon.box = inHand.box; targetMon.slot = inHand.slot;
+            st.box.push(targetMon);
+          } else {
+            st.party.splice(inHand.slot, 0, targetMon);
+          }
+        } else {
+          const tIdx = st.party.indexOf(targetMon);
+          if (tIdx >= 0) st.party.splice(tIdx, 1);
+          st.party.splice(targetSlot, 0, inHand.mon);
+
+          if (inHand.from === 'grid') {
+            targetMon.box = inHand.box; targetMon.slot = inHand.slot;
+            st.box.push(targetMon);
+          } else {
+            st.party.splice(inHand.slot, 0, targetMon);
+          }
+        }
+        inHand = null;
+        ui.sound.sfx('pc');
+      }
+    };
+
+    const openMonMenu = async (m, area, slot) => {
+      busy = true;
+      const opts = [
+        'Déplacer',
+        area === 'grid' ? 'Retirer vers l\'Équipe' : 'Déposer dans la Boîte',
+        m.item ? `Prendre ${itemName(m.item)}` : 'Donner un Objet',
+        'Résumé',
+        'Relâcher',
+        'Annuler'
+      ];
+      const r = await ui.ask(`${monName(m)} (N.${m.lvl}) : que faire ?`, opts, { keep: true });
       ui.closeDialog();
-      const k = await partyScreen(game, { mode: 'pick', prompt: 'Quelle créature déposer ?' });
-      if (k < 0) continue;
-      if (st.party.filter((m, j) => j !== k && m.hp > 0).length === 0) { await ui.say('Il te faut au moins une créature en forme dans ton équipe !', { keep: true }); continue; }
-      const m = st.party.splice(k, 1)[0]; st.box.push(m);
-      await ui.say(`${monName(m)} a été déposé dans la boîte.`, { keep: true });
-    } else break;
+
+      if (r === 0) {
+        // Déplacer
+        inHand = { from: area, box: curBox, slot, mon: m };
+        ui.sound.sfx('select');
+      } else if (r === 1) {
+        // Retirer ou Déposer instantané
+        if (area === 'grid') {
+          if (st.party.length >= 6) {
+            ui.sound.sfx('bump');
+            await ui.say('Ton équipe est déjà complète (6/6) !');
+          } else {
+            const idx = st.box.indexOf(m);
+            if (idx >= 0) st.box.splice(idx, 1);
+            st.party.push(m);
+            ui.sound.sfx('pc');
+          }
+        } else {
+          if (st.party.length <= 1) {
+            ui.sound.sfx('bump');
+            await ui.say('C\'est ta dernière créature en équipe !');
+          } else if (st.party.filter((p, j) => p !== m && p.hp > 0).length === 0) {
+            ui.sound.sfx('bump');
+            await ui.say('Il te faut au moins une créature en forme dans ton équipe !');
+          } else {
+            // Trouver premier slot libre
+            const occSlots = new Set(st.box.filter((b) => b.box === curBox).map((b) => b.slot));
+            let freeSlot = -1;
+            for (let k = 0; k < 30; k++) { if (!occSlots.has(k)) { freeSlot = k; break; } }
+            if (freeSlot < 0) {
+              ui.sound.sfx('bump');
+              await ui.say(`La Boîte ${curBox + 1} est pleine ! Change de boîte pour déposer.`);
+            } else {
+              const pIdx = st.party.indexOf(m);
+              if (pIdx >= 0) st.party.splice(pIdx, 1);
+              m.box = curBox; m.slot = freeSlot;
+              st.box.push(m);
+              ui.sound.sfx('pc');
+            }
+          }
+        }
+      } else if (r === 2) {
+        // Objet
+        if (m.item) {
+          const it = takeHeldItem(m, st.bag);
+          ui.sound.sfx('item');
+          await ui.say(`Vous retirez ${itemName(it)} à ${monName(m)}.`);
+        } else {
+          // Donner un objet
+          const heldEligible = Object.keys(st.bag).filter((k) => st.bag[k] > 0 && ITEMS[k]?.held);
+          if (!heldEligible.length) {
+            await ui.say('Tu n\'as aucun objet tenu stratégique dans ton Sac.');
+          } else {
+            const itIdx = await ui.list({
+              title: 'Donner quel objet tenu ?',
+              items: heldEligible.map((k) => ({ label: itemName(k), right: `×${st.bag[k]}` })).concat([{ label: 'Annuler' }]),
+              cancel: heldEligible.length
+            });
+            if (itIdx >= 0 && itIdx < heldEligible.length) {
+              const chosen = heldEligible[itIdx];
+              giveHeldItem(m, chosen, st.bag);
+              ui.sound.sfx('item');
+              await ui.say(`${monName(m)} tient désormais ${itemName(chosen)} !`);
+            }
+          }
+        }
+      } else if (r === 3) {
+        // Résumé
+        const list = area === 'grid' ? st.box.filter((x) => x.box === curBox) : st.party;
+        const targetIdx = list.indexOf(m);
+        if (targetIdx >= 0) await summaryScreen(game, list, targetIdx);
+      } else if (r === 4) {
+        // Relâcher
+        if (area === 'party' && st.party.length <= 1) {
+          ui.sound.sfx('bump');
+          await ui.say('Impossible de relâcher ta seule créature en équipe !');
+        } else {
+          const sure = await ui.yesNo(`Es-tu vraiment sûr de vouloir relâcher ${monName(m)} dans la nature ?\nCette action est irréversible !`);
+          if (sure) {
+            if (area === 'grid') {
+              const idx = st.box.indexOf(m);
+              if (idx >= 0) st.box.splice(idx, 1);
+            } else {
+              const idx = st.party.indexOf(m);
+              if (idx >= 0) st.party.splice(idx, 1);
+            }
+            ui.sound.sfx('faint');
+            await ui.say(`Au revoir, ${monName(m)} !\nIl s'élance joyeusement dans les hautes herbes.`);
+          }
+        }
+      }
+      busy = false;
+      draw();
+    };
+
+    const draw = () => {
+      const theme = BOX_THEMES[curBox] || BOX_THEMES[0];
+      const boxMons = st.box.filter((m) => m.box === curBox);
+      const activeMon = inHand ? inHand.mon : getMonAt(selArea, selSlot);
+
+      s.innerHTML = `
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/pc.png" alt="" onerror="this.style.display='none'">
+            <span class="scr-bar-title">SYSTÈME DE STOCKAGE POKÉMON</span>
+            ${inHand ? `<span class="pc-inhand-tag">EN MAIN : ${esc(monName(inHand.mon))}</span>` : ''}
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-close-btn" data-act="close">ÉTEINDRE ✕</button>
+          </div>
+        </div>
+        <div class="pc-main-layout">
+          <div class="pc-preview-panel">
+            ${renderPCPokemonPreview(activeMon)}
+          </div>
+          <div class="pc-box-panel" style="background:${theme.grad}">
+            <div class="pc-box-bar">
+              <button type="button" class="pc-box-arrow prev" data-act="prev-box" title="Boîte précédente (◀)">◀</button>
+              <div class="pc-box-title">
+                <span class="pc-box-num">BOÎTE ${curBox + 1}</span>
+                <span class="pc-box-sub">${theme.name} · ${boxMons.length}/30</span>
+              </div>
+              <button type="button" class="pc-box-arrow next" data-act="next-box" title="Boîte suivante (▶)">▶</button>
+            </div>
+            <div class="pc-grid">
+              ${[...Array(30).keys()].map((sIdx) => {
+                const pm = getMonAt('grid', sIdx);
+                const isSel = (selArea === 'grid' && selSlot === sIdx);
+                const isHeld = (inHand && inHand.mon === pm);
+                return `<div class="pc-cell ${isSel ? 'sel' : ''} ${pm ? 'occ' : 'empty'} ${isHeld ? 'in-hand' : ''}" data-slot="${sIdx}">
+                  ${pm ? `
+                    <img class="pc-ico" src="${ASSETS.icon(pm.sp)}" alt="" onerror="this.src='${ASSETS.front(pm.sp)}'">
+                    <span class="pc-lvl">${pm.lvl}</span>
+                    ${pm.item ? '<span class="pc-held-dot" title="Objet tenu"></span>' : ''}
+                    ${pm.shiny ? '<span class="pc-shiny-star">★</span>' : ''}
+                  ` : ''}
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="pc-party-panel">
+            <div class="pc-party-head">ÉQUIPE (${st.party.length}/6)</div>
+            <div class="pc-party-list">
+              ${[0, 1, 2, 3, 4, 5].map((pIdx) => {
+                const pm = st.party[pIdx];
+                const isSel = (selArea === 'party' && selSlot === pIdx);
+                const isHeld = (inHand && inHand.mon === pm);
+                return `<div class="pc-party-slot ${isSel ? 'sel' : ''} ${pm ? 'occ' : 'empty'} ${isHeld ? 'in-hand' : ''}" data-party="${pIdx}">
+                  ${pm ? `
+                    <img class="pc-ico" src="${ASSETS.icon(pm.sp)}" alt="" onerror="this.src='${ASSETS.front(pm.sp)}'">
+                    <div class="pc-party-slot-info">
+                      <div class="pc-ps-top"><span class="pc-ps-name">${esc(monName(pm))}</span><span class="pc-ps-lvl">N.${pm.lvl}</span></div>
+                      <div class="pc-ps-hp"><i><u style="width:${Math.max(0, pm.hp / pm.stats[0] * 100)}%;background:${hpCol(pm.hp / pm.stats[0])}"></u></i></div>
+                    </div>
+                    ${pm.item ? '<span class="pc-held-dot"></span>' : ''}
+                  ` : '<span class="pc-slot-empty-lbl">— VIDE —</span>'}
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="pc-help">
+          ${inHand ? 'Cliquez sur une case pour poser ou échanger · Échap : Annuler' : '◀ ▶ Changer de boîte · Clic / Flèches : Déplacer · Entrée : Options · Échap : Quitter'}
+        </div>`;
+
+      s.querySelector('[data-act="close"]')?.addEventListener('click', closePC);
+      s.querySelector('[data-act="prev-box"]')?.addEventListener('click', () => {
+        curBox = (curBox + 7) % 8;
+        ui.sound.sfx('blip');
+        draw();
+      });
+      s.querySelector('[data-act="next-box"]')?.addEventListener('click', () => {
+        curBox = (curBox + 1) % 8;
+        ui.sound.sfx('blip');
+        draw();
+      });
+
+      s.querySelectorAll('.pc-cell').forEach((cell) => {
+        const slot = +cell.dataset.slot;
+        cell.addEventListener('mouseenter', () => {
+          if (busy) return;
+          if (selArea !== 'grid' || selSlot !== slot) {
+            selArea = 'grid'; selSlot = slot;
+            draw();
+          }
+        });
+        cell.addEventListener('click', async () => {
+          if (busy) return;
+          selArea = 'grid'; selSlot = slot;
+          if (inHand) {
+            doDropOrSwap('grid', slot);
+            draw();
+          } else {
+            const m = getMonAt('grid', slot);
+            if (m) await openMonMenu(m, 'grid', slot);
+          }
+        });
+      });
+
+      s.querySelectorAll('.pc-party-slot').forEach((slotEl) => {
+        const pIdx = +slotEl.dataset.party;
+        slotEl.addEventListener('mouseenter', () => {
+          if (busy) return;
+          if (selArea !== 'party' || selSlot !== pIdx) {
+            selArea = 'party'; selSlot = pIdx;
+            draw();
+          }
+        });
+        slotEl.addEventListener('click', async () => {
+          if (busy) return;
+          selArea = 'party'; selSlot = pIdx;
+          if (inHand) {
+            doDropOrSwap('party', pIdx);
+            draw();
+          } else {
+            const m = getMonAt('party', pIdx);
+            if (m) await openMonMenu(m, 'party', pIdx);
+          }
+        });
+      });
+    };
+
+    draw();
+
+    const pop = ui.input.push(async (k) => {
+      if (busy) return;
+      if (k === 'b') {
+        if (inHand) {
+          inHand = null;
+          ui.sound.sfx('cancel');
+          draw();
+          return;
+        }
+        closePC();
+        return;
+      }
+      if (k === 'left') {
+        if (selArea === 'party') {
+          selArea = 'grid'; selSlot = Math.min(29, selSlot * 6 + 5);
+        } else if (selSlot % 6 === 0) {
+          curBox = (curBox + 7) % 8;
+          selSlot += 5;
+        } else {
+          selSlot--;
+        }
+      } else if (k === 'right') {
+        if (selArea === 'grid') {
+          if (selSlot % 6 === 5) {
+            selArea = 'party'; selSlot = Math.min(st.party.length - 1, Math.floor(selSlot / 6));
+          } else {
+            selSlot++;
+          }
+        } else {
+          curBox = (curBox + 1) % 8;
+          selArea = 'grid'; selSlot = 0;
+        }
+      } else if (k === 'up') {
+        if (selArea === 'grid') {
+          if (selSlot >= 6) selSlot -= 6;
+        } else {
+          if (selSlot > 0) selSlot--;
+        }
+      } else if (k === 'down') {
+        if (selArea === 'grid') {
+          if (selSlot + 6 < 30) selSlot += 6;
+        } else {
+          if (selSlot < st.party.length - 1) selSlot++;
+        }
+      } else if (k === 'a') {
+        if (inHand) {
+          doDropOrSwap(selArea, selSlot);
+          draw();
+          return;
+        }
+        const m = getMonAt(selArea, selSlot);
+        if (m) await openMonMenu(m, selArea, selSlot);
+        return;
+      } else return;
+      ui.sound.sfx('blip');
+      draw();
+    });
+  });
+}
+
+/* ================= MAÎTRE DES CAPACITÉS (MOVE RELEARNER) ================= */
+function openMoveRelearnerUI(game, m, moveIds, scales) {
+  const ui = game.ui;
+  return new Promise((resolve) => {
+    const s = screen(ui, 'relearn-scr');
+    let sel = 0;
+    const close = (chosen) => { pop(); s.remove(); resolve(chosen); };
+
+    const draw = () => {
+      s.innerHTML = `
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <span class="scr-bar-title">MAÎTRE DES CAPACITÉS</span>
+            <span class="scr-bar-sub">Écailles Cœur : <b>×${scales}</b></span>
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-close-btn" data-act="close">RETOUR ✕</button>
+          </div>
+        </div>
+        <div class="relearn-body">
+          <div class="relearn-left">
+            <div class="relearn-mon-card">
+              <div class="rmc-head">
+                <span class="rmc-name">${esc(monName(m))}${gender(m)}</span>
+                <span class="rmc-lvl">N.${m.lvl}</span>
+              </div>
+              <div class="rmc-art">
+                <img class="rmc-spr" src="${ASSETS.front(m.sp, m.shiny)}" alt="">
+              </div>
+              <div class="rmc-types">
+                ${SPECIES[m.sp].t.map(typeTag).join(' ')}
+              </div>
+              <div class="rmc-current-moves-title">Capacités actuelles :</div>
+              <div class="rmc-current-moves">
+                ${m.moves.map((x) => {
+                  const M = MOVES[x.id];
+                  if (!M) return '';
+                  return `<div class="rmc-cmv" style="--tc:${TYPE_COL[M.t]}">
+                    <span class="rmc-cmv-type">${TYPE_FR[M.t]}</span>
+                    <span class="rmc-cmv-name">${esc(M.n)}</span>
+                    <span class="rmc-cmv-pp">${x.pp}/${M.pp}</span>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="relearn-right">
+            <div class="relearn-list-header">Capacités oubliées disponibles (${moveIds.length}) :</div>
+            <div class="relearn-list">
+              ${moveIds.map((id, idx) => {
+                const M = MOVES[id];
+                const isSel = idx === sel;
+                const catName = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+                return `<div class="relearn-row ${isSel ? 'sel' : ''}" data-idx="${idx}" style="--tc:${TYPE_COL[M.t]}">
+                  <div class="rr-top">
+                    <span class="rr-name">${esc(M.n)}</span>
+                    <span class="rr-type">${TYPE_FR[M.t]}</span>
+                    <span class="rr-cat">${catName}</span>
+                  </div>
+                  <div class="rr-mid">
+                    <span class="rr-pw">${M.p ? `Puis. ${M.p}` : 'Statut'}</span>
+                    <span class="rr-acc">${M.a ? `Préc. ${M.a}%` : 'Préc. —'}</span>
+                    <span class="rr-pp">PP ${M.pp}/${M.pp}</span>
+                  </div>
+                  <div class="rr-desc">${esc(moveDesc(M))}</div>
+                </div>`;
+              }).join('')}
+            </div>
+            <div class="relearn-action-bar">
+              <button type="button" class="relearn-btn-confirm" data-act="confirm">RÉAPPRENDRE CETTE CAPACITÉ</button>
+            </div>
+          </div>
+        </div>
+        <div class="relearn-help">▲ ▼ Choisir une capacité · Entrée / Clic : Valider · Échap : Annuler</div>`;
+
+      s.querySelector('[data-act="close"]')?.addEventListener('click', () => {
+        ui.sound.sfx('cancel');
+        close(null);
+      });
+      s.querySelector('[data-act="confirm"]')?.addEventListener('click', () => {
+        ui.sound.sfx('select');
+        close(moveIds[sel]);
+      });
+      s.querySelectorAll('.relearn-row').forEach((row) => {
+        const idx = +row.dataset.idx;
+        row.addEventListener('mouseenter', () => {
+          if (sel !== idx) { sel = idx; ui.sound.sfx('blip'); draw(); }
+        });
+        row.addEventListener('click', () => {
+          sel = idx;
+          ui.sound.sfx('select');
+          close(moveIds[sel]);
+        });
+      });
+    };
+
+    draw();
+
+    const pop = ui.input.push((k) => {
+      if (k === 'up') {
+        sel = (sel - 1 + moveIds.length) % moveIds.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'down') {
+        sel = (sel + 1) % moveIds.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'a') {
+        ui.sound.sfx('select');
+        close(moveIds[sel]);
+      } else if (k === 'b') {
+        ui.sound.sfx('cancel');
+        close(null);
+      }
+    });
+  });
+}
+
+export async function moveRelearnerScreen(game) {
+  const ui = game.ui, st = game.state;
+  const scales = st.bag['heart-scale'] || 0;
+
+  await ui.say([
+    'Maître des Capacités : « Salutations jeune dresseur ! Je suis le Maître des Capacités.',
+    'Grâce à mes précieux enseignements et à une Écaille Cœur, je peux réveiller le potentiel oublié de tes Pokémon ! »',
+    `Tu possèdes actuellement ${scales} Écaille(s) Cœur.`
+  ], { keep: true });
+
+  if (scales <= 0) {
+    const see = await ui.yesNo('Tu n\'as pas d\'Écaille Cœur... Veux-tu quand même consulter les capacités de ton équipe ?', { keep: true });
+    if (!see) { ui.closeDialog(); return; }
+  } else {
+    const ok = await ui.yesNo('Veux-tu réapprendre une capacité oubliée à l\'un de tes partenaires ?', { keep: true });
+    if (!ok) { ui.closeDialog(); return; }
+  }
+
+  ui.closeDialog();
+
+  for (;;) {
+    const curScales = st.bag['heart-scale'] || 0;
+    const target = await partyScreen(game, {
+      mode: 'pick',
+      prompt: `Choisir un Pokémon (Écailles Cœur : ×${curScales})`
+    });
+    if (target < 0) break;
+
+    const m = st.party[target];
+    const S = SPECIES[m.sp];
+    if (!S) continue;
+
+    const knownIds = new Set(m.moves.map((x) => x.id));
+    const candidateMoves = (S.ls || []).filter(([lvl, id]) => lvl <= m.lvl && !knownIds.has(id));
+    const uniqueIds = [...new Set(candidateMoves.map(([, id]) => id))];
+
+    if (!uniqueIds.length) {
+      await ui.say(`Maître des Capacités : « ${monName(m)} se souvient déjà de toutes ses capacités pour son niveau ! »`);
+      continue;
+    }
+
+    const chosenMoveId = await openMoveRelearnerUI(game, m, uniqueIds, curScales);
+    if (!chosenMoveId) continue;
+
+    if (curScales <= 0) {
+      await ui.say('Maître des Capacités : « Reviens me voir avec 1 Écaille Cœur pour sceller cet enseignement ! »');
+      continue;
+    }
+
+    const M = MOVES[chosenMoveId];
+    if (m.moves.length >= 4) {
+      const forgetIdx = await ui.list({
+        title: `Quelle attaque remplacer pour ${M.n} ?`,
+        items: m.moves.map((x) => ({
+          label: MOVES[x.id].n,
+          right: `${TYPE_FR[MOVES[x.id].t]} · PP ${x.pp}/${MOVES[x.id].pp}`
+        })).concat([{ label: 'Annuler' }]),
+        cls: 'psub learn',
+        cancel: 4
+      });
+      if (forgetIdx < 0 || forgetIdx >= 4) continue;
+      const oldM = MOVES[m.moves[forgetIdx].id];
+      const confirm = await ui.yesNo(`Oublier ${oldM.n} et dépenser 1 Écaille Cœur pour réapprendre ${M.n} ?`);
+      if (!confirm) continue;
+
+      st.bag['heart-scale']--;
+      m.moves[forgetIdx] = { id: chosenMoveId, pp: M.pp };
+      ui.sound.sfx('learn');
+      await ui.say([
+        '1, 2, 3... et Pouf !',
+        `${monName(m)} a oublié ${oldM.n}...`,
+        `Et ${monName(m)} a réappris avec éclat l'attaque ${M.n} !`
+      ]);
+    } else {
+      const confirm = await ui.yesNo(`Dépenser 1 Écaille Cœur pour enseigner ${M.n} à ${monName(m)} ?`);
+      if (!confirm) continue;
+
+      st.bag['heart-scale']--;
+      m.moves.push({ id: chosenMoveId, pp: M.pp });
+      ui.sound.sfx('learn');
+      await ui.say(`${monName(m)} a réappris avec éclat l'attaque ${M.n} !`);
+    }
+
+    game.save(true);
+    const again = await ui.yesNo('Veux-tu enseigner une autre capacité ?');
+    if (!again) break;
+  }
+
+  await ui.say('Maître des Capacités : « Que la force et la sagesse accompagnent ton équipe ! À bientôt. »');
+}
+
+/* ================= PC DES NATURES (Centre de soins) ================= */
+export async function naturePcScreen(game) {
+  const ui = game.ui, st = game.state;
+  ui.sound.sfx('pc');
+  await ui.say([`${st.name} allume le PC des Natures.`, 'Ce PC règle le caractère d\'un Pokémon : une stat monte de 10 %, une autre baisse de 10 %.'], { keep: true });
+  for (;;) {
+    if (!st.party.length) { await ui.say('Tu n\'as encore aucune créature.', { keep: true }); break; }
+    ui.closeDialog();
+    const k = await partyScreen(game, { mode: 'pick', prompt: 'Changer la nature de quel Pokémon ?' });
+    if (k < 0) break;
+    const m = st.party[k];
+    const label = (n) => { const ne = natureEffect(n); return ne ? `+${STAT_NAMES[ne[0]]} −${STAT_NAMES[ne[1]]}` : 'neutre'; };
+    const n = await ui.list({ title: `${monName(m)} : ${natureName(m.nat ?? 0)}`, items: NATURES.map((name, i) => ({ label: name + (i === m.nat ? ' ✓' : ''), right: label(i) })).concat([{ label: 'Annuler' }]), cls: 'shop natures', cancel: NATURES.length, start: m.nat ?? 0 });
+    if (n < 0 || n >= NATURES.length || n === m.nat) continue;
+    if (!(await ui.yesNo(`${monName(m)} devient ${natureName(n)} (${label(n)}) ?`, { keep: true }))) continue;
+    m.nat = n; refreshStats(m, true); ui.sound.sfx('levelup');
+    await ui.say(`${monName(m)} est maintenant de nature ${natureName(n)} !`, { keep: true });
   }
   ui.closeDialog();
 }
@@ -1040,21 +2118,32 @@ export function optionsScreen(game) {
     const s = screen(ui, 'opt-scr', 'OPTIONS');
     const box = el('div', 'box opts'); s.appendChild(box);
     const speeds = ['Lente', 'Normale', 'Rapide', 'Instantanée'];
+    const runSpeeds = ['Normale (1×)', 'Rapide (1.7×)', 'Turbo (2.5×)'];
     let i = 0;
     const rows = () => [
       ['Vitesse du texte', speeds[ui.textSpeed]],
+      ['Vitesse de course', runSpeeds[game.runSpeed ?? 1]],
       ['Volume', '■'.repeat(Math.round(snd.vol * 10)) + '□'.repeat(10 - Math.round(snd.vol * 10))],
+      ['Pokémon qui suit', game.followOff ? 'Non' : 'Oui'],
       ['Retour', ''],
     ];
-    const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys"><b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj (maintenue) : courir · C : carte</div>'; };
+    const draw = () => { box.innerHTML = rows().map(([a, b], k) => `<div class="list-row ${k === i ? 'on' : ''}"><span class="cur">▶</span><span class="lbl">${a}</span><span class="rgt">${b ? '◀ ' + b + ' ▶' : ''}</span></div>`).join('') + '<div class="keys"><b>Commandes</b><br>Flèches ou ZQSD : se déplacer · Espace / Entrée : valider, parler<br>Échap : annuler, menu · Maj : sprint · R : basculer course rapide/turbo · C : carte</div>'; };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'up') i = (i + 2) % 3; else if (k === 'down') i = (i + 1) % 3;
-      else if (k === 'left' || k === 'right') {
+      const nRows = 5;
+      if (k === 'up') i = (i + nRows - 1) % nRows; else if (k === 'down') i = (i + 1) % nRows;
+      else if (k === 'left' || k === 'right' || (k === 'a' && (i === 1 || i === 3))) {
         const d = k === 'left' ? -1 : 1;
         if (i === 0) { ui.textSpeed = (ui.textSpeed + d + 4) % 4; try { localStorage.setItem('odyssee-textspeed', ui.textSpeed); } catch (e) {} }
-        if (i === 1) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
-      } else if (k === 'b' || (k === 'a' && i === 2)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
+        if (i === 1) {
+          game.runSpeed = ((game.runSpeed ?? 1) + d + 3) % 3;
+          try { localStorage.setItem('odyssee-runspeed', game.runSpeed); } catch (e) {}
+          game.hud?.update(true);
+          game.ui.updateRunKeyHint?.(game.autoRun, game.runSpeed);
+        }
+        if (i === 2) snd.setVolume(Math.max(0, Math.min(1, Math.round(snd.vol * 10 + d) / 10)));
+        if (i === 3) { game.followOff = !game.followOff; try { localStorage.setItem('odyssee-suiveur', game.followOff ? '0' : '1'); } catch (e) {} }
+      } else if (k === 'b' || (k === 'a' && i === 4)) { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
       else return;
       ui.sound.sfx('blip'); draw();
     });
@@ -1124,240 +2213,258 @@ export function loadCodeScreen(ui, check) {
   });
 }
 
-/* ================= JOURNAL DES QUÊTES (Style 5G Noir 2 / Blanc 2) ================= */
+/* ================= JOURNAL DES QUÊTES (carnet de voyage, style Noir 2 / Blanc 2) ================= */
+// Pas d'indice ni de destination : chaque quête acceptée rappelle en quelques phrases ce qu'on nous a demandé et ce qui
+// s'est passé depuis, avec le temps de jeu écoulé depuis qu'on l'a acceptée.
 export function questsScreen(game) {
   const ui = game.ui;
   return new Promise((resolve) => {
     const s = screen(ui, 'quests-scr');
-    let currentTab = 'active'; // 'active' | 'done' | 'all'
-    let selectedIdx = 0;
-
+    let tab = 'active', sel = 0;
+    const CAT = { main: 'HISTOIRE', side: 'AVENTURE', legend: 'LÉGENDE', npc: 'HABITANT' };
+    const lists = () => {
+      const all = getAllQuests(game);
+      const act = all.filter((q) => q.status !== 'done'), done = all.filter((q) => q.status === 'done');
+      return { all, act, done, shown: tab === 'active' ? act : tab === 'done' ? done : all };
+    };
     const render = () => {
-      const allQuests = getAllQuests(game);
-      const activeCount = allQuests.filter((q) => q.status !== 'done').length;
-      const doneCount = allQuests.filter((q) => q.status === 'done').length;
-      const allCount = allQuests.length;
-
-      let filtered = allQuests;
-      if (currentTab === 'active') {
-        filtered = allQuests.filter((q) => q.status !== 'done');
-        if (!filtered.length) filtered = allQuests;
-      } else if (currentTab === 'done') {
-        filtered = allQuests.filter((q) => q.status === 'done');
-      }
-
-      if (selectedIdx >= filtered.length) {
-        selectedIdx = Math.max(0, filtered.length - 1);
-      }
-
-      const selQuest = filtered[selectedIdx] || allQuests[0];
-      const tracked = getTrackedQuest(game);
-
+      const { all, act, done, shown } = lists();
+      if (sel >= shown.length) sel = Math.max(0, shown.length - 1);
+      const q = shown[sel];
       s.innerHTML = `
         <div class="scr-bar">
           <div class="scr-bar-left">
             <img class="scr-bar-ico" src="img/items/notebook.png" alt="">
             <span class="scr-bar-title">JOURNAL DES QUÊTES</span>
-            <span class="scr-bar-sub">${activeCount} actives · ${doneCount} terminées</span>
+            <span class="scr-bar-sub">${act.length} en cours · ${done.length} terminée${done.length > 1 ? 's' : ''}</span>
           </div>
           <div class="quests-tabs">
-            <button type="button" class="qtab${currentTab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${activeCount})</button>
-            <button type="button" class="qtab${currentTab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${doneCount})</button>
-            <button type="button" class="qtab${currentTab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${allCount})</button>
+            <button type="button" class="qtab${tab === 'active' ? ' on' : ''}" data-tab="active">EN COURS (${act.length})</button>
+            <button type="button" class="qtab${tab === 'done' ? ' on' : ''}" data-tab="done">TERMINÉES (${done.length})</button>
+            <button type="button" class="qtab${tab === 'all' ? ' on' : ''}" data-tab="all">TOUTES (${all.length})</button>
           </div>
-          <div class="scr-bar-right">
-            <button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button>
-          </div>
+          <div class="scr-bar-right"><button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button></div>
         </div>
-
         <div class="quests-body">
-          <!-- Colonne gauche: Liste des quêtes -->
           <div class="qcol-list">
-            <div class="qlist-head">
-              <span>MISSIONS D'ODYSSÉE</span>
-              <span class="qlist-cnt">${filtered.length} quête${filtered.length > 1 ? 's' : ''}</span>
-            </div>
+            <div class="qlist-head"><span>CARNET DE VOYAGE</span><span class="qlist-cnt">${shown.length} quête${shown.length > 1 ? 's' : ''}</span></div>
             <div class="qlist-scroll">
-              ${filtered.length === 0 ? '<div style="padding:15px;color:#8aa0be;font-size:13px;text-align:center;">Aucune quête dans cette catégorie.</div>' : ''}
-              ${filtered.map((q, idx) => `
-                <div class="qcard ${q.status}${idx === selectedIdx ? ' on' : ''}${q.isTracked ? ' tracked' : ''}" data-idx="${idx}">
+              ${shown.length ? '' : `<div class="qempty">${tab === 'done' ? 'Aucune quête terminée pour l\'instant.' : 'Aucune quête en cours. Parle aux habitants : ils ont souvent quelque chose à demander.'}</div>`}
+              ${shown.map((x, i) => `
+                <div class="qcard ${x.status}${i === sel ? ' on' : ''}${x.isTracked ? ' tracked' : ''}" data-idx="${i}">
                   <span class="cur">▶</span>
-                  <div class="qcard-top">
-                    <span class="qcat-tag qcat-${q.cat}">${esc(q.cat === 'main' ? 'PRINCIPALE' : q.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${q.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}
-                  </div>
-                  <div class="qcard-name">${esc(q.name)}</div>
-                  <div class="qcard-sub">
-                    <span class="qcard-step">${q.status === 'done' ? '✔ Terminée' : `Étape ${q.step}/${q.totalSteps}`}</span>
-                    <span class="qcard-loc">📍 ${esc(q.where)}</span>
-                  </div>
-                </div>
-              `).join('')}
+                  <div class="qcard-top"><span class="qcat-tag qcat-${x.cat}">${CAT[x.cat] || ''}</span>${x.isTracked ? '<span class="qtracked-tag">★ SUIVIE</span>' : ''}</div>
+                  <div class="qcard-name">${esc(x.name)}</div>
+                  <div class="qcard-sub"><span class="qcard-step">${x.status === 'done' ? '✔ Terminée' : 'En cours'}</span><span class="qcard-loc">${esc(x.since)}</span></div>
+                </div>`).join('')}
             </div>
           </div>
-
-          <!-- Colonne droite: Fiche détaillée -->
           <div class="qcol-detail">
-            ${selQuest ? `
+            ${q ? `
               <div class="qdet-head">
                 <div class="qdet-head-left">
                   <div class="qdet-title-row">
-                    <span class="qcat-tag qcat-${selQuest.cat}">${esc(selQuest.cat === 'main' ? 'QUÊTE PRINCIPALE' : selQuest.cat === 'side' ? 'AVENTURE' : 'HABITANT')}</span>
-                    ${selQuest.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
-                    ${selQuest.isTracked ? '<span class="qtracked-tag">★ QUÊTE ACTUELLEMENT SUIVIE</span>' : ''}
+                    <span class="qcat-tag qcat-${q.cat}">${CAT[q.cat] || ''}</span>
+                    ${q.status === 'done' ? '<span class="qcat-tag" style="background:#208038">✔ TERMINÉE</span>' : '<span class="qcat-tag" style="background:#0088cc">EN COURS</span>'}
                   </div>
-                  <div class="qdet-title">${esc(selQuest.name)}</div>
-                  <div class="qdet-giver">Donneur : <b>${esc(selQuest.giver)}</b> · 📍 <i>${esc(selQuest.where)}</i></div>
+                  <div class="qdet-title">${esc(q.name)}</div>
+                  <div class="qdet-giver">${esc(q.giver)} · acceptée ${esc(q.since)}</div>
                 </div>
-                ${selQuest.status !== 'done' ? `
-                  <button type="button" class="qbtn-track${selQuest.isTracked ? ' tracked' : ''}" data-act="track">
-                    ${selQuest.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE CETTE QUÊTE'}
-                  </button>
-                ` : ''}
+                ${q.status !== 'done' ? `<button type="button" class="qbtn-track${q.isTracked ? ' tracked' : ''}" data-act="track">${q.isTracked ? '★ NE PLUS SUIVRE' : '★ SUIVRE'}</button>` : ''}
               </div>
-
-              <!-- Grand Boîtier OÙ ALLER -->
-              <div class="qbox-destination">
-                <div class="qdest-head">
-                  <span class="qdest-pin">📍</span>
-                  <span>OÙ ALLER / PROCHAINE DESTINATION :</span>
-                </div>
-                <div class="qdest-place">${esc(selQuest.destination)}</div>
-                <div class="qdest-hint">${esc(selQuest.direction)}</div>
-              </div>
-
-              <!-- Étapes de la quête -->
-              <div class="qsteps-box">
-                <div class="qsteps-title">ÉTAPES DE LA QUÊTE (${selQuest.step} / ${selQuest.totalSteps})</div>
-                ${selQuest.steps.map((st) => `
-                  <div class="qstep-item${st.done ? ' done' : ''}${st.current ? ' current' : ''}">
-                    <div class="qstep-mark">${st.done ? '☑' : st.current ? '▶' : '◻'}</div>
-                    <div class="qstep-body">
-                      <div class="qstep-txt">${esc(st.desc)}</div>
-                      <div class="qstep-loc">📍 Destination : ${esc(st.destination)}</div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-
-              <!-- Récompenses -->
-              <div class="qreward-box">
-                <span class="qreward-ico">🎁</span>
-                <div><b>RÉCOMPENSE :</b> ${esc(selQuest.reward)}</div>
-              </div>
-            ` : '<div style="padding:30px;color:#8aa0be;text-align:center;">Sélectionne une quête dans la liste de gauche.</div>'}
+              <div class="qdiary">
+                ${q.notes.map((n, i) => `<p class="${i === q.notes.length - 1 ? 'last' : ''}">${esc(n)}</p>`).join('')}
+              </div>` : '<div class="qempty">Le carnet est encore vierge.</div>'}
           </div>
         </div>
-
         <div class="quests-foot">
           <div class="quests-foot-keys">
-            <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
-            <span><kbd>◄</kbd><kbd>►</kbd> Changer d'onglet</span>
-            <span><kbd>ESPACE</kbd> / <kbd>ENTRÉE</kbd> Suivre la quête</span>
-            <span><kbd>X</kbd> / <kbd>ÉCHAP</kbd> Fermer</span>
+            <span><kbd>▲</kbd><kbd>▼</kbd> Choisir</span><span><kbd>◄</kbd><kbd>►</kbd> Onglet</span>
+            <span><kbd>ESPACE</kbd> Suivre dans le HUD</span><span><kbd>ÉCHAP</kbd> Fermer</span>
           </div>
-          <div class="quests-foot-tracked">
-            <span class="qft-label">OBJECTIF SUIVI :</span>
-            <span class="qft-val">${tracked ? `★ ${esc(tracked.name)} (📍 ${esc(tracked.destination)})` : 'Aucun'}</span>
-          </div>
-        </div>
-      `;
-
-      // Clics sur les cartes
-      s.querySelectorAll('.qcard').forEach((card) => {
-        card.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = +card.dataset.idx;
-          if (selectedIdx !== idx) {
-            selectedIdx = idx;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clics sur les onglets
-      s.querySelectorAll('.qtab').forEach((tab) => {
-        tab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const t = tab.dataset.tab;
-          if (currentTab !== t) {
-            currentTab = t;
-            selectedIdx = 0;
-            ui.sound.sfx('blip');
-            render();
-          }
-        });
-      });
-
-      // Clic bouton Suivre
-      const trackBtn = s.querySelector('[data-act="track"]');
-      if (trackBtn && selQuest) {
-        trackBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        });
-      }
-
-      // Bouton fermeture
-      const closeBtn = s.querySelector('[data-act="close"]');
-      if (closeBtn) {
-        closeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeScreen();
-        });
-      }
+        </div>`;
+      s.querySelectorAll('.qcard').forEach((c) => c.addEventListener('click', (e) => { e.stopPropagation(); sel = +c.dataset.idx; ui.sound.sfx('blip'); render(); }));
+      s.querySelectorAll('.qtab').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); tab = b.dataset.tab; sel = 0; ui.sound.sfx('blip'); render(); }));
+      s.querySelector('[data-act="track"]')?.addEventListener('click', (e) => { e.stopPropagation(); if (q) { setTrackedQuest(game, q.id); ui.sound.sfx('select'); game.hud?.update(true); render(); } });
+      s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => { e.stopPropagation(); close(); });
     };
-
-    const closeScreen = () => {
-      pop();
-      s.remove();
-      ui.sound.sfx('cancel');
-      resolve();
-    };
-
+    const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); };
     const pop = ui.input.push((k) => {
-      const allQuests = getAllQuests(game);
-      let filtered = allQuests;
-      if (currentTab === 'active') filtered = allQuests.filter((q) => q.status === 'active');
-      else if (currentTab === 'done') filtered = allQuests.filter((q) => q.status === 'done');
-      if (!filtered.length) filtered = allQuests;
-
-      if (k === 'up') {
-        selectedIdx = (selectedIdx - 1 + filtered.length) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'down') {
-        selectedIdx = (selectedIdx + 1) % filtered.length;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'left') {
-        currentTab = currentTab === 'all' ? 'done' : currentTab === 'done' ? 'active' : 'all';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'right') {
-        currentTab = currentTab === 'active' ? 'done' : currentTab === 'done' ? 'all' : 'active';
-        selectedIdx = 0;
-        ui.sound.sfx('blip');
-        render();
-      } else if (k === 'a') {
-        const selQuest = filtered[selectedIdx];
-        if (selQuest && selQuest.status !== 'done') {
-          setTrackedQuest(game, selQuest.id);
-          ui.sound.sfx('select');
-          game.hud?.update(true);
-          render();
-        }
-      } else if (k === 'b') {
-        closeScreen();
-      }
+      const { shown } = lists();
+      if (k === 'up' && shown.length) sel = (sel - 1 + shown.length) % shown.length;
+      else if (k === 'down' && shown.length) sel = (sel + 1) % shown.length;
+      else if (k === 'left') { tab = tab === 'all' ? 'done' : tab === 'done' ? 'active' : 'all'; sel = 0; }
+      else if (k === 'right') { tab = tab === 'active' ? 'done' : tab === 'done' ? 'all' : 'active'; sel = 0; }
+      else if (k === 'a') { const q = shown[sel]; if (!q || q.status === 'done') return; setTrackedQuest(game, q.id); game.hud?.update(true); ui.sound.sfx('select'); render(); return; }
+      else if (k === 'b' || k === 'quests') { close(); return; }
+      else return;
+      ui.sound.sfx('blip'); render();
     });
-
+    syncJournal(game);
     render();
   });
 }
 
+
+/* ================= ÉCRAN D'APPRENTISSAGE DE CAPACITÉ 5G ================= */
+/** Écran B2W2 pour remplacer une attaque quand le Pokémon en connaît déjà 4 */
+export function learnMoveScreen(game, m, moveId) {
+  return new Promise((resolve) => {
+    const ui = game.ui;
+    const newM = MOVES[moveId];
+    const s = screen(ui, 'learn-move-scr');
+    let sel = 0; // 0..3: anciennes capacités, 4: abandonner
+
+    const draw = () => {
+      const activeMove = sel < 4 ? MOVES[m.moves[sel].id] : null;
+      const activeDesc = sel < 4 ? moveDesc(activeMove) : "Conserver les 4 capacités actuelles et abandonner l'apprentissage de cette nouvelle capacité.";
+
+      s.innerHTML = `
+        <div class="scr-bar">
+          <div class="scr-bar-left">
+            <img class="scr-bar-ico" src="img/hud/team.png" alt="">
+            <span class="scr-bar-title">APPRENTISSAGE D'UNE CAPACITÉ</span>
+            <span class="scr-bar-sub">${esc(monName(m))} (N.${m.lvl})</span>
+          </div>
+          <div class="scr-bar-right">
+            <button type="button" class="scr-close-btn" data-act="cancel">ABANDONNER ✕</button>
+          </div>
+        </div>
+
+        <div class="lm-body">
+          <!-- Carte Haute : Nouvelle Capacité -->
+          <div class="lm-new-card">
+            <div class="lm-card-label">NOUVELLE CAPACITÉ À APPRENDRE</div>
+            <div class="lm-move-row new" style="--tc:${TYPE_COL[newM.t]}">
+              <div class="lm-move-main">
+                <span class="lm-move-name">${esc(newM.n)}</span>
+                <span class="lm-type" style="background:${TYPE_COL[newM.t]}">${TYPE_FR[newM.t]}</span>
+                <span class="lm-cat"><img src="img/battle/cat_${newM.c || 'physical'}.png" alt=""><span>${newM.c === 'special' ? 'Spécial' : newM.c === 'status' ? 'Statut' : 'Physique'}</span></span>
+              </div>
+              <div class="lm-move-stats">
+                <span class="lm-stat-pw">${newM.p ? 'Puissance : ' + newM.p : 'Statut'}</span>
+                <span class="lm-stat-acc">${newM.a ? 'Précision : ' + newM.a + '%' : 'Précision : —'}</span>
+                <span class="lm-stat-pp">PP : <b>${newM.pp}</b>/${newM.pp}</span>
+              </div>
+            </div>
+            <div class="lm-desc-box new">
+              <div class="lm-desc-tag">EFFET :</div>
+              <div class="lm-desc-content">${esc(moveDesc(newM))}</div>
+            </div>
+          </div>
+
+          <!-- Section Basse : Capacités Actuelles & Choix -->
+          <div class="lm-current-section">
+            <div class="lm-section-title">
+              <span>Sélectionne la capacité à oublier :</span>
+              <span class="lm-instruct">▲ ▼ ◀ ▶ Naviguer · Entrée / Clic : Valider</span>
+            </div>
+
+            <div class="lm-moves-grid">
+              ${m.moves.map((mv, idx) => {
+                const M = MOVES[mv.id];
+                const isSel = idx === sel;
+                return `
+                  <div class="lm-cur-move ${isSel ? 'sel' : ''}" data-idx="${idx}" style="--tc:${TYPE_COL[M.t]}">
+                    <div class="lm-cm-header">
+                      <span class="lm-cm-num">${idx + 1}</span>
+                      <span class="lm-cm-name">${esc(M.n)}</span>
+                      <span class="lm-type" style="background:${TYPE_COL[M.t]}">${TYPE_FR[M.t]}</span>
+                    </div>
+                    <div class="lm-cm-stats">
+                      <span class="lm-cat"><img src="img/battle/cat_${M.c || 'physical'}.png" alt=""></span>
+                      <span class="lm-stat-pw">${M.p ? 'Puis. ' + M.p : 'Statut'}</span>
+                      <span class="lm-stat-pp">PP ${mv.pp}/${M.pp}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+              <div class="lm-cur-move abandon ${sel === 4 ? 'sel' : ''}" data-idx="4">
+                <span class="lm-abandon-ico">✕</span>
+                <span class="lm-abandon-txt">Conserver les attaques actuelles</span>
+              </div>
+            </div>
+
+            <!-- Encadré comparatif dynamique pour l'attaque sélectionnée -->
+            <div class="lm-comparison-box">
+              <div class="lm-comp-head">
+                ${sel < 4 ? `
+                  <span class="lm-comp-tag">CAPACITÉ ACTUELLE SÉLECTIONNÉE (${sel + 1}/4) :</span>
+                  <span class="lm-comp-name">${esc(activeMove.n)}</span>
+                  <span class="lm-comp-acc">${activeMove.a ? 'Précision : ' + activeMove.a + '%' : 'Précision : —'}</span>
+                ` : `
+                  <span class="lm-comp-tag">OPTION :</span>
+                  <span class="lm-comp-name">Abandonner</span>
+                `}
+              </div>
+              <div class="lm-comp-desc">${esc(activeDesc)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      s.querySelector('[data-act="cancel"]')?.addEventListener('click', () => doCancel());
+      s.querySelectorAll('.lm-cur-move').forEach((elRow) => {
+        const idx = +elRow.dataset.idx;
+        elRow.addEventListener('pointerenter', () => {
+          if (sel !== idx) {
+            sel = idx;
+            game.sound.sfx('blip');
+            draw();
+          }
+        });
+        elRow.addEventListener('click', () => {
+          if (idx === 4) doCancel();
+          else doReplace(idx);
+        });
+      });
+    };
+
+    const doReplace = async (k) => {
+      const oldMove = MOVES[m.moves[k].id];
+      const confirm = await ui.yesNo(`Oublier ${oldMove.n} pour apprendre ${newM.n} ?`);
+      if (!confirm) return;
+      s.remove();
+      pop();
+      resolve(k);
+    };
+
+    const doCancel = async () => {
+      const confirm = await ui.yesNo(`Abandonner l'apprentissage de ${newM.n} ?`);
+      if (!confirm) return;
+      s.remove();
+      pop();
+      resolve(-1);
+    };
+
+    const pop = ui.input.push((k) => {
+      let j = sel;
+      if (k === 'up') {
+        if (sel >= 2 && sel < 4) j = sel - 2;
+        else if (sel === 4) j = 2;
+      } else if (k === 'down') {
+        if (sel <= 1) j = sel + 2;
+        else if (sel === 2 || sel === 3) j = 4;
+      } else if (k === 'left') {
+        if (sel === 1 || sel === 3) j = sel - 1;
+      } else if (k === 'right') {
+        if (sel === 0 || sel === 2) j = sel + 1;
+      } else if (k === 'a') {
+        if (sel === 4) doCancel();
+        else doReplace(sel);
+        return;
+      } else if (k === 'b') {
+        doCancel();
+        return;
+      } else return;
+
+      if (j !== sel) {
+        sel = j;
+        game.sound.sfx('blip');
+        draw();
+      }
+    });
+
+    draw();
+  });
+}

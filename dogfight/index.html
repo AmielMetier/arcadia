@@ -16,74 +16,73 @@
     <button class="icon-btn" id="btnExit" title="Quitter" aria-label="Quitter">✕</button>
   </div>
 
+  <div id="touchUI" aria-hidden="true">
+    <button data-a="fire" class="t-fire">Tir</button>
+    <button data-a="msl">Missile</button>
+    <button data-a="flare">Leurre</button>
+    <button data-a="ab">Capacité</button>
+    <button data-a="boost">Boost</button>
+    <button data-a="brake">Frein</button>
+  </div>
+
   <div id="loadingOverlay">
     <div class="load-title">DOGFIGHT <span>3D</span></div>
-    <div class="load-status" id="loadStatus">Génération de l'île en cours…</div>
-    <div class="spinner"></div>
+    <div class="load-status" id="loadStatus">Chargement…</div>
+    <div class="spinner" id="loadSpin"></div>
   </div>
 
-  <div id="briefingModal" class="hidden">
-    <div class="briefing-backdrop"></div>
-    <div class="briefing-card">
-      <div class="briefing-badge">✈️ BRIEFING DE VOL</div>
-      <h1 class="briefing-title">DOGFIGHT <span>3D</span></h1>
-      <p class="briefing-sub">Combats aériens au canon rotatif Vulcan M61 au-dessus de l'île</p>
-
-      <div class="controls-grid">
-        <div class="control-box">
-          <div class="control-icon">⌨️</div>
-          <div class="control-desc">
-            <strong>Pilotage Clavier (100% autonome)</strong>
-            <span><kbd>Z</kbd> ou <kbd>↑</kbd> piquer, <kbd>S</kbd> ou <kbd>↓</kbd> cabrer, <kbd>Q</kbd> ou <kbd>←</kbd> virer à gauche, <kbd>D</kbd> ou <kbd>→</kbd> virer à droite.</span>
-          </div>
-        </div>
-
-        <div class="control-box">
-          <div class="control-icon">💥</div>
-          <div class="control-desc">
-            <strong>Canon Vulcan M61</strong>
-            <span><kbd>Espace</kbd> ou <kbd>Clic gauche</kbd> : visez dans le réticule rouge d'anticipation.</span>
-          </div>
-        </div>
-
-        <div class="control-box">
-          <div class="control-icon">⚡</div>
-          <div class="control-desc">
-            <strong>Postcombustion (Boost)</strong>
-            <span>Maintenez <kbd>Maj (Shift)</kbd> pour accélérer jusqu'à 750 km/h.</span>
-          </div>
-        </div>
-
-        <div class="control-box">
-          <div class="control-icon">🛑</div>
-          <div class="control-desc">
-            <strong>Aérofrein</strong>
-            <span><kbd>Ctrl</kbd> ou <kbd>C</kbd> / <kbd>X</kbd> pour freiner et resserrer vos virages.</span>
-          </div>
-        </div>
-
-        <div class="control-box">
-          <div class="control-icon">🧭</div>
-          <div class="control-desc">
-            <strong>Vol Droit & Stabilisation</strong>
-            <span>Relâchez les touches pour que l'avion maintienne son dernier cap et file tout droit à l'horizontale.</span>
-          </div>
-        </div>
-
-        <div class="control-box tip-box">
-          <div class="control-icon">🎯</div>
-          <div class="control-desc">
-            <strong>Astuce de combat</strong>
-            <span>Tirez par courtes rafales pour éviter la surchauffe du canon rotatif !</span>
-          </div>
-        </div>
-      </div>
-
-      <button id="btnStart" class="btn-launch" type="button">
-        🚀 DÉCOLLER ! (Entrée)
-      </button>
+  <section id="hangar" class="hidden" aria-label="Hangar">
+    <div class="h-head">
+      <p class="h-eyebrow">Hangar</p>
+      <h1>Choisis ton avion</h1>
     </div>
-  </div>
+    <div class="h-planes" role="group" aria-label="Avion">
+      <button type="button" data-plane="f16" aria-pressed="true"><b>F-16</b><span>Fighting Falcon</span></button>
+      <button type="button" data-plane="f22" aria-pressed="false"><b>F-22</b><span>Raptor</span></button>
+      <button type="button" data-plane="rafale" aria-pressed="false"><b>Rafale</b><span>Dassault</span></button>
+      <button type="button" data-plane="su35" aria-pressed="false"><b>Su-35</b><span>Flanker-E</span></button>
+      <button type="button" data-plane="f18" aria-pressed="false"><b>F/A-18</b><span>Super Hornet</span></button>
+      <button type="button" data-plane="a10" aria-pressed="false"><b>A-10</b><span>Thunderbolt II</span></button>
+    </div>
+    <p class="h-mode" id="modeBrief"></p>
+    <p class="h-blurb" id="planeBlurb"></p>
+    <p class="h-ability"><kbd>R</kbd> <b id="abilityName"></b> <span id="abilityDesc"></span></p>
+    <dl class="h-stats">
+      <dt>Vitesse</dt><dd><i id="stat-speed"></i></dd>
+      <dt>Roulis</dt><dd><i id="stat-roll"></i></dd>
+      <dt>Virage</dt><dd><i id="stat-pitch"></i></dd>
+      <dt>Solidité</dt><dd><i id="stat-hp"></i></dd>
+      <dt>Canon</dt><dd><i id="stat-gun"></i></dd>
+      <dt>Repérage</dt><dd><i id="stat-sig"></i></dd>
+    </dl>
+    <ul class="h-roster" id="hangarRoster"></ul>
+    <ul class="h-keys">
+      <li><kbd>Souris</kbd> viser, l'avion suit</li>
+      <li><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> piloter soi-même</li>
+      <li><kbd>Espace</kbd> ou clic : canon</li>
+      <li><kbd>E</kbd> ou clic droit : missile (12 s), <kbd>F</kbd> : leurres (9 s)</li>
+      <li><kbd>R</kbd> : capacité de l'avion (25 s)</li>
+      <li><kbd>Maj</kbd> postcombustion, <kbd>C</kbd> aérofrein</li>
+    </ul>
+    <button id="btnStart" class="btn-launch" type="button">Décoller</button>
+  </section>
+
+  <section id="endScreen" class="hidden" aria-label="Fin de partie">
+    <div class="end-card">
+      <h1 id="endTitle"></h1>
+      <p id="endSub"></p>
+      <table>
+        <thead><tr><th></th><th>Pilote</th><th>Avion</th><th>Élim.</th><th>Aide</th><th>Morts</th></tr></thead>
+        <tbody id="endRows"></tbody>
+      </table>
+      <ul class="end-awards" id="endAwards"></ul>
+      <p id="endWait" hidden>En attente de l'hôte…</p>
+      <div class="end-actions">
+        <button id="btnReplay" class="btn-launch" type="button">Rejouer</button>
+        <button id="btnQuit" class="btn-sec" type="button">Quitter</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script src="../shared/bridge.js"></script>
