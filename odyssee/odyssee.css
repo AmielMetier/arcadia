@@ -1810,15 +1810,84 @@ img { image-rendering: pixelated; }
   width: 54%;
   display: none;
   z-index: 21;
+  box-sizing: border-box;
 }
 .bcmd.on { display: block; }
-.cmd-grid, .mv-grid {
+
+/* Quand le menu des attaques est ouvert : plein bandeau tactile B2W2 */
+.bcmd.moves {
+  left: calc(var(--bp) * 3.5);
+  right: calc(var(--bp) * 3.5);
+  width: auto;
+  bottom: calc(var(--bp) * 3);
+  height: calc(var(--bp) * 45);
+}
+.battle.moves-open .btext {
+  display: none !important;
+}
+
+.mv-layout {
+  display: flex;
+  gap: calc(var(--bp) * 2);
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.cmd-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: calc(var(--bp) * 2.2);
   height: 100%;
+  box-sizing: border-box;
 }
+
+.mv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--bp) * 1.8);
+  height: 100%;
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Bouton Retour B2W2 */
+.mv-back-btn {
+  width: calc(var(--bp) * 22);
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--bp) * 1.2);
+  background:
+    repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 calc(var(--bp) * 1.2), rgba(0,0,0,0.18) calc(var(--bp) * 1.2) calc(var(--bp) * 2.4)),
+    linear-gradient(180deg, #323a4c 0%, #1a1e28 100%);
+  border: calc(var(--bp) * 1.2) solid #7084a4;
+  outline: calc(var(--bp) * 1.1) solid #080a10;
+  box-shadow:
+    inset 0 calc(var(--bp) * 1) 0 rgba(255, 255, 255, 0.35),
+    calc(var(--bp) * 1.6) calc(var(--bp) * 1.6) 0 rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+  text-shadow: calc(var(--bp) * 0.8) calc(var(--bp) * 0.8) 0 #080a10;
+  border-radius: 0;
+  flex-shrink: 0;
+  padding: 0;
+}
+.mv-back-btn:hover, .mv-back-btn.sel {
+  border-color: #ffe858 !important;
+  color: #ffe858 !important;
+  outline: calc(var(--bp) * 1.3) solid #080a10;
+  box-shadow:
+    inset 0 0 0 calc(var(--bp) * 1) #fff,
+    calc(var(--bp) * 2) calc(var(--bp) * 2) 0 #080a10;
+}
+.mv-back-ico { font-size: 1.1em; font-weight: 900; line-height: 1; }
+.mv-back-lbl { font-size: 0.62em; font-weight: 800; letter-spacing: 0.5px; }
 
 /* Boutons d'action 5G (ATTAQUE / SAC / ÉQUIPE / FUITE) */
 .cbtn {
@@ -1899,12 +1968,13 @@ img { image-rendering: pixelated; }
 /* Cartes de capacités 5G (bandeau supérieur coloré + rail inférieur carbone) */
 .mbtn {
   position: relative;
+  box-sizing: border-box;
   border-radius: 0;
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--tc) 68%, #202634) 0 54%,
-      #161a24 54% 100%
+      color-mix(in srgb, var(--tc) 68%, #202634) 0 52%,
+      #161a24 52% 100%
     );
   border: calc(var(--bp) * 1.1) solid color-mix(in srgb, var(--tc) 75%, #e0e8f8);
   outline: calc(var(--bp) * 1.1) solid #080a10;
@@ -1914,11 +1984,13 @@ img { image-rendering: pixelated; }
   color: #fff;
   cursor: pointer;
   text-shadow: calc(var(--bp) * 0.8) calc(var(--bp) * 0.8) 0 #080a10;
-  padding: calc(var(--bp) * 1.4) calc(var(--bp) * 4);
+  padding: calc(var(--bp) * 1) calc(var(--bp) * 3);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  line-height: 1.1;
+  line-height: 1.05;
+  overflow: hidden;
+  height: 100%;
 }
 .mbtn.empty {
   background: #181c26;
@@ -1933,18 +2005,25 @@ img { image-rendering: pixelated; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: calc(var(--bp) * 2);
+  gap: calc(var(--bp) * 1.5);
+  min-height: 0;
 }
 .mbtn .mn {
   font-weight: 700;
-  font-size: 0.84em;
+  font-size: 0.82em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.mbtn-top-right {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 1.5);
+  flex-shrink: 0;
+}
 .mbtn .mcat {
-  width: calc(var(--bp) * 9);
-  height: calc(var(--bp) * 5.5);
+  width: calc(var(--bp) * 8.5);
+  height: calc(var(--bp) * 5.2);
   image-rendering: pixelated;
   flex-shrink: 0;
   border: calc(var(--bp) * 0.5) solid #080a10;
@@ -1954,19 +2033,25 @@ img { image-rendering: pixelated; }
   align-items: center;
   justify-content: space-between;
   gap: calc(var(--bp) * 2);
-  font-size: 0.62em;
-  padding-top: calc(var(--bp) * 0.8);
+  font-size: 0.60em;
+  min-height: 0;
+}
+.mbtn-bot-left {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--bp) * 2);
 }
 .mbtn .mt {
   font-weight: 700;
   text-transform: uppercase;
-  padding: 0 calc(var(--bp) * 1.8);
+  padding: 0 calc(var(--bp) * 1.5);
   background: var(--tc);
-  border: calc(var(--bp) * 0.6) solid #080a10;
-  box-shadow: inset 0 calc(var(--bp) * 0.5) 0 rgba(255, 255, 255, 0.35);
+  border: calc(var(--bp) * 0.5) solid #080a10;
+  box-shadow: inset 0 calc(var(--bp) * 0.4) 0 rgba(255, 255, 255, 0.35);
+  font-size: 0.95em;
 }
-.mbtn .mpw { color: #ced8ec; font-weight: 600; }
-.mbtn .mpp { font-weight: 700; color: #ffe058; font-variant-numeric: tabular-nums; }
+.mbtn .mpw { color: #ced8ec; font-weight: 600; font-size: 0.95em; }
+.mbtn .mpp { font-weight: 700; color: #ffe058; font-variant-numeric: tabular-nums; font-size: 0.95em; }
 .mbtn .mpp.zero { color: #ff5858; }
 /* dégâts prévus sur le Pokémon d'en face (% de ses PV max) : petite étiquette en haut à droite de la carte */
 /* (à la place de la puissance, dans le rail du bas : la puissance reste dans l'infobulle) */
@@ -2748,22 +2833,17 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .pastille { display: inline-block; width: calc(var(--px) * 7); height: calc(var(--px) * 7); border-radius: 50%; border: 1px solid #2228; vertical-align: middle; margin-right: calc(var(--px) * 2); }
 .appar-aide { text-align: center; color: #fff; text-shadow: var(--px) var(--px) 0 #283850; font-size: calc(var(--px) * 7); }
 /* ================= BADGES D'EFFICACITÉ DES TYPES EN COMBAT ================= */
-.mbtn-mid {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin: calc(var(--bp) * 0.4) 0;
-}
 .bm-eff {
-  font-size: 0.58em;
+  font-size: 0.54em;
   font-weight: 800;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
-  padding: calc(var(--bp) * 0.3) calc(var(--bp) * 1.5);
+  padding: calc(var(--bp) * 0.25) calc(var(--bp) * 1.4);
   border-radius: 0;
   border: calc(var(--bp) * 0.6) solid #080a10;
   box-shadow: inset 0 calc(var(--bp) * 0.4) 0 rgba(255, 255, 255, 0.35);
   white-space: nowrap;
+  line-height: 1;
 }
 .bm-eff.eff-super {
   background: #2cb34a;

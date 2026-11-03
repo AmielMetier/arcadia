@@ -510,65 +510,106 @@ export class BattleView {
       const m = this.battle.me;
       const foeMon = this.battle.foe;
       const foeTypes = foeMon ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
-      this.cmd.innerHTML = `<div class="mv-grid">${[0, 1, 2, 3].map((k) => {
-        const x = m.moves[k];
-        if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
-        const M = MOVES[x.id];
-        const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
-        const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
-        let effBadge = '';
-        if (foeTypes && (M.p || M.c !== 'status')) {
-          const eff = typeEff(M.t, foeTypes);
-          if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
-          else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
-          else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
-          else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
-        }
-        return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
-          <div class="mbtn-top">
-            <span class="mn">${esc(M.n)}</span>
-            <img class="mcat" src="${catIcon}" alt="${M.c}">
-          </div>
-          <div class="mbtn-mid">
-            ${effBadge}
-          </div>
-          <div class="mbtn-bot">
-            <span class="mt">${TYPE_FR[M.t]}</span>
-            <span class="mpw">${pwTxt}</span>
-            <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
-          </div>
-        </div>`;
-      }).join('')}</div>`;
-      this.cmd.classList.add('on', 'moves'); this.root.classList.add('cmdon');
+      this.cmd.innerHTML = `<div class="mv-layout">
+        <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
+          const x = m.moves[k];
+          if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
+          const M = MOVES[x.id];
+          const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
+          const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
+          let effBadge = '';
+          if (foeTypes && (M.p || M.c !== 'status')) {
+            const eff = typeEff(M.t, foeTypes);
+            if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+            else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+            else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+            else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+          }
+          return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
+            <div class="mbtn-top">
+              <span class="mn">${esc(M.n)}</span>
+              <div class="mbtn-top-right">
+                ${effBadge}
+                <img class="mcat" src="${catIcon}" alt="${M.c}">
+              </div>
+            </div>
+            <div class="mbtn-bot">
+              <div class="mbtn-bot-left">
+                <span class="mt">${TYPE_FR[M.t]}</span>
+                <span class="mpw">${pwTxt}</span>
+              </div>
+              <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
+            </div>
+          </div>`;
+        }).join('')}</div>
+        <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
+          <span class="mv-back-ico">✕</span>
+          <span class="mv-back-lbl">RETOUR</span>
+        </button>
+      </div>`;
+      this.cmd.classList.add('on', 'moves');
+      this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMove || 0; if (!m.moves[i]) i = 0;
       const btns = [...this.cmd.querySelectorAll('.mbtn')];
-      const show = () => btns.forEach((b, k) => b.classList.toggle('sel', k === i));
+      const backBtn = this.cmd.querySelector('.mv-back-btn');
+      const show = () => {
+        btns.forEach((b, k) => b.classList.toggle('sel', k === i));
+        backBtn?.classList.toggle('sel', i === 4);
+      };
       show();
       let done = false;
-      const confirmMove = (idx) => {
+      const closeMenu = (idx) => {
         if (done) return;
+        done = true;
+        pop();
+        this.cmd.classList.remove('on', 'moves');
+        this.root.classList.remove('cmdon', 'moves-open');
+        if (idx >= 0) {
+          this.lastMove = idx;
+          this.sound.sfx('select');
+        } else {
+          this.sound.sfx('cancel');
+        }
+        resolve(idx);
+      };
+      const confirmMove = (idx) => {
         const x = m.moves[idx];
         if (!x) return;
         if (x.pp <= 0 && this.battle.usableMoves(0).length) { this.sound.sfx('bump'); return; }
-        done = true;
-        pop();
-        this.cmd.classList.remove('on', 'moves'); this.root.classList.remove('cmdon');
-        this.lastMove = idx;
-        this.sound.sfx('select');
-        resolve(idx);
+        closeMenu(idx);
       };
       btns.forEach((b, idx) => {
         if (!m.moves[idx]) return;
         b.addEventListener('pointerenter', () => { if (i !== idx) { i = idx; this.sound.sfx('blip'); show(); } });
         b.addEventListener('click', (e) => { e.stopPropagation(); i = idx; show(); confirmMove(idx); });
       });
+      backBtn?.addEventListener('pointerenter', () => { if (i !== 4) { i = 4; this.sound.sfx('blip'); show(); } });
+      backBtn?.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(-1); });
+
       const pop = this.ui.input.push((k) => {
         let j = i;
-        if (k === 'up' || k === 'down') j = i ^ 2; else if (k === 'left' || k === 'right') j = i ^ 1;
-        else if (k === 'a') { confirmMove(i); return; }
-        else if (k === 'b') { if (done) return; done = true; pop(); this.cmd.classList.remove('on', 'moves'); this.root.classList.remove('cmdon'); this.sound.sfx('cancel'); resolve(-1); return; }
-        else return;
-        if (m.moves[j]) { i = j; this.sound.sfx('blip'); show(); }
+        if (k === 'up') {
+          if (i === 4) j = 1;
+          else if (i >= 2) j = i - 2;
+        } else if (k === 'down') {
+          if (i === 4) j = 3;
+          else if (i <= 1) j = i + 2;
+        } else if (k === 'left') {
+          if (i === 4) j = 1;
+          else if (i % 2 === 1) j = i - 1;
+        } else if (k === 'right') {
+          if (i % 2 === 0) j = i + 1;
+          else if (i === 1 || i === 3) j = 4;
+        } else if (k === 'a') {
+          if (i === 4) { closeMenu(-1); return; }
+          confirmMove(i);
+          return;
+        } else if (k === 'b') {
+          closeMenu(-1);
+          return;
+        } else return;
+
+        if (j === 4 || m.moves[j]) { i = j; this.sound.sfx('blip'); show(); }
       });
     });
   }
