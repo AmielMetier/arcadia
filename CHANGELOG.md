@@ -14,6 +14,11 @@
   - Dans les grottes, le sol ne clignote plus à travers la roche et la roche ne déborde plus en carrés sur le sol.
   - Au bord des grottes, on ne voit plus un grand aplat noir.
 
+## 3.89 — 3 novembre 2026
+- **Odyssée** — Combats :
+  - Les changements de stats s'affichent à côté des jauges : « Atq +2 » en vert quand une stat monte, « Vit −1 » en rouge quand elle baisse.
+  - Ils disparaissent quand le Pokémon est rappelé ou quand Buée Noire les annule.
+
 ## 3.88 — 3 novembre 2026
 - **Odyssée** — Arènes :
   - En entrant dans une arène, le guide t'accueille, présente le Champion et te demande si tu es prêt.

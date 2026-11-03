@@ -35,6 +35,8 @@ function tinted(img, color) {
 }
 const ease = (t) => t * t * (3 - 2 * t);
 
+const BOOST_NAMES = ['Atq', 'Déf', 'Atq Spé', 'Déf Spé', 'Vit', 'Préc', 'Esq'];
+
 export class BattleView {
   constructor(game) { this.game = game; this.ui = game.ui; this.sound = game.sound; }
 
@@ -267,6 +269,7 @@ export class BattleView {
         <div class="bh-top"><span class="bh-name"></span><span class="bh-lv"></span></div>
         <div class="bh-mid"><span class="bh-st"></span><div class="bh-hp"><b>PV</b><i><u></u></i></div></div>
         <div class="bh-caught" title="Déjà capturé"></div>
+        <div class="bh-boosts"></div>
       </div>
       <div class="bhud me">
         <div class="bh-head">
@@ -279,6 +282,7 @@ export class BattleView {
           <div class="bh-exp-wrap"><b>EXP</b><div class="bh-exp"><i><u></u></i></div></div>
           <div class="bh-hpn"></div>
         </div>
+        <div class="bh-boosts"></div>
       </div>
       <div class="battle-weather-badge" style="display:none"></div>
       <div class="dlg box btext"><div class="dlg-name" style="display:none"></div><div class="dlg-txt"></div><div class="dlg-arrow">▼</div></div>
@@ -317,6 +321,12 @@ export class BattleView {
       const st = !p ? 'empty' : p.hp <= 0 ? 'ko' : p.status ? 'status' : 'ok';
       return `<img class="bh-ball" src="img/battle/ball_${st}.png" alt="">`;
     }).join('');
+  }
+  /** crans de stats sous la jauge : « Atq +2 », « Vit −1 »… (verts en hausse, rouges en baisse) */
+  showBoosts(side) {
+    const h = side === 1 ? this.hud?.foe : this.hud?.me, box = h?.querySelector('.bh-boosts'); if (!box) return;
+    const st = this.boosts?.[side] || [];
+    box.innerHTML = BOOST_NAMES.map((n, k) => { const c = st[k + 1] || 0; return c ? `<span class="bh-boost ${c > 0 ? 'up' : 'down'}">${n} ${c > 0 ? '+' : '−'}${Math.abs(c)}</span>` : ''; }).join('');
   }
   setHud(side, m, hp) {
     if (m && hp == null) hp = m.hp;
@@ -363,6 +373,7 @@ export class BattleView {
     this.seenInBattle = new Set();
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
     this.bg = this.makeBg(this.kind, o.night);
+    this.boosts = null; this.showBoosts(0); this.showBoosts(1);
     this.st = { shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [],
       foe: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 }, me: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
@@ -410,6 +421,7 @@ export class BattleView {
     this.battle = battle; this.kind = o.bg || 'grass'; this.alive = true;
     this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
     this.bg = this.makeBg(this.kind, o.night);
+    this.boosts = null; this.showBoosts(0); this.showBoosts(1);
     this.st = { shakeX: 0, shakeY: 0, eSlide: -this.W, pSlide: this.W, screenFlash: 0, wipe: 0, parts: [], balls: [],
       foe: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 }, me: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
@@ -749,13 +761,13 @@ export class BattleView {
     for (const e of evs) {
       switch (e.t) {
         case 'msg': await this.msg(e.text, { wait: this.battle.state === 'over' && /remportez|battu|K\.O\.|perdez|attrapé|panique/.test(e.text) }); break;
-        case 'send': await this.animSend(e.side); break;
+        case 'send': if (this.boosts) this.boosts[e.side] = [0, 0, 0, 0, 0, 0, 0, 0]; this.showBoosts(e.side); await this.animSend(e.side); break;
         case 'recall': await this.animRecall(e.side); break;
         case 'move': await this.animMove(e.side, e.move, e.type); break;
         case 'hit': await this.animHit(e.side, e.eff, e.crit); break;
         case 'hp': await this.animHp(e.side, e.from, e.hp, e.status); break;
         case 'status': { const m = this.battle.act(e.side); this.setHud(e.side, m); if (e.status) { this.sound.sfx('status'); const c = this.sprCenter(e.side); this.burst(c.x, c.y, [STATUS_FR[e.status]?.[1] || '#fff', '#ffffff'], 12, { r: 2 }); await wait(250); } break; }
-        case 'stat': await this.animStat(e.side, e.up); break;
+        case 'stat': if (e.all) this.boosts = e.all; this.showBoosts(0); this.showBoosts(1); if (e.side >= 0) await this.animStat(e.side, e.up); break;
         case 'weather': this.updateWeather(e.weather); break;
         case 'gym-tension': {
           this.sound.play('gymTension');
