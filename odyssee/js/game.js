@@ -3,7 +3,7 @@
 import { T, walkable, isGrassEnc, DIRS, OPP } from './world/tiles.js';
 import { createMon, monName, healFull, levelEvolution, itemEvolution, evolve, setUidBase, levelCap, ensureNature } from './core/mon.js';
 import { Battle } from './core/battle.js';
-import { ITEMS, itemName, applyItem, canUseOn, useCandy } from './core/items.js';
+import { ITEMS, itemName, applyItem, canUseOn, useCandy, formatFindItem, formatObtainItem, itemPocketName } from './core/items.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
 import { SAUVAGE, R } from './data/remplacants.js';
@@ -785,7 +785,7 @@ export class Game {
     this.state.bag[it.item] = (this.state.bag[it.item] || 0) + it.qty;
     this.state.flags['I:' + it.id] = true;
     this.items = this.items.filter((q) => q !== it); this.view.removeActor('item:' + it.id);
-    await this.ui.say(`${this.state.name} trouve ${it.qty > 1 ? it.qty + ' × ' : ''}${itemName(it.item)} !\nVous rangez l'objet dans le Sac.`);
+    await this.ui.say(formatFindItem(this.state.name, it.item, it.qty));
   }
 
   /* ================= légendaires ================= */
@@ -878,7 +878,7 @@ export class Game {
     }
     if (!st.flags.passe) {
       st.flags.passe = true; this.give('ferry-ticket'); this.sound.sfx('item');
-      await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', `Tiens, voici ton Passe Marin. ${st.name} reçoit le Passe Marin !`], { speaker: sp });
+      await ui.say(['Ahoy, moussaillon ! Mon bateau fait le tour des îles de l\'Est.', 'L\'Île Orageuse pour ceux qui ont 2 badges, l\'Île de la Grue avec 3, et l\'Île Givrée, tout au nord, avec 5.', `Tiens, voici ton Passe Marin.`], { speaker: sp });
     }
     const opts = Object.entries(docks).filter(([k, d]) => k !== here && (!d.show || d.show(st.flags))), b = this.badgeCount();
     await ui.say('Où veux-tu aller ?', { keep: true, speaker: sp });
@@ -1228,7 +1228,7 @@ export class Game {
     const gift = GYM_GIFT[g];
     if (gift && !this.hasField(gift)) {
       this.give('cs-' + gift); this.sound.sfx('item');
-      await ui.say(`${st.name} reçoit la ${FIELD[gift].cs} ${FIELD[gift].name} !\nElle est rangée dans les Objets rares du Sac.`);
+      await ui.say(formatObtainItem(st.name, 'cs-' + gift, 1, FIELD[gift]));
     }
     if (g === 7) { st.flags.drakos = true; this.give('town-map'); }
     this.refreshGates();
@@ -1513,9 +1513,9 @@ export class Game {
       },
       flag: (k, v = true) => { st().flags[k] = v; g.refreshNpcs(); },
       has: (k, n = 1) => (st().bag[k] || 0) >= n,
-      give: async (k, n = 1, quiet) => { g.give(k, n); g.sound.sfx('item'); if (!quiet) await ui().say(`${st().name} reçoit ${n > 1 ? n + ' × ' : ''}${itemName(k)} !`); },
+      give: async (k, n = 1, quiet) => { g.give(k, n); g.sound.sfx('item'); if (!quiet) await ui().say(formatObtainItem(st().name, k, n)); },
       take: (k, n = 1) => g.take(k, n),
-      money: async (n) => { st().money += n; g.sound.sfx('item'); await ui().say(`${st().name} reçoit ${n.toLocaleString('fr-FR')} ₽ !`); },
+      money: async (n) => { st().money += n; g.sound.sfx('item'); await ui().say(`${st().name} obtient ${n.toLocaleString('fr-FR')} ₽ !`); },
       badges: () => g.badgeCount(),
       heal: () => { for (const m of st().party) healFull(m); },
       sfx: (k) => g.sound.sfx(k),
@@ -1615,7 +1615,9 @@ export class Game {
       if (st.flags.gsGiven) { await ui.say(st.flags['L:celebi'] === 'caught' ? ['Tu as vu Celebi ? Oh... Alors la légende était vraie.', 'Prends bien soin de lui, mon petit.'] : ['L\'autel est dans le Bois Murmure, un peu à l\'écart du sentier.', 'Pose la Balle GS dans le creux... et sois patient.'], { speaker: sp }); return; }
       if (this.badgeCount() < 1) { await ui.say(['Quand j\'étais jeune, j\'ai trouvé une étrange capsule dorée dans le Bois Murmure.', 'Reviens me voir quand tu auras le badge d\'Hector. Je te raconterai.'], { speaker: sp }); return; }
       st.flags.gsGiven = true; this.give('gs-ball'); this.sound.sfx('item');
-      await ui.say(['Le badge d\'Hector ! Tu es un vrai dresseur, maintenant.', 'Tiens, prends cette capsule dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.', `${st.name} reçoit la Balle GS !`, 'On dit que le gardien de la forêt, un petit être qui voyage dans le temps, attend qu\'on la lui rapporte...'], { speaker: sp });
+      await ui.say(['Le badge d\'Hector ! Tu es un vrai dresseur, maintenant.', 'Tiens, prends cette capsule dorée. Je l\'ai trouvée près d\'un vieil autel du Bois Murmure.'], { speaker: sp });
+      await ui.say(formatObtainItem(st.name, 'gs-ball', 1));
+      await ui.say('On dit que le gardien de la forêt, un petit être qui voyage dans le temps, attend qu\'on la lui rapporte...', { speaker: sp });
     } else if (name === 'phare') {
       const sp = 'Gardien du phare', f = st.flags;
       if (f.pylons) { await ui.say(f['L:zapdos'] === 'caught' ? 'Électhor dans ton équipe ! L\'île n\'a jamais été aussi calme.' : ['Le Pic Tonnerre est ouvert.', 'Électhor y attend, au milieu des éclairs. Prépare de quoi soigner la paralysie !'], { speaker: sp }); return; }
@@ -1639,7 +1641,10 @@ export class Game {
     } else if (name === 'grandSage') {
       if (st.flags.plume) return;
       st.flags.plume = true; this.give('plume-arc'); this.give('great-ball', 5); this.sound.sfx('item');
-      await ui.say(['Ton cœur et celui de tes créatures battent ensemble.', 'Cette plume t\'appartient désormais.', `${st.name} reçoit la Plume Arc-en-ciel et 5 Super Balls !`, 'Monte sur le toit. Le novice te laissera passer.'], { speaker: 'Grand Sage Hoël' });
+      await ui.say(['Ton cœur et celui de tes créatures battent ensemble.', 'Cette plume t\'appartient désormais.'], { speaker: 'Grand Sage Hoël' });
+      await ui.say(formatObtainItem(st.name, 'plume-arc', 1));
+      await ui.say(formatObtainItem(st.name, 'great-ball', 5));
+      await ui.say('Monte sur le toit. Le novice te laissera passer.', { speaker: 'Grand Sage Hoël' });
       this.refreshGates();
     } else if (name === 'ermite') {
       const sp = 'Ermite', f = st.flags; f.ermite = true;
@@ -1647,7 +1652,9 @@ export class Game {
       if (f.plumeArgent) { await ui.say(f['L:lugia'] === 'caught' ? 'Lugia... Tu l\'as vu de tes propres yeux. Moi, j\'ai attendu toute ma vie.' : ['La Grotte des Tourbillons est à l\'est du village.', 'Avec la Plume Argentée, les courants te laisseront passer jusqu\'à Lugia.'], { speaker: sp }); return; }
       if (f['L:articuno']) {
         f.plumeArgent = true; this.give('plume-argent'); this.sound.sfx('item');
-        await ui.say(['Tu as affronté Artikodin sur la Cime Givrée ? Alors tu es prêt.', 'Prends cette plume. Je l\'ai trouvée sur la plage, il y a quarante ans. Elle vient de Lugia, le gardien des mers.', `${st.name} reçoit la Plume Argentée !`, 'Le pêcheur qui garde la Grotte des Tourbillons te laissera entrer.'], { speaker: sp });
+        await ui.say(['Tu as affronté Artikodin sur la Cime Givrée ? Alors tu es prêt.', 'Prends cette plume. Je l\'ai trouvée sur la plage, il y a quarante ans. Elle vient de Lugia, le gardien des mers.'], { speaker: sp });
+        await ui.say(formatObtainItem(st.name, 'plume-argent', 1));
+        await ui.say('Le pêcheur qui garde la Grotte des Tourbillons te laissera entrer.', { speaker: sp });
         this.refreshGates();
         return;
       }

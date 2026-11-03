@@ -6,7 +6,7 @@ import { FIELD } from './world/region.js';
 import { createMon, monName, healFull } from './core/mon.js';
 import { SPECIES } from './data/species.js';
 import { MOVES } from './data/moves.js';
-import { ITEMS, itemName } from './core/items.js';
+import { ITEMS, itemName, formatObtainItem } from './core/items.js';
 import { partyScreen } from './ui/screens.js';
 import { ASSETS, loadImg } from './assets.js';
 import { el } from './ui/ui.js';
