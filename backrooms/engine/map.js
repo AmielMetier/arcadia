@@ -2,6 +2,23 @@
 // Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
 // quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 ascenseur.
 // Le Level 1 (entrepôt) est dans level1.js et partage les types de cases, l'ascenseur et le parcours en largeur.
+// Pièges du Level 0 : une ou deux grandes salles au sol creusé de trous carrés (on marche sur les arêtes ; qui tombe
+// attend qu'un collègue lui lance une corde), et une cassette posée dans un renfoncement en hauteur, qu'on n'atteint
+// qu'en posant dessous l'échelle cachée ailleurs dans le dédale.
+
+export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
+export const PIT_DEPTH = 2.4;
+export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
+
+// tous les objets qu'on ramasse avec F : 'bottle', 'battery', 'ladder' (id unique, position, pris ou non)
+export function itemList(...lists) {
+  const items = [];
+  for (const [kind, list] of lists) for (const o of list) items.push(Object.assign(o, { kind, iid: items.length }));
+  items.forEach((o, i) => {
+    o.id = i;
+  });
+  return items;
+}
 
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
 export const WALL_HEIGHT = 3.0; // hauteur sous plafond
@@ -206,6 +223,23 @@ export function createBackroomsMap(seed = 42) {
   // la cabine et les murs qui la ferment ont pu retirer des cases du sol
   for (let i = walkable.length - 1; i >= 0; i--) if (grid[walkable[i].z * W + walkable[i].x] !== T.FLOOR) walkable.splice(i, 1);
 
+  // 7b. Salles piégées : l'intérieur d'une ou deux grandes salles est creusé de trous (le tour de la salle reste sûr)
+  const pitGrid = new Int16Array(W * H).fill(-1);
+  const pits = [];
+  const bigHalls = halls.filter((r) => r.w >= 7 && r.h >= 7).sort(() => rnd() - 0.5).slice(0, 1 + (rnd() < 0.6 ? 1 : 0));
+  for (const r of bigHalls) {
+    for (let z = r.z + 1; z < r.z + r.h - 1; z++) {
+      for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
+        if (grid[z * W + x] !== T.FLOOR || dist[z * W + x] < 0) continue;
+        if (Math.hypot(x - sx, z - sz) < 4.5 || Math.hypot(x - exitCell.x, z - exitCell.z) < 3) continue;
+        pitGrid[z * W + x] = pits.length;
+        pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
+      }
+    }
+  }
+  // rien ne se pose dans un trou
+  for (let i = walkable.length - 1; i >= 0; i--) if (pitGrid[walkable[i].z * W + walkable[i].x] >= 0) walkable.splice(i, 1);
+
   // 8. Les 5 cassettes : une par secteur autour du départ, loin du départ, de la sortie et entre elles
   const cassettes = [];
   const taken = [exitCell];
@@ -224,6 +258,28 @@ export function createBackroomsMap(seed = 42) {
     const chosen = pick(candidates);
     taken.push(chosen);
     cassettes.push({ id: i, ...cellPos(chosen), name: `Cassette VHS #${i + 1}`, collected: false });
+  }
+
+  // 8b. Une cassette dans un renfoncement en hauteur, au-dessus d'une case contre un mur
+  const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
+  let niche = null;
+  for (const cas of [...cassettes].sort(() => rnd() - 0.5)) {
+    const c = { x: cas.gx, z: cas.gz };
+    let sides = wallSide(c);
+    let cell = c;
+    if (!sides.length) {
+      // pas de mur ici : on la déplace dans une case voisine adossée à un mur
+      cell = walkable.filter((w) => Math.abs(w.x - c.x) + Math.abs(w.z - c.z) <= 4 && wallSide(w).length).sort((a, b) => Math.abs(a.x - c.x) + Math.abs(a.z - c.z) - (Math.abs(b.x - c.x) + Math.abs(b.z - c.z)))[0];
+      if (!cell) continue;
+      sides = wallSide(cell);
+    }
+    const [dx, dz] = pick(sides);
+    const off = CELL_SIZE / 2 - 0.2; // la cassette dépasse un peu du mur
+    Object.assign(cas, cellPos(cell), { high: true });
+    cas.x = (cell.x + 0.5) * CELL_SIZE + dx * off;
+    cas.z = (cell.z + 0.5) * CELL_SIZE + dz * off;
+    niche = { cas: cas.id, gx: cell.x, gz: cell.z, dx, dz, x: cas.x, z: cas.z, baseX: (cell.x + 0.5) * CELL_SIZE + dx * 0.55, baseZ: (cell.z + 0.5) * CELL_SIZE + dz * 0.55, ladder: false };
+    break;
   }
 
   // 9. Éclairage : un néon par case paire. Un bruit à basse fréquence découpe des zones où les néons sont morts
@@ -306,6 +362,20 @@ export function createBackroomsMap(seed = 42) {
     batteries.push({ id: batteries.length, ...cellPos(c), taken: false });
   }
 
+  // 10b. L'échelle : loin du renfoncement, mais pas trop (25 à 45 cases de marche)
+  const ladders = [];
+  if (niche) {
+    const dn = bfs(grid, W, H, niche.gx, niche.gz);
+    const ok = (lo, hi) => walkable.filter((c) => !busy.has(c.z * W + c.x) && dn[c.z * W + c.x] >= lo && dn[c.z * W + c.x] <= hi);
+    const cand = ok(25, 45).length ? ok(25, 45) : ok(12, 70);
+    const c = cand.length ? pick(cand) : null;
+    if (c) {
+      busy.add(c.z * W + c.x);
+      ladders.push({ id: 0, ...cellPos(c), taken: false });
+    }
+  }
+  const items = itemList(['bottle', bottles], ['battery', batteries], ['ladder', ladders]);
+
   // 11. Point de départ de l'entité : loin du joueur, mais pas forcément au bout de la carte
   const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || far[0];
 
@@ -324,7 +394,15 @@ export function createBackroomsMap(seed = 42) {
     props,
     bottles,
     batteries,
+    items,
+    pits,
+    niche,
     dist,
+    // numéro du trou sous une case (-1 : pas de trou)
+    pitAt(gx, gz) {
+      if (gx < 0 || gx >= W || gz < 0 || gz >= H) return -1;
+      return pitGrid[gz * W + gx];
+    },
     monsterSpawn: cellPos(monsterCell),
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;

@@ -4,7 +4,7 @@
 // sont de vraies lumières. L'image finale passe par le filtre de vieille caméra (vhs.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
-import { CELL_SIZE, WALL_HEIGHT, T, PROP_KINDS } from '../engine/map.js';
+import { CELL_SIZE, WALL_HEIGHT, T, PROP_KINDS, PIT_HALF, PIT_DEPTH, NICHE_Y } from '../engine/map.js';
 import { FUSES } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
@@ -96,7 +96,49 @@ export function createBackroomsScene(container, map) {
 
   // 1. Sol en moquette humide (une répétition de texture par case)
   textures.carpet.repeat.set(W, H);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), baked(new THREE.MeshLambertMaterial({ map: textures.carpet })));
+  const floorMat = baked(new THREE.MeshLambertMaterial({ map: textures.carpet }));
+  const pits = map.pits || [];
+  if (pits.length) {
+    // 16 texels par case (16 cm : de quoi garder les arêtes de 50 cm entre les trous) ; la ligne 0 du masque
+    // est au bord z max du sol (le plan est couché)
+    const R = 16;
+    const mw = W * R;
+    const mh = H * R;
+    const mask = new Uint8Array(mw * mh * 4).fill(255);
+    const tx = (v) => Math.round((v / CELL_SIZE) * R);
+    for (const pit of pits) {
+      const x0 = tx(pit.x - PIT_HALF);
+      const x1 = tx(pit.x + PIT_HALF);
+      for (let zi = tx(pit.z - PIT_HALF); zi < tx(pit.z + PIT_HALF); zi++) {
+        const row = mh - 1 - zi;
+        mask.fill(0, (row * mw + x0) * 4, (row * mw + x1) * 4);
+      }
+    }
+    const maskTex = new THREE.DataTexture(mask, mw, mh, THREE.RGBAFormat);
+    maskTex.magFilter = maskTex.minFilter = THREE.NearestFilter;
+    maskTex.needsUpdate = true;
+    floorMat.alphaMap = maskTex;
+    floorMat.alphaTest = 0.5;
+    // parois (4 par trou) et fond
+    const wallGeo = new THREE.PlaneGeometry(PIT_HALF * 2, PIT_DEPTH);
+    const pitWalls = new THREE.InstancedMesh(wallGeo, baked(new THREE.MeshLambertMaterial({ color: '#5e5434' })), pits.length * 4);
+    const pitFloor = new THREE.InstancedMesh(new THREE.PlaneGeometry(PIT_HALF * 2, PIT_HALF * 2), baked(new THREE.MeshLambertMaterial({ color: '#2f2a1a' })), pits.length);
+    const d = new THREE.Object3D();
+    pits.forEach((pit, i) => {
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz], k) => {
+        d.position.set(pit.x + dx * PIT_HALF, -PIT_DEPTH / 2, pit.z + dz * PIT_HALF);
+        d.rotation.set(0, Math.atan2(-dx, -dz), 0); // la paroi regarde l'intérieur du trou
+        d.updateMatrix();
+        pitWalls.setMatrixAt(i * 4 + k, d.matrix);
+      });
+      d.position.set(pit.x, -PIT_DEPTH + 0.01, pit.z);
+      d.rotation.set(-Math.PI / 2, 0, 0);
+      d.updateMatrix();
+      pitFloor.setMatrixAt(i, d.matrix);
+    });
+    scene.add(pitWalls, pitFloor);
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL_SIZE, H * CELL_SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set((W * CELL_SIZE) / 2, 0, (H * CELL_SIZE) / 2);
   scene.add(floor);
@@ -203,17 +245,55 @@ export function createBackroomsScene(container, map) {
     group.add(new THREE.Mesh(cassetteGeo, cassetteMat));
     const aura = new THREE.PointLight('#f5a524', 2.2, 5, 1.6);
     group.add(aura);
-    group.position.set(cas.x, 0.85, cas.z);
+    group.position.set(cas.x, cas.high ? NICHE_Y : 0.85, cas.z);
     scene.add(group);
     cassetteMeshes.push({ id: cas.id, cas, group });
   }
 
-  // 8. Eau d'amande (rend l'endurance)
-  const bottleMeshes = [];
+  // 7b. Le renfoncement dans le mur, la cassette posée dedans, et l'échelle une fois posée
+  const N = map.niche;
+  let placedLadder = null;
+  const railMat = baked(new THREE.MeshLambertMaterial({ color: '#8a8f94' }));
+  const makeLadder = (h) => {
+    const g = new THREE.Group();
+    for (const sx of [-0.22, 0.22]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, h, 0.05), railMat);
+      rail.position.set(sx, h / 2, 0);
+      g.add(rail);
+    }
+    for (let y = 0.3; y < h - 0.1; y += 0.3) {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.035, 0.035), railMat);
+      rung.position.set(0, y, 0);
+      g.add(rung);
+    }
+    return g;
+  };
+  if (N) {
+    const wx = (N.gx + 0.5) * CELL_SIZE + N.dx * (CELL_SIZE / 2 - 0.012);
+    const wz = (N.gz + 0.5) * CELL_SIZE + N.dz * (CELL_SIZE / 2 - 0.012);
+    const face = Math.atan2(-N.dx, -N.dz); // regarde la pièce
+    const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.62), new THREE.MeshBasicMaterial({ color: '#0d0b07' }));
+    hole.position.set(wx, NICHE_Y + 0.12, wz);
+    hole.rotation.y = face;
+    const ledge = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.05, 0.28), wallMat);
+    ledge.position.set(wx - N.dx * 0.12, NICHE_Y - 0.2, wz - N.dz * 0.12);
+    ledge.rotation.y = face;
+    scene.add(hole, ledge);
+    // l'échelle posée : appuyée au mur, sous le renfoncement
+    placedLadder = makeLadder(2.3);
+    placedLadder.position.set(N.baseX + N.dx * 0.25, 0, N.baseZ + N.dz * 0.25);
+    placedLadder.rotation.set(0, face, 0);
+    placedLadder.rotateX(-0.22);
+    placedLadder.visible = false;
+    scene.add(placedLadder);
+  }
+
+  // 8. Objets au sol : eau d'amande, piles, échelle (un maillage par objet, créé à la demande)
+  const itemMeshes = [];
   const glassMat = baked(new THREE.MeshLambertMaterial({ color: '#e8efe6', transparent: true, opacity: 0.75 }));
   const capMat = baked(new THREE.MeshLambertMaterial({ color: '#2f6fb0' }));
   const labelMat = baked(new THREE.MeshLambertMaterial({ map: textures.label }));
-  for (const b of map.bottles) {
+  const makeBottle = () => {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.26, 12), glassMat);
     body.position.y = 0.13;
@@ -224,17 +304,11 @@ export function createBackroomsScene(container, map) {
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.035, 10), capMat);
     cap.position.y = 0.335;
     g.add(body, label, neck, cap);
-    g.position.set(b.x + 0.4, 0, b.z - 0.3);
-    g.rotation.y = b.id * 1.7;
-    scene.add(g);
-    bottleMeshes.push({ b, g });
-  }
-
-  // 8b. Piles (deux bâtons cuivrés couchés par terre)
-  const batteryMeshes = [];
+    return g;
+  };
   const cellMat = baked(new THREE.MeshLambertMaterial({ color: '#1d1d1d' }));
   const capCopper = baked(new THREE.MeshLambertMaterial({ color: '#c98a2b', emissive: '#5a3a08', emissiveIntensity: 0.6 }));
-  for (const b of map.batteries || []) {
+  const makeBattery = () => {
     const g = new THREE.Group();
     for (let i = 0; i < 2; i++) {
       const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.2, 10), cellMat);
@@ -245,11 +319,29 @@ export function createBackroomsScene(container, map) {
       top.position.set(0.07, 0.045, i * 0.1 - 0.05);
       g.add(cell, top);
     }
-    g.position.set(b.x - 0.3, 0, b.z + 0.35);
-    g.rotation.y = b.id * 2.3;
+    return g;
+  };
+  // l'échelle au sol : couchée
+  const makeFloorLadder = () => {
+    const g = new THREE.Group();
+    const l = makeLadder(2.2);
+    l.rotation.x = -Math.PI / 2;
+    l.position.set(0, 0.04, 1.1);
+    g.add(l);
+    return g;
+  };
+  const addItemMesh = (it) => {
+    const g = it.kind === 'bottle' ? makeBottle() : it.kind === 'battery' ? makeBattery() : makeFloorLadder();
+    g.position.set(it.x, 0, it.z);
+    g.rotation.y = it.id * 1.7;
     scene.add(g);
-    batteryMeshes.push({ b, g });
-  }
+    itemMeshes.push({ it, g });
+  };
+  for (const it of map.items || []) addItemMesh(it);
+
+  // 8b. Cordes lancées dans les trous (du sauveteur jusqu'au fond)
+  const ropeMat = new THREE.LineBasicMaterial({ color: '#d9c38a' });
+  const ropeLines = new Map();
 
   // 8c. Level 1 : rayonnages métalliques (montants bleus, lisses orange, plateaux), panneau de fond et marchandises
   if (map.shelves && map.shelves.length) {
@@ -411,6 +503,7 @@ export function createBackroomsScene(container, map) {
   exitLight.position.set(map.exit.x, 2.4, map.exit.z);
   scene.add(exitLight);
   let doorOpen = 0;
+  let eyeLift = 0; // la caméra descend au fond d'un trou, monte en haut de l'échelle
 
   // 9c. Table des lampes torches au départ (construite au premier rendu : c'est le moteur qui la place)
   let tableBuilt = false;
@@ -614,7 +707,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
-      camera.position.set(P.x, 1.6 + (P.moving ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) : 0), P.z);
+      const lift = P.trapped >= 0 ? -PIT_DEPTH + P.climbT * (PIT_DEPTH - 0.3) : P.onLadder ? 1.0 : 0;
+      eyeLift += (lift - eyeLift) * Math.min(1, dt * (P.trapped >= 0 && P.climbT === 0 ? 14 : 4));
+      camera.position.set(P.x, 1.6 + eyeLift + (P.moving ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) : 0), P.z);
       camera.rotation.order = 'YXZ';
       camera.rotation.y = P.yaw;
       camera.rotation.x = P.pitch;
@@ -655,13 +750,39 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // 3. Cassettes et bouteilles
       for (const cm of cassetteMeshes) {
         cm.group.visible = !cm.cas.collected;
-        if (cm.group.visible) {
+        if (cm.group.visible && cm.cas.high) {
+          // dans le renfoncement : elle ne tourne pas, elle regarde la pièce
+          cm.group.rotation.y = Math.atan2(-map.niche.dx, -map.niche.dz);
+        } else if (cm.group.visible) {
           cm.group.rotation.y = time * 1.6;
           cm.group.position.y = 0.85 + Math.sin(time * 2.5 + cm.id) * 0.08;
         }
       }
-      for (const bm of bottleMeshes) bm.g.visible = !bm.b.taken;
-      for (const bm of batteryMeshes) bm.g.visible = !bm.b.taken;
+      // objets au sol (ceux qu'un échange a posés apparaissent)
+      const items = map.items || [];
+      for (let i = itemMeshes.length; i < items.length; i++) addItemMesh(items[i]);
+      for (const im of itemMeshes) im.g.visible = !im.it.taken;
+      if (placedLadder) placedLadder.visible = !!(N && N.ladder);
+      // cordes
+      for (const [pid, line] of ropeLines) if (sim.ropes[pid] === undefined) {
+        scene.remove(line);
+        ropeLines.delete(pid);
+      }
+      for (const pid in sim.ropes) {
+        const R = sim.players.find((q) => q.id === sim.ropes[pid]);
+        const pit = map.pits[pid];
+        if (!R || !pit) continue;
+        let line = ropeLines.get(+pid);
+        if (!line) {
+          line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), ropeMat);
+          scene.add(line);
+          ropeLines.set(+pid, line);
+        }
+        // de la main du sauveteur, par-dessus l'arête, jusqu'au fond
+        const ex = pit.x + Math.sign(R.x - pit.x) * Math.min(Math.abs(R.x - pit.x), PIT_HALF);
+        const ez = pit.z + Math.sign(R.z - pit.z) * Math.min(Math.abs(R.z - pit.z), PIT_HALF);
+        line.geometry.setFromPoints([new THREE.Vector3(R.x, 1.0, R.z), new THREE.Vector3(ex, 0.02, ez), new THREE.Vector3(ex * 0.7 + pit.x * 0.3, -PIT_DEPTH + 0.05, ez * 0.7 + pit.z * 0.3)]);
+      }
 
       // 4. Sortie : rouge verrouillée, verte ouverte
       const open = sim.open;
@@ -694,7 +815,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const a = avatarOf(Q);
         a.g.visible = show;
         if (!show) continue;
-        a.g.position.set(Q.x, Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0, Q.z);
+        a.g.position.set(Q.x, Q.trapped >= 0 ? -PIT_DEPTH + Q.climbT * (PIT_DEPTH - 0.3) : Q.onLadder ? 1.0 : Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0, Q.z);
         a.g.rotation.y = Q.yaw;
         a.beam.visible = Q.flashlight;
       }

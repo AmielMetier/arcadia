@@ -7,7 +7,7 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Au tout début, personne n'a de lampe : une table au départ en porte une par joueur. Un joueur attrapé regarde les
 // autres jusqu'à la fin de l'étage ; si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createBackroomsMap } from './map.js';
+import { CELL_SIZE, T, createBackroomsMap, PIT_HALF } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { findPath, hasLineOfSight } from './nav.js';
 
@@ -23,7 +23,12 @@ export const STAMINA_REGEN = 9;
 export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entité ne le perde
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
-export const INV_SIZE = 2; // cases d'objets (piles et eau d'amande) : la case 1 de l'inventaire est réservée à la lampe
+export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
+export const PICK_R = 1.4; // portée de F pour ramasser
+export const CLIMB_T = 1.2; // secondes à grimper à la corde (Z maintenu)
+export const SOLO_CLIMB_T = 7; // seul, on finit par s'en sortir sans corde, bien plus lentement
+export const WHISTLE_CD = 1.2;
+export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
 export const FUSES = 3;
 export const LAST_LEVEL = 1;
@@ -55,7 +60,13 @@ function newPlayer(id, name, map, i) {
     hasLamp: false, // lampe torche prise sur la table du départ
     bottles: 0,
     battery: 100, // pile de la lampe torche (0 à 100)
-    inv: [], // inventaire : 'battery' ou 'bottle', INV_SIZE cases au plus
+    inv: [null, null], // cases 2 et 3 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
+    sel: 1, // case choisie (1 ou 2 ; la case 0, c'est la lampe) : E l'utilise, F l'échange contre un objet au sol
+    trapped: -1, // numéro du trou où le joueur est tombé (-1 : non)
+    climbT: 0, // avancée de la remontée à la corde
+    onLadder: false, // en haut de l'échelle (la caméra monte)
+    whistleCd: 0,
+    heat: 0, // coups de sifflet récents : trop, et l'entité vient
     signal: 0, // 0 à 1 : force du signal de l'objectif le plus proche (affiché par la caméra)
     moving: false,
     status: 'alive', // 'alive' | 'elevator' (à l'abri, spectateur) | 'dead' (spectateur)
@@ -91,6 +102,7 @@ export class BackroomsSim {
       if (old) {
         // on garde son inventaire, sa pile et ses trouvailles d'un étage à l'autre
         P.inv = old.inv;
+        P.sel = old.sel;
         P.battery = old.battery;
         P.bottles = old.bottles;
         P.found = old.found;
@@ -132,6 +144,8 @@ export class BackroomsSim {
     }
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
+    this.items0 = (this.map.items || []).length; // objets d'origine (les suivants ont été posés par des joueurs)
+    this.ropes = {}; // corde lancée dans un trou : { [trou]: id du sauveteur }
     this.powered = false; // panneau du monte-charge réalimenté
     this.departT = 0; // compte à rebours du départ de l'ascenseur
     this.blackout = 0; // secondes de noir restantes
@@ -240,7 +254,15 @@ export class BackroomsSim {
   // Boire l'eau d'amande (souffle au maximum) ou changer la pile de la lampe
   useItem(P, i) {
     const kind = P.inv[i];
-    if (!kind) return;
+    if (!kind) return this.emit({ type: 'emptySlot', id: P.id });
+    if (kind === 'ladder') {
+      // l'échelle se pose sous le renfoncement de la cassette
+      const N = this.map.niche;
+      if (!N || N.ladder || Math.hypot(N.baseX - P.x, N.baseZ - P.z) > 2.2) return this.emit({ type: 'ladderFar', id: P.id });
+      N.ladder = true;
+      P.inv[i] = null;
+      return this.emit({ type: 'ladderPlaced', id: P.id });
+    }
     if (kind === 'bottle') {
       if (P.stamina >= 100) return this.emit({ type: 'useless', kind, id: P.id });
       P.stamina = 100;
@@ -249,8 +271,82 @@ export class BackroomsSim {
       if (P.battery >= 100) return this.emit({ type: 'useless', kind, id: P.id });
       P.battery = Math.min(100, P.battery + BATTERY_PACK);
     }
-    P.inv.splice(i, 1);
+    P.inv[i] = null;
     this.emit({ type: kind, used: true, id: P.id });
+  }
+
+  // F : prendre sa lampe sur la table, ou l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
+  pickUp(P) {
+    if (!P.hasLamp && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
+      const lamp = this.lamps.find((l) => !l.taken);
+      if (lamp) {
+        lamp.taken = true;
+        P.hasLamp = true;
+        P.flashlight = true;
+        return this.emit({ type: 'lamp', id: P.id, lamp: lamp.id });
+      }
+    }
+    const it = this.nearItem(P);
+    if (!it) return this.emit({ type: 'nothing', id: P.id });
+    it.taken = true;
+    let slot = P.inv.indexOf(null);
+    let dropped = null;
+    if (slot < 0) {
+      // inventaire plein : l'objet de la case choisie reste par terre à sa place
+      slot = P.sel - 1;
+      dropped = P.inv[slot];
+      this.map.items.push({ id: this.map.items.length, kind: dropped, x: it.x, z: it.z, gx: it.gx, gz: it.gz, taken: false });
+    }
+    P.inv[slot] = it.kind;
+    this.emit({ type: 'pickup', kind: it.kind, dropped, by: P.id });
+  }
+
+  // l'objet au sol le plus proche à portée de F
+  nearItem(P) {
+    let best = null;
+    let bd = PICK_R;
+    for (const it of this.map.items || []) {
+      if (it.taken) continue;
+      const d = Math.hypot(it.x - P.x, it.z - P.z);
+      if (d < bd) {
+        bd = d;
+        best = it;
+      }
+    }
+    return best;
+  }
+
+  // R : lancer sa corde dans un trou voisin où quelqu'un est tombé
+  throwRope(P) {
+    if (P.trapped >= 0) return;
+    for (const Q of this.players) {
+      if (Q === P || Q.status !== 'alive' || Q.trapped < 0 || this.ropes[Q.trapped] !== undefined) continue;
+      const pit = this.map.pits[Q.trapped];
+      if (Math.hypot(pit.x - P.x, pit.z - P.z) > 2.4) continue;
+      this.ropes[Q.trapped] = P.id;
+      return this.emit({ type: 'rope', by: P.id, to: Q.id, name: P.name });
+    }
+    this.emit({ type: 'noRope', id: P.id });
+  }
+
+  // T : siffler. Les autres l'entendent ; trop de coups de sifflet rapprochés attirent l'entité
+  whistle(P) {
+    if (P.whistleCd > 0) return;
+    P.whistleCd = WHISTLE_CD;
+    P.heat += 1;
+    this.emit({ type: 'whistle', id: P.id, name: P.name, x: P.x, z: P.z });
+    const M = this.monster;
+    if (!this.hasMonster || M.mode === 'chase') return;
+    if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
+    if (P.heat >= WHISTLE_HEAT || Math.random() < 0.15) {
+      M.mode = 'search';
+      M.silent = false;
+      M.ambush = null;
+      M.lastSeenX = P.x;
+      M.lastSeenZ = P.z;
+      M.repathT = 0;
+      this.emit({ type: 'heard', id: P.id });
+    }
   }
 
   // Un pas de simulation. input : les commandes du joueur de cet écran ; others : { id: commandes } des autres
@@ -297,6 +393,12 @@ export class BackroomsSim {
     // 1. Orientation, lampe et inventaire
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
+    if (input.sel === 1 || input.sel === 2) P.sel = input.sel;
+    P.whistleCd = Math.max(0, P.whistleCd - DT);
+    P.heat = Math.max(0, P.heat - DT / 20);
+    if (input.whistle) this.whistle(P);
+    if (input.rope) this.throwRope(P);
+    if (input.pick) this.pickUp(P);
     if (input.toggleFlashlight) {
       if (!P.hasLamp) this.emit({ type: 'noLamp', id: P.id });
       else if (!P.flashlight && P.battery <= 0) this.emit({ type: 'batteryEmpty', id: P.id });
@@ -306,6 +408,7 @@ export class BackroomsSim {
       }
     }
     if (input.use !== undefined && input.use !== null) this.useItem(P, input.use);
+    if (input.useSel) this.useItem(P, P.sel - 1);
 
     // la lampe vide la pile ; à plat, elle s'éteint
     if (P.flashlight) {
@@ -332,7 +435,28 @@ export class BackroomsSim {
     const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
-    if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8)) {
+    if (P.trapped >= 0) {
+      // au fond d'un trou : on ne remonte qu'à la corde (Z maintenu), ou très lentement si l'on est seul
+      P.moving = false;
+      const pit = this.map.pits[P.trapped];
+      const rope = this.ropes[P.trapped];
+      const solo = this.players.length === 1;
+      if (my > 0 && (rope !== undefined || solo)) P.climbT += DT / (rope !== undefined ? CLIMB_T : SOLO_CLIMB_T);
+      else P.climbT = Math.max(0, P.climbT - DT * 0.5);
+      if (P.climbT >= 1) {
+        // on ressort sur l'arête, du côté du sauveteur
+        const R = this.players.find((q) => q.id === rope);
+        const ax = R ? R.x - pit.x : -Math.sin(P.yaw);
+        const az = R ? R.z - pit.z : -Math.cos(P.yaw);
+        const alongX = Math.abs(ax) >= Math.abs(az);
+        P.x = pit.x + (alongX ? Math.sign(ax || 1) * (PIT_HALF + 0.12) : 0);
+        P.z = pit.z + (alongX ? 0 : Math.sign(az || 1) * (PIT_HALF + 0.12));
+        delete this.ropes[P.trapped];
+        P.trapped = -1;
+        P.climbT = 0;
+        this.emit({ type: 'climbed', id: P.id, name: P.name });
+      }
+    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8)) {
       P.x = pos.x;
       P.z = pos.z;
     } else if (P.moving) {
@@ -348,20 +472,29 @@ export class BackroomsSim {
       P.z = pos.z;
     }
 
-    // 3b. Prendre une lampe sur la table du départ (une par joueur)
-    if (!P.hasLamp && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
-      const lamp = this.lamps.find((l) => !l.taken);
-      if (lamp) {
-        lamp.taken = true;
-        P.hasLamp = true;
-        P.flashlight = true;
-        this.emit({ type: 'lamp', id: P.id, lamp: lamp.id });
+    // 3b. Un pas de trop au-dessus d'un trou : on tombe
+    if (P.trapped < 0 && this.map.pitAt) {
+      const id = this.map.pitAt(Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE));
+      const pit = id >= 0 && this.map.pits[id];
+      if (pit && Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) {
+        P.trapped = id;
+        P.climbT = 0;
+        P.x = pit.x;
+        P.z = pit.z;
+        P.running = false;
+        this.emit({ type: 'fall', id: P.id, name: P.name });
       }
     }
+
+    // 3c. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
+    const N = this.map.niche;
+    P.onLadder = !!(N && N.ladder && P.trapped < 0 && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 0.9);
 
     // 4. Objectifs : cassettes (Level 0) ou fusibles (Level 1), pour toute l'équipe
     for (const cas of this.map.cassettes || []) {
       if (cas.collected || Math.hypot(cas.x - P.x, cas.z - P.z) >= 1.4) continue;
+      if (cas.high && !P.onLadder) continue; // trop haut sans l'échelle
+      if (P.trapped >= 0) continue;
       cas.collected = true;
       this.cassettes++;
       P.found++;
@@ -369,7 +502,7 @@ export class BackroomsSim {
       if (this.cassettes === CASSETTES) this.emit({ type: 'exitUnlocked' });
     }
     for (const f of this.map.fuses || []) {
-      if (f.taken || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
+      if (f.taken || P.trapped >= 0 || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
       f.taken = true;
       this.fuses++;
       P.found++;
@@ -382,21 +515,6 @@ export class BackroomsSim {
       this.emit({ type: 'exitUnlocked' });
     }
 
-    // 4b. Eau d'amande et piles : ramassées dans l'inventaire s'il reste une case
-    let near = null;
-    for (const [kind, list] of [['bottle', this.map.bottles], ['battery', this.map.batteries]]) {
-      for (const b of list || []) {
-        if (b.taken || Math.hypot(b.x - P.x, b.z - P.z) >= 1.1) continue;
-        if (P.inv.length < INV_SIZE) {
-          b.taken = true;
-          P.inv.push(kind);
-          this.emit({ type: 'pickup', kind, id: b.id, by: P.id });
-        } else near = kind + b.id;
-      }
-    }
-    // inventaire plein : on le dit une fois par objet approché
-    if (near && near !== this.fullNear[P.id]) this.emit({ type: 'invFull', id: P.id });
-    this.fullNear[P.id] = near;
 
     // 4c. Signal de l'objectif le plus proche (à vol d'oiseau, 0 au-delà de 45 m), puis de l'ascenseur
     let best = Infinity;
@@ -406,7 +524,7 @@ export class BackroomsSim {
     P.signal = best === Infinity ? 0 : Math.max(0, 1 - best / 45);
 
     // 5. Entrer dans l'ascenseur ouvert : à l'abri, spectateur jusqu'au départ
-    if (this.open) {
+    if (this.open && P.trapped < 0) {
       const E = this.map.elevator;
       const inside = E
         ? Math.floor(P.x / CELL_SIZE) === E.gx && Math.floor(P.z / CELL_SIZE) === E.gz
@@ -424,6 +542,11 @@ export class BackroomsSim {
   predict(input = {}) {
     const P = this.player;
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return;
+    if (P.trapped >= 0) {
+      if (input.yaw !== undefined) P.yaw = input.yaw;
+      if (input.pitch !== undefined) P.pitch = input.pitch;
+      return;
+    }
     if (input.yaw !== undefined) P.yaw = input.yaw;
     if (input.pitch !== undefined) P.pitch = input.pitch;
     const mx = input.mx || 0;
@@ -479,9 +602,13 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0],
-      k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.bottles, 'taken'), bits(this.map.batteries, 'taken'), bits(this.lamps, 'taken')],
+      k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.items, 'taken'), '', bits(this.lamps, 'taken')],
+      // objets posés par des joueurs (échanges), cordes lancées, échelle posée
+      ix: (this.map.items || []).slice(this.items0).map((o) => [o.kind, r2(o.x), r2(o.z)]),
+      ro: Object.keys(this.ropes).map((k) => [+k, this.ropes[k]]),
+      nl: this.map.niche && this.map.niche.ladder ? 1 : 0,
     };
   }
 
@@ -497,7 +624,7 @@ export class BackroomsSim {
     this.departT = snap.dp;
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -507,7 +634,8 @@ export class BackroomsSim {
       }
       const mine = id === this.localId;
       const far = Math.hypot(P.x - x, P.z - z) > 2.5;
-      if (!mine || far || status !== 'alive' || P.status !== 'alive') {
+      // l'hôte décide des chutes et des remontées : la position suit
+      if (!mine || far || status !== 'alive' || P.status !== 'alive' || trapped >= 0 || (P.trapped >= 0 && trapped < 0)) {
         P.x = x;
         P.z = z;
       }
@@ -521,8 +649,12 @@ export class BackroomsSim {
       P.status = status;
       P.flashlight = !!fl;
       P.hasLamp = !!lamp;
+      if (!mine && sel) P.sel = sel;
+      P.trapped = trapped ?? -1;
+      P.climbT = climbT || 0;
+      P.onLadder = !!onLadder;
       P.battery = bat;
-      P.inv = inv ? inv.split(',') : [];
+      P.inv = (inv || ',').split(',').map((k) => k || null);
       P.signal = signal;
       P.found = found;
     }
@@ -535,8 +667,13 @@ export class BackroomsSim {
     });
     set(this.map.cassettes, 'collected', snap.k[0]);
     set(this.map.fuses, 'taken', snap.k[1]);
-    set(this.map.bottles, 'taken', snap.k[2]);
-    set(this.map.batteries, 'taken', snap.k[3]);
+    for (const [kind, x, z] of (snap.ix || []).slice(this.map.items.length - this.items0)) {
+      this.map.items.push({ id: this.map.items.length, kind, x, z, gx: Math.floor(x / CELL_SIZE), gz: Math.floor(z / CELL_SIZE), taken: false });
+    }
+    set(this.map.items, 'taken', snap.k[2]);
+    this.ropes = {};
+    for (const [k, v] of snap.ro || []) this.ropes[k] = v;
+    if (this.map.niche) this.map.niche.ladder = !!snap.nl;
     // la table compte autant de lampes que de joueurs chez l'hôte
     if (snap.k[4] !== undefined && this.table) {
       while (this.lamps.length < snap.k[4].length) this.lamps.push({ ...this.lamps[0], id: this.lamps.length, taken: false });

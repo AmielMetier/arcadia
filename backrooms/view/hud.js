@@ -27,7 +27,7 @@ export class BackroomsHUD {
       <div class="cam cam-br">
         <div class="tapes"><span id="cassetteIcons"></span> <b id="cassetteText">0/5</b></div>
         <div class="signal"><span id="signalLabel">SIGNAL</span> <span id="signalBars"></span></div>
-        <div class="flash-indicator" id="flashStatus">[F] LAMPE ON</div>
+        <div class="flash-indicator" id="flashStatus">[1] LAMPE ON</div>
       </div>
 
       <!-- Inventaire : la case 1 est réservée à la lampe torche, les cases 2 et 3 aux piles et à l'eau d'amande -->
@@ -42,6 +42,8 @@ export class BackroomsHUD {
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
+      <!-- Ce que tu peux faire ici : ramasser, poser l'échelle, lancer ta corde, grimper -->
+      <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="climb" id="climbBar" hidden><i></i></div></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
       <div class="click-prompt" id="clickPrompt">
@@ -176,7 +178,7 @@ export class BackroomsHUD {
     // 4b. Inventaire
     const inv = P.inv || [];
     const key = inv.join(',');
-    const slotsKey = `${key}|${P.hasLamp ? 1 : 0}${P.flashlight ? 1 : 0}`;
+    const slotsKey = `${inv.join(',')}|${P.hasLamp ? 1 : 0}${P.flashlight ? 1 : 0}|${P.sel}`;
     if (slotsKey !== this.invKey) {
       this.invKey = slotsKey;
       this.$('#inv').querySelectorAll('.slot').forEach((b, i) => {
@@ -190,18 +192,52 @@ export class BackroomsHUD {
         }
         const k = inv[i - 1];
         b.classList.toggle('full', !!k);
-        b.querySelector('span').innerHTML = k === 'battery' ? '<i class="ico-bat"></i>PILE' : k === 'bottle' ? '<i class="ico-bot"></i>AMANDE' : '';
+        b.classList.toggle('sel', P.sel === i);
+        b.querySelector('span').innerHTML = k === 'battery' ? '<i class="ico-bat"></i>PILE' : k === 'bottle' ? '<i class="ico-bot"></i>AMANDE' : k === 'ladder' ? '<i class="ico-ladder"></i>ÉCHELLE' : '';
       });
     }
 
+    // 4c. Invite : ce que la touche fait ici
+    this.prompt(sim, P);
+
     // 5. Lampe torche
-    this.$('#flashStatus').textContent = P.hasLamp ? `[F] LAMPE ${P.flashlight ? 'ON' : 'OFF'}` : 'PAS DE LAMPE';
+    this.$('#flashStatus').textContent = P.hasLamp ? `[1] LAMPE ${P.flashlight ? 'ON' : 'OFF'}` : 'PAS DE LAMPE';
 
     // 6. Message passager
     if (this.toastT > 0) {
       this.toastT -= dt;
       if (this.toastT <= 0) this.$('#toast').hidden = true;
     }
+  }
+
+  prompt(sim, P) {
+    const NAME = { bottle: "L'EAU D'AMANDE", battery: 'LES PILES', ladder: "L'ÉCHELLE" };
+    let text = '';
+    let climb = -1;
+    if (P.status === 'alive' && sim.state === 'playing' && !(sim.departT > 0)) {
+      const N = sim.map.niche;
+      if (P.trapped >= 0) {
+        const rope = sim.ropes[P.trapped] !== undefined;
+        const solo = sim.players.length === 1;
+        climb = P.climbT;
+        text = rope ? 'MAINTIENS Z POUR GRIMPER À LA CORDE' : solo ? 'TU ES TOMBÉ · MAINTIENS Z POUR GRIMPER (LENTEMENT)' : "TU ES COINCÉ AU FOND · SIFFLE (T) POUR QU'UN COLLÈGUE TE LANCE SA CORDE";
+        if (!rope && !solo) climb = -1;
+      } else {
+        const fallen = sim.players.find((q) => q !== P && q.status === 'alive' && q.trapped >= 0 && sim.ropes[q.trapped] === undefined && Math.hypot(sim.map.pits[q.trapped].x - P.x, sim.map.pits[q.trapped].z - P.z) < 2.4);
+        const it = sim.nearItem(P);
+        const sel = P.inv[P.sel - 1];
+        if (fallen) text = `[R] LANCER TA CORDE À ${fallen.name.toUpperCase()}`;
+        else if (!P.hasLamp && sim.table && Math.hypot(sim.table.x - P.x, sim.table.z - P.z) < 1.7) text = '[F] PRENDRE UNE LAMPE TORCHE';
+        else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = "[E] POSER L'ÉCHELLE SOUS LA CASSETTE";
+        else if (it) text = P.inv.includes(null) ? `[F] RAMASSER ${NAME[it.kind]}` : `[F] ÉCHANGER ${NAME[sel || 'bottle']} (CASE ${P.sel + 1}) CONTRE ${NAME[it.kind]}`;
+        else if (N && !N.ladder && !sim.map.cassettes[N.cas].collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'LA CASSETTE EST TROP HAUT : IL FAUT UNE ÉCHELLE';
+      }
+    }
+    const el = this.$('#prompt');
+    el.hidden = !text;
+    if (text) this.$('#promptText').textContent = text;
+    this.$('#climbBar').hidden = climb < 0;
+    if (climb >= 0) this.$('#climbBar i').style.width = `${Math.round(climb * 100)}%`;
   }
 
   toast(text) {
@@ -276,8 +312,8 @@ export class BackroomsHUD {
     const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
     this.$('#pauseGo').textContent = tactile ? "TOUCHE L'ÉCRAN POUR JOUER" : kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
     this.$('#pauseKeys').textContent = kb
-      ? 'ZQSD marcher · Flèches regarder · Maj courir · F ou 1 lampe · 2 3 objets · Échap pause'
-      : 'ZQSD marcher · Souris regarder · Maj courir · F ou 1 lampe · 2 3 objets · Échap pause';
+      ? 'ZQSD marcher · Flèches regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · R corde · T siffler · Échap pause'
+      : 'ZQSD marcher · Souris regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · R corde · T siffler · Échap pause';
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }

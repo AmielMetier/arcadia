@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.78 — 3 novembre 2026
+- **The Backrooms** — des trous, une échelle, une corde et un sifflet au Level 0, et de nouvelles commandes.
+  - Une ou deux grandes salles ont le sol creusé de trous carrés : on passe sur les arêtes. Qui tombe reste coincé au fond jusqu'à ce qu'un collègue lui lance sa corde (R) ; il remonte en maintenant Z. Seul, on finit par s'en sortir, bien plus lentement.
+  - Une des 5 cassettes est posée dans un renfoncement en hauteur : il faut trouver l'échelle cachée plus loin, la poser dessous (E) et grimper.
+  - T fait siffler, pour que les autres t'entendent (à gauche, à droite, plus ou moins loin). Attention : à force de siffler, l'entité vient voir.
+  - Nouvelles commandes : F ramasse un objet (si l'inventaire est plein, il prend la place de l'objet de la case choisie, qui reste par terre), 2 et 3 choisissent une case, E utilise l'objet choisi, 1 allume ou éteint la lampe.
+  - Un message indique ce que tu peux faire là où tu es (ramasser, échanger, poser l'échelle, lancer ta corde, grimper).
+
 ## 3.77 — 3 novembre 2026
 - **The Backrooms** — la lampe torche a sa case dans l'inventaire.
   - La case 1 est réservée à la lampe : elle s'y range quand tu la prends sur la table, et la touche 1 (ou F) l'allume et l'éteint.

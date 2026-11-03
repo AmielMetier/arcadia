@@ -2,7 +2,23 @@
 import assert from 'node:assert/strict';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, DT, DEPART_T, FUSES } from '../backrooms/engine/sim.js';
+import { BackroomsSim, DT, DEPART_T, FUSES, CLIMB_T, SOLO_CLIMB_T, WHISTLE_CD } from '../backrooms/engine/sim.js';
+import { PIT_HALF, bfs } from '../backrooms/engine/map.js';
+
+// distance en marche (en cases) entre deux cases
+const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
+
+// amène un joueur sur une cassette (celle du renfoncement : échelle posée, au pied de l'échelle)
+const putOn = (sim, P, cas) => {
+  if (cas.high) {
+    sim.map.niche.ladder = true;
+    P.x = sim.map.niche.baseX;
+    P.z = sim.map.niche.baseZ;
+  } else {
+    P.x = cas.x;
+    P.z = cas.z;
+  }
+};
 import { createWarehouseMap } from '../backrooms/engine/level1.js';
 
 // avance la partie de n secondes
@@ -96,8 +112,7 @@ test("ramassage des 5 cassettes, l'ascenseur s'ouvre et descend au Level 1", () 
 
   // Téléporter sur chaque cassette pour la ramasser
   for (const cas of map.cassettes) {
-    sim.player.x = cas.x;
-    sim.player.z = cas.z;
+    putOn(sim, sim.player, cas);
     sim.step();
     assert.ok(cas.collected, `la cassette ${cas.id} a été ramassée`);
   }
@@ -172,36 +187,179 @@ test("eau d'amande : remplit l'endurance", () => {
   sim.player.x = b.x;
   sim.player.z = b.z;
   sim.step();
+  assert.equal(b.taken, false, 'on ne ramasse plus en passant');
+  sim.step({ pick: true });
   assert.equal(b.taken, true);
-  assert.deepEqual(sim.player.inv, ['bottle'], "la bouteille va dans l'inventaire");
+  assert.deepEqual(sim.player.inv, ['bottle', null], "F : la bouteille va dans l'inventaire");
   assert.ok(sim.player.stamina < 100, "elle ne se boit pas toute seule");
-  sim.step({ use: 0 });
-  assert.equal(sim.player.stamina, 100);
-  assert.equal(sim.player.inv.length, 0);
+  sim.step({ useSel: true });
+  assert.equal(sim.player.stamina, 100, 'E : on boit la case choisie');
+  assert.deepEqual(sim.player.inv, [null, null]);
   assert.ok(sim.drainEvents().some((e) => e.type === 'bottle'));
 });
 
-test("inventaire : la case 1 pour la lampe, deux cases d'objets, la troisième trouvaille reste par terre", () => {
+test("inventaire : deux cases d'objets ; plein, F échange l'objet de la case choisie contre celui du sol", () => {
   const m = createBackroomsMap(9);
   const sim = new BackroomsSim({ map: m, difficulty: 'peaceful' });
-  const objs = [m.bottles[0], m.batteries[0], m.batteries[1]];
-  for (const o of objs) {
-    sim.player.x = o.x;
-    sim.player.z = o.z;
-    sim.step({});
+  const P = sim.player;
+  const ladder = m.items.find((i) => i.kind === 'ladder');
+  for (const o of [m.bottles[0], m.batteries[0]]) {
+    P.x = o.x;
+    P.z = o.z;
+    sim.step({ pick: true });
   }
-  assert.equal(sim.player.inv.length, 2);
-  assert.equal(objs[2].taken, false, 'la 3e reste au sol');
-  assert.ok(sim.drainEvents().some((e) => e.type === 'invFull'));
-  sim.player.x = m.spawn.x;
-  sim.player.z = m.spawn.z;
-  sim.player.stamina = 100;
-  sim.step({ use: 0 });
-  assert.equal(sim.player.inv.length, 2, "inutile : l'objet est gardé");
-  sim.player.battery = 10;
-  sim.step({ use: 1 });
-  assert.equal(sim.player.inv.length, 1);
-  assert.ok(sim.player.battery > 60);
+  assert.deepEqual(P.inv, ['bottle', 'battery']);
+  // plein : la case choisie (2, l'eau d'amande) part au sol à la place de l'échelle
+  P.x = ladder.x;
+  P.z = ladder.z;
+  sim.step({ pick: true, sel: 1 });
+  assert.deepEqual(P.inv, ['ladder', 'battery']);
+  assert.equal(ladder.taken, true);
+  const dropped = m.items[m.items.length - 1];
+  assert.equal(dropped.kind, 'bottle');
+  assert.equal(dropped.taken, false);
+  assert.ok(Math.hypot(dropped.x - ladder.x, dropped.z - ladder.z) < 0.01, "l'eau d'amande est posée là où était l'échelle");
+  // une case vide : F y range l'objet sans rien poser
+  P.x = m.spawn.x;
+  P.z = m.spawn.z;
+  P.battery = 10;
+  sim.step({ sel: 2 });
+  sim.step({ useSel: true });
+  assert.ok(P.battery > 60, 'E : la pile de la case 3 recharge la lampe');
+  assert.deepEqual(P.inv, ['ladder', null]);
+  P.x = dropped.x;
+  P.z = dropped.z;
+  const before = m.items.length;
+  sim.step({ pick: true });
+  assert.deepEqual(P.inv, ['ladder', 'bottle']);
+  assert.equal(m.items.length, before, 'rien de posé : il restait une case');
+  // E sur une eau d'amande inutile (souffle plein) : on la garde
+  P.stamina = 100;
+  sim.step({ useSel: true });
+  assert.deepEqual(P.inv, ['ladder', 'bottle']);
+});
+
+test("renfoncement : la cassette en hauteur s'attrape seulement depuis l'échelle, qu'il faut aller chercher", () => {
+  for (const sd of [2, 9, 31]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd });
+    const m = sim.map;
+    const N = m.niche;
+    assert.ok(N, `graine ${sd} : un renfoncement`);
+    const cas = m.cassettes[N.cas];
+    assert.ok(cas.high);
+    const ladder = m.items.find((i) => i.kind === 'ladder');
+    assert.ok(ladder, "une échelle sur la carte");
+    const d = bfsDist(m, N.gx, N.gz, ladder.gx, ladder.gz);
+    assert.ok(d >= 12 && d <= 70, `graine ${sd} : échelle à ${d} cases du renfoncement`);
+    const P = sim.player;
+    // sans échelle, même juste dessous : trop haut
+    P.x = N.baseX;
+    P.z = N.baseZ;
+    sim.step();
+    assert.equal(cas.collected, false, 'trop haut sans échelle');
+    // on va chercher l'échelle, on la pose dessous (E), on grimpe
+    P.x = ladder.x;
+    P.z = ladder.z;
+    sim.step({ pick: true });
+    assert.deepEqual(P.inv, ['ladder', null], "l'échelle va dans l'inventaire");
+    P.x = N.baseX + 1.5;
+    P.z = N.baseZ;
+    if (sim.isColliding(P.x, P.z, 0.3)) {
+      P.x = N.baseX;
+      P.z = N.baseZ;
+    }
+    sim.step({ useSel: true });
+    assert.ok(N.ladder, 'échelle posée');
+    assert.deepEqual(P.inv, [null, null]);
+    P.x = N.baseX;
+    P.z = N.baseZ;
+    sim.step();
+    assert.ok(P.onLadder, "en haut de l'échelle");
+    assert.ok(cas.collected, 'cassette récupérée');
+  }
+});
+
+test("trous : on tombe, on attend la corde d'un collègue (R) et on remonte en maintenant Z", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, players, localId: 1 });
+  const m = sim.map;
+  assert.ok(m.pits.length >= 8, 'une salle piégée');
+  const [a, b] = sim.players;
+  const pit = m.pits[Math.floor(m.pits.length / 2)];
+  // sur l'arête, on ne tombe pas
+  a.x = pit.x + PIT_HALF + 0.1;
+  a.z = pit.z;
+  sim.step();
+  assert.equal(a.trapped, -1, "sur l'arête, on tient");
+  // un pas de trop
+  a.x = pit.x + 0.3;
+  sim.step();
+  assert.equal(a.trapped, pit.id, 'tombé');
+  assert.ok(sim.drainEvents().some((e) => e.type === 'fall'));
+  // sans corde, impossible de remonter à plusieurs
+  run(sim, CLIMB_T * 3, {}, { 1: { my: 1 } });
+  sim.step({ my: 1 });
+  assert.equal(a.trapped, pit.id, 'pas de corde : coincé');
+  assert.equal(a.x, pit.x);
+  // B est loin : R ne fait rien
+  b.x = m.spawn.x;
+  b.z = m.spawn.z;
+  sim.step({}, { 2: { rope: true } });
+  assert.ok(sim.drainEvents().some((e) => e.type === 'noRope'));
+  // B au bord du trou lance sa corde
+  b.x = pit.x - PIT_HALF - 0.12;
+  b.z = pit.z;
+  sim.step({}, { 2: { rope: true } });
+  assert.equal(sim.ropes[pit.id], 2, 'corde lancée');
+  assert.equal(b.trapped, -1);
+  // l'ascenseur ne part pas sans celui qui est au fond
+  sim.cassettes = 5;
+  run(sim, CLIMB_T + 0.3, { my: 1 });
+  assert.equal(a.trapped, -1, 'remonté');
+  assert.equal(sim.ropes[pit.id], undefined, 'corde ramassée');
+  assert.ok(Math.abs(a.x - pit.x) >= PIT_HALF || Math.abs(a.z - pit.z) >= PIT_HALF, "ressorti sur l'arête");
+  assert.ok(a.x < pit.x, 'du côté du sauveteur');
+});
+
+test('trous : seul, on finit par remonter sans corde, bien plus lentement', () => {
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12 });
+  const pit = sim.map.pits[0];
+  const P = sim.player;
+  P.x = pit.x;
+  P.z = pit.z;
+  sim.step();
+  assert.equal(P.trapped, pit.id);
+  run(sim, CLIMB_T * 2, { my: 1 });
+  assert.equal(P.trapped, pit.id, 'pas encore');
+  run(sim, SOLO_CLIMB_T, { my: 1 });
+  assert.equal(P.trapped, -1, 'remonté seul');
+});
+
+test("sifflet (T) : les autres l'entendent ; trop de coups rapprochés attirent l'entité", () => {
+  const sim = new BackroomsSim({ difficulty: 'normal', seed: 40 });
+  const P = sim.player;
+  const M = sim.monster;
+  // l'entité rôde à 30 m, sans voir le joueur
+  M.x = P.x + 30;
+  M.z = P.z;
+  M.mode = 'patrol';
+  const origRandom = Math.random;
+  Math.random = () => 0.99; // pas de coup de chance : il faut insister
+  try {
+    sim.step({ whistle: true });
+    sim.step({ whistle: true });
+    const ev = sim.drainEvents().filter((e) => e.type === 'whistle');
+    assert.equal(ev.length, 1, 'un coup de sifflet à la fois');
+    assert.notEqual(M.mode, 'search', 'un coup : elle ne vient pas encore');
+    run(sim, WHISTLE_CD + 0.05);
+    sim.step({ whistle: true });
+    run(sim, WHISTLE_CD + 0.05);
+    sim.step({ whistle: true });
+    assert.equal(M.mode, 'search', "au 3e coup rapproché, elle vient voir");
+    assert.ok(Math.hypot(M.lastSeenX - P.x, M.lastSeenZ - P.z) < 0.01);
+  } finally {
+    Math.random = origRandom;
+  }
 });
 
 test('murs : chaque graine donne un dédale différent', () => {
@@ -239,8 +397,8 @@ test("lampe torche : la pile se vide, la lampe s'éteint, une pile la recharge",
   const b = m.batteries[0];
   sim.player.x = b.x;
   sim.player.z = b.z;
-  sim.step({});
-  sim.step({ use: 0 });
+  sim.step({ pick: true });
+  sim.step({ useSel: true });
   assert.ok(sim.player.battery > 50, 'la pile recharge la lampe');
   sim.step({ toggleFlashlight: true });
   assert.equal(sim.player.flashlight, true);
@@ -328,8 +486,7 @@ test("à plusieurs : qui entre dans l'ascenseur devient spectateur, il part quan
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   const sim = new BackroomsSim({ difficulty: 'normal', seed: 21, players, localId: 1 });
   for (const c of sim.map.cassettes) {
-    sim.player.x = c.x;
-    sim.player.z = c.z;
+    putOn(sim, sim.player, c);
     sim.step();
   }
   assert.equal(sim.cassettes, 5, "les cassettes comptent pour toute l'équipe");
@@ -409,13 +566,13 @@ test("réseau : l'invité reçoit l'état de l'hôte, se déplace chez lui et su
   host.step({}, { 2: { pos: { x: hg.x + 20, z: hg.z } } });
   assert.ok(Math.hypot(hg.x - g.x, hg.z - g.z) < 3, 'téléportation refusée');
   // l'hôte ramasse une cassette : l'invité la voit disparaître et le compteur monte
-  const c = host.map.cassettes[2];
+  const c = host.map.cassettes.find((q) => !q.high);
   host.player.x = c.x;
   host.player.z = c.z;
   host.step();
   wire();
   assert.equal(guest.cassettes, 1);
-  assert.equal(guest.map.cassettes[2].collected, true);
+  assert.equal(guest.map.cassettes[c.id].collected, true);
   // tout le monde dans l'ascenseur : l'invité passe au Level 1 avec la même carte
   host.cassettes = 5;
   for (const P of host.players) {
@@ -455,12 +612,14 @@ test('départ : une table avec une lampe par joueur, chacun prend la sienne', ()
     // sans lampe, F ne fait rien
     sim.step({ toggleFlashlight: true });
     assert.ok(sim.drainEvents().some((e) => e.type === 'noLamp'));
-    // chacun s'approche de la table et prend une lampe ; il n'y en a pas pour un quatrième
+    // chacun s'approche de la table et prend une lampe avec F ; il n'y en a pas pour un quatrième
     for (const P of sim.players) {
       P.x = sim.table.x + 1.2;
       P.z = sim.table.z;
     }
     sim.step();
+    assert.ok(sim.players.every((p) => !p.hasLamp), 'on la prend avec F, pas en passant');
+    sim.step({ pick: true }, { 2: { pick: true }, 3: { pick: true } });
     assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde est équipé et la lampe est allumée');
     assert.ok(sim.lamps.every((l) => l.taken));
     // on ne traverse pas la table
@@ -483,6 +642,41 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
   assert.equal(a1.status, 'alive');
   assert.ok(a1.hasLamp && a1.flashlight);
   assert.equal(sim.table, null, "plus de table à l'étage suivant");
+});
+
+test("réseau : chute, corde, échelle posée et objets échangés arrivent chez l'invité", () => {
+  const players = [{ id: 1, name: 'Hôte' }, { id: 2, name: 'Invité' }];
+  const host = new BackroomsSim({ difficulty: 'peaceful', seed: 12, players, localId: 1 });
+  const guest = new BackroomsSim({ difficulty: 'peaceful', seed: 12, players, localId: 2 });
+  const wire = () => guest.applySnapshot(JSON.parse(JSON.stringify(host.snapshot())));
+  const [h, g] = host.players;
+  // l'invité tombe dans un trou, l'hôte lui lance sa corde
+  const pit = host.map.pits[0];
+  g.x = pit.x;
+  g.z = pit.z;
+  h.x = pit.x - PIT_HALF - 0.12;
+  h.z = pit.z;
+  host.step({ rope: true });
+  host.step({ rope: true });
+  wire();
+  assert.equal(guest.player.trapped, pit.id);
+  assert.equal(guest.ropes[pit.id], 1);
+  // l'hôte échange : l'objet posé apparaît chez l'invité
+  const [b0, b1] = host.map.bottles;
+  for (const b of [b0, b1, host.map.batteries[0]]) {
+    h.x = b.x;
+    h.z = b.z;
+    host.step({ pick: true });
+  }
+  wire();
+  assert.equal(guest.map.items.length, host.map.items.length);
+  assert.equal(guest.map.items[guest.map.items.length - 1].kind, 'bottle');
+  assert.equal(guest.map.batteries[0].taken, true);
+  assert.deepEqual(guest.players[0].inv, ['battery', 'bottle']);
+  // l'échelle posée
+  host.map.niche.ladder = true;
+  wire();
+  assert.ok(guest.map.niche.ladder);
 });
 
 console.log(`\n${count} tests réussis pour The Backrooms !`);

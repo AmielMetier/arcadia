@@ -2,7 +2,7 @@
 // Des travées d'étagères métalliques séparées par de grandes allées, des piliers de béton, un parking vide çà et là,
 // des caisses dans les allées, 3 fusibles à retrouver et le monte-charge qui ramène à la surface.
 // Mêmes cases et même forme de carte que le Level 0 (map.js) : le moteur et la scène lisent les deux.
-import { CELL_SIZE, T, blocks, bfs, carveElevator } from './map.js';
+import { CELL_SIZE, T, blocks, bfs, carveElevator, itemList } from './map.js';
 
 export const LEVEL1_SIZE = 56;
 export const LEVEL1_CEIL = 4.2; // plafond plus haut qu'au Level 0
@@ -227,6 +227,10 @@ export function createWarehouseMap(seed = 7) {
     props,
     bottles,
     batteries,
+    items: itemList(['bottle', bottles], ['battery', batteries]),
+    pits: [],
+    niche: null,
+    pitAt: () => -1,
     shelves,
     dist,
     monsterSpawn: cellPos(monsterCell),

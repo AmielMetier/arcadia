@@ -1,6 +1,6 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
 import { createBackroomsMap } from './engine/map.js';
-import { BackroomsSim, DT, DEPART_T, INV_SIZE } from './engine/sim.js';
+import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
 import { createBackroomsScene } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
 import { BackroomsHUD } from './view/hud.js';
@@ -39,8 +39,11 @@ const keys = {};
 let mouseDx = 0;
 let mouseDy = 0;
 let isPointerLocked = false;
-let toggleFlashlightRequested = false;
-let useRequested = null; // objet à utiliser (touches 2 et 3 ; la touche 1, c'est la lampe)
+let toggleFlashlightRequested = false; // touche 1 : la lampe
+let useRequested = null; // (tests) une case d'objet précise à utiliser
+// actions du prochain pas : E utilise la case choisie, F ramasse, R lance la corde, T siffle
+const act = { use: false, pick: false, rope: false, whistle: false };
+let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
 try {
@@ -83,10 +86,16 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   keys[e.code] = true;
-  if (e.code === 'KeyF' && !e.repeat) toggleFlashlightRequested = true;
-  // case 1 : la lampe torche (comme F) ; cases 2 et 3 : les objets
+  // 1 : allumer / éteindre la lampe ; 2, 3 : choisir une case d'objet ; E : l'utiliser ; F : ramasser ;
+  // R : lancer sa corde dans un trou ; T : siffler
   const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
   if (slot >= 0 && !e.repeat) useSlot(slot % 3);
+  if (!e.repeat) {
+    if (e.code === 'KeyE') act.use = true;
+    else if (e.code === 'KeyF') act.pick = true;
+    else if (e.code === 'KeyR') act.rope = true;
+    else if (e.code === 'KeyT') act.whistle = true;
+  }
   if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
 });
 
@@ -101,7 +110,7 @@ window.addEventListener('blur', () => {
 const touch = { move: null, look: null, run: false };
 const touchBtns = document.createElement('div');
 touchBtns.className = 'touch-btns';
-touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="lamp">🔦<small>Lampe</small></button>';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="pick">✋<small>Prendre</small></button><button data-t="use">⚙<small>Utiliser</small></button><button data-t="rope">🪢<small>Corde</small></button><button data-t="whistle">📣<small>Siffler</small></button>';
 document.body.appendChild(touchBtns);
 const stick = document.createElement('div');
 stick.className = 'touch-stick';
@@ -113,7 +122,7 @@ for (const b of touchBtns.querySelectorAll('button')) {
     e.preventDefault();
     e.stopPropagation();
     if (b.dataset.t === 'run') touch.run = true;
-    else toggleFlashlightRequested = true;
+    else act[b.dataset.t] = true;
     b.classList.add('on');
   });
   const up = () => {
@@ -186,9 +195,16 @@ document.addEventListener('mousemove', (e) => {
 });
 
 // Une case de l'inventaire : la 1re allume ou éteint la lampe, les deux autres utilisent un objet
-function useSlot(i) {
-  if (i === 0) toggleFlashlightRequested = true;
-  else useRequested = i - 1;
+// Une case de l'inventaire : la 1re allume ou éteint la lampe ; les deux autres se choisissent (au doigt, toucher
+// la case déjà choisie l'utilise)
+function useSlot(i, tap = false) {
+  if (i === 0) {
+    toggleFlashlightRequested = true;
+    return;
+  }
+  if (tap && sim && sim.player.sel === i) act.use = true;
+  selRequested = i;
+  if (sim) sim.player.sel = i; // tout de suite à l'écran, l'hôte suit
 }
 
 let lastSettings = {};
@@ -230,7 +246,7 @@ function startRun({ seed, difficulty, players, run, level }) {
     sfx = new BackroomsSfx();
   }
   if (!hud) {
-    hud = new BackroomsHUD(hudEl, { play, setKbMode, use: useSlot });
+    hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => useSlot(i, true) });
   }
 
   stepDist = 0;
@@ -242,9 +258,10 @@ function guestInputs() {
   const out = {};
   for (const id in NET.inputs) {
     const i = NET.inputs[id];
-    const a = NET.actions[id] || (NET.actions[id] = { f: 0, u: [] });
-    out[id] = { mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, toggleFlashlight: a.f > 0, use: a.u.length ? a.u.shift() : null };
-    if (a.f > 0) a.f--;
+    const q = NET.actions[id] || (NET.actions[id] = []);
+    // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
+    const a = q.shift() || {};
+    out[id] = { mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', rope: a.k === 'r', whistle: a.k === 't' };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -262,11 +279,10 @@ function onMsg(from, m) {
       sim.addPlayer(from, (p && p.name) || 'Joueur');
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
-      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
-    } else if (m.t === 'a' && m.run === NET.run) {
-      const a = NET.actions[from] || (NET.actions[from] = { f: 0, u: [] });
-      if (m.k === 'f') a.f = Math.min(2, a.f + 1);
-      else if (m.k === 'u' && a.u.length < 3) a.u.push(Math.max(0, Math.min(INV_SIZE - 1, m.i | 0)));
+      NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 'r', 't'].includes(m.k)) {
+      const q = NET.actions[from] || (NET.actions[from] = []);
+      if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1 });
     }
     return;
   }
@@ -302,6 +318,17 @@ function onRoster() {
   for (const P of [...sim.players]) if (!ids.has(P.id)) sim.removePlayer(P.id);
 }
 
+const ITEM_NAME = { bottle: "Eau d'amande", battery: 'Piles', ladder: 'Échelle' };
+
+// position gauche / droite d'un son par rapport au regard de la caméra (-1 à 1)
+function panTo(x, z) {
+  const V = sim.viewPlayer(sim.spectate || 0);
+  let d = Math.atan2(x - V.x, z - V.z) - (V.yaw - Math.PI);
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return Math.max(-0.9, Math.min(0.9, Math.sin(d)));
+}
+
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -324,10 +351,41 @@ function handleEvent(ev, me) {
     case 'pickup':
       if (!mine) break;
       if (sfx) sfx.battery();
-      if (hud) hud.toast(ev.kind === 'bottle' ? "Eau d'amande dans l'inventaire" : "Piles dans l'inventaire");
+      if (hud) hud.toast(`${ITEM_NAME[ev.kind]} dans l'inventaire${ev.dropped ? ` · ${ITEM_NAME[ev.dropped].toLowerCase()} posée par terre` : ''}`);
       break;
-    case 'invFull':
-      if (mine && hud) hud.toast('Inventaire plein : utilise un objet (2 ou 3)');
+    case 'nothing':
+      if (mine && hud) hud.toast('Rien à ramasser ici');
+      break;
+    case 'emptySlot':
+      if (mine && hud) hud.toast('Case vide : choisis un objet avec 2 ou 3');
+      break;
+    case 'ladderFar':
+      if (mine && hud) hud.toast("Pose l'échelle juste sous le renfoncement de la cassette");
+      break;
+    case 'ladderPlaced':
+      if (sfx) sfx.battery();
+      if (hud) hud.toast(mine ? "Échelle posée : approche-toi pour grimper" : "L'échelle est posée sous la cassette");
+      break;
+    case 'fall':
+      if (sfx) sfx.fall(ev.id === me);
+      if (hud) hud.toast(ev.id === me ? (sim.players.length > 1 ? 'Tu es tombé dans un trou ! Siffle (T) pour appeler à l\'aide' : 'Tu es tombé dans un trou… maintiens Z pour grimper') : `${ev.name} est tombé dans un trou ! Lance-lui ta corde (R)`);
+      break;
+    case 'rope':
+      if (sfx) sfx.rope();
+      if (hud && ev.to === me) hud.toast(`${ev.name} te lance une corde : maintiens Z pour grimper`);
+      break;
+    case 'noRope':
+      if (mine && hud) hud.toast("Personne n'est tombé dans un trou près de toi");
+      break;
+    case 'climbed':
+      if (hud && ev.id !== me) hud.toast(`${ev.name} est remonté`);
+      break;
+    case 'whistle':
+      if (sfx) sfx.whistle(ev.id === me ? 1 : Math.max(0.15, 1 - Math.hypot(ev.x - sim.viewPlayer(sim.spectate || 0).x, ev.z - sim.viewPlayer(sim.spectate || 0).z) / 60), ev.id === me ? 0 : panTo(ev.x, ev.z));
+      if (hud && ev.id !== me) hud.toast(`${ev.name} siffle`);
+      break;
+    case 'heard':
+      if (mine && hud) hud.toast("Chut… l'entité a entendu le sifflet");
       break;
     case 'useless':
       if (mine && hud) hud.toast(ev.kind === 'bottle' ? 'Tu as déjà tout ton souffle' : 'La lampe est déjà chargée');
@@ -345,7 +403,7 @@ function handleEvent(ev, me) {
     case 'lamp':
       if (ev.id !== me) break;
       if (sfx) sfx.battery();
-      if (hud) hud.toast('Lampe torche en main · [F] pour l\'allumer ou l\'éteindre');
+      if (hud) hud.toast('Lampe torche en main (case 1) · [1] pour l\'allumer ou l\'éteindre');
       break;
     case 'noLamp':
       if (ev.id === me && hud) hud.toast('Pas de lampe : prends-en une sur la table du départ');
@@ -471,15 +529,21 @@ function loop(currentTime) {
       run: live && run,
       toggleFlashlight: toggleFlashlightRequested,
       use: useRequested,
+      sel: selRequested || undefined,
+      useSel: act.use,
+      pick: act.pick,
+      rope: act.rope,
+      whistle: act.whistle,
     };
     if (NET.role === 'guest') {
       // l'invité se déplace chez lui ; lampe et objets partent tout de suite à l'hôte
       sim.predict(input);
-      if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', run: NET.run });
-      if (useRequested !== null) send('host', { t: 'a', k: 'u', i: useRequested, run: NET.run });
+      const sel = sim.player.sel;
+      if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
+      for (const [k, on] of [['e', act.use], ['p', act.pick], ['r', act.rope], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
-        send('host', { t: 'i', run: NET.run, mx: input.mx, my: input.my, r: input.run ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2) }, true);
+        send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2) }, true);
       }
     } else {
       sim.step(input, NET.role === 'host' ? guestInputs() : null);
@@ -487,6 +551,8 @@ function loop(currentTime) {
     NET.tick++;
     toggleFlashlightRequested = false;
     useRequested = null;
+    selRequested = 0;
+    act.use = act.pick = act.rope = act.whistle = false;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
@@ -564,16 +630,20 @@ if (window.DDVolume && btnSet) {
         ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou flèches'],
         ['Regarder', 'souris'],
         ['Courir', '<kbd>Maj</kbd>'],
-        ['Lampe torche (case 1)', '<kbd>F</kbd> ou <kbd>1</kbd>'],
-        ['Utiliser un objet', '<kbd>2</kbd> <kbd>3</kbd>'],
+        ['Lampe torche (case 1)', '<kbd>1</kbd>'],
+        ['Choisir une case · utiliser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd>'],
+        ['Ramasser (échange si plein)', '<kbd>F</kbd>'],
+        ['Lancer sa corde dans un trou', '<kbd>R</kbd>'],
+        ['Siffler (attention à l\'entité)', '<kbd>T</kbd>'],
         ['Pause', '<kbd>Échap</kbd>'],
       ] }] },
       { title: 'Sans souris', items: [{ keys: [
         ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>'],
         ['Tourner la vue', '<kbd>←</kbd><kbd>→</kbd>'],
         ['Lever, baisser les yeux', '<kbd>↑</kbd><kbd>↓</kbd>'],
-        ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>F</kbd> ou <kbd>1</kbd>'],
-        ['Utiliser un objet', '<kbd>2</kbd> <kbd>3</kbd>'],
+        ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>1</kbd>'],
+        ['Choisir · utiliser · ramasser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd> · <kbd>F</kbd>'],
+        ['Corde · siffler', '<kbd>R</kbd> · <kbd>T</kbd>'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],
@@ -583,7 +653,7 @@ if (window.DDVolume && btnSet) {
 // Initialisation HubBridge ou Solo
 function boot(info) {
   if (!sfx) sfx = new BackroomsSfx();
-  if (!hud) hud = new BackroomsHUD(hudEl, { play, setKbMode, use: useSlot });
+  if (!hud) hud = new BackroomsHUD(hudEl, { play, setKbMode, use: (i) => useSlot(i, true) });
   if (H && H.embedded) {
     NET.role = info.role === 'host' ? 'host' : info.role === 'guest' ? 'guest' : 'solo';
     NET.myId = info.myId;

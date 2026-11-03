@@ -443,6 +443,90 @@ export class BackroomsSfx {
     lfo.stop(t + sec + 0.1);
   }
 
+  // Sifflet : deux notes aiguës qui montent ; vol de 0 à 1 (plus faible de loin), pan de -1 (gauche) à 1 (droite)
+  whistle(vol = 1, pan = 0) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.13 * vol, t);
+    if (c.createStereoPanner) {
+      const p = c.createStereoPanner();
+      p.pan.setValueAtTime(pan, t);
+      out.connect(p);
+      p.connect(this.out);
+    } else out.connect(this.out);
+    [[1700, 2300, 0, 0.28], [2100, 2700, 0.32, 0.45]].forEach(([f0, f1, d, len]) => {
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f0, t + d);
+      osc.frequency.exponentialRampToValueAtTime(f1, t + d + len);
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(1, t + d + 0.03);
+      g.gain.setValueAtTime(1, t + d + len - 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, t + d + len);
+      osc.connect(g);
+      g.connect(out);
+      osc.start(t + d);
+      osc.stop(t + d + len + 0.02);
+    });
+  }
+
+  // Chute dans un trou : un frottement puis un choc sourd (plus fort pour celui qui tombe)
+  fall(mine = true) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const k = mine ? 1 : 0.4;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
+    g.gain.setValueAtTime(0.25 * k, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(g);
+    g.connect(this.out);
+    osc.start(t);
+    osc.stop(t + 0.55);
+    const thud = c.createOscillator();
+    const tg = c.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(70, t + 0.45);
+    thud.frequency.exponentialRampToValueAtTime(30, t + 0.7);
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.setValueAtTime(0.6 * k, t + 0.45);
+    tg.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+    thud.connect(tg);
+    tg.connect(this.out);
+    thud.start(t);
+    thud.stop(t + 0.8);
+  }
+
+  // Corde qu'on déroule : un sifflement de frottement qui descend
+  rope() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const len = 0.6;
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const f = c.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(2200, t);
+    f.frequency.exponentialRampToValueAtTime(500, t + len);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.25, t);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.out);
+    src.start(t);
+  }
+
   // Victoire
   win() {
     if (!this.unlocked || !this.ctx) return;
