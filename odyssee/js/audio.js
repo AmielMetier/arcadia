@@ -301,6 +301,22 @@ export class Sound {
       case 'buy': P(n('B5'), 0, 0.06, 0.08); P(n('E6'), 0.07, 0.12, 0.08); break;
       case 'pc': [['C6', 0], ['E6', 0.06], ['G6', 0.12]].forEach(([m, d]) => P(n(m), d, 0.05, 0.05, 'pulse12')); break;
       case 'status': P(n('A4'), 0, 0.3, 0.08, 'pulse50', { slide: n('E4') }); break;
+      case 'cut':
+        this.tone('noise', 3800, t, 0.07, 0.22, B, { filter: 'bandpass' });
+        P(n('E6'), 0, 0.06, 0.14, 'triangle', { slide: n('B4') });
+        this.tone('noise', 1600, t + 0.06, 0.14, 0.1, B, { filter: 'lowpass' });
+        break;
+      case 'splash':
+        this.tone('noise', 900, t, 0.14, 0.24, B, { filter: 'lowpass' });
+        P(n('G5'), 0.01, 0.08, 0.12, 'triangle', { slide: n('C5') });
+        P(n('D6'), 0.05, 0.09, 0.1, 'sine', { slide: n('G5') });
+        break;
+      case 'whistle':
+        this.duck(1800);
+        [['E5', 0], ['B5', 0.1], ['E6', 0.2], ['G#6', 0.32], ['B6', 0.48]].forEach(([m, d], i) => {
+          P(n(m), d, i === 4 ? 0.7 : 0.13, 0.12, 'sine');
+        });
+        break;
       default: break;
     }
   }

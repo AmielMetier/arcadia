@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 3.91 — 3 novembre 2026
+- **Odyssée** — Objets d'exploration et capacités de terrain :
+  - Remplacement définitif des CS classiques par trois Objets Rares d'exploration dédiés :
+    - **Sécateur Sylvestre** (remplace Coupe) : cisaille horticole ouvragée en acier ciselé et or, avec manches vert émeraude.
+    - **Harnais Flottant d'Écume** (remplace Surf) : harnais de monte nautique azur à boucles coquillages et flotteurs d'écume.
+    - **Sifflet Céleste** (remplace Vol) : flûte dorée ailée ornée d'un ruban céleste, invoquant les courants aériens.
+  - Visuels d'objets en pur Pixel Art 16-bit (palette et esthétique Pokémon DS Gen 4 / Gen 5 HeartGold / SoulSilver et Noir & Blanc 2).
+  - Animations de terrain authentiques fidèles aux jeux vidéo Pokémon :
+    - **Coupe** : double taillade diagonale croisée animée en flash lumineux (X-slash), secousse de l'écran, son tranchant et tourbillon de 12 feuilles vertes virevoltantes à la disparition du buisson.
+    - **Surf** : saut parabolique du dresseur vers l'eau, impact sonore aquatique et triples ondelettes d'écume concentriques avec gerbe de gouttelettes d'eau au déploiement du Harnais Flottant.
+    - **Vol** : mélodie céleste cristalline au sifflet, spirale de notes de musique dorées et étincelles éoliennes autour du joueur, envolée verticale dans les nuages avec fermeture en iris, puis descente depuis le ciel avec nuage de poussière et atterrissage en douceur devant le Centre Pokémon.
+  - Descriptions d'objets et boîtes de dialogue immersives dans l'esprit de Pokémon Version Noire 2 et Blanche 2.
+
 ## 3.90 — 3 novembre 2026
 - **The Backrooms** — l'entité du Level 1 est plus sombre, mais bien plus nette : on la voit en détail sans qu'elle soit brouillée.
 - **The Backrooms** — l'entité du Level 1 est bien plus grande, et chaque level a son propre screamer.

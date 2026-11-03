@@ -275,7 +275,8 @@ export class Game {
     if (!f || f.hidden || !sp) { if (v.actors.has('follower')) v.removeActor('follower'); return; }
     let x = f.x, y = f.y, hop = 0, sf = 0;
     if (f.move) { const u = Math.min(1, f.move.t); x = f.move.fx + (f.move.tx - f.move.fx) * u; y = f.move.fy + (f.move.ty - f.move.fy) * u; sf = u < 0.5 ? (f.step % 2 ? 1 : 2) : 0; if (f.move.jump) hop = Math.sin(u * Math.PI) * 0.45; }
-    else sf = Math.floor(performance.now() / 420) % 2 ? 1 : 0;   // il piétine sur place, comme dans HGSS
+    else sf = Math.floor(performance.now() / 420) % 2 ? 1 : 0;
+    if (f.flyElevation) hop += f.flyElevation;   // il piétine sur place, comme dans HGSS
     const a = v.actor('follower', {});
     a.mesh.scale.setScalar(SUIVEUR);   // un peu plus petit que le dresseur
     v.setFrame(a, 'poke:' + sp, f.dir, sf);
@@ -473,6 +474,7 @@ export class Game {
       if (p.move.jump) hop = Math.sin(u * Math.PI) * 0.55;
       stepFrame = p.surf ? 0 : u < 0.5 ? (p.step % 2 ? 1 : 2) : 0;
     } else if (p.bumpT > 0) stepFrame = p.bumpT > 0.15 ? (p.step % 2 ? 1 : 2) : 0;
+    if (p.flyElevation) hop += p.flyElevation;
     const a = v.actor('player', {});
     const bike = this.onBike();
     if (bike) { stepFrame = 0; hop += 6 * HPX; }   // assis sur la selle
@@ -933,6 +935,152 @@ export class Game {
     this.ui.banner(d.name);
   }
 
+  /* ================= animations de terrain authentiques ================= */
+  async animateCut(x, y) {
+    const pt = this.view.tileToScreen ? this.view.tileToScreen(x, y, 0.3) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const fx = document.createElement('div');
+    fx.className = 'field-cut-fx';
+    fx.style.left = `${pt.x}px`;
+    fx.style.top = `${pt.y}px`;
+
+    const s1 = document.createElement('div'); s1.className = 'cut-slash slash-1';
+    const s2 = document.createElement('div'); s2.className = 'cut-slash slash-2';
+    fx.append(s1, s2);
+
+    for (let i = 0; i < 12; i++) {
+      const leaf = document.createElement('div');
+      leaf.className = 'cut-leaf';
+      const angle = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const dist = 32 + Math.random() * 30;
+      leaf.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      leaf.style.setProperty('--dy', `${Math.sin(angle) * dist * 0.75 + 10}px`);
+      leaf.style.setProperty('--rot', `${Math.round((Math.random() - 0.5) * 720)}deg`);
+      leaf.style.animationDelay = `${(i % 3) * 0.03}s`;
+      fx.appendChild(leaf);
+    }
+    this.ui.root.appendChild(fx);
+
+    this.sound.sfx('cut');
+    this.view.shake = 0.3;
+    await wait(80);
+    this.sound.sfx('hitweak');
+    await this.ui.flash(1, '#ffffff', 50);
+    await wait(280);
+    fx.remove();
+  }
+
+  animateSurfSplash(x, y) {
+    const pt = this.view.tileToScreen ? this.view.tileToScreen(x, y, 0) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const fx = document.createElement('div');
+    fx.className = 'field-surf-splash';
+    fx.style.left = `${pt.x}px`;
+    fx.style.top = `${pt.y}px`;
+
+    for (let i = 0; i < 3; i++) {
+      const r = document.createElement('div');
+      r.className = 'surf-ripple';
+      fx.appendChild(r);
+    }
+
+    for (let i = 0; i < 8; i++) {
+      const d = document.createElement('div');
+      d.className = 'surf-droplet';
+      const angle = (i / 8) * Math.PI * 2;
+      const dist = 18 + Math.random() * 22;
+      d.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      d.style.setProperty('--dy', `${Math.sin(angle) * dist * 0.6}px`);
+      d.style.animationDelay = `${i * 0.02}s`;
+      fx.appendChild(d);
+    }
+
+    this.ui.root.appendChild(fx);
+    setTimeout(() => fx.remove(), 600);
+  }
+
+  async animateFlyDeparture() {
+    const pt = this.view.tileToScreen ? this.view.tileToScreen(this.player.x, this.player.y, 0.4) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const fx = document.createElement('div');
+    fx.className = 'field-fly-fx';
+    fx.style.left = `${pt.x}px`;
+    fx.style.top = `${pt.y}px`;
+
+    const notes = ['♪', '♫', '♬', '✦', '♪', '♫'];
+    notes.forEach((glyph, i) => {
+      const n = document.createElement('div');
+      n.className = 'fly-musical-note';
+      n.textContent = glyph;
+      n.style.setProperty('--angle', `${i * 60}deg`);
+      n.style.setProperty('--rad', `${36 + (i % 2) * 16}px`);
+      n.style.animationDelay = `${i * 0.08}s`;
+      fx.appendChild(n);
+    });
+
+    for (let i = 0; i < 10; i++) {
+      const sp = document.createElement('div');
+      sp.className = 'fly-sparkle';
+      const a = (i / 10) * Math.PI * 2;
+      sp.style.setProperty('--dx', `${Math.cos(a) * (24 + Math.random() * 24)}px`);
+      sp.style.setProperty('--dy', `${-18 - Math.random() * 36}px`);
+      sp.style.animationDelay = `${i * 0.05}s`;
+      fx.appendChild(sp);
+    }
+
+    this.ui.root.appendChild(fx);
+    await wait(750);
+    fx.remove();
+  }
+
+  async animateFlyAscent() {
+    const p = this.player;
+    const dur = 0.55;
+    const t0 = performance.now();
+    while (performance.now() - t0 < dur * 1000) {
+      const u = (performance.now() - t0) / (dur * 1000);
+      p.flyElevation = u * u * 4.5;
+      if (this.fol) this.fol.flyElevation = p.flyElevation;
+      await wait(16);
+    }
+    p.flyElevation = 4.5;
+    if (this.fol) this.fol.flyElevation = 4.5;
+  }
+
+  async animateFlyDescent() {
+    const p = this.player;
+    const dur = 0.65;
+    const t0 = performance.now();
+    while (performance.now() - t0 < dur * 1000) {
+      const u = (performance.now() - t0) / (dur * 1000);
+      const ease = 1 - Math.pow(1 - u, 3);
+      p.flyElevation = (1 - ease) * 4.5;
+      if (this.fol) this.fol.flyElevation = p.flyElevation;
+      await wait(16);
+    }
+    p.flyElevation = 0;
+    if (this.fol) this.fol.flyElevation = 0;
+
+    this.sound.sfx('bump');
+    this.view.shake = 0.15;
+    this.animateLandingDust(p.x, p.y);
+  }
+
+  animateLandingDust(x, y) {
+    const pt = this.view.tileToScreen ? this.view.tileToScreen(x, y, 0) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const fx = document.createElement('div');
+    fx.className = 'field-fly-fx';
+    fx.style.left = `${pt.x}px`;
+    fx.style.top = `${pt.y}px`;
+
+    [-18, -10, 10, 18].forEach((dx) => {
+      const dust = document.createElement('div');
+      dust.className = 'fly-landing-dust';
+      dust.style.setProperty('--dx', `${dx}px`);
+      fx.appendChild(dust);
+    });
+
+    this.ui.root.appendChild(fx);
+    setTimeout(() => fx.remove(), 400);
+  }
+
   /* ================= capacités de terrain ================= */
   hasField(k) { const f = FIELD[k]; return !!(this.state.bag['cs-' + k] || (f?.item && this.state.bag[f.item])); }
   canField(k) { return this.hasField(k) && this.badgeCount() >= FIELD[k].badge; }
@@ -945,8 +1093,14 @@ export class Game {
     if (!(await this.ui.yesNo(`${look}\nUtiliser ${F.name} ?`))) return;
     const mon = this.fieldUser();
     this.sound.cry(ASSETS.cry(mon.sp));
-    if (k === 'coupe') { await this.ui.say(`${st.name} utilise le Sécateur Sylvestre pour trancher le buisson !`, { auto: 600 }); } else { await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 }); }
-    this.sound.sfx(k === 'coupe' ? 'hitweak' : 'hitstrong'); await this.ui.flash(1, '#ffffff', 60);
+    if (k === 'coupe') {
+      await this.ui.say(`${st.name} utilise le Sécateur Sylvestre pour trancher le buisson !`, { auto: 600 });
+      await this.animateCut(x, y);
+    } else {
+      await this.ui.say(`${monName(mon)} utilise ${F.name} !`, { auto: 500 });
+      this.sound.sfx('hitstrong');
+      await this.ui.flash(1, '#ffffff', 60);
+    }
     const m = this.mapObj;
     m.set(x, y, m.outdoor ? T.GRASS : T.CAVE);
     (st.cleared[m.id] ||= []).push(key(x, y));
@@ -969,24 +1123,38 @@ export class Game {
     if (!this.canField('surf')) { await this.ui.say(this.hasField('surf') ? ['L\'eau est d\'un bleu profond...', 'Il faut le Badge Mirage pour surfer.'] : 'L\'eau est d\'un bleu profond...'); return; }
     if (!st.party.some((m) => m.hp > 0)) return;
     if (!(await this.ui.yesNo('L\'eau est d\'un bleu profond...\nUtiliser le Harnais Flottant ?'))) return;
-    this.sound.sfx('bump');
-    await this.ui.say(`${st.name} déploie le Harnais Flottant et glisse sur l\'eau !`, { auto: 600 });
+    await this.ui.say(`${st.name} déploie le Harnais Flottant et s'élance sur l'eau !`, { auto: 600 });
     const p = this.player;
-    p.surf = true; p.move = { fx: p.x, fy: p.y, tx: x, ty: y, t: 0, dur: 0.3, jump: true, scripted: true };
+    this.sound.sfx('ledge');
+    p.move = { fx: p.x, fy: p.y, tx: x, ty: y, t: 0, dur: 0.35, jump: true, scripted: true };
+    while (p.move && p.move.t < 0.85) await wait(16);
+    this.sound.sfx('splash');
+    this.animateSurfSplash(x, y);
+    p.surf = true;
     while (p.move) await wait(16);
     this.updateZone();
   }
   /** Vol : retour dans une ville déjà visitée (devant son Centre de soins) */
   async fly() {
+    const st = this.state;
     const towns = Object.values(this.world.towns).filter((t) => this.state.visited.includes(t.id) && (t.centerDoor || t.homeDoor));
     const k = await this.ui.list({ title: 'Voler vers...', items: towns.map((t) => ({ label: t.name })).concat([{ label: 'Annuler' }]), cls: 'shop', cancel: towns.length });
     if (k < 0 || k >= towns.length) return false;
     const t = towns[k], mon = this.fieldUser();
     this.sound.cry(ASSETS.cry(mon.sp));
-    this.sound.sfx('item');
-    await this.ui.say(`${st.name} souffle dans le Sifflet Céleste !\nUn grand oiseau descend des nuages et vous emporte.`, { auto: 700 });
+    this.sound.sfx('whistle');
+    await this.animateFlyDeparture();
+    await this.ui.say(`${st.name} souffle dans le Sifflet Céleste !\nUne mélodie dorée résonne et vous emporte dans les cieux.`, { auto: 700 });
+    await this.animateFlyAscent();
+    await this.ui.doorTransition(true, 280);
     const [x, y] = t.centerDoor || t.homeDoor;
-    await this.warp({ map: 'monde', x, y, dir: 'down' }, 'exit');
+    this.player.x = x; this.player.y = y + 1; this.player.dir = 'down'; this.player.move = null; this.player.surf = false;
+    this.setMap('monde');
+    this.view.update(0, this.player.x, this.player.y);
+    this.save(true);
+    await this.ui.doorTransition(false, 250);
+    await this.animateFlyDescent();
+    await this.ui.say(`Vous atterrissez en douceur devant le Centre de soins de ${t.name}.`, { auto: 650 });
     return true;
   }
 
