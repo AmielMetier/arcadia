@@ -4962,11 +4962,43 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 
 .tfilter-bar {
   display: flex;
+  flex-direction: column;
+  gap: calc(var(--px) * 1.5);
+  padding-bottom: calc(var(--px) * 2);
+  border-bottom: calc(var(--px) * 1) solid #19273f;
+}
+
+.tfilter-row {
+  display: flex;
   align-items: center;
   gap: calc(var(--px) * 1.5);
   flex-wrap: wrap;
-  padding-bottom: calc(var(--px) * 2);
-  border-bottom: calc(var(--px) * 1) solid #19273f;
+}
+
+.tfilter-cat-btn {
+  font: inherit;
+  font-size: calc(var(--px) * 4);
+  font-weight: 600;
+  color: #94a3b8;
+  background: #111c2e;
+  border: calc(var(--px) * 1) solid #1e304b;
+  border-radius: calc(var(--px) * 2);
+  padding: calc(var(--px) * 1) calc(var(--px) * 2.5);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.tfilter-cat-btn:hover {
+  color: #f8fafc;
+  border-color: #38bdf8;
+}
+
+.tfilter-cat-btn.on {
+  color: #0b111a;
+  background: #fcd34d;
+  border-color: #fef08a;
+  font-weight: 800;
+  box-shadow: 0 0 calc(var(--px) * 3) rgba(252, 211, 77, 0.4);
 }
 
 .tfilter-btn {
@@ -5097,6 +5129,60 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
   align-items: center;
   justify-content: space-between;
   gap: calc(var(--px) * 2);
+}
+
+.tmedal-title-left {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--px) * 1.5);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.tmedal-cat-tag {
+  font-size: calc(var(--px) * 3);
+  font-weight: 700;
+  border-radius: calc(var(--px) * 1);
+  padding: calc(var(--px) * 0.4) calc(var(--px) * 1.4);
+  letter-spacing: calc(var(--px) * 0.1);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tmedal-cat-tag.cat-pvp {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(244, 63, 94, 0.4);
+}
+
+.tmedal-cat-tag.cat-aventure {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(251, 191, 36, 0.4);
+}
+
+.tmedal-cat-tag.cat-pokedex {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(52, 211, 153, 0.4);
+}
+
+.tmedal-cat-tag.cat-entrainement {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(56, 189, 248, 0.4);
+}
+
+.tmedal-cat-tag.cat-exploration {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(192, 132, 252, 0.4);
+}
+
+.tmedal-cat-tag.cat-domaine {
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.15);
+  border: calc(var(--px) * 0.8) solid rgba(251, 146, 60, 0.4);
 }
 
 .tmedal-title {

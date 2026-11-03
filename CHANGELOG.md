@@ -2,6 +2,22 @@
 
 ## 3.95 — 4 novembre 2026
 - **Arcadia** — Les comptes peuvent recevoir le grade VIP, qui donnera accès à des jeux et des modes de jeu réservés. Il n'y en a pas encore : ils arriveront plus tard. Un compte VIP l'affiche sous son nom (« ⭐ VIP »).
+- **Odyssée** — Expansion du Journal des Trophées & Boîte à Médailles B2W2 (32 Médailles au total) :
+  - **20 nouveaux objectifs hors-PvP** couvrant tous les aspects du monde :
+    - *Aventure & Histoire* : Étoile Montante (4 badges continent), Maître du Continent (8 badges), Conquérant du Sud (15 badges totaux), Sauveur d'Odyssée (Team Éclipse & Lugia).
+    - *Pokédex & Collection* : Naturaliste Débutant (20 capturés), Zoologiste Émérite (60 capturés), Encyclopédie Vivante (120 capturés), Étoile Miraculeuse (Posséder un Pokémon Chromatique / Shiny).
+    - *Entraînement & Puissance* : Premier Envol (1re évolution), Lien Élémentaire (évolution par pierre), Sommet de la Puissance (Pokémon Niv. 100), Bataillon d'Élite (6 Pokémon Niv. 60+).
+    - *Exploration & Quêtes* : Fouilleur Curieux (15 objets au sol), Grand Voyageur (10 villes visitées), Ami des Habitants (5 quêtes secondaires finies), Pionnier du Terrain (Posséder les 3 Objets Rares : Sécateur Sylvestre, Harnais Flottant, Sifflet Céleste).
+    - *Domaine d'Aube & Économie* : Bâtisseur du Domaine (1re construction), Maire Prospère (3 résidents installés), Flambeur de Métropole (1 000 jetons casino), Magnat d'Odyssée (100 000 ₽ amassés).
+  - **Règle stricte des Master Balls & Rééquilibrage des Récompenses** :
+    - Réduction à **une seule et unique Master Ball** dans l'intégralité du jeu, réservée au trophée des 50 victoires PvP (*Seigneur des Duels*).
+    - Le trophée des 10 victoires face au même joueur (*Némésis Suprême*) octroie désormais les *Lunettes Choix ×1*.
+  - **Interface utilisateur B2W2 perfectionnée** :
+    - Double barre de filtrage ergonomique : navigation par catégorie thématique (*Toutes*, *⚔️ PvP*, *🗺️ Aventure*, *📖 Pokédex*, *⚡ Entraînement*, *🧭 Exploration*, *🏰 Domaine*) et par rang (*Tous rangs*, *À Réclamer*, *Débloquées*, *Bronze*, *Argent*, *Or*, *Platine*).
+    - Badges de catégorie dédiés affichés sur chaque carte de médaille.
+    - Évaluation automatique `checkAllTrophies(st)` lors de l'ouverture du journal, des remises de badges et des sauvegardes.
+  - **Tests & Robustesse** :
+    - Suite de tests unitaires et d'intégration `tools/test-trophies-system.mjs` validant à 100% les 32 trophées, les déblocages non-PvP et le contrôle strict d'attribution d'une unique Master Ball.
 
 ## 3.94 — 3 novembre 2026
 - **CI & Hub** — Robustesse du workflow de publication automatique du journal (`.github/workflows/changelog.yml`) :

@@ -11,7 +11,7 @@ import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADG
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
 import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast } from './ui/screens.js';
-import { recordPvpMatch, ensurePvpState } from './core/trophies.js';
+import { recordPvpMatch, ensurePvpState, checkAllTrophies } from './core/trophies.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX, CHAR_ROWS } from './render/world3d.js';
@@ -176,6 +176,7 @@ export class Game {
   }
   save(silent = false) {
     const s = this.state; const p = this.player;
+    if (s && !silent) { try { this.checkTrophies(true); } catch (e) {} }
     s.map = this.mapObj.id; s.x = p.x; s.y = p.y; s.dir = p.dir; s.surf = !!p.surf;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); if (!silent) this.sound.sfx('save'); } catch (e) { return false; }
     this.onSaved?.(silent);
@@ -1224,9 +1225,21 @@ export class Game {
     return outcome;
   }
 
+  checkTrophies(notify = true) {
+    if (!this.state) return [];
+    const newly = checkAllTrophies(this.state);
+    if (notify && newly && newly.length > 0) {
+      for (const trophy of newly) {
+        showTrophyToast(this, trophy);
+      }
+    }
+    return newly;
+  }
+
   async openTrophies() {
     this.busy = true;
     try {
+      this.checkTrophies(false);
       await trophiesScreen(this);
     } finally {
       this.busy = false;
@@ -1481,6 +1494,7 @@ export class Game {
   async badgeScene(g, name) {
     const st = this.state, ui = this.ui;
     st.badges[g] = true;
+    try { this.checkTrophies(true); } catch (e) {}
     this.sound.sfx('badge');
     await ui.say(`${st.name} reçoit le ${BADGES[g].name} de la part de ${name} !`);
     const lines = {

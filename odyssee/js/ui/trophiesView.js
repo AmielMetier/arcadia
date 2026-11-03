@@ -7,7 +7,8 @@ import {
   ensurePvpState,
   claimTrophyReward,
   getPvpSummary,
-  getHeadToHeadStatus
+  getHeadToHeadStatus,
+  checkAllTrophies
 } from '../core/trophies.js';
 import { itemName } from '../core/items.js';
 
@@ -55,6 +56,18 @@ export function showTrophyToast(game, trophy) {
   }, 3600);
 }
 
+const CAT_INFOS = {
+  combat: { label: 'Duel PvP', icon: '⚔️', cls: 'cat-pvp' },
+  reseau: { label: 'Réseau PvP', icon: '🌐', cls: 'cat-pvp' },
+  rival: { label: 'Rival PvP', icon: '🔥', cls: 'cat-pvp' },
+  streak: { label: 'Série PvP', icon: '👑', cls: 'cat-pvp' },
+  aventure: { label: 'Aventure', icon: '🗺️', cls: 'cat-aventure' },
+  pokedex: { label: 'Pokédex', icon: '📖', cls: 'cat-pokedex' },
+  entrainement: { label: 'Entraînement', icon: '⚡', cls: 'cat-entrainement' },
+  exploration: { label: 'Exploration', icon: '🧭', cls: 'cat-exploration' },
+  domaine: { label: 'Domaine', icon: '🏰', cls: 'cat-domaine' }
+};
+
 /**
  * Affiche l'écran complet du Journal des Trophées et Médailles B2W2.
  */
@@ -62,14 +75,17 @@ export function trophiesScreen(game) {
   const ui = game.ui;
   const st = game.state;
   ensurePvpState(st);
+  checkAllTrophies(st);
 
   return new Promise((resolve) => {
     const s = screen(ui, 'trophies-scr');
     let tab = 'medals'; // 'medals' | 'history' | 'streaks'
     let medalFilter = 'all'; // 'all' | 'unlocked' | 'claimable' | 'bronze' | 'silver' | 'gold' | 'platinum'
+    let catFilter = 'all'; // 'all' | 'pvp' | 'aventure' | 'pokedex' | 'entrainement' | 'exploration' | 'domaine'
     let selIdx = 0;
 
     const render = () => {
+      checkAllTrophies(st);
       const summary = getPvpSummary(st);
       const trophies = TROPHIES_CATALOG.map((t) => {
         const u = st.pvp.trophies[t.id] || {};
@@ -86,6 +102,13 @@ export function trophiesScreen(game) {
 
       // Filtrage des trophées
       const filteredTrophies = trophies.filter((t) => {
+        if (catFilter !== 'all') {
+          if (catFilter === 'pvp') {
+            if (!['combat', 'reseau', 'rival', 'streak'].includes(t.category)) return false;
+          } else if (t.category !== catFilter) {
+            return false;
+          }
+        }
         if (medalFilter === 'unlocked') return t.unlocked;
         if (medalFilter === 'claimable') return t.unlocked && !t.claimed;
         if (medalFilter === 'bronze') return t.tier === 'bronze';
@@ -120,7 +143,7 @@ export function trophiesScreen(game) {
         </div>
 
         <div class="trophies-body">
-          ${tab === 'medals' ? renderMedalsTab(filteredTrophies, summary, medalFilter) : ''}
+          ${tab === 'medals' ? renderMedalsTab(filteredTrophies, trophies, summary, medalFilter, catFilter) : ''}
           ${tab === 'history' ? renderHistoryTab(summary) : ''}
           ${tab === 'streaks' ? renderStreaksTab(summary) : ''}
         </div>
@@ -140,6 +163,16 @@ export function trophiesScreen(game) {
         b.addEventListener('click', (e) => {
           e.stopPropagation();
           tab = b.dataset.tab;
+          selIdx = 0;
+          ui.sound?.sfx('blip');
+          render();
+        });
+      });
+
+      s.querySelectorAll('.tfilter-cat-btn').forEach((b) => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          catFilter = b.dataset.cat;
           selIdx = 0;
           ui.sound?.sfx('blip');
           render();
@@ -202,9 +235,8 @@ export function trophiesScreen(game) {
         render();
       } else if (k === 'a' || k === 'space') {
         if (tab === 'medals') {
-          // Chercher le premier trophée réclamable ou celui sélectionné
-          const summary = getPvpSummary(st);
-          const claimable = TROPHIES_CATALOG.find((t) => st.pvp.trophies[t.id]?.unlocked && !st.pvp.trophies[t.id]?.claimed);
+          const claimable = filteredTrophies.find((t) => t.unlocked && !t.claimed) ||
+                            trophies.find((t) => t.unlocked && !t.claimed);
           if (claimable) {
             handleClaim(claimable.id);
             return;
@@ -219,7 +251,7 @@ export function trophiesScreen(game) {
   });
 }
 
-function renderMedalsTab(trophies, summary, medalFilter) {
+function renderMedalsTab(filteredTrophies, allTrophies, summary, medalFilter, catFilter) {
   const TIER_COLORS = {
     bronze: '#d48842',
     silver: '#cad2df',
@@ -234,28 +266,63 @@ function renderMedalsTab(trophies, summary, medalFilter) {
     platinum: 'PLATINE'
   };
 
+  const catPool = allTrophies.filter((t) => {
+    if (catFilter === 'all') return true;
+    if (catFilter === 'pvp') return ['combat', 'reseau', 'rival', 'streak'].includes(t.category);
+    return t.category === catFilter;
+  });
+
+  const catTotal = catPool.length;
+  const catClaimable = catPool.filter((t) => t.unlocked && !t.claimed).length;
+  const catUnlocked = catPool.filter((t) => t.unlocked).length;
+  const catBronze = catPool.filter((t) => t.tier === 'bronze').length;
+  const catSilver = catPool.filter((t) => t.tier === 'silver').length;
+  const catGold = catPool.filter((t) => t.tier === 'gold').length;
+  const catPlat = catPool.filter((t) => t.tier === 'platinum').length;
+
+  const countCat = (catKey) => {
+    if (catKey === 'all') return allTrophies.length;
+    if (catKey === 'pvp') return allTrophies.filter((t) => ['combat', 'reseau', 'rival', 'streak'].includes(t.category)).length;
+    return allTrophies.filter((t) => t.category === catKey).length;
+  };
+
   return `
     <div class="tmedals-container">
       <div class="tfilter-bar">
-        <button type="button" class="tfilter-btn${medalFilter === 'all' ? ' on' : ''}" data-filter="all">Toutes (${summary.trophiesTotal})</button>
-        <button type="button" class="tfilter-btn${medalFilter === 'claimable' ? ' on' : ''}" data-filter="claimable">
-          À Réclamer ${summary.claimableCount > 0 ? `(${summary.claimableCount})` : ''}
-        </button>
-        <button type="button" class="tfilter-btn${medalFilter === 'unlocked' ? ' on' : ''}" data-filter="unlocked">Débloquées (${summary.unlockedCount})</button>
-        <span class="tfilter-sep">|</span>
-        <button type="button" class="tfilter-btn tier-bronze${medalFilter === 'bronze' ? ' on' : ''}" data-filter="bronze">Bronze</button>
-        <button type="button" class="tfilter-btn tier-silver${medalFilter === 'silver' ? ' on' : ''}" data-filter="silver">Argent</button>
-        <button type="button" class="tfilter-btn tier-gold${medalFilter === 'gold' ? ' on' : ''}" data-filter="gold">Or</button>
-        <button type="button" class="tfilter-btn tier-platinum${medalFilter === 'platinum' ? ' on' : ''}" data-filter="platinum">Platine</button>
+        <!-- Ligne 1 : Catégories thématiques B2W2 -->
+        <div class="tfilter-row tfilter-cat-row">
+          <button type="button" class="tfilter-cat-btn${catFilter === 'all' ? ' on' : ''}" data-cat="all">Toutes (${countCat('all')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'pvp' ? ' on' : ''}" data-cat="pvp">⚔️ PvP (${countCat('pvp')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'aventure' ? ' on' : ''}" data-cat="aventure">🗺️ Aventure (${countCat('aventure')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'pokedex' ? ' on' : ''}" data-cat="pokedex">📖 Pokédex (${countCat('pokedex')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'entrainement' ? ' on' : ''}" data-cat="entrainement">⚡ Entraînement (${countCat('entrainement')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'exploration' ? ' on' : ''}" data-cat="exploration">🧭 Exploration (${countCat('exploration')})</button>
+          <button type="button" class="tfilter-cat-btn${catFilter === 'domaine' ? ' on' : ''}" data-cat="domaine">🏰 Domaine (${countCat('domaine')})</button>
+        </div>
+
+        <!-- Ligne 2 : Filtres de statut et de palier -->
+        <div class="tfilter-row tfilter-tier-row">
+          <button type="button" class="tfilter-btn${medalFilter === 'all' ? ' on' : ''}" data-filter="all">Tous rangs (${catTotal})</button>
+          <button type="button" class="tfilter-btn${medalFilter === 'claimable' ? ' on' : ''}" data-filter="claimable">
+            À Réclamer ${catClaimable > 0 ? `(${catClaimable})` : ''}
+          </button>
+          <button type="button" class="tfilter-btn${medalFilter === 'unlocked' ? ' on' : ''}" data-filter="unlocked">Débloquées (${catUnlocked})</button>
+          <span class="tfilter-sep">|</span>
+          <button type="button" class="tfilter-btn tier-bronze${medalFilter === 'bronze' ? ' on' : ''}" data-filter="bronze">Bronze (${catBronze})</button>
+          <button type="button" class="tfilter-btn tier-silver${medalFilter === 'silver' ? ' on' : ''}" data-filter="silver">Argent (${catSilver})</button>
+          <button type="button" class="tfilter-btn tier-gold${medalFilter === 'gold' ? ' on' : ''}" data-filter="gold">Or (${catGold})</button>
+          <button type="button" class="tfilter-btn tier-platinum${medalFilter === 'platinum' ? ' on' : ''}" data-filter="platinum">Platine (${catPlat})</button>
+        </div>
       </div>
 
       <div class="tmedals-grid">
-        ${trophies.length ? trophies.map((t) => {
+        ${filteredTrophies.length ? filteredTrophies.map((t) => {
           const pct = Math.min(100, Math.round((t.current / t.max) * 100));
           const iconSrc = `img/trophies/medal_${t.tier}_64.png`;
           const isDone = t.done || t.unlocked;
           const isClaimed = t.claimed;
           const isClaimable = isDone && !isClaimed;
+          const cat = CAT_INFOS[t.category] || { label: 'Général', icon: '★', cls: 'cat-pvp' };
 
           return `
             <div class="tmedal-card ${t.tier}${isDone ? ' unlocked' : ' locked'}${isClaimable ? ' claimable' : ''}">
@@ -269,7 +336,10 @@ function renderMedalsTab(trophies, summary, medalFilter) {
 
               <div class="tmedal-info-col">
                 <div class="tmedal-title-row">
-                  <span class="tmedal-title">${esc(t.title)}</span>
+                  <div class="tmedal-title-left">
+                    <span class="tmedal-cat-tag ${cat.cls}">${cat.icon} ${cat.label}</span>
+                    <span class="tmedal-title">${esc(t.title)}</span>
+                  </div>
                   ${isClaimed ? '<span class="tmedal-claimed-badge">✔ Obtenu</span>' : isClaimable ? '<span class="tmedal-claimable-badge">★ Prêt !</span>' : ''}
                 </div>
                 <div class="tmedal-desc">${esc(t.desc)}</div>
