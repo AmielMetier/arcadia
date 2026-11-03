@@ -1323,6 +1323,7 @@ img { image-rendering: pixelated; }
 
 /* ================= SAC D'OBJETS B2W2 (PROPOSITION 1 — DUAL PANEL & ROUE ANIMÉE) ================= */
 .bag-scr {
+  pointer-events: auto;
   position: absolute;
   inset: 0;
   display: flex;
@@ -1416,8 +1417,10 @@ img { image-rendering: pixelated; }
   right: calc(var(--px) * 1.5);
   top: calc(var(--px) * 2);
   bottom: calc(var(--px) * 2);
-  width: 48%;
-  max-width: calc(var(--px) * 64);
+  height: calc(100% - var(--px) * 4);
+  aspect-ratio: 215 / 510;
+  width: auto;
+  max-width: 48%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1850,6 +1853,8 @@ img { image-rendering: pixelated; }
   border: calc(var(--px) * 1) solid #000;
   color: #ffffff;
   cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
   font-weight: 800;
   font-size: calc(var(--px) * 5.8);
   letter-spacing: 0.04em;
