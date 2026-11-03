@@ -19,6 +19,7 @@ export function centerInterior(id, name) {
   const m = room(id, 13, 10, { floor: 'center', music: 'center', wall: 'wall_center', name });
   counter(m, 3, 9, 4);
   m.npc({ id: id + ':infirmiere', x: 6, y: 3, sprite: 'nurse', role: 'nurse' });
+  m.npc({ id: id + ':relearner', x: 2, y: 4, sprite: 'savant', role: 'relearner', dir: 'right' });
   furn(m, 'healer', 8, 2); m.set(9, 2, T.BLOCK);
   furn(m, 'pc', 11, 2); m.object(11, 2, { type: 'pc' });
   // PC des Natures : on y change la nature d'un Pokémon de l'équipe

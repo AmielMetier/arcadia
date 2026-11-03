@@ -97,6 +97,8 @@ export function createMon(sp, lvl, o = {}) {
     shiny: o.shiny ?? r() < 1 / 1024,
     ball: o.ball || 'poke-ball',
     met: o.met || '', ot: o.ot || '',
+    item: o.item || null,
+    ability: o.ability || null,
   };
   refreshStats(m);
   return m;
@@ -158,13 +160,23 @@ export function expProgress(m, maxLvl = 100) {
 }
 
 /** évolution par niveau possible ? renvoie l'espèce cible */
-export function levelEvolution(m) {
-  const ev = SPECIES[m.sp].ev; if (!ev) return null;
+export function levelEvolution(m, hour = 12) {
+  const S = SPECIES[m.sp]; if (!S) return null;
+  // Cas spécial Évoli : évolution temporelle (Mentali le jour, Noctali la nuit)
+  if (m.sp === 133 && m.lvl >= 25) {
+    const isNight = hour >= 20 || hour < 6;
+    return isNight ? 197 : 196; // 197 = Noctali, 196 = Mentali
+  }
+  const ev = S.ev; if (!ev) return null;
   const e = ev.find((x) => x.lvl && m.lvl >= x.lvl);
   return e ? e.to : null;
 }
 export function itemEvolution(m, item) {
-  const ev = SPECIES[m.sp].ev; if (!ev) return null;
+  if (m.sp === 133) {
+    if (item === 'sun-stone') return 196; // Mentali
+    if (item === 'moon-stone' || item === 'dusk-stone') return 197; // Noctali
+  }
+  const ev = SPECIES[m.sp]?.ev; if (!ev) return null;
   const e = ev.find((x) => x.item === item);
   return e ? e.to : null;
 }

@@ -7,6 +7,7 @@ import { monName, expProgress } from '../core/mon.js';
 import { ITEMS, canUseOn, itemName } from '../core/items.js';
 import { ASSETS, loadImg } from '../assets.js';
 import { TYPE_COL, TYPE_FR, STATUS_FR, hpCol, partyScreen, bagScreen } from './screens.js';
+import { typeEff } from '../core/battle.js';
 
 const BH = 192;
 const TYPE_FX = {
@@ -247,11 +248,32 @@ export class BattleView {
           <div class="bh-hpn"></div>
         </div>
       </div>
+      <div class="battle-weather-badge" style="display:none"></div>
       <div class="dlg box btext"><div class="dlg-name" style="display:none"></div><div class="dlg-txt"></div><div class="dlg-arrow">▼</div></div>
       <div class="bcmd"></div>`);
     this.game.ui.root.appendChild(r);
     this.hud = { foe: r.querySelector('.bhud.foe'), me: r.querySelector('.bhud.me') };
     this.textBox = r.querySelector('.btext'); this.cmd = r.querySelector('.bcmd');
+    this.weatherBadge = r.querySelector('.battle-weather-badge');
+  }
+  updateWeather(w) {
+    if (!this.weatherBadge) this.weatherBadge = this.root?.querySelector('.battle-weather-badge');
+    if (!this.weatherBadge) return;
+    if (!w || w === 'none') {
+      this.weatherBadge.style.display = 'none';
+      this.weatherBadge.className = 'battle-weather-badge';
+      return;
+    }
+    const W_INFO = {
+      rain: { icon: '🌧️', label: 'Pluie' },
+      sun: { icon: '☀️', label: 'Zénith' },
+      sandstorm: { icon: '🌪️', label: 'Sable' },
+      hail: { icon: '❄️', label: 'Grêle' },
+    };
+    const info = W_INFO[w] || { icon: '⛅', label: w };
+    this.weatherBadge.innerHTML = `<span class="bwb-icon">${info.icon}</span><span class="bwb-label">${info.label}</span>`;
+    this.weatherBadge.className = `battle-weather-badge ${w}`;
+    this.weatherBadge.style.display = 'flex';
   }
   renderPartyBalls(side) {
     const party = this.battle?.sides?.[side]?.party || [];
@@ -304,6 +326,7 @@ export class BattleView {
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(battle.weather);
     this.setHud(1, null); this.setHud(0, null);
     // images
     const foeSide = battle.sides[1];
@@ -347,6 +370,7 @@ export class BattleView {
       trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 } };
     this.buildDom();
     this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(battle.weather);
     this.setHud(1, null); this.setHud(0, null);
     await Promise.all([
       this.loadBattleDecor(this.kind, o.night),
@@ -484,6 +508,8 @@ export class BattleView {
   moveMenu() {
     return new Promise((resolve) => {
       const m = this.battle.me;
+      const foeMon = this.battle.foe;
+      const foeTypes = foeMon ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
       this.cmd.innerHTML = `<div class="mv-grid">${[0, 1, 2, 3].map((k) => {
         const x = m.moves[k];
         if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
@@ -494,10 +520,21 @@ export class BattleView {
         const dp = this.battle.damagePreview ? this.battle.damagePreview(0, 1, x.id) : null;
         const dmgTxt = !dp ? '' : dp.eff === 0 ? '<span class="mdmg none">Aucun effet</span>'
           : `<span class="mdmg${dp.sure ? ' ko' : dp.ko ? ' maybe' : ''}" title="Dégâts prévus sur ${esc(monName(this.battle.foe))} (sans coup critique) · puissance ${M.p || '—'}">${Math.round(dp.lo) === Math.round(dp.hi) ? Math.round(dp.lo) : `${Math.round(dp.lo)}–${Math.round(dp.hi)}`} %${dp.eff > 1 ? ' ▲' : dp.eff < 1 ? ' ▼' : ''}</span>`;
+        let effBadge = '';
+        if (foeTypes && (M.p || M.c !== 'status')) {
+          const eff = typeEff(M.t, foeTypes);
+          if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+          else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+          else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+          else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+        }
         return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
           <div class="mbtn-top">
             <span class="mn">${esc(M.n)}</span>
             <img class="mcat" src="${catIcon}" alt="${M.c}">
+          </div>
+          <div class="mbtn-mid">
+            ${effBadge}
           </div>
           <div class="mbtn-bot">
             <span class="mt">${TYPE_FR[M.t]}</span>
@@ -558,6 +595,13 @@ export class BattleView {
         case 'hp': await this.animHp(e.side, e.from, e.hp, e.status); break;
         case 'status': { const m = this.battle.act(e.side); this.setHud(e.side, m); if (e.status) { this.sound.sfx('status'); const c = this.sprCenter(e.side); this.burst(c.x, c.y, [STATUS_FR[e.status]?.[1] || '#fff', '#ffffff'], 12, { r: 2 }); await wait(250); } break; }
         case 'stat': await this.animStat(e.side, e.up); break;
+        case 'weather': this.updateWeather(e.weather); break;
+        case 'gym-tension': {
+          this.sound.play('gymTension');
+          this.st.screenFlash = 0.6;
+          await wait(180);
+          break;
+        }
         case 'anim': await this.animStatus(e.side, e.k); break;
         case 'faint': await this.animFaint(e.side); break;
         case 'exp': if (e.active) await this.animExp(e); break;

@@ -1,39 +1,39 @@
 # Journal des versions — Arcadia
 
-## 3.75 — 3 novembre 2026
+## 3.76 — 3 novembre 2026
 - **Odyssée** — Tous les personnages ont maintenant leur nouveau dessin : Nocturne et ses admins Nyx et Érèbe, le Conseil 4 (Frimas, Spectrel, Brutus et Ombrelle), Lumen et le savant.
 
-## 3.74 — 3 novembre 2026
+## 3.75 — 3 novembre 2026
 - **Odyssée** — Une armoire dans ta chambre, à Bourg-Aube : change de tenue quand tu veux, sans attendre la boutique de Métropole.
 - **Odyssée** — Nouveaux dessins pour le capitaine, le facteur, la vieille dame, Nox, le voleur, Brume et une sbire de la Team Éclipse.
 
-## 3.73 — 3 novembre 2026
+## 3.74 — 3 novembre 2026
 - **Odyssée** — Sur certains téléphones, les personnages restent nets (ils pouvaient s'afficher flous).
 
-## 3.72 — 3 novembre 2026
+## 3.73 — 3 novembre 2026
 - **Odyssée** — À plusieurs, les autres joueurs apparaissent avec la tenue qu'ils se sont choisie.
 
-## 3.71 — 3 novembre 2026
+## 3.72 — 3 novembre 2026
 - **Odyssée** — Portraits de combat pour Morgane, Gaspard, Ferdinand, Lilas et Corbin, et un nouveau portrait de Théo qui lui ressemble enfin (cheveux bleus et écharpe rouge).
 
-## 3.70 — 3 novembre 2026
+## 3.71 — 3 novembre 2026
 - **Odyssée** — Les sept Champions des Terres du Sud ont leur propre dessin : Margot, Aurèle, Morgane, Gaspard, Ferdinand, Lilas et Corbin, ainsi que le croupier du Casino.
 - **Odyssée** — Margot et Aurèle ont leur portrait de combat ; les autres Champions du Sud ne s'affichent plus en image cassée pendant le combat.
 
-## 3.69 — 3 novembre 2026
+## 3.70 — 3 novembre 2026
 - **Odyssée** — Crée ton personnage au début de l'aventure : garçon ou fille, couleur de peau et de cheveux, casquette ou bonnet, pull, t-shirt, veste ou chemise, pantalon ou short, baskets ou sandales, sac à dos ou sacoche, et la couleur de chaque vêtement.
 - **Odyssée** — La boutique de mode de Métropole ouvre : sa cabine d'essayage permet de changer de style quand on veut.
 - **Odyssée** — Nouveaux dessins pour Pierre, Margot, Aurèle, le vieux jardinier, Lucie, la fillette au médaillon, Brume et les sbires de la Team Éclipse.
 
-## 3.68 — 3 novembre 2026
+## 3.69 — 3 novembre 2026
 - **Odyssée** — Cinq nouveaux dresseurs sur les routes du nord (Route 1, Route 3, Route 7 et Route 10).
 - **Odyssée** — La carte de la région montre le Pont de l'Austral qui relie Bourg-Aube aux Terres du Sud.
 
-## 3.67 — 3 novembre 2026
+## 3.68 — 3 novembre 2026
 - **Odyssée** — Un vélo ! À Voltacité, Lucien t'en assemble un si tu lui rapportes deux pièces. Touche V pour monter dessus ou en descendre (dehors), on roule deux fois plus vite qu'en courant.
 - **Odyssée** — Le permis bateau : le capitaine de l'Embarcadère de l'Aube ne fait plus embarquer sans lui. Examen à la Capitainerie de Port-Azur (quatre questions puis une épreuve pratique), dès deux badges.
 
-## 3.66 — 3 novembre 2026
+## 3.67 — 3 novembre 2026
 - **Odyssée** — La région double de taille : au sud de Bourg-Aube, le Pont de l'Austral mène aux Terres du Sud, ouvertes après les huit premiers badges.
   - Sept nouvelles villes à arène et huit routes, avec une trentaine de nouveaux dresseurs, des marais traversés de passerelles et un désert de sable.
   - Douze arènes sur le continent et les trois frères de l'archipel : il faut maintenant quinze badges pour la Ligue (le Conseil 4 et la Maître sont plus forts).
@@ -45,7 +45,7 @@
   - Un pricer donne le prix des produits dérivés de chaque titre : forwards et futures, change à terme et swaps, CDS, options européennes, américaines et asiatiques.
   - Pierre, l'analyste en costume, fait passer un entretien de huit questions : réussis-le pour ouvrir un compte et investir tes Pokédollars.
 
-## 3.65 — 2 novembre 2026
+## 3.66 — 2 novembre 2026
 - **Odyssée** — Un grand coup de pinceau sur la région.
   - Tous les personnages sont redessinés en haute définition d'après leurs anciens modèles : l'infirmière, la maman, le professeur, les Champions, les dresseurs… fini les gros pixels.
   - Nouveaux portraits de combat pour les Champions, Célestine, le Conseil 4, la Team Éclipse et la Brume.
@@ -56,6 +56,10 @@
   - Des petites barrières de bois brun bordent les chemins des routes.
   - Les statues des arènes sont redessinées : une sculpture de pierre sur un vrai socle.
   - Chaque maison a sa boîte aux lettres : on y lit le nom de la famille qui habite là.
+## 3.65 — 2 novembre 2026
+- **Arcadia** — L'écran de chargement des jeux, avec son bouton « C'est parti ! », est de retour.
+- **Arcadia** — Le menu Arcadia revient dans tous les jeux, maintenant sur le bord droit de l'écran : commandes, son, plein écran et retour au salon.
+- **Arcadia** — Les boutons « Jouer avec mes potes » et « Jouer seul » de l'accueil lancent de nouveau le jeu.
 
 ## 3.64 — 2 novembre 2026
 - **Odyssée** — Les herbes, les grottes et la mer accueillent tous les Pokémon qu'on y croise dans les jeux, de Rouge à X / Y : plus de 40 espèces dès la route 1.

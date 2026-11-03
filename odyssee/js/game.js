@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, STARTER_CHOICES, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX, CHAR_ROWS } from './render/world3d.js';
@@ -634,6 +634,7 @@ export class Game {
       if (d.trainer) { if (!st.flags['T:' + n.id]) await this.trainerBattle(n, false); else await this.ui.say(d.trainer.after || 'Quel combat !', { speaker: d.trainer.name }); }
       else if (d.role === 'nurse') await this.nurse();
       else if (d.role === 'shop') await shopScreen(this, d.stock);
+      else if (d.role === 'relearner') await moveRelearnerScreen(this);
       else if (d.talk) await d.talk(this.api(), n);
       else if (d.script) await this.script(d.script, n);
       else if (d.text) await this.ui.say(d.text);
@@ -909,7 +910,7 @@ export class Game {
         this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
         for (const s of steps) { for (const id of s.learned) await this.ui.say(`${monName(m)} apprend ${MOVES[id].n} !`); for (const id of s.ask) await this.askLearn(m, id); }
-        const to = levelEvolution(m); if (to) await this.evolveScene(m, to);
+        const to = levelEvolution(m, this.hour()); if (to) await this.evolveScene(m, to);
         continue;
       }
       let moveIdx = -1;
@@ -937,8 +938,18 @@ export class Game {
   }
 
   async wildBattle(enc, o = {}) {
-    let e = enc[0];
-    if (!o.fixed) { const tot = enc.reduce((a, x) => a + x[3], 0); let r = Math.random() * tot; for (const x of enc) { r -= x[3]; if (r <= 0) { e = x; break; } } }
+    let pool = enc;
+    const h = this.hour();
+    const isNight = h >= 20 || h < 6;
+    if (!o.fixed && isNight && enc.length > 1) {
+      const avgLvl = Math.round(enc.reduce((a, x) => a + (x[1] + x[2]) / 2, 0) / enc.length);
+      const minLvl = Math.max(2, avgLvl - 2), maxLvl = Math.max(minLvl, avgLvl + 2);
+      const nightSp = avgLvl < 15 ? [92, 163, 167, 41] : avgLvl < 30 ? [92, 198, 41, 1039] : [93, 198, 42, 1040];
+      const nightEnc = nightSp.map((sp) => [sp, minLvl, maxLvl, 12]);
+      pool = [...enc.filter((x) => x[0] !== 16 && x[0] !== 1010), ...nightEnc];
+    }
+    let e = pool[0];
+    if (!o.fixed) { const tot = pool.reduce((a, x) => a + x[3], 0); let r = Math.random() * tot; for (const x of pool) { r -= x[3]; if (r <= 0) { e = x; break; } } }
     const lvl = e[1] + Math.floor(Math.random() * (e[2] - e[1] + 1));
     const lead = this.lead(); if (!lead) return;
     if (!o.fixed && this.state.repel > 0 && lead.lvl >= lvl) return;
@@ -1057,6 +1068,21 @@ export class Game {
     return false;
   }
 
+  getMapWeather() {
+    const m = this.mapObj, z = this.zone;
+    if (!m) return 'none';
+    if (m.weather) return m.weather;
+    if (z?.weather) return z.weather;
+    if (z?.theme === 'snow' || m.id?.includes('snow') || m.id?.includes('glace')) return 'hail';
+    if (z?.theme === 'volcanic' || m.id?.includes('cendre') || m.id?.includes('desert')) return 'sandstorm';
+    if (z?.town === 'azur' || z?.name?.includes('Pluie') || m.id?.includes('marais')) return 'rain';
+    if (m.outdoor) {
+      const h = this.hour();
+      if ((z?.surfEnc || m.surfEnc) && (Math.sin(h * 0.7) > 0.65)) return 'rain';
+    }
+    return 'none';
+  }
+
   /** combat générique ; o.wild (créature) ou o.trainer + o.party */
   async runBattle(o) {
     const st = this.state;
@@ -1064,11 +1090,12 @@ export class Game {
     const curtain = await this.encounterIntro(kind);
     const m = this.mapObj, z = this.zone;
     const bg = !m.outdoor ? (m.floor === 'cave' ? 'cave' : m.battleBg) : this.player.surf ? 'water' : z?.theme === 'volcanic' ? 'volcanic' : z?.theme === 'snow' ? 'snow' : z?.town === 'azur' || z?.town === 'granit' || z?.name === 'Cap des Étoiles' ? 'water' : 'grass';
-    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap() });
+    const weather = o.weather || this.getMapWeather();
+    const battle = new Battle({ player: { name: st.name, party: st.party, bag: st.bag }, foe: o.wild ? { name: 'sauvage', party: [o.wild] } : { name: o.trainer.name, party: o.party, trainer: o.trainer }, cap: this.levelCap(), weather: weather !== 'none' ? weather : undefined });
     const foeMons = o.wild ? [o.wild] : o.party;
     const h = this.hour();
     curtain.remove();
-    const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5) });
+    const result = await this.bv.run(battle, { bg, night: m.outdoor && (h >= 20 || h < 5.5), weather });
     // argent
     if (result === 'win' && battle.prizeMoney) st.money += battle.prizeMoney;
     if (result === 'caught') {
@@ -1086,7 +1113,7 @@ export class Game {
     } else this.bv.close();
     this.sound.stopMusic(0.1);
     // évolutions après le combat
-    if (result !== 'lose') for (const mon of st.party) if (battle.levelUps.has(mon.uid) && mon.hp > 0) { const to = levelEvolution(mon); if (to) await this.evolveScene(mon, to); }
+    if (result !== 'lose') for (const mon of st.party) if (battle.levelUps.has(mon.uid) && mon.hp > 0) { const to = levelEvolution(mon, this.hour()); if (to) await this.evolveScene(mon, to); }
     if (result === 'lose' && o.noWhiteout) for (const mon of st.party) healFull(mon);
     else if (result === 'lose') await this.whiteout();
     this.sound.current = null;
