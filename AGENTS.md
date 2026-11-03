@@ -71,6 +71,9 @@ Ajouter `[skip changelog]` dans le message d'un commit purement technique pour q
   le déplacement, les escaliers, les passages secrets, le couteau, le lancer, le revolver, la bavure, le héros, les pièces, la coupure, le secret des rôles,
   la prédiction des invités et des manches entières entre bots (à lancer quand on touche au moteur). Modèles CC0 (Quaternius, Kenney, KayKit) : `mystery/models/LICENSE.txt`.
   `?debug` expose `__mystery` (`ff(sec)` avance le moteur sans dessiner, `to(x, z, niveau)`, `start()`) ; `?autostart`, `?seed`, `?role=m|s|i`, `?mode=explore`, `?bots=4`, `?lag=150`, `?q=bas`.
+- The Backrooms (`backrooms/`, moteur sans DOM dans `backrooms/engine/`) : Level 0 (`map.js`, moquette, 5 cassettes) puis Level 1 (`level1.js`, entrepôt,
+  étagères, 3 fusibles, coupures de courant, embuscades), reliés par un ascenseur qui part quand tous les joueurs encore en vie sont dedans.
+  À plusieurs, l'hôte fait autorité (`snapshot` / `applySnapshot`), l'invité se déplace chez lui (`predict`). `node --experimental-detect-module tools/test-backrooms.mjs`.
 - Sauvegardes en ligne (`server/saves.js`, client `odyssee/js/net/cloud.js`) : le relais range les parties dans le dépôt GitHub,
   branche `saves`, sous le code ami du compte Hub. Mise en route sur Render : `docs/SAUVEGARDES.md`. Test : `node tools/test-saves.mjs`.
   Comptes Arcadia (identifiant + mot de passe, profil chiffré dans le navigateur avant de partir) : client `hub/account.js`, serveur `server/accounts.js`

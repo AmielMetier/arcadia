@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.74 — 3 novembre 2026
+- **The Backrooms** — le Level 1, l'ascenseur et le jeu à plusieurs.
+  - On joue maintenant à plusieurs : les cassettes et les fusibles comptent pour toute l'équipe, et on voit les autres avancer avec leur lampe.
+  - Les 5 cassettes ouvrent un vrai ascenseur. Qui y entre est à l'abri et regarde ceux qui sont encore dehors ; il part quand tout le monde est dedans.
+  - Plus il y a de monde dans l'ascenseur, plus l'entité devient rapide, voit loin et s'acharne sur ceux qui restent.
+  - Un joueur attrapé regarde les autres jusqu'au prochain étage, où il revient.
+  - Level 1 : un sous-sol industriel en béton humide, des allées d'étagères métalliques, des caisses et un brouillard froid au ras du sol.
+  - Trouve les 3 fusibles dans les allées et rapporte-les au panneau du monte-charge pour remonter à la surface.
+  - Des coupures de courant plongent l'entrepôt dans le noir total pendant 15 à 20 secondes : il ne reste que ta lampe.
+  - L'entité contourne par les rangées d'étagères et t'attend en silence au bout d'une allée.
+
 ## 3.73 — 3 novembre 2026
 - **The Backrooms** — un inventaire, une entité qui se dévoile et un dédale différent à chaque partie.
   - De loin, l'entité n'est qu'une image brouillée et pleine de parasites ; plus elle s'approche, plus elle devient nette, jusqu'à apparaître parfaitement tout près.

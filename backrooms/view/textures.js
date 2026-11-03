@@ -1,8 +1,10 @@
-// The Backrooms - Textures du Level 0
-// Motifs dessinés au canvas, salis par des photos CC0 de Poly Haven (backrooms/tex/) dès qu'elles sont chargées.
+// The Backrooms - Textures du Level 0 (moquette, papier peint) et du Level 1 (béton de l'entrepôt)
+// Motifs dessinés au canvas, salis par des photos CC0 de Poly Haven dès qu'elles sont chargées :
+// backrooms/tex/ pour le Level 0, les bétons de kart/tex/ (déjà sur le site) pour le Level 1.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 
 const TEX = new URL('../tex/', import.meta.url).href;
+const KART_TEX = new URL('../../kart/tex/', import.meta.url).href;
 
 function canvas(w, h = w) {
   const c = document.createElement('canvas');
@@ -25,7 +27,7 @@ function loadImage(name) {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = TEX + name;
+    img.src = name.startsWith('kart:') ? KART_TEX + name.slice(5) : TEX + name;
   });
 }
 
@@ -135,25 +137,170 @@ function drawCeiling(ctx, S, grime) {
   }
 }
 
-export function createBackroomsTextures() {
+// Level 1 : béton brut humide, coulures sombres au pied, bande jaune et noire de sécurité
+function drawConcreteWall(ctx, S, photo) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#77776f';
+  ctx.fillRect(0, 0, S, S);
+  if (photo) {
+    ctx.globalCompositeOperation = 'luminosity';
+    ctx.drawImage(photo, 0, 0, S, S);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#9da3a6';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'source-over';
+  } else noise(ctx, S, S, 40);
+  // joints des banches
+  ctx.fillStyle = 'rgba(30, 32, 34, 0.35)';
+  ctx.fillRect(0, S * 0.33, S, 3);
+  ctx.fillRect(0, S * 0.66, S, 3);
+  // humidité qui remonte
+  const g = ctx.createLinearGradient(0, S * 0.55, 0, S);
+  g.addColorStop(0, 'rgba(20, 24, 26, 0)');
+  g.addColorStop(1, 'rgba(20, 24, 26, 0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 9; i++) {
+    const x = Math.random() * S;
+    const w = 4 + Math.random() * 10;
+    const gg = ctx.createLinearGradient(0, 0, 0, S * (0.4 + Math.random() * 0.4));
+    gg.addColorStop(0, 'rgba(25, 28, 30, 0.35)');
+    gg.addColorStop(1, 'rgba(25, 28, 30, 0)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(x, 0, w, S);
+  }
+  // bande de sécurité au pied
+  const y0 = S * 0.93;
+  ctx.fillStyle = '#c9a227';
+  ctx.fillRect(0, y0, S, S - y0);
+  ctx.fillStyle = '#16181a';
+  for (let x = -S; x < S * 2; x += 40) {
+    ctx.beginPath();
+    ctx.moveTo(x, S);
+    ctx.lineTo(x + 20, S);
+    ctx.lineTo(x + 20 + (S - y0), y0);
+    ctx.lineTo(x + (S - y0), y0);
+    ctx.fill();
+  }
+}
+
+// Dalle de béton lissé, taches d'huile et flaques ; une ligne jaune délavée au bord de chaque case
+function drawConcreteFloor(ctx, S, photo) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#5b5d5c';
+  ctx.fillRect(0, 0, S, S);
+  if (photo) {
+    ctx.globalCompositeOperation = 'luminosity';
+    ctx.drawImage(photo, 0, 0, S, S);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#7d8486';
+    ctx.fillRect(0, 0, S, S);
+    ctx.globalCompositeOperation = 'source-over';
+  } else noise(ctx, S, S, 30);
+  for (let i = 0; i < 4; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const r = 20 + Math.random() * 70;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(12, 14, 16, 0.4)');
+    g.addColorStop(1, 'rgba(12, 14, 16, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, S, S);
+  }
+  ctx.fillStyle = 'rgba(201, 162, 39, 0.28)';
+  ctx.fillRect(0, 0, S, 7);
+}
+
+// Plafond de béton sombre avec un chemin de câbles
+function drawConcreteCeiling(ctx, S, photo) {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#3c3f40';
+  ctx.fillRect(0, 0, S, S);
+  if (photo) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(photo, 0, 0, S, S);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.fillStyle = '#26292b';
+  ctx.fillRect(S * 0.45, 0, S * 0.1, S);
+  ctx.fillStyle = '#4b5052';
+  for (let y = 0; y < S; y += 32) ctx.fillRect(S * 0.45, y, S * 0.1, 4);
+}
+
+export function createBackroomsTextures(level = 0) {
   const S = 512;
+  const L1 = level === 1;
   const [wallCanvas, wctx] = canvas(S);
   const [carpetCanvas, cctx] = canvas(S);
   const [ceilCanvas, clctx] = canvas(S);
-  drawWallpaper(wctx, S, null);
-  drawCarpet(cctx, S, null);
-  drawCeiling(clctx, S, null);
+  const drawW = L1 ? drawConcreteWall : drawWallpaper;
+  const drawF = L1 ? drawConcreteFloor : drawCarpet;
+  const drawC = L1 ? drawConcreteCeiling : drawCeiling;
+  drawW(wctx, S, null);
+  drawF(cctx, S, null);
+  drawC(clctx, S, null);
 
   const wall = tex(wallCanvas);
   const carpet = tex(carpetCanvas);
   const ceiling = tex(ceilCanvas);
 
   // les photos arrivent un peu plus tard : on redessine par-dessus
-  const ready = Promise.all([loadImage('papier.jpg'), loadImage('moquette.jpg'), loadImage('plafond.jpg')]).then(([pap, moq, pla]) => {
-    if (pap) { drawWallpaper(wctx, S, pap); wall.needsUpdate = true; }
-    if (moq) { drawCarpet(cctx, S, moq); carpet.needsUpdate = true; }
-    if (pla) { drawCeiling(clctx, S, pla); ceiling.needsUpdate = true; }
+  const files = L1 ? ['kart:cwall.jpg', 'kart:concrete.jpg', 'kart:concrete.jpg'] : ['papier.jpg', 'moquette.jpg', 'plafond.jpg'];
+  const ready = Promise.all(files.map(loadImage)).then(([pap, moq, pla]) => {
+    if (pap) { drawW(wctx, S, pap); wall.needsUpdate = true; }
+    if (moq) { drawF(cctx, S, moq); carpet.needsUpdate = true; }
+    if (pla) { drawC(clctx, S, pla); ceiling.needsUpdate = true; }
   });
+
+  // Portes d'ascenseur en inox brossé
+  const [doorCanvas, dctx] = canvas(128, 256);
+  dctx.fillStyle = '#8e9398';
+  dctx.fillRect(0, 0, 128, 256);
+  for (let x = 0; x < 128; x++) {
+    dctx.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'}, ${Math.random() * 0.08})`;
+    dctx.fillRect(x, 0, 1, 256);
+  }
+  dctx.fillStyle = 'rgba(0,0,0,0.25)';
+  dctx.fillRect(0, 0, 3, 256);
+  dctx.fillRect(125, 0, 3, 256);
+  const steel = tex(doorCanvas);
+  steel.wrapS = steel.wrapT = THREE.ClampToEdgeWrapping;
+
+  // Caisse en bois des étagères
+  const [crateCanvas, kctx] = canvas(128);
+  kctx.fillStyle = '#8a6a3f';
+  kctx.fillRect(0, 0, 128, 128);
+  noise(kctx, 128, 128, 30);
+  kctx.fillStyle = '#5e4526';
+  for (let y = 0; y < 128; y += 32) kctx.fillRect(0, y, 128, 3);
+  kctx.lineWidth = 10;
+  kctx.strokeStyle = '#6d5030';
+  kctx.strokeRect(5, 5, 118, 118);
+  kctx.beginPath();
+  kctx.moveTo(8, 8);
+  kctx.lineTo(120, 120);
+  kctx.stroke();
+  const crate = tex(crateCanvas);
+
+  // Nappe de brouillard au ras du sol (taches douces, transparentes)
+  const [fogCanvas, fctx] = canvas(256);
+  fctx.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const r = 20 + Math.random() * 60;
+    for (const [ox, oy] of [[0, 0], [256, 0], [-256, 0], [0, 256], [0, -256]]) {
+      const g = fctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.18)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      fctx.fillStyle = g;
+      fctx.fillRect(0, 0, 256, 256);
+    }
+  }
+  const fog = new THREE.CanvasTexture(fogCanvas);
+  fog.wrapS = fog.wrapT = THREE.RepeatWrapping;
 
   // Cassette VHS
   const [vhsCanvas, vctx] = canvas(256, 160);
@@ -225,5 +372,5 @@ export function createBackroomsTextures() {
   lctx.fillText("D'AMANDE", 64, 46);
   const label = tex(labelCanvas);
 
-  return { wall, carpet, ceiling, vhs, exit, sign, label, ready };
+  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, ready };
 }

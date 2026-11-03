@@ -12,6 +12,8 @@ export class BackroomsHUD {
       <div class="cam cam-tl">
         <div class="vhs-rec"><span class="rec-dot">●</span> REC</div>
         <div class="vhs-play">PLAY ▶ SP</div>
+        <div class="vhs-level" id="levelTag">LEVEL 0</div>
+        <div class="blackout-tag" id="blackoutTag" hidden>⚠ COUPURE DE COURANT</div>
       </div>
       <div class="cam cam-tr">
         <div class="battery" id="battery"><i></i></div>
@@ -34,6 +36,10 @@ export class BackroomsHUD {
       <div class="crosshair"></div>
 
       <div class="objective-banner" id="objBanner"></div>
+      <!-- Spectateur : à l'abri dans l'ascenseur, ou attrapé -->
+      <div class="spectate" id="spectate" hidden><b id="specTitle"></b><span id="specSub"></span></div>
+      <!-- Fondu : l'ascenseur descend, carte de l'étage -->
+      <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span></div></div>
       <div class="toast" id="toast" hidden></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
@@ -103,31 +109,43 @@ export class BackroomsHUD {
     this.$('#battery').style.setProperty('--b', Math.max(0.04, bat / 100).toFixed(3));
     this.$('#battery').classList.toggle('low', bat < 20);
 
-    // 2. Cassettes
-    if (P.cassettesCollected !== this.lastCount) {
-      this.lastCount = P.cassettesCollected;
-      this.$('#cassetteIcons').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < P.cassettesCollected ? 'on' : ''}"></i>`).join('');
-      this.$('#cassetteText').textContent = `${P.cassettesCollected}/5`;
+    // 2. Objectif de l'étage : 5 cassettes (Level 0) ou 3 fusibles à rapporter au monte-charge (Level 1)
+    const L1 = sim.level === 1;
+    const got = L1 ? sim.fuses : sim.cassettes;
+    const total = L1 ? 3 : 5;
+    const objKey = `${sim.level}:${got}:${sim.open}`;
+    if (objKey !== this.lastCount) {
+      this.lastCount = objKey;
+      this.$('#levelTag').textContent = `LEVEL ${sim.level}`;
+      this.$('#cassetteIcons').innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < got ? 'on' : ''}${L1 ? ' fuse' : ''}"></i>`).join('');
+      this.$('#cassetteText').textContent = `${got}/${total}`;
       this.bannerT = 6;
       const banner = this.$('#objBanner');
-      if (P.cassettesCollected >= 5) {
-        banner.textContent = 'LA SORTIE EST OUVERTE : SUIS LE SIGNAL JUSQU\'À LA PORTE EXIT';
-        banner.classList.add('unlocked');
-      } else {
-        banner.textContent = P.cassettesCollected === 0
-          ? 'RETROUVE LES 5 CASSETTES VHS · LE SIGNAL MONTE QUAND TU T\'EN APPROCHES'
-          : `CASSETTE ${P.cassettesCollected}/5 RÉCUPÉRÉE`;
-        banner.classList.remove('unlocked');
-      }
+      banner.classList.toggle('unlocked', sim.open);
+      if (sim.open) banner.textContent = L1 ? 'LE MONTE-CHARGE EST ALIMENTÉ : MONTEZ TOUS DEDANS' : "L'ASCENSEUR EST OUVERT : REJOIGNEZ-LE TOUS · SUIS LE SIGNAL";
+      else if (L1 && got >= total) banner.textContent = 'RAPPORTE LES FUSIBLES AU PANNEAU DU MONTE-CHARGE · SUIS LE SIGNAL';
+      else if (L1) banner.textContent = got === 0 ? 'LEVEL 1 · TROUVE LES 3 FUSIBLES DANS LES ALLÉES' : `FUSIBLE ${got}/3 RÉCUPÉRÉ`;
+      else banner.textContent = got === 0 ? "RETROUVE LES 5 CASSETTES VHS · LE SIGNAL MONTE QUAND TU T'EN APPROCHES" : `CASSETTE ${got}/5 RÉCUPÉRÉE`;
     }
     this.bannerT -= dt;
     this.$('#objBanner').classList.toggle('hide', this.bannerT <= 0);
+    this.$('#blackoutTag').hidden = !(sim.blackout > 0);
+
+    // 2b. Spectateur : dans l'ascenseur ou attrapé, on regarde ceux qui sont encore dehors
+    const spec = P.status !== 'alive' && sim.state === 'playing';
+    this.$('#spectate').hidden = !spec;
+    if (spec) {
+      const view = sim.viewPlayer(sim.spectate || 0);
+      const inside = sim.players.filter((p) => p.status === 'elevator').length;
+      this.$('#specTitle').textContent = sim.departT > 0 ? "LES PORTES SE FERMENT…" : P.status === 'elevator' ? "TU ES DANS L'ASCENSEUR" : "L'ENTITÉ T'A EU";
+      this.$('#specSub').textContent = sim.departT > 0 ? '' : `${inside}/${sim.players.length} à l'abri · tu regardes ${view.name}${view !== P ? ' · clic ou Espace : changer' : ''}`;
+    }
 
     // 3. Signal de la cassette (ou de la sortie) la plus proche
     const bars = Math.round(P.signal * 5);
     const flick = P.signal > 0 && Math.random() < 0.08 ? Math.max(0, bars - 1) : bars;
     this.$('#signalBars').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < flick ? 'on' : ''}" style="height:${6 + i * 3}px"></i>`).join('');
-    this.$('#signalLabel').textContent = P.cassettesCollected >= 5 ? 'SORTIE' : 'SIGNAL';
+    this.$('#signalLabel').textContent = sim.open || (L1 && got >= total) ? (L1 ? 'MONTE-CHARGE' : 'ASCENSEUR') : 'SIGNAL';
 
     // 4. Souffle (endurance)
     const stamBar = this.$('#staminaBar');
@@ -185,23 +203,39 @@ export class BackroomsHUD {
       end.hidden = false;
     }, sim.state === 'dead' ? 1300 : 300);
 
+    const solo = sim.players.length === 1;
     if (sim.state === 'won') {
-      title.textContent = "TU T'ES ÉCHAPPÉ !";
+      title.textContent = solo ? "TU T'ES ÉCHAPPÉ !" : 'VOUS VOUS ÊTES ÉCHAPPÉS !';
       title.style.color = '#22c55e';
-      sub.textContent = 'Tu as réussi à survivre aux Backrooms et à trouver la sortie.';
-      stats.textContent = `Temps d'évasion : ${formatTime(sim.time)} · 5/5 cassettes récupérées`;
+      sub.textContent = "Le monte-charge vous a remontés hors de l'entrepôt. Les Backrooms vous ont laissés partir… cette fois.";
+      stats.textContent = `Temps d'évasion : ${formatTime(sim.time)} · Level 0 et Level 1 traversés`;
     } else {
-      title.textContent = 'TU AS PÉRI';
+      title.textContent = solo ? 'TU AS PÉRI' : "PERSONNE N'EN EST SORTI";
       title.style.color = '#ef4444';
-      sub.textContent = "L'entité t'a rattrapé dans les couloirs infinis...";
-      stats.textContent = `Cassettes trouvées : ${sim.player.cassettesCollected}/5 · Survécu pendant ${formatTime(sim.time)}`;
+      sub.textContent = sim.level === 1 ? "L'entité vous attendait au bout des étagères…" : "L'entité t'a rattrapé dans les couloirs infinis...";
+      stats.textContent = `Level ${sim.level} · ${sim.level === 1 ? `fusibles ${sim.fuses}/3` : `cassettes ${sim.cassettes}/5`} · Survécu pendant ${formatTime(sim.time)}`;
     }
 
+    // un invité attend que l'hôte relance une partie
+    const btn = this.$('#btnRestart');
+    btn.disabled = !onRestart;
+    btn.textContent = onRestart ? 'REJOUER' : "EN ATTENTE DE L'HÔTE…";
     this.$('#btnRestart').onclick = () => {
+      if (!onRestart) return;
       end.hidden = true;
       this.lastCount = -1;
       if (onRestart) onRestart();
     };
+  }
+
+  // Fondu au noir : l'ascenseur descend, puis la carte de l'étage
+  fade(title, sub = '', hold = 0) {
+    const f = this.$('#fade');
+    this.$('#fadeTitle').textContent = title;
+    this.$('#fadeSub').textContent = sub;
+    f.classList.add('on');
+    clearTimeout(this.fadeTimer);
+    if (hold > 0) this.fadeTimer = setTimeout(() => f.classList.remove('on'), hold * 1000);
   }
 
   showPause(visible, kb) {

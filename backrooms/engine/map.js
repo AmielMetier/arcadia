@@ -1,6 +1,7 @@
 // The Backrooms (Level 0) - Génération de la carte du dédale
 // Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
-// quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 porte de sortie.
+// quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 ascenseur.
+// Le Level 1 (entrepôt) est dans level1.js et partage les types de cases, l'ascenseur et le parcours en largeur.
 
 export const CELL_SIZE = 2.5; // chaque case fait 2.5m x 2.5m
 export const WALL_HEIGHT = 3.0; // hauteur sous plafond
@@ -10,8 +11,48 @@ export const T = {
   EMPTY: 0,
   FLOOR: 1,
   WALL: 2,
-  EXIT: 3,
+  EXIT: 3, // cabine de l'ascenseur : un mur tant qu'il est fermé
+  SHELF: 4, // étagère métallique (Level 1) : bloque le passage et la vue comme un mur
 };
+
+// cases qui bloquent le passage (et la vue) : murs, étagères et cabine d'ascenseur
+export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT;
+
+// Creuse la cabine de l'ascenseur dans un mur voisin de la case d'entrée : la cabine est fermée sur trois côtés,
+// on y entre par l'entrée. Renvoie { gx, gz, x, z, dx, dz } (dx, dz : de l'entrée vers la cabine) ou null.
+export function carveElevator(grid, W, H, entrance, spawn, rnd) {
+  const at = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
+  const reach = () => {
+    const d = bfs(grid, W, H, spawn.x, spawn.z);
+    let n = 0;
+    for (let i = 0; i < W * H; i++) if (d[i] >= 0) n++;
+    return n;
+  };
+  const before = reach();
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5);
+  for (const [dx, dz] of dirs) {
+    const cx = entrance.x + dx;
+    const cz = entrance.z + dz;
+    if (cx < 1 || cx > W - 2 || cz < 1 || cz > H - 2) continue;
+    if (at(cx, cz) === T.FLOOR) continue; // la cabine se creuse dans un mur
+    const around = [[cx + dx, cz + dz], [cx + dz, cz + dx], [cx - dz, cz - dx]];
+    const saved = around.map(([x, z]) => at(x, z));
+    const orig = at(cx, cz);
+    around.forEach(([x, z]) => {
+      if (x > 0 && x < W - 1 && z > 0 && z < H - 1) grid[z * W + x] = T.WALL;
+    });
+    grid[cz * W + cx] = T.EXIT;
+    // fermer la cabine ne doit couper aucun passage
+    if (reach() >= before - 3) {
+      return { gx: cx, gz: cz, x: (cx + 0.5) * CELL_SIZE, z: (cz + 0.5) * CELL_SIZE, dx, dz };
+    }
+    grid[cz * W + cx] = orig;
+    around.forEach(([x, z], i) => {
+      if (x > 0 && x < W - 1 && z > 0 && z < H - 1) grid[z * W + x] = saved[i];
+    });
+  }
+  return null;
+}
 
 // meubles abandonnés (modèles Kenney du manoir) : nom, hauteur en m, rayon de collision
 export const PROP_KINDS = [
@@ -153,10 +194,17 @@ export function createBackroomsMap(seed = 42) {
 
   const spawn = cellPos({ x: sx, z: sz });
 
-  // 7. La sortie : l'une des cases les plus éloignées (en marche) du départ
+  // 7. La sortie : un ascenseur creusé dans un mur, devant l'une des cases les plus éloignées (en marche) du départ
   const far = walkable.filter((c) => D(c) > 0).sort((a, b) => D(b) - D(a));
-  const exitCell = far[Math.floor(rnd() * Math.min(20, far.length))];
+  let exitCell = null;
+  let elevator = null;
+  for (let i = 0; i < 60 && !elevator; i++) {
+    exitCell = far[Math.floor(rnd() * Math.min(20 + i * 4, far.length))];
+    elevator = carveElevator(grid, W, H, exitCell, { x: sx, z: sz }, rnd);
+  }
   const exit = cellPos(exitCell);
+  // la cabine et les murs qui la ferment ont pu retirer des cases du sol
+  for (let i = walkable.length - 1; i >= 0; i--) if (grid[walkable[i].z * W + walkable[i].x] !== T.FLOOR) walkable.splice(i, 1);
 
   // 8. Les 5 cassettes : une par secteur autour du départ, loin du départ, de la sortie et entre elles
   const cassettes = [];
@@ -262,12 +310,15 @@ export function createBackroomsMap(seed = 42) {
   const monsterCell = pick(walkable.filter((c) => D(c) > maxD * 0.55)) || far[0];
 
   return {
+    level: 0,
+    ceil: WALL_HEIGHT,
     W,
     H,
     grid,
     walkable,
     spawn,
     exit,
+    elevator,
     cassettes,
     lights,
     props,
@@ -277,7 +328,7 @@ export function createBackroomsMap(seed = 42) {
     monsterSpawn: cellPos(monsterCell),
     isWall(gx, gz) {
       if (gx < 0 || gx >= W || gz < 0 || gz >= H) return true;
-      return grid[gz * W + gx] === T.WALL;
+      return blocks(grid[gz * W + gx]);
     },
     isWalkableWorld(wx, wz) {
       const gx = Math.floor(wx / CELL_SIZE);
@@ -288,7 +339,7 @@ export function createBackroomsMap(seed = 42) {
 }
 
 // distances en cases depuis (sx, sz), -1 si inaccessible
-function bfs(grid, W, H, sx, sz) {
+export function bfs(grid, W, H, sx, sz) {
   const dist = new Int32Array(W * H).fill(-1);
   const queue = new Int32Array(W * H);
   let head = 0;
@@ -304,7 +355,7 @@ function bfs(grid, W, H, sx, sz) {
       const nz = z + dz;
       if (nx < 0 || nx >= W || nz < 0 || nz >= H) continue;
       const nk = nz * W + nx;
-      if (dist[nk] >= 0 || grid[nk] === T.WALL) continue;
+      if (dist[nk] >= 0 || blocks(grid[nk])) continue;
       dist[nk] = dist[k] + 1;
       queue[tail++] = nk;
     }

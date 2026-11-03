@@ -365,6 +365,84 @@ export class BackroomsSfx {
     osc.stop(t + 0.22);
   }
 
+  // Coupure de courant : gros claquement du disjoncteur, le bourdonnement des néons se tait
+  blackout() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(90, t);
+    osc.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+    g.gain.setValueAtTime(0.32, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    osc.connect(g);
+    g.connect(this.out);
+    osc.start(t);
+    osc.stop(t + 0.65);
+    if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(0, t, 0.08);
+  }
+
+  // Le courant revient : le bourdonnement remonte
+  power() {
+    if (!this.unlocked || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(0.045, t, 0.4);
+    this.battery();
+  }
+
+  // Ding de l'ascenseur (deux notes de cloche)
+  ding() {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    [[1318, 0], [1046, 0.28]].forEach(([f, d]) => {
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t + d);
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.16, t + d + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + d + 1.2);
+      osc.connect(g);
+      g.connect(this.out);
+      osc.start(t + d);
+      osc.stop(t + d + 1.3);
+    });
+  }
+
+  // L'ascenseur descend : grondement grave qui tremble
+  elevator(sec = 3) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const osc = c.createOscillator();
+    const lfo = c.createOscillator();
+    const lg = c.createGain();
+    const g = c.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(48, t);
+    lfo.frequency.setValueAtTime(7, t);
+    lg.gain.setValueAtTime(6, t);
+    lfo.connect(lg);
+    lg.connect(osc.frequency);
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(160, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.5);
+    g.gain.setValueAtTime(0.2, t + sec - 0.6);
+    g.gain.exponentialRampToValueAtTime(0.001, t + sec);
+    osc.connect(f);
+    f.connect(g);
+    g.connect(this.out);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + sec + 0.1);
+    lfo.stop(t + sec + 0.1);
+  }
+
   // Victoire
   win() {
     if (!this.unlocked || !this.ctx) return;

@@ -142,6 +142,39 @@ html, body {
 }
 .objective-banner.hide { opacity: 0; }
 .objective-banner.unlocked { color: #7dffa0; }
+.vhs-level { font-size: 22px; opacity: 0.8; margin-top: 2px; }
+.blackout-tag { font-size: 22px; color: #ff6b5b; margin-top: 6px; animation: recBlink 0.9s steps(1) infinite; }
+.tapes i.fuse { border-radius: 50%; width: 14px; }
+.tapes i.fuse.on { background: #ffb020; border-color: #ffb020; }
+.spectate {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 10px 22px;
+  pointer-events: none;
+  z-index: 12;
+}
+.spectate b { display: block; font-weight: normal; font-size: 30px; color: #ffcf3a; letter-spacing: 2px; }
+.spectate span { font-size: 20px; opacity: 0.85; }
+.fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.9s;
+  pointer-events: none;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.fade.on { opacity: 1; }
+.fade b { display: block; font-weight: normal; font-size: 54px; letter-spacing: 6px; color: #f2f0e6; }
+.fade span { font-size: 24px; opacity: 0.75; }
 .toast {
   position: absolute;
   top: 62%;
