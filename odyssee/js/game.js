@@ -1054,7 +1054,16 @@ export class Game {
       if (it.candy) {
         this.take(r.item); const steps = useCandy(m, cap); this.sound.sfx('levelup');
         await this.ui.say(`${monName(m)} monte au niveau ${m.lvl} !`);
-        for (const s of steps) { for (const id of s.learned) await this.ui.say(`${monName(m)} apprend ${MOVES[id].n} !`); for (const id of s.ask) await this.askLearn(m, id); }
+        for (const s of steps) { for (const id of s.learned) {
+          const M = MOVES[id];
+          const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+          const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
+          const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
+          await this.ui.say([
+            `${monName(m)} apprend ${M.n} !`,
+            `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
+          ]);
+        } for (const id of s.ask) await this.askLearn(m, id); }
         const to = levelEvolution(m, this.hour()); if (to) await this.evolveScene(m, to);
         continue;
       }
@@ -1162,7 +1171,24 @@ export class Game {
       speaker: tr.cls ? `${tr.cls} ${tr.name}` : tr.name,
       face: tr.bs || tr.ow || n.sprite
     });
-    const party = tr.team.map(([sp, lvl]) => createMon(sp, lvl, { iv: Array(6).fill(Math.min(31, 8 + lvl / 2 | 0)), shiny: false }));
+    const isBoss = d.leader != null || d.champion;
+    const leaderDefaultItem = (sp, lvl) => {
+      const S = SPECIES[sp]; if (!S) return 'sitrus-berry';
+      const type = S.t[0] || 'normal';
+      const typeBoosters = { fire: 'charcoal', water: 'mystic-water', grass: 'miracle-seed', electric: 'magnet', dark: 'black-glasses', rock: 'hard-stone', ground: 'soft-sand', flying: 'sharp-beak', fighting: 'black-belt', poison: 'poison-barb', psychic: 'twisted-spoon', bug: 'silver-powder', dragon: 'dragon-fang', ice: 'never-melt-ice', steel: 'metal-coat', normal: 'silk-scarf' };
+      if (lvl >= 65) return 'life-orb';
+      if (S.ev && S.ev.length) return 'eviolite';
+      return typeBoosters[type] || 'sitrus-berry';
+    };
+    const party = tr.team.map((entry) => {
+      const [sp, lvl, heldItem, customMoves] = Array.isArray(entry) ? entry : [entry.sp, entry.lvl, entry.item, entry.moves];
+      return createMon(sp, lvl, {
+        iv: Array(6).fill(isBoss ? 31 : Math.min(31, 8 + lvl / 2 | 0)),
+        item: heldItem || (isBoss ? leaderDefaultItem(sp, lvl) : null),
+        moves: customMoves || null,
+        shiny: false
+      });
+    });
     const res = await this.runBattle({ trainer: { ...tr, items: { ...(tr.items || {}) } }, party, music, id: n.id, leader: d.leader, champion: d.champion, rival: d.rival });
     this.musicLock = false;
     if (res === 'win') {
@@ -1382,7 +1408,16 @@ export class Game {
       const res = evolve(m, to); this.markCaught(to);
       this.sound.cry(ASSETS.cry(to)); this.sound.sfx('levelup');
       await ui.say(`Félicitations ! Votre ${oldName} a évolué en ${SPECIES[to].n} !`);
-      for (const id of res.learned) await ui.say(`${monName(m)} apprend ${MOVES[id].n} !`);
+      for (const id of res.learned) {
+        const M = MOVES[id];
+        const cat = M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique';
+        const pow = M.p ? ('Puis. ' + M.p) : 'Statut';
+        const acc = M.a ? ('Préc. ' + M.a + '%') : 'Préc. —';
+        await ui.say([
+          `${monName(m)} apprend ${M.n} !`,
+          `[${TYPE_FR[M.t]} · ${cat} · ${pow} · ${acc}]\n${moveDesc(M)}`
+        ]);
+      }
       for (const id of res.ask) await this.askLearn(m, id);
     }
     alive = false; s.remove(); this.sound.current = null; this.updateZone();

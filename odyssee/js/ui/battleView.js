@@ -8,6 +8,7 @@ import { ITEMS, canUseOn, itemName } from '../core/items.js';
 import { ASSETS, loadImg } from '../assets.js';
 import { TYPE_COL, TYPE_FR, STATUS_FR, hpCol, partyScreen, bagScreen } from './screens.js';
 import { typeEff } from '../core/battle.js';
+import { moveDesc } from '../data/moveDescriptions.js';
 
 const BH = 192;
 const TYPE_FX = {
@@ -528,55 +529,107 @@ export class BattleView {
       const foeKnown = foeMon ? this.game.isSpeciesKnown(foeMon.sp) : false;
       const foeTypes = (foeMon && foeKnown) ? (SPECIES[foeMon.sp]?.t || ['normal']) : null;
       this.cmd.innerHTML = `<div class="mv-layout">
-        <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
-          const x = m.moves[k];
-          if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
-          const M = MOVES[x.id];
-          const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
-          const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
-          let effBadge = '';
-          if (foeMon && (M.p || M.c !== 'status')) {
-            if (foeKnown && foeTypes) {
-              const eff = typeEff(M.t, foeTypes);
-              if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
-              else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
-              else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
-              else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
-            } else {
-              const count = this.game.seenCount(foeMon.sp);
-              effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+        <div class="mv-desc-banner">
+          <div class="mv-desc-head">
+            <span class="mv-desc-type"></span>
+            <span class="mv-desc-cat"></span>
+            <span class="mv-desc-pow"></span>
+            <span class="mv-desc-acc"></span>
+          </div>
+          <div class="mv-desc-text"></div>
+        </div>
+        <div class="mv-main">
+          <div class="mv-grid">${[0, 1, 2, 3].map((k) => {
+            const x = m.moves[k];
+            if (!x) return '<div class="mbtn empty"><span class="mn">—</span></div>';
+            const M = MOVES[x.id];
+            const catIcon = `img/battle/cat_${M.c || 'physical'}.png`;
+            const pwTxt = M.p ? `Puis. ${M.p}` : 'Statut';
+            let effBadge = '';
+            if (foeMon && (M.p || M.c !== 'status')) {
+              if (foeKnown && foeTypes) {
+                const eff = typeEff(M.t, foeTypes);
+                if (eff === 0) effBadge = '<span class="bm-eff eff-nul">SANS EFFET</span>';
+                else if (eff >= 2) effBadge = `<span class="bm-eff eff-super">SUPER EFF.${eff > 2 ? ' ×4' : ''}</span>`;
+                else if (eff < 1) effBadge = `<span class="bm-eff eff-weak">PEU EFF.${eff < 0.5 ? ' ×¼' : ''}</span>`;
+                else effBadge = '<span class="bm-eff eff-norm">EFFICACE</span>';
+              } else {
+                const count = this.game.seenCount(foeMon.sp);
+                effBadge = `<span class="bm-eff eff-unk" title="Efficacité inconnue (vu ${count}/3)">???</span>`;
+              }
             }
-          }
-          return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
-            <div class="mbtn-top">
-              <span class="mn">${esc(M.n)}</span>
-              <div class="mbtn-top-right">
-                ${effBadge}
-                <img class="mcat" src="${catIcon}" alt="${M.c}">
+            return `<div class="mbtn" data-i="${k}" style="--tc:${TYPE_COL[M.t]}">
+              <div class="mbtn-top">
+                <span class="mn">${esc(M.n)}</span>
+                <div class="mbtn-top-right">
+                  ${effBadge}
+                  <img class="mcat" src="${catIcon}" alt="${M.c}">
+                </div>
               </div>
-            </div>
-            <div class="mbtn-bot">
-              <div class="mbtn-bot-left">
-                <span class="mt">${TYPE_FR[M.t]}</span>
-                <span class="mpw">${pwTxt}</span>
+              <div class="mbtn-bot">
+                <div class="mbtn-bot-left">
+                  <span class="mt">${TYPE_FR[M.t]}</span>
+                  <span class="mpw">${pwTxt}</span>
+                </div>
+                <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
               </div>
-              <span class="mpp${x.pp === 0 ? ' zero' : ''}">PP ${x.pp}/${M.pp}</span>
-            </div>
-          </div>`;
-        }).join('')}</div>
-        <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
-          <span class="mv-back-ico">✕</span>
-          <span class="mv-back-lbl">RETOUR</span>
-        </button>
+            </div>`;
+          }).join('')}</div>
+          <button type="button" class="mv-back-btn" title="Retour (Échap / B)">
+            <span class="mv-back-ico">✕</span>
+            <span class="mv-back-lbl">RETOUR</span>
+          </button>
+        </div>
       </div>`;
       this.cmd.classList.add('on', 'moves');
       this.root.classList.add('cmdon', 'moves-open');
       let i = this.lastMove || 0; if (!m.moves[i]) i = 0;
       const btns = [...this.cmd.querySelectorAll('.mbtn')];
       const backBtn = this.cmd.querySelector('.mv-back-btn');
+      const descType = this.cmd.querySelector('.mv-desc-type');
+      const descCat = this.cmd.querySelector('.mv-desc-cat');
+      const descPow = this.cmd.querySelector('.mv-desc-pow');
+      const descAcc = this.cmd.querySelector('.mv-desc-acc');
+      const descText = this.cmd.querySelector('.mv-desc-text');
       const show = () => {
         btns.forEach((b, k) => b.classList.toggle('sel', k === i));
         backBtn?.classList.toggle('sel', i === 4);
+        if (i === 4) {
+          if (descType) descType.style.display = 'none';
+          if (descCat) descCat.style.display = 'none';
+          if (descPow) descPow.style.display = 'none';
+          if (descAcc) descAcc.style.display = 'none';
+          if (descText) descText.textContent = '✕ Retour : Revenir au menu principal des actions (Attaque, Sac, Pokémon, Fuite).';
+        } else {
+          const x = m.moves[i];
+          if (x) {
+            const M = MOVES[x.id];
+            if (descType) {
+              descType.style.display = 'inline-block';
+              descType.textContent = TYPE_FR[M.t];
+              descType.style.background = TYPE_COL[M.t];
+            }
+            if (descCat) {
+              descCat.style.display = 'inline-flex';
+              descCat.innerHTML = `<img src="img/battle/cat_${M.c || 'physical'}.png" alt=""><span>${M.c === 'special' ? 'Spécial' : M.c === 'status' ? 'Statut' : 'Physique'}</span>`;
+            }
+            if (descPow) {
+              descPow.style.display = 'inline-block';
+              descPow.textContent = M.p ? `Puis. ${M.p}` : 'Puis. —';
+            }
+            if (descAcc) {
+              descAcc.style.display = 'inline-block';
+              descAcc.textContent = M.a ? `Préc. ${M.a}%` : 'Préc. —';
+            }
+            if (descText) descText.textContent = moveDesc(M);
+          } else {
+            if (descType) descType.style.display = 'none';
+            if (descCat) descCat.style.display = 'none';
+            if (descPow) descPow.style.display = 'none';
+            if (descAcc) descAcc.style.display = 'none';
+            if (descText) descText.textContent = 'Emplacement vide.';
+          }
+        }
       };
       show();
       let done = false;
