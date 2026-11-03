@@ -1,6 +1,10 @@
 # Journal des versions — Arcadia
 
 ## 3.94 — 3 novembre 2026
+- **CI & Hub** — Robustesse du workflow de publication automatique du journal (`.github/workflows/changelog.yml`) :
+  - Staging complet (`git add -A`) pour intégrer la mise à jour des balises de cache (`?v=...`) dans `index.html` et `apropos.html`.
+  - Rebase sécurisé avec `--autostash` évitant les blocages `cannot pull with rebase: You have unstaged changes`.
+  - Support multi-plateforme Windows / Linux dans `tools/changelog-auto.mjs` via `fileURLToPath`.
 - **Odyssée** — Journal des Trophées & Médailles B2W2, Historique Face-à-Face et Séries de Victoires :
   - **Boîte à Médailles & Journal des Trophées** :
     - Nouvelle option accessible directement depuis le Menu Principal du jeu (`TROPHÉES`) et affichage haute fidélité style Nintendo DS Pokémon Noir 2 / Blanc 2.
