@@ -215,6 +215,10 @@ export class Battle {
     this.turn++;
     const forced = this.forcedAction(0);
     let a = forced || action;
+    if (a.type === 'run' && !this.wild) {
+      this.turn--;
+      return [{ t: 'msg', text: 'Impossible de fuir un combat de Dresseur !' }];
+    }
     if (a.type === 'move' && a.idx != null) {
       const mv = this.me.moves[a.idx];
       if (!this.usableMoves(0).length) a = { type: 'move', id: 165 };
@@ -246,12 +250,13 @@ export class Battle {
     if (this.wild) { const k = usable[this.r(usable.length)]; return { type: 'move', id: m.moves[k].id, slot: k }; }
 
     const isSmart = t.ai === 'smart';
+    const isRival = t.cls === 'Rival' || t.rival || this.rival;
     // 1. Utilisation stratégique des objets de soin par les Champions / Dresseurs
     if (t.items) {
       const ratio = m.hp / m.stats[0];
       const hasStatus = !!m.status;
       const isAceOrLast = !side.party.some((p, idx) => idx !== side.active && p.hp > 0);
-      const healThreshold = isSmart ? (isAceOrLast ? 0.48 : 0.40) : 0.28;
+      const healThreshold = (isSmart || isRival) ? (isAceOrLast ? 0.52 : 0.44) : 0.28;
 
       // Si altéré par un statut grave (sommeil, gel, poison, brûlure, paralysie) et qu'on a un Guérison
       if (hasStatus && t.items['full-restore'] > 0 && (ratio < 0.75 || this.rng() < 0.85)) {
@@ -305,10 +310,11 @@ export class Battle {
         if (d >= playerMon.hp) {
           s *= 3.8;
           // Si c'est une attaque prioritaire (+1) et qu'on est plus lent, énorme priorité de finition
-          if (mv.pr && mv.pr > 0 && !amFaster) s *= 2.0;
+          if (mv.pr && mv.pr > 0) s *= 5.0;
         }
 
         // Pénalités de contrecoup / recharge
+        if (eff >= 2) s *= (eff >= 4 ? 1.75 : 1.35);
         if (mv.m?.recharge) s *= 0.5;
         if (mv.m?.boom) {
           s = (m.hp < m.stats[0] * 0.22 && d >= playerMon.hp) ? s * 1.5 : s * 0.04;
@@ -342,7 +348,7 @@ export class Battle {
                            (x.ail === 'brn' && playerType.includes('fire')) ||
                            (x.ail === 'par' && playerType.includes('electric'));
             if (cannot) s = 0.001;
-            else s = playerMon.stats[0] * (x.ail === 'slp' ? 1.65 : 1.25);
+            else s = playerMon.stats[0] * (x.ail === 'slp' ? 1.85 : 1.4);
           }
         }
         // Confusion
@@ -357,7 +363,8 @@ export class Battle {
         else if (x.st) {
           const turn = this.sides[1].v.turns;
           const isAtkBoost = x.st.some(([stat, amt]) => (stat === 1 || stat === 3) && amt > 0);
-          if (turn <= 2 && m.hp >= m.stats[0] * 0.65) {
+          const curStage = Math.max(this.sides[1].v.st[1] || 0, this.sides[1].v.st[3] || 0);
+          if (curStage < 2 && m.hp >= m.stats[0] * 0.50) {
             s = isAtkBoost ? playerMon.stats[0] * 1.3 : playerMon.stats[0] * 0.85;
           } else {
             s = playerMon.stats[0] * 0.1;
@@ -377,7 +384,7 @@ export class Battle {
     });
 
     let pick;
-    if (isSmart) {
+    if (isSmart || isRival) {
       // Pour une IA très forte : prend TOUJOURS la décision la plus optimale
       pick = scores.reduce((a, b) => (b.s > a.s ? b : a));
     } else {
