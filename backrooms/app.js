@@ -47,6 +47,7 @@ function play() {
 
 function setKbMode(on) {
   kbMode = on;
+  for (const k in keys) keys[k] = false;
   try {
     localStorage.setItem('backrooms_kb', on ? '1' : '0');
   } catch (e) {}
@@ -334,6 +335,41 @@ function loop(currentTime) {
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
   window.__br = { get sim() { return sim; }, get scene() { return scene; }, keys, frame: (t) => loop(t) };
+}
+
+// Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris
+const btnSet = document.getElementById('btnSet');
+if (window.DDVolume && btnSet) {
+  btnSet.innerHTML = window.DDVolume.ICON || '⚙️';
+  btnSet.addEventListener('click', () => {
+    // ouvrir les réglages met la partie en pause et rend la souris
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (!paused) setPaused(true);
+  });
+  window.DDVolume.panel(btnSet, {
+    accent: '#ffcf3a',
+    kinds: ['fx'],
+    test: () => sfx && sfx.bottle(),
+    sections: [
+      { title: 'Jeu', items: [
+        { label: 'Commandes', get: () => (kbMode ? 'kb' : 'mouse'), set: (v) => setKbMode(v === 'kb'), options: [['mouse', 'Souris'], ['kb', 'Sans souris']] },
+      ] },
+      { title: 'Commandes', items: [{ keys: [
+        ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou flèches'],
+        ['Regarder', 'souris'],
+        ['Courir', '<kbd>Maj</kbd>'],
+        ['Lampe torche', '<kbd>F</kbd>'],
+        ['Pause', '<kbd>Échap</kbd>'],
+      ] }] },
+      { title: 'Sans souris', items: [{ keys: [
+        ['Se déplacer', '<kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd>'],
+        ['Tourner la vue', '<kbd>←</kbd><kbd>→</kbd>'],
+        ['Lever, baisser les yeux', '<kbd>↑</kbd><kbd>↓</kbd>'],
+        ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>F</kbd>'],
+        ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
+      ] }] },
+    ],
+  });
 }
 
 // Initialisation HubBridge ou Solo

@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.72 — 3 novembre 2026
+- **The Backrooms** — un bouton ⚙ Réglages, comme dans les autres jeux.
+  - On y choisit ses commandes : Souris, ou Sans souris (ZQSD pour marcher, les flèches tournent la vue et font lever ou baisser les yeux).
+  - Le curseur du son règle enfin le volume du jeu.
+  - Ouvrir les réglages met la partie en pause.
+
 ## 3.71 — 3 novembre 2026
 - **The Backrooms** — une lampe qui s'épuise, des pas qui te poursuivent et des commandes tactiles.
   - La batterie du caméscope est maintenant celle de ta lampe torche : elle se vide quand la lampe est allumée, faiblit, clignote, puis s'éteint.

@@ -25,6 +25,9 @@ export class BackroomsSfx {
 
     const c = (this.ctx = new AudioCtx());
     if (c.state === 'suspended') c.resume();
+    // sortie commune, réglée par le curseur « Effets » du panneau Réglages
+    this.out = window.DDVolume ? window.DDVolume.gain(c, 'fx') : c.createGain();
+    this.out.connect(c.destination);
 
     // 1. Initialiser le bourdonnement strident et glitché de l'entité
     this.initMonsterAudio();
@@ -47,9 +50,9 @@ export class BackroomsSfx {
       this.monsterPanner = c.createStereoPanner();
       this.monsterPanner.pan.setValueAtTime(0, c.currentTime);
       this.monsterGain.connect(this.monsterPanner);
-      this.monsterPanner.connect(c.destination);
+      this.monsterPanner.connect(this.out);
     } else {
-      this.monsterGain.connect(c.destination);
+      this.monsterGain.connect(this.out);
     }
 
     // Oscillateur principal : onde en dents de scie agressive
@@ -108,7 +111,7 @@ export class BackroomsSfx {
 
     hum1.connect(this.ambientGain);
     humGain2.connect(this.ambientGain);
-    this.ambientGain.connect(c.destination);
+    this.ambientGain.connect(this.out);
 
     hum1.start();
     hum2.start();
@@ -156,7 +159,7 @@ export class BackroomsSfx {
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
 
     osc.connect(g);
-    g.connect(c.destination);
+    g.connect(this.out);
     osc.start(t);
     osc.stop(t + 0.08);
   }
@@ -175,7 +178,7 @@ export class BackroomsSfx {
     cg.gain.setValueAtTime(0.12, t);
     cg.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
     click.connect(cg);
-    cg.connect(c.destination);
+    cg.connect(this.out);
     click.start(t);
     click.stop(t + 0.04);
 
@@ -192,7 +195,7 @@ export class BackroomsSfx {
       g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.06 + 0.4);
 
       osc.connect(g);
-      g.connect(c.destination);
+      g.connect(this.out);
       osc.start(t + idx * 0.06);
       osc.stop(t + idx * 0.06 + 0.45);
     });
@@ -216,7 +219,7 @@ export class BackroomsSfx {
       g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.08 + 0.6);
 
       osc.connect(g);
-      g.connect(c.destination);
+      g.connect(this.out);
       osc.start(t + idx * 0.08);
       osc.stop(t + idx * 0.08 + 0.65);
     });
@@ -257,11 +260,11 @@ export class BackroomsSfx {
     ng.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
 
     whiteNoise.connect(ng);
-    ng.connect(c.destination);
+    ng.connect(this.out);
     whiteNoise.start(t);
 
     osc.connect(g);
-    g.connect(c.destination);
+    g.connect(this.out);
     osc.start(t);
     osc.stop(t + 0.75);
   }
@@ -282,7 +285,7 @@ export class BackroomsSfx {
       g.gain.linearRampToValueAtTime(0.12, t0 + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.11);
       osc.connect(g);
-      g.connect(c.destination);
+      g.connect(this.out);
       osc.start(t0);
       osc.stop(t0 + 0.12);
     }
@@ -301,7 +304,7 @@ export class BackroomsSfx {
     lg.gain.setValueAtTime(0.45, t);
     lg.gain.exponentialRampToValueAtTime(0.001, t + 1);
     low.connect(lg);
-    lg.connect(c.destination);
+    lg.connect(this.out);
     low.start(t);
     low.stop(t + 1.05);
     const hi = c.createOscillator();
@@ -313,7 +316,7 @@ export class BackroomsSfx {
     hg.gain.linearRampToValueAtTime(0.05, t + 0.05);
     hg.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
     hi.connect(hg);
-    hg.connect(c.destination);
+    hg.connect(this.out);
     hi.start(t);
     hi.stop(t + 0.75);
   }
@@ -333,7 +336,7 @@ export class BackroomsSfx {
       g.gain.setValueAtTime(0.06, t + i * 0.07);
       g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + (empty ? 0.3 : 0.06));
       osc.connect(g);
-      g.connect(c.destination);
+      g.connect(this.out);
       osc.start(t + i * 0.07);
       osc.stop(t + i * 0.07 + 0.32);
     });
@@ -356,8 +359,8 @@ export class BackroomsSfx {
       const p = c.createStereoPanner();
       p.pan.setValueAtTime(pan, t);
       g.connect(p);
-      p.connect(c.destination);
-    } else g.connect(c.destination);
+      p.connect(this.out);
+    } else g.connect(this.out);
     osc.start(t);
     osc.stop(t + 0.22);
   }

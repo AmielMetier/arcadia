@@ -263,6 +263,26 @@ html, body {
 }
 .btn-restart:hover { background: #f2f0e6; color: #000; text-shadow: none; }
 
+/* Bouton Réglages (panneau commun aux jeux) */
+.icon-btn {
+  position: fixed;
+  top: 112px;
+  right: 22px;
+  z-index: 45;
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(242, 240, 230, 0.55);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #f2f0e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.icon-btn:hover { background: rgba(242, 240, 230, 0.2); }
+.icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
 /* Commandes tactiles */
 .touch-btns { display: none; }
 body.touch .touch-btns {

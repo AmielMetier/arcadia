@@ -308,7 +308,7 @@ window.HUB_GAMES = [
    Affichée sur l'écran de chargement commun, dans le menu Arcadia en jeu et pour les filtres de l'accueil. */
 window.HUB_GAME_INFO = {
   backrooms: { genre: 'action', time: '5–10 min',
-    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['F', 'Allumer / Éteindre la lampe torche'], ['Échap', 'Pause · choisir Souris ou Sans souris (flèches pour regarder)']],
+    keys: [['ZQSD / Flèches', 'Se déplacer'], ['Souris', 'Regarder autour de soi'], ['Maj (Shift)', 'Courir (Endurance limitée)'], ['F', 'Allumer / Éteindre la lampe torche'], ['Échap', 'Pause'], ['⚙ Réglages', 'Mode Sans souris : les flèches tournent la vue']],
     tips: ['Écoute attentivement : le bourdonnement strident de l\'entité devient de plus en plus fort quand elle s\'approche.', 'Casse sa ligne de vue : derrière quelques murs, l'entité finit par te perdre.', 'Suis les barres de SIGNAL du caméscope pour trouver les 5 cassettes, puis la porte EXIT.', 'L'eau d'amande rend tout ton souffle.', 'Ta lampe vide sa pile : éteins-la dans les zones éclairées et ramasse les piles dans le noir.'] },
   dogfight: { genre: 'action', time: '5–10 min',
     keys: [['Flèches / ZQSD', 'Pilotage & Virages coordonnés'], ['Espace / Clic', 'Canon Vulcan M61'], ['Maj (Shift)', 'Postcombustion (Boost)'], ['Ctrl / C', 'Aérofrein (virage plus serré)'], ['Tab', 'Classement']],
