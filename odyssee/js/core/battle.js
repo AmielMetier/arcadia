@@ -187,6 +187,10 @@ export class Battle {
     this.turn++;
     const forced = this.forcedAction(0);
     let a = forced || action;
+    if (a.type === 'run' && !this.wild) {
+      this.turn--;
+      return [{ t: 'msg', text: 'Impossible de fuir un combat de Dresseur !' }];
+    }
     if (a.type === 'move' && a.idx != null) {
       const mv = this.me.moves[a.idx];
       if (!this.usableMoves(0).length) a = { type: 'move', id: 165 };

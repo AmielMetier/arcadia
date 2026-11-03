@@ -433,7 +433,7 @@ export class BattleView {
         let mine = null;
         if (battle.need[0]) {
           const party = battle.sides[0].party;
-          mine = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
+          mine = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quel Pokémon ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === battle.sides[0].active ? 'Au combat' : null) });
           if (mine < 0 || !party[mine] || party[mine].hp <= 0) mine = party.findIndex((m) => m.hp > 0);
         }
         duel.sendSwitch(n, mine);
@@ -496,7 +496,14 @@ export class BattleView {
         if (k < 0) continue;
         return { type: 'switch', idx: k };
       }
-      if (c === 3) return { type: 'run' };
+      if (c === 3) {
+        if (!b.wild) {
+          this.sound.sfx('bump');
+          await this.msg('Impossible de fuir un combat de Dresseur !', { wait: true });
+          continue;
+        }
+        return { type: 'run' };
+      }
     }
   }
   commandMenu() {
@@ -726,7 +733,7 @@ export class BattleView {
   }
   async forcedSwitch() {
     const b = this.battle;
-    const k = await partyScreen(this.game, { mode: 'pick', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
+    const k = await partyScreen(this.game, { mode: 'pick', pickLabel: 'Envoyer', prompt: 'Envoyer quelle créature ?', filter: (m, i) => (m.hp <= 0 ? 'K.O.' : i === b.sides[0].active ? 'Au combat' : null) });
     if (k < 0) return;
     await this.play(b.playerSwitch(k));
   }
