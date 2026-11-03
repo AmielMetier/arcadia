@@ -1,0 +1,11 @@
+Textures de The Backrooms. Toutes sont dans le domaine public (CC0 1.0,
+https://creativecommons.org/publicdomain/zero/1.0/) : utilisation libre, même commerciale, sans obligation de citer.
+On les cite quand même, avec plaisir.
+
+Poly Haven (https://polyhaven.com), réduites en 512 px puis recolorées et mélangées aux motifs dessinés dans
+backrooms/view/textures.js :
+  moquette.jpg  Dirty Carpet        https://polyhaven.com/a/dirty_carpet
+  papier.jpg    Decrepit Wallpaper  https://polyhaven.com/a/decrepit_wallpaper
+  plafond.jpg   Ceiling Interior    https://polyhaven.com/a/ceiling_interior
+
+Les meubles abandonnés sont ceux de Mystère Mystère (Kenney, Furniture Kit, CC0) : voir mystery/models/LICENSE.txt.

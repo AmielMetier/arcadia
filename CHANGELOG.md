@@ -1,5 +1,96 @@
 # Journal des versions — Arcadia
 
+## 3.90 — 3 novembre 2026
+- **The Backrooms** — l'entité du Level 1 est plus sombre, mais bien plus nette : on la voit en détail sans qu'elle soit brouillée.
+- **The Backrooms** — l'entité du Level 1 est bien plus grande, et chaque level a son propre screamer.
+  - Au Level 1, quand elle t'attrape, c'est elle qui surgit en plein écran en gesticulant, avec sa voix à fond.
+- **The Backrooms** — une nouvelle entité rôde dans l'entrepôt du Level 1.
+  - Après l'ascenseur, ce n'est plus la même créature qui te traque : une silhouette qui gesticule en boucle, avec sa propre voix.
+  - On l'entend en permanence au loin, de plus en plus fort à mesure qu'elle se rapproche, à gauche ou à droite selon où elle se trouve.
+- **The Backrooms** — le Level 0 sur deux étages, et un faux ascenseur.
+  - Un faux pas dans un trou ne te bloque plus : tu tombes à l'étage du dessous, juste en dessous, sonné un instant. La corde n'est plus utile.
+  - Deux escaliers, loin des trous, relient les deux étages. Le caméscope y guide quand il ne reste plus de cassette à ton étage.
+  - Les 5 cassettes sont réparties entre les deux étages.
+  - Il y a un ascenseur à chaque étage, impossibles à distinguer. Quand les 5 cassettes sont trouvées, le vrai s'ouvre et le faux se change en mur jaune : le signal pointe vers celui de ton étage, à toi de voir si c'est le bon.
+  - L'entité prend aussi les escaliers pour suivre les joueurs, et on l'entend étouffée à travers le plancher.
+- **The Backrooms** — un parcours de trous qui tourne, et une vraie barre d'équilibre.
+  - Le couloir piégé ne va plus tout droit : il prend un ou plusieurs virages obligatoires (en L, en S, en zigzag).
+  - Sur une arête entre deux trous, on n'avance que tout droit et plus lentement, sans pouvoir courir. Le corps tangue (la caméra penche) : Q et D servent à se redresser. Trop penché, on bascule dans le trou de ce côté.
+  - Une jauge d'équilibre s'affiche quand on est sur une arête.
+- **The Backrooms** — les trous gardent une cassette, et on n'y retombe plus en sortant.
+  - Les trous ne sont plus dans de grandes salles qu'on pouvait contourner : une des cassettes est enfermée dans une petite pièce, au bout d'un couloir étroit au sol creusé de trous. On passe sur l'arête du milieu, sans autre chemin possible.
+  - En remontant d'un trou, on est déposé sur la case sûre la plus proche et on reste immobile un instant : Z encore enfoncé ne fait plus retomber dedans.
+  - On ne remonte seul que s'il ne reste personne dehors pour lancer une corde ; sinon, il faut qu'un coéquipier vienne la tendre (R).
+- **The Backrooms** — des trous, une échelle, une corde et un sifflet au Level 0, et de nouvelles commandes.
+  - Une ou deux grandes salles ont le sol creusé de trous carrés : on passe sur les arêtes. Qui tombe reste coincé au fond jusqu'à ce qu'un collègue lui lance sa corde (R) ; il remonte en maintenant Z. Seul, on finit par s'en sortir, bien plus lentement.
+  - Une des 5 cassettes est posée dans un renfoncement en hauteur : il faut trouver l'échelle cachée plus loin, la poser dessous (E) et grimper.
+  - T fait siffler, pour que les autres t'entendent (à gauche, à droite, plus ou moins loin). Attention : à force de siffler, l'entité vient voir.
+  - Nouvelles commandes : F ramasse un objet (si l'inventaire est plein, il prend la place de l'objet de la case choisie, qui reste par terre), 2 et 3 choisissent une case, E utilise l'objet choisi, 1 allume ou éteint la lampe.
+  - Un message indique ce que tu peux faire là où tu es (ramasser, échanger, poser l'échelle, lancer ta corde, grimper).
+- **The Backrooms** — la lampe torche a sa case dans l'inventaire.
+  - La case 1 est réservée à la lampe : elle s'y range quand tu la prends sur la table, et la touche 1 (ou F) l'allume et l'éteint.
+  - Il reste deux cases pour les piles et l'eau d'amande, utilisées avec 2 et 3.
+- **The Backrooms** — une table de lampes torches au départ.
+  - Au début de la partie, personne n'a de lampe : une table posée juste à côté du départ en porte une par joueur, à prendre en passant.
+  - Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ; si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
+- **The Backrooms** — l'ascenseur ne reste plus bloqué sur « L'ascenseur descend… ».
+  - Une pause pendant la descente figeait le trajet, et l'écran de pause restait caché sous le noir : la descente va maintenant toujours jusqu'au bout.
+  - Une barre de chargement montre l'avancée du trajet jusqu'à l'étage suivant.
+  - L'écran de pause s'affiche toujours au premier plan.
+- **The Backrooms** — le Level 1, l'ascenseur et le jeu à plusieurs.
+  - On joue maintenant à plusieurs : les cassettes et les fusibles comptent pour toute l'équipe, et on voit les autres avancer avec leur lampe.
+  - Les 5 cassettes ouvrent un vrai ascenseur. Qui y entre est à l'abri et regarde ceux qui sont encore dehors ; il part quand tout le monde est dedans.
+  - Plus il y a de monde dans l'ascenseur, plus l'entité devient rapide, voit loin et s'acharne sur ceux qui restent.
+  - Un joueur attrapé regarde les autres jusqu'au prochain étage, où il revient.
+  - Level 1 : un sous-sol industriel en béton humide, des allées d'étagères métalliques, des caisses et un brouillard froid au ras du sol.
+  - Trouve les 3 fusibles dans les allées et rapporte-les au panneau du monte-charge pour remonter à la surface.
+  - Des coupures de courant plongent l'entrepôt dans le noir total pendant 15 à 20 secondes : il ne reste que ta lampe.
+  - L'entité contourne par les rangées d'étagères et t'attend en silence au bout d'une allée.
+- **The Backrooms** — un inventaire, une entité qui se dévoile et un dédale différent à chaque partie.
+  - De loin, l'entité n'est qu'une image brouillée et pleine de parasites ; plus elle s'approche, plus elle devient nette, jusqu'à apparaître parfaitement tout près.
+  - Un inventaire de trois cases : les piles et l'eau d'amande se ramassent et s'utilisent quand tu veux avec 1, 2 ou 3 (ou en touchant la case au téléphone).
+  - Les murs sont tirés au hasard à chaque partie : couloirs, cloisons et recoins ne sont jamais au même endroit.
+  - Rejouer garde la difficulté choisie.
+- **Arcadia** — la liste des jeux de l'accueil se charge de nouveau (une faute dans la fiche de The Backrooms la bloquait depuis la 3.66).
+- **The Backrooms** — un bouton ⚙ Réglages, comme dans les autres jeux.
+  - On y choisit ses commandes : Souris, ou Sans souris (ZQSD pour marcher, les flèches tournent la vue et font lever ou baisser les yeux).
+  - Le curseur du son règle enfin le volume du jeu.
+  - Ouvrir les réglages met la partie en pause.
+- **The Backrooms** — une lampe qui s'épuise, des pas qui te poursuivent et des commandes tactiles.
+  - La batterie du caméscope est maintenant celle de ta lampe torche : elle se vide quand la lampe est allumée, faiblit, clignote, puis s'éteint.
+  - Des piles traînent dans le dédale, surtout dans les zones sombres : ramasse-les pour recharger ta lampe.
+  - Quand l'entité te traque, tu entends ses pas lourds se rapprocher, à gauche ou à droite.
+  - Le jeu se joue au téléphone : glisse à gauche pour marcher, à droite pour regarder, avec des boutons Courir et Lampe.
+- **Mystère Mystère** — des manches mieux rythmées et plus de tension à la fin.
+  - Le meurtrier joué par un bot se fond plus longtemps dans la foule avant de frapper : fini les manches pliées en dix secondes.
+  - Il ne panique plus quand le shérif passe arme au poing près de lui alors que personne ne le soupçonne.
+  - « Plus que deux survivants… » puis « Dernier survivant ! » : une annonce et un battement de cœur quand il ne reste presque plus personne.
+  - L'annonce du début de manche attend que ta carte de rôle ait disparu au lieu de s'afficher par-dessus.
+- **The Backrooms** — l'entité est plus nette et bien centrée sur son visage.
+  - Sa photo est plus nette, et l'image du jeu un peu moins floue.
+  - Quand elle t'attrape, son visage arrive pile au centre de l'écran.
+  - Sa tête est maintenant dans l'axe de l'entité : quand elle fonce sur toi, c'est son visage qui te fait face.
+- **The Backrooms** — un mode « Sans souris » et des couloirs plus sombres.
+  - Un mode « Sans souris », comme dans Mystère Mystère, se choisit dans le menu pause : ZQSD pour marcher, les flèches pour regarder, Entrée pour jouer et Échap pour mettre en pause.
+  - Le jeu se met en pause tant que tu n'as pas pris le contrôle : l'entité ne bouge plus pendant ce temps.
+  - Entrée relance une partie depuis l'écran de fin.
+  - Les néons éclairent moins, la brume est plus épaisse et les zones plongées dans le noir sont plus nombreuses : la lampe torche devient précieuse.
+- **The Backrooms** — le Level 0 devient immense, lent et filmé au vieux caméscope.
+  - Le dédale fait maintenant 160 mètres de côté : des milliers de couloirs, de cloisons percées, de piliers et quelques grandes salles vides.
+  - On avance plus lentement, et l'entité aussi. La course reste possible, mais le souffle s'épuise vite.
+  - Tout est filmé comme une vieille cassette VHS : image floue et bombée, couleurs qui bavent, lignes, grain, bande de tracking. L'image se déchire quand l'entité approche.
+  - L'entité a désormais un visage : une silhouette plate qui te fixe toujours, tremble quand elle te traque et surgit plein écran quand elle t'attrape.
+  - Des zones entières ont leurs néons morts ou qui grésillent : sans lampe torche, on n'y voit presque rien.
+  - Vraies textures de moquette, de papier peint et de faux plafond, et des meubles de bureau abandonnés le long des murs.
+  - Le caméscope capte le signal des cassettes : plus tu t'en approches, plus les barres montent. Une fois les 5 cassettes trouvées, il guide vers la sortie.
+  - Des bouteilles d'eau d'amande traînent par terre : une gorgée et ton souffle revient.
+  - L'entité te perd si tu casses sa ligne de vue assez longtemps, mais elle rôde de plus en plus près de toi.
+- **The Backrooms** — nouveau jeu : échappe-toi du dédale jaune infini du Level 0.
+  - Un dédale oppressant de pièces et couloirs au papier peint jaune moisi, moquette humide et néons qui grésillent.
+  - Une entité sombre rôde dans les couloirs : son bourdonnement strident et glitché devient de plus en plus fort et violent quand elle s'approche de toi.
+  - Trouve les 5 cassettes VHS cachées dans les recoins du dédale pour déverrouiller la porte de SORTIE (EXIT) et t'enfuir.
+  - Lampe torche (F), course avec gestion de l'endurance (Shift), et filtre vidéo VHS d'époque avec glitchs de proximité.
+
 ## 3.89 — 3 novembre 2026
 - **Odyssée** — Nouveaux décors, dessinés au pixel près :
   - Les routes, villes et grottes ont un nouveau sol : herbe, fleurs, chemins et lacs varient d'un endroit à l'autre, plus de motifs qui se répètent.
