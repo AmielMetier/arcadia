@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.84 — 3 novembre 2026
+- **The Backrooms** — l'entité du Level 1 est plus sombre, mais bien plus nette : on la voit en détail sans qu'elle soit brouillée.
+
 ## 3.83 — 3 novembre 2026
 - **The Backrooms** — l'entité du Level 1 est bien plus grande, et chaque level a son propre screamer.
   - Au Level 1, quand elle t'attrape, c'est elle qui surgit en plein écran en gesticulant, avec sa voix à fond.

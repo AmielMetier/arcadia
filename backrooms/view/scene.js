@@ -12,8 +12,8 @@ import { createVhsFilter } from './vhs.js';
 
 const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
 export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
-// L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (15 par seconde, 23 par rangée) jouée en boucle
-export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=1', import.meta.url).href, frames: 149, cols: 23, rows: 7, fps: 15, aspect: 176 / 288 };
+// L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
+export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400 };
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
 const AMBIENT = 0.015; // lumière minimale dans les zones mortes
@@ -773,7 +773,7 @@ export function createBackroomsScene(container, floors) {
     const h = anim ? 2.8 : 2.15; // au Level 1, il est immense (le plafond de l'entrepôt est à 4,2 m)
     const w = anim ? h * anim.aspect : Math.min(2.3, (h * t.image.width) / t.image.height);
     if (anim) faceFrame.value.set(0, 0, 1 / anim.cols, 1 / anim.rows);
-    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? '#ffffff' : '#e6dccb' });
+    const mat = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, side: THREE.DoubleSide, color: anim ? '#463e37' : '#e6dccb' }); // au Level 1, une silhouette sombre
     // brouillage de l'image : bandes décalées, couleurs qui bavent, neige et lignes manquantes (uGlitch de 0 à 1)
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uGlitch = faceGlitch;
@@ -884,7 +884,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const chase = M.mode === 'chase';
         // plus elle est proche, moins elle est brouillée : nette à moins de 2,5 m
         const g = THREE.MathUtils.clamp((Math.hypot(P.x - M.x, P.z - M.z) - 2.5) / 14, 0, 1);
-        faceGlitch.value = g;
+        faceGlitch.value = anim ? g * 0.3 : g; // au Level 1, sombre mais net : à peine brouillé
         faceTime.value = time;
         if (anim) {
           const f = Math.floor(time * anim.fps) % anim.frames;
@@ -892,11 +892,11 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
           faceFrame.value.x = (f % anim.cols) / anim.cols;
           faceFrame.value.y = 1 - (Math.floor(f / anim.cols) + 1) / anim.rows;
         }
-        const j = (chase ? 0.12 : 0.04) * g;
+        const j = (chase ? 0.12 : 0.04) * faceGlitch.value;
         const my = -(M.floor || 0) * FLOOR_DY;
         monsterGroup.position.set(M.x + (Math.random() - 0.5) * j, my + (chase ? Math.abs(Math.sin(time * 9)) * 0.08 : Math.sin(time * 2) * 0.03), M.z + (Math.random() - 0.5) * j);
         monsterGroup.rotation.y = Math.atan2(P.x - M.x, P.z - M.z);
-        face.scale.set(1 + (Math.random() - 0.5) * 0.08 * g, 1 + Math.sin(time * 18) * 0.04 * g, 1);
+        face.scale.set(1 + (Math.random() - 0.5) * 0.08 * faceGlitch.value, 1 + Math.sin(time * 18) * 0.04 * faceGlitch.value, 1);
         monsterAura.intensity = (chase ? 3 : 1.5) + Math.random() * 1.2;
       } else {
         monsterGroup.visible = false;

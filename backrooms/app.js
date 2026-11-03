@@ -214,7 +214,7 @@ function initGame(settings = lastSettings) {
   const difficulty = settings.difficulty || 'normal';
   const players = NET.role === 'host' ? H.players.map((p) => ({ id: p.id, name: p.name || 'Joueur' })) : [{ id: 0, name: 'Joueur' }];
   NET.run = Date.now();
-  startRun({ seed, difficulty, players, run: NET.run, level: 0 });
+  startRun({ seed, difficulty, players, run: NET.run, level: 1 });
   if (NET.role === 'host') send('all', goMessage());
 }
 
@@ -226,8 +226,8 @@ function startRun({ seed, difficulty, players, run, level }) {
   NET.actions = {};
   NET.events = [];
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Joueur' }];
-  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId }); // les étages sortent de la graine
-  if (level) sim.loadLevel(level);
+  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId, level }); // les étages sortent de la graine
+  if (level && sim.level !== level) sim.loadLevel(level);
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
     scene.dispose();
