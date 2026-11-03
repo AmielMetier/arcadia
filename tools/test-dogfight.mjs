@@ -243,7 +243,7 @@ function play(n, lvl, sec, settings = {}) {
   };
   const steps = (g, sec) => { const ev = []; for (let t = 0; t < sec; t += DT) { stepGame(g, DT, world); ev.push(...drainEvents(g)); } return ev; };
   const count = (ev, e) => ev.filter((q) => q.e === e).length;
-  // missiles : sans stock, un toutes les 20 s, toujours avec accrochage, 70 % d'un F-16
+  // missiles : sans stock, un toutes les 12 s, toujours avec accrochage, 70 % d'un F-16
   {
     const g = duel('f16', 'f16'), [a, b] = g.planes;
     a.inp.msl = true; let ev = steps(g, DT);
@@ -251,21 +251,21 @@ function play(n, lvl, sec, settings = {}) {
     ev = steps(g, 1.6);
     assert(a.lockId === 2 && a.lockT >= 1, 'missile : la cible devant est accrochée');
     a.inp.msl = true; ev = steps(g, DT);
-    assert(count(ev, 'mfire') === 1 && Math.abs(a.msCd - MISSILE_COOLDOWN) < 0.1, 'missile : tir, puis 20 s de recharge');
+    assert(count(ev, 'mfire') === 1 && Math.abs(a.msCd - MISSILE_COOLDOWN) < 0.1, `missile : tir, puis ${MISSILE_COOLDOWN} s de recharge`);
     ev = steps(g, 6);
     assert(Math.abs(b.health - (TYPES.f16.hp - MISSILE_DAMAGE)) < 0.5 && b.alive, `missile : un F-16 touché garde 30 % (${b.health.toFixed(0)})`);
     a.inp.msl = true; ev = steps(g, DT);
     assert(count(ev, 'mfire') === 0, 'missile : rien pendant la recharge');
     ev = steps(g, MISSILE_COOLDOWN - 6);
     a.inp.msl = true; ev = steps(g, 0.1);
-    assert(a.msCd > 19 && count(ev, 'mfire') === 1, 'missile : de nouveau prêt après 20 s, sans limite de stock');
-    // leurres : sans stock, toutes les 15 s
+    assert(a.msCd > MISSILE_COOLDOWN - 1 && count(ev, 'mfire') === 1, `missile : de nouveau prêt après ${MISSILE_COOLDOWN} s, sans limite de stock`);
+    // leurres : sans stock, toutes les 9 s
     b.inp.flare = true; ev = steps(g, DT);
-    assert(count(ev, 'flare') === 1 && Math.abs(b.flCd - FLARE_COOLDOWN) < 0.1, 'leurres : lâchés, puis 15 s de recharge');
+    assert(count(ev, 'flare') === 1 && Math.abs(b.flCd - FLARE_COOLDOWN) < 0.1, `leurres : lâchés, puis ${FLARE_COOLDOWN} s de recharge`);
     b.inp.flare = true; ev = steps(g, 5);
     assert(count(ev, 'flare') === 0, 'leurres : rien pendant la recharge');
-    b.inp.flare = true; ev = steps(g, 10.1);
-    assert(count(ev, 'flare') === 1, 'leurres : de nouveau prêts après 15 s');
+    b.inp.flare = true; ev = steps(g, FLARE_COOLDOWN - 4.9);
+    assert(count(ev, 'flare') === 1, `leurres : de nouveau prêts après ${FLARE_COOLDOWN} s`);
     // tout est prêt à la réapparition
     a.msCd = 12; a.flCd = 9; a.abCd = 30; a.y = -5; steps(g, DT);
     assert(!a.alive, 'crash pour le test de réapparition');
@@ -282,13 +282,13 @@ function play(n, lvl, sec, settings = {}) {
     b.y = 70; a.fy = -0.14; for (let i = 0; i < 180; i++) stepLock(a, [a, b], world, DT);
     assert(a.lockId === 2 && a.lockT === 1, 'au-dessus de 50 m, on l\'accroche');
   }
-  // capacités : 35 s, une par avion
+  // capacités : 25 s, une par avion
   assert(TYPE_IDS.length === 6 && TYPE_IDS.every((t) => ABILITIES[TYPES[t].ab]) && new Set(TYPE_IDS.map((t) => TYPES[t].ab)).size === 6, 'six avions, six capacités différentes');
   {
     // Surcharge du F-16 : plus vite, sans chauffer
     const g = duel('f16', 'f16'), [a] = g.planes, shots0 = a.shots || 0;
     a.inp.ab = true; let ev = steps(g, DT);
-    assert(count(ev, 'ab') === 1 && a.abCd > ABILITY_COOLDOWN - 0.1 && a.abT > 5.9, 'Surcharge : déclenchée, 35 s de recharge');
+    assert(count(ev, 'ab') === 1 && a.abCd > ABILITY_COOLDOWN - 0.1 && a.abT > 5.9, `Surcharge : déclenchée, ${ABILITY_COOLDOWN} s de recharge`);
     a.inp.fire = true; steps(g, 5); a.inp.fire = false;
     assert(a.heat === 0 && !a.over && (a.shots - shots0) > FIRE_RATE * 1.25 * 5, `Surcharge : ${a.shots - shots0} obus en 5 s sans chauffer`);
     a.inp.ab = true; ev = steps(g, DT);
@@ -311,7 +311,7 @@ function play(n, lvl, sec, settings = {}) {
     const g = duel('rafale', 'f16', [{ id: 3, name: 'C', type: 'f16' }]), [a] = g.planes;
     g.planes[2].z = 300; a.lockT = 0; a.inp.ab = true; let ev = steps(g, DT);
     const fired = ev.filter((q) => q.e === 'mfire');
-    assert(fired.length === 2 && new Set(fired.map((q) => q.target)).size === 2 && a.abCd > 34, 'Salve : deux missiles, deux cibles, sans accrocher');
+    assert(fired.length === 2 && new Set(fired.map((q) => q.target)).size === 2 && a.abCd > ABILITY_COOLDOWN - 1, 'Salve : deux missiles, deux cibles, sans accrocher');
     const solo = duel('rafale', 'f16'), r = solo.planes[0];
     Object.assign(solo.planes[1], { z: -2000 }); r.inp.ab = true; ev = steps(solo, DT);
     assert(count(ev, 'abno') === 1 && r.abCd === 0 && count(ev, 'mfire') === 0, 'Salve : sans cible devant, elle reste prête');
@@ -371,7 +371,7 @@ function play(n, lvl, sec, settings = {}) {
   stepGame(g, DT, world); s0.inp.ab = false;
   for (let i = 0; i < 20; i++) stepGame(g, DT, world);
   const rc = snapRows(g)[2], cp = applyRow(createFlight({ type: 'su35' }), rc);
-  assert(s0.cob > 0 && Math.abs(cp.cob - s0.cob) < 0.01 && cp.abCd > 30, 'réseau : le Cobra et les recharges voyagent avec l\'instantané');
+  assert(s0.cob > 0 && Math.abs(cp.cob - s0.cob) < 0.01 && cp.abCd > ABILITY_COOLDOWN - 5, 'réseau : le Cobra et les recharges voyagent avec l\'instantané');
   stepFlight(cp, {}, DT); stepFlight(s0, {}, DT);
   assert(Math.hypot(cp.x - s0.x, cp.y - s0.y, cp.z - s0.z) < 0.5 && cp.fy * s0.fy + cp.fx * s0.fx + cp.fz * s0.fz > 0.999, 'réseau : l\'invité rejoue le Cobra comme l\'hôte');
   console.log('✓ Réseau : instantané compact, reprise d\'hôte, prédiction');

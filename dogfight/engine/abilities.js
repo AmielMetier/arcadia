@@ -1,9 +1,9 @@
-// Capacités de Dogfight 3D : une par avion, toutes les 35 s, prête dès la réapparition.
+// Capacités de Dogfight 3D : une par avion, toutes les 25 s, prête dès la réapparition.
 // Moteur pur : l'effet vit dans l'avion (abT : temps d'effet restant, abCd : recharge restante), les armes et le vol le lisent.
 import { TYPES, startCobra, COBRA_TIME } from './flight.js';
 import { fireMissile, hidden, LOCK_RANGE } from './weapons.js';
 
-export const ABILITY_COOLDOWN = 35;
+export const ABILITY_COOLDOWN = 25;
 export const ABILITIES = {
   surge: { name: 'Surcharge', short: 'SURCH.', time: 6, desc: 'Canon sans surchauffe et 30 % plus rapide pendant 6 s.' },
   stealth: { name: 'Furtivité', short: 'FURTIF', time: 6, desc: '6 s sans pouvoir être accroché ni suivi, et invisible au radar ennemi.' },

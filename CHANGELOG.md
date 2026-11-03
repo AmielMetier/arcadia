@@ -3,12 +3,16 @@
 ## 3.84 — 3 novembre 2026
 - **Dogfight 3D** — Quatre vraies cartes, au relief réel : les îles Éoliennes (Lipari et Vulcano), Tenerife (le massif de Teno et les falaises de Los Gigantes), Kauai (la côte de Nā Pali) et les Lofoten (Reine et ses aiguilles). On choisit la carte dans les réglages du salon.
   - La zone de jeu fait 12 km de côté, avec un horizon qui porte jusqu'aux îles voisines.
-  - Les couleurs suivent le terrain : forêts dans les vallons, roche sur les pentes, sable sur les plages, neige sur les sommets des Lofoten, et des milliers d'arbres.
+  - Le sol a les vraies couleurs du lieu, vues par satellite, avec le grain de l'herbe et de la roche quand on passe au ras ; les fortes pentes sont en roche grise.
+  - Les vrais villages, routes, pistes, sentiers, champs, vergers, vignes et serres de chaque île, avec les maisons en relief, leurs fenêtres, leurs ombres, les ponts et les arbres des jardins.
+  - Les forêts poussent là où le satellite en voit, avec les arbres de Birdie Party teintés comme le sol, et des buissons parsèment le maquis et les landes.
+  - L'air est plus clair : les montagnes se voient de loin.
+  - L'île d'Island Rush baigne dans la même mer que le reste de la carte, sans carré d'eau plus clair autour d'elle.
   - Chaque carte a sa base aérienne, avec sa piste et ses hangars tournés vers elle.
-- **Dogfight 3D** — Quatre nouveaux chasseurs : Rafale, Su-35, F/A-18 et A-10. Chaque avion a sa capacité, prête toutes les 35 secondes (touche R, bouton Y à la manette) :
+- **Dogfight 3D** — Quatre nouveaux chasseurs : Rafale, Su-35, F/A-18 et A-10. Chaque avion a sa capacité, prête toutes les 25 secondes (touche R, bouton Y à la manette) :
   - F-16 Surcharge (canon sans surchauffe et plus rapide), F-22 Furtivité (impossible à accrocher, invisible au radar), Rafale Salve (deux missiles d'un coup), Su-35 Cobra (cabré brutal qui fait passer le poursuivant devant), F/A-18 Brouilleur (les missiles autour de toi décrochent), A-10 Brrrt (canon à dégâts doublés).
   - Le roulis libre passe sur V.
-- **Dogfight 3D** — Missiles et leurres à volonté, avec un temps de recharge : 20 secondes pour le missile, 15 pour les leurres.
+- **Dogfight 3D** — Missiles et leurres à volonté, avec un temps de recharge : 12 secondes pour le missile, 9 pour les leurres.
   - Un missile fait 70 de dégâts et demande toujours d'accrocher la cible. Un leurre fait décrocher un missile 7 fois sur 10.
   - Sous 50 m du sol, personne ne peut t'accrocher : le rase-mottes devient une vraie défense.
   - En bas à droite, quatre cases montrent canon, missile, leurres et capacité, avec leur recharge. Tout est prêt à chaque réapparition.

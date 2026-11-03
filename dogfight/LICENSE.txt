@@ -19,9 +19,24 @@ Tiré du modèle numérique de surface Copernicus GLO-30 par tools/relief-dogfig
   © DLR e.V. 2010-2014 et © Airbus Defence and Space GmbH 2014-2018, fourni dans le cadre de COPERNICUS
   par l'Union européenne et l'ESA. Licence gratuite du Copernicus DEM : usage, copie et diffusion permis avec cette mention.
 
+VUE SATELLITE (relief/<carte>.webp et relief/<carte>-loin.webp)
+Tirée par tools/imagerie-dogfight.py de la mosaïque Sentinel-2 sans nuages EOxCloudless (https://cloudless.eox.at),
+par EOX IT Services GmbH ; contient des données Copernicus Sentinel modifiées. Rééchantillonnée et recadrée.
+  Éoliennes, Teno, Lofoten : édition 2017, licence Creative Commons Attribution 4.0
+    (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/deed.fr).
+  Kauai : édition 2024 (l'édition 2017 ne couvre pas Hawaï), licence Creative Commons Attribution - Pas d'utilisation
+    commerciale - Partage dans les mêmes conditions 4.0 (CC BY-NC-SA 4.0). Cette licence interdit tout usage commercial de l'image.
+
+ROUTES, BÂTIMENTS, CHAMPS ET COURS D'EAU (relief/<carte>-osm.json)
+© les contributeurs d'OpenStreetMap (https://www.openstreetmap.org/copyright). Extraits par tools/osm-dogfight.py
+(projetés, simplifiés). Ces fichiers sont sous licence Open Database License 1.0 (ODbL, https://opendatacommons.org/licenses/odbl/1-0/),
+comme les données d'origine.
+
 TEXTURES (textures/*.webp)
 Poly Haven (https://polyhaven.com), licence CC0 (domaine public). Réduites et réencodées en WebP.
-  herbe.webp — Aerial Grass Rock ; roche.webp — Aerial Rocks 02 ; plage.webp — Aerial Beach 01 ; neige.webp — Snow Field Aerial.
+  herbe.webp — Aerial Grass Rock ; roche.webp — Aerial Rocks 04 ; falaise.webp — Marble Cliff 04 ;
+  plage.webp — Aerial Beach 01 ; neige.webp — Snow Field Aerial.
+  herbe_n.webp, roche_n.webp, falaise_n.webp : leur relief (normales) et leur occlusion, tirés des mêmes ensembles.
 
 SONS (sons/*.mp3)
 Découpés, passés en mono, normalisés et réencodés en MP3 ; les boucles sont recollées en fondu dans le jeu.

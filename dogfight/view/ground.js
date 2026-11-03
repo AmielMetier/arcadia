@@ -1,8 +1,8 @@
-// Le sol vu du ciel : la vraie île d'Island Rush (relief, routes, bâtiments, arbres), repeinte façon photo aérienne,
-// au centre de l'archipel (archipel.js).
+// Le sol vu du ciel : la vraie île d'Island Rush (relief, routes, bâtiments, arbres de Birdie Party), repeinte façon photo aérienne,
+// posée en mer dans l'archipel (archipel.js), dont la mer l'entoure.
 // Aucune copie du générateur : si l'île change dans Island Rush, Dogfight suit tout seul.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
-import { GR, CELL, STOREY } from '../../royale/engine/map.js';
+import { GR, CELL, STOREY, WATER } from '../../royale/engine/map.js';
 import { terrainImage, drawMap } from '../../royale/view/maprender.js';
 import { HAZE, FOG_DENSITY, noiseData, hash } from './sky.js';
 
@@ -102,34 +102,31 @@ function buildBuildings(map) {
   return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
 }
 
-function buildTrees(map) {
-  const group = new THREE.Group(), meshes = [];
-  const make = (kinds, geo, palette) => {
-    const list = map.props.filter((p) => kinds.includes(p.kind));
-    const im = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), list.length), o = new THREE.Object3D(), cc = new THREE.Color();
-    list.forEach((p, i) => { o.position.set(p.x, map.heightAt(p.x, p.z), p.z); o.scale.setScalar(p.s * (0.9 + hash(i, 3) * 0.5)); o.rotation.y = i; o.updateMatrix(); im.setMatrixAt(i, o.matrix); cc.setHex(palette[i % palette.length]); im.setColorAt(i, cc); });
-    im.frustumCulled = false; group.add(im); meshes.push({ im, n: list.length });
-  };
-  const leafy = new THREE.IcosahedronGeometry(3.6, 0); leafy.scale(1, 1.15, 1); leafy.translate(0, 5, 0);
-  const pine = new THREE.ConeGeometry(2.7, 10, 5); pine.translate(0, 5.5, 0);
-  make(['arbre'], leafy, [0x35492a, 0x41552f, 0x2e4228, 0x4a5c33]);
-  make(['sapin'], pine, [0x263a29, 0x2c4030]);
+// Les arbres de l'île : ceux de Birdie Party, comme sur l'archipel
+function buildTrees(map, kit) {
+  const items = map.props.filter((p) => p.kind === 'arbre' || p.kind === 'sapin').map((p, i) => ({
+    x: p.x, y: map.heightAt(p.x, p.z), z: p.z, s: p.s * (0.9 + hash(i, 3) * 0.5), rot: i, v: i,
+    kind: p.kind === 'sapin' ? 'pine' : hash(i, 7) < 0.5 ? 'round' : 'oak',
+  }));
+  const group = kit.plant(items, { shadows: false, dark: true }), meshes = group.children.map((im) => ({ im, n: im.count }));
+  for (const { im } of meshes) im.frustumCulled = false;
   group.setDensity = (f) => { for (const m of meshes) m.im.count = Math.floor(m.n * f); };
   return group;
 }
 
-export function buildGround(scene, map, sun, noiseTex, anisotropy = 8) {
+export function buildGround(scene, map, sun, noiseTex, anisotropy = 8, kit) {
   const canvas = paintIsland(map, sun);
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = anisotropy; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
   const shared = { uMap: { value: tex }, uN: { value: noiseTex }, uSun: { value: sun }, uHaze: { value: HAZE }, uCam: { value: new THREE.Vector3() }, uFogD: { value: FOG_DENSITY } };
   const islandMat = new THREE.ShaderMaterial({ uniforms: shared, fog: false, vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT });
 
-  // relief : une grille régulière, l'eau à plat à son niveau
+  // relief : une grille régulière, les lacs et rivières à plat à leur niveau ; la mer est celle de l'archipel (archipel.js),
+  // qui passe par-dessus le fond
   const N = map.n, H = map.heights, W = map.water, WL = map.waterLevel, STEP = 4;
   const n = Math.floor((N - 1) / STEP) + 1, pos = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = new Uint32Array((n - 1) * (n - 1) * 6);
   let k = 0;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++, k++) {
-    const q = j * STEP * N + i * STEP, y = W[q] ? Math.max(WL[q], 0) : Math.max(H[q], 0.5);
+    const q = j * STEP * N + i * STEP, y = W[q] === WATER.MER ? Math.min(H[q], -0.6) : W[q] ? Math.max(WL[q], 0) : Math.max(H[q], 0.5);
     pos[k * 3] = i * STEP * 2; pos[k * 3 + 1] = y; pos[k * 3 + 2] = j * STEP * 2; uv[k * 2] = i / (n - 1); uv[k * 2 + 1] = 1 - j / (n - 1);
   }
   k = 0;
@@ -140,7 +137,7 @@ export function buildGround(scene, map, sun, noiseTex, anisotropy = 8) {
   // la mer de l'archipel prend la couleur de l'eau au bord de l'île : pas de couture sur le rivage
   const [dr, dg, db] = canvas.getContext('2d').getImageData(1, 1, 1, 1).data;
   const deep = new THREE.Color().setRGB(dr / 255, dg / 255, db / 255, THREE.SRGBColorSpace);
-  const buildings = buildBuildings(map), trees = buildTrees(map);
+  const buildings = buildBuildings(map), trees = buildTrees(map, kit);
   scene.add(island, buildings, trees);
-  return { canvas, trees, deep, update(camPos) { shared.uCam.value.copy(camPos); }, dispose() { geo.dispose(); islandMat.dispose(); tex.dispose(); buildings.geometry.dispose(); buildings.material.dispose(); } };
+  return { canvas, trees, deep, update(camPos) { shared.uCam.value.copy(camPos); }, dispose() { geo.dispose(); islandMat.dispose(); tex.dispose(); buildings.geometry.dispose(); buildings.material.dispose(); for (const im of trees.children) im.dispose(); scene.remove(island, buildings, trees); } };
 }

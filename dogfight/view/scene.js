@@ -6,6 +6,7 @@ import { buildDecor } from './decor.js';
 import { buildSky, buildClouds, buildVolumetric, noiseTexture, HAZE, FOG_DENSITY, SUN } from './sky.js';
 import { buildPlane, loadPlanes, makeEnvironment, planeLength } from './plane.js';
 import { FxManager } from './fx.js';
+import { createTreeKit } from '../../golf/view/trees.js';
 import { ZONE_CEIL } from '../engine/modes.js';
 
 const QUALITY = {
@@ -38,8 +39,9 @@ export class DogfightScene {
     this.noise = noiseTexture();
     this.sky = buildSky(this.scene, this.noise, () => this.camera);
     const aniso = this.renderer.capabilities.getMaxAnisotropy();
-    this.ground = buildGround(this.scene, world.map, SUN, this.noise, aniso);
-    this.archi = buildArchipelago(this.scene, { sun: SUN, deep: this.ground.deep, noiseTex: this.noise, anisotropy: aniso });
+    this.treeKit = createTreeKit();   // les arbres de Birdie Party
+    this.ground = buildGround(this.scene, world.map, SUN, this.noise, aniso, this.treeKit);
+    this.archi = buildArchipelago(this.scene, { sun: SUN, deep: this.ground.deep, noiseTex: this.noise, anisotropy: aniso, kit: this.treeKit, renderer: this.renderer, island: world.map });
     this.clouds = buildClouds(this.scene, world.clouds);
     this.env = makeEnvironment(this.renderer, this.sky);
     this.decor = buildDecor(this.scene, this.env);
@@ -196,7 +198,7 @@ export class DogfightScene {
   dispose() {
     window.removeEventListener('resize', this.onResize);
     for (const m of this.planes.values()) m.dispose();
-    this.fx.dispose(); this.ground.dispose(); this.archi.dispose(); this.decor.dispose(); this.clouds.dispose();
+    this.fx.dispose(); this.ground.dispose(); this.archi.dispose(); this.treeKit.dispose(); this.decor.dispose(); this.clouds.dispose();
     if (this.volumetric) this.volumetric.dispose();
     this.noise.dispose(); this.env.dispose();
     this.renderer.dispose();

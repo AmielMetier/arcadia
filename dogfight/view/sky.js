@@ -4,8 +4,9 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CLOUD_BASE } from '../engine/world.js';
 
 export const HAZE = new THREE.Color(0xb4c8da);
-export const FOG_DENSITY = 0.00014;
-export const SUN = new THREE.Vector3(0.72, 0.5, -0.32).normalize();
+export const FOG_DENSITY = 0.00008;
+// le soleil au sud-est, haut : comme sur la vue satellite des cartes (prise en milieu de matinée), les ombres concordent
+export const SUN = new THREE.Vector3(0.48, 0.67, 0.57).normalize();
 
 export const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
 export function tile2D(size, oct = 5, base = 4) {

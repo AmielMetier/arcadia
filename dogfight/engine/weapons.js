@@ -1,5 +1,5 @@
 // Armement de Dogfight 3D : canon rotatif, balles (qui héritent de la vitesse du tireur), surchauffe,
-// missiles à accrochage (un toutes les 20 s, sans limite de stock), leurres (toutes les 15 s), et point d'anticipation.
+// missiles à accrochage (un toutes les 12 s, sans limite de stock), leurres (toutes les 9 s), et point d'anticipation.
 // Un avion caché ne s'accroche pas : dans un nuage, en rase-mottes, furtif, ou près d'un brouilleur ennemi.
 // Moteur pur : la cadence de tir ne dépend plus des images par seconde.
 import { TYPES } from './flight.js';
@@ -23,8 +23,8 @@ export const MISSILE_TURN = 1.5;     // rad/s
 export const MISSILE_LIFE = 7;
 export const MISSILE_DAMAGE = 70;    // un F-16 neuf garde 30 % : il faut finir au canon
 export const MISSILE_FUSE = 14;
-export const MISSILE_COOLDOWN = 20;
-export const FLARE_COOLDOWN = 15;
+export const MISSILE_COOLDOWN = 12;
+export const FLARE_COOLDOWN = 9;
 export const LOW_HIDE = 50;          // en dessous (au-dessus du sol ou de l'eau), les radars ne voient plus l'avion
 export const JAM_RADIUS = 1100;      // portée du brouilleur du F/A-18
 export const FLARE_TIME = 0.7;
