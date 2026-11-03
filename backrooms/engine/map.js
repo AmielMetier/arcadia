@@ -8,7 +8,8 @@
 //  - une cassette posée dans un renfoncement en hauteur, qu'on n'atteint qu'avec l'échelle cachée ailleurs.
 
 export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
-export const PIT_DEPTH = 2.4;
+export const FLOOR_DY = 3.4; // l'étage du bas est 3,40 m plus bas (3 m sous plafond et 40 cm de dalle)
+export const PIT_DEPTH = FLOOR_DY; // on tombe d'un étage
 export const NICHE_Y = 2.25; // hauteur de la cassette dans son renfoncement
 
 // tous les objets qu'on ramasse avec F : 'bottle', 'battery', 'ladder' (id unique, position, pris ou non)
@@ -38,7 +39,7 @@ export const blocks = (v) => v === T.WALL || v === T.SHELF || v === T.EXIT;
 
 // Creuse la cabine de l'ascenseur dans un mur voisin de la case d'entrée : la cabine est fermée sur trois côtés,
 // on y entre par l'entrée. Renvoie { gx, gz, x, z, dx, dz } (dx, dz : de l'entrée vers la cabine) ou null.
-export function carveElevator(grid, W, H, entrance, spawn, rnd) {
+export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
   const at = (x, z) => (x < 0 || x >= W || z < 0 || z >= H ? T.WALL : grid[z * W + x]);
   const reach = () => {
     const d = bfs(grid, W, H, spawn.x, spawn.z);
@@ -54,6 +55,7 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd) {
     if (cx < 1 || cx > W - 2 || cz < 1 || cz > H - 2) continue;
     if (at(cx, cz) === T.FLOOR) continue; // la cabine se creuse dans un mur
     const around = [[cx + dx, cz + dz], [cx + dz, cz + dx], [cx - dz, cz - dx]];
+    if (avoid && [[cx, cz], ...around].some(([x, z]) => avoid.has(z * W + x))) continue;
     const saved = around.map(([x, z]) => at(x, z));
     const orig = at(cx, cz);
     around.forEach(([x, z]) => {
@@ -83,7 +85,10 @@ export const PROP_KINDS = [
   { m: 'bookcaseClosedDoors', h: 1.9, r: 0.5 },
 ];
 
-export function createBackroomsMap(seed = 42) {
+// opts.lower : étage du bas (pas de couloir piégé, de renfoncement ni d'échelle) ; opts.forced : cases qui doivent
+// rester du sol accessible (sous les trous de l'étage du dessus)
+export function createBackroomsMap(seed = 42, opts = {}) {
+  const lower = !!opts.lower;
   const W = MAP_SIZE;
   const H = MAP_SIZE;
   const grid = new Uint8Array(W * H);
@@ -196,6 +201,41 @@ export function createBackroomsMap(seed = 42) {
     sz = Math.min(H - 2, Math.max(1, (H >> 1) + Math.floor(rnd() * (spread * 2 + 1)) - spread));
   }
 
+  // 5b. Cases imposées (sous les trous du dessus) : du sol, relié au reste par un passage creusé s'il le faut
+  if (opts.forced && opts.forced.length) {
+    for (const [x, z] of opts.forced) set(x, z, T.FLOOR);
+    dist = bfs(grid, W, H, sx, sz);
+    for (const [fx, fz] of opts.forced) {
+      if (dist[fz * W + fx] >= 0) continue;
+      // parcours en largeur à travers les murs jusqu'à une case accessible, puis on creuse le chemin
+      const prev = new Int32Array(W * H).fill(-1);
+      const q = [fz * W + fx];
+      prev[q[0]] = q[0];
+      let hit = -1;
+      for (let h = 0; h < q.length && hit < 0; h++) {
+        const k = q[h];
+        const x = k % W;
+        const z = (k - x) / W;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx;
+          const nz = z + dz;
+          if (!inside(nx, nz)) continue;
+          const nk = nz * W + nx;
+          if (prev[nk] >= 0) continue;
+          prev[nk] = k;
+          if (dist[nk] >= 0) {
+            hit = nk;
+            break;
+          }
+          q.push(nk);
+        }
+      }
+      for (let k = hit; k >= 0 && k !== prev[k]; k = prev[k]) grid[k] = grid[k] === T.EXIT ? T.EXIT : T.FLOOR;
+      grid[fz * W + fx] = T.FLOOR;
+      dist = bfs(grid, W, H, sx, sz);
+    }
+  }
+
   // 6. Parcours en largeur depuis le départ : les poches inaccessibles deviennent des murs, on garde les distances
   for (let i = 0; i < W * H; i++) {
     if (grid[i] === T.FLOOR && dist[i] < 0) grid[i] = T.WALL;
@@ -218,7 +258,7 @@ export function createBackroomsMap(seed = 42) {
   let elevator = null;
   for (let i = 0; i < 60 && !elevator; i++) {
     exitCell = far[Math.floor(rnd() * Math.min(20 + i * 4, far.length))];
-    elevator = carveElevator(grid, W, H, exitCell, { x: sx, z: sz }, rnd);
+    elevator = carveElevator(grid, W, H, exitCell, { x: sx, z: sz }, rnd, opts.forced ? new Set(opts.forced.map(([x, z]) => z * W + x)) : null);
   }
   const exit = cellPos(exitCell);
   // la cabine et les murs qui la ferment ont pu retirer des cases du sol
@@ -341,7 +381,7 @@ export function createBackroomsMap(seed = 42) {
     cas.vault = true;
     return true;
   };
-  const byFar = [...cassettes].sort((a, b) => D({ x: b.gx, z: b.gz }) - D({ x: a.gx, z: a.gz }));
+  const byFar = lower ? [] : [...cassettes].sort((a, b) => D({ x: b.gx, z: b.gz }) - D({ x: a.gx, z: a.gz }));
   vaultLoop: for (const cas of byFar) {
     for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5)) {
       for (const shape of [...SHAPES].sort(() => rnd() - 0.5)) {
@@ -358,7 +398,7 @@ export function createBackroomsMap(seed = 42) {
   // 8b. Une cassette dans un renfoncement en hauteur, au-dessus d'une case contre un mur
   const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   let niche = null;
-  for (const cas of [...cassettes].filter((c) => !c.vault).sort(() => rnd() - 0.5)) {
+  for (const cas of lower ? [] : [...cassettes].filter((c) => !c.vault).sort(() => rnd() - 0.5)) {
     const c = { x: cas.gx, z: cas.gz };
     let sides = wallSide(c);
     let cell = c;
@@ -476,7 +516,9 @@ export function createBackroomsMap(seed = 42) {
 
   return {
     level: 0,
+    floor: lower ? 1 : 0,
     ceil: WALL_HEIGHT,
+    stairs: [],
     W,
     H,
     grid,
@@ -534,4 +576,64 @@ export function bfs(grid, W, H, sx, sz) {
     }
   }
   return dist;
+}
+
+// Le Level 0 sur deux étages : on tombe par les trous du haut, on remonte par les escaliers (2, loin des trous).
+// Les 5 cassettes sont réparties entre les étages (celle du couloir piégé et celle du renfoncement en haut).
+// Chaque étage a son ascenseur ; le moteur décide lequel est le vrai.
+export function createLevel0(seed = 42) {
+  const up = createBackroomsMap(seed);
+  const W = up.W;
+  const forced = up.pits.map((p) => [p.gx, p.gz]);
+  const down = createBackroomsMap(seed + 7919, { lower: true, forced });
+
+  // les escaliers : une case libre aux deux étages, loin des trous, avec une case pour arriver de chaque côté
+  let s = (seed * 31 + 7) >>> 0 || 1;
+  const rnd = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const free = (m, x, z) => m.grid[z * W + x] === T.FLOOR && m.dist[z * W + x] >= 0 && m.pitAt(x, z) < 0;
+  const busyCell = (m, x, z) =>
+    m.cassettes.some((c) => c.gx === x && c.gz === z) || m.items.some((i) => i.gx === x && i.gz === z) || (m.exit.gx === x && m.exit.gz === z) || (m.spawn.gx === x && m.spawn.gz === z);
+  const farFromPits = (x, z, d) => up.pits.every((p) => Math.abs(p.gx - x) + Math.abs(p.gz - z) >= d);
+  const stairs = [];
+  for (const minPit of [10, 6]) {
+    const cand = up.walkable.filter((c) => farFromPits(c.x, c.z, minPit) && Math.hypot(c.x - up.spawn.gx, c.z - up.spawn.gz) > 6).sort(() => rnd() - 0.5);
+    for (const c of cand) {
+      if (stairs.length >= 2) break;
+      if (!free(up, c.x, c.z) || !free(down, c.x, c.z) || busyCell(up, c.x, c.z) || busyCell(down, c.x, c.z)) continue;
+      if (stairs.some((st) => Math.abs(st.gx - c.x) + Math.abs(st.gz - c.z) < 24)) continue;
+      // on monte vers (dx, dz) : on arrive en haut sur la case devant, on redescend sur la case derrière
+      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5).find(([dx, dz]) => free(up, c.x + dx, c.z + dz) && free(down, c.x - dx, c.z - dz));
+      if (!dir) continue;
+      const [dx, dz] = dir;
+      const at = (x, z) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
+      stairs.push({ id: stairs.length, gx: c.x, gz: c.z, ...at(c.x, c.z), dx, dz, up: at(c.x + dx, c.z + dz), down: at(c.x - dx, c.z - dz) });
+    }
+    if (stairs.length >= 2) break;
+  }
+  up.stairs = stairs;
+  down.stairs = stairs;
+  // pas d'objet ni de meuble sur les marches
+  for (const m of [up, down]) {
+    m.props = m.props.filter((p) => !stairs.some((st) => Math.hypot(p.x - st.x, p.z - st.z) < 2));
+  }
+
+  // les cassettes : 3 en haut (dont celle du couloir piégé et celle du renfoncement), 2 en bas
+  const special = up.cassettes.filter((c) => c.vault || c.high);
+  const others = up.cassettes.filter((c) => !c.vault && !c.high);
+  const keepUp = [...special, ...others.slice(0, Math.max(0, 3 - special.length))];
+  const freeIds = up.cassettes.filter((c) => !keepUp.includes(c)).map((c) => c.id);
+  up.cassettes = keepUp;
+  // en bas : les plus éloignées des escaliers
+  const dStair = (c) => Math.min(...stairs.map((st) => Math.abs(st.gx - c.gx) + Math.abs(st.gz - c.gz)), 999);
+  down.cassettes = [...down.cassettes].sort((a, b) => dStair(b) - dStair(a)).slice(0, freeIds.length);
+  down.cassettes.forEach((c, i) => {
+    c.id = freeIds[i];
+  });
+  return { level: 0, floors: [up, down], stairs };
 }

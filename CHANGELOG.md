@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.81 — 3 novembre 2026
+- **The Backrooms** — le Level 0 sur deux étages, et un faux ascenseur.
+  - Un faux pas dans un trou ne te bloque plus : tu tombes à l'étage du dessous, juste en dessous, sonné un instant. La corde n'est plus utile.
+  - Deux escaliers, loin des trous, relient les deux étages. Le caméscope y guide quand il ne reste plus de cassette à ton étage.
+  - Les 5 cassettes sont réparties entre les deux étages.
+  - Il y a un ascenseur à chaque étage, impossibles à distinguer. Quand les 5 cassettes sont trouvées, le vrai s'ouvre et le faux se change en mur jaune : le signal pointe vers celui de ton étage, à toi de voir si c'est le bon.
+  - L'entité prend aussi les escaliers pour suivre les joueurs, et on l'entend étouffée à travers le plancher.
+
 ## 3.80 — 3 novembre 2026
 - **The Backrooms** — un parcours de trous qui tourne, et une vraie barre d'équilibre.
   - Le couloir piégé ne va plus tout droit : il prend un ou plusieurs virages obligatoires (en L, en S, en zigzag).

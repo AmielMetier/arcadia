@@ -1,13 +1,15 @@
 // The Backrooms - Moteur de simulation (60 Hz), sans DOM
 // Plusieurs joueurs possibles (l'hôte fait autorité). Deux niveaux :
-//   Level 0 : 5 cassettes VHS ouvrent l'ascenseur.
+//   Level 0 : deux étages superposés (on tombe par les trous du haut, on remonte par les escaliers). 5 cassettes
+//             VHS réparties entre les étages ; un ascenseur à chaque étage, mais un seul est le vrai : quand les 5
+//             cassettes sont trouvées, le faux se referme en mur et le vrai s'ouvre.
 //   Level 1 : l'entrepôt ; 3 fusibles à rapporter au panneau du monte-charge, des coupures de courant, et l'entité
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
 // Qui entre dans l'ascenseur ouvert devient spectateur ; il part quand plus personne n'est dehors. Plus il y a de
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Au tout début, personne n'a de lampe : une table au départ en porte une par joueur. Un joueur attrapé regarde les
 // autres jusqu'à la fin de l'étage ; si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createBackroomsMap, PIT_HALF } from './map.js';
+import { CELL_SIZE, T, createLevel0, PIT_HALF } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { findPath, hasLineOfSight } from './nav.js';
 
@@ -25,8 +27,6 @@ export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
 export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const PICK_R = 1.4; // portée de F pour ramasser
-export const CLIMB_T = 1.2; // secondes à grimper à la corde (Z maintenu)
-export const SOLO_CLIMB_T = 7; // sans personne pour lancer une corde, on finit par s'en sortir, bien plus lentement
 // Barre d'équilibre : sur une arête entre deux trous, on n'avance que tout droit et le corps tangue ; Q et D
 // corrigent. tilt va de -1 (penché à gauche) à 1 (à droite) : au bout, on tombe dans le trou de ce côté.
 export const BEAM_SPEED = 0.65; // vitesse de marche sur une arête (part de la marche normale)
@@ -34,7 +34,9 @@ export const BEAM_UNSTABLE = 4; // plus on penche, plus on penche
 export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant)
 export const BEAM_FIX = 4.5; // force de Q / D
 export const BEAM_DAMP = 2.5;
-export const CLIMB_LOCK = 0.7; // secondes d'immobilité en sortant d'un trou (Z encore enfoncé ne fait pas retomber)
+export const FALL_LOCK = 0.9; // secondes à terre après une chute d'un étage
+export const STAIR_LOCK = 0.5; // secondes dans l'escalier
+export const STAIR_R = 0.75; // on prend l'escalier en entrant dans sa case
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
@@ -46,10 +48,11 @@ export const BLACKOUT_EVERY = [35, 60];
 export const BLACKOUT_LEN = [15, 20];
 
 const rand = (a, b) => a + Math.random() * (b - a);
+const cellOf = (v) => Math.floor(v / CELL_SIZE);
 
-// la carte d'un niveau : même graine de partie, une carte par niveau
+// les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
-  return level === 1 ? createWarehouseMap(seed * 7 + 13) : createBackroomsMap(seed);
+  return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
 }
 
 function newPlayer(id, name, map, i) {
@@ -58,6 +61,7 @@ function newPlayer(id, name, map, i) {
   return {
     id,
     name,
+    floor: 0, // étage (0 : en haut, 1 : en bas)
     x: map.spawn.x + off[0],
     z: map.spawn.z + off[1],
     yaw: 0,
@@ -70,9 +74,7 @@ function newPlayer(id, name, map, i) {
     battery: 100, // pile de la lampe torche (0 à 100)
     inv: [null, null], // cases 2 et 3 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
     sel: 1, // case choisie (1 ou 2 ; la case 0, c'est la lampe) : E l'utilise, F l'échange contre un objet au sol
-    trapped: -1, // numéro du trou où le joueur est tombé (-1 : non)
-    climbT: 0, // avancée de la remontée à la corde
-    lockT: 0, // immobile un instant en sortant d'un trou
+    lockT: 0, // immobile un instant (après une chute, dans l'escalier)
     onBeam: false, // sur une arête entre deux trous
     tilt: 0, // équilibre (-1 à 1)
     tiltV: 0,
@@ -80,6 +82,7 @@ function newPlayer(id, name, map, i) {
     whistleCd: 0,
     heat: 0, // coups de sifflet récents : trop, et l'entité vient
     signal: 0, // 0 à 1 : force du signal de l'objectif le plus proche (affiché par la caméra)
+    sigTo: 'goal', // ce que suit le signal : 'goal', 'stairs' ou 'exit'
     moving: false,
     status: 'alive', // 'alive' | 'elevator' (à l'abri, spectateur) | 'dead' (spectateur)
     danger: 0, // 0 à 1 : proximité de l'entité, pour ce joueur (son, image)
@@ -90,6 +93,7 @@ function newPlayer(id, name, map, i) {
 
 export class BackroomsSim {
   // players : [{ id, name }] (le premier est l'hôte) ; localId : le joueur de cet écran
+  // map : une carte d'un seul étage (tests) ; sinon le niveau est généré à partir de la graine
   constructor({ map = null, difficulty = 'normal', seed = 42, players = null, localId = 0, level = 0 } = {}) {
     this.difficulty = difficulty;
     this.seed = seed;
@@ -100,14 +104,16 @@ export class BackroomsSim {
     this.hasMonster = difficulty !== 'peaceful';
     this.monsterChaseSpeed = MONSTER_CHASE_SPEED * (difficulty === 'hard' ? 1.2 : 1);
     this.events = [];
-    this.loadLevel(level, map);
+    this.loadLevel(level, map ? [map] : null);
   }
 
-  // Installe un niveau : nouvelle carte, joueurs au départ (les morts reviennent), entité au loin
-  loadLevel(level, map = null) {
+  // Installe un niveau : nouveaux étages, joueurs au départ (les morts reviennent), entité au loin
+  loadLevel(level, floors = null) {
     const prev = this.players || [];
     this.level = level;
-    this.map = map || makeLevelMap(level, this.seed);
+    this.floors = floors || makeLevelMap(level, this.seed);
+    this.map = this.floors[0];
+    this.stairs = this.map.stairs || [];
     this.players = this.roster.map((r, i) => {
       const P = newPlayer(r.id, r.name, this.map, i);
       const old = prev.find((p) => p.id === r.id);
@@ -132,7 +138,8 @@ export class BackroomsSim {
     this.lamps = [];
     if (level === 0) {
       const { gx, gz } = this.map.spawn;
-      const free = (x, z) => !this.map.isWall(x, z) && !(this.map.props || []).some((p) => Math.hypot(p.x - (x + 0.5) * CELL_SIZE, p.z - (z + 0.5) * CELL_SIZE) < 1.4);
+      const free = (x, z) =>
+        !this.map.isWall(x, z) && !(this.map.pitAt && this.map.pitAt(x, z) >= 0) && !this.stairs.some((st) => st.gx === x && st.gz === z) && !(this.map.props || []).some((p) => Math.hypot(p.x - (x + 0.5) * CELL_SIZE, p.z - (z + 0.5) * CELL_SIZE) < 1.4);
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
       const d = dirs.find(([dx, dz]) => free(gx + dx, gz + dz) && free(gx + 2 * dx, gz + 2 * dz)) || dirs.find(([dx, dz]) => free(gx + dx, gz + dz));
       if (d) {
@@ -156,16 +163,18 @@ export class BackroomsSim {
     }
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
-    this.items0 = (this.map.items || []).length; // objets d'origine (les suivants ont été posés par des joueurs)
-    this.ropes = {}; // corde lancée dans un trou : { [trou]: id du sauveteur }
+    this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
+    // un seul vrai ascenseur : on ne sait pas lequel tant que les cassettes ne sont pas toutes trouvées
+    this.realFloor = this.floors.length > 1 ? (Math.random() < 0.5 ? 0 : 1) : 0;
+    this.unlocked = false;
     this.powered = false; // panneau du monte-charge réalimenté
     this.departT = 0; // compte à rebours du départ de l'ascenseur
     this.blackout = 0; // secondes de noir restantes
     this.nextBlackout = level === 1 ? rand(...BLACKOUT_EVERY) * 0.6 : Infinity;
-    this.fullNear = {};
 
     const ms = this.map.monsterSpawn;
     this.monster = {
+      floor: 0,
       x: ms.x,
       z: ms.z,
       yaw: 0,
@@ -188,7 +197,18 @@ export class BackroomsSim {
       waitT: 0,
       burstT: 0, // élan de la charge après une embuscade
       silent: false, // l'entité se tait quand elle attend en embuscade
+      stairT: 0, // dans l'escalier
     };
+  }
+
+  // la carte d'un étage
+  fm(floor) {
+    return this.floors[floor] || this.floors[0];
+  }
+
+  // toutes les cassettes, des deux étages, dans l'ordre de leur numéro
+  get allCassettes() {
+    return this.floors.flatMap((f) => f.cassettes || []).sort((a, b) => a.id - b.id);
   }
 
   // le joueur de cet écran
@@ -225,51 +245,61 @@ export class BackroomsSim {
     return list;
   }
 
+  // Toutes les cassettes trouvées : le faux ascenseur se referme en mur (on ne le sait qu'en arrivant devant)
+  unlockLevel0() {
+    this.unlocked = true;
+    for (let f = 0; f < this.floors.length; f++) {
+      const E = this.floors[f].elevator;
+      if (E) E.fake = f !== this.realFloor;
+    }
+  }
+
   // Déplacement avec glissement contre les murs
-  moveWithCollisions(px, pz, dx, dz, radius = PLAYER_RADIUS) {
+  moveWithCollisions(px, pz, dx, dz, radius = PLAYER_RADIUS, floor = 0) {
     let nextX = px + dx;
     let nextZ = pz + dz;
-    if (this.isColliding(nextX, pz, radius)) nextX = px;
-    if (this.isColliding(nextX, nextZ, radius)) nextZ = pz;
+    if (this.isColliding(nextX, pz, radius, floor)) nextX = px;
+    if (this.isColliding(nextX, nextZ, radius, floor)) nextZ = pz;
     return { x: nextX, z: nextZ };
   }
 
-  // la cabine de l'ascenseur se traverse seulement quand il est ouvert
-  blocked(gx, gz) {
-    if (!this.map.isWall(gx, gz)) return false;
-    return !(this.open && this.map.grid[gz * this.map.W + gx] === T.EXIT);
+  // la cabine de l'ascenseur se traverse seulement quand il est ouvert (et que c'est le vrai)
+  blocked(gx, gz, floor = 0) {
+    const m = this.fm(floor);
+    if (!m.isWall(gx, gz)) return false;
+    return !(this.open && m.grid[gz * m.W + gx] === T.EXIT && !(m.elevator && m.elevator.fake));
   }
 
-  isColliding(x, z, radius) {
-    const minGx = Math.floor((x - radius) / CELL_SIZE);
-    const maxGx = Math.floor((x + radius) / CELL_SIZE);
-    const minGz = Math.floor((z - radius) / CELL_SIZE);
-    const maxGz = Math.floor((z + radius) / CELL_SIZE);
+  isColliding(x, z, radius, floor = 0) {
+    const minGx = cellOf(x - radius);
+    const maxGx = cellOf(x + radius);
+    const minGz = cellOf(z - radius);
+    const maxGz = cellOf(z + radius);
     for (let gz = minGz; gz <= maxGz; gz++) {
       for (let gx = minGx; gx <= maxGx; gx++) {
-        if (!this.blocked(gx, gz)) continue;
+        if (!this.blocked(gx, gz, floor)) continue;
         const closestX = Math.max(gx * CELL_SIZE, Math.min(x, (gx + 1) * CELL_SIZE));
         const closestZ = Math.max(gz * CELL_SIZE, Math.min(z, (gz + 1) * CELL_SIZE));
         if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
       }
     }
     // table des lampes, caisses et meubles abandonnés (cercles)
-    const T0 = this.table;
+    const T0 = floor === 0 && this.table;
     if (T0 && (T0.x - x) ** 2 + (T0.z - z) ** 2 < (radius + T0.r) ** 2) return true;
-    for (const pr of this.map.props || []) {
+    for (const pr of this.fm(floor).props || []) {
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
     }
     return false;
   }
 
-  // Boire l'eau d'amande (souffle au maximum) ou changer la pile de la lampe
+  // Boire l'eau d'amande (souffle au maximum), changer la pile de la lampe, poser l'échelle
   useItem(P, i) {
     const kind = P.inv[i];
     if (!kind) return this.emit({ type: 'emptySlot', id: P.id });
     if (kind === 'ladder') {
       // l'échelle se pose sous le renfoncement de la cassette
-      const N = this.map.niche;
+      const N = this.fm(P.floor).niche;
       if (!N || N.ladder || Math.hypot(N.baseX - P.x, N.baseZ - P.z) > 2.2) return this.emit({ type: 'ladderFar', id: P.id });
       N.ladder = true;
       P.inv[i] = null;
@@ -289,7 +319,7 @@ export class BackroomsSim {
 
   // F : prendre sa lampe sur la table, ou l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
   pickUp(P) {
-    if (!P.hasLamp && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
+    if (!P.hasLamp && P.floor === 0 && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
       const lamp = this.lamps.find((l) => !l.taken);
       if (lamp) {
         lamp.taken = true;
@@ -307,17 +337,18 @@ export class BackroomsSim {
       // inventaire plein : l'objet de la case choisie reste par terre à sa place
       slot = P.sel - 1;
       dropped = P.inv[slot];
-      this.map.items.push({ id: this.map.items.length, kind: dropped, x: it.x, z: it.z, gx: it.gx, gz: it.gz, taken: false });
+      const items = this.fm(P.floor).items;
+      items.push({ id: items.length, kind: dropped, x: it.x, z: it.z, gx: it.gx, gz: it.gz, taken: false });
     }
     P.inv[slot] = it.kind;
     this.emit({ type: 'pickup', kind: it.kind, dropped, by: P.id });
   }
 
-  // l'objet au sol le plus proche à portée de F
+  // l'objet au sol le plus proche à portée de F (à son étage)
   nearItem(P) {
     let best = null;
     let bd = PICK_R;
-    for (const it of this.map.items || []) {
+    for (const it of this.fm(P.floor).items || []) {
       if (it.taken) continue;
       const d = Math.hypot(it.x - P.x, it.z - P.z);
       if (d < bd) {
@@ -326,6 +357,13 @@ export class BackroomsSim {
       }
     }
     return best;
+  }
+
+  // le trou sous un point de l'étage du haut (-1 : pas de trou)
+  pitUnder(x, z, floor) {
+    const m = this.fm(floor);
+    if (!this.floors[floor + 1]) return -1; // pas d'étage en dessous : pas de trou
+    return m.pitAt ? m.pitAt(cellOf(x), cellOf(z)) : -1;
   }
 
   // l'hôte (ou le joueur seul) tient son équilibre ; s'il le perd, il tombe
@@ -338,8 +376,7 @@ export class BackroomsSim {
 
   // Barre d'équilibre : renvoie le côté de la chute (-1 gauche, 1 droite) ou 0
   balance(P, mx) {
-    const C = CELL_SIZE;
-    P.onBeam = P.trapped < 0 && this.map.pitAt && this.map.pitAt(Math.floor(P.x / C), Math.floor(P.z / C)) >= 0;
+    P.onBeam = this.pitUnder(P.x, P.z, P.floor) >= 0;
     if (!P.onBeam) {
       P.tilt *= Math.max(0, 1 - DT * 5);
       P.tiltV = 0;
@@ -369,7 +406,22 @@ export class BackroomsSim {
       const t = Math.round(P.x / C) * C - P.x;
       if (Math.abs(t) < 0.4) dx += Math.sign(t) * Math.min(Math.abs(t), pull);
     }
-    return this.moveWithCollisions(P.x, P.z, dx, dz);
+    return this.moveWithCollisions(P.x, P.z, dx, dz, PLAYER_RADIUS, P.floor);
+  }
+
+  // Tomber par un trou : on atterrit à l'étage du dessous, juste en dessous, sonné un instant
+  fallThrough(P, pitId, balance = false) {
+    const pit = this.fm(P.floor).pits[pitId];
+    P.floor += 1;
+    P.x = pit.x;
+    P.z = pit.z;
+    P.lockT = FALL_LOCK;
+    P.running = false;
+    P.onBeam = false;
+    P.tilt = 0;
+    P.tiltV = 0;
+    P.stamina = Math.max(0, P.stamina - 30);
+    this.emit({ type: 'fall', id: P.id, name: P.name, balance });
   }
 
   // Perdre l'équilibre : on bascule dans le trou du côté où l'on penche
@@ -379,59 +431,27 @@ export class BackroomsSim {
     P.tilt = 0;
     P.tiltV = 0;
     for (const d of [0.9, 0.6, 1.3]) {
-      const x = P.x + rx * side * d;
-      const z = P.z + rz * side * d;
-      const id = this.map.pitAt(Math.floor(x / CELL_SIZE), Math.floor(z / CELL_SIZE));
-      if (id < 0) continue;
-      const pit = this.map.pits[id];
-      P.trapped = id;
-      P.climbT = 0;
-      P.x = pit.x;
-      P.z = pit.z;
-      P.running = false;
-      P.onBeam = false;
-      this.emit({ type: 'fall', id: P.id, name: P.name, balance: true });
-      return;
+      const id = this.pitUnder(P.x + rx * side * d, P.z + rz * side * d, P.floor);
+      if (id >= 0) return this.fallThrough(P, id, true);
     }
   }
 
-  // Seul au fond, on peut remonter sans corde s'il n'y a plus personne dehors pour en lancer une
-  canClimbAlone(P) {
-    return !this.players.some((q) => q !== P && q.status === 'alive' && q.trapped < 0);
-  }
-
-  // Le point de sortie d'un trou : la case sans trou la plus proche de (x, z), autour du trou
-  safeSpot(x, z, pit) {
-    let best = null;
-    let bd = Infinity;
-    for (let r = 1; r <= 8 && !best; r++) {
-      for (let gz = pit.gz - r; gz <= pit.gz + r; gz++) {
-        for (let gx = pit.gx - r; gx <= pit.gx + r; gx++) {
-          if (this.map.isWall(gx, gz) || this.map.pitAt(gx, gz) >= 0) continue;
-          const cx = (gx + 0.5) * CELL_SIZE;
-          const cz = (gz + 0.5) * CELL_SIZE;
-          const d = Math.hypot(cx - x, cz - z) + Math.hypot(cx - pit.x, cz - pit.z) * 0.5;
-          if (d < bd) {
-            bd = d;
-            best = { x: cx, z: cz };
-          }
-        }
-      }
+  // Prendre l'escalier : on entre dans sa case, on arrive à l'autre étage devant les marches
+  takeStairs(P) {
+    for (const st of this.stairs) {
+      if (Math.hypot(st.x - P.x, st.z - P.z) > STAIR_R) continue;
+      const up = P.floor > 0;
+      P.floor += up ? -1 : 1;
+      const to = up ? st.up : st.down;
+      P.x = to.x;
+      P.z = to.z;
+      P.lockT = STAIR_LOCK;
+      // on regarde dans le sens de la sortie de l'escalier
+      P.yaw = up ? Math.atan2(-st.dx, -st.dz) : Math.atan2(st.dx, st.dz);
+      this.emit({ type: 'stairs', id: P.id, up });
+      return true;
     }
-    return best || { x: this.map.spawn.x, z: this.map.spawn.z };
-  }
-
-  // R : lancer sa corde dans un trou voisin où quelqu'un est tombé
-  throwRope(P) {
-    if (P.trapped >= 0) return;
-    for (const Q of this.players) {
-      if (Q === P || Q.status !== 'alive' || Q.trapped < 0 || this.ropes[Q.trapped] !== undefined) continue;
-      const pit = this.map.pits[Q.trapped];
-      if (Math.hypot(pit.x - P.x, pit.z - P.z) > 2.4) continue;
-      this.ropes[Q.trapped] = P.id;
-      return this.emit({ type: 'rope', by: P.id, to: Q.id, name: P.name });
-    }
-    this.emit({ type: 'noRope', id: P.id });
+    return false;
   }
 
   // T : siffler. Les autres l'entendent ; trop de coups de sifflet rapprochés attirent l'entité
@@ -439,9 +459,9 @@ export class BackroomsSim {
     if (P.whistleCd > 0) return;
     P.whistleCd = WHISTLE_CD;
     P.heat += 1;
-    this.emit({ type: 'whistle', id: P.id, name: P.name, x: P.x, z: P.z });
+    this.emit({ type: 'whistle', id: P.id, name: P.name, x: P.x, z: P.z, floor: P.floor });
     const M = this.monster;
-    if (!this.hasMonster || M.mode === 'chase') return;
+    if (!this.hasMonster || M.mode === 'chase' || M.floor !== P.floor) return;
     if (Math.hypot(M.x - P.x, M.z - P.z) > 45) return;
     if (P.heat >= WHISTLE_HEAT || Math.random() < 0.15) {
       M.mode = 'search';
@@ -502,7 +522,6 @@ export class BackroomsSim {
     P.whistleCd = Math.max(0, P.whistleCd - DT);
     P.heat = Math.max(0, P.heat - DT / 20);
     if (input.whistle) this.whistle(P);
-    if (input.rope) this.throwRope(P);
     if (input.pick) this.pickUp(P);
     if (input.toggleFlashlight) {
       if (!P.hasLamp) this.emit({ type: 'noLamp', id: P.id });
@@ -541,36 +560,16 @@ export class BackroomsSim {
     P.moving = mx !== 0 || my !== 0;
     const pos = input.pos;
     // un invité a perdu l'équilibre chez lui : il bascule dans le trou de ce côté
-    if (input.beamFall && P.trapped < 0) this.beamFall(P, Math.sign(input.beamFall));
-    if (P.trapped >= 0) {
-      // au fond d'un trou : on ne remonte qu'à la corde (Z maintenu), ou très lentement si l'on est seul
-      P.moving = false;
-      const pit = this.map.pits[P.trapped];
-      const rope = this.ropes[P.trapped];
-      const alone = this.canClimbAlone(P);
-      if (my > 0 && (rope !== undefined || alone)) P.climbT += DT / (rope !== undefined ? CLIMB_T : SOLO_CLIMB_T);
-      else P.climbT = Math.max(0, P.climbT - DT * 0.5);
-      if (P.climbT >= 1) {
-        // on ressort sur la case sûre la plus proche (du côté du sauveteur), immobile un instant
-        const R = this.players.find((q) => q.id === rope);
-        const spot = this.safeSpot(R ? R.x : pit.x, R ? R.z : pit.z, pit);
-        P.x = spot.x;
-        P.z = spot.z;
-        P.lockT = CLIMB_LOCK;
-        delete this.ropes[P.trapped];
-        P.trapped = -1;
-        P.climbT = 0;
-        this.emit({ type: 'climbed', id: P.id, name: P.name });
-      }
-    } else if (P.lockT > 0) {
+    if (input.beamFall) this.beamFall(P, Math.sign(input.beamFall));
+    if (P.lockT > 0) {
       P.lockT = Math.max(0, P.lockT - DT);
       P.moving = false;
-    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8)) {
+    } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
       // un invité se déplace chez lui (et tient son équilibre chez lui) : l'hôte prend sa position et son inclinaison
       P.x = pos.x;
       P.z = pos.z;
       if (Number.isFinite(input.tilt)) P.tilt = Math.max(-1, Math.min(1, input.tilt));
-      P.onBeam = this.map.pitAt(Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE)) >= 0;
+      P.onBeam = this.pitUnder(P.x, P.z, P.floor) >= 0;
     } else if (input.remote) {
       // invité sans position ce pas-ci : il reste où il est
     } else if (this.balanceSide(P, mx, my) !== 0) {
@@ -590,68 +589,60 @@ export class BackroomsSim {
       const fz = -Math.cos(P.yaw);
       const rx = Math.cos(P.yaw);
       const rz = -Math.sin(P.yaw);
-      const pos = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT);
-      P.x = pos.x;
-      P.z = pos.z;
+      const p2 = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT, PLAYER_RADIUS, P.floor);
+      P.x = p2.x;
+      P.z = p2.z;
     }
 
-    // 3b. Un pas de trop au-dessus d'un trou : on tombe
-    if (P.trapped < 0 && this.map.pitAt) {
-      const id = this.map.pitAt(Math.floor(P.x / CELL_SIZE), Math.floor(P.z / CELL_SIZE));
-      const pit = id >= 0 && this.map.pits[id];
-      if (pit && Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) {
-        P.trapped = id;
-        P.climbT = 0;
-        P.x = pit.x;
-        P.z = pit.z;
-        P.running = false;
-        this.emit({ type: 'fall', id: P.id, name: P.name });
-      }
+    // 3b. Un pas de trop au-dessus d'un trou : on tombe à l'étage du dessous
+    const pitId = this.pitUnder(P.x, P.z, P.floor);
+    if (pitId >= 0) {
+      const pit = this.fm(P.floor).pits[pitId];
+      if (Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) this.fallThrough(P, pitId);
     }
+    // 3c. L'escalier
+    if (P.lockT <= 0) this.takeStairs(P);
 
-    // 3c. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
-    const N = this.map.niche;
-    P.onLadder = !!(N && N.ladder && P.trapped < 0 && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 0.9);
+    // 3d. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
+    const map = this.fm(P.floor);
+    const N = map.niche;
+    P.onLadder = !!(N && N.ladder && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 0.9);
 
     // 4. Objectifs : cassettes (Level 0) ou fusibles (Level 1), pour toute l'équipe
-    for (const cas of this.map.cassettes || []) {
+    for (const cas of map.cassettes || []) {
       if (cas.collected || Math.hypot(cas.x - P.x, cas.z - P.z) >= 1.4) continue;
       if (cas.high && !P.onLadder) continue; // trop haut sans l'échelle
-      if (P.trapped >= 0) continue;
       cas.collected = true;
       this.cassettes++;
       P.found++;
       this.emit({ type: 'cassette', id: cas.id, by: P.id, count: this.cassettes, total: CASSETTES });
-      if (this.cassettes === CASSETTES) this.emit({ type: 'exitUnlocked' });
+      if (this.cassettes === CASSETTES) {
+        if (this.level === 0) this.unlockLevel0();
+        this.emit({ type: 'exitUnlocked' });
+      }
     }
-    for (const f of this.map.fuses || []) {
-      if (f.taken || P.trapped >= 0 || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
+    for (const f of map.fuses || []) {
+      if (f.taken || Math.hypot(f.x - P.x, f.z - P.z) >= 1.3) continue;
       f.taken = true;
       this.fuses++;
       P.found++;
       this.emit({ type: 'fuse', id: f.id, by: P.id, count: this.fuses, total: FUSES });
     }
     // les 3 fusibles rapportés au panneau du monte-charge : le courant revient, les portes s'ouvrent
-    if (this.level === 1 && !this.powered && this.fuses >= FUSES && Math.hypot(this.map.exit.x - P.x, this.map.exit.z - P.z) < 2.6) {
+    if (this.level === 1 && !this.powered && this.fuses >= FUSES && Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 2.6) {
       this.powered = true;
       this.emit({ type: 'powered', by: P.id });
       this.emit({ type: 'exitUnlocked' });
     }
 
+    // 4c. Signal (à vol d'oiseau, 0 au-delà de 45 m) : l'objectif le plus proche à cet étage ; s'il n'en reste qu'à
+    // l'autre étage, l'escalier ; une fois tout trouvé, l'ascenseur de cet étage (le vrai… ou le faux)
+    this.updateSignal(P);
 
-    // 4c. Signal de l'objectif le plus proche (à vol d'oiseau, 0 au-delà de 45 m), puis de l'ascenseur
-    let best = Infinity;
-    const goals = this.level === 0 ? this.map.cassettes.filter((c) => !c.collected) : this.fuses < FUSES ? this.map.fuses.filter((f) => !f.taken) : [];
-    for (const g of goals) best = Math.min(best, Math.hypot(g.x - P.x, g.z - P.z));
-    if (!goals.length) best = Math.hypot(this.map.exit.x - P.x, this.map.exit.z - P.z);
-    P.signal = best === Infinity ? 0 : Math.max(0, 1 - best / 45);
-
-    // 5. Entrer dans l'ascenseur ouvert : à l'abri, spectateur jusqu'au départ
-    if (this.open && P.trapped < 0) {
-      const E = this.map.elevator;
-      const inside = E
-        ? Math.floor(P.x / CELL_SIZE) === E.gx && Math.floor(P.z / CELL_SIZE) === E.gz
-        : Math.hypot(this.map.exit.x - P.x, this.map.exit.z - P.z) < 1.8;
+    // 5. Entrer dans le vrai ascenseur ouvert : à l'abri, spectateur jusqu'au départ
+    if (this.open && P.floor === this.realFloor) {
+      const E = map.elevator;
+      const inside = E ? cellOf(P.x) === E.gx && cellOf(P.z) === E.gz : Math.hypot(map.exit.x - P.x, map.exit.z - P.z) < 1.8;
       if (inside) {
         P.status = 'elevator';
         P.moving = false;
@@ -661,59 +652,71 @@ export class BackroomsSim {
     }
   }
 
-  // Invité : il déplace seulement son joueur, sans rien ramasser ni décider (l'hôte le fera)
+  updateSignal(P) {
+    const map = this.fm(P.floor);
+    const near = (list) => list.reduce((b, g) => Math.min(b, Math.hypot(g.x - P.x, g.z - P.z)), Infinity);
+    let best = Infinity;
+    P.sigTo = 'goal';
+    if (this.level === 0 && !this.open) {
+      best = near((map.cassettes || []).filter((c) => !c.collected));
+      if (best === Infinity && this.stairs.length) {
+        best = near(this.stairs);
+        P.sigTo = 'stairs';
+      }
+    } else if (this.level === 1 && this.fuses < FUSES) {
+      best = near((map.fuses || []).filter((f) => !f.taken));
+    } else {
+      best = Math.hypot(map.exit.x - P.x, map.exit.z - P.z);
+      P.sigTo = 'exit';
+    }
+    P.signal = best === Infinity ? 0 : Math.max(0, 1 - best / 45);
+  }
+
+  // Invité : il déplace seulement son joueur, sans rien ramasser ni décider (l'hôte le fera). Renvoie le côté d'une
+  // chute de la barre d'équilibre (l'hôte fera tomber), sinon 0.
   predict(input = {}) {
     const P = this.player;
-    if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return;
-    if (P.trapped >= 0 || P.lockT > 0) {
-      if (input.yaw !== undefined) P.yaw = input.yaw;
-      if (input.pitch !== undefined) P.pitch = input.pitch;
+    if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return 0;
+    if (input.yaw !== undefined) P.yaw = input.yaw;
+    if (input.pitch !== undefined) P.pitch = input.pitch;
+    if (P.lockT > 0) {
       P.lockT = Math.max(0, P.lockT - DT);
       return 0;
     }
-    {
-      if (input.yaw !== undefined) P.yaw = input.yaw;
-      if (input.pitch !== undefined) P.pitch = input.pitch;
-      const mx0 = input.mx || 0;
-      const my0 = input.my || 0;
-      P.moving = mx0 !== 0 || my0 !== 0;
-      const side = this.balance(P, mx0);
-      if (side) {
-        // l'hôte fera tomber ; en attendant, on ne bouge plus
-        P.tilt = 0;
-        P.tiltV = 0;
-        return side;
-      }
-      if (P.onBeam) {
-        P.running = false;
-        P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
-        P.moving = my0 !== 0;
-        if (my0 !== 0) {
-          const b = this.beamStep(P, my0);
-          P.x = b.x;
-          P.z = b.z;
-        }
-        return 0;
-      }
-    }
-    if (input.yaw !== undefined) P.yaw = input.yaw;
-    if (input.pitch !== undefined) P.pitch = input.pitch;
     const mx = input.mx || 0;
     const my = input.my || 0;
     P.moving = mx !== 0 || my !== 0;
+    const side = this.balance(P, mx);
+    if (side) {
+      P.tilt = 0;
+      P.tiltV = 0;
+      return side;
+    }
+    if (P.onBeam) {
+      P.running = false;
+      P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+      P.moving = my !== 0;
+      if (my !== 0) {
+        const b = this.beamStep(P, my);
+        P.x = b.x;
+        P.z = b.z;
+      }
+      return 0;
+    }
     P.running = !!input.run && P.moving && P.stamina > 5;
     if (P.running) P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
     else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
-    if (!P.moving) return;
+    if (!P.moving) return 0;
     const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
     const len = Math.hypot(mx, my) || 1;
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);
     const rx = Math.cos(P.yaw);
     const rz = -Math.sin(P.yaw);
-    const pos = this.moveWithCollisions(P.x, P.z, ((fx * my + rx * mx) / len) * speed * DT, ((fz * my + rz * mx) / len) * speed * DT);
+    const pos = this.moveWithCollisions(P.x, P.z, ((fx * my + rx * mx) / len) * speed * DT, ((fz * my + rz * mx) / len) * speed * DT, PLAYER_RADIUS, P.floor);
     P.x = pos.x;
     P.z = pos.z;
+    return 0;
   }
 
   // Un joueur arrive en cours de partie : spectateur jusqu'au prochain étage
@@ -751,13 +754,14 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0]),
-      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0],
-      k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.items, 'taken'), '', bits(this.lamps, 'taken')],
-      // objets posés par des joueurs (échanges), cordes lancées, échelle posée
-      ix: (this.map.items || []).slice(this.items0).map((o) => [o.kind, r2(o.x), r2(o.z)]),
-      ro: Object.keys(this.ropes).map((k) => [+k, this.ropes[k]]),
-      nl: this.map.niche && this.map.niche.ladder ? 1 : 0,
+      // le vrai ascenseur ne se dévoile qu'une fois les cassettes trouvées
+      rf: this.open ? this.realFloor : -1,
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0]),
+      m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor],
+      k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), '', bits(this.lamps, 'taken')],
+      // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
+      ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
+      nl: this.floors.some((f) => f.niche && f.niche.ladder) ? 1 : 0,
     };
   }
 
@@ -771,9 +775,13 @@ export class BackroomsSim {
     this.powered = !!snap.pw;
     this.blackout = snap.bo;
     this.departT = snap.dp;
+    if (snap.rf >= 0 && !this.unlocked) {
+      this.realFloor = snap.rf;
+      if (this.level === 0) this.unlockLevel0();
+    }
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder, lockT, tilt, onBeam] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, floor, sigTo, onLadder, lockT, tilt, onBeam] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -783,8 +791,8 @@ export class BackroomsSim {
       }
       const mine = id === this.localId;
       const far = Math.hypot(P.x - x, P.z - z) > 2.5;
-      // l'hôte décide des chutes et des remontées : la position suit
-      if (!mine || far || status !== 'alive' || P.status !== 'alive' || trapped >= 0 || (P.trapped >= 0 && trapped < 0)) {
+      // l'hôte décide des chutes et des escaliers : la position suit
+      if (!mine || far || status !== 'alive' || P.status !== 'alive' || P.floor !== floor) {
         P.x = x;
         P.z = z;
       }
@@ -794,13 +802,13 @@ export class BackroomsSim {
         P.running = !!running;
         P.moving = !!moving;
         P.stamina = stam;
-      }
+      } else if (P.floor !== floor) P.yaw = yaw;
+      P.floor = floor || 0;
       P.status = status;
       P.flashlight = !!fl;
       P.hasLamp = !!lamp;
       if (!mine && sel) P.sel = sel;
-      P.trapped = trapped ?? -1;
-      P.climbT = climbT || 0;
+      P.sigTo = sigTo || 'goal';
       P.onLadder = !!onLadder;
       if (lockT > 0 && !(P.lockT > 0)) P.lockT = lockT;
       if (!mine) {
@@ -816,18 +824,20 @@ export class BackroomsSim {
     const M = this.monster;
     [M.x, M.z, M.yaw, M.mode] = snap.m;
     M.silent = !!snap.m[4];
+    M.floor = snap.m[5] || 0;
     const set = (list, k, b) => (list || []).forEach((o, i) => {
-      o[k] = b[i] === '1';
+      o[k] = (b || '')[i] === '1';
     });
-    set(this.map.cassettes, 'collected', snap.k[0]);
+    set(this.allCassettes, 'collected', snap.k[0]);
     set(this.map.fuses, 'taken', snap.k[1]);
-    for (const [kind, x, z] of (snap.ix || []).slice(this.map.items.length - this.items0)) {
-      this.map.items.push({ id: this.map.items.length, kind, x, z, gx: Math.floor(x / CELL_SIZE), gz: Math.floor(z / CELL_SIZE), taken: false });
-    }
-    set(this.map.items, 'taken', snap.k[2]);
-    this.ropes = {};
-    for (const [k, v] of snap.ro || []) this.ropes[k] = v;
-    if (this.map.niche) this.map.niche.ladder = !!snap.nl;
+    // objets posés par des joueurs : on ajoute ceux qu'on n'a pas encore, étage par étage
+    this.floors.forEach((f, fi) => {
+      const list = (snap.ix || []).filter((o) => o[0] === fi);
+      for (const [, kind, x, z] of list.slice(f.items.length - this.items0[fi])) f.items.push({ id: f.items.length, kind, x, z, gx: cellOf(x), gz: cellOf(z), taken: false });
+    });
+    const takenBits = (snap.k[2] || '').split('|');
+    this.floors.forEach((f, fi) => set(f.items, 'taken', takenBits[fi]));
+    for (const f of this.floors) if (f.niche) f.niche.ladder = !!snap.nl;
     // la table compte autant de lampes que de joueurs chez l'hôte
     if (snap.k[4] !== undefined && this.table) {
       while (this.lamps.length < snap.k[4].length) this.lamps.push({ ...this.lamps[0], id: this.lamps.length, taken: false });
@@ -861,26 +871,28 @@ export class BackroomsSim {
     this.emit({ type: 'level', level: this.level });
   }
 
-  // Proximité de l'entité pour chaque joueur (son, image) et cible de la traque
+  // Proximité de l'entité pour chaque joueur (son, image) et cible de la traque. À l'autre étage, on l'entend
+  // étouffée à travers le plancher et elle ne voit personne.
   senseMonster() {
     const M = this.monster;
     let target = null;
     let bestScore = Infinity;
     for (const P of this.players) {
+      const same = P.floor === M.floor;
       const dx = P.x - M.x;
       const dz = P.z - M.z;
       const dist = Math.hypot(dx, dz);
-      P.mDist = dist;
+      P.mDist = same ? dist : dist + 40;
       // bourdonnement : de 0 à 35 m, il monte vite quand elle est à portée ; elle se tait en embuscade
       const ratio = 1 - Math.min(1, Math.max(0, (dist - 1.2) / 32));
-      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent ? 0.35 : 1);
+      P.danger = dist > 35 ? 0 : Math.pow(ratio, 1.6) * (M.silent ? 0.35 : 1) * (same ? 1 : 0.25);
       let diff = Math.atan2(M.x - P.x, M.z - P.z) - (P.yaw - Math.PI);
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
       P.pan = Math.max(-0.9, Math.min(0.9, Math.sin(diff)));
       if (P.status !== 'alive') continue;
-      P.seen = hasLineOfSight(this.map, M.x, M.z, P.x, P.z);
-      const score = dist - (P.seen ? 12 : 0) - (P.id === M.target ? 6 : 0);
+      P.seen = same && hasLineOfSight(this.fm(M.floor), M.x, M.z, P.x, P.z);
+      const score = P.mDist - (P.seen ? 12 : 0) - (P.id === M.target ? 6 : 0);
       if (score < bestScore) {
         bestScore = score;
         target = P;
@@ -897,11 +909,13 @@ export class BackroomsSim {
     const P = this.senseMonster();
     if (!P) return;
     M.target = P.id;
+    const map = this.fm(M.floor);
     const rage = this.rage; // 0 seul ou personne à l'abri, jusqu'à 1 quand il ne reste qu'un joueur dehors
     const dark = this.blackout > 0;
+    const same = P.floor === M.floor;
     const dx = P.x - M.x;
     const dz = P.z - M.z;
-    const dist = P.mDist;
+    const dist = same ? Math.hypot(dx, dz) : Infinity;
     M.distToPlayer = dist;
     M.hasLineOfSight = P.seen;
 
@@ -947,7 +961,7 @@ export class BackroomsSim {
     } else if (M.mode === 'chase') {
       // hors de vue : au bout de quelques secondes, le joueur l'a semée
       M.unseenT += DT;
-      if (M.unseenT > LOSE_TRACK_T + rage * 4) M.mode = 'search';
+      if (M.unseenT > LOSE_TRACK_T + rage * 4 || !same) M.mode = 'search';
     }
 
     // Vitesse selon le mode, la colère et le noir
@@ -959,7 +973,7 @@ export class BackroomsSim {
     else M.speed = MONSTER_PATROL_SPEED * (1 + rage * 0.5);
 
     // Level 1 : en patrouille, elle contourne par les rangées d'étagères pour attendre le joueur plus loin
-    if (M.mode === 'patrol' && this.map.isShelfSide) {
+    if (M.mode === 'patrol' && map.isShelfSide && same) {
       M.ambushT -= DT;
       if (M.ambushT <= 0 && dist < 45) {
         const spot = this.findAmbush(P);
@@ -974,22 +988,33 @@ export class BackroomsSim {
       }
     }
 
-    // Recalcul de trajectoire
+    // Recalcul de trajectoire. Sa proie est à l'autre étage : elle va à l'escalier le plus proche
     M.repathT -= DT;
     if (M.repathT <= 0) {
       M.repathT = M.mode === 'chase' ? 0.35 : 1.2;
       let tx = P.x;
       let tz = P.z;
-      if (M.mode === 'patrol') {
+      if (!same && this.stairs.length && M.mode !== 'patrol') {
+        const st = this.stairs.reduce((b, s) => (Math.hypot(s.x - M.x, s.z - M.z) < Math.hypot(b.x - M.x, b.z - M.z) ? s : b));
+        tx = st.x;
+        tz = st.z;
+      } else if (M.mode === 'patrol') {
         if (!M.targetWander || Math.hypot(M.x - M.targetWander.x, M.z - M.targetWander.z) < 1.5) {
-          // l'entité rôde : souvent non loin d'un joueur (de plus en plus quand elle s'énerve)
-          const near = Math.random() < 0.5 + rage * 0.4 ? this.map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
-          const pool = near.length ? near : this.map.walkable;
-          const c = pool[Math.floor(Math.random() * pool.length)];
-          M.targetWander = { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
+          // l'entité rôde : souvent non loin d'un joueur de son étage (de plus en plus quand elle s'énerve) ;
+          // de temps en temps, elle change d'étage
+          if (!same && this.stairs.length && Math.random() < 0.35 + rage * 0.4) {
+            M.mode = 'search';
+          } else {
+            const near = same && Math.random() < 0.5 + rage * 0.4 ? map.walkable.filter((c) => Math.hypot((c.x + 0.5) * CELL_SIZE - P.x, (c.z + 0.5) * CELL_SIZE - P.z) < 28 - rage * 12) : [];
+            const pool = near.length ? near : map.walkable;
+            const c = pool[Math.floor(Math.random() * pool.length)];
+            M.targetWander = { x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE };
+          }
         }
-        tx = M.targetWander.x;
-        tz = M.targetWander.z;
+        if (M.targetWander) {
+          tx = M.targetWander.x;
+          tz = M.targetWander.z;
+        }
       } else if (M.mode === 'search') {
         tx = M.lastSeenX;
         tz = M.lastSeenZ;
@@ -998,7 +1023,8 @@ export class BackroomsSim {
         tx = M.ambush.x;
         tz = M.ambush.z;
       }
-      const path = findPath(this.map, M.x, M.z, tx, tz);
+      M.goal = { x: tx, z: tz };
+      const path = findPath(map, M.x, M.z, tx, tz);
       if (path && path.length > 0) {
         M.path = path;
         M.pathIndex = 0;
@@ -1018,15 +1044,45 @@ export class BackroomsSim {
         M.z += (wdz / wdist) * stepLen;
         M.yaw = Math.atan2(wdx, wdz);
       }
-    } else if (M.mode === 'chase' && dist > 0.1) {
+    } else if (M.mode === 'chase' && same && dist > 0.1) {
       const stepLen = Math.min(dist, M.speed * DT);
       M.x += (dx / dist) * stepLen;
       M.z += (dz / dist) * stepLen;
       M.yaw = Math.atan2(dx, dz);
+    } else if (M.goal && cellOf(M.goal.x) === cellOf(M.x) && cellOf(M.goal.z) === cellOf(M.z) && Math.hypot(M.goal.x - M.x, M.goal.z - M.z) > 0.1) {
+      // le but est dans sa case (pas de chemin à suivre) : tout droit
+      const gx = M.goal.x - M.x;
+      const gz = M.goal.z - M.z;
+      const gd = Math.hypot(gx, gz);
+      const stepLen = Math.min(gd, M.speed * DT);
+      M.x += (gx / gd) * stepLen;
+      M.z += (gz / gd) * stepLen;
+      M.yaw = Math.atan2(gx, gz);
+    }
+
+    // l'entité prend l'escalier quand sa proie est à l'autre étage
+    M.stairT = Math.max(0, M.stairT - DT);
+    if (!same && M.stairT <= 0) {
+      for (const st of this.stairs) {
+        if (Math.hypot(st.x - M.x, st.z - M.z) > 0.6) continue;
+        const up = M.floor > 0;
+        M.floor += up ? -1 : 1;
+        const to = up ? st.up : st.down;
+        M.x = to.x;
+        M.z = to.z;
+        M.path = [];
+        M.repathT = 0;
+        M.stairT = 3;
+        M.mode = 'search';
+        M.lastSeenX = P.x;
+        M.lastSeenZ = P.z;
+        this.emit({ type: 'monsterStairs', floor: M.floor });
+        break;
+      }
     }
 
     // L'entité attrape le joueur
-    if (dist < 1.15) {
+    if (same && dist < 1.15) {
       P.status = 'dead';
       P.moving = false;
       this.emit({ type: 'jumpscare', x: M.x, z: M.z, id: P.id });
@@ -1040,20 +1096,21 @@ export class BackroomsSim {
 
   // Une case au bout ou le long d'une rangée d'étagères, sur la route probable du joueur et hors de sa vue
   findAmbush(P) {
+    const map = this.fm(P.floor);
     const fx = -Math.sin(P.yaw);
     const fz = -Math.cos(P.yaw);
     const px = P.x + fx * 10;
     const pz = P.z + fz * 10;
     let best = null;
     let bestD = Infinity;
-    for (const c of this.map.walkable) {
+    for (const c of map.walkable) {
       const x = (c.x + 0.5) * CELL_SIZE;
       const z = (c.z + 0.5) * CELL_SIZE;
       const dp = Math.hypot(x - px, z - pz);
       if (dp > 8 || dp >= bestD) continue;
       if (Math.hypot(x - P.x, z - P.z) < 7) continue;
-      if (!this.map.isShelfSide(c.x, c.z)) continue;
-      if (hasLineOfSight(this.map, P.x, P.z, x, z)) continue;
+      if (!map.isShelfSide(c.x, c.z)) continue;
+      if (hasLineOfSight(map, P.x, P.z, x, z)) continue;
       best = { x, z, gx: c.x, gz: c.z };
       bestD = dp;
     }

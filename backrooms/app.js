@@ -1,5 +1,4 @@
 // The Backrooms - Logique applicative principale, entrées clavier/souris et boucle de jeu
-import { createBackroomsMap } from './engine/map.js';
 import { BackroomsSim, DT, DEPART_T } from './engine/sim.js';
 import { createBackroomsScene } from './view/scene.js';
 import { BackroomsSfx } from './view/sfx.js';
@@ -41,8 +40,8 @@ let mouseDy = 0;
 let isPointerLocked = false;
 let toggleFlashlightRequested = false; // touche 1 : la lampe
 let useRequested = null; // (tests) une case d'objet précise à utiliser
-// actions du prochain pas : E utilise la case choisie, F ramasse, R lance la corde, T siffle
-const act = { use: false, pick: false, rope: false, whistle: false };
+// actions du prochain pas : E utilise la case choisie, F ramasse, T siffle
+const act = { use: false, pick: false, whistle: false };
 let selRequested = 0; // touches 2 et 3 : choisir la case d'objet (1 ou 2)
 let kbMode = false;
 let paused = true; // la partie attend qu'on prenne le contrôle
@@ -87,13 +86,12 @@ window.addEventListener('keydown', (e) => {
   }
   keys[e.code] = true;
   // 1 : allumer / éteindre la lampe ; 2, 3 : choisir une case d'objet ; E : l'utiliser ; F : ramasser ;
-  // R : lancer sa corde dans un trou ; T : siffler
+  // T : siffler
   const slot = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
   if (slot >= 0 && !e.repeat) useSlot(slot % 3);
   if (!e.repeat) {
     if (e.code === 'KeyE') act.use = true;
     else if (e.code === 'KeyF') act.pick = true;
-    else if (e.code === 'KeyR') act.rope = true;
     else if (e.code === 'KeyT') act.whistle = true;
   }
   if (kbMode && (e.code === 'Escape' || e.code === 'KeyP')) setPaused(true);
@@ -110,7 +108,7 @@ window.addEventListener('blur', () => {
 const touch = { move: null, look: null, run: false };
 const touchBtns = document.createElement('div');
 touchBtns.className = 'touch-btns';
-touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="pick">✋<small>Prendre</small></button><button data-t="use">⚙<small>Utiliser</small></button><button data-t="rope">🪢<small>Corde</small></button><button data-t="whistle">📣<small>Siffler</small></button>';
+touchBtns.innerHTML = '<button data-t="run">🏃<small>Courir</small></button><button data-t="pick">✋<small>Prendre</small></button><button data-t="use">⚙<small>Utiliser</small></button><button data-t="whistle">📣<small>Siffler</small></button>';
 document.body.appendChild(touchBtns);
 const stick = document.createElement('div');
 stick.className = 'touch-stick';
@@ -227,16 +225,15 @@ function startRun({ seed, difficulty, players, run, level }) {
   NET.inputs = {};
   NET.actions = {};
   NET.events = [];
-  const map = createBackroomsMap(seed);
   if (!players.some((p) => p.id === NET.myId)) players = [...players, { id: NET.myId, name: 'Joueur' }];
-  sim = new BackroomsSim({ map, difficulty, seed, players, localId: NET.myId });
+  sim = new BackroomsSim({ difficulty, seed, players, localId: NET.myId }); // les étages sortent de la graine
   if (level) sim.loadLevel(level);
   // un invité qui arrive en cours de partie regarde les autres jusqu'au prochain étage (l'hôte le dira)
   if (scene) {
     scene.dispose();
     stageEl.innerHTML = '';
   }
-  scene = createBackroomsScene(stageEl, sim.map);
+  scene = createBackroomsScene(stageEl, sim.floors);
   if (hud) {
     hud.$('#endScreen').hidden = true;
     hud.lastCount = -1;
@@ -261,7 +258,7 @@ function guestInputs() {
     const q = NET.actions[id] || (NET.actions[id] = []);
     // une action par pas, dans l'ordre où l'invité les a faites (avec la case qu'il avait choisie)
     const a = q.shift() || {};
-    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', rope: a.k === 'r', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0 };
+    out[id] = { remote: true, mx: i.mx, my: i.my, run: i.run, yaw: i.yaw, pitch: i.pitch, pos: i.pos, tilt: i.tilt, sel: a.sel || i.sel, toggleFlashlight: a.k === 'f', useSel: a.k === 'e', pick: a.k === 'p', whistle: a.k === 't', beamFall: a.k === 'b' ? a.side : 0 };
     i.pos = null; // une position annoncée ne sert qu'une fois
   }
   return out;
@@ -280,7 +277,7 @@ function onMsg(from, m) {
       send(from, goMessage());
     } else if (m.t === 'i' && m.run === NET.run) {
       NET.inputs[from] = { mx: num(m.mx, -1, 1), my: num(m.my, -1, 1), run: !!m.r, yaw: num(m.yaw, -1e4, 1e4), pitch: num(m.pitch, -1.4, 1.4), sel: m.s === 2 ? 2 : 1, tilt: num(m.tl, -1, 1), pos: { x: num(m.x, 0, 1e3), z: num(m.z, 0, 1e3) } };
-    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 'r', 't', 'b'].includes(m.k)) {
+    } else if (m.t === 'a' && m.run === NET.run && ['f', 'e', 'p', 't', 'b'].includes(m.k)) {
       const q = NET.actions[from] || (NET.actions[from] = []);
       if (q.length < 8) q.push({ k: m.k, sel: m.s === 2 ? 2 : 1, side: m.side > 0 ? 1 : -1 });
     }
@@ -368,20 +365,20 @@ function handleEvent(ev, me) {
       break;
     case 'fall':
       if (sfx) sfx.fall(ev.id === me);
-      if (hud) hud.toast(ev.id === me ? (sim.canClimbAlone(sim.player) ? 'Tu es tombé dans un trou… maintiens Z pour grimper' : 'Tu es tombé dans un trou ! Siffle (T) pour appeler à l\'aide') : `${ev.name} est tombé dans un trou ! Lance-lui ta corde (R)`);
+      if (hud) hud.toast(ev.id === me ? "Tu es tombé à l'étage du dessous ! Trouve un escalier pour remonter" : `${ev.name} est tombé à l'étage du dessous`);
       break;
-    case 'rope':
-      if (sfx) sfx.rope();
-      if (hud && ev.to === me) hud.toast(`${ev.name} te lance une corde : maintiens Z pour grimper`);
-      break;
-    case 'noRope':
-      if (mine && hud) hud.toast("Personne n'est tombé dans un trou près de toi");
-      break;
-    case 'climbed':
-      if (hud && ev.id !== me) hud.toast(`${ev.name} est remonté`);
+    case 'stairs':
+      if (ev.id !== me) break;
+      if (sfx) sfx.step();
+      if (hud) hud.toast(ev.up ? "Tu remontes à l'étage du haut" : "Tu descends à l'étage du bas");
       break;
     case 'whistle':
-      if (sfx) sfx.whistle(ev.id === me ? 1 : Math.max(0.15, 1 - Math.hypot(ev.x - sim.viewPlayer(sim.spectate || 0).x, ev.z - sim.viewPlayer(sim.spectate || 0).z) / 60), ev.id === me ? 0 : panTo(ev.x, ev.z));
+      {
+        // de loin, plus faible ; d'un autre étage, étouffé à travers le plancher
+        const V = sim.viewPlayer(sim.spectate || 0);
+        const vol = ev.id === me ? 1 : Math.max(0.15, 1 - Math.hypot(ev.x - V.x, ev.z - V.z) / 60) * ((ev.floor || 0) === (V.floor || 0) ? 1 : 0.35);
+        if (sfx) sfx.whistle(vol, ev.id === me ? 0 : panTo(ev.x, ev.z));
+      }
       if (hud && ev.id !== me) hud.toast(`${ev.name} siffle`);
       break;
     case 'heard':
@@ -436,7 +433,7 @@ function handleEvent(ev, me) {
       if (scene && scene.level === ev.level && scene.map === sim.map) break;
       if (scene) scene.dispose();
       stageEl.innerHTML = '';
-      scene = createBackroomsScene(stageEl, sim.map);
+      scene = createBackroomsScene(stageEl, sim.floors);
       sim.spectate = 0;
       stepDist = 0;
       if (hud) hud.fade(`LEVEL ${ev.level}`, ev.level === 1 ? 'Le sous-sol industriel' : '', 2.2);
@@ -532,7 +529,6 @@ function loop(currentTime) {
       sel: selRequested || undefined,
       useSel: act.use,
       pick: act.pick,
-      rope: act.rope,
       whistle: act.whistle,
     };
     if (NET.role === 'guest') {
@@ -542,7 +538,7 @@ function loop(currentTime) {
       if (fell) send('host', { t: 'a', k: 'b', side: fell, run: NET.run });
       const sel = sim.player.sel;
       if (toggleFlashlightRequested) send('host', { t: 'a', k: 'f', s: sel, run: NET.run });
-      for (const [k, on] of [['e', act.use], ['p', act.pick], ['r', act.rope], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
+      for (const [k, on] of [['e', act.use], ['p', act.pick], ['t', act.whistle]]) if (on) send('host', { t: 'a', k, s: sel, run: NET.run });
       if (NET.tick % 3 === 0) {
         const P = sim.player;
         send('host', { t: 'i', run: NET.run, s: P.sel, mx: input.mx, my: input.my, r: input.run ? 1 : 0, yaw: +P.yaw.toFixed(3), pitch: +P.pitch.toFixed(3), x: +P.x.toFixed(2), z: +P.z.toFixed(2), tl: +P.tilt.toFixed(2) }, true);
@@ -554,7 +550,7 @@ function loop(currentTime) {
     toggleFlashlightRequested = false;
     useRequested = null;
     selRequested = 0;
-    act.use = act.pick = act.rope = act.whistle = false;
+    act.use = act.pick = act.whistle = false;
 
     // Détection de pas pour le son de marche sur moquette
     if (sim.state === 'playing') {
@@ -635,7 +631,6 @@ if (window.DDVolume && btnSet) {
         ['Lampe torche (case 1)', '<kbd>1</kbd>'],
         ['Choisir une case · utiliser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd>'],
         ['Ramasser (échange si plein)', '<kbd>F</kbd>'],
-        ['Lancer sa corde dans un trou', '<kbd>R</kbd>'],
         ['Siffler (attention à l\'entité)', '<kbd>T</kbd>'],
         ['Pause', '<kbd>Échap</kbd>'],
       ] }] },
@@ -645,7 +640,7 @@ if (window.DDVolume && btnSet) {
         ['Lever, baisser les yeux', '<kbd>↑</kbd><kbd>↓</kbd>'],
         ['Courir · lampe', '<kbd>Maj</kbd> · <kbd>1</kbd>'],
         ['Choisir · utiliser · ramasser', '<kbd>2</kbd> <kbd>3</kbd> · <kbd>E</kbd> · <kbd>F</kbd>'],
-        ['Corde · siffler', '<kbd>R</kbd> · <kbd>T</kbd>'],
+        ['Siffler', '<kbd>T</kbd>'],
         ['Jouer · pause', '<kbd>Entrée</kbd> · <kbd>Échap</kbd> ou <kbd>P</kbd>'],
       ] }] },
     ],

@@ -504,29 +504,6 @@ export class BackroomsSfx {
     thud.stop(t + 0.8);
   }
 
-  // Corde qu'on déroule : un sifflement de frottement qui descend
-  rope() {
-    if (!this.unlocked || !this.ctx) return;
-    const c = this.ctx;
-    const t = c.currentTime;
-    const len = 0.6;
-    const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    const f = c.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.setValueAtTime(2200, t);
-    f.frequency.exponentialRampToValueAtTime(500, t + len);
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.25, t);
-    src.connect(f);
-    f.connect(g);
-    g.connect(this.out);
-    src.start(t);
-  }
-
   // Victoire
   win() {
     if (!this.unlocked || !this.ctx) return;

@@ -42,8 +42,8 @@ export class BackroomsHUD {
       <!-- Fondu : l'ascenseur descend, carte de l'étage -->
       <div class="fade" id="fade"><div><b id="fadeTitle"></b><span id="fadeSub"></span><div class="fade-bar" id="fadeBarBox" hidden><i id="fadeBar"></i></div></div></div>
       <div class="toast" id="toast" hidden></div>
-      <!-- Ce que tu peux faire ici : ramasser, poser l'échelle, lancer ta corde, grimper -->
-      <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="climb" id="climbBar" hidden><i></i></div><div class="beam" id="beamBar" hidden><b></b><i></i></div></div>
+      <!-- Ce que tu peux faire ici : ramasser, échanger, poser l'échelle ; la jauge d'équilibre sur une arête -->
+      <div class="prompt" id="prompt" hidden><span id="promptText"></span><div class="beam" id="beamBar" hidden><b></b><i></i></div></div>
 
       <!-- Pause : prendre le contrôle et choisir ses commandes -->
       <div class="click-prompt" id="clickPrompt">
@@ -120,12 +120,13 @@ export class BackroomsHUD {
     if (objKey !== this.lastCount) {
       this.lastCount = objKey;
       this.$('#levelTag').textContent = `LEVEL ${sim.level}`;
+      this.floorShown = -1;
       this.$('#cassetteIcons').innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < got ? 'on' : ''}${L1 ? ' fuse' : ''}"></i>`).join('');
       this.$('#cassetteText').textContent = `${got}/${total}`;
       this.bannerT = 6;
       const banner = this.$('#objBanner');
       banner.classList.toggle('unlocked', sim.open);
-      if (sim.open) banner.textContent = L1 ? 'LE MONTE-CHARGE EST ALIMENTÉ : MONTEZ TOUS DEDANS' : "L'ASCENSEUR EST OUVERT : REJOIGNEZ-LE TOUS · SUIS LE SIGNAL";
+      if (sim.open) banner.textContent = L1 ? 'LE MONTE-CHARGE EST ALIMENTÉ : MONTEZ TOUS DEDANS' : "UN SEUL DES DEUX ASCENSEURS S'EST OUVERT… L'AUTRE N'EST PLUS QU'UN MUR";
       else if (L1 && got >= total) banner.textContent = 'RAPPORTE LES FUSIBLES AU PANNEAU DU MONTE-CHARGE · SUIS LE SIGNAL';
       else if (L1) banner.textContent = got === 0 ? 'LEVEL 1 · TROUVE LES 3 FUSIBLES DANS LES ALLÉES' : `FUSIBLE ${got}/3 RÉCUPÉRÉ`;
       else banner.textContent = got === 0 ? "RETROUVE LES 5 CASSETTES VHS · LE SIGNAL MONTE QUAND TU T'EN APPROCHES" : `CASSETTE ${got}/5 RÉCUPÉRÉE`;
@@ -168,7 +169,12 @@ export class BackroomsHUD {
     const bars = Math.round(P.signal * 5);
     const flick = P.signal > 0 && Math.random() < 0.08 ? Math.max(0, bars - 1) : bars;
     this.$('#signalBars').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < flick ? 'on' : ''}" style="height:${6 + i * 3}px"></i>`).join('');
-    this.$('#signalLabel').textContent = sim.open || (L1 && got >= total) ? (L1 ? 'MONTE-CHARGE' : 'ASCENSEUR') : 'SIGNAL';
+    this.$('#signalLabel').textContent = P.sigTo === 'stairs' ? 'ESCALIER' : sim.open || (L1 && got >= total) ? (L1 ? 'MONTE-CHARGE' : 'ASCENSEUR') : 'SIGNAL';
+    // l'étage où l'on est (Level 0, sur deux étages)
+    if (sim.floors.length > 1 && this.floorShown !== P.floor) {
+      this.floorShown = P.floor;
+      this.$('#levelTag').textContent = `LEVEL ${sim.level} · ÉTAGE ${P.floor ? 'BAS' : 'HAUT'}`;
+    }
 
     // 4. Souffle (endurance)
     const stamBar = this.$('#staminaBar');
@@ -213,45 +219,35 @@ export class BackroomsHUD {
   prompt(sim, P) {
     const NAME = { bottle: "L'EAU D'AMANDE", battery: 'LES PILES', ladder: "L'ÉCHELLE" };
     let text = '';
-    let climb = -1;
     let beam = null;
     if (P.status === 'alive' && sim.state === 'playing' && !(sim.departT > 0)) {
-      const N = sim.map.niche;
-      if (P.trapped >= 0) {
-        const rope = sim.ropes[P.trapped] !== undefined;
-        const alone = sim.canClimbAlone(P);
-        climb = P.climbT;
-        text = rope ? 'MAINTIENS Z POUR GRIMPER À LA CORDE' : alone ? "PERSONNE POUR T'AIDER · MAINTIENS Z POUR GRIMPER (LENTEMENT)" : "TU ES COINCÉ AU FOND · SIFFLE (T) POUR QU'UN COLLÈGUE TE LANCE SA CORDE";
-        if (!rope && !alone) climb = -1;
-      } else {
+      const N = sim.fm(P.floor).niche;
+      const nicheCas = N && sim.allCassettes.find((c) => c.id === N.cas);
+      {
         if (P.onBeam) {
           // barre d'équilibre : le repère penche avec toi, Q et D le ramènent au milieu
           text = "ÉQUILIBRE · Z POUR AVANCER, Q / D POUR TE REDRESSER";
           beam = P.tilt || 0;
         }
-        const fallen = sim.players.find((q) => q !== P && q.status === 'alive' && q.trapped >= 0 && sim.ropes[q.trapped] === undefined && Math.hypot(sim.map.pits[q.trapped].x - P.x, sim.map.pits[q.trapped].z - P.z) < 2.4);
         const it = sim.nearItem(P);
         const sel = P.inv[P.sel - 1];
         if (beam !== null) {
           // rien d'autre sur l'arête
-        } else if (fallen) text = `[R] LANCER TA CORDE À ${fallen.name.toUpperCase()}`;
-        else if (!P.hasLamp && sim.table && Math.hypot(sim.table.x - P.x, sim.table.z - P.z) < 1.7) text = '[F] PRENDRE UNE LAMPE TORCHE';
+        } else if (!P.hasLamp && P.floor === 0 && sim.table && Math.hypot(sim.table.x - P.x, sim.table.z - P.z) < 1.7) text = '[F] PRENDRE UNE LAMPE TORCHE';
         else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = "[E] POSER L'ÉCHELLE SOUS LA CASSETTE";
         else if (it) text = P.inv.includes(null) ? `[F] RAMASSER ${NAME[it.kind]}` : `[F] ÉCHANGER ${NAME[sel || 'bottle']} (CASE ${P.sel + 1}) CONTRE ${NAME[it.kind]}`;
-        else if (N && !N.ladder && !sim.map.cassettes[N.cas].collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'LA CASSETTE EST TROP HAUT : IL FAUT UNE ÉCHELLE';
+        else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'LA CASSETTE EST TROP HAUT : IL FAUT UNE ÉCHELLE';
       }
     }
     const el = this.$('#prompt');
     el.hidden = !text;
     if (text) this.$('#promptText').textContent = text;
-    this.$('#climbBar').hidden = climb < 0;
     this.$('#beamBar').hidden = beam === null;
     if (beam !== null) {
       const mark = this.$('#beamBar i');
       mark.style.left = `${50 + beam * 50}%`;
       mark.classList.toggle('danger', Math.abs(beam) > 0.6);
     }
-    if (climb >= 0) this.$('#climbBar i').style.width = `${Math.round(climb * 100)}%`;
   }
 
   toast(text) {
@@ -326,8 +322,8 @@ export class BackroomsHUD {
     const tactile = document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
     this.$('#pauseGo').textContent = tactile ? "TOUCHE L'ÉCRAN POUR JOUER" : kb ? 'APPUIE SUR ENTRÉE POUR JOUER' : "CLIQUE POUR PRENDRE LE CONTRÔLE";
     this.$('#pauseKeys').textContent = kb
-      ? 'ZQSD marcher · Flèches regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · R corde · T siffler · Échap pause'
-      : 'ZQSD marcher · Souris regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · R corde · T siffler · Échap pause';
+      ? 'ZQSD marcher · Flèches regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · T siffler · Échap pause'
+      : 'ZQSD marcher · Souris regarder · Maj courir · 1 lampe · 2 3 choisir · E utiliser · F ramasser · T siffler · Échap pause';
     for (const b of this.el.querySelectorAll('button[data-kb]')) b.classList.toggle('on', (b.dataset.kb === '1') === kb);
   }
 }
