@@ -1,4 +1,5 @@
 // odyssee/js/ui/screens.js — écrans plein cadre : équipe, résumé, sac, Pokédex, carte, carte de dresseur, boutique, PC, options
+export { trophiesScreen, showTrophyToast } from './trophiesView.js';
 import { el, esc } from './ui.js';
 import { SPECIES } from '../data/species.js';
 import { ORIGINALES } from '../data/remplacants.js';

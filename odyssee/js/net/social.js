@@ -333,5 +333,8 @@ async function battleSession(game, from, name, gender, rid, challenger) {
   }
   game.sound.stopMusic(0.1); game.sound.current = null;
   game.updateZone();
+  if (result === 'win' || result === 'lose' || result === 'tie' || result === 'draw') {
+    try { game.recordPvpResult?.(foeName, result); } catch (e) { console.error('PvP record error:', e); }
+  }
   await ui.say(result === 'win' ? `Tu as battu ${foeName} !` : result === 'lose' ? `${foeName} a gagné ce combat. La revanche t'attend !` : 'Le combat se termine sans vainqueur.');
 }

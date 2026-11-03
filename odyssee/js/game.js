@@ -10,7 +10,8 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast } from './ui/screens.js';
+import { recordPvpMatch, ensurePvpState } from './core/trophies.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
 import { HPX, CHAR_ROWS } from './render/world3d.js';
@@ -169,6 +170,7 @@ export class Game {
       v: 2, name, gender, id: Math.floor(Math.random() * 65536), money: 3000, badges: Array(BADGES.length).fill(false), flags: {},
       party: [], box: [], bag: { potion: 1 }, dex: { seen: [], caught: [], seenCount: {} }, time: 0, visited: ['aube'], repel: 0,
       cleared: {}, surf: false, explored: [], journal: {},
+      pvp: { totalWins: 0, totalLosses: 0, totalDraws: 0, currentStreak: 0, bestStreak: 0, players: {}, trophies: {} },
       lastCenter: { map: 'aube:maison', x: 4, y: 5, dir: 'up' }, ...this.world.start,
     };
   }
@@ -189,6 +191,7 @@ export class Game {
     // Pokémon d'avant les natures : chacun reçoit la sienne (toujours la même), ses stats sont recalculées
     while (s.badges.length < BADGES.length) s.badges.push(false);   // anciennes parties : 8 badges → 15
     for (const m of s.party.concat(s.box)) ensureNature(m);
+    ensurePvpState(s);
     return s;
   }
 
@@ -1168,6 +1171,7 @@ export class Game {
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
     opts.push(['QUÊTES', 'quests']);
+    opts.push(['TROPHÉES', 'trophies']);
     if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'REVENIR' : 'DOMAINE', 'domaine']);
     opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
@@ -1183,6 +1187,7 @@ export class Game {
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
       else if (k === 'quests') await questsScreen(this);
+      else if (k === 'trophies') await trophiesScreen(this);
       else if (k === 'domaine') { this.busy = false; if (await allerDomaine(this)) break; this.busy = true; }
       else if (k === 'opt') await optionsScreen(this);
       else if (k === 'code') {
@@ -1207,6 +1212,27 @@ export class Game {
     this.busy = false;
   }
   /** le sprite du joueur : sa tenue composée s'il en a une, sinon le dresseur ou la dresseuse de base */
+  recordPvpResult(foeName, result) {
+    if (!this.state) return null;
+    const outcome = recordPvpMatch(this.state, foeName, result);
+    if (outcome.newlyUnlocked && outcome.newlyUnlocked.length > 0) {
+      for (const trophy of outcome.newlyUnlocked) {
+        showTrophyToast(this, trophy);
+      }
+    }
+    this.save(true);
+    return outcome;
+  }
+
+  async openTrophies() {
+    this.busy = true;
+    try {
+      await trophiesScreen(this);
+    } finally {
+      this.busy = false;
+    }
+  }
+
   playerSprite() { return this.state.tenue && this._tenueOk ? 'joueur' : this.state.gender === 'f' ? 'player_f' : 'player_m'; }
   /** compose la tenue du joueur dans la planche des personnages */
   appliquerTenue() {
