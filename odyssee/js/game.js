@@ -22,6 +22,7 @@ import { syncJournal } from './core/questsData.js';
 import { QUIZ } from './world/arenes.js';
 import { casinoScreen, bourseScreen, entretienPierre } from './ui/metropole.js';
 import { apparenceScreen } from './ui/apparence.js';
+import { preparerDomaine, frigo, architecte } from './ui/domaine.js';
 import { composer } from './render/tenue.js';
 
 // v2 : nouvelle région (arènes dans un autre ordre, archipel, créatures originales) — les sauvegardes v1 ne sont pas reprises
@@ -90,6 +91,7 @@ export class Game {
     this.stepLock = false; this.stepGap = false;
     this.player = { x: state.x, y: state.y, dir: state.dir || 'down', move: null, step: 0, turnLock: 0, bumpT: 0, surf: !!state.surf };
     this.appliquerTenue();
+    preparerDomaine(this);   // le terrain acheté grâce au frigo, avec tout ce qui y a été bâti
     this.setMap(state.map);
     this.view.setTimeOfDay(this.hour());
     this.hud?.update(true);
@@ -875,6 +877,8 @@ export class Game {
     this.state.tenue = T; this.state.gender = T.genre; this.appliquerTenue(); this.sound.sfx('levelup');
     await ui.say(o.armoire ? 'Te voilà prêt' + (T.genre === 'f' ? 'e' : '') + ' pour l\'aventure !' : 'Superbe ! Ce style te va à merveille.', sp);
   }
+  /** le frigo de la maison (et l'aimant de l'agence immobilière) */
+  frigo() { return frigo(this); }
   /** à vélo : deux fois plus vite que la course, dehors seulement */
   onBike() { return !!this.state?.velo && this.mapObj?.outdoor && !this.player?.surf; }
   async toggleVelo() {
@@ -1345,6 +1349,7 @@ export class Game {
     if (name === 'casino') return casinoScreen(this);
     if (name === 'pierre') return entretienPierre(this);
     if (name === 'apparence') return this.apparence();
+    if (name === 'architecte') return architecte(this);
     if (name === 'mom') {
       if (!st.flags.starter) { await ui.say([`Ah, ${st.name}, tu es enfin réveillé${st.gender === 'f' ? 'e' : ''} !`, 'Le Professeur Saule est passé ce matin. Il t\'attend à son laboratoire, juste au sud-est.', 'Théo y est déjà, bien sûr... Allez, file !'], { speaker: 'Maman' }); return; }
       await ui.say(`${st.name} ! Tu as l'air épuisé${st.gender === 'f' ? 'e' : ''}. Repose-toi un peu.`, { keep: true, speaker: 'Maman' });
