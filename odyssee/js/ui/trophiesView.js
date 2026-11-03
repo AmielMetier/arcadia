@@ -83,6 +83,8 @@ export function trophiesScreen(game) {
     let medalFilter = 'all'; // 'all' | 'unlocked' | 'claimable' | 'bronze' | 'silver' | 'gold' | 'platinum'
     let catFilter = 'all'; // 'all' | 'pvp' | 'aventure' | 'pokedex' | 'entrainement' | 'exploration' | 'domaine'
     let selIdx = 0;
+    let currentTrophies = [];
+    let currentFiltered = [];
 
     const render = () => {
       checkAllTrophies(st);
@@ -118,6 +120,9 @@ export function trophiesScreen(game) {
         return true;
       });
 
+      currentTrophies = trophies;
+      currentFiltered = filteredTrophies;
+
       s.innerHTML = `
         <div class="scr-bar">
           <div class="scr-bar-left">
@@ -138,7 +143,7 @@ export function trophiesScreen(game) {
             </button>
           </div>
           <div class="scr-bar-right">
-            <button class="scr-btn-close" type="button" data-act="close" title="Fermer (Échap)">✕</button>
+            <button class="scr-close-btn scr-btn-close" type="button" data-act="close" title="Fermer (Échap ou T)">FERMER ✕</button>
           </div>
         </div>
 
@@ -153,53 +158,68 @@ export function trophiesScreen(game) {
             <span><kbd>▲</kbd><kbd>▼</kbd> Naviguer</span>
             <span><kbd>◄</kbd><kbd>►</kbd> Changer d'onglet</span>
             <span><kbd>ESPACE</kbd> / <kbd>ENTRÉE</kbd> Réclamer la récompense</span>
-            <span><kbd>ÉCHAP</kbd> Quitter</span>
+            <span><kbd>ÉCHAP</kbd> / <kbd>T</kbd> Quitter</span>
           </div>
         </div>
       `;
 
-      // Brancher les événements
+      // Brancher les événements souris et tactiles
       s.querySelectorAll('.ttab').forEach((b) => {
         b.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation();
           tab = b.dataset.tab;
           selIdx = 0;
-          ui.sound?.sfx('blip');
+          try { ui.sound?.sfx('blip'); } catch (err) {}
           render();
         });
       });
 
       s.querySelectorAll('.tfilter-cat-btn').forEach((b) => {
         b.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation();
           catFilter = b.dataset.cat;
           selIdx = 0;
-          ui.sound?.sfx('blip');
+          try { ui.sound?.sfx('blip'); } catch (err) {}
           render();
         });
       });
 
       s.querySelectorAll('.tfilter-btn').forEach((b) => {
         b.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation();
           medalFilter = b.dataset.filter;
           selIdx = 0;
-          ui.sound?.sfx('blip');
+          try { ui.sound?.sfx('blip'); } catch (err) {}
           render();
         });
       });
 
       s.querySelectorAll('[data-act="claim"]').forEach((b) => {
         b.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation();
           const tid = b.dataset.id;
           handleClaim(tid);
         });
       });
 
-      s.querySelector('[data-act="close"]')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        close();
+      s.querySelectorAll('.tmedal-card.claimable').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          const tid = card.querySelector('[data-act="claim"]')?.dataset.id;
+          if (tid) handleClaim(tid);
+        });
+      });
+
+      s.querySelectorAll('[data-act="close"]').forEach((b) => {
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          close();
+        });
       });
     };
 
@@ -209,6 +229,7 @@ export function trophiesScreen(game) {
         try { game.sound?.sfx('item'); } catch (e) {}
         game.save(true);
         ui.toast(`Récompense obtenue : ${res.label} ajoutée au Sac !`, 2000);
+        game.hud?.update(true);
         render();
       } else {
         ui.toast(res.message || 'Impossible de réclamer.', 1500);
@@ -218,7 +239,7 @@ export function trophiesScreen(game) {
     const close = () => {
       pop();
       s.remove();
-      ui.sound?.sfx('cancel');
+      try { ui.sound?.sfx('cancel'); } catch (e) {}
       resolve();
     };
 
@@ -235,14 +256,14 @@ export function trophiesScreen(game) {
         render();
       } else if (k === 'a' || k === 'space') {
         if (tab === 'medals') {
-          const claimable = filteredTrophies.find((t) => t.unlocked && !t.claimed) ||
-                            trophies.find((t) => t.unlocked && !t.claimed);
+          const claimable = currentFiltered.find((t) => t.unlocked && !t.claimed) ||
+                            currentTrophies.find((t) => t.unlocked && !t.claimed);
           if (claimable) {
             handleClaim(claimable.id);
             return;
           }
         }
-      } else if (k === 'b' || k === 'menu') {
+      } else if (k === 'b' || k === 'menu' || k === 'trophies') {
         close();
       }
     });

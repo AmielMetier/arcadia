@@ -766,6 +766,7 @@ export class Game {
     else if (k === 'map') { this.busy = true; await mapScreen(this); this.busy = false; }
     else if (k === 'velo') { this.busy = true; try { await this.toggleVelo(); } finally { this.busy = false; } }
     else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
+    else if (k === 'trophies') { this.busy = true; await trophiesScreen(this); this.busy = false; }
     else if (k === 'hud') this.hud?.toggle();
   }
   async interact() {

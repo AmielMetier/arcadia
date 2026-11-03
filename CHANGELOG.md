@@ -13,6 +13,9 @@
     - Réduction à **une seule et unique Master Ball** dans l'intégralité du jeu, réservée au trophée des 50 victoires PvP (*Seigneur des Duels*).
     - Le trophée des 10 victoires face au même joueur (*Némésis Suprême*) octroie désormais les *Lunettes Choix ×1*.
   - **Interface utilisateur B2W2 perfectionnée** :
+    - Rétablissement complet de l'interactivité souris et tactile : activation explicite de pointer-events: auto sur .screen, .trophies-scr et l'ensemble des contrôles interactifs (onglets, filtres thématiques, filtres de rangs, boutons de réclamation et bouton fermer).
+    - Bouton et icône d'accès rapide intégrés au HUD Pokégear : ajout du 6e bouton TROPHÉES dans le dock d'actions (repeat(6, 1fr)), pastille de suivi dynamique débloquées/total dans la barre supérieure et raccourci clavier touche T.
+    - Réclamation tactile et souris directe : clic sur toute la surface d'une carte débloquée pour réclamer sa récompense, avec actualisation immédiate du Sac et du HUD.
     - Double barre de filtrage ergonomique : navigation par catégorie thématique (*Toutes*, *⚔️ PvP*, *🗺️ Aventure*, *📖 Pokédex*, *⚡ Entraînement*, *🧭 Exploration*, *🏰 Domaine*) et par rang (*Tous rangs*, *À Réclamer*, *Débloquées*, *Bronze*, *Argent*, *Or*, *Platine*).
     - Badges de catégorie dédiés affichés sur chaque carte de médaille.
     - Évaluation automatique `checkAllTrophies(st)` lors de l'ouverture du journal, des remises de badges et des sauvegardes.

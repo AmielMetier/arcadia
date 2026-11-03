@@ -6,7 +6,8 @@ import { el, esc } from './ui.js';
 import { ASSETS } from '../assets.js';
 import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
-import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen } from './screens.js';
+import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen, trophiesScreen } from './screens.js';
+import { getPvpSummary } from '../core/trophies.js';
 import { getTrackedQuest } from '../core/questsData.js';
 
 const gender = (m) => (m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '');
@@ -128,6 +129,9 @@ export class Hud {
       } else if (act === 'quests') {
         g.busy = true; g.sound.sfx('select');
         try { await questsScreen(g); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'trophies') {
+        g.busy = true; g.sound.sfx('select');
+        try { await trophiesScreen(g); } finally { g.busy = false; this.update(true); }
       }
     });
   }
@@ -210,9 +214,9 @@ export class Hud {
             <img class="hud-stat-ico" src="img/hud/coin.png" alt="">
             <span class="hud-money">${st.money.toLocaleString('fr-FR')} ₽</span>
           </div>
-          <div class="hud-stat-item">
-            <img class="hud-stat-ico" src="img/hud/trophy.png" alt="">
-            <span class="hud-badge-cnt">${bCount}/${BADGES.length}</span>
+          <div class="hud-stat-item hud-trophy-pill" data-act="trophies" title="Journal des Trophées & Médailles (${trUnlocked}/${trTotal}) — Cliquer pour ouvrir (Touche T)" style="cursor: pointer;">
+            <img class="hud-stat-ico" src="img/hud/trophy.png" alt="" onerror="this.src='img/trophies/box_120.png'">
+            <span class="hud-trophy-cnt">${trUnlocked}/${trTotal} 🏅</span>
           </div>
           <div class="hud-stat-item hud-cap-pill" title="Niveau max autorisé avant la prochaine Arène">
             <span>MAX N.${g.levelCap()}</span>
@@ -245,6 +249,9 @@ export class Hud {
         </button>
         <button type="button" class="hud-btn" data-act="quests" tabindex="-1" title="Journal des Quêtes (Touche Q)">
           <img src="img/hud/quest.png" alt="" onerror="this.src='img/items/notebook.png'"><span>QUÊTES</span>
+        </button>
+        <button type="button" class="hud-btn" data-act="trophies" tabindex="-1" title="Journal des Trophées & Médailles (Touche T)">
+          <img src="img/hud/trophy.png" alt="" onerror="this.src='img/trophies/box_120.png'"><span>TROPHÉES</span>
         </button>
       </div>
     `;
