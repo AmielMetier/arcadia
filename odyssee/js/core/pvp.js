@@ -100,14 +100,20 @@ export class PvpBattle extends Battle {
     if (this.state !== 'switch') return [];
     this.ev = [];
     const pick = { 0: mine, 1: theirs };
+    const switched = [];
     for (const i of [this.canon, 1 - this.canon]) {
       if (!this.need[i]) continue;
       const party = this.sides[i].party;
       let idx = pick[i];
       if (!party[idx] || party[idx].hp <= 0) idx = party.findIndex((m) => m.hp > 0);
-      this.doSwitch(i, idx, true);
+      this.doSwitch(i, idx, true, false);
+      switched.push(i);
     }
     this.need = [false, false];
+    if (switched.length) {
+      switched.sort((p, q) => this.stat(q, 5) - this.stat(p, 5) || this.tie({ i: p }, { i: q }));
+      for (const s of switched) this.triggerEntry(s);
+    }
     this.state = 'choose';
     return this.flush();
   }

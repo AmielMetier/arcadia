@@ -12,6 +12,11 @@
   - La flamme de la postcombustion monte et retombe en douceur, l'éclair et les traçantes partent de la vraie bouche du canon, et le dessous des nuages paraît moins plat.
   - En qualité Auto, après une partie bien fluide, le jeu essaie les nuages volumétriques au décollage suivant, et revient en arrière si l'image rame.
 
+## 3.65 — 2 novembre 2026
+- **Arcadia** — L'écran de chargement des jeux, avec son bouton « C'est parti ! », est de retour.
+- **Arcadia** — Le menu Arcadia revient dans tous les jeux, maintenant sur le bord droit de l'écran : commandes, son, plein écran et retour au salon.
+- **Arcadia** — Les boutons « Jouer avec mes potes » et « Jouer seul » de l'accueil lancent de nouveau le jeu.
+
 ## 3.64 — 2 novembre 2026
 - **Mystère Mystère** — nouveau jeu : un murder mystery à la première personne dans un grand manoir, de 3 à 12 invités avec les bots.
   - Au début de chaque manche, un rôle secret : meurtrier, shérif ou innocent. Personne ne sait qui est qui avant la fin.

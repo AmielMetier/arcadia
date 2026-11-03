@@ -506,3 +506,8 @@ body:not(:has(#play.on)) .atab{display:none}
   .side>.friends{flex:1}
 }
 #pwBox{margin-top:12px}.ntov .nt input{margin-bottom:8px}
+/* menu Arcadia sur le bord droit de l'écran */
+.atab{left:auto;right:0;transform:translate(62%,-50%);padding:8px 14px 8px 10px;border-left:2px solid rgba(255,255,255,.25);border-right:0;border-radius:12px 0 0 12px;flex-direction:row}
+.amenu{justify-content:flex-end}
+@keyframes amslideR{from{transform:translateX(30px)}}
+.am-panel{animation-name:amslideR}
