@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.79 — 3 novembre 2026
+- **The Backrooms** — les trous gardent une cassette, et on n'y retombe plus en sortant.
+  - Les trous ne sont plus dans de grandes salles qu'on pouvait contourner : une des cassettes est enfermée dans une petite pièce, au bout d'un couloir étroit au sol creusé de trous. On passe sur l'arête du milieu, sans autre chemin possible.
+  - En remontant d'un trou, on est déposé sur la case sûre la plus proche et on reste immobile un instant : Z encore enfoncé ne fait plus retomber dedans.
+  - On ne remonte seul que s'il ne reste personne dehors pour lancer une corde ; sinon, il faut qu'un coéquipier vienne la tendre (R).
+
 ## 3.78 — 3 novembre 2026
 - **The Backrooms** — des trous, une échelle, une corde et un sifflet au Level 0, et de nouvelles commandes.
   - Une ou deux grandes salles ont le sol creusé de trous carrés : on passe sur les arêtes. Qui tombe reste coincé au fond jusqu'à ce qu'un collègue lui lance sa corde (R) ; il remonte en maintenant Z. Seul, on finit par s'en sortir, bien plus lentement.

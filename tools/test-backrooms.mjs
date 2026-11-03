@@ -283,7 +283,7 @@ test("trous : on tombe, on attend la corde d'un collègue (R) et on remonte en m
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
   const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 12, players, localId: 1 });
   const m = sim.map;
-  assert.ok(m.pits.length >= 8, 'une salle piégée');
+  assert.ok(m.pits.length >= 8, 'un couloir piégé');
   const [a, b] = sim.players;
   const pit = m.pits[Math.floor(m.pits.length / 2)];
   // sur l'arête, on ne tombe pas
@@ -314,11 +314,47 @@ test("trous : on tombe, on attend la corde d'un collègue (R) et on remonte en m
   assert.equal(b.trapped, -1);
   // l'ascenseur ne part pas sans celui qui est au fond
   sim.cassettes = 5;
-  run(sim, CLIMB_T + 0.3, { my: 1 });
+  for (let i = 0; i < 200 && a.trapped >= 0; i++) sim.step({ my: 1 });
   assert.equal(a.trapped, -1, 'remonté');
   assert.equal(sim.ropes[pit.id], undefined, 'corde ramassée');
-  assert.ok(Math.abs(a.x - pit.x) >= PIT_HALF || Math.abs(a.z - pit.z) >= PIT_HALF, "ressorti sur l'arête");
-  assert.ok(a.x < pit.x, 'du côté du sauveteur');
+  // déposé sur une case sans trou, et Z encore enfoncé ne le fait pas retomber
+  assert.equal(m.pitAt(Math.floor(a.x / CELL_SIZE), Math.floor(a.z / CELL_SIZE)), -1, 'sur une case sûre');
+  assert.ok(!sim.isColliding(a.x, a.z, 0.38));
+  const out = { x: a.x, z: a.z };
+  run(sim, 0.5, { my: 1, yaw: a.yaw });
+  assert.equal(a.trapped, -1, 'pas retombé');
+  assert.ok(Math.hypot(a.x - out.x, a.z - out.z) < 0.01, "immobile un instant à la sortie");
+});
+
+test("trous : tant qu'un coéquipier est libre, il faut sa corde ; sinon on remonte seul", () => {
+  const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }];
+  const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 21, players, localId: 1 });
+  const [a, b] = sim.players;
+  const pit = sim.map.pits[0];
+  a.x = pit.x;
+  a.z = pit.z;
+  sim.step();
+  assert.equal(a.trapped, pit.id);
+  run(sim, SOLO_CLIMB_T + 1, { my: 1 });
+  assert.equal(a.trapped, pit.id, 'B est en vie : A attend la corde');
+  b.status = 'dead';
+  run(sim, SOLO_CLIMB_T + 1, { my: 1 });
+  assert.equal(a.trapped, -1, 'plus personne dehors : A remonte seul');
+});
+
+test("couloir piégé : une cassette n'est accessible qu'en traversant les trous", () => {
+  for (const sd of [1, 4, 8, 15, 23, 42, 77]) {
+    const m = createBackroomsMap(sd);
+    const v = m.cassettes.find((c) => c.vault);
+    assert.ok(v, `graine ${sd} : une cassette gardée`);
+    assert.ok(m.pits.length >= 6);
+    const g = m.grid.map((val, i) => (m.pitAt(i % m.W, Math.floor(i / m.W)) >= 0 ? T.WALL : val));
+    const d = bfs(g, m.W, m.H, m.spawn.gx, m.spawn.gz);
+    assert.ok(d[v.gz * m.W + v.gx] < 0, `graine ${sd} : impossible de contourner les trous`);
+    assert.ok(m.dist[v.gz * m.W + v.gx] > 0, 'mais accessible en les traversant');
+    for (const c of m.cassettes) if (!c.vault) assert.ok(d[c.gz * m.W + c.gx] >= 0, 'les autres cassettes sans trou');
+    assert.ok(d[m.exit.gz * m.W + m.exit.gx] >= 0, "l'ascenseur sans trou");
+  }
 });
 
 test('trous : seul, on finit par remonter sans corde, bien plus lentement', () => {

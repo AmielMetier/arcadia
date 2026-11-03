@@ -2,9 +2,10 @@
 // Grande grille de cases (64 × 64, soit 160 m de côté) : un quadrillage de cloisons percées de passages, des piliers,
 // quelques grandes salles vides, des zones aux néons morts, 5 cassettes VHS, de l'eau d'amande et 1 ascenseur.
 // Le Level 1 (entrepôt) est dans level1.js et partage les types de cases, l'ascenseur et le parcours en largeur.
-// Pièges du Level 0 : une ou deux grandes salles au sol creusé de trous carrés (on marche sur les arêtes ; qui tombe
-// attend qu'un collègue lui lance une corde), et une cassette posée dans un renfoncement en hauteur, qu'on n'atteint
-// qu'en posant dessous l'échelle cachée ailleurs dans le dédale.
+// Pièges du Level 0, posés une fois le dédale construit :
+//  - une cassette enfermée dans une petite pièce, qu'on n'atteint que par un couloir étroit au sol creusé de trous
+//    carrés (on marche sur l'arête du milieu ; qui tombe attend qu'un collègue lui lance une corde) ;
+//  - une cassette posée dans un renfoncement en hauteur, qu'on n'atteint qu'avec l'échelle cachée ailleurs.
 
 export const PIT_HALF = 1.0; // un trou fait 2 m de côté dans une case de 2,5 m : il reste des arêtes de 50 cm
 export const PIT_DEPTH = 2.4;
@@ -223,22 +224,9 @@ export function createBackroomsMap(seed = 42) {
   // la cabine et les murs qui la ferment ont pu retirer des cases du sol
   for (let i = walkable.length - 1; i >= 0; i--) if (grid[walkable[i].z * W + walkable[i].x] !== T.FLOOR) walkable.splice(i, 1);
 
-  // 7b. Salles piégées : l'intérieur d'une ou deux grandes salles est creusé de trous (le tour de la salle reste sûr)
+  // 7b. Les trous : posés plus bas, une fois les cassettes en place (le couloir piégé qui garde l'une d'elles)
   const pitGrid = new Int16Array(W * H).fill(-1);
   const pits = [];
-  const bigHalls = halls.filter((r) => r.w >= 7 && r.h >= 7).sort(() => rnd() - 0.5).slice(0, 1 + (rnd() < 0.6 ? 1 : 0));
-  for (const r of bigHalls) {
-    for (let z = r.z + 1; z < r.z + r.h - 1; z++) {
-      for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
-        if (grid[z * W + x] !== T.FLOOR || dist[z * W + x] < 0) continue;
-        if (Math.hypot(x - sx, z - sz) < 4.5 || Math.hypot(x - exitCell.x, z - exitCell.z) < 3) continue;
-        pitGrid[z * W + x] = pits.length;
-        pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
-      }
-    }
-  }
-  // rien ne se pose dans un trou
-  for (let i = walkable.length - 1; i >= 0; i--) if (pitGrid[walkable[i].z * W + walkable[i].x] >= 0) walkable.splice(i, 1);
 
   // 8. Les 5 cassettes : une par secteur autour du départ, loin du départ, de la sortie et entre elles
   const cassettes = [];
@@ -260,10 +248,88 @@ export function createBackroomsMap(seed = 42) {
     cassettes.push({ id: i, ...cellPos(chosen), name: `Cassette VHS #${i + 1}`, collected: false });
   }
 
+  // 8a. Le couloir piégé : autour d'une cassette, une pièce de 3 × 3 cases fermée de murs, et un seul accès, un
+  // couloir de 2 cases de large et 4 de long au sol creusé de trous. On vérifie qu'on ne peut pas la contourner et que
+  // tout le reste du dédale reste accessible ; sinon on essaie une autre cassette ou un autre côté.
+  const reachAll = (blockPits) => {
+    const g = blockPits ? grid.map((v, i) => (pitGrid[i] >= 0 ? T.WALL : v)) : grid;
+    return bfs(g, W, H, sx, sz);
+  };
+  const vaultTry = (cas, [dx, dz]) => {
+    const px = -dz;
+    const pz = dx; // perpendiculaire
+    const cx = cas.gx;
+    const cz = cas.gz;
+    const writes = new Map(); // case -> nouvelle valeur
+    const pitCells = [];
+    const put = (x, z, v) => writes.set(z * W + x, v);
+    for (let a = -2; a <= 2; a++) {
+      for (let b = -2; b <= 2; b++) {
+        const ring = Math.max(Math.abs(a), Math.abs(b)) === 2;
+        put(cx + a, cz + b, ring ? T.WALL : T.FLOOR);
+      }
+    }
+    // couloir : il part du mur de la pièce (distance 2) et s'en éloigne de 4 cases ; murs de chaque côté
+    for (let k = 2; k <= 5; k++) {
+      for (const l of [0, 1]) {
+        const x = cx + dx * k + px * l;
+        const z = cz + dz * k + pz * l;
+        put(x, z, T.FLOOR);
+        pitCells.push([x, z]);
+      }
+      put(cx + dx * k - px, cz + dz * k - pz, T.WALL);
+      put(cx + dx * k + px * 2, cz + dz * k + pz * 2, T.WALL);
+    }
+    // l'entrée du couloir donne sur le dédale
+    for (const l of [0, 1]) put(cx + dx * 6 + px * l, cz + dz * 6 + pz * l, T.FLOOR);
+    // rien d'important ne doit être écrasé
+    const keep = new Set([sz * W + sx, exitCell.z * W + exitCell.x, ...cassettes.filter((c) => c !== cas).map((c) => c.gz * W + c.gx)]);
+    if (elevator) keep.add(elevator.gz * W + elevator.gx);
+    for (const [k] of writes) {
+      const x = k % W;
+      const z = (k - x) / W;
+      if (x < 1 || x > W - 2 || z < 1 || z > H - 2) return false;
+      if (keep.has(k) || grid[k] === T.EXIT) return false;
+      if (Math.hypot(x - sx, z - sz) < 4) return false;
+    }
+    const saved = new Map([...writes.keys()].map((k) => [k, grid[k]]));
+    for (const [k, v] of writes) grid[k] = v;
+    const ids = pitCells.map(([x, z]) => {
+      pitGrid[z * W + x] = pits.length + pitCells.indexOf(pitCells.find((q) => q[0] === x && q[1] === z));
+      return z * W + x;
+    });
+    const open = reachAll(false);
+    const shut = reachAll(true);
+    const others = [exitCell, ...cassettes.filter((c) => c !== cas).map((c) => ({ x: c.gx, z: c.gz }))];
+    const ok = open[cas.gz * W + cas.gx] >= 0 && shut[cas.gz * W + cas.gx] < 0 && others.every((c) => shut[c.z * W + c.x] >= 0);
+    if (!ok) {
+      for (const [k, v] of saved) grid[k] = v;
+      for (const k of ids) pitGrid[k] = -1;
+      return false;
+    }
+    for (const [x, z] of pitCells) {
+      pitGrid[z * W + x] = pits.length;
+      pits.push({ id: pits.length, gx: x, gz: z, x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
+    }
+    cas.vault = true;
+    return true;
+  };
+  const byFar = [...cassettes].sort((a, b) => D({ x: b.gx, z: b.gz }) - D({ x: a.gx, z: a.gz }));
+  vaultLoop: for (const cas of byFar) {
+    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5)) {
+      if (vaultTry(cas, d)) break vaultLoop;
+    }
+  }
+  // le dédale a changé : distances, cases libres (sans les trous) et cassette au centre de sa pièce
+  dist = bfs(grid, W, H, sx, sz);
+  for (let i = 0; i < W * H; i++) if (grid[i] === T.FLOOR && dist[i] < 0) grid[i] = T.WALL;
+  walkable.length = 0;
+  for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) if (grid[z * W + x] === T.FLOOR && pitGrid[z * W + x] < 0) walkable.push({ x, z });
+
   // 8b. Une cassette dans un renfoncement en hauteur, au-dessus d'une case contre un mur
   const wallSide = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => get(c.x + dx, c.z + dz) === T.WALL);
   let niche = null;
-  for (const cas of [...cassettes].sort(() => rnd() - 0.5)) {
+  for (const cas of [...cassettes].filter((c) => !c.vault).sort(() => rnd() - 0.5)) {
     const c = { x: cas.gx, z: cas.gz };
     let sides = wallSide(c);
     let cell = c;

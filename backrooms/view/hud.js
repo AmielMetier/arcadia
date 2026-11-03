@@ -218,10 +218,10 @@ export class BackroomsHUD {
       const N = sim.map.niche;
       if (P.trapped >= 0) {
         const rope = sim.ropes[P.trapped] !== undefined;
-        const solo = sim.players.length === 1;
+        const alone = sim.canClimbAlone(P);
         climb = P.climbT;
-        text = rope ? 'MAINTIENS Z POUR GRIMPER À LA CORDE' : solo ? 'TU ES TOMBÉ · MAINTIENS Z POUR GRIMPER (LENTEMENT)' : "TU ES COINCÉ AU FOND · SIFFLE (T) POUR QU'UN COLLÈGUE TE LANCE SA CORDE";
-        if (!rope && !solo) climb = -1;
+        text = rope ? 'MAINTIENS Z POUR GRIMPER À LA CORDE' : alone ? "PERSONNE POUR T'AIDER · MAINTIENS Z POUR GRIMPER (LENTEMENT)" : "TU ES COINCÉ AU FOND · SIFFLE (T) POUR QU'UN COLLÈGUE TE LANCE SA CORDE";
+        if (!rope && !alone) climb = -1;
       } else {
         const fallen = sim.players.find((q) => q !== P && q.status === 'alive' && q.trapped >= 0 && sim.ropes[q.trapped] === undefined && Math.hypot(sim.map.pits[q.trapped].x - P.x, sim.map.pits[q.trapped].z - P.z) < 2.4);
         const it = sim.nearItem(P);

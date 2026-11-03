@@ -26,7 +26,8 @@ export const BATTERY_PACK = 60; // % rendus par une pile utilisée
 export const INV_SIZE = 2; // cases d'objets (piles, eau d'amande, échelle) : la case 1 de l'inventaire est réservée à la lampe
 export const PICK_R = 1.4; // portée de F pour ramasser
 export const CLIMB_T = 1.2; // secondes à grimper à la corde (Z maintenu)
-export const SOLO_CLIMB_T = 7; // seul, on finit par s'en sortir sans corde, bien plus lentement
+export const SOLO_CLIMB_T = 7; // sans personne pour lancer une corde, on finit par s'en sortir, bien plus lentement
+export const CLIMB_LOCK = 0.7; // secondes d'immobilité en sortant d'un trou (Z encore enfoncé ne fait pas retomber)
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
@@ -64,6 +65,7 @@ function newPlayer(id, name, map, i) {
     sel: 1, // case choisie (1 ou 2 ; la case 0, c'est la lampe) : E l'utilise, F l'échange contre un objet au sol
     trapped: -1, // numéro du trou où le joueur est tombé (-1 : non)
     climbT: 0, // avancée de la remontée à la corde
+    lockT: 0, // immobile un instant en sortant d'un trou
     onLadder: false, // en haut de l'échelle (la caméra monte)
     whistleCd: 0,
     heat: 0, // coups de sifflet récents : trop, et l'entité vient
@@ -316,6 +318,32 @@ export class BackroomsSim {
     return best;
   }
 
+  // Seul au fond, on peut remonter sans corde s'il n'y a plus personne dehors pour en lancer une
+  canClimbAlone(P) {
+    return !this.players.some((q) => q !== P && q.status === 'alive' && q.trapped < 0);
+  }
+
+  // Le point de sortie d'un trou : la case sans trou la plus proche de (x, z), autour du trou
+  safeSpot(x, z, pit) {
+    let best = null;
+    let bd = Infinity;
+    for (let r = 1; r <= 8 && !best; r++) {
+      for (let gz = pit.gz - r; gz <= pit.gz + r; gz++) {
+        for (let gx = pit.gx - r; gx <= pit.gx + r; gx++) {
+          if (this.map.isWall(gx, gz) || this.map.pitAt(gx, gz) >= 0) continue;
+          const cx = (gx + 0.5) * CELL_SIZE;
+          const cz = (gz + 0.5) * CELL_SIZE;
+          const d = Math.hypot(cx - x, cz - z) + Math.hypot(cx - pit.x, cz - pit.z) * 0.5;
+          if (d < bd) {
+            bd = d;
+            best = { x: cx, z: cz };
+          }
+        }
+      }
+    }
+    return best || { x: this.map.spawn.x, z: this.map.spawn.z };
+  }
+
   // R : lancer sa corde dans un trou voisin où quelqu'un est tombé
   throwRope(P) {
     if (P.trapped >= 0) return;
@@ -440,22 +468,24 @@ export class BackroomsSim {
       P.moving = false;
       const pit = this.map.pits[P.trapped];
       const rope = this.ropes[P.trapped];
-      const solo = this.players.length === 1;
-      if (my > 0 && (rope !== undefined || solo)) P.climbT += DT / (rope !== undefined ? CLIMB_T : SOLO_CLIMB_T);
+      const alone = this.canClimbAlone(P);
+      if (my > 0 && (rope !== undefined || alone)) P.climbT += DT / (rope !== undefined ? CLIMB_T : SOLO_CLIMB_T);
       else P.climbT = Math.max(0, P.climbT - DT * 0.5);
       if (P.climbT >= 1) {
-        // on ressort sur l'arête, du côté du sauveteur
+        // on ressort sur la case sûre la plus proche (du côté du sauveteur), immobile un instant
         const R = this.players.find((q) => q.id === rope);
-        const ax = R ? R.x - pit.x : -Math.sin(P.yaw);
-        const az = R ? R.z - pit.z : -Math.cos(P.yaw);
-        const alongX = Math.abs(ax) >= Math.abs(az);
-        P.x = pit.x + (alongX ? Math.sign(ax || 1) * (PIT_HALF + 0.12) : 0);
-        P.z = pit.z + (alongX ? 0 : Math.sign(az || 1) * (PIT_HALF + 0.12));
+        const spot = this.safeSpot(R ? R.x : pit.x, R ? R.z : pit.z, pit);
+        P.x = spot.x;
+        P.z = spot.z;
+        P.lockT = CLIMB_LOCK;
         delete this.ropes[P.trapped];
         P.trapped = -1;
         P.climbT = 0;
         this.emit({ type: 'climbed', id: P.id, name: P.name });
       }
+    } else if (P.lockT > 0) {
+      P.lockT = Math.max(0, P.lockT - DT);
+      P.moving = false;
     } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8)) {
       P.x = pos.x;
       P.z = pos.z;
@@ -542,9 +572,10 @@ export class BackroomsSim {
   predict(input = {}) {
     const P = this.player;
     if (this.state !== 'playing' || P.status !== 'alive' || this.departT > 0) return;
-    if (P.trapped >= 0) {
+    if (P.trapped >= 0 || P.lockT > 0) {
       if (input.yaw !== undefined) P.yaw = input.yaw;
       if (input.pitch !== undefined) P.pitch = input.pitch;
+      P.lockT = Math.max(0, P.lockT - DT);
       return;
     }
     if (input.yaw !== undefined) P.yaw = input.yaw;
@@ -602,7 +633,7 @@ export class BackroomsSim {
       pw: this.powered ? 1 : 0,
       bo: r2(this.blackout),
       dp: r2(this.departT),
-      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0]),
+      p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.trapped, r2(P.climbT), P.onLadder ? 1 : 0, r2(P.lockT)]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0],
       k: [bits(this.map.cassettes, 'collected'), bits(this.map.fuses, 'taken'), bits(this.map.items, 'taken'), '', bits(this.lamps, 'taken')],
       // objets posés par des joueurs (échanges), cordes lancées, échelle posée
@@ -624,7 +655,7 @@ export class BackroomsSim {
     this.departT = snap.dp;
     const seen = new Set();
     for (const row of snap.p) {
-      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder] = row;
+      const [id, x, z, yaw, pitch, status, fl, bat, stam, inv, signal, running, moving, found, name, lamp, sel, trapped, climbT, onLadder, lockT] = row;
       seen.add(id);
       let P = this.players.find((q) => q.id === id);
       if (!P) {
@@ -653,6 +684,7 @@ export class BackroomsSim {
       P.trapped = trapped ?? -1;
       P.climbT = climbT || 0;
       P.onLadder = !!onLadder;
+      if (lockT > 0 && !(P.lockT > 0)) P.lockT = lockT;
       P.battery = bat;
       P.inv = (inv || ',').split(',').map((k) => k || null);
       P.signal = signal;

@@ -368,7 +368,7 @@ function handleEvent(ev, me) {
       break;
     case 'fall':
       if (sfx) sfx.fall(ev.id === me);
-      if (hud) hud.toast(ev.id === me ? (sim.players.length > 1 ? 'Tu es tombé dans un trou ! Siffle (T) pour appeler à l\'aide' : 'Tu es tombé dans un trou… maintiens Z pour grimper') : `${ev.name} est tombé dans un trou ! Lance-lui ta corde (R)`);
+      if (hud) hud.toast(ev.id === me ? (sim.canClimbAlone(sim.player) ? 'Tu es tombé dans un trou… maintiens Z pour grimper' : 'Tu es tombé dans un trou ! Siffle (T) pour appeler à l\'aide') : `${ev.name} est tombé dans un trou ! Lance-lui ta corde (R)`);
       break;
     case 'rope':
       if (sfx) sfx.rope();
