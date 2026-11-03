@@ -369,7 +369,7 @@ function handleEvent(ev, me) {
       break;
     case 'stairs':
       if (ev.id !== me) break;
-      if (sfx) sfx.step();
+      if (sfx) sfx.step(sim.level === 1);
       if (hud) hud.toast(ev.up ? "Tu remontes à l'étage du haut" : "Tu descends à l'étage du bas");
       break;
     case 'whistle':
@@ -559,7 +559,7 @@ function loop(currentTime) {
       const stepInterval = sim.player.running ? 1.25 : 0.85;
       if (stepDist >= stepInterval) {
         stepDist = 0;
-        if (sfx) sfx.step();
+        if (sfx) sfx.step(sim.level === 1);
       }
     }
 
@@ -596,6 +596,7 @@ function loop(currentTime) {
   // Rendu graphique et HUD
   if (scene) {
     scene.render(sim, currentTime / 1000);
+    if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
   }
   if (hud) {
     hud.update(sim, sim.time, delta);

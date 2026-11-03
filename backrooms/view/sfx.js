@@ -98,25 +98,67 @@ export class BackroomsSfx {
     this.ambientGain = c.createGain();
     this.ambientGain.gain.setValueAtTime(0.045, c.currentTime); // son d'ambiance discret
 
-    // Bourdonnement 60 Hz + 120 Hz des vieux néons de bureau
-    const hum1 = c.createOscillator();
-    hum1.type = 'sine';
-    hum1.frequency.setValueAtTime(60, c.currentTime);
-
-    const hum2 = c.createOscillator();
-    hum2.type = 'sine';
-    hum2.frequency.setValueAtTime(120, c.currentTime);
-
-    const humGain2 = c.createGain();
-    humGain2.gain.value = 0.35;
-    hum2.connect(humGain2);
-
-    hum1.connect(this.ambientGain);
-    humGain2.connect(this.ambientGain);
+    // Le grésillement des ballasts : un 120 Hz riche en harmoniques, adouci, avec une pointe de sifflement aigu
+    const buzz = c.createOscillator();
+    buzz.type = 'sawtooth';
+    buzz.frequency.setValueAtTime(120, c.currentTime);
+    const buzzLp = c.createBiquadFilter();
+    buzzLp.type = 'lowpass';
+    buzzLp.frequency.value = 700;
+    buzzLp.Q.value = 0.7;
+    const buzzGain = c.createGain();
+    buzzGain.gain.value = 0.32;
+    buzz.connect(buzzLp).connect(buzzGain).connect(this.ambientGain);
+    // le 60 Hz du secteur, en fond
+    const hum = c.createOscillator();
+    hum.type = 'sine';
+    hum.frequency.setValueAtTime(60, c.currentTime);
+    hum.connect(this.ambientGain);
+    // sifflement aigu, qui flotte un peu
+    const whine = c.createOscillator();
+    whine.type = 'sine';
+    whine.frequency.setValueAtTime(7400, c.currentTime);
+    const wob = c.createOscillator();
+    wob.frequency.value = 0.3;
+    const wobGain = c.createGain();
+    wobGain.gain.value = 40;
+    wob.connect(wobGain).connect(whine.frequency);
+    const whineGain = c.createGain();
+    whineGain.gain.value = 0.025;
+    whine.connect(whineGain).connect(this.ambientGain);
     this.ambientGain.connect(this.out);
 
-    hum1.start();
-    hum2.start();
+    // Le « silence » d'une pièce vide : un souffle grave, toujours là, même dans le noir
+    const len = c.sampleRate * 2;
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; // bruit brun
+      d[i] = last * 3.5;
+    }
+    const room = c.createBufferSource();
+    room.buffer = buf;
+    room.loop = true;
+    const roomLp = c.createBiquadFilter();
+    roomLp.type = 'lowpass';
+    roomLp.frequency.value = 380;
+    this.roomGain = c.createGain();
+    this.roomGain.gain.value = 0.05;
+    room.connect(roomLp).connect(this.roomGain).connect(this.out);
+
+    buzz.start();
+    hum.start();
+    whine.start();
+    wob.start();
+    room.start();
+  }
+
+  // Le grésillement suit les néons autour de toi (light : la lumière reçue là où tu es, 0 dans le noir)
+  setHum(light) {
+    if (!this.unlocked || !this.ambientGain || this.dark) return;
+    const t = this.ctx.currentTime;
+    this.ambientGain.gain.setTargetAtTime(0.012 + Math.min(1, light) * 0.07, t, 0.3);
   }
 
   // La voix de l'entité du Level 1 : la bande-son de sa vidéo, jouée en boucle sans fin. Chargée une seule fois,
@@ -170,24 +212,40 @@ export class BackroomsSfx {
   }
 
   // Bruit de pas feutrés sur moquette
-  step() {
+  // Un pas : étouffé et un peu spongieux sur la moquette humide, sec et claquant sur le béton (hard)
+  step(hard = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
+    const v = 0.8 + Math.random() * 0.4;
 
+    // le talon : un coup sourd
     const osc = c.createOscillator();
     const g = c.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(90, t);
+    osc.frequency.setValueAtTime((hard ? 110 : 80) * v, t);
     osc.frequency.exponentialRampToValueAtTime(35, t + 0.07);
-
-    g.gain.setValueAtTime(0.06, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-
+    g.gain.setValueAtTime(hard ? 0.05 : 0.045, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     osc.connect(g);
     g.connect(this.out);
     osc.start(t);
-    osc.stop(t + 0.08);
+    osc.stop(t + 0.09);
+
+    // la semelle : un frottement de fibres (moquette) ou un claquement (béton)
+    const n = Math.floor(c.sampleRate * (hard ? 0.05 : 0.12));
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, hard ? 4 : 1.6);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const f = c.createBiquadFilter();
+    f.type = hard ? 'highpass' : 'lowpass';
+    f.frequency.value = hard ? 1800 * v : 900 * v;
+    const ng = c.createGain();
+    ng.gain.value = (hard ? 0.09 : 0.05) * v;
+    src.connect(f).connect(ng).connect(this.out);
+    src.start(t + (hard ? 0 : 0.02));
   }
 
   // Ramassage d'une cassette VHS
@@ -420,6 +478,7 @@ export class BackroomsSfx {
     osc.start(t);
     osc.stop(t + 0.65);
     if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(0, t, 0.08);
+    this.dark = true;
   }
 
   // Le courant revient : le bourdonnement remonte
@@ -427,6 +486,7 @@ export class BackroomsSfx {
     if (!this.unlocked || !this.ctx) return;
     const t = this.ctx.currentTime;
     if (this.ambientGain) this.ambientGain.gain.setTargetAtTime(0.045, t, 0.4);
+    this.dark = false;
     this.battery();
   }
 
