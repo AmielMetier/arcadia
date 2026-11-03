@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.94 — 3 novembre 2026
+- **The Backrooms** — plus de table au départ : chacun commence avec sa lampe torche déjà allumée, dans la case 1 de l'inventaire.
+
 ## 3.93 — 3 novembre 2026
 - **The Backrooms** — un rendu beaucoup plus réaliste, comme dans les films.
   - Les néons éclairent comme de vrais pavés lumineux : des flaques de lumière rondes sur la moquette, et les murs projettent leur ombre dans les couloirs voisins.

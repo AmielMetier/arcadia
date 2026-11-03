@@ -69,7 +69,7 @@ function newPlayer(id, name, map, i) {
     stamina: 100, // 0 à 100
     running: false,
     flashlight: false,
-    hasLamp: false, // lampe torche prise sur la table du départ
+    hasLamp: true, // lampe torche, toujours dans la case 1
     bottles: 0,
     battery: 100, // pile de la lampe torche (0 à 100)
     inv: [null, null], // cases 2 et 3 de l'inventaire : 'battery', 'bottle', 'ladder' ou null
@@ -126,41 +126,14 @@ export class BackroomsSim {
         P.found = old.found;
         P.yaw = old.yaw;
       }
-      // à partir du Level 1, tout le monde a sa lampe (ceux qui étaient tombés en reçoivent une)
-      if (level > 0) {
-        P.hasLamp = true;
-        P.flashlight = !old || old.flashlight || old.status !== 'alive';
-      }
+      // tout le monde part avec sa lampe torche, allumée, dans la case 1 (ceux qui étaient tombés en reçoivent une)
+      P.hasLamp = true;
+      P.flashlight = !old || old.flashlight || old.status !== 'alive';
       return P;
     });
-    // Level 0 : la table des lampes torches, posée dans une case libre à côté du départ
+    // plus de table au départ : chacun a sa lampe dans la case 1 dès le début
     this.table = null;
     this.lamps = [];
-    if (level === 0) {
-      const { gx, gz } = this.map.spawn;
-      const free = (x, z) =>
-        !this.map.isWall(x, z) && !(this.map.pitAt && this.map.pitAt(x, z) >= 0) && !this.stairs.some((st) => st.gx === x && st.gz === z) && !(this.map.props || []).some((p) => Math.hypot(p.x - (x + 0.5) * CELL_SIZE, p.z - (z + 0.5) * CELL_SIZE) < 1.4);
-      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
-      const d = dirs.find(([dx, dz]) => free(gx + dx, gz + dz) && free(gx + 2 * dx, gz + 2 * dz)) || dirs.find(([dx, dz]) => free(gx + dx, gz + dz));
-      if (d) {
-        const tx = (gx + d[0] + 0.5) * CELL_SIZE;
-        const tz = (gz + d[1] + 0.5) * CELL_SIZE;
-        // la table regarde le départ ; les lampes sont alignées sur sa longueur
-        const rot = Math.atan2(d[0], d[1]) + Math.PI / 2;
-        this.table = { x: tx, z: tz, r: 0.62, rot };
-        const n = this.roster.length;
-        for (let i = 0; i < n; i++) {
-          const o = n > 1 ? (i / (n - 1) - 0.5) * 1.1 : 0;
-          this.lamps.push({ id: i, x: tx + Math.cos(rot) * o, z: tz - Math.sin(rot) * o, taken: false });
-        }
-      } else {
-        // pas de place (très rare) : chacun part avec sa lampe
-        for (const P of this.players) {
-          P.hasLamp = true;
-          P.flashlight = true;
-        }
-      }
-    }
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
