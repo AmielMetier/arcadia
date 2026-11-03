@@ -342,7 +342,7 @@ function detailDecal(kind, seed) {
   else if (kind === 'brindilles') spots(1, (a, b) => { for (let i = 0; i < 5; i++) p(a + i, b - (i >> 1), i % 2 ? '#8a6a40' : '#6e5230'); p(a + 2, b + 1, '#5a4228'); });
   return up2(c);
 }
-export const RELIEF = { biomes: ['terre', 'montagne', 'mer', 'magma', 'glace', 'lune'], cols: ['s0', 's1', 's2', 's3', 'w0', 'w1', 'w2', 't0', 't1', 'r0'] };
+export const RELIEF = { biomes: ['terre', 'montagne', 'mer', 'magma', 'glace', 'lune'], cols: ['s0', 's1', 's2', 's3', 'w0', 'w1', 'w2', 't0', 't1', 'r0', 'p00', 'p01', 'p02', 'p10', 'p11', 'p12', 'p20', 'p21', 'p22', 'f0', 'f1', 'f2', 'f3', 'n0', 'n1', 'n2', 'n3', 'l0', 'e0', 'l1', 'e1', 'l2', 'e2', 'q0', 'q1', 'q2', 'q3', 'q4', 'q5'] };
 export const HERBE_PIECES = ['a', 'b', 'c', 't', 'tl', 'tr', 'l', 'r', 'bot', 'bl', 'br', 'in_nw', 'in_ne', 'in_sw', 'in_se'];
 
 /* ---------------- atlas animé (eau, fleurs) ---------------- */
@@ -565,7 +565,7 @@ export function setArt({ kits = {}, sols = {}, sol32 = {}, hgss = {}, relief = n
   // sols à 16 px (PixelLab) : ils prennent la place des tuiles du tileset (agrandies ×2 comme les autres)
   const s = (k) => SOL32['s16_' + k];
   if (s('chemin_0')) {
-    const alias = { grass0: 'chemin_0', grass1: 'chemin_0', grass2: 'chemin_0', forest0: 'berge_15', forest1: 'chemin_0', path0: 'chemin_15', sand0: 'sable_15', pave0: 'pave_15',
+    const alias = { grass0: 'chemin_0', grass1: 'herbe_v1', grass2: 'chemin_0', forest0: 'berge_15', forest1: 'chemin_0', path0: 'chemin_15', sand0: 'sable_15', pave0: 'pave_15',
       snow0: 'neige_0', snow1: 'herbes_neige_0', ash0: 'cendre_0', ash1: 'cendre_0', ledge: 'rebord', bridgeNS: 'pont_ns', bridgeEW: 'pont_eo', stairs: 'escalier',
       cliffR: 'falaise', cave0: 'grotte', cave1: 'grotte', lava0: 'lave', deep0: 'profond' };
     for (const [k, v] of Object.entries(alias)) if (s(v)) SOL32[k] = s(v);

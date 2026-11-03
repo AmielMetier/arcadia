@@ -1,6 +1,52 @@
 # Journal des versions — Arcadia
 
+## 3.89 — 3 novembre 2026
+- **Odyssée** — Nouveaux décors, dessinés au pixel près :
+  - Les routes, villes et grottes ont un nouveau sol : herbe, fleurs, chemins et lacs varient d'un endroit à l'autre, plus de motifs qui se répètent.
+  - L'eau est animée : vaguelettes, reflets et écume qui vient lécher la berge. Nouveaux pontons sur pilotis.
+  - Les rebords qu'on saute ont l'aspect de HeartGold / SoulSilver.
+  - Le passage d'une zone à l'autre (neige, cendre, forêt, sable) se fait en douceur, sans frontière en ligne droite.
+  - Les villages ont des pavés de toutes tailles et couleurs, qui s'égaillent dans les chemins à l'entrée ; Métropole, Voltacité et Forge-Acier ont des rues en bitume avec trottoirs, et un escalier à leur entrée.
+  - On ne voit plus le vide au bord de la région : la mer, la forêt et les montagnes continuent au loin.
+  - Les entrées de grottes sont de vraies montagnes de roche avec une arche, et dedans la sortie s'éclaire de la lumière du jour.
+  - Nouveau panneau de route en bois, vu de trois quarts.
+- **Odyssée** — Corrections :
+  - Dans les grottes, le sol ne clignote plus à travers la roche et la roche ne déborde plus en carrés sur le sol.
+  - Au bord des grottes, on ne voit plus un grand aplat noir.
+
+## 3.88 — 3 novembre 2026
+- **Odyssée** — Arènes :
+  - En entrant dans une arène, le guide t'accueille, présente le Champion et te demande si tu es prêt.
+  - Si tu acceptes, les portes se ferment jusqu'à la victoire ou la défaite ; sinon, tu ressors pour te préparer.
+  - Le guide donne maintenant un conseil pour toutes les arènes, y compris celles des Terres du Sud.
+
+## 3.87 — 3 novembre 2026
+- **Odyssée** — Grottes :
+  - Le dessus des parois varie : fissures, cailloux, creux et gravier, comme le sol des grottes.
+  - Les falaises et les bords de roche alternent plusieurs dessins pour ne plus se répéter.
+  - Dans les coins rentrants, le dessus de la roche ne dépasse plus de la falaise.
+
+## 3.86 — 3 novembre 2026
+- **Odyssée** — Talents, Repousses et grottes :
+  - Chaque Pokémon a maintenant son vrai talent (Engrais, Statik, Lévitation, Intimidation, Turbo…), visible dans son résumé, et plus d'une centaine de talents agissent vraiment en combat.
+  - Deux Pokémon de la même espèce peuvent avoir des talents différents ; certains, plus rares, ont un talent caché.
+  - On peut utiliser plusieurs Repousses d'affilée : leurs pas s'additionnent et le sac reste ouvert.
+  - Quand un Repousse s'épuise, le jeu propose d'en utiliser un autre tout de suite.
+  - Les parois des grottes reprennent le style des jeux DS : plateaux de roche aux coins arrondis, bords en pente et petite falaise au pied.
+
+## 3.85 — 3 novembre 2026
+- **Odyssée** — Des grottes en vraie roche :
+  - Les parois ne sont plus des blocs carrés : la roche monte en pentes, avec des coins en biais et des terrasses, comme sur DS.
+  - Les montagnes autour des entrées de grottes ont des flancs inclinés et une vraie bouche en arche.
+  - Les rochers pointus se dressent sur le haut des parois, un peu moins nombreux.
+
 ## 3.84 — 3 novembre 2026
+- **Odyssée** — Décors et confort :
+  - Les grottes ont de vraies parois de roche, en gradins comme sur DS, hérissées de rochers pointus.
+  - Nouveaux chemins et nouvelle pelouse sur les routes et dans les villes, plus nets et moins pixelisés.
+  - Les rebords qu'on saute d'un seul côté ont un nouveau dessin.
+  - Après avoir battu le Champion, on peut revenir directement à l'entrée de l'arène.
+  - L'infirmière, le vendeur, ta mère et plusieurs habitants ont enfin leur propre visage dans les dialogues.
 - **Dogfight 3D** — Quatre vraies cartes, au relief réel : les îles Éoliennes (Lipari et Vulcano), Tenerife (le massif de Teno et les falaises de Los Gigantes), Kauai (la côte de Nā Pali) et les Lofoten (Reine et ses aiguilles). On choisit la carte dans les réglages du salon.
   - La zone de jeu fait 12 km de côté, avec un horizon qui porte jusqu'aux îles voisines.
   - Le sol a les vraies couleurs du lieu, vues par satellite, avec le grain de l'herbe et de la roche quand on passe au ras ; les fortes pentes sont en roche grise.
