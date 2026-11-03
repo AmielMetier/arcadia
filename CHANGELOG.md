@@ -1,5 +1,12 @@
 # Journal des versions — Arcadia
 
+## 3.80 — 3 novembre 2026
+- **Arcadia** — Les menus se pilotent à la manette (Xbox, PlayStation, Switch…), dans le Hub comme dans tous les jeux.
+  - La croix ou le stick gauche passe d'un bouton à l'autre, A valide, B revient en arrière, et gauche / droite règle les volumes.
+  - Ça marche sur l'accueil, dans le salon, sur l'écran de chargement (« C'est parti ! ») et dans les écrans de préparation des jeux (« Lancer la manche »…).
+  - Le bouton Vue / Share / Select ouvre et ferme le menu Arcadia : son, plein écran, retour au salon.
+  - En pleine partie, la manette reste au jeu : les menus ne réagissent que quand ils sont affichés.
+
 ## 3.79 — 3 novembre 2026
 - **Arcadia** — À plusieurs, le bouton « C'est parti ! » de l'écran de chargement attend que tous les joueurs du salon aient fini de charger le jeu : plus de départ en décalé.
   - En attendant, l'écran montre combien de joueurs sont prêts (« En attente… 2/4 ») et chez qui ça charge encore.
