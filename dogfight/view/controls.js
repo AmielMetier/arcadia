@@ -1,6 +1,6 @@
 // Commandes de Dogfight 3D : souris (l'instructeur suit le point visé), clavier (commandes directes), manette, tactile.
 // Le clavier et la souris marchent ensemble : tant qu'on appuie, on pilote soi-même ; en lâchant, l'avion garde son cap et remet les ailes à plat.
-import { ZONE_MAX, CENTER, CEILING, KEY_ATTACK, keyRamp, keyCurve } from '../engine/flight.js';
+import { ZONE_MAX, zoneDist, CEILING, KEY_ATTACK, keyRamp, keyCurve } from '../engine/flight.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const AIM_LAG = 0.07;      // lissage du point visé : efface les à-coups d'un trackpad (s)
@@ -12,7 +12,7 @@ export class FlightControls {
     this.surface = surface;
     this.keys = new Set();
     this.firing = false;
-    this.mslPulse = false; this.flarePulse = false;
+    this.mslPulse = false; this.flarePulse = false; this.abPulse = false;
     this.yaw = 0; this.pitch = 0; this.sYaw = 0; this.sPitch = 0; this.mouseUsed = 0; this.dirty = false;
     this.stickP = 0; this.stickR = 0; this.stickY = 0;
     this.sens = 1; this.invert = false; this.assist = true;
@@ -33,6 +33,7 @@ export class FlightControls {
       this.keys.add(e.code);
       if (e.code === 'KeyE') this.mslPulse = true;
       if (e.code === 'KeyF') this.flarePulse = true;
+      if (e.code === 'KeyR') this.abPulse = true;
     });
     on(window, 'keyup', (e) => this.keys.delete(e.code));
     on(window, 'blur', () => this.release());
@@ -65,7 +66,7 @@ export class FlightControls {
     on(window, 'touchend', endTouch); on(window, 'touchcancel', endTouch);
     if (touchBox) for (const b of touchBox.querySelectorAll('button[data-a]')) {
       const a = b.dataset.a;
-      on(b, 'pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.setTouch(); if (a === 'msl') this.mslPulse = true; else if (a === 'flare') this.flarePulse = true; else this.btn[a] = true; b.classList.add('on'); });
+      on(b, 'pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.setTouch(); if (a === 'msl') this.mslPulse = true; else if (a === 'flare') this.flarePulse = true; else if (a === 'ab') this.abPulse = true; else this.btn[a] = true; b.classList.add('on'); });
       const up = () => { if (this.btn[a] !== undefined) this.btn[a] = false; b.classList.remove('on'); };
       on(b, 'pointerup', up); on(b, 'pointerleave', up); on(b, 'pointercancel', up);
     }
@@ -90,12 +91,13 @@ export class FlightControls {
     if (rx || ry) { this.yaw -= rx * 1.6 * this.sens * dt; this.pitch = clamp(this.pitch - ry * 1.3 * this.sens * dt * (this.invert ? -1 : 1), -1.45, 1.45); this.dirty = true; }
     if (edge(0)) this.mslPulse = true;
     if (edge(2)) this.flarePulse = true;
+    if (edge(3)) this.abPulse = true;
     return { p: ly * (this.invert ? -1 : 1), r: lx, y: (b(15) ? 1 : 0) - (b(14) ? 1 : 0), boost: b(5), brake: b(6) || b(4), fire: b(7) };
   }
 
   // Les commandes de cette image. me : l'avion du joueur (pour recaler le point visé)
   sample(me, dt) {
-    const out = { p: 0, r: 0, y: 0, boost: false, brake: false, fire: false, msl: false, flare: false, free: false, ax: 0, ay: 0, az: 1 };
+    const out = { p: 0, r: 0, y: 0, boost: false, brake: false, fire: false, msl: false, flare: false, ab: false, free: false, ax: 0, ay: 0, az: 1 };
     const k = this.keys, has = (...c) => c.some((x) => k.has(x));
     if (!this.enabled) { if (me) { const a = this.aim(); out.ax = a.x; out.ay = a.y; out.az = a.z; } return out; }
     let keyP = (has('KeyS', 'ArrowDown') ? 1 : 0) - (has('KeyZ', 'KeyW', 'ArrowUp') ? 1 : 0);
@@ -110,15 +112,15 @@ export class FlightControls {
     out.boost = has('ShiftLeft', 'ShiftRight') || this.btn.boost;
     out.brake = has('KeyC', 'KeyX') || this.btn.brake;
     out.fire = this.firing || k.has('Space') || this.btn.fire;
-    out.free = k.has('KeyR') || !this.assist;
+    out.free = k.has('KeyV') || !this.assist;
     const pad = this.pollPad(dt);
     if (pad) { if (pad.p) pitch = pad.p; if (pad.r) roll = pad.r; if (pad.y) yaw = pad.y; out.boost = out.boost || pad.boost; out.brake = out.brake || pad.brake; out.fire = out.fire || pad.fire; }
     if (this.stick.id !== null) { pitch = this.stick.dy; roll = this.stick.dx; }
-    out.msl = this.mslPulse; out.flare = this.flarePulse; this.mslPulse = false; this.flarePulse = false;
+    out.msl = this.mslPulse; out.flare = this.flarePulse; out.ab = this.abPulse; this.mslPulse = false; this.flarePulse = false; this.abPulse = false;
     out.p = pitch; out.r = roll; out.y = yaw;
     // appui direct, ou instructeur repris hors zone : le point visé suit le nez, pour ne pas ramener l'avion en arrière au relâchement
     if (me) {
-      const direct = pitch !== 0 || roll !== 0 || yaw !== 0, forced = Math.hypot(me.x - CENTER, me.z - CENTER) > ZONE_MAX || me.y > CEILING;
+      const direct = pitch !== 0 || roll !== 0 || yaw !== 0, forced = zoneDist(me.x, me.z) > ZONE_MAX || me.y > CEILING;
       if (direct || forced || (!this.assist && !this.dirty)) this.aimFrom(me.fx, me.fy, me.fz);
     }
     const smooth = 1 - Math.exp(-dt / AIM_LAG);

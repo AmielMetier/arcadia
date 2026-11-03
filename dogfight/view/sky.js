@@ -4,7 +4,7 @@ import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { CLOUD_BASE } from '../engine/world.js';
 
 export const HAZE = new THREE.Color(0xb4c8da);
-export const FOG_DENSITY = 0.00024;
+export const FOG_DENSITY = 0.00014;
 export const SUN = new THREE.Vector3(0.72, 0.5, -0.32).normalize();
 
 export const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -63,10 +63,11 @@ function puffTexture() {
 export function buildClouds(scene, clouds) {
   const items = [];
   const add = (c, count) => {
+    const B = c.base ?? CLOUD_BASE;
     for (let p = 0; p < count; p++) {
       const a = hash(c.i, p + 10) * 6.283, rr = Math.sqrt(hash(c.i, p + 50)) * c.R, e = 1 - (rr / c.R) * (rr / c.R), up = Math.pow(hash(c.i, p + 90), 0.8);
       const sz = (c.R * 0.15 + 11) * (0.7 + hash(c.i, p + 130) * 0.9) * (1.15 - up * 0.5), h = e * c.H * up, ox = Math.cos(a) * rr, oz = Math.sin(a) * rr * 0.85, side = (ox * SUN.x + oz * SUN.z) / c.R;
-      items.push({ x: c.x + ox, y: CLOUD_BASE + sz * 0.42 + h, z: c.z + oz, s: sz, l: Math.max(0, Math.min(1, 0.22 + 0.72 * (h / c.H) + 0.22 * side)), rot: hash(c.i, p + 170) * 6.283, keep: hash(c.i, p + 210) });
+      items.push({ x: c.x + ox, y: B + sz * 0.42 + h, z: c.z + oz, s: sz, l: Math.max(0, Math.min(1, 0.22 + 0.72 * (h / c.H) + 0.22 * side)), rot: hash(c.i, p + 170) * 6.283, keep: hash(c.i, p + 210), b: B, low: c.base !== undefined });
     }
   };
   for (const c of clouds) add(c, c.bank ? 60 + Math.floor(c.R / 5) : 10 + Math.floor(c.R / 7));
@@ -74,13 +75,13 @@ export function buildClouds(scene, clouds) {
   const g = new THREE.InstancedBufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
   g.setIndex([0, 1, 2, 0, 2, 3]);
-  const ip = new Float32Array(n * 4), il = new Float32Array(n * 2);
-  g.setAttribute('iP', new THREE.InstancedBufferAttribute(ip, 4)); g.setAttribute('iL', new THREE.InstancedBufferAttribute(il, 2));
+  const ip = new Float32Array(n * 4), il = new Float32Array(n * 3);
+  g.setAttribute('iP', new THREE.InstancedBufferAttribute(ip, 4)); g.setAttribute('iL', new THREE.InstancedBufferAttribute(il, 3));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, fog: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-    uniforms: { uT: { value: puffTexture() }, uHaze: { value: HAZE }, uSun: { value: SUN }, uBase: { value: CLOUD_BASE } },
-    vertexShader: `attribute vec4 iP; attribute vec2 iL; uniform vec3 uSun; varying vec2 vU; varying vec2 vQ; varying float vL; varying float vF; varying float vY; varying float vNear; varying vec3 vSun; void main(){ vec4 mv=modelViewMatrix*vec4(iP.xyz,1.); float c=cos(iL.y),s=sin(iL.y); vec2 q=position.xy; vec2 r=vec2(q.x*c-q.y*s,q.x*s+q.y*c); mv.xy+=q*iP.w; vU=r*.5+.5; vQ=q; vL=iL.x; vec3 up=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]),ri=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]); vY=iP.y+(q.x*ri.y+q.y*up.y)*iP.w; vSun=normalize((viewMatrix*vec4(uSun,0.)).xyz); float d=length(mv.xyz); vF=1.-exp(-pow(d*.00024,1.5)); vNear=smoothstep(iP.w*.35,iP.w*1.6,d); gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: `uniform sampler2D uT; uniform vec3 uHaze; uniform float uBase; varying vec2 vU; varying vec2 vQ; varying float vL; varying float vF; varying float vY; varying float vNear; varying vec3 vSun; void main(){ vec4 t=texture2D(uT,vU); float b=uBase+(t.r-.5)*50.; float a=t.a*smoothstep(b-6.,b+26.,vY)*vNear; if(a<.006)discard; float r2=dot(vQ,vQ); vec3 n=normalize(vec3(vQ,sqrt(max(1.-r2,.04)))); float lam=dot(n,vSun)*.5+.5; lam+=(t.r-.5)*.55; float v=clamp(vL*.52+lam*.66-.1,0.,1.); vec3 shade=vec3(.17,.23,.34),mid=vec3(.5,.56,.66),lit=vec3(1.,.99,.97); vec3 c=v<.5?mix(shade,mid,v*2.):mix(mid,lit,(v-.5)*2.); c=mix(c,uHaze,vF*.9); a*=.92; gl_FragColor=vec4(c,1.);
+    uniforms: { uT: { value: puffTexture() }, uHaze: { value: HAZE }, uSun: { value: SUN } },
+    vertexShader: `attribute vec4 iP; attribute vec3 iL; uniform vec3 uSun; varying vec2 vU; varying vec2 vQ; varying float vL; varying float vF; varying float vY; varying float vB; varying float vNear; varying vec3 vSun; void main(){ vB=iL.z; vec4 mv=modelViewMatrix*vec4(iP.xyz,1.); float c=cos(iL.y),s=sin(iL.y); vec2 q=position.xy; vec2 r=vec2(q.x*c-q.y*s,q.x*s+q.y*c); mv.xy+=q*iP.w; vU=r*.5+.5; vQ=q; vL=iL.x; vec3 up=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]),ri=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]); vY=iP.y+(q.x*ri.y+q.y*up.y)*iP.w; vSun=normalize((viewMatrix*vec4(uSun,0.)).xyz); float d=length(mv.xyz); vF=1.-exp(-pow(d*.00024,1.5)); vNear=smoothstep(iP.w*.35,iP.w*1.6,d); gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `uniform sampler2D uT; uniform vec3 uHaze; varying vec2 vU; varying vec2 vQ; varying float vL; varying float vF; varying float vY; varying float vB; varying float vNear; varying vec3 vSun; void main(){ vec4 t=texture2D(uT,vU); float b=vB+(t.r-.5)*50.; float a=t.a*smoothstep(b-6.,b+26.,vY)*vNear; if(a<.006)discard; float r2=dot(vQ,vQ); vec3 n=normalize(vec3(vQ,sqrt(max(1.-r2,.04)))); float lam=dot(n,vSun)*.5+.5; lam+=(t.r-.5)*.55; float v=clamp(vL*.52+lam*.66-.1,0.,1.); vec3 shade=vec3(.17,.23,.34),mid=vec3(.5,.56,.66),lit=vec3(1.,.99,.97); vec3 c=v<.5?mix(shade,mid,v*2.):mix(mid,lit,(v-.5)*2.); c=mix(c,uHaze,vF*.9); a*=.92; gl_FragColor=vec4(c,1.);
       #include <colorspace_fragment>
       gl_FragColor=vec4(gl_FragColor.rgb*a,a);
     }`,
@@ -90,17 +91,20 @@ export function buildClouds(scene, clouds) {
   scene.add(mesh);
 
   const order = items.map((_, i) => i), dist = new Float32Array(n);
-  let frame = 0, shown = n;
+  let frame = 0, shown = n, density = 1, onlyLow = false;
+  const pick = () => { const list = items.map((it, i) => (it.keep <= density && (!onlyLow || it.low) ? i : -1)).filter((i) => i >= 0); order.length = 0; order.push(...list); shown = list.length; g.instanceCount = shown; frame = 0; };
   const api = {
     mesh, total: n,
-    setDensity(f) { const list = items.map((it, i) => (it.keep <= f ? i : -1)).filter((i) => i >= 0); order.length = 0; order.push(...list); shown = list.length; g.instanceCount = shown; frame = 0; },
+    setDensity(f) { density = f; pick(); },
+    // les nuages volumétriques dessinent les nuages d'altitude ; le banc bas reste en bouffées
+    setOnlyLow(v) { onlyLow = v; pick(); },
     setVisible(v) { mesh.visible = v; },
     update(cam) {
       if (frame++ % 20 || !mesh.visible) return;
       const cx = cam.x, cy = cam.y, cz = cam.z;
       for (let i = 0; i < n; i++) { const it = items[i]; dist[i] = (it.x - cx) ** 2 + (it.y - cy) ** 2 + (it.z - cz) ** 2; }
       order.sort((a, b) => dist[b] - dist[a]);
-      for (let k = 0; k < shown; k++) { const it = items[order[k]]; ip[k * 4] = it.x; ip[k * 4 + 1] = it.y; ip[k * 4 + 2] = it.z; ip[k * 4 + 3] = it.s; il[k * 2] = it.l; il[k * 2 + 1] = it.rot; }
+      for (let k = 0; k < shown; k++) { const it = items[order[k]]; ip[k * 4] = it.x; ip[k * 4 + 1] = it.y; ip[k * 4 + 2] = it.z; ip[k * 4 + 3] = it.s; il[k * 3] = it.l; il[k * 3 + 1] = it.rot; il[k * 3 + 2] = it.b; }
       g.attributes.iP.needsUpdate = true; g.attributes.iL.needsUpdate = true;
     },
     dispose() { g.dispose(); mat.dispose(); mat.uniforms.uT.value.dispose(); },
@@ -147,7 +151,7 @@ function noise3D(n) {
 export function buildVolumetric(renderer, clouds, { scale = 0.28, steps = 44, light = 2 } = {}) {
   const n3 = 48, t3 = new THREE.Data3DTexture(noise3D(n3), n3, n3, n3);
   t3.format = THREE.RedFormat; t3.type = THREE.UnsignedByteType; t3.wrapS = t3.wrapT = t3.wrapR = THREE.RepeatWrapping; t3.minFilter = t3.magFilter = THREE.LinearFilter; t3.unpackAlignment = 1; t3.needsUpdate = true;
-  const cover = coverageTexture(clouds);
+  const cover = coverageTexture(clouds.filter((c) => c.base === undefined));
   const TOP = CLOUD_BASE + 230;
   const size = new THREE.Vector2(); renderer.getDrawingBufferSize(size);
   const rt = new THREE.WebGLRenderTarget(Math.max(2, Math.round(size.x * scale)), Math.max(2, Math.round(size.y * scale)), { type: THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });

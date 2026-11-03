@@ -1,8 +1,10 @@
-// Scène de Dogfight 3D : rend la vraie île, le ciel, les avions et les effets, et gère la caméra de poursuite et la qualité.
+// Scène de Dogfight 3D : rend l'archipel et la vraie île d'Island Rush, le décor, le ciel, les avions et les effets, et gère la caméra de poursuite et la qualité.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { buildGround } from './ground.js';
+import { buildArchipelago } from './archipel.js';
+import { buildDecor } from './decor.js';
 import { buildSky, buildClouds, buildVolumetric, noiseTexture, HAZE, FOG_DENSITY, SUN } from './sky.js';
-import { buildPlane, loadPlanes, makeEnvironment } from './plane.js';
+import { buildPlane, loadPlanes, makeEnvironment, planeLength } from './plane.js';
 import { FxManager } from './fx.js';
 import { ZONE_CEIL } from '../engine/modes.js';
 
@@ -29,15 +31,19 @@ export class DogfightScene {
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(HAZE, FOG_DENSITY);
-    this.camera = new THREE.PerspectiveCamera(66, (container.clientWidth || innerWidth) / (container.clientHeight || innerHeight), 0.5, 14000);
+    this.camera = new THREE.PerspectiveCamera(66, (container.clientWidth || innerWidth) / (container.clientHeight || innerHeight), 0.5, 24000);
     this.scene.add(new THREE.HemisphereLight(0xcfe0f2, 0x5f6650, 1.05));
     const sun = new THREE.DirectionalLight(0xfff0dc, 2.4); sun.position.copy(SUN); this.scene.add(sun);
 
     this.noise = noiseTexture();
     this.sky = buildSky(this.scene, this.noise, () => this.camera);
-    this.ground = buildGround(this.scene, world.map, SUN, this.noise, this.renderer.capabilities.getMaxAnisotropy());
+    const aniso = this.renderer.capabilities.getMaxAnisotropy();
+    this.ground = buildGround(this.scene, world.map, SUN, this.noise, aniso);
+    this.archi = buildArchipelago(this.scene, { sun: SUN, deep: this.ground.deep, noiseTex: this.noise, anisotropy: aniso });
     this.clouds = buildClouds(this.scene, world.clouds);
     this.env = makeEnvironment(this.renderer, this.sky);
+    this.decor = buildDecor(this.scene, this.env);
+    this.lastDraw = 0;
     this.volumetric = null;
     this.ready = loadPlanes(this.env);
     this.fx = new FxManager(this.scene, this.camera);
@@ -67,12 +73,12 @@ export class DogfightScene {
     this.quality = QUALITY[q] ? q : 'moyen';
     this.prCap = Q.pr;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.prCap));
-    this.ground.trees.setDensity(Q.trees);
+    this.ground.trees.setDensity(Q.trees); this.archi.forest.setDensity(Q.trees); this.archi.setDetail(this.quality !== 'bas');
     if (Q.vol) {
       try { if (!this.volumetric) this.volumetric = buildVolumetric(this.renderer, this.world.clouds); } catch (e) { console.warn('Nuages volumétriques indisponibles :', e); this.volumetric = null; return this.setQuality('moyen'); }
-      this.clouds.setVisible(false);
+      this.clouds.setDensity(1); this.clouds.setOnlyLow(true);
     } else {
-      this.clouds.setVisible(true);
+      this.clouds.setOnlyLow(false);
       this.clouds.setDensity(Q.clouds);
     }
     this.resize();
@@ -112,9 +118,9 @@ export class DogfightScene {
     for (const p of list) {
       let m = this.planes.get(p.id);
       const col = p.tagColor || p.color;
-      if (!m || m.type !== p.type || m.col !== col) {
+      if (!m || m.type !== p.type || m.col !== col || (p.type === 'cargo' && m.model !== p.model)) {
         if (m) { this.scene.remove(m.root); m.dispose(); }
-        m = buildPlane(p.type, col); m.col = col; this.scene.add(m.root); this.planes.set(p.id, m);
+        m = buildPlane(p.type, col, p.model); m.col = col; this.scene.add(m.root); this.planes.set(p.id, m);
       }
       m.root.visible = p.alive && (p.inv <= 0 || Math.floor(this.fx.time * 10) % 2 === 0 || !p.alive);
       if (!p.alive) continue;
@@ -168,7 +174,7 @@ export class DogfightScene {
     }
     this.preview.root.visible = true;
     this.orbit += dt * 0.28;
-    const r = 24, { position: p } = this.preview.root;
+    const r = 24 * Math.max(1, planeLength(type) / 16), { position: p } = this.preview.root;
     this.preview.root.rotation.set(0, -0.9 + Math.sin(this.orbit * 0.7) * 0.08, Math.sin(this.orbit * 0.9) * 0.1);
     this.camera.position.set(p.x + Math.cos(this.orbit) * r, p.y + 6.5 + Math.sin(this.orbit * 0.6) * 2, p.z + Math.sin(this.orbit) * r);
     this.camera.up.set(0, 1, 0); this.camera.lookAt(p.x, p.y + 0.4, p.z);
@@ -179,7 +185,8 @@ export class DogfightScene {
 
   draw() {
     this.camera.updateMatrixWorld();
-    this.ground.update(this.camera.position);
+    const t = this.fx.time, dt = Math.min(0.1, t - this.lastDraw); this.lastDraw = t;
+    this.ground.update(this.camera.position); this.archi.update(this.camera.position, t); this.decor.update(dt);
     this.clouds.update(this.camera.position);
     if (this.volumetric) this.volumetric.pre(this.camera);
     this.renderer.render(this.scene, this.camera);
@@ -189,7 +196,7 @@ export class DogfightScene {
   dispose() {
     window.removeEventListener('resize', this.onResize);
     for (const m of this.planes.values()) m.dispose();
-    this.fx.dispose(); this.ground.dispose(); this.clouds.dispose();
+    this.fx.dispose(); this.ground.dispose(); this.archi.dispose(); this.decor.dispose(); this.clouds.dispose();
     if (this.volumetric) this.volumetric.dispose();
     this.noise.dispose(); this.env.dispose();
     this.renderer.dispose();

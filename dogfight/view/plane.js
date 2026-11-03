@@ -1,7 +1,8 @@
-// Les avions de Dogfight 3D : F-16 et F-22 chargés une fois, clonés par joueur, avec un modèle très simple au loin,
-// reflets du ciel, flamme de postcombustion, éclair du canon et couleur d'escadron.
+// Les avions de Dogfight 3D : F-16 et F-22 chargés une fois, les autres dessinés (models.js), clonés par joueur,
+// avec un modèle très simple au loin, reflets du ciel, flamme de postcombustion, éclair du canon et couleur d'escadron.
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
+import { DRAWN, CARGO, drawModel } from './models.js';
 
 // fins et tips : sommet des dérives et bouts d'ailes, relevés sur les modèles
 // nozzles : centre de chaque tuyère, un peu à l'intérieur pour que la flamme en sorte, et demi-largeur, demi-hauteur de son ouverture
@@ -10,7 +11,9 @@ const FILES = {
   f22: { url: 'f-22.glb', len: 18.99, fins: [[2.93, 1.93, -5.55], [-2.93, 1.93, -5.55]], tip: [6.7, -1.18, -3.7], nozzles: [[0.65, -1.1, -6.85, 0.42, 0.14], [-0.65, -1.1, -6.85, 0.42, 0.14]] },
 };
 // La bouche du canon, relevée sur les modèles : à gauche du fuselage sur le F-16, à droite sur le F-22
-export const GUNS = { f16: [0.52, 0.1, 3], f22: [-0.58, -0.2, 4], cargo: [0, 0, 0] };
+export const GUNS = { f16: [0.52, 0.1, 3], f22: [-0.58, -0.2, 4], cargo: [0, 0, 0], ...Object.fromEntries(Object.entries(DRAWN).map(([k, d]) => [k, d.gun])) };
+const DEFS = { ...FILES, ...DRAWN };
+export const planeLength = (type) => (DEFS[type] || FILES.f16).len;
 const FAR_LOD = 480;   // au-delà : modèle simple
 const templates = {};
 let skyEnv = null;
@@ -34,6 +37,7 @@ function prepare(gltf, def, env) {
 
 export function loadPlanes(env, onProgress) {
   skyEnv = env;
+  for (const [type, def] of Object.entries(DRAWN)) templates[type] = drawModel(def, env);
   const loader = new GLTFLoader();
   return Promise.all(Object.entries(FILES).map(([type, def]) => new Promise((resolve) => {
     loader.load(def.url, (gltf) => { templates[type] = prepare(gltf, def, env); if (onProgress) onProgress(type); resolve(); }, undefined, (err) => { console.warn(`Modèle ${def.url} indisponible, modèle simple utilisé :`, err); resolve(); });
@@ -78,31 +82,22 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffea70, transparent: tru
 const finGeo = new THREE.BoxGeometry(0.1, 0.2, 1);
 const tipGeo = new THREE.BoxGeometry(0.13, 0.08, 1.15);
 
-// Le transport d'Escorte : quatre moteurs à hélices, une aile haute, une grosse dérive. Nez sur +Z, comme les chasseurs
-let cargoParts = null;
-function cargoGeometry() {
-  if (cargoParts) return cargoParts;
-  const cyl = (r0, r1, len) => { const g = new THREE.CylinderGeometry(r0, r1, len, 12); g.rotateX(Math.PI / 2); return g; };
-  cargoParts = {
-    body: cyl(2.7, 2.7, 22), nose: cyl(0.9, 2.7, 5).translate(0, -0.25, 13.5), tail: cyl(2.7, 0.7, 9).translate(0, 0.9, -15.5),
-    wing: new THREE.BoxGeometry(42, 0.55, 6).translate(0, 2.7, 2), fin: new THREE.BoxGeometry(0.5, 8.5, 5.5).translate(0, 6, -17.5), stab: new THREE.BoxGeometry(15, 0.4, 3.6).translate(0, 1.4, -18),
-    pod: cyl(0.75, 0.95, 4.4), disc: new THREE.CircleGeometry(1.9, 18), glass: new THREE.BoxGeometry(2.8, 0.8, 1.7).translate(0, 1.2, 12.6),
+// Le transport d'Escorte, C-17 ou A400M selon la route ; sa dérive à la couleur du camp, ses hélices qui tournent
+function buildCargo(color, model) {
+  const def = CARGO[model] || CARGO.a400m, root = drawModel(def, skyEnv);
+  const band = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.55, emissive: new THREE.Color(color), emissiveIntensity: 0.3 });
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.6, 4.2), band); mark.position.fromArray(def.fin); root.add(mark);
+  const spin = root.userData.spin;
+  return {
+    root, type: 'cargo', model, setFiring() {},
+    setBoost(on, dt) { for (const g of spin) g.rotation.z += dt * 24 * g.userData.dir; },
+    dispose() { root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); },
   };
-  return cargoParts;
-}
-function buildCargo(color) {
-  const G = cargoGeometry(), root = new THREE.Group();
-  const hull = new THREE.MeshStandardMaterial({ color: 0xc2c9cf, roughness: 0.6, metalness: 0.1, envMap: skyEnv, envMapIntensity: 0.75 }), band = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.55, emissive: new THREE.Color(color), emissiveIntensity: 0.3 });
-  const blade = new THREE.MeshBasicMaterial({ color: 0x20252b, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }), dark = new THREE.MeshStandardMaterial({ color: 0x17222e, roughness: 0.2, metalness: 0.5, envMap: skyEnv });
-  const add = (g, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); root.add(o); return o; };
-  add(G.body, hull); add(G.nose, hull); add(G.tail, hull); add(G.wing, hull); add(G.fin, band); add(G.stab, hull); add(G.glass, dark);
-  for (const x of [-14, -7, 7, 14]) { add(G.pod, hull, x, 2.2, 3.8); add(G.disc, blade, x, 2.2, 6.1); }
-  return { root, type: 'cargo', setBoost() {}, setFiring() {}, dispose() { hull.dispose(); band.dispose(); blade.dispose(); dark.dispose(); } };
 }
 
-export function buildPlane(type, color) {
-  if (type === 'cargo') return buildCargo(color);
-  const def = FILES[type] || FILES.f16, tpl = templates[type] || templates.f16;
+export function buildPlane(type, color, model) {
+  if (type === 'cargo') return buildCargo(color, model);
+  const def = DEFS[type] || FILES.f16, tpl = templates[type] || templates.f16;
   const root = new THREE.Group(), lod = new THREE.LOD();
   root.add(lod);
   const near = new THREE.Group();

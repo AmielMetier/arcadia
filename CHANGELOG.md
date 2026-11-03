@@ -1,5 +1,22 @@
 # Journal des versions — Arcadia
 
+## 3.84 — 3 novembre 2026
+- **Dogfight 3D** — Quatre vraies cartes, au relief réel : les îles Éoliennes (Lipari et Vulcano), Tenerife (le massif de Teno et les falaises de Los Gigantes), Kauai (la côte de Nā Pali) et les Lofoten (Reine et ses aiguilles). On choisit la carte dans les réglages du salon.
+  - La zone de jeu fait 12 km de côté, avec un horizon qui porte jusqu'aux îles voisines.
+  - Les couleurs suivent le terrain : forêts dans les vallons, roche sur les pentes, sable sur les plages, neige sur les sommets des Lofoten, et des milliers d'arbres.
+  - Chaque carte a sa base aérienne, avec sa piste et ses hangars tournés vers elle.
+- **Dogfight 3D** — Quatre nouveaux chasseurs : Rafale, Su-35, F/A-18 et A-10. Chaque avion a sa capacité, prête toutes les 35 secondes (touche R, bouton Y à la manette) :
+  - F-16 Surcharge (canon sans surchauffe et plus rapide), F-22 Furtivité (impossible à accrocher, invisible au radar), Rafale Salve (deux missiles d'un coup), Su-35 Cobra (cabré brutal qui fait passer le poursuivant devant), F/A-18 Brouilleur (les missiles autour de toi décrochent), A-10 Brrrt (canon à dégâts doublés).
+  - Le roulis libre passe sur V.
+- **Dogfight 3D** — Missiles et leurres à volonté, avec un temps de recharge : 20 secondes pour le missile, 15 pour les leurres.
+  - Un missile fait 70 de dégâts et demande toujours d'accrocher la cible. Un leurre fait décrocher un missile 7 fois sur 10.
+  - Sous 50 m du sol, personne ne peut t'accrocher : le rase-mottes devient une vraie défense.
+  - En bas à droite, quatre cases montrent canon, missile, leurres et capacité, avec leur recharge. Tout est prêt à chaque réapparition.
+- **Dogfight 3D** — Escorte refaite : le transport (un C-17 ou un A400M) suit un vrai trajet d'île en île, au ras de l'eau, entre les montagnes et à travers les nuages, puis se pose sur la piste.
+  - Trois trajets par carte, selon la durée de la partie (5, 8 ou 10 minutes).
+  - Les assaillants n'ont que 5 vies chacun : s'ils tombent tous, les défenseurs gagnent aussi.
+- **Dogfight 3D** — De vrais sons : réacteur et postcombustion enregistrés, canon, départ de missile, explosions, leurres, et le transport qu'on entend venir de loin.
+
 ## 3.83 — 3 novembre 2026
 - **Odyssée** — Corrections :
   - En entrant dans un bâtiment, l'écran ne reste plus noir : le cercle se referme puis se rouvre proprement, comme sur DS.
