@@ -8,10 +8,15 @@ export const LEVEL1_SIZE = 56;
 export const LEVEL1_CEIL = 4.2; // plafond plus haut qu'au Level 0
 
 // caisses et cartons posés dans les allées (modèles Kenney du manoir) : nom, hauteur, rayon de collision
+// caisses et matériel abandonnés dans les allées (modèles Poly Haven, CC0)
 export const L1_PROPS = [
-  { m: 'cardboardBoxClosed', h: 0.6, r: 0.38 },
-  { m: 'cardboardBoxOpen', h: 0.55, r: 0.38 },
-  { m: 'trashcan', h: 0.6, r: 0.24 },
+  { m: 'wooden_crate_01', h: 0.62, r: 0.38 },
+  { m: 'cardboard_box_01', h: 0.5, r: 0.36 },
+  { m: 'Barrel_01', h: 0.9, r: 0.3 },
+  { m: 'propane_tank', h: 0.8, r: 0.2 },
+  { m: 'plastic_crate_01', h: 0.36, r: 0.3 },
+  { m: 'hand_truck', h: 1.15, r: 0.32 },
+  { m: 'trashbag', h: 0.5, r: 0.3 },
 ];
 
 export function createWarehouseMap(seed = 7) {

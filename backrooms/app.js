@@ -597,6 +597,15 @@ function loop(currentTime) {
   if (scene) {
     scene.render(sim, currentTime / 1000);
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
+    if (sfx) {
+      // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
+      const P = sim.player;
+      const tired = 1 - P.stamina / 100;
+      const run = P.running && P.moving ? 0.45 + tired * 0.55 : 0;
+      const pant = tired > 0.2 ? ((tired - 0.2) / 0.8) * 0.85 : 0;
+      const fear = sim.hasMonster ? sim.monster.danger * 0.35 : 0;
+      sfx.setBreath(P.status === 'alive' && sim.state === 'playing' && !paused ? Math.max(run, pant, fear) : 0);
+    }
   }
   if (hud) {
     hud.update(sim, sim.time, delta);

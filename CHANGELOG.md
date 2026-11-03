@@ -1,5 +1,13 @@
 # Journal des versions — Arcadia
 
+## 3.95 — 3 novembre 2026
+- **The Backrooms** — plus sombre, plus vrai, et on entend son propre souffle.
+  - Les couloirs sont plus sombres : davantage de néons morts ou qui grésillent, et un vrai noir loin des lampes. La lampe torche devient indispensable.
+  - Quand tu sprintes, tu entends ton souffle s'emballer ; il reste haletant le temps de reprendre ton endurance, et s'accélère quand l'entité approche.
+  - De vrais objets abandonnés, photographiés : cartons, chaises d'école et chaises en plastique renversées, bureaux métalliques, vieilles télés cathodiques, sacs poubelle, panneaux « sol glissant ».
+  - Sur les murs : prises électriques, détecteurs incendie, boîtiers électriques et horloges arrêtées ; au plafond, des grilles d'aération.
+  - Dans l'entrepôt du Level 1 : caisses en bois, bidons rouges, bouteilles de gaz, caisses en plastique, diables et sacs poubelle entre les étagères.
+
 ## 3.94 — 3 novembre 2026
 - **The Backrooms** — plus de table au départ : chacun commence avec sa lampe torche déjà allumée, dans la case 1 de l'inventaire.
 

@@ -75,14 +75,15 @@ export function carveElevator(grid, W, H, entrance, spawn, rnd, avoid = null) {
 }
 
 // meubles abandonnés (modèles Kenney du manoir) : nom, hauteur en m, rayon de collision
+// Objets abandonnés du Level 0 (modèles Poly Haven, CC0, dans backrooms/models/) ; chair : posée de travers, parfois renversée
 export const PROP_KINDS = [
-  { m: 'cardboardBoxClosed', h: 0.55, r: 0.35 },
-  { m: 'cardboardBoxOpen', h: 0.5, r: 0.35 },
-  { m: 'chairDesk', h: 1.0, r: 0.3 },
-  { m: 'trashcan', h: 0.55, r: 0.22 },
-  { m: 'desk', h: 0.8, r: 0.6 },
-  { m: 'sideTableDrawers', h: 0.75, r: 0.35 },
-  { m: 'bookcaseClosedDoors', h: 1.9, r: 0.5 },
+  { m: 'cardboard_box_01', h: 0.42, r: 0.32 },
+  { m: 'SchoolChair_01', h: 0.86, r: 0.3, chair: true },
+  { m: 'plastic_monobloc_chair_01', h: 0.8, r: 0.3, chair: true },
+  { m: 'metal_office_desk', h: 0.76, r: 0.6 },
+  { m: 'Television_01', h: 0.45, r: 0.3 },
+  { m: 'trashbag', h: 0.5, r: 0.3 },
+  { m: 'WetFloorSign_01', h: 0.62, r: 0.22 },
 ];
 
 // opts.lower : étage du bas (pas de couloir piégé, de renfoncement ni d'échelle) ; opts.forced : cases qui doivent
@@ -440,8 +441,8 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       const nearSpawn = Math.hypot(x - sx, z - sz) < 7;
       const v = zone(x, z);
       let state = 'on';
-      if (!nearSpawn && v < 0.4) state = 'off';
-      else if (!nearSpawn && (v < 0.5 || rnd() < 0.08)) state = 'flicker';
+      if (!nearSpawn && v < 0.46) state = 'off';
+      else if (!nearSpawn && (v < 0.56 || rnd() < 0.1)) state = 'flicker';
       lights.push({
         x: (x + 0.5) * CELL_SIZE,
         y: WALL_HEIGHT - 0.02,
@@ -474,8 +475,8 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       r: kind.r,
       x: (c.x + 0.5) * CELL_SIZE + wall[0] * off + (rnd() - 0.5) * 0.3,
       z: (c.z + 0.5) * CELL_SIZE + wall[1] * off + (rnd() - 0.5) * 0.3,
-      rot: rot + (kind.m === 'chairDesk' ? (rnd() - 0.5) * 2 : (rnd() - 0.5) * 0.25),
-      tipped: kind.m === 'chairDesk' && rnd() < 0.3,
+      rot: rot + (kind.chair ? (rnd() - 0.5) * 2 : (rnd() - 0.5) * 0.25),
+      tipped: !!kind.chair && rnd() < 0.3,
     });
   }
   const bottles = [];

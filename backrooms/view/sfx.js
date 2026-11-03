@@ -2,6 +2,8 @@
 // Bourdonnement strident et glitché qui s'amplifie à l'approche de l'entité
 
 const VOICE = new URL('../monster/david.mp3', import.meta.url).href;
+// souffle haletant (« breathing tired » de mikeask, OpenGameArt, CC0)
+const BREATH = new URL('../sfx/souffle.mp3', import.meta.url).href;
 
 export class BackroomsSfx {
   constructor() {
@@ -152,6 +154,34 @@ export class BackroomsSfx {
     whine.start();
     wob.start();
     room.start();
+  }
+
+  // Ton souffle : il s'emballe quand tu sprintes, reste haletant tant que tu n'as pas récupéré, et la peur
+  // l'accélère quand l'entité approche (level de 0 à 1)
+  setBreath(level) {
+    if (!this.unlocked || !this.ctx) return;
+    const c = this.ctx;
+    if (!this.breathGain) {
+      this.breathGain = c.createGain();
+      this.breathGain.gain.value = 0;
+      this.breathGain.connect(this.out);
+      fetch(BREATH)
+        .then((r) => r.arrayBuffer())
+        .then((b) => c.decodeAudioData(b))
+        .then((buf) => {
+          const src = c.createBufferSource();
+          src.buffer = buf;
+          src.loop = true;
+          src.connect(this.breathGain);
+          src.start();
+          this.breathSrc = src;
+        })
+        .catch(() => {});
+    }
+    const t = c.currentTime;
+    this.breathGain.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.55, t, level > 0.05 ? 0.35 : 0.8);
+    // plus essoufflé, plus rapide
+    if (this.breathSrc) this.breathSrc.playbackRate.setTargetAtTime(0.9 + Math.min(1, level) * 0.25, t, 0.5);
   }
 
   // Le grésillement suit les néons autour de toi (light : la lumière reçue là où tu es, 0 dans le noir)

@@ -5,18 +5,18 @@
 // dessous par les trous et les cages d'escalier. L'image finale passe par le filtre de vieille caméra (vhs.js).
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
-import { CELL_SIZE, WALL_HEIGHT, T, PROP_KINDS, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engine/map.js';
+import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engine/map.js';
 import { FUSES } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 
-const MODELS = new URL('../../mystery/models/meubles/', import.meta.url).href;
+const MODELS = new URL('../models/', import.meta.url).href; // modèles Poly Haven (CC0), voir models/LICENSE.txt
 export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href; // ?v : image plus nette, ne pas garder l'ancienne en cache
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
 export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400 };
 
 const LIGHT_R = 2.6; // portée d'un néon, en cases
-const AMBIENT = 0.015; // lumière minimale dans les zones mortes
+const AMBIENT = 0.006; // lumière minimale dans les zones mortes (presque le noir complet)
 const RB = 4; // finesse de l'éclairage cuit : texels par case (des flaques de lumière rondes, des ombres nettes au coin des murs)
 const AO_R = 0.8; // portée de l'ombre de contact au pied des murs, en mètres
 const SLAB = FLOOR_DY - WALL_HEIGHT; // épaisseur de la dalle entre deux étages
@@ -174,7 +174,7 @@ export function createBackroomsScene(container, floors) {
       live.set(base);
       for (const f of flickers) if (f.k > 0) addPrint(live, f.fp, f.k);
       for (let i = 0; i < BW * BH; i++) {
-        const v = Math.min(1, AMBIENT * (power ? 1 : 0.25) + live[i] * 0.36 * power); // stocké à moitié : jusqu'à 2 de lumière
+        const v = Math.min(1, AMBIENT * (power ? 1 : 0.25) + live[i] * 0.3 * power); // stocké à moitié : jusqu'à 2 de lumière
         bakeData[i * 4] = Math.round(v * 255);
       }
       bakeTex.needsUpdate = true;
@@ -323,17 +323,19 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     fixtures.instanceMatrix.needsUpdate = true;
     group.add(fixtures);
 
-    // 5. Meubles abandonnés (modèles Kenney CC0 du manoir de Mystère Mystère), un InstancedMesh par morceau
+    // 5. Objets abandonnés (modèles Poly Haven CC0), un InstancedMesh par morceau ; leur photo de couleur est gardée
     const propMats = new Map();
     const propMat = (src) => {
-      const key = src.color ? src.color.getHexString() : 'x';
+      const key = src.uuid;
       if (!propMats.has(key)) {
-        const c = src.color ? src.color.clone().multiplyScalar(0.62) : new THREE.Color('#888');
-        propMats.set(key, baked(new THREE.MeshLambertMaterial({ color: c })));
+        const c = src.color ? src.color.clone().multiplyScalar(0.8) : new THREE.Color('#888');
+        if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
+        propMats.set(key, baked(new THREE.MeshLambertMaterial({ color: c, map: src.map || null, side: src.side })));
       }
       return propMats.get(key);
     };
-    for (const kind of PROP_KINDS) {
+    const kinds = new Map(map.props.map((p) => [p.m, { m: p.m, h: p.h }]));
+    for (const kind of kinds.values()) {
       const list = map.props.filter((p) => p.m === kind.m);
       if (!list.length) continue;
       loader.load(MODELS + kind.m + '.glb', (g) => {
@@ -356,6 +358,90 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
           const src = Array.isArray(o.material) ? o.material[0] : o.material;
           const inst = new THREE.InstancedMesh(o.geometry, propMat(src), list.length);
           place.forEach((m, i) => inst.setMatrixAt(i, m.clone().multiply(o.matrixWorld)));
+          inst.instanceMatrix.needsUpdate = true;
+          inst.frustumCulled = false;
+          group.add(inst);
+        });
+      }, undefined, () => {});
+    }
+
+    // 5b. Ce qui est fixé aux murs et au plafond : prises électriques, détecteurs incendie, boîtiers électriques,
+    // horloges arrêtées, grilles d'aération. Tirés d'une graine propre à l'étage (même décor chez tout le monde).
+    let ds = 1234567 + fi * 7919 + (map.level || 0) * 104729 + (map.spawn ? Math.round(map.spawn.x * 13 + map.spawn.z * 7) : 0);
+    const drnd = () => ((ds = (ds * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const pitCells = new Set((map.pits || []).map((p) => Math.floor(p.z / CELL_SIZE) * W + Math.floor(p.x / CELL_SIZE)));
+    const stairCells = new Set((map.stairs || []).map((st) => st.gz * W + st.gx));
+    const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [] };
+    const ceilSpots = [];
+    const rates = L1 ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0 } : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004 };
+    const heights = { outlet: 0.32, fire_alarm: 2.15, power_box_01: 1.35, wall_clock: 2.25 };
+    for (let z = 0; z < H; z++) {
+      for (let x = 0; x < W; x++) {
+        const i = z * W + x;
+        if (map.grid[i] === T.WALL || pitCells.has(i) || stairCells.has(i)) continue;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx;
+          const nz = z + dz;
+          if (nx < 0 || nz < 0 || nx >= W || nz >= H || map.grid[nz * W + nx] !== T.WALL) continue;
+          for (const k in rates) {
+            if (drnd() >= rates[k]) continue;
+            const along = (drnd() - 0.5) * (CELL_SIZE - 0.8);
+            wallSpots[k].push({
+              x: (x + 0.5) * CELL_SIZE + dx * (CELL_SIZE / 2 - 0.004) + (dz ? along : 0),
+              z: (z + 0.5) * CELL_SIZE + dz * (CELL_SIZE / 2 - 0.004) + (dx ? along : 0),
+              rot: Math.atan2(-dx, -dz), // l'objet regarde la pièce
+            });
+            break;
+          }
+        }
+        if (!L1 && drnd() < 0.045) ceilSpots.push({ x: (x + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, z: (z + 0.5) * CELL_SIZE + (drnd() - 0.5) * 1.2, rot: drnd() < 0.5 ? 0 : Math.PI / 2 });
+      }
+    }
+    // prises : une petite plaque blanche jaunie à deux trous
+    if (wallSpots.outlet.length) {
+      const om = baked(new THREE.MeshLambertMaterial({ map: textures.outlet }));
+      const outlets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.075, 0.115, 0.012), om, wallSpots.outlet.length);
+      wallSpots.outlet.forEach((s, i) => {
+        dummy.position.set(s.x, heights.outlet, s.z);
+        dummy.rotation.set(0, s.rot, 0);
+        dummy.updateMatrix();
+        outlets.setMatrixAt(i, dummy.matrix);
+      });
+      dummy.rotation.set(0, 0, 0);
+      outlets.instanceMatrix.needsUpdate = true;
+      group.add(outlets);
+    }
+    // grilles d'aération du faux plafond
+    if (ceilSpots.length) {
+      const vm = baked(new THREE.MeshLambertMaterial({ map: textures.vent }));
+      const vents = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.6, 0.6), vm, ceilSpots.length);
+      ceilSpots.forEach((s, i) => {
+        dummy.position.set(s.x, CEIL - 0.006, s.z);
+        dummy.rotation.set(Math.PI / 2, 0, s.rot);
+        dummy.updateMatrix();
+        vents.setMatrixAt(i, dummy.matrix);
+      });
+      dummy.rotation.set(0, 0, 0);
+      vents.instanceMatrix.needsUpdate = true;
+      group.add(vents);
+    }
+    // modèles collés au mur (leur dos est à z = 0 et ils regardent +z)
+    for (const name of ['fire_alarm', 'power_box_01', 'wall_clock']) {
+      const spots = wallSpots[name];
+      if (!spots.length) continue;
+      loader.load(MODELS + name + '.glb', (g) => {
+        const root = g.scene;
+        root.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(root);
+        const fix = new THREE.Matrix4().makeTranslation(0, 0, -box.min.z);
+        root.traverse((o) => {
+          if (!o.isMesh) return;
+          const src = Array.isArray(o.material) ? o.material[0] : o.material;
+          const inst = new THREE.InstancedMesh(o.geometry, propMat(src), spots.length);
+          spots.forEach((s, i) => {
+            const m = new THREE.Matrix4().makeTranslation(s.x, heights[name], s.z).multiply(new THREE.Matrix4().makeRotationY(s.rot)).multiply(fix);
+            inst.setMatrixAt(i, m.multiply(o.matrixWorld));
+          });
           inst.instanceMatrix.needsUpdate = true;
           inst.frustumCulled = false;
           group.add(inst);
@@ -1037,7 +1123,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const fv = floorViews[P.floor || 0];
       lightNow = fv ? fv.lightAt(P.x, P.z) : 0.5;
       const lightHere = lightNow + (flashLight.visible ? 0.3 : 0);
-      const wantExp = THREE.MathUtils.clamp(0.62 / (0.12 + lightHere), 1.0, 2.3);
+      const wantExp = THREE.MathUtils.clamp(0.5 / (0.12 + lightHere), 0.95, 1.8);
       exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
       vhs.render(scene, camera, time, danger * calm, exposure);
     },

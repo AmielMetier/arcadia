@@ -396,5 +396,45 @@ export function createBackroomsTextures(level = 0) {
   const lamp = tex(lampCanvas);
   lamp.wrapS = lamp.wrapT = THREE.ClampToEdgeWrapping;
 
-  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, lamp, ready };
+  // Prise électrique : plaque jaunie, deux trous ronds
+  const [outCanvas, octx] = canvas(64, 96);
+  octx.fillStyle = '#e4dcc4';
+  octx.fillRect(0, 0, 64, 96);
+  octx.strokeStyle = 'rgba(80, 70, 50, 0.5)';
+  octx.lineWidth = 3;
+  octx.strokeRect(2, 2, 60, 92);
+  octx.fillStyle = '#d6ccb0';
+  octx.beginPath();
+  octx.arc(32, 48, 17, 0, Math.PI * 2);
+  octx.fill();
+  octx.fillStyle = '#1c1a16';
+  for (const x of [25, 39]) {
+    octx.beginPath();
+    octx.arc(x, 48, 3.2, 0, Math.PI * 2);
+    octx.fill();
+  }
+  octx.fillStyle = '#8a8270';
+  octx.fillRect(30, 12, 4, 4);
+  octx.fillRect(30, 80, 4, 4);
+  noise(octx, 64, 96, 10);
+  const outlet = tex(outCanvas);
+  outlet.wrapS = outlet.wrapT = THREE.ClampToEdgeWrapping;
+
+  // Grille d'aération du faux plafond : lames grises et poussière noire entre elles
+  const [ventCanvas, vtctx] = canvas(128);
+  vtctx.fillStyle = '#c9c4b2';
+  vtctx.fillRect(0, 0, 128, 128);
+  vtctx.fillStyle = '#9b9584';
+  vtctx.fillRect(6, 6, 116, 116);
+  for (let y = 12; y < 118; y += 9) {
+    vtctx.fillStyle = '#26241e';
+    vtctx.fillRect(12, y, 104, 4);
+    vtctx.fillStyle = '#d5d0bf';
+    vtctx.fillRect(12, y + 4, 104, 2);
+  }
+  noise(vtctx, 128, 128, 16);
+  const vent = tex(ventCanvas);
+  vent.wrapS = vent.wrapT = THREE.ClampToEdgeWrapping;
+
+  return { wall, carpet, ceiling, vhs, exit, sign, label, steel, crate, fog, lamp, outlet, vent, ready };
 }
