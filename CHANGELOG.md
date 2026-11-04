@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.10 — 4 novembre 2026
+- Perfections visuelles 16:10 et alignement pixel-art du Registre Ami C-Gear (v4.09) (Amiel)
+
 ## 4.09 — 4 novembre 2026
 - **Odyssée** — Visualisation des Joueurs Connectés en direct & Registre Ami B2W2 C-Gear 5G :
   - **Affichage en direct du nombre de joueurs connectés** :
