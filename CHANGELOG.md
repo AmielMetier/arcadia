@@ -1,10 +1,40 @@
 # Journal des versions — Arcadia
 
-## 3.96 — 4 novembre 2026
+## 3.98 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
-  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « SORTIE ? » et sa flèche, jours comptés en bâtons, « NE COURS PAS » à la peinture qui coule, maisons d'enfant, mains sales.
+  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « EXIT ? » et sa flèche, jours comptés en bâtons, « DON'T RUN » à la peinture qui coule (tout ce qui est écrit sur les murs est en anglais), maisons d'enfant, mains sales.
+
+## 3.97 — 4 novembre 2026
+- **Odyssée** — Mode Spectateur des combats PvP en direct :
+  - **Observation en temps réel des duels en cours** : les dresseurs du monde multijoueur peuvent désormais assister en direct aux combats opposant deux autres joueurs dans la région.
+  - **Détection des combats sur la carte & tags dynamiques** :
+    - Les dresseurs en combat affichent une étiquette animée au-dessus de leur personnage indiquant `⚔️ vs [Adversaire]`.
+    - Interagir avec un dresseur en combat ouvre une boîte de dialogue proposant : *« [Dresseur] affronte [Adversaire] en combat ! Que veux-tu faire ? »* avec les choix **Regarder le combat**, **Sa fiche**, ou **Rien**.
+  - **Section Duels en direct dans le Journal des Trophées** :
+    - La liste des affrontements en cours dans la région apparaît au sommet de l'onglet Historique (`TROPHÉES` ou touche `T`), avec pastille animée `● EN DIRECT` et bouton `👁️ Regarder` pour rejoindre instantanément le combat.
+  - **Rejoindre en cours de match & synchronisation fidèle** :
+    - L'hôte sérialise instantanément l'état actuel du combat (`spec_init` : météo, tours écoulés, Pokémon actifs, barres de PV, statuts, décors et arènes) pour tout spectateur rejoignant en cours de match.
+    - Diffusion en direct des animations de chaque tour (`spec_ev` : attaques, dégâts, animations, changements de Pokémon, K.O.) et notification de fin de duel (`spec_end`).
+    - Confidentialité préservée : les IVs, EVs et caractéristiques secrètes des équipes restent privées.
+  - **Interface spectateur immersive (`BattleView.runSpectate`)** :
+    - Bannière supérieure affichant `[● EN DIRECT] Nom1 vs Nom2` et bouton de sortie `[✕ Quitter]`.
+    - Nom des dresseurs intégré aux jauges de vie (`[Alice] : Pikachu` vs `[Bob] : Carapuce`).
+    - Sortie propre et fluide à tout moment (touche Échap / B ou clic sur Quitter) pour regagner le monde sans perturber les deux combattants.
+  - **Tests unitaires & d'intégration** :
+    - Nouvelle suite `tools/test-spectate-battle.mjs` validant le protocole réseau `Link`, la déduplication des duels actifs, l'export des Pokémon spectateurs et le rendu HUD.
+
+## 3.96 — 4 novembre 2026
+- **Odyssée** — Talents signatures exclusifs pour les 3 familles de starters originaux (options 1C, 2B, 3C) :
+  - **Halo Sylvestre** (*Capyousse* #1001, *Capyflore* #1002, *Capysaule* #1003) :
+    - À son entrée au combat, la douce lueur du Pokémon apaise l'ennemi et baisse son Attaque Spéciale d'un cran (-1 Atq Spé, équivalent spécial d'Intimidation).
+  - **Cire Brûlante** (*Mèchelet* #1004, *Ciroulet* #1005, *Lustrelle* #1006) :
+    - Tout contact physique avec le Pokémon projette de la cire chaude sur l'attaquant : baisse systématiquement la Vitesse de l'assaillant d'un cran (-1 Vit) avec 30% de chances de brûlure directe.
+  - **Cœur Vaillant** (*Narvi* #1007, *Narvalier* #1008, *Narvaillant* #1009) :
+    - Animé par une bravoure héroïque, son Attaque augmente d'un cran (+1 Atq) dès son entrée en jeu, et il est immunisé contre la peur (*flinch*) et les baisses d'Attaque (notamment l'Intimidation adverse).
+  - Intégration complète dans le moteur de combat (`core/battle.js`), le registre des talents (`data/talents.js`, `data/abilities.js`), l'écran résumé d'équipe et le stockage PC.
+  - Suite de tests unitaires `tools/test-starters-talents.mjs` validant l'attribution des talents et les effets en combat (38 vérifications réussies).
 
 ## 3.95 — 4 novembre 2026
 - **Arcadia** — Les comptes peuvent recevoir le grade VIP, qui donnera accès à des jeux et des modes de jeu réservés. Il n'y en a pas encore : ils arriveront plus tard. Un compte VIP l'affiche sous son nom (« ⭐ VIP »).
@@ -25,6 +55,9 @@
     - Double barre de filtrage ergonomique : navigation par catégorie thématique (*Toutes*, *⚔️ PvP*, *🗺️ Aventure*, *📖 Pokédex*, *⚡ Entraînement*, *🧭 Exploration*, *🏰 Domaine*) et par rang (*Tous rangs*, *À Réclamer*, *Débloquées*, *Bronze*, *Argent*, *Or*, *Platine*).
     - Badges de catégorie dédiés affichés sur chaque carte de médaille.
     - Évaluation automatique `checkAllTrophies(st)` lors de l'ouverture du journal, des remises de badges et des sauvegardes.
+  - **Correctif chargement** :
+    - Initialisation sécurisée du compteur de trophées dans le HUD (`getPvpSummary(st)` avec fallbacks) éliminant l'erreur au chargement initial du monde (`trUnlocked is not defined`).
+    - Suite de tests unitaires dédiée `tools/test-hud-update.mjs` validant le rendu du HUD sur états de sauvegarde neufs ou existants.
   - **Tests & Robustesse** :
     - Suite de tests unitaires et d'intégration `tools/test-trophies-system.mjs` validant à 100% les 32 trophées, les déblocages non-PvP et le contrôle strict d'attribution d'une unique Master Ball.
 

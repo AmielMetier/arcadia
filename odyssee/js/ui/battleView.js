@@ -337,7 +337,10 @@ export class BattleView {
     }
     h.style.visibility = '';
     const g = m.gender === 'm' ? '<span class="g m">♂</span>' : m.gender === 'f' ? '<span class="g f">♀</span>' : '';
-    h.querySelector('.bh-name').innerHTML = esc(monName(m)) + g;
+    const trainerTag = this.spectator && this.battle?.sides?.[side]?.name
+      ? `<span class="bh-trainer-tag">${esc(this.battle.sides[side].name)} :</span> `
+      : '';
+    h.querySelector('.bh-name').innerHTML = trainerTag + esc(monName(m)) + g;
     h.querySelector('.bh-lv').textContent = 'N.' + m.lvl;
     const typesEl = h.querySelector('.bh-types');
     if (typesEl) {
@@ -411,6 +414,159 @@ export class BattleView {
     await wait(300);
     return battle.result;
   }
+
+  /* ---------------- mode spectateur en direct ---------------- */
+  async runSpectate(specSession, o = {}) {
+    const p0 = specSession.p0, p1 = specSession.p1;
+    const b = {
+      pvp: true,
+      spectator: true,
+      state: 'choose',
+      weather: specSession.weather || 'none',
+      weatherTurns: specSession.weatherTurns || 0,
+      turn: specSession.turn || 0,
+      sides: [
+        {
+          name: p0.name,
+          trainer: { cls: 'Dresseur', name: p0.name, bs: p0.bs || 'calem', prize: 0 },
+          party: p0.party || [],
+          active: p0.active ?? 0,
+          v: { st: p0.st ? [...p0.st] : [0, 0, 0, 0, 0, 0, 0, 0] },
+        },
+        {
+          name: p1.name,
+          trainer: { cls: 'Dresseur', name: p1.name, bs: p1.bs || 'serena', prize: 0 },
+          party: p1.party || [],
+          active: p1.active ?? 0,
+          v: { st: p1.st ? [...p1.st] : [0, 0, 0, 0, 0, 0, 0, 0] },
+        },
+      ],
+      act(side) {
+        const s = this.sides[side];
+        return s?.party?.[s.active] || null;
+      },
+      get me() { return this.act(0); },
+      get foe() { return this.act(1); },
+      stages() {
+        return [this.sides[0].v.st, this.sides[1].v.st];
+      },
+    };
+
+    this.battle = b;
+    this.spectator = true;
+    this.kind = o.bg || specSession.bg || 'grass';
+    this.alive = true;
+    this.W = Math.max(256, Math.min(420, Math.round(BH * innerWidth / innerHeight)));
+    this.bg = this.makeBg(this.kind, o.night ?? specSession.night);
+    this.boosts = [b.sides[0].v.st, b.sides[1].v.st];
+    this.st = {
+      shakeX: 0, shakeY: 0, eSlide: 0, pSlide: 0, screenFlash: 0, wipe: 0, parts: [], balls: [],
+      foe: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
+      me: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
+      trainer: { visible: false, img: null, scale: 1, alpha: 1, dx: 0, dy: 0, white: 0 },
+    };
+    this.buildDom();
+    this.root.style.setProperty('--bp', (innerHeight / BH) + 'px');
+    this.updateWeather(b.weather);
+    this.setHud(1, null); this.setHud(0, null);
+
+    this.game.sound.playMusic('trainer', 0.25);
+
+    await Promise.all([
+      this.loadBattleDecor(this.kind, o.night ?? specSession.night),
+      this.loadSide(1),
+      this.loadSide(0),
+    ]);
+    requestAnimationFrame(this.frame);
+
+    const m0 = b.act(0), m1 = b.act(1);
+    if (m0 && m0.hp > 0) {
+      this.st.me.visible = true;
+      this.setHud(0, m0);
+    }
+    if (m1 && m1.hp > 0) {
+      this.st.foe.visible = true;
+      this.setHud(1, m1);
+    }
+    this.showBoosts(0);
+    this.showBoosts(1);
+
+    const banner = el('div', 'spectator-banner');
+    banner.innerHTML = `
+      <div class="spec-live-pill"><span class="spec-dot">●</span> EN DIRECT</div>
+      <div class="spec-matchup">${esc(p0.name)} <small>vs</small> ${esc(p1.name)}</div>
+      <button type="button" class="spec-leave-btn" title="Quitter (Échap)">Quitter ✕</button>
+    `;
+    this.root.appendChild(banner);
+
+    let spectatorQuit = false;
+    const leave = () => {
+      if (spectatorQuit) return;
+      spectatorQuit = true;
+      specSession.leave?.();
+    };
+    banner.querySelector('.spec-leave-btn').onclick = leave;
+
+    const popInput = this.game.input.push((k) => {
+      if (k === 'b' || k === 'cancel') leave();
+    });
+
+    this.cmd.innerHTML = `
+      <div class="spec-cmd-box">
+        <div class="spec-cmd-title">👁️ MODE SPECTATEUR</div>
+        <div class="spec-cmd-status">Combat entre ${esc(p0.name)} et ${esc(p1.name)}</div>
+        <button type="button" class="spec-cmd-quit-btn">Quitter le combat</button>
+      </div>
+    `;
+    this.cmd.querySelector('.spec-cmd-quit-btn').onclick = leave;
+
+    await this.msg(`Tu observes le combat en direct entre ${p0.name} et ${p1.name} !`);
+
+    while (!spectatorQuit && b.state !== 'over') {
+      this.ui.typePage(this.textBox, `En attente du tour ${b.turn + 1} de ${p0.name} et ${p1.name}…`, { last: true });
+      const msg = await specSession.waitNext();
+      if (spectatorQuit) break;
+      if (!msg || msg.t === 'left' || msg.t === 'timeout') {
+        await this.msg("Le combat s'est arrêté ou la connexion avec l'hôte a été interrompue.");
+        await wait(1200);
+        break;
+      }
+      if (msg.t === 'spec_ev') {
+        b.turn = msg.turn ?? (b.turn + 1);
+        await this.playSpecEvs(msg.events);
+      }
+      if (msg.t === 'spec_end') {
+        if (msg.events?.length) await this.playSpecEvs(msg.events);
+        b.state = 'over';
+        const winTxt = msg.winner ? `${msg.winner} remporte le combat !` : "Le combat est terminé !";
+        await this.msg(winTxt, { wait: true });
+        await wait(1800);
+        break;
+      }
+    }
+
+    popInput();
+    this.spectator = false;
+  }
+
+  async playSpecEvs(evs) {
+    if (!evs || !evs.length) return;
+    for (const e of evs) {
+      if (e.t === 'send' && Number.isInteger(e.side) && Number.isInteger(e.idx)) {
+        if (this.battle.sides[e.side]) this.battle.sides[e.side].active = e.idx;
+      } else if (e.t === 'hp' && Number.isInteger(e.side)) {
+        const m = this.battle.act(e.side);
+        if (m) m.hp = e.hp;
+      } else if (e.t === 'faint' && Number.isInteger(e.side)) {
+        const m = this.battle.act(e.side);
+        if (m) m.hp = 0;
+      } else if (e.t === 'status' && Number.isInteger(e.side)) {
+        const m = this.battle.act(e.side);
+        if (m) m.status = e.status;
+      }
+    }
+    await this.play(evs);
+  }
   /**
    * combat contre un autre joueur. `duel` fournit l'échange de choix :
    *   duel.sendAct(n, action, sum), duel.waitAct(n) → { action, sum } | { quit } | { left } | { timeout }
@@ -438,12 +594,21 @@ export class BattleView {
     requestAnimationFrame(this.frame);
     this.st.trainer.visible = true;
     await this.tween(700, (u) => { const e = ease(u); this.st.eSlide = -this.W * (1 - e); this.st.pSlide = this.W * (1 - e); });
-    await this.play(battle.start());
+    const startEvs = battle.start();
+    await this.play(startEvs);
+    duel.broadcastEvents?.(startEvs);
     const waiting = () => this.ui.typePage(this.textBox, `En attente de ${duel.foeName}…`, { last: true });
     const lost = async (r) => {
-      if (r.mine) { await this.play(battle.stop('lose', 'Vous abandonnez le combat...')); return; }
+      if (r.mine) {
+        const stopEvs = battle.stop('lose', 'Vous abandonnez le combat...');
+        await this.play(stopEvs);
+        duel.broadcastEvents?.(stopEvs, true, duel.foeName);
+        return;
+      }
       const why = r.quit ? `${duel.foeName} abandonne le combat !` : r.left ? `${duel.foeName} a quitté la partie.` : r.desync ? 'La connexion a mélangé le combat : il s\'arrête ici, sans vainqueur.' : `${duel.foeName} ne répond plus.`;
-      await this.play(battle.stop(r.desync ? 'draw' : 'win', why));
+      const stopEvs = battle.stop(r.desync ? 'draw' : 'win', why);
+      await this.play(stopEvs);
+      duel.broadcastEvents?.(stopEvs, true, r.quit ? battle.sides[0].name : duel.foeName);
     };
     while (battle.state !== 'over') {
       if (battle.state === 'switch') {
@@ -458,14 +623,18 @@ export class BattleView {
         if (battle.need[1]) waiting();
         const r = await duel.waitSwitch(n);
         if (r.idx === undefined) { await lost(r); break; }
-        await this.play(battle.switchBoth(mine, r.idx));
+        const swEvs = battle.switchBoth(mine, r.idx);
+        await this.play(swEvs);
+        duel.broadcastEvents?.(swEvs);
         continue;
       }
       const action = await this.chooseAction();
       if (!action) continue;
       if (action.type === 'forfeit') {
         duel.sendQuit();
-        await this.play(battle.stop('lose', 'Vous abandonnez le combat...'));
+        const stopEvs = battle.stop('lose', 'Vous abandonnez le combat...');
+        await this.play(stopEvs);
+        duel.broadcastEvents?.(stopEvs, true, duel.foeName);
         break;
       }
       const n = battle.turn + 1, sum = battle.checksum();
@@ -475,7 +644,10 @@ export class BattleView {
       if (!r.action) { await lost(r); break; }
       if (r.sum !== sum) { await lost({ desync: true }); break; }
       battle.remote = r.action;
-      await this.play(battle.playerAction(action));
+      const actEvs = battle.playerAction(action);
+      await this.play(actEvs);
+      const isOver = battle.state === 'over';
+      duel.broadcastEvents?.(actEvs, isOver, isOver ? (battle.result === 'win' ? battle.sides[0].name : duel.foeName) : null);
     }
     await wait(300);
     return battle.result;

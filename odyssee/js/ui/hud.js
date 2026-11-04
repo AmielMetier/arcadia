@@ -146,11 +146,14 @@ export class Hud {
     const loc = g.locationName();
     const tracked = getTrackedQuest(g);
     const bCount = g.badgeCount();
+    const pvpSummary = getPvpSummary(st);
+    const trUnlocked = pvpSummary?.unlockedCount ?? 0;
+    const trTotal = pvpSummary?.trophiesTotal ?? 32;
     const badgesKey = st.badges.map((b) => (b ? '1' : '0')).join('');
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${st.money};${badgesKey};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 

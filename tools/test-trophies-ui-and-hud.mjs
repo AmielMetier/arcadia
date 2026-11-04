@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ROOT = path.resolve('arcadia');
+const ROOT = fs.existsSync(path.resolve('odyssee')) ? path.resolve('.') : path.resolve('arcadia');
 
 console.log('Testing Odyssée Trophies Screen & HUD Integrations...');
 

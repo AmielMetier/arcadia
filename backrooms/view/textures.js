@@ -110,9 +110,9 @@ function drawWallArt(ctx) {
       shaky([[x - 34, top + 70], [x, top + 50], [x + 34, top + 70]], '#9b1d1a', 5);
     }
   });
-  // 2. une flèche et « SORTIE ? »
+  // 2. une flèche et « EXIT ? »
   cell(2, () => {
-    text('SORTIE ?', 128, 90, 44, '#1d2a6b', -0.05);
+    text('EXIT ?', 128, 90, 50, '#1d2a6b', -0.05);
     shaky([[30, 160], [210, 150]], '#1d2a6b', 9);
     shaky([[180, 120], [220, 150], [182, 182]], '#1d2a6b', 9);
   });
@@ -125,12 +125,11 @@ function drawWallArt(ctx) {
       if (g < 5) shaky([[x0 - 8, y0 + 50], [x0 + 52, y0 + 18]], '#16150f', 4);
     }
   });
-  // 4. « NE COURS PAS » à la peinture rouge qui coule
+  // 4. « DON'T RUN » à la peinture rouge qui coule
   cell(4, () => {
-    text('NE', 128, 70, 54, '#7a0f0c', -0.04);
-    text('COURS', 128, 130, 58, '#7a0f0c', 0.03);
-    text('PAS', 128, 190, 58, '#7a0f0c', -0.02);
-    drips(50, 206, 196, 'rgba(122, 15, 12, 0.8)', 9);
+    text("DON'T", 128, 92, 62, '#7a0f0c', -0.04);
+    text('RUN', 128, 170, 76, '#7a0f0c', 0.03);
+    drips(60, 196, 180, 'rgba(122, 15, 12, 0.8)', 9);
   });
   // 5. une spirale griffonnée
   cell(5, () => {
