@@ -1,5 +1,17 @@
 # Journal des versions — Arcadia
 
+## 4.02 — 4 novembre 2026
+- **Odyssée** — Refonte intégrale et correction de la Carte de Dresseur B2W2 (Résolution du bug de superposition et pixel-art authentique) :
+  - **Suppression définitive des textes et boîtes incrustés dans l'image de fond** :
+    - Remplacement des images d'arrière-plan IA qui contenaient du faux texte (« TEMPS DE JEU ») et des fausses boîtes désalignées par de **véritables textures de châssis haute fidélité en pixel art 16-bit** (`tools/generate_clean_card_textures.py`).
+    - Trame de carbone micro-tissée avec dithering Bayer authentique Nintendo DS, biseaux métalliques aux angles chanfreinés et liserés néon sans aucun artefact visuel pour les 5 rangs de prestige (`normal`, `bronze`, `silver`, `gold`, `master`).
+    - Face B (`card_back_case.jpg`) : écrin en velours bleu saphir matelassé avec ferrures dorées et alvéoles réceptrices sans texte polluant.
+  - **Refonte ergonomique et visuelle de la Face A (Profil de Dresseur)** :
+    - **Disposition en grille technologique B2W2** : remplacement de la longue colonne de lignes sombres par un en-tête héroïque (Dresseur + Titre officiel) et une grille de modules statistiques biseautés aux couleurs officielles (Argent ₽, Temps de jeu, Pokédex avec barre de complétion, Badges avec 15 mini pips lumineux, Médailles B2W2 et accès direct au Panthéon).
+    - **Portrait du Dresseur épuré** : suppression du tag « DRESSEUR » qui masquait la tête du personnage, piédestal holographique rayonnant et sceau officiel de la Ligue d'Odyssée.
+    - **Plateau d'équipe 6 Pokémon authentique** : élimination des blocs « SLOT VIDE » génériques au profit d'alvéoles circulaires en retrait gravées dans le métal (`tc-ts-socket`) avec mention discrète « Libre », et cartouches d'équipe interactifs avec cri du Pokémon au clic.
+  - **Page d'aperçu dédiée** : ajout de `preview_card_b2w2.html` permettant de tester instantanément toutes les variantes de rangs et les deux faces de la carte.
+
 ## 4.01 — 4 novembre 2026
 - **Odyssée** — Animations visuelles avancées des attaques majeures, Météo dynamique overworld et Panthéon interactif :
   - **Animations visuelles avancées des attaques signatures majeures (`battleView.js`)** :

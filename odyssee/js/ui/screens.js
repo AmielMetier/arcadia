@@ -1462,9 +1462,9 @@ export function cardScreen(game, BADGES, other) {
         const q = team[slotIdx];
         if (!q) {
           return `
-            <div class="tc-team-slot empty">
+            <div class="tc-team-slot empty" title="Emplacement libre">
               <div class="tc-ts-socket"></div>
-              <div class="tc-ts-none">SLOT VIDE</div>
+              <span class="tc-ts-empty-label">— Libre —</span>
             </div>
           `;
         }
@@ -1555,8 +1555,7 @@ export function cardScreen(game, BADGES, other) {
                     <div class="tc-photo-hologram"></div>
                     <div class="tc-photo-pedestal"></div>
                     <img class="tc-photo-spr" src="${ASSETS.trainer(c.gender === 'f' ? 'player_f' : 'player_m')}" alt="" onerror="this.style.display='none'">
-                    <span class="tc-photo-tag">DRESSEUR</span>
-                  </div>
+                                      </div>
                   <div class="tc-stamp ${rank.themeCls}">
                     <div class="tc-stamp-ring">
                       <span class="tc-stamp-stars">${"★".repeat(rank.stars || 1)}</span>
@@ -1569,50 +1568,59 @@ export function cardScreen(game, BADGES, other) {
                 <!-- Colonne Droite : Données du Dresseur -->
                 <div class="tc-data-col">
                   <div class="tc-data-box">
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">DRESSEUR</span>
-                      <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
-                    </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">TITRE OFFICIEL</span>
-                      <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
-                    </div>
-                    ${other ? '' : `
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">ARGENT</span>
-                      <span class="tc-val tc-money-val"><b>${(c.money || 0).toLocaleString('fr-FR')}</b> ₽</span>
-                    </div>`}
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">POKÉDEX</span>
-                      <div class="tc-val tc-pdx-row">
-                        <span><b>${c.dex || 0}</b> capturés <small>(vus : ${c.seen != null ? c.seen : (c.dex || 0)})</small></span>
-                        <div class="tc-pdx-bar"><u style="width:${dexPct}%"></u></div>
+                    <div class="tc-hero-row">
+                      <div class="tc-hero-cell tc-hero-name-cell">
+                        <span class="tc-lbl-mini">DRESSEUR</span>
+                        <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
+                      </div>
+                      <div class="tc-hero-cell tc-hero-title-cell">
+                        <span class="tc-lbl-mini">TITRE OFFICIEL</span>
+                        <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
                       </div>
                     </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">TEMPS DE JEU</span>
-                      <span class="tc-val">${timeStr}</span>
+                    <div class="tc-stats-grid">
+                      ${other ? '' : `
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">₽</i> ARGENT</span>
+                        <span class="tc-val tc-money-val"><b>${(c.money || 0).toLocaleString('fr-FR')}</b> ₽</span>
+                      </div>`}
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">⏱</i> TEMPS DE JEU</span>
+                        <span class="tc-val tc-time-val">${timeStr}</span>
+                      </div>
+                      <div class="tc-stat-card tc-stat-card-wide">
+                        <div class="tc-stat-card-top">
+                          <span class="tc-lbl"><i class="tc-ico">📖</i> POKÉDEX</span>
+                          <span class="tc-val"><b>${c.dex || 0}</b> capturés <small>(vus : ${c.seen != null ? c.seen : (c.dex || 0)})</small></span>
+                        </div>
+                        <div class="tc-pdx-bar"><u style="width:${dexPct}%"></u></div>
+                      </div>
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">🛡</i> BADGES D'ARÈNE</span>
+                        <div class="tc-badges-val-wrap">
+                          <span class="tc-val tc-badges-val"><b>${rank.badgesCount}</b> / 15 Badges</span>
+                          <div class="tc-badge-pips">
+                            ${Array.from({ length: 15 }).map((_, bi) => `<span class="tc-pip${c.badges?.[bi] ? ' on' : ''}"></span>`).join('')}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">🏅</i> MÉDAILLES B2W2</span>
+                        <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
+                      </div>
+                      ${c.champion || (c.hof && c.hof.length) ? `
+                      <div class="tc-stat-card tc-stat-clickable" data-act="open-pantheon" title="Clic : Consulter vos sacres de la Ligue">
+                        <span class="tc-lbl"><i class="tc-ico">🏆</i> PANTHÉON</span>
+                        <span class="tc-val tc-hof-val" style="cursor:pointer;">
+                          <b>${(c.hof || []).length || 1}</b> sacre${(c.hof || []).length > 1 ? 's' : ''} ➔
+                        </span>
+                      </div>` : ''}
+                      ${(c.pvpWins || c.pvpLosses) ? `
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">⚔</i> DUELS MULTI</span>
+                        <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
+                      </div>` : ''}
                     </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">BADGES D'ARÈNE</span>
-                      <span class="tc-val tc-badges-val"><b>${rank.badgesCount}</b> / 15 Badges</span>
-                    </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">MÉDAILLES B2W2</span>
-                      <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
-                    </div>
-                    ${c.champion || (c.hof && c.hof.length) ? `
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">PANTHÉON</span>
-                      <span class="tc-val tc-hof-val" style="cursor:pointer;" title="Clic : Consulter vos sacres de la Ligue">
-                        <b>${(c.hof || []).length || 1}</b> sacre${(c.hof || []).length > 1 ? 's' : ''} 🏆
-                      </span>
-                    </div>` : ''}
-                    ${(c.pvpWins || c.pvpLosses) ? `
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">DUELS MULTI</span>
-                      <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
-                    </div>` : ''}
                   </div>
                 </div>
               </div>
@@ -1695,6 +1703,14 @@ export function cardScreen(game, BADGES, other) {
       // Attach Event Handlers
       s.querySelectorAll('[data-act="close"]').forEach((b) => {
         b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); close(); };
+      });
+
+      s.querySelectorAll('[data-act="open-pantheon"]').forEach((b) => {
+        b.onclick = async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          await pantheonScreen(game);
+        };
       });
 
       s.querySelectorAll('[data-act="flip"]').forEach((b) => {
