@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.11 — 4 novembre 2026
+- **Arcadia** — Un cinquième compte reçoit le grade VIP.
+
 ## 4.10 — 4 novembre 2026
 - Perfections visuelles 16:10 et alignement pixel-art du Registre Ami C-Gear (v4.09) (Amiel)
 
