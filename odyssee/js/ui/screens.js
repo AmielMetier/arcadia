@@ -172,7 +172,7 @@ export function partyScreen(game, o = {}) {
               <div class="pslot-types">${typesHtml}</div>
               <div class="pslot-hp-box">
                 <div class="hp-b2w2">
-                  <span class="hp-tag">HP</span>
+                  <span class="hp-tag">PV</span>
                   <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
                 </div>
                 <div class="phpn">${m.hp} / ${m.stats[0]}</div>
@@ -217,7 +217,7 @@ export function partyScreen(game, o = {}) {
             </div>
             <div class="pslot-sub-right">
               <div class="hp-b2w2">
-                <span class="hp-tag">HP</span>
+                <span class="hp-tag">PV</span>
                 <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
               </div>
               <div class="phpn">${m.hp} / ${m.stats[0]}</div>

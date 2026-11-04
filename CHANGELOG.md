@@ -1,6 +1,8 @@
 # Journal des versions — Arcadia
 
 ## 3.97 — 4 novembre 2026
+- **Odyssée** — Harmonisation française des jauges de vie (HUD & Écran d'équipe) :
+  - Remplacement de l'étiquette anglaise `HP` par `PV` (Points de Vie) sur l'ensemble des capsules de Pokémon du HUD (`hud.js`) et les cartouches de l'écran d'équipe B2W2 (`screens.js`).
 - **Odyssée** — Mode Spectateur des combats PvP en direct :
   - **Observation en temps réel des duels en cours** : les dresseurs du monde multijoueur peuvent désormais assister en direct aux combats opposant deux autres joueurs dans la région.
   - **Détection des combats sur la carte & tags dynamiques** :

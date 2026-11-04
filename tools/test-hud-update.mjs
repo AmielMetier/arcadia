@@ -44,6 +44,8 @@ const { createMon } = await import('../odyssee/js/core/mon.js');
   hud.update(true);
   if (!hud.gearEl.innerHTML.includes('TROPHÉES')) throw new Error('Missing TROPHÉES button in gearEl');
   if (!hud.gearEl.innerHTML.includes('0/32 🏅')) throw new Error('Missing 0/32 🏅 in gearEl');
+  if (!hud.partyEl.innerHTML.includes('<b>PV</b>')) throw new Error('Missing <b>PV</b> badge in HUD party element');
+  if (hud.partyEl.innerHTML.includes('<b>HP</b>')) throw new Error('Unexpected <b>HP</b> badge in HUD party element');
   console.log('✔ Test Case 1 (Fresh state without pvp) passed');
 }
 

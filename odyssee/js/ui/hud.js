@@ -187,7 +187,7 @@ export class Hud {
                 <span class="hud-lvl">N.${m.lvl}</span>
               </div>
               <div class="hud-hp">
-                <b>HP</b>
+                <b>PV</b>
                 <i><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></i>
               </div>
               <div class="hud-exp">
