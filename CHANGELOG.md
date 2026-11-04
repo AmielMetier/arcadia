@@ -1,5 +1,16 @@
 # Journal des versions — Arcadia
 
+## 3.96 — 4 novembre 2026
+- **Odyssée** — Talents signatures exclusifs pour les 3 familles de starters originaux (options 1C, 2B, 3C) :
+  - **Halo Sylvestre** (*Capyousse* #1001, *Capyflore* #1002, *Capysaule* #1003) :
+    - À son entrée au combat, la douce lueur du Pokémon apaise l'ennemi et baisse son Attaque Spéciale d'un cran (-1 Atq Spé, équivalent spécial d'Intimidation).
+  - **Cire Brûlante** (*Mèchelet* #1004, *Ciroulet* #1005, *Lustrelle* #1006) :
+    - Tout contact physique avec le Pokémon projette de la cire chaude sur l'attaquant : baisse systématiquement la Vitesse de l'assaillant d'un cran (-1 Vit) avec 30% de chances de brûlure directe.
+  - **Cœur Vaillant** (*Narvi* #1007, *Narvalier* #1008, *Narvaillant* #1009) :
+    - Animé par une bravoure héroïque, son Attaque augmente d'un cran (+1 Atq) dès son entrée en jeu, et il est immunisé contre la peur (*flinch*) et les baisses d'Attaque (notamment l'Intimidation adverse).
+  - Intégration complète dans le moteur de combat (`core/battle.js`), le registre des talents (`data/talents.js`, `data/abilities.js`), l'écran résumé d'équipe et le stockage PC.
+  - Suite de tests unitaires `tools/test-starters-talents.mjs` validant l'attribution des talents et les effets en combat (38 vérifications réussies).
+
 ## 3.95 — 4 novembre 2026
 - **Arcadia** — Les comptes peuvent recevoir le grade VIP, qui donnera accès à des jeux et des modes de jeu réservés. Il n'y en a pas encore : ils arriveront plus tard. Un compte VIP l'affiche sous son nom (« ⭐ VIP »).
 - **Odyssée** — Expansion du Journal des Trophées & Boîte à Médailles B2W2 (32 Médailles au total) :
