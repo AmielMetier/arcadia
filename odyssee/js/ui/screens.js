@@ -535,13 +535,17 @@ export function summaryScreen(game, list, idx) {
     };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'left') page = (page + 2) % 3;
-      else if (k === 'right') page = (page + 1) % 3;
-      else if (k === 'up') idx = (idx - 1 + list.length) % list.length;
-      else if (k === 'down') idx = (idx + 1) % list.length;
-      else if (k === 'b' || k === 'a') { close(); return; }
-      else return;
-      ui.sound.sfx('blip'); draw();
+      if (k === 'left') { page = (page + 2) % 3; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'right') { page = (page + 1) % 3; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'up') { idx = (idx - 1 + list.length) % list.length; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'down') { idx = (idx + 1) % list.length; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'a' || k === 'space') {
+        page = (page + 1) % 3;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'b') {
+        close();
+      }
     });
   });
 }
@@ -1034,11 +1038,39 @@ export function dexScreen(game) {
     };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'up') i = (i - 1 + ids.length) % ids.length; else if (k === 'down') i = (i + 1) % ids.length;
-      else if (k === 'left') i = Math.max(0, i - 10); else if (k === 'right') i = Math.min(ids.length - 1, i + 10);
-      else if (k === 'b' || k === 'a') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
-      else return;
-      ui.sound.sfx('blip'); draw();
+      if (k === 'up') {
+        i = (i - 1 + ids.length) % ids.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'down') {
+        i = (i + 1) % ids.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'left') {
+        i = Math.max(0, i - 10);
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'right') {
+        i = Math.min(ids.length - 1, i + 10);
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'a' || k === 'space') {
+        const id = ids[i];
+        if (seen.has(id)) {
+          try { ui.sound?.cry?.(id); } catch (e) {}
+          if (spr) {
+            spr.style.transform = 'scale(1.2)';
+            setTimeout(() => { if (spr) spr.style.transform = ''; }, 200);
+          }
+        } else {
+          try { ui.sound?.sfx?.('cancel'); } catch (e) {}
+        }
+      } else if (k === 'b') {
+        pop();
+        s.remove();
+        ui.sound.sfx('cancel');
+        resolve();
+      }
     });
   });
 }
@@ -1341,7 +1373,16 @@ export function mapScreen(game) {
     const pop = ui.input.push((key) => {
       if (key === 'left' || key === 'up') { k = (k + spots.length - 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
       if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
-      if (key === 'a' || key === 'b' || key === 'map') close();
+      if (key === 'a' || key === 'space') {
+        try { ui.sound?.sfx('select'); } catch (err) {}
+        const curSpot = s.querySelector('.carte-spot-on');
+        if (curSpot) {
+          curSpot.style.transform = 'scale(1.4)';
+          setTimeout(() => { if (curSpot) curSpot.style.transform = ''; }, 200);
+        }
+        return;
+      }
+      if (key === 'b' || key === 'map') close();
     });
   });
 }
@@ -1786,15 +1827,41 @@ export function cardScreen(game, BADGES, other) {
     };
 
     const pop = ui.input.push((k) => {
-      if (k === 'a' || k === 'b' || k === 'cancel') {
+      if (k === 'b' || k === 'cancel') {
         close();
-      } else if (k === 'space' || k === 'left' || k === 'right') {
-        face = face === 'profile' ? 'badges' : 'profile';
-        try { ui.sound?.sfx('blip'); } catch (err) {}
-        render();
+      } else if (k === 'a' || k === 'space' || k === 'left' || k === 'right') {
+        if (face === 'profile') {
+          face = 'badges';
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          render();
+        } else if (k === 'left' || k === 'right') {
+          face = 'profile';
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          render();
+        } else if (k === 'a' || k === 'space') {
+          if (c.badges?.[selBadge] && ui.sound?.badgeChime) {
+            ui.sound.badgeChime(selBadge);
+            const inspImg = s.querySelector('.tc-bi-img');
+            if (inspImg) {
+              inspImg.classList.remove('shine');
+              void inspImg.offsetWidth;
+              inspImg.classList.add('shine');
+            }
+          } else {
+            face = 'profile';
+            try { ui.sound?.sfx('blip'); } catch (err) {}
+            render();
+          }
+        }
       } else if (face === 'badges' && (k === 'up' || k === 'down')) {
         selBadge = (selBadge + (k === 'down' ? 1 : -1) + BADGE_SPECS.length) % BADGE_SPECS.length;
-        try { ui.sound?.sfx('select'); } catch (err) {}
+        try {
+          if (c.badges?.[selBadge] && ui.sound?.badgeChime) {
+            ui.sound.badgeChime(selBadge);
+          } else {
+            ui.sound?.sfx('select');
+          }
+        } catch (err) {}
         render();
       }
     });

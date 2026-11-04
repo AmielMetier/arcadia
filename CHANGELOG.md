@@ -1,5 +1,15 @@
 # Journal des versions — Arcadia
 
+## 4.03 — 4 novembre 2026
+- **Odyssée** — Normalisation des touches d'action Clavier (Espace, Entrée et Échap) sur tous les écrans modaux :
+  - **Correction du comportement des touches Espace & Entrée (`'a'`)** :
+    - Sur la **Carte de Dresseur** (`cardScreen`) : appuyer sur Espace ou Entrée bascule désormais instantanément entre le Profil (Face A) et les 15 Badges (Face B), ou fait tinter le carillon musical cristallin du badge sélectionné avec brillance visuelle. La carte ne se ferme plus intempestivement.
+    - Sur le **Pokédex** (`dexScreen`) : appuyer sur Espace ou Entrée joue le cri authentique de l'espèce sélectionnée et anime le sprite en rebond dynamique au lieu de fermer le Pokédex. Seule la touche Échap (`'b'`) ou le clic sur fermer quitte l'écran.
+    - Sur le **Résumé de Pokémon** (`summaryScreen`) : appuyer sur Espace ou Entrée fait défiler cycliquement les pages (Informations générales → Capacités & PP → Statistiques) avec sonorité rétro sans quitter l'écran.
+    - Sur la **Carte de la Région** (`mapScreen`) : appuyer sur Espace ou Entrée pulse et met en valeur le lieu ciblé avec son de confirmation sans fermer la carte.
+  - **Tests automatisés & validation** :
+    - Création de `tools/test-screen-keyboard-inputs.mjs` vérifiant que `'a'` (Espace / Entrée) exécute les interactions prévues sans jamais fermer aucun écran modal, et que `'b'` (Échap) assure la fermeture propre (100% de succès).
+
 ## 4.02 — 4 novembre 2026
 - **Odyssée** — Refonte intégrale et correction de la Carte de Dresseur B2W2 (Résolution du bug de superposition et pixel-art authentique) :
   - **Suppression définitive des textes et boîtes incrustés dans l'image de fond** :
