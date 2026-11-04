@@ -2747,6 +2747,9 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
 .hud-stat-ico { width: calc(var(--px) * 13); height: calc(var(--px) * 13); object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 var(--px) 0 rgba(0,0,0,.45)); }
 .hud-money { font-size: calc(var(--px) * 7.8); font-weight: 600; color: #fff6c8; white-space: nowrap; }
 .hud-badge-cnt { font-size: calc(var(--px) * 7.8); font-weight: 600; color: #ffffff; }
+.hud-trophy-cnt { font-size: calc(var(--px) * 7.2); font-weight: 600; color: #ffd858; white-space: nowrap; }
+.hud-trophy-pill { cursor: pointer; transition: transform .1s ease, filter .1s ease; }
+.hud-trophy-pill:hover { filter: brightness(1.22); transform: scale(1.04); }
 .hud-cap-pill {
   font-size: calc(var(--px) * 5.8); font-weight: 700; color: #ffe278;
   background: rgba(10, 16, 28, .68); border: calc(var(--px) * .7) solid rgba(255, 210, 88, .55);

@@ -19,6 +19,9 @@
     - Double barre de filtrage ergonomique : navigation par catégorie thématique (*Toutes*, *⚔️ PvP*, *🗺️ Aventure*, *📖 Pokédex*, *⚡ Entraînement*, *🧭 Exploration*, *🏰 Domaine*) et par rang (*Tous rangs*, *À Réclamer*, *Débloquées*, *Bronze*, *Argent*, *Or*, *Platine*).
     - Badges de catégorie dédiés affichés sur chaque carte de médaille.
     - Évaluation automatique `checkAllTrophies(st)` lors de l'ouverture du journal, des remises de badges et des sauvegardes.
+  - **Correctif chargement** :
+    - Initialisation sécurisée du compteur de trophées dans le HUD (`getPvpSummary(st)` avec fallbacks) éliminant l'erreur au chargement initial du monde (`trUnlocked is not defined`).
+    - Suite de tests unitaires dédiée `tools/test-hud-update.mjs` validant le rendu du HUD sur états de sauvegarde neufs ou existants.
   - **Tests & Robustesse** :
     - Suite de tests unitaires et d'intégration `tools/test-trophies-system.mjs` validant à 100% les 32 trophées, les déblocages non-PvP et le contrôle strict d'attribution d'une unique Master Ball.
 
