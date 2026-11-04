@@ -6,6 +6,16 @@
     - Remplacement des dégradés CSS génériques par de véritables textures d'interface Nintendo DS illustrées avec Nanobanana, calquées sur la direction artistique du Sac de Baroudeur (`b2w2-bag`).
     - **Face A (Recto - Profil Dresseur)** : boîtier haute technologie en fibre de carbone avec liserés néon cyan et biseaux d'acier chromé, décliné dynamiquement en 5 variantes de prestige B2W2 selon les étoiles du dresseur (`card_front_normal.jpg`, `card_front_bronze.jpg`, `card_front_silver.jpg`, `card_front_gold.jpg`, `card_front_master.jpg`).
     - **Face B (Verso - Coffret des 15 Badges)** : vitrine luxueuse en velours bleu saphir profond (`card_back_case.jpg`) avec surpiqûres, socles alvéolés et compartiments d'arène pour le Continent Nord et les Terres du Sud.
+  - **Interactivité complète des commandes et éléments tactiles** :
+    - **Face A (Profil Dresseur)** :
+      - Bouton de bascule en haut à droite (`tc-btn-flip`) et en bas (`tc-foot-btn`) pour pivoter vers le coffret des 15 badges avec bruitage rétro `blip`.
+      - Bouton de fermeture instantanée `✕` (`tc-btn-close`) avec son `cancel`.
+      - **Cartouches d'équipe interactives** : chaque slot de Pokémon (`tc-team-slot`) est désormais cliquable avec effet de survol, déclenchant le cri officiel du Pokémon (`cry`) et une animation de saut enjouée (`tc-ts-bounce`).
+      - **Cadre photo interactif** : clic sur le dresseur (`tc-photo-frame`) déclenchant une pulsation holographique lumineuse (`tc-photo-pulse`).
+    - **Face B (Coffret des 15 Badges)** :
+      - **Carillon cristallin B2W2** : chaque alvéole de badge (`tc-badge-slot`) est un bouton interactif. Cliquer sur un badge débloqué joue sa note dédiée dans la gamme de victoire (Do-Ré-Mi-Fa-Sol-La-Si-Do...) via le nouveau synthétiseur `badgeChime(idx)`, répliquant le célèbre polissage des badges de Pokémon Noir 2 et Blanc 2.
+      - Mise à jour instantanée du grand panneau Inspecteur avec nom, arène, champion, privilège et niveau maximum.
+    - **Contrôles clavier intégraux** : <kbd>ESPACE</kbd> / <kbd>◄</kbd> <kbd>►</kbd> pour tourner la carte, <kbd>▲</kbd> <kbd>▼</kbd> pour parcourir les badges, <kbd>ÉCHAP</kbd> pour quitter.
   - **Interface utilisateur & finitions matérielles 16-bit DS** :
     - Boîtier, cadres et cartouches aux coins biseautés et chanfreinés façon écran tactile DS (`clip-path: polygon(...)`).
     - Trame de scanlines et dithering rétro (`tc-pixelart-scanlines`) identique à l'écran du Sac.
