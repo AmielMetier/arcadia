@@ -1523,6 +1523,10 @@ export function cardScreen(game, BADGES, other) {
 
       s.innerHTML = `
         <div class="b2w2-card-casing ${rank.themeCls}">
+          <!-- Fond Pixel Art 16-bit B2W2 Nanobanana -->
+          <img class="tc-pixelart-bg" src="${face === 'profile' ? ASSETS.cardBg(rank.theme) : ASSETS.cardBack}" alt="Fond Carte B2W2">
+          <div class="tc-pixelart-scanlines"></div>
+
           <!-- Barre Supérieure B2W2 DS -->
           <div class="tc-header">
             <div class="tc-hdr-left">
@@ -1550,11 +1554,13 @@ export function cardScreen(game, BADGES, other) {
                     <div class="tc-photo-hologram"></div>
                     <div class="tc-photo-pedestal"></div>
                     <img class="tc-photo-spr" src="${ASSETS.trainer(c.gender === 'f' ? 'player_f' : 'player_m')}" alt="" onerror="this.style.display='none'">
+                    <span class="tc-photo-tag">DRESSEUR</span>
                   </div>
-                  <div class="tc-stamp">
+                  <div class="tc-stamp ${rank.themeCls}">
                     <div class="tc-stamp-ring">
+                      <span class="tc-stamp-stars">${"★".repeat(rank.stars || 1)}</span>
                       <span class="tc-stamp-title">LIGUE D'ODYSSÉE</span>
-                      <span class="tc-stamp-sub">CERTIFIÉ B2W2</span>
+                      <span class="tc-stamp-sub">RANG ${rank.grade.toUpperCase()}</span>
                     </div>
                   </div>
                 </div>

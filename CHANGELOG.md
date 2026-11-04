@@ -1,5 +1,21 @@
 # Journal des versions — Arcadia
 
+## 4.00 — 4 novembre 2026
+- **Odyssée** — Refonte 100% Pixel Art Nanobanana de la Carte de Dresseur B2W2 :
+  - **Fonds & Châssis Pixel Art 16-bit authentiques générés avec Nanobanana** :
+    - Remplacement des dégradés CSS génériques par de véritables textures d'interface Nintendo DS illustrées avec Nanobanana, calquées sur la direction artistique du Sac de Baroudeur (`b2w2-bag`).
+    - **Face A (Recto - Profil Dresseur)** : boîtier haute technologie en fibre de carbone avec liserés néon cyan et biseaux d'acier chromé, décliné dynamiquement en 5 variantes de prestige B2W2 selon les étoiles du dresseur (`card_front_normal.jpg`, `card_front_bronze.jpg`, `card_front_silver.jpg`, `card_front_gold.jpg`, `card_front_master.jpg`).
+    - **Face B (Verso - Coffret des 15 Badges)** : vitrine luxueuse en velours bleu saphir profond (`card_back_case.jpg`) avec surpiqûres, socles alvéolés et compartiments d'arène pour le Continent Nord et les Terres du Sud.
+  - **Interface utilisateur & finitions matérielles 16-bit DS** :
+    - Boîtier, cadres et cartouches aux coins biseautés et chanfreinés façon écran tactile DS (`clip-path: polygon(...)`).
+    - Trame de scanlines et dithering rétro (`tc-pixelart-scanlines`) identique à l'écran du Sac.
+    - Cadre photo dresseur avec piédestal holographique rayonnant (`tc-photo-pedestal`) et faisceaux lumineux.
+    - Sceau officiel de la Ligue d'Odyssée certifiant le rang de dresseur et le nombre d'étoiles.
+    - 6 capsules métalliques d'équipe Pokémon avec socles circulaires de Poké Balls et jauges PV en pixel art.
+    - Inspecteur de badges interactif aux coins dorés avec zoom 128px étincelant et privilèges d'arènes.
+  - **Validation & Tests** :
+    - Suite de tests `tools/test-trainer-card-b2w2.mjs` validant les 6 arrière-plans Nanobanana, les 45 sprites de badges, le rendu DOM et la bascule recto/verso.
+
 ## 3.99 — 4 novembre 2026
 - **Odyssée** — Refonte intégrale et composition sur mesure des **Musiques Épiques de Combats de Boss** :
   - Remplacement des boucles générées procéduralement par **6 grandes compositions originales écrites à la main** (plus de 7 400 notes synthétisées réparties sur 7 canaux audio : basse sub/galopante, double lead mélodique, guitare électrique saturée par distorsion WaveShaper tanh, nappes d'harmonie, arpèges virtuoses en doubles croches et batterie rock/métal avec kicks, caisses claires, cymbales crash et toms) :
