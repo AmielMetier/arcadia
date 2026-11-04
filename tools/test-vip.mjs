@@ -15,7 +15,7 @@ const run = (user) => {
   vm.runInNewContext(code, { window: w, TextEncoder });
   return w;
 };
-const v = run('amiel');
+const v = run('testvip');
 ok(v.HubVIP.is() && v.HUB_GAMES.length === 2 && v.HUB_GAMES[0].settings[0].options.length === 2, 'le VIP voit tout');
 for (const who of ['nico', null]) {
   const n = run(who);
@@ -26,5 +26,9 @@ for (const who of ['nico', null]) {
 }
 const w = run(null);
 for (const s of ['', 'amiel', 'é' + 'x'.repeat(70)]) ok(w.HubVIP.hash(s) === crypto.createHash('sha256').update('arcadia-vip:' + s.toLowerCase()).digest('hex'), `empreinte identique à Node (${s.length} car.)`);
+// les comptes déjà inscrits (nom de fichier = server/accounts.js pathOf)
+const { pathOf } = await import('../server/accounts.js').catch(() => ({}));
+const acc = run('amiel'); ok(acc.HubVIP.is(), 'compte inscrit « amiel » reconnu VIP par son fichier');
+if (pathOf) ok(pathOf('amiel') === 'accounts/171379463336fbba34735af308802c65.json', 'même empreinte que le serveur');
 if (fails) process.exit(1);
 console.log('\nCOMPTES VIP : TOUS LES TESTS SONT AU VERT');

@@ -17,6 +17,14 @@
   const HASHES = [
     // empreintes des identifiants VIP (tools/vip-add.mjs)
   ];
+  // comptes en ligne VIP désignés par le nom de leur fichier sur GitHub (branche saves, accounts/<id>.json) :
+  // les 4 comptes déjà inscrits le 4 novembre 2026
+  const ACCOUNTS = [
+    '171379463336fbba34735af308802c65',
+    '24348069406b1041600ea8aed25ccf63',
+    '39e22bb73b4fcd2fa85999ba152d6b17',
+    '8b8f89805089e303539fe8c6c4986739',
+  ];
 
   // SHA-256 synchrone (court) : la liste doit être triée avant que le Hub ne se dessine
   function sha256(str) {
@@ -48,7 +56,7 @@
   }
 
   const sess = window.HubAccount && window.HubAccount.session();
-  const vip = !!(sess && HASHES.includes(sha256('arcadia-vip:' + sess.user)));
+  const vip = !!(sess && (HASHES.includes(sha256('arcadia-vip:' + sess.user)) || ACCOUNTS.includes(sha256('arcadia-account:' + sess.user).slice(0, 32))));
   const isVipOpt = (o) => !!(o && o[2] && o[2].vip);
 
   // tous les jeux (pour lancer celui qu'un VIP a choisi dans son salon), puis la liste visible par ce joueur
