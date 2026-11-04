@@ -14,6 +14,7 @@ import { Game } from './game.js';
 import { apparenceScreen } from './ui/apparence.js';
 import { createMon } from './core/mon.js';
 import { ASSETS, loadImg, loadAll } from './assets.js';
+import { DECOR_PLUS } from './data/decor-plus.js';
 import { SPRITES } from './data/sprites.js';
 import { SOL16_FICHIERS } from './data/sol16.js';
 import { R, ORIGINALES } from './data/remplacants.js';
@@ -31,6 +32,7 @@ addEventListener('unhandledrejection', (e) => fatal(e.reason));
 
 // éléments de décor dessinés repris dans le jeu (les autres restent dessinés par le code : herbes, fleurs…)
 const NATURE = ['tree', 'tree2', 'pine', 'snowpine', 'deadtree', 'palm', 'bush', 'rock', 'stalag', 'sign', 'fence', 'lamp', 'mailbox', 'pot', 'itemball', 'bang', 'statue'];
+const MOBILIER_PLUS = ['machine_sous', 'borne_tetris', 'borne_invaders', 'borne_briques', 'borne_serpent'];
 const SOLS = ['tall0', 'tall1', 'darktall0', 'darktall1', 'snowtall0', 'snowtall1', 'floor_wood', 'floor_center', 'floor_mart', 'floor_lab', 'floor_league', 'floor_gymBug', 'floor_gymRock', 'floor_gymWater', 'floor_gymElec', 'floor_gymGrass', 'floor_gymPsy', 'floor_gymFire', 'floor_gymDragon', 'wall_center', 'wall_mart', 'wall_gym', 'wall_league'];
 
 async function loadArt() {
@@ -41,8 +43,12 @@ async function loadArt() {
   // mobilier (sans écraser un élément de la nature du même nom, comme la statue d'arène)
   for (const k of Object.keys(SPRITES.mobilier || {})) if (!sprites[k]) sprites[k] = ASSETS.mobilier(k);
   for (const [k, v] of Object.entries(SPRITES.mobilier || {})) if (v[2] && !dens[k]) dens[k] = v[2];
+  // mobilier dessiné à part (Casino de Métropole : machines à sous et bornes d'arcade), même densité que la planche
+  for (const k of MOBILIER_PLUS) { sprites[k] = ASSETS.mobilier(k); dens[k] = 2; }
   // décor du tileset (fontaine, torii, lanternes, cloche…) : dessiné à la densité des tuiles du DS
   for (const k of Object.keys(SPRITES.deco || {})) if (!sprites[k]) { sprites[k] = ASSETS.deco(k); dens[k] = 1; }
+  // décor ajouté à la main (arbres d'automne, relief…) : data/decor-plus.js
+  for (const [k, [dir, d]] of Object.entries(DECOR_PLUS)) { sprites[k] = ASSETS[dir](k); dens[k] = d; }
   const kits = {}; for (const k of SPRITES.facades || []) kits[k] = ASSETS.facade(k);
   const sols = {}; for (const k of SOLS) sols[k] = ASSETS.sol(k);
   // tileset global (tools/odyssee-tileset.py) : sols à 32 px et pièces des hautes herbes
@@ -112,7 +118,7 @@ async function boot() {
   // outil de test : démarrer directement une partie depuis la console
   window.__ody.play = async (state) => { document.querySelector('.title-scr')?.remove(); input.handlers.length = 0; ui.closeDialog(); mode = 'game'; await game.start(state); };
 
-  // version test (odyssee/test/) : on choisit un lieu et une équipe, et on y apparaît ; rien n'est sauvegardé
+
   /* ---------------- écran titre ---------------- */
   for (;;) {
     sound.play('title');

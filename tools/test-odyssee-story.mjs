@@ -47,6 +47,9 @@ function explore(pos) {
       if (t0 !== T.MAT) continue; // on ne reste pas sur une porte
     }
     const onWater = t0 === T.WATER;
+    // le bateau : à côté d'un passeur, avec le permis, vers chaque quai que les badges ouvrent
+    if (p.map === 'monde' && st.bag['permis-bateau']) for (const n of m.npcs) if (n.script === 'ferry' && Math.abs(n.x - p.x) + Math.abs(n.y - p.y) === 1)
+      for (const d of Object.values(W.docks)) if (game.badgeCount() >= d.badges && (!d.show || d.show(st.flags))) push(d.map, d.x, d.y);
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const x = p.x + dx, y = p.y + dy; if (!m.in(x, y)) continue;
       const t = m.get(x, y), B = bl(p.map);
@@ -54,7 +57,7 @@ function explore(pos) {
       if (t === T.LEDGE && dy === 1 && !onWater) { if (walkable(m.get(x, y + 1)) && !B.has(x + ',' + (y + 1))) push(p.map, x, y + 1); continue; }
       if (t === T.LEDGE_E && dx === 1) { if (walkable(m.get(x + 1, y))) push(p.map, x + 1, y); continue; }
       if (t === T.LEDGE_W && dx === -1) { if (walkable(m.get(x - 1, y))) push(p.map, x - 1, y); continue; }
-      let pass = walkable(t) && (onWater || m.height(x, y) === m.height(p.x, p.y));
+      let pass = walkable(t) && m.height(x, y) === m.height(p.x, p.y);
       if (t === T.STAIRS || t0 === T.STAIRS) pass = walkable(t) && Math.abs(m.height(x, y) - m.height(p.x, p.y)) <= 1;
       if (t === T.CUT && can('coupe')) pass = true;
       if (t === T.SMASH && can('eclate')) pass = true;
@@ -126,6 +129,8 @@ leader(0);
 beat('ecl:bois1', 'ecl:bois2'); talk('lumen-bois', () => { st.bag['cs-flash'] = 1; });
 beat('ecl:grotte1', 'ecl:erebe1', 'ecl:grotte2');
 beat('ecl:azur1', 'ecl:nyx1'); talk('azur:marin'); leader(1);
+// le permis bateau (Capitainerie de Port-Azur, dès 2 badges) : l'archipel et les îles de l'Est ne s'atteignent qu'en bateau
+talk('permis:inspectrice', () => { st.bag['permis-bateau'] = 1; });
 cannot('l\'Arène de Voltacité est fermée tant que la Centrale est occupée', leaderId(2));
 beat('ecl:volta1', 'ecl:volta2', 'ecl:erebe2'); talk('volta:ingenieur', () => { st.bag['cs-force'] = 1; });
 leader(2);
@@ -134,6 +139,16 @@ item('monde', 'medaillon'); talk('sylve:medaillon');
 cannot('Mirage est bloquée par la Team Éclipse', leaderId(4));
 beat('ecl:rep1', 'ecl:rep2', 'ecl:rep3', 'ecl:nyx2', 'ecl:rep4', 'ecl:rep5', 'ecl:boss1'); st.flags.eclipse = true;
 leader(4); talk('mirage:voyante', () => { st.bag['plume-argent'] = 1; st.flags.plumeArgent = true; });
+// la Tour Dorée (l'ancienne Tour de la Grue), dans le parc du Temple Kagura, à côté de la Tour Cendrée : on monte jusqu'au
+// Grand Sage Hoël, qui confie la Plume Arc-en-ciel ; sans elle, le novice barre l'escalier du toit, avec elle, Ho-Oh s'y pose
+{ const hooh = W.legends.find((q) => q.id === 'hooh'), toit = maps[hooh.map], sage = maps['grue:tour3'].npcs.find((n) => n.trainer?.name === 'Hoël');
+  const surLeToit = () => { const seen = explore(pos); return [[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => seen.has(key(toit.id, hooh.x + dx, hooh.y + dy))); };
+  ok(hooh.map === 'grue:tour-toit' && !surLeToit(), 'le toit de la Tour Dorée est fermé tant qu\'on n\'a pas la Plume Arc-en-ciel');
+  talk(sage.id, () => { st.flags['T:' + sage.id] = true; st.flags.plume = true; st.bag['plume-arc'] = 1; });
+  reach('Ho-Oh, sur le toit de la Tour Dorée', toit.id, hooh.x, hooh.y); }
+// la Tour Cendrée, dans la Forêt des Torii : on descend au sous-sol par l'échelle, les trois bêtes s'y réveillent
+// (elles ne se montrent ensuite dans les îles qu'à partir de 5 badges : légendaires `cond: 'beasts'`)
+{ const sous = maps['cendree:sous-sol'], [ex, ey] = sous.betesSortie; if (reach('sous-sol de la Tour Cendrée', sous.id, ex, ey)) st.flags.beasts = true; }
 item('monde', 'rare-candy', W.towns.D.x + 26, W.towns.D.y + 1); // îlot du port (Surf)
 leader(5); leader(6); leader(7);
 cannot('la Route Victoire reste fermée tant que dure l\'Éclipse', 'c4:1');

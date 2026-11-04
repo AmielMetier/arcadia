@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 4.12 — 4 novembre 2026
+- **Odyssée** — La région change de visage :
+  - Maisons, centres, boutiques, laboratoire, Ligue, casino et bourse passent en fausse 3D ; leurs fenêtres s'allument la nuit.
+  - Nouvelles arènes à portique et voûte, coiffées de la statue de leur Champion.
+  - Du relief partout : talus de pelouse, falaises à longer, routes sinueuses qui montent et descendent, un désert et le Canyon d'Ocre.
+  - Deux montagnes à gravir, le Mont Lunaire et le Mont Givré, avec leurs lacets et leurs passerelles au-dessus des ravins.
+  - La Forêt des Torii rejoint la carte, plus grande : sentiers, ruisseau, jardin d'automne, et deux tours anciennes à découvrir.
+  - Le Bois Murmure devient une forêt dense et sombre, avec ses cabanes et ses mystères.
+  - La mine de Pierrefort : trois niveaux à explorer.
+  - Villes et villages agrandis, et une usine Poké Ball monumentale à Pierrefort.
+  - L'archipel et les îles de l'Est se rejoignent en bateau, au-delà des tourbillons.
+  - Les hautes herbes bougent et s'écartent quand on y entre ; l'ancien sol ne réapparaît plus quand la carte change.
+  - Casino de Métropole : poker Texas Hold'em, tables dessinées et salle d'arcade à quatre bornes.
+
 ## 4.11 — 4 novembre 2026
 - **Arcadia** — Un cinquième compte reçoit le grade VIP.
 

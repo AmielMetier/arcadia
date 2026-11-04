@@ -294,7 +294,7 @@ export function addStory({ W, maps, towns, routes, legends, trainerNpc }) {
       item: 'medaillon', flag: 'qMedaillon', who: 'Margaux', reward: [['rare-candy', 1], ['super-potion', 3]],
       ask: ['Snif... J\'ai perdu le médaillon de ma grand-mère en jouant dans le Bois Murmure.', 'Il est sûrement tombé derrière un petit arbre... Je n\'arrive pas à passer !'],
       thanks: ['Mon médaillon ! Tu l\'as retrouvé ! Merci, merci, merci !', 'Tiens, c\'est tout ce que j\'ai. Grand-mère dit que ça rend les Pokémon plus forts.'], done: ['Je ne le quitterai plus jamais !'] } });
-    tn(C, 8, 13, { id: 'geologue', sprite: 'montagnard', dir: 'down', script: 'show', show: {
+    tn(C, 48, 13, { id: 'geologue', sprite: 'montagnard', dir: 'down', script: 'show', show: {
       flag: 'qRoche', who: 'Géologue', test: (m) => SPECIES[m.sp].t.includes('rock'), reward: [['great-ball', 4]],
       ask: ['Je collectionne les observations de Pokémon Roche.', 'Montre-m\'en un, n\'importe lequel, et je te récompenserai !'],
       thanks: ['Magnifique ! Regarde-moi cette carapace minérale...', 'Voilà pour toi, comme promis.'], done: ['La Grotte Lunaire regorge de Pokémon Roche. Et de Pierres Lune !'] } });
@@ -385,16 +385,18 @@ function secretPocket(W, pts, t0, side, obs, items) {
     while (k++ < 14 && W.get(x, y) !== T.TREE && W.get(x, y) !== T.PINE) { x += dx; y += dy; }
     const before = W.get(x - dx, y - dy);
     if (k >= 14 || !walkable(before) || before === T.TALL || before === T.DARKTALL) continue;
+    if (W.items.some((it) => it.x === x - dx && it.y === y - dy) || W.npcs.some((n) => n.x === x - dx && n.y === y - dy)) continue;   // l'entrée reste libre
     const ex = x, ey = y;
     const set = [];
     for (let i = 1; i <= 3; i++) set.push([ex + dx * i, ey + dy * i]);
     const cx = ex + dx * 5, cy = ey + dy * 5;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) set.push([cx + i, cy + j]);
     const inSet = new Set(set.map(([a, b]) => key(a, b)));
-    let ok = W.in(cx - 3, cy - 3) && W.in(cx + 3, cy + 3);
+    let ok = W.in(cx - 3, cy - 3) && W.in(cx + 3, cy + 3) && W.height(ex, ey) === W.height(ex - dx, ey - dy);
     for (const [a, b] of set) {
       if (!ok) break;
       if (W.get(a, b) !== T.TREE && W.get(a, b) !== T.PINE) ok = false;
+      if (W.height(a, b) !== W.height(ex - dx, ey - dy)) ok = false;   // le recoin reste au niveau du sentier (relief)
       for (let j = -1; j <= 1 && ok; j++) for (let i = -1; i <= 1; i++) {
         const q = key(a + i, b + j); if (inSet.has(q) || (a + i === ex && b + j === ey)) continue;
         const tt = W.get(a + i, b + j); if (tt !== T.TREE && tt !== T.PINE && tt !== T.WATER) { ok = false; break; }
