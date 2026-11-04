@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.07 — 4 novembre 2026
+- **Arcadia** — Les premiers comptes en ligne, protégés par mot de passe, reçoivent le grade VIP (« ⭐ VIP » sous le nom).
+
 ## 4.06 — 4 novembre 2026
 - **Odyssée** — Accessibilité universelle du Système de Stockage des Pokémon (Boîtes PC) :
   - **PC interactifs dans la ville de départ (Bourg-Aube)** :

@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 let fails = 0;
 const ok = (c, m) => { if (!c) { fails++; console.error('ÉCHEC :', m); } else console.log('ok -', m); };
 const code = fs.readFileSync(new URL('../hub/vip.js', import.meta.url), 'utf8')
-  .replace(/    \/\/ empreintes des identifiants VIP \(tools\/vip-add\.mjs\)\r?\n/, (m) => m + `    '${crypto.createHash('sha256').update('arcadia-vip:amiel').digest('hex')}',\n`);
+  .replace(/    \/\/ empreintes des identifiants VIP \(tools\/vip-add\.mjs\)\r?\n/, (m) => m + `    '${crypto.createHash('sha256').update('arcadia-vip:testvip').digest('hex')}',\n`);
 const GAMES = [
   { id: 'a', title: 'Normal', settings: [{ key: 'mode', options: [['n', 'Normal'], ['s', 'Secret', { vip: true }]], def: 'n' }, { key: 'x', vip: true, options: [[1, 'Un']], def: 1 }] },
   { id: 'b', title: 'Jeu VIP', vip: true, settings: [] },
