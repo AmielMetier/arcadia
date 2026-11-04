@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.11 — 4 novembre 2026
+## 4.12 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -17,6 +17,39 @@
 - **The Backrooms** — on voit ce qu'on tient : la lampe torche dans la main droite, et dans la main gauche l'eau d'amande ou les piles quand leur case est choisie. Ils bougent avec le pas et prennent la lumière d'où l'on est.
 - **The Backrooms** — des zones plus claires : par endroits tous les néons marchent et éclairent plus fort et plus loin, entre des couloirs sombres ; moins de néons grillés au hasard, et le caméscope rattrape un peu plus l'obscurité.
 - **The Backrooms** — à bout de souffle après avoir trop couru, on ne peut plus courir pendant une seconde.
+- **The Backrooms** — nouvelle affiche dans le salon : une vraie image du jeu, une salle du Level 0 sous les néons.
+
+## 4.11 — 4 novembre 2026
+- **Arcadia** — Un cinquième compte reçoit le grade VIP.
+
+## 4.10 — 4 novembre 2026
+- Perfections visuelles 16:10 et alignement pixel-art du Registre Ami C-Gear (v4.09) (Amiel)
+
+## 4.09 — 4 novembre 2026
+- **Odyssée** — Visualisation des Joueurs Connectés en direct & Registre Ami B2W2 C-Gear 5G :
+  - **Affichage en direct du nombre de joueurs connectés** :
+    - **Dans le HUD Pokégear (en haut à droite)** : capsule d'état multijoueur avec voyant LED vert pulsé (🟢 X en ligne), réactif en temps réel dès qu'un dresseur rejoint ou quitte la région.
+    - **Dans la barre d'accès rapide** : bouton dédié AMIS (X) avec icône pixel-art personnalisée img/hud/friends.png.
+    - **Dans le Menu Pause (START / Entrée / Échap)** : entrée dynamique AMIS & EN LIGNE (X 🟢) indiquant le nombre exact de dresseurs présents.
+    - **Raccourci clavier universel** : touche O ou G pour ouvrir instantanément l'écran des amis et connexions.
+  - **Écran interactif Registre Ami & Connexions C-Gear 5G (friendsScreen)** :
+    - **Mon Code Ami Personnel** : affichage du code dresseur unique à 8 caractères (XXXX-XXXX) avec bouton de copie en un clic dans le presse-papier et retour visuel animé.
+    - **Onglet Dresseurs en direct** : liste de tous les dresseurs actifs dans la session avec leur sprite miniature, nom, genre, statut en temps réel (Disponible, En combat PvP, Occupé) et localisation GPS exacte (Route 1, Port-Écume, etc.).
+    - **Actions instantanées sur chaque dresseur** : consulter sa Carte de Dresseur complète, lui proposer un duel PvP 1v1, un échange de Pokémon, ou l'ajouter en ami en un clic.
+    - **Onglet Mes Amis** : carnet d'amis complet affichant le statut en ligne/hors-ligne, le numéro de salon de jeu avec possibilité de rejoindre leur salon ou de leur envoyer une invitation.
+    - **Onglet Ajouter un Ami** : formulaire de saisie de Code Ami avec validation automatique et gestion des demandes d'amis reçues (Accepter / Refuser).
+  - **Architecture résiliente (Hub Arcadia & Standalone)** :
+    - Module odyssee/js/net/friends.js unifiant HubFriends, HubBridge et un fallback local (localStorage) fonctionnel même hors-ligne ou hors Hub.
+    - Contrôles non-destructifs : Espace et Entrée n'échappent pas et exécutent les actions, ◄ / ► naviguent entre onglets, Échap referme proprement.
+  - **Tests & Démonstration** :
+    - Suite de tests complète tools/test-friends-and-online.mjs validant 100% des cas d'usage.
+    - Page de prévisualisation autonome odyssee/preview_friends_b2w2.html.
+
+## 4.08 — 4 novembre 2026
+- **The Backrooms** — Le jeu est désormais réservé aux comptes VIP. Si un VIP le lance dans son salon, ses invités peuvent y jouer avec lui.
+
+## 4.07 — 4 novembre 2026
+- **Arcadia** — Les premiers comptes en ligne, protégés par mot de passe, reçoivent le grade VIP (« ⭐ VIP » sous le nom).
 
 ## 4.06 — 4 novembre 2026
 - **Odyssée** — Accessibilité universelle du Système de Stockage des Pokémon (Boîtes PC) :

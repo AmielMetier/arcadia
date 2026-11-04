@@ -10,7 +10,8 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen, friendsScreen } from './ui/screens.js';
+import { getFriendsManager } from './net/friends.js';
 import { recordPvpMatch, ensurePvpState, checkAllTrophies } from './core/trophies.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
@@ -768,6 +769,7 @@ export class Game {
     else if (k === 'velo') { this.busy = true; try { await this.toggleVelo(); } finally { this.busy = false; } }
     else if (k === 'quests') { this.busy = true; await questsScreen(this); this.busy = false; }
     else if (k === 'trophies') { this.busy = true; await trophiesScreen(this); this.busy = false; }
+    else if (k === 'friends') { this.busy = true; await friendsScreen(this); this.busy = false; }
     else if (k === 'hud') this.hud?.toggle();
   }
   async interact() {
@@ -1177,6 +1179,9 @@ export class Game {
     opts.push(['QUÊTES', 'quests']);
     opts.push(['TROPHÉES', 'trophies']);
     if (st.domaine) opts.push([this.mapObj.id === 'domaine' ? 'REVENIR' : 'DOMAINE', 'domaine']);
+    const friendsMgr = getFriendsManager(this);
+    const onlineCount = friendsMgr.getOnlineCount();
+    opts.push([`AMIS & EN LIGNE (${onlineCount} 🟢)`, 'friends']);
     opts.push([st.name.toUpperCase(), 'card'], ['CARTE', 'map'], ['CODE', 'code'], ['OPTIONS', 'opt'], ['FERMER', 'close']);
     let idx = Math.min(this._menuIdx || 0, opts.length - 1);
     for (;;) {
@@ -1189,6 +1194,7 @@ export class Game {
       else if (k === 'pc') await pcScreen(this);
       else if (k === 'bag') { if (await this.fieldBag()) break; }
       else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
+      else if (k === 'friends') await friendsScreen(this);
       else if (k === 'card') await cardScreen(this, BADGES);
       else if (k === 'map') await mapScreen(this);
       else if (k === 'quests') await questsScreen(this);

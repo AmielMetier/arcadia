@@ -6,7 +6,8 @@ import { el, esc } from './ui.js';
 import { ASSETS } from '../assets.js';
 import { monName, expProgress } from '../core/mon.js';
 import { BADGES } from '../world/region.js';
-import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen, trophiesScreen } from './screens.js';
+import { hpCol, statusTag, partyScreen, summaryScreen, mapScreen, cardScreen, questsScreen, trophiesScreen, friendsScreen } from './screens.js';
+import { getFriendsManager } from '../net/friends.js';
 import { getPvpSummary } from '../core/trophies.js';
 import { getTrackedQuest } from '../core/questsData.js';
 
@@ -132,6 +133,9 @@ export class Hud {
       } else if (act === 'trophies') {
         g.busy = true; g.sound.sfx('select');
         try { await trophiesScreen(g); } finally { g.busy = false; this.update(true); }
+      } else if (act === 'friends') {
+        g.busy = true; g.sound.sfx('select');
+        try { await friendsScreen(g); } finally { g.busy = false; this.update(true); }
       }
     });
   }
@@ -149,11 +153,13 @@ export class Hud {
     const pvpSummary = getPvpSummary(st);
     const trUnlocked = pvpSummary?.unlockedCount ?? 0;
     const trTotal = pvpSummary?.trophiesTotal ?? 32;
+    const friendsMgr = getFriendsManager(g);
+    const onlineCount = friendsMgr.getOnlineCount();
     const badgesKey = st.badges.map((b) => (b ? '1' : '0')).join('');
     const partyKey = st.party
       .map((m) => `${m.uid}:${m.sp}:${m.nick || ''}:${m.lvl}:${m.hp}:${m.stats[0]}:${m.exp}:${m.status || ''}:${m.shadow ? 1 : 0}:${m.shiny ? 1 : 0}`)
       .join('|');
-    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${partyKey}`;
+    const sig = `${this.collapsed ? 1 : 0};${g.autoRun ? 1 : 0}:${g.runSpeed ?? 1};${this.swapFrom};${loc};${st.money};${badgesKey};${trUnlocked};${st.trackedQuest || ''}:${tracked?.notes?.length || 0};${onlineCount};${partyKey}`;
     if (!force && sig === this._sig) return;
     this._sig = sig;
 
@@ -210,6 +216,10 @@ export class Hud {
       <div class="hud-gear-card">
         <div class="hud-loc-row">
           <span class="hud-loc" title="Lieu actuel">${esc(loc)}</span>
+          <button type="button" class="hud-online-badge" data-act="friends" title="Dresseurs connectés : ${onlineCount} · Ouvrir le Registre Ami (Touche O / Clic)" tabindex="-1">
+            <span class="hud-online-dot"></span>
+            <span class="hud-online-cnt">${onlineCount} en ligne</span>
+          </button>
           <button type="button" class="hud-toggle" data-act="toggle" title="${this.collapsed ? 'Afficher le HUD (Touche U)' : 'Cacher le HUD (Touche U)'}" tabindex="-1">${this.collapsed ? '▾ HUD' : '▴'}</button>
         </div>
         <div class="hud-stats" data-act="card" title="Cliquer pour ouvrir la Carte de Dresseur">
@@ -255,6 +265,9 @@ export class Hud {
         </button>
         <button type="button" class="hud-btn" data-act="trophies" tabindex="-1" title="Journal des Trophées & Médailles (Touche T)">
           <img src="img/hud/trophy.png" alt="" onerror="this.src='img/trophies/box_120.png'"><span>TROPHÉES</span>
+        </button>
+        <button type="button" class="hud-btn hud-friends-btn" data-act="friends" tabindex="-1" title="Registre Ami & Connexions C-Gear (Touche O)">
+          <img src="img/hud/friends.png" alt="" onerror="this.src='img/hud/team.png'"><span>AMIS (${onlineCount})</span>
         </button>
       </div>
     `;

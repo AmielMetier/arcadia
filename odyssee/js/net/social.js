@@ -34,6 +34,8 @@ export function installSocial(game) {
   link.onRequest = (from, m) => onRequest(game, from, m);
   // fiche demandée par un autre joueur : réponse automatique, sans interrompre la partie
   link.onCard = () => (game.state ? trainerCard(game.state) : null);
+  game.talkToPeer = (peer) => talkToPeer(game, peer);
+  game.showPeerCard = (peer) => showCard(game, peer);
 
   /* ---------------- affichage ---------------- */
   game.peersTick = (dt) => {
@@ -173,7 +175,7 @@ export async function talkToPeer(game, peer) {
 }
 
 /** fiche dresseur d'un autre joueur : badges, Pokédex, temps de jeu, équipe */
-async function showCard(game, peer) {
+export async function showCard(game, peer) {
   const rid = newId();
   game.link.send(peer.id, { t: 'card?', rid });
   const r = await game.link.wait(peer.id, (m) => m.t === 'card' && m.rid === rid, 8000);
