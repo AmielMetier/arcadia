@@ -182,6 +182,29 @@ export class BattleView {
         x.restore();
       }
       else if (p.shape === 'leaf') { x.save(); x.translate(p.x, p.y); x.rotate(p.a || 0); x.fillRect(-3, -1, 6, 3); x.restore(); }
+      else if (p.shape === 'slash') {
+        x.save(); x.strokeStyle = p.c; x.lineWidth = p.lw || 2.5;
+        x.beginPath();
+        const len = p.len || 16, ang = p.ang != null ? p.ang : (Math.PI / 4);
+        x.moveTo(p.x - Math.cos(ang) * len, p.y - Math.sin(ang) * len);
+        x.lineTo(p.x + Math.cos(ang) * len, p.y + Math.sin(ang) * len);
+        x.stroke();
+        x.restore();
+      }
+      else if (p.shape === 'crystal') {
+        x.save(); x.translate(p.x, p.y); x.rotate(p.a || 0);
+        x.fillStyle = p.c;
+        const cs = p.r || 3;
+        x.beginPath(); x.moveTo(0, -cs); x.lineTo(cs * 0.7, 0); x.lineTo(0, cs); x.lineTo(-cs * 0.7, 0); x.closePath();
+        x.fill();
+        x.restore();
+      }
+      else if (p.shape === 'flame') {
+        x.save(); x.translate(p.x, p.y);
+        x.fillStyle = p.c;
+        x.beginPath(); x.arc(0, 0, Math.max(1, p.r), 0, Math.PI * 2); x.fill();
+        x.restore();
+      }
       else x.fillRect(Math.round(p.x - p.r), Math.round(p.y - p.r), Math.max(1, Math.round(p.r * 2)), Math.max(1, Math.round(p.r * 2)));
       x.globalAlpha = 1;
     }
@@ -997,6 +1020,41 @@ export class BattleView {
       await this.animShadowBlast(side, from, to);
       return;
     }
+
+    // --- ANIMATIONS VISUELLES AVANCÉES DES ATTAQUES MAJEURES ---
+    const mKey = M?.key || '', mName = M?.n || '';
+    if (['flamethrower', 'fire-blast', 'heat-wave', 'overheat', 'blast-burn', 'flare-blitz'].includes(mKey) || ['Lance-Flammes', 'Déflagration', 'Canicule', 'Surchauffe', 'Rafale Feu', 'Boutefeu'].includes(mName)) {
+      await this.animFlamethrower(side, from, to, mKey === 'fire-blast' || mName === 'Déflagration');
+      return;
+    }
+    if (['hydro-pump', 'surf', 'waterfall', 'scald', 'muddy-water', 'hydro-cannon'].includes(mKey) || ['Hydrocanon', 'Surf', 'Cascade', 'Ébullition', 'Hydroblast'].includes(mName)) {
+      await this.animHydroPump(side, from, to);
+      return;
+    }
+    if (['thunderbolt', 'thunder', 'discharge', 'zap-cannon', 'volt-switch'].includes(mKey) || ['Tonnerre', 'Fatal-Foudre', 'Coup d’Jus', 'Élecanon', 'Change-Éclair'].includes(mName)) {
+      await this.animThunderbolt(side, from, to, mKey === 'thunder' || mName === 'Fatal-Foudre');
+      return;
+    }
+    if (['earthquake', 'earth-power', 'fissure', 'bulldoze', 'magnitude'].includes(mKey) || ['Séisme', 'Telluriforce', 'Abîme', 'Piétinement', 'Ampleur'].includes(mName)) {
+      await this.animEarthquake(side, from, to);
+      return;
+    }
+    if (['ice-beam', 'blizzard', 'sheer-cold', 'freeze-dry', 'glaciate'].includes(mKey) || ['Laser Glace', 'Blizzard', 'Glaciation', 'Lyophilisation'].includes(mName)) {
+      await this.animIceBeam(side, from, to, mKey === 'blizzard' || mName === 'Blizzard');
+      return;
+    }
+    if (['psychic', 'psyshock', 'shadow-ball', 'dark-pulse', 'future-sight'].includes(mKey) || ['Psyko', 'Choc Psy', 'Ball’Ombre', 'Vibrobscur'].includes(mName)) {
+      await this.animPsychicShadow(side, from, to, M?.t === 'ghost' || M?.t === 'dark');
+      return;
+    }
+    if (['razor-leaf', 'leaf-blade', 'leaf-storm', 'petal-dance', 'frenzy-plant'].includes(mKey) || ['Tranch’Herbe', 'Lame Feuille', 'Tempête Verte', 'Danse Fleurs', 'Végé-Attak'].includes(mName)) {
+      await this.animLeafBlade(side, from, to);
+      return;
+    }
+    if (['hyper-beam', 'solar-beam', 'giga-impact', 'focus-blast'].includes(mKey) || ['Ultralaser', 'Lance-Soleil', 'Giga Impact', 'Exploforce'].includes(mName)) {
+      await this.animHyperBeam(side, from, to);
+      return;
+    }
     if (M.c === 'physical') {
       await this.tween(130, (u) => { o.dx = dir * 14 * Math.sin(u * Math.PI / 2); o.dy = -dir * 6 * Math.sin(u * Math.PI / 2); });
       this.burst(to.x, to.y, fx, 16, { speed: 2.4, r: 2 });
@@ -1024,6 +1082,313 @@ export class BattleView {
       await wait(180);
     }
   }
+  /* ---------------- ANIMATIONS VISUELLES AVANCÉES DES ATTAQUES MAJEURES ---------------- */
+
+  async animFlamethrower(side, from, to, isBlast = false) {
+    const o = side === 1 ? this.st.foe : this.st.me;
+    const dir = side === 1 ? -1 : 1;
+    const flameCols = ['#ffffff', '#fff340', '#ff9800', '#f44336', '#b71c1c'];
+
+    this.sound.sfx('throw');
+    await this.tween(120, (u) => { o.dx = dir * 12 * Math.sin(u * Math.PI); });
+
+    const dur = isBlast ? 560 : 480;
+    const flameCount = isBlast ? 42 : 32;
+    this.sound.sfx('hitstrong');
+
+    await this.tween(dur, (u) => {
+      const emitted = Math.floor(u * flameCount);
+      while ((this._fEmitted || 0) < emitted) {
+        this._fEmitted = (this._fEmitted || 0) + 1;
+        const progress = this._fEmitted / flameCount;
+        const bx = from.x + (to.x - from.x) * progress;
+        const by = (from.y - 6) + (to.y - (from.y - 6)) * progress + Math.sin(progress * Math.PI * 3) * 12;
+        const spread = (Math.random() - 0.5) * (6 + progress * 16);
+        const col = flameCols[Math.floor(Math.random() * flameCols.length)];
+        this.st.parts.push({
+          x: bx + spread,
+          y: by + (Math.random() - 0.5) * 8,
+          vx: (to.x - from.x) * 0.04 + (Math.random() - 0.5) * 0.8,
+          vy: -0.6 - Math.random() * 0.8,
+          r: 2.5 + progress * 4.5,
+          grow: 0.25,
+          c: col,
+          shape: 'flame',
+          life: 0.38,
+          max: 0.38,
+        });
+      }
+    });
+    this._fEmitted = 0;
+
+    this.st.screenFlash = 0.35;
+    this.shakeScreen(isBlast ? 6 : 4, 320);
+    this.burst(to.x, to.y, flameCols, isBlast ? 28 : 20, { speed: 3.2, r: 3.5 });
+    for (let i = 0; i < (isBlast ? 4 : 2); i++) {
+      this.st.parts.push({
+        x: to.x, y: to.y,
+        vx: 0, vy: 0,
+        r: 6 + i * 8, grow: 2.2,
+        shape: 'ring',
+        c: flameCols[i % flameCols.length],
+        life: 0.35, max: 0.35
+      });
+    }
+    await wait(200);
+  }
+
+  async animHydroPump(side, from, to) {
+    const waterCols = ['#e0f7ff', '#80d8ff', '#00b0ff', '#0091ea', '#ffffff'];
+    this.sound.sfx('splash');
+    const dur = 540;
+    const waterCount = 38;
+
+    await this.tween(dur, (u) => {
+      const emitted = Math.floor(u * waterCount);
+      while ((this._wEmitted || 0) < emitted) {
+        this._wEmitted = (this._wEmitted || 0) + 1;
+        const p = this._wEmitted / waterCount;
+        const px = from.x + (to.x - from.x) * p;
+        const py = (from.y - 4) + (to.y - (from.y - 4)) * p - Math.sin(p * Math.PI) * 26;
+        const col = waterCols[Math.floor(Math.random() * waterCols.length)];
+        this.st.parts.push({
+          x: px + (Math.random() - 0.5) * 10,
+          y: py + (Math.random() - 0.5) * 8,
+          vx: (to.x - from.x) * 0.035,
+          vy: 0.8 + Math.random() * 0.8,
+          r: 2 + p * 3.8,
+          grow: 0.15,
+          c: col,
+          life: 0.36,
+          max: 0.36
+        });
+      }
+    });
+    this._wEmitted = 0;
+
+    this.sound.sfx('splash');
+    this.shakeScreen(5, 360);
+    this.burst(to.x, to.y, waterCols, 26, { speed: 3.5, r: 3, up: 1.2 });
+    this.st.parts.push({ x: to.x, y: to.y + 8, vx: 0, vy: 0, r: 10, grow: 2.8, shape: 'ring', c: '#80d8ff', life: 0.38, max: 0.38 });
+    this.st.parts.push({ x: to.x, y: to.y + 8, vx: 0, vy: 0, r: 18, grow: 3.2, shape: 'ring', c: '#ffffff', life: 0.42, max: 0.42 });
+    await wait(220);
+  }
+
+  async animThunderbolt(side, from, to, isThunder = false) {
+    const elecCols = ['#ffffff', '#ffff76', '#ffea00', '#00e5ff'];
+    this.st.screenFlash = -0.2;
+    await wait(70);
+
+    const strikes = isThunder ? 4 : 2;
+    for (let s = 0; s < strikes; s++) {
+      this.sound.sfx('bang');
+      this.st.screenFlash = 0.55;
+      this.shakeScreen(isThunder ? 7 : 5, 220);
+
+      for (let k = 0; k < 3; k++) {
+        this.st.parts.push({
+          x: to.x + (Math.random() - 0.5) * 18,
+          y: -10,
+          vx: 0,
+          vy: 1.8,
+          r: 3,
+          lw: 3,
+          shape: 'bolt',
+          c: elecCols[Math.floor(Math.random() * elecCols.length)],
+          life: 0.28,
+          max: 0.28
+        });
+      }
+
+      this.burst(to.x, to.y, elecCols, 16, { speed: 3.2, r: 2.5 });
+      this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 8, grow: 2.5, shape: 'ring', c: '#ffea00', life: 0.3, max: 0.3 });
+      await wait(110);
+    }
+    await wait(140);
+  }
+
+  async animEarthquake(side, from, to) {
+    const earthCols = ['#5d4037', '#8d6e63', '#a1887f', '#ffb74d', '#3e2723'];
+    this.sound.sfx('hitstrong');
+    this.shakeScreen(9, 580);
+
+    for (let i = 0; i < 4; i++) {
+      this.st.parts.push({
+        x: to.x,
+        y: to.y + 16,
+        vx: 0, vy: 0,
+        r: 8 + i * 12,
+        grow: 3.6,
+        shape: 'ring',
+        c: earthCols[i % earthCols.length],
+        life: 0.48,
+        max: 0.48
+      });
+      await wait(80);
+    }
+
+    this.sound.sfx('bump');
+    for (let k = 0; k < 22; k++) {
+      this.st.parts.push({
+        x: to.x + (Math.random() - 0.5) * 44,
+        y: to.y + 14,
+        vx: (Math.random() - 0.5) * 2.8,
+        vy: -2.8 - Math.random() * 2.5,
+        g: 0.22,
+        r: 2 + Math.random() * 3,
+        c: earthCols[Math.floor(Math.random() * earthCols.length)],
+        life: 0.48,
+        max: 0.48
+      });
+    }
+    await wait(240);
+  }
+
+  async animIceBeam(side, from, to, isBlizzard = false) {
+    const iceCols = ['#e1f5fe', '#b3e5fc', '#80deea', '#00e5ff', '#ffffff'];
+    this.sound.sfx('stat');
+    const dur = 460;
+    const crystalCount = isBlizzard ? 36 : 26;
+
+    await this.tween(dur, (u) => {
+      const emitted = Math.floor(u * crystalCount);
+      while ((this._iEmitted || 0) < emitted) {
+        this._iEmitted = (this._iEmitted || 0) + 1;
+        const p = this._iEmitted / crystalCount;
+        const px = from.x + (to.x - from.x) * p;
+        const py = from.y + (to.y - from.y) * p + (Math.random() - 0.5) * 8;
+        this.st.parts.push({
+          x: px,
+          y: py,
+          vx: (to.x - from.x) * 0.04,
+          vy: (Math.random() - 0.5) * 0.6,
+          r: 2.5 + Math.random() * 2.5,
+          a: Math.random() * Math.PI,
+          va: 0.15,
+          shape: 'crystal',
+          c: iceCols[Math.floor(Math.random() * iceCols.length)],
+          life: 0.32,
+          max: 0.32
+        });
+      }
+    });
+    this._iEmitted = 0;
+
+    this.sound.sfx('hitweak');
+    this.burst(to.x, to.y, iceCols, 24, { speed: 3.2, r: 2.8 });
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 12, grow: 2.2, shape: 'ring', c: '#80deea', life: 0.35, max: 0.35 });
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 20, grow: 2.6, shape: 'ring', c: '#ffffff', life: 0.4, max: 0.4 });
+    await wait(180);
+  }
+
+  async animPsychicShadow(side, from, to, isShadow = false) {
+    const cols = isShadow
+      ? ['#1a052e', '#4a148c', '#7b1fa2', '#d500f9', '#ffffff']
+      : ['#f3e5f5', '#e040fb', '#aa00ff', '#651fff', '#ffffff'];
+
+    this.sound.sfx('stat');
+    await this.tween(380, (u) => {
+      const px = from.x + (to.x - from.x) * ease(u);
+      const py = from.y + (to.y - from.y) * ease(u) - Math.sin(u * Math.PI) * 14;
+      this.st.parts.push({
+        x: px + (Math.random() - 0.5) * 6,
+        y: py + (Math.random() - 0.5) * 6,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: (Math.random() - 0.5) * 0.8,
+        r: 3 + u * 4.5,
+        c: cols[Math.floor(Math.random() * cols.length)],
+        life: 0.28,
+        max: 0.28
+      });
+    });
+
+    this.sound.sfx('poof');
+    this.shakeScreen(4, 280);
+    this.burst(to.x, to.y, cols, 22, { speed: 2.8, r: 3 });
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 10, grow: 2.6, shape: 'ring', c: cols[1], life: 0.38, max: 0.38 });
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 18, grow: 3.2, shape: 'ring', c: cols[3], life: 0.42, max: 0.42 });
+    await wait(190);
+  }
+
+  async animLeafBlade(side, from, to) {
+    const leafCols = ['#76ff03', '#00e676', '#00c853', '#1b5e20', '#ffffff'];
+    this.sound.sfx('cut');
+
+    for (let k = 0; k < 20; k++) {
+      const p = k / 20;
+      this.st.parts.push({
+        x: from.x + (to.x - from.x) * p + (Math.random() - 0.5) * 14,
+        y: from.y + (to.y - from.y) * p + Math.sin(p * Math.PI * 2) * 14,
+        vx: (to.x - from.x) * 0.04,
+        vy: -0.4 + Math.random() * 0.8,
+        r: 3,
+        a: Math.random() * Math.PI,
+        va: 0.25,
+        shape: 'leaf',
+        c: leafCols[Math.floor(Math.random() * leafCols.length)],
+        life: 0.38,
+        max: 0.38
+      });
+    }
+    await wait(180);
+
+    this.sound.sfx('cut');
+    this.shakeScreen(3, 200);
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, shape: 'slash', ang: Math.PI / 4, len: 20, lw: 3, c: '#00e676', life: 0.28, max: 0.28 });
+    this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, shape: 'slash', ang: -Math.PI / 4, len: 20, lw: 3, c: '#ffffff', life: 0.28, max: 0.28 });
+    this.burst(to.x, to.y, leafCols, 16, { speed: 2.5, r: 2 });
+    await wait(180);
+  }
+
+  async animHyperBeam(side, from, to) {
+    const o = side === 1 ? this.st.foe : this.st.me;
+    const beamCols = ['#ffffff', '#ffea00', '#ff6d00', '#d50000'];
+
+    this.sound.sfx('throw');
+    await this.tween(240, (u) => {
+      o.white = u * 0.6;
+      const ang = Math.random() * Math.PI * 2, dist = 20 * (1 - u);
+      this.st.parts.push({
+        x: from.x + Math.cos(ang) * dist,
+        y: from.y + Math.sin(ang) * dist,
+        vx: -Math.cos(ang) * 1.5,
+        vy: -Math.sin(ang) * 1.5,
+        r: 2,
+        c: '#ffea00',
+        life: 0.22,
+        max: 0.22
+      });
+    });
+
+    this.sound.sfx('hitstrong');
+    this.st.screenFlash = 0.65;
+    this.shakeScreen(8, 480);
+
+    for (let i = 0; i < 28; i++) {
+      const p = i / 28;
+      const px = from.x + (to.x - from.x) * p;
+      const py = from.y + (to.y - from.y) * p;
+      this.st.parts.push({
+        x: px,
+        y: py,
+        vx: 0, vy: 0,
+        r: 5 + (1 - Math.abs(p - 0.5) * 2) * 4,
+        c: beamCols[i % beamCols.length],
+        shape: 'flame',
+        life: 0.35,
+        max: 0.35
+      });
+    }
+
+    this.burst(to.x, to.y, beamCols, 32, { speed: 4.2, r: 4 });
+    for (let r = 0; r < 3; r++) {
+      this.st.parts.push({ x: to.x, y: to.y, vx: 0, vy: 0, r: 12 + r * 10, grow: 3.5, shape: 'ring', c: beamCols[r], life: 0.42, max: 0.42 });
+    }
+    o.white = 0;
+    await wait(260);
+  }
+
+
   async animShadowBlast(side, from, to) {
     const o = side === 1 ? this.st.foe : this.st.me;
     const targetO = side === 1 ? this.st.me : this.st.foe;

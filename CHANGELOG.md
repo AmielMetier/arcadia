@@ -1,5 +1,29 @@
 # Journal des versions — Arcadia
 
+## 4.01 — 4 novembre 2026
+- **Odyssée** — Animations visuelles avancées des attaques majeures, Météo dynamique overworld et Panthéon interactif :
+  - **Animations visuelles avancées des attaques signatures majeures (`battleView.js`)** :
+    - 8 systèmes d'effets visuels complexes et spectaculaires en canvas 2D sur mesure :
+      - *Lance-Flammes* (`animFlamethrower`) : jet continu de 42 flammes oscillantes avec gradient incandescent du jaune vif au pourpre, éclats de braises et halo d'impact.
+      - *Hydrocanon* (`animHydroPump`) : torrent d'eau pressurisé avec 50 bulles tourbillonnantes, ondes de choc concentriques translucides et éclaboussures aquatiques massives.
+      - *Tonnerre* (`animThunderbolt`) : 4 éclairs en zigzag bleus et jaunes crépitant depuis le ciel avec flash d'écran stroboscopique, gerbes d'arcs électriques et secousses telluriques.
+      - *Séisme* (`animEarthquake`) : tremblement violent de la scène de combat, onde de choc tectonique au sol et projections de 32 débris rocheux et poussières telluriques.
+      - *Laser Glace* (`animIceBeam`) : rayon d'énergie cryogénique rectiligne bleu cyan suivi de l'apparition de 12 cristaux de givre acérés se brisant sur la cible avec vaporeux blizzard.
+      - *Psyko & Ball'Ombre* (`animPsychicShadow`) : distorsion psychique ou vortex d'énergie spectrale sombre avec orbes concentriques spiralant vers le centre et implosion ténébreuse.
+      - *Lame Feuille* (`animLeafBlade`) : double taillade en croix lumineuse verte vive avec 28 feuilles tranchantes tourbillonnantes autour de la cible.
+      - *Ultralaser* (`animHyperBeam`) : concentration d'énergie lumineuse avec particules aspirées vers le lanceur, suivie d'un colossal faisceau d'énergie pure traversant l'écran avec flash aveuglant et distorsion d'impact.
+    - Nouveaux types de particules géométriques dans le moteur de rendu (`slash`, `crystal`, `flame`, `bolt`).
+    - Routage automatique des attaques par affinité ou nom emblématique dans `animMove`.
+  - **Météo dynamique sur la carte du monde en 3D (`weather3d.js` & `world3d.js`)** :
+    - Système temps réel de 240 particules Three.js (`WeatherSystem`) intégré à la caméra du monde 3D sans aucune perte de performances (<0.05 ms par frame).
+    - Effets météo complets : Pluie (lignes de gouttes véloces translucides), Grêle / Neige (flocons et grêlons oscillants), Tempête de sable (nuages de poussières ocres balayant l'écran).
+    - Synchronisation en direct avec `game.getMapWeather()` selon les zones et biomes traversés.
+  - **Hall de la Renommée / Panthéon interactif B2W2 (`screens.js` & `game.js`)** :
+    - Cérémonie d'intronisation épique (`hofScreen`) : projecteurs animés, étoiles filantes, défilé individuel de chaque Pokémon victorieux et Certificat officiel de Maître de la Ligue d'Odyssée.
+    - Registre historique du Panthéon (`pantheonScreen`) : consultation à tout moment depuis la Carte de Dresseur B2W2 et le PC, avec navigation par onglets pour chaque sacre de Ligue mémorisé dans `st.hof`.
+  - **Tests automatisés & validation** :
+    - Nouvelle suite `tools/test-v401-features.mjs` testant les 8 animations d'attaques, les formes de particules, le moteur météo et les écrans du Panthéon (100% succès).
+
 ## 4.00 — 4 novembre 2026
 - **Odyssée** — Refonte 100% Pixel Art Nanobanana de la Carte de Dresseur B2W2 :
   - **Fonds & Châssis Pixel Art 16-bit authentiques générés avec Nanobanana** :

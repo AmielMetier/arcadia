@@ -10,7 +10,7 @@ import { SAUVAGE, R } from './data/remplacants.js';
 import { STARTERS, STARTER_CHOICES, STARTER_TABLE, starterSlot, RIVAL_NAME, BADGES, LEADERS, FIELD } from './world/region.js';
 import { BattleView } from './ui/battleView.js';
 import { Hud } from './ui/hud.js';
-import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast } from './ui/screens.js';
+import { partyScreen, bagScreen, dexScreen, mapScreen, cardScreen, shopScreen, pcScreen, naturePcScreen, moveRelearnerScreen, optionsScreen, pokedexRegisterScene, TYPE_FR, questsScreen, trophiesScreen, showTrophyToast, hofScreen, pantheonScreen } from './ui/screens.js';
 import { recordPvpMatch, ensurePvpState, checkAllTrophies } from './core/trophies.js';
 import { el, esc, wait } from './ui/ui.js';
 import { ASSETS, loadImg } from './assets.js';
@@ -377,6 +377,7 @@ export class Game {
     this.zone = z; this.explore();
     if (!this.musicLock) this.sound.play(p.surf && m.outdoor ? 'route2' : (z && z.music) || m.music);
     this.zone = z;
+    try { this.view?.setWeather(this.getMapWeather()); } catch (e) {}
   }
 
   async warp(to, sfx = 'door') {
@@ -2117,10 +2118,28 @@ export class Game {
     await ui.say(['Félicitations !', `${st.name}, tu es le nouveau Maître de la Ligue Céleste !`, 'Drakos m\'a fait passer un message, tu sais. « Le vieux Drakos attend sa revanche. »', st.flags.rivalB3 ? `Et ${B.name} m'a écrit aussi. ${B.il === 'il' ? 'Il' : 'Elle'} veut ouvrir une arène à Port-Granit, ouverte à tous.` : 'Drakos a rouvert les ports de l\'archipel.', 'Grâce à toi, les îles et le continent se reparlent.', 'Et sans toi, la nuit de la Team Éclipse recouvrirait encore la région. Lugia veille de nouveau sur les marées.', 'Ton équipe et toi entrez au Panthéon des dresseurs.'], { speaker: 'Célestine' });
     await ui.say([`Bravo, ${st.name}. Tu as tenu ta promesse.`, 'Mais la prochaine fois, c\'est moi qui serai Maître !'], { speaker: RIVAL_NAME });
     if (st.flags.rivalB4) await ui.say(['Félicitations. Je suis venu' + B.e + ' avec mon grand-père pour voir ça.', 'On se reverra sur les îles. Elles t\'attendront toujours.'], { speaker: B.name });
-    const s = el('div', 'screen hof-scr'); s.innerHTML = `<div class="scr-title">PANTHÉON</div><div class="hof">${st.party.map((m) => `<div class="hof-m box"><img src="${ASSETS.front(m.sp, m.shiny)}" alt=""><div>${esc(monName(m))}</div><div>N.${m.lvl}</div></div>`).join('')}</div><div class="box hof-txt">${esc(st.name)} — Maître de la Ligue · ${st.dex.caught.length} créatures capturées<br>Merci d'avoir joué à ce prototype d'Odyssée !</div>`;
-    ui.root.appendChild(s);
-    await new Promise((res) => { const pop = this.input.push((k) => { if (k === 'a' || k === 'b') { pop(); res(); } }); });
-    s.remove();
+    if (!st.hof) st.hof = [];
+    const entry = {
+      id: st.hof.length + 1,
+      date: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      time: st.time || 0,
+      title: st.hof.length === 0 ? 'Nouveau Maître' : `Sacre #${st.hof.length + 1}`,
+      team: st.party.map((m) => ({
+        sp: m.sp,
+        nick: m.nick || null,
+        lvl: m.lvl,
+        shiny: !!m.shiny,
+        shadow: !!m.shadow,
+        g: m.g,
+        moves: (m.moves || []).map((x) => ({ id: x.id, pp: x.pp })),
+        stats: [...m.stats],
+        ball: m.ball || 'poke-ball',
+        ot: m.ot || st.name,
+      })),
+      dexCount: st.dex?.caught?.length || 0,
+    };
+    st.hof.push(entry);
+    await hofScreen(this, entry);
     for (const m of st.party) healFull(m);
     this.save(true);
   }
