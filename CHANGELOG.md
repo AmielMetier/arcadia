@@ -1,5 +1,22 @@
 # Journal des versions — Arcadia
 
+## 4.04 — 4 novembre 2026
+- **Odyssée** — Refonte 100% Pixel-Art Nanobanana de l'interface de la Carte et de la Cartographie Régionale B2W2 :
+  - **Interface C-Gear B2W2 (Concept 1 validé)** :
+    - Remplacement de l'ancien écran par un véritable châssis rétro Nintendo DS façon C-Gear 5G (`c_gear_b2w2_bg.jpg`) au fini carbone bleu nuit, biseaux métalliques chanfreinés et trame de scanlines.
+    - Nouvel en-tête avec voyant C-Gear holographique animé (`cgearPulse`), titre lumineux cyan `#00e0ff`, compteur dynamique des villes découvertes et badge de niveau max (Level Cap).
+    - Cadre cartographique biseauté avec 4 coins de visée néon et affichage tête haute (coordonnées GPS en direct et mention « RADAR 5G ACTIF »).
+    - Nouveau radar de joueur (« VOUS ÊTES ICI ») avec onde circulaire expansive pulsante (`mapRadarWave`) et noyau lumineux.
+    - Marqueurs interactifs avec symboles distinctifs pour les Arènes (`★`), les badges obtenus (`✓`) et la Ligue Pokémon (`👑`).
+    - Curseur de ciblage technologique réticulaire (`map-cur-bracket`) avec animation fluide de déplacement.
+    - Tiroir de contrôle tactile inférieur avec boutons rétro 3D DS (`◀ LIEU PRÉC.` et `LIEU SUIV. ▶`), fiche descriptive détaillée et légende complète à 4 pastilles (Vous, Ville, Arène, Ligue).
+  - **Cartographie Régionale B2W2 (Option A validée)** :
+    - Nouvelle palette haute définition B2W2 (`B2W2_PALETTE`) : océan profond sapphire en dégradé d'altimétrie et écume cyan vif, côtes et falaises étagées aux teintes chaudes, plaines d'Unys et forêts denses contrastées.
+    - Voies terrestres et maritimes à liseré sombre et coeur clair cyan néon pour une visibilité cartographique optimale.
+    - Intégration de l'illustration de référence `odyssee_region_map_b2w2.jpg` dans les assets du jeu (`ASSETS.regionMapB2W2`).
+  - **Tests automatisés** :
+    - Création de `tools/test-b2w2-map.mjs` validant les assets d'arrière-plan, les endpoints `ASSETS`, le cycle de vie de `mapScreen` et les contrôles clavier non-destructifs (100% succès).
+
 ## 4.03 — 4 novembre 2026
 - **Odyssée** — Normalisation des touches d'action Clavier (Espace, Entrée et Échap) sur tous les écrans modaux :
   - **Correction du comportement des touches Espace & Entrée (`'a'`)** :

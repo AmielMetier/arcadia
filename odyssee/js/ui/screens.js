@@ -1081,12 +1081,13 @@ export function dexScreen(game) {
 /** carte de la région, dessinée comme le Pokégear de HeartGold / SoulSilver : mer en trois bleus, côtes en falaises,
  *  plaines et forêts, montagnes en paliers, routes blanches cerclées de gris, villes en pastilles rouges.
  *  Un pixel = une case ; le relief est posé par blocs de 2 × 2 cases, comme les pixels doublés du DS. */
-const HG = {
-  open: [81, 186, 218], far: [66, 181, 206], deep: [57, 165, 189], foam: [139, 219, 244],
-  flat: [97, 195, 146], shadow: [81, 179, 128], cliff: [197, 145, 106],
-  top: [242, 178, 130], vhigh: [220, 162, 114], high: [195, 146, 105], low: [162, 130, 89],
-  ink: '#525252', road: '#ffffff', town: '#fa5263', townDark: '#a23047', special: '#72cb93', water: '#60b2fc',
+const B2W2_PALETTE = {
+  open: [20, 68, 108], far: [14, 50, 84], deep: [10, 36, 62], foam: [0, 224, 255],
+  flat: [60, 164, 116], shadow: [40, 126, 86], cliff: [168, 122, 88],
+  top: [238, 180, 136], vhigh: [214, 158, 116], high: [188, 140, 100], low: [156, 122, 84],
+  ink: '#0b1c2d', road: '#e0f4ff', town: '#ef4444', townDark: '#991b1b', special: '#00e0ff', water: '#185a9d',
 };
+const HG = B2W2_PALETTE;
 let carteIcons = null;
 function loadCarteIcons() {
   if (carteIcons) return carteIcons;
@@ -1196,8 +1197,13 @@ function drawRegion(game, cv, v) {
   for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
   const visited = new Set(game.state.visited || []);
   for (const t of Object.values(game.world.towns)) {
-    const big = t.gym != null || t.id === 'plateau';
-    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+    const isGym = t.gym != null;
+    const isLigue = t.id === 'plateau';
+    const big = isGym || isLigue;
+    const isVis = visited.has(t.id);
+    const fillCol = isLigue ? (isVis ? '#a855f7' : '#7e22ce') : isGym ? (isVis ? '#fbbf24' : '#d97706') : (isVis ? '#ef4444' : '#64748b');
+    const darkCol = isLigue ? '#4c1d95' : isGym ? '#92400e' : (isVis ? '#991b1b' : '#334155');
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, fillCol, darkCol);
   }
   // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
   const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
@@ -1251,33 +1257,50 @@ export function mapScreen(game) {
               ? 'Siège du Conseil des 4 et du Maître de la Ligue'
               : 'Ville visitée · Centre Pokémon disponible',
           tag: hasGym ? (gotBadge ? 'BADGE OBTENU ✓' : `ARÈNE #${gIdx + 1} (CAP N.${capLvl})`) : t.id === 'plateau' ? 'LIGUE POKÉMON' : 'VILLE VISITÉE',
-          tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : 'town',
+          tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : t.id === 'plateau' ? 'league' : 'town',
         };
       })
     );
 
     s.innerHTML = `
-      <div class="scr-bar">
-        <div class="scr-bar-left">
-          <img class="scr-bar-ico" src="img/hud/map.png" alt="">
-          <span class="scr-bar-title">CARTE DE LA RÉGION D'ODYSSÉE</span>
-          <span class="scr-bar-sub">${visited.size} / ${allTowns.length} VILLES</span>
+      <!-- Fond et Châssis C-Gear B2W2 Nanobanana -->
+      <img class="map-pixelart-bg" src="${ASSETS.carteBg}" alt="">
+      <div class="map-scanlines"></div>
+
+      <!-- En-tête C-Gear B2W2 -->
+      <div class="map-b2w2-hdr">
+        <div class="map-hdr-left">
+          <div class="map-cgear-icon"></div>
+          <div class="map-hdr-titles">
+            <span class="map-hdr-main">CARTE DE LA RÉGION D'ODYSSÉE</span>
+            <span class="map-hdr-sub">${visited.size} / ${allTowns.length} VILLES DÉCOUVERTES · SYSTÈME C-GEAR 5G</span>
+          </div>
         </div>
-        <div class="scr-bar-right">
-          <span class="scr-cap-badge">NIV. MAX ACTUEL : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
-          <button type="button" class="scr-close-btn" data-act="close">FERMER ✕</button>
+        <div class="map-hdr-right">
+          <span class="map-cap-pill">CAP NIVEAU : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
+          <button type="button" class="map-close-btn" data-act="close" title="Fermer (Échap)">FERMER ✕</button>
         </div>
       </div>
+
+      <!-- Cadre Écran Cartographique Central -->
       <div class="map-stage">
         <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
           <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
+          <div class="map-hud-overlay">
+            <span class="map-coord-tag">LOC: [${Math.round(p.x)}, ${Math.round(p.y)}]</span>
+            <span class="map-radar-tag">RADAR 5G ACTIF</span>
+          </div>
         </div>
       </div>
+
+      <!-- Panneau Inférieur Tactile B2W2 -->
       <div class="map-footer">
-        <button type="button" class="map-nav-btn" data-act="prev" title="Lieu précédent (◀)">◀</button>
+        <button type="button" class="map-nav-btn prev" data-act="prev" title="Lieu précédent (◀ ou Flèche Gauche)">
+          <span class="map-btn-arr">◀</span> LIEU PRÉC.
+        </button>
         <div class="map-info">
           <div class="map-info-top">
             <span class="map-where"></span>
@@ -1285,11 +1308,14 @@ export function mapScreen(game) {
           </div>
           <div class="map-sub"></div>
         </div>
-        <button type="button" class="map-nav-btn" data-act="next" title="Lieu suivant (▶)">▶</button>
+        <button type="button" class="map-nav-btn next" data-act="next" title="Lieu suivant (▶ ou Flèche Droite)">
+          LIEU SUIV. <span class="map-btn-arr">▶</span>
+        </button>
         <div class="map-legend">
           <span><i class="lg-dot me"></i> Vous</span>
           <span><i class="lg-dot town"></i> Ville</span>
           <span><i class="lg-dot gym"></i> Arène</span>
+          <span><i class="lg-dot league"></i> Ligue</span>
         </div>
       </div>`;
 
@@ -1323,6 +1349,7 @@ export function mapScreen(game) {
     st.mapView = target;
 
     const me = el('div', 'map-me');
+    me.innerHTML = '<div class="map-me-radar"></div><div class="map-me-core"></div>';
     pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
@@ -1333,6 +1360,7 @@ export function mapScreen(game) {
       pin.type = 'button';
       pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
+      pin.innerHTML = sp.tagCls?.includes('gym') ? '★' : sp.tagCls?.includes('badge-ok') ? '✓' : sp.tagCls?.includes('league') ? '👑' : '';
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
         k = idx;
@@ -1343,6 +1371,7 @@ export function mapScreen(game) {
     });
 
     const cur = el('div', 'map-cur');
+    cur.innerHTML = '<div class="map-cur-bracket tl"></div><div class="map-cur-bracket tr"></div><div class="map-cur-bracket bl"></div><div class="map-cur-bracket br"></div>';
     lab.appendChild(cur);
     const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
