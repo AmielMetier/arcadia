@@ -1014,6 +1014,74 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
   flashLight.target = flashTarget;
   scene.add(camera);
 
+  // Ce que l'on tient devant soi : la lampe torche dans la main droite, et dans la main gauche l'objet de la case
+  // choisie (eau d'amande ou piles ; l'échelle, trop grande, reste dans le sac). Ils suivent la caméra et prennent
+  // la lumière d'où l'on est (néons autour, lampe allumée).
+  const held = new THREE.Group();
+  camera.add(held);
+  const heldMats = [];
+  const hmat = (opts) => {
+    const m = new THREE.MeshBasicMaterial(opts);
+    m.userData.base = m.color.clone();
+    heldMats.push(m);
+    return m;
+  };
+  const along = (geo) => geo.rotateX(Math.PI / 2); // un cylindre couché dans l'axe du regard
+  // la lampe : corps noir strié, tête chromée, verre qui s'allume
+  const heldLamp = new THREE.Group();
+  const lampBody = hmat({ color: '#2a2b2e' });
+  const lampRing = hmat({ color: '#5d6066' });
+  heldLamp.add(new THREE.Mesh(along(new THREE.CylinderGeometry(0.021, 0.021, 0.19, 14)), lampBody));
+  for (const z of [-0.03, 0, 0.03]) {
+    const grip = new THREE.Mesh(along(new THREE.CylinderGeometry(0.0225, 0.0225, 0.012, 14)), lampRing);
+    grip.position.z = z + 0.02;
+    heldLamp.add(grip);
+  }
+  const lampHead = new THREE.Mesh(along(new THREE.CylinderGeometry(0.034, 0.024, 0.055, 16)), lampRing);
+  lampHead.position.z = -0.12;
+  heldLamp.add(lampHead);
+  const lensMat = new THREE.MeshBasicMaterial({ color: '#2c2b26' });
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.031, 16), lensMat);
+  lens.position.z = -0.148;
+  heldLamp.add(lens);
+  heldLamp.position.set(0.21, -0.2, -0.5);
+  heldLamp.rotation.set(0.08, 0.18, 0);
+  heldLamp.scale.setScalar(0.85);
+  held.add(heldLamp);
+  // l'eau d'amande : la même bouteille qu'au sol, avec son étiquette
+  const heldBottle = new THREE.Group();
+  const hGlass = hmat({ color: '#e6eef2', transparent: true, opacity: 0.7 });
+  const hBody = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.26, 16), hGlass);
+  hBody.position.y = 0.13;
+  const hLabel = new THREE.Mesh(new THREE.CylinderGeometry(0.0715, 0.0715, 0.1, 16, 1, true), hmat({ map: textures.label }));
+  hLabel.position.y = 0.12;
+  hLabel.rotation.y = Math.PI * 0.85; // le logo vers soi
+  const hNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 0.06, 12), hGlass);
+  hNeck.position.y = 0.29;
+  const hCap = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.035, 12), hmat({ color: '#f2f2ee' }));
+  hCap.position.y = 0.335;
+  heldBottle.add(hBody, hLabel, hNeck, hCap);
+  heldBottle.scale.setScalar(0.62);
+  heldBottle.position.set(-0.22, -0.33, -0.5);
+  heldBottle.rotation.set(0.12, 0, 0.18);
+  held.add(heldBottle);
+  // les piles : deux grosses piles noires à bout cuivré, dans la paume
+  const heldBattery = new THREE.Group();
+  const hCell = hmat({ color: '#1e1e1e' });
+  const hCopper = hmat({ color: '#c98a2b' });
+  for (let i = 0; i < 2; i++) {
+    const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.06, 12), hCell);
+    cell.rotation.z = Math.PI / 2;
+    cell.position.set(0, 0, i * 0.036 - 0.018);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.0172, 0.0172, 0.022, 12), hCopper);
+    top.rotation.z = Math.PI / 2;
+    top.position.set(0.026, 0, i * 0.036 - 0.018);
+    heldBattery.add(cell, top);
+  }
+  heldBattery.position.set(-0.2, -0.22, -0.45);
+  heldBattery.rotation.set(0.5, 0.35, 0.1);
+  held.add(heldBattery);
+
   // Les autres joueurs : une silhouette au caméscope, et le faisceau de leur lampe
   const avatars = new Map();
   const avatarMat = new THREE.MeshLambertMaterial({ color: '#2b2f36' });
@@ -1183,6 +1251,21 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       // pile faible : la lampe faiblit et clignote
       const bat = P.battery ?? 100;
       flashLight.intensity = 20 * (bat < 15 ? 0.45 + (Math.random() < 0.12 ? -0.4 : 0.15) : bat < 35 ? 0.75 : 1);
+
+      // les objets en main : la lampe dès qu'on l'a, l'objet de la case choisie s'il y en a un (pas l'échelle)
+      const alive = P.status === 'alive' && !P.onLadder;
+      const inHand = alive ? P.inv && P.inv[(P.sel || 1) - 1] : null;
+      heldLamp.visible = alive && !!P.hasLamp;
+      heldBottle.visible = inHand === 'bottle';
+      heldBattery.visible = inHand === 'battery';
+      // éclairés par la lumière d'où l'on est, un peu plus quand la lampe est allumée
+      const k = THREE.MathUtils.clamp(0.07 + lightNow * 1.1 + (flashLight.visible ? 0.4 : 0), 0.06, 1.05);
+      for (const m of heldMats) m.color.copy(m.userData.base).multiplyScalar(k);
+      lensMat.color.set(flashLight.visible ? '#fff6d8' : '#2c2b26');
+      // ils suivent le pas, un peu en retard sur la tête
+      const sway = P.moving ? (P.running ? 1.6 : 1) : 0.25;
+      held.position.set(Math.cos(bob) * 0.007 * sway, Math.sin(bob * 2) * 0.006 * sway - (P.running ? 0.02 : 0), 0);
+      held.rotation.set(Math.sin(bob * 2) * 0.01 * sway, Math.cos(bob) * 0.015 * sway, 0);
 
       // 2. L'entité fait face au joueur et tressaute quand elle le traque
       if (sim.hasMonster) {
