@@ -458,7 +458,7 @@ export function createBackroomsTextures(level = 0) {
   vctx.fillText('BACKROOMS // TAPE', 30, 48);
   vctx.fillStyle = '#333';
   vctx.font = '16px monospace';
-  vctx.fillText('NE PAS EFFACER', 30, 72);
+  vctx.fillText('DO NOT ERASE', 30, 72);
   const vhs = tex(vhsCanvas);
   vhs.wrapS = vhs.wrapT = THREE.ClampToEdgeWrapping;
 
@@ -506,8 +506,8 @@ export function createBackroomsTextures(level = 0) {
   lctx.fillStyle = '#7a4a1a';
   lctx.font = 'bold 15px sans-serif';
   lctx.textAlign = 'center';
-  lctx.fillText("EAU", 64, 26);
-  lctx.fillText("D'AMANDE", 64, 46);
+  lctx.fillText("ALMOND", 64, 26);
+  lctx.fillText("WATER", 64, 46);
   const label = tex(labelCanvas);
 
   // Pavé lumineux encastré (diffuseur prismatique dans son cadre) ; au Level 1, un tube nu sous sa réglette

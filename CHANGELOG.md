@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 3.99 — 4 novembre 2026
+- **The Backrooms** — tout le jeu passe en anglais : objectifs, messages, inventaire, écran de pause, écran de fin, étiquettes des cassettes et des bouteilles. Les réglages restent en français.
+
 ## 3.98 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
