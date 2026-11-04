@@ -16,7 +16,7 @@ export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href
 export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400 };
 
 const LIGHT_R = 1.55; // portée d'un néon, en cases : une flaque de lumière nette, le noir juste à côté
-const AMBIENT = 0.0015; // lumière minimale dans les zones mortes (le noir complet)
+const AMBIENT = 0.003; // lumière minimale dans les zones mortes (presque le noir complet)
 const RB = 4; // finesse de l'éclairage cuit : texels par case (des flaques de lumière rondes, des ombres nettes au coin des murs)
 const AO_R = 0.8; // portée de l'ombre de contact au pied des murs, en mètres
 const SLAB = FLOOR_DY - WALL_HEIGHT; // épaisseur de la dalle entre deux étages
@@ -159,7 +159,6 @@ export function createBackroomsScene(container, floors) {
       uCeil: { value: CEIL },
       uDamp: { value: L1 ? 0.6 : 1 },
     };
-    const LR = LIGHT_R * CELL_SIZE;
     // un texel est-il éclairé par ce néon ? Le rayon ne doit traverser aucun mur, sauf, pour un texel de mur,
     // les 70 premiers centimètres de son propre mur (la face tournée vers le néon)
     const seen = (lx, lz, px, pz) => {
@@ -180,8 +179,11 @@ export function createBackroomsScene(container, floors) {
       }
       return inOwn < 0.7;
     };
+    // les néons des zones claires éclairent plus fort et plus loin
     const footprint = (l) => {
       const out = [];
+      const LR = l.bright ? LIGHT_R * CELL_SIZE * 1.55 : LIGHT_R * CELL_SIZE;
+      const gain = l.bright ? 1.3 : 1;
       const r = Math.ceil(LR / TX);
       const tx0 = Math.floor(l.x / TX);
       const tz0 = Math.floor(l.z / TX);
@@ -192,7 +194,7 @@ export function createBackroomsScene(container, floors) {
           const pz = (tz + 0.5) * TX;
           const d = Math.hypot(px - l.x, pz - l.z);
           if (d > LR || !seen(l.x, l.z, px, pz)) continue;
-          out.push(tz * BW + tx, Math.pow(1 - d / LR, 2.4) * 1.05);
+          out.push(tz * BW + tx, Math.pow(1 - d / LR, 2.4) * 1.05 * gain);
         }
       }
       return out;
@@ -1310,7 +1312,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const fv = floorViews[P.floor || 0];
       lightNow = fv ? fv.lightAt(P.x, P.z) : 0.5;
       const lightHere = lightNow + (flashLight.visible ? 0.3 : 0);
-      const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.25);
+      const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.4);
       exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
       vhs.render(scene, camera, time, danger * calm, exposure);
     },

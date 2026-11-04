@@ -452,9 +452,11 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       const nearSpawn = Math.hypot(x - sx, z - sz) < 7;
       const v = zone(x, z);
       let state = 'on';
-      // en plus des zones mortes, un néon sur quatre est grillé : des îlots de lumière séparés par le noir
-      if (!nearSpawn && (v < 0.46 || rnd() < 0.25)) state = 'off';
-      else if (!nearSpawn && (v < 0.56 || rnd() < 0.1)) state = 'flicker';
+      // des zones claires (tous les néons marchent, ils éclairent plus fort et plus loin), des zones mortes, et entre
+      // les deux des néons grillés çà et là : des îlots de lumière séparés par le noir
+      const bright = nearSpawn || v > 0.66;
+      if (!bright && (v < 0.46 || rnd() < 0.15)) state = 'off';
+      else if (!bright && (v < 0.56 || rnd() < 0.1)) state = 'flicker';
       lights.push({
         x: (x + 0.5) * CELL_SIZE,
         y: WALL_HEIGHT - 0.02,
@@ -463,6 +465,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
         gz: z,
         state,
         flicker: state === 'flicker',
+        bright,
       });
     }
   }

@@ -22,6 +22,7 @@ export const MONSTER_PATROL_SPEED = 1.5;
 export const MONSTER_CHASE_SPEED = 2.75;
 export const STAMINA_DRAIN = 15; // par seconde de course
 export const STAMINA_REGEN = 9;
+export const WINDED_T = 1; // à bout de souffle : une seconde sans pouvoir courir
 export const LOSE_TRACK_T = 4; // secondes sans voir le joueur avant que l'entité ne le perde
 export const BATTERY_DRAIN = 0.42; // % par seconde de lampe allumée (environ 4 minutes pour une pile pleine)
 export const BATTERY_PACK = 60; // % rendus par une pile utilisée
@@ -110,6 +111,7 @@ function newPlayer(id, name, map, i) {
     yaw: 0,
     pitch: 0,
     stamina: 100, // 0 à 100
+    winded: 0, // secondes avant de pouvoir recourir, une fois à bout de souffle
     running: false,
     flashlight: false,
     hasLamp: true, // lampe torche, toujours dans la case 1
@@ -577,9 +579,11 @@ export class BackroomsSim {
     const mx = input.mx || 0;
     const my = input.my || 0;
     const wantRun = !!input.run && (mx !== 0 || my !== 0) && !P.onBeam;
-    if (wantRun && P.stamina > 5) {
+    P.winded = Math.max(0, (P.winded || 0) - DT);
+    if (wantRun && P.stamina > 0 && !(P.winded > 0)) {
       P.running = true;
       P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
+      if (P.stamina <= 0) P.winded = WINDED_T; // à bout de souffle
     } else {
       P.running = false;
       P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
@@ -732,9 +736,12 @@ export class BackroomsSim {
       }
       return 0;
     }
-    P.running = !!input.run && P.moving && P.stamina > 5;
-    if (P.running) P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
-    else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
+    P.winded = Math.max(0, (P.winded || 0) - DT);
+    P.running = !!input.run && P.moving && P.stamina > 0 && !(P.winded > 0);
+    if (P.running) {
+      P.stamina = Math.max(0, P.stamina - DT * STAMINA_DRAIN);
+      if (P.stamina <= 0) P.winded = WINDED_T;
+    } else P.stamina = Math.min(100, P.stamina + DT * STAMINA_REGEN);
     if (!P.moving) return 0;
     const speed = P.running ? SPRINT_SPEED : WALK_SPEED;
     const len = Math.hypot(mx, my) || 1;

@@ -576,6 +576,27 @@ test('départ : pas de table, chacun a déjà sa lampe allumée dans la case 1',
   }
 });
 
+test("à bout de souffle : une seconde sans pouvoir courir, chez l'hôte comme chez l'invité", () => {
+  for (const guest of [false, true]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: 3 });
+    const P = sim.player;
+    const go = () => (guest ? sim.predict({ my: 1, run: true, yaw: P.yaw }) : sim.step({ my: 1, run: true, yaw: P.yaw }));
+    let t = 0;
+    while (P.stamina > 0 && t < 20) {
+      go();
+      t += DT;
+    }
+    assert.equal(P.stamina, 0, 'endurance épuisée');
+    let stopped = 0;
+    for (let i = 0; i < Math.round(1.5 / DT); i++) {
+      go();
+      if (P.running) break;
+      stopped += DT;
+    }
+    assert.ok(stopped > 0.9 && stopped < 1.1, `${guest ? 'invité' : 'hôte'} : environ une seconde sans courir (${stopped.toFixed(2)} s)`);
+  }
+});
+
 test('départ à plusieurs : chacun dans son coin, à portée de sifflet, et pareil chez tout le monde', () => {
   const players = [1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'P' + id }));
   for (const sd of [3, 14, 42, 92, 653]) {

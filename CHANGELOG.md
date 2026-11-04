@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.10 — 4 novembre 2026
+## 4.11 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -15,6 +15,8 @@
 - **The Backrooms** — un éclairage bien plus angoissant : chaque néon ne fait plus qu'une petite flaque de lumière nette, le noir complet reprend juste à côté, un néon sur quatre est grillé, et le caméscope ne rattrape plus l'obscurité.
 - **The Backrooms** — une image plus propre, comme dans les vidéos des Backrooms : plus nette, des jaunes plus francs, des noirs plus profonds ; le grain, les lignes de balayage et la bavure des couleurs sont bien plus discrets, et l'image ne glitche plus en permanence : les parasites de la cassette ne reviennent que quand l'entité est tout près, et moins fort.
 - **The Backrooms** — on voit ce qu'on tient : la lampe torche dans la main droite, et dans la main gauche l'eau d'amande ou les piles quand leur case est choisie. Ils bougent avec le pas et prennent la lumière d'où l'on est.
+- **The Backrooms** — des zones plus claires : par endroits tous les néons marchent et éclairent plus fort et plus loin, entre des couloirs sombres ; moins de néons grillés au hasard, et le caméscope rattrape un peu plus l'obscurité.
+- **The Backrooms** — à bout de souffle après avoir trop couru, on ne peut plus courir pendant une seconde.
 
 ## 4.06 — 4 novembre 2026
 - **Odyssée** — Accessibilité universelle du Système de Stockage des Pokémon (Boîtes PC) :
