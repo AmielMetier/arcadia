@@ -1,5 +1,24 @@
 # Journal des versions — Arcadia
 
+## 3.97 — 4 novembre 2026
+- **Odyssée** — Mode Spectateur des combats PvP en direct :
+  - **Observation en temps réel des duels en cours** : les dresseurs du monde multijoueur peuvent désormais assister en direct aux combats opposant deux autres joueurs dans la région.
+  - **Détection des combats sur la carte & tags dynamiques** :
+    - Les dresseurs en combat affichent une étiquette animée au-dessus de leur personnage indiquant `⚔️ vs [Adversaire]`.
+    - Interagir avec un dresseur en combat ouvre une boîte de dialogue proposant : *« [Dresseur] affronte [Adversaire] en combat ! Que veux-tu faire ? »* avec les choix **Regarder le combat**, **Sa fiche**, ou **Rien**.
+  - **Section Duels en direct dans le Journal des Trophées** :
+    - La liste des affrontements en cours dans la région apparaît au sommet de l'onglet Historique (`TROPHÉES` ou touche `T`), avec pastille animée `● EN DIRECT` et bouton `👁️ Regarder` pour rejoindre instantanément le combat.
+  - **Rejoindre en cours de match & synchronisation fidèle** :
+    - L'hôte sérialise instantanément l'état actuel du combat (`spec_init` : météo, tours écoulés, Pokémon actifs, barres de PV, statuts, décors et arènes) pour tout spectateur rejoignant en cours de match.
+    - Diffusion en direct des animations de chaque tour (`spec_ev` : attaques, dégâts, animations, changements de Pokémon, K.O.) et notification de fin de duel (`spec_end`).
+    - Confidentialité préservée : les IVs, EVs et caractéristiques secrètes des équipes restent privées.
+  - **Interface spectateur immersive (`BattleView.runSpectate`)** :
+    - Bannière supérieure affichant `[● EN DIRECT] Nom1 vs Nom2` et bouton de sortie `[✕ Quitter]`.
+    - Nom des dresseurs intégré aux jauges de vie (`[Alice] : Pikachu` vs `[Bob] : Carapuce`).
+    - Sortie propre et fluide à tout moment (touche Échap / B ou clic sur Quitter) pour regagner le monde sans perturber les deux combattants.
+  - **Tests unitaires & d'intégration** :
+    - Nouvelle suite `tools/test-spectate-battle.mjs` validant le protocole réseau `Link`, la déduplication des duels actifs, l'export des Pokémon spectateurs et le rendu HUD.
+
 ## 3.96 — 4 novembre 2026
 - **Odyssée** — Talents signatures exclusifs pour les 3 familles de starters originaux (options 1C, 2B, 3C) :
   - **Halo Sylvestre** (*Capyousse* #1001, *Capyflore* #1002, *Capysaule* #1003) :

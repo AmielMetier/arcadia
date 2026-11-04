@@ -149,7 +149,7 @@ export function trophiesScreen(game) {
 
         <div class="trophies-body">
           ${tab === 'medals' ? renderMedalsTab(filteredTrophies, trophies, summary, medalFilter, catFilter) : ''}
-          ${tab === 'history' ? renderHistoryTab(summary) : ''}
+          ${tab === 'history' ? renderHistoryTab(summary, game) : ''}
           ${tab === 'streaks' ? renderStreaksTab(summary) : ''}
         </div>
 
@@ -211,6 +211,16 @@ export function trophiesScreen(game) {
           if (e.target.closest('button')) return;
           const tid = card.querySelector('[data-act="claim"]')?.dataset.id;
           if (tid) handleClaim(tid);
+        });
+      });
+
+      s.querySelectorAll('.tpvp-spec-btn').forEach((b) => {
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const { rid, host, p0, p1 } = b.dataset;
+          close();
+          game.spectateDuel?.(host, rid, p0, p1);
         });
       });
 
@@ -394,11 +404,28 @@ function renderMedalsTab(filteredTrophies, allTrophies, summary, medalFilter, ca
   `;
 }
 
-function renderHistoryTab(summary) {
+function renderHistoryTab(summary, game) {
+  const activeDuels = game?.getActiveDuels ? game.getActiveDuels() : [];
   const players = summary.players || [];
 
   return `
     <div class="thistory-container">
+      ${activeDuels.length ? `
+        <div class="tpvp-live-duels box">
+          <div class="tpvp-live-head">
+            <span class="tpvp-live-badge"><span class="spec-dot">●</span> EN DIRECT</span>
+            <span class="tpvp-live-title">COMBATS EN COURS DANS LA RÉGION (${activeDuels.length})</span>
+          </div>
+          <div class="tpvp-live-list">
+            ${activeDuels.map((d) => `
+              <div class="tpvp-live-item">
+                <span class="tpvp-live-names">⚔️ <b>${esc(d.p0)}</b> <small>vs</small> <b>${esc(d.p1)}</b></span>
+                <button type="button" class="tpvp-spec-btn" data-rid="${esc(d.rid)}" data-host="${esc(d.hostId)}" data-p0="${esc(d.p0)}" data-p1="${esc(d.p1)}">👁️ Regarder</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div class="tpvp-banner box">
         <div class="tpvp-stat-item">
           <span class="tpvp-stat-label">VICTOIRES</span>
