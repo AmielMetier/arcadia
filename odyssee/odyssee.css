@@ -8280,3 +8280,35 @@ kbd { display: inline-block; font: inherit; font-size: .85em; min-width: 1.4em; 
   border-left: calc(var(--px) * 0.8) solid var(--tc);
   padding: calc(var(--px) * 0.2) calc(var(--px) * 1.2);
 }
+
+.pc-link-btn {
+  background: linear-gradient(180deg, #1e3a5f 0%, #0d1a2d 100%);
+  border: calc(var(--px) * 1) solid #000;
+  box-shadow: inset calc(var(--px) * 0.8) calc(var(--px) * 0.8) 0 #38bdf8, calc(var(--px) * 1) calc(var(--px) * 1) 0 #000;
+  clip-path: polygon(
+    calc(var(--px) * 1.5) 0,
+    calc(100% - calc(var(--px) * 1.5)) 0,
+    100% calc(var(--px) * 1.5),
+    100% 100%,
+    0 100%,
+    0 calc(var(--px) * 1.5)
+  );
+  color: #00e0ff;
+  font-weight: 800;
+  font-size: calc(var(--px) * 4.4);
+  padding: calc(var(--px) * 1.4) calc(var(--px) * 3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--px) * 1.5);
+  transition: filter 0.12s, transform 0.08s;
+  white-space: nowrap;
+}
+.pc-link-btn:hover {
+  filter: brightness(1.25);
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #fff;
+}
+.pc-link-btn:active {
+  transform: translate(calc(var(--px) * 0.5), calc(var(--px) * 0.5));
+}

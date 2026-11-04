@@ -1,5 +1,20 @@
 # Journal des versions — Arcadia
 
+## 4.06 — 4 novembre 2026
+- **Odyssée** — Accessibilité universelle du Système de Stockage des Pokémon (Boîtes PC) :
+  - **PC interactifs dans la ville de départ (Bourg-Aube)** :
+    - Ajout du PC personnel du joueur dans sa chambre à Bourg-Aube (sur le bureau à côté de la télévision), comme dans les jeux Pokémon classiques.
+    - Activation des deux ordinateurs du Laboratoire du Professeur Saule à Bourg-Aube (m.object(5, 2, { type: 'pc' }) et (7, 2)).
+    - Rappel : un PC est également présent dans chaque Centre Pokémon de la région (en haut à droite, en case 11, 2).
+  - **Accès nomade aux Boîtes PC depuis le Menu Principal (START / Échap)** :
+    - Ajout de l'option BOÎTES PC directement dans le menu pause sous ÉQUIPE, permettant d'organiser, déposer et retirer ses créatures n'importe où en voyage (fonctionnalité moderne de type Boîte Pokémon nomade / C-Gear).
+  - **Raccourci direct dans l'Écran ÉQUIPE (partyScreen)** :
+    - Bouton tactile BOÎTES PC 💻 ajouté dans la barre d'action inférieure de l'équipe pour basculer en un clic vers le système de stockage.
+  - **Normalisation des contrôles clavier du PC (pcScreen)** :
+    - Prise en charge unifiée des touches Espace et Entrée pour sélectionner et déplacer des créatures sans conflit, et Échap pour annuler la prise en main ou éteindre le PC.
+  - **Tests automatisés** :
+    - Création de 	ools/test-pc-storage-access.mjs validant la présence et l'interactivité de tous les PC du monde ainsi que les raccourcis d'interface (100% succès).
+
 ## 4.05 — 4 novembre 2026
 - **Odyssée** — Résolution du bug de superposition cartographique et interactivité GPS temps réel de la Carte C-Gear 5G :
   - **Suppression du bug visuel de double-carte et faux textes** :

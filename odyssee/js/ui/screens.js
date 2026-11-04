@@ -65,6 +65,19 @@ export function partyScreen(game, o = {}) {
 
     const foot = el('div', 'pfoot');
     const help = el('div', 'box phelp');
+    if (o.mode === 'menu') {
+      const pcBtn = el('button', 'pc-link-btn', 'BOÎTES PC 💻');
+      pcBtn.type = 'button';
+      pcBtn.title = 'Accéder au Système de Stockage des Pokémon';
+      pcBtn.onclick = async () => {
+        if (busy) return;
+        busy = true;
+        await pcScreen(game);
+        busy = false;
+        draw();
+      };
+      foot.append(pcBtn);
+    }
     const cancel = el('button', 'pcancel', 'RETOUR ✕');
     cancel.type = 'button';
     foot.append(help, cancel);
@@ -281,7 +294,7 @@ export function partyScreen(game, o = {}) {
       } else if (k === 'b') {
         if (swapFrom >= 0) { swapFrom = -1; draw(); return; }
         ui.sound.sfx('cancel'); close(-1); return;
-      } else if (k === 'a') {
+      } else if (k === 'a' || k === 'space') {
         await triggerSlot(i); return;
       } else return;
       ui.sound.sfx('blip'); draw();
@@ -2557,7 +2570,7 @@ export async function pcScreen(game) {
         } else {
           if (selSlot < st.party.length - 1) selSlot++;
         }
-      } else if (k === 'a') {
+      } else if (k === 'a' || k === 'space') {
         if (inHand) {
           doDropOrSwap(selArea, selSlot);
           draw();
