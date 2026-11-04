@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 3.100 — 4 novembre 2026
+## 4.01 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -11,6 +11,33 @@
 - **The Backrooms** — les couloirs résonnent : chaque bruit a son écho, plus long dans l'entrepôt en béton du Level 1.
 - **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc.
 - **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
+- **The Backrooms** — de vrais escaliers entre les deux étages du Level 0 : on les monte et on les descend en marchant, marche après marche, au lieu d'être téléporté. Rampes le long des marches, garde-corps autour de la cage d'escalier en haut.
+
+## 4.00 — 4 novembre 2026
+- **Odyssée** — Refonte 100% Pixel Art Nanobanana de la Carte de Dresseur B2W2 :
+  - **Fonds & Châssis Pixel Art 16-bit authentiques générés avec Nanobanana** :
+    - Remplacement des dégradés CSS génériques par de véritables textures d'interface Nintendo DS illustrées avec Nanobanana, calquées sur la direction artistique du Sac de Baroudeur (`b2w2-bag`).
+    - **Face A (Recto - Profil Dresseur)** : boîtier haute technologie en fibre de carbone avec liserés néon cyan et biseaux d'acier chromé, décliné dynamiquement en 5 variantes de prestige B2W2 selon les étoiles du dresseur (`card_front_normal.jpg`, `card_front_bronze.jpg`, `card_front_silver.jpg`, `card_front_gold.jpg`, `card_front_master.jpg`).
+    - **Face B (Verso - Coffret des 15 Badges)** : vitrine luxueuse en velours bleu saphir profond (`card_back_case.jpg`) avec surpiqûres, socles alvéolés et compartiments d'arène pour le Continent Nord et les Terres du Sud.
+  - **Interactivité complète des commandes et éléments tactiles** :
+    - **Face A (Profil Dresseur)** :
+      - Bouton de bascule en haut à droite (`tc-btn-flip`) et en bas (`tc-foot-btn`) pour pivoter vers le coffret des 15 badges avec bruitage rétro `blip`.
+      - Bouton de fermeture instantanée `✕` (`tc-btn-close`) avec son `cancel`.
+      - **Cartouches d'équipe interactives** : chaque slot de Pokémon (`tc-team-slot`) est désormais cliquable avec effet de survol, déclenchant le cri officiel du Pokémon (`cry`) et une animation de saut enjouée (`tc-ts-bounce`).
+      - **Cadre photo interactif** : clic sur le dresseur (`tc-photo-frame`) déclenchant une pulsation holographique lumineuse (`tc-photo-pulse`).
+    - **Face B (Coffret des 15 Badges)** :
+      - **Carillon cristallin B2W2** : chaque alvéole de badge (`tc-badge-slot`) est un bouton interactif. Cliquer sur un badge débloqué joue sa note dédiée dans la gamme de victoire (Do-Ré-Mi-Fa-Sol-La-Si-Do...) via le nouveau synthétiseur `badgeChime(idx)`, répliquant le célèbre polissage des badges de Pokémon Noir 2 et Blanc 2.
+      - Mise à jour instantanée du grand panneau Inspecteur avec nom, arène, champion, privilège et niveau maximum.
+    - **Contrôles clavier intégraux** : <kbd>ESPACE</kbd> / <kbd>◄</kbd> <kbd>►</kbd> pour tourner la carte, <kbd>▲</kbd> <kbd>▼</kbd> pour parcourir les badges, <kbd>ÉCHAP</kbd> pour quitter.
+  - **Interface utilisateur & finitions matérielles 16-bit DS** :
+    - Boîtier, cadres et cartouches aux coins biseautés et chanfreinés façon écran tactile DS (`clip-path: polygon(...)`).
+    - Trame de scanlines et dithering rétro (`tc-pixelart-scanlines`) identique à l'écran du Sac.
+    - Cadre photo dresseur avec piédestal holographique rayonnant (`tc-photo-pedestal`) et faisceaux lumineux.
+    - Sceau officiel de la Ligue d'Odyssée certifiant le rang de dresseur et le nombre d'étoiles.
+    - 6 capsules métalliques d'équipe Pokémon avec socles circulaires de Poké Balls et jauges PV en pixel art.
+    - Inspecteur de badges interactif aux coins dorés avec zoom 128px étincelant et privilèges d'arènes.
+  - **Validation & Tests** :
+    - Suite de tests `tools/test-trainer-card-b2w2.mjs` validant les 6 arrière-plans Nanobanana, les 45 sprites de badges, le rendu DOM et la bascule recto/verso.
 
 ## 3.99 — 4 novembre 2026
 - **Odyssée** — Refonte intégrale et composition sur mesure des **Musiques Épiques de Combats de Boss** :

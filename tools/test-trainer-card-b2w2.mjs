@@ -33,6 +33,19 @@ for (let i = 1; i <= 15; i++) {
 }
 console.log('✔ All 45 badge image assets (15 standard, 15 locked, 15 high-res) verified!');
 
+// Verify Nanobanana pixel art backgrounds for trainer card
+const cardImgDir = path.join(arcadiaDir, 'odyssee/img/card');
+const rankThemes = ['normal', 'bronze', 'silver', 'gold', 'master'];
+for (const theme of rankThemes) {
+  const bgPath = path.join(cardImgDir, `card_front_${theme}.jpg`);
+  assert.ok(fs.existsSync(bgPath), `Card front background missing: card_front_${theme}.jpg`);
+  assert.ok(fs.statSync(bgPath).size > 10000, `card_front_${theme}.jpg must not be empty`);
+}
+const backCasePath = path.join(cardImgDir, 'card_back_case.jpg');
+assert.ok(fs.existsSync(backCasePath), 'Card back case image missing: card_back_case.jpg');
+assert.ok(fs.statSync(backCasePath).size > 10000, 'card_back_case.jpg must not be empty');
+console.log('✔ All 6 Nanobanana pixel art card backgrounds (5 rank themes + velvet case) verified!');
+
 // ============================================================================
 // 2. Setup minimal browser mocks to test screens.js in node
 // ============================================================================
@@ -225,6 +238,8 @@ console.log('✔ trainerCard state export validated with full B2W2 metrics!');
 
   // Assertions on generated HTML
   assert.ok(screenHtml.includes('b2w2-card-casing'), 'Must contain B2W2 card casing element');
+  assert.ok(screenHtml.includes('tc-pixelart-bg'), 'Must contain Nanobanana pixel art background image');
+  assert.ok(screenHtml.includes('tc-pixelart-scanlines'), 'Must contain DS scanlines overlay');
   assert.ok(screenHtml.includes('IDNo. 48291'), 'Must display padded IDNo.');
   assert.ok(screenHtml.includes('CARTE DE DRESSEUR'), 'Must display title header');
   assert.ok(screenHtml.includes('tc-face-profile'), 'Must contain profile face');

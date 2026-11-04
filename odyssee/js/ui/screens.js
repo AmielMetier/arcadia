@@ -1473,7 +1473,7 @@ export function cardScreen(game, BADGES, other) {
         const ballItem = q.ball || 'poke-ball';
         const ballSrc = ASSETS.item(ballItem);
         return `
-          <div class="tc-team-slot${isShiny ? ' shiny' : ''}">
+          <button type="button" class="tc-team-slot${isShiny ? ' shiny' : ''}" data-slotidx="${slotIdx}" title="Clic : Écouter le cri de ${esc(q.nick || S.n || 'Pokémon')}">
             <div class="tc-ts-top">
               <img class="tc-ts-ball" src="${ballSrc}" alt="" title="${ballItem}">
               <span class="tc-ts-name">${esc(q.nick || S.n || 'Pokémon')}</span>
@@ -1494,7 +1494,7 @@ export function cardScreen(game, BADGES, other) {
                 </div>
               </div>
             </div>
-          </div>
+          </button>
         `;
       }).join('');
 
@@ -1523,6 +1523,10 @@ export function cardScreen(game, BADGES, other) {
 
       s.innerHTML = `
         <div class="b2w2-card-casing ${rank.themeCls}">
+          <!-- Fond Pixel Art 16-bit B2W2 Nanobanana -->
+          <img class="tc-pixelart-bg" src="${face === 'profile' ? ASSETS.cardBg(rank.theme) : ASSETS.cardBack}" alt="Fond Carte B2W2">
+          <div class="tc-pixelart-scanlines"></div>
+
           <!-- Barre Supérieure B2W2 DS -->
           <div class="tc-header">
             <div class="tc-hdr-left">
@@ -1550,11 +1554,13 @@ export function cardScreen(game, BADGES, other) {
                     <div class="tc-photo-hologram"></div>
                     <div class="tc-photo-pedestal"></div>
                     <img class="tc-photo-spr" src="${ASSETS.trainer(c.gender === 'f' ? 'player_f' : 'player_m')}" alt="" onerror="this.style.display='none'">
+                    <span class="tc-photo-tag">DRESSEUR</span>
                   </div>
-                  <div class="tc-stamp">
+                  <div class="tc-stamp ${rank.themeCls}">
                     <div class="tc-stamp-ring">
+                      <span class="tc-stamp-stars">${"★".repeat(rank.stars || 1)}</span>
                       <span class="tc-stamp-title">LIGUE D'ODYSSÉE</span>
-                      <span class="tc-stamp-sub">CERTIFIÉ B2W2</span>
+                      <span class="tc-stamp-sub">RANG ${rank.grade.toUpperCase()}</span>
                     </div>
                   </div>
                 </div>
@@ -1698,9 +1704,43 @@ export function cardScreen(game, BADGES, other) {
           const bidx = parseInt(slot.dataset.bidx, 10);
           if (!isNaN(bidx) && bidx >= 0 && bidx < BADGE_SPECS.length) {
             selBadge = bidx;
-            try { ui.sound?.sfx('select'); } catch (err) {}
+            try {
+              if (c.badges?.[bidx] && ui.sound?.badgeChime) {
+                ui.sound.badgeChime(bidx);
+              } else {
+                ui.sound?.sfx('select');
+              }
+            } catch (err) {}
             render();
           }
+        };
+      });
+
+      // Interactivité des slots d'équipe : Cri du Pokémon & animation de saut
+      s.querySelectorAll('.tc-team-slot[data-slotidx]').forEach((slot) => {
+        slot.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const sidx = parseInt(slot.dataset.slotidx, 10);
+          const mon = team[sidx];
+          if (mon) {
+            try { ui.sound?.cry(ASSETS.cry(mon.sp)); } catch (err) {}
+            slot.classList?.remove?.('tc-ts-bounce');
+            void slot.offsetWidth;
+            slot.classList?.add?.('tc-ts-bounce');
+          }
+        };
+      });
+
+      // Interactivité de la photo du dresseur
+      s.querySelectorAll('.tc-photo-frame').forEach((photo) => {
+        if (photo.style) photo.style.cursor = 'pointer';
+        photo.title = 'Clic : Saluer le dresseur';
+        photo.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          photo.classList?.remove?.('tc-photo-pulse');
+          void photo.offsetWidth;
+          photo.classList?.add?.('tc-photo-pulse');
         };
       });
     };

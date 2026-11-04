@@ -6,7 +6,7 @@
 import * as THREE from '../../shared/vendor/three/three.module.min.js';
 import { GLTFLoader } from '../../shared/vendor/three/GLTFLoader.js';
 import { CELL_SIZE, WALL_HEIGHT, T, PIT_HALF, NICHE_Y, FLOOR_DY } from '../engine/map.js';
-import { FUSES } from '../engine/sim.js';
+import { FUSES, feetY } from '../engine/sim.js';
 import { createBackroomsTextures } from './textures.js';
 import { createVhsFilter } from './vhs.js';
 
@@ -124,7 +124,11 @@ export function createBackroomsScene(container, floors) {
     return t;
   };
   // les trous d'un étage (ceux du sol, par où l'on tombe) et ses cages d'escalier
-  const holesOf = (m) => [...(m.pits || []).map((p) => ({ x: p.x, z: p.z, half: PIT_HALF })), ...(m.stairs || []).map((st) => ({ x: st.x, z: st.z, half: CELL_SIZE / 2 - 0.05 }))];
+  const holesOf = (m) => [
+    ...(m.pits || []).map((p) => ({ x: p.x, z: p.z, half: PIT_HALF })),
+    // la trémie de l'escalier : ses deux cases
+    ...(m.stairs || []).flatMap((st) => [st.gx, st.gx2].map((gx, k) => ({ x: (gx + 0.5) * CELL_SIZE, z: ([st.gz, st.gz2][k] + 0.5) * CELL_SIZE, half: CELL_SIZE / 2 - 0.02 }))),
+  ];
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
   function buildFloor(map, fi) {
@@ -465,7 +469,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     let ds = 1234567 + fi * 7919 + (map.level || 0) * 104729 + (map.spawn ? Math.round(map.spawn.x * 13 + map.spawn.z * 7) : 0);
     const drnd = () => ((ds = (ds * 1103515245 + 12345) % 2147483648) / 2147483648);
     const pitCells = new Set((map.pits || []).map((p) => Math.floor(p.z / CELL_SIZE) * W + Math.floor(p.x / CELL_SIZE)));
-    const stairCells = new Set((map.stairs || []).map((st) => st.gz * W + st.gx));
+    const stairCells = new Set((map.stairs || []).flatMap((st) => [st.gz * W + st.gx, st.gz2 * W + st.gx2]));
     const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [], drawing: [] };
     const ceilSpots = [];
     const rates = L1
@@ -675,28 +679,55 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     };
     for (const it of map.items || []) addItemMesh(it);
 
-    // 8. Escaliers : en bas, des marches qui montent jusqu'à la trémie ; en haut, un garde-corps autour de la trémie
+    // 8. Escaliers : à l'étage du bas, une volée de deux cases (20 marches de 17 cm) qui monte jusqu'à la trémie, avec
+    // ses rampes ; à l'étage du haut, un garde-corps sur les côtés et au bout de la trémie (on arrive par l'autre bout)
     const stairMat = baked(new THREE.MeshLambertMaterial({ color: '#7a7058' }));
+    const noseMat = baked(new THREE.MeshLambertMaterial({ color: '#3d3a32' }));
     const railStair = baked(new THREE.MeshLambertMaterial({ color: '#3a3a36' }));
+    const W2 = CELL_SIZE - 0.08; // largeur de la volée
     for (const st of map.stairs || []) {
+      const along = (o, lat, y, sx, sy, sz, mat) => {
+        // une boîte posée le long de la volée : o depuis le bas, lat sur le côté
+        const m = new THREE.Mesh(new THREE.BoxGeometry(st.dx ? sx : sz, sy, st.dx ? sz : sx), mat);
+        m.position.set(st.bx + st.dx * o + st.dz * lat, y, st.bz + st.dz * o - st.dx * lat);
+        group.add(m);
+        return m;
+      };
       if (fi > 0 || floors.length === 1) {
-        // les marches montent vers (dx, dz), sur toute la hauteur d'un étage
-        const n = 14;
-        const run = CELL_SIZE - 0.2;
+        const n = 20;
+        const run = st.len / n;
         for (let i = 0; i < n; i++) {
           const h = ((i + 1) * FLOOR_DY) / n;
-          const step = new THREE.Mesh(new THREE.BoxGeometry(st.dx ? run / n : 1.7, h, st.dz ? run / n : 1.7), stairMat);
-          const o = -run / 2 + (i + 0.5) * (run / n);
-          step.position.set(st.x + st.dx * o, h / 2, st.z + st.dz * o);
-          group.add(step);
+          along((i + 0.5) * run, 0, h / 2, run, h, W2, stairMat);
+          // le nez de marche, plus sombre
+          along((i + 0.06) * run, 0, h - 0.012, run * 0.12, 0.024, W2, noseMat);
+        }
+        // rampes des deux côtés : une main courante qui suit la pente, sur des poteaux
+        const slope = Math.atan2(FLOOR_DY, st.len);
+        for (const s of [-1, 1]) {
+          const lat = s * (W2 / 2 - 0.04);
+          const hand = along(st.len / 2, lat, FLOOR_DY / 2 + 0.95, Math.hypot(st.len, FLOOR_DY), 0.05, 0.05, railStair);
+          // incliner la main courante dans le sens de la montée
+          if (st.dx) hand.rotation.z = st.dx * slope;
+          else hand.rotation.x = -st.dz * slope;
+          for (let k = 1; k < 5; k++) {
+            const o = (k / 5) * st.len;
+            const y0 = (o / st.len) * FLOOR_DY;
+            along(o, lat, y0 + 0.5, 0.04, 1.0, 0.04, railStair);
+          }
         }
       } else {
-        // garde-corps sur les deux côtés parallèles à la montée, bande jaune et noire au bord
+        // une rambarde : main courante, lisse à mi-hauteur et poteaux, sur les côtés et au bout d'en bas de la trémie
+        // (le haut des marches reste ouvert : c'est par là qu'on arrive)
         for (const s of [-1, 1]) {
-          const rail = new THREE.Mesh(new THREE.BoxGeometry(st.dz ? 0.06 : CELL_SIZE - 0.1, 1.0, st.dx ? 0.06 : CELL_SIZE - 0.1), railStair);
-          rail.position.set(st.x + (st.dz ? s * (CELL_SIZE / 2 - 0.05) : 0), 0.5, st.z + (st.dx ? s * (CELL_SIZE / 2 - 0.05) : 0));
-          group.add(rail);
+          const lat = s * (CELL_SIZE / 2 - 0.03);
+          along(st.len / 2, lat, 1.0, st.len, 0.05, 0.05, railStair);
+          along(st.len / 2, lat, 0.5, st.len, 0.03, 0.03, railStair);
+          for (let k = 0; k <= 6; k++) along((k / 6) * st.len, lat, 0.5, 0.04, 1.0, 0.04, railStair);
         }
+        along(0.03, 0, 1.0, 0.05, 0.05, CELL_SIZE, railStair);
+        along(0.03, 0, 0.5, 0.03, 0.03, CELL_SIZE, railStair);
+        for (let k = 1; k < 4; k++) along(0.03, (k / 4 - 0.5) * CELL_SIZE, 0.5, 0.04, 1.0, 0.04, railStair);
       }
     }
 
@@ -1122,9 +1153,9 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 
       // 1. Caméra : balancement lent de la marche, plus marqué en courant ; une chute la fait plonger d'un étage
       if (P.moving) bob += dt * (P.running ? 9 : 5.5);
-      const want = 1.6 - (P.floor || 0) * FLOOR_DY + (P.onLadder ? 1.0 : 0);
+      const want = 1.6 + feetY(sim.stairs, P.x, P.z, P.floor) + (P.onLadder ? 1.0 : 0);
       const fall = want < eyeY - 0.5;
-      eyeY += (want - eyeY) * Math.min(1, dt * (fall ? 9 : 4));
+      eyeY += (want - eyeY) * Math.min(1, dt * (fall ? 9 : 10));
       camera.position.set(P.x, eyeY + (P.moving ? Math.sin(bob * 2) * (P.running ? 0.05 : 0.025) : 0), P.z);
       camera.rotation.order = 'YXZ';
       camera.rotation.y = P.yaw;
@@ -1182,7 +1213,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
         const a = avatarOf(Q);
         a.g.visible = show;
         if (!show) continue;
-        a.g.position.set(Q.x, -(Q.floor || 0) * FLOOR_DY + (Q.onLadder ? 1.0 : Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0), Q.z);
+        a.g.position.set(Q.x, feetY(sim.stairs, Q.x, Q.z, Q.floor) + (Q.onLadder ? 1.0 : Q.moving ? Math.abs(Math.sin(time * 8)) * 0.04 : 0), Q.z);
         a.g.rotation.set(0, Q.yaw, 0);
         a.g.rotateZ(-(Q.tilt || 0) * 0.6);
         a.beam.visible = Q.flashlight;

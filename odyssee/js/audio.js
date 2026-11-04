@@ -1218,6 +1218,18 @@ export class Sound {
     try { const a = new window.Audio(url); a.volume = Math.min(1, this.vol * 0.45); a.play().catch(() => {}); } catch (e) {}
   }
 
+  /* ---------------- carillon cristallin interactif des 15 badges B2W2 (gamme de victoire) ---------------- */
+  badgeChime(idx = 0) {
+    if (!this.ctx || this.vol <= 0) return;
+    const notes = ['C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6', 'C7'];
+    const m = notes[Math.max(0, Math.min(notes.length - 1, idx))];
+    const t = this.ctx.currentTime + 0.01;
+    const f = freq(midiOf(m));
+    this.tone('sine', f, t, 0.35, 0.22, this.sfxBus, { attack: 0.005, release: 0.25 });
+    this.tone('triangle', f * 2, t, 0.18, 0.09, this.sfxBus, { release: 0.14 });
+    this.tone('pulse50', f * 0.5, t, 0.22, 0.07, this.sfxBus, { release: 0.16 });
+  }
+
   /* ---------------- cinématique Lugia Obscur : sound design complet ---------------- */
   playLugiaCinematicAudio() {
     if (!this.ctx) return { stop: () => {} };

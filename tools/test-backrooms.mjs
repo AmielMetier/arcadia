@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { createBackroomsMap, CELL_SIZE, T } from '../backrooms/engine/map.js';
 import { findPath, hasLineOfSight } from '../backrooms/engine/nav.js';
-import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD } from '../backrooms/engine/sim.js';
-import { PIT_HALF, bfs, createLevel0 } from '../backrooms/engine/map.js';
+import { BackroomsSim, DT, DEPART_T, FUSES, WHISTLE_CD, stairAt, feetY } from '../backrooms/engine/sim.js';
+import { PIT_HALF, bfs, createLevel0, FLOOR_DY } from '../backrooms/engine/map.js';
 
 // distance en marche (en cases) entre deux cases
 const bfsDist = (m, ax, az, bx, bz) => bfs(m.grid, m.W, m.H, ax, az)[bz * m.W + bx];
@@ -729,20 +729,41 @@ test("chute : par un trou, on atterrit à l'étage du dessous, juste en dessous 
   const x0 = P.x;
   sim.step({ my: 1 });
   assert.equal(P.x, x0);
-  // l'escalier : de l'étage du bas on remonte, devant les marches
+  // l'escalier : de l'étage du bas on remonte en marchant, marche après marche, sans être téléporté
   const st = sim.stairs[0];
   run(sim, 1);
   P.x = st.down.x;
   P.z = st.down.z;
   P.yaw = Math.atan2(-st.dx, -st.dz);
-  for (let i = 0; i < 120 && P.floor === 1; i++) sim.step({ my: 1, yaw: P.yaw });
-  assert.equal(P.floor, 0, 'remonté par l\u2019escalier');
-  assert.ok(Math.hypot(P.x - st.up.x, P.z - st.up.z) < 0.01);
-  // et on redescend par la même cage
-  run(sim, 1);
+  let last = { x: P.x, z: P.z, y: feetY(sim.stairs, P.x, P.z, P.floor) };
+  let climbed = false;
+  for (let i = 0; i < 600 && Math.hypot(P.x - st.up.x, P.z - st.up.z) > 0.3; i++) {
+    sim.step({ my: 1, yaw: P.yaw });
+    const y = feetY(sim.stairs, P.x, P.z, P.floor);
+    assert.ok(Math.hypot(P.x - last.x, P.z - last.z) < 0.2, 'pas de téléportation');
+    assert.ok(y >= last.y - 1e-9 && y - last.y < 0.2, 'les pieds montent peu à peu');
+    if (y > -FLOOR_DY + 0.5 && y < -0.5) climbed = true;
+    last = { x: P.x, z: P.z, y };
+  }
+  assert.ok(climbed, 'on est passé par le milieu des marches');
+  assert.equal(P.floor, 0, "remonté par l'escalier");
+  assert.ok(Math.hypot(P.x - st.up.x, P.z - st.up.z) <= 0.3, 'arrivé en haut, devant les marches');
+  // et on redescend par la même volée
   P.yaw = Math.atan2(st.dx, st.dz);
-  for (let i = 0; i < 120 && P.floor === 0; i++) sim.step({ my: 1, yaw: P.yaw });
+  for (let i = 0; i < 600 && Math.hypot(P.x - st.down.x, P.z - st.down.z) > 0.3; i++) sim.step({ my: 1, yaw: P.yaw });
   assert.equal(P.floor, 1, 'redescendu');
+  // on ne monte pas sur les marches par le côté, et on ne tombe pas dans la trémie depuis l'étage du haut
+  const side = { x: st.x + st.dz * CELL_SIZE, z: st.z - st.dx * CELL_SIZE };
+  for (const floor of [0, 1]) {
+    if (sim.isColliding(side.x, side.z, 0.38, floor)) continue;
+    P.floor = floor;
+    P.x = side.x;
+    P.z = side.z;
+    P.yaw = Math.atan2(st.dz, -st.dx); // tourné vers la volée
+    for (let i = 0; i < 180; i++) sim.step({ my: 1, yaw: P.yaw });
+    assert.ok(!stairAt(sim.stairs, P.x, P.z), `étage ${floor} : bloqué au bord de l'escalier`);
+    assert.equal(P.floor, floor);
+  }
 });
 
 test("ascenseurs : un en haut, un en bas ; les 5 cassettes trouvées, le faux devient un mur et seul le vrai emmène", () => {

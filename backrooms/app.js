@@ -362,7 +362,6 @@ function handleEvent(ev, me) {
     case 'stairs':
       if (ev.id !== me) break;
       if (sfx) sfx.step(sim.level === 1);
-      if (hud) hud.toast(ev.up ? 'Back up to the upper floor' : 'Down to the lower floor');
       break;
     case 'whistle':
       {

@@ -651,7 +651,8 @@ export function createLevel0(seed = 42) {
   const forced = up.pits.map((p) => [p.gx, p.gz]);
   const down = createBackroomsMap(seed + 7919, { lower: true, forced });
 
-  // les escaliers : une case libre aux deux étages, loin des trous, avec une case pour arriver de chaque côté
+  // les escaliers : deux cases libres aux deux étages (la volée), loin des trous ; on y entre en bas par la case
+  // d'avant (étage du bas) et en haut par la case d'après (étage du haut)
   let s = (seed * 31 + 7) >>> 0 || 1;
   const rnd = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -669,14 +670,33 @@ export function createLevel0(seed = 42) {
     const cand = up.walkable.filter((c) => farFromPits(c.x, c.z, minPit) && Math.hypot(c.x - up.spawn.gx, c.z - up.spawn.gz) > 6).sort(() => rnd() - 0.5);
     for (const c of cand) {
       if (stairs.length >= 2) break;
-      if (!free(up, c.x, c.z) || !free(down, c.x, c.z) || busyCell(up, c.x, c.z) || busyCell(down, c.x, c.z)) continue;
+      const ok = (x, z) => free(up, x, z) && free(down, x, z) && !busyCell(up, x, z) && !busyCell(down, x, z);
+      if (!ok(c.x, c.z)) continue;
       if (stairs.some((st) => Math.abs(st.gx - c.x) + Math.abs(st.gz - c.z) < 24)) continue;
-      // on monte vers (dx, dz) : on arrive en haut sur la case devant, on redescend sur la case derrière
-      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort(() => rnd() - 0.5).find(([dx, dz]) => free(up, c.x + dx, c.z + dz) && free(down, c.x - dx, c.z - dz));
+      // on monte vers (dx, dz) sur deux cases : on arrive en haut sur la case d'après, on part d'en bas de la case d'avant
+      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+        .sort(() => rnd() - 0.5)
+        .find(([dx, dz]) => ok(c.x + dx, c.z + dz) && free(up, c.x + 2 * dx, c.z + 2 * dz) && free(down, c.x - dx, c.z - dz) && farFromPits(c.x + dx, c.z + dz, minPit));
       if (!dir) continue;
       const [dx, dz] = dir;
       const at = (x, z) => ({ x: (x + 0.5) * CELL_SIZE, z: (z + 0.5) * CELL_SIZE });
-      stairs.push({ id: stairs.length, gx: c.x, gz: c.z, ...at(c.x, c.z), dx, dz, up: at(c.x + dx, c.z + dz), down: at(c.x - dx, c.z - dz) });
+      // x, z : le milieu de la volée ; bx, bz : le bas de la première marche ; len : sa longueur au sol
+      stairs.push({
+        id: stairs.length,
+        gx: c.x,
+        gz: c.z,
+        gx2: c.x + dx,
+        gz2: c.z + dz,
+        x: (c.x + 0.5 + dx * 0.5) * CELL_SIZE,
+        z: (c.z + 0.5 + dz * 0.5) * CELL_SIZE,
+        bx: (c.x + 0.5 - dx * 0.5) * CELL_SIZE,
+        bz: (c.z + 0.5 - dz * 0.5) * CELL_SIZE,
+        len: 2 * CELL_SIZE,
+        dx,
+        dz,
+        up: at(c.x + 2 * dx, c.z + 2 * dz),
+        down: at(c.x - dx, c.z - dz),
+      });
     }
     if (stairs.length >= 2) break;
   }
@@ -684,7 +704,7 @@ export function createLevel0(seed = 42) {
   down.stairs = stairs;
   // pas d'objet ni de meuble sur les marches
   for (const m of [up, down]) {
-    m.props = m.props.filter((p) => !stairs.some((st) => Math.hypot(p.x - st.x, p.z - st.z) < 2));
+    m.props = m.props.filter((p) => !stairs.some((st) => Math.hypot(p.x - st.x, p.z - st.z) < 3.4));
     m.tapes = m.tapes.filter((t) => !stairs.some((st) => Math.hypot((t.x1 + t.x2) / 2 - st.x, (t.z1 + t.z2) / 2 - st.z) < 3));
   }
 

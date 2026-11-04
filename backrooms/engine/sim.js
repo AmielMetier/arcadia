@@ -9,7 +9,7 @@
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
 // Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
 // si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
-import { CELL_SIZE, T, createLevel0, PIT_HALF } from './map.js';
+import { CELL_SIZE, T, createLevel0, PIT_HALF, FLOOR_DY } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { findPath, hasLineOfSight } from './nav.js';
 
@@ -35,8 +35,6 @@ export const BEAM_NOISE = [10, 16]; // à-coups au hasard (immobile, en marchant
 export const BEAM_FIX = 4.5; // force de Q / D
 export const BEAM_DAMP = 2.5;
 export const FALL_LOCK = 0.9; // secondes à terre après une chute d'un étage
-export const STAIR_LOCK = 0.5; // secondes dans l'escalier
-export const STAIR_R = 0.75; // on prend l'escalier en entrant dans sa case
 export const WHISTLE_CD = 1.2;
 export const WHISTLE_HEAT = 2.5; // chaque coup compte 1 et s'oublie en 20 s : au 3e coup rapproché, l'entité vient à coup sûr
 export const CASSETTES = 5;
@@ -81,6 +79,23 @@ export function spreadSpawns(map, n) {
     spots.push({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
   }
   return spots;
+}
+
+// Où en est-on dans un escalier ? t : 0 en bas de la volée, 1 en haut ; lat : écart au milieu de la volée
+// (null : pas dans un escalier)
+export function stairAt(stairs, x, z) {
+  for (const st of stairs || []) {
+    const t = ((x - st.bx) * st.dx + (z - st.bz) * st.dz) / st.len;
+    const lat = (x - st.x) * st.dz - (z - st.z) * st.dx;
+    if (t >= 0 && t <= 1 && Math.abs(lat) < CELL_SIZE / 2) return { st, t, lat };
+  }
+  return null;
+}
+
+// Hauteur des pieds (0 : sol de l'étage du haut, -FLOOR_DY : sol du bas) ; dans l'escalier, elle suit les marches
+export function feetY(stairs, x, z, floor) {
+  const s = stairAt(stairs, x, z);
+  return s ? -FLOOR_DY + s.t * FLOOR_DY : -(floor || 0) * FLOOR_DY;
 }
 
 function newPlayer(id, name, map, i) {
@@ -429,22 +444,44 @@ export class BackroomsSim {
     }
   }
 
-  // Prendre l'escalier : on entre dans sa case, on arrive à l'autre étage devant les marches
-  takeStairs(P) {
-    for (const st of this.stairs) {
-      if (Math.hypot(st.x - P.x, st.z - P.z) > STAIR_R) continue;
-      const up = P.floor > 0;
-      P.floor += up ? -1 : 1;
-      const to = up ? st.up : st.down;
-      P.x = to.x;
-      P.z = to.z;
-      P.lockT = STAIR_LOCK;
-      // on regarde dans le sens de la sortie de l'escalier
-      P.yaw = up ? Math.atan2(-st.dx, -st.dz) : Math.atan2(st.dx, st.dz);
-      this.emit({ type: 'stairs', id: P.id, up });
-      return true;
+  // L'escalier se monte et se descend en marchant : on n'y entre que par le bas (depuis l'étage du bas) ou par le
+  // haut (depuis l'étage du haut), on ne passe pas par-dessus les rampes, et on change d'étage à mi-volée.
+  // Renvoie la position permise pour un pas de (P.x, P.z) vers (nx, nz) ; met à jour P.floor.
+  stairStep(P, nx, nz) {
+    if (!this.stairs.length) return { x: nx, z: nz };
+    const from = stairAt(this.stairs, P.x, P.z);
+    let to = stairAt(this.stairs, nx, nz);
+    const r = CELL_SIZE / 2 - PLAYER_RADIUS;
+    if (!from && to) {
+      // on entre : par le bas depuis l'étage du bas, par le haut depuis l'étage du haut ; pas par les côtés
+      const st = to.st;
+      const t0 = ((P.x - st.bx) * st.dx + (P.z - st.bz) * st.dz) / st.len;
+      const lat0 = (P.x - st.x) * st.dz - (P.z - st.z) * st.dx;
+      const okBottom = t0 < 0 && P.floor === 1;
+      const okTop = t0 > 1 && P.floor === 0;
+      if (!(okBottom || okTop) || Math.abs(lat0) > CELL_SIZE / 2) return { x: P.x, z: P.z };
     }
-    return false;
+    if (from) {
+      const st = from.st;
+      let t = ((nx - st.bx) * st.dx + (nz - st.bz) * st.dz) / st.len;
+      let lat = (nx - st.x) * st.dz - (nz - st.z) * st.dx;
+      // les rampes : on reste entre les deux
+      lat = Math.max(-r, Math.min(r, lat));
+      // on ne sort par le bas qu'en bas, par le haut qu'en haut (l'autre bout est sous la dalle ou au bord du vide)
+      if (t < 0 && P.floor !== 1) t = 0;
+      if (t > 1 && P.floor !== 0) t = 1;
+      nx = st.bx + st.dx * t * st.len + st.dz * lat;
+      nz = st.bz + st.dz * t * st.len - st.dx * lat;
+      to = stairAt(this.stairs, nx, nz);
+    }
+    if (to) {
+      const floor = to.t >= 0.5 ? 0 : 1;
+      if (floor !== P.floor) {
+        P.floor = floor;
+        this.emit({ type: 'stairs', id: P.id, up: floor === 0 });
+      }
+    }
+    return { x: nx, z: nz };
   }
 
   // T : siffler. Les autres l'entendent ; trop de coups de sifflet rapprochés attirent l'entité
@@ -559,8 +596,9 @@ export class BackroomsSim {
       P.moving = false;
     } else if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) && Math.hypot(pos.x - P.x, pos.z - P.z) < 3 && !this.isColliding(pos.x, pos.z, PLAYER_RADIUS * 0.8, P.floor)) {
       // un invité se déplace chez lui (et tient son équilibre chez lui) : l'hôte prend sa position et son inclinaison
-      P.x = pos.x;
-      P.z = pos.z;
+      const ps = this.stairStep(P, pos.x, pos.z);
+      P.x = ps.x;
+      P.z = ps.z;
       if (Number.isFinite(input.tilt)) P.tilt = Math.max(-1, Math.min(1, input.tilt));
       P.onBeam = this.pitUnder(P.x, P.z, P.floor) >= 0;
     } else if (input.remote) {
@@ -583,8 +621,9 @@ export class BackroomsSim {
       const rx = Math.cos(P.yaw);
       const rz = -Math.sin(P.yaw);
       const p2 = this.moveWithCollisions(P.x, P.z, (fx * normY + rx * normX) * speed * DT, (fz * normY + rz * normX) * speed * DT, PLAYER_RADIUS, P.floor);
-      P.x = p2.x;
-      P.z = p2.z;
+      const p3 = this.stairStep(P, p2.x, p2.z);
+      P.x = p3.x;
+      P.z = p3.z;
     }
 
     // 3b. Un pas de trop au-dessus d'un trou : on tombe à l'étage du dessous
@@ -593,9 +632,6 @@ export class BackroomsSim {
       const pit = this.fm(P.floor).pits[pitId];
       if (Math.abs(P.x - pit.x) < PIT_HALF && Math.abs(P.z - pit.z) < PIT_HALF) this.fallThrough(P, pitId);
     }
-    // 3c. L'escalier
-    if (P.lockT <= 0) this.takeStairs(P);
-
     // 3d. Au pied de l'échelle posée : on grimpe jusqu'au renfoncement
     const map = this.fm(P.floor);
     const N = map.niche;
@@ -707,8 +743,9 @@ export class BackroomsSim {
     const rx = Math.cos(P.yaw);
     const rz = -Math.sin(P.yaw);
     const pos = this.moveWithCollisions(P.x, P.z, ((fx * my + rx * mx) / len) * speed * DT, ((fz * my + rz * mx) / len) * speed * DT, PLAYER_RADIUS, P.floor);
-    P.x = pos.x;
-    P.z = pos.z;
+    const ps = this.stairStep(P, pos.x, pos.z);
+    P.x = ps.x;
+    P.z = ps.z;
     return 0;
   }
 
