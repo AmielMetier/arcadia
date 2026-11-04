@@ -1,5 +1,8 @@
 # Journal des versions — Arcadia
 
+## 4.08 — 4 novembre 2026
+- **The Backrooms** — Le jeu est désormais réservé aux comptes VIP. Si un VIP le lance dans son salon, ses invités peuvent y jouer avec lui.
+
 ## 4.07 — 4 novembre 2026
 - **Arcadia** — Les premiers comptes en ligne, protégés par mot de passe, reçoivent le grade VIP (« ⭐ VIP » sous le nom).
 
