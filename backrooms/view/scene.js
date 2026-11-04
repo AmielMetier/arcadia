@@ -15,8 +15,8 @@ export const ENTITY_IMG = new URL('../img/entite.png?v=2', import.meta.url).href
 // L'entité du Level 1 : une vidéo détourée, découpée en planche d'images (12 par seconde, 16 par rangée) jouée en boucle
 export const ENTITY_ANIM = { url: new URL('../monster/david.webp?v=2', import.meta.url).href, frames: 119, cols: 16, rows: 8, fps: 12, aspect: 246 / 400 };
 
-const LIGHT_R = 2.6; // portée d'un néon, en cases
-const AMBIENT = 0.006; // lumière minimale dans les zones mortes (presque le noir complet)
+const LIGHT_R = 1.55; // portée d'un néon, en cases : une flaque de lumière nette, le noir juste à côté
+const AMBIENT = 0.0015; // lumière minimale dans les zones mortes (le noir complet)
 const RB = 4; // finesse de l'éclairage cuit : texels par case (des flaques de lumière rondes, des ombres nettes au coin des murs)
 const AO_R = 0.8; // portée de l'ombre de contact au pied des murs, en mètres
 const SLAB = FLOOR_DY - WALL_HEIGHT; // épaisseur de la dalle entre deux étages
@@ -84,7 +84,7 @@ export function createBackroomsScene(container, floors) {
   const scene = new THREE.Scene();
   // Level 1 : un froid bleuté, un brouillard plus épais
   scene.background = new THREE.Color(L1 ? '#06080a' : '#0d0b06');
-  scene.fog = new THREE.FogExp2(L1 ? '#0b0e11' : '#14110a', L1 ? 0.058 : 0.05);
+  scene.fog = new THREE.FogExp2(L1 ? '#050608' : '#080604', L1 ? 0.058 : 0.05);
 
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 90);
   camera.position.set(map0.spawn.x, 1.6, map0.spawn.z);
@@ -97,7 +97,7 @@ export function createBackroomsScene(container, floors) {
   vhs.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
 
   const textures = createBackroomsTextures(map0.level || 0);
-  const ambient = new THREE.AmbientLight(L1 ? '#c9d8ff' : '#fff3c4', 0.05);
+  const ambient = new THREE.AmbientLight(L1 ? '#c9d8ff' : '#fff3c4', 0.012);
   scene.add(ambient);
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
@@ -192,7 +192,7 @@ export function createBackroomsScene(container, floors) {
           const pz = (tz + 0.5) * TX;
           const d = Math.hypot(px - l.x, pz - l.z);
           if (d > LR || !seen(l.x, l.z, px, pz)) continue;
-          out.push(tz * BW + tx, Math.pow(1 - d / LR, 1.4) * 0.55);
+          out.push(tz * BW + tx, Math.pow(1 - d / LR, 2.4) * 1.05);
         }
       }
       return out;
@@ -910,7 +910,7 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const setPower = (v) => {
       if (v === power) return;
       power = v;
-      ambient.intensity = v ? 0.05 : 0;
+      ambient.intensity = v ? 0.012 : 0;
       for (const l of map.lights) fixtures.setColorAt(l.index, power && l.state !== 'off' ? ON : OFF);
       fixtures.instanceColor.needsUpdate = true;
       writeBake();
@@ -1227,7 +1227,7 @@ float ghash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
       const fv = floorViews[P.floor || 0];
       lightNow = fv ? fv.lightAt(P.x, P.z) : 0.5;
       const lightHere = lightNow + (flashLight.visible ? 0.3 : 0);
-      const wantExp = THREE.MathUtils.clamp(0.5 / (0.12 + lightHere), 0.95, 1.8);
+      const wantExp = THREE.MathUtils.clamp(0.45 / (0.15 + lightHere), 0.9, 1.25);
       exposure += (wantExp - exposure) * Math.min(1, dt * 1.1);
       vhs.render(scene, camera, time, danger * calm, exposure);
     },
