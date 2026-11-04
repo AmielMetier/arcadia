@@ -1,8 +1,8 @@
 # Journal des versions — Arcadia
 
-## 4.05 — 4 novembre 2026
+## 4.06 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
-  - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
+  - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
   - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « EXIT ? » et sa flèche, jours comptés en bâtons, « DON'T RUN » à la peinture qui coule, maisons d'enfant, mains sales.
 - **The Backrooms** — tout le jeu passe en anglais : objectifs, messages, inventaire, écrans de pause et de fin, inscriptions sur les murs, étiquettes des cassettes et des bouteilles. Les réglages restent en français.

@@ -490,8 +490,8 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       tipped: !!kind.chair && rnd() < 0.3,
     });
   }
-  // 10a. Chantiers abandonnés : un couloir barré de rubalise jaune et noire (on passe dessous), des cônes au pied
-  // des murs et un projecteur éteint sur son trépied juste avant
+  // 10a. Chantiers abandonnés : de la rubalise jaune et noire arrachée qui traîne par terre en travers du couloir
+  // (elle ne bloque rien), des cônes au pied des murs et un projecteur éteint sur son trépied juste avant
   const tapes = [];
   const prop = (kind, x, z, rot) => props.push({ m: kind.m, h: kind.h, r: kind.r, proc: true, x, z, rot, tipped: false });
   const nearPit = (c) => pits.some((p) => Math.abs(p.gx - c.x) <= 1 && Math.abs(p.gz - c.z) <= 1);
@@ -506,12 +506,15 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     const cx = (c.x + 0.5) * CELL_SIZE;
     const cz = (c.z + 0.5) * CELL_SIZE;
     const h = CELL_SIZE / 2;
-    const torn = rnd() < 0.3 ? (rnd() < 0.5 ? 1 : 2) : 0; // 1 ou 2 : ce bout-là s'est décroché et pend
-    const ys = rnd() < 0.4 ? [0.98, 0.55] : [0.95 + rnd() * 0.1];
-    for (const y of ys) {
-      const o = (rnd() - 0.5) * 0.4;
-      if (alongZ) tapes.push({ x1: cx - h, z1: cz + o, x2: cx + h, z2: cz + o + (rnd() - 0.5) * 0.3, y, torn });
-      else tapes.push({ x1: cx + o, z1: cz - h, x2: cx + o + (rnd() - 0.5) * 0.3, z2: cz + h, y, torn });
+    // un ou deux morceaux couchés au sol, d'un pied de mur vers l'autre, en biais ; wave : ses ondulations
+    for (let k = rnd() < 0.4 ? 2 : 1; k > 0; k--) {
+      const a = (rnd() - 0.5) * 1.6;
+      const b = (rnd() - 0.5) * 1.6;
+      const s1 = h - 0.15 - rnd() * 0.5;
+      const s2 = h - 0.15 - rnd() * 0.9;
+      const wave = { amp: 0.12 + rnd() * 0.25, freq: 1.5 + rnd() * 2.5, ph: rnd() * 6.28 };
+      if (alongZ) tapes.push({ x1: cx - s1, z1: cz + a, x2: cx + s2, z2: cz + b, wave });
+      else tapes.push({ x1: cx + a, z1: cz - s1, x2: cx + b, z2: cz + s2, wave });
     }
     // cônes au pied des murs (1 ou 2), dont un parfois renversé
     const side = alongZ ? [1, 0] : [0, 1];

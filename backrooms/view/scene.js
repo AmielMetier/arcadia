@@ -424,36 +424,38 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       else loader.load(MODELS + kind.m + '.glb', (g) => place(g.scene), undefined, () => {});
     }
 
-    // 5a. La rubalise des chantiers : un ruban tendu d'un mur à l'autre, qui pend un peu au milieu ; un bout décroché
-    // tombe jusqu'au sol
+    // 5a. La rubalise des chantiers : arrachée, elle traîne à plat sur la moquette en ondulant (on marche dessus)
     if (map.tapes && map.tapes.length) {
       const pos = [];
       const uv = [];
-      const W2 = 0.07; // largeur du ruban
+      const W2 = 0.075; // largeur du ruban
       for (const t of map.tapes) {
         const L = Math.hypot(t.x2 - t.x1, t.z2 - t.z1);
-        const N = 12;
+        const ux = (t.x2 - t.x1) / L;
+        const uz = (t.z2 - t.z1) / L;
+        const w = t.wave || { amp: 0.2, freq: 2, ph: 0 };
+        const N = 28;
         const pts = [];
+        let u = 0;
         for (let i = 0; i <= N; i++) {
           const f = i / N;
-          let x = t.x1 + (t.x2 - t.x1) * f;
-          let z = t.z1 + (t.z2 - t.z1) * f;
-          let y = t.y - Math.sin(f * Math.PI) * 0.12;
-          // bout décroché : le ruban part du mur qui le tient encore et retombe en courbe jusqu'au sol
-          if (t.torn) {
-            const g = t.torn === 1 ? f : 1 - f; // 0 au mur qui tient, 1 au bout libre
-            x = t.torn === 1 ? t.x2 + (t.x1 - t.x2) * g * 0.55 : t.x1 + (t.x2 - t.x1) * g * 0.55;
-            z = t.torn === 1 ? t.z2 + (t.z1 - t.z2) * g * 0.55 : t.z1 + (t.z2 - t.z1) * g * 0.55;
-            y = Math.max(0.02, t.y - g * g * t.y * 1.05);
-          }
-          pts.push([x, y, z, (f * L) / 0.9]);
+          // le ruban serpente de part et d'autre de la ligne droite, plus librement vers le bout arraché
+          const off = Math.sin(f * w.freq * Math.PI + w.ph) * w.amp * (0.4 + f * 0.6);
+          const x = t.x1 + ux * f * L - uz * off;
+          const z = t.z1 + uz * f * L + ux * off;
+          if (i) u += Math.hypot(x - pts[i - 1][0], z - pts[i - 1][2]) / 0.9;
+          pts.push([x, 0.006 + (i % 3) * 0.0015, z, u]);
         }
         for (let i = 0; i < N; i++) {
           const [ax, ay, az, au] = pts[i];
           const [bx, by, bz, bu] = pts[i + 1];
-          // le ruban est vertical (sa largeur en hauteur), légèrement vrillé
-          const tw = Math.sin(i * 1.3) * 0.015;
-          pos.push(ax, ay - W2 / 2, az + tw, bx, by - W2 / 2, bz - tw, bx, by + W2 / 2, bz + tw, ax, ay - W2 / 2, az + tw, bx, by + W2 / 2, bz + tw, ax, ay + W2 / 2, az - tw);
+          // à plat : la largeur du ruban est perpendiculaire à son trajet, sur le sol
+          const dx = bx - ax;
+          const dz = bz - az;
+          const d = Math.hypot(dx, dz) || 1;
+          const px = (-dz / d) * (W2 / 2);
+          const pz = (dx / d) * (W2 / 2);
+          pos.push(ax - px, ay, az - pz, bx - px, by, bz - pz, bx + px, by, bz + pz, ax - px, ay, az - pz, bx + px, by, bz + pz, ax + px, ay, az + pz);
           uv.push(au, 0, bu, 0, bu, 1, au, 0, bu, 1, au, 1);
         }
       }
@@ -461,7 +463,8 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       tg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       tg.computeVertexNormals();
-      group.add(new THREE.Mesh(tg, baked(new THREE.MeshLambertMaterial({ map: textures.tape, side: THREE.DoubleSide }))));
+      const tapeMat = baked(new THREE.MeshLambertMaterial({ map: textures.tape, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      group.add(new THREE.Mesh(tg, tapeMat));
     }
 
     // 5b. Ce qui est fixé aux murs et au plafond : prises électriques, détecteurs incendie, boîtiers électriques,
