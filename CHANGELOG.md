@@ -1,5 +1,18 @@
 # Journal des versions — Arcadia
 
+## 3.99 — 4 novembre 2026
+- **Odyssée** — Refonte intégrale et composition sur mesure des **Musiques Épiques de Combats de Boss** :
+  - Remplacement des boucles générées procéduralement par **6 grandes compositions originales écrites à la main** (plus de 7 400 notes synthétisées réparties sur 7 canaux audio : basse sub/galopante, double lead mélodique, guitare électrique saturée par distorsion WaveShaper tanh, nappes d'harmonie, arpèges virtuoses en doubles croches et batterie rock/métal avec kicks, caisses claires, cymbales crash et toms) :
+    - **1. Thème des Champions d'Arène (`leader`) — 175 BPM, Mi mineur** : intro fanfare d'arène avec roulement de caisse claire en crescendo, toms descendants, déflagration de guitare électrique saturée, basse rapide en doubles croches et mélodie héroïque triomphante pour les 15 arènes.
+    - **2. Thème de l'Ultime Espoir du Champion (`gymTension`) — 188 BPM, Sol majeur** : hommage au célèbre thème *« Last Pokémon / Victory Lies Ahead »* de Pokémon Noir et Blanc (5G). Se déclenche automatiquement quand le champion ou le maître envoie son dernier Pokémon (ou son as). Double-kick effréné, basse galopante, carillons étincelants et mélodie euphorique pleine d'adrénaline.
+    - **3. Thème de la Maîtresse de la Ligue Céleste & Conseil des 4 (`champion`) — 178 BPM, Do mineur harmonique** : composition symphonique grandiose de 28 mesures digne des duels contre Cynthia et Red. Prélude mystérieux en notes suspendues, montée chromatique tellurique, spirales d'arpèges baroques vertigineuses et duel en contrepoint sous une déferlante de metal symphonique.
+    - **4. Thème des Boss Légendaires & Lugia Obscur XD001 (`legend`) — 164 BPM, Si mineur avec tritons** : atmosphère titanesque, apocalyptique et ténébreuse inspirée de Pokémon Colosseum / XD et Giratina. Battements de cœur colossaux en sub-bass, cloches au triton dissonant (*diabolus in musica*), rugissements de distorsion et rythmique tribale martelée.
+    - **5. Thème des Boss & Admins de la Team Éclipse (`eclipse`) — 170 BPM, Fa mineur** : style cyberpunk et techno-rock industriel. Sirène d'alarme de laboratoire, beat 4-on-the-floor percutant, ligne de basse acid bondissante et stabs de guitare syncopés traduisant le machiavélisme de la faction adverse.
+    - **6. Thème du Rival (`rival`) — 172 BPM, Ré mineur** : rock fougueux et combatif rythmant les duels au sommet contre Théo.
+  - **Architecture audio & Tests automatisés** :
+    - Prise en charge native des intros de combat avec transition fluide vers le point de boucle (`loopStart`), distorsion WaveShaper 2× avec filtre passe-bas 2600 Hz pour la guitare électrique.
+    - Nouvelle suite `tools/test-epic-boss-music.mjs` validant les 6 compositions, les 7 pistes instrumentales, les métriques MIDI et la transition en plein combat lors du dernier Pokémon (100% succès).
+
 ## 3.98 — 4 novembre 2026
 - **Odyssée** — Refonte de la Carte de Dresseur en pixel art Noir 2 / Blanc 2 (B2W2) & Collection des 15 Badges d'Arène :
   - **Carte de Dresseur double-face B2W2 authentique** :
