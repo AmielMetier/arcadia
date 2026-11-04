@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.08 — 4 novembre 2026
+## 4.09 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -13,7 +13,7 @@
 - **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
 - **The Backrooms** — de vrais escaliers entre les deux étages du Level 0 : on les monte et on les descend en marchant, marche après marche, au lieu d'être téléporté. Rampes le long des marches, garde-corps autour de la cage d'escalier en haut.
 - **The Backrooms** — un éclairage bien plus angoissant : chaque néon ne fait plus qu'une petite flaque de lumière nette, le noir complet reprend juste à côté, un néon sur quatre est grillé, et le caméscope ne rattrape plus l'obscurité.
-- **The Backrooms** — une image plus propre, comme dans les vidéos des Backrooms : plus nette, des jaunes plus francs, des noirs plus profonds ; le grain, les lignes de balayage et la bavure des couleurs sont bien plus discrets, et les parasites de la cassette ne reviennent que quand l'entité approche.
+- **The Backrooms** — une image plus propre, comme dans les vidéos des Backrooms : plus nette, des jaunes plus francs, des noirs plus profonds ; le grain, les lignes de balayage et la bavure des couleurs sont bien plus discrets, et l'image ne glitche plus en permanence : les parasites de la cassette ne reviennent que quand l'entité est tout près, et moins fort.
 
 ## 4.06 — 4 novembre 2026
 - **Odyssée** — Accessibilité universelle du Système de Stockage des Pokémon (Boîtes PC) :
