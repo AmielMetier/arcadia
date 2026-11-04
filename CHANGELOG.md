@@ -1,5 +1,11 @@
 # Journal des versions — Arcadia
 
+## 3.96 — 4 novembre 2026
+- **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
+  - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
+  - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
+  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « SORTIE ? » et sa flèche, jours comptés en bâtons, « NE COURS PAS » à la peinture qui coule, maisons d'enfant, mains sales.
+
 ## 3.95 — 4 novembre 2026
 - **Arcadia** — Les comptes peuvent recevoir le grade VIP, qui donnera accès à des jeux et des modes de jeu réservés. Il n'y en a pas encore : ils arriveront plus tard. Un compte VIP l'affiche sous son nom (« ⭐ VIP »).
 - **Odyssée** — Expansion du Journal des Trophées & Boîte à Médailles B2W2 (32 Médailles au total) :

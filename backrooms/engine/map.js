@@ -84,7 +84,18 @@ export const PROP_KINDS = [
   { m: 'Television_01', h: 0.45, r: 0.3 },
   { m: 'trashbag', h: 0.5, r: 0.3 },
   { m: 'WetFloorSign_01', h: 0.62, r: 0.22 },
+  { m: 'Sofa_01', h: 0.9, r: 0.62 },
+  { m: 'modern_arm_chair_01', h: 0.86, r: 0.38, turn: true },
+  { m: 'SchoolDesk_01', h: 0.75, r: 0.4, turn: true },
+  { m: 'standing_chalkboard_01', h: 1.2, r: 0.32 },
+  { m: 'worn_metal_rack', h: 1.6, r: 0.45 },
+  { m: 'tool_cart', h: 0.9, r: 0.45, turn: true },
+  { m: 'projector_screen', h: 1.8, r: 0.35 },
+  { m: 'wooden_ladder', h: 1.5, r: 0.35 },
 ];
+// Le matériel des chantiers abandonnés (dessiné dans le code) : projecteurs éteints sur trépied et cônes
+export const WORKLIGHT = { m: 'worklight', h: 1.75, r: 0.32, proc: true };
+export const CONE = { m: 'cone', h: 0.5, r: 0.18, proc: true };
 
 // opts.lower : étage du bas (pas de couloir piégé, de renfoncement ni d'échelle) ; opts.forced : cases qui doivent
 // rester du sol accessible (sous les trous de l'étage du dessus)
@@ -475,9 +486,60 @@ export function createBackroomsMap(seed = 42, opts = {}) {
       r: kind.r,
       x: (c.x + 0.5) * CELL_SIZE + wall[0] * off + (rnd() - 0.5) * 0.3,
       z: (c.z + 0.5) * CELL_SIZE + wall[1] * off + (rnd() - 0.5) * 0.3,
-      rot: rot + (kind.chair ? (rnd() - 0.5) * 2 : (rnd() - 0.5) * 0.25),
+      rot: rot + (kind.chair ? (rnd() - 0.5) * 2 : kind.turn ? (rnd() - 0.5) * 1.2 : (rnd() - 0.5) * 0.25),
       tipped: !!kind.chair && rnd() < 0.3,
     });
+  }
+  // 10a. Chantiers abandonnés : un couloir barré de rubalise jaune et noire (on passe dessous), des cônes au pied
+  // des murs et un projecteur éteint sur son trépied juste avant
+  const tapes = [];
+  const prop = (kind, x, z, rot) => props.push({ m: kind.m, h: kind.h, r: kind.r, proc: true, x, z, rot, tipped: false });
+  const nearPit = (c) => pits.some((p) => Math.abs(p.gx - c.x) <= 1 && Math.abs(p.gz - c.z) <= 1);
+  for (let i = 0; i < 400 && tapes.length < 14; i++) {
+    const c = pick(walkable);
+    if (busy.has(c.z * W + c.x) || nearPit(c) || Math.hypot(c.x - sx, c.z - sz) < 4) continue;
+    // couloir : des murs des deux côtés sur un axe, du sol des deux côtés sur l'autre
+    const alongZ = get(c.x - 1, c.z) === T.WALL && get(c.x + 1, c.z) === T.WALL && get(c.x, c.z - 1) !== T.WALL && get(c.x, c.z + 1) !== T.WALL;
+    const alongX = get(c.x, c.z - 1) === T.WALL && get(c.x, c.z + 1) === T.WALL && get(c.x - 1, c.z) !== T.WALL && get(c.x + 1, c.z) !== T.WALL;
+    if (!alongZ && !alongX) continue;
+    busy.add(c.z * W + c.x);
+    const cx = (c.x + 0.5) * CELL_SIZE;
+    const cz = (c.z + 0.5) * CELL_SIZE;
+    const h = CELL_SIZE / 2;
+    const torn = rnd() < 0.3 ? (rnd() < 0.5 ? 1 : 2) : 0; // 1 ou 2 : ce bout-là s'est décroché et pend
+    const ys = rnd() < 0.4 ? [0.98, 0.55] : [0.95 + rnd() * 0.1];
+    for (const y of ys) {
+      const o = (rnd() - 0.5) * 0.4;
+      if (alongZ) tapes.push({ x1: cx - h, z1: cz + o, x2: cx + h, z2: cz + o + (rnd() - 0.5) * 0.3, y, torn });
+      else tapes.push({ x1: cx + o, z1: cz - h, x2: cx + o + (rnd() - 0.5) * 0.3, z2: cz + h, y, torn });
+    }
+    // cônes au pied des murs (1 ou 2), dont un parfois renversé
+    const side = alongZ ? [1, 0] : [0, 1];
+    for (const s of rnd() < 0.5 ? [-1, 1] : [rnd() < 0.5 ? -1 : 1]) {
+      const px = cx + side[0] * s * (h - 0.35);
+      const pz = cz + side[1] * s * (h - 0.35);
+      props.push({ m: CONE.m, h: CONE.h, r: CONE.r, proc: true, x: px, z: pz, rot: rnd() * 6.28, tipped: rnd() < 0.25 });
+    }
+    // le projecteur, dans la case d'avant ou d'après, tourné vers la rubalise
+    const dir = rnd() < 0.5 ? -1 : 1;
+    const nx = c.x + (alongZ ? 0 : dir);
+    const nz = c.z + (alongZ ? dir : 0);
+    if (rnd() < 0.8 && !busy.has(nz * W + nx) && get(nx, nz) !== T.WALL) {
+      busy.add(nz * W + nx);
+      const s = rnd() < 0.5 ? -1 : 1;
+      const px = (nx + 0.5) * CELL_SIZE + side[0] * s * (h - 0.45);
+      const pz = (nz + 0.5) * CELL_SIZE + side[1] * s * (h - 0.45);
+      prop(WORKLIGHT, px, pz, Math.atan2(cx - px, cz - pz));
+    }
+  }
+  // et quelques projecteurs oubliés ailleurs, contre un mur
+  for (let i = 0; i < 200 && props.filter((p) => p.m === WORKLIGHT.m).length < 18; i++) {
+    const c = pick(walkable);
+    const wall = nearWall(c);
+    if (busy.has(c.z * W + c.x) || !wall || nearPit(c) || Math.hypot(c.x - sx, c.z - sz) < 3) continue;
+    busy.add(c.z * W + c.x);
+    const off = CELL_SIZE / 2 - 0.5;
+    prop(WORKLIGHT, (c.x + 0.5) * CELL_SIZE + wall[0] * off, (c.z + 0.5) * CELL_SIZE + wall[1] * off, Math.atan2(-wall[0], -wall[1]) + (rnd() - 0.5) * 1.5);
   }
   const bottles = [];
   for (let i = 0; i < 40 && bottles.length < 9; i++) {
@@ -530,6 +592,7 @@ export function createBackroomsMap(seed = 42, opts = {}) {
     cassettes,
     lights,
     props,
+    tapes,
     bottles,
     batteries,
     items,
@@ -622,6 +685,7 @@ export function createLevel0(seed = 42) {
   // pas d'objet ni de meuble sur les marches
   for (const m of [up, down]) {
     m.props = m.props.filter((p) => !stairs.some((st) => Math.hypot(p.x - st.x, p.z - st.z) < 2));
+    m.tapes = m.tapes.filter((t) => !stairs.some((st) => Math.hypot((t.x1 + t.x2) / 2 - st.x, (t.z1 + t.z2) / 2 - st.z) < 3));
   }
 
   // les cassettes : 3 en haut (dont celle du couloir piégé et celle du renfoncement), 2 en bas

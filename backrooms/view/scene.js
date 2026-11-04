@@ -21,6 +21,60 @@ const RB = 4; // finesse de l'éclairage cuit : texels par case (des flaques de 
 const AO_R = 0.8; // portée de l'ombre de contact au pied des murs, en mètres
 const SLAB = FLOOR_DY - WALL_HEIGHT; // épaisseur de la dalle entre deux étages
 
+// Projecteur de chantier éteint : trépied noir, mât, barre et deux phares halogènes jaunes qui regardent +z
+function makeWorklight() {
+  const root = new THREE.Group();
+  const black = new THREE.MeshLambertMaterial({ color: '#1d1c1a' });
+  const yellow = new THREE.MeshLambertMaterial({ color: '#d29a12' });
+  const glass = new THREE.MeshLambertMaterial({ color: '#4a4636' });
+  const leg = new THREE.CylinderGeometry(0.014, 0.014, 1, 6);
+  const hubY = 0.75;
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.5;
+    const foot = new THREE.Vector3(Math.cos(a) * 0.42, 0, Math.sin(a) * 0.42);
+    const top = new THREE.Vector3(0, hubY, 0);
+    const m = new THREE.Mesh(leg, black);
+    m.position.copy(foot).add(top).multiplyScalar(0.5);
+    m.scale.y = foot.distanceTo(top);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(foot).normalize());
+    root.add(m);
+  }
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.85, 8), black);
+  mast.position.y = hubY + 0.42;
+  root.add(mast);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.03), black);
+  bar.position.y = 1.6;
+  root.add(bar);
+  for (const x of [-0.2, 0.2]) {
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.2, 0.11), yellow);
+    head.position.set(x, 1.66, 0.04);
+    head.rotation.x = 0.25;
+    root.add(head);
+    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.15, 0.01), glass);
+    lens.position.set(0, 0, 0.058);
+    head.add(lens);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.02), black);
+    handle.position.set(0, 0.12, 0);
+    head.add(handle);
+  }
+  return root;
+}
+
+// Cône de chantier orange à bande blanche, sur son socle noir
+function makeCone() {
+  const root = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.36), new THREE.MeshLambertMaterial({ color: '#1b1a18' }));
+  base.position.y = 0.015;
+  root.add(base);
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.15, 0.47, 14), new THREE.MeshLambertMaterial({ color: '#d4510f' }));
+  cone.position.y = 0.265;
+  root.add(cone);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.09, 0.08, 14), new THREE.MeshLambertMaterial({ color: '#d8d6cc' }));
+  band.position.y = 0.3;
+  root.add(band);
+  return root;
+}
+
 // floors : les étages du niveau (une carte chacun)
 export function createBackroomsScene(container, floors) {
   if (!Array.isArray(floors)) floors = [floors];
@@ -334,12 +388,11 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       }
       return propMats.get(key);
     };
-    const kinds = new Map(map.props.map((p) => [p.m, { m: p.m, h: p.h }]));
+    const kinds = new Map(map.props.map((p) => [p.m, { m: p.m, h: p.h, proc: p.proc }]));
     for (const kind of kinds.values()) {
       const list = map.props.filter((p) => p.m === kind.m);
       if (!list.length) continue;
-      loader.load(MODELS + kind.m + '.glb', (g) => {
-        const root = g.scene;
+      const place = (root) => {
         root.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(root);
         const size = new THREE.Vector3();
@@ -362,7 +415,49 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
           inst.frustumCulled = false;
           group.add(inst);
         });
-      }, undefined, () => {});
+      };
+      if (kind.proc) place(kind.m === 'cone' ? makeCone() : makeWorklight());
+      else loader.load(MODELS + kind.m + '.glb', (g) => place(g.scene), undefined, () => {});
+    }
+
+    // 5a. La rubalise des chantiers : un ruban tendu d'un mur à l'autre, qui pend un peu au milieu ; un bout décroché
+    // tombe jusqu'au sol
+    if (map.tapes && map.tapes.length) {
+      const pos = [];
+      const uv = [];
+      const W2 = 0.07; // largeur du ruban
+      for (const t of map.tapes) {
+        const L = Math.hypot(t.x2 - t.x1, t.z2 - t.z1);
+        const N = 12;
+        const pts = [];
+        for (let i = 0; i <= N; i++) {
+          const f = i / N;
+          let x = t.x1 + (t.x2 - t.x1) * f;
+          let z = t.z1 + (t.z2 - t.z1) * f;
+          let y = t.y - Math.sin(f * Math.PI) * 0.12;
+          // bout décroché : le ruban part du mur qui le tient encore et retombe en courbe jusqu'au sol
+          if (t.torn) {
+            const g = t.torn === 1 ? f : 1 - f; // 0 au mur qui tient, 1 au bout libre
+            x = t.torn === 1 ? t.x2 + (t.x1 - t.x2) * g * 0.55 : t.x1 + (t.x2 - t.x1) * g * 0.55;
+            z = t.torn === 1 ? t.z2 + (t.z1 - t.z2) * g * 0.55 : t.z1 + (t.z2 - t.z1) * g * 0.55;
+            y = Math.max(0.02, t.y - g * g * t.y * 1.05);
+          }
+          pts.push([x, y, z, (f * L) / 0.9]);
+        }
+        for (let i = 0; i < N; i++) {
+          const [ax, ay, az, au] = pts[i];
+          const [bx, by, bz, bu] = pts[i + 1];
+          // le ruban est vertical (sa largeur en hauteur), légèrement vrillé
+          const tw = Math.sin(i * 1.3) * 0.015;
+          pos.push(ax, ay - W2 / 2, az + tw, bx, by - W2 / 2, bz - tw, bx, by + W2 / 2, bz + tw, ax, ay - W2 / 2, az + tw, bx, by + W2 / 2, bz + tw, ax, ay + W2 / 2, az - tw);
+          uv.push(au, 0, bu, 0, bu, 1, au, 0, bu, 1, au, 1);
+        }
+      }
+      const tg = new THREE.BufferGeometry();
+      tg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      tg.computeVertexNormals();
+      group.add(new THREE.Mesh(tg, baked(new THREE.MeshLambertMaterial({ map: textures.tape, side: THREE.DoubleSide }))));
     }
 
     // 5b. Ce qui est fixé aux murs et au plafond : prises électriques, détecteurs incendie, boîtiers électriques,
@@ -371,10 +466,12 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
     const drnd = () => ((ds = (ds * 1103515245 + 12345) % 2147483648) / 2147483648);
     const pitCells = new Set((map.pits || []).map((p) => Math.floor(p.z / CELL_SIZE) * W + Math.floor(p.x / CELL_SIZE)));
     const stairCells = new Set((map.stairs || []).map((st) => st.gz * W + st.gx));
-    const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [] };
+    const wallSpots = { outlet: [], fire_alarm: [], power_box_01: [], wall_clock: [], drawing: [] };
     const ceilSpots = [];
-    const rates = L1 ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0 } : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004 };
-    const heights = { outlet: 0.32, fire_alarm: 2.15, power_box_01: 1.35, wall_clock: 2.25 };
+    const rates = L1
+      ? { outlet: 0.02, fire_alarm: 0.01, power_box_01: 0.012, wall_clock: 0, drawing: 0 }
+      : { outlet: 0.05, fire_alarm: 0.008, power_box_01: 0.003, wall_clock: 0.004, drawing: 0.016 };
+    const heights = { outlet: 0.32, fire_alarm: 2.15, power_box_01: 1.35, wall_clock: 2.25, drawing: 1.3 };
     for (let z = 0; z < H; z++) {
       for (let x = 0; x < W; x++) {
         const i = z * W + x;
@@ -410,6 +507,33 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       dummy.rotation.set(0, 0, 0);
       outlets.instanceMatrix.needsUpdate = true;
       group.add(outlets);
+    }
+    // dessins sur les murs : un des 8 de la planche, de taille et de hauteur variables, un peu de travers
+    if (wallSpots.drawing.length) {
+      const dm = baked(new THREE.MeshLambertMaterial({ map: textures.drawings, transparent: true, alphaTest: 0.05, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      for (let d = 0; d < 8; d++) {
+        const spots = wallSpots.drawing.filter((_, i) => i % 8 === (d + fi * 3) % 8);
+        if (!spots.length) continue;
+        const pg = new THREE.PlaneGeometry(1, 1);
+        const u0 = (d % 4) / 4;
+        const v0 = 1 - (Math.floor(d / 4) + 1) / 2;
+        const uvs = pg.attributes.uv;
+        for (let i = 0; i < uvs.count; i++) uvs.setXY(i, u0 + uvs.getX(i) / 4, v0 + uvs.getY(i) / 2);
+        const inst = new THREE.InstancedMesh(pg, dm, spots.length);
+        spots.forEach((s, i) => {
+          const sz = 0.7 + ((i * 37 + d * 11) % 10) * 0.06;
+          dummy.position.set(s.x, heights.drawing + (((i * 53 + d) % 7) - 3) * 0.1, s.z);
+          dummy.rotation.set(0, s.rot, (((i * 29 + d) % 5) - 2) * 0.05);
+          dummy.scale.set(sz, sz, 1);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+        });
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        inst.instanceMatrix.needsUpdate = true;
+        inst.frustumCulled = false;
+        group.add(inst);
+      }
     }
     // grilles d'aération du faux plafond
     if (ceilSpots.length) {
