@@ -499,24 +499,23 @@ export function createBackroomsTextures(level = 0) {
   const sign = tex(signCanvas);
   sign.wrapS = sign.wrapT = THREE.ClampToEdgeWrapping;
 
-  // Étiquette de l'eau d'amande
-  const [labelCanvas, lctx] = canvas(128, 64);
+  // Étiquette de l'eau d'amande : la vraie (photo de la bouteille), deux fois autour (devant et derrière). Le canvas a
+  // d'emblée la taille de la photo : une texture déjà envoyée à la carte graphique ne change plus de taille (sinon,
+  // à un niveau où la bouteille s'affiche avant la fin du chargement, elle restait sans étiquette).
+  const [labelCanvas, lctx] = canvas(256, 176);
   lctx.fillStyle = '#f1e7c9';
-  lctx.fillRect(0, 0, 128, 64);
-  lctx.fillStyle = '#7a4a1a';
-  lctx.font = 'bold 15px sans-serif';
+  lctx.fillRect(0, 0, 256, 176);
+  lctx.fillStyle = '#c0306a';
+  lctx.font = 'bold 40px sans-serif';
   lctx.textAlign = 'center';
-  lctx.fillText("ALMOND", 64, 26);
-  lctx.fillText("WATER", 64, 46);
+  lctx.fillText('ALMOND', 128, 80);
+  lctx.fillText('WATER', 128, 124);
   const label = tex(labelCanvas);
-  // la vraie étiquette (photo de la bouteille) remplace le dessin dès qu'elle est chargée : devant et derrière
+  label.repeat.set(2, 1);
+  label.offset.set(0.5, 0); // le logo bien au milieu de chaque face
   loadImage('eau_amande.jpg').then((img) => {
     if (!img) return;
-    labelCanvas.width = img.width;
-    labelCanvas.height = img.height;
-    lctx.drawImage(img, 0, 0);
-    label.repeat.set(2, 1);
-    label.offset.set(0.5, 0); // le logo bien au milieu de chaque face
+    lctx.drawImage(img, 0, 0, 256, 176);
     label.needsUpdate = true;
   });
 

@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.12 — 4 novembre 2026
+## 4.13 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : rubalise jaune et noire arrachée qui traîne par terre en travers des couloirs (elle ne bloque jamais le passage), cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -9,7 +9,7 @@
 - **The Backrooms** — à plusieurs, chacun commence dans son coin du dédale, à quelques couloirs des autres : assez loin pour ne pas se voir, assez près pour s'entendre siffler.
 - **The Backrooms** — le son est en 3D : on entend d'où viennent le sifflet, les pas des autres joueurs et l'entité (devant, derrière, à gauche, à droite), étouffés quand ils sont à l'autre étage.
 - **The Backrooms** — les couloirs résonnent : chaque bruit a son écho, plus long dans l'entrepôt en béton du Level 1.
-- **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc.
+- **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc, à tous les niveaux (au Level 1, elle restait parfois sans étiquette).
 - **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
 - **The Backrooms** — de vrais escaliers entre les deux étages du Level 0 : on les monte et on les descend en marchant, marche après marche, au lieu d'être téléporté. Rampes le long des marches, garde-corps autour de la cage d'escalier en haut.
 - **The Backrooms** — un éclairage bien plus angoissant : chaque néon ne fait plus qu'une petite flaque de lumière nette, le noir complet reprend juste à côté, un néon sur quatre est grillé, et le caméscope ne rattrape plus l'obscurité.
