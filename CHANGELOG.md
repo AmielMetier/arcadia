@@ -1,15 +1,47 @@
 # Journal des versions — Arcadia
 
-## 3.99 — 4 novembre 2026
-- **The Backrooms** — tout le jeu passe en anglais : objectifs, messages, inventaire, écran de pause, écran de fin, étiquettes des cassettes et des bouteilles. Les réglages restent en français.
-
-## 3.98 — 4 novembre 2026
+## 3.100 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
-  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « EXIT ? » et sa flèche, jours comptés en bâtons, « DON'T RUN » à la peinture qui coule (tout ce qui est écrit sur les murs est en anglais), maisons d'enfant, mains sales.
+  - Des dessins sur les murs : sourires à la craie, bonshommes bâtons, « EXIT ? » et sa flèche, jours comptés en bâtons, « DON'T RUN » à la peinture qui coule, maisons d'enfant, mains sales.
+- **The Backrooms** — tout le jeu passe en anglais : objectifs, messages, inventaire, écrans de pause et de fin, inscriptions sur les murs, étiquettes des cassettes et des bouteilles. Les réglages restent en français.
+- **The Backrooms** — à plusieurs, chacun commence dans son coin du dédale, à quelques couloirs des autres : assez loin pour ne pas se voir, assez près pour s'entendre siffler.
+- **The Backrooms** — le son est en 3D : on entend d'où viennent le sifflet, les pas des autres joueurs et l'entité (devant, derrière, à gauche, à droite), étouffés quand ils sont à l'autre étage.
+- **The Backrooms** — les couloirs résonnent : chaque bruit a son écho, plus long dans l'entrepôt en béton du Level 1.
+- **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc.
+- **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
+
+## 3.99 — 4 novembre 2026
+- **Odyssée** — Refonte intégrale et composition sur mesure des **Musiques Épiques de Combats de Boss** :
+  - Remplacement des boucles générées procéduralement par **6 grandes compositions originales écrites à la main** (plus de 7 400 notes synthétisées réparties sur 7 canaux audio : basse sub/galopante, double lead mélodique, guitare électrique saturée par distorsion WaveShaper tanh, nappes d'harmonie, arpèges virtuoses en doubles croches et batterie rock/métal avec kicks, caisses claires, cymbales crash et toms) :
+    - **1. Thème des Champions d'Arène (`leader`) — 175 BPM, Mi mineur** : intro fanfare d'arène avec roulement de caisse claire en crescendo, toms descendants, déflagration de guitare électrique saturée, basse rapide en doubles croches et mélodie héroïque triomphante pour les 15 arènes.
+    - **2. Thème de l'Ultime Espoir du Champion (`gymTension`) — 188 BPM, Sol majeur** : hommage au célèbre thème *« Last Pokémon / Victory Lies Ahead »* de Pokémon Noir et Blanc (5G). Se déclenche automatiquement quand le champion ou le maître envoie son dernier Pokémon (ou son as). Double-kick effréné, basse galopante, carillons étincelants et mélodie euphorique pleine d'adrénaline.
+    - **3. Thème de la Maîtresse de la Ligue Céleste & Conseil des 4 (`champion`) — 178 BPM, Do mineur harmonique** : composition symphonique grandiose de 28 mesures digne des duels contre Cynthia et Red. Prélude mystérieux en notes suspendues, montée chromatique tellurique, spirales d'arpèges baroques vertigineuses et duel en contrepoint sous une déferlante de metal symphonique.
+    - **4. Thème des Boss Légendaires & Lugia Obscur XD001 (`legend`) — 164 BPM, Si mineur avec tritons** : atmosphère titanesque, apocalyptique et ténébreuse inspirée de Pokémon Colosseum / XD et Giratina. Battements de cœur colossaux en sub-bass, cloches au triton dissonant (*diabolus in musica*), rugissements de distorsion et rythmique tribale martelée.
+    - **5. Thème des Boss & Admins de la Team Éclipse (`eclipse`) — 170 BPM, Fa mineur** : style cyberpunk et techno-rock industriel. Sirène d'alarme de laboratoire, beat 4-on-the-floor percutant, ligne de basse acid bondissante et stabs de guitare syncopés traduisant le machiavélisme de la faction adverse.
+    - **6. Thème du Rival (`rival`) — 172 BPM, Ré mineur** : rock fougueux et combatif rythmant les duels au sommet contre Théo.
+  - **Architecture audio & Tests automatisés** :
+    - Prise en charge native des intros de combat avec transition fluide vers le point de boucle (`loopStart`), distorsion WaveShaper 2× avec filtre passe-bas 2600 Hz pour la guitare électrique.
+    - Nouvelle suite `tools/test-epic-boss-music.mjs` validant les 6 compositions, les 7 pistes instrumentales, les métriques MIDI et la transition en plein combat lors du dernier Pokémon (100% succès).
+
+## 3.98 — 4 novembre 2026
+- **Odyssée** — Refonte de la Carte de Dresseur en pixel art Noir 2 / Blanc 2 (B2W2) & Collection des 15 Badges d'Arène :
+  - **Carte de Dresseur double-face B2W2 authentique** :
+    - Boîtier texturé carbone et liseré bleu néon inspiré de l'interface tactile DS de Pokémon Noir 2 / Blanc 2.
+    - Face A (Profil de Dresseur) : portrait holographique avec halo d'étoiles, grade et rang de dresseur (de Normal à Maître 5 étoiles basé sur la Ligue, les 15 Badges, les Trophées et le Pokédex), tampon de rang officiel, statistiques d'aventure complètes (Argent, Temps de jeu, Pokédex capturés/vus, Trophées, Victoires/Défaites PvP), et capsules des 6 Pokémon de l'équipe avec Poké Ball d'origine, niveau, jauge PV et types.
+    - Face B (Coffret d'Arène & Coffret des 15 Badges) : deux écrins de velours distincts pour le Continent Nord (8 badges) et les Terres du Sud (7 badges), avec inspecteur de badge interactif affichant le grand sprite 128px, nom officiel, type d'arène, champion, ville, plafond de niveau et privilège de terrain (Sécateur Sylvestre, Harnais Flottant, Sifflet Céleste...).
+    - Navigation intuitive recto/verso par boutons tactiles et touches clavier (<kbd>Espace</kbd>, <kbd>◄</kbd>, <kbd>►</kbd>, <kbd>▲</kbd>, <kbd>▼</kbd>).
+  - **Refonte pixel art 16-bit des 15 Badges d'Arène avec Nanobanana (`image-generator`)** :
+    - 45 sprites haute fidélité (64×64 actifs, 64×64 silhouettes verrouillées avec effet gravure métallique, 128×128 vitrine d'inspection).
+    - Nord : Badge Graine (Sylve-Bourg), Badge Zéphyr (Hauts-Vents), Badge Marée (Port-Serein), Badge Flamme (Cratère-Rouge), Badge Toxine (Marais-Bourbe), Badge Séisme (Faille-Ocre), Badge Cryo (Pics-Gelés), Badge Zénith (Citadelle-Ailée).
+    - Sud : Badge Mirage (Oasis-Cachée), Badge Dynamo (Centrale-Sud), Badge Abysse (Récif-Noir), Badge Spectre (Nécropole), Badge Acier (Fonderie-Basse), Badge Sylvestre (Jungle-Oubliée), Badge Apex (Dôme-des-Légendes).
+  - **Tests automatisés & validation** :
+    - Nouvelle suite `tools/test-trainer-card-b2w2.mjs` validant les 45 assets d'images, la conformité des 15 badges avec `region.js`, la progression des rangs de dresseur et le rendu DOM B2W2 (100% succès).
 
 ## 3.97 — 4 novembre 2026
+- **Odyssée** — Harmonisation française des jauges de vie (HUD & Écran d'équipe) :
+  - Remplacement de l'étiquette anglaise `HP` par `PV` (Points de Vie) sur l'ensemble des capsules de Pokémon du HUD (`hud.js`) et les cartouches de l'écran d'équipe B2W2 (`screens.js`).
 - **Odyssée** — Mode Spectateur des combats PvP en direct :
   - **Observation en temps réel des duels en cours** : les dresseurs du monde multijoueur peuvent désormais assister en direct aux combats opposant deux autres joueurs dans la région.
   - **Détection des combats sur la carte & tags dynamiques** :

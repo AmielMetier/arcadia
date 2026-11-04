@@ -172,7 +172,7 @@ export function partyScreen(game, o = {}) {
               <div class="pslot-types">${typesHtml}</div>
               <div class="pslot-hp-box">
                 <div class="hp-b2w2">
-                  <span class="hp-tag">HP</span>
+                  <span class="hp-tag">PV</span>
                   <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
                 </div>
                 <div class="phpn">${m.hp} / ${m.stats[0]}</div>
@@ -217,7 +217,7 @@ export function partyScreen(game, o = {}) {
             </div>
             <div class="pslot-sub-right">
               <div class="hp-b2w2">
-                <span class="hp-tag">HP</span>
+                <span class="hp-tag">PV</span>
                 <div class="hp-track"><u style="width:${(r * 100).toFixed(1)}%;background:${hpCol(r)}"></u></div>
               </div>
               <div class="phpn">${m.hp} / ${m.stats[0]}</div>
@@ -1346,20 +1346,387 @@ export function mapScreen(game) {
   });
 }
 
-/* ================= CARTE DE DRESSEUR ================= */
-/** fiche d'un dresseur (la sienne, ou celle d'un autre joueur reçue par le réseau : voir trainerCard) */
-export function trainerCard(st) {
-  return { name: st.name, id: st.id, gender: st.gender, money: st.money, dex: st.dex.caught.length, seen: st.dex.seen.length, time: st.time, badges: st.badges.map(Boolean),
-    team: st.party.map((m) => ({ sp: m.sp, lvl: m.lvl, shiny: !!m.shiny, nick: m.nick || null })), champion: !!st.flags?.champion };
+/* ================= CARTE DE DRESSEUR FAÇON 5G (NOIR 2 / BLANC 2) ================= */
+export const BADGE_SPECS = [
+  { id: 1, name: 'Badge Élytre', type: 'bug', leader: 'Hector', town: 'Sylve', reward: 'Autorise Coupe hors combat', cap: 25 },
+  { id: 2, name: 'Badge Écume', type: 'water', leader: 'Marine', town: 'Port-Azur', reward: 'Accès aux Navires & Mers', cap: 35 },
+  { id: 3, name: 'Badge Volt', type: 'electric', leader: 'Volta', town: 'Électro-Ville', reward: 'Autorise Flash & Galeries', cap: 45 },
+  { id: 4, name: 'Badge Pétale', type: 'grass', leader: 'Flora', town: 'Floralia', reward: 'Débloque les Échanges multijoueurs', cap: 55 },
+  { id: 5, name: 'Badge Mirage', type: 'psychic', leader: 'Sibylle', town: 'Cité Mirage', reward: 'Dissipe les Brumes & Illusions', cap: 65 },
+  { id: 6, name: 'Badge Granit', type: 'rock', leader: 'Basalte', town: 'Île Basalte', reward: 'Autorise Éclate-Roc hors combat', cap: 70 },
+  { id: 7, name: 'Badge Braise', type: 'fire', leader: 'Pyros', town: 'Île Pyros', reward: 'Autorise Force hors combat', cap: 75 },
+  { id: 8, name: 'Badge Écaille', type: 'dragon', leader: 'Drakos', town: 'Île Drakos', reward: 'Autorise Vol & Accès Ligue du Nord', cap: 80 },
+  { id: 9, name: 'Badge Pavé', type: 'normal', leader: 'Margot', town: 'Métropole', reward: 'Accès VIP au Casino & Bourse', cap: 82 },
+  { id: 10, name: 'Badge Rafale', type: 'flying', leader: 'Aurèle', town: 'Port-Lisière', reward: 'Courants aériens des Terres du Sud', cap: 85 },
+  { id: 11, name: 'Badge Venin', type: 'poison', leader: 'Morgane', town: 'Marais-Noir', reward: 'Immunité aux bourbiers toxiques', cap: 88 },
+  { id: 12, name: 'Badge Dune', type: 'ground', leader: 'Gaspard', town: 'Dunes d\'Ocre', reward: 'Traversée des tempêtes de sable', cap: 90 },
+  { id: 13, name: 'Badge Rouage', type: 'steel', leader: 'Ferdinand', town: 'Forge-Acier', reward: 'Maîtrise métallurgique & blindages', cap: 92 },
+  { id: 14, name: 'Badge Féérie', type: 'fairy', leader: 'Lilas', town: 'Rosebrume', reward: 'Passage du Sanctuaire Féerique', cap: 95 },
+  { id: 15, name: 'Badge Ombre', type: 'dark', leader: 'Corbin', town: 'Ombreval', reward: 'Accès ultime à la Ligue du Sud', cap: 100 },
+];
+
+export function getCardRank(c) {
+  let stars = 0;
+  const badgesCount = (c.badges || []).filter(Boolean).length;
+  if (c.champion) stars++;
+  if (badgesCount >= 8) stars++;
+  if (badgesCount >= 15) stars++;
+  if ((c.dex || 0) >= 60) stars++;
+  if ((c.trophies || 0) >= 10 || (c.pvpWins || 0) >= 10) stars++;
+
+  let grade = 'NORMAL';
+  let themeCls = 'card-normal';
+  let title = 'Voyageur d\'Odyssée';
+
+  if (stars >= 5) {
+    grade = 'MAÎTRE';
+    themeCls = 'card-master';
+    title = 'Maître Suprême d\'Odyssée';
+  } else if (stars === 4) {
+    grade = 'PLATINE';
+    themeCls = 'card-platinum';
+    title = 'Légende Régionale';
+  } else if (stars === 3) {
+    grade = 'OR';
+    themeCls = 'card-gold';
+    title = 'Champion Émérite';
+  } else if (stars === 2) {
+    grade = 'ARGENT';
+    themeCls = 'card-silver';
+    title = 'Dresseur d\'Élite';
+  } else if (stars === 1) {
+    grade = 'BRONZE';
+    themeCls = 'card-bronze';
+    title = 'Étoile Montante';
+  }
+
+  return { stars, grade, themeCls, title, badgesCount };
 }
+
+/** Fiche d'un dresseur (la sienne, ou reçue par le réseau) */
+export function trainerCard(st) {
+  const pvp = st.pvp || {};
+  const unlockedTrophies = Object.values(pvp.trophies || {}).filter((t) => t.unlocked).length;
+  return {
+    name: st.name,
+    id: st.id,
+    gender: st.gender,
+    money: st.money,
+    dex: st.dex?.caught?.length || 0,
+    seen: st.dex?.seen?.length || 0,
+    time: st.time || 0,
+    badges: (st.badges || []).map(Boolean),
+    team: (st.party || []).map((m) => ({
+      sp: m.sp,
+      lvl: m.lvl,
+      shiny: !!m.shiny,
+      nick: m.nick || null,
+      hp: m.hp,
+      maxHp: m.stats?.[0] || m.hp,
+      ball: m.ball || 'poke-ball',
+    })),
+    champion: !!st.flags?.champion,
+    trophies: unlockedTrophies,
+    pvpWins: pvp.totalWins || 0,
+    pvpLosses: pvp.totalLosses || 0,
+  };
+}
+
 export function cardScreen(game, BADGES, other) {
   const ui = game.ui, c = other || trainerCard(game.state);
   return new Promise((resolve) => {
     const s = screen(ui, 'card-scr');
-    const h = Math.floor((c.time || 0) / 3600), m = Math.floor((c.time || 0) / 60) % 60;
-    const team = (c.team || []).slice(0, 6).map((q) => `<div class="tc-mon" title="${esc(q.nick || SPECIES[q.sp]?.n || '?')}"><img src="${ASSETS.icon(q.sp)}" alt=""><span>N.${q.lvl}</span></div>`).join('');
-    s.innerHTML = `<div class="tcard box"><div class="tc-top"><span>${other ? 'CARTE DE ' + esc(String(c.name).toUpperCase()) : 'CARTE DRESSEUR'}</span><span>ID ${String(c.id || 0).padStart(5, '0')}</span></div><div class="tc-body"><table class="kv"><tr><td>Nom</td><td>${esc(c.name)}${c.champion ? ' ★' : ''}</td></tr>${other ? '' : `<tr><td>Argent</td><td>${(c.money || 0).toLocaleString('fr-FR')} ₽</td></tr>`}<tr><td>Pokédex</td><td>${c.dex}${c.seen != null ? ` (vus : ${c.seen})` : ''}</td></tr><tr><td>Temps de jeu</td><td>${h}:${String(m).padStart(2, '0')}</td></tr></table><div class="tc-photo"><div class="tc-char ${c.gender === 'f' ? 'f' : 'm'}"></div></div></div><div class="badges">${BADGES.map((b, k) => `<div class="badge ${c.badges?.[k] ? 'got' : ''}" style="--bc:${b.color}" title="${esc(b.name)}"><i></i></div>`).join('')}</div>${team ? `<div class="tc-team">${team}</div>` : ''}</div>`;
-    const pop = ui.input.push((k) => { if (k === 'a' || k === 'b') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); } });
+    s.classList.add('b2w2-screen');
+
+    let face = 'profile'; // 'profile' | 'badges'
+    let selBadge = Math.max(0, (c.badges || []).findIndex(Boolean));
+    if (selBadge < 0) selBadge = 0;
+
+    const rank = getCardRank(c);
+    const h = Math.floor((c.time || 0) / 3600);
+    const m = Math.floor((c.time || 0) / 60) % 60;
+    const timeStr = `${h}h ${String(m).padStart(2, '0')}`;
+    const idStr = String(c.id || 0).padStart(5, '0');
+    const dexTotal = 150;
+    const dexPct = Math.min(100, Math.round(((c.dex || 0) / dexTotal) * 100));
+
+    const render = () => {
+      const starsHtml = Array.from({ length: 5 })
+        .map((_, i) => `<span class="tc-star${i < rank.stars ? ' on' : ''}">★</span>`)
+        .join('');
+
+      // Face A : Profil
+      const team = (c.team || []).slice(0, 6);
+      const teamHtml = Array.from({ length: 6 }).map((_, slotIdx) => {
+        const q = team[slotIdx];
+        if (!q) {
+          return `
+            <div class="tc-team-slot empty">
+              <div class="tc-ts-socket"></div>
+              <div class="tc-ts-none">SLOT VIDE</div>
+            </div>
+          `;
+        }
+        const S = SPECIES[q.sp] || {};
+        const hpR = q.hp != null && q.maxHp ? Math.max(0, Math.min(1, q.hp / q.maxHp)) : 1;
+        const isShiny = !!q.shiny;
+        const ballItem = q.ball || 'poke-ball';
+        const ballSrc = ASSETS.item(ballItem);
+        return `
+          <div class="tc-team-slot${isShiny ? ' shiny' : ''}">
+            <div class="tc-ts-top">
+              <img class="tc-ts-ball" src="${ballSrc}" alt="" title="${ballItem}">
+              <span class="tc-ts-name">${esc(q.nick || S.n || 'Pokémon')}</span>
+              ${isShiny ? '<span class="tc-ts-star">★</span>' : ''}
+              <span class="tc-ts-lvl">N.${q.lvl}</span>
+            </div>
+            <div class="tc-ts-mid">
+              <div class="tc-ts-icon-wrap">
+                <img class="tc-ts-icon" src="${ASSETS.icon(q.sp)}" alt="" onerror="this.src='${ASSETS.front(q.sp)}'">
+              </div>
+              <div class="tc-ts-meta">
+                <div class="tc-ts-types">
+                  ${(S.t || ['normal']).map((t) => `<span class="tc-ts-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('')}
+                </div>
+                <div class="tc-ts-hp">
+                  <span class="tc-ts-hp-tag">PV</span>
+                  <div class="tc-ts-hp-track"><u style="width:${(hpR * 100).toFixed(0)}%;background:${hpCol(hpR)}"></u></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Face B : Badges Showcase
+      const renderBadgeSlot = (spec, idx) => {
+        const isGot = !!c.badges?.[idx];
+        const isSel = selBadge === idx;
+        const iconSrc = isGot ? ASSETS.badge(spec.id) : ASSETS.badge(spec.id, true);
+        return `
+          <button type="button" class="tc-badge-slot${isGot ? ' got' : ' locked'}${isSel ? ' selected' : ''}" data-bidx="${idx}" title="${esc(spec.name)} (${isGot ? 'Obtenu' : 'Non débloqué'})">
+            <div class="tc-badge-socket">
+              <img class="tc-badge-img${isGot ? ' shine' : ' dim'}" src="${iconSrc}" alt="${esc(spec.name)}">
+            </div>
+            <span class="tc-badge-num">#${spec.id}</span>
+            <span class="tc-badge-label">${esc(spec.name.replace('Badge ', ''))}</span>
+          </button>
+        `;
+      };
+
+      const nordBadgesHtml = BADGE_SPECS.slice(0, 8).map(renderBadgeSlot).join('');
+      const sudBadgesHtml = BADGE_SPECS.slice(8, 15).map((spec, i) => renderBadgeSlot(spec, i + 8)).join('');
+
+      const selSpec = BADGE_SPECS[selBadge] || BADGE_SPECS[0];
+      const selGot = !!c.badges?.[selBadge];
+      const selImgSrc = selGot ? ASSETS.badge(selSpec.id).replace('.png', '_128.png') : ASSETS.badge(selSpec.id, true);
+
+      s.innerHTML = `
+        <div class="b2w2-card-casing ${rank.themeCls}">
+          <!-- Barre Supérieure B2W2 DS -->
+          <div class="tc-header">
+            <div class="tc-hdr-left">
+              <span class="tc-hdr-title">${other ? 'CARTE DE ' + esc(String(c.name).toUpperCase()) : 'CARTE DE DRESSEUR'}</span>
+              <div class="tc-stars-wrap">${starsHtml}</div>
+              <span class="tc-hdr-grade">${rank.grade}</span>
+            </div>
+            <div class="tc-hdr-right">
+              <span class="tc-id-pill">IDNo. ${idStr}</span>
+              <button type="button" class="tc-btn-flip" data-act="flip" title="Basculer Recto / Verso (Espace ou ◄ / ►)">
+                ${face === 'profile' ? 'Voir les 15 Badges ▶' : '◀ Profil Dresseur'}
+              </button>
+              <button type="button" class="tc-btn-close" data-act="close" title="Fermer (Échap)">✕</button>
+            </div>
+          </div>
+
+          <!-- Corps de la Carte B2W2 (2 faces commutables) -->
+          <div class="tc-body-wrap">
+            <!-- FACE A : Profil Dresseur -->
+            <div class="tc-face tc-face-profile${face === 'profile' ? ' active' : ''}">
+              <div class="tc-profile-grid">
+                <!-- Colonne Gauche : Cadre Photo & Sceau -->
+                <div class="tc-photo-col">
+                  <div class="tc-photo-frame">
+                    <div class="tc-photo-hologram"></div>
+                    <div class="tc-photo-pedestal"></div>
+                    <img class="tc-photo-spr" src="${ASSETS.trainer(c.gender === 'f' ? 'player_f' : 'player_m')}" alt="" onerror="this.style.display='none'">
+                  </div>
+                  <div class="tc-stamp">
+                    <div class="tc-stamp-ring">
+                      <span class="tc-stamp-title">LIGUE D'ODYSSÉE</span>
+                      <span class="tc-stamp-sub">CERTIFIÉ B2W2</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Colonne Droite : Données du Dresseur -->
+                <div class="tc-data-col">
+                  <div class="tc-data-box">
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">DRESSEUR</span>
+                      <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
+                    </div>
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">TITRE OFFICIEL</span>
+                      <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
+                    </div>
+                    ${other ? '' : `
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">ARGENT</span>
+                      <span class="tc-val tc-money-val"><b>${(c.money || 0).toLocaleString('fr-FR')}</b> ₽</span>
+                    </div>`}
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">POKÉDEX</span>
+                      <div class="tc-val tc-pdx-row">
+                        <span><b>${c.dex || 0}</b> capturés <small>(vus : ${c.seen != null ? c.seen : (c.dex || 0)})</small></span>
+                        <div class="tc-pdx-bar"><u style="width:${dexPct}%"></u></div>
+                      </div>
+                    </div>
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">TEMPS DE JEU</span>
+                      <span class="tc-val">${timeStr}</span>
+                    </div>
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">BADGES D'ARÈNE</span>
+                      <span class="tc-val tc-badges-val"><b>${rank.badgesCount}</b> / 15 Badges</span>
+                    </div>
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">MÉDAILLES B2W2</span>
+                      <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
+                    </div>
+                    ${(c.pvpWins || c.pvpLosses) ? `
+                    <div class="tc-data-row">
+                      <span class="tc-lbl">DUELS MULTI</span>
+                      <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
+                    </div>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Plateau Équipe Pokémon (6 Slots) -->
+              <div class="tc-team-tray">
+                <div class="tc-tray-head">
+                  <span class="tc-tray-title">ÉQUIPE EN VOYAGE</span>
+                  <span class="tc-tray-sub">${team.length} / 6 POKÉMON ACTIFS</span>
+                </div>
+                <div class="tc-team-grid">${teamHtml}</div>
+              </div>
+            </div>
+
+            <!-- FACE B : Coffret des 15 Badges -->
+            <div class="tc-face tc-face-badges${face === 'badges' ? ' active' : ''}">
+              <div class="tc-velvet-casing">
+                <div class="tc-velvet-head">
+                  <div class="tc-vh-title">COFFRET D'HONNEUR DES 15 BADGES D'ODYSSÉE</div>
+                  <div class="tc-vh-progress">
+                    <span class="tc-vh-count"><b>${rank.badgesCount}</b> / 15 DÉBLOQUÉS</span>
+                    <div class="tc-vh-bar"><u style="width:${Math.round((rank.badgesCount / 15) * 100)}%"></u></div>
+                  </div>
+                </div>
+
+                <div class="tc-trays-container">
+                  <!-- Plateau 1 : Continent Nord & Archipel (8 Badges) -->
+                  <div class="tc-tray-block">
+                    <div class="tc-tb-title">CONTINENT NORD & ARCHIPEL (8 BADGES)</div>
+                    <div class="tc-badges-grid grid-8">${nordBadgesHtml}</div>
+                  </div>
+
+                  <!-- Plateau 2 : Terres du Sud (7 Badges) -->
+                  <div class="tc-tray-block">
+                    <div class="tc-tb-title">TERRES DU SUD (7 BADGES)</div>
+                    <div class="tc-badges-grid grid-7">${sudBadgesHtml}</div>
+                  </div>
+                </div>
+
+                <!-- Panneau Inspecteur de Badge interactif -->
+                <div class="tc-badge-inspector">
+                  <div class="tc-bi-art-col">
+                    <div class="tc-bi-socket">
+                      <img class="tc-bi-img${selGot ? ' shine' : ' dim'}" src="${selImgSrc}" alt="${esc(selSpec.name)}">
+                    </div>
+                  </div>
+                  <div class="tc-bi-info-col">
+                    <div class="tc-bi-title-row">
+                      <span class="tc-bi-num">#${selSpec.id}</span>
+                      <span class="tc-bi-name">${esc(selSpec.name.toUpperCase())}</span>
+                      <span class="tc-bi-type" style="--tc:${TYPE_COL[selSpec.type] || '#888'}">${TYPE_FR[selSpec.type] || selSpec.type}</span>
+                      <span class="tc-bi-status ${selGot ? 'got' : 'locked'}">${selGot ? '✔ OBTENU' : '🔒 NON DÉBLOQUÉ'}</span>
+                    </div>
+                    <div class="tc-bi-gym-row">
+                      Arène de <b>${esc(selSpec.town)}</b> · Champion${selSpec.leader === 'Marine' || selSpec.leader === 'Volta' || selSpec.leader === 'Flora' || selSpec.leader === 'Sibylle' || selSpec.leader === 'Margot' || selSpec.leader === 'Morgane' || selSpec.leader === 'Lilas' ? 'ne' : ''} <b>${esc(selSpec.leader)}</b>
+                    </div>
+                    <div class="tc-bi-reward-row">
+                      Privilège : <b>${esc(selSpec.reward)}</b> <span class="tc-bi-cap">(Niv. max : N.${selSpec.cap})</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pied de la Carte B2W2 -->
+          <div class="tc-footer">
+            <div class="tc-foot-hints">
+              <span><kbd>ESPACE</kbd> / <kbd>◄</kbd> <kbd>►</kbd> ${face === 'profile' ? 'Voir les Badges' : 'Profil'}</span>
+              <span><kbd>▲</kbd> <kbd>▼</kbd> Sélectionner un badge</span>
+              <span><kbd>ÉCHAP</kbd> Quitter</span>
+            </div>
+            <button type="button" class="tc-foot-btn" data-act="flip">
+              ${face === 'profile' ? 'COFFRET DES 15 BADGES ➔' : '➔ RETOUR AU PROFIL'}
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Attach Event Handlers
+      s.querySelectorAll('[data-act="close"]').forEach((b) => {
+        b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); close(); };
+      });
+
+      s.querySelectorAll('[data-act="flip"]').forEach((b) => {
+        b.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          face = face === 'profile' ? 'badges' : 'profile';
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          render();
+        };
+      });
+
+      s.querySelectorAll('.tc-badge-slot').forEach((slot) => {
+        slot.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const bidx = parseInt(slot.dataset.bidx, 10);
+          if (!isNaN(bidx) && bidx >= 0 && bidx < BADGE_SPECS.length) {
+            selBadge = bidx;
+            try { ui.sound?.sfx('select'); } catch (err) {}
+            render();
+          }
+        };
+      });
+    };
+
+    const close = () => {
+      pop();
+      s.remove();
+      try { ui.sound?.sfx('cancel'); } catch (e) {}
+      resolve();
+    };
+
+    const pop = ui.input.push((k) => {
+      if (k === 'a' || k === 'b' || k === 'cancel') {
+        close();
+      } else if (k === 'space' || k === 'left' || k === 'right') {
+        face = face === 'profile' ? 'badges' : 'profile';
+        try { ui.sound?.sfx('blip'); } catch (err) {}
+        render();
+      } else if (face === 'badges' && (k === 'up' || k === 'down')) {
+        selBadge = (selBadge + (k === 'down' ? 1 : -1) + BADGE_SPECS.length) % BADGE_SPECS.length;
+        try { ui.sound?.sfx('select'); } catch (err) {}
+        render();
+      }
+    });
+
+    render();
   });
 }
 

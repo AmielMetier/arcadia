@@ -14,6 +14,7 @@ let sfx = null;
 let hud = null;
 let stepDist = 0;
 let monsterStepT = 0;
+const otherStepT = new Map(); // prochain pas de chaque autre joueur
 
 // Réseau : l'hôte fait tourner la partie et envoie un instantané ~20 fois par seconde ; un invité se déplace chez lui
 // (pour que ça réponde tout de suite), envoie ses commandes et reçoit tout le reste de l'hôte.
@@ -317,15 +318,6 @@ function onRoster() {
 
 const ITEM_NAME = { bottle: 'Almond water', battery: 'Batteries', ladder: 'Ladder' };
 
-// position gauche / droite d'un son par rapport au regard de la caméra (-1 à 1)
-function panTo(x, z) {
-  const V = sim.viewPlayer(sim.spectate || 0);
-  let d = Math.atan2(x - V.x, z - V.z) - (V.yaw - Math.PI);
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  return Math.max(-0.9, Math.min(0.9, Math.sin(d)));
-}
-
 // Événements de la partie : sons, messages, changement d'étage, fin
 function handleEvent(ev, me) {
   const mine = ev.by !== undefined ? ev.by === me : ev.id === undefined || ev.id === me;
@@ -374,10 +366,9 @@ function handleEvent(ev, me) {
       break;
     case 'whistle':
       {
-        // de loin, plus faible ; d'un autre étage, étouffé à travers le plancher
+        // placé là où siffle le joueur ; d'un autre étage, étouffé à travers le plancher
         const V = sim.viewPlayer(sim.spectate || 0);
-        const vol = ev.id === me ? 1 : Math.max(0.15, 1 - Math.hypot(ev.x - V.x, ev.z - V.z) / 60) * ((ev.floor || 0) === (V.floor || 0) ? 1 : 0.35);
-        if (sfx) sfx.whistle(vol, ev.id === me ? 0 : panTo(ev.x, ev.z));
+        if (sfx) sfx.whistle(ev.id === me ? null : { x: ev.x, z: ev.z, muffled: (ev.floor || 0) !== (V.floor || 0) });
       }
       if (hud && ev.id !== me) hud.toast(`${ev.name} whistles`);
       break;
@@ -396,14 +387,6 @@ function handleEvent(ev, me) {
       if (!mine) break;
       if (sfx) sfx.battery();
       if (hud) hud.toast('Battery replaced: flashlight recharged');
-      break;
-    case 'lamp':
-      if (ev.id !== me) break;
-      if (sfx) sfx.battery();
-      if (hud) hud.toast('Flashlight in hand (slot 1) · [1] to turn it on or off');
-      break;
-    case 'noLamp':
-      if (ev.id === me && hud) hud.toast('No flashlight: grab one from the starting table');
       break;
     case 'batteryEmpty':
       if (!mine) break;
@@ -583,12 +566,12 @@ function loop(currentTime) {
 
   // Mise à jour du son continu de l'entité, et ses pas lourds quand elle te traque
   if (sfx && sim.hasMonster && sim.state === 'playing') {
-    sfx.updateMonsterSound(sim.monster.danger, sim.monster.pan, sim.level === 1);
+    sfx.updateMonsterSound(sim.monster.danger, sim.monster, sim.level === 1);
     if (!paused && sim.monster.mode === 'chase' && sim.monster.danger > 0.05) {
       monsterStepT -= delta;
       if (monsterStepT <= 0) {
         monsterStepT = 0.42;
-        sfx.monsterStep(sim.monster.danger, sim.monster.pan);
+        sfx.monsterStep(sim.monster.danger, sim.monster);
       }
     }
   } else if (sfx) sfx.updateMonsterSound(0, 0); // partie finie : l'entité se tait
@@ -597,6 +580,22 @@ function loop(currentTime) {
   if (scene) {
     scene.render(sim, currentTime / 1000);
     if (sfx) sfx.setHum(scene.lightHere); // le grésillement des néons autour de soi
+    if (sfx) {
+      // l'oreille suit la caméra (le joueur, ou celui qu'on regarde) ; l'écho change avec le niveau
+      const V = sim.viewPlayer(sim.spectate || 0);
+      sfx.setListener(V.x, V.z, V.yaw);
+      sfx.setRoom(sim.level);
+      // les pas des autres joueurs, là où ils marchent (plus rapprochés quand ils courent)
+      for (const O of sim.players) {
+        if (O === V || O.status !== 'alive' || !O.moving || paused) {
+          otherStepT.delete(O.id);
+          continue;
+        }
+        const left = (otherStepT.get(O.id) ?? Math.random() * 0.3) - delta;
+        if (left <= 0) sfx.step(sim.level === 1, { x: O.x, z: O.z, muffled: (O.floor || 0) !== (V.floor || 0) }, O.running ? 1 : 0.7);
+        otherStepT.set(O.id, left <= 0 ? (O.running ? 0.32 : 0.5) : left);
+      }
+    }
     if (sfx) {
       // le souffle : sprint, puis halètement le temps de récupérer, et la peur quand l'entité est là
       const P = sim.player;
@@ -614,7 +613,7 @@ function loop(currentTime) {
 
 // ?debug : accès à la partie depuis la console (tests)
 if (/[?&]debug(&|=|$)/.test(location.search)) {
-  window.__br = { get sim() { return sim; }, get scene() { return scene; }, keys, frame: (t) => loop(t) };
+  window.__br = { get sim() { return sim; }, get scene() { return scene; }, get sfx() { return sfx; }, keys, frame: (t) => loop(t) };
 }
 
 // Réglages (bouton ⚙ commun aux jeux) : son, et choix Souris / Sans souris

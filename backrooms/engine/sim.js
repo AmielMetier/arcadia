@@ -7,8 +7,8 @@
 //             qui se cache au bout des rangées d'étagères pour tendre des embuscades.
 // Qui entre dans l'ascenseur ouvert devient spectateur ; il part quand plus personne n'est dehors. Plus il y a de
 // monde dans la cabine, plus l'entité s'énerve contre ceux qui restent.
-// Au tout début, personne n'a de lampe : une table au départ en porte une par joueur. Un joueur attrapé regarde les
-// autres jusqu'à la fin de l'étage ; si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
+// Chacun part avec sa lampe torche dans la case 1. Un joueur attrapé regarde les autres jusqu'à la fin de l'étage ;
+// si l'équipe le termine, tout le monde repart à l'étage suivant, lampe en main.
 import { CELL_SIZE, T, createLevel0, PIT_HALF } from './map.js';
 import { createWarehouseMap } from './level1.js';
 import { findPath, hasLineOfSight } from './nav.js';
@@ -53,6 +53,34 @@ const cellOf = (v) => Math.floor(v / CELL_SIZE);
 // les étages d'un niveau : même graine de partie, des cartes différentes par niveau
 export function makeLevelMap(level, seed) {
   return level === 1 ? [createWarehouseMap(seed * 7 + 13)] : createLevel0(seed).floors;
+}
+
+// Départ du Level 0 à plusieurs : chacun dans son coin du dédale, à 4 à 8 cases de marche du départ (pas en vue des
+// autres, mais assez près pour s'entendre siffler), au moins 3 cases entre deux joueurs. Le tirage ne dépend que de la
+// carte : l'hôte et les invités placent tout le monde au même endroit.
+export function spreadSpawns(map, n) {
+  const spots = [{ x: map.spawn.x, z: map.spawn.z }];
+  if (!map.dist || !map.walkable || n < 2) return spots;
+  const W = map.W;
+  const near = (c, list, d) => list.some((o) => Math.abs((o.gx ?? o.x) - c.x) < d && Math.abs((o.gz ?? o.z) - c.z) < d);
+  const pitAt = (c) => (map.pitAt ? map.pitAt(c.x, c.z) >= 0 : false);
+  const free = (c) =>
+    !pitAt(c) &&
+    !near(c, map.stairs || [], 2) &&
+    !(map.props || []).some((p) => Math.hypot(p.x - (c.x + 0.5) * CELL_SIZE, p.z - (c.z + 0.5) * CELL_SIZE) < p.r + 0.6);
+  const hash = (c) => (((c.x * 73856093) ^ (c.z * 19349663) ^ (map.spawn.gx * 83492791)) >>> 0) % 1000;
+  const cand = map.walkable.filter((c) => {
+    const d = map.dist[c.z * W + c.x];
+    return d >= 4 && d <= 8 && Math.hypot(c.x - map.spawn.gx, c.z - map.spawn.gz) * CELL_SIZE < 22 && free(c);
+  }).sort((a, b) => hash(a) - hash(b));
+  const taken = [{ x: map.spawn.gx, z: map.spawn.gz }];
+  for (const c of cand) {
+    if (spots.length >= n) break;
+    if (taken.some((t) => Math.abs(t.x - c.x) + Math.abs(t.z - c.z) < 3)) continue;
+    taken.push(c);
+    spots.push({ x: (c.x + 0.5) * CELL_SIZE, z: (c.z + 0.5) * CELL_SIZE });
+  }
+  return spots;
 }
 
 function newPlayer(id, name, map, i) {
@@ -114,8 +142,14 @@ export class BackroomsSim {
     this.floors = floors || makeLevelMap(level, this.seed);
     this.map = this.floors[0];
     this.stairs = this.map.stairs || [];
+    // au début de la partie, chacun part de son côté ; aux étages suivants, tout le monde sort ensemble de l'ascenseur
+    const spots = level === 0 && !prev.length ? spreadSpawns(this.map, this.roster.length) : [];
     this.players = this.roster.map((r, i) => {
       const P = newPlayer(r.id, r.name, this.map, i);
+      if (spots[i]) {
+        P.x = spots[i].x;
+        P.z = spots[i].z;
+      }
       const old = prev.find((p) => p.id === r.id);
       if (old) {
         // on garde son inventaire, sa pile et ses trouvailles d'un étage à l'autre
@@ -131,9 +165,6 @@ export class BackroomsSim {
       P.flashlight = !old || old.flashlight || old.status !== 'alive';
       return P;
     });
-    // plus de table au départ : chacun a sa lampe dans la case 1 dès le début
-    this.table = null;
-    this.lamps = [];
     this.cassettes = 0; // cassettes trouvées par l'équipe (Level 0)
     this.fuses = 0; // fusibles en poche (Level 1)
     this.items0 = this.floors.map((f) => (f.items || []).length); // objets d'origine (les suivants ont été posés par des joueurs)
@@ -256,9 +287,7 @@ export class BackroomsSim {
         if ((x - closestX) ** 2 + (z - closestZ) ** 2 < radius * radius) return true;
       }
     }
-    // table des lampes, caisses et meubles abandonnés (cercles)
-    const T0 = floor === 0 && this.table;
-    if (T0 && (T0.x - x) ** 2 + (T0.z - z) ** 2 < (radius + T0.r) ** 2) return true;
+    // caisses et meubles abandonnés (cercles)
     for (const pr of this.fm(floor).props || []) {
       const rr = radius + pr.r;
       if (Math.abs(pr.x - x) < rr && Math.abs(pr.z - z) < rr && (pr.x - x) ** 2 + (pr.z - z) ** 2 < rr * rr) return true;
@@ -290,17 +319,8 @@ export class BackroomsSim {
     this.emit({ type: kind, used: true, id: P.id });
   }
 
-  // F : prendre sa lampe sur la table, ou l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
+  // F : ramasser l'objet le plus proche (dans une case vide, sinon échangé avec la case choisie)
   pickUp(P) {
-    if (!P.hasLamp && P.floor === 0 && this.table && Math.hypot(this.table.x - P.x, this.table.z - P.z) < 1.7) {
-      const lamp = this.lamps.find((l) => !l.taken);
-      if (lamp) {
-        lamp.taken = true;
-        P.hasLamp = true;
-        P.flashlight = true;
-        return this.emit({ type: 'lamp', id: P.id, lamp: lamp.id });
-      }
-    }
     const it = this.nearItem(P);
     if (!it) return this.emit({ type: 'nothing', id: P.id });
     it.taken = true;
@@ -701,11 +721,6 @@ export class BackroomsSim {
     this.players.push(P);
   }
 
-  // l'objectif à suivre pour un joueur sans lampe : la table du départ
-  get needLamp() {
-    return !!this.table && !this.player.hasLamp && this.player.status === 'alive';
-  }
-
   // Un joueur s'en va : il disparaît de la partie ; s'il était le dernier dehors, l'ascenseur part
   removePlayer(id) {
     this.roster = this.roster.filter((r) => r.id !== id);
@@ -731,7 +746,7 @@ export class BackroomsSim {
       rf: this.open ? this.realFloor : -1,
       p: this.players.map((P) => [P.id, r2(P.x), r2(P.z), r2(P.yaw), r2(P.pitch), P.status, P.flashlight ? 1 : 0, Math.round(P.battery), Math.round(P.stamina), P.inv.map((k) => k || '').join(','), r2(P.signal), P.running ? 1 : 0, P.moving ? 1 : 0, P.found, P.name, P.hasLamp ? 1 : 0, P.sel, P.floor, P.sigTo, P.onLadder ? 1 : 0, r2(P.lockT), r2(P.tilt), P.onBeam ? 1 : 0]),
       m: [r2(M.x), r2(M.z), r2(M.yaw), M.mode, M.silent ? 1 : 0, M.floor],
-      k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), '', bits(this.lamps, 'taken')],
+      k: [bits(this.allCassettes, 'collected'), bits(this.map.fuses, 'taken'), this.floors.map((f) => bits(f.items, 'taken')).join('|'), ''],
       // objets posés par des joueurs (échanges) : [étage, objet, x, z] ; échelle posée
       ix: this.floors.flatMap((f, fi) => (f.items || []).slice(this.items0[fi]).map((o) => [fi, o.kind, r2(o.x), r2(o.z)])),
       nl: this.floors.some((f) => f.niche && f.niche.ladder) ? 1 : 0,
@@ -811,11 +826,6 @@ export class BackroomsSim {
     const takenBits = (snap.k[2] || '').split('|');
     this.floors.forEach((f, fi) => set(f.items, 'taken', takenBits[fi]));
     for (const f of this.floors) if (f.niche) f.niche.ladder = !!snap.nl;
-    // la table compte autant de lampes que de joueurs chez l'hôte
-    if (snap.k[4] !== undefined && this.table) {
-      while (this.lamps.length < snap.k[4].length) this.lamps.push({ ...this.lamps[0], id: this.lamps.length, taken: false });
-      set(this.lamps, 'taken', snap.k[4]);
-    }
     if (this.hasMonster) this.senseMonster();
   }
 

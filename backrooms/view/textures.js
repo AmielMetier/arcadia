@@ -509,6 +509,16 @@ export function createBackroomsTextures(level = 0) {
   lctx.fillText("ALMOND", 64, 26);
   lctx.fillText("WATER", 64, 46);
   const label = tex(labelCanvas);
+  // la vraie étiquette (photo de la bouteille) remplace le dessin dès qu'elle est chargée : devant et derrière
+  loadImage('eau_amande.jpg').then((img) => {
+    if (!img) return;
+    labelCanvas.width = img.width;
+    labelCanvas.height = img.height;
+    lctx.drawImage(img, 0, 0);
+    label.repeat.set(2, 1);
+    label.offset.set(0.5, 0); // le logo bien au milieu de chaque face
+    label.needsUpdate = true;
+  });
 
   // Pavé lumineux encastré (diffuseur prismatique dans son cadre) ; au Level 1, un tube nu sous sa réglette
   const [lampCanvas, pctx] = canvas(128, 64);

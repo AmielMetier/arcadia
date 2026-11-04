@@ -30,8 +30,21 @@ export class BackroomsSfx {
     const c = (this.ctx = new AudioCtx());
     if (c.state === 'suspended') c.resume();
     // sortie commune, réglée par le curseur « Effets » du panneau Réglages
-    this.out = window.DDVolume ? window.DDVolume.gain(c, 'fx') : c.createGain();
-    this.out.connect(c.destination);
+    this.master = window.DDVolume ? window.DDVolume.gain(c, 'fx') : c.createGain();
+    this.master.connect(c.destination);
+    // les bruits de la pièce passent par this.out : le son direct, plus son écho dans les couloirs (réverbération
+    // à convolution, réglée par setRoom). L'ambiance et ton propre souffle restent secs (this.master).
+    this.out = c.createGain();
+    this.out.connect(this.master);
+    this.verb = c.createConvolver();
+    this.verbLp = c.createBiquadFilter();
+    this.verbLp.type = 'lowpass';
+    this.verbLp.frequency.value = 4200;
+    this.wet = c.createGain();
+    this.out.connect(this.verb).connect(this.verbLp).connect(this.wet).connect(this.master);
+    this.setRoom(0);
+    // l'oreille : HRTF (on entend devant, derrière, à gauche, à droite)
+    this.setListener(0, 0, 0);
 
     // 1. Initialiser le bourdonnement strident et glitché de l'entité
     this.initMonsterAudio();
@@ -42,6 +55,103 @@ export class BackroomsSfx {
     this.unlocked = true;
   }
 
+  // L'écho des couloirs : une réponse impulsionnelle calculée (premières réflexions sur les murs proches, puis une
+  // longue queue qui s'éteint). Level 0 : moquette et faux plafond, un écho moyen ; Level 1 : béton, il traîne.
+  setRoom(level = 0) {
+    if (!this.ctx || this.roomLevel === level) return;
+    this.roomLevel = level;
+    const c = this.ctx;
+    const len = level === 1 ? 3.4 : 2.3;
+    const n = Math.floor(c.sampleRate * len);
+    const ir = c.createBuffer(2, n, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      const pre = Math.floor(c.sampleRate * 0.018);
+      for (let i = pre; i < n; i++) {
+        const k = (i - pre) / (n - pre);
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, level === 1 ? 2.6 : 3.4) * 0.6;
+      }
+      // quelques échos francs sur les murs (décalés à gauche et à droite)
+      for (const [ms, a] of [[23, 0.9], [41, 0.6], [67, 0.45], [97, 0.35], [131, 0.25], [173, 0.18]]) {
+        const i = Math.floor(c.sampleRate * (ms + (ch ? 7 : 0)) / 1000);
+        if (i < n) d[i] += (Math.random() < 0.5 ? -1 : 1) * a;
+      }
+    }
+    this.verb.buffer = ir;
+    this.wet.gain.setTargetAtTime(level === 1 ? 0.5 : 0.38, c.currentTime, 0.2);
+    this.verbLp.frequency.value = level === 1 ? 5200 : 3600;
+  }
+
+  // l'oreille du joueur : sa position et la direction de son regard (yaw de la caméra)
+  setListener(x, z, yaw) {
+    const L = this.ctx && this.ctx.listener;
+    if (!L) return;
+    this.ear = { x, z, yaw };
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+    if (L.positionX) {
+      const t = this.ctx.currentTime;
+      L.positionX.setTargetAtTime(x, t, 0.02);
+      L.positionY.setTargetAtTime(1.6, t, 0.02);
+      L.positionZ.setTargetAtTime(z, t, 0.02);
+      L.forwardX.setTargetAtTime(fx, t, 0.02);
+      L.forwardY.setTargetAtTime(0, t, 0.02);
+      L.forwardZ.setTargetAtTime(fz, t, 0.02);
+      L.upX.value = 0;
+      L.upY.value = 1;
+      L.upZ.value = 0;
+    } else {
+      L.setPosition(x, 1.6, z);
+      L.setOrientation(fx, 0, fz, 0, 1, 0);
+    }
+  }
+
+  // une source placée dans l'espace (HRTF) ; rolloff 0 : seule la direction compte
+  panner(rolloff = 1, ref = 2.5) {
+    const p = this.ctx.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.refDistance = ref;
+    p.rolloffFactor = rolloff;
+    p.maxDistance = 120;
+    p.connect(this.out);
+    return p;
+  }
+
+  moveTo(p, x, z, smooth = 0) {
+    if (p.positionX) {
+      const t = this.ctx.currentTime;
+      if (smooth) {
+        p.positionX.setTargetAtTime(x, t, smooth);
+        p.positionY.setTargetAtTime(1.2, t, smooth);
+        p.positionZ.setTargetAtTime(z, t, smooth);
+      } else {
+        p.positionX.setValueAtTime(x, t);
+        p.positionY.setValueAtTime(1.2, t);
+        p.positionZ.setValueAtTime(z, t);
+      }
+    } else p.setPosition(x, 1.2, z);
+  }
+
+  // entrée d'un son ponctuel placé en { x, z } ; muffled : de l'autre étage, étouffé à travers le plancher
+  at(pos, vol = 1) {
+    const c = this.ctx;
+    const p = this.panner(pos.rolloff ?? 1, pos.ref ?? 2.5);
+    this.moveTo(p, pos.x, pos.z);
+    let head = p;
+    if (pos.muffled) {
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 420;
+      lp.connect(head);
+      head = lp;
+    }
+    const g = c.createGain();
+    g.gain.value = vol * (pos.muffled ? 0.5 : 1);
+    g.connect(head);
+    return g;
+  }
+
   initMonsterAudio() {
     const c = this.ctx;
 
@@ -49,15 +159,9 @@ export class BackroomsSfx {
     this.monsterGain = c.createGain();
     this.monsterGain.gain.setValueAtTime(0.0001, c.currentTime);
 
-    // Panoramique stéréo (gauche/droite)
-    if (c.createStereoPanner) {
-      this.monsterPanner = c.createStereoPanner();
-      this.monsterPanner.pan.setValueAtTime(0, c.currentTime);
-      this.monsterGain.connect(this.monsterPanner);
-      this.monsterPanner.connect(this.out);
-    } else {
-      this.monsterGain.connect(this.out);
-    }
+    // placé en 3D là où se trouve l'entité (son volume, lui, suit le danger : pas d'atténuation en plus)
+    this.monsterPanner = this.panner(0);
+    this.monsterGain.connect(this.monsterPanner);
 
     // Oscillateur principal : onde en dents de scie agressive
     this.monsterOsc1 = c.createOscillator();
@@ -128,7 +232,7 @@ export class BackroomsSfx {
     const whineGain = c.createGain();
     whineGain.gain.value = 0.025;
     whine.connect(whineGain).connect(this.ambientGain);
-    this.ambientGain.connect(this.out);
+    this.ambientGain.connect(this.master);
 
     // Le « silence » d'une pièce vide : un souffle grave, toujours là, même dans le noir
     const len = c.sampleRate * 2;
@@ -147,7 +251,7 @@ export class BackroomsSfx {
     roomLp.frequency.value = 380;
     this.roomGain = c.createGain();
     this.roomGain.gain.value = 0.05;
-    room.connect(roomLp).connect(this.roomGain).connect(this.out);
+    room.connect(roomLp).connect(this.roomGain).connect(this.master);
 
     buzz.start();
     hum.start();
@@ -164,7 +268,7 @@ export class BackroomsSfx {
     if (!this.breathGain) {
       this.breathGain = c.createGain();
       this.breathGain.gain.value = 0;
-      this.breathGain.connect(this.out);
+      this.breathGain.connect(this.master);
       fetch(BREATH)
         .then((r) => r.arrayBuffer())
         .then((b) => c.decodeAudioData(b))
@@ -213,7 +317,8 @@ export class BackroomsSfx {
 
   // Mettre à jour le bourdonnement strident de l'entité à chaque frame ; voice : c'est la voix du Level 1 qu'on
   // entend à la place du bourdonnement
-  updateMonsterSound(danger, pan, voice = false) {
+  // pos : { x, z } de l'entité (null : on ne bouge pas la source)
+  updateMonsterSound(danger, pos, voice = false) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
@@ -225,10 +330,7 @@ export class BackroomsSfx {
     const targetVol = voice ? 0.0001 : Math.max(0.0001, danger * 0.45);
     this.monsterGain.gain.setTargetAtTime(targetVol, t, 0.08);
 
-    // Ajuster le panoramique stéréo (-1 à 1)
-    if (this.monsterPanner) {
-      this.monsterPanner.pan.setTargetAtTime(pan, t, 0.05);
-    }
+    if (pos && typeof pos === 'object') this.moveTo(this.monsterPanner, pos.x, pos.z, 0.05);
 
     // Plus l'entité est proche, plus la fréquence monte dans les aigus stridents et le glitch accélère
     const baseFreq = 140 + danger * 380; // 140Hz -> 520Hz
@@ -243,11 +345,13 @@ export class BackroomsSfx {
 
   // Bruit de pas feutrés sur moquette
   // Un pas : étouffé et un peu spongieux sur la moquette humide, sec et claquant sur le béton (hard)
-  step(hard = false) {
+  // pos : { x, z, muffled } pour les pas d'un autre joueur (sinon ce sont les tiens) ; vol : plus bas pour les autres
+  step(hard = false, pos = null, vol = 1) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
     const v = 0.8 + Math.random() * 0.4;
+    const dest = pos ? this.at(pos, vol) : this.out;
 
     // le talon : un coup sourd
     const osc = c.createOscillator();
@@ -258,7 +362,7 @@ export class BackroomsSfx {
     g.gain.setValueAtTime(hard ? 0.05 : 0.045, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     osc.connect(g);
-    g.connect(this.out);
+    g.connect(dest);
     osc.start(t);
     osc.stop(t + 0.09);
 
@@ -274,7 +378,7 @@ export class BackroomsSfx {
     f.frequency.value = hard ? 1800 * v : 900 * v;
     const ng = c.createGain();
     ng.gain.value = (hard ? 0.09 : 0.05) * v;
-    src.connect(f).connect(ng).connect(this.out);
+    src.connect(f).connect(ng).connect(dest);
     src.start(t + (hard ? 0 : 0.02));
   }
 
@@ -348,7 +452,8 @@ export class BackroomsSfx {
     // Level 1 : sa voix à plein volume, collée à l'oreille, puis le silence
     if (level === 1 && this.voiceGain) {
       if (this.monsterGain) this.monsterGain.gain.setValueAtTime(0.0001, t);
-      if (this.monsterPanner) this.monsterPanner.pan.setValueAtTime(0, t);
+      // juste devant toi
+      if (this.monsterPanner && this.ear) this.moveTo(this.monsterPanner, this.ear.x - Math.sin(this.ear.yaw) * 0.6, this.ear.z - Math.cos(this.ear.yaw) * 0.6);
       this.voiceGain.gain.cancelScheduledValues(t);
       this.voiceGain.gain.setValueAtTime(2.2, t);
       this.scareUntil = t + 1.6;
@@ -469,7 +574,7 @@ export class BackroomsSfx {
   }
 
   // Pas lourds de l'entité, spatialisés, plus forts quand elle est près
-  monsterStep(danger, pan) {
+  monsterStep(danger, pos) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
@@ -481,12 +586,7 @@ export class BackroomsSfx {
     g.gain.setValueAtTime(0.5 * danger, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     osc.connect(g);
-    if (c.createStereoPanner) {
-      const p = c.createStereoPanner();
-      p.pan.setValueAtTime(pan, t);
-      g.connect(p);
-      p.connect(this.out);
-    } else g.connect(this.out);
+    g.connect(pos && typeof pos === 'object' ? this.at({ ...pos, rolloff: 0 }) : this.out);
     osc.start(t);
     osc.stop(t + 0.22);
   }
@@ -571,19 +671,15 @@ export class BackroomsSfx {
     lfo.stop(t + sec + 0.1);
   }
 
-  // Sifflet : deux notes aiguës qui montent ; vol de 0 à 1 (plus faible de loin), pan de -1 (gauche) à 1 (droite)
-  whistle(vol = 1, pan = 0) {
+  // Sifflet : deux notes aiguës qui montent ; pos : { x, z, muffled } d'un autre joueur (null : c'est toi qui siffles).
+  // De loin il faiblit mais porte loin dans les couloirs (atténuation douce), d'un autre étage il est étouffé.
+  whistle(pos = null) {
     if (!this.unlocked || !this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime;
     const out = c.createGain();
-    out.gain.setValueAtTime(0.13 * vol, t);
-    if (c.createStereoPanner) {
-      const p = c.createStereoPanner();
-      p.pan.setValueAtTime(pan, t);
-      out.connect(p);
-      p.connect(this.out);
-    } else out.connect(this.out);
+    out.gain.setValueAtTime(pos ? 0.3 : 0.13, t);
+    out.connect(pos ? this.at({ ...pos, ref: 3, rolloff: 0.35 }) : this.out);
     [[1700, 2300, 0, 0.28], [2100, 2700, 0.32, 0.45]].forEach(([f0, f1, d, len]) => {
       const osc = c.createOscillator();
       const g = c.createGain();

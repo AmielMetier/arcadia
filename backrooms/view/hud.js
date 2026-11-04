@@ -137,15 +137,6 @@ export class BackroomsHUD {
       else if (L1) banner.textContent = got === 0 ? 'LEVEL 1 · FIND THE 3 FUSES IN THE AISLES' : `FUSE ${got}/3 RECOVERED`;
       else banner.textContent = got === 0 ? 'FIND THE 5 VHS TAPES · THE SIGNAL GETS STRONGER AS YOU GET CLOSER' : `TAPE ${got}/5 RECOVERED`;
     }
-    // au départ : d'abord prendre sa lampe sur la table
-    if (sim.needLamp) {
-      this.$('#objBanner').textContent = 'GRAB THE FLASHLIGHT FROM THE TABLE NEXT TO YOU';
-      this.bannerT = Math.max(this.bannerT, 1);
-      this.wasNeedLamp = true;
-    } else if (this.wasNeedLamp) {
-      this.wasNeedLamp = false;
-      this.lastCount = -1; // revenir à l'objectif de l'étage
-    }
     this.bannerT -= dt;
     this.$('#objBanner').classList.toggle('hide', this.bannerT <= 0);
     this.$('#blackoutTag').hidden = !(sim.blackout > 0);
@@ -195,7 +186,7 @@ export class BackroomsHUD {
       this.invKey = slotsKey;
       this.$('#inv').querySelectorAll('.slot').forEach((b, i) => {
         if (i === 0) {
-          // case de la lampe : vide tant qu'on ne l'a pas prise sur la table
+          // case de la lampe (toujours là depuis le départ)
           b.classList.toggle('full', !!P.hasLamp);
           b.classList.toggle('lamp-on', !!P.flashlight);
           b.classList.add('lamp-slot');
@@ -239,8 +230,7 @@ export class BackroomsHUD {
         const sel = P.inv[P.sel - 1];
         if (beam !== null) {
           // rien d'autre sur l'arête
-        } else if (!P.hasLamp && P.floor === 0 && sim.table && Math.hypot(sim.table.x - P.x, sim.table.z - P.z) < 1.7) text = '[F] TAKE A FLASHLIGHT';
-        else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = '[E] PLACE THE LADDER UNDER THE TAPE';
+        } else if (N && !N.ladder && sel === 'ladder' && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.2) text = '[E] PLACE THE LADDER UNDER THE TAPE';
         else if (it) text = P.inv.includes(null) ? `[F] PICK UP ${NAME[it.kind]}` : `[F] SWAP ${NAME[sel || 'bottle']} (SLOT ${P.sel + 1}) FOR ${NAME[it.kind]}`;
         else if (N && !N.ladder && nicheCas && !nicheCas.collected && Math.hypot(N.baseX - P.x, N.baseZ - P.z) < 2.6) text = 'THE TAPE IS TOO HIGH: YOU NEED A LADDER';
       }

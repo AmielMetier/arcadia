@@ -565,8 +565,7 @@ test('départ : pas de table, chacun a déjà sa lampe allumée dans la case 1',
   const players = [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }];
   for (const sd of [3, 14, 15, 92, 653]) {
     const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
-    assert.equal(sim.table, null, `graine ${sd} : pas de table au départ`);
-    assert.equal(sim.lamps.length, 0);
+    assert.ok(!sim.table, `graine ${sd} : pas de table au départ`);
     assert.ok(sim.players.every((p) => p.hasLamp && p.flashlight), 'tout le monde part équipé, lampe allumée');
     // la touche 1 éteint et rallume sa lampe
     sim.step({ toggleFlashlight: true });
@@ -575,6 +574,25 @@ test('départ : pas de table, chacun a déjà sa lampe allumée dans la case 1',
     sim.step({ toggleFlashlight: true });
     assert.equal(sim.player.flashlight, true);
   }
+});
+
+test('départ à plusieurs : chacun dans son coin, à portée de sifflet, et pareil chez tout le monde', () => {
+  const players = [1, 2, 3, 4, 5, 6].map((id) => ({ id, name: 'P' + id }));
+  for (const sd of [3, 14, 42, 92, 653]) {
+    const sim = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 1 });
+    const guest = new BackroomsSim({ difficulty: 'peaceful', seed: sd, players, localId: 4 });
+    const ps = sim.players;
+    assert.equal(new Set(ps.map((p) => `${p.x},${p.z}`)).size, ps.length, `graine ${sd} : personne au même endroit`);
+    for (const [i, p] of ps.entries()) {
+      assert.equal(p.x, guest.players[i].x, 'même départ chez un invité');
+      assert.equal(p.z, guest.players[i].z);
+      assert.ok(!sim.isColliding(p.x, p.z, 0.3, 0), `graine ${sd} : ${p.name} pas dans un mur ni un meuble`);
+      for (const q of ps) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) < 45, 'assez près pour entendre siffler');
+    }
+  }
+  // seul : au départ habituel
+  const solo = new BackroomsSim({ difficulty: 'peaceful', seed: 3 });
+  assert.equal(solo.player.x, solo.map.spawn.x);
 });
 
 test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
@@ -592,7 +610,7 @@ test("un joueur tombé au Level 0 repart au Level 1 avec une lampe", () => {
   const a1 = sim.players.find((p) => p.id === 1);
   assert.equal(a1.status, 'alive');
   assert.ok(a1.hasLamp && a1.flashlight);
-  assert.equal(sim.table, null, "plus de table à l'étage suivant");
+  assert.ok(!sim.table, "plus de table à l'étage suivant");
 });
 
 // hasard reproductible pour les tests d'équilibre
