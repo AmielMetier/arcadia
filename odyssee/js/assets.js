@@ -53,6 +53,8 @@ export const ASSETS = {
   hgss: (k) => `${IMG}hgss/${k}.png`,
   deco: (k) => `${IMG}deco/${k}.png`,
   carte: (k) => `${IMG}carte/${k}.png`,
+  badge: (k, locked = false) => `${IMG}badges/badge_${k}${locked ? '_locked' : ''}.png`,
+  cardFrame: `${IMG}card/b2w2_card_frame.png`,
   title: `${IMG}title-odyssor.png`,
 };
 /** précharge une image (résout même en cas d'échec) */

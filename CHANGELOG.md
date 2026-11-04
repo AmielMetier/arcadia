@@ -1,5 +1,19 @@
 # Journal des versions — Arcadia
 
+## 3.98 — 4 novembre 2026
+- **Odyssée** — Refonte de la Carte de Dresseur en pixel art Noir 2 / Blanc 2 (B2W2) & Collection des 15 Badges d'Arène :
+  - **Carte de Dresseur double-face B2W2 authentique** :
+    - Boîtier texturé carbone et liseré bleu néon inspiré de l'interface tactile DS de Pokémon Noir 2 / Blanc 2.
+    - Face A (Profil de Dresseur) : portrait holographique avec halo d'étoiles, grade et rang de dresseur (de Normal à Maître 5 étoiles basé sur la Ligue, les 15 Badges, les Trophées et le Pokédex), tampon de rang officiel, statistiques d'aventure complètes (Argent, Temps de jeu, Pokédex capturés/vus, Trophées, Victoires/Défaites PvP), et capsules des 6 Pokémon de l'équipe avec Poké Ball d'origine, niveau, jauge PV et types.
+    - Face B (Coffret d'Arène & Coffret des 15 Badges) : deux écrins de velours distincts pour le Continent Nord (8 badges) et les Terres du Sud (7 badges), avec inspecteur de badge interactif affichant le grand sprite 128px, nom officiel, type d'arène, champion, ville, plafond de niveau et privilège de terrain (Sécateur Sylvestre, Harnais Flottant, Sifflet Céleste...).
+    - Navigation intuitive recto/verso par boutons tactiles et touches clavier (<kbd>Espace</kbd>, <kbd>◄</kbd>, <kbd>►</kbd>, <kbd>▲</kbd>, <kbd>▼</kbd>).
+  - **Refonte pixel art 16-bit des 15 Badges d'Arène avec Nanobanana (`image-generator`)** :
+    - 45 sprites haute fidélité (64×64 actifs, 64×64 silhouettes verrouillées avec effet gravure métallique, 128×128 vitrine d'inspection).
+    - Nord : Badge Graine (Sylve-Bourg), Badge Zéphyr (Hauts-Vents), Badge Marée (Port-Serein), Badge Flamme (Cratère-Rouge), Badge Toxine (Marais-Bourbe), Badge Séisme (Faille-Ocre), Badge Cryo (Pics-Gelés), Badge Zénith (Citadelle-Ailée).
+    - Sud : Badge Mirage (Oasis-Cachée), Badge Dynamo (Centrale-Sud), Badge Abysse (Récif-Noir), Badge Spectre (Nécropole), Badge Acier (Fonderie-Basse), Badge Sylvestre (Jungle-Oubliée), Badge Apex (Dôme-des-Légendes).
+  - **Tests automatisés & validation** :
+    - Nouvelle suite `tools/test-trainer-card-b2w2.mjs` validant les 45 assets d'images, la conformité des 15 badges avec `region.js`, la progression des rangs de dresseur et le rendu DOM B2W2 (100% succès).
+
 ## 3.97 — 4 novembre 2026
 - **Odyssée** — Harmonisation française des jauges de vie (HUD & Écran d'équipe) :
   - Remplacement de l'étiquette anglaise `HP` par `PV` (Points de Vie) sur l'ensemble des capsules de Pokémon du HUD (`hud.js`) et les cartouches de l'écran d'équipe B2W2 (`screens.js`).
