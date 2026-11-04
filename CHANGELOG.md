@@ -1,6 +1,6 @@
 # Journal des versions — Arcadia
 
-## 4.01 — 4 novembre 2026
+## 4.05 — 4 novembre 2026
 - **The Backrooms** — le dédale aux murs jaunes est bien plus encombré, comme si d'autres étaient passés avant toi.
   - Des chantiers abandonnés : couloirs barrés de rubalise jaune et noire (on passe dessous), parfois décrochée et traînant par terre, cônes orange et projecteurs éteints sur leur trépied.
   - Nouveaux meubles laissés là : vieux canapés, fauteuils, pupitres d'école, tableaux noirs, étagères en métal, chariots à outils, écrans de projection et escabeaux.
@@ -12,6 +12,69 @@
 - **The Backrooms** — la bouteille d'eau d'amande a une vraie étiquette et un bouchon blanc.
 - **The Backrooms** — la lampe torche est toujours dans la case 1 dès le départ : il n'y a plus aucune table à lampes.
 - **The Backrooms** — de vrais escaliers entre les deux étages du Level 0 : on les monte et on les descend en marchant, marche après marche, au lieu d'être téléporté. Rampes le long des marches, garde-corps autour de la cage d'escalier en haut.
+
+## 4.04 — 4 novembre 2026
+- **Odyssée** — Refonte 100% Pixel-Art Nanobanana de l'interface de la Carte et de la Cartographie Régionale B2W2 :
+  - **Interface C-Gear B2W2 (Concept 1 validé)** :
+    - Remplacement de l'ancien écran par un véritable châssis rétro Nintendo DS façon C-Gear 5G (`c_gear_b2w2_bg.jpg`) au fini carbone bleu nuit, biseaux métalliques chanfreinés et trame de scanlines.
+    - Nouvel en-tête avec voyant C-Gear holographique animé (`cgearPulse`), titre lumineux cyan `#00e0ff`, compteur dynamique des villes découvertes et badge de niveau max (Level Cap).
+    - Cadre cartographique biseauté avec 4 coins de visée néon et affichage tête haute (coordonnées GPS en direct et mention « RADAR 5G ACTIF »).
+    - Nouveau radar de joueur (« VOUS ÊTES ICI ») avec onde circulaire expansive pulsante (`mapRadarWave`) et noyau lumineux.
+    - Marqueurs interactifs avec symboles distinctifs pour les Arènes (`★`), les badges obtenus (`✓`) et la Ligue Pokémon (`👑`).
+    - Curseur de ciblage technologique réticulaire (`map-cur-bracket`) avec animation fluide de déplacement.
+    - Tiroir de contrôle tactile inférieur avec boutons rétro 3D DS (`◀ LIEU PRÉC.` et `LIEU SUIV. ▶`), fiche descriptive détaillée et légende complète à 4 pastilles (Vous, Ville, Arène, Ligue).
+  - **Cartographie Régionale B2W2 (Option A validée)** :
+    - Nouvelle palette haute définition B2W2 (`B2W2_PALETTE`) : océan profond sapphire en dégradé d'altimétrie et écume cyan vif, côtes et falaises étagées aux teintes chaudes, plaines d'Unys et forêts denses contrastées.
+    - Voies terrestres et maritimes à liseré sombre et coeur clair cyan néon pour une visibilité cartographique optimale.
+    - Intégration de l'illustration de référence `odyssee_region_map_b2w2.jpg` dans les assets du jeu (`ASSETS.regionMapB2W2`).
+  - **Tests automatisés** :
+    - Création de `tools/test-b2w2-map.mjs` validant les assets d'arrière-plan, les endpoints `ASSETS`, le cycle de vie de `mapScreen` et les contrôles clavier non-destructifs (100% succès).
+
+## 4.03 — 4 novembre 2026
+- **Odyssée** — Normalisation des touches d'action Clavier (Espace, Entrée et Échap) sur tous les écrans modaux :
+  - **Correction du comportement des touches Espace & Entrée (`'a'`)** :
+    - Sur la **Carte de Dresseur** (`cardScreen`) : appuyer sur Espace ou Entrée bascule désormais instantanément entre le Profil (Face A) et les 15 Badges (Face B), ou fait tinter le carillon musical cristallin du badge sélectionné avec brillance visuelle. La carte ne se ferme plus intempestivement.
+    - Sur le **Pokédex** (`dexScreen`) : appuyer sur Espace ou Entrée joue le cri authentique de l'espèce sélectionnée et anime le sprite en rebond dynamique au lieu de fermer le Pokédex. Seule la touche Échap (`'b'`) ou le clic sur fermer quitte l'écran.
+    - Sur le **Résumé de Pokémon** (`summaryScreen`) : appuyer sur Espace ou Entrée fait défiler cycliquement les pages (Informations générales → Capacités & PP → Statistiques) avec sonorité rétro sans quitter l'écran.
+    - Sur la **Carte de la Région** (`mapScreen`) : appuyer sur Espace ou Entrée pulse et met en valeur le lieu ciblé avec son de confirmation sans fermer la carte.
+  - **Tests automatisés & validation** :
+    - Création de `tools/test-screen-keyboard-inputs.mjs` vérifiant que `'a'` (Espace / Entrée) exécute les interactions prévues sans jamais fermer aucun écran modal, et que `'b'` (Échap) assure la fermeture propre (100% de succès).
+
+## 4.02 — 4 novembre 2026
+- **Odyssée** — Refonte intégrale et correction de la Carte de Dresseur B2W2 (Résolution du bug de superposition et pixel-art authentique) :
+  - **Suppression définitive des textes et boîtes incrustés dans l'image de fond** :
+    - Remplacement des images d'arrière-plan IA qui contenaient du faux texte (« TEMPS DE JEU ») et des fausses boîtes désalignées par de **véritables textures de châssis haute fidélité en pixel art 16-bit** (`tools/generate_clean_card_textures.py`).
+    - Trame de carbone micro-tissée avec dithering Bayer authentique Nintendo DS, biseaux métalliques aux angles chanfreinés et liserés néon sans aucun artefact visuel pour les 5 rangs de prestige (`normal`, `bronze`, `silver`, `gold`, `master`).
+    - Face B (`card_back_case.jpg`) : écrin en velours bleu saphir matelassé avec ferrures dorées et alvéoles réceptrices sans texte polluant.
+  - **Refonte ergonomique et visuelle de la Face A (Profil de Dresseur)** :
+    - **Disposition en grille technologique B2W2** : remplacement de la longue colonne de lignes sombres par un en-tête héroïque (Dresseur + Titre officiel) et une grille de modules statistiques biseautés aux couleurs officielles (Argent ₽, Temps de jeu, Pokédex avec barre de complétion, Badges avec 15 mini pips lumineux, Médailles B2W2 et accès direct au Panthéon).
+    - **Portrait du Dresseur épuré** : suppression du tag « DRESSEUR » qui masquait la tête du personnage, piédestal holographique rayonnant et sceau officiel de la Ligue d'Odyssée.
+    - **Plateau d'équipe 6 Pokémon authentique** : élimination des blocs « SLOT VIDE » génériques au profit d'alvéoles circulaires en retrait gravées dans le métal (`tc-ts-socket`) avec mention discrète « Libre », et cartouches d'équipe interactifs avec cri du Pokémon au clic.
+  - **Page d'aperçu dédiée** : ajout de `preview_card_b2w2.html` permettant de tester instantanément toutes les variantes de rangs et les deux faces de la carte.
+
+## 4.01 — 4 novembre 2026
+- **Odyssée** — Animations visuelles avancées des attaques majeures, Météo dynamique overworld et Panthéon interactif :
+  - **Animations visuelles avancées des attaques signatures majeures (`battleView.js`)** :
+    - 8 systèmes d'effets visuels complexes et spectaculaires en canvas 2D sur mesure :
+      - *Lance-Flammes* (`animFlamethrower`) : jet continu de 42 flammes oscillantes avec gradient incandescent du jaune vif au pourpre, éclats de braises et halo d'impact.
+      - *Hydrocanon* (`animHydroPump`) : torrent d'eau pressurisé avec 50 bulles tourbillonnantes, ondes de choc concentriques translucides et éclaboussures aquatiques massives.
+      - *Tonnerre* (`animThunderbolt`) : 4 éclairs en zigzag bleus et jaunes crépitant depuis le ciel avec flash d'écran stroboscopique, gerbes d'arcs électriques et secousses telluriques.
+      - *Séisme* (`animEarthquake`) : tremblement violent de la scène de combat, onde de choc tectonique au sol et projections de 32 débris rocheux et poussières telluriques.
+      - *Laser Glace* (`animIceBeam`) : rayon d'énergie cryogénique rectiligne bleu cyan suivi de l'apparition de 12 cristaux de givre acérés se brisant sur la cible avec vaporeux blizzard.
+      - *Psyko & Ball'Ombre* (`animPsychicShadow`) : distorsion psychique ou vortex d'énergie spectrale sombre avec orbes concentriques spiralant vers le centre et implosion ténébreuse.
+      - *Lame Feuille* (`animLeafBlade`) : double taillade en croix lumineuse verte vive avec 28 feuilles tranchantes tourbillonnantes autour de la cible.
+      - *Ultralaser* (`animHyperBeam`) : concentration d'énergie lumineuse avec particules aspirées vers le lanceur, suivie d'un colossal faisceau d'énergie pure traversant l'écran avec flash aveuglant et distorsion d'impact.
+    - Nouveaux types de particules géométriques dans le moteur de rendu (`slash`, `crystal`, `flame`, `bolt`).
+    - Routage automatique des attaques par affinité ou nom emblématique dans `animMove`.
+  - **Météo dynamique sur la carte du monde en 3D (`weather3d.js` & `world3d.js`)** :
+    - Système temps réel de 240 particules Three.js (`WeatherSystem`) intégré à la caméra du monde 3D sans aucune perte de performances (<0.05 ms par frame).
+    - Effets météo complets : Pluie (lignes de gouttes véloces translucides), Grêle / Neige (flocons et grêlons oscillants), Tempête de sable (nuages de poussières ocres balayant l'écran).
+    - Synchronisation en direct avec `game.getMapWeather()` selon les zones et biomes traversés.
+  - **Hall de la Renommée / Panthéon interactif B2W2 (`screens.js` & `game.js`)** :
+    - Cérémonie d'intronisation épique (`hofScreen`) : projecteurs animés, étoiles filantes, défilé individuel de chaque Pokémon victorieux et Certificat officiel de Maître de la Ligue d'Odyssée.
+    - Registre historique du Panthéon (`pantheonScreen`) : consultation à tout moment depuis la Carte de Dresseur B2W2 et le PC, avec navigation par onglets pour chaque sacre de Ligue mémorisé dans `st.hof`.
+  - **Tests automatisés & validation** :
+    - Nouvelle suite `tools/test-v401-features.mjs` testant les 8 animations d'attaques, les formes de particules, le moteur météo et les écrans du Panthéon (100% succès).
 
 ## 4.00 — 4 novembre 2026
 - **Odyssée** — Refonte 100% Pixel Art Nanobanana de la Carte de Dresseur B2W2 :

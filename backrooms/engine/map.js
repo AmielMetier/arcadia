@@ -702,6 +702,9 @@ export function createLevel0(seed = 42) {
   }
   up.stairs = stairs;
   down.stairs = stairs;
+  // pas de néon dans la cage d'escalier de l'étage du bas (son plafond est ouvert sur l'étage du haut)
+  const inWell = (l) => stairs.some((st) => (l.gx === st.gx && l.gz === st.gz) || (l.gx === st.gx2 && l.gz === st.gz2));
+  down.lights = down.lights.filter((l) => !inWell(l));
   // pas d'objet ni de meuble sur les marches
   for (const m of [up, down]) {
     m.props = m.props.filter((p) => !stairs.some((st) => Math.hypot(p.x - st.x, p.z - st.z) < 3.4));

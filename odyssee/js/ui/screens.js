@@ -535,13 +535,17 @@ export function summaryScreen(game, list, idx) {
     };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'left') page = (page + 2) % 3;
-      else if (k === 'right') page = (page + 1) % 3;
-      else if (k === 'up') idx = (idx - 1 + list.length) % list.length;
-      else if (k === 'down') idx = (idx + 1) % list.length;
-      else if (k === 'b' || k === 'a') { close(); return; }
-      else return;
-      ui.sound.sfx('blip'); draw();
+      if (k === 'left') { page = (page + 2) % 3; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'right') { page = (page + 1) % 3; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'up') { idx = (idx - 1 + list.length) % list.length; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'down') { idx = (idx + 1) % list.length; ui.sound.sfx('blip'); draw(); }
+      else if (k === 'a' || k === 'space') {
+        page = (page + 1) % 3;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'b') {
+        close();
+      }
     });
   });
 }
@@ -1034,11 +1038,39 @@ export function dexScreen(game) {
     };
     draw();
     const pop = ui.input.push((k) => {
-      if (k === 'up') i = (i - 1 + ids.length) % ids.length; else if (k === 'down') i = (i + 1) % ids.length;
-      else if (k === 'left') i = Math.max(0, i - 10); else if (k === 'right') i = Math.min(ids.length - 1, i + 10);
-      else if (k === 'b' || k === 'a') { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); return; }
-      else return;
-      ui.sound.sfx('blip'); draw();
+      if (k === 'up') {
+        i = (i - 1 + ids.length) % ids.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'down') {
+        i = (i + 1) % ids.length;
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'left') {
+        i = Math.max(0, i - 10);
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'right') {
+        i = Math.min(ids.length - 1, i + 10);
+        ui.sound.sfx('blip');
+        draw();
+      } else if (k === 'a' || k === 'space') {
+        const id = ids[i];
+        if (seen.has(id)) {
+          try { ui.sound?.cry?.(id); } catch (e) {}
+          if (spr) {
+            spr.style.transform = 'scale(1.2)';
+            setTimeout(() => { if (spr) spr.style.transform = ''; }, 200);
+          }
+        } else {
+          try { ui.sound?.sfx?.('cancel'); } catch (e) {}
+        }
+      } else if (k === 'b') {
+        pop();
+        s.remove();
+        ui.sound.sfx('cancel');
+        resolve();
+      }
     });
   });
 }
@@ -1049,12 +1081,13 @@ export function dexScreen(game) {
 /** carte de la région, dessinée comme le Pokégear de HeartGold / SoulSilver : mer en trois bleus, côtes en falaises,
  *  plaines et forêts, montagnes en paliers, routes blanches cerclées de gris, villes en pastilles rouges.
  *  Un pixel = une case ; le relief est posé par blocs de 2 × 2 cases, comme les pixels doublés du DS. */
-const HG = {
-  open: [81, 186, 218], far: [66, 181, 206], deep: [57, 165, 189], foam: [139, 219, 244],
-  flat: [97, 195, 146], shadow: [81, 179, 128], cliff: [197, 145, 106],
-  top: [242, 178, 130], vhigh: [220, 162, 114], high: [195, 146, 105], low: [162, 130, 89],
-  ink: '#525252', road: '#ffffff', town: '#fa5263', townDark: '#a23047', special: '#72cb93', water: '#60b2fc',
+const B2W2_PALETTE = {
+  open: [20, 68, 108], far: [14, 50, 84], deep: [10, 36, 62], foam: [0, 224, 255],
+  flat: [60, 164, 116], shadow: [40, 126, 86], cliff: [168, 122, 88],
+  top: [238, 180, 136], vhigh: [214, 158, 116], high: [188, 140, 100], low: [156, 122, 84],
+  ink: '#0b1c2d', road: '#e0f4ff', town: '#ef4444', townDark: '#991b1b', special: '#00e0ff', water: '#185a9d',
 };
+const HG = B2W2_PALETTE;
 let carteIcons = null;
 function loadCarteIcons() {
   if (carteIcons) return carteIcons;
@@ -1164,8 +1197,13 @@ function drawRegion(game, cv, v) {
   for (const m of Object.values(game.world.maps)) if (m !== W && m.outdoor && m.outside?.map === 'monde' && m.id !== 'magma') pill(m.outside.x, m.outside.y, 6, 6, HG.special);
   const visited = new Set(game.state.visited || []);
   for (const t of Object.values(game.world.towns)) {
-    const big = t.gym != null || t.id === 'plateau';
-    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, visited.has(t.id) ? HG.town : '#b0b0b0', visited.has(t.id) ? HG.townDark : '#808080');
+    const isGym = t.gym != null;
+    const isLigue = t.id === 'plateau';
+    const big = isGym || isLigue;
+    const isVis = visited.has(t.id);
+    const fillCol = isLigue ? (isVis ? '#a855f7' : '#7e22ce') : isGym ? (isVis ? '#fbbf24' : '#d97706') : (isVis ? '#ef4444' : '#64748b');
+    const darkCol = isLigue ? '#4c1d95' : isGym ? '#92400e' : (isVis ? '#991b1b' : '#334155');
+    pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, fillCol, darkCol);
   }
   // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
   const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
@@ -1219,33 +1257,50 @@ export function mapScreen(game) {
               ? 'Siège du Conseil des 4 et du Maître de la Ligue'
               : 'Ville visitée · Centre Pokémon disponible',
           tag: hasGym ? (gotBadge ? 'BADGE OBTENU ✓' : `ARÈNE #${gIdx + 1} (CAP N.${capLvl})`) : t.id === 'plateau' ? 'LIGUE POKÉMON' : 'VILLE VISITÉE',
-          tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : 'town',
+          tagCls: hasGym ? (gotBadge ? 'badge-ok' : 'gym') : t.id === 'plateau' ? 'league' : 'town',
         };
       })
     );
 
     s.innerHTML = `
-      <div class="scr-bar">
-        <div class="scr-bar-left">
-          <img class="scr-bar-ico" src="img/hud/map.png" alt="">
-          <span class="scr-bar-title">CARTE DE LA RÉGION D'ODYSSÉE</span>
-          <span class="scr-bar-sub">${visited.size} / ${allTowns.length} VILLES</span>
+      <!-- Fond et Châssis C-Gear B2W2 Nanobanana -->
+      <img class="map-pixelart-bg" src="${ASSETS.carteBg}" alt="">
+      <div class="map-scanlines"></div>
+
+      <!-- En-tête C-Gear B2W2 -->
+      <div class="map-b2w2-hdr">
+        <div class="map-hdr-left">
+          <div class="map-cgear-icon"></div>
+          <div class="map-hdr-titles">
+            <span class="map-hdr-main">CARTE DE LA RÉGION D'ODYSSÉE</span>
+            <span class="map-hdr-sub">${visited.size} / ${allTowns.length} VILLES DÉCOUVERTES · SYSTÈME C-GEAR 5G</span>
+          </div>
         </div>
-        <div class="scr-bar-right">
-          <span class="scr-cap-badge">NIV. MAX ACTUEL : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
-          <button type="button" class="scr-close-btn" data-act="close">FERMER ✕</button>
+        <div class="map-hdr-right">
+          <span class="map-cap-pill">CAP NIVEAU : <b>N.${game.levelCap ? game.levelCap() : levelCap(st.badges)}</b></span>
+          <button type="button" class="map-close-btn" data-act="close" title="Fermer (Échap)">FERMER ✕</button>
         </div>
       </div>
+
+      <!-- Cadre Écran Cartographique Central -->
       <div class="map-stage">
         <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
           <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
+          <div class="map-hud-overlay">
+            <span class="map-coord-tag">LOC: [${Math.round(p.x)}, ${Math.round(p.y)}]</span>
+            <span class="map-radar-tag">RADAR 5G ACTIF</span>
+          </div>
         </div>
       </div>
+
+      <!-- Panneau Inférieur Tactile B2W2 -->
       <div class="map-footer">
-        <button type="button" class="map-nav-btn" data-act="prev" title="Lieu précédent (◀)">◀</button>
+        <button type="button" class="map-nav-btn prev" data-act="prev" title="Lieu précédent (◀ ou Flèche Gauche)">
+          <span class="map-btn-arr">◀</span> LIEU PRÉC.
+        </button>
         <div class="map-info">
           <div class="map-info-top">
             <span class="map-where"></span>
@@ -1253,11 +1308,14 @@ export function mapScreen(game) {
           </div>
           <div class="map-sub"></div>
         </div>
-        <button type="button" class="map-nav-btn" data-act="next" title="Lieu suivant (▶)">▶</button>
+        <button type="button" class="map-nav-btn next" data-act="next" title="Lieu suivant (▶ ou Flèche Droite)">
+          LIEU SUIV. <span class="map-btn-arr">▶</span>
+        </button>
         <div class="map-legend">
           <span><i class="lg-dot me"></i> Vous</span>
           <span><i class="lg-dot town"></i> Ville</span>
           <span><i class="lg-dot gym"></i> Arène</span>
+          <span><i class="lg-dot league"></i> Ligue</span>
         </div>
       </div>`;
 
@@ -1291,6 +1349,7 @@ export function mapScreen(game) {
     st.mapView = target;
 
     const me = el('div', 'map-me');
+    me.innerHTML = '<div class="map-me-radar"></div><div class="map-me-core"></div>';
     pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
@@ -1301,6 +1360,7 @@ export function mapScreen(game) {
       pin.type = 'button';
       pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
+      pin.innerHTML = sp.tagCls?.includes('gym') ? '★' : sp.tagCls?.includes('badge-ok') ? '✓' : sp.tagCls?.includes('league') ? '👑' : '';
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
         k = idx;
@@ -1311,6 +1371,7 @@ export function mapScreen(game) {
     });
 
     const cur = el('div', 'map-cur');
+    cur.innerHTML = '<div class="map-cur-bracket tl"></div><div class="map-cur-bracket tr"></div><div class="map-cur-bracket bl"></div><div class="map-cur-bracket br"></div>';
     lab.appendChild(cur);
     const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
@@ -1341,7 +1402,16 @@ export function mapScreen(game) {
     const pop = ui.input.push((key) => {
       if (key === 'left' || key === 'up') { k = (k + spots.length - 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
       if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
-      if (key === 'a' || key === 'b' || key === 'map') close();
+      if (key === 'a' || key === 'space') {
+        try { ui.sound?.sfx('select'); } catch (err) {}
+        const curSpot = s.querySelector('.carte-spot-on');
+        if (curSpot) {
+          curSpot.style.transform = 'scale(1.4)';
+          setTimeout(() => { if (curSpot) curSpot.style.transform = ''; }, 200);
+        }
+        return;
+      }
+      if (key === 'b' || key === 'map') close();
     });
   });
 }
@@ -1429,6 +1499,7 @@ export function trainerCard(st) {
     trophies: unlockedTrophies,
     pvpWins: pvp.totalWins || 0,
     pvpLosses: pvp.totalLosses || 0,
+    hof: (st.hof || []).slice(),
   };
 }
 
@@ -1461,9 +1532,9 @@ export function cardScreen(game, BADGES, other) {
         const q = team[slotIdx];
         if (!q) {
           return `
-            <div class="tc-team-slot empty">
+            <div class="tc-team-slot empty" title="Emplacement libre">
               <div class="tc-ts-socket"></div>
-              <div class="tc-ts-none">SLOT VIDE</div>
+              <span class="tc-ts-empty-label">— Libre —</span>
             </div>
           `;
         }
@@ -1554,8 +1625,7 @@ export function cardScreen(game, BADGES, other) {
                     <div class="tc-photo-hologram"></div>
                     <div class="tc-photo-pedestal"></div>
                     <img class="tc-photo-spr" src="${ASSETS.trainer(c.gender === 'f' ? 'player_f' : 'player_m')}" alt="" onerror="this.style.display='none'">
-                    <span class="tc-photo-tag">DRESSEUR</span>
-                  </div>
+                                      </div>
                   <div class="tc-stamp ${rank.themeCls}">
                     <div class="tc-stamp-ring">
                       <span class="tc-stamp-stars">${"★".repeat(rank.stars || 1)}</span>
@@ -1568,43 +1638,59 @@ export function cardScreen(game, BADGES, other) {
                 <!-- Colonne Droite : Données du Dresseur -->
                 <div class="tc-data-col">
                   <div class="tc-data-box">
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">DRESSEUR</span>
-                      <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
-                    </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">TITRE OFFICIEL</span>
-                      <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
-                    </div>
-                    ${other ? '' : `
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">ARGENT</span>
-                      <span class="tc-val tc-money-val"><b>${(c.money || 0).toLocaleString('fr-FR')}</b> ₽</span>
-                    </div>`}
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">POKÉDEX</span>
-                      <div class="tc-val tc-pdx-row">
-                        <span><b>${c.dex || 0}</b> capturés <small>(vus : ${c.seen != null ? c.seen : (c.dex || 0)})</small></span>
-                        <div class="tc-pdx-bar"><u style="width:${dexPct}%"></u></div>
+                    <div class="tc-hero-row">
+                      <div class="tc-hero-cell tc-hero-name-cell">
+                        <span class="tc-lbl-mini">DRESSEUR</span>
+                        <span class="tc-val tc-name-val">${esc(c.name)}${c.champion ? ' <span class="tc-champ-badge">★ CHAMPION</span>' : ''}</span>
+                      </div>
+                      <div class="tc-hero-cell tc-hero-title-cell">
+                        <span class="tc-lbl-mini">TITRE OFFICIEL</span>
+                        <span class="tc-val tc-rank-title">${esc(rank.title)}</span>
                       </div>
                     </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">TEMPS DE JEU</span>
-                      <span class="tc-val">${timeStr}</span>
+                    <div class="tc-stats-grid">
+                      ${other ? '' : `
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">₽</i> ARGENT</span>
+                        <span class="tc-val tc-money-val"><b>${(c.money || 0).toLocaleString('fr-FR')}</b> ₽</span>
+                      </div>`}
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">⏱</i> TEMPS DE JEU</span>
+                        <span class="tc-val tc-time-val">${timeStr}</span>
+                      </div>
+                      <div class="tc-stat-card tc-stat-card-wide">
+                        <div class="tc-stat-card-top">
+                          <span class="tc-lbl"><i class="tc-ico">📖</i> POKÉDEX</span>
+                          <span class="tc-val"><b>${c.dex || 0}</b> capturés <small>(vus : ${c.seen != null ? c.seen : (c.dex || 0)})</small></span>
+                        </div>
+                        <div class="tc-pdx-bar"><u style="width:${dexPct}%"></u></div>
+                      </div>
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">🛡</i> BADGES D'ARÈNE</span>
+                        <div class="tc-badges-val-wrap">
+                          <span class="tc-val tc-badges-val"><b>${rank.badgesCount}</b> / 15 Badges</span>
+                          <div class="tc-badge-pips">
+                            ${Array.from({ length: 15 }).map((_, bi) => `<span class="tc-pip${c.badges?.[bi] ? ' on' : ''}"></span>`).join('')}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">🏅</i> MÉDAILLES B2W2</span>
+                        <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
+                      </div>
+                      ${c.champion || (c.hof && c.hof.length) ? `
+                      <div class="tc-stat-card tc-stat-clickable" data-act="open-pantheon" title="Clic : Consulter vos sacres de la Ligue">
+                        <span class="tc-lbl"><i class="tc-ico">🏆</i> PANTHÉON</span>
+                        <span class="tc-val tc-hof-val" style="cursor:pointer;">
+                          <b>${(c.hof || []).length || 1}</b> sacre${(c.hof || []).length > 1 ? 's' : ''} ➔
+                        </span>
+                      </div>` : ''}
+                      ${(c.pvpWins || c.pvpLosses) ? `
+                      <div class="tc-stat-card">
+                        <span class="tc-lbl"><i class="tc-ico">⚔</i> DUELS MULTI</span>
+                        <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
+                      </div>` : ''}
                     </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">BADGES D'ARÈNE</span>
-                      <span class="tc-val tc-badges-val"><b>${rank.badgesCount}</b> / 15 Badges</span>
-                    </div>
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">MÉDAILLES B2W2</span>
-                      <span class="tc-val tc-trophies-val"><b>${c.trophies || 0}</b> / 32 🏅</span>
-                    </div>
-                    ${(c.pvpWins || c.pvpLosses) ? `
-                    <div class="tc-data-row">
-                      <span class="tc-lbl">DUELS MULTI</span>
-                      <span class="tc-val tc-pvp-val"><b>${c.pvpWins || 0}</b>V — <b>${c.pvpLosses || 0}</b>D</span>
-                    </div>` : ''}
                   </div>
                 </div>
               </div>
@@ -1689,6 +1775,14 @@ export function cardScreen(game, BADGES, other) {
         b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); close(); };
       });
 
+      s.querySelectorAll('[data-act="open-pantheon"]').forEach((b) => {
+        b.onclick = async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          await pantheonScreen(game);
+        };
+      });
+
       s.querySelectorAll('[data-act="flip"]').forEach((b) => {
         b.onclick = (e) => {
           e.preventDefault(); e.stopPropagation();
@@ -1731,6 +1825,15 @@ export function cardScreen(game, BADGES, other) {
         };
       });
 
+      // Consultation du Panthéon depuis la Carte de Dresseur
+      s.querySelectorAll('.tc-hof-val').forEach((btn) => {
+        btn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          try { ui.sound?.sfx('select'); } catch (err) {}
+          pantheonScreen(game);
+        };
+      });
+
       // Interactivité de la photo du dresseur
       s.querySelectorAll('.tc-photo-frame').forEach((photo) => {
         if (photo.style) photo.style.cursor = 'pointer';
@@ -1753,15 +1856,41 @@ export function cardScreen(game, BADGES, other) {
     };
 
     const pop = ui.input.push((k) => {
-      if (k === 'a' || k === 'b' || k === 'cancel') {
+      if (k === 'b' || k === 'cancel') {
         close();
-      } else if (k === 'space' || k === 'left' || k === 'right') {
-        face = face === 'profile' ? 'badges' : 'profile';
-        try { ui.sound?.sfx('blip'); } catch (err) {}
-        render();
+      } else if (k === 'a' || k === 'space' || k === 'left' || k === 'right') {
+        if (face === 'profile') {
+          face = 'badges';
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          render();
+        } else if (k === 'left' || k === 'right') {
+          face = 'profile';
+          try { ui.sound?.sfx('blip'); } catch (err) {}
+          render();
+        } else if (k === 'a' || k === 'space') {
+          if (c.badges?.[selBadge] && ui.sound?.badgeChime) {
+            ui.sound.badgeChime(selBadge);
+            const inspImg = s.querySelector('.tc-bi-img');
+            if (inspImg) {
+              inspImg.classList.remove('shine');
+              void inspImg.offsetWidth;
+              inspImg.classList.add('shine');
+            }
+          } else {
+            face = 'profile';
+            try { ui.sound?.sfx('blip'); } catch (err) {}
+            render();
+          }
+        }
       } else if (face === 'badges' && (k === 'up' || k === 'down')) {
         selBadge = (selBadge + (k === 'down' ? 1 : -1) + BADGE_SPECS.length) % BADGE_SPECS.length;
-        try { ui.sound?.sfx('select'); } catch (err) {}
+        try {
+          if (c.badges?.[selBadge] && ui.sound?.badgeChime) {
+            ui.sound.badgeChime(selBadge);
+          } else {
+            ui.sound?.sfx('select');
+          }
+        } catch (err) {}
         render();
       }
     });
@@ -2875,5 +3004,313 @@ export function learnMoveScreen(game, m, moveId) {
     });
 
     draw();
+  });
+}
+
+
+/* ================= HALL DE LA RENOMMÉE / PANTHÉON B2W2 ================= */
+
+export function hofScreen(game, entry) {
+  const ui = game.ui, st = game.state;
+  return new Promise((resolve) => {
+    const s = screen(ui, 'hof-ceremony-scr');
+    s.classList.add('b2w2-screen');
+
+    const party = (entry?.team || st.party || []).slice(0, 6);
+    let curMonIdx = 0; // 0..party.length (party.length = récapitulatif final)
+    const totalMons = party.length;
+
+    const render = () => {
+      // 1. Écran récapitulatif final de sacre
+      if (curMonIdx >= totalMons) {
+        const recapListHtml = party.map((m) => {
+          const S = SPECIES[m.sp] || {};
+          const isShiny = !!m.shiny;
+          return `
+            <div class="hof-recap-mon">
+              <div class="hof-rm-socket">
+                <img class="hof-rm-icon" src="${ASSETS.icon(m.sp, m.shadow)}" alt="" onerror="this.src='${ASSETS.front(m.sp)}'">
+              </div>
+              <div class="hof-rm-info">
+                <div class="hof-rm-name">${esc(m.nick || S.n || 'Pokémon')}${isShiny ? ' <span class="tc-star">★</span>' : ''}</div>
+                <div class="hof-rm-lvl">N.${m.lvl}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        s.innerHTML = `
+          <div class="hof-casing final">
+            <div class="hof-header">
+              <span class="hof-hdr-title">LIGUE POKÉMON D'ODYSSÉE</span>
+              <span class="hof-hdr-badge">★ ENTRÉE AU PANTHÉON ★</span>
+            </div>
+            <div class="hof-recap-body">
+              <div class="hof-trainer-col">
+                <div class="hof-photo-frame">
+                  <div class="hof-photo-pedestal"></div>
+                  <img class="hof-trainer-spr" src="${ASSETS.trainer(st.gender === 'f' ? 'player_f' : 'player_m')}" alt="">
+                  <span class="hof-trainer-tag">MAÎTRE DE LA LIGUE</span>
+                </div>
+                <div class="hof-master-seal">
+                  <div class="hof-seal-stars">★★★★★</div>
+                  <div class="hof-seal-title">CERTIFICAT DU PANTHÉON</div>
+                  <div class="hof-seal-id">Dresseur : <b>${esc(st.name)}</b> (ID : ${String(st.id || 0).padStart(5, '0')})</div>
+                </div>
+              </div>
+              <div class="hof-team-col">
+                <div class="hof-team-title">LES COMPAGNONS DU SACRE (#${entry?.id || 1})</div>
+                <div class="hof-recap-grid">${recapListHtml}</div>
+                <div class="hof-recap-meta">
+                  <span>Date : <b>${entry?.date || new Date().toLocaleDateString('fr-FR')}</b></span>
+                  <span>Temps : <b>${Math.floor((entry?.time || st.time || 0) / 3600)}h ${String(Math.floor((entry?.time || st.time || 0) / 60) % 60).padStart(2, '0')}</b></span>
+                  <span>Pokédex : <b>${entry?.dexCount || st.dex?.caught?.length || 0}</b></span>
+                </div>
+              </div>
+            </div>
+            <div class="hof-footer">
+              <button type="button" class="hof-btn-next" data-act="finish">ENREGISTRER ET FERMER (Entrée / Échap) ▶</button>
+            </div>
+          </div>
+        `;
+        s.querySelector('[data-act="finish"]')?.addEventListener('click', close);
+        return;
+      }
+
+      // 2. Présentation d'un Pokémon individuel avec projecteur
+      const m = party[curMonIdx];
+      const S = SPECIES[m.sp] || {};
+      const ab = getAbility(m);
+      const isShiny = !!m.shiny;
+      const movesHtml = (m.moves || []).slice(0, 4).map((mv) => {
+        const moveObj = MOVES[mv.id || mv] || { n: 'Capacité', t: 'normal', c: 'physical' };
+        return `
+          <div class="hof-mon-move" style="--tc:${TYPE_COL[moveObj.t] || '#888'}">
+            <span class="hof-mm-type">${TYPE_FR[moveObj.t] || moveObj.t}</span>
+            <span class="hof-mm-name">${esc(moveObj.n)}</span>
+          </div>
+        `;
+      }).join('');
+
+      s.innerHTML = `
+        <div class="hof-casing solo">
+          <div class="hof-header">
+            <span class="hof-hdr-title">PANTHÉON D'ODYSSÉE · IMMORTALISATION (${curMonIdx + 1} / ${totalMons})</span>
+            <span class="hof-hdr-date">${entry?.title || 'Sacre de la Ligue'}</span>
+          </div>
+          <div class="hof-solo-body">
+            <div class="hof-solo-art-col">
+              <div class="hof-solo-pedestal">
+                <div class="hof-solo-light"></div>
+                <img class="hof-solo-spr${isShiny ? ' shiny' : ''}" src="${ASSETS.front(m.sp, isShiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+              </div>
+            </div>
+            <div class="hof-solo-info-col">
+              <div class="hof-si-top">
+                <span class="hof-si-slot">POKÉMON #${curMonIdx + 1}</span>
+                <span class="hof-si-name">${esc(m.nick || S.n || 'Pokémon')}</span>
+                ${isShiny ? '<span class="tc-star">★ SHINY</span>' : ''}
+                <span class="hof-si-lvl">N.${m.lvl}</span>
+              </div>
+              <div class="hof-si-types">
+                ${(S.t || ['normal']).map((t) => `<span class="hof-si-type" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('')}
+              </div>
+              <div class="hof-si-meta">
+                <div>Espèce : <b>${esc(S.n || 'Inconnu')}</b> (N° Pokédex : #${String(S.no || m.sp).padStart(3, '0')})</div>
+                <div>Talent : <b>${esc(ab?.name || 'Aucun')}</b></div>
+                <div>Dresseur d'Origine : <b>${esc(m.ot || st.name)}</b></div>
+              </div>
+              <div class="hof-si-moves-title">CAPACITÉS DU TRIOMPHE</div>
+              <div class="hof-si-moves-grid">${movesHtml}</div>
+            </div>
+          </div>
+          <div class="hof-footer">
+            <span class="hof-foot-hint">Appuyez sur <kbd>ESPACE</kbd> ou cliquez pour continuer</span>
+            <button type="button" class="hof-btn-next" data-act="next">
+              ${curMonIdx + 1 < totalMons ? 'POKÉMON SUIVANT ▶' : 'TABLEAU DE LA LIGUE ➔'}
+            </button>
+          </div>
+        </div>
+      `;
+
+      try { ui.sound?.sfx('select'); ui.sound?.cry(ASSETS.cry(m.sp)); } catch (e) {}
+
+      s.querySelector('[data-act="next"]')?.addEventListener('click', () => {
+        curMonIdx++;
+        render();
+      });
+    };
+
+    const close = () => {
+      pop();
+      s.remove();
+      try { ui.sound?.sfx('cancel'); } catch (e) {}
+      resolve();
+    };
+
+    const pop = ui.input.push((k) => {
+      if (k === 'a' || k === 'space' || k === 'right' || k === 'down') {
+        if (curMonIdx < totalMons) {
+          curMonIdx++;
+          render();
+        } else {
+          close();
+        }
+      } else if (k === 'b' || k === 'cancel') {
+        if (curMonIdx < totalMons) {
+          curMonIdx = totalMons;
+          render();
+        } else {
+          close();
+        }
+      }
+    });
+
+    render();
+  });
+}
+
+export function pantheonScreen(game) {
+  const ui = game.ui, st = game.state;
+  return new Promise((resolve) => {
+    const s = screen(ui, 'pantheon-history-scr');
+    s.classList.add('b2w2-screen');
+
+    const history = (st.hof || []).slice().reverse();
+    let selEntryIdx = 0;
+
+    const render = () => {
+      if (!history.length) {
+        s.innerHTML = `
+          <div class="pantheon-casing empty">
+            <div class="pantheon-hdr">
+              <span class="pantheon-title">HALL DE LA RENOMMÉE D'ODYSSÉE</span>
+              <button type="button" class="tc-btn-close" data-act="close">✕</button>
+            </div>
+            <div class="pantheon-empty-body">
+              <div class="pantheon-empty-pedestal">🏆</div>
+              <div class="pantheon-empty-title">AUCUN SACRE ENREGISTRÉ</div>
+              <div class="pantheon-empty-desc">
+                Le Hall de la Renommée honore les dresseurs ayant triomphé des 4 membres du Conseil des 4 et de la Maîtresse de la Ligue Céleste.<br>
+                Relevez le défi pour inscrire votre équipe dans la légende d'Odyssée !
+              </div>
+            </div>
+            <div class="pantheon-foot">
+              <button type="button" class="pantheon-btn-close" data-act="close">Refermer (Échap)</button>
+            </div>
+          </div>
+        `;
+        s.querySelectorAll('[data-act="close"]').forEach((b) => b.onclick = close);
+        return;
+      }
+
+      const entry = history[selEntryIdx] || history[0];
+      const tabsHtml = history.map((e, idx) => `
+        <button type="button" class="pantheon-tab${idx === selEntryIdx ? ' on' : ''}" data-eidx="${idx}">
+          <b>Sacre #${e.id || (history.length - idx)}</b>
+          <small>${esc(e.date || 'Ligue')}</small>
+        </button>
+      `).join('');
+
+      const teamHtml = (entry.team || []).map((m) => {
+        const S = SPECIES[m.sp] || {};
+        const isShiny = !!m.shiny;
+        const movesHtml = (m.moves || []).slice(0, 4).map((mv) => {
+          const mObj = MOVES[mv.id || mv] || { n: 'Capacité', t: 'normal' };
+          return `<span class="ph-mv" style="--tc:${TYPE_COL[mObj.t] || '#888'}">${esc(mObj.n)}</span>`;
+        }).join('');
+
+        return `
+          <div class="ph-team-slot${isShiny ? ' shiny' : ''}">
+            <div class="ph-slot-art">
+              <img class="ph-slot-spr" src="${ASSETS.front(m.sp, isShiny, m.shadow)}" alt="" onerror="this.src='${ASSETS.icon(m.sp)}'">
+            </div>
+            <div class="ph-slot-info">
+              <div class="ph-slot-name">${esc(m.nick || S.n || 'Pokémon')}${isShiny ? ' <span class="tc-star">★</span>' : ''} <span class="ph-slot-lvl">N.${m.lvl}</span></div>
+              <div class="ph-slot-types">
+                ${(S.t || ['normal']).map((t) => `<span class="ph-type-pill" style="--tc:${TYPE_COL[t] || '#888'}">${TYPE_FR[t] || t}</span>`).join('')}
+              </div>
+              <div class="ph-slot-moves">${movesHtml}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      s.innerHTML = `
+        <div class="pantheon-casing">
+          <div class="pantheon-hdr">
+            <div class="pantheon-hdr-left">
+              <span class="pantheon-title">HALL DE LA RENOMMÉE D'ODYSSÉE</span>
+              <span class="pantheon-subtitle">REGISTRE HISTORIQUE DES MAÎTRES</span>
+            </div>
+            <button type="button" class="tc-btn-close" data-act="close" title="Fermer">✕</button>
+          </div>
+          <div class="pantheon-body">
+            <div class="pantheon-tabs-col">
+              <div class="pantheon-tabs-head">${history.length} SACRE${history.length > 1 ? 'S' : ''}</div>
+              <div class="pantheon-tabs-list">${tabsHtml}</div>
+            </div>
+            <div class="pantheon-content-col">
+              <div class="pantheon-entry-card">
+                <div class="ph-entry-head">
+                  <div class="ph-eh-left">
+                    <span class="ph-eh-title">SACRE OFFICIEL #${entry.id || 1}</span>
+                    <span class="ph-eh-date">Date : <b>${entry.date || '—'}</b> · Temps : <b>${Math.floor((entry.time || 0) / 3600)}h ${String(Math.floor((entry.time || 0) / 60) % 60).padStart(2, '0')}</b></span>
+                  </div>
+                  <div class="ph-eh-dex">Pokédex : <b>${entry.dexCount || 0}</b> capturés</div>
+                </div>
+                <div class="ph-team-grid">${teamHtml}</div>
+              </div>
+            </div>
+          </div>
+          <div class="pantheon-foot">
+            <div class="tc-foot-hints">
+              <span><kbd>▲</kbd> <kbd>▼</kbd> Sélectionner un sacre</span>
+              <span><kbd>ÉCHAP</kbd> Quitter</span>
+            </div>
+            <button type="button" class="pantheon-btn-close" data-act="close">Refermer</button>
+          </div>
+        </div>
+      `;
+
+      s.querySelectorAll('[data-act="close"]').forEach((b) => b.onclick = close);
+      s.querySelectorAll('.pantheon-tab').forEach((tab) => {
+        tab.onclick = () => {
+          const eidx = parseInt(tab.dataset.eidx, 10);
+          if (!isNaN(eidx) && eidx >= 0 && eidx < history.length) {
+            selEntryIdx = eidx;
+            try { ui.sound?.sfx('select'); } catch (err) {}
+            render();
+          }
+        };
+      });
+    };
+
+    const close = () => {
+      pop();
+      s.remove();
+      try { ui.sound?.sfx('cancel'); } catch (e) {}
+      resolve();
+    };
+
+    const pop = ui.input.push((k) => {
+      if (k === 'b' || k === 'cancel') {
+        close();
+      } else if (k === 'up') {
+        if (selEntryIdx > 0) {
+          selEntryIdx--;
+          try { ui.sound?.sfx('select'); } catch (err) {}
+          render();
+        }
+      } else if (k === 'down') {
+        if (selEntryIdx < history.length - 1) {
+          selEntryIdx++;
+          try { ui.sound?.sfx('select'); } catch (err) {}
+          render();
+        }
+      }
+    });
+
+    render();
   });
 }

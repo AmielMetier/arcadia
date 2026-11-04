@@ -102,7 +102,7 @@ export function createBackroomsScene(container, floors) {
   const dummy = new THREE.Object3D();
   const loader = new GLTFLoader();
 
-  // masque de transparence d'un plan couché (sol ou plafond) : des trous carrés. 16 texels par case (16 cm : de quoi
+  // masque de transparence d'un plan couché (sol ou plafond) : des trous rectangulaires (demi-côtés hx, hz). 16 texels par case (16 cm : de quoi
   // garder les arêtes de 50 cm entre les trous). flip : la ligne 0 du masque est au bord z max (sol) ou z 0 (plafond)
   const holeMask = (W, H, holes, flip) => {
     const R = 16;
@@ -111,9 +111,9 @@ export function createBackroomsScene(container, floors) {
     const mask = new Uint8Array(mw * mh * 4).fill(255);
     const tx = (v) => Math.round((v / CELL_SIZE) * R);
     for (const h of holes) {
-      const x0 = tx(h.x - h.half);
-      const x1 = tx(h.x + h.half);
-      for (let zi = tx(h.z - h.half); zi < tx(h.z + h.half); zi++) {
+      const x0 = tx(h.x - h.hx);
+      const x1 = tx(h.x + h.hx);
+      for (let zi = tx(h.z - h.hz); zi < tx(h.z + h.hz); zi++) {
         const row = flip ? mh - 1 - zi : zi;
         mask.fill(0, (row * mw + x0) * 4, (row * mw + x1) * 4);
       }
@@ -125,9 +125,9 @@ export function createBackroomsScene(container, floors) {
   };
   // les trous d'un étage (ceux du sol, par où l'on tombe) et ses cages d'escalier
   const holesOf = (m) => [
-    ...(m.pits || []).map((p) => ({ x: p.x, z: p.z, half: PIT_HALF })),
-    // la trémie de l'escalier : ses deux cases
-    ...(m.stairs || []).flatMap((st) => [st.gx, st.gx2].map((gx, k) => ({ x: (gx + 0.5) * CELL_SIZE, z: ([st.gz, st.gz2][k] + 0.5) * CELL_SIZE, half: CELL_SIZE / 2 - 0.02 }))),
+    ...(m.pits || []).map((p) => ({ x: p.x, z: p.z, hx: PIT_HALF, hz: PIT_HALF })),
+    // la trémie de l'escalier : une seule ouverture sur ses deux cases (pas de poutre au milieu)
+    ...(m.stairs || []).map((st) => ({ x: st.x, z: st.z, hx: (st.dx ? st.len : CELL_SIZE) / 2 - 0.02, hz: (st.dz ? st.len : CELL_SIZE) / 2 - 0.02 })),
   ];
 
   // Un étage entier : sol, plafond, murs, néons, meubles, cassettes, objets, ascenseur… dans un groupe à sa hauteur
@@ -316,9 +316,9 @@ float bkFbm(vec2 p) { return bkNoise(p) * 0.55 + bkNoise(p * 2.13 + 7.1) * 0.3 +
       const edges = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, SLAB), edgeMat, holes.length * 4);
       holes.forEach((h, i) => {
         [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz], k) => {
-          dummy.position.set(h.x + dx * h.half, -SLAB / 2, h.z + dz * h.half);
+          dummy.position.set(h.x + dx * h.hx, -SLAB / 2, h.z + dz * h.hz);
           dummy.rotation.set(0, Math.atan2(-dx, -dz), 0); // la paroi regarde l'intérieur du trou
-          dummy.scale.set(h.half * 2, 1, 1);
+          dummy.scale.set((dx ? h.hz : h.hx) * 2, 1, 1);
           dummy.updateMatrix();
           edges.setMatrixAt(i * 4 + k, dummy.matrix);
         });
