@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 console.log('Testing Odyssée B2W2 Map Screen & Cartography (v4.04)...');
@@ -9,7 +9,7 @@ const regionMap = 'odyssee/img/carte/odyssee_region_map_b2w2.jpg';
 
 assert.ok(fs.existsSync(cgearBg), 'c_gear_b2w2_bg.jpg must exist on disk');
 assert.ok(fs.existsSync(regionMap), 'odyssee_region_map_b2w2.jpg must exist on disk');
-assert.ok(fs.statSync(cgearBg).size > 500000, 'c_gear_b2w2_bg.jpg must be a valid high-res image');
+assert.ok(fs.statSync(cgearBg).size > 50000, 'c_gear_b2w2_bg.jpg must be a valid image asset');
 assert.ok(fs.statSync(regionMap).size > 500000, 'odyssee_region_map_b2w2.jpg must be a valid high-res image');
 console.log('✔ Map image assets verified on disk!');
 
@@ -97,11 +97,21 @@ const mockGame = {
 };
 
 const { ASSETS } = await import('../odyssee/js/assets.js');
-const { mapScreen } = await import('../odyssee/js/ui/screens.js');
+const { mapScreen, exploredView, fullRegionView } = await import('../odyssee/js/ui/screens.js');
 
 assert.ok(ASSETS.carteBg.includes('c_gear_b2w2_bg.jpg'), 'ASSETS.carteBg must reference c_gear_b2w2_bg.jpg');
 assert.ok(ASSETS.regionMapB2W2.includes('odyssee_region_map_b2w2.jpg'), 'ASSETS.regionMapB2W2 must reference odyssee_region_map_b2w2.jpg');
 console.log('✔ ASSETS carteBg and regionMapB2W2 verified!');
+
+// Test exploredView & fullRegionView calculations with widescreen aspect ratio
+const expV = exploredView(mockGame, 16 / 10);
+assert.ok(expV.w > 0 && expV.h > 0, 'exploredView must return positive dimensions');
+assert.ok(Math.abs(expV.w / expV.h - 1.6) < 0.05, 'exploredView aspect ratio must adapt to 16/10');
+const fullV = fullRegionView(mockGame, 16 / 10);
+assert.ok(fullV.w >= 440, 'fullRegionView width must cover world map width');
+assert.equal(fullV.h, 520, 'fullRegionView height must cover world map height');
+assert.ok(fullV.h > 0, 'fullRegionView height must be positive');
+console.log('✔ exploredView & fullRegionView widescreen 16:10 math validated!');
 
 let closed = false;
 mapScreen(mockGame).then(() => { closed = true; });

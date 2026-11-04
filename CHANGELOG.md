@@ -1,5 +1,23 @@
 # Journal des versions — Arcadia
 
+## 4.05 — 4 novembre 2026
+- **Odyssée** — Résolution du bug de superposition cartographique et interactivité GPS temps réel de la Carte C-Gear 5G :
+  - **Suppression du bug visuel de double-carte et faux textes** :
+    - Remplacement de l'image de fond IA c_gear_b2w2_bg.jpg (qui contenait une fausse carte peinte avec « Route 02 », « Cités 01 », « PORT-ÉCUME » et des panneaux désalignés) par un **châssis C-Gear 5G 100% propre en pixel-art 16-bit** généré procéduralement (	ools/generate_clean_cgear_texture.py), sans aucun texte intrusif ni fausse illustration.
+  - **Grand Écran Cartographique Haute Définition (Format 16:10)** :
+    - Élargissement complet de la zone cartographique .map-wrap qui passe d'une colonne étroite comprimée (ratio 0.84) à un véritable écran panoramique Nintendo DS 16:10 occupant toute la largeur utile avec biseaux cyan néon et coins technologiques.
+    - Voile radar semi-transparent B2W2 (au lieu d'un bloc noir opaque brutal) : les zones explorées sont 100% vives, lumineuses et détaillées, tandis que les zones inexplorées restent sous un élégant filtre radar technologique C-Gear à 72% d'opacité laissant deviner la topographie de l'archipel.
+  - **Positionnement en direct & Interactivité tactile complète** :
+    - **Bandeau GPS en direct** : affichage en temps réel du lieu actuel (GPS EN DIRECT : BOURG-EN-VOL), des coordonnées exactes [LOC: X, Y] et voyant vert pulsant (gpsPulse).
+    - **Balise Joueur interactive** : balise avec double anneau radar expansif (.map-me-radar-outer et .map-me-radar), noyau cyan lumineux et badge flottant « VOUS ÊTES ICI ». Clic direct sur la balise pour se recentrer avec effet sonore.
+    - **Bouton « ⌖ MA POSITION »** : raccourci tactile pour centrer instantanément la caméra et le réticule sur la position actuelle du joueur.
+    - **Bouton « 🗺️ VUE RÉGION / 🔍 VUE ZOOMÉE »** : bascule fluide animée entre la vue détaillée zoomée sur la zone explorée et la vue panoramique d'ensemble de toute la région d'Odyssée (ullRegionView).
+    - **Waypoints GPS au clic libre** : cliquer n'importe où sur la carte pose un repère technologique instantané avec calcul automatique de la distance en pas et de la direction cardinale (À ~45 pas au Nord-Est).
+    - **Calcul de distance & orientation sur les villes** : chaque lieu ou arène affiche sa distance et sa direction par rapport à votre position actuelle en direct.
+  - **Aperçu & Tests** :
+    - Page de démonstration interactive odyssee/preview_map_b2w2.html.
+    - Validation complète des tests 	ools/test-b2w2-map.mjs et 	ools/test-screen-keyboard-inputs.mjs (100% succès).
+
 ## 4.04 — 4 novembre 2026
 - **Odyssée** — Refonte 100% Pixel-Art Nanobanana de l'interface de la Carte et de la Cartographie Régionale B2W2 :
   - **Interface C-Gear B2W2 (Concept 1 validé)** :

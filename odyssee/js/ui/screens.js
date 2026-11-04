@@ -1143,15 +1143,15 @@ function regionTerrain(game) {
 }
 
 /** cadre de la carte : ce qu'on a exploré (plus une marge), jamais plus petit qu'un tiers de la région ;
- *  il garde les proportions de la région et s'élargit à mesure qu'on avance */
-export function exploredView(game) {
+ *  il s'adapte au ratio de l'écran (par défaut 16/10) et s'élargit à mesure qu'on avance */
+export function exploredView(game, targetAspect) {
   const W = game.world.maps.monde, C = 8, cw = Math.ceil(W.w / C), seen = game.state.explored || [];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const i of seen) { const cx = i % cw, cy = Math.floor(i / cw); x0 = Math.min(x0, cx * C); y0 = Math.min(y0, cy * C); x1 = Math.max(x1, cx * C + C); y1 = Math.max(y1, cy * C + C); }
   const p = game.worldPos(); if (!isFinite(x0)) { x0 = p.x - 20; x1 = p.x + 20; y0 = p.y - 15; y1 = p.y + 15; }
-  const M = 14, ar = W.w / W.h;
+  const M = 16, ar = targetAspect || (16 / 10);
   x0 -= M; y0 -= M; x1 += M; y1 += M;
-  let w = Math.max(x1 - x0, W.w / 3), h = Math.max(y1 - y0, W.h / 3);
+  let w = Math.max(x1 - x0, 80), h = Math.max(y1 - y0, 50);
   if (w / h > ar) h = w / ar; else w = h * ar;
   w = Math.min(w, W.w); h = Math.min(h, W.h);
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -1159,20 +1159,39 @@ export function exploredView(game) {
   return { x, y, w, h };
 }
 
-/** dessine la région dans le cadre v (en cases) : relief, routes, villes, et le noir de ce qui reste à découvrir */
+/** vue régionale complète de l'archipel d'Odyssée */
+export function fullRegionView(game, targetAspect) {
+  const W = game.world.maps.monde;
+  const ar = targetAspect || (16 / 10);
+  let w = W.w, h = W.h;
+  if (w / h > ar) h = w / ar; else w = h * ar;
+  const x = Math.max(0, (W.w - w) / 2), y = Math.max(0, (W.h - h) / 2);
+  return { x, y, w, h };
+}
+
+/** dessine la région dans le cadre v (en cases) : relief, routes, villes, et voile radar C-Gear */
 function drawRegion(game, cv, v) {
   const W = game.world.maps.monde, ctx = cv.getContext('2d'), R = regionTerrain(game);
-  const s = cv.width / v.w;                    // pixels écran par case
-  const X = (x) => (x - v.x) * s, Y = (y) => (y - v.y) * s;
+  const sx = cv.width / v.w, sy = cv.height / v.h;
+  const X = (x) => (x - v.x) * sx, Y = (y) => (y - v.y) * sy;
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#07080c'; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.drawImage(R.canvas, v.x, v.y, v.w, v.h, 0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#060c18'; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Découpage sécurisé du canvas de terrain de la région
+  const sx0 = Math.max(0, Math.min(W.w, Math.floor(v.x)));
+  const sy0 = Math.max(0, Math.min(W.h, Math.floor(v.y)));
+  const sw = Math.min(W.w - sx0, Math.ceil(v.w));
+  const sh = Math.min(W.h - sy0, Math.ceil(v.h));
+  if (sw > 0 && sh > 0) {
+    ctx.drawImage(R.canvas, sx0, sy0, sw, sh, X(sx0), Y(sy0), sw * sx, sh * sy);
+  }
+
   // icônes du Pokégear : grandeur fixe à l'écran (deux pixels par pixel d'icône quand la carte est zoomée)
-  const k = Math.max(1, Math.min(3, Math.round(s / 2.2)));
+  const k = Math.max(1, Math.min(3, Math.round(sx / 2.2)));
   const I = loadCarteIcons();
   const icon = (key, x, y) => { const im = I[key]; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, Math.round(X(x) - im.width * k / 2), Math.round(Y(y) - im.height * k + 2 * k), im.width * k, im.height * k); };
   const { kind, bw, toOpen, toFoot, B } = R;
-  const step = Math.max(14, Math.round(22 * 2.2 / s * k));
+  const step = Math.max(14, Math.round(22 * 2.2 / sx * k));
   for (let y = 10; y < W.h - 6; y += step) for (let x = 10; x < W.w - 6; x += step) {
     const jx = x + ((x * 7 + y * 13) % 9) - 4, jy = y + ((x * 11 + y * 5) % 9) - 4;
     if (jx < v.x - 10 || jx > v.x + v.w + 10 || jy < v.y - 10 || jy > v.y + v.h + 14) continue;
@@ -1180,10 +1199,11 @@ function drawRegion(game, cv, v) {
     if (kk === 2 && toOpen[i] >= 4 && ((x + y) / step | 0) % 2 === 0) icon((jx * 5 + jy) % 7 ? 'arbre_v' : 'arbre_o', jx, jy);
     else if (kk === 3 && toFoot[i] >= 3) icon((jx * 3 + jy) % 2 ? 'montagne' : 'colline', jx, jy);
   }
+
   // routes : un trait blanc cerclé de gris
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const roads = (game.world.routes || []).map((r) => r.pts);
-  for (const [lw, col] of [[Math.max(4, s * 1.9), HG.ink], [Math.max(2, s * 1.1), HG.road]]) {
+  for (const [lw, col] of [[Math.max(4, sx * 1.9), HG.ink], [Math.max(2, sx * 1.1), HG.road]]) {
     ctx.strokeStyle = col; ctx.lineWidth = lw;
     for (const pts of roads) { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x + 0.5), Y(y + 0.5)) : ctx.moveTo(X(x + 0.5), Y(y + 0.5)))); ctx.stroke(); }
   }
@@ -1205,22 +1225,27 @@ function drawRegion(game, cv, v) {
     const darkCol = isLigue ? '#4c1d95' : isGym ? '#92400e' : (isVis ? '#991b1b' : '#334155');
     pill(t.x + t.w / 2, t.y + t.h / 2, big ? 14 : 10, big ? 10 : 8, fillCol, darkCol);
   }
-  // ce qui n'a pas été exploré reste dans le noir, aux bords adoucis (façon Elden Ring)
+
+  // Voile radar B2W2 : les zones explorées sont découpées et 100% nettes et vives,
+  // les zones inexplorées restent sous un élégant filtre radar semi-transparent C-Gear
   const seen = game.state.explored || [], C = 8, cw = Math.ceil(W.w / C), ch = Math.ceil(W.h / C);
   const mask = document.createElement('canvas'); mask.width = cw; mask.height = ch;
   const mx = mask.getContext('2d'), md = mx.createImageData(cw, ch);
   for (const i of seen) if (i >= 0 && i < cw * ch) md.data[i * 4 + 3] = 255;
   mx.putImageData(md, 0, 0);
+
   const fog = document.createElement('canvas'); fog.width = cv.width; fog.height = cv.height;
   const fx = fog.getContext('2d');
-  fx.fillStyle = '#07080c'; fx.fillRect(0, 0, fog.width, fog.height);
+  fx.fillStyle = 'rgba(6, 12, 22, 0.72)';
+  fx.fillRect(0, 0, fog.width, fog.height);
   fx.globalCompositeOperation = 'destination-out';
   fx.imageSmoothingEnabled = true;
-  fx.filter = `blur(${Math.max(2, s * 3.2)}px)`;
-  fx.drawImage(mask, X(0), Y(0), cw * C * s, ch * C * s);
+  fx.filter = `blur(${Math.max(2, sx * 3.2)}px)`;
+  fx.drawImage(mask, X(0), Y(0), cw * C * sx, ch * C * sy);
   fx.filter = 'none'; fx.globalCompositeOperation = 'source-over';
   ctx.drawImage(fog, 0, 0);
 }
+
 export function mapScreen(game) {
   const ui = game.ui, W = game.world.maps.monde, towns = game.world.towns, st = game.state;
   const allTowns = Object.values(towns);
@@ -1263,7 +1288,7 @@ export function mapScreen(game) {
     );
 
     s.innerHTML = `
-      <!-- Fond et Châssis C-Gear B2W2 Nanobanana -->
+      <!-- Fond et Châssis C-Gear B2W2 Nanobanana (sans fausses cartes ni texte intrusif) -->
       <img class="map-pixelart-bg" src="${ASSETS.carteBg}" alt="">
       <div class="map-scanlines"></div>
 
@@ -1282,15 +1307,29 @@ export function mapScreen(game) {
         </div>
       </div>
 
-      <!-- Cadre Écran Cartographique Central -->
+      <!-- Barre de localisation GPS en direct -->
+      <div class="map-gps-bar">
+        <div class="map-gps-left">
+          <span class="map-gps-dot"></span>
+          <span class="map-gps-title">GPS EN DIRECT :</span>
+          <span class="map-gps-loc">${esc(here.toUpperCase())}</span>
+          <span class="map-gps-coords">[LOC: ${Math.round(p.x)}, ${Math.round(p.y)}]</span>
+        </div>
+        <div class="map-gps-right">
+          <button type="button" class="map-ctrl-btn" data-act="me" title="Centrer la sélection sur ma position (Touche Espace / C)">⌖ MA POSITION</button>
+          <button type="button" class="map-ctrl-btn" data-act="toggle-view" title="Basculer entre vue zoomée et vue de la région">🗺️ VUE RÉGION</button>
+        </div>
+      </div>
+
+      <!-- Cadre Écran Cartographique Central Grand Écran B2W2 -->
       <div class="map-stage">
-        <div class="map-wrap" style="aspect-ratio:${W.w} / ${W.h}">
-          <canvas class="mapcv" width="${W.w * 2}" height="${W.h * 2}"></canvas>
+        <div class="map-wrap">
+          <canvas class="mapcv"></canvas>
           <div class="map-labels"></div>
           <div class="map-corner tl"></div><div class="map-corner tr"></div>
           <div class="map-corner bl"></div><div class="map-corner br"></div>
           <div class="map-hud-overlay">
-            <span class="map-coord-tag">LOC: [${Math.round(p.x)}, ${Math.round(p.y)}]</span>
+            <span class="map-coord-tag">GPS: [${Math.round(p.x)}, ${Math.round(p.y)}]</span>
             <span class="map-radar-tag">RADAR 5G ACTIF</span>
           </div>
         </div>
@@ -1325,18 +1364,34 @@ export function mapScreen(game) {
     const tagEl = s.querySelector('.map-tag');
     const subEl = s.querySelector('.map-sub');
 
-    // la carte est cadrée sur ce qu'on a exploré : elle se dézoome à mesure qu'on découvre la région
-    // (à l'ouverture, elle part du cadre de la dernière fois et s'élargit jusqu'au nouveau)
-    const target = exploredView(game), from = st.mapView && st.mapView.w ? st.mapView : target;
+    let isFullRegion = false;
+    const target = exploredView(game, 16 / 10), from = st.mapView && st.mapView.w ? st.mapView : target;
     let view = { ...from };
-    const fit = () => { const r = c.getBoundingClientRect(); const w = Math.max(320, Math.round(r.width * (window.devicePixelRatio || 1))); if (c.width !== w) { c.width = w; c.height = Math.round(w * W.h / W.w); } };
-    const place = (node, x, y) => { node.style.left = ((x - view.x) / view.w * 100) + '%'; node.style.top = ((y - view.y) / view.h * 100) + '%'; };
+
+    const fit = () => {
+      const r = c.getBoundingClientRect();
+      const w = Math.max(320, Math.round(r.width * (window.devicePixelRatio || 1)));
+      const h = Math.max(200, Math.round(r.height * (window.devicePixelRatio || 1)));
+      if (c.width !== w || c.height !== h) {
+        c.width = w;
+        c.height = h;
+      }
+    };
+    const place = (node, x, y) => {
+      node.style.left = ((x - view.x) / view.w * 100) + '%';
+      node.style.top = ((y - view.y) / view.h * 100) + '%';
+    };
     const pinsAt = [];
-    const draw = () => { fit(); drawRegion(game, c, view); for (const [node, x, y] of pinsAt) place(node, x, y); };
+    const draw = () => {
+      fit();
+      drawRegion(game, c, view);
+      for (const [node, x, y] of pinsAt) place(node, x, y);
+    };
     draw();
     Object.values(loadCarteIcons()).forEach((im) => { if (!im.complete) im.onload = draw; });
+
     if (Math.abs(from.w - target.w) > 0.5 || Math.abs(from.x - target.x) > 0.5 || Math.abs(from.y - target.y) > 0.5) {
-      const t0 = performance.now(), D = 1100;
+      const t0 = performance.now(), D = 900;
       const anim = () => {
         if (!s.isConnected) return;
         const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
@@ -1344,23 +1399,36 @@ export function mapScreen(game) {
         draw();
         if (u < 1) requestAnimationFrame(anim);
       };
-      setTimeout(() => requestAnimationFrame(anim), 250);
+      setTimeout(() => requestAnimationFrame(anim), 200);
     }
     st.mapView = target;
 
+    // Balise Joueur "VOUS ÊTES ICI" interactive avec double halo radar
     const me = el('div', 'map-me');
-    me.innerHTML = '<div class="map-me-radar"></div><div class="map-me-core"></div>';
+    me.innerHTML = `
+      <div class="map-me-radar-outer"></div>
+      <div class="map-me-radar"></div>
+      <div class="map-me-core"></div>
+      <div class="map-me-tag">VOUS ÊTES ICI</div>
+    `;
+    me.title = `Votre position : ${here} [${Math.round(p.x)}, ${Math.round(p.y)}]`;
+    me.addEventListener('click', (e) => {
+      e.stopPropagation();
+      k = 0;
+      ui.sound.sfx('blip');
+      show();
+    });
     pinsAt.push([me, p.x, p.y]); place(me, p.x, p.y);
     lab.appendChild(me);
 
-    // Interactive town pins on the map
+    // Points d'intérêt des villes & arènes visitées
     spots.forEach((sp, idx) => {
       if (idx === 0) return;
       const pin = el('button', 'map-pin ' + (sp.tagCls || ''));
       pin.type = 'button';
       pinsAt.push([pin, sp.x, sp.y]); place(pin, sp.x, sp.y);
       pin.title = sp.name;
-      pin.innerHTML = sp.tagCls?.includes('gym') ? '★' : sp.tagCls?.includes('badge-ok') ? '✓' : sp.tagCls?.includes('league') ? '👑' : '';
+      pin.innerHTML = sp.tagCls?.includes('gym') ? '★' : sp.tagCls?.includes('badge-ok') ? '✓' : sp.tagCls?.includes('league') ? '👑' : '●';
       pin.addEventListener('click', (e) => {
         e.stopPropagation();
         k = idx;
@@ -1370,8 +1438,15 @@ export function mapScreen(game) {
       lab.appendChild(pin);
     });
 
+    // Viseur / Réticule de ciblage B2W2
     const cur = el('div', 'map-cur');
-    cur.innerHTML = '<div class="map-cur-bracket tl"></div><div class="map-cur-bracket tr"></div><div class="map-cur-bracket bl"></div><div class="map-cur-bracket br"></div>';
+    cur.innerHTML = `
+      <div class="map-cur-bracket tl"></div>
+      <div class="map-cur-bracket tr"></div>
+      <div class="map-cur-bracket bl"></div>
+      <div class="map-cur-bracket br"></div>
+      <div class="map-cur-crosshair"></div>
+    `;
     lab.appendChild(cur);
     const curAt = [cur, p.x, p.y]; pinsAt.push(curAt);
 
@@ -1382,12 +1457,94 @@ export function mapScreen(game) {
       whereEl.textContent = q.name;
       tagEl.textContent = q.tag || '';
       tagEl.className = 'map-tag ' + (q.tagCls || '');
-      subEl.textContent = q.sub || '';
+      
+      if (k === 0) {
+        subEl.textContent = `Position actuelle du dresseur · Coordonnées [${Math.round(p.x)}, ${Math.round(p.y)}]`;
+      } else {
+        const dist = Math.round(Math.hypot(q.x - p.x, q.y - p.y));
+        const dx = q.x - p.x, dy = q.y - p.y;
+        const dir = (Math.abs(dy) > Math.abs(dx) * 2) ? (dy < 0 ? 'Nord' : 'Sud') : (Math.abs(dx) > Math.abs(dy) * 2) ? (dx < 0 ? 'Ouest' : 'Est') : (dy < 0 ? 'Nord-' : 'Sud-') + (dx < 0 ? 'Ouest' : 'Est');
+        subEl.innerHTML = `${esc(q.sub || '')} <span class="map-sub-dist">· À ~${dist} pas au ${dir}</span>`;
+      }
     };
     show();
 
+    // Clic n'importe où sur la carte : Waypoint GPS interactif
+    c.addEventListener('click', (e) => {
+      const rect = c.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left) / rect.width;
+      const clickY = (e.clientY - rect.top) / rect.height;
+      const worldX = Math.round(view.x + clickX * view.w);
+      const worldY = Math.round(view.y + clickY * view.h);
+
+      let nearestIdx = -1, nearestDist = 18;
+      spots.forEach((sp, i) => {
+        const d = Math.hypot(sp.x - worldX, sp.y - worldY);
+        if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+      });
+
+      if (nearestIdx >= 0) {
+        k = nearestIdx;
+        ui.sound.sfx('blip');
+        show();
+      } else {
+        ui.sound.sfx('select');
+        curAt[1] = worldX; curAt[2] = worldY; place(cur, worldX, worldY);
+        const dist = Math.round(Math.hypot(worldX - p.x, worldY - p.y));
+        const dx = worldX - p.x, dy = worldY - p.y;
+        const dir = (Math.abs(dy) > Math.abs(dx) * 2) ? (dy < 0 ? 'Nord' : 'Sud') : (Math.abs(dx) > Math.abs(dy) * 2) ? (dx < 0 ? 'Ouest' : 'Est') : (dy < 0 ? 'Nord-' : 'Sud-') + (dx < 0 ? 'Ouest' : 'Est');
+        whereEl.textContent = `Point GPS [${worldX}, ${worldY}]`;
+        tagEl.textContent = 'POINT REPÈRE';
+        tagEl.className = 'map-tag waypoint';
+        subEl.innerHTML = `Repère temporaire posé sur la carte <span class="map-sub-dist">· À ~${dist} pas au ${dir}</span>`;
+      }
+    });
+
+    const toggleView = () => {
+      isFullRegion = !isFullRegion;
+      const aspect = c.width > 0 && c.height > 0 ? (c.width / c.height) : (16 / 10);
+      const nextTarget = isFullRegion ? fullRegionView(game, aspect) : exploredView(game, aspect);
+      const startView = { ...view };
+      const t0 = performance.now(), D = 450;
+      const anim = () => {
+        if (!s.isConnected) return;
+        const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
+        for (const prop of ['x', 'y', 'w', 'h']) view[prop] = startView[prop] + (nextTarget[prop] - startView[prop]) * e;
+        draw();
+        if (u < 1) requestAnimationFrame(anim);
+      };
+      requestAnimationFrame(anim);
+      const zoomBtn = s.querySelector('[data-act="toggle-view"]');
+      if (zoomBtn) zoomBtn.textContent = isFullRegion ? '🔍 VUE ZOOMÉE' : '🗺️ VUE RÉGION';
+      ui.sound.sfx('blip');
+    };
+
+    const centerOnPlayer = () => {
+      k = 0;
+      ui.sound.sfx('select');
+      show();
+      if (isFullRegion) {
+        toggleView();
+      } else {
+        const aspect = c.width > 0 && c.height > 0 ? (c.width / c.height) : (16 / 10);
+        const nextTarget = exploredView(game, aspect);
+        const startView = { ...view };
+        const t0 = performance.now(), D = 350;
+        const anim = () => {
+          if (!s.isConnected) return;
+          const u = Math.min(1, (performance.now() - t0) / D), e = 1 - Math.pow(1 - u, 3);
+          for (const prop of ['x', 'y', 'w', 'h']) view[prop] = startView[prop] + (nextTarget[prop] - startView[prop]) * e;
+          draw();
+          if (u < 1) requestAnimationFrame(anim);
+        };
+        requestAnimationFrame(anim);
+      }
+    };
+
     const close = () => { pop(); s.remove(); ui.sound.sfx('cancel'); resolve(); };
     s.querySelector('[data-act="close"]')?.addEventListener('click', close);
+    s.querySelector('[data-act="me"]')?.addEventListener('click', centerOnPlayer);
+    s.querySelector('[data-act="toggle-view"]')?.addEventListener('click', toggleView);
     s.querySelector('[data-act="prev"]')?.addEventListener('click', () => {
       k = (k + spots.length - 1) % spots.length;
       ui.sound.sfx('blip');
@@ -1404,11 +1561,8 @@ export function mapScreen(game) {
       if (key === 'right' || key === 'down') { k = (k + 1) % spots.length; ui.sound.sfx('blip'); show(); return; }
       if (key === 'a' || key === 'space') {
         try { ui.sound?.sfx('select'); } catch (err) {}
-        const curSpot = s.querySelector('.carte-spot-on');
-        if (curSpot) {
-          curSpot.style.transform = 'scale(1.4)';
-          setTimeout(() => { if (curSpot) curSpot.style.transform = ''; }, 200);
-        }
+        cur.style.transform = 'translate(-50%, -50%) scale(1.4)';
+        setTimeout(() => { if (cur) cur.style.transform = 'translate(-50%, -50%)'; }, 200);
         return;
       }
       if (key === 'b' || key === 'map') close();
