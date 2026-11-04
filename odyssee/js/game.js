@@ -1171,6 +1171,7 @@ export class Game {
     const opts = [];
     if (st.flags.dex) opts.push(['POKéDEX', 'dex']);
     if (st.party.length) opts.push(['ÉQUIPE', 'party']);
+    if (st.party.length) opts.push(['BOÎTES PC', 'pc']);
     opts.push(['SAC', 'bag']);
     if (this.canField('vol')) opts.push(['VOL', 'fly']);
     opts.push(['QUÊTES', 'quests']);
@@ -1185,6 +1186,7 @@ export class Game {
       const k = opts[r][1];
       if (k === 'dex') await dexScreen(this);
       else if (k === 'party') await partyScreen(this, { mode: 'menu' });
+      else if (k === 'pc') await pcScreen(this);
       else if (k === 'bag') { if (await this.fieldBag()) break; }
       else if (k === 'fly') { if (this.player.surf || !this.mapObj.outdoor) { await this.ui.say('On ne peut pas s\'envoler d\'ici.'); continue; } if (await this.fly()) break; }
       else if (k === 'card') await cardScreen(this, BADGES);
